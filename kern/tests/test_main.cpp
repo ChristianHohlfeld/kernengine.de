@@ -1341,12 +1341,14 @@ TEST(game_world_orb_run_play) {
   f.world->step(1.0f / 60, tap);
   f.run(0.4f);
   CHECK(f.world->hud().boost < full - 0.1f);
-  // Hop: the hover car leaves the street and comes back down.
+  // Lift thrusters: holding jump lifts the hover car off the street; it comes back down.
+  f.run(4);
   CHECK(f.world->actor_matrix(f.world->player(), m));
   const f32 rest = m.translation().z;
   game::PlayInput hop;
   hop.jump = true;
-  f.world->step(1.0f / 60, hop);
+  f.run(0.5f, hop);
+  CHECK(f.world->hud().boosting);
   f32 peak = rest;
   for (int i = 0; i < 60; ++i) {
     f.world->step(1.0f / 60, {});
@@ -1356,6 +1358,55 @@ TEST(game_world_orb_run_play) {
   CHECK(peak > rest + 1.0f);
   f.run(3);
   CHECK(f.world->actor_matrix(f.world->player(), m) && std::fabs(m.translation().z - rest) < 0.5f);
+  // Reverse comes at once: from speed, pulling back stops the car and rolls it backwards.
+  const physics::Body car_body0 = f.world->actor_body(f.world->player());
+  auto along = [&]() {
+    Mat4 mm;
+    f.world->actor_matrix(f.world->player(), mm);
+    const Vec3 hd = mm.transform_vector({1, 0, 0});
+    return dot(f.world->physics().linear_velocity(car_body0), normalize(Vec3{hd.x, hd.y, 0}, {1, 0, 0}));
+  };
+  auto sideways = [&]() {
+    Mat4 mm;
+    f.world->actor_matrix(f.world->player(), mm);
+    const Vec3 hd = normalize(mm.transform_vector({1, 0, 0}), {1, 0, 0});
+    const Vec3 vv = f.world->physics().linear_velocity(car_body0);
+    return std::fabs(hd.x * vv.y - hd.y * vv.x);
+  };
+  game::PlayInput gas;
+  gas.move_y = 1;
+  f.run(2, gas);
+  CHECK(along() > 15);
+  game::PlayInput back;
+  back.move_y = -1;
+  f.run(2.0f, back);
+  CHECK(along() < -3);
+  // Handbrake: the tail lets go - a turn at speed slides far more than with grip.
+  auto slide = [&](bool brake) {
+    f.run(2, gas);
+    game::PlayInput t = gas;
+    t.move_x = 1;
+    t.handbrake = brake;
+    f32 most = 0;
+    for (int i = 0; i < 40; ++i) { f.world->step(1.0f / 60, t); most = std::max(most, sideways()); }
+    f.run(1.5f);
+    return most;
+  };
+  const f32 gripped = slide(false), drifting = slide(true);
+  CHECK(drifting > gripped * 2 && drifting > 3);
+  // Kickflip: tap right twice quickly - the car hops sideways and rolls once (drawn), then lands.
+  f.run(2);
+  CHECK(f.world->actor_matrix(f.world->player(), m));
+  const f32 before_flip = m.translation().z;
+  game::PlayInput right;
+  right.move_x = 1;
+  f.run(0.08f, right);
+  f.run(0.08f);
+  f.run(0.08f, right);
+  f.run(0.25f);
+  CHECK(f.world->actor_matrix(f.world->player(), m) && m.translation().z > before_flip + 0.4f);
+  f.run(3);
+  CHECK(f.world->actor_matrix(f.world->player(), m) && std::fabs(m.translation().z - rest) < 0.6f);
   // Collect an orb: put the car on it.
   game::ActorId orb = 0;
   const u32 before = f.world->hud().pickups;

@@ -15,6 +15,14 @@
 
 namespace kern::game {
 
+/// The kickflip's roll (radians) at this moment: one full turn, eased in and out.
+static f32 flip_roll_of(f32 left, f32 dir) {
+  if (left <= 0) return 0;
+  const f32 t = clamp(1 - left / 0.7f, 0.0f, 1.0f);
+  return dir * 2 * kPi * t * t * (3 - 2 * t);
+}
+
+
 namespace {
 
 constexpr f32 kDeg = kPi / 180.0f;
@@ -913,7 +921,7 @@ void GameWorld::compute_world_matrices(f32 time, f32 alpha) {
       if (pawn && mode_ != SimMode::replica) {
         // Hover bob and lean (visual only).
         const f32 bob = 0.07f * kern::dm::sin(sim_time_ * 3.1f);
-        const Quat lean = Quat::axis_angle({1, 0, 0}, -pawn->steer_vis * 0.18f) * Quat::axis_angle({0, 1, 0}, -pawn->pitch_vis);
+        const Quat lean = Quat::axis_angle({1, 0, 0}, -pawn->steer_vis * 0.18f + flip_roll_of(pawn->flip, pawn->flip_dir)) * Quat::axis_angle({0, 1, 0}, -pawn->pitch_vis);
         m = Mat4::trs(p.position + Vec3{0, 0, bob}, quat_normalize(p.rotation * lean), b->second->scale);
       }
       world_[id] = m;
@@ -1702,9 +1710,25 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
   pw_->boost_latch = in.boost;
   pw_->boost_hold = max_of(0.0f, pw_->boost_hold - dt);
   bool boosting = c.boost && (in.boost || pw_->boost_hold > 0) && pw_->boost > 0.02f;
-  pw_->boost = c.boost ? clamp(pw_->boost + (boosting ? -0.45f : 0.12f) * dt, 0.0f, 1.0f) : 0.0f;
-  if (c.boost && pw_ == local_) hud_.boost = pw_->boost;
-  if (boosting && !pw_->was_boosting) cue(c.boost_sound, pose.position, 0.7f, 1, true, audio::Bus::sfx, pw_->actor);
+  // Hover car lift thrusters (the jump button): hold to rise, a tap fires them briefly. They share the boost tank.
+  const bool hover_lift = c.mode == ControlMode::hovercar && c.jump_speed > 0;
+  if (hover_lift && jump_pressed) pw_->lift_hold = 0.25f;
+  pw_->lift_hold = max_of(0.0f, pw_->lift_hold - dt);
+  pw_->lifting = hover_lift && (in.jump || pw_->lift_hold > 0) && pw_->boost > 0.02f;
+  const f32 drain = (boosting ? 0.45f : 0.0f) + (pw_->lifting ? 0.5f : 0.0f);
+  pw_->boost = c.boost || hover_lift ? clamp(pw_->boost + (drain > 0 ? -drain : 0.22f) * dt, 0.0f, 1.0f) : 0.0f;
+  if ((c.boost || hover_lift) && pw_ == local_) hud_.boost = pw_->boost;
+  if (pw_ == local_) hud_.boosting = boosting || pw_->lifting;
+  // The thrusters pulse while they fire (the sound the empty tank makes, on purpose).
+  if (boosting || pw_->lifting) {
+    pw_->boost_pulse -= dt;
+    if (pw_->boost_pulse <= 0) {
+      cue(c.boost_sound, pose.position, boosting ? 0.55f : 0.45f, pw_->lifting && !boosting ? 0.8f : 1.0f, true, audio::Bus::sfx, pw_->actor);
+      pw_->boost_pulse = 0.085f;
+    }
+  } else {
+    pw_->boost_pulse = 0;
+  }
   pw_->was_boosting = boosting;
   // Landing: the first ground contact after falling.
   if (c.mode != ControlMode::hovercar && c.mode != ControlMode::flyer && !pw_->use_mover) {
@@ -1722,7 +1746,7 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
       forward.z = 0;
       forward = normalize(forward, {1, 0, 0});
       const Vec3 side{-forward.y, forward.x, 0};
-      const f32 throttle = clamp(in.move_y, -0.7f, 1.0f);
+      const f32 throttle = clamp(in.move_y, -1.0f, 1.0f);
       // Steering response: gentle around the centre, full lock at the rim (analog sticks;
       // keys are -1/0/1 and stay the same).
       const f32 sx = clamp(-in.move_x, -1.0f, 1.0f);
@@ -1731,19 +1755,26 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
       const bool hover = c.mode == ControlMode::hovercar;
       const bool on_ground = hover || grounded(body, reach + 0.25f);
       if (on_ground) {
-        f32 accel = throttle * (throttle > 0 ? c.acceleration : c.acceleration * 1.25f);
+        // Throttle against the motion brakes hard, so reverse comes at once; reverse itself pulls well.
+        f32 accel;
+        if (throttle < 0 && fwd > 0.5f) accel = throttle * c.acceleration * 2.6f;        // braking
+        else if (throttle > 0 && fwd < -0.5f) accel = throttle * c.acceleration * 2.6f;  // braking out of reverse
+        else accel = throttle * (throttle > 0 ? c.acceleration : c.acceleration * 1.5f);
         if (boosting) accel += 42;
         const f32 cap = boosting ? c.boost_speed : c.max_speed;
         if (fwd > cap) accel = min_of(accel, -(fwd - cap) * 4);
-        if (fwd < -cap * 0.33f) accel = max_of(accel, (-cap * 0.33f - fwd) * 4);
+        if (fwd < -cap * 0.45f) accel = max_of(accel, (-cap * 0.45f - fwd) * 4);
         if (throttle == 0 && !boosting) accel -= fwd * 0.6f;  // rolling drag
+        // Handbrake: the rear locks - the car slows, the tail lets go and it turns in tighter (drift).
+        if (in.handbrake) accel = accel * 0.3f - fwd * 1.1f;
         physics_.apply_force_to_center(body, forward * (accel * m));
-        // Lateral grip.
         // Lateral grip as a force (steady impulses fight the solver; Box3D "Forces and Impulses").
-        physics_.apply_force_to_center(body, side * (-lat * (1 - kern::dm::exp(-7.5f * dt)) / dt * m));
+        pw_->grip = damp(pw_->grip, in.handbrake ? 0.7f : 7.5f, in.handbrake ? 12.0f : 2.5f, dt);
+        physics_.apply_force_to_center(body, side * (-lat * (1 - kern::dm::exp(-pw_->grip * dt)) / dt * m));
         const f32 grip = clamp(std::fabs(fwd) / 9.0f, 0.0f, 1.0f) * (fwd >= 0 ? 1.0f : -1.0f);
+        const f32 drift_turn = in.handbrake ? 1.7f : 1.0f + (7.5f - pw_->grip) / 7.5f * 0.5f;
         const Vec3 w = physics_.angular_velocity(body);
-        physics_.set_angular_velocity(body, {w.x, w.y, steer * turn * grip});
+        physics_.set_angular_velocity(body, {w.x, w.y, steer * turn * grip * drift_turn});
         pw_->steer_vis = damp(pw_->steer_vis, steer * grip, 6, dt);
         // Nose dips when braking, lifts when accelerating (per 60 Hz step like Orb Run).
         const f32 accel_pitch = clamp((fwd - pw_->last_forward) * 0.02f * (1.0f / (60.0f * dt)), -0.12f, 0.12f);
@@ -1754,14 +1785,30 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
         // Hover spring over whatever is below (Box3D ray cast).
         const f32 probe = c.hover_height * 4 + reach;
         const physics::RayHit hit = physics_.cast_ray(pose.position, Vec3{0, 0, -probe}, ~0ull, body);
-        // Hop: an upward impulse, and the spring lets go until the car comes down again.
-        pw_->hop = max_of(0.0f, pw_->hop - dt);
-        if (jump_pressed && c.jump_speed > 0 && hit.hit && pw_->hop <= 0) {
-          physics_.apply_linear_impulse_to_center(body, Vec3{0, 0, (c.jump_speed - v.z) * m});
-          pw_->hop = 2 * c.jump_speed / max_of(1.0f, -g.z) * 0.8f;
-          cue(c.jump_sound, pose.position, 0.8f, 1, true, audio::Bus::sfx, pw_->actor);
+        // Lift thrusters: rise while they fire, then fall back onto the hover spring.
+        if (pw_->lifting) {
+          const f32 up = v.z < 9 ? (-g.z + 15) : -g.z;
+          physics_.apply_force_to_center(body, Vec3{0, 0, up * m});
         }
-        if (hit.hit && pw_->hop <= 0) {
+        // Kickflip: double tap left or right - a sideways hop with a full roll (the roll is drawn).
+        const f32 mx = in.move_x;
+        const f32 tap = mx > 0.6f ? 1.0f : mx < -0.6f ? -1.0f : 0.0f;
+        if (tap != 0 && pw_->steer_released) {
+          if (tap == pw_->tap_dir && sim_time_ - pw_->tap_time < 0.3f && pw_->flip <= 0 && hit.hit) {
+            pw_->flip = 0.7f;
+            pw_->flip_dir = tap;
+            physics_.apply_linear_impulse_to_center(body, (Vec3{0, 0, 6.5f - min_of(v.z, 0.0f)} - side * (tap * 6.0f)) * m);
+            cue(c.jump_sound, pose.position, 0.8f, 1.1f, true, audio::Bus::sfx, pw_->actor);
+            pw_->tap_dir = 0;
+          } else {
+            pw_->tap_dir = tap;
+            pw_->tap_time = sim_time_;
+          }
+          pw_->steer_released = false;
+        }
+        if (std::fabs(mx) < 0.3f) pw_->steer_released = true;
+        pw_->flip = max_of(0.0f, pw_->flip - dt);
+        if (hit.hit && !pw_->lifting && pw_->flip < 0.25f) {
           const f32 dist = hit.fraction * probe - reach;
           const f32 accel = (c.hover_height - dist) * 60 - v.z * 9 - g.z;
           physics_.apply_force_to_center(body, Vec3{0, 0, clamp(accel, -40.0f, 80.0f) * m});
@@ -2471,6 +2518,12 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
   if (in.camera && !camera_latch_ && vehicle) { interior_view_ = !interior_view_; camera_reset_ = true; }
   camera_latch_ = in.camera;
   if (!vehicle) interior_view_ = false;
+  hud_.interior = interior_view_;
+  {
+    const bool thrust = local_ && (local_->was_boosting || local_->lifting);
+    const f32 kick = vehicle ? clamp(in.move_y, 0.0f, 1.0f) * 4 + (thrust ? 12.0f : 0.0f) : 0.0f;
+    fov_kick_ = camera_reset_ ? kick : damp(fov_kick_, kick, thrust ? 6.0f : 3.0f, dt);
+  }
   if (interior_view_) {
     // Low interior view: no chassis, the eye a hand above the street for the sense of speed.
     Vec3 forward = pose.rotation.rotate({1, 0, 0});
@@ -2484,10 +2537,18 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
     target = eye + forward * 20 + Vec3{0, 0, -0.35f};
     camera_eye_ = eye;
     camera_reset_ = false;
+    // Boosting: the view trembles a little.
+    if (local_ && (local_->was_boosting || local_->lifting)) {
+      Rng rng(static_cast<u32>(sim_time_ * 1999.0f) + 7);
+      eye += Vec3{rng.range(-1, 1), rng.range(-1, 1), rng.range(-1, 1)} * 0.025f;
+    }
     cam.eye = eye;
     cam.target = target;
+    // A kickflip rolls the view with the car.
+    const Pawn* pp = pawn_of(player_);
+    cam.up = pp ? Quat::axis_angle(forward, flip_roll_of(pp->flip, pp->flip_dir)).rotate({0, 0, 1}) : Vec3{0, 0, 1};
     cam.near = 0.05f;
-    cam.fov = (c.camera_fov + 10 + clamp(speed - 20, 0.0f, 40.0f) * 0.4f) * kDeg;
+    cam.fov = (c.camera_fov + 10 + clamp(speed - 20, 0.0f, 40.0f) * 0.4f + fov_kick_) * kDeg;
     return true;
   }
   switch (c.camera) {
@@ -2547,7 +2608,7 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
   }
   cam.eye = eye;
   cam.target = target;
-  cam.fov = (c.camera_fov + clamp(speed - 30, 0.0f, 30.0f) * 0.35f) * kDeg;
+  cam.fov = (c.camera_fov + clamp(speed - 30, 0.0f, 30.0f) * 0.35f + fov_kick_) * kDeg;
   return true;
 }
 

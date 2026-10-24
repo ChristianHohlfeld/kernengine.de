@@ -768,7 +768,11 @@ export function hudHtml(h) {
     : `<div class="k-hud-stat"><b>${formatTime(h.elapsed)}</b><span>time</span></div>`);
   if (h.best > 0) stats.push(`<div class="k-hud-stat"><b>${formatTime(h.best)}</b><span>best</span></div>`);
   parts.push(`<div class="k-hud-stats">${stats.join("")}</div>`);
-  let html = `<div class="k-hud-top">${parts.join("")}</div>`;
+  let html = "";
+  // Boost in the low interior view: streaks rush past the edges of the view.
+  if (h.boosting && h.interior && h.status === "playing")
+    html += `<div class="k-streaks" style="--a:${Math.round((h.elapsed * 997) % 360)}deg"></div>`;
+  html += `<div class="k-hud-top">${parts.join("")}</div>`;
   if (h.soldier) html += soldierHtml(h.soldier, h.status === "playing");
   else if (h.player) {
     const kmh = Math.round(h.speed * 3.6);
@@ -822,6 +826,7 @@ export const HUD_STYLE = `.k-hud{position:absolute;inset:0;pointer-events:none;c
 .k-hud-speed{position:absolute;right:20px;bottom:18px;text-align:right}
 .k-hud-speed b{font-size:34px;font-weight:700}
 .k-hud-speed span{margin-left:4px;font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase}
+.k-streaks{position:absolute;inset:0;pointer-events:none;background:repeating-conic-gradient(from var(--a) at 50% 46%,rgba(255,255,255,.0) 0deg 5deg,rgba(220,240,255,.55) 5deg 5.6deg,rgba(255,255,255,0) 5.6deg 11deg);-webkit-mask:radial-gradient(ellipse 70% 62% at 50% 46%,transparent 52%,#000 100%);mask:radial-gradient(ellipse 70% 62% at 50% 46%,transparent 52%,#000 100%);opacity:.55}
 .k-hud-boost{width:150px;height:4px;margin-top:6px;margin-left:auto;background:rgba(255,255,255,.18);border-radius:2px;overflow:hidden}
 .k-hud-boost div{height:100%;background:linear-gradient(90deg,#4fe3c8,#9ff7e8)}
 .k-hud-message{position:absolute;left:50%;top:22%;transform:translateX(-50%);padding:8px 16px;border-radius:999px;background:rgba(8,12,18,.55);font-size:15px;white-space:nowrap}
@@ -873,7 +878,7 @@ ${HUD_STYLE}
 ${TOUCH_STYLE}`;
 
 export const PLAYER_BODY = `<canvas id="gl" tabindex="0" aria-label="Game view"></canvas><div id="hud" class="k-hud"></div><div id="loading">Loading</div>
-<div id="hint">WASD / arrows move · Space jump · Shift boost · C camera · mouse look (click to capture, Esc frees) · P pause · R restart · gamepad supported</div>
+<div id="hint">WASD / arrows move · Space jump · Shift boost · Space lift · X handbrake · double-tap A/D kickflip · C camera · mouse look (click to capture, Esc frees) · P pause · R restart · gamepad supported</div>
 <button id="restart" hidden aria-label="Restart">↻</button><div id="error" role="alert"></div>`;
 
 /**

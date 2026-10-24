@@ -193,13 +193,27 @@ void TouchControls::layout() {
     case ControlMode::hovercar:
     case ControlMode::vehicle:
       if (boost_) low.push_back(make_button("boost", "BOOST", 64, amber));
-      if (jump_) low.push_back(make_button("jump", "HOP", 56, dark));
-      upper.push_back(make_button("camera", "VIEW", 54, green));  // chase / low interior view
-      upper.push_back(make_button("interact", "USE", 54, blue));
+      low.push_back(make_button("handbrake", "DRIFT", 58, dark));  // rear handbrake
+      if (jump_ && mode_ == ControlMode::hovercar) upper.push_back(make_button("jump", "LIFT", 56, blue));  // lift thrusters
+      else if (jump_) upper.push_back(make_button("jump", "HOP", 56, dark));
+      upper.push_back(make_button("camera", "VIEW", 50, green));  // chase / low interior view
       break;
   }
   const TouchStick& L = view_.move;
   const TouchStick& R = view_.look;
+  // The low row must fit between the sticks (portrait phones): what does not fit goes up.
+  {
+    f32 room = R.x - (L.x + L.size) - 2 * kGap, used = 0;
+    std::size_t fit = 0;
+    for (; fit < low.size(); ++fit) {
+      if (used + low[fit].w > room) break;
+      used += low[fit].w + kGap;
+    }
+    if (fit < low.size()) {
+      upper.insert(upper.begin(), low.begin() + static_cast<std::ptrdiff_t>(fit), low.end());
+      low.resize(fit);
+    }
+  }
   // Low row: right to left from the look stick.
   f32 x = R.x - kGap;
   for (TouchButton& b : low) {
@@ -410,6 +424,7 @@ void TouchControls::update(f32 dt, PlayInput& in, f32 vfov_deg) {
   in.reload = held("reload");
   in.interact = held("interact");
   in.camera = held("camera");
+  in.handbrake = held("handbrake");
   in.boost = held("boost") || (sprint_ && (mode_ == ControlMode::character || mode_ == ControlMode::soldier));
   in.up = (held("up") ? 1.0f : 0.0f) - (held("down") ? 1.0f : 0.0f);
   in.aim = aim_on_;

@@ -993,6 +993,8 @@ static json::Value hud_json(const game::Hud& h, bool player) {
   hud.set("remaining", internal::round_num(h.remaining, 100));
   hud.set("speed", internal::round_num(h.speed, 10));
   hud.set("boost", internal::round_num(h.boost, 100));
+  hud.set("boosting", h.boosting);
+  hud.set("interior", h.interior);
   hud.set("best", internal::round_num(h.best, 100));
   hud.set("player", player);
   if (h.soldier) {
@@ -1539,6 +1541,7 @@ json::Value Studio::run(const json::Value& c) {
     g.interact = c["y"].as_bool();
     g.boost = c["l3"].as_bool() || c["lb"].as_bool();
     g.camera = c["view"].as_bool(false);
+    g.handbrake = c["b"].as_bool();
     g.up = (c["rb"].as_bool() ? 1.0f : 0.0f) - (c["lb"].as_bool() ? 1.0f : 0.0f);
     if (c["start"].as_bool() && !pad_start_ && play_ != PlayState::editing) toggle_pause();
     pad_start_ = c["start"].as_bool();

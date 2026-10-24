@@ -145,6 +145,7 @@ game::PlayInput Studio::play_input() const {
   in.jump = held("Space");
   in.boost = held("ShiftLeft") || held("ShiftRight");
   in.camera = held("KeyC");  // vehicles: chase / low interior view
+  in.handbrake = held("KeyX");  // vehicles: handbrake (drift)
   in.look_x = look_dx_ * 0.2f * prefs_.mouse_sensitivity;
   in.look_y = look_dy_ * 0.2f * prefs_.mouse_sensitivity * (prefs_.invert_y ? -1.0f : 1.0f);
   in.zoom = play_zoom_;
@@ -175,6 +176,7 @@ game::PlayInput Studio::play_input() const {
   in.jump = in.jump || t.jump;
   in.boost = in.boost || t.boost;
   in.camera = in.camera || t.camera;
+  in.handbrake = in.handbrake || t.handbrake;
   in.fire = in.fire || t.fire;
   in.aim = in.aim || t.aim;
   in.reload = in.reload || t.reload;
@@ -210,6 +212,7 @@ game::PlayInput Studio::play_input() const {
     in.interact = in.interact || pad_.interact;
     in.boost = in.boost || pad_.boost;
     in.camera = in.camera || pad_.camera;
+    in.handbrake = in.handbrake || pad_.handbrake;
     // Robot on a pad, as the duck's own pad mapping: RT chirps, LT rides the wheee (the beak opens
     // with them); crouch (B) sits / stands, interact (Y) picks, reload (X) rolls.
     if (pad_.fire) in.robot |= 64;

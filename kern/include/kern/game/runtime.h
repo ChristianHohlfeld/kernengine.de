@@ -78,6 +78,7 @@ struct PlayInput {
   f32 move_x = 0, move_y = 0, up = 0;  // -1..1 (right, forward, up)
   bool jump = false, boost = false;
   bool camera = false;                 // held: switches the vehicle view (chase / low interior) on press
+  bool handbrake = false;              // vehicles: rear handbrake (drift)
   u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
   f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
   f32 zoom = 0;                        // camera distance change (wheel)
@@ -106,6 +107,8 @@ struct Hud {
   f32 elapsed = 0, remaining = -1; // remaining < 0: no time limit
   f32 speed = 0;                  // m/s of the player
   f32 boost = -1;                 // 0..1, < 0: the controller has no boost
+  bool boosting = false;          // the player's boost or lift thrusters fire
+  bool interior = false;          // the low interior view is on
   f32 best = 0;                   // best finishing time of this session (0 = none)
   // soldier (first-person shooter) state of the local player
   bool soldier = false;
@@ -567,6 +570,7 @@ class GameWorld {
   bool camera_reset_ = true;
   bool interior_view_ = false, camera_latch_ = false;  // vehicles: the low interior view (no chassis drawn)
   f32 interior_ground_ = 0;
+  f32 fov_kick_ = 0;                 // degrees added to the vehicle camera's view with throttle and boost
   Hud hud_;
   u32 broken_joints_ = 0;
   std::vector<std::string> events_;
@@ -586,7 +590,13 @@ class GameWorld {
     bool jump_latch = false, was_boosting = false, airborne = false, boost_latch = false;
     f32 boost = 1, fall_speed = 0, stride = 0;
     f32 boost_hold = 0;               // a tap on boost still boosts this long (s)
-    f32 hop = 0;                      // hover car: seconds left of a hop (the hover spring lets go)
+    f32 lift_hold = 0;                // hover car: a tap on lift still thrusts this long (s)
+    f32 boost_pulse = 0;              // seconds to the next thruster pulse sound
+    bool lifting = false;             // hover car: the lift thrusters fire
+    f32 flip = 0, flip_dir = 0;       // hover car: seconds left of a kickflip, its side (+1 right)
+    f32 tap_time = -10, tap_dir = 0;  // last steering tap (double tap left / right: kickflip)
+    bool steer_released = true;
+    f32 grip = 7.5f;                  // lateral grip rate (the handbrake lowers it: drift)
     u32 steps = 0;
     f32 steer_vis = 0, pitch_vis = 0, last_forward = 0;
     // Character players walk with Box3D's kinematic mover instead of fighting the solver.
