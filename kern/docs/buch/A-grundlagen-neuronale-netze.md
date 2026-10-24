@@ -131,7 +131,7 @@ Gebräuchliche Aktivierungen:
 ```
 
 Kern verwendet **ELU** mit $\alpha = 1$ – wie rsl_rl, die Bibliothek, mit der Pollen Robotics die
-Netze des Micro Duck trainiert. Im Code (`Mlp::forward`):
+Netze der Micro Duck trainiert. Im Code (`Mlp::forward`):
 
 ```cpp
 y[k] = y[k] > 0 ? y[k] : kern::dm::expm1(y[k]);  // ELU

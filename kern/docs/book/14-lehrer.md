@@ -44,7 +44,7 @@ Status according to `docs/lehrer.md`:
 | Step | Status |
 |---|---|
 | Headless simulation, MLP with backprop and Adam, PPO like rsl_rl, ONNX export | done |
-| Variation (domain randomisation), learning in the browser, determinism | done |
+| Variation (domain randomization), learning in the browser, determinism | done |
 | The jump: demonstration → imitation → practice | done |
 | Digital twin: device models, calibration, matching | done (without real measurement data) |
 | Play: kick a ball, pick up a sock, carry it off, spit it out | being reworked (Section 14.8) |
@@ -71,9 +71,9 @@ The Lehrer separates five roles so that they can run in different places:
 - **`Recipe`** bundles task, PPO configuration, warm start, servo profile, sub-steps, imitation and
   curricula. Every place that trains (tool, browser) uses the same recipes (`recipe_for`), so that
   the same run produces the same network everywhere.
-- **`Collector`** runs environments with a fixed `Policy` (actor, normaliser, noise) and delivers a
+- **`Collector`** runs environments with a fixed `Policy` (actor, normalizer, noise) and delivers a
   `Rollout`. **`Ppo`** is the learner: it takes the rollouts of all collectors, computes the update
-  and hands out the next `Policy`. Both serialise into flat buffers (`Policy::serialize`,
+  and hands out the next `Policy`. Both serialize into flat buffers (`Policy::serialize`,
   `Rollout::serialize`).
 - **`Backend`** is where the computation happens. `ThreadBackend` distributes groups of environments
   across threads; in the browser each web worker is a collector and one further worker is the
@@ -186,7 +186,7 @@ provides. For the jump (`privileged() = 9`):
 This lets the critic estimate the value of a state more accurately, and the advantages from which
 the actor learns become less noisy.
 
-### Variation (domain randomisation)
+### Variation (domain randomization)
 
 Like Pollen's velocity and kick recipes. All values per episode, as long as `randomize` is on:
 
@@ -194,7 +194,7 @@ Like Pollen's velocity and kick recipes. All values per episode, as long as `ran
 |---|---|---|
 | Start | yaw, tilt, sole friction | yaw ±180°, roll/pitch ±3°, sole friction × 0.7 … 1.3 |
 | Build (`vary_micro_duck`) | trunk mass and inertia | × 0.95 … 1.05 |
-| | centre of mass of trunk / head per axis | ±3 mm / ±3 mm; for the jump, curriculum up to ±15 / ±10 mm |
+| | center of mass of trunk / head per axis | ±3 mm / ±3 mm; for the jump, curriculum up to ±15 / ±10 mm |
 | Servos (profile) | separate values per servo within the spreads | XL330: friction and armature ±10 % |
 | | bus delay | 15 … 30 ms |
 | Sensors (actor only) | gyro, gravity | ±0.03, ±0.01 (uniform) |
@@ -227,7 +227,7 @@ output. `dims` are inputs, hidden layers, outputs, so for the jump actor `{61, 5
 All parameters live in one vector `params_`; for each layer l the weights `w[i · out + o]`
 (input-major) followed by the biases `b[o]`.
 
-**Initialisation** as in PyTorch's `nn.Linear`: weights and biases uniform in ±1/√fan_in; the last
+**Initialization** as in PyTorch's `nn.Linear`: weights and biases uniform in ±1/√fan_in; the last
 layer can be scaled with `output_gain` (default 1).
 
 **Forward pass** for a batch of `batch` inputs:
@@ -241,7 +241,7 @@ y  = z^L                                 (last layer linear)
 
 `dense()` computes `y[r][o] = b[o] + Σᵢ x[r][i] · w[i][o]`, four rows of the batch per pass over the
 weights. The memory layout turns both directions into contiguous axpy loops that the compiler
-vectorises without reordering sums (important for determinism, Section 14.7). `expm1` comes from
+vectorizes without reordering sums (important for determinism, Section 14.7). `expm1` comes from
 Kern's deterministic libm (`kern::dm::expm1`). With a `Cache`, the forward pass remembers all
 activations `act[0..L]` for the backward pass.
 
@@ -261,7 +261,7 @@ to `grad`, so that the pieces of a minibatch can be summed into one gradient. On
 returns the gradient with respect to the input. The test
 `lehrer_mlp_gradient_matches_finite_differences` compares the gradient with finite differences.
 
-### Normalisation
+### Normalization
 
 `Normalizer` is rsl_rl's `EmpiricalNormalization`: running mean and variance per input,
 
@@ -279,12 +279,12 @@ mean' = mean + δ · n / total
 var'  = (var · count + v · n + δ² · count · n / total) / total
 ```
 
-It starts at mean 0, variance 1, count 0. The export writes the normaliser into the ONNX as `Sub`
-(mean) and `Div` (√var + 0.01), exactly as in Pollen's networks. The critic has a normaliser of its
+It starts at mean 0, variance 1, count 0. The export writes the normalizer into the ONNX as `Sub`
+(mean) and `Div` (√var + 0.01), exactly as in Pollen's networks. The critic has a normalizer of its
 own over its 61 + privileged inputs.
 
-A **warm start** (`Ppo::warm_start`) takes over the weights and normaliser of a finished network and
-**freezes the normaliser** (`freeze_actor_normalizer`): the weights were trained with exactly these
+A **warm start** (`Ppo::warm_start`) takes over the weights and normalizer of a finished network and
+**freezes the normalizer** (`freeze_actor_normalizer`): the weights were trained with exactly these
 values. Inputs that the old network never used (for the jump, the phase slots 55 and 56) get weight
 0, mean 0 and divisor 1; the actor then initially acts exactly like the old network until it learns
 to use them.
@@ -350,26 +350,26 @@ out `[step][environment]`.
 The noise stream of environment k depends only on (seed, global index), never on which worker runs
 it.
 
-### 2. Canonical ordering and normaliser update
+### 2. Canonical ordering and normalizer update
 
 `learn(rollouts)` stores all rows of all rollouts in **one** fixed order: step by step, within that
 the rollouts in the order of their global indices, within that environment by environment. The
 result therefore does not depend on how the environments were distributed across workers.
 
-Then the normalisers learn from all observed rows at once (rsl_rl updates them step by step during
+Then the normalizers learn from all observed rows at once (rsl_rl updates them step by step during
 collection; Kern's collectors keep the policy fixed for a rollout, so it happens here). A frozen
-actor normaliser stays frozen; the critic's always learns.
+actor normalizer stays frozen; the critic's always learns.
 
 ### 3. Re-evaluating the old policy
 
-Using the **current** normalisers, the learner computes for each row the mean μ_old, the value V(s)
+Using the **current** normalizers, the learner computes for each row the mean μ_old, the value V(s)
 and the log probability of the collected action:
 
 ```
 log π(a|s) = Σ_j [ −(a_j − μ_j)² / (2 σ_j²) − ln σ_j − ½ ln 2π ]
 ```
 
-The reason is given in `docs/lehrer.md`: with a few dozen environments the normalisers drift
+The reason is given in `docs/lehrer.md`: with a few dozen environments the normalizers drift
 noticeably between two iterations; with the values from collection time the ratio of new to old
 policy would be distorted.
 
@@ -388,7 +388,7 @@ V(s_T) at the end of the rollout is the value of `last_critic`. A timeout is not
 episode could have continued, so its value is estimated instead of set to 0. A `terminal` (fall), on
 the other hand, has no value afterwards.
 
-The advantages are then normalised over the whole batch: `(A − mean) / (std + 10⁻⁸)`, with the
+The advantages are then normalized over the whole batch: `(A − mean) / (std + 10⁻⁸)`, with the
 sample standard deviation (n − 1).
 
 ### 5. Update: epochs and minibatches
@@ -410,7 +410,7 @@ KL > 2 · desired_kl  →  lr ← max(10⁻⁵, lr / 1.5)
 KL < desired_kl / 2  →  lr ← min(10⁻², lr · 1.5)
 ```
 
-Both Adam optimisers receive the new rate. This keeps every step within a trust region: if the
+Both Adam optimizers receive the new rate. This keeps every step within a trust region: if the
 policy has already moved far, the next step becomes smaller.
 
 **c) Surrogate loss** (clipped), per row:
@@ -467,7 +467,7 @@ the returns of the new policy steer an actor that already acts well – and dest
 `IterationStats` contains the mean reward per step, mean return and length of the episodes that
 ended in the iteration, value and surrogate loss, entropy, learning rate, mean σ, collection and
 learning time, and the total number of duck steps. `Ppo::save()` writes the whole learner (magic
-`KERNPPO1`: iteration, steps, learning rate, normaliser status, policy, critic, both normalisers,
+`KERNPPO1`: iteration, steps, learning rate, normalizer status, policy, critic, both normalizers,
 both Adam states); `load()` reads it back.
 
 ## 14.6 Imitation, demonstrations and CMA-ES
@@ -485,7 +485,7 @@ reference height in the reward, various network sizes and learning rates) did no
 - With only a few dozen ducks the minibatches are small and the gradient is noisy; the KL limit
   keeps the learning rate down.
 
-That is why the Lehrer teaches in three steps: **find a demonstration → imitate → practise**. At
+That is why the Lehrer teaches in three steps: **find a demonstration → imitate → practice**. At
 runtime there is only the network; the demonstration (the *Vorbild*, "role model") exists only
 during learning.
 
@@ -507,7 +507,7 @@ demonstration's targets in between.
 
 ### CMA-ES (`cmaes.cpp`)
 
-CMA-ES (Hansen's Covariance Matrix Adaptation Evolution Strategy) optimises without gradients. The
+CMA-ES (Hansen's Covariance Matrix Adaptation Evolution Strategy) optimizes without gradients. The
 Lehrer uses it where there is no derivative: the simulation is the function, its parameters are the
 input – the jump demonstration and the servo calibration.
 
@@ -516,7 +516,7 @@ follows Hansen's tutorial (2016):
 
 ```
 λ = population (default 4 + ⌊3 ln n⌋),  μ = λ/2
-wᵢ ∝ ln(μ + ½) − ln i, normalised;  μ_eff = 1 / Σ wᵢ²
+wᵢ ∝ ln(μ + ½) − ln i, normalized;  μ_eff = 1 / Σ wᵢ²
 c_σ = (μ_eff + 2) / (n + μ_eff + 5)
 d_σ = 1 + 2 max(0, √((μ_eff − 1)/(n + 1)) − 1) + c_σ
 c_c = (4 + μ_eff/n) / (n + 4 + 2 μ_eff/n)
@@ -534,7 +534,7 @@ per generation:
 ```
 
 The starting point is evaluated first; the result is never worse. Returned are the best evaluated
-point (`best`) and the centre of the search distribution (`mean`). With noisy costs the centre is
+point (`best`) and the center of the search distribution (`mean`). With noisy costs the center is
 the better answer, because the best point may just have been lucky. All candidates of a generation
 go to `evaluate_all` together and run in parallel there. The normal distribution comes in double
 precision from a separate `Rng` with `kern::dm` functions, so a search is reproducible as well.
@@ -557,12 +557,12 @@ a robust jump. The score (`score_jump_demo`, higher is better):
 + 20 if it was a real jump (JumpMeter)
 ```
 
-The search returns the centre `mean`. The built-in demonstration (`builtin_jump_demo()`) was found
+The search returns the center `mean`. The built-in demonstration (`builtin_jump_demo()`) was found
 for the XL330 profile in three stages with a total of 370 generations.
 
 ### Imitation with DAgger
 
-Behaviour cloning on its own – the network learns from episodes driven by the demonstration – has a
+Behavior cloning on its own – the network learns from episodes driven by the demonstration – has a
 well-known problem: **distribution shift**. During learning the network only sees states the
 demonstration gets into. If it makes a small mistake itself, it ends up in a state it has never
 seen, makes a bigger mistake there, and the errors grow over the episode.
@@ -570,7 +570,7 @@ seen, makes a bigger mistake there, and the errors grow over the episode.
 DAgger ("Dataset Aggregation") fixes this by letting the network drive itself while the
 demonstration provides the labels:
 
-1. **Round 0:** the demonstration drives. Each observation is labelled with its action.
+1. **Round 0:** the demonstration drives. Each observation is labeled with its action.
 2. **Round k > 0:** the network drives (mean plus noise 0.05 for coverage). On every tick the
    demonstration says what it would have done; that action is the label.
 3. After each round the network learns from **all** examples collected so far.
@@ -594,13 +594,13 @@ between actor mean and label, with its own fresh Adam, minibatches in a fixed sh
 L = 1 / (m · A) · Σ (μ − target)²,     ∂L/∂μ = 2 (μ − target) / (m · A)
 ```
 
-A non-frozen actor normaliser takes in the observations beforehand. Jump: 10 epochs, minibatch 256,
+A non-frozen actor normalizer takes in the observations beforehand. Jump: 10 epochs, minibatch 256,
 learning rate 10⁻³. Play layer: 30 epochs, 256, 10⁻³.
 
 ### Practice
 
 After imitation (`begin_practice`) the action noise is set to `practice_std` (jump: 0.1), the actor
-waits `critic_warmup` = 30 iterations for the critic, and then PPO practises with the jump reward,
+waits `critic_warmup` = 30 iterations for the critic, and then PPO practices with the jump reward,
 an imitation reward and full variation until the jump is robust.
 
 ### The `jump` task
@@ -664,7 +664,7 @@ fixed, reproducible error and not noise that looks different from machine to mac
   - Each duck gets its seed from (seed, global index), not from the worker; the same goes for the
     collector's noise stream.
   - The learner orders the rollouts canonically (step by step, duck by duck) before computing
-    normalisers, GAE and update.
+    normalizers, GAE and update.
   - Update and imitation split every minibatch into a fixed 8 parts and sum them in a fixed order,
     regardless of how many threads compute them.
 
@@ -694,7 +694,7 @@ floating-point ordering that depends on the number of threads (sums in a fixed o
 
 The play layer (`play.onnx`, [Chapter 13](13-micro-duck.md#1311-the-play-layer-walker_playcpp))
 learns like the jump: a demonstration shows the way, the network imitates it from its own sensors
-(DAgger), and then it practises (PPO).
+(DAgger), and then it practices (PPO).
 
 ### `PlayEnv`
 
@@ -723,7 +723,7 @@ example level:
 - Ball: radius 3.5–6 cm, mass 15–50 g, rolling resistance 0.01–0.05 (foam to rubber).
 - With 30 % a second sock lies somewhere, at least 30 cm from the first.
 
-**Variation** (if `randomize`): sole friction × 0.7–1.3, trunk mass × 0.95–1.05, centre of mass of
+**Variation** (if `randomize`): sole friction × 0.7–1.3, trunk mass × 0.95–1.05, center of mass of
 the trunk ±5 mm and of the head ±3 mm per axis, friction and armature per servo within the profile
 spread, bus delay 15–30 ms, detector `sigma_abs` 0–4 mm, `sigma_rel` 0–3 %, dropouts 0–20 %.
 
@@ -758,12 +758,12 @@ answer follows from what it sees now and how long it has been standing. It decid
   over while turning).
 - **Target:** the nearer of ball and sock (a ball in the way is kicked away first).
 - **Farther than 0.25 m:** look at it (the head pitches more strongly the closer it is, 0.1–0.5 rad,
-  and turns at most 0.3 rad towards the target – gently, because bowed far while walking fast and
+  and turns at most 0.3 rad toward the target – gently, because bowed far while walking fast and
   turning, the duck tips over), turn at up to 0.6 rad/s on the spot or 0.4 rad/s while walking;
   walk at 0.15–0.3 m/s as long as the target is less than 0.6 rad off. When it turns on the spot,
   the head is in the default pose.
 - **Close** (the same for ball and sock): Pollen's gait can only be stopped, not placed in small
-  steps, and a swinging foot pushes a sock away. So it walks slowly and steadily towards the target
+  steps, and a swinging foot pushes a sock away. So it walks slowly and steadily toward the target
   along a line (0.12–0.15 m/s; from standstill a fixed nudge at 0.3 m/s, because the gait otherwise
   does not start), steers instead of side-stepping, says "stop" – for the sock by the coasting
   distance of 0.7 cm before the spot, for the ball only 0.5 cm past it – stands, and starts the
@@ -795,7 +795,7 @@ Whatever the demonstration does not know by hand, the Lehrer measures in the phy
   `std::call_once` ensures the single measurement, while WebAssembly runs on one thread and needs no
   mutex for it. `--spielen` prints the result before the first round ("the bite, measured in this
   physics: …"). If nothing holds anywhere, it takes 6.5 cm in front of the trunk,
-  centred. As a result **no bite position is hard-coded as a number**: if the physics changes
+  centered. As a result **no bite position is hard-coded as a number**: if the physics changes
   (friction, sock model, beak), the Lehrer measures again.
 - **How far the duck keeps walking after "stop"** (`measure_stop`, `--halt-messen`, "measure
   stopping"): four runs each from 0.10, 0.12, 0.15 and 0.20 m/s, measured ahead and sideways.
@@ -809,8 +809,8 @@ the episodes of a round are on the clean robot, half with full variation.
 
 ### Practice with PPO (`--spielen-ueben`)
 
-The imitated network then practises on its own (`--spielen-ueben`, "practise playing"):
-`make_play_learner`, warm start from the file (weights and frozen normaliser, no new inputs), action
+The imitated network then practices on its own (`--spielen-ueben`, "practice playing"):
+`make_play_learner`, warm start from the file (weights and frozen normalizer, no new inputs), action
 noise 0.1 (`--uebungs-std`, "practice std"), and for the first 20 iterations only the critic
 learns. Only what works is rewarded (table above): where the bite really holds and how it really has
 to stand, it finds out for itself. Half the environments are clean, half are varied.
@@ -955,7 +955,7 @@ itself, the page shows the duck steps/s.
 | Test | checks |
 |---|---|
 | `lehrer_mlp_gradient_matches_finite_differences` | backward pass of the MLP |
-| `lehrer_adam_fits_a_curve_and_the_normaliser_tracks` | Adam and normaliser |
+| `lehrer_adam_fits_a_curve_and_the_normaliser_tracks` | Adam and normalizer |
 | `lehrer_ppo_learns_to_reach` | PPO learns a simple task |
 | `lehrer_ppo_learns_from_collectors_elsewhere` | collecting and learning separated |
 | `lehrer_duck_env_runs_episodes_headless` | velstand holds the duck via the Lehrer path; the same episode bit for bit |

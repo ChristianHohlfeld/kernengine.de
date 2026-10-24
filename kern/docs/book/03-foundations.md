@@ -328,7 +328,7 @@ matrices, culling, picking).
 | Angles | radians in `math.h`; levels store Euler angles in **degrees** ([Chapter 8](08-game-runtime.md)) |
 | Projection | OpenGL clip space (depth −1 … 1); the camera looks along −Z in view coordinates |
 
-Z up applies everywhere: in the renderer, in the physics (`physics.h`: "metres, seconds, kilograms,
+Z up applies everywhere: in the renderer, in the physics (`physics.h`: "meters, seconds, kilograms,
 Z up, quaternions (x, y, z, w)"), in audio (`audio.h`) and in levels. The primitives in
 `geo/primitives.h` are likewise Z up and, unless stated otherwise, centered on the origin
 ([Chapter 5](05-scene-and-geometry.md)).
@@ -438,7 +438,7 @@ struct Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
   f32 fov = kPi / 3, near = 0.05f, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
-  f32 ortho_height = 20;      // orthographic: visible height in metres
+  f32 ortho_height = 20;      // orthographic: visible height in meters
 };
 ```
 

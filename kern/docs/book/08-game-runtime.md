@@ -462,7 +462,7 @@ The component keys are listed in the tables of 8.4.
 - **Unknown keys are ignored; missing ones get default values.** Older files thus load in newer
   versions.
 - **Wrong types are errors** with a message ("friction must be a number", "size must be [x, y, z]",
-  "color must be a #rrggbb colour", "mode: unknown value"). The error names the actor.
+  "color must be a #rrggbb color", "mode: unknown value"). The error names the actor.
 - **Numbers are clamped to their range**, e.g.:
 
 | Range | Keys |

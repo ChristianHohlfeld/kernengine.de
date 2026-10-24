@@ -2,7 +2,7 @@
 
 This appendix explains how triangles in memory become an image on the screen – fast enough for 60
 frames per second in the browser. It starts with coordinates and matrices, proceeds through the
-graphics pipeline and shaders to lighting, shadows, ambient occlusion and colour space, and ends with
+graphics pipeline and shaders to lighting, shadows, ambient occlusion and color space, and ends with
 the question of why Kern connects WebAssembly and WebGL2 exactly the way it does. The topical
 chapters [Chapter 4](04-graphics.md) (graphics) and [Chapter 5](05-scene-and-geometry.md) (scene and
 geometry) refer back here.
@@ -43,10 +43,10 @@ flowchart LR
 | Space | What it describes |
 |---|---|
 | Model space | vertices relative to the model's origin, as stored in the mesh |
-| World space | all objects in one common system (metres, Z up) |
+| World space | all objects in one common system (meters, Z up) |
 | Camera space | relative to the camera: camera at the origin, looking along $-z$ |
 | Clip space | after projection, four-dimensional (homogeneous) |
-| NDC | normalised device coordinates; the visible region is the cube $[-1,1]^3$ |
+| NDC | normalized device coordinates; the visible region is the cube $[-1,1]^3$ |
 | Screen | pixels and depth value $[0,1]$ |
 
 ### B.1.2 Homogeneous coordinates
@@ -69,9 +69,9 @@ $$p_\text{clip} = P \cdot V \cdot M \cdot p_\text{model}.$$
 ### B.1.3 Kern's conventions
 
 The header of `math.h` says it in one sentence: "column-major 4x4 matrices (OpenGL layout). World
-convention: metres, right-handed, Z up."
+convention: meters, right-handed, Z up."
 
-- **Metres**: all lengths.
+- **Meters**: all lengths.
 - **Right-handed, Z up**: $x$ and $y$ span the ground, $z$ points up. The default camera (`Camera` in
   `math.h`) stands at `eye{0, -18, 8}`, looks at `target{0, 0, 2}` with `up{0, 0, 1}`. The physics
   also uses Z up ([Appendix C](C-physics.md)), and the sky computes with `d.z` as the height above
@@ -133,7 +133,7 @@ The indices here follow GLSL and Kern's column-major layout, `P[column][row]`: $
 element $\frac{f_\text{ar}+n}{n-f_\text{ar}}$ (`m[10]`), $P_{32}$ the element $\frac{2 f_\text{ar} n}{n-f_\text{ar}}$
 in column 3, row 2 of the matrix above (counting from 0; `m[14]`). The depth in NDC is
 $z_\text{ndc} = -P_{22} + P_{32}/w$, i.e. **proportional to $1/w$** up to a constant. The depth
-buffer values $d = (z_\text{ndc}+1)/2$ therefore crowd towards 1 in the distance. With Kern's
+buffer values $d = (z_\text{ndc}+1)/2$ therefore crowd toward 1 in the distance. With Kern's
 $n = 0.05$, $f_\text{ar} = 1800$ ($P_{22} \approx -1.0000556$, $P_{32} \approx -0.1000028$):
 
 | Distance $w$ | Depth value $d$ | Resolution at 24 bits ($\Delta d = 2^{-24}$) |
@@ -167,13 +167,13 @@ it as three attributes `iNormal0..2`. A singular matrix (scale 0) is rejected.
 
 ---
 
-## B.2 Rasterisation and the depth buffer
+## B.2 Rasterization and the depth buffer
 
 ### B.2.1 From triangle to pixels
 
-After projection, the three corners of a triangle are available as screen points. **Rasterisation**
-determines which pixels (more precisely: which pixel centres) lie inside. For each such pixel a
-**fragment** is produced. The vertex values (colour, normal, world position, texture coordinates)
+After projection, the three corners of a triangle are available as screen points. **Rasterization**
+determines which pixels (more precisely: which pixel centers) lie inside. For each such pixel a
+**fragment** is produced. The vertex values (color, normal, world position, texture coordinates)
 are interpolated in between, with barycentric weights $\lambda_0 + \lambda_1 + \lambda_2 = 1$:
 
 $$v = \lambda_0 v_0 + \lambda_1 v_1 + \lambda_2 v_2.$$
@@ -184,7 +184,7 @@ interpolates $v/w$ and $1/w$ linearly and divides).
 ```
      v2
      /\
-    /  \       ■ = pixel centre inside the triangle → fragment
+    /  \       ■ = pixel center inside the triangle → fragment
    / ■■ \
   / ■■■■ \
  /________\
@@ -214,7 +214,7 @@ objects.
 
 ### B.2.3 Back faces
 
-For closed bodies, triangles facing away from the camera are always hidden. The GPU recognises them
+For closed bodies, triangles facing away from the camera are always hidden. The GPU recognizes them
 by the winding order of their corners on the screen and discards them (**backface culling**).
 `Mesh::cull_mode()` chooses: double-sided materials and lines without culling; mirrored instances
 (negative determinant) with the side swapped; a mesh whose instances are partly mirrored and partly
@@ -230,7 +230,7 @@ not, likewise without culling.
 flowchart LR
   VB["Vertex buffer (attributes)"] --> VS["Vertex shader (per vertex)"]
   U["Uniforms (per draw call)"] --> VS
-  VS --> R["Rasterisation + interpolation"]
+  VS --> R["Rasterization + interpolation"]
   R --> FS["Fragment shader (per pixel)"]
   U --> FS
   T["Textures"] --> FS
@@ -243,7 +243,7 @@ Two stages are programmable:
 - The **vertex shader** runs once per vertex. It must produce `gl_Position` (clip coordinates) and
   can pass further values on to the fragment shader (`out`).
 - The **fragment shader** runs once per fragment. It receives the interpolated values (`in`) and
-  writes one or more colours.
+  writes one or more colors.
 
 ### B.3.2 Attributes, uniforms, varyings, textures
 
@@ -285,7 +285,7 @@ A fragment shader can write to several images simultaneously (*multiple render t
 Kern's standard shader has three outputs:
 
 ```glsl
-layout(location=0) out vec4 outColor;  // final colour (sRGB, 8 bits)
+layout(location=0) out vec4 outColor;  // final color (sRGB, 8 bits)
 layout(location=1) out vec4 outHdr;    // linear HDR light (16-bit floating point) for bloom
 layout(location=2) out vec4 outAo;     // share of indirect light for ambient occlusion
 ```
@@ -298,7 +298,7 @@ This way Kern needs **no second geometry pass** for bloom and ambient occlusion 
 
 ### B.4.1 What makes a pixel bright
 
-Physically, a pixel measures the **radiance** $L_o$ leaving the surface towards the eye. The
+Physically, a pixel measures the **radiance** $L_o$ leaving the surface toward the eye. The
 rendering equation (Kajiya) describes it as a sum over all incident light:
 
 $$L_o(\omega_o) = L_e + \int_{\Omega} f_r(\omega_i, \omega_o)\, L_i(\omega_i)\, (n\cdot\omega_i)\, d\omega_i.$$
@@ -320,7 +320,7 @@ perpendicular to the light:
 
 $$L_o = \frac{\rho}{\pi}\, E\, \max(0, n \cdot l).$$
 
-- $l$: direction to the light source (normalised),
+- $l$: direction to the light source (normalized),
 - $n$: surface normal.
 
 The factor $1/\pi$ ensures energy conservation: a white surface ($\rho = 1$) does not reflect more
@@ -333,11 +333,11 @@ float ndl = max(dot(n, sun), 0.0);
 vec3 rgb = base * (1.0 - metal) * (uSunColor * ndl * shadow + point * PI) / PI + indirect;
 ```
 
-`base` is the albedo (vertex colour × material × texture, converted into linear colour space),
-`uSunColor` the sun as a linear colour times intensity (default `{2.8, 2.47, 2.11}`), `shadow` the
+`base` is the albedo (vertex color × material × texture, converted into linear color space),
+`uSunColor` the sun as a linear color times intensity (default `{2.8, 2.47, 2.11}`), `shadow` the
 factor from the shadow map (B.5). Metals have no diffuse component (`1 - metal`).
 
-**Example:** grey surface $\rho = 0.5$, sun at 45° ($n\cdot l = 0.707$), red channel $E = 2.8$:
+**Example:** gray surface $\rho = 0.5$, sun at 45° ($n\cdot l = 0.707$), red channel $E = 2.8$:
 $L = 0.5 \cdot 2.8 \cdot 0.707 / \pi = 0.315$.
 
 ### B.4.3 Point lights
@@ -347,7 +347,7 @@ Kern uses an attenuation that goes smoothly to 0 at the range $r$:
 
 $$\text{att} = \frac{\left(\max\left(0,\ 1 - d^2/r^2\right)\right)^2}{1 + d^2/r^2}.$$
 
-Up to 6 point lights (`kMaxPointLights = 6`), each with position, range, colour and intensity
+Up to 6 point lights (`kMaxPointLights = 6`), each with position, range, color and intensity
 (`uPointPosRange`, `uPointColorIntensity`); $d^2$ is clamped below at 0.04 so that a light sitting
 directly on a surface does not become infinitely bright.
 
@@ -373,7 +373,7 @@ Commonly used are:
 - **GGX/Trowbridge–Reitz:** $D = \dfrac{\alpha^2}{\pi\left((n\cdot h)^2(\alpha^2 - 1) + 1\right)^2}$
   with $\alpha = \text{roughness}^2$.
 - **Schlick Fresnel:** $F = F_0 + (F_{90} - F_0)(1 - \cos\theta)^5$, with $F_0 \approx 0.04$ for
-  non-metals and $F_0 = $ base colour for metals.
+  non-metals and $F_0 = $ base color for metals.
 
 ### B.4.5 What Kern's standard shader actually computes
 
@@ -409,7 +409,7 @@ by extensions) additionally reflects the sky so that panes do not look black.
 
 ### B.4.6 Indirect light
 
-Kern computes light coming from the sky and the ground without ray tracing, from a few colours:
+Kern computes light coming from the sky and the ground without ray tracing, from a few colors:
 
 - **Hemisphere light:** between `uGroundColor` (below) and `uSkyColor` (above), blended according to
   $n_z$ – an upward-facing surface receives sky light, a downward-facing one ground light.
@@ -464,7 +464,7 @@ front of it.
   smaller shadow distance means smaller texels, i.e. sharper shadows. At the edge the shadow fades
   out over the last tenth of the distance.
 - **Snapped to the texel grid:** `focus_key` rounds the focus (the camera target or the sphere's
-  centre) in the plane perpendicular to the sun to whole texels. The map then only jumps by whole texels and does not
+  center) in the plane perpendicular to the sun to whole texels. The map then only jumps by whole texels and does not
   shimmer. Together with the extent, the rounded focus also yields a **cache key**: as long as it, the sun and the
   shadow casters stay the same, the map is reused (`RenderStats::shadow_reused`).
 - **Depth only:** `colorMask(0, 0, 0, 0)`, an empty fragment shader, target `DEPTH_COMPONENT24`.
@@ -475,7 +475,7 @@ front of it.
 - **Hardware PCF:** the depth texture has `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` and
   `LINEAR` filtering. A lookup through `sampler2DShadow` then compares the four nearest texels and
   interpolates the results – soft edges from a single `texture()` call.
-- **Optimised PCF** (Castaño 2013, "The Witness"): 4 or 9 such hardware taps form a tent-filtered
+- **Optimized PCF** (Castaño 2013, "The Witness"): 4 or 9 such hardware taps form a tent-filtered
   3 × 3 or 5 × 5 kernel. Each tap sits between the texels so that the hardware's bilinear weighting
   yields exactly the tent weights. `ShadowOptions::filter` selects 1, 4 or 9 taps; Studio uses 4 on
   phones and 9 on desktop.
@@ -522,21 +522,21 @@ in the mid-range, compresses the highlights softly and never saturates hard:
 **In Kern** it is the ACES filmic curve in the three.js version (MIT, see Appendix D) (`acesFilmic` in `kGlslToneMap`):
 
 1. Exposure: `c *= uExposure / 0.6`.
-2. A matrix into the curve's working colour space (`inM`).
+2. A matrix into the curve's working color space (`inM`).
 3. The rational approximation of RRT+ODT:
    $\text{rrtOdt}(v) = \dfrac{v(v + 0.0245786) - 0.000090537}{v(0.983729 v + 0.4329510) + 0.238081}$.
 4. Back (`outM`), clamp to $[0,1]$.
 
-Then optionally a colour grade (`gradeColor`: a little more saturation, a gentle S-curve, warm
+Then optionally a color grade (`gradeColor`: a little more saturation, a gentle S-curve, warm
 highlights and cool shadows).
 
 ### B.6.3 Gamma and sRGB
 
-Screens and image files do not store colours linearly but in **sRGB**: dark tones get more of the
+Screens and image files do not store colors linearly but in **sRGB**: dark tones get more of the
 256 levels because the eye distinguishes more finely there. Computation, however, must be
 **linear** – light adds linearly. Hence:
 
-1. convert input colours (textures, vertex colours from sRGB sources) **to linear**,
+1. convert input colors (textures, vertex colors from sRGB sources) **to linear**,
 2. compute linearly,
 3. convert **to sRGB** at the end.
 
@@ -545,15 +545,15 @@ The exact sRGB formulas (in `kGlslToneMap`):
 $$c_\text{lin} = \begin{cases} c/12.92 & c \le 0.04045 \\ \left(\frac{c + 0.055}{1.055}\right)^{2.4} & \text{otherwise}\end{cases}\qquad
 c_\text{sRGB} = \begin{cases} 12.92\,c & c \le 0.0031308 \\ 1.055\, c^{1/2.4} - 0.055 & \text{otherwise}\end{cases}$$
 
-**Example:** linear middle grey 0.18 becomes sRGB $1.055 \cdot 0.18^{1/2.4} - 0.055 = 0.461$ – almost
+**Example:** linear middle gray 0.18 becomes sRGB $1.055 \cdot 0.18^{1/2.4} - 0.055 = 0.461$ – almost
 half the scale, although it is only 18% of the light.
 
-Vertex colours that are already linear skip the conversion (`uLinearColor`; in the browser marked via
+Vertex colors that are already linear skip the conversion (`uLinearColor`; in the browser marked via
 `markLinearColors` in `kern.mjs`).
 
 ### B.6.4 Fog
 
-After tone mapping, Kern mixes in fog, like three.js ("FogExp2 after the colour-space conversion"):
+After tone mapping, Kern mixes in fog, like three.js ("FogExp2 after the color-space conversion"):
 
 $$\text{fog} = 1 - e^{-(\rho_f\, d)^2}.$$
 
@@ -597,12 +597,12 @@ The weights sum to $0.2270 + 2\cdot0.3162 + 2\cdot0.0703 = 1$.
 
 ### B.7.3 Kern's bloom pass
 
-- The scene writes simultaneously to an RGBA8 target (final colour) and to a linear **RGBA16F** copy
+- The scene writes simultaneously to an RGBA8 target (final color) and to a linear **RGBA16F** copy
   (`outHdr`).
 - Bright parts with a soft threshold: `c * smoothstep(0.88, 0.88 + 0.35, max(c.r, c.g, c.b))`, at a
   quarter of the resolution.
 - Blur on two levels: $1/4$ and $1/8$ of the resolution; strengths 0.13 and 0.08.
-- Compositing: `scene + present(hdr + bloom) - present(hdr)`. `present` is tone mapping + colour
+- Compositing: `scene + present(hdr + bloom) - present(hdr)`. `present` is tone mapping + color
   grading + sRGB. So only the **difference** that bloom makes after tone mapping is added – pixels
   without bloom remain bit-exact as the scene rendered them.
 - A frame-time watchdog switches the halo off for the session if the device needs more than 27 ms per
@@ -628,7 +628,7 @@ $$\text{AO}(p) = \frac{1}{\pi}\int_{\Omega} V(p, \omega)\,(n\cdot\omega)\,d\omeg
 
 Tracing rays through the entire scene is too expensive. **Screen-space ambient occlusion** (SSAO)
 uses the depth buffer instead: for each pixel one reconstructs the position in camera space and
-checks whether neighbouring pixels lie "above" the point. Classic SSAO counts samples in a sphere and
+checks whether neighboring pixels lie "above" the point. Classic SSAO counts samples in a sphere and
 is a rough estimate.
 
 **GTAO** (*ground-truth ambient occlusion*, Jimenez et al. 2016) evaluates the integral
@@ -636,7 +636,7 @@ systematically in slices:
 
 1. Per pixel, a few directions $\phi$ in the image plane (slices).
 2. In each slice, one searches on both sides for the **horizon**: the highest angle at which a
-   neighbouring surface blocks the sky.
+   neighboring surface blocks the sky.
 3. Between the two horizon angles $h_0$, $h_1$ the sky is visible. The integral of the
    cosine-weighted visibility over this arc has a closed form. With $\gamma$, the angle of the normal
    projected into the slice:
@@ -660,9 +660,9 @@ $$\hat a(h, \gamma) = \tfrac14\left(\cos\gamma + 2h\sin\gamma - \cos(2h - \gamma
 
 `AmbientOcclusionPass` (`passes.h`, `gtao.cpp`) follows Intel's XeGTAO (MIT, see Appendix D):
 
-- The normal is reconstructed **from depth** (per axis, the neighbour with the smaller depth jump);
+- The normal is reconstructed **from depth** (per axis, the neighbor with the smaller depth jump);
   there is no normal buffer.
-- The effect radius is in world metres (`AoOptions::radius`, default 1.6) and is converted to screen
+- The effect radius is in world meters (`AoOptions::radius`, default 1.6) and is converted to screen
   pixels per pixel; near surfaces are capped.
 - `fastAcos` (Lagarde's approximation, max. error 0.0068 rad) instead of `acos`.
 - A $4\times4$ ordered pattern rotates the slices from pixel to pixel; a depth-aware $4\times4$
@@ -674,7 +674,7 @@ $$\hat a(h, \gamma) = \tfrac14\left(\cos\gamma + 2h\sin\gamma - \cos(2h - \gamma
   texels of other surfaces receive no weight.
 
 **It is applied only to indirect light.** The standard shader writes into its third output `outAo`
-the share of indirect light per colour channel (already reduced by the fog) and the brightness of the
+the share of indirect light per color channel (already reduced by the fog) and the brightness of the
 albedo. During compositing (`kCombine` in `bloom.cpp`) the following is then computed:
 
 $$h' = h \cdot \left(1 - s \cdot \left(1 - \text{mb}(v, \rho)\right)\right)$$
@@ -708,16 +708,16 @@ Physical sky models integrate this scattering along the view ray.
 Kern's `SkyPass` is deliberately **not** a scattering integral but an analytic model ("Rayleigh-like
 gradient", `passes.h`) that is cheap to evaluate per pixel:
 
-- **Gradient** between horizon and zenith colour according to the height above the horizon,
+- **Gradient** between horizon and zenith color according to the height above the horizon,
   $\text{mix}(\text{hor}, \text{zen}, h^{0.45})$.
 - **Golden hour:** the closer the sun is to the horizon, the more orange the horizon becomes
-  (`dusk`), with a band that is brighter towards the sun's side.
+  (`dusk`), with a band that is brighter toward the sun's side.
 - **Sun disc and Mie halo:** $\mu = \cos(\angle(\text{view}, \text{sun}))$; the halo as
   $0.22\mu^8 + 0.5\mu^{64}$, the disc as a steep `smoothstep` at $\mu \approx 0.9993$.
 - **Night:** moon (same principle) and stars from a cell hash, with a slight twinkle.
 - **Clouds:** 5 octaves of value noise (*fBm*), projected onto a plane above the viewer
-  (`d.xy / (d.z + 0.12)`), shifted by the wind, brightened towards the sun.
-- **Atmosphere:** `SkyAtmosphere` passes the fog colour and sun scattering to the scene so that the
+  (`d.xy / (d.z + 0.12)`), shifted by the wind, brightened toward the sun.
+- **Atmosphere:** `SkyAtmosphere` passes the fog color and sun scattering to the scene so that the
   horizon and distant geometry blend into each other.
 
 A full-screen triangle is drawn. The vertex shader builds the view direction from the NDC corners
@@ -741,8 +741,8 @@ where $r_i$ are the rows of $PV$, and a point $p$ lies inside if $a x + b y + c 
 for all six planes.
 
 **In Kern:** `Frustum::from_matrix` in `frustum.h` (with column-major access `m[3] + sign * m[axis]`
-etc.) normalises the planes, and `sphere_visible` tests a **bounding sphere**: it is certainly
-outside if its centre lies further than its radius behind a plane.
+etc.) normalizes the planes, and `sphere_visible` tests a **bounding sphere**: it is certainly
+outside if its center lies further than its radius behind a plane.
 
 ```
        \         /
@@ -814,12 +814,12 @@ From the header of `renderer.h`:
 
 ```mermaid
 flowchart TD
-  A["1. Sun shadow map (only when needed)"] --> B["2. Opaque meshes, front to back (MRT: colour, HDR, AO share)"]
+  A["1. Sun shadow map (only when needed)"] --> B["2. Opaque meshes, front to back (MRT: color, HDR, AO share)"]
   B --> C["3. Sky at depth 1, uncovered pixels only"]
   C --> D["4. Transparent meshes, back to front"]
   D --> E["5. GTAO from the depth buffer"]
   E --> F["6. First-person view after depth clear"]
-  F --> G["7. Compositing: bloom, colour grading, AO"]
+  F --> G["7. Compositing: bloom, color grading, AO"]
 ```
 
 ---
@@ -884,7 +884,7 @@ flowchart LR
 | Concept | Section | Where in Kern |
 |---|---|---|
 | homogeneous coordinates, column-major matrices | B.1 | `Mat4` (`math.h`) |
-| Z up, right-handed, metres | B.1.3 | `math.h`, `Camera` |
+| Z up, right-handed, meters | B.1.3 | `math.h`, `Camera` |
 | view, perspective, depth | B.1.4–B.1.6 | `look_at`, `perspective`, `viewDepth` in `gtao.cpp` |
 | normal matrix | B.1.7 | `normal_matrix3`, `iNormal0..2` |
 | depth test, sorting, transparency | B.2 | `Renderer::render` |

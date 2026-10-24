@@ -405,7 +405,7 @@ aus und endet mit Rückgabe 2.
 | Option | Rezept `jump` | Rezept `stand` | Bedeutung |
 |---|---|---|---|
 | `--steps N` | 48 | 24 | Schritte je Ente und Iteration |
-| `--init-std X` | 0,3 | 1,0 | anfängliche Aktions-Standardabweichung |
+| `--init-std X` | 0,3 | 1,0 | anfängliche Standardabweichung der Aktionen |
 | `--lr X` | 1e-4 | 1e-3 | Lernrate |
 | `--entropy X` | 0,005 | 0,01 | Entropie-Koeffizient |
 | `--critic A,B,…` | 256,128 | 256,128 | Schichten des Critic |

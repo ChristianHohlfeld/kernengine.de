@@ -11,7 +11,7 @@ The code in question lives in `src/lehrer/` and `include/kern/lehrer/`:
 | File | Contents |
 |---|---|
 | `nn.h`, `nn.cpp` | `Mlp` (the network), forward and backward pass, `Adam`, `Normalizer` |
-| `ppo.h`, `ppo.cpp` | `Policy`, `Collector`, `Rollout`, `Ppo` (learning algorithm), `imitate` (behaviour cloning) |
+| `ppo.h`, `ppo.cpp` | `Policy`, `Collector`, `Rollout`, `Ppo` (learning algorithm), `imitate` (behavior cloning) |
 | `env.h` | `Env`, `Task`, `DuckEnv`, `Rng`, the sizes 61 observations and 14 actions |
 | `vorbild.h`, `vorbild.cpp` | jump Vorbild ("role model", the demonstrator), its search with CMA-ES, DAgger |
 | `cmaes.h`, `cmaes.cpp` | CMA-ES |
@@ -37,7 +37,7 @@ $$y = f_\theta(x).$$
   They are not set by hand but learned.
 
 "Learning" means changing $\theta$ so that $f_\theta$ does what we want. What "want" means is fixed
-by a number that we minimise – the loss function (Section A.3).
+by a number that we minimize – the loss function (Section A.3).
 
 ### A.1.2 The neuron
 
@@ -148,7 +148,7 @@ That is exactly what `Mlp::backward` exploits:
 if (y <= 0) prev[k] *= y + 1;
 ```
 
-### A.1.5 Initialisation
+### A.1.5 Initialization
 
 Before learning, the weights must have some values. Setting them all to 0 would be fatal: every
 neuron in a layer would compute the same thing and receive the same gradient; they would remain
@@ -191,13 +191,13 @@ for (i32 i = 0; i < in; ++i) {
 ```
 
 The innermost loop runs over consecutive memory locations of `wi` and `y` – an "axpy" operation
-($y \leftarrow y + a\,x$) that the compiler can vectorise **without changing the order of the
+($y \leftarrow y + a\,x$) that the compiler can vectorize **without changing the order of the
 additions**. That is the reason for the input-major memory layout: with row-major weights the inner
-loop would be a dot product, which the compiler only vectorises if it is allowed to reorder sums –
+loop would be a dot product, which the compiler only vectorizes if it is allowed to reorder sums –
 and reordered floating-point sums are no longer bit-identical (A.11.10).
 
 The header of `nn.cpp` says exactly this: "Weights are stored input-major so that both passes run as
-contiguous axpy loops the compiler vectorises without reassociating sums."
+contiguous axpy loops the compiler vectorizes without reassociating sums."
 
 ### A.2.3 The cache
 
@@ -210,7 +210,7 @@ merely acting) the function alternates between two buffers and keeps nothing.
 ## A.3 Loss functions
 
 The loss function $\mathcal{L}(\theta)$ measures how bad the network currently is. Learning means
-minimising it.
+minimizing it.
 
 ### A.3.1 Mean squared error
 
@@ -228,7 +228,7 @@ Its derivative with respect to an output is particularly simple:
 
 $$\frac{\partial \mathcal{L}}{\partial y_{r,j}} = \frac{2\,(y_{r,j} - t_{r,j})}{N\,m}.$$
 
-**In Kern:** behaviour cloning (`Ppo::imitate`) uses exactly this loss; the line
+**In Kern:** behavior cloning (`Ppo::imitate`) uses exactly this loss; the line
 
 ```cpp
 p.dout[...] = 2 * d / static_cast<f32>(m * act_);
@@ -240,7 +240,7 @@ critic's value loss in PPO is also a squared error (A.11.7).
 ### A.3.2 The loss as a landscape
 
 One can picture $\mathcal{L}$ as a landscape over the space of all parameters: every point $\theta$
-has a height. We stand somewhere (after initialisation) and want to get down into the valley. With
+has a height. We stand somewhere (after initialization) and want to get down into the valley. With
 hundreds of thousands of dimensions the landscape has no map – we only feel the slope under our feet.
 That slope is the gradient.
 
@@ -425,21 +425,21 @@ checkpoint (`Ppo::save`): a resumed run takes exactly the steps that the uninter
 have taken.
 
 Actor and critic have **separate** Adam instances (`actor_adam_`, `critic_adam_`), and
-`Ppo::imitate` creates a third, fresh one for behaviour cloning – so that the moments from cloning do
+`Ppo::imitate` creates a third, fresh one for behavior cloning – so that the moments from cloning do
 not carry over into the subsequent PPO.
 
 ---
 
-## A.7 Input normalisation
+## A.7 Input normalization
 
 ### A.7.1 The problem
 
 The 61 observations have very different orders of magnitude: joint angles in radians (tenths), joint
 velocities in rad/s (up to two digits), the gravity vector between −1 and 1. A network can cope with
-that, but it learns more slowly: with the same initialisation the large inputs dominate the sums, and
+that, but it learns more slowly: with the same initialization the large inputs dominate the sums, and
 the gradients of the weights attached to large inputs are correspondingly large.
 
-### A.7.2 The solution: running standardisation
+### A.7.2 The solution: running standardization
 
 Each input is rescaled to mean 0 and standard deviation 1:
 
@@ -463,38 +463,38 @@ only the three numbers $(\mu, \sigma^2, n)$ to do so.
 `Normalizer` in `nn.h` ("rsl_rl's EmpiricalNormalization") implements this (`update`, computed in
 `f64`). Two points matter:
 
-- **It belongs to the network.** A network that learned with normalised inputs is worthless without
-  exactly that normalisation. That is why the ONNX export writes it as `Sub` (mean) and `Div`
+- **It belongs to the network.** A network that learned with normalized inputs is worthless without
+  exactly that normalization. That is why the ONNX export writes it as `Sub` (mean) and `Div`
   ($\sigma + 0.01$) at the start of the graph (A.14), and `Policy::serialize` includes it.
-- **It can be frozen.** When warm-starting from Pollen's velstand network, Kern adopts its normaliser
+- **It can be frozen.** When warm-starting from Pollen's velstand network, Kern adopts its normalizer
   and freezes it (`freeze_actor_normalizer`, `Ppo::warm_start`). For new inputs the old network never
   saw (the jump phase in slots 55 and 56), it sets mean 0 and divisor 1 and the associated weights
   to 0 – the warm-started network then behaves **exactly** like the original until it learns to use
   the new inputs.
 
-The learner updates the normalisers once per iteration with all collected observations and then
-re-evaluates the old policy **with the new normalisers** (`Ppo::learn`). The reason is given in
+The learner updates the normalizers once per iteration with all collected observations and then
+re-evaluates the old policy **with the new normalizers** (`Ppo::learn`). The reason is given in
 `docs/lehrer.md`: "bei einigen Dutzend Umgebungen wandern die Normalisierer sonst merklich" ("with a
-few dozen environments the normalisers would otherwise drift noticeably"), and PPO's probability
+few dozen environments the normalizers would otherwise drift noticeably"), and PPO's probability
 ratios (A.11.4) would be distorted.
 
 ---
 
-## A.8 Overfitting and generalisation
+## A.8 Overfitting and generalization
 
-A network with 200,000 parameters can memorise a small dataset: the error on the training examples
+A network with 200,000 parameters can memorize a small dataset: the error on the training examples
 is tiny, on new examples it is large. This is **overfitting**. The usual remedies:
 
 | Remedy | Idea |
 |---|---|
-| more and more varied data | less to memorise |
+| more and more varied data | less to memorize |
 | validation data | check on data that were never used for learning |
 | early stopping | take the best network according to validation, not the last one |
-| smaller networks, regularisation | less capacity for memorising |
+| smaller networks, regularization | less capacity for memorizing |
 
 In robotics, overfitting usually means: the network has adapted itself to **exactly this
 simulation** – to this mass, this friction, this servo. In the real world everything is a little
-different. The remedy is variation (domain randomisation, A.12). Kern therefore evaluates every
+different. The remedy is variation (domain randomization, A.12). Kern therefore evaluates every
 network twice: on the **clean** robot and under **full variation** (`kern_lehrer --eval`,
 `JumpReport`, `PlayReport`). The choice of round for the play network
 (`docs/lehrer.md`, Section 8; Section 14.8) is likewise early stopping after an evaluation.
@@ -506,14 +506,14 @@ network twice: on the **clean** robot and under **full variation** (`kern_lehrer
 ### A.9.1 Supervised learning
 
 In **supervised learning** there are pairs $(x, t)$: the correct answer for each input. The network
-learns the mapping by minimising a loss such as the MSE. This is the simplest form of learning –
+learns the mapping by minimizing a loss such as the MSE. This is the simplest form of learning –
 provided someone supplies the correct answers.
 
-### A.9.2 Behaviour cloning
+### A.9.2 Behavior cloning
 
 In robot learning, the "correct answer" is the action of an expert. If one has an expert who
 demonstrates a task, and records pairs (observation, expert action), a network can be trained on
-them in a supervised manner. This is called **behaviour cloning** (BC).
+them in a supervised manner. This is called **behavior cloning** (BC).
 
 **In Kern:** `Ppo::imitate(observations, target, epochs, batch, learning_rate, seed)` fits the
 actor's mean to the target actions via MSE – Adam with its own moments, minibatches in a fixed
@@ -522,7 +522,7 @@ order. In Kern the expert is called the **Vorbild** ("role model"): for the jump
 
 ### A.9.3 Distribution shift
 
-Behaviour cloning has an insidious flaw. The network only learns states the expert visited. If it
+Behavior cloning has an insidious flaw. The network only learns states the expert visited. If it
 makes a small mistake, it ends up in a state the expert would never have reached – there it has no
 data and makes a larger mistake, and so on. The errors compound. This is called **distribution
 shift** (or *covariate shift*): the distribution of states at test time differs from that during
@@ -580,7 +580,7 @@ hidden quantities, it cannot.
 
 ## A.10 Reinforcement learning from the ground up
 
-Behaviour cloning needs an expert. If there is none – or if the network is to become better than the
+Behavior cloning needs an expert. If there is none – or if the network is to become better than the
 expert – one needs **reinforcement learning** (RL): the network tries things out, the environment
 rewards or punishes, and the network learns to obtain more reward.
 
@@ -803,7 +803,7 @@ flowchart LR
   R -->|"return target"| Critic
 ```
 
-**In Kern:** `Ppo` has `policy_.actor` and `critic_`, each with its own normaliser
+**In Kern:** `Ppo` has `policy_.actor` and `critic_`, each with its own normalizer
 (`policy_.normalizer`, `critic_norm_`) and its own Adam. The critic has one output
 (`c.push_back(1)` in the constructor).
 
@@ -854,12 +854,12 @@ return_buf_[row] = adv + v;
 `live` is 0 after an episode end (terminal or timeout): then there is neither $\gamma V(s_{t+1})$
 nor a continuation of the recursion. For the last step of the rollout, $V(s_{T})$ comes from
 `last_critic`, the critic observation of where each duck stood at the end. Afterwards the advantages
-are normalised over the whole batch to mean 0 and standard deviation 1 – this makes the size of the
+are normalized over the whole batch to mean 0 and standard deviation 1 – this makes the size of the
 policy gradient independent of the scale of the reward.
 
 ### A.11.3 Why a naive policy gradient is unstable
 
-One could now simply maximise $\sum_t \log\pi_\theta(a_t|o_t)\hat A_t$. The problem: the data come
+One could now simply maximize $\sum_t \log\pi_\theta(a_t|o_t)\hat A_t$. The problem: the data come
 from the **old** policy. If one takes a large step, the new policy is far away, the advantages no
 longer apply to it, and a good policy can be destroyed in a single step – with bad data in the next
 round from which recovery is hardly possible. Several epochs on the same data (which would be
@@ -877,7 +877,7 @@ surrogate objective is
 
 $$L^\text{CLIP}(\theta) = \mathbb{E}_t\left[\min\left(\rho_t \hat A_t,\ \operatorname{clip}(\rho_t, 1-\varepsilon, 1+\varepsilon)\,\hat A_t\right)\right],$$
 
-with $\varepsilon = 0.2$ (`PpoConfig::clip`). It is **maximised**; Kern minimises its negative and
+with $\varepsilon = 0.2$ (`PpoConfig::clip`). It is **maximized**; Kern minimizes its negative and
 therefore writes the minimum as the maximum of the negated terms:
 
 ```cpp
@@ -938,7 +938,7 @@ jumps.
 
 ### A.11.7 Value loss
 
-The critic minimises $(V_\phi(s_t) - \hat R_t)^2$. Here, too, Kern clips (`clipped_value_loss`):
+The critic minimizes $(V_\phi(s_t) - \hat R_t)^2$. Here, too, Kern clips (`clipped_value_loss`):
 the new value estimate may move at most $\varepsilon$ away from the estimate at collection time, and
 the larger of the two errors counts:
 
@@ -951,9 +951,9 @@ with weight `value_coef = 1`.
 ```mermaid
 flowchart TD
   S["Collect: T steps × N ducks (Collector)"] --> K["Canonical order: step by step, duck by duck"]
-  K --> N["Update normalisers"]
+  K --> N["Update normalizers"]
   N --> E["Re-evaluate old policy: μ_old, log π_old, V_old"]
-  E --> G["GAE: advantages Â, targets R̂; normalise Â"]
+  E --> G["GAE: advantages Â, targets R̂; normalize Â"]
   G --> P["Draw one permutation"]
   P --> EP{"Another epoch (of 5)?"}
   EP -->|yes| MB["Minibatch (of 4)"]
@@ -969,9 +969,9 @@ The values of Kern's `PpoConfig`: `steps_per_env = 24` (jump: 48), `epochs = 5`,
 
 ### A.11.9 Collecting and learning kept separate
 
-Kern deliberately separates the two halves: a `Collector` needs only the `Policy` (actor, normaliser,
+Kern deliberately separates the two halves: a `Collector` needs only the `Policy` (actor, normalizer,
 spread) and returns a `Rollout`; the learner (`Ppo::learn`) takes the rollouts of all collectors.
-Both can be serialised into flat buffers. This way the collectors can be native threads or web
+Both can be serialized into flat buffers. This way the collectors can be native threads or web
 workers in the browser (`docs/lehrer.md`, Section 6).
 
 ### A.11.10 Determinism in learning
@@ -1010,9 +1010,9 @@ Two strategies complement each other:
 2. **Make the network insensitive:** it learns in many slightly different worlds, so that the real
    one is just one more.
 
-### A.12.2 Domain randomisation
+### A.12.2 Domain randomization
 
-In **domain randomisation**, every episode draws its physical and sensory parameters afresh from
+In **domain randomization**, every episode draws its physical and sensory parameters afresh from
 distributions. A network that works in all these worlds has learned what they have in common.
 
 **In Kern** (`docs/lehrer.md`, Section 5; `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
@@ -1020,7 +1020,7 @@ distributions. A network that works in all these worlds has learned what they ha
 | What | Variation |
 |---|---|
 | Start | random yaw, ±3° tilt, sole friction 0.7–1.3 |
-| Build | torso mass and inertia ±5%, centre of mass of torso and head (curriculum 3 → 15 mm and 3 → 10 mm respectively) |
+| Build | torso mass and inertia ±5%, center of mass of torso and head (curriculum 3 → 15 mm and 3 → 10 mm respectively) |
 | Servos | from the profile's spreads (XL330: friction, rotor inertia ±10%), dead time 15–30 ms |
 | Sensors | noise on gyro, gravity, joint angles, joint velocities; encoder offset; IMU delay |
 | Pushes | every 3–6 s ±0.3 m/s, from iteration 300 (until 500 at 27% strength) |
@@ -1028,7 +1028,7 @@ distributions. A network that works in all these worlds has learned what they ha
 Two subtleties:
 
 - **Curricula**: some variations are introduced only gradually. `Task::progress(iteration)` widens
-  the centre-of-mass spread from iteration 200 over 600 iterations; `Recipe::push_scale` switches the
+  the center-of-mass spread from iteration 200 over 600 iterations; `Recipe::push_scale` switches the
   pushes on only from iteration 300. Too much variation at the start prevents the motion from
   emerging at all.
 - **What cannot be measured is varied.** Besides the values, `ServoProfile` has the spreads
@@ -1065,25 +1065,25 @@ reordered from the ONNX layout (`[out][in]`, Gemm with `transB`) into Kern's inp
 
 ### A.13.1 When there is no gradient
 
-Some optimisation problems have no usable gradient. Examples in Kern:
+Some optimization problems have no usable gradient. Examples in Kern:
 
 - **The jump Vorbild:** 15 numbers (servo targets of the left leg at five points in time), evaluated
   by an entire simulation with falling, flight and landing. The evaluation is noisy (different robots
   in each generation) and piecewise flat.
 - **Calibration:** choose the parameters of a servo profile so that the simulation reproduces
-  measurements (`kalibrierung.cpp` optimises 6 parameters).
+  measurements (`kalibrierung.cpp` optimizes 6 parameters).
 
-**Evolution strategies** are suited to such cases: candidates are drawn around a centre, evaluated,
-and the centre is shifted towards the better ones.
+**Evolution strategies** are suited to such cases: candidates are drawn around a center, evaluated,
+and the center is shifted toward the better ones.
 
 ### A.13.2 The idea of CMA-ES
 
 **CMA-ES** (*Covariance Matrix Adaptation Evolution Strategy*, Hansen) draws the candidates from a
-multivariate normal distribution and learns not only its centre but also its shape:
+multivariate normal distribution and learns not only its center but also its shape:
 
 $$x_k = m + \sigma\, y_k,\qquad y_k = B D z_k,\qquad z_k \sim \mathcal N(0, I).$$
 
-- $m$: the centre of the search,
+- $m$: the center of the search,
 - $\sigma$: the global step size,
 - $C = B D^2 B^\top$: the covariance matrix (shape and orientation of the search cloud); $B$ its
   eigenvectors, $D$ the square roots of its eigenvalues,
@@ -1094,14 +1094,14 @@ $$x_k = m + \sigma\, y_k,\qquad y_k = B D z_k,\qquad z_k \sim \mathcal N(0, I).$
    ·  ·   ·              · ·                      ·
   ·  ●  ·  ·            ·●··                     ●:
    · ·  ·               ·  ·  ↗                  (narrow, along
-  (round, large)       (stretched towards valley) the valley)
+  (round, large)       (stretched toward valley) the valley)
 ```
 
 The update per generation (after sorting the candidates by cost):
 
-1. **Weights** for the $\mu$ best: $w_i \propto \ln(\mu + \tfrac12) - \ln i$, normalised to sum 1.
+1. **Weights** for the $\mu$ best: $w_i \propto \ln(\mu + \tfrac12) - \ln i$, normalized to sum 1.
    The effective number $\mu_\text{eff} = 1/\sum w_i^2$.
-2. **Centre:** $m \leftarrow m + \sigma \sum_i w_i\, y_{i:\lambda}$.
+2. **Center:** $m \leftarrow m + \sigma \sum_i w_i\, y_{i:\lambda}$.
 3. **Evolution path for the step size:**
    $p_\sigma \leftarrow (1 - c_\sigma) p_\sigma + \sqrt{c_\sigma(2-c_\sigma)\mu_\text{eff}}\; B \sum_i w_i z_{i:\lambda}$.
 4. **Step size:**
@@ -1128,7 +1128,7 @@ are specified in Hansen's tutorial; Kern adopts the formulas verbatim.
 - The starting point is evaluated first: "the result is never worse than where it began."
 - All candidates of a generation are passed together to `evaluate_all`, which can evaluate them in
   parallel.
-- The result contains `best` (the best evaluated point) **and** `mean` (the centre at the end). With
+- The result contains `best` (the best evaluated point) **and** `mean` (the center at the end). With
   noisy costs, `mean` is the better answer: the best point may just have been lucky.
   `search_jump_demo` therefore returns `demo_of(r.mean)`.
 
@@ -1157,7 +1157,7 @@ An MLP needs only a few operators:
 
 | Operator | Effect |
 |---|---|
-| `Sub`, `Div` | element-wise; here the normalisation $(x - \mu)/(\sigma + 0.01)$ |
+| `Sub`, `Div` | element-wise; here the normalization $(x - \mu)/(\sigma + 0.01)$ |
 | `Gemm` | $Y = X W^\top + b$ (with attribute `transB = 1`) |
 | `Elu` | the activation |
 
@@ -1198,13 +1198,13 @@ flowchart TD
   subgraph N["2. Imitate (DAgger, A.9)"]
     N1["Warm start: velstand (A.12.4)"] --> N2["Round 0: Vorbild drives"]
     N2 --> N3["Rounds 1–7: network drives, Vorbild labels"]
-    N3 --> N4["Behaviour cloning: MSE, Adam (A.3, A.6)"]
+    N3 --> N4["Behavior cloning: MSE, Adam (A.3, A.6)"]
   end
-  subgraph U["3. Practise (PPO, A.11)"]
+  subgraph U["3. Practice (PPO, A.11)"]
     U1["30 iterations critic only"] --> U2["PPO: GAE, clip, KL learning rate, entropy"]
     U2 --> U3["Full variation, asymmetric critic (A.12)"]
   end
-  V --> N --> U --> X["Export: ONNX with normaliser (A.14)"]
+  V --> N --> U --> X["Export: ONNX with normalizer (A.14)"]
   X --> S["Studio / robot: only the network"]
 ```
 
@@ -1212,13 +1212,13 @@ flowchart TD
 |---|---|---|
 | MLP, ELU | A.1 | `Mlp` (`nn.h`), `Mlp::forward` |
 | Backpropagation | A.5 | `Mlp::backward` |
-| MSE, behaviour cloning | A.3, A.9 | `Ppo::imitate` |
+| MSE, behavior cloning | A.3, A.9 | `Ppo::imitate` |
 | Adam, gradient clipping | A.4, A.6 | `Adam` (`nn.h`) |
-| Normalisation | A.7 | `Normalizer`; in ONNX as Sub/Div |
+| Normalization | A.7 | `Normalizer`; in ONNX as Sub/Div |
 | MDP, observation, reward | A.10 | `Env`, `Task`, `DuckEnv` (`env.h`) |
 | Gaussian policy, entropy | A.10 | `Policy`, `Collector`, `Ppo::update` |
 | Actor-critic, GAE, PPO | A.11 | `Ppo::learn`, `Ppo::update`, `PpoConfig` |
-| Domain randomisation | A.12 | `Task::Noise`, `Task::Start`, `ServoProfile::spread_*` |
+| Domain randomization | A.12 | `Task::Noise`, `Task::Start`, `ServoProfile::spread_*` |
 | Asymmetric critic | A.12 | `Task::privileged`, `DuckEnv::critic()` |
 | DAgger | A.9 | `dagger_episodes`, `JumpImitation`, `imitate_play` |
 | CMA-ES | A.13 | `cmaes_minimise`; Vorbild search, calibration |
@@ -1228,7 +1228,7 @@ flowchart TD
 The guiding principle behind it is stated at the end of `vorbild.h`: "At run time there is only the
 network: the demonstration exists only while it learns." Everything in this appendix – Vorbild,
 critic, spread, variation – is scaffolding that helps during learning and is taken down afterwards.
-What remains is a normalisation and a handful of matrix multiplications with ELU in between.
+What remains is a normalization and a handful of matrix multiplications with ELU in between.
 
 ---
 

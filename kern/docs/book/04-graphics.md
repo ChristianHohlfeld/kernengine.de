@@ -478,14 +478,14 @@ Kern Studio renders each viewport with its own `render()` call. A single full-sc
 
 ### 4.8.1 Sun Shadows
 
-`SunShadowMap` (`src/gfx/shadow.cpp`) is a single orthographic depth map. It follows the camera's view (shadow distance), snaps to its texel grid and is filtered in the standard shader with Castaño's optimised PCF. This keeps the shadows sharp and still when the camera moves.
+`SunShadowMap` (`src/gfx/shadow.cpp`) is a single orthographic depth map. It follows the camera's view (shadow distance), snaps to its texel grid and is filtered in the standard shader with Castaño's optimized PCF. This keeps the shadows sharp and still when the camera moves.
 
 **Options and limits** (`ShadowOptions`):
 
 | Field | Default | Valid | Meaning |
 |---|---|---|---|
 | `resolution` | 512 | power of two 128–4096 | edge length of the map in texels |
-| `extent` | 120 | 10–2000 | half edge length of the covered square in metres (without a shadow distance) |
+| `extent` | 120 | 10–2000 | half edge length of the covered square in meters (without a shadow distance) |
 | `bias` | 0.0012 | 0 ≤ bias < 0.04 | depth offset for the comparison |
 | `filter` | 9 | 1, 4, 9 | PCF taps: 1 hardware tap (2 × 2), 4 taps (3 × 3 kernel), 9 taps (5 × 5 kernel) |
 
@@ -498,7 +498,7 @@ At runtime `Renderer::set_shadow_filter(taps)` sets the filter level. The Studio
 ```cpp
 const f32 n = camera.near, f = max_of(camera.near + 0.1f, min_of(shadow_distance_, camera.far));
 const f32 tv = std::tan(camera.fov * 0.5f), th = tv * aspect, k = th * th + tv * tv;
-const f32 c = min_of(f, (f + n) * (1 + k) * 0.5f);         // centre on the view axis
+const f32 c = min_of(f, (f + n) * (1 + k) * 0.5f);         // center on the view axis
 const f32 r = std::sqrt((f - c) * (f - c) + f * f * k);    // radius
 focus = camera.eye + forward * c;  extent = r;
 ```
@@ -517,11 +517,11 @@ const f64 d = std::round(dot(focus, b.dir) / 8.0f);   // coarse along the light
 
 Why? If the map moves with the camera by fractions of a texel, shadow edges land on the grid differently every frame – the edges "swim" and flicker. Snapped, the map only moves in whole texels, and an edge always lies the same way. Along the light direction a coarse 8 m step is enough; this movement does not shift any texels, it only has to keep the depth range valid.
 
-**Reuse.** A hash is formed from the rounded coordinates, the sun direction (rounded to 10⁻⁴) and the extent (rounded to millimetres). The renderer combines it with the shadow revision and the frame's layer mask. The map is redrawn only when this key changes. The shadow revision increases when a shadow caster appears, disappears, moves, changes its material, or when `invalidate(true)` is called. With a stationary camera over a static city, the shadow then costs not a single draw call.
+**Reuse.** A hash is formed from the rounded coordinates, the sun direction (rounded to 10⁻⁴) and the extent (rounded to millimeters). The renderer combines it with the shadow revision and the frame's layer mask. The map is redrawn only when this key changes. The shadow revision increases when a shadow caster appears, disappears, moves, changes its material, or when `invalidate(true)` is called. With a stationary camera over a static city, the shadow then costs not a single draw call.
 
-**Drawing.** Matrix: `ortho(-e, e, -e, e, 0.2, 4e) * look_at(focus + dir * 2e, focus, up)` with `e` = the current extent and the snapped focus. The light frustum culls meshes whose bounds lie outside (except skinned ones). Colour writes off, depth test `LESS`, `polygonOffset(2, 3)` against shadow acne, a dedicated lean shader (position, instance matrix and skinning only; the fragment shader is empty). Only meshes with `casts_shadow()` in the active layers are drawn, with their own cull mode.
+**Drawing.** Matrix: `ortho(-e, e, -e, e, 0.2, 4e) * look_at(focus + dir * 2e, focus, up)` with `e` = the current extent and the snapped focus. The light frustum culls meshes whose bounds lie outside (except skinned ones). Color writes off, depth test `LESS`, `polygonOffset(2, 3)` against shadow acne, a dedicated lean shader (position, instance matrix and skinning only; the fragment shader is empty). Only meshes with `casts_shadow()` in the active layers are drawn, with their own cull mode.
 
-**Sampling.** The depth texture has `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` and linear filtering. A `texture(sampler2DShadow, ...)` then compares four neighbouring texels in hardware and interpolates the results bilinearly – that is the "hardware PCF", level 1. Levels 4 and 9 build on it, after Castaño (2013, "The Witness"), a tent-filtered 3 × 3 or 5 × 5 kernel: each tap lies between the texels so that the bilinear hardware weighting yields exactly the tent weights (`sunShadow` in the standard shader; sum divided by 16 or 144). For this the shader gets `uSunShadowFilter` and `uSunShadowTexel` (map size, its reciprocal, one texel in metres):
+**Sampling.** The depth texture has `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` and linear filtering. A `texture(sampler2DShadow, ...)` then compares four neighboring texels in hardware and interpolates the results bilinearly – that is the "hardware PCF", level 1. Levels 4 and 9 build on it, after Castaño (2013, "The Witness"), a tent-filtered 3 × 3 or 5 × 5 kernel: each tap lies between the texels so that the bilinear hardware weighting yields exactly the tent weights (`sunShadow` in the standard shader; sum divided by 16 or 144). For this the shader gets `uSunShadowFilter` and `uSunShadowTexel` (map size, its reciprocal, one texel in meters):
 
 ```glsl
 if (uSunShadowEnabled == 1 && ndl > 0.0) {
@@ -687,7 +687,7 @@ On a tie, the earlier request wins. `request()` limits intensity to 100 and rang
 | `ao` | see 4.8.4 | `AoOptions` |
 | `grade` | `true` | production grading after tonemapping |
 
-At runtime: `set_shadows(&options)` or `set_shadows(nullptr)`, `set_shadow_distance` (metres, 0 = fixed `extent`), `set_shadow_filter` (1, 4 or 9 taps), `set_ambient_occlusion`, `set_ambient_occlusion_radius`, `set_point_lights`, `invalidate(shadows)`.
+At runtime: `set_shadows(&options)` or `set_shadows(nullptr)`, `set_shadow_distance` (meters, 0 = fixed `extent`), `set_shadow_filter` (1, 4 or 9 taps), `set_ambient_occlusion`, `set_ambient_occlusion_radius`, `set_point_lights`, `invalidate(shadows)`.
 
 ### `Lighting` and `SkyState`
 

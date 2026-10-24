@@ -892,7 +892,7 @@ export function buildGameHtml({sources, wasmBase64, levelText, title}) {
   const code = inlineModules(sources.kern, sources.game).replace(/<\/script/gi, "<\\/script");
   const boot = `\n{const t=id=>document.getElementById(id).textContent;` +
     `startGame({base64:t("kern-wasm").trim(),levelText:t("kern-level")}).catch(e=>{const b=document.getElementById("error");b.style.display="block";b.textContent="Game failed to start: "+e.message;console.error(e);});}`;
-  const notices = typeof KERN_NOTICES === "string" ? `<!--\nMade with Kern (https://github.com/ChristianHohlfeld/kern).\n${KERN_NOTICES.replace(/--/g, "- -")}\n-->\n` : "";
+  const notices = typeof KERN_NOTICES === "string" ? `<!--\nMade with Kern (https://github.com/ChristianHohlfeld/kernengine.de).\n${KERN_NOTICES.replace(/--/g, "- -")}\n-->\n` : "";
   return `<!doctype html>\n${notices}<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">` +
     `<meta name="generator" content="Kern Studio"><title>${escHtml(title || "Kern game")}</title><style>${PLAYER_STYLE}</style></head><body>${PLAYER_BODY}` +
     `<script type="application/json" id="kern-level">${levelText.replace(/</g, "\\u003c")}<\/script>` +

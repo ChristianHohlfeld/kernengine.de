@@ -25,9 +25,9 @@ numbers.
 
 | Quantity | Symbol | Meaning | Unit |
 |---|---|---|---|
-| Position | $x$ | location of the centre of mass in the world | m |
+| Position | $x$ | location of the center of mass in the world | m |
 | Orientation | $q$ | rotation as a unit quaternion | – |
-| Linear velocity | $v$ | velocity of the centre of mass | m/s |
+| Linear velocity | $v$ | velocity of the center of mass | m/s |
 | Angular velocity | $\omega$ | rotation axis × rotation rate | rad/s |
 
 In addition, the **mass properties**, which do not change:
@@ -35,7 +35,7 @@ In addition, the **mass properties**, which do not change:
 | Quantity | Symbol | Meaning | Unit |
 |---|---|---|---|
 | Mass | $m$ | inertia against acceleration | kg |
-| Centre of mass | $c$ | in the body's own frame | m |
+| Center of mass | $c$ | in the body's own frame | m |
 | Inertia tensor | $I$ | inertia against rotation, $3\times3$, symmetric | kg·m² |
 
 The inertia tensor is constant in the body frame; in world coordinates it rotates along:
@@ -46,7 +46,7 @@ $I_\text{world} = R\, I\, R^\top$ with the rotation matrix $R$ of $q$.
 shapes and their density (`ShapeMaterial::density`) or are specified explicitly:
 `World::set_mass_data(body, mass, center, inertia[6])` with the six entries
 $I_{xx}, I_{yy}, I_{zz}, I_{xy}, I_{xz}, I_{yz}$ – this is how imported robots (MJCF, URDF) get their
-measured values. Conventions as in the renderer: metres, seconds, kilograms, **Z up**, quaternions
+measured values. Conventions as in the renderer: meters, seconds, kilograms, **Z up**, quaternions
 $(x, y, z, w)$, gravity $(0, 0, -9.80665)$ m/s² by default.
 
 ### C.1.3 The equations of motion
@@ -98,7 +98,7 @@ This is a system of equations in $x_{n+1}, v_{n+1}$, still easy to solve here.
 
 What happens over many steps? For each method one can compute an amplification factor per step:
 
-| Method | Amplification per step | Behaviour |
+| Method | Amplification per step | Behavior |
 |---|---|---|
 | explicit | $\sqrt{1 + (h\omega)^2} > 1$ | energy always **grows**, explodes |
 | semi-implicit | $= 1$ for $h\omega < 2$ | energy fluctuates but stays bounded; unstable for $h\omega \ge 2$ |
@@ -256,7 +256,7 @@ $s > 0$, the solver allows an approach of at most $s$ in this step ("speculative
 additionally **continuous collision** detection (Kern leaves it on, `enable_continuous`; fast player
 vehicles become `bullet`).
 
-The tolerances are fixed in metres (`box3d:include/box3d/constants.h`):
+The tolerances are fixed in meters (`box3d:include/box3d/constants.h`):
 
 | Tolerance | Value |
 |---|---|
@@ -267,7 +267,7 @@ The tolerances are fixed in metres (`box3d:include/box3d/constants.h`):
 That is why moving bodies should be between 0.1 m and 10 m in size. The Micro Duck, with limbs of
 2–4 cm, is simulated in Kern **scaled up by a factor of 4** (`kWalkerScale = 4`), with Froude
 similarity: lengths ×4, masses ×64, times ×2 (`docs/physics.md`, Section 1). Real units are used
-towards the outside (the networks' observations, logs).
+toward the outside (the networks' observations, logs).
 
 ---
 
@@ -316,7 +316,7 @@ Physically one distinguishes static and kinetic friction ($\mu_s > \mu_k$). Box3
 coefficient.
 
 **In Box3D** (`box3d:src/contact_solver.c`, "Central friction"): friction is solved not per contact
-point but once **at the centre of the manifold**, with the sum of the normal impulses of all points
+point but once **at the center of the manifold**, with the sum of the normal impulses of all points
 as the limit. The friction cone is **round**: if $\lVert\lambda_t\rVert$ is too large, the vector is
 shortened to length $\mu\sum\lambda_n$, rather than clamping each component individually. In
 addition there is **torsional friction** about the normal ("twist friction"), bounded by $\mu$ times
@@ -562,7 +562,7 @@ sub-steps. Kern additionally keeps springs below half the sub-step frequency (Ny
 
 An iterative solver distributes impulses according to the effective masses. If a heavy body hangs
 from a light one, it needs very many iterations until the impulses have propagated through; in the
-meantime the joints stretch. Rule of thumb: keep neighbouring masses within about 10:1
+meantime the joints stretch. Rule of thumb: keep neighboring masses within about 10:1
 (`docs/physics.md`, Section 2). Kern therefore gives the duck's 5 g hip brackets a minimum mass and
 makes a rigid part **one** body with several shapes instead of welding bodies together.
 
@@ -723,7 +723,7 @@ $$(0.1 + 0.2) + 0.3 = 0.6000000000000001,\qquad 0.1 + (0.2 + 0.3) = 0.6\quad(\te
 
 This gives rise to the dangers:
 
-- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorise. Kern
+- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorize. Kern
   forbids these options.
 - **Parallel sums.** If a sum is split across threads, the order depends on the number of threads.
   Kern sums in fixed chunks in a fixed order ([Appendix A](A-neural-networks.md), A.11.10).
@@ -745,7 +745,7 @@ WebAssembly.
 $+$, $\times$ and $\sqrt{\ }$ are prescribed exactly by IEEE, **but $\sin$, $\cos$, $\exp$, $\log$,
 $\text{pow}$, $\text{atan2}$ are not**. glibc, Apple's libm, Android's bionic and wasi-libc round them
 differently in the last bit. Kern therefore brings its own: the implementations from **musl** (MIT
-licence, `third_party/musl_math`, renamed to `kern_musl_*`), accessible via `kern::dm::` in
+license, `third_party/musl_math`, renamed to `kern_musl_*`), accessible via `kern::dm::` in
 `include/kern/core/dmath.h`. The rule for new code:
 
 > "Everything that feeds the simulation uses `kern::dm::sin` etc. instead of `std::sin`."

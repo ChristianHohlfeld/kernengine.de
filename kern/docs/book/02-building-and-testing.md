@@ -434,7 +434,7 @@ native and browser tests run in parallel and do not hold up publishing.
 ```
 
 **Concurrency:** the group is `ci-<ref>-pr` for pull requests and `ci-<ref>-<sha>` otherwise; only
-older runs of a pull request are cancelled. On `main`, every push runs to completion so that every
+older runs of a pull request are canceled. On `main`, every push runs to completion so that every
 green state is published (according to the comment, a run takes about 17 minutes).
 Permissions: `contents: write` (for the push to `gh-pages`).
 

@@ -34,7 +34,7 @@ There are three ways to open Studio:
 
 The project's home page (https://kernengine.de/) links to Studio, the Lehrer, the
 two example games and two levels you can play directly (`kern/web/studio/play.html?level=orbRun` and
-`?level=physicsLab`). Its footer names the owner ("© 2026 Christian Heinrich Hohlfeld") and links the licence
+`?level=physicsLab`). Its footer names the owner ("© 2026 Christian Heinrich Hohlfeld") and links the license
 (`LICENSING.txt`, Apache 2.0), the third-party components (`LICENSES.txt`), the source code, the Studio
 docs, the engine docs, the imprint and the privacy policy.
 
@@ -1065,7 +1065,7 @@ replaces the bundled one without copying any file.
 
 On publishing, the CI copies the networks to `editor/microduck/` and `editor/policies/`. If you host an
 exported game with a duck yourself, put these two folders next to the HTML file
-([11.16](#1116-exporting-a-game)). The licence of `microduck/` (`kern/third_party/microduck/LICENSE`)
+([11.16](#1116-exporting-a-game)). The license of `microduck/` (`kern/third_party/microduck/LICENSE`)
 and the `NOTICE` go with it; a game with the duck's look is non-commercial
 ([Chapter 12](12-your-own-games.md#126-publishing)).
 
@@ -1093,7 +1093,7 @@ detail in [Chapter 8](08-game-runtime.md).
 The file name is the level name, with everything except letters, digits, `-` and `_` replaced by `_`.
 
 **Android** has no `showOpenFilePicker`; Studio opens the regular file dialog there. That dialog does not
-know the `.klevel` extension and, with a filter, would grey out all saved levels. On Android Studio
+know the `.klevel` extension and, with a filter, would gray out all saved levels. On Android Studio
 therefore does not filter; if the chosen file is not a level, "… is not a Kern level" appears and the
 editor keeps running.
 
@@ -1183,7 +1183,7 @@ At the bottom there is a hint with the key bindings, hidden on touch devices.
 **What is not in the file:** the Micro Duck's on-demand networks ([11.14](#1114-loading-policies-jumponnx-playonnx)).
 Walking works without them because `velstand.onnx` is built in. For sitting, kicking, jumping and the play
 layer, the folders `microduck/` and `policies/` belong next to the HTML file, together with the
-licence of `microduck/` (`kern/third_party/microduck/LICENSE`) and the `NOTICE`. A game with the duck's
+license of `microduck/` (`kern/third_party/microduck/LICENSE`) and the `NOTICE`. A game with the duck's
 look is non-commercial ([Chapter 12](12-your-own-games.md#126-publishing)).
 
 ---

@@ -211,7 +211,7 @@ const game::ActorId duck = game::add_micro_duck(level, {0, 0, 0});  // Rumpf auf
 Schrittrate der Welt ein. Das Studio fügt die Ente aus dem Katalog genauso ein und meldet die
 geänderten World Settings.
 
-## 13.4 Das Servo-Modell
+## 13.4 Das Servomodell
 
 Pollen trainiert mit dem BAM-Modell „m6“ des XL330-M288 bei 7,4 V. Kern bildet es als
 **Gerätemodell** ab: ein kleines Gesetz in echten Einheiten über Box3D, dessen Parameter in einem

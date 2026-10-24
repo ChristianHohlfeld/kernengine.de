@@ -79,7 +79,7 @@ All functions act on the process-wide renderer `c_api_renderer()` (used by `Kern
 
 | Function | Description |
 |---|---|
-| `i32 kern_renderer_init(const u32* d)` | initialisation from a `KERN_ID_*` descriptor; queries `kern_game_extensions` |
+| `i32 kern_renderer_init(const u32* d)` | initialization from a `KERN_ID_*` descriptor; queries `kern_game_extensions` |
 | `void kern_renderer_shutdown()` | tear down the renderer |
 | `i32 kern_renderer_resize(i32 w, i32 h)` | size of the drawing buffer |
 | `u32 kern_material_key_count()`, `const char* kern_material_key(u32 i)` | names of the extensions' material parameters |
@@ -97,7 +97,7 @@ All functions act on the process-wide renderer `c_api_renderer()` (used by `Kern
 | `i32 kern_mesh_visible(u32 id, i32 visible)` | visibility |
 | `i32 kern_mesh_remove(u32 id)` | remove a mesh |
 | `i32 kern_mesh_exists(u32 id)`, `u32 kern_mesh_count()` | queries |
-| `i32 kern_mesh_info(u32 id, f64* out)` | `out[8]`: vertices, triangles, instances, visible, bounds centre xyz, bounds radius |
+| `i32 kern_mesh_info(u32 id, f64* out)` | `out[8]`: vertices, triangles, instances, visible, bounds center xyz, bounds radius |
 | `const void* kern_mesh_stream(u32 id, u32 stream, u32* count)` | read access to CPU streams: 0 positions, 1 normals, 2 colors, 3 uvs, 4 transforms, 5 tints (`f32`), 6 indices (`u32`) |
 
 **Textures**
@@ -163,7 +163,7 @@ The offsets must match the constants in `kern/web/kern.mjs` (`MD`, `MF`, `ID`, `
 | 1 << 3 | `CAST_SHADOW` | casts shadows |
 | 1 << 4 | `FRUSTUM_CULLED` | is culled |
 | 1 << 5 | `VIEWMODEL` | viewmodel layer (after a depth clear, e.g. gizmos) |
-| 1 << 6 | `LINEAR_COLORS` | vertex colours are linear (no sRGB decoding) |
+| 1 << 6 | `LINEAR_COLORS` | vertex colors are linear (no sRGB decoding) |
 | 1 << 7 | `WELD` | index a triangle soup before uploading |
 | 1 << 8 | `LINES` | line list instead of triangles (always unlit, no shadow, not pickable) |
 
@@ -243,7 +243,7 @@ Driven by the host `kern/web/app.mjs` ([Chapter 12](12-your-own-games.md)).
 
 The page `kern/web/studio/` and exported games (`game.mjs`) talk to the editor through these
 functions. JSON responses come back as pointers (valid until the next call, length via
-`kern_studio_result_length()`); before a successful initialisation almost all functions return
+`kern_studio_result_length()`); before a successful initialization almost all functions return
 `nullptr` or 0 (exception: `kern_studio_load_policy` registers policies even beforehand). The
 commands for `kern_studio_command` are described in [Chapter 11](11-studio.md) (source:
 `docs/studio.md`, section "Protokoll").
@@ -324,7 +324,7 @@ Results are pointers with `kern_lehrer_result_length()` bytes, valid until the n
 | `i32 kern_lehrer_create(const char* task, u32 task_length, i32 envs, u32 seed, i32 first)` | environments `first … first+envs−1` of a run (`jump`, `stand`) with its recipe; worker w of k gets `first = w × envs` |
 | `void kern_lehrer_progress(i32 iteration)` | before iteration `iteration` (from 1): curricula and pushes according to the recipe |
 | `i32 kern_lehrer_set_policy(const f32* data, u32 count)` | policy to act with (`Policy::serialize`, `count` floats) |
-| `const u8* kern_lehrer_collect(i32 steps)` | `steps` steps of each environment; returns a serialised rollout |
+| `const u8* kern_lehrer_collect(i32 steps)` | `steps` steps of each environment; returns a serialized rollout |
 | `i32 kern_lehrer_learner(const char* task, u32 task_length, const char* config, u32 config_length, u32 seed)` | learner with recipe; JSON overrides `learningRate`, `initStd`, `entropyCoef`, `desiredKl`, `steps`, `epochs`, `minibatches`, `warmStart` (`"velstand"` \| `"none"`), `imitate` |
 | `i32 kern_lehrer_steps()` | steps per environment and iteration of the recipe |
 | `const char* kern_lehrer_evaluate(i32 episodes)` | `jump` only: JSON `jumps`, `episodes`, `heightMm`, `riseMm`, `tiltDeg`, `flightS`, `falls` |
@@ -375,7 +375,7 @@ After reading all options, the program loads Pollen's policies (`--policies`) an
 | 7 | `--vorbild-suchen FILE` | search for a jump demonstration (CMA-ES) |
 | 8 | `--vorbild-pruefen X` | evaluate a demonstration |
 | 9 | `--spielen-pruefen X` | evaluate a play network or demonstration |
-| 10 | `--spielen-ueben FILE` | practise a play network (PPO) |
+| 10 | `--spielen-ueben FILE` | practice a play network (PPO) |
 | 11 | `--spielen-spur` | one play episode, decision by decision |
 | 12 | `--biss-fenster` | measure where the beak grips a sock |
 | 13 | `--halt-messen` | measure how far the duck keeps walking after "stop" |
@@ -476,7 +476,7 @@ before practice).
 |---|---|
 | `--spielen` | play network through imitation of the demonstration (DAgger); `--out` is written after each round ("play") |
 | `--spielen-pruefen vorbild\|play.onnx` | evaluate the demonstration or a network (clean and with variation) ("check play") |
-| `--spielen-ueben play.onnx` | practise a network with PPO (half the ducks clean, half with variation; the critic warms up for 20 iterations); every 20 iterations an evaluation and `<stem>_itNNNN.onnx` ("practise play") |
+| `--spielen-ueben play.onnx` | practice a network with PPO (half the ducks clean, half with variation; the critic warms up for 20 iterations); every 20 iterations an evaluation and `<stem>_itNNNN.onnx` ("practice play") |
 | `--spielen-spur` | one episode, decision by decision; with `--netz play.onnx` the network drives and the line shows both answers ("play trace") |
 | `--netz play.onnx` | play network for `--spielen-spur` and `--demo-spur` ("network") |
 | `--biss-fenster` | where the beak gets hold of a sock ("bite window") |
@@ -518,8 +518,8 @@ A level is JSON with `"format": "kern-level"` and `"version": 1`. The writer
 | `sounds` | imported sounds: `id`, `name`, `duration`, `src` |
 | `logic` | level graph (only if present) |
 
-Units: metres, seconds, kilograms, Z up; rotations as Euler angles in degrees (x roll, y pitch,
-z yaw; applied as yaw × pitch × roll); colours sRGB 0…1. A different `format` is rejected ("not a
+Units: meters, seconds, kilograms, Z up; rotations as Euler angles in degrees (x roll, y pitch,
+z yaw; applied as yaw × pitch × roll); colors sRGB 0…1. A different `format` is rejected ("not a
 Kern level"), as is a higher `version` ("level was written by a newer Kern Studio"). Components and
 fields are described in [Chapter 8](08-game-runtime.md).
 
@@ -536,7 +536,7 @@ obs [1, n] → Sub(obs_mean) → Div(obs_div) → (Gemm, Elu(alpha 1))* → Gemm
 
 - Input `obs`, output `actions`, `float32`. The Gemm weights are stored as `[out][in]` with
   `transB = 1`.
-- The normaliser is part of the graph: `(obs − mean) / div` (according to `docs/lehrer.md`,
+- The normalizer is part of the graph: `(obs − mean) / div` (according to `docs/lehrer.md`,
   `div` = σ + 0.01).
 - Motion networks have 61 observations and 14 actions (Pollen's `velstand`: 61 → 512 → 256 → 128 →
   14). The play network `play.onnx` has 23 → 9 (25 Hz).
@@ -567,7 +567,7 @@ Box3D)`, `rate_hz` = `25`, `observation_names` (23 names from `ball_known` to `w
 `action_names` = `forward,strafe,turn,head_yaw,head_pitch_down,beak_open,kick_left,ground_pick,neck_bow`.
 
 **The pick-up detector** (`pickup_detector.onnx`, robotd) has a different shape: input a window of
-50 × 63 features, normalise and mask, a Gather of the columns it reads, three Conv1d with ELU, then
+50 × 63 features, normalize and mask, a Gather of the columns it reads, three Conv1d with ELU, then
 Gemm, ELU, Gemm, Sigmoid; output p(held). It is read by `parse_onnx_pickup` (`PickupDetector`); it
 is built in as bytes (`third_party/microduck/pickup_detector.inc`, `pickup_detector()`),
 [Chapter 13](13-micro-duck.md).
@@ -640,14 +640,14 @@ Details in [Chapter 16](16-calibration.md) and `docs/kalibrierung.md`.
 | **Armature** | rotor inertia of a servo, transferred through the gearbox onto the joint axis (kg·m²) |
 | **Box3D** | 3D physics engine by Erin Catto, compiled in unmodified as C17 ([Chapter 6](06-physics.md)) |
 | **C ABI** | the flat `extern "C"` functions of the module, through which JavaScript talks to the engine |
-| **CMA-ES** | derivative-free optimisation method; used in the Lehrer for calibration and demonstration search |
+| **CMA-ES** | derivative-free optimization method; used in the Lehrer for calibration and demonstration search |
 | **Collector** | runs environments with a given policy and delivers rollouts (German: *Sammler*) |
 | **Content Drawer** | Studio panel for placing actors |
 | **Critic** | value function in PPO; in the Lehrer it sees the clean state (asymmetric) |
 | **DAgger** | imitation learning: the network drives, the demonstration states the correct action on each tick |
 | **Determinism fingerprint** | hash per control tick over the state of the walking duck; reference in `kern/tests/determinism_fingerprint.txt` |
 | **`dm`** | `kern::dm`, deterministic transcendental functions from musl |
-| **Domain randomisation / variation** | training with random deviations in build, servos, sensors and start |
+| **Domain randomization / variation** | training with random deviations in build, servos, sensors and start |
 | **DuckEnv** | Lehrer environment: one Micro Duck in a `GameWorld` of its own |
 | **Error channel** | `fail()` / `last_error()` instead of exceptions (German: *Fehlerkanal*) |
 | **GameWorld** | displays a level with the renderer and plays it on Box3D |

@@ -45,10 +45,36 @@ def mermaid(code):
     else: sys.exit(f"mmdc failed on diagram {mermaid_n}:\n{code}")
     from PIL import Image
     pw, ph = Image.open(png).size
-    text_w, max_h = w - 39.0, 185.0                 # mm: the text block's width, the tallest a diagram may be
+    text_w, max_h = w - 39.0 - 3.5, 185.0           # mm: the text block's width less the paragraph indent, the tallest a diagram may be
     natural = pw / 4 / 96 * 25.4 * 0.85             # mm at 96 dpi, a little smaller (the book's type is smaller than the web's)
     width = min(text_w, natural, max_h * pw / ph)
     return f"![]({png}){{width={width:.1f}mm}}"
+
+TEXT_W, TEXT_H = w - 39.0, h - 54.0  # mm: the text block (inner 22 + outer 17, top 20 + bottom 24 + head)
+
+
+def print_width(f):
+    """A picture's printed width: the text width at most, never below 300 dpi, never taller than
+    60 % of the text block (a tall phone screenshot would leave half a page empty), the author's
+    photo 45 mm."""
+    from PIL import Image
+    pw, ph = Image.open(f).size
+    if f.name.startswith("autor"): return min(45.0, pw / 300 * 25.4)
+    return min(TEXT_W - 3.5, pw / 300 * 25.4, 0.6 * TEXT_H * pw / ph)  # 3.5 mm: the paragraph indent
+
+
+def print_copy(f):
+    """Dark screenshots (the Studio's dark UI) printed in black and white turn into dark grey
+    areas: for print they are lightened (gamma 0.55, black lifted to 12 %), the original stays."""
+    from PIL import Image, ImageStat
+    im = Image.open(f).convert("RGB")
+    lum = ImageStat.Stat(im.convert("L")).mean[0] / 255
+    if lum >= 0.42 or f.name.startswith("autor"): return f
+    lut = [round(255 * (0.12 + 0.88 * (v / 255) ** 0.55)) for v in range(256)]  # #1e1e1e panels -> light grey, white stays white
+    out = work / "fig" / ("hell-" + f.name)
+    im.point(lut * 3).save(out)
+    return out
+
 
 parts = []
 for i, p in enumerate(files):
@@ -63,7 +89,7 @@ for i, p in enumerate(files):
         if not f.exists():
             print("missing image", path, file=sys.stderr)
             return ""
-        return f"![{alt}]({f}){{width={'45mm' if f.name.startswith('autor') else '100%'}}}"
+        return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
     t = re.sub(r"!\[([^\]]*)\]\(((?:\.\./buch/)?bilder/[^)\s]+)\)", img, t)
     # Links to other chapters (with or without an anchor) point into the book.
     def link(m):
@@ -72,7 +98,7 @@ for i, p in enumerate(files):
         return m.group(0)
     t = re.sub(r"\[([^\]]+)\]\(([0-9A-Z][^)#\s]*\.md)(#[^)\s]+)?\)", link, t)
     if p.name.startswith("00"):  # in print: the imprint alone (the title page and the table of contents are the book's)
-        t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\thispagestyle{empty}\\footnotesize\n```\n\n## ", t, count=1, flags=re.S | re.M)
+        t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\thispagestyle{empty}\\begingroup\\footnotesize\\raggedright\n```\n\n## ", t, count=1, flags=re.S | re.M)
         t = re.sub(r"^## (.+)$", r"## \1 {.unnumbered}", t, flags=re.M)
         t = re.sub(r"^## (Inhalt|Contents)\b.*\Z", "", t, flags=re.S | re.M)
     # The chapter's first heading carries its id; the imprint and the appendices are not numbered.
@@ -89,7 +115,7 @@ for i, p in enumerate(files):
     if p.name[0].isalpha() and (i == 0 or files[i - 1].name[0].isdigit()):
         t = "```{=latex}\n\\appendix\n```\n\n" + t
     if p.name.startswith("00"):
-        t = t + "\n\n```{=latex}\n\\normalsize\n\\tableofcontents\n\\kernmainmatter\n```\n"
+        t = t + "\n\n```{=latex}\n\\par\\endgroup\\normalsize\n\\tableofcontents\n\\kernmainmatter\n```\n"
     parts.append(t)
 
 (work / "buch.md").write_text("\n\n".join(parts))
@@ -103,8 +129,14 @@ header.write_text(r"""
 \setmonofont{DejaVu Sans Mono}[Scale=0.82]
 \setsansfont{DejaVu Sans}[Scale=0.9]
 \usepackage{fvextra}
+\usepackage{xurl}
+\usepackage{adjustbox}
+\makeatletter\renewcommand*\@pnumwidth{2.4em}\makeatother  %% three-digit page numbers in the contents
+\binoppenalty=100
+\relpenalty=100
+\tolerance=2000
+\hbadness=10000
 \DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\footnotesize}
-\RecustomVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines,breakanywhere,fontsize=\footnotesize}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}
@@ -116,10 +148,10 @@ header.write_text(r"""
 \let\kernmainmatter\mainmatter
 \renewcommand{\mainmatter}{}  %%%% pandoc says it before the body; the book says it after the contents
 \frontmatter
-""" % ("[variant=british]{english}" if a.en else "[spelling=new]{german}", logo_tex.as_posix()))
+""" % ("[variant=american]{english}" if a.en else "[spelling=new]{german}", logo_tex.as_posix()))
 title = "Kern – The Book" if a.en else "Kern – Das Buch"
 titlepage = work / "titlepage.tex"
-sub = ("The engine, Kern Studio, a walking robot and the Lehrer" if a.en
+sub = ("The Engine, Kern Studio, a Walking Robot and the Lehrer" if a.en
        else "Die Engine, Kern Studio, ein Laufroboter und der Lehrer")
 titlepage.write_text(r"""
 \thispagestyle{empty}
@@ -140,9 +172,9 @@ titlepage.write_text(r"""
 \end{center}
 \newpage
 """ % ("The Book" if a.en else "Das Buch", sub))
-cmd = ["pandoc", str(work / "buch.md"), "-o", str(out),
+cmd = ["pandoc", str(work / "buch.md"), "-s", "-o", str(work / "buch.tex"), "--lua-filter", str(here / "buch_code.lua"), "--columns=50", "--no-highlight",
        "-f", "markdown+pipe_tables+tex_math_dollars+raw_attribute+autolink_bare_uris-yaml_metadata_block-implicit_figures",
-       "--pdf-engine=xelatex", "--top-level-division=chapter", "--toc-depth=1",
+       "--top-level-division=chapter", "--toc-depth=1",
        "-V", "documentclass=scrbook", "-V", "classoption=openright,twoside,fontsize=10pt,headings=normal",
        "-V", f"geometry=paperwidth={w}mm,paperheight={h}mm,inner=22mm,outer=17mm,top=20mm,bottom=24mm",
        "-V", "fontfamily=fontspec", "-V", "mainfont=DejaVu Serif", "-V", "mainfontoptions=Scale=0.92", "-V", "mathfont=DejaVu Math TeX Gyre", "-V", "colorlinks=true", "-V", "linkcolor=black", "-V", "urlcolor=black",
@@ -150,6 +182,25 @@ cmd = ["pandoc", str(work / "buch.md"), "-o", str(out),
        "-H", str(header), "--resource-path", str(src)]
 r = subprocess.run(cmd, cwd=work)
 if r.returncode: sys.exit(f"pandoc failed (intermediate files in {work})")
+# Table cells: the first word of a cell may be hyphenated too (\hspace{0pt} gives it glue before it).
+tex = (work / "buch.tex").read_text()
+tex = tex.replace("\\raggedright\\arraybackslash}", "\\raggedright\\arraybackslash\\hspace{0pt}}")
+tex = tex.replace("\\begin{minipage}[b]{\\linewidth}\\raggedright\n", "\\begin{minipage}[b]{\\linewidth}\\raggedright\\hspace{0pt}\n")
+(work / "buch.tex").write_text(tex)
+for run in range(3):  # contents, references and running heads settle after three runs
+    r = subprocess.run(["xelatex", "-interaction=nonstopmode", "-halt-on-error", "buch.tex"], cwd=work, capture_output=True, text=True)
+    if r.returncode: sys.exit(f"xelatex failed (intermediate files in {work}):\n{r.stdout[-3000:]}")
+shutil.copy(work / "buch.pdf", out)
+# Nothing may reach into the margin: every overfull line is reported with its page (KDP rejects
+# text outside the margins).
+log = (work / "buch.log").read_text(errors="replace")
+over, page = [], 1
+for line in log.splitlines():
+    for m in re.finditer(r"\[(\d+)", line): page = int(m.group(1)) + 1
+    m = re.match(r"Overfull \\hbox \(([\d.]+)pt too wide\)", line)
+    if m and float(m.group(1)) > 0.5: over.append((page, float(m.group(1))))
+if over:
+    print(f"OVERFULL: {len(over)} lines, worst {max(o[1] for o in over):.1f} pt; pages (approx.): " + ", ".join(f"{p}:{v:.0f}pt" for p, v in over[:40]), file=sys.stderr)
 pages = subprocess.run(["pdfinfo", str(out)], capture_output=True, text=True).stdout
 pages = re.search(r"Pages:\s+(\d+)", pages)
 print(f"{out}: {pages.group(1) if pages else '?'} pages, {mermaid_n} diagrams, {w} x {h} mm")

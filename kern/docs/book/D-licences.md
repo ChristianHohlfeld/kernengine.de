@@ -1,10 +1,10 @@
-# Appendix D – Licences
+# Appendix D – Licenses
 
-This appendix reproduces the licence texts of the software that Kern uses and this book describes.
+This appendix reproduces the license texts of the software that Kern uses and this book describes.
 Where each part comes from and what was changed is listed in the repository in `kern/LICENSES.md`
 and `NOTICE`.
 
-| Component | Rights holder | Licence |
+| Component | Rights holder | License |
 |---|---|---|
 | Kern (engine, Kern Studio, Lehrer, tools, networks) | Christian Heinrich Hohlfeld | Apache License 2.0 |
 | Box3D | Erin Catto | MIT |
@@ -12,14 +12,14 @@ and `NOTICE`.
 | musl maths functions | Rich Felker et al. | MIT |
 | Intel XeGTAO (method and presets, `gtao.cpp`) | Intel Corporation | MIT |
 | three.js (ACES fit, fog, `standard_shader.cpp`) | three.js authors | MIT |
-| Micro Duck robot model (MJCF), policies, pick-up detector, ported software (idle look-around, autonomous brain, voice synthesiser) | Pollen Robotics | Apache License 2.0 |
+| Micro Duck robot model (MJCF), policies, pick-up detector, ported software (idle look-around, autonomous brain, voice synthesizer) | Pollen Robotics | Apache License 2.0 |
 | `policies/jump.onnx` (warm start from Pollen's `velstand.onnx`) | Christian Heinrich Hohlfeld; Pollen Robotics | Apache License 2.0 |
 | Micro Duck 3D models in Kern Studio (not included in this book) | Pollen Robotics | CC BY-NC-SA 4.0 |
 
-The licence text of CC BY-NC-SA 4.0 is available at
+The license text of CC BY-NC-SA 4.0 is available at
 <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>.
 
-The book itself is not covered by these licences (see the [imprint](00-imprint.md)).
+The book itself is not covered by these licenses (see the [imprint](00-imprint.md)).
 
 ## D.1 Box3D (MIT)
 

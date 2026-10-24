@@ -15,8 +15,8 @@ browser, with kern3d a dependency-free WebGL core – the forerunner of Kern.
 
 Professionally he has built software for billing and financing (ines GmbH), a crafts platform
 (wirsindhandwerk.de) and, as a freelancer, for clients including Robert Bosch GmbH. Today he is the
-advisor for digital transformation and process optimisation and the internal data protection officer
-at WOBAK, the municipal housing company of Konstanz, where he leads the digitalisation project group
+advisor for digital transformation and process optimization and the internal data protection officer
+at WOBAK, the municipal housing company of Konstanz, where he leads the digitalization project group
 and the internal AI pilot group. Alongside, he builds and runs his own products, among them
 digitalisierungsplanung.de, a tool that records real work in the browser and makes it available to
 AI agents through an MCP server.

@@ -103,7 +103,7 @@ S = 4 (`game::kWalkerScale` in `include/kern/game/walker.h`, in the code as `kDu
 scaling is a change of units, not a bigger robot: if every quantity is scaled according to its
 dimension, Box3D computes the same motion. Everything that goes outside is in real units:
 `walker_probe`, the networks' observations, logs and calibration
-([Chapter 16](16-calibration.md)). Simulation results are no guarantee of safe behaviour on hardware.
+([Chapter 16](16-calibration.md)). Simulation results are no guarantee of safe behavior on hardware.
 
 The test `physics_scale_is_a_unit_system` (`tests/test_main.cpp`) builds a small servo leg (72 g
 trunk, two 5 cm links, spring servos with friction) at 1×, 4× and 8× size:
@@ -587,7 +587,7 @@ How it works:
   body may tilt and swing at the grab point.
 - With `hold_rotation = true` the grab also keeps the orientation the body had when grabbed, as a
   hand does: an angular spring at half the frequency, critically damped, maximum torque a quarter of
-  the maximum force (a quarter-metre lever). `GameWorld::begin_grab` uses this for a Micro Duck's
+  the maximum force (a quarter-meter lever). `GameWorld::begin_grab` uses this for a Micro Duck's
   trunk, so that it stays upright when lifted instead of swinging on a point
   ([Chapter 13](13-micro-duck.md)).
 - `update(dt)` moves the mouse body to the target via `set_target_pose`. The body stays fully in the

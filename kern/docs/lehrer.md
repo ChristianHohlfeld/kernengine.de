@@ -1,6 +1,6 @@
-# Der Lehrer: eigene Netze für den Micro Duck
+# Der Lehrer: eigene Netze für die Micro Duck
 
-Kern trainiert Policies für den Micro Duck selbst. Alles läuft in C++ auf Kerns eigener Engine und
+Kern trainiert Policies für die Micro Duck selbst. Alles läuft in C++ auf Kerns eigener Engine und
 Box3D: Simulation, Lernverfahren, Export. Es gibt keine Python- oder PyTorch-Abhängigkeit. Gelernt
 wird beim Nutzer: nativ auf allen Kernen (auch headless auf einem Server), im Browser auf Desktop
 und Handy und später direkt im Studio.

@@ -1099,7 +1099,7 @@ Studio schützt ungespeicherte Arbeit, ohne bei jedem Neuladen zu fragen:
 - Die Engine schreibt spätestens 2 s nach jeder Änderung eine Kopie, aber nur, solange das Dokument
   ungespeicherte Änderungen hat. Die Seite hält höchstens eine Kopie (`localStorage`,
   `kern-studio.autosave.v1`).
-- Nach dem Speichern, oder wenn man bis zum gespeicherten Stand zurück-undoed, löscht die Seite die
+- Nach dem Speichern, oder wenn man alle Änderungen bis zum gespeicherten Stand rückgängig macht, löscht die Seite die
   Kopie wieder.
 - Beim Verlassen der Seite, beim Wechsel in den Hintergrund und vor einem Update schreibt sie eine fällige
   Kopie sofort. Hat das Dokument ungespeicherte Änderungen, fragt der Browser beim Verlassen nach.

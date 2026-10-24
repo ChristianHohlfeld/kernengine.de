@@ -85,7 +85,7 @@ Stattdessen gilt (`box3d:docs/loose_ends.md:59-61`): **Einheiten an genau einer 
 der Grenze zu Box3D**, nie verstreut im Simulationscode.
 
 Kerns Regel für kleine reale Modelle: das ganze Modell mit einem Faktor S skalieren, jede Größe mit
-ihrer Dimension (Froude-Ähnlichkeit – Posen und Gangart bleiben gleich). Für den Micro Duck ist
+ihrer Dimension (Froude-Ähnlichkeit – Posen und Gangart bleiben gleich). Für die Micro Duck ist
 S = 4 (`game::kWalkerScale` in `include/kern/game/walker.h`, im Code als `kDuckScale`):
 
 | Größe | Faktor | bei S = 4 | Bemerkung |
@@ -860,7 +860,7 @@ Spiele erzeugen Bodies und Gelenke nicht von Hand, sondern aus einem Level
 
 ---
 
-## 6.17 Das Servomodell – Brücke zum Micro Duck
+## 6.17 Das Servomodell – Brücke zur Micro Duck
 
 Box3D rechnet starre Körper, Gelenke und Kontakte. Was ein echtes Gerät darüber hinaus tut – ein
 Servo mit Regler, Reibung und Latenz – ist ein kleines **Gerätemodell** mit Parametern in echten

@@ -791,8 +791,8 @@ Was das Vorbild nicht von Hand weiß, misst der Lehrer in der Physik, wie sie je
   wird geprüft, ob die Socke hochkam und ob sie nach 3 s Wegtragen noch im Schnabel ist. Die beste
   Stelle ist eine gehaltene mit den meisten gehaltenen Stellen in ihrer Umgebung (±2 seitlich,
   ±1 voraus), denn das Hingehen ist nie exakt.
-- **`bite_spot()`** misst das einmal pro Prozess, bevor die Episoden es brauchen, mit dem Schnabel-
-  fenster, das das Netz gezeigt bekommt. Die Gitterstellen laufen parallel auf den Threads des
+- **`bite_spot()`** misst das einmal pro Prozess, bevor die Episoden es brauchen, mit dem Schnabelfenster,
+  das das Netz gezeigt bekommt. Die Gitterstellen laufen parallel auf den Threads des
   Trainings; nativ sorgt `std::call_once` für die eine Messung, WebAssembly läuft auf einem Thread und
   braucht dafür keinen Mutex. `--spielen` gibt das Ergebnis vor der ersten Runde aus („the bite,
   measured in this physics: …“). Hält nirgends etwas, nimmt es 6,5 cm vor dem Rumpf, mittig.

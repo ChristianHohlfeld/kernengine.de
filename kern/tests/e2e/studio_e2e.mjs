@@ -32,7 +32,7 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
 // Software WebGL (SwiftShader) renders the city at about one frame per second,
 // so every check waits for its effect instead of a fixed time.
 async function openStudio(url, viewport = {width: 1024, height: 640}) {
-  const ctx = await browser.newContext({viewport, acceptDownloads: true});
+  const ctx = await browser.newContext({viewport, acceptDownloads: true, deviceScaleFactor: Number(process.env.KERN_E2E_SCALE || 1)});  // KERN_E2E_SCALE: print-resolution screenshots for the book
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));

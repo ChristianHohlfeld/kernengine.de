@@ -43,7 +43,7 @@ layer (kick, pick).
 | `--vorbild-pruefen builtin\|demo.json [--episodes 10]` | how a demonstration jumps ("check Vorbild") |
 | `--spielen [--nachahmen 8] [--episoden 64] [--out play.onnx]` | play layer through imitation (DAgger) ("play", "imitate", "episodes") |
 | `--spielen-pruefen vorbild\|play.onnx [--episodes 10]` | how the demonstration or the network plays ("check play") |
-| `--spielen-ueben play.onnx [--iterations 300] [--envs N] [--uebungs-std 0.1] [--out play_geuebt.onnx]` | practise the play layer with PPO ("practise play", "practice std") |
+| `--spielen-ueben play.onnx [--iterations 300] [--envs N] [--uebungs-std 0.1] [--out play_geuebt.onnx]` | practice the play layer with PPO ("practice play", "practice std") |
 | `--spielen-spur [--seed N] [--randomized] [--netz play.onnx]` | one play episode, decision by decision ("play trace", "network") |
 | `--biss-fenster` | where the beak grips a sock (grid) ("bite window") |
 | `--halt-messen` | how far the duck keeps walking after "stop" ("measure stopping") |
@@ -74,7 +74,7 @@ This is how `policies/jump.onnx` was created (32 ducks on 2 cores, seed 1, 3000 
 3. **Imitate** (DAgger, [Section 14.6](14-lehrer.md#146-imitation-demonstrations-and-cma-es)).
    Afterwards the tool writes `jump_nachgeahmt.onnx` ("imitated" – what imitation alone produces)
    and, with `--checkpoint`, the learner to `run.ckpt.nachgeahmt`.
-4. **Practise** (PPO, [Section 14.5](14-lehrer.md#145-ppo-step-by-step-ppocpp)): for the first
+4. **Practice** (PPO, [Section 14.5](14-lehrer.md#145-ppo-step-by-step-ppocpp)): for the first
    30 iterations only the critic learns, then both. Every `--eval-every` (10) iterations the network
    jumps 5 episodes on the clean robot.
 5. **Save:** every `--save-every` (25) iterations and at the end, the ONNX to `--out` and the learner
@@ -90,7 +90,7 @@ and the network is saved immediately. With `--stop-after-jump` the run ends ther
 kern/build/kern_lehrer --task jump --iterations 6000 --resume run.ckpt --checkpoint run.ckpt --out jump.onnx
 ```
 
-`--resume` loads the whole learner (networks, normalisers, σ, Adam states, learning rate, iteration)
+`--resume` loads the whole learner (networks, normalizers, σ, Adam states, learning rate, iteration)
 and skips imitation. Iterations keep counting; `--iterations` is the target, not the number of
 additional iterations. The log file is then appended to instead of being created afresh. With
 `run.ckpt.nachgeahmt` as `--resume`, practice starts over from the imitation result.
@@ -117,7 +117,7 @@ kern/build/kern_lehrer --vorbild-pruefen demo2.json --episodes 20
 kern/build/kern_lehrer --task jump --vorbild demo2.json --out jump2.onnx
 ```
 
-For each generation a line appears with the score and the measurement of the search centre on the
+For each generation a line appears with the score and the measurement of the search center on the
 clean robot (height, rise, flight time, tilt, "a real jump" / "no real jump" / "fell"). The built-in
 demonstration was created in three stages with a total of 370 generations; the first stage took
 about 18 minutes on 2 cores for about 2 million duck steps (`docs/lehrer.md`).
@@ -154,7 +154,7 @@ Imitation writes per round:
   round <r> (<seconds> s): <n> samples, error <mse> | the network: <j> of 5 episodes a real jump, ...
 ```
 
-`samples` are all ticks labelled so far, `error` the mean squared error per action of the last
+`samples` are all ticks labeled so far, `error` the mean squared error per action of the last
 epoch.
 
 With `--log jump.csv`, each iteration is written as a CSV row with the columns
@@ -190,7 +190,7 @@ evaluation during the run has only 5 clean episodes.
    for f in jump_it*.onnx; do kern/build/kern_lehrer --eval "$f" --episodes 40; done
    ```
 
-   `--eval` prints two lines: "clean robot" (seed 1000) and "randomised: build, servos, sensors,
+   `--eval` prints two lines: "clean robot" (seed 1000) and "randomized: build, servos, sensors,
    start" (seed 5000, full variation).
 3. Choose by: real jumps with variation, then falls (0), then rise, flight time and tilt.
 4. Check the candidate in the Studio (Section 15.8).
@@ -208,8 +208,8 @@ To see what a switch does, it helps to work through one iteration of the jump re
 | Step | Computation |
 |---|---|
 | Collecting | 32 ducks × 48 ticks = 1536 rows; per row a = μ + σ·ε with σ = 0.1 after imitation |
-| Normaliser | the critic normaliser takes in the 1536 rows; the actor normaliser is frozen (warm start) |
-| GAE | per duck backwards over 48 ticks with γ = 0.99, λ = 0.95; then advantages normalised to mean 0, std 1 |
+| Normalizer | the critic normalizer takes in the 1536 rows; the actor normalizer is frozen (warm start) |
+| GAE | per duck backwards over 48 ticks with γ = 0.99, λ = 0.95; then advantages normalized to mean 0, std 1 |
 | Minibatches | 1536 / 4 = 384 rows per minibatch, each in 8 fixed chunks of 48 rows |
 | Updates | 5 epochs × 4 minibatches = 20 Adam steps for actor (with σ) and critic |
 | Learning rate | before each of the 20 steps: measure KL; if KL > 0.02 divide by 1.5, if KL < 0.005 multiply by 1.5 |
@@ -217,7 +217,7 @@ To see what a switch does, it helps to work through one iteration of the jump re
 `--steps` and `--envs` change the number of rows and hence the minibatch size; `--epochs` and
 `--minibatches` the number of steps per iteration; `--kl` the size each step should reach at most.
 Imitation, by contrast, is supervised: for the jump, 8 rounds of 96 episodes of at most 100 ticks
-give at most 76,800 labelled examples; 49,936 were measured, because an episode ends early as soon
+give at most 76,800 labeled examples; 49,936 were measured, because an episode ends early as soon
 as the duck falls or a part other than the soles touches the ground. After each round the actor is
 fitted to all examples so far in 10 epochs with minibatches of 256.
 
@@ -255,7 +255,7 @@ Notes from the runs in `docs/lehrer.md`:
   from the Studio's.
 
 About `--warm-start`: `make_learner` only evaluates the value `velstand`; any other value starts
-with randomly initialised weights. A warm start from a file exists only for the play layer
+with randomly initialized weights. A warm start from a file exists only for the play layer
 (`--spielen-ueben`).
 
 ## 15.7 Training the play layer
@@ -272,7 +272,7 @@ pick with the beak open in the phase window [0.04, 0.30), and prints for each po
 came up and whether it was still in the beak after being carried for 3 s, plus the best point:
 
 ```
-sock centre (ahead, left, real m): held at the end of the pick / still held after carrying 3 s
+sock center (ahead, left, real m): held at the end of the pick / still held after carrying 3 s
 +0.045 -0.020  0 0
 ...
 best: +0.0xx ahead, +0.0xx left (n kept around it)
@@ -327,7 +327,7 @@ with `--netz`, the network's next to them (the network then drives); standing st
 time; how far the sock was moved, ground contact, which network is driving, state, gravity. At the
 end, the result of the episode. Where demonstration and network diverge, you can see it here.
 
-### 5. Practise
+### 5. Practice
 
 ```
 kern/build/kern_lehrer --spielen-ueben play.onnx --iterations 300 --envs 32 --out play_geuebt.onnx
@@ -467,10 +467,10 @@ needs an evaluation of its own.
 
 If PPO does not find the motion, a demonstration helps, as with the jump:
 
-- a small **parameterisation** (for the jump, 15 numbers: three joints at five points in time, the
+- a small **parameterization** (for the jump, 15 numbers: three joints at five points in time, the
   other leg mirrored, targets via `amplitude · tanh`),
-- a **score** that CMA-ES can minimise (`score_jump_demo` as the pattern: rewards the motion,
-  penalises tilt and falls, on clean and varied robots),
+- a **score** that CMA-ES can minimize (`score_jump_demo` as the pattern: rewards the motion,
+  penalizes tilt and falls, on clean and varied robots),
 - a **teacher object** with `act(observation, probe, step, action)` (`JumpTeacher`) that has an
   answer for every state – a prerequisite for DAgger.
 
@@ -520,7 +520,7 @@ What Kern's networks demonstrate:
 - **Actions like controls.** Walking commands with a dead zone like a stick (below 20 % the duck
   stands), motions as a threshold (> 0.5 starts), limits for head and neck.
 - **Reward from named terms.** Each term visible individually (`--trace`), with weight × term × dt.
-  Regularisers as in Pollen's: action change, angular rate, self-contact. Curricula via
+  Regularizers as in Pollen's: action change, angular rate, self-contact. Curricula via
   `progress(iteration)`: penalties and variation ranges grow as the motion takes shape.
 - **Hard episode ends.** A fall and ground contact of other parts end the episode with a penalty;
   otherwise leaning on something becomes the safe bet.
@@ -545,8 +545,8 @@ From `docs/lehrer.md`:
   imitation solved it.
 - **A good actor and a clueless critic.** Without "critic first", the advantages of a critic that
   does not yet know the returns destroy an imitated actor.
-- **Normalisers drift.** With a few dozen environments the normalisers change noticeably between two
-  iterations; the old policy is therefore re-evaluated with the current normalisers before the
+- **Normalizers drift.** With a few dozen environments the normalizers change noticeably between two
+  iterations; the old policy is therefore re-evaluated with the current normalizers before the
   update.
 - **Bugs in the world, not in the network.** Training the play layer brought three bugs in the world
   to light: the sock crept across the floor by itself (round cloth lumps rolled; now rolling

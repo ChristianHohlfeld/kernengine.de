@@ -9,7 +9,7 @@ simulation does not know precisely. Kern pursues three routes to this:
    fitted to measurements (`--kalibrieren`, "calibrate") and checked against other measurements.
 2. **Matching the whole robot** (`--abgleich`, "matching"): a log from the real robot, replayed in
    the simulation; the difference is the remaining gap to the real world.
-3. **Domain randomisation:** whatever the measurement cannot pin down, the training varies.
+3. **Domain randomization:** whatever the measurement cannot pin down, the training varies.
 
 Box3D stays untouched throughout; it computes rigid bodies, joints and contacts
 ([Chapter 6](06-physics.md)). A fourth principle is added to these: **measure in the physics rather
@@ -101,8 +101,8 @@ servo gets small spreads, a poorly known one large spreads.
 From `docs/kalibrierung.md`:
 
 1. **Setup:** servo firmly clamped, axis horizontal, an arm with a weight attached. Weigh the mass of
-   arm and weight (to 0.1 g), measure the distance of the centre of mass from the axis (balance the
-   arm on an edge), compute the inertia about its own centre of mass from the shape (small compared
+   arm and weight (to 0.1 g), measure the distance of the center of mass from the axis (balance the
+   arm on an edge), compute the inertia about its own center of mass from the shape (small compared
    with m·r² for small weights). Angle 0 = arm hanging straight down.
 2. **Operate the servo as in the robot:** same firmware settings (position mode, P/I/D gains,
    profile), same voltage (7.4 V, if the manufacturer allows this voltage for the servo), Return Delay Time 0, same bus rate.
@@ -127,8 +127,8 @@ time,target,angle
 ...
 ```
 
-- Comment lines `# key value` describe the load (`ServoLoad`): mass in kg, distance of the centre of
-  mass from the axis in m, inertia about its own centre of mass in kg·m², `horizontal 1` for a
+- Comment lines `# key value` describe the load (`ServoLoad`): mass in kg, distance of the center of
+  mass from the axis in m, inertia about its own center of mass in kg·m², `horizontal 1` for a
   horizontal axis (gravity loads the arm like a pendulum), otherwise inertia only.
 - `time` in seconds (non-decreasing), `target` the target angle sent at the time of sending, `angle`
   the measured angle, both in radians. Lines that do not begin with a number (the header) are
@@ -143,7 +143,7 @@ the duck:
 - **the same scaling** (scale 4, Froude factors as in [Section 13.3](13-micro-duck.md#133-the-model)),
 - **the same step rate** (100 Hz world, 16 sub-steps; one step = 5 ms real),
 - **the same joint softness** as the duck's servo joints (constraint 240 Hz, damping ratio 2),
-- a fixed base, a link with the mass and centre of mass of the load, inertia of the load plus
+- a fixed base, a link with the mass and center of mass of the load, inertia of the load plus
   armature as on the duck's links (A about the axis, A/2 across),
 - gravity only with a horizontal axis.
 
@@ -184,7 +184,7 @@ wrote xl330_unit3.json
 ```
 
 What matters is the **hold-out error** ("held out"). Only it tells you whether the model explains the
-servo or has merely memorised the curves. That is why at least one log with a different signal and a
+servo or has merely memorized the curves. That is why at least one log with a different signal and a
 different load belongs in `--pruefen`.
 
 Test `lehrer_calibrates_a_servo_from_bench_logs`: a servo deviates from the nominal profile (K −20 %,
@@ -264,7 +264,7 @@ Note: the play layer (`PlayEnv`) currently always builds its servos from `xl330_
 friction and armature within its spreads; `--profil` affects the PPO training of the motions
 (`--task`).
 
-## 16.5 Domain randomisation
+## 16.5 Domain randomization
 
 Whatever is not measured or varies, the training varies. The complete ranges are listed in
 [Section 14.3](14-lehrer.md#143-the-ducks-environment); here they are ordered by their role for
@@ -274,7 +274,7 @@ sim-to-real:
 |---|---|
 | Individual servo units | separate values per servo within the profile spread (XL330: friction, armature ±10 %) |
 | Bus latency | 15–30 ms per episode |
-| Build (battery, cables, print) | trunk mass and inertia ±5 %, centre of mass of trunk and head (jump: curriculum up to ±15 / ±10 mm) |
+| Build (battery, cables, print) | trunk mass and inertia ±5 %, center of mass of trunk and head (jump: curriculum up to ±15 / ±10 mm) |
 | Floor | sole friction × 0.7–1.3 |
 | IMU | noise (gyro ±0.03, gravity ±0.01), 0–1 tick delay |
 | Encoders | noise ±0.001 rad, offset ±0.015 rad per episode and joint, velocity ±0.25 |
@@ -285,7 +285,7 @@ sim-to-real:
 The critic always sees the clean state; only the actor, which goes onto the robot, sees the noisy
 sensors (asymmetric critic, [Section 14.3](14-lehrer.md#143-the-ducks-environment)).
 
-Gear backlash is not in the model. Pollen's training randomises it (the MJCF variants
+Gear backlash is not in the model. Pollen's training randomizes it (the MJCF variants
 `robot_*_backlash.xml`), and velstand is robust to it; Kern's own networks learn without it.
 
 ## 16.6 Measuring in the physics instead of hard-coding
@@ -297,7 +297,7 @@ measures them in the simulation, just as you would measure them on the real robo
 - **The bite position** (`bite_spot`, `measure_bite`): where must a sock lie in front of the duck
   for Pollen's pick to grab it and keep hold while carrying it? The Lehrer places the sock on a grid
   of 99 points in front of a duck that has just walked and is standing, runs the pick with the beak
-  window the network is shown, and takes the point that, together with its neighbours, holds most
+  window the network is shown, and takes the point that, together with its neighbors, holds most
   reliably. This happens once per process before the first training; no bite position is in the code
   as a number ([Section 14.8](14-lehrer.md#148-learning-the-play-layer)).
 - **The coasting after "stop"** (`--halt-messen`): how far the duck keeps walking from a slow gait.
