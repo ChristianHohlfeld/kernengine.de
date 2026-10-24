@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -139,6 +139,7 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   const engine = new StudioEngine(kern);
   const page = new StudioPage(kern, engine, () => base64 ?? toBase64(bytes));
   page.start();
+  applyAudioPrefs(engine);  // music / effects switches remembered on this device
   window.KernStudio = page.api();
   engine.loadPolicies().catch(() => {});  // the robot's moves (sit, pick, kicks, roll, rollers)
   return page;
@@ -498,7 +499,7 @@ class StudioPage {
         this.engine.command({cmd: "activeViewport", viewport: i});
         this.openMenu(this.viewportMenu(i, kind), r.left, r.bottom + 2);
       });
-      rec.hud.addEventListener("click", e => { if (e.target.closest("[data-hud=restart]")) this.engine.command({cmd: "restart"}); });
+      rec.hud.addEventListener("click", e => hudClick(this.engine, e));
     }
   }
 
@@ -671,6 +672,8 @@ class StudioPage {
       const showHud = clientHud ? true : (active || (st.net?.local && v.index === 0)) && st.hud && (st.play === "playing" || st.hud.status === "won" || st.hud.status === "lost");
       const html = clientHud ? hudHtml(clientHud) : showHud ? hudHtml(st.hud) : "";
       if (html !== v.hudKey) { v.hudKey = html; v.hud.innerHTML = html; v.hud.hidden = !html; }
+      // Music and effects switches at the top right while the game plays.
+      if (active || v.audio) { (v.audio ||= mountAudioSwitches(v.el, this.engine)).hidden = !(active && showHud); }
       // Playing on a touch device: the game takes the whole screen (EXIT stops), like SpawnCity.
       if (v.index === 0) {
         const immersive = st.play === "playing" && !s.play.ejected && st.input?.device === "touch";

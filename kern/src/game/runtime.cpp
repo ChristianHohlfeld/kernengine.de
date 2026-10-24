@@ -531,8 +531,9 @@ void GameWorld::sync_ground(const WorldSettings& w) {
   in.material.roughness = 1;
   in.layers = layers_;
   if (!ground_mesh_) ground_mesh_ = r_.allocate_id();
-  // Slightly below z = 0 so planes and pavements placed at 0 win the depth test.
-  const Mat4 t = Mat4::translate({0, 0, -0.01f});
+  // Below z = 0 so floors and pavements placed at 0 win the depth test, also far away and at
+  // grazing angles on phones (with the game camera's near plane, see update_camera).
+  const Mat4 t = Mat4::translate({0, 0, -0.035f});
   in.transforms = Span<const f32>(t.m, 16);
   if (!r_.upsert(ground_mesh_, in)) { r_.release_id(ground_mesh_); ground_mesh_ = 0; }
 }
@@ -2513,6 +2514,7 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
   cam.up = {0, 0, 1};
   cam.orthographic = false;
   cam.far = 4000;
+  cam.near = 0.15f;  // depth precision: floors at z = 0 over the endless ground do not flicker
   Vec3 eye, target;
   const bool vehicle = c.mode == ControlMode::hovercar || c.mode == ControlMode::vehicle;
   if (in.camera && !camera_latch_ && vehicle) { interior_view_ = !interior_view_; camera_reset_ = true; }
@@ -2547,7 +2549,7 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
     // A kickflip rolls the view with the car.
     const Pawn* pp = pawn_of(player_);
     cam.up = pp ? Quat::axis_angle(forward, flip_roll_of(pp->flip, pp->flip_dir)).rotate({0, 0, 1}) : Vec3{0, 0, 1};
-    cam.near = 0.05f;
+    cam.near = 0.08f;
     cam.fov = (c.camera_fov + 10 + clamp(speed - 20, 0.0f, 40.0f) * 0.4f + fov_kick_) * kDeg;
     return true;
   }

@@ -643,7 +643,7 @@ export const TOUCH_STYLE = `.k-touch{position:absolute;inset:0;pointer-events:no
 .k-touch .tb.on{border-color:#f5b301;color:#f5b301}
 .k-touch-on .k-hud-top{top:58px}
 .k-touch-on .k-hp,.k-touch-on .k-ammo,.k-touch-on .k-hud-speed{left:auto;right:max(14px,env(safe-area-inset-right));bottom:auto}
-.k-touch-on .k-ammo,.k-touch-on .k-hud-speed{top:10px}.k-touch-on .k-hp{top:66px}.k-touch-on .k-ammo b{font-size:30px}
+.k-touch-on .k-ammo,.k-touch-on .k-hud-speed{top:58px}.k-touch-on .k-hp{top:114px}.k-touch-on .k-ammo b{font-size:30px}
 .k-touch .tf{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid rgba(255,138,106,.8);box-shadow:0 0 12px rgba(255,90,60,.5)}`;
 
 /**
@@ -756,6 +756,57 @@ export function formatTime(seconds) {
  * score, pickups, timer, speed and boost, the latest message, and the
  * win / lose banner.
  */
+// Music and effects on / off: the two switches at the top right of every game, remembered on this device.
+const AUDIO_KEY = "kern.audio";
+export const audioPrefs = (() => {
+  try { const v = JSON.parse(localStorage.getItem(AUDIO_KEY) || "{}"); return {music: v.music !== false, effects: v.effects !== false}; }
+  catch { return {music: true, effects: true}; }
+})();
+/** Sends the remembered music / effects switches to the engine (call once it runs). */
+export function applyAudioPrefs(engine) {
+  engine.command({cmd: "audioBus", bus: "music", muted: !audioPrefs.music});
+  engine.command({cmd: "audioBus", bus: "effects", muted: !audioPrefs.effects});
+}
+/** Handles a click in the HUD (the restart button of the win / lose banner). */
+export function hudClick(engine, e) {
+  if (e.target.closest("[data-hud=restart]")) engine.command({cmd: "restart"});
+}
+const ICON_MUSIC = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/></svg>`;
+const ICON_FX = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+/**
+ * The music and effects switches (top right): one element that stays (the HUD markup is redrawn
+ * every frame, a tap needs a button that is still there when the finger lifts). Returns it; the
+ * caller shows it while a game plays.
+ */
+export function mountAudioSwitches(parent, engine) {
+  const el = document.createElement("div");
+  el.className = "k-audio";
+  const make = (id, icon, label) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.audio = id;
+    b.title = label;
+    b.innerHTML = icon;
+    const show = () => { const on = audioPrefs[id]; b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${label} ${on ? "an" : "aus"}`); };
+    show();
+    // Taps stay on the button: they never reach the game's touch controls or the canvas.
+    for (const t of ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown"]) b.addEventListener(t, e => e.stopPropagation());
+    b.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      audioPrefs[id] = !audioPrefs[id];
+      try { localStorage.setItem(AUDIO_KEY, JSON.stringify(audioPrefs)); } catch {}
+      applyAudioPrefs(engine);
+      show();
+    });
+    el.appendChild(b);
+  };
+  make("music", ICON_MUSIC, "Musik");
+  make("effects", ICON_FX, "Effekte");
+  parent.appendChild(el);
+  return el;
+}
+
 export function hudHtml(h) {
   if (!h) return "";
   const parts = [];
@@ -824,6 +875,10 @@ export const HUD_STYLE = `.k-hud{position:absolute;inset:0;pointer-events:none;c
 .k-hud-stat span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.65}
 .k-hud-stat.k-warn b{color:#ff8f6b}
 .k-hud-speed{position:absolute;right:20px;bottom:18px;text-align:right}
+.k-audio{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));display:flex;gap:8px;pointer-events:auto;z-index:20;touch-action:manipulation}.k-audio[hidden]{display:none}
+.k-audio button{width:40px;height:40px;padding:9px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);background:rgba(10,14,20,.45);color:#fff;cursor:pointer;position:relative}
+.k-audio button svg{width:100%;height:100%;display:block}
+.k-audio button.off{opacity:.55}.k-audio button.off::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:#ff6a5a;transform:rotate(-45deg)}
 .k-hud-speed b{font-size:34px;font-weight:700}
 .k-hud-speed span{margin-left:4px;font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase}
 .k-streaks{position:absolute;inset:0;pointer-events:none;background:repeating-conic-gradient(from var(--a) at 50% 46%,rgba(255,255,255,.0) 0deg 5deg,rgba(220,240,255,.55) 5deg 5.6deg,rgba(255,255,255,0) 5.6deg 11deg);-webkit-mask:radial-gradient(ellipse 70% 62% at 50% 46%,transparent 52%,#000 100%);mask:radial-gradient(ellipse 70% 62% at 50% 46%,transparent 52%,#000 100%);opacity:.55}
@@ -1000,7 +1055,9 @@ export async function startGame({levelText = null, template = null, bytes = null
   const gamepad = new GamepadInput(engine);
   let touchShown = false;
   $("restart").addEventListener("click", () => engine.command({cmd: "restart"}));
-  hud.addEventListener("click", e => { if (e.target.closest("[data-hud=restart]")) engine.command({cmd: "restart"}); });
+  hud.addEventListener("click", e => hudClick(engine, e));
+  applyAudioPrefs(engine);
+  mountAudioSwitches(hud.parentNode, engine);
 
   let rectKey = "", hudKey = "", lastTextures = 0;
   const frame = time => {

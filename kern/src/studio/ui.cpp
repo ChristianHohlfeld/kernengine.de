@@ -1770,6 +1770,18 @@ json::Value Studio::run(const json::Value& c) {
       return false;
     }));
   }
+  if (name == "audioBus") {
+    // Music / effects on and off (the switches in the HUD): "music", "effects" (sfx, ambience,
+    // voice and ui) or one bus by name.
+    const std::string bus = str("bus");
+    const bool off = c["muted"].as_bool(false);
+    std::vector<audio::Bus> buses;
+    if (bus == "effects") buses = {audio::Bus::sfx, audio::Bus::ambience, audio::Bus::voice, audio::Bus::ui};
+    else if (audio::Bus b; audio::parse_bus(bus, b)) buses = {b};
+    else return error("unknown bus: " + bus);
+    for (audio::Bus b : buses) mixer_->bus(b).muted = off;
+    return ok();
+  }
   if (name == "mute") {
     set_muted(c["muted"].is_bool() ? c["muted"].as_bool() : !muted());
     report(muted() ? "Sound muted" : "Sound on");
