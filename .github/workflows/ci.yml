@@ -73,16 +73,23 @@ jobs:
           key: kern-obj-${{ github.sha }}
           restore-keys: kern-obj-
       - name: Build Kern Studio and the example games
+        shell: bash
         run: |
-          set -euo pipefail
-          export WASI_SDK=/home/runner/wasi-sdk
-          "$WASI_SDK/bin/clang++" --version | head -1  # the toolchain is really there
-          tools/build_studio.sh
-          kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
-          kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
-          kern/build.sh --lehrer generated/kern_lehrer.wasm
-          for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
-          python3 -I tools/kern_notices.py --check
+          build() {
+            export WASI_SDK=/home/runner/wasi-sdk
+            "$WASI_SDK/bin/clang++" --version | head -1  # the toolchain is really there
+            tools/build_studio.sh
+            kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
+            kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
+            kern/build.sh --lehrer generated/kern_lehrer.wasm
+            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+            python3 -I tools/kern_notices.py --check
+          }
+          set -o pipefail
+          if ! (set -euo pipefail; build) 2>&1 | tee /tmp/build.log; then
+            tail -n 25 /tmp/build.log | sed 's/^/::error::/'  # visible as annotations without the log
+            exit 1
+          fi
       - name: Lehrer in WebAssembly (one PPO iteration through the workers' C ABI)
         run: node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm
       - name: Logic JIT (graphs compiled to WebAssembly must match the interpreter)
