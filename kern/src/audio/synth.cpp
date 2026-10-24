@@ -236,6 +236,33 @@ struct Stereo {
   }
 };
 
+Buffer kick(u32 rate) {
+  SynthPatch p = patch(Wave::sine, 150, 0.001f, 0.02f, 0.3f, 0.95f);
+  p.slide = -7;
+  p.min_frequency = 42;
+  Buffer b = synthesize(p, rate);
+  SynthPatch c = patch(Wave::noise, 12000, 0.0005f, 0.002f, 0.01f, 0.25f);
+  c.seed = 11;
+  add(b, synthesize(c, rate));
+  return b;
+}
+
+Buffer hat(u32 rate, bool open) {
+  SynthPatch n = patch(Wave::noise, 12000, 0.0005f, 0.004f, open ? 0.22f : 0.045f, 0.22f);
+  n.highpass = 7000;
+  n.seed = open ? 31 : 29;
+  return synthesize(n, rate);
+}
+
+Buffer pad(u32 rate, f32 note, f32 dur, f32 detune_cents) {
+  SynthPatch p = patch(Wave::saw, midi_hz(note + detune_cents / 100.0f), 0.45f, dur, 1.2f, 0.16f);
+  p.lowpass = 1300;
+  p.resonance = 0.15f;
+  p.vibrato_depth = 0.05f;
+  p.vibrato_rate = 4.7f;
+  return synthesize(p, rate);
+}
+
 Buffer snare(u32 rate) {
   SynthPatch n = patch(Wave::noise, 12000, 0.001f, 0.01f, 0.16f, 0.5f);
   n.highpass = 900;
@@ -366,43 +393,29 @@ Buffer shaker(u32 rate) {
   return synthesize(n, rate);
 }
 
-Buffer soft_pluck(u32 rate, f32 note) {
-  SynthPatch p = patch(Wave::triangle, midi_hz(note), 0.003f, 0.03f, 0.28f, 0.35f);
-  p.lowpass = 3400;
-  p.lowpass_sweep = -1.5f;
-  return synthesize(p, rate);
-}
-
 void drive_bar(int b, f32 t0, f32 beat, u32 rate, Score& s) {
-  // 118 BPM synthwave, 16 bars: Am - F - C - G. Bars 0-3 build up (pads, bass, kick), 4-11 the
-  // groove with an 8th arpeggio, 12-15 a 16th arpeggio an octave up; soft drums, warm filters.
+  // 120 BPM: Am - F - C - G, four on the floor, 8th bass, 16th arpeggio.
   static const i32 roots[4] = {57, 53, 48, 55};
   static const i32 chords[4][3] = {{57, 60, 64}, {53, 57, 60}, {48, 52, 55}, {55, 59, 62}};
   const int c = b % 4;
   const f32 bar = 4 * beat;
-  for (int q = 0; q < 4; ++q) s.put("skick", [rate] { return soft_kick(rate); }, t0 + q * beat, b < 2 ? 0.0f : 0.38f, 0);
-  if (b >= 4) {
-    s.put("snare", [rate] { return snare(rate); }, t0 + beat, 0.3f, 0.05f);
-    s.put("snare", [rate] { return snare(rate); }, t0 + 3 * beat, 0.3f, 0.05f);
-  }
+  for (int q = 0; q < 4; ++q) s.put("kick", [rate] { return kick(rate); }, t0 + q * beat, 0.9f, 0);
+  s.put("snare", [rate] { return snare(rate); }, t0 + beat, 0.55f, 0.05f);
+  s.put("snare", [rate] { return snare(rate); }, t0 + 3 * beat, 0.55f, 0.05f);
   for (int e = 0; e < 8; ++e)
-    if (b >= 2) s.put("shk", [rate] { return shaker(rate); }, t0 + e * beat * 0.5f, e % 2 ? 0.55f : 0.3f, e % 2 ? 0.3f : -0.3f);
+    s.put(e % 2 ? "hato" : "hatc", [rate, e] { return hat(rate, e % 2 != 0); }, t0 + e * beat * 0.5f, e % 2 ? 0.28f : 0.22f, e % 2 ? 0.3f : -0.3f);
   for (int e = 0; e < 8; ++e) {
     const f32 note = static_cast<f32>(roots[c] - 12 + (e == 7 ? 7 : 0));
-    s.put(note_key("b", note), [rate, note, beat] { return bass(rate, note, beat * 0.42f); }, t0 + e * beat * 0.5f, 0.38f, 0);
+    s.put(note_key("b", note), [rate, note, beat] { return bass(rate, note, beat * 0.45f); }, t0 + e * beat * 0.5f, 0.75f, 0);
   }
   for (int v = 0; v < 3; ++v) {
     const f32 note = static_cast<f32>(chords[c][v]);
-    s.put(note_key("wp", note, -6), [rate, note, bar] { return warm_pad(rate, note, bar - 0.4f, -6); }, t0, 0.7f, -0.6f);
-    s.put(note_key("wp", note, 6), [rate, note, bar] { return warm_pad(rate, note, bar - 0.4f, 6); }, t0, 0.7f, 0.6f);
+    s.put(note_key("p", note, -7), [rate, note, bar] { return pad(rate, note, bar - 0.2f, -7); }, t0, 0.55f, -0.6f);
+    s.put(note_key("p", note, 7), [rate, note, bar] { return pad(rate, note, bar - 0.2f, 7); }, t0, 0.55f, 0.6f);
   }
-  if (b >= 4) {
-    const bool fast = b >= 12;
-    const int steps = fast ? 16 : 8;
-    for (int x = 0; x < steps; ++x) {
-      const f32 note = static_cast<f32>(chords[c][x % 3] + 12 * (fast ? 2 : 1));
-      s.put(note_key("sp", note), [rate, note] { return soft_pluck(rate, note); }, t0 + x * bar / steps, fast ? 0.55f : 0.65f, x % 2 ? 0.4f : -0.4f);
-    }
+  for (int x = 0; x < 16; ++x) {
+    const f32 note = static_cast<f32>(chords[c][x % 3] + 12 * (1 + (x / 6) % 2));
+    s.put(note_key("k", note), [rate, note] { return pluck(rate, note); }, t0 + x * beat * 0.25f, 0.32f, x % 2 ? 0.45f : -0.45f);
   }
 }
 
@@ -444,7 +457,7 @@ void calm_bar(int b, f32 t0, f32 beat, u32 rate, Score& s) {
 }
 
 const Song* find_song(std::string_view name) {
-  static const Song drive{4 * 60.0f / 118, 16, 0.75f, drive_bar};
+  static const Song drive{2.0f, 8, 0.8f, drive_bar};
   static const Song calm{4 * 60.0f / 72, 16, 0.65f, calm_bar};
   if (name == "music_drive") return &drive;
   if (name == "music_calm") return &calm;
