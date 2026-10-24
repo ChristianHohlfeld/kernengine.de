@@ -3,135 +3,420 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Kern Engine</title>
-<meta name="description" content="Kern: 3D-Engine in C++20, kompiliert nach WebAssembly, WebGL2-Renderer, Box3D-Physik und der Kern Editor als Game-Engine-Oberfläche.">
+<title>Kern – Das Buch</title>
+<meta name="description" content="Kern – Das Buch: Wie man eine eigene 3D-Engine in C++ baut, die im Browser läuft, und damit einem Roboter das Laufen beibringt. Hardcover von Christian Heinrich Hohlfeld. Die Software ist Open Source und läuft sofort im Browser.">
+<link rel="canonical" href="https://kernengine.de/">
+<meta property="og:type" content="book">
+<meta property="og:title" content="Kern – Das Buch">
+<meta property="og:description" content="Eine eigene 3D-Engine in C++, die im Browser läuft – und ein Roboter, der darin laufen lernt. Das Buch zur Engine, die du sofort ausprobieren kannst.">
+<meta property="og:url" content="https://kernengine.de/">
+<meta property="og:image" content="https://kernengine.de/img/buch-cover.jpg">
+<meta property="og:locale" content="de_DE">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0f2244">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Book","name":"Kern – Das Buch","alternateName":"Kern: Die Engine, Kern Studio, ein Laufroboter und der Lehrer","author":{"@type":"Person","name":"Christian Heinrich Hohlfeld","url":"https://christianhohlfeld.com"},"inLanguage":"de","bookFormat":"https://schema.org/Hardcover","isbn":"9798164877255","image":"https://kernengine.de/img/buch-cover.jpg","url":"https://kernengine.de/","workExample":[{"@type":"Book","inLanguage":"en","name":"Kern – The Book","bookFormat":"https://schema.org/Hardcover"}]}
+</script>
 <style>
-/* No web fonts from third-party hosts (no Google Fonts): the families below are used when they are
-   installed on the device, otherwise the system fonts after them. */
-/* Layout: one column of "build targets" like a build log; each target is a row with its artifact and launch link. */
+/* No third-party fonts, no trackers, no cookies: system fonts only. */
 :root {
-  --bg: #f3f4f1; --surface: #ffffff; --ink: #161a1d; --muted: #5b646b; --line: #d7dbd6;
-  --accent: #1f6f5c; --accent-ink: #ffffff; --signal: #b8860b;
+  --bg: #f4f5f2; --surface: #ffffff; --ink: #14181c; --muted: #59626a; --line: #d8dcd6;
+  --navy: #0f2244; --navy-2: #16305d; --sky: #9cc4ff; --blue: #2f7bf6; --blue-ink: #ffffff;
+  --accent: #1f6f5c; --signal: #f5b301;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #101315; --surface: #171b1e; --ink: #e8ecea; --muted: #97a19c; --line: #2a3033; --accent: #4fbf9f; --accent-ink: #0d1412; --signal: #e0b44c; color-scheme: dark; }
+  :root:not([data-theme="light"]) { --bg: #0e1114; --surface: #161a1e; --ink: #e8ecea; --muted: #9aa39f; --line: #283036; --accent: #4fbf9f; color-scheme: dark; }
 }
-:root[data-theme="dark"] { --bg: #101315; --surface: #171b1e; --ink: #e8ecea; --muted: #97a19c; --line: #2a3033; --accent: #4fbf9f; --accent-ink: #0d1412; --signal: #e0b44c; color-scheme: dark; }
+:root[data-theme="dark"] { --bg: #0e1114; --surface: #161a1e; --ink: #e8ecea; --muted: #9aa39f; --line: #283036; --accent: #4fbf9f; color-scheme: dark; }
 * { box-sizing: border-box; }
-html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
-.wrap { max-width: 980px; margin: 0 auto; padding-block: 56px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 48px; }
-header { display: grid; gap: 18px; }
-.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-h1 { margin: 0; font: 800 clamp(56px, 12vw, 120px)/.9 var(--display); font-stretch: 112%; letter-spacing: -.02em; text-wrap: balance; }
-.lede { margin: 0; max-width: 62ch; font-size: 18px; color: var(--ink); }
-.lede b { font-weight: 500; }
-.cta { display: flex; flex-wrap: wrap; gap: 12px; }
-a.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 6px; font: 500 15px/1 var(--body); text-decoration: none; border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
-a.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-a.btn:hover { border-color: var(--accent); }
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-h2 { margin: 0 0 14px; font: 600 22px/1.2 var(--display); font-stretch: 112%; }
-.targets { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.targets li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 24px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
-.targets .name { font: 600 17px/1.3 var(--body); }
-.targets .what { grid-column: 1; margin: 0; color: var(--muted); max-width: 62ch; }
-.targets .cmd { grid-column: 1; font: 13px/1.4 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
-.targets a.go { grid-column: 2; grid-row: 1 / span 3; white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
-.targets a.go:hover { text-decoration: underline; }
-.stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-.stack div { padding: 16px 18px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
-.stack dt { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
-.stack dd { margin: 0; }
-.stack code, p code { font: 14px var(--mono); }
-footer { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-text-size-adjust: 100%; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font: 500 12px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); font-stretch: 110%; text-wrap: balance; }
+h2 { margin: 0 0 12px; font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; letter-spacing: -.01em; }
+h3 { margin: 0 0 6px; font-size: 19px; line-height: 1.25; }
+p { margin: 0 0 14px; }
+section { padding-block: clamp(56px, 9vw, 96px); }
+.intro { max-width: 64ch; color: var(--muted); font-size: 18px; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 22px; border-radius: 8px; font: 600 16px/1.2 var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+.btn.primary { background: var(--signal); color: #1a1300; }
+.btn.primary:hover { background: #ffc626; }
+.btn.ghost { border-color: rgba(255,255,255,.35); color: #fff; }
+.btn.ghost:hover { border-color: #fff; }
+.btn.line { border-color: var(--line); background: var(--surface); color: var(--ink); }
+.btn.line:hover { border-color: var(--blue); }
+.btn small { font-weight: 500; opacity: .75; }
+
+/* hero */
+.hero { background: radial-gradient(1200px 600px at 75% 30%, var(--navy-2), var(--navy)); color: #fff; padding-top: max(28px, env(safe-area-inset-top, 0px)); overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 4px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px/1 var(--display); }
+.brand i { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(160deg, #3a8bff, #1f5fd6); display: grid; place-items: center; font-style: normal; font-size: 17px; }
+.nav nav { display: flex; gap: 18px; font-size: 15px; }
+.nav nav a { color: #cfe0ff; text-decoration: none; }
+.nav nav a:hover { color: #fff; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(28px, 5vw, 64px); align-items: center; padding-block: clamp(36px, 7vw, 84px) clamp(48px, 8vw, 96px); }
+.hero .eyebrow { color: var(--sky); }
+.hero h1 { margin: 14px 0 18px; font-size: clamp(38px, 6.2vw, 66px); line-height: 1.02; letter-spacing: -.02em; }
+.hero h1 em { font-style: normal; color: var(--sky); }
+.hero .lede { font-size: clamp(17px, 2vw, 19px); color: #dce7fb; max-width: 54ch; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.buy-note { margin-top: 14px; font-size: 14px; color: #b9c9e6; max-width: 52ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.14); font-size: 14px; color: #cddbf3; }
+.facts b { color: #fff; font-weight: 600; }
+.book { perspective: 1400px; display: grid; place-items: center; }
+.book img { width: min(360px, 78vw); border-radius: 3px 8px 8px 3px; transform: rotateY(-16deg) rotateX(3deg); box-shadow: -2px 0 0 #0a1830 inset, 26px 30px 60px rgba(0,0,0,.55), 6px 6px 16px rgba(0,0,0,.35); transform-origin: left center; }
+@media (prefers-reduced-motion: no-preference) { .book img { transition: transform .5s ease; } .book:hover img { transform: rotateY(-6deg) rotateX(1deg); } }
+
+/* proof strip */
+.proof { background: var(--surface); border-bottom: 1px solid var(--line); }
+.proof .wrap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.proof div { padding: 22px 16px; border-right: 1px solid var(--line); }
+.proof div:last-child { border-right: 0; }
+.proof b { display: block; font: 700 26px/1.1 var(--display); }
+.proof span { font-size: 14px; color: var(--muted); }
+
+/* learn */
+.learn { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 30px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+.card .num { font: 600 13px/1 var(--mono); color: var(--blue); margin-bottom: 12px; display: block; }
+.card p { color: var(--muted); margin: 0; font-size: 16px; }
+
+/* demo */
+.demo { background: #0d1117; color: #e8eef6; }
+.demo .intro { color: #a9b6c6; }
+.demo .eyebrow { color: #7fa6d9; }
+.shots { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 30px; }
+.shot { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid #263040; background: #111823; text-decoration: none; color: #fff; display: block; }
+.shot img { width: 100%; }
+.shot .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 14px; background: linear-gradient(transparent, rgba(5,8,14,.92)); display: flex; justify-content: space-between; align-items: end; gap: 12px; }
+.shot .cap b { font: 600 17px/1.2 var(--display); }
+.shot .cap span { font-size: 14px; color: #ffd45c; white-space: nowrap; }
+.shot:hover { border-color: #3d6fb8; }
+.shot-side { display: grid; gap: 16px; }
+.samples { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.samples a { display: block; height: 100%; padding: 16px 18px; border: 1px solid #263040; border-radius: 10px; text-decoration: none; background: #111823; }
+.samples a:hover { border-color: #3d6fb8; }
+.samples b { display: block; font-size: 16px; margin-bottom: 4px; }
+.samples span { font-size: 14px; color: #a9b6c6; }
+.demo .cta .btn.line { background: transparent; color: #fff; border-color: #3a4656; }
+
+/* contents */
+details.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-top: 26px; }
+details.toc summary { cursor: pointer; padding: 18px 22px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+details.toc summary::-webkit-details-marker { display: none; }
+details.toc summary::after { content: "+"; font: 600 20px/1 var(--mono); color: var(--blue); }
+details.toc[open] summary::after { content: "–"; }
+.toc ol { margin: 0; padding: 0 22px 20px 44px; columns: 2; column-gap: 40px; }
+.toc li { break-inside: avoid; padding: 4px 0; }
+.toc .app { list-style: none; margin: 0; padding: 14px 22px 20px; border-top: 1px solid var(--line); columns: 2; column-gap: 40px; }
+.toc .app b { color: var(--blue); font-weight: 600; margin-right: 6px; }
+.toc li span { color: var(--muted); font-size: 15px; display: block; }
+
+/* audience + author */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.two ul { margin: 0; padding-left: 20px; }
+.two li { margin-bottom: 8px; }
+.author { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: clamp(20px, 4vw, 44px); align-items: start; }
+.author img { border-radius: 12px; width: 200px; }
+.ai { margin-top: 18px; padding: 18px 20px; border-left: 3px solid var(--blue); background: var(--surface); border-radius: 0 10px 10px 0; font-size: 16px; }
+
+/* editions */
+.editions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.ed { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 26px; display: flex; flex-direction: column; gap: 10px; }
+.ed.main { border: 2px solid var(--signal); }
+.ed .price { font: 700 34px/1 var(--display); }
+.ed .meta { color: var(--muted); font-size: 15px; }
+.ed .btn { margin-top: auto; align-self: start; }
+.ed .btn.primary { color: #1a1300; }
+
+/* faq */
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 18px 0; font-weight: 600; }
+.faq details p { color: var(--muted); }
+
+/* final */
+.final { background: var(--navy); color: #fff; text-align: center; }
+.final h2 { max-width: 22ch; margin-inline: auto; }
+.final .cta { justify-content: center; }
+.final .buy-note { margin-inline: auto; }
+
+footer { padding-block: 28px calc(28px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 footer a { color: var(--muted); }
-@media (max-width: 560px) {
-  .targets li { grid-template-columns: minmax(0, 1fr); }
-  .targets a.go { grid-column: 1; grid-row: auto; }
+
+/* sticky buy bar on phones */
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: none; gap: 10px; padding: 10px max(12px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(15,34,68,.96); backdrop-filter: blur(8px); border-top: 1px solid rgba(255,255,255,.12); }
+.bar .btn { flex: 1; min-height: 46px; padding: 10px 12px; font-size: 15px; }
+
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .book { order: -1; }
+  .book img { width: min(250px, 62vw); }
+  .learn, .samples { grid-template-columns: minmax(0, 1fr); }
+  .shots, .two, .editions { grid-template-columns: minmax(0, 1fr); }
+  .proof .wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .proof div:nth-child(2) { border-right: 0; }
+  .proof div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .toc ol, .toc .app { columns: 1; }
+  .nav nav a.hide-sm { display: none; }
+  .author { grid-template-columns: minmax(0, 1fr); }
+  .author img { width: 160px; }
+  .bar { display: flex; }
+  footer { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
-@media (prefers-reduced-motion: no-preference) { a.btn { transition: border-color .15s; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="eyebrow">C++20 · WebAssembly · WebGL2 · Box3D</div>
-    <h1>Kern</h1>
-    <p class="lede">Eine 3D-Engine in <b>C++</b>, kompiliert mit wasi-sdk nach <b>WebAssembly</b>, mit eigenem WebGL2-Renderer und <b>Box3D</b>-Physik. Dazu <b>Kern Studio</b>, ein Engine-Editor im Stil der Unreal Engine: Fly Mode, Gizmos, Outliner und Details, Play und Simulate im Viewport, Spiele als eine HTML-Datei. Kein three.js, kein Emscripten.</p>
-    <div class="cta">
-      <a class="btn primary" href="./editor/">Kern Studio öffnen</a>
-      <a class="btn" href="./kern/web/studio/play.html?level=orbRun">Orb Run spielen</a>
-      <a class="btn" href="https://github.com/ChristianHohlfeld/kernengine.de">Quellcode</a>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="nav">
+      <a class="brand" href="./"><i>K</i>Kern</a>
+      <nav aria-label="Seite">
+        <a class="hide-sm" href="#inhalt">Inhalt</a>
+        <a class="hide-sm" href="#autor">Autor</a>
+        <a href="#ausgaben">Ausgaben</a>
+        <a href="./editor/">Editor</a>
+      </nav>
     </div>
-  </header>
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Das Buch · Hardcover · Deutsch und Englisch</div>
+        <h1>Bau deine eigene 3D-Engine – und bring einem <em>Roboter das Laufen</em> bei.</h1>
+        <p class="lede">Kern ist eine Game-Engine in reinem C++, die im Browser läuft: Grafik, Physik, Sound, ein kompletter Editor und ein Laufroboter, der mit neuronalen Netzen geht, springt und einen Ball kickt. Dieses Buch erklärt jede Zeile davon – und die Engine kannst du jetzt gleich ausprobieren.</p>
+        <div class="cta">
+          <a class="btn primary" data-buy="de" href="#ausgaben">Buch vormerken</a>
+          <a class="btn ghost" href="./editor/">Editor im Browser öffnen</a>
+        </div>
+        <p class="buy-note" data-note="de">Erscheint als Hardcover bei Amazon. Vormerken heißt: Du bekommst eine Nachricht, sobald das Buch bestellbar ist. Kostet nichts und verpflichtet zu nichts.</p>
+        <div class="facts">
+          <span><b>17 Kapitel</b> + 4 Anhänge</span>
+          <span><b>Hardcover</b> 17,8 × 25,4 cm</span>
+          <span><b>Software</b> Open Source, kostenlos</span>
+        </div>
+      </div>
+      <div class="book"><img src="img/buch-cover.jpg" width="900" height="1286" alt="Buchcover: Kern – Das Buch. Die Engine, Kern Studio, ein Laufroboter und der Lehrer. Christian Heinrich Hohlfeld."></div>
+    </div>
+  </div>
+</header>
 
-  <section aria-labelledby="live">
-    <h2 id="live">Live</h2>
-    <ul class="targets">
-      <li>
-        <span class="name">Kern Studio</span>
-        <p class="what">Der Editor: Levels aus Actors und Komponenten, Viewports mit Unreal-Navigation (rechte Maustaste + WASD), Box3D-Körper, Collider und alle Gelenktypen, Play und Simulate im Viewport, Package Game. Startet mit Orb Run.</p>
-        <span class="cmd">tools/build_studio.sh → studio.html</span>
-        <a class="go" href="./editor/">Öffnen →</a>
-      </li>
-      <li>
-        <span class="name">Kern Lehrer</span>
-        <p class="what">Bringt der Micro Duck neue Bewegungen bei, auf diesem Gerät: Kerns Engine und Box3D, PPO in C++ in Web Workern, Export als ONNX im Format von Pollens Netzen. Als Erstes: der Sprung.</p>
-        <span class="cmd">kern/build.sh --lehrer → kern_lehrer.wasm</span>
-        <a class="go" href="./lehrer/">Öffnen →</a>
-      </li>
-      <li>
-        <span class="name">Orb Run</span>
-        <p class="what">Das Start-Level aus Studio, ohne Editor gespielt: prozedurale Stadt, Box3D-Hovercar, 24 Orbs, Tag wird Nacht. WASD, Shift Boost, Maus schaut.</p>
-        <span class="cmd">kern_studio.wasm · player-only</span>
-        <a class="go" href="./kern/web/studio/play.html?level=orbRun">Spielen →</a>
-      </li>
-      <li>
-        <span class="name">Physics Lab</span>
-        <p class="what">Jeder Box3D-Gelenktyp in einem Level: Stapel, Pendel, Scharniertür, Seilbrücke mit Bruchstelle, Drehteller mit Motor, Lift und ein Rover auf Wheel-Gelenken. Mit der Kugel hineinrollen.</p>
-        <span class="cmd">kern_studio.wasm · player-only</span>
-        <a class="go" href="./kern/web/studio/play.html?level=physicsLab">Spielen →</a>
-      </li>
-      <li>
-        <span class="name">orbrun (C++)</span>
-        <p class="what">Das ursprüngliche Orb Run als reines C++-Spiel gegen <code>kern::App</code>: Stadt, Fahrphysik, Verkehr, Tag und Nacht und eine eigene Shader-Erweiterung.</p>
-        <span class="cmd">kern/build.sh --app orbrun.cpp</span>
-        <a class="go" href="./kern/examples/orbrun/">Starten →</a>
-      </li>
-      <li>
-        <span class="name">hello</span>
-        <p class="what">Das kleinste Kern-Spiel: 64 instanzierte, schattenwerfende Boxen, Orbit-Kamera und Klick-Picking in rund 90 Zeilen.</p>
-        <span class="cmd">kern/build.sh --app hello.cpp</span>
-        <a class="go" href="./kern/examples/hello/">Starten →</a>
-      </li>
+<div class="proof" aria-label="Kern in Zahlen">
+  <div class="wrap">
+    <div><b>C++20</b><span>eine Codebasis für Browser und Desktop</span></div>
+    <div><b>Kein Setup</b><span>Editor und Spiele laufen im Browser, auch auf dem Handy</span></div>
+    <div><b>11.000+</b><span>automatische Prüfungen bei jedem Build</span></div>
+    <div><b>Apache 2.0</b><span>der Quellcode gehört auch dir</span></div>
+  </div>
+</div>
+
+<main>
+<section aria-labelledby="lernen">
+  <div class="wrap">
+    <div class="eyebrow">Was du lernst</div>
+    <h2 id="lernen">Nicht wie man eine Engine benutzt. Wie man eine baut.</h2>
+    <p class="intro">Die meisten Bücher zeigen Unity oder Unreal von außen. Dieses Buch öffnet eine komplette, laufende Engine und geht sie Schicht für Schicht durch – mit dem echten Code, den du parallel im Browser ausführst.</p>
+    <div class="learn">
+      <div class="card"><span class="num">01 · Engine</span><h3>Grafik, Physik, Audio</h3><p>Ein eigener WebGL2-Renderer mit PBR, Schatten und Bloom, Box3D-Physik mit allen Gelenken, eine eigene Sound-Engine – und warum jede Entscheidung so gefallen ist.</p></div>
+      <div class="card"><span class="num">02 · Werkzeug</span><h3>Ein Editor wie Unreal</h3><p>Kern Studio: Levels, Gizmos, Logik-Graphen, Play und Simulate, Mehrspieler – und wie du daraus eigene Spiele als eine einzige HTML-Datei exportierst.</p></div>
+      <div class="card"><span class="num">03 · KI</span><h3>Ein Roboter lernt laufen</h3><p>Die Micro Duck läuft auf den Original-Netzen ihres Herstellers. Mit dem Lehrer trainierst du per Reinforcement Learning eigene Bewegungen – direkt im Browser.</p></div>
+      <div class="card"><span class="num">04 · Praxis</span><h3>Eigene Spiele schreiben</h3><p>Vom kleinsten Kern-Spiel in 90 Zeilen bis zur prozeduralen Stadt mit Hovercar, Verkehr und Tag-Nacht-Wechsel.</p></div>
+      <div class="card"><span class="num">05 · Brücke</span><h3>Von der Simulation zum echten Roboter</h3><p>Wie man Servos, Massen und Reibung kalibriert, damit ein trainiertes Netz auch in der echten Welt funktioniert.</p></div>
+      <div class="card"><span class="num">06 · Grundlagen</span><h3>Ohne Vorwissen verständlich</h3><p>Drei Anhänge erklären neuronale Netze, Echtzeit-Rendering und Physiksimulation von Grund auf – für alle, die es wirklich verstehen wollen.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="demo" aria-labelledby="ausprobieren">
+  <div class="wrap">
+    <div class="eyebrow">Kein Video. Die echte Engine.</div>
+    <h2 id="ausprobieren">Probier es aus, bevor du das Buch kaufst.</h2>
+    <p class="intro">Alles, was das Buch beschreibt, läuft hier in deinem Browser – ohne Installation, ohne Konto. Öffne den Editor, drück Play und fahr los.</p>
+    <div class="shots">
+      <a class="shot" href="./editor/"><img src="img/studio.jpg" width="1600" height="1000" loading="lazy" alt="Kern Studio im Play-Modus: Orb Run, ein Hovercar fährt durch eine prozedurale Stadt."><div class="cap"><b>Kern Studio – der Editor</b><span>Öffnen →</span></div></a>
+      <div class="shot-side">
+        <a class="shot" href="./kern/web/studio/play.html?level=physicsLab"><img src="img/physics-lab.jpg" width="1024" height="640" loading="lazy" alt="Physics Lab: Stapel, Pendel, Seilbrücke und Gelenke in Box3D."><div class="cap"><b>Physics Lab</b><span>Spielen →</span></div></a>
+        <a class="shot" href="./kern/web/studio/play.html?level=orbRun"><img src="img/phone.jpg" width="1200" height="554" loading="lazy" alt="Orb Run auf dem Handy mit Touch-Steuerung."><div class="cap"><b>Orb Run – auch auf dem Handy</b><span>Spielen →</span></div></a>
+      </div>
+    </div>
+    <ul class="samples">
+      <li><a href="./lehrer/"><b>Der Lehrer</b><span>Trainiere neuronale Netze für einen Laufroboter, direkt in deinem Browser.</span></a></li>
+      <li><a href="./kern/examples/hello/"><b>hello</b><span>Das kleinste Kern-Spiel: 64 Boxen, Schatten, Klick-Auswahl, rund 90 Zeilen C++.</span></a></li>
+      <li><a href="./kern/examples/orbrun/"><b>Orb Run in C++</b><span>Stadt, Fahrphysik, Verkehr und Tag-Nacht als reines C++-Programm.</span></a></li>
     </ul>
-  </section>
+    <div class="cta"><a class="btn primary" data-buy="de" href="#ausgaben">Buch vormerken</a><a class="btn line" href="./editor/">Editor öffnen</a></div>
+  </div>
+</section>
 
-  <section aria-labelledby="stack">
-    <h2 id="stack">Aufbau</h2>
-    <dl class="stack">
-      <div><dt>Renderer</dt><dd>PBR, Instancing, Skinning, Sonnenschatten mit Wiederverwendung, Bloom, Picking über BVH, Linien, Ebenen, orthografische Ansichten</dd></div>
-      <div><dt>Physik</dt><dd>Box3D von Erin Catto als C17 im selben Modul: Körper, Compounds, Hüllen, alle Gelenktypen mit Motoren, Federn und Bruch, Raycasts, MotorJoint-Griff</dd></div>
-      <div><dt>Spiel</dt><dd><code>kern::game</code>: Levels (<code>.klevel</code>) aus Actors und Komponenten, Controller, Pickups, Trigger, Siegbedingungen, prozedurale Stadt</dd></div>
-      <div><dt>Studio</dt><dd><code>kern::studio::Studio</code> in C++; die Seite zeichnet nur Panels aus JSON</dd></div>
-    </dl>
-  </section>
+<section id="inhalt" aria-labelledby="inhalt-h">
+  <div class="wrap">
+    <div class="eyebrow">Inhalt</div>
+    <h2 id="inhalt-h">Von den Grundlagen bis zum laufenden Roboter</h2>
+    <p class="intro">Das Buch ist so aufgebaut, dass du die Engine erst benutzt, dann verstehst und schließlich erweiterst. Jedes Kapitel lässt sich sofort im Browser nachvollziehen.</p>
+    <details class="toc">
+      <summary>Alle 17 Kapitel und 4 Anhänge anzeigen</summary>
+      <ol>
+        <li>Einführung<span>Was Kern ist und wie das Buch funktioniert</span></li>
+        <li>Bauen und Testen<span>Von C++ zu WebAssembly, Tests und Determinismus</span></li>
+        <li>Grundlagen<span>Mathematik, Speicher, Plattform</span></li>
+        <li>Grafik<span>WebGL2, PBR, Schatten, Nachbearbeitung</span></li>
+        <li>Szene und Geometrie<span>Meshes, Instancing, Picking</span></li>
+        <li>Physik<span>Box3D, Gelenke, Fahrzeuge</span></li>
+        <li>Audio<span>Die eigene Sound-Engine</span></li>
+        <li>Die Spiel-Laufzeit<span>Actors, Komponenten, Controller</span></li>
+        <li>Logik-Graphen<span>Spiellogik ohne Code</span></li>
+        <li>Netzwerk und Mehrspieler<span>Synchronisierung und Vorhersage</span></li>
+        <li>Kern Studio<span>Der Editor im Detail</span></li>
+        <li>Eigene Spiele schreiben<span>Von hello bis Orb Run</span></li>
+        <li>Die Micro Duck<span>Ein Laufroboter in der Simulation</span></li>
+        <li>Der Lehrer<span>Reinforcement Learning im Browser</span></li>
+        <li>Eigene Modelle trainieren<span>Neue Bewegungen beibringen</span></li>
+        <li>Kalibrierung<span>Von der Simulation zum echten Roboter</span></li>
+        <li>Referenz<span>Alles zum Nachschlagen</span></li>
+      </ol>
+      <ul class="app">
+        <li><b>Anhang A</b> Grundlagen: neuronale Netze, Nachahmung und Reinforcement Learning</li>
+        <li><b>Anhang B</b> Grundlagen: Echtzeit-Rendering</li>
+        <li><b>Anhang C</b> Grundlagen: Physiksimulation</li>
+        <li><b>Anhang D</b> Lizenzen</li>
+      </ul>
+    </details>
+    <div class="cta"><a class="btn line" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch/01-einfuehrung.md">Leseprobe: Kapitel 1 lesen</a></div>
+  </div>
+</section>
 
-  <footer>
+<section aria-labelledby="fuer-wen" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow">Für wen</div>
+    <h2 id="fuer-wen">Für alle, die verstehen wollen, was unter der Haube passiert</h2>
+    <div class="two">
+      <div class="card"><h3>Das Buch ist für dich, wenn du …</h3><ul>
+        <li>Spiele entwickelst und wissen willst, wie Engines wirklich funktionieren,</li>
+        <li>C++ kannst oder lernst und ein großes, echtes Projekt studieren willst,</li>
+        <li>dich für Robotik und Reinforcement Learning interessierst,</li>
+        <li>unterrichtest und Material suchst, das Schüler sofort ausprobieren können.</li>
+      </ul></div>
+      <div class="card"><h3>Was du mitbringen solltest</h3><ul>
+        <li>Grundkenntnisse im Programmieren, idealerweise C++ oder eine ähnliche Sprache,</li>
+        <li>einen aktuellen Browser – mehr brauchst du zum Ausprobieren nicht,</li>
+        <li>Neugier. Mathematik, Rendering und neuronale Netze erklären die Anhänge von Grund auf.</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="autor" aria-labelledby="autor-h" style="padding-top:0">
+  <div class="wrap author">
+    <img src="img/autor.jpg" width="480" height="600" loading="lazy" alt="Christian Heinrich Hohlfeld">
+    <div>
+      <div class="eyebrow">Der Autor</div>
+      <h2 id="autor-h">Christian Heinrich Hohlfeld</h2>
+      <p>Softwareentwickler aus Konstanz, programmiert seit 2010 – in C++, Java, C#, TypeScript und Python. B.Sc. Software Engineering an der HTWG Konstanz. Seine Android-App MMA News erreichte rund 220.000 Downloads, sein Spiel Alien Star Racing kam in einem von Microsoft gesponserten Wettbewerb unter die besten zehn. Heute verantwortet er Digitalisierung und KI bei einem kommunalen Unternehmen und baut daneben eigene Produkte.</p>
+      <p class="ai"><b>Offen gesagt:</b> Kern und dieses Buch sind mit künstlicher Intelligenz entstanden. Idee, Architektur, Auswahl der Bausteine und jede Entscheidung, was gut genug ist, stammen vom Autor; Code und Text hat zum größten Teil ein KI-System unter seiner Leitung geschrieben. Das Buch zeigt damit auch, was ein erfahrener Entwickler heute mit KI allein bauen kann.</p>
+      <p><a href="https://christianhohlfeld.com">christianhohlfeld.com</a></p>
+    </div>
+  </div>
+</section>
+
+<section id="ausgaben" aria-labelledby="ausgaben-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow">Ausgaben</div>
+    <h2 id="ausgaben-h">Hardcover, auf Deutsch und auf Englisch</h2>
+    <div class="editions">
+      <div class="ed main">
+        <div class="eyebrow">Deutsche Ausgabe</div>
+        <h3>Kern – Das Buch</h3>
+        <div class="price">59,90 €</div>
+        <div class="meta">Hardcover · 17,8 × 25,4 cm · ISBN 979-8-1648-7725-5<br>Gebundener Ladenpreis in Deutschland</div>
+        <a class="btn primary" data-buy="de" href="#ausgaben">Buch vormerken</a>
+        <p class="meta" data-note="de" style="margin:0">Erscheint bei Amazon. Du bekommst eine Nachricht, sobald es bestellbar ist.</p>
+      </div>
+      <div class="ed" lang="en">
+        <div class="eyebrow">English edition</div>
+        <h3>Kern – The Book</h3>
+        <div class="price">$69.99</div>
+        <div class="meta">Hardcover · 7 × 10 in · €69.90 (EU) · £59.99 (UK)</div>
+        <a class="btn line" data-buy="en" href="#ausgaben">Reserve the English edition</a>
+        <p class="meta" data-note="en" style="margin:0">Coming to Amazon. We’ll tell you the day it can be ordered.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="faq" aria-labelledby="faq-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow">Fragen</div>
+    <h2 id="faq-h">Häufige Fragen</h2>
+    <details><summary>Die Software ist kostenlos – warum sollte ich das Buch kaufen?</summary><p>Der Code zeigt, was die Engine tut. Das Buch erklärt, warum: welche Entscheidungen hinter Renderer, Physik und Training stehen, welche Alternativen verworfen wurden und wie die Teile zusammenspielen. Dazu kommen drei Grundlagen-Anhänge, die Rendering, Physik und neuronale Netze von Null an erklären.</p></details>
+    <details><summary>Was heißt „vormerken“?</summary><p>Amazon bietet für gedruckte Bücher keine Vorbestellung an. Wenn du das Buch vormerkst, schickst du eine kurze E-Mail und bekommst eine Antwort, sobald es bestellbar ist. Deine Adresse wird nur dafür verwendet und danach gelöscht.</p></details>
+    <details><summary>Gibt es das Buch auch als E-Book?</summary><p>Zum Start erscheint es als Hardcover. Wenn du ein E-Book möchtest, schreib es beim Vormerken dazu – genug Nachfrage entscheidet.</p></details>
+    <details><summary>Brauche ich einen starken Rechner?</summary><p>Nein. Kern läuft in jedem aktuellen Browser mit WebGL2, auf Desktop, Tablet und Handy. Für das Bauen aus dem Quellcode reicht ein normaler Laptop.</p></details>
+    <details><summary>Kann ich Kern kommerziell nutzen?</summary><p>Die Engine steht unter der Apache License 2.0. Ausgenommen sind die 3D-Modelle der Micro Duck von Pollen Robotics (nur nicht kommerziell); ein kommerzieller Build lässt sie weg. Für Schulen und Unternehmen gibt es Kurse und Integrationslizenzen auf Anfrage.</p></details>
+    <details><summary>Ist das ein Produkt von Pollen Robotics oder Hugging Face?</summary><p>Nein. Kern ist ein unabhängiges Projekt. Die Micro Duck ist ein Roboter von Pollen Robotics; Kern nutzt dessen offen veröffentlichte Modelle und Netze unter ihren Lizenzen.</p></details>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="wrap">
+    <h2 id="final-h">Die Engine läuft schon. Das Buch erklärt, wie.</h2>
+    <div class="cta"><a class="btn primary" data-buy="de" href="#ausgaben">Buch vormerken</a><a class="btn ghost" href="./editor/">Editor öffnen</a></div>
+    <p class="buy-note" data-note="de">Du bekommst eine Nachricht, sobald das Hardcover bei Amazon bestellbar ist.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
     <span>© 2026 Christian Heinrich Hohlfeld</span>
-    <a href="LICENSING.txt">Lizenz (Apache 2.0)</a>
-    <a href="LICENSES.txt">Bestandteile Dritter</a>
+    <a href="./editor/">Kern Studio</a>
+    <a href="./lehrer/">Kern Lehrer</a>
     <a href="https://github.com/ChristianHohlfeld/kernengine.de">Quellcode</a>
     <a href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/studio.md">Studio-Doku</a>
     <a href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/README.md">Engine-Doku</a>
+    <a href="LICENSING.txt">Lizenz (Apache 2.0)</a>
+    <a href="LICENSES.txt">Bestandteile Dritter</a>
     <a href="impressum.html">Impressum</a>
     <a href="datenschutz.html">Datenschutz</a>
-  </footer>
-</div>
+  </div>
+</footer>
+
+<div class="bar" aria-label="Schnellzugriff"><a class="btn primary" data-buy="de" href="#ausgaben">Buch vormerken</a><a class="btn ghost" href="./editor/">Editor</a></div>
+
+<script>
+// Sobald das Buch bei Amazon live ist: die Produktlinks hier eintragen. Dann werden alle
+// "Vormerken"-Knöpfe zu "Bestellen" und führen direkt zu Amazon.
+const AMAZON = {
+  de: "",   // z. B. https://www.amazon.de/dp/…
+  en: ""    // e.g. https://www.amazon.com/dp/…
+};
+const MAIL = "chris.hohlfeld@gmail.com";
+const VORMERKEN = {
+  de: { subject: "Vormerken: Kern – Das Buch (Deutsch)", body: "Hallo Chris,\n\nbitte gib mir Bescheid, sobald „Kern – Das Buch“ als Hardcover bestellbar ist.\n\nE-Book gewünscht: ja / nein\n\nViele Grüße\n" },
+  en: { subject: "Reserve: Kern – The Book (English)", body: "Hi Chris,\n\nplease let me know as soon as the English hardcover of “Kern – The Book” can be ordered.\n\nWould like an e-book too: yes / no\n\nBest regards\n" }
+};
+for (const a of document.querySelectorAll("[data-buy]")) {
+  const lang = a.dataset.buy, live = AMAZON[lang];
+  if (live) {
+    a.href = live;
+    a.rel = "noopener";
+    a.textContent = lang === "de" ? "Bei Amazon bestellen – 59,90 €" : "Order on Amazon";
+  } else {
+    const m = VORMERKEN[lang];
+    a.href = "mailto:" + MAIL + "?subject=" + encodeURIComponent(m.subject) + "&body=" + encodeURIComponent(m.body);
+  }
+}
+for (const p of document.querySelectorAll("[data-note]")) if (AMAZON[p.dataset.note]) p.remove();
+</script>
 </body>
 </html>

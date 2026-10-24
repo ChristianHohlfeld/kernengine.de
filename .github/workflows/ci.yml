@@ -105,6 +105,7 @@ jobs:
           # The landing page, Impressum and Datenschutz; self-hosted fonts when site/fonts exists.
           cp site/*.html _site/
           if [ -d site/fonts ]; then cp -r site/fonts _site/; fi
+          cp -r site/img _site/  # the landing page's pictures (book cover, screenshots, author)
           cp LICENSE _site/LICENSE.txt && cp kern/LICENSES.md _site/LICENSES.txt
           if [ -f LICENSING.md ]; then cp LICENSING.md _site/LICENSING.txt; fi
           # The editor as an installable app: build SHA as the page's first comment, build.json for
