@@ -140,4 +140,14 @@ with sync_playwright() as p:
     page.pdf(path=str(out), width=f"{TW}in", height=f"{TH}in", print_background=True, prefer_css_page_size=True)
     b.close()
 work.unlink()
+# Chromium rounds the page to whole CSS pixels; KDP checks the size to a few hundredths of a point,
+# so the page (all boxes) is set to the exact calculator size.
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import RectangleObject
+reader, writer = PdfReader(out), PdfWriter()
+for pg in reader.pages:
+    pg.scale_to(round(TW * 72, 2), round(TH * 72, 2))
+    for box in ("cropbox", "trimbox", "bleedbox", "artbox"): setattr(pg, box, RectangleObject(pg.mediabox))
+    writer.add_page(pg)
+writer.write(out)
 print(f"{out}: {TW:.3f} x {TH:.3f} in ({TW * 25.4:.1f} x {TH * 25.4:.1f} mm), spine {S:.3f} in ({S * 25.4:.1f} mm) for {a.pages} pages")
