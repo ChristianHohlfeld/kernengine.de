@@ -1538,6 +1538,7 @@ json::Value Studio::run(const json::Value& c) {
     g.reload = c["x"].as_bool();
     g.interact = c["y"].as_bool();
     g.boost = c["l3"].as_bool() || c["lb"].as_bool();
+    g.camera = c["view"].as_bool(false);
     g.up = (c["rb"].as_bool() ? 1.0f : 0.0f) - (c["lb"].as_bool() ? 1.0f : 0.0f);
     if (c["start"].as_bool() && !pad_start_ && play_ != PlayState::editing) toggle_pause();
     pad_start_ = c["start"].as_bool();

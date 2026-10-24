@@ -194,6 +194,7 @@ void TouchControls::layout() {
     case ControlMode::vehicle:
       if (boost_) low.push_back(make_button("boost", "BOOST", 64, amber));
       if (jump_) low.push_back(make_button("jump", "HOP", 56, dark));
+      upper.push_back(make_button("camera", "VIEW", 54, green));  // chase / low interior view
       upper.push_back(make_button("interact", "USE", 54, blue));
       break;
   }
@@ -408,6 +409,7 @@ void TouchControls::update(f32 dt, PlayInput& in, f32 vfov_deg) {
   in.jump = held("jump");
   in.reload = held("reload");
   in.interact = held("interact");
+  in.camera = held("camera");
   in.boost = held("boost") || (sprint_ && (mode_ == ControlMode::character || mode_ == ControlMode::soldier));
   in.up = (held("up") ? 1.0f : 0.0f) - (held("down") ? 1.0f : 0.0f);
   in.aim = aim_on_;

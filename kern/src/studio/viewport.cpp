@@ -144,6 +144,7 @@ game::PlayInput Studio::play_input() const {
   in.up = (held("KeyE") || held("Space") ? 1.0f : 0.0f) - (held("KeyQ") || held("ShiftLeft") || held("ControlLeft") ? 1.0f : 0.0f);
   in.jump = held("Space");
   in.boost = held("ShiftLeft") || held("ShiftRight");
+  in.camera = held("KeyC");  // vehicles: chase / low interior view
   in.look_x = look_dx_ * 0.2f * prefs_.mouse_sensitivity;
   in.look_y = look_dy_ * 0.2f * prefs_.mouse_sensitivity * (prefs_.invert_y ? -1.0f : 1.0f);
   in.zoom = play_zoom_;
@@ -173,6 +174,7 @@ game::PlayInput Studio::play_input() const {
   in.up = clamp(in.up + t.up, -1.0f, 1.0f);
   in.jump = in.jump || t.jump;
   in.boost = in.boost || t.boost;
+  in.camera = in.camera || t.camera;
   in.fire = in.fire || t.fire;
   in.aim = in.aim || t.aim;
   in.reload = in.reload || t.reload;
@@ -207,6 +209,7 @@ game::PlayInput Studio::play_input() const {
     in.reload = in.reload || pad_.reload;
     in.interact = in.interact || pad_.interact;
     in.boost = in.boost || pad_.boost;
+    in.camera = in.camera || pad_.camera;
     // Robot on a pad, as the duck's own pad mapping: RT chirps, LT rides the wheee (the beak opens
     // with them); crouch (B) sits / stands, interact (Y) picks, reload (X) rolls.
     if (pad_.fire) in.robot |= 64;

@@ -948,7 +948,12 @@ void GameWorld::present(f64 now_ms, Vec3 eye) {
       }
       const Actor* a = level_.find(id);
       bool visible = a && !a->hidden && alive_[id] && !art_hidden_.count(id);
-      for (const Actor* p = a ? level_.find(a->parent) : nullptr; p && visible; p = level_.find(p->parent)) visible = !p->hidden;
+      bool own = interior_view_ && id == player_;
+      for (const Actor* p = a ? level_.find(a->parent) : nullptr; p && visible; p = level_.find(p->parent)) {
+        visible = !p->hidden;
+        own = own || (interior_view_ && p->id == player_);
+      }
+      visible = visible && !own;
       if (visible != v->visible) { r_.set_visible(v->mesh, visible); v->visible = visible; }
     }
     // Moving traffic.
@@ -1692,7 +1697,11 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
   const Vec3 cam_right{cam_fwd.y, -cam_fwd.x, 0};
   Vec3 move = cam_right * clamp(in.move_x, -1.0f, 1.0f) + cam_fwd * clamp(in.move_y, -1.0f, 1.0f);
   if (length(move) > 1) move = normalize(move);
-  bool boosting = c.boost && in.boost && pw_->boost > 0.02f;
+  // A tap boosts too: a short press keeps boosting for a moment (touch buttons are tapped).
+  if (in.boost && !pw_->boost_latch) pw_->boost_hold = 0.6f;
+  pw_->boost_latch = in.boost;
+  pw_->boost_hold = max_of(0.0f, pw_->boost_hold - dt);
+  bool boosting = c.boost && (in.boost || pw_->boost_hold > 0) && pw_->boost > 0.02f;
   pw_->boost = c.boost ? clamp(pw_->boost + (boosting ? -0.45f : 0.12f) * dt, 0.0f, 1.0f) : 0.0f;
   if (c.boost && pw_ == local_) hud_.boost = pw_->boost;
   if (boosting && !pw_->was_boosting) cue(c.boost_sound, pose.position, 0.7f, 1, true, audio::Bus::sfx, pw_->actor);
@@ -1713,7 +1722,11 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
       forward.z = 0;
       forward = normalize(forward, {1, 0, 0});
       const Vec3 side{-forward.y, forward.x, 0};
-      const f32 throttle = clamp(in.move_y, -0.7f, 1.0f), steer = clamp(-in.move_x, -1.0f, 1.0f);
+      const f32 throttle = clamp(in.move_y, -0.7f, 1.0f);
+      // Steering response: gentle around the centre, full lock at the rim (analog sticks;
+      // keys are -1/0/1 and stay the same).
+      const f32 sx = clamp(-in.move_x, -1.0f, 1.0f);
+      const f32 steer = sx * (0.3f + 0.7f * sx * sx);
       const f32 fwd = dot(v, forward), lat = dot(v, side);
       const bool hover = c.mode == ControlMode::hovercar;
       const bool on_ground = hover || grounded(body, reach + 0.25f);
@@ -1741,7 +1754,14 @@ void GameWorld::drive_player(const PlayInput& in, f32 dt) {
         // Hover spring over whatever is below (Box3D ray cast).
         const f32 probe = c.hover_height * 4 + reach;
         const physics::RayHit hit = physics_.cast_ray(pose.position, Vec3{0, 0, -probe}, ~0ull, body);
-        if (hit.hit) {
+        // Hop: an upward impulse, and the spring lets go until the car comes down again.
+        pw_->hop = max_of(0.0f, pw_->hop - dt);
+        if (jump_pressed && c.jump_speed > 0 && hit.hit && pw_->hop <= 0) {
+          physics_.apply_linear_impulse_to_center(body, Vec3{0, 0, (c.jump_speed - v.z) * m});
+          pw_->hop = 2 * c.jump_speed / max_of(1.0f, -g.z) * 0.8f;
+          cue(c.jump_sound, pose.position, 0.8f, 1, true, audio::Bus::sfx, pw_->actor);
+        }
+        if (hit.hit && pw_->hop <= 0) {
           const f32 dist = hit.fraction * probe - reach;
           const f32 accel = (c.hover_height - dist) * 60 - v.z * 9 - g.z;
           physics_.apply_force_to_center(body, Vec3{0, 0, clamp(accel, -40.0f, 80.0f) * m});
@@ -2447,6 +2467,29 @@ bool GameWorld::update_camera(Camera& cam, f32 dt, const PlayInput& in) {
   cam.orthographic = false;
   cam.far = 4000;
   Vec3 eye, target;
+  const bool vehicle = c.mode == ControlMode::hovercar || c.mode == ControlMode::vehicle;
+  if (in.camera && !camera_latch_ && vehicle) { interior_view_ = !interior_view_; camera_reset_ = true; }
+  camera_latch_ = in.camera;
+  if (!vehicle) interior_view_ = false;
+  if (interior_view_) {
+    // Low interior view: no chassis, the eye a hand above the street for the sense of speed.
+    Vec3 forward = pose.rotation.rotate({1, 0, 0});
+    forward.z = 0;
+    forward = normalize(forward, {1, 0, 0});
+    const physics::RayHit hit = physics_.cast_ray(center, Vec3{0, 0, -6}, ~0ull, body);
+    const f32 ground = hit.hit ? center.z - hit.fraction * 6 : center.z - 1;
+    interior_ground_ = camera_reset_ ? ground : interior_ground_ + (ground - interior_ground_) * (1 - kern::dm::exp(-10 * dt));
+    eye = Vec3{center.x, center.y, max_of(interior_ground_ + 0.45f, center.z - 0.6f)} + forward * 1.2f;
+    camera_yaw_ = kern::dm::atan2(forward.y, forward.x) / kDeg;
+    target = eye + forward * 20 + Vec3{0, 0, -0.35f};
+    camera_eye_ = eye;
+    camera_reset_ = false;
+    cam.eye = eye;
+    cam.target = target;
+    cam.near = 0.05f;
+    cam.fov = (c.camera_fov + 10 + clamp(speed - 20, 0.0f, 40.0f) * 0.4f) * kDeg;
+    return true;
+  }
   switch (c.camera) {
     case CameraMode::first_person: {
       if (c.mode == ControlMode::hovercar || c.mode == ControlMode::vehicle) camera_yaw_ = yaw_of(pose.rotation) / kDeg + 0;

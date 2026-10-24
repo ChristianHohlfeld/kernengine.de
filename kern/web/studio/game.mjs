@@ -607,7 +607,7 @@ export const escHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&am
  * go to the engine every frame while a pad is connected. Kern applies dead zones,
  * response curves and the soldier's aim rates (SpawnCity mapping):
  * left stick move, right stick look, RT fire, LT aim, A jump, B crouch,
- * X reload, Y interact, L3 / LB sprint, Start pause.
+ * X reload, Y interact, L3 / LB sprint, Back / View the vehicle camera, Start pause.
  */
 export class GamepadInput {
   constructor(engine) { this.engine = engine; this.connected = false; this.last = ""; }
@@ -620,7 +620,7 @@ export class GamepadInput {
     }
     const b = i => !!p.buttons[i]?.pressed, v = i => p.buttons[i]?.value ?? 0, ax = i => p.axes[i] ?? 0;
     const s = {cmd: "gamepad", connected: true, lx: ax(0), ly: -ax(1), rx: ax(2), ry: ax(3), lt: v(6), rt: v(7),
-      a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), l3: b(10), start: b(9)};
+      a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), l3: b(10), start: b(9), view: b(8)};
     // Any pressed button or a stick past .22 marks the pad as the device in use (SpawnCity pad-input).
     s.active = p.buttons.slice(0, 17).some(x => x?.pressed) || p.axes.slice(0, 4).some(a => Math.abs(a) > 0.22);
     const key = JSON.stringify(s);
@@ -873,7 +873,7 @@ ${HUD_STYLE}
 ${TOUCH_STYLE}`;
 
 export const PLAYER_BODY = `<canvas id="gl" tabindex="0" aria-label="Game view"></canvas><div id="hud" class="k-hud"></div><div id="loading">Loading</div>
-<div id="hint">WASD / arrows move · Space jump · Shift boost · mouse look (click to capture, Esc frees) · P pause · R restart · gamepad supported</div>
+<div id="hint">WASD / arrows move · Space jump · Shift boost · C camera · mouse look (click to capture, Esc frees) · P pause · R restart · gamepad supported</div>
 <button id="restart" hidden aria-label="Restart">↻</button><div id="error" role="alert"></div>`;
 
 /**

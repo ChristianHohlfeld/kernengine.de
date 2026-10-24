@@ -77,6 +77,7 @@ std::vector<BodyPlan> plan_bodies(const Level& level);
 struct PlayInput {
   f32 move_x = 0, move_y = 0, up = 0;  // -1..1 (right, forward, up)
   bool jump = false, boost = false;
+  bool camera = false;                 // held: switches the vehicle view (chase / low interior) on press
   u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
   f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
   f32 zoom = 0;                        // camera distance change (wheel)
@@ -219,6 +220,7 @@ class GameWorld {
   bool update_camera(Camera& camera, f32 dt, const PlayInput& input);
   ActorId player() const { return player_; }
   f32 camera_yaw() const { return camera_yaw_; }
+  bool interior_view() const { return interior_view_; }
   f32 camera_pitch() const { return camera_pitch_; }
   f32 sim_time() const { return sim_time_; }
 
@@ -563,6 +565,8 @@ class GameWorld {
   ActorId presented_player_id_ = 0;
   f32 camera_yaw_ = 0, camera_pitch_ = 18, camera_zoom_ = 1;
   bool camera_reset_ = true;
+  bool interior_view_ = false, camera_latch_ = false;  // vehicles: the low interior view (no chassis drawn)
+  f32 interior_ground_ = 0;
   Hud hud_;
   u32 broken_joints_ = 0;
   std::vector<std::string> events_;
@@ -579,8 +583,10 @@ class GameWorld {
     f32 yaw = 0;                      // camera yaw for camera-relative movement (degrees)
     Vec3 spawn_position;
     Quat spawn_rotation;
-    bool jump_latch = false, was_boosting = false, airborne = false;
+    bool jump_latch = false, was_boosting = false, airborne = false, boost_latch = false;
     f32 boost = 1, fall_speed = 0, stride = 0;
+    f32 boost_hold = 0;               // a tap on boost still boosts this long (s)
+    f32 hop = 0;                      // hover car: seconds left of a hop (the hover spring lets go)
     u32 steps = 0;
     f32 steer_vis = 0, pitch_vis = 0, last_forward = 0;
     // Character players walk with Box3D's kinematic mover instead of fighting the solver.

@@ -1325,9 +1325,45 @@ TEST(game_world_orb_run_play) {
   Camera cam;
   CHECK(f.world->update_camera(cam, 1.0f / 60, {}));
   CHECK(cam.eye.z > m.translation().z + 2);
+  // The view button: the low interior view, eye just above the street, no chassis drawn; again: back.
+  game::PlayInput view;
+  view.camera = true;
+  CHECK(f.world->update_camera(cam, 1.0f / 60, view) && f.world->interior_view());
+  CHECK(f.world->actor_matrix(f.world->player(), m));
+  CHECK(cam.eye.z < m.translation().z && cam.eye.z > 0.2f);
+  CHECK(f.world->update_camera(cam, 1.0f / 60, view) && f.world->interior_view());  // held: no flip
+  CHECK(f.world->update_camera(cam, 1.0f / 60, {}) && f.world->update_camera(cam, 1.0f / 60, view) && !f.world->interior_view());
+  // A tap on boost (one frame) still boosts for a moment.
+  f.run(4);
+  const f32 full = f.world->hud().boost;
+  game::PlayInput tap;
+  tap.boost = true;
+  f.world->step(1.0f / 60, tap);
+  f.run(0.4f);
+  CHECK(f.world->hud().boost < full - 0.1f);
+  // Hop: the hover car leaves the street and comes back down.
+  CHECK(f.world->actor_matrix(f.world->player(), m));
+  const f32 rest = m.translation().z;
+  game::PlayInput hop;
+  hop.jump = true;
+  f.world->step(1.0f / 60, hop);
+  f32 peak = rest;
+  for (int i = 0; i < 60; ++i) {
+    f.world->step(1.0f / 60, {});
+    CHECK(f.world->actor_matrix(f.world->player(), m));
+    peak = std::max(peak, m.translation().z);
+  }
+  CHECK(peak > rest + 1.0f);
+  f.run(3);
+  CHECK(f.world->actor_matrix(f.world->player(), m) && std::fabs(m.translation().z - rest) < 0.5f);
   // Collect an orb: put the car on it.
   game::ActorId orb = 0;
-  for (const game::Actor& a : f.world->level().actors) if (a.pickup) { orb = a.id; break; }
+  const u32 before = f.world->hud().pickups;
+  const f32 score_before = f.world->hud().score;
+  for (const game::Actor& a : f.world->level().actors) {
+    Mat4 am;
+    if (a.pickup && f.world->actor_alive(a.id) && f.world->actor_matrix(a.id, am)) { orb = a.id; break; }
+  }
   Mat4 om;
   CHECK(f.world->actor_matrix(orb, om));
   physics::World& phys = f.world->physics();
@@ -1336,7 +1372,7 @@ TEST(game_world_orb_run_play) {
   phys.set_pose(car_body, {om.translation(), game::euler_to_quat({0, 0, 90})});
   phys.set_linear_velocity(car_body, {});
   f.run(0.3f);
-  CHECK(f.world->hud().pickups == 1 && f.world->hud().score == 1);
+  CHECK(f.world->hud().pickups == before + 1 && f.world->hud().score == score_before + 1);
   std::vector<u32> ids;
   f.world->present(1000, {0, 0, 10});
   // Falling off the world respawns.
