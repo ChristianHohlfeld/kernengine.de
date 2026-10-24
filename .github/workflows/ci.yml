@@ -121,6 +121,7 @@ jobs:
             cp kern/examples/$g/index.html kern/examples/$g/$g.wasm _site/kern/examples/$g/
           done
           touch _site/.nojekyll
+          echo kernengine.de > _site/CNAME  # custom domain of the gh-pages site (DNS at DomainFactory)
           du -sh _site
       - uses: actions/upload-artifact@v4
         with:
