@@ -77,7 +77,7 @@ jobs:
         run: |
           build() {
             export WASI_SDK=/home/runner/wasi-sdk
-            "$WASI_SDK/bin/clang++" --version | head -1  # the toolchain is really there
+            test -x "$WASI_SDK/bin/clang++"  # the toolchain is really there
             tools/build_studio.sh
             kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp

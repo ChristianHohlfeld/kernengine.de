@@ -40,14 +40,14 @@ finish() {
 # Is the object $1 older than its source $2 or the header $3?
 stale() { [ ! -f "$1" ] || [ "$2" -nt "$1" ] || [ "$3" -nt "$1" ]; }
 
-box_header="$(ls -t "$root"/third_party/box3d/src/*.h "$root"/third_party/box3d/include/box3d/*.h | head -1)"
+box_header="$({ ls -t "$root"/third_party/box3d/src/*.h "$root"/third_party/box3d/include/box3d/*.h || true; } | head -1)"
 for c in "$root"/third_party/box3d/src/*.c; do
   o="$out/obj/box3d/$(basename "$c" .c).o"
   if stale "$o" "$c" "$box_header"; then
     run "$cc" -std=c17 "${opt[@]}" -DBOX3D_DISABLE_SIMD -w -I"$root/third_party/box3d/include" -I"$root/third_party/box3d/src" -c "$c" -o "$o"
   fi
 done
-musl_header="$(ls -t "$root"/third_party/musl_math/src/*.h | head -1)"
+musl_header="$({ ls -t "$root"/third_party/musl_math/src/*.h || true; } | head -1)"
 for c in "$root"/third_party/musl_math/src/*.c; do
   o="$out/obj/musl_math/$(basename "$c" .c).o"
   if stale "$o" "$c" "$musl_header"; then run "$cc" -std=c17 "${opt[@]}" -fno-math-errno -w -c "$c" -o "$o"; fi
@@ -56,7 +56,7 @@ sources=()
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/src" -name '*.cpp' -not -path "*/studio/*" -not -path "*/app/*" | sort)
 sources+=("$root/tests/gl_stub.cpp" "$here/kern_lehrer.cpp")
 flags=(-std=c++20 "${opt[@]}" -fno-exceptions -fno-rtti -I"$root/include" -I"$root/third_party/box3d/include" -I"$root/tests")
-newest_header="$(ls -t $(find "$root/include" "$root/src" -name '*.h' -o -name '*.inc') | head -1)"
+newest_header="$({ ls -t $(find "$root/include" "$root/src" -name '*.h' -o -name '*.inc') || true; } | head -1)"
 objects=()
 for f in "${sources[@]}"; do
   rel="${f#"$root"/}"

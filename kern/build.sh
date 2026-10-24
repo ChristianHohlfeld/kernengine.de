@@ -77,14 +77,14 @@ objects=()
 if [ "$with_physics" = 1 ]; then
   cflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -DBOX3D_DISABLE_SIMD -ffp-contract=off
           -I"$here/third_party/box3d/include" -I"$here/third_party/box3d/src" -w)
-  key="$(printf '%s ' "${cflags[@]}" "$("$CC" --version | head -1)" | sha256sum | cut -c1-16)"
+  key="$(printf '%s ' "${cflags[@]}" "$({ "$CC" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
   cache="$cache_root/box3d-$key"
   mkdir -p "$cache"
   pids=()
   for c in "$here"/third_party/box3d/src/*.c; do
     o="$cache/$(basename "$c" .c).o"
     objects+=("$o")
-    newest_header="$(ls -t "$here"/third_party/box3d/src/*.h "$here"/third_party/box3d/src/*.inl "$here"/third_party/box3d/include/box3d/*.h | head -1)"
+    newest_header="$({ ls -t "$here"/third_party/box3d/src/*.h "$here"/third_party/box3d/src/*.inl "$here"/third_party/box3d/include/box3d/*.h || true; } | head -1)"  # ls may die of SIGPIPE under pipefail
     if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ "$newest_header" -nt "$o" ]; then
       "$CC" "${cflags[@]}" -c "$c" -o "$o" &
       pids+=($!)
@@ -95,14 +95,14 @@ if [ "$with_physics" = 1 ]; then
 fi
 # Deterministic libm (kern/core/dmath.h): musl's sin, exp, atan2 ... compiled the same way everywhere.
 mflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off -fno-math-errno -w)
-mkey="$(printf '%s ' "${mflags[@]}" "$("$CC" --version | head -1)" | sha256sum | cut -c1-16)"
+mkey="$(printf '%s ' "${mflags[@]}" "$({ "$CC" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
 mcache="$cache_root/musl-math-$mkey"
 mkdir -p "$mcache"
 pids=()
 for c in "$here"/third_party/musl_math/src/*.c; do
   o="$mcache/$(basename "$c" .c).o"
   objects+=("$o")
-  newest_header="$(ls -t "$here"/third_party/musl_math/src/*.h | head -1)"
+  newest_header="$({ ls -t "$here"/third_party/musl_math/src/*.h || true; } | head -1)"
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ "$newest_header" -nt "$o" ]; then
     "$CC" "${mflags[@]}" -c "$c" -o "$o" &
     pids+=($!)
@@ -127,7 +127,7 @@ cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
           -fno-exceptions -fno-rtti -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off
           -Wall -Wextra -Wno-unused-parameter -Werror=return-type
           "${includes[@]}" "${extra_flags[@]}")
-flags_key="$(printf '%s ' "${cxxflags[@]}" "$("$CXX" --version | head -1)" | sha256sum | cut -c1-16)"
+flags_key="$(printf '%s ' "${cxxflags[@]}" "$({ "$CXX" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
 # Any header or included data (.inc) change rebuilds everything (simple and safe).
 headers_key="$(find "$here/include" "$here/src" "$here/third_party/box3d/include" "$here/third_party/microduck" -name '*.h' -o -name '*.inl' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-16)"
 cpp_cache="$cache_root/cpp-$flags_key"
