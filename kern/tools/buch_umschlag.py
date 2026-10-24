@@ -32,7 +32,7 @@ W, H = (float(x) for x in a.trim.split("x"))
 # 482 pages -> 1213.1 x 822 pt, spine 1.274 in; 458 pages -> 1209.2 x 822 pt, spine 1.220 in).
 # Outside the trim: 0.708 in of wrap and board overhang on the outer edges, 0.079 in at each side
 # of the spine. Safe zones: text 0.635 in from every trim edge and 0.4 in from the spine (hinge).
-MX, MY, SPINE_SIDE = 0.708, 0.708, 0.079
+MX, MY, SPINE_SIDE = 0.7083, 0.70833, 0.0789  # 2 x (MX + SPINE_SIDE) = 1.5744 in, 2 x MY = 1.41667 in (822 pt high)
 SAFE, HINGE_SAFE = 0.635, 0.4
 S = a.spine or round(a.pages * 0.002252 + 0.189, 3)
 TW, TH = 2 * W + S + 2 * SPINE_SIDE + 2 * MX, H + 2 * MY
