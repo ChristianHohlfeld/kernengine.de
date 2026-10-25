@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -135,6 +135,7 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
     if (!response.ok) throw Error(`${url} - ${response.status} (build it with tools/build_studio.sh)`);
     bytes = new Uint8Array(await response.arrayBuffer());
   }
+  localizePage();  // German interface on German systems (visual only)
   const kern = await loadKern({bytes, base64});
   const engine = new StudioEngine(kern);
   const page = new StudioPage(kern, engine, () => base64 ?? toBase64(bytes));
@@ -673,7 +674,7 @@ class StudioPage {
       const html = clientHud ? hudHtml(clientHud) : showHud ? hudHtml(st.hud) : "";
       if (html !== v.hudKey) { v.hudKey = html; v.hud.innerHTML = html; v.hud.hidden = !html; }
       // Music and effects switches at the top right while the game plays.
-      if (active || v.audio) { (v.audio ||= mountAudioSwitches(v.el, this.engine)).hidden = !(active && showHud); }
+      if (active || v.audio) { const a = (v.audio ||= mountAudioSwitches(v.el, this.engine)), hide = !(active && showHud); if (a.hidden !== hide) a.hidden = hide; }
       // Playing on a touch device: the game takes the whole screen (EXIT stops), like SpawnCity.
       if (v.index === 0) {
         const immersive = st.play === "playing" && !s.play.ejected && st.input?.device === "touch";

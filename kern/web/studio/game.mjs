@@ -8,6 +8,344 @@
 // draws the HUD text - nothing else.
 import {loadKern, KERN_NOTICES} from "../kern.mjs";
 
+/**
+ * German interface for Kern Studio and the games, purely visual: the engine, its commands, the
+ * level files and the console stay in English. The page's text is translated as it appears
+ * (a MutationObserver swaps exact phrases in text nodes and in title / placeholder / aria-label),
+ * so no panel code changes and nothing the user typed is touched: inputs, the outliner's actor
+ * names, the level name and the output log are left alone.
+ *
+ * The language follows the browser / the operating system (navigator.languages). `?lang=en` or
+ * `?lang=de` in the address overrides it and is remembered on this device.
+ */
+
+const I18N_KEY = "kern.lang";
+
+function i18nPickLanguage() {
+  try {
+    const q = new URLSearchParams(location.search).get("lang");
+    if (q === "de" || q === "en") { localStorage.setItem(I18N_KEY, q); return q; }
+    const kept = localStorage.getItem(I18N_KEY);
+    if (kept === "de" || kept === "en") return kept;
+  } catch { /* storage blocked: follow the browser */ }
+  const langs = (typeof navigator !== "undefined" && (navigator.languages?.length ? navigator.languages : [navigator.language])) || [];
+  return String(langs[0] || "en").toLowerCase().startsWith("de") ? "de" : "en";
+}
+
+export const I18N_LANG = i18nPickLanguage();
+
+// Exact phrases (as the page shows them, trimmed). Product and level names stay English.
+const I18N_DE = {
+  // menu bar, toolbar, tabs
+  "File": "Datei", "Edit": "Bearbeiten", "Window": "Fenster", "Play": "Spielen", "Help": "Hilfe",
+  "Untitled": "Unbenannt", "Unsaved changes": "Ungespeicherte Änderungen",
+  "⤓ Install": "⤓ Installieren", "Install Kern Studio as an app (works offline, full screen)": "Kern Studio als App installieren (offline, Vollbild)",
+  "In Safari tap": "Tippe in Safari auf", "Share": "Teilen", "↑ and then": "↑ und dann auf", "Add to Home Screen": "Zum Home-Bildschirm",
+  ": Kern Studio then starts full screen like an app and works offline.": ": Kern Studio startet dann im Vollbild wie eine App und läuft offline.",
+  "Save (Ctrl+S)": "Speichern (Strg+S)", "Undo (Ctrl+Z)": "Rückgängig (Strg+Z)", "Redo (Ctrl+Y)": "Wiederholen (Strg+Y)",
+  "Place an actor": "Actor platzieren", "Add": "Hinzufügen",
+  "Select (Q)": "Auswählen (Q)", "Move (W)": "Verschieben (W)", "Rotate (E)": "Drehen (E)", "Scale (R)": "Skalieren (R)",
+  "World / local coordinates (Ctrl+`)": "Welt- / lokale Koordinaten (Strg+`)", "Grid snap ([ and ])": "Am Raster ausrichten ([ und ])",
+  "Rotation snap": "Drehung einrasten", "Scale snap": "Skalierung einrasten", "Camera speed (wheel while flying)": "Kamerageschwindigkeit (Mausrad beim Fliegen)",
+  "Play in the viewport (Alt+P)": "Im Viewport spielen (Alt+P)", "Simulate physics (Alt+S)": "Physik simulieren (Alt+S)",
+  "Pause (Pause)": "Pause (Pause)", "Advance one frame (.)": "Ein Bild weiter (.)", "Stop (Esc)": "Stopp (Esc)", "Eject / possess (F8)": "Aussteigen / übernehmen (F8)",
+  "Viewport layout": "Viewport-Aufteilung", "Logic": "Logik",
+  "Logic: the level's Blueprint-style graph (actors have their own: Details > Logic)": "Logik: der Graph des Levels im Blueprint-Stil (Actors haben eigene: Details > Logik)",
+  "Package the game as one HTML file": "Spiel als eine HTML-Datei verpacken", "Outliner and Details": "Outliner und Details",
+  "Stop playing": "Spiel beenden", "⟵ EXIT": "⟵ ENDE", "❚❚ PAUSE": "❚❚ PAUSE", "▶ RESUME": "▶ WEITER", "Resume": "Fortsetzen", "Pause": "Pause",
+  "Outliner": "Outliner", "Details": "Details", "World": "Welt", "World Settings": "Welteinstellungen", "Close": "Schließen",
+  "New folder for the selection": "Neuer Ordner für die Auswahl", "Search actors": "Actors suchen", "Label": "Name", "Type": "Typ",
+  "Place Actors": "Actors platzieren", "Textures": "Texturen", "Sounds": "Sounds", "Output Log": "Ausgabeprotokoll", "Search": "Suchen",
+  "Close (Ctrl+Space)": "Schließen (Strg+Leertaste)", "Content drawer (Ctrl+Space)": "Inhaltsablage (Strg+Leertaste)", "Content Drawer": "Inhaltsablage",
+  "Enter console command (help)": "Konsolenbefehl eingeben (help)", "Sound on / off": "Ton an / aus", "Output level": "Ausgangspegel", "Version": "Version",
+  "Play controls this actor": "Spielen steuert diesen Actor", "Player": "Spieler", "Locked": "Gesperrt",
+  "Select an actor in the viewport or the outliner to edit its details.": "Wähle einen Actor im Viewport oder im Outliner, um seine Details zu bearbeiten.",
+  "Search details": "Details durchsuchen", "Multiple values": "Mehrere Werte", "Reset to default": "Auf Standard zurücksetzen", "Reset to Default": "Auf Standard zurücksetzen",
+  "Copy Value": "Wert kopieren", "Paste Value": "Wert einfügen",
+
+  // menus
+  "New Level...": "Neues Level...", "New Level": "Neues Level", "Open Level...": "Level öffnen...", "Save": "Speichern", "Save As...": "Speichern unter...",
+  "Example Levels": "Beispiel-Levels", "Package Game (HTML)...": "Spiel verpacken (HTML)...", "Package Game": "Spiel verpacken", "Package": "Verpacken",
+  "Import Texture...": "Textur importieren...", "Import texture": "Textur importieren", "Import Sound": "Sound importieren", "Import image": "Bild importieren",
+  "Import an image": "Ein Bild importieren", "Import audio (WAV, MP3, OGG, M4A, FLAC)": "Audio importieren (WAV, MP3, OGG, M4A, FLAC)",
+  "Undo": "Rückgängig", "Redo": "Wiederholen", "History...": "Verlauf...", "Undo History": "Rückgängig-Verlauf",
+  "Cut": "Ausschneiden", "Copy": "Kopieren", "Paste": "Einfügen", "Duplicate": "Duplizieren", "Delete": "Löschen",
+  "Select All": "Alles auswählen", "Select Children": "Kinder auswählen", "Deselect": "Auswahl aufheben",
+  "Group": "Gruppieren", "Attach": "Anhängen", "Detach": "Lösen", "Hide": "Ausblenden", "Show All": "Alle einblenden", "Lock": "Sperren", "Unlock": "Entsperren",
+  "Focus Selection": "Auswahl fokussieren", "Focus": "Fokussieren", "Snap to Floor": "Auf den Boden setzen", "Snap to floor": "Auf den Boden setzen",
+  "Make Player": "Zum Spieler machen", "Make Player (control it in Play)": "Zum Spieler machen (beim Spielen steuern)",
+  "Connect with Constraint": "Mit Gelenk verbinden", "Keep Simulation Changes": "Simulationsänderungen übernehmen",
+  "Keep the simulated poses of the selection": "Die simulierten Posen der Auswahl übernehmen",
+  "Move to folder": "In Ordner verschieben", "Remove from folder": "Aus Ordner entfernen", "Rename Folder": "Ordner umbenennen", "Rename folder": "Ordner umbenennen",
+  "Remove Folder (keep actors)": "Ordner entfernen (Actors behalten)", "Rename": "Umbenennen", "Remove": "Entfernen",
+  "Edit Logic": "Logik bearbeiten", "Add Logic (Blueprint)": "Logik hinzufügen (Blueprint)", "Open this actor's logic graph (Blueprint)": "Logik-Graph dieses Actors öffnen (Blueprint)",
+  "Preferences...": "Einstellungen...", "Preferences": "Einstellungen", "Reset Settings to Defaults...": "Einstellungen zurücksetzen...", "Reset Settings to Defaults": "Einstellungen zurücksetzen",
+  "Viewport Layout": "Viewport-Aufteilung", "1 viewport": "1 Viewport", "2 viewports": "2 Viewports", "4 viewports": "4 Viewports",
+  "Fullscreen": "Vollbild", "Game View": "Spielansicht", "Game view": "Spielansicht", "Game view (hide editor helpers)": "Spielansicht (Editor-Hilfen ausblenden)",
+  "Stats": "Statistik", "Icons": "Symbole", "Grid": "Raster", "Bounds": "Begrenzungen", "Collision Shapes": "Kollisionsformen", "Contact Points": "Kontaktpunkte",
+  "Constraints": "Gelenke", "Selection Outline": "Auswahlumriss", "Fog": "Nebel", "Sky": "Himmel",
+  "Simulate": "Simulieren", "Stop": "Stopp", "Advance One Frame": "Ein Bild weiter", "Restart Game": "Spiel neu starten", "Restart": "Neu starten",
+  "Eject from Player": "Aus dem Spieler aussteigen", "Possess Player": "Spieler übernehmen", "Number of Players": "Anzahl der Spieler", "Play: one player": "Spielen: ein Spieler",
+  "Host Online Game...": "Online-Spiel hosten...", "Host Online Game": "Online-Spiel hosten", "Join Online Game...": "Online-Spiel beitreten...", "Join Online Game": "Online-Spiel beitreten",
+  "Leave Online Game": "Online-Spiel verlassen", "Host": "Hosten", "Join": "Beitreten", "Joining the game...": "Trete dem Spiel bei...", "Network Emulation": "Netzwerk-Emulation",
+  "Perfect": "Perfekt", "Relay (optional)": "Relay (optional)", "Online play:": "Online spielen:",
+  "Controls...": "Steuerung...", "About Kern Studio": "Über Kern Studio",
+  "Perspective": "Perspektive", "Top": "Oben", "Bottom": "Unten", "Front": "Vorne", "Back": "Hinten", "Left": "Links", "Right": "Rechts",
+  "Lit": "Beleuchtet", "Unlit": "Unbeleuchtet", "Wireframe": "Drahtgitter", "Show": "Anzeigen", "View Mode": "Ansichtsmodus", "Viewport Type": "Viewport-Typ",
+  "Viewport options": "Viewport-Optionen", "Layout": "Aufteilung", "Maximise / restore (quad layout)": "Maximieren / wiederherstellen (4er-Aufteilung)",
+  "Bookmarks": "Lesezeichen", "Camera speed": "Kamerageschwindigkeit", "Camera speed (1-8)": "Kamerageschwindigkeit (1-8)",
+  "Grid size": "Rastergröße", "Grid snapping": "Am Raster einrasten", "Rotation snapping": "Drehung einrasten", "Scale snapping": "Skalierung einrasten",
+  "Rotation step": "Drehschritt", "Scale step": "Skalierungsschritt", "Mouse sensitivity": "Mausempfindlichkeit", "Invert mouse Y": "Maus-Y umkehren",
+  "Interface": "Oberfläche", "Apply": "Übernehmen", "Cancel": "Abbrechen", "Create": "Erstellen", "Update": "Aktualisieren", "Later": "Später", "Dismiss": "Schließen",
+  "New version available": "Neue Version verfügbar", "Start fresh": "Neu anfangen", "Play it": "Spielen",
+  "Your settings are kept in this browser. Edit > Reset Settings to Defaults puts all of them back.": "Deine Einstellungen bleiben in diesem Browser. Bearbeiten > Einstellungen zurücksetzen stellt alle wieder her.",
+  "Unsaved changes of the current level are kept in the autosave until you start editing the new one.": "Ungespeicherte Änderungen des aktuellen Levels bleiben in der automatischen Sicherung, bis du das neue bearbeitest.",
+  "Builds one self-contained HTML file with the Kern runtime and this level. It plays full screen in any browser - no editor, no server.": "Erstellt eine eigenständige HTML-Datei mit der Kern-Laufzeit und diesem Level. Sie läuft im Vollbild in jedem Browser – ohne Editor, ohne Server.",
+  "Game title": "Spieltitel", "Level name": "Level-Name", "Name": "Name", "Actor name": "Actor-Name",
+  "World coordinates (Ctrl+` for local)": "Weltkoordinaten (Strg+` für lokal)", "Local coordinates (Ctrl+` for world)": "Lokale Koordinaten (Strg+` für Welt)",
+  "Possess the player (F8)": "Spieler übernehmen (F8)", "Eject from the player (F8)": "Aus dem Spieler aussteigen (F8)", "Show four viewports": "Vier Viewports zeigen",
+  "Show one viewport": "Einen Viewport zeigen", "Show / hide": "Ein- / ausblenden", "Show / hide (H)": "Ein- / ausblenden (H)", "Advance one simulation step": "Einen Simulationsschritt weiter",
+  "Player (controlled in Play)": "Spieler (beim Spielen gesteuert)", "comma, separated": "durch Komma getrennt", "Preview": "Vorhören", "Burst color": "Funkenfarbe",
+  "Period": "Periode", "Step rate": "Schrittrate", "Drone": "Drohne", "Sock": "Socke",
+  "Pollen Robotics' biped robot on its trained networks: W/S walk, A/D turn, Space quacks, 1 sit, 2 pick up, 3/4 kick, 5 roll, 6 beak": "Der zweibeinige Roboter von Pollen Robotics auf seinen trainierten Netzen: W/S laufen, A/D drehen, Leertaste quakt, 1 sitzen, 2 aufheben, 3/4 kicken, 5 rollen, 6 Schnabel",
+  "The Micro Duck on its roller skates: roller.onnx skates, 2 crouches": "Die Micro Duck auf Rollschuhen: roller.onnx fährt, 2 duckt",
+
+  // controls dialog
+  "Select (Shift adds, Ctrl toggles); click empty space to deselect": "Auswählen (Umschalt fügt hinzu, Strg schaltet um); Klick ins Leere hebt die Auswahl auf",
+  "Marquee select (Shift adds, Ctrl toggles); actors move with the gizmo (W / E / R)": "Rahmenauswahl (Umschalt fügt hinzu, Strg schaltet um); Actors bewegen sich mit dem Gizmo (W / E / R)",
+  "Move forward / back (zoom in orthographic views)": "Vor / zurück (Zoom in orthografischen Ansichten)", "Move up / down and sideways while flying": "Hoch / runter und seitwärts beim Fliegen",
+  "Orbit / dolly / pan around the selection": "Um die Auswahl kreisen / heranfahren / schwenken", "Orbit around selection (Alt+LMB)": "Um die Auswahl kreisen (Alt+LMT)",
+  "Duplicate while moving": "Beim Verschieben duplizieren", "Drag from Place Actors": "Aus „Actors platzieren“ ziehen", "Drop a new actor exactly where you release it": "Neuen Actor genau dort ablegen, wo du loslässt",
+  "Select / move / rotate / scale  /  cycle": "Auswählen / verschieben / drehen / skalieren  /  durchschalten", "Focus selection  /  snap to floor": "Auswahl fokussieren  /  auf den Boden setzen",
+  "Copy, paste, cut, duplicate, delete": "Kopieren, einfügen, ausschneiden, duplizieren, löschen", "Undo / redo": "Rückgängig / wiederholen",
+  "Hide selected / hide others / show all": "Auswahl ausblenden / andere ausblenden / alle einblenden", "Set / jump to camera bookmark": "Kamera-Lesezeichen setzen / anspringen",
+  "Smaller / larger grid snap": "Kleineres / größeres Raster", "Perspective / top / front / side view": "Perspektive / oben / vorne / seitlich",
+  "Wireframe / unlit / lit / collision view": "Drahtgitter / unbeleuchtet / beleuchtet / Kollisionsansicht", "Play  /  Simulate": "Spielen  /  Simulieren",
+  "Stop  /  eject or possess  /  free the mouse": "Stopp  /  aussteigen oder übernehmen  /  Maus freigeben", "Grab and throw physics bodies": "Physikkörper greifen und werfen",
+  "Left click": "Linksklick", "Left drag": "Links ziehen", "Right mouse + WASD / QE": "Rechte Maustaste + WASD / QE", "Mouse wheel": "Mausrad",
+  "Middle mouse drag": "Mittlere Maustaste ziehen", "Right + left mouse": "Rechte + linke Maustaste", "Alt + left / right / middle": "Alt + links / rechts / Mitte",
+  "Alt + drag gizmo": "Alt + Gizmo ziehen", "Drag (Simulate)": "Ziehen (Simulieren)", "K (Simulate)": "K (Simulieren)", "Key": "Taste", "Action": "Aktion",
+
+  // status line
+  "Kern Studio ready - Orb Run loaded. Press Play (Alt+P) to drive, or fly around with the right mouse button + WASD.": "Kern Studio bereit – Orb Run geladen. Drück Spielen (Alt+P) zum Fahren oder flieg mit rechter Maustaste + WASD herum.",
+  "Playing - WASD / arrows to move, mouse to look, Shift+F1 frees the mouse, F8 ejects, Esc stops": "Spielt – WASD / Pfeiltasten bewegen, Maus schaut, Umschalt+F1 gibt die Maus frei, F8 steigt aus, Esc beendet",
+  "Playing - left stick moves, right stick or a drag looks around, the buttons act": "Spielt – linker Stick bewegt, rechter Stick oder Wischen schaut, die Knöpfe handeln",
+  "Simulating - physics runs, drag a body to move or lift it, K keeps the selected actors' poses": "Simuliert – die Physik läuft, zieh einen Körper zum Bewegen oder Anheben, K übernimmt die Posen der Auswahl",
+  "Stopped - back to editing": "Gestoppt – zurück im Editor", "Paused": "Pausiert", "Resumed": "Fortgesetzt", "Restarted": "Neu gestartet",
+  "Ejected - free camera, F8 possesses the player again": "Ausgestiegen – freie Kamera, F8 übernimmt den Spieler wieder", "Possessed the player": "Spieler übernommen",
+  "Watching - free camera, F8 takes over the player again": "Zuschauen – freie Kamera, F8 übernimmt den Spieler wieder",
+  "Watching - WASD / QE fly, drag to look around, drag a body to move or lift it (wheel: nearer / farther), F8 takes over the player": "Zuschauen – WASD / QE fliegen, ziehen zum Umsehen, einen Körper ziehen zum Bewegen oder Anheben (Mausrad: näher / weiter), F8 übernimmt den Spieler",
+  "Watching - drag to look around, pinch to fly, drag a body to move or lift it, F8 takes over the player": "Zuschauen – ziehen zum Umsehen, zwei Finger zum Fliegen, einen Körper ziehen zum Bewegen oder Anheben, F8 übernimmt den Spieler",
+  "Mouse released - click the viewport to control the game again": "Maus freigegeben – klick in den Viewport, um wieder zu steuern",
+  "Nothing to control yet: drop a player from Content > Players (Soldier, Hover Car...) - simulating instead": "Noch nichts zu steuern: zieh einen Spieler aus Inhalte > Spieler (Soldat, Hovercar...) – stattdessen wird simuliert",
+  "Stop playing to add actors": "Beende das Spiel, um Actors hinzuzufügen", "Stop playing to undo": "Beende das Spiel, um rückgängig zu machen", "Stop playing to redo": "Beende das Spiel, um zu wiederholen",
+  "Fix the errors above to play": "Behebe die Fehler oben, um zu spielen", "No player to possess": "Kein Spieler zum Übernehmen", "No server to join": "Kein Server zum Beitreten",
+  "Only an actor with a Player Controller can be the player": "Nur ein Actor mit Spieler-Steuerung kann der Spieler sein",
+  "Select two actors: the constrained one, then (last) the one it hangs on": "Wähle zwei Actors: den verbundenen, dann (zuletzt) den, an dem er hängt",
+  "Select actors to put them into a new folder": "Wähle Actors, um sie in einen neuen Ordner zu legen",
+  "Keep Simulation Changes works on selected actors while simulating": "„Simulationsänderungen übernehmen“ wirkt beim Simulieren auf ausgewählte Actors",
+  "Cannot attach an actor to its own child": "Ein Actor kann nicht an sein eigenes Kind gehängt werden",
+  "Only audio files can be imported as sounds": "Nur Audiodateien lassen sich als Sounds importieren",
+  "Sound muted": "Ton aus", "Sound on": "Ton an", "Settings reset to defaults": "Einstellungen zurückgesetzt", "Saved": "Gespeichert", "Opened": "Geöffnet",
+  "Starting the engine": "Engine startet", "Loading": "Lädt", "Game lost": "Spiel verloren",
+
+  // details: sections and groups
+  "Transform": "Transformation", "Location": "Position", "Rotation": "Drehung", "Scale": "Skalierung", "Lock proportions": "Proportionen sperren",
+  "Mesh": "Mesh", "Static Mesh": "Statisches Mesh", "Physics": "Physik", "Physics (Box3D)": "Physik (Box3D)", "Rigid Body": "Starrkörper", "Rigid Body (Box3D)": "Starrkörper (Box3D)",
+  "Material": "Material", "Collision": "Kollision", "Collider": "Kollider", "Constraint": "Gelenk", "Constraint (joint)": "Gelenk", "Light": "Licht", "Audio": "Audio",
+  "Player Controller": "Spieler-Steuerung", "Camera": "Kamera", "Movement": "Bewegung", "Handling": "Fahrverhalten", "Weapon": "Waffe", "Health": "Gesundheit",
+  "Pickup": "Pickup", "Trigger": "Trigger", "Mover": "Beweger", "Rotator": "Rotator", "Sky and light": "Himmel und Licht", "Gameplay": "Spielablauf", "Sound": "Sound",
+  "Game": "Spiel", "Physical material": "Physikmaterial", "Limits": "Grenzen", "Spring": "Feder", "Motor": "Motor", "Breaking": "Bruch", "Respawn": "Wiedereinstieg",
+  "Explosion": "Explosion", "Regeneration": "Regeneration", "Edit world settings": "Welteinstellungen bearbeiten", "Remove component": "Komponente entfernen",
+  "Hidden (editor and game)": "Ausgeblendet (Editor und Spiel)", "Locked (not selectable)": "Gesperrt (nicht auswählbar)", "Tags": "Tags", "Outliner folder": "Outliner-Ordner",
+  "Attached to": "Angehängt an", "Transform only: a parent or pivot": "Nur Transformation: ein Elternteil oder Drehpunkt",
+
+  // details: fields
+  "Shape": "Form", "Size": "Größe", "Radius": "Radius", "Height": "Höhe", "Segments": "Segmente", "Generate collision": "Kollision erzeugen", "Friction": "Reibung",
+  "Restitution (bounce)": "Rückprall (Elastizität)", "Rolling resistance": "Rollwiderstand", "Base color": "Grundfarbe", "Roughness": "Rauheit", "Metallic": "Metallisch",
+  "Emissive color": "Leuchtfarbe", "Emissive strength": "Leuchtstärke", "Opacity": "Deckkraft", "Texture": "Textur", "Texture tiling": "Texturkachelung", "Two sided": "Beidseitig",
+  "Cast shadow": "Wirft Schatten", "Motion": "Bewegungsart", "Mobility": "Mobilität", "Mass (0 = from density)": "Masse (0 = aus Dichte)", "Density": "Dichte",
+  "Linear damping": "Lineare Dämpfung", "Angular damping": "Winkeldämpfung", "Gravity scale": "Schwerkraftfaktor", "Allow sleep": "Ruhen erlauben", "Start awake": "Wach starten",
+  "Lock position": "Position sperren", "Lock rotation": "Drehung sperren", "Continuous (bullet)": "Kontinuierlich (Geschoss)", "Initial velocity": "Anfangsgeschwindigkeit",
+  "Initial spin": "Anfangsdrehung", "Sensor (overlap only)": "Sensor (nur Überlappung)", "Group index": "Gruppenindex", "Channel bits": "Kanal-Bits", "Collides with bits": "Kollidiert mit Bits",
+  "Offset": "Versatz", "Box size": "Boxgröße", "Capsule length": "Kapsellänge", "Connected actor": "Verbundener Actor", "World (fixed point)": "Welt (fester Punkt)",
+  "Anchor (local)": "Anker (lokal)", "Axis (local)": "Achse (lokal)", "Collide connected": "Verbundene kollidieren", "Limit": "Begrenzung", "Lower": "Unten", "Upper": "Oben",
+  "Frequency": "Frequenz", "Damping ratio": "Dämpfungsgrad", "Max force / torque": "Max. Kraft / Drehmoment", "Speed": "Geschwindigkeit",
+  "Break force (0 = never)": "Bruchkraft (0 = nie)", "Break torque (0 = never)": "Bruchmoment (0 = nie)", "Break sound": "Bruchgeräusch", "Rest length (0 = at start)": "Ruhelänge (0 = wie beim Start)",
+  "Distance": "Abstand", "Light color": "Lichtfarbe", "Intensity": "Intensität", "Attenuation radius": "Reichweite", "Attenuation": "Abschwächung",
+  "Volume": "Lautstärke", "Pitch": "Tonhöhe", "Spatial (3D)": "Räumlich (3D)", "Falloff distance": "Abfallentfernung", "Roll-off": "Abfall", "Doppler": "Doppler",
+  "Play on start": "Beim Start abspielen", "Bus": "Bus", "Impact sound": "Aufprallgeräusch", "Impact threshold": "Aufprallschwelle",
+  "Max speed": "Höchstgeschwindigkeit", "Acceleration": "Beschleunigung", "Turn rate": "Drehrate", "Boost": "Boost", "Boost speed": "Boost-Geschwindigkeit",
+  "Jump speed (0 = none)": "Sprunggeschwindigkeit (0 = keiner)", "Hover height": "Schwebehöhe", "Field of view": "Sichtfeld", "Field of View": "Sichtfeld",
+  "Eye height": "Augenhöhe", "Crouch speed": "Ducken-Geschwindigkeit", "Look sensitivity": "Blickempfindlichkeit", "Head bob": "Kopfwippen",
+  "Fire rate": "Feuerrate", "Damage": "Schaden", "Range": "Reichweite", "Magazine": "Magazin", "Reserve": "Reserve", "Reload time": "Nachladezeit", "Recoil": "Rückstoß",
+  "Hip spread": "Streuung aus der Hüfte", "Aimed spread": "Streuung beim Zielen", "Aim field of view": "Sichtfeld beim Zielen", "Pellets per shot": "Schrot pro Schuss",
+  "Headshot multiplier": "Kopftreffer-Faktor", "Points for a kill": "Punkte pro Abschuss", "Armor": "Panzerung", "Respawn after (0 = never)": "Wiedereinstieg nach (0 = nie)",
+  "Respawn delay": "Wiedereinstiegs-Verzögerung", "Respawn point": "Wiedereinstiegspunkt", "Regenerate after (0 = never)": "Regeneriert nach (0 = nie)",
+  "Explosion damage": "Explosionsschaden", "Explosion radius (0 = none)": "Explosionsradius (0 = keiner)", "Impulse on bodies": "Impuls auf Körper",
+  "Points": "Punkte", "Heals": "Heilt", "Ammo": "Munition", "Only once": "Nur einmal", "Action": "Aktion", "Message": "Nachricht",
+  "Strength (launch m/s, damage)": "Stärke (Start m/s, Schaden)", "Teleport target": "Teleport-Ziel", "Rotation rate": "Drehrate", "Phase": "Phase",
+  "Start delay": "Startverzögerung", "Win condition": "Siegbedingung", "Target score": "Zielpunktzahl", "Time limit (0 = none)": "Zeitlimit (0 = keins)",
+  "Kill Z (respawn below)": "Kill-Z (darunter Wiedereinstieg)", "Gravity": "Schwerkraft", "Time of day": "Tageszeit", "Day length (0 = frozen)": "Tageslänge (0 = angehalten)",
+  "Sun azimuth": "Sonnenrichtung", "Fog density": "Nebeldichte", "Exposure": "Belichtung", "Ambient occlusion radius (0 = off)": "Umgebungsverdeckung (0 = aus)",
+  "Shadow distance (smaller: sharper)": "Schattenreichweite (kleiner: schärfer)", "Clouds": "Wolken", "Ground color": "Bodenfarbe", "Endless ground": "Endloser Boden",
+  "Ground friction": "Bodenreibung", "Ground bounciness": "Bodenelastizität", "Contact stiffness": "Kontaktsteifigkeit", "Contact damping ratio": "Kontaktdämpfung",
+  "Contact push-out speed": "Kontakt-Ausstoßgeschwindigkeit", "Sub-steps": "Teilschritte", "Music": "Musik", "Music volume": "Musiklautstärke", "Ambience": "Atmosphäre",
+  "Ambience volume": "Atmosphärenlautstärke", "Reverb": "Hall", "Master volume": "Gesamtlautstärke", "Lit windows at night": "Erleuchtete Fenster bei Nacht",
+  "Blocks per side": "Blöcke pro Seite", "Block pitch": "Blockraster", "Street width": "Straßenbreite", "Tallest building": "Höchstes Gebäude", "Trees": "Bäume",
+  "Traffic cars": "Verkehr (Autos)", "Seed": "Seed", "Units": "Einheiten", "Pitch by speed": "Tonhöhe nach Tempo", "Engine loop": "Motorschleife",
+  "Initial state": "Anfangszustand", "Walking network": "Laufnetz", "Actions to servo goals": "Aktionen zu Servo-Zielen",
+  "Kern extras (ball play, sock fetching, beak in the pick)": "Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)",
+
+  // details: choices
+  "Box": "Box", "Sphere": "Kugel", "Cylinder": "Zylinder", "Cone": "Kegel", "Capsule": "Kapsel", "Plane": "Ebene", "Torus": "Torus", "Ramp": "Rampe",
+  "Static": "Statisch", "Kinematic": "Kinematisch", "Dynamic (simulate physics)": "Dynamisch (Physik simulieren)", "Fit to mesh": "An Mesh anpassen", "Convex hull": "Konvexe Hülle",
+  "Hinge (revolute)": "Scharnier (Drehgelenk)", "Slider (prismatic)": "Schiene (Schubgelenk)", "Ball (spherical)": "Kugelgelenk", "Fixed (weld)": "Fest (verschweißt)",
+  "Distance / rope": "Abstand / Seil", "Wheel (suspension)": "Rad (Federung)", "Parallel": "Parallel", "No collision (filter)": "Keine Kollision (Filter)",
+  "Hover car": "Hovercar", "Rolling ball": "Rollende Kugel", "Character": "Figur", "Flyer": "Flieger", "Vehicle": "Fahrzeug", "Soldier (first person shooter)": "Soldat (Ego-Shooter)",
+  "Walker (robot on its trained network)": "Läufer (Roboter auf seinem trainierten Netz)", "Rifle": "Gewehr", "Pistol": "Pistole", "Shotgun": "Schrotflinte", "Sniper rifle": "Scharfschützengewehr",
+  "Chase": "Verfolger", "First person": "Ego-Perspektive", "Top down": "Von oben", "Goal (win)": "Ziel (Sieg)", "Hazard (lose)": "Gefahr (Niederlage)",
+  "Checkpoint (respawn here)": "Checkpoint (hier wieder einsteigen)", "Jump pad (launch)": "Sprungfeld (Start)", "Teleport": "Teleport", "Damage zone": "Schadenszone",
+  "Logic event only": "Nur Logik-Ereignis", "Sine": "Sinus", "Ping-pong": "Hin und her", "Loop": "Schleife", "None (sandbox)": "Keine (Sandkasten)",
+  "Collect all pickups": "Alle Pickups sammeln", "Reach a goal trigger": "Ein Ziel erreichen", "Survive the time limit": "Das Zeitlimit überleben", "Reach a target score": "Eine Punktzahl erreichen",
+  "None": "Keine", "Linear": "Linear", "Inverse (natural)": "Invers (natürlich)", "Exponential": "Exponentiell", "Automatic": "Automatisch", "Nothing at all": "Gar nichts",
+  "As trained (scale 1, no filter)": "Wie trainiert (Faktor 1, kein Filter)", "As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)": "Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)",
+  "Effects": "Effekte", "Voice": "Stimme",
+
+  // outliner types
+  "Procedural City": "Prozedurale Stadt", "Audio Source": "Audioquelle", "Constrained Mesh": "Verbundenes Mesh", "Physics Mesh": "Physik-Mesh", "Point Light": "Punktlicht",
+  "Empty Actor": "Leerer Actor", "Actor": "Actor",
+
+  // place actors: groups and descriptions
+  "Basic": "Grundformen", "Shapes": "Formen", "Lights": "Lichter", "Players": "Spieler", "Physics Body": "Physikkörper", "Empty": "Leer",
+  "Cube": "Würfel", "Physics Cube": "Physik-Würfel", "Physics Sphere": "Physik-Kugel", "Physics Barrel": "Physik-Fass", "Crate Stack": "Kistenstapel",
+  "Hinged Door": "Scharniertür", "Moving Platform": "Bewegliche Plattform", "Spinner": "Drehbalken", "See-Saw": "Wippe", "Chain": "Kette", "Pendulum": "Pendel",
+  "Jump Pad": "Sprungfeld", "Teleporter": "Teleporter", "Damage Zone": "Schadenszone", "Health Pack": "Medipack", "Ammo Box": "Munitionskiste",
+  "Explosive Barrel": "Explosives Fass", "Target Dummy": "Zielpuppe", "Message Trigger": "Nachrichten-Trigger", "Goal": "Ziel", "Hazard": "Gefahr", "Checkpoint": "Checkpoint",
+  "Hover Car": "Hovercar", "Rolling Ball": "Rollende Kugel", "Soldier": "Soldat", "Walker": "Läufer", "City Ambience": "Stadtatmosphäre", "Ambient Wind": "Wind",
+  "Radio": "Radio", "Orb": "Orb", "Star": "Stern", "Ring": "Ring", "Wheel": "Rad", "Slider": "Schiene", "Hinge": "Scharnier", "Ball": "Kugel", "Cross": "Kreuz",
+  "Dynamic Box3D box": "Dynamische Box3D-Box", "Dynamic ball": "Dynamische Kugel", "Dynamic cylinder (convex hull)": "Dynamischer Zylinder (konvexe Hülle)",
+  "Pyramid of 10 crates": "Pyramide aus 10 Kisten", "Door on a sprung hinge with limits": "Tür an gefedertem Scharnier mit Anschlägen", "Kinematic platform on a mover": "Kinematische Plattform auf einem Beweger",
+  "Rotating kinematic bar": "Rotierender kinematischer Balken", "Plank on a hinge": "Brett an einem Scharnier", "Ball on a distance joint": "Kugel an einem Abstandsgelenk",
+  "Launches players up and forward": "Schleudert Spieler hoch und nach vorn", "Two linked pads: step on A, arrive at B": "Zwei verbundene Felder: auf A treten, bei B ankommen",
+  "Hurts whoever walks in (25 per entry)": "Schadet jedem, der hineinläuft (25 pro Eintritt)", "Heals 50; stays while you are at full health; returns after 15 s": "Heilt 50; bleibt liegen, solange du volle Gesundheit hast; kommt nach 15 s zurück",
+  "Blows up when shot: pushes and hurts what is near": "Explodiert bei Beschuss: stößt und verletzt, was in der Nähe ist", "Shootable target with health and a head; respawns": "Beschießbares Ziel mit Gesundheit und Kopf; kommt zurück",
+  "Shows a text when touched": "Zeigt bei Berührung einen Text", "Trigger that wins the game": "Trigger, der das Spiel gewinnt", "Trigger that loses the game": "Trigger, der das Spiel verliert",
+  "Glowing pickup worth 1 point": "Leuchtendes Pickup, 1 Punkt", "Spinning pickup worth 10 points": "Drehendes Pickup, 10 Punkte",
+  "Coloured light with a radius": "Farbiges Licht mit Reichweite", "Looping city murmur with falloff": "Stadtrauschen in Schleife mit Abfall", "Looping wind, heard everywhere": "Wind in Schleife, überall hörbar",
+  "Music box: plays the calm loop in 3D": "Spieluhr: spielt die ruhige Schleife in 3D", "Blocks, streets, trees and traffic": "Blöcke, Straßen, Bäume und Verkehr",
+  "Fast Box3D hover car with boost": "Schnelles Box3D-Hovercar mit Boost", "Physics ball you roll and jump": "Physikkugel zum Rollen und Springen",
+  "Third-person runner: walks, sprints, jumps, climbs steps": "Läufer aus der dritten Person: geht, sprintet, springt, steigt Stufen",
+  "Flyer: Space / E up, Q / Ctrl down": "Flieger: Leertaste / E hoch, Q / Strg runter",
+  "First-person shooter: rifle, health, respawn. Mouse, gamepad, touch; online ready": "Ego-Shooter: Gewehr, Gesundheit, Wiedereinstieg. Maus, Gamepad, Touch; online-fähig",
+  "Floor, sun and sky - a clean start": "Boden, Sonne und Himmel – ein sauberer Anfang", "Procedural night city, Box3D hover car, 24 orbs to collect": "Prozedurale Nachtstadt, Box3D-Hovercar, 24 Orbs zum Sammeln",
+  "Every Box3D joint: hinge, slider, wheel, rope bridge, motor, stacks": "Jedes Box3D-Gelenk: Scharnier, Schiene, Rad, Seilbrücke, Motor, Stapel",
+  "Wedge to drive or roll up": "Keil zum Hochfahren oder -rollen", "Upright cone": "Aufrechter Kegel", "Upright cylinder": "Aufrechter Zylinder", "Capsule along Z": "Kapsel entlang Z",
+  "Observer camera (Play: fly, watch, drag bodies)": "Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)",
+
+  // game HUD and touch controls
+  "collected": "gesammelt", "score": "Punkte", "time": "Zeit", "left": "übrig", "best": "Bestzeit", "Victory": "Gewonnen", "Game over": "Spiel vorbei",
+  "Play again": "Nochmal spielen", "R to restart": "R startet neu", "Click to continue": "Klicken zum Fortfahren", "Musik": "Musik", "Effekte": "Effekte",
+  "STEER / GAS": "LENKEN / GAS", "MOVE": "LAUFEN", "LOOK": "SCHAUEN", "FLY": "FLIEGEN", "JUMP": "SPRUNG", "BOOST": "BOOST", "DRIFT": "DRIFT", "LIFT": "LIFT",
+  "VIEW": "SICHT", "HOP": "HÜPFEN", "USE": "NUTZEN", "UP": "HOCH", "DOWN": "RUNTER", "AIM": "ZIELEN", "RELOAD": "LADEN", "CROUCH": "DUCKEN",
+  "QUACK": "QUAK", "PICK": "GREIFEN", "SIT": "SITZ", "KICK L": "KICK L", "KICK R": "KICK R", "ROLL": "ROLLEN", "BEAK": "SCHNABEL", "WHEEE": "HUIII",
+};
+
+// Phrases with a variable part (counts, names): [pattern, replacement].
+const I18N_PATTERNS = [
+  [/^(\d+) actors$/, "$1 Actors"], [/^(\d+) actors \((\d+) selected\)$/, "$1 Actors ($2 ausgewählt)"], [/^(\d+) of (\d+) selected$/, "$1 von $2 ausgewählt"],
+  [/^Saved (.+)$/, "Gespeichert: $1"], [/^Opened (.+)$/, "Geöffnet: $1"], [/^Deleted (.+)$/, "Gelöscht: $1"], [/^Copied (.+)$/, "Kopiert: $1"],
+  [/^Undo (.+)$/, "Rückgängig: $1"], [/^Redo (.+)$/, "Wiederholen: $1"], [/^New level: (.+)$/, "Neues Level: $1"], [/^Physics set to (.+)$/, "Physik: $1"],
+  [/^Reopened "(.+)", where you worked last time$/, "„$1“ wieder geöffnet, wo du zuletzt warst"],
+  [/^Kept the simulated placement of (.+)$/, "Simulierte Position übernommen: $1"], [/^Packaging (.+)$/, "Verpacke $1"],
+  [/^Saving failed: (.+)$/, "Speichern fehlgeschlagen: $1"], [/^Opening failed: (.+)$/, "Öffnen fehlgeschlagen: $1"], [/^Packaging failed: (.+)$/, "Verpacken fehlgeschlagen: $1"],
+  [/^Unknown console command: (.+)$/, "Unbekannter Konsolenbefehl: $1"], [/^Camera speed (\d+)$/, "Kamerageschwindigkeit $1"], [/^Grid snap (.+)$/, "Raster $1"],
+  [/^Speed (.+)$/, "Tempo $1"],
+  [/^(\d+) bodies · (\d+) awake · (\d+) joints( \((\d+) broken\))? · (\d+) contacts$/, "$1 Körper · $2 wach · $3 Gelenke · $6 Kontakte"],
+  // Only when the named part is a known phrase ("Add Point Light"), never half-translated.
+  [/^Add (.+)$/, "$1 hinzufügen", true], [/^Remove (.+)$/, "$1 entfernen", true],
+  [/^(.+) - drag into a viewport or click$/, "$1 – in einen Viewport ziehen oder anklicken", true],
+  [/^(.+) \(([^()]*)\)$/, "$1 ($2)", true],  // a field's tooltip with its unit: "Friction (N)"
+];
+
+const I18N_ATTRS = ["title", "placeholder", "aria-label"];
+// What the user wrote or the engine prints stays as it is.
+const I18N_SKIP = "input, textarea, select, #log, #outliner .label, #levelName, #console, #logicEditor, [data-i18n-skip], script, style, svg, code, pre";
+
+/** The German phrase for `s` (or `s` itself): exact phrases, then the patterns. */
+export function tr(s) {
+  if (I18N_LANG !== "de" || !s) return s;
+  const key = s.trim();
+  if (!key) return s;
+  let out = I18N_DE[key];
+  if (out === undefined) {
+    for (const [re, rep, known] of I18N_PATTERNS) {
+      const m = key.match(re);
+      if (!m) continue;
+      if (known && I18N_DE[m[1]] === undefined) continue;
+      // The variable part is translated too when it is a known phrase ("Add Point Light").
+      out = rep.replace(/\$(\d)/g, (_, i) => I18N_DE[m[+i]] ?? m[+i]);
+      break;
+    }
+  }
+  // Shortcuts as German keyboards label them: Strg, Umschalt, Leertaste, Entf.
+  if (out === undefined && /^(Ctrl|Shift|Alt)\+/.test(key))
+    out = key.replace(/\bCtrl\b/g, "Strg").replace(/\bShift\b/g, "Umschalt").replace(/\bSpace\b/g, "Leertaste").replace(/\bDelete\b/g, "Entf");
+  if (out === undefined || out === key) return s;
+  return s.replace(key, out);
+}
+
+function i18nSkipped(el) {
+  return !el || el.closest?.(I18N_SKIP) != null;
+}
+
+function i18nText(node) {
+  const v = node.nodeValue;
+  if (!v || !/[A-Za-z]/.test(v)) return;
+  if (i18nSkipped(node.parentElement)) return;
+  const out = tr(v);
+  if (out !== v) node.nodeValue = out;
+}
+
+function i18nAttrs(el) {
+  if (i18nSkipped(el) && !(el.matches?.("input, textarea") && el.closest?.("#log, #outliner .label, [data-i18n-skip]") == null)) return;
+  for (const a of I18N_ATTRS) {
+    const v = el.getAttribute?.(a);
+    if (v) { const out = tr(v); if (out !== v) el.setAttribute(a, out); }
+  }
+}
+
+function i18nWalk(root) {
+  if (root.nodeType === Node.TEXT_NODE) { i18nText(root); return; }
+  if (root.nodeType !== Node.ELEMENT_NODE) return;
+  i18nAttrs(root);
+  const it = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  for (let n = it.nextNode(); n; n = it.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) i18nText(n);
+    else i18nAttrs(n);
+  }
+}
+
+let i18nStarted = false;
+/** Starts translating the page (German browsers only); safe to call more than once. */
+export function localizePage() {
+  if (I18N_LANG !== "de" || i18nStarted || typeof document === "undefined") return;
+  i18nStarted = true;
+  document.documentElement.lang = "de";
+  const run = () => {
+    i18nWalk(document.body);
+    new MutationObserver(records => {
+      for (const r of records) {
+        if (r.type === "characterData") i18nText(r.target);
+        else if (r.type === "attributes") i18nAttrs(r.target);
+        else for (const n of r.addedNodes) i18nWalk(n);
+      }
+    }).observe(document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: I18N_ATTRS});
+  };
+  if (document.body) run(); else addEventListener("DOMContentLoaded", run, {once: true});
+}
+
+
 export const POINTER = {down: 0, move: 1, up: 2, cancel: 3, wheel: 4, leave: 5};
 
 /** Thin wrapper over kern/src/studio/api.cpp. */
@@ -787,7 +1125,8 @@ export function mountAudioSwitches(parent, engine) {
     b.dataset.audio = id;
     b.title = label;
     b.innerHTML = icon;
-    const show = () => { const on = audioPrefs[id]; b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${label} ${on ? "an" : "aus"}`); };
+    const de = I18N_LANG === "de";
+    const show = () => { const on = audioPrefs[id]; b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${label} ${on ? (de ? "an" : "on") : (de ? "aus" : "off")}`); };
     show();
     // Taps stay on the button: they never reach the game's touch controls or the canvas.
     for (const t of ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown"]) b.addEventListener(t, e => e.stopPropagation());
@@ -801,8 +1140,8 @@ export function mountAudioSwitches(parent, engine) {
     });
     el.appendChild(b);
   };
-  make("music", ICON_MUSIC, "Musik");
-  make("effects", ICON_FX, "Effekte");
+  make("music", ICON_MUSIC, I18N_LANG === "de" ? "Musik" : "Music");
+  make("effects", ICON_FX, I18N_LANG === "de" ? "Effekte" : "Effects");
   parent.appendChild(el);
   return el;
 }
@@ -966,6 +1305,7 @@ export function buildGameHtml({sources, wasmBase64, levelText, title}) {
  * `base64` or `url`.
  */
 export async function startGame({levelText = null, template = null, bytes = null, base64 = null, url = null, canvas = document.getElementById("gl")} = {}) {
+  localizePage();  // German interface on German systems (visual only)
   const kern = await loadKern({bytes, base64, url});
   const engine = new StudioEngine(kern);
   const gl = canvas.getContext("webgl2", {antialias: true, alpha: false, powerPreference: "high-performance"});

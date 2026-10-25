@@ -6,6 +6,8 @@ Kern Studio ist der Editor der Kern-Engine. Er arbeitet wie eine Game Engine im 
 - Bauen: `tools/build_studio.sh` → `generated/studio.html` (eine Datei, läuft offline)
 - Entwickeln: Repository statisch ausliefern, `kern/web/studio/index.html` öffnen (lädt `generated/kern_studio.wasm`)
 
+**Sprache:** Auf Systemen und Browsern mit Deutsch als erster Sprache zeigt Studio seine Oberfläche auf Deutsch, auch die Spiele (HUD, Touch-Knöpfe). Das ist rein optisch: Befehle, Konsole, Level-Dateien, Logik-Graphen und alles, was man selbst eingibt, bleiben unverändert. `?lang=en` oder `?lang=de` in der Adresse wählt die Sprache fest und merkt sie sich (`game.mjs`, Abschnitt „German interface“).
+
 Beim Start ist **Orb Run** geladen. Das ist eine prozedurale Stadt mit Verkehr, einem Box3D-Hovercar, 24 Energie-Orbs und einem Tag, der in die Nacht übergeht. Mit **Play** (Alt+P) fährt man sofort los.
 
 ## Aufbau
