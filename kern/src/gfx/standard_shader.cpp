@@ -134,10 +134,16 @@ vec3 skyReflection(vec3 r, float sharpness) {
 constexpr const char* kFragmentShadow = R"GLSL(
 // Castano's optimised PCF (2013, "The Witness"; as in MJP's shadow sample): a tent-filtered 3x3 (4 taps)
 // or 5x5 (9 taps) kernel from bilinear-weighted hardware comparison taps.
-float shadowTap(vec2 base, vec2 o, float z) { return texture(uSunShadowMap, vec3(base + o * uSunShadowTexel.y, z)); }
+// Receiver-plane depth bias (Isidoro 2006): every tap compares against the depth the receiver's own plane has
+// at that tap, so a wide kernel on a grazing surface (long sun shadows) does not shadow itself in stripes.
+vec2 gShadowUV, gShadowGrad;
+float shadowTap(vec2 base, vec2 o, float z) {
+  vec2 at = base + o * uSunShadowTexel.y;
+  return texture(uSunShadowMap, vec3(at, z + dot(gShadowGrad, at - gShadowUV)));
+}
 float sunShadow(vec3 uvz) {
   float z = uvz.z - uSunShadowBias;
-  if (uSunShadowFilter < 4) return texture(uSunShadowMap, vec3(uvz.xy, z));
+  if (uSunShadowFilter < 4) return texture(uSunShadowMap, vec3(uvz.xy, z + 0.5 * dot(gShadowGrad, vec2(uSunShadowTexel.y))));
   vec2 uv = uvz.xy * uSunShadowTexel.x;
   vec2 b = floor(uv + 0.5);
   float s = uv.x + 0.5 - b.x, t = uv.y + 0.5 - b.y;
@@ -179,12 +185,19 @@ constexpr const char* kFragmentLighting = R"GLSL(
   float ndl = max(dot(n, sun), 0.0);
   vec3 hemis = mix(uGroundColor, uSkyColor, clamp(n.z * 0.5 + 0.5, 0.0, 1.0));
   float shadow = 1.0;
+  // Normal offset (Holbert 2011): look the shadow up a texel off the surface along its normal,
+  // more where the light grazes it - no acne without a large constant bias (no detached shadows).
+  vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
+  vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
+  vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
+  // Depth slope of the receiver in map space (derivatives must run outside the branch below).
+  vec3 sdx = dFdx(uvz), sdy = dFdy(uvz);
+  float sdet = sdx.x * sdy.y - sdx.y * sdy.x;
+  gShadowUV = uvz.xy;
+  gShadowGrad = abs(sdet) > 1e-12 ? vec2(sdx.z * sdy.y - sdy.z * sdx.y, sdy.z * sdx.x - sdx.z * sdy.x) / sdet : vec2(0.0);
+  float sgl = length(gShadowGrad) * uSunShadowTexel.y;
+  if (sgl > 0.004) gShadowGrad *= 0.004 / sgl;
   if (uSunShadowEnabled == 1 && ndl > 0.0) {
-    // Normal offset (Holbert 2011): look the shadow up a texel off the surface along its normal,
-    // more where the light grazes it - no acne without a large constant bias (no detached shadows).
-    vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
-    vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
-    vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
     if (uvz.x > 0.0 && uvz.x < 1.0 && uvz.y > 0.0 && uvz.y < 1.0 && uvz.z > 0.0) {
       shadow = sunShadow(uvz);
       float d = length(vWorld - uSunShadowFade.xyz);
