@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -195,6 +195,13 @@ class StudioPage {
     style.textContent = HUD_STYLE + "\n" + TOUCH_STYLE;
     document.head.append(style);
     watchInputDevice(this.engine);
+    // Language: Deutsch / English (the other one is offered; the page reloads, the level is autosaved).
+    {
+      const b = $("#langBtn"), de = I18N_LANG === "de";
+      b.textContent = de ? "EN" : "DE";
+      b.title = de ? "Switch Kern Studio to English" : "Kern Studio auf Deutsch umstellen";
+      b.addEventListener("click", () => setLanguage(de ? "en" : "de"));
+    }
     $("#touchExit").addEventListener("click", () => { this.engine.command({cmd: "stop"}); this.flushUi(); });
     $("#touchPause").addEventListener("click", () => { this.engine.command({cmd: "pause"}); this.flushUi(); });
     addEventListener("pagehide", () => this.saveSettings());

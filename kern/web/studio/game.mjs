@@ -326,6 +326,14 @@ function i18nWalk(root) {
   }
 }
 
+/** Sets the interface language ("de" or "en"), remembers it on this device and reloads the page. */
+export function setLanguage(lang) {
+  try { localStorage.setItem(I18N_KEY, lang); } catch { /* storage blocked */ }
+  const u = new URL(location.href);
+  u.searchParams.delete("lang");
+  location.replace(u.href);
+}
+
 let i18nStarted = false;
 /** Starts translating the page (German browsers only); safe to call more than once. */
 export function localizePage() {
