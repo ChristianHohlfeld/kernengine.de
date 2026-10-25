@@ -198,8 +198,10 @@ class StudioPage {
     // Language: Deutsch / English (the other one is offered; the page reloads, the level is autosaved).
     {
       const b = $("#langBtn"), de = I18N_LANG === "de";
-      b.textContent = de ? "EN" : "DE";
-      b.title = de ? "Switch Kern Studio to English" : "Kern Studio auf Deutsch umstellen";
+      // Both languages, the active one highlighted: "DE | EN".
+      b.innerHTML = `<span class="${de ? "on" : ""}">DE</span><span class="${de ? "" : "on"}">EN</span>`;
+      b.title = de ? "Sprache: Deutsch (tippen für English)" : "Language: English (tap for Deutsch)";
+      b.setAttribute("aria-label", b.title);
       b.addEventListener("click", () => setLanguage(de ? "en" : "de"));
     }
     $("#touchExit").addEventListener("click", () => { this.engine.command({cmd: "stop"}); this.flushUi(); });
