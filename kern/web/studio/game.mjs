@@ -97,7 +97,7 @@ const I18N_DE = {
   "Grid size": "Rastergröße", "Grid snapping": "Am Raster einrasten", "Rotation snapping": "Drehung einrasten", "Scale snapping": "Skalierung einrasten",
   "Rotation step": "Drehschritt", "Scale step": "Skalierungsschritt", "Mouse sensitivity": "Mausempfindlichkeit", "Invert mouse Y": "Maus-Y umkehren",
   "Interface": "Oberfläche", "Apply": "Übernehmen", "Cancel": "Abbrechen", "Create": "Erstellen", "Update": "Aktualisieren", "Later": "Später", "Dismiss": "Schließen",
-  "New version available": "Neue Version verfügbar", "Start fresh": "Neu anfangen", "Play it": "Spielen",
+  "New version available": "Neue Version verfügbar", "A newer version is online": "Eine neuere Version ist online", "Up to date": "Aktuell", "Start fresh": "Neu anfangen", "Play it": "Spielen",
   "Your settings are kept in this browser. Edit > Reset Settings to Defaults puts all of them back.": "Deine Einstellungen bleiben in diesem Browser. Bearbeiten > Einstellungen zurücksetzen stellt alle wieder her.",
   "Unsaved changes of the current level are kept in the autosave until you start editing the new one.": "Ungespeicherte Änderungen des aktuellen Levels bleiben in der automatischen Sicherung, bis du das neue bearbeitest.",
   "Builds one self-contained HTML file with the Kern runtime and this level. It plays full screen in any browser - no editor, no server.": "Erstellt eine eigenständige HTML-Datei mit der Kern-Laufzeit und diesem Level. Sie läuft im Vollbild in jedem Browser – ohne Editor, ohne Server.",

@@ -152,8 +152,8 @@
 // old version. The deployed page carries its build SHA (first comment of the document); every
 // deploy also publishes ./build.json. The page asks for build.json (no-store, unique query: no CDN,
 // HTTP cache or worker can answer) on start, whenever you come back to it, when the network returns
-// and every 60 s. A newer build reloads at once while nothing would be lost (editing, no unsaved
-// changes); otherwise an UPDATE button waits for you (the level is autosaved and offered again).
+// and every 60 s. A newer build always comes: it reloads at once while you edit (unsaved changes
+// go into the autosave first and are reopened), and while a game plays it waits until you stop.
 (function () {
   var first = document.firstChild, m = first && first.nodeType === 8 && /BUILD_SHA:([0-9a-f]{7,40})/.exec(first.nodeValue || "");
   var mine = m && m[1];
@@ -168,7 +168,8 @@
   function safe() {
     var k = studio();
     if (!k) return true;  // still loading
-    try { return k.status && k.status.play === "editing" && !k.engine.dirty(); } catch (e) { return false; }
+    // Editing: the autosave (written on pagehide) carries unsaved changes over. Playing waits.
+    try { return k.status && k.status.play === "editing"; } catch (e) { return false; }
   }
   function tag(sha) {
     var el = document.getElementById("buildTag");
@@ -179,9 +180,12 @@
   }
   function fresh(sha) {
     if (reloading) return;
-    // Loop guard: if the CDN still serves the old page after two reloads, wait for a click.
-    var key = "kernUpdateTries:" + sha, tries = 0;
-    try { tries = +sessionStorage.getItem(key) || 0; sessionStorage.setItem(key, String(tries + 1)); } catch (e) {}
+    // Loop guard: if the CDN still serves the old page after two reloads, try again two minutes
+    // later (the button can do it sooner).
+    var key = "kernUpdateTries:" + sha, tries = 0, last = 0;
+    try { var v = (sessionStorage.getItem(key) || "0:0").split(":"); tries = +v[0] || 0; last = +v[1] || 0;
+      if (tries >= 2 && Date.now() - last > 120000) tries = 0;
+      sessionStorage.setItem(key, (tries + 1) + ":" + Date.now()); } catch (e) {}
     if (tries >= 2) { showPill(); return; }
     reloading = true;
     window.__kernReloadForUpdate = true;
@@ -212,12 +216,15 @@
     });
     document.body.appendChild(pill);
   }
+  var waiting = 0;
   function seen(sha, reason) {
     tag(sha);
     if (!sha || sha === mine) return;
     pending = sha;
-    if (safe() && (reason === "load" || reason === "resume" || reason === "interval")) fresh(sha);
-    else showPill();
+    if (safe()) { fresh(sha); return; }
+    // A game is playing: update the moment it stops (the button is there for an earlier update).
+    showPill();
+    if (!waiting) waiting = setInterval(function () { if (safe()) { clearInterval(waiting); waiting = 0; fresh(pending); } }, 1000);
   }
   function check(reason) {
     var now = Date.now();
