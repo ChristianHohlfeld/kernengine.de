@@ -74,6 +74,39 @@ class StandTask : public Task {
   }
 };
 
+// Balance training uses the unchanged robot simulation, sensors and servo model.
+class BalanceTask final : public Task {
+ public:
+  BalanceTask() { noise.push_every_min = 1.0f; noise.push_every_max = 1.8f; noise.push = 0.3f; }
+  std::string name() const override { return "balance"; }
+  f32 episode_seconds() const override { return 8.0f; }
+  Start reset(Rng& rng) override {
+    Start s;
+    s.yaw = rng.uniform(-180, 180);
+    s.roll = rng.uniform(-3, 3);
+    s.pitch = rng.uniform(-3, 3);
+    s.foot_friction = rng.uniform(0.7f, 1.3f);
+    return s;
+  }
+  f32 reward(const Tick& t, bool& terminal) override {
+    Terms r(*this);
+    const auto& p = t.probe;
+    const f32 tilt2 = p.gravity.x * p.gravity.x + p.gravity.y * p.gravity.y;
+    r.add("survive", 1, 1);
+    r.add("upright", 4, upright(p));
+    r.add("tilt", -6, tilt2);
+    r.add("drift", -1.5f, p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y);
+    r.add("body_ang_vel", -0.1f, p.spin.x * p.spin.x + p.spin.y * p.spin.y);
+    r.add("pose_legs", 0.35f, pose_match(p.joint, kLegs, 10, 0.5f));
+    r.add("pose_neck", 0.2f, pose_match(p.joint, kNeck, 4, 0.3f));
+    r.add("action_rate", -0.05f, action_rate(t));
+    r.add("self_collisions", -1, p.self_contact ? 1.0f : 0.0f);
+    terminal = fell(p) || p.body_contact;
+    if (terminal) r.add("fall", -15, 1, false);
+    return r.sum();
+  }
+};
+
 class JumpTask : public Task {
  public:
   JumpTask(const JumpDemo* demo, f32 imitate) : imitate_(imitate) {
@@ -200,5 +233,6 @@ class JumpTask : public Task {
 
 std::unique_ptr<Task> make_jump_task(const JumpDemo* demo, f32 imitate) { return std::make_unique<JumpTask>(demo, imitate); }
 std::unique_ptr<Task> make_stand_task() { return std::make_unique<StandTask>(); }
+std::unique_ptr<Task> make_balance_task() { return std::make_unique<BalanceTask>(); }
 
 }  // namespace kern::lehrer
