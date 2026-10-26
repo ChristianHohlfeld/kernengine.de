@@ -119,16 +119,33 @@ int trace(const Options& o) {
   return 0;
 }
 
+void print_balance(const char* name, const BalanceReport& r) {
+  std::printf("%s: survived %d/%d (8 s), falls %d, within 15 deg %.1f%%, mean worst tilt %.1f deg\n",
+              name, r.survived, r.episodes, r.falls, r.stable_fraction * 100.0f, r.max_tilt_deg);
+}
+
 int evaluate(const Options& o) {
   game::WalkerPolicy p;
   std::string err;
-  const std::vector<u8> bytes = read_file(o.eval);
-  if (bytes.empty() || !game::parse_onnx_policy(Span<const u8>(bytes.data(), bytes.size()), p, &err)) {
-    std::fprintf(stderr, "cannot read %s: %s\n", o.eval.c_str(), err.c_str());
-    return 1;
+  const game::WalkerPolicy* policy = nullptr;
+  if (o.task == "balance" && o.eval == "velstand") {
+    policy = game::walker_policy("velstand.onnx");
+    if (!policy) { std::fprintf(stderr, "Pollen velstand.onnx unavailable\n"); return 1; }
+  } else {
+    const std::vector<u8> bytes = read_file(o.eval);
+    if (bytes.empty() || !game::parse_onnx_policy(Span<const u8>(bytes.data(), bytes.size()), p, &err)) {
+      std::fprintf(stderr, "cannot read %s: %s\n", o.eval.c_str(), err.c_str());
+      return 1;
+    }
+    policy = &p;
   }
-  print_report((o.eval + " (clean robot)").c_str(), evaluate_jump(act_onnx, &p, o.episodes, 1000, game::kWalkerSubsteps));
-  print_report((o.eval + " (randomised: build, servos, sensors, start)").c_str(), evaluate_jump(act_onnx, &p, o.episodes, 5000, game::kWalkerSubsteps, true));
+  if (o.task == "balance") {
+    print_balance((o.eval + " (clean, no pushes)").c_str(), evaluate_balance(act_onnx, const_cast<game::WalkerPolicy*>(policy), o.episodes, 1000, game::kWalkerSubsteps, false));
+    print_balance((o.eval + " (full variation + pushes)").c_str(), evaluate_balance(act_onnx, const_cast<game::WalkerPolicy*>(policy), o.episodes, 5000, game::kWalkerSubsteps, true));
+  } else {
+    print_report((o.eval + " (clean robot)").c_str(), evaluate_jump(act_onnx, const_cast<game::WalkerPolicy*>(policy), o.episodes, 1000, game::kWalkerSubsteps));
+    print_report((o.eval + " (randomised: build, servos, sensors, start)").c_str(), evaluate_jump(act_onnx, const_cast<game::WalkerPolicy*>(policy), o.episodes, 5000, game::kWalkerSubsteps, true));
+  }
   return 0;
 }
 
@@ -561,7 +578,7 @@ int main(int argc, char** argv) {
     else if (a == "--nachahmungs-lohn") o.imitate_reward = static_cast<f32>(std::atof(next()));
     else {
       std::fprintf(stderr,
-                   "usage: kern_lehrer [--task jump|stand] [--envs N] [--threads N] [--iterations 600] [--steps 24] [--seed 1]\n"
+                   "usage: kern_lehrer [--task jump|stand|balance] [--envs N] [--threads N] [--iterations 600] [--steps 24] [--seed 1]\n"
                    "                  [--out task.onnx] [--log log.csv] [--checkpoint run.ckpt] [--resume run.ckpt] [--save-every 25]\n"
                    "                  [--warm-start velstand|none] [--init-std 0.3] [--lr 1e-3] [--entropy 0.005]\n"
                    "                  [--critic 256,128] [--actor 512,256,128] [--epochs 5] [--minibatches 4] [--adaptive-lr 1] [--kl 0.01]\n"
@@ -686,10 +703,16 @@ int main(int argc, char** argv) {
     const f64 sps = static_cast<f64>(o.envs) * recipe.ppo.steps_per_env / (s.collect_seconds + s.learn_seconds);
     JumpReport rep;
     const bool evaluated = o.task == "jump" && o.eval_every > 0 && it % o.eval_every == 0;
+    const bool balance_evaluated = o.task == "balance" && o.eval_every > 0 && it % o.eval_every == 0;
+    BalanceReport balance;
+    if (balance_evaluated) balance = evaluate_balance(act_ppo, &ppo, 5, 5000, game::kWalkerSubsteps, true);
     if (evaluated) rep = evaluate_jump(act_ppo, &ppo, 5, 1000, game::kWalkerSubsteps);
     std::printf("it %5d  %8.0f s  return %7.3f  len %5.1f  value %7.4f  std %.3f  lr %.1e  %5.0f steps/s (collect %.2fs, learn %.2fs)", s.iteration, seconds,
                 s.mean_return, s.mean_length, s.value_loss, s.mean_std, s.learning_rate, sps, s.collect_seconds, s.learn_seconds);
     if (evaluated) std::printf("  | jumps %d/5 up %.1f mm rise %.1f mm flight %.2f s tilt %.0f falls %d", rep.jumps, rep.height_mm, rep.rise_mm, rep.flight_s, rep.tilt_deg, rep.falls);
+    if (balance_evaluated)
+      std::printf("  | balance %d/5 survived, stable %.0f%%, max tilt %.0f deg",
+                  balance.survived, balance.stable_fraction * 100.0f, balance.max_tilt_deg);
     std::printf("\n");
     if (evaluated && rep.jumps >= 4 && !jumped) {
       jumped = true;
