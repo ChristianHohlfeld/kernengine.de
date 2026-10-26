@@ -37,6 +37,7 @@ async function spawn() {
 async function start() {
   if (running) return;
   const task = $("task").value;
+  setStatsTask(task);
   const workers = Math.max(1, Math.min(64, Number($("workers").value) || 1));
   const envs = Math.max(1, Math.min(256, Number($("envs").value) || 8));
   running = true;
@@ -62,6 +63,11 @@ async function start() {
     const made = await call(learner, { type: "learner", task, seed, config }, "policy");
     policy = made.policy;
     steps = made.steps || 24;
+    if (task === "balance") {
+      status("Messe Pollens Ausgangsnetz mit identischen Stößen ...");
+      const baseline = await call(learner, { type: "evaluate", episodes: 5 }, "evaluated");
+      showBalance(baseline.report, true);
+    }
     // First imitation of the demonstration (the jump's recipe), round by round, then practice.
     let left = made.imitationLeft || 0;
     while (running && left > 0) {
@@ -102,11 +108,12 @@ async function loop(task) {
     show(learned.stats, seconds, collectors.length * Number($("envs").value) * steps);
     if (iteration % 25 === 0 || iteration === total) {
       if (task === "jump") showJump((await call(learner, { type: "evaluate", episodes: 5 }, "evaluated")).report);
+      if (task === "balance") showBalance((await call(learner, { type: "evaluate", episodes: 5 }, "evaluated")).report);
       await exportOnnx(task);
     }
   }
   if (running) {
-    status(`Fertig: ${iteration} Iterationen. Das Netz herunterladen oder direkt in Kern Studio nutzen.`);
+    status(task === "balance" ? "Fertig: Balance-Netz herunterladen und gesondert prüfen." : "Fertig: Das Netz herunterladen oder direkt in Kern Studio nutzen.");
     await exportOnnx(task);
     stop(true);
   }
@@ -117,7 +124,11 @@ async function exportOnnx(task) {
   onnx = new Blob([d.onnx], { type: "application/octet-stream" });
   onnx.task = task;
   $("download").disabled = false;
-  await saveForStudio(`${task}.onnx`, d.onnx).catch(() => {});
+  if (task === "balance") {
+    $("saved").textContent = "balance.onnx bereit. Noch nicht automatisch im Studio oder Roboter aktiv.";
+  } else {
+    await saveForStudio(`${task}.onnx`, d.onnx).catch(() => {});
+  }
 }
 
 /** Kern Studio on this device picks the network up (IndexedDB "kern-lehrer", key = file name), at
@@ -154,6 +165,17 @@ function show(s, seconds, steps) {
   draw();
 }
 
+function setStatsTask(task) {
+  document.querySelectorAll("[data-jump]").forEach(el => { el.hidden = task !== "jump"; });
+  document.querySelectorAll("[data-balance]").forEach(el => { el.hidden = task !== "balance"; });
+}
+function showBalance(r, baseline = false) {
+  if (!r) return;
+  if (baseline) { $("s-baseline").textContent = r.survived + "/" + r.episodes; return; }
+  $("s-survived").textContent = r.survived + "/" + r.episodes;
+  $("s-stable").textContent = (r.stableFraction * 100).toFixed(1) + " %";
+  $("s-tilt").textContent = r.maxTiltDeg.toFixed(1) + "°";
+}
 /** How the network jumps now (5 episodes on the clean robot). */
 function showJump(r) {
   if (!r) return;
@@ -212,6 +234,8 @@ function stop(done = false) {
   if (!done && !$("status").classList.contains("err")) status("Angehalten.");
 }
 
+$("task").onchange = () => setStatsTask($("task").value);
+setStatsTask($("task").value);
 $("start").onclick = start;
 $("pause").onclick = () => {
   paused = !paused;
