@@ -6,11 +6,20 @@
 
 namespace kern::lehrer {
 
-f32 Recipe::push_scale(i32 iteration) const { return iteration < 300 ? 0.0f : iteration < 500 ? 0.27f : 1.0f; }
+f32 Recipe::push_scale(i32 iteration) const {
+  if (task == "balance") {
+    if (iteration < 30) return 0.0f;
+    if (iteration < 150) return 0.15f + 0.35f * (iteration - 30) / 120.0f;
+    if (iteration < 400) return 0.5f + 0.5f * (iteration - 150) / 250.0f;
+    return 1.0f;
+  }
+  return iteration < 300 ? 0.0f : iteration < 500 ? 0.27f : 1.0f;
+}
 
 std::unique_ptr<Task> make_task(const std::string& name) {
   if (name == "jump") return make_jump_task();
   if (name == "stand") return make_stand_task();
+  if (name == "balance") return make_balance_task();
   return nullptr;
 }
 
@@ -24,6 +33,14 @@ Recipe recipe_for(const std::string& task) {
   r.task = task;
   r.substeps = game::kWalkerSubsteps;
   r.ppo.critic_hidden = {256, 128};
+  if (task == "balance") {
+    r.warm_start = "velstand";
+    r.ppo.steps_per_env = 48;
+    r.ppo.init_std = 0.12f;
+    r.ppo.learning_rate = 5e-5f;
+    r.ppo.entropy_coef = 0.001f;
+    r.critic_warmup = 20;
+  }
   if (task == "jump") {
     // From velstand's balance (warm start); imitation of the built-in demonstration (vorbild.h),
     // then practice: small action noise, a careful learning rate, the demonstration's reward.
@@ -71,7 +88,7 @@ void begin_practice(Ppo& learner, const Recipe& recipe) {
 }
 
 void before_learning(Ppo& learner, const Recipe& recipe) {
-  learner.set_actor_frozen(recipe.imitate && learner.iteration() < recipe.critic_warmup);
+  learner.set_actor_frozen((recipe.imitate || recipe.task == "balance") && learner.iteration() < recipe.critic_warmup);
 }
 
 }  // namespace kern::lehrer

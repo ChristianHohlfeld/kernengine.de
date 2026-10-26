@@ -101,6 +101,8 @@ struct JumpDemo;
 std::unique_ptr<Task> make_jump_task(const JumpDemo* demo = nullptr, f32 imitate = 0);
 /// Stand still at home (the pipeline's smoke test: quick to learn, easy to check).
 std::unique_ptr<Task> make_stand_task();
+/// Train robust standing under external pushes.
+std::unique_ptr<Task> make_balance_task();
 
 /// An environment the Lehrer learns in: reset, then observation / step. The actor sees
 /// observation() (obs_size), the critic critic() (critic_size, the actor's first).
@@ -205,6 +207,14 @@ JumpReport evaluate_jump(ActFn act, void* user, i32 episodes, u64 seed, i32 subs
 }  // namespace kern::lehrer
 
 namespace kern::lehrer {
+
+/// Balance benchmark, eight seconds; varied testing includes repeated external pushes.
+struct BalanceReport {
+  i32 episodes = 0, survived = 0, falls = 0;
+  f32 stable_fraction = 0, max_tilt_deg = 0;
+};
+BalanceReport evaluate_balance(ActFn act, void* user, i32 episodes, u64 seed,
+                               i32 substeps = 0, bool randomized = true);
 
 /// A reproducibility fingerprint: Pollen's velstand network drives the clean duck (no randomisation)
 /// for `ticks` control ticks in the Studio's physics, walking forward then turning; out[t] is a

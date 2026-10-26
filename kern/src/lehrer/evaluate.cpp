@@ -72,4 +72,40 @@ JumpReport evaluate_jump(ActFn act, void* user, i32 episodes, u64 seed, i32 subs
   return rep;
 }
 
+BalanceReport evaluate_balance(ActFn act, void* user, i32 episodes, u64 seed, i32 substeps, bool randomized) {
+  BalanceReport rep;
+  for (i32 i = 0; i < episodes; ++i) {
+    DuckEnv env(make_balance_task(), seed + static_cast<u64>(i) * 7919u,
+                substeps > 0 ? substeps : game::kWalkerSubsteps);
+    env.task().randomize = randomized;
+    env.push_scale = randomized ? 1.0f : 0.0f;
+    env.reset();
+    i32 ticks = 0, stable = 0;
+    f32 worst_tilt = 0;
+    bool fell = false;
+    for (;;) {
+      f32 action[kActions];
+      act(user, env.observation(), action);
+      const Env::Step step = env.step(action);
+      const auto& p = env.probe();
+      const f32 tilt = kern::dm::acos(clamp(-p.gravity.z, -1.0f, 1.0f)) * 57.2957795f;
+      worst_tilt = max_of(worst_tilt, tilt);
+      if (-p.gravity.z >= 0.9659258f) ++stable;
+      ++ticks;
+      if (step.terminal) { fell = true; break; }
+      if (step.timeout) break;
+    }
+    ++rep.episodes;
+    rep.falls += fell ? 1 : 0;
+    rep.survived += fell ? 0 : 1;
+    rep.stable_fraction += static_cast<f32>(stable) / ticks;
+    rep.max_tilt_deg += worst_tilt;
+  }
+  if (rep.episodes > 0) {
+    rep.stable_fraction /= rep.episodes;
+    rep.max_tilt_deg /= rep.episodes;
+  }
+  return rep;
+}
+
 }  // namespace kern::lehrer

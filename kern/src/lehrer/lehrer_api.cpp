@@ -123,7 +123,21 @@ KERN_EXPORT(kern_lehrer_steps) i32 kern_lehrer_steps() { return g && g->learner 
 /// How the learner's network jumps now (clean robot, `episodes` episodes) as JSON: jumps,
 /// episodes, heightMm, flightS, falls.
 KERN_EXPORT(kern_lehrer_evaluate) const char* kern_lehrer_evaluate(i32 episodes) {
-  if (!g || !g->learner || g->task != "jump") return nullptr;
+  if (!g || !g->learner) return nullptr;
+  if (g->task == "balance") {
+    const BalanceReport r = evaluate_balance([](void* u, const f32* o, f32* a) { static_cast<Ppo*>(u)->act(o, a); },
+                                             g->learner.get(), max_of(1, episodes), 5000, g->recipe.substeps, true);
+    json::Value v = json::Value::object();
+    v.set("episodes", r.episodes);
+    v.set("survived", r.survived);
+    v.set("falls", r.falls);
+    v.set("stableFraction", static_cast<f64>(r.stable_fraction));
+    v.set("maxTiltDeg", static_cast<f64>(r.max_tilt_deg));
+    g->text = json::stringify(v);
+    g->length = static_cast<u32>(g->text.size());
+    return g->text.c_str();
+  }
+  if (g->task != "jump") return nullptr;
   const JumpReport r = evaluate_jump([](void* u, const f32* o, f32* a) { static_cast<Ppo*>(u)->act(o, a); }, g->learner.get(), max_of(1, episodes), 1000,
                                      g->recipe.substeps);
   json::Value v = json::Value::object();

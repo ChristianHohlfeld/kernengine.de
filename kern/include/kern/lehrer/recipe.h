@@ -34,7 +34,7 @@ struct Recipe {
   f32 push_scale(i32 iteration) const;
 };
 
-/// "jump" or "stand"; nullptr for anything else.
+/// "jump", "stand" or "balance"; nullptr for anything else.
 std::unique_ptr<Task> make_task(const std::string& name);
 /// The recipe's task (with its demonstration's imitation reward when it has one).
 std::unique_ptr<Task> make_task(const Recipe& recipe);

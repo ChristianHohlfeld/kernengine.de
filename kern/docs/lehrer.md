@@ -25,6 +25,36 @@ exportiert (61 Beobachtungen, 14 Aktionen) und kann wie diese auf den Roboter.
 | 9. Digitaler Zwilling: Gerätemodelle, Kalibrierung, Abgleich (`docs/kalibrierung.md`) | fertig (ohne echte Messdaten) |
 | 10. Spielen: Ball kicken, Socke aufheben, wegtragen, ausspucken – ein gelerntes Netz (Abschnitt 8) | Ball fertig; Socke gelernt, Erfolgsquote niedrig |
 
+## Balance gegen Stöße – ohne Änderung der Engine
+
+Die neue Aufgabe `balance` übernimmt Pollens `velstand.onnx` als Startpunkt.
+Jede Episode dauert 8 Sekunden. Nach den ersten 30 Lerniterationen folgen
+Stöße alle 1,0–1,8 Sekunden; ihre Stärke steigt bis Iteration 400 an.
+Der Actor sieht ausschließlich die 61 regulären Beobachtungen, steuert dieselben
+14 Servoziele und wird mit PPO auf geringere Neigung, bessere Beruhigung und
+selteneres Fallen trainiert. Die Physik und Engine bleiben unverändert.
+
+Bauen und trainieren (Linux/macOS, im Repo-Root):
+
+    kern/tools/lehrer.sh
+    kern/build/kern_lehrer --task balance --envs 32 --threads 4 --iterations 1000 --out balance.onnx --checkpoint balance.ckpt
+
+Fairer Vergleich mit identischen Seeds, jeweils ohne Stöße und mit voller
+Variation inklusive Stößen:
+
+    kern/build/kern_lehrer --task balance --eval velstand --episodes 20
+    kern/build/kern_lehrer --task balance --eval balance.onnx --episodes 20
+
+Erfolg: überstandene Acht-Sekunden-Episoden, Zeit innerhalb 15° Neigung,
+mittlere maximale Neigung. Nur ein messbarer Vorteil gegenüber der Baseline ist
+eine Verbesserung. Im Browser (`/lehrer/`) steht „Balance gegen Stöße“ als
+Auswahl bereit; der Lehrer misst die Baseline vor dem Training und zeigt
+die neuen Werte alle 25 Iterationen. Die fertige Datei kann man herunterladen.
+
+**Wichtig:** `balance.onnx` ersetzt ohne eigene Laufzeitintegration weder
+`velstand.onnx` im Studio noch die Steh-Policy der echten MicroDuck.
+Vor Hardwareeinsatz separat kalibrieren, absichern und überprüfen.
+
 ## 1. Die Umgebung (`src/lehrer`)
 
 - **`DuckEnv`:** eine Ente auf ebenem Boden in einer eigenen GameWorld.
