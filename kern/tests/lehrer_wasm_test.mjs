@@ -47,6 +47,14 @@ const stats = JSON.parse(kern.string(sp, e.kern_lehrer_result_length()));
 check(stats.iteration === 1 && stats.steps === 16, "stats " + JSON.stringify(stats));
 const onnx = take(e.kern_lehrer_export_onnx());
 check(onnx.length > 50000 && new TextDecoder().decode(onnx).includes("actions"), "onnx");
+// Verify the second task shares the same WebAssembly ABI without imitation.
+{
+  const bal = enc.encode("balance"), bp = put(bal);
+  check(e.kern_lehrer_create(bp, bal.length, 1, 7, 0) === 1, "balance collector");
+  check(e.kern_lehrer_learner(bp, bal.length, cp, config.length, 7) === 1, "balance learner");
+  check(e.kern_lehrer_imitation_left() === 0, "balance no imitation");
+  check(take(e.kern_lehrer_export_onnx()).length > 50000, "balance ONNX export");
+}
 // Bit-identical with every other build (tests/determinism_fingerprint.txt).
 {
   const p = e.kern_lehrer_fingerprint(400), n = e.kern_lehrer_result_length() / 8;
