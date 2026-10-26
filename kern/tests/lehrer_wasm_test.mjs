@@ -54,6 +54,11 @@ check(onnx.length > 50000 && new TextDecoder().decode(onnx).includes("actions"),
   check(e.kern_lehrer_learner(bp, bal.length, cp, config.length, 7) === 1, "balance learner");
   check(e.kern_lehrer_imitation_left() === 0, "balance no imitation");
   check(take(e.kern_lehrer_export_onnx()).length > 50000, "balance ONNX export");
+  const reportPtr = e.kern_lehrer_evaluate(1);
+  check(reportPtr !== 0, "balance benchmark available");
+  const report = JSON.parse(kern.string(reportPtr, e.kern_lehrer_result_length()));
+  check(report.episodes === 1 && report.survived + report.falls === 1, "balance survival benchmark");
+  check(Number.isFinite(report.stableFraction) && report.stableFraction >= 0 && report.stableFraction <= 1, "balance stability metric");
 }
 // Bit-identical with every other build (tests/determinism_fingerprint.txt).
 {
