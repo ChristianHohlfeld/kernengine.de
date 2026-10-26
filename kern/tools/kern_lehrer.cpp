@@ -128,8 +128,10 @@ int evaluate(const Options& o) {
   game::WalkerPolicy p;
   std::string err;
   const game::WalkerPolicy* policy = nullptr;
+  std::shared_ptr<const game::WalkerPolicy> baseline;
   if (o.task == "balance" && o.eval == "velstand") {
-    policy = game::walker_policy("velstand.onnx");
+    baseline = game::walker_policy("velstand.onnx");
+    policy = baseline.get();
     if (!policy) { std::fprintf(stderr, "Pollen velstand.onnx unavailable\n"); return 1; }
   } else {
     const std::vector<u8> bytes = read_file(o.eval);
