@@ -101,6 +101,8 @@ struct JumpDemo;
 std::unique_ptr<Task> make_jump_task(const JumpDemo* demo = nullptr, f32 imitate = 0);
 /// Stand still at home (the pipeline's smoke test: quick to learn, easy to check).
 std::unique_ptr<Task> make_stand_task();
+/// Train robust standing under external pushes.
+std::unique_ptr<Task> make_balance_task();
 
 /// An environment the Lehrer learns in: reset, then observation / step. The actor sees
 /// observation() (obs_size), the critic critic() (critic_size, the actor's first).
