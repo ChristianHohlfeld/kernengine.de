@@ -208,6 +208,14 @@ JumpReport evaluate_jump(ActFn act, void* user, i32 episodes, u64 seed, i32 subs
 
 namespace kern::lehrer {
 
+/// Balance benchmark, eight seconds; varied testing includes repeated external pushes.
+struct BalanceReport {
+  i32 episodes = 0, survived = 0, falls = 0;
+  f32 stable_fraction = 0, max_tilt_deg = 0;
+};
+BalanceReport evaluate_balance(ActFn act, void* user, i32 episodes, u64 seed,
+                               i32 substeps = 0, bool randomized = true);
+
 /// A reproducibility fingerprint: Pollen's velstand network drives the clean duck (no randomisation)
 /// for `ticks` control ticks in the Studio's physics, walking forward then turning; out[t] is a
 /// hash over the exact bits of the robot's state after tick t (trunk pose and velocity, every joint
