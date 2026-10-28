@@ -129,8 +129,9 @@ Im Viewport selbst siehst du unten links das **Achsenkreuz**: X rot, Y grün, Z 
 oben.** Eine Infozeile nennt Tempo und Kameraposition, eine Hinweiszeile die gerade gültigen Tasten,
 und beim Ziehen am Gizmo steht da, wie weit du verschoben, gedreht oder skaliert hast.
 
-> **Probier's aus!** Stell über die Toolbar **Layout** auf vier Viewports. Klick in einen der flachen
-> Viewports und schau, wie er auf Wireframe springt. Mit dem Maximieren-Knopf holst du einen davon groß
+> **Probier's aus!** Stell über die Toolbar **Layout** auf vier Viewports. Klick in den perspektivischen
+> Viewport, stell seinen Ansichtstyp auf **Top** (Alt+J) und schau, wie er von Lit auf Wireframe
+> springt; Alt+G bringt die Perspektive zurück. Mit dem Maximieren-Knopf holst du einen Viewport groß
 > und wieder zurück.
 
 ### Outliner
@@ -212,7 +213,7 @@ Computerspiel.
 | … + Mausrad | Tempo-Stufe 1 bis 8 |
 | … + Z / C | heran- / wegzoomen |
 | Mittlere Maustaste ziehen | schwenken |
-| Alt + linke / rechte Maustaste | um die Auswahl kreisen / näher heran |
+| Alt + linke / rechte Maustaste | um die Auswahl kreisen / näher heran oder weg |
 | Mausrad | vor und zurück |
 | F oder Doppelklick | Auswahl ins Bild holen |
 | Ctrl+1 … 9 / 1 … 9 | Lesezeichen setzen / anspringen |
@@ -372,7 +373,7 @@ Studio setzt den Gelenkpunkt auf halbem Weg zwischen beide (außer bei Seil und 
 hängenden Actor einen Rigid Body, falls er keinen hat.
 
 > **Probier's aus!** Setze einen **Cube** und schieb ihn mit dem Gizmo hoch in die Luft, daneben eine
-> **Physics Cube**. Wähle erst die Physics Cube, dann mit Ctrl den Cube, und verbinde sie mit
+> **Physics Cube**, ebenfalls ein Stück in der Luft. Wähle erst die Physics Cube, dann mit Ctrl den Cube, und verbinde sie mit
 > **Distance / rope**. Jetzt **Simulate**: Die Kiste schwingt am Seil wie ein Pendel.
 
 ### Der Spieler und die Prüfung vor dem Start
@@ -450,7 +451,7 @@ auch Spielereignisse.
 
 ## 11.9 World Settings
 
-Der Tab **World Settings** neben Details gilt fürs ganze Level. Er hat fünf Gruppen:
+Der Tab **World Settings** neben Details gilt fürs ganze Level. Er hat vier Gruppen:
 
 - **Game:** Level name, Game title, welcher Actor der Player ist, **Observer camera** (11.11), die
   **Win condition** (None, Collect all pickups, Reach a goal trigger, Survive the time limit, Reach a
@@ -542,9 +543,10 @@ Loslassen **wirft** ihn mit Schwung. Ein kurzer Klick wählt nur aus.
 ![Simulate mit eingeblendeten Kollisionsformen](../buch/bilder/studio-simulate.png)
 
 > **Probier's aus!** Lade **File › Example Levels › Physics Lab** und drück **Simulate**. Greif die
-> Seilbrücke, wirf eine Kiste gegen den Stapel, dreh am Scharnier. Dann setz einen **Crate Stack**, lass
-> ihn umfallen, wähle alle Kisten und drück **K**: Der eingestürzte Stapel bleibt so liegen, als wäre er
-> immer schon umgefallen.
+> Seilbrücke, wirf eine Kiste gegen den Stapel, dreh am Scharnier. Dann stopp mit Esc, setz einen
+> **Crate Stack**, starte wieder **Simulate** und reiß ihn mit der Maus um. Wähle im Outliner alle
+> Kisten (Shift+Klick) und drück **K**: Der eingestürzte Stapel bleibt so liegen, als wäre er immer
+> schon umgefallen.
 
 ![Physics Lab: alle Gelenktypen in der Simulation](../buch/bilder/studio-physics-lab.png)
 
@@ -598,7 +600,7 @@ es ums Bedienen.
 **Das Beispiel-Level** (File › Example Levels › Micro Duck) ist ein Zimmer in ihrem Maßstab mit Möbeln,
 einem Ball und zwei Socken. Die Ente läuft von selbst. Schon ohne Zusätze spielt sie Ball wie in Pollens
 ursprünglicher Software: hinlaufen, ausrichten, mit links kicken. Mit **Kern extras** (im Beispiel an)
-übernimmt stattdessen Kerns eigene Spielschicht mit Ball und Socken. Der Level-Graph lässt sie quaken,
+übernimmt stattdessen Kerns eigene Spielschicht mit Ball und Socken. Der Level-Graph lässt sie zwitschern,
 sobald ihre Kopfkamera den Ball sieht. Play startet mit der Observer camera; **F8** übernimmt die Ente.
 
 **Ohne Eingabe** ist sie **Autonomous**: Sie erkundet den Raum mit Abstandssensor (ToF) und Kamera,
@@ -638,8 +640,8 @@ eingebaut; alle anderen lädt die Seite nach, sobald ein Level eine Ente enthäl
   **Kern extras**.
 
 Die Engine meldet, welche Dateien fehlen, die Seite holt sie, die Engine prüft jede und merkt sie sich
-unter ihrem Namen. Klappt eine Datei nicht, versucht die Seite es nach 5 s, 10 s, 20 s … erneut,
-höchstens einmal pro Minute. Bis dahin bleibt die Ente bei dieser Bewegung stehen und sagt, warum.
+unter ihrem Namen. Klappt eine Datei nicht, versucht die Seite es nach 5 s, 10 s, 20 s … erneut;
+der Abstand wächst bis höchstens eine Minute. Bis dahin bleibt die Ente bei dieser Bewegung stehen und sagt, warum.
 
 > **Wusstest du?** Netze, die du selbst mit dem Kern Lehrer im Browser trainierst
 > ([Kapitel 14](14-lehrer.md)), landen im Speicher desselben Browsers. Studio lädt sie beim Start und

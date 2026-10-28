@@ -122,7 +122,7 @@ Typ hat eigene Werte. Ein paar Beispiele:
 Dazu Feuerrate, Streuung, Rückstoß, Nachladezeit und ein Kopftreffer-Faktor.
 
 **Health** – Lebenspunkte (Standard 100), Rüstung, Regeneration, Wiederauferstehen (*Respawn*),
-Punkte für den Sieger und auf Wunsch eine Explosion beim Zerstören.
+Punkte für den, der ihn erledigt, und auf Wunsch eine Explosion beim Zerstören.
 
 **Pickup** – etwas zum Einsammeln: Punkte, Partikelfarbe, Sound, optional Heilung oder Munition, und
 eine Zeit, nach der es wiederkommt.
@@ -463,8 +463,8 @@ Unter File › Example Levels (und File › New Level) warten sechs fertige Welt
   und 16 Unterschritten, und ein Logik-Graph lässt sie zwitschern, wenn sie den Ball sieht.
 - **Basic:** Boden und ein Würfel. **Empty:** gar nichts.
 
-> **Probier's aus!** Starte im Studio Orb Run mit Play (Alt+P) und sammle ein paar Orbs. Dann öffne
-> die World Settings und stell die **Tageszeit** auf 0,75. Starte erneut – jetzt fährst du in den
+> **Probier's aus!** Starte im Studio Orb Run mit Play (Alt+P) und sammle ein paar Orbs. Dann stoppe mit
+> Esc, öffne die World Settings und stell die **Tageszeit** auf 0,75. Starte erneut – jetzt fährst du in den
 > Sonnenuntergang.
 
 ## 8.19 Was die GameWorld sonst noch kann

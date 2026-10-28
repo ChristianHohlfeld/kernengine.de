@@ -130,9 +130,9 @@ Spieler bekommt einen **Pawn**, eine Kopie der Spielfigur des Levels. 30-mal pro
 Server jedem Client einen **Snapshot**: das HUD und die Lage aller beweglichen Dinge.
 
 **Der Client spielt eine Replika.** Er lädt dasselbe Level, rechnet aber **keine eigene Physik**; seine
-Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingabe, die letzten vier gleich mit.
+Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vier der letzten auf einmal, die neueste zuerst.
 
-> **Stell dir vor …** ein Daumenkino, von dem du nur jedes dritte Bild bekommst, manche zu spät. Zeigst
+> **Stell dir vor …** ein Daumenkino, von dem du nur jedes zweite Bild bekommst, manche zu spät. Zeigst
 > du jedes sofort, ruckelt es. Also wartest du ein wenig und zeichnest die Bilder **dazwischen** selbst.
 > Genau so zeigt der Client die Welt etwa **100 ms in der Vergangenheit** und rechnet weiche Übergänge
 > (Interpolation). Fehlt ein Snapshot, schätzt er die Bewegung bis zu 250 ms weiter und hält dann an.
