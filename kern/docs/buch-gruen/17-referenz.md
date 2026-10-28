@@ -89,8 +89,8 @@ Breakpoint, **Ctrl+F** sucht.
 Jede dieser Tasten gibt dir für 2 Sekunden das Steuer; Gehirn und Spielschicht der Ente machen so
 lange Pause ([Kapitel 13](13-micro-duck.md)).
 
-> **Probier's aus!** Lade die Vorlage **Micro Duck**, drück Play und probier alle Tasten von 1 bis 7
-> der Reihe nach. Was passiert, wenn du die 3 drückst, während die Ente sitzt?
+> **Probier's aus!** Lade die Vorlage **Micro Duck**, drück Play, übernimm die Ente mit **F8** und
+> probier alle Tasten von 1 bis 7 der Reihe nach. Was passiert, wenn du die 3 drückst, während die Ente sitzt?
 
 ## 17.3 Befehle des Lehrers (`kern_lehrer`)
 
@@ -98,8 +98,8 @@ Der Lehrer läuft im Browser, es gibt ihn aber auch als Programm für die Komman
 es mit `kern/tools/lehrer.sh`, danach liegt es unter `kern/build/kern_lehrer`
 ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 14](14-lehrer.md)).
 
-Das Programm hat viele **Betriebsarten**. Welche gilt, entscheidet die erste passende Option auf der
-Kommandozeile; ohne besondere Option wird trainiert. Die wichtigsten:
+Das Programm hat viele **Betriebsarten**. Welche gilt, entscheidet eine feste Rangfolge: Die
+erste zutreffende gewinnt; ohne besondere Option wird trainiert. Die wichtigsten:
 
 | Option | Was passiert |
 |---|---|
@@ -260,7 +260,7 @@ Die Fachwörter des ganzen Buchs, kurz erklärt. In Klammern steht, wo sie ausf�
 | **Level** | eine Spielwelt, gespeichert als `.klevel` |
 | **Outliner** | Baumansicht aller Actors |
 | **Package Game** | Level als eigenständige HTML-Datei exportieren |
-| **Play / Simulate** | Spiel spielen / Physik laufen lassen, während du weiter bearbeitest |
+| **Play / Simulate** | Spiel spielen / Physik laufen lassen, Editor bleibt bedienbar |
 | **Viewport** | das Fenster, durch das du in die 3D-Welt schaust |
 | **World Settings** | Einstellungen der ganzen Welt, etwa die Schrittrate |
 
@@ -315,7 +315,8 @@ Das vollständige Glossar mit allen Fachbegriffen steht im blauen Buch.
 
 - **F1** im Studio zeigt die wichtigsten Kürzel; Alt+P spielt, Alt+S simuliert, Esc stoppt.
 - Die Ente steuerst du mit W A S D und den Tasten 1 bis 7.
-- `kern_lehrer` trainiert, bewertet, kalibriert und misst – die erste passende Option entscheidet.
+- `kern_lehrer` trainiert, bewertet, kalibriert und misst – eine feste Rangfolge der Optionen
+  entscheidet.
 - Levels sind `.klevel`-Dateien in JSON, Netze `.onnx`, Servoprofile JSON, Logs CSV.
 - Engine und Browser reden über die C-ABI: 1 heißt Erfolg, 0 Fehler.
 - Für jede einzelne Funktion und Option schlägst du im blauen Buch nach.

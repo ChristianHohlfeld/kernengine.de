@@ -22,7 +22,7 @@ Optimierung auf den eigenen Prozessor ab.
 
 > **Wusstest du?** Diese Prozessor-Schalter wählen nur Befehle aus, sie ändern **kein** Ergebnis.
 > Das Netz bleibt Bit für Bit dasselbe wie im Browser und im Studio
-> ([Kapitel 14.7](14-lehrer.md#147-determinismus-überall-dasselbe-netz)).
+> ([Kapitel 14.7](14-lehrer.md)).
 
 Beim Start lädt `kern_lehrer` Pollens Netze aus `third_party/microduck/` (oder `--policies DIR`).
 Es braucht sie für den Warmstart (velstand), das Vorbild und die Spielschicht. Wie Kern selbst
@@ -94,7 +94,7 @@ Pro Generation erscheint eine Zeile mit Note und Urteil („a real jump“, „n
 Mit `--vorbild start.json` sucht man von einem älteren Ergebnis aus weiter.
 
 **Im Browser** trainiert die Seite `/lehrer/` dasselbe Rezept
-([Kapitel 14.11](14-lehrer.md#1411-der-lehrer-im-browser)). Gleicher Seed und gleich viele Enten
+([Kapitel 14.11](14-lehrer.md)). Gleicher Seed und gleich viele Enten
 insgesamt (Worker × Enten je Worker) ergeben dasselbe Netz wie nativ.
 
 ## 15.4 Fortschritt lesen
@@ -108,7 +108,7 @@ Bewertung zusätzlich `| jumps 4/5 up … rise … flight … tilt … falls …
 | `len` | Episodenlänge in Takten | 100 = 2 s ohne Sturz |
 | `value` | Fehler des Kritikers | erst hoch, dann fallend |
 | `std` | Aktionsrauschen σ | sinkt, wenn die Ente sicherer wird |
-| `lr` | Lernrate | dauerhaft 1e-5: Policy springt zu stark |
+| `lr` | Lernrate | dauerhaft 1e-5: Policy ändert sich zu stark |
 | `jumps n/5` | Probe auf dem sauberen Roboter | das eigentliche Ziel |
 
 Beim Nachahmen zeigt jede Runde Beispiele, Fehler und echte Sprünge. Mit `--log jump.csv` landet jede Iteration als CSV-Zeile in
@@ -217,16 +217,17 @@ Kerns eigene Netze haben feste Namen: `jump.onnx` und `play.onnx`. Drei Wege ins
    ausgelieferte Seite aus `policies/` daneben.
 2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät; das Studio
    lädt es beim Start und übernimmt jedes neue sofort, auch in offenen Tabs (nur für den Sprung).
-3. **Prüfen:** Micro-Duck-Level öffnen, Play, Taste **7** für den Sprung, oder die Ente in Ruhe
-   lassen (Spielschicht: Autonomous und Kern extras an, Ball oder Socke in Sicht). Die
+3. **Prüfen:** Micro-Duck-Level öffnen, Play, mit **F8** die Ente übernehmen, Taste **7** für den
+   Sprung, oder die Ente in Ruhe lassen (Spielschicht: Autonomous und Kern extras an, Ball oder Socke in Sicht). Die
    Browser-Konsole meldet „Kern: trained network jump.onnx loaded“ oder warnt, wenn etwas nicht lädt.
 
 Das Netz muss die Form eines rsl_rl-Actors haben (Sub, Div, Gemm/Elu …, Gemm) – genau so exportiert
 der Lehrer. Eine Spielschicht ohne 23 Eingänge und 9 Ausgänge wird nicht gerechnet.
 
 > **Probier's aus!** Trainiere auf der Lehrer-Seite einen Sprung, lass dabei auf
-> https://kernengine.de/ das Micro-Duck-Level offen, starte Play und drück **7**, sobald die
-> Konsole „trained network jump.onnx loaded“ meldet. Jetzt springt **deine** Ente.
+> https://kernengine.de/ das Micro-Duck-Level offen, starte Play, übernimm die Ente mit **F8** und
+> drück **7**, sobald die Konsole „trained network jump.onnx loaded“ meldet. Jetzt springt
+> **deine** Ente.
 
 ## 15.9 Eine neue Bewegung hinzufügen
 

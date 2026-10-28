@@ -201,7 +201,7 @@ Lernrate, Gradientenbegrenzung 1,0, geclippter Wertverlust.
 3. **Alte Policy neu bewerten** – mit den frischen Normalisierern. Bei nur ein paar Dutzend Enten
    wandern sie zwischen zwei Iterationen merklich, sonst wäre der Vergleich „neu gegen alt“ schief.
 4. **Vorteil mit GAE.** War jede Aktion besser oder schlechter als erwartet (Beispiel in Anhang
-   A.11.2)? Ein **Zeitablauf** ist kein Scheitern: Die Episode hätte weitergehen können, also wird
+   A.11)? Ein **Zeitablauf** ist kein Scheitern: Die Episode hätte weitergehen können, also wird
    der Wert der Zukunft geschätzt statt auf null gesetzt. Ein **Sturz** hat keine Zukunft.
 5. **Update.** 5 Epochen × 4 Minibatches = 20 Lernschritte. Jede Minibatch wird in genau
    **8 feste Teilstücke** zerlegt, die auf den Threads laufen. Vor jedem Schritt misst der Lerner
@@ -286,7 +286,7 @@ Sprung-Belohnung, einer Nachahmungsbelohnung und voller Variation, bis der Sprun
 
 Der einzige Befehl ist ein **Phasensignal**: cos und sin der Phase t / 2 s in den Plätzen 55 und 56.
 Die Episode dauert 2 s. Kein Skript, keine inverse Kinematik, keine künstlichen Kräfte – die Bewegung
-kommt allein vom Netz über 14 Servoziele. Die Belohnung hat 13 Terme, die wichtigsten:
+kommt allein vom Netz über 14 Servoziele. Die Belohnung hat 15 Terme, die wichtigsten:
 
 | Term | Gewicht | Wofür |
 |---|---|---|
@@ -347,7 +347,7 @@ eine Episode dauert höchstens 60 s. Der Actor ist 23 → 256 → 128 → 9; der
 
 **Szenen:** zufällige Blickrichtung; mit 30 % ein Ball, 30 % eine Socke, 40 % beides, oft dicht
 beieinander. Das Ziel liegt mal direkt vor der Ente, meist 0,35 bis 1,2 m entfernt, manchmal außer
-Sicht. Bälle von 3,5 bis 6 cm, 15 bis 50 g, Schaumstoff bis Gummi; mit 30 % eine zweite Socke. Dazu
+Sicht. Bälle mit 3,5 bis 6 cm Radius, 15 bis 50 g, Schaumstoff bis Gummi; mit 30 % eine zweite Socke. Dazu
 Variation wie beim Sprung und ein Objektdetektor, der verrauscht ist und bis zu 20 % aussetzt.
 
 **Belohnung** pro Entscheidung: −0,01 für die Zeit, +2 × Annäherung, +3 fürs gehaltene Aufheben,

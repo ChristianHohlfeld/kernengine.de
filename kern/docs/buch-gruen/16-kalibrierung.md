@@ -43,8 +43,8 @@ im Lehrer und auf dem Prüfstand. Die Zahlen stehen in einem **Profil**, einer J
 ```
 
 Zeile für Zeile: Profil xl330; wie fest er zieht und bremst; Reibung und Kraft; wie träge und spät
-(20 ms) er reagiert; Reibung und Armatur dürfen je Exemplar ±10 % abweichen; der Bus braucht 15 bis
-30 ms. Kern prüft jeden Wert auf einen sinnvollen Bereich. Ein anderer Servo ist ein anderes Profil;
+(20 ms) er reagiert; Reibung und Armatur dürfen je Exemplar ±10 % abweichen; im Training streut die
+Verzögerung zwischen 15 und 30 ms. Kern prüft jeden Wert auf einen sinnvollen Bereich. Ein anderer Servo ist ein anderes Profil;
 ein grundsätzlich anderes Gerät, etwa ein Linearaktor, bekäme ein eigenes Modell.
 
 Die **Streuungen** sind ehrlich zugegebene Unsicherheit: Das Training zieht daraus je Episode und
@@ -99,8 +99,9 @@ Ohne echten Servo schreibt `kern_lehrer --beispiele beispiele/` simulierte Beisp
 Chirp, ein Roboter-Log) und das Profil, um die Kette einmal durchzuspielen.
 
 > **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ das Micro-Duck-Level und
-> stelle bei der Ente **Actions to servo goals** auf `robot`, das Profil des echten Roboters. Kick
-> den Ball mit der 3. Merkst du den Unterschied?
+> stelle bei der Ente **Actions to servo goals** auf `robot` (so fährt Pollens Software den echten
+> Roboter). Starte Play, übernimm die Ente mit **F8** und kick den Ball mit der 3. Merkst du den
+> Unterschied?
 
 ## 16.3 Abgleich: der ganze Roboter
 
@@ -120,8 +121,8 @@ Das Schöne: Ein Log aus der Simulation, mit denselben Servos abgespielt, ergibt
 Bit für Bit, denn die Simulation ist deterministisch. Darum ist jeder Unterschied zu einem echten
 Log ein echter Modellfehler und kein Rauschen.
 
-> **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die Step rate auf einen
-> anderen Wert als 100 und starte Play. Kern meldet, dass der Takt nicht passt:
+> **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die Step rate auf 90 statt
+> 100 und starte Play. Kern meldet, dass der Takt nicht passt:
 > „set World Settings > Step Rate to 100“.
 
 ## 16.4 Training mit dem eigenen Profil
@@ -146,7 +147,7 @@ Was nicht gemessen ist oder streut, würfelt das Training aus:
 | Lagesensor, Gelenkgeber | Rauschen, Versatz, Verzögerung |
 | Störungen | Stöße alle 3–6 s |
 | Kamera-Detektor | Positionsrauschen, bis 20 % Aussetzer |
-| Spielzeug | Ball 3,5–6 cm, 15–50 g |
+| Spielzeug | Ballradius 3,5–6 cm, 15–50 g |
 
 Genaue Bereiche in [Kapitel 14](14-lehrer.md). Ein Trick: Der **Kritiker**, der beim Training
 bewertet, sieht immer den sauberen Zustand; nur der **Actor**, der auf den Roboter kommt, muss mit
@@ -161,7 +162,8 @@ Zahlen, die aus Modell und Physik folgen, stimmen als feste Werte im Code nach d
 - **Die Bissposition:** Wo muss die Socke liegen, damit das Aufheben sie greift und hält? Der
   Lehrer probiert vor dem ersten Training 99 Stellen und nimmt die zuverlässigste.
 - **Der Nachlauf nach „Stopp“** (`--halt-messen`): Hier gilt die Regel noch nicht ganz – das
-  Vorbild trägt den gemessenen Wert (0,7 cm aus 0,12 m/s) fest ein und muss neu messen.
+  Vorbild trägt den gemessenen Wert (0,7 cm aus 0,12 m/s) fest ein; nach einer Änderung der Physik
+  misst man neu.
 - **Der Griffsensor:** „hält etwas“ ist das, was der Mund-Servo meldet.
 - **Stillstand:** gemessen über die Fußkontakte, nicht über „kein Laufbefehl“.
 

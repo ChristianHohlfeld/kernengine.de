@@ -67,7 +67,7 @@ Regler sind das? Eine Schicht von n auf m Neuronen hat n · m Gewichte und m Bia
 (256, 128), das Netz der Spielschicht ist 23 → 256 → 128 → 9.
 
 In Kern ist das `Mlp` in `nn.h`. Alle Parameter liegen in einem einzigen langen Vektor, die Gewichte
-„eingangsweise“ – warum, erklärt [Kapitel 14.4](14-lehrer.md#144-die-netze-mlp-normalizer-adam).
+„eingangsweise“ – warum, erklärt [Kapitel 14.4](14-lehrer.md).
 
 ### Warum die Aktivierung so wichtig ist
 
@@ -221,7 +221,7 @@ manche Gradienten riesig und andere winzig sind, und er reagiert nervös auf Rau
 (Kingma und Ba, 2015) merkt sich für jeden Regler zwei gleitende Durchschnitte:
 
 - die übliche **Richtung** (geglätteter Gradient, „Schwung“),
-- die übliche **Größe** (geglätteter quadrierter Gradient).
+- die übliche **Größe** (Wurzel aus dem geglätteten quadrierten Gradienten).
 
 Der Schritt ist dann ungefähr Lernrate × Richtung / Größe. Dadurch macht jeder Regler ähnlich große
 Schritte, egal wie groß seine Zahlen sind.
@@ -253,7 +253,7 @@ Dafür reicht eine exakte Formel (Chans Algorithmus), die nur drei Zahlen pro Ei
 
 Wichtig: **Der Normalisierer gehört zum Netz.** Ohne genau diese Umrechnung ist das Netz wertlos,
 deshalb steht er im exportierten Netz ganz vorn (A.14). Beim Warmstart wird er eingefroren
-([Kapitel 14.4](14-lehrer.md#144-die-netze-mlp-normalizer-adam)).
+([Kapitel 14.4](14-lehrer.md)).
 
 ## A.8 Auswendiglernen gegen Verstehen
 
@@ -357,7 +357,7 @@ er tun soll. Und er nimmt sie **wörtlich**.
 
 > **Achtung, Falle!** In frühen Läufen lernte die Ente, auf dem Schwanz zu sitzen, Hechtsprünge zu
 > machen oder sich abzustützen – weil die Belohnung das zuließ. Jede Lücke musste mit einer
-> strengeren Regel geschlossen werden ([Kapitel 15.11](15-eigene-modelle.md#1511-fallstricke-aus-den-echten-läufen)).
+> strengeren Regel geschlossen werden ([Kapitel 15.11](15-eigene-modelle.md)).
 
 Der **Return** ist die Summe aller künftigen Belohnungen. Damit er nicht unendlich wird, zählen
 spätere Belohnungen weniger: Jeder Schritt in die Zukunft multipliziert mit dem **Diskontfaktor**
@@ -507,7 +507,7 @@ Kommazahlen im Computer sind tückisch: (0,1 + 0,2) + 0,3 ergibt im Rechner nich
 Reihenfolge, die von der Zahl der Threads abhängt, bekommt man auf 2 und 16 Kernen verschiedene
 Netze. Kern summiert deshalb immer in fester Reihenfolge (jede Minibatch in genau 8 Teilen) und
 erreicht so: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
-([Kapitel 14.7](14-lehrer.md#147-determinismus-überall-dasselbe-netz),
+([Kapitel 14.7](14-lehrer.md),
 [Anhang C](C-grundlagen-physik.md)).
 
 ## A.12 Von der Simulation in die Wirklichkeit
@@ -520,7 +520,7 @@ ist die Kernaufgabe des Robotiklernens. Zwei Strategien ergänzen sich:
    ([Kapitel 16](16-kalibrierung.md)).
 2. **Das Netz unempfindlich machen:** Es lernt in vielen leicht verschiedenen Welten, sodass die
    echte nur eine weitere ist. Das ist **Domain Randomization**. Was Kern alles variiert, steht in
-   [Kapitel 14.3](14-lehrer.md#143-die-turnhalle-der-ente).
+   [Kapitel 14.3](14-lehrer.md).
 
 > **Stell dir vor …** du übst Tischtennis mal mit schwerem, mal mit leichtem Ball, mal auf rutschigem,
 > mal auf stumpfem Boden, mal mit Brille, mal ohne. Am Turniertag ist dir egal, wie der Saal ist.
@@ -562,7 +562,8 @@ Pro Generation passiert grob:
 5. Die Wolke streckt sich in die Richtungen, in denen es gut lief.
 
 Kern hat CMA-ES nach Hansens Tutorial selbst geschrieben (`cmaes.cpp`). Ohne Vorgabe sind es
-4 + ⌊3 · ln n⌋ Kandidaten (für 6 Kalibrierparameter: 9), die Vorbildsuche nimmt 16. Der Startpunkt
+4 + ⌊3 · ln n⌋ Kandidaten (für 6 Parameter wären das 9); die Kalibrierung nimmt 12, die
+Vorbildsuche 16. Der Startpunkt
 wird zuerst bewertet, das Ergebnis ist also nie schlechter. Alle Kandidaten einer Generation werden
 parallel bewertet. Zurück kommen der beste Punkt **und** der Mittelpunkt, und bei verrauschten Noten
 ist der Mittelpunkt die bessere Antwort: Der Beste hatte vielleicht nur Glück. Auch CMA-ES rechnet
@@ -585,7 +586,7 @@ Kern schreibt die Datei mit einem **eigenen, winzigen Schreiber** für das Proto
 Bibliothek, im selben Format wie Pollens Netze (61 rein, 14 raus).
 Exportiert wird nur der **Mittelwert** der Policy: Auf dem Roboter wird nicht mehr ausprobiert, σ
 und Kritiker bleiben im Lerner. Mehr in
-[Kapitel 14.10](14-lehrer.md#1410-der-export-nach-onnx).
+[Kapitel 14.10](14-lehrer.md).
 
 ## A.15 Wie alles zusammenkommt
 

@@ -66,7 +66,7 @@ harte Grenzen und eine **Home-Pose**, die bequeme Grundhaltung. Kern baut die En
 Haltung auf. Alle Winkel stehen im blauen Buch.
 
 > **Wusstest du?** Das Gelenk `head_yaw` reicht von −2,967 bis +2,967 rad, also rund ±170 Grad.
-> Ganz wie eine Eule ist das nicht, aber fast.
+> Damit kann sie fast ganz nach hinten schauen.
 
 ### Masse und die unsichtbare Scheibe
 
@@ -217,7 +217,7 @@ up first“.
 
 Das Netz sagt nicht „Knie auf 30°“, sondern „Knie etwas weiter als in der Grundhaltung“: Servoziel =
 **Home-Pose + Aktion**. Kern fährt jedes Netz **wie trainiert**, ohne Abschwächung und Glättung (nur
-Rollen und Ducken mit Faktor 0,8). Pollens Software auf dem echten Roboter schwächt mit 0,9 ab und
+Rollschuhfahren und Ducken mit Faktor 0,8). Pollens Software auf dem echten Roboter schwächt mit 0,9 ab und
 glättet – Feintuning für die Hardware. Unter **Actions to servo goals** wählst du `training`
 (Standard) oder `robot`. Gemessen kippen die Kicks mit `robot` um; laufen klappt mit beidem.
 
@@ -249,8 +249,9 @@ die nächste Entfernung, ihre Richtung und ob links und rechts frei ist.
 hochkant. Kern prüft, ob die Mitte eines Actors im Bild liegt und nicht verdeckt ist. Mit ganz
 gesenktem Kopf sieht die Kamera den Boden 6 bis 15 cm vor dem Rumpf.
 
-> **Probier's aus!** Schalte beim Spielen das Show-Flag **Robot Camera** ein. Oben rechts im
-> Viewport siehst du das Kamerabild der Ente, daneben das ToF-Gitter. Lauf auf den Ball zu!
+> **Probier's aus!** Starte Play im Micro-Duck-Level. Oben rechts im Viewport siehst du das
+> Kamerabild der Ente, daneben das ToF-Gitter (Show-Flag **Robot Camera**, standardmäßig an).
+> Übernimm sie mit **F8** und lauf auf den Ball zu!
 
 **Gleichgewicht.** Eine IMU (ein Lagesensor wie im Handy) meldet, wo unten ist. „Gefallen“ heißt
 wie im Original: 200 ms lang deutlich schief. Stolpern zählt nicht. velstand steht von selbst auf.
@@ -383,8 +384,9 @@ Die **Stimme** ist eine bitgenaue Übertragung von Pollens Synthesizer, mit eige
 `jump.onnx`, dann zurück. Im Studio: 3 von 3 echte Sprünge, 9 mm hoch, 120 ms in der Luft – danach
 steht und läuft die Ente wieder.
 
-> **Probier's aus!** Drück im Micro-Duck-Level die **7**. Dann die **3**, wenn der Ball vor dem
-> linken Fuß liegt. Und zum Schluss die **1**: Sitz, Ente!
+> **Probier's aus!** Starte Play im Micro-Duck-Level, übernimm die Ente mit **F8** und drück die
+> **7**. Dann die **3**, wenn der Ball vor dem linken Fuß liegt. Und zum Schluss die **1**: Sitz,
+> Ente!
 
 **Netze laden:** Das Studio lädt fehlende Netze nach und versucht es bei Fehlern erneut (höchstens
 einmal pro Minute). Im Browser mit dem Lehrer trainierte Netze übernimmt es auf demselben Gerät.
