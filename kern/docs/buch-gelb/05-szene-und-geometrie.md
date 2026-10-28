@@ -3,214 +3,359 @@
 > **Dein Level:** Kern entscheidet, was die Kamera sehen kann, findet blitzschnell das Dreieck
 > unter deiner Maus und baut aus ein paar Zahlen eine ganze Stadt. Hier lernst du, wie.
 
-Zwei Bausteine liegen rund um den Renderer: **Szene** (Sichtbarkeit, BVH, **Picking**) und
-**Geometrie** (Formen auf dem Prozessor bauen). Danach kommt die prozedurale Stadt. Den Renderer
-erklärt [Kapitel 4](04-grafik.md), die Mathematik [Anhang B](B-grundlagen-rendering.md).
+> **Wörter, die du brauchst:**
+>
+> - **Mesh** – das Drahtgitter aus Dreiecken, aus dem ein 3D-Ding besteht.
+> - **Ecke** (englisch *Vertex*) – ein Punkt im Mesh. Jede Ecke hat eine Lage und oft noch eine
+>   Farbe, eine Normale und eine UV.
+> - **Indizes** – eine Liste von Nummern, die sagt, welche drei Ecken zusammen ein Dreieck bilden.
+> - **Normale** – ein kleiner Pfeil, der senkrecht aus einer Fläche zeigt. Mit ihm rechnet das
+>   Licht: Fläche zur Sonne hell, Fläche weg von der Sonne dunkel.
+> - **UV** – zwei Zahlen pro Ecke, die sagen, welche Stelle eines Bildes (einer **Textur**) dort
+>   aufgeklebt wird, wie bei einem Aufkleber.
+> - **Matrix** – eine kleine Zahlentabelle, die sagt, wie ein Ding verschoben, gedreht und
+>   gestreckt wird.
+> - **Instanz** – dasselbe Mesh noch einmal an einem anderen Ort, nur mit einer anderen Matrix.
+>   Hundert Bäume, aber nur ein gespeicherter Baum.
+> - **Actor** – ein Ding im Level von Kern Studio, zum Beispiel eine Kiste, ein Licht oder die
+>   ganze Stadt.
+
+Dieses Kapitel hat zwei Teile. Die **Szene** beantwortet Fragen über fertige Meshes: Was sieht die
+Kamera? Was liegt unter der Maus? Die **Geometrie** baut neue Meshes: Dächer, Wände, Straßen, Boden.
+Am Ende setzt Kern alles zu einer ganzen Stadt zusammen. Wie gemalt wird, erklärt
+[Kapitel 4](04-grafik.md), die Mathematik dahinter [Anhang B](B-grundlagen-rendering.md).
 
 ## 5.1 Die Spielregeln
 
-- **Z zeigt nach oben**, gemessen wird in **Metern** – überall in Kern.
-- Alle Bauer liefern `MeshData`: Positionen, Normalen (wohin eine Fläche zeigt), Farben, UVs, auf
-  Wunsch einen **Zusatzstrom** – und **Indizes**. Ohne Indizes ist das Mesh eine **Triangle Soup**:
-  Je drei Ecken hintereinander sind ein Dreieck.
-- Farben sind **sRGB**, wie alle Eckfarben des Standard-Shaders.
-- Beim Hochladen kommt der Zusatzstrom in einen von zwei Erweiterungsplätzen; Platz 2 oder höher
-  heißt „weglassen“.
+Überall in Kern gelten zwei Regeln: **Z zeigt nach oben**, und gemessen wird in **Metern**. Ein
+Haus mit 20 Metern Höhe reicht also von z = 0 bis z = 20. So passen Grafik, Physik und Ton ohne
+Umrechnen zusammen.
+
+Alle Bauer in diesem Kapitel liefern ihr Ergebnis in derselben Form: eine Liste von **Ecken** (mit
+Lage, Normale, Farbe und UV) und, wenn es sich lohnt, eine Liste von **Indizes**.
+
+> **So kannst du es dir vorstellen:** Ein Würfel hat 8 Ecken und 6 Seiten, jede Seite sind
+> 2 Dreiecke, zusammen 12. Ohne Indizes schreibst du für jedes Dreieck seine drei Ecken auf:
+> 12 · 3 = 36 Ecken, viele davon doppelt. Das heißt **Triangle Soup** (Dreieckssuppe). Mit Indizes
+> schreibst du jede Ecke einmal auf und dahinter nur noch Nummern wie „Dreieck 1 = Ecke 0, 1, 2“.
+> Das ist wie ein Malen-nach-Zahlen-Bild: erst die Punkte, dann die Linien zwischen ihren Nummern.
+
+Farben und den Weg der Daten zur Grafikkarte erklärt [Kapitel 4](04-grafik.md). Die genauen Namen
+und Werte stehen im blauen Buch, Kapitel 5.
 
 ## 5.2 Frustum-Culling: Nicht im Bild, nicht gezeichnet
 
-Die Kamera sieht in eine abgeschnittene Pyramide mit sechs Wänden, das **Frustum**. Damit der Test
-billiger ist als das Zeichnen, prüft Kern nur **eine Kugel** pro Mesh gegen die Wände. Liegt ihr Mittelpunkt **weiter als
-der Radius** hinter einer Wand, ist sie sicher draußen. Die Wände liest Kern direkt aus der
-View-Projektionsmatrix (Verfahren von Gribb und Hartmann) und **normiert** sie, damit der Abstand in
-Metern herauskommt.
+Was nicht im Bild ist, muss nicht gezeichnet werden. Die Kamera sieht in eine abgeschnittene
+Pyramide mit sechs Wänden (links, rechts, oben, unten, nah, fern). Diese Pyramide heißt **Frustum**.
+Alles, was sicher draußen liegt, lässt Kern weg. Das heißt **Culling** (Aussortieren).
 
-> **So kannst du es dir vorstellen:** Ein Basketball (Radius 12 cm) mit dem Mittelpunkt 30 cm
-> hinter der Hallenwand ist ganz draußen; bei 5 cm ragt er noch herein.
+```
+  Blick von oben auf das Sichtfeld der Kamera
 
-Der Test ist **vorsichtig**: Nahe einer Ecke wird eine Kugel manchmal umsonst gezeichnet, aber nie
-fälschlich weggelassen. Kaputte Kugeln gelten als sichtbar.
+    ○ A        ╲      ○ B     ╱
+    draußen     ╲    drin    ╱      ◐ C
+                 ╲          ╱     auf der Kante:
+                  ╲        ╱      wird gezeichnet
+                   ╲      ╱
+                    ╲____╱
+                    Kamera
+```
 
-Die Kugeln entstehen beim Hochladen: eine um das Mesh, eine um alle Instanzen. Wie stark eine
-Matrix höchstens streckt, schätzt Kern lieber zu groß – mit der Wurzel aus der Quadratsumme ihrer
-neun Dreh- und Streckzahlen. Streckt eine Matrix nur x auf das Doppelte, ist
-das √(4 + 1 + 1) ≈ 2,45 statt 2.
+Der Test muss viel schneller sein als das Zeichnen, sonst lohnt er nicht. Darum prüft Kern nicht
+tausende Dreiecke, sondern **eine Kugel**, die das ganze Mesh umschließt. Liegt ihr Mittelpunkt
+**weiter als ihr Radius** hinter einer der sechs Wände, ist die ganze Kugel draußen, und damit
+auch das Mesh.
 
-> **Vorsicht, Falle:** Ein Wald als *ein* instanziertes Mesh über die ganze Karte gilt fast immer
-> als sichtbar. Besser in räumliche Gruppen teilen.
+> **So kannst du es dir vorstellen:** Ein Basketball hat 12 cm Radius. Liegt sein Mittelpunkt 30 cm
+> hinter der Hallenwand, ist er ganz draußen (30 > 12). Liegt der Mittelpunkt nur 5 cm dahinter,
+> ragt er noch 7 cm herein (5 < 12).
 
-Nie verworfen werden animierte (geskinnte) Figuren, weil eine Pose über die Ruhehaltung hinausragen
-kann, und Meshes mit `frustum_culled = false`. Der Schattenpass testet genauso gegen das Frustum der
-Sonne.
+Der Test ist **vorsichtig**: Nahe einer Ecke der Pyramide wird eine Kugel manchmal umsonst
+gezeichnet, aber nie fälschlich weggelassen. Lieber einmal zu viel malen als ein Loch im Bild.
+Kaputte Kugeln gelten deshalb als sichtbar.
+
+Die Kugel berechnet Kern einmal, wenn das Mesh zur Grafikkarte geht. Hat ein Mesh viele Instanzen,
+umschließt eine einzige Kugel **alle** zusammen.
+
+> **Vorsicht, Falle:** Ein Wald als *ein* Mesh mit Bäumen über die ganze Karte hat eine riesige
+> Kugel. Die ist fast immer im Bild, also wird der ganze Wald immer gemalt. Besser: den Wald in
+> Gruppen teilen, die nah beieinanderstehen.
+
+Zwei Ausnahmen: Animierte Figuren lässt Kern nie weg, weil ein ausgestreckter Arm über die Kugel
+der Grundhaltung hinausragen kann. Und man kann das Culling für ein Mesh abschalten. Die Schatten
+der Sonne nutzen denselben Test mit dem Sichtfeld der Sonne.
+
+> **Für Profis:** Die sechs Wände liest Kern direkt aus der Matrix der Kamera, und wie stark eine
+> Instanz-Matrix eine Kugel höchstens streckt, schätzt Kern absichtlich etwas zu groß. Wie das
+> geht, steht im blauen Buch, Kapitel 5.
 
 ## 5.3 Die BVH: Kisten in Kisten
 
-Picking testet einen Strahl gegen Dreiecke – in einer Stadtkachel zehntausende. Eine **BVH** packt
-sie in Kisten, diese in größere Kisten. Verfehlt der Strahl eine Kiste, ist ihr Inhalt erledigt.
+Willst du wissen, welches Dreieck ein Strahl trifft, musst du im schlimmsten Fall jedes einzelne
+prüfen, und eine Stadtkachel hat zehntausende. Eine **BVH** (englisch *Bounding Volume
+Hierarchy*, auf Deutsch etwa „Stufen von Hüllkisten“) packt die Dreiecke in kleine Kisten, die
+Kisten in größere Kisten und so weiter. Verfehlt der Strahl eine Kiste, ist ihr ganzer Inhalt auf
+einmal erledigt.
 
-> **So kannst du es dir vorstellen:** Im Wörterbuch schlägst du die Mitte auf und halbierst weiter.
-> Bei 10 000 Dreiecken bleiben nach 11 Halbierungen höchstens 5 pro Kiste übrig
-> (10 000 → 5000 → 2500 → … → 10 → 5) – das reicht, denn ein Blatt darf bis zu 8 haben.
+```mermaid
+flowchart TD
+  A["Große Kiste: getroffen"] --> B["Links: verfehlt, Inhalt erledigt"]
+  A --> C["Rechts: getroffen"]
+  C --> D["8 Dreiecke: Kiste verfehlt"]
+  C --> E["8 Dreiecke: Kiste getroffen, prüfen"]
+```
 
-**Bauen:** Kern teilt die Dreiecke entlang der Richtung, in der ihre Mittelpunkte am weitesten
-streuen, genau **am Median**. Höchstens 8 Dreiecke sind ein Blatt. Der Baum ist höchstens 32 tief,
-also reicht ein fester Stapel mit 64 Plätzen; alles liegt in flachen Listen.
+> **So kannst du es dir vorstellen:** Im Wörterbuch schlägst du die Mitte auf, siehst, in welche
+> Hälfte dein Wort gehört, und halbierst weiter. Bei 10 000 Dreiecken bleiben nach 11 Halbierungen
+> höchstens 5 pro Kiste übrig (10 000 → 5000 → 2500 → … → 10 → 5). Statt 10 000 Tests braucht ein
+> Strahl dann nur ein paar Dutzend.
 
-**Suchen:** Strahl gegen Kiste (der „Slab-Test“, auch an Kanten zuverlässig), im Blatt gegen die
-Dreiecke. **Die nähere Kiste kommt zuerst** dran; ein früher, naher Treffer streicht alle ferneren.
+**Bauen:** Kern schaut, in welcher Richtung die Dreiecke am weitesten verteilt sind, und teilt sie
+dort genau in der Mitte, sodass links und rechts gleich viele liegen (diese Mitte heißt
+**Median**). Das wiederholt Kern, bis höchstens 8 Dreiecke in einer Kiste sind.
 
-Eine BVH bekommt nur **feste Weltgeometrie** (keine Linien, eine unverschobene Instanz, nicht
-animiert, ab 36 Dreiecken). Bewegt man das Mesh oder bekommt es mehr Instanzen, fliegt sie raus; steht es wieder unverschoben
-da, wird sie neu gebaut.
+**Suchen:** Der Strahl prüft zuerst Kisten, dann erst die Dreiecke in den kleinsten Kisten. **Die
+nähere Kiste kommt zuerst dran.** Findet der Strahl dort schon einen Treffer, kann er alle Kisten
+überspringen, die weiter weg liegen.
+
+Eine BVH lohnt sich nur für **feste Weltgeometrie**: ein großes Mesh, das genau einmal und
+unverschoben dasteht und nicht animiert ist. Verschiebt man es, wirft Kern die BVH weg; steht es
+wieder unverschoben da, baut Kern sie neu. Alles andere prüft Kern Dreieck für Dreieck. Die genauen
+Bedingungen stehen im blauen Buch, Kapitel 5.
 
 ## 5.4 Picking: Was liegt unter der Maus?
 
-Kern schickt den Pixel rückwärts durch die Kamera auf die nahe und die ferne Ebene; die Verbindung
-ist der **Strahl**. Perspektivisch startet er im Auge, orthografisch auf der nahen Ebene (alle
-Strahlen parallel).
+**Picking** heißt: herausfinden, was du gerade angeklickt hast. Dafür schickt Kern vom Mauszeiger
+aus einen **Strahl** in die Welt. Das erste Dreieck, das er trifft, ist angeklickt.
 
-Für jedes Mesh, das in Frage kommt:
+```
+  Auge ─────► Pixel unter der Maus ─────────► Haus
+            (auf dem Bildschirm)      Strahl: erster Treffer
+```
 
-1. **Grobtest** gegen die Weltkugel (nicht bei animierten Figuren).
-2. **Feintest** mit BVH oder Dreieck für Dreieck. Animierte Figuren nimmt Kern in ihrer **aktuellen
-   Pose** – was du siehst, kannst du anklicken.
-3. **Dreieckstest** nach Möller und Trumbore; Rückseiten nur bei zweiseitigen Materialien.
+Der Strahl beginnt im Auge der Kamera und geht durch den Pixel unter der Maus, also genau durch
+die Pyramide aus 5.2, von ihrer nahen bis zu ihrer fernen Wand. Für jedes Mesh, das in Frage kommt,
+macht Kern zwei Tests:
 
-Der Treffer nennt Mesh, Instanz, Dreieck, Abstand, Punkt und Normale, bis 1800 m weit. Im Beispiel
-`hello` färbt ein Klick so eine Kiste rot.
+1. **Grobtest:** Trifft der Strahl die Kugel um das Mesh? Wenn nein, ist das Mesh erledigt.
+2. **Feintest:** mit der BVH oder Dreieck für Dreieck. Animierte Figuren prüft Kern in ihrer
+   **aktuellen Haltung**: Was du siehst, kannst du auch anklicken.
 
-**Kern Studio** übersetzt das Mesh in seinen Actor, lässt den Strahl durch Boden und gesperrte
-Actors weiterfliegen und wählt Lichter und leere Actors über ihr Symbol.
+Der Treffer verrät das Mesh, die Instanz, das Dreieck, den Abstand, den genauen Punkt und die
+Normale. Im Beispielprogramm „hello“ färbt ein Klick so eine Kiste rot.
+
+**Kern Studio** fragt danach noch: Zu welchem Actor gehört dieses Mesh? Den Boden und gesperrte
+Actors lässt es den Strahl einfach durchfliegen. Lichter und leere Actors haben kein Mesh, sie
+wählst du über ihr Symbol im Bild.
 
 > **Mission:** Öffne auf https://kernengine.de/ File › Example Levels › **Orb Run** und klick ein
-> Hochhaus an. Ausgewählt wird der Actor **City** – die ganze Stadt gehört zu ihm.
+> Hochhaus an. Ausgewählt wird der Actor **City**. Was ist passiert? Der Strahl hat ein Dreieck
+> des Hochhauses getroffen, aber das Hochhaus ist kein eigener Actor: Es gehört zur Stadt, also
+> wählt Studio die ganze Stadt aus.
+
+> **Für Profis:** Der Dreieckstest heißt nach seinen Erfindern Möller-Trumbore. Rückseiten von
+> Dreiecken zählen nur bei Materialien, die beidseitig gemalt werden.
 
 ## 5.5 Earcut: Vielecke in Dreiecke schneiden
 
-Grundrisse sind oft nicht konvex (L-Form) und haben Löcher (Innenhöfe). Kern zerlegt sie mit einer
-C++-Fassung von **Earcut** v3.0.2 von Mapbox (ISC-Lizenz). Sie soll wie die JavaScript-Vorlage
-rechnen; der Vergleichstest liegt im SpawnCity-Projekt, Kern selbst prüft Flächen und Dreieckszahlen.
+Die Grafikkarte kann nur Dreiecke malen. Ein Hausdach aus Kartendaten ist aber ein **Vieleck**,
+oft mit Knick (L-Form) und manchmal mit Loch (Innenhof). Ein Vieleck mit Knick nach innen heißt
+**nicht konvex**: Du kannst zwei Punkte darin finden, deren Verbindungslinie hinausläuft. Kern
+zerlegt solche Vielecke mit **Earcut**, einem bewährten freien Verfahren.
 
-**Ohren abschneiden:** Ein Vieleck mit n Ecken hat immer mindestens zwei „Ohren“ – Ecken, deren
-Dreieck mit den Nachbarn ganz im Vieleck liegt. Abschneiden, wiederholen: Es entstehen **n − 2
-Dreiecke**. Ein Viereck gibt 2, eine L-Form mit 6 Ecken gibt 4. Ein Ohr muss nach außen zeigen, und
-keine andere Ecke darf im Dreieck liegen. Prüfen muss Earcut nur nahe Ecken, die nach innen zeigen.
+**Ohren abschneiden:** Ein Vieleck mit n Ecken hat immer mindestens zwei **Ohren**. Ein Ohr ist eine
+Ecke, deren Dreieck mit den beiden Nachbarecken ganz im Vieleck liegt. Schneidest du es ab, bleibt
+ein Vieleck mit einer Ecke weniger. Das wiederholst du, bis nur noch ein Dreieck übrig ist. Es
+entstehen immer **n − 2 Dreiecke**.
 
-**Wenn es klemmt** (Kartendaten sind selten sauber): doppelte Ecken entfernen, Überschneidungen
-reparieren, zuletzt mit einer Diagonale teilen.
+```
+  A─────────B
+  │ ╲       │       L-Form mit 6 Ecken:
+  │    ╲  1 │       Ohr B ab  → Dreieck 1
+  │      ╲  │       Ohr E ab  → Dreieck 2
+  │  4      C─────────D
+  │      ╱   3   ╱    │       Ohr D ab  → Dreieck 3
+  │    ╱    ╱    2    │       Rest A C F → Dreieck 4
+  │ ╱  ╱              │
+  F───────────────────E       6 − 2 = 4 Dreiecke
+```
 
-**Löcher** werden vorher mit einer „Brücke“ an den Außenring angeschlossen (Verfahren von Eberly):
-vom Lochpunkt ganz links zu einer sichtbaren Ecke außen, hin und zurück geschnitten. Dann ist alles
-ein Ring.
+Ein Ohr muss nach außen zeigen, und keine andere Ecke darf in seinem Dreieck liegen. Bei C zum
+Beispiel zeigt die Ecke nach innen, C ist darum am Anfang kein Ohr.
 
-**Ab 80 Ecken** bekommt jede Ecke eine **z-Order-Nummer**: Die Bits von x und y werden wie die Zähne
-eines Reißverschlusses verschränkt. Nahe Punkte haben ähnliche Nummern, also prüft Earcut nur Ecken
+**Wenn es klemmt:** Kartendaten sind selten sauber. Findet Earcut kein Ohr mehr, räumt es auf
+(doppelte Ecken weg), repariert kleine Überkreuzungen und teilt das Vieleck zuletzt mit einer
+Linie in zwei Hälften, die es einzeln zerlegt.
+
+**Löcher:** Earcut kann nur einen einzigen Ring zerschneiden. Darum schneidet es vorher eine schmale
+**Brücke** vom Loch zum Außenrand, hin und zurück. Jetzt ist der Innenhof ein Teil des Randes, und
+alles ist wieder ein Ring.
+
+**Große Vielecke:** Bei vielen Ecken wäre es zu langsam, für jedes Ohr alle Ecken zu prüfen. Earcut
+gibt dann jeder Ecke eine Nummer, bei der nahe Punkte ähnliche Nummern bekommen, und prüft nur Ecken
 mit passender Nummer.
 
-Danach vergleicht der Häuserbauer die Dreiecksflächen mit dem Grundriss. **Über 0,7 % Abweichung**
-wird das Haus übersprungen statt mit kaputtem Dach gebaut.
+**Kontrolle:** Danach vergleicht der Häuserbauer die Fläche aller Dreiecke mit der Fläche des
+Grundrisses. Weichen sie deutlich ab, wird das Haus übersprungen. Lieber ein Haus weniger als eins
+mit kaputtem Dach.
+
+> **Für Profis:** Kern nutzt eine C++-Fassung von Earcut von Mapbox. Die Brücke findet es nach einem
+> Verfahren von David Eberly, und die Nummern für nahe Punkte heißen z-Order. Version, Lizenz und
+> Grenzwerte stehen im blauen Buch, Kapitel 5.
 
 ## 5.6 Primitive: der Baukasten
 
-Fertige Bauer, Z oben: **Quader** (24 Ecken; auch „am Boden“), **Kugel**, **Kapsel**, **Torus**,
-**Zylinder**, **Kegel** (beide auf z = 0) und **Ebene**. `append` hängt ein Mesh mit einer Matrix an
-ein anderes (ohne Zusatzstrom). So ist das Auto in Orb Run aus drei Quadern, und alle Bodenplatten
-der Stadt sind **ein** Mesh.
+**Primitive** sind fertige Grundformen, die Kern auf Knopfdruck baut, alle mit Z nach oben:
+**Quader**, **Kugel**, **Kapsel**, **Torus** (ein Ring wie ein Donut), **Zylinder**, **Kegel** und
+**Ebene**. Zylinder und Kegel stehen auf dem Boden, die anderen sitzen um ihren Mittelpunkt.
+
+Formen lassen sich **aneinanderhängen**, verschoben und gedreht, sodass ein einziges Mesh
+herauskommt. Ein Mesh ist für die Grafikkarte schneller als viele kleine. So ist das Auto in Orb
+Run aus drei Quadern gebaut, und alle Bodenplatten der Stadt sind **ein** Mesh.
+
+Ein Würfel aus dem Baukasten hat übrigens 24 Ecken, nicht 8. Warum, steht gleich in 5.7.
 
 ## 5.7 Welding: doppelte Ecken verschmelzen
 
-In einer Triangle Soup stehen Ecken mehrfach im Speicher. Ein **indiziertes** Mesh speichert jede
-einmal – das spart Speicher und Ladezeit. Kern verschmilzt nur **bitgleiche** Ecken. Darum
-geht nichts verloren, und scharfe Kanten bleiben scharf.
+**Welding** (Verschweißen) macht aus einer Triangle Soup ein Mesh mit Indizes: Jede Ecke, die
+mehrfach vorkommt, wird nur einmal gespeichert, und die Dreiecke zeigen mit Nummern auf sie. Das
+spart Speicher und Ladezeit.
 
-> **So kannst du es dir vorstellen:** Ein Würfel als Soup hat 12 · 3 = 36 Ecken. Jede Würfelecke
-> berührt drei Seiten mit drei Normalen. Nach dem Welding bleiben 24 – genau wie beim Quader-Bauer.
+Kern verschmilzt dabei nur Ecken, die **ganz genau gleich** sind: gleiche Lage, gleiche Normale,
+gleiche Farbe, gleiche UV, bis zur letzten Stelle. Darum geht nichts verloren, und scharfe Kanten
+bleiben scharf.
 
-Gesucht wird mit einer **Hashtabelle** (aus den Bits wird eine Fachnummer). Indiziert wird **nur,
-wenn es sich lohnt**; Voraussetzung sind keine Indizes und höchstens 4 Zusatzwerte.
+> **So kannst du es dir vorstellen:** Schau dir eine Würfelecke an. Dort treffen drei Seiten
+> zusammen: oben, vorn und rechts. Jede Seite hat ihre eigene Normale, also ihren eigenen Pfeil.
+>
+> ```
+>        ↑ Normale der Oberseite
+>        │
+>        ●───→ Normale der rechten Seite
+>       ╱
+>      ↙ Normale der Vorderseite
+> ```
+>
+> Gleiche Lage, aber drei verschiedene Pfeile: Das sind für den Computer drei verschiedene Ecken.
+> Die Soup hat 36 Ecken. Welding legt alle zusammen, die wirklich gleich sind, und es bleiben
+> 8 · 3 = 24. Würde Kern alle drei Pfeile zu einem mitteln, sähe der Würfel weich und rund aus.
+
+Um gleiche Ecken schnell zu finden, nutzt Kern eine **Hashtabelle**: Aus den Zahlen jeder Ecke
+wird eine Fachnummer berechnet, wie die Fachnummer in einem Schrank mit vielen Schubladen. Gleiche
+Ecken landen im selben Fach, also muss Kern nur dort nachsehen. Und Kern indiziert **nur, wenn es
+sich lohnt**: Spart es keinen Platz, bleibt die Soup, wie sie ist.
 
 > **Krass, aber wahr:** Mit 1300 Gebäuden aus Konstanz brauchen Bauen und Welding in Kern etwa
-> 45 ms. Die frühere JavaScript-Lösung brauchte etwa 1260 ms – fast 28-mal so lange.
+> 45 ms. Die frühere JavaScript-Lösung brauchte etwa 1260 ms, fast 28-mal so lange.
 
-Ein **Inhalts-Hash** verrät, ob ein neu gebautes Stück sich vom alten unterscheidet.
+Nach demselben Prinzip berechnet Kern für ein ganzes Stück Stadt eine **Prüfnummer**. Ist sie nach
+einem Neubau gleich, hat sich nichts geändert, und das alte Stück kann bleiben.
 
 ## 5.8 Häuser aus Grundrissen
 
-Der Häuserbauer zieht Grundrisse als Zahlenliste in die Höhe und sortiert die Häuser in
-quadratische **Chunks**. In C++:
+Der **Häuserbauer** macht aus Grundrissen fertige Häuser: Er zieht den Grundriss in die Höhe, setzt
+ein Dach darauf und baut an jede Kante eine Wand. Ein Grundriss ist dabei nur eine Liste von
+Punkten: der Außenrand und, wenn es einen gibt, der Rand des Innenhofs. Dazu kommen eine
+Zufallszahl (der **Seed**, siehe 5.11) für Farben und Fassade, die Höhe des Fußes und die Höhe der
+Dachkante.
 
-```cpp
-FootprintStream footprints;
-footprints.begin(seed, 0, height);  // Seed, Fuß, Traufe
-footprints.ring(outer, 4);          // äußerer Ring
-footprints.ring(court, 4);          // Loch (Innenhof)
+```mermaid
+flowchart LR
+  A["Grundriss: Punkte"] --> B["Aufräumen"]
+  B --> C["Dach: Earcut"]
+  C --> D["Wände an jeder Kante"]
+  D --> E["Gesims oben"]
+  E --> F["fertiges Haus"]
 ```
 
-Zeile 2 beginnt ein Haus (der Seed wählt Farben und Fassade), Zeile 3 gibt den Außenring, Zeile 4
-einen Innenhof. Pro Haus:
+Pro Haus passiert Folgendes:
 
-1. **Aufräumen:** Punkte unter 1,5 cm Abstand fliegen raus; unter 3 Punkten oder 0,08 m² ist der
-   Ring leer.
-2. **Drehsinn:** außen gegen, Löcher mit dem Uhrzeigersinn.
-3. **Aussortieren** bei leerem Ring, Wand bis 0,1 m oder Earcut-Fehler über 0,7 %.
-4. **Farben** aus dem Seed; ein Stockwerk ist 3,1 bis 3,6 m hoch.
-5. **Dach** aus Earcut-Dreiecken, nach oben zeigend; Innenhöfe bleiben offen.
-6. **Wände** für jede Kante; UVs in Metern entlang und nach oben.
-7. **Gesims** (bei Kanten über 1,2 m und Wänden über 3,5 m): 0,55 m hoch, 0,24 m vorstehend.
+1. **Aufräumen:** Punkte, die fast aufeinanderliegen, fliegen raus. Ist der Rand danach winzig,
+   wird das Haus übersprungen.
+2. **Umlaufrichtung festlegen:** Der Außenrand läuft gegen den Uhrzeigersinn, Innenhöfe mit dem
+   Uhrzeigersinn. So weiß Kern bei jeder Wand, wo außen ist, und die Normale zeigt nach draußen.
+3. **Dach:** Earcut zerlegt den Grundriss in Dreiecke, alle mit der Normale nach oben. Innenhöfe
+   bleiben offen.
+4. **Wände:** Jede Kante bekommt eine Wand aus zwei Dreiecken, vom Fuß bis zur Dachkante. Ihre UVs
+   sind in Metern: entlang der Wand und nach oben.
+5. **Gesims:** Bei großen Häusern läuft oben ein vorstehendes Band um das Dach, wie ein Rahmen.
+6. **Farben:** Der Seed wählt Wand- und Dachfarbe und die Stockwerkshöhe.
 
-Vier Zusatzwerte pro Ecke (Wandlänge mit −1 für Dach und −2 für Gesims, Wandhöhe, Seed-Zahl,
-Stockwerkshöhe) nutzt `NightWindows` ([Kapitel 4](04-grafik.md)) für leuchtende Fenster.
+Jede Ecke bekommt außerdem einen kleinen **Wand-Steckbrief**: Wie lang ist diese Wand, wie hoch,
+wie hoch ist ein Stockwerk? Daraus malt eine Shader-Erweiterung nachts leuchtende Fenster, ohne
+dass ein einziges Fenster gebaut wird ([Kapitel 4](04-grafik.md), 4.13).
 
-```cpp
-BuildingBuilder b;
-b.begin(stream, length, options);
-while (!b.step(4.0)) { /* nächster Frame */ }
-```
+**In Häppchen bauen:** Der Häuserbauer sortiert die Häuser in quadratische Kartenstücke, die
+**Chunks**. Jeder Chunk wird ein eigenes Mesh. Große Chunks bedeuten weniger Malbefehle an die
+Grafikkarte, kleine Chunks lassen sich besser aussortieren (5.2). Und der Bauer arbeitet mit einem
+**Zeitbudget**: In jedem Bild baut er nur so viele Häuser, wie in ein paar Millisekunden passen,
+dann ist das nächste Bild dran. So entsteht auch eine riesige Stadt, ohne dass das Spiel ruckelt.
+Auch eine Webseite kann den Häuserbauer so in Häppchen benutzen.
 
-`step(4.0)` baut, was in etwa 4 ms passt, und meldet `true`, wenn alles fertig ist – eine riesige
-Stadt verteilt sich so ruckelfrei auf viele Frames. Große Chunks sparen Zeichenaufrufe, kleine
-verbessern das Culling; Standard: 320 m, höchstens 2600 Häuser.
+Die genauen Namen, Maße und Befehle stehen im blauen Buch, Kapitel 5.
 
 ## 5.9 Straßen
 
-Der Straßenbauer legt Bordstein, Fahrbahn und gestrichelte Mittellinie aufs Gelände, alle 6 m
-geteilt, damit sie Hügeln folgen. Höhen: 9 cm, 11,2 cm und 13,5 cm. Lägen sie gleich hoch, flackerte
-es (**Z-Fighting**). Striche: 3 m lang, alle 7 m. Ein Radius schneidet einen Kartenausschnitt aus.
+Der **Straßenbauer** macht aus einer Linie auf der Karte ein Straßenband mit Bordstein, Fahrbahn
+und gestrichelter Mittellinie. Damit die Straße einem Hügel folgt statt in der Luft zu hängen, teilt
+er sie in kurze Stücke von wenigen Metern. Jedes Stück bekommt an seinen Ecken die Höhe des
+Geländes.
 
-Die Höhe liefert ein **HeightSampler** („Höhe bei x, y?“), ohne ihn ist der Boden flach. Im
-Quelltext heißt er „physics truth“: dieselbe Höhe wie in der Physik, damit Autos genau auf der
-sichtbaren Straße fahren. Keine endliche Zahl heißt Abbruch. In JavaScript: `kern.heightSampler`.
+Bordstein, Fahrbahn und Mittellinie liegen jeweils **ein paar Zentimeter höher** als die Schicht
+darunter. Lägen sie genau gleich hoch, könnte die Grafikkarte nicht entscheiden, welche Fläche vorn
+ist, und würde bei jedem Bild anders entscheiden. Das Bild flackert dann, das heißt
+**Z-Fighting**.
+
+Die Höhe liefert eine **Höhenabfrage**: „Wie hoch ist der Boden bei x, y?“ Gibt es keine, ist der
+Boden flach. Wichtig ist, dass die Grafik **dieselbe** Höhe benutzt wie die Physik. Sonst führen
+die Autos ein Stück über oder unter der Straße, die du siehst. Liefert die Abfrage Unsinn, bricht
+der Bauer lieber ab, als eine kaputte Straße zu bauen.
+
+Wie beim Häuserbauer gibt es Chunks und ein Zeitbudget. Mit einem Kreis um einen Mittelpunkt kann
+man nur einen Ausschnitt einer großen Karte bauen.
 
 ## 5.10 Gelände-Kacheln
 
-Eine Gelände-Kachel ist ein Gitter aus 1 bis 128 mal so vielen Quadraten, jedes entlang der
-Diagonale Südwest–Nordost geteilt. Die Normalen kommen aus den Nachbarhöhen: links 4 m, rechts 6 m
-bei 1 m Abstand sind 2 m auf 2 m, also 100 % Steigung. Eine Extra-Reihe rundherum sorgt für
-nahtlose Nachbarkacheln; auf Wunsch meldet die Kachel ihre kleinste und größte Höhe.
+Der Boden einer großen Karte besteht aus **Kacheln**. Eine Kachel ist ein Gitter aus Quadraten,
+jede Gitterecke hat ihre eigene Höhe, und jedes Quadrat wird an der Diagonale in zwei Dreiecke
+geteilt. Liegen die Ecken verschieden hoch, werden die Dreiecke schräg, und es entstehen Hügel.
 
-Der **GeoProjector** rechnet Längen- und Breitengrade (WGS84) in Meter um, mit Erdradius
-6 378 137 m. So landen Kartendaten direkt in Kern-Koordinaten.
+```
+  Höhen der Gitterecken        seitlich gesehen
 
-## 5.11 Geometrie aus JavaScript
+   2   3   5                      ╱╲
+   1   2   4                  ___╱  ╲___
+   1   1   2
+```
 
-`renderer.beginBuildings(...)` startet einen Häuserauftrag, der zum Beispiel 4 ms pro Frame baut; `commit` weldet jeden
-Chunk, lädt ihn hoch, meldet die Bytes und gibt den Speicher frei. Einen unbekannten Strom-Namen in
-`extraKey` lehnt es mit Fehler ab. `upsertTerrainTile` baut eine Gelände-Kachel in einem Rutsch. Der
-Schalter `weld` weldet ein Mesh vor dem Hochladen – wenn es eine reine Soup mit Normalen ist.
+Für das Licht braucht jede Ecke eine **Normale**, denn ein Hang zur Sonne ist hell, ein Hang weg
+von ihr dunkel. Kern schaut dafür auf die Nachbarn: Liegt links eine Ecke auf 4 m und rechts eine
+auf 6 m, jeweils 1 m entfernt, steigt der Boden auf 2 m Strecke um 2 m. Das ist 100 % Steigung, und
+die Normale kippt entsprechend zur Seite. Für die Ecken am Rand schaut Kern dafür auch eine Reihe
+in die Nachbarkachel. So passen zwei Kacheln ohne sichtbare Naht aneinander.
 
-## 5.12 Die prozedurale Stadt
+Kartendaten sind in Längen- und Breitengraden angegeben, Kern rechnet in Metern. Ein **Umrechner**
+macht aus Grad Meter östlich und nördlich eines Mittelpunkts. So landen echte Grundrisse direkt
+in der Spielwelt.
 
-Die Komponente **Procedural City** (Place Actors, Gruppe **World**) ist der Stadtgenerator von Orb
-Run. Sie erzeugt Häuser, Straßen, Bodenplatten, Bäume, Kollisionskörper und Verkehr.
+## 5.11 Die prozedurale Stadt
+
+**Prozedural** heißt: nicht von Hand gebaut, sondern nach Regeln berechnet. Die Komponente
+**Procedural City** (in Place Actors, Gruppe **World**) ist der Stadtgenerator von Orb Run. Aus ein
+paar Zahlen erzeugt sie Häuser, Straßen, Bodenplatten, Bäume, Kollisionskörper und Verkehr.
 
 ![Ein exportiertes Spiel: die prozedurale Stadt mit Gebäuden, Straßen und Bäumen](../buch/bilder/game.png)
 
-Felder in Details (Standard): **Seed** (20261022), **Blocks per side** (7; 1–16), **Block pitch**
-(80 m; ab 30), **Street width** (16 m; ab 6, höchstens halber Pitch), **Tallest building** (84 m),
-**Trees**, **Traffic cars** (22), **Lit windows at night**. Ungültiges wird abgelehnt.
+In Details stellst du unter anderem ein: den **Seed**, wie viele Blöcke pro Seite, wie weit die
+Blöcke auseinanderliegen, wie breit die Straßen sind, wie hoch das höchste Haus wird, ob es Bäume
+gibt, wie viele Autos fahren und ob nachts Fenster leuchten. Unsinnige Werte lehnt Kern ab.
 
-**Gleicher Seed, gleiche Stadt.** Der Zufallsgenerator (ein „xorshift32“) liefert laut Quelltext
-dieselbe Folge wie in Orb Run.
+**Gleicher Seed, gleiche Stadt.** Der Computer würfelt nicht wirklich. Er rechnet aus einer
+Startzahl, dem **Seed**, eine lange Folge von Zahlen, die zufällig aussieht, aber immer gleich ist.
+
+> **So kannst du es dir vorstellen:** Ein Kartenstapel, der immer auf genau dieselbe Weise gemischt
+> wird. Wer denselben Stapel bekommt, zieht dieselben Karten in derselben Reihenfolge. Ein anderer
+> Seed ist ein anders gemischter Stapel.
 
 ```mermaid
 flowchart LR
@@ -221,72 +366,99 @@ flowchart LR
   E --> F["Bäume"]
 ```
 
-1. **Blockraster:** 7 × 7 Blöcke im Abstand von 80 m. Jeder bekommt eine 18 cm hohe Bodenplatte und
-   einen Kollisionsquader.
-2. **Höhen:** Jeder Block hat eine „Zentrumsnähe“ von 0 bis 1, die **quadriert** wird. Die
-   Höchsthöhe reicht von 14 m bis 84 m; bei Nähe 0,5 sind es 14 + 0,25 · 70 = 31,5 m. So wächst ein
-   Hochhausberg in der Mitte.
-3. **Bebauung**, eine von vier Arten: ein blockgroßes Haus (in 60 % der Fälle mit 14 m tiefem
-   Innenhof), vier Einzelhäuser mit 5 m Gassen, ein L-Haus plus ein kleines, oder drei Riegel.
-4. **Straßen** an jeder Blockkante, 60 m über die Stadt hinaus, mit Bordstein und Mittellinie.
-5. **Bauen** in 200-m-Chunks mit sechs Wand- und drei Dachfarben; alles wird geweldet.
-6. **Bäume** alle 11 m an den Blockrändern, mit 35 % Lücken. Stämme sind Zylinder, Kronen Kegel –
-   je **ein** instanziertes Mesh.
+1. **Blockraster:** Die Stadt ist ein Schachbrett aus Blöcken, dazwischen Straßen. Jeder Block
+   bekommt eine flache Bodenplatte.
+2. **Höhen:** Jeder Block hat eine **Zentrumsnähe** von 0 (Rand) bis 1 (Mitte). Kern nimmt sie
+   **mal sich selbst** (quadriert sie). Die Höchsthöhe reicht dann von 14 m bis zum Wert in Details,
+   im Beispiel 84 m: bei Nähe 0,5 sind das 14 + 0,5 · 0,5 · 70 = 31,5 m.
+3. **Bebauung:** Jeder Block bekommt eine von vier Arten: ein großes Haus (oft mit Innenhof), vier
+   Einzelhäuser mit Gassen, ein L-Haus plus ein kleines oder drei lange Riegel.
+4. **Straßen** an jeder Blockkante, ein Stück über die Stadt hinaus, mit Bordstein und Mittellinie.
+5. **Bauen:** Häuser- und Straßenbauer aus 5.8 und 5.9 bauen alles in Chunks, danach wird alles
+   geweldet (5.7).
+6. **Bäume** an den Blockrändern, mit Lücken. Stämme sind Zylinder, Kronen Kegel, beide je **ein**
+   Mesh mit vielen Instanzen.
 
-Jeder Chunk ist ein Mesh mit der Matrix des City-Actors als Instanz; Verschieben ändert nur die
-Matrix, neu gebaut wird nur bei echten Parameteränderungen. Die Fensterwerte bekommen die Häuser nur,
-wenn **Lit windows at night** an ist. Straßen werfen keinen Schatten. Liegt die
-Stadt unverschoben im Ursprung, bekommt jeder Chunk eine BVH.
+Warum quadrieren? Schau dir einen Schnitt durch die Stadt an:
 
-Für die Physik ist die Stadt **ein** fester Box3D-Körper mit einem Quader pro Gebäudeflügel und
-Platte (Reibung 0,5, [Kapitel 6](06-physik.md)). Die Autos (9 bis 15 m/s, fünf Farben, ein
-instanziertes Mesh) parken im Editor. In Play und Simulate fahren sie als kinematische Körper,
-springen am Stadtrand auf die andere Seite und **halten an**, wenn der Spieler weniger als 10 m vor
-ihnen steht. Zufällige Straßenpunkte verteilen die Orbs von Orb Run.
+```
+  Höhe
+  84 m |               ▇
+       |             ▇ ▇ ▇
+       |           ▇ ▇ ▇ ▇ ▇
+  14 m | ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇
+       +-------------------------------- 
+        Rand          Mitte          Rand
+```
+
+Kleine Zahlen werden beim Quadrieren noch kleiner: 0,5 · 0,5 = 0,25, aber 0,9 · 0,9 = 0,81. Darum
+bleiben die meisten Blöcke niedrig, und nur ganz in der Mitte wächst ein steiler **Hochhausberg**.
+
+Alle Chunks hängen an der Matrix des City-Actors. Verschiebst du die Stadt, ändert sich nur diese
+Matrix, gebaut wird nichts neu. Neu gebaut wird nur, wenn du eine Einstellung änderst. Steht die
+Stadt unverschoben da, bekommt jeder Chunk eine BVH (5.3), und Picking in der Stadt geht schnell.
+
+Für die Physik ist die ganze Stadt **ein** fester Körper aus vielen Quadern, einem pro Hausflügel
+und Bodenplatte ([Kapitel 6](06-physik.md)). Die Autos stehen im Editor still. In Play und Simulate
+fahren sie ihre Spur entlang, springen am Stadtrand auf die andere Seite und **halten an**, wenn du
+weniger als 10 m vor ihnen stehst. Auch die Orbs von Orb Run verteilt Kern auf zufällige
+Straßenpunkte.
 
 > **Mission:** Wähle in Orb Run **City**, ändere in Details den **Seed** und **Tallest building**.
-> Gib dann wieder 20261022 und 84 ein: Die alte Stadt ist exakt zurück.
-
-## 5.13 Formen im Level und eingebaute Meshes
-
-Ein Static Mesh hat eine Form: Box, Sphere, Cylinder, Cone, Capsule, Plane, Torus, Ramp oder Mesh,
-um den Actor-Ursprung, weiß (die Farbe macht das Material). Quader, Ebene und Rampe haben UVs in
-Metern mal „Texture tiling“. Die Rampe ist ein Keil, an +X hoch. Für die Physik gibt es Ausmaße,
-Hüllenpunkte und die Wahl eines passenden Colliders ([Kapitel 6](06-physik.md)).
-
-Die Form **Mesh** nimmt ein eingebautes Netz: die Bauteile der **Micro Duck** von Pollen Robotics
-(etwa `duck/neck`). Sie stehen unter CC BY-NC-SA 4.0, sind **nicht kommerziell** nutzbar, hier nicht
-abgebildet und fehlen im kommerziellen Build. Gespeichert sind sie sparsam (8 und 16 Bit pro
-Wert, dazu Hüllenpunkte), ausgepackt beim ersten Zugriff. Auf dem
-PC schützt ein Mutex diesen Speicher, weil der Lehrer auf mehreren Threads baut
-([Kapitel 14](14-lehrer.md)). Gespiegelte Streckung dreht die Dreiecke um. Ein **unbekannter Name**
-ergibt einen 10-cm-Würfel, damit der Fehler auffällt. Mehr in [Kapitel 13](13-micro-duck.md).
+> Gib dann wieder 20261022 und 84 ein: Die alte Stadt ist exakt zurück. Gleicher Seed, gleiche
+> Stadt.
 
 > **Mission:** Exportiere Orb Run mit File › **Package Game (HTML)...** und starte es mit
-> **Play it** – wie im Bild in 5.12.
+> **Play it**. Jetzt fährst du selbst durch die Stadt aus dem Bild oben.
+
+## 5.12 Formen im Level und eingebaute Meshes
+
+Jedes **Static Mesh** im Level hat eine Grundform: Box, Sphere, Cylinder, Cone, Capsule, Plane,
+Torus, Ramp oder Mesh. Kern baut sie aus dem Baukasten in 5.6, weiß und um den Ursprung des Actors.
+Die Farbe kommt erst vom Material. Damit eine Textur auf großen und kleinen Flächen gleich groß
+aussieht, laufen die UVs in Metern. Die Rampe ist ein Keil, der an einer Seite hoch und an der
+anderen flach ist. Welcher Kollisionskörper zur Form passt, erklärt [Kapitel 6](06-physik.md).
+
+Die Form **Mesh** nimmt ein Netz, das fest in Kern eingebaut ist: die Bauteile der **Micro Duck**
+von Pollen Robotics, zum Beispiel ihr Hals oder ein Bein. Sie dürfen nur **nicht kommerziell**
+genutzt werden, sind darum in diesem Buch nicht abgebildet und fehlen in der Fassung für den
+Verkauf. Damit Kern klein bleibt, sind sie eng gepackt gespeichert und werden erst beim ersten
+Gebrauch ausgepackt.
+
+Gibst du einen **unbekannten Namen** ein, erscheint ein kleiner 10-cm-Würfel. Das ist Absicht: So
+fällt der Fehler sofort auf, statt dass einfach nichts da ist. Wie die Ente aus ihren Teilen
+zusammengesetzt wird, zeigt [Kapitel 13](13-micro-duck.md). Die genauen Namen stehen im blauen
+Buch, Kapitel 5.
 
 ## Level geschafft!
 
+- Du weißt, woraus ein Mesh besteht: Ecken, Normalen, UVs und Indizes.
 - Du weißt, warum Kern Kugeln gegen sechs Wände testet.
 - Du kannst erklären, wie „Kisten in Kisten“ das Picking schnell machen.
 - Du weißt, wie Earcut aus n Ecken n − 2 Dreiecke schneidet.
-- Du kennst die Schritte vom Grundriss zum Haus und von der Linie zur Straße.
-- Du kannst mit einem Seed deine eigene Stadt erzeugen.
+- Du kennst die Schritte vom Grundriss zum Haus und weißt, warum Straßenschichten verschieden hoch
+  liegen.
+- Du kannst mit einem Seed deine eigene Stadt erzeugen und wiederfinden.
 
 ## Rätsel-Ecke
 
 1. Wie viele Dreiecke macht Earcut aus einem Grundriss mit 10 Ecken?
 2. Eine Kugel mit 3 m Radius liegt mit dem Mittelpunkt 2 m hinter einer Frustum-Wand. Wird sie
    weggelassen?
-3. **Boss-Rätsel:** Du verschiebst die Stadt um 100 m. Was wird neu gebaut, und was passiert mit
+3. Eine flache, quadratische Bodenplatte als Soup hat 2 Dreiecke. Wie viele Ecken hat sie vor und
+   nach dem Welding?
+4. **Boss-Rätsel:** Du verschiebst die Stadt um 100 m. Was wird neu gebaut, und was passiert mit
    den BVHs?
 
 ### Lösungen
 
 1. **8**, denn 10 − 2 = 8.
-2. **Nein**, sie ragt noch 1 m herein.
-3. Nichts wird neu gebaut, nur die Instanzmatrix ändert sich. Weil sie nicht mehr die Einheitsmatrix
-   ist, wirft Kern die BVHs weg; Picking geht dann Dreieck für Dreieck.
+2. **Nein**, denn 2 m < 3 m: Sie ragt noch 1 m herein.
+3. Vorher 2 · 3 = **6**, nachher **4**. Alle Ecken haben dieselbe Normale (nach oben), also sind
+   die zwei Ecken auf der Diagonale doppelt und werden verschmolzen.
+4. Nichts wird neu gebaut, nur die Matrix der Stadt ändert sich. Weil die Chunks jetzt verschoben
+   sind, wirft Kern die BVHs weg; Picking geht dann Dreieck für Dreieck. Stellst du die Stadt
+   zurück, baut Kern die BVHs wieder.
 
 ---
 
