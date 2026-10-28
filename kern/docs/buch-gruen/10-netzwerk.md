@@ -85,8 +85,9 @@ Darüber liegt die **Connection** mit zwei Kanalarten:
 Im zuverlässigen Kanal schickt Kern eine Nachricht erneut, bis das Paket, das sie trug, quittiert ist
 (frühestens nach 0,1 s bzw. dem 1,25-Fachen der Umlaufzeit). Große Nachrichten reisen als **Blöcke**,
 Stück für Stück. Fehler (volle Warteschlange, zu große Nachricht, kaputtes Paket) meldet die
-Connection; Grenzwerte stehen im blauen Buch. Positionen und Eingaben gehen unzuverlässig: Die Position von vor einer halben Sekunde
-will niemand nachgeliefert, die nächste ist schon unterwegs.
+Connection; die genauen Grenzwerte stehen im blauen Buch. Positionen und Eingaben gehen
+unzuverlässig: Die Position von vor einer halben Sekunde will niemand nachgeliefert, die nächste ist
+schon unterwegs.
 
 ---
 
@@ -135,11 +136,13 @@ Spieler bekommt einen **Pawn**, eine Kopie der Spielfigur des Levels. 30-mal pro
 Server jedem Client einen **Snapshot**: das HUD und die Lage aller beweglichen Dinge.
 
 **Der Client spielt eine Replika.** Er lädt dasselbe Level, rechnet aber **keine eigene Physik**; seine
-Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vier der letzten auf einmal, die neueste zuerst. Eine
-Eingabe enthält Bewegung, Blickrichtung, Sprung, Boost, Feuer, Zielen, Nachladen, Ducken und Interact.
-Gespawnte oder geänderte Dinge der Logik übernimmt er mit derselben ID wie beim Server. Seine Bodies
-sind kinematisch, Spielfiguren nutzen keinen Character Mover; nur der Stadtverkehr fährt lokal als
-Deko. Ein Soldat bekommt zusätzlich seinen HUD-Zustand (Gesundheit, Munition …).
+Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vier der letzten auf
+einmal, die neueste zuerst. Eine Eingabe enthält Bewegung, Blickrichtung, Sprung, Boost, Feuer,
+Zielen, Nachladen, Ducken und Interact. Was die Logik des Servers erzeugt oder ändert, übernimmt er
+mit derselben Nummer (ID) wie beim Server. Seine Körper sind kinematisch – sie werden nur dorthin
+gesetzt, wo der Server sie meldet –, und Spielfiguren nutzen keinen Character Mover; nur der
+Stadtverkehr fährt lokal als Deko. Ein Soldat bekommt zusätzlich seinen HUD-Zustand (Gesundheit,
+Munition …).
 
 Im Code: `net.host(…)` startet als Server, `net.join(…)` als Client, jeden Frame rechnet
 `net.update(…)` erst das Netz, dann die Welt. `status()` liefert Text wie „Connected (slot 2)“,
@@ -167,9 +170,9 @@ Im Code: `net.host(…)` startet als Server, `net.join(…)` als Client, jeden F
 Ein Snapshot muss in **ein** Paket passen (900 Byte für die Dinge im Level). Darum führt jeder Client
 für jedes Ding einen Topf: Bewegt es sich, kommen 10 Punkte hinein, sonst 0,25. Gesendet wird, was am
 vollsten ist, danach wird der Topf geleert. Die eigene Figur des Clients kommt immer zuerst. Was sich
-bewegt, ist ständig dran; was ruht, selten, aber nie vergessen. Positionen reisen auf **1 mm** genau (innerhalb ±8192 m), Drehungen mit 11 Bit je Komponente,
-höchstens 255 Dinge pro Snapshot. Gesendet werden nur Dinge, die sich bewegen können (dynamische und
-kinematische Bodies).
+bewegt, ist ständig dran; was ruht, selten, aber nie vergessen. Positionen reisen auf **1 mm** genau
+(innerhalb ±8192 m), Drehungen mit 11 Bit je Zahl, und höchstens 255 Dinge passen in einen Snapshot.
+Gesendet werden nur Dinge, die sich bewegen können (dynamische und kinematische Körper).
 
 ### Uhr und Prüfsumme
 
@@ -198,8 +201,8 @@ jeder weitere Spieler ein echter Netzwerk-Client mit eigener Welt und eigenem Vi
 - Das Studio schaltet auf **vier Viewports**: 1 ist der Server, 2 der erste Client usw.
 - Nur der **aktive** Viewport bekommt deine Eingaben; die anderen stehen still.
 - **Play › Network Emulation** macht die Leitung absichtlich schlecht: Perfect, LAN (5 ms), Average
-  (50 ms, 1 % Verlust), Bad (150 ms, 5 %), Terrible (300 ms, 20 %), jeweils mit etwas Jitter (1 bis
-  100 ms).
+  (50 ms, 1 % Verlust), Bad (150 ms, 5 %), Terrible (300 ms, 20 %); außer Perfect schwankt die
+  Verzögerung jeweils etwas (Jitter von 1 bis 100 ms).
 - Solange Clients noch beitreten, tauscht Studio mehrmals pro Frame Pakete aus, damit der Handshake
   nicht auf gerenderte Bilder wartet.
 - Die Statuszeile zeigt Rolle, Spieler, Umlaufzeit, Verlust und Bandbreite, je lokalem Client auch
@@ -268,9 +271,10 @@ Die Adresse dieses Rechners samt Port (Standard 8790) trägst du im Dialog bzw. 
 > durch die Absendernummer und stellt zu. Wer sich anmeldet, schickt `{"host": raum}` oder
 > `{"join": raum}` und erfährt seine ID und die des Hosts.
 
-Päckchen sind höchstens 1400 Byte groß (zu kurze, zu lange und an unbekannte IDs werden verworfen), Raumnamen kürzer als 64 Zeichen. Geht der Host, ist der Raum für
-Neue geschlossen. Ein normaler Browseraufruf des Ports bekommt „Kern relay“ zur Antwort. Die Sicherheit
-kommt von Prüfsumme und Verbindungs-ID (10.5), nicht vom Relay.
+Päckchen sind höchstens 1400 Byte groß; zu kurze, zu lange und solche an unbekannte IDs wirft der
+Relay weg. Raumnamen sind kürzer als 64 Zeichen. Geht der Host, ist der Raum für Neue geschlossen.
+Ein normaler Browseraufruf des Ports bekommt „Kern relay“ zur Antwort. Die Sicherheit kommt von
+Prüfsumme und Verbindungs-ID (10.5), nicht vom Relay.
 
 ---
 
@@ -285,17 +289,18 @@ kommt von Prüfsumme und Verbindungs-ID (10.5), nicht vom Relay.
 | Stadtverkehr | simuliert | fährt lokal (Deko) |
 | Kamera, Eingabe | lokal | lokal, Eingabe an Server |
 
-Clients senden derzeit nichts Zuverlässiges.
+Übrigens schicken Clients derzeit nichts über den zuverlässigen Kanal.
 
 ---
 
 ## 10.13 Tests
 
 Kerns Tests nehmen das Netz hart ran: Die Serialisierung muss Grenzwerte, abgeschnittene Daten und
-2000 Zufallspuffer überstehen, Quittungen und Fragmente müssen stimmen. Der zuverlässige Kanal muss unter **25 % Verlust, 60 ± 30 ms
-Verzögerung und 10 % Duplikaten** alles in Reihenfolge abliefern; der Verbindungsaufbau übersteht
-**500 Müll-Päckchen**, Timeouts und Wiederverbinden. Weitere Tests prüfen Soldaten und Schüsse übers
-Netz, Logik-Änderungen bei Clients und „Number of Players“ mit drei Spielern im Studio.
+2000 Zufallspuffer überstehen, Quittungen und Fragmente müssen stimmen. Der zuverlässige Kanal muss
+unter **25 % Verlust, 60 ± 30 ms Verzögerung und 10 % Duplikaten** alles in Reihenfolge abliefern;
+der Verbindungsaufbau übersteht **500 Müll-Päckchen**, Timeouts und Wiederverbinden. Weitere Tests
+prüfen Soldaten und Schüsse übers Netz, Logik-Änderungen bei Clients und „Number of Players“ mit
+drei Spielern im Studio.
 
 ---
 

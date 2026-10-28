@@ -67,7 +67,7 @@ ein Auto vorbei, springt der Pegel nicht stufig, sondern fließt – ohne kratze
 Dann liest er Sample für Sample den Clip. Liegt die Leseposition zwischen zwei Samples, schätzt er
 den Wert aus vier Nachbarn mit einer weichen Kurve (Hermite-Interpolation), dämpft die Höhen nach
 Entfernung und addiert alles in den Bus. Danach rückt die Leseposition um Tonhöhe × Doppler weiter.
-Schleifen fangen am Ende nahtlos vorn an, Mono-Clips klingen auf beiden Seiten.
+Schleifen springen am Ende wieder an den Anfang, Mono-Clips klingen auf beiden Seiten.
 
 **Virtuelle Stimmen:** Ist ein 3D-Ton praktisch unhörbar weit weg, wird er nicht gemischt – das spart
 Zeit. Seine Position läuft aber heimlich weiter. Kommst du zur brummenden Maschine zurück, brummt sie
@@ -152,7 +152,7 @@ halten, verklingen, dazu ein „Punch“ am Anfang), Tonhöhe mit Rutschen, Vibr
 sowie Effekte wie Tremolo, Wiederholung und „Bitcrush“. Langsame Änderungen wie Vibrato rechnet Kern
 nur alle 16 Samples neu – das spart viel Zeit und ist nicht hörbar. Rauschen wird wie bei sfxr im
 Takt der Tonhöhe neu gewürfelt, deshalb klingt tiefes Rauschen dunkler. Die Option *Wiederholung*
-startet die Tonhöhe immer wieder neu (Power-up-Effekt), der Sprung ist der Münz-Effekt unten. Kleine
+startet die Tonhöhe immer wieder neu (Power-up-Effekt); der Sprung macht das Münz-„Pling“ unten. Kleine
 Helfer schichten mehrere Klänge mit Zeitversatz, machen aus einem Puffer eine nahtlose Schleife
 (das Ende wird weich über den Anfang geblendet) und gleichen die Lautstärke an.
 
@@ -225,8 +225,8 @@ Danach macht Kern den Klang absichtlich „schlechter“: 16 Bit wie auf dem Rob
 300 Hz weggefiltert, weil der winzige echte Lautsprecher tiefe Töne kaum wiedergibt. Die Laute
 spielen auf dem Bus `voice` am **Kopf** der Ente, wo ihr Lautsprecher sitzt. Ein neuer Laut schneidet
 den alten ab, wie bei einem einzigen Lautsprecher; während `wheee` werden andere Laute verworfen.
-Wann die Ente welchen Laut ruft, erklärt [Kapitel 13](13-micro-duck.md). Weil das Ausrechnen auf Telefonen spürbar dauert,
-bereitet Kern die Laute jeder Ente vorab vor, einen pro Bild.
+Weil das Ausrechnen auf Telefonen spürbar dauert, bereitet Kern die Laute jeder Ente vorab vor,
+einen pro Bild. Wann die Ente welchen Laut ruft, erklärt [Kapitel 13](13-micro-duck.md).
 
 ## 7.7 Klang im Spiel: SoundBank und GameAudio
 
@@ -285,8 +285,8 @@ Jeder Rigid Body hat einen Aufprall-Sound (Standard `builtin:impact`) und eine *
 2,5 m/s. Jeder Collider kann einen eigenen Sound tragen – die Sohle der Ente klingt nach
 `plastic_step`, ihr Gehäuse nach `plastic`. Dazu ein paar Regeln:
 
-- Nur Teile mit Aufprall-Sound melden überhaupt Treffer. Höchstens **6 Aufprallgeräusche pro
-  Physikschritt**; unter der Schwelle bleibt es still.
+- Treffer melden nur Teile, die einen Aufprall-Sound haben oder die Spieler oder Logik brauchen.
+  Höchstens **6 Aufprallgeräusche pro Physikschritt**; unter der Schwelle bleibt es still.
 - **Entprellen:** Eine Sohle rollt ab und hüpft dabei winzig. Ein Schritt klingt deshalb höchstens
   alle 0,5 s pro Actor, ein Klopfen alle 0,09 s.
 - Härtere Aufprälle sind **lauter**; ganz leichte spielen das sanftere `impact_light`.

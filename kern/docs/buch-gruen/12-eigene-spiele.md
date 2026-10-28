@@ -24,9 +24,10 @@ Gefahrenzone aus und gewinnt, wenn alles eingesammelt ist. Die Bedienung der Pan
 
 ### Schritt 1: Ein neues Level
 
-Öffne Kern Studio (über https://kernengine.de/ oder offline als `generated/studio.html`), dann **File › New Level...**, Vorlage **Basic**,
-**Create**. Du hast einen Boden (40 × 40 m), Sonne, Himmel und einen Würfel. Trag in **World Settings**
-den **Level name** und den **Game title** „Orb Garden“ ein.
+Öffne Kern Studio (über https://kernengine.de/ oder offline als `generated/studio.html`), dann
+**File › New Level...**, Vorlage **Basic**, **Create**. Du hast einen Boden (40 × 40 m), Sonne,
+Himmel und einen Würfel. Trag in **World Settings** den **Level name** und den **Game title** „Orb
+Garden“ ein.
 
 > **Achtung, Falle!** Warum nicht **Empty**? Weil Empty wirklich **nichts** hat, auch keinen Boden. Deine
 > Figur würde ins Bodenlose fallen. (World Settings hat zwar einen **Endless ground**, aber ein
@@ -144,15 +145,15 @@ Die Eingabe fragst du so ab: `down` (Taste gehalten), `pressed`/`released` (in d
 bzw. losgelassen), Zeigerposition und -bewegung in Pixeln der Zeichenfläche (auch bei gefangener
 Maus), Maustasten, Mausrad, Finger und ob die Seite den Fokus hat. Tasten zählen nach ihrer
 **Position**, wie in Studio. Dazu liefert die Engine Größe der Zeichenfläche, die Statistik des
-letzten Frames (Draw Calls, Dreiecke) und eine Löschfarbe für Stellen ohne Himmel. Alle Signaturen
+letzten Frames (Draw Calls, Dreiecke) und eine Hintergrundfarbe für Stellen ohne Himmel. Alle Signaturen
 stehen im blauen Buch.
 
 ### Ein Frame im Ablauf
 
 Die Seite (`app.mjs`) startet das Modul: Startparameter übergeben, `kern_create_app()` holen,
 `configure`, Renderer anlegen, `start`. Danach reicht sie Tasten, Maus, Finger und Fokus weiter. Zu
-jedem Bildschirmbild ruft sie den Frame auf: erst dein `update`, dann setzt die Engine die
-Nur-dieser-Frame-Werte zurück, dann zeichnet sie. Größenänderung führt zu `resized`, ein
+jedem Bildschirmbild ruft sie den Frame auf: erst dein `update`, dann setzt die Engine die Werte
+zurück, die nur für diesen einen Frame gelten, dann zeichnet sie. Größenänderung führt zu `resized`, ein
 Kontextverlust pausiert den Renderer, und `stop()` der Seite ruft dein `stop` und fährt den Renderer
 herunter.
 
@@ -223,15 +224,15 @@ kern/build.sh --app kern/examples/hello/hello.wasm \
 ```
 
 `--app` packt die App-Laufzeit dazu. Weitere Schalter: `--physics` für Box3D, `--game` für Levels und
-Spiel-Laufzeit, `--studio` für das ganze Studio, `--lehrer` für den Lehrer. Alles, was auf `.cpp` oder `.cc`
-endet, ist Quellcode deines Spiels (gern mehrere Dateien), alle anderen Argumente gehen als Schalter
-an den Compiler. Umgebungsvariablen wählen etwa einen Debug-Build (`KERN_BUILD=debug`); die Liste
-steht im blauen Buch.
+Spiel-Laufzeit, `--studio` für das ganze Studio, `--lehrer` für den Lehrer. Alles, was auf `.cpp`
+oder `.cc` endet, ist Quellcode deines Spiels (gern mehrere Dateien), alle anderen Argumente gehen
+als Schalter an den Compiler. Umgebungsvariablen wählen etwa einen Debug-Build (`KERN_BUILD=debug`);
+die Liste steht im blauen Buch.
 
 > **Wusstest du?** Der Build merkt sich jede übersetzte Datei unter einem Fingerabdruck aus Quelle,
-> Einstellungen und allen eingebundenen Dateien. Ein zweiter Build übersetzt nur, was sich geändert hat, und Studio und
-> Beispiele teilen sich die übersetzte Engine.
-> Das fertige Modul läuft in jedem Browser mit WebGL2, ab Safari 15 ([Kapitel 2](02-bauen-und-testen.md)).
+> Einstellungen und allen eingebundenen Dateien. Ein zweiter Build übersetzt nur, was sich geändert
+> hat, und Studio und Beispiele teilen sich die übersetzte Engine. Das fertige Modul läuft in jedem
+> Browser mit WebGL2, ab Safari 15 ([Kapitel 2](02-bauen-und-testen.md)).
 
 ### Ein ganzes Spiel: orbrun
 
@@ -249,17 +250,19 @@ Kamera nach, lädt das Veränderliche zur Grafikkarte und schreibt die Statuszei
 `ORBS 5/24 | 01:12.4 | BOOST [######----] | 87 km/h`. `?time=0.6` in der Adresse startet nachts.
 Was darin steckt:
 
-- **Die Stadt:** 7 × 7 Blöcke im Abstand von 80 m, 16 m breite Straßen, jeder Block per Zufall (aus einem
-  Startwert) mit einer von vier Bebauungen: ein großes Haus (oft mit Innenhof), vier Parzellen, ein
-  L-förmiges Haus oder drei Riegel; zur Mitte hin werden die Häuser höher. Bäume sind instanziert. Die Gebäude- und Straßenbauer der Engine
-  erzeugen die Meshes ([Kapitel 5](05-szene-und-geometrie.md)).
+- **Die Stadt:** 7 × 7 Blöcke im Abstand von 80 m, 16 m breite Straßen, jeder Block per Zufall (aus
+  einem Startwert) mit einer von vier Bebauungen: ein großes Haus (oft mit Innenhof), vier Parzellen,
+  ein L-förmiges Haus oder drei Riegel; zur Mitte hin werden die Häuser höher. Die Bäume sind
+  instanziert (ein Mesh, viele Kopien). Die Gebäude- und Straßenbauer der Engine erzeugen die Meshes
+  ([Kapitel 5](05-szene-und-geometrie.md)).
 - **Kollision ohne Physik-Engine:** Jedes Gebäude ist ein Vieleck, das Auto ein Kreis von 1,7 m Radius,
   der aus den Wänden der Nachbarzellen (40-m-Gitter) geschoben wird und abprallt; der Stadtrand ist
   eine feste Grenze.
 - **Fahrgefühl:** höchstens 36 m/s, mit Boost 60 m/s. Gas beschleunigt mit 24 m/s², rückwärts mit 21,
   Boost mit zusätzlich 42. Seitliches Rutschen klingt schnell ab, Lenken wirkt erst mit Tempo (voll ab
-  9 m/s) und kehrt sich rückwärts um. Boost leert sich mit 0,45 pro Sekunde und lädt mit 0,12 nach. Damit das Auto beim Boost nicht durch Wände „tunnelt“, bewegt es sich in
-  Teilschritten von höchstens 0,6 m.
+  9 m/s) und kehrt sich rückwärts um. Der Boost-Vorrat leert sich mit 0,45 pro Sekunde und lädt mit
+  0,12 nach. Damit das Auto beim Boost nicht durch Wände „tunnelt“, bewegt es sich in Teilschritten
+  von höchstens 0,6 m.
 - **Verkehr:** 22 Autos mit 9 bis 15 m/s, 2,8 m neben der Straßenmitte; steht der Spieler weniger als
   10 m vor einem, hält es an. Am Stadtrand tauchen sie gegenüber wieder auf.
 - **Orbs:** Näher als 3,2 m, und der Orb sprüht 28 Funken aus dem Partikelsystem der Engine (ein
@@ -277,8 +280,7 @@ zufällig manche leuchten, und zwar ohne die Engine anzufassen. Die Werte reisen
 unverändert über die ganze Wand, denn ein Mischen würde das Zufallsmuster der Fenster zerstören. Ein
 Regler `uNight` (einmal pro Frame gesetzt) dimmt die Fenster tagsüber. Nur Gebäude bekommen diese
 Zusatzwerte, Straßen nicht. In der Ferne verschwimmt das Raster zu einem sanften Schimmer, damit nichts
-flimmert. Wie solche Erweiterungen funktionieren, steht in
-[Kapitel 4](04-grafik.md).
+flimmert. Wie solche Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 
 ### Ein eigenes Spiel anlegen
 
@@ -301,7 +303,8 @@ um:
   Spiel. Wiederholte Tastenereignisse zählen nicht.
 - **Fokus:** Verliert das Fenster den Fokus, lässt die Engine alle Tasten los. Nach Alt+Tab bleibt nichts
   hängen.
-- **Pointer-Lock** auf Wunsch des Spiels; ist die Seite versteckt, erfährt der Renderer es pro Frame.
+- **Maus fangen** (*Pointer-Lock*) auf Wunsch des Spiels; ist die Seite versteckt, erfährt der
+  Renderer es pro Frame.
 - **Kontextverlust:** Verliert der Browser kurz die Grafikkarte, pausiert der Renderer und lädt danach
   alles aus seinen Kopien neu hoch.
 
@@ -317,11 +320,11 @@ Das Modul bietet seine Funktionen als flache **C-ABI** an: einfache Funktionen, 
 aufrufen kann. Dafür gibt es zwei fertige Fassaden.
 
 **Den Renderer aus JavaScript nutzen.** `kern.mjs` enthält `KernRenderer`. So arbeitet SpawnCity: Die
-Spiellogik ist JavaScript, gezeichnet wird in C++. Nach `loadKern` legst du Meshes unter einem Namen (als Zeichenkette)
-mit Zahlen-Arrays an, setzt die Kamera, renderst (zurück kommt eine Statistik) und pickst aufs Dreieck
-genau. Die Fassade kopiert die Arrays in einen wiederverwendeten Bereich im Modulspeicher; im Frame
-entstehen keine neuen Speicherblöcke. Pro Modul gibt es einen `KernRenderer`. Die Methoden
-stehen in [Kapitel 17](17-referenz.md).
+Spiellogik ist JavaScript, gezeichnet wird in C++. Nach `loadKern` (lädt das Modul) legst du Meshes
+unter einem Namen mit Zahlen-Arrays an, setzt die Kamera, renderst (zurück kommt eine Statistik) und
+pickst aufs Dreieck genau. Die Fassade kopiert die Arrays in einen wiederverwendeten Bereich im
+Modulspeicher; im Frame entstehen keine neuen Speicherblöcke. Pro Modul gibt es einen
+`KernRenderer`. Die Methoden stehen in [Kapitel 17](17-referenz.md).
 
 **Studio-Levels in deine eigene Seite einbetten.** `game.mjs` bietet `startGame`, denselben Spiel-Host,
 den exportierte Spiele enthalten. Das Modul ist das von Studio (gebaut mit `--studio`). Du gibst
@@ -329,8 +332,8 @@ den exportierte Spiele enthalten. Das Modul ist das von Studio (gebaut mit `--st
 `game.mjs`, startet das Modul im Spieler-Modus, lädt bei Bedarf die Netze der Micro Duck und startet
 Play. Die Beispielseite `play.html` spielt so die eingebauten Levels (`?level=orbRun`, `physicsLab`,
 `shootingRange`, `microDuck`, `basic`). Zurück kommt ein Objekt (auch als `window.KernGame`) mit
-`command`, `status`, der Engine, Ton und Netz. Dann
-kannst du das Spiel aus deinem Code steuern, etwa mit eigenen Bildschirmknöpfen:
+`command`, `status`, der Engine, Ton und Netz. Damit kannst du das Spiel aus deinem Code steuern,
+etwa mit eigenen Bildschirmknöpfen:
 
 ```js
 game.command({cmd: "gameInput", moveY: 1, jump: true});
@@ -346,9 +349,9 @@ Nachladen, Ducken, Interact und Blick. Wer keine Fassade will, ruft die `kern_st
 direkt auf, wie Studio selbst ([Kapitel 11](11-studio.md)).
 
 **Logik-Graphen als C++.** Im Logik-Editor lädt der Knopf **C++** einen Graphen als lesbaren Quelltext
-herunter. Er meldet sich über einen Fingerabdruck (Hash) an seinem Graphen an. Baust du ihn mit `--studio` in
-ein Modul, läuft der Graph als nativer Code statt im Interpreter oder JIT. Interpreter, JIT
-und C++ liefern dasselbe Ergebnis ([Kapitel 9](09-logik.md)).
+herunter. Er meldet sich über einen Fingerabdruck (Hash) an seinem Graphen an. Baust du ihn mit
+`--studio` in ein Modul, läuft der Graph als nativer Code statt im Interpreter oder JIT. Interpreter,
+JIT und C++ liefern dasselbe Ergebnis ([Kapitel 9](09-logik.md)).
 
 ---
 
@@ -378,10 +381,9 @@ erlaubt, dein eigenes Produkt „Kern“ zu nennen nicht. Bestandteile anderer b
 
 > **Achtung, Falle!** Die **Micro Duck** ist eine Ausnahme. Das Studio-Modul und jedes exportierte Spiel
 > enthalten Pollens 3D-Modelle der Ente, und die dürfen nur **nicht kommerziell** genutzt werden
-> (CC BY-NC-SA 4.0). Wer verkaufen will, baut das Modul mit `KERN_COMMERCIAL=1 tools/build_studio.sh` (oder
-> `kern/build.sh --commercial`).
-> Dann fehlen die Modelle, und die Ente ist unsichtbar. Pollens Netze (Apache 2.0) dürfen mit Lizenz und
-> NOTICE mit.
+> (CC BY-NC-SA 4.0). Wer verkaufen will, baut das Modul mit `KERN_COMMERCIAL=1 tools/build_studio.sh`
+> (oder `kern/build.sh --commercial`). Dann fehlen die Modelle, und die Ente ist unsichtbar.
+> Pollens Netze (Apache 2.0) dürfen mit Lizenz und NOTICE mit.
 
 ### Studio-Spiele
 
@@ -391,8 +393,8 @@ verschickst sie einfach. Sie läuft offline, im Vollbild, mit Tastatur, Maus, Ga
 - **Mit Micro Duck:** die Ordner `microduck/` und `policies/` daneben legen, sonst kann die Ente nur
   laufen. Zu `microduck/` gehören Pollens Lizenz und NOTICE.
 - **Online:** `?host=raum` an die Adresse hängen bietet ein Spiel an, `?join=raum` tritt bei. Für
-  verschiedene Rechner läuft der Relay auf einem erreichbaren Server (Port 8790, npm-Paket `ws`), und alle hängen
-  `&relay=` mit dessen Adresse an ([Kapitel 10](10-netzwerk.md)).
+  verschiedene Rechner läuft der Relay auf einem erreichbaren Server (Port 8790, npm-Paket `ws`), und
+  alle hängen `&relay=` mit dessen Adresse an ([Kapitel 10](10-netzwerk.md)).
 
 ### C++-Spiele
 

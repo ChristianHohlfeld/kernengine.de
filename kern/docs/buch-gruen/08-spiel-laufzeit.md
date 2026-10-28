@@ -43,7 +43,7 @@ Damit alle Teile dieselbe Sprache sprechen, gelten feste Abmachungen:
 - Gemessen wird in **Metern, Sekunden und Kilogramm**.
 - **Z zeigt nach oben** (nicht Y, wie in manchen anderen Programmen).
 - Drehungen stehen als **Winkel in Grad** da: Rollen, Nicken, Gieren – genau wie im Editor.
-  Angewendet wird erst Gieren, dann Nicken, dann Rollen.
+  Zusammengesetzt werden sie in der Reihenfolge Gieren · Nicken · Rollen.
 - Farben sind **sRGB-Werte von 0 bis 1**, in der Datei als `#rrggbb`.
 - Die Lage eines Actors ist immer **relativ zu seinem Eltern-Actor**. Hängst du ein Rad an ein Auto,
   fährt das Rad mit.
@@ -105,18 +105,20 @@ Trägheit zählen nur dann, sonst entscheiden Formen und Dichten.
 
 **Collider** – die unsichtbare Form, mit der die Physik rechnet: automatisch ans Mesh angepasst,
 Box, Kugel, Kapsel oder konvexe Hülle. Mit Dichte (Standard 1000 kg/m³, wie Wasser), Reibung und
-Oberfläche. Eine Hülle ohne eigene Punkte nimmt die Hülle des Meshes. Ein Collider kann **Sensor** sein: Er stößt nichts weg, merkt aber, wenn etwas
-hineinkommt – perfekt für Ziellinien und Münzen. Über Kanäle und Gruppen legst du fest, wer mit wem
-zusammenstößt; Teile mit derselben negativen Gruppe stoßen nie zusammen. Jeder Collider kann
+Oberfläche. Eine Hülle ohne eigene Punkte nimmt die Hülle des Meshes. Ein Collider kann **Sensor**
+sein: Er stößt nichts weg, merkt aber, wenn etwas hineinkommt – perfekt für Ziellinien und Münzen.
+Über Kanäle und Gruppen legst du fest, wer mit wem zusammenstößt; Teile mit derselben negativen
+Gruppe stoßen nie zusammen. Jeder Collider kann
 einen eigenen Aufprall-Sound haben.
 
 **Constraint** – ein Gelenk zu einem anderen Actor oder zur Welt. Neun Arten: Scharnier (*hinge*),
 Schiene (*slider*), Kugelgelenk, fest, Seil (*distance*), Rad, Motor, parallel und „keine Kollision“.
 Gelenke können Grenzen, Motoren und Federn haben und bei zu viel Kraft oder Drehmoment **brechen**
 (0 = unzerbrechlich; dabei spielt ein Bruch-Sound). Ein Seil mit Länge 0 nimmt den Abstand beim
-Start. Ein Scharnier kann einen Referenzwinkel haben: den Winkel, den es in der Baupose anzeigt. Ein Scharnier kann
-außerdem ein **Servo** sein – ein kleiner Motor, der einen Zielwinkel ansteuert, wie bei einem
-echten Roboter. Die Regel ist anschaulich: Je weiter der Winkel vom Ziel weg ist, desto stärker
+Start. Ein Scharnier kann einen Referenzwinkel haben: den Winkel, den es in der Baupose anzeigt.
+Außerdem kann ein Scharnier ein **Servo** sein – ein kleiner Motor, der einen Zielwinkel ansteuert,
+wie bei einem echten Roboter. Die Regel ist anschaulich: Je weiter der Winkel vom Ziel weg ist,
+desto stärker
 drückt der Servo zurück, gebremst durch Dämpfung und begrenzt durch ein Höchstmoment
 ([Kapitel 6](06-physik.md)).
 
@@ -128,9 +130,9 @@ Der Walker hat eigene Schalter: allein laufen, wenn niemand steuert; Gangart (`v
 `alpha`); Rollschuhe; Aktionsstil (`training` oder `robot`); Kerns Zusätze (Spielnetz mit Ball und
 Socke) und die Verzögerung der Servos. Was sie bewirken, erklärt [Kapitel 13](13-micro-duck.md).
 
-**Weapon** – eine Waffe für Soldaten. Sie trifft sofort per Strahl (*Hitscan*), im Mehrspieler
-entscheidet der Server mit Lag-Kompensation (8.13). Gewehr, Pistole, Schrotflinte oder Scharfschützengewehr. Jeder
-Typ hat eigene Werte. Ein paar Beispiele:
+**Weapon** – eine Waffe für Soldaten: Gewehr, Pistole, Schrotflinte oder Scharfschützengewehr. Sie
+trifft sofort per unsichtbarem Strahl (*Hitscan*); im Mehrspieler entscheidet der Server, mit
+Lag-Kompensation (8.13). Jeder Typ hat eigene Werte. Ein paar Beispiele:
 
 | Waffe | Schaden | Magazin | Reichweite |
 |---|---|---|---|
@@ -262,8 +264,8 @@ Formen werden vergrößert: bewegte auf mindestens 1 cm, statische auf 2 mm.
 1. Level **prüfen** – ein Fehler bricht ab.
 2. Eine **Kopie** des Levels anlegen, das Original merken.
 3. Die **Box3D-Welt** bauen, mit Schwerkraft und Kontakt-Einstellungen. Ab 2 m/s zählt ein Stoß
-   als Treffer (Logik „On Hit“, Kamerawackeln); für leise Aufprall-Sounds sinkt die Schwelle bis
-   0,05 m/s.
+   als Treffer (Logik „On Hit“, Kamerawackeln). Haben Körper Aufprall-Sounds mit niedrigerer
+   Schwelle, sinkt sie bis zu deren Wert, aber nie unter 0,05 m/s.
 4. Actors so ordnen, dass Eltern vor Kindern kommen.
 5. **Körper**, dann **Gelenke**, dann **Walker** anlegen.
 6. Den **Stadtverkehr** starten.
@@ -317,8 +319,8 @@ anderes heraus. Deshalb rechnet Kern immer in **festen Schritten**, normalerweis
 Das funktioniert wie ein Sparschwein: Jedes Bild wirft die vergangene Zeit hinein. Solange genug für
 einen ganzen Schritt drin ist, nimmt Kern einen Schritt heraus und rechnet ihn. Was übrig bleibt,
 wartet aufs nächste Bild. Damit ein langer Hänger nicht alles durcheinanderbringt, ist das
-Sparschwein begrenzt (es fasst höchstens 0,25 s, und pro Bild werden höchstens 0,1 s simuliert). Mehr dazu in
-[Kapitel 6](06-physik.md).
+Sparschwein begrenzt: Es fasst höchstens 0,25 s, und pro Bild werden höchstens 0,1 s simuliert.
+Mehr dazu in [Kapitel 6](06-physik.md).
 
 Und weil ein Bild meist zwischen zwei Schritten liegt, schiebt Kern die Körper für die Anzeige
 geschmeidig zwischen der alten und der neuen Pose hin und her (*Interpolation*). So sieht alles
@@ -350,7 +352,7 @@ flowchart TD
 
 Danach läuft die Tageszeit weiter, die Kamera folgt, und `present` gibt dem Renderer die Posen.
 Versteckte Actors (samt Kindern), eingesammelte Pickups und benutzte Trigger sind dabei unsichtbar.
-Danach setzt die Welt Licht, Himmel, Nebel und Lampen und sagt dem Renderer, wie „nachtig“ es ist –
+Zum Schluss setzt die Welt Licht, Himmel, Nebel und Lampen und sagt dem Renderer, wie „nachtig“ es ist –
 davon hängt ab, wie stark die Stadtfenster leuchten.
 
 Im Studio kommen pro Bild noch ein paar Aufgaben dazu: Kameras und Touch aktualisieren, beim Spielen
@@ -406,8 +408,8 @@ Die Kamera folgt der **geglätteten** Pose des Spielers. Es gibt drei Arten:
 - **First Person:** die Augen des Spielers; Fahrzeuge blicken in Fahrtrichtung.
 - **Top Down:** von oben.
 
-Über 30 m/s weitet sich das Sichtfeld (bis 10,5° mehr) – so fühlt sich Tempo schneller an. Harte Treffer lassen die
-Kamera wackeln. Soldaten haben eine eigene Kamera.
+Über 30 m/s weitet sich das Sichtfeld (bis 10,5° mehr) – so fühlt sich Tempo schneller an. Harte
+Treffer lassen die Kamera wackeln. Soldaten haben eine eigene Kamera.
 
 ## 8.12 Regeln, HUD und Trigger
 
@@ -429,11 +431,11 @@ Mit Zeitlimit verliert man bei null – außer bei *survive*. Ein Gefahren-Trigg
 Am Ende setzt Kern den Status, spielt einen Jingle, merkt sich bei *collectAll* und *reachGoal* die
 Bestzeit und meldet der Logik „Spiel vorbei“.
 
-**Trigger** können viel: *goal* gewinnt, *hazard* verliert, *checkpoint* setzt den Startpunkt 1 m über den Trigger,
-*message* zeigt einen Text, *launch* schleudert den Spieler hoch und halb so schnell nach vorn
-(Sprungschanze), *teleport* beamt
-ihn zu einem anderen Actor (mit einer Sekunde Sperre gegen sofortiges Zurückbeamen), *damage* zieht
-Lebenspunkte ab und *event* meldet sich nur bei der Logik. Jeder Trigger hat einen passenden
+**Trigger** können viel: *goal* gewinnt, *hazard* verliert, *checkpoint* setzt den Startpunkt 1 m
+über den Trigger, *message* zeigt einen Text, *launch* schleudert den Spieler hoch und halb so
+schnell nach vorn (Sprungschanze), *teleport* beamt ihn zu einem anderen Actor (mit einer Sekunde
+Sperre gegen sofortiges Zurückbeamen), *damage* zieht Lebenspunkte ab und *event* meldet sich nur
+bei der Logik. Jeder Trigger hat einen passenden
 Standard-Sound (`goal`, `hazard`, `checkpoint`, bei Meldungen `confirm`, bei der Schanze `boost`,
 beim Teleporter `powerup`). Vor jeder Aktion sagt er der Logik Bescheid. Ein einmaliger Trigger ist
 danach verbraucht – außer Ziel und Gefahr.
@@ -445,7 +447,8 @@ hier erfährt die Logik davon, und mit einer Respawn-Zeit kommt das Pickup zurü
 ## 8.13 Soldaten
 
 Der **Soldat** ist ein Ego-Shooter-Spieler, übernommen aus SpawnCity, dem Spiel, aus dem Kern
-entstanden ist. Alles wird in den festen Schritten berechnet. Einige Feinheiten, die das Spielgefühl ausmachen:
+entstanden ist. Alles wird in den festen Schritten berechnet. Einige Feinheiten, die das
+Spielgefühl ausmachen:
 
 - **Ducken** macht die Figur auf 60 % kleiner; aufstehen geht nur, wenn über dem Kopf Platz ist.
   **Sprinten** geht nur vorwärts, nicht beim Zielen oder Ducken; beim Zielen geht die Figur mit 60 %.
@@ -479,7 +482,8 @@ die Simulation nicht, deshalb zeigen Server, Mitspieler und Editor dasselbe. Die
 Ein **Walker** ist ein gelenkiger Roboter, der auf seinen eigenen Servos läuft – die Micro Duck mit
 dem trainierten Netz von Pollen Robotics. Die GameWorld legt für jeden Walker einen Steuerzustand an
 und treibt ihn jeden Schritt: Sensoren lesen, Verhalten wählen, alle vier Physikschritte das Netz
-fragen, Servos mit kurzer Verzögerung bewegen – wie beim echten Roboter. Das ist ein Thema für sich, nachzulesen in [Kapitel 13](13-micro-duck.md).
+fragen, Servos mit kurzer Verzögerung bewegen – wie beim echten Roboter. Das ist ein Thema für sich,
+nachzulesen in [Kapitel 13](13-micro-duck.md).
 
 ## 8.15 Der Ton
 
@@ -522,11 +526,11 @@ Kern glättet ihre Sticks mit toten Zonen und Kurven.
 ## 8.17 Logik in der Welt
 
 Jeder Actor und das Level können einen **Logik-Graphen** tragen. Die GameWorld startet sie in Play
-und Simulate – auf dem Rechner, der das Sagen hat (allein oder als Server) – und schickt ihnen Ereignisse: Überlappung, Treffer, Pickup, Trigger, Schaden, Tod,
-Respawn, Interact, Eingaben, Tasten, Spielende, neuer Spieler. Die Graphen können umgekehrt die Welt verändern – Actors
-verschieben, erzeugen, anschubsen, Gelenkmotoren schalten, Strahlen schießen, Punkte vergeben,
-das Spiel beenden. Was sie ändern, wird
-fürs Netzwerk mitgeschrieben. Mehr in [Kapitel 9](09-logik.md).
+und Simulate – auf dem Rechner, der das Sagen hat (allein oder als Server) – und schickt ihnen
+Ereignisse: Überlappung, Treffer, Pickup, Trigger, Schaden, Tod, Respawn, Interact, Eingaben,
+Tasten, Spielende, neuer Spieler. Die Graphen können umgekehrt die Welt verändern – Actors
+verschieben, erzeugen, anschubsen, Gelenkmotoren schalten, Strahlen schießen, Punkte vergeben, das
+Spiel beenden. Was sie ändern, wird fürs Netzwerk mitgeschrieben. Mehr in [Kapitel 9](09-logik.md).
 
 ## 8.18 Die Beispiel-Levels
 
@@ -540,8 +544,8 @@ Unter File › Example Levels (und File › New Level) warten sechs fertige Welt
   Seilbrücke aus 12 Planken (die mittleren Gelenke brechen bei 60 000 N), Drehteller, Lift und ein
   selbstfahrender Rover auf vier gefederten Rädern. Du bist eine rollende Kugel, sammelst fünf Sterne,
   weichst einem rotierenden Gefahren-Kehrer aus und musst ins Ziel.
-- **Shooting Range:** du bist ein Soldat mit Gewehr in einem Schießstand mit acht Zielpuppen in 10 bis 60 m, Deckung und Turm; Ziel sind
-  150 Punkte, auch im Mehrspieler.
+- **Shooting Range:** Du bist ein Soldat mit Gewehr, in einem Schießstand mit acht Zielpuppen in 10
+  bis 60 m, Deckung und Turm. Ziel sind 150 Punkte, auch im Mehrspieler.
 - **Micro Duck:** ein Zimmer im Maßstab des Roboters – echt 2,5 × 2,5 m, in der Welt 10 × 10 m – mit
   Holzboden, Büchern, Ball und Socken. Die Ente läuft selbstständig, die Physik rechnet mit 100 Hz
   und 16 Unterschritten, es gibt keinen endlosen Boden, Play beginnt mit der Observer-Kamera, und ein

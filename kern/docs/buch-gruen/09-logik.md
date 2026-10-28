@@ -160,10 +160,11 @@ Jede State Machine hat genau einen Anfangszustand. Ein **Übergang** kann feuern
 - solange eine **Bedingung** (eine Bool-Variable) wahr ist,
 - oder **automatisch** im nächsten Tick.
 
-Ein Übergang kann auch „aus jedem Zustand“ kommen (aber nicht vom Ziel in sich selbst). Pro
-Maschine und Prüfung gibt es höchstens einen Übergang, eine Kette automatischer Übergänge geht also
-einen Zustand pro Schritt weiter. Betreten und Verlassen eines Zustands lösen eigene Ereignisse aus,
-an die du Ketten hängen kannst; „On State Entered“ verrät auch den vorigen Zustand. **Set State**
+Ein Übergang kann auch „aus jedem Zustand“ kommen (er feuert aber nicht, wenn die Maschine schon im
+Zielzustand ist). Pro Maschine und Prüfung gibt es höchstens einen Übergang, eine Kette automatischer
+Übergänge geht also einen Zustand pro Schritt weiter. Betreten und Verlassen eines Zustands lösen
+eigene Ereignisse aus, an die du Ketten hängen kannst; „On State Entered“ verrät auch den vorigen
+Zustand. **Set State**
 springt direkt in einen Zustand.
 
 ## 9.5 Die Grundknoten
@@ -177,13 +178,15 @@ Kern bringt **76 Grundknoten** mit. Die Familien:
   und Call Event.
 - **Variablen:** Get, Set, Add.
 - **Mathe und Logik:** Rechnen, Runden, Sinus, Zufall, Vergleichen, Und/Oder/Nicht, Select.
-- **Werte, Vektoren, Text** und **Hilfen** wie Game Time und Print (auf Wunsch auch auf dem Bildschirm).
+- **Werte, Vektoren, Text** und **Hilfen** wie Game Time und Print (auf Wunsch auch auf dem
+  Bildschirm).
 
 Ein paar Feinheiten: Every N Seconds zählt seine eigene Zeit. Sequence hat 1 bis 16 Ausgänge, For
 Loop zählt einschließlich des letzten Werts. Ein Delay ignoriert weitere Aufrufe, solange es wartet;
-das Retriggerable Delay fängt dagegen neu an. Tween meldet jeden Schritt einen Wert von 0 bis 1 (linear
-oder sanft) und am Ende „Finished“. Switch verzweigt nach Zahl oder Text, Compare vergleicht mit einer
-winzigen Toleranz (10⁻⁹), und Umlenkknoten (*Reroute*) ordnen nur Drähte.
+das Retriggerable Delay fängt dagegen neu an. Tween meldet jeden Schritt einen Wert von 0 bis 1
+(gleichmäßig oder mit sanfter Kurve) und am Ende „Finished“. Switch verzweigt nach Zahl oder Text,
+Compare vergleicht mit einer winzigen Toleranz (10⁻⁹), und Umlenkknoten (*Reroute*) ordnen nur
+Drähte.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
 > dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Replays und Netzwerkspiele
@@ -205,7 +208,7 @@ bedeutet immer **Self**.
 | On Damaged, On Death, On Respawn | Schaden, Tod, Rückkehr |
 | On Interact | der Spieler F (Gamepad: Y) drückt und den Actor ansieht (bis 3 m) oder danebensteht (2 m) |
 | On Player Joined, On Game Over | ein Spieler kommt dazu, das Spiel endet |
-| On Input Action, On Key | eine Aktion (jeder Spieler, jedes Gerät) oder eine Taste (nur lokal) |
+| On Input Action, On Key | eine Aktion (jeder Spieler, jedes Gerät) oder Taste (nur lokal) gedrückt wird |
 
 Eine Überlappung zählt übrigens den ganzen Besucher: Kapsel und Kopf eines Spielers sind *ein*
 Besucher, nicht zwei.
@@ -241,8 +244,8 @@ Wohin gehen Ereignisse? An den Graphen des betroffenen Actors – oder, wenn der
 seines nächsten Vorfahren mit Graph. Das ist praktisch: Der eingeschweißte Collider einer Tür gehört
 zur Tür. Außerdem bekommt **immer** der Level-Graph das Ereignis mit; Ereignisse ohne Actor (etwa
 Spielende) gehen an alle. Hat ein Level Logik, meldet die Physik Überlappungen aller beweglichen und
-Treffer aller dynamischen Formen – sonst hätten die Graphen nichts zu hören. Der Logik-Tick läuft am Ende
-jedes festen Schritts, nach den Physik-Ereignissen.
+Treffer aller dynamischen Formen – sonst hätten die Graphen nichts zu hören. Der Logik-Tick läuft
+am Ende jedes festen Schritts, nach den Physik-Ereignissen.
 
 **Fürs Netzwerk** schreibt Kern mit, was Logik an der Welt ändert: geänderte Werte, gespawnte Actors,
 versetzte Körper. Der Server schickt das an alle – auch an Spieler, die später dazukommen
@@ -324,7 +327,8 @@ Actors. Die Oberfläche beschreibt [Kapitel 11](11-studio.md); hier das Wichtigs
 - Knoten rasten auf ein 8-px-Raster ein. Fehlt einem neuen Knoten seine Variable oder State Machine,
   legt Kern sie gleich an. Benennst du eine Variable um, ändern sich alle Knoten mit; wechselst du
   ihren Typ, wird der Wert umgewandelt.
-- Kopieren und Einfügen geht als Graph-JSON, Vorlagen landen unter den vorhandenen Knoten.
+- Kopieren und Einfügen läuft über den Graphen als JSON-Text; eingefügte Vorlagen landen unter den
+  vorhandenen Knoten.
 - Zusammengehörige Handgriffe (einen Draht aufnehmen und woanders ablegen, Tippen in denselben Pin)
   sind zusammen ein Undo-Schritt.
 - **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen (Datei
