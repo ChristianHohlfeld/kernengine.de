@@ -1,598 +1,547 @@
 # 6 Physik – Wie Dinge fallen, rollen und zusammenhalten
 
 > **Kurz gesagt:** Kern lässt Kisten fallen, Bälle rollen, Türen schwingen und Roboter laufen. Die
-> Rechenarbeit macht **Box3D**, eine Physik-Engine von Erin Catto (der 3D-Nachfolger von Box2D v3).
-> Kern legt eine schmale Schicht darüber. Du lernst Körper, Formen, Materialien, Gelenke, Kontakte,
-> den Takt der Simulation und das Servomodell der Micro Duck kennen.
+> Rechenarbeit macht **Box3D**, eine fertige Physik-Engine von Erin Catto. Kern legt eine schmale
+> Schicht darüber. Du lernst Körper, Formen, Materialien, Gelenke, Kontakte, den Takt der Simulation
+> und das Servomodell der Micro Duck kennen.
 
-Die Grundlagen dahinter (Integration, Kollision, Solver, Regelkreise, Determinismus) erklärt
-[Anhang C](C-grundlagen-physik.md). Hier geht es darum, **wie Kern sie benutzt**.
+> **Begriffe vorab:**
+> - **Servo** – ein kleiner Stellmotor, der auf Befehl einen Winkel anfährt und hält, wie er die
+>   Ruder eines Modellflugzeugs bewegt. Die Micro Duck hat in jedem Gelenk einen.
+> - **Hertz (Hz)** – „wie oft pro Sekunde“. 60 Hz heißt 60-mal pro Sekunde. Bei einer Feder sagt
+>   es, wie schnell sie hin- und herschwingt: je mehr Hertz, desto steifer.
+> - **Radiant** – das Winkelmaß der Mathematiker. Ein voller Kreis sind gut 6,28 Radiant, ein
+>   rechter Winkel gut 1,57; ein Radiant sind etwa 57 Grad. Die Physik rechnet so, du siehst im
+>   Studio Grad.
+> - **Drehmoment** – Drehkraft. Ein Schraubenschlüssel mit langem Griff gibt bei gleicher Kraft
+>   mehr Drehmoment. Gemessen in Newtonmeter (N·m).
+> - **Impuls** – ein kurzer Stoß, wie ein Tritt gegen einen Ball. Eine **Kraft** dagegen schiebt
+>   eine Weile.
+> - **Collider** – die unsichtbare, einfache Form, mit der ein Ding anstößt. Oft gröber als das,
+>   was man sieht: Ein Auto stößt etwa als Kiste an.
+> - **Solver** – der Teil von Box3D, der in jedem Schritt alle Regeln auf einmal erfüllt: Nichts
+>   steckt im anderen, Gelenke halten zusammen.
+> - **Netz** – das gelernte Steuerprogramm der Ente, ein neuronales Netz. Es wurde in der
+>   Simulation durch viel Ausprobieren trainiert ([Kapitel 13](13-micro-duck.md) und
+>   [14](14-lehrer.md)).
 
 ![Das Beispiel-Level Physics Lab in Kern Studio: Stapel, Pendel, Tür, Seilbrücke, Drehteller, Lift und Rover](../buch/bilder/studio-physics-lab.png)
 
-Eine Grundregel vorweg, weil sie alles prägt: **Box3D wird nie an Kern angepasst.** Weder sein
-Quelltext noch seine Konstanten werden verändert, und Kern dreht nicht an Solver-Stellschrauben, um ein
-Modell „zum Laufen zu bringen“. Passt ein Modell nicht, wird das **Modell** angepasst (skaliert, Massen
-verteilt, mehr Sub-Steps), nicht die Physik. Was ein echtes Gerät zusätzlich tut, etwa ein Servo mit
-Regler und Reibung, bekommt ein eigenes kleines Gerätemodell in echten Einheiten (Abschnitt 6.17).
+**Die Grundregel: Box3D wird nie an Kern angepasst.** Kern verändert weder Box3Ds Programm noch
+seine festen Werte, und Kern verstellt keine geheimen Regler darin, um ein Modell „zum Laufen zu
+bringen“. Passt ein Modell nicht, wird das **Modell** angepasst, nicht die Physik. Was ein echtes
+Gerät zusätzlich tut, etwa ein Servo mit Regler und Reibung, bekommt ein eigenes kleines Modell in
+echten Einheiten (6.15).
 
-## 6.1 Aufbau der Schicht
+> **Stell dir vor …** ein Schiedsrichter, den alle Mannschaften anerkennen. Passt einem Team das Spiel
+> nicht, trainiert es anders. Den Schiedsrichter zu bestechen, ist tabu.
 
-Box3D liegt unverändert unter `third_party/box3d` und wird in dasselbe WebAssembly-Modul übersetzt wie
-der Rest. Darüber sitzt `kern::physics` – die **einzige Stelle**, an der Kern mit Box3D spricht.
-Gebaut wird sie mit `kern/build.sh --physics` ([Kapitel 2](02-bauen-und-testen.md)).
+Kern spricht mit Box3D nur an **einer einzigen Übergabestelle**. Dort wird jede Eingabe geprüft,
+damit Unsinn wie ein negativer Radius nie in die Physik gelangt. Gerechnet wird in Metern, Sekunden
+und Kilogramm, mit Z nach oben – wie im Renderer.
 
-Die Abmachungen:
+Die Grundlagen dahinter (wie eine Physiksimulation überhaupt denkt) erklärt
+[Anhang C](C-grundlagen-physik.md). Hier geht es darum, **wie Kern sie benutzt**.
 
-- Meter, Sekunden, Kilogramm, **Z oben** – wie im Renderer.
-- Winkel sind in der Physik **Radiant**. Grad gibt es nur in Leveldateien und im Details-Panel.
-- Körper, Formen und Gelenke sind **Handles** (Nummern, 0 heißt „keins“); die `World` besitzt alles
-  und gibt beim Zerstören alles frei.
-- Fehler liefern ein ungültiges Handle und eine Erklärung in `last_error()`
-  ([Kapitel 3](03-grundlagen.md)). Jede Eingabe wird geprüft: Eine Pose mit `NaN` oder ein negativer
-  Radius erreicht Box3D nie.
+## 6.1 Die richtige Größe
 
-## 6.2 Die richtige Größe
+Box3D rechnet mit einem festen **Spielraum von ein paar Millimetern**: Körper dürfen sich um etwa
+5 mm durchdringen, und Kontakte werden schon kurz vor der Berührung angelegt. Für eine Kiste ist das
+winzig. Für ein Glied von 2 cm Länge ist es riesig.
 
-Box3D rechnet mit festen Toleranzen **in Metern**: Körper dürfen sich um 5 mm durchdringen („Linear
-Slop“), Kontakte entstehen schon ab 20 mm Abstand („Speculative Distance“), Hüllquader haben bis 50 mm
-Reserve. Daraus folgt die erste Regel: **Bewegte Körper gehören zwischen 0,1 m und 10 m, nie unter
-1 cm.** Die Spiel-Laufzeit setzt das durch: Bewegte Formen werden auf mindestens 1 cm Kantenlänge
-angehoben (Kugeln 5 mm Radius), feste dürfen bis 2 mm dünn sein.
+> **Stell dir vor …** ein Lineal mit Millimeterstrichen. Für einen Schrank ist es genau genug, für
+> eine Ameise nicht.
+
+Daraus folgt die erste Regel: **Bewegte Körper gehören zwischen 10 cm und 10 m.** Viel kleiner wird
+es wackelig. Darum macht die Spiel-Laufzeit bewegte Formen nie kleiner als 1 cm.
 
 > **Wusstest du?** Gemessen: Die Micro Duck in echter Größe hat Glieder von 2–4 cm. Ihr Rumpf sank
-> innerhalb von 10 Frames 9 cm durch die Beine. In vierfacher Größe halten die Gelenke.
+> innerhalb von 10 Bildern 9 cm durch die Beine. In vierfacher Größe halten die Gelenke.
 
-### Skalieren statt Toleranzen verstellen
+### Skalieren statt Spielraum verstellen
 
-Box3D könnte seine Toleranzen umstellen, aber nur für die **ganze** Welt – und in einem Kern-Level
-stehen Autos neben kleinen Robotern. Kern skaliert deshalb das **Modell** mit einem Faktor S, und zwar
-jede Größe passend zu ihrer Dimension (Froude-Ähnlichkeit). Für die Micro Duck ist S = 4:
-
-| Größe | Faktor | bei S = 4 |
-|---|---|---|
-| Länge | S | ×4 |
-| Zeit, Geschwindigkeit | √S | ×2 |
-| Masse | S³ | ×64 |
-| Drehmoment, Steifigkeit | S⁴ | ×256 |
-| Dämpfung | S⁴·√S | ×512 |
-| Trägheitsmoment | S⁵ | ×1024 |
-| Frequenzen | 1/√S | ×½ |
-| Beschleunigung, Schwerkraft | 1 | bleibt 9,81 m/s² |
+Box3D könnte seinen Spielraum umstellen, aber nur für die **ganze** Welt – und in einem Kern-Level
+stehen Autos neben kleinen Robotern. Kern vergrößert darum das **Modell**.
 
 > **Stell dir vor …** Filmleute drehen Szenen mit Modellschiffen und spielen sie langsamer ab, damit
 > die Wellen „echt“ wirken. Kern macht es umgekehrt: Der Roboter wird größer, und eine echte Sekunde
-> dauert in der Welt zwei. Die Bewegung bleibt dieselbe – nur in Einheiten, mit denen Box3D gut umgehen
+> dauert in der Welt länger. Die Bewegung bleibt dieselbe – nur in Maßen, mit denen Box3D gut umgehen
 > kann.
 
-Das ist ein **Wechsel der Einheiten**, kein größerer Roboter; nach außen (Netze, Logs, Kalibrierung)
-geht alles in echten Einheiten. Ein Test baut ein Servo-Bein in 1-, 4- und 8-facher Größe: Frei hängend
-laufen 1× und 4× **Bit für Bit gleich**. Auf dem Boden, wo die festen Toleranzen wirken, liegen sie nur
-0,23 bis 0,27 mm auseinander. Bei 4× entsprechen Box3Ds Toleranzen am echten Roboter sogar nur 1,25 mm
-bzw. 5 mm – feiner als in echter Größe.
+Für die Micro Duck heißt das: **Länge ×4, Zeit ×2, die Schwerkraft bleibt gleich.** Alles andere
+(Masse, Kraft, Schwung) wird passend dazu umgerechnet, sodass die Bewegung genau gleich aussieht, nur
+größer und langsamer. Das ist **nur ein Wechsel der Maßeinheit**, kein anderer Roboter. Nach außen,
+etwa zum Netz oder in Messprotokollen, spricht Kern weiter in echten Einheiten.
 
-Fest eingestellte Werte werden **kalibriert, nicht skaliert**. Weil die Zeit doppelt so lang läuft,
-entsprechen Frequenzen am echten Roboter dem Doppelten, Geschwindigkeiten der Hälfte: Kontaktsteifigkeit
-30 Hz in der Welt sind echte 60 Hz, die Servo-Gelenkweichheit 240 Hz echte 480 Hz, die
-Ausdrückgeschwindigkeit 3 m/s echte 1,5 m/s, die Restitutionsschwelle 1 m/s echte 0,5 m/s.
-Abweichungen zum echten Roboter kommen also aus den Modellen von Servo, Kontakt und Massen, die an Messungen abgeglichen werden ([Kapitel 16](16-kalibrierung.md)). Eine
-Garantie für sicheres Verhalten auf echter Hardware ist die Simulation nicht. Ein Roboter anderer
-Größe bekommt einfach ein anderes S.
+Ein Test beweist es: Ein frei hängendes Servo-Bein bewegt sich in einfacher und vierfacher Größe
+**Bit für Bit gleich**, also bis in die letzte Stelle jeder Zahl. Auf dem Boden, wo der feste
+Spielraum mitspielt, liegen sie weniger als einen drittel Millimeter auseinander.
 
-## 6.3 Die Welt
+Werte, die für die ganze Welt gelten (etwa wie weich Kontakte nachgeben), werden nicht mitskaliert.
+Wo die Simulation vom echten Roboter abweicht, liegt es an den Modellen für Servo, Kontakt und Massen,
+und die werden an Messungen angepasst ([Kapitel 16](16-kalibrierung.md)). Eine Garantie, dass der
+echte Roboter sich sicher verhält, ist die Simulation nicht. Ein Roboter anderer Größe bekommt einfach
+einen anderen Faktor.
 
-Alles beginnt mit einer Welt und ihren Einstellungen:
+> **Für Neugierige:** Bei vierfacher Größe wirkt Box3Ds Spielraum von 5 mm am echten Roboter wie nur
+> 1,25 mm – feiner als in echter Größe. Die vollständige Umrechnungstabelle steht im blauen Buch,
+> Kapitel 6.
 
-```cpp
-physics::WorldSettings ws;
-physics::World world;
-if (!world.create(ws)) { /* last_error() */ }
-world.step(1.0f / 60, 4);   // ein Schritt, 4 Sub-Steps
-```
+## 6.2 Die Welt und ihre Körper
 
-Zeile 1–3 erschaffen eine Welt mit Standardeinstellungen (oder melden, warum nicht). Zeile 4 rechnet
-eine Sechzigstelsekunde weiter, aufgeteilt in vier Teilschritte.
+Alles lebt in einer **Welt**. Sie hält alle Körper, Formen und Gelenke und rechnet sie Schritt für
+Schritt weiter, wie die Blätter eines Daumenkinos (6.12). In dieser Welt gibt es drei Arten von
+**Körpern**:
 
-Die wichtigsten Standards: Schwerkraft 9,80665 m/s² nach unten, ruhende Körper dürfen schlafen,
-Continuous Collision ist an, Stöße unter 1 m/s prallen nicht ab, Kontakte sind 30 Hz steif mit
-Dämpfung 10 und werden höchstens mit 3 m/s auseinandergedrückt, Hit-Events gibt es ab 1 m/s
-Aufprall, Höchstgeschwindigkeit 400 m/s. Eine Null oder ein negativer Wert bei Kontaktwerten und
-Höchstgeschwindigkeit lässt Box3Ds eigenen Standard stehen.
+> **Stell dir vor …** ein Theater. Der Bühnenboden bewegt sich nie: **fest**. Die Hebebühne fährt
+> genau so, wie die Technik es befiehlt, und schiebt alles mit, was draufsteht: **kinematisch**. Und
+> der Ball, den ein Schauspieler wirft, gehorcht Schwerkraft, Stößen und Reibung: **dynamisch**.
 
-Zwei Dinge setzt Kern immer selbst: **einen einzigen Arbeitsthread** (WebAssembly läuft einfädig, und
-es macht die Reihenfolge eindeutig) und eine eigene **Reibungsfunktion** für Materialpaare (6.6). Weil
-der Lehrer viele Welten auf mehreren Threads betreibt ([Kapitel 14](14-lehrer.md)), schützt nativ ein
-Schloss das Erzeugen und Zerstören von Welten.
+Einen dynamischen Körper bewegst du auf zwei Arten:
 
-Ein `step` leert die Ereignisse des letzten Schritts, ignoriert unsinnige Zeitschritte, rechnet mit 1 bis
-64 Sub-Steps, zählt mit und sammelt die neuen Ereignisse (6.10). Wie groß der Schritt ist, entscheidet
-der Aufrufer – im Spiel `GameWorld::step` (6.13).
+- Eine **Kraft** wirkt genau **einen** Schritt lang. Was dauerhaft schieben soll, etwa ein Wind,
+  muss jeden Schritt neu wirken.
+- Ein **Impuls** ist ein einmaliger Stoß, etwa für einen Sprung.
 
-## 6.4 Körper
+Wie schwer ein Körper ist und wie träge er sich dreht, ergibt sich normalerweise aus seinen Formen
+und deren Material. Importierte Roboter bringen dagegen ihre gemessenen Werte mit; dann bestimmen die
+Formen nur noch, wo sie anstoßen.
 
-Box3D kennt drei Arten von Körpern (Bodies):
+Damit schnelle Dinge nicht durch dünne Wände huschen, prüft Box3D ihre Bahn zwischen zwei Schritten
+lückenlos gegen feste Dinge; besonders schnelle, etwa Spielerfahrzeuge, auch gegen bewegte. Ruhende Körper dürfen „schlafen“: Sie werden nicht mehr gerechnet, bis sie jemand anstößt.
 
-> **Stell dir vor …** ein Theater. Der Bühnenboden bewegt sich nie: **fixed** (statisch). Die
-> Hebebühne fährt genau so, wie die Technik es befiehlt, und schiebt alles mit, was draufsteht:
-> **kinematic**. Und der Ball, den ein Schauspieler wirft, gehorcht Schwerkraft, Stößen und Reibung:
-> **dynamic**.
+Spiele bauen ihre Körper nicht von Hand, sondern aus dem Level ([Kapitel 8](08-spiel-laufzeit.md)).
+Studio zeichnet die Collider im Editor aus **demselben Plan**, nach dem das Spiel die Physik baut.
+Was du siehst, wird also genau so simuliert.
 
-Beim Anlegen gibst du Art, Anfangspose, Geschwindigkeiten, Dämpfung, Schwerkraftfaktor und einen
-freien Benutzerwert an. Mit `bullet` prüft Box3D einen schnellen Körper auch gegen andere bewegte
-Körper lückenlos.
+> **Für Neugierige:** Die Welt rechnet mit nur **einem** Rechenfaden. Dann ist die Reihenfolge aller
+> Rechnungen immer gleich – eine Voraussetzung dafür, dass überall dasselbe herauskommt (6.13).
 
-Zur Laufzeit kannst du Pose und Geschwindigkeit lesen und setzen, einen kinematischen Körper zu einer
-Zielpose fahren lassen, Achsen sperren (`set_motion_locks`) und Kräfte oder Impulse aufbringen:
+## 6.3 Formen
 
-- Eine **Kraft** wirkt genau **einen** Schritt. Dauerlasten müssen jeden Schritt neu gesetzt werden.
-- Ein **Impuls** ist ein einmaliger Stoß (Newtonsekunden), etwa für einen Sprung.
+Damit ein Körper anstoßen kann, bekommt er **Formen**, gern auch mehrere. Box3D kennt fünf:
 
-Kräfte und Impulse wecken einen schlafenden Körper. Den Typ zu wechseln geht, ist aber teuer.
-
-Masse, Schwerpunkt und Trägheit ergeben sich normalerweise aus den Formen und ihrer Dichte. Mit
-`set_mass` setzt du nur die Masse (die Trägheit wächst passend mit; der Körper bleibt in sich
-stimmig). Mit `set_mass_data` setzt du alles einzeln – der Weg für importierte Roboterbeschreibungen (MJCF, URDF), die ihre gemessenen Werte
-mitbringen. Die Kollisionsformen bestimmen dann nur noch den Kontakt.
-
-## 6.5 Formen
-
-Damit ein Körper anstoßen kann, bekommt er **Formen** (Shapes), gern auch mehrere (ein *Compound*).
-
-| Form | Was du angibst |
+| Form | Alltagsbild |
 |---|---|
-| `box` | volle Kantenlängen, Lage |
-| `sphere` | Radius |
-| `capsule` | Radius, Abstand der Halbkugeln entlang Z |
-| `hull` | mindestens 4 Punkte: konvexe Hülle |
-| `mesh` | Dreiecke gegen den Uhrzeigersinn, **nur an festen Körpern** |
+| Kiste | ein Schuhkarton |
+| Kugel | ein Ball |
+| Kapsel | eine Tablette: Zylinder mit zwei Halbkugeln an den Enden |
+| Hülle | ein Gummituch, straff um eine Punktwolke gespannt |
+| Dreiecksnetz | beliebige Form, aber **nur für Dinge, die sich nie bewegen** |
 
-Eine **konvexe Hülle** ist die Form, die entsteht, wenn du ein Gummituch um eine Punktwolke spannst
-(mehr in [Anhang C](C-grundlagen-physik.md)). Abgelehnt wird alles Unsinnige: Radius ≤ 0, flache
-Hüllen, ein Mesh an einem bewegten Körper. Bei Meshes verschweißt Kern Ecken mit 0,5 mm Toleranz und
-lässt Box3D innere Kanten erkennen. So stolpert nichts über „Geisterkanten“ zwischen zwei Dreiecken.
-Hat eine Hülle zu viele Ecken, reduziert Box3D sie auf seine Höchstzahl.
+Die **Hülle** ist der Allrounder: Sie passt sich an fast jede Form an, solange sie keine Dellen hat
+(mehr in [Anhang C](C-grundlagen-physik.md)). Beliebige Dreiecksnetze sind nur als fester Boden oder
+feste Wand erlaubt, weil Zusammenstöße zwischen zwei solchen Netzen viel zu teuer wären. Unsinniges
+wie ein Radius von null oder eine flache Hülle wird abgelehnt.
 
-### Material und Filter
+Bei festen Dreiecksnetzen achtet Kern auf die Nähte zwischen den Dreiecken. Sonst bliebe ein rollender
+Ball an der Naht zwischen zwei Bodenplatten hängen, als wäre dort eine Kante – eine sogenannte
+**Geisterkante**.
 
-Jede Form hat ein Material: **Dichte** (Standard 1 kg/m³), **Reibung** (0,6), **Restitution** (Sprungkraft,
-0), **Rollwiderstand** (0), eine **Oberfläche** (6.6) und den Schalter **Sensor** – dann meldet die Form
-nur Überlappungen und stößt nichts an. Dazu kommen Kollisionsfilter:
+> **Probier's aus!** Öffne über **File › Example Levels** das **Physics Lab** und schalte unter
+> **Window › Show** den Punkt **Collision Shapes** ein. Jetzt siehst du die Collider als Linien über
+> den Dingen: Kästen, Kugeln und andere Formen. Vergleiche: Wo ist die Form gröber als das sichtbare Ding?
 
-- **Kanäle:** Jede Form hat Kategorie-Bits und Masken-Bits. Zwei Formen kollidieren nur, wenn jede in
-  der Maske der anderen vorkommt.
-- **Gruppen:** Gleiche positive Gruppe kollidiert immer, gleiche negative nie. Praktisch für Roboter,
-  deren Glieder sich nicht gegenseitig stören sollen.
-- **Ereignis-Schalter:** welche Meldungen die Form erzeugt (6.10).
+## 6.4 Material
 
-`hull_mesh` baut die Dreiecke genau der Hülle, die kollidiert (4 bis 4096 Punkte, nicht flach); Studio
-zeichnet sie als Linien.
+Jede Form hat ein **Material**. Es sagt, wie schwer, wie rutschig und wie sprungfreudig sie ist:
 
-## 6.6 Oberflächen mit Paar-Reibung
+- **Dichte** – wie schwer der Stoff ist. Im Level startet jeder Collider mit **1000 kg/m³**, der
+  Dichte von Wasser. Ein Würfel von 10 cm Kantenlänge wiegt damit 1 kg, einer von 1 m eine Tonne.
+- **Reibung** – wie griffig (6.6).
+- **Restitution** – wie stark etwas abprallt (6.6).
+- **Rollwiderstand** – wie schnell Rollendes ausrollt (6.6).
+- **Oberfläche** – woraus es ist, etwa Stoff oder Holz (6.5).
+- **Sensor** – ein Schalter: Dann stößt die Form nichts an, sondern meldet nur, wenn etwas in sie
+  hineinkommt, wie eine Lichtschranke.
 
-Treffen zwei Formen aufeinander, braucht der Kontakt **einen** Reibwert. Box3D nimmt normalerweise
-√(a · b), die Wurzel aus dem Produkt (warum, steht in [Anhang C](C-grundlagen-physik.md)). Für
-Restitution nimmt es das Maximum. Für die meisten Dinge reicht das. Aber der Quelltext sagt es treffend:
-*TPU auf Baumwolle hat seinen eigenen gemessenen Wert, nicht das Mittel aus TPU auf TPU und Baumwolle
-auf Baumwolle.*
+> **Für Neugierige:** Wer Box3D in eigenem Programmcode ohne Level benutzt, startet bei Box3Ds
+> Grundwert von 1 kg/m³. Jeder Collider eines Levels – auch der automatische eines Meshes – bekommt
+> von der Spiel-Laufzeit aber die 1000 kg/m³.
 
-Deshalb kennt Kern **Oberflächenmaterialien**: `none`, `cloth`, `tpu` und `floor`. Für bestimmte Paare
-gibt es eigene Werte (Haftreibung trockener Paare):
+### Wer mit wem zusammenstößt
+
+Nicht alles soll mit allem kollidieren. Die Glieder eines Roboters etwa sollen sich nicht gegenseitig
+anstoßen, sonst verhaken sie sich.
+
+> **Stell dir vor …** eine Gästeliste. Jede Form sagt, zu welchem Verein sie gehört und mit welchen
+> Vereinen sie sich anlegt. Zwei Formen stoßen nur zusammen, wenn **beide** mit dem Verein der
+> anderen etwas zu tun haben wollen.
+
+Dazu kommen **Gruppen**: Alle Teile eines Roboters bekommen dieselbe Gruppennummer, die heißt „unter
+uns nie“. Und Körper, die direkt durch ein Gelenk verbunden sind, stoßen ohnehin nicht zusammen.
+
+## 6.5 Oberflächen mit Paar-Reibung
+
+Treffen zwei Formen aufeinander, braucht der Kontakt **einen** Reibwert. Normalerweise bildet Box3D
+aus den Reibwerten beider Formen eine Art Mittelwert, der näher am rutschigeren liegt: Eis auf Gummi
+bleibt rutschig. Für die meisten Dinge reicht das.
+
+Aber nicht für alle. Der Quelltext sagt es treffend: *TPU auf Baumwolle hat seinen eigenen gemessenen
+Wert, nicht das Mittel aus TPU auf TPU und Baumwolle auf Baumwolle.* (TPU ist ein weicher,
+gummiartiger Kunststoff aus dem 3D-Drucker.)
+
+> **Stell dir vor …** die Micro Duck soll eine Socke mit dem Schnabel greifen. Die Socke soll am
+> Schnabel haften, auf dem Holzboden aber rutschen. Mit einem einzigen Reibwert pro Ding geht das nicht:
+> Ist die Socke griffig, klebt sie auch am Boden. Es kommt auf das **Paar** an.
+
+Deshalb kennt Kern **Oberflächen**: Stoff, TPU und Boden. Für bestimmte Paare gibt es eigene,
+gemessene Werte (Haftreibung trockener Paare):
 
 | Paar | Reibung | Herkunft |
 |---|---|---|
-| cloth – cloth | 0,5 | Baumwollstrick auf Strick |
-| cloth – tpu | 0,8 | weiche Schnabelpolster auf Baumwolle |
-| cloth – floor | 0,4 | Baumwolle auf Holz/Laminat |
+| Stoff auf Stoff | 0,5 | Baumwollstrick auf Strick |
+| Stoff auf TPU | 0,8 | weiche Schnabelpolster auf Baumwolle |
+| Stoff auf Boden | 0,4 | Baumwolle auf Holz/Laminat |
 
-Kern ändert Box3D dafür nicht, sondern nutzt zwei vorgesehene Andockstellen: Die Oberfläche wird als
-Material-Nummer in die Form geschrieben, und die Welt bekommt Kerns Reibungsfunktion:
+Hat eine Seite keine Oberfläche, gilt wieder der übliche Mittelwert aus den Reibwerten der Formen.
+Die Micro Duck nutzt alle drei ([Kapitel 13](13-micro-duck.md)): Die Klumpen ihrer Socke sind Stoff,
+die gedruckten Polster am Schnabel TPU, der Holzboden im Beispiel-Level ist Boden. Ihre Sohlen haben
+**keine** Oberfläche: Sie behalten genau die Reibung, mit der ihr Netz trainiert wurde.
 
-```cpp
-float pair_friction(float fa, uint64_t ma,
-                    float fb, uint64_t mb) {
-  const f32 f = ma && mb && ma <= 3 && mb <= 3
-      ? surface_friction(Surface(ma), Surface(mb)) : -1.0f;
-  return f >= 0 ? f : sqrtf(fa * fb);
-}
-```
+Ein Feld dafür im Details-Panel gibt es nicht; die Oberfläche steht in der Leveldatei.
 
-Box3D ruft sie bei jedem Kontakt mit den Reibwerten (`fa`, `fb`) und Materialnummern (`ma`, `mb`)
-beider Formen auf. Zeile 3–4: Haben beide eine echte Oberfläche (1 bis 3), wird in der Paartabelle
-nachgeschaut; gibt es keinen Eintrag, kommt −1 zurück. Zeile 5: Gibt es einen Wert, gilt er, sonst die
-übliche Wurzel. Ist eine Seite `none`, zählen also immer die Reibwerte der Formen. Restitution und
-Rollwiderstand bleiben unberührt.
+> **Für Neugierige:** Kern ändert Box3D dafür nicht. Box3D hat eine vorgesehene Andockstelle für
+> eine eigene Reibungsregel, und dort hängt Kern seine Paartabelle ein. Der Code steht im blauen Buch,
+> Kapitel 6; warum der übliche Mittelwert so gebildet wird, erklärt [Anhang C](C-grundlagen-physik.md).
 
-> **Achtung, Falle!** Wer eine neue Oberfläche ergänzt, muss auch die Grenze `<= 3` anpassen, ihren
-> Namen eintragen und ihre Paare in die Tabelle schreiben. Sonst wird sie stillschweigend ignoriert.
+## 6.6 Reibung, Sprungkraft, Rollwiderstand
 
-Im Level steht die Oberfläche als Text (`"cloth"` usw.) an drei Stellen: am automatischen Collider
-eines Meshes, an einem eigenen Collider und am endlosen Boden. Ein eigenes Feld im Details-Panel gibt es
-dafür (Stand dieses Codes) nicht; sie wird im Leveldokument gesetzt. Unbekannte Namen werden `none`.
+Drei Material-Werte bestimmen, wie sich ein Ding anfühlt:
 
-Die Micro Duck nutzt alle drei ([Kapitel 13](13-micro-duck.md)): Die Klumpen ihrer Socke sind `cloth`,
-die gedruckten Polster am Schnabel `tpu`, und im Beispiel-Level ist der Holzboden `floor`. Ihre Sohlen
-haben **keine** Oberfläche: Sie behalten die Reibwerte, mit denen ihr Netz trainiert wurde (1,0 auf
-1,0 ergibt √1 = 1).
+- **Reibung** macht rutschig (Eis) oder griffig (Gummi).
+- **Restitution** macht hüpfig: 0 heißt „plumps, liegt“, 1 heißt „springt ohne Verlust zurück“. Von
+  zwei Formen zählt die sprungfreudigere. Ganz leichte Stöße prallen nie ab, sonst würde alles ewig
+  zittern.
+- **Rollwiderstand** bremst Rollendes, weil echte Bälle und Böden etwas nachgeben.
 
-## 6.7 Reibung, Sprungkraft, Rollwiderstand
+Kern setzt den Rollwiderstand gezielt ein, und die Kommentare im Code erklären, warum:
 
-**Reibung** stellst du pro Form ein. Im Editor: Details › Mesh › **Physics** für den automatischen
-Collider oder Details › Collider für eigene. Den endlosen Boden findest du unter World Settings ›
-Physics (Box3D) › **Ground friction** und **Ground bounciness**.
+- der Ball im Micro-Duck-Level: „ein Gummiball auf Holzboden rollt aus“,
+- die Reifen des Rovers im Physics Lab rollen leicht,
+- die Sockenklumpen bremsen stark: „ein Stoffklumpen rollt nicht; runde Klumpen würden es, und der
+  Haufen krabbelt“.
 
-**Restitution** (0 bis 1) entscheidet, wie stark etwas abprallt; Box3D nimmt das Maximum beider
-Formen. Stöße unter 1 m/s prallen gar nicht ab. **Kontaktweichheit** (Contact stiffness 30 Hz, Contact
-damping ratio 10, Contact push-out speed 3 m/s) steht ebenfalls in den World Settings.
+**Roboterfüße** sind breite, flache Formen mit hoher Reibung.
 
-**Rollwiderstand** bremst rollende Dinge. Box3D nimmt das Maximum beider Formen mal einen „Rollradius“
-(Radius bei Kugeln und Kapseln, ein Viertel des Innenradius bei Hüllen – auch Quader sind in Box3D
-Hüllen) und begrenzt damit das bremsende Moment. Kern setzt ihn gezielt ein:
+Im Editor findest du die Werte im Details-Panel: unter **Mesh › Physics** für den automatischen
+Collider eines Dings, unter **Collider** für einen eigenen. Den endlosen Boden stellst du unter
+**World Settings › Physics (Box3D)** mit **Ground friction** und **Ground bounciness** ein.
 
-- der Ball im Micro-Duck-Level: 0,03 („ein Gummiball auf Holzboden rollt aus“),
-- die Reifen des Rovers im Physics Lab: 0,02,
-- die Sockenklumpen: 0,5 („ein Stoffklumpen rollt nicht; runde Klumpen würden es, und der Haufen
-  krabbelt“).
+> **Probier's aus!** Öffne das **Physics Lab** und wähle eine Kiste. Die Kisten haben eigene
+> Collider, also stellst du im Details-Panel unter **Collider** die **Restitution** auf **0,9**.
+> Starte Simulate (Alt+S), den Probelauf mit Physik, greife die Kiste mit der Maus, heb sie hoch und lass sie fallen. Sie springt
+> jetzt mehrmals auf, jedes Mal etwas niedriger. Stell den Wert auf 0: Sie plumpst und bleibt
+> liegen. Gleiche Kiste, anderes Material.
 
-**Roboterfüße** sind breite, flache Quader oder Hüllen mit hoher Reibung.
+> **Für Neugierige:** In den World Settings gibt es außerdem Felder dafür, wie weich Kontakte
+> nachgeben und wie schnell Box3D Ineinandergeratenes wieder auseinanderdrückt.
 
-> **Probier's aus!** Öffne über **File › Example Levels** das **Physics Lab**, wähle eine Kiste und
-> setze im Details-Panel unter **Collider** die Restitution hoch (die Kisten haben eigene Collider;
-> Mesh › Physics gilt nur für den automatischen). Starte Simulate (Alt+S) und wirf die Kiste
-> mit der Maus auf den Boden.
+## 6.7 Gelenke
 
-## 6.8 Gelenke
+Ein **Gelenk** verbindet zwei Körper und erlaubt nur bestimmte Bewegungen. Box3D kennt neun Arten,
+und jede hat ein Vorbild im Alltag:
 
-Ein **Gelenk** verbindet zwei Körper und schränkt ein, wie sie sich zueinander bewegen dürfen. Das
-Lehrbuchbeispiel ist eine Tür:
+| Gelenk (Editor) | Alltagsbild |
+|---|---|
+| Hinge | Türscharnier: dreht um eine Achse |
+| Slider | Schublade: gleitet entlang einer Linie |
+| Ball | Schultergelenk, mit Kegel als Grenze |
+| Fixed | Schweißnaht (darf auch etwas federn) |
+| Distance / rope | Stange oder Seil |
+| Wheel | Rad mit Federung und Antrieb |
+| Motor | zieht B zu einer Lage relativ zu A |
+| Parallel | hält etwas weich aufrecht |
+| No collision | verbindet nichts, verhindert nur Zusammenstöße |
 
-```cpp
-physics::JointSettings j;
-j.type = physics::JointType::revolute;
-j.body_a = frame_body;  j.body_b = door;
-j.frame_a = physics::frame_from_axis(
-    world.local_point(frame_body, hinge), {0, 0, 1}, false);
-j.frame_b = physics::frame_from_axis(
-    world.local_point(door, hinge), {0, 0, 1}, false);
-j.enable_limit = true;  j.lower = -1.7f;  j.upper = 1.7f;
-const physics::Joint joint = world.create_joint(j);
-```
+**Das Beispiel Tür:** Ein Scharnier verbindet Türrahmen und Tür. Kern legt am Scharnierpunkt eine
+senkrechte Achse fest, um die sich die Tür drehen darf. Eine **Grenze** von gut 97 Grad in jede
+Richtung sorgt dafür, dass die Tür nicht durch die Wand schwingt. Der Winkel null ist die Lage, in
+der Tür und Rahmen gebaut wurden – darum baut man Gelenke immer in ihrer Ruhelage.
 
-Zeile 2 wählt ein Drehgelenk (*revolute*, ein Scharnier). Zeile 3 sagt: Es verbindet Türrahmen und
-Tür. Zeile 4–7 bauen für beide Körper einen **Frame** (ein kleines Koordinatenkreuz) am Scharnierpunkt,
-dessen Z-Achse senkrecht nach oben zeigt – um diese Achse dreht die Tür. Zeile 8 begrenzt den Winkel
-auf ±1,7 Radiant (gut ±97°), damit die Tür nicht durch die Wand schwingt. Zeile 9 baut das Gelenk.
+Viele Gelenke haben drei Extras:
 
-Ein paar Abmachungen: Drehgelenke, Kugelgelenke und Parallel-Gelenke arbeiten **um die Z-Achse** ihres
-Frames, Schiebe- und Radgelenke **entlang der X-Achse**. `frame_from_axis` baut so einen Frame aus Anker
-und Achse. Der Nullwinkel liegt dort, wo beide Frames übereinstimmen.
+- eine **Feder**, die zu einer Lage zurückzieht, wie ein Türschließer,
+- **Grenzen**, die die Bewegung begrenzen, wie ein Türstopper,
+- einen **Motor**, der mit einer Wunschgeschwindigkeit dreht, aber nur bis zu seiner Höchstkraft.
 
-| Gelenk (Editor) | Box3D | Alltagsbild |
-|---|---|---|
-| Hinge | revolute | Türscharnier |
-| Slider | prismatic | Schublade |
-| Ball | spherical | Schultergelenk, mit Kegelgrenze |
-| Fixed | weld | Schweißnaht (auch weich) |
-| Distance / rope | distance | Stange oder Seil |
-| Wheel | wheel | Rad mit Federung und Antrieb |
-| Motor | motor | zieht B zu einer Lage relativ zu A |
-| Parallel | parallel | hält etwas weich aufrecht |
-| No collision | filter | verhindert nur Kollision |
-
-Viele Gelenke haben drei Extras: eine **Feder** (Frequenz in Hertz und Dämpfungsgrad), **Grenzen** und
-einen **Motor** (Sollgeschwindigkeit und Höchstkraft bzw. -moment). Ein Seil ist ein Distance-Gelenk
-mit Höchstlänge (Ruhelänge mindestens 1 mm). Ein Weld-Gelenk mit 0 Hz ist starr, mit mehr Hertz weich;
-das Kugelgelenk begrenzt mit einem Kegel. Vertauschte Grenzen dreht Kern um, negative Höchstkräfte
-werden 0. Verbundene Körper kollidieren standardmäßig nicht miteinander. Und jedes Gelenk hat
-eine **Weichheit im Solver** (Box3Ds Standard: 60 Hz, Dämpfung 2). Ein Gelenk, das einen Körper mit sich
-selbst verbinden will, wird abgelehnt.
-
-Zur Laufzeit kannst du Motoren schalten, Winkel und Drehgeschwindigkeit eines Scharniers lesen, die
-**Zwangskraft** und das Zwangsmoment abfragen (wie stark das Gelenk gerade hält), Meldeschwellen setzen
-und Gelenke entfernen (die Körper werden dabei geweckt).
+Während des Spiels kann man fragen, wie stark ein Gelenk gerade hält, und Motoren an- und
+ausschalten.
 
 ### Wenn Gelenke brechen
 
-Mit Bruchschwellen (im Editor *Break force* und *Break torque*) meldet Box3D ein Gelenk, sobald es zu
-stark belastet wird. Die Spiel-Laufzeit zerstört es dann, zählt mit, schreibt „Joint on "…" broke“ ins
-Log und spielt den Bruch-Sound. So reißt die Seilbrücke im Physics Lab.
+Ein Gelenk kann eine **Bruchschwelle** haben (im Editor *Break force* und *Break torque*). Wird es
+stärker belastet, bricht es: Die Spiel-Laufzeit entfernt es, schreibt eine Meldung ins Log und spielt
+den Bruch-Sound. So reißt die Seilbrücke im Physics Lab.
 
-> **Probier's aus!** Starte im Physics Lab Simulate und ziehe mit der Maus kräftig an einer Planke der
-> Seilbrücke: Die Kette gibt nach und schwingt. (Reißen wird sie so kaum – der Maus-Griff hat eine
-> begrenzte Kraft, die schwachen Gelenke brechen erst unter großer Last.) Schalte unter
-> **Window › Show** die Punkte **Collision Shapes** und **Constraints** ein, dann siehst du Formen
-> und Gelenke.
+> **Probier's aus!** Starte im Physics Lab Simulate und zieh mit der Maus kräftig an einer Planke der
+> Seilbrücke: Die Kette gibt nach und schwingt, reißt aber kaum, denn der Maus-Griff hat eine
+> begrenzte Kraft. Willst du sie reißen sehen? Wähle im Editor die Planke **Plank 07** (Ordner
+> **Bridge**) und setze in Details unter **Breaking** die **Break force** auf einen kleinen Wert,
+> etwa 500. Starte Simulate erneut: Je nach Wert reißt die Brücke schon unter ihrem eigenen Gewicht
+> oder sobald du an ihr ziehst. Schalte unter **Window › Show** auch **Constraints** (die Gelenke)
+> ein, dann siehst du, welches Gelenk fehlt.
 
-### Die Gelenkfeder in echten Einheiten
+Servos und Roboterbeschreibungen geben Federn in anderen Einheiten an als Box3D. Kern rechnet sie in
+jedem Schritt an der Übergabestelle um. Wie, steht im blauen Buch, Kapitel 6.
 
-Box3D stellt Federn als Frequenz und Dämpfungsgrad ein. Servos und Roboterbeschreibungen rechnen aber
-in Newtonmeter pro Radiant (Steifigkeit) und Newtonmetersekunden pro Radiant (Dämpfung).
-`set_joint_spring` rechnet an der Grenze um, genau wie Box3D intern: über die **effektive Masse** des
-Gelenks, also wie schwer sich die Drehung um die Achse anfühlt. Weil die von der Lage abhängt, wird die
-Funktion **jeden Schritt** aufgerufen. Der Zielwinkel wird auf ±π begrenzt, eine Steifigkeit ≤ 0
-schaltet die Feder ab. Box3D löst die Feder implizit; sie ist bei jeder Steifigkeit stabil. Die Formeln
-stehen in [Anhang C](C-grundlagen-physik.md).
+## 6.8 Abfragen: Strahlen, Kugeln, Explosionen
 
-## 6.9 Abfragen: Strahlen, Kugeln, Explosionen
+Man kann der Physik auch Fragen stellen, ohne etwas zu bewegen:
 
-- **`cast_ray`** schießt einen Strahl und meldet den nächsten Treffer: Punkt, Normale, Körper, Form und
-  wie weit entlang der Strecke. Sensoren werden übersprungen, ebenso ein Körper, den du ausnimmst – oder
-  eine ganze Liste (ein Robotersensor sieht so seine eigenen Glieder nicht).
-- **`cast_sphere`** schiebt eine Kugel statt eines Strahls: ein „dicker Strahl“ für Bodenproben, die
-  keine Kante verfehlen.
-- **`explode`** verteilt einen Stoß kugelförmig um einen Punkt auf Kugeln, Kapseln und Hüllen; ein
-  negativer Wert macht eine Implosion. Eine Maske über die Kategorie-Bits wählt aus, wen Abfragen sehen.
-- **`push_body`** schubst einen Körper gerade so stark, dass er einem bewegten Schieber nicht im Weg
-  bleibt. Dazu kommen zwei Kapsel-Abfragen für den Character Mover (6.12): wie weit die Kapsel fahren
-  kann und welche Ebenen (höchstens 32) sie berührt.
+- **Strahl-Frage:** „Was trifft eine gedachte Linie von hier nach dort als Erstes?“ Die Antwort:
+  Punkt, Richtung der Fläche, Körper. Sensoren werden übersprungen, und man kann Körper ausnehmen.
+  So sieht ein Robotersensor seine eigenen Glieder nicht.
+- **Kugel-Frage:** wie die Strahl-Frage, aber mit einer geschobenen Kugel statt einer dünnen Linie.
+  Ein „dicker Strahl“ verfehlt keine Kante, gut für Bodenproben.
+- **Explosion:** ein Stoß, der kugelförmig von einem Punkt ausgeht und alles in der Nähe wegschubst.
+  Mit negativer Stärke wird daraus ein Sog.
 
-## 6.10 Kontakte und Ereignisse
+Über die Vereine aus 6.4 lässt sich wählen, wen eine Abfrage überhaupt sieht.
 
-Nach jedem Schritt liegen die Ereignisse **dieses** Schritts bereit: Formen beginnen oder hören auf
-sich zu berühren, ein Besucher betritt oder verlässt einen Sensor, ein Stoß war heftig genug für ein
-**Hit-Event** (mit Punkt und Aufprallgeschwindigkeit), ein Gelenk hat seine Bruchschwelle überschritten.
-Weil eine Form inzwischen zerstört sein kann, tragen die Ereignisse auch die Körper.
+## 6.9 Kontakte und Ereignisse
 
-> **Achtung, Falle!** Ereignisse kosten Rechenzeit. Die Spiel-Laufzeit schaltet sie nur dort ein, wo das
-> Spiel sie liest: Sensor-Ereignisse an Sensoren und Spielern (bei Logik-Graphen an allen bewegten
-> Formen), Kontakt-Ereignisse nur am Spieler (für Pickups und Trigger), Hit-Ereignisse an Spieler,
-> Körpern mit Aufprall-Sound oder bei Logik.
+Nach jedem Schritt meldet die Physik, was passiert ist: Zwei Formen fangen an oder hören auf, sich zu
+berühren. Etwas betritt oder verlässt einen Sensor. Ein Aufprall war heftig genug für ein Geräusch.
+Ein Gelenk ist gebrochen.
 
-Zwei Abfragen lesen Kontaktdaten direkt: `contact_points` liefert alle Berührpunkte eines Körpers mit
-Normale, Eindringtiefe und Normalimpuls – Studio zeichnet sie mit dem Show-Flag **Contact Points**. Und
-`touching` sagt, welche Körper einer gerade berührt und wie fest. Das ist genau das, was ein
-Kontaktsensor meldet, etwa eine Sohle auf dem Boden; die Micro Duck nutzt es für ihre Füße.
+> **Stell dir vor …** ein Nachrichtenticker nach jedem Spielzug. Der Ticker kostet aber Arbeit, also
+> abonniert man nur die Meldungen, die man auch liest.
 
-## 6.11 MouseGrab: Körper mit der Maus ziehen
+> **Achtung, Falle!** Ereignisse kosten Rechenzeit. Die Spiel-Laufzeit schaltet sie darum nur dort
+> ein, wo das Spiel sie wirklich liest – etwa am Spieler, damit er Dinge einsammeln und unsichtbare Auslöser
+> betreten kann.
+
+Man kann außerdem direkt fragen: „Welche Körper berührt dieser Körper gerade, und wie fest?“ So weiß
+die Micro Duck, ob ihr Fuß gerade den Boden berührt – genau wie ein Berührungssensor in einer echten
+Sohle. Studio zeigt die Berührpunkte mit **Window › Show › Contact Points**.
+
+## 6.10 MouseGrab: Körper mit der Maus ziehen
 
 > **Stell dir vor …** du hängst einen Gegenstand an ein Gummiband und ziehst am anderen Ende. Er folgt
 > dir, schwingt, stößt an, und wenn du loslässt, fliegt er mit Schwung weiter.
 
-Genau so funktioniert `MouseGrab`: Ein unsichtbarer kinematischer „Maus-Körper“ folgt dem Zeiger, und
-ein Motor-Gelenk mit Feder verbindet ihn mit dem Griffpunkt. Die Feder hat 7,5 Hz und ist kritisch
-gedämpft (sie schwingt nicht nach). Ihre Kraft ist auf das Hundertfache des Gewichts begrenzt. Drehen
-darf sich der Körper frei – er kippt und pendelt am Griff. Mit `hold_rotation` hält der Griff zusätzlich
-die Ausrichtung fest, wie eine Hand (Drehfeder mit halber Frequenz, Höchstmoment ein Viertel der
-Höchstkraft). Das nutzt Studio für den Rumpf der Micro Duck, damit sie hochgehoben aufrecht bleibt.
-Feste und kinematische Körper lassen sich nicht greifen; verschwindet der gegriffene Körper, endet der
-Griff von selbst. Studio greift in Simulate, nach Eject und mit der Observer-Kamera.
+Genau so funktioniert der Maus-Griff: Ein unsichtbarer Punkt folgt dem Mauszeiger, und eine
+gedämpfte Feder verbindet ihn mit der Stelle, an der du gegriffen hast. Die Feder schwingt nicht nach
+und zieht nie stärker als ein Vielfaches des Gewichts. Drehen darf sich der Körper frei: Er kippt und
+pendelt am Griff. Für den Rumpf der Micro Duck hält der Griff zusätzlich die Ausrichtung fest, wie
+eine Hand, damit sie hochgehoben aufrecht bleibt. Feste und kinematische Körper lassen sich nicht
+greifen.
 
-> **Probier's aus!** In Simulate greifst du jeden dynamischen Körper mit der linken Maustaste (oder dem
-> Finger). Zeiger nach oben hebt, Mausrad holt näher oder schiebt weg, Loslassen wirft.
+> **Probier's aus!** In Simulate greifst du jeden dynamischen Körper mit der linken Maustaste (oder
+> dem Finger). Zeiger nach oben hebt, das Mausrad holt näher oder schiebt weg, Loslassen wirft.
 
-## 6.12 Der Character Mover
+## 6.11 Der Character Mover
 
-Für Spielfiguren gibt es den `CharacterMover`, gebaut auf Box3Ds experimenteller Mover-Schnittstelle.
-Die Figur ist eine Kapsel, die **außerhalb des Solvers** läuft: Sie kämpft nicht gegen Kontakte, sondern
-rechnet ihre Bewegung selbst und schubst dynamische Körper an, in die sie läuft.
+Spielfiguren laufen **nicht** ganz echt physikalisch. Echte Physik würde eine Figur an jeder
+Bordsteinkante hängen lassen und an Wänden kleben. Darum rechnet die Figur ihre Bewegung selbst aus,
+außerhalb des Solvers, und schubst dabei Dinge an, in die sie läuft.
 
-Standards: 0,4 m Radius, 1,8 m Höhe, 6 m/s, Sprung mit 6 m/s, Sprint ×1,6, in der Luft ein Viertel
-der Beschleunigung, Flächen über 50° sind kein Boden, und eine eigene, knackigere Schwerkraft von
-20 m/s². Wie stark er Körper schubst, ist einstellbar (0 = gar nicht).
+> **Stell dir vor …** die Figur steht auf einem Springstock (Pogo-Stick), der sie immer ein Stück
+> über dem Boden hält. Eine kleine Stufe rutscht einfach unter dem Stock durch, und die Figur wird
+> sanft auf die neue Höhe gehoben. So läuft sie Treppen und Rampen hinauf, ohne zu stolpern.
 
-Pro Schritt passiert:
+Die Figur selbst ist eine Kapsel. In jedem Schritt beschleunigt sie in die gewünschte Richtung, prüft,
+welche Flächen sie berührt, und gleitet an ihnen entlang statt hineinzulaufen. Drückt sie gegen eine
+Wand, baut sich also keine Geschwindigkeit auf. Zu steile Flächen gelten nicht als Boden. Die
+Spiel-Laufzeit nutzt den Character Mover für die Spieler „Character“ und „Soldier“
+([Kapitel 8](08-spiel-laufzeit.md)).
 
-1. Reibung, Beschleunigung Richtung Wunsch, Sprung, Schwerkraft.
-2. **Pogo-Feder:** Eine Kugelprobe misst den Abstand zum Boden, und eine gedämpfte Feder (4 Hz,
-   Dämpfung 0,7) hält die Kapsel auf Stufenhöhe (0,45 m). So läuft sie Treppen und Rampen hinauf.
-3. Bis zu fünfmal: berührte Ebenen sammeln, die Bewegung dagegen lösen und den Rest an den Ebenen
-   abschneiden. Gegen eine Wand drücken baut also keine Geschwindigkeit auf.
-4. Dynamische Körper in den berührten Ebenen bekommen einen Stoß.
+> **Für Neugierige:** Der Character Mover hat seine eigene, knackigere Schwerkraft, damit Sprünge sich
+> gut anfühlen. Alle Standardwerte stehen im blauen Buch, Kapitel 6.
 
-Danach kennt der Mover seine Fußposition und die berührten Ebenen (für Trigger und Pickups). Die
-Spiel-Laufzeit nutzt ihn für die Spieler „Character“ und „Soldier“ und macht deren Körper dafür
-kinematisch ([Kapitel 8](08-spiel-laufzeit.md)).
-
-## 6.13 Der Takt: Zeitschritt und Sub-Steps
+## 6.12 Der Takt: Zeitschritt und Sub-Steps
 
 > **Stell dir vor …** ein Daumenkino. Jedes Blatt ist ein Physikschritt. Wenn die Blätter immer
 > gleich weit auseinanderliegen, läuft der Film ruhig. Würdest du mal ein, mal fünf Blätter
 > überspringen, wäre alles ruckelig – und eine Feder könnte sich „aufschaukeln“.
 
-Box3D bekommt **nie einen schwankenden Zeitschritt**. Die Schrittrate ist eine Level-Einstellung
-(**Step rate**, Standard 60 Hz, erlaubt 15 bis 480 Hz; nie gröber als 30 Hz). `GameWorld::step` nutzt
-einen **Akkumulator** nach Glenn Fiedler („Fix Your Timestep“):
+Darum bekommt Box3D **immer gleich große Zeitschritte**, egal wie schnell dein Bildschirm ist.
+Standard sind 60 Schritte pro Sekunde (60 Hz). Die Level-Einstellung **Step rate** erlaubt 15 bis 480;
+die Regeln raten aber, nie unter 30 zu gehen.
 
-- Jeder Frame zahlt seine Zeit in ein Sparschwein ein. Die Physik hebt sie in festen Portionen ab; der
-  Rest bleibt für das nächste Mal.
-- Ein langer Frame (etwa ein Hintergrund-Tab) zählt höchstens 0,25 s, und pro Frame laufen höchstens
-  0,1 s Simulation. Das verhindert die **„Spiral of Death“**, in der die Physik nie aufholt. Ist man
-  trotzdem im Rückstand, fallen ganze Schritte weg, und der Rest im Sparschwein bleibt im Takt.
-- Die Simulationszeit **zählt Schritte**, statt Kommazahlen aufzusummieren, die mit der Zeit driften.
-- Eingaben gelten pro Schritt; eine Steuerung, die mit 50 Hz rechnet, zählt Schritte, nicht Sekunden.
+Aber Bildschirme liefern ihre Bilder nicht im Takt der Physik. Wie passt das zusammen?
 
-Gezeichnet wird **zwischen** den beiden letzten Physikständen, gewichtet mit dem Rest im Sparschwein.
-So ist Bewegung bei jeder Bildrate glatt. Die Kamera folgt dieser geglätteten Pose; mit der rohen Pose
-wackelten schnelle Autos im Bild.
+> **Stell dir vor …** ein Sparschwein. Jedes Bild zahlt die Zeit ein, die seit dem letzten vergangen
+> ist. Die Physik hebt sie in festen Portionen ab, so viele, wie drin sind. Was übrig bleibt, wartet
+> auf das nächste Bild.
+
+Hängt der Rechner einmal (etwa weil ein Browser-Tab im Hintergrund lag), wird nicht unbegrenzt
+nachgerechnet. Sonst bräuchte das Aufholen so lange, dass man noch weiter zurückfiele, ein
+Teufelskreis. Lieber fallen ein paar Schritte weg.
+
+Die Simulationszeit **zählt Schritte**, statt Sekundenbruchteile aufzusummieren, bei denen sich
+winzige Rundungsfehler mit der Zeit ansammeln würden. Auch Eingaben gelten pro Schritt.
+
+**Zwischenbilder:** Gezeichnet wird ein Zwischenstand der beiden letzten Physikschritte, je nachdem,
+wie viel Rest im Sparschwein liegt. So sieht Bewegung bei jeder Bildrate glatt aus. Die Kamera folgt
+diesem geglätteten Stand; mit dem rohen Stand wackelten schnelle Autos im Bild.
 
 ### Sub-Steps
 
-Jeder Schritt wird in Box3D noch einmal in **Sub-Steps** geteilt (World Settings › **Sub-steps**,
-Standard 4, im Level 1 bis 16). Lange Gelenkketten dehnen sich mit mehr Sub-Steps weniger.
+Jeder Schritt wird in Box3D noch einmal in **Sub-Steps** (Teilschritte) zerlegt, einstellbar unter
+**World Settings › Sub-steps** (Standard 4, im Level 1 bis 16). Mehr Teilschritte bedeuten, dass
+lange Gelenkketten besser zusammenhalten.
 
 > **Wusstest du?** Gemessen an der Hüfte der Ente: Bei 4 Sub-Steps wuchs die Gelenklücke unter Last auf
 > 5 cm. Bei 16 Sub-Steps bleibt sie unter 1 mm. Fügt Studio einen Roboter ein, stellt es deshalb
-> 16 Sub-Steps und dessen Schrittrate ein (Micro Duck: 100 Hz) und meldet das.
+> 16 Sub-Steps und dessen Schrittrate ein (Micro Duck: 100 Schritte pro Sekunde) und meldet das.
 
-Auch die Steifigkeit hängt an den Sub-Steps: Box3D begrenzt Gelenkfedern auf ein Viertel und
-Kontaktfedern auf ein Achtel der Sub-Step-Rate. Kern hält zusätzlich jede Feder des Levels unter der
-halben Sub-Step-Frequenz. Servogelenke bekommen eine Gelenkweichheit von 240 Hz (oder weniger, wenn die
-Grenze es verlangt). Steifer geht also nur mit mehr Sub-Steps.
+Auch die Steifigkeit hängt an den Teilschritten: **Je steifer eine Feder, desto mehr Teilschritte
+braucht sie.** Eine Feder, die schneller schwingt, als die Physik hinschaut, gerät außer Kontrolle.
+Darum begrenzen Box3D und Kern jede Feder auf das, was die Zahl der Teilschritte noch sauber fassen
+kann. Steifer geht nur mit mehr Teilschritten.
 
-## 6.14 Determinismus
+## 6.13 Determinismus
 
-Kern ist **Bit für Bit deterministisch**: Gleiche Eingaben ergeben auf allen geprüften Plattformen
-(GCC auf x86, Apple clang auf ARM, WebAssembly) exakt dasselbe Ergebnis. Die Physik trägt bei durch
-festen Zeitschritt, einen einzigen Thread, Box3D ohne SIMD-Abkürzungen, das Abschalten von
-FMA-Zusammenfassungen und Kerns eigene Mathebibliothek für Sinus und Co. Warum jeder dieser Punkte nötig
-ist, erklärt [Anhang C](C-grundlagen-physik.md).
+Kern ist **Bit für Bit deterministisch**: Gleiche Eingaben ergeben auf einem Linux-PC, auf einem Mac
+und im Browser exakt dasselbe Ergebnis, bis in die letzte Stelle jeder Zahl. Alle drei werden
+regelmäßig geprüft.
 
-Geprüft wird mit einem **Fingerabdruck**: Die Ente geht 400 Regeltakte, jeder wird gehasht, und die
-Hashes müssen nativ, als WebAssembly und auf ARM dieselbe Referenzdatei treffen
-([Kapitel 14](14-lehrer.md)). Die Regel für neuen Code: `kern::dm::` statt `std::` für sin, cos, exp,
-log & Co., keine Summen, deren Reihenfolge von Threads abhängt, keine `-ffast-math`.
+Warum so streng? Weil Physik winzige Unterschiede in Sekunden aufschaukelt. Ein Unterschied in der
+letzten Stelle wird bei einem laufenden Roboter schnell zu einem ganz anderen Schritt. Und Kern
+braucht Gleichheit: Ein Training soll auf jedem Gerät dasselbe Netz ergeben, ein Fehler soll sich
+nachstellen lassen, und eine Aufzeichnung soll überall gleich ablaufen.
 
-## 6.15 Die Regeln
+Die Physik trägt dazu bei mit dem festen Zeitschritt, einem einzigen Rechenfaden und Kerns eigenen
+Rechenregeln für Sinus und Co. Warum jeder dieser Punkte nötig ist, erklärt
+[Anhang C](C-grundlagen-physik.md).
 
-`docs/physics.md` ist verbindlich für jeden Code, der Körper, Formen, Gelenke oder Motoren anlegt. Die
-Regeln stützen sich auf Erin Cattos eigene Dokumentation und Vorträge und auf Messungen in Kern. Das
-Wichtigste:
+Geprüft wird mit einem **Fingerabdruck**: Die Ente läuft eine kurze Strecke, nach jedem Schritt ihrer Steuerung wird eine
+kurze Prüfzahl ihres Zustands gebildet, und die Liste muss auf allen Plattformen dieselbe sein
+([Kapitel 14](14-lehrer.md)).
 
-- **Größen:** Meter, Kilogramm, Sekunden. Bewegte Körper 0,1 bis 10 m. Kleine Modelle als Ganzes
-  skalieren, Einheiten nur an der Grenze zu Box3D umrechnen. Tabu: Box3Ds Längeneinheit verstellen.
-- **Massen:** Nachbarmassen höchstens etwa 10 : 1 (Erin Cattos Rat bei extremen Verhältnissen: leichte
-  Teile schwerer, schwere leichter machen). Ein starres Teil ist **ein** Körper mit mehreren Formen,
-  nicht mehrere verschweißte; Kinder, die nur ein Mesh haben, schweißt Kern als Formen in den nächsten
-  Vorfahren mit Körper ein. Leichte Glieder bekommen eine Mindestmasse (die 5-g-Hüftbügel der
-  Ente wiegen mindestens 20 g).
-- **Takt:** fester Zeitschritt, Interpolation, Kamera an der geglätteten Pose, lange Ketten mit mehr
-  Sub-Steps, Federn unter der halben Sub-Step-Frequenz.
-- **Gelenke:** in der Ruhepose bauen, Grenzen müssen die Null enthalten. Eigenkollision per negativer
-  Gruppe oder No-collision-Gelenk filtern. Box3Ds Standard-Weichheit (60 Hz, 2) nicht anfassen, außer
-  bei Servos.
-- **Motoren:** Immer eine **endliche** Höchstkraft setzen. Servos sind Gelenkfedern mit
-  physikalischen Werten (6.17); das Haltemoment entsteht durch Begrenzen des Fehlers. **Nicht**
-  „Motorgeschwindigkeit = Faktor × Fehler“ für Roboter mit trainiertem Netz – das wäre eine starre
-  Regelung, das Netz hat aber einen nachgiebigen Servo gelernt. Gelenkreibung ist ein Motor mit
-  Geschwindigkeit 0. Rotorträgheit ist eine Masse (Scheibe auf der Achse); was Box3D nicht kann, wird
-  dokumentiert, nicht vorgetäuscht. Aufrecht halten per Parallel-Gelenk. Reibung pro Form,
-  Rollwiderstand für runde Dinge.
-- **Kräfte:** Dauerlasten jeden Schritt als Kraft, Sprünge als Impuls, Dämpfung über Box3Ds eingebaute
-  Dämpfung – nie selbst gebaut als Kraft gegen die Geschwindigkeit, das wird an leichten Körpern
-  instabil.
-- **Tabu: die Physik umgehen.** Keine Zusatzmomente, die etwas „nachbilden“, keine gesetzten
-  Geschwindigkeiten an Körpern mit Gelenken oder Kontakten, keine Stützkräfte für Roboter. Gemessen:
-  Ein „Gyro“ auf Geschwindigkeitsebene ließ den Rumpf der Ente springen.
-- **Körper:** an der Endpose erzeugen statt teleportieren, Typ beim Erzeugen festlegen. Kinematische
-  Körper über Geschwindigkeit oder Zielpose bewegen (ein Ziel langsamer als die Schlafschwelle wird
-  übersprungen). Figuren laufen auf dem Character Mover. Importierte Roboter bringen Masse, Schwerpunkt
-  und Trägheit mit; Gelenke, die nicht in Nullstellung gebaut werden, tragen ihren Bauwinkel als
-  Referenz. Bewegungssperren nur bei Fahrzeugen, Figuren und Fliegern, **nie bei Walkern** – ein Roboter muss fallen können, sonst
-  lernt er nichts Echtes.
-- **Schlaf und Ereignisse:** Continuous Collision anlassen, schnelle Spielerfahrzeuge sind Bullets.
-  Ereignisse nur an Formen, deren Meldungen das Spiel liest. Spieler und Roboter schlafen nie (eine
-  langsame Gangart liegt unter der Schlafschwelle von 5 cm/s).
+> **Für Neugierige:** Für neuen Code gilt darum: keine Rechen-Abkürzungen, die das Ergebnis in der
+> letzten Stelle ändern dürfen, und Sinus & Co. nur aus Kerns eigener Mathebibliothek. Die genauen
+> Regeln stehen im blauen Buch, Kapitel 6.
 
-Die Checkliste für einen neuen gelenkigen Preset fasst das zusammen: jedes bewegte Teil in echter
-Größe ab 10 cm (sonst skalieren), ein Körper pro starrem Segment, Massen im Rahmen, Bau in der Ruhepose,
-Servos als Gelenkfedern, 8 bis 16 Sub-Steps, Eigenkollision per negativer Gruppe – und am Ende ein Test:
-Der Preset steht, seine Gelenke halten (Lücke unter 1 % der Gliedlänge), und er erfüllt
-deterministisch seine Aufgabe.
+## 6.14 Vier Grundsätze
 
-## 6.16 Wie die Spiel-Laufzeit die Physik nutzt
+Kern hat für alles, was Körper, Formen, Gelenke oder Motoren anlegt, eine verbindliche Regelliste.
+Sie stützt sich auf Erin Cattos eigene Ratschläge und auf Messungen in Kern. Im Kern sind es vier
+Grundsätze:
 
-Spiele bauen ihre Physik aus dem Level ([Kapitel 8](08-spiel-laufzeit.md)): `plan_bodies` plant Körper
-und Formen (Studio zeichnet mit demselben Plan die Collider), `create_body` und `create_joints` setzen
-ihn um (samt Grad → Radiant, Materialien, Filtern, Ereignissen, Massen, Sperren, Federgrenze,
-Bruchschwellen), und `fixed_step` treibt jeden Schritt Controller, kinematische Animationen, Verkehr,
-Walker, Servos und Maus-Griff an, ruft `World::step` und verarbeitet die Ereignisse.
+1. **Die richtige Größe.** Bewegte Dinge zwischen 10 cm und 10 m. Was kleiner ist, wird als Ganzes
+   vergrößert (6.1), statt an der Physik zu drehen.
+2. **Ähnliche Massen.** Benachbarte Teile sollen nicht allzu verschieden schwer sein, höchstens etwa
+   zehnmal. Hängt ein Klotz an einem Fädchen, dehnen sich die Gelenke. Ein starres Teil ist **ein**
+   Körper mit mehreren Formen, nicht mehrere zusammengeschweißte. Zu leichte Glieder bekommen eine
+   Mindestmasse – die 5-g-Hüftbügel der Ente wiegen mindestens 20 g.
+3. **Die Physik nie überlisten.** Keine heimlichen Zusatzkräfte, keine einfach gesetzten
+   Geschwindigkeiten an Körpern mit Gelenken oder Kontakten, keine selbst gebastelte Bremse. Das
+   kämpft gegen den Solver und pumpt Energie hinein. Gemessen: Ein solcher Trick ließ den Rumpf der
+   Ente springen.
+4. **Roboter müssen fallen dürfen.** Keine Stützen, keine gesperrten Achsen bei Laufrobotern. In der
+   echten Welt gibt es sie auch nicht – und ein Roboter, der in der Simulation gestützt wird, lernt
+   nichts, was ihm draußen hilft.
 
-## 6.17 Das Servomodell – Brücke zur Micro Duck
+> **Für Neugierige:** Die vollständige Liste mit allen Regeln, ihren Gründen und einer Checkliste für
+> neue Roboter steht im blauen Buch, Kapitel 6.
 
-Box3D rechnet starre Körper. Ein echter Servo tut mehr: Er regelt, hat Reibung und reagiert verzögert.
-Dafür hat Kern ein kleines **Gerätemodell** mit Werten in echten Einheiten, das **Profil**. Ein anderer
-Servo ist ein anderes Profil; ein Aktor, der sich grundsätzlich anders verhält, bräuchte ein anderes
-Modell. Profile werden an Messungen kalibriert und an anderen Messungen geprüft.
+## 6.15 Das Servomodell – Brücke zur Micro Duck
 
-Das Gesetz in Worten: Das Moment ist die Steifigkeit K mal Abstand zum Ziel (aber höchstens das
-Höchstmoment T), minus die Dämpfung D mal Geschwindigkeit. Dazu kommen Reibung F im Getriebe, die
-Trägheit des Rotors (Armature) und eine Verzögerung, bis ein Befehl ankommt. Umgesetzt wird es mit
-Box3Ds eigenen Gelenkteilen:
+Box3D rechnet starre Körper. Ein echter Servo tut mehr: Er regelt sich selbst zum Ziel, hat Reibung
+im Getriebe und reagiert verzögert. Dafür hat Kern ein kleines **Gerätemodell** mit Werten in echten
+Einheiten.
 
-```cpp
-void servo_step(physics::World& world,
-                const physics::Joint& joint, f32 target,
-                f32 stiffness, f32 damping,
-                f32 friction, f32 torque) {
-  const f32 q = world.joint_angle(joint);
-  const f32 k = max_of(1e-6f, stiffness);
-  const f32 reach = torque > 0 ? torque / k : 1e9f;
-  world.set_joint_spring(joint,
-      q + clamp(target - q, -reach, reach), k,
-      max_of(0.0f, damping));
-  world.set_joint_motor(joint, friction > 0, 0,
-                        max_of(0.0f, friction));
-}
-```
+> **Stell dir vor …** eine Hand, die einen Hebel zu einer Markierung drückt. Je weiter der Hebel weg
+> ist, desto fester drückt sie, aber nie stärker, als ihre Kraft reicht. Wird der Hebel schnell, bremst
+> sie ihn etwas. Das Getriebe dazwischen hakt ein wenig. Und die Anweisung „Drück dorthin!“ erreicht
+> die Hand immer einen Augenblick zu spät.
 
-Zeile 5 liest den aktuellen Winkel. Zeile 7 rechnet aus, wie weit das Ziel höchstens entfernt sein darf: T geteilt durch
-K. Zeile 8–10 stellen die Gelenkfeder auf ein Ziel, das nie weiter weg ist – so übersteigt die Kraft nie
-das Höchstmoment, genau wie bei einem echten Servo, dessen Ansteuerung sättigt. Zeile 11–12 schalten einen
-Motor mit Sollgeschwindigkeit 0 und der Reibung als Höchstmoment ein: Er hält das Gelenk fest, bis mehr
-Kraft anliegt. Das ist Erin Cattos Rezept für Gelenkreibung.
+Das sind die vier Zutaten:
 
-Dieselbe Funktion läuft im Studio, im Lehrer und auf dem Kalibrier-Prüfstand, für jedes Servo-Gelenk in
-jedem Physikschritt.
+- **Ziehen:** Je weiter vom Ziel, desto mehr Drehmoment – wie eine Drehfeder.
+- **Höchstkraft:** Ab einem gewissen Abstand drückt der Motor schon mit voller Kraft; weiter weg bringt
+  nichts mehr.
+- **Reibung:** Das Getriebe hält das Gelenk fest, bis genug Kraft anliegt.
+- **Verzögerung:** Befehle kommen ein paar Hundertstelsekunden später an.
+
+Kern baut das nur aus Box3Ds **eigenen** Gelenkteilen, ohne Zusatzkräfte. Die Feder des Scharniers
+übernimmt das Ziehen. Für die Höchstkraft gibt es einen Trick: Kern rückt das Ziel der Feder nie
+weiter weg, als die Feder mit voller Kraft ziehen kann. So kann sie nie stärker ziehen als der echte
+Motor. Die Reibung ist ein Motor, der „Geschwindigkeit null“ will und dafür nur wenig Kraft hat: Er
+hält das Gelenk, bis jemand stärker drückt.
+
+Dieselbe Rechnung läuft im Studio, im Lehrer (dem Trainingsprogramm) und auf dem Prüfstand für die
+Messungen, für jedes Servo-Gelenk in jedem Physikschritt.
+
+> **Für Neugierige:** Die Rechnung ist nur ein paar Zeilen lang und steht samt Erklärung im blauen
+> Buch, Kapitel 6. Das Rezept für die Gelenkreibung stammt von Erin Catto selbst.
 
 ### Servos im Level
 
-Ein Hinge-Gelenk wird mit `servo = true` zum Servo. Standards: Ziel 0°, Steifigkeit 50 N·m/rad,
-Dämpfung 2 N·m·s/rad, Reibung 0,1 N·m; das Höchstmoment ist die Motorkraft des Gelenks. Servo-Gelenke
-bekommen die steifere Gelenkweichheit aus 6.13, damit leichte Glieder sich nicht dehnen.
+Jedes Scharnier (Hinge) im Level lässt sich zum Servo machen. Es bekommt dann einen Zielwinkel, eine
+Steifigkeit, eine Dämpfung und eine Reibung; seine Höchstkraft ist die Motorkraft des Gelenks.
+Servo-Gelenke werden außerdem etwas steifer gerechnet, damit leichte Glieder sich nicht dehnen.
 
-### Profile und der XL330
+### Profile und Streuung
 
-Ein Profil (`ServoProfile`, als JSON speicherbar) enthält K, D, F, T, Armature und Verzögerung – und
-dazu **Streuungen**. Sie sagen, wie sicher die Werte sind. Das Training zieht für jeden Servo eigene
-Werte innerhalb dieser Grenzen, damit das Netz nicht an dem hängt, was die Messung nicht festlegen
-konnte. Unsinnige Werte werden abgelehnt; Steifigkeit und Höchstmoment müssen positiv sein.
+Alle Werte eines Servotyps stehen in einem **Profil**. Ein anderer Servo ist einfach ein anderes
+Profil. Profile werden an Messungen des echten Geräts angepasst und an anderen Messungen geprüft
+([Kapitel 16](16-kalibrierung.md)). Das Standardprofil ist der Dynamixel XL330, der Servo der Micro
+Duck, mit den Werten, mit denen Pollen Robotics ihn trainiert hat.
 
-Das Standardprofil ist der Dynamixel XL330-M288 so, wie Pollen Robotics ihn trainiert (Modell „m6“ aus
-BAM – Better Actuator Models von Rhoban – bei 7,4 V):
+Jedes Profil sagt außerdem, wie **sicher** seine Werte sind. Beim Training zieht Kern für jeden Servo
+leicht verschiedene Werte innerhalb dieser Grenzen.
 
-| Wert | XL330 |
-|---|---|
-| Steifigkeit K | 0,554 N·m/rad |
-| Dämpfung D | 0,053 N·m·s/rad |
-| Reibung F | 0,0048 N·m |
-| Höchstmoment T | 0,963 N·m |
-| Armature A | 0,0018 kg·m² |
-| Verzögerung | 20 ms (Training 15–30 ms) |
-| Streuung | Armature, Reibung je ±10 % |
+> **Stell dir vor …** ein Basketballspieler, der immer nur mit demselben Ball übt. Im Turnier ist
+> der Ball etwas härter – und er trifft nicht mehr. Wer mit leicht verschiedenen Bällen übt, trifft mit
+> jedem. Genauso lernt das Netz, mit Servos umzugehen, die ein bisschen anders sind als gemessen.
 
 ### Die Grenze zu Box3D
 
-Beim Eintragen in die Ente wird skaliert – genau an dieser einen Stelle: Steifigkeit, Reibung und
-Höchstmoment mal S⁴, Dämpfung mal S⁴ · √S, Trägheit mal S⁵. Die Armature kommt als dünne Scheibe auf
-der Gelenkachse dazu. (Eine Trägheit nur um die Achse wäre kein echter starrer Körper, und Box3D würde
-damit Energie gewinnen.) Die Verzögerung läuft durch eine Warteschlange in ganzen Physikschritten: bei
-100 Hz und S = 4 sind 20 ms echt genau 4 Schritte.
+Die Ente lebt in der vierfach vergrößerten Welt (6.1), die Profile sprechen echte Einheiten. Kern
+rechnet genau an **einer** Stelle um, wenn die Werte in die Ente geschrieben werden. Auch die
+Verzögerung wird umgerechnet, und zwar in ganze Physikschritte.
+
+**Durchgerechnet:** Der XL330 reagiert 20 ms (Tausendstelsekunden) verzögert. In der vergrößerten Welt
+läuft die Zeit doppelt so lang, also werden daraus 40 ms. Die Ente rechnet 100 Schritte pro Sekunde,
+ein Schritt dauert also 10 ms. 40 ms sind damit genau **4 Schritte**. Die Befehle stehen so lange in
+einer Warteschlange, bevor sie beim Servo ankommen.
+
+> **Für Neugierige:** Die Trägheit des kleinen Motors im Servo kommt als dünne Scheibe auf die
+> Gelenkachse. Eine bequemere Abkürzung hätte Box3D Energie aus dem Nichts gewinnen lassen. Was Box3D
+> nicht abbilden kann, wird aufgeschrieben, nicht vorgetäuscht.
 
 Wie die Micro Duck damit läuft, steht in [Kapitel 13](13-micro-duck.md), wie Profile gemessen werden,
-in [Kapitel 16](16-kalibrierung.md).
-
-## 6.18 Tests
-
-Acht Tests sichern alles ab, von Körpern und Ereignissen über alle neun Gelenktypen, Skalierung und
-Materialien bis zum Physics Lab samt brechender Brücke, dem Character Mover und dem Fingerabdruck.
+in [Kapitel 16](16-kalibrierung.md). Automatische Tests sichern das alles ab, von den Körpern über
+alle neun Gelenkarten bis zum Fingerabdruck.
 
 ## Das nimmst du mit
 
-- Box3D rechnet, Kern passt nie Box3D an, sondern das Modell.
-- Bewegte Körper gehören zwischen 0,1 und 10 m; kleine Roboter werden als Ganzes skaliert (Ente: S = 4).
+- Box3D rechnet. Kern passt nie Box3D an, sondern das Modell.
+- Bewegte Körper gehören zwischen 10 cm und 10 m; kleine Roboter werden als Ganzes vergrößert (Ente:
+  Länge ×4, Zeit ×2) – nur ein Wechsel der Maßeinheit.
 - Es gibt feste, kinematische und dynamische Körper; Formen und Materialien bestimmen den Kontakt.
-- Oberflächen wie `cloth`, `tpu`, `floor` geben Materialpaaren eigene, gemessene Reibung.
+- Manche Paare haben eine eigene, gemessene Reibung: Die Socke haftet am Schnabel und rutscht auf dem
+  Boden.
 - Gelenke verbinden Körper, haben Federn, Grenzen, Motoren und können brechen.
-- Fester Zeitschritt, Akkumulator und Interpolation sorgen für glatte, wiederholbare Bewegung;
-  Sub-Steps machen Gelenkketten steif.
-- Ein Servo ist eine Gelenkfeder mit begrenztem Ziel plus ein Reibungsmotor – mit Werten aus einem Profil.
+- Die Physik rechnet in festen Schritten, gespart wird wie im Sparschwein, gezeichnet wird ein
+  Zwischenstand. Mehr Teilschritte halten Gelenkketten fester zusammen.
+- Die Physik nie überlisten, Roboter fallen lassen.
+- Ein Servo zieht wie eine Feder zum Ziel, aber nur bis zu seiner Höchstkraft, mit etwas Reibung und
+  Verspätung – mit Werten aus einem Profil.
 
 ## Knobelecke
 
-1. Warum stellt Kern nicht einfach Box3Ds Längeneinheit um, statt die Ente zu skalieren?
+1. Warum stellt Kern nicht einfach Box3Ds Spielraum um, statt die Ente zu vergrößern?
 2. Ein Ball hüpft nie, obwohl seine Restitution 0,9 ist. Er fällt nur langsam. Woran liegt's?
-3. Socke (`cloth`) liegt auf einem Boden ohne Oberfläche (`none`). Welche Reibung gilt?
+3. Eine Socke (Oberfläche Stoff) liegt auf einem Boden ganz ohne Oberfläche. Welche Reibung gilt?
 4. Du setzt in jedem Schritt die Geschwindigkeit des Ente-Rumpfs, damit er aufrecht bleibt. Was ist
    daran falsch?
-5. Wie viele Physikschritte Verzögerung hat ein Servo mit 30 ms bei 100 Hz und S = 4?
+5. Ein anderer Servo reagiert 30 ms verzögert. Die Ente lebt in der Welt, in der die Zeit doppelt so
+   lang läuft, und rechnet 100 Schritte pro Sekunde. Wie viele Schritte Verzögerung sind das?
 
 ### Lösungen
 
-1. Die Toleranzen gelten für die ganze Welt, und im selben Level stehen Autos neben kleinen Robotern.
-2. Stöße unter der Restitutionsschwelle von 1 m/s prallen nicht ab.
-3. Keine Paar-Reibung, weil eine Seite `none` ist: √(a · b) aus den Reibwerten der Formen.
-4. Gesetzte Geschwindigkeiten an Körpern mit Gelenken übergehen den Solver und pumpen Energie hinein
-   (gemessen: der Rumpf sprang). Und ein Roboter, der Hilfe bekommt, lernt nichts für die echte Welt.
-5. 30 ms × √4 = 60 ms Weltzeit, bei 100 Hz also 6 Schritte.
+1. Der Spielraum gilt für die ganze Welt, und im selben Level stehen Autos neben kleinen Robotern.
+2. Er ist zu langsam: Ganz leichte Stöße prallen nie ab, damit nichts ewig zittert.
+3. Für dieses Paar gibt es keinen eigenen Wert, weil der Boden keine Oberfläche hat. Also gilt der
+   übliche Mittelwert aus den Reibwerten der beiden Formen.
+4. Das überlistet die Physik: Es kämpft gegen den Solver und pumpt Energie hinein (gemessen: der Rumpf
+   sprang). Und ein Roboter, der Hilfe bekommt, lernt nichts für die echte Welt.
+5. 30 ms × 2 = 60 ms in der Welt. Ein Schritt dauert 10 ms, also 6 Schritte.
 
 ---
 
