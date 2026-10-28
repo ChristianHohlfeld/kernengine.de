@@ -220,4 +220,4 @@ last detail and is the source for all three. If a topic grabs you, look it up in
 
 ---
 
-© 2026 Christian Heinrich Hohlfeld · All rights reserved · [Imprint and Rights](00-imprint.md)
+© 2026 Christian Heinrich Hohlfeld · All rights reserved · [Imprint and rights](00-imprint.md)
