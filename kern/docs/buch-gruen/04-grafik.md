@@ -505,7 +505,7 @@ dem Hemisphärenlicht nur noch als Nachtaufhellung, einer Bodenfarbe der Umgebun
 das eine Straße zurückwirft, und eingeschaltetem Höhennebel, Sonnenstreuung und Horizontnebel
 ([Kapitel 8](08-spiel-laufzeit.md)).
 
-Die **Kamera** hat Augpunkt, Ziel, Oben-Richtung (Z), 60° Öffnung, nahe
+Die **Kamera** hat Augpunkt, Ziel, Oben-Richtung (Z), 60° Öffnung (die Editor-Viewports in Studio nehmen 70°), nahe
 Ebene 0,05 m und ferne 1800 m, wahlweise orthografisch. Die Welt ist **Z-oben, in Metern**.
 
 ## 4.11 Kontextverlust
