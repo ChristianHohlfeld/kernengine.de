@@ -170,7 +170,7 @@ treibende Bassdrum) und `music_calm` (80 Schläge pro Minute, Flächen und eine 
 laufen nahtlos im Kreis. Weil ihr Ausrechnen einige hundert Millisekunden dauert, verteilt Kern es
 in kleine Zeitscheiben – so ruckelt ein Level beim Laden nicht.
 
-Angesprochen werden Sounds mit `builtin:<name>`. Es gibt über 40 in acht Gruppen: Gameplay
+Angesprochen werden Sounds mit `builtin:<name>`. Es gibt 38 in acht Gruppen: Gameplay
 (`pickup`, `jump`, `goal` …), Combat (`gunshot`, `reload` …), Physics (`explosion`, `impact`,
 `plastic` …), Vehicle (`engine`, `hover`, `boost`), Ambience (`wind`, `city`, `hum`), Robot
 (`servo`, `quack`, `beep`), UI (`click`, `confirm`, `error`) und Music. Die vollständige Liste steht

@@ -122,8 +122,8 @@ läuft. Du baust ein Level aus Actors (Dingen in der Welt) und spielst es mit
 Spiel, wieder eine einzige HTML-Datei, mit denselben C++-Klassen wie im Editor
 ([Kapitel 8](08-spiel-laufzeit.md), [Kapitel 11](11-studio.md)).
 
-> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim Start ist Orb Run geladen.
-> Drück **Play** (Alt+P), fahr mit dem Hovercar los und sammle ein paar Orbs. Dann **Stop** –
+> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim ersten Start ist Orb Run geladen
+> (sonst: **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem Hovercar los und sammle ein paar Orbs. Dann **Stop** –
 > Glückwunsch, du hast gerade C++ im Browser gespielt.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck – auf deinem Rechner als Programm
