@@ -95,8 +95,8 @@ Ergebnis hängt nur von den Bytes ab, nie vom Rechner.
 braucht es für Levels (`.klevel`), Studio-Befehle, Servoprofile, Trainingsdaten und die Netzliste
 der Micro Duck. Sein JSON-Baustein verspricht drei Dinge:
 
-1. **Die Reihenfolge bleibt.** Einlesen und wieder schreiben ergibt Byte für Byte dasselbe. Ändert
-   sich ein Wert im Level, ändert sich nur eine Zeile der Datei.
+1. **Die Reihenfolge bleibt.** Hat Kern oder JavaScript die Datei geschrieben, ergibt Einlesen und
+   wieder Schreiben Byte für Byte dasselbe. Ändert sich ein Wert im Level, ändert sich nur eine Zeile der Datei.
 2. **Zahlen sehen aus wie in JavaScript** – die kürzeste Ziffernfolge, die die Zahl eindeutig
    beschreibt, genau wie bei `JSON.stringify`.
 3. **Misstrauen gegenüber fremden Dateien.** Abgelehnt werden unendliche Zahlen, zu tiefe

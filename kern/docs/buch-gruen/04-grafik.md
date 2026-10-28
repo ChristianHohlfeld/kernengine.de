@@ -140,7 +140,7 @@ verwirft er stattdessen die Vorderseiten.
 ### Anlegen mit `upsert`
 
 Neue Meshes übergibst du als **MeshInput**. Pflicht sind nur die Positionen; fehlen Normalen, rechnet
-Kern flache aus, fehlen Farben, ist alles weiß, fehlen Instanzen, gibt es eine. `upsert` (aus *update*
+Kern bei losen Dreiecken flache aus (sonst zeigen sie nach oben), fehlen Farben, ist alles weiß, fehlen Instanzen, gibt es eine. `upsert` (aus *update*
 und *insert*) legt ein Mesh an oder ersetzt es – **atomar**: erst alles prüfen (endliche Zahlen,
 gültige Indizes, passende Längen, Knochengewichte mit Summe 1, keine kaputten Matrizen), dann tauschen.
 Schlägt die Prüfung fehl, bleibt **das alte Mesh sichtbar**. Für einen Editor ist das Gold wert: Ein

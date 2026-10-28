@@ -222,7 +222,8 @@ Hüllen) und begrenzt damit das bremsende Moment. Kern setzt ihn gezielt ein:
 **Roboterfüße** sind breite, flache Quader oder Hüllen mit hoher Reibung.
 
 > **Probier's aus!** Öffne über **File › Example Levels** das **Physics Lab**, wähle eine Kiste und
-> setze im Details-Panel unter Mesh › Physics die Restitution hoch. Starte Simulate (Alt+S) und wirf die Kiste
+> setze im Details-Panel unter **Collider** die Restitution hoch (die Kisten haben eigene Collider;
+> Mesh › Physics gilt nur für den automatischen). Starte Simulate (Alt+S) und wirf die Kiste
 > mit der Maus auf den Boden.
 
 ## 6.8 Gelenke
@@ -245,7 +246,7 @@ const physics::Joint joint = world.create_joint(j);
 Zeile 2 wählt ein Drehgelenk (*revolute*, ein Scharnier). Zeile 3 sagt: Es verbindet Türrahmen und
 Tür. Zeile 4–7 bauen für beide Körper einen **Frame** (ein kleines Koordinatenkreuz) am Scharnierpunkt,
 dessen Z-Achse senkrecht nach oben zeigt – um diese Achse dreht die Tür. Zeile 8 begrenzt den Winkel
-auf ±1,7 Radiant (knapp ±97°), damit die Tür nicht durch die Wand schwingt. Zeile 9 baut das Gelenk.
+auf ±1,7 Radiant (gut ±97°), damit die Tür nicht durch die Wand schwingt. Zeile 9 baut das Gelenk.
 
 Ein paar Abmachungen: Drehgelenke, Kugelgelenke und Parallel-Gelenke arbeiten **um die Z-Achse** ihres
 Frames, Schiebe- und Radgelenke **entlang der X-Achse**. Der Nullwinkel liegt dort, wo beide Frames
@@ -278,9 +279,11 @@ Mit Bruchschwellen (im Editor *Break force* und *Break torque*) meldet Box3D ein
 stark belastet wird. Die Spiel-Laufzeit zerstört es dann, zählt mit, schreibt „Joint on "…" broke“ ins
 Log und spielt den Bruch-Sound. So reißt die Seilbrücke im Physics Lab.
 
-> **Probier's aus!** Starte im Physics Lab Simulate und ziehe mit der Maus kräftig an der Seilbrücke,
-> bis sie reißt. Schalte unter **Window › Show** die Punkte **Collision Shapes** und **Constraints**
-> ein, dann siehst du Formen und Gelenke.
+> **Probier's aus!** Starte im Physics Lab Simulate und ziehe mit der Maus kräftig an einer Planke der
+> Seilbrücke: Die Kette gibt nach und schwingt. (Reißen wird sie so kaum – der Maus-Griff hat eine
+> begrenzte Kraft, die schwachen Gelenke brechen erst unter großer Last.) Schalte unter
+> **Window › Show** die Punkte **Collision Shapes** und **Constraints** ein, dann siehst du Formen
+> und Gelenke.
 
 ### Die Gelenkfeder in echten Einheiten
 

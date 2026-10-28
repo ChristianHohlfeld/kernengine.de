@@ -66,7 +66,7 @@ beschreibt Kern mit **Quaternionen**, vier Zahlen ohne die Tücken von drei Wink
 ### Ansicht und Perspektive
 
 Die **Ansichtsmatrix** (`Mat4::look_at`) baut aus Augpunkt, Zielpunkt und „oben“ drei senkrechte
-Kamera-Achsen. Zeigen Blick und „oben“ in dieselbe Richtung, ist die Kamera unbestimmt; Kern verweigert
+Kamera-Achsen. Liegen Blick und „oben“ auf einer Linie (gleich oder genau entgegengesetzt), ist die Kamera unbestimmt; Kern verweigert
 dann das Bild („degenerate camera direction/up“).
 
 **Perspektive** heißt: Doppelt so weit weg erscheint halb so groß – die Bildposition ist x geteilt durch
@@ -88,7 +88,7 @@ Der Punkt landet knapp rechts oberhalb der Bildmitte (480; 270), gezählt von un
 Projektion (`Mat4::ortho`), in der Fernes nicht kleiner wird.
 
 > **Probier's aus!** Schalte in Kern Studio im Viewport-Menü **≡** den **Field of View** zwischen 50°
-> und 110° um – bei 110° wirkt die Welt wie durchs Fischauge. Mit **Alt+J** (Top) springst du in eine
+> und 110° um – bei 110° wirkt die Welt wie durchs Weitwinkelobjektiv, an den Rändern stark gestreckt. Mit **Alt+J** (Top) springst du in eine
 > orthografische Ansicht: Ferne Gebäude sind plötzlich so groß wie nahe.
 
 ### Tiefe ist ungleich verteilt
@@ -261,7 +261,7 @@ passt die Karte an die Sicht an (Schattendistanz), kombiniert drei Arten Bias (P
 Vergleichsabstand, **Normal Offset**) und filtert mit **PCF** (*percentage closer filtering*: mehrere
 Vergleiche, gemittelt). Wie das zusammenspielt, steht in [Kapitel 4](04-grafik.md), 4.8.1. Warum die
 Anpassung so wichtig ist: Mit den Standardwerten (512 Kartenpunkte über ±120 m) ist ein Kartenpunkt
-2 · 120 / 512 ≈ **0,47 m** breit – gröber als eine Micro Duck.
+2 · 120 / 512 ≈ **0,47 m** breit – viel zu grob für etwas so Kleines wie die Micro Duck.
 
 ## B.6 HDR, Tonemapping und Gamma
 
@@ -286,9 +286,8 @@ rundet die Lichter weich ab:
 Kern nutzt die **ACES-Filmkurve** in der Fassung von three.js (Belichtung einrechnen, eine rationale
 Näherung der Filmkurve, auf 0 bis 1 begrenzen), danach optional sein Farbgrading.
 
-> **Probier's aus!** Dreh in den **World Settings** die **Exposure** hoch und runter. Selbst bei hoher
-> Belichtung brennt der Himmel nicht einfach weiß aus, sondern rundet sich weich ab – die Filmkurve
-> bei der Arbeit.
+> **Probier's aus!** Dreh in den **World Settings** die **Exposure** hoch und runter. Helle Stellen laufen
+> weich ins Weiß, statt hart abzuschneiden – die Filmkurve bei der Arbeit.
 
 ### Gamma und sRGB
 

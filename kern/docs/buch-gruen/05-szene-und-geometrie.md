@@ -110,7 +110,8 @@ gesperrte Actors weiter. Lichter und leere Actors wählst du über ihr Symbol.
 
 Ein Grundriss ist ein Vieleck, oft L-förmig (nicht konvex) und manchmal mit Löchern (Innenhöfen). Der
 Grafikprozessor kann nur Dreiecke. Kern zerschneidet Vielecke mit **Earcut**, einer C++-Umsetzung von
-Mapbox Earcut v3.0.2 (ISC-Lizenz), die dieselben Ergebnisse liefert wie die JavaScript-Vorlage.
+Mapbox Earcut v3.0.2 (ISC-Lizenz), die laut ihrem Kopfkommentar dieselben Ergebnisse liefert wie
+die JavaScript-Vorlage.
 
 > **Stell dir vor …** du hast ein Papiervieleck und eine Schere. Du suchst eine Ecke, deren Dreieck
 > mit den beiden Nachbarecken ganz im Papier liegt – ein **Ohr**. Schnipp! Übrig bleibt ein Vieleck
