@@ -78,7 +78,8 @@ Schafft eine Probe zum ersten Mal mindestens 4 von 5 echten Sprüngen, jubelt da
 > weitere 3000 also `--iterations 6000`.
 
 Mit `run.ckpt.nachgeahmt` beginnt das Üben neu ab der Nachahmung. `--vorbild none` probiert
-reines PPO – der Weg, der den Absprung nicht fand. Weitere Schalter ändern Vorbild, DAgger-Runden,
+reines PPO (die Belohnung bekommt dann eine Referenzhöhe, `track_height`) – der Weg, der den
+Absprung nicht fand. Weitere Schalter ändern Vorbild, DAgger-Runden,
 Übungsrauschen und Nachahmungsbelohnung.
 
 Ein eigenes Vorbild suchst du so:
@@ -105,10 +106,11 @@ Bewertung zusätzlich `| jumps 4/5 up … rise … flight … tilt … falls …
 | Feld | Bedeutung | Worauf achten |
 |---|---|---|
 | `return` | mittlere Rückgabe | soll über Hunderte Iterationen steigen |
-| `len` | Episodenlänge in Takten | 100 = 2 s ohne Sturz |
+| `len` | Episodenlänge in Takten | 100 = 2 s; kürzer: Sturz oder Bodenkontakt |
 | `value` | Fehler des Kritikers | erst hoch, dann fallend |
-| `std` | Aktionsrauschen σ | sinkt, wenn die Ente sicherer wird |
+| `std` | Aktionsrauschen σ | sinkt, wenn die Ente sicherer wird (min. 0,001) |
 | `lr` | Lernrate | dauerhaft 1e-5: Policy ändert sich zu stark |
+| `steps/s` | Entenschritte pro Sekunde | Tempo des Geräts |
 | `jumps n/5` | Probe auf dem sauberen Roboter | das eigentliche Ziel |
 
 Beim Nachahmen zeigt jede Runde Beispiele, Fehler und echte Sprünge. Mit `--log jump.csv` landet jede Iteration als CSV-Zeile in
@@ -141,6 +143,8 @@ schlechter werden, und die Probe im Lauf hat nur 5 Episoden. Darum:
 3. Wählen nach: echte Sprünge mit Variation, dann null Stürze, dann Steigen, Flugzeit, Neigung.
 4. Im Studio prüfen (15.8).
 
+Für `policies/jump.onnx` ergab das 40 von 40 sauber und 36 von 40 mit Variation, ohne Sturz.
+
 ## 15.6 An den Reglern drehen
 
 ### Eine Iteration in Zahlen
@@ -149,12 +153,15 @@ Was ein Schalter bewirkt, sieht man am besten an einer durchgerechneten Iteratio
 Sprung-Rezepts mit 32 Enten:
 
 - **Sammeln:** 32 Enten × 48 Takte = **1536 Zeilen**, jede mit Rauschen σ = 0,1.
-- **GAE:** pro Ente rückwärts über 48 Takte, γ = 0,99, λ = 0,95.
+- **Normalisierer:** Der des Kritikers lernt aus den 1536 Zeilen, der des Actors ist eingefroren.
+- **GAE:** pro Ente rückwärts über 48 Takte, γ = 0,99, λ = 0,95; danach Vorteile auf Mittel 0,
+  Streuung 1.
 - **Minibatches:** 1536 / 4 = **384 Zeilen**, jede in 8 Teilstücke à 48 Zeilen.
 - **Updates:** 5 Epochen × 4 Minibatches = **20 Adam-Schritte**, vor jedem die KL-Messung.
 
 Die Nachahmung hätte höchstens 76 800 Beispiele (8 × 96 Episoden × 100 Takte); es waren 49 936,
-weil Episoden beim Sturz früher enden.
+weil Episoden bei Sturz oder Bodenkontakt früher enden. Nach jeder Runde wird der Actor in
+10 Epochen (Minibatch 256) an alle bisherigen Beispiele angepasst.
 
 ### Die wichtigsten Schalter
 
@@ -169,7 +176,8 @@ weil Episoden beim Sturz früher enden.
 | `--substeps N` | 16 | nicht ändern! |
 
 Dazu kommen Epochen, Minibatches, Netzgrößen (beim Warmstart muss der Actor zu velstand passen),
-Warmstart (nur `velstand` wirkt, alles andere heißt Zufallsgewichte) und `--profil servo.json` für
+Anfangsrauschen (`--init-std`), adaptive Lernrate an/aus, Warmstart (nur `velstand` wirkt, alles
+andere heißt Zufallsgewichte; von einer Datei startet nur die Spielschicht) und `--profil servo.json` für
 kalibrierte Servos ([Kapitel 16](16-kalibrierung.md)); alles Weitere in
 [Kapitel 17](17-referenz.md).
 
@@ -202,7 +210,8 @@ Sechs Schritte:
    20 Iterationen eine Messung und ein Schnappschuss.
 6. **Im Beispiel-Level prüfen:** `--demo-spur --netz play_geuebt.onnx --seed 120` spielt das
    Micro-Duck-Level wie das Studio, 120 s lang (hier ist `--seed` die Dauer!), eine Zeile pro
-   Sekunde. Mit `KERN_JUMP_AT=SEKUNDE`
+   Sekunde: Lage, Zustand, was der Tracker weiß und was das Spielnetz antwortet. Es nimmt
+   `jump.onnx` und dein Spielnetz (sonst `play.onnx`). Mit `KERN_JUMP_AT=SEKUNDE`
    drückt es in dieser Sekunde Taste 7.
 
 > **Achtung, Falle!** `--out` wird beim Nachahmen nach **jeder** Runde überschrieben. Willst du eine
@@ -214,7 +223,8 @@ Sechs Schritte:
 Kerns eigene Netze haben feste Namen: `jump.onnx` und `play.onnx`. Drei Wege ins Studio:
 
 1. **Ins Repository:** nach `kern/policies/` kopieren. Die Entwicklerseite lädt von dort, eine
-   ausgelieferte Seite aus `policies/` daneben.
+   ausgelieferte Seite aus `policies/` daneben. Die Engine holt ein Netz erst, wenn eine Ente es
+   braucht.
 2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät; das Studio
    lädt es beim Start und übernimmt jedes neue sofort, auch in offenen Tabs (nur für den Sprung).
 3. **Prüfen:** Micro-Duck-Level öffnen, Play, mit **F8** die Ente übernehmen, Taste **7** für den
@@ -222,7 +232,7 @@ Kerns eigene Netze haben feste Namen: `jump.onnx` und `play.onnx`. Drei Wege ins
    Browser-Konsole meldet „Kern: trained network jump.onnx loaded“ oder warnt, wenn etwas nicht lädt.
 
 Das Netz muss die Form eines rsl_rl-Actors haben (Sub, Div, Gemm/Elu …, Gemm) – genau so exportiert
-der Lehrer. Eine Spielschicht ohne 23 Eingänge und 9 Ausgänge wird nicht gerechnet.
+der Lehrer. Eine Spielschicht ohne 23 Eingänge und 9 Ausgänge wird nicht gerechnet (ihre Aktion bleibt 0).
 
 > **Probier's aus!** Trainiere auf der Lehrer-Seite einen Sprung, lass dabei auf
 > https://kernengine.de/ das Micro-Duck-Level offen, starte Play, übernimm die Ente mit **F8** und
@@ -236,7 +246,9 @@ schwere Bewegungen oft ein fünftes:
 
 1. **Eine `Task`** in `src/lehrer/`. Das blaue Buch zeigt als Gerüst eine Verbeugung `BowTask`:
    2 s Dauer, zufälliger Start, Phasensignal in den Plätzen 55 und 56, vier Geheimwerte für den
-   Kritiker, ein Lehrplan für den Sturz-Malus, eine Belohnung aus benannten Termen.
+   Kritiker, ein Lehrplan für den Sturz-Malus, eine Belohnung aus benannten Termen. Hilfen wie
+   `upright`, `action_rate` und `fell` liegen schon in `tasks.cpp`; eine Fabrikfunktion
+   `make_bow_task()` macht die Klasse von außen nutzbar.
 2. **Rezept und Name** in `src/lehrer/recipe.cpp`:
 
    ```cpp
@@ -252,9 +264,12 @@ schwere Bewegungen oft ein fünftes:
    Unbekanntes ergibt nichts. Dazu bekommt `recipe_for` einen Eintrag (Warmstart, Rauschen, Lernrate). Danach kennen
    `--task bow` und der Browser die Aufgabe; auf der Lehrer-Seite fehlt nur ein Menüeintrag.
 3. **Eine Messung**, die prüft, was die Bewegung **ist**, nicht was die Belohnung zählt.
-   `JumpMeter` zeigt das Muster: Takt für Takt beobachten, am Ende entscheiden.
+   `JumpMeter` zeigt das Muster: Takt für Takt beobachten, am Ende entscheiden. `--eval` und die
+   Probe im Lauf kennen derzeit nur den Sprung; eine neue Aufgabe braucht ihre eigene Bewertung.
 4. **Die Verdrahtung im Studio** wie beim Sprung: Bewegungsliste, Taste, Touch-Knopf, Name im
-   Logik-Knoten **Robot Move**, Dateiname und die Datei in `kern/policies/`.
+   Logik-Knoten **Robot Move**, Dateiname und die Datei in `kern/policies/`. Im Studio wechselt die
+   Ente dann hart auf das neue Netz und nach dessen Dauer zurück; die Beobachtung baut das Studio
+   genau wie im Training (mit Phase).
 5. **Ein Vorbild (optional):** eine kleine Parametrisierung, eine Note für CMA-ES und ein
    Vorbild-Objekt, das in **jedem** Zustand eine Antwort hat (sonst kein DAgger). CMA-ES und
    Nachahmung sind allgemein; die Vorbild-Funktionen sind derzeit auf den Sprung zugeschnitten.
@@ -267,16 +282,18 @@ Laufzeit-Ebene, Umgebung, Lerner, Metadaten und Bewertung – PPO und Nachahmung
 
 Was Kerns Netze vorleben:
 
-- **Nur, was der Roboter wirklich hat.** Der Actor sieht Sensorwerte, nie wahre Positionen. Die
-  gehören in die Geheimwerte des Kritikers.
+- **Nur, was der Roboter wirklich hat.** Der Actor sieht Sensorwerte (IMU, Gelenke,
+  Kamera-Detektor, Mund-Encoder), nie wahre Positionen; Ball und Socke kennt die Spielschicht nur
+  verrauscht und mit Aussetzern. Wahres gehört in die Geheimwerte des Kritikers.
 - **Zeit sichtbar machen.** Eine Bewegung mit Ablauf bekommt ein Phasensignal (cos, sin), keinen
   Zähler. Ein Netz ohne Gedächtnis braucht Zeitgrößen: Die Spielschicht sieht, wie lange sie steht,
   geht und trägt.
 - **Messen statt befehlen.** „Steht still“ heißt „beide Sohlen am Boden, keine Bewegung läuft“ – was
   die Beine tun, nicht was befohlen wurde.
 - **Aktionen wie Bedienelemente:** Laufbefehle mit Totzone wie ein Stick (unter 20 % steht die
-  Ente), Bewegungen über eine Schwelle (über 0,5 startet).
-- **Belohnung aus benannten Termen;** Lehrpläne machen Strafen und Variation nach und nach
+  Ente), Bewegungen über eine Schwelle (über 0,5 startet), Grenzen für Kopf und Nacken.
+- **Belohnung aus benannten Termen,** Gewicht × Term × dt, mit Bremsen wie bei Pollen
+  (Aktionsänderung, Drehrate, Eigenkontakt); Lehrpläne machen Strafen und Variation nach und nach
   strenger.
 - **Episodenende hart:** Sturz und Bodenkontakt anderer Teile beenden die Episode.
 - **Vorbild ohne Geheimwissen:** Es sieht nur, was das Netz sieht; ein Wunsch, der aus einer Dauer
@@ -291,14 +308,17 @@ Was Kerns Netze vorleben:
 Aus `docs/lehrer.md`, damit du nicht hineintappst:
 
 - **Die Belohnung wird ausgenutzt.** Frühe Enten saßen auf dem Schwanz, machten Hechtsprünge oder
-  stützten sich ab. Jedes Mal half nur eine strengere Regel.
+  stützten sich ab. Jedes Mal half nur eine strengere Regel: Bodenkontakt beendet die Episode,
+  Neigung kostet, Punkte gibt es nur aufrecht.
 - **Die Messung war zu locker.** Die erste ließ eine Ente durch, die sich nur aufrichtete und die
-  Füße anzog, mit 45° Kippen.
+  Füße anzog, mit 45° Kippen. Seitdem zählt nur ein echter Sprung (Steigen in der Luft, Flug,
+  höchstens 30° Neigung, Landen).
 - **PPO allein findet seltene Bewegungen nicht;** ohne „Kritiker zuerst“ geht Nachgeahmtes
   kaputt; wandernde Normalisierer verfälschen das Update (alles in Kapitel 14).
 - **Fehler in der Welt statt im Netz.** Beim Training der Spielschicht kamen drei ans Licht: Die
   Socke kroch von selbst über den Boden, der Ball rollte ewig, und das Gähnen im Leerlauf öffnete
-  beim Aufheben den Schnabel. Lernt ein Netz an einer Stelle nicht, zeigen `--spielen-spur` und
+  beim Aufheben den Schnabel. Abhilfe: Rollwiderstand für Socke und Ball, und eine laufende
+  Bewegung zählt nicht mehr als Stillstehen. Lernt ein Netz an einer Stelle nicht, zeigen `--spielen-spur` und
   `--trace` oft so einen Fehler.
 - **Zahlen von Hand veralten.** Die Bissposition stand früher als Zahl in der Doku; jetzt misst der
   Lehrer sie bei jedem Lauf.

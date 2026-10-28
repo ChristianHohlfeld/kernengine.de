@@ -86,14 +86,15 @@ Iteration ruft das Backend außerdem die Lehrpläne auf („ab jetzt kostet ein 
 Jede `DuckEnv` baut eine Ente auf ebenem Boden in einer **eigenen** `GameWorld`. Der Renderer bleibt
 headless, die Grafikkarte wird nie angefasst. Ein Schalter sorgt dafür, dass der Regler der Ente die
 Aktion des Lehrers nimmt, genau wie im Training: Grundstellung plus Aktion, mit der Busverzögerung
-des Servoprofils.
+des Servoprofils. Läuft gerade eine fertige Bewegung (Skill, Aufheben, Sitzen), hat sie Vorrang.
 
 Ein `step(action)` ist ein **Regeltakt** von 20 ms Roboterzeit: Aktion an den Regler, 4 Weltschritte
 rechnen, ab und zu ein Schubs (wenn Variation an ist), dann misst `walker_probe` alles, was
 Belohnung und Kritiker brauchen (Lage, Geschwindigkeit, Drehrate, Sohlenkontakte, Fußhöhen,
 Bodenkontakt anderer Teile, Gelenke). Die Aufgabe rechnet die Belohnung und sagt, ob Schluss ist.
 Zuletzt entsteht die neue Beobachtung: zuerst genau das, was der Regler sieht, plus die Befehle der
-Aufgabe in den Plätzen 48–60. Der Kritiker bekommt diese saubere Version plus Zusatzwissen. Erst
+Aufgabe in den Plätzen 48–60. Der Kritiker bekommt diese saubere Version plus Zusatzwissen. Hat die Aufgabe ein Vorbild, fragt sie
+es jetzt, was es täte (für die Nachahmungsbelohnung). Erst
 ganz am Ende bekommt **nur der Actor** die Sensorfehler aufgeprägt.
 
 ### Die Aufgabe: Was gibt Punkte?
@@ -125,7 +126,7 @@ Rumpfhöhe über dem Start, die Rumpfgeschwindigkeit, die Fußhöhen und ob die 
 würfelt der Lehrer pro Episode vieles neu, wie in Pollens Rezepten (**Domain Randomization**):
 
 - **Start:** Blickrichtung beliebig, ±3° Schieflage, Sohlenreibung × 0,7 bis 1,3.
-- **Bau:** Rumpfmasse ±5 %, Schwerpunkte um ±3 mm verschoben (beim Sprung per Lehrplan bis
+- **Bau:** Rumpfmasse und -trägheit ±5 %, Schwerpunkte um ±3 mm verschoben (beim Sprung per Lehrplan bis
   ±15 mm im Rumpf und ±10 mm im Kopf).
 - **Servos:** jeder mit eigener Reibung und Trägheit (XL330: ±10 %), Busverzögerung 15–30 ms.
 - **Sensoren (nur Actor):** Rauschen auf Gyro, Schwerkraft und Gelenken, ein Encoder-Versatz, eine
@@ -202,11 +203,15 @@ Lernrate, Gradientenbegrenzung 1,0, geclippter Wertverlust.
    wandern sie zwischen zwei Iterationen merklich, sonst wäre der Vergleich „neu gegen alt“ schief.
 4. **Vorteil mit GAE.** War jede Aktion besser oder schlechter als erwartet (Beispiel in Anhang
    A.11)? Ein **Zeitablauf** ist kein Scheitern: Die Episode hätte weitergehen können, also wird
-   der Wert der Zukunft geschätzt statt auf null gesetzt. Ein **Sturz** hat keine Zukunft.
+   der Wert der Zukunft geschätzt statt auf null gesetzt. Ein **Sturz** hat keine Zukunft. Am Ende
+   des Rollouts schätzt der Kritiker den Wert der Lage, in der jede Ente gerade steht. Danach werden
+   alle Vorteile auf Mittelwert 0 und Streuung 1 gebracht, damit die Schrittgröße nicht vom
+   Belohnungsmaßstab abhängt.
 5. **Update.** 5 Epochen × 4 Minibatches = 20 Lernschritte. Jede Minibatch wird in genau
    **8 feste Teilstücke** zerlegt, die auf den Threads laufen. Vor jedem Schritt misst der Lerner
    per KL-Divergenz, wie weit sich die Policy schon bewegt hat: über 0,02 teilt er die Lernrate
-   durch 1,5, unter 0,005 multipliziert er mit 1,5. Der geclippte Verlust macht gute Aktionen
+   durch 1,5, unter 0,005 multipliziert er mit 1,5 (immer zwischen 10⁻⁵ und 10⁻²). So bleibt jeder
+   Schritt in einer „Vertrauensregion“. Der geclippte Verlust macht gute Aktionen
    wahrscheinlicher, aber nur bis zum Verhältnis 1,2 (schlechte unwahrscheinlicher bis 0,8). Der
    Kritiker lernt die Erträge vorherzusagen, ein kleiner Entropie-Bonus hält das Rauschen am
    Leben, das σ selbst ist ein gelernter Regler pro Aktion (mindestens 0,001). Zum Schluss werden
@@ -218,7 +223,9 @@ Lernrate, Gradientenbegrenzung 1,0, geclippter Wertverlust.
 > Kritikers und zerstörten das Gelernte. Deshalb lernt in den ersten 30 Iterationen (Spielschicht:
 > 20) **nur der Kritiker** – „Kritiker zuerst“.
 
-Nach jeder Iteration gibt es eine Statistik. Ein Checkpoint (Kennung `KERNPPO1`) enthält den ganzen
+Nach jeder Iteration gibt es eine Statistik: mittlere Belohnung, Rückgabe und Länge der beendeten
+Episoden, Wert- und Surrogatverlust, Entropie, Lernrate, mittleres σ, Zeiten und Entenschritte
+insgesamt. Ein Checkpoint (Kennung `KERNPPO1`) enthält den ganzen
 Lerner mit beiden Netzen, Normalisierern und Adam-Gedächtnissen.
 
 ## 14.6 Vorbild, Nachahmen, Üben: wie der Sprung entstand
@@ -258,8 +265,13 @@ Sprung hält velstand die Balance.
 > 16 Steine um dich herum. Wo es am tiefsten plumpst, gehst du hin – und merkst dir, in welche
 > Richtung es tiefer wird.
 
-Kern hat CMA-ES selbst nach Hansens Tutorial geschrieben, deterministisch wie alles. Pro Generation
-16 Kandidaten; jeder springt 6 Episoden, eine sauber, fünf mit voller Variation. Alle Kandidaten
+Kern hat CMA-ES selbst nach Hansens Tutorial geschrieben, deterministisch wie alles. Der Lehrer
+nutzt es überall, wo es keine Ableitung gibt: hier fürs Vorbild, in [Kapitel 16](16-kalibrierung.md)
+für die Servo-Kalibrierung. CMA-ES lernt nicht nur, wohin es geht, sondern auch die Form der
+Suchwolke (welche Zahlen zusammen wandern sollten). Der Startpunkt wird zuerst bewertet, das
+Ergebnis ist also nie schlechter; alle Kandidaten einer Generation rechnen parallel. Pro Generation
+16 Kandidaten, Suchbreite σ = 0,8 ab Grundstellung (0,3 ab einem gegebenen Start); jeder springt
+6 Episoden, eine sauber, fünf mit voller Variation. Alle Kandidaten
 einer Generation treffen **dieselben** Roboter (fairer Vergleich), jede Generation andere (kein
 Vorbild für Glücks-Enten). Die Note belohnt Steigen, Flugzeit und Höhe, bestraft Neigung über 15°
 und Stürze (frühe mehr als späte) und gibt Bonuspunkte fürs Stehen am Ende und für einen echten
@@ -273,7 +285,9 @@ Fehler führt ins Unbekannte, dort macht es einen größeren, die Fehler schauke
 **Verteilungsverschiebung** (Anhang A.9). DAgger dreht den Spieß um: **Das Netz fährt, das Vorbild
 kommentiert.** In Runde 0 fährt das Vorbild; ab Runde 1 fährt das Netz (mit etwas Rauschen, 0,05),
 und in jedem Takt sagt das Vorbild, was es getan hätte. Nach jeder Runde lernt das Netz aus **allen**
-bisherigen Beispielen.
+bisherigen Beispielen. So enthält der Datensatz genau die Lagen, in die das Netz selbst gerät, mit
+der richtigen Antwort dafür. Voraussetzung: Das Vorbild muss in jeder dieser Lagen eine sinnvolle
+Antwort haben.
 
 Beim Sprung: 8 Runden à 96 Episoden mit voller Variation; gelernt wird per mittlerem quadratischem
 Fehler mit eigenem, frischem Adam (10 Epochen, Minibatch 256, Lernrate 10⁻³). Wer welchen Teil einer
@@ -297,7 +311,9 @@ kommt allein vom Netz über 14 Servoziele. Die Belohnung hat 15 Terme, die wicht
 | `tilt` | −30 | Schieflage kostet |
 | `fall` | −2 → −20 | einmalig, per Lehrplan strenger |
 
-Dazu kleinere Terme, etwa für Haltung, Wegrutschen und einen zweiten Hüpfer.
+Dazu kleinere Terme: Haltung von Beinen und Hals, Wegrutschen, ein zweiter Hüpfer, Drehrate,
+Eigenkontakt, hektische Aktionen (per Lehrplan ab Iteration 200 strenger) und, nur ohne Vorbild,
+eine Referenzhöhe. Als Sturz gilt mehr als 60° Neigung oder ein Rumpf unter 5 cm.
 
 > **Achtung, Falle!** Eine Episode endet bei **jedem Bodenkontakt eines Teils außer den Sohlen**.
 > Sonst wäre es die sicherste Wette, sich auf Schnabel oder Schwanz abzustützen. Netze sind Meister
@@ -305,7 +321,9 @@ Dazu kleinere Terme, etwa für Haltung, Wegrutschen und einen zweiten Hüpfer.
 
 Was als **echter Sprung** zählt, entscheidet der strenge `JumpMeter`: alle Teile mindestens 60 ms in
 der Luft, der Rumpf steigt dabei mindestens 5 mm über die Abhebehöhe (nur Füße anziehen gilt nicht),
-nie mehr als 30° Neigung, und am Ende steht die Ente aufrecht auf beiden Sohlen.
+nie mehr als 30° Neigung, und am Ende steht die Ente aufrecht auf beiden Sohlen. Mit diesem Maß
+misst `evaluate_jump` jede Policy in Studio-Physik: echte Sprünge, Stürze, Höhe, Steigen, Flugzeit,
+Neigung.
 
 ## 14.7 Determinismus: überall dasselbe Netz
 
@@ -352,14 +370,18 @@ Variation wie beim Sprung und ein Objektdetektor, der verrauscht ist und bis zu 
 
 **Belohnung** pro Entscheidung: −0,01 für die Zeit, +2 × Annäherung, +3 fürs gehaltene Aufheben,
 etwas fürs Tragen, **+10 für einen 0,25 m weggekickten Ball oder eine 0,25 m weit getragene und
-ausgespuckte Socke**, −5 für einen Sturz.
+ausgespuckte Socke**, −5 für einen Sturz. Die Annäherung zählt zum wahren Ziel (Socke vor Ball),
+nicht während die Ente etwas hält. Kick- oder Ablege-Erfolg beendet die Episode als Zeitablauf, nicht
+als Scheitern.
 
 **Das Vorbild** sieht **genau dasselbe wie das Netz**, keine wahren Positionen, und hat kein
 verstecktes Gedächtnis außer der Startstelle des linken Fußes (dazu Ballradius und gemessene
 Bissposition). Nur so kann das Netz es wirklich lernen. Vereinfacht: Sieht es nichts, dreht es sich.
 Sonst steuert es das nähere Ziel an (ein Ball im Weg wird zuerst gekickt), geht nah dran langsam auf
 einer Linie heran, sagt „Stopp“ und steht. Steht es richtig, startet es Kick oder Aufheben, sonst
-geht es zurück und kommt neu. Hält es etwas, trägt es 0,3 m und spuckt aus. Der Wunsch nach Kick oder
+geht es zurück und kommt neu (Spielraum: Socke ±8 mm voraus und ±12 mm seitlich, Ball ±2 cm).
+„Stehen“ heißt: beide Sohlen länger als 0,25 s am Boden. Beim Aufheben ist der Schnabel von
+Phase 0,04 bis 0,30 offen. Hält es etwas, trägt es 0,3 m und spuckt aus. Der Wunsch nach Kick oder
 Aufheben steigt als **Rampe** über die letzte halbe Sekunde des Stillstehens, damit das Netz ihn aus
 der Stehzeit ablesen kann.
 
@@ -367,9 +389,13 @@ der Stehzeit ablesen kann.
 schreiben, legt der Lehrer die Socke auf ein Gitter von 11 × 9 Stellen vor eine stehende Ente, lässt
 sie aufheben und prüft, ob die Socke nach 3 s Tragen noch im Schnabel ist. Gewählt wird eine Stelle,
 um die herum auch viele andere halten, denn das Hingehen ist nie millimetergenau. Ändert sich die
-Physik, misst er neu. Ebenso misst er, wie weit die Ente nach „Stopp“ noch geht.
+Physik, misst er neu; hält nirgends etwas, nimmt er 6,5 cm vor dem Rumpf, mittig. Ebenso misst er, wie weit die Ente nach „Stopp“ noch geht.
 
-Beim Nachahmen und Üben laufen die Episoden je zur Hälfte sauber und variiert. `play.onnx` entstand
+Nachgeahmt wird wie beim Sprung mit DAgger (30 Epochen, Minibatch 256, Lernrate 10⁻³). Danach soll
+das Netz üben (`--spielen-ueben`): Warmstart von der Datei mit eingefrorenem Normalisierer,
+Rauschen 0,1, 20 Iterationen „Kritiker zuerst“, und belohnt wird nur, was wirkt – wo der Biss
+wirklich hält, findet es selbst. Beim Nachahmen und Üben laufen die Episoden je zur Hälfte sauber
+und variiert. `play.onnx` entstand
 aus 12 Runden Nachahmen à 32 Episoden; ausgewählt wurde Runde 8:
 
 | | sauberer Roboter | volle Variation |

@@ -103,7 +103,8 @@ Alle Regler auf 0 zu stellen wäre fatal: Alle Neuronen einer Schicht rechneten 
 dieselbe Korrektur und blieben für immer **Zwillinge**. Deshalb werden sie zufällig gezogen, und zwar
 klein genug, dass die Summen nicht von Schicht zu Schicht explodieren. Kern macht es wie PyTorch:
 gleichverteilt zwischen −1/√n und +1/√n, wobei n die Zahl der Eingänge ist. Bei 61 Eingängen also
-etwa ±0,128.
+etwa ±0,128. Für die letzte Schicht gibt es noch einen Faktor (`output_gain`), mit dem man die
+ersten Ausgaben klein halten kann.
 
 ## A.2 Die Vorwärtsrechnung
 
@@ -111,6 +112,11 @@ etwa ±0,128.
 ganzen Stapel (**Batch**) von Eingaben auf einmal; Kern rechnet dabei vier Zeilen gleichzeitig. Fürs
 Lernen merkt sich die Vorwärtsrechnung alle Zwischenergebnisse (den **Cache**), beim bloßen Handeln
 nicht.
+
+Die innerste Schleife läuft dabei immer über Gewichte, die im Speicher direkt hintereinander
+liegen, und rechnet „y plus a mal x“. So kann der Compiler sie beschleunigen, **ohne die
+Reihenfolge der Additionen zu ändern**. Genau dafür liegen die Gewichte eingangsweise: Sonst müsste
+der Compiler Summen umordnen, und umgeordnete Kommazahl-Summen sind nicht mehr bitgleich (A.11).
 
 ## A.3 Der Verlust: Wie schlecht bin ich gerade?
 
@@ -167,7 +173,8 @@ Kern mischt die Reihenfolge mit seinem eigenen Zufallsgenerator.
 
 Ein einzelner Ausreißer kann einen riesigen Gradienten erzeugen und das Netz mit einem Schritt
 ruinieren. Deshalb wird die **Länge** des gesamten Gradienten begrenzt: Ist sie größer als 1,0,
-wird sie auf 1,0 gestutzt. Die Richtung bleibt gleich. In Kern sitzt diese Bremse in `Adam`.
+wird sie auf 1,0 gestutzt. Die Richtung bleibt gleich. In Kern sitzt diese Bremse in `Adam`; sie
+misst die Länge in doppelter Genauigkeit und beim Actor über Netzgewichte **und** σ zusammen.
 
 ## A.5 Backpropagation: Wer ist schuld?
 
@@ -230,8 +237,9 @@ Schritte, egal wie groß seine Zahlen sind.
 Der Schritt ist also genau ± Lernrate, **ob der Gradient 0,000001 oder 1000 ist**. Wie ein Wanderer,
 der im Nebel immer gleich große Schritte macht und nur auf die Richtung achtet.
 
-Kern nutzt PyTorchs Standardwerte (Glättung 0,9 und 0,999). Actor, Kritiker und Nachahmen haben
-je einen eigenen Adam, und sein Gedächtnis kommt in den Checkpoint: Ein fortgesetzter Lauf macht
+Kern nutzt PyTorchs Standardwerte (Glättung 0,9 und 0,999, Lernrate 10⁻³). Actor, Kritiker und
+Nachahmen haben je einen eigenen Adam (der fürs Nachahmen ist frisch, damit sein Schwung nicht ins
+spätere PPO hineinwirkt), und sein Gedächtnis kommt in den Checkpoint: Ein fortgesetzter Lauf macht
 genau die Schritte, die ein ununterbrochener gemacht hätte.
 
 ## A.7 Normalisierung: alle auf Augenhöhe
@@ -252,8 +260,13 @@ Weil eine bessere Ente andere Zustände erlebt, werden Mittelwert und Streuung l
 Dafür reicht eine exakte Formel (Chans Algorithmus), die nur drei Zahlen pro Eingang braucht.
 
 Wichtig: **Der Normalisierer gehört zum Netz.** Ohne genau diese Umrechnung ist das Netz wertlos,
-deshalb steht er im exportierten Netz ganz vorn (A.14). Beim Warmstart wird er eingefroren
-([Kapitel 14.4](14-lehrer.md)).
+deshalb steht er im exportierten Netz ganz vorn (A.14) und reist mit der Policy zu jedem Sammler.
+Beim Warmstart wird er eingefroren; neue Eingänge bekommen Mittelwert 0, Teiler 1 und Gewicht 0,
+sodass das Netz anfangs exakt wie das alte handelt ([Kapitel 14.4](14-lehrer.md)).
+
+Der Lerner führt die Normalisierer einmal pro Iteration mit allen gesammelten Beobachtungen nach
+und bewertet die alte Policy danach **mit den neuen** Werten neu. Bei wenigen Dutzend Enten wandern
+sie sonst merklich, und die Verhältnisse von PPO (A.11) wären verfälscht.
 
 ## A.8 Auswendiglernen gegen Verstehen
 
@@ -311,7 +324,8 @@ flowchart TD
 So entstehen Daten genau dort, wohin der Schüler wirklich gerät, mit der richtigen Antwort dafür.
 In Kern fährt das Netz ab Runde 1 mit etwas Rauschen (0,05), damit auch Lagen knapp neben seiner
 Bahn vorkommen; nach jeder Runde lernt es aus **allen** Beispielen (10 Epochen, Minibatch 256,
-Lernrate 10⁻³). Beim Sprung springt das Netz nach 7 Runden zum ersten Mal echt.
+Lernrate 10⁻³). Beim Sprung springt das Netz nach 7 Runden zum ersten Mal echt. Die Spielschicht
+lernt genauso. Das Vorbild heißt beim Sprung `JumpTeacher`, beim Spielen `PlayEnv::teacher`.
 
 Eine Bedingung macht DAgger erst möglich: Das Vorbild darf nur sehen, was das Netz sieht, und kein
 verstecktes Gedächtnis haben. Eine Antwort, die nur von der Beobachtung abhängt, kann ein Netz exakt
@@ -339,6 +353,8 @@ Der **Agent** (die Ente mit ihrem Netz) sieht eine **Beobachtung**, wählt eine 
 Umgebung antwortet mit einer neuen Beobachtung und einer **Belohnung**. In Kern ist die Umgebung eine
 `Env`; bei `DuckEnv` ist ein Schritt ein Regeltakt von 20 ms (50 pro Sekunde).
 
+Ein Schritt (`step`) liefert die Belohnung und ob die Episode durch Sturz oder Zeitablauf endete.
+
 Fachleute nennen das einen **Markov-Entscheidungsprozess**: Zustände, Aktionen, eine Physik, die
 den nächsten Zustand bestimmt, Belohnungen. „Markov“ heißt: Was als Nächstes passiert, hängt nur
 vom Jetzt ab, nicht von der Vorgeschichte.
@@ -348,7 +364,9 @@ vom Jetzt ab, nicht von der Vorgeschichte.
 Die Ente kennt ihren Zustand nicht vollständig. Sie sieht nur, was ihre Sensoren melden, mit
 Rauschen und Verspätung: Gelenkwinkel, Gyro, Schwerkraftrichtung, ihre letzte Aktion, Befehle. Ihre
 wahre Höhe über dem Boden oder ihre Geschwindigkeit im Raum sieht sie **nicht**. Die letzte Aktion
-in der Beobachtung wirkt wie ein kleines Gedächtnis.
+in der Beobachtung wirkt wie ein kleines Gedächtnis. Fachleute sagen dazu „teilweise beobachtbar“
+(POMDP). Wie stark die Sensoren rauschen und verspäten, legt `Task::Noise` fest (Zahlen in
+[Kapitel 14](14-lehrer.md)).
 
 ### Belohnung und Return
 
@@ -358,6 +376,9 @@ er tun soll. Und er nimmt sie **wörtlich**.
 > **Achtung, Falle!** In frühen Läufen lernte die Ente, auf dem Schwanz zu sitzen, Hechtsprünge zu
 > machen oder sich abzustützen – weil die Belohnung das zuließ. Jede Lücke musste mit einer
 > strengeren Regel geschlossen werden ([Kapitel 15.11](15-eigene-modelle.md)).
+
+In Kern liefert `Task::reward` die Belohnung, nach der Konvention von mjlab als Summe aus Gewicht ×
+Term × Taktdauer; die einzelnen Terme bleiben für Berichte sichtbar.
 
 Der **Return** ist die Summe aller künftigen Belohnungen. Damit er nicht unendlich wird, zählen
 spätere Belohnungen weniger: Jeder Schritt in die Zukunft multipliziert mit dem **Diskontfaktor**
@@ -375,6 +396,8 @@ Die **Policy** ist die Entscheidungsregel: Beobachtung rein, Aktion raus. Zum Le
 
 Der **Wert** V einer Lage sagt: „Wie viel Return erwarte ich ab hier?“ Der **Vorteil** einer Aktion
 sagt: „War sie besser oder schlechter als das, was ich hier sonst so tue?“ Positiv heißt besser.
+Dazwischen steht der **Aktionswert** Q: der erwartete Return, wenn ich erst genau diese Aktion
+wähle und danach wie gewohnt weitermache. Der Vorteil ist Q minus V.
 Genau das braucht das Lernen: Mach mehr von dem, was besser als üblich war.
 
 Eine einfache Schätzung des Vorteils aus einem Schritt ist der **TD-Fehler**: das, was passiert ist
@@ -398,12 +421,15 @@ Policy würfeln.
 Kern würfelt mit einer **Glockenkurve** (Normalverteilung) pro Servo: Aktion = Mittelwert aus dem
 Netz + σ × Zufallszahl. Das σ ist ein eigener, lernbarer Regler pro Aktion: Am Anfang ist es groß
 (viel Ausprobieren), später kleiner. Beim Sprung startet es bei 0,3 und wird nach der Nachahmung auf
-0,1 gesetzt, damit ein Netz, das schon springt, nicht alles wieder verlernt. Untergrenze ist 0,001.
+0,1 gesetzt, damit ein Netz, das schon springt, nicht alles wieder verlernt. Untergrenze ist 0,001,
+der Standard ohne Rezept 1,0. Jede Ente würfelt mit ihrem **eigenen** Zufallsstrom, der nur von
+Seed und ihrer Nummer abhängt, nie davon, welcher Worker sie rechnet.
 
 ### Entropie: die Neugier am Leben halten
 
 Die **Entropie** misst, wie unbestimmt eine Verteilung ist. Bei der Glockenkurve hängt sie nur
-von σ ab: σ = 1 ergibt pro Aktion 1,419, σ = 0,1 ergibt −0,884. Ohne Gegenmaßnahme schrumpft σ oft
+von σ ab: σ = 1 ergibt pro Aktion 1,419, σ = 0,1 ergibt −0,884 (bei kontinuierlichen Verteilungen darf die
+Entropie negativ sein). Ohne Gegenmaßnahme schrumpft σ oft
 zu schnell, die Ente hört auf auszuprobieren und bleibt bei der ersten halbwegs brauchbaren Lösung
 hängen. Ein kleiner **Entropie-Bonus** im Verlust hält sie neugierig (Kern: 0,01, beim Sprung
 0,005).
@@ -426,7 +452,7 @@ Der TD-Fehler eines einzigen Schritts rauscht wenig, ist aber schief, wenn der K
 Der volle Return rauscht stark, ist aber ehrlich. **GAE** (Generalized Advantage Estimation) mischt
 beides mit einem zweiten Regler λ: Man geht rückwärts durch die Zeit, und jeder Vorteil ist der
 eigene TD-Fehler plus γ · λ mal der Vorteil des nächsten Schritts. Kern nutzt λ = 0,95, also
-γ · λ = 0,9405.
+γ · λ = 0,9405. Mit λ = 0 bliebe nur der TD-Fehler, mit λ = 1 der volle Return.
 
 **Rechnen wir drei Schritte:** Belohnungen (1, 0, 2), Werte V = (5, 4, 6), Wert danach 3.
 
@@ -447,14 +473,16 @@ return_buf_[row] = adv + v;
 ```
 
 Zeile 1 ist der TD-Fehler, Zeile 2 die GAE-Rückwärtssumme, Zeile 3 das Ziel des Kritikers. `live`
-ist 0 nach einem Episodenende; dann gibt es keine Fortsetzung. Am Schluss werden alle Vorteile auf
+ist 0 nach einem Episodenende; dann gibt es keine Fortsetzung. Für den letzten Schritt des
+Rollouts schätzt der Kritiker den Wert dort, wo jede Ente gerade steht. Am Schluss werden alle Vorteile auf
 Mittel 0 und Streuung 1 gebracht, damit ihre Größe nicht von der Größe der Belohnungen abhängt.
 
 ### Warum zu große Schritte gefährlich sind
 
 Die Daten stammen von der **alten** Policy. Macht man einen großen Schritt, ist die neue Policy weit
 weg, die Vorteile gelten für sie nicht mehr, und eine gute Policy kann in einem Schritt kaputtgehen.
-Dann sammelt sie schlechte Daten, aus denen sie sich kaum erholt.
+Dann sammelt sie schlechte Daten, aus denen sie sich kaum erholt. Mehrere Epochen auf denselben
+Daten, die eigentlich sparsam wären, machen es noch schlimmer.
 
 ### PPO: Verbessern mit Gurt
 
@@ -480,7 +508,7 @@ in diese Richtung schieben würde, findet nicht statt.
 
 Zusätzlich regelt Kern wie rsl_rl die **Lernrate** über die **KL-Divergenz**, ein Maß dafür, wie
 verschieden alte und neue Policy sind: Ist sie größer als 0,02, wird die Lernrate durch 1,5 geteilt,
-unter 0,005 mit 1,5 malgenommen. Große Schritte, wenn es ruhig ist, kleine, wenn die Policy springt.
+unter 0,005 mit 1,5 malgenommen, immer zwischen 10⁻⁵ und 10⁻². Große Schritte, wenn es ruhig ist, kleine, wenn die Policy springt.
 Auch der Kritiker hat eine Bremse: Seine Schätzung darf sich pro Update nur um ε vom alten Wert
 entfernen.
 
@@ -497,6 +525,9 @@ flowchart TD
   AD --> Ende["neue Policy"]
 ```
 
+Kerns Standardwerte: 24 Takte je Ente (Sprung 48), 5 Epochen, 4 Minibatches, Clip 0,2, γ = 0,99,
+λ = 0,95, Lernrate 10⁻³ (Sprung 10⁻⁴).
+
 Sammeln und Lernen sind in Kern getrennt: Sammler brauchen nur die Policy und liefern Rollouts, der
 Lerner nimmt alle Rollouts. Deshalb können die Sammler Threads oder Web Worker sein.
 
@@ -505,8 +536,9 @@ Lerner nimmt alle Rollouts. Deshalb können die Sammler Threads oder Web Worker 
 Kommazahlen im Computer sind tückisch: (0,1 + 0,2) + 0,3 ergibt im Rechner nicht exakt dasselbe wie
 0,1 + (0,2 + 0,3) – im letzten Bit unterscheiden sie sich. Summiert man Gradienten in einer
 Reihenfolge, die von der Zahl der Threads abhängt, bekommt man auf 2 und 16 Kernen verschiedene
-Netze. Kern summiert deshalb immer in fester Reihenfolge (jede Minibatch in genau 8 Teilen) und
-erreicht so: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
+Netze. Kern gibt deshalb jeder Ente ihren Seed aus ihrer globalen Nummer, ordnet alle Rollouts in eine
+feste Reihenfolge, summiert immer in fester Reihenfolge (jede Minibatch in genau 8 Teilen), nimmt
+alle Mathe-Funktionen aus `kern::dm` und verzichtet auf FMA. Das Ergebnis: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
 ([Kapitel 14.7](14-lehrer.md),
 [Anhang C](C-grundlagen-physik.md)).
 
@@ -526,12 +558,15 @@ ist die Kernaufgabe des Robotiklernens. Zwei Strategien ergänzen sich:
 > mal auf stumpfem Boden, mal mit Brille, mal ohne. Am Turniertag ist dir egal, wie der Saal ist.
 
 Zwei Feinheiten: Manche Variation kommt erst nach und nach (**Lehrpläne**), weil zu viel Chaos am
-Anfang verhindert, dass die Bewegung überhaupt entsteht. Und was man nicht genau messen kann, wird
-**variiert**, damit sich das Netz nicht darauf verlässt.
+Anfang verhindert, dass die Bewegung überhaupt entsteht. Beim Sprung wächst die
+Schwerpunkt-Streuung ab Iteration 200 über 600 Iterationen, die Schubse kommen ab Iteration 300.
+Und was man nicht genau messen kann, wird **variiert**, damit sich das Netz nicht darauf verlässt:
+Das Servoprofil hat neben jedem Wert eine Streuung, und das Training zieht jeden Servo daraus.
 
 Dazu kommen der **asymmetrische Kritiker**, der beim Lernen mehr sehen darf als der Roboter
 (beim Sprung 9 Zusatzwerte, bei der Spielschicht 6), und der **Warmstart**: Kerns Sprung beginnt
-als Pollens velstand-Netz, kann also schon stehen und muss nur den Sprung dazulernen.
+als Pollens velstand-Netz, kann also schon stehen und muss nur den Sprung dazulernen. Dessen
+Gewichte werden dafür aus dem ONNX-Layout in Kerns eingangsweises Layout umsortiert.
 
 ## A.13 Suchen ohne Gradient: CMA-ES
 
@@ -570,6 +605,10 @@ ist der Mittelpunkt die bessere Antwort: Der Beste hatte vielleicht nur Glück. 
 mit Kerns eigenem Zufall und `kern::dm`, ist also reproduzierbar. Die genauen Formeln stehen im
 blauen Buch.
 
+Beim Vorbild sucht CMA-ES frei im ganzen Zahlenraum; erst tanh mal Amplitude macht daraus
+Servoziele, die so immer innerhalb ±2,5 rad bleiben. Jeder Kandidat springt 6 Episoden (eine
+sauber, fünf variiert), alle Kandidaten einer Generation auf denselben Robotern.
+
 ## A.14 ONNX: das Netz zum Mitnehmen
 
 **ONNX** ist ein offenes Dateiformat für Rechengraphen. Ein Modell ist eine Kette von Bausteinen
@@ -585,7 +624,9 @@ obs ─► Sub ─► Div ─► Gemm ─► Elu ─► … ─► Gemm ─► a
 Kern schreibt die Datei mit einem **eigenen, winzigen Schreiber** für das Protobuf-Format, ohne
 Bibliothek, im selben Format wie Pollens Netze (61 rein, 14 raus).
 Exportiert wird nur der **Mittelwert** der Policy: Auf dem Roboter wird nicht mehr ausprobiert, σ
-und Kritiker bleiben im Lerner. Mehr in
+und Kritiker bleiben im Lerner. Die Gewichte werden dafür als [Ausgang][Eingang] umsortiert, die
+Metadaten tragen dieselben Schlüssel wie bei Pollen plus `task` und `lehrer`. Ein Test liest die
+Datei wieder ein und vergleicht bis 10⁻⁴ genau, und ONNX Runtime lädt sie auch. Mehr in
 [Kapitel 14.10](14-lehrer.md).
 
 ## A.15 Wie alles zusammenkommt
