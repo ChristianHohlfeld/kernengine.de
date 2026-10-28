@@ -9,8 +9,6 @@ Die allgemeinen Grundlagen – wie aus Dreiecken Pixel werden, was Matrizen tun,
 funktionieren – stehen in [Anhang B](B-grundlagen-rendering.md). Kommt dir hier ein Begriff spanisch
 vor, blättere ruhig dorthin. In diesem Kapitel geht es darum, was **Kern** daraus macht.
 
-![Kern Studio mit Orb Run: prozedurale Stadt, Sonnenschatten, Himmel und Bloom](../buch/bilder/studio.png)
-
 ## 4.1 Überblick
 
 Kerns **Renderer** – der Teil, der Bilder erzeugt – ist erstaunlich klein: eine Brücke zu WebGL2,

@@ -10,8 +10,6 @@ https://kernengine.de/ – mit **Kern Studio**, dem Editor, in dem du Welten bau
 mit **dem Lehrer**, der Roboter-Gehirnen das Laufen beibringt, mit spielbaren Levels wie **Orb Run**
 und **Physics Lab** und den C++-Beispielspielen `hello` und `orbrun`.
 
-![Kern Studio mit dem Level Orb Run](../buch/bilder/studio.png)
-
 ## 1.1 Was Kern ist
 
 Eine **Engine** ist der Motor unter der Haube eines Spiels: Sie zeichnet, rechnet Stöße, spielt Töne,
@@ -124,8 +122,6 @@ läuft. Du baust ein Level aus Actors (Dingen in der Welt) und spielst es mit
 Spiel, wieder eine einzige HTML-Datei, mit denselben C++-Klassen wie im Editor
 ([Kapitel 8](08-spiel-laufzeit.md), [Kapitel 11](11-studio.md)).
 
-![Ein exportiertes Spiel](../buch/bilder/game.png)
-
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim Start ist Orb Run geladen.
 > Drück **Play** (Alt+P), fahr mit dem Hovercar los und sammle ein paar Orbs. Dann **Stop** –
 > Glückwunsch, du hast gerade C++ im Browser gespielt.
@@ -135,8 +131,6 @@ Spiel, wieder eine einzige HTML-Datei, mit denselben C++-Klassen wie im Editor
 mehrere Web Worker (Hintergrund-Helfer) Erfahrungen sammeln und einer daraus lernt. Gleicher
 Startwert, gleich viele Enten: **dasselbe Netz**, hier wie dort. Gespeichert wird im Format ONNX,
 wie Pollens Netze ([Kapitel 14](14-lehrer.md)).
-
-![Die Lehrer-Seite im Browser](../buch/bilder/lehrer.png)
 
 An der Ente greift alles ineinander: Modell von Pollen Robotics, Glieder als Physikkörper mit
 Gelenken, Servos (Motoren) mit Gerätemodell, Netze, die Kern selbst rechnet, Stimme aus dem Mixer,

@@ -158,8 +158,6 @@ stammen daher.
 > rechte Maustaste gedrückt und flieg mit W nach vorn. Dann **Simulate** (Alt+S) – und sieh den
 > Gelenken bei der Arbeit zu.
 
-![Simulate mit Physik-Ansicht, wie der Browser-Test es prüft](../buch/bilder/studio-simulate.png)
-
 ## 2.9 Der Fingerabdruck
 
 Wie beweist man, dass Kern überall **exakt** gleich rechnet? Die Micro Duck läuft mit Pollens Netz

@@ -20,8 +20,6 @@ sieht und tut. Obendrauf setzt Kern den **Lehrer** ([Kapitel 14](14-lehrer.md)),
 (`jump.onnx`) und die **Spielschicht** (`play.onnx`). Eigene Netze trainieren erklärt
 [Kapitel 15](15-eigene-modelle.md), den Abgleich mit dem echten Roboter [Kapitel 16](16-kalibrierung.md).
 
-![Das Micro-Duck-Level im Studio (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-level.png)
-
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und wähle bei **New Level** die
 > Vorlage **Micro Duck**. Drück auf Play und schau zu: Die Ente spaziert los, schaut sich um – und
 > wenn sie den Ball entdeckt, wird es spannend.
@@ -366,8 +364,6 @@ Bau): 7 von 11, 13 von 21, aber 10 Stürze. Aufheben, wegtragen und ausspucken i
 erst einmal. Kicken klappt gut, beim Sockenholen ist Luft nach oben ([Kapitel 14](14-lehrer.md)).
 
 ## 13.12 Die Ente steuern
-
-![Touch-Steuerung am Telefon (hier in Orb Run; bei der Ente erscheinen ihre eigenen Tasten)](../buch/bilder/phone-play-390.png)
 
 | Bewegung | Tastatur | Gamepad | Touch |
 |---|---|---|---|

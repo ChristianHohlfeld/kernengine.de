@@ -188,8 +188,6 @@ gurrt, ebenfalls ohne Aufnahmen. Kern hat dafür einen eigenen kleinen Synthesiz
 des Rust-Pakets `sounds` aus dem Microduck-Projekt von Pollen Robotics, die den echten Roboter gebaut
 haben.
 
-![Die Micro Duck im Level: ihre Laute kommen aus ihrem Kopf, auf dem Voice-Bus](../buch/bilder/duck-level.png)
-
 Eine einzige Zahl, der **Seed**, legt die Persönlichkeit einer Ente fest: Tonlage, Helligkeit,
 Nasalität, Vibrato, Atem, „Quakigkeit“, Triller, Tempo. Zwei Seeds klingen wie zwei verschiedene
 Tiere, derselbe Seed immer gleich. Der echte Roboter bildet seinen Seed aus der Seriennummer, Kern aus

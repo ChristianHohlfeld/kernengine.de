@@ -129,8 +129,6 @@ Im Viewport selbst siehst du unten links das **Achsenkreuz**: X rot, Y grün, Z 
 oben.** Eine Infozeile nennt Tempo und Kameraposition, eine Hinweiszeile die gerade gültigen Tasten,
 und beim Ziehen am Gizmo steht da, wie weit du verschoben, gedreht oder skaliert hast.
 
-![Vier Viewports: Perspektive und drei orthografische Ansichten](../buch/bilder/studio-quad.png)
-
 > **Probier's aus!** Stell über die Toolbar **Layout** auf vier Viewports. Klick in einen der flachen
 > Viewports und schau, wie er auf Wireframe springt. Mit dem Maximieren-Knopf holst du einen davon groß
 > und wieder zurück.

@@ -200,8 +200,6 @@ die gedruckten Polster am Schnabel `tpu`, und im Beispiel-Level ist der Holzbode
 haben **keine** Oberfläche: Sie behalten die Reibwerte, mit denen ihr Netz trainiert wurde (1,0 auf
 1,0 ergibt √1 = 1).
 
-![Das Beispiel-Level Micro Duck: Holzboden, Ball und zwei Socken mit eigener Paar-Reibung](../buch/bilder/duck-level.png)
-
 ## 6.7 Reibung, Sprungkraft, Rollwiderstand
 
 **Reibung** stellst du pro Form ein. Im Editor: Details › Mesh › **Physics** für den automatischen

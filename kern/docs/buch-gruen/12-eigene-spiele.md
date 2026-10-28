@@ -108,8 +108,6 @@ kannst sie weitergeben und in jedem Studio öffnen (Ctrl+O oder auf die Seite zi
 und bietet **Play it** an. Diese eine Datei enthält Engine, Level und Spiel. Sie läuft offline, direkt
 von der Festplatte, von jedem Webserver und am Telefon mit Touch-Sticks.
 
-![Ein exportiertes Spiel im Browser](../buch/bilder/game.png)
-
 > **Probier's aus!** Schick dir `Orb_Garden.html` aufs Telefon und öffne sie. Die Engine erkennt den
 > Touchscreen und zeichnet Sticks und Knöpfe von selbst. Du hast gerade ein Handyspiel gebaut!
 

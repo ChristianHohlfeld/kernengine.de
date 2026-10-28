@@ -72,8 +72,6 @@ Von den meisten Komponenten darf ein Actor höchstens eine haben (ein Mesh, ein 
 **Collider** und **Gelenke** dürfen es beliebig viele sein. Dazu kann jeder Actor einen eigenen
 Logik-Graphen tragen.
 
-![Ein ausgewählter Actor im Studio: Outliner, Details mit den Komponenten, Gizmo im Viewport](../buch/bilder/studio-selected.png)
-
 ## 8.4 Die Komponenten – der Steckbaukasten
 
 Hier ist der ganze Baukasten im Überblick. Alle Felder mit Standardwerten listet das blaue Buch.
@@ -252,8 +250,6 @@ Mit **F8** wechselst du mitten im Lauf zwischen Simulate und Play („Eject“ u
 dass der Spieler seinen Zustand verliert. Pausieren geht auch, und im Pausenzustand macht die
 Taste **.** (Punkt) genau einen Schritt.
 
-![Simulate im Studio: die Physik läuft, niemand wird gesteuert, Körper lassen sich greifen](../buch/bilder/studio-simulate.png)
-
 > **Probier's aus!** Öffne das **Physics Lab** (File › Example Levels), starte Play (Alt+P), drück
 > nach ein paar Sekunden **F8** und schau dir die Szene von außen an. Pausiere und tippe immer wieder
 > auf **.** – du gehst Bild für Bild durch die Physik wie durch ein Daumenkino.
@@ -403,8 +399,6 @@ entstanden ist. Alles wird in den festen Schritten berechnet. Einige Feinheiten,
 Die Figuren, Waffen, Mündungsfeuer, Einschusslöcher und Hülsen sind reine Darstellung – sie ändern
 die Simulation nicht. Die Waffenmodelle sind aus Grundformen gebaut.
 
-![Play im Studio mit HUD](../buch/bilder/studio-play.png)
-
 ## 8.14 Walker
 
 Ein **Walker** ist ein gelenkiger Roboter, der auf seinen eigenen Servos läuft – die Micro Duck mit
@@ -443,8 +437,6 @@ Ein paar Kniffe: Den linken Stick ganz nach vorn drücken heißt Sprinten. Schne
 rechten Stick drehen stärker („Flick“). Und ziehst du den Stick über den Rand hinaus, dreht die
 Kamera einfach weiter (*Edge Turn*). Gamepads funktionieren ebenfalls.
 
-![Kern auf dem Telefon: Sticks und Knöpfe im Spiel](../buch/bilder/game-phone.png)
-
 ## 8.17 Logik in der Welt
 
 Jeder Actor und das Level können einen **Logik-Graphen** tragen. Die GameWorld startet sie in Play
@@ -470,8 +462,6 @@ Unter File › Example Levels (und File › New Level) warten sechs fertige Welt
   Holzboden, Büchern, Ball und Socken. Die Ente läuft selbstständig, die Physik rechnet mit 100 Hz
   und 16 Unterschritten, und ein Logik-Graph lässt sie zwitschern, wenn sie den Ball sieht.
 - **Basic:** Boden und ein Würfel. **Empty:** gar nichts.
-
-![Orb Run im Studio](../buch/bilder/studio.png)
 
 > **Probier's aus!** Starte im Studio Orb Run mit Play (Alt+P) und sammle ein paar Orbs. Dann öffne
 > die World Settings und stell die **Tageszeit** auf 0,75. Starte erneut – jetzt fährst du in den
