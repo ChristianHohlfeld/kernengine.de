@@ -83,3 +83,12 @@ Game-Engine, eine Physiksimulation und ein lernender Roboter funktionieren.
 
 Etwa 40–50 % der Wortzahl des blauen Kapitels. Lieber ein Beispiel mehr als ein Fachwort mehr.
 Kein Thema auslassen.
+
+## Nachtrag 28.10.: Prinzipien vor Details (gilt vor allem anderen)
+
+Ein Lesetest mit den Zielgruppen hat gezeigt: Die Bücher waren zu technisch. „Vollständig“ heißt deshalb: Jedes **Prinzip** des blauen Buchs kommt vor und wird verstanden – was es ist, wozu, wie es grundsätzlich funktioniert, warum Kern es so macht, wie man es in Studio sieht. **Nicht** jedes Detail. Funktions- und Klassennamen, Dateipfade, Schalter, Feldnamen, JSON-Schlüssel, Standardwerte und Zahlen ohne Erkenntniswert gehören ins blaue Buch („Die genauen Namen und Werte stehen im blauen Buch, Kapitel N.“), höchstens ein reizvolles Detail pro Abschnitt in einen Kasten (gelb `> **Für Profis:**`, grün `> **Für Neugierige:**`).
+
+- Jeder Abschnitt beginnt mit dem Prinzip in einfachen Worten und einem Bild aus dem Alltag.
+- Jedes Kapitel hat direkt nach dem Eingangskasten einen Begriffskasten (gelb `> **Wörter, die du brauchst:**`, grün `> **Begriffe vorab:**`, höchstens 8 Begriffe), damit niemand vorher die Anhänge lesen muss.
+- Studio-Bedienung (Menüs, Tasten, Felder) für die Missionen bleibt; lange Listen nur in Kapitel 17.
+- Rätsel fragen Prinzipien ab, keine Details.
