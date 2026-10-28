@@ -207,6 +207,11 @@ tex = (work / "buch.tex").read_text()
 tex = tex.replace("\\raggedright\\arraybackslash}", "\\raggedright\\arraybackslash\\hspace{0pt}}")
 tex = tex.replace("\\begin{minipage}[b]{\\linewidth}\\raggedright\n", "\\begin{minipage}[b]{\\linewidth}\\raggedright\\hspace{0pt}\n")
 (work / "buch.tex").write_text(tex)
+# Links inside the book must reach a heading: pandoc drops leading digits from heading ids
+# ("## 14.7 Determinismus" -> "determinismus"), so an anchor like #147-determinismus leads nowhere.
+targets = set(re.findall(r"\\(?:hypertarget|label)\{([^}]+)\}", tex))
+dead = sorted(set(re.findall(r"\\hyperlink\{([^}]+)\}", tex)) - targets)
+if dead: print(f"DEAD LINKS: {len(dead)}: " + ", ".join(dead[:30]), file=sys.stderr)
 for run in range(3):  # contents, references and running heads settle after three runs
     r = subprocess.run(["xelatex", "-interaction=nonstopmode", "-halt-on-error", "buch.tex"], cwd=work, capture_output=True, text=True)
     if r.returncode: sys.exit(f"xelatex failed (intermediate files in {work}):\n{r.stdout[-3000:]}")
