@@ -1,299 +1,460 @@
 # 15 Eigene Modelle trainieren – dein Netz, deine Ente
 
-> **Dein Level:** Jetzt trainierst du selbst. Du lernst, wie du den Lehrer startest, seinen Fortschritt
-> liest, das beste Netz auswählst und es im Studio springen lässt – und wie eine neue Bewegung dazukommt.
+> **Dein Level:** Jetzt trainierst du selbst. Du startest den Lehrer im Browser, liest seinen
+> Fortschritt, wählst das beste Netz aus und lässt es im Studio springen. Und du lernst, worauf es
+> ankommt, wenn man einer Ente eine ganz neue Bewegung beibringen will.
 
-Dies ist die Anleitung; wie der Lehrer rechnet, steht in [Kapitel 14](14-lehrer.md), die Grundlagen
-in [Anhang A](A-grundlagen-neuronale-netze.md). Zwei Wege gibt es: die **Lehrer-Seite im Browser**
-(nur Sprung und Stehen) und das **Werkzeug** `kern_lehrer` für alle, die Kern aus dem Quellcode bauen
-([Kapitel 2](02-bauen-und-testen.md)).
+> **Wörter, die du brauchst:**
+> - **Rückgabe** – alle Punkte, die eine Ente in einer Episode zusammen gesammelt hat
+> - **Beobachtung** – alles, was das Netz in einem Takt zu sehen bekommt
+> - **Aktion** – was das Netz antwortet, zum Beispiel 14 Servoziele
+> - **Hyperparameter** – Einstellungen, die man vor dem Lernen festlegt, etwa die Zahl der Enten
+> - **Lernrate** – wie groß jeder Lernschritt ist, also wie weit die Regler auf einmal gedreht werden
+> - **Schnappschuss** – ein gespeicherter Zwischenstand des Netzes während des Trainings
+> - **Kommandozeile** – ein Fenster, in das man Befehle tippt, statt Knöpfe zu klicken
+> - **Totzone** – ein Bereich, in dem eine kleine Eingabe noch gar nichts bewirkt
 
-> **Mission:** Öffne von https://kernengine.de/ aus den Lehrer, wähle „Sprung“ und starte. Lass den
-> Tab offen (ein Handy ans Ladekabel). Beobachte „echte Sprünge (sauberer Roboter)“: Ab wann springt
-> dein Netz?
+Wie der Lehrer innen rechnet – Actor und Kritiker, PPO, Vorbild, Nachmachen, Variation – steht in
+[Kapitel 14](14-lehrer.md). Hier probierst du es aus und lernst die Regeln, nach denen man ein
+Training plant.
 
-## 15.1 Das Werkzeug bauen
+Es gibt zwei Wege. Der **Hauptweg** ist die **Lehrer-Seite im Browser**: Du brauchst nichts zu
+installieren, und sie kann den Sprung und das Stehen trainieren. Der zweite Weg ist ein Programm für
+die Kommandozeile. Das bekommt nur, wer Kern selbst aus dem Quellcode baut, und es kann ein paar Dinge
+mehr. In diesem Kapitel steht es nur in den Kästen „Für Profis“.
 
-```
-kern/tools/lehrer.sh           # baut kern/build/kern_lehrer
-kern/tools/lehrer.sh /pfad/out # baut nach /pfad/out
-```
+> **Mission:** Öffne auf https://kernengine.de/ den Eintrag „Der Lehrer“, wähle „Sprung“ und drücke
+> Start. Lass den Tab offen (ein Handy ans Ladekabel). Rechne mit 10 Minuten oder mehr, bis etwas
+> passiert. Beobachte die Anzeige „echte Sprünge (sauberer Roboter)“: Ab wann springt dein Netz?
 
-Das Skript läuft auf Linux und macOS (x86 und ARM), übersetzt Box3D, Kerns Mathebibliothek und die
-Quellen außer Studio und App mit den Schaltern für Determinismus und baut nur neu, was sich geändert
-hat. `CC`/`CXX` wählen den Compiler, `KERN_JOBS` die Zahl paralleler Compiler, `KERN_NATIVE=0` schaltet
-die Optimierung für deinen Prozessor ab – sie ändert **kein Ergebnis**. Pollens Netze lädt das Werkzeug
-aus `third_party/microduck/` (oder `--policies ORDNER`).
+## 15.1 Die Lehrer-Seite
 
-## 15.2 Alle Befehle
+Die Lehrer-Seite ist eine komplette Trainingshalle im Browser. Du stellst oben ein, was trainiert wird,
+drückst Start und siehst unten zu, wie das Netz besser wird. Sie rechnet mit demselben Trainingsplan
+und derselben Physik wie das Programm auf einem großen Rechner.
 
-| Befehl | Zweck |
+> **So kannst du es dir vorstellen:** wie ein Backofen mit Sichtfenster. Du stellst Temperatur und
+> Zeit ein, schiebst den Teig hinein und kannst durch die Scheibe sehen, wie er aufgeht.
+
+Die Felder der Seite:
+
+| Feld | Was es bedeutet |
 |---|---|
-| `--task jump` / `stand` | eine Bewegung mit PPO trainieren |
-| `--eval netz.onnx` | Sprung messen, sauber und variiert |
-| `--trace …` | eine Episode Takt für Takt |
-| `--vorbild-suchen demo.json` | Sprung-Vorbild mit CMA-ES suchen |
-| `--vorbild-pruefen …` | ein Vorbild springen lassen |
-| `--spielen` | Spielschicht nachahmen (DAgger) |
-| `--spielen-pruefen …` | Vorbild oder Netz spielen lassen |
-| `--spielen-ueben play.onnx` | Spielschicht mit PPO üben |
-| `--spielen-spur` | eine Spielepisode Schritt für Schritt |
-| `--biss-fenster` | wo der Schnabel eine Socke greift |
-| `--halt-messen` | wie weit die Ente nach „Stopp“ geht |
-| `--demo-spur` | das Beispiel-Level wie im Studio |
-| `--fingerprint 400` | Determinismus-Fingerabdruck |
-| `--kalibrieren` u. a. | Kalibrierung ([Kapitel 16](16-kalibrierung.md)) |
+| Bewegung | Sprung oder „Stehen“ als schneller Test |
+| Worker | wie viele Helfer gleichzeitig rechnen |
+| Enten je Worker | wie viele Enten jeder Helfer führt |
+| Iterationen | wie viele Trainingsrunden |
+| Seed | die Startzahl für den Zufall |
+| Aktionsrauschen am Anfang | wie viel Zufall am Anfang (leer: wie im Plan) |
+| Lernrate | wie große Schritte (leer: wie im Plan) |
 
-Für alle gilt: `--threads N` (Standard: alle Kerne) und `--seed N` (Standard 1).
+Die Zahl der Worker schlägt die Seite selbst vor, passend zu deinem Gerät. Darunter liegen die Knöpfe
+Start, Pause und „.onnx herunterladen“.
+
+> **Für Profis:** Wer Kern auf dem eigenen Rechner baut ([Kapitel 2](02-bauen-und-testen.md), am besten
+> zusammen mit einem Erwachsenen), bekommt mit einem Skript auch das Lehrer-Programm für die
+> Kommandozeile. Es kann zusätzlich Spielstände fortsetzen, eigene Vorbilder suchen und die
+> Spielschicht trainieren. Spannend: Das Skript darf das Programm genau für deinen Prozessor
+> beschleunigen – das ändert **kein** Ergebnis, das Netz bleibt bis zur letzten Stelle dasselbe
+> (Kapitel 14.7). Das Bauen und alle Befehle stehen im blauen Buch, Kapitel 15.
+
+## 15.2 Was der Lehrer alles kann
+
+Der Lehrer ist mehr als ein Trainingsknopf. Er ist ein ganzer Werkzeugkasten, damit man nicht nur
+trainiert, sondern auch **misst** und **nachsieht**, was beim Training passiert.
+
+> **So kannst du es dir vorstellen:** Ein Sportverein hat nicht nur einen Trainingsplatz, sondern auch
+> eine Stoppuhr, eine Videokamera für die Zeitlupe und einen Arzt, der prüft, ob alles in Ordnung ist.
+
+Das kann der Lehrer:
+
+- **Trainieren:** Springen oder Stehen (im Browser), die Spielschicht (nur im Programm).
+- **Messen:** Wie oft springt ein Netz echt, sauber und mit Variation?
+- **Nachsehen:** eine Episode Takt für Takt anschauen, mit jedem Punkte-Posten einzeln.
+- **Vorbild suchen:** einen neuen Sprung für das Nachmachen finden.
+- **Prüfen:** den Fingerabdruck für den Determinismus bilden (Kapitel 14.7).
+- **Servos nachmessen:** für die Kalibrierung ([Kapitel 16](16-kalibrierung.md)).
+
+Im Browser gibt es davon das Trainieren und das Messen der Sprünge. Den Rest kann nur das Programm.
+Die genauen Befehle stehen im blauen Buch, Kapitel 15.
 
 ## 15.3 Den Sprung trainieren
 
-### Der Standardlauf
+Ein Sprung-Training folgt immer demselben Plan, dem **Rezept**. Du musst nichts davon einstellen –
+aber du solltest wissen, was gerade passiert, wenn du zusiehst.
 
-```
-kern/build/kern_lehrer --task jump --iterations 3000 \
-  --out jump.onnx --log jump.csv \
-  --checkpoint run.ckpt --keep-every 250
-```
+> **So kannst du es dir vorstellen:** wie ein Trainingstag im Sportverein: aufwärmen mit dem, was du
+> schon kannst, der Trainerin zuschauen und nachmachen, dann selbst üben, bis es sitzt.
 
-So entstand Kerns `jump.onnx` (32 Enten auf 2 Kernen, Seed 1). Was passiert:
+Der Ablauf als Zeitstrahl:
 
-1. **Rezept laden:** Warmstart von velstand, Nachahmen (8 Runden à 96 Episoden), Üben mit Rauschen
-   0,1 und Lernrate 10⁻⁴. Optionen überschreiben einzelne Werte.
-2. **Enten anlegen:** `--envs` (16 je Thread), abgerundet auf ein Vielfaches der Threads.
-3. **Nachahmen,** dann `jump_nachgeahmt.onnx` und `run.ckpt.nachgeahmt` schreiben.
-4. **Üben:** 30 Iterationen nur Kritiker; alle 10 Iterationen (`--eval-every`) 5 Probesprünge.
-5. **Speichern:** alle 25 Iterationen (`--save-every`), am Ende und alle 250 als Schnappschuss
-   (`jump_it00250.onnx`).
+1. **Rezept laden:** Start beim Lauf- und Stehnetz velstand, das schon stehen kann (Warmstart).
+2. **Enten anlegen:** Worker × Enten je Worker Enten, jede mit ihrem eigenen Zufall.
+3. **Nachmachen:** 8 Runden lang ahmt das Netz das Vorbild nach. Die Seite meldet „Nachahmen: Runde …
+   von 8“ und prüft nach jeder Runde, ob das Netz schon springt.
+4. **Kritiker zuerst:** Die ersten 30 Iterationen lernt nur der Kritiker.
+5. **Üben:** Danach üben beide mit PPO, mit wenig Rauschen und voller Variation.
+6. **Prüfen und speichern:** Alle 25 Iterationen springt das Netz 5-mal zur Probe, und die Seite
+   speichert es.
 
-Bei mindestens 4 von 5 echten Probesprüngen erscheint `FIRST REAL JUMP at iteration …`, und das Netz
-wird gespeichert; `--stop-after-jump` beendet den Lauf dort.
+Oft springt das Netz schon nach dem Nachmachen. Das Üben macht den Sprung danach **robust**, also
+sicher auch mit einer etwas anderen Ente.
 
-### Fortsetzen, ohne Vorbild, eigenes Vorbild
+Zwei Dinge aus echten Läufen sind lehrreich:
 
-```
-kern_lehrer --task jump --iterations 6000 \
-  --resume run.ckpt --checkpoint run.ckpt
-```
+- **Ohne Vorbild geht es nicht.** Reines Üben mit Punkten hat den Absprung nie gefunden (Kapitel 14.6).
+- **Ein Training ist wie ein Spielstand.** Das Programm kann den ganzen Lernstand speichern und später
+  genau dort weitermachen. Wegen des Determinismus kommt dabei dasselbe heraus wie ohne Pause.
 
-`--resume` lädt den ganzen Lerner und überspringt das Nachahmen; `--iterations` ist das **Ziel**. Mit
-`run.ckpt.nachgeahmt` beginnt das Üben neu.
+Die Lehrer-Seite trainiert genau dasselbe Rezept wie das Programm. Gleicher Seed und gleich viele
+Enten insgesamt ergeben dasselbe Netz – im Browser wie auf dem großen Rechner.
 
-`--vorbild none` ist reines PPO (mit dem Term `track_height`) – dieser Weg fand den Absprung nicht.
-Zum Experimentieren: `--vorbild demo.json`, `--nachahmen 5 --episoden 64`, `--uebungs-std 0.2`,
-`--nachahmungs-lohn 0`. Ein eigenes Vorbild suchst du mit `--vorbild-suchen demo.json --iterations 120`
-(fortsetzen mit `--vorbild demo.json`) und prüfst es mit `--vorbild-pruefen`. Jede Generation meldet
-„a real jump“, „no real jump“ oder „fell“.
-
-Die Lehrer-Seite trainiert dasselbe Rezept: Gleicher Seed und gleich viele Enten insgesamt (Worker ×
-Enten je Worker) ergeben dasselbe Netz wie auf dem Rechner.
+> **Für Profis:** Mit dem Programm entstand Kerns Sprungnetz: 32 Enten, Seed 1, 3000 Iterationen
+> Üben, Schnappschüsse alle 250 Iterationen. Dort kann man auch ohne Vorbild trainieren, ein eigenes
+> Vorbild suchen und einzelne Werte des Rezepts überschreiben. Befehle und Dateinamen: blaues Buch,
+> Kapitel 15.
 
 ## 15.4 Fortschritt lesen
 
-Jede Übungsiteration schreibt eine Zeile mit diesen Feldern:
+Während des Trainings zeigt die Seite nach jeder Iteration Zahlen und eine Kurve. Sie verraten, ob
+das Netz wirklich etwas lernt. Die wichtigste Frage dabei: Steigen die Punkte, **und** kann die Ente
+das, was sie soll?
 
-| Feld | Bedeutung | Worauf achten |
+> **So kannst du es dir vorstellen:** wie das Zeugnis und die Klassenarbeit. Die Punkte (Rückgabe)
+> sind die Noten. Aber erst die echte Probe (echte Sprünge) zeigt, ob du es wirklich kannst – oder nur
+> gelernt hast, wie man Punkte sammelt.
+
+| Anzeige | Bedeutung | Worauf achten |
 |---|---|---|
-| `return` | mittlere Rückgabe | steigt langsam |
-| `len` | Episodenlänge in Takten | 100 = 2 s ohne Sturz |
-| `value` | Fehler des Kritikers | erst hoch, dann fallend |
-| `std` | Rauschen σ | sinkt, wenn das Netz sicherer wird |
-| `lr` | Lernrate | dauerhaft 1e-5: Schritte zu groß |
-| `steps/s` | Entenschritte pro Sekunde | Tempo deines Geräts |
-| `jumps n/5` | Sprungprobe | das eigentliche Ziel |
+| mittlere Episoden-Rückgabe | Punkte pro Versuch | steigt über viele Iterationen |
+| Episodenlänge (s) | wie lange ein Versuch dauert | Sprung: 2 s heißt ohne Sturz |
+| Aktionsrauschen (std) | wie viel Zufall | sinkt, wenn das Netz sicherer wird |
+| echte Sprünge | Probe: 5 Sprünge | das eigentliche Ziel |
+| Sprunghöhe, Flugzeit | wie gut gesprungen | sollen steigen |
+| Schritte / s | Tempo deines Geräts | nur Tempo, kein Lernen |
 
-Das Nachahmen meldet pro Runde Beispiele (`samples`) und Fehler (`error`). Mit `--log jump.csv`
-landet jede Iteration in einer CSV-Datei für die Tabellenkalkulation (`jumps` = −1: nicht gemessen).
-Geht etwas schief, zeigt `--trace jump.onnx` eine Episode Takt für Takt mit jedem Belohnungsterm
-(`builtin` statt Datei: das Vorbild; `--randomized`: mit Variation). So siehst du, ob das Netz
-springt – oder nur die Belohnung austrickst.
+Die Kurve zeigt Rückgabe und Episodenlänge über die Iterationen. Ein typischer guter Verlauf: Sie
+zappelt von Runde zu Runde, steigt aber über Hunderte von Iterationen langsam an. Ist die Episodenlänge
+kürzer als 2 Sekunden, enden Versuche zu früh – durch einen Sturz oder weil ein falsches Teil den
+Boden berührt.
+
+Wenn etwas schiefgeht, hilft das **Nachsehen**: Das Programm zeigt eine Episode Takt für Takt, mit
+jedem Punkte-Posten einzeln. So siehst du, ob das Netz springt – oder nur die Belohnung austrickst.
+
+> **Für Profis:** Das Programm zeigt zwei Werte mehr. Der Fehler des Kritikers ist nach dem Nachmachen
+> hoch (er kennt die neue Spielerin noch nicht) und soll dann fallen. Die Lernrate passt sich selbst
+> an: Ändert sich die Policy pro Schritt zu stark, wird sie kleiner. Klebt sie dauerhaft am kleinsten
+> erlaubten Wert, waren die Schritte also ständig **zu groß** – die Bremse ist voll angezogen. Alle
+> Felder: blaues Buch, Kapitel 15.
 
 ## 15.5 Das beste Netz auswählen
 
-Das letzte Netz ist nicht immer das beste. Darum:
+Das letzte Netz ist nicht immer das beste. Ein Training kann nach einem guten Stand auch wieder
+schlechter werden. Und die Probe während des Trainings sind nur 5 Sprünge – das kann Glück sein.
 
-1. Mit `--keep-every` Schnappschüsse behalten.
-2. Jeden mit mehr Episoden messen, sauber **und** variiert:
+> **So kannst du es dir vorstellen:** wie beim Sportfest. Nicht der letzte Wurf zählt, sondern der
+> beste. Und ein einzelner Glückstreffer macht noch keinen Sieger.
 
-   ```
-   for f in jump_it*.onnx; do
-     kern_lehrer --eval "$f" --episodes 40
-   done
-   ```
+So wählt man richtig:
 
-3. Wählen nach: echte Sprünge mit Variation, dann Stürze (0), dann Steigen, Flugzeit, Neigung.
-4. Im Studio prüfen (15.8).
+1. **Zwischenstände behalten:** Schnappschüsse speichern, statt nur den letzten Stand.
+2. **Gründlich messen:** jeden mit viel mehr Episoden prüfen, sauber **und** mit Variation.
+3. **Richtig sortieren:** zuerst echte Sprünge mit Variation, dann Stürze (am besten 0), dann
+   Steigen, Flugzeit und Kippen.
+4. **Im Studio ausprobieren** (15.8).
 
-Für Kerns `jump.onnx` ergab das 40 von 40 sauber und 36 von 40 variiert, ohne Sturz.
+Für Kerns Sprungnetz ergab das 40 von 40 echte Sprünge sauber und 36 von 40 mit Variation, ohne Sturz.
+
+Im Browser speichert die Seite alle 25 Iterationen den neuesten Stand und überschreibt den alten.
+Siehst du einen guten Stand, sichere ihn mit „.onnx herunterladen“.
+
+> **Für Profis:** Das Programm hebt Schnappschüsse automatisch auf und misst jeden mit 40 Episoden.
+> Wie das geht, steht im blauen Buch, Kapitel 15.
 
 ## 15.6 Hyperparameter wählen
 
-**Hyperparameter** sind die Einstellungen vor dem Lernen. Eine Iteration mit 32 Enten: 32 × 48 = 1536
-Zeilen (Rauschen 0,1), aufgeteilt in 4 Minibatches à 384 Zeilen (je 8 Teile à 48), 5 Epochen × 4 =
-20 Adam-Schritte, vor jedem die Lernratenprüfung. Beim Nachahmen wären 8 × 96 × 100 = 76 800 Beispiele
-möglich; es waren 49 936, weil eine Episode früher endet, sobald die Ente fällt oder ein anderes Teil
-als die Sohlen den Boden berührt.
+Hyperparameter sind die Einstellungen **vor** dem Lernen. Drei Regeln aus den echten Läufen reichen,
+um sie zu verstehen.
 
-| Option | Sprung-Rezept | Wirkung |
-|---|---|---|
-| `--envs N` | 16 je Thread | mehr Daten; **ändert das Netz** |
-| `--threads N` | alle Kerne | Tempo (bei festem `--envs`) |
-| `--steps N` | 48 | Takte je Ente und Iteration |
-| `--epochs`, `--minibatches` | 5, 4 | Lernschritte je Iteration |
-| `--lr X` | 10⁻⁴ | Startlernrate |
-| `--kl X` | 0,01 | Größe jedes Schritts |
-| `--init-std X` | 0,3 | Rauschen vor dem Nachahmen |
-| `--uebungs-std X` | 0,1 | Rauschen beim Üben |
-| `--entropy X` | 0,005 | bremst das Sinken von σ |
-| `--actor`, `--critic` | 512,256,128 / 256,128 | Netzgrößen |
-| `--warm-start` | velstand | oder `none` |
-| `--substeps N` | 16 | nicht ändern! |
-| `--profil servo.json` | XL330 | kalibrierte Servos |
-
-Dazu `--adaptive-lr 0|1`. Beim Warmstart muss der Actor zu velstand passen. Ohne `--envs` gilt
-„16 je Thread“: Wer dann die Threads ändert, ändert auch die Zahl der Enten – und damit das Netz.
-`--warm-start` kennt nur `velstand`; jeder andere Wert startet mit Zufallsgewichten. Einen Warmstart
-aus einer Datei gibt es nur beim Üben der Spielschicht. Tipps aus echten Läufen:
-nach dem Nachahmen vorsichtig sein; mehr Rauschen hilft nicht beim Finden; wenige Enten bremsen; mit
-8 statt 16 Unterschritten lernt das Netz eine andere Physik.
+**Regel 1: Die Lernrate ist die Schrittlänge.**
 
 > **So kannst du es dir vorstellen:** Die Lernrate ist wie die Schrittlänge beim Laufen im Dunkeln.
 > Zu kurz, und du kommst nie an. Zu lang, und du stolperst über die Bordsteinkante.
 
+Nach dem Nachmachen ist die Ente schon gut. Darum lernt sie danach mit kleinen Schritten und wenig
+Rauschen weiter. Große Schritte und viel Zufall würden ein gutes Netz leicht kaputtmachen. Und mehr
+Rauschen hilft nicht beim Finden: Mit viel Zufall und ohne Startnetz lernte die Ente zu stehen, nicht
+zu springen.
+
+**Regel 2: Mehr Enten ändern das Netz, mehr Helfer nur das Tempo.** Ein Beispiel:
+
+| Worker × Enten je Worker | Enten | Ergebnis |
+|---|---|---|
+| 2 × 16 | 32 | Netz A |
+| 4 × 8 | 32 | wieder Netz A, nur schneller |
+| 4 × 16 | 64 | Netz B, ein anderes |
+
+Mehr Enten heißt mehr Erfahrung pro Iteration – also andere Daten und ein anderes Netz. Wenige Enten
+bremsen das Lernen, weil jede Runde dann wenig Erfahrung bringt. Mehr Helfer verteilen dieselbe Arbeit
+nur auf mehr Köche.
+
+**Regel 3: Die Physik muss genau wie im Studio sein.** Man könnte die Physik gröber rechnen und wäre
+schneller. Aber dann bewegt sich die Ente anders, und das Netz lernt eine andere Welt als die, in der
+es später springen soll.
+
+> **Für Profis:** Das Programm hat für jeden Hyperparameter einen eigenen Schalter: wie viele Takte
+> jede Ente pro Iteration macht, wie oft der Auswerter die Daten durchgeht, wie groß die Netze sind,
+> welches Servoprofil gilt. Die Liste mit allen Werten des Sprung-Rezepts steht im blauen Buch,
+> Kapitel 15.
+
 ## 15.7 Die Spielschicht trainieren
 
-Das geht nur mit dem Werkzeug, in sechs Schritten:
+Die Spielschicht – die Ente geht zu Ball oder Socke, kickt oder hebt auf – lernt man nur mit dem
+Programm, nicht im Browser. Spannend ist sie trotzdem, denn sie zeigt den ganzen Weg in sechs Schritten.
 
-1. **Messen:** `--biss-fenster` zeigt auf einem Gitter von 11 × 9 Stellen, wo der Schnabel eine Socke
-   hält, und die beste Stelle (das Training misst es selbst). `--halt-messen` zeigt den Nachlauf nach
-   „Stopp“.
-2. **Nachahmen:**
+> **So kannst du es dir vorstellen:** wie ein Kochrezept ausprobieren. Erst prüfst du, was deine
+> Küche kann. Dann kochst du nach, schmeckst ab, schaust, wo es anders wurde, verbesserst – und
+> servierst es am Ende den Gästen.
 
-   ```
-   kern_lehrer --spielen --nachahmen 12 \
-     --episoden 32 --out play.onnx
-   ```
+1. **Messen:** Wo greift der Schnabel eine Socke gut? Wie weit läuft die Ente nach „Stopp“ noch? Das
+   misst der Lehrer in der Physik, statt es hinzuschreiben.
+2. **Nachmachen:** Das Netz ahmt das Vorbild der Spielschicht nach, Runde für Runde.
+3. **Prüfen:** Kicks, Aufheben, Ausspucken und Stürze zählen – für das Netz **und** für das Vorbild.
+4. **Ansehen:** eine Episode Entscheidung für Entscheidung, das Vorbild und das Netz nebeneinander.
+   So sieht man, wo das Netz abweicht.
+5. **Üben:** mit PPO, Kritiker zuerst, mit wenig Rauschen.
+6. **Im Level prüfen:** das Beispiel-Level genau wie im Studio durchspielen lassen.
 
-   Standard: 8 Runden à 64 Episoden; jede Runde misst das Netz in 16 sauberen Episoden.
-3. **Prüfen:** `--spielen-pruefen vorbild` bzw. `play.onnx` zählt Kicks, Aufheben, Ausspucken,
-   Griffe und Stürze, sauber und variiert. Das Vorbild zeigt, was höchstens drin ist.
-4. **Ansehen:** `--spielen-spur --seed 3` zeigt jede Entscheidung (25 pro Sekunde); mit `--netz` fährt
-   das Netz, und du siehst, wo es vom Vorbild abweicht.
-5. **Üben:** `--spielen-ueben play.onnx --iterations 300 --envs 32`: Rauschen 0,1, erst 20 Iterationen
-   nur Kritiker, alle 20 Iterationen ein Schnappschuss.
-6. **Im Level prüfen:** `--demo-spur --netz play_geuebt.onnx --seed 120` spielt das Micro-Duck-Level
-   wie im Studio, hier 120 s – bei diesem Befehl ist `--seed` die Dauer in Sekunden! Mit
-   `KERN_JUMP_AT=SEKUNDE` drückt es dort die Taste 7.
+Ein wichtiger Gedanke steckt in Schritt 3: **Das Vorbild ist die Obergrenze.** Ein Netz, das nur
+nachmacht, wird höchstens so gut wie sein Vorbild. Kann schon das Vorbild die Socke nicht festhalten,
+liegt das Problem nicht beim Netz. Besser als das Vorbild kann es erst beim Üben werden, weil dort
+nur zählt, was wirklich klappt.
 
-> **Vorsicht, Falle:** `--out` wird nach **jeder** Runde überschrieben. Willst du eine frühere Runde
-> behalten, kopiere die Datei während des Laufs. Für das alte `play.onnx` war Runde 10 von 12 die beste.
+> **Für Profis:** Alle Befehle für die sechs Schritte stehen im blauen Buch, Kapitel 15.
 
 ## 15.8 Im Studio benutzen
 
-Kerns Netze heißen fest `jump.onnx` und `play.onnx`. So kommt deins ins Studio:
+Ein Netz, das du im Browser trainierst, landet von selbst im Studio – auf demselben Gerät, im selben
+Browser. Die Lehrer-Seite speichert es auf deinem Gerät, und Kern Studio lädt es beim Start. Offene
+Studio-Tabs übernehmen jedes neue Netz sofort. Das gilt für den Sprung.
 
-1. **Ins Repository:** die Datei nach `kern/policies/` kopieren. Eine fertige Seite lädt aus
-   `policies/` neben der Seite.
-2. **Aus dem Browser-Lehrer:** Er speichert sein Netz auf demselben Gerät. Das Studio lädt es beim
-   Start und übernimmt jedes neue sofort, auch in offenen Tabs. Das gilt nur für den Sprung.
-3. **Prüfen:** Micro-Duck-Level öffnen, Play, Taste **7**. Für die Spielschicht die Ente in Ruhe lassen,
-   mit Autonomous und Kern extras an und Ball oder Socke in Sicht.
+> **So kannst du es dir vorstellen:** wie ein Spielstand, den zwei Spiele auf deiner Konsole
+> gemeinsam benutzen dürfen. Das eine speichert ihn, das andere lädt ihn.
 
-Das Netz braucht die Form eines rsl_rl-Actors; ein Spielnetz ohne 23 Eingänge und 9 Ausgänge wird
-nicht gerechnet.
+Zum Prüfen: Micro-Duck-Level öffnen, Play, Taste **7**. Die Spielschicht arbeitet von allein, wenn die
+Ente autonom ist, „Kern extras“ an ist und Ball oder Socke in Sicht sind ([Kapitel 13](13-micro-duck.md)).
 
-> **Mission:** Hast du im Browser-Lehrer einen Sprung trainiert? Öffne auf demselben Gerät Kern Studio,
-> lade File › Example Levels › Micro Duck (läuft Play, erst mit Esc stoppen), starte Play, drücke F8
-> und dann **7**. Öffne die
-> Browser-Konsole: Dort steht „Kern: trained network jump.onnx loaded“. Jetzt springt **dein** Netz.
+> **Mission:** Hast du im Browser einen Sprung trainiert? Öffne im selben Browser Kern Studio, lade
+> File › Example Levels › Micro Duck (läuft Play, erst mit Esc stoppen), starte Play, drücke F8 und
+> dann **7**. Jetzt springt **dein** Netz. Am Computer kannst du es nachprüfen: Drück F12, wähle den
+> Reiter „Konsole“, dort steht „Kern: trained network jump.onnx loaded“. Auf dem Handy gibt es diese
+> Konsole nicht – da reicht der Sprung als Beweis.
 
 > **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter Details › Player Controller ›
 > Walker nach **Autonomous** und **Kern extras**. Starte Play einmal mit und einmal ohne Kern extras
-> (zum Umschalten erst mit Esc stoppen). Was macht die Ente mit Ball und Socke anders?
+> (zum Umschalten erst mit Esc stoppen). Achte auf Ball und Socke: Mit Kern extras entscheidet die
+> gelernte Spielschicht, was die Ente mit ihnen macht – ohne nicht.
+
+> **Für Profis:** Wer Kern selbst baut, kann ein Netz auch als Datei in Kerns Ordner für Netze legen.
+> Kern prüft dabei, ob das Netz die richtige Form hat; ein Netz mit falscher Größe wird nicht
+> benutzt. Ordner und Dateinamen: blaues Buch, Kapitel 15.
 
 ## 15.9 Eine neue Aufgabe hinzufügen
 
-Eine neue Bewegung (61 → 14) braucht vier Dinge, oft dazu ein Vorbild.
+Eine neue Bewegung beizubringen ist mehr als „trainiere mal“. Man muss vorher genau sagen, was gelernt
+werden soll und woran man den Erfolg erkennt. Dafür gibt es **fünf Schritte**; Schritt 4, das Vorbild,
+braucht man nur für schwere Bewegungen.
 
-**1. Die Aufgabe:** in `src/lehrer/` von `Task` ableiten. Anfang eines Beispiels „bow“ (Verbeugung):
+> **So kannst du es dir vorstellen:** wie eine neue Sportart im Verein. Man braucht Spielregeln, einen
+> Trainingsplan, einen Schiedsrichter, manchmal jemanden, der es vormacht – und am Ende einen Platz
+> im Spielplan.
 
-```cpp
-class BowTask : public Task {
- public:
-  std::string name() const override { return "bow"; }
-  f32 episode_seconds() const override { return 2.0f; }
-  i32 privileged() const override { return 4; }
-```
+Nehmen wir als Beispiel eine **Verbeugung**:
 
-Zeile 1: `BowTask` ist eine `Task`. Zeilen 3–5: Name, 2 s Dauer, 4 Extra-Werte für den Kritiker.
-Dazu kommen Start, Phasensignal (Plätze 55/56), Lehrpläne und Belohnung mit Hilfen wie `upright` und
-`fell`. Das ganze Gerüst steht im blauen Buch.
+1. **Die Aufgabe (die Spielregeln):** Wie startet eine Episode, wie lange dauert sie (bei der
+   Verbeugung zum Beispiel 2 Sekunden), wofür gibt es Punkte? Etwa: Punkte, wenn der Kopf tief geht
+   und beide Füße am Boden bleiben, Abzug fürs Zappeln, Ende bei einem Sturz. Dazu: Was darf der
+   Kritiker extra sehen – etwa die wahre Höhe des Rumpfs?
+2. **Das Rezept (der Trainingsplan):** Mit welchem Netz startet das Training, mit wie viel Rauschen
+   und welcher Lernrate? Danach kennen Programm und Browser die neue Aufgabe; der Lehrer-Seite fehlt nur
+   noch ein Eintrag im Menü.
+3. **Die Messung (der Schiedsrichter):** Ein Prüfer, der feststellt, ob eine Verbeugung **wirklich**
+   gelungen ist – so wie es für den Sprung festgelegt ist, was ein echter Sprung ist.
+4. **Ein Vorbild (nur bei Bedarf):** Findet das Üben die Bewegung nicht, beschreibt man sie mit
+   wenigen Zahlen, lässt CMA-ES die besten suchen und baut ein Vorbild, das in **jeder** Lage eine
+   Antwort hat. Nur dann kann das Netz es mit DAgger nachmachen.
+5. **Im Studio einbauen (der Spielplan):** eine Taste, ein Knopf fürs Handy, ein Name für den
+   Logik-Knoten **Robot Move** und das Netz selbst.
 
-**2. Rezept und Namen** in `recipe.cpp` eintragen (etwa Warmstart velstand, Lernrate 10⁻⁴). Dann
-kennen Werkzeug und Browser die Aufgabe; der Lehrer-Seite fehlt nur ein Menüeintrag. Nutzt die
-Aufgabe Plätze, die velstand nie gesehen hat, müssen sie beim Warmstart als neue Eingänge gelten;
-das macht Kern derzeit nur für die Phasenplätze 55 und 56.
+Der wichtigste Satz dieses Abschnitts steht in Schritt 3: **Miss, was die Bewegung ist – nicht, was
+die Punkte zählen.** Die Punkte sind nur ein Lockmittel. Ein Netz findet oft einen Weg, Punkte zu
+holen, ohne die Bewegung zu machen. Nur eine strenge Messung deckt das auf.
 
-**3. Messen** wie der `JumpMeter`: prüfen, was die Bewegung **ist**, nicht was die Belohnung zählt.
+Eine Bewegung, die ganz andere Eingaben und Ausgaben braucht als die Bein-Netze, zeigt die
+Spielschicht: Sie hat eine eigene Halle, eigene Punkte und eine eigene Messung. Das Lernen selbst –
+PPO und Nachmachen – bleibt dasselbe.
 
-**4. Ein Vorbild (optional).** Findet PPO die Bewegung nicht: wenige Zahlen, die sie beschreiben, eine
-Bewertung für CMA-ES und ein Vorbild, das in **jedem** Zustand eine Antwort hat (für DAgger).
-`cmaes_minimise` und `Ppo::imitate` sind allgemein, der Rest ist auf den Sprung zugeschnitten.
-
-**5. Im Studio verdrahten** wie den Sprung: Eintrag in der Bewegungsliste, Taste, Touch-Knopf, Name
-beim Logik-Knoten **Robot Move**, Dateiname in `game.mjs`, Datei in `kern/policies/`. Ein Netz mit
-**anderem** Format zeigt die Spielschicht: eigene Umgebung, eigener Lerner, eigene Bewertung – PPO und
-Nachahmen bleiben gleich.
+> **Für Profis:** Wie Aufgabe, Rezept und Einbau im Programmcode aussehen, steht mit einem
+> vollständigen Gerüst für die Verbeugung im blauen Buch, Kapitel 15.
 
 ## 15.10 Beobachtung, Aktion und Belohnung entwerfen
 
-- **Nur, was der Roboter hat:** Sensoren für den Actor, Wahres für den Kritiker.
-- **Zeit sichtbar machen:** Phasensignal (cos, sin), Steh- und Gehzeit.
-- **Messen statt befehlen:** „Steht“ heißt, was die Beine tun.
-- **Aktionen wie Bedienelemente:** Totzone wie beim Stick (unter 20 %), Bewegung startet über 0,5.
-- **Benannte Terme**, Strafen wachsen per Lehrplan.
-- **Hartes Ende** bei Sturz und falschem Bodenkontakt.
-- **Vorbild ohne Geheimwissen;** Wünsche steigen als Rampe.
+Das ist der wichtigste Abschnitt dieses Kapitels. Ein Netz lernt nur, was man ihm möglich macht: Was
+es sieht (die **Beobachtung**), was es tun kann (die **Aktion**) und wofür es Punkte bekommt (die
+**Belohnung**). Wer das gut entwirft, bekommt ein Netz, das auf dem echten Roboter funktioniert. Wer
+es schlecht entwirft, bekommt ein Netz, das schummelt oder sich auf etwas verlässt, das es gar nicht
+gibt.
+
+> **So kannst du es dir vorstellen:** Du erfindest ein Spiel für deine kleine Schwester. Sagst du „Wer
+> zuerst fertig ist, gewinnt“, wird sie schnell – aber vielleicht schlampig. Was belohnt wird, wird
+> gemacht. Genau so ist es beim Netz.
+
+Kerns Netze zeigen sieben Regeln.
+
+### 1. Nur zeigen, was der Roboter wirklich hat
+
+Der Actor bekommt nur, was die Sensoren des echten Roboters messen: Neigung, Drehung, Gelenkwinkel,
+was die Kamera erkennt. Nie die wahre Position von Ball oder Socke. Die Spielschicht kennt den Ball nur
+so, wie die Kamera ihn sieht – ungenau und manchmal gar nicht.
+
+Warum so streng? Ein Netz verlässt sich auf alles, was es bekommt. Bekommt es im Training die wahre
+Ballposition, nutzt es sie. Auf dem echten Roboter gibt es sie nicht – und das Netz ist blind. Die
+wahren Werte bekommt darum nur der Kritiker, denn der kommt nie auf den Roboter.
+
+### 2. Die Zeit sichtbar machen
+
+Ein Netz hat **kein Gedächtnis**. Es sieht nur den jetzigen Takt. Woher soll es wissen, wann im Sprung
+es ist oder wie lange es schon steht? Man muss es ihm zeigen.
+
+Beim Sprung ist das die Uhr mit einem Zeiger (Kapitel 14.6): Das Netz bekommt die zwei Koordinaten
+der Zeigerspitze, und der Zeiger läuft in 2 Sekunden einmal herum. Ein Beispiel: Nach 0,5 Sekunden hat
+er eine Viertelrunde geschafft. Begann er rechts bei (1 | 0), steht er jetzt oben bei (0 | 1). Beide
+Zahlen bleiben immer zwischen −1 und +1, wie lange die Episode auch läuft. Ein einfacher Zähler würde
+dagegen immer größer.
+
+Die Spielschicht bekommt stattdessen Zeiten zu sehen: wie lange sie schon steht, wie lange sie geht und
+wie lange sie etwas trägt.
+
+### 3. Messen statt befehlen
+
+„Die Ente steht“ heißt in der Spielschicht: **Beide Sohlen sind länger als eine Viertelsekunde am
+Boden** – also das, was die Beine wirklich tun. Nicht: „Der Laufbefehl ist null.“ Warum? Bei ganz
+kleinen Laufbefehlen setzt der Gang manchmal gar nicht an. Dann **steht** die Ente, obwohl ein Befehl
+anliegt. Wer dem Befehl glaubt statt der Messung, irrt sich.
+
+Dieselbe Idee steckt im echten Sprung (Kapitel 14.6): Gezählt wird, was der Körper tut – Flug, Steigen,
+Landen –, nicht was das Netz wollte.
+
+### 4. Aktionen wie Bedienelemente
+
+Die Aktionen der Spielschicht funktionieren wie ein Gamepad:
+
+- **Laufbefehle mit Totzone,** wie der Stick: Unter 20 % Ausschlag steht die Ente. Bei 15 % passiert
+  also nichts, bei 60 % geht sie los. So zittert sie nicht bei jeder winzigen Zahl.
+- **Bewegungen als Knopf:** Kick und Aufheben sind Zahlen zwischen −1 und +1. Erst über 0,5 gilt der
+  Knopf als gedrückt.
+- **Grenzen für Kopf und Hals,** damit das Netz nichts Unmögliches verlangt.
+
+Solche Aktionen sind für das Netz leicht zu treffen: Es muss nicht eine exakte Zahl erwischen, sondern
+nur den richtigen Bereich.
+
+### 5. Punkte-Posten mit Namen
+
+Die Belohnung ist keine einzelne Zahl, sondern eine Summe aus Posten mit Namen: „aufrecht“, „landen“,
+„zappeln“, „Sturz“ … Beim Nachsehen kann man jeden Posten einzeln anschauen. Steigen die Punkte, aber
+die Ente springt nicht, sieht man so sofort, **welcher** Posten die Punkte bringt – und findet den
+Trick, mit dem das Netz schummelt.
+
+Dazu kommen kleine Abzüge, die gute Manieren fördern: fürs Zappeln, fürs Wackeln, wenn die Ente sich
+selbst berührt. Und manche Strafen wachsen per **Lehrplan**: Am Anfang darf die Ente noch zappeln und
+fallen, ohne dass es viel kostet. Wenn sie die Bewegung allmählich kann, werden die Strafen größer.
+
+### 6. Ein hartes Ende
+
+Ein Sturz und jeder Bodenkontakt eines Teils, das keine Sohle ist, beenden die Episode **sofort**.
+Ein paar Minuspunkte würden nicht reichen. Rechnen wir: Kostet Abstützen auf dem Schnabel 1 Punkt, aber
+die Ente bleibt so noch 1 Sekunde stehen und holt 2 Punkte fürs Aufrechtbleiben, dann lohnt sich das
+Abstützen. Ein sofortiges Ende nimmt ihr alle späteren Punkte – dann lohnt es sich nie.
+
+### 7. Ein Vorbild ohne Geheimwissen
+
+Soll das Netz ein Vorbild nachmachen, darf das Vorbild nur sehen, was auch das Netz sieht, und sich
+nichts heimlich merken. Sonst kann das Netz es nicht lernen – wie bei einem Lehrer, der in die
+Lösung schaut.
+
+Ein Beispiel aus der Spielschicht: Das Vorbild will kicken, wenn die Ente lange genug steht. Würde es
+das als einen einzelnen Knopfdruck in genau einem Takt melden, müsste das Netz diesen einen Takt
+treffen. Stattdessen steigt der Wunsch als **Rampe**: Nach 1 Sekunde Stehen ist er −1, nach 1,25
+Sekunden 0, nach 1,5 Sekunden +1. Die Stehzeit sieht das Netz (Regel 2). So kann es den Wunsch direkt
+aus dem ablesen, was es sieht. Über 0,5 gilt der Knopf als gedrückt (Regel 4).
 
 ## 15.11 Fallstricke aus den echten Läufen
 
-- **Belohnung ausgetrickst:** Die Ente saß auf dem Schwanz oder stützte sich ab. Nur strengere Regeln
-  halfen.
-- **Zu lockere Messung:** Ein „Sprung“ mit 45° Kippen ging durch. Jetzt zählt nur ein echter.
-- **Seltene Bewegungen:** PPO allein findet sie nicht; Vorbild und Nachahmen schon.
-- **Ahnungsloser Kritiker** zerstört einen guten Actor – darum Kritiker zuerst.
-- **Wandernde Normalisierer:** Die alte Policy wird neu bewertet.
-- **Fehler in der Welt:** Die Socke kroch, der Ball rollte ewig, Gähnen öffnete den Schnabel. Lernt
-  ein Netz etwas nicht, kann das auf so einen Fehler zeigen.
-- **Zahlen von Hand veralten:** Die Bissstelle wird bei jedem Lauf gemessen.
-- **Determinismus brechen** mit `std::sin` oder Summen in Thread-Reihenfolge; `--fingerprint 400`
-  zeigt es.
-- **Andere Physik als im Studio** heißt: Das Netz lernt eine andere Welt.
+Beim Training von Kerns Netzen ging einiges schief. Aus jedem Fehler wurde eine Regel. Wer selbst
+trainiert, stolpert sonst über dieselben Steine.
+
+> **So kannst du es dir vorstellen:** wie ein Fehlerheft in Mathe. Wer aufschreibt, was schiefging,
+> macht denselben Fehler nicht zweimal.
+
+- **Die Belohnung wurde ausgetrickst.** Die Ente setzte sich auf den Schwanz, machte einen Hechtsprung
+  oder stützte sich ab – alles gab Punkte, keins war ein Sprung. Geholfen haben nur strengere Regeln:
+  hartes Ende bei Bodenkontakt, Abzug fürs Kippen, Punkte nur aufrecht.
+- **Die Messung war zu locker.** Ein „Sprung“, bei dem die Ente sich nur aufrichtete, die Füße anzog
+  und um 45° kippte, wurde erst mitgezählt. Seitdem zählt nur ein echter Sprung.
+- **Seltene Bewegungen findet Üben allein nicht.** Was alle Servos gleichzeitig mit voller Kraft
+  braucht, entsteht durch Zufall praktisch nie. Vorbild und Nachmachen lösten das.
+- **Ein ahnungsloser Kritiker** macht eine gute Spielerin kaputt. Darum lernt nach dem Nachmachen
+  zuerst nur der Kritiker.
+- **Fehler in der Welt statt im Netz.** Die Socke kroch von selbst über den Boden, der Ball rollte
+  ewig, und das Gähnen der Ente öffnete beim Aufheben den Schnabel. Lernt ein Netz an einer Stelle
+  einfach nicht, kann ein solcher Fehler der Welt dahinterstecken – das Nachsehen Takt für Takt zeigt
+  ihn.
+- **Zahlen von Hand veralten.** Wo der Schnabel greift, stand früher als feste Zahl in der
+  Beschreibung. Ändert sich die Physik, stimmt sie nicht mehr. Jetzt misst der Lehrer sie bei jedem
+  Lauf neu.
+- **Der Determinismus bricht leicht.** Eine einzige Rechnung, die anders rundet, und das Netz ist auf
+  einem anderen Gerät ein anderes (Kapitel 14.7). Der Fingerabdruck zeigt es.
+- **Eine andere Physik als im Studio** heißt: Das Netz lernt eine andere Welt.
+
+> **Für Profis:** Ein Fallstrick betrifft den Umrechner (Kapitel 14.4). Bei wenigen Dutzend Enten
+> ändert er sich von Iteration zu Iteration merklich. Darum rechnet der Auswerter die alte Policy vor
+> jedem Lernschritt mit dem neuen Umrechner nach – sonst würde er alt und neu schief vergleichen.
+> Mehr im blauen Buch, Kapitel 15.
 
 ## Level geschafft!
 
-- Du trainierst einen Sprung im Browser oder mit `kern_lehrer`.
-- Du liest `return`, `len`, `std` und die Sprungprobe.
-- Du wählst das beste Netz, sauber und variiert gemessen.
-- Du weißt, was das Netz ändert und was nur das Tempo.
+- Du trainierst einen Sprung auf der Lehrer-Seite und weißt, was dabei gerade passiert.
+- Du liest Rückgabe, Episodenlänge, Rauschen und die Sprungprobe – und weißt, dass nur die Probe
+  zeigt, ob die Ente es wirklich kann.
+- Du wählst das beste Netz aus, sauber und mit Variation gemessen.
+- Du weißt, was das Netz ändert (die Zahl der Enten) und was nur das Tempo (die Zahl der Helfer).
 - Du bringst dein Netz ins Studio.
-- Du kennst die Schritte für eine neue Bewegung.
+- Du kennst die sieben Regeln, nach denen man Beobachtung, Aktion und Belohnung entwirft.
 
 ## Rätsel-Ecke
 
 1. Welche Taste startet im Studio den Sprung?
-2. Ändert `--threads 1` statt `--threads 8` das Netz? Und `--envs`?
-3. Dein Lauf zeigt dauerhaft `lr 1e-05`. Was bedeutet das?
-4. **Boss-Rätsel:** Bei `--demo-spur --seed 120` – wie lange läuft das Level, und warum ist das eine
-   Falle?
+2. Du trainierst mit 2 Workern × 16 Enten, Seed 1. Deine Freundin nimmt 4 Worker × 8 Enten, auch Seed 1.
+   Bekommt ihr dasselbe Netz? Und wenn sie 4 × 16 nimmt?
+3. Warum lernt die Ente nach dem Nachmachen mit kleinen Schritten und wenig Rauschen weiter?
+4. Du willst der Ente eine Verbeugung beibringen und gibst Punkte, je tiefer der Kopf ist. Was könnte
+   die Ente stattdessen lernen, und welche Regel hilft?
+5. **Boss-Rätsel:** Dein Netz bekommt immer mehr Punkte, aber bei „echte Sprünge“ steht dauernd 0 von
+   5. Was ist wahrscheinlich passiert, und wie findest du es heraus?
 
 ### Lösungen
 
 1. Die **7** (auf dem Handy der Knopf HOP).
-2. Kommt drauf an: Mit festem `--envs` ändern Threads nur das Tempo. Ohne `--envs` gilt 16 Enten je
-   Thread – 16 statt 128 Enten, also andere Daten und ein anderes Netz. `--envs` ändert es immer.
-3. Die Policy ändert sich je Schritt zu stark; die Regel drückt die Lernrate ganz nach unten.
-4. 120 Sekunden: Nur hier bedeutet `--seed` die Dauer, nicht den Zufallsstart.
+2. Ja: 2 × 16 = 32 und 4 × 8 = 32 Enten, gleicher Seed – dasselbe Netz, ihres nur schneller. Mit
+   4 × 16 = 64 Enten entstehen andere Erfahrungen und darum ein anderes Netz.
+3. Nach dem Nachmachen kann sie schon springen. Große Schritte und viel Zufall könnten das gute Netz
+   kaputtmachen – wie zu viel Salz in einer fertigen Suppe.
+4. Sie könnte sich hinlegen oder mit dem Kopf auf den Boden stützen. Das gibt viele Punkte, ist aber
+   keine Verbeugung. Hilfe: ein hartes Ende, wenn ein anderes Teil als die Sohlen den Boden berührt,
+   und eine strenge Messung, was eine echte Verbeugung ist.
+5. Das Netz trickst die Belohnung aus: Es hat einen Weg gefunden, Punkte zu holen, ohne zu springen.
+   Schau eine Episode Takt für Takt an und prüfe, **welcher** Punkte-Posten die Punkte bringt. Dann
+   machst du die Regeln strenger.
 
 ---
 

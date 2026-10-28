@@ -1,120 +1,136 @@
 # 14 Der Lehrer – eine Schule für die Ente
 
-> **Kurz gesagt:** Der Lehrer ist Kerns eigene Trainingsschule für die Micro Duck. Dutzende Enten
-> üben gleichzeitig in der Simulation, bekommen erst ein Vorbild gezeigt und probieren dann selbst,
-> bis aus Zufallszahlen ein Netz geworden ist, das springen kann. Alles läuft in Kerns eigenem C++,
-> auf dem Rechner wie im Browser, und kommt überall Bit für Bit gleich heraus.
+> **Kurz gesagt:** Der Lehrer ist Kerns eigene Trainingsschule für die Micro Duck. Dutzende
+> simulierte Enten üben gleichzeitig, bekommen erst ein Vorbild gezeigt und probieren dann selbst,
+> bis aus zufällig eingestellten Reglern ein Netz geworden ist, das springen kann. Das Training läuft
+> auf dem eigenen Rechner wie im Browser und kommt überall bis zur letzten Stelle gleich heraus.
 
-Kein Python, kein PyTorch: Simulation, Lernverfahren und Export laufen in C++ auf Kerns Engine
-und der Physik Box3D. Der Lehrer lernt nativ auf allen Prozessorkernen (auch ohne Bildschirm auf
-einem Server) und als WebAssembly im Browser, auf Desktop und Handy. Ein Lauf ergibt auf allen in der CI geprüften
-Plattformen **Bit für Bit dasselbe Netz**.
+## Was du dafür wissen musst
 
-Die Ente im Lehrer ist **dieselbe** wie im Studio: dieselbe `GameWorld`, dieselben Servos und
-Sensoren, derselbe 50-Hz-Regler, dieselbe Physik mit 16 Sub-Steps ([Kapitel 13](13-micro-duck.md)).
-Ein Netz von hier läuft deshalb unverändert im Studio. Exportiert wird es im Format von Pollens Netzen
-(Pollen Robotics hat den echten Roboter und seine Netze gebaut). Auf dem echten Roboter ist es nicht
-erprobt: Wer es auf Hardware lädt, tut das auf eigenes Risiko ([Kapitel 16](16-kalibrierung.md)).
+> **Begriffe vorab:**
+> - **Neuronales Netz** – ein Mischpult mit sehr vielen Reglern: Messwerte gehen hinein, Befehle für
+>   die Motoren kommen heraus. „Lernen“ heißt, die Regler nachzustellen.
+> - **Servo** – der kleine Motor in jedem Gelenk der Ente. Er bekommt einen Zielwinkel und zieht dorthin.
+> - **Beobachtung** – alles, was die Ente in einem Augenblick über sich weiß: wie sie geneigt ist, wie
+>   ihre Gelenke stehen, was sie zuletzt befohlen hat.
+> - **Aktion** – die Antwort des Netzes: für jedes der 14 Gelenke ein neuer Zielwinkel.
+> - **Takt** – ein Entscheidungsmoment. Die Ente entscheidet 50-mal pro Sekunde.
+> - **Episode** – ein Übungsdurchgang, vom Start bis zum Sturz oder bis die Zeit um ist.
+> - **Belohnung** – Punkte, die die Ente in jedem Takt bekommt oder verliert. Mehr Punkte heißt besser.
+> - **Übungsrunde** – alle Enten üben ein kurzes Stück, dann stellt der Trainer die Regler einmal
+>   nach. Fachleute sagen **Iteration**. Tausende Runden ergeben einen Sprung.
 
-So sind Kerns eigene Netze entstanden: `policies/jump.onnx` (der Sprung) und `policies/play.onnx`
-(die Spielschicht). Dieses Kapitel zeigt, wie der Lehrer gebaut ist und rechnet. Was ein neuronales
-Netz ist und wie Nachahmen und Reinforcement Learning funktionieren, erklärt
-[Anhang A](A-grundlagen-neuronale-netze.md) von Grund auf; die Bedienung steht in
-[Kapitel 15](15-eigene-modelle.md).
+Programmierwissen brauchst du nicht. Hilfreich ist, wenn du die Ente aus
+[Kapitel 13](13-micro-duck.md) kennst: Sie läuft im Studio auf fertigen Netzen von Pollen Robotics
+(der Firma, die den echten Roboter und seine Netze gebaut hat). Mit **F8** übernimmst du sie, mit
+der Taste **7** springt sie.
+
+Ein Netz kann auf zwei Arten lernen, und der Lehrer nutzt beide:
+
+- **Nachahmen:** Ein Vorbild zeigt, was in jeder Lage zu tun ist, und das Netz lernt, es genauso zu
+  machen – wie beim Abschreiben mit Lösungsheft.
+- **Lernen durch Belohnung:** Niemand sagt die richtige Antwort. Die Ente probiert, bekommt Punkte
+  und lernt, was sich lohnt – wie ein Hund, der für Kunststücke Leckerli bekommt. Fachleute nennen
+  das **Reinforcement Learning**.
+
+Beides erklärt [Anhang A](A-grundlagen-neuronale-netze.md) Schritt für Schritt. Für dieses Kapitel
+reichen die Begriffe oben; alle weiteren erklärt der Text, wenn sie vorkommen.
+
+Das Wichtigste vorweg: Die Ente im Lehrer ist **dieselbe** wie im Studio, mit denselben Motoren,
+Sensoren und derselben Physik. Ein Netz, das hier lernt, läuft deshalb ohne Umbau im Studio. Auf dem
+echten Roboter ist es nicht erprobt: Wer es auf Hardware lädt, tut das auf eigenes Risiko
+([Kapitel 16](16-kalibrierung.md)). So sind Kerns eigene Netze entstanden: der Sprung und die
+Spielschicht (das Netz, das entscheidet, ob die Ente mit Ball oder Socke spielt).
+
+> **Für Neugierige:** Der Lehrer ist in C++ geschrieben, der Sprache, in der auch Kern selbst
+> steckt. Die meisten KI-Forscher trainieren dagegen mit Python-Werkzeugen wie PyTorch. Dass Kern
+> ohne sie auskommt, heißt: Es braucht nichts außer Kern, und das Training läuft auch im Browser.
 
 ## 14.1 Was steckt drin?
 
-Der Lehrer wohnt in `src/lehrer/` und `include/kern/lehrer/`: etwa ein Dutzend Dateipaare für
-Umgebung, Aufgaben, Netz, PPO, Threads, Rezepte, Vorbild und CMA-ES, Spielschicht, ONNX-Export,
-Kalibrierung, Fingerabdruck und Browser-Schnittstelle, dazu das Werkzeug `kern_lehrer` und die Seite
-`web/lehrer/`. Der Stand laut `docs/lehrer.md`:
+Der Lehrer kann heute: Enten ohne Bild simulieren, ein Netz trainieren und als Datei speichern, die
+Enten unter wechselnden Bedingungen üben lassen, überall dasselbe Ergebnis liefern – und er hat der
+Ente den Sprung beigebracht. Fertig ist auch das Werkzeug, mit dem man die simulierten Motoren an
+echte anpasst (Kapitel 16), nur fehlen dafür noch echte Messdaten. Am Spielen mit Ball und Socke wird
+noch gearbeitet.
 
-| Schritt | Stand |
-|---|---|
-| Simulation ohne Bild, Netz mit Adam, PPO, ONNX-Export | fertig |
-| Variation, Lernen im Browser, Determinismus | fertig |
-| Der Sprung: Vorbild → Nachahmen → Üben | fertig |
-| Digitaler Zwilling: Gerätemodelle, Kalibrierung | fertig (ohne echte Messdaten) |
-| Spielen: Ball kicken, Socke aufheben, tragen, ausspucken | in Überarbeitung |
+Die genauen Namen der Bausteine und Dateien stehen im blauen Buch, Kapitel 14.
 
 ## 14.2 Wer macht was?
 
-> **Stell dir vor …** eine Sportschule. Der **Lehrplan** (`Recipe`) legt fest, was geübt wird. Die
-> **Übung** (`Task`) sagt, wofür es Punkte gibt. In der **Turnhalle** (`Env`) turnt eine Ente.
-> **Helfer mit Klemmbrett** (`Collector`) schreiben alles mit (`Rollout`). Der **Trainer** (`Ppo`)
-> wertet die Zettel aus und gibt neue Anweisungen (`Policy`) heraus. Das **Gebäude** (`Backend`)
-> bestimmt, wie viele Hallen gleichzeitig offen sind.
+Ein Training besteht aus wenigen Rollen, die sauber getrennt sind. Dadurch kann jede Rolle dort
+arbeiten, wo gerade Platz ist: auf mehreren Rechenkernen eines Computers oder in mehreren
+Hintergrund-Prozessen eines Browsers.
+
+> **Stell dir vor …** eine Sportschule. Der **Lehrplan** legt fest, was geübt wird. Die **Übung**
+> sagt, wofür es Punkte gibt. In jeder **Turnhalle** turnt eine Ente. **Helfer mit Klemmbrett**
+> schreiben alles mit, was dort passiert. Der **Trainer** wertet die Zettel aus und gibt neue
+> **Anweisungen** heraus. Das **Gebäude** bestimmt, wie viele Hallen gleichzeitig offen sind.
 
 ```mermaid
 flowchart LR
-  R["Recipe"] --> T["Task"]
-  T --> E["DuckEnv / PlayEnv"]
-  P["Ppo (Lerner)"] -->|"Policy"| B["Backend"]
-  B --> C["Collector"]
-  C -->|"step / observation"| E
-  C -->|"Rollout"| P
+  L["Lehrplan"] --> U["Übung"]
+  U --> H["Turnhallen mit Enten"]
+  T["Trainer"] -->|"Anweisungen"| HE["Helfer"]
+  HE -->|"lassen turnen"| H
+  HE -->|"Zettel"| T
 ```
 
-`DuckEnv` führt eine Ente durch Episoden (61 Beobachtungen rein, 14 Aktionen raus), `PlayEnv` die
-Spielschicht (23 rein, 9 raus). Werkzeug und Browser nutzen dieselben Rezepte, damit derselbe Lauf
-überall dasselbe Netz ergibt. Policy und Rollout lassen sich in flache Puffer packen und so zwischen
-Threads oder Web Workern verschicken. `ThreadBackend` verteilt Gruppen von Enten auf Threads; im
-Browser ist jeder Web Worker ein Sammler und ein weiterer der Lerner.
+Eine Übungsrunde geht so: Die Helfer lassen alle Enten mit den aktuellen Anweisungen turnen und
+schreiben mit. Der Trainer sammelt alle Zettel ein, wertet sie aus und schreibt bessere Anweisungen.
+Das ist **eine** Runde; Tausende ergeben einen Sprung. Vor jeder Runde schaut der Lehrplan außerdem,
+ob es Zeit für strengere Regeln ist („ab jetzt kostet ein Sturz mehr“).
 
-Die Trainingsschleife ist dadurch kurz:
+Rechner und Browser benutzen denselben Lehrplan, damit derselbe Lauf überall dasselbe Netz ergibt.
 
-```cpp
-IterationStats train_iteration(Ppo& ppo, Backend& backend) {
-  std::vector<Rollout> rollouts;
-  backend.collect(ppo.policy(), ppo.config().steps_per_env,
-                  ppo.iteration() + 1, rollouts);
-  std::vector<const Rollout*> ptrs;
-  for (const Rollout& r : rollouts) ptrs.push_back(&r);
-  ppo.set_parallel(backend.update_parallel());
-  return ppo.learn(ptrs);
-}
-```
-
-In Worten: Das Backend lässt alle Enten mit der aktuellen Policy üben und füllt die Liste der
-Rollouts. Zeiger darauf einsammeln, dem Lerner die Threads des Backends leihen, lernen. Das ist **eine** Iteration; Tausende ergeben einen Sprung. Vor jeder
-Iteration ruft das Backend außerdem die Lehrpläne auf („ab jetzt kostet ein Sturz mehr“).
+> **Für Neugierige:** Die Klassennamen der Rollen, die Trainingsschleife in C++ und wie die Zettel
+> zwischen Rechenkernen verschickt werden, stehen im blauen Buch, Kapitel 14.2.
 
 ## 14.3 Die Turnhalle der Ente
 
 ### Eine Ente, eine Welt
 
-Jede `DuckEnv` baut eine Ente auf ebenem Boden in einer **eigenen** `GameWorld`. Der Renderer bleibt
-headless, die Grafikkarte wird nie angefasst. Ein Schalter sorgt dafür, dass der Regler der Ente die
-Aktion des Lehrers nimmt, genau wie im Training: Grundstellung plus Aktion, mit der Busverzögerung
-des Servoprofils. Läuft gerade eine fertige Bewegung (Skill, Aufheben, Sitzen), hat sie Vorrang.
+Jede Ente übt in ihrer **eigenen kleinen Welt**, ganz ohne Bild: Es wird nur gerechnet, nichts
+gezeichnet. Das spart Zeit, denn sehen muss beim Üben niemand etwas.
 
-Ein `step(action)` ist ein **Regeltakt** von 20 ms Roboterzeit: Aktion an den Regler, 4 Weltschritte
-rechnen, ab und zu ein Schubs (wenn Variation an ist), dann misst `walker_probe` alles, was
-Belohnung und Kritiker brauchen (Lage, Geschwindigkeit, Drehrate, Sohlenkontakte, Fußhöhen,
-Bodenkontakt anderer Teile, Gelenke). Die Aufgabe rechnet die Belohnung und sagt, ob Schluss ist.
-Zuletzt entsteht die neue Beobachtung: zuerst genau das, was der Regler sieht, plus die Befehle der
-Aufgabe in den Plätzen 48–60. Der Kritiker bekommt diese saubere Version plus Zusatzwissen. Hat
-die Aufgabe ein Vorbild, fragt sie es jetzt, was es täte (für die Nachahmungsbelohnung). Erst ganz
-am Ende bekommt **nur der Actor** die Sensorfehler aufgeprägt.
+Ein Takt dauert für die Ente 1/50 Sekunde und läuft immer gleich ab:
+
+```mermaid
+flowchart LR
+  B["Befehl des Netzes"] --> P["Physik rechnet"]
+  P --> M["Messen: Wie geht es ihr?"]
+  M --> PU["Punkte verteilen"]
+  PU --> O["neue Beobachtung"]
+  O --> B
+```
+
+Gemessen wird alles, was für die Punkte zählt: Neigung, Tempo, welche Sohle den Boden berührt, ob
+ein anderer Körperteil den Boden berührt. Erst ganz am Ende bekommt die neue Beobachtung kleine
+Messfehler, wie sie echte Sensoren haben (dazu gleich mehr).
 
 ### Die Aufgabe: Was gibt Punkte?
 
-Eine `Task` ist eine kleine C++-Klasse: Name, Episodenlänge, zufälliger Start, Befehle, Belohnung,
-Lehrpläne. Belohnungen folgen der Konvention von mjlab: **Gewicht × Term × dt** (dt = 0,02 s), jeder
-Term mit Namen, damit `--trace` ihn zeigen kann. Nur Einmaliges wie der Sturz wird nicht mit dt
-multipliziert.
+Eine **Aufgabe** legt fest, wofür es Punkte gibt, wie lange eine Episode dauert und wann sie vorbei
+ist. Jeder Punkte-Posten hat einen Namen und ein Gewicht. So kann man später nachsehen, wofür die
+Ente ihre Punkte bekommen hat – und ob sie geschummelt hat.
 
-Eingebaut sind zwei Aufgaben. **`stand`** ist der Schnelltest: 4 s stehen, Punkte fürs Aufrechtsein,
-für Bein- und Halshaltung und die richtige Höhe (0,115 m), ein kleiner Abzug für hektische Aktionen;
-ein Sturz kostet −4 und beendet die Episode. **`jump`** ist der Sprung (14.6).
+Eingebaut sind zwei Aufgaben. **Stehen** ist der Schnelltest: 4 Sekunden stehen. Punkte gibt es fürs
+Aufrechtsein, für eine ordentliche Haltung von Beinen und Hals und die richtige Höhe; hektisches
+Zappeln kostet ein wenig. Ein Sturz kostet viel und beendet die Episode. Die zweite Aufgabe ist der
+**Sprung** (14.6).
 
-### Der asymmetrische Kritiker
+### Der Kritiker sieht mehr
 
-Beim Lernen arbeiten zwei Netze zusammen (Grundlagen in Anhang A.11). Der **Actor** handelt und
-sieht nur, was die Sensoren liefern, mit allen Fehlern. Nur er wird exportiert. Der **Kritiker**
-schätzt, wie gut eine Lage ist, existiert nur beim Lernen und darf deshalb mehr sehen: die saubere
-Beobachtung und Dinge, die kein Sensor misst. Beim Sprung sind das 9 Zusatzwerte, etwa die
-Rumpfhöhe über dem Start, die Rumpfgeschwindigkeit, die Fußhöhen und ob die Ente schon geflogen ist.
+Beim Lernen arbeiten **zwei** Netze zusammen. Das **handelnde Netz** steuert die Ente. Es sieht nur,
+was die Sensoren liefern, mit allen Fehlern – und nur dieses Netz kommt später in Studio und
+Roboter. (Fachleute sagen „Actor“; mit den Actors, den Dingen im Studio-Level, hat das nichts zu
+tun.) Das zweite Netz ist der **Kritiker**. Er handelt nicht, sondern schätzt nur: „Wie viele Punkte
+sind aus dieser Lage noch zu holen?“ Er wird nur beim Lernen gebraucht und darf deshalb mehr sehen:
+die fehlerfreie Beobachtung und Dinge, die kein Sensor misst, etwa wie hoch der Rumpf über dem Start
+ist oder ob die Ente schon geflogen ist.
+
+Weil die beiden unterschiedlich viel sehen, nennt man das einen **asymmetrischen** Kritiker
+(asymmetrisch heißt ungleich).
 
 > **Stell dir vor …** ein Fahrschüler mit beschlagener Brille und ein Fahrlehrer mit klarer Sicht.
 > Fahren muss später der Schüler allein. Aber beim Üben sind die Rückmeldungen viel besser, weil der
@@ -122,301 +138,304 @@ Rumpfhöhe über dem Start, die Rumpfgeschwindigkeit, die Fußhöhen und ob die 
 
 ### Variation: jede Ente ein bisschen anders
 
-Übte die Ente immer in derselben perfekten Welt, lernte sie genau diese Welt auswendig. Deshalb
-würfelt der Lehrer pro Episode vieles neu, wie in Pollens Rezepten (**Domain Randomization**):
+Übte die Ente immer in derselben perfekten Welt, lernte sie genau diese Welt auswendig – und
+scheiterte an der kleinsten Abweichung. Deshalb würfelt der Lehrer in jeder Episode vieles neu. Das
+heißt **Variation** (Fachleute sagen Domain Randomization):
 
-- **Start:** Blickrichtung beliebig, ±3° Schieflage, Sohlenreibung × 0,7 bis 1,3.
-- **Bau:** Rumpfmasse und -trägheit ±5 %, Schwerpunkte um ±3 mm verschoben (beim Sprung per
-  Lehrplan bis ±15 mm im Rumpf und ±10 mm im Kopf).
-- **Servos:** jeder mit eigener Reibung und Trägheit (XL330: ±10 %), Busverzögerung 15–30 ms.
-- **Sensoren (nur Actor):** Rauschen auf Gyro, Schwerkraft und Gelenken, ein Encoder-Versatz, eine
-  IMU, die bis zu einen Takt zu spät ist.
-- **Schubse:** alle 3–6 s bis zu 0,3 m/s; per Lehrplan erst ab Iteration 300, bis 500 mit 27 %.
+- mal ein rutschigerer, mal ein griffigerer Boden, und die Ente startet in eine beliebige Richtung,
+- mal ein etwas schwererer Körper, mal sitzt der Schwerpunkt ein paar Millimeter anders,
+- jeder Motor ein bisschen anders: mal schwergängiger, mal träger, und Befehle kommen mal früher, mal
+  später an,
+- die Sensoren rauschen und liegen leicht daneben, manchmal kommt eine Meldung einen Takt zu spät,
+- ab und zu ein Schubs von der Seite – aber erst, wenn die Ente schon einige Hundert Übungsrunden
+  hinter sich hat, und zuerst nur sanft.
 
-Wie man die Servo-Streuung misst, erklärt [Kapitel 16](16-kalibrierung.md).
+Die Sensorfehler bekommt nur das handelnde Netz zu spüren, der Kritiker sieht weiter klar.
 
-> **Wusstest du?** Der Lehrer bewertet jedes Netz **zweimal**: auf dem sauberen Roboter und mit
-> voller Variation. Ein Netz, das nur mit genau einer Masse, einer Reibung und einer Verzögerung
-> stehen kann, steht auf dem echten Roboter nicht.
+> **Wusstest du?** Der Lehrer prüft jedes Netz **zweimal**: auf dem sauberen Roboter und mit voller
+> Variation. Ein Netz, das nur mit genau einem Gewicht, einem Boden und einem Motor stehen kann, steht
+> auf dem echten Roboter nicht.
 
-Der Zufall selbst ist reproduzierbar: `Rng` ist splitmix64, klein und schnell. Bei einem Lauf mit
-Seed s bekommt Ente k den Seed s · 1000003 + k. Er hängt nur von der Nummer der Ente ab, nie vom
-Thread, der sie rechnet (wichtig für 14.7).
+Der Zufall ist trotzdem wiederholbar: Jede Ente bekommt eine eigene **Startzahl** für ihren Würfel
+(Fachwort **Seed**), und dieselbe Startzahl liefert immer dieselben Würfe. Die Startzahl hängt nur
+von der Nummer der Ente ab, nicht davon, welcher Rechenkern sie gerade rechnet. Das wird in 14.7
+wichtig. Wie man die Streuung echter Motoren misst, erklärt [Kapitel 16](16-kalibrierung.md); die
+genauen Bereiche stehen im blauen Buch, Kapitel 14.3.
 
-## 14.4 Die Netze: Mlp, Normalizer, Adam
+## 14.4 Die Netze: mit Vorsprung starten
 
-**Das Netz.** `Mlp` ist ein mehrschichtiges Perzeptron wie in rsl_rl, der Bibliothek, mit der Pollen
-die Netze der Ente trainiert: ELU zwischen den Schichten, lineare letzte Schicht. Der Sprung-Actor
-hat die Form **61 → 512 → 256 → 128 → 14**, knapp 200 000 Regler (nachgerechnet in Anhang A.1).
-Alle Parameter liegen in einem langen Vektor, die Gewichte „eingangsweise“. Das klingt nach
-Buchhaltung, hat aber einen klugen Grund: So werden beide Rechenrichtungen zu einfachen Schleifen,
-die der Compiler beschleunigt, **ohne die Reihenfolge der Additionen zu ändern** – und die ist
-heilig (14.7). Auch die e-Funktion der ELU kommt aus Kerns deterministischer Mathe-Bibliothek.
+Das handelnde Netz der Ente ist ein Mischpult mit knapp **200 000 Reglern**: 61 Messwerte gehen
+hinein, 14 Zielwinkel kommen heraus, dazwischen liegen drei Schichten (wie das gerechnet wird,
+zeigt Anhang A.1).
 
-Am Anfang werden die Gewichte zufällig gezogen wie in PyTorch, im Bereich ±1/√(Zahl der Eingänge).
-Bei der Rückwärtsrechnung (Anhang A.5) nutzt Kern einen Trick: Die Ableitung der ELU im negativen
-Bereich ist genau „Ausgabe + 1“, also genügt die gespeicherte Ausgabe. Gradienten werden
-**aufaddiert**, damit sich Teilstücke einer Minibatch summieren lassen. Ein Test prüft das Ganze
-gegen finite Differenzen.
+**Alle Messwerte auf ein gemeinsames Maß.** Bevor die Messwerte ins Netz gehen, werden sie
+umgerechnet, sodass jeder ungefähr gleich groß ist. Sonst würde ein Wert, der zufällig in großen
+Zahlen gemessen wird, alle anderen übertönen – wie ein Musiker, der viel lauter spielt als die
+übrigen. Der Lehrer führt dafür laufend Buch, welche Werte typisch sind (Anhang A.7).
 
-**Der Normalisierer** rechnet jeden Eingang auf ein gemeinsames Maß um (Anhang A.7):
+**Warmstart: nicht bei null anfangen.** Das ist das wichtigste Prinzip dieses Abschnitts. Die Ente
+beginnt den Sprung nicht mit zufälligen Reglern, sondern mit Pollens fertigem Steh- und Laufnetz
+„velstand“. Sie kann also vom ersten Takt an stehen und muss nur das Springen dazulernen.
 
+> **Stell dir vor …** du willst Rückwärtssalto lernen. Du fängst nicht als Baby an, das erst laufen
+> lernen muss, sondern als jemand, der schon sicher steht. Die ganze Übungszeit geht ins Neue.
+
+Dabei gibt es zwei Kniffe. Erstens übernimmt das Netz auch das gemeinsame Maß von velstand und hält
+es fest, denn die Regler passen genau zu diesem Maß. Zweitens bekommt der Sprung ein neues Signal,
+das velstand nie gesehen hat (die Uhr des Sprungs, 14.6). Dieser neue Eingang startet abgeschaltet.
+So handelt die Ente anfangs **genau** wie velstand und lernt dann nach und nach, das neue Signal zu
+nutzen.
+
+Verstellt werden die Regler mit **Adam**, einem bewährten Verfahren, das sich merkt, in welche
+Richtung es zuletzt ging, und deshalb gleichmäßig vorankommt (Anhang A.6). Wie genau das alles
+rechnet, steht im blauen Buch, Kapitel 14.4.
+
+## 14.5 Üben mit PPO: kleine, vorsichtige Schritte
+
+Beim Üben nach Punkten benutzt der Lehrer **PPO** – dasselbe Verfahren, mit dem Pollen die Netze der
+Ente trainiert. Der Name ist englisch (Proximal Policy Optimization); die Idee lässt sich in einem
+Satz sagen: **Verbessere das Netz in Richtung „besser als erwartet“, aber nie zu weit auf einmal.**
+In Anhang A.11 heißt das „Verbessern mit Gurt“.
+
+> **Stell dir vor …** du stellst ein Radio ein. Drehst du wild am Knopf, rauscht es nur. Drehst du
+> ein kleines Stück, hörst hin und drehst dann weiter, findest du den Sender – und verlierst ihn nicht
+> wieder.
+
+Eine Übungsrunde in fünf Schritten:
+
+```mermaid
+flowchart TD
+  A["1. Üben: alle Enten turnen, mit etwas Neugier"] --> B
+  B["2. Zettel sortieren"] --> C
+  C["3. Messlatte nachstellen"] --> D
+  D["4. Jede Bewegung: besser oder schlechter als erwartet?"] --> E
+  E["5. Netz ein kleines Stück Richtung besser"]
 ```
-y = (x − Mittelwert) / (√Varianz + 0,01)
-```
 
-Mittelwert und Varianz führt er laufend nach (Chans Formel, in doppelter Genauigkeit). Beim Export
-landet er als `Sub` und `Div` vorn im Netz, wie bei Pollen. Der Kritiker hat seinen eigenen.
+1. **Üben.** Jede Ente turnt ein kurzes Stück. Zu jedem Befehl des Netzes kommt etwas Zufall dazu.
+   Dieses **Rauschen** ist die Neugier: Ohne es würde die Ente nie etwas Neues ausprobieren.
+2. **Sortieren.** Der Trainer legt alle Zettel in eine feste Reihenfolge, Takt für Takt und Ente für
+   Ente. Wer welche Ente gerechnet hat, spielt danach keine Rolle mehr.
+3. **Messlatte nachstellen.** Das gemeinsame Maß aus 14.4 lernt aus den neuen Zetteln dazu, und die
+   alten Antworten werden mit dem neuen Maß noch einmal bewertet, damit der Vergleich „neu gegen alt“
+   fair bleibt.
+4. **Besser oder schlechter als erwartet?** Für jede Bewegung vergleicht der Trainer, wie viele
+   Punkte danach wirklich kamen, mit dem, was der Kritiker erwartet hatte. Den Unterschied nennt man
+   den **Vorteil**. Positiv heißt: Diese Bewegung war besser als gedacht, davon mehr.
+5. **Ein kleines Stück verstellen.** Der Trainer verstellt die Regler so, dass gute Bewegungen etwas
+   wahrscheinlicher werden und schlechte etwas unwahrscheinlicher – aber eine Bewegung wird pro
+   Runde höchstens um etwa ein Fünftel wahrscheinlicher oder unwahrscheinlicher. Vor jedem Teilschritt misst er, wie weit sich das Netz schon verändert hat; ist
+   es zu weit, macht er die nächsten Schritte kleiner. Auch der Kritiker lernt dabei, besser zu
+   schätzen.
 
-Beim **Warmstart** übernimmt der Actor Gewichte und Normalisierer von Pollens Steh- und Laufnetz
-velstand und **friert den Normalisierer ein**, denn die Gewichte gehören zu genau diesen Werten.
-Eingänge, die velstand nie benutzt hat (beim Sprung die Phasenplätze 55 und 56), bekommen Gewicht 0.
-Der Actor handelt dann anfangs exakt wie velstand, bis er lernt, sie zu nutzen.
+**Warum so vorsichtig?** Die Zettel stammen vom **alten** Netz. Springt das Netz zu weit, gelten sie
+nicht mehr, und ein gutes Netz kann in einem einzigen Schritt kaputtgehen. Danach sammelt es
+schlechte Zettel, aus denen es sich kaum erholt.
 
-**Adam** (Anhang A.6) läuft mit PyTorchs Standardwerten. Vorher wird der Gradient auf die
-Gesamtlänge 1,0 gestutzt. Adams Gedächtnis kommt mit in den Checkpoint.
+**Sturz oder Zeitablauf?** Eine Episode kann auf zwei Arten enden, und der Trainer behandelt sie
+verschieden. Ein **Sturz** ist ein echtes Ende: Danach kommen keine Punkte mehr. Ist dagegen nur die
+**Zeit um**, hätte die Ente weiterstehen können. Dann zählt der Trainer die Punkte, die noch gekommen
+wären, mit dazu, so wie der Kritiker sie schätzt. Sonst würde die Ente lernen, dass gutes Stehen am
+Ende der Zeit plötzlich nichts mehr wert ist.
 
-## 14.5 PPO Schritt für Schritt
+> **Achtung, Falle! Kritiker zuerst.** Nach dem Nachahmen (14.6) kann das handelnde Netz schon
+> springen, aber der Kritiker hat keine Ahnung, was das wert ist. Würde das Netz sofort mitlernen,
+> steuerten es die Zufallsurteile des Kritikers – und zerstörten das Gelernte. Deshalb lernt in den
+> ersten 30 Übungsrunden **nur der Kritiker**. Erst wenn er vernünftig schätzt, darf das Netz
+> mitlernen.
 
-Kern folgt dem PPO von rsl_rl. Warum PPO so gebaut ist, steht in Anhang A.11; hier geht es um den
-Ablauf in Kern.
-
-| Einstellung | Standard | Sprung | Spielschicht |
-|---|---|---|---|
-| Actor | 512, 256, 128 | 512, 256, 128 | 256, 128 |
-| Kritiker | 512, 256, 128 | 256, 128 | 256, 128 |
-| Rauschen am Anfang | 1,0 | 0,3 | 0,2 |
-| Takte je Ente | 24 | 48 | 64 |
-| Entropie-Bonus | 0,01 | 0,005 | 0 |
-| Lernrate | 10⁻³ | 10⁻⁴ | 10⁻⁴ |
-
-Überall gleich: 5 Epochen, 4 Minibatches, Clip 0,2, γ = 0,99, λ = 0,95, Ziel-KL 0,01 mit adaptiver
-Lernrate, Gradientenbegrenzung 1,0, geclippter Wertverlust.
-
-1. **Sammeln.** Jede Ente läuft ihre Takte. Der Actor liefert einen Mittelwert μ, dazu kommt
-   Rauschen: **a = μ + σ · ε**. Das Rauschen ist die Neugier – ohne es probiert die Ente nie etwas
-   Neues. Gespeichert werden Beobachtungen, Aktion, Belohnung und ob die Episode durch Sturz
-   („terminal“) oder Zeitablauf („timeout“) endete.
-2. **Ordnen.** Der Lerner legt alle Zeilen in **eine** feste Reihenfolge, Schritt für Schritt und
-   darin Ente für Ente. Dann lernen die Normalisierer aus allem auf einmal (ein eingefrorener bleibt).
-3. **Alte Policy neu bewerten** – mit den frischen Normalisierern. Bei nur ein paar Dutzend Enten
-   wandern sie zwischen zwei Iterationen merklich, sonst wäre der Vergleich „neu gegen alt“ schief.
-4. **Vorteil mit GAE.** War jede Aktion besser oder schlechter als erwartet (Beispiel in Anhang
-   A.11)? Ein **Zeitablauf** ist kein Scheitern: Die Episode hätte weitergehen können, also wird
-   der Wert der Zukunft geschätzt statt auf null gesetzt. Ein **Sturz** hat keine Zukunft. Am Ende
-   des Rollouts schätzt der Kritiker den Wert der Lage, in der jede Ente gerade steht. Danach werden
-   alle Vorteile auf Mittelwert 0 und Streuung 1 gebracht, damit die Schrittgröße nicht vom
-   Belohnungsmaßstab abhängt.
-5. **Update.** 5 Epochen × 4 Minibatches = 20 Lernschritte. Jede Minibatch wird in genau
-   **8 feste Teilstücke** zerlegt, die auf den Threads laufen. Vor jedem Schritt misst der Lerner
-   per KL-Divergenz, wie weit sich die Policy schon bewegt hat: über 0,02 teilt er die Lernrate
-   durch 1,5, unter 0,005 multipliziert er mit 1,5 (immer zwischen 10⁻⁵ und 10⁻²). So bleibt jeder
-   Schritt in einer „Vertrauensregion“. Der geclippte Verlust macht gute Aktionen
-   wahrscheinlicher, aber nur bis zum Verhältnis 1,2 (schlechte unwahrscheinlicher bis 0,8). Der
-   Kritiker lernt die Erträge vorherzusagen, ein kleiner Entropie-Bonus hält das Rauschen am
-   Leben, das σ selbst ist ein gelernter Regler pro Aktion (mindestens 0,001). Zum Schluss werden
-   die 8 Teilgradienten in fester Reihenfolge summiert, und je ein Adam macht einen Schritt für
-   Actor und Kritiker.
-
-> **Achtung, Falle!** Nach dem Nachahmen kann der Actor schon springen, aber der Kritiker hat keine
-> Ahnung, was das wert ist. Lernte der Actor sofort mit, steuerten ihn die Zufallsurteile des
-> Kritikers und zerstörten das Gelernte. Deshalb lernt in den ersten 30 Iterationen (Spielschicht:
-> 20) **nur der Kritiker** – „Kritiker zuerst“.
-
-Nach jeder Iteration gibt es eine Statistik: mittlere Belohnung, Rückgabe und Länge der beendeten
-Episoden, die Verluste von Kritiker und Actor (Wert- und Surrogatverlust), Entropie, Lernrate,
-mittleres σ, die Zeiten und die Entenschritte insgesamt. Ein Checkpoint (Kennung `KERNPPO1`)
-enthält den ganzen Lerner mit beiden Netzen, Normalisierern und Adam-Gedächtnissen.
+> **Für Neugierige:** Alle Einstellungen (Netzgrößen, Lernraten, wie viele Takte je Runde, wie
+> stark gebremst wird) und die Formeln von PPO stehen im blauen Buch, Kapitel 14.5.
 
 ## 14.6 Vorbild, Nachahmen, Üben: wie der Sprung entstand
 
-### Warum PPO allein scheiterte
+### Warum Üben allein scheiterte
 
-Die ersten Läufe mit reinem PPO – mit Lehrplänen, Phasensignal, Warmstart, verschiedenen Netzgrößen
-und Lernraten – fanden den Absprung nicht. Drei Gründe:
+Die ersten Versuche ließen die Ente nur nach Punkten üben, mit vielen Varianten. Den Absprung fand
+sie nie. Es gab drei Gründe:
 
-- Ein Absprung braucht **alle Beinservos gleichzeitig am Anschlag**. Die Servos sind weich und
-  erreichen ihr Höchstmoment erst bei 1,7 rad Abweichung; das Netz muss also Ziele weit hinter den
-  Gelenkgrenzen setzen. Zufälliges Ausprobieren erzeugt das praktisch nie.
-- Stehen ist sicher und bringt Punkte; ein missglückter Versuch kostet einen Sturz.
-- Mit wenigen Dutzend Enten ist der Gradient verrauscht.
+- **Der Absprung ist zu selten.** Die Motoren der Ente sind wie weiche Gummibänder: Sie ziehen erst
+  mit voller Kraft, wenn man ihnen ein Ziel nennt, das weit jenseits dessen liegt, was das Gelenk
+  überhaupt kann. Für einen Absprung müssen alle Beinmotoren das gleichzeitig tun. Durch zufälliges
+  Ausprobieren kommt das praktisch nie vor.
+- **Stehen ist sicher.** Stehen bringt verlässlich Punkte, ein missglückter Sprungversuch endet im
+  Sturz. Also bleibt die Ente lieber stehen.
+- **Zu wenig Erfahrung pro Runde.** Mit wenigen Dutzend Enten sammelt jede Runde wenig Erfahrung.
+  Die Richtung, in die der Trainer die Regler verstellt, ist dann unsicher.
 
 > **Stell dir vor …** du willst einem Hund einen Salto beibringen und gibst nur dann ein Leckerli,
 > wenn er zufällig einen macht. Du wartest ewig. Zeigst du ihm die Bewegung Stück für Stück, geht
 > es plötzlich.
 
-Darum lehrt der Lehrer in drei Schritten: **Vorbild suchen → Nachahmen → Üben.** Zur Laufzeit gibt
-es nur das Netz; das Vorbild existiert nur beim Lernen.
+Darum lehrt der Lehrer in drei Schritten: **Vorbild suchen → Nachahmen → Üben.** Das Vorbild gibt es
+nur beim Lernen; die fertige Ente springt allein mit ihrem Netz.
 
 ### Das Vorbild: ein Sprung in 15 Zahlen
 
-`JumpDemo` beschreibt einen Sprung mit **15 Zahlen**: die Servoziele von Hüfte, Knie und Knöchel des
-linken Beins zu fünf Zeitpunkten (Hocke, Abdruck, Anziehen, Landen, Abfedern); das rechte Bein
-spiegelt. Dazwischen wird interpoliert und alles durch tanh mit Amplitude 2,5 rad geschickt. So
-sind Ziele hinter den Gelenkgrenzen möglich, und der Servo drückt mit voller Kraft. Vor und nach dem
-Sprung hält velstand die Balance.
+Das Vorbild ist ein ganz einfacher Bewegungsplan: fünf Haltungen nacheinander – **Hocke, Abdruck,
+Anziehen, Landen, Abfedern**. Für jede Haltung gibt es drei Zielwinkel für das linke Bein (Hüfte,
+Knie, Knöchel), das rechte Bein macht es spiegelbildlich. Fünf mal drei ergibt **15 Zahlen**.
+Zwischen den Haltungen wird weich übergeblendet, und alles ist so begrenzt, dass die Motoren mit
+voller Kraft drücken dürfen, aber nichts Unsinniges passiert. Vor und nach dem Sprung hält velstand
+die Balance.
 
-### Die 15 Zahlen finden: CMA-ES
+### Die 15 Zahlen finden: geschicktes Ausprobieren
 
-„15 Zahlen rein, Sprungnote raus“ ist eine ganze Physiksimulation, ohne Ableitung. Hier hilft
-**CMA-ES**, eine Evolutionsstrategie ohne Gradienten (Anhang A.13).
+Welche 15 Zahlen ergeben einen guten Sprung? Ausrechnen lässt sich das nicht – dazwischen steckt
+eine ganze Physiksimulation. Man kann nur ausprobieren und schauen, wie gut der Sprung wird. Das
+macht ein Suchverfahren namens **CMA-ES** (Anhang A.13).
 
 > **Stell dir vor …** du suchst im Dunkeln die tiefste Stelle eines Sees und wirfst jedes Mal
 > 16 Steine um dich herum. Wo es am tiefsten plumpst, gehst du hin – und merkst dir, in welche
 > Richtung es tiefer wird.
 
-Kern hat CMA-ES selbst nach Hansens Tutorial geschrieben, deterministisch wie alles. Der Lehrer
-nutzt es überall, wo es keine Ableitung gibt: hier fürs Vorbild, in [Kapitel 16](16-kalibrierung.md)
-für die Servo-Kalibrierung. CMA-ES lernt nicht nur, wohin es geht, sondern auch die Form der
-Suchwolke (welche Zahlen zusammen wandern sollten). Der Startpunkt wird zuerst bewertet, das
-Ergebnis ist also nie schlechter; alle Kandidaten einer Generation rechnen parallel. Pro Generation
-16 Kandidaten, Suchbreite σ = 0,8 ab Grundstellung (0,3 ab einem gegebenen Start); jeder springt
-6 Episoden, eine sauber, fünf mit voller Variation. Alle Kandidaten einer Generation treffen
-**dieselben** Roboter (fairer Vergleich), jede Generation andere (kein
-Vorbild für Glücks-Enten). Die Note belohnt Steigen, Flugzeit und Höhe, bestraft Neigung über 15°
-und Stürze (frühe mehr als späte) und gibt Bonuspunkte fürs Stehen am Ende und für einen echten
-Sprung. Zurück kommt das **Zentrum** der Suchwolke, nicht der beste Einzelne, denn der kann Glück
-gehabt haben. Das eingebaute Vorbild brauchte drei Stufen mit zusammen **370 Generationen**.
+Jede Runde mit 16 Versuchen heißt **Generation**. Jeder Versuch springt mehrmals, einmal auf dem
+sauberen Roboter und mehrmals mit Variation, und bekommt eine Note: Steigen, Flugzeit und Höhe
+bringen Punkte, Schieflage und Stürze kosten, Stehenbleiben am Ende und ein echter Sprung bringen
+Bonus. Zwei Regeln machen die Suche ehrlich:
 
-### Nachahmen mit DAgger
+- **Fairer Vergleich:** Alle Versuche einer Generation springen auf **denselben** Robotern. Jede
+  Generation bekommt aber neue. So setzt sich kein Vorbild durch, das nur bei ein paar Glücks-Enten
+  funktioniert.
+- **Die Mitte statt des Besten:** Am Ende nimmt der Lehrer nicht den besten Einzelversuch, sondern
+  die Mitte der Steinwolke. Der beste Einzelne kann einfach Glück gehabt haben; die Mitte ist
+  verlässlicher.
 
-Lernt das Netz nur aus Fahrten des Vorbilds, kennt es nur dessen Zustände. Ein kleiner eigener
-Fehler führt ins Unbekannte, dort macht es einen größeren, die Fehler schaukeln sich auf: die
-**Verteilungsverschiebung** (Anhang A.9). DAgger dreht den Spieß um: **Das Netz fährt, das Vorbild
-kommentiert.** In Runde 0 fährt das Vorbild; ab Runde 1 fährt das Netz (mit etwas Rauschen, 0,05),
-und in jedem Takt sagt das Vorbild, was es getan hätte. Nach jeder Runde lernt das Netz aus **allen**
-bisherigen Beispielen. So enthält der Datensatz genau die Lagen, in die das Netz selbst gerät, mit
-der richtigen Antwort dafür. Voraussetzung: Das Vorbild muss in jeder dieser Lagen eine sinnvolle
-Antwort haben.
+Das eingebaute Vorbild brauchte zusammen 370 Generationen. Kern benutzt dieselbe Suche auch, um die
+simulierten Motoren an echte anzupassen ([Kapitel 16](16-kalibrierung.md)).
 
-Beim Sprung: 8 Runden à 96 Episoden mit voller Variation; gelernt wird per mittlerem quadratischem
-Fehler mit eigenem, frischem Adam (10 Epochen, Minibatch 256, Lernrate 10⁻³). Wer welchen Teil einer
-Runde rechnet, ist egal: Zusammengefügt ergibt sich genau dieselbe Runde.
+### Nachahmen mit Korrektur
 
-Danach wird **geübt**: Rauschen 0,1, 30 Iterationen „Kritiker zuerst“, dann PPO mit
-Sprung-Belohnung, einer Nachahmungsbelohnung und voller Variation, bis der Sprung robust ist.
+Jetzt soll das Netz das Vorbild nachahmen. Das einfachste wäre: Das Vorbild springt, das Netz schaut
+zu. Aber das hat eine Falle.
 
-### Die Aufgabe `jump`
+> **Stell dir vor …** du lernst Fahrradfahren nur, indem du jemandem zusiehst, der immer perfekt in
+> der Mitte des Wegs fährt. Dann fährst du selbst, kommst ein paar Zentimeter ab – und weißt nicht
+> weiter, denn so eine Lage hast du nie gesehen. Du korrigierst falsch und landest im Gebüsch.
 
-Der einzige Befehl ist ein **Phasensignal**: cos und sin der Phase t / 2 s in den Plätzen 55 und 56.
-Die Episode dauert 2 s. Kein Skript, keine inverse Kinematik, keine künstlichen Kräfte – die Bewegung
-kommt allein vom Netz über 14 Servoziele. Die Belohnung hat 15 Terme, die wichtigsten:
+Deshalb dreht der Lehrer den Spieß um: **Das Netz fährt, das Vorbild kommentiert.** In der ersten
+Runde springt noch das Vorbild. Ab der zweiten springt das Netz selbst, und in jedem Takt sagt das
+Vorbild, was es an dieser Stelle getan hätte. Nach jeder Runde lernt das Netz aus **allen** bisher
+gesammelten Beispielen. So übt es genau die Lagen, in die es selbst gerät, mit der richtigen Antwort
+dafür. Voraussetzung: Das Vorbild muss in jeder Lage eine sinnvolle Antwort haben. Das Verfahren
+heißt **DAgger** (kurz für „Dataset Aggregation“, Datensammeln).
 
-| Term | Gewicht | Wofür |
-|---|---|---|
-| `airborne` | 20 × aufrecht | im Flugfenster in der Luft und steigend |
-| `lift` | 20 × aufrecht | Steiggeschwindigkeit beim Absprung |
-| `landed` | 6 × aufrecht | nach dem Flug auf beiden Sohlen |
-| `imitate` | 10 | nah an der Aktion des Vorbilds |
-| `tilt` | −30 | Schieflage kostet |
-| `fall` | −2 → −20 | einmalig, per Lehrplan strenger |
+Danach wird **geübt**, und zwar behutsam: wenig Neugier, kleine Schritte, Kritiker zuerst (14.5).
+Zusätzlich gibt es Punkte dafür, nah am Vorbild zu bleiben. So geht das Nachgeahmte nicht verloren,
+und die Ente lernt unter voller Variation, den Sprung sicher zu machen.
 
-Dazu kleinere Terme: Haltung von Beinen und Hals, Wegrutschen, ein zweiter Hüpfer, Drehrate,
-Eigenkontakt, hektische Aktionen (per Lehrplan ab Iteration 200 strenger) und, nur ohne Vorbild,
-eine Referenzhöhe. Als Sturz gilt mehr als 60° Neigung oder ein Rumpf unter 5 cm.
+### Die Aufgabe Sprung
 
-> **Achtung, Falle!** Eine Episode endet bei **jedem Bodenkontakt eines Teils außer den Sohlen**.
-> Sonst wäre es die sicherste Wette, sich auf Schnabel oder Schwanz abzustützen. Netze sind Meister
-> im Ausnutzen von Lücken.
+Die Ente bekommt nur ein einziges Signal: eine Art **Uhr des Sprungs**. Stell dir einen Uhrzeiger
+vor, der in 2 Sekunden einmal herumläuft; die Ente bekommt zwei Zahlen, die sagen, wo seine Spitze
+gerade steht. Daran erkennt sie, wie weit der Sprung schon ist. Kein Skript, keine künstlichen
+Kräfte: Die ganze Bewegung kommt aus dem Netz, über die 14 Zielwinkel der Motoren. Eine Episode
+dauert 2 Sekunden.
 
-Was als **echter Sprung** zählt, entscheidet der strenge `JumpMeter`: alle Teile mindestens 60 ms in
-der Luft, der Rumpf steigt dabei mindestens 5 mm über die Abhebehöhe (nur Füße anziehen gilt nicht),
-nie mehr als 30° Neigung, und am Ende steht die Ente aufrecht auf beiden Sohlen. Mit diesem Maß
-misst `evaluate_jump` jede Policy in Studio-Physik: echte Sprünge, Stürze, Höhe, Steigen, Flugzeit,
-Neigung.
+Wofür es Punkte gibt (die wichtigsten Posten):
+
+| Wofür | Punkte |
+|---|---|
+| in der Luft sein, im richtigen Moment und steigend | viel Plus (nur aufrecht) |
+| kräftig nach oben abdrücken | viel Plus (nur aufrecht) |
+| nach dem Flug auf beiden Sohlen landen | Plus (nur aufrecht) |
+| nah am Vorbild bleiben | Plus |
+| schief stehen | viel Minus |
+| Sturz | einmalig Minus, mit der Zeit strenger |
+
+Dazu kleinere Posten für eine ordentliche Haltung, gegen Wegrutschen, einen zweiten Hüpfer und
+hektisches Zappeln.
+
+> **Achtung, Falle!** Eine Episode endet bei **jedem Bodenkontakt eines Körperteils außer den
+> Sohlen**. Sonst wäre es die sicherste Wette, sich auf Schnabel oder Schwanz abzustützen. Netze sind
+> Meister im Ausnutzen von Lücken.
+
+**Punkte sind nicht dasselbe wie die Prüfung.** Ob ein Sprung wirklich einer war, entscheidet eine
+eigene, strenge Messung, unabhängig von den Punkten: Alle Körperteile müssen mindestens 60
+Millisekunden in der Luft sein, der Rumpf muss dabei mindestens 5 mm steigen (nur die Füße anziehen
+gilt nicht), die Ente darf nie mehr als 30° kippen, und am Ende steht sie aufrecht auf beiden Sohlen.
+Die Punkte helfen beim Lernen; die Messung sagt, ob das Ziel erreicht ist.
 
 ## 14.7 Determinismus: überall dasselbe Netz
 
-Simulation, Training und abgespielte Roboter-Logs kommen auf allen CI-Plattformen gleich heraus:
-GCC auf x86, Apple clang auf ARM, WebAssembly. Ein Fehler ist damit wiederholbar und kein Rauschen,
-das auf jedem Rechner anders aussieht.
+**Determinismus** heißt: Gleicher Anfang, gleiches Ergebnis – auf jedem Gerät, bis zur letzten
+Nachkommastelle. Das ist wichtig, damit man Fehler wiederfinden kann. Läuft eine Ente auf deinem
+Rechner anders als auf meinem, weiß niemand, ob ein Fehler im Programm steckt oder nur im Zufall.
 
-> **Wusstest du?** Ein einziges anderes Bit im letzten Rundungsschritt eines Sinus reicht, damit die
-> simulierte Ente nach Sekunden einen anderen Gang hat.
+Das klingt selbstverständlich, ist es aber nicht.
 
-Was dafür nötig ist:
+> **Wusstest du?** Kommazahlen im Computer sind tückisch: (0,1 + 0,2) + 0,3 ergibt im Rechner nicht
+> ganz genau dasselbe wie 0,1 + (0,2 + 0,3). Der Unterschied steckt in der allerletzten Stelle. In
+> einer Robotersimulation reicht so ein winziger Unterschied, damit die Ente nach ein paar Sekunden
+> einen anderen Gang hat.
 
-- **Keine FMA-Zusammenfassung** (`-ffp-contract=off`): sonst rundet `a*b+c` auf manchen Prozessoren
-  anders als in WebAssembly.
-- **Box3D ohne SIMD**, wie in WebAssembly; nativ kostet das nichts, der Gelenklöser ist der Engpass.
-- **Eigene Mathe-Bibliothek:** `sin`, `cos`, `exp` … runden auf verschiedenen Systemen im letzten Bit
-  verschieden. Kern nutzt überall die Fassungen aus musl über `kern::dm::`. Nur was laut IEEE exakt
-  ist (`sqrt`, `fabs`, `floor`), bleibt aus `std::`.
-- **Unabhängig von der Zahl der Worker:** Seeds aus der globalen Entennummer, kanonische Ordnung,
-  immer 8 Teilstücke in fester Summierreihenfolge.
+Kern sorgt deshalb für drei Dinge:
 
-Gleicher Seed und gleich viele Enten ergeben also dasselbe Netz, auf 1 Kern, 16 Kernen oder in
-4 Web Workern. Geprüft wird das mit einem **Fingerabdruck**: `kern_lehrer --fingerprint 400` lässt
-die saubere Ente 400 Takte gehen und drehen und gibt pro Takt einen Hash über die exakten Bits von
-Lage und Gelenken aus. Der erste abweichende Takt zeigt, wann zwei Builds auseinanderlaufen. Die CI
-prüft das dreimal; ein weiterer Test lernt mit 1, 2 und 4 Workern und vergleicht die Netze Byte für
-Byte. **Regel für neuen Code:** `kern::dm::sin` statt `std::sin`, keine Summen in
-Thread-Reihenfolge, kein `-ffast-math` ([Kapitel 2](02-bauen-und-testen.md)).
+- **Immer dieselbe Reihenfolge.** Jede Summe wird in derselben Reihenfolge gerechnet, egal wie viele
+  Rechenkerne mithelfen. (Ein **Rechenkern** ist eines der Rechenwerke in einem Prozessor; heutige
+  Computer haben mehrere, die gleichzeitig arbeiten.)
+- **Eigene Rechenfunktionen.** Funktionen wie „Sinus“ runden auf verschiedenen Systemen in der
+  letzten Stelle verschieden. Kern bringt seine eigenen mit, die überall gleich runden.
+- **Startzahl pro Ente.** Der Zufall jeder Ente hängt nur von der Startzahl des Laufs und der Nummer
+  der Ente ab.
+
+Darum gilt: **Gleiche Startzahl und gleich viele Enten ergeben dasselbe Netz** – auf einem
+Rechenkern, auf 16 oder im Browser. Mehr Rechenkerne machen das Training nur schneller.
+
+Geprüft wird das mit einem **Fingerabdruck**: Eine Ente geht und dreht sich 400 Takte lang, und nach
+jedem Takt wird aus ihrer genauen Lage eine Prüfsumme gebildet. Vergleicht man die Prüfsummen zweier
+Rechner, sieht man sofort, ob und ab welchem Takt sie auseinanderlaufen. Automatische Prüfungen
+vergleichen das auf drei Arten von Systemen, darunter im Browser.
+
+> **Für Neugierige:** Welche Schalter beim Übersetzen nötig sind, woher die Rechenfunktionen
+> stammen und welche Regeln für neuen Code gelten, steht im blauen Buch, Kapitel 14.7.
 
 ## 14.8 Die Spielschicht lernen
 
-Die Spielschicht ([Kapitel 13](13-micro-duck.md)) entscheidet, ob die Ente zu Ball oder Socke geht,
-kickt, aufhebt, trägt und ausspuckt. Sie lernt wie der Sprung: Vorbild, DAgger, PPO.
+Die **Spielschicht** ([Kapitel 13](13-micro-duck.md)) entscheidet, ob die Ente zu Ball oder Socke
+geht, kickt, aufhebt, trägt und ausspuckt. Das Laufen selbst übernehmen darunter weiter Pollens
+Netze; die Spielschicht gibt ihnen Laufbefehle und startet Kick oder Aufheben. Sie lernt wie der Sprung: Vorbild, Nachahmen,
+Üben. Jede Szene ist anders: mal ein Ball, mal eine Socke, mal beides, mal direkt vor der Ente, mal
+außer Sicht, dazu Variation und eine Kamera, die manchmal danebenliegt oder kurz nichts erkennt.
+Punkte gibt es vor allem für einen weggekickten Ball und eine weggetragene und ausgespuckte Socke.
 
-**`PlayEnv`:** Die Ente läuft selbstständig mit Kern extras; der Lehrer steuert nur die
-Spielschicht, darunter laufen Pollens Netze unverändert. Ein Schritt ist eine Entscheidung (40 ms),
-eine Episode dauert höchstens 60 s. Der Actor ist 23 → 256 → 128 → 9; der Kritiker kennt zusätzlich
-6 Geheimwerte (ob Ball und Socke da sind und wo sie wirklich liegen).
+**Das Vorbild darf nicht mehr wissen als das Netz.** Das ist hier das wichtigste Prinzip. Das Vorbild
+sieht genau dieselben 23 Werte wie das Netz, keine wahren Positionen von Ball und Socke. Wüsste es
+mehr, könnte das Netz es nie nachmachen – es würde Antworten lernen, für die ihm die Gründe fehlen.
+Vereinfacht macht das Vorbild Folgendes: Sieht es nichts, dreht es sich. Sonst geht es zum näheren
+Ziel, kommt langsam heran, bleibt stehen und kickt oder hebt auf. Steht es falsch, geht es ein Stück
+zurück und versucht es neu.
 
-**Szenen:** zufällige Blickrichtung; mit 30 % ein Ball, 30 % eine Socke, 40 % beides, oft dicht
-beieinander. Das Ziel liegt mal direkt vor der Ente, meist 0,35 bis 1,2 m entfernt, manchmal außer
-Sicht. Bälle mit 3,5 bis 6 cm Radius, 15 bis 50 g, Schaumstoff bis Gummi; mit 30 % eine zweite Socke. Dazu
-Variation wie beim Sprung und ein Objektdetektor, der verrauscht ist und bis zu 20 % aussetzt.
+**Messen statt Zahlen eintragen.** Wo muss die Socke liegen, damit der Schnabel sie gut greift?
+Statt eine Zahl ins Programm zu schreiben, probiert es der Lehrer aus: Er legt die Socke an viele
+Stellen eines Gitters vor eine stehende Ente, lässt sie aufheben und prüft, ob die Socke nach 3
+Sekunden Tragen noch im Schnabel ist. Gewählt wird eine Stelle, um die herum auch viele andere
+halten, denn das Hingehen ist nie millimetergenau. Ändert sich die Physik, misst er einfach neu.
 
-**Belohnung** pro Entscheidung: −0,01 für die Zeit, +2 × Annäherung, +3 fürs gehaltene Aufheben,
-etwas fürs Tragen, **+10 für einen 0,25 m weggekickten Ball oder eine 0,25 m weit getragene und
-ausgespuckte Socke**, −5 für einen Sturz. Die Annäherung zählt zum wahren Ziel (Socke vor Ball),
-nicht während die Ente etwas hält. Kick- oder Ablege-Erfolg beendet die Episode als Zeitablauf, nicht
-als Scheitern.
-
-**Das Vorbild** sieht **genau dasselbe wie das Netz**, keine wahren Positionen, und hat kein
-verstecktes Gedächtnis außer der Startstelle des linken Fußes (dazu Ballradius und gemessene
-Bissposition). Nur so kann das Netz es wirklich lernen. Vereinfacht: Sieht es nichts, dreht es sich.
-Sonst steuert es das nähere Ziel an (ein Ball im Weg wird zuerst gekickt), geht nah dran langsam auf
-einer Linie heran, sagt „Stopp“ und steht. Steht es richtig, startet es Kick oder Aufheben, sonst
-geht es zurück und kommt neu (Spielraum: Socke ±8 mm voraus und ±12 mm seitlich, Ball ±2 cm).
-„Stehen“ heißt: beide Sohlen länger als 0,25 s am Boden. Beim Aufheben ist der Schnabel von
-Phase 0,04 bis 0,30 offen. Hält es etwas, trägt es 0,3 m und spuckt aus. Der Wunsch nach Kick oder
-Aufheben steigt als **Rampe** über die letzte halbe Sekunde des Stillstehens, damit das Netz ihn aus
-der Stehzeit ablesen kann.
-
-**Was der Lehrer selbst misst:** Wo greift der Schnabel eine Socke? Statt eine Zahl in den Code zu
-schreiben, legt der Lehrer die Socke auf ein Gitter von 11 × 9 Stellen vor eine stehende Ente, lässt
-sie aufheben und prüft, ob die Socke nach 3 s Tragen noch im Schnabel ist. Gewählt wird eine Stelle,
-um die herum auch viele andere halten, denn das Hingehen ist nie millimetergenau. Ändert sich die
-Physik, misst er neu; hält nirgends etwas, nimmt er 6,5 cm vor dem Rumpf, mittig. Ebenso misst
-er, wie weit die Ente nach „Stopp“ noch geht.
-
-Nachgeahmt wird wie beim Sprung mit DAgger (30 Epochen, Minibatch 256, Lernrate 10⁻³). Danach soll
-das Netz üben (`--spielen-ueben`): Warmstart von der Datei mit eingefrorenem Normalisierer,
-Rauschen 0,1, 20 Iterationen „Kritiker zuerst“, und belohnt wird nur, was wirkt – wo der Biss
-wirklich hält, findet es selbst. Beim Nachahmen und Üben laufen die Episoden je zur Hälfte sauber
-und variiert. `play.onnx` entstand aus 12 Runden Nachahmen à 32 Episoden; ausgewählt wurde Runde 8:
+Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8. Ergebnisse:
 
 | | sauberer Roboter | volle Variation |
 |---|---|---|
 | Ball weggekickt | 9 von 11 | 7 von 11 |
 | Socke aufgehoben | 4 von 21 | 13 von 21 |
-| aufgehoben, getragen, ausgespuckt | 1 von 21 | 0 von 21 |
-| Griffe, die hielten | 2 von 14 | 1 von 15 |
+| Socke getragen und ausgespuckt | 1 von 21 | 0 von 21 |
 | Stürze | 2 von 32 | 10 von 32 |
 
 Der **Ball ist gelernt**: Das Netz stellt den linken Fuß hinter den Ball und startet Pollens Kick;
-passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt, aber mit der gemessenen
-Reibung der Polster auf Baumwolle hält der Biss selten. Der Engpass ist der **Griff in dieser
-Physik**, nicht die Entscheidung. Als Nächstes kommen ein Sockenmodell, das sich wie Stoff in den
-Schnabel legt, und das Üben mit Belohnung.
+passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt zu, aber der Biss hält in
+der Simulation selten: Von 14 Bissversuchen auf dem sauberen Roboter hielten nur 2 bis zum Schluss.
+Der Engpass ist also der **Griff in dieser Physik**, nicht die Entscheidung. Als Nächstes kommen eine
+Socke, die sich wie Stoff in den Schnabel legt, und das Üben nach Punkten.
+
+> **Für Neugierige:** Szenen, Punkte, Toleranzen des Vorbilds und die Größe des Gitters stehen im
+> blauen Buch, Kapitel 14.8.
 
 ## 14.9 Ergebnisse des Sprungs
 
-`policies/jump.onnx`: Sprung-Rezept, 32 Enten auf 2 Kernen, Seed 1, 3000 Übungsiterationen.
+Das fertige Sprung-Netz entstand mit 32 Enten, Startzahl 1 und 3000 Übungsrunden. Geprüft wurde es
+in je 40 Episoden:
 
-| | sauber (40 Episoden) | volle Variation (40) |
+| | sauberer Roboter | volle Variation |
 |---|---|---|
 | echte Sprünge | 40 von 40 | 36 von 40 |
 | Steigen in der Luft | 11,6 mm | 8,2 mm |
@@ -424,99 +443,108 @@ Schnabel legt, und das Üben mit Belohnung.
 | größte Neigung (Mittel) | 8° | 9° |
 | Stürze | 0 von 40 | 0 von 40 |
 
-Die vier „unechten“ Sprünge waren nur zu flach. Der Weg dahin in Entenschritten:
-Vorbildsuche einmalig rund 2 Millionen (18 Minuten auf 2 Kernen), erster echter Sprung des Netzes
-nach 7 Nachahmungsrunden (43 355), Nachahmung fertig nach 49 936, Üben 2,3 Millionen.
+11,6 mm ist gut ein Zentimeter – für eine Ente von der Größe der Micro Duck ein ordentlicher
+Hüpfer. Die vier „unechten“ Sprünge waren nur zu flach; gestürzt ist die Ente nie.
+Auch im Studio gelang der Sprung 3 von 3 Mal, mit 9 mm Steigen und 120 ms Flug, und danach stand
+und lief die Ente weiter. (Die 9 mm stammen aus dieser Studio-Messung, die 11,6 und 8,2 mm aus
+der Prüfung im Lehrer.)
 
-| Plattform | erster echter Sprung | Üben (Schritte/s) |
-|---|---|---|
-| nativ, 2 Threads | 106 s | 1431 |
-| nativ, 1 Thread | – | 763 |
-| Browser, 2 Sammler + Lerner | 515 s | 391 |
-| Browser, alles auf 1 Kern | 539 s | 336 |
-
-Der Browser lernt **dasselbe Netz**, nur rund 4- bis 5-mal langsamer (WebAssembly ohne SIMD und
-ohne Threads im Worker). Nativ schafft die Physik rund 1300 Entenschritte pro Sekunde und Kern. Mit
-8 statt 16 Sub-Steps wäre sie 1,6-mal schneller, aber Gang und Bewegungen ändern sich messbar –
-also bleibt es bei 16. Im Studio: 3 von 3 echte Sprünge, danach steht und läuft die Ente weiter.
+**Rechner gegen Browser.** Weil das Training überall gleich rechnet, lernt der Browser **dasselbe
+Netz**, nur langsamer, etwa 4- bis 5-mal. Auf dem Testrechner mit 2 Rechenkernen kam der erste echte
+Sprung im Browser nach knapp 9 Minuten, das Nachahmen war nach etwa 11 Minuten fertig. Das
+anschließende Üben dauert deutlich länger. Auf deinem Gerät kann es schneller oder langsamer gehen.
 
 > **Probier's aus!** Öffne auf https://kernengine.de/ das Beispiel-Level (File › Example Levels ›
-> Micro Duck), starte Play, übernimm die Ente mit F8 und drück **7**. Was du siehst, ist
-> `jump.onnx` aus dem Lehrer: rund 9 mm Steigen, 120 ms Flug.
+> Micro Duck), starte **Play**, übernimm die Ente mit **F8** und drück **7**. Was du siehst, ist das
+> Netz aus dem Lehrer. Achte darauf: Alle Füße sind kurz in der Luft, und die Ente landet aufrecht –
+> genau das zählt als echter Sprung. Es ist ein kleiner Hüpfer, rund einen Zentimeter hoch.
 
-## 14.10 Der Export nach ONNX
+> **Für Neugierige:** Wie viele Entenschritte jede Phase brauchte und die Tempo-Tabelle für Rechner
+> und Browser stehen im blauen Buch, Kapitel 14.9.
 
-ONNX ist ein offenes Dateiformat für Netze (Anhang A.14). Kern schreibt den Actor genau in der Form
-von Pollens Netzen: `obs ─ Sub ─ Div ─ Gemm ─ Elu ─ … ─ Gemm ─ actions`. Vorn sitzt der
-Normalisierer, dann die Schichten. Kern liest die Datei zur Probe wieder ein (bis 10⁻⁴ genau), und
-auch ONNX Runtime, die Laufzeit des echten Roboters, lädt sie. Die Metadaten
-haben dieselben Schlüssel wie bei Pollen (Gelenknamen, Grundstellung, Beobachtungsnamen …) plus
-`task` und `lehrer` („Kern (C++ PPO on Box3D)“). Die Spielschicht hat eigene, darunter `rate_hz` = 25.
+## 14.10 Das Netz als Datei
+
+Zum Schluss wird das handelnde Netz als Datei gespeichert, im Format **ONNX**. ONNX ist ein
+Standard-Dateiformat für Netze, wie PDF für Dokumente: Viele Programme können es lesen. Kern
+speichert das Netz genau so, wie Pollen seine Netze speichert, damit es auch die Software des echten
+Roboters laden kann. Vorn im Netz steckt dabei gleich das gemeinsame Maß aus 14.4, sodass niemand es
+getrennt mitliefern muss. Zur Probe liest Kern die Datei wieder ein und vergleicht (Anhang A.14).
+
+Die genauen Bausteine und Beschriftungen der Datei stehen im blauen Buch, Kapitel 14.10.
 
 ## 14.11 Der Lehrer im Browser
 
 ![Die Lehrer-Seite im Browser](../buch/bilder/lehrer.png)
 
-`kern/build.sh --lehrer` baut `kern_lehrer.wasm`. Die Seite `/lehrer/` lädt das Modul einmal und
-gibt es an jeden Web Worker. **Sammler-Worker** führen ihre Enten und schicken Rollouts; **ein
-Lerner-Worker** macht Nachahmung, PPO-Update, alle 25 Iterationen eine Sprungprobe und den Export.
-Er nimmt auch Einstellungen als JSON, die das Rezept überschreiben.
+Auf der **Lehrer-Seite** (Adresse: kernengine.de/lehrer/) kannst du selbst trainieren, ohne etwas zu
+installieren. Mehrere Hintergrund-Prozesse des Browsers teilen sich die Arbeit: Einige lassen Enten
+turnen (die Helfer), einer lernt (der Trainer).
 
-Auf der Seite wählst du die Bewegung (Sprung, oder Stehen als Schnelltest), Worker (Standard
-Kerne − 1, höchstens 8), Enten je Worker (8), Iterationen (1500), Seed, Anfangsrauschen und
-Lernrate. Sie zeigt Iteration, Schritte pro Sekunde, Rückgabe, Episodenlänge, echte Sprünge, Höhe
-und Flugzeit als Zahlen und Kurven und hält den Bildschirm wach.
+Oben wählst du die **Bewegung**: „Sprung“ oder „Stehen (Schnelltest)“. Die übrigen Felder (Worker,
+Enten je Worker, Iterationen, Seed, Aktionsrauschen, Lernrate) kannst du auf ihren Voreinstellungen
+lassen. Die Seite zeigt laufend, wie es steht. Die wichtigsten Anzeigen:
 
-Alle 25 Iterationen und am Ende speichert sie das Netz **im Browser** (IndexedDB „kern-lehrer“) und
-meldet es per BroadcastChannel: **Offene Studio-Tabs übernehmen es sofort.** „.onnx herunterladen“
-liefert die Datei. Die Spielschicht lässt sich im Browser nicht trainieren.
+- **mittlere Episoden-Rückgabe:** die Punkte einer ganzen Episode, im Mittel über alle Enten.
+  Steigt sie über viele Runden, lernen die Enten.
+- **Episodenlänge (s):** wie lange eine Episode im Mittel dauert. Kurz heißt: Die Enten fallen früh
+  um. Beim Stehen geht eine Episode höchstens 4 Sekunden, beim Sprung 2.
+- **echte Sprünge:** wie viele von 5 Probesprüngen auf dem sauberen Roboter echt waren. Das ist das
+  eigentliche Ziel.
 
-> **Probier's aus!** Öffne auf kernengine.de die Lehrer-Seite `/lehrer/`, wähle Stehen als
-> Schnelltest und starte. Beobachte Rückgabe und Episodenlänge: Wie lange halten die Enten durch?
-> Starte danach einen Sprung-Lauf mit einem offenen Studio-Tab daneben – das neue Netz landet dort
-> von selbst.
+Nach dem Nachahmen, danach alle 25 Runden und am Ende speichert die Seite das Netz **im Browser**
+und meldet „Für Kern Studio gespeichert als …“. Offene Studio-Tabs im selben Browser übernehmen ein
+neues Sprung-Netz sofort. Mit „.onnx herunterladen“ bekommst du die Datei. Die Spielschicht lässt
+sich im Browser nicht trainieren.
 
-> **Wusstest du?** Chromes CPU-Drosselung bremst nur den Hauptthread, nicht die Worker, und taugt
-> deshalb nicht als Handy-Ersatz. Gemessen wurde stattdessen „alles auf einem Kern“, und auf dem
-> Handy zeigt die Seite selbst, wie viele Entenschritte pro Sekunde es schafft.
+> **Probier's aus!** Öffne **kernengine.de/lehrer/**, wähle **Stehen (Schnelltest)** und drück
+> **Start**. Am Anfang sind die Regler zufällig, die Enten fallen schnell um: Die Episodenlänge ist
+> kurz. Beobachte, wie sie über die Runden wächst, Richtung 4 Sekunden – dann fallen die Enten nicht
+> mehr um. Du musst nicht bis zum Ende warten; **Pause** hält an. Den Sprung trainierst du in
+> [Kapitel 15](15-eigene-modelle.md).
+
+> **Für Neugierige:** Wie die Seite gebaut wird, wie sie das Netz im Browser ablegt und wie sie offene
+> Studio-Tabs benachrichtigt, steht im blauen Buch, Kapitel 14.11.
 
 ## 14.12 Tests
 
-Rund ein Dutzend Tests prüfen Rückwärtsrechnung, Adam, PPO, bitgleiche Episoden, den Fingerabdruck,
-gleiche Netze bei 1, 2 und 4 Workern, den Export, den Sprung im Lehrer **und** im Studio und die
-Kalibrierung ([Kapitel 16](16-kalibrierung.md)).
+Rund ein Dutzend automatische Prüfungen stellen sicher, dass alles richtig rechnet: vom Lernen
+selbst über „überall dasselbe Netz“ bis zum echten Sprung im Lehrer **und** im Studio. Die Liste
+steht im blauen Buch, Kapitel 14.12.
 
 ## Das nimmst du mit
 
-- Der Lehrer trainiert in reinem C++ auf Kerns Physik, nativ und im Browser, Bit für Bit gleich.
+- Der Lehrer ist Kerns eigene Trainingsschule: auf dem Rechner und im Browser, überall mit genau
+  demselben Ergebnis.
 - Die Ente im Lehrer ist dieselbe wie im Studio, deshalb läuft ein Netz dort ohne Umbau.
-- Rezept, Aufgabe, Umgebung, Sammler und Lerner sind getrennt; ein Backend verteilt sie.
-- Der Actor sieht nur fehlerhafte Sensoren, der Kritiker mehr. Exportiert wird nur der Actor.
-- Variation macht robust; bewertet wird immer sauber **und** variiert.
-- Der Sprung entstand so: Vorbild mit CMA-ES, Nachahmen mit DAgger, Üben mit PPO,
-  „Kritiker zuerst“.
-- Determinismus braucht eigene Mathe-Funktionen, kein FMA und feste Summierreihenfolgen.
+- Das handelnde Netz sieht nur fehlerhafte Sensoren, der Kritiker mehr. Nur das handelnde Netz kommt
+  auf den Roboter.
+- Variation macht robust; geprüft wird immer sauber **und** mit Variation.
+- Warmstart: Die Ente beginnt mit einem Netz, das schon stehen kann.
+- Üben heißt: in kleinen, vorsichtigen Schritten Richtung „besser als erwartet“ – und nach dem
+  Nachahmen lernt zuerst der Kritiker.
+- Der Sprung entstand so: Vorbild durch geschicktes Ausprobieren gefunden, dann nachgeahmt, dann
+  selbst geübt. Punkte helfen beim Lernen, eine strenge Messung prüft das Ergebnis.
 - Die Spielschicht kickt den Ball schon gut; beim Sockengriff ist die Physik der Engpass.
 
 ## Knobelecke
 
-1. Warum darf der Kritiker Dinge sehen, die kein Sensor misst, der Actor aber nicht?
-2. Eine Episode endet nach 2 s ohne Sturz. Warum setzt der Lehrer den Wert der Zukunft nicht auf
-   null?
-3. Warum gibt CMA-ES das Zentrum der Suchwolke zurück und nicht den besten Kandidaten?
-4. Du rechnest denselben Lauf mit 2 und mit 8 Threads. Was muss gleich bleiben, damit dasselbe
-   Netz herauskommt?
+1. Warum darf der Kritiker Dinge sehen, die kein Sensor misst, das handelnde Netz aber nicht?
+2. Eine Steh-Episode endet nach 4 Sekunden ohne Sturz. Warum tut der Lehrer nicht so, als kämen
+   danach keine Punkte mehr?
+3. Warum nimmt die Vorbildsuche am Ende die Mitte der Steinwolke und nicht den besten Einzelversuch?
+4. Du lässt denselben Lauf einmal mit 2 und einmal mit 8 Rechenkernen laufen. Was muss gleich
+   bleiben, damit dasselbe Netz herauskommt?
 5. Warum endet eine Sprung-Episode, sobald der Schnabel den Boden berührt?
 
 ### Lösungen
 
-1. Der Kritiker wird nur beim Lernen gebraucht und nie exportiert. Der Actor muss auf dem Roboter
-   mit dessen echten Sensoren auskommen.
-2. Ein Zeitablauf ist kein Scheitern; die Ente hätte weiterstehen können. Ihr Wert wird geschätzt.
-   Nur ein Sturz hat keine Zukunft.
-3. Die Noten sind verrauscht; der beste Einzelne kann Glück gehabt haben. Das Zentrum ist
+1. Der Kritiker wird nur beim Lernen gebraucht und kommt nie auf den Roboter. Das handelnde Netz
+   muss dort mit den echten, fehlerhaften Sensoren auskommen.
+2. Ein Zeitablauf ist kein Scheitern; die Ente hätte weiterstehen können. Die Punkte, die noch
+   gekommen wären, werden geschätzt. Nur nach einem Sturz kommt wirklich nichts mehr.
+3. Die Noten schwanken durch den Zufall; der beste Einzelne kann Glück gehabt haben. Die Mitte ist
    verlässlicher.
-4. Seed und Gesamtzahl der Enten. Die Zahl der Threads ändert nur die Geschwindigkeit.
+4. Die Startzahl und die Gesamtzahl der Enten. Die Zahl der Rechenkerne ändert nur das Tempo.
 5. Sonst lernt das Netz, dass Abstützen sicher Punkte bringt, statt zu springen.
 
 ---

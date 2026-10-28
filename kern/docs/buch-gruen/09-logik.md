@@ -1,19 +1,35 @@
 # 9 Logik-Graphen – Spielregeln zum Zusammenstecken
 
-> **Kurz gesagt:** In Kern schreibst du Spiellogik nicht als Programmtext, sondern steckst sie aus
-> Knoten und Drähten zusammen, wie die Blueprints der Unreal Engine. Ein Ereignis stößt eine Kette an,
-> und die Knoten fallen nacheinander wie Dominosteine. Damit das schnell geht, übersetzt Kern jeden
-> Graphen beim Start in Maschinencode – und auf Wunsch sogar in lesbares C++. Alle drei Wege liefern
-> exakt dasselbe Ergebnis.
+> **Kurz gesagt:** In Kern schreibst du Spielregeln nicht als Programmtext, sondern steckst sie aus
+> Kästchen und Drähten zusammen – so, wie man es aus großen Spiele-Engines kennt. Ein Ereignis stößt
+> eine Kette an, und die Kästchen fallen nacheinander wie Dominosteine. Damit das schnell geht, kann
+> Kern so ein Bild auf drei Wegen ausführen – Schritt für Schritt vorlesen, in schnellen
+> Maschinencode übersetzen oder als lesbaren Programmtext ausgeben – und alle drei liefern exakt
+> dasselbe Ergebnis.
+
+> **Begriffe vorab:**
+> - **Programm** – eine genaue Schritt-für-Schritt-Anleitung für den Computer.
+> - **Maschinencode** – die Sprache, die der Prozessor direkt versteht: sehr schnell, aber für
+>   Menschen unlesbar.
+> - **C++** – die Programmiersprache, in der Kern geschrieben ist; lesbar für Programmierer.
+> - **WebAssembly** – eine Programmform, die der Browser sehr schnell in Maschinencode verwandelt.
+> - **Variable** – ein beschriftetes Kästchen, in dem sich ein Programm etwas merkt, etwa „Punkte: 30“.
+> - **Autorität** – der Rechner, der das Sagen hat: im Einzelspiel deiner, im Netzwerkspiel der Server.
+> - **Sensor und Trigger** – Zonen, die merken, wenn etwas hineinkommt ([Kapitel 8](08-spiel-laufzeit.md)).
+> - **Deterministisch** – auf jedem Gerät exakt gleich gerechnet.
 
 „Wenn der Spieler die Münze berührt, gib ihm 10 Punkte.“ So klingt Spiellogik. Kern hat dafür
 **keine** Skriptsprache – du malst Logik als Bild, und dieses Bild ist ein vollwertiges Programm.
 
 ## 9.1 Das Modell: Knoten, Drähte, Dominosteine
 
+Ein Logik-Graph ist ein Bild aus Kästchen und Drähten. Weiße Drähte legen fest, **was als Nächstes
+passiert**; andere Drähte liefern **Werte** wie Zahlen oder Namen. Variablen merken sich etwas,
+Zustandsmaschinen merken sich einen Zustand, und manche Kästchen warten eine Weile.
+
 Ein **Logik-Graph** besteht aus **Knoten** (Kästchen, die etwas tun) und **Drähten** (Verbindungen
-zwischen ihnen). Er ist reines Datum – eine Liste von Knoten und Drähten –, und hinter jedem
-Knotentyp steckt eine C++-Funktion der Engine.
+zwischen ihnen). Der Graph selbst ist nur eine Beschreibung – eine Liste von Kästchen und Drähten.
+Hinter jeder Kästchensorte steckt ein fertiges Stück Kern, das die eigentliche Arbeit tut.
 
 > **Stell dir vor …** eine Reihe Dominosteine. Du stupst den ersten an (ein Ereignis), er kippt den
 > nächsten, der den nächsten … Die weißen Pfeil-Drähte im Graphen sind die Abstände zwischen den
@@ -21,330 +37,348 @@ Knotentyp steckt eine C++-Funktion der Engine.
 
 Es gibt zwei Sorten Anschlüsse (*Pins*):
 
-- **Exec-Pins** (weiße Pfeile): der Ablauf. **Event-Knoten** starten eine Kette, **Aktionsknoten**
-  setzen sie fort, **Flow-Knoten** verzweigen, wiederholen oder warten.
-- **Daten-Pins**: Werte wie Zahlen, Text oder Actors. Eingänge **ziehen** sich ihre Werte: Wird ein
-  Wert gebraucht, rechnet der verbundene Knoten ihn in diesem Moment aus. Reine Rechenknoten
-  (*Pure*: Mathe, Abfragen) haben gar keinen Exec-Pin. Ausgänge von Aktionsknoten behalten dagegen
-  den Wert ihres letzten Laufs. Ist ein Eingang nicht verbunden, gilt der Wert, den du direkt in den
-  Knoten getippt hast.
+- **Ablauf-Pins** (*Exec*, weiße Pfeile): die Reihenfolge. **Ereignis-Knoten** starten eine Kette,
+  **Aktionsknoten** setzen sie fort, **Ablauf-Knoten** verzweigen, wiederholen oder warten.
+- **Daten-Pins** (farbig): Werte wie Zahlen, Text oder Dinge. Ein Eingang holt sich seinen Wert genau
+  dann, wenn er gebraucht wird. Ist er nicht verbunden, gilt der Wert, den du direkt ins Kästchen
+  getippt hast.
+
+Bei den Daten gibt es zwei Arten von Kästchen, und der Unterschied ist leicht zu merken:
+
+> **Stell dir vor …** ein **Thermometer** und einen **Kassenbon**. Das Thermometer zeigt dir immer den
+> Wert von *jetzt*, jedes Mal, wenn du hinschaust. Der Kassenbon zeigt, was beim *letzten Einkauf*
+> passiert ist – bis du das nächste Mal einkaufst.
+
+**Rechenknoten** (Plus, Vergleichen, „wo steht der Spieler?“) sind Thermometer: Sie haben keinen
+weißen Draht und rechnen jedes Mal frisch, wenn jemand ihren Wert liest. **Aktionsknoten** (Punkte
+geben, ein Ding erzeugen) sind Kassenbons: Ihr Ergebnis bleibt stehen, bis sie das nächste Mal
+laufen.
 
 Dazu kommen:
 
-- **Variablen** – das Gedächtnis eines Graphen, mit Typ und Startwert.
-- **State Machines** – Zustände mit Übergängen, im Stil des Zustandseditors von
-  digitalisierungsplanung.de (mehr in 9.4).
-- **Latente Knoten** wie Delay oder Tween – sie halten die Kette an und machen später weiter.
+- **Variablen** – das Gedächtnis eines Graphen, mit Sorte und Startwert.
+- **State Machines** (Zustandsmaschinen) – Zustände mit Übergängen, wie bei einer Ampel (mehr in
+  9.4).
+- **Wartende Knoten** wie Delay (warten) oder Tween (sanft verändern) – sie halten die Kette an und
+  machen später weiter.
 
-Das **Level** hat einen eigenen Graphen, und jeder **Actor** kann einen tragen. Im Actor-Graphen ist
-„Self“ der Actor selbst.
+Das **Level** hat einen eigenen Graphen, und jeder **Actor** kann einen tragen. Im Graphen eines
+Actors heißt der Actor selbst „Self“.
 
 ### Welche Drähte passen?
 
-Es gibt sieben Typen: Exec, Bool, Int, Float, Vektor, Text und Actor. Nicht jeder Draht passt
-überall – wie bei Steckern. Erlaubt ist:
+Jeder Daten-Draht trägt eine bestimmte **Sorte** von Wert – wie Kabel mit verschiedenen Steckern.
+Nicht jeder Stecker passt in jede Buchse. Es gibt sieben Sorten:
 
-- gleicher Typ immer, Exec aber nur mit Exec;
-- **alles nach Text** („everything prints“ – alles lässt sich ausdrucken);
-- Zahlen untereinander;
-- Actor nach Bool („ist gültig?“);
-- eine Zahl nach Vektor (in alle drei Richtungen).
+| Sorte | im Alltag | Beispiel |
+|---|---|---|
+| Exec | „jetzt du!“ – der Ablauf selbst | der weiße Pfeil |
+| Bool | Ja oder Nein | „Ist die Tür offen?“ |
+| Int | ganze Zahl | Anzahl Münzen: 7 |
+| Float | Kommazahl | Tempo: 3,5 m/s |
+| Vektor | drei Zahlen für Ort oder Richtung | „2 m vor, 1 m links, 3 m hoch“ |
+| Text | Buchstaben | „Gewonnen!“ |
+| Actor | ein Ding im Level | die Tür |
 
-Die Umrechnungen sind fest geregelt: Text „0“ oder „false“ ist falsch, ein Vektor als Zahl ist seine
-Länge, eine Kommazahl wird beim Wandeln in eine ganze Zahl abgeschnitten, und Text wird als Zahl
-gelesen.
+Erlaubt sind gleiche Sorten – Ablauf aber nur mit Ablauf –, Zahlen untereinander, und **alles nach
+Text**, denn alles lässt sich ausdrucken. Ein paar weitere Umwandlungen sind fest geregelt, etwa
+„Ding nach Ja/Nein“ (gibt es das Ding noch?).
 
-### Wie ein Graph gespeichert wird
+> **Für Neugierige:** Ein Vektor als Zahl ist seine Länge, eine Kommazahl wird beim Wandeln in eine
+> ganze Zahl abgeschnitten, und der Text „0“ oder „false“ gilt als Nein. Die vollständigen Regeln
+> stehen im blauen Buch, Kapitel 9.
 
-Graphen stehen als JSON direkt im Level ([Kapitel 8](08-spiel-laufzeit.md)). Knoten haben eine
-Nummer, einen Typ (etwa `game.add_score`) und eine Position; Drähte sind kurze Listen
-`[von, Ausgang, nach, Eingang]`. Kommentarrahmen werden mitgespeichert, wirken aber nicht.
+Gespeichert wird ein Graph als Text direkt in der Leveldatei ([Kapitel 8](08-spiel-laufzeit.md)) –
+mit Kästchen, Drähten, Positionen und Kommentarrahmen. Die Kommentare wirken nicht, sie helfen nur
+beim Lesen.
 
 ## 9.2 Knoten von innen
 
-Jeder Knotentyp hat eine Beschreibung: Name, Kategorie, Hilfetext, Suchwörter, seine Pins, seine
-Einstellungen (etwa ein Variablenname oder eine Taste) und seine **Art** – Event, Action, Pure oder
-Flow. Dazu die eigentliche C++-Funktion.
+Hinter jedem Kästchen steckt ein kleines Stück Programm. Wenn es fertig ist, meldet es, **an welchem
+Ausgang es weitergeht** – oder „Stopp, hier endet die Kette“, oder „Ich warte, weck mich später“.
 
-Diese Funktion meldet zurück, **an welchem Exec-Ausgang es weitergeht**. Oder sie sagt „Stopp, hier
-endet die Kette“ – oder „Ich warte, weck mich später“ (latente Knoten).
+Jede Kästchensorte hat einen Steckbrief: Name, Kategorie im Menü, Hilfetext, Suchwörter, Anschlüsse,
+Einstellungen (etwa ein Variablenname oder eine Taste) und ihre Art – Ereignis, Aktion, Rechnen oder
+Ablauf. Dazu kommt die eigentliche Arbeit.
 
-So sieht ein echter Spielknoten aus:
+So sieht der Steckbrief des Kästchens **„Add Score“** (Punkte geben) aus, in Worten:
 
-```cpp
-lib.add(action("game.add_score", "Add Score", "Game",
-    {data("points", "Points", PinType::number, 10.0)}, {},
-    [](Context& c, GameWorld& w) {
-      w.add_score(static_cast<f32>(c.in_number("points")));
-    },
-    "Adds points (wins at the target score ...).",
-    "points reward"));
-```
+> **Steckbrief „Add Score“:** Art: Aktion. Kategorie: Game. Ein Dateneingang „Points“, eine Zahl,
+> vorbelegt mit 10. Arbeit: Lies den Eingang und gib der Spielwelt so viele Punkte. Danach geht es am
+> Ausgang „then“ weiter. Hilfetext: „Adds points …“, Suchwörter: „points reward“.
 
-Zeile für Zeile:
-
-- Ein neuer **Aktionsknoten** mit dem Typ `game.add_score`, dem Titel „Add Score“, Kategorie „Game“.
-- Er hat einen Dateneingang „Points“, eine Zahl mit Standardwert 10.
-- Seine Arbeit: den Eingang lesen und der Spielwelt so viele Punkte geben.
-- Dann ein Hilfetext und Suchwörter für das Menü.
-
-Den Exec-Eingang und den Ausgang „then“ baut `action` automatisch dazu. Knoten sehen die Welt über
-einen **Context**: Eingänge lesen, Ausgänge schreiben, Einstellungen abfragen, warten.
-
-Alle eingebauten Knoten liegen in einer **Library**: die Grundknoten plus die Spielknoten, die sich
-beim Programmstart selbst anmelden.
+Den Ablauf-Eingang und den Ausgang „then“ bekommt jede Aktion automatisch dazu. Alle eingebauten
+Kästchen zusammen bilden eine Art **Bausatz-Katalog**, aus dem das Menü im Editor seine Vorschläge
+holt. Wie so ein Steckbrief als C++ aussieht, zeigt das blaue Buch, Kapitel 9.
 
 ## 9.3 Prüfen, bevor es losgeht
 
-Bevor ein Graph läuft, prüft Kern ihn. **Fehler** sind zum Beispiel:
+Bevor ein Graph läuft, prüft Kern ihn – wie ein Elektriker, der vor dem Einschalten die Leitungen
+durchmisst. Falsch verdrahtete Graphen werden abgeschaltet, Kästchen, die nie drankommen, werden
+gemeldet.
 
-- ein unbekannter Knotentyp oder ein Draht zu einem Pin, den es nicht gibt;
-- ein Draht zwischen unpassenden Typen, etwa Exec an einen Datenpin;
-- zwei Drähte in denselben Dateneingang;
-- Rechenknoten, die von sich selbst abhängen (ein Kreis);
+**Fehler** sind zum Beispiel:
+
+- ein Draht zwischen unpassenden Sorten, etwa ein Ablauf-Draht an einem Daten-Pin;
+- zwei Drähte in denselben Dateneingang – welcher Wert soll dann gelten?
+- Rechenknoten, die von sich selbst abhängen (ein Kreis, der nie fertig würde);
 - Einstellungen, die auf fehlende Variablen oder Zustände zeigen;
 - eine State Machine ohne genau einen Anfangszustand.
 
-Eine **Warnung** gibt es für Knoten, deren Exec-Eingang nirgends angeschlossen ist – sie laufen nie.
+Eine **Warnung** gibt es für Kästchen, deren Ablauf-Eingang nirgends angeschlossen ist – sie laufen
+nie.
 
 Ein Graph mit Fehlern wird beim Start abgeschaltet und gemeldet. Im Studio zeigt **Compile** (F7)
 das Ergebnis vorher an.
 
 ## 9.4 Wie ein Graph ausgeführt wird
 
-Alle Graphen einer Welt laufen in einer **Runtime**; jeder Graph wird dort eine **Instanz** für
-seinen Besitzer (Actor oder Level). Gerechnet wird in den festen Simulationsschritten, und zwar nur
-auf der **Autorität** – im Einzelspiel oder auf dem Netzwerk-Server.
+Alle Graphen laufen im Takt der Spielschritte, und zwar nur auf dem Rechner, der das Sagen hat. Am
+Anfang feuert „Begin Play“, danach in jedem Schritt „Tick“.
 
-Zu Beginn (**Begin Play**) betreten die State Machines ihren Anfangszustand, und „Begin Play“ feuert.
-In jedem Schritt (**Tick**) passiert dann dreierlei: Fällige Wartezeiten laufen weiter (die früheste
-zuerst), das Tick-Ereignis feuert, und die State Machines prüfen ihre Timer- und
-Bedingungsübergänge. Jede Instanz verrät ihre **Stufe**: „interpreter“, „compiling“, „compiled
-(WebAssembly)“ oder „native C++“ (9.8).
+Gerechnet wird in den festen Schritten der Simulation ([Kapitel 8](08-spiel-laufzeit.md)), und nur
+auf der **Autorität** – im Einzelspiel auf deinem Rechner, im Netzwerkspiel nur auf dem Server. Der
+Grund: Es soll **eine einzige Wahrheit** geben. Würden zwei Rechner unabhängig voneinander
+entscheiden, ob eine Münze eingesammelt ist, könnten sie verschiedener Meinung sein. Also entscheidet
+einer, und alle anderen bekommen das Ergebnis.
+
+Zu Beginn (**Begin Play**) gehen die State Machines in ihren Anfangszustand, und „Begin Play“ feuert.
+In jedem Schritt (**Tick**) passiert dann dreierlei: Abgelaufene Wartezeiten machen weiter, das
+Tick-Ereignis feuert, und die State Machines prüfen, ob sie den Zustand wechseln.
 
 ### Ereignisse und Ketten
 
-Ein **Ereignis** hat einen Typ (etwa „etwas betritt den Sensor“), optional einen Ziel-Actor und
-Zusatzwerte. Kern sucht alle passenden Event-Knoten, schreibt die Werte in deren Ausgänge und lässt
-die Kette laufen. Actors, die währenddessen entstehen, sind gleich mit dabei. Ein **Custom Event**
-lässt sich gezielt rufen: an alle Graphen oder an einen Actor – und es schaltet zugleich
-State-Machine-Übergänge mit diesem Namen.
+Passiert etwas in der Welt, ist das ein **Ereignis** – etwa „etwas betritt den Sensor“, oft mit
+Zusatzangaben wie „wer?“. Kern sucht alle passenden Ereignis-Knoten, gibt ihnen die Angaben mit und
+lässt jede Kette laufen. Mit einem **Custom Event** (eigenes Ereignis) kannst du auch selbst ein
+Ereignis mit einem Namen ausrufen – an alle Graphen oder an ein bestimmtes Ding.
 
-Für Verzweigungen hat der Interpreter einen **Stapel** von Merkzetteln. Eine **Sequence** etwa führt
-ihren ersten Ausgang sofort aus und legt Zettel für die übrigen auf den Stapel. Ist ein Zweig zu
-Ende, nimmt Kern den nächsten Zettel. Schleifen funktionieren genauso: Körper ausführen, dann
-mit einem Zettel zum Schleifenknoten zurück.
+Verzweigt sich eine Kette, etwa bei **Sequence** („erst das, dann das, dann das“), arbeitet Kern die
+Zweige brav nacheinander ab und merkt sich dabei, welche noch offen sind – wie du mit einer Liste auf
+dem Einkaufszettel. Schleifen funktionieren ähnlich: Inhalt der Schleife ausführen, dann zurück zum
+Schleifenknoten, bis die Bedingung nicht mehr stimmt.
 
-Hängt ein Eingang an einem Rechenknoten, wird dieser bei **jedem** Lesen neu ausgerechnet (bis zu 48
-Ebenen tief). Hängt er an einem Aktionsknoten, liest er dessen gespeicherten letzten Wert.
+> **Für Neugierige:** Die offenen Zweige liegen auf einem „Stapel“ von Merkzetteln: Der zuletzt
+> hingelegte wird zuerst abgearbeitet. Wie tief Ketten und Rechnungen geschachtelt sein dürfen, steht
+> im blauen Buch, Kapitel 9.
 
 ### Schutz vor Endlosschleifen
 
-> **Achtung, Falle!** Eine While-Schleife, deren Bedingung immer wahr bleibt, würde das Spiel
-> einfrieren. Kern zählt deshalb mit: Laufen in einem Schritt mehr als **200 000 Knoten**, wird der
-> Graph abgeschaltet – mit der Meldung „infinite loop? The graph is stopped.“ Der Rest des Spiels
-> läuft weiter.
+> **Achtung, Falle!** Eine While-Schleife („solange …, wiederhole“), deren Bedingung immer wahr
+> bleibt, würde das Spiel einfrieren. Kern zählt deshalb mit: Laufen in einem Schritt mehr als
+> **200 000 Kästchen**, wird der Graph abgeschaltet – mit der Meldung „infinite loop? The graph is
+> stopped.“ Der Rest des Spiels läuft weiter.
 
-Außerdem dürfen Ereignisse, die Ereignisse auslösen, höchstens 64 tief verschachtelt sein. Im
-übersetzten Code stoppen mehr als 512 verschachtelte Schleifen oder Sequences die Instanz.
+Ebenso gibt es Grenzen dafür, wie oft Ereignisse neue Ereignisse auslösen dürfen. So kann ein
+verdrahteter Kreis nie das ganze Spiel lahmlegen, sondern höchstens seinen eigenen Graphen.
 
 ### State Machines – wie eine Ampel
 
 > **Stell dir vor …** eine Ampel. Sie ist immer in genau einem **Zustand**: Grün, Gelb oder Rot. Nach
 > einer Zeit springt sie zum nächsten. Das ist eine **State Machine**.
 
-Jede State Machine hat genau einen Anfangszustand. Ein **Übergang** kann feuern:
+Jede State Machine hat genau einen Anfangszustand. Ein **Übergang** zum nächsten Zustand kann
+ausgelöst werden:
 
-- auf ein **Ereignis** mit einem bestimmten Namen,
-- nach einem **Timer** (so viele Sekunden im Zustand),
-- solange eine **Bedingung** (eine Bool-Variable) wahr ist,
-- oder **automatisch** im nächsten Tick.
+- durch ein **Ereignis** mit einem bestimmten Namen (ein Custom Event mit diesem Namen schaltet ihn),
+- nach einer **Zeit** (so viele Sekunden im Zustand),
+- sobald eine **Bedingung** (eine Ja/Nein-Variable) wahr ist,
+- oder **automatisch** im nächsten Schritt.
 
-Ein Übergang kann auch „aus jedem Zustand“ kommen (er feuert aber nicht, wenn die Maschine schon im
-Zielzustand ist). Pro Maschine und Prüfung gibt es höchstens einen Übergang, eine Kette automatischer
-Übergänge geht also einen Zustand pro Schritt weiter. Betreten und Verlassen eines Zustands lösen
-eigene Ereignisse aus, an die du Ketten hängen kannst; „On State Entered“ verrät auch den vorigen
-Zustand. **Set State**
-springt direkt in einen Zustand.
+Ein Übergang kann auch „aus jedem Zustand“ kommen, etwa ein Not-Aus. Betreten und Verlassen eines
+Zustands lösen eigene Ereignisse aus, an die du Ketten hängen kannst. **Set State** springt direkt in
+einen Zustand.
 
 ## 9.5 Die Grundknoten
 
-Kern bringt **76 Grundknoten** mit. Die Familien:
+Kern bringt **76 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis und Rechnen. Du musst sie
+nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar Beispiele zeigen, was in
+dem Baukasten steckt:
 
-- **Events:** Begin Play, Event Tick, Every N Seconds, Custom Event.
-- **State Machines:** On State Entered/Left, Set State, Current State, Is In State.
-- **Flow:** Branch (wenn/sonst), Sequence, For Loop, While Loop, Do Once, Do N, Gate (Tor auf/zu),
-  Flip Flop (abwechselnd A und B), Delay, Retriggerable Delay, Tween (sanft von 0 nach 1), Switch
-  und Call Event.
-- **Variablen:** Get, Set, Add.
-- **Mathe und Logik:** Rechnen, Runden, Sinus, Zufall, Vergleichen, Und/Oder/Nicht, Select.
-- **Werte, Vektoren, Text** und **Hilfen** wie Game Time und Print (auf Wunsch auch auf dem
-  Bildschirm).
+- **Branch – die Weiche.** Ein Ja/Nein-Wert kommt herein, und der Ablauf fährt entweder auf das
+  Gleis „True“ oder auf „False“. „Hat der Spieler genug Münzen? Dann öffne die Tür, sonst zeig eine
+  Meldung.“
+- **Delay – die Eieruhr.** Die Kette hält an und läuft nach der eingestellten Zeit weiter. Drückt
+  jemand während des Wartens noch einmal, ignoriert die Eieruhr das; eine zweite Sorte fängt dann neu
+  an zu zählen.
+- **Gate – die Schranke.** Kommt der Ablauf an, geht er nur weiter, wenn die Schranke offen ist.
+  Andere Drähte öffnen und schließen sie.
+- **Flip Flop – der Lichtschalter.** Jedes Drücken schaltet um: einmal Ausgang A, dann B, dann
+  wieder A. Perfekt für eine Tür, die auf- und zugeht.
+- **Tween – der Dimmer.** Statt eine Lampe hart anzuknipsen, dreht er einen Wert über eine
+  einstellbare Zeit sanft von 0 auf 1 und meldet in jedem Schritt, wie weit er ist.
+- **Every N Seconds – der Wecker.** Feuert regelmäßig, etwa alle 3 Sekunden.
 
-Ein paar Feinheiten: Every N Seconds zählt seine eigene Zeit. Sequence hat 1 bis 16 Ausgänge, For
-Loop zählt einschließlich des letzten Werts. Ein Delay ignoriert weitere Aufrufe, solange es wartet;
-das Retriggerable Delay fängt dagegen neu an. Tween meldet jeden Schritt einen Wert von 0 bis 1
-(gleichmäßig oder mit sanfter Kurve) und am Ende „Finished“. Switch verzweigt nach Zahl oder Text,
-Compare vergleicht mit einer winzigen Toleranz (10⁻⁹), und Umlenkknoten (*Reroute*) ordnen nur
-Drähte.
+Dazu kommen Variablen lesen, setzen und hochzählen, Rechnen, Vergleichen, Zufall, Text und
+**Print**, das einen Text ins Protokoll oder auf den Bildschirm schreibt. Alle 76 Knoten mit ihren
+Feinheiten stehen im blauen Buch, Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
-> dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Replays und Netzwerkspiele
-> überein.
+> dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Wiederholungen und
+> Netzwerkspiele überein.
 
 ## 9.6 Die Spielknoten
 
-Dazu kommen **71 Spielknoten**, die mit der Spielwelt sprechen. Ein Actor-Eingang ohne Draht
-bedeutet immer **Self**.
+Dazu kommen **71 Spielknoten**, die mit der Spielwelt sprechen. Sie **hören** auf das, was in der
+Welt passiert, und sie können die Welt **verändern**. Hat ein Ding-Eingang keinen Draht, ist immer
+das eigene Ding (Self) gemeint.
 
 **Ereignisse** – die Anstupser der Dominoketten:
 
 | Knoten | Feuert, wenn … |
 |---|---|
-| On Begin / End Overlap | etwas den Sensor dieses Actors betritt oder verlässt |
-| On Entered Sensor | dieser Actor einen fremden Sensor betritt |
-| On Hit | es kracht (ab 2 m/s, höchstens 32 pro Schritt) |
+| On Begin / End Overlap | etwas den Sensor dieses Dings betritt oder verlässt |
+| On Entered Sensor | dieses Ding einen fremden Sensor betritt |
+| On Hit | es kracht |
 | On Collected, On Trigger | ein Pickup eingesammelt oder ein Trigger berührt wird |
 | On Damaged, On Death, On Respawn | Schaden, Tod, Rückkehr |
-| On Interact | der Spieler F (Gamepad: Y) drückt und den Actor ansieht (bis 3 m) oder danebensteht (2 m) |
+| On Interact | der Spieler F (Gamepad: Y) drückt und das Ding ansieht oder danebensteht |
 | On Player Joined, On Game Over | ein Spieler kommt dazu, das Spiel endet |
-| On Input Action, On Key | eine Aktion (jeder Spieler, jedes Gerät) oder Taste (nur lokal) gedrückt wird |
+| On Input Action, On Key | eine Spieler-Aktion oder eine Taste gedrückt wird |
 
-Eine Überlappung zählt übrigens den ganzen Besucher: Kapsel und Kopf eines Spielers sind *ein*
+Eine Überlappung zählt übrigens den ganzen Besucher: Körper und Kopf eines Spielers sind *ein*
 Besucher, nicht zwei.
 
-Die übrigen Knoten in Familien:
+Die **Aktionen** sind in Familien sortiert. Je ein Beispiel:
 
-- **Actors:** Self, Spieler und Spielerzahl, finden (nach Name oder Tag, auch zufällig), Tags prüfen,
-  Ort, Drehung, Richtung, Tempo und Abstand lesen, setzen, verschieben, ein- und ausschalten,
-  **Spawn Actor** (eine Kopie mit Kindern und Logik erzeugen) und zerstören, und **Set Property**, das
-  jeden Wert einer Komponente über seinen Pfad wie in der Leveldatei ändern kann – etwa die Farbe.
-- **Physik:** Geschwindigkeit setzen, Impuls und Kraft (für einen Schritt), Launch (behält das
-  waagrechte Tempo), Physik ein/aus (dynamisch ↔ kinematisch), Gelenkmotoren
-  (für Türen, Lifte, Winden), Explosionen und Strahltests (*Line Trace*).
-- **Spiel und Kampf:** Punkte, Meldungen (für alle Spieler), gewinnen, verlieren, Schaden, Heilen,
-  Töten, Munition, Gesundheit lesen, Licht, Farbe, Funken, Kamerawackeln (nur auf diesem Gerät),
-  Sounds (3D oder flach) und „For Each Actor with Tag“.
-- **Roboter:** die Micro Duck laufen lassen (wie mit dem Gamepad, in den trainierten Grenzen: bis
-  0,4 m/s vorwärts, 0,3 m/s seitwärts, 57 °/s drehen) und schauen lassen, ihre Autonomie schalten,
-  Spezialbewegungen wie Sitzen, Aufheben, Kicken, Purzelbaum oder Sprung, Schnabel, Streicheln,
-  Hören, „hält sie etwas?“, Zwitschern, Abstandssensor, Kopfkamera und ihr Zustand
-  ([Kapitel 13](13-micro-duck.md)).
+- **Dinge:** **Spawn Actor** erzeugt eine Kopie eines Dings – samt Kindern und Spielregeln. So
+  entsteht ein Spawner, der alle paar Sekunden eine Kiste ausspuckt.
+- **Physik:** **Launch** gibt einem Ding einen kräftigen Schwung, etwa nach oben wie ein
+  Trampolin. Andere Knoten schubsen,
+  bremsen oder schalten Gelenkmotoren – für Türen, Lifte und Winden.
+- **Spiel und Kampf:** **Add Score** gibt Punkte, **Show Message** zeigt allen Spielern einen Text,
+  andere lassen gewinnen, verlieren, heilen oder einen Ton spielen.
+- **Roboter:** **Walk** lässt die Ente laufen wie mit dem Gamepad – nur so schnell, wie
+  sie es im Training gelernt hat. Andere Knoten lassen sie sitzen, kicken oder zwitschern oder fragen
+  ihren Abstandssensor und ihre Kopfkamera ab ([Kapitel 13](13-micro-duck.md)).
+
+Alle 71 Spielknoten mit ihren Grenzen und Werten stehen im blauen Buch, Kapitel 9.
 
 ## 9.7 Logik in der Spielwelt
 
+Die Spielwelt gibt den Graphen alles, was sie brauchen: die Spielzeit, einen planbaren Zufall und
+die Ereignisse. Ein Ereignis geht an das betroffene Ding – oder an dessen nächstes „Elternteil“ mit
+Graph. Was die Logik verändert, bekommen alle Mitspieler mit.
+
 Die GameWorld startet die Graphen nur in Play oder Simulate, nur auf der Autorität (nicht auf
-Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt.
+Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen:
 
-Ihr **Host** liefert den Graphen die Grundlagen: die **Simulationszeit** (aus den Schritten
-gezählt, nicht die Wanduhr), Ausgaben und Fehler ins Output Log (Print auf Wunsch als HUD-Meldung)
-und einen **deterministischen Zufall**. Gespawnte Actors und neue Spieler bringen ihre Graphen mit.
+- die **Spielzeit** – aus den Simulationsschritten gezählt, nicht von der Uhr an der Wand. Pausierst
+  du das Spiel oder ruckelt ein langsamer Rechner, läuft die Spielzeit trotzdem genau gleich, und ein
+  „nach 3 Sekunden“ bedeutet überall dasselbe;
+- Ausgaben und Fehler ins Output Log (Print auf Wunsch als Meldung im HUD);
+- einen **deterministischen Zufall**.
 
-Wohin gehen Ereignisse? An den Graphen des betroffenen Actors – oder, wenn der keinen hat, an den
-seines nächsten Vorfahren mit Graph. Das ist praktisch: Der eingeschweißte Collider einer Tür gehört
-zur Tür. Außerdem bekommt **immer** der Level-Graph das Ereignis mit; Ereignisse ohne Actor (etwa
-Spielende) gehen an alle. Hat ein Level Logik, meldet die Physik Überlappungen aller beweglichen und
-Treffer aller dynamischen Formen – sonst hätten die Graphen nichts zu hören. Der Logik-Tick läuft
-am Ende jedes festen Schritts, nach den Physik-Ereignissen.
+Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit.
 
-**Fürs Netzwerk** schreibt Kern mit, was Logik an der Welt ändert: geänderte Werte, gespawnte Actors,
-versetzte Körper. Der Server schickt das an alle – auch an Spieler, die später dazukommen
+**Wohin gehen Ereignisse?** An den Graphen des betroffenen Dings – oder, wenn es keinen hat, an den
+seines nächsten Vorfahren mit Graph. Das ist praktisch: Die unsichtbare Form, die in eine Tür
+eingeschweißt ist, gehört zur Tür, und die Tür hört das Ereignis. Außerdem bekommt **immer** der
+Level-Graph das Ereignis mit; Ereignisse ohne Ding (etwa Spielende) gehen an alle.
+
+**Fürs Netzwerk** schreibt Kern mit, was die Logik an der Welt ändert: geänderte Werte, erzeugte
+Dinge, versetzte Körper. Der Server schickt das an alle – auch an Spieler, die später dazukommen
 ([Kapitel 10](10-netzwerk.md)).
+
+> **Für Neugierige:** Hat ein Level Logik, meldet die Physik mehr Berührungen als sonst, damit die
+> Graphen etwas zu hören haben. Und die Logik rechnet am Ende jedes Schritts, nach der Physik. Die
+> Einzelheiten stehen im blauen Buch, Kapitel 9.
 
 ## 9.8 Vom Bild zum Maschinencode
 
+Ein Graph kann Schritt für Schritt „gedolmetscht“ oder einmal ganz übersetzt werden. Die Übersetzung
+ist viel schneller und übernimmt sogar mitten im Spiel.
+
 > **Stell dir vor …** du liest ein Buch in einer fremden Sprache. Ein **Dolmetscher** kann es dir
 > Satz für Satz vorlesen – das klappt sofort, ist aber langsam. Oder jemand **übersetzt** das ganze
-> Buch einmal, und danach liest du flüssig. Der Interpreter ist der Dolmetscher, der JIT ist der
-> Übersetzer.
+> Buch einmal, und danach liest du flüssig.
 
-Kern hat zwei Übersetzer, die denselben Plan benutzen:
+Kern hat einen Dolmetscher, den **Interpreter**, und zwei Übersetzer, die nach demselben Plan
+arbeiten:
 
-- **WebAssembly (JIT):** Beim Start von Play oder Simulate schreibt Kern für jeden Graphen ein
-  kleines WebAssembly-Modul. Der Browser macht daraus Maschinencode, und Kern hängt es direkt in die
-  Engine ein. Kein JavaScript dazwischen.
-- **C++-Export:** Derselbe Graph als lesbarer C++-Quelltext. In ein Spiel gebaut
-  (`kern/build.sh --studio out.wasm datei.cpp`), ersetzt er für diesen Graphen den Interpreter.
-  Gibt es für einen Graphen exportierten Code, hat der Vorrang. Außerhalb des Browsers gibt es keinen
-  JIT: Dort läuft der Graph im Interpreter oder als exportiertes C++.
+- **Die Übersetzung in letzter Sekunde** (*JIT*, „just in time“): Beim Start von Play oder Simulate
+  schreibt Kern jeden Graphen als kleines WebAssembly-Programm. Der Browser macht daraus
+  Maschinencode, und Kern hängt ihn direkt in die Engine ein.
+- **Der C++-Export:** Derselbe Graph als lesbarer C++-Programmtext. Wer will, baut ihn fest in sein
+  Spiel ein; dann ersetzt er für diesen Graphen den Dolmetscher.
 
-Einfache Dinge – Verzweigungen, Schleifen, Zahlen-Variablen, Rechnen, Vergleichen – erzeugt der
-Übersetzer direkt. Alles andere (Spielknoten, Text, Vektoren, Wartezeiten) ruft einfach die
-C++-Funktion des Knotens auf.
+Einfache Dinge – Verzweigungen, Schleifen, Zahlen, Rechnen, Vergleichen – schreibt der Übersetzer
+direkt hin. Alles andere, etwa Spielknoten, ruft einfach das fertige Stück Kern auf, das auch der
+Dolmetscher benutzt.
 
-Das erzeugte Programm ist eine Schleife mit einem **Programmzähler**: ein Fall pro Knoten, wie
-nummerierte Stationen einer Schnitzeljagd. So funktioniert jede Verdrahtung, auch Kreise. Auch hier
-wird gezählt und bei einer Endlosschleife gestoppt.
+> **Wusstest du?** Laut Messung ist der übersetzte Graph etwa **55-mal schneller** als der
+> Dolmetscher. Gemessen wird das mit einer Million Schleifendurchläufen.
 
-Der exportierte C++-Code meldet sich mit einem **Fingerabdruck** des Graphen an. In diesen
-Fingerabdruck fließen die Positionen und Kommentare **nicht** ein. Einen Knoten zu verschieben macht
-den Export also nicht ungültig – jede inhaltliche Änderung aber schon. Dann muss neu exportiert
-werden.
+Weil das Übersetzen im Browser einen Moment dauert, startet jeder Graph zunächst beim Dolmetscher.
+Sobald der Maschinencode bereit ist, übernimmt er – mitten im Spiel. Klappt das Übersetzen nicht,
+dolmetscht der Interpreter einfach weiter.
 
-> **Wusstest du?** Laut Messung ist der JIT etwa **55-mal schneller** als der Interpreter. Gemessen
-> wird das mit einer Million Schleifendurchläufen.
+Ein exportierter C++-Text gehört genau zu einem Graphen. Erkannt wird das an einem **Fingerabdruck**:
+einer Zahl, die Kern aus dem Inhalt des Graphen errechnet. Ändert sich der Inhalt, ändert sich die
+Zahl. Positionen und Kommentare fließen **nicht** ein. Einen Knoten zu verschieben macht den Export
+also nicht ungültig – jede inhaltliche Änderung aber schon. Dann muss neu exportiert werden.
 
-Weil das Übersetzen im Browser kurz dauert, startet jeder Graph zunächst im Interpreter
-(Stufe „compiling“). Sobald der Maschinencode bereit ist, übernimmt er – mitten im Spiel. Klappt das
-Übersetzen nicht, läuft der Graph einfach im Interpreter weiter.
+> **Für Neugierige:** Das übersetzte Programm ist wie eine Schnitzeljagd mit nummerierten Stationen:
+> ein Zähler sagt, an welcher Station (welchem Knoten) es gerade weitergeht. So funktioniert jede
+> Verdrahtung, auch Kreise. Wie man einen exportierten Graphen ins Spiel baut und wo es keinen JIT
+> gibt, steht im blauen Buch, Kapitel 9.
 
 ## 9.9 Warum alle drei Wege gleich rechnen müssen
 
-Interpreter, JIT und C++-Export sind **austauschbar**, sogar mitten im Spiel. Das geht nur, weil
-sie sich ein Gedächtnis teilen.
+Dolmetscher und Übersetzung teilen sich dasselbe Gedächtnis. Nur darum kann mitten im Spiel
+gewechselt werden, und nur darum kommt überall exakt dasselbe heraus.
 
 > **Stell dir vor …** einen Staffellauf. Der erste Läufer übergibt den Stab, ohne stehen zu bleiben.
 > Damit das klappt, müssen beide denselben Stab halten. In Kern ist der Stab der gemeinsame Speicher:
-> Variablen, Schleifenzähler, Gates und Flip-Flops liegen in festen **Slots**, die Interpreter und
-> Maschinencode gleichermaßen lesen und schreiben. Beim Wechsel muss nichts umkopiert werden.
+> Variablen, Schleifenzähler, Schranken und Lichtschalter liegen in festen Fächern (*Slots*), die
+> Dolmetscher und Maschinencode gleichermaßen lesen und beschreiben. Beim Wechsel muss nichts
+> umkopiert werden.
 
 Warum ist das so wichtig?
 
 - **Determinismus:** Kern rechnet überall gleich ([Kapitel 6](06-physik.md)). Würde ein Graph im
-  Browser anders rechnen als nativ, wären Replays, Training und Fehlersuche wertlos. Sogar der Schutz
-  gegen Endlosschleifen zählt in allen Stufen gleich.
-- **Wartezeiten** wie Delay setzen ihre Kette in jeder Stufe gleich fort.
-- **Debuggen:** Haltepunkte und die Live-Anzeige laufender Knoten funktionieren auch im übersetzten
+  Browser anders rechnen als anderswo, wären Wiederholungen, Training und Fehlersuche wertlos. Sogar
+  der Schutz gegen Endlosschleifen zählt auf allen drei Wegen gleich.
+- **Wartezeiten** wie Delay setzen ihre Kette auf jedem Weg gleich fort.
+- **Fehlersuche:** Haltepunkte und die Live-Anzeige laufender Knoten funktionieren auch im übersetzten
   Code.
 
-Abgesichert wird das mit einem Satz gemeinsamer Testfälle – Mathe-Schleifen, Gates und Sequences,
+Abgesichert wird das mit einem Satz gemeinsamer Testfälle – Rechen-Schleifen, Schranken,
 verschachtelte Schleifen, State Machines, eine absichtliche Endlosschleife und mehr. Jeder Fall läuft
-im Interpreter, als JIT-Code und als exportiertes C++, und die Ergebnisse müssen **identisch** sein.
-Wer einen Knoten ändert, muss ihn deshalb an drei Stellen gleich ändern.
+beim Dolmetscher, als JIT-Code und als exportiertes C++, und die Ergebnisse müssen **identisch** sein.
 
 ## 9.10 Logik bearbeiten im Studio
 
-Der Logik-Editor im Studio folgt dem Blueprint-Editor von Unreal. Du öffnest ihn über **Logic** in
-der Toolbar (Level-Graph) oder über **Edit Logic** / **Add Logic (Blueprint)** im Kontextmenü eines
-Actors. Die Oberfläche beschreibt [Kapitel 11](11-studio.md); hier das Wichtigste:
+Im Logik-Editor ziehst du Drähte, bekommst passende Vorschläge, kannst alles rückgängig machen,
+Haltepunkte setzen und beim Spielen zusehen, welche Kästchen gerade laufen.
 
-- Jede Bearbeitung ist ein Befehl an die Engine und damit ein **Undo-Schritt**.
+Du öffnest ihn über **Logic** in der Toolbar (Level-Graph) oder über **Edit Logic** / **Add Logic
+(Blueprint)** im Kontextmenü eines Actors. Die Oberfläche beschreibt [Kapitel 11](11-studio.md);
+hier das Wichtigste:
+
+- Jede Bearbeitung lässt sich **rückgängig machen** (Undo).
 - Ziehst du einen Draht von einem Pin ins Leere, schlägt das **Aktionsmenü** nur Knoten vor, die
   dazu passen. Du tippst einen Suchbegriff, drückst Enter – der Knoten erscheint und ist schon
   verbunden.
 - **Promote to Variable** macht aus einem Pin mit einem Klick eine neue Variable.
-- Ein Doppelklick auf einen Draht fügt einen Umlenkknoten ein – für ordentliche Drähte.
-- Knoten rasten auf ein 8-px-Raster ein. Fehlt einem neuen Knoten seine Variable oder State Machine,
-  legt Kern sie gleich an. Benennst du eine Variable um, ändern sich alle Knoten mit; wechselst du
-  ihren Typ, wird der Wert umgewandelt.
-- Kopieren und Einfügen läuft über den Graphen als JSON-Text; eingefügte Vorlagen landen unter den
-  vorhandenen Knoten.
-- Zusammengehörige Handgriffe (einen Draht aufnehmen und woanders ablegen, Tippen in denselben Pin)
-  sind zusammen ein Undo-Schritt.
-- **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen (Datei
-  `logic_<level>_<actor>.cpp`).
-- **F9** setzt einen Haltepunkt: Läuft der Knoten beim Spielen, hält das Spiel nach diesem
-  Simulationsschritt an, und der Editor springt hin.
-- Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre Live-Werte.
+- Ein Doppelklick auf einen Draht fügt einen Umlenkpunkt ein – für ordentliche Drähte.
+- Benennst du eine Variable um, ändern sich alle Knoten mit.
+- **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen.
+- **F9** setzt einen Haltepunkt: Läuft der Knoten beim Spielen, hält das Spiel nach diesem Schritt
+  an, und der Editor springt hin.
+- Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre aktuellen Werte.
 
-> **Probier's aus!** Öffne das Basic-Level (File › Example Levels), klick auf **Logic** und dann auf
-> **Begin Play**. Zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show message“, Enter, und
-> schreib einen Text hinein. Zurück zum **Viewport**, platziere einen Rolling Ball und starte
-> **Play**: Dein Text erscheint im HUD!
+> **Probier's aus!** Öffne das Basic-Level (File › Example Levels). Es hat noch keine Spielfigur:
+> Öffne den Content Drawer (Ctrl+Space), Tab **Place Actors**, Gruppe **Players**, und klick auf
+> **Rolling Ball** – die Kugel wird dein Spieler. Klick dann in der Toolbar auf **Logic** und
+> wähle den Knoten **Begin Play**. Zieh vom Ausgang „then“ einen Draht ins Leere, tippe
+> „show message“, Enter, und schreib einen Text hinein. Zurück im Viewport startest du **Play**
+> (Alt+P): Dein Text erscheint im HUD. Ein Domino – und er ist gefallen!
 
 ## 9.11 Beispiele zum Nachbauen
 
-Alle Beispiele sind echte Graphen aus Kern; die meisten gibt es im Logik-Editor unter **Templates**.
+Mit wenigen Kästchen entstehen echte Spielregeln. Alle Beispiele sind echte Graphen aus Kern; die
+meisten gibt es im Logik-Editor unter **Templates**.
 
 **Punktezone.** Wer den Sensor betritt, bekommt 10 Punkte, eine Meldung und einen Ton – vier
 Dominosteine in einer Reihe:
@@ -356,10 +390,11 @@ flowchart LR
   C --> D[Play Sound pickup]
 ```
 
-**Tür.** Interact führt zu einem Flip Flop: Beim ersten Mal öffnet ein Tween die Tür in 0,8 s, beim
-zweiten Mal schließt ein anderer sie wieder – jeden Schritt ein kleines Stück. Dazu ein Bestätigungston.
+**Tür.** Interact führt zu einem Lichtschalter (Flip Flop): Beim ersten Mal öffnet ein Dimmer (Tween)
+die Tür in 0,8 s, beim zweiten Mal schließt ein anderer sie wieder – jeden Schritt ein kleines Stück.
+Dazu ein Bestätigungston.
 
-**Spawner.** Alle 3 Sekunden: Sind es weniger als 10? Dann erzeuge einen Physics Cube und zähl mit.
+**Spawner.** Alle 3 Sekunden: Sind es weniger als 10? Dann erzeuge einen Physik-Würfel und zähl mit.
 Die Kopien sehen alle Mitspieler.
 
 **Ampel.** Eine State Machine „Light“: Grün → (4 s) → Gelb → (1,5 s) → Rot → (4 s) → Grün. Bei
@@ -383,12 +418,14 @@ wenn der Ball auftaucht, und nicht alle 0,25 s.
 
 ## Das nimmst du mit
 
-- Kern hat keine Skriptsprache: Logik sind Graphen aus Knoten und Drähten.
-- Exec-Drähte bestimmen die Reihenfolge wie Dominosteine; Daten-Drähte liefern Werte auf Abruf.
-- Variablen sind das Gedächtnis, State Machines die Zustände, latente Knoten warten.
-- Graphen laufen in den festen Schritten, nur auf der Autorität; ihre Änderungen werden repliziert.
-- Ein Zähler (200 000 Knoten pro Schritt) stoppt Endlosschleifen.
-- Interpreter, JIT (WebAssembly, etwa 55-mal schneller) und C++-Export liefern exakt dasselbe.
+- Kern hat keine Skriptsprache: Logik sind Graphen aus Kästchen und Drähten.
+- Weiße Drähte bestimmen die Reihenfolge wie Dominosteine; Daten-Drähte liefern Werte auf Abruf.
+- Rechenknoten sind Thermometer (immer frisch), Aktionsknoten Kassenbons (Wert vom letzten Lauf).
+- Variablen sind das Gedächtnis, State Machines die Zustände, wartende Knoten machen später weiter.
+- Graphen laufen in den festen Schritten und nur auf dem Rechner, der das Sagen hat; alle anderen
+  bekommen die Änderungen geschickt.
+- Ein Zähler stoppt Endlosschleifen, bevor sie das Spiel einfrieren.
+- Dolmetscher, Übersetzung (etwa 55-mal schneller) und C++-Export liefern exakt dasselbe.
 - Im Studio: Compile (F7), Haltepunkte (F9), Templates und C++-Export.
 
 ## Knobelecke
@@ -397,15 +434,15 @@ wenn der Ball auftaucht, und nicht alle 0,25 s.
    im Knoten änderst?
 2. Warum läuft Logik im Netzwerkspiel nur auf dem Server?
 3. Was würde ohne die Variable „Ball Seen“ passieren, solange der Ball im Bild ist?
-4. Warum liegen die Schleifenzähler in gemeinsamen Slots statt im Interpreter?
+4. Warum liegen die Schleifenzähler in gemeinsamen Fächern statt beim Dolmetscher?
 
 ### Lösungen
 
 1. Beim Verschieben nicht, denn Positionen zählen nicht zum Fingerabdruck. Bei einer geänderten Zahl
    schon.
-2. Damit es nur eine Wahrheit gibt. Der Server rechnet, die Clients bekommen die Änderungen.
+2. Damit es nur eine Wahrheit gibt. Der Server entscheidet, die anderen bekommen die Änderungen.
 3. Die Ente würde alle 0,25 s zwitschern.
-4. Damit der JIT-Code mitten im Spiel übernehmen kann, ohne etwas umzukopieren.
+4. Damit die Übersetzung mitten im Spiel übernehmen kann, ohne etwas umzukopieren.
 
 ---
 

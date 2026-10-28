@@ -1,130 +1,199 @@
 # Anhang B – Grundlagen: Wie aus Dreiecken Bilder werden
 
-> **Kurz gesagt:** Dieser Anhang erklärt das Handwerk hinter jedem 3D-Spiel: wie Koordinaten und
-> Matrizen eine Figur an die richtige Stelle des Bildschirms bringen, wie die Grafikkarte Dreiecke in
-> Pixel verwandelt und wie Licht, Schatten, Glanz und Farbe berechnet werden – 60-mal pro Sekunde im
-> Browser. Bei jedem Grundbegriff erfährst du kurz, wie Kern ihn umsetzt.
+> **Kurz gesagt:** Dieser Anhang erklärt das Handwerk hinter jedem 3D-Spiel: wie ein Ding an die
+> richtige Stelle des Bildschirms kommt, wie die Grafikkarte Dreiecke in Bildpunkte verwandelt und wie
+> Licht, Schatten, Glanz und Farbe entstehen – 60-mal pro Sekunde im Browser. Bei jedem Grundbegriff
+> erfährst du kurz, wie Kern ihn umsetzt.
 
-Wie Kern die Bausteine im Detail zusammensetzt, steht in [Kapitel 4](04-grafik.md) und
-[Kapitel 5](05-szene-und-geometrie.md). Hier geht es um das „Warum“. Welche Quelldatei welchen
-Baustein enthält, listet das blaue Buch am Anfang von Anhang B.
+> **Begriffe vorab:**
+> - **Pixel** – ein einzelner Bildpunkt des Bildschirms; ein Bild besteht aus Millionen davon.
+> - **Koordinaten** – drei Zahlen, die sagen, wo etwas ist: wie weit nach rechts, nach vorne, nach oben.
+> - **Grafikkarte** (auch GPU) – der Spezialchip, der Millionen Bildpunkte gleichzeitig ausmalt.
+> - **Mesh** – das Drahtgitter aus Dreiecken, aus dem ein 3D-Ding besteht.
+> - **Shader** – ein kleines Malprogramm, das auf der Grafikkarte läuft.
+> - **Textur** – ein Bild, das wie ein Aufkleber auf ein Mesh geklebt wird.
+
+Lies diesen Anhang am besten **vor** [Kapitel 4](04-grafik.md): Dort geht es darum, wie Kern die
+Bausteine zusammensetzt, hier um das „Warum“. Die genauen Namen und Werte stehen im blauen Buch,
+Anhang B.
 
 ## B.1 Koordinatenräume
 
+### Die Matrix: ein Rezept für jeden Punkt
+
+Ein Ding in einem 3D-Spiel muss ständig bewegt werden: verschoben, gedreht, größer oder kleiner
+gemacht. Dafür benutzt man eine **Matrix**. Stell sie dir als **Rezept** vor, das man auf jeden
+einzelnen Punkt eines Dings anwendet: „Strecke ihn auf das Doppelte, drehe ihn um 90 Grad, schiebe ihn
+5 m nach rechts.“ Man wirft einen Punkt hinein, und der neue Punkt kommt heraus. Wendet man dasselbe
+Rezept auf alle Ecken eines Meshes an, bewegt sich das ganze Ding.
+
+Aufgeschrieben ist so ein Rezept als kleine Tabelle aus 4 × 4 = 16 Zahlen. Wie man mit ihr rechnet,
+musst du nicht können – wichtig sind drei Eigenschaften:
+
+- **Ein Rezept für alles:** Strecken, Drehen und Verschieben passen in eine einzige Matrix.
+- **Rezepte lassen sich zusammenfassen:** Zwei Rezepte hintereinander ergeben wieder ein Rezept. Das
+  nennt man Matrizen **multiplizieren**. Die Grafikkarte muss dann nur noch ein Rezept anwenden statt
+  vieler.
+- **Die Reihenfolge zählt:** Erst drehen, dann verschieben ist etwas anderes als erst verschieben,
+  dann drehen (dazu gleich die Falle).
+
+### Die vierte Zahl w
+
+Ein Punkt hat drei Koordinaten. Trotzdem hängt man ihm eine **vierte Zahl** an, w genannt. Warum?
+
+Drehen und Strecken sind Rezepte der Art „jede neue Koordinate ist eine Mischung der alten“. Ein
+Verschieben ist aber „plus 5 m“ – das ist keine Mischung, sondern eine feste Zugabe, und passt nicht
+in so ein Rezept. Der Trick: Man gibt jedem Punkt eine vierte Zahl, die einfach **1** ist. Dann kann
+das Rezept sagen: „Nimm 5 m pro Einheit von w dazu.“ Ein Punkt hat w = 1, bekommt also genau 5 m dazu.
+
+Eine **Richtung** dagegen („nach Norden“, „senkrecht nach oben“) bekommt **w = 0**. Sie wird gedreht,
+aber nie verschoben – eine Richtung hat keinen Ort. Beispiel mit dem Rezept „5 m nach rechts“:
+
+| Was | vorher (mit w) | nachher |
+|---|---|---|
+| Punkt | 1, 2, 3 · w = 1 | **6**, 2, 3 |
+| Richtung | 1, 2, 3 · w = 0 | 1, 2, 3 (unverändert) |
+
+> **Stell dir vor …** … eine Hausnummer und die Angabe „Richtung Norden“. Zieht die ganze Stadt 5 km
+> nach Osten um, hat dein Haus einen neuen Ort. „Norden“ bleibt Norden.
+
+Später hilft w noch ein zweites Mal, bei der Perspektive (weiter unten).
+
+**In Kern:** Es gibt zwei Rechenwege, einen für Punkte (w = 1) und einen für Richtungen (w = 0).
+
 ### Warum es mehrere Räume gibt
 
-Der Rumpf der Micro Duck wird einmal in seinem **eigenen** Koordinatensystem beschrieben. Dann steht
-die Ente irgendwo in der Welt, eine Kamera schaut auf sie, und am Ende landet sie auf Pixeln. Jeder
-Schritt wechselt das Koordinatensystem:
+Der Rumpf der Micro Duck wird einmal in seiner **eigenen** Beschreibung festgelegt: „Der Kopf sitzt
+ein Stück über der Mitte.“ Dann steht die Ente irgendwo in der Welt, eine Kamera schaut auf sie, und am Ende
+landet sie auf Pixeln. Jeder Schritt ist ein anderes Koordinatensystem – ein anderer **Raum** –, und
+für jeden Wechsel gibt es ein Rezept:
 
 ```mermaid
 flowchart LR
-  M["Modellraum"] -->|"Modellmatrix"| W["Weltraum"]
-  W -->|"Ansichtsmatrix"| K["Kameraraum"]
-  K -->|"Projektion"| C["Clip-Raum"]
-  C -->|"÷ w"| N["NDC-Würfel"]
-  N -->|"Viewport"| S["Pixel und Tiefe"]
+  M["eigene Beschreibung"] -->|"Modell-Rezept"| W["Welt"]
+  W -->|"Kamera-Rezept"| K["Blick der Kamera"]
+  K -->|"Projektion"| S["Bildschirm"]
 ```
 
-> **Stell dir vor …** … den Weg zu deinem Lieblingstisch im Café: „hinten links am Fenster“
-> (Modellraum), „das Café liegt Hauptstraße 12“ (Weltraum), „von mir aus schräg rechts vorne“
-> (Kameraraum), „auf meinem Handyfoto oben rechts“ (Bildschirm). Ein Tisch, vier Beschreibungen.
+> **Stell dir vor …** … den Weg zu deinem Lieblingstisch im Café: „hinten links am Fenster“ (eigene
+> Beschreibung des Cafés), „das Café liegt Hauptstraße 12“ (Welt), „von mir aus schräg rechts vorne“
+> (Blick der Kamera), „auf meinem Handyfoto oben rechts“ (Bildschirm). Ein Tisch, vier Beschreibungen.
 
-Im **Kameraraum** sitzt die Kamera im Ursprung und blickt entlang −z. In den **NDC** („normalisierte
-Gerätekoordinaten“) liegt alles Sichtbare im Würfel von −1 bis 1; auf dem **Bildschirm** gibt es
-Pixel und einen Tiefenwert zwischen 0 und 1.
+Weil alle Schritte Rezepte sind, fasst man sie zu einem einzigen zusammen. So rechnet die Grafikkarte
+jede Ecke in einem Rutsch von der eigenen Beschreibung bis auf den Bildschirm.
 
-### Homogene Koordinaten: der Trick mit der vierten Zahl
+### Kerns Gewohnheiten
 
-Drehen und Strecken kann eine 3×3-Matrix, Verschieben nicht – „plus 5 m nach rechts“ ist keine
-Multiplikation. Der Trick: eine **vierte Zahl w**. Ein **Punkt** bekommt w = 1, eine **Richtung**
-w = 0. Die Verschiebung steht in der letzten Spalte einer 4×4-Matrix und wirkt nur, wo w = 1 ist.
+Kern rechnet in **Metern**, und **Z zeigt nach oben** – x und y spannen den Boden auf
+([Kapitel 3](03-grundlagen.md)). Die Lage eines Dings baut Kern immer in derselben Reihenfolge: erst
+**strecken**, dann **drehen**, dann **verschieben**. Drehungen speichert Kern als **Quaternion**, vier
+Zahlen statt drei Winkeln. Drei Winkel nacheinander können sich nämlich gegenseitig blockieren, sodass
+plötzlich eine Drehrichtung fehlt; Quaternionen haben diese Tücke nicht.
 
-Beispiel: Verschiebung um (5, 0, 0). Der Punkt (1, 2, 3, **1**) wird zu (6, 2, 3, 1). Die Richtung
-(1, 2, 3, **0**) bleibt, wie sie ist – eine Richtung hat keinen Ort. Und weil jetzt alle Schritte
-4×4-Matrizen sind, kann man sie hintereinander multiplizieren:
+> **Achtung, Falle!** Reihenfolge zählt! Stell dir einen Spielstein in der Mitte eines Tischs vor.
+> Erst drehen, dann 5 m schieben: Der Stein dreht sich auf der Stelle und rutscht dann weg. Erst
+> schieben, dann drehen: Die Drehung passiert um die *Tischmitte* – der Stein fährt einen Kreisbogen.
+>
+> ```
+>  erst drehen, dann schieben     erst schieben, dann drehen
+>
+>     ■ ───────► ■                     ■ · · ·
+>   (dreht sich hier)                ·       ·
+>                                   ●         ■   ● = Tischmitte
+> ```
 
-```
-p_clip = P · V · M · p_modell
-```
-
-(M Modell-, V Ansichts-, P Projektionsmatrix.) In Kern rechnet `Mat4::transform_point` mit w = 1,
-`transform_vector` mit w = 0.
-
-### Kerns Konventionen
-
-Der Kopf von `math.h` sagt es in einem Satz: spaltenweise 4×4-Matrizen im OpenGL-Layout, Meter,
-rechtshändig, Z oben. Also: Längen in **Metern**; **Z zeigt nach oben**, x und y spannen den Boden auf
-(die Standardkamera steht bei (0, −18, 8) und schaut auf (0, 0, 2); auch Physik und Himmel rechnen so).
-Matrizen sind **spaltenweise** gespeichert, die Verschiebung steht in den Feldern 12–14 – genau das
-Layout, das WebGL erwartet. Eine Matrix wirkt **von links**: Bei A · B wirkt zuerst B. Drehungen
-beschreibt Kern mit **Quaternionen**, vier Zahlen ohne die Tücken von drei Winkeln.
-
-> **Achtung, Falle!** Reihenfolge zählt! Erst drehen, dann 5 m schieben ist etwas anderes als erst
-> schieben, dann drehen – im zweiten Fall schwenkt das Objekt auf einem Kreis um den Ursprung. Kerns
-> „Verschieben · Drehen · Skalieren“ heißt deshalb: erst skalieren, dann drehen, dann verschieben.
+> **Für Neugierige:** In der Formel schreibt man so ein zusammengesetztes Rezept „rückwärts“ als
+> Verschieben · Drehen · Strecken. Das Rezept, das direkt neben dem Punkt steht, wirkt zuerst. Deshalb
+> heißt es in Kapitel 3, der Punkt wird „von rechts“ an die Matrix multipliziert – gemeint ist dasselbe.
 
 ### Ansicht und Perspektive
 
-Die **Ansichtsmatrix** (`Mat4::look_at`) baut aus Augpunkt, Zielpunkt und „oben“ drei senkrechte
-Kamera-Achsen; die Kamera blickt entlang der negativen dritten Achse. Die Matrix ist die Umkehrung der
-Kameralage: Sie dreht und schiebt die Welt so, dass die Kamera im Ursprung landet. Liegen Blick und
-„oben“ auf einer Linie (gleich oder genau entgegengesetzt), ist die Kamera unbestimmt; Kern verweigert
-dann das Bild („degenerate camera direction/up“).
+Das **Kamera-Rezept** macht etwas Überraschendes: Es bewegt nicht die Kamera, sondern die **ganze
+Welt** – so lange, bis die Kamera in der Mitte steht und geradeaus schaut. Wie beim Filmdreh im Auto:
+Statt das Auto fahren zu lassen, zieht man die Kulisse am Fenster vorbei. Gebaut wird das Rezept aus
+drei Angaben: wo die Kamera steht, wohin sie schaut und wo „oben“ ist.
 
-**Perspektive** heißt: Doppelt so weit weg erscheint halb so groß – die Bildposition ist x geteilt durch
-die Entfernung. Eine Matrix kann nicht dividieren, aber sie kann die Entfernung nach w schreiben, und
-die Grafikkarte teilt danach durch w: die **perspektivische Division**. Kerns Projektion hat einen
-senkrechten Öffnungswinkel von 60°, also den Zoomfaktor f = 1 / tan(30°) ≈ 1,732, und eine nahe und
-ferne Ebene bei 0,05 m und 1800 m.
+Schaut die Kamera genau in Richtung „oben“ (oder genau entgegen), geht das nicht: Wer senkrecht
+nach oben schaut, weiß nicht mehr, wo oben im Bild sein soll. Kern verweigert dann das Bild, statt Unsinn zu malen.
 
-**Durchgerechnet:** Bild 960 × 540 (Seitenverhältnis 1,778, waagerechter Faktor 1,732 / 1,778 ≈ 0,974),
-Punkt im Kameraraum (1; 0,5; −10), also 10 m vor der Kamera:
+**Perspektive** heißt: Doppelt so weit weg erscheint halb so groß. Die Position auf dem Bild ist also
+die Größe **geteilt durch die Entfernung**.
 
-| Schritt | Rechnung | Ergebnis |
-|---|---|---|
-| Clip x, y, w | 0,974 · 1; 1,732 · 0,5; 10 | 0,974; 0,866; 10 |
-| NDC | durch w teilen | 0,0974; 0,0866 |
-| Pixel | (NDC + 1) / 2 · (960; 540) | (526,8; 293,4) |
+```
+                                     ·┃   2 m hoch, 10 m weit
+                            ·         ┃
+                   ·┃                 ┃
+          ·         ┃ 1 m, 5 m weit   ┃
+  Auge ●════════════┻═════════════════┻════
+  Ein Sehstrahl streift beide Spitzen: Im Bild sind sie gleich groß.
+```
 
-Der Punkt landet knapp rechts oberhalb der Bildmitte (480; 270), gezählt von unten links. Für Editor-Ansichten gibt es die **parallele**
-Projektion (`Mat4::ortho`), in der Fernes nicht kleiner wird.
+Ein 2 m hoher Baum in 10 m Entfernung erscheint also genauso groß wie ein 1 m hoher in 5 m. Nun kann
+ein Rezept zwar mischen und zugeben, aber nicht teilen. Hier hilft wieder w: Das Rezept schreibt die
+Entfernung in die vierte Zahl, und die Grafikkarte teilt danach alles durch w. Das heißt
+**perspektivische Division**.
 
-> **Probier's aus!** Schalte in Kern Studio im Viewport-Menü **≡** den **Field of View** zwischen 50°
-> und 110° um – bei 110° wirkt die Welt wie durchs Weitwinkelobjektiv, an den Rändern stark gestreckt. Mit **Alt+J** (Top) springst du in eine
-> orthografische Ansicht: Ferne Gebäude sind plötzlich so groß wie nahe.
+Für Editor-Ansichten gibt es auch die **Parallelansicht** ohne Perspektive: Dort wird Fernes nicht
+kleiner, wie auf einem Bauplan.
+
+**In Kern:** Die Kamera hat standardmäßig einen Öffnungswinkel von 60° (von der Unter- zur Oberkante
+des Bildes) und sieht von 5 cm bis 1800 m vor sich.
+
+Das blaue Buch rechnet einen Punkt 10 m vor der Kamera Schritt für Schritt bis auf seinen Bildpunkt
+durch, samt der Zwischenstationen zwischen Kamera und Bildschirm.
+
+> **Probier's aus!** Öffne in Kern Studio oben im Ansichtsfenster das Menü **≡** und schalte den
+> **Field of View** (Öffnungswinkel) zwischen 50° und 110° um – bei 110° wirkt die Welt wie durchs
+> Weitwinkelobjektiv, an den Rändern stark gestreckt. Mit **Alt+J** (Top) springst du in eine
+> Parallelansicht von oben: Ferne Gebäude sind plötzlich so groß wie nahe.
 
 ### Tiefe ist ungleich verteilt
 
-Der gespeicherte Tiefenwert ist (bis auf Konstanten) proportional zu **1 / Entfernung**. Die Werte
-drängen sich in der Ferne gegen 1. Mit Kerns Ebenen und einem 24-Bit-Tiefenpuffer:
+Für jeden Bildpunkt merkt sich die Grafikkarte, wie weit das Gemalte entfernt ist (der Tiefenpuffer,
+B.2). Diese Tiefe speichert sie aber nicht wie ein normales Maßband. Nah an der Kamera sind die Striche
+sehr eng, in der Ferne sehr weit.
 
-| Entfernung | Tiefenwert | kleinster trennbarer Abstand |
-|---|---|---|
-| 1 m | 0,950026 | |
-| 10 m | 0,995028 | ≈ 0,1 mm |
-| 100 m | 0,999528 | ≈ 1,2 cm |
-| 1000 m | 0,999978 | ≈ 1,2 m |
+> **Stell dir vor …** … ein Lineal, dessen Striche nah am Auge im Abstand von Haaren liegen und hinten
+> im Abstand von Metern. Nah kannst du winzige Unterschiede messen, fern nur grobe.
 
-Schon bei 1 m sind 95 % des Wertebereichs verbraucht! Die Genauigkeit wird **quadratisch** mit der
-Entfernung schlechter und hängt fast nur von der nahen Ebene ab: Sie zu verdoppeln, verdoppelt die
-Genauigkeit überall. Kerns Ambient Occlusion rechnet die Formel rückwärts, um die echte Entfernung
-zurückzubekommen (`viewDepth`).
+Wie grob, zeigt diese kleine Tabelle mit Kerns Einstellungen:
+
+| Entfernung | kleinster Abstand, den die Tiefe noch trennt |
+|---|---|
+| 10 m | etwa 0,1 mm |
+| 1000 m | etwa 1,2 m |
+
+Wie eng die Striche vorne liegen, hängt vor allem von der **nahen Ebene** ab: der Entfernung, ab der
+die Kamera überhaupt etwas sieht (in Kern 5 cm). Alles davor wird abgeschnitten. Schiebt man die nahe
+Ebene doppelt so weit hinaus, wird die Tiefe **überall doppelt so genau** – die wertvollen engen Striche
+werden nicht mehr für den leeren Raum direkt vor der Linse verschwendet.
 
 > **Wusstest du?** Daher flackern in manchen Spielen ferne, dicht beieinanderliegende Flächen
-> („Z-Fighting“): Der Tiefenpuffer kann sie dort schlicht nicht mehr auseinanderhalten.
+> („Z-Fighting“): Der Tiefenpuffer kann sie dort schlicht nicht mehr auseinanderhalten und malt mal die
+> eine, mal die andere.
 
 ### Normalen
 
-Eine **Normale** zeigt senkrecht von einer Fläche weg. Staucht man ein Objekt ungleichmäßig, stünde
-eine einfach mittransformierte Normale schief. Richtig ist die **inverse Transponierte** des 3×3-Teils
-der Modellmatrix – grob: Was die Fläche streckt, muss die Normale stauchen. Kern rechnet sie auf der
-CPU, einmal pro Instanz. Eine Matrix mit Skalierung 0 lehnt er ab, denn sie hat keine Inverse.
+Eine **Normale** ist ein gedachter Pfeil, der senkrecht aus einer Fläche zeigt. Sie ist der „Blick“
+der Fläche und bestimmt, wie hell die Fläche im Licht ist: Schaut sie zur Sonne, ist sie hell, schaut
+sie weg, dunkel (B.4).
 
-## B.2 Rasterisierung und Tiefenpuffer
+Staucht man ein Ding ungleichmäßig, darf man die Normalen nicht einfach mitstauchen – sonst stehen
+sie schief. Ein Beispiel: Ein Dach ist 45° geneigt, seine Normale zeigt schräg nach oben. Staucht man
+das Haus auf halbe Höhe, wird das Dach flacher – seine Normale müsste also *steiler* nach oben zeigen.
+Staucht man den Pfeil aber einfach mit, kippt er *flacher*. Genau falsch herum!
 
-Nach der Projektion liegen die Ecken eines Dreiecks als Bildschirmpunkte vor. Die **Rasterisierung**
-prüft, welche Pixelmittelpunkte innen liegen; für jeden entsteht ein **Fragment**, ein Pixel-Kandidat.
+Die Faustregel: Was die Fläche streckt, muss die Normale stauchen, und umgekehrt. Dafür braucht jede
+Kopie eines Dings ein eigenes kleines Rezept nur für ihre Normalen.
+
+**In Kern:** Dieses Normalen-Rezept rechnet Kern einmal pro Kopie aus; ein auf Größe null gestauchtes
+Ding lehnt er ab, weil es dafür keins gibt.
+
+## B.2 Vom Dreieck zu Bildpunkten
+
+Nach der Projektion liegen die drei Ecken eines Dreiecks als Punkte auf dem Bildschirm. Nun schaut die
+Grafikkarte nach, welche Pixel innerhalb des Dreiecks liegen. Das heißt **Rasterisierung**. Für jeden
+solchen Pixel entsteht ein **Fragment**, ein Kandidat für einen Bildpunkt.
 
 ```
      v2
@@ -136,386 +205,433 @@ prüft, welche Pixelmittelpunkte innen liegen; für jeden entsteht ein **Fragmen
 v0        v1
 ```
 
-Was an den Ecken steht (Farbe, Normale, Texturkoordinate), wird dazwischen **gemischt**, mit drei
-Gewichten, die zusammen 1 ergeben – ein Fragment genau in der Mitte bekommt von jeder Ecke ein Drittel.
-Weil die Perspektive Abstände verzerrt, mischt die Grafikkarte **perspektivisch korrekt**.
+Was an den Ecken steht – Farbe, Normale, Texturkoordinate –, wird dazwischen **gemischt**
+(interpoliert). Jede Ecke bekommt einen Anteil, und die Anteile ergeben zusammen 100 %. Ein Fragment
+genau in der Mitte bekommt von jeder Ecke ein Drittel; eines direkt an Ecke v0 fast alles von v0. So
+entstehen weiche Farbverläufe über das Dreieck.
 
-Treffen mehrere Dreiecke dasselbe Pixel, entscheidet der **Tiefenpuffer** (Z-Buffer): Er merkt sich pro
-Pixel die kleinste bisherige Tiefe, und nur ein Fragment, das den Test besteht, wird geschrieben. Für
-Undurchsichtiges ist die Reihenfolge damit egal – für die Geschwindigkeit nicht. Kern testet mit
-„kleiner oder gleich“ und malt Undurchsichtiges von vorne nach hinten (Verdecktes scheitert früh, bevor
-der teure Shader läuft). Durchsichtiges kommt von hinten nach vorne, gemischt nach seiner Deckkraft und
-ohne in den Tiefenpuffer zu schreiben – hier zählt die Reihenfolge. Der Himmel füllt danach die Lücken
-bei Tiefe 1, und die Ego-Ebene kommt nach einem Löschen der Tiefe ([Kapitel 4](04-grafik.md), 4.7).
+**Der Tiefenpuffer.** Treffen mehrere Dreiecke dasselbe Pixel, muss die Grafikkarte entscheiden, was
+vorne ist. Dafür führt sie den **Tiefenpuffer**: ein unsichtbares zweites Bild, in dem für jeden Pixel
+steht, wie weit das bisher Gemalte entfernt ist. Ein neues Fragment wird nur gemalt, wenn es näher
+ist.
 
-Bei geschlossenen Körpern sind Dreiecke, die von der Kamera wegzeigen, immer verdeckt. Die
-Grafikkarte erkennt sie am **Umlaufsinn** ihrer Ecken (im oder gegen den Uhrzeigersinn) und verwirft
-sie: **Backface Culling**. Eine Spiegelung kehrt den Umlaufsinn um, deshalb behandelt Kern gespiegelte
-Instanzen gesondert (Kapitel 4, 4.4).
+> **Stell dir vor …** … einen Maler, der neben jedem Pinselstrich notiert, wie weit das Gemalte weg
+> war. Kommt ein neuer Strich für dieselbe Stelle, schaut er auf seinen Zettel: Liegt der neue weiter
+> hinten, malt er ihn gar nicht erst.
 
-> **Probier's aus!** Schalte in Kern Studio mit **Alt+2** auf **Wireframe** und sieh die Dreiecke, aus
-> denen alles besteht. **Alt+3** zeigt **Unlit** (Farbe ohne Licht), **Alt+4** wieder **Lit**.
+Für Undurchsichtiges ist die Reihenfolge damit egal – für die Geschwindigkeit nicht. Kern malt
+Undurchsichtiges **von vorne nach hinten**: Verdecktes fällt so früh durch, bevor der teure Shader
+läuft. **Durchsichtiges** kommt danach **von hinten nach vorne** und wird mit dem Dahinterliegenden
+gemischt; hier zählt die Reihenfolge, wie bei Folien übereinander. Der **Himmel** füllt nur die Lücken,
+und die Dinge in deiner Hand (die Ego-Ebene) kommen zuletzt ([Kapitel 4](04-grafik.md), 4.7).
 
-## B.3 Die GPU-Pipeline und Shader
+**Rückseiten.** Bei geschlossenen Körpern sind Dreiecke, die von der Kamera wegzeigen, immer verdeckt
+– wie die Rückseite eines Würfels. Die Grafikkarte erkennt sie daran, ob ihre Ecken auf dem Bildschirm
+im oder gegen den Uhrzeigersinn aufeinanderfolgen, und lässt sie weg (**Backface Culling**). Eine
+Spiegelung dreht diesen Umlaufsinn um; deshalb behandelt Kern gespiegelte Kopien gesondert
+([Kapitel 4](04-grafik.md), 4.4).
 
-Die Grafikkarte arbeitet wie ein Fließband:
+> **Probier's aus!** Schalte in Kern Studio mit **Alt+2** auf **Wireframe** (Drahtgitter) und sieh die
+> Dreiecke, aus denen alles besteht. **Alt+3** zeigt **Unlit** (Farbe ohne Licht), **Alt+4** wieder
+> **Lit** (mit Licht).
+
+## B.3 Das Fließband der Grafikkarte
+
+Die Grafikkarte arbeitet wie ein Fließband. Jeder Malauftrag – ein **Zeichenaufruf** (englisch *draw
+call*), also „Male diese Form“ – läuft durch dieselben Stationen:
 
 ```mermaid
 flowchart LR
-  VB["Ecken-Daten"] --> VS["Vertex-Shader"]
+  VB["Ecken-Daten"] --> VS["Vertex-Shader: jede Ecke"]
   VS --> R["Rasterisierung"]
-  R --> FS["Fragment-Shader"]
+  R --> FS["Fragment-Shader: jeder Bildpunkt"]
   T["Texturen"] --> FS
   FS --> D["Tiefentest, Mischen"]
-  D --> FB["Bild(er)"]
+  D --> FB["fertige Bilder"]
 ```
 
-Zwei Stationen sind programmierbar: Der **Vertex-Shader** läuft pro Ecke und liefert ihre
-Bildschirmposition, der **Fragment-Shader** pro Fragment und liefert Farben. Sie arbeiten mit
-vier Arten von Daten:
+Zwei Stationen sind programmierbar: Der **Vertex-Shader** läuft einmal pro Ecke und sagt, wo sie auf
+dem Bildschirm landet. Der **Fragment-Shader** läuft einmal pro Fragment und sagt, welche Farbe es
+bekommt. Dabei arbeiten sie mit vier Arten von Daten:
 
-| Begriff | ändert sich | Beispiel |
+| Fachbegriff | Alltagsbild | Beispiel |
 |---|---|---|
-| Attribut | pro Ecke oder Instanz | Position, Normale, Modellmatrix |
-| Uniform | pro Zeichenaufruf | Sonnenrichtung, Materialfarbe |
-| Varying | gemischt pro Fragment | Weltposition, Farbe |
-| Textur | Bild, abgetastet | Farbbild, Schattenkarte |
+| Attribut | Steckbrief jeder Ecke (oder Kopie) | Position, Normale |
+| Uniform | Ansage für den ganzen Malauftrag | Sonnenrichtung, Materialfarbe |
+| Varying | Zwischenwert, der übers Dreieck verläuft | Farbe zwischen den Ecken |
+| Textur | aufgeklebtes Bild | Holzmaserung, Schattenkarte |
 
-Die Attribute haben in Kern feste Plätze, im Standard- wie im Schatten-Shader gleich. Erweiterungen
-hängen eigene Attribute, Uniforms und Code an verabredeten Stellen an, ohne den Shader zu kopieren.
 Drei Tricks machen das Fließband schnell:
 
-- **Instancing:** Hundert gleiche Bäume malt man mit **einem** Aufruf; ein Attribut, das „pro
-  Instanz“ statt pro Ecke vorrückt, gibt jedem Baum Ort und Farbton. In Kern ist jedes Mesh
-  instanziert; bewegt sich etwas, ändern sich nur diese Instanz-Daten, die Geometrie bleibt auf der
-  Grafikkarte.
-- **Skinning:** Bei Figuren folgt jede Ecke bis zu vier Knochen, gewichtet, Gewichte zusammen 1 – in
-  Kern mit bis zu 32 Knochen, im Standard- und im Schatten-Shader.
-- **Mehrere Ziele:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder schreiben. Kern füllt
-  drei – fertiges Bild, echtes Licht für Bloom, AO-Datensatz – und braucht so für Bloom und AO
-  **keinen zweiten Durchgang** über alle Dreiecke.
+- **Instancing (Kopien):** Hundert gleiche Bäume malt man mit **einem** Malauftrag. Die Form ist nur
+  einmal da; jede Kopie bringt nur ihren Ort und Farbton mit. Bewegt sich etwas, ändern sich nur diese
+  Angaben – die Form selbst bleibt auf der Grafikkarte.
+- **Skinning (Haut über Knochen):** Bei Figuren folgt jede Ecke bis zu vier Knochen, jeder mit einem
+  Anteil, zusammen 100 % – so biegt sich die Haut am Ellbogen weich.
+- **Mehrere Bilder auf einmal:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder schreiben. So
+  spart man sich einen zweiten Durchgang über alle Dreiecke.
+
+**In Kern:** Jede Form wird als Kopien-Paket gemalt, und der eine Standard-Shader schreibt drei Bilder
+auf einmal – das fertige Foto, das echte Licht fürs Glühen (B.7) und Notizen für die Eckenschatten
+(B.8).
 
 ## B.4 Beleuchtung
 
-### Was ein Pixel hell macht
+### Was einen Bildpunkt hell macht
 
-Die **Rendering-Gleichung** (nach Kajiya) sagt in Worten: *Licht, das herauskommt = Eigenleuchten +
-alles einfallende Licht, gewichtet damit, wie die Oberfläche es Richtung Auge wirft, und mit dem
-Einfallswinkel.* Wie eine Oberfläche Licht umlenkt, beschreibt die **BRDF** – ihr „Charakterprofil“.
-Alles aufzusummieren ist zu teuer; Echtzeit teilt auf in **direktes Licht** (Sonne, Lampen, genau
-gerechnet) und **indirektes Licht** aus der Umgebung (stark vereinfacht).
+Das Licht, das von einer Fläche in dein Auge kommt, ist ihr **eigenes Leuchten** plus alles Licht, das
+auf sie fällt und das sie **in deine Richtung zurückwirft**. Wie eine Oberfläche das tut, ist ihr
+„Charakterprofil“: Ein Spiegel wirft alles in eine Richtung, eine Wand verteilt es gleichmäßig.
 
-### Lambert: matte Flächen
+Alles Licht der Welt aufzusummieren, auch das, was von Wänden zurückprallt, wäre viel zu teuer. Spiele
+teilen deshalb auf: **direktes Licht** (Sonne, Lampen) wird genau gerechnet, **indirektes Licht** aus
+der Umgebung nur grob geschätzt.
 
-Eine matte Fläche streut Licht gleichmäßig in alle Richtungen. Ihre Helligkeit hängt nur vom
-**Einfallswinkel** ab.
+### Matte Flächen
+
+Eine matte Fläche, etwa Papier oder ein Acker, verteilt Licht gleichmäßig in alle Richtungen. Wie hell
+sie ist, hängt nur davon ab, **wie steil das Licht auftrifft**.
 
 > **Stell dir vor …** … eine Taschenlampe senkrecht auf den Tisch: ein kleiner, heller Kreis. Kippst
 > du sie, wird der Fleck zum langen, blassen Oval – gleiches Licht, mehr Fläche.
 
-Formel: Helligkeit = Albedo / π · Lichtstärke · cos(Einfallswinkel), Licht von hinten zählt 0. Die
-**Albedo** ist der Anteil, den die Fläche zurückwirft; das 1/π verhindert, dass eine weiße Fläche mehr
-Licht abgibt, als sie bekommt. **Beispiel:** graue Fläche (0,5), Sonne unter 45° (cos = 0,707), Kerns
-Sonne im roten Kanal 2,8: 0,5 · 2,8 · 0,707 / π ≈ **0,315**. Metalle haben keinen matten Anteil.
+| Licht fällt … | Anteil der vollen Helligkeit |
+|---|---|
+| senkrecht ein | 100 % |
+| um 45° gekippt | gut 70 % |
+| um 60° gekippt | 50 % |
+| streifend (90°) | 0 % |
+| von hinten | 0 % |
 
-**Punktlichter** werden in Wirklichkeit mit dem Quadrat der Entfernung schwächer, aber nie null – jede
-Lampe müsste die ganze Welt beleuchten. Kern lässt sie deshalb **an der Reichweite glatt auf 0**
-abfallen, bei höchstens 6 Lampen. Jede hat Position, Reichweite, Farbe und Stärke. Den Abstand
-zählt Kern mindestens als 0,2 m (im Quadrat 0,04), damit eine Lampe direkt auf einer Fläche nicht
-unendlich hell wird.
+Dazu kommt die **Albedo**: wie viel Licht eine Fläche überhaupt zurückwirft – Schnee sehr viel,
+Asphalt wenig. Eine graue Fläche mit halber Albedo ist also halb so hell wie eine weiße im selben
+Licht. Diese Regel trägt den Namen ihres Entdeckers **Lambert**. Metalle haben übrigens keinen matten
+Anteil; ihr Licht steckt ganz im Glanz.
+
+**Lampen** werden in Wirklichkeit mit der Entfernung schwächer, aber nie ganz null – jede Lampe müsste
+also die ganze Welt beleuchten. Das wäre viel zu teuer.
+
+**In Kern:** Jede Lampe hat eine Reichweite, an der ihr Licht weich auf null ausläuft, und es leuchten
+höchstens sechs Lampen gleichzeitig.
 
 ### Glanz
 
-Glänzende Flächen werfen Licht gerichtet zurück. Das klassische **Blinn-Phong** nimmt den
-**Halbvektor** genau zwischen Licht und Auge: Liegt die Normale nahe daran, siehst du einen Glanzpunkt.
+Glänzende Flächen werfen Licht gerichtet zurück, daher der helle Fleck auf einem Apfel. Die heutige
+Erklärung: Eine Fläche besteht aus Millionen winziger, verschieden schief stehender **Spiegelchen**.
 
-Modernes **PBR** (physikalisch basiertes Rendern) nutzt die **Mikrofacetten-Theorie**: Eine raue
-Fläche besteht aus Millionen winziger, verschieden gekippter Spiegel. Drei Fragen bestimmen den Glanz
-(die Cook-Torrance-Formel): **D**, die Verteilung – wie viele Spiegelchen werfen Licht ins Auge? (meist
-nach **GGX**; glatt heißt kleiner, scharfer Punkt, rau heißt breiter Schimmer). **F**, Fresnel – wie
-viel wird überhaupt gespiegelt? Bei flachem Blick viel mehr, wie bei einem See, der schräg betrachtet
-den Himmel spiegelt; die Näherung nach **Schlick** startet senkrecht bei etwa **4 %** für Nichtmetalle
-und bei der Grundfarbe für Metalle. **G**, Geometrie – wie sehr verdecken sich die Spiegelchen?
+```
+   glatt: ‾‾‾‾‾‾‾‾‾‾  alle gleich gerichtet → kleiner, scharfer Punkt
+   rau:   /\/‾\_/\/‾  kreuz und quer        → breiter, matter Schimmer
+```
 
-**Kern** hat zwei Regler, Rauheit und Metallanteil, und ein **vereinfachtes PBR**: Lambert für mattes
-Licht, GGX und Schlick für den Sonnen-Glanzpunkt, eine Spiegelung des Himmels. Abkürzungen: Glanz nur
-bei Metall oder Rauheit unter 0,95; ein Schlick, bei dem raue Flächen am Rand weniger glänzen; kein
-eigener G-Term – mit der einfachsten Annahme kürzt sich die Formel bis auf den Faktor 1/4, der im Shader
-steht; und D gedeckelt bei 40 gegen einzelne Riesenpixel. Die Himmelsspiegelung wird je nach Rauheit
-zwischen weichem Himmelslicht und schärferem Himmelsverlauf gemischt und mit F gewichtet. Glas (von
-Erweiterungen gesetzt) spiegelt zusätzlich den Himmel, damit Scheiben nicht schwarz wirken.
+Drei Fragen bestimmen den Glanz:
 
-**Indirektes Licht** rechnet Kern aus wenigen Farben: ein **Hemisphärenlicht** (oben Himmels-, unten
-Bodenfarbe, gemischt nach der Neigung) und eine **Umgebungskuppel** aus Zenit, Horizont und Boden. Es
-läuft getrennt mit, damit die Umgebungsverdeckung (B.8) nur diesen Anteil abdunkelt.
+1. **Wie viele Spiegelchen zeigen genau so, dass sie Licht in mein Auge werfen?** Bei glatten Flächen
+   wenige Richtungen, dafür sehr hell; bei rauen viele, dafür schwach.
+2. **Wie stark spiegelt die Fläche bei diesem Blickwinkel?** Bei flachem Blick viel mehr – wie ein
+   See, der schräg betrachtet den Himmel spiegelt, von oben aber durchsichtig wirkt. Das heißt
+   **Fresnel-Effekt**. Senkrecht spiegeln Nichtmetalle nur wenig, Metalle dagegen stark und in ihrer
+   eigenen Farbe.
+3. **Verdecken sich die Spiegelchen gegenseitig?** Bei rauen Flächen werfen sie sich kleine Schatten.
+
+**Indirektes Licht** schätzt man mit wenigen Farben: oben Himmelsfarbe, unten Bodenfarbe, dazwischen
+gemischt nach der Neigung der Fläche, dazu eine bunte Kuppel aus Himmel, Horizont und Boden.
+
+**In Kern:** Zwei Regler, **Rauheit** und **Metall**, steuern ein vereinfachtes Glanzmodell mit
+Sonnen-Glanzpunkt und Himmelsspiegelung, und das indirekte Licht läuft getrennt mit, damit die
+Eckenschatten (B.8) nur dieses abdunkeln.
+
+> **Für Neugierige:** Die Fachnamen der drei Fragen lauten Verteilung (meist nach „GGX“), Fresnel
+> (meist nach „Schlick“) und Geometrie. Kern beantwortet die dritte Frage mit der einfachsten Annahme
+> und begrenzt die erste nach oben, damit keine einzelnen Riesen-Glanzpunkte flackern.
 
 ## B.5 Schattenkarten
 
-Ein Punkt liegt im Schatten, wenn zwischen ihm und der Sonne etwas ist. Also malt man die Szene einmal
-**aus Sicht der Sonne** und notiert pro Kartenpunkt nur die Entfernung zum ersten Objekt – die
-**Schattenkarte**. Beim normalen Malen fragt jeder Punkt: „Bin ich weiter weg als das Notierte?“ Wenn
-ja, steht etwas davor.
+Ein Punkt liegt im Schatten, wenn zwischen ihm und der Sonne etwas steht. Also malt man die Szene
+einmal **aus Sicht der Sonne** und notiert für jeden Punkt dieser Karte nur, wie weit das erste
+getroffene Ding entfernt ist – die **Schattenkarte**. Beim normalen Malen fragt jede Stelle: „Bin ich
+weiter weg als das Notierte?“ Wenn ja, steht etwas davor.
 
 ```
    Sonne ═══╗  (parallele Strahlen)
             ║  ↓   ↓   ↓   ↓
-            ║     ███          gespeicherte Tiefe: Dach
+            ║     ███          notierte Entfernung: Dach
             ║  ↓  ███  ↓   ↓
             ║  ── ─── ─────    Boden dahinter → Schatten
 ```
 
+Das klingt einfach, hat aber Tücken:
+
 | Problem | Ursache | Gegenmittel |
 |---|---|---|
-| Schattenakne (Streifen) | Fläche beschattet sich selbst | Bias, Polygon-Offset |
-| Peter Panning | zu viel Bias, Schatten löst sich | Bias klein halten |
-| gezackte Kanten | ein Kartenpunkt deckt viele Pixel | Filtern (PCF) |
-| Flimmern | Karte rutscht um Bruchteile | am Raster einrasten |
-| unscharf in der Nähe | Karte deckt zu viel ab | an die Sicht anpassen |
+| feine Streifen („Schattenakne“) | Fläche beschattet sich selbst | kleiner Sicherheitsabstand |
+| Schatten löst sich vom Ding | Sicherheitsabstand zu groß | Abstand klein halten |
+| Treppchenkanten | ein Kartenpunkt deckt viele Pixel | mehrere Nachbarn mischen |
+| Flimmern | Karte rutscht um Bruchteile | nur um ganze Punkte schieben |
+| unscharf in der Nähe | Karte deckt zu viel ab | nur das Sichtbare abdecken |
 
-Kern nutzt für die Sonne eine parallele (orthografische) Projektion, rastet auf ganze Kartenpunkte ein,
-passt die Karte an die Sicht an (Schattendistanz), kombiniert drei Arten Bias (Polygon-Offset, kleiner
-Vergleichsabstand, **Normal Offset**) und filtert mit **PCF** (*percentage closer filtering*: mehrere
-Vergleiche, gemittelt) – 1, 4 oder 9 Abtastungen, wobei die Grafikkarte in jeder schon vier Nachbarn
-vergleicht und mischt. In die Karte kommt nur Tiefe, und nur von Schattenwerfern; sie wird
-wiederverwendet, solange Sonne, Kartenlage und Schattenwerfer gleich bleiben. Flächen, die von der
-Sonne wegzeigen, fragen gar nicht erst nach. Mit Schattendistanz blendet der Schatten über das letzte
-Zehntel aus. Wie das zusammenspielt, steht in [Kapitel 4](04-grafik.md), 4.8.1. Warum die
-Anpassung so wichtig ist: Mit den Standardwerten (512 Kartenpunkte über ±120 m) ist ein Kartenpunkt
-2 · 120 / 512 ≈ **0,47 m** breit – viel zu grob für etwas so Kleines wie die Micro Duck.
+Der **Sicherheitsabstand** ist das wichtigste Gegenmittel: Die Fläche gilt erst als beschattet, wenn
+sie ein klein wenig weiter weg ist als das Notierte. Sonst würde sie sich wegen der groben Karte selbst
+verdunkeln – wie die Streifen auf einem Foto vom Bildschirm. Ist der Abstand zu groß, schwebt der
+Schatten dagegen ein Stück neben dem Ding; Fachleute nennen das nach der Märchenfigur „Peter Panning“,
+weil Peter Pan seinen Schatten verliert.
 
-## B.6 HDR, Tonemapping und Gamma
+**In Kern:** Die Karte deckt nur ab, was man bis zur Schattendistanz sieht, rastet auf ganze Punkte ein
+und wird nur neu gemalt, wenn sich etwas ändert – warum das so wichtig ist und wie es zusammenspielt,
+steht in [Kapitel 4](04-grafik.md), 4.8.1.
+
+## B.6 Helles Licht, Bildschirm und Farbe
 
 ### Tonemapping
 
-Echtes Licht hat einen riesigen Bereich; Kerns Sonne liegt bei bis zu 2,8, ein Bildschirm kann nur 0
-bis 1. Man rechnet deshalb in **linearem HDR** (*high dynamic range*) und presst erst am Ende auf den
-Bildschirm. Diese Abbildung heißt **Tonemapping**. Eine gute Kurve ist in der Mitte fast gerade und
-rundet die Lichter weich ab:
+Echtes Licht hat einen riesigen Bereich, von fast dunkel bis gleißend hell. Ein Bildschirm kann
+dagegen nur von Schwarz bis Weiß. Man rechnet deshalb mit dem **echten** Licht, auch
+wenn es viel heller als Weiß ist (Fachwort **HDR**, *high dynamic range*), und presst es erst ganz am
+Ende auf den Bildschirmbereich. Dieses Zusammenpressen heißt **Tonemapping**. Eine gute Kurve lässt
+mittlere Helligkeiten fast, wie sie sind, und rundet sehr Helles weich ab:
 
 ```
- Ausgabe
-  1 |            ____________
-    |        _--
-    |      /
-    |    /
-    |  /
-  0 |/________________________ Eingabe (linear)
-    0    1    2    3    4
+ auf dem
+ Bildschirm
+  Weiß |            ____________
+       |        _--
+       |      /
+       |    /
+       |  /
+Schwarz|/________________________ echtes Licht
+       0    1    2    3    4
 ```
 
-Kern nutzt die **ACES-Filmkurve** in der Fassung von three.js (Belichtung einrechnen, eine rationale
-Näherung der Filmkurve, auf 0 bis 1 begrenzen), danach optional sein Farbgrading.
+**In Kern:** Die Kurve ist eine bewährte Filmkurve aus der Kinotechnik, wie sie auch die
+Grafikbibliothek three.js benutzt; danach kann noch ein Farbgrading folgen.
 
-> **Probier's aus!** Dreh in den **World Settings** die **Exposure** hoch und runter. Helle Stellen laufen
-> weich ins Weiß, statt hart abzuschneiden – die Filmkurve bei der Arbeit.
+> **Probier's aus!** Dreh im Tab **World Settings** die **Exposure** (Belichtung) hoch und runter.
+> Helle Stellen laufen weich ins Weiß, statt hart abzuschneiden – die Filmkurve bei der Arbeit.
 
 ### Gamma und sRGB
 
-Bildschirme und Bilddateien speichern Farben in **sRGB**: Dunkle Töne bekommen mehr der 256 Stufen,
-weil das Auge dort feiner unterscheidet. Licht addiert sich aber **linear**. Also: Eingangsfarben **nach
-linear** umrechnen, linear rechnen, am Ende **nach sRGB** zurück. Für hellere Werte gilt grob
-sRGB = 1,055 · linear^(1/2,4) − 0,055, umgekehrt linear = ((sRGB + 0,055) / 1,055)^2,4 (ganz dunkle
-Werte haben einen kleinen geraden Abschnitt).
+Bildschirme und Bilddateien speichern Helligkeit nicht so, wie Licht sich verhält, sondern so, wie
+unser Auge es empfindet: Dunkle Töne bekommen viel mehr der 256 Helligkeitsstufen, weil wir dort
+feinere Unterschiede sehen. Diese Schreibweise heißt **sRGB**. Die Schreibweise, die echtes Licht
+abbildet, heißt **linear**: Doppelt so viel Licht ist dort doppelt so viel Zahl.
 
-**Beispiel:** Lineares Mittelgrau 0,18 wird zu 1,055 · 0,18^(1/2,4) − 0,055 ≈ **0,461** – fast die
-halbe Skala, obwohl es nur 18 % des Lichts sind.
+| echtes Licht (linear) | als sRGB-Wert gespeichert |
+|---|---|
+| 5 % | etwa 25 % |
+| 18 % | etwa 46 % |
+| 50 % | etwa 74 % |
+| 100 % | 100 % |
 
-> **Achtung, Falle!** Wer in sRGB rechnet, bekommt zu dunkle Übergänge und falsche Mischfarben. Liegen
-> Farben schon linear vor, muss man es sagen – in Kern über `linear_colors` bzw. im Browser
-> `markLinearColors` –, sonst werden sie doppelt umgewandelt.
+Die zweite Zeile ist berühmt: 18 % des Lichts empfindet das Auge als **mittleres Grau**, und in sRGB
+steht es tatsächlich fast in der Mitte der Skala.
+
+Das Problem: Licht addiert sich **linear**. Zwei Lampen machen doppelt so viel Licht – aber der
+sRGB-Wert verdoppelt sich nicht. Wer mit sRGB-Zahlen rechnet, rechnet falsch, ungefähr so, als würde
+man Schuhgrößen addieren. Darum gilt: Farben **erst nach linear** umrechnen, linear rechnen, ganz am
+Ende **zurück nach sRGB**.
+
+> **Achtung, Falle!** Wer in sRGB rechnet, bekommt zu dunkle Übergänge und falsche Mischfarben. Und
+> wer Farben schon linear liefert, muss das Kern sagen – sonst rechnet Kern sie ein zweites Mal um.
 
 ### Nebel
 
-Nach dem Tonemapping mischt Kern Nebel ein, wie three.js: Nebelanteil = 1 − e^(−(Dichte ·
-Entfernung)²). Mit der Standarddichte 0,00085 sind das bei 100 m 0,085² ≈ 0,0072, also **0,7 %**, bei
-1000 m 0,85² ≈ 0,72 und 1 − e^(−0,72) ≈ **51 %**. Durch das Quadrat bleibt die Nähe lange klar, dann
-zieht der Dunst rasch zu. Mit Höhenabfall wird er nach oben dünner, mit Sonnenstreuung leuchtet er in
-Sonnenrichtung.
+Nebel wird mit der Entfernung dichter. Kern mischt ihn so ein, dass die Nähe lange klar bleibt und der
+Dunst dann rasch zuzieht. Mit Kerns Standardnebel:
 
-## B.7 Bloom
+| Entfernung | Anteil Nebel |
+|---|---|
+| 100 m | kaum, unter 1 % |
+| 500 m | etwa 17 % |
+| 1000 m | etwa die Hälfte |
+| 2000 m | fast alles |
 
-**Bloom** ist der Lichthof um sehr helle Stellen, wie Gegenlicht im Auge. Rezept: helle Anteile
-ausschneiden, unscharf machen (gern auf verkleinerten Bildern – billiger und breiter), zurückaddieren.
+**In Kern:** Auf Wunsch wird der Nebel nach oben dünner und leuchtet in Richtung Sonne in
+Sonnenfarbe.
 
-Ein Gauß-Weichzeichner ist **trennbar**: Statt 9 × 9 = 81 Zugriffen reichen 9 waagerecht plus 9
-senkrecht. Noch billiger: Liest man **zwischen** zwei Texeln, mischt die Hardware sie gratis, also
-ersetzen **fünf** Zugriffe neun Gewichte. Kerns Gewichte: 0,2270 in der Mitte, je 0,3162 bei ±1,3846
-und je 0,0703 bei ±3,2308 Texeln – zusammen 0,2270 + 2 · 0,3162 + 2 · 0,0703 = **1**, damit das Bild
-nicht heller oder dunkler wird.
+## B.7 Bloom: das Glühen
 
-In Kern schreibt die Szene das echte Licht nebenbei in eine Kopie aus 16-Bit-Kommazahlen. Daraus schneidet der Bloom
-mit weicher Schwelle ab etwa 0,88 das Helle aus, zeichnet es auf einem Viertel und einem Achtel der
-Bildgröße weich (Stärken 0,13 und 0,08) und addiert beim Zusammensetzen nur den **Unterschied**, den
-das Glühen nach dem Tonemapping macht; Pixel ohne Glühen bleiben bitgenau. Braucht das Gerät im Mittel
-3,5 s lang über 27 ms pro Bild, schaltet ein Wächter das Glühen ab, außer es ist erzwungen. Mehr in
-Kapitel 4, 4.8.3.
+**Bloom** ist der Lichthof um sehr helle Stellen, wie Gegenlicht im Auge oder in einer Kamera. Das
+Rezept: das sehr Helle ausschneiden, unscharf machen und wieder darüberlegen. Das Unscharfmachen
+geschieht gern auf verkleinerten Bildern – das ist billiger und gibt einen breiteren Schein.
 
-## B.8 Umgebungsverdeckung: SSAO und GTAO
+Unscharf machen heißt: Jeder Bildpunkt wird mit seinen Nachbarn gemischt. Mischt man jeden Punkt mit
+allen Nachbarn in einem Quadrat von 9 × 9, sind das 81 Lesezugriffe pro Punkt. Viel schneller geht es
+in zwei Durchgängen.
+
+> **Stell dir vor …** … du willst ein Kästchenbild verwischen. Statt jedes Kästchen mit allen 80
+> Nachbarn im Quadrat zu mischen, verwischst du erst jede Zeile nach links und rechts und dann jede
+> Spalte nach oben und unten. Das Ergebnis ist dasselbe – aber 9 + 9 = 18 statt 81 Zugriffe.
+
+Und noch ein Trick: Liest man genau **zwischen** zwei Bildpunkten, mischt die Grafikkarte sie gratis.
+So reichen pro Durchgang fünf statt neun Zugriffe. Die Mischanteile ergeben zusammen genau 100 %,
+damit das Bild weder heller noch dunkler wird.
+
+**In Kern:** Das Glühen entsteht aus dem echten Licht des Shaders, wird auf zwei verkleinerten Stufen
+verwischt und als feine Folie über das fertige Foto gelegt ([Kapitel 4](04-grafik.md), 4.8.3).
+
+## B.8 Eckenschatten: Umgebungsverdeckung
 
 In Ecken, Fugen und unter Dingen kommt weniger Umgebungslicht an, weil ein Teil des Himmels verdeckt
-ist. Diese **Umgebungsverdeckung** (*ambient occlusion*, AO) lässt Dinge auf dem Boden „stehen“ statt
-schweben. Sie fragt: *Wie viel Himmel über diesem Punkt ist frei?* – wobei steile Richtungen mehr zählen
-als flache. Die Sonne hat eigene Schatten; AO betrifft nur indirektes Licht.
+ist. Diese **Umgebungsverdeckung** (englisch *ambient occlusion*, kurz AO) lässt Dinge auf dem Boden
+„stehen“ statt schweben. Sie fragt: *Wie viel Himmel über diesem Punkt ist frei?* Dabei zählt Himmel
+direkt über der Fläche mehr als Himmel knapp über dem Horizont – aus demselben Grund wie bei der
+Taschenlampe: Steil einfallendes Licht trifft eine Fläche kräftiger als flaches. Die Sonne hat ihre
+eigenen Schatten; AO betrifft nur das indirekte Licht.
 
 > **Stell dir vor …** … du liegst in einer Mulde im Gras und schaust nach oben. Je tiefer die Mulde,
 > desto kleiner dein Stück Himmel – und desto dunkler ist es bei dir, auch ohne Sonnenschatten.
 
-Strahlen durch die ganze Szene sind zu teuer. **SSAO** (*Screen-Space AO*) nutzt den Tiefenpuffer und
-prüft mit Stichproben, ob Nachbarpixel „über“ dem Punkt liegen – eine grobe Schätzung. **GTAO**
-(*Ground-Truth AO*, Jimenez und Kollegen 2016) geht systematisch vor: Pro Pixel ein paar Richtungen
-(„Scheiben“) wählen, in jeder links und rechts den **Horizont** suchen – den höchsten Winkel, unter dem
-Nachbargeometrie den Himmel verdeckt –, für den freien Bogen dazwischen eine **fertige Formel**
-einsetzen und über die Scheiben mitteln.
+Strahlen durch die ganze Szene zu schicken, wäre zu teuer. Darum schätzt man die Verdeckung aus dem
+fertigen Tiefenpuffer, also aus dem, was ohnehin schon auf dem Bildschirm ist. Ältere Verfahren
+prüfen dabei ein paar Stichproben in der Nachbarschaft – eine grobe Schätzung. Das genauere Verfahren
+**GTAO** geht systematisch vor: Es schaut von jedem Punkt in ein paar Richtungen, sucht links und
+rechts, wie hoch die Umgebung den Himmel verdeckt (den **Horizont**), und rechnet aus, wie viel Himmel
+dazwischen frei bleibt.
 
 ```
-             Horizont h1
-   Blick ↓      ╲   │n   ╱  Horizont h0
+             Horizont links
+   Blick ↓      ╲   │   ╱  Horizont rechts
                  ╲  │   ╱
    ████████       ╲ │  ╱      ████
    ████████████────●────────████████
-                  Pixel
-   sichtbarer Himmel: Bogen zwischen h0 und h1
+                  Punkt
+   freier Himmel: der Bogen zwischen den beiden Horizonten
 ```
 
-Kern folgt Intels XeGTAO: Normale aus der Tiefe, Radius in Metern (Standard 1,6), ein 4×4-Muster, das
-die Scheiben dreht und ein kantenbewusster Filter wieder wegmittelt, und eine
-**Mehrfachreflexions-Korrektur**: Helle Flächen gewinnen Licht zurück, das zwischen den Verdeckern
-hin- und herspringt. Das Ergebnis ist ein eigenes Bild (Standard: halbe Auflösung) mit Sichtbarkeit und Tiefe; die Tiefe sorgt
-beim Hochskalieren dafür, dass nichts über Kanten verläuft. Vier Qualitätsstufen und ein Wächter, der
-auf langsamen Geräten herunterstuft, halten es schnell. Angewendet wird es **nur auf den indirekten
-Anteil**, den der Standard-Shader in seinem dritten Ausgang mitschreibt. Weil er ihn ohnehin kennt,
-braucht Kern dafür keinen zweiten Geometrie-Durchgang (Kapitel 4, 4.8.4).
+**In Kern:** Kern nutzt GTAO, dunkelt damit nur das indirekte Licht ab, das der Shader nebenbei notiert
+hat, und braucht dafür keinen zweiten Durchgang über alle Dreiecke ([Kapitel 4](04-grafik.md), 4.8.4).
 
 ## B.9 Himmel und Atmosphäre
 
-Der Himmel ist blau, weil Luftmoleküle blaues Licht viel stärker streuen als rotes – die
-**Rayleigh-Streuung**, proportional zu 1 / Wellenlänge⁴. Blau (etwa 450 nm) wird so gut viermal stärker
-gestreut als Rot (etwa 650 nm). Am Horizont ist der Weg durch die Luft länger, das Licht heller und bei
-tiefer Sonne rötlich. Um die Sonne streuen größere Teilchen nach vorn: Die **Mie-Streuung** macht den
-hellen Hof.
+Der Himmel ist blau, weil die Luft blaues Licht viel stärker in alle Richtungen streut als rotes. Je
+kürzer die Wellenlänge, desto stärker die Streuung, und zwar sehr steil: Blau wird gut viermal so stark
+gestreut wie Rot. Das heißt **Rayleigh-Streuung**. Am Horizont ist der Weg durch die Luft länger; das
+Licht wird mehrfach gestreut, der Himmel dort heller, und bei tiefer Sonne wird er rötlich. Um die
+Sonne herum streuen größere Teilchen das Licht nach vorne und machen den hellen Hof
+(**Mie-Streuung**).
 
-Echte Himmelsmodelle rechnen diese Streuung entlang des Sichtstrahls aus. Kerns Himmel ist bewusst
-**kein** solches Integral, sondern ein billiges Rezept, das ähnlich aussieht: Farbverlauf, goldene
-Stunde mit einem zur Sonne hin helleren Band, Sonnenscheibe mit Mie-artigem Hof, Mond, funkelnde
-Sterne, Wolken aus fünf Lagen Rauschen (vom Wind verschoben, zur Sonne hin heller) und ein Übergang in
-Nebelfarbe und Sonnenstreuung der Szene – gemalt als bildschirmfüllendes Dreieck, das nur die Lücken
-füllt (Kapitel 4, 4.8.2).
+Echte Himmelsmodelle verfolgen das Licht Schritt für Schritt entlang jedes Blicks durch die Luft.
+**In Kern:** Der Himmel ist bewusst keine solche Lichtrechnung, sondern ein billiges Rezept aus
+Farbverlauf, goldener Stunde, Sonne, Mond, Sternen und Wolken, das ähnlich aussieht und nur die Lücken
+füllt ([Kapitel 4](04-grafik.md), 4.8.2).
 
-## B.10 Culling und Szenenstrukturen
+## B.10 Unsichtbares weglassen
 
-Was außerhalb des Bildes liegt, muss man nicht malen. Der sichtbare Bereich einer Kamera ist ein
-**Pyramidenstumpf** (*frustum*) aus sechs Ebenen. Gribb und Hartmann haben gezeigt, dass man sie durch
-Addieren und Subtrahieren der Zeilen der Kameramatrix direkt ablesen kann. Kern testet pro Mesh eine
-**Hüllkugel**: Liegt ihr Mittelpunkt mehr als einen Radius hinter einer Ebene, ist das Mesh unsichtbar.
+Was außerhalb des Bildes liegt, muss man nicht malen. Der Bereich, den eine Kamera sieht, ist eine
+liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide** (englisch *frustum*). Um zu prüfen,
+ob ein Ding darin liegt, steckt man es in eine gedachte **Hüllkugel** und fragt: Liegt die Kugel ganz
+hinter einer der Wände der Pyramide? Dann ist das Ding unsichtbar.
 
 ```
        \         /
         \  ●    /     ● sichtbar
-   ○     \     /      ○ verworfen: ganz hinter der linken Ebene
+   ○     \     /      ○ verworfen: ganz hinter der linken Wand
           \   /
            \ /
           Kamera
 ```
 
-Der Test ist **vorsichtig**: Er wirft nie Sichtbares weg, lässt aber manchmal Unsichtbares durch
-(Kugeln nahe einer Ecke). Kern prüft so jedes Mesh, dessen Material `frustum_culled` gesetzt hat –
-außer Figuren mit Skelett, denn ihre Knochen können die Kugel verlassen. Bei instanzierten Meshes
-umschließt die Kugel alle Instanzen. Die Schattenkarte prüft gegen ihre eigene Pyramide.
+Der Test ist **vorsichtig**: Er wirft nie Sichtbares weg, lässt aber manchmal Unsichtbares durch, etwa
+Kugeln nahe einer Ecke der Pyramide. Im Zweifel wird eben gemalt.
 
-> **Probier's aus!** Schalte in Kern Studio unter **Show** die **Bounds** ein und sieh die Hüllen, mit
-> denen Kern entscheidet, was in der Sichtpyramide liegt.
+**In Kern:** So prüft Kern jedes Ding vor dem Malen – außer Figuren mit Skelett, deren Arme und Beine
+aus der Kugel ragen können.
 
-Bei vielen Objekten hilft eine **BVH** (*Bounding Volume Hierarchy*): ein Baum, in dem jeder Knoten eine
-Hüllbox um alle Kinder hat. Trifft ein Strahl einen Knoten nicht, fällt der ganze Ast weg – wie beim
-Zahlenraten mit „größer oder kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
+> **Probier's aus!** Schalte in Kern Studio im Menü **Show** die **Bounds** ein und sieh die Hüllen,
+> mit denen Kern entscheidet, was in der Sichtpyramide liegt – auch um Bäume, Gebäude und die Ente.
+
+Bei vielen Dingen hilft ein **Baum aus Kästen** (englisch *BVH*): Ganz oben ein Kasten um alles, darin
+zwei kleinere Kästen, darin wieder zwei, bis unten einzelne Dreiecke liegen. Trifft ein Strahl einen
+Kasten nicht, fällt alles darin auf einen Schlag weg – wie beim Zahlenraten mit „größer oder
+kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
 
 ```
             [ alle ]
            /        \
      [ links ]    [ rechts ]
       /    \        /    \
-   [△△]  [△△]   [△△]  [△△]   Blätter: Dreiecke
+   [△△]  [△△]   [△△]  [△△]   unten: Dreiecke
 ```
 
-In Kern dient die BVH dem **Anklicken**, nicht dem Malen: Unbewegte Weltobjekte ab 36 Dreiecken bekommen
-einen Baum über ihre Dreiecke (immer in der Mitte geteilt), bewegte werden direkt geprüft. Der Strahl
-wird mit dem Slab-Test gegen die Kästen und nach Möller-Trumbore gegen die Dreiecke geprüft. Die
-Physik hat ihre eigene BVH in Box3D ([Anhang C](C-grundlagen-physik.md)).
+**In Kern:** Der Baum aus Kästen dient dem **Anklicken** – welches Dreieck liegt unter der Maus? –,
+nicht dem Malen; die Physik hat ihren eigenen ([Anhang C](C-grundlagen-physik.md)).
 
-## B.11 Draw Calls und Zustandswechsel
+## B.11 Wenige große Aufträge
 
-Jeder **Draw Call** (Zeichenaufruf) kostet Prozessorzeit: Zustand prüfen, Puffer binden, Uniforms
-hochladen – im Browser noch der Weg von WebAssembly über JavaScript samt Prüfung. Tausende kleine
-Aufrufe können länger dauern als die eigentliche Arbeit der Grafikkarte. Auch **Zustandswechsel**
-(anderes Programm, andere Textur) kosten.
+Jeder **Zeichenaufruf** kostet Zeit, bevor die Grafikkarte überhaupt anfängt: Einstellungen prüfen,
+Daten bereitlegen, Werte schicken – im Browser zusätzlich der Weg über die Brücke zur Webseite samt
+Prüfung. Tausende kleine Aufrufe können länger dauern als die eigentliche Malarbeit. Auch jedes
+Umschalten, etwa auf eine andere Textur, kostet.
 
 > **Stell dir vor …** … du gehst einkaufen. Hundertmal für je eine Zutat in den Laden zu laufen dauert
 > viel länger als einmal mit vollem Korb – obwohl am Ende dasselbe im Kühlschrank steht.
 
-Kerns Gegenmittel: **ein** Standardprogramm, Instancing, ein Uniform-Cache, Bild-Werte einmal pro Bild,
-gemerkte Textur und Rückseiten-Einstellung, Schattenkarte nur bei Bedarf, Sichtprüfung vor dem Malen
-und Geometrie nur einmal hochladen. Die Statistik (`RenderStats`) zeigt Zeichenaufrufe, Dreiecke,
-Instanzen, verworfene Meshes und die Zeit auf CPU und – wenn der Browser es kann – GPU. Den Ablauf
-eines Bildes zeigt [Kapitel 4](04-grafik.md), 4.7.
+**In Kern:** Ein einziges Malprogramm, Kopien statt Duplikate, ein Merkzettel gegen doppelte Werte,
+Schattenkarte nur bei Bedarf und Formen nur einmal hochladen – und eine Statistik zeigt, wie viele
+Aufträge ein Bild gekostet hat ([Kapitel 4](04-grafik.md), 4.7 und 4.12).
 
-## B.12 Warum WebAssembly und WebGL2 so verbunden sind
+## B.12 Warum Kern und Browser so zusammenarbeiten
 
-Kern ist C++, der Browser bietet aber nur JavaScript-Schnittstellen. **WebAssembly** (WASM) ist ein
-kompaktes Format, das der Browser in Maschinencode übersetzt. Ein WASM-Modul hat einen **linearen
-Speicher** (ein großes Byte-Feld) und darf nur Funktionen aufrufen, die man ihm beim Laden als
-**Importe** gibt. **WebGL2** ist die Grafikschnittstelle des Browsers, im Wesentlichen OpenGL ES 3.0.
-Kern übersetzt mit wasi-sdk (Ziel `wasm32-wasip1`); `gl.h` meldet genau die gebrauchten
-WebGL2-Funktionen an, `kern.mjs` übersetzt Nummern in WebGL-Objekte und reicht Daten **ohne Kopie**
-weiter, durch Fenster auf Kerns Speicher, die nach einem Speicherwachstum erneuert werden. Den
-WebGL2-Zugang legt die Seite ohne Kantenglättung und ohne Transparenz an, denn Kern malt in eigene
-Ziele und setzt selbst zusammen; nur Kern Studio und exportierte Spiele schalten die Kantenglättung
-ein (Kapitel 4, 4.2).
+Kern ist in C++ geschrieben, einer schnellen Programmiersprache. Der Browser versteht aber von Haus aus
+nur JavaScript. Die Brücke heißt **WebAssembly**: ein kompaktes Format, das der Browser fast so schnell
+wie ein normales Programm ausführt. Ein WebAssembly-Programm darf allerdings nur Zahlen austauschen und
+nur das benutzen, was ihm die Webseite beim Start ausdrücklich in die Hand gibt. Die Grafikkarte
+erreicht es über **WebGL2**, die Malschnittstelle des Browsers.
 
 ```mermaid
 flowchart LR
-  R["C++: Renderer, Physik, Spiel"] --> G["gl.h: Importe"]
-  G -->|"Nummern, Adresse + Länge"| K["kern.mjs"]
-  K --> W["WebGL2 im Browser"]
+  R["Kern: Malen, Physik, Spiel"] --> G["kurze Liste Malbefehle"]
+  G -->|"Nummern, Adresse + Länge"| K["dünne Webseiten-Schicht"]
+  K --> W["Grafikkarte über WebGL2"]
 ```
 
-| Entscheidung | Grund |
+Daraus folgen Kerns wichtigste Entscheidungen, in Alltagssprache:
+
+| Entscheidung | Warum |
 |---|---|
-| alles in C++/WASM | eine Codebasis für Browser, Tests, Lehrer, Server; deterministische Physik |
-| JavaScript hauchdünn | Logik in JS wäre doppelt und schlechter testbar |
-| kleine, feste Importliste | alles Gebrauchte steht an einer Stelle |
-| Nummern statt JS-Objekten | WASM kann nur Zahlen halten |
-| Kopien aller Meshes, Texturen | Wiederaufbau nach Kontextverlust |
-| wenige Aufrufe, Uniform-Cache | jeder Aufruf überquert die Grenze |
-| Headless-Modus | der Lehrer rechnet dieselbe Welt ohne Grafik |
-| ein Thread im WASM | Box3D einfädig; Parallelität über Web Worker |
+| alles in einer Sprache | dann rechnet es überall gleich – im Browser, in Tests, im Lehrer |
+| Webseiten-Schicht hauchdünn | nichts doppelt, nichts, was anders rechnen könnte |
+| kurze, feste Liste der Malbefehle | alles Gebrauchte steht an einer Stelle |
+| Nummern statt Dingen | über die Brücke passen nur Zahlen (Garderobenmarken) |
+| Kopien von allem | Versicherung, falls der Browser die Grafikkarte wegnimmt |
+| wenige Aufträge, Merkzettel | jeder Weg über die Brücke kostet |
+| Malen ohne Bildschirm möglich | der Lehrer rechnet dieselbe Welt ohne Grafik |
+
+Die genauen Namen der Bauteile stehen im blauen Buch, Anhang B.
 
 ## Das nimmst du mit
 
-- Ein Punkt wandert über **Modell-, Welt-, Kamera- und Clip-Raum** auf den Bildschirm; die vierte
-  Zahl w macht Verschieben und Perspektive zu Matrix-Multiplikationen.
-- Kern rechnet in **Metern, Z oben**, mit spaltenweisen Matrizen.
-- Der Tiefenpuffer ist nah extrem genau, fern grob; die **nahe Ebene** entscheidet.
-- Vertex-Shader rechnen Ecken, Fragment-Shader Pixel.
-- Licht = matter Anteil (Lambert) + Glanz (GGX, Fresnel) + vereinfachtes Umgebungslicht.
-- Schattenkarten sind ein Foto aus Sicht der Sonne; Bias, Einrasten und PCF machen sie sauber.
-- Rechnen **linear in HDR**, pressen mit einer **Filmkurve**, zuletzt **sRGB**.
-- Wenige Zeichenaufrufe machen ein Spiel im Browser schnell.
+- Eine **Matrix** ist ein Rezept, das jeden Punkt streckt, dreht und verschiebt; Rezepte lassen sich
+  zu einem zusammenfassen, und die Reihenfolge zählt.
+- Die **vierte Zahl w** ist 1 für Orte und 0 für Richtungen – die Hausnummer zieht um, „Norden“ nicht.
+- Ein Ding wandert wie der Café-Tisch durch vier Beschreibungen bis auf den Bildschirm.
+- **Doppelt so weit weg, halb so groß**; die Grafikkarte teilt dafür durch w.
+- Der Tiefenpuffer misst nah sehr fein, fern grob; die **nahe Ebene** entscheidet.
+- Vertex-Shader rechnen Ecken, Fragment-Shader Bildpunkte.
+- Licht = matter Anteil (Taschenlampe) + Glanz (Spiegelchen, See) + grobes Umgebungslicht.
+- Schattenkarten sind ein Foto aus Sicht der Sonne, mit kleinem Sicherheitsabstand.
+- Gerechnet wird mit **echtem, linearem Licht**; eine **Filmkurve** presst es auf den Bildschirm.
+- Wenige große Aufträge machen ein Spiel schnell – einmal einkaufen mit vollem Korb.
 
 ## Knobelecke
 
-1. Warum bekommt eine Richtung w = 0 und ein Punkt w = 1?
-2. Ein Punkt ist doppelt so weit weg wie ein anderer. Wie groß erscheint er?
-3. Du willst ferne Flächen genauer trennen. Was hilft am meisten?
-4. Warum darf man Farben nicht einfach in sRGB addieren?
-5. Warum malt Kern den Himmel *nach* den undurchsichtigen Objekten?
+1. Warum bekommt eine Richtung w = 0 und ein Ort w = 1?
+2. Ein Ding ist doppelt so weit weg wie ein gleich großes anderes. Wie groß erscheint es?
+3. In der Ferne flackern zwei dicht beieinanderliegende Flächen. Was hilft am meisten?
+4. Warum darf man Farben nicht einfach als sRGB-Zahlen addieren?
+5. Warum malt Kern den Himmel *nach* den undurchsichtigen Dingen?
 
 ### Lösungen
 
-1. Mit w = 0 wirkt die Verschiebung nicht – eine Richtung hat keinen Ort.
-2. Halb so groß: Die perspektivische Division teilt durch die Entfernung.
-3. Die nahe Ebene vergrößern: doppelt so weit draußen heißt überall doppelt so genau.
-4. Licht addiert sich linear; in sRGB werden Mischungen und Verläufe falsch, meist zu dunkel.
-5. Dann bestehen nur freie Pixel den Tiefentest, und der teure Himmelsshader läuft nur, wo Himmel ist.
+1. Mit w = 0 wird nichts verschoben – eine Richtung hat keinen Ort. Die Hausnummer zieht um, „Norden“
+   bleibt Norden.
+2. Halb so groß: Die Grafikkarte teilt durch die Entfernung.
+3. Die nahe Ebene weiter hinausschieben: Doppelt so weit heißt überall doppelt so genau, denn die
+   feinen Striche werden nicht mehr für den leeren Raum direkt vor der Kamera verbraucht.
+4. Licht addiert sich linear, sRGB-Zahlen aber nicht – wie Schuhgrößen. Mischungen und Verläufe werden
+   dann falsch, meist zu dunkel.
+5. Dann kommt der Himmel nur an Stellen durch, auf denen noch nichts liegt, und der teure Himmels-Shader
+   läuft nur dort, wo wirklich Himmel ist.
 
 ---
 

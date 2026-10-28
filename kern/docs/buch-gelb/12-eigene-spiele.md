@@ -1,25 +1,38 @@
 # 12 Dein eigenes Spiel
 
 > **Dein Level:** Jetzt baust du ein ganzes Spiel – mit Spielfigur, Hindernissen, Orbs, Gefahr,
-> Logik und Ton – und verschickst es als eine Datei. Danach schaust du Profis über die Schulter, die
-> Spiele in C++ oder JavaScript schreiben.
+> Logik und Ton – und verschickst es als eine Datei. Danach schaust du Profis über die Schulter und
+> lernst das wichtigste Prinzip jedes Spiels kennen: die Spielschleife.
 
-Kern bietet **drei Wege** zum eigenen Spiel, alle mit derselben Grafik, Physik und Plattformschicht:
+> **Wörter, die du brauchst:**
+>
+> - **Engine** – das fertige Grundgerüst, das malt, Physik rechnet und Töne spielt; dein Spiel
+>   benutzt es.
+> - **Trigger** – eine unsichtbare Zone, die etwas auslöst, sobald jemand hineinläuft.
+> - **Frame** – ein Einzelbild des Spiels, wie eine Seite im Daumenkino.
+> - **dt** – die Zeit seit dem letzten Bild, in Sekunden.
+> - **Compiler** – ein Übersetzer, der aus Programmtext ein Programm für den Computer macht.
+> - **Modul** – die übersetzte Spieldatei, die der Browser lädt und ausführt.
+> - **Webserver** – ein Programm, das Dateien so ausliefert wie eine Internetseite.
 
-| Weg | Womit | Gut für |
+Kern bietet **drei Wege** zum eigenen Spiel. Alle drei benutzen dieselbe Engine, also dieselbe
+Grafik und dieselbe Physik:
+
+| Weg | Womit | Für wen |
 |---|---|---|
-| **A** Studio, ohne Code | Kern Studio, Logik-Graphen | schnelle Spiele, Unterricht; Ergebnis: eine HTML-Datei |
-| **B** C++ | eine Klasse, die von `kern::App` erbt | eigene Simulation, eigene Grafik, eigene Shader |
-| **C** JavaScript | die C-Schnittstelle der Engine | eigene Seiten, die die Engine steuern (wie SpawnCity) |
+| **A** Studio | klicken und ziehen, ohne Code | für dich – das ganze Spiel in diesem Kapitel |
+| **B** C++ | programmieren in der Sprache, in der Kern selbst geschrieben ist | Profis mit eigener Spielidee |
+| **C** JavaScript | programmieren in der Sprache von Webseiten | Profis mit eigener Webseite |
 
-Dazu kommt eine Mischform: Logik-Graphen aus Studio als C++ exportieren (12.4).
+Weg A baust du hier vollständig nach. B und C sind zum Reinschnuppern: Du lernst, wie ein
+programmiertes Spiel im Inneren tickt, ohne selbst programmieren zu müssen.
 
 ---
 
 ## 12.1 Weg A: Orb Garden, ein Spiel ohne Code
 
 Wir bauen ein Sammelspiel: Eine Figur läuft über eine Fläche mit Hindernissen, sammelt Orbs, weicht
-einer Gefahr aus und gewinnt, wenn alles eingesammelt ist. Die Fenster erklärt
+einer Gefahr aus und gewinnt, wenn alles eingesammelt ist. Die Fenster von Studio erklärt
 [Kapitel 11](11-studio.md).
 
 ### Schritt 1: Ein neues Level
@@ -42,19 +55,23 @@ zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick › *
 
 ### Schritt 3: Hindernisse und Physik
 
-1. Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** platzieren und mit **W**, **E**,
-   **R** zurechtrücken; das Raster (0,5 m) hält die Kanten sauber, **End** setzt auf den Boden.
-2. Aus **Physics** einen **Crate Stack** und eine **Hinged Door** – sie reagieren auf deine Figur.
-3. Aus **Gameplay** eine **Moving Platform** und einen **Spinner**, die sich von selbst bewegen.
-4. Mit **Simulate** (Alt+S) prüfen, Kisten greifen und werfen. **K** übernimmt die Lage der gewählten
-   Actors – praktisch für einen Stapel, der natürlich umgefallen aussehen soll. Wähle dafür in
-   Simulate die **Kisten selbst** (kurzer Klick, Shift+Klick für weitere). Der Crate Stack ist nur
-   ein leerer Eltern-Actor, an dem die Kisten als Kinder hängen; ist er gewählt, übernimmt K nur
-   seine eigene Lage, und die Kisten springen beim Stop zurück.
+Drei Sorten Dinge machen ein Level lebendig: Manche stehen fest, manche reagieren auf Physik, und
+manche bewegen sich von selbst.
+
+1. **Fest:** Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** platzieren und mit
+   **W**, **E**, **R** zurechtrücken; das Raster (0,5 m) hält die Kanten sauber, **End** setzt auf den
+   Boden.
+2. **Physik:** Aus **Physics** einen **Crate Stack** und eine **Hinged Door** – sie reagieren auf
+   deine Figur.
+3. **Von selbst:** Aus **Gameplay** eine **Moving Platform** und einen **Spinner**.
+4. Mit **Simulate** (Alt+S) prüfen, Kisten greifen und werfen. **K** übernimmt die Lage der
+   gewählten Kisten ins Level – praktisch für einen Stapel, der natürlich umgefallen aussehen soll.
+   Wähl dafür in Simulate die **einzelnen Kisten** (Klick, Shift+Klick für weitere), nicht den
+   ganzen Stapel.
 
 > **Vorsicht, Falle:** Ein **Cube** aus Shapes hat Kollision, fällt aber nicht. Gib ihm mit **+ Add ›
-> Rigid Body** einen Körper und stell **Mobility** auf **Dynamic** – oder nimm die **Physics Cube**
-> ([Kapitel 6](06-physik.md)).
+> Rigid Body** einen Körper und stell **Mobility** auf **Dynamic** – das heißt: Er fällt und lässt
+> sich schubsen. Oder nimm gleich die **Physics Cube** ([Kapitel 6](06-physik.md)).
 
 ### Schritt 4: Etwas zum Einsammeln
 
@@ -64,28 +81,40 @@ Settings › Win condition** auf **Collect all pickups**.
 
 ### Schritt 5: Gefahr, Checkpoint und Zeitlimit
 
-Ein **Hazard** (verliert das Spiel) oder eine **Damage Zone**, mit Scale auf Größe gezogen. Ein
-**Checkpoint**: Fällt die Figur unter **Kill Z** oder verliert sie, startet sie dort neu. Wer mag,
-setzt ein **Time limit**; das HUD zählt herunter. Andere Ziele: **Reach a goal trigger** (mit
-**Goal**), **Survive the time limit**, **Reach a target score**.
+Jetzt bekommt dein Spiel Spannung. Es gibt zwei Arten von Gefahr, und sie wirken verschieden:
+
+- Ein **Hazard** beendet die Runde sofort: Das Spiel ist **verloren**. Ein Checkpoint hilft da nicht.
+- Eine **Damage Zone** nimmt der Figur Gesundheit. Das wirkt nur bei Figuren, die Gesundheit haben:
+  Gib deinem Character dafür mit **+ Add › Health** eine. Ist sie aufgebraucht, taucht die Figur nach
+  einem kurzen Moment wieder auf – am letzten **Checkpoint**, falls sie einen berührt hat, sonst am
+  Start.
+
+Beide ziehst du mit Scale auf die gewünschte Größe. Ein **Checkpoint** merkt sich, wo die Figur
+neu startet. Das gilt auch, wenn sie unter **Kill Z** fällt – das ist die Höhe, unter der eine Figur
+als heruntergefallen gilt (World Settings). Wer mag, setzt ein **Time limit**; das HUD zählt
+herunter. Andere Ziele: **Reach a goal trigger** (mit **Goal**), **Survive the time limit**, **Reach
+a target score**.
 
 > **Mission:** Bau Schritt 3 bis 5 mit 60 Sekunden Zeitlimit. Zu leicht? Leg den Star auf die Moving
 > Platform.
 
 ### Schritt 6: Logik ohne Programmieren
 
+Logik heißt: „Wenn das passiert, dann tu jenes.“ Statt sie zu programmieren, steckst du sie aus
+fertigen Kästchen zusammen ([Kapitel 9](09-logik.md)).
+
 1. Einen **Message Trigger** platzieren, in Details › Trigger die **Action** auf **Logic event
-   only**.
+   only**. Damit tut der Trigger nichts Eigenes, sondern sagt nur deiner Logik Bescheid, wenn jemand
+   hineinläuft.
 2. In Details auf **Logic** klicken; der Logik-Editor öffnet den Graphen dieses Actors.
 3. **Templates › Score zone (overlap +10)**: Betreten gibt 10 Punkte, „+10“ und einen Ton.
-4. **Compile** (F7) prüft, **Viewport** führt zurück.
+4. **Compile** (F7): Studio prüft deinen Plan auf Fehler. **Viewport** führt zurück.
 
-Weitere Vorlagen: eine Tür auf **Interact** (Taste F), ein Spawner, eine Ampel und ein Verhalten für
-die Micro Duck ([Kapitel 9](09-logik.md)).
+Weitere Vorlagen: eine Tür, die aufgeht, wenn die Figur davorsteht und **F** drückt
+(**Interact**), ein Spawner, eine Ampel und ein Verhalten für die Micro Duck.
 
-> **Vorsicht, Falle:** Ein Graph mit Fehlern hält Play nicht auf. Kern schaltet beim Start nur
-> diesen Graphen ab, schreibt „Logic error: …“ ins Output Log, und der Rest läuft weiter. Passiert in
-> deiner Zone nichts, schau ins Log.
+> **Vorsicht, Falle:** Ein Graph mit Fehlern hält Play nicht auf – Kern schaltet nur ihn ab. Passiert
+> in deiner Zone nichts, schau ins Output Log.
 
 ### Schritt 7: Ton
 
@@ -99,61 +128,62 @@ Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche schon mit
 - **Play** testet, **F8** lässt die Figur los und übernimmt sie wieder. **Play › Number of Players ›
   2 Players** testet zu zweit. **Fehler im Level**, etwa ein Gelenk zu einem gelöschten Actor,
   verhindern Play und stehen im Output Log.
-- **Ctrl+S** speichert eine `.klevel`-Datei samt Texturen und Sounds, die du weitergeben und in jedem
+- **Ctrl+S** speichert eine Level-Datei samt Texturen und Sounds, die du weitergeben und in jedem
   Studio öffnen kannst. Ungespeichertes sichert Studio zusätzlich im Browser.
-- **File › Package Game (HTML)...**, Titel prüfen, **Package**: Studio lädt `Orb_Garden.html`
-  herunter (das Leerzeichen wurde zu `_`) und bietet **Play it** an.
+- **File › Package Game (HTML)...**, Titel prüfen, **Package**: Studio lädt die Datei
+  Orb_Garden.html herunter (das Leerzeichen wurde zu einem Unterstrich) und bietet **Play it** an.
 
-Die Datei enthält Engine, Level und Spiel-Host. Sie läuft offline, als einfache Datei, von jedem
-Webserver und auf dem Handy mit Touch-Sticks.
+Diese eine Datei enthält alles: die Engine, dein Level und das Programm, das es abspielt. Sie läuft
+ohne Internet, per Doppelklick, von jeder Webseite und auf dem Handy mit Touch-Sticks.
 
 ![Dasselbe Spiel auf dem Telefon: die Engine erkennt Touch und zeichnet Sticks und Knöpfe](../buch/bilder/game-phone.png)
 
 > **Mission:** Exportiere Orb Garden, klick **Play it** und spiel eine Runde. Öffne die Datei dann
-> auf einem Handy oder Tablet: Die Touch-Sticks erscheinen von allein.
+> auf einem Handy oder Tablet (lass dir beim Übertragen ruhig helfen): Die Touch-Sticks erscheinen
+> von allein.
 
 ---
 
 ## 12.2 Weg B: ein Spiel in C++
 
-Hier ist dein Spiel eine **Klasse**, die von `kern::App` erbt. Die Engine ruft sie jeden Frame auf
-und malt danach; Browser-Kram erledigt `kern/web/app.mjs`.
+Bei Weg B schreibt man das Spiel als Programmtext. Die Engine ruft dieses Programm in jedem Moment
+auf, fragt „Was jetzt?“, und malt danach das Ergebnis. Um den Browser kümmert sich ein kleiner
+Helfer, die Plattformschicht (12.3).
 
-> **So kannst du es dir vorstellen:** Die Engine ist Spielfeld und Anzeigetafel, deine Klasse die
+> **So kannst du es dir vorstellen:** Die Engine ist Spielfeld und Anzeigetafel, dein Programm die
 > Mannschaft. Jeden Moment heißt es „Du bist dran“ – sie macht ihren Zug, die Tafel zeigt ihn.
 
-### Die Bausteine
+### Die Spielschleife
 
-Deine **App** kann `configure()` (Grafik-Optionen wie Schatten und Bloom), `extensions()` (eigene
-Shader), `start()` (Formen anlegen; „falsch“ bricht ab), `update()` (jeden Frame), `resized()` und
-`stop()` füllen. Die **Engine** gibt dir den `renderer` (Formen, Kamera, Licht, Anklicken,
-[Kapitel 4](04-grafik.md)), `input`, `set_status(text)` für die Seite, `request_pointer_lock`,
-Startwerte aus der Adresse (`arg`, etwa `?time=0.6`), Größe, `stats()` und `clear_color`.
+Ein Spiel ist ein Daumenkino. Jedes Einzelbild heißt **Frame**, und flüssig wirkt es ab etwa 30
+Bildern pro Sekunde. Für jedes Bild läuft dieselbe Runde:
 
-**Input** kennt `down(Key)` (gehalten), `pressed`/`released` (in diesem Frame), Zeiger, Maustasten,
-Mausrad, bis zu 10 Finger und den Fokus. Tasten heißen `a` bis `z`, `digit0` bis `digit9`, `left`,
-`space`, `enter` und so weiter – nach ihrer **Position**. **Frame** liefert `time`, `dt` (Sekunden
-seit dem letzten Frame, höchstens 0,1) und `index`.
+```mermaid
+flowchart LR
+  A[Eingabe lesen] --> B[Welt weiterrechnen]
+  B --> C[Bild malen]
+  C --> A
+```
 
-`update` läuft **genau einmal** pro Bild, dann wird gemalt. `pressed`, `released`, Zeigerbewegung und
-Mausrad gelten nur für diesen Frame – lies sie in `update`, statt sie aufzuheben.
+1. **Eingabe:** Welche Tasten sind gedrückt, wo ist die Maus, wo die Finger?
+2. **Rechnen:** Figur bewegen, Zusammenstöße prüfen, Punkte zählen.
+3. **Malen:** Die Engine zeichnet die neue Lage.
 
-### Der Ablauf eines Frames
+Dazu kommen zwei Sonderfälle: **einmal am Anfang** alles aufbauen (Formen, Licht, Kamera) und **einmal
+am Ende** aufräumen. Ein C++-Spiel füllt genau diese Stellen: Aufbauen, die Runde für jedes Bild und
+Aufräumen.
 
-Die Seite startet das Modul, gibt die Startwerte aus der Adresse weiter und ruft
-`kern_create_app()`, `configure()` und `start()`. Danach reicht sie Tasten, Maus und Finger weiter und
-ruft pro Bild `update`, dann malt die Engine. Ändert sich die Fenstergröße, kommt `resized()`, beim
-Beenden `stop()`.
+Ein Detail ist wichtig: Ein Tastendruck gilt nur für **das eine Bild**, in dem er passiert. Darum
+liest das Spiel die Eingabe in jeder Runde neu, statt sie für später aufzuheben.
 
-### Das kleinste Kern-Spiel: hello
+### Das wichtigste Prinzip: dt
 
-`kern/examples/hello/hello.cpp` (83 Zeilen): 64 Kisten, die sich drehen und Schatten werfen, eine
-Kamera, die du kreisen lässt, und Anklicken. `configure` schaltet Schatten an (1024er-Karte, 40 m).
-`start` holt für jede Form eine Nummer (`allocate_id()`) und legt sie mit `upsert` an.
+Nicht jeder Rechner schafft gleich viele Bilder pro Sekunde. Würde sich eine Figur pro Bild um ein
+festes Stück bewegen, wäre sie auf einem schnellen Rechner schneller als auf einem langsamen. Darum
+bekommt das Spiel in jeder Runde **dt**: die Zeit seit dem letzten Bild, in Sekunden. Bewegung wird
+immer mit dt malgenommen.
 
-> **Krass, aber wahr:** Die 64 Kisten sind **eine** Form mit 64 Kopien („Instanzen“), jede mit
-> eigener 4×4-Matrix (16 Zahlen für Lage, Drehung, Größe) und Farbe. Die Grafikkarte malt alle mit
-> **einem** Zeichenbefehl.
+So steht es im kleinsten Kern-Spiel „hello“ (64 Kisten, um die du die Kamera kreisen lässt):
 
 ```cpp
 Input& in = engine.input;
@@ -161,146 +191,96 @@ if (in.down(Key::left)) yaw_ += frame.dt * 1.5f;
 if (in.down(Key::right)) yaw_ -= frame.dt * 1.5f;
 ```
 
-Zeile 1 holt die Eingabe. Hältst du ←, wächst der Drehwinkel `yaw_` um `dt × 1,5` (Zeile 2), bei →
-schrumpft er (Zeile 3). Rechne nach: Bei 60 Bildern pro Sekunde kommen pro Bild 1,5 ÷ 60 = 0,025
-dazu, nach einer Sekunde 1,5. Bei 30 Bildern 30 × 0,05 = 1,5. Gleich schnell – egal wie flott dein
-Rechner ist. (1,5 im Bogenmaß sind etwa 86°.)
+- Zeile 1 holt die Eingabe dieses Bildes.
+- Zeile 2: Hältst du ←, wächst der Drehwinkel `yaw_` um dt × 1,5.
+- Zeile 3: Bei → schrumpft er um dasselbe Stück.
 
-Die Maus dreht ebenfalls, das Mausrad ändert den Abstand (8 bis 80 m), dann wird die Kamera neu
-gesetzt (Z oben). Jede Kiste dreht sich mit eigenem Tempo; `update_instances` lädt nur Geändertes
-hoch. Ein Klick schießt einen Strahl durch den Pixel – die getroffene Kiste wird rot. `set_status`
-schreibt Zeichenbefehle und Dreiecke unten auf die Seite.
+**Rechne nach:** Bei 60 Bildern pro Sekunde ist dt = 1 ÷ 60. Pro Bild kommen 1,5 ÷ 60 = 0,025
+dazu, nach 60 Bildern also 1,5. Bei 30 Bildern ist dt = 1 ÷ 30, pro Bild kommen 0,05 dazu, nach 30
+Bildern 30 × 0,05 = 1,5. **Gleich schnell – egal wie flott dein Rechner ist.** 1,5 ist hier ein
+Winkel und bedeutet knapp eine Viertelumdrehung pro Sekunde.
 
-```cpp
-App* kern_create_app() {
-  static Hello app;
-  return &app;
-}
-```
+> **Krass, aber wahr:** Die 64 Kisten in hello sind **eine** Form mit 64 Kopien. Jede Kopie hat nur
+> ihre eigene Lage, Drehung, Größe und Farbe. Die Grafikkarte malt alle mit **einem** Zeichenbefehl –
+> viel schneller als 64 einzelne.
 
-Diese Funktion braucht jedes Spiel: Die Engine ruft sie beim Start einmal auf und bekommt dein Spiel.
-`static` lässt es so lange leben wie das Modul. Die Seite dazu ist winzig: ein Canvas, eine
-Statuszeile und `runKernApp` (12.3).
+### Vom Text zum Spiel: Module
 
-### Bauen
+Ein Browser kann C++ nicht direkt lesen. Ein **Übersetzer** (Compiler) macht aus dem Programmtext
+eine Datei, die der Browser ausführen kann. Diese Datei heißt **Modul** (im Format WebAssembly).
+Beim Übersetzen wählt man, welche Teile der Engine hinein sollen: Grafik ist immer dabei, Physik,
+Levels oder Studio kommen nur auf Wunsch dazu – wie ein Baukasten, aus dem man nur nimmt, was das
+Spiel braucht. Übersetzt wird nur, was sich seit dem letzten Mal geändert hat.
 
-Du brauchst **wasi-sdk**, Release 25 (gibt es auf GitHub):
-
-```sh
-export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
-kern/build.sh --app \
-  kern/examples/hello/hello.wasm \
-  kern/examples/hello/hello.cpp
-```
-
-Zeile 1 sagt, wo wasi-sdk liegt; der Rest ist ein Befehl (`\` setzt ihn fort): baue aus
-`hello.cpp` die Datei `hello.wasm`. Renderer, Geometrie und Mathe sind immer dabei; Schalter fügen
-Teile hinzu: `--app` (App-Laufzeit), `--physics` (Box3D), `--game` (Levels und Spiel-Laufzeit, mit
-Box3D), `--studio` (Kern Studio, mit `--game`), `--lehrer` (der Lehrer, mit `--game`). Dateien auf
-`.cpp` oder `.cc` sind Quellen, der Rest geht an den Compiler. `KERN_BUILD=debug` baut
-zum Fehlersuchen, `KERN_JOBS` und `KERN_OBJ_CACHE` regeln Tempo und Zwischenspeicher – übersetzt
-wird nur, was sich geändert hat. Das Ergebnis läuft in jedem Browser mit WebGL2, auch Safari ab 15
-([Kapitel 2](02-bauen-und-testen.md)).
+Wie man Kern auf dem eigenen Rechner baut, zeigt [Kapitel 2](02-bauen-und-testen.md). Die genauen
+Namen und Werte stehen im blauen Buch, Kapitel 12.
 
 ### Ein ganzes Spiel: orbrun
 
-`kern/examples/orbrun/orbrun.cpp` (726 Zeilen): Ein Hovercar sammelt in einer Zufallsstadt 24 Orbs,
-während es Nacht wird. W/S fahren, A/D lenken, Leertaste Boost, N schnelle Zeit, Enter neue Stadt;
-am Handy lenkt die linke Hälfte, die rechte boostet. `?time=0.6` in der Adresse startet nachts.
-Jeden Frame liest das Spiel die Eingabe, fährt, bewegt den Verkehr, sammelt, stellt Licht und Kamera
-ein und lädt das Veränderte zur Grafikkarte.
+Das zweite Beispiel ist ein Rennspiel: Ein Hovercar sammelt in einer Zufallsstadt 24 Orbs, während es
+Nacht wird. Jede Runde der Spielschleife liest es die Eingabe, fährt, bewegt den Verkehr, sammelt
+Orbs, stellt Licht und Kamera ein und schickt das Veränderte an die Grafikkarte. Zwei Ideen daraus
+lohnen sich:
 
-> **Vorsicht, Falle:** Das Studio-Level **Orb Run** ist ein anderes Programm mit derselben Idee: aus
-> Actors gebaut, mit Box3D. Das C++-Beispiel macht alles selbst.
+- **Kollision ohne Physik-Engine:** Das Auto ist für die Rechnung nur ein Kreis. Steckt der Kreis in
+  einem Haus, schiebt das Spiel ihn hinaus und lässt das Auto an der Wand abprallen.
+- **Nicht durch Wände flutschen:** Beim Boost legt das Auto in einem Bild ein großes Stück zurück. In
+  einem Bild noch vor der Wand, im nächsten schon dahinter – und den Zusammenstoß gäbe es nie. Darum
+  bewegt es sich in kleinen Teilschritten von höchstens 0,6 m und prüft jeden davon.
 
-- **Stadt:** 7 × 7 Blöcke, 80 m Abstand, 16 m breite Straßen, je Block eine von vier Bebauungen,
-  zur Mitte hin höher ([Kapitel 5](05-szene-und-geometrie.md)).
-- **Kollision ohne Physik-Engine:** Das Auto ist ein Kreis (Radius 1,7 m), der aus den Häusern
-  geschoben wird und an Wänden abprallt. Beim Boost bewegt es sich in Schritten von höchstens 0,6 m,
-  damit es nicht durch Wände flutscht.
-- **Fahrphysik:** Höchsttempo 36 m/s, mit Boost 60 m/s – das sind 36 × 3,6 = **129,6 km/h** und
-  **216 km/h**. Lenken wirkt erst mit Tempo.
-- **Verkehr:** 22 Autos, 9 bis 15 m/s; stehst du weniger als 10 m vor einem, hält es.
-- **Orbs:** näher als 3,2 m – weg, 28 Funken, und am Ende eine Bestzeit.
-- **Tag und Nacht:** 480 s pro Tag, mit N 40 s; Sonne, Mond, Himmel und Nebel folgen. Von allen
-  Lichtwünschen (Scheinwerfer, je Orb eins) bekommt der Renderer die sechs wichtigsten.
-- **Kamera:** folgt weich, weicht bei Tempo zurück, wackelt bei Zusammenstößen; das Mausrad ändert
-  den Abstand.
-- **Status:** eine Zeile wie `ORBS 5/24 | 01:12.4 | … | 87 km/h`, nur neu gesendet, wenn sie sich
-  ändert.
+**Rechne nach:** Mit Boost fährt das Auto höchstens 60 m/s, das sind 60 × 3,6 = **216 km/h**. Bei 30
+Bildern pro Sekunde sind das 2 m pro Bild – mehr als dreimal so viel wie ein Teilschritt.
 
-> **Für Profis:** Die Shader-Erweiterung **NightWindows** zeigt, wie ein Spiel dem Standard-Shader
-> etwas hinzufügt, ohne die Engine anzufassen: Jede Hauswand bekommt vier Zahlen (Länge, Höhe,
-> Zufallswert, Geschosshöhe), daraus malt der Shader ein Fensterraster, das nachts leuchtet. In der
-> Ferne verschwimmt es, damit nichts flimmert ([Kapitel 4](04-grafik.md)).
-
-### Ein eigenes Spiel anlegen
-
-Lege einen Ordner `meinspiel/` mit `meinspiel.cpp` (deine App-Klasse plus `kern_create_app()`) und
-`index.html` an, baue mit `kern/build.sh --app` (für Box3D zusätzlich `--physics`, für Levels
-`--game`) und liefere den Ordner mit `kern.mjs` und `app.mjs` über einen Webserver aus (12.5).
+> **Für Profis:** Die Häuser bekommen nachts leuchtende Fenster, obwohl die Engine keine Fenster
+> kennt. Das Spiel hängt dafür ein kleines Zusatzprogramm an das Malprogramm der Grafikkarte (einen
+> **Shader**), ohne die Engine zu verändern ([Kapitel 4](04-grafik.md)).
 
 ---
 
-## 12.3 Die Plattformschicht app.mjs
+## 12.3 Die Plattformschicht
 
-`kern/web/app.mjs` macht nur, was ein Browser nur in JavaScript erlaubt.
+Zwischen Engine und Browser sitzt ein kleiner Helfer in JavaScript, die **Plattformschicht**. Sie
+erledigt nur, was ein Browser ausschließlich in JavaScript erlaubt: Sie lädt das Modul, hält die
+Zeichenfläche passend groß, reicht Tasten, Maus und Finger weiter und ruft für jedes Bild die
+Spielschleife auf.
 
-```js
-const app = await runKernApp({
-  canvas: document.getElementById("game"),
-  url: "./meinspiel.wasm",
-});
-```
+> **So kannst du es dir vorstellen:** Das Spiel ist die Kassette, die Plattformschicht die Konsole
+> mit Controller-Anschluss und Fernseher-Kabel. Dieselbe Kassette läuft auf jeder Konsole.
 
-Zeile 1 startet dein Spiel und wartet, bis es läuft; Zeile 2 sagt, wo gemalt wird; Zeile 3, welche
-Datei geladen wird. Statt `url` gehen auch Bytes oder Base64. Optional gibt es `onStatus`, `onError`,
-`maxPixelRatio`, Extras für WebGL2 und Startwerte; zurück kommt ein Objekt mit `stop()`.
-Der Gastgeber hält die Zeichenfläche passend groß, liest Tasten nach
-Position (Pfeile scrollen nicht), reicht Maus und Finger weiter, lässt bei Fokusverlust alle Tasten
-los, fängt auf Wunsch die Maus und baut nach einem Grafikkarten-Absturz alles wieder auf. Ohne
-`--app` gebaut heißt es „module was not built with --app“.
+Ein paar Dinge erledigt sie, damit das Spiel nicht daran denken muss: Pfeiltasten scrollen die Seite
+nicht weg. Wechselst du das Fenster, lässt sie alle Tasten los, damit keine „hängen bleibt“. Und stürzt
+die Grafikkarte kurz ab, baut sie alles wieder auf. Die genauen Namen und Werte stehen im blauen Buch,
+Kapitel 12.
 
 ---
 
 ## 12.4 Weg C: aus JavaScript
 
-**Grafik aus JavaScript (wie SpawnCity):** `kern/web/kern.mjs` mit `loadKern` und `KernRenderer`.
-Spiellogik in JavaScript, Malen in C++: Formen mit Namen anlegen (`upsert`), Kopien ändern, Kamera
-setzen, `render()`, Dreiecke anklicken mit `pick`. Im Frame wird nichts neu angelegt; es gibt einen
-Renderer pro Modul ([Kapitel 17](17-referenz.md)).
+Bei Weg C schreibt man die eigene Webseite in JavaScript und lässt Kern nur bestimmte Arbeiten
+machen. Drei Möglichkeiten gibt es:
 
-**Studio-Levels einbauen:** `startGame` aus `kern/web/studio/game.mjs` ist derselbe Spiel-Gastgeber
-wie in exportierten Dateien. `play.html` spielt eingebaute Levels (`?level=orbRun`, `physicsLab`,
-`shootingRange`, `microDuck`, `basic`); ein eigenes gibst du als Text deiner `.klevel`-Datei mit.
-Zurück kommt ein Objekt (auch `window.KernGame`):
+- **Nur malen lassen:** Die Spielregeln stehen in JavaScript, Kern zeichnet. So arbeitet das
+  Drohnenspiel SpawnCity.
+- **Ein Studio-Level einbauen:** Eine eigene Seite spielt ein Level aus Studio ab und kann es
+  steuern – zum Beispiel mit eigenen Bildschirmknöpfen, die die Figur laufen und springen lassen,
+  oder mit einem eigenen Siegerbildschirm.
+- **Logik-Graphen als C++:** Der Knopf **C++** im Logik-Editor macht aus deinem Graphen
+  Programmtext. Eingebaut läuft der Graph als fertig übersetztes Programm, statt Schritt für
+  Schritt gedeutet zu werden – mit genau demselben Ergebnis
+  ([Kapitel 9](09-logik.md)).
 
-```js
-game.command({cmd: "gameInput", moveY: 1, jump: true});
-game.command({cmd: "gameInput", moveY: 0, jump: false});
-if (game.status.hud?.status === "won") showMyWinScreen();
-```
-
-Zeile 1 lässt die Figur vorwärts laufen und springen – wie eigene Bildschirmknöpfe. Zeile 2 lässt
-los. Zeile 3 fragt, ob gewonnen wurde, und ruft dann `showMyWinScreen()` auf. Diese Funktion gibt es
-nicht in Kern: Sie ist ein Beispiel für deinen eigenen Code, der deinen Siegerbildschirm zeigt.
-`gameInput` kennt auch `moveX`, `up`, `boost`, `fire`, `aim`, `reload`, `crouch`, `interact`, `lookX`
-und `lookY`; die Werte addieren sich zu Tastatur, Touch und Gamepad. Das Objekt hat außerdem
-`engine` (alle Studio-Funktionen), `audio` und `net`. Wer ganz ohne Hilfe arbeiten will, ruft die
-Funktionen `kern_studio_…` direkt auf.
-
-**Logik-Graphen als C++:** Der Knopf **C++** im Logik-Editor lädt den Graphen als C++-Text. Mit
-`kern/build.sh --studio` eingebaut, findet ihn die Engine über einen Fingerabdruck (Hash) des Graphen
-und lässt ihn als Maschinencode laufen statt über Interpreter oder JIT – mit demselben Ergebnis
-([Kapitel 9](09-logik.md)).
+Die genauen Namen und Werte stehen im blauen Buch, Kapitel 12, und in
+[Kapitel 17](17-referenz.md).
 
 ---
 
 ## 12.5 Hosten
 
-Ein C++-Spiel besteht aus `meinspiel/index.html`, `meinspiel.wasm` und `kern/web/app.mjs` mit
-`kern.mjs` direkt daneben. Weil die Seite das Modul übers Netz lädt, brauchst du einen
-**Webserver**; für den eigenen Rechner reicht ein einfacher im Hauptordner des Repositorys.
+Ein exportiertes Studio-Spiel ist eine einzige Datei. Ein C++-Spiel besteht aus mehreren: einer
+Webseite, dem Modul und der Plattformschicht. Die Seite **lädt** das Modul und die Plattformschicht
+**nach**, und das erlaubt ein Browser aus Sicherheitsgründen nur über einen **Webserver** – nicht,
+wenn du die Datei per Doppelklick öffnest. Ein Webserver ist ein Programm, das Dateien so ausliefert
+wie eine Internetseite; für den eigenen Rechner reicht ein ganz einfacher.
 
 > **So kannst du es dir vorstellen:** Das exportierte Studio-Spiel ist ein fertiges Lunchpaket in
 > einer Dose. Das C++-Spiel ist Kochen in der Schulküche – du brauchst die Küche dazu.
@@ -309,34 +289,36 @@ Ein C++-Spiel besteht aus `meinspiel/index.html`, `meinspiel.wasm` und `kern/web
 
 ## 12.6 Veröffentlichen
 
-**Die Rechte:** Kern ist Open Source (Apache License 2.0). Eigene Spiele und Netze darfst du nutzen,
-weitergeben und verkaufen, auch ohne deinen Quellcode zu zeigen. Wer ein exportiertes Spiel
-weitergibt, legt Lizenz und NOTICE bei (im HTML reicht ein Hinweis mit Link) und lässt die
-Urheberrechtsvermerke drin. „Made with Kern“ ist erlaubt, dein Produkt „Kern“ zu nennen nicht. Teile von anderen behalten ihre Lizenzen
-([Anhang D](D-lizenzen.md)).
+**Die Regeln in einfach:** Kern ist Open Source, also frei benutzbar.
 
-**Ausnahme Micro Duck:** Pollens 3D-Modelle der Ente (CC BY-NC-SA 4.0) sind **nur nicht
-kommerziell** erlaubt. Zum Verkaufen baust du mit `KERN_COMMERCIAL=1 tools/build_studio.sh` (oder
-`kern/build.sh --commercial`); dann hat die Ente kein Aussehen. Pollens Netze (Apache 2.0) dürfen
-mit Lizenz und NOTICE mit.
+| Du darfst | Du darfst nicht |
+|---|---|
+| eigene Spiele weitergeben und sogar verkaufen | dein Spiel „Kern“ nennen |
+| „Made with Kern“ draufschreiben | die Lizenzhinweise entfernen |
+| deinen eigenen Code geheim halten | das Aussehen der Ente verkaufen |
 
-**Studio-Spiele** lädst du auf einen Webspace, legst sie in ein Repository mit GitHub Pages oder
-verschickst sie direkt. Mit Ente gehören `microduck/` und `policies/` daneben, sonst kann sie nur
-laufen ([Kapitel 11](11-studio.md)). Online spielen geht mit `?host=raum`, `?join=raum` und für
-verschiedene Rechner einem Relay (`node tools/net_relay.mjs`, Port 8790) plus `&relay=`
-([Kapitel 10](10-netzwerk.md)).
+Wer ein exportiertes Spiel weitergibt, legt einen Hinweis auf die Lizenz bei (im Spiel reicht ein
+Link). Teile von anderen behalten ihre eigenen Regeln ([Anhang D](D-lizenzen.md)).
 
-**C++-Spiele** lädst du mit derselben Ordnerstruktur hoch. Kern selbst baut so in seiner CI
-(`.github/workflows/ci.yml`) Studio, hello und orbrun und veröffentlicht alles auf GitHub Pages unter
-https://kernengine.de/ – Studio als installierbare App im Ordner `editor/`, mit den Netzordnern der
-Ente; der Quellcode liegt auf https://github.com/ChristianHohlfeld/kernengine.de.
+**Ausnahme Micro Duck:** Das Aussehen der Ente stammt von Pollen Robotics und darf **nur nicht
+kommerziell** benutzt werden, also nicht in einem Spiel, mit dem man Geld verdient. Für ein Spiel
+zum Verkaufen gibt es eine Bauweise ohne dieses Aussehen. Pollens Netze dürfen mit.
+
+**Studio-Spiele** lädst du – am besten zusammen mit einem Erwachsenen – auf einen Webspace oder eine
+kostenlose Projektseite, oder du verschickst die Datei einfach. Mit Ente gehören zwei Ordner mit
+ihren Netzen daneben, sonst kann sie nur laufen ([Kapitel 11](11-studio.md)). Wie man online
+zusammen spielt, steht in [Kapitel 10](10-netzwerk.md).
+
+**C++-Spiele** kommen mit allen ihren Dateien auf einen Webserver. Kern selbst macht das automatisch:
+Bei jeder Änderung baut ein Automat Studio und die Beispiele neu und stellt alles auf
+https://kernengine.de/. Der Quellcode liegt auf https://github.com/ChristianHohlfeld/kernengine.de.
 
 | Prüfliste | Studio-Spiel | C++-Spiel |
 |---|---|---|
-| keine Fehler | Output Log | Browser-Konsole, `onError` |
+| keine Fehler | Output Log | Fehleranzeige des Browsers |
 | Handy | Sticks kommen von selbst | Touch selbst auswerten |
 | Ton | nach erstem Klick | Sache des Spiels |
-| Dateien | eine HTML (plus Ente-Ordner) | HTML, `.wasm`, `kern.mjs`, `app.mjs` |
+| Dateien | eine HTML (plus Ente-Ordner) | Seite, Modul, Plattformschicht |
 | Auslieferung | beliebig, auch als Datei | Webserver |
 
 > **Mission:** Geh die Prüfliste für Orb Garden durch: Log ohne Fehler? Läuft es am Handy? Musik nach
@@ -348,27 +330,31 @@ Ente; der Quellcode liegt auf https://github.com/ChristianHohlfeld/kernengine.de
 
 - Du kennst die drei Wege zu einem Kern-Spiel.
 - Du hast ein Sammelspiel in zehn Schritten gebaut, gespeichert und exportiert.
-- Du weißt, dass ein kaputter Logik-Graph das Spiel nicht stoppt – und wo du nachschaust.
-- Du verstehst `update` und `dt` in einem C++-Spiel.
-- Du weißt, warum 64 Kisten mit einem Zeichenbefehl gemalt werden.
+- Du weißt, was Hazard, Damage Zone und Checkpoint unterscheidet.
+- Du kennst die Spielschleife: Eingabe, Rechnen, Malen – in jedem Bild.
+- Du weißt, warum Spiele mit dt rechnen und warum schnelle Dinge in Teilschritten fahren.
 - Du kennst die Regeln fürs Weitergeben und Verkaufen.
 
 ## Rätsel-Ecke
 
 1. Warum ist **Basic** ein besserer Start als **Empty**?
 2. Dein Shapes-Würfel fällt nicht. Was fehlt?
-3. Warum läuft das exportierte Studio-Spiel per Doppelklick, das C++-Spiel nicht?
-4. **Boss-Rätsel:** Ein Spiel bewegt eine Figur mit `x += 5 * frame.dt`. Rechner A schafft 50
-   Bilder pro Sekunde, B 25. Wie weit kommt die Figur in 2 Sekunden? Und mit `x += 0.1` ohne `dt`?
+3. Deine Figur läuft in eine Damage Zone und hat danach keine Gesundheit mehr. Wo taucht sie wieder
+   auf? Und was passiert stattdessen bei einem Hazard?
+4. Warum läuft das exportierte Studio-Spiel per Doppelklick, das C++-Spiel nicht?
+5. **Boss-Rätsel:** Ein Spiel macht in jedem Bild „ändere x um 5 · dt“. Rechner A schafft 50 Bilder
+   pro Sekunde, B 25. Wie weit kommt die Figur in 2 Sekunden? Und mit „ändere x um 0,1“ ohne dt?
 
 ### Lösungen
 
-1. Empty hat **keinen Boden**.
+1. Empty hat **keinen Boden** – die Figur fiele ins Leere.
 2. Ein **Rigid Body** mit **Mobility = Dynamic** – oder gleich eine Physics Cube.
-3. Das Studio-Spiel hat **alles in einer Datei**; das C++-Spiel lädt `.wasm` und Module nach, was der
-   Browser nur über einen Webserver erlaubt.
-4. Mit `dt` beide **10 m** (5 m pro Sekunde mal 2 s). Ohne `dt` kommt A 100 × 0,1 = 10 m weit, B nur
-   50 × 0,1 = **5 m**. Darum rechnen Spiele mit `dt`.
+3. Am letzten **Checkpoint**, den sie berührt hat (ohne Checkpoint am Start). Ein Hazard dagegen
+   beendet die Runde: Das Spiel ist verloren.
+4. Das Studio-Spiel hat **alles in einer Datei**. Das C++-Spiel lädt Modul und Plattformschicht nach,
+   und das erlaubt der Browser nur über einen Webserver.
+5. Mit dt beide **10 m** (5 m pro Sekunde mal 2 s). Ohne dt kommt A 100 × 0,1 = 10 m weit, B nur
+   50 × 0,1 = **5 m**. Darum rechnen Spiele mit dt.
 
 ---
 

@@ -3,15 +3,33 @@
 > **Dein Level:** Du betrittst Kern, eine echte 3D-Engine im Browser. Du erfährst, was darin
 > steckt, nach welchen Regeln sie gebaut ist und wie du dieses Buch spielst.
 
+> **Wörter, die du brauchst:**
+> - **Programmiersprache** – eine Sprache, in der Menschen einem Computer genaue Anweisungen
+>   aufschreiben. C++ und JavaScript sind zwei davon.
+> - **Browser** – das Programm, mit dem du Webseiten öffnest, etwa Chrome, Firefox oder Safari.
+> - **Grafikkarte** – der Chip im Computer, der die Bilder zeichnet.
+> - **Bit** – die kleinste Einheit im Computer: eine 0 oder eine 1. Alle Zahlen bestehen aus Bits.
+> - **Simulation** – eine Welt im Computer, die nach festen Regeln Schritt für Schritt weiterrechnet,
+>   zum Beispiel wie ein Würfel fällt.
+> - **Level** – eine Spielwelt mit allem, was darin steht.
+
 Hallo und willkommen! Unter jedem Spiel steckt eine **Engine**, der Motor unter der Haube. Das
 Spiel sagt nur: „Hier steht ein Auto, bei W fährt es.“ Zeichnen, Physik und Ton erledigt die Engine.
 
-In diesem Buch nimmst du die Engine **Kern** auseinander. Auf
-https://kernengine.de/ warten **Kern Studio**, ein Editor, in dem du Welten baust und
-sofort spielst; die **Micro Duck**, ein zweibeiniger Roboter von Pollen Robotics, der in Kern mit
-seinen echten, trainierten Netzen läuft; der **Lehrer**, der neue Netze für diesen Roboter
-trainiert; dazu spielbare Levels wie **Orb Run** und **Physics Lab** und die C++-Beispiele `hello`
-und `orbrun`.
+In diesem Buch nimmst du die Engine **Kern** auseinander. Auf https://kernengine.de/ findest du
+alles, worum es geht:
+
+- **Kern** ist die Engine: Sie zeichnet, rechnet Physik und spielt Töne, für jedes Spiel, das sie
+  benutzt.
+- **Kern Studio** ist der Editor: Dort baust du Welten aus fertigen Teilen und spielst sie sofort.
+- Die **Micro Duck** ist ein echter zweibeiniger Roboter der Firma Pollen Robotics. In Kern läuft sie
+  als Nachbau in der Simulation, gesteuert von ihren echten Netzen.
+- Ein **Netz** (genauer: neuronales Netz) ist ein künstliches „Gehirn“ aus vielen Zahlen, das durch
+  Üben lernt. Bei der Micro Duck steuert ein Netz die Beine.
+- Der **Lehrer** ist das Programm, das solche Netze trainiert: Er lässt viele Enten in der Simulation
+  üben, bis sie laufen oder springen können.
+
+Dazu gibt es spielbare Levels wie **Orb Run** und **Physics Lab**.
 
 ![Kern Studio mit dem Level Orb Run](../buch/bilder/studio.png)
 
@@ -21,159 +39,185 @@ und `orbrun`.
 
 > **Vorsicht, Falle:** Auf einem deutschen Rechner zeigt Studio deutsche Beschriftungen, etwa
 > „Datei“ statt „File“. Dieses Buch nennt die englischen. Schalte deshalb mit dem Knopf **DE | EN**
-> unten rechts in der Statusleiste auf Englisch um oder öffne Studio mit `?lang=en` am Ende der
-> Adresse. Studio merkt sich die Wahl auf deinem Gerät.
+> unten rechts in der Statusleiste auf Englisch um. Studio merkt sich die Wahl auf deinem Gerät.
 
 ## 1.1 Was Kern ist
 
-Kern ist in **C++20** geschrieben. Browser verstehen kein C++, deshalb übersetzt der Werkzeugkasten
-**wasi-sdk** Kern nach **WebAssembly**, einer Maschinensprache für Browser. Gezeichnet wird mit
-**WebGL2**. Entstanden ist Kern aus dem Spiel **SpawnCity**, aber die Engine kennt SpawnCity nicht:
-Spiele sprechen mit der Engine, nie umgekehrt.
+Kern ist in der Programmiersprache **C++** geschrieben. Die ist schnell, aber Browser verstehen sie
+nicht. Deshalb wird Kern vorher **übersetzt**, und zwar in **WebAssembly**, eine Maschinensprache,
+die jeder moderne Browser versteht und sehr schnell ausführt. Das Zeichnen übernimmt die Grafikkarte;
+Kern spricht sie über
+**WebGL2** an, den Weg, auf dem eine Webseite der Grafikkarte Zeichenbefehle gibt.
 
-| Teil | Was er macht |
-|---|---|
-| Grundlagen, Mathematik | Typen, Fehler, JSON, Vektoren |
-| Renderer, Szene, Geometrie | zeichnen, Häuser, Straßen, Gelände |
-| Physik (Box3D) | Stöße, Gelenke, Schwerkraft |
-| Audio | Mixer, 3D-Klang, Stimme der Ente |
-| Spiel-Laufzeit | Levels, Spieler, Regeln |
-| Logik, Netzwerk | Bausteine, Mehrspieler |
-| Studio, Lehrer | Editor und Trainer |
-| JavaScript-Schicht | Brücke zum Browser |
+> **So kannst du es dir vorstellen:** Ein Buch erscheint auf Englisch. Damit es in Deutschland jeder
+> lesen kann, übersetzt es jemand einmal. Danach liest jeder die Übersetzung. Genauso wird Kern
+> einmal von C++ nach WebAssembly übersetzt, und dein Browser führt die Übersetzung aus.
+
+Entstanden ist Kern aus dem Spiel **SpawnCity**. Trotzdem kennt die Engine SpawnCity nicht: **Spiele
+sprechen mit der Engine, nie umgekehrt.** Das hat einen guten Grund. Weil die Engine nichts über ein
+bestimmtes Spiel weiß, kann man mit ihr beliebig viele verschiedene Spiele bauen.
+
+Kern besteht aus diesen Teilen:
+
+| Teil | Was er macht | Zum Beispiel |
+|---|---|---|
+| Grundlagen, Mathe | Zahlen, Fehler, Positionen | wo der Würfel steht |
+| Grafik | Bilder zeichnen | Häuser, Straßen, Gelände |
+| Physik | Stöße, Gelenke, Schwerkraft | eine Kiste fällt um |
+| Ton | Klänge mischen, 3D-Klang | das Quaken wird lauter, wenn die Ente näher kommt |
+| Spiel-Laufzeit | Levels, Spieler, Regeln | Orb einsammeln gibt Punkte |
+| Logik, Netzwerk | Spielabläufe, Mehrspieler | Tür geht auf, wenn du davorstehst |
+| Studio, Lehrer | Editor und Trainer | Welt bauen, Ente trainieren |
+| JavaScript-Schicht | Brücke zum Browser | Tastendruck weitergeben |
 
 ## 1.2 Kerns Regeln
 
-**Alles selbst gemacht.** Kern nutzt weder die Grafik-Engine three.js noch den Übersetzer
-Emscripten. Der Renderer ruft WebGL2 direkt auf. Das Modul ist ein **Reactor**: kein Hauptprogramm,
-sondern der Browser ruft einmal eine Startfunktion und danach, was er braucht. Weil Kern nur den
-Grundumfang von WebAssembly plus vier weit verbreitete Erweiterungen nutzt, läuft es auf jedem
-WebGL2-Browser, sogar Safari ab 15.
+Kern folgt drei großen Regeln.
 
-**JavaScript ist nur der Kellner.** Grafikkarte, Tasten, Töne und Dateien erreicht
-im Browser nur JavaScript. Genau das – und nur das – erledigt die JavaScript-Schicht. Selbst die Studio-Fenster
-zeichnet sie nur nach Angaben des C++-Editors, und der Blueprint-Editor hält keinen eigenen Graphen:
-Jede Änderung ist ein Befehl an die Engine.
+**Alles selbst gemacht.** Kern benutzt keine fremde Grafik-Engine und kein fremdes Gerüst. Der Code,
+der zeichnet, ist Kerns eigener und spricht die Grafikkarte direkt an. So weiß man bei jedem Bild
+genau, woher es kommt.
+
+**JavaScript ist nur der Kellner.** Grafikkarte, Tasten, Töne und Dateien erreicht im Browser nur
+die Programmiersprache JavaScript. Genau das – und nur das – erledigt Kerns JavaScript-Teil. Was ein
+Spiel tut, steht in C++. Selbst die Fenster von Studio zeichnet JavaScript nur nach den Angaben, die
+der Editor in C++ macht.
 
 > **So kannst du es dir vorstellen:** Der Kellner bringt die Bestellung in die Küche und das Essen
 > an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche.
 
-Alles, was ein Spiel tut, steht in C++ und lässt sich ohne Browser testen.
+Der Vorteil: Alles, was ein Spiel tut, lässt sich auch ohne Browser testen (das zeigt
+[Kapitel 2](02-bauen-und-testen.md)).
 
-**Überall exakt gleich.** Eine Simulation oder ein Training kommt auf einem PC mit x86-Chip, einem
-Mac mit ARM-Chip und im Browser **Bit für Bit** gleich heraus. Das heißt **Determinismus**. Dafür
-zieht Kern `a*b+c` nie zu einem Rechenschritt zusammen, lässt Box3D ohne Spezialbefehle laufen,
-bringt `sin`, `cos` und Co. selbst mit und rechnet beim Lernen unabhängig davon, wie viele Helfer
-mitarbeiten ([Kapitel 3](03-grundlagen.md)). Ein **Fingerabdruck** prüft das auf drei Plattformen
-([Kapitel 2](02-bauen-und-testen.md)).
+**Überall exakt gleich.** Eine Simulation kommt auf einem PC, einem Mac und im Browser **Bit
+für Bit** gleich heraus. Das heißt **Determinismus**. Warum ist das schwer? Computer runden. Teil
+1 durch 3, und du bekommst 0,3333… ohne Ende. Irgendwo muss der Computer aufhören und runden. Rundet
+ein Rechner an der allerletzten Stelle ein winziges bisschen anders als ein anderer, merkt man das
+zuerst gar nicht. Aber eine Simulation rechnet Tausende Schritte, und jeder baut auf dem vorigen
+auf. So schaukelt sich der winzige Unterschied auf, bis die Ente nach ein paar Sekunden den Fuß
+woanders hinsetzt.
 
-> **Krass, aber wahr:** Weil Kern so exakt rechnet, ist ein Unterschied zwischen echtem Roboter und
-> Simulation ein echter Modellfehler und kein Zufallsrauschen ([Kapitel 16](16-kalibrierung.md)).
+> **So kannst du es dir vorstellen:** Stille Post. Flüstert der Erste nur einen Laut ein bisschen
+> anders, kommt am Ende der Reihe ein ganz anderer Satz an. Kern sorgt dafür, dass jeder Rechner
+> exakt gleich flüstert.
 
-**Noch mehr Regeln:**
+Wie Kern das schafft, steht in [Kapitel 3](03-grundlagen.md). Wie man es beweist, mit einem
+**Fingerabdruck** der Simulation, steht in [Kapitel 2](02-bauen-und-testen.md).
 
-- Keine Ausnahmen (Exceptions): Bei Fehlern gibt es `false` und eine Meldung.
-- Eingaben werden geprüft, kaputte ändern nichts Bestehendes. Der JSON-Leser
-  lehnt zum Beispiel zu tief verschachtelte Texte ab.
-- JavaScript legt beim Zeichnen keinen neuen Speicher an.
-- Keine Schummelei: Die Micro Duck steht nur durch Servos und Bodenkontakt.
-- Editor, Spiel und Lehrer teilen Spielwelt, Servos und Physik.
-- Verliert der Browser die Grafikkarte, pausiert Kern und baut danach alles neu auf.
+Wozu der Aufwand? Läuft etwas schief, läuft es auf jedem Rechner genau gleich schief. Dann kann man
+den Fehler immer wieder herbeiführen, finden und reparieren.
+
+> **Krass, aber wahr:** Weil Kern so exakt rechnet, liegt ein Unterschied zwischen dem echten Roboter
+> und der Simulation nie am Zufall. Er zeigt, dass das Modell der Ente an einer Stelle noch nicht
+> stimmt – und genau das will man wissen ([Kapitel 16](16-kalibrierung.md)).
+
+**Noch drei kleine Regeln:**
+
+- **Erst prüfen, dann ändern.** Kern prüft alles, was von außen kommt. Eine kaputte Eingabe ändert
+  nichts am Bestehenden.
+- **Keine Schummelei.** Die Micro Duck steht nur durch die Motoren in ihren Gelenken und ihren
+  Kontakt zum Boden. Keine unsichtbare Hand hält sie fest.
+- **Eine Welt für alle.** Editor, exportiertes Spiel und Lehrer benutzen dieselbe Spielwelt,
+  dieselben Motoren und dieselbe Physik.
+
+> **Für Profis:** Kern verzichtet bewusst auf die Grafik-Engine three.js und den Übersetzer
+> Emscripten. Das Modul läuft ab Safari 15 auf jedem Browser mit WebGL2. Verliert der Browser
+> kurz die Grafikkarte, pausiert Kern und baut danach alles neu auf. Die genauen Namen und Werte
+> stehen im blauen Buch, Kapitel 1.
 
 ## 1.3 Der Bauplan: Stockwerke
 
-Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter.
+Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter, nie die darüber. Die Grafik
+weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen.
 
 ```mermaid
 flowchart TD
-  JS["JavaScript-Schicht"] --> ABI["C-Schnittstelle"]
+  JS["JavaScript, der Kellner"] --> ABI["die Tür"]
   ABI --> ST["Studio und Lehrer"]
-  ST --> SP["Spiel-Laufzeit"]
-  SP --> MID["Physik, Logik, Netz, Audio"]
+  ST --> SP["Spielregeln und Levels"]
+  SP --> MID["Physik, Logik, Netzwerk, Ton"]
   MID --> GFX["Grafik, Szene, Geometrie"]
-  GFX --> CORE["Grundlagen, Mathematik"]
+  GFX --> CORE["Grundlagen, Mathe"]
 ```
 
-Manche Stockwerke kommen nur per Schalter dazu: `--app` (Spiele ganz in C++), `--physics` (Box3D),
-`--game` (bringt die Physik mit), `--studio` und `--lehrer` (bringen Spiel-Laufzeit und Physik mit).
-Alles andere, etwa Grafik, Audio, Logik und Netzwerk, ist immer drin.
+Nicht jedes Stockwerk ist immer eingebaut. Physik, Spielregeln, Studio und Lehrer kommen nur dazu,
+wenn man sie anfordert. Wer Studio will, bekommt Spielregeln und Physik automatisch mit, weil Studio
+darauf steht. Grafik, Ton, Logik und Netzwerk sind immer dabei.
 
-Zwischen C++ und JavaScript gibt es nur eine Tür: den Speicher des Moduls. Der Browser legt dort
-Zahlen ab und gibt der Engine die Adresse; Texte gehen als „Adresse plus Länge“. Studio antwortet mit JSON-Text im Speicher. Umgekehrt ruft die
-Engine Funktionen des Browsers auf, etwa zum Zeichnen oder für die Uhrzeit
-([Kapitel 17](17-referenz.md)).
+Zwischen C++ und JavaScript gibt es nur **eine Tür**: einen Speicherbereich, auf den beide Seiten
+zugreifen dürfen.
 
-> **Vorsicht, Falle:** Wo welche Zahl liegt, ist auf beiden Seiten fest vereinbart. Ändert man es
-> nur in C++, reden beide aneinander vorbei.
+> **So kannst du es dir vorstellen:** eine Wand voller nummerierter Schließfächer. Der Browser legt
+> Zahlen in die Fächer und sagt der Engine nur: „Schau ab Fach 1000 nach.“ Ein Text geht als „ab
+> Fach 2000, so und so viele Zeichen“. Antworten legt die Engine genauso in Fächer zurück.
+
+Umgekehrt kann die Engine den Browser um etwas bitten, etwa „zeichne das“ oder „wie spät ist es?“.
+
+> **Vorsicht, Falle:** Beide Seiten müssen genau wissen, in welchem Fach welche Zahl liegt. Ändert
+> man die Reihenfolge nur auf einer Seite, liest die andere Unsinn. Die Liste aller Fächer und Türen
+> steht in [Kapitel 17](17-referenz.md) und im blauen Buch, Kapitel 1.
 
 ## 1.4 Vier Formen, ein Code
 
-**Ein Spiel ganz in C++.** So stellt das kleinste Beispiel `hello` seinen Renderer ein:
+Derselbe C++-Code von Kern steckt in vier verschiedenen Dingen. Je nach Zweck werden andere
+Stockwerke zusammengestellt.
 
-```cpp
-RendererOptions configure() override {
-  RendererOptions o;
-  o.shadows = true;
-  o.shadow.resolution = 1024;
-  o.shadow.extent = 40;
-  return o;
-}
-```
+| Form | Was es ist | Beispiel |
+|---|---|---|
+| Spiel ganz in C++ | ein Spiel, das Kern direkt benutzt | die Beispiele Hello und Orb Run |
+| Nur die Grafik | eine Webseite, die mit Kern zeichnet | SpawnCity |
+| Studio | der Editor, auch für fertige Spiele | dein eigenes Level |
+| Lehrer | der Trainer für die Ente | ein neues Sprung-Netz |
 
-Ein leerer Einstellungszettel `o`, Schatten an, Schattenkarte mit Auflösung 1024, die
-40 Meter in jede Richtung abdeckt, Zettel abgeben. Danach ruft der Browser in jedem Bild `update()` auf
-([Kapitel 12](12-eigene-spiele.md)). Das größere `orbrun` hat Stadt, Verkehr und Tag und Nacht.
+**Ein Spiel ganz in C++.** Beim Start sagt das Spiel der Engine, was es braucht, zum Beispiel:
+„Ich will Schatten.“ Danach fragt der Browser das Spiel bei jedem Bild, das der Bildschirm zeigt:
+„Was ist jetzt passiert?“ Das Spiel bewegt seine Dinge, und die Engine zeichnet das neue Bild. Diese
+Runde heißt **Spielschleife** ([Kapitel 12](12-eigene-spiele.md)).
 
-**Nur der Renderer.** So nutzt SpawnCity Kern: JavaScript lädt das Modul und lässt es zeichnen
+**Nur die Grafik.** So nutzt SpawnCity Kern: Eine Webseite lädt Kern und lässt es nur zeichnen
 ([Kapitel 4](04-grafik.md)).
 
-**Studio und exportierte Spiele.** Das ganze Studio ist **eine** HTML-Datei, die offline per
-Doppelklick läuft. **File → Package Game (HTML)…** macht aus deinem Level ebenfalls eine einzige HTML-Datei,
-die mit denselben C++-Klassen spielt ([Kapitel 11](11-studio.md)).
+**Studio und exportierte Spiele.** Das ganze Studio steckt in **einer** einzigen Datei, die sogar
+ohne Internet per Doppelklick läuft. **File → Package Game (HTML)…** macht aus deinem Level
+ebenfalls eine einzige Datei. Darin spielt dein Level mit genau demselben C++-Code wie im Editor
+([Kapitel 11](11-studio.md)).
 
-**Der Lehrer.** Er trainiert Netze für die Micro Duck: als Programm auf allen Prozessorkernen oder
-im Browser auf `/lehrer/`. Gleicher Startwert, gleich viele Enten – überall dasselbe Netz. Das
-Studio lädt es wie Pollens Netze ([Kapitel 14](14-lehrer.md)).
+**Der Lehrer.** Er trainiert Netze für die Micro Duck: als eigenes Programm, das einen ganzen Computer
+zum Rechnen nutzt, oder direkt im Browser. Startet man ihn zweimal genau gleich, kommt beide Male Bit für
+Bit dasselbe Netz heraus. Studio lädt dieses Netz wie die Netze von Pollen
+([Kapitel 14](14-lehrer.md)).
 
-In der Micro Duck greift alles ineinander: Modell von Pollen, Glieder aus Box3D-Körpern, Servos mit
-Gerätemodell, Netze, die Kern selbst rechnet, Stimme aus dem Mixer, Logik-Bausteine der Kategorie
-*Robots* – und im Studio ein Actor wie jeder andere.
+In der Micro Duck greift alles ineinander: Physik für ihre Glieder, Motoren in den Gelenken, Netze
+fürs Gehirn, Ton für ihr Quaken, Logik für Befehle – und im Studio ist sie ein Ding im Level wie jedes
+andere.
 
 > **Mission:** Stoppe ein laufendes Spiel mit **Esc**, denn während Play sind die Menüeinträge
 > gesperrt. Lade **File → Example Levels → Micro Duck** und drück **Play**. Erst schaust du zu,
 > wie die Ente allein herumläuft. **F8** übernimmt sie: **W** läuft, **A**/**D** drehen, die
 > **Leertaste** quakt.
 
-> **Mission:** Öffne von der Startseite aus den **Lehrer** und schau dich um.
+> **Mission:** Öffne von der Startseite aus den **Lehrer**. Wähle bei **Bewegung** „Stehen
+> (Schnelltest)“ und drück **Start**. Beobachte die Kurve **Episodenlänge**: Ein Versuch endet,
+> sobald eine Ente stürzt. Steigt die Kurve, halten die Enten länger durch – das Netz lernt gerade.
+> Mit **Pause** hältst du an.
 
 ## 1.5 Wo alles liegt
 
-Der Quellcode ist offen: https://github.com/ChristianHohlfeld/kernengine.de (Apache License 2.0).
+Der ganze Quellcode von Kern ist **offen** und liegt auf
+https://github.com/ChristianHohlfeld/kernengine.de – jeder darf hineinschauen, daraus lernen,
+Fehler finden und Kern unter den Regeln der Lizenz für eigene Projekte benutzen. Und jeder kann
+nachprüfen, ob das, was dieses Buch erzählt, wirklich so im Code steht.
 
-```
-tools/        Studio bauen, Relay, Import
-site/         Startseite
-generated/    fertig gebaute Dateien
-kern/         die Engine
-  include/    Header      src/   Code
-  web/        JavaScript  tests/ Tests
-  examples/   hello, orbrun
-  policies/   Kerns eigene Netze
-  third_party/  Box3D, musl, Micro Duck
-  docs/       Dokumente und Bücher
-```
-
-Für Physik und Micro Duck sind `kern/docs/physics.md` und `walker.md` verbindlich.
-
-> **Vorsicht, Falle:** Die SpawnCity-Dateien aus `kern/README.md` liegen im SpawnCity-Repository.
+> **Für Profis:** Die Engine liegt im Ordner `kern/`, darin Code, Tests, Beispiele, die
+> JavaScript-Schicht und die Bücher. Die Lizenz ist die Apache License 2.0. Den ganzen Ordnerbaum
+> erklärt das blaue Buch, Kapitel 1.
 
 ## 1.6 So spielst du dieses Buch
 
-**Jedes Kapitel ist ein Level.** Oben steht **Dein Level**. Es geht von unten nach oben: Bauen und
-Grundlagen, Grafik bis Netzwerk, Studio und eigene Spiele, Micro Duck bis Kalibrierung, zum
-Schluss die [Referenz](17-referenz.md). Drei Bonuslevel erklären neuronale Netze
-([A](A-grundlagen-neuronale-netze.md)), Echtzeit-Grafik ([B](B-grundlagen-rendering.md)) und
-Physik ([C](C-grundlagen-physik.md)).
+**Jedes Kapitel ist ein Level.** Oben steht **Dein Level**, gleich darunter **Wörter, die du
+brauchst**. Es geht von unten nach oben wie im Hochhaus: Bauen und Grundlagen, Grafik bis Netzwerk,
+Studio und eigene Spiele, Micro Duck bis Kalibrierung, zum Schluss ein
+[Spickzettel](17-referenz.md).
 
 | Kasten | Was drinsteht |
 |---|---|
@@ -185,36 +229,54 @@ Physik ([C](C-grundlagen-physik.md)).
 
 Am Ende: **Level geschafft!** und die **Rätsel-Ecke**.
 
-Abkürzungen: Kern ändern – 2 und 3 (vor Physik oder Roboter auch 6 und 13). Spiele bauen – 11
-oder 12, dazu 8 und 9. Ente – 13, 14, 16. Kern in eine Webseite einbauen – 4 und 17.
+**Dein Leseweg.** Drei Bonuslevel sind deine **Nachschlagehilfe**: Anhang
+[A](A-grundlagen-neuronale-netze.md) erklärt, wie Netze lernen, Anhang
+[B](B-grundlagen-rendering.md), wie aus Dreiecken Bilder werden, und Anhang
+[C](C-grundlagen-physik.md), wie eine Physiksimulation denkt. Du musst sie nicht zuerst lesen.
+Klemmt es aber, schlag dort nach. Ein guter Tipp: Lies Anhang B vor
+[Kapitel 4](04-grafik.md), Anhang C vor [Kapitel 6](06-physik.md) und Anhang A vor
+[Kapitel 14](14-lehrer.md).
+
+Du willst gleich loslegen? Für eigene Spiele sind [Kapitel 11](11-studio.md) und
+[Kapitel 12](12-eigene-spiele.md) dein Start. Für die Ente liest du [Kapitel 13](13-micro-duck.md),
+[14](14-lehrer.md) und [16](16-kalibrierung.md).
+
+**Die Konsole „Cmd“.** In Studio gibt es ganz unten in der Statusleiste ein kleines Eingabefeld mit
+der Aufschrift **Cmd**. Das ist die **Konsole**: Dort tippst du kurze Befehle, statt im Menü zu
+suchen. Die Antwort erscheint daneben als Meldung in der Statusleiste. Mit ↑ und ↓ holst du frühere
+Eingaben zurück, **Esc** verlässt das Feld. Ein paar Missionen in diesem Buch benutzen sie.
+
+> **Mission:** Klick unten auf **Cmd**, tipp `help` und drück Enter: Studio zeigt alle Befehle. Tipp
+> dann `tod 0.75` – die Tageszeit springt auf Sonnenuntergang. Mit `tod 0.5` ist wieder Mittag.
 
 **Drei Bücher, ein Inhalt.** Du liest das **gelbe Buch**. Das **grüne** erklärt alles einfach für
 Erwachsene ohne Vorwissen, das **blaue** geht technisch bis ins letzte Detail und ist die Quelle für
 alle drei. Packt dich ein Thema, schlag im blauen Buch nach!
 
-> **Für Profis:** Der Code im Buch stammt aus dem echten Quelltext. Pfade gelten ab `kern/`, außer
-> bei `tools/`, `site/` und `generated/`.
-
 ## Level geschafft!
 
-- Du weißt, was eine Engine ist und was in Kern steckt.
-- Du kennst C++20, WebAssembly und WebGL2 als Zutaten.
+- Du weißt, was Engine, Studio, Micro Duck, Netz und Lehrer sind.
+- Du weißt, warum der Browser eine Übersetzung von Kern braucht.
 - Du weißt, warum JavaScript nur der Kellner ist.
-- Du kennst Kerns Stockwerke und die vier Formen aus einem Code.
-- Du hast Orb Run gespielt und die Micro Duck gesteuert.
+- Du weißt, warum Kern auf jedem Rechner Bit für Bit gleich rechnen muss.
+- Du kennst das Hochhaus: Oben benutzt unten, nie andersherum.
+- Du hast Orb Run gespielt, die Micro Duck gesteuert und die Konsole benutzt.
 
 ## Rätsel-Ecke
 
 1. Warum läuft Kern nicht direkt als C++ im Browser?
-2. Du baust mit `--studio`. Was kommt automatisch mit?
+2. Warum darf die Engine nichts über ein bestimmtes Spiel wissen?
 3. **Boss-Rätsel:** Warum läuft ein im Lehrer trainiertes Netz im Studio genauso?
 
 ### Lösungen
 
-1. Browser verstehen kein C++; wasi-sdk übersetzt es nach WebAssembly.
-2. Spiel-Laufzeit (`--game`) und Physik (`--physics`).
-3. Lehrer und Studio teilen Spielwelt, Servos und Physik, und Kern rechnet überall Bit für Bit
-   gleich. Das Netz trifft auf genau dieselbe Welt.
+1. Browser verstehen kein C++. Darum wird Kern vorher nach WebAssembly übersetzt, und das versteht
+   jeder moderne Browser.
+2. Dann kann man mit derselben Engine beliebig viele verschiedene Spiele bauen. Wie im Hochhaus
+   benutzt das Spiel oben die Engine unten, nie umgekehrt.
+3. Lehrer und Studio benutzen dieselbe Spielwelt, dieselben Motoren und dieselbe Physik, und Kern
+   rechnet überall Bit für Bit gleich. Das Netz trifft also auf genau dieselbe Welt, in der es
+   geübt hat.
 
 ---
 

@@ -1,626 +1,641 @@
 # 4 Grafik – wie Kern Bilder malt
 
-> **Kurz gesagt:** Hier schaust du Kerns Maler über die Schulter: wie der C++-Code im Browser an die
-> Grafikkarte kommt, woraus Meshes und Materialien bestehen, was der eine große Standard-Shader in
-> jedem Pixel rechnet und in welcher Reihenfolge ein Bild entsteht – mit Sonnenschatten, Himmel,
+> **Kurz gesagt:** Hier schaust du Kerns Maler über die Schulter: wie Kern die Grafikkarte
+> erreicht, woraus Formen und Materialien bestehen, was das eine große Malprogramm für jeden
+> Bildpunkt rechnet und in welcher Reihenfolge ein Bild entsteht – mit Sonnenschatten, Himmel,
 > Glühen und weichen Eckenschatten. Zum Schluss bringen wir die Fenster einer Nachtstadt zum Leuchten.
 
-Die allgemeinen Grundlagen – wie aus Dreiecken Pixel werden, was Matrizen tun, wie Licht und Farbe
-funktionieren – stehen in [Anhang B](B-grundlagen-rendering.md). Kommt dir hier ein Begriff spanisch
-vor, blättere ruhig dorthin. In diesem Kapitel geht es darum, was **Kern** daraus macht.
+> **Begriffe vorab:**
+> - **Grafikkarte** (auch GPU) – der Spezialchip, der Millionen Bildpunkte gleichzeitig ausmalt.
+> - **Mesh** – das Drahtgitter aus Dreiecken, aus dem ein 3D-Ding besteht.
+> - **Shader** – ein kleines Malprogramm, das auf der Grafikkarte läuft.
+> - **Normale** – ein gedachter Pfeil, der senkrecht aus einer Fläche zeigt: wohin die Fläche „schaut“.
+> - **Interpolation** – das Mischen von Werten zwischen den Ecken, wie ein Farbverlauf von einer Ecke
+>   zur anderen.
+> - **Tiefenpuffer** – ein unsichtbares zweites Bild, das sich für jeden Bildpunkt merkt, wie weit das
+>   dort Gemalte entfernt ist.
+> - **sRGB und linear** – zwei Arten, Helligkeit als Zahl zu schreiben: sRGB passt zu Bildschirm und
+>   Auge, linear zum echten Licht, mit dem man rechnen kann.
+> - **Tonemapping** – das sanfte Zusammenpressen von zu hellem Licht auf das, was ein Bildschirm zeigen
+>   kann, wie bei einem Fotofilm.
+
+Wer die Grundlagen dahinter in Ruhe nachlesen möchte – wie aus Dreiecken Bildpunkte werden, wie Licht
+und Farbe funktionieren –, findet sie in [Anhang B](B-grundlagen-rendering.md). Hier geht es darum,
+was **Kern** daraus macht. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 4.
 
 ## 4.1 Überblick
 
-Kerns **Renderer** – der Teil, der Bilder erzeugt – ist erstaunlich klein: eine Brücke zu WebGL2,
-ein Shader-Baukasten, Meshes und Materialien, der Renderer selbst, vier Zusatz-Malgänge (Schatten,
-Himmel, Bloom, Ambient Occlusion) sowie Partikel und Lichter. Drei Grundsätze prägen alles:
+Kerns **Renderer** ist der Teil, der Bilder erzeugt. Er ist erstaunlich klein: eine Brücke zur
+Grafikkarte, ein Shader-Baukasten, Formen und Materialien, der Renderer selbst, vier Zusatz-Malgänge
+(Schatten, Himmel, **Bloom** – das Glühen um helle Stellen – und **Ambient Occlusion** – die weichen
+Eckenschatten) sowie Funken und Lampen. Drei Grundsätze prägen alles:
 
-1. **Ein Programm für alles.** Jedes Objekt wird mit demselben **Standard-Shader** gemalt (ein Shader
-   ist ein kleines Programm auf der Grafikkarte). Spiele, die anders aussehen wollen, stecken kleine
-   **Erweiterungen** in diesen einen Shader, statt eigene zu schreiben.
+1. **Ein Malprogramm für alles.** Jedes Ding wird mit demselben **Standard-Shader** gemalt. Spiele,
+   die anders aussehen wollen, stecken kleine **Erweiterungen** in dieses eine Programm, statt eigene
+   zu schreiben.
 2. **Einmal hochladen, danach nur Bewegung.** Eine Form wandert einmal auf die Grafikkarte, danach
    ändert sich nur, *wo* sie steht. Die Arbeit pro Bild folgt dem, was sich bewegt, nicht der Größe
    der Welt.
-3. **Die Kopie im Hauptspeicher ist die Wahrheit.** Kern behält jede Form zusätzlich im
-   Arbeitsspeicher. Daraus rechnet er, was sichtbar ist und was du anklickst – und er baut damit alles
-   neu auf, wenn der Browser ihm die Grafikkarte wegnimmt (4.11).
+3. **Die Kopie im Arbeitsspeicher ist die Wahrheit.** Kern behält jede Form zusätzlich im
+   Arbeitsspeicher des Rechners. Daraus rechnet er, was sichtbar ist und was du anklickst – und er baut
+   damit alles neu auf, wenn der Browser ihm die Grafikkarte wegnimmt (4.11).
 
 > **Stell dir vor …** … ein Theater. Die Kulissen werden einmal auf die Bühne getragen; in jeder
 > Vorstellung bewegen sich nur die Schauspieler. Und von jeder Kulisse liegt ein Bauplan in der
 > Schublade – brennt die Bühne ab, steht morgen alles wieder genauso da.
 
-## 4.2 Die WebGL2-Anbindung
+## 4.2 Die Brücke zur Grafikkarte
 
-Kern wird mit wasi-sdk nach **WebAssembly** übersetzt, einem kompakten Format, das der Browser fast so
-schnell wie Maschinencode ausführt – ohne Emscripten und ohne automatisch erzeugten
-JavaScript-„Klebstoff“. Die Grafikbefehle sind schlichte **Importe**: Das Modul sagt beim Laden „Ich
-brauche `drawElementsInstanced` aus dem Paket `kern_gl`“, und die Webseite reicht die Funktion herein.
-Die Liste in `gl.h` ist laut Kommentar „genau das, was die Engine benutzt“; ein neuer Befehl kommt dort
-und in `web/kern.mjs` dazu.
+Kern selbst kann die Grafikkarte nicht direkt ansprechen. Das darf im Browser nur die Webseite, über
+**WebGL2**, die Malschnittstelle des Browsers. Also reicht Kern jeden Malbefehl über eine schmale
+Brücke an die Webseite weiter, und die gibt ihn an die Grafikkarte.
 
-Über die Grenze zwischen WebAssembly und JavaScript gehen **nur Zahlen**:
+Über diese Brücke gehen **nur Zahlen**:
 
-- **Grafikobjekte sind Nummern.** JavaScript legt das echte Objekt in eine Tabelle und gibt Kern die
-  Platznummer, `0` heißt „nichts“. Wie an der Garderobe: Du bekommst eine Marke, nicht den Mantel.
-- **Daten sind „Adresse plus Länge“.** JavaScript schaut durch ein Fenster direkt in Kerns Speicher und
-  reicht die Bytes an WebGL weiter, **ohne zu kopieren**. Wächst Kerns Speicher, erneuert `refresh()`
-  diese Fenster.
+- **Grafik-Dinge sind Nummern.** Die Webseite verwahrt das echte Ding und gibt Kern eine Platznummer.
+  Wie an der Garderobe: Du bekommst eine Marke, nicht den Mantel.
+- **Daten sind „Adresse plus Länge“.** Statt einen großen Datenberg zu kopieren, sagt Kern nur: „Ab
+  hier, so viele Bytes.“ Die Webseite schaut direkt in Kerns Speicher und reicht die Daten weiter –
+  ohne Kopie.
 
-Außerhalb des Browsers, in den nativen Tests, bleiben die Importe leer; dort hängt eine Attrappe
-(`tests/gl_stub.cpp`) dran, die die GL-Aufrufe nur mitschreibt.
+Die Brücke ist bewusst dünn: Die Webseite lädt Kern, verwaltet die Nummern und den Fall, dass die
+Grafikkarte verloren geht – mehr nicht. Alles, was das Bild ausmacht, steht in Kern. Außerhalb des
+Browsers, in den automatischen Tests, hängt statt der Grafikkarte eine **Attrappe** an der Brücke,
+die jeden Malbefehl nur mitschreibt.
 
-`web/kern.mjs` tut laut Kopfkommentar genau drei Dinge und enthält **keine Engine-Logik**: das Modul
-mit seinen Importen laden (dazu ein winziges WASI für Konsole, Zufall und Uhr – die Engine fasst keine
-Dateien an), die Nummern-Tabellen und den Kontextverlust verwalten und `KernRenderer` anbieten, eine
-bequeme Fassade für JavaScript. Ein zweites Importpaket, `kern_env`, liefert der Engine unter anderem
-die Uhrzeit, die Geländehöhe der Seite, Mauszeiger-Sperre, Statusmeldungen und den Weg, auf dem
-in WebAssembly übersetzte Logik-Graphen ins Modul kommen ([Kapitel 9](09-logik.md)).
+Benutzen kann man den Renderer auf zwei Wegen: aus einem Spiel, das selbst in C++ geschrieben ist
+(wie Orb Run, [Kapitel 12](12-eigene-spiele.md)), oder aus einer Webseite in JavaScript. Kern Studio
+hat einen eigenen Zugang ([Kapitel 11](11-studio.md)); innen arbeitet immer derselbe Renderer.
 
-Den WebGL2-Zugang (den **Kontext**) legt die Webseite an. Die Engine-Seite verzichtet dabei auf die
-eingebaute Kantenglättung, weil Kern ohnehin in eigene Zwischenbilder malt (4.7); Kern Studio und
-exportierte Spiele erzeugen ihren Kontext selbst und schalten sie ein.
+## 4.3 Malprogramme und der Merkzettel
 
-Benutzen lässt sich der Renderer auf zwei Wegen: **C++-Spiele** schreiben eine `kern::App`, in der
-jedes Bild erst das Spiel (`update`) und dann das Malen (`render`) läuft – so arbeiten das Beispiel
-„hello“ und Orb Run ([Kapitel 12](12-eigene-spiele.md)). **JavaScript-Programme** wie SpawnCity
-nehmen `KernRenderer`, genau einen pro Modul. Kern Studio hat eine dritte, eigene Schnittstelle
-([Kapitel 11](11-studio.md)); innen arbeitet derselbe Renderer.
+Ein **Malprogramm** hat zwei Teile: Der **Vertex-Shader** rechnet jede Ecke einer Form aus – wo sie
+auf dem Bildschirm landet. Der **Fragment-Shader** rechnet danach jeden Bildpunkt aus – welche Farbe
+er bekommt. Zwei Teile, weil es zwei sehr verschiedene Mengen sind: ein paar Tausend Ecken, aber
+Millionen Bildpunkte. Findet der Übersetzer der Grafikkarte einen Fehler, hängt Kern ein Namensschild
+davor, damit man sofort sieht, welches Programm klemmt.
 
-## 4.3 Programme und der Uniform-Cache
-
-Ein **Programm** besteht aus Vertex-Shader (rechnet jede Ecke) und Fragment-Shader (rechnet jedes
-Pixel). Kern übersetzt beide und meldet Fehler mit einem Namensschild davor, etwa „standard fragment
-shader: …“. Fragt er nach einem Einstellwert, den der Übersetzer wegoptimiert hat, bekommt er die
-Nummer `0` – und alle Setzbefehle ignorieren `0`. Ein unbenutzter Wert kostet nichts. Beim Wegräumen
-unterscheidet Kern zwei Fälle: Lebt die Grafikkarte noch, löscht er das Programm; nach einem
-Kontextverlust ist es schon tot, und er vergisst nur die Nummer.
-
-**Uniforms** sind Werte, die für einen ganzen Zeichenaufruf gleich bleiben: Farbe, Rauheit,
-Sonnenrichtung. Die Grafikkarte merkt sie sich. Der **Uniform-Cache** nutzt das und schickt nur, was
-sich wirklich geändert hat:
-
-```cpp
-void UniformCache::set_float(u32 location, f32 v) {
-  if (!location) return;
-  Entry& e = entry(location);
-  if (e.kind == 2 && e.count == 1 && e.f[0] == v) return;
-  e.kind = 2; e.count = 1; e.f[0] = v;
-  gl::uniform1f(location, v);
-}
-```
-
-Zeile für Zeile: Nummer 0? Sofort zurück. Merkzettel für diese Nummer holen. Steht dort schon genau
-dieser Wert, zurück. Sonst Zettel aktualisieren und erst dann wirklich senden. Große Werte wie Matrizen
-vergleicht der Cache über einen **Fingerabdruck** (Hash) statt Zahl für Zahl. Nur die Knochen
-animierter Figuren gehen ungecacht durch – die ändern sich ohnehin jedes Bild.
+Viele Angaben gelten für einen ganzen Malauftrag gleich: die Farbe eines Materials, die Richtung der
+Sonne. Solche Werte heißen **Uniforms**, und die Grafikkarte merkt sie sich, bis man etwas Neues sagt.
+Kern führt dazu einen **Merkzettel** (den Uniform-Cache): Bevor er einen Wert schickt, schaut er nach,
+ob genau dieser Wert schon dort steht. Wenn ja, schickt er nichts.
 
 > **Stell dir vor …** … jeder Satz an die Grafikkarte kostet Porto. Sagst du zehnmal „Die Farbe ist
-> Blau“, zahlst du zehnmal. Der Cache ist der Kollege, der sagt: „Hast du schon gesagt, steht noch da.“
+> Blau“, zahlst du zehnmal. Der Merkzettel ist der Kollege, der sagt: „Hast du schon gesagt, steht
+> noch da.“
 
-Das lohnt sich, weil jeder Befehl von WebAssembly über JavaScript in WebGL wandert, das ihn noch einmal
-prüft.
+Das lohnt sich, weil jeder Befehl über die Brücke aus 4.2 wandert und der Browser ihn unterwegs noch
+einmal prüft. Bei Hunderten Formen mit gleichem Material fällt so der größte Teil der Post weg.
 
-## 4.4 Mesh, Material und MeshInput
+> **Für Neugierige:** Lange Werte wie ganze Matrizen vergleicht der Merkzettel nicht Zahl für Zahl,
+> sondern über einen Fingerabdruck. Nur die Knochen animierter Figuren gehen ohne Merkzettel durch –
+> sie ändern sich ohnehin in jedem Bild.
+
+## 4.4 Form, Material und Kopien
 
 ### Ecken und Instanzen
 
-Ein **Mesh** ist eine Form aus Dreiecken. Jede Ecke (**Vertex**) trägt Position, **Normale** (wohin
-die Fläche zeigt), Farbe und **Texturkoordinate** (welcher Bildpunkt hier klebt); Figuren mit Skelett
-dazu je vier Knochennummern und Gewichte. Zwei Plätze sind frei für Erweiterungen.
+Jede Form besteht aus Dreiecken, und jede Ecke trägt einen kleinen **Steckbrief**: ihre Position,
+ihre Normale, ihre Farbe und ihre **Texturkoordinate** (welcher Punkt eines aufgeklebten Bildes hier
+liegt). Bei Figuren mit Skelett steht dazu, an welchen Knochen die Ecke hängt.
 
-Andere Angaben gelten **pro Instanz**. Eine Instanz ist eine Kopie des Meshes an anderer Stelle – wie
-hundert Bäume aus einer Vorlage. Pro Instanz gibt es die Modellmatrix (Ort, Drehung, Größe), einen
-Farbton (**Tint**) und die Normalenmatrix (damit Normalen nach dem Strecken stimmen, Anhang B). Der
-Clou: **Jedes Mesh ist instanziert**, auch mit nur einer Instanz, und wird mit genau einem
-Zeichenaufruf gemalt. Die Normalenmatrix rechnet Kern pro Instanz auf der CPU aus. Kaputte Matrizen
-(etwa auf Größe null gestaucht) lehnt Kern ab.
+Andere Angaben gelten **pro Instanz**. Eine Instanz ist eine Kopie der Form an anderer Stelle – wie
+hundert Bäume aus einer Vorlage. Pro Instanz merkt sich Kern Ort, Drehung und Größe sowie einen
+Farbton. Der Clou: **Jede Form wird als Instanz-Paket gemalt**, auch wenn es nur eine Kopie gibt, und
+zwar mit genau einem Malauftrag für alle Kopien.
 
-Grenzen, die du kennen solltest: **32 Knochen**, **6 Punktlichter**, **2 Zusatzströme** und **8
-Zahlen-Parameter** für Erweiterungen.
+> **Stell dir vor …** … einen Stempel. Die Form ist der Stempel, die Instanzen sind die Abdrücke auf
+> dem Papier. Hundert Abdrücke brauchen keinen hundertfachen Stempel.
+
+Kaputte Angaben, etwa eine Kopie, die auf Größe null gestaucht ist, lehnt Kern ab.
 
 ### Das Material
 
-| Feld | Was es tut |
-|---|---|
-| `color` | Grundfarbe mit Deckkraft |
-| `alpha` | undurchsichtig, ausgestanzt (Schwelle 0,5) oder durchscheinend |
-| `roughness`, `metalness` | rau oder glatt, Metall oder nicht |
-| `emissive` | Eigenleuchten, darf über 1 liegen |
+Das **Material** sagt, wie eine Oberfläche aussieht:
 
-Dazu Schalter wie `unlit` (nur Farbe, kein Licht), `double_sided`, `cast_shadow` und `frustum_culled`
-(darf weggelassen werden, wenn außer Sicht). Einige verdienen einen zweiten Blick:
+| Eigenschaft | Was sie bewirkt | Beispiel |
+|---|---|---|
+| Farbe | Grundfarbe und Deckkraft | rotes Auto |
+| Durchsichtigkeit | ganz, ausgestanzt oder halb | Wand, Zaun, Glas |
+| Rauheit und Metall | matt oder glänzend, Metall oder nicht | Gummi, Chrom |
+| Eigenleuchten | strahlt selbst, auch heller als Weiß | Neonröhre |
 
-- **Farben sind sRGB**, der übliche Farbraum von Bildern und Farbwählern. Kern multipliziert
-  Eckenfarbe, Tint, Materialfarbe und Texturpixel und rechnet das in lineares Licht um (warum: Anhang
-  B). Mit `linear_colors` entfällt das; `emissive` ist schon linear.
+Dazu kommen Schalter: **unbeleuchtet** (nur Farbe, kein Licht), **zweiseitig** (auch von hinten
+sichtbar), **wirft Schatten** und **darf weggelassen werden, wenn außer Sicht**. Einige verdienen
+einen zweiten Blick:
+
+- **Farben kommen in sRGB**, so wie Farbwähler und Bilddateien sie liefern. Kern rechnet sie vor dem
+  Beleuchten in lineares Licht um, denn nur damit lässt sich richtig rechnen (Anhang B erklärt,
+  warum). Das Eigenleuchten ist schon linear.
 - **Nur Undurchsichtiges wirft Schatten.**
-- **`viewmodel`** ist die Ego-Ebene: Diese Meshes kommen ganz zum Schluss, nach dem Löschen der Tiefe.
-  Eine Wand vor dir schneidet die Waffe in deiner Hand nicht ab. Studio malt dort seine Gizmos.
-- **`lines`** macht Linien daraus – automatisch unbeleuchtet, ohne Schatten, nicht anklickbar.
+- **Die Ego-Ebene** ist für Dinge in deiner Hand: Sie kommen ganz zum Schluss, nachdem Kern den
+  Tiefenpuffer geleert hat. So schneidet eine Wand vor dir die Waffe in deiner Hand nicht ab. Studio
+  malt dort auch seine Anfasser zum Verschieben und Drehen.
+- **Linien** statt Dreiecken gibt es für Hilfsdarstellungen. Sie sind immer unbeleuchtet, werfen
+  keinen Schatten und lassen sich nicht anklicken.
 
-Rückseiten von Dreiecken verwirft die Grafikkarte normalerweise. Kern lässt sie stehen bei
-zweiseitigen Materialien, Linien und gemischt gespiegelten Instanzen; sind *alle* Instanzen gespiegelt,
-verwirft er stattdessen die Vorderseiten.
+> **Für Neugierige:** Die Grafikkarte lässt Rückseiten von Dreiecken normalerweise weg. Ein
+> gespiegeltes Objekt ist für sie aber „von innen nach außen gestülpt“. Sind in einem Paket manche
+> Kopien gespiegelt und manche nicht, zeigt Kern einfach beide Seiten.
 
-> **Wusstest du?** Ein gespiegeltes Objekt ist für die Grafikkarte „von innen nach außen gestülpt“,
-> weil sich der Umlaufsinn der Ecken umdreht. Gespiegelte und normale Kopien in einem einzigen
-> Zeichenaufruf lassen sich deshalb nicht korrekt behandeln – Kern zeigt dann einfach beide Seiten.
+### Anlegen: erst prüfen, dann tauschen
 
-### Anlegen mit `upsert`
+Eine neue Form übergibt man Kern als Paket. Pflicht sind nur die Positionen der Ecken. Fehlen
+Normalen, rechnet Kern einfache aus; fehlen Farben, ist alles weiß; fehlt die Angabe der Kopien, gibt
+es genau eine.
 
-Neue Meshes übergibst du als **MeshInput**. Pflicht sind nur die Positionen; fehlen Normalen, rechnet
-Kern bei losen Dreiecken flache aus (sonst zeigen sie nach oben), fehlen Farben, ist alles weiß, fehlen Instanzen, gibt es eine. `upsert` (aus *update*
-und *insert*) legt ein Mesh an oder ersetzt es – **atomar**: erst alles prüfen (endliche Zahlen,
-gültige Indizes, passende Längen, Knochengewichte mit Summe 1, keine kaputten Matrizen), dann tauschen.
-Schlägt die Prüfung fehl, bleibt **das alte Mesh sichtbar**. Für einen Editor ist das Gold wert: Ein
-halbfertiger Zwischenstand löscht nichts. Die Mesh-Nummern vergibt der Renderer selbst, damit sich nie
-zwei Besitzer einen Platz teilen.
+Das Wichtigste: Kern legt eine Form **ganz oder gar nicht** an. Erst prüft er alles – sind alle Zahlen
+gültig, passen die Längen zusammen, ergeben die Knochenanteile zusammen 100 %? Erst dann tauscht er
+die alte Form gegen die neue. Scheitert die Prüfung, **bleibt die alte Form sichtbar**.
 
-Beim Hochladen legt Kern feste Puffer für die Eckendaten an, drei veränderliche für die Instanzen und
-einen für die Eckennummern. Bei **höchstens 65 536 Ecken** speichert er diese Nummern mit 16 statt 32
-Bit – halber Platz im häufigsten Fall. Unbewegte Weltobjekte ab 36 Dreiecken (genau eine Instanz,
-nicht verschoben, gedreht oder gestreckt, ohne Skelett, keine Linien) bekommen zusätzlich eine **BVH**, ein Inhaltsverzeichnis für
-schnelle Mausklicks ([Kapitel 5](05-szene-und-geometrie.md)). `remove` gibt ein Mesh und seine Nummer
-wieder frei.
+> **Stell dir vor …** … Tapezieren. Die neue Bahn wird erst ganz zugeschnitten und geprüft, dann
+> ausgetauscht – nie halb abgerissen.
 
-### Bewegen mit `update_instances`
+Für einen Editor ist das Gold wert: Ein halbfertiger Zwischenstand löscht nichts. Die Nummern der
+Formen vergibt der Renderer selbst, damit sich nie zwei Besitzer einen Platz teilen. Unbewegte, größere
+Formen der Welt bekommen beim Hochladen zusätzlich ein Inhaltsverzeichnis, das Mausklicks schnell
+macht ([Kapitel 5](05-szene-und-geometrie.md)).
 
-Alles Bewegte geht über `update_instances`, sparsam bis ins Mark: Neue Farbtöne allein laden nur den
-Farbton-Puffer hoch. Byte-gleiche Daten bewirken **gar nichts**. Reicht der Platz nicht, wird der
-Puffer mindestens verdoppelt, damit schwankende Instanzzahlen nicht ständig neuen Speicher brauchen.
-Fehlen passende Farbtöne (nicht genau vier Zahlen pro Instanz), sind alle Instanzen weiß. Weitere
-Stellschrauben: Knochen neu setzen (gleiche Knochenzahl wie beim Anlegen), Sichtbarkeit, Material
-(aus Linien werden dabei keine Dreiecke und umgekehrt) und Ebenen. Was einen Schattenwerfer betrifft,
-merkt sich Kern für die Schattenkarte (4.8.1).
+### Bewegen: nur das Nötige
 
-Jedes Mesh hat außerdem eine **Ebenenmaske**, deren Bits wie Lichtschalter wirken. Pro Bild bestimmt
-die Maske, was gemalt wird und was Schatten wirft; beim Anklicken filtert sie genauso. Studio trennt so
-etwa Raster, Icons, Gizmos pro Viewport, Collider-Darstellung und die Welten mehrerer Netzwerkspieler.
+Alles, was sich bewegt, ändert nur die Angaben der Instanzen, und das sparsam: Ändert sich nur der
+Farbton, wird nur der Farbton hochgeladen. Sind die neuen Daten genau gleich den alten, **passiert gar
+nichts**. Ebenso lassen sich Knochen, Sichtbarkeit und Material einzeln ändern.
 
-**Texturen** (aufgeklebte Bilder) legt Kern selbst an – mit Optionen für Mipmaps (verkleinerte
-Vorstufen für die Ferne), Wiederholen und pixeligen Look – und behält ihre Pixel als Kopie. Oder die
-Webseite meldet eine eigene Textur an und hinterlegt, wie sie nach einem Kontextverlust neu gefüllt
-wird. Jedes Mesh hat höchstens eine Farbtextur (Einheit 0; die Schattenkarte liegt auf Einheit 1).
+Jede Form hat außerdem eine **Ebenenmaske**, die wie eine Reihe Lichtschalter wirkt. Für jedes Bild
+sagt man, welche Schalter an sind; nur diese Formen werden gemalt, werfen Schatten und lassen sich
+anklicken. Studio trennt so zum Beispiel das Bodenraster, Hilfssymbole und die Welten mehrerer
+Netzwerkspieler.
 
-> **Probier's aus!** Öffne https://kernengine.de/, lege mit **File › New Level…** die Vorlage
-> **Basic** an und zieh aus dem Content Drawer (Gruppe *Shapes*) einen **Cube** hinein. Spiele in
-> **Details** unter *Material* mit **Roughness**, **Metallic** und **Emissive**. Schalte dann **Unlit**
-> ein – schon ist der Würfel ein flacher Farbklecks ohne Licht und Schatten.
+### Texturen
+
+Eine **Textur** ist ein Bild, das auf eine Form geklebt wird, wie ein Aufkleber. Jede Form hat
+höchstens eine Farbtextur. Kern legt Texturen selbst an und behält ihre Bildpunkte als Kopie; auf
+Wunsch mit **Mipmaps**, verkleinerten Fassungen für die Ferne – wie Briefmarken-Versionen eines
+Posters, damit ein weit entferntes Muster nicht flimmert. Eine Webseite kann auch eine eigene Textur
+anmelden; dann hinterlegt sie, wie die Textur nach einem Verlust der Grafikkarte neu gefüllt wird.
+
+> **Probier's aus!** Öffne https://kernengine.de/ und lege mit **File › New Level…** die Vorlage
+> **Basic** an. Klappe unten in der Statusleiste den **Content Drawer** auf, die Bausteinleiste, und
+> zieh aus der Gruppe *Shapes* einen **Cube** hinein. Spiele rechts in **Details** unter *Material*
+> mit **Roughness** (Rauheit), **Metallic** (Metall) und **Emissive** (Eigenleuchten). Schalte dann
+> **Unlit** ein – schon ist der Würfel ein flacher Farbklecks ohne Licht und Schatten. So siehst du,
+> dass jede Zeile der Material-Tabelle oben eine sichtbare Wirkung hat.
 
 ## 4.5 Der Standard-Shader
 
-Kern setzt seinen einen Shader beim Start aus festen Bausteinen zusammen und fügt an verabredeten
+Kern baut sein eines Malprogramm beim Start aus festen Bausteinen zusammen und fügt an verabredeten
 Stellen die Schnipsel der Erweiterungen ein. Heraus kommt genau **ein** Programm.
 
-Der **Vertex-Shader** baut pro Ecke die Modellmatrix aus den Instanzdaten, wendet bei Figuren das
-Skelett an und rechnet Weltposition, Normale und Bildschirmposition. Das **Skinning** (Haut folgt
-Knochen) ist das klassische „Linear Blend Skinning“: Jede Ecke folgt bis zu vier Knochen nach Gewicht.
+Der **Vertex-Shader** nimmt jede Ecke, setzt sie an den Ort ihrer Instanz und berechnet, wo sie auf
+dem Bildschirm landet. Bei Figuren biegt er vorher die Haut nach dem Skelett: Jede Ecke folgt bis zu
+vier Knochen, jeder mit einem Anteil.
 
 > **Stell dir vor …** … eine Ecke an deinem Ellbogen hängt zu 60 % am Oberarm und zu 40 % am
 > Unterarm. Beugst du den Arm, landet sie dazwischen – die Haut knickt nicht, sie biegt sich weich.
 
-Der **Fragment-Shader** rechnet pro Pixel und schreibt **drei Bilder gleichzeitig**: `outColor`, das
-fertige Bild, wie du es siehst; `outHdr`, die echte Lichtmenge vor dem Tonemapping (für das Glühen);
-und `outAo`, einen Datensatz für die Ambient Occlusion. Dazwischen: Textur lesen, Deckkraft
-ausrechnen (Instanz-Deckkraft mal Material mal Texel), bei ausgestanzten Materialien alles unter der
-Schwelle wegwerfen, Farbe linearisieren, beleuchten, tonemappen, Nebel.
+Der **Fragment-Shader** rechnet dann jeden Bildpunkt aus, in dieser Reihenfolge:
+
+1. Aufgeklebtes Bild nachschlagen, Deckkraft bestimmen.
+2. Bei ausgestanzten Materialien (etwa einem Zaun) durchsichtige Stellen ganz weglassen.
+3. Die Farbe in lineares Licht umrechnen.
+4. Beleuchten: Sonne, Himmel, Lampen, Glanz, Eigenleuchten.
+5. Tonemapping: zu helles Licht sanft zusammenpressen.
+6. Nebel dazumischen.
+
+Dabei schreibt er **drei Bilder gleichzeitig**: das **fertige Foto**, wie du es siehst; ein
+**Lichtmesser-Bild** mit der echten Lichtmenge vor dem Tonemapping, aus dem später das Glühen entsteht;
+und einen **Notizzettel für die Eckenschatten**, auf dem steht, wie viel des Lichts aus der Umgebung
+kommt.
 
 ### Licht und Material
 
-Das Modell lehnt sich an das Standardmaterial von three.js an – ein vereinfachtes **PBR**
-(physikalisch basiertes Rendern, Anhang B). Das Licht eines Pixels hat mehrere Zutaten:
+Kerns Lichtmodell lehnt sich an das bekannte Standardmaterial der Grafikbibliothek three.js an – ein
+vereinfachtes **physikalisch basiertes** Modell: Es ahmt nach, wie echtes Licht sich verhält. Das
+Licht eines Bildpunkts hat mehrere Zutaten:
 
 | Zutat | Alltagsbild |
 |---|---|
 | Sonne, mit Schatten | Taschenlampe in sehr weiter Ferne |
-| Hemisphärenlicht | blauer Himmel oben, brauner Acker unten |
-| Himmels-Irradianz | Licht einer bunten Kuppel |
-| bis zu 6 Punktlichter | Glühbirnen mit Reichweite |
+| Himmel und Boden | blauer Himmel oben, brauner Acker unten |
+| Himmelskuppel | Licht einer bunten Kuppel ringsum |
+| bis zu 6 Lampen | Glühbirnen mit Reichweite |
 | Glanz und Spiegelung | Lichtpunkt auf einem Apfel |
 | Eigenleuchten | Neonröhre |
 
-**Sonne:** Je direkter sie auf eine Fläche scheint, desto heller (Lambert, Anhang B), mal dem
-Schattenfaktor (1 = beleuchtet, 0 = Schatten). **Hemisphärenlicht:** Nach oben zeigende Flächen
-bekommen Himmelsfarbe, nach unten zeigende Bodenfarbe (Z ist oben). **Punktlichter** fallen bis zur
-Reichweite **weich auf null** ab.
+**Sonne:** Je direkter sie auf eine Fläche scheint, desto heller (Anhang B, Taschenlampen-Bild) – und
+gar nicht, wo der Schatten liegt. **Himmel und Boden:** Flächen, deren Normale nach oben zeigt,
+bekommen Himmelsfarbe, nach unten zeigende Bodenfarbe. **Lampen** werden mit der Entfernung schwächer
+und gehen an ihrer Reichweite **weich auf null**.
 
-Himmels- und Bodenlicht führt Kern in einer eigenen Variable `indirect` mit. Warum? Die Ambient
-Occlusion soll später **nur dieses** Licht abdunkeln; Sonne und Lampen haben ihre eigenen Schatten.
-Metalle haben übrigens kein diffuses Licht – ihre Farbe steckt ganz im Glanz.
+Das Licht von Himmel und Boden führt Kern getrennt mit. Warum? Die Eckenschatten sollen später **nur
+dieses** Licht abdunkeln; Sonne und Lampen haben ihre eigenen Schatten. Metalle haben übrigens kein
+mattes Licht – ihre Farbe steckt ganz im Glanz.
 
-**Glanz** gibt es nur bei Metall oder Rauheit unter 0,95: eine Himmelsspiegelung und ein
-Sonnen-Glanzpunkt. Darin stecken **Fresnel** nach Schlick (bei flachem Blick spiegelt alles stärker –
-denk an einen See) und die **GGX-Verteilung** (Größe und Schärfe des Glanzpunkts). Nichtmetalle
-spiegeln senkrecht nur 4 %, Metalle in ihrer Grundfarbe.
+**Glanz** gibt es bei Metall und bei allem, was nicht ganz rau ist: eine Spiegelung des Himmels und ein
+Glanzpunkt der Sonne. Glatte Flächen haben einen kleinen, scharfen Glanzpunkt, raue einen breiten
+Schimmer. Und bei flachem Blick spiegelt alles stärker – denk an einen See, der schräg betrachtet den
+Himmel zeigt.
 
 > **Wusstest du?** Sehr glatte Flächen können rechnerisch absurd helle Glanzpunkte erzeugen – einzelne
-> Pixel, die im Bloom als flackernde Sterne aufblitzen. Kern deckelt den GGX-Wert deshalb bei 40.
+> Bildpunkte, die im Glühen als flackernde Sterne aufblitzen. Kern begrenzt den Glanz deshalb nach oben.
 
-**Glas:** Erklärt eine Erweiterung eine Fläche zu Glas (`surfaceGlass`), spiegelt sie den Himmel,
-stärker bei flachem Blick. So wirken Scheiben hell statt schwarz. **Eigenleuchten** (`emissive`) kommt
-zuletzt dazu, linear und **ohne Obergrenze** – Werte über 1 werden später zum Glühen.
+**Glas:** Erklärt eine Erweiterung eine Fläche zu Glas, spiegelt sie den Himmel, stärker bei flachem
+Blick. So wirken Scheiben hell statt schwarz. **Eigenleuchten** kommt zuletzt dazu, **ohne
+Obergrenze** – alles über Weiß wird später zum Glühen.
 
-### Vom Licht zum Pixel – und Nebel
+> **Für Neugierige:** Die Fachnamen der Glanz-Rechnung sind „GGX“ (wie viele winzige Spiegelchen ins
+> Auge zeigen) und „Fresnel nach Schlick“ (wie viel bei welchem Blickwinkel gespiegelt wird). Anhang B
+> erklärt beide mit Bildern.
 
-Kerns Lichtwerte liegen oft über 1 (die Sonne um 2,8), ein Bildschirm kann nur 0 bis 1. Also: echtes
-Licht in `outHdr` sichern, dann mit der **ACES-Filmkurve** (Fassung von three.js, inklusive Belichtung)
-sanft in 0 bis 1 pressen – wie ein Fotofilm, der Helles weich abrundet. Optional folgt Kerns
-**Farbgrading**: Sättigung ×1,14, sanfte S-Kurve, wärmere Lichter, kühlere Schatten (abschaltbar
-über die Renderer- und die Bloom-Einstellungen). Dann sRGB.
+### Vom Licht zum Bildpunkt – und Nebel
 
-Der **Nebel** kommt wie bei three.js **nach** der sRGB-Umwandlung, als „FogExp2“. Mit der
-Standarddichte 0,00085 ist er nach 100 m kaum da (0,7 %), nach 1000 m schon gut zur Hälfte (51 %).
-Drei Extras machen ihn lebendig: **Höhenabfall** (Dunst am Boden, klar über den Dächern),
-**Sonnenstreuung** (in Sonnenrichtung leuchtet er sonnenfarben) und **Horizontnebel** (4.8.2). Sind
-alle aus, sieht er aus wie in three.js.
+Echtes Licht kann viel heller sein, als ein Bildschirm zeigen kann: Kerns Sonne ist in der Rechnung
+fast dreimal so hell wie das hellste Bildschirm-Weiß. Also sichert Kern zuerst die echte Lichtmenge im
+Lichtmesser-Bild und presst sie dann mit einer **Filmkurve** sanft auf den Bildschirmbereich – wie ein
+Fotofilm, der Helles weich abrundet, statt es hart abzuschneiden (Skizze in Anhang B). Danach kann ein
+**Farbgrading** folgen, wie bei einem Kinofilm: kräftigere Farben, wärmere Lichter, kühlere Schatten.
+Zuletzt rechnet Kern die Farbe in sRGB zurück, die Sprache des Bildschirms.
 
-Der **AO-Datensatz** schließlich enthält pro Pixel, welcher Anteil des Lichts indirekt ist (pro
-Farbkanal, schon um den Nebel verringert), und die Helligkeit der Grundfarbe. Durchsichtiges und die
-Ego-Ebene gelten als unverdeckt.
+Der **Nebel** kommt danach, mit der Entfernung: Bei 100 m ist er kaum zu sehen, bei einem Kilometer
+schon gut zur Hälfte. Die Nähe bleibt also lange klar, dann zieht der Dunst rasch zu. Drei Extras
+machen ihn lebendig: **Bodennebel** (dicht am Boden, klar über den Dächern), **Sonnenschein im Nebel**
+(in Richtung Sonne leuchtet er sonnenfarben) und **Horizontnebel** (4.8.2).
+
+Auf den **Notizzettel für die Eckenschatten** schreibt der Shader für jeden Bildpunkt, wie viel seines
+Lichts aus der Umgebung stammt und wie hell die Grundfarbe ist. Durchsichtiges und die Ego-Ebene
+bekommen keine Eckenschatten.
 
 ## 4.6 Shader-Erweiterungen
 
-Dein Spiel braucht leuchtende Fenster oder eine Kraftfeld-Kuppel? Dann schreibst du eine
-**ShaderExtension**: GLSL-Schnipsel (GLSL ist die Shader-Sprache) für feste Einfügestellen. Die Engine
-bleibt unverändert.
+Ein Spiel braucht leuchtende Fenster oder eine schimmernde Kraftfeld-Kuppel? Dann schreibt es eine
+**Shader-Erweiterung**: kleine Schnipsel in der Shader-Sprache, die Kern an fest verabredeten Stellen
+in sein Malprogramm einsetzt. Die Engine selbst bleibt unverändert.
 
 > **Stell dir vor …** … ein fertiges Malen-nach-Zahlen-Bild mit sechs Feldern „Hier darfst du
 > ergänzen“. Deine Erweiterung füllt genau diese Felder – sie kann das Bild verschönern, aber den Rest
 > nicht kaputtmachen.
 
-| Stelle | Was du dort darfst |
-|---|---|
-| `vertex_declarations` | eigene Werte im Vertex-Shader anmelden |
-| `vertex` | Farbe, Deckkraft, UV einer Ecke ändern |
-| `fragment_declarations` | eigene Werte und Funktionen anmelden |
-| `fragment_discard` | Pixel früh wegwerfen |
-| `fragment_input` | Farben als linear behandeln |
-| `fragment_surface` | Grundfarbe, Glas, Leuchten vor dem Licht ändern |
+An diesen Stellen darf eine Erweiterung zum Beispiel die Farbe einer Ecke ändern, Bildpunkte früh
+weglassen, Farben als schon linear kennzeichnen oder – die wichtigste Stelle – kurz vor der
+Beleuchtung Grundfarbe, Glas und Eigenleuchten einer Fläche umstellen. Außerdem darf sie eigene
+**Zusatzangaben pro Ecke** mitbringen (höchstens zwei) und eigene Einstellwerte setzen, am besten über
+Kerns Merkzettel, dann spart sie mit. Fehlt einer Form die Zusatzangabe, liest der Shader dort einfach
+null – die Erweiterung tut dann nichts.
 
-Das Spiel reicht seine Erweiterungen beim Start des Renderers herein (in einer `App` über
-`App::extensions()`). Jeder Schnipsel bekommt eine Kommentarzeile mit dem Namen der Erweiterung, damit
-Übersetzerfehler sofort den Schuldigen zeigen. Außerdem kann eine Erweiterung:
+Das Spiel reicht seine Erweiterungen beim Start herein. Jeder Schnipsel bekommt ein Namensschild, damit
+bei einem Fehler sofort klar ist, welche Erweiterung schuld ist. Ein Beispiel folgt in 4.13.
 
-- **eigene Ecken-Daten** mitbringen: höchstens zwei Ströme insgesamt (Plätze 14 und 15), je 1–4
-  Zahlen. C++ liefert sie im `MeshInput`, JavaScript als benanntes Feld in `KernRenderer.upsert`.
-  Fehlt der Strom, liest der Shader (0, 0, 0, 1);
-- **ganzzahlige Materialparameter** benennen (höchstens 8) und daraus pro Zeichenaufruf eigene
-  Uniforms setzen;
-- **eigene Uniforms** einmal pro Bild setzen – am besten über den Uniform-Cache, dann spart sie mit.
-  Ihre Nummern sucht sie nach jedem Bauen des Programms, auch nach einem Kontextverlust.
+## 4.7 Der Ablauf eines Bildes
 
-Ein Beispiel folgt in 4.13.
-
-## 4.7 Der Ablauf eines Frames
-
-Ein **Frame** ist ein Bild – ein Blatt im Daumenkino. Bei 60 Bildern pro Sekunde hat Kern gut 16
-Millisekunden dafür:
+Ein Bild (englisch **Frame**) ist ein Blatt im Daumenkino. Bei 60 Bildern pro Sekunde hat Kern gut 16
+Tausendstelsekunden dafür, und die Reihenfolge der Malgänge ist sorgfältig gewählt:
 
 ```mermaid
 flowchart TD
-  A["Prüfen: Kamera, Rechteck"] --> B["Sonnenschatten bei Bedarf"]
+  A["Kamera prüfen"] --> B["Sonnenschatten bei Bedarf"]
   B --> C["Undurchsichtiges, vorne nach hinten"]
   C --> D["Himmel in die Lücken"]
   D --> E["Durchsichtiges, hinten nach vorne"]
-  E --> F["Ambient Occlusion"]
+  E --> F["Eckenschatten ausrechnen"]
   F --> G["Ego-Ebene"]
-  G --> H["Composite: Bloom und AO"]
+  G --> H["Zusammensetzen: Glühen, Eckenschatten"]
 ```
 
-Zuerst **prüft** Kern Kamera und Bildrechteck, bevor er die Grafikkarte anfasst. Wenn der Browser es
-kann, misst eine **Stoppuhr** die GPU-Zeit; das Ergebnis kommt erst einige Bilder später (bis dahin
-meldet die Statistik −1). Die **Schattenkarte** wird nur bei Bedarf neu gemalt.
+Zuerst **prüft** Kern Kamera und Bildausschnitt, bevor er die Grafikkarte überhaupt anfasst. Die
+**Schattenkarte** wird nur neu gemalt, wenn sich etwas geändert hat (4.8.1). Dann **sortiert** Kern
+aus: Unsichtbares fliegt raus, ebenso alles, was außerhalb der Sichtpyramide der Kamera liegt –
+außer Figuren mit Skelett, deren Arme und Beine aus ihrer gedachten Hülle ragen können.
 
-Dann wählt Kern das **Ziel**: normalerweise ein eigenes Szenen-Ziel, sofern Bloom an und vom Gerät
-unterstützt ist, sonst direkt den Bildschirm. Malt er nur in einen Teil des Fensters, etwa einen von vier Viewports, geht es direkt auf den Bildschirm – dann **ohne Bloom und ohne
-Ambient Occlusion**.
+**Undurchsichtiges** malt Kern **von vorne nach hinten**. Warum? Nahe Flächen tragen sich zuerst in
+den Tiefenpuffer ein. Kommt danach etwas, das dahinter liegt, merkt die Grafikkarte das sofort und
+spart sich das teure Ausmalen. **Durchsichtiges** kommt **von hinten nach vorne**, wie Folien auf
+einem Overheadprojektor – sonst stimmt die Mischung nicht. Dazwischen malt Kern den **Himmel** in die
+Lücken. Pro Form gibt es einen Malauftrag; Einstellungen, die gleich bleiben, schickt Kern nicht neu.
 
-Beim **Einsortieren** fliegt Unsichtbares raus, ebenso alles außerhalb der Sichtpyramide – außer
-Figuren mit Skelett, deren Pose aus ihrer Ruhehülle ragen kann. Undurchsichtiges wird **von vorne nach
-hinten** gemalt: Nahe Flächen füllen den Tiefenpuffer, alles dahinter scheitert am Tiefentest, bevor
-der teure Shader läuft. Durchsichtiges **von hinten nach vorne**, wie Folien auf einem
-Overheadprojektor. Kamera und Licht setzt Kern einmal pro Bild; pro Mesh gibt es einen Zeichenaufruf,
-und Texturen oder Rückseiten-Einstellungen werden nur bei einem Wechsel umgeschaltet.
+Danach rechnet Kern die **Eckenschatten** aus, und zwar *vor* der Ego-Ebene: Die leert ja den
+Tiefenpuffer, und den braucht die Eckenschatten-Rechnung noch. Zum Schluss **setzt** Kern alles
+**zusammen** (Glühen und Eckenschatten ins fertige Foto) und führt eine **Statistik**, wie viele
+Malaufträge und Dreiecke das Bild gekostet hat.
 
-Danach folgen Himmel, Durchsichtiges, Ambient Occlusion (vor der Ego-Ebene, denn deren Tiefen-Löschen
-würde die Welttiefe vernichten), Ego-Ebene, **Composite** und eine **Statistik** mit Zeichenaufrufen,
-Dreiecken, Instanzen und Zeiten.
+Glühen und Eckenschatten brauchen eigene Zwischenbilder. Die gibt es nur, wenn Kern das ganze Fenster
+bemalt. Malt er nur einen Teil des Fensters, geht es direkt auf den Bildschirm – **ohne Glühen und
+ohne Eckenschatten**.
 
-Das Szenen-Ziel hat drei Farbschichten: fertiges Bild (4 Byte pro Pixel), echtes Licht als
-16-Bit-Kommazahlen (8 Byte) und AO-Datensatz (4 Byte). Zusammen **16 Byte** – laut Code-Kommentar
-genau das Budget, das kachelbasierte Handy-Grafikchips pro Pixel in ihrem schnellen Speicher halten.
-Deshalb ist der AO-Datensatz bewusst nur 8 Bit pro Kanal.
-
-> **Achtung, Falle!** WebGL verlangt, dass jeder Zeichenaufruf in **alle** angeschlossenen
-> Farbschichten schreibt. Deshalb liefert sogar der Himmel einen leeren AO-Datensatz. Wer eigene
-> Malgänge baut und das vergisst, bekommt Fehler.
+> **Für Neugierige:** Die drei Bilder, die der Shader gleichzeitig schreibt, sind zusammen genau so
+> groß, wie Handy-Grafikchips pro Bildpunkt in ihrem schnellen Zwischenspeicher halten können. Deshalb
+> ist der Notizzettel für die Eckenschatten bewusst knapp gehalten.
 
 ![Vier Viewports in Kern Studio: Teilansichten zeichnen direkt auf den Bildschirm](../buch/bilder/studio-quad.png)
 
-Stellst du in Kern Studio über **Window › Viewport Layout** vier Viewports ein, glühen die Lichter
-deshalb nicht mehr, und Ecken wirken flacher. Mit einem Viewport sind Glühen und weiche Eckenschatten
-wieder da.
+> **Probier's aus!** Stelle in Kern Studio über **Window › Viewport Layout** vier Ansichtsfenster
+> (Viewports) ein. Jedes ist nur ein Teil des Fensters – darum glühen die Lichter nicht mehr, und Ecken
+> wirken flacher. Zurück auf einen Viewport: Glühen und weiche Eckenschatten sind wieder da. Dein Gerät
+> war also nicht zu langsam – es liegt an der Bauweise.
 
-## 4.8 Die Passes im Detail
+## 4.8 Die Zusatz-Malgänge im Detail
 
-Ein **Pass** ist ein eigener Malgang mit eigenem Shader. Kern hat vier.
+Ein **Pass** ist ein eigener Malgang mit eigenem Shader, der etwas Besonderes beisteuert. Kern hat
+vier: Sonnenschatten, Himmel, Glühen und Eckenschatten.
 
 ### 4.8.1 Sonnenschatten
 
-Kern malt die Szene einmal **aus Sicht der Sonne** und merkt sich pro Kartenpunkt nur die Entfernung
-zum nächsten Objekt – die **Schattenkarte** (Grundprinzip in [Anhang B](B-grundlagen-rendering.md)).
-Standard: 512 × 512 Punkte über ±120 m, ein kleiner Sicherheitsabstand (Bias 0,0012) und ein Filter
-mit 1, 4 oder 9 Abtastungen. Erlaubt sind 128 bis 4096 Punkte (Zweierpotenzen), ±10 bis ±2000 m und
-ein Bias unter 0,04. Studio nimmt auf Telefonen 4 Abtastungen, am Desktop 9; `?shadowFilter=1`, `4`
-oder `9` in der Adresse überschreibt das.
+Ein Punkt liegt im Schatten, wenn zwischen ihm und der Sonne etwas steht. Also malt Kern die Welt
+einmal **aus Sicht der Sonne** und merkt sich für jeden Punkt dieser Karte nur, wie weit das erste
+getroffene Ding entfernt ist – die **Schattenkarte**. Beim normalen Malen fragt dann jede Stelle: „Bin
+ich weiter von der Sonne weg als das, was auf der Karte steht? Dann liegt etwas davor – Schatten.“
+(Skizze in [Anhang B](B-grundlagen-rendering.md).)
 
-**Schattendistanz.** 512 Punkte über 240 m – fast ein halber Meter pro Punkt! Für eine Ente viel zu
-grob. Mit der **Schattendistanz** deckt die Karte nur ab, was du bis zu dieser Entfernung siehst. In
-Levels: **World Settings › Shadow distance** (Standard 80 m, im Micro-Duck-Level 10 m). Genauer
-umschließt die Karte eine **Kugel** um den sichtbaren Kegel der Kamera (nach Valient, 2008). Eine Kugel
-bleibt gleich groß, wie auch immer du dich drehst – also auch die Kartenpunkte. Ohne Schattendistanz
-(im Renderer Standard 0) oder bei orthografischer Kamera gilt das feste Quadrat um das Kameraziel.
+**Die Karte hat nur begrenzt viele Punkte.** Ein Beispiel: Spannt man 512 Kartenpunkte über eine
+240 m breite Fläche, ist jeder Punkt fast einen halben Meter breit. Für eine Ente, die selbst kaum so
+groß ist, viel zu grob – ihr Schatten wäre ein Klecks. Darum gibt es die **Schattendistanz**: Die Karte
+deckt nur ab, was du bis zu dieser Entfernung siehst. Weniger Fläche, gleiche Punktzahl – schärfere
+Schatten. In Levels stellst du sie in den World Settings ein; das Micro-Duck-Level nimmt nur 10 m.
 
-**Einrasten.** Wandert die Karte um Bruchteile eines Punkts mit, fallen Schattenkanten jedes Mal anders
-aufs Raster und flimmern. Kern rundet ihre Position auf **ganze Kartenpunkte**.
+Genauer legt Kern eine **Kugel** um den Bereich, den die Kamera bis zur Schattendistanz sieht, und
+deckt diese Kugel ab. Warum eine Kugel und kein genau passender Kasten? Eine Kugel bleibt gleich groß,
+wie auch immer du dich drehst – also bleiben auch die Kartenpunkte gleich groß.
+
+**Einrasten.** Wandert die Karte mit der Kamera um Bruchteile eines Punkts mit, fallen Schattenkanten
+jedes Mal anders aufs Raster und flimmern. Kern verschiebt die Karte deshalb nur um **ganze
+Kartenpunkte**.
 
 > **Stell dir vor …** … du malst eine schräge Linie auf Fliesen. Verschiebst du das Fliesenmuster ein
 > bisschen, sieht die Treppchenkante jedes Mal anders aus. Verschiebst du nur um ganze Fliesen, bleiben
 > die Treppchen dieselben – und fallen kaum auf.
 
-**Wiederverwenden.** Aus Kartenposition, Sonnenrichtung, Ausdehnung, einer Zählnummer für
-Schattenwerfer (sie steigt, wenn einer erscheint, verschwindet, sich bewegt oder das Material wechselt)
-und den aktiven Ebenen bildet Kern einen Schlüssel. Nur wenn er sich ändert, wird neu gemalt. Über einer
-unbewegten Stadt kostet der Schatten bei stehender Kamera **keinen einzigen Zeichenaufruf**.
+**Wiederverwenden.** Kern malt die Karte nur neu, wenn sich etwas Wichtiges geändert hat: die Sonne,
+die Lage der Karte oder ein Ding, das Schatten wirft. Über einer unbewegten Stadt kostet der Schatten
+bei stehender Kamera **keinen einzigen Malauftrag**.
 
-**Malen und abtasten.** Gemalt wird nur Tiefe – nur Schattenwerfer der aktiven Ebenen, die in der
-Sichtpyramide der Sonne liegen –, mit einem schlanken Shader und einem kleinen Polygon-Offset gegen
-**Schattenakne** (Streifen, mit denen sich eine Fläche selbst beschattet). Beim Nachschlagen kann die Grafikkarte Tiefen direkt vergleichen und vier Nachbarn mischen – Stufe 1. Die
-Stufen 4 und 9 setzen daraus einen größeren, weichen Filter zusammen (nach Castaño, 2013, aus dem Spiel
-„The Witness“): Jede Abtastung sitzt so geschickt **zwischen** den Punkten, dass die eingebaute Mischung
-genau die richtigen Gewichte liefert. Dazu kommt der **Normal Offset** (nach Holbert, 2011): Kern schaut
-ein Stückchen von der Fläche weg nach, entlang der Normale, mehr bei streifendem Licht. Das verhindert
-Akne, ohne dass ein großer Bias den Schatten vom Objekt löst.
+**Schattenakne vermeiden.** Weil ein Kartenpunkt ein kleines Stück Fläche abdeckt, kann sich eine
+Fläche selbst beschatten: Es entstehen feine Streifen, die **Schattenakne** – ähnlich den Streifen auf
+einem Foto von einem Bildschirm. Kern hilft mit einem kleinen **Sicherheitsabstand** und schaut zudem
+ein Stückchen von der Fläche weg nach, bei schräg einfallendem Licht etwas mehr. So bleibt die Akne
+weg, ohne dass sich der Schatten sichtbar vom Ding löst.
 
-Außerhalb der Karte gilt alles als beleuchtet; Flächen, die von der Sonne wegzeigen, schauen gar nicht
-nach. Mit Schattendistanz blendet der Schatten über das letzte Zehntel sanft aus.
+**Weiche Kanten.** Statt nur einen Kartenpunkt zu fragen, mischt Kern mehrere Nachbarn. So bekommt die
+Schattenkante einen weichen Übergang statt harter Treppchen. Am Computer mischt Kern mehr Nachbarn als
+auf dem Telefon.
 
-**Faustregel:** Ausdehnung und Auflösung bestimmen zusammen die Punktgröße. Orb Run nutzt 2048 Punkte
-auf ±110 m, also 220 m / 2048 ≈ **gut 10 cm pro Punkt**; „hello“ 1024 Punkte auf ±40 m. Studio legt die
-Karte mit 2048 Punkten an und nutzt in Levels die Schattendistanz.
+Außerhalb der Karte gilt alles als beleuchtet; Flächen, die von der Sonne wegzeigen, fragen gar nicht
+erst nach. Am Rand der Schattendistanz blendet der Schatten sanft aus, statt abzureißen.
 
-> **Probier's aus!** Lade **File › Example Levels › Micro Duck** und stelle in **World Settings** die
-> **Shadow distance** von 10 auf 200 m: Die Schatten von Ente und Ball werden matschig. Zurück auf 10 –
-> gestochen scharf. Kleiner heißt schärfer, reicht aber weniger weit.
+> **Für Neugierige:** Beim Mischen der Nachbarn nutzt Kern einen Trick aus dem Spiel „The Witness“:
+> Er fragt geschickt *zwischen* den Kartenpunkten, sodass die Grafikkarte die Nachbarn gratis mit den
+> richtigen Anteilen mischt. So wirken neun Abfragen wie ein weicher Filter über 25 Kartenpunkte.
+
+> **Probier's aus!** Lade **File › Example Levels › Micro Duck**, öffne rechts den Tab **World
+> Settings** und stelle die **Shadow distance** (Schattendistanz) von 10 auf 200 m: Die Schatten von
+> Ente und Ball werden matschig, denn dieselben Kartenpunkte verteilen sich jetzt auf viel mehr
+> Fläche. Zurück auf 10 – gestochen scharf. Kleiner heißt schärfer, reicht aber weniger weit.
 
 ### 4.8.2 Himmel
 
-Der Himmel ist ein einziges bildschirmfüllendes Dreieck **ganz hinten**. Kern malt es *nach* dem
-Undurchsichtigen, mit Tiefentest – nur Pixel, auf denen noch nichts liegt, bestehen. Der aufwendige
-Himmelsshader läuft also nur dort, wo wirklich Himmel zu sehen ist.
+Der Himmel ist ein einziges riesiges Dreieck, das den ganzen Bildschirm bedeckt und **ganz hinten**
+liegt. Kern malt es *nach* dem Undurchsichtigen. Dank Tiefenpuffer kommt es nur dort durch, wo noch
+nichts gemalt ist. Der aufwendige Himmels-Shader läuft also nur dort, wo wirklich Himmel zu sehen ist.
 
-Pro Pixel mischt er: einen **Verlauf** von Horizont- zu Zenitfarbe (nachts dunkelblau), die **goldene
-Stunde** (je tiefer die Sonne, desto oranger der Horizont und violetter der Zenit), eine **Sonne** mit
-weichem Hof und scharfer Scheibe, nachts **Mond und funkelnde Sterne**, **Wolken** aus fünf
-übereinandergelegten Rauschmustern (vom Wind verschoben, von Explosionen wie von einer Schockwelle
-weggedrückt) und auf Wunsch **Horizontnebel**, in dem sich der Horizont in die Nebelfarbe der Szene
-auflöst – je dünner der Nebel der Szene, desto dünner auch dieser Dunst. Sinkt die Sonne ein Stück unter den
-Horizont, verschwinden Scheibe und Hof; unterhalb des Horizonts geht der Himmel in die Horizontfarbe
-über. Orthografische Kameras haben keinen Himmel; dort bleibt die Löschfarbe stehen, die Grundfarbe, mit der
-jedes Bild beginnt.
+Für jeden Bildpunkt mischt er: einen **Verlauf** vom Horizont zum Himmel über dir (nachts
+dunkelblau), die **goldene Stunde** (je tiefer die Sonne, desto oranger der Horizont und violetter der
+Himmel darüber), eine **Sonne** mit weichem Hof und scharfer Scheibe, nachts **Mond und funkelnde
+Sterne**, **Wolken** und auf Wunsch **Horizontnebel**, in dem der Horizont in die Nebelfarbe der Szene
+übergeht – je dünner der Nebel der Szene, desto dünner auch dieser Dunst.
 
-### 4.8.3 Bloom und Composite
+Die Wolken entstehen aus **Rauschmustern**: Zufallsmustern, die trotzdem immer gleich aussehen, wie
+die Maserung in Marmor. Fünf davon, fein und grob übereinandergelegt, ergeben Wolken; der Wind
+verschiebt sie, und eine Explosion drückt sie weg wie eine Schockwelle. Sinkt die Sonne unter den
+Horizont, verschwinden Scheibe und Hof. Kameras ohne Perspektive (wie die Draufsicht im Editor) haben
+keinen Himmel; dort bleibt die Grundfarbe stehen, mit der jedes Bild beginnt.
 
-**Bloom** ist das Glühen um sehr helle Stellen. Es braucht Zwischenbilder mit Kommazahlen; kann das
-Gerät das nicht, meldet Kern „unsupported“ und malt direkt. Ablauf: **Helles ausschneiden** (auf einem
-Viertel der Größe, weicher Übergang ab etwa 0,88), **weichzeichnen** – waagerecht, dann senkrecht, neun
-Gewichte mit nur fünf Lesezugriffen (Trick in Anhang B) –, **noch einmal** auf einem Achtel der Größe
-für den breiten Schein, dann **Composite**.
+### 4.8.3 Glühen (Bloom) und Zusammensetzen
 
-Der Composite ist schlauer, als er aussieht: Er nimmt das fertige Bild und addiert nur den
-**Unterschied** zwischen „Licht mit Glühen und AO, durch die Filmkurve“ und „Licht ohne, durch dieselbe
-Kurve“. Warum so umständlich? Das fertige Bild enthält schon den Nebel, der in der Lichtkopie fehlt.
-Neu entwickeln hieße: Nebel weg. Pixel ohne Glühen und Verdeckung kopiert er einfach.
+**Bloom** ist das Glühen um sehr helle Stellen, wie Gegenlicht im Auge. Kern macht es in drei
+Schritten: Aus dem Lichtmesser-Bild **schneidet** er alles sehr Helle **aus**, **verwischt** es auf
+verkleinerten Bildern (das ist billiger und ergibt einen breiteren Schein) und **legt** es über das
+fertige Foto. Kann ein Gerät die dafür nötigen Zwischenbilder nicht, malt Kern ohne Glühen.
+
+Das Verwischen geht übrigens in zwei Durchgängen – erst waagerecht, dann senkrecht –, und jeder
+Lesezugriff holt dabei gleich zwei Nachbarpunkte auf einmal. Wie das genau geht, steht in Anhang B.
+
+Beim Zusammensetzen entwickelt Kern das Foto nicht neu. Er rechnet nur aus, **um wie viel** Glühen
+und Eckenschatten das Bild verändern, und legt genau diesen Unterschied darüber. Warum so umständlich?
+Das fertige Foto enthält schon den Nebel, das Lichtmesser-Bild nicht. Neu entwickeln hieße: Nebel weg.
+Bildpunkte ohne Glühen und ohne Eckenschatten übernimmt Kern einfach unverändert.
 
 > **Stell dir vor …** … ein fertig gerahmtes Foto. Statt es neu zu entwickeln, legst du eine dünne
 > Folie mit dem Glühen darüber. Der Rahmen – der Nebel – bleibt, wie er ist.
 
-**Der Wächter.** Liegt die gemittelte Bildzeit länger als 3,5 Sekunden über 27 Millisekunden (also
-unter etwa 37 Bildern pro Sekunde), schaltet sich das Glühen für die Sitzung ab, außer es ist erzwungen.
-Der Composite läuft weiter, denn er bringt auch die AO ins Bild. Ist die Seite verborgen, setzt Kern
-den Wächter zurück – sonst würden gedrosselte Hintergrundbilder das Glühen abschalten.
+**Der Wächter.** Stockt ein Gerät über mehrere Sekunden, schaltet ein Wächter das Glühen
+für den Rest der Sitzung ab. Das Zusammensetzen läuft weiter, denn es bringt auch die Eckenschatten ins
+Bild. Ist die Seite gerade versteckt, etwa in einem Hintergrund-Tab, setzt Kern den Wächter zurück –
+der Browser bremst solche Seiten absichtlich, und das soll das Glühen nicht abschalten.
 
-### 4.8.4 Ambient Occlusion (GTAO)
+### 4.8.4 Eckenschatten (Ambient Occlusion)
 
-**Ambient Occlusion** (Umgebungsverdeckung, AO) sind die weichen Schatten in Ecken, Ritzen und unter
-Dingen, wo weniger Himmelslicht hinkommt. Kern nutzt **GTAO** (nach Jimenez und Kollegen, 2016) in der
-Form von Intels XeGTAO; das Verfahren erklärt Anhang B. Kerns Besonderheit: **kein zusätzlicher
-Malgang** für die Geometrie.
+**Ambient Occlusion** – auf Deutsch Umgebungsverdeckung, hier kurz Eckenschatten – sind die weichen
+dunklen Stellen in Ecken, Ritzen und unter Dingen. Dort kommt weniger Himmelslicht hin, weil die
+Umgebung einen Teil des Himmels verdeckt.
 
-1. Beim normalen Malen schreibt der Shader nebenbei den indirekten Lichtanteil auf (4.5).
-2. GTAO rechnet aus der fertigen Tiefe, wie stark jeder Punkt verdeckt ist.
-3. Der Composite dunkelt **genau den indirekten Anteil** ab. Sonne und Lampen bleiben unberührt.
+> **Stell dir vor …** … du liegst in einer Mulde im Gras und schaust nach oben. Je tiefer die Mulde,
+> desto kleiner dein Stück Himmel – und desto dunkler ist es bei dir, auch ohne Sonnenschatten.
 
-So sitzt die AO physikalisch an der richtigen Stelle. Einen Vor-Malgang spart Kern sich auch, weil
-Apple- und Mali-Grafikchips verdeckte Pixel ohnehin in der Hardware verwerfen.
+Kern nutzt dafür ein bewährtes Verfahren namens GTAO, das Anhang B erklärt. Kerns Besonderheit: Er
+braucht **keinen zusätzlichen Malgang** über alle Formen.
 
-Vereinfacht macht der Hauptpass dies: Er rechnet aus dem Tiefenwert die Position zurück, gewinnt die
-Normale ebenfalls aus der Tiefe (pro Richtung zählt der Nachbar mit dem kleineren Tiefensprung), rechnet
-den **Radius** (Standard 1,6 m) in Pixel um und sucht in einigen Richtungen links und rechts den
-**höchsten Horizont**. Die Richtungen drehen sich nach einem 4×4-Muster, das ein kantenbewusster Filter
-wieder wegmittelt. Beim Einrechnen hilft der **Multi-Bounce**: Helle Flächen bekommen Licht zurück, das
-zwischen den Wänden hin- und herspringt – eine weiße Zimmerecke wird weniger dunkel als eine schwarze.
+1. Beim normalen Malen schreibt der Shader nebenbei den Notizzettel: wie viel Licht aus der Umgebung
+   kommt (4.5).
+2. Aus dem fertigen Tiefenpuffer rechnet Kern, wie stark jede Stelle von ihrer Umgebung verdeckt ist:
+   Er schaut in einige Richtungen und sucht, wie hoch die Nachbarschaft den Himmel verdeckt.
+3. Beim Zusammensetzen dunkelt er **genau das Umgebungslicht** ab. Sonne und Lampen bleiben
+   unberührt.
 
-**Qualität** (Richtungen × Schritte pro Seite): low 1 × 2, medium 2 × 2, high 3 × 3, ultra 9 × 3.
-Standard ist medium in halber Auflösung; ein Wächter senkt auf langsamen Geräten erst die Qualität und
-schaltet dann auf halbe Auflösung. Studio und exportierte Spiele nehmen auf Telefonen medium/halb,
-sonst high/voll; `?ao=off|low|medium|high|ultra` und `?aoRes=half|full` überschreiben das. Eine
-Stärke (`power`, Standard 2,2) macht die Verdeckung kräftiger. Der Radius gehört zur Szene, nicht zum
-Gerät: Levels setzen ihn in den World Settings, 0 schaltet AO für diese Szene ab. AO läuft nur
-mit Szenen-Ziel (nicht in Teil-Viewports, nicht ohne Bloom-Unterstützung) und perspektivischer Kamera.
+So sitzen die Eckenschatten physikalisch an der richtigen Stelle. Dazu kommt eine Korrektur für Licht,
+das zwischen hellen Wänden hin- und herspringt: Eine weiße Zimmerecke wird weniger dunkel als eine
+schwarze.
+
+Die Rechnung ist nicht billig. Darum stellt Kern die Qualität nach dem Gerät ein – auf dem Telefon
+gröber, am Computer feiner –, und ein Wächter stuft sie herunter, wenn es ruckelt. Den **Radius**, also
+wie weit Kern nach Verdeckern sucht, legt dagegen die Szene fest: Er steht in den World Settings, und
+0 schaltet die Eckenschatten für diese Szene ab. Eckenschatten gibt es nur, wenn Kern das ganze Fenster
+mit Perspektive bemalt (4.7).
 
 > **Probier's aus!** Stelle in **World Settings** den **Ambient occlusion radius** auf 0: Ecken und
-> Fugen wirken flach, Objekte schweben. Dann 1,6 (Standard) und probeweise 4 – siehst du, wie die Dinge
-> am Boden „festwachsen“?
+> Fugen wirken flach, Dinge scheinen zu schweben. Dann 1,6 (der Standard) und probeweise 4 – siehst
+> du, wie die Dinge am Boden „festwachsen“?
 
-## 4.9 Partikel und Punktlichter
+## 4.9 Funken und Lampen
 
-Funken, Rauch, Mündungsfeuer: Kerns **Partikel** sind kleine Quadrate, die sich zur Kamera drehen –
-alle zusammen **ein** instanziertes, durchsichtiges Mesh, rein optisch, ohne Physik. Jedes hat
-eine Farbe, eine Lebensdauer (16 bis 10 000 ms, Standard 350), eine Größe (Standard 35 cm), auf Wunsch
-Schwerkraft, Wachsen und schnelleres Verblassen. Ein System fasst 1 bis 4096 Partikel; ist es voll, wird
-ein neues abgelehnt und gezählt. Jedes Bild bewegt Kern sie (Startpunkt plus Geschwindigkeit mal Zeit,
-minus Fallen), sortiert sie **von hinten nach vorne** und blendet sie über die Lebenszeit aus. Das
-Partikel-Mesh ist unbeleuchtet, zweiseitig, wirft keinen Schatten, wird nie weggecullt und ist
-unsichtbar, solange kein Partikel lebt. Die Spiel-Laufzeit nutzt 512 Partikel; JavaScript erreicht
-dieselbe Klasse über `kern_fx_*`.
+Funken, Rauch, Mündungsfeuer: Kerns **Partikel** sind kleine Quadrate, die sich immer zur Kamera
+drehen. Alle zusammen sind **eine** Form mit vielen Kopien (4.4), rein optisch, ohne Physik – sie
+prallen nirgends ab. Jedes Partikel hat eine Farbe, eine Lebensdauer und eine Größe, auf Wunsch
+Schwerkraft, Wachsen und schnelleres Verblassen. In jedem Bild bewegt Kern sie weiter, sortiert sie
+von hinten nach vorne (sie sind ja durchsichtig) und lässt sie über ihr Leben hinweg verblassen. Ist
+das Budget voll, wird ein neues Partikel abgelehnt.
 
-> **Achtung, Falle!** Die Partikel-Uhr läuft nie rückwärts. Das ist Absicht: Sonst tauchten längst
-> verblasste Funken nach einer Pause wieder auf wie Gespenster.
+> **Achtung, Falle!** Die Partikel-Uhr läuft nie rückwärts. Meldet ein Spiel nach einer Pause oder
+> einem Zurückspulen eine frühere Zeit, bleibt Kern bei der späteren. Sonst tauchten längst verblasste
+> Funken wieder auf wie Gespenster.
 
-Der Shader kennt nur sechs Punktlichter. Hat ein Spiel zwanzig Lampen, wählt der **LightPool** jedes
-Bild die sechs wichtigsten: Helligkeit geteilt durch (1 + Entfernung / Reichweite), wobei die
-Reichweite mindestens als 4 m zählt; bei Gleichstand gewinnt, wer zuerst fragte. Helligkeit über 100
-und Reichweite über 1000 m kappt er. Beispiel: Lampe A, Helligkeit 10, Reichweite 10 m, 30 m entfernt: 10 / (1 + 3) = 2,5. Lampe B, Helligkeit 4, gleiche
-Reichweite, 5 m entfernt: 4 / 1,5 ≈ 2,7 – die schwächere, aber nähere gewinnt. Orb Run meldet so einen
-Scheinwerfer vor dem Auto und ein Licht pro Orb an.
+Der Shader kennt nur **sechs Lampen** auf einmal. Hat ein Spiel zwanzig, wählt Kern in jedem Bild die
+sechs wichtigsten aus. Wichtig heißt: hell und nah. Kern nimmt die Helligkeit und teilt sie umso
+stärker, je weiter die Lampe im Verhältnis zu ihrer Reichweite entfernt ist.
+
+**Beispiel:** Lampe A hat Helligkeit 10, 10 m Reichweite und ist 30 m entfernt – dreimal ihre
+Reichweite. Kern teilt durch 1 + 3 = 4 und kommt auf 2,5. Lampe B hat Helligkeit 4, dieselbe
+Reichweite und ist nur 5 m entfernt – eine halbe Reichweite. Kern teilt durch 1,5 und kommt auf gut
+2,7. Die schwächere, aber nähere Lampe gewinnt. Orb Run meldet so einen Scheinwerfer vor dem Auto und
+ein Licht pro Orb an.
 
 ## 4.10 Einstellungen
 
-Die vollständigen Listen stehen im blauen Buch und in [Kapitel 17](17-referenz.md); hier das Wichtigste.
-Grundeinstellungen sind Bildgröße (Standard 960 × 540), Sonnenschatten (Standard aus), Bloom, AO und
-Farbgrading (an). Schatten, Schattendistanz, Filter, AO, AO-Radius und Punktlichter lassen sich zur
-Laufzeit ändern; `invalidate` erzwingt ein Neumalen, auf Wunsch samt Schattenkarte.
-
-Jedem Bild gibst du **RenderParams** mit: die Löschfarbe (dunkles Blau, sichtbar, wo kein Himmel ist),
-optional ein Teilrechteck (dann ohne Bloom und AO), ob die Seite verborgen ist (setzt die Wächter
-aus), die Ebenenmaske und ob der Himmel gemalt wird.
-
-Alle Lichtfarben stehen linear und schon mal Stärke im Renderer; die Vorgaben heißen im Code
-„production day“: Sonne schräg von oben aus Richtung (−0,45; −0,52; 0,72), Sonnenfarbe (2,8; 2,47;
-2,11), Nebeldichte 0,00085, Belichtung 1, Umgebungsstärke 0,9. Den Himmel steuern Sonnen- und
-Mondrichtung, Nacht (0 bis 1), Wolken, Wind und Explosionen. In Levels musst du nichts davon von Hand
-setzen: Die Spiel-Laufzeit rechnet alles aus der **Tageszeit**, mit Sonne zu Himmelslicht etwa 5 : 1,
-dem Hemisphärenlicht nur noch als Nachtaufhellung, einer Bodenfarbe der Umgebungskuppel aus dem Licht,
-das eine Straße zurückwirft, und eingeschaltetem Höhennebel, Sonnenstreuung und Horizontnebel
+Fast alles in diesem Kapitel lässt sich einstellen: Bildgröße, Schatten, Glühen, Eckenschatten,
+Farbgrading, Lichtfarben, Nebel, Himmel und Kamera – die vollständige Liste steht im blauen Buch,
+Kapitel 4, und in [Kapitel 17](17-referenz.md). In Levels musst du davon nichts von Hand setzen: Kern
+errechnet Sonne, Himmelslicht, Nebel und Himmel aus der **Tageszeit**
 ([Kapitel 8](08-spiel-laufzeit.md)).
 
-Die **Kamera** hat Augpunkt, Ziel, Oben-Richtung (Z), 60° Öffnung (die Editor-Viewports in Studio nehmen 70°), nahe
-Ebene 0,05 m und ferne 1800 m, wahlweise orthografisch. Die Welt ist **Z-oben, in Metern**.
+## 4.11 Wenn der Browser die Grafikkarte wegnimmt
 
-## 4.11 Kontextverlust
-
-Ein Browser darf dir die Grafikkarte jederzeit wegnehmen – bei Speichermangel, Treiber-Neustart oder
-auf dem Handy im Hintergrund. Viele Webseiten zeigen dann nur noch Schwarz. Kern nicht:
+Ein Browser darf einer Seite die Grafikkarte jederzeit wegnehmen – bei Speichermangel, wenn der
+Grafiktreiber neu startet, oder auf dem Handy, wenn die Seite im Hintergrund liegt. Das nennt man
+**Kontextverlust**. Viele Webseiten zeigen dann nur noch Schwarz. Kern nicht:
 
 1. **Verlust:** Die Seite sagt dem Browser „Ich will das zurück!“ (sonst gäbe es keine
-   Wiederherstellung). Kern vergisst alle Grafiknummern; `render()` lehnt höflich ab mit „GL context
-   lost; waiting for restoration“. Meshes und Texturen bleiben als Kopie, `upsert` geht weiter.
-2. **Wiederherstellung:** Erst füllt die Seite ihre eigenen Texturen, dann baut Kern Programme, Passes
-   und Erweiterungen neu und lädt alles aus den Kopien hoch.
+   Wiederherstellung). Kern vergisst alle Garderobenmarken der Grafikkarte und malt vorerst nicht.
+   Formen und Texturen bleiben als Kopie erhalten, und man kann sogar weiter neue anlegen.
+2. **Wiederherstellung:** Erst füllt die Seite ihre eigenen Texturen neu, dann baut Kern Malprogramme,
+   Zusatz-Malgänge und Erweiterungen neu und lädt alles aus seinen Kopien wieder hoch.
 3. **Gescheitert?** Kern räumt auf und kann es später sauber erneut versuchen.
 
-Derselbe Mechanismus erlaubt den **Headless-Modus** ganz ohne Grafikkarte, etwa im Lehrer
-([Kapitel 14](14-lehrer.md)).
+Derselbe Mechanismus erlaubt auch das Arbeiten ganz **ohne Bildschirm** („headless“), etwa im
+Lehrer, der Roboter trainiert und dabei nichts malen muss ([Kapitel 14](14-lehrer.md)).
 
-> **Wusstest du?** Genau dafür hält Kern die Kopie im Hauptspeicher (Grundsatz 3). Was nach
+> **Wusstest du?** Genau dafür hält Kern die Kopie im Arbeitsspeicher (Grundsatz 3 aus 4.1). Was nach
 > verschwendetem Speicher aussieht, ist eine Versicherung.
 
-## 4.12 Performance-Hinweise
+## 4.12 So bleibt ein Spiel flüssig
 
-- **Instanzieren statt kopieren:** Die Stadt der Laufzeit malt alle Baumstämme als ein Mesh, alle
-  Kronen als ein zweites.
-- **Statisches zusammenfassen:** Gebäude- und Straßenbauer packen viele kleine Teile in wenige große
-  Meshes – weniger Zeichenaufrufe, weniger Sortierarbeit.
-- **Nur hochladen, was sich ändert;** gleiche Daten kosten nichts, reine Farbwechsel wenig.
-- **Schatten schonen:** Jede Bewegung eines Schattenwerfers malt die ganze Karte neu. Was keinen
-  sichtbaren Schatten braucht, bekommt `cast_shadow = false` – Orb Run tut das für Straßen und Boden.
-  Mit Schattendistanz wird außerdem neu gemalt, sobald sich die Kamera um einen Kartenpunkt bewegt.
-- **16-Bit-Indizes** kommen automatisch; `weld` ([Kapitel 5](05-szene-und-geometrie.md)) macht aus losen
-  Dreiecken sparsame indizierte Meshes.
-- **Frustum-Culling anlassen:** Abschalten (`frustum_culled = false`) nur für Dinge, deren Hülle nicht
-  stimmt, etwa Partikel.
-- **Messen statt raten:** Die Statistik zeigt Zeichenaufrufe, Schatten-Wiederverwendung, Dreiecke und
-  Zeiten; in JavaScript gibt `KernRenderer.render()` sie als Objekt zurück. AO und Bloom passen sich
-  ohnehin selbst an.
+Jeder Malauftrag kostet Zeit, egal wie klein er ist. Ein Spiel bleibt flüssig, wenn es Kern wenige,
+große Aufträge gibt und nichts unnötig neu schickt.
+
+> **Stell dir vor …** … du gehst einkaufen. Hundertmal für je eine Zutat in den Laden zu laufen dauert
+> viel länger als einmal mit vollem Korb – obwohl am Ende dasselbe im Kühlschrank steht.
+
+- **Kopien statt Duplikate:** Viele gleiche Dinge sind eine Form mit vielen Instanzen. Die Stadt der
+  Spiel-Laufzeit malt alle Baumstämme als eine Form, alle Kronen als eine zweite.
+- **Kleines zusammenfassen:** Gebäude- und Straßenbauer packen viele kleine Teile in wenige große
+  Formen – weniger Aufträge, weniger Sortierarbeit.
+- **Nur hochladen, was sich ändert:** Gleiche Daten kosten nichts, reine Farbwechsel wenig.
+- **Schatten schonen:** Jede Bewegung eines Dings, das Schatten wirft, malt die ganze Schattenkarte
+  neu. Was keinen sichtbaren Schatten braucht, bekommt keinen – Orb Run schaltet ihn für Straßen und
+  Boden ab.
+- **Platz sparen:** Bei kleineren Formen speichert Kern die Eckennummern automatisch in halber Größe;
+  Werkzeuge aus [Kapitel 5](05-szene-und-geometrie.md) fassen doppelte Ecken zusammen.
+- **Unsichtbares weglassen lassen:** Den Schalter „darf weggelassen werden, wenn außer Sicht“ schaltet
+  man nur bei Dingen ab, deren gedachte Hülle nicht stimmt, etwa bei Partikeln.
+- **Messen statt raten:** Die Statistik zeigt Malaufträge, wiederverwendete Schatten, Dreiecke und
+  Zeiten. Glühen und Eckenschatten passen sich ohnehin selbst an.
 
 ## 4.13 Beispiel: Fenster, die nachts leuchten (Orb Run)
 
 In Orb Run leuchten nachts die Fenster der Stadt – aber die Gebäude **haben gar keine Fenster**. Es
-sind glatte Kästen! Die Fenster malt erst der Shader, mit einer Erweiterung namens `NightWindows`.
+sind glatte Kästen! Die Fenster malt erst der Shader, mit einer Erweiterung namens „Nachtfenster“
+(NightWindows).
 
-Der Gebäudebauer ([Kapitel 5](05-szene-und-geometrie.md)) gibt jeder Ecke einen **Wand-Datensatz** mit
-vier Zahlen mit: Wandlänge (−1 fürs Dach, −2 fürs Gesims), Wandhöhe, einen Zufalls-Seed pro Gebäude und
-die Stockwerkshöhe. Die Texturkoordinaten sind Meter entlang der Wand (u) und über dem Boden (v). Über
-jede Wand legt der Shader ein unsichtbares Raster aus 3 m breiten Spalten und Stockwerkszeilen. Ein
-Ausschnitt aus `fragment_surface`:
+Der Gebäudebauer ([Kapitel 5](05-szene-und-geometrie.md)) gibt jeder Ecke einer Wand einen kleinen
+**Wand-Datensatz** mit: wie lang und hoch die Wand ist, wie hoch ein Stockwerk ist und eine
+Zufallszahl pro Gebäude. Außerdem weiß jeder Punkt der Wand, wie viele Meter er vom Wandanfang und vom
+Boden entfernt ist. Damit legt der Shader ein **unsichtbares Raster** über die Wand: 3 m breite Spalten
+und eine Zeile pro Stockwerk.
 
-```glsl
-float column = floor(u / 3.0), floorIndex = floor(z / storey);
-vec2 cell = vec2(fract(u / 3.0), fract(z / storey));
-base = mix(base, vec3(0.05, 0.06, 0.08), win * 0.85);
-surfaceGlass = max(surfaceGlass, win * (1.0 - lit * uNight) * 0.7);
+```
+  +-------+-------+-------+-------+   ← Dachkante
+  |  [#]  |  [ ]  |  [#]  |  [#]  |   3. Stock
+  +-------+-------+-------+-------+
+  |  [ ]  |  [#]  |  [ ]  |  [#]  |   2. Stock
+  +-------+-------+-------+-------+
+  |  [#]  |  [#]  |  [ ]  |  [ ]  |   1. Stock
+  +-------+-------+-------+-------+
+  |       |       |       |       |   Erdgeschoss: keine Fenster
+  +-------+-------+-------+-------+
+    3 m     3 m     3 m     3 m       [#] leuchtet   [ ] dunkles Glas
 ```
 
-- Zeile 1: In welcher Spalte, welchem Stockwerk bin ich? (`floor` rundet ab.)
-- Zeile 2: Wo in der Zelle, von 0 bis 1? (`fract` nimmt die Nachkommastellen.) Liegt der Punkt im
-  Mittelteil, ist hier Fenster (`win`).
-- Zeile 3: Fensterflächen werden fast schwarz.
-- Zeile 4: Unbeleuchtete Fenster werden Glas und spiegeln den Himmel – tagsüber alle, nachts nur die
-  dunklen.
+Für jeden Bildpunkt einer Wand fragt der Shader:
 
-Der Rest in Worten: Der Schnipsel wirkt nur auf ungefähr senkrechten Wänden, ab dem ersten Stock bis
-1 m unter der Dachkante. Ob ein Fenster leuchtet, entscheidet ein **Hash** aus Spalte, Stockwerk und
-Seed – etwa **58 %** sind an. Beleuchtete Fenster bekommen warmes `emissive` mal `uNight` und glühen
-dank Bloom. In der Ferne würde das Raster feiner als ein Pixel und wild flimmern (**Aliasing**);
-`fwidth` misst das, und Kern ersetzt die Fenster dann durch ein mittleres Glühen der Fassade. Den
-Wand-Datensatz reicht der Vertex-Shader **`flat`** weiter, also ohne Interpolation: Er ist pro Wand
-konstant, und winzige Rundungsfehler würden den Hash verwürfeln – Fenster flackerten an und aus. Das
-Uniform `uNight` setzt die Erweiterung einmal pro Bild über den Cache, aus dem Tag-Nacht-Zyklus.
+1. In welcher Spalte und in welchem Stockwerk bin ich?
+2. Liege ich im Mittelteil meiner Zelle? Dann bin ich ein Fenster. (Nicht im Erdgeschoss und nicht
+   direkt unter dem Dach.)
+3. Ist dieses Fenster an? Das entscheidet ein „Würfel“ aus Spalte, Stockwerk und Zufallszahl des
+   Gebäudes – gut die Hälfte der Fenster ist an.
+4. Fensterflächen werden dunkel. Dunkle Fenster werden zu Glas und spiegeln den Himmel – tagsüber alle,
+   nachts nur die ausgeschalteten. Eingeschaltete bekommen nachts warmes Eigenleuchten und glühen dank
+   Bloom.
 
 > **Stell dir vor …** … ein Würfel, der für dasselbe Fenster **immer dieselbe Zahl** würfelt. Genau
-> das ist der Hash: Fenster 7 im 12. Stock ist jede Nacht hell, und niemand musste es sich merken.
+> das ist der Würfel hier (Fachwort: Hash): Fenster 7 im 12. Stock ist jede Nacht hell, und niemand
+> musste es sich merken.
 
-Eingebunden wird die Erweiterung über `App::extensions()`. Gebäude-Chunks bekommen den Wand-Strom in
-Platz 0, Straßen und Bodenplatten keinen – dort liest der Shader Wandlänge 0, und der Schnipsel tut
-nichts. Die Spiel-Laufzeit hat eine Klasse `kern::game::NightWindows` mit identischem Shader-Code, die
-Studio und exportierte Spiele immer anmelden; ob eine **Procedural City** den Strom liefert, entscheidet
-ihr Schalter **Lit windows at night**.
+**Gegen Flimmern:** In der Ferne würde das Raster feiner als ein Bildpunkt; die Fenster sprängen wild
+an und aus (**Aliasing**). Der Shader merkt, wie schnell sich das Raster von Bildpunkt zu Bildpunkt
+ändert, und ersetzt die Fenster in der Ferne durch ein gleichmäßiges, mittleres Glühen der Fassade.
 
-> **Probier's aus!** Lade **File › Example Levels › Orb Run** und tippe unten in die Konsole (**Cmd**)
-> erst `tod 0.75` – die goldene Stunde färbt den Himmel – und dann `tod 0.95` für die Nacht. Dunkle
-> Glasfenster, warm leuchtende Fenster, in der Ferne ein weicher Schimmer. Wähle die Stadt aus
-> und schalte in **Details** **Lit windows at night** aus – dann bekommen ihre Gebäude keine
-> leuchtenden Fenster mehr.
+**Gegen Flackern:** Normalerweise mischt die Grafikkarte die Werte der Ecken über das Dreieck
+(Interpolation). Den Wand-Datensatz reicht Kern dagegen unverändert an jeden Bildpunkt weiter – er ist
+für die ganze Wand gleich. Schon winzige Rundungsfehler beim Mischen könnten den Würfel ein anderes
+Ergebnis werfen lassen, und Fenster flackerten an und aus.
+
+Wie dunkel es ist, sagt dem Shader ein einziger Einstellwert für die Nacht, den die Erweiterung einmal
+pro Bild aus dem Tag-Nacht-Zyklus setzt – über den Merkzettel. Straßen und Bodenplatten bekommen keinen
+Wand-Datensatz; dort liest der Shader null, und die Erweiterung tut nichts. Kern Studio und exportierte
+Spiele haben dieselbe Erweiterung immer an Bord; ob eine **Procedural City** (eine automatisch
+erzeugte Stadt) ihre Gebäude damit ausstattet, entscheidet ihr Schalter **Lit windows at night**.
+
+> **Probier's aus!** Lade **File › Example Levels › Orb Run**. Klicke unten in der Statusleiste auf
+> **Cmd**: Das öffnet die Konsole, ein Eingabefeld für Befehle. Tippe `tod 0.75` und Enter – `tod`
+> steht für *time of day* und setzt die Tageszeit von 0 bis 1 (0,25 Sonnenaufgang, 0,5 Mittag, 0,75
+> Sonnenuntergang). Die goldene Stunde färbt den Himmel. Dann `tod 0.95` für die späte Nacht: dunkle
+> Glasfenster, warm leuchtende Fenster, in der Ferne ein weicher Schimmer. Wähle die Stadt aus und
+> schalte rechts in **Details** **Lit windows at night** aus – dann bekommen ihre Gebäude keine
+> leuchtenden Fenster mehr. Du siehst: Die Fenster gibt es nur im Malprogramm.
 
 ## Das nimmst du mit
 
-- Kern malt **alles mit einem Standard-Shader**; Spiele erweitern ihn über sechs Einfügestellen.
-- Formen werden **einmal hochgeladen**, danach ändern sich nur Instanzen; gleiche Daten kosten nichts.
-- Der Uniform-Cache spart jeden Aufruf, der nichts Neues sagt.
-- Jedes Pixel landet in **drei Bildern**: fertiges Bild, echtes Licht, AO-Datensatz.
-- Die Schattenkarte deckt eine **Kugel** um die Sicht ab, rastet ein und wird nur bei Bedarf neu gemalt.
-- AO dunkelt **nur indirektes Licht** ab und braucht keinen zweiten Geometrie-Malgang.
-- Kern übersteht einen **Kontextverlust** dank der Kopien im Speicher.
-- Teil-Viewports haben weder Bloom noch AO.
+- Kern malt **alles mit einem Malprogramm**; Spiele ergänzen es an verabredeten Stellen.
+- Formen werden **einmal hochgeladen**, danach ändern sich nur ihre Kopien; gleiche Daten kosten
+  nichts.
+- Ein **Merkzettel** spart jeden Befehl an die Grafikkarte, der nichts Neues sagt.
+- Jeder Bildpunkt landet in **drei Bildern**: fertiges Foto, echtes Licht fürs Glühen, Notizen für die
+  Eckenschatten.
+- Die Schattenkarte deckt eine **Kugel** um die Sicht ab, rastet auf ganze Punkte ein und wird nur bei
+  Bedarf neu gemalt.
+- Eckenschatten dunkeln **nur das Umgebungslicht** ab und brauchen keinen zweiten Malgang.
+- Kern übersteht den **Verlust der Grafikkarte** dank seiner Kopien im Arbeitsspeicher.
+- Teil-Ansichten haben weder Glühen noch Eckenschatten.
 
 ## Knobelecke
 
-1. Warum sortiert Kern Undurchsichtiges von vorne nach hinten, Durchsichtiges aber andersherum?
-2. Ein Spiel bewegt jedes Bild einen kleinen Ball, der Schatten wirft. Was kostet das, wie spart man?
+1. Warum malt Kern Undurchsichtiges von vorne nach hinten, Durchsichtiges aber andersherum?
+2. Ein Spiel bewegt in jedem Bild einen kleinen Ball, der Schatten wirft. Was kostet das, und wie
+   spart man?
 3. Warum ist die Schattenkarte mit Schattendistanz eine Kugel und kein genau passender Kasten?
 4. In der Vier-Viewport-Ansicht glüht nichts. Ist dein Gerät zu langsam?
-5. Warum wird der Wand-Datensatz der Nachtfenster `flat` weitergereicht?
+5. Die Fenster in Orb Run gibt es gar nicht als Form. Warum ist es trotzdem schlau, sie erst im
+   Malprogramm entstehen zu lassen?
 
 ### Lösungen
 
-1. Verdecktes scheitert so früh am Tiefentest und spart Shaderzeit. Bei Durchsichtigem zählt die
-   Reihenfolge der Schichten – also hinten zuerst.
-2. Jede Bewegung malt die ganze Schattenkarte neu. Braucht der Ball keinen sichtbaren Schatten:
-   `cast_shadow = false`.
+1. Vorne zuerst: Verdecktes fällt sofort am Tiefenpuffer durch und kostet kein Ausmalen. Bei
+   Durchsichtigem zählt die Reihenfolge der Schichten wie bei Folien – also hinten zuerst.
+2. Jede Bewegung malt die ganze Schattenkarte neu. Braucht der Ball keinen sichtbaren Schatten,
+   schaltet man ihn für den Ball ab.
 3. Eine Kugel bleibt beim Drehen gleich groß, also auch die Kartenpunkte – die Kanten flimmern nicht.
-4. Nein: Teil-Viewports malen mit Rechteck direkt auf den Bildschirm, ohne Bloom und AO.
-5. Er ist pro Wand konstant; Interpolation brächte nur Rundungsrauschen, das den Fenster-Hash verwürfelt.
+4. Nein: Teil-Ansichten malen direkt auf den Bildschirm, ohne die Zwischenbilder für Glühen und
+   Eckenschatten.
+5. Es braucht keine zusätzlichen Dreiecke und keinen Speicher für Tausende Fenster; jedes Gebäude
+   bekommt Fenster, ganz gleich, wie groß es ist; ein einziger Wert schaltet zwischen Tag und Nacht;
+   und weil der Würfel immer gleich fällt, muss sich niemand merken, welches Fenster an ist.
 
 ---
 

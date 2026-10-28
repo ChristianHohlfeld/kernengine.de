@@ -4,18 +4,35 @@
 > Kern lässt im Browser genau die Netze laufen, die auch den echten Roboter steuern. Du lernst ihre
 > Motoren, Sensoren und Netze kennen – und alles, was die Ente kann.
 
+> **Wörter, die du brauchst:**
+>
+> - **Servo** – ein kleiner Motor, dem man einen Winkel nennt und der dann dorthin fährt.
+> - **Neuronales Netz** – ein Rechenrezept, das durch sehr viel Ausprobieren gelernt hat, aus
+>   Messwerten Befehle zu machen, hier: Motorbefehle.
+> - **Simulation** – ein Programm, das eine Welt mit ihrer Physik nachrechnet, statt sie zu bauen.
+> - **Drehmoment** – wie stark etwas dreht. Wie beim Schraubenschlüssel: mehr Kraft oder ein
+>   längerer Hebel dreht stärker.
+> - **Trägheit** – wie schwer sich etwas in Drehung versetzen oder wieder anhalten lässt.
+> - **Dämpfung** – eine Bremse gegen schnelle Bewegung, wie Honig in einem Gelenk.
+> - **Rauschen** – kleine zufällige Fehler in einer Messung.
+> - **Weltzeit und Roboterzeit** – die Uhr in Kerns großer Nachbau-Welt und die Uhr des echten
+>   Roboters. Sie laufen verschieden schnell (Abschnitt 13.3).
+
 Die Micro Duck stammt von der Firma **Pollen Robotics**: rund 25 cm groß, 0,74 kg schwer, mit 14
-**Servos** vom Typ Dynamixel XL330 in Beinen und Hals und einem fünfzehnten für den Unterschnabel.
-Ein Servo ist ein kleiner Motor, dem man einen Winkel nennt und der dann dorthin fährt.
+Servos in Beinen und Hals und einem fünfzehnten für den Unterschnabel.
 
-Laufen hat Pollen der Ente nicht mit Regeln beigebracht, sondern mit **neuronalen Netzen**, trainiert
-in der Physiksimulation MuJoCo (Repository `microduck_rl`, Framework mjlab, Lernverfahren rsl_rl).
-Die fertigen Netze werden als **ONNX**-Dateien gespeichert, und genau die lädt der echte Roboter.
+Laufen hat Pollen der Ente nicht mit Regeln beigebracht („wenn du kippst, setz den Fuß nach links“),
+sondern mit **neuronalen Netzen**. Die Netze haben in einer Physiksimulation tausendfach geübt, bis
+die Ente lief. Das fertige Netz ist eine Datei, und genau diese Datei lädt auch der echte Roboter.
+Wie so ein Netz innen aussieht, erklärt [Anhang A](A-grundlagen-neuronale-netze.md).
 
-Kern baut den Roboter auf seiner Physik-Engine Box3D nach und rechnet dieselben Netze. Das Ziel
-heißt **Treue**: dasselbe Modell, dieselben Servos, derselbe Takt. Dazu kommen drei eigene Dinge:
-der **Lehrer** zum Trainieren ([Kapitel 14](14-lehrer.md), [Kapitel 15](15-eigene-modelle.md)),
-der **Sprung** (`jump.onnx`) und die **Spielschicht** (`play.onnx`).
+Kern baut den Roboter auf seiner eigenen Physik nach und rechnet dieselben Netze. Das Ziel heißt
+**Treue**: dasselbe Modell, dieselben Servos, derselbe Takt. Dazu kommen drei Dinge, die nur Kern
+hat: der **Lehrer** zum Trainieren eigener Netze ([Kapitel 14](14-lehrer.md)), ein **Sprung** und
+die **Spielschicht**, die entscheidet, was die Ente mit Ball und Socke macht.
+
+> **Für Profis:** Pollen trainiert in der Simulation MuJoCo; die Netze sind ONNX-Dateien. Die
+> Servos sind vom Typ Dynamixel XL330. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 13.
 
 ![Das Micro-Duck-Level im Studio (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-level.png)
 
@@ -25,20 +42,21 @@ der **Sprung** (`jump.onnx`) und die **Spielschicht** (`play.onnx`).
 
 ## 13.1 Wo der Code liegt
 
-Fast alles steht in `kern/src/game/`: `walker.cpp` (Aufbau, Regler, Sensoren, Steuerung),
-`walker_policy.cpp` (Netze), `servo.cpp`, `walker_brain.cpp` (Verhalten) und `walker_play.cpp`
-(Spielschicht). Pollens Netze und Baupläne liegen
-in `third_party/microduck/`, Kerns eigene Netze in `policies/`.
+Der Code der Ente ist nach Aufgaben getrennt: Aufbau und Steuerung, Netze, Servos, eigenes
+Verhalten und Spielschicht stehen jeweils in einem eigenen Teil. Pollens Dateien (Netze, Baupläne)
+liegen getrennt von Kerns eigenen Netzen – so sieht man immer, was von wem stammt. Die genauen Namen
+stehen im blauen Buch, Kapitel 13.
 
 ## 13.2 Die Grundregel: nicht schummeln
 
-Ein trainiertes Netz funktioniert nur, wenn die Simulation dieselbe Physik rechnet wie im Training:
+Ein trainiertes Netz funktioniert nur, wenn die Simulation dieselbe Physik rechnet wie im Training.
+Darum gelten feste Regeln:
 
-- Keine Hilfskräfte, kein Festhalten, kein Teleport, kein Überblenden zwischen Netzen. Die Ente
-  steht nur durch Servos und Fußkontakte.
-- Ein Servo besteht nur aus Box3Ds eigenen Gelenkteilen (Abschnitt 13.4).
-- Feste Zeitschritte: Gleiche Eingaben ergeben **Bit für Bit** denselben Gang, auf jedem Gerät
-  (**Determinismus**, [Kapitel 14](14-lehrer.md)).
+- Keine Hilfskräfte, kein Festhalten, kein Teleport, kein weiches Überblenden von einem Netz zum
+  anderen. Die Ente steht nur durch ihre Servos und ihre Fußkontakte.
+- Ein Servo besteht nur aus Bauteilen, die die Physik-Engine sowieso hat (Abschnitt 13.4).
+- Die Zeit läuft in festen Schritten. Gleiche Eingaben ergeben **Bit für Bit** denselben Gang, auf
+  jedem Gerät. Das heißt **Determinismus** ([Kapitel 14](14-lehrer.md)).
 
 > **Vorsicht, Falle:** Eine kleine unsichtbare Stütze, „damit sie nicht umfällt“, klingt harmlos.
 > Aber das Netz würde sich darauf verlassen – und am echten Roboter gibt es keine.
@@ -47,379 +65,450 @@ Ein trainiertes Netz funktioniert nur, wenn die Simulation dieselbe Physik rechn
 
 ### Bauplan, Glieder, Gelenke
 
-Pollen beschreibt die Ente in einer **MJCF**-Datei, dem Bauplan-Format von MuJoCo. Ein
-Import-Werkzeug macht daraus Kerns Modelldaten und bricht ab, wenn etwas nicht zusammenpasst (Namen
-und Reihenfolge der Gelenke, Grundstellung, Aufbau des Netzes).
+Pollen beschreibt die Ente in einer Bauplan-Datei: welche Teile es gibt, wie schwer sie sind und wie
+sie mit Gelenken verbunden sind. Ein Werkzeug übersetzt diesen Bauplan in Kerns Modell und prüft
+dabei, ob alles zusammenpasst – Namen und Reihenfolge der Gelenke, Grundstellung, Aufbau des Netzes.
+Passt etwas nicht, bricht es ab. Lieber gar keine Ente als eine falsche.
 
-In Kern hat die Ente **16 Glieder**: Rumpf, 14 Glieder für die Netze und den Unterschnabel. Jedes
-Bein hat fünf Gelenke: Hüfte gieren, rollen, nicken, dann Knie und Knöchel. Dazu kommen Hals, Kopf
-nicken, gieren, rollen und als 15. Servogelenk der Mund. **Gieren, Nicken, Rollen** sind die drei
-Drehrichtungen: „nein“ schütteln, „ja“ nicken, Kopf zur Schulter neigen.
+Die Ente besteht aus **16 Teilen** (Gliedern): dem Rumpf und 15 Teilen, die je an einem Servogelenk
+hängen. Der Rumpf hat kein eigenes Gelenk, darum sind es 16 Teile, aber 15 Servos:
 
-Jedes Gelenk hat harte Grenzen und einen **Home-Winkel** für die Grundstellung. Winkel misst man in
-**Radiant**: Ein Kreis hat 2π ≈ 6,28 rad, 1 rad sind etwa 57°.
+- **jedes Bein 5 Gelenke:** Hüfte gieren, Hüfte rollen, Hüfte nicken, Knie, Knöchel,
+- **Hals und Kopf 4 Gelenke:** Hals nicken, Kopf nicken, Kopf gieren, Kopf rollen,
+- **der Mund** als 15. Servo.
 
-> **Krass, aber wahr:** Das Kopf-Gieren reicht von −2,967 bis +2,967 rad, rund ±170°. Die Ente kann
-> fast nach hinten schauen.
+**Gieren, Nicken, Rollen** sind die drei Drehrichtungen: „nein“ schütteln, „ja“ nicken, den Kopf zur
+Schulter neigen. Die 14 Gelenke in Beinen und Hals steuern die Netze, den Mund nicht.
+
+Jedes Gelenk hat harte Grenzen und einen **Home-Winkel** für die Grundstellung. Winkel misst Kern in
+**Radiant** (rad). Stell dir einen Kreis vor und lege seinen Radius als Faden um den Rand: Der Winkel,
+der zu diesem Bogen gehört, ist 1 rad, etwa 57°. Eine ganze Umdrehung sind gut 6,28 rad.
+
+> **Krass, aber wahr:** Das Kopf-Gieren reicht bis knapp 3 rad in jede Richtung, rund ±170°. Die
+> Ente kann fast nach hinten schauen.
 
 ### Massen und Armatur
 
-Masse, Schwerpunkt und **Trägheit** (wie schwer sich ein Teil in Drehung versetzen lässt) kommen aus
-dem Bauplan: Rumpf 0,199 kg, Kopf 0,155 kg, zusammen 0,74 kg.
+Aus dem Bauplan kommen für jedes Teil die Masse, der **Schwerpunkt** (der Punkt, an dem man das Teil
+balancieren könnte) und die **Trägheit**.
 
-Im Servo dreht ein winziger Motor über ein Getriebe 288 : 1. Seine Drehmasse heißt **Armatur**.
-Box3D kennt so etwas nicht, deshalb bekommt jedes Glied eine gedachte dünne Scheibe auf seiner
-Gelenkachse. Nicht exakt, aber die Ente zappelt damit viel weniger (Abschnitt 13.14).
+Im Servo dreht ein winziger Motor über ein Getriebe: 288 Umdrehungen des Motors ergeben eine Umdrehung
+des Gelenks. Der schnell kreiselnde Motor wirkt wie ein kleines Schwungrad und macht jede Bewegung
+des Gelenks träger. Diese Drehmasse des Motors heißt **Armatur**. Kerns Physik kennt keine Getriebe,
+darum bekommt jedes Glied eine gedachte dünne Scheibe auf seiner Gelenkachse, die genauso träge macht.
+Nicht exakt, aber ohne sie zappelt die Ente gut dreimal so stark (Abschnitt 13.14).
 
 ### Was die Welt berührt
 
-Was zusammenstößt, sind **konvexe Hüllen**: wie Geschenkpapier, straff um ein Teil gespannt, ohne
-Dellen nach innen. Die Sohlen haben Reibung 1, das Schnabelpolster aus TPU-Gummi auch 1, die
-Servogehäuse 0 (wie im Training), die Schalen von Rumpf und Kopf 0,5 – darauf rutscht eine gestürzte
-Ente nicht wie auf Eis.
+Für Zusammenstöße benutzt Kern vereinfachte Formen, **konvexe Hüllen**: wie Geschenkpapier, straff um
+ein Teil gespannt, ohne Dellen nach innen. Damit rechnet die Physik viel schneller als mit jeder
+kleinen Kante.
 
-Seit der Überarbeitung der Spielschicht kennt die Physik **Oberflächen** mit eigenen Paarwerten:
-Baumwolle auf Baumwolle 0,5, TPU auf Baumwolle 0,8, Baumwolle auf Holzboden 0,4. Alle anderen Paare
-mischt Box3D als **geometrisches Mittel** √(a · b). Beispiel: Sohle 1 auf Boden 0,6 ergibt
-√0,6 ≈ 0,77. Eine Oberfläche tragen Kollider, Meshes oder der Boden der Welt (im Level-JSON
-`groundSurface`); im Micro-Duck-Level ist der Boden `floor`. Box3D duldet bei Kontakten bis 5 mm
-Überlappung (Slop); gemessen stehen die Sohlen nur 0,3–0,6 mm im Boden.
+Jede Hülle hat eine **Reibung**: 0 heißt glatt wie Eis, je größer, desto griffiger. Die Sohlen und
+das Gummipolster im Schnabel greifen gut (1), die Servogehäuse sind glatt (0, genau wie im Training),
+die Schalen von Rumpf und Kopf liegen dazwischen (0,5) – so rutscht eine gestürzte Ente nicht wie auf
+Eis.
+
+Zwei Stoffe, die sich berühren, mischt die Physik normalerweise zu einem gemeinsamen Wert. Für
+manche Paare stimmt das Mischen aber nicht. Darum kennt Kern **Oberflächen** mit eigenen,
+gemessenen Werten: Stoff auf Stoff, Gummi auf Stoff und Stoff auf Holz.
+
+**Beispiel aus dem Micro-Duck-Level:** Der Holzboden hat Reibung 1. Die Sohlen (1) greifen darauf
+also mit 1, genau wie im Training. Die Socke ist aber aus Baumwolle, und Baumwolle auf Holz hat einen
+eigenen Wert: 0,4. Darum rutscht eine Socke über denselben Boden, auf dem die Ente sicher steht.
+
+> **Für Profis:** Alle übrigen Paare mischt die Physik als geometrisches Mittel: Wurzel aus a mal b.
+> Sohle 1 auf einem Boden mit 0,6 ergibt √0,6 ≈ 0,77. Die genauen Werte stehen im blauen Buch,
+> Kapitel 13.
 
 ### Maßstab 4
 
-Box3D ist für Körper von 0,1 bis 10 m gebaut, die Glieder der Ente sind nur 2 bis 4 cm groß. Darum
-baut Kern sie **4-mal so groß** und rechnet an genau einer Stelle um, nach der
-**Froude-Ähnlichkeit**: Lässt man alles passend mitwachsen, verhält sich die große Welt genau wie
-die kleine.
+Kerns Physik-Engine Box3D rechnet am besten mit Körpern von 10 cm bis 10 m. Die Glieder der Ente
+sind aber nur 2 bis 4 cm groß. Darum baut Kern sie **4-mal so groß** und rechnet an genau einer
+Stelle um. Lässt man alles passend mitwachsen, verhält sich die große Welt genau wie die kleine:
 
-Länge mal 4, Masse mal 4³ = 64, Zeit und Geschwindigkeit mal √4 = 2, Drehgeschwindigkeit mal ½,
-Moment und Servosteifigkeit mal 4⁴ = 256, Trägheit mal 4⁵ = 1024. Masse mal 64, weil ein Würfel mit
-4-facher Kantenlänge 4 · 4 · 4 = 64-mal so viel Inhalt hat. Das Netz bekommt trotzdem echte
-Einheiten: Drehgeschwindigkeiten multipliziert Kern vorher mit 2.
+- **Länge** mal 4.
+- **Masse** mal 64, weil ein Würfel mit 4-facher Kantenlänge 4 · 4 · 4 = 64-mal so viel Inhalt hat.
+- **Zeit** mal 2. Große Dinge bewegen sich gemächlicher: Ein Ball fällt aus 1 m Höhe in knapp einer
+  halben Sekunde, aus 4 m in knapp einer ganzen. Viermal so hoch dauert nur doppelt so lang.
+
+Damit gibt es zwei Uhren. Die **Weltzeit** läuft in Kerns großer Welt, die **Roboterzeit** beim
+echten Roboter. **1 Sekunde Weltzeit sind ½ Sekunde Roboterzeit.** Das Netz merkt davon nichts:
+Kern rechnet alles, was hineingeht, vorher in echte Werte um. Auch alle Angaben in diesem Kapitel
+sind Roboterzeit und echte Zentimeter, außer es steht „Weltzeit“ dabei.
 
 > **So kannst du es dir vorstellen:** Wenn im Film ein Modellhaus einstürzt, sieht es nur echt aus,
-> wenn man es in Zeitlupe abspielt. Größere Dinge bewegen sich gemächlicher – genau das sagt der
-> Faktor √4 für die Zeit.
+> wenn man es in Zeitlupe abspielt. Kern macht es umgekehrt: Es baut groß und weiß, dass die große
+> Welt langsamer läuft.
 
 ### Aussehen, Rollschuhe, Einbau
 
-Das Aussehen stammt aus Pollens 3D-Modellen (Lizenz CC BY-NC-SA 4.0, nicht kommerziell), darum
-zeigen die Bilder dieses Buchs eine eigene Gestaltung. Im Katalog gibt es auch **Micro Duck
-(Rollers)**: Kufen mit je zwei freien Rädern statt Sohlen, 23,5 mm höher.
+Das Aussehen der Ente stammt aus Pollens 3D-Modellen und darf nur nicht kommerziell benutzt werden.
+Darum zeigen die Bilder dieses Buchs eine eigene Gestaltung. Im Katalog gibt es auch **Micro Duck
+(Rollers)**: Kufen mit je zwei frei drehenden Rädern statt Sohlen.
 
-```cpp
-game::Level level;
-const game::ActorId duck =
-    game::add_micro_duck(level, {0, 0, 0});
-```
-
-Zeile 1 legt ein Level an, Zeile 2–3 setzen die Ente auf (0, 0, 0) und stellen die Welt auf 100
-Schritte pro Sekunde mit 16 Unterschritten. Das Studio macht beim Einfügen aus dem Katalog dasselbe.
+Setzt du eine Ente aus dem Katalog in ein Level, stellt Studio die Uhr der Welt gleich passend ein:
+so viele Physikschritte pro Sekunde, wie der Takt der Ente braucht (Abschnitt 13.5). Was es dabei
+geändert hat, meldet es. Aus einem eigenen Programm geht das genauso; die genauen Namen stehen im
+blauen Buch, Kapitel 13.
 
 ## 13.4 Das Servomodell
 
-Kern bildet Pollens gemessenes Modell des XL330 als **Gerätemodell** nach: ein kleines Gesetz,
-dessen Zahlen in einem **Profil** stehen.
-
-| Zahl | Wert | Bedeutung |
-|---|---|---|
-| K Steifigkeit | 0,554 N·m/rad | wie stark er zum Ziel zieht |
-| D Dämpfung | 0,053 N·m·s/rad | bremst schnelle Bewegung |
-| F Reibung | 0,0048 N·m | Reibung im Gelenk |
-| T Höchstmoment | 0,963 N·m | mehr Kraft geht nicht |
-| A Armatur | 0,0018 kg·m² | Drehmasse des Motors |
-| Verzögerung | 20 ms | Befehl kommt später an |
-
-Das Gesetz: Der Servo zieht mit `K · (Ziel − Winkel)`, höchstens mit T. Die Dämpfung bremst, die
-Reibung hält dagegen.
-
-**Rechenbeispiel:** 0,5 rad neben dem Ziel zieht er mit 0,554 · 0,5 ≈ 0,28 N·m, nicht einmal ein
-Drittel seiner 0,963 N·m. Volle Kraft erst bei 0,963 / 0,554 ≈ 1,7 rad, fast 100°. Die Servos der
-Ente sind also **weich**.
+Ein Servo ist für Kern ein **Gerätemodell**: ein kleines Gesetz, das beschreibt, wie das echte Gerät
+sich verhält, und dazu ein **Profil** mit seinen gemessenen Zahlen. Das Gesetz ist einfach: Der Servo
+zieht das Gelenk zum Ziel, je weiter weg, desto stärker – aber nur bis zu einer Grenze.
 
 > **So kannst du es dir vorstellen:** Ein Gummiband zwischen Gelenk und Ziel. Je weiter weg, desto
 > stärker der Zug, bis zu einer Grenze. Die Dämpfung ist wie Honig im Gelenk.
 
-Eine einzige Funktion setzt dieses Gesetz in jedem Physikschritt um, im Studio, im Lehrer und auf dem
-Prüfstand aus [Kapitel 16](16-kalibrierung.md). Box3D rechnet die Feder so, dass sie immer stabil
-bleibt; die Reibung ist ein Motor mit Sollgeschwindigkeit 0. Jede Ente, sogar jeder Servo, kann ein
-eigenes Profil bekommen.
+| Zahl im Profil | was sie bedeutet |
+|---|---|
+| **K** Steifigkeit | wie stark er pro Radiant Abstand zieht |
+| **T** Höchstmoment | mehr Drehmoment geht nicht |
+| **D** Dämpfung | bremst schnelle Bewegung |
+| **F** Reibung | bremst im Gelenk |
+| **A** Armatur | Schwungrad-Trägheit des Motors |
+| Verzögerung | Befehle kommen 20 ms später an |
 
-> **Vorsicht, Falle:** Die Firmware des echten Servos kann den Strom auf 1,75 A begrenzen (0,64 N·m). Dann
-> kommt die Ente nicht mehr vom Rücken hoch. Pollen trainiert ohne diese Grenze, Kern auch.
+Das Gesetz in Schulmathe: **Zug = K · (Ziel − Winkel)**, aber höchstens T. Drehmoment misst man in
+Newtonmeter (N·m). Für den Servo der Ente ist K = 0,554 und T = 0,963 N·m – etwa so viel, wie ein
+Kilogramm am Ende eines 10 cm langen Hebels drückt.
+
+**Rechenbeispiel:** Steht das Gelenk 0,5 rad neben dem Ziel, zieht der Servo mit 0,554 · 0,5 ≈ 0,28
+N·m. Das ist nicht einmal ein Drittel seiner Höchstkraft. Volle Kraft hat er erst bei
+0,963 ÷ 0,554 ≈ 1,7 rad Abstand, fast 100°. Die Servos der Ente sind also **weich**: Sie geben nach,
+wie ein Gummiband.
+
+Kern baut dieses Gesetz nur aus Teilen, die die Physik-Engine schon hat: einer Gelenkfeder für das
+Gummiband und einer Gelenkbremse für die Reibung. Ein und dasselbe Stück Code macht das in jedem
+Physikschritt, im Studio, im Lehrer und auf dem Prüfstand aus [Kapitel 16](16-kalibrierung.md). Jede
+Ente, sogar jeder einzelne Servo, kann ein eigenes Profil bekommen.
+
+> **Vorsicht, Falle:** Die Software im echten Servo kann den Strom begrenzen. Dann hat er nur noch
+> 0,64 statt 0,963 N·m, rund zwei Drittel – und die Ente kommt nicht mehr vom Rücken hoch. Pollen
+> trainiert ohne diese Grenze, Kern auch.
 
 ## 13.5 Der Takt
 
-Im Training dauert ein Physikschritt 5 ms. In Kern dauert er 10 ms Weltzeit mit 16 Unterschritten.
-Warum das passt: In der 4-fach großen Welt läuft die Zeit √4 = 2-mal langsamer, also sind 10 ms
-Weltzeit genau 5 ms Roboterzeit.
+Drei Dinge laufen im Takt, aber verschieden schnell: die Physik, das Netz und die Spielschicht. Die
+Physik rechnet in kleinen Schritten. Das Netz entscheidet nur alle **4 Physikschritte** neu; das ist
+der **Regeltakt**. Die Spielschicht entscheidet nur in jedem zweiten Regeltakt.
 
-Alle **4 Physikschritte** fragt Kern das Netz – das ist der **Regeltakt**: 20 ms, also 50-mal pro
-Sekunde. Dass nur jeder 4. Schritt zählt, heißt **Decimation**. Auch die Befehlsverzögerung sind
-4 Schritte (20 ms, im Training 15–30 ms): Die Servos bekommen immer das Ziel von vor 4 Schritten.
-Passt die Schrittrate der Welt nicht, rundet Kern auf ganze Schritte und meldet „set World Settings >
-Step Rate to 100“. Feste Schritte erklärt [Kapitel 8](08-spiel-laufzeit.md).
+| Was | Weltzeit (Kern) | Roboterzeit |
+|---|---|---|
+| ein Physikschritt | 10 ms | 5 ms – wie im Training |
+| Regeltakt = 4 Schritte | 40 ms | 20 ms, also 50-mal pro Sekunde |
+| Spielschicht = 8 Schritte | 80 ms | 40 ms, also 25-mal pro Sekunde |
 
-> **So kannst du es dir vorstellen:** Der Schlagzeuger spielt Sechzehntel (Physik), die Sängerin
-> setzt auf jedem vierten Schlag ein (Regeltakt), der Chor nur auf jedem achten – das ist die
-> Spielschicht mit 25 Entscheidungen pro Sekunde.
+Weil die Weltzeit doppelt so schnell zählt (Abschnitt 13.3), sind 10 ms in Kerns Welt genau die 5 ms
+des Trainings. Auch die **Verzögerung** ist in Schritten gezählt: Die Servos bekommen immer das Ziel
+von vor 4 Schritten, das sind 20 ms Roboterzeit (im Training schwankt sie zwischen 15 und 30 ms).
+Ist die Uhr der Welt falsch eingestellt, rundet Kern auf ganze Schritte und meldet das im Studio.
+
+Wie Kern trotz schwankender Bildrate immer mit gleich langen Schritten rechnet, erklärt
+[Kapitel 8](08-spiel-laufzeit.md): Übrige Zeit wird aufgehoben, bis sie für einen ganzen Schritt
+reicht.
+
+> **So kannst du es dir vorstellen:** Der Schlagzeuger spielt in schnellen Schlägen (Physik), die
+> Sängerin setzt auf jedem vierten Schlag ein (Regeltakt), der Chor nur auf jedem achten
+> (Spielschicht).
 
 ## 13.6 Die Netze der Ente
 
-Kern lädt **dieselben ONNX-Dateien** wie der Roboter. Das Lauf- und Stehnetz `velstand.onnx` ist
-eingebaut, die anderen lädt das Studio nach. Kern liest ONNX selbst und nimmt genau eine Form an:
-Eingaben normalisieren, Schichten von Neuronen mit der Funktion **ELU** dazwischen, am Ende eine
-lineare Schicht. Alles andere lehnt es mit Begründung ab. Das eingebaute velstand rechnet bis auf
-2 Hunderttausendstel genau wie die Referenz.
+Für jede Bewegung gibt es ein eigenes gelerntes Netz. Kern lädt **dieselben Netz-Dateien** wie der
+echte Roboter. Das Netz fürs Laufen und Stehen ist fest eingebaut, die anderen lädt Studio nach.
 
-| Bewegung | Netz |
+Kern liest die Netz-Dateien selbst. Es nimmt nur genau die Bauart an, die Pollens Training erzeugt,
+und lehnt alles andere mit Begründung ab. Ein Test vergleicht das eingebaute Laufnetz mit einer
+genauen Vergleichsrechnung: Die Ergebnisse weichen erst in der fünften Stelle nach dem Komma ab.
+
+| Bewegung | von wem |
 |---|---|
-| Laufen und Stehen | `velstand.onnx` (v8) |
-| ältere Gangart | `alpha_walking`, `alpha_stand` |
-| Sitzen / Aufstehen | `alpha_sitstand.onnx` |
-| Socke aufheben | `alpha_ground_pick.onnx` |
-| Kick links / rechts | `ball_kick_left` / `_right` |
-| Rolle | `roulade.onnx` |
-| Rollschuh, Ducken | `roller`, `roller_crouch` |
-| **Sprung** (Kern) | `jump.onnx` |
+| Laufen und Stehen (dazu eine ältere Gangart) | Pollen |
+| Sitzen / Aufstehen | Pollen |
+| Socke aufheben | Pollen |
+| Kick links / rechts | Pollen |
+| Rolle | Pollen |
+| Rollschuh fahren, Ducken auf Rollen | Pollen |
+| **Sprung** | Kern |
 
-Laufen läuft dauernd, die anderen sind **Episoden** mit fester Dauer, etwa Kick 0,5 s, Rolle 1 s,
-Sprung 2 s. Das Aufheben bekommt eine Phase mit 4 s Periode und endet bei 70 %, also nach 2,8 s.
-Sitzen dauert 2 s, Aufstehen 1 s; die Rolle läuft weiter, solange du die Taste hältst. Der Schnabel
+Das Laufnetz läuft dauernd. Die anderen sind **Episoden** mit fester Dauer: Kick ½ s, Rolle 1 s
+(gehalten rollt sie weiter), Sprung 2 s, Sitzen 2 s, Aufstehen 1 s, Aufheben knapp 3 s. Der Schnabel
 ist ein Servo ohne Netz.
 
 ### Wer gerade dran ist
 
-In jedem Regeltakt folgt Kern derselben Reihenfolge wie Pollens Steuerprogramm robotd: abgelaufene
-Bewegungen beenden; ein Netz wählen (Vorrang: laufende Bewegung, Aufheben, Sitzen, Rollen, Stehen,
-sonst Laufen); rechnen und auf Servoziele umrechnen; die Zeitfenster weiterschalten. Jedes Netz
-bekommt genau die Befehle, mit denen es trainiert wurde.
+Es gibt immer nur ein Netz, das die Beine steuert. Wer drankommt, regelt eine feste **Vorfahrt** – wie
+an einer Kreuzung. In jedem Regeltakt läuft dieselbe Reihenfolge ab wie in Pollens Steuerprogramm auf
+dem Roboter:
 
-Eine Bewegung startet nur, wenn keine läuft, die Ente nicht sitzt und das Netz geladen ist – sonst
-kommt der Grund zurück. Fehlt ein Netz, springt kein anderes ein: Die Servos halten die
-Grundstellung, und die Ente meldet einmal, welche Datei fehlt.
+1. Abgelaufene Bewegungen beenden.
+2. Ein Netz wählen. Vorfahrt hat eine laufende Bewegung, dann Aufheben, Sitzen, Rollen, Stehen und
+   zuletzt Laufen.
+3. Das Netz rechnen und seine Antwort in Servoziele umrechnen.
+4. Die Uhren der Bewegungen weiterstellen.
+
+Jedes Netz bekommt genau die Befehle, mit denen es trainiert wurde. Eine Bewegung startet nur, wenn
+keine andere läuft, die Ente nicht sitzt und das Netz geladen ist – sonst sagt Kern, warum nicht.
+Fehlt ein Netz, springt **kein anderes** ein: Die Servos halten die Grundstellung, und die Ente
+meldet einmal, welche Datei fehlt.
 
 ### Vom Netz zum Servoziel
 
-Jedes Servoziel ist **Home-Winkel + Scale · Ausgabe**, höchstens ±π. Kern fährt jedes Netz **wie
-trainiert**: Scale 1, ohne Glättung (nur Rollschuh und Ducken: 0,8). Pollens Programm auf dem echten
-Roboter nimmt Scale 0,9 und einen **Tiefpass**: neues Ziel = 0,7 · Netzwert + 0,3 · altes Ziel
-(Kopf: 0,5). Das Feld **Actions to servo goals** wählt `training` (Standard) oder `robot`.
+Das Netz antwortet nicht mit fertigen Winkeln, sondern damit, wie weit jedes Gelenk von seiner
+Grundstellung abweichen soll. Servoziel = Home-Winkel plus Antwort des Netzes.
+
+Kern nimmt die Antwort **genau so, wie trainiert**. Pollens Programm auf dem echten Roboter macht es
+anders: Es schwächt die Antwort auf 90 % ab und lässt das Ziel weich nachziehen, statt es sofort zu
+setzen – wie ein Hund an der Leine, der nur langsam hinterherkommt. Das ist Feinabstimmung für die
+echte Hardware. Im Details-Panel wählst du mit **Actions to servo goals** zwischen `training` (so wie
+trainiert, Standard) und `robot` (wie auf dem Roboter).
+
+Das Prinzip dahinter: **Ein Netz funktioniert am besten genau so, wie es trainiert wurde.** Schon
+kleine Änderungen können es umwerfen.
 
 > **Mission:** Läuft das Level, stopp es mit **Esc** – während Play lässt sich nichts einstellen.
 > Wähl im Outliner die **Micro Duck** und stell im Details-Panel **Actions to servo goals** auf
 > `robot`. Starte Play, übernimm die Ente mit **F8** und drück **3** für den Kick. Dann dasselbe
-> mit `training`. Gemessen kippen die Kicks mit dem Roboter-Profil um und bleiben mit `training`
-> stehen.
+> mit `training`. Was du sehen solltest: Mit `robot` kippt sie beim Kick um, mit `training` bleibt
+> sie stehen. Laufen kann sie mit beiden.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 
-| Plätze | Inhalt |
-|---|---|
-| 0–2 | wie schnell der Rumpf sich dreht |
-| 3–5 | wo „unten“ ist; aufrecht (0, 0, −1) |
-| 6–19 | Gelenkwinkel minus Grundstellung |
-| 20–33 | Gelenkgeschwindigkeiten (einen Takt alt) |
-| 34–47 | die letzte eigene Ausgabe |
-| 48–50 | Laufbefehl: vor, seitwärts, drehen |
-| 51–54 | Kopfbefehl |
-| 55–60 | Körperhaltung; 55/56 nutzt der Sprung |
+```mermaid
+flowchart LR
+  A[61 Zahlen über Körper und Befehl] --> B[Laufnetz]
+  B --> C[14 Servoziele]
+```
 
-Der Laufbefehl reicht bis ±0,4 m/s vorwärts, ±0,3 m/s seitwärts, ±1 rad/s Drehung. Er wird geglättet
-wie auf dem Roboter: Jeder Takt rückt 20 % näher ans Ziel (**EMA**). Von 0 auf 1 geht es also
-0,2 – 0,36 – 0,49 …
+In jedem Regeltakt bekommt das Laufnetz **61 Zahlen**, in Gruppen:
 
-velstand rechnet: normalisieren, dann 512, 256 und 128 Neuronen, dann 14 Ausgaben – die 14
-Servoziele. Was ein Neuron ist, erklärt [Anhang A](A-grundlagen-neuronale-netze.md).
+- wie schnell sich der Rumpf dreht,
+- wo „unten“ ist (so merkt es, ob es schief steht),
+- die 14 Gelenkwinkel, gemessen ab der Grundstellung,
+- wie schnell sich die Gelenke drehen (einen Takt alt, genau wie im Training),
+- seine eigene letzte Antwort,
+- der Laufbefehl: vorwärts (bis 0,4 m/s), seitwärts (bis 0,3 m/s), drehen,
+- der Kopfbefehl und die Körperhaltung.
 
-> **Für Profis:** Warum bekommt das Netz seine letzte Ausgabe zurück? So kennt es seinen letzten
-> Befehl, obwohl die Servos ihn erst 20 ms später bekommen. Kern liefert diese Plätze genau wie im
+Heraus kommen **14 Zahlen**: die Servoziele für Beine und Hals. Dazwischen rechnet das Netz durch
+drei Schichten aus 512, 256 und 128 Rechenknoten, den **Neuronen**.
+
+Der Laufbefehl springt nicht sofort auf den neuen Wert, sondern rückt in jedem Takt **20 %** des
+Rests näher, genau wie auf dem Roboter. Von 0 auf 1 geht es also 0,2 – 0,36 – 0,49 … Rechne nach:
+0,2 + 20 % von 0,8 = 0,36.
+
+> **Für Profis:** Warum bekommt das Netz seine letzte Antwort zurück? So kennt es seinen letzten
+> Befehl, obwohl die Servos ihn erst 20 ms später bekommen. Kern liefert diese Zahlen genau wie im
 > Training.
 
 ## 13.8 Sensoren
 
 Die Ente sieht nur, was der echte Roboter sieht, von denselben Stellen aus.
 
-**Kopf-ToF (VL53L8CX):** „Time of Flight“ misst, wie lange Licht hin und zurück braucht. 8 × 8
-Zonen, Sichtfeld 45° × 45°, 4 m Reichweite, 15 Bilder pro Sekunde. In Kern ist jede Zone ein
-**Strahltest** (Ray-Cast), der die eigenen Glieder überspringt. Jede Zone gilt als **Boden** (ein
-Strahl nach unten, der mindestens 85 % der Sensorhöhe schafft), **zu nah** (waagerecht unter 10 cm)
-oder **Hindernis** – dazu Entfernung, Richtung und ob links oder rechts frei ist (blockiert unter
-1 m).
+**Abstandssensor (ToF):** „Time of Flight“ heißt Flugzeit. Der Sensor schickt Licht los und misst,
+wie lange es bis zum Hindernis und zurück braucht – daraus folgt die Entfernung. Er teilt sein
+Sichtfeld (45° × 45°) in 8 × 8 Zonen, reicht 4 m weit und misst 15-mal pro Sekunde. In Kern ist jede
+Zone ein **Strahltest**: ein gedachter Laserpointer, der die eigenen Glieder überspringt und meldet,
+was er zuerst trifft. Jede Zone gilt als **Boden** (der Strahl zeigt nach unten und trifft erst tief
+unten), **zu nah** (unter 10 cm) oder **Hindernis**. Dazu meldet er, ob links oder rechts frei ist.
 
-**Kopfkamera (IMX219):** hochkant eingebaut, 62° hoch, 37,4° breit. „Sieht sie den Ball?“ heißt:
-Seine Mitte liegt im Bild, und ein Strahl dorthin trifft zuerst den Ball.
+**Kopfkamera:** hochkant eingebaut. „Sieht sie den Ball?“ heißt: Seine Mitte liegt im Bild, und ein
+gedachter Strahl dorthin trifft zuerst den Ball, nicht etwas davor.
 
-**IMU:** spürt Drehung und wo unten ist. „Gefallen“ heißt: 200 ms lang deutlich schief (der Wert
-für unten über −0,5). Kurzes Stolpern zählt nicht. velstand v8 steht von selbst wieder auf.
+**Lagesensor (IMU):** spürt Drehung und wo unten ist – wie das Gleichgewichtsorgan in deinem Ohr.
+„Gefallen“ heißt: 200 ms lang deutlich schief. Kurzes Stolpern zählt nicht. Das Laufnetz steht von
+selbst wieder auf.
 
-**Mund-Encoder:** Ein Encoder misst den Winkel des Servos. Ist der Mund auf „zu“ gestellt und steht
-trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er bei 0,0°, eine Socke hält ihn
-3,6–7,8° offen. Er fährt von −5° bis 30°.
+**Mund-Encoder:** Ein Encoder misst den Winkel des Mund-Servos. Ist der Mund auf „zu“ gestellt und
+steht trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er ganz, eine Socke hält ihn
+3,6–7,8° offen.
 
 > **Mission:** Im Play zeigt das Studio oben rechts **HEAD CAMERA** (Kamerabild und Zustand) und
 > **TOF 8×8**: rot Hindernis (heller, je näher), grün Boden, gelb zu nah. Übernimm die Ente mit
-> **F8**, lenk sie auf eine Wand zu und beobachte das Gitter. Die Anzeige schaltest du unter Window › Show › **Robot Camera**.
+> **F8**, lenk sie auf eine Wand zu und beobachte, wie das Gitter von Grün zu immer hellerem Rot
+> wechselt. Die Anzeige schaltest du unter Window › Show › **Robot Camera**.
 
 ## 13.9 Wer steuert?
 
-1. **Hand:** Ein Stick (über 5 %) oder eine Robot-Taste gibt dir 2 s Vorrang.
-2. **Logik:** die Blueprint-Knoten **Walk** oder **Look**.
-3. **Autonomie:** das eigene Verhalten, wenn **Autonomous** an ist.
+Drei können der Ente Befehle geben. Es gilt eine feste Rangfolge:
 
-Steht die Ente still und hat 2 s niemand den Kopf gesteuert, übernimmt der **Idle-Blick** aus
-Pollens Software: Kopfbewegungen auf weichen Kurven, langsames Wandern und Muster, die Pollen
-„Dösen“ und „Gähnen“ nennt.
+1. **Hand:** Du mit Stick oder Robot-Taste. Jede Eingabe gibt dir 2 s Vorrang.
+2. **Logik:** die Blueprint-Knoten **Walk** oder **Look** ([Kapitel 9](09-logik.md)).
+3. **Autonomie:** ihr eigenes Verhalten, wenn **Autonomous** an ist.
+
+Steht die Ente still und hat 2 s niemand ihren Kopf gesteuert, übernimmt der **Idle-Blick** aus
+Pollens Software: weiche Kopfbewegungen, langsames Umherschauen und Muster, die Pollen „Dösen“ und
+„Gähnen“ nennt.
 
 ### Hochgehoben
 
-Wird der echte Roboter hochgehoben, sollen die Beine nicht in der Luft weiterlaufen. Pollens kleines
-Netz `pickup_detector.onnx` (rund 8000 Zahlen) liest dafür in jedem Regeltakt die letzte Sekunde: 50
-Zeilen mit je 63 Messwerten. Heraus kommt eine Wahrscheinlichkeit p für „wird gehalten“.
+Wird der echte Roboter hochgehoben, sollen die Beine nicht in der Luft weiterlaufen. Dafür liest
+Pollens kleines Netz in jedem Regeltakt die Messwerte der letzten Sekunde und antwortet mit einer
+Wahrscheinlichkeit p für „wird gehalten“. p = 0,8 heißt: zu 80 % sicher.
 
-- **Pause** bei p > 0,8 in 5 Takten hintereinander: Die Servoziele gleiten in 300 ms in die
+- **Pause**, wenn p 5 Takte hintereinander über 0,8 liegt: Die Beine gleiten in 300 ms in die
   Standhaltung, der Zustand heißt „Held“.
-- **Weiter** bei p < 0,35 in 4 Takten, frühestens nach 300 ms. Die Netze starten frisch.
+- **Weiter**, wenn p 4 Takte hintereinander unter 0,35 liegt, frühestens nach 300 ms. Die Netze
+  starten frisch.
 
-Ausgewertet wird nur eine volle Sekunde, und nur, solange Lauf- oder Stehnetz fahren. Eine
-Bewegung, Sitzen, Rollschuhe oder der Lehrer beenden eine Pause. Servoströme hat Kern nicht, aber
-das Netz liest diese Spalten ohnehin nicht.
+Warum zwei verschiedene Grenzen? Läge beides bei 0,5, würde die Ente bei einem Wert um 0,5 ständig
+zwischen Pause und Laufen hin- und herflackern. Mit Abstand zwischen den Grenzen und mehreren Takten
+in Folge entscheidet sie sich klar.
+
+Ausgewertet wird nur, solange Lauf- oder Stehnetz fahren und eine volle Sekunde Messwerte da ist.
+Der echte Roboter misst auch die Ströme seiner Servos; die hat Kern nicht. Das ist kein Problem,
+denn Pollens Netz benutzt diese Werte gar nicht.
 
 > **Mission:** Starte **Simulate** (Alt+S) und zieh die Ente mit der linken Maustaste **am Rumpf**
-> hoch (im Play geht das beim Zuschauen mit der Observer camera). Der Griff hält sie in ihrer Lage wie eine Hand. Die Beine stoppen. Setz sie ab – sie läuft
-> weiter.
+> hoch (im Play geht das beim Zuschauen mit der Observer camera). Der Griff hält sie fest wie eine
+> Hand. Die Beine stoppen. Setz sie ab – sie läuft weiter.
 
 ## 13.10 Selbstständig: das Verhaltensprogramm
 
-Steuert niemand, wählt ein Programm das Verhalten (im Code „Gehirn“). Es überträgt Pollens Programm
-`autod` (Commit `df9a750` vom 01.10.2026) mit allen Zuständen und Zahlen:
+Steuert niemand, sucht ein Programm aus, was die Ente tut. Kern übernimmt dafür Pollens eigenes
+Verhaltensprogramm mit allen Zuständen und Zahlen. Ein **Zustand** ist eine Tätigkeit, die eine
+Weile dauert; danach wählt das Programm die nächste:
 
-- **Chill** (stehen, 3–7 s), **LookAround** (große Blicke), **Wander** (1–3 m zu einem wenig
-  besuchten Ziel), **TurnInPlace** (drehen), **Zoomies** (volles Tempo mit „Wheee“, nur mit über
-  1,2 m freier Bahn),
-- **Stretch**, **Ruffle**, **Dance**, **Sneeze** – kurze Bewegungs- und Klangabläufe,
-- **GroundPick** (aufheben), **Nap** (sitzen, 12–40 s), **Petted** (gestreichelt),
-  **BallPlay** und **Kick**.
+- **Chill** (ruhig stehen), **LookAround** (sich umschauen), **Wander** (1–3 m zu einem Ziel
+  laufen), **TurnInPlace** (auf der Stelle drehen), **Zoomies** (mit vollem Tempo und „Wheee“
+  herumflitzen, nur mit viel Platz),
+- **Stretch** (strecken), **Ruffle** (Federn schütteln), **Dance** (tanzen), **Sneeze** (niesen),
+- **GroundPick** (etwas aufheben), **Nap** (sich setzen und dösen), **Petted** (gestreichelt
+  werden), **BallPlay** und **Kick**.
 
-Eine **Energie** von 0 bis 1 gewichtet den nächsten Zustand. Ein **Hindernismodell** sorgt für
-Abstand: Unter 0,45 m bremst die Ente und weicht aus, unter 0,15 m dreht sie weg und meidet die
-Stelle 5 Minuten. Ein **Neuheitsraster** aus 0,5-m-Feldern lässt sie wenig besuchte Ziele
-bevorzugen; dazu kommen Quak-Salven und Hören: Eine Stimme bekommt eine Antwort, ein Geräusch
-weckt sie kurz. Mikrofon und Berührungssensor hat Kern nicht; Hören und Streicheln kommen über
-Befehle. Sogar der Zufall ist deterministisch. Solange eine Bewegung läuft, die Ente sich setzt,
-aufsteht oder gefallen ist, wählt das Programm nichts Neues.
+Wie das Programm wählt: Eine **Energie** zwischen 0 und 1 macht manche Zustände wahrscheinlicher –
+mit viel Energie eher Wander, Dance oder Zoomies, mit wenig eher Nap. Ein **Neuheitsraster** merkt sich, wo die Ente
+schon war, damit sie lieber neue Orte besucht. Ein **Hindernismodell** sorgt für Abstand: Unter 45 cm
+bremst sie und weicht aus, unter 15 cm dreht sie weg und meidet die Stelle 5 Minuten. Dazu kommen
+Quak-Salven und Hören. Mikrofon und Berührungssensor hat Kern nicht; Hören und Streicheln kommen
+über Logik-Befehle.
+
+Sogar der **Zufall** ist bei Kern vorhersagbar: Die Zufallszahlen kommen aus einem Rechenverfahren
+mit festem Startwert für jede Ente. Gleiche Ausgangslage, gleiche „Zufälle“ – so bleibt der
+Determinismus aus Abschnitt 13.2 erhalten. Solange eine Bewegung läuft oder die Ente gefallen ist,
+wählt das Programm nichts Neues.
 
 ### BallPlay
 
-Pollens frühere, nicht öffentliche Software hatte den Zustand BallPlay: anlaufen, ausrichten,
-kicken. Kern baut ihn nach dieser Beschreibung nach, mit Pollens Kick-Netz. Er ist
-**standardmäßig an**:
+Pollens frühere, nicht öffentliche Software hatte einen Zustand BallPlay. Kern baut ihn nach dieser
+Beschreibung nach, mit Pollens Kick-Netz. Er ist **standardmäßig an** und läuft wie ein Rezept in
+fünf Schritten:
 
-1. **Sehen:** ein Ball (Kugel mit Tag `ball` oder Namen „Ball“, höchstens 8 cm hoch) im Kamerabild.
-2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis 35 cm. Liegt der Ball mehr als 0,6 rad
-   seitlich, dreht sie erst auf der Stelle.
-3. **Ausrichten:** kleine Schritte, bis der Ball 9 cm vor und 4,2 cm neben dem linken Fuß liegt –
-   genau wie im Kick-Training. Verliert sie ihn dicht vor sich, tritt sie zurück, bis sie ihn sieht.
-4. **Kicken:** Kopf gerade, 3 s ruhig, Kick, Quaklaute. Danach ist der Ball 2–5 s uninteressant.
-5. **Aufgeben:** nach 6 s ohne Sicht (wenn er weit weg ist) oder nach 45 s ohne Kick (dann 20 s
-   Ruhe); danach folgt LookAround.
+1. **Sehen:** Ein Ball liegt im Kamerabild.
+2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis etwa 35 cm. Liegt der Ball weit seitlich, dreht
+   sie sich erst auf der Stelle.
+3. **Ausrichten:** kleine Schritte, bis der Ball genau dort vor dem linken Fuß liegt, wo er auch im
+   Kick-Training lag. Verliert sie ihn dicht vor sich, tritt sie zurück, bis sie ihn wieder sieht.
+4. **Kicken:** Kopf gerade, 3 s ruhig stehen, Kick, Quaklaute. Danach ist dieser Ball ein paar
+   Sekunden uninteressant.
+5. **Aufgeben:** wenn sie ihn lange nicht mehr sieht oder lange nicht zum Kicken kommt; dann schaut
+   sie sich um.
 
-Gekickt wird nur links, weil der rechte Kick in Kern manchmal umkippt. Der „Detektor“ ist ein
-geometrischer Sichttest, kein Netz im Kamerabild. Mit **Kern extras** und geladenem `play.onnx`
-übernimmt statt BallPlay die Spielschicht; solange sie eingreift, startet das Programm weder
-Aufheben noch Sitzen.
+Gekickt wird nur links, weil der rechte Kick in Kern manchmal umkippt. Das „Sehen“ ist ein
+geometrischer Sichttest, kein Netz, das Bilder erkennt. Mit **Kern extras** übernimmt statt BallPlay
+die Spielschicht.
 
 ## 13.11 Die Spielschicht
 
 Pollens Netze sind Bewegungen; keins davon sieht. Was die Ente mit Ball oder Socke tut – hinschauen,
-hingehen, kicken, aufheben, wegtragen, ausspucken –, entscheidet das Netz `play.onnx`. Drumherum gibt
-es nur Wahrnehmung, keine handgeschriebenen Spielregeln.
+hingehen, kicken, aufheben, wegtragen, ausspucken –, entscheidet bei Kern ein weiteres gelerntes
+Netz, die **Spielschicht**. Drumherum gibt es nur Wahrnehmung, keine handgeschriebenen Spielregeln.
 
 ![Die Ente spielt (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-play.png)
 
-Die Spielschicht sitzt an der Stelle eines Gamepads und antwortet 25-mal pro Sekunde mit Laufbefehl,
-Kopf, Schnabel und welche Bewegung starten soll (Zustand „Play“). Sie braucht **Kern extras**
-(Details › Controller), **Autonomous**, einen Mund-Servo, keine Rollschuhe und `play.onnx`. Sie
-greift ein, solange sie ein Objekt kennt, etwas im Schnabel ist oder ihre Bewegung läuft – und
-niemand von Hand oder per Logik steuert.
+Die Spielschicht sitzt an der Stelle, an der sonst ein Mensch mit Gamepad sitzt. 25-mal pro Sekunde
+(Roboterzeit) antwortet sie mit Laufbefehl, Kopf, Schnabel und welche Bewegung starten soll; der
+Zustand heißt dann „Play“. Sie braucht **Kern extras** und **Autonomous** (beides im Details-Panel),
+einen Mund-Servo, keine Rollschuhe und ihr Netz. Sie greift ein, solange sie ein Ding kennt, etwas im
+Schnabel ist oder ihre Bewegung läuft – und niemand von Hand oder per Logik steuert.
 
 > **Mission:** Stopp das Beispiel-Level mit **Esc**, wähl die **Micro Duck** und schalte im
 > Details-Panel **Kern extras** aus. Starte Play: Jetzt spielt nicht das gelernte Netz, sondern
-> BallPlay. Beobachte den Unterschied, wenn sie den Ball entdeckt.
+> BallPlay. Was du sehen solltest: Die Ente kümmert sich nur noch gezielt um den Ball und kickt ihn.
+> Zu den Socken geht sie nicht mehr gezielt – Hingehen, Aufheben und Wegtragen kann nur die
+> Spielschicht.
 
 ### Detektor und Tracker
 
-Der **Detektor** ist wie der Servo ein Gerätemodell. Er meldet je Sorte das nächste sichtbare
-Objekt, gemessen in seiner Mitte am Boden. Eine Socke ist ein Actor mit Tag `sock`; sie gilt als
-gesehen, wenn ein Teil von ihr sichtbar ist. Ein Ball über 8 cm oder eine Socke über 3 cm Höhe zählt
-nicht – etwa die Socke im Schnabel. Dazu kommen **Rauschen** und **Aussetzer**.
+Der **Detektor** ist wie der Servo ein Gerätemodell, hier für die Kamera. Er meldet für Ball und
+Socke jeweils das nächste sichtbare Ding. Als Ort nimmt er dessen **Mitte**: den Durchschnitt der
+Positionen aller seiner Teile – bei der Socke also aller sieben Stoffklumpen. Gemeldet wird der Punkt
+auf dem Boden genau unter dieser Mitte. Liegt die Mitte zu hoch, beim Ball über 8 cm, bei der Socke
+über 3 cm, zählt das Ding nicht – etwa die Socke im Schnabel.
 
-**Rechenbeispiel** mit den Beispielwerten aus dem Code: Die Schätzung streut um 0,002 m +
-0,01 · Entfernung. Bei 1 m sind das 0,002 + 0,01 = 0,012 m, rund 1,2 cm. Je weiter weg, desto ungenauer – wie Schätzen mit einem Auge. Im Studio ist der Detektor
-rauschfrei, im Training zieht der Lehrer zufällige Werte.
+Damit es echt wird, kann der Detektor **Rauschen** (kleine zufällige Fehler im Ort) und **Aussetzer**
+(ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel** mit Beispielwerten aus dem Code: Der
+Fehler ist 0,2 cm plus 1 % der Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
+desto ungenauer – wie Schätzen mit einem Auge. Im Studio ist der Detektor rauschfrei, im Training
+würfelt der Lehrer die Werte für jede Übungsrunde neu.
 
-Der **Tracker** merkt sich ein Objekt, das aus dem Bild verschwindet, 3 s lang (unter 0,35 m vor der
-Ente 30 s). Einen gekickten Ball meldet er 15 s nicht, eine weggetragene Socke 40 s nicht – als
-weggetragen gilt sie ab 0,25 m. Ab dem Zugreifen zählt er, wie weit und wie lange die Ente trägt.
+Der **Tracker** ist das Gedächtnis. Verschwindet ein Ding aus dem Bild, merkt er sich, wo es zuletzt
+war, und wie lange das her ist – so wie du weißt, dass der Ball hinter dem Sofa liegt, obwohl du ihn
+nicht siehst. Nach ein paar Sekunden vergisst er es, bei Dingen direkt vor der Ente erst viel später.
+Einen eben gekickten Ball und eine weggetragene Socke meldet er eine Weile gar nicht, damit die Ente
+nicht sofort wieder hinrennt. Ab dem Zugreifen zählt er, wie weit und wie lange sie trägt.
 
 ### 23 hinein, 9 heraus
 
-Die **23 Eingaben** sind alle in echten Metern aus Sicht der Ente (x voraus, y links): wo Ball und
-Socke vermutlich liegen und wie alt die Meldung ist, wo der linke Fuß steht, ob etwas im Schnabel
-ist, wie weit er offen ist, ob sie läuft, aufhebt oder kickt, wo unten ist, wie weit und lange sie
-trägt, wie lange sie steht oder geht. Die wahren Positionen bekommt sie nie.
+Die Spielschicht bekommt **23 Zahlen**, alle in echten Metern aus Sicht der Ente:
 
-**Stillstand** misst Kern an den Beinen: beide Sohlen auf etwas, das nicht die Ente ist, und keine
-Bewegung läuft. Denn auf „ein wenig vorwärts“ setzt Pollens Gang manchmal gar nicht an.
+- **Ball und Socke:** ob sie bekannt sind, wo sie vermutlich liegen, wie alt die Meldung ist,
+- **Schnabel:** ob etwas drin ist und wie weit er offen ist,
+- **Körper:** wo der linke Fuß steht, wo unten ist, ob sie läuft, aufhebt oder kickt,
+- **Uhren:** wie weit und lange sie trägt, wie lange sie steht oder geht.
 
-Die **9 Ausgaben**: vorwärts, seitwärts, drehen, Kopf gieren, Kopf nicken, Schnabel auf, Kick
-links, Aufheben, Hals beugen. Die Laufbefehle haben eine **Totzone** wie ein Gamepad-Stick: Unter
-20 % steht die Ente. Alle Werte werden zuerst auf ±1,5 begrenzt.
+Die wahren Positionen bekommt sie **nie**, nur die Schätzungen des Detektors – genau wie ein echter
+Roboter. **Stehen** misst Kern an den Beinen: Beide Sohlen stehen auf dem Boden, und keine Bewegung
+läuft. Denn auf einen winzigen Laufbefehl setzt Pollens Gang manchmal gar nicht an – befohlen ist
+dann „laufen“, aber die Ente steht.
 
-- **Rückwärts** fährt sie an wie Pollens `autod`: 0,6 s mit 0,3 m/s, danach nie unter 0,15 m/s.
-  Langsamer setzt der Gang aus dem Stand gar nicht an.
-- Der Kopf folgt mit Glättung 0,3; Körperpose und „Wheee“ sind aus.
+Heraus kommen **9 Zahlen**: vorwärts, seitwärts, drehen, Kopf gieren, Kopf nicken, Schnabel auf,
+Kick links, Aufheben, Hals beugen. Die Laufbefehle haben eine **Totzone** wie ein Gamepad-Stick:
+Unter 20 % steht die Ente. Ein Netz, das 0,1 statt 0 antwortet, läuft also nicht los.
+
+- **Rückwärts** fährt sie an wie Pollens Programm: erst kurz kräftig, danach nie ganz langsam, weil
+  der Gang aus dem Stand sonst gar nicht ansetzt.
 - Eine Bewegung startet nur, wenn keine läuft und der Schnabel leer ist.
-- Beim Aufheben steuert das Netz den Schnabel selbst (ohne Spielschicht öffnet Kern extras ihn
-  bei Phase 0,16 und beißt bei 0,24).
+- Beim Aufheben steuert das Netz den Schnabel selbst: Es hat gelernt, wann es öffnet und zubeißt.
+
+> **Für Profis:** Ohne Spielschicht öffnet Kern extras den Schnabel beim Aufheben zu einem festen
+> Zeitpunkt und beißt kurz danach zu. Die genauen Werte stehen im blauen Buch, Kapitel 13.
 
 ### Socke, Ball, Beispiel-Level
 
-Die **Socke** sind sieben Stoffklumpen von 12,5 mm, lose 3,4 cm hoch gehäuft (vier unten, zwei
-darauf, einer oben), zusammen 25 g. Weiche Federn (15 Hz, Dämpfung 0,7) verbinden Nachbarn: Was der
-Schnabel packt, zieht den Rest mit. Jeder Klumpen hat die Oberfläche `cloth` und Rollwiderstand
-0,5 – runde Klumpen würden sonst rollen, und der Haufen kröche davon. Im Code:
+Die **Socke** besteht aus sieben weichen Stoffklumpen, lose zu einem 3,4 cm hohen Häufchen gelegt
+(vier unten, zwei darauf, einer oben), zusammen 25 g. Weiche Federn verbinden Nachbarn: Was der
+Schnabel packt, zieht den Rest mit. Damit die runden Klumpen nicht wegrollen und der Haufen nicht
+davonkriecht, bremst ein **Rollwiderstand** sie.
 
-```cpp
-std::vector<game::Actor> sock =
-    game::micro_duck_sock_actors();
-```
+Der **Ball** ist 12 cm groß und 50 g schwer. Auch er hat einen kleinen Rollwiderstand – sonst rollte
+er ewig.
 
-Index 0 ist die Wurzel „Sock“. Ids, Eltern und Gelenkziele rechnet man wie bei `add_micro_duck`
-um, dann kommt alles mit `level.add` ins Level.
-
-Der **Ball** im Beispiel-Level ist 12 cm groß, 50 g schwer, mit Rollwiderstand 0,03 – sonst rollte er ewig.
-
-Das **Beispiel-Level** ist ein Zimmer von 2,5 × 2,5 m mit Holzboden (Reibung 1), Schuhkarton,
-Bücherstapel, Kiste, Blumentopf, Ball und zwei Socken. Die Ente ist autonom, Kern extras ist an. Ein
-Level-Blueprint lässt die Ente einmal zwitschern (Knoten **Chirp**), wenn der Ball ins Kamerabild
-kommt – eine Vorführung des Blueprints, kein Verhalten der Ente.
+Das **Beispiel-Level** ist ein Zimmer von 2,5 × 2,5 m mit Holzboden, Schuhkarton, Bücherstapel,
+Kiste, Blumentopf, Ball und zwei Socken. Die Ente ist autonom, Kern extras ist an. Ein
+Level-Blueprint lässt die Ente einmal zwitschern, wenn der Ball ins Kamerabild kommt – eine
+Vorführung der Logik-Knoten, kein Verhalten der Ente.
 
 ### Wie gut es klappt
 
-Je 32 Episoden; „Variation“ heißt mit zufälligen Abweichungen bei Bau, Servos und Sensoren:
+Gemessen wurde in 32 Übungsrunden, einmal mit sauberem Roboter, einmal mit **Variation** (zufällige
+kleine Abweichungen bei Bau, Servos und Sensoren). In jeder Runde lag nur ein Ball, nur eine Socke
+oder beides. In **11** der 32 Runden lag nur ein Ball, in den übrigen **21** eine Socke (manchmal
+mit Ball daneben). Darum zählt der Ball „von 11“ und die Socke „von 21“. Die Griffe zählen die
+einzelnen Bisse, die Stürze alle 32 Runden.
 
 | Ergebnis | sauber | Variation |
 |---|---|---|
-| Ball weggekickt | 9 von 11 | 7 von 11 |
-| Socke aufgehoben | 4 von 21 | 13 von 21 |
-| aufgehoben, getragen, ausgespuckt | 1 von 21 | 0 von 21 |
-| Griffe, die hielten | 2 von 14 | 1 von 15 |
-| Stürze | 2 von 32 | 10 von 32 |
+| Ball weggekickt | 9 von 11 (82 %) | 7 von 11 (64 %) |
+| Socke aufgehoben | 4 von 21 (19 %) | 13 von 21 (62 %) |
+| aufgehoben, getragen, ausgespuckt | 1 von 21 (5 %) | 0 von 21 |
+| Bisse, die hielten | 2 von 14 (14 %) | 1 von 15 (7 %) |
+| Stürze | 2 von 32 (6 %) | 10 von 32 (31 %) |
 
-Ehrlich: Kicken klappt gut, Tragen noch kaum. Zwei Tests prüfen, dass
-nur das Netz entscheidet: Einen Ball 30 cm vor ihr kickt die Ente über 25 cm weit, zu einer Socke
-30 cm vor ihr geht sie hin, hebt sie auf und beißt zu.
+Ehrlich: Kicken klappt gut, Tragen noch kaum – die Socke rutscht oft aus dem Schnabel. Zwei Tests
+prüfen, dass nur das Netz entscheidet: Einen Ball 30 cm vor ihr kickt die Ente über 25 cm weit; zu
+einer Socke 30 cm vor ihr geht sie hin, hebt sie auf und beißt zu.
 
 ## 13.12 Die Ente steuern
 
@@ -434,99 +523,112 @@ nur das Netz entscheidet: Einen Ball 30 cm vor ihr kickt die Ente über 25 cm we
 | „Wheee“ (gehalten) | V | LT / WHEEE |
 | **Sprung** | **7** | – / **HOP** |
 
-Laufen: W/S vor und zurück (bis 0,4 m/s), A/D drehen (bis 1 rad/s), sonst linker Stick oder
-MOVE-Stick. Am Gamepad gilt eine runde Totzone von 10 % und eine Kurve mit Hochzahl 1,28. Am Telefon liegen QUACK und PICK unten am Daumen.
+Laufen: W/S vor und zurück, A/D drehen, sonst linker Stick oder MOVE-Stick. Am Telefon liegen QUACK
+und PICK unten am Daumen. Jede dieser Eingaben gibt dir für 2 s Vorrang (Abschnitt 13.9).
 
-Die Laute folgen Pollens robotd: „greet“ beim Start und wenn das Gamepad zurückkommt, „inquire“,
-wenn es weg ist, „chirp“ bei jedem neuen Druck auf Quaken, „wheee“ solange gehalten, „peck“ beim
-Hinsetzen. Sie stammen aus einer bitgenauen Übertragung von Pollens Synthesizer, mit eigener Stimme
-je Ente ([Kapitel 7](07-audio.md)).
+Die Laute der Ente – Begrüßen, Fragen, Zwitschern, „Wheee“, ein Picken beim Hinsetzen – kommen aus
+einem genauen Nachbau von Pollens Klangerzeuger, mit einer eigenen Stimme für jede Ente
+([Kapitel 7](07-audio.md)).
 
-**Der Sprung:** Taste 7, HOP oder der Logik-Knoten **Robot Move** mit „jump“. Kern wechselt hart auf
-`jump.onnx` und nach 2 s zurück; das Netz erfährt die Zeit über die Plätze 55 und 56, die Pollens
-Netze nie benutzen. Im Studio: 3 von 3 echten Sprüngen, 9,0 mm Steigen, 120 ms Flug, 8° Neigung,
-danach steht und läuft die Ente wieder.
+**Der Sprung:** Taste 7, HOP oder der Logik-Knoten **Robot Move** mit „jump“. Kern wechselt auf das
+Sprungnetz und nach 2 s zurück. Woher weiß das Netz, wie weit der Sprung schon ist? Kern schreibt die
+Zeit in zwei der 61 Eingaben, die Pollens Netze nie benutzen. Im Studio gelangen 3 von 3 echten
+Sprüngen: ein kleiner Hüpfer von knapp 1 cm, danach steht und läuft die Ente wieder.
 
 > **Krass, aber wahr:** In Pollens Netzsatz gibt es keinen Sprung. Dieses Netz hat Kerns eigener Lehrer
 > trainiert, auf derselben Physik, die du im Studio siehst ([Kapitel 14](14-lehrer.md)).
 
 ### Netze laden
 
-Nur velstand ist eingebaut. Die übrigen Netze erfragt das Studio bei der Engine und lädt sie:
-Pollens aus dem Ordner `microduck/`, Kerns `jump.onnx` und `play.onnx` aus `policies/`. Lädt eine
-Datei nicht, fragt es nach 5, 10, 20 s … erneut, höchstens einmal pro Minute. Netze, die du mit dem
-Lehrer im Browser trainiert hast, speichert er auf deinem Gerät (IndexedDB „kern-lehrer“). Das
-Studio lädt sie ebenfalls, und offene Studio-Tabs übernehmen ein neues sofort.
+Nur das Laufnetz ist eingebaut. Die anderen Netze lädt Studio erst, wenn die Engine meldet, dass sie
+eins braucht: Pollens Netze aus einem Ordner, Kerns eigene (Sprung und Spielschicht) aus einem
+zweiten. Klappt das Laden nicht, versucht Studio es später noch einmal, mit immer längeren Pausen. Bis dahin bleibt die Ente bei dieser Bewegung stehen und meldet,
+was fehlt.
 
-**Details-Panel:** **Autonomous (camera, ToF)**, **Walking network** (`velstand` oder `alpha`), **Actions to servo goals**,
-**Kern extras**; nur im Level-JSON `rollers` und `servoDelay` (Standard 0,02 s).
+Was du mit dem Lehrer im Browser trainierst, speichert er auf deinem Gerät. Studio lädt es von dort
+ebenfalls, und ein offenes Studio übernimmt ein neues Netz sofort – ohne eine Datei zu kopieren.
 
-**Blueprint-Kategorie Robots** ([Kapitel 9](09-logik.md)): Walk, Look, Set Autonomous, Chirp, Robot
-Move (`sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump`), Robot Beak, Pet Robot, Robot
-Hears, Robot ToF, Robot Camera Sees, Robot State, Robot Holds Something.
+Im **Details-Panel** stellst du ein, ob die Ente **Autonomous** ist, welche Gangart sie benutzt
+(**Walking network**), wie Netzantworten zu Servozielen werden (**Actions to servo goals**) und ob
+**Kern extras** an sind. In der Logik gibt es eine eigene Kategorie **Robots** mit Knoten wie
+**Walk**, **Look**, **Robot Move**, **Robot ToF** oder **Robot Holds Something**
+([Kapitel 9](09-logik.md)). Die genauen Namen und Werte stehen im blauen Buch, Kapitel 13.
 
 ## 13.13 Die Ente aus C++ steuern
 
-```cpp
-w.walker_command(duck, 0.2f, 0, 0, 3.0f);
-w.walker_look(duck, 0.5f, 0.2f, 2.0f);
-std::string why = w.walker_skill(duck, "pick");
-bool holds = w.walker_holding(duck);
-```
-
-Zeile 1: 0,2 m/s vorwärts, 3 s lang. Zeile 2: Kopf gieren und nicken. Zeile 3: Aufheben starten;
-leerer Text heißt „gestartet“, sonst steht der Grund drin. Zeile 4: Ist etwas im Schnabel?
-Weitere Funktionen liefern die Sensoren (`walker_sensors`, `walker_sees`), das laufende Netz
-(`walker_driving`) und den Zustand (`walker_state`). Was der Lehrer
-zusätzlich braucht, steht in [Kapitel 14](14-lehrer.md).
+Alles, was du in Studio mit Tasten und Logik-Knoten machst, geht auch aus einem eigenen Programm:
+einen Laufbefehl für eine bestimmte Zeit geben, den Kopf drehen, eine Bewegung starten, fragen, ob
+etwas im Schnabel ist, die Sensoren lesen oder den Zustand abfragen. Startet eine Bewegung nicht,
+antwortet Kern mit dem Grund, statt still zu scheitern. Die genauen Namen stehen im blauen Buch,
+Kapitel 13; was der Lehrer zusätzlich braucht, in [Kapitel 14](14-lehrer.md).
 
 ## 13.14 Nachgemessen
 
-| Fall | Kern | Pollen (MuJoCo) |
+Wie treu ist Kerns Ente? Ein Test gibt Kern und Pollens Simulation dieselben Befehle und vergleicht:
+
+| Befehl | Kern | Pollen (MuJoCo) |
 |---|---|---|
-| Befehl 0 | steht, driftet unter 2 mm | steht |
+| nichts tun | steht, rutscht unter 2 mm | steht |
 | vorwärts 0,4 m/s | ≈ 0,135 m/s | ≈ 0,17 m/s |
 | drehen 1 rad/s | ≈ 0,61 rad/s | ≈ 0,97 rad/s |
 | auf dem Rücken | steht nach ≤ 12 s | steht auf |
 
+Ein Befehl ist ein Wunsch, kein Versprechen: Schon in Pollens eigener Simulation läuft die Ente viel
+langsamer als befohlen. Entscheidend ist darum der Vergleich der beiden Spalten. Er zeigt: Kerns Ente
+macht dasselbe, läuft und dreht aber noch etwas langsamer als das Original.
+
 Ohne Armatur zappelte Kerns Ente gut dreimal so stark. Alle Bewegungen gelingen, der Kick links
 schießt den Ball 4 m weit; der Kick rechts kippt manchmal, und sie steht wieder auf. Kein Gelenk
-überschreitet seine Grenze um mehr als 0,004 rad. BallPlay kickt auch ohne Kern extras, ohne Sturz.
+überschreitet seine Grenzen nennenswert. BallPlay kickt auch ohne Kern extras, ohne Sturz.
 
 ## 13.15 Was noch fehlt
 
-Getriebespiel (±1°) fehlt, die Armatur ist nur eine Scheibe, Box3D mischt Reibung anders als
-MuJoCo, der rechte Kick kippt, BallPlay ist ein Nachbau, Servoströme fehlen. Nur in Kern gibt es
-Spielschicht, Schnabel-Timing und Sprung. Wer mit dem echten Roboter arbeitet: Die
-Sicherheitsregeln stehen in [Kapitel 16](16-kalibrierung.md) – nur zusammen mit einem Erwachsenen.
+Ehrlich gesagt ist Kerns Ente noch nicht perfekt:
+
+- **Getriebespiel:** Im echten Servo wackeln die Zahnräder ein kleines bisschen (etwa 1°), wie eine
+  ausgeleierte Fahrradkette. Kern rechnet das nicht.
+- Die **Armatur** ist nur eine mitdrehende Scheibe, kein echtes Getriebe.
+- Kerns Physik **mischt Reibung** zweier Flächen anders als Pollens Simulation.
+- Der **rechte Kick** kippt manchmal; warum, ist noch offen.
+- **BallPlay** ist ein Nachbau nach einer Beschreibung.
+- **Servoströme** misst Kern nicht.
+
+Dafür gibt es nur in Kern die Spielschicht, das Schnabel-Timing beim Aufheben und den Sprung. Wer
+mit dem echten Roboter arbeitet: Die Sicherheitsregeln stehen in
+[Kapitel 16](16-kalibrierung.md) – nur zusammen mit einem Erwachsenen.
 
 ## Level geschafft!
 
-- Du kennst die Micro Duck: 25 cm, 0,74 kg, 14 Servos plus Schnabel.
+- Du kennst die Micro Duck: 25 cm, 0,74 kg, 14 Servos plus Schnabel, gesteuert von gelernten Netzen.
 - Du weißt, warum Kern bei der Physik nie schummelt.
-- Du rechnest mit dem Maßstab 4 zwischen Kern-Welt und echtem Roboter hin und her.
-- Du berechnest das Moment eines Servos aus K und dem Abstand zum Ziel.
-- Du weißt, was das Netz sieht (61 Zahlen) und befiehlt (14 Ziele).
-- Du kennst ToF, Kamera, IMU, Mund-Encoder und die Rangfolge Hand – Logik – Autonomie.
-- Du steuerst alle Bewegungen der Ente, auch Kerns Sprung.
+- Du unterscheidest Weltzeit und Roboterzeit und weißt, warum Kern die Ente 4-mal so groß baut.
+- Du verstehst den Servo als Gummiband und rechnest sein Drehmoment aus.
+- Du weißt, was das Laufnetz sieht (61 Zahlen) und befiehlt (14 Ziele).
+- Du kennst die Sensoren und die Rangfolge Hand – Logik – Autonomie.
+- Du weißt, dass die Spielschicht wie ein Spieler mit Gamepad nur schätzt, wo Ball und Socke liegen.
 
 ## Rätsel-Ecke
 
 1. Was bewegt der fünfzehnte Servo der Ente?
 2. Warum baut Kern die Ente 4-mal so groß?
-3. Ein Servo steht 0,2 rad neben seinem Ziel. Mit welchem Moment zieht er?
+3. Servo A steht 0,2 rad neben seinem Ziel, Servo B 0,4 rad. Welcher zieht stärker, und wie viel
+   stärker? Und warum zieht ein Servo, der 3 rad daneben steht, nicht 15-mal so stark wie A?
 4. Die Ente hat eine Socke im Schnabel. Warum meldet der Detektor sie nicht?
-5. **Boss-Rätsel:** Ein Physikschritt dauert in Kern 10 ms Weltzeit. Wie viel echte Roboterzeit
-   liegt zwischen zwei Entscheidungen der Spielschicht?
+5. **Boss-Rätsel:** Ein Physikschritt dauert in Kern 10 ms Weltzeit. Wie viel Roboterzeit liegt
+   zwischen zwei Entscheidungen der Spielschicht? Und wie viel Weltzeit?
 
 ### Lösungen
 
 1. Den Unterschnabel. Die anderen 14 sitzen in Beinen und Hals.
-2. Box3D rechnet am besten mit Körpern von 0,1 bis 10 m; die Glieder sind nur 2–4 cm groß.
-3. 0,554 · 0,2 ≈ 0,11 N·m – weit unter dem Höchstmoment 0,963 N·m.
-4. Eine Socke zählt nur, wenn ihre Mitte höchstens 3 cm hoch liegt. Im Schnabel ist sie höher.
-5. Ein Schritt sind 5 ms Roboterzeit, ein Regeltakt 4 Schritte, und die Spielschicht entscheidet
-   jeden zweiten Takt: 8 · 5 ms = 40 ms.
+2. Kerns Physik rechnet am besten mit Körpern ab etwa 10 cm; die Glieder sind nur 2–4 cm groß.
+3. B zieht **doppelt** so stark: Der Zug wächst mit dem Abstand (K · 0,4 statt K · 0,2). Aber nur bis
+   zum Höchstmoment. Das erreicht er schon bei etwa 1,7 rad – bei 3 rad zieht er nicht stärker als
+   bei 1,7 rad.
+4. Der Detektor nimmt die Mitte der Socke, den Durchschnitt aller sieben Klumpen. Liegt diese Mitte
+   höher als 3 cm über dem Boden, zählt die Socke nicht – und im Schnabel liegt sie höher.
+5. Ein Schritt sind 5 ms Roboterzeit, ein Regeltakt 4 Schritte, und die Spielschicht entscheidet in
+   jedem zweiten Takt: 8 · 5 ms = **40 ms Roboterzeit**. In Weltzeit sind es doppelt so viel:
+   8 · 10 ms = **80 ms**.
 
 ---
 

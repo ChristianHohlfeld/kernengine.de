@@ -1,254 +1,460 @@
 # 3 Das Fundament
 
-> **Dein Level:** Jedes Hochhaus braucht ein Fundament. Hier lernst du die vier Bausteine, auf denen
-> ganz Kern steht: Typen und Fehler, JSON, 3D-Mathematik und eine Mathe-Bibliothek, die auf jedem
-> Rechner exakt gleich rechnet.
+> **Dein Level:** Jedes Hochhaus braucht ein Fundament. Hier lernst du die Ideen, auf denen ganz Kern
+> steht: wie ein Computer Zahlen speichert und rundet, wie er Fehler meldet, wie er Daten als Text
+> aufschreibt, wie er im Raum rechnet – und warum er auf jedem Rechner exakt gleich rechnen muss.
 
-Die vier Bausteine sind die Header `base.h`, `json.h`, `math.h` und `dmath.h`.
+> **Wörter, die du brauchst:**
+> - **Funktion** – ein kleines Teilprogramm mit Namen: Es bekommt Werte, rechnet und gibt ein
+>   Ergebnis zurück.
+> - **Bibliothek** – eine Sammlung fertiger Funktionen, die viele Programme mitbenutzen, zum
+>   Beispiel für Mathe.
+> - **Daten** – alle Zahlen und Texte, mit denen ein Programm arbeitet.
+> - **Renderer** – der Teil der Engine, der die Bilder zeichnet.
+> - **Browser-Konsole** – ein verstecktes Fenster im Browser, in dem Webseiten Meldungen hinterlassen.
+>   In vielen Browsern öffnet es sich mit F12.
+> - **Datei** – ein gespeichertes Stück Daten mit einem Namen, etwa ein Foto oder ein Level.
 
-## 3.1 Die Werkzeugkiste: `base.h`
+## 3.1 Zahlen im Computer
 
-### Typen mit klarer Breite
+Ein Computer speichert jede Zahl in einer festen Zahl von **Bits**. Mehr Bits heißt: größere Zahlen
+oder mehr Stellen. Kern schreibt bei jeder Zahl dazu, wie viele Bits sie hat und ob sie ein
+Vorzeichen haben darf.
 
-Kern schreibt bei Zahlen immer die Breite aus: `u8` bis `u64` (ohne Vorzeichen), `i8` bis `i64`
-(mit Vorzeichen), `f32` und `f64` (Kommazahlen). Die Zahl sagt, wie viele Bit der Typ hat. An der
-Grenze zu WebAssembly zählt das: Dort ist ein Zeiger 32 Bit breit, `f64` ist genau JavaScripts
-`Number`, und die Schnittstelle zum Browser spricht in `u32`-Wörtern.
+> **So kannst du es dir vorstellen:** ein Zahlenschloss, dessen Rädchen nur 0 und 1 kennen. Mit
+> einem Rädchen gibt es 2 Möglichkeiten, mit zwei Rädchen 2 · 2 = 4, mit acht Rädchen
+> 2 · 2 · 2 · 2 · 2 · 2 · 2 · 2 = 256. Eine Zahl aus 8 Bit kann also die Werte 0 bis 255 haben.
+
+Kern benutzt Zahlen mit 8, 16, 32 oder 64 Bit. Warum ist die genaue Breite so wichtig? An der Tür
+zwischen C++ und JavaScript ([Kapitel 1](01-einfuehrung.md)) müssen beide Seiten wissen, wie groß
+jedes Schließfach ist. Liest die eine Seite 32 Bit, wo die andere 64 hingelegt hat, kommt Unsinn
+heraus.
+
+**Kommazahlen werden gerundet.** Auch Kommazahlen haben nur eine feste Zahl von Bits. Eine
+Kommazahl mit 32 Bit hat ungefähr 7 gültige Stellen, eine mit 64 Bit ungefähr 16. Alles dahinter wird
+gerundet. 1 : 3 ergibt also nicht 0,3333… ohne Ende, sondern zum Beispiel 0,3333333. Fast jede
+Rechnung mit Kommazahlen endet deshalb mit einem kleinen Rundungsschritt. Das ist kein Fehler, das
+ist einfach so. Wichtig wird es in 3.9.
+
+> **Für Profis:** Kern nennt die Zahlentypen nach Art und Breite, etwa „u8“ (Ganzzahl ohne
+> Vorzeichen, 8 Bit) oder „f64“ (Kommazahl, 64 Bit, genau JavaScripts Zahlentyp). Alle Typen stehen
+> im blauen Buch, Kapitel 3.
+
+## 3.2 Fehler sauber melden
 
 ### Fehler ohne Drama
 
-Kern benutzt keine Ausnahmen. Eine Funktion, die scheitern kann, gibt `false` (oder 0) zurück und
-hinterlegt eine Meldung mit `fail()`. Weil `fail()` selbst `false` liefert, passt eine Prüfung in
-eine Zeile – so beim Picking:
+Manches kann schiefgehen: eine kaputte Datei, eine unmögliche Kamera, ein Effekt, den die
+Grafikkarte nicht kann. Viele Programme werfen dann einen „Alarm“ aus, eine sogenannte **Ausnahme**,
+die quer durchs Programm fliegt, bis sie jemand auffängt – oder bis das Programm abstürzt. Kern macht
+das nie. Bei Kern antwortet eine Funktion, die scheitern kann, einfach mit **„hat nicht geklappt“**
+und legt vorher einen Zettel mit dem Grund hin.
 
-```cpp
-if (!camera_valid(camera))
-  return fail("invalid camera");
-```
+> **So kannst du es dir vorstellen:** Du bittest deinen Bruder, Milch zu holen. Er kommt zurück und
+> sagt: „Hat nicht geklappt – der Laden war zu.“ Kein Geschrei, aber du weißt, was los ist, und
+> kannst entscheiden, was du jetzt machst.
 
-Ist die Kamera kaputt, merkt sich Kern „invalid camera“ und meldet `false`. Lesen kann man die
-Meldung mit `last_error()`, aus JavaScript mit `kern_last_error()`.
+Ein Beispiel: Beim Anklicken eines Dings prüft Kern zuerst, ob die Kamera gültig ist. Ist sie es
+nicht, schreibt Kern „invalid camera“ (ungültige Kamera) auf den Zettel und meldet „hat nicht
+geklappt“. Wer wissen will, warum, liest den Zettel – auch von JavaScript aus.
 
-> **Vorsicht, Falle:** Es gibt nur **einen** Meldungspuffer (1024 Zeichen) für alle Threads. Jeder
-> `fail()` überschreibt den vorigen. `last_error()` zeigt also die letzte Meldung, nicht
-> unbedingt die zu deinem Aufruf. Sicher geht, wer vorher `clear_error()` ruft.
+> **Für Profis:** Es gibt nur **einen** Zettel für alle. Jede neue Fehlermeldung überschreibt die
+> vorige. Wer sicher die Meldung zu seinem eigenen Aufruf lesen will, wischt den Zettel vorher leer.
+> Die Funktionsnamen stehen im blauen Buch, Kapitel 3.
 
-> **Krass, aber wahr:** Kern prüft oft `!(x > 0)` statt `x <= 0`. Der Grund ist **NaN** („keine
-> Zahl“, etwa 0 durch 0). Jeder Vergleich mit NaN ist falsch. `x <= 0` ließe NaN durch,
-> `!(x > 0)` fängt es.
+### Die Keine-Zahl: NaN
 
-### Logging, Zeit und Helfer
+Rechnet ein Computer 0 durch 0, kommt keine Zahl heraus, sondern **NaN** („Not a Number“, keine
+Zahl). NaN hat eine verrückte Eigenschaft: **Jeder Vergleich mit NaN ist falsch.** „NaN ist größer
+als 0“ – falsch. „NaN ist kleiner oder gleich 0“ – auch falsch.
 
-`log()` kennt die Stufen `debug`, `info`, `warn` und `error`. Im Browser landet der Text mit
-`[kern]` davor in der Konsole, nativ in der Ausgabe. Aus dem Bloom-Effekt:
+Das ist eine Falle. Angenommen, eine Größe x muss positiv sein, und Kern will alles Ungültige
+abfangen. Rechne beide Prüfungen mit x = NaN durch:
 
-```cpp
-supported_ = false;
-log(LogLevel::warn, "bloom disabled: %s", last_error());
-return false;
-```
+| Prüfung | mit x = NaN | Fehler bemerkt? |
+|---|---|---|
+| „Ist x kleiner oder gleich 0?“ | falsch | nein, NaN rutscht durch |
+| „Ist x **nicht** größer als 0?“ | „größer als 0“ ist falsch, „nicht falsch“ ist wahr | ja |
 
-Klappt Bloom nicht: abschalten, Warnung samt Grund, `false`.
+Darum fragt Kern oft „Ist x nicht größer als 0?“ statt „Ist x kleiner oder gleich 0?“. Für normale
+Zahlen bedeuten beide dasselbe. Nur die zweite Frage fängt auch NaN.
 
-`now_ms()` liefert Millisekunden für Messungen. **In die Simulation gehört sie nie**: Die zählt
-feste Schritte, keine Uhrzeit.
-`min_of`, `max_of` und `clamp` (auf einen Bereich begrenzen) wollen zwei Werte vom selben Typ.
+### Meldungen aufschreiben
 
-### `Span`: das Schaufenster
+Kern schreibt Meldungen in vier Stufen auf: Hinweise, Informationen, Warnungen und Fehler. Im Browser
+landen sie in der Browser-Konsole, mit „[kern]“ davor. Ein Beispiel: Kann die Grafikkarte den
+Leuchteffekt um helle Lichter (**Bloom**) nicht, schaltet Kern ihn ab, schreibt eine Warnung samt
+Grund auf und macht ohne ihn weiter. Das Bild ist dann schlichter, aber das Spiel läuft.
 
-Ein `Span` zeigt auf Werte, die woanders liegen: Zeiger `data` plus Anzahl `size`. Er **besitzt**
-sie nicht. Jeder Behälter mit `data()` und `size()` wird von selbst zum Span. In diesem Format
-fließen alle Daten in die Engine, aus C++ wie aus JavaScript.
+## 3.3 Die Uhr bleibt draußen
+
+Kern kann die Uhr lesen, auf die Tausendstelsekunde genau. Das braucht es zum **Messen**: Wie lange
+dauert ein Bild? Wie viel Zeit bleibt noch, um Klänge vorzubereiten? Aber in die **Simulation** gehört
+die Uhrzeit nie. Eine Simulation zählt Schritte, keine Sekunden auf der Uhr.
+
+> **So kannst du es dir vorstellen:** ein Daumenkino. Jedes Blatt ist ein Schritt. Ob du schnell
+> oder langsam blätterst, die Geschichte auf den Blättern bleibt dieselbe.
+
+Warum ist das so wichtig? Stell dir vor, die Simulation richtet sich nach der Uhr. Ein schneller PC
+schafft in einer Sekunde viele kleine Schritte, ein altes Tablet nur wenige große. Jeder Schritt endet
+mit einem kleinen Rundungsschritt (3.1), also runden beide unterschiedlich oft an unterschiedlichen
+Stellen. Nach ein paar Sekunden steht die Ente auf dem PC woanders als auf dem Tablet, und der
+Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md) wäre kaputt.
+
+Darum zählt Kern feste Schritte. Die Micro Duck zum Beispiel entscheidet 50-mal pro Sekunde
+Simulationszeit neu. Braucht ein langsamer Rechner für diese 50 Schritte zwei echte Sekunden, läuft
+die Ente langsamer über den Bildschirm, aber sie macht genau dieselben Schritte.
+
+## 3.4 Ausleihen und wiedererkennen
+
+### Der Span: das Schaufenster
+
+Daten zu kopieren kostet Zeit, besonders wenn es Tausende Zahlen sind, etwa die Ecken eines
+3D-Modells. Darum gibt man der Engine oft keine Kopie, sondern nur einen Hinweis: „Die Zahlen liegen
+dort, es sind so und so viele.“ Diesen Hinweis nennt Kern einen **Span**. Ein Span **besitzt** die
+Daten nicht, er zeigt nur darauf. In diesem Format fließen alle Daten in die Engine, aus C++ wie aus
+JavaScript.
 
 > **So kannst du es dir vorstellen:** Ein Span ist ein Schaufenster: Du siehst die Ware, aber sie
-> gehört dir nicht. Räumt der Laden aus, ist das Fenster leer.
+> gehört dir nicht. Das ist viel schneller, als alles zu kaufen. Räumt der Laden aber aus, ist das
+> Fenster leer.
 
-Ein Span darf also nie länger leben als seine Daten. Wer Daten behalten will, kopiert sie – der
-Renderer hält darum eigene Kopien ([Kapitel 4](04-grafik.md)).
+Daraus folgt eine Regel: Ein Span darf nie länger benutzt werden, als seine Daten leben. Wer Daten
+behalten will, kopiert sie. Der Renderer hält darum eigene Kopien von allem, was er zeichnet
+([Kapitel 4](04-grafik.md)).
 
-### Hashes
+### Hashes: die Kennzahl
 
-`hash_bytes` (64-Bit-FNV-1a) macht aus beliebig vielen Bytes eine Kennzahl. Damit erkennt der
-Renderer unveränderte Werte, und der Fingerabdruck der Ente aus [Kapitel 2](02-bauen-und-testen.md)
-ist genau so ein Hash. `hash_u32` (*lowbias32*) mischt eine Ganzzahl, etwa für Rauschen im Spiel.
-Beide rechnen nur mit Ganzzahlen: gleiche Bytes, gleiche Kennzahl.
+Einen **Hash** kennst du schon aus [Kapitel 2](02-bauen-und-testen.md): eine Kennzahl, die aus vielen
+Daten entsteht. Statt 1000 Zahlen einzeln zu vergleichen, vergleicht man zwei Kennzahlen. Sind sie
+verschieden, hat sich etwas geändert. Der Renderer erkennt so zum Beispiel, ob er einen Wert gar nicht
+neu an die Grafikkarte schicken muss.
 
-## 3.2 JSON
+Eine zweite Sorte Hash mischt eine einzelne Zahl kräftig durch. Damit macht das Spiel Muster, die
+zufällig aussehen, aber bei jedem Start gleich sind. Beide Sorten rechnen nur mit ganzen Zahlen, also
+ohne Runden: Gleiche Daten ergeben auf jedem Rechner dieselbe Kennzahl.
 
-Levels, Studio-Befehle, Servoprofile: alles **JSON**. Kerns JSON-Baustein verspricht dreierlei:
+## 3.5 Daten als JSON
 
-1. **Reihenfolge bleibt.** Objekte behalten die Reihenfolge ihrer Schlüssel. Eine Datei, die Kern
-   oder JavaScripts `JSON.stringify` geschrieben hat, kommt nach Einlesen und Schreiben Byte für
-   Byte gleich heraus. Änderungen an Levels sieht man so sauber.
-2. **Zahlen wie in JavaScript**, Ziffer für Ziffer wie `JSON.stringify`.
-3. **Sicher gegen böse Dateien.** Er lehnt mehr als 80 Ebenen Verschachtelung ab (Studio-Befehle:
-   120), nicht endliche Zahlen und die Schlüssel `__proto__`, `prototype` und `constructor`, mit
-   denen man JavaScript-Seiten angreifen kann.
+Levels, Studio-Befehle, Einstellungen der Servos: Kern schreibt das alles als **JSON** auf. JSON ist
+eine einfache Art, Daten als Text zu speichern, die Menschen und Programme lesen können. So sieht ein
+Würfel in einem Level ungefähr aus:
 
-```cpp
-CHECK(num(0.1) == "0.1");
-CHECK(num(-0.0) == "0");
-CHECK(num(1e21) == "1e+21");
-CHECK(num(NAN) == "null");
+```json
+{
+  "name": "Cube",
+  "transform": {
+    "position": [0, 0, 1],
+    "rotation": [0, 0, 90]
+  }
+}
 ```
 
-Dieser Test legt fest: 0,1 bleibt „0.1“, minus null wird „0“, 10²¹ wird „1e+21“, NaN wird `null`.
+In geschweiften Klammern stehen Paare aus **Name: Wert**. Ein Wert kann eine Zahl sein, ein Text in
+Anführungszeichen, eine Liste in eckigen Klammern oder wieder ein Paar-Block. Hier heißt der Actor
+„Cube“, steht 1 Meter über dem Boden und ist um 90° gedreht.
 
-> **Krass, aber wahr:** 10²⁰ schreibt Kern als „100000000000000000000“ aus, 10²¹ aber als
-> „1e+21“ – genau wie JavaScript.
+> **So kannst du es dir vorstellen:** ein ausgefüllter Steckbrief. Jede Zeile hat eine Überschrift
+> und einen Eintrag. Ein Steckbrief kann sogar einen kleineren Steckbrief enthalten.
 
-Ein fehlender Schlüssel liefert `null` statt eines Absturzes, `as_number(ersatz)` bei falschem Typ
-den Ersatzwert, und `parse` schreibt seine Meldung
-in einen eigenen Text (nicht in `last_error()`) mit der Stelle („at offset 17“). Beim Laden, etwa eines Servoprofils, prüft Kern jedes Feld auf Typ und Bereich
-und übernimmt erst ganz am Ende. Ein kaputtes Feld lässt das alte Profil unberührt. Genauso
-überschreibt `parse` sein Ergebnis nur, wenn alles geklappt hat. Zurück in Text verwandelt
-`stringify(wert, 2)` mit zwei Leerzeichen Einrückung, wie `JSON.stringify(wert, null, 2)`.
+> **Mission:** Speichere ein Level mit **Ctrl+S**. Beim ersten Mal fragt dich der Browser nach einem
+> Ort, oder die Datei landet in deinem Download-Ordner. Öffne die Datei mit der Endung „.klevel“ in
+> einem einfachen Texteditor (unter Windows „Editor“, auf dem Mac „TextEdit“). Es ist JSON! Finde
+> `"format": "kern-level"` und bei deinen Actors die Drehungen in Grad.
 
-> **Mission:** Speichere ein Level mit **Ctrl+S** und öffne die `.klevel`-Datei in einem
-> Texteditor. Es ist JSON! Finde `"format": "kern-level"` und die Rotationen deiner Actors in Grad.
+Kerns JSON-Baustein verspricht drei Dinge:
 
-## 3.3 Die 3D-Mathematik
+1. **Die Reihenfolge bleibt.** Liest Kern eine Datei ein und schreibt sie unverändert wieder hinaus,
+   kommt Zeichen für Zeichen dieselbe Datei heraus. Ändert man ein Level, sieht man beim Vergleichen
+   von alter und neuer Datei nur die Zeilen, die sich wirklich geändert haben.
+2. **Zahlen wie im Browser.** Kern schreibt jede Zahl genau so auf, wie JavaScript es tut. Dieselbe
+   Zahl ergibt also auf beiden Seiten denselben Text.
+3. **Sicher gegen böse Dateien.** Eine Datei aus dem Internet kann kaputt sein oder absichtlich gemein
+   gebaut. Kern lehnt zum Beispiel Steckbriefe ab, die zu tief ineinandergeschachtelt sind, wie eine
+   Matroschka mit Hunderten Puppen, und Zahlen, die unendlich groß wären.
+
+Fehlt ein Eintrag, bekommt Kern „nichts“ zurück statt eines Absturzes.
+
+> **Für Profis:** Sehr große Zahlen schreibt Kern wie JavaScript: 10²⁰ ganz aus, mit 20 Nullen, aber
+> 10²¹ als „1e+21“. Die genaue Tiefengrenze und die verbotenen Namen, mit denen man sonst
+> JavaScript-Seiten angreifen könnte, stehen im blauen Buch, Kapitel 3.
+
+### Erst prüfen, dann übernehmen
+
+Das ist eines der wichtigsten Prinzipien in Kern: **Erst wird alles geprüft, dann wird übernommen –
+alles oder nichts.**
+
+Ein Beispiel: Kern lädt die Einstellungen eines Servos aus einer Datei, sagen wir fünf Werte. Kern
+liest Wert 1, prüft ihn: Ist es eine Zahl, liegt sie im erlaubten Bereich? Dann Wert 2, Wert 3. Wert 4
+ist kaputt. Jetzt bricht Kern ab und meldet den Grund. Das alte Servoprofil bleibt **vollständig**
+unberührt. Erst wenn alle fünf Werte geprüft sind, ersetzt Kern das alte Profil in einem Rutsch durch
+das neue.
+
+> **So kannst du es dir vorstellen:** Kochen nach Rezept. Du checkst zuerst, ob alle Zutaten da sind,
+> und fängst erst dann an. Sonst stehst du mit halb verrührtem Teig da, und das Ei fehlt.
+
+Warum so streng? Ein halb übernommenes Profil – drei neue Werte, zwei alte – wäre eine Mischung, die
+niemand wollte. Genauso liefert der JSON-Leser sein Ergebnis nur, wenn die ganze Datei in Ordnung
+war, und seine Fehlermeldung nennt die Stelle, an der es klemmt.
+
+## 3.6 Positionen und Richtungen als Pfeile
+
+### Kerns Regeln für den Raum
 
 | Regel | Festlegung |
 |---|---|
 | Einheiten | Meter, Sekunden, Kilogramm |
 | Oben | **+Z** |
-| Händigkeit | rechtshändig |
-| Winkel | Radiant im Code, Grad in Levels |
-| Matrizen | 4×4, spaltenweise |
+| Achsen | „rechtshändig“ |
 
-**Z oben** gilt überall: Renderer, Physik, Audio, Levels. Die Kamera blickt in ihren eigenen
-Koordinaten entlang −Z, und die Projektion folgt OpenGL. `math.h` steht ganz im Header und legt nie
-Speicher an. So kann der Compiler die Rechnungen direkt in den Code einbauen, das macht sie schnell.
+**Z zeigt nach oben**, überall: in der Grafik, der Physik, beim Ton und in den Levels. X und Y liegen
+flach auf dem Boden wie das Koordinatensystem in deinem Heft.
 
-> **Mission:** Wähl **File → New Level...**, die Vorlage **Basic** und **Create**. Setz über den Content Drawer (Ctrl+Space) einen
-> **Cube**. Unten links zeigt das Achsenkreuz X rot, Y grün, Z blau – nach oben. Zieh mit dem
-> Move-Werkzeug (**W**) am blauen Pfeil und beobachte in **Details** das Feld **Location** Z.
+„Rechtshändig“ kannst du mit deiner rechten Hand prüfen: Streck den Daumen nach rechts, den
+Zeigefinger nach vorn und den Mittelfinger nach oben. Daumen ist X, Zeigefinger Y, Mittelfinger Z. Mit
+der linken Hand klappt das nicht – dort zeigt der Mittelfinger nach unten.
 
-### Vektoren
+> **Mission:** Wähl **File → New Level...**, die Vorlage **Basic** und **Create**. Setz über den
+> Content Drawer (Ctrl+Space) einen **Cube**. Unten links zeigt das Achsenkreuz X rot, Y grün, Z blau
+> – nach oben. Zieh mit dem Move-Werkzeug (**W**) am blauen Pfeil und beobachte in **Details** das Feld
+> **Location** Z.
 
-`Vec2`, `Vec3`, `Vec4` sind Pfeile aus 2, 3 oder 4 Zahlen, mit Skalar- und Kreuzprodukt, Länge und
-Abstand (Pythagoras!), Mischen (`lerp`). `normalize` macht einen Pfeil 1 lang. Ein Nullpfeil hat
-keine Richtung – statt NaN liefert Kern dann einen Ersatz, standardmäßig (0, 0, 1). So verdirbt
-eine Eingabe mit zwei gleichen Punkten nicht die ganze Szene.
+### Vektoren: Pfeile aus Zahlen
 
-### Drehungen: `Quat`
+Ein **Vektor** ist ein Pfeil. In der Ebene beschreiben ihn zwei Zahlen: wie weit nach rechts, wie
+weit nach vorn. Im Raum kommt eine dritte dazu: wie weit nach oben. Mit Vektoren beschreibt Kern
+Positionen (ein Pfeil vom Nullpunkt (0, 0, 0) zum Punkt), Richtungen und Geschwindigkeiten.
 
-Kern speichert eine Drehung als **Quaternion** (x, y, z, w): eine geschickte Verpackung von „Achse
-plus Winkel“. So packt `Quat::axis_angle`:
+Zeichne in dein Heft einen Pfeil von (0, 0) nach (3, 4). Wie lang ist er? Das ist Pythagoras:
+3 · 3 + 4 · 4 = 9 + 16 = 25, die Wurzel aus 25 ist **5**. Im Raum geht es genauso, nur mit drei
+Zahlen: Der Pfeil (2, 3, 6) ist √(4 + 9 + 36) = √49 = **7** Meter lang.
 
-```cpp
-const Vec3 a = normalize(axis);
-const f32 s = kern::dm::sin(radians * 0.5f);
-return {a.x * s, a.y * s, a.z * s,
-        kern::dm::cos(radians * 0.5f)};
-```
+Oft braucht man nur die **Richtung** eines Pfeils, nicht seine Länge. Dann teilt man jede Zahl durch
+die Länge: (3, 4) geteilt durch 5 ergibt (0,6; 0,8). Der Pfeil zeigt noch genauso, ist aber genau 1
+lang.
 
-Für 90° um Z: halber Winkel 45°, sin 45° ≈ 0,707, cos 45° ≈ 0,707. Achse (0, 0, 1)
-mal 0,707 gibt x = 0, y = 0, z = 0,707, dazu w = 0,707. Keine Drehung ist (0, 0, 0, 1). Beachte das
-`kern::dm::sin` – warum, zeigt 3.4. Zwei Drehungen verknüpft man mit `*`: Bei `q * b` wirkt erst
-`b`, dann `q`. `rotate(v)` dreht einen Pfeil.
+> **Vorsicht, Falle:** Der Pfeil (0, 0, 0) hat die Länge 0 und gar keine Richtung. Teilt man durch 0,
+> kommt NaN heraus (3.2), und das würde sich durch die ganze Szene fressen. Das passiert schnell, etwa
+> wenn jemand zweimal denselben Punkt anklickt. Kern gibt in diesem Fall einen Ersatzpfeil zurück,
+> der nach oben zeigt.
 
-### Matrizen: `Mat4`
+Weitere Pfeil-Rechnungen, etwa Abstände oder das Mischen zweier Pfeile, stehen im blauen Buch,
+Kapitel 3.
 
-Eine 4×4-Matrix verschiebt, dreht und skaliert in einem Rutsch. Ihre 16 Zahlen liegen **Spalte für
-Spalte** (Zahl = Platz):
+## 3.7 Drehen
 
-```
- 0  4  8 12
- 1  5  9 13
- 2  6 10 14
- 3  7 11 15
-```
+### Grad und Radiant
 
-Zeile r, Spalte c steht auf Platz `c * 4 + r`. Die Verschiebung steht auf 12, 13, 14.
-
-`trs(t, q, s)` baut eine Matrix aus Verschiebung, Drehung, Skalierung; bei `A * B` wirkt erst `B`,
-dann `A`. Aus dem Test `math_matrices`: (1, 0, 0) mal 2 gestreckt → (2, 0, 0), um 90° um Z gedreht
-→ (0, 2, 0), um (1, 2, 3) verschoben → **(1, 4, 3)**.
-
-`transform_point` dreht, streckt und verschiebt einen Punkt; `transform_vector` lässt die
-Verschiebung weg, denn eine Richtung hat keinen Ort. Dazu kommen `perspective` und `ortho` (Projektion), `look_at` (Kamerablick), `normal_matrix3`
-(Licht auf schief gestreckten Flächen) und `invert` in doppelter Genauigkeit, damit Klick-Strahlen
-auch weit weg treffen.
+In Studio und in den Level-Dateien misst du Winkel in **Grad**: Eine ganze Runde hat 360°. Im
+C++-Code rechnet Kern dagegen in **Radiant**. Radiant heißt: Wie weit wanderst du auf einem Kreis mit
+1 Meter Radius? Eine ganze Runde ist der ganze Umfang, etwa 6,28 Meter (das ist 2 · π). Eine halbe
+Runde (180°) ist etwa 3,14, eine Viertelrunde (90°) etwa 1,57. Für Mathe-Formeln ist Radiant
+bequemer, für Menschen Grad. Darum rechnet Kern zwischen beiden um.
 
 > **Mission:** Tipp in **Details** bei **Rotation** Z deines Cubes `45*2` und drück Enter.
 > Rechenausdrücke sind erlaubt – der Würfel dreht sich um 90°.
 
-### Kugel, Kiste, Kamera
+### Drehungen in vier Zahlen
 
-Eine `Sphere` mit negativem Radius gilt als leer; im Zweifel wird gezeichnet. Eine `Aabb`
-(achsenparallele Kiste) startet „umgedreht“, damit der erste Punkt sie festlegt.
+Jede Drehung im Raum lässt sich so beschreiben: **um diese Achse, um so viel Grad.**
 
-Die `Camera` ist eine **Beschreibung**, keine Matrix: Augpunkt, Ziel, Oben (+Z), dazu der
-**senkrechte** Öffnungswinkel in Radiant (Standard π/3 = 60°) und nahe und ferne Grenze.
-Orthografische Kameras geben statt des Winkels die sichtbare Höhe in Metern an. `camera_valid`
-prüft alles. Ein Test prüft, dass das Ziel genau in der Bildmitte landet. Aus der Kamera entstehen die sechs
-Wände des Sichtbereichs fürs Culling ([Kapitel 5](05-szene-und-geometrie.md)). Aus JavaScript setzt
-man die Kamera mit zwölf Zahlen; ungültige weist Kern mit „invalid camera“ zurück.
+> **So kannst du es dir vorstellen:** Steck einen Spieß durch einen Apfel. Der Spieß ist die Achse.
+> Jetzt drehst du den Apfel um den Spieß – um 30°, um 90°, wie du willst. Jede Drehung, die es gibt,
+> ist so ein Spieß plus ein Winkel.
 
-> **Mission:** Drück **Alt+J** für die Draufsicht, eine orthografische Kamera: Die Infozeile zeigt
-> jetzt die sichtbare Breite in Metern. **Alt+G** schaltet zurück zur Perspektive.
+Kern packt Achse und Winkel geschickt in **vier Zahlen**. Diese Verpackung heißt **Quaternion**. Die
+Rechnung dahinter brauchst du nicht. Wichtig ist, warum Kern sie benutzt: Zwei Drehungen kann man
+damit sauber zu einer einzigen zusammensetzen. „Keine Drehung“
+sind die vier Zahlen (0, 0, 0, 1).
 
-## 3.4 Mathe, die überall gleich rechnet
+Bei zwei Drehungen hintereinander zählt die **Reihenfolge**. Probier es mit einem Buch auf dem Tisch:
 
-`sqrt` und `floor` sind exakt festgelegt, `sin`, `cos`, `exp` oder `atan2` nicht: Die Bibliotheken
-von Linux, Apple, Android und WebAssembly runden im letzten Bit verschieden. In einer
-Robotersimulation wird aus einem Bit binnen Sekunden ein anderer Gang.
+- Erst um 90° um die Hochachse drehen, dann um 90° nach vorn kippen.
+- Jetzt das Ganze andersherum: erst kippen, dann drehen.
 
-Ein zweiter Bit-Dieb heißt **FMA**: `a*b+c` in einem Schritt mit nur einer Rundung. Ein
-ausgedachtes Beispiel: Rechne 0,15 · 3 − 0,04 und runde nach jedem Schritt wie in der Schule auf
-eine Nachkommastelle. Der Computer rundet genauso, nur im letzten Bit:
+Das Buch liegt am Ende verschieden da! Darum legt Kern genau fest, welche Drehung zuerst wirkt.
+
+Wie Kern Achse und Winkel in die vier Zahlen packt, braucht Sinus und Kosinus aus der 9. oder 10.
+Klasse. Die Rechnung steht im blauen Buch, Kapitel 3.
+
+### Matrizen: alles in einem Rutsch
+
+Ein Ding im Level wird oft **gestreckt**, **gedreht** und **verschoben**. Kern packt alle drei
+Bewegungen in eine Tabelle aus 4 × 4 = 16 Zahlen, eine **Matrix**. Wie eine Matrix einen Punkt
+verändert, erklärt Anhang [B](B-grundlagen-rendering.md) im Abschnitt „Matrizen ohne Angst“. Hier
+genügt das Prinzip: Eine Matrix ist ein Rezept „erst strecken, dann drehen, dann verschieben“, das
+man auf jeden Punkt anwenden kann.
+
+Ein Beispiel aus Kerns Tests, das du im Heft nachzeichnen kannst:
+
+1. Start: der Punkt (1, 0, 0).
+2. Mal 2 gestreckt: (2, 0, 0).
+3. Um 90° um die Z-Achse gedreht: Der Punkt wandert von der X-Achse auf die Y-Achse, also (0, 2, 0).
+4. Um (1, 2, 3) verschoben: (0 + 1, 2 + 2, 0 + 3) = **(1, 4, 3)**.
+
+Ändert man die Reihenfolge, kommt etwas anderes heraus, genau wie beim Buch. Kern wendet bei zwei
+Matrizen immer erst die rechte, dann die linke an.
+
+Matrizen unterscheiden **Punkte** und **Richtungen**. Ein Punkt wird gestreckt, gedreht und
+verschoben. Eine Richtung, etwa „nach Norden“, wird nur gestreckt und gedreht, nie verschoben. Denn
+eine Richtung hat keinen Ort.
+
+**Wo die 16 Zahlen liegen.** Im Speicher liegen die 16 Zahlen nicht als Tabelle, sondern in einer
+langen Reihe. Kern legt sie **Spalte für Spalte** ab: erst die vier Zahlen der ersten Spalte, dann die
+der zweiten und so weiter. Wie in vielen Programmen wird dabei **ab 0 gezählt**: Die erste Spalte ist
+Spalte 0, die erste Zeile ist Zeile 0, der erste Platz ist Platz 0. Die Zahlen in der Tabelle sind die
+Plätze:
+
+```
+          Spalte 0  Spalte 1  Spalte 2  Spalte 3
+Zeile 0       0         4         8        12
+Zeile 1       1         5         9        13
+Zeile 2       2         6        10        14
+Zeile 3       3         7        11        15
+```
+
+Jede Spalte hat 4 Plätze. Darum findest du einen Platz so: Spaltennummer mal 4, plus Zeilennummer. Die
+Verschiebung steht in Spalte 3, Zeilen 0 bis 2, also auf den Plätzen 12, 13 und 14.
+
+> **Für Profis:** Um herauszufinden, was unter der Maus liegt, muss Kern eine Matrix „rückwärts“
+> rechnen. Das macht es mit doppelt so vielen Bits, damit auch weit entfernte Dinge genau getroffen
+> werden. Alle Matrix-Funktionen stehen im blauen Buch, Kapitel 3.
+
+## 3.8 Die Kamera
+
+Eine Kamera ist in Kern keine Matrix, sondern eine **Beschreibung**:
+
+- **Augpunkt** – wo die Kamera steht,
+- **Ziel** – wohin sie schaut,
+- **Oben** – welche Richtung im Bild oben ist (normalerweise +Z),
+- **Öffnungswinkel** – wie weit sie von oben nach unten sieht, normalerweise 60°,
+- **nahe und ferne Grenze** – was näher oder weiter weg ist, wird nicht gezeichnet. Normalerweise
+  beginnt das Bild 5 Zentimeter vor der Kamera und endet nach 1,8 Kilometern.
+
+> **So kannst du es dir vorstellen:** eine Taschenlampe im Dunkeln. Wo du stehst, wohin du leuchtest,
+> wie breit der Lichtkegel ist und wie weit das Licht reicht – mehr braucht man nicht, um zu wissen,
+> was du siehst.
+
+Aus dieser Beschreibung rechnen Renderer, Anklicken und Editor ihre Matrizen selbst aus. Bevor Kern
+eine Kamera benutzt, prüft es sie: Liegt die ferne Grenze hinter der nahen? Ist der Winkel größer als
+0° und kleiner als 180°? Ungültige Kameras weist Kern mit „invalid camera“ zurück (3.2).
+
+Neben der normalen Kamera mit Perspektive gibt es die **Draufsicht ohne Perspektive**: Dort wird
+nichts kleiner, wenn es weiter weg ist, wie auf einer Landkarte. Statt eines Winkels sagt man hier,
+wie viele Meter hoch das Bild ist.
+
+> **Mission:** Drück **Alt+J** für die Draufsicht. Die kleine graue Schrift unten links im Viewport (dem
+> 3D-Fenster)
+> zeigt jetzt, wie viele Meter breit das Bild ist.
+> **Alt+G** schaltet zurück zur Perspektive.
+
+**Was die Kamera nicht sieht, wird nicht gezeichnet.** Aus der Kamera berechnet Kern die sechs Wände
+ihres Sichtbereichs: links, rechts, oben, unten, nah, fern. Um jedes Ding legt Kern eine einfache
+Hülle, eine Kugel oder eine Kiste. Liegt die Hülle ganz außerhalb der Wände, spart sich Kern das
+Zeichnen ([Kapitel 5](05-szene-und-geometrie.md)). Ist eine Hülle ungültig, zeichnet Kern das Ding
+trotzdem. Im Zweifel lieber einmal zu viel zeichnen als ein Loch im Bild.
+
+> **Für Profis:** Eine neue Kiste startet „umgedreht“: ihr kleinster Wert riesig groß, ihr größter
+> riesig klein. Der erste Punkt, den man hinzufügt, legt sie dann sofort richtig fest – wie eine
+> Bestenliste, die mit einem unschlagbar schlechten Ergebnis beginnt.
+
+## 3.9 Mathe, die überall gleich rechnet
+
+Erinnerst du dich an die Stille Post aus [Kapitel 1](01-einfuehrung.md)? Hier siehst du, wo die
+kleinen Unterschiede herkommen und wie Kern sie verhindert. Es gibt drei Quellen.
+
+### Quelle 1: Rechenfunktionen, die verschieden runden
+
+Manche Rechnungen sind auf jedem Rechner bis aufs letzte Bit festgelegt, zum Beispiel Wurzelziehen
+oder Abrunden. Andere nicht: etwa Funktionen, die Winkel umrechnen, oder Potenzen. Dort darf jeder
+Hersteller ein bisschen anders runden, und Linux, Mac, Android und Browser tun das auch – an der
+allerletzten Stelle. In einer Robotersimulation wird aus diesem einen Bit binnen Sekunden ein anderer
+Gang.
+
+**Kerns Lösung:** Kern bringt seine eigene Mathe-Bibliothek mit. Sie stammt aus einem freien Projekt
+und wird auf jedem Rechner auf genau dieselbe Weise übersetzt. So rundet sie überall gleich. Die
+Physik-Engine hat ihre eigenen, ebenso festen Winkelfunktionen. Langsamer wird dadurch nichts.
+
+### Quelle 2: zusammengezogene Rechenschritte
+
+Manche Prozessoren können „mal und dann plus“ in **einem** Schritt rechnen und runden dabei nur einmal
+statt zweimal. Das klingt harmlos, ändert aber das Ergebnis. Rechne selbst! Aufgabe: 0,15 · 3 − 0,04.
+Wir runden wie in der Schule auf eine Nachkommastelle, der Computer macht es genauso, nur weit
+hinten:
 
 | Weg | Rechnung | Ergebnis |
 |---|---|---|
-| zwei Schritte | 0,45 → 0,5; 0,5 − 0,04 = 0,46 | 0,5 |
-| ein Schritt | 0,45 − 0,04 = 0,41 | 0,4 |
+| zwei Schritte | 0,15 · 3 = 0,45 → 0,5, dann 0,5 − 0,04 = 0,46 → 0,5 | **0,5** |
+| ein Schritt | 0,15 · 3 − 0,04 = 0,41 → 0,4 | **0,4** |
 
-Gleiche Aufgabe, andere Antwort. Darum gilt überall `-ffp-contract=off`: kein Zusammenziehen.
+Gleiche Aufgabe, andere Antwort. Darum verbietet Kern dem Compiler überall, Schritte zusammenzuziehen
+([Kapitel 2](02-bauen-und-testen.md)).
 
-**Die Lösung:** Kern bringt die Funktionen der Bibliothek **musl** mit, umbenannt in `kern_musl_*`,
-und übersetzt sie auf jeder Plattform gleich streng, ohne FMA. Box3D hat eigene Winkelfunktionen.
-Benutzt wird alles mit `kern::dm::` davor: `kern::dm::sin`, `kern::dm::atan2`, `kern::dm::pow`
-und so weiter. Wie bei `std::` gilt: `float` hinein, `float` heraus; `double` hinein, `double` heraus. Exaktes wie `sqrt` und `floor` bleibt bei `std::`.
+### Quelle 3: die Reihenfolge beim Zusammenzählen
 
-**Die Regeln für neuen Code:**
+In der Schule lernst du: 1 + 2 + 3 = 3 + 2 + 1, die Reihenfolge ist egal. Beim Computer stimmt das
+nicht ganz, weil nach jedem Schritt gerundet wird. Wieder auf eine Nachkommastelle:
 
-- Was die **Simulation füttert**, nimmt `kern::dm::`.
-- Summen in fester Reihenfolge, nie abhängig von der Zahl der Threads.
-- Keine `-ffast-math`-Optionen.
+| Reihenfolge | Rechnung | Ergebnis |
+|---|---|---|
+| 1 + 0,04 + 0,04 | 1 + 0,04 = 1,04 → 1,0, dann 1,0 + 0,04 = 1,04 → 1,0 | **1,0** |
+| 0,04 + 0,04 + 1 | 0,04 + 0,04 = 0,08 → 0,1, dann 0,1 + 1 = 1,1 | **1,1** |
 
-Reine Darstellung darf die normale Bibliothek nehmen; Ton, Primitive, Partikel, Teile des Editors
-und die Kamera von `hello` tun das. Liefert solcher Code aber Werte für Physik, Steuerung oder
-Training, muss er auf `kern::dm::` umsteigen.
+Rechnen mehrere Helfer gleichzeitig an einer Summe, hängt die Reihenfolge davon ab, wer zuerst fertig
+ist. Darum zählt Kern Summen immer in einer festen Reihenfolge zusammen, egal wie viele Helfer
+mitrechnen.
 
-> **Für Profis:** Jeden Fehler zeigt der Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md) bis
-> auf den Regeltakt genau. Langsamer wird nichts: musl ist so flott wie die Bibliothek des Rechners,
-> und die meiste Zeit kostet ohnehin Box3Ds Gelenk-Löser.
+### Die Regeln
+
+- Was die **Simulation füttert**, benutzt Kerns eigene Mathe-Bibliothek.
+- Summen werden immer in derselben Reihenfolge gebildet.
+- Abkürzungen, die den Compiler schneller, aber ungenauer machen, sind verboten.
+
+Was nur **angezeigt** wird, etwa Ton, Partikel oder Teile des Editors, darf die gewöhnliche Bibliothek
+des Rechners benutzen. Sobald solcher Code aber
+Werte für die Physik, die Steuerung oder das Training liefert, muss er auf Kerns eigene Bibliothek
+umsteigen.
+
+> **Für Profis:** Die eigene Bibliothek stammt aus musl. Man ruft sie mit `kern::dm::` auf, etwa
+> `kern::dm::sin` statt `std::sin`. Jeden Verstoß zeigt der Fingerabdruck aus
+> [Kapitel 2](02-bauen-und-testen.md) bis auf den Regeltakt genau. Die Namen aller Funktionen und
+> Compiler-Optionen stehen im blauen Buch, Kapitel 3.
 
 ## Level geschafft!
 
-- Du meldest Fehler mit `fail()` und fängst NaN mit `!(x > 0)`.
-- Du weißt, warum ein Span nicht länger leben darf als seine Daten.
-- Du kennst Kerns JSON und seine drei Versprechen.
-- Du kennst die Regeln: Meter, **Z oben**, Matrizen spaltenweise, Quaternion (x, y, z, w).
-- Du weißt, warum die Simulation `kern::dm::` statt `std::` braucht.
+- Du weißt, wie viele Werte in 8 Bit passen und warum Kommazahlen gerundet werden.
+- Du weißt, wie Kern Fehler meldet und warum „nicht größer als 0“ auch NaN fängt.
+- Du weißt, warum die Uhrzeit nie in die Simulation darf.
+- Du weißt, was JSON ist und warum Kern erst alles prüft und dann übernimmt.
+- Du kennst Kerns Raum: Meter, **Z oben**, rechte Hand; Pfeile, Drehungen und Matrizen.
+- Du weißt, was eine Kamera beschreibt und warum Unsichtbares nicht gezeichnet wird.
+- Du weißt, warum Kern seine eigene Mathe mitbringt.
 
 ## Rätsel-Ecke
 
 1. In welche Richtung zeigt in Kern „oben“?
-2. Warum fängt `!(x > 0)` mehr Fehler als `x <= 0`?
-3. Auf welchem Platz der 16 Zahlen steht die Verschiebung in Z?
-4. **Boss-Rätsel:** Ein Controller berechnet die Laufrichtung der Ente mit `std::atan2`. Der
-   Fingerabdruck auf dem Mac weicht ab. Warum, und wie reparierst du es?
+2. x ist NaN. Warum bemerkt „Ist x kleiner oder gleich 0?“ den Fehler nicht, „Ist x nicht größer als
+   0?“ aber schon?
+3. Auf welchem der 16 Plätze steht die Verschiebung in Z-Richtung? Denk daran: Kern zählt ab 0.
+4. Eine Servodatei hat fünf Werte, der vierte ist kaputt. Was passiert mit dem alten Profil?
+5. **Boss-Rätsel:** Ein Steuerprogramm berechnet die Laufrichtung der Ente mit der gewöhnlichen
+   Mathe-Bibliothek des Rechners. Der Fingerabdruck auf dem Mac weicht ab. Warum, und wie reparierst
+   du es?
 
 ### Lösungen
 
 1. Nach +Z.
-2. Jeder Vergleich mit NaN ist falsch: `x <= 0` ließe NaN durch, `!(x > 0)` wird wahr und fängt es.
-3. Auf Platz 14 (Spalte 3, Zeile 2: 3 · 4 + 2 = 14).
-4. `std::atan2` kommt aus der Bibliothek des Rechners und rundet dort im letzten Bit anders. Weil
-   der Wert die Simulation füttert, wächst der Unterschied. Lösung: `kern::dm::atan2`.
+2. Jeder Vergleich mit NaN ist falsch. „Kleiner oder gleich 0?“ ist also falsch, und der Fehler
+   rutscht durch. „Größer als 0?“ ist ebenfalls falsch – und „nicht falsch“ ist wahr. So wird NaN
+   gefangen.
+3. Auf Platz 14. Die Verschiebung steht in Spalte 3, Z ist die dritte Zahl, also Zeile 2 (gezählt ab
+   0: X ist Zeile 0, Y Zeile 1, Z Zeile 2). Spalte mal 4 plus Zeile: 3 · 4 + 2 = 14. Wer ab 1 zählt,
+   landet fälschlich bei 4 · 4 + 3 = 19 – den Platz gibt es gar nicht.
+4. Nichts. Kern prüft erst alle Werte und übernimmt nur, wenn alle stimmen. Das alte Profil bleibt
+   vollständig erhalten, und eine Meldung nennt den kaputten Wert.
+5. Die Bibliothek des Rechners rundet auf dem Mac an der letzten Stelle anders als auf dem PC. Weil
+   der Wert die Simulation füttert, schaukelt sich der Unterschied von Schritt zu Schritt auf.
+   Lösung: Die Richtung mit Kerns eigener Mathe-Bibliothek berechnen, die überall gleich rundet.
 
 ---
 
