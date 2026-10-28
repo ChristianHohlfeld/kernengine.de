@@ -84,7 +84,8 @@ Darüber liegt die **Connection** mit zwei Kanalarten:
 
 Im zuverlässigen Kanal schickt Kern eine Nachricht erneut, bis das Paket, das sie trug, quittiert ist
 (frühestens nach 0,1 s bzw. dem 1,25-Fachen der Umlaufzeit). Große Nachrichten reisen als **Blöcke**,
-Stück für Stück. Positionen und Eingaben gehen unzuverlässig: Die Position von vor einer halben Sekunde
+Stück für Stück. Fehler (volle Warteschlange, zu große Nachricht, kaputtes Paket) meldet die
+Connection; Grenzwerte stehen im blauen Buch. Positionen und Eingaben gehen unzuverlässig: Die Position von vor einer halben Sekunde
 will niemand nachgeliefert, die nächste ist schon unterwegs.
 
 ---
@@ -108,6 +109,10 @@ aufgepolstert: So bringt ein Angreifer den Server nie dazu, mehr zurückzuschick
 
 Standardwerte: bis zu 16 Clients, nach 6 s Stille gilt die Verbindung als abgebrochen, und mindestens
 alle 0,1 s geht ein Lebenszeichen raus. Ist der Server voll, bekommt der Client „denied“.
+Unterwegs durchläuft der Client die Zustände `connecting` (fragt an), `challenged` (antwortet) und
+`connected`; schief gehen kann `denied`, `timed_out` oder `error`. Trennen darf jede Seite, die
+Abmeldung wird zur Sicherheit mehrfach geschickt. Client und Server arbeiten jeden Frame im selben
+Takt: Pakete empfangen, Zeit vorstellen, Pakete senden.
 
 ---
 
@@ -130,7 +135,15 @@ Spieler bekommt einen **Pawn**, eine Kopie der Spielfigur des Levels. 30-mal pro
 Server jedem Client einen **Snapshot**: das HUD und die Lage aller beweglichen Dinge.
 
 **Der Client spielt eine Replika.** Er lädt dasselbe Level, rechnet aber **keine eigene Physik**; seine
-Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vier der letzten auf einmal, die neueste zuerst.
+Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vier der letzten auf einmal, die neueste zuerst. Eine
+Eingabe enthält Bewegung, Blickrichtung, Sprung, Boost, Feuer, Zielen, Nachladen, Ducken und Interact.
+Gespawnte oder geänderte Dinge der Logik übernimmt er mit derselben ID wie beim Server. Seine Bodies
+sind kinematisch, Spielfiguren nutzen keinen Character Mover; nur der Stadtverkehr fährt lokal als
+Deko. Ein Soldat bekommt zusätzlich seinen HUD-Zustand (Gesundheit, Munition …).
+
+Im Code: `net.host(…)` startet als Server, `net.join(…)` als Client, jeden Frame rechnet
+`net.update(…)` erst das Netz, dann die Welt. `status()` liefert Text wie „Connected (slot 2)“,
+`stats()` Umlaufzeit, Verlust, Bandbreite und mehr.
 
 > **Stell dir vor …** ein Daumenkino, von dem du nur jedes zweite Bild bekommst, manche zu spät. Zeigst
 > du jedes sofort, ruckelt es. Also wartest du ein wenig und zeichnest die Bilder **dazwischen** selbst.
@@ -154,7 +167,9 @@ Dinge folgen nur den Meldungen. Jeden Takt schickt er seine Eingaben, bis zu vie
 Ein Snapshot muss in **ein** Paket passen (900 Byte für die Dinge im Level). Darum führt jeder Client
 für jedes Ding einen Topf: Bewegt es sich, kommen 10 Punkte hinein, sonst 0,25. Gesendet wird, was am
 vollsten ist, danach wird der Topf geleert. Die eigene Figur des Clients kommt immer zuerst. Was sich
-bewegt, ist ständig dran; was ruht, selten, aber nie vergessen. Positionen reisen auf **1 mm** genau.
+bewegt, ist ständig dran; was ruht, selten, aber nie vergessen. Positionen reisen auf **1 mm** genau (innerhalb ±8192 m), Drehungen mit 11 Bit je Komponente,
+höchstens 255 Dinge pro Snapshot. Gesendet werden nur Dinge, die sich bewegen können (dynamische und
+kinematische Bodies).
 
 ### Uhr und Prüfsumme
 
@@ -183,8 +198,12 @@ jeder weitere Spieler ein echter Netzwerk-Client mit eigener Welt und eigenem Vi
 - Das Studio schaltet auf **vier Viewports**: 1 ist der Server, 2 der erste Client usw.
 - Nur der **aktive** Viewport bekommt deine Eingaben; die anderen stehen still.
 - **Play › Network Emulation** macht die Leitung absichtlich schlecht: Perfect, LAN (5 ms), Average
-  (50 ms, 1 % Verlust), Bad (150 ms, 5 %), Terrible (300 ms, 20 %).
-- Die Statuszeile zeigt Rolle, Spieler, Umlaufzeit, Verlust und Bandbreite.
+  (50 ms, 1 % Verlust), Bad (150 ms, 5 %), Terrible (300 ms, 20 %), jeweils mit etwas Jitter (1 bis
+  100 ms).
+- Solange Clients noch beitreten, tauscht Studio mehrmals pro Frame Pakete aus, damit der Handshake
+  nicht auf gerenderte Bilder wartet.
+- Die Statuszeile zeigt Rolle, Spieler, Umlaufzeit, Verlust und Bandbreite, je lokalem Client auch
+  Puffer und HUD.
 
 > **Probier's aus!** Öffne Kern Studio über https://kernengine.de/, lade **File › Example Levels ›
 > Shooting Range**, wähle **Play › Number of Players › 2 Players** und drücke **Play**. Klicke
@@ -226,7 +245,9 @@ täte. Quittungen, Kanäle und Handshake erledigt der C++-Teil.
   4 s, sonst heißt es „no game is hosted in room …“.
 - **Über Relay** per WebSocket; ohne Host kommt „nobody hosts room …“.
 
-Etwa alle 8 ms (und jeden Frame) holt KernNet die ausgehenden Päckchen aus der Engine.
+Lokal ist die eigene Peer-ID eine Zufallszahl, beim Relay vergibt dieser sie fortlaufend. Etwa alle
+8 ms (und jeden Frame) holt KernNet bis zu 256 ausgehende Päckchen aus der Engine; ankommende reicht es
+an sie weiter.
 
 ---
 
@@ -243,9 +264,11 @@ node tools/net_relay.mjs 8790
 Die Adresse dieses Rechners samt Port (Standard 8790) trägst du im Dialog bzw. bei `&relay=` ein.
 
 > **Stell dir vor …** ein Briefträger, der keine Briefe liest, sondern nur auf die Hausnummer schaut. So
-> ist der Relay **absichtlich dumm**: Er sieht nur Bytes und eine 8-Byte-Empfängernummer.
+> ist der Relay **absichtlich dumm**: Er sieht nur Bytes und eine 8-Byte-Empfängernummer, ersetzt sie
+> durch die Absendernummer und stellt zu. Wer sich anmeldet, schickt `{"host": raum}` oder
+> `{"join": raum}` und erfährt seine ID und die des Hosts.
 
-Päckchen sind höchstens 1400 Byte groß, Raumnamen kürzer als 64 Zeichen. Geht der Host, ist der Raum für
+Päckchen sind höchstens 1400 Byte groß (zu kurze, zu lange und an unbekannte IDs werden verworfen), Raumnamen kürzer als 64 Zeichen. Geht der Host, ist der Raum für
 Neue geschlossen. Ein normaler Browseraufruf des Ports bekommt „Kern relay“ zur Antwort. Die Sicherheit
 kommt von Prüfsumme und Verbindungs-ID (10.5), nicht vom Relay.
 
@@ -262,11 +285,14 @@ kommt von Prüfsumme und Verbindungs-ID (10.5), nicht vom Relay.
 | Stadtverkehr | simuliert | fährt lokal (Deko) |
 | Kamera, Eingabe | lokal | lokal, Eingabe an Server |
 
+Clients senden derzeit nichts Zuverlässiges.
+
 ---
 
 ## 10.13 Tests
 
-Kerns Tests nehmen das Netz hart ran: Der zuverlässige Kanal muss unter **25 % Verlust, 60 ± 30 ms
+Kerns Tests nehmen das Netz hart ran: Die Serialisierung muss Grenzwerte, abgeschnittene Daten und
+2000 Zufallspuffer überstehen, Quittungen und Fragmente müssen stimmen. Der zuverlässige Kanal muss unter **25 % Verlust, 60 ± 30 ms
 Verzögerung und 10 % Duplikaten** alles in Reihenfolge abliefern; der Verbindungsaufbau übersteht
 **500 Müll-Päckchen**, Timeouts und Wiederverbinden. Weitere Tests prüfen Soldaten und Schüsse übers
 Netz, Logik-Änderungen bei Clients und „Number of Players“ mit drei Spielern im Studio.
