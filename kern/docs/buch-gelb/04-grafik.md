@@ -125,7 +125,7 @@ gespiegelten Meshes nichts – ein Spiegelbild dreht den Umlaufsinn der Ecken um
 ### Anlegen mit `upsert`
 
 `upsert` bekommt Positionen (Pflicht) und wahlweise alles andere; Fehlendes wird ergänzt (weiß, eine
-Instanz am Ursprung, flache Normalen). Es ist **alles oder nichts**: Erst prüft Kern, ob alle Zahlen
+Instanz am Ursprung, flache Flächennormalen bzw. +Z). Es ist **alles oder nichts**: Erst prüft Kern, ob alle Zahlen
 echt sind, jeder Index auf eine Ecke zeigt, die Längen passen und die vier Knochengewichte jeder Ecke
 1 ergeben (±0,001). Nur dann wird das neue Mesh gebaut und gegen das alte getauscht.
 
@@ -236,15 +236,16 @@ Den Überblick als Bild zeigt [Anhang B.11](B-grundlagen-rendering.md). Im Detai
 0. **Prüfen** von Bildausschnitt und Kamera, bevor irgendetwas verstellt wird.
 1. **GPU-Zeit messen**, falls möglich; die Antwort kommt Bilder später (höchstens 4 unterwegs).
 2. **Sonnenschatten**, nur wenn sich etwas geändert hat (4.8.1).
-3. **Ziel wählen.** Ohne Teil-Rechteck malt Kern in eigene Bildpuffer, dann gibt es Glühen und
-   Verdeckung. Mit Teil-Rechteck direkt auf den Bildschirm, ohne beides.
+3. **Ziel wählen.** Ohne Teil-Rechteck malt Kern in eigene Bildpuffer, sofern das Glühen an ist und
+   das Gerät es kann; dann gibt es Glühen und Verdeckung. Sonst, und immer mit Teil-Rechteck, malt es
+   direkt auf den Bildschirm, ohne beides.
 4. **Einsortieren.** Unsichtbares, abgeschaltete Ebenen und alles außerhalb der Sichtpyramide fallen
    weg – außer Figuren mit Knochen, deren Pose den gespeicherten Umriss verlassen kann. Deckendes wird
    **vorn nach hinten** sortiert (Verdecktes fällt früh am Tiefentest durch), Durchsichtiges **hinten
    nach vorn** (damit sich Farben richtig überlagern).
 5. **Deckende Objekte:** gemeinsame Werte einmal pro Bild, dann ein Zeichenbefehl pro Mesh; Textur
    und Seiten-Weglassen nur bei Wechsel umstellen.
-6. **Himmel** (4.8.2). 7. **Durchsichtiges**, ohne in den Tiefenpuffer zu schreiben.
+6. **Himmel**, nur bei Perspektive (4.8.2). 7. **Durchsichtiges**, ohne in den Tiefenpuffer zu schreiben.
 8. **Verdeckung** – *vor* der Ego-Ebene, weil deren Löschen die Welttiefe vernichtet.
 9. **Ego-Ebene.** 10. **Zusammensetzen** (4.8.3). 11. **Statistik.**
 
@@ -267,9 +268,11 @@ schreibt alle drei Ergebnisse; WebGL verlangt das.
 Kern Studio malt jeden Viewport einzeln. Ein einzelner großer Viewport hat kein Teil-Rechteck und
 bekommt Glühen und Verdeckung; in der Vier-Ansicht fehlt beides.
 
-> **Mission:** Lade **File › Example Levels ▸ Orb Run** und schalte in der Toolbar mit **Layout** auf
-> 4 Viewports. Vergleiche die Perspektive mit der Einzelansicht (Knopf **Maximieren** in der Leiste des
-> Viewports): Groß wirken Ecken und Fugen dunkler – dort läuft die Verdeckung.
+> **Mission:** Lade **File › Example Levels ▸ Orb Run** und schalte im Viewport-Menü **≡** unter
+> **Layout** auf **4 viewports**. Mit dem Knopf ganz rechts in der Leiste eines Viewports (**Maximise**)
+> wird er wieder einzeln und groß. Flieg nah an eine Hausecke im Schatten und schalte hin und her. Der
+> Unterschied ist fein: Groß wirkt die Ecke oft etwas dunkler und plastischer, denn nur dort läuft die
+> Verdeckung.
 
 ## 4.8 Die Passes im Detail
 
@@ -291,10 +294,11 @@ Kern Studio wählt den Filter nach Gerät: Handys 4, Computer 9.
 reicht (Standard 80 m, im Micro-Duck-Level 10 m). Kern legt eine **Kugel** um diesen Teil der
 Sichtpyramide. Warum Kugel? Dreh dich auf der Stelle – sie bleibt gleich groß, also auch die Texel.
 
-Rechnen wir mit 60° Öffnung, Format 16:9 und 2048 Texeln (so legt Studio die Karte an): Bei 80 m
-ergibt sich ein Kugelradius von etwa 94 m. Die Karte ist 2 · 94 = 188 m breit, ein Texel
-188 ÷ 2048 ≈ **9 cm**. Bei 10 m: Radius knapp 12 m, ein Texel ≈ **1,2 cm**. Kleinere Distanz heißt
-schärfere Schatten, die weniger weit reichen.
+Ein Rechenbeispiel: Die Editor-Kamera in Studio hat 70° Öffnung, das Bild sei 16:9, die Karte hat
+2048 Texel (so legt Studio sie an). Bei 80 m ergibt die Formel aus dem blauen Buch einen Kugelradius
+von etwa 114 m. Die Karte ist 2 · 114 = 228 m breit, ein Texel 228 ÷ 2048 ≈ **11 cm**. Bei 10 m:
+Radius gut 14 m, ein Texel ≈ **1,4 cm**. Kleinere Distanz heißt schärfere Schatten, die weniger weit
+reichen.
 
 **Einrasten.** Rutscht die Karte mit der Kamera um Bruchteile eines Texels, fallen Schattenkanten in
 jedem Bild etwas anders aufs Raster – sie „schwimmen“. Kern rundet die Lage deshalb auf **ganze
@@ -317,9 +321,10 @@ zusammen. Außerhalb der Karte ist alles beleuchtet; mit Schattendistanz blendet
 letzten Zehntel aus. Orb Run (C++) nutzt 2048 Texel auf ±110 m, also 220 ÷ 2048 ≈ 11 cm pro Texel,
 das Beispiel *hello* 1024 Texel auf ±40 m.
 
-> **Mission:** Stell in **World Settings** die **Shadow distance (smaller: sharper)** auf 10, dann 80,
-> dann 500. Bei 10 sind nahe Schatten gestochen scharf, ferne fehlen. Bei 500 reichen sie weit, sind
-> aber verwaschen.
+> **Mission:** Lade Orb Run und flieg nah an ein Haus heran, bis der Boden weniger als 10 m vor dir
+> liegt. Stell in **World Settings** die **Shadow distance (smaller: sharper)** auf 10, dann 80, dann
+> 500. Bei 10 sind die Schatten direkt vor dir am schärfsten, alles weiter als 10 m hat keinen. Bei 500
+> reichen sie weit, aber ihre Kanten werden gröber.
 
 ### 4.8.2 Himmel
 
@@ -336,7 +341,8 @@ Rauschen in 5 Feinheitsstufen, die mit dem Wind ziehen (eine Explosion drückt s
 Was **Bloom** ist, erklärt [Anhang B.7](B-grundlagen-rendering.md). Kern braucht dafür Bildpuffer mit
 Kommazahlen; fehlen sie, meldet es „unsupported“ und malt direkt. Ablauf: Helles ausschneiden (weiche
 Schwelle von 0,88 bis 1,23) auf einem Viertel der Auflösung, weichzeichnen, auf ein Achtel
-verkleinern, noch einmal weichzeichnen, zusammensetzen.
+verkleinern, noch einmal weichzeichnen, zusammensetzen. Die feine Stufe zählt mit 0,13, die breite
+mit 0,08.
 
 Beim **Zusammensetzen** steckt ein Kniff: Das fertige Bild enthält schon den Nebel, das Rohlicht nicht.
 Neu tonemappen würde den Nebel löschen. Also rechnet Kern „Rohlicht mit Glühen und Verdeckung“ und
@@ -345,7 +351,8 @@ bloß kopiert.
 
 **Bildzeit-Wächter.** Kern führt einen gleitenden Mittelwert der Bilddauer (Ausreißer über 200 ms
 zählen nicht). Liegt er 3,5 s lang über 27 ms – also unter etwa 37 Bildern pro Sekunde –, schaltet sich
-das Glühen ab, außer es ist erzwungen; das Zusammensetzen läuft für die Verdeckung weiter.
+das Glühen ab, außer es ist erzwungen; das Zusammensetzen läuft für die Verdeckung weiter. Ist die
+Seite verborgen, beginnt der Wächter von vorn – der Browser bremst Hintergrund-Tabs ja absichtlich.
 
 ### 4.8.4 Umgebungsverdeckung (GTAO)
 
@@ -380,8 +387,10 @@ langsamen Geräten bis *low* herunter und dann auf halbe Auflösung. Studio nimm
 halber, sonst high in voller Auflösung. AO läuft nur mit eigenem Bildpuffer und Perspektive. Den
 Radius setzt die Szene: World Settings › **Ambient occlusion radius (0 = off)**.
 
-> **Mission:** Stell **Ambient occlusion radius (0 = off)** auf 0, dann auf 3. Schau in einem großen
-> Viewport auf Hausecken und den Boden unter Objekten: Mit Radius wird es dort dunkler und plastischer.
+> **Mission:** Stell in **World Settings** den **Ambient occlusion radius (0 = off)** auf 0, dann auf 3.
+> Schau in einem großen Viewport auf Hausecken im Schatten und den Boden unter Objekten. Der Effekt ist
+> dezent; am deutlichsten ist er im Schatten, denn dort kommt fast nur indirektes Licht an – und nur
+> das dunkelt die Verdeckung ab.
 
 ## 4.9 Partikel und Punktlichter
 
@@ -411,7 +420,7 @@ Nebeldichte 0,00085, Belichtung 1, Umgebung 0,9, Atmosphären-Extras aus. Der Hi
 für Sonne, Mond, Nacht, Wolken, Wind und Explosion. Im Spiel rechnet die Laufzeit alles aus der
 **Tageszeit**, mit Sonne zu Himmelslicht etwa 5 : 1 ([Kapitel 8](08-spiel-laufzeit.md)). **Pro Bild**
 gibt es Hintergrundfarbe, Teil-Rechteck, „Seite verborgen“, Ebenen und Himmel an/aus. **Kamera:** oben
-ist +Z, 60° Öffnung, nahe Ebene 0,05 m, ferne 1800 m.
+ist +Z, 60° Öffnung, nahe Ebene 0,05 m, ferne 1800 m. (Die Editor-Viewports in Studio nehmen 70°.)
 
 ## 4.11 Kontextverlust
 
@@ -434,7 +443,9 @@ Derselbe Weg erlaubt Betrieb **ganz ohne Grafikkarte** – so rechnet der Lehrer
 - **Instanzieren:** Die Stadt malt alle Baumstämme als ein Mesh, alle Kronen als ein zweites.
 - **Zusammenfassen:** wenige große Meshes statt vieler kleiner.
 - **Nur Änderungen schicken**; reine Farbwechsel lassen den Schatten gültig.
-- **Schatten schonen:** Straßen, Boden und Partikel brauchen keinen – `cast_shadow = false`.
+- **Schatten schonen:** Jeder bewegte Schattenwerfer malt die ganze Karte neu. Straßen, Boden und
+  Partikel brauchen keinen – `cast_shadow = false`. Mit Schattendistanz malt auch eine bewegte Kamera
+  die Karte neu, sobald sich der Fokus um einen Texel verschiebt.
 - **Indizes:** `weld` ([Kapitel 5](05-szene-und-geometrie.md)) macht lose Dreiecke zu indizierten.
 - **Sichtpyramiden-Test anlassen**, außer der Umriss stimmt nicht (Partikel).
 - **Messen:** Die Statistik nennt Befehle, Dreiecke, Instanzen und Zeiten; in Studio zeigt
@@ -458,23 +469,25 @@ float win = step(0.22, cell.x) * step(cell.x, 0.78)
 Zeile 1: Die Wand wird in **3 m breite Spalten** geteilt; bei u = 10 m ist das Spalte 3. Zeile 2:
 genauso die Stockwerke. Zeile 3: `fract` ist der Rest hinter dem Komma, also wo du in der Zelle bist:
 10 ÷ 3 = 3,33, Rest 0,33. Zeilen 4–5: `step(a, b)` ist 1, wenn b ≥ a, sonst 0. Ein Fenster ist da, wo
-der Rest waagerecht zwischen 0,22 und 0,78 und senkrecht zwischen 0,28 und 0,78 liegt. 0,33 passt – du
-stehst vor einem Fenster.
+der Rest waagerecht zwischen 0,22 und 0,78 und senkrecht zwischen 0,28 und 0,78 liegt. 0,33 passt
+waagerecht – stimmt auch die Höhe, stehst du vor einem Fenster.
 
 Außerdem: Der Datenstrom „wall“ liegt auf Platz 14 und geht **unverändert** (`flat`) an die Pixel –
 Mischen würde die Zufallszahl verwürfeln. Fenster gibt es nur auf Wänden, ab dem ersten Stock bis 1 m
 unters Dach; eine Zufallszahl aus Spalte, Stockwerk und Haus schaltet etwa 58 % an. Wird ein Fenster
 kleiner als ein Pixel (`fwidth` misst das), glüht die Fassade stattdessen gleichmäßig – gegen
-Flimmern. Dunkle Fenster werden **Glas**, leuchtende bekommen warmes **Leuchten** über 1 und glühen im
-Bloom. `uNight` kommt einmal pro Bild über den Cache. Straßen und Boden haben keinen Strom; dort
+Flimmern. Dunkle Fenster werden **Glas**, leuchtende bekommen warmes **Leuchten** (bis 1,6) und
+glühen im Bloom. `uNight` kommt einmal pro Bild über den Cache. Straßen und Boden haben keinen Strom; dort
 liest der Shader 0, und nichts passiert. Kern Studio
 und exportierte Spiele melden eine Kopie dieser Erweiterung immer an; in der Komponente **Procedural
 City** entscheidet **Lit windows at night**, ob die Häuser den Strom bekommen
 ([Kapitel 5](05-szene-und-geometrie.md)).
 
 > **Mission:** Lade Orb Run und zieh in World Settings **Time of day** auf etwa 0,9 (0,25 ist
-> Sonnenaufgang, 0,5 Mittag, 0,75 Sonnenuntergang): Die Fenster gehen an. Wähle im Outliner den Actor
-> mit der Procedural City und schalte in Details **Lit windows at night** aus und wieder ein.
+> Sonnenaufgang, 0,5 Mittag, 0,75 Sonnenuntergang; bei 0,9 ist volle Nacht): Die Fenster gehen an.
+> Wähle im Outliner den Actor **City** und schalte in Details **Lit windows at night** aus und wieder
+> ein.
+
 ## Level geschafft!
 
 - C++ steuert die Grafikkarte über Nummern und Speicheradressen.

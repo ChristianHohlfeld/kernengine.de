@@ -68,7 +68,8 @@ Zeigen Blick und „oben“ gleich, fehlt die Seitwärts-Achse, und Kern malt ni
 
 **Perspektive** heißt: doppelt so weit weg, halb so groß. Teilen kann eine Matrix nicht, aber sie
 schreibt die Entfernung in w, und die Grafikkarte teilt danach durch w. Die Vergrößerung ist
-f = 1 ÷ tan(halber Öffnungswinkel); Kern nimmt 60°, also f ≈ 1,732. Für die Breite wird noch durch das
+f = 1 ÷ tan(halber Öffnungswinkel); Kerns Standardkamera nimmt 60°, also f ≈ 1,732 (die
+Editor-Viewports in Studio starten mit 70°). Für die Breite wird noch durch das
 Seitenverhältnis geteilt. Kern schneidet bei 0,05 m und 1800 m ab.
 
 **Durchgerechnet:** Bild 960 × 540, Punkt 1 m rechts, 0,5 m hoch, 10 m vor der Kamera.
@@ -229,7 +230,9 @@ Raue Flächen verteilen den Glanz, glatte bündeln ihn zu einem winzigen, gleiß
 begrenzt Kern D auf 40.
 
 **Fresnel nach Schlick:** Senkrecht spiegelt ein Nichtmetall den Anteil F0 = 0,04 (Metalle: ihre
-Farbe), ganz flach fast alles (bei Kern 0,96). Dazwischen entscheidet (1 − cos Blickwinkel) hoch 5:
+Farbe). Ganz flach spiegelt es den Anteil F90; bei Kern ist F90 = 1 − Rauheit (mindestens F0), raue
+Flächen glänzen also auch am Rand weniger. Dazwischen entscheidet (1 − cos Blickwinkel) hoch 5.
+Beispiel für die glatteste Fläche, die Kern kennt (Rauheit 0,04, also F90 = 0,96):
 
 | Blick | cos | F |
 |---|---|---|
@@ -237,8 +240,8 @@ Farbe), ganz flach fast alles (bei Kern 0,96). Dazwischen entscheidet (1 − cos
 | schräg | 0,5 | ≈ 0,07 |
 | flach | 0,2 | ≈ 0,34 |
 
-> **Krass, aber wahr:** Senkrecht spiegelt ein Holztisch nur 4 %, flach betrachtet über ein Drittel.
-> Darum glänzen Straßen bei tiefer Sonne so.
+> **Krass, aber wahr:** Eine spiegelglatte Nichtmetall-Fläche spiegelt senkrecht nur 4 %, flach
+> betrachtet über ein Drittel. Darum glänzt eine nasse Straße, wenn du flach über sie schaust.
 
 **Kern** nutzt Rauheit und Metall: Lambert für Mattes, GGX und Schlick für den Sonnen-Glanz, den
 Himmel als Fresnel-Spiegelung. Den G-Term spart es; mit einer einfachen Annahme kürzt er sich bis auf
@@ -345,8 +348,9 @@ Occlusion*, AO) misst den sichtbaren Himmelsanteil, Richtungen nahe der Normale 
 
 **SSAO** (*Screen Space*) nutzt statt teurer Strahlen nur den Tiefenpuffer und zählt Stichproben in
 einer Kugel – grob. **GTAO** (Jimenez und andere, 2016) sucht in einigen Richtungen links und rechts
-den **Horizont**: den höchsten Winkel, unter dem etwas den Himmel verdeckt. Für den freien Bogen
-dazwischen gibt es eine fertige Formel; bei flachem Boden liefert jede Seite (1 − cos(2h)) ÷ 4.
+den **Horizont**: wie weit der Himmel frei ist, gemessen als Winkel h von der Normale aus (90° heißt:
+frei bis zum Boden). Für den freien Bogen dazwischen gibt es eine fertige Formel; bei flachem Boden
+liefert jede Seite (1 − cos(2h)) ÷ 4.
 
 ```
             Horizont h1
