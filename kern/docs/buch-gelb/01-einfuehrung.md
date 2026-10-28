@@ -19,6 +19,11 @@ und `orbrun`.
 > **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem Hovercar los und
 > sammle Orbs. **Esc** beendet das Spiel.
 
+> **Vorsicht, Falle:** Auf einem deutschen Rechner zeigt Studio deutsche Beschriftungen, etwa
+> „Datei“ statt „File“. Dieses Buch nennt die englischen. Schalte deshalb mit dem Knopf **DE/EN**
+> unten rechts in der Statusleiste auf Englisch um oder öffne Studio mit `?lang=en` am Ende der
+> Adresse. Studio merkt sich die Wahl auf deinem Gerät.
+
 ## 1.1 Was Kern ist
 
 Kern ist in **C++20** geschrieben. Browser verstehen kein C++, deshalb übersetzt der Werkzeugkasten
@@ -41,12 +46,14 @@ Spiele sprechen mit der Engine, nie umgekehrt.
 
 **Alles selbst gemacht.** Kern nutzt weder die Grafik-Engine three.js noch den Übersetzer
 Emscripten. Der Renderer ruft WebGL2 direkt auf. Das Modul ist ein **Reactor**: kein Hauptprogramm,
-sondern der Browser ruft einmal eine Startfunktion und danach, was er braucht. Weil Kern nur die
-ältesten WebAssembly-Fähigkeiten nutzt, läuft es auf jedem WebGL2-Browser, sogar Safari ab 15.
+sondern der Browser ruft einmal eine Startfunktion und danach, was er braucht. Weil Kern nur den
+Grundumfang von WebAssembly plus vier weit verbreitete Erweiterungen nutzt, läuft es auf jedem
+WebGL2-Browser, sogar Safari ab 15.
 
 **JavaScript ist nur der Kellner.** Grafikkarte, Tasten, Töne und Dateien erreicht
 im Browser nur JavaScript. Genau das – und nur das – erledigt die JavaScript-Schicht. Selbst die Studio-Fenster
-zeichnet sie nur nach Angaben des C++-Editors.
+zeichnet sie nur nach Angaben des C++-Editors, und der Blueprint-Editor hält keinen eigenen Graphen:
+Jede Änderung ist ein Befehl an die Engine.
 
 > **So kannst du es dir vorstellen:** Der Kellner bringt die Bestellung in die Küche und das Essen
 > an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche.
@@ -65,12 +72,13 @@ mitarbeiten ([Kapitel 3](03-grundlagen.md)). Ein **Fingerabdruck** prüft das au
 
 **Noch mehr Regeln:**
 
-- Keine Ausnahmen: Bei Fehlern gibt es `false` und eine Meldung.
-- Kaputte Eingaben ändern nichts Bestehendes.
+- Keine Ausnahmen (Exceptions): Bei Fehlern gibt es `false` und eine Meldung.
+- Eingaben werden geprüft, kaputte ändern nichts Bestehendes. Der JSON-Leser
+  lehnt zum Beispiel zu tief verschachtelte Texte ab.
 - JavaScript legt beim Zeichnen keinen neuen Speicher an.
 - Keine Schummelei: Die Micro Duck steht nur durch Servos und Bodenkontakt.
 - Editor, Spiel und Lehrer teilen Spielwelt, Servos und Physik.
-- Verliert der Browser die Grafikkarte, baut Kern alles neu auf.
+- Verliert der Browser die Grafikkarte, pausiert Kern und baut danach alles neu auf.
 
 ## 1.3 Der Bauplan: Stockwerke
 
@@ -88,9 +96,10 @@ flowchart TD
 
 Manche Stockwerke kommen nur per Schalter dazu: `--app` (Spiele ganz in C++), `--physics` (Box3D),
 `--game` (bringt die Physik mit), `--studio` und `--lehrer` (bringen Spiel-Laufzeit und Physik mit).
+Alles andere, etwa Grafik, Audio, Logik und Netzwerk, ist immer drin.
 
 Zwischen C++ und JavaScript gibt es nur eine Tür: den Speicher des Moduls. Der Browser legt dort
-Zahlen ab und gibt der Engine die Adresse; Texte gehen als „Adresse plus Länge“. Umgekehrt ruft die
+Zahlen ab und gibt der Engine die Adresse; Texte gehen als „Adresse plus Länge“. Studio antwortet mit JSON-Text im Speicher. Umgekehrt ruft die
 Engine Funktionen des Browsers auf, etwa zum Zeichnen oder für die Uhrzeit
 ([Kapitel 17](17-referenz.md)).
 
@@ -119,7 +128,7 @@ Ein leerer Einstellungszettel `o`, Schatten an, Schattenkarte mit Auflösung 102
 ([Kapitel 4](04-grafik.md)).
 
 **Studio und exportierte Spiele.** Das ganze Studio ist **eine** HTML-Datei, die offline per
-Doppelklick läuft. **File → Package Game** macht aus deinem Level ebenfalls eine einzige HTML-Datei,
+Doppelklick läuft. **File → Package Game (HTML)…** macht aus deinem Level ebenfalls eine einzige HTML-Datei,
 die mit denselben C++-Klassen spielt ([Kapitel 11](11-studio.md)).
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck: als Programm auf allen Prozessorkernen oder
@@ -130,7 +139,8 @@ In der Micro Duck greift alles ineinander: Modell von Pollen, Glieder aus Box3D-
 Gerätemodell, Netze, die Kern selbst rechnet, Stimme aus dem Mixer, Logik-Bausteine der Kategorie
 *Robots* – und im Studio ein Actor wie jeder andere.
 
-> **Mission:** Lade **File → Example Levels → Micro Duck** und drück **Play**. Erst schaust du zu,
+> **Mission:** Stoppe ein laufendes Spiel mit **Esc**, denn während Play sind die Menüeinträge
+> gesperrt. Lade **File → Example Levels → Micro Duck** und drück **Play**. Erst schaust du zu,
 > wie die Ente allein herumläuft. **F8** übernimmt sie: **W** läuft, **A**/**D** drehen, die
 > **Leertaste** quakt.
 

@@ -155,7 +155,7 @@ startet dasselbe Modul im Player-Modus, mit denselben C++-Klassen wie im Editor
 
 > **Achtung, Falle!** Auf einem deutschen System zeigt Kern Studio seine Menüs auf Deutsch („Datei“
 > statt „File“, „Welteinstellungen“ statt „World Settings“). Dieses Buch nennt die englischen Namen.
-> Damit du alles wiederfindest, klick unten rechts in der Statusleiste auf **EN** – Studio merkt sich
+> Damit du alles wiederfindest, klick unten rechts in der Statusleiste auf **DE | EN** – Studio merkt sich
 > die Wahl. Oder öffne es gleich mit `?lang=en` am Ende der Adresse.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck – auf deinem Rechner als Programm

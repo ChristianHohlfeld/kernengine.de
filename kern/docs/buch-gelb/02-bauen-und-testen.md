@@ -26,7 +26,9 @@ Zeile 1 sagt, wo der Werkzeugkasten liegt, Zeile 2 baut `generated/studio.html`,
 per Doppelklick läuft, Zeile 3 startet alle Unit-Tests. Zum Entwickeln liefert man den
 Repository-Ordner mit einem kleinen Webserver aus und öffnet `kern/web/studio/index.html`.
 `play.html?level=orbRun` spielt ein Level ohne Editor (auch `physicsLab`, `shootingRange`,
-`microDuck`, `basic`).
+`microDuck`, `basic`). Die C++-Beispiele baut `kern/build.sh --app`, etwa
+`kern/examples/hello/hello.cpp` zu `hello.wasm`. Für den Browser-Test startet man vorher einen
+Webserver: `python3 -m http.server 8771`.
 
 ## 2.2 Der Werkzeugkasten
 
@@ -90,12 +92,14 @@ laufen ohne. Dazu gilt `-Werror`: Jede Warnung stoppt den Testbuild.
 > ein kleines Foul vielleicht. Der Videobeweis sieht jedes.
 
 **Die GL-Attrappe.** Ohne Browser kein WebGL. `gl_stub.cpp` spielt die Grafikkarte und schreibt mit,
-was der Renderer verlangt. So lässt sich der Renderer sogar beim Grafikabsturz testen.
+was der Renderer verlangt. So lässt sich der Renderer ohne Grafikkarte testen, sogar der Fall, dass der Browser die
+Grafikkarte verliert (Kontextverlust). Derselbe Stub steckt im Lehrer.
 
 ## 2.7 Logik: drei Wege, ein Ergebnis
 
 Ein Logik-Graph läuft im **Interpreter**, als **JIT** oder als **exportiertes C++**
-([Kapitel 9](09-logik.md)). Alle drei müssen Bit für Bit dasselbe liefern. `run.sh` prüft den
+([Kapitel 9](09-logik.md)). Alle drei müssen Bit für Bit dasselbe liefern. Die gemeinsamen Testfälle sind kleine Graphen als
+JSON in `kern/tests/logic_cases.h`. `run.sh` prüft den
 Interpreter und (nur ohne Filter) das exportierte C++; den JIT testet die CI unter Node, genau wie
 im Browser, und misst nebenbei eine Million Schleifendurchläufe in beiden Stufen.
 
@@ -140,9 +144,10 @@ Die Referenz für 400 Takte steht in `kern/tests/determinism_fingerprint.txt` un
 ```
 
 Verglichen wird dreimal: mit GCC auf x86 samt Sanitizern, im WebAssembly-Modul unter Node und mit
-Apple clang auf ARM. Von Hand:
+Apple clang auf ARM. Von Hand baust du erst den Lehrer und vergleichst dann:
 
 ```sh
+kern/tools/lehrer.sh
 kern/build/kern_lehrer --fingerprint 400 \
   | diff - kern/tests/determinism_fingerprint.txt
 ```
@@ -154,8 +159,9 @@ Begründung) oder Code rechnet plattformabhängig: `std::sin` statt `kern::dm::s
 `-ffp-contract=off`-Option, eine Summe, deren Reihenfolge von der Thread-Zahl abhängt. Ein zweiter
 Test lernt mit 1, 2 und 4 Workern (zusammen 8 Enten) und vergleicht die Netze Byte für Byte.
 
-> **Krass, aber wahr:** In einer Robotersimulation wird aus einem falschen Bit binnen Sekunden ein
-> anderer Gang. Ohne Fingerabdruck würde das niemand merken.
+> **Krass, aber wahr:** Geprüft wird jeder einzelne der 400 Takte. Weicht einer ab, nennt der
+> Unit-Test den ersten abweichenden Takt (`first differing tick`). So findet man die Stelle, an der
+> die Rechnung zum ersten Mal auseinanderläuft.
 
 ## 2.10 Die CI: der unermüdliche Prüfer
 
@@ -180,8 +186,9 @@ flowchart LR
   https://kernengine.de/.
 - **e2e:** der Browser-Test mit Playwright 1.56.0 auf den veröffentlichten Dateien.
 
-Auf `main` läuft jeder Push zu Ende, damit jeder grüne Stand online geht; ein Lauf dauert etwa
-17 Minuten.
+Die Seite geht online, sobald `build` fertig ist; die Tests laufen parallel und halten das nicht
+auf. Auf `main` läuft jeder Push zu Ende, damit jeder grüne Stand online geht; ein Lauf dauert etwa
+17 Minuten. Bei Pull Requests bricht ein neuer Push den älteren Lauf ab.
 
 > **Mission:** Öffne das veröffentlichte Studio und schau unten rechts in die Statusleiste. Dort
 > steht „v“ und sieben Zeichen: der Anfang der Build-Kennung, die die CI beim Veröffentlichen in

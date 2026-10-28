@@ -77,8 +77,9 @@ Beide rechnen nur mit Ganzzahlen: gleiche Bytes, gleiche Kennzahl.
 
 Levels, Studio-Befehle, Servoprofile: alles **JSON**. Kerns JSON-Baustein verspricht dreierlei:
 
-1. **Reihenfolge bleibt.** Einlesen und Schreiben ergibt Byte für Byte dieselbe Datei. Änderungen an
-   Levels sieht man so sauber.
+1. **Reihenfolge bleibt.** Objekte behalten die Reihenfolge ihrer Schlüssel. Eine Datei, die Kern
+   oder JavaScripts `JSON.stringify` geschrieben hat, kommt nach Einlesen und Schreiben Byte für
+   Byte gleich heraus. Änderungen an Levels sieht man so sauber.
 2. **Zahlen wie in JavaScript**, Ziffer für Ziffer wie `JSON.stringify`.
 3. **Sicher gegen böse Dateien.** Er lehnt mehr als 80 Ebenen Verschachtelung ab (Studio-Befehle:
    120), nicht endliche Zahlen und die Schlüssel `__proto__`, `prototype` und `constructor`, mit
@@ -99,7 +100,9 @@ Dieser Test legt fest: 0,1 bleibt „0.1“, minus null wird „0“, 10²¹ wir
 Ein fehlender Schlüssel liefert `null` statt eines Absturzes, `as_number(ersatz)` bei falschem Typ
 den Ersatzwert, und `parse` schreibt seine Meldung
 in einen eigenen Text (nicht in `last_error()`) mit der Stelle („at offset 17“). Beim Laden, etwa eines Servoprofils, prüft Kern jedes Feld auf Typ und Bereich
-und übernimmt erst ganz am Ende. Ein kaputtes Feld lässt das alte Profil unberührt.
+und übernimmt erst ganz am Ende. Ein kaputtes Feld lässt das alte Profil unberührt. Genauso
+überschreibt `parse` sein Ergebnis nur, wenn alles geklappt hat. Zurück in Text verwandelt
+`stringify(wert, 2)` mit zwei Leerzeichen Einrückung, wie `JSON.stringify(wert, null, 2)`.
 
 > **Mission:** Speichere ein Level mit **Ctrl+S** und öffne die `.klevel`-Datei in einem
 > Texteditor. Es ist JSON! Finde `"format": "kern-level"` und die Rotationen deiner Actors in Grad.
@@ -114,10 +117,11 @@ und übernimmt erst ganz am Ende. Ein kaputtes Feld lässt das alte Profil unber
 | Winkel | Radiant im Code, Grad in Levels |
 | Matrizen | 4×4, spaltenweise |
 
-**Z oben** gilt überall: Renderer, Physik, Audio, Levels. `math.h` legt keinen Speicher an, damit
-der Compiler sie maximal schnell machen kann.
+**Z oben** gilt überall: Renderer, Physik, Audio, Levels. Die Kamera blickt in ihren eigenen
+Koordinaten entlang −Z, und die Projektion folgt OpenGL. `math.h` steht ganz im Header und legt nie
+Speicher an. So kann der Compiler die Rechnungen direkt in den Code einbauen, das macht sie schnell.
 
-> **Mission:** Lade **File → New Level → Basic** und setz über den Content Drawer (Ctrl+Space) einen
+> **Mission:** Wähl **File → New Level...**, die Vorlage **Basic** und **Create**. Setz über den Content Drawer (Ctrl+Space) einen
 > **Cube**. Unten links zeigt das Achsenkreuz X rot, Y grün, Z blau – nach oben. Zieh mit dem
 > Move-Werkzeug (**W**) am blauen Pfeil und beobachte in **Details** das Feld **Location** Z.
 
@@ -126,7 +130,7 @@ der Compiler sie maximal schnell machen kann.
 `Vec2`, `Vec3`, `Vec4` sind Pfeile aus 2, 3 oder 4 Zahlen, mit Skalar- und Kreuzprodukt, Länge und
 Abstand (Pythagoras!), Mischen (`lerp`). `normalize` macht einen Pfeil 1 lang. Ein Nullpfeil hat
 keine Richtung – statt NaN liefert Kern dann einen Ersatz, standardmäßig (0, 0, 1). So verdirbt
-ein Klick auf zwei gleiche Punkte nicht die ganze Szene.
+eine Eingabe mit zwei gleichen Punkten nicht die ganze Szene.
 
 ### Drehungen: `Quat`
 
@@ -142,7 +146,8 @@ return {a.x * s, a.y * s, a.z * s,
 
 Für 90° um Z: halber Winkel 45°, sin 45° ≈ 0,707, cos 45° ≈ 0,707. Achse (0, 0, 1)
 mal 0,707 gibt x = 0, y = 0, z = 0,707, dazu w = 0,707. Keine Drehung ist (0, 0, 0, 1). Beachte das
-`kern::dm::sin` – warum, zeigt 3.4.
+`kern::dm::sin` – warum, zeigt 3.4. Zwei Drehungen verknüpft man mit `*`: Bei `q * b` wirkt erst
+`b`, dann `q`. `rotate(v)` dreht einen Pfeil.
 
 ### Matrizen: `Mat4`
 
@@ -162,7 +167,8 @@ Zeile r, Spalte c steht auf Platz `c * 4 + r`. Die Verschiebung steht auf 12, 13
 dann `A`. Aus dem Test `math_matrices`: (1, 0, 0) mal 2 gestreckt → (2, 0, 0), um 90° um Z gedreht
 → (0, 2, 0), um (1, 2, 3) verschoben → **(1, 4, 3)**.
 
-Dazu kommen `perspective` und `ortho` (Projektion), `look_at` (Kamerablick), `normal_matrix3`
+`transform_point` dreht, streckt und verschiebt einen Punkt; `transform_vector` lässt die
+Verschiebung weg, denn eine Richtung hat keinen Ort. Dazu kommen `perspective` und `ortho` (Projektion), `look_at` (Kamerablick), `normal_matrix3`
 (Licht auf schief gestreckten Flächen) und `invert` in doppelter Genauigkeit, damit Klick-Strahlen
 auch weit weg treffen.
 
@@ -177,8 +183,9 @@ Eine `Sphere` mit negativem Radius gilt als leer; im Zweifel wird gezeichnet. Ei
 Die `Camera` ist eine **Beschreibung**, keine Matrix: Augpunkt, Ziel, Oben (+Z), dazu der
 **senkrechte** Öffnungswinkel in Radiant (Standard π/3 = 60°) und nahe und ferne Grenze.
 Orthografische Kameras geben statt des Winkels die sichtbare Höhe in Metern an. `camera_valid`
-prüft alles. Ein Test prüft, dass das Ziel genau in der Bildmitte landet. Aus JavaScript setzt man
-die Kamera mit zwölf Zahlen.
+prüft alles. Ein Test prüft, dass das Ziel genau in der Bildmitte landet. Aus der Kamera entstehen die sechs
+Wände des Sichtbereichs fürs Culling ([Kapitel 5](05-szene-und-geometrie.md)). Aus JavaScript setzt
+man die Kamera mit zwölf Zahlen; ungültige weist Kern mit „invalid camera“ zurück.
 
 > **Mission:** Drück **Alt+J** für die Draufsicht, eine orthografische Kamera: Die Infozeile zeigt
 > jetzt die sichtbare Breite in Metern. **Alt+G** schaltet zurück zur Perspektive.
@@ -189,8 +196,9 @@ die Kamera mit zwölf Zahlen.
 von Linux, Apple, Android und WebAssembly runden im letzten Bit verschieden. In einer
 Robotersimulation wird aus einem Bit binnen Sekunden ein anderer Gang.
 
-Ein zweiter Bit-Dieb heißt **FMA**: `a*b+c` in einem Schritt mit nur einer Rundung. Rechne
-0,15 · 3 − 0,04 und behalte nur eine Nachkommastelle:
+Ein zweiter Bit-Dieb heißt **FMA**: `a*b+c` in einem Schritt mit nur einer Rundung. Ein
+ausgedachtes Beispiel: Rechne 0,15 · 3 − 0,04 und runde nach jedem Schritt wie in der Schule auf
+eine Nachkommastelle. Der Computer rundet genauso, nur im letzten Bit:
 
 | Weg | Rechnung | Ergebnis |
 |---|---|---|
@@ -202,7 +210,7 @@ Gleiche Aufgabe, andere Antwort. Darum gilt überall `-ffp-contract=off`: kein Z
 **Die Lösung:** Kern bringt die Funktionen der Bibliothek **musl** mit, umbenannt in `kern_musl_*`,
 und übersetzt sie auf jeder Plattform gleich streng, ohne FMA. Box3D hat eigene Winkelfunktionen.
 Benutzt wird alles mit `kern::dm::` davor: `kern::dm::sin`, `kern::dm::atan2`, `kern::dm::pow`
-und so weiter. Exaktes wie `sqrt` und `floor` bleibt bei `std::`.
+und so weiter. Wie bei `std::` gilt: `float` hinein, `float` heraus; `double` hinein, `double` heraus. Exaktes wie `sqrt` und `floor` bleibt bei `std::`.
 
 **Die Regeln für neuen Code:**
 
