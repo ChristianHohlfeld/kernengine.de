@@ -26,7 +26,8 @@ Die Abmachungen:
 
 - Meter, Sekunden, Kilogramm, **Z oben** – wie im Renderer.
 - Winkel sind in der Physik **Radiant**. Grad gibt es nur in Leveldateien und im Details-Panel.
-- Körper, Formen und Gelenke sind **Handles** (Nummern, 0 heißt „keins“); die `World` besitzt alles.
+- Körper, Formen und Gelenke sind **Handles** (Nummern, 0 heißt „keins“); die `World` besitzt alles
+  und gibt beim Zerstören alles frei.
 - Fehler liefern ein ungültiges Handle und eine Erklärung in `last_error()`
   ([Kapitel 3](03-grundlagen.md)). Jede Eingabe wird geprüft: Eine Pose mit `NaN` oder ein negativer
   Radius erreicht Box3D nie.
@@ -54,8 +55,10 @@ jede Größe passend zu ihrer Dimension (Froude-Ähnlichkeit). Für die Micro Du
 | Zeit, Geschwindigkeit | √S | ×2 |
 | Masse | S³ | ×64 |
 | Drehmoment, Steifigkeit | S⁴ | ×256 |
+| Dämpfung | S⁴·√S | ×512 |
 | Trägheitsmoment | S⁵ | ×1024 |
-| Schwerkraft | 1 | bleibt 9,81 m/s² |
+| Frequenzen | 1/√S | ×½ |
+| Beschleunigung, Schwerkraft | 1 | bleibt 9,81 m/s² |
 
 > **Stell dir vor …** Filmleute drehen Szenen mit Modellschiffen und spielen sie langsamer ab, damit
 > die Wellen „echt“ wirken. Kern macht es umgekehrt: Der Roboter wird größer, und eine echte Sekunde
@@ -65,12 +68,16 @@ jede Größe passend zu ihrer Dimension (Froude-Ähnlichkeit). Für die Micro Du
 Das ist ein **Wechsel der Einheiten**, kein größerer Roboter; nach außen (Netze, Logs, Kalibrierung)
 geht alles in echten Einheiten. Ein Test baut ein Servo-Bein in 1-, 4- und 8-facher Größe: Frei hängend
 laufen 1× und 4× **Bit für Bit gleich**. Auf dem Boden, wo die festen Toleranzen wirken, liegen sie nur
-0,23 bis 0,27 mm auseinander.
+0,23 bis 0,27 mm auseinander. Bei 4× entsprechen Box3Ds Toleranzen am echten Roboter sogar nur 1,25 mm
+bzw. 5 mm – feiner als in echter Größe.
 
-Fest eingestellte Werte (Kontaktsteifigkeit 30 Hz, Gelenkweichheit der Servos 240 Hz …) werden
-**kalibriert, nicht skaliert**. Abweichungen zum echten Roboter kommen also aus den Modellen von Servo,
+Fest eingestellte Werte werden **kalibriert, nicht skaliert**. Weil die Zeit doppelt so lang läuft,
+entsprechen Frequenzen am echten Roboter dem Doppelten, Geschwindigkeiten der Hälfte: Kontaktsteifigkeit
+30 Hz in der Welt sind echte 60 Hz, die Servo-Gelenkweichheit 240 Hz echte 480 Hz, die
+Ausdrückgeschwindigkeit 3 m/s echte 1,5 m/s, die Restitutionsschwelle 1 m/s echte 0,5 m/s. Abweichungen zum echten Roboter kommen also aus den Modellen von Servo,
 Kontakt und Massen, die an Messungen abgeglichen werden ([Kapitel 16](16-kalibrierung.md)). Eine
-Garantie für sicheres Verhalten auf echter Hardware ist die Simulation nicht.
+Garantie für sicheres Verhalten auf echter Hardware ist die Simulation nicht. Ein Roboter anderer
+Größe bekommt einfach ein anderes S.
 
 ## 6.3 Die Welt
 
@@ -88,7 +95,9 @@ eine Sechzigstelsekunde weiter, aufgeteilt in vier Teilschritte.
 
 Die wichtigsten Standards: Schwerkraft 9,80665 m/s² nach unten, ruhende Körper dürfen schlafen,
 Continuous Collision ist an, Stöße unter 1 m/s prallen nicht ab, Kontakte sind 30 Hz steif mit
-Dämpfung 10 und werden höchstens mit 3 m/s auseinandergedrückt, Höchstgeschwindigkeit 400 m/s.
+Dämpfung 10 und werden höchstens mit 3 m/s auseinandergedrückt, Hit-Events gibt es ab 1 m/s
+Aufprall, Höchstgeschwindigkeit 400 m/s. Eine Null oder ein negativer Wert bei Kontaktwerten und
+Höchstgeschwindigkeit lässt Box3Ds eigenen Standard stehen.
 
 Zwei Dinge setzt Kern immer selbst: **einen einzigen Arbeitsthread** (WebAssembly läuft einfädig, und
 es macht die Reihenfolge eindeutig) und eine eigene **Reibungsfunktion** für Materialpaare (6.6). Weil
@@ -118,8 +127,10 @@ Zielpose fahren lassen, Achsen sperren (`set_motion_locks`) und Kräfte oder Imp
 - Eine **Kraft** wirkt genau **einen** Schritt. Dauerlasten müssen jeden Schritt neu gesetzt werden.
 - Ein **Impuls** ist ein einmaliger Stoß (Newtonsekunden), etwa für einen Sprung.
 
+Kräfte und Impulse wecken einen schlafenden Körper. Den Typ zu wechseln geht, ist aber teuer.
+
 Masse, Schwerpunkt und Trägheit ergeben sich normalerweise aus den Formen und ihrer Dichte. Mit
-`set_mass` setzt du nur die Masse (die Trägheit wächst passend mit). Mit `set_mass_data` setzt du alles
+`set_mass` setzt du nur die Masse (die Trägheit wächst passend mit; der Körper bleibt in sich stimmig). Mit `set_mass_data` setzt du alles
 einzeln – der Weg für importierte Roboterbeschreibungen (MJCF, URDF), die ihre gemessenen Werte
 mitbringen. Die Kollisionsformen bestimmen dann nur noch den Kontakt.
 
@@ -131,14 +142,15 @@ Damit ein Körper anstoßen kann, bekommt er **Formen** (Shapes), gern auch mehr
 |---|---|
 | `box` | volle Kantenlängen, Lage |
 | `sphere` | Radius |
-| `capsule` | Radius, Länge entlang Z |
+| `capsule` | Radius, Abstand der Halbkugeln entlang Z |
 | `hull` | mindestens 4 Punkte: konvexe Hülle |
-| `mesh` | Dreiecksnetz, **nur an festen Körpern** |
+| `mesh` | Dreiecke gegen den Uhrzeigersinn, **nur an festen Körpern** |
 
 Eine **konvexe Hülle** ist die Form, die entsteht, wenn du ein Gummituch um eine Punktwolke spannst
 (mehr in [Anhang C](C-grundlagen-physik.md)). Abgelehnt wird alles Unsinnige: Radius ≤ 0, flache
 Hüllen, ein Mesh an einem bewegten Körper. Bei Meshes verschweißt Kern Ecken mit 0,5 mm Toleranz und
 lässt Box3D innere Kanten erkennen. So stolpert nichts über „Geisterkanten“ zwischen zwei Dreiecken.
+Hat eine Hülle zu viele Ecken, reduziert Box3D sie auf seine Höchstzahl.
 
 ### Material und Filter
 
@@ -152,7 +164,8 @@ nur Überlappungen und stößt nichts an. Dazu kommen Kollisionsfilter:
   deren Glieder sich nicht gegenseitig stören sollen.
 - **Ereignis-Schalter:** welche Meldungen die Form erzeugt (6.10).
 
-`hull_mesh` baut die Dreiecke genau der Hülle, die kollidiert; Studio zeichnet sie als Linien.
+`hull_mesh` baut die Dreiecke genau der Hülle, die kollidiert (4 bis 4096 Punkte, nicht flach); Studio
+zeichnet sie als Linien.
 
 ## 6.6 Oberflächen mit Paar-Reibung
 
@@ -186,7 +199,8 @@ float pair_friction(float fa, uint64_t ma,
 Box3D ruft sie bei jedem Kontakt mit den Reibwerten (`fa`, `fb`) und Materialnummern (`ma`, `mb`)
 beider Formen auf. Zeile 3–4: Haben beide eine echte Oberfläche (1 bis 3), wird in der Paartabelle
 nachgeschaut; gibt es keinen Eintrag, kommt −1 zurück. Zeile 5: Gibt es einen Wert, gilt er, sonst die
-übliche Wurzel. Ist eine Seite `none`, zählen also immer die Reibwerte der Formen.
+übliche Wurzel. Ist eine Seite `none`, zählen also immer die Reibwerte der Formen. Restitution und
+Rollwiderstand bleiben unberührt.
 
 > **Achtung, Falle!** Wer eine neue Oberfläche ergänzt, muss auch die Grenze `<= 3` anpassen, ihren
 > Namen eintragen und ihre Paare in die Tabelle schreiben. Sonst wird sie stillschweigend ignoriert.
@@ -249,8 +263,8 @@ dessen Z-Achse senkrecht nach oben zeigt – um diese Achse dreht die Tür. Zeil
 auf ±1,7 Radiant (gut ±97°), damit die Tür nicht durch die Wand schwingt. Zeile 9 baut das Gelenk.
 
 Ein paar Abmachungen: Drehgelenke, Kugelgelenke und Parallel-Gelenke arbeiten **um die Z-Achse** ihres
-Frames, Schiebe- und Radgelenke **entlang der X-Achse**. Der Nullwinkel liegt dort, wo beide Frames
-übereinstimmen.
+Frames, Schiebe- und Radgelenke **entlang der X-Achse**. `frame_from_axis` baut so einen Frame aus Anker
+und Achse. Der Nullwinkel liegt dort, wo beide Frames übereinstimmen.
 
 | Gelenk (Editor) | Box3D | Alltagsbild |
 |---|---|---|
@@ -266,12 +280,15 @@ Frames, Schiebe- und Radgelenke **entlang der X-Achse**. Der Nullwinkel liegt do
 
 Viele Gelenke haben drei Extras: eine **Feder** (Frequenz in Hertz und Dämpfungsgrad), **Grenzen** und
 einen **Motor** (Sollgeschwindigkeit und Höchstkraft bzw. -moment). Ein Seil ist ein Distance-Gelenk
-mit Höchstlänge. Verbundene Körper kollidieren standardmäßig nicht miteinander. Und jedes Gelenk hat
+mit Höchstlänge (Ruhelänge mindestens 1 mm). Ein Weld-Gelenk mit 0 Hz ist starr, mit mehr Hertz weich;
+das Kugelgelenk begrenzt mit einem Kegel. Vertauschte Grenzen dreht Kern um, negative Höchstkräfte
+werden 0. Verbundene Körper kollidieren standardmäßig nicht miteinander. Und jedes Gelenk hat
 eine **Weichheit im Solver** (Box3Ds Standard: 60 Hz, Dämpfung 2). Ein Gelenk, das einen Körper mit sich
 selbst verbinden will, wird abgelehnt.
 
-Zur Laufzeit kannst du Motoren schalten, Scharnierwinkel lesen, die **Zwangskraft** abfragen (wie stark
-das Gelenk gerade hält) und Gelenke entfernen.
+Zur Laufzeit kannst du Motoren schalten, Winkel und Drehgeschwindigkeit eines Scharniers lesen, die
+**Zwangskraft** und das Zwangsmoment abfragen (wie stark das Gelenk gerade hält), Meldeschwellen setzen
+und Gelenke entfernen (die Körper werden dabei geweckt).
 
 ### Wenn Gelenke brechen
 
@@ -291,8 +308,9 @@ Box3D stellt Federn als Frequenz und Dämpfungsgrad ein. Servos und Roboterbesch
 in Newtonmeter pro Radiant (Steifigkeit) und Newtonmetersekunden pro Radiant (Dämpfung).
 `set_joint_spring` rechnet an der Grenze um, genau wie Box3D intern: über die **effektive Masse** des
 Gelenks, also wie schwer sich die Drehung um die Achse anfühlt. Weil die von der Lage abhängt, wird die
-Funktion **jeden Schritt** aufgerufen. Box3D löst die Feder implizit; sie ist bei jeder Steifigkeit
-stabil. Die Formeln stehen in [Anhang C](C-grundlagen-physik.md).
+Funktion **jeden Schritt** aufgerufen. Der Zielwinkel wird auf ±π begrenzt, eine Steifigkeit ≤ 0
+schaltet die Feder ab. Box3D löst die Feder implizit; sie ist bei jeder Steifigkeit stabil. Die Formeln
+stehen in [Anhang C](C-grundlagen-physik.md).
 
 ## 6.9 Abfragen: Strahlen, Kugeln, Explosionen
 
@@ -301,15 +319,18 @@ stabil. Die Formeln stehen in [Anhang C](C-grundlagen-physik.md).
   eine ganze Liste (ein Robotersensor sieht so seine eigenen Glieder nicht).
 - **`cast_sphere`** schiebt eine Kugel statt eines Strahls: ein „dicker Strahl“ für Bodenproben, die
   keine Kante verfehlen.
-- **`explode`** verteilt einen Stoß kugelförmig um einen Punkt; ein negativer Wert macht eine Implosion.
+- **`explode`** verteilt einen Stoß kugelförmig um einen Punkt auf Kugeln, Kapseln und Hüllen; ein
+  negativer Wert macht eine Implosion. Eine Maske über die Kategorie-Bits wählt aus, wen Abfragen sehen.
 - **`push_body`** schubst einen Körper gerade so stark, dass er einem bewegten Schieber nicht im Weg
-  bleibt. Dazu kommen zwei Kapsel-Abfragen für den Character Mover (6.12).
+  bleibt. Dazu kommen zwei Kapsel-Abfragen für den Character Mover (6.12): wie weit die Kapsel fahren
+  kann und welche Ebenen (höchstens 32) sie berührt.
 
 ## 6.10 Kontakte und Ereignisse
 
 Nach jedem Schritt liegen die Ereignisse **dieses** Schritts bereit: Formen beginnen oder hören auf
 sich zu berühren, ein Besucher betritt oder verlässt einen Sensor, ein Stoß war heftig genug für ein
 **Hit-Event** (mit Punkt und Aufprallgeschwindigkeit), ein Gelenk hat seine Bruchschwelle überschritten.
+Weil eine Form inzwischen zerstört sein kann, tragen die Ereignisse auch die Körper.
 
 > **Achtung, Falle!** Ereignisse kosten Rechenzeit. Die Spiel-Laufzeit schaltet sie nur dort ein, wo das
 > Spiel sie liest: Sensor-Ereignisse an Sensoren und Spielern (bei Logik-Graphen an allen bewegten
@@ -330,8 +351,10 @@ Genau so funktioniert `MouseGrab`: Ein unsichtbarer kinematischer „Maus-Körpe
 ein Motor-Gelenk mit Feder verbindet ihn mit dem Griffpunkt. Die Feder hat 7,5 Hz und ist kritisch
 gedämpft (sie schwingt nicht nach). Ihre Kraft ist auf das Hundertfache des Gewichts begrenzt. Drehen
 darf sich der Körper frei – er kippt und pendelt am Griff. Mit `hold_rotation` hält der Griff zusätzlich
-die Ausrichtung fest, wie eine Hand. Das nutzt Studio für den Rumpf der Micro Duck, damit sie
-hochgehoben aufrecht bleibt. Feste und kinematische Körper lassen sich nicht greifen.
+die Ausrichtung fest, wie eine Hand (Drehfeder mit halber Frequenz, Höchstmoment ein Viertel der
+Höchstkraft). Das nutzt Studio für den Rumpf der Micro Duck, damit sie hochgehoben aufrecht bleibt.
+Feste und kinematische Körper lassen sich nicht greifen; verschwindet der gegriffene Körper, endet der
+Griff von selbst. Studio greift in Simulate, nach Eject und mit der Observer-Kamera.
 
 > **Probier's aus!** In Simulate greifst du jeden dynamischen Körper mit der linken Maustaste (oder dem
 > Finger). Zeiger nach oben hebt, Mausrad holt näher oder schiebt weg, Loslassen wirft.
@@ -342,19 +365,22 @@ Für Spielfiguren gibt es den `CharacterMover`, gebaut auf Box3Ds experimentelle
 Die Figur ist eine Kapsel, die **außerhalb des Solvers** läuft: Sie kämpft nicht gegen Kontakte, sondern
 rechnet ihre Bewegung selbst und schubst dynamische Körper an, in die sie läuft.
 
-Standards: 0,4 m Radius, 1,8 m Höhe, 6 m/s, Flächen über 50° sind kein Boden, und eine eigene,
-knackigere Schwerkraft von 20 m/s².
+Standards: 0,4 m Radius, 1,8 m Höhe, 6 m/s, Sprung mit 6 m/s, Sprint ×1,6, in der Luft ein Viertel
+der Beschleunigung, Flächen über 50° sind kein Boden, und eine eigene, knackigere Schwerkraft von
+20 m/s². Wie stark er Körper schubst, ist einstellbar (0 = gar nicht).
 
 Pro Schritt passiert:
 
 1. Reibung, Beschleunigung Richtung Wunsch, Sprung, Schwerkraft.
-2. **Pogo-Feder:** Eine Kugelprobe misst den Abstand zum Boden, und eine gedämpfte Feder hält die Kapsel
-   auf Stufenhöhe (0,45 m). So läuft sie Treppen und Rampen hinauf.
+2. **Pogo-Feder:** Eine Kugelprobe misst den Abstand zum Boden, und eine gedämpfte Feder (4 Hz,
+   Dämpfung 0,7) hält die Kapsel auf Stufenhöhe (0,45 m). So läuft sie Treppen und Rampen hinauf.
 3. Bis zu fünfmal: berührte Ebenen sammeln, die Bewegung dagegen lösen und den Rest an den Ebenen
    abschneiden. Gegen eine Wand drücken baut also keine Geschwindigkeit auf.
 4. Dynamische Körper in den berührten Ebenen bekommen einen Stoß.
 
-Die Spiel-Laufzeit nutzt den Mover für die Spieler „Character“ und „Soldier“ ([Kapitel 8](08-spiel-laufzeit.md)).
+Danach kennt der Mover seine Fußposition und die berührten Ebenen (für Trigger und Pickups). Die
+Spiel-Laufzeit nutzt ihn für die Spieler „Character“ und „Soldier“ und macht deren Körper dafür
+kinematisch ([Kapitel 8](08-spiel-laufzeit.md)).
 
 ## 6.13 Der Takt: Zeitschritt und Sub-Steps
 
@@ -370,7 +396,7 @@ einen **Akkumulator** nach Glenn Fiedler („Fix Your Timestep“):
   Rest bleibt für das nächste Mal.
 - Ein langer Frame (etwa ein Hintergrund-Tab) zählt höchstens 0,25 s, und pro Frame laufen höchstens
   0,1 s Simulation. Das verhindert die **„Spiral of Death“**, in der die Physik nie aufholt. Ist man
-  trotzdem im Rückstand, fallen ganze Schritte weg.
+  trotzdem im Rückstand, fallen ganze Schritte weg; der Takt bleibt erhalten.
 - Die Simulationszeit **zählt Schritte**, statt Kommazahlen aufzusummieren, die mit der Zeit driften.
 - Eingaben gelten pro Schritt; eine Steuerung, die mit 50 Hz rechnet, zählt Schritte, nicht Sekunden.
 
@@ -413,28 +439,43 @@ Wichtigste:
 
 - **Größen:** Meter, Kilogramm, Sekunden. Bewegte Körper 0,1 bis 10 m. Kleine Modelle als Ganzes
   skalieren, Einheiten nur an der Grenze zu Box3D umrechnen. Tabu: Box3Ds Längeneinheit verstellen.
-- **Massen:** Nachbarmassen höchstens etwa 10 : 1. Ein starres Teil ist **ein** Körper mit mehreren
-  Formen, nicht mehrere verschweißte. Leichte Glieder bekommen eine Mindestmasse (die 5-g-Hüftbügel der
+- **Massen:** Nachbarmassen höchstens etwa 10 : 1 (Erin Cattos Rat bei extremen Verhältnissen: leichte
+  Teile schwerer, schwere leichter machen). Ein starres Teil ist **ein** Körper mit mehreren Formen,
+  nicht mehrere verschweißte; Kinder, die nur ein Mesh haben, schweißt Kern als Formen in den nächsten
+  Vorfahren mit Körper ein. Leichte Glieder bekommen eine Mindestmasse (die 5-g-Hüftbügel der
   Ente wiegen mindestens 20 g).
 - **Takt:** fester Zeitschritt, Interpolation, Kamera an der geglätteten Pose, lange Ketten mit mehr
   Sub-Steps, Federn unter der halben Sub-Step-Frequenz.
 - **Gelenke:** in der Ruhepose bauen, Grenzen müssen die Null enthalten. Eigenkollision per negativer
   Gruppe oder No-collision-Gelenk filtern. Box3Ds Standard-Weichheit (60 Hz, 2) nicht anfassen, außer
   bei Servos.
-- **Motoren:** Immer eine **endliche** Höchstkraft setzen. Servos sind Gelenkfedern (6.17).
-  Gelenkreibung ist ein Motor mit Geschwindigkeit 0. Aufrecht halten per Parallel-Gelenk.
+- **Motoren:** Immer eine **endliche** Höchstkraft setzen. Servos sind Gelenkfedern mit
+  physikalischen Werten (6.17); das Haltemoment entsteht durch Begrenzen des Fehlers. **Nicht**
+  „Motorgeschwindigkeit = Faktor × Fehler“ für Roboter mit trainiertem Netz – das wäre eine starre
+  Regelung, das Netz hat aber einen nachgiebigen Servo gelernt. Gelenkreibung ist ein Motor mit
+  Geschwindigkeit 0. Rotorträgheit ist eine Masse (Scheibe auf der Achse); was Box3D nicht kann, wird
+  dokumentiert, nicht vorgetäuscht. Aufrecht halten per Parallel-Gelenk. Reibung pro Form,
+  Rollwiderstand für runde Dinge.
 - **Kräfte:** Dauerlasten jeden Schritt als Kraft, Sprünge als Impuls, Dämpfung über Box3Ds eingebaute
-  Dämpfung.
+  Dämpfung – nie selbst gebaut als Kraft gegen die Geschwindigkeit, das wird an leichten Körpern
+  instabil.
 - **Tabu: die Physik umgehen.** Keine Zusatzmomente, die etwas „nachbilden“, keine gesetzten
   Geschwindigkeiten an Körpern mit Gelenken oder Kontakten, keine Stützkräfte für Roboter. Gemessen:
   Ein „Gyro“ auf Geschwindigkeitsebene ließ den Rumpf der Ente springen.
-- **Körper:** an der Endpose erzeugen statt teleportieren, Typ beim Erzeugen festlegen. Bewegungssperren
+- **Körper:** an der Endpose erzeugen statt teleportieren, Typ beim Erzeugen festlegen. Kinematische
+  Körper über Geschwindigkeit oder Zielpose bewegen (ein Ziel langsamer als die Schlafschwelle wird
+  übersprungen). Figuren laufen auf dem Character Mover. Importierte Roboter bringen Masse, Schwerpunkt
+  und Trägheit mit; Gelenke, die nicht in Nullstellung gebaut werden, tragen ihren Bauwinkel als
+  Referenz. Bewegungssperren
   nur bei Fahrzeugen, Figuren und Fliegern, **nie bei Walkern** – ein Roboter muss fallen können, sonst
   lernt er nichts Echtes.
 - **Schlaf und Ereignisse:** Continuous Collision anlassen, schnelle Spielerfahrzeuge sind Bullets.
-  Spieler und Roboter schlafen nie (eine langsame Gangart liegt unter der Schlafschwelle von 5 cm/s).
+  Ereignisse nur an Formen, deren Meldungen das Spiel liest. Spieler und Roboter schlafen nie (eine
+  langsame Gangart liegt unter der Schlafschwelle von 5 cm/s).
 
-Die Checkliste für einen neuen gelenkigen Preset fasst das zusammen und verlangt am Ende einen Test:
+Die Checkliste für einen neuen gelenkigen Preset fasst das zusammen: jedes bewegte Teil in echter
+Größe ab 10 cm (sonst skalieren), ein Körper pro starrem Segment, Massen im Rahmen, Bau in der Ruhepose,
+Servos als Gelenkfedern, 8 bis 16 Sub-Steps, Eigenkollision per negativer Gruppe – und am Ende ein Test:
 Der Preset steht, seine Gelenke halten (Lücke unter 1 % der Gliedlänge), und er erfüllt
 deterministisch seine Aufgabe.
 
@@ -442,14 +483,16 @@ deterministisch seine Aufgabe.
 
 Spiele bauen ihre Physik aus dem Level ([Kapitel 8](08-spiel-laufzeit.md)): `plan_bodies` plant Körper
 und Formen (Studio zeichnet mit demselben Plan die Collider), `create_body` und `create_joints` setzen
-ihn um (samt Grad → Radiant, Materialien, Bruchschwellen), und `fixed_step` treibt jeden Schritt
-Controller, Verkehr, Servos und Maus-Griff an, ruft `World::step` und verarbeitet die Ereignisse.
+ihn um (samt Grad → Radiant, Materialien, Filtern, Ereignissen, Massen, Sperren, Federgrenze,
+Bruchschwellen), und `fixed_step` treibt jeden Schritt Controller, kinematische Animationen, Verkehr,
+Walker, Servos und Maus-Griff an, ruft `World::step` und verarbeitet die Ereignisse.
 
 ## 6.17 Das Servomodell – Brücke zur Micro Duck
 
 Box3D rechnet starre Körper. Ein echter Servo tut mehr: Er regelt, hat Reibung und reagiert verzögert.
 Dafür hat Kern ein kleines **Gerätemodell** mit Werten in echten Einheiten, das **Profil**. Ein anderer
-Servo ist ein anderes Profil.
+Servo ist ein anderes Profil; ein Aktor, der sich grundsätzlich anders verhält, bräuchte ein anderes
+Modell. Profile werden an Messungen kalibriert und an anderen Messungen geprüft.
 
 Das Gesetz in Worten: Das Moment ist die Steifigkeit K mal Abstand zum Ziel (aber höchstens das
 Höchstmoment T), minus die Dämpfung D mal Geschwindigkeit. Dazu kommen Reibung F im Getriebe, die
@@ -493,7 +536,7 @@ bekommen die steifere Gelenkweichheit aus 6.13, damit leichte Glieder sich nicht
 Ein Profil (`ServoProfile`, als JSON speicherbar) enthält K, D, F, T, Armature und Verzögerung – und
 dazu **Streuungen**. Sie sagen, wie sicher die Werte sind. Das Training zieht für jeden Servo eigene
 Werte innerhalb dieser Grenzen, damit das Netz nicht an dem hängt, was die Messung nicht festlegen
-konnte. Unsinnige Werte werden abgelehnt.
+konnte. Unsinnige Werte werden abgelehnt; Steifigkeit und Höchstmoment müssen positiv sein.
 
 Das Standardprofil ist der Dynamixel XL330-M288 so, wie Pollen Robotics ihn trainiert (Modell „m6“ aus
 BAM – Better Actuator Models von Rhoban – bei 7,4 V):

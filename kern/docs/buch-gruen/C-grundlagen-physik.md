@@ -18,7 +18,8 @@ Der **Zustand** besteht aus vier Größen: wo der Schwerpunkt ist (Position), wi
 (Orientierung, gespeichert als Quaternion), wie schnell er sich bewegt und wie schnell er sich dreht.
 Dazu kommen Eigenschaften, die sich nie ändern: die **Masse** (wie schwer er sich beschleunigen lässt),
 der **Schwerpunkt** und der **Trägheitstensor** – eine 3 × 3-Tabelle, die sagt, wie schwer er sich um
-jede Achse drehen lässt. Ein langer Stab dreht sich um seine Längsachse leicht, quer dazu schwer.
+jede Achse drehen lässt. Ein langer Stab dreht sich um seine Längsachse leicht, quer dazu schwer. Im
+Körper selbst ist diese Tabelle fest; von der Welt aus gesehen dreht sie mit dem Körper mit.
 
 In Kern entstehen Masse und Trägheit aus den Formen und ihrer Dichte. Importierte Roboter bringen ihre
 gemessenen Werte mit ([Kapitel 6](06-physik.md)).
@@ -26,6 +27,7 @@ gemessenen Werte mit ([Kapitel 6](06-physik.md)).
 Die Bewegung folgt zwei Gesetzen: **Newton** (Kraft = Masse × Beschleunigung) für das Verschieben und
 **Euler** für das Drehen. In Eulers Gleichung steckt ein Extra, der **Kreiselterm**. Er sorgt dafür, dass
 lange, dünne Körper taumeln, wenn sie sich nicht genau um eine ihrer Hauptachsen drehen. Diese
+Die Drehung selbst ändert sich über ein Quaternionenprodukt mit der Drehgeschwindigkeit. Diese
 Gleichungen beschreiben, wie sich der Zustand *ändert*. Eine Simulation muss sie in kleinen
 Zeitschritten lösen. Das heißt **Integration**.
 
@@ -45,7 +47,9 @@ gutes Verfahren sollte ihre Energie weder aufblähen noch vernichten. Drei Kandi
 | semi-implizit | erst neue Geschwindigkeit, damit neue Position | Energie bleibt, solange der Schritt klein genug ist |
 | implizit | Kraft vom Ende des Schritts | Energie **fällt**, immer stabil |
 
-**Zahlenbeispiel:** Eine Feder mit 30 Hz, Schrittweite 1/60 s. Explizit wächst die Schwingung pro Schritt
+Genauer: Semi-implizit bleibt stabil, solange Schrittweite × Kreisfrequenz (2π × Hertz) unter 2 liegt.
+
+**Zahlenbeispiel:** Eine Feder mit 30 Hz, Schrittweite 1/60 s (Schrittweite × Kreisfrequenz ≈ 3,14). Explizit wächst die Schwingung pro Schritt
 um den Faktor 3,3 – nach zehn Schritten auf das 150 000-Fache. Semi-implizit ist der Schritt hier zu
 groß; auch das wird instabil. Implizit wird die Schwingung stark gedämpft, bleibt aber brav.
 
@@ -59,7 +63,7 @@ Die Lehre: **Steife Federn und große Schritte vertragen sich nicht** – außer
 
 Box3D rechnet **semi-implizit**. In jedem Teilschritt werden erst die Geschwindigkeiten aus Kräften und
 Schwerkraft aktualisiert, dann löst der Solver Kontakte und Gelenke (C.6), dann rücken die Positionen
-**mit der neuen Geschwindigkeit** vor.
+**mit der neuen Geschwindigkeit** vor; die Drehung wird danach wieder normiert.
 
 - Die eingebaute **Dämpfung** wird mit einem Faktor zwischen 0 und 1 eingerechnet und ist deshalb immer
   stabil. Kerns Regel daraus: Dämpfung über Box3Ds Einstellung, nie selbst gebaut als Kraft gegen die
@@ -103,17 +107,24 @@ flowchart LR
 berühren, wenn ihre Quader überlappen – sechs Vergleiche. Die Quader liegen in einem Baum (einer BVH,
 wie in [Kapitel 5](05-szene-und-geometrie.md)). Damit der Baum nicht jeden Schritt umgebaut werden
 muss, sind die Quader etwas größer (bis 50 mm). Erst wer seinen Quader verlässt, wird umsortiert.
-Feste Körper haben einen eigenen Baum.
+Feste Körper haben einen eigenen Baum. Mit dem Baum findet man die Nachbarn eines Quaders in
+logarithmischer Zeit: Bei doppelt so vielen Körpern kommt nur ein Schritt dazu, statt dass sich die
+Arbeit verdoppelt.
 
 **Narrow Phase (genau):** Hier zählen **konvexe** Formen, also solche ohne Dellen: Die Verbindungslinie
 zweier Punkte liegt immer ganz drin. Kugel, Kapsel, Quader und konvexe Hüllen sind konvex. Für sie gibt
 es robuste Verfahren:
 
-- **GJK** (nach Gilbert, Johnson und Keerthi) misst den Abstand zweier konvexer Formen. Es braucht von
-  jeder Form nur eine Auskunft: „Welcher Punkt liegt in dieser Richtung am weitesten außen?“
+- **GJK** (nach Gilbert, Johnson und Keerthi) misst den Abstand zweier konvexer Formen. Der Trick:
+  Man zieht jeden Punkt von B von jedem Punkt von A ab (die **Minkowski-Differenz**). Liegt der
+  Ursprung darin, berühren sich die Formen. GJK tastet sich mit einfachen Formen (Punkt, Strecke,
+  Dreieck, Tetraeder) an den Ursprung heran und braucht von jeder Form nur eine Auskunft: „Welcher
+  Punkt liegt in dieser Richtung am weitesten außen?“
 - **SAT** (*Separating Axis Theorem*): Zwei konvexe Körper berühren sich genau dann nicht, wenn es eine
-  Richtung gibt, in der man zwischen ihnen hindurchschauen kann – eine **trennende Achse**. Box3D merkt
-  sich die zuletzt gefundene, denn meist stimmt sie im nächsten Schritt wieder.
+  Richtung gibt, in der man zwischen ihnen hindurchschauen kann – eine **trennende Achse**. Infrage
+  kommen nur die Flächennormalen beider Körper und Kreuzprodukte ihrer Kanten. Box3D baut so die
+  Kontakte zwischen Hüllen und merkt sich die zuletzt gefundene Achse, denn meist stimmt sie im
+  nächsten Schritt wieder.
 
 > **Stell dir vor …** zwei Kartons auf dem Tisch. Wenn du dich so hinknien kannst, dass du einen
 > Lichtspalt zwischen ihnen siehst, berühren sie sich nicht. Das ist die ganze Idee von SAT.
@@ -123,14 +134,18 @@ Das Ergebnis ist ein **Manifold**: eine Kontaktrichtung (Normale) und einige Kon
 
 Eine **konvexe Hülle** ist die kleinste konvexe Form um eine Punktwolke – wie ein Gummituch, das man
 darum spannt. Box3D erlaubt bis 128 Ecken. Dellige Dinge (ein Auto, ein Fuß mit Aussparung) setzt man
-aus mehreren Hüllen zusammen. Beliebige Dreiecksnetze gibt es nur für feste Körper.
+aus mehreren Hüllen zusammen. Flache oder entartete Punktwolken lehnt Box3D ab. Beliebige
+Dreiecksnetze gibt es nur für feste Körper. Zum Anzeigen baut Kern die Dreiecke einer Hülle mit
+`hull_mesh`.
 
 ### Spekulative Kontakte
 
 Ein schneller Körper könnte in einem Schritt durch eine dünne Wand fliegen (*Tunneling*). Box3D legt
 Kontaktpunkte deshalb schon **vor** der Berührung an, ab 20 mm Abstand, und erlaubt in diesem Schritt
 nur so viel Annäherung, wie Platz ist. Für sehr schnelle Körper gibt es zusätzlich **Continuous
-Collision**. Weil diese Toleranzen in Metern fest sind, gilt die Größenregel aus
+Collision**; Kern lässt sie an und macht schnelle Spielerfahrzeuge zu „Bullets“. Die festen Toleranzen
+in Metern: 5 mm erlaubte Durchdringung (Linear Slop), 20 mm spekulative Distanz (das Vierfache),
+50 mm für das Wiederverwenden von Kontakten. Weil diese Toleranzen in Metern fest sind, gilt die Größenregel aus
 [Kapitel 6](06-physik.md): bewegte Körper 0,1 bis 10 m – die Micro Duck wird darum vierfach skaliert.
 
 ## C.4 Kontakte, Reibung und Restitution
@@ -149,12 +164,15 @@ exakt, aber sehr gut näherungsweise (C.6).
 ### Reibung nach Coulomb
 
 Reibung wirkt in der Kontaktebene gegen das Rutschen. Sie ist höchstens **Reibwert μ × Andruck**. Solange
-weniger nötig ist, **haftet** der Kontakt; wird mehr verlangt, **gleitet** er.
+weniger nötig ist, **haftet** der Kontakt; wird mehr verlangt, **gleitet** er. Was hier wirkt, ist ein
+**Impuls** (Kraft × Zeit); der Impuls senkrecht zur Fläche heißt Normalimpuls.
 
 Alle erlaubten Kräfte bilden einen **Reibungskegel** um die Normale: Kraft innen heißt Haften, am Rand
-Gleiten. In der Physik unterscheidet man Haft- und Gleitreibung; Box3D kennt nur **einen** Reibwert. Es
-löst die Reibung einmal in der Mitte des Manifolds, mit einem **runden** Kegel, und bremst zusätzlich
-das Verdrehen um die Normale.
+Gleiten; der Kegel ist umso breiter, je größer μ (halber Öffnungswinkel arctan μ). In der Physik
+unterscheidet man Haft- und Gleitreibung; Box3D kennt nur **einen** Reibwert. Es löst die Reibung
+einmal in der Mitte des Manifolds, begrenzt durch die Summe der Normalimpulse aller Punkte, mit einem
+**runden** Kegel (ein zu großer Reibungsimpuls wird als Ganzes gekürzt), und bremst zusätzlich das
+Verdrehen um die Normale.
 
 ### Zwei Reibwerte, ein Kontakt
 
@@ -178,7 +196,8 @@ auf Socke muss greifen, Socke auf Boden muss rutschen. Ein einziger Wert pro For
 Die **Restitution** e sagt, wie viel Geschwindigkeit nach einem Stoß übrig bleibt: e = 0 heißt liegen
 bleiben, e = 1 perfekt elastisch. Box3D nimmt das **Maximum** beider Formen – ein Gummiball springt auch
 auf Beton. Stöße unter 1 m/s prallen gar nicht ab, sonst würde ein ruhender Körper wegen winziger Reste
-ewig zittern. Angewendet wird die Restitution nach dem eigentlichen Lösen.
+ewig zittern. Angewendet wird die Restitution nach dem eigentlichen Lösen, mit der
+Annäherungsgeschwindigkeit von vor dem Schritt (Kern: 2 Durchgänge).
 
 ### Rollwiderstand
 
@@ -198,6 +217,9 @@ Geschwindigkeiten: Die beiden Punkte dürfen sich nicht auseinanderbewegen. Eine
 Der Solver sucht dann einen Impuls, der die Regel erfüllt. Wie groß der sein muss, hängt an der
 **effektiven Masse**: Wie schwer fühlt sich diese Bewegung an? Beim Türscharnier ist das die Trägheit
 der Tür um die Scharnierachse. Eine schwere Tür braucht einen großen Impuls, eine leichte einen kleinen.
+Bei einem Drehgelenk zwischen zwei Körpern ist sie genau 1 geteilt durch die Summe der „Drehleichtigkeiten“
+(inversen Trägheiten) beider Körper um die Achse. Ein Korrekturanteil baut außerdem Fehler ab, die sich
+schon eingeschlichen haben (Drift).
 
 Welche Gelenke Box3D kennt (Scharnier, Schiene, Kugelgelenk, Seil, Rad …), zeigt die Tabelle in
 [Kapitel 6](06-physik.md). Wichtig für alle: Ein Preset wird in seiner **Ruhepose** gebaut, denn dort liegt
@@ -225,7 +247,9 @@ Impulsen vom letzten Mal statt mit null, ist der Solver nach wenigen Runden fert
 Ein harter Constraint korrigiert Fehler sofort und vollständig. Das zittert und kann Energie
 hineinpumpen. Box3D macht darum **alle** Constraints weich: Jeder verhält sich wie eine sehr steife,
 gedämpfte Feder mit einer Frequenz in Hertz und einem Dämpfungsgrad – und wird **implizit** gelöst, also
-stabil (C.2).
+stabil (C.2). Aus Frequenz, Dämpfung und Sub-Step-Länge rechnet Box3D drei Zahlen: wie schnell ein
+Fehler abgebaut wird, und zwei Anteile, die zusammen 1 ergeben – der eine steht für „ganz hart“, der
+andere für „gar nicht“. Dazwischen liegt jeder Constraint.
 
 **Zahlenbeispiel** mit Kerns Kontaktwerten (30 Hz, Dämpfung 10) bei der Micro Duck: Eine Durchdringung von
 1 mm wird mit etwa 6,6 mm/s herausgeschoben – sanft statt ruckartig. Gegen feste Körper, etwa Füße auf
@@ -252,7 +276,9 @@ ihn würde ein Körper nach einer Korrektur damit weiterfliegen.
 Eine Feder lässt sich nur rechnen, wenn sie langsamer schwingt, als die Sub-Steps „hinschauen“. Box3D
 begrenzt Gelenkfedern auf ein Viertel und Kontaktfedern auf ein Achtel der Sub-Step-Rate. Bei der Micro
 Duck (1600 Sub-Steps pro Sekunde) also höchstens 400 Hz für Gelenke und 200 Hz für Kontakte; Kerns
-Servogelenke nutzen 240 Hz. Steifer geht nur mit mehr Sub-Steps.
+Servogelenke nutzen 240 Hz. Steifer geht nur mit mehr Sub-Steps. Federn im Level hält Kern zusätzlich
+unter der halben Sub-Step-Frequenz (Nyquist-Grenze: Eine Schwingung braucht mindestens zwei
+„Blicke“ pro Periode).
 
 > **Probier's aus!** Stelle im Physics Lab unter World Settings › Physics (Box3D) die **Sub-steps** einmal
 > auf 1 und einmal auf 16, starte jeweils Simulate und zieh an der Seilbrücke. Achte darauf, wie sehr
@@ -308,7 +334,12 @@ Kern baut den Servo nur aus Box3Ds eigenen Teilen ([Kapitel 6](06-physik.md), Ab
 PD-Regler **ist** die Gelenkfeder des Scharniers und damit implizit stabil. Die Sättigung entsteht,
 indem das **Ziel** auf höchstens T/K Abstand begrenzt wird. Die Reibung ist ein Motor mit
 Sollgeschwindigkeit 0. Die Rotorträgheit ist eine Scheibe auf der Achse, und die Totzeit eine
-Warteschlange: 20 ms × √4 (Zeitskalierung) × 100 Hz = 4 Weltschritte. Dieselbe Funktion treibt Studio,
+Warteschlange: 20 ms × √4 (Zeitskalierung) × 100 Hz = 4 Weltschritte.
+
+Box3D will Federn aber als Frequenz und Dämpfungsgrad, nicht in N·m/rad. `set_joint_spring` rechnet um,
+mit der effektiven Masse m aus C.5: Kreisfrequenz ω = √(K / m), Frequenz = ω / 2π, Dämpfungsgrad =
+D / (2 · m · ω). Weil m von der Lage abhängt, geschieht das jeden Schritt. Alle Werte stehen in einem
+**Geräteprofil**: K, D, F, T, Armature, Totzeit – und für das Training ihre Streuungen. Dieselbe Funktion treibt Studio,
 Lehrer und Kalibrierstand ([Kapitel 16](16-kalibrierung.md)).
 
 ## C.8 Was man nicht tun sollte
@@ -347,8 +378,11 @@ Daraus folgen Kerns Gegenmittel:
 
 FMA ist eine Prozessor-Abkürzung, die Multiplikation und Addition in einem Rutsch rechnet. Beide
 Ergebnisse sind korrekt, aber verschieden – und WebAssembly macht es nicht, native Builds manchmal schon.
-Plus, Mal und Wurzel schreibt der Gleitkomma-Standard exakt vor, Sinus & Co. aber nicht. Deshalb nutzt
-alles, was die Simulation speist, `kern::dm::sin` statt `std::sin`.
+Plus, Mal und Wurzel schreibt der Gleitkomma-Standard exakt vor, Sinus & Co. aber nicht: glibc, Apples
+libm, Androids bionic und wasi-libc runden sie im letzten Bit verschieden. Deshalb
+bringt Kern die Umsetzungen von musl (MIT-Lizenz) mit, und alles, was die Simulation speist, nutzt
+`kern::dm::sin` statt `std::sin`. `sqrt`, `fabs` und `floor` sind exakt und bleiben `std::`; Box3D hat
+eigene deterministische Winkelfunktionen.
 
 ### Prüfen
 
