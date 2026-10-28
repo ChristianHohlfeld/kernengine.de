@@ -2,6 +2,11 @@
 """Sets the book (kern/docs/buch, or kern/docs/book) as one print-ready PDF.
 
     python3 kern/tools/buch_pdf.py [--en] [--out kern-buch.pdf] [--format 170x240]
+    python3 kern/tools/buch_pdf.py --src buch-gruen --edition "Einfach erklärt" --out kern-gruen.pdf
+
+The same book exists in editions for different readers (kern/docs/buch: the technical one,
+kern/docs/buch-gruen: the same content explained more simply); --src picks the folder, --edition
+and --subtitle the title page.
 
 Needs pandoc, xelatex (with German hyphenation for the German book) and mmdc (Mermaid CLI).
 The chapters are read in order (00 imprint, 01-17, appendices A-C), Mermaid diagrams are
@@ -18,9 +23,14 @@ ap.add_argument("--en", action="store_true", help="the English book (kern/docs/b
 ap.add_argument("--out", default=None)
 ap.add_argument("--format", default="177.8x254", help="trim size in mm, width x height (default: Amazon KDP hardcover 7 x 10 in)")
 ap.add_argument("--keep", action="store_true", help="keep the intermediate files (prints where)")
+ap.add_argument("--src", default=None, help="the book's folder in kern/docs (default: buch, or book with --en)")
+ap.add_argument("--edition", default=None, help="the line under 'Kern' on the title page (default: Das Buch / The Book)")
+ap.add_argument("--subtitle", default=None, help="the subtitle on the title page")
+ap.add_argument("--boxes", action="store_true", help="block quotes as grey boxes with a bar (the green edition's 'Probier's aus!' and friends)")
+ap.add_argument("--code-size", default="footnotesize", help="LaTeX size of code blocks (small keeps code at 7 pt or more)")
 a = ap.parse_args()
 
-src = docs / ("book" if a.en else "buch")
+src = docs / (a.src or ("book" if a.en else "buch"))
 out = pathlib.Path(a.out or ("kern-book.pdf" if a.en else "kern-buch.pdf")).resolve()
 w, h = (float(x) for x in a.format.lower().split("x"))
 files = sorted(p for p in src.glob("*.md") if re.match(r"^(\d\d|[A-Z])-", p.name))
@@ -121,6 +131,14 @@ for i, p in enumerate(files):
 (work / "buch.md").write_text("\n\n".join(parts))
 lang = "en" if a.en else "de"
 header = work / "header.tex"
+# The green edition's boxes ("Kurz gesagt", "Probier's aus!", ...) are block quotes: printed in black
+# and white as a light grey box with a dark bar on the left, which may break across pages.
+BOXES = r"""
+\usepackage[most]{tcolorbox}
+\renewenvironment{quote}{\begin{tcolorbox}[breakable,enhanced,colback=black!6,colframe=black!6,
+  borderline west={2.2pt}{0pt}{black!70},arc=0pt,outer arc=0pt,boxrule=0pt,left=8pt,right=6pt,top=4pt,bottom=4pt,
+  before skip=8pt,after skip=8pt]\setlength{\parindent}{0pt}\setlength{\parskip}{3pt}}{\end{tcolorbox}}
+"""
 logo_tex = work / "kern_logo.tex"
 logo_tex.write_text((here / "kern_logo.tex").read_text().replace("KERNLOGO", (docs / "buch" / "bilder" / "kern-logo.png").as_posix()))
 header.write_text(r"""
@@ -136,7 +154,7 @@ header.write_text(r"""
 \relpenalty=100
 \tolerance=2000
 \hbadness=10000
-\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\footnotesize}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\%s}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}
@@ -147,11 +165,13 @@ header.write_text(r"""
 \input{%s}
 \let\kernmainmatter\mainmatter
 \renewcommand{\mainmatter}{}  %%%% pandoc says it before the body; the book says it after the contents
+%s
 \frontmatter
-""" % ("[variant=american]{english}" if a.en else "[spelling=new]{german}", logo_tex.as_posix()))
-title = "Kern – The Book" if a.en else "Kern – Das Buch"
+""" % ("[variant=american]{english}" if a.en else "[spelling=new]{german}", a.code_size, logo_tex.as_posix(), BOXES if a.boxes else ""))
+edition = a.edition or ("The Book" if a.en else "Das Buch")
+title = "Kern – " + edition
 titlepage = work / "titlepage.tex"
-sub = ("The Engine, Kern Studio, a Walking Robot and the Lehrer" if a.en
+sub = a.subtitle or ("The Engine, Kern Studio, a Walking Robot and the Lehrer" if a.en
        else "Die Engine, Kern Studio, ein Laufroboter und der Lehrer")
 titlepage.write_text(r"""
 \thispagestyle{empty}
@@ -171,7 +191,7 @@ titlepage.write_text(r"""
 \vspace{12mm}
 \end{center}
 \newpage
-""" % ("The Book" if a.en else "Das Buch", sub))
+""" % (edition, sub))
 cmd = ["pandoc", str(work / "buch.md"), "-s", "-o", str(work / "buch.tex"), "--lua-filter", str(here / "buch_code.lua"), "--columns=50", "--no-highlight",
        "-f", "markdown+pipe_tables+tex_math_dollars+raw_attribute+autolink_bare_uris-yaml_metadata_block-implicit_figures",
        "--top-level-division=chapter", "--toc-depth=1",

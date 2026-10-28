@@ -2,6 +2,7 @@
 """The book's cover for an Amazon KDP hardcover (case laminate): back, spine and front in one PDF.
 
     python3 kern/tools/buch_umschlag.py --pages 452 [--en] [--out kern-buch-umschlag.pdf]
+    python3 kern/tools/buch_umschlag.py --pages 300 --gruen   (the green edition: "Einfach erklärt")
 
 The cover's size follows from the trim size and the page count:
   width  = 2 x trim width + spine + 2 x hinge + 2 x (wrap + overhang)
@@ -23,6 +24,7 @@ ap.add_argument("--en", action="store_true")
 ap.add_argument("--out", default=None)
 ap.add_argument("--trim", default="7x10", help="trim size in inches")
 ap.add_argument("--spine", type=float, default=0, help="spine width in inches (default: from the page count)")
+ap.add_argument("--gruen", action="store_true", help="the green edition (kern/docs/buch-gruen): same content, explained more simply")
 ap.add_argument("--image", default="studio.png", help="the front picture (in kern/docs/buch/bilder); no duck on the cover of a book that is sold: the robot is Pollen Robotics'")
 a = ap.parse_args()
 
@@ -37,7 +39,11 @@ SAFE, HINGE_SAFE = 0.635, 0.4
 S = a.spine or round(a.pages * 0.002252 + 0.189, 3)
 TW, TH = 2 * W + S + 2 * SPINE_SIDE + 2 * MX, H + 2 * MY
 M = MY
-out = pathlib.Path(a.out or ("kern-book-cover.pdf" if a.en else "kern-buch-umschlag.pdf")).resolve()
+out = pathlib.Path(a.out or ("kern-book-cover.pdf" if a.en else "kern-gruen-umschlag.pdf" if a.gruen else "kern-buch-umschlag.pdf")).resolve()
+# Each edition has its colour: blue for the technical book, green for the simpler one.
+C = (dict(bg1="#1d4a33", bg2="#0f2a1d", bg3="#08170f", acc="#a8e6b8", line="#3ddc84", light="#d8f0df", blurb="#e0f2e6", rights="#93b9a0", grid="#a8e6b8")
+     if a.gruen else
+     dict(bg1="#1b3358", bg2="#0d1830", bg3="#070d1a", acc="#9cc4ff", line="#3d8bff", light="#d5e2f5", blurb="#dbe5f4", rights="#8ea3c4", grid="#9cc4ff"))
 
 def data(name):
     p = img_dir / name
@@ -70,14 +76,30 @@ how rendering, physics and neural networks work – and how to train your own mo
 <p><b>Christian Heinrich Hohlfeld</b>, a software engineer since 2010, designed Kern and built it with AI.</p>
 <p>The software is open source and free: <b>kernengine.de</b></p>"""),
 }
+if a.gruen:
+    t = {
+        "book": "Einfach erklärt",
+        "sub": "Die Engine, Kern Studio, ein Laufroboter und der Lehrer – für alle, die verstehen wollen, wie Spiele und lernende Roboter funktionieren",
+        "tag": "Mitmachen, ausprobieren, verstehen",
+        "blurb": """<p>Wie kommt ein 3D-Spiel in den Browser? Warum fällt ein Würfel genau so, wie er fällt? Und wie bringt man einem
+kleinen Roboter das Laufen bei, ohne ihm jede Bewegung vorzuschreiben?</p>
+<p><b>Kern</b> ist eine echte 3D-Engine, die im Browser läuft – mit Grafik, Physik, Klang, Netzwerkspiel und dem Editor
+<b>Kern Studio</b>. Mit dem <b>Lehrer</b> lernt darin die Micro Duck, ein zweibeiniger Laufroboter, zu laufen, zu springen,
+einen Ball zu kicken und eine Socke zu holen.</p>
+<p>Dieses Buch erklärt alles davon – vollständig, aber ohne Vorwissen: mit Alltagsbildern statt Formelwüsten, mit
+Experimenten zum Selbermachen und einer Knobelecke in jedem Kapitel. Die grüne Ausgabe hat denselben Inhalt wie
+„Kern – Das Buch“, nur einfacher erzählt.</p>
+<p><b>Christian Heinrich Hohlfeld</b>, Softwareentwickler seit 2010, hat Kern entworfen und mit KI gebaut.</p>
+<p>Die Software ist Open Source und kostenlos: <b>kernengine.de</b></p>""",
+    }
 html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @page {{ size: {TW}in {TH}in; margin: 0 }}
 html, body {{ margin: 0; padding: 0 }}
 body {{ width: {TW}in; height: {TH}in; position: relative; overflow: hidden;
-  background: radial-gradient(ellipse at 75% 30%, #1b3358 0%, #0d1830 55%, #070d1a 100%);
+  background: radial-gradient(ellipse at 75% 30%, {C["bg1"]} 0%, {C["bg2"]} 55%, {C["bg3"]} 100%);
   font-family: 'DejaVu Sans', sans-serif; color: #e8eef8 }}
 .grid {{ position: absolute; inset: 0; opacity: .07;
-  background-image: linear-gradient(#9cc4ff 1px, transparent 1px), linear-gradient(90deg, #9cc4ff 1px, transparent 1px);
+  background-image: linear-gradient({C["grid"]} 1px, transparent 1px), linear-gradient(90deg, {C["grid"]} 1px, transparent 1px);
   background-size: 0.5in 0.5in }}
 .panel {{ position: absolute; top: {M}in; height: {H}in }}
 .back {{ left: {MX}in; width: {W}in }}
@@ -86,27 +108,27 @@ body {{ width: {TW}in; height: {TH}in; position: relative; overflow: hidden;
 .front .logo img {{ width: 1.15in; height: 1.15in }}
 .front .logo {{ position: absolute; left: 0.75in; top: 0.85in }}
 .front h1 {{ position: absolute; left: 0.75in; top: 2.05in; margin: 0; font-size: 92pt; letter-spacing: -2pt; font-weight: bold; color: #fff }}
-.front .book {{ position: absolute; left: 0.8in; top: 3.45in; font-size: 24pt; color: #9cc4ff }}
-.front .sub {{ position: absolute; left: 0.8in; right: 0.7in; top: 4.0in; font-size: 14pt; line-height: 1.35; color: #d5e2f5 }}
+.front .book {{ position: absolute; left: 0.8in; top: 3.45in; font-size: 24pt; color: {C["acc"]} }}
+.front .sub {{ position: absolute; left: 0.8in; right: 0.7in; top: 4.0in; font-size: 14pt; line-height: 1.35; color: {C["light"]} }}
 .front .shot {{ position: absolute; left: 0.75in; right: 0.7in; top: 5.05in; height: 3.45in; border-radius: 10px; overflow: hidden;
-  box-shadow: 0 0 0 1.5px #3d8bff, 0 10px 40px rgba(0,0,0,.6) }}
+  box-shadow: 0 0 0 1.5px {C["line"]}, 0 10px 40px rgba(0,0,0,.6) }}
 .front .shot img {{ display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 60% }}
 .front .author {{ position: absolute; left: 0.8in; bottom: 1.0in; font-size: 17pt; color: #fff }}
-.front .tag {{ position: absolute; left: 0.8in; bottom: 0.72in; font-size: 10pt; color: #9cc4ff; letter-spacing: .5pt }}
+.front .tag {{ position: absolute; left: 0.8in; bottom: 0.72in; font-size: 10pt; color: {C["acc"]}; letter-spacing: .5pt }}
 .spine .inner {{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(90deg);
   white-space: nowrap; font-size: {min(16, S * 72 * 0.42):.1f}pt; display: flex; align-items: center; gap: 0.25in }}
-.spine .inner b {{ color: #fff }} .spine .inner span {{ color: #9cc4ff }}
+.spine .inner b {{ color: #fff }} .spine .inner span {{ color: {C["acc"]} }}
 .spine .mark {{ position: absolute; left: 50%; bottom: 0.72in; transform: translateX(-50%) }}
 .spine .mark img {{ width: {min(0.6, S * 0.7):.2f}in; height: {min(0.6, S * 0.7):.2f}in }}
 .back .logo img {{ width: 0.55in; height: 0.55in }}
 .back .logo {{ position: absolute; left: 0.75in; top: 0.85in }}
 .back .title {{ position: absolute; left: 1.45in; top: 0.9in; font-size: 20pt; font-weight: bold }}
-.back .title span {{ font-weight: normal; color: #9cc4ff }}
-.back .blurb {{ position: absolute; left: 0.75in; right: 0.65in; top: 1.75in; font-size: 11pt; line-height: 1.5; color: #dbe5f4 }}
+.back .title span {{ font-weight: normal; color: {C["acc"]} }}
+.back .blurb {{ position: absolute; left: 0.75in; right: 0.65in; top: 1.75in; font-size: 11pt; line-height: 1.5; color: {C["blurb"]} }}
 .back .blurb b {{ color: #fff }}
 .back .shots {{ position: absolute; left: 0.75in; right: 0.65in; top: 6.3in; display: flex; gap: 0.18in }}
-.back .shots img {{ width: 50%; border-radius: 6px; box-shadow: 0 0 0 1px #3d8bff }}
-.back .rights {{ position: absolute; left: 0.75in; bottom: 0.72in; width: 3.4in; font-size: 7.5pt; line-height: 1.4; color: #8ea3c4 }}
+.back .shots img {{ width: 50%; border-radius: 6px; box-shadow: 0 0 0 1px {C["line"]} }}
+.back .rights {{ position: absolute; left: 0.75in; bottom: 0.72in; width: 3.4in; font-size: 7.5pt; line-height: 1.4; color: {C["rights"]} }}
 /* KDP prints the ISBN barcode in a 2 x 1.2 in white box in the lower right corner of the back
    cover (at least 0.76 in from the bottom, 0.25 in from the hinge): the area stays empty. */
 </style></head><body><div class="grid"></div>
@@ -118,7 +140,7 @@ body {{ width: {TW}in; height: {TH}in; position: relative; overflow: hidden;
   <div class="rights">© 2026 Christian Heinrich Hohlfeld · ORCID 0009-0003-6634-9045<br>
   {"Alle Rechte am Buch vorbehalten. Die Software Kern ist Open Source (Apache 2.0). Kein Produkt von Pollen Robotics oder Hugging Face und nicht von ihnen geprüft." if de else "Book: all rights reserved. The Kern software is open source (Apache 2.0). Not a product of Pollen Robotics or Hugging Face, nor reviewed by them."}</div>
 </div>
-<div class="panel spine"><div class="inner"><b>Kern</b><span>{t["book"]}</span><span style="color:#d5e2f5">Christian Heinrich Hohlfeld</span></div>
+<div class="panel spine"><div class="inner"><b>Kern</b><span>{t["book"]}</span><span style="color:{C["light"]}">Christian Heinrich Hohlfeld</span></div>
   <div class="mark">{logo}</div></div>
 <div class="panel front">
   <div class="logo">{logo}</div>
