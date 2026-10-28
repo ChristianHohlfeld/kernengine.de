@@ -47,7 +47,10 @@ zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick › *
 2. Aus **Physics** einen **Crate Stack** und eine **Hinged Door** – sie reagieren auf deine Figur.
 3. Aus **Gameplay** eine **Moving Platform** und einen **Spinner**, die sich von selbst bewegen.
 4. Mit **Simulate** (Alt+S) prüfen, Kisten greifen und werfen. **K** übernimmt die Lage der gewählten
-   Actors – praktisch für einen Stapel, der natürlich umgefallen aussehen soll.
+   Actors – praktisch für einen Stapel, der natürlich umgefallen aussehen soll. Wähle dafür in
+   Simulate die **Kisten selbst** (kurzer Klick, Shift+Klick für weitere). Der Crate Stack ist nur
+   ein leerer Eltern-Actor, an dem die Kisten als Kinder hängen; ist er gewählt, übernimmt K nur
+   seine eigene Lage, und die Kisten springen beim Stop zurück.
 
 > **Vorsicht, Falle:** Ein **Cube** aus Shapes hat Kollision, fällt aber nicht. Gib ihm mit **+ Add ›
 > Rigid Body** einen Körper und stell **Mobility** auf **Dynamic** – oder nimm die **Physics Cube**
@@ -135,6 +138,13 @@ seit dem letzten Frame, höchstens 0,1) und `index`.
 `update` läuft **genau einmal** pro Bild, dann wird gemalt. `pressed`, `released`, Zeigerbewegung und
 Mausrad gelten nur für diesen Frame – lies sie in `update`, statt sie aufzuheben.
 
+### Der Ablauf eines Frames
+
+Die Seite startet das Modul, gibt die Startwerte aus der Adresse weiter und ruft
+`kern_create_app()`, `configure()` und `start()`. Danach reicht sie Tasten, Maus und Finger weiter und
+ruft pro Bild `update`, dann malt die Engine. Ändert sich die Fenstergröße, kommt `resized()`, beim
+Beenden `stop()`.
+
 ### Das kleinste Kern-Spiel: hello
 
 `kern/examples/hello/hello.cpp` (83 Zeilen): 64 Kisten, die sich drehen und Schatten werfen, eine
@@ -184,9 +194,10 @@ kern/build.sh --app \
 ```
 
 Zeile 1 sagt, wo wasi-sdk liegt; der Rest ist ein Befehl (`\` setzt ihn fort): baue aus
-`hello.cpp` die Datei `hello.wasm`. Schalter fügen Teile hinzu: `--app` (App-Laufzeit), `--physics`
-(Box3D), `--game` (Levels und Spiel-Laufzeit), `--studio` (Kern Studio), `--lehrer` (der Lehrer).
-Dateien auf `.cpp` oder `.cc` sind Quellen, der Rest geht an den Compiler. `KERN_BUILD=debug` baut
+`hello.cpp` die Datei `hello.wasm`. Renderer, Geometrie und Mathe sind immer dabei; Schalter fügen
+Teile hinzu: `--app` (App-Laufzeit), `--physics` (Box3D), `--game` (Levels und Spiel-Laufzeit, mit
+Box3D), `--studio` (Kern Studio, mit `--game`), `--lehrer` (der Lehrer, mit `--game`). Dateien auf
+`.cpp` oder `.cc` sind Quellen, der Rest geht an den Compiler. `KERN_BUILD=debug` baut
 zum Fehlersuchen, `KERN_JOBS` und `KERN_OBJ_CACHE` regeln Tempo und Zwischenspeicher – übersetzt
 wird nur, was sich geändert hat. Das Ergebnis läuft in jedem Browser mit WebGL2, auch Safari ab 15
 ([Kapitel 2](02-bauen-und-testen.md)).
@@ -195,7 +206,9 @@ wird nur, was sich geändert hat. Das Ergebnis läuft in jedem Browser mit WebGL
 
 `kern/examples/orbrun/orbrun.cpp` (726 Zeilen): Ein Hovercar sammelt in einer Zufallsstadt 24 Orbs,
 während es Nacht wird. W/S fahren, A/D lenken, Leertaste Boost, N schnelle Zeit, Enter neue Stadt;
-am Handy lenkt die linke Hälfte, die rechte boostet.
+am Handy lenkt die linke Hälfte, die rechte boostet. `?time=0.6` in der Adresse startet nachts.
+Jeden Frame liest das Spiel die Eingabe, fährt, bewegt den Verkehr, sammelt, stellt Licht und Kamera
+ein und lädt das Veränderte zur Grafikkarte.
 
 > **Vorsicht, Falle:** Das Studio-Level **Orb Run** ist ein anderes Programm mit derselben Idee: aus
 > Actors gebaut, mit Box3D. Das C++-Beispiel macht alles selbst.
@@ -209,8 +222,12 @@ am Handy lenkt die linke Hälfte, die rechte boostet.
   **216 km/h**. Lenken wirkt erst mit Tempo.
 - **Verkehr:** 22 Autos, 9 bis 15 m/s; stehst du weniger als 10 m vor einem, hält es.
 - **Orbs:** näher als 3,2 m – weg, 28 Funken, und am Ende eine Bestzeit.
-- **Tag und Nacht:** 480 s pro Tag, mit N 40 s; Sonne, Mond, Himmel, Nebel und bis zu sechs
-  Punktlichter folgen.
+- **Tag und Nacht:** 480 s pro Tag, mit N 40 s; Sonne, Mond, Himmel und Nebel folgen. Von allen
+  Lichtwünschen (Scheinwerfer, je Orb eins) bekommt der Renderer die sechs wichtigsten.
+- **Kamera:** folgt weich, weicht bei Tempo zurück, wackelt bei Zusammenstößen; das Mausrad ändert
+  den Abstand.
+- **Status:** eine Zeile wie `ORBS 5/24 | 01:12.4 | … | 87 km/h`, nur neu gesendet, wenn sie sich
+  ändert.
 
 > **Für Profis:** Die Shader-Erweiterung **NightWindows** zeigt, wie ein Spiel dem Standard-Shader
 > etwas hinzufügt, ohne die Engine anzufassen: Jede Hauswand bekommt vier Zahlen (Länge, Höhe,
@@ -237,8 +254,9 @@ const app = await runKernApp({
 ```
 
 Zeile 1 startet dein Spiel und wartet, bis es läuft; Zeile 2 sagt, wo gemalt wird; Zeile 3, welche
-Datei geladen wird. Optional gibt es `onStatus`, `onError`, `maxPixelRatio` und Startwerte; zurück
-kommt ein Objekt mit `stop()`. Der Gastgeber hält die Zeichenfläche passend groß, liest Tasten nach
+Datei geladen wird. Statt `url` gehen auch Bytes oder Base64. Optional gibt es `onStatus`, `onError`,
+`maxPixelRatio`, Extras für WebGL2 und Startwerte; zurück kommt ein Objekt mit `stop()`.
+Der Gastgeber hält die Zeichenfläche passend groß, liest Tasten nach
 Position (Pfeile scrollen nicht), reicht Maus und Finger weiter, lässt bei Fokusverlust alle Tasten
 los, fängt auf Wunsch die Maus und baut nach einem Grafikkarten-Absturz alles wieder auf. Ohne
 `--app` gebaut heißt es „module was not built with --app“.
@@ -260,17 +278,21 @@ Zurück kommt ein Objekt (auch `window.KernGame`):
 ```js
 game.command({cmd: "gameInput", moveY: 1, jump: true});
 game.command({cmd: "gameInput", moveY: 0, jump: false});
-if (game.status.hud?.status === "won") showMyWin();
+if (game.status.hud?.status === "won") showMyWinScreen();
 ```
 
 Zeile 1 lässt die Figur vorwärts laufen und springen – wie eigene Bildschirmknöpfe. Zeile 2 lässt
-los. Zeile 3 fragt, ob gewonnen wurde, und zeigt dann deinen Siegerbildschirm. `gameInput` kennt auch
-`moveX`, `boost`, `fire`, `aim`, `crouch`, `interact`, `lookX` und mehr; die Werte addieren sich zu
-Tastatur, Touch und Gamepad.
+los. Zeile 3 fragt, ob gewonnen wurde, und ruft dann `showMyWinScreen()` auf. Diese Funktion gibt es
+nicht in Kern: Sie ist ein Beispiel für deinen eigenen Code, der deinen Siegerbildschirm zeigt.
+`gameInput` kennt auch `moveX`, `up`, `boost`, `fire`, `aim`, `reload`, `crouch`, `interact`, `lookX`
+und `lookY`; die Werte addieren sich zu Tastatur, Touch und Gamepad. Das Objekt hat außerdem
+`engine` (alle Studio-Funktionen), `audio` und `net`. Wer ganz ohne Hilfe arbeiten will, ruft die
+Funktionen `kern_studio_…` direkt auf.
 
 **Logik-Graphen als C++:** Der Knopf **C++** im Logik-Editor lädt den Graphen als C++-Text. Mit
-`kern/build.sh --studio` eingebaut, läuft er als Maschinencode statt über Interpreter oder JIT – mit
-demselben Ergebnis ([Kapitel 9](09-logik.md)).
+`kern/build.sh --studio` eingebaut, findet ihn die Engine über einen Fingerabdruck (Hash) des Graphen
+und lässt ihn als Maschinencode laufen statt über Interpreter oder JIT – mit demselben Ergebnis
+([Kapitel 9](09-logik.md)).
 
 ---
 
@@ -288,14 +310,15 @@ Ein C++-Spiel besteht aus `meinspiel/index.html`, `meinspiel.wasm` und `kern/web
 ## 12.6 Veröffentlichen
 
 **Die Rechte:** Kern ist Open Source (Apache License 2.0). Eigene Spiele und Netze darfst du nutzen,
-weitergeben und verkaufen. Wer ein exportiertes Spiel weitergibt, legt Lizenz und NOTICE bei (im
-HTML reicht ein Hinweis mit Link) und lässt die Urheberrechtsvermerke drin. „Made with Kern“ ist
-erlaubt, dein Produkt „Kern“ zu nennen nicht. Teile von anderen behalten ihre Lizenzen
+weitergeben und verkaufen, auch ohne deinen Quellcode zu zeigen. Wer ein exportiertes Spiel
+weitergibt, legt Lizenz und NOTICE bei (im HTML reicht ein Hinweis mit Link) und lässt die
+Urheberrechtsvermerke drin. „Made with Kern“ ist erlaubt, dein Produkt „Kern“ zu nennen nicht. Teile von anderen behalten ihre Lizenzen
 ([Anhang D](D-lizenzen.md)).
 
 **Ausnahme Micro Duck:** Pollens 3D-Modelle der Ente (CC BY-NC-SA 4.0) sind **nur nicht
-kommerziell** erlaubt. Zum Verkaufen baust du mit `KERN_COMMERCIAL=1 tools/build_studio.sh`; dann
-hat die Ente kein Aussehen. Pollens Netze (Apache 2.0) dürfen mit Lizenz und NOTICE mit.
+kommerziell** erlaubt. Zum Verkaufen baust du mit `KERN_COMMERCIAL=1 tools/build_studio.sh` (oder
+`kern/build.sh --commercial`); dann hat die Ente kein Aussehen. Pollens Netze (Apache 2.0) dürfen
+mit Lizenz und NOTICE mit.
 
 **Studio-Spiele** lädst du auf einen Webspace, legst sie in ein Repository mit GitHub Pages oder
 verschickst sie direkt. Mit Ente gehören `microduck/` und `policies/` daneben, sonst kann sie nur
@@ -304,8 +327,9 @@ verschiedene Rechner einem Relay (`node tools/net_relay.mjs`, Port 8790) plus `&
 ([Kapitel 10](10-netzwerk.md)).
 
 **C++-Spiele** lädst du mit derselben Ordnerstruktur hoch. Kern selbst baut so in seiner CI
-(`.github/workflows/ci.yml`) Studio, hello und orbrun und veröffentlicht alles auf
-https://kernengine.de/; der Quellcode liegt auf https://github.com/ChristianHohlfeld/kernengine.de.
+(`.github/workflows/ci.yml`) Studio, hello und orbrun und veröffentlicht alles auf GitHub Pages unter
+https://kernengine.de/ – Studio als installierbare App im Ordner `editor/`, mit den Netzordnern der
+Ente; der Quellcode liegt auf https://github.com/ChristianHohlfeld/kernengine.de.
 
 | Prüfliste | Studio-Spiel | C++-Spiel |
 |---|---|---|

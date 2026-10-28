@@ -57,7 +57,7 @@ Nebenbei misst Kern **Ping**, **Verlust** und **Bandbreite**, geglättet gegen A
 ## 10.4 Kanäle: Einschreiben oder Postkarte
 
 - **Zuverlässig und geordnet** (Einschreiben): genau einmal, in Reihenfolge. Unbestätigtes wird neu
-  geschickt, frühestens nach 0,1 s oder dem 1,25-Fachen des Pings. Große Nachrichten (über 512 Byte)
+  geschickt, nach 0,1 s oder, wenn das länger ist, nach dem 1,25-Fachen des Pings. Große Nachrichten (über 512 Byte)
   reisen in Blöcken.
 - **Unzuverlässig** (Postkarte): einmal mit dem nächsten Päckchen – für Positionen, Eingaben und
   Effekte, die verspätet wertlos sind.
@@ -99,6 +99,10 @@ Netz jedes Mal **genau gleich schlecht** – ideal zum Testen.
   Sounds und Schüsse per Postkarte.
 - Beide brauchen **dasselbe Level**. Das Willkommen trägt eine Prüfsumme (ohne die Editor-Kamera);
   passt sie nicht, kommt „the server plays a different level“.
+- Ein neuer Client bekommt nach dem Willkommen alle Pawns, alles, was Logik bisher erzeugt oder
+  geändert hat, und welche Pickups schon weg sind. So sieht auch ein Nachzügler dieselbe Welt.
+- In der Replika sind alle beweglichen Körper **kinematisch**: Sie folgen nur den Posen aus den
+  Snapshots.
 
 ```cpp
 game::NetGame net(world);
@@ -121,19 +125,24 @@ dessen HUD-Werte wie Gesundheit und Munition mit.
 
 ### Der Prioritätstopf
 
-Ein Snapshot muss in ein Päckchen passen. Jeder Client hat pro Ding einen Punktetopf: bewegt **+10**,
-sonst **+0,25**. Der eigene Pawn kommt immer zuerst, dann nach Punkten, bis 900 Byte voll sind. Wer
-mitkommt, fällt auf 0. Eine ruhende Kiste braucht 10 ÷ 0,25 = **40 Ticks**, um aufzuholen.
+Ein Snapshot muss in ein Päckchen passen. Jeder Client hat pro Ding einen Punktetopf. Pro Snapshot
+gibt es **+10**, wenn sich das Ding seit dem letzten Senden bewegt hat (oder noch nie gesendet wurde),
+sonst **+0,25**. Der eigene Pawn kommt immer zuerst, dann die anderen nach Punkten, bis 900 Byte
+voll sind (höchstens 255 Dinge). Wer mitkommt, fällt auf 0. Eine ruhende Kiste braucht 40 Snapshots
+(10 ÷ 0,25), bis sie so viele Punkte hat wie ein fahrendes Auto nach einem.
 
-> **Krass, aber wahr:** Positionen reisen auf **1 mm** genau im Bereich ±8192 m. Das sind über 16
-> Millionen Werte, und 2²⁴ = 16 777 216 reicht: 24 Bit pro Koordinate.
+> **Krass, aber wahr:** Positionen reisen auf **1 mm** genau im Bereich ±8192 m. Das sind
+> 16 384 000 Millimeterschritte, und 2²⁴ = 16 777 216 reicht: 24 Bit pro Koordinate. Die Drehung
+> braucht „smallest three“ mit 11 Bit je Zahl.
 
 ### Uhr und Zwischenbilder
 
 Bei jedem Snapshot gleicht der Client seine **Uhr** ab: kleineren Zeitabständen folgt er schnell
 (20 %), größeren langsam (2 %), denn das schnellste Päckchen war am wenigsten aufgehalten. Dann
 **interpoliert** er: A sagt bei 1,00 s „x = 10 m“, B bei 1,10 s „x = 12 m“; gezeigt wird 1,05 s, also
-x = 11 m. Fehlt Nachschub, rechnet er bis zu 250 ms weiter.
+x = 11 m. Fehlt Nachschub, rechnet er entlang der letzten Bewegung bis zu 250 ms weiter und hält
+dann an. Der **Puffer** in der Statuszeile sagt, wie weit der neueste Snapshot vor der gezeigten Zeit
+liegt.
 
 > **So kannst du es dir vorstellen:** Ein Daumenkino mit fehlenden Seiten. Kern zeigt eine Seite,
 > die etwas zurückliegt, und malt die Bilder dazwischen selbst.
@@ -145,8 +154,10 @@ x = 11 m. Fehlt Nachschub, rechnet er bis zu 250 ms weiter.
 ![Mehrspieler-Play im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](../buch/bilder/studio-multiplayer.png)
 
 **Play › Number of Players** (1–4) macht die Welt zum **Listen-Server**, einem Server, der
-mitspielt. Jeder weitere Spieler ist ein echter Client mit eigener Welt und eigenem Viewport. Studio
-schaltet auf vier Viewports; Client 1 erscheint in Viewport 2. Nur der **aktive Viewport** bekommt
+mitspielt. Jeder weitere Spieler ist ein echter Client mit eigener Welt und eigenem Viewport,
+verbunden über das Speicher-Netz. War nur ein Viewport offen, schaltet Studio auf vier; Client 1
+erscheint in Viewport 2. Solange Clients noch beitreten, tauscht Studio pro Bild viermal Päckchen
+aus, damit der Handschlag schnell fertig ist. Nur der **aktive Viewport** bekommt
 deine Eingabe. Die Statuszeile zeigt Rolle, Spieler, Ping, Verlust, Bandbreite und je Client den
 Puffer.
 
@@ -159,8 +170,11 @@ Puffer.
 | Terrible | 300 ms (±100) | 20 % |
 
 > **Mission:** Öffne Orb Run in Studio auf https://kernengine.de/, stell **Play › Number of
-> Players** auf **2 Players** und drück **Play**. Klick in Viewport 2 und fahr. Stell dann **Play ›
-> Network Emulation** auf **Terrible** und beobachte Ping und Verlust.
+> Players** auf **2 Players (listen server)** und drück **Play**. Klick in Viewport 2 und fahr.
+> Gib mit **Shift+F1** die Maus frei (Esc würde stoppen), stell **Play › Network Emulation** auf
+> **Terrible** und beobachte Ping und Verlust in der Statuszeile.
+
+Die Konsolenbefehle dazu (`netPlayers`, `netSimulate`) stehen im blauen Buch.
 
 **Online:** **Play › Host Online Game…** bzw. **Join Online Game…** fragt nach einem **Raum**
 (Standard „kern“) und optional einem **Relay**; leer heißt: Tabs dieses Browsers. Alle brauchen
@@ -174,8 +188,8 @@ dasselbe Level. **Leave Online Game** beendet die Sitzung.
 ## 10.9 Exportierte Spiele im Netz
 
 Ein exportiertes Spiel ([Kapitel 11](11-studio.md)) liest seine Adresse: `?host=raum` hostet,
-`?join=raum` tritt bei, `&relay=` plus Adresse nutzt einen Relay. Klappt es nicht, erscheint „Online
-play failed: … – playing alone“.
+`?join=raum` tritt bei, `&relay=` plus Adresse nutzt einen Relay. Ohne Raumnamen gilt „kern“.
+Klappt es nicht, erscheint „Online play failed: … – playing alone“, und du spielst allein.
 
 ---
 
@@ -183,7 +197,8 @@ play failed: … – playing alone“.
 
 **KernNet** trägt nur Bytes, wie UDP es täte; alles andere macht der C++-Teil. Lokal nutzt es einen
 BroadcastChannel: Der Host meldet sich alle 500 ms, ein Gast wartet bis zu 4 s, sonst „no game is
-hosted in room …“. Mit Relay geht es über eine WebSocket-Verbindung.
+hosted in room …“. Mit Relay geht es über eine WebSocket-Verbindung; ist dort kein Host, heißt es
+„nobody hosts room …“.
 
 ---
 
@@ -200,7 +215,8 @@ node tools/net_relay.mjs 8790
 Zeile 1 installiert das Paket, Zeile 2 startet den Relay auf Port 8790 (dem Standard). In den Dialog
 trägst du `ws://`, den Rechnernamen und `:8790` ein. Der Relay vergibt Nummern, setzt sie vor jedes
 Datagramm und stellt zu. Zu große oder unzustellbare Päckchen wirft er weg; geht der Host, ist der
-Raum für Neue zu.
+Raum für Neue zu. Statt der Zahl geht auch die Umgebungsvariable `PORT`. Rufst du den Port im
+Browser auf, antwortet er nur „Kern relay“.
 
 > **So kannst du es dir vorstellen:** Ein Briefträger, der keine Briefe öffnet. Ob ein Päckchen echt
 > ist, prüfen die Empfänger mit CRC32 und Verbindungs-ID.
@@ -216,6 +232,8 @@ Raum für Neue zu.
 | Sounds | erzeugt | spielt ab |
 | Stadtverkehr | simuliert | lokal, Deko |
 | Kamera, Eingabe | lokal | lokal, Eingabe geht zum Server |
+
+Clients schicken bisher nur Eingaben, nichts per Einschreiben.
 
 ---
 
@@ -246,8 +264,9 @@ Müll-Päckchen), Spiele im Netz, den Soldaten, Logik-Änderungen und Number of 
 1. Welcher Kanal passt für „Pickup eingesammelt“?
 2. Wie viele Bit braucht eine Zahl von 0 bis 15?
 3. Warum zeigt der Client absichtlich die Vergangenheit?
-4. **Boss-Rätsel:** Eine Kiste ruht, ein Auto fährt; beide starten mit 0 Punkten, und pro Snapshot
-   passt genau ein Ding (ohne deinen Pawn). Wer wird gesendet, und welche Punkte bleiben?
+4. **Boss-Rätsel:** Kiste und Auto wurden beide schon einmal gesendet und stehen bei 0 Punkten.
+   Jetzt ruht die Kiste, das Auto fährt, und pro Snapshot passt genau ein Ding (ohne deinen Pawn).
+   Wer wird gesendet, und welche Punkte bleiben?
 
 ### Lösungen
 

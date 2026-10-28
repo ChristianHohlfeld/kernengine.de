@@ -108,7 +108,7 @@ for i, p in enumerate(files):
         return m.group(0)
     t = re.sub(r"\[([^\]]+)\]\(([0-9A-Z][^)#\s]*\.md)(#[^)\s]+)?\)", link, t)
     if p.name.startswith("00"):  # in print: the imprint alone (the title page and the table of contents are the book's)
-        t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\thispagestyle{empty}\\begingroup\\footnotesize\\raggedright\n```\n\n## ", t, count=1, flags=re.S | re.M)
+        t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\hypertarget{kap-00}{}\\thispagestyle{empty}\\begingroup\\footnotesize\\raggedright\n```\n\n## ", t, count=1, flags=re.S | re.M)
         t = re.sub(r"^## (.+)$", r"## \1 {.unnumbered}", t, flags=re.M)
         t = re.sub(r"^## (Inhalt|Contents)\b.*\Z", "", t, flags=re.S | re.M)
     # The chapter's first heading carries its id; the imprint and the appendices are not numbered.
