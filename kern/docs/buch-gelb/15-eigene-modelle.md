@@ -131,12 +131,13 @@ Für Kerns `jump.onnx` ergab das 40 von 40 sauber und 36 von 40 variiert, ohne S
 **Hyperparameter** sind die Einstellungen vor dem Lernen. Eine Iteration mit 32 Enten: 32 × 48 = 1536
 Zeilen (Rauschen 0,1), aufgeteilt in 4 Minibatches à 384 Zeilen (je 8 Teile à 48), 5 Epochen × 4 =
 20 Adam-Schritte, vor jedem die Lernratenprüfung. Beim Nachahmen wären 8 × 96 × 100 = 76 800 Beispiele
-möglich; es waren 49 936, weil Episoden bei Sturz früher enden.
+möglich; es waren 49 936, weil eine Episode früher endet, sobald die Ente fällt oder ein anderes Teil
+als die Sohlen den Boden berührt.
 
 | Option | Sprung-Rezept | Wirkung |
 |---|---|---|
 | `--envs N` | 16 je Thread | mehr Daten; **ändert das Netz** |
-| `--threads N` | alle Kerne | nur das Tempo |
+| `--threads N` | alle Kerne | Tempo (bei festem `--envs`) |
 | `--steps N` | 48 | Takte je Ente und Iteration |
 | `--epochs`, `--minibatches` | 5, 4 | Lernschritte je Iteration |
 | `--lr X` | 10⁻⁴ | Startlernrate |
@@ -149,7 +150,10 @@ möglich; es waren 49 936, weil Episoden bei Sturz früher enden.
 | `--substeps N` | 16 | nicht ändern! |
 | `--profil servo.json` | XL330 | kalibrierte Servos |
 
-Dazu `--adaptive-lr 0|1`. Beim Warmstart muss der Actor zu velstand passen. Tipps aus echten Läufen:
+Dazu `--adaptive-lr 0|1`. Beim Warmstart muss der Actor zu velstand passen. Ohne `--envs` gilt
+„16 je Thread“: Wer dann die Threads ändert, ändert auch die Zahl der Enten – und damit das Netz.
+`--warm-start` kennt nur `velstand`; jeder andere Wert startet mit Zufallsgewichten. Einen Warmstart
+aus einer Datei gibt es nur beim Üben der Spielschicht. Tipps aus echten Läufen:
 nach dem Nachahmen vorsichtig sein; mehr Rauschen hilft nicht beim Finden; wenige Enten bremsen; mit
 8 statt 16 Unterschritten lernt das Netz eine andere Physik.
 
@@ -199,12 +203,13 @@ Das Netz braucht die Form eines rsl_rl-Actors; ein Spielnetz ohne 23 Eingänge u
 nicht gerechnet.
 
 > **Mission:** Hast du im Browser-Lehrer einen Sprung trainiert? Öffne auf demselben Gerät Kern Studio,
-> lade File › Example Levels › Micro Duck, starte Play, drücke F8 und dann **7**. Öffne die
+> lade File › Example Levels › Micro Duck (läuft Play, erst mit Esc stoppen), starte Play, drücke F8
+> und dann **7**. Öffne die
 > Browser-Konsole: Dort steht „Kern: trained network jump.onnx loaded“. Jetzt springt **dein** Netz.
 
 > **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter Details › Player Controller ›
-> Walker nach **Autonomous** und **Kern extras**. Starte Play einmal mit und einmal ohne Kern extras.
-> Was macht die Ente mit Ball und Socke anders?
+> Walker nach **Autonomous** und **Kern extras**. Starte Play einmal mit und einmal ohne Kern extras
+> (zum Umschalten erst mit Esc stoppen). Was macht die Ente mit Ball und Socke anders?
 
 ## 15.9 Eine neue Aufgabe hinzufügen
 
@@ -225,7 +230,9 @@ Dazu kommen Start, Phasensignal (Plätze 55/56), Lehrpläne und Belohnung mit Hi
 `fell`. Das ganze Gerüst steht im blauen Buch.
 
 **2. Rezept und Namen** in `recipe.cpp` eintragen (etwa Warmstart velstand, Lernrate 10⁻⁴). Dann
-kennen Werkzeug und Browser die Aufgabe; der Lehrer-Seite fehlt nur ein Menüeintrag.
+kennen Werkzeug und Browser die Aufgabe; der Lehrer-Seite fehlt nur ein Menüeintrag. Nutzt die
+Aufgabe Plätze, die velstand nie gesehen hat, müssen sie beim Warmstart als neue Eingänge gelten;
+das macht Kern derzeit nur für die Phasenplätze 55 und 56.
 
 **3. Messen** wie der `JumpMeter`: prüfen, was die Bewegung **ist**, nicht was die Belohnung zählt.
 
@@ -283,7 +290,8 @@ Nachahmen bleiben gleich.
 ### Lösungen
 
 1. Die **7** (auf dem Handy der Knopf HOP).
-2. Threads ändern nur das Tempo. Die Zahl der Enten ändert die Daten und damit das Netz.
+2. Kommt drauf an: Mit festem `--envs` ändern Threads nur das Tempo. Ohne `--envs` gilt 16 Enten je
+   Thread – 16 statt 128 Enten, also andere Daten und ein anderes Netz. `--envs` ändert es immer.
 3. Die Policy ändert sich je Schritt zu stark; die Regel drückt die Lernrate ganz nach unten.
 4. 120 Sekunden: Nur hier bedeutet `--seed` die Dauer, nicht den Zufallsstart.
 

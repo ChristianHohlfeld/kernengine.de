@@ -33,7 +33,7 @@ x1 ──w1──┐
 x2 ──w2──┘
 ```
 
-Ein Neuron mit **zwei Eingängen** soll entscheiden, wie stark ein Knie nachgibt. x1 = 0,5 ist die
+Ein ausgedachtes Beispiel: Ein Neuron mit **zwei Eingängen** soll entscheiden, wie stark ein Knie nachgibt. x1 = 0,5 ist die
 Neigung des Rumpfs, x2 = 2 sein Tempo nach vorn. Die Gewichte sind w1 = 0,8 und w2 = −0,5, der Bias
 b = 0,1.
 
@@ -51,7 +51,7 @@ Das liegt an der Aktivierung.
 
 Kern nutzt **ELU**, wie die Bibliothek rsl_rl, mit der Pollen Robotics die Netze der Ente trainiert.
 Ist z positiv, bleibt es, wie es ist. Ist z negativ, rechnet ELU *e hoch z minus 1* mit e ≈ 2,718: Für
-z = −0,5 ist 2,718⁻⁰'⁵ ≈ 0,607, also ELU(−0,5) ≈ −0,39. Nach unten nähert sich ELU der −1.
+z = −0,5 ist e hoch −0,5 ≈ 0,607, also ELU(−0,5) ≈ −0,39. Nach unten nähert sich ELU der −1.
 
 ```
 ELU(z)
@@ -63,7 +63,8 @@ ELU(z)
 
 Ohne so einen Knick wären viele Schichten nicht besser als eine: Mal 2 und dann mal 3 ist dasselbe wie
 mal 6. Erst der Knick erlaubt Regeln wie „Knie stärker beugen, je schneller sie kippt – aber nur bis
-zum Anschlag“. Anders als tanh oder ReLU ist ELU glatt und hat kein „totes“ Gebiet.
+zum Anschlag“. tanh wird an beiden Enden flach, ReLU (alles unter 0 wird 0) hat ein „totes“ Gebiet. ELU ist glatt
+und hat kein totes Gebiet.
 
 ### Schichten und das MLP
 
@@ -199,8 +200,9 @@ oder 1000 ist.
 > **Krass, aber wahr:** Beide Mittel starten bei 0 und wären anfangs viel zu klein. Adam rechnet das mit
 > einer Korrektur heraus – sonst würde der kluge Wanderer kaum loslaufen.
 
-Kern nutzt die Standardwerte von PyTorch. Actor, Kritiker und Nachahmen haben je einen eigenen Adam,
-und sein Gedächtnis kommt in den Checkpoint.
+Kern nutzt die Standardwerte von PyTorch. Actor, Kritiker und Nachahmen haben je einen eigenen Adam.
+Das Gedächtnis der Adams von Actor und Kritiker kommt in den Checkpoint: Ein fortgesetzter Lauf
+macht genau die Schritte, die der ununterbrochene gemacht hätte.
 
 ## A.7 Normalisierung: alle auf Augenhöhe
 
@@ -214,7 +216,9 @@ neu = (x − Mittelwert) / (Streuung + 0,01)
 Mittel 2, Streuung 3, Wert 8: (8 − 2) / 3,01 ≈ 1,99. Die 0,01 verhindert das Teilen durch 0. Mittel
 und Streuung werden laufend nachgeführt (Chans Formel braucht dafür nur Mittel, Streuung und Anzahl und
 ist exakt). Der Normalisierer **gehört zum Netz**: Ohne genau diese Umrechnung ist es wertlos, darum
-steht er im Export mit drin.
+steht er im Export mit drin. Beim Warmstart übernimmt Kern den Normalisierer des alten Netzes und
+**friert ihn ein**. Und weil er bei wenigen Dutzend Enten zwischen zwei Iterationen merklich wandert,
+bewertet der Lerner die alte Policy mit dem neuen Normalisierer noch einmal neu.
 
 ## A.8 Auswendiglernen gegen Verstehen
 
@@ -266,7 +270,8 @@ flowchart TD
 Bei **DAgger** fährt der Schüler, und das Vorbild sagt in jeder Lage, was **es** getan hätte. So
 entstehen Daten genau dort, wohin der Schüler gerät. Kern gibt etwas Zusatzrauschen dazu, damit auch
 Lagen knapp neben der Spur vorkommen. Das Vorbild muss überall eine Antwort haben und darf nichts
-wissen, was das Netz nicht sieht.
+wissen, was das Netz nicht sieht. Beim Sprung sind es 8 Runden à 96 Episoden; ab Runde 7 springt das
+Netz zum ersten Mal echt. Das Spielnetz lernt genauso.
 
 ## A.10 Lernen durch Belohnung
 
@@ -294,7 +299,8 @@ ab – wie beim Schach nur die Stellung zählt.
 ### Zustand und Beobachtung
 
 Der **Zustand** ist alles: jede Lage, jedes Tempo. Die Ente bekommt nur eine **Beobachtung** – was ihre
-Sensoren liefern, mit Rauschen und Verzögerung. Ihre wahre Höhe kennt sie nicht. Die letzte Aktion ist
+Sensoren liefern, mit Rauschen und Verzögerung. Ihre wahre Höhe kennt sie nicht. Fachleute nennen das
+ein **teilweise beobachtbares** MDP (POMDP). Die letzte Aktion ist
 Teil der Beobachtung, ein Mini-Gedächtnis.
 
 ### Belohnung und Return
@@ -419,7 +425,8 @@ Sammeln und Lernen sind getrennt: Sammler brauchen nur die Policy, der Lerner nu
 können Sammler Threads oder Web Worker sein. Weil Kern alles in fester Reihenfolge rechnet, entsteht
 überall dasselbe Netz.
 
-> **Mission:** Starte im Lehrer einen Sprung-Lauf und schau auf die Kurve. Die grüne Linie ist die
+> **Mission:** Starte im Lehrer „Stehen (Schnelltest)“ und schau auf die Kurve (beim Sprung beginnt
+> sie erst nach dem Nachahmen). Die grüne Linie ist die
 > Episoden-Rückgabe, der Return. Steigt sie, sammeln die Enten mehr Belohnung – Reinforcement Learning
 > live auf deinem Gerät.
 
@@ -440,9 +447,10 @@ Höhe: der **asymmetrische Kritiker**. Und beim **Warmstart** beginnt ein Netz b
 Kerns Sprung als Pollens Laufnetz **velstand**, das schon balancieren kann.
 
 > **Mission:** Lade in Kern Studio auf https://kernengine.de/ das Level File › Example Levels › Micro
-> Duck und starte Play. Heb die Ente mit der Maus am Rumpf hoch und setz sie wieder ab: Sie pausiert und
-> läuft danach weiter. Dass ein Netz solche Störungen wegsteckt, lernt es, indem es in vielen leicht
-> verschiedenen Welten übt.
+> Duck (läuft Play oder Simulate, erst mit Esc stoppen) und starte Play. Das Level beginnt mit der
+> Beobachterkamera. Zieh die Ente mit der Maus am Rumpf hoch und setz sie wieder ab: Sie pausiert
+> und läuft danach weiter. Das Hochheben erkennt übrigens ein eigenes kleines Netz von Pollen
+> Robotics, kein Training mit Variation.
 
 ## A.13 Suchen wie die Evolution: CMA-ES
 

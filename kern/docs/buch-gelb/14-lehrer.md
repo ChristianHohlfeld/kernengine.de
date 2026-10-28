@@ -12,8 +12,9 @@ WebAssembly im Browser, auf Computer und Handy.
 Die Ente im Lehrer ist **dieselbe** wie im Studio: dieselbe Spielwelt, dieselben Servos und Sensoren,
 derselbe Regler mit 50 Takten pro Sekunde, dieselbe Physik mit 16 Unterschritten
 ([Kapitel 13](13-micro-duck.md)). Ein Netz von hier läuft darum unverändert im Studio. Gespeichert wird
-es im Format der Netze von Pollen Robotics. Auf dem echten Roboter ist es nicht erprobt; ihn nur
-zusammen mit einem Erwachsenen benutzen ([Kapitel 16](16-kalibrierung.md)).
+es im Format der Netze von Pollen Robotics. Auf dem echten Roboter ist es nicht erprobt: Wer ein selbst trainiertes Netz
+auf Hardware lädt, tut das auf eigenes Risiko – und nur zusammen mit einem Erwachsenen
+([Kapitel 16](16-kalibrierung.md)).
 
 So sind Kerns Netze `jump.onnx` (der Sprung) und `play.onnx` (die Spielschicht) entstanden. Was ein
 Netz ist und wie Nachahmen und Belohnung funktionieren, erklärt
@@ -182,8 +183,8 @@ allen Rezepten die Schichten 256 und 128.
    - Die 8 Teile werden **in fester Reihenfolge** addiert, dann macht je ein Adam einen Schritt für
      Actor (mit σ) und Kritiker.
 
-> **Krass, aber wahr:** 32 Enten × 48 Takte = 1536 Zeilen pro Iteration. Für den fertigen Sprung
-> braucht es 3000 Iterationen.
+> **Krass, aber wahr:** 32 Enten × 48 Takte = 1536 Zeilen pro Iteration. Jeder Takt sind 0,02 s,
+> also sammelt der Lehrer pro Iteration 1536 × 0,02 s ≈ 31 Sekunden Entenleben.
 
 **Kritiker zuerst:** Nach dem Nachahmen ist der Actor gut, der Kritiker ahnungslos. Seine Urteile
 würden den Actor zerstören. Darum lernt 30 Iterationen lang (Spielschicht: 20) **nur der Kritiker**.
@@ -222,12 +223,18 @@ Vorbild entstand in **370 Generationen**.
 
 ### Nachahmen mit DAgger
 
+Nur aus den Fahrten des Vorbilds zu lernen hat einen Haken: Das Netz kennt dann nur Zustände, in die
+das Vorbild gerät. Macht es selbst einen kleinen Fehler, landet es irgendwo, wo es nie war, macht
+einen größeren Fehler – und die Fehler wachsen. Das heißt **Verteilungsverschiebung**. DAgger lässt
+darum das Netz selbst fahren und das Vorbild nur beschriften:
+
 1. **Runde 0:** Das Vorbild fährt, jede Beobachtung bekommt seine Aktion als Beschriftung.
 2. **Ab Runde 1:** Das Netz fährt selbst (mit Rauschen 0,05), das Vorbild sagt in jedem Takt, was
    **es** getan hätte.
 3. Nach jeder Runde lernt das Netz aus **allen** Beispielen.
 
-Beim Sprung: 8 Runden mit je 96 Episoden in voller Variation, gelernt mit eigenem Adam, 10 Epochen,
+So landen genau die Zustände im Datensatz, in die das Netz selbst gerät – mit der richtigen Antwort.
+Dafür muss das Vorbild in jedem dieser Zustände eine sinnvolle Antwort haben. Beim Sprung: 8 Runden mit je 96 Episoden in voller Variation, gelernt mit eigenem Adam, 10 Epochen,
 Minibatch 256, Lernrate 10⁻³. Danach **übt** das Netz mit PPO: Rauschen 0,1, erst 30 Iterationen nur
 Kritiker, dann Sprung-Belohnung plus Belohnung fürs Nachahmen, mit voller Variation.
 
@@ -302,10 +309,11 @@ Tragen, +10 für einen Kick, der den Ball 0,25 m bewegt, +10 fürs Ablegen 0,25 
 Sturz.
 
 **Das Vorbild** sieht **genau dasselbe wie das Netz** und hat kein verstecktes Gedächtnis (außer der
-Startstelle des linken Fußes). Es geht zum näheren Ziel, dreht sich, wenn es nichts sieht, nähert sich
+Startstelle des linken Fußes). Läuft ein Kick, tut es nichts; läuft ein Aufheben, öffnet es den
+Schnabel im richtigen Moment. Hält es etwas, geht es los und spuckt es nach 0,3 m wieder aus. Sonst geht es zum näheren Ziel, dreht sich, wenn es nichts sieht, nähert sich
 langsam, sagt „Stopp“ an einer gemessenen Stelle, wartet, bis es wirklich steht (beide Sohlen länger
 als 0,25 s am Boden), und startet dann Kick oder Aufheben. Liegt das Ziel falsch, geht es zurück. Der
-Wunsch zu kicken steigt als **Rampe** an, damit das Netz ihn aus der Stehzeit ablesen kann.
+Wunsch nach Kick oder Aufheben steigt als **Rampe** an, damit das Netz ihn aus der Stehzeit ablesen kann.
 Das Netz ahmt dieses Vorbild mit DAgger nach (halb sauber, halb variiert) und übt danach mit PPO,
 anfangs 20 Iterationen nur mit dem Kritiker.
 
@@ -350,8 +358,8 @@ Der Browser lernt **dasselbe Netz** (gleiche 49 936 Beispiele), nur langsamer (b
 WebAssembly hier ohne SIMD und ohne Threads im Worker rechnet. Ein Entenschritt sind 4 Weltschritte mit
 je 16 Unterschritten. Mit 8 wäre es 1,6-mal schneller, aber die Bewegungen würden sich ändern.
 
-> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und lade File › Example Levels › Micro Duck.
-> Starte Play, übernimm die Ente mit F8 und drücke **7**. Das ist `jump.onnx` aus diesem Kapitel. Auf
+> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und lade File › Example Levels › Micro Duck
+> (läuft gerade Play oder Simulate, erst mit Esc stoppen). Starte Play, übernimm die Ente mit F8 und drücke **7**. Das ist `jump.onnx` aus diesem Kapitel. Auf
 > dem Handy heißt der Knopf **HOP**.
 
 ## 14.10 ONNX-Export und Metadaten
@@ -388,8 +396,9 @@ Ein-Kern-Fall gemessen. Die Seite zeigt dir das Tempo deines Geräts selbst.
 > **Mission:** Öffne den Lehrer, wähle „Stehen (Schnelltest)“ und drücke Start. Rechne: Worker ×
 > Enten je Worker = Enten insgesamt. Wie viele Schritte pro Sekunde schafft dein Gerät?
 
-> **Mission:** Starte einen Sprung-Lauf mit Seed 1, notiere nach ein paar Iterationen die Rückgabe,
-> lade neu und starte genauso noch einmal. Stimmen die Rückgaben? Das ist Determinismus.
+> **Mission:** Starte „Stehen (Schnelltest)“ mit Seed 1, notiere nach ein paar Iterationen die
+> mittlere Episoden-Rückgabe, lade neu und starte mit denselben Einstellungen noch einmal. Stimmen
+> die Zahlen? Das ist Determinismus.
 
 > **Für Profis:** Der Lerner nimmt JSON-Einstellungen an, die das Rezept überschreiben, etwa
 > `learningRate`, `initStd`, `desiredKl`, `steps` oder `warmStart`.

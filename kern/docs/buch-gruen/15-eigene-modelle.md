@@ -168,7 +168,7 @@ weil Episoden bei Sturz oder Bodenkontakt früher enden. Nach jeder Runde wird d
 | Option | Sprung-Rezept | Wirkung |
 |---|---|---|
 | `--envs N` | 16 je Thread | mehr Daten, ruhigerer Gradient; **bestimmt das Ergebnis** |
-| `--threads N` | alle Kerne | nur die Geschwindigkeit |
+| `--threads N` | alle Kerne | die Geschwindigkeit – bei festem `--envs`; ohne `--envs` gibt es 16 Enten je Thread |
 | `--steps N` | 48 | Takte je Ente und Iteration |
 | `--lr X`, `--kl X` | 10⁻⁴, 0,01 | Startlernrate, Ziel-KL |
 | `--uebungs-std X` | 0,1 | Rauschen beim Üben |
@@ -353,7 +353,8 @@ Aus `docs/lehrer.md`, damit du nicht hineintappst:
 1. 4000 – `--iterations` ist das Ziel.
 2. Fünf Episoden sind ein sehr kleiner, verrauschter Test; ein Netz kann zufällig gut aussehen.
    Und erst mit Variation zeigt sich, ob es robust ist.
-3. Mehr Threads: gleiches Netz, nur schneller. Mehr Enten: anderes Netz.
+3. Mehr Threads bei festem `--envs`: gleiches Netz, nur schneller. Ohne `--envs` bringen mehr Threads
+   aber mehr Enten mit (16 je Thread) – und mehr Enten heißt: anderes Netz.
 4. Weil Netze Lücken in der Belohnung ausnutzen. Die Messung muss prüfen, ob die Bewegung
    wirklich passiert ist.
 
