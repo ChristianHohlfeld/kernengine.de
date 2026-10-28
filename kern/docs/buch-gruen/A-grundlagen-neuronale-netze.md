@@ -394,11 +394,11 @@ sind 2 Sekunden: genau so lang wie ein ganzer Sprung.
 Die **Policy** ist die Entscheidungsregel: Beobachtung rein, Aktion raus. Zum Lernen ist sie
 **zufällig** (sie würfelt um einen Mittelwert herum), auf dem Roboter nimmt man nur den Mittelwert.
 
-Der **Wert** V einer Lage sagt: „Wie viel Return erwarte ich ab hier?“ Der **Vorteil** einer Aktion
-sagt: „War sie besser oder schlechter als das, was ich hier sonst so tue?“ Positiv heißt besser.
-Dazwischen steht der **Aktionswert** Q: der erwartete Return, wenn ich erst genau diese Aktion
-wähle und danach wie gewohnt weitermache. Der Vorteil ist Q minus V.
-Genau das braucht das Lernen: Mach mehr von dem, was besser als üblich war.
+Der **Wert** V einer Lage sagt: „Wie viel Return erwarte ich ab hier?“ Der **Aktionswert** Q sagt:
+„Wie viel Return erwarte ich, wenn ich erst genau diese Aktion wähle und danach wie gewohnt
+weitermache?“ Der **Vorteil** einer Aktion ist Q minus V, also: „War sie besser oder schlechter als
+das, was ich hier sonst so tue?“ Positiv heißt besser. Genau das braucht das Lernen: Mach mehr von
+dem, was besser als üblich war.
 
 Eine einfache Schätzung des Vorteils aus einem Schritt ist der **TD-Fehler**: das, was passiert ist
 (Belohnung plus Wert der neuen Lage mal γ), minus das, was man erwartet hatte (Wert der alten Lage).
@@ -428,9 +428,8 @@ Seed und ihrer Nummer abhängt, nie davon, welcher Worker sie rechnet.
 ### Entropie: die Neugier am Leben halten
 
 Die **Entropie** misst, wie unbestimmt eine Verteilung ist. Bei der Glockenkurve hängt sie nur
-von σ ab: σ = 1 ergibt pro Aktion 1,419, σ = 0,1 ergibt −0,884 (bei kontinuierlichen Verteilungen darf die
-Entropie negativ sein). Ohne Gegenmaßnahme schrumpft σ oft
-zu schnell, die Ente hört auf auszuprobieren und bleibt bei der ersten halbwegs brauchbaren Lösung
+von σ ab: σ = 1 ergibt pro Aktion 1,419, σ = 0,1 ergibt −0,884 (bei kontinuierlichen Verteilungen
+darf die Entropie negativ sein). Ohne Gegenmaßnahme schrumpft σ oft zu schnell, die Ente hört auf auszuprobieren und bleibt bei der ersten halbwegs brauchbaren Lösung
 hängen. Ein kleiner **Entropie-Bonus** im Verlust hält sie neugierig (Kern: 0,01, beim Sprung
 0,005).
 
@@ -474,15 +473,15 @@ return_buf_[row] = adv + v;
 
 Zeile 1 ist der TD-Fehler, Zeile 2 die GAE-Rückwärtssumme, Zeile 3 das Ziel des Kritikers. `live`
 ist 0 nach einem Episodenende; dann gibt es keine Fortsetzung. Für den letzten Schritt des
-Rollouts schätzt der Kritiker den Wert dort, wo jede Ente gerade steht. Am Schluss werden alle Vorteile auf
-Mittel 0 und Streuung 1 gebracht, damit ihre Größe nicht von der Größe der Belohnungen abhängt.
+Rollouts schätzt der Kritiker den Wert dort, wo jede Ente gerade steht. Am Schluss werden alle
+Vorteile auf Mittel 0 und Streuung 1 gebracht, damit ihre Größe nicht von der Größe der Belohnungen abhängt.
 
 ### Warum zu große Schritte gefährlich sind
 
 Die Daten stammen von der **alten** Policy. Macht man einen großen Schritt, ist die neue Policy weit
 weg, die Vorteile gelten für sie nicht mehr, und eine gute Policy kann in einem Schritt kaputtgehen.
 Dann sammelt sie schlechte Daten, aus denen sie sich kaum erholt. Mehrere Epochen auf denselben
-Daten, die eigentlich sparsam wären, machen es noch schlimmer.
+Daten – eigentlich praktisch, weil man die Daten besser ausnutzt – machen es noch schlimmer.
 
 ### PPO: Verbessern mit Gurt
 
@@ -508,7 +507,8 @@ in diese Richtung schieben würde, findet nicht statt.
 
 Zusätzlich regelt Kern wie rsl_rl die **Lernrate** über die **KL-Divergenz**, ein Maß dafür, wie
 verschieden alte und neue Policy sind: Ist sie größer als 0,02, wird die Lernrate durch 1,5 geteilt,
-unter 0,005 mit 1,5 malgenommen, immer zwischen 10⁻⁵ und 10⁻². Große Schritte, wenn es ruhig ist, kleine, wenn die Policy springt.
+unter 0,005 mit 1,5 malgenommen, immer zwischen 10⁻⁵ und 10⁻². Große Schritte, wenn es ruhig ist,
+kleine, wenn die Policy springt.
 Auch der Kritiker hat eine Bremse: Seine Schätzung darf sich pro Update nur um ε vom alten Wert
 entfernen.
 
@@ -536,11 +536,17 @@ Lerner nimmt alle Rollouts. Deshalb können die Sammler Threads oder Web Worker 
 Kommazahlen im Computer sind tückisch: (0,1 + 0,2) + 0,3 ergibt im Rechner nicht exakt dasselbe wie
 0,1 + (0,2 + 0,3) – im letzten Bit unterscheiden sie sich. Summiert man Gradienten in einer
 Reihenfolge, die von der Zahl der Threads abhängt, bekommt man auf 2 und 16 Kernen verschiedene
-Netze. Kern gibt deshalb jeder Ente ihren Seed aus ihrer globalen Nummer, ordnet alle Rollouts in eine
-feste Reihenfolge, summiert immer in fester Reihenfolge (jede Minibatch in genau 8 Teilen), nimmt
-alle Mathe-Funktionen aus `kern::dm` und verzichtet auf FMA. Das Ergebnis: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
-([Kapitel 14.7](14-lehrer.md),
-[Anhang C](C-grundlagen-physik.md)).
+Netze. Kern verhindert das:
+
+- Jede Ente bekommt ihren Seed aus ihrer globalen Nummer.
+- Alle Rollouts kommen in eine feste Reihenfolge, und summiert wird immer in fester Reihenfolge
+  (jede Minibatch in genau 8 Teilen).
+- Alle Mathe-Funktionen kommen aus `kern::dm`.
+- Kein FMA: Der Compiler darf „a mal b plus c“ nicht zu einem Befehl zusammenfassen, der je nach
+  Prozessor anders rundet.
+
+Das Ergebnis: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
+([Kapitel 14.7](14-lehrer.md), [Anhang C](C-grundlagen-physik.md)).
 
 ## A.12 Von der Simulation in die Wirklichkeit
 

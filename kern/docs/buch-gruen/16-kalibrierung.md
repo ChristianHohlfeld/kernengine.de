@@ -68,10 +68,10 @@ So hängt das Netz nicht an Zahlen, die niemand genau kennt.
 
 ### Log und Prüfstand im Computer
 
-Ein Prüfstand-Log ist eine Textdatei: oben Kommentarzeilen zur Last (`# mass`, `# arm` …), dann
-Zeilen mit Zeit, gesendetem und gemessenem Winkel (`# horizontal 1`: Achse waagerecht, die
-Schwerkraft zieht den Arm wie ein Pendel). Kern baut den Servo mit Last in Box3D nach, in derselben Umgebung wie die Ente (Maßstab 4, gleiche
-Schrittrate, Gelenkweichheit und Armatur), spielt die gesendeten Ziele mit Verzögerung ab und
+Ein Prüfstand-Log ist eine Textdatei: oben Kommentarzeilen zur Last (`# mass`, `# arm` …;
+`# horizontal 1` heißt: Achse waagerecht, die Schwerkraft zieht den Arm wie ein Pendel), dann
+Zeilen mit Zeit, gesendetem und gemessenem Winkel. Kern baut den Servo mit Last in Box3D nach, in
+derselben Umgebung wie die Ente (Maßstab 4, gleiche Schrittrate, Gelenkweichheit und Armatur), spielt die gesendeten Ziele mit Verzögerung ab und
 vergleicht simulierten und gemessenen Winkel. Der Fehler ist der quadratische Mittelwert, kurz **RMS**.
 
 ### Anpassen und prüfen
@@ -123,8 +123,7 @@ Bleibt ein Gelenk auffällig, fehlt dort etwas im Modell, etwa Getriebespiel.
 
 Das Schöne: Ein Log aus der Simulation, mit denselben Servos abgespielt, ergibt Abstand **genau 0**,
 Bit für Bit, denn die Simulation ist deterministisch; mit anderen Servos ergibt sich ein messbarer
-Abstand. Darum ist jeder Unterschied zu einem echten
-Log ein echter Modellfehler und kein Rauschen.
+Abstand. Darum ist jeder Unterschied zu einem echten Log ein echter Modellfehler und kein Rauschen.
 
 > **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die Step rate auf 90 statt
 > 100 und starte Play. Kern meldet, dass der Takt nicht passt:
@@ -148,7 +147,7 @@ Was nicht gemessen ist oder streut, würfelt das Training aus:
 |---|---|
 | Servo-Exemplare | eigene Werte je Servo (XL330: ±10 %) |
 | Buslatenz | 15–30 ms |
-| Bau (Akku, Kabel …) | Rumpfmasse ±5 %, Schwerpunkt verschoben |
+| Bau (Akku, Kabel …) | Rumpfmasse und -trägheit ±5 %, Schwerpunkt verschoben |
 | Boden | Sohlenreibung × 0,7–1,3 |
 | Lagesensor, Gelenkgeber | Rauschen, 0–1 Takt Verzögerung, Versatz bis ±0,015 rad |
 | Störungen | Stöße alle 3–6 s, bis ±0,3 m/s |
@@ -157,8 +156,8 @@ Was nicht gemessen ist oder streut, würfelt das Training aus:
 
 Genaue Bereiche in [Kapitel 14](14-lehrer.md). Ein Trick: Der **Kritiker**, der beim Training
 bewertet, sieht immer den sauberen Zustand; nur der **Actor**, der auf den Roboter kommt, muss mit
-verrauschten Sensoren klarkommen. Getriebespiel variiert nur Pollens Training über eigene Varianten des Bauplans (velstand ist
-dagegen robust); Kerns eigene Netze lernen ohne.
+verrauschten Sensoren klarkommen. Getriebespiel variiert nur Pollens Training, über eigene
+Varianten des Bauplans (velstand ist dagegen robust); Kerns eigene Netze lernen ohne.
 
 ## 16.6 In der Physik messen statt eintragen
 

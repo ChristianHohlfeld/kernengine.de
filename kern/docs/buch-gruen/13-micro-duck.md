@@ -86,8 +86,8 @@ Trick: Jedes Glied bekommt eine **dünne gedachte Scheibe** auf der Gelenkachse 
 Warum eine Scheibe? Ein Körper, der nur um eine einzige Achse träge wäre, ist kein echter starrer
 Körper, und Box3D würde damit Energie gewinnen. Perfekt ist die Scheibe nicht – sie dreht mit dem
 Glied statt 288-mal schneller; dreht sich das Elternglied um dieselbe Achse, ist die Trägheit etwas
-zu groß –, aber gemessen
-läuft die Ente damit näher am Training und zappelt deutlich weniger (Abschnitt 13.14).
+zu groß –, aber gemessen läuft die Ente damit näher am Training und zappelt deutlich weniger
+(Abschnitt 13.14).
 
 ### Was die Welt berührt
 
@@ -115,8 +115,9 @@ lässt Kontakte bis 5 mm einsinken; gemessen stehen die Sohlen nur 0,3–0,6 mm 
 Box3D mag Körper zwischen 10 cm und 10 m. Die Glieder der Ente sind 2 bis 4 cm klein. Also baut Kern
 sie **viermal so groß** und rechnet an genau einer Stelle um, nach einer Regel aus dem Schiffsbau
 (Froude-Ähnlichkeit): Längen ×4, Massen ×64, Trägheiten ×1024, Momente und Servosteifigkeit ×256,
-Dämpfung ×512, Zeiten und Geschwindigkeiten ×2, Drehgeschwindigkeiten ×½. Das Netz merkt davon nichts: Kern rechnet alles in echte Robotereinheiten zurück, und auch alle
-Werte, die du über Logik oder Sensoren bekommst, sind echte Meter und Sekunden.
+Dämpfung ×512, Zeiten und Geschwindigkeiten ×2, Drehgeschwindigkeiten ×½. Das Netz merkt davon
+nichts: Kern rechnet alles in echte Robotereinheiten zurück, und auch alle Werte, die du über Logik
+oder Sensoren bekommst, sind echte Meter und Sekunden.
 
 ### Aussehen, Rollschuhe, Einbau
 
@@ -162,16 +163,17 @@ erreicht er erst bei 1,7 rad Abweichung. Die Servos sind also **weich** – eher
 Hand als ein Schraubstock.
 
 Eine einzige Funktion (`game::servo_step`) setzt das in jedem Physikschritt um – im Studio, im
-Lehrer und auf dem Prüfstand der Kalibrierung gleich. Der Zug ist Box3Ds Gelenkfeder; sie wird
-implizit gerechnet und bleibt darum bei jeder Steifigkeit stabil. Die Reibung ist ein Motor mit
-Sollgeschwindigkeit 0, dessen Kraft genau die Reibung ist.
+Lehrer und auf dem Prüfstand der Kalibrierung gleich. Den Zug übernimmt Box3Ds eingebaute
+Gelenkfeder, die Box3D so rechnet, dass sie bei jeder Steifigkeit stabil bleibt. Die Reibung ist ein
+Motor, der das Gelenk anhalten will (Sollgeschwindigkeit 0), aber höchstens mit der Kraft der
+Reibung.
 
 > **Wusstest du?** Die Firmware des echten Servos begrenzt den Strom auf 1,75 A, also 0,64 N·m.
 > Damit käme die Ente nicht mehr vom Rücken hoch! Pollen trainiert ausdrücklich ohne diese Grenze,
 > und Kern auch.
 
-Ein Profil gilt für alle Servos einer Ente oder für ein einzelnes Gelenk (auch den Schnabel). Eigene Profile misst man
-wie in [Kapitel 16](16-kalibrierung.md).
+Ein Profil gilt für alle Servos einer Ente oder für ein einzelnes Gelenk (auch den Schnabel).
+Eigene Profile misst man wie in [Kapitel 16](16-kalibrierung.md).
 
 ## 13.5 Der Takt
 
@@ -183,9 +185,11 @@ Schritte denken. Beides rechnet Kern beim Start jeder Ente aus der Schrittrate d
 nicht, rundet Kern auf ganze Schritte und sagt Bescheid („set World Settings > Step Rate to 100“).
 
 Die Befehlsverzögerung von 20 ms ist eine Warteschlange: Jeder Befehl wartet 4 Physikschritte, wie
-ein Brief, der unterwegs ist. Die Spielschicht denkt noch seltener, 25-mal pro Sekunde. Die Spielschleife folgt dem Rezept „Fix Your
-Timestep“: Jeder Frame liefert Zeit, die Simulation verbraucht sie in festen Schritten, der Rest
-wartet im Akkumulator, gezeichnet wird zwischen den letzten beiden Zuständen, und die Zeit ist ein
+ein Brief, der unterwegs ist. Die Spielschicht denkt noch seltener, 25-mal pro Sekunde.
+
+Die Spielschleife folgt dem Rezept „Fix Your Timestep“: Jeder Frame liefert Zeit, die Simulation
+verbraucht sie in festen Schritten, der Rest wartet auf einem Zeitkonto (dem Akkumulator) auf den
+nächsten Frame. Gezeichnet wird zwischen den letzten beiden Zuständen, und die Zeit ist ein
 Schrittzähler ([Kapitel 8](08-spiel-laufzeit.md)).
 
 ## 13.6 Die Netze der Ente
@@ -213,8 +217,8 @@ hinten kommen 14 Servobefehle heraus, und Trainieren heißt, die Regler zu drehe
 
 Laufen geht **dauernd**, andere Netze laufen **episodisch** mit Anfang und Ende: der Kick 0,5 s, der
 Sprung 2 s, Sitzen 2 s, Aufstehen 1 s, eine Rolle 1 s. Die ältere Gangart `alpha` schaltet unter
-einem Laufbefehl von 0,05 auf ihr Stehnetz `alpha_stand`. Das Aufheben bekommt eine Uhr mit (4 s pro Runde) und endet
-bei 70 % davon; die Rolle läuft weiter, solange du die Taste hältst. Die Gangart wählst du im
+einem Laufbefehl von 0,05 auf ihr Stehnetz `alpha_stand`. Das Aufheben bekommt eine Uhr mit (4 s
+pro Runde) und endet bei 70 % davon; die Rolle läuft weiter, solange du die Taste hältst. Die Gangart wählst du im
 Details-Panel unter **Walking network**.
 
 ### Wer gerade dran ist
@@ -222,9 +226,8 @@ Details-Panel unter **Walking network**.
 Der Regler arbeitet wie Pollens Roboter-Software robotd: erst abgelaufene Bewegungen beenden, dann
 das Netz wählen (laufende Bewegung vor Aufheben vor Sitzen vor Rollen vor Stehen vor Laufen), jedem
 Netz seine Befehle in der trainierten Form geben, rechnen, Uhr weiterstellen. Immer nur eine
-Bewegung, aus dem Sitzen keine; die Erinnerung an die letzte Aktion teilen sich alle Netze. Sonst
-kommt ein Grund zurück, etwa „the robot is sitting - stand it
-up first“.
+Bewegung, aus dem Sitzen keine. Sonst kommt ein Grund zurück, etwa „the robot is sitting - stand
+it up first“. Die Erinnerung an die letzte Aktion, die jedes Netz mitbekommt, teilen sich alle Netze.
 
 > **Achtung, Falle!** Fehlt die Datei eines Netzes noch, springt kein anderes ein. Die Ente hält
 > die Grundhaltung und sagt einmal, welche Datei fehlt. Bleibt sie stur stehen, schau in die
@@ -234,19 +237,20 @@ up first“.
 
 Das Netz sagt nicht „Knie auf 30°“, sondern „Knie etwas weiter als in der Grundhaltung“: Servoziel =
 **Home-Pose + Aktion**. Kern fährt jedes Netz **wie trainiert**, ohne Abschwächung und Glättung (nur
-Rollschuhfahren und Ducken mit Faktor 0,8). Pollens Software auf dem echten Roboter schwächt mit 0,9 ab und
-glättet (Kopf 0,5, Beine 0,7) – Feintuning für die Hardware. Das Ziel darf bis ±π gehen, den
-ganzen Weg des Servos: Liegt es hinter der Gelenkgrenze, drückt das Gelenk wie in MuJoCo gegen
-seinen harten Anschlag. Unter **Actions to servo goals** wählst du `training`
-(Standard) oder `robot`. Gemessen kippen die Kicks mit `robot` um; laufen klappt mit beidem.
+Rollschuhfahren und Ducken mit Faktor 0,8). Pollens Software auf dem echten Roboter schwächt mit
+0,9 ab und glättet (Kopf 0,5, Beine 0,7) – Feintuning für die Hardware. Unter **Actions to servo
+goals** wählst du `training` (Standard) oder `robot`. Gemessen kippen die Kicks mit `robot` um; laufen klappt mit beidem.
+
+Das Ziel darf bis ±π gehen, den ganzen Weg des Servos. Liegt es hinter der Gelenkgrenze, drückt das
+Gelenk wie in MuJoCo gegen seinen harten Anschlag.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 
 Alle Bewegungsnetze bekommen dieselben 61 Zahlen: wie schnell sich der Rumpf dreht, wo unten ist,
 14 Gelenkwinkel (ab Grundhaltung), 14 Gelenkgeschwindigkeiten (einen Takt alt, wie im Training),
 die letzte eigene Aktion, den Laufbefehl (bis 0,4 m/s vor, 0,3 m/s seitwärts, 1 rad/s drehen; wie
-auf dem Roboter sanft geglättet), einen Kopfbefehl und die Körperhaltung. Kerns Sprung nutzt die Plätze 55 und 56, die Pollens Netze nie
-anfassen, für seine Uhr. Heraus kommen 14 Zahlen, eine pro Gelenk. Das Laufnetz hat dazwischen drei
+auf dem Roboter sanft geglättet), einen Kopfbefehl und die Körperhaltung. Kerns Sprung nutzt die
+Plätze 55 und 56, die Pollens Netze nie anfassen, für seine Uhr. Heraus kommen 14 Zahlen, eine pro Gelenk. Das Laufnetz hat dazwischen drei
 Schichten mit 512, 256 und 128 Neuronen.
 
 > **Wusstest du?** Das Netz weiß nicht, wo es im Raum ist. Es kennt nur den eigenen Körper.
@@ -306,7 +310,7 @@ Eine hochgehobene Ente soll nicht in der Luft weiterstrampeln. Pollen hat dafür
 trainiert, den **Pick-up-Detektor** (rund 8000 Parameter). Er betrachtet jeweils die letzte Sekunde
 (50 Takte mit je 63 Werten: Drehung, Schwerkraft, Gelenke, letzte Sollwerte …) und schätzt, wie
 wahrscheinlich die Ente gehalten wird. Kern rechnet es selbst nach, bis auf 10⁻⁵ genau wie die
-Referenz, und erst mit vollem Fenster. Liegt die Schätzung 5 Takte hintereinander über 80 %, gleiten
+Referenz, und erst, wenn eine volle Sekunde beisammen ist. Liegt die Schätzung 5 Takte hintereinander über 80 %, gleiten
 die Servos in 300 ms in eine ruhige Standhaltung, und die Ente meldet „Held“. Sinkt sie 4 Takte lang
 unter 35 % (frühestens nach 300 ms), starten die Netze frisch. Aufgepasst wird nur, solange Lauf-
 oder Stehnetz fahren; eine Bewegung, Sitzen, Rollschuhe oder der Lehrer beenden die Pause.
@@ -330,7 +334,7 @@ ergibt eine kleine Persönlichkeit:
 | Chill, LookAround | steht und schaut (3–7 s), legt den Kopf schief |
 | Wander | läuft 1–3 m in eine von 16 Richtungen |
 | TurnInPlace | dreht sich, der Kopf voraus |
-| Zoomies | volle Fahrt, „Wheee“ (nur über 1,2 m frei) |
+| Zoomies | volle Fahrt, ruckige Kurven, „Wheee“ (nur über 1,2 m frei) |
 | Stretch, Ruffle, Dance | streckt sich, schüttelt sich, groovt |
 | Sneeze | niest und schaut benommen |
 | GroundPick, Nap | hebt etwas auf; setzt sich, döst 12–40 s |
@@ -390,8 +394,8 @@ weiter weg, desto ungenauer – und aussetzen wie eine echte Kamera; im Studio i
 weggetragen heißt mindestens 0,25 m, eine beim Hochheben verlorene Socke bleibt Ziel. Er zählt auch,
 wie weit und wie lange die Ente etwas trägt.
 
-Die Spielschicht sieht 23 Zahlen aus Sicht der Ente (x voraus, y links), nie wahre Positionen: was sie über Ball und
-Socke weiß, wo ihr linker Fuß ist, ob sie etwas hält, ob sie läuft, aufhebt oder kickt, wie lange
+Die Spielschicht sieht 23 Zahlen aus Sicht der Ente (x voraus, y links), nie wahre Positionen: was
+sie über Ball und Socke weiß, wo ihr linker Fuß ist, ob sie etwas hält, ob sie läuft, aufhebt oder kickt, wie lange
 sie trägt, still steht oder geht. „Still stehen“ zählt die Fußkontakte, nicht den Befehl – denn auf
 „ein klein wenig vorwärts“ setzt Pollens Gang manchmal gar nicht an. Heraus kommen 9 Befehle:
 vorwärts, seitwärts, drehen, Kopf drehen und nicken, Nacken beugen, Schnabel auf, Kick links,
@@ -410,14 +414,15 @@ den Boden. Der Ball im Beispiel-Level hat 12 cm, 50 g und etwas Rollwiderstand, 
 
 **Das Beispiel-Level** ist ein 2,5 × 2,5 m großer Raum mit Holzboden, Schuhkarton, Bücherstapel,
 Kiste, Blumentopf, einem Ball und zwei Socken. Die Ente ist autonom, Kern extras sind an. Ein
-kleiner Blueprint lässt die Ente zwitschern, wenn der
-Ball ins Bild kommt – eine Vorführung der Logik-Knoten.
+kleiner Blueprint lässt die Ente zwitschern (Knoten „Chirp“), wenn der Ball ins Bild kommt – eine Vorführung der
+Logik-Knoten.
 
 **Wie gut spielt sie?** Über 32 Durchgänge auf dem sauberen Roboter: Ball 9 von 11 Mal weggekickt
-(im Mittel nach 17 s), Socke 4 von 21 Mal aufgehoben, 2 Stürze. Mit voller Variation (zufällig veränderte Servos, Sensoren,
-Bau): 7 von 11, 13 von 21, aber 10 Stürze. Aufheben, wegtragen und ausspucken in einem Rutsch gelang
-erst einmal. Nur wenige Griffe hielten (2 von 14 bzw. 1 von 15). Zwei Tests prüfen in Studio-Physik, dass nur das
-Netz entscheidet: Ball 30 cm vor der Ente wird gekickt, eine Socke 30 cm vor ihr geholt und gebissen.
+(im Mittel nach 17 s), Socke 4 von 21 Mal aufgehoben, 2 Stürze. Mit voller Variation (zufällig
+veränderte Servos, Sensoren, Bau): 7 von 11, 13 von 21, aber 10 Stürze. Aufheben, wegtragen und
+ausspucken in einem Rutsch gelang erst einmal, und nur wenige Griffe hielten (2 von 14 bzw. 1 von
+15). Zwei Tests prüfen in Studio-Physik, dass nur das Netz entscheidet: Ein Ball 30 cm vor der Ente
+wird gekickt, eine Socke 30 cm vor ihr geholt und gebissen.
 Kicken klappt gut, beim Sockenholen ist Luft nach oben ([Kapitel 14](14-lehrer.md)).
 
 ## 13.12 Die Ente steuern
@@ -478,8 +483,8 @@ Zeile für Zeile: die erste Ente der Welt holen; sie 3 s lang mit 0,2 m/s nach v
 bitten, etwas aufzuheben (leere Antwort heißt „mach ich“, sonst steht der Grund drin); fragen, ob sie
 etwas im Schnabel hat; fragen, was sie gerade tut. Ebenso gibt es `walker_look` (Kopf),
 `walker_sensors` (ToF, Schwerkraft, Sturz), `walker_sees` (Kamera) und `walker_driving` (welches Netz
-gerade fährt, oder „held“). Für den Lehrer gibt es eigene Eingänge, mit denen
-ein lernendes Netz steuert ([Kapitel 14](14-lehrer.md)).
+gerade fährt, oder „held“). Für den Lehrer gibt es eigene Eingänge, mit denen ein lernendes Netz
+steuert ([Kapitel 14](14-lehrer.md)).
 
 ## 13.14 Nachgemessen
 
@@ -493,7 +498,7 @@ Ohne die Armatur-Scheibe wären es nur 0,105 m/s und 0,52 rad/s, und Rumpf und K
 als dreimal so stark (Rumpf 3,6 statt 1,0 rad/s, Kopf 6,7 statt 1,9). Auf Bauch oder Rücken steht
 die Ente nach höchstens 12 s wieder. Alle Bewegungen gelingen, der linke Kick schießt den Ball 4 m
 weit; nur der rechte kippt manchmal. Kein Gelenk geht mehr als 0,004 rad über seine Grenze. Und auch
-ganz ohne Kern extras sieht, holt und kickt die Ente einen Ball, ohne zu fallen.
+ganz ohne Kern extras sieht die Ente einen Ball, läuft an, richtet ihn aus und kickt, ohne zu fallen.
 
 ## 13.15 Was noch fehlt
 

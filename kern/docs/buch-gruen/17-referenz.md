@@ -128,10 +128,11 @@ Die fünf Spiel-Messungen (`--spielen`, `--spielen-spur`, `--biss-fenster`, `--h
 Dazu kommen Stellschrauben: `--threads` und `--envs` (wie viele Rechenkerne und wie viele Enten
 gleichzeitig), `--iterations` (wie lange; Training 600, Kalibrierung 80 Generationen), `--episodes`
 (wie viele Bewertungsrunden, Standard 10), `--seed` (welcher Zufall), `--out` (wohin), `--policies`
-(wo Pollens Netze liegen), `--profil` (welches Servoprofil), `--randomized` (Spur mit Variation)
-und `--netz` (welches Spiel-Netz eine Spur fährt). Für Fortgeschrittene lassen sich die Werte des
-Rezepts überschreiben: Schritte, Lernrate, Entropie, Größe von Actor und Critic, Epochen,
-Minibatches, adaptive Lernrate, Substeps und der Warmstart vom velstand-Netz; ebenso die Nachahmung
+(wo Pollens Netze liegen), `--profil` (welches Servoprofil), `--randomized` (`--trace` oder Spur
+mit Variation) und `--netz` (welches Spiel-Netz eine Spur fährt). Für Fortgeschrittene lassen sich
+die Werte des Rezepts überschreiben: Schritte, Anfangsrauschen, Lernrate, Entropie, Größe von Actor
+und Kritiker, Epochen, Minibatches, adaptive Lernrate mit Ziel-KL, Substeps und der Warmstart vom
+velstand-Netz; ebenso die Nachahmung
 (Vorbild, Runden, Episoden, Übungsrauschen, Gewicht der Nachahmungsbelohnung).
 
 Für lange Trainings wichtig:
@@ -246,14 +247,14 @@ Die Grundregeln, kurz:
   Aufruf derselben Gruppe.
 - Umgekehrt braucht das Modul ein paar Dinge vom Browser: WebGL2 zum Zeichnen, die Uhrzeit,
   Logausgabe, die Geländehöhe für die Geometrie, Statustext und Pointer-Lock für C++-Spiele und das
-  Übersetzen kompilierter Logik-Graphen. Dazu kommt ein winziger WASI-Ersatz; Dateien fasst die
-  Engine nie an. Braucht die Engine eine neue WebGL-Funktion, muss sie an zwei Stellen eingetragen
+  Übersetzen kompilierter Logik-Graphen. Dazu kommt ein winziger Ersatz für WASI, die
+  Systemschnittstelle von WebAssembly; Dateien fasst die Engine nie an. Braucht die Engine eine neue WebGL-Funktion, muss sie an zwei Stellen eingetragen
   werden: in `gl.h` und in `kern.mjs`.
 - Ein paar Symbole liefert das Spiel selbst: Ein C++-Spiel definiert `kern_create_app()`, und es kann
   eigene Shader-Erweiterungen melden (`kern_game_extensions`, sonst keine). Tests ersetzen die
   Geländehöhe nativ durch eine eigene Funktion.
-- Feste Datenblöcke (Deskriptoren für Meshes, Kamera, Licht, Himmel, Picking …) haben genau
-  festgelegte Plätze, die in C++ und in `kern.mjs` übereinstimmen müssen.
+- Feste Datenblöcke, sogenannte Deskriptoren (für Meshes, Start, Rendern, Licht, Himmel,
+  Picking …), haben genau festgelegte Plätze, die in C++ und in `kern.mjs` übereinstimmen müssen.
 
 Die Funktionen sind in Gruppen sortiert:
 

@@ -78,9 +78,9 @@ Schafft eine Probe zum ersten Mal mindestens 4 von 5 echten Sprüngen, jubelt da
 > weitere 3000 also `--iterations 6000`.
 
 Mit `run.ckpt.nachgeahmt` beginnt das Üben neu ab der Nachahmung. `--vorbild none` probiert
-reines PPO (die Belohnung bekommt dann eine Referenzhöhe, `track_height`) – der Weg, der den
-Absprung nicht fand. Weitere Schalter ändern Vorbild, DAgger-Runden,
-Übungsrauschen und Nachahmungsbelohnung.
+reines PPO – der Weg, der den Absprung nicht fand. Damit die Ente ohne Vorbild überhaupt eine
+Richtung hat, bekommt die Belohnung dann eine Referenzhöhe (`track_height`). Weitere Schalter ändern
+Vorbild, DAgger-Runden, Übungsrauschen und Nachahmungsbelohnung.
 
 Ein eigenes Vorbild suchst du so:
 
@@ -113,8 +113,8 @@ Bewertung zusätzlich `| jumps 4/5 up … rise … flight … tilt … falls …
 | `steps/s` | Entenschritte pro Sekunde | Tempo des Geräts |
 | `jumps n/5` | Probe auf dem sauberen Roboter | das eigentliche Ziel |
 
-Beim Nachahmen zeigt jede Runde Beispiele, Fehler und echte Sprünge. Mit `--log jump.csv` landet jede Iteration als CSV-Zeile in
-einer Datei, die du direkt in eine Tabellenkalkulation laden kannst (`jumps` ist −1, wo nicht
+Beim Nachahmen zeigt jede Runde Beispiele, Fehler und echte Sprünge. Mit `--log jump.csv` landet
+jede Iteration als CSV-Zeile in einer Datei, die du direkt in eine Tabellenkalkulation laden kannst (`jumps` ist −1, wo nicht
 bewertet wurde).
 
 **Wenn etwas schiefgeht,** zeigt `--trace` eine Episode Takt für Takt: Höhe, Sohlenkontakte,
@@ -177,8 +177,8 @@ weil Episoden bei Sturz oder Bodenkontakt früher enden. Nach jeder Runde wird d
 
 Dazu kommen Epochen, Minibatches, Netzgrößen (beim Warmstart muss der Actor zu velstand passen),
 Anfangsrauschen (`--init-std`), adaptive Lernrate an/aus, Warmstart (nur `velstand` wirkt, alles
-andere heißt Zufallsgewichte; von einer Datei startet nur die Spielschicht) und `--profil servo.json` für
-kalibrierte Servos ([Kapitel 16](16-kalibrierung.md)); alles Weitere in
+andere heißt Zufallsgewichte; von einer Datei startet nur die Spielschicht) und
+`--profil servo.json` für kalibrierte Servos ([Kapitel 16](16-kalibrierung.md)); alles Weitere in
 [Kapitel 17](17-referenz.md).
 
 > **Stell dir vor …** du hast einem Hund gerade mühsam einen Trick beigebracht. Brüllst du jetzt
@@ -210,9 +210,9 @@ Sechs Schritte:
    20 Iterationen eine Messung und ein Schnappschuss.
 6. **Im Beispiel-Level prüfen:** `--demo-spur --netz play_geuebt.onnx --seed 120` spielt das
    Micro-Duck-Level wie das Studio, 120 s lang (hier ist `--seed` die Dauer!), eine Zeile pro
-   Sekunde: Lage, Zustand, was der Tracker weiß und was das Spielnetz antwortet. Es nimmt
-   `jump.onnx` und dein Spielnetz (sonst `play.onnx`). Mit `KERN_JUMP_AT=SEKUNDE`
-   drückt es in dieser Sekunde Taste 7.
+   Sekunde: Lage, Zustand, was der Tracker (das Gedächtnis der Spielschicht) weiß und was das
+   Spielnetz antwortet. Es nimmt `jump.onnx` und dein Spielnetz (sonst `play.onnx`). Mit
+   `KERN_JUMP_AT=SEKUNDE` drückt es in dieser Sekunde Taste 7.
 
 > **Achtung, Falle!** `--out` wird beim Nachahmen nach **jeder** Runde überschrieben. Willst du eine
 > frühere Runde behalten, kopier die Datei während des Laufs. (Beim alten `play.onnx` war Runde 10
@@ -228,11 +228,12 @@ Kerns eigene Netze haben feste Namen: `jump.onnx` und `play.onnx`. Drei Wege ins
 2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät; das Studio
    lädt es beim Start und übernimmt jedes neue sofort, auch in offenen Tabs (nur für den Sprung).
 3. **Prüfen:** Micro-Duck-Level öffnen, Play, mit **F8** die Ente übernehmen, Taste **7** für den
-   Sprung, oder die Ente in Ruhe lassen (Spielschicht: Autonomous und Kern extras an, Ball oder Socke in Sicht). Die
-   Browser-Konsole meldet „Kern: trained network jump.onnx loaded“ oder warnt, wenn etwas nicht lädt.
+   Sprung, oder die Ente in Ruhe lassen (Spielschicht: Autonomous und Kern extras an, Ball oder
+   Socke in Sicht). Die Browser-Konsole meldet „Kern: trained network jump.onnx loaded“ oder warnt, wenn etwas nicht lädt.
 
 Das Netz muss die Form eines rsl_rl-Actors haben (Sub, Div, Gemm/Elu …, Gemm) – genau so exportiert
-der Lehrer. Eine Spielschicht ohne 23 Eingänge und 9 Ausgänge wird nicht gerechnet (ihre Aktion bleibt 0).
+der Lehrer. Eine Spielschicht ohne 23 Eingänge und 9 Ausgänge wird nicht gerechnet (ihre Aktion
+bleibt 0).
 
 > **Probier's aus!** Trainiere auf der Lehrer-Seite einen Sprung, lass dabei auf
 > https://kernengine.de/ das Micro-Duck-Level offen, starte Play, übernimm die Ente mit **F8** und
@@ -261,8 +262,8 @@ schwere Bewegungen oft ein fünftes:
    ```
 
    Die Funktion übersetzt Namen in Aufgaben; die neue Zeile liefert für „bow“ die Verbeugung,
-   Unbekanntes ergibt nichts. Dazu bekommt `recipe_for` einen Eintrag (Warmstart, Rauschen, Lernrate). Danach kennen
-   `--task bow` und der Browser die Aufgabe; auf der Lehrer-Seite fehlt nur ein Menüeintrag.
+   Unbekanntes ergibt nichts. Dazu bekommt `recipe_for` einen Eintrag (Warmstart, Rauschen,
+   Lernrate). Danach kennen `--task bow` und der Browser die Aufgabe; auf der Lehrer-Seite fehlt nur ein Menüeintrag.
 3. **Eine Messung**, die prüft, was die Bewegung **ist**, nicht was die Belohnung zählt.
    `JumpMeter` zeigt das Muster: Takt für Takt beobachten, am Ende entscheiden. `--eval` und die
    Probe im Lauf kennen derzeit nur den Sprung; eine neue Aufgabe braucht ihre eigene Bewertung.
@@ -318,8 +319,8 @@ Aus `docs/lehrer.md`, damit du nicht hineintappst:
 - **Fehler in der Welt statt im Netz.** Beim Training der Spielschicht kamen drei ans Licht: Die
   Socke kroch von selbst über den Boden, der Ball rollte ewig, und das Gähnen im Leerlauf öffnete
   beim Aufheben den Schnabel. Abhilfe: Rollwiderstand für Socke und Ball, und eine laufende
-  Bewegung zählt nicht mehr als Stillstehen. Lernt ein Netz an einer Stelle nicht, zeigen `--spielen-spur` und
-  `--trace` oft so einen Fehler.
+  Bewegung zählt nicht mehr als Stillstehen. Lernt ein Netz an einer Stelle nicht, zeigen
+  `--spielen-spur` und `--trace` oft so einen Fehler.
 - **Zahlen von Hand veralten.** Die Bissposition stand früher als Zahl in der Doku; jetzt misst der
   Lehrer sie bei jedem Lauf.
 - **Determinismus brechen:** ein `std::sin`, eine Summe in Thread-Reihenfolge oder `-ffast-math`,
