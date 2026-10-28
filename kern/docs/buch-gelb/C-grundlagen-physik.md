@@ -53,7 +53,7 @@ c = 2/s und 60 Hz durch 1,033, also 3,2 % weniger – sie kann nie kippen. Auch 
 rechnet Box3D implizit. Tempolimits: 400 m/s und eine Achteldrehung (45°) pro Schritt.
 
 > **Vorsicht, Falle:** Warum verbietet Kern eine selbst gebaute Bremskraft „Kraft = −c · Tempo“? Ein
-> 10-g-Glied, c = 10, 60 Hz: Pro Schritt ändert sich das Tempo um 10 ÷ 0,01 ÷ 60 ≈ 16,7-mal das
+> Beispiel: 10-g-Glied, c = 10, 60 Hz: Pro Schritt ändert sich das Tempo um 10 ÷ 0,01 ÷ 60 ≈ 16,7-mal das
 > Tempo selbst. Aus 1 m/s vorwärts werden −15,7 m/s rückwärts. Die „Bremse“ katapultiert.
 
 ### Fester Zeitschritt
@@ -70,8 +70,9 @@ flowchart LR
   L -->|nein| R["zeichnen bei Rest / h"]
 ```
 
-Mit h = 16,7 ms: Ein Bild dauert 25 ms – ein Schritt, 8,3 ms Rest, gezeichnet bei 50 % zwischen
-altem und neuem Zustand. Nächstes Bild: 33,3 ms, zwei Schritte, Rest 0. Kerns Grenzen: [Kapitel 6](06-physik.md), 6.13.
+Ein Beispiel mit h = 16,7 ms: Ein Bild dauert 25 ms – ein Schritt, 8,3 ms Rest, gezeichnet bei 50 %
+zwischen altem und neuem Zustand. Das nächste Bild dauert wieder 25 ms: Im Schwein sind jetzt
+33,3 ms, also zwei Schritte, Rest 0. Kerns Grenzen: [Kapitel 6](06-physik.md), 6.13.
 
 **Sub-Steps** teilen jeden Schritt weiter: bei der Micro Duck 100 Hz × 16 = 1600 pro Sekunde, je
 0,625 ms. Kleinere Schritte machen Gelenkketten steifer.
@@ -125,13 +126,14 @@ mit rund 2943 N; bei μ = 0,6 hält sie bis 1766 N. Schiebst du mit 1000 N, **ha
 
 Eigentlich ist Haftreibung stärker als Gleitreibung; Box3D kennt nur einen Wert. Es rechnet die
 Reibung einmal in der **Mitte** des Manifolds und hält den Kegel **rund**: Gebraucht werden (3 | 4),
-nach Pythagoras 5, erlaubt sind 2,5 – dann wird der Pfeil auf (1,5 | 2) halbiert, statt jede Zahl
+nach Pythagoras 5, erlaubt sind (als Beispiel) 2,5 – dann wird der Pfeil auf (1,5 | 2) halbiert, statt jede Zahl
 auf 2,5 zu kappen. Dazu kommt **Drehreibung** um die Normale.
 
 > **Mission:** Setz über **+ Add › Shapes** eine **Ramp** (6 m lang, 1,5 m hoch: 25 % Steigung) und
-> über **+ Add › Physics** einen **Physics Cube** darauf. In Simulate bleibt er liegen. Stell in
-> Details › Static Mesh › Physics seine **Friction** auf 0,02: Er rutscht, denn √(0,02 · 0,6) ≈ 0,11
-> ist kleiner als 0,25.
+> über **+ Add › Physics** einen **Physics Cube**; schieb ihn auf die Schräge. In Simulate bleibt er
+> liegen (beide haben Reibung 0,6). Stopp mit Esc, stell in Details › Static Mesh › Physics seine
+> **Friction** auf 0,02 und starte Simulate neu: Er rutscht, denn √(0,02 · 0,6) ≈ 0,11 ist kleiner
+> als 0,25.
 
 **Zwei Reibwerte, ein Kontakt:** Box3D nimmt √(μA · μB). Bei 0,6 und 1,0 sind das 0,775 (Mittelwert
 0,8), bei Eis 0,05 und Gummi 1,0 nur 0,224 (Mittelwert 0,525), und bei 0 und 1,0 genau 0. Was
@@ -146,7 +148,8 @@ Gummiball springt auch auf Beton. Unter 1 m/s prallt nichts ab, sonst würde Ruh
 Angewendet wird die Sprungkraft **nach** dem Lösen, mit dem Tempo von vor dem Stoß.
 
 > **Mission:** Setz eine **Physics Sphere** in die Szene, stell in Details › Static Mesh › Physics
-> die **Restitution** auf 0,9, heb sie in Simulate hoch und lass sie fallen. Mit 0 bleibt sie liegen.
+> die **Restitution** auf 0,9, heb sie in Simulate hoch und lass sie fallen. Stopp mit Esc, stell 0
+> ein und probier es noch einmal: Jetzt bleibt sie liegen.
 
 **Rollwiderstand:** Eine perfekte Kugel rollt ewig. Echte Bälle und Böden geben nach – das bremst
 mit **Rollwiderstand mal Druckkraft**, bei 0,03 also 3 % des Gewichts. Box3D nimmt den größeren Wert
@@ -157,6 +160,9 @@ mal Radius. Kerns Notizen: „Der Ball rollte ewig“ – bis er Rollwiderstand 
 Ein **Gelenk** ist eine Regel, etwa: „Punkt A und Punkt B bleiben aufeinander“ – also müssen beide
 gleich schnell sein. Weicht das ab, sucht der Solver einen reparierenden **Stoß**. Wie stark der
 wirkt, hängt von der **effektiven Masse** ab:
+
+Im einfachsten Fall – zwei Kugeln, die sich nur geradeaus ziehen oder schieben, ohne sich zu drehen –
+gilt:
 
 **effektive Masse = 1 ÷ (1/mA + 1/mB)**
 
@@ -271,12 +277,15 @@ Prüfnummer. Zwei Builds sind gleich, wenn alle 400 Nummern gleich sind – gepr
 WebAssembly in Node und Apple clang auf ARM.
 
 > **Krass, aber wahr:** Ein hängendes Servo-Bein läuft in einfacher und vierfacher Größe **Bit für
-> Bit gleich**: Mal Zweierpotenzen ändert bei Kommazahlen nur den Exponenten, gerundet wird exakt
-> gleich.
+> Bit gleich**. Bei S = 4 sind alle Faktoren Zweierpotenzen (2, 4, 64, 256 …). Eine Kommazahl mal
+> einer Zweierpotenz verschiebt im Computer nur den Exponenten, die Ziffern bleiben gleich. Ist jede
+> Größe passend mitskaliert, rundet darum jede Rechnung genau gleich. Am Boden klappt das nicht mehr:
+> Box3Ds feste Toleranzen skalieren nicht mit.
 
-> **Mission:** Stell im Physics Lab unter World Settings › Physics (Box3D) die **Sub-steps** auf 1,
-> starte Simulate und beobachte die Seilbrücke. Dann mit 16 vergleichen: Lange Gelenkketten dehnen
-> sich mit wenigen Sub-Steps mehr – siehst du den Unterschied?
+> **Mission:** Stell im Physics Lab unter World Settings › Physics (Box3D) die **Sub-steps** von 4
+> auf 1, starte Simulate und beobachte die Seilbrücke. Stopp mit Esc, stell 16 ein und vergleiche:
+> Mit 1 Sub-Step hängt die Mitte rund einen Meter tiefer – lange Gelenkketten dehnen sich mit
+> wenigen Sub-Steps mehr.
 
 ## C.10 Auf einen Blick
 

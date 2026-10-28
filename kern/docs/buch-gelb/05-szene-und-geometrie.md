@@ -49,7 +49,8 @@ Picking testet einen Strahl gegen Dreiecke – in einer Stadtkachel zehntausende
 sie in Kisten, diese in größere Kisten. Verfehlt der Strahl eine Kiste, ist ihr Inhalt erledigt.
 
 > **So kannst du es dir vorstellen:** Im Wörterbuch schlägst du die Mitte auf und halbierst weiter.
-> Bei 10 000 Dreiecken reichen etwa 13 Halbierungen, denn 2¹³ = 8192 und 2¹⁴ = 16 384.
+> Bei 10 000 Dreiecken bleiben nach 11 Halbierungen höchstens 5 pro Kiste übrig
+> (10 000 → 5000 → 2500 → … → 10 → 5) – das reicht, denn ein Blatt darf bis zu 8 haben.
 
 **Bauen:** Kern teilt die Dreiecke entlang der Richtung, in der ihre Mittelpunkte am weitesten
 streuen, genau **am Median**. Höchstens 8 Dreiecke sind ein Blatt. Der Baum ist höchstens 32 tief,
@@ -59,7 +60,8 @@ also reicht ein fester Stapel mit 64 Plätzen; alles liegt in flachen Listen.
 Dreiecke. **Die nähere Kiste kommt zuerst** dran; ein früher, naher Treffer streicht alle ferneren.
 
 Eine BVH bekommt nur **feste Weltgeometrie** (keine Linien, eine unverschobene Instanz, nicht
-animiert, ab 36 Dreiecken). Bewegt man das Mesh, fliegt sie raus; steht es still, kommt sie neu.
+animiert, ab 36 Dreiecken). Bewegt man das Mesh oder bekommt es mehr Instanzen, fliegt sie raus; steht es wieder unverschoben
+da, wird sie neu gebaut.
 
 ## 5.4 Picking: Was liegt unter der Maus?
 
@@ -78,7 +80,7 @@ Der Treffer nennt Mesh, Instanz, Dreieck, Abstand, Punkt und Normale, bis 1800 m
 `hello` färbt ein Klick so eine Kiste rot.
 
 **Kern Studio** übersetzt das Mesh in seinen Actor, lässt den Strahl durch Boden und gesperrte
-Actors weiterfliegen und wählt Lichter über ihr Symbol.
+Actors weiterfliegen und wählt Lichter und leere Actors über ihr Symbol.
 
 > **Mission:** Öffne auf https://kernengine.de/ File › Example Levels › **Orb Run** und klick ein
 > Hochhaus an. Ausgewählt wird der Actor **City** – die ganze Stadt gehört zu ihm.
@@ -191,7 +193,7 @@ Der **GeoProjector** rechnet Längen- und Breitengrade (WGS84) in Meter um, mit 
 
 ## 5.11 Geometrie aus JavaScript
 
-`renderer.beginBuildings(...)` startet einen Häuserauftrag mit 4 ms pro Frame; `commit` weldet jeden
+`renderer.beginBuildings(...)` startet einen Häuserauftrag, der zum Beispiel 4 ms pro Frame baut; `commit` weldet jeden
 Chunk, lädt ihn hoch, meldet die Bytes und gibt den Speicher frei. Einen unbekannten Strom-Namen in
 `extraKey` lehnt es mit Fehler ab. `upsertTerrainTile` baut eine Gelände-Kachel in einem Rutsch. Der
 Schalter `weld` weldet ein Mesh vor dem Hochladen – wenn es eine reine Soup mit Normalen ist.
@@ -232,7 +234,8 @@ flowchart LR
    je **ein** instanziertes Mesh.
 
 Jeder Chunk ist ein Mesh mit der Matrix des City-Actors als Instanz; Verschieben ändert nur die
-Matrix, neu gebaut wird nur bei echten Parameteränderungen. Straßen werfen keinen Schatten. Liegt die
+Matrix, neu gebaut wird nur bei echten Parameteränderungen. Die Fensterwerte bekommen die Häuser nur,
+wenn **Lit windows at night** an ist. Straßen werfen keinen Schatten. Liegt die
 Stadt unverschoben im Ursprung, bekommt jeder Chunk eine BVH.
 
 Für die Physik ist die Stadt **ein** fester Box3D-Körper mit einem Quader pro Gebäudeflügel und
@@ -242,7 +245,7 @@ springen am Stadtrand auf die andere Seite und **halten an**, wenn der Spieler w
 ihnen steht. Zufällige Straßenpunkte verteilen die Orbs von Orb Run.
 
 > **Mission:** Wähle in Orb Run **City**, ändere in Details den **Seed** und **Tallest building**.
-> Gib dann wieder 20261022 ein: Die alte Stadt ist exakt zurück.
+> Gib dann wieder 20261022 und 84 ein: Die alte Stadt ist exakt zurück.
 
 ## 5.13 Formen im Level und eingebaute Meshes
 

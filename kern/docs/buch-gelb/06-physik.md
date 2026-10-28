@@ -145,9 +145,9 @@ Jede Form hat ein **Material**:
 | Oberfläche | keine | für Paar-Reibung |
 | Sensor | aus | nur Überlappung |
 
-Dazu **Kanäle**: A und B stoßen nur zusammen, wenn A's Kategorie in B's Maske liegt und umgekehrt.
-Formen mit derselben **negativen Gruppe** stoßen nie zusammen – so kollidiert ein Roboter nicht mit
-sich selbst. Und Schalter für Kontakt-, Sensor- und Hit-Ereignisse.
+Dazu **Kanäle**: A und B stoßen nur zusammen, wenn die Kategorie von A in der Maske von B liegt und
+umgekehrt. Formen mit derselben **positiven Gruppe** stoßen immer zusammen, mit derselben
+**negativen Gruppe** nie – so kollidiert ein Roboter nicht mit sich selbst. Und Schalter für Kontakt-, Sensor- und Hit-Ereignisse.
 
 `hull_mesh` erzeugt die Dreiecke einer Hülle mit demselben Bauer, der auch kollidiert; Studio zeichnet
 damit Hüllen-Collider (4 bis 4096 Punkte, nicht flach).
@@ -194,8 +194,8 @@ und Kapsel, ein Viertel des Innenradius bei Hüllen (auch Quader sind Hüllen). 
 runde Dinge: Ball im Micro-Duck-Level 0,03 („rollt aus“), Rover-Reifen im Physics Lab 0,02,
 Sockenklumpen 0,5 („ein Stoffklumpen rollt nicht“). **Roboterfüße** sind breit, flach und griffig.
 
-> **Mission:** Wähle im Physics Lab die oberste Kiste, **Crate 15**. Setz in Details › Collider die
-> **Friction** von 0,7 auf 0, starte Simulate, setz die Kiste auf den Boden und schubs sie an: Sie
+> **Mission:** Läuft noch Simulate, stopp mit Esc. Wähle im Physics Lab die oberste Kiste,
+> **Crate 15**. Setz in Details › Collider die **Friction** von 0,7 auf 0, starte Simulate, setz die Kiste auf den Boden und schubs sie an: Sie
 > gleitet wie auf Eis – denn √(0 · Bodenreibung) ist immer 0.
 
 ## 6.8 Gelenke
@@ -224,11 +224,15 @@ Bruchschwellen setzen und Winkel, Drehtempo, Zwangskraft und -moment lesen.
 
 **Brechen:** Box3D meldet Gelenke über ihrer Kraft- oder Momentschwelle. Die Spiel-Laufzeit
 zerstört sie dann, zählt sie, schreibt `Joint on "…" broke` ins Log und spielt den Bruch-Sound. Im
-Physics Lab haben die drei mittleren Brückenplanken so eine Schwelle (60 000 N).
+Physics Lab haben die drei mittleren der 13 Brückengelenke so eine Schwelle (60 000 N): die Gelenke
+von Plank 06, 07 und 08.
 
-> **Mission:** Wähle **Plank 06** und senke in Details › Constraint › Breaking die **Break force**
-> auf 2000. Starte Simulate und reiß die Planke mit der Maus hoch. Das Gelenk bricht, das Output Log
-> meldet es, und die Statusleiste zählt mit.
+> **Mission:** Stopp ein laufendes Simulate mit Esc. Wähle **Plank 06** und senke in Details ›
+> Constraint › Breaking die **Break force** auf 20 000. Starte Simulate: Die Brücke hält. Pack
+> die Planke mit der Maus und zieh sie kräftig zwei, drei Meter hoch. Das Gelenk bricht, das
+> Output Log meldet es, und die Statusleiste zählt mit („1 broken“). Warum reicht der Griff (6.11)?
+> Die straff gespannte Brücke zieht schon in Ruhe mit über 10 000 N an diesem Gelenk; der Griff legt
+> etwas drauf. Darum reißt es mit 2000 schon gleich nach dem Start.
 
 **Feder in echten Einheiten:** Box3D will Federn in Hertz und Dämpfungsgrad, Servos rechnen in
 N·m/rad und N·m·s/rad. Kern rechnet an der Grenze um, wie Box3D intern, mit der **effektiven Masse**
@@ -263,7 +267,8 @@ spürt die Micro Duck Fußkontakt und Eigenkollision ([Kapitel 13](13-micro-duck
 
 Der Maus-Griff zieht mit einer **Feder**: ein unsichtbarer kinematischer „Maus-Körper“ plus ein
 **Motor-Gelenk** zum Körper. Die Feder hat 7,5 Hz, ist kritisch gedämpft (kein Nachwippen) und schafft höchstens das 100-Fache der
-Gewichtskraft. Bei einer 300-kg-Kiste aus dem Physics Lab sind das rund 290 000 N. Drehen darf der
+Gewichtskraft. Bei einer 300-kg-Kiste aus dem Physics Lab sind das 100 · 300 · 9,81 ≈ 294 000 N, bei
+einer 15-kg-Brückenplanke rund 14 700 N. Drehen darf der
 Körper frei; mit „Ausrichtung halten“ hält eine zweite Feder ihn aufrecht wie eine Hand – so baumelt
 eine hochgehobene Micro Duck nicht. Der Körper bleibt ganz in der Physik: Er stößt an, kippt und
 fliegt beim Loslassen weiter. Feste und kinematische Körper lassen sich nicht greifen. Studio nutzt
@@ -310,7 +315,8 @@ Sub-Step-Rate. Kern hält zusätzlich jede Feder unter der Hälfte:
 Bei 60 Hz und 4 Sub-Steps sind das 120 Hz. Servogelenke bekommen 240 Hz Weichheit (oder die Grenze)
 mit Dämpfung 2.
 
-> **Mission:** Starte im Physics Lab Simulate, drück **Pause** und dann mehrmals **.** (Punkt):
+> **Mission:** Starte im Physics Lab Simulate, drück die Taste **Pause** (oder Play › Pause) und
+> dann mehrmals **.** (Punkt):
 > Jeder Druck ist genau ein fester Schritt. Step rate und Sub-steps findest du in World Settings ›
 > Physics (Box3D).
 
