@@ -212,9 +212,60 @@ tex = tex.replace("\\begin{minipage}[b]{\\linewidth}\\raggedright\n", "\\begin{m
 targets = set(re.findall(r"\\(?:hypertarget|label)\{([^}]+)\}", tex))
 dead = sorted(set(re.findall(r"\\hyperlink\{([^}]+)\}", tex)) - targets)
 if dead: print(f"DEAD LINKS: {len(dead)}: " + ", ".join(dead[:30]), file=sys.stderr)
-for run in range(3):  # contents, references and running heads settle after three runs
-    r = subprocess.run(["xelatex", "-interaction=nonstopmode", "-halt-on-error", "buch.tex"], cwd=work, capture_output=True, text=True)
-    if r.returncode: sys.exit(f"xelatex failed (intermediate files in {work}):\n{r.stdout[-3000:]}")
+def latex(runs=3):
+    for run in range(runs):  # contents, references and running heads settle after three runs
+        r = subprocess.run(["xelatex", "-interaction=nonstopmode", "-halt-on-error", "buch.tex"], cwd=work, capture_output=True, text=True)
+        if r.returncode: sys.exit(f"xelatex failed (intermediate files in {work}):\n{r.stdout[-3000:]}")
+
+
+def short_chapter_ends():
+    """Pages that end a chapter with only a few lines on them (the next page opens a chapter):
+    returns (page, first words, number of lines)."""
+    import pdfplumber
+    found = []
+    with pdfplumber.open(work / "buch.pdf") as pdf:
+        n = len(pdf.pages)
+        for i in range(1, n - 1):
+            page, nxt = pdf.pages[i], pdf.pages[i + 1]
+            lines = {}
+            for wd in page.extract_words(x_tolerance=1.2):
+                if wd["top"] < 45 or wd["bottom"] > page.height - 45: continue  # running head, page number
+                lines.setdefault(round(wd["top"] / 3), []).append(wd)
+            if not 0 < len(lines) <= 3: continue  # four more lines still keep KDP's bottom margin
+            big = [c for c in nxt.chars if c["size"] > 14]  # a chapter heading opens the next page
+            if not big and nxt.extract_words(): continue
+            first = sorted(lines.items())[0][1]
+            words = [w["text"] for w in sorted(first, key=lambda w: w["x0"])]
+            found.append((i + 1, words, len(lines)))
+    return found
+
+
+def pull_back(tex, words, n):
+    """Puts \\enlargethispage before the paragraph holding these words, so that the page before
+    takes the few lines too."""
+    tokens = [t for w in words for t in re.findall(r"\w+", w)]
+    while tokens and (tokens[0].isdigit() or len(tokens[0]) < 2): tokens.pop(0)  # list numbers
+    tokens = [t for t in tokens if not t.endswith("-")][:5]
+    if len(tokens) < 2 or sum(len(t) for t in tokens) < 10: return tex, False
+    pat = r"[\W_]+(?:\\[a-zA-Z]+\{|\{\})*".join(re.escape(t) for t in tokens)
+    m = re.search(pat, tex)
+    if not m: return tex, False
+    start = tex.rfind("\n\n", 0, m.start()) + 2
+    return tex[:start] + f"\\enlargethispage{{{n + 1}\\baselineskip}}\n" + tex[start:], True
+
+
+latex()
+for attempt in range(2):
+    shorts = short_chapter_ends()
+    if not shorts: break
+    tex, changed = (work / "buch.tex").read_text(), False
+    for pg, words, n in shorts:
+        tex, ok = pull_back(tex, words, n)
+        changed |= ok
+        print(f"short chapter end on page {pg} ({n} lines): {'pulled back' if ok else 'not found'}", file=sys.stderr)
+    if not changed: break
+    (work / "buch.tex").write_text(tex)
+    latex()
 shutil.copy(work / "buch.pdf", out)
 # Nothing may reach into the margin: every overfull line is reported with its page (KDP rejects
 # text outside the margins).
