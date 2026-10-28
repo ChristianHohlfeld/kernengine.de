@@ -17,13 +17,23 @@ liest Eingaben. Das Spiel sagt nur noch: „Hier steht ein Auto, und bei W fähr
 
 Kern ist in **C++20** geschrieben und wird nach **WebAssembly** übersetzt, einer Art
 Maschinensprache für Browser. Gezeichnet wird mit **WebGL2**, der Grafikschnittstelle des Browsers.
-Entstanden ist Kern aus dem Spiel **SpawnCity**, doch die Engine kennt SpawnCity nicht: Spiele
-sprechen nur mit der Engine, nie umgekehrt.
+Entstanden ist Kern aus dem Spiel **SpawnCity** und bringt von dort seine Versionsgeschichte mit.
+Doch die Engine kennt SpawnCity nicht: Spiele sprechen nur mit der Engine, nie umgekehrt.
 
-Im selben Modul stecken Grundlagen und Mathematik, ein **Renderer** (Licht, Schatten, Himmel,
-Partikel), Geometrie für Häuser, Straßen und Gelände, die **Physik** Box3D, ein eigener
-**Audio**-Mixer, die **Spiel-Laufzeit** mit Mehrspieler, **Logik**-Bausteine, **Netzwerk**,
-**Kern Studio** und **der Lehrer** – plus eine dünne JavaScript-Schicht zum Browser.
+Im selben Modul stecken:
+
+- **Grundlagen und Mathematik:** Zahlentypen, Fehlermeldungen, JSON, Vektoren und Matrizen – in
+  Metern, rechtshändig, Z oben ([Kapitel 3](03-grundlagen.md)).
+- ein **Renderer** (Licht, Schatten, Himmel, Glühen, Partikel) und die **Szene**, die Unsichtbares
+  aussortiert und erkennt, worauf du klickst;
+- **Geometrie** für Häuser, Straßen und Gelände und eine **App-Laufzeit** für reine C++-Spiele;
+- die **Physik** Box3D mit Körpern, Gelenken und Strahltests, ein eigener **Audio**-Mixer mit
+  3D-Klang und Synthesizer;
+- die **Spiel-Laufzeit** mit Levels, Actors und Mehrspieler, **Logik**-Graphen (interpretiert, per
+  JIT nach WebAssembly übersetzt oder als C++ exportiert) und **Netzwerk**;
+- **Kern Studio**, ein Editor nach dem Vorbild großer Game-Engines, ganz in C++ und ohne Browser
+  testbar, und **der Lehrer** mit Trainingsverfahren wie PPO, ONNX-Export und Kalibrierung;
+- eine flache **C-Schnittstelle** für JavaScript und eine dünne JavaScript-Schicht zum Browser.
 
 Und dann ist da die **Micro Duck**: ein zweibeiniger Roboter von Pollen Robotics. In Kern läuft sie
 mit ihren echten, trainierten neuronalen Netzen (Kern ist mit Pollen Robotics nicht verbunden).
@@ -59,20 +69,27 @@ Multiplikation und Addition nicht zu einem Schritt verschmelzen, Box3D rechnet o
 Prozessor-Spezialbefehle, Kern bringt eigene Winkelfunktionen mit, und beim Training ist die
 Reihenfolge aller Summen fest – egal, wie viele Helfer mitrechnen.
 
-Bewiesen wird das mit einem **Fingerabdruck**: Die Ente läuft ein paar hundert Schritte, ihr
-Zustand wird nach jedem zu einer Prüfsumme – und die Liste muss überall übereinstimmen ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 3](03-grundlagen.md)).
+Bewiesen wird das mit einem **Fingerabdruck** (`kern_lehrer --fingerprint 400`): Die Ente läuft
+400 Takte, ihr Zustand wird nach jedem zu einer Prüfsumme – und die Liste muss mit einer
+Referenzdatei übereinstimmen. Die CI vergleicht das auf drei Plattformen: GCC auf x86, Apple clang
+auf ARM und WebAssembly ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 3](03-grundlagen.md)).
 
-> **Wusstest du?** Läuft die simulierte Ente anders als die echte, liegt das dank Determinismus
-> wirklich am Modell und nicht an Rechenrauschen ([Kapitel 16](16-kalibrierung.md)).
+> **Wusstest du?** Dank Determinismus ist ein Fehler der Simulation ein fester, wiederholbarer Fehler
+> statt Rauschen. Läuft die simulierte Ente anders als die echte, liegt das wirklich am Modell
+> ([Kapitel 16](16-kalibrierung.md)).
 
 ### Noch ein paar Hausregeln
 
-- **Keine Ausnahmen.** Eine Funktion meldet „hat nicht geklappt“ und hinterlegt eine lesbare
-  Meldung ([Kapitel 3](03-grundlagen.md)).
-- **Eingaben werden geprüft,** bevor sich etwas ändert; kaputte Daten zerstören nichts.
-- **Kein neuer Speicher pro Bild** auf der JavaScript-Seite.
-- **Die Physik wird nicht beschummelt.** Die Micro Duck steht nur durch ihre Motoren und Füße –
-  keine unsichtbare Hand ([Kapitel 6](06-physik.md), [Kapitel 13](13-micro-duck.md)).
+- **Keine Ausnahmen, keine Laufzeit-Typinformation (RTTI).** Eine Funktion meldet „hat nicht
+  geklappt“ und hinterlegt eine lesbare Meldung; JavaScript liest sie mit `kern_last_error()`
+  ([Kapitel 3](03-grundlagen.md)).
+- **Eingaben werden geprüft,** bevor sich etwas ändert; kaputte Daten zerstören nichts. Der
+  JSON-Leser lehnt zu tiefe Verschachtelung und gefährliche Schlüssel wie `__proto__` ab.
+- **Kein neuer Speicher pro Bild** auf der JavaScript-Seite: Die Fassade `KernRenderer` kopiert
+  Daten in einen immer wiederverwendeten Bereich.
+- **Die Physik wird nicht beschummelt.** Box3D wird unverändert mitübersetzt. Die Micro Duck steht
+  nur durch ihre Motoren und Füße – keine unsichtbare Hand ([Kapitel 6](06-physik.md),
+  [Kapitel 13](13-micro-duck.md)).
 - **Eine Umsetzung für alle Orte.** Editor, Spiel und Lehrer teilen Spielwelt und Physik.
 - **Robust:** Geht der Grafikkontext verloren, pausiert Kern und baut danach alles neu auf
   ([Kapitel 4](04-grafik.md)).
@@ -97,9 +114,12 @@ reine C++-Spiele, `--physics` für Box3D, `--game` für die Spiel-Laufzeit (samt
 und `--lehrer` (beide samt Spiel und Physik).
 
 C++ und JavaScript tauschen sich nur über den **Speicher** des Moduls aus, einen großen, gemeinsamen
-Zahlenblock. JavaScript schreibt Daten hinein und sagt der Engine, wo sie liegen; Texte gehen als
-Paar aus Startstelle und Länge, Antworten des Studios kommen als JSON-Text zurück. Umgekehrt ruft die
-Engine Funktionen des Browsers auf: WebGL2, Uhrzeit, Konsole und ein paar mehr.
+Zahlenblock. JavaScript reserviert dort Platz, schreibt Daten an feste Stellen (die in C++ und in
+`kern.mjs` gleich festgelegt sein müssen) und sagt der Engine, wo sie liegen. Texte gehen als
+Paar aus Startstelle und Länge, Antworten des Studios kommen als JSON-Text zurück, gültig bis zum
+nächsten Aufruf. Umgekehrt ruft die Engine Funktionen des Browsers auf: WebGL2, Uhrzeit, Konsole,
+Zufall und ein paar mehr; unbekannte Systemaufrufe beantwortet ein winziger Ersatz mit „nicht
+unterstützt“.
 
 > **Stell dir vor …** Zwei Nachbarn ohne gemeinsame Sprache teilen sich einen Briefkasten. Einer
 > legt Zettel hinein, der andere holt sie ab. Mehr Kontakt gibt es nicht.
@@ -110,16 +130,21 @@ Alle Funktionen an dieser Grenze listet [Kapitel 17](17-referenz.md).
 
 **Ein Spiel ganz in C++.** Du schreibst eine Klasse, die von `kern::App` erbt. In `start()` legst du
 die Welt an – im kleinsten Beispiel `hello` etwa einen graugrünen Boden, den du dem Renderer mit
-`upsert` („einfügen oder ersetzen“) übergibst. Danach ruft der Browser in jedem Bild `update()` auf,
-und Kern zeichnet ([Kapitel 12](12-eigene-spiele.md)). Das große Geschwister `orbrun` ist ein ganzes
-Spiel mit Stadt, Fahrphysik, Verkehr, Tag und Nacht.
+`upsert` („einfügen oder ersetzen“) übergibst; in `configure()` wählst du Renderer-Optionen wie
+Schatten. Danach ruft der Browser in jedem Bild `kern_app_frame` auf; das ruft `update()`, und Kern
+zeichnet ([Kapitel 12](12-eigene-spiele.md)). Das große Geschwister `orbrun` ist ein ganzes
+Spiel mit Stadt, Fahrphysik, Verkehr, Tag und Nacht und einer eigenen Shader-Erweiterung.
 
-**Nur der Renderer, aus JavaScript** – so nutzt SpawnCity Kern ([Kapitel 4](04-grafik.md)).
+**Nur der Renderer, aus JavaScript** – so nutzt SpawnCity Kern: `loadKern()` lädt das Modul,
+`new KernRenderer(…)` legt den Renderer an, und `upsert`, `updateInstances`, `setCamera`, `render`
+und `pick` erledigen den Rest ([Kapitel 4](04-grafik.md)).
 
-**Kern Studio und exportierte Spiele.** Das Studio steckt in **einer** HTML-Datei, die offline
-läuft. Du baust ein Level aus Actors (Dingen in der Welt) und spielst es mit
+**Kern Studio und exportierte Spiele.** `tools/build_studio.sh` packt Engine, Physik, Spiel-Laufzeit
+und Studio in **eine** HTML-Datei, die offline läuft, sogar per Doppelklick. Du baust ein Level aus
+Actors (Dingen in der Welt) und spielst es mit
 **Play** oder **Simulate** direkt im Fenster. **File → Package Game** macht daraus ein eigenständiges
-Spiel, wieder eine einzige HTML-Datei, mit denselben C++-Klassen wie im Editor
+Spiel, wieder eine einzige HTML-Datei: Engine-Modul, zwei JavaScript-Dateien und das Level. Sie
+startet dasselbe Modul im Player-Modus, mit denselben C++-Klassen wie im Editor
 ([Kapitel 8](08-spiel-laufzeit.md), [Kapitel 11](11-studio.md)).
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim ersten Start ist Orb Run geladen
@@ -128,7 +153,8 @@ Spiel, wieder eine einzige HTML-Datei, mit denselben C++-Klassen wie im Editor
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck – auf deinem Rechner als Programm
 `kern_lehrer` (auch ohne Bildschirm auf einem Server) oder im Browser auf der Seite `/lehrer/`, wo
-mehrere Web Worker (Hintergrund-Helfer) Erfahrungen sammeln und einer daraus lernt. Gleicher
+mehrere Web Worker (Hintergrund-Helfer), jeder mit eigenem Modul, Erfahrungen sammeln und einer
+daraus lernt. Beide nutzen dieselben Trainingsrezepte und dieselbe Spielwelt. Gleicher
 Startwert, gleich viele Enten: **dasselbe Netz**, hier wie dort. Gespeichert wird im Format ONNX,
 wie Pollens Netze ([Kapitel 14](14-lehrer.md)).
 
@@ -146,10 +172,13 @@ Logik-Bausteine der Kategorie *Robots* – und im Studio ist sie einfach ein Act
 Der Quelltext liegt offen auf https://github.com/ChristianHohlfeld/kernengine.de. Die Engine wohnt
 in `kern/`: Header in `include`, Umsetzung in `src`, die JavaScript-Schicht in `web`, Tests in
 `tests`, die Beispielspiele in `examples`, Kerns eigene Netze in `policies`, Box3D, musl und die
-Micro Duck in `third_party`, dieses Buch in `docs`. Daneben liegen `tools` (Bauskripte), `site`
-(Startseite) und `generated` (Bauergebnisse).
+Micro Duck in `third_party`, dieses Buch in `docs`. Daneben liegen `tools` (Studio-Bau, ein Relay
+für Mehrspieler über Rechnergrenzen, Import der Micro Duck, Mesh-Vereinfachung), `site` (Startseite
+und App-Dateien des installierbaren Editors), `generated` (Bauergebnisse) und die CI in
+`.github/workflows/ci.yml`. Die vollständige Verzeichniskarte steht im blauen Buch.
 
-Kern steht unter der **Apache License 2.0**. Die Einzeldokumente in `kern/docs/` sind die Quellen dieses Buchs; für Physik und Micro
+Kern steht unter der **Apache License 2.0**; `kern/LICENSES.md` nennt die Bestandteile Dritter mit
+ihren Lizenzen. Die Einzeldokumente in `kern/docs/` sind die Quellen dieses Buchs; für Physik und Micro
 Duck sind `physics.md` und `walker.md` verbindlich.
 
 > **Achtung, Falle!** `kern/README.md` nennt ein paar SpawnCity-Dateien. Die suchst du hier
@@ -160,15 +189,9 @@ Duck sind `physics.md` und `walker.md` verbindlich.
 Du liest das **grüne Buch**. Sein großer Bruder, das **blaue Buch**, hat Kapitel für Kapitel
 denselben Inhalt, aber technisch bis in jede Option. Packt dich ein Thema, schlag dort nach.
 
-Unterwegs begegnen dir immer dieselben Kästen:
-
-- **Kurz gesagt:** – unter jeder Kapitelüberschrift, worum es geht.
-- **Stell dir vor …** – Technik, verglichen mit dem Alltag.
-- **Probier's aus!** – eine Aufgabe in Kern Studio.
-- **Wusstest du?** – eine verblüffende Tatsache.
-- **Achtung, Falle!** – ein typischer Fehler und wie du ihn vermeidest.
-
-Am Kapitelende stehen **Das nimmst du mit** und die **Knobelecke** mit Fragen zum Nachdenken, die
+Unterwegs begegnen dir immer dieselben Kästen: **Kurz gesagt** (worum es geht), **Stell dir vor …** (ein Alltagsvergleich), **Probier's aus!**
+(eine Aufgabe in Kern Studio), **Wusstest du?** (eine verblüffende Tatsache) und **Achtung, Falle!**
+(ein typischer Fehler). Am Kapitelende stehen **Das nimmst du mit** und die **Knobelecke**, die
 Lösungen direkt darunter. Nicht spicken! (Na gut, ein bisschen.)
 
 Das Buch ist von unten nach oben gebaut, wie Kern selbst: erst Bauen und Grundlagen, dann Grafik,
@@ -180,7 +203,8 @@ Wo fängst du an? Wer Kern verändern will: Kapitel 2 und 3 (vor Physik oder Rob
 Wer ein Spiel baut: 11 oder 12, dazu 8 und 9. Wer die Ente liebt: 13, 14, 16. Wer Kern in eine
 Webseite einbaut: 4 und 17.
 
-Codebeispiele stammen aus dem echten Quelltext; Pfade beziehen sich auf `kern/`.
+Codebeispiele stammen aus dem echten Quelltext. Pfade beziehen sich auf `kern/`, außer sie
+beginnen mit `tools/`, `site/` oder `generated/` – die liegen in der Wurzel des Repositorys.
 
 ## Das nimmst du mit
 

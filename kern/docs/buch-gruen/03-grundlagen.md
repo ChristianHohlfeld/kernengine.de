@@ -5,8 +5,7 @@
 > Winkelfunktionen, die auf jedem Rechner exakt dieselben Bits liefern – samt dem Grund für jede
 > Entscheidung.
 
-Ein Keller ist nicht glamourös – aber ist er schief, ist es das ganze Haus. Die vier Bausteine
-heißen `core/base.h`, `core/json.h`, `math/math.h` und `core/dmath.h`.
+Ist der Keller schief, ist es das ganze Haus. Die vier Bausteine heißen `core/base.h`, `core/json.h`, `math/math.h` und `core/dmath.h`.
 
 ## 3.1 Der Werkzeugkasten: `base.h`
 
@@ -53,11 +52,13 @@ Jeder Vergleich mit NaN ist falsch, also ist `!(NaN > 0)` wahr.
 ### Logging, Uhr und kleine Helfer
 
 `log()` schreibt in vier Stufen (`debug`, `info`, `warn`, `error`): im Browser mit dem Vorsatz
-`[kern]` in die Konsole (oder an einen eigenen Empfänger des Hosts), nativ Warnungen und Fehler nach
-`stderr`. Kann etwa der Glüheffekt Bloom nicht starten, loggt Kern `bloom disabled:` plus die
+`[kern]` in die Konsole – Fehler als `console.error`, Warnungen als `console.warn`, sonst
+`console.log` – oder an einen eigenen Empfänger des Hosts; nativ Warnungen und Fehler nach
+`stderr`, den Rest nach `stdout`. Kann etwa der Glüheffekt Bloom nicht starten, loggt Kern `bloom disabled:` plus die
 Meldung von der Pinnwand – und das Spiel läuft ohne Glühen weiter.
 
-`now_ms()` liefert Millisekunden einer Uhr, die nur vorwärts läuft – für Messungen und
+`now_ms()` liefert Millisekunden einer Uhr, die nur vorwärts läuft (im Browser
+`performance.now()`) – für Messungen und
 Zeitbudgets, etwa wenn die Sound-Bank nur begrenzt lange Klänge vorrechnen darf.
 
 > **Achtung, Falle!** In der Simulation hat die Uhr nichts verloren! Physik und Roboter zählen
@@ -70,21 +71,25 @@ halten“; bei gemischten Typen nennt man den Typ, z. B. `min_of<u32>(…)`.
 ### `Span`: ein Fenster auf Daten
 
 Ein `Span` besteht nur aus `data` (wo fangen die Werte an?) und `size` (wie viele?). Er **besitzt**
-die Daten nicht, er zeigt nur darauf. Jeder Container mit `data()` und `size()`, etwa ein
+die Daten nicht, er zeigt nur darauf – wie `std::span`, nur leichter, und `data` und `size` sind
+einfache Felder statt Methoden. Jeder Container mit `data()` und `size()`, etwa ein
 `std::vector`, wird automatisch zum Span. So fließen Daten in die Engine, aus C++ wie aus
-JavaScript.
+JavaScript: Auch `MeshInput`, das Paket für ein Mesh, besteht aus Spans, und die C-Schnittstelle
+baut sie direkt aus Zeigern in den Speicher.
 
 > **Stell dir vor …** Ein Span ist ein Zettel: „Regal 4, die nächsten 20 Bücher.“ Leicht und
 > praktisch – aber räumt jemand das Regal aus, zeigt er ins Leere.
 
 Darum darf ein Span nicht länger leben als seine Daten. Wer sie behalten will, **kopiert** sie – so
 wie der Renderer, der Kopien für das Picking und den Neuaufbau nach einem Grafikverlust hält
-([Kapitel 4](04-grafik.md)).
+([Kapitel 4](04-grafik.md)), oder die Geometrie-Aufträge, weil JavaScript seinen Zwischenspeicher
+gleich wiederverwendet.
 
 ### Hashes
 
 Ein **Hash** macht aus beliebig vielen Bytes eine kurze, feste Zahl. Mit `hash_bytes` (**FNV-1a**,
-64 Bit) erkennt der Renderer unveränderte Werte – und auch der Fingerabdruck
+64 Bit, Startwert wählbar) erkennt der Renderer unveränderte Werte und den Schlüssel seiner
+Schattenkarte – und auch der Fingerabdruck
 der Ente aus [Kapitel 2](02-bauen-und-testen.md) ist ein FNV-1a. `hash_u32` (*lowbias32*) mischt
 Zahlen, etwa für Rauschen, das trotzdem immer gleich ausfällt. Beide rechnen nur mit Ganzzahlen: Das
 Ergebnis hängt nur von den Bytes ab, nie vom Rechner.
@@ -107,7 +112,9 @@ der Micro Duck. Sein JSON-Baustein verspricht drei Dinge:
 > **Wusstest du?** Kern schreibt `0.30000000000000004` – genau wie JavaScript bei 0.1 + 0.2. Ein Test
 > prüft solche Fälle, etwa 10²¹ → `1e+21` und NaN → `null`.
 
-Ein `json::Value` ist null, Wahrheitswert, Zahl, Text, Liste oder Objekt. Sicher wird Code damit so:
+Ein `json::Value` ist null, Wahrheitswert, Zahl, Text, Liste oder Objekt. Er kann seinen Typ nennen,
+Werte liefern (`truthy()` sogar mit JavaScripts Wahrheitsregeln), Listen und Objekte bearbeiten und
+sich mit `==` vergleichen; die ganze Funktionsliste steht im blauen Buch. Sicher wird Code damit so:
 
 - Ein fehlender Schlüssel liefert **null** statt eines Absturzes; `v["a"][2]["b"]` geht immer.
 - `as_number` und `as_bool` liefern bei falschem Typ einen Ersatzwert. Wer „fehlt“ von „falscher
@@ -116,7 +123,9 @@ Ein `json::Value` ist null, Wahrheitswert, Zahl, Text, Liste oder Objekt. Sicher
   leere Liste.
 - `parse` schreibt das Ergebnis **nur bei Erfolg**. Fehlermeldungen nennen die Stelle
   (`at offset 17`); Text hinter dem Wert gibt `trailing characters`; ein UTF-8-BOM am Anfang ist
-  erlaubt. `stringify` schreibt kompakt oder eingerückt.
+  erlaubt. Tiefe und Schlüsselsperre lassen sich in den `ParseOptions` einstellen.
+- `stringify(v, indent)` arbeitet wie `JSON.stringify(value, null, indent)`: kompakt bei
+  `indent <= 0`, sonst eingerückt; unendliche Zahlen werden `null`, −0 wird `0`.
 
 ### Ein Beispiel: Servoprofile
 
@@ -147,6 +156,11 @@ machen kann. Zuerst die Spielregeln:
 > Zimmerdecke. Rechtshändig heißt: Daumen, Zeige- und Mittelfinger der rechten Hand rechtwinklig
 > abspreizen – das sind X, Y und Z.
 
+Spaltenweise heißt: Die 16 Zahlen liegen Spalte für Spalte im Speicher, die Verschiebung in den
+Plätzen 12, 13 und 14 – wie bei OpenGL. Punkte werden von rechts an die Matrix multipliziert
+(`p' = M * p`). In der Kamerasicht blickt man entlang −Z, und die Projektion landet im
+OpenGL-Bildraum mit Tiefe von −1 bis 1.
+
 Z oben gilt überall: Renderer, Physik, Ton, Levels, Grundformen. In **Radiant** ist ein halber
 Kreis π (etwa 3,14) statt 180°; Levels und das Details-Panel im Studio zeigen Grad
 ([Kapitel 8](08-spiel-laufzeit.md)).
@@ -158,20 +172,26 @@ Kreis π (etwa 3,14) statt 180°; Levels und das Details-Panel im Studio zeigen 
 ### Vektoren und Quaternionen
 
 `Vec2`, `Vec3` und `Vec4` sind Pfeile (oder Punkte) aus zwei, drei oder vier Zahlen, mit Länge,
-Abstand, Mischen, Skalar- und Kreuzprodukt. Schlau ist `normalize`, das einen Pfeil auf Länge 1
+Abstand, Mischen (`lerp`), Minimum/Maximum, Skalar- und Kreuzprodukt, dazu `finite` (alles
+endlich?) und `hex_color(0xRRGGBB)` für Farben. Schlau ist `normalize`, das einen Pfeil auf Länge 1
 bringt: Hat er Länge null – etwa nach zwei Klicks auf denselben Punkt –, liefert es einen
 **Ersatzwert** (standardmäßig nach oben) statt NaN, das sich wie ein Virus durch die Szene fräße.
 
 Drehungen speichert Kern als **Quaternion**: vier Zahlen `(x, y, z, w)`, Standard `w = 1` heißt
 „keine Drehung“. Klingt furchteinflößend, ist im Gebrauch einfach: `axis_angle(achse, winkel)`
-erzeugt eine Drehung, zwei Drehungen lassen sich multiplizieren, `rotate` dreht einen Vektor.
+erzeugt eine Drehung (die Achse wird dabei auf Länge 1 gebracht), `a * b` dreht erst um `b`, dann
+um `a`, `rotate` dreht einen Vektor.
 
 ### Matrizen
 
 Eine **Matrix** ist eine 4×4-Tabelle, die einen Punkt auf einen Schlag verschiebt, dreht und
 vergrößert. `trs` baut sie aus diesen drei Teilen, `perspective` und `ortho` bauen Ansichten mit und
-ohne Fluchtpunkt, `look_at` die Blickmatrix der Kamera. `invert` kehrt eine Matrix in doppelter
-Genauigkeit um, damit Klicks auch in großer Entfernung treffen.
+ohne Fluchtpunkt, `look_at` die Blickmatrix der Kamera (bei unmöglicher Blickrichtung die
+Einheitsmatrix und `ok = false`). `transform_point` bewegt einen Punkt, `transform_vector` nur eine
+Richtung (ohne Verschieben), `transform` rechnet mit vier Zahlen, etwa in den Bildraum. `invert`
+kehrt eine Matrix in doppelter Genauigkeit um, damit Klicks auch in großer Entfernung treffen; bei
+fast unumkehrbaren Matrizen meldet es `false`. `normal_matrix3` hält Normalen (Pfeile senkrecht aus einer Fläche) auch bei
+ungleichmäßigem Strecken senkrecht.
 
 Bei `A * B` wirkt **erst B**, dann A. Ein Test prüft `trs` am Punkt (1, 0, 0): mit 2 skalieren
 → (2, 0, 0), um 90° um Z drehen → (0, 2, 0), um (1, 2, 3) verschieben → **(1, 4, 3)**. Genau so
@@ -189,8 +209,11 @@ startet „verkehrt herum“, sodass der erste Punkt sie richtig setzt.
 Die **Kamera** ist keine Matrix, sondern eine Beschreibung: Auge, Ziel, oben. Standard: Auge
 (0, −18, 8), Ziel (0, 0, 2), oben +Z, Öffnungswinkel π/3 = **60°**, gemessen **senkrecht**,
 gezeichnet von 0,05 m bis 1800 m. Studios Drauf-, Vorder- und Seitenansicht
-nutzen eine orthografische Kamera mit sichtbarer Höhe (Standard 20 m). Ungültiges weist
-`camera_valid` zurück.
+nutzen eine orthografische Kamera mit sichtbarer Höhe (Standard 20 m). Ungültiges (etwa `far`
+nicht größer als `near`) weist `camera_valid` zurück. `projection_matrix` wählt Perspektive oder
+Parallelansicht; Projektion mal Blickmatrix ergibt die View-Projection, aus der
+`Frustum::from_matrix` die sechs Wände des Sichtbereichs fürs Aussortieren gewinnt. JavaScript setzt die Kamera mit zwölf Zahlen über
+`kern_camera_set`, das Ungültiges mit `invalid camera` ablehnt.
 
 ## 3.4 Mathematik, die überall gleich rechnet
 
@@ -204,11 +227,13 @@ im Browser gelerntes Netz liefe nativ anders.
 
 Die Lösung: Kern bringt die Funktionen der C-Bibliothek **musl** mit und übersetzt sie in allen
 drei Bauwegen gleich, ohne verschmolzene Rechenschritte. Neue Namen (aus `sin` wird `kern_musl_sin`)
-verhindern Verwechslungen mit dem System. Box3D hat ohnehin eigene deterministische
-Winkelfunktionen.
+verhindern Verwechslungen mit dem System. Box3D rechnet im Skalar-Pfad und hat ohnehin eigene
+deterministische Winkelfunktionen.
 
-Benutzt wird das im Namensraum `kern::dm` genau wie `std::` – `sin`, `cos`, `exp`, `atan2`, `pow`
-und weitere. Aus Kerns Mathematik:
+Benutzt wird das im Namensraum `kern::dm` genau wie `std::`: `sin`, `cos`, `tan`, `asin`, `acos`,
+`atan`, `exp`, `expm1`, `log`, `log10`, `atan2`, `pow` und `hypot`. Mit `float` rechnet die
+`float`-Fassung, sonst die `double`-Fassung. `sqrt`, `fabs` und `floor` bleiben bei `std::`, weil sie
+ohnehin exakt sind. Aus Kerns Mathematik:
 
 ```cpp
 static Quat axis_angle(Vec3 axis, f32 radians) {
@@ -220,7 +245,8 @@ static Quat axis_angle(Vec3 axis, f32 radians) {
 ```
 
 Achse auf Länge 1 bringen, Sinus des halben Winkels – mit `kern::dm::sin`! – an die Achse
-multiplizieren, Kosinus als vierte Zahl. So ergibt jede Drehung überall dieselben Bits.
+multiplizieren, Kosinus als vierte Zahl. So ergibt jede Drehung überall dieselben Bits. Auch
+`perspective` nutzt `kern::dm::tan`.
 
 Die Regel für neuen Code:
 

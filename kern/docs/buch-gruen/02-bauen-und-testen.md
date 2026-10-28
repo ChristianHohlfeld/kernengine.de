@@ -24,8 +24,17 @@ CXX=g++ CC=gcc kern/tests/run.sh
 ```
 
 Zeile 1 sagt, wo der Übersetzer liegt, Zeile 2 baut `generated/studio.html`, Zeile 3 baut und
-startet alle Tests mit GCC. Die fertige `studio.html` läuft per Doppelklick, ohne Internet. Zum
-Entwickeln öffnest du über einen Webserver `kern/web/studio/index.html`. `play.html?level=orbRun`
+startet alle Tests mit GCC. Beispielspiele und den Browser-Lehrer baust du so:
+
+```sh
+kern/build.sh --app kern/examples/hello/hello.wasm \
+  kern/examples/hello/hello.cpp
+kern/build.sh --lehrer generated/kern_lehrer.wasm
+```
+
+(`orbrun` genauso wie `hello`.) Die fertige `studio.html` läuft per Doppelklick, ohne Internet. Zum
+Entwickeln lieferst du die Repository-Wurzel über einen Webserver aus und öffnest
+`kern/web/studio/index.html`; sie lädt `generated/kern_studio.wasm`. `play.html?level=orbRun`
 im selben Ordner spielt ein Level ohne Editor (auch `physicsLab`, `shootingRange`, `microDuck`,
 `basic`).
 
@@ -49,8 +58,8 @@ Netzwerk, Szene und die eigene Mathematik aus musl. Die Schalter kennst du aus
 [Kapitel 1](01-einfuehrung.md). Weitere Argumente, die auf `.cpp` oder `.cc` enden, werden als
 Spielquellen mitübersetzt; alles andere geht als Option an den Compiler.
 
-Vier Umgebungsvariablen steuern den Bau: `WASI_SDK` (wo), `KERN_BUILD` (`release` voll optimiert,
-`debug` weniger optimiert), `KERN_JOBS` (wie viele Übersetzer parallel, Standard: alle Kerne) und
+Vier Umgebungsvariablen steuern den Bau: `WASI_SDK` (wo), `KERN_BUILD` (`release`: `-O3` mit
+ThinLTO; `debug`: `-O1 -g` ohne LTO), `KERN_JOBS` (wie viele Übersetzer parallel, Standard: alle Kerne) und
 `KERN_OBJ_CACHE` (wo Zwischenergebnisse liegen). Kleiner Haken: Auch im Debug-Modus landen keine
 Debug-Informationen im Modul, weil der letzte Schritt sie immer entfernt.
 
@@ -73,8 +82,9 @@ Schluss meldet das Skript stolz `built <out> (<n> bytes)`.
 
 Jede Quelle wird einzeln und parallel übersetzt, und ThinLTO, ein Optimierer, verbindet sie. Damit
 ein Neubau nicht alles neu kocht, gibt es einen **Objekt-Cache**, den sich Studio und Beispielspiele
-teilen. Jedes Stück trägt ein Etikett aus dem Inhalt seiner Quelle, ihrem Pfad und dem Inhalt
-**aller** Header.
+teilen und den die CI von Lauf zu Lauf aufhebt. Jedes C++-Stück trägt ein Etikett aus dem Inhalt
+seiner Quelle, ihrem Pfad und dem Inhalt **aller** Header. Box3D, musl und ThinLTO haben eigene
+Fächer; dort wird neu übersetzt, was fehlt oder älter als seine Quelle ist.
 
 > **Achtung, Falle!** Du änderst ein Komma in einer Header-Datei – und **alles** wird neu übersetzt?
 > Absicht! Weil alle Header ins Etikett eingehen, passt kein Vorratsstück mehr. Einfach und sicher:
@@ -96,8 +106,9 @@ das schief, erscheint eine Meldung. Mit `--skip-wasm` wird das vorhandene Modul 
 
 `kern/tools/lehrer.sh` baut `kern_lehrer` für Linux und macOS, auf x86 und ARM, voll optimiert und
 auf allen Kernen. Drin ist fast die ganze Engine, nur Studio und App-Laufzeit fehlen; statt WebGL
-steckt eine Attrappe darin, denn der Lehrer zeichnet nicht. Das Skript erlaubt die besten Befehle
-deines Prozessors – Ergebnisse ändert das nicht, weil `-ffp-contract=off` gilt. Bedienung:
+steckt eine Attrappe darin, denn der Lehrer zeichnet nicht. Das Ergebnis landet in `kern/build/`
+(oder einem Ordner deiner Wahl). Mit `KERN_NATIVE=1` (Standard) erlaubt das Skript die besten
+Befehle deines Prozessors – Ergebnisse ändert das nicht, weil `-ffp-contract=off` gilt. Bedienung:
 [Kapitel 14](14-lehrer.md) und [Kapitel 17](17-referenz.md).
 
 ## 2.6 Die Unit-Tests
@@ -114,7 +125,9 @@ ab. Box3D und musl, fremder Code, laufen ohne Spürhunde. Außerdem gilt `-Werro
 wird zum Fehler – das Bauskript ist nachsichtiger, die Tests nicht.
 
 Kern hat ein winziges eigenes Testgerüst: `TEST(name)` meldet einen Test an, `CHECK(bedingung)` prüft,
-`CHECK_NEAR(a, b, eps)` vergleicht Zahlen mit Toleranz; am Ende steht `<n> checks, <m> failures`. Die
+`CHECK_NEAR(a, b, eps)` vergleicht Zahlen mit Toleranz. Je Test erscheint `ok` oder `FAIL` (mit
+Datei, Zeile, Ausdruck und `last_error()`), am Ende `<n> checks, <m> failures`; bei einem Fehler
+endet das Programm mit 1. Die
 Tests decken die ganze Engine ab: Matrizen und Kamera, Geometrie, Renderer, Physik, JSON, Spiel,
 Logik, Audio, Netzwerk, Studio (startet es mit Orb Run? ist Undo exakt?), Micro Duck (rechnet Kern
 ihr Netz wie die Referenz? steht, läuft und dreht sie sich?), Lehrer und Determinismus. Ohne Filter
@@ -134,24 +147,34 @@ einen Kontextverlust übersteht.
 Ein Logik-Graph ([Kapitel 9](09-logik.md)) läuft im **Interpreter** (Knoten für Knoten), als
 **JIT** (zur Laufzeit in WebAssembly übersetzt) oder als **exportiertes C++**. Alle drei müssen Bit
 für Bit dasselbe liefern. Gemeinsame Testfälle wie `math_loops` prüfen das: den Interpreter ein
-Unit-Test, das exportierte C++ ein zweiter Schritt von `run.sh`, der den erzeugten Quelltext
-übersetzt und vergleicht, den JIT ein eigenes Modul unter Node – genau wie im Browser.
+Unit-Test, das exportierte C++ ein zweiter Schritt von `run.sh` (`kern_tests --emit-logic` schreibt
+den Quelltext, der dann übersetzt und verglichen wird), den JIT ein eigenes Modul unter Node – genau
+wie im Browser. Dabei muss jeder Graph wirklich in seiner Stufe laufen, etwa
+`compiled (WebAssembly)`.
 
 > **Wusstest du?** Zum Schluss des JIT-Tests läuft ein Wettrennen: eine Million
 > Schleifendurchläufe, interpretiert und übersetzt. Ausgegeben wird, wie viel schneller der JIT ist.
 
 ## 2.8 Der Browser-Test
 
-Der **e2e**-Test („End to End“) startet einen echten Chromium, ferngesteuert mit Playwright, und
-bedient das Studio wie ein Mensch. Eine Grafikkarte bekommt er nicht, sondern die
+```sh
+python3 -m http.server 8771 &
+node kern/tests/e2e/studio_e2e.mjs   # Standard: Port 8771
+```
+
+Zeile 1 liefert die Repository-Wurzel aus (`generated/` muss gebaut sein), Zeile 2 startet den
+**e2e**-Test („End to End“): einen echten Chromium, ferngesteuert mit Playwright, der das Studio
+bedient wie ein Mensch. Eine Grafikkarte bekommt er nicht, sondern die
 Software-Nachbildung SwiftShader – die schafft die Stadt mit etwa **einem Bild pro Sekunde**. Darum
 wartet jede Prüfung auf ihre Wirkung statt eine feste Zeit. Ob überhaupt gezeichnet wurde, verrät
 die Zahl verschiedener Farben im Bild.
 
 Geprüft wird fast alles: Menüs, Fly Mode, Auswählen und Verschieben, Undo, Play, Simulate, vier
 Viewports, Vorlagen, Logik-Editor, Micro Duck mit Kopfkamera, Mehrspieler über zwei Tabs, Spiel
-packen und spielen, Wiederherstellen nach dem Neuladen, Einstellungen, schmale Fenster, Telefone.
-Screenshots entstehen nur, wenn `KERN_E2E_SHOTS` einen Ordner nennt – viele Bilder dieses Buchs
+packen und spielen, Wiederherstellen nach dem Neuladen, Einstellungen, schmale Fenster, Telefone,
+die Android-Dateiauswahl, dazu die Modul-Fassung des Studios. Am Ende steht
+`<n> checks, <m> failures`; bei Fehlern endet der Test mit 1, auf GitHub zusätzlich als
+Fehlermarkierung. Screenshots entstehen nur, wenn `KERN_E2E_SHOTS` einen Ordner nennt – viele Bilder dieses Buchs
 stammen daher.
 
 > **Probier's aus!** Mach, was der Test-Roboter macht: **File → New Level → Physics Lab**. Halte die
@@ -212,12 +235,15 @@ flowchart LR
 - **native**: Unit-Tests mit Spürhunden, dann Logik-Export.
 - **determinism**: baut den Lehrer auf einem Mac mit ARM und vergleicht den Fingerabdruck.
 - **build**: holt wasi-sdk und den Vorrat vom letzten Lauf, baut Studio, Beispielspiele und Lehrer,
-  prüft die Syntax aller JavaScript-Dateien, testet Lehrer (zwei Enten sammeln, einer lernt,
-  ONNX-Export, Fingerabdruck) und JIT und stellt die Webseite zusammen: Startseite, Editor,
-  Lehrer-Seite, Netze der Ente, Beispielspiele, Lizenzen.
-- **deploy**: nur für `main`; schiebt die Seite in den Zweig `gh-pages`, und sie erscheint auf
-  https://kernengine.de/.
-- **e2e**: der Browser-Test, mit genau den Dateien, die veröffentlicht werden.
+  prüft die Syntax aller JavaScript-Dateien, testet Lehrer (zwei Enten sammeln, einer lernt `jump`:
+  Nachahmungsrunden, ein Stück DAgger, eine PPO-Iteration, ONNX-Export, Fingerabdruck) und JIT und
+  stellt die Webseite zusammen: Startseite, Editor, Lehrer-Seite, Netze der Ente, Beispielspiele,
+  Lizenzen. Das Ergebnis wird 7 Tage als Artefakt `site` aufgehoben.
+- **deploy**: nur für `main`; legt ein frisches Git-Repository an und schiebt es mit Gewalt (`-f`)
+  in den Zweig `gh-pages`, und die Seite erscheint auf https://kernengine.de/. (Die `README.md`
+  nennt noch eine eigene `pages.yml` – im Repository gibt es aber nur `ci.yml`.)
+- **e2e**: der Browser-Test mit Playwright 1.56.0, mit genau den Dateien, die veröffentlicht
+  werden. Er lädt einen Screenshot-Ordner hoch, setzt `KERN_E2E_SHOTS` aber nicht.
 
 Tests halten die Veröffentlichung nicht auf. Auf `main` läuft jeder Push bis zum Ende, damit jeder
 grüne Stand online geht – etwa 17 Minuten pro Lauf. Bei Pull Requests ersetzt ein neuer Lauf den
@@ -228,10 +254,19 @@ alten.
 
 ## 2.11 Zu Hause wie die CI
 
-Alles lässt sich lokal nachstellen, in derselben Reihenfolge: Unit-Tests, Fingerabdruck, Module
-samt Lehrer- und JIT-Test, Browser-Test (das blaue Buch listet die Befehle). Die Lehrer-Seite ist
-auf den Aufbau der veröffentlichten Seite zugeschnitten und läuft lokal erst, wenn du sie wie die CI
-zusammenstellst.
+Alles lässt sich lokal nachstellen, in derselben Reihenfolge: Unit-Tests, Fingerabdruck, Module,
+dann diese beiden Modul-Tests, zuletzt der Browser-Test:
+
+```sh
+node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm
+kern/build.sh /tmp/logic_test.wasm \
+  kern/tests/logic_wasm_test.cpp -Ikern/tests
+node kern/tests/logic_wasm_test.mjs /tmp/logic_test.wasm
+```
+
+Die Seiten laden ihre Dateien relativ, die Netze der Ente etwa je nach Fassung (Entwicklung,
+Single-File, veröffentlicht) aus einem anderen Ordner. Die Lehrer-Seite ist auf den Aufbau der
+veröffentlichten Seite zugeschnitten und läuft lokal erst, wenn du sie wie die CI zusammenstellst.
 
 ## 2.12 Wenn's klemmt
 
@@ -244,7 +279,7 @@ zusammenstellst.
 | `runtime error`, `AddressSanitizer` | Datei, Zeile lesen; Test einzeln |
 | Fingerabdruck weicht ab | Abschnitt 2.9 |
 | Logik läuft im `interpreter` | JIT-Ausgabe prüfen |
-| Browser-Test hängt | Server starten, Studio bauen |
+| Browser-Test hängt (wartet bis 90 s) | Server starten, Studio bauen |
 | Playwright fehlt | installieren, `NODE_PATH` setzen |
 
 Fällt der JIT aus, rechnet Kern im Interpreter weiter (`logic JIT failed …`) – langsamer, aber
