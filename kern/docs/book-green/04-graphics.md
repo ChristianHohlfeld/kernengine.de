@@ -575,8 +575,8 @@ ground (v). Over every wall, the shader lays an invisible grid of 3 m wide colum
 An excerpt from `fragment_surface`:
 
 ```glsl
-float column = floor(u / 3.0), floorIndex = floor(z / story);
-vec2 cell = vec2(fract(u / 3.0), fract(z / story));
+float column = floor(u / 3.0), floorIndex = floor(z / storey);
+vec2 cell = vec2(fract(u / 3.0), fract(z / storey));
 base = mix(base, vec3(0.05, 0.06, 0.08), win * 0.85);
 surfaceGlass = max(surfaceGlass, win * (1.0 - lit * uNight) * 0.7);
 ```
