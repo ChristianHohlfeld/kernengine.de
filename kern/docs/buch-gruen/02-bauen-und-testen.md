@@ -1,319 +1,268 @@
 # 2 Bauen und Testen: die Werkstatt hinter Kern
 
-> **Kurz gesagt:** Bevor Kern im Browser läuft, muss der C++-Code übersetzt werden – und bevor eine
-> Änderung online geht, muss sie hunderte Prüfungen bestehen. Hier lernst du die Bauwerkzeuge, die
-> Tests, den Fingerabdruck für Determinismus und die automatische Prüfstraße kennen.
+> **Kurz gesagt:** Hinter Kern stehen drei Prinzipien. Erstens: Der Code wird **übersetzt**, bevor
+> er im Browser laufen kann. Zweitens: Hunderte **automatische Prüfungen** bewachen jede Änderung.
+> Drittens: Ein **Fingerabdruck** beweist, dass Kern überall exakt gleich rechnet. Ein Fließband
+> erledigt alle drei bei jeder Änderung von selbst.
 
-## 2.1 Der Überblick
+> **Begriffe vorab:**
+> - **Quelltext** – der Text eines Programms, so wie Menschen ihn schreiben, hier in C++.
+> - **Header** – eine Art Inhaltsverzeichnis im Quelltext, das viele Programmteile gemeinsam lesen.
+> - **Speicher** – der Arbeitsplatz eines Programms im Rechner, eine lange Reihe nummerierter Fächer
+>   für Zahlen.
+> - **Simulation** – eine nachgerechnete Welt: Der Computer berechnet Schritt für Schritt, wie sich
+>   Dinge bewegen.
+> - **Takt** – ein einzelner Rechenschritt der Simulation. Die Ente entscheidet in jedem Takt neu,
+>   wie sie ihre Motoren bewegt.
+> - **Server** – ein Computer im Internet, der Aufgaben für andere erledigt.
+> - **GitHub** – eine Webseite, auf der der Quelltext von Kern liegt und jede Änderung aufgezeichnet
+>   wird.
 
-| Werkzeug | Macht daraus |
-|---|---|
-| `kern/build.sh` | ein WebAssembly-Modul |
-| `tools/build_studio.sh` | Kern Studio als eine HTML-Datei |
-| `kern/tools/lehrer.sh` | den Lehrer für deinen Rechner |
-| `kern/tests/run.sh` | alle Unit-Tests |
-| Logik- und Lehrer-Tests | Prüfungen im WebAssembly-Modul |
-| `kern/tests/e2e/studio_e2e.mjs` | einen echten Browser-Test |
+Stell dir eine Werkstatt mit drei Stationen vor: An der ersten wird gekocht (übersetzt), an der
+zweiten wird abgeschmeckt (geprüft), an der dritten wird das Ergebnis mit einem Muster verglichen
+(Fingerabdruck). Am Ende steht die Auslieferung: die Webseite https://kernengine.de/. Dieses Kapitel
+geht die Stationen der Reihe nach durch.
 
-Der kürzeste Weg zu Studio und grünen Tests:
+## 2.1 Übersetzen: vom Rezept zum Gericht
 
-```sh
-export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
-tools/build_studio.sh
-CXX=g++ CC=gcc kern/tests/run.sh
-```
+Ein Programm wird in einer Sprache für Menschen geschrieben. Bevor ein Browser es ausführen kann,
+muss es in dessen Befehle übersetzt werden. Bei Kern heißt das: Aus dem C++-Quelltext wird ein
+WebAssembly-**Modul**, eine einzige Datei, die der Browser lädt.
 
-Zeile 1 sagt, wo der Übersetzer liegt, Zeile 2 baut `generated/studio.html`, Zeile 3 baut und
-startet alle Tests mit GCC. Beispielspiele und den Browser-Lehrer baust du so:
+> **Stell dir vor …** Der Quelltext ist das Rezept, das **Bauskript** ist der Koch, das Modul ist
+> das fertige Gericht. Beim Bestellen sagst du, welche Gänge du willst: nur die Grundausstattung
+> (Malen, Ton, Logik, Netzwerk), oder dazu Physik, Spielregeln, den Editor oder den Trainer.
 
-```sh
-kern/build.sh --app kern/examples/hello/hello.wasm \
-  kern/examples/hello/hello.cpp
-kern/build.sh --lehrer generated/kern_lehrer.wasm
-```
-
-(`orbrun` genauso wie `hello`.) Die fertige `studio.html` läuft per Doppelklick, ohne Internet. Zum
-Entwickeln lieferst du die Repository-Wurzel über einen Webserver aus und öffnest
-`kern/web/studio/index.html`; sie lädt `generated/kern_studio.wasm`. `play.html?level=orbRun`
-im selben Ordner spielt ein Level ohne Editor (auch `physicsLab`, `shootingRange`, `microDuck`,
-`basic`).
-
-## 2.2 Der Übersetzer: wasi-sdk 25
-
-Kern braucht **wasi-sdk 25**: den Compiler clang, einen Linker (der die Teile zusammenklebt) und die
-Standardbibliotheken für C und C++, alles für das Ziel WebAssembly. Emscripten braucht Kern nicht.
-Die Variable `WASI_SDK` zeigt auf den Ordner (sonst gilt `/opt/wasi-sdk`). Für Tests und den Lehrer
-auf deinem Rechner reicht ein normaler Compiler (GCC oder clang, auf dem Mac Apple clang); dazu
-kommen Python 3, Node (die CI nutzt Version 22) und für den Browser-Test Playwright mit Chromium.
-
-## 2.3 `kern/build.sh`: der Koch
-
-```
-kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer]
-              <out.wasm> [Optionen / Spielquellen ...]
-```
-
-Ohne Schalter übersetzt das Skript den Grundstock – Grafik, Audio, Grundlagen, Geometrie, Logik,
-Netzwerk, Szene und die eigene Mathematik aus musl. Die Schalter kennst du aus
-[Kapitel 1](01-einfuehrung.md). Weitere Argumente, die auf `.cpp` oder `.cc` enden, werden als
-Spielquellen mitübersetzt; alles andere geht als Option an den Compiler.
-
-Vier Umgebungsvariablen steuern den Bau: `WASI_SDK` (wo), `KERN_BUILD` (`release`: voll optimiert,
-`-O3` mit ThinLTO; `debug`: weniger optimiert, `-O1 -g` ohne ThinLTO), `KERN_JOBS` (wie viele
-Übersetzer parallel, Standard: alle Kerne) und
-`KERN_OBJ_CACHE` (wo Zwischenergebnisse liegen). Kleiner Haken: Auch im Debug-Modus landen keine
-Debug-Informationen im Modul, weil der letzte Schritt sie immer entfernt.
-
-### Die wichtigsten Optionen
-
-- **`-ffp-contract=off`** überall, auch für Box3D und musl. Sonst dürfte der Compiler `a*b+c` zu einem
-  Rechenschritt verschmelzen – der rundet anders, je nach Prozessor ([Kapitel 3](03-grundlagen.md)).
-- **Box3D im „Skalar-Pfad“**: ohne Spezialbefehle, die mehrere Zahlen auf einmal rechnen – wie in
-  WebAssembly.
-- **Keine Ausnahmen, keine Laufzeit-Typinformation** (`-fno-exceptions -fno-rtti`).
-- **Nur Markiertes ist von außen sichtbar,** und jede Funktion bekommt ein eigenes Fach, damit der
-  Linker Ungenutztes wegwerfen kann.
-
-Beim Linken entsteht ein **Reactor** mit 1 MiB Stack und einem Speicher, der mit 32 MiB startet und
-bis 2 GiB wachsen darf. Die Funktionstabelle ist wachsbar – dort legt der Logik-JIT
-([Kapitel 9](09-logik.md)) Graphen ab, die er während des Spiels in WebAssembly übersetzt. Zum
-Schluss meldet das Skript stolz `built <out> (<n> bytes)`.
+Der Koch hat zwei feste Hausregeln. Erstens: **keine Rechen-Abkürzungen.** Manche Prozessoren
+können zwei Rechenschritte zu einem verschmelzen und runden dabei anders als andere. Das ist
+verboten, damit Kern überall gleich rechnet ([Kapitel 1](01-einfuehrung.md)). Zweitens: Nur was
+ausdrücklich nach außen gereicht werden soll, ist von außen sichtbar, und Ungenutztes fliegt raus.
 
 ### Der Vorratsschrank
 
-Jede Quelle wird einzeln und parallel übersetzt, und ThinLTO, ein Optimierer, verbindet sie. Damit
-ein Neubau nicht alles neu kocht, gibt es einen **Objekt-Cache**, den sich Studio und Beispielspiele
-teilen und den die CI von Lauf zu Lauf aufhebt. Jedes C++-Stück trägt ein Etikett aus dem Inhalt
-seiner Quelle, ihrem Pfad und dem Inhalt **aller** Header. Box3D und musl haben eigene Fächer;
-dort wird neu übersetzt, was fehlt oder älter als seine Quelle oder der neueste Header ist. Auch
-ThinLTO hat ein eigenes Fach.
+Kern besteht aus vielen Dutzend Quelltext-Stücken. Jedes wird einzeln übersetzt, viele
+gleichzeitig, und am Ende zu einem Modul zusammengefügt. Damit nicht bei jedem Bauen alles neu gekocht wird, kommt
+jedes übersetzte Stück in einen **Vorratsschrank**. Es trägt ein Etikett, das aus seinem Rezept und
+dem Inhalt **aller** Header errechnet wird. Passt das Etikett noch, wird das Stück aus dem Schrank
+genommen statt neu gekocht. Studio und Beispielspiele teilen sich den Schrank, und das Fließband
+aus Abschnitt 2.4 hebt ihn von Lauf zu Lauf auf.
 
-> **Achtung, Falle!** Du änderst ein Komma in einer Header-Datei – und **alles** wird neu übersetzt?
-> Absicht! Weil alle Header ins Etikett eingehen, passt kein Vorratsstück mehr. Einfach und sicher:
-> Nie bleibt ein veraltetes Teil übrig.
+> **Achtung, Falle!** Du änderst ein einziges Komma in einem Header – und **alles** wird neu
+> übersetzt? Absicht! Weil alle Header ins Etikett eingehen, passt nach jeder Header-Änderung kein
+> Vorratsstück mehr. Das kostet Zeit, ist aber einfach und sicher: Nie bleibt ein veraltetes Teil
+> übrig.
 
-## 2.4 Kern Studio als eine einzige Datei
+### Studio im Koffer
 
-`tools/build_studio.sh` baut das Modul mit `--studio` und packt alles in **eine** HTML-Datei: das
-Stylesheet direkt hinein, das Modul als base64-Text (binäre Daten als Buchstaben verkleidet), die
-JavaScript-Dateien aneinandergehängt zu einem Skript, ohne ihre `import`- und `export`-Zeilen. So
-läuft die Seite auch unter strengen Sicherheitsregeln. Zwei Skripte liegen zusätzlich als reiner
-Text bei – aus ihnen schreibt das Studio exportierte Spiele. Ein Startblock wirft den Motor an; geht
-das schief, erscheint eine Meldung. Mit `--skip-wasm` wird das vorhandene Modul wiederverwendet.
+Ein zweites Skript packt Kern Studio in **eine einzige** HTML-Datei: das Modul, die
+JavaScript-Schicht und das Aussehen der Seite, alles in einem Koffer. Das Modul besteht eigentlich
+aus Rohdaten; damit es in eine Textdatei passt, wird es als lange Buchstabenfolge verkleidet,
+ähnlich wie Morsezeichen Buchstaben als Punkte und Striche verkleiden. Deshalb läuft das Studio per
+Doppelklick, ohne Internet und ohne Installation.
 
-> **Wusstest du?** Enthält eine JavaScript-Quelle die Zeichenfolge `</script`, bricht der Bau ab.
-> Der Browser hielte sie für das Ende des eingebetteten Skripts und zeigte den Rest als Kauderwelsch.
+### Der Lehrer ohne Bildschirm
 
-## 2.5 Der Lehrer für deinen Rechner
+Den Lehrer kann man auch als eigenes, schnelles Programm für den eigenen Rechner bauen. Er braucht
+keinen Bildschirm, denn Training muss nichts malen. Darum läuft er sogar auf einem Server ohne
+Monitor. Wie man ihn bedient, zeigt [Kapitel 14](14-lehrer.md).
 
-`kern/tools/lehrer.sh` baut `kern_lehrer` für Linux und macOS, auf x86 und ARM, voll optimiert und
-auf allen Kernen. Drin ist fast die ganze Engine, nur Studio und App-Laufzeit fehlen; statt WebGL
-steckt eine Attrappe darin, denn der Lehrer zeichnet nicht. Das Ergebnis landet in `kern/build/`
-(oder einem Ordner deiner Wahl). Mit `KERN_NATIVE=1` (Standard) erlaubt das Skript die besten
-Befehle deines Prozessors – Ergebnisse ändert das nicht, weil `-ffp-contract=off` gilt. Bedienung:
-[Kapitel 14](14-lehrer.md) und [Kapitel 17](17-referenz.md).
+Die genauen Namen und Werte stehen im blauen Buch, Kapitel 2.
 
-## 2.6 Die Unit-Tests
+## 2.2 Automatisch prüfen: hunderte kleine Kontrollen
 
-```sh
-CXX=g++ CC=gcc kern/tests/run.sh     # alle Tests
-kern/tests/run.sh micro_duck          # nur Tests mit "micro_duck"
-```
+Ein **Test** ist ein kleines Programm, das ein Stück Kern ausprobiert und nachsieht, ob das
+Richtige herauskommt. Kern hat weit über hundert davon, jeder mit vielen einzelnen Prüfungen, und
+sie laufen bei jeder Änderung. Wer etwas kaputt macht, merkt es sofort – nicht erst, wenn ein
+Spieler es findet.
 
-Ein **Unit-Test** prüft ein kleines Stück Code. Kerns Code wird dafür mit zwei **Sanitizern**
-übersetzt, eingebauten Spürhunden: Der *AddressSanitizer* bellt, wenn Code in fremden Speicher
-greift, der *UndefinedBehaviorSanitizer*, wenn er etwas tut, was C++ verbietet. Beide brechen sofort
-ab. Box3D und musl, fremder Code, laufen ohne Spürhunde. Außerdem gilt `-Werror`: **Jede** Warnung
-wird zum Fehler – das Bauskript ist nachsichtiger, die Tests nicht.
+So klingen Prüfungen in Alltagssprache:
 
-Kern hat ein winziges eigenes Testgerüst: `TEST(name)` meldet einen Test an, `CHECK(bedingung)` prüft,
-`CHECK_NEAR(a, b, eps)` vergleicht Zahlen mit Toleranz. Je Test erscheint `ok` oder `FAIL` (mit
-Datei, Zeile, Ausdruck und `last_error()`), am Ende `<n> checks, <m> failures`; bei einem Fehler
-endet das Programm mit 1. Die Tests decken die ganze Engine ab: Matrizen und Kamera, Geometrie, Renderer, Physik, JSON, Spiel,
-Logik, Audio, Netzwerk, Studio (startet es mit Orb Run? ist Undo exakt?), Micro Duck (rechnet Kern
-ihr Netz wie die Referenz? steht, läuft und dreht sie sich?), Lehrer und Determinismus. Ohne Filter
-folgt zum Schluss der Logik-Export-Test.
+- Startet das Studio mit Orb Run?
+- Macht Undo eine Änderung exakt rückgängig?
+- Rechnet Kern das Netz der Ente genauso wie die Vorlage von Pollen Robotics?
+- Steht die Ente, läuft sie und dreht sie sich, wenn ihr Netz sie steuert?
 
-Auf deinem Rechner gibt es kein WebGL. Darum ersetzt eine **Attrappe** (`gl_stub.cpp`) die
-Grafikschnittstelle: Sie zeichnet nichts, schreibt aber auf, was der Renderer von ihr wollte.
+Jede Prüfung meldet „ok“ oder „FAIL“. Ein einziges FAIL genügt, und der ganze Lauf gilt als
+gescheitert.
+
+### Spürhunde
+
+Beim Prüfen wird Kerns eigener Code mit eingebauten **Spürhunden** übersetzt. Einer bellt, wenn ein
+Programmteil in ein Speicherfach greift, das ihm nicht gehört. Der andere bellt, wenn der Code etwas
+tut, was C++ verbietet. Beide brechen sofort ab und nennen die Stelle. Fremder Code, den Kern
+unverändert übernimmt, läuft ohne Spürhunde – geprüft werden soll Kerns eigener. Außerdem sind die
+Tests strenger als der normale Bau: Schon jede **Warnung** des Übersetzers gilt als Fehler.
+
+### Die Attrappe
+
+Auf dem Prüfrechner gibt es keine Grafikkarte, die ein Browser ansteuern könnte. Darum ersetzt eine
+**Attrappe** die Grafikschnittstelle: Sie malt nichts, schreibt aber genau auf, was Kern von ihr
+wollte.
 
 > **Stell dir vor …** Ein Pilot übt im Flugsimulator. Kein Flugzeug hebt ab, aber jeder Knopfdruck
-> wird protokolliert. Hinterher sieht man genau: Kam das Fahrwerk rechtzeitig rein?
+> wird aufgezeichnet. Hinterher sieht man genau: Kam das Fahrwerk rechtzeitig rein?
 
-So prüfen die Tests ohne Grafikkarte, ob der Renderer Eingaben prüft, Schatten wiederverwendet oder
-einen Kontextverlust übersteht.
+So prüfen die Tests ohne Grafikkarte, ob das Malen kaputte Eingaben abweist, einmal Berechnetes
+wiederverwendet und den Verlust der Grafikkarte übersteht.
 
-## 2.7 Logik: drei Wege, ein Ergebnis
+### Spielregeln: drei Wege, ein Ergebnis
 
-Ein Logik-Graph ([Kapitel 9](09-logik.md)) läuft im **Interpreter** (Knoten für Knoten), als
-**JIT** (zur Laufzeit in WebAssembly übersetzt) oder als **exportiertes C++**. Alle drei müssen Bit
-für Bit dasselbe liefern. Gemeinsame Testfälle wie `math_loops` prüfen das: den Interpreter ein
-Unit-Test, das exportierte C++ ein zweiter Schritt von `run.sh` (`kern_tests --emit-logic` schreibt
-den Quelltext, der dann übersetzt und verglichen wird), den JIT ein eigenes Modul unter Node – genau
-wie im Browser. Dabei muss jeder Graph wirklich in seiner Stufe laufen, etwa
-`compiled (WebAssembly)`.
+Spielregeln, die man im Studio als Kästchen und Pfeile zusammenklickt ([Kapitel 9](09-logik.md)),
+kann Kern auf drei Arten ausführen. Alle drei müssen exakt dasselbe Ergebnis liefern, und
+gemeinsame Testfälle prüfen genau das.
 
-> **Wusstest du?** Zum Schluss des JIT-Tests läuft ein Wettrennen: eine Million
-> Schleifendurchläufe, interpretiert und übersetzt. Ausgegeben wird, wie viel schneller der JIT ist.
+> **Stell dir vor …** Eine Geschichte kann man Satz für Satz vom Zettel vorlesen (langsam, aber
+> sofort bereit). Man kann sie kurz vor dem Auftritt in die eigene Sprache übertragen und dann
+> flüssig vortragen (schnell, sobald es losgeht). Oder man lässt sie als fertiges Buch drucken. Wer
+> zuhört, muss jedes Mal dieselbe Geschichte hören.
 
-## 2.8 Der Browser-Test
+Fällt der schnelle Weg einmal aus, liest Kern einfach Satz für Satz weiter – langsamer, aber nichts
+geht kaputt.
 
-```sh
-python3 -m http.server 8771 &
-node kern/tests/e2e/studio_e2e.mjs   # Standard: Port 8771
-```
+> **Wusstest du?** Am Ende dieses Tests läuft ein Wettrennen: eine Million Schleifendurchläufe,
+> einmal vorgelesen, einmal übersetzt. Ausgegeben wird, wie viel schneller der übersetzte Weg ist.
 
-Zeile 1 liefert die Repository-Wurzel aus (`generated/` muss gebaut sein), Zeile 2 startet den
-**e2e**-Test („End to End“): einen echten Chromium, ferngesteuert mit Playwright, der das Studio
-bedient wie ein Mensch. Eine Grafikkarte bekommt er nicht, sondern die
-Software-Nachbildung SwiftShader – die schafft die Stadt mit etwa **einem Bild pro Sekunde**. Darum
-wartet jede Prüfung auf ihre Wirkung statt eine feste Zeit. Ob überhaupt gezeichnet wurde, verrät
-die Zahl verschiedener Farben im Bild.
+### Der Testklicker
 
-Geprüft wird fast alles: Menüs, Fly Mode, Auswählen und Verschieben, Undo, Play, Simulate, vier
-Viewports, Vorlagen, Logik-Editor, Micro Duck mit Kopfkamera, Mehrspieler über zwei Tabs, Spiel
-packen und spielen, Wiederherstellen nach dem Neuladen, Einstellungen, schmale Fenster, Telefone,
-die Android-Dateiauswahl, dazu die Fassung des Studios aus Einzeldateien. Am Ende steht
-`<n> checks, <m> failures`; bei Fehlern endet der Test mit 1, auf GitHub zusätzlich als
-Fehlermarkierung. Screenshots entstehen nur, wenn `KERN_E2E_SHOTS` einen Ordner nennt – viele Bilder dieses Buchs
-stammen daher.
+Die letzte Prüfung ist die größte: Ein ferngesteuerter Browser bedient das Studio wie ein
+unermüdlicher Mensch. Er öffnet Menüs, verschiebt Dinge, drückt Play, packt ein Spiel und spielt
+es, er tut sogar so, als wäre er ein Telefon. Eine echte Grafikkarte bekommt er nicht, sondern eine
+nachgebildete, die die Stadt von Orb Run mit nur etwa **einem Bild pro Sekunde** schafft. Darum
+wartet jede Prüfung, bis ihre Wirkung sichtbar ist, statt eine feste Zeit.
 
-> **Probier's aus!** Mach, was der Test-Roboter macht: **File → New Level → Physics Lab**. Halte die
-> rechte Maustaste gedrückt und flieg mit W nach vorn. Dann **Simulate** (Alt+S) – und sieh den
-> Gelenken bei der Arbeit zu.
+Ob überhaupt etwas gemalt wurde, verrät ein einfacher Trick: Der Testklicker zählt, wie viele
+**verschiedene Farben** im Bild vorkommen. Ein leeres Bild hat kaum Farben, ein gemaltes viele.
+Nebenbei kann er Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
 
-## 2.9 Der Fingerabdruck
+![Simulate mit Physik-Ansicht, wie der Testklicker es prüft](../buch/bilder/studio-simulate.png)
 
-Wie beweist man, dass Kern überall **exakt** gleich rechnet? Die Micro Duck läuft mit Pollens Netz
-`velstand` in der Studio-Physik: 150 Takte vorwärts (Kommando 0,15), dann Drehen auf der Stelle
-(0,8). Nach **jedem** Takt wird ihr ganzer Zustand – Position, Drehung, Geschwindigkeiten,
-Gelenkwinkel – mit dem Verfahren **FNV-1a** zu einer 16-stelligen Prüfsumme:
+> **Probier's aus!** Mach, was der Testklicker macht. Wähle **File → New Level → Physics Lab**.
+> Halte die rechte Maustaste gedrückt und flieg mit W nach vorn. Dann **Simulate** (Alt+S): Jetzt
+> rechnet die Physik: Das Pendel schwingt, der Drehteller dreht sich, der Rover fährt los. Der
+> Testklicker prüft genau solche Abläufe – bei jeder Änderung und ohne müde zu werden.
 
-```
-0 7588b1a57dfadf95
-1 46e1d239a7ed5cfe
-```
+Die genauen Namen und Werte stehen im blauen Buch, Kapitel 2.
+
+## 2.3 Der Fingerabdruck: überall dasselbe Ergebnis
+
+Wie beweist man, dass Kern auf jedem Rechner **exakt** gleich rechnet? Man lässt alle Rechner
+dasselbe tun und vergleicht – aber nicht nur das Endergebnis, sondern jeden einzelnen Schritt.
+
+Dafür braucht man eine **Prüfsumme**: eine Zahl, die aus vielen Daten errechnet wird und sich völlig
+ändert, sobald sich auch nur eine Kleinigkeit ändert – wie ein Fingerabdruck. Dieselben Daten
+ergeben immer dieselbe Zahl.
+
+Der Test geht so: Die Micro Duck läuft in der Physik des Studios ein Stück geradeaus und dreht sich
+dann auf der Stelle, gesteuert von einem Netz von Pollen Robotics. Nach **jedem** Takt wird ihr
+ganzer Zustand – wo sie steht, wie sie gedreht ist, wie schnell sie sich bewegt, wie jedes Gelenk
+steht – zu einer Prüfsumme. 400 Takte ergeben eine Liste von 400 Prüfsummen. Diese Liste muss auf
+einem Linux-PC, auf einem Mac mit Apple-Chip und im WebAssembly-Modul, das auch der Browser benutzt,
+**Zeile für Zeile** mit einer gespeicherten Vorlage übereinstimmen.
 
 > **Stell dir vor …** Du fotografierst die Ente 400-mal und vergleichst jedes Foto mit einem
 > Referenzalbum. Verrutscht eine Feder um ein Haar, weißt du sogar, auf welchem Foto.
 
-Die Referenz für 400 Takte liegt in `kern/tests/determinism_fingerprint.txt`. Geprüft wird mit GCC
-auf x86 (der Test nennt den ersten abweichenden Takt), in WebAssembly unter Node und mit Apple clang
-auf ARM. Von Hand:
+Weicht ein Foto ab, gibt es nur zwei Erklärungen: Entweder wurde die Simulation absichtlich
+geändert – dann muss die Vorlage neu erzeugt und die Änderung begründet werden. Oder irgendwo rechnet
+Code auf verschiedenen Rechnern verschieden, etwa weil er eine Winkelrechnung des Systems statt
+Kerns eigener benutzt ([Kapitel 3](03-grundlagen.md)).
 
-```sh
-kern/tools/lehrer.sh
-kern/build/kern_lehrer --fingerprint 400 \
-  | diff - kern/tests/determinism_fingerprint.txt
-```
+Ein zweiter Test prüft das Lernen: Er trainiert ein Netz mit einem, zwei und vier Helfern, die
+zusammen immer acht Enten betreuen. Alle drei Netze müssen bis aufs letzte Bit gleich sein. Das
+klappt nur, weil Kern immer in derselben Reihenfolge zusammenzählt, egal wie viele Helfer
+mitrechnen.
 
-Der Lehrer wird gebaut, druckt 400 Prüfsummen, `diff` vergleicht. Keine Ausgabe heißt: alles gleich.
-Ein Unterschied bedeutet: Entweder wurde die Simulation absichtlich geändert (dann Referenz neu
-erzeugen und begründen), oder irgendwo rechnet Code plattformabhängig.
+> **Für Neugierige:** Die Prüfsumme heißt FNV-1a und ist 16 Zeichen lang. Wer den Lehrer auf dem
+> eigenen Rechner baut, kann den Fingerabdruck selbst erzeugen und mit der Vorlage vergleichen –
+> wie, steht im blauen Buch, Kapitel 2.
 
-> **Achtung, Falle!** Der Klassiker ist ein `std::sin` statt `kern::dm::sin` in Code, der die
-> Simulation speist. Auf deinem Rechner läuft alles prima, auf dem Mac weicht plötzlich ein Takt ab.
-> Weitere Verdächtige: eine fehlende `-ffp-contract=off`-Option oder eine Summe, deren Reihenfolge
-> von der Zahl der Threads abhängt ([Kapitel 3](03-grundlagen.md)).
+## 2.4 Das Fließband: die automatische Prüfstraße
 
-Ein weiterer Test lernt mit 1, 2 und 4 Workern (immer 8 Enten) – die Netze müssen Byte für Byte
-gleich sein.
-
-## 2.10 Die automatische Prüfstraße
-
-**CI** (*Continuous Integration*) heißt: Bei jeder Änderung prüft ein Server alles durch. Kerns
-Pipeline auf GitHub läuft bei jedem Push auf `main`, bei Pull Requests und auf Knopfdruck:
+Niemand muss daran denken, die Prüfungen zu starten. Bei jeder Änderung auf GitHub springt ein
+**Fließband** an, auf Englisch **CI** (*Continuous Integration*, „ständiges Zusammenführen“). Server
+von GitHub erledigen dann alles von selbst: übersetzen, prüfen, Fingerabdruck vergleichen,
+veröffentlichen. Ein Lauf dauert etwa 17 Minuten.
 
 ```mermaid
 flowchart LR
-  P["Push"] --> N["native"]
-  P --> D["determinism"]
-  P --> B["build"]
-  B --> DEP["deploy"]
-  B --> E["e2e"]
+  P["Änderung"] --> N["Tests mit Spürhunden"]
+  P --> D["Fingerabdruck auf dem Mac"]
+  P --> B["Bauen und Grundprüfungen"]
+  B --> DEP["Veröffentlichen"]
+  B --> E["Testklicker"]
 ```
 
-- **native**: Unit-Tests mit Spürhunden, dann Logik-Export.
-- **determinism**: baut den Lehrer auf einem Mac mit ARM und vergleicht den Fingerabdruck.
-- **build**: holt wasi-sdk und den Vorrat vom letzten Lauf, baut Studio, Beispielspiele und Lehrer,
-  prüft die Syntax aller JavaScript-Dateien, testet Lehrer (zwei Enten sammeln, einer lernt den Sprung
-  `jump` – je ein kleines Stück jedes Lernverfahrens aus [Kapitel 14](14-lehrer.md): Nachahmung,
-  DAgger, PPO –, dazu ONNX-Export und Fingerabdruck) und JIT und
-  stellt die Webseite zusammen: Startseite, Editor, Lehrer-Seite, Netze der Ente, Beispielspiele,
-  Lizenzen. Das Ergebnis hebt GitHub 7 Tage als Paket (Artefakt) `site` auf.
-- **deploy**: nur für `main`; legt ein frisches Git-Repository an und schiebt es mit Gewalt (`-f`)
-  in den Zweig `gh-pages`, und die Seite erscheint auf https://kernengine.de/. (Die `README.md`
-  nennt noch eine eigene `pages.yml` – im Repository gibt es aber nur `ci.yml`.)
-- **e2e**: der Browser-Test mit Playwright 1.56.0, mit genau den Dateien, die veröffentlicht
-  werden. Er lädt einen Screenshot-Ordner hoch, setzt `KERN_E2E_SHOTS` aber nicht.
+Die Stationen:
 
-Tests halten die Veröffentlichung nicht auf. Auf `main` läuft jeder Push bis zum Ende, damit jeder
-grüne Stand online geht – etwa 17 Minuten pro Lauf. Bei Pull Requests ersetzt ein neuer Lauf den
-alten.
+- **Tests mit Spürhunden:** alle Prüfungen aus Abschnitt 2.2 auf einem Linux-Rechner.
+- **Fingerabdruck auf dem Mac:** Der Lehrer wird auf einem Mac mit Apple-Chip gebaut und muss die
+  Ente exakt wie die anderen bewegen.
+- **Bauen und Grundprüfungen:** übersetzt Studio, Beispielspiele und Lehrer und prüft dabei schon
+  einiges: ob alle JavaScript-Dateien fehlerfrei geschrieben sind, ob der Lehrer im Browser-Modul
+  ein kleines Stück jedes Lernverfahrens schafft und den richtigen Fingerabdruck liefert, und ob die
+  Spielregeln übersetzt so rechnen wie vorgelesen. Dann stellt es die fertige Webseite zusammen.
+- **Veröffentlichen:** stellt die Webseite auf https://kernengine.de/.
+- **Testklicker:** bedient das Studio mit genau den Dateien, die veröffentlicht werden.
 
-> **Wusstest du?** Der installierbare Editor merkt selbst, wenn es eine neue Version gibt: Die CI
-> legt eine Datei `build.json` mit der Versionskennung daneben, und er vergleicht.
+Wichtig ist, was **wartet** und was nicht. Veröffentlicht wird, sobald die Station „Bauen und
+Grundprüfungen“ fertig ist. Scheitert dort eine Prüfung, geht nichts online. Die drei anderen
+Prüfstationen laufen dagegen **nebenher**: Die Veröffentlichung wartet nicht auf sie. Darum heißt
+es: Diese Tests halten die Veröffentlichung nicht auf. Fällt eine von ihnen durch, ist die neue
+Fassung vielleicht schon online – aber auf GitHub leuchtet sofort eine rote Markierung, und die
+nächste Änderung muss den Fehler beheben.
 
-## 2.11 Zu Hause wie die CI
+> **Stell dir vor …** Eine Bäckerei. Bevor ein Brot in den Laden kommt, muss es durchgebacken sein –
+> das ist die Pflicht an der Backstation. Die Verkostung durch die Meisterin läuft parallel zum
+> Verkauf. Schmeckt ihr etwas nicht, wird sofort nachgebessert, aber das Brot im Regal bleibt dort.
 
-Alles lässt sich lokal nachstellen, in derselben Reihenfolge: Unit-Tests, Fingerabdruck, Module,
-dann diese beiden Modul-Tests, zuletzt der Browser-Test:
+Der Vorteil: Jede Änderung ist schnell online. Der Preis: Ein Fehler, den nur die nebenher
+laufenden Tests finden, kann kurz sichtbar sein. Änderungsvorschläge, die erst noch begutachtet
+werden, laufen übrigens ebenfalls über das Fließband, werden aber nie veröffentlicht.
 
-```sh
-node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm
-kern/build.sh /tmp/logic_test.wasm \
-  kern/tests/logic_wasm_test.cpp -Ikern/tests
-node kern/tests/logic_wasm_test.mjs /tmp/logic_test.wasm
-```
+> **Probier's aus!** Im Studio steht in der Statusleiste ganz unten die **Version**, etwa „v 1af26d8“:
+> das Kürzel der Änderung, aus der das Fließband diese Fassung gebaut hat. Tippe dann ins Feld **Cmd** in der Statusleiste
+> `stat` und drück Enter. Öffne mit dem Knopf **Output Log** das Protokoll: Dort steht jetzt, wie
+> viele Bilder pro Sekunde dein Rechner schafft. Vergleich das mit dem Testklicker, der sich mit
+> einem Bild pro Sekunde begnügen muss.
 
-Die Seiten laden ihre Dateien relativ, die Netze der Ente etwa je nach Fassung (Entwicklung,
-eine einzige Datei, veröffentlicht) aus einem anderen Ordner. Die Lehrer-Seite ist auf den Aufbau der
-veröffentlichten Seite zugeschnitten und läuft lokal erst, wenn du sie wie die CI zusammenstellst.
+> **Wusstest du?** Der installierbare Editor merkt selbst, wenn das Fließband eine neue Version
+> veröffentlicht hat: Neben jeder Fassung liegt eine kleine Datei mit ihrer Kennung, und er
+> vergleicht.
 
-## 2.12 Wenn's klemmt
-
-| Symptom | Was tun? |
-|---|---|
-| `wasi-sdk clang++ not found` | `WASI_SDK` richtig setzen |
-| `missing …/kern_studio.wasm` | ohne `--skip-wasm` bauen |
-| `source contains '</script'` | Zeichenfolge aufteilen |
-| Testbau bricht an Warnung ab | Warnung beheben (`-Werror`) |
-| `runtime error`, `AddressSanitizer` | Datei, Zeile lesen; Test einzeln |
-| Fingerabdruck weicht ab | Abschnitt 2.9 |
-| Logik läuft im `interpreter` | JIT-Ausgabe prüfen |
-| Browser-Test hängt (wartet bis 90 s) | Server starten, Studio bauen |
-| Playwright fehlt | installieren, `NODE_PATH` setzen |
-
-Fällt der JIT aus, rechnet Kern im Interpreter weiter (`logic JIT failed …`) – langsamer, aber
-nichts geht kaputt.
-
-> **Probier's aus!** Im Studio steht ganz unten in der Statusleiste die laufende Version. Tippe in
-> die Konsole (**Cmd**) `stat` – dann landen Bilder pro Sekunde und Zählerstände im Log.
+Wie man das ganze Fließband zu Hause nachstellt und was typische Fehlermeldungen bedeuten, steht im
+blauen Buch, Kapitel 2.
 
 ## Das nimmst du mit
 
-- `kern/build.sh` übersetzt mit wasi-sdk 25 nach WebAssembly; Schalter wählen die Teile.
-- `-ffp-contract=off` überall ist der Grundstein für gleiche Ergebnisse.
-- Der Objekt-Cache spart Zeit; Header-Änderungen bauen bewusst alles neu.
-- Unit-Tests laufen mit Sanitizern und `-Werror`; eine Attrappe ersetzt WebGL.
-- Logik muss im Interpreter, als JIT und als C++ gleich rechnen.
-- Der Fingerabdruck vergleicht 400 Takte der Ente auf drei Plattformen.
-- Die CI prüft jede Änderung und veröffentlicht auf kernengine.de.
+- Code wird übersetzt, bevor er im Browser läuft; der Bau wählt, welche Teile mitkommen.
+- Ein Vorratsschrank mit Etiketten spart Zeit; nach einer Header-Änderung wird bewusst alles neu
+  übersetzt.
+- Weit über hundert Tests prüfen jede Änderung. Spürhunde finden verbotene Speicherzugriffe, eine Attrappe
+  ersetzt die Grafikkarte, ein Testklicker bedient das Studio wie ein Mensch.
+- Spielregeln müssen auf allen drei Wegen dasselbe ergeben.
+- Der Fingerabdruck vergleicht 400 Takte der Ente auf PC, Mac und im Browser-Modul.
+- Das Fließband prüft jede Änderung und veröffentlicht; nur die Bau-Station hält die
+  Veröffentlichung an, die übrigen Tests laufen nebenher.
 
 ## Knobelecke
 
-1. Warum laufen Box3D und musl ohne Sanitizer, Kerns Code aber mit?
-2. Du änderst einen Kommentar in einem Header. Was passiert beim nächsten Bauen?
-3. Warum zählt der Browser-Test Farben, statt Fotos zu vergleichen?
-4. Der Fingerabdruck stimmt bis Takt 211 und weicht ab 212 ab. Was sagt dir das?
+1. Warum laufen die Spürhunde nur über Kerns eigenen Code, nicht über übernommenen fremden Code?
+2. Du änderst einen Header. Was passiert beim nächsten Bauen, und warum?
+3. Warum zählt der Testklicker Farben, statt Bildschirmfotos zu vergleichen?
+4. Der Fingerabdruck stimmt bis Takt 211 und weicht ab Takt 212 ab. Was sagt dir das?
+5. Die Tests mit Spürhunden schlagen fehl. Ist die Webseite trotzdem aktualisiert worden?
 
 ### Lösungen
 
-1. Sie sind fremder, unverändert übernommener Code; geprüft werden soll Kerns eigener.
-2. Alles wird neu übersetzt, denn der Inhalt aller Header steckt in jedem Etikett.
-3. Software-Grafik ist langsam; die Farbzahl verrät einfach und robust, ob überhaupt gezeichnet wurde.
-4. Bei Takt 212 kommt erstmals ein anderes Bit heraus – dort setzt die Fehlersuche an, etwa bei
-   einem `std::sin` statt `kern::dm::sin`.
+1. Geprüft werden soll Kerns eigener Code; der fremde wird unverändert übernommen.
+2. Alles wird neu übersetzt, denn der Inhalt aller Header steckt in jedem Etikett. Kein veraltetes
+   Vorratsstück kann übrig bleiben.
+3. Die nachgebildete Grafik ist langsam; die Zahl der Farben verrät einfach und zuverlässig, ob
+   überhaupt etwas gemalt wurde.
+4. Bei Takt 212 kommt zum ersten Mal etwas anderes heraus. Dort setzt die Fehlersuche an, etwa bei
+   einer Winkelrechnung, die nicht Kerns eigene Formel benutzt.
+5. Ja, wenn die Bau-Station geklappt hat: Diese Tests laufen nebenher und halten die
+   Veröffentlichung nicht auf. Die rote Markierung zeigt aber sofort, dass etwas zu reparieren ist.
 
 ---
 

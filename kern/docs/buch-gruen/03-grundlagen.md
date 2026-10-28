@@ -1,294 +1,331 @@
 # 3 Grundlagen: das Fundament unter allem
 
-> **Kurz gesagt:** Jedes Stockwerk von Kern steht auf vier Bausteinen: einem Werkzeugkasten mit
-> Zahlentypen, Fehlermeldungen und Helfern, einem eigenen JSON-Leser, Mathematik für den 3D-Raum und
-> Winkelfunktionen, die auf jedem Rechner exakt dieselben Bits liefern – samt dem Grund für jede
-> Entscheidung.
+> **Kurz gesagt:** Jedes Stockwerk von Kern steht auf vier Bausteinen: einem **Werkzeugkasten**
+> (Zahlen, Fehlermeldungen, Uhr, Helfer), einem **Daten-Leser** für das Format JSON, der
+> **Raum-Mathe** für die 3D-Welt und dem **Rechnen ohne Rundungsunterschiede**. Hier erfährst du,
+> was jeder Baustein tut und warum er so gebaut ist.
 
-Ist der Keller schief, ist es das ganze Haus. Die vier Bausteine heißen `core/base.h`,
-`core/json.h`, `math/math.h` und `core/dmath.h`.
+> **Begriffe vorab:**
+> - **Funktion** – ein benanntes Programmstück, das eine Aufgabe erledigt und eine Antwort gibt,
+>   etwa „Ist diese Datei in Ordnung? – Ja.“
+> - **Daten** – alles, was ein Programm verarbeitet: Zahlen, Texte, Listen.
+> - **Kommazahl** – im Computer eine Zahl mit fester Stellenzahl; was nicht hineinpasst, wird
+>   gerundet ([Kapitel 1](01-einfuehrung.md)).
+> - **Koordinaten** – drei Zahlen, die sagen, wo etwas steht: wie weit rechts, vorn und oben.
+> - **Achse** – eine gedachte Linie durch den Raum, um die man etwas drehen kann.
+> - **Renderer** – der Teil von Kern, der die Bilder malt.
+> - **Texteditor** – ein schlichtes Schreibprogramm, unter Windows „Editor“, auf dem Mac „TextEdit“.
 
-## 3.1 Der Werkzeugkasten: `base.h`
+Ist der Keller schief, ist es das ganze Haus. Die genauen Namen und Werte zu diesem Kapitel stehen
+im blauen Buch, Kapitel 3.
 
-### Zahlen mit klarer Größe
+## 3.1 Der Werkzeugkasten
 
-Ein `int` kann je nach Rechner unterschiedlich groß sein. Kern schreibt die Breite darum immer dazu:
-`u8` bis `u64` (ohne Vorzeichen), `i8` bis `i64` (mit Vorzeichen), `f32` und `f64` (Kommazahlen); die
-Zahl nennt die Bits. An der Grenze zu WebAssembly zählt jedes Bit: Dort ist ein Zeiger 32 Bit breit,
-`f64` ist genau JavaScripts `Number`, und die Daten der Schnittstelle sind 32-Bit-Wörter
-([Kapitel 17](17-referenz.md)).
+### Zahlen mit fester Stellenzahl
 
-### Wenn etwas schiefgeht: `fail()` und `last_error()`
+Eine Zahl belegt im Computer eine feste Anzahl von Bit-Kästchen. Wie viele, kann je nach Rechner
+verschieden sein, wenn man es nicht festlegt. Kern legt es **immer** fest: 8, 16, 32 oder 64
+Kästchen, mit oder ohne Minuszeichen, ganze Zahl oder Kommazahl.
 
-Kern verzichtet auf „Ausnahmen“, den Notfallknopf vieler Sprachen. Eine Funktion, die scheitern
-kann, gibt `false` zurück (oder 0 bzw. einen leeren Zeiger) und hinterlegt vorher mit `fail()` eine
-lesbare Meldung. Der Trick: `fail()` gibt **immer** `false` zurück, so wird jede Prüfung eine Zeile:
+> **Stell dir vor …** Ein Kilometerzähler mit sechs Stellen springt nach 999 999 auf 000 000, einer
+> mit sieben Stellen erst später. Wer zwei Autos vergleicht, muss wissen, wie viele Stellen jeder
+> Zähler hat.
 
-```cpp
-if (!camera_valid(camera))
-  return fail("invalid camera");
-bool ok = false;
-const Mat4 view = Mat4::look_at(camera.eye, camera.target,
-                                camera.up, &ok);
-if (!ok) return fail("degenerate camera direction/up");
-```
+Ein Zähler aus 8 Kästchen schafft 0 bis 255 und beginnt dann wieder bei 0. Weil Kern die Größe immer
+festlegt, rechnet jeder Rechner mit gleich großen Zählern – und was über den gemeinsamen Speicher
+zum Browser geht, ist auf beiden Seiten gleich groß.
 
-Ungültige Kamera: Meldung hinterlegen, `false` zurück. Sonst wird die Blickrichtung berechnet, und
-`ok` sagt, ob das klappte (nicht etwa, wenn Auge und Ziel am selben Punkt stehen).
+### Wenn etwas schiefgeht: Nein sagen und einen Zettel hinterlassen
+
+Viele Programmiersprachen haben für Fehler einen **Notfallknopf** (Fachwort: Ausnahme): Das Programm
+springt mitten aus der Arbeit heraus, bis irgendwo jemand den Notfall auffängt. Kern verzichtet
+darauf. Eine Funktion, die scheitern kann, antwortet schlicht **„Nein“** und hängt vorher einen
+Zettel mit dem Grund an eine Pinnwand. Wer sie aufgerufen hat, entscheidet selbst, was nun geschieht.
+Nichts reißt mitten in der Arbeit ab.
+
+Bekommt der Renderer zum Beispiel ein 3D-Modell mit kaputten Zahlen, antwortet er „Nein“, pinnt den
+Grund an, und das alte Modell bleibt unverändert stehen.
 
 > **Stell dir vor …** Ein Hotel hat genau **eine** Pinnwand. Wer etwas meldet, hängt einen Zettel
 > hin und nimmt dabei den alten ab. Wer nachsieht, liest immer nur den neuesten.
 
-So verhält sich der Fehlerkanal: ein Speicher für das ganze Programm, 1024 Zeichen, von allen
-Threads geteilt; jede Meldung überschreibt die vorige. JavaScript liest ihn mit `kern_last_error()`
-und leert ihn mit `kern_clear_error()`. Der JSON-Parser und einige andere Module schreiben ihre
-Meldung dagegen auf einen eigenen Zettel.
+So funktioniert Kerns Fehlerkanal: eine Pinnwand für das ganze Programm, die auch die Browser-Seite
+lesen und abräumen kann. Nur einige Bausteine, etwa der JSON-Leser, geben ihren Zettel direkt dem
+zurück, der sie gerufen hat.
 
-> **Achtung, Falle!** `last_error()` zeigt die Meldung des **letzten** `fail()` – nicht unbedingt
-> die des Aufrufs, der gerade scheiterte. Wer sicher gehen will, ruft vorher `clear_error()`.
+> **Achtung, Falle!** Die Pinnwand zeigt den **neuesten** Zettel – nicht unbedingt den der Aufgabe,
+> nach der du fragst. Wer sicher gehen will, räumt die Pinnwand vorher ab.
 
-Kern prüft gern `!(x > 0)` statt `x <= 0`. Das fängt **NaN** („not a number“, etwa 0 durch 0):
-Jeder Vergleich mit NaN ist falsch, also ist `!(NaN > 0)` wahr.
+### Die Uhr gehört nicht in die Simulation
 
-### Logging, Uhr und kleine Helfer
+Kern hat eine Uhr, die Millisekunden zählt. Sie dient **Messungen**: Wie lange hat etwas gedauert,
+ist das Zeitbudget aufgebraucht? So darf die Sound-Bank beim Start nur eine begrenzte Zeit lang
+Klänge vorrechnen.
 
-`log()` schreibt in vier Stufen (`debug`, `info`, `warn`, `error`): im Browser mit dem Vorsatz
-`[kern]` in die Konsole – Fehler als `console.error`, Warnungen als `console.warn`, sonst
-`console.log` – oder an einen eigenen Empfänger des Hosts; nativ Warnungen und Fehler nach
-`stderr`, den Rest nach `stdout`. Kann etwa der Glüheffekt Bloom nicht starten, loggt Kern
-`bloom disabled:` plus die Meldung von der Pinnwand – und das Spiel läuft ohne Glühen weiter.
+In der **Simulation** hat diese Uhr nichts verloren. Physik und Roboter zählen **feste Schritte**:
+Ein Takt ist immer gleich lang, egal wie schnell der Rechner ihn ausrechnet. Schaute die Ente auf die
+Uhr, liefe sie auf einem langsamen Rechner anders als auf einem schnellen
+([Kapitel 6](06-physik.md), [Kapitel 13](13-micro-duck.md)).
 
-`now_ms()` liefert Millisekunden einer Uhr, die nur vorwärts läuft (im Browser
-`performance.now()`) – für Messungen und Zeitbudgets, etwa wenn die Sound-Bank nur begrenzt lange Klänge vorrechnen darf.
+> **Stell dir vor …** Ein Brettspiel. Man zieht Runde um Runde, nicht nach der Stoppuhr – sonst
+> gewinnt, wer schneller würfelt, statt wer besser spielt. Kerns Simulation zählt Runden.
 
-> **Achtung, Falle!** In der Simulation hat die Uhr nichts verloren! Physik und Roboter zählen
-> **feste Schritte**. Schaute die Ente auf die Uhr, liefe sie auf einem langsamen Rechner anders als
-> auf einem schnellen ([Kapitel 6](06-physik.md), [Kapitel 13](13-micro-duck.md)).
+Außerdem liegen im Werkzeugkasten ein **Protokoll**, das Meldungen von „nur zur Fehlersuche“ bis
+„Fehler“ sammelt, und kleine Helfer, die etwa einen Wert zwischen zwei Grenzen halten. Kann zum
+Beispiel der Glüheffekt nicht starten, protokolliert Kern eine Warnung, und das Spiel läuft ohne
+Glühen weiter.
 
-`min_of`, `max_of` und `clamp` liefern das Kleinere, das Größere und „zwischen zwei Grenzen
-halten“; bei gemischten Typen nennt man den Typ, z. B. `min_of<u32>(…)`.
+### Ein Fenster auf Daten
 
-### `Span`: ein Fenster auf Daten
+> **Stell dir vor …** Ein Zettel: „Regal 4, die nächsten 20 Bücher.“ Er ist leicht, denn man muss
+> die Bücher nicht herumtragen. Aber er **besitzt** sie nicht. Räumt jemand das Regal aus, zeigt der
+> Zettel ins Leere.
 
-Ein `Span` besteht nur aus `data` (wo fangen die Werte an?) und `size` (wie viele?). Er **besitzt**
-die Daten nicht, er zeigt nur darauf – wie `std::span`, nur leichter, und `data` und `size` sind
-einfache Felder statt Methoden. Jeder Container mit `data()` und `size()`, etwa ein
-`std::vector`, wird automatisch zum Span. So fließen Daten in die Engine, aus C++ wie aus
-JavaScript: Auch `MeshInput`, das Paket für ein Mesh, besteht aus Spans, und die C-Schnittstelle
-baut sie direkt aus Zeigern in den Speicher.
+So ein Zettel heißt in Kern **Span** (Spanne): nur zwei Angaben, wo die Daten anfangen und wie viele
+es sind. In dieser Form fließen fast alle Daten in die Engine, ohne dass etwas kopiert werden muss.
+Daraus folgt eine Regel: Wer die Daten **behalten** will, kopiert sie. Der Renderer etwa behält
+Kopien seiner Modelle, um später zu erkennen, worauf du klickst, und um nach dem Verlust der
+Grafikkarte alles neu aufzubauen ([Kapitel 4](04-grafik.md)).
 
-> **Stell dir vor …** Ein Span ist ein Zettel: „Regal 4, die nächsten 20 Bücher.“ Leicht und
-> praktisch – aber räumt jemand das Regal aus, zeigt er ins Leere.
+### Fingerabdrücke für Daten: Hashes
 
-Darum darf ein Span nicht länger leben als seine Daten. Wer sie behalten will, **kopiert** sie – so
-wie der Renderer, der Kopien für das Picking und den Neuaufbau nach einem Grafikverlust hält
-([Kapitel 4](04-grafik.md)), oder die Geometrie-Aufträge, weil JavaScript seinen Zwischenspeicher
-gleich wiederverwendet.
+Ein **Hash** macht aus beliebig vielen Daten eine kurze Zahl. Dieselben Daten ergeben immer
+dieselbe Zahl; ändert sich nur ein Buchstabe, kommt eine völlig andere heraus.
 
-### Hashes
+> **Stell dir vor …** Eine Quersumme, nur viel gründlicher: Bei der Quersumme ergeben 12 und 21
+> dasselbe, ein guter Hash bemerkt die Vertauschung.
 
-Ein **Hash** macht aus beliebig vielen Bytes eine kurze, feste Zahl. Mit `hash_bytes` (**FNV-1a**,
-64 Bit, Startwert wählbar) erkennt der Renderer unveränderte Werte und den Schlüssel seiner
-Schattenkarte – und auch der Fingerabdruck
-der Ente aus [Kapitel 2](02-bauen-und-testen.md) ist ein FNV-1a. `hash_u32` (*lowbias32*) mischt
-Zahlen, etwa für Rauschen, das trotzdem immer gleich ausfällt. Beide rechnen nur mit Ganzzahlen: Das
-Ergebnis hängt nur von den Bytes ab, nie vom Rechner.
+Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt einen Wert nur neu an
+die Grafikkarte, wenn sein Hash anders ist. Auch der Fingerabdruck der Ente aus
+[Kapitel 2](02-bauen-und-testen.md) besteht aus Hashes. Ein zweiter Hash mischt Zahlen
+durch, für zufällig aussehende Muster, die trotzdem jedes Mal gleich ausfallen.
+Hashes rechnen nur mit ganzen Zahlen, ohne
+Rundung – das Ergebnis hängt also nur von den Daten ab, nie vom Rechner.
+
+> **Für Neugierige:** Kern prüft gern „ist **nicht** größer als null“ statt „ist kleiner oder
+> gleich null“. Grund ist der Sonderwert **NaN** („not a number“), der etwa bei 0 durch 0 entsteht:
+> Jeder Vergleich mit NaN ist falsch, „nicht größer als null“ also wahr – und der Wert fliegt raus.
 
 ## 3.2 JSON: Kerns Lieblingsformat
 
-**JSON** ist ein Textformat für strukturierte Daten, etwa `{"name": "Ente", "beine": 2}`. Kern
-braucht es für Levels (`.klevel`), Studio-Befehle, Servoprofile, Trainingsdaten und die Netzliste
-der Micro Duck. Sein JSON-Baustein verspricht drei Dinge:
+**JSON** ist ein Textformat für Daten, das Menschen und Programme lesen können, etwa
+`{"name": "Ente", "beine": 2}`: Jeder Eintrag hat einen Namen und einen Wert. Kern speichert darin
+Levels, Befehle zwischen Studio-Seite und Engine, die Motorbeschreibungen der Ente, Übungsdaten des
+Lehrers und die Liste der Entennetze. Sein JSON-Baustein gibt drei Versprechen.
 
-1. **Die Reihenfolge bleibt.** Hat Kern oder JavaScript die Datei geschrieben, ergibt Einlesen und
-   wieder Schreiben Byte für Byte dasselbe. Ändert sich ein Wert im Level, ändert sich nur eine Zeile der Datei.
-2. **Zahlen sehen aus wie in JavaScript** – die kürzeste Ziffernfolge, die die Zahl eindeutig
-   beschreibt, genau wie bei `JSON.stringify`.
-3. **Misstrauen gegenüber fremden Dateien.** Abgelehnt werden unendliche Zahlen, zu tiefe
-   Verschachtelung (mehr als 80 Ebenen; Studio-Befehle dürfen 120) und die Schlüssel `__proto__`,
-   `prototype` und `constructor`, die auf der JavaScript-Seite Unheil anrichten könnten
-   (*Prototype Pollution*).
+**1. Die Reihenfolge bleibt.** Liest Kern eine Datei ein und schreibt sie wieder hinaus, steht alles
+an seinem Platz. Ändert sich im Level ein Wert, ändert sich in der Datei nur diese Stelle – so lassen
+sich zwei Fassungen bequem vergleichen.
 
-> **Wusstest du?** Kern schreibt `0.30000000000000004` – genau wie JavaScript bei 0.1 + 0.2. Ein Test
-> prüft solche Fälle, etwa 10²¹ → `1e+21` und NaN → `null`.
+**2. Zahlen sehen aus wie im Browser.** Kern schreibt jede Zahl mit genau so vielen Ziffern, wie
+nötig sind, um sie beim Wiedereinlesen exakt zurückzubekommen – nach derselben Regel wie JavaScript.
+Eine Datei sieht darum gleich aus, ob Kern oder der Browser sie geschrieben hat.
 
-Ein `json::Value` ist null, Wahrheitswert, Zahl, Text, Liste oder Objekt. Er kann seinen Typ nennen,
-Werte liefern (`truthy()` sogar mit JavaScripts Wahrheitsregeln), Listen und Objekte bearbeiten und
-sich mit `==` vergleichen; die ganze Funktionsliste steht im blauen Buch. Sicher wird Code damit so:
+> **Wusstest du?** Rechnet man im Browser 0,1 + 0,2, kommt **0,30000000000000004** heraus, und Kern
+> schreibt genau dasselbe. Das ist Rundung: Computer speichern Kommazahlen im **Zweiersystem**, und
+> dort ist 0,1 ein unendlicher Bruch – so wie 1/3 bei uns 0,3333… ist und nie aufgeht. Gespeichert
+> wird eine Zahl knapp neben 0,1, ebenso bei 0,2, und ihre Summe landet knapp neben der gespeicherten
+> 0,3. Weil sie eine andere Zahl ist, braucht sie mehr Ziffern. Genau solche winzigen Abweichungen
+> machen Kern beim Rechnen so penibel ([Kapitel 1](01-einfuehrung.md)).
 
-- Ein fehlender Schlüssel liefert **null** statt eines Absturzes; `v["a"][2]["b"]` geht immer.
-- `as_number` und `as_bool` liefern bei falschem Typ einen Ersatzwert. Wer „fehlt“ von „falscher
-  Typ“ unterscheiden will, fragt mit `find` und `is_number`.
-- `set` ersetzt einen Schlüssel **an seinem Platz**; `push` macht aus einer Nicht-Liste erst eine
-  leere Liste.
-- `parse` schreibt das Ergebnis **nur bei Erfolg**. Fehlermeldungen nennen die Stelle
-  (`at offset 17`); Text hinter dem Wert gibt `trailing characters`; ein UTF-8-BOM am Anfang ist
-  erlaubt. Tiefe und Schlüsselsperre lassen sich in den `ParseOptions` einstellen.
-- `stringify(v, indent)` arbeitet wie `JSON.stringify(value, null, indent)`: kompakt bei
-  `indent <= 0`, sonst eingerückt; nicht endliche Zahlen (unendlich, NaN) werden `null`, −0 wird `0`.
+**3. Misstrauen gegenüber fremden Dateien.** Ein Level kann von irgendwem stammen. Darum lehnt Kern
+unendlich große Zahlen ab, absurd tief geschachtelte Einträge und ein paar Eintragsnamen, die auf der
+Browser-Seite Unheil anrichten könnten.
 
-### Ein Beispiel: Servoprofile
+Dazu kommt Gelassenheit beim Lesen: Fehlt ein Eintrag, gibt es einen leeren Wert statt eines
+Absturzes, bei falschem Typ einen Ersatzwert. Und das Einlesen liefert sein Ergebnis **nur, wenn es
+ganz geklappt hat**; sonst nennt es die Stelle, an der es hakte.
 
-Ein **Servoprofil** beschreibt einen Motor der Micro Duck ([Kapitel 16](16-kalibrierung.md)). Kern
-liest es nach einem festen Muster: Text parsen; ist er kein Objekt oder ist `kind` nicht `servo`,
-abbrechen. Jedes bekannte Feld einzeln suchen – fehlen darf es. Ist es da, muss es eine Zahl im
-erlaubten Bereich sein, sonst Abbruch mit `bad value for` und Feldname. **Erst ganz am Ende** wird
-das fertige Profil übernommen; ein halb kaputtes landet nie im Programm. Geschrieben wird es mit
-zwei Leerzeichen Einrückung.
+### Erst prüfen, dann übernehmen: Servoprofile
 
-> **Probier's aus!** Speichere im Studio ein Level mit **File → Save** (Ctrl+S) und öffne die
-> `.klevel`-Datei in einem Texteditor. Das ist Kerns JSON: Schlüssel in fester Reihenfolge, Zahlen so,
-> wie JavaScript sie schreiben würde.
+Ein **Servoprofil** beschreibt einen Motor der Micro Duck: wie kräftig er ist, wie steif und
+gedämpft er nachgibt, wie verzögert er reagiert ([Kapitel 16](16-kalibrierung.md)). Kern prüft
+erst, ob der Text überhaupt eine Motorbeschreibung ist, dann jeden Eintrag einzeln: Fehlen darf er
+(dann gilt der Standardwert), aber wenn er da ist, muss er eine Zahl im erlaubten Bereich sein –
+sonst Abbruch mit dem Namen des schuldigen Eintrags. **Erst ganz am Ende** wird das Profil übernommen.
+
+> **Stell dir vor …** Ein Bankschalter. Erst wird das ganze Überweisungsformular geprüft, dann
+> gebucht. Nie wird halb gebucht und dann gemerkt, dass die Kontonummer fehlt.
+
+> **Probier's aus!** Schau einem Level unter die Haube.
+> 1. **File → New Level → Basic**: ein Boden und ein Würfel.
+> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transform** das Feld **Location** mit
+>    X, Y und Z. Tippe bei Z eine **3** und drück Enter: Der Würfel schwebt 3 Meter hoch.
+> 3. **File → Save** (Ctrl+S). Chrome und Edge fragen, wohin; andere Browser legen die Datei
+>    `Untitled.klevel` in den Download-Ordner.
+> 4. Rechtsklick auf die Datei, **Öffnen mit**, dann **Editor** (Windows) bzw. **TextEdit** (Mac).
+>
+> Ganz oben steht `"format": "kern-level"` – daran erkennt Kern seine Levels. Such nach **Cube**:
+> Darunter steht bei **position** die Zahlenfolge 0, 0, 3 – dein Würfel. So sieht ein Level von
+> innen aus: Namen mit Werten, in fester Reihenfolge.
 
 ## 3.3 Mathematik für den 3D-Raum
 
-`math.h` steht ganz im Header und legt nie Speicher an, damit der Compiler sie besonders schnell
-machen kann. Zuerst die Spielregeln:
+### Die Spielregeln
 
-| Regel | Festlegung |
-|---|---|
-| Einheiten | Meter, Sekunden, Kilogramm |
-| Koordinaten | rechtshändig, **+Z ist oben** |
-| Winkel | im Code Radiant, in Levels Grad |
-| Matrizen | 4×4, spaltenweise gespeichert |
+Damit alle Teile dieselbe Welt meinen, gilt überall: Längen in **Metern**, Zeiten in **Sekunden**,
+Massen in **Kilogramm**, und **Z zeigt nach oben**.
 
-> **Stell dir vor …** Leg Karopapier auf den Tisch: X zeigt nach rechts, Y nach vorn, Z senkrecht zur
-> Zimmerdecke. Rechtshändig heißt: Daumen, Zeige- und Mittelfinger der rechten Hand rechtwinklig
-> abspreizen – das sind X, Y und Z.
+> **Stell dir vor …** Leg Karopapier auf den Tisch: X zeigt nach rechts, Y nach vorn, Z zur
+> Zimmerdecke. Das heißt **rechtshändig**: Spreiz Daumen, Zeige- und Mittelfinger der rechten Hand
+> rechtwinklig ab – das sind X, Y und Z.
 
-Spaltenweise heißt: Die 16 Zahlen liegen Spalte für Spalte im Speicher, die Verschiebung in den
-Plätzen 12, 13 und 14 – wie bei OpenGL. Punkte werden von rechts an die Matrix multipliziert
-(`p' = M * p`). In der Kamerasicht blickt man entlang −Z, und die Projektion landet im
-OpenGL-Bildraum mit Tiefe von −1 bis 1.
+Winkel stehen im Studio und in Levels in **Grad**. Innen rechnet Kern in **Radiant**, und das ist
+ein einfaches Bild: Lauf am Rand eines Kreises mit 1 Meter Radius entlang. Ein halber Umlauf ist etwa
+3,14 Meter lang (die Kreiszahl π). Der Winkel in Radiant ist die Strecke am Rand: 180° sind π, 90°
+etwa 1,57. Viele Formeln werden so einfacher.
 
-Z oben gilt überall: Renderer, Physik, Ton, Levels, Grundformen. In **Radiant** ist ein halber
-Kreis π (etwa 3,14) statt 180°; Levels und das Details-Panel im Studio zeigen Grad
-([Kapitel 8](08-spiel-laufzeit.md)).
+> **Probier's aus!** Öffne **File → New Level → Physics Lab**. Tippe ins Feld **Cmd** unten in der
+> Statusleiste `gravity 0 0 -2`, drück Enter und starte **Simulate**. Die Schwerkraft zeigt jetzt
+> schwach in Richtung minus Z, nach unten: Alles fällt fast wie auf dem Mond. `gravity` ohne Zahlen
+> stellt die Erde wieder her, 0, 0, −9,80665: Fallendes wird jede Sekunde um rund 9,8 Meter pro
+> Sekunde schneller.
 
-> **Probier's aus!** Öffne **File → New Level → Physics Lab**, tippe unten in die Konsole (**Cmd**)
-> `gravity 0 0 -2` und starte **Simulate**. Die Schwerkraft zeigt schwach Richtung minus Z – alles
-> fällt fast wie auf dem Mond. `gravity` ohne Werte stellt 0 0 −9,80665 wieder her.
+### Vektoren und Drehungen
 
-### Vektoren und Quaternionen
+Ein **Vektor** ist eine Wegbeschreibung aus Zahlen: „3 Meter nach rechts, 4 nach vorn, 1 nach
+oben“, kurz (3, 4, 1). Man kann ihn als Pfeil zeichnen; derselbe Zahlensatz kann auch den Punkt
+meinen, an dem man ankommt. Oft braucht man nur die **Richtung** eines Pfeils und bringt ihn dafür
+auf die Länge 1. Klickt jemand zweimal auf denselben Punkt, entsteht aber ein Pfeil der Länge null
+ohne Richtung. Statt eines Unsinnswerts, der sich wie ein Virus durch alle weiteren Rechnungen
+fräße, liefert Kern dann einen **Ersatz**: im Zweifel „nach oben“.
 
-`Vec2`, `Vec3` und `Vec4` sind Pfeile (oder Punkte) aus zwei, drei oder vier Zahlen, mit Länge,
-Abstand, Mischen (`lerp`), Minimum/Maximum, Skalar- und Kreuzprodukt, dazu `finite` (alles
-endlich?) und `hex_color(0xRRGGBB)` für Farben. Schlau ist `normalize`, das einen Pfeil auf Länge 1
-bringt: Hat er Länge null – etwa nach zwei Klicks auf denselben Punkt –, liefert es einen
-**Ersatzwert** (standardmäßig nach oben) statt NaN, das sich wie ein Virus durch die Szene fräße.
+Jede **Drehung** im Raum lässt sich durch eine Achse und einen Winkel beschreiben.
 
-Drehungen speichert Kern als **Quaternion**: vier Zahlen `(x, y, z, w)`, Standard `w = 1` heißt
-„keine Drehung“. Klingt furchteinflößend, ist im Gebrauch einfach: `axis_angle(achse, winkel)`
-erzeugt eine Drehung (die Achse wird dabei auf Länge 1 gebracht), `a * b` dreht erst um `b`, dann
-um `a`, `rotate` dreht einen Vektor.
+> **Stell dir vor …** Ein Grillhähnchen am Spieß. Der Spieß ist die Achse, und das Hähnchen wird um
+> einen Winkel gedreht. Jede Drehung, egal wie schief, ist so ein Spieß mit Winkel.
 
-### Matrizen
+Kern packt Achse und Winkel in vier Zahlen, eine **Quaternion**. Die Mathematik dahinter ist
+knifflig, der Gebrauch einfach: Achse und Winkel hinein, Drehung heraus. Die vier Zahlen entstehen
+mit Kerns eigenen Winkelformeln aus Abschnitt 3.4, damit jede Drehung überall gleich ausfällt.
 
-Eine **Matrix** ist eine 4×4-Tabelle, die einen Punkt auf einen Schlag verschiebt, dreht und
-vergrößert. Die wichtigsten Werkzeuge:
+### Matrizen: eine ganze Bewegung in einem Paket
 
-- `trs` baut sie aus diesen drei Teilen.
-- `perspective` und `ortho` bauen Ansichten mit und ohne Fluchtpunkt, `look_at` die Blickmatrix der
-  Kamera. Ist die Blickrichtung unmöglich, liefert `look_at` die Einheitsmatrix (die nichts
-  verändert) und `ok = false`.
-- `transform_point` bewegt einen Punkt, `transform_vector` nur eine Richtung (ohne Verschieben),
-  `transform` rechnet mit allen vier Zahlen, etwa auf dem Weg zum Bildschirm.
-- `invert` kehrt eine Matrix um, in doppelter Genauigkeit, damit Klicks auch in großer Entfernung
-  treffen. Ist sie (fast) nicht umkehrbar, meldet es `false`.
-- `normal_matrix3` sorgt dafür, dass Normalen – Pfeile, die senkrecht aus einer Fläche zeigen – auch
-  nach ungleichmäßigem Strecken senkrecht bleiben.
+Ein Ding in der 3D-Welt wird meist auf einmal **gestreckt**, **gedreht** und **verschoben**. Eine
+**Matrix** packt alle drei Schritte in ein Paket: eine Tabelle aus 4 mal 4, also 16 Zahlen. Man
+steckt einen Punkt hinein und bekommt den fertig bewegten Punkt heraus. Der Renderer bekommt für
+jedes Ding so ein Paket; im kleinsten Beispielspiel hat jede der sich drehenden Kisten ihr eigenes.
 
-Bei `A * B` wirkt **erst B**, dann A. Ein Test prüft `trs` am Punkt (1, 0, 0): mit 2 skalieren
-→ (2, 0, 0), um 90° um Z drehen → (0, 2, 0), um (1, 2, 3) verschieben → **(1, 4, 3)**. Genau so
-bekommt in `hello` jede Kiste ihre Matrix, 16 Zahlen je Kiste.
+Ein Beispiel auf Karopapier: Der Punkt (1, 0, 0) liegt einen Meter rechts vom Ursprung. Das Paket
+sagt: mit 2 strecken, um 90° um die Z-Achse drehen, um (1, 2, 3) verschieben.
 
-> **Achtung, Falle!** Erst gehen, dann drehen ist etwas anderes als erst drehen, dann gehen – du
-> landest woanders. Darum legt `trs` die Reihenfolge fest.
+1. **Strecken** mit 2: Aus (1, 0, 0) wird (2, 0, 0).
+2. **Drehen** um 90° um Z, von oben gesehen gegen den Uhrzeigersinn: Was nach rechts zeigte, zeigt
+   danach nach vorn. Aus (2, 0, 0) wird (0, 2, 0).
+3. **Verschieben** um (1, 2, 3): Aus (0, 2, 0) wird **(1, 4, 3)**.
 
-### Kugeln, Kisten, Kamera
+Ein Test in Kern prüft genau diese Rechnung.
 
-`Sphere` (Kugel) und `Aabb` (achsenparallele Kiste) helfen beim Aussortieren des Unsichtbaren. Eine
-ungültige Kugel (Radius −1) wird trotzdem gezeichnet: **im Zweifel zeichnen**. Eine leere Kiste
-startet „verkehrt herum“, sodass der erste Punkt sie richtig setzt.
+> **Achtung, Falle!** Die Reihenfolge zählt. Erst zwei Schritte gehen und dann umdrehen ist etwas
+> anderes als erst umdrehen und dann gehen. Darum legt Kern sie fest: erst strecken, dann drehen,
+> dann verschieben.
 
-Die **Kamera** ist keine Matrix, sondern eine Beschreibung: Auge, Ziel, oben. Standard: Auge
-(0, −18, 8), Ziel (0, 0, 2), oben +Z, Öffnungswinkel π/3 = **60°**, gemessen **senkrecht**,
-gezeichnet von 0,05 m bis 1800 m. Studios Drauf-, Vorder- und Seitenansicht
-nutzen eine orthografische Kamera mit sichtbarer Höhe (Standard 20 m). Ungültiges (etwa `far`
-nicht größer als `near`) weist `camera_valid` zurück. `projection_matrix` wählt Perspektive oder
-Parallelansicht. Projektion mal Blickmatrix ergibt die View-Projection-Matrix, den ganzen Weg von
-der Welt auf den Bildschirm. Aus ihr gewinnt `Frustum::from_matrix` die sechs Wände des
-Sichtbereichs, mit denen Kern Unsichtbares aussortiert. JavaScript setzt die Kamera mit zwölf Zahlen
-über `kern_camera_set`, das Ungültiges mit `invalid camera` ablehnt.
+Mathematiker schreiben so ein Paket „rückwärts“ auf: Der Punkt steht ganz rechts, die Schritte
+links davon – **Verschieben · Drehen · Strecken · Punkt**. Das ist kein Widerspruch, man liest nur
+vom Punkt aus, also von rechts nach links: Was dem Punkt am nächsten steht, wirkt zuerst. Wie beim
+Anziehen: Außen am Fuß sitzt der Schuh, aber zuerst kam die Socke, die direkt am Fuß anliegt.
+
+Eine Matrix lässt sich auch **umkehren**; dann macht sie die Bewegung rückwärts. Das braucht Kern,
+wenn du in die Szene klickst: Der Weg führt vom Bildschirm zurück in die Welt. Kern rechnet diese
+Umkehrung mit doppelt so vielen Stellen wie sonst, damit auch Klicks auf ferne Dinge treffen.
+
+### Kamera und Sichtbereich
+
+Die **Kamera** ist bei Kern keine Matrix, sondern eine **Beschreibung**, wie ein Fotograf sie gäbe:
+Wo stehe ich? Wohin schaue ich? Wo ist oben? Wie weit ist mein Objektiv geöffnet? Kerns
+Standardkamera öffnet **60°**, gemessen von unten nach oben, und malt von 5 Zentimetern bis 1,8
+Kilometern Entfernung. Aus der Beschreibung errechnet Kern zwei Matrizen – eine für den Blick, eine
+für das Objektiv, das den Raum aufs flache Bild drückt – und fasst sie zu **einer** zusammen: dem
+ganzen Weg von der Welt aufs Bild. Eine unmögliche Kamera, etwa mit Auge und Ziel am selben Ort,
+weist Kern mit einem Zettel an der Pinnwand zurück.
+
+Neben der Perspektive gibt es die **Parallelansicht** ohne Fluchtpunkt, wie bei einem Bauplan: Ferne
+Dinge werden nicht kleiner. Studio nutzt sie für die Ansichten von oben, vorn und von der Seite.
+
+Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze (Bild in
+[Anhang B](B-grundlagen-rendering.md)). Was draußen liegt, muss nicht gemalt werden. Damit die
+Prüfung schnell geht, steckt Kern jedes Ding in eine unsichtbare **Kugel** oder einen **Karton**.
+Liegt die Kugel ganz außerhalb der Pyramide, ist das Ding unsichtbar – eine schnelle Prüfung statt
+vieler Dreiecke. Ist eine Kugel ungültig, wird das Ding trotzdem gemalt. Kerns Regel: **im Zweifel
+zeichnen** – lieber einmal zu viel als ein Loch in der Welt.
+
+> **Probier's aus!** Öffne Orb Run. Klick in der Leiste oben im Viewport auf **≡** und stell
+> **Field of View** erst auf 110°, dann auf 50°: Weitwinkel mit verzerrten Rändern, dann wie
+> herangezoomt. Drück im Viewport **Alt+J**: Die Ansicht springt auf **Top**, die Parallelansicht von
+> oben, wie ein Stadtplan. **Alt+G** holt die Perspektive zurück.
 
 ## 3.4 Mathematik, die überall gleich rechnet
 
-Wurzel, Betrag und Abrunden liefern auf jedem Rechner dieselben Bits. Sinus, Kosinus,
-Exponentialfunktion und Co. **nicht**: Linux, macOS, Android und WebAssembly runden im letzten Bit
-verschieden. In einer Robotersimulation wird aus einem Bit binnen Sekunden ein anderer Gang – und ein
-im Browser gelerntes Netz liefe nativ anders.
+Erinnerst du dich an die Wanderroute aus [Kapitel 1](01-einfuehrung.md)? Ein winziger Unterschied
+am Anfang, und abends ist man in einem anderen Dorf. Hier geht es darum, woher solche Unterschiede
+kommen.
 
-> **Stell dir vor …** Zwei Kinder würfeln eine Wanderroute aus, an jeder Kreuzung ein Wurf. Weicht nur
-> der erste ab, landen sie abends in verschiedenen Dörfern.
+Manche Rechnungen haben eine eindeutig festgelegte Antwort, die jeder Rechner gleich liefert:
+Wurzelziehen, Abrunden, den Betrag einer Zahl. Bei den **Winkelrechnungen** Sinus und Kosinus ist
+das **nicht** so.
 
-Die Lösung: Kern bringt die Funktionen der C-Bibliothek **musl** mit und übersetzt sie in allen
-drei Bauwegen gleich, ohne verschmolzene Rechenschritte. Neue Namen (aus `sin` wird `kern_musl_sin`)
-verhindern Verwechslungen mit dem System. Box3D rechnet im Skalar-Pfad und hat ohnehin eigene
-deterministische Winkelfunktionen.
+> **Stell dir vor …** Ein Punkt läuft auf dem Kreis mit 1 Meter Radius aus Abschnitt 3.3. Der
+> Kosinus sagt, wie weit er gerade rechts vom Mittelpunkt steht, der Sinus, wie weit oben. Wer etwas
+> drehen will, braucht diese Zahlen ständig.
 
-Benutzt wird das im Namensraum `kern::dm` genau wie `std::`: `sin`, `cos`, `tan`, `asin`, `acos`,
-`atan`, `exp`, `expm1`, `log`, `log10`, `atan2`, `pow` und `hypot`. Mit `float` rechnet die
-`float`-Fassung, sonst die `double`-Fassung. `sqrt`, `fabs` und `floor` bleiben bei `std::`, weil sie
-ohnehin exakt sind. Aus Kerns Mathematik:
+Solche Werte lassen sich nur annähern. Jedes System – Linux, macOS, Android, WebAssembly – nähert auf
+seine eigene Weise an, und im allerletzten Bit kommt manchmal etwas anderes heraus. In einer
+Robotersimulation wird daraus binnen Sekunden ein anderer Gang, und ein im Browser gelerntes Netz
+liefe auf dem eigenen Rechner anders.
 
-```cpp
-static Quat axis_angle(Vec3 axis, f32 radians) {
-  const Vec3 a = normalize(axis);
-  const f32 s = kern::dm::sin(radians * 0.5f);
-  return {a.x * s, a.y * s, a.z * s,
-          kern::dm::cos(radians * 0.5f)};
-}
-```
+Kerns Lösung: **eigene Formeln** für Sinus, Kosinus und Verwandte, aus einer freien
+Programmsammlung. Sie werden überall gleich übersetzt, ohne Rechen-Abkürzungen, und tragen eigene
+Namen, damit sie nie mit denen des Systems verwechselt werden. Die Physik-Bibliothek hat ohnehin
+eigene, überall gleiche Winkelrechnungen. Für neuen Code gilt darum:
 
-Achse auf Länge 1 bringen, Sinus des halben Winkels – mit `kern::dm::sin`! – an die Achse
-multiplizieren, Kosinus als vierte Zahl. So ergibt jede Drehung überall dieselben Bits. Auch
-`perspective` nutzt `kern::dm::tan`.
+- Alles, was die **Simulation beeinflusst**, benutzt Kerns eigene Formeln.
+- Keine Summe darf davon abhängen, wie viele Helfer mitrechnen.
+- Keine Rechen-Abkürzungen, die „schnell, aber ungefähr“ rechnen.
 
-Die Regel für neuen Code:
+Reine **Darstellung** – Ton, Funken, Teile des Editors – darf die Formeln des Systems benutzen: Ob ein
+Funke einen Millimeter weiter links fliegt, merkt niemand. Fließt so ein Wert aber in Physik,
+Steuerung oder Training ein, muss er auf Kerns eigene Formeln umziehen.
 
-- Alles, was die **Simulation speist**, nutzt `kern::dm::` statt `std::`.
-- Keine Summe darf von der Zahl der Threads abhängen.
-- Keine `-ffast-math`-Optionen.
+> **Wusstest du?** Die eigenen Formeln kosten keine Geschwindigkeit: Sie sind so schnell wie die des
+> Systems, und das Tempo der Physik bestimmt ohnehin das Berechnen der Gelenke. Ob alles stimmt,
+> verrät der Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md).
 
-Reine **Darstellung** – Ton, Partikel, Teile des Editors, die Kamera von `hello` – darf die
-System-Mathematik nutzen. Geht solcher Code in Physik, Controller oder Training ein, muss er auf
-`kern::dm::` umziehen.
-
-> **Wusstest du?** Die eigene Mathematik kostet keine Geschwindigkeit: musl ist so schnell wie das
-> System, und das Tempo der Physik bestimmt ohnehin Box3Ds Gelenk-Löser. Ob alles
-> stimmt, verrät der Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md).
+> **Für Neugierige:** Die Formeln stammen aus der Programmsammlung **musl**; jede bekommt eine
+> Vorsilbe, damit sie nie mit der Fassung des Systems zusammenstößt.
 
 ## Das nimmst du mit
 
-- Fehler meldet Kern mit `false` und `fail()`; die Meldung hängt an einer einzigen Pinnwand.
-- `!(x > 0)` statt `x <= 0` fängt auch NaN.
-- Die Uhr dient Messungen, nie der Simulation.
-- Ein `Span` ist ein Fenster auf Daten; wer sie behält, kopiert.
-- Kerns JSON hält die Reihenfolge, schreibt Zahlen wie JavaScript und misstraut fremden Dateien.
-- Meter, rechtshändig, **Z oben**, Matrizen spaltenweise, Öffnungswinkel senkrecht in Radiant.
-- Für die Simulation: `kern::dm::`, `-ffp-contract=off`, feste Summen.
+- Kern legt bei jeder Zahl fest, wie viele Bit-Kästchen sie hat.
+- Fehler meldet Kern mit „Nein“ und einem Zettel an einer einzigen Pinnwand.
+- Die Uhr dient Messungen, nie der Simulation: Die zählt feste Schritte wie ein Brettspiel.
+- Ein Span zeigt auf Daten, ohne sie zu besitzen; wer sie behalten will, kopiert sie.
+- Kerns JSON hält die Reihenfolge, schreibt Zahlen wie der Browser und misstraut fremden Dateien.
+- Meter, Sekunden, Kilogramm, **Z oben**; eine Matrix packt Strecken, Drehen und Verschieben in ein
+  Paket, und die Reihenfolge zählt.
+- Die Kamera ist eine Beschreibung wie beim Fotografen; Unsichtbares wird aussortiert, im Zweifel
+  aber gemalt.
+- Für die Simulation gelten eigene Winkelformeln, feste Summen und keine Rechen-Abkürzungen.
 
 ## Knobelecke
 
-1. Warum gibt `fail()` immer `false` zurück?
-2. (1, 0, 0) wird um 90° um Z gedreht und dann um (5, 0, 0) verschoben. Wo landet der Punkt?
-3. Ein Partikeleffekt nutzt `std::sin`. Problem? Und wenn die Partikel die Ente anschubsen sollen?
+1. Zwei Aufgaben scheitern kurz nacheinander. Danach liest du die Pinnwand. Wessen Zettel siehst du?
+2. Der Punkt (1, 0, 0) wird um 90° um die Z-Achse gedreht und dann um (5, 0, 0) verschoben. Wo
+   landet er? (Tipp: Karopapier, X nach rechts, Y nach vorn.)
+3. Ein Funkeneffekt benutzt die Sinus-Formel des Systems. Problem? Und wenn die Funken die Ente
+   anschubsen sollen?
+4. Warum ergibt 0,1 + 0,2 im Computer nicht genau 0,3?
+5. Warum darf die Ente nicht auf die Uhr schauen, um zu entscheiden, wie weit sie in einem Takt geht?
 
 ### Lösungen
 
-1. Damit `return fail("…");` in einer Zeile Meldung hinterlegt und Misserfolg meldet.
-2. Drehen ergibt (0, 1, 0), Verschieben (5, 1, 0).
-3. Für reine Darstellung erlaubt. Beeinflussen die Partikel die Physik, muss `kern::dm::sin` her.
+1. Den der zweiten Aufgabe: Jeder neue Zettel ersetzt den alten.
+2. Drehen macht aus (1, 0, 0) den Punkt (0, 1, 0), Verschieben dann (5, 1, 0).
+3. Für reine Darstellung ist es erlaubt. Schubsen die Funken die Ente, fließen sie in die Physik
+   ein, und dann muss Kerns eigene Formel her.
+4. Im Zweiersystem sind 0,1 und 0,2 unendliche Brüche. Gespeichert werden Zahlen knapp daneben, und
+   ihre Summe liegt knapp neben 0,3.
+5. Ein langsamer Rechner zeigte mehr verstrichene Zeit an als ein schneller, und die Ente liefe auf
+   beiden verschieden. Mit festen Schritten läuft sie überall gleich.
 
 ---
 
