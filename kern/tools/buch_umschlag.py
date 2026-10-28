@@ -43,7 +43,7 @@ TW, TH = 2 * W + S + 2 * SPINE_SIDE + 2 * MX, H + 2 * MY
 M = MY
 out = pathlib.Path(a.out or ("kern-book-cover.pdf" if a.en else "kern-gruen-umschlag.pdf" if a.gruen else "kern-gelb-umschlag.pdf" if a.gelb else "kern-buch-umschlag.pdf")).resolve()
 # Each edition has its colour: blue for the technical book, green for the simpler one.
-C = (dict(bg1="#5a4400", bg2="#2e2300", bg3="#171100", acc="#ffd84a", line="#ffc400", light="#fff1c2", blurb="#fff6dc", rights="#c9b47a", grid="#ffd84a")
+C = (dict(bg1="#7a5c00", bg2="#3d2e00", bg3="#1e1700", acc="#ffd84a", line="#ffc400", light="#fff1c2", blurb="#fff6dc", rights="#c9b47a", grid="#ffd84a")
      if a.gelb else
      dict(bg1="#1d4a33", bg2="#0f2a1d", bg3="#08170f", acc="#a8e6b8", line="#3ddc84", light="#d8f0df", blurb="#e0f2e6", rights="#93b9a0", grid="#a8e6b8")
      if a.gruen else
@@ -111,6 +111,38 @@ Experimenten zum Selbermachen und einer Knobelecke in jedem Kapitel. Die grüne 
 „Kern – Das Buch“, nur einfacher erzählt.</p>
 <p><b>Christian Heinrich Hohlfeld</b>, Softwareentwickler seit 2010, hat Kern entworfen und mit KI gebaut.</p>
 <p>Die Software ist Open Source und kostenlos: <b>kernengine.de</b></p>""",
+    }
+if a.en and a.gelb:
+    t = {
+        "book": "For Explorers",
+        "sub": "How Games, Physics and Learning Robots Work – for Young Readers Aged 12 and Up",
+        "tag": "Missions, puzzles and real technology",
+        "blurb": """<p>How does a 3D game get into your browser? Why does a cube fall exactly the way it does? And how does a
+small robot learn to walk without anyone telling it every move?</p>
+<p><b>Kern</b> is a real 3D engine that runs in the browser – with graphics, physics, sound, multiplayer and the editor
+<b>Kern Studio</b>, where you build your own levels and games. With the <b>Lehrer</b>, the Micro Duck, a two-legged
+walking robot, learns to walk, to jump, to kick a ball and to fetch a sock.</p>
+<p>This book explains all of it – completely and without shortcuts, with school math, with missions to try yourself
+and a puzzle corner in every chapter. The yellow edition has the same content as
+<i>Kern – The Book</i> and <i>Kern – Simply Explained</i>.</p>
+<p><b>Christian Heinrich Hohlfeld</b>, a software engineer since 2010, designed Kern and built it with AI.</p>
+<p>The software is open source and free: <b>kernengine.de</b></p>""",
+    }
+elif a.en and a.gruen:
+    t = {
+        "book": "Simply Explained",
+        "sub": "The Engine, Kern Studio, a Walking Robot and the Lehrer – for Everyone Who Wants to Understand How Games and Learning Robots Work",
+        "tag": "Try it, play with it, understand it",
+        "blurb": """<p>How does a 3D game get into the browser? Why does a cube fall exactly the way it does? And how do you teach
+a small robot to walk without prescribing every move?</p>
+<p><b>Kern</b> is a real 3D engine that runs in the browser – with graphics, physics, sound, networked play and the editor
+<b>Kern Studio</b>. With the <b>Lehrer</b>, the Micro Duck, a two-legged walking robot, learns to walk, to jump,
+to kick a ball and to fetch a sock.</p>
+<p>This book explains all of it – completely, but without prior knowledge: with everyday pictures instead of walls of
+formulas, with experiments to try yourself and brain teasers in every chapter. The green edition has the same
+content as <i>Kern – The Book</i>, told more simply.</p>
+<p><b>Christian Heinrich Hohlfeld</b>, a software engineer since 2010, designed Kern and built it with AI.</p>
+<p>The software is open source and free: <b>kernengine.de</b></p>""",
     }
 html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @page {{ size: {TW}in {TH}in; margin: 0 }}
