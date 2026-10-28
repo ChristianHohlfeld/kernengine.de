@@ -20,7 +20,7 @@ und `orbrun`.
 > sammle Orbs. **Esc** beendet das Spiel.
 
 > **Vorsicht, Falle:** Auf einem deutschen Rechner zeigt Studio deutsche Beschriftungen, etwa
-> „Datei“ statt „File“. Dieses Buch nennt die englischen. Schalte deshalb mit dem Knopf **DE/EN**
+> „Datei“ statt „File“. Dieses Buch nennt die englischen. Schalte deshalb mit dem Knopf **DE | EN**
 > unten rechts in der Statusleiste auf Englisch um oder öffne Studio mit `?lang=en` am Ende der
 > Adresse. Studio merkt sich die Wahl auf deinem Gerät.
 
