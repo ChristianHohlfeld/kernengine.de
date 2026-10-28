@@ -72,8 +72,8 @@ steht es wieder still, baut er sie neu. Alles andere wird Dreieck für Dreieck g
 
 ## 5.4 Picking: Was liegt unter dem Mauszeiger?
 
-Kern rechnet den Pixel (gemessen im Zeichenpuffer) in Koordinaten von −1 bis 1 um und projiziert ihn rückwärts durch die Kamera
-auf die nahe und die ferne Wand des Frustums. Die Verbindung ist der **Bildschirmstrahl**. Bei einer
+Kern rechnet den Pixel (gemessen im Zeichenpuffer der Grafik) in Koordinaten von −1 bis 1 um und
+projiziert ihn rückwärts durch die Kamera auf die nahe und die ferne Wand des Frustums. Die Verbindung ist der **Bildschirmstrahl**. Bei einer
 perspektivischen Kamera startet er im Auge, bei einer orthografischen (ohne Perspektive) laufen alle
 Strahlen parallel.
 
@@ -100,11 +100,10 @@ if (engine.renderer.pick(in.pointer().x, in.pointer().y,
 Zeile 1 legt einen leeren Treffer an. Zeile 2–3 fragen: Liegt etwas unter dem Mauszeiger, und ist es
 das Kisten-Mesh? `{}` heißt Standardeinstellungen: bis 1800 m weit, unsichtbare Meshes und Linien
 zählen nicht. Man kann außerdem ein Mesh ausnehmen und Ebenen (Layer) wählen; eine kleine Statistik
-zählt geprüfte Dreiecke und per Kugel verworfene Meshes. Die drei Zeilen
-danach färben genau diese Kiste: viel Rot, wenig Grün und Blau.
+zählt geprüfte Dreiecke und per Kugel verworfene Meshes. Die drei Zeilen danach färben genau diese Kiste: viel Rot, wenig Grün und Blau.
 
-Kern Studio pickt genauso (nur auf der Szenen-Ebene), ordnet Meshes ihren Actors zu und schießt den Strahl durch Boden und
-gesperrte Actors weiter. Lichter und leere Actors wählst du über ihr Symbol.
+Kern Studio pickt genauso (nur auf der Ebene der Szene, nicht bei Raster oder Gizmos), ordnet Meshes
+ihren Actors zu und schießt den Strahl durch Boden und gesperrte Actors weiter. Lichter und leere Actors wählst du über ihr Symbol.
 
 > **Probier's aus!** Klicke im Viewport verschiedene Objekte an und beobachte, wie der Outliner
 > mitspringt. Jeder Klick ist ein Strahl auf der Suche nach dem nächsten Dreieck.
@@ -205,8 +204,8 @@ Spiel-Laufzeit bauen ihre kleine Stadt mit `step(1e9)` in einem Zug. Zähler mel
 
 Der `RoadBuilder` legt Straßen als **Bänder** aufs Gelände: optional Bordstein, dann Fahrbahn und
 gestrichelte Mittellinie (3 m lange Striche alle 7 m, ab 1 m). Eingabe ist wieder eine Zahlenliste: pro
-Straße Breite, Schalter, zwei Farbnummern aus einer Palette und die Punkte. Damit sie Hügeln folgen, wird jedes Stück in
-Abschnitte von höchstens 6 m geteilt, und jede Ecke fragt nach der Bodenhöhe.
+Straße Breite, Schalter (Bordstein, Markierung), zwei Farbnummern aus einer Palette und die Punkte.
+Damit die Bänder Hügeln folgen, wird jedes Stück in Abschnitte von höchstens 6 m geteilt, und jede Ecke fragt nach der Bodenhöhe.
 
 | Schicht | Höhe über Gelände | Breite |
 |---|---|---|
@@ -229,8 +228,8 @@ großen Karte.
 `build_terrain_tile` baut Landschaft als indiziertes Gitter mit 1 bis 128 Feldern pro Seite; jede
 Gitterecke fragt den HeightSampler, jedes Feld wird an der Diagonale Südwest–Nordost in zwei Dreiecke
 geteilt. Die UVs laufen über die Kachel von 0 bis 1, und die Funktion meldet die kleinste und größte
-Höhe (nützlich für Hüllen oder Detailstufen). Die Normalen ergeben sich aus dem Höhenunterschied der Nachbarn. Weil die Funktion dafür
-eine Reihe über den Rand hinaus abtastet, passen Nachbarkacheln **nahtlos** aneinander.
+Höhe (nützlich für Hüllen oder Detailstufen). Die Normalen ergeben sich aus dem Höhenunterschied der
+Nachbarn. Weil die Funktion dafür eine Reihe über den Rand hinaus abtastet, passen Nachbarkacheln **nahtlos** aneinander.
 
 Der `GeoProjector` rechnet GPS-Koordinaten in Meter östlich und nördlich eines Ursprungs um
 (Erdradius 6 378 137 m). So kommen Grundrisse aus Kartendaten direkt in Kerns Welt.
@@ -242,8 +241,8 @@ verschweißen, hochladen und seinen Speicher freigeben (der Renderer hat ja eine
 `commit` meldet die Bytes vor und nach dem Welding. Mit `extraKey` wählst du den
 Erweiterungsstrom für die Zusatzwerte; einen unbekannten Namen lehnt `commit` mit Fehler ab, statt still
 einen anderen zu nehmen. `upsertTerrainTile` baut und lädt eine Gelände-Kachel in einem Aufruf, und mit
-`weld: true` verschweißt Kern eine selbst hochgeladene reine Dreieckssuppe mit Normalen vorher (ohne
-Skinning, Linien und mit höchstens einem Zusatzstrom; sonst kommt sie unverändert an).
+`weld: true` verschweißt Kern eine selbst hochgeladene Dreieckssuppe vorher. Das klappt nur bei reiner Suppe mit
+Normalen, ohne Skelett, ohne Linien und mit höchstens einem Zusatzstrom; sonst kommt sie unverändert an.
 
 ## 5.12 Die prozedurale Stadt
 
@@ -269,13 +268,13 @@ Gleicher Seed, gleiche Stadt (derselbe Zufallsgenerator wie in Orb Run):
 2. **Höhe:** Je näher an der Mitte, desto höher: Die Höchstgrenze wächst von 14 m am Rand bis zur
    eingestellten Höhe in der Mitte (mit dem Quadrat der Zentrumsnähe). Die Mitte wird Hochhausgegend.
 3. **Bebauung** pro Block (Grundstück 3 m eingerückt), eine von vier Arten: ein blockgroßes Haus (in
-   60 % der Fälle mit 14 m tiefem Innenhof, Kollision dann als vier Flügel), vier Einzelhäuser mit 5 m Gassen, ein L-Haus plus ein kleines oder drei Riegel.
+   60 % der Fälle mit 14 m tiefem Innenhof, Kollision dann als vier Flügel), vier Einzelhäuser mit
+   5 m Gassen, ein L-Haus plus ein kleines oder drei Riegel.
 4. **Straßen** an allen Blockkanten (Bandbreite drei Viertel der Straßenbreite) mit Bordstein und
    Mittellinie, 60 m über die Stadt hinaus. Gebaut wird mit den Bauern von oben (Chunks 200 m, sechs
-   Wand- und drei Dachfarben), alles geweldet.
+   Wand- und drei Dachfarben), alles verschweißt (Welding, 5.7).
 5. **Bäume** alle 11 m entlang der Blockränder, mit 35 % Lücken, zufälliger Größe, Drehung und
-   Grünton; alle Stämme (Zylinder) sind ein
-   instanziertes Mesh, alle Kronen (Kegel) ein zweites.
+   Grünton; alle Stämme (Zylinder) sind ein instanziertes Mesh, alle Kronen (Kegel) ein zweites.
 
 Beim Hochladen wird jeder Chunk ein Mesh. Verschiebst du die Stadt, ändert sich nur eine Matrix; neu
 gebaut wird nur, wenn sich eine Einstellung wirklich ändert (das prüft ein Fingerabdruck der
@@ -287,8 +286,7 @@ Für die Physik wird die ganze Stadt **ein** statischer Box3D-Körper mit einem 
 und Bodenplatte (Reibung 0,5, siehe [Kapitel 6](06-physik.md)). Die Autos parken im Editor. In Play und
 Simulate fahren sie als kinematische Körper ihre Spur entlang (9 bis 15 m/s, fünf Farben), springen am
 Stadtrand auf die andere Seite und halten, wenn der Spieler weniger als 10 m vor ihnen steht. Alle Autos sind ein einziges instanziertes
-Mesh. Eine
-Hilfsfunktion liefert zufällige Straßenpunkte, etwa zum Verteilen von Orbs.
+Mesh. Eine Hilfsfunktion liefert zufällige Straßenpunkte, etwa zum Verteilen von Orbs.
 
 > **Probier's aus!** Öffne den Content Drawer (Ctrl+Space) und setze aus der Gruppe **World** eine
 > **Procedural City** ins Level. Ändere in Details den **Seed** oder **Blocks per side** – jedes Mal
@@ -306,8 +304,8 @@ Kugel, Kapsel, sonst Hülle) – mehr in [Kapitel 6](06-physik.md).
 Die Form **Mesh** verweist auf ein fest einkompiliertes Dreiecksmesh. Heute sind das die Glieder der
 Micro Duck, die Meshes von Pollen Robotics in vereinfachter Form, mit Namen wie `duck/trunk_base` oder
 `duck/neck` (die volle Liste liefert `builtin_mesh_names()`); vereinfacht hat sie das Werkzeug
-`tools/micro_duck_import.py`. Sie stehen unter CC BY-NC-SA 4.0 (nur nicht kommerziell), sind darum hier nicht abgebildet,
-und ein kommerzieller Build lässt sie weg. Gespeichert sind sie platzsparend (Positionen in 16 Bit,
+`tools/micro_duck_import.py`. Sie stehen unter CC BY-NC-SA 4.0 (nur nicht kommerziell), sind darum
+hier nicht abgebildet, und ein kommerzieller Build lässt sie weg. Gespeichert sind sie platzsparend (Positionen in 16 Bit,
 Normalen und Farben in 8 Bit, dazu Hüllpunkte für die Kollision) und werden beim ersten Zugriff
 ausgepackt. Weil der Lehrer ([Kapitel 14](14-lehrer.md)) auf mehreren Threads baut, schützt nativ ein
 Schloss (Mutex) diesen Vorrat; im Browser gibt es nur einen Thread. Im Level lässt sich ein solches

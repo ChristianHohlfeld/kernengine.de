@@ -74,8 +74,8 @@ bzw. 5 mm – feiner als in echter Größe.
 Fest eingestellte Werte werden **kalibriert, nicht skaliert**. Weil die Zeit doppelt so lang läuft,
 entsprechen Frequenzen am echten Roboter dem Doppelten, Geschwindigkeiten der Hälfte: Kontaktsteifigkeit
 30 Hz in der Welt sind echte 60 Hz, die Servo-Gelenkweichheit 240 Hz echte 480 Hz, die
-Ausdrückgeschwindigkeit 3 m/s echte 1,5 m/s, die Restitutionsschwelle 1 m/s echte 0,5 m/s. Abweichungen zum echten Roboter kommen also aus den Modellen von Servo,
-Kontakt und Massen, die an Messungen abgeglichen werden ([Kapitel 16](16-kalibrierung.md)). Eine
+Ausdrückgeschwindigkeit 3 m/s echte 1,5 m/s, die Restitutionsschwelle 1 m/s echte 0,5 m/s.
+Abweichungen zum echten Roboter kommen also aus den Modellen von Servo, Kontakt und Massen, die an Messungen abgeglichen werden ([Kapitel 16](16-kalibrierung.md)). Eine
 Garantie für sicheres Verhalten auf echter Hardware ist die Simulation nicht. Ein Roboter anderer
 Größe bekommt einfach ein anderes S.
 
@@ -130,8 +130,8 @@ Zielpose fahren lassen, Achsen sperren (`set_motion_locks`) und Kräfte oder Imp
 Kräfte und Impulse wecken einen schlafenden Körper. Den Typ zu wechseln geht, ist aber teuer.
 
 Masse, Schwerpunkt und Trägheit ergeben sich normalerweise aus den Formen und ihrer Dichte. Mit
-`set_mass` setzt du nur die Masse (die Trägheit wächst passend mit; der Körper bleibt in sich stimmig). Mit `set_mass_data` setzt du alles
-einzeln – der Weg für importierte Roboterbeschreibungen (MJCF, URDF), die ihre gemessenen Werte
+`set_mass` setzt du nur die Masse (die Trägheit wächst passend mit; der Körper bleibt in sich
+stimmig). Mit `set_mass_data` setzt du alles einzeln – der Weg für importierte Roboterbeschreibungen (MJCF, URDF), die ihre gemessenen Werte
 mitbringen. Die Kollisionsformen bestimmen dann nur noch den Kontakt.
 
 ## 6.5 Formen
@@ -396,7 +396,7 @@ einen **Akkumulator** nach Glenn Fiedler („Fix Your Timestep“):
   Rest bleibt für das nächste Mal.
 - Ein langer Frame (etwa ein Hintergrund-Tab) zählt höchstens 0,25 s, und pro Frame laufen höchstens
   0,1 s Simulation. Das verhindert die **„Spiral of Death“**, in der die Physik nie aufholt. Ist man
-  trotzdem im Rückstand, fallen ganze Schritte weg; der Takt bleibt erhalten.
+  trotzdem im Rückstand, fallen ganze Schritte weg, und der Rest im Sparschwein bleibt im Takt.
 - Die Simulationszeit **zählt Schritte**, statt Kommazahlen aufzusummieren, die mit der Zeit driften.
 - Eingaben gelten pro Schritt; eine Steuerung, die mit 50 Hz rechnet, zählt Schritte, nicht Sekunden.
 
@@ -466,8 +466,7 @@ Wichtigste:
   Körper über Geschwindigkeit oder Zielpose bewegen (ein Ziel langsamer als die Schlafschwelle wird
   übersprungen). Figuren laufen auf dem Character Mover. Importierte Roboter bringen Masse, Schwerpunkt
   und Trägheit mit; Gelenke, die nicht in Nullstellung gebaut werden, tragen ihren Bauwinkel als
-  Referenz. Bewegungssperren
-  nur bei Fahrzeugen, Figuren und Fliegern, **nie bei Walkern** – ein Roboter muss fallen können, sonst
+  Referenz. Bewegungssperren nur bei Fahrzeugen, Figuren und Fliegern, **nie bei Walkern** – ein Roboter muss fallen können, sonst
   lernt er nichts Echtes.
 - **Schlaf und Ereignisse:** Continuous Collision anlassen, schnelle Spielerfahrzeuge sind Bullets.
   Ereignisse nur an Formen, deren Meldungen das Spiel liest. Spieler und Roboter schlafen nie (eine
@@ -515,8 +514,7 @@ void servo_step(physics::World& world,
 }
 ```
 
-Zeile 5 liest den
-aktuellen Winkel. Zeile 7 rechnet aus, wie weit das Ziel höchstens entfernt sein darf: T geteilt durch
+Zeile 5 liest den aktuellen Winkel. Zeile 7 rechnet aus, wie weit das Ziel höchstens entfernt sein darf: T geteilt durch
 K. Zeile 8–10 stellen die Gelenkfeder auf ein Ziel, das nie weiter weg ist – so übersteigt die Kraft nie
 das Höchstmoment, genau wie bei einem echten Servo, dessen Ansteuerung sättigt. Zeile 11–12 schalten einen
 Motor mit Sollgeschwindigkeit 0 und der Reibung als Höchstmoment ein: Er hält das Gelenk fest, bis mehr

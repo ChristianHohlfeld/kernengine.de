@@ -53,8 +53,8 @@ Außerhalb des Browsers, in den nativen Tests, bleiben die Importe leer; dort h�
 mit seinen Importen laden (dazu ein winziges WASI für Konsole, Zufall und Uhr – die Engine fasst keine
 Dateien an), die Nummern-Tabellen und den Kontextverlust verwalten und `KernRenderer` anbieten, eine
 bequeme Fassade für JavaScript. Ein zweites Importpaket, `kern_env`, liefert der Engine unter anderem
-die Uhrzeit, die Geländehöhe der Seite, Mauszeiger-Sperre, Statusmeldungen und den JIT-Weg der
-Logik-Graphen ([Kapitel 9](09-logik.md)).
+die Uhrzeit, die Geländehöhe der Seite, Mauszeiger-Sperre, Statusmeldungen und den Weg, auf dem
+in WebAssembly übersetzte Logik-Graphen ins Modul kommen ([Kapitel 9](09-logik.md)).
 
 Den WebGL2-Zugang (den **Kontext**) legt die Webseite an. Die Engine-Seite verzichtet dabei auf die
 eingebaute Kantenglättung, weil Kern ohnehin in eigene Zwischenbilder malt (4.7); Kern Studio und
@@ -112,7 +112,8 @@ Andere Angaben gelten **pro Instanz**. Eine Instanz ist eine Kopie des Meshes an
 hundert Bäume aus einer Vorlage. Pro Instanz gibt es die Modellmatrix (Ort, Drehung, Größe), einen
 Farbton (**Tint**) und die Normalenmatrix (damit Normalen nach dem Strecken stimmen, Anhang B). Der
 Clou: **Jedes Mesh ist instanziert**, auch mit nur einer Instanz, und wird mit genau einem
-Zeichenaufruf gemalt. Die Normalenmatrix rechnet Kern pro Instanz auf der CPU aus. Kaputte Matrizen (etwa auf Größe null gestaucht) lehnt Kern ab.
+Zeichenaufruf gemalt. Die Normalenmatrix rechnet Kern pro Instanz auf der CPU aus. Kaputte Matrizen
+(etwa auf Größe null gestaucht) lehnt Kern ab.
 
 Grenzen, die du kennen solltest: **32 Knochen**, **6 Punktlichter**, **2 Zusatzströme** und **8
 Zahlen-Parameter** für Erweiterungen.
@@ -157,8 +158,8 @@ zwei Besitzer einen Platz teilen.
 
 Beim Hochladen legt Kern feste Puffer für die Eckendaten an, drei veränderliche für die Instanzen und
 einen für die Eckennummern. Bei **höchstens 65 536 Ecken** speichert er diese Nummern mit 16 statt 32
-Bit – halber Platz im häufigsten Fall. Unbewegte Weltobjekte ab 36 Dreiecken (eine Instanz am
-Ursprung, ohne Skelett, keine Linien) bekommen zusätzlich eine **BVH**, ein Inhaltsverzeichnis für
+Bit – halber Platz im häufigsten Fall. Unbewegte Weltobjekte ab 36 Dreiecken (genau eine Instanz,
+nicht verschoben, gedreht oder gestreckt, ohne Skelett, keine Linien) bekommen zusätzlich eine **BVH**, ein Inhaltsverzeichnis für
 schnelle Mausklicks ([Kapitel 5](05-szene-und-geometrie.md)). `remove` gibt ein Mesh und seine Nummer
 wieder frei.
 
@@ -311,8 +312,7 @@ kann, misst eine **Stoppuhr** die GPU-Zeit; das Ergebnis kommt erst einige Bilde
 meldet die Statistik −1). Die **Schattenkarte** wird nur bei Bedarf neu gemalt.
 
 Dann wählt Kern das **Ziel**: normalerweise ein eigenes Szenen-Ziel, sofern Bloom an und vom Gerät
-unterstützt ist, sonst direkt den Bildschirm. Malt er nur in einen Teil des
-Fensters, etwa einen von vier Viewports, geht es direkt auf den Bildschirm – dann **ohne Bloom und ohne
+unterstützt ist, sonst direkt den Bildschirm. Malt er nur in einen Teil des Fensters, etwa einen von vier Viewports, geht es direkt auf den Bildschirm – dann **ohne Bloom und ohne
 Ambient Occlusion**.
 
 Beim **Einsortieren** fliegt Unsichtbares raus, ebenso alles außerhalb der Sichtpyramide – außer
@@ -374,8 +374,8 @@ und den aktiven Ebenen bildet Kern einen Schlüssel. Nur wenn er sich ändert, w
 unbewegten Stadt kostet der Schatten bei stehender Kamera **keinen einzigen Zeichenaufruf**.
 
 **Malen und abtasten.** Gemalt wird nur Tiefe – nur Schattenwerfer der aktiven Ebenen, die in der
-Sichtpyramide der Sonne liegen –, mit einem schlanken Shader und einem kleinen Polygon-Offset gegen **Schattenakne** (Streifen, mit denen sich eine Fläche selbst beschattet). Beim
-Nachschlagen kann die Grafikkarte Tiefen direkt vergleichen und vier Nachbarn mischen – Stufe 1. Die
+Sichtpyramide der Sonne liegen –, mit einem schlanken Shader und einem kleinen Polygon-Offset gegen
+**Schattenakne** (Streifen, mit denen sich eine Fläche selbst beschattet). Beim Nachschlagen kann die Grafikkarte Tiefen direkt vergleichen und vier Nachbarn mischen – Stufe 1. Die
 Stufen 4 und 9 setzen daraus einen größeren, weichen Filter zusammen (nach Castaño, 2013, aus dem Spiel
 „The Witness“): Jede Abtastung sitzt so geschickt **zwischen** den Punkten, dass die eingebaute Mischung
 genau die richtigen Gewichte liefert. Dazu kommt der **Normal Offset** (nach Holbert, 2011): Kern schaut
@@ -404,9 +404,10 @@ Stunde** (je tiefer die Sonne, desto oranger der Horizont und violetter der Zeni
 weichem Hof und scharfer Scheibe, nachts **Mond und funkelnde Sterne**, **Wolken** aus fünf
 übereinandergelegten Rauschmustern (vom Wind verschoben, von Explosionen wie von einer Schockwelle
 weggedrückt) und auf Wunsch **Horizontnebel**, in dem sich der Horizont in die Nebelfarbe der Szene
-auflöst – je dünner der Nebel der Szene, desto dünner auch dieser Dunst. Sinkt die Sonne unter den
+auflöst – je dünner der Nebel der Szene, desto dünner auch dieser Dunst. Sinkt die Sonne ein Stück unter den
 Horizont, verschwinden Scheibe und Hof; unterhalb des Horizonts geht der Himmel in die Horizontfarbe
-über. Orthografische Kameras haben keinen Himmel; dort bleibt die Löschfarbe stehen.
+über. Orthografische Kameras haben keinen Himmel; dort bleibt die Löschfarbe stehen, die Grundfarbe, mit der
+jedes Bild beginnt.
 
 ### 4.8.3 Bloom und Composite
 
@@ -480,8 +481,7 @@ dieselbe Klasse über `kern_fx_*`.
 Der Shader kennt nur sechs Punktlichter. Hat ein Spiel zwanzig Lampen, wählt der **LightPool** jedes
 Bild die sechs wichtigsten: Helligkeit geteilt durch (1 + Entfernung / Reichweite), wobei die
 Reichweite mindestens als 4 m zählt; bei Gleichstand gewinnt, wer zuerst fragte. Helligkeit über 100
-und Reichweite über 1000 m kappt er. Beispiel: Lampe A,
-Helligkeit 10, Reichweite 10 m, 30 m entfernt: 10 / (1 + 3) = 2,5. Lampe B, Helligkeit 4, gleiche
+und Reichweite über 1000 m kappt er. Beispiel: Lampe A, Helligkeit 10, Reichweite 10 m, 30 m entfernt: 10 / (1 + 3) = 2,5. Lampe B, Helligkeit 4, gleiche
 Reichweite, 5 m entfernt: 4 / 1,5 ≈ 2,7 – die schwächere, aber nähere gewinnt. Orb Run meldet so einen
 Scheinwerfer vor dem Auto und ein Licht pro Orb an.
 

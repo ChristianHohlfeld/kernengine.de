@@ -58,8 +58,9 @@ Netzwerk, Szene und die eigene Mathematik aus musl. Die Schalter kennst du aus
 [Kapitel 1](01-einfuehrung.md). Weitere Argumente, die auf `.cpp` oder `.cc` enden, werden als
 Spielquellen mitübersetzt; alles andere geht als Option an den Compiler.
 
-Vier Umgebungsvariablen steuern den Bau: `WASI_SDK` (wo), `KERN_BUILD` (`release`: `-O3` mit
-ThinLTO; `debug`: `-O1 -g` ohne LTO), `KERN_JOBS` (wie viele Übersetzer parallel, Standard: alle Kerne) und
+Vier Umgebungsvariablen steuern den Bau: `WASI_SDK` (wo), `KERN_BUILD` (`release`: voll optimiert,
+`-O3` mit ThinLTO; `debug`: weniger optimiert, `-O1 -g` ohne ThinLTO), `KERN_JOBS` (wie viele
+Übersetzer parallel, Standard: alle Kerne) und
 `KERN_OBJ_CACHE` (wo Zwischenergebnisse liegen). Kleiner Haken: Auch im Debug-Modus landen keine
 Debug-Informationen im Modul, weil der letzte Schritt sie immer entfernt.
 
@@ -83,8 +84,9 @@ Schluss meldet das Skript stolz `built <out> (<n> bytes)`.
 Jede Quelle wird einzeln und parallel übersetzt, und ThinLTO, ein Optimierer, verbindet sie. Damit
 ein Neubau nicht alles neu kocht, gibt es einen **Objekt-Cache**, den sich Studio und Beispielspiele
 teilen und den die CI von Lauf zu Lauf aufhebt. Jedes C++-Stück trägt ein Etikett aus dem Inhalt
-seiner Quelle, ihrem Pfad und dem Inhalt **aller** Header. Box3D, musl und ThinLTO haben eigene
-Fächer; dort wird neu übersetzt, was fehlt oder älter als seine Quelle ist.
+seiner Quelle, ihrem Pfad und dem Inhalt **aller** Header. Box3D und musl haben eigene Fächer;
+dort wird neu übersetzt, was fehlt oder älter als seine Quelle oder der neueste Header ist. Auch
+ThinLTO hat ein eigenes Fach.
 
 > **Achtung, Falle!** Du änderst ein Komma in einer Header-Datei – und **alles** wird neu übersetzt?
 > Absicht! Weil alle Header ins Etikett eingehen, passt kein Vorratsstück mehr. Einfach und sicher:
@@ -127,8 +129,7 @@ wird zum Fehler – das Bauskript ist nachsichtiger, die Tests nicht.
 Kern hat ein winziges eigenes Testgerüst: `TEST(name)` meldet einen Test an, `CHECK(bedingung)` prüft,
 `CHECK_NEAR(a, b, eps)` vergleicht Zahlen mit Toleranz. Je Test erscheint `ok` oder `FAIL` (mit
 Datei, Zeile, Ausdruck und `last_error()`), am Ende `<n> checks, <m> failures`; bei einem Fehler
-endet das Programm mit 1. Die
-Tests decken die ganze Engine ab: Matrizen und Kamera, Geometrie, Renderer, Physik, JSON, Spiel,
+endet das Programm mit 1. Die Tests decken die ganze Engine ab: Matrizen und Kamera, Geometrie, Renderer, Physik, JSON, Spiel,
 Logik, Audio, Netzwerk, Studio (startet es mit Orb Run? ist Undo exakt?), Micro Duck (rechnet Kern
 ihr Netz wie die Referenz? steht, läuft und dreht sie sich?), Lehrer und Determinismus. Ohne Filter
 folgt zum Schluss der Logik-Export-Test.
@@ -172,7 +173,7 @@ die Zahl verschiedener Farben im Bild.
 Geprüft wird fast alles: Menüs, Fly Mode, Auswählen und Verschieben, Undo, Play, Simulate, vier
 Viewports, Vorlagen, Logik-Editor, Micro Duck mit Kopfkamera, Mehrspieler über zwei Tabs, Spiel
 packen und spielen, Wiederherstellen nach dem Neuladen, Einstellungen, schmale Fenster, Telefone,
-die Android-Dateiauswahl, dazu die Modul-Fassung des Studios. Am Ende steht
+die Android-Dateiauswahl, dazu die Fassung des Studios aus Einzeldateien. Am Ende steht
 `<n> checks, <m> failures`; bei Fehlern endet der Test mit 1, auf GitHub zusätzlich als
 Fehlermarkierung. Screenshots entstehen nur, wenn `KERN_E2E_SHOTS` einen Ordner nennt – viele Bilder dieses Buchs
 stammen daher.
@@ -235,10 +236,11 @@ flowchart LR
 - **native**: Unit-Tests mit Spürhunden, dann Logik-Export.
 - **determinism**: baut den Lehrer auf einem Mac mit ARM und vergleicht den Fingerabdruck.
 - **build**: holt wasi-sdk und den Vorrat vom letzten Lauf, baut Studio, Beispielspiele und Lehrer,
-  prüft die Syntax aller JavaScript-Dateien, testet Lehrer (zwei Enten sammeln, einer lernt `jump`:
-  Nachahmungsrunden, ein Stück DAgger, eine PPO-Iteration, ONNX-Export, Fingerabdruck) und JIT und
+  prüft die Syntax aller JavaScript-Dateien, testet Lehrer (zwei Enten sammeln, einer lernt den Sprung
+  `jump` – je ein kleines Stück jedes Lernverfahrens aus [Kapitel 14](14-lehrer.md): Nachahmung,
+  DAgger, PPO –, dazu ONNX-Export und Fingerabdruck) und JIT und
   stellt die Webseite zusammen: Startseite, Editor, Lehrer-Seite, Netze der Ente, Beispielspiele,
-  Lizenzen. Das Ergebnis wird 7 Tage als Artefakt `site` aufgehoben.
+  Lizenzen. Das Ergebnis hebt GitHub 7 Tage als Paket (Artefakt) `site` auf.
 - **deploy**: nur für `main`; legt ein frisches Git-Repository an und schiebt es mit Gewalt (`-f`)
   in den Zweig `gh-pages`, und die Seite erscheint auf https://kernengine.de/. (Die `README.md`
   nennt noch eine eigene `pages.yml` – im Repository gibt es aber nur `ci.yml`.)
@@ -265,7 +267,7 @@ node kern/tests/logic_wasm_test.mjs /tmp/logic_test.wasm
 ```
 
 Die Seiten laden ihre Dateien relativ, die Netze der Ente etwa je nach Fassung (Entwicklung,
-Single-File, veröffentlicht) aus einem anderen Ordner. Die Lehrer-Seite ist auf den Aufbau der
+eine einzige Datei, veröffentlicht) aus einem anderen Ordner. Die Lehrer-Seite ist auf den Aufbau der
 veröffentlichten Seite zugeschnitten und läuft lokal erst, wenn du sie wie die CI zusammenstellst.
 
 ## 2.12 Wenn's klemmt

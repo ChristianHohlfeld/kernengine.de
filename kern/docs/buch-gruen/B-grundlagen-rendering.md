@@ -181,15 +181,19 @@ vier Arten von Daten:
 | Varying | gemischt pro Fragment | Weltposition, Farbe |
 | Textur | Bild, abgetastet | Farbbild, Schattenkarte |
 
-**Instancing:** Hundert gleiche Bäume malt man mit **einem** Aufruf; ein Attribut, das „pro Instanz“
-statt pro Ecke vorrückt, gibt jedem Baum Ort und Farbton. In Kern ist jedes Mesh instanziert; bewegt
-sich etwas, ändern sich nur diese Instanz-Daten, die Geometrie bleibt auf der Grafikkarte. Die
-Attribute haben feste Plätze, im Standard- wie im Schatten-Shader gleich; Erweiterungen hängen eigene
-Attribute, Uniforms und Code an verabredeten Stellen an, ohne den Shader zu kopieren.
-**Skinning:** Bei Figuren folgt jede Ecke bis zu vier Knochen, gewichtet, Gewichte zusammen 1 – in Kern
-mit bis zu 32 Knochen, im Standard- und im Schatten-Shader. **Mehrere Ziele:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder
-schreiben. Kern füllt drei – fertiges Bild, echtes Licht für Bloom, AO-Datensatz – und braucht so für
-Bloom und AO **keinen zweiten Durchgang** über alle Dreiecke.
+Die Attribute haben in Kern feste Plätze, im Standard- wie im Schatten-Shader gleich. Erweiterungen
+hängen eigene Attribute, Uniforms und Code an verabredeten Stellen an, ohne den Shader zu kopieren.
+Drei Tricks machen das Fließband schnell:
+
+- **Instancing:** Hundert gleiche Bäume malt man mit **einem** Aufruf; ein Attribut, das „pro
+  Instanz“ statt pro Ecke vorrückt, gibt jedem Baum Ort und Farbton. In Kern ist jedes Mesh
+  instanziert; bewegt sich etwas, ändern sich nur diese Instanz-Daten, die Geometrie bleibt auf der
+  Grafikkarte.
+- **Skinning:** Bei Figuren folgt jede Ecke bis zu vier Knochen, gewichtet, Gewichte zusammen 1 – in
+  Kern mit bis zu 32 Knochen, im Standard- und im Schatten-Shader.
+- **Mehrere Ziele:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder schreiben. Kern füllt
+  drei – fertiges Bild, echtes Licht für Bloom, AO-Datensatz – und braucht so für Bloom und AO
+  **keinen zweiten Durchgang** über alle Dreiecke.
 
 ## B.4 Beleuchtung
 
@@ -339,7 +343,7 @@ ersetzen **fünf** Zugriffe neun Gewichte. Kerns Gewichte: 0,2270 in der Mitte, 
 und je 0,0703 bei ±3,2308 Texeln – zusammen 0,2270 + 2 · 0,3162 + 2 · 0,0703 = **1**, damit das Bild
 nicht heller oder dunkler wird.
 
-In Kern schreibt die Szene das echte Licht nebenbei in eine 16-Bit-Kopie. Daraus schneidet der Bloom
+In Kern schreibt die Szene das echte Licht nebenbei in eine Kopie aus 16-Bit-Kommazahlen. Daraus schneidet der Bloom
 mit weicher Schwelle ab etwa 0,88 das Helle aus, zeichnet es auf einem Viertel und einem Achtel der
 Bildgröße weich (Stärken 0,13 und 0,08) und addiert beim Zusammensetzen nur den **Unterschied**, den
 das Glühen nach dem Tonemapping macht; Pixel ohne Glühen bleiben bitgenau. Braucht das Gerät im Mittel
@@ -376,7 +380,7 @@ einsetzen und über die Scheiben mitteln.
 Kern folgt Intels XeGTAO: Normale aus der Tiefe, Radius in Metern (Standard 1,6), ein 4×4-Muster, das
 die Scheiben dreht und ein kantenbewusster Filter wieder wegmittelt, und eine
 **Mehrfachreflexions-Korrektur**: Helle Flächen gewinnen Licht zurück, das zwischen den Verdeckern
-hin- und herspringt. Das Ergebnis ist ein kleines Bild mit Sichtbarkeit und Tiefe; die Tiefe sorgt
+hin- und herspringt. Das Ergebnis ist ein eigenes Bild (Standard: halbe Auflösung) mit Sichtbarkeit und Tiefe; die Tiefe sorgt
 beim Hochskalieren dafür, dass nichts über Kanten verläuft. Vier Qualitätsstufen und ein Wächter, der
 auf langsamen Geräten herunterstuft, halten es schnell. Angewendet wird es **nur auf den indirekten
 Anteil**, den der Standard-Shader in seinem dritten Ausgang mitschreibt. Weil er ihn ohnehin kennt,
@@ -394,7 +398,8 @@ Echte Himmelsmodelle rechnen diese Streuung entlang des Sichtstrahls aus. Kerns 
 **kein** solches Integral, sondern ein billiges Rezept, das ähnlich aussieht: Farbverlauf, goldene
 Stunde mit einem zur Sonne hin helleren Band, Sonnenscheibe mit Mie-artigem Hof, Mond, funkelnde
 Sterne, Wolken aus fünf Lagen Rauschen (vom Wind verschoben, zur Sonne hin heller) und ein Übergang in
-Nebelfarbe und Sonnenstreuung der Szene – gemalt als bildschirmfüllendes Dreieck, das nur die Lücken füllt (Kapitel 4, 4.8.2).
+Nebelfarbe und Sonnenstreuung der Szene – gemalt als bildschirmfüllendes Dreieck, das nur die Lücken
+füllt (Kapitel 4, 4.8.2).
 
 ## B.10 Culling und Szenenstrukturen
 
@@ -434,8 +439,8 @@ Zahlenraten mit „größer oder kleiner?“, wo zehn Fragen statt tausend Versu
 
 In Kern dient die BVH dem **Anklicken**, nicht dem Malen: Unbewegte Weltobjekte ab 36 Dreiecken bekommen
 einen Baum über ihre Dreiecke (immer in der Mitte geteilt), bewegte werden direkt geprüft. Der Strahl
-wird mit dem Slab-Test gegen die Kästen und nach Möller-Trumbore gegen die Dreiecke geprüft. Die Physik hat ihre eigene BVH in Box3D
-([Anhang C](C-grundlagen-physik.md)).
+wird mit dem Slab-Test gegen die Kästen und nach Möller-Trumbore gegen die Dreiecke geprüft. Die
+Physik hat ihre eigene BVH in Box3D ([Anhang C](C-grundlagen-physik.md)).
 
 ## B.11 Draw Calls und Zustandswechsel
 
@@ -463,7 +468,8 @@ Kern übersetzt mit wasi-sdk (Ziel `wasm32-wasip1`); `gl.h` meldet genau die geb
 WebGL2-Funktionen an, `kern.mjs` übersetzt Nummern in WebGL-Objekte und reicht Daten **ohne Kopie**
 weiter, durch Fenster auf Kerns Speicher, die nach einem Speicherwachstum erneuert werden. Den
 WebGL2-Zugang legt die Seite ohne Kantenglättung und ohne Transparenz an, denn Kern malt in eigene
-Ziele und setzt selbst zusammen (Kapitel 4, 4.2).
+Ziele und setzt selbst zusammen; nur Kern Studio und exportierte Spiele schalten die Kantenglättung
+ein (Kapitel 4, 4.2).
 
 ```mermaid
 flowchart LR

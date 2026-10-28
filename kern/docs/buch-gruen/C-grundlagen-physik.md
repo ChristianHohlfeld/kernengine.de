@@ -26,8 +26,8 @@ gemessenen Werte mit ([Kapitel 6](06-physik.md)).
 
 Die Bewegung folgt zwei Gesetzen: **Newton** (Kraft = Masse × Beschleunigung) für das Verschieben und
 **Euler** für das Drehen. In Eulers Gleichung steckt ein Extra, der **Kreiselterm**. Er sorgt dafür, dass
-lange, dünne Körper taumeln, wenn sie sich nicht genau um eine ihrer Hauptachsen drehen. Diese
-Die Drehung selbst ändert sich über ein Quaternionenprodukt mit der Drehgeschwindigkeit. Diese
+lange, dünne Körper taumeln, wenn sie sich nicht genau um eine ihrer Hauptachsen drehen. Die
+Drehung selbst ändert sich über ein Quaternionenprodukt mit der Drehgeschwindigkeit. Diese
 Gleichungen beschreiben, wie sich der Zustand *ändert*. Eine Simulation muss sie in kleinen
 Zeitschritten lösen. Das heißt **Integration**.
 
@@ -47,10 +47,11 @@ gutes Verfahren sollte ihre Energie weder aufblähen noch vernichten. Drei Kandi
 | semi-implizit | erst neue Geschwindigkeit, damit neue Position | Energie bleibt, solange der Schritt klein genug ist |
 | implizit | Kraft vom Ende des Schritts | Energie **fällt**, immer stabil |
 
-Genauer: Semi-implizit bleibt stabil, solange Schrittweite × Kreisfrequenz (2π × Hertz) unter 2 liegt.
+Genauer: Semi-implizit bleibt stabil, solange Schrittweite × Kreisfrequenz unter 2 liegt (die
+Kreisfrequenz ist 2π × Hertz).
 
-**Zahlenbeispiel:** Eine Feder mit 30 Hz, Schrittweite 1/60 s (Schrittweite × Kreisfrequenz ≈ 3,14). Explizit wächst die Schwingung pro Schritt
-um den Faktor 3,3 – nach zehn Schritten auf das 150 000-Fache. Semi-implizit ist der Schritt hier zu
+**Zahlenbeispiel:** Eine Feder mit 30 Hz, Schrittweite 1/60 s, also Schrittweite × Kreisfrequenz
+≈ 3,14. Explizit wächst die Schwingung pro Schritt um den Faktor 3,3 – nach zehn Schritten auf das 150 000-Fache. Semi-implizit ist der Schritt hier zu
 groß; auch das wird instabil. Implizit wird die Schwingung stark gedämpft, bleibt aber brav.
 
 Die Lehre: **Steife Federn und große Schritte vertragen sich nicht** – außer man rechnet implizit.
@@ -145,8 +146,8 @@ Kontaktpunkte deshalb schon **vor** der Berührung an, ab 20 mm Abstand, und erl
 nur so viel Annäherung, wie Platz ist. Für sehr schnelle Körper gibt es zusätzlich **Continuous
 Collision**; Kern lässt sie an und macht schnelle Spielerfahrzeuge zu „Bullets“. Die festen Toleranzen
 in Metern: 5 mm erlaubte Durchdringung (Linear Slop), 20 mm spekulative Distanz (das Vierfache),
-50 mm für das Wiederverwenden von Kontakten. Weil diese Toleranzen in Metern fest sind, gilt die Größenregel aus
-[Kapitel 6](06-physik.md): bewegte Körper 0,1 bis 10 m – die Micro Duck wird darum vierfach skaliert.
+50 mm für das Wiederverwenden von Kontakten. Weil diese Toleranzen in Metern fest sind, gilt die
+Größenregel aus [Kapitel 6](06-physik.md): bewegte Körper 0,1 bis 10 m – die Micro Duck wird darum vierfach skaliert.
 
 ## C.4 Kontakte, Reibung und Restitution
 
@@ -164,15 +165,16 @@ exakt, aber sehr gut näherungsweise (C.6).
 ### Reibung nach Coulomb
 
 Reibung wirkt in der Kontaktebene gegen das Rutschen. Sie ist höchstens **Reibwert μ × Andruck**. Solange
-weniger nötig ist, **haftet** der Kontakt; wird mehr verlangt, **gleitet** er. Was hier wirkt, ist ein
-**Impuls** (Kraft × Zeit); der Impuls senkrecht zur Fläche heißt Normalimpuls.
+weniger nötig ist, **haftet** der Kontakt; wird mehr verlangt, **gleitet** er. Der Solver rechnet
+dabei mit **Impulsen** (Kraft × Zeit) statt mit Kräften; der Impuls senkrecht zur Fläche heißt
+**Normalimpuls**.
 
 Alle erlaubten Kräfte bilden einen **Reibungskegel** um die Normale: Kraft innen heißt Haften, am Rand
 Gleiten; der Kegel ist umso breiter, je größer μ (halber Öffnungswinkel arctan μ). In der Physik
 unterscheidet man Haft- und Gleitreibung; Box3D kennt nur **einen** Reibwert. Es löst die Reibung
-einmal in der Mitte des Manifolds, begrenzt durch die Summe der Normalimpulse aller Punkte, mit einem
-**runden** Kegel (ein zu großer Reibungsimpuls wird als Ganzes gekürzt), und bremst zusätzlich das
-Verdrehen um die Normale.
+einmal in der Mitte des Manifolds, begrenzt durch die Summe der Normalimpulse aller Punkte. Der Kegel
+ist dabei wirklich **rund**: Ein zu großer Reibungsimpuls wird als Ganzes gekürzt, nicht Richtung für
+Richtung. Zusätzlich bremst Box3D das Verdrehen um die Normale.
 
 ### Zwei Reibwerte, ein Kontakt
 
@@ -217,8 +219,8 @@ Geschwindigkeiten: Die beiden Punkte dürfen sich nicht auseinanderbewegen. Eine
 Der Solver sucht dann einen Impuls, der die Regel erfüllt. Wie groß der sein muss, hängt an der
 **effektiven Masse**: Wie schwer fühlt sich diese Bewegung an? Beim Türscharnier ist das die Trägheit
 der Tür um die Scharnierachse. Eine schwere Tür braucht einen großen Impuls, eine leichte einen kleinen.
-Bei einem Drehgelenk zwischen zwei Körpern ist sie genau 1 geteilt durch die Summe der „Drehleichtigkeiten“
-(inversen Trägheiten) beider Körper um die Achse. Ein Korrekturanteil baut außerdem Fehler ab, die sich
+Bei einem Drehgelenk zwischen zwei Körpern ist sie genau 1 geteilt durch die Summe der
+„Drehleichtigkeiten“ (inversen Trägheiten) beider Körper um die Achse. Ein Korrekturanteil baut außerdem Fehler ab, die sich
 schon eingeschlichen haben (Drift).
 
 Welche Gelenke Box3D kennt (Scharnier, Schiene, Kugelgelenk, Seil, Rad …), zeigt die Tabelle in
@@ -334,13 +336,13 @@ Kern baut den Servo nur aus Box3Ds eigenen Teilen ([Kapitel 6](06-physik.md), Ab
 PD-Regler **ist** die Gelenkfeder des Scharniers und damit implizit stabil. Die Sättigung entsteht,
 indem das **Ziel** auf höchstens T/K Abstand begrenzt wird. Die Reibung ist ein Motor mit
 Sollgeschwindigkeit 0. Die Rotorträgheit ist eine Scheibe auf der Achse, und die Totzeit eine
-Warteschlange: 20 ms × √4 (Zeitskalierung) × 100 Hz = 4 Weltschritte.
+Warteschlange: 20 ms × √4 (Zeitskalierung) × 100 Hz = 4 Weltschritte. Dieselbe Funktion treibt
+Studio, Lehrer und Kalibrierstand ([Kapitel 16](16-kalibrierung.md)).
 
 Box3D will Federn aber als Frequenz und Dämpfungsgrad, nicht in N·m/rad. `set_joint_spring` rechnet um,
 mit der effektiven Masse m aus C.5: Kreisfrequenz ω = √(K / m), Frequenz = ω / 2π, Dämpfungsgrad =
 D / (2 · m · ω). Weil m von der Lage abhängt, geschieht das jeden Schritt. Alle Werte stehen in einem
-**Geräteprofil**: K, D, F, T, Armature, Totzeit – und für das Training ihre Streuungen. Dieselbe Funktion treibt Studio,
-Lehrer und Kalibrierstand ([Kapitel 16](16-kalibrierung.md)).
+**Geräteprofil**: K, D, F, T, Armature, Totzeit – und für das Training ihre Streuungen.
 
 ## C.8 Was man nicht tun sollte
 

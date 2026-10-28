@@ -29,10 +29,12 @@ Im selben Modul stecken:
 - **Geometrie** für Häuser, Straßen und Gelände und eine **App-Laufzeit** für reine C++-Spiele;
 - die **Physik** Box3D mit Körpern, Gelenken und Strahltests, ein eigener **Audio**-Mixer mit
   3D-Klang und Synthesizer;
-- die **Spiel-Laufzeit** mit Levels, Actors und Mehrspieler, **Logik**-Graphen (interpretiert, per
-  JIT nach WebAssembly übersetzt oder als C++ exportiert) und **Netzwerk**;
+- die **Spiel-Laufzeit** mit Levels, Actors und Mehrspieler, **Logik**-Graphen (Spielregeln als
+  Kästchen und Pfeile; Kern führt sie aus, übersetzt sie blitzschnell nach WebAssembly oder gibt sie
+  als C++ aus) und **Netzwerk**;
 - **Kern Studio**, ein Editor nach dem Vorbild großer Game-Engines, ganz in C++ und ohne Browser
-  testbar, und **der Lehrer** mit Trainingsverfahren wie PPO, ONNX-Export und Kalibrierung;
+  testbar, und **der Lehrer**, der Netze mit Lernverfahren wie PPO trainiert, sie im Format ONNX speichert
+  und die Simulation mit dem echten Roboter abgleicht (Kalibrierung);
 - eine flache **C-Schnittstelle** für JavaScript und eine dünne JavaScript-Schicht zum Browser.
 
 Und dann ist da die **Micro Duck**: ein zweibeiniger Roboter von Pollen Robotics. In Kern läuft sie
@@ -71,7 +73,7 @@ Reihenfolge aller Summen fest – egal, wie viele Helfer mitrechnen.
 
 Bewiesen wird das mit einem **Fingerabdruck** (`kern_lehrer --fingerprint 400`): Die Ente läuft
 400 Takte, ihr Zustand wird nach jedem zu einer Prüfsumme – und die Liste muss mit einer
-Referenzdatei übereinstimmen. Die CI vergleicht das auf drei Plattformen: GCC auf x86, Apple clang
+Referenzdatei übereinstimmen. Die CI – der automatische Prüflauf bei jeder Änderung – vergleicht das auf drei Plattformen: GCC auf x86, Apple clang
 auf ARM und WebAssembly ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 3](03-grundlagen.md)).
 
 > **Wusstest du?** Dank Determinismus ist ein Fehler der Simulation ein fester, wiederholbarer Fehler
@@ -85,7 +87,7 @@ auf ARM und WebAssembly ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 3](03-gru
   ([Kapitel 3](03-grundlagen.md)).
 - **Eingaben werden geprüft,** bevor sich etwas ändert; kaputte Daten zerstören nichts. Der
   JSON-Leser lehnt zu tiefe Verschachtelung und gefährliche Schlüssel wie `__proto__` ab.
-- **Kein neuer Speicher pro Bild** auf der JavaScript-Seite: Die Fassade `KernRenderer` kopiert
+- **Kein neuer Speicher pro Bild** auf der JavaScript-Seite: Die JavaScript-Klasse `KernRenderer` kopiert
   Daten in einen immer wiederverwendeten Bereich.
 - **Die Physik wird nicht beschummelt.** Box3D wird unverändert mitübersetzt. Die Micro Duck steht
   nur durch ihre Motoren und Füße – keine unsichtbare Hand ([Kapitel 6](06-physik.md),
@@ -133,7 +135,7 @@ die Welt an – im kleinsten Beispiel `hello` etwa einen graugrünen Boden, den 
 `upsert` („einfügen oder ersetzen“) übergibst; in `configure()` wählst du Renderer-Optionen wie
 Schatten. Danach ruft der Browser in jedem Bild `kern_app_frame` auf; das ruft `update()`, und Kern
 zeichnet ([Kapitel 12](12-eigene-spiele.md)). Das große Geschwister `orbrun` ist ein ganzes
-Spiel mit Stadt, Fahrphysik, Verkehr, Tag und Nacht und einer eigenen Shader-Erweiterung.
+Spiel mit Stadt, Fahrphysik, Verkehr, Tag und Nacht und einem eigenen Zusatz für den Shader, das Zeichenprogramm der Grafikkarte.
 
 **Nur der Renderer, aus JavaScript** – so nutzt SpawnCity Kern: `loadKern()` lädt das Modul,
 `new KernRenderer(…)` legt den Renderer an, und `upsert`, `updateInstances`, `setCamera`, `render`
@@ -150,6 +152,11 @@ startet dasselbe Modul im Player-Modus, mit denselben C++-Klassen wie im Editor
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim ersten Start ist Orb Run geladen
 > (sonst: **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem Hovercar los
 > und sammle ein paar Orbs. Dann **Stop** – Glückwunsch, du hast gerade C++ im Browser gespielt.
+
+> **Achtung, Falle!** Auf einem deutschen System zeigt Kern Studio seine Menüs auf Deutsch („Datei“
+> statt „File“, „Welteinstellungen“ statt „World Settings“). Dieses Buch nennt die englischen Namen.
+> Damit du alles wiederfindest, klick unten rechts in der Statusleiste auf **EN** – Studio merkt sich
+> die Wahl. Oder öffne es gleich mit `?lang=en` am Ende der Adresse.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck – auf deinem Rechner als Programm
 `kern_lehrer` (auch ohne Bildschirm auf einem Server) oder im Browser auf der Seite `/lehrer/`, wo
@@ -172,7 +179,7 @@ Logik-Bausteine der Kategorie *Robots* – und im Studio ist sie einfach ein Act
 Der Quelltext liegt offen auf https://github.com/ChristianHohlfeld/kernengine.de. Die Engine wohnt
 in `kern/`: Header in `include`, Umsetzung in `src`, die JavaScript-Schicht in `web`, Tests in
 `tests`, die Beispielspiele in `examples`, Kerns eigene Netze in `policies`, Box3D, musl und die
-Micro Duck in `third_party`, dieses Buch in `docs`. Daneben liegen `tools` (Studio-Bau, ein Relay
+Micro Duck in `third_party`, dieses Buch in `docs`. Daneben liegen `tools` (Studio-Bau, ein Vermittler (Relay)
 für Mehrspieler über Rechnergrenzen, Import der Micro Duck, Mesh-Vereinfachung), `site` (Startseite
 und App-Dateien des installierbaren Editors), `generated` (Bauergebnisse) und die CI in
 `.github/workflows/ci.yml`. Die vollständige Verzeichniskarte steht im blauen Buch.

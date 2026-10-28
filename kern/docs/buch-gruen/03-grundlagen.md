@@ -5,7 +5,8 @@
 > Winkelfunktionen, die auf jedem Rechner exakt dieselben Bits liefern – samt dem Grund für jede
 > Entscheidung.
 
-Ist der Keller schief, ist es das ganze Haus. Die vier Bausteine heißen `core/base.h`, `core/json.h`, `math/math.h` und `core/dmath.h`.
+Ist der Keller schief, ist es das ganze Haus. Die vier Bausteine heißen `core/base.h`,
+`core/json.h`, `math/math.h` und `core/dmath.h`.
 
 ## 3.1 Der Werkzeugkasten: `base.h`
 
@@ -54,12 +55,11 @@ Jeder Vergleich mit NaN ist falsch, also ist `!(NaN > 0)` wahr.
 `log()` schreibt in vier Stufen (`debug`, `info`, `warn`, `error`): im Browser mit dem Vorsatz
 `[kern]` in die Konsole – Fehler als `console.error`, Warnungen als `console.warn`, sonst
 `console.log` – oder an einen eigenen Empfänger des Hosts; nativ Warnungen und Fehler nach
-`stderr`, den Rest nach `stdout`. Kann etwa der Glüheffekt Bloom nicht starten, loggt Kern `bloom disabled:` plus die
-Meldung von der Pinnwand – und das Spiel läuft ohne Glühen weiter.
+`stderr`, den Rest nach `stdout`. Kann etwa der Glüheffekt Bloom nicht starten, loggt Kern
+`bloom disabled:` plus die Meldung von der Pinnwand – und das Spiel läuft ohne Glühen weiter.
 
 `now_ms()` liefert Millisekunden einer Uhr, die nur vorwärts läuft (im Browser
-`performance.now()`) – für Messungen und
-Zeitbudgets, etwa wenn die Sound-Bank nur begrenzt lange Klänge vorrechnen darf.
+`performance.now()`) – für Messungen und Zeitbudgets, etwa wenn die Sound-Bank nur begrenzt lange Klänge vorrechnen darf.
 
 > **Achtung, Falle!** In der Simulation hat die Uhr nichts verloren! Physik und Roboter zählen
 > **feste Schritte**. Schaute die Ente auf die Uhr, liefe sie auf einem langsamen Rechner anders als
@@ -125,7 +125,7 @@ sich mit `==` vergleichen; die ganze Funktionsliste steht im blauen Buch. Sicher
   (`at offset 17`); Text hinter dem Wert gibt `trailing characters`; ein UTF-8-BOM am Anfang ist
   erlaubt. Tiefe und Schlüsselsperre lassen sich in den `ParseOptions` einstellen.
 - `stringify(v, indent)` arbeitet wie `JSON.stringify(value, null, indent)`: kompakt bei
-  `indent <= 0`, sonst eingerückt; unendliche Zahlen werden `null`, −0 wird `0`.
+  `indent <= 0`, sonst eingerückt; nicht endliche Zahlen (unendlich, NaN) werden `null`, −0 wird `0`.
 
 ### Ein Beispiel: Servoprofile
 
@@ -185,13 +185,18 @@ um `a`, `rotate` dreht einen Vektor.
 ### Matrizen
 
 Eine **Matrix** ist eine 4×4-Tabelle, die einen Punkt auf einen Schlag verschiebt, dreht und
-vergrößert. `trs` baut sie aus diesen drei Teilen, `perspective` und `ortho` bauen Ansichten mit und
-ohne Fluchtpunkt, `look_at` die Blickmatrix der Kamera (bei unmöglicher Blickrichtung die
-Einheitsmatrix und `ok = false`). `transform_point` bewegt einen Punkt, `transform_vector` nur eine
-Richtung (ohne Verschieben), `transform` rechnet mit vier Zahlen, etwa in den Bildraum. `invert`
-kehrt eine Matrix in doppelter Genauigkeit um, damit Klicks auch in großer Entfernung treffen; bei
-fast unumkehrbaren Matrizen meldet es `false`. `normal_matrix3` hält Normalen (Pfeile senkrecht aus einer Fläche) auch bei
-ungleichmäßigem Strecken senkrecht.
+vergrößert. Die wichtigsten Werkzeuge:
+
+- `trs` baut sie aus diesen drei Teilen.
+- `perspective` und `ortho` bauen Ansichten mit und ohne Fluchtpunkt, `look_at` die Blickmatrix der
+  Kamera. Ist die Blickrichtung unmöglich, liefert `look_at` die Einheitsmatrix (die nichts
+  verändert) und `ok = false`.
+- `transform_point` bewegt einen Punkt, `transform_vector` nur eine Richtung (ohne Verschieben),
+  `transform` rechnet mit allen vier Zahlen, etwa auf dem Weg zum Bildschirm.
+- `invert` kehrt eine Matrix um, in doppelter Genauigkeit, damit Klicks auch in großer Entfernung
+  treffen. Ist sie (fast) nicht umkehrbar, meldet es `false`.
+- `normal_matrix3` sorgt dafür, dass Normalen – Pfeile, die senkrecht aus einer Fläche zeigen – auch
+  nach ungleichmäßigem Strecken senkrecht bleiben.
 
 Bei `A * B` wirkt **erst B**, dann A. Ein Test prüft `trs` am Punkt (1, 0, 0): mit 2 skalieren
 → (2, 0, 0), um 90° um Z drehen → (0, 2, 0), um (1, 2, 3) verschieben → **(1, 4, 3)**. Genau so
@@ -211,9 +216,10 @@ Die **Kamera** ist keine Matrix, sondern eine Beschreibung: Auge, Ziel, oben. St
 gezeichnet von 0,05 m bis 1800 m. Studios Drauf-, Vorder- und Seitenansicht
 nutzen eine orthografische Kamera mit sichtbarer Höhe (Standard 20 m). Ungültiges (etwa `far`
 nicht größer als `near`) weist `camera_valid` zurück. `projection_matrix` wählt Perspektive oder
-Parallelansicht; Projektion mal Blickmatrix ergibt die View-Projection, aus der
-`Frustum::from_matrix` die sechs Wände des Sichtbereichs fürs Aussortieren gewinnt. JavaScript setzt die Kamera mit zwölf Zahlen über
-`kern_camera_set`, das Ungültiges mit `invalid camera` ablehnt.
+Parallelansicht. Projektion mal Blickmatrix ergibt die View-Projection-Matrix, den ganzen Weg von
+der Welt auf den Bildschirm. Aus ihr gewinnt `Frustum::from_matrix` die sechs Wände des
+Sichtbereichs, mit denen Kern Unsichtbares aussortiert. JavaScript setzt die Kamera mit zwölf Zahlen
+über `kern_camera_set`, das Ungültiges mit `invalid camera` ablehnt.
 
 ## 3.4 Mathematik, die überall gleich rechnet
 
