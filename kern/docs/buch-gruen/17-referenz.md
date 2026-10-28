@@ -99,7 +99,9 @@ es mit `kern/tools/lehrer.sh`, danach liegt es unter `kern/build/kern_lehrer`
 ([Kapitel 2](02-bauen-und-testen.md), [Kapitel 14](14-lehrer.md)).
 
 Das Programm hat viele **Betriebsarten**. Welche gilt, entscheidet eine feste Rangfolge: Die
-erste zutreffende gewinnt; ohne besondere Option wird trainiert. Die wichtigsten:
+erste zutreffende gewinnt, ganz vorn steht `--fingerprint`; ohne besondere Option wird trainiert.
+Eine andere Aufgabe als `jump` oder `stand` und jede unbekannte Option beenden das Programm mit
+Rückgabe 2 (bei einer unbekannten Option mit einer Kurzhilfe). Die Betriebsarten:
 
 | Option | Was passiert |
 |---|---|
@@ -111,17 +113,40 @@ erste zutreffende gewinnt; ohne besondere Option wird trainiert. Die wichtigsten
 | `--abgleich FILE` | Roboter-Log gegen die Simulation |
 | `--beispiele DIR` | Beispiel-Logs und Profil schreiben |
 | `--vorbild-suchen FILE` | ein Sprung-Vorbild mit CMA-ES suchen |
+| `--vorbild-pruefen X` | ein Vorbild bewerten |
 | `--spielen` | Spiel-Netz durch Nachahmung lernen |
 | `--spielen-ueben FILE` | Spiel-Netz mit PPO weiterüben |
 | `--spielen-pruefen X` | Spiel-Netz oder Vorbild bewerten |
+| `--spielen-spur` | eine Spiel-Episode Entscheidung für Entscheidung |
 | `--biss-fenster` | messen, wo der Schnabel die Socke greift |
 | `--halt-messen` | messen, wie weit die Ente nach „Stopp“ läuft |
 | `--demo-spur` | das Micro-Duck-Level abspielen und mitschreiben |
 
+Die fünf Spiel-Messungen (`--spielen`, `--spielen-spur`, `--biss-fenster`, `--halt-messen`,
+`--demo-spur`) teilen sich einen Schalter: Es gilt der letzte auf der Kommandozeile.
+
 Dazu kommen Stellschrauben: `--threads` und `--envs` (wie viele Rechenkerne und wie viele Enten
-gleichzeitig), `--iterations` (wie lange), `--seed` (welcher Zufall), `--out` (wohin), `--profil`
-(welches Servoprofil) und eine ganze Reihe für Fortgeschrittene – Lernrate, Netzgröße, Nachahmung,
-Checkpoints. Alle stehen mit ihren Standardwerten im blauen Buch.
+gleichzeitig), `--iterations` (wie lange; Training 600, Kalibrierung 80 Generationen), `--episodes`
+(wie viele Bewertungsrunden, Standard 10), `--seed` (welcher Zufall), `--out` (wohin), `--policies`
+(wo Pollens Netze liegen), `--profil` (welches Servoprofil), `--randomized` (Spur mit Variation)
+und `--netz` (welches Spiel-Netz eine Spur fährt). Für Fortgeschrittene lassen sich die Werte des
+Rezepts überschreiben: Schritte, Lernrate, Entropie, Größe von Actor und Critic, Epochen,
+Minibatches, adaptive Lernrate, Substeps und der Warmstart vom velstand-Netz; ebenso die Nachahmung
+(Vorbild, Runden, Episoden, Übungsrauschen, Gewicht der Nachahmungsbelohnung).
+
+Für lange Trainings wichtig:
+
+- `--log` schreibt je Iteration eine CSV-Zeile (Belohnung, Verluste, Sprünge …).
+- `--checkpoint` sichert den ganzen Lerner (Standard alle 25 Iterationen, `--save-every`), `--resume`
+  macht dort weiter. `--keep-every` hebt Zwischenstände als eigene `.onnx` auf.
+- Beim Sprung bewertet das Programm alle 10 Iterationen fünf Episoden (`--eval-every`). Springt die
+  Ente in 4 von 5 echt, meldet es `FIRST REAL JUMP` und schreibt das Netz sofort;
+  `--stop-after-jump` hört dann auf.
+- Mit Nachahmung entsteht zusätzlich `<name>_nachgeahmt.onnx`, das Netz vor dem Üben.
+- `--demo-spur` nimmt `--seed` als Dauer in Sekunden (Standard 120); die Umgebungsvariable
+  `KERN_JUMP_AT` löst in einer bestimmten Sekunde den Sprung aus.
+
+Alle Optionen mit ihren Standardwerten stehen im blauen Buch.
 
 > **Achtung, Falle!** Das Ergebnis eines Trainings hängt von der Zahl der Enten ab (`--envs`), nicht
 > von der Zahl der Rechenkerne. Wer auf einem anderen Rechner mit anderen `--threads` trainiert, aber
@@ -178,8 +203,11 @@ Spiel-Netz `play.onnx` 23 Eingänge und 9 Ausgänge. Passt eine Datei nicht, sag
 „not an rsl_rl actor“ oder „unsupported ONNX operator“.
 
 Beim Export schreibt Kern Zusatzinfos ins Netz: Gelenknamen, Grundhaltung, Aufgabe und den Vermerk,
-dass Kerns Lehrer es trainiert hat. Pollens Netze liegen in `kern/third_party/microduck/`, Kerns
-eigene (`jump.onnx`, `play.onnx`) in `kern/policies/`. Ein im Browser trainiertes Netz bleibt auf
+dass Kerns Lehrer es trainiert hat; beim Spiel-Netz auch seinen Takt (25 Hz) und die Namen seiner
+23 Eingänge und 9 Ausgänge. Die Laufparameter jeder Bewegung (Art, Dauer, Abschwächung) stehen nicht
+im Netz, sondern im eingebauten Manifest. Pollens Netze liegen in `kern/third_party/microduck/`,
+Kerns eigene (`jump.onnx`, `play.onnx`) in `kern/policies/`; auf der veröffentlichten Seite in
+`editor/microduck/` und `editor/policies/`. Ein im Browser trainiertes Netz bleibt auf
 deinem Gerät gespeichert und ersetzt dort das mitgelieferte. Der Pick-up-Detektor der Ente ist ein
 Sonderfall mit anderer Form; er ist fest eingebaut.
 
@@ -187,7 +215,9 @@ Sonderfall mit anderer Form; er ist fest eingebaut.
 
 Ein **Servoprofil** ist eine kleine JSON-Datei mit den Zahlen eines Servotyps: Steifigkeit,
 Dämpfung, Reibung, Höchstmoment, Armatur, Verzögerung und Streuungen. Mindestens Steifigkeit und
-Höchstmoment müssen drinstehen und positiv sein; fehlt etwas anderes, gilt 0.
+Höchstmoment müssen drinstehen und positiv sein; fehlt etwas anderes, gilt 0. Kern selbst schreibt
+immer alle Felder in fester Reihenfolge. Passt etwas nicht, meldet es etwa „bad value for …“ oder
+„stiffness and torque must be positive“.
 
 Ein **Prüfstand-Log** beginnt mit Kommentarzeilen zur Last (`# mass`, `# arm`, `# inertia`,
 `# horizontal`) und hat dann Zeilen mit Zeit, Zielwinkel und gemessenem Winkel. Ein **Roboter-Log**
@@ -205,15 +235,25 @@ so schnell wie echte Programme ausführen. Die Seite drumherum ist JavaScript. D
 
 Die Grundregeln, kurz:
 
-- Jede Funktion heißt im Modul genauso wie im C++-Code, zum Beispiel `kern_render`.
-- Die Seite startet das Modul einmal und ruft dann die Funktionen auf.
+- Jede Funktion heißt im Modul genauso wie im C++-Code, zum Beispiel `kern_render`. Nativ, etwa in
+  Tests und im Lehrer-Programm, sind es ganz normale C-Funktionen.
+- Das Modul ist ein **Reactor**: Es hat kein `main`. Die Seite ruft einmal `_initialize` und danach
+  die Funktionen.
 - Daten gehen durch einen gemeinsamen Speicher: Die Seite reserviert Platz (`kern_alloc`),
-  schreibt hinein und übergibt die Adresse.
+  schreibt hinein und übergibt die Adresse (32 Bit).
 - **1 heißt Erfolg, 0 Fehler**; die Meldung holt man mit `kern_last_error()`.
 - Texte gehen als UTF-8 hinein. Antworten wie JSON gehören dem Modul und gelten bis zum nächsten
   Aufruf derselben Gruppe.
 - Umgekehrt braucht das Modul ein paar Dinge vom Browser: WebGL2 zum Zeichnen, die Uhrzeit,
-  Logausgabe und einige Helfer. Dateien fasst die Engine nie an.
+  Logausgabe, die Geländehöhe für die Geometrie, Statustext und Pointer-Lock für C++-Spiele und das
+  Übersetzen kompilierter Logik-Graphen. Dazu kommt ein winziger WASI-Ersatz; Dateien fasst die
+  Engine nie an. Braucht die Engine eine neue WebGL-Funktion, muss sie an zwei Stellen eingetragen
+  werden: in `gl.h` und in `kern.mjs`.
+- Ein paar Symbole liefert das Spiel selbst: Ein C++-Spiel definiert `kern_create_app()`, und es kann
+  eigene Shader-Erweiterungen melden (`kern_game_extensions`, sonst keine). Tests ersetzen die
+  Geländehöhe nativ durch eine eigene Funktion.
+- Feste Datenblöcke (Deskriptoren für Meshes, Kamera, Licht, Himmel, Picking …) haben genau
+  festgelegte Plätze, die in C++ und in `kern.mjs` übereinstimmen müssen.
 
 Die Funktionen sind in Gruppen sortiert:
 
@@ -227,6 +267,25 @@ Die Funktionen sind in Gruppen sortiert:
 | `kern_studio_*` | das Studio und exportierte Spiele | [Kapitel 11](11-studio.md) |
 | `kern_lehrer_*` | Training im Browser | [Kapitel 14](14-lehrer.md) |
 | `kern_logic_*` | kompilierte Logik-Graphen | [Kapitel 9](09-logik.md) |
+
+Ein paar Dinge, die man über die Gruppen wissen sollte:
+
+- **Renderer:** Es gibt einen Renderer pro Modul. Mesh-Ids gehören dem, der sie anlegt; eine
+  ungültige Eingabe lässt ein vorhandenes Mesh unverändert. Nach einem WebGL-Kontextverlust baut die
+  Engine alles neu auf.
+- **Partikel:** ein System pro Modul, das in ein vorher reserviertes Mesh zeichnet.
+- **Geometrie:** Gebäude und Straßen entstehen als Aufträge in Häppchen mit Zeitbudget, damit kein
+  Frame ruckelt.
+- **App:** `kern/web/app.mjs` treibt ein C++-Spiel Frame für Frame; der Zeitschritt ist auf 0,1 s
+  begrenzt, und wenn das Fenster den Fokus verliert, werden alle Tasten losgelassen.
+- **Studio:** Die Seite schickt Befehle als JSON (`{"cmd": …}`), liest den Zustand der Panels und
+  die Werte pro Frame, reicht Zeiger, Finger und Tasten weiter, liefert Texturen, Netze und Klänge
+  nach, bewegt für den Mehrspieler nur Datenpakete und holt fällige Autosaves ab. Vor der
+  Initialisierung antwortet fast nichts; nur Netze lassen sich schon vorher laden. Mit „player only“
+  startet dasselbe Modul ohne Editor für exportierte Spiele.
+- **Lehrer:** ein Modul pro Web Worker; jeder Worker sammelt Erfahrung, lernt daraus oder beides.
+- **Logik:** Diese Funktionen ruft nicht die Seite, sondern der zur Laufzeit erzeugte Code eines
+  Logik-Graphen. Scheitert das Übersetzen, bleibt der Graph im Interpreter.
 
 Welche Gruppen ein Modul enthält, hängt davon ab, wie es gebaut wurde: Grafik, Partikel, Geometrie
 und Logik sind immer dabei, App, Studio und Lehrer nur, wenn man sie einschaltet
@@ -261,6 +320,7 @@ Die Fachwörter des ganzen Buchs, kurz erklärt. In Klammern steht, wo sie ausf�
 | **Outliner** | Baumansicht aller Actors |
 | **Package Game** | Level als eigenständige HTML-Datei exportieren |
 | **Play / Simulate** | Spiel spielen / Physik laufen lassen, Editor bleibt bedienbar |
+| **Player-only** | das Studio-Modul ohne Editor, für exportierte Spiele |
 | **Viewport** | das Fenster, durch das du in die 3D-Welt schaust |
 | **World Settings** | Einstellungen der ganzen Welt, etwa die Schrittrate |
 
@@ -271,14 +331,23 @@ Die Fachwörter des ganzen Buchs, kurz erklärt. In Klammern steht, wo sie ausf�
 | **Box3D** | die Physik-Engine von Erin Catto, die Kern unverändert mitbringt ([Kap. 6](06-physik.md)) |
 | **C-ABI** | die Funktionsliste, über die JavaScript mit der Engine spricht |
 | **Determinismus** | gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis |
+| **`dm`** | Kerns Rechenfunktionen (Sinus & Co.), die überall gleich rechnen |
 | **Fehlerkanal** | Kern meldet Fehler über `fail()` / `last_error()` statt mit Ausnahmen |
 | **GameWorld** | stellt ein Level dar und spielt es auf Box3D |
 | **GTAO** | Verfahren, das Ecken und Ritzen realistisch abdunkelt ([Kap. 4](04-grafik.md)) |
+| **HostTransport** | Netzweg, bei dem die Browserseite die Datenpakete trägt |
 | **JIT** | Logik-Graph wird während des Spiels in WebAssembly übersetzt |
+| **LoopbackNetwork** | Netz im selben Programm, für Tests und Mehrspieler im Editor |
 | **Mesh** | 3D-Form aus Dreiecken |
 | **NetGame** | Mehrspieler: ein Server bestimmt, alle anderen bekommen Schnappschüsse ([Kap. 10](10-netzwerk.md)) |
+| **NightWindows** | Shader-Erweiterung für leuchtende Fenster bei Nacht |
+| **Reactor** | WebAssembly-Modul ohne `main`: einmal starten, dann Funktionen rufen |
 | **ShaderExtension** | Zusatz für den Standard-Shader, mit dem ein Spiel eigene Looks bekommt |
+| **Span** | Blick auf eine Reihe von Elementen, ohne sie zu besitzen |
 | **Substeps** | Unterschritte der Physik pro Weltschritt; für die Ente 16 |
+| **Tier** | Ausführungsstufe eines Logik-Graphen: Interpreter, kompiliert, natives C++ |
+| **Viewmodel-Ebene** | Zeichenebene über allem, etwa für Gizmos |
+| **wasi-sdk** | Werkzeugkette, mit der Kern für WebAssembly gebaut wird (Release 25) |
 | **WebAssembly** | Programmformat, das Browser sehr schnell ausführen |
 | **Welding** | doppelte Eckpunkte eines Meshes verlustfrei zusammenfassen |
 
@@ -291,16 +360,21 @@ Die Fachwörter des ganzen Buchs, kurz erklärt. In Klammern steht, wo sie ausf�
 | **CMA-ES** | Suchverfahren, das Kandidaten probiert und sich an die besten herantastet |
 | **DAgger** | Nachahmen: Das Netz fährt, das Vorbild sagt, was richtig gewesen wäre |
 | **Domänen-Randomisierung** | Training mit zufälligen Abweichungen, damit das Netz robust wird |
+| **DuckEnv** | Übungsplatz des Lehrers: eine Ente in ihrer eigenen Welt |
+| **Fingerabdruck** | Prüfsumme je Takt, die Determinismus nachweist |
 | **Gerätemodell** | kleines Modell eines echten Geräts (Servo, Detektor) mit Profil |
 | **IMU** | Lagesensor: wo ist unten, wie schnell dreht sich der Körper |
 | **Kern extras** | Schalter für Kerns eigene Zusätze an der Ente, z. B. die Spielschicht |
 | **Lehrer** | Kerns Trainingssystem für die Netze der Micro Duck ([Kap. 14](14-lehrer.md)) |
+| **Lerner** | der Teil des Trainings, der aus der Erfahrung lernt |
 | **Micro Duck** | zweibeiniger Laufroboter von Pollen Robotics ([Kap. 13](13-micro-duck.md)) |
 | **ONNX** | Austauschformat für trainierte Netze |
 | **Policy** | ein trainiertes Netz: Beobachtungen hinein, Aktionen heraus |
 | **PPO** | das Lernverfahren des Lehrers (Lernen durch Belohnung) |
 | **Rezept** | die Trainingseinstellungen einer Aufgabe |
 | **Rollout** | gesammelte Erfahrung: was beobachtet, getan und belohnt wurde |
+| **rsl_rl** | Lernbibliothek, mit der Pollen trainiert; Vorbild für Kerns PPO |
+| **Sammler** | führt Enten mit einem Netz aus und liefert Rollouts |
 | **Servo** | Motor, der auf einen vorgegebenen Winkel fährt |
 | **Servoprofil** | die Zahlen eines Servotyps als JSON ([Kap. 16](16-kalibrierung.md)) |
 | **Spielschicht** | Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut |
@@ -309,7 +383,7 @@ Die Fachwörter des ganzen Buchs, kurz erklärt. In Klammern steht, wo sie ausf�
 | **Vorbild** | Vorführung, die ein Netz zuerst nachahmt |
 | **Walker** | Steuerart für gelenkige Roboter, die ein Netz fährt |
 
-Das vollständige Glossar mit allen Fachbegriffen steht im blauen Buch.
+Die genauen Definitionen stehen im Glossar des blauen Buchs.
 
 ## Das nimmst du mit
 

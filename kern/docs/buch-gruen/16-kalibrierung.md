@@ -56,11 +56,12 @@ So hängt das Netz nicht an Zahlen, die niemand genau kennt.
 ### So misst man
 
 1. **Aufbau:** Servo einspannen, Achse waagerecht, Arm mit Gewicht; Masse (auf 0,1 g) und
-   Schwerpunktabstand messen.
+   Schwerpunktabstand messen. Winkel 0 heißt: Arm hängt senkrecht nach unten.
 2. **Wie im Roboter betreiben:** gleiche Firmware-Einstellungen, Spannung (7,4 V, sofern der
    Hersteller sie zulässt) und Bus-Takt.
-3. **Signale**, mindestens 100-mal pro Sekunde abgefragt: Sprünge, ein Chirp (ein Hin und Her, das
-   von 0,5 auf 4 Hz schneller wird) und ein Rechteck.
+3. **Signale**, mindestens 100-mal pro Sekunde abgefragt: kleine und große Sprünge (etwa ±0,2 und
+   ±0,9 rad), ein Chirp (ein Hin und Her mit 0,5 rad, das von 0,5 auf 4 Hz schneller wird) und ein
+   Rechteck (±0,3 rad).
 4. **Zwei oder drei Lasten**, etwa 50 g an 5 cm und 120 g an 6 cm; mindestens ein Log je Servo nur
    zum Prüfen.
 5. **Mehrere Servos** messen; ihre Unterschiede werden zur Streuung.
@@ -68,7 +69,8 @@ So hängt das Netz nicht an Zahlen, die niemand genau kennt.
 ### Log und Prüfstand im Computer
 
 Ein Prüfstand-Log ist eine Textdatei: oben Kommentarzeilen zur Last (`# mass`, `# arm` …), dann
-Zeilen mit Zeit, gesendetem und gemessenem Winkel. Kern baut den Servo mit Last in Box3D nach, in derselben Umgebung wie die Ente (Maßstab 4, gleiche
+Zeilen mit Zeit, gesendetem und gemessenem Winkel (`# horizontal 1`: Achse waagerecht, die
+Schwerkraft zieht den Arm wie ein Pendel). Kern baut den Servo mit Last in Box3D nach, in derselben Umgebung wie die Ente (Maßstab 4, gleiche
 Schrittrate, Gelenkweichheit und Armatur), spielt die gesendeten Ziele mit Verzögerung ab und
 vergleicht simulierten und gemessenen Winkel. Der Fehler ist der quadratische Mittelwert, kurz **RMS**.
 
@@ -82,7 +84,8 @@ kern_lehrer --kalibrieren steps.csv,chirp.csv \
 Das sucht ein Profil, das die ersten beiden Logs am besten erklärt, und prüft es am dritten. Gesucht
 wird mit **CMA-ES** ([Kapitel 14](14-lehrer.md)): 12 Kandidaten pro Generation, standardmäßig 80
 Generationen. Die sechs Stellschrauben sind die fünf Servowerte (als Faktor zum Startprofil) und die
-Verzögerung.
+Verzögerung. Mit `--profil` beginnt die Suche bei einem eigenen Startprofil, `--iterations` ändert
+die Zahl der Generationen, `--threads` verteilt die Kandidaten auf mehrere Rechenkerne.
 
 > **Stell dir vor …** zwölf Gitarren mit je sechs Wirbeln, jede etwas anders gestimmt. CMA-ES hört
 > hin, welche am besten klingen, und stimmt die nächsten zwölf ähnlich wie die Gewinner.
@@ -113,12 +116,14 @@ beschreibt dieses Buch nicht.)
 kern_lehrer --abgleich roboter.csv --profil xl330_unit3.json
 ```
 
-Die Simulation bekommt Takt für Takt dieselben Aktionen und vergleicht ihre Sensoren mit dem Log:
+Die Simulation startet stehend auf dem sauberen Roboter, bekommt Takt für Takt dieselben Aktionen
+wie im Training (ohne Abschwächung und Glättung) und vergleicht ihre Sensoren mit dem Log:
 Drehung, Schwerkraft, Gelenkwinkel, -geschwindigkeiten – je Gruppe und für jedes Gelenk einzeln.
 Bleibt ein Gelenk auffällig, fehlt dort etwas im Modell, etwa Getriebespiel.
 
 Das Schöne: Ein Log aus der Simulation, mit denselben Servos abgespielt, ergibt Abstand **genau 0**,
-Bit für Bit, denn die Simulation ist deterministisch. Darum ist jeder Unterschied zu einem echten
+Bit für Bit, denn die Simulation ist deterministisch; mit anderen Servos ergibt sich ein messbarer
+Abstand. Darum ist jeder Unterschied zu einem echten
 Log ein echter Modellfehler und kein Rauschen.
 
 > **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die Step rate auf 90 statt
@@ -131,8 +136,9 @@ Log ein echter Modellfehler und kein Rauschen.
 kern_lehrer --task jump --profil xl330_unit3.json --out jump.onnx
 ```
 
-Jetzt trainieren die Enten mit den gemessenen Servos samt Streuungen. Das wirkt auf die
-Bewegungen; die Spielschicht nutzt derzeit immer das XL330-Profil.
+Jetzt trainieren die Enten mit den gemessenen Servos samt Streuungen; bei der Bewertung ohne
+Variation gilt das Profil exakt. Das wirkt auf die Bewegungen; die Spielschicht nutzt derzeit immer
+das XL330-Profil und variiert Reibung und Armatur in dessen Streuung.
 
 ## 16.5 Domänen-Randomisierung
 
@@ -144,15 +150,15 @@ Was nicht gemessen ist oder streut, würfelt das Training aus:
 | Buslatenz | 15–30 ms |
 | Bau (Akku, Kabel …) | Rumpfmasse ±5 %, Schwerpunkt verschoben |
 | Boden | Sohlenreibung × 0,7–1,3 |
-| Lagesensor, Gelenkgeber | Rauschen, Versatz, Verzögerung |
-| Störungen | Stöße alle 3–6 s |
+| Lagesensor, Gelenkgeber | Rauschen, 0–1 Takt Verzögerung, Versatz bis ±0,015 rad |
+| Störungen | Stöße alle 3–6 s, bis ±0,3 m/s |
 | Kamera-Detektor | Positionsrauschen, bis 20 % Aussetzer |
 | Spielzeug | Ballradius 3,5–6 cm, 15–50 g |
 
 Genaue Bereiche in [Kapitel 14](14-lehrer.md). Ein Trick: Der **Kritiker**, der beim Training
 bewertet, sieht immer den sauberen Zustand; nur der **Actor**, der auf den Roboter kommt, muss mit
-verrauschten Sensoren klarkommen. Getriebespiel variiert nur Pollens Training (velstand ist dagegen
-robust); Kerns eigene Netze lernen ohne.
+verrauschten Sensoren klarkommen. Getriebespiel variiert nur Pollens Training über eigene Varianten des Bauplans (velstand ist
+dagegen robust); Kerns eigene Netze lernen ohne.
 
 ## 16.6 In der Physik messen statt eintragen
 
