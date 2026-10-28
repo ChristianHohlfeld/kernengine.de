@@ -2,153 +2,226 @@
 
 > **Kurz gesagt:** Dieser Anhang erklärt ohne Mathe-Studium, wie ein neuronales Netz funktioniert,
 > wie es durch Nachmachen und durch Belohnung lernt und warum die Micro Duck am Ende springen kann.
-> Du brauchst nur Grundrechenarten und ein bisschen Neugier. Jeder Begriff kommt erst allgemein,
-> dann mit Beispiel, dann mit der Stelle, wo Kern ihn benutzt.
+> Die Grundrechenarten reichen fast überall. Wo doch etwas mehr vorkommt – Hochzahlen, die
+> e-Funktion, eine Steigung, die Glockenkurve –, führen wir es an Ort und Stelle mit einem Bild und
+> einer kleinen Tabelle ein. Die Rechenbeispiele darfst du auch überspringen: Die Bilder tragen.
 
-Wie Kerns Lehrer all das umsetzt, steht in [Kapitel 14](14-lehrer.md), wie du selbst trainierst,
-in [Kapitel 15](15-eigene-modelle.md). Der Code liegt in `src/lehrer/`.
+> **Begriffe vorab:**
+> - **Servo** – ein kleiner Motor, dem man einen Winkel sagt und der dann dorthin fährt; die Ente
+>   hat 14 davon.
+> - **Simulation** – die nachgebaute Ente im Computer, die nach den Regeln der Physik läuft und fällt.
+> - **Takt** – der Herzschlag der Steuerung: 50-mal pro Sekunde misst die Ente und bekommt neue Ziele.
+> - **Episode** – ein Übungsdurchgang, vom Start bis zum Sturz oder bis die Zeit um ist.
+> - **Lehrer** – Kerns Trainingssystem, das die Netze der Ente lernen lässt.
+> - **Seed** – die Startzahl für den Zufall: gleicher Seed, gleicher Zufall.
+> - **velstand** – das fertige Lauf- und Stehnetz von Pollen Robotics, das in Kern mitkommt.
+> - **Rechenkern** – ein Prozessor im Computer; mehrere Kerne können gleichzeitig rechnen.
+
+Wie Kerns Lehrer all das umsetzt, steht in [Kapitel 14](14-lehrer.md), wie du selbst trainierst, in
+[Kapitel 15](15-eigene-modelle.md). Die genauen Formeln, Namen und Werte stehen im blauen Buch,
+Anhang A.
 
 ## A.1 Was ein neuronales Netz ist
 
 ### Ein Mischpult mit vielen Reglern
 
+Ein neuronales Netz ist eine Rechenmaschine: Zahlen rein, Zahlen raus. Dazwischen sitzen sehr viele
+Regler, und **Lernen** heißt, diese Regler so lange nachzustellen, bis das Richtige herauskommt.
+
 > **Stell dir vor …** ein riesiges Mischpult. Vorn kommen Signale herein, hinten kommt Musik heraus.
 > Dazwischen sitzen Tausende Drehregler. Am Anfang stehen sie zufällig, und es klingt furchtbar.
-> „Lernen“ heißt: die Regler so lange nachstellen, bis das Richtige herauskommt.
+> „Lernen“ heißt: die Regler so lange nachstellen, bis es gut klingt.
 
-Ein neuronales Netz ist genau so ein Mischpult, mathematisch eine Funktion: Zahlen rein, Zahlen
-raus. Bei der Micro Duck gehen **61 Zahlen** hinein (Lage des Rumpfs, Gelenkwinkel, Gelenk-
-geschwindigkeiten, letzte Aktion, Befehle) und **14 Zahlen** heraus: die Ziele für die 14 Servos.
-Die Regler heißen **Parameter** (Gewichte und Biases). Niemand stellt sie von Hand ein; sie werden
-gelernt. Was „richtig“ ist, legt eine Zahl fest, die möglichst klein werden soll: der Verlust (A.3).
+Bei der Micro Duck gehen **61 Zahlen** hinein: wie der Rumpf liegt, wie die Gelenke stehen und wie
+schnell sie sich bewegen, was die Ente zuletzt getan hat und welcher Befehl gerade gilt. Heraus
+kommen **14 Zahlen**: die Zielwinkel für die 14 Servos. Niemand stellt die Regler von Hand ein; sie
+werden gelernt. Was „richtig“ ist, misst eine Zahl, die möglichst klein werden soll: der **Verlust**
+(A.3).
 
 ### Das Neuron
 
 Der kleinste Baustein ist das künstliche **Neuron**. Es macht drei Dinge:
 
-1. Jeden Eingang mit seinem **Gewicht** malnehmen (wie stark zählt er? auch negativ möglich).
-2. Alles addieren und einen **Bias** dazuzählen (eine Art Grundeinstellung).
-3. Das Ergebnis durch eine **Aktivierungsfunktion** schicken, die es „verbiegt“.
+1. Jeden Eingang mit seinem **Gewicht** malnehmen: Wie stark zählt dieser Eingang? Gewichte dürfen
+   auch negativ sein.
+2. Alles zusammenzählen und eine **Grundeinstellung** dazurechnen (Fachwort **Bias**).
+3. Das Ergebnis durch eine **Aktivierung** schicken, die es „verbiegt“ (gleich mehr dazu).
 
 ```
- x1 ──w1──┐
-          ├──► Summe + b ──► z ──► ELU(z) ──► Ausgabe
- x2 ──w2──┘
+ Eingang 1 ──Gewicht 1──┐
+                        ├──► Summe + Bias ──► verbiegen ──► Ausgabe
+ Eingang 2 ──Gewicht 2──┘
 ```
 
-**Rechnen wir eins durch.** Zwei Eingänge x₁ = 0,5 und x₂ = −1, Gewichte w₁ = 2 und w₂ = 0,5,
-Bias b = 0,1:
+**Rechnen wir eins durch.** Zwei Eingänge 0,5 und −1, Gewichte 2 und 0,5, Bias 0,1:
 
 - Summe: 2 · 0,5 + 0,5 · (−1) + 0,1 = 1 − 0,5 + 0,1 = **0,6**
-- Die Aktivierung ELU lässt positive Zahlen unverändert: Ausgabe **0,6**.
+- Die Aktivierung lässt positive Zahlen, wie sie sind: Ausgabe **0,6**.
 
-Jetzt drehen wir nur am Bias: b = −0,9. Die Summe wird 1 − 0,5 − 0,9 = **−0,4**. Für negative
-Zahlen rechnet ELU e^z − 1 = e^(−0,4) − 1 ≈ 0,670 − 1 = **−0,330**. Ein einziger Regler hat die
-Antwort umgedreht. Genau so lernt ein Netz: Es dreht an Tausenden Reglern ein winziges Stück.
+Jetzt drehen wir nur an der Grundeinstellung: Bias −0,9. Die Summe wird 1 − 0,5 − 0,9 = **−0,4**.
+Negative Zahlen staucht die Aktivierung; laut der Tabelle im nächsten Abschnitt wird aus −0,4 etwa
+**−0,33**. Ein einziger Regler hat die Antwort umgedreht. Genau so lernt ein Netz: Es dreht an
+Tausenden Reglern je ein winziges Stück.
 
-### Schichten und das MLP
+### Warum das Verbiegen so wichtig ist
 
-Viele Neuronen nebeneinander, die dieselben Eingänge sehen, bilden eine **Schicht**. Mehrere
-Schichten hintereinander ergeben ein **mehrschichtiges Perzeptron** (MLP). Kern baut den
-Sprung-Actor so:
+Ohne Verbiegen könnte ein Netz nur **malnehmen und zusammenzählen**. Das ergibt immer eine gerade
+Linie: doppelt so viel rein, doppelt so viel raus. Hängt man solche Rechnungen hintereinander, kommt
+wieder nur eine gerade Linie heraus. Hundert Schichten könnten dann nicht mehr als eine. Erst das
+Verbiegen erlaubt „krumme“ Zusammenhänge wie „Knie stärker beugen, je schneller der Rumpf kippt,
+aber nur bis zum Anschlag“.
+
+> **Stell dir vor …** du baust aus geraden Holzlatten eine Kurve. Mit einer einzigen langen Latte
+> geht das nie. Mit vielen kurzen Latten, die jeweils an einem Knick abbiegen, schon. Jedes Neuron
+> liefert so einen Knick.
+
+Kern verwendet die Aktivierung **ELU**, wie Pollen Robotics beim Training der Ente. In Worten:
+**Positive Zahlen bleiben, wie sie sind. Negative werden gestaucht, und zwar nie unter −1.**
+
+```
+ Ausgabe
+   2 │                         ╱
+   1 │                     ╱
+   0 ┼ · · · · · · · · ●· · · · ·
+     │          _ ─ ─╯
+  −1 │ ─ ─ ─ ─            (−1 wird nie ganz erreicht)
+     └──┬──────┬──────┬──────┬───
+       −4     −2      0      2    Eingang
+     links: sanft gebogen | rechts: gerade Linie
+```
+
+Für die Stauchung links braucht man die **e-Funktion**. Ein Bild dafür: Stell dir einen Kuchen
+vor, von dem bei jedem Schritt nach links derselbe Anteil übrig bleibt – bei einem ganzen Schritt
+gut ein Drittel. Wie viel vom ganzen Kuchen (1) übrig ist, zeigt die mittlere Spalte. ELU zieht davon
+1 ab:
+
+| Eingang | übrig vom Kuchen (e hoch Eingang) | ELU = übrig − 1 |
+|---|---|---|
+| 0 | 1 | 0 |
+| −0,4 | 0,670 | −0,33 |
+| −0,5 | 0,607 | −0,39 |
+| −1 | 0,368 | −0,63 |
+| −2 | 0,135 | −0,86 |
+| −4 | 0,018 | −0,98 |
+
+Du musst die e-Funktion nie selbst ausrechnen – die Tabelle reicht für alle Beispiele in diesem
+Anhang. Wichtig ist nur das Bild: Je weiter links, desto näher kommt ELU an −1, ohne es zu erreichen.
+
+> **Für Neugierige:** Eine verbreitete andere Aktivierung setzt alle negativen Zahlen einfach auf 0.
+> Dann kann ein Neuron in einem Bereich landen, in dem es nichts mehr lernt. ELU hat diesen „toten“
+> Bereich nicht, weil es links nie ganz flach wird.
+
+### Schichten
+
+Viele Neuronen nebeneinander, die alle dieselben Eingänge sehen, bilden eine **Schicht**. Mehrere
+Schichten hintereinander ergeben ein Netz. Das Sprung-Netz der Ente sieht so aus:
 
 ```mermaid
 flowchart LR
-  x["Eingabe (61)"] --> L1["Schicht 512 + ELU"]
-  L1 --> L2["Schicht 256 + ELU"]
-  L2 --> L3["Schicht 128 + ELU"]
-  L3 --> y["Ausgabe 14 (linear)"]
+  x["61 Messwerte"] --> L1["512 Neuronen, verbiegen"]
+  L1 --> L2["256 Neuronen, verbiegen"]
+  L2 --> L3["128 Neuronen, verbiegen"]
+  L3 --> y["14 Servoziele (ohne Verbiegen)"]
 ```
 
-Die letzte Schicht ist **linear**, ohne Aktivierung, denn Servoziele dürfen jede Zahl sein. Wie viele
-Regler sind das? Eine Schicht von n auf m Neuronen hat n · m Gewichte und m Biases:
-61 · 512 + 512 · 256 + 256 · 128 + 128 · 14 = **196 864 Gewichte**, dazu **910 Biases**, zusammen
-**197 774 Parameter**. Fast 200 000 Regler! Der Kritiker hat in Kerns Rezepten die Form
-(256, 128), das Netz der Spielschicht ist 23 → 256 → 128 → 9.
+Die letzte Schicht verbiegt nicht, denn ein Servoziel darf jede Zahl sein, auch eine stark negative.
+Zusammen hat das Netz fast **200 000 Regler**.
 
-In Kern ist das `Mlp` in `nn.h`. Alle Parameter liegen in einem einzigen langen Vektor, die Gewichte
-„eingangsweise“ – warum, erklärt [Kapitel 14.4](14-lehrer.md).
-
-### Warum die Aktivierung so wichtig ist
-
-Ohne Aktivierung wäre ein tiefes Netz nutzlos: Lineare Rechnungen hintereinander sind wieder eine
-lineare Rechnung. Hundert Schichten könnten dann nicht mehr als eine. Erst das „Verbiegen“ erlaubt
-krumme Zusammenhänge wie „Knie stärker beugen, je schneller der Rumpf kippt, aber nur bis zum
-Anschlag“.
-
-Kern verwendet **ELU**, wie die Bibliothek rsl_rl, mit der Pollen Robotics die Netze der Micro Duck
-trainiert:
-
-| z | ELU(z) | z | ELU(z) |
-|---|---|---|---|
-| −4 | −0,98 | 0 | 0 |
-| −1 | −0,63 | 1 | 1 |
-| −0,4 | −0,33 | 2 | 2 |
-
-Rechts ist ELU eine gerade Linie, links biegt sie sanft ab und nähert sich −1. Anders als die
-verbreitete ReLU (links einfach 0) gibt es kein „totes“ Gebiet, in dem ein Neuron nichts mehr lernt.
-Im Code ist es eine Zeile:
-
-```cpp
-y[k] = y[k] > 0 ? y[k] : kern::dm::expm1(y[k]);  // ELU
-```
-
-Ist der Wert positiv, bleibt er; sonst wird e^z − 1 berechnet. `expm1` macht das auch für winzige
-Zahlen genau, und `kern::dm` ist Kerns eigene Mathe-Bibliothek, die auf jedem Gerät bitgleich
-rechnet (A.11).
+> **Für Neugierige:** So zählt man nach: Eine Schicht mit n Eingängen und m Neuronen hat n · m
+> Gewichte und m Grundeinstellungen. 61 · 512 + 512 · 256 + 256 · 128 + 128 · 14 = 196 864 Gewichte,
+> dazu 910 Grundeinstellungen, zusammen 197 774 Regler.
 
 ### Der Start: Zufall, aber klein
 
-Alle Regler auf 0 zu stellen wäre fatal: Alle Neuronen einer Schicht rechneten dasselbe, bekämen
-dieselbe Korrektur und blieben für immer **Zwillinge**. Deshalb werden sie zufällig gezogen, und zwar
-klein genug, dass die Summen nicht von Schicht zu Schicht explodieren. Kern macht es wie PyTorch:
-gleichverteilt zwischen −1/√n und +1/√n, wobei n die Zahl der Eingänge ist. Bei 61 Eingängen also
-etwa ±0,128. Für die letzte Schicht gibt es noch einen Faktor (`output_gain`), mit dem man die
-ersten Ausgaben klein halten kann.
+Bevor gelernt wird, müssen die Regler irgendwo stehen. Alle auf 0 wäre fatal: Dann rechneten alle
+Neuronen einer Schicht genau dasselbe, bekämen dieselbe Korrektur und blieben für immer
+**Zwillinge**. Darum stellt man sie zufällig ein, aber klein. Je mehr Eingänge ein Neuron hat, desto
+kleiner die Startwerte – sonst würden die Summen von Schicht zu Schicht immer größer und
+explodierten.
 
 ## A.2 Die Vorwärtsrechnung
 
-„Vorwärts“ heißt: Schicht für Schicht ausrechnen, von der Eingabe zur Ausgabe, meist für einen
-ganzen Stapel (**Batch**) von Eingaben auf einmal; Kern rechnet dabei vier Zeilen gleichzeitig. Fürs
-Lernen merkt sich die Vorwärtsrechnung alle Zwischenergebnisse (den **Cache**), beim bloßen Handeln
-nicht.
+**Vorwärts rechnen** heißt: die Eingabe vorn hineingeben, Schicht für Schicht weiterreichen, bis
+hinten die Antwort herauskommt. Das ist alles, was ein fertiges Netz tut, 50-mal pro Sekunde.
 
-Die innerste Schleife läuft dabei immer über Gewichte, die im Speicher direkt hintereinander
-liegen, und rechnet „y plus a mal x“. So kann der Compiler sie beschleunigen, **ohne die
-Reihenfolge der Additionen zu ändern**. Genau dafür liegen die Gewichte eingangsweise: Sonst müsste
-der Compiler Summen umordnen, und umgeordnete Kommazahl-Summen sind nicht mehr bitgleich (A.11).
+> **Stell dir vor …** eine Eimerkette bei einem Brand. Der erste nimmt das Wasser, gibt es dem
+> nächsten, der gibt es weiter, bis der letzte es ins Feuer kippt. Jede Schicht ist ein Mensch in
+> der Kette: Sie nimmt, was die vorige ihr gibt, rechnet daran und reicht es weiter.
+
+```
+ Messwerte ─► Schicht 1 ─► Schicht 2 ─► Schicht 3 ─► Servoziele
+             (Zwischen-   (Zwischen-   (Zwischen-
+              ergebnis)    ergebnis)    ergebnis)
+```
+
+Beim **Lernen** gibt es einen Unterschied: Dann merkt sich die Kette jedes Zwischenergebnis, wie
+Zettel, die an jeder Station liegen bleiben. Die braucht man gleich, wenn der Fehler rückwärts
+verteilt wird (A.5). Beim bloßen Handeln auf dem Roboter wirft man sie sofort weg.
+
+> **Für Neugierige:** Kern ordnet die Rechnung so, dass der Rechner sie schnell erledigen kann,
+> **ohne** dabei die Reihenfolge der Additionen zu verändern. Warum das wichtig ist, steht in A.11
+> unter „Gleiches Ergebnis auf jedem Rechner“.
 
 ## A.3 Der Verlust: Wie schlecht bin ich gerade?
 
-Damit ein Netz lernen kann, braucht es eine Zahl, die sagt, wie falsch es liegt: die
-**Verlustfunktion**. Je kleiner, desto besser.
+Damit ein Netz lernen kann, braucht es eine Zahl, die sagt, wie falsch es liegt: den **Verlust**. Je
+kleiner, desto besser. Lernen heißt dann einfach: den Verlust kleiner machen.
 
-Der Klassiker ist der **mittlere quadratische Fehler** (MSE): Für jede Ausgabe den Abstand zum
-Zielwert nehmen, quadrieren, alles mitteln. Beispiel: Das Netz sagt (0,5; 2), richtig wäre (1; 1).
-Fehler: (0,5 − 1)² = 0,25 und (2 − 1)² = 1, Mittel **0,625**. Quadrieren hat zwei Vorteile: Minus
-und Plus zählen gleich, und große Fehler zählen besonders viel.
+Der Klassiker ist der **mittlere quadratische Fehler**: Für jede Ausgabe den Abstand zum Zielwert
+nehmen, mit sich selbst malnehmen („quadrieren“), dann den Durchschnitt bilden. Beispiel: Das Netz
+sagt 0,5 und 2, richtig wäre 1 und 1. Die Abstände sind −0,5 und 1; quadriert 0,25 und 1;
+Durchschnitt **0,625**. Das Quadrieren hat zwei Vorteile: Ein Fehler nach unten zählt so viel wie
+einer nach oben, und große Fehler zählen besonders viel (doppelter Abstand, vierfacher Verlust).
 
-In Kern nutzt das Nachahmen genau diesen Verlust (`Ppo::imitate`), und auch der Kritiker lernt mit
-einem quadratischen Fehler (A.11).
+Diesen Verlust benutzt der Lehrer, wenn das Netz ein Vorbild nachahmt (A.9).
 
-> **Stell dir vor …** der Verlust ist eine Landschaft. Jede Reglerstellung ist ein Ort, der Verlust
-> ist die Höhe. Du willst ins tiefste Tal. Aber die Landschaft hat fast 200 000 Richtungen, und es
-> gibt keine Karte. Du stehst im **dichten Nebel** und spürst nur, wie steil der Boden unter deinen
-> Füßen ist.
+> **Stell dir vor …** der Verlust ist eine Landschaft. Jede Stellung aller Regler ist ein Ort, der
+> Verlust ist die Höhe dort. Du willst ins tiefste Tal. Aber die Landschaft hat fast 200 000
+> Richtungen, und es gibt keine Karte. Du stehst im **dichten Nebel** und spürst nur, wie steil der
+> Boden unter deinen Füßen ist.
 
 ## A.4 Gradientenabstieg: im Nebel bergab
 
 ### Die Grundidee
 
-Die Neigung unter den Füßen heißt **Gradient**. Er zeigt bergauf. Also macht man einen Schritt in
-die Gegenrichtung:
+Im Nebel spürst du nur die **Steigung** unter deinen Füßen: Wohin geht es bergauf, und wie steil?
+Also machst du einen Schritt in die Gegenrichtung, bergab. Die Steigung für alle Regler zusammen
+heißt **Gradient**. Die Schrittlänge heißt **Lernrate**.
 
 ```
-neuer Regler = alter Regler − Lernrate × Gradient
+ neuer Regler = alter Regler − Lernrate × Steigung
 ```
 
-Die **Lernrate** ist die Schrittlänge. Ein Beispiel mit nur einem Regler θ und dem Verlust θ² (ein
-Tal mit tiefstem Punkt bei 0). Der Gradient ist 2θ.
+Wie misst man eine Steigung? Ganz ohne höhere Mathe: ein winziges Stück zur Seite gehen und schauen,
+wie viel höher man dann steht. Steigung = Höhenunterschied geteilt durch die Schrittlänge.
+
+**Ein Tal zum Ausprobieren.** Ein einziger Regler r, und der Verlust ist r · r (kurz **r²**, „r
+hoch 2“). Das ist ein Tal mit dem tiefsten Punkt bei r = 0.
+
+```
+ Verlust
+   4 │●                       ●
+   3 │  ╲                   ╱
+   2 │    ╲               ╱
+   1 │      ●           ●   ← Kugel bei r = 1
+   0 │         ╲  ●  ╱
+     └┬─────┬─────┬─────┬─────┬───
+     −2    −1     0     1     2   Regler r
+```
+
+Steht der Regler bei 1, ist der Verlust 1 · 1 = 1. Ein Hundertstel weiter, bei 1,01, ist er
+1,01 · 1,01 = 1,0201. Der Unterschied 0,0201 geteilt durch 0,01 ergibt etwa **2**. So bekommt man
+an jeder Stelle die Steigung, und für dieses Tal kommt immer „zweimal r“ heraus:
+
+| Regler r | Verlust r² | Steigung dort |
+|---|---|---|
+| −2 | 4 | −4 (bergab nach rechts) |
+| −1 | 1 | −2 |
+| 0 | 0 | 0 (ganz unten) |
+| 1 | 1 | 2 (bergab nach links) |
+| 2 | 4 | 4 |
+
+Jetzt laufen wir los, von r = 1 aus, mit zwei verschiedenen Lernraten:
 
 | Schritt | Lernrate 0,1 | Lernrate 1,1 |
 |---|---|---|
@@ -157,138 +230,158 @@ Tal mit tiefstem Punkt bei 0). Der Gradient ist 2θ.
 | 2 | 0,64 | 1,44 |
 | 3 | 0,512 | −1,728 |
 
-Mit 0,1 geht es brav ins Tal. Mit 1,1 springst du jedes Mal über das Tal hinweg, landest höher als
-vorher und schaukelst dich auf. Zu kleine Schritte dagegen kommen kaum voran. Die Lernrate ist
-deshalb einer der wichtigsten Regler überhaupt.
+Mit 0,1 geht es brav ins Tal. Mit 1,1 springst du jedes Mal über das Tal hinweg, landest auf der
+anderen Seite höher als vorher und schaukelst dich auf – wie eine Kugel, die zu fest angestoßen wird.
+Zu kleine Schritte dagegen kommen kaum voran. Die Lernrate ist deshalb einer der wichtigsten Regler
+überhaupt.
 
-### Minibatches und Epochen
+### Häppchen statt alles: Minibatches und Epochen
 
-Den exakten Gradienten über **alle** Beispiele zu berechnen, ist teuer. Also schätzt man ihn an einer
-zufälligen Handvoll, einem **Minibatch**, und macht viele kleine Schritte (stochastischer
-Gradientenabstieg). Die Schätzung rauscht, und kleine Minibatches rauschen mehr. Genau das bremste
-das Sprungtraining mit nur wenigen Dutzend Enten. Ein Durchgang durch alle Daten heißt **Epoche**.
-Kern mischt die Reihenfolge mit seinem eigenen Zufallsgenerator.
+Die genaue Steigung über **alle** Übungsbeispiele auszurechnen, dauert lange. Also schätzt man sie an
+einer kleinen, zufälligen Handvoll, einem **Minibatch**, und macht dafür viele kleine Schritte.
+
+> **Stell dir vor …** eine Umfrage. Wer fünf Leute fragt, bekommt ein wackeligeres Ergebnis als bei
+> tausend – aber er ist viel schneller fertig und kann öfter fragen.
+
+Kleine Häppchen geben also eine wackeligere Richtung. Das hat das Sprungtraining der Ente gespürt:
+Mit nur wenigen Dutzend Enten sind die Häppchen klein und die Richtung entsprechend unruhig. Einmal
+alle Daten durchgehen heißt **Epoche**.
 
 ### Die Notbremse
 
-Ein einzelner Ausreißer kann einen riesigen Gradienten erzeugen und das Netz mit einem Schritt
-ruinieren. Deshalb wird die **Länge** des gesamten Gradienten begrenzt: Ist sie größer als 1,0,
-wird sie auf 1,0 gestutzt. Die Richtung bleibt gleich. In Kern sitzt diese Bremse in `Adam`; sie
-misst die Länge in doppelter Genauigkeit und beim Actor über Netzgewichte **und** σ zusammen.
+Ein einzelnes verrücktes Beispiel kann eine riesige Steigung erzeugen und das Netz mit einem einzigen
+Schritt ruinieren. Darum wird die Schrittlänge nach oben begrenzt: Die **Richtung** bleibt, aber zu
+große Schritte werden auf eine Höchstlänge gekürzt.
+
+> **Stell dir vor …** ein Tempomat mit Höchstgeschwindigkeit. Lenken darfst du frei, aber schneller
+> als erlaubt fährt das Auto nie.
 
 ## A.5 Backpropagation: Wer ist schuld?
 
-Für jeden der 200 000 Regler brauchen wir den Gradienten: „Wenn ich diesen Regler ein bisschen
-drehe, wie ändert sich der Verlust?“ Jeden Regler einzeln anzustupsen und neu zu rechnen, wäre
-200 000-mal die ganze Rechnung. **Backpropagation** schafft es in einem einzigen Rückwärtsdurchgang.
+Für jeden der 200 000 Regler braucht man die Steigung: „Wenn ich diesen Regler ein bisschen drehe,
+wie ändert sich der Verlust?“ Jeden Regler einzeln anzustupsen und alles neu zu rechnen, hieße
+200 000-mal die ganze Rechnung. **Backpropagation** (Rückwärtsverteilung) schafft es in einem
+einzigen Durchgang von hinten nach vorn.
 
 > **Stell dir vor …** ein Staffellauf ist verloren. Der Trainer fragt die Schlussläuferin: „Wie viel
 > hast du verloren?“ Sie antwortet und gibt die Frage an die Läuferin vor ihr weiter, anteilig nach
 > deren Beitrag. So wandert die Schuld vom Ziel bis zum Start, und jede weiß am Ende, was sie
 > verbessern muss.
 
-Mathematisch ist das die **Kettenregel**: Der Fehler am Ausgang wird Schicht für Schicht nach hinten
-gereicht, jedes Mal mit den Gewichten und der Steigung der Aktivierung verrechnet.
+So funktioniert es: Am Ausgang ist klar, wie falsch die Antwort war. Diesen Fehler reicht man Schicht
+für Schicht nach vorn weiter. Jede Schicht nimmt ihn mal den Gewichten, über die er gekommen ist, und
+mal der Steigung ihres Verbiegens. Dafür braucht sie die Zwischenergebnisse, die sich die
+Vorwärtsrechnung gemerkt hat (A.2). Fachleute nennen das die **Kettenregel**.
 
-### Von Hand durchgerechnet
+Das Ergebnis eines kleinen Beispiels in Worten: Ein Mini-Netz liegt anfangs mit einem Verlust von
+**1,656** ziemlich daneben. Nach einem einzigen Rückwärtsdurchgang und einem Schritt bergab ist der
+Verlust fast **0**. Bei echten Netzen mit vielen Beispielen, die sich teilweise widersprechen, geht
+es dagegen in winzigen Schritten voran.
 
-Ein Mini-Netz: ein Eingang x, ein ELU-Neuron, ein linearer Ausgang y, Verlust (y − t)².
-Startwerte: x = 1, Ziel t = 1, w₁ = 0,5, b₁ = −1, w₂ = 2, b₂ = 0,5.
+### Für Nachrechner: das Mini-Netz von Hand
 
-**Vorwärts:** z = 0,5 · 1 − 1 = −0,5. h = ELU(−0,5) = e^(−0,5) − 1 ≈ −0,393. y = 2 · (−0,393) + 0,5
-≈ −0,287. Verlust (−0,287 − 1)² ≈ **1,656**. Ziemlich daneben.
+Ein Eingang x = 1, ein Neuron mit ELU, ein Ausgang ohne Verbiegen, Ziel 1. Die Regler: erstes
+Gewicht 0,5, erste Grundeinstellung −1, zweites Gewicht 2, zweite Grundeinstellung 0,5.
+
+**Vorwärts:** Summe 0,5 · 1 − 1 = −0,5. ELU aus der Tabelle: **−0,393**. Ausgang 2 · (−0,393) + 0,5
+≈ −0,287. Verlust (−0,287 − 1)² ≈ **1,656**.
 
 **Rückwärts:**
 
 | Was | Rechnung | Wert |
 |---|---|---|
-| Fehler am Ausgang | 2 · (y − t) | −2,574 |
-| Schuld von w₂ | −2,574 · h | 1,013 |
-| weiter zu h | −2,574 · w₂ | −5,148 |
-| Steigung der ELU | h + 1 | 0,607 |
-| Schuld von w₁ und b₁ | −5,148 · 0,607 | −3,122 |
+| Fehler am Ausgang | Steigung des Quadrats: 2 · (−0,287 − 1) | −2,574 |
+| Schuld des zweiten Gewichts | −2,574 · (−0,393) | 1,013 |
+| weitergereicht ans Neuron | −2,574 · 2 | −5,148 |
+| Steigung der ELU dort | −0,393 + 1 | 0,607 |
+| Schuld von erstem Gewicht und erster Grundeinstellung | −5,148 · 0,607 | −3,122 |
 
-Die Steigung der ELU im negativen Bereich ist e^z, und das ist genau h + 1. Man braucht also nur die
-Ausgabe des Neurons. Diesen Trick nutzt auch Kern.
+Zwei Kniffe stecken darin. Erstens: Der Fehler am Ausgang ist die Steigung des Quadrats – dieselbe
+Regel „zweimal Abstand“ wie im Tal aus A.4. Zweitens: Im gestauchten Bereich ist die Steigung der
+ELU genau „Ausgabe plus 1“ – man kann sie also aus dem gemerkten Zwischenergebnis ablesen.
 
-**Ein Schritt bergab** mit Lernrate 0,1: w₂ wird 1,899, b₂ wird 0,757, w₁ wird 0,812, b₁ wird
-−0,688. **Noch einmal vorwärts:** z = 0,124 (jetzt positiv), y ≈ 0,994, Verlust ≈ **0,00004**. Ein
-einziger Schritt hat den Fehler hier fast beseitigt. Bei echten Netzen mit vielen Beispielen, die
-sich widersprechen, geht es in winzigen Schritten voran.
+**Ein Schritt bergab** mit Lernrate 0,1: Das zweite Gewicht wird 1,899, die zweite Grundeinstellung
+0,757, das erste Gewicht 0,812, die erste Grundeinstellung −0,688. **Noch einmal vorwärts:** Die
+Summe ist jetzt 0,124 (positiv, ELU lässt sie stehen), der Ausgang ≈ 0,994, der Verlust ≈
+**0,00004**.
 
-In Kern macht das `Mlp::backward`. Die Gradienten werden **aufaddiert**, damit Teile eines Batches
-auf verschiedenen Threads gerechnet und hinterher summiert werden können. Ob alles stimmt, prüft ein
-Test mit **finiten Differenzen**: einen Regler minimal hoch- und runterdrehen und schauen, wie sich
-der Verlust ändert.
+> **Für Neugierige:** Ob die Rückwärtsrechnung stimmt, prüft Kern genau auf die langsame Art aus dem
+> ersten Absatz: einen Regler ein winziges Stück hoch- und runterdrehen und schauen, wie sich der
+> Verlust ändert. Beide Wege müssen dieselbe Steigung liefern.
 
 ## A.6 Adam: der kluge Wanderer
 
-Reiner Gradientenabstieg hat zwei Schwächen: Alle Regler bekommen dieselbe Schrittweite, obwohl
-manche Gradienten riesig und andere winzig sind, und er reagiert nervös auf Rauschen. **Adam**
-(Kingma und Ba, 2015) merkt sich für jeden Regler zwei gleitende Durchschnitte:
+Einfaches Bergabgehen hat zwei Schwächen: Alle Regler bekommen dieselbe Lernrate, obwohl manche
+Steigungen riesig und andere winzig sind, und jeder Wackler im Gelände bringt den Wanderer aus dem
+Tritt. **Adam** ist ein klügeres Verfahren. Es merkt sich für jeden Regler zwei Dinge:
 
-- die übliche **Richtung** (geglätteter Gradient, „Schwung“),
-- die übliche **Größe** (Wurzel aus dem geglätteten quadrierten Gradienten).
+- die **übliche Richtung** der letzten Schritte – das gibt Schwung und glättet Wackler,
+- die **übliche Größe** der letzten Steigungen.
 
-Der Schritt ist dann ungefähr Lernrate × Richtung / Größe. Dadurch macht jeder Regler ähnlich große
-Schritte, egal wie groß seine Zahlen sind.
+Beides sind **gleitende Durchschnitte**: Durchschnitte der letzten Schritte, bei denen neuere mehr
+zählen als ältere, so wie man beim Wetter eher auf die letzten Tage achtet als auf den letzten Monat.
+Adam teilt dann die übliche Richtung durch die übliche Größe. Dadurch macht jeder Regler ähnlich
+große Schritte, egal ob seine Steigungen winzig oder riesig sind.
 
-**Beispiel:** Im allerersten Schritt ist nach Adams Anfangskorrektur Richtung = g und Größe = |g|.
-Der Schritt ist also genau ± Lernrate, **ob der Gradient 0,000001 oder 1000 ist**. Wie ein Wanderer,
-der im Nebel immer gleich große Schritte macht und nur auf die Richtung achtet.
+**Beispiel:** Im allerersten Schritt sind Richtung und Größe genau gleich groß. Der Schritt ist also
+genau so lang wie die Lernrate, **ob die Steigung 0,000001 oder 1000 ist**.
 
-Kern nutzt PyTorchs Standardwerte (Glättung 0,9 und 0,999, Lernrate 10⁻³). Actor, Kritiker und
-Nachahmen haben je einen eigenen Adam (der fürs Nachahmen ist frisch, damit sein Schwung nicht ins
-spätere PPO hineinwirkt), und sein Gedächtnis kommt in den Checkpoint: Ein fortgesetzter Lauf macht
-genau die Schritte, die ein ununterbrochener gemacht hätte.
+> **Stell dir vor …** ein erfahrener Wanderer im Nebel. Er macht immer gleich große, ruhige Schritte
+> und achtet vor allem auf die Richtung. Ein einzelner Stein unter dem Schuh bringt ihn nicht vom Weg.
+
+Adams Gedächtnis gehört zum Spielstand des Trainings: Wird ein unterbrochener Lauf fortgesetzt,
+macht er genau die Schritte, die ein ununterbrochener gemacht hätte.
 
 ## A.7 Normalisierung: alle auf Augenhöhe
 
-Die 61 Eingänge sind sehr verschieden groß: Winkel um Zehntel, Gelenkgeschwindigkeiten zweistellig,
-die Schwerkraftrichtung zwischen −1 und 1. Die großen Eingänge würden die Summen dominieren und das
-Lernen verlangsamen. Deshalb rechnet man jeden Eingang auf Mittelwert 0 und Streuung 1 um:
+Die 61 Messwerte der Ente sind sehr verschieden groß: Winkel um ein paar Zehntel, Geschwindigkeiten
+zweistellig, die Richtung nach unten zwischen −1 und 1. Die großen würden die Summen beherrschen und
+das Lernen bremsen. Darum rechnet man jeden Messwert auf ein gemeinsames Maß um: **„Wie weit liegt
+er über oder unter dem Üblichen?“** Das erledigt der **Normalisierer**.
 
-```
-normiert = (x − Mittelwert) / (Streuung + 0,01)
-```
+> **Stell dir vor …** Schulnoten aus verschiedenen Ländern: Eine 2 in Deutschland, eine 15 von 20 in
+> Frankreich, ein „B“ in England. Erst wenn man alle in ein gemeinsames System umrechnet, kann man sie
+> vergleichen.
 
-**Beispiel:** Eine Gelenkgeschwindigkeit hat im Mittel 2 und streut um 4. Der Wert 10 wird zu
-(10 − 2) / 4,01 ≈ **2,0**: „zwei Streuungen über dem Üblichen“. Die 0,01 verhindert eine Division
-durch null bei Eingängen, die fast konstant sind.
+Dafür braucht man zwei Zahlen pro Messwert: den **Durchschnitt** und die **Streuung**. Die Streuung
+sagt, wie weit die Werte üblicherweise vom Durchschnitt abweichen.
 
-Weil eine bessere Ente andere Zustände erlebt, werden Mittelwert und Streuung laufend nachgeführt.
-Dafür reicht eine exakte Formel (Chans Algorithmus), die nur drei Zahlen pro Eingang braucht.
+**Beispiel:** Eine Gelenkgeschwindigkeit ist im Durchschnitt 2 und weicht üblicherweise um 4 davon
+ab. Der Wert 10 liegt 8 über dem Durchschnitt, also zwei übliche Abweichungen darüber: umgerechnet
+**2**. Der Wert 2 wird zu 0, der Wert −2 zu −1.
 
-Wichtig: **Der Normalisierer gehört zum Netz.** Ohne genau diese Umrechnung ist das Netz wertlos,
-deshalb steht er im exportierten Netz ganz vorn (A.14) und reist mit der Policy zu jedem Sammler.
-Beim Warmstart wird er eingefroren; neue Eingänge bekommen Mittelwert 0, Teiler 1 und Gewicht 0,
-sodass das Netz anfangs exakt wie das alte handelt ([Kapitel 14.4](14-lehrer.md)).
+Weil eine bessere Ente andere Lagen erlebt, führt der Lehrer Durchschnitt und Streuung beim Üben
+laufend nach.
 
-Der Lerner führt die Normalisierer einmal pro Iteration mit allen gesammelten Beobachtungen nach
-und bewertet die alte Policy danach **mit den neuen** Werten neu. Bei wenigen Dutzend Enten wandern
-sie sonst merklich, und die Verhältnisse von PPO (A.11) wären verfälscht.
+Wichtig: **Der Normalisierer gehört fest zum Netz.** Ohne genau diese Umrechnung versteht das Netz
+seine Eingaben nicht mehr. Darum steht er im fertigen Netz ganz vorn (A.14).
 
 ## A.8 Auswendiglernen gegen Verstehen
 
-Ein Netz mit 200 000 Reglern kann eine kleine Datenmenge **auswendig lernen**: perfekte Antworten auf
-die Übungsaufgaben, Unsinn bei neuen. Das heißt **Überanpassung**. Gegenmittel: mehr und
-vielfältigere Daten, Prüfung auf Daten, die nie zum Lernen dienten, rechtzeitig aufhören (das beste
-Netz nehmen, nicht das letzte) und kleinere Netze.
+Ein Netz mit 200 000 Reglern kann eine kleine Menge Übungsaufgaben **auswendig lernen**: perfekte
+Antworten auf die bekannten Aufgaben, Unsinn bei neuen. Das heißt **Überanpassung**. Gegenmittel:
+mehr und vielfältigere Übungsdaten, Prüfen auf Aufgaben, die nie zum Lernen dienten, rechtzeitig
+aufhören (das beste Netz nehmen, nicht das letzte) und kleinere Netze.
+
+> **Stell dir vor …** ein Schüler, der die Lösungen des Übungsblatts auswendig kann. In der
+> Klassenarbeit mit neuen Zahlen hilft ihm das gar nichts.
 
 In der Robotik heißt Überanpassung meist: Das Netz hat sich auf **genau diese Simulation**
-eingestellt. Das Gegenmittel ist Variation (A.12); Kern prüft jedes Netz sauber **und** variiert,
-und das Auswählen der besten Runde ist „rechtzeitig aufhören“.
+eingestellt. Das Gegenmittel ist Variation (A.12). Der Lehrer prüft jedes Netz deshalb auf dem
+sauberen **und** auf variierten Robotern, und dass am Ende die beste Runde gewählt wird, ist das
+„rechtzeitige Aufhören“.
 
 ## A.9 Lernen durch Nachmachen
 
-### Überwachtes Lernen und Verhaltensklonen
+### Mit Lösungsheft: Verhaltensklonen
 
-Beim **überwachten Lernen** gibt es zu jeder Eingabe die richtige Antwort, wie ein Arbeitsheft mit
-Lösungen. Das Netz minimiert den Fehler, fertig. In der Robotik ist die „richtige Antwort“ die Aktion
-eines Experten: Man lässt ihn vormachen, notiert Paare (was er sieht, was er tut) und trainiert das
-Netz darauf. Das heißt **Verhaltensklonen**. In Kern heißt der Experte **Vorbild**.
+Beim **überwachten Lernen** gibt es zu jeder Aufgabe die richtige Antwort, wie ein Arbeitsheft mit
+Lösungen. Das Netz macht den Verlust zwischen seiner Antwort und der Lösung klein, fertig. In der
+Robotik ist die „richtige Antwort“ das, was ein Experte tut: Man lässt ihn vormachen, schreibt Paare
+auf (was er sieht, was er tut) und trainiert das Netz darauf. Das heißt **Verhaltensklonen**. Im
+Lehrer heißt der Experte **Vorbild**.
 
-### Die Falle: Verteilungsverschiebung
+### Die Falle: Lagen, die man nie gesehen hat
 
 > **Stell dir vor …** du lernst Fahrradfahren nur, indem du jemandem zusiehst, der immer perfekt in
 > der Mitte des Wegs fährt. Dann fährst du selbst, kommst ein paar Zentimeter vom Weg ab – und weißt
@@ -303,38 +396,38 @@ Netz darauf. Das heißt **Verhaltensklonen**. In Kern heißt der Experte **Vorbi
                            ●  Sturz
 ```
 
-Das heißt **Verteilungsverschiebung**: Beim Fahren erzeugt das Netz selbst Zustände, die es beim
-Lernen nie gesehen hat. Forscher haben gezeigt, dass der Gesamtfehler dabei mit dem **Quadrat** der
-Episodenlänge wachsen kann statt nur mit der Länge.
+Fachleute nennen das **Verteilungsverschiebung**: Beim Selberfahren gerät das Netz in Lagen, die es
+beim Lernen nie gesehen hat, und kleine Fehler schaukeln sich auf.
 
 ### DAgger: Der Schüler fährt, der Lehrer kommentiert
 
-**DAgger** (Ross, Gordon und Bagnell, 2011) dreht den Spieß um. Der Schüler fährt selbst, und das
-Vorbild sagt in jedem Moment, was **es** getan hätte.
+**DAgger** dreht den Spieß um. Der Schüler fährt selbst, und das Vorbild sagt in jedem Moment, was
+**es** an dieser Stelle getan hätte.
 
 ```mermaid
 flowchart TD
   A["Runde 0: Vorbild fährt"] --> F["Netz lernt aus allen Daten"]
   F --> R["Nächste Runde: Netz fährt"]
-  R --> L["Vorbild beschriftet jede Lage"]
-  L --> D["Neue Paare zu allen alten"]
+  R --> L["Vorbild sagt zu jeder Lage, was richtig wäre"]
+  L --> D["Neue Paare zu allen alten legen"]
   D --> F
 ```
 
-So entstehen Daten genau dort, wohin der Schüler wirklich gerät, mit der richtigen Antwort dafür.
-In Kern fährt das Netz ab Runde 1 mit etwas Rauschen (0,05), damit auch Lagen knapp neben seiner
-Bahn vorkommen; nach jeder Runde lernt es aus **allen** Beispielen (10 Epochen, Minibatch 256,
-Lernrate 10⁻³). Beim Sprung springt das Netz nach 7 Runden zum ersten Mal echt. Die Spielschicht
-lernt genauso. Das Vorbild heißt beim Sprung `JumpTeacher`, beim Spielen `PlayEnv::teacher`.
+So entstehen Übungsdaten genau dort, wohin der Schüler wirklich gerät, samt der richtigen Antwort
+dafür. Damit auch Lagen knapp neben seiner Bahn vorkommen, fährt das Netz mit etwas Zufall. Beim
+Sprung der Ente springt das Netz nach 7 Runden zum ersten Mal echt.
 
-Eine Bedingung macht DAgger erst möglich: Das Vorbild darf nur sehen, was das Netz sieht, und kein
-verstecktes Gedächtnis haben. Eine Antwort, die nur von der Beobachtung abhängt, kann ein Netz exakt
-lernen; eine, die von Verborgenem abhängt, nicht.
+Eine Bedingung macht DAgger erst möglich: Das Vorbild darf nur sehen, was auch das Netz sieht.
+
+> **Stell dir vor …** der Fahrlehrer sagt „Jetzt bremsen!“, weil er hinter der Hecke ein Kind
+> gesehen hat. Der Schüler sieht das Kind nicht. Er kann diese Regel nicht lernen – für ihn kommt das
+> Bremsen aus dem Nichts.
 
 ## A.10 Lernen durch Belohnung
 
 Verhaltensklonen braucht einen Experten. Gibt es keinen, oder soll das Netz besser werden als er,
-hilft **Reinforcement Learning** (RL, bestärkendes Lernen).
+hilft **Reinforcement Learning** (bestärkendes Lernen): Man sagt nicht, **wie** etwas geht, sondern
+nur, **ob** es gut war.
 
 > **Stell dir vor …** Hundetraining. Du sagst dem Hund nicht, wie er seine Muskeln bewegen soll. Er
 > probiert etwas, und wenn es gut war, gibt es ein Leckerli. Mit der Zeit macht er öfter, was
@@ -344,352 +437,420 @@ hilft **Reinforcement Learning** (RL, bestärkendes Lernen).
 
 ```mermaid
 flowchart LR
-  Agent["Agent (Policy)"] -->|"Aktion"| Welt["Umgebung (Simulation)"]
+  Agent["Ente mit ihrem Netz"] -->|"Aktion"| Welt["Simulation"]
   Welt -->|"Beobachtung"| Agent
   Welt -->|"Belohnung"| Agent
 ```
 
-Der **Agent** (die Ente mit ihrem Netz) sieht eine **Beobachtung**, wählt eine **Aktion**, die
-Umgebung antwortet mit einer neuen Beobachtung und einer **Belohnung**. In Kern ist die Umgebung eine
-`Env`; bei `DuckEnv` ist ein Schritt ein Regeltakt von 20 ms (50 pro Sekunde).
+Der Handelnde – Fachwort **Agent**, hier die Ente mit ihrem Netz – sieht eine **Beobachtung**, wählt
+eine **Aktion**, und die Welt antwortet mit einer neuen Lage und einer **Belohnung**. Bei der Ente
+dreht sich dieser Kreis einmal pro Takt, also 50-mal pro Sekunde, bis die Episode durch einen Sturz
+oder durch Zeitablauf endet.
 
-Ein Schritt (`step`) liefert die Belohnung und ob die Episode durch Sturz oder Zeitablauf endete.
+> **Für Neugierige:** Fachleute nennen diesen Kreislauf einen Markov-Entscheidungsprozess. „Markov“
+> heißt: Was als Nächstes passiert, hängt nur von der Lage jetzt ab, nicht davon, wie man dorthin
+> gekommen ist.
 
-Fachleute nennen das einen **Markov-Entscheidungsprozess**: Zustände, Aktionen, eine Physik, die
-den nächsten Zustand bestimmt, Belohnungen. „Markov“ heißt: Was als Nächstes passiert, hängt nur
-vom Jetzt ab, nicht von der Vorgeschichte.
+### Was die Ente weiß und was nicht
 
-### Zustand gegen Beobachtung
-
-Die Ente kennt ihren Zustand nicht vollständig. Sie sieht nur, was ihre Sensoren melden, mit
-Rauschen und Verspätung: Gelenkwinkel, Gyro, Schwerkraftrichtung, ihre letzte Aktion, Befehle. Ihre
-wahre Höhe über dem Boden oder ihre Geschwindigkeit im Raum sieht sie **nicht**. Die letzte Aktion
-in der Beobachtung wirkt wie ein kleines Gedächtnis. Fachleute sagen dazu „teilweise beobachtbar“
-(POMDP). Wie stark die Sensoren rauschen und verspäten, legt `Task::Noise` fest (Zahlen in
-[Kapitel 14](14-lehrer.md)).
+Die Ente kennt ihre Lage nicht vollständig. Sie sieht nur, was ihre Sensoren melden, und die
+rauschen und hinken etwas hinterher: Gelenkwinkel, einen Drehsensor im Rumpf, die Richtung nach
+unten, ihre letzte Aktion, den Befehl. Ihre wahre Höhe über dem Boden oder ihre Geschwindigkeit im
+Raum sieht sie **nicht**. Die letzte Aktion in der Beobachtung wirkt wie ein kleines Gedächtnis.
 
 ### Belohnung und Return
 
-Die **Belohnung** ist eine Zahl pro Schritt und die einzige Stelle, an der man dem Agenten sagt, was
-er tun soll. Und er nimmt sie **wörtlich**.
+Die **Belohnung** ist eine Zahl pro Takt und die einzige Stelle, an der man der Ente sagt, was sie
+tun soll. Und sie nimmt sie **wörtlich**.
 
 > **Achtung, Falle!** In frühen Läufen lernte die Ente, auf dem Schwanz zu sitzen, Hechtsprünge zu
 > machen oder sich abzustützen – weil die Belohnung das zuließ. Jede Lücke musste mit einer
-> strengeren Regel geschlossen werden ([Kapitel 15.11](15-eigene-modelle.md)).
+> strengeren Regel geschlossen werden ([Kapitel 15](15-eigene-modelle.md)).
 
-In Kern liefert `Task::reward` die Belohnung, nach der Konvention von mjlab als Summe aus Gewicht ×
-Term × Taktdauer; die einzelnen Terme bleiben für Berichte sichtbar.
+Der **Return** ist die **Gesamtpunktzahl ab jetzt**: alle künftigen Belohnungen zusammen. Damit sie
+nicht ins Unendliche wächst, zählen spätere Belohnungen weniger. Jeder Takt in die Zukunft nimmt
+die Belohnung mit 0,99 mal, kostet also ein Prozent.
 
-Der **Return** ist die Summe aller künftigen Belohnungen. Damit er nicht unendlich wird, zählen
-spätere Belohnungen weniger: Jeder Schritt in die Zukunft multipliziert mit dem **Diskontfaktor**
-γ. Kern nutzt γ = 0,99. Eine Belohnung in 100 Schritten zählt dann nur noch 0,99¹⁰⁰ ≈ 0,37-mal so
-viel, in 300 Schritten nur noch etwa 0,05-mal. Die Ente „schaut“ also grob 100 Takte voraus, das
-sind 2 Sekunden: genau so lang wie ein ganzer Sprung.
+> **Stell dir vor …** ein Eis in der Sonne, das jede Sekunde ein Prozent kleiner wird. Ein Eis jetzt
+> ist mehr wert als dasselbe Eis, das du erst in zwei Minuten bekommst.
 
-> **Wusstest du?** Der Return lässt sich rückwärts rechnen: Return jetzt = Belohnung jetzt +
-> γ × Return ab dem nächsten Schritt. Auf dieser einen Zeile baut fast alles Weitere auf.
+Wie viel bleibt nach vielen Takten übrig? Dafür nimmt man 0,99 so oft mit sich selbst mal, wie Takte
+vergehen; kurz schreibt man das mit einer **Hochzahl**: 0,99¹⁰⁰ heißt „100-mal hintereinander mit
+0,99 malnehmen“.
+
+| Takte in der Zukunft | Sekunden | so viel zählt die Belohnung noch |
+|---|---|---|
+| 1 | 0,02 | 0,99 |
+| 10 | 0,2 | 0,90 |
+| 50 | 1 | 0,61 |
+| 100 | 2 | 0,37 |
+| 300 | 6 | 0,05 |
+
+Die Ente „schaut“ also grob 100 Takte voraus, das sind 2 Sekunden: etwa so lang wie ein ganzer
+Sprung.
+
+> **Wusstest du?** Den Return kann man rückwärts ausrechnen: Gesamtpunktzahl ab jetzt = Belohnung
+> jetzt + 0,99 × Gesamtpunktzahl ab dem nächsten Takt. Man fängt am Ende der Episode an und läuft
+> zurück zum Anfang.
 
 ### Policy, Wert und Vorteil
 
-Die **Policy** ist die Entscheidungsregel: Beobachtung rein, Aktion raus. Zum Lernen ist sie
-**zufällig** (sie würfelt um einen Mittelwert herum), auf dem Roboter nimmt man nur den Mittelwert.
+Die **Policy** ist die Entscheidungsregel der Ente: Beobachtung rein, Aktion raus – also ihr Netz.
+Zum Lernen ist sie **etwas zufällig** (gleich mehr dazu); auf dem Roboter nimmt man nur ihre beste
+Idee.
 
-Der **Wert** V einer Lage sagt: „Wie viel Return erwarte ich ab hier?“ Der **Aktionswert** Q sagt:
-„Wie viel Return erwarte ich, wenn ich erst genau diese Aktion wähle und danach wie gewohnt
-weitermache?“ Der **Vorteil** einer Aktion ist Q minus V, also: „War sie besser oder schlechter als
-das, was ich hier sonst so tue?“ Positiv heißt besser. Genau das braucht das Lernen: Mach mehr von
-dem, was besser als üblich war.
+Der **Wert** einer Lage sagt: „Wie viele Punkte erwarte ich ab hier, wenn ich mache wie immer?“ Der
+**Vorteil** einer Aktion sagt: „War sie besser oder schlechter als das, was ich hier sonst tue?“
+Positiv heißt besser. Genau das braucht das Lernen: **Mach mehr von dem, was besser war als üblich.**
 
-Eine einfache Schätzung des Vorteils aus einem Schritt ist der **TD-Fehler**: das, was passiert ist
-(Belohnung plus Wert der neuen Lage mal γ), minus das, was man erwartet hatte (Wert der alten Lage).
+**Beispiel:** An dieser Stelle bekommt die Ente normalerweise noch 5 Punkte. Diesmal hat sie etwas
+anderes probiert und 7 bekommen. Vorteil: **+2**. Diese Aktion soll häufiger werden.
 
 ### Sturz oder Zeitablauf?
 
-Eine Episode kann auf zwei grundverschiedene Arten enden. Beim **Sturz** gibt es keine Zukunft, ihr
-Wert ist 0. Beim **Zeitablauf** stünde die Ente noch, das Zeitlimit ist nur eine Eigenschaft des
-Trainings. Wer beides gleich behandelt, bringt dem Netz bei, dass Anstrengung kurz vor Schluss
-sinnlos ist. Kern unterscheidet daher und schätzt beim Zeitablauf den Wert der Zukunft mit
-(„Bootstrapping“).
+Eine Episode kann auf zwei grundverschiedene Arten enden. Nach einem **Sturz** gibt es keine Zukunft
+mehr, ihr Wert ist 0. Beim **Zeitablauf** stünde die Ente noch, das Zeitlimit ist nur eine
+Eigenschaft des Trainings. Wer beides gleich behandelt, bringt dem Netz bei, dass Anstrengung kurz
+vor Schluss sinnlos ist. Der Lehrer unterscheidet daher und schätzt beim Zeitablauf, wie viele Punkte
+die Ente noch bekommen hätte.
 
-### Wie lernt die Policy? Der Policy-Gradient
+### Wie lernt die Policy? Würfeln und verschieben
 
-Die Belohnung hängt über die Physik von der Aktion ab, und die Physik lässt sich nicht ableiten. Der
-Trick: Man leitet nur die **Wahrscheinlichkeit** der gewählten Aktion ab. Hatte eine Aktion einen
-positiven Vorteil, macht man sie wahrscheinlicher, bei negativem unwahrscheinlicher. Dafür muss die
-Policy würfeln.
+Die Belohnung hängt über die ganze Physik von der Aktion ab. Durch die Physik kann man keine
+Steigung ausrechnen. Der Trick: Die Ente **würfelt ein wenig**. Das Netz sagt „ungefähr so“, und die
+Ente weicht jedes Mal ein bisschen zufällig davon ab. War eine Abweichung gut (positiver Vorteil),
+verschiebt man das „ungefähr so“ in ihre Richtung. War sie schlecht, weg davon.
 
-Kern würfelt mit einer **Glockenkurve** (Normalverteilung) pro Servo: Aktion = Mittelwert aus dem
-Netz + σ × Zufallszahl. Das σ ist ein eigener, lernbarer Regler pro Aktion: Am Anfang ist es groß
-(viel Ausprobieren), später kleiner. Beim Sprung startet es bei 0,3 und wird nach der Nachahmung auf
-0,1 gesetzt, damit ein Netz, das schon springt, nicht alles wieder verlernt. Untergrenze ist 0,001,
-der Standard ohne Rezept 1,0. Jede Ente würfelt mit ihrem **eigenen** Zufallsstrom, der nur von
-Seed und ihrer Nummer abhängt, nie davon, welcher Worker sie rechnet.
+Wie weit sie abweicht, folgt der **Glockenkurve** (Fachwort **Normalverteilung**): Kleine
+Abweichungen sind häufig, große selten. Wie breit die Glocke ist, sagt eine einzige Zahl, die
+**Streuung σ** (gesprochen „Sigma“).
+
+```
+  breite Glocke (σ groß)            schmale Glocke (σ klein)
+
+          _.-‾‾‾-._                            ∧
+      _.-‾         ‾-._                       / \
+  ──‾─────────┼─────────‾──          ────────/──┼──\────────
+        „ungefähr so“                     „ungefähr so“
+  viel Ausprobieren                  wenig Ausprobieren
+```
+
+| Bereich um „ungefähr so“ | so viele Versuche landen darin |
+|---|---|
+| ± 1 σ | etwa 2 von 3 |
+| ± 2 σ | etwa 19 von 20 |
+| ± 3 σ | fast alle |
+
+**Beispiel:** Das Netz sagt für ein Knie 0,2, und σ ist 0,1. Dann landen etwa zwei von drei
+Versuchen zwischen 0,1 und 0,3, fast alle zwischen −0,1 und 0,5.
+
+σ ist selbst ein Regler, den das Training mitlernt, für jeden Servo eigens. Am Anfang ist die Glocke
+breit (viel Neugier), später wird sie schmaler. Beim Sprung wird sie nach dem Nachahmen bewusst
+schmal gestellt, damit ein Netz, das schon springt, nicht alles wieder verwürfelt. Jede Ente würfelt
+mit ihrem **eigenen**, festen Zufall, der nur vom Seed und ihrer Nummer abhängt.
 
 ### Entropie: die Neugier am Leben halten
 
-Die **Entropie** misst, wie unbestimmt eine Verteilung ist. Bei der Glockenkurve hängt sie nur
-von σ ab: σ = 1 ergibt pro Aktion 1,419, σ = 0,1 ergibt −0,884 (bei kontinuierlichen Verteilungen
-darf die Entropie negativ sein). Ohne Gegenmaßnahme schrumpft σ oft zu schnell, die Ente hört auf auszuprobieren und bleibt bei der ersten halbwegs brauchbaren Lösung
-hängen. Ein kleiner **Entropie-Bonus** im Verlust hält sie neugierig (Kern: 0,01, beim Sprung
-0,005).
+Ohne Gegenmaßnahme wird die Glocke oft zu schnell schmal: Die Ente hört auf, Neues auszuprobieren,
+und bleibt bei der ersten halbwegs brauchbaren Lösung hängen. Dagegen hilft ein kleiner Bonus für
+Neugier. Gemessen wird die Neugier mit der **Entropie**: einer Zahl, die sagt, wie breit die Ente
+ausprobiert.
+
+> **Stell dir vor …** ein Koch, der immer nur sein erstes halbwegs gutes Rezept kocht. Ein kleiner
+> Bonus fürs Ausprobieren hält ihn offen für Besseres – ohne dass er jeden Tag etwas völlig Neues
+> auf den Tisch bringt.
+
+| Glocke | wie breit probiert die Ente | Entropie |
+|---|---|---|
+| σ = 1 | sehr breit | hoch |
+| σ = 0,3 | mittel | mittel |
+| σ = 0,1 | eng um ihre beste Idee | niedrig |
+
+Der Bonus ist klein. Er soll das Schmalerwerden nur bremsen, nicht verhindern.
 
 ## A.11 Actor, Kritiker und PPO
 
 ### Zwei Netze, eine Mannschaft
 
-Für den Vorteil braucht man den Wert V. Den schätzt ein zweites Netz, der **Kritiker**. Das
-handelnde Netz heißt **Actor**. Beide lernen gleichzeitig: Der Kritiker lernt, Returns
-vorherzusagen; der Actor lernt aus den Vorteilen, die der Kritiker ausrechnet. Jedes hat eigenen
-Normalisierer und eigenen Adam.
+Für den Vorteil muss man wissen, wie viele Punkte an einer Stelle **üblich** sind, also ihren Wert.
+Den schätzt ein zweites Netz, der **Kritiker**. Das handelnde Netz heißt **Actor**. (Achtung: Im
+Studio heißt „Actor“ etwas anderes, nämlich ein Ding im Level. Hier ist immer das handelnde Netz
+gemeint.)
 
-Nach dem Nachahmen ist der Actor schon gut, der Kritiker weiß aber nichts; seine Urteile wären
-Zufall. Deshalb lernt in Kern zuerst **nur der Kritiker** (30 Iterationen).
+> **Stell dir vor …** eine Sportlerin und ihre Trainerin. Die Sportlerin turnt (Actor). Die
+> Trainerin turnt nie selbst, sagt aber nach jeder Übung: „Das war besser als sonst“ oder
+> „schlechter als sonst“ (Kritiker).
 
-### GAE: der Vorteil, gut geschätzt
+Beide lernen gleichzeitig: Der Kritiker lernt, die Gesamtpunktzahl vorherzusagen; der Actor lernt
+aus den Vorteilen, die der Kritiker ausrechnet. Nach dem Nachahmen ist der Actor schon gut, der
+Kritiker weiß aber noch nichts; seine Urteile wären Zufall. Deshalb lernt anfangs eine Weile **nur
+der Kritiker** („Kritiker zuerst“).
 
-Der TD-Fehler eines einzigen Schritts rauscht wenig, ist aber schief, wenn der Kritiker sich irrt.
-Der volle Return rauscht stark, ist aber ehrlich. **GAE** (Generalized Advantage Estimation) mischt
-beides mit einem zweiten Regler λ: Man geht rückwärts durch die Zeit, und jeder Vorteil ist der
-eigene TD-Fehler plus γ · λ mal der Vorteil des nächsten Schritts. Kern nutzt λ = 0,95, also
-γ · λ = 0,9405. Mit λ = 0 bliebe nur der TD-Fehler, mit λ = 1 der volle Return.
+### GAE: Ein schlechter Schritt kann gut gewesen sein
 
-**Rechnen wir drei Schritte:** Belohnungen (1, 0, 2), Werte V = (5, 4, 6), Wert danach 3.
+Wie gut war eine einzelne Aktion wirklich? Manchmal sieht ein Schritt für sich allein schlecht aus,
+führt aber in eine Lage, von der aus alles besser läuft.
 
-| t | TD-Fehler | Vorteil | Ziel des Kritikers |
-|---|---|---|---|
-| 2 | 2 + 0,99 · 3 − 6 = −1,03 | −1,03 | 4,97 |
-| 1 | 0 + 0,99 · 6 − 4 = 1,94 | 1,94 − 0,9687 = 0,9713 | 4,9713 |
-| 0 | 1 + 0,99 · 4 − 5 = −0,04 | −0,04 + 0,9135 = 0,8735 | 5,8735 |
+> **Stell dir vor …** beim Schach opferst du eine Figur. Für sich allein ein Verlust. Drei Züge
+> später setzt du matt. Im Rückblick war das Opfer der beste Zug der Partie.
 
-Schritt 0 sah für sich allein leicht schlecht aus, war aber insgesamt **gut**: Er führte in eine
-Lage, von der aus es besser lief als erwartet. Das Ziel des Kritikers ist jeweils Vorteil plus Wert.
-In Kern sind das drei Zeilen:
-
-```cpp
-const f32 delta = reward + live * cfg_.gamma * next - v;
-adv = delta + live * cfg_.gamma * cfg_.lam * adv;
-return_buf_[row] = adv + v;
+```
+  Schritt 0            Schritt 1             Schritt 2
+  für sich: etwas  ──► führt in eine    ──► es läuft besser
+  schlechter als       gute Lage             als erwartet
+  erwartet
+  ─────────────────────────────────────────────────────────
+  im Rückblick: Schritt 0 war insgesamt GUT
 ```
 
-Zeile 1 ist der TD-Fehler, Zeile 2 die GAE-Rückwärtssumme, Zeile 3 das Ziel des Kritikers. `live`
-ist 0 nach einem Episodenende; dann gibt es keine Fortsetzung. Für den letzten Schritt des
-Rollouts schätzt der Kritiker den Wert dort, wo jede Ente gerade steht. Am Schluss werden alle
-Vorteile auf Mittel 0 und Streuung 1 gebracht, damit ihre Größe nicht von der Größe der Belohnungen abhängt.
+Genau das macht **GAE** (Fachwort für „gut geschätzter Vorteil“). Man geht **rückwärts** durch die
+Zeit: Jeder Schritt bekommt zuerst seine eigene Überraschung – „Wie viel besser oder schlechter als
+erwartet war es gleich danach?“ – und dazu einen Teil dessen, was danach noch kam. Je weiter weg die
+Folgen, desto weniger zählen sie.
+
+Warum nicht einfach alle echten Punkte bis zum Ende zusammenzählen? Weil die vom Zufall vieler
+späterer Schritte verwackelt sind. Und warum nicht nur dem Kritiker vertrauen? Weil der sich irren
+kann. GAE mischt beides: ein bisschen Vertrauen in den Kritiker, ein bisschen echte Erfahrung.
+
+**In Zahlen:** In einem Beispiel mit drei Schritten sah Schritt 0 für sich allein leicht schlecht
+aus (Überraschung −0,04), war aber mit seinen Folgen klar gut (Vorteil +0,87).
+
+> **Für Neugierige:** Wie stark spätere Folgen zählen, regelt ein zweiter Abwertungsfaktor neben
+> den 0,99, beim Lehrer 0,95. Am Ende werden alle Vorteile noch auf ein gemeinsames Maß gebracht,
+> wie beim Normalisierer (A.7). Die ganze Rechnung steht im blauen Buch, Anhang A.
 
 ### Warum zu große Schritte gefährlich sind
 
-Die Daten stammen von der **alten** Policy. Macht man einen großen Schritt, ist die neue Policy weit
-weg, die Vorteile gelten für sie nicht mehr, und eine gute Policy kann in einem Schritt kaputtgehen.
-Dann sammelt sie schlechte Daten, aus denen sie sich kaum erholt. Mehrere Epochen auf denselben
+Die Erfahrung stammt vom **alten** Verhalten. Ändert man das Netz auf einmal stark, passt die
+Erfahrung nicht mehr zu ihm, und ein gutes Verhalten kann in einem einzigen Schritt kaputtgehen. Dann
+sammelt die Ente schlechte Erfahrung, aus der sie sich kaum erholt. Mehrere Epochen auf denselben
 Daten – eigentlich praktisch, weil man die Daten besser ausnutzt – machen es noch schlimmer.
+
+> **Stell dir vor …** eine Lehrerin bekommt nach einer einzigen Stunde Rückmeldung und wirft daraufhin
+> ihren ganzen Unterrichtsstil um. Die Rückmeldung galt aber für den alten Stil, nicht für den neuen.
 
 ### PPO: Verbessern mit Gurt
 
-**Proximal Policy Optimization** (Schulman und andere, 2017) begrenzt, wie weit sich die Policy pro
-Update bewegen darf. Zentral ist das **Verhältnis** ρ: Wie viel wahrscheinlicher wählt die neue
-Policy die gesammelte Aktion als die alte? ρ = 1 heißt „gleich“. PPO erlaubt Verbesserungen nur, bis
-ρ das Band von 0,8 bis 1,2 verlässt (Clip ε = 0,2):
+**PPO** ist das Lernverfahren des Lehrers. Seine Idee: **Pro Runde darf sich das Verhalten nur ein
+bisschen ändern.** Gemessen wird das an einem einfachen Verhältnis: Wie viel öfter wählt das neue Netz
+eine bestimmte Aktion als das alte? 1 heißt „gleich oft“, 1,2 heißt „20 Prozent öfter“.
 
-| Vorteil | Verhältnis | Lernt weiter? | Bedeutung |
-|---|---|---|---|
-| positiv | bis 1,2 | ja | gute Aktion verstärken |
-| positiv | über 1,2 | **nein** | schon genug verstärkt |
-| negativ | ab 0,8 | ja | schlechte Aktion abschwächen |
-| negativ | unter 0,8 | **nein** | schon genug abgeschwächt |
+> **Stell dir vor …** ein Hund an der Leine. Er darf schnuppern, wohin er will, aber nur so weit,
+> wie die Leine reicht. Bei der nächsten Runde wird die Leine wieder vom neuen Standort aus gemessen.
 
-**Beispiel:** Vorteil 1, ρ = 1,3. Ungebremst wäre der Gewinn 1,3, gebremst 1,2. PPO nimmt den
-vorsichtigeren Wert, und weil der am Deckel klebt, fließt kein Gradient: Der Schritt, der noch weiter
-in diese Richtung schieben würde, findet nicht statt.
+```
+ Verhältnis neu/alt:   0,8          1,0          1,2
+                        ├────────────┼────────────┤
+ gute Aktion:                        ────────────►│ hier Schluss
+ schlechte Aktion:     │◄────────────
+                  hier Schluss
+```
 
-> **Wusstest du?** PPO ist absichtlich pessimistisch. Verbesserungen werden gedeckelt,
-> Verschlechterungen nie. Wählt die neue Policy eine **schlechte** Aktion häufiger als vorher
-> (Vorteil negativ, ρ = 1,3), wird das immer korrigiert.
+- Eine **gute** Aktion (positiver Vorteil) darf pro Runde höchstens 20 Prozent häufiger werden.
+  Darüber hinaus wird nicht mehr weiter verstärkt.
+- Eine **schlechte** Aktion darf höchstens 20 Prozent seltener werden. Darüber hinaus wird nicht mehr
+  weiter abgeschwächt.
 
-Zusätzlich regelt Kern wie rsl_rl die **Lernrate** über die **KL-Divergenz**, ein Maß dafür, wie
-verschieden alte und neue Policy sind: Ist sie größer als 0,02, wird die Lernrate durch 1,5 geteilt,
-unter 0,005 mit 1,5 malgenommen, immer zwischen 10⁻⁵ und 10⁻². Große Schritte, wenn es ruhig ist,
-kleine, wenn die Policy springt.
-Auch der Kritiker hat eine Bremse: Seine Schätzung darf sich pro Update nur um ε vom alten Wert
-entfernen.
+> **Wusstest du?** PPO ist absichtlich vorsichtig, aber nur in eine Richtung. Verbesserungen werden
+> gedeckelt, Fehler nie. Wählt das neue Netz eine **schlechte** Aktion öfter als das alte (Vorteil
+> negativ, Verhältnis 1,3), wird das immer korrigiert.
 
-### Ein PPO-Update im Ganzen
+> **Für Neugierige:** Zusätzlich passt der Lehrer die Lernrate selbst an: Ändert sich das Verhalten
+> pro Runde zu stark, wird sie kleiner, bleibt es sehr ruhig, wird sie größer. Und auch der Kritiker
+> hat eine Leine: Seine Schätzung darf sich pro Runde nur ein Stück vom alten Wert entfernen.
+
+### Eine Trainingsrunde im Ganzen
 
 ```mermaid
 flowchart TD
-  S["Sammeln: Takte × Enten"] --> K["ordnen, Normalisierer nachführen"]
-  K --> E["alte Policy neu bewerten"]
-  E --> G["GAE: Vorteile und Ziele"]
-  G --> MB["5 Epochen × 4 Minibatches"]
-  MB --> KL["KL messen, Lernrate anpassen"]
-  KL --> AD["Gradienten in 8 Teilen, Adam"]
-  AD --> Ende["neue Policy"]
+  S["Alle Enten üben ein Stück"] --> K["Erfahrung ordnen"]
+  K --> G["Für jeden Schritt: besser oder schlechter als erwartet?"]
+  G --> MB["In Häppchen vorsichtig verstellen (mit Leine)"]
+  MB --> AD["Lernrate nachregeln"]
+  AD --> Ende["Neues Netz: nächste Runde"]
 ```
 
-Kerns Standardwerte: 24 Takte je Ente (Sprung 48), 5 Epochen, 4 Minibatches, Clip 0,2, γ = 0,99,
-λ = 0,95, Lernrate 10⁻³ (Sprung 10⁻⁴).
-
-Sammeln und Lernen sind in Kern getrennt: Sammler brauchen nur die Policy und liefern Rollouts, der
-Lerner nimmt alle Rollouts. Deshalb können die Sammler Threads oder Web Worker sein.
+Eine solche Runde heißt **Iteration**. Üben und Lernen sind getrennt: Die **Sammler** brauchen nur das
+aktuelle Netz und liefern ihre Erfahrung ab, der **Lerner** verbessert daraus das Netz. Deshalb
+können die Sammler auf mehreren Rechenkernen gleichzeitig arbeiten. Die genauen Einstellungen stehen
+im blauen Buch, Anhang A.
 
 ### Gleiches Ergebnis auf jedem Rechner
 
 Kommazahlen im Computer sind tückisch: (0,1 + 0,2) + 0,3 ergibt im Rechner nicht exakt dasselbe wie
-0,1 + (0,2 + 0,3) – im letzten Bit unterscheiden sie sich. Summiert man Gradienten in einer
-Reihenfolge, die von der Zahl der Threads abhängt, bekommt man auf 2 und 16 Kernen verschiedene
-Netze. Kern verhindert das:
+0,1 + (0,2 + 0,3) – im allerletzten Bit unterscheiden sie sich. Zählt man beim Lernen in einer
+Reihenfolge zusammen, die davon abhängt, wie viele Rechenkerne mithelfen, bekommt man auf 2 und auf 16
+Kernen verschiedene Netze. Kern verhindert das:
 
-- Jede Ente bekommt ihren Seed aus ihrer globalen Nummer.
-- Alle Rollouts kommen in eine feste Reihenfolge, und summiert wird immer in fester Reihenfolge
-  (jede Minibatch in genau 8 Teilen).
-- Alle Mathe-Funktionen kommen aus `kern::dm`.
-- Kein FMA: Der Compiler darf „a mal b plus c“ nicht zu einem Befehl zusammenfassen, der je nach
-  Prozessor anders rundet.
+- Jede Ente hat ihren eigenen, festen Würfel, der nur von ihrer Nummer und dem Seed abhängt.
+- Zusammengezählt wird immer in derselben Reihenfolge, egal wie viele Kerne helfen.
+- Kern bringt eigene Rechenfunktionen mit, die auf jedem Gerät gleich runden.
+- Der Rechner darf keine Rechenschritte zusammenfassen, die je nach Prozessor anders runden.
 
-Das Ergebnis: gleicher Seed, gleich viele Enten, gleiches Netz, nativ wie im Browser
-([Kapitel 14.7](14-lehrer.md), [Anhang C](C-grundlagen-physik.md)).
+Das Ergebnis: gleicher Seed, gleich viele Enten, **dasselbe Netz** – auf dem Laptop wie im Browser
+auf dem Handy ([Kapitel 14](14-lehrer.md), [Anhang C](C-grundlagen-physik.md)).
 
 ## A.12 Von der Simulation in die Wirklichkeit
 
-Ein simuliert trainiertes Netz trifft auf einen Roboter, der anders ist: ungenau gemessene Massen,
-streuende Servos, wechselnde Böden, rauschende Sensoren. Diese **Sim-to-Real-Lücke** zu überbrücken,
-ist die Kernaufgabe des Robotiklernens. Zwei Strategien ergänzen sich:
+Ein Netz, das in der Simulation gelernt hat, trifft auf einen Roboter, der immer ein bisschen anders
+ist: ungenau gemessene Massen, streuende Servos, wechselnde Böden, rauschende Sensoren. Diese
+**Sim-to-Real-Lücke** zu überbrücken, ist die Kernaufgabe des Robotiklernens. Zwei Wege ergänzen
+sich:
 
-1. **Die Simulation der Wirklichkeit annähern:** genaue, an Messungen kalibrierte Modelle
+1. **Die Simulation der Wirklichkeit annähern:** genaue, an Messungen angepasste Modelle
    ([Kapitel 16](16-kalibrierung.md)).
-2. **Das Netz unempfindlich machen:** Es lernt in vielen leicht verschiedenen Welten, sodass die
-   echte nur eine weitere ist. Das ist **Domain Randomization**. Was Kern alles variiert, steht in
-   [Kapitel 14.3](14-lehrer.md).
+2. **Das Netz unempfindlich machen:** Es übt in vielen leicht verschiedenen Welten, sodass die echte
+   nur eine weitere ist. Das ist **Variation** (Fachwort Domänen-Randomisierung).
 
 > **Stell dir vor …** du übst Tischtennis mal mit schwerem, mal mit leichtem Ball, mal auf rutschigem,
 > mal auf stumpfem Boden, mal mit Brille, mal ohne. Am Turniertag ist dir egal, wie der Saal ist.
 
-Zwei Feinheiten: Manche Variation kommt erst nach und nach (**Lehrpläne**), weil zu viel Chaos am
-Anfang verhindert, dass die Bewegung überhaupt entsteht. Beim Sprung wächst die
-Schwerpunkt-Streuung ab Iteration 200 über 600 Iterationen, die Schubse kommen ab Iteration 300.
-Und was man nicht genau messen kann, wird **variiert**, damit sich das Netz nicht darauf verlässt:
-Das Servoprofil hat neben jedem Wert eine Streuung, und das Training zieht jeden Servo daraus.
+Drei Feinheiten helfen dabei:
 
-Dazu kommen der **asymmetrische Kritiker**, der beim Lernen mehr sehen darf als der Roboter
-(beim Sprung 9 Zusatzwerte, bei der Spielschicht 6), und der **Warmstart**: Kerns Sprung beginnt
-als Pollens velstand-Netz, kann also schon stehen und muss nur den Sprung dazulernen. Dessen
-Gewichte werden dafür aus dem ONNX-Layout in Kerns eingangsweises Layout umsortiert.
+- **Lehrpläne:** Manche Variation kommt erst nach und nach dazu, weil zu viel Chaos am Anfang
+  verhindert, dass die Bewegung überhaupt entsteht. Wie beim Klavierüben: erst langsam, dann
+  schneller; erst ohne Störung, dann mit. Beim Sprung kommen etwa die Schubse erst nach einigen
+  hundert Runden dazu.
+- **Was man nicht genau messen kann, wird variiert:** Zu jedem Servowert gehört eine Streuung, und
+  das Training zieht jeden Servo daraus. So verlässt sich das Netz nicht auf Zahlen, die niemand
+  genau kennt.
+- **Der asymmetrische Kritiker:** Der Kritiker wird nur beim Üben gebraucht. Darum darf er mehr sehen
+  als der Roboter, etwa die genaue Höhe des Rumpfs. Seine Urteile werden dadurch genauer – und auf
+  den Roboter kommt ja nur der Actor.
 
-## A.13 Suchen ohne Gradient: CMA-ES
+Dazu kommt der **Warmstart**: Kerns Sprung beginnt nicht mit zufälligen Reglern, sondern als Pollens
+velstand-Netz. Es kann also schon stehen und balancieren und muss nur noch den Sprung dazulernen.
 
-Manche Probleme haben keinen nutzbaren Gradienten. Beim Sprung-Vorbild sind 15 Zahlen die Eingabe
-und eine ganze Simulation mit Flug, Landung und Sturz die Bewertung; verrauscht, weil jede
-Generation andere Roboter trifft. Bei der Kalibrierung sollen 6 Servoparameter so gewählt werden,
-dass die Simulation Messungen nachspielt.
+## A.13 Suchen ohne Steigung: CMA-ES
 
-Hier helfen **Evolutionsstrategien**: Kandidaten um einen Mittelpunkt würfeln, bewerten, den
-Mittelpunkt zu den Besseren schieben. **CMA-ES** (nach Hansen) lernt zusätzlich die **Form** der
-Würfelwolke:
+Manchmal kann man gar keine Steigung ausrechnen. Beim Sprung-Vorbild sind 15 Zahlen die Eingabe und
+eine ganze Simulation mit Flug, Landung und vielleicht Sturz die Bewertung; dazu ist sie verrauscht,
+weil jede Runde andere Roboter trifft. Bei der Kalibrierung sollen 6 Servowerte so gewählt werden,
+dass die Simulation Messungen nachspielt ([Kapitel 16](16-kalibrierung.md)).
+
+Dann hilft Ausprobieren mit System: eine **Wolke** von Kandidaten um einen Mittelpunkt würfeln,
+alle bewerten, den Mittelpunkt zu den Besseren schieben. **CMA-ES** lernt zusätzlich die **Form**
+der Wolke.
+
+> **Stell dir vor …** du suchst nachts mit Freunden den tiefsten Punkt eines Sees, jeder mit einem
+> Senklot im eigenen Boot. Ihr verteilt euch, ruft eure Tiefen, und alle rudern zu denen mit den
+> tiefsten Werten. Merkt ihr, dass der See in einer Richtung lang abfällt, verteilt ihr euch in diese
+> Richtung weiter.
 
 ```
- Generation 1          Generation 5            Generation 20
-   ·  ·   ·              · ·                      ·
-  ·  ●  ·  ·            ·●··                     ●:
-   · ·  ·               ·  ·  ↗                  (schmal, entlang
-  (rund, groß)         (gestreckt Richtung Tal)    des Tals)
+ Runde 1              Runde 5                Runde 20
+    ·  ·  ·               · ·                       ·
+  ·   ●   ·              · ● · ·                   ●
+    ·  ·  ·                ·  ·  ·  ↗            (schmal, liegt
+  rund und groß       in Richtung Tal          genau im Tal)
+                      gestreckt
 ```
 
-Pro Generation passiert grob:
+Pro Runde passiert grob:
 
 1. Kandidaten aus der Wolke ziehen und bewerten.
-2. Die bessere Hälfte bekommt Gewichte, die Besten am meisten.
-3. Der Mittelpunkt wandert zu ihrem gewichteten Mittel.
-4. Die Schrittweite wächst, wenn mehrere Generationen in dieselbe Richtung gingen, und schrumpft,
-   wenn sich die Schritte aufheben.
+2. Die bessere Hälfte zählt, die Besten am meisten.
+3. Der Mittelpunkt wandert zu ihnen.
+4. Ging es mehrere Runden in dieselbe Richtung, werden die Schritte größer; heben sie sich auf,
+   kleiner.
 5. Die Wolke streckt sich in die Richtungen, in denen es gut lief.
 
-Kern hat CMA-ES nach Hansens Tutorial selbst geschrieben (`cmaes.cpp`). Ohne Vorgabe sind es
-4 + ⌊3 · ln n⌋ Kandidaten (für 6 Parameter wären das 9); die Kalibrierung nimmt 12, die
-Vorbildsuche 16. Der Startpunkt
-wird zuerst bewertet, das Ergebnis ist also nie schlechter. Alle Kandidaten einer Generation werden
-parallel bewertet. Zurück kommen der beste Punkt **und** der Mittelpunkt, und bei verrauschten Noten
-ist der Mittelpunkt die bessere Antwort: Der Beste hatte vielleicht nur Glück. Auch CMA-ES rechnet
-mit Kerns eigenem Zufall und `kern::dm`, ist also reproduzierbar. Die genauen Formeln stehen im
-blauen Buch.
+Zwei Kniffe machen das Verfahren verlässlich. Der Startpunkt wird zuerst bewertet, das Ergebnis ist
+also nie schlechter als der Anfang. Und bei verrauschten Bewertungen nimmt man am Ende eher den
+**Mittelpunkt** als den Besten: Der Beste hatte vielleicht nur Glück.
 
-Beim Vorbild sucht CMA-ES frei im ganzen Zahlenraum; erst tanh mal Amplitude macht daraus
-Servoziele, die so immer innerhalb ±2,5 rad bleiben. Jeder Kandidat springt 6 Episoden (eine
-sauber, fünf variiert), alle Kandidaten einer Generation auf denselben Robotern.
+> **Für Neugierige:** Kern hat CMA-ES selbst geschrieben; es rechnet mit Kerns eigenem Zufall und
+> liefert daher bei gleichem Seed immer dasselbe. Die Formeln stehen im blauen Buch, Anhang A.
 
 ## A.14 ONNX: das Netz zum Mitnehmen
 
-**ONNX** ist ein offenes Dateiformat für Rechengraphen. Ein Modell ist eine Kette von Bausteinen
-(Operatoren) mit den Gewichten als Konstanten in derselben Datei. Programme wie ONNX Runtime führen es
-aus, auf dem Roboter, im Browser oder auf dem Server, ohne die Software zu kennen, die es trainiert
-hat. Für ein MLP braucht man nur vier: `Sub` und `Div` (die Normalisierung), `Gemm` (eine Schicht:
-Gewichte mal Eingang plus Bias) und `Elu`.
+Ein fertiges Netz muss raus aus dem Lehrer: ins Studio, auf den Roboter, in andere Programme. Dafür
+gibt es ein gemeinsames Dateiformat für Netze, **ONNX**. Es beschreibt das Netz als Kette einfacher
+Rechenbausteine, mit allen Reglerwerten in derselben Datei.
+
+> **Stell dir vor …** ein PDF. Egal, mit welchem Programm ein Dokument geschrieben wurde – als PDF
+> kann es jeder öffnen und es sieht überall gleich aus. ONNX ist das PDF für Netze: Der Roboter muss
+> nicht wissen, womit das Netz trainiert wurde.
+
+Die Kette für die Ente ist kurz:
 
 ```
-obs ─► Sub ─► Div ─► Gemm ─► Elu ─► … ─► Gemm ─► actions
+ Messwerte ─► umrechnen (Normalisierer) ─► Schicht ─► verbiegen
+           ─► … ─► Schicht ─► 14 Servoziele
 ```
 
-Kern schreibt die Datei mit einem **eigenen, winzigen Schreiber** für das Protobuf-Format, ohne
-Bibliothek, im selben Format wie Pollens Netze (61 rein, 14 raus).
-Exportiert wird nur der **Mittelwert** der Policy: Auf dem Roboter wird nicht mehr ausprobiert, σ
-und Kritiker bleiben im Lerner. Die Gewichte werden dafür als [Ausgang][Eingang] umsortiert, die
-Metadaten tragen dieselben Schlüssel wie bei Pollen plus `task` und `lehrer`. Ein Test liest die
-Datei wieder ein und vergleicht bis 10⁻⁴ genau, und ONNX Runtime lädt sie auch. Mehr in
-[Kapitel 14.10](14-lehrer.md).
+Kern schreibt seine Netze genau im selben Format wie Pollen Robotics. Exportiert wird dabei nur das
+„ungefähr so“ des Netzes, ohne Würfeln: **Auf dem Roboter wird nicht mehr ausprobiert.** Auch der
+Kritiker bleibt zu Hause; er war nur Trainer.
+
+> **Für Neugierige:** Kern braucht für den Export keine fremde Bibliothek, sondern hat einen eigenen,
+> winzigen Schreiber. Zur Probe liest Kern jede Datei wieder ein und vergleicht. Einzelheiten im
+> blauen Buch, Anhang A und Kapitel 14.
 
 ## A.15 Wie alles zusammenkommt
 
 ```mermaid
 flowchart TD
-  V["1. Vorbild suchen (CMA-ES)"] --> W["Warmstart von velstand"]
-  W --> N["2. Nachahmen (DAgger, MSE, Adam)"]
+  V["1. Vorbild suchen"] --> W["Start mit velstand"]
+  W --> N["2. Nachahmen: Schüler fährt, Vorbild kommentiert"]
   N --> K["Kritiker zuerst"]
-  K --> U["3. Üben (PPO, GAE, Variation)"]
-  U --> X["Export: ONNX mit Normalisierer"]
-  X --> S["Studio / Roboter: nur das Netz"]
+  K --> U["3. Üben mit Belohnung, Leine und Variation"]
+  U --> X["Export: Netz mit Normalisierer"]
+  X --> S["Studio und Roboter: nur das Netz"]
 ```
 
-Die Leitlinie steht in Kerns Code: „At run time there is only the network: the demonstration exists
-only while it learns.“ Vorbild, Kritiker, Rauschen, Variation – alles ist **Gerüst**, das beim Lernen
-hilft und danach abgebaut wird. Was bleibt, ist eine Normalisierung und eine Handvoll
-Matrixmultiplikationen mit ELU dazwischen. Und das reicht, damit eine Ente springt.
+Die Leitlinie steht in Kerns Code, übersetzt: „Zur Laufzeit gibt es nur das Netz – das Vorbild
+existiert nur, solange es lernt.“ Vorbild, Kritiker, Würfeln, Variation – alles ist **Gerüst**, das
+beim Lernen hilft und danach abgebaut wird. Was bleibt, ist eine Umrechnung der Messwerte und ein
+paar Schichten, die malnehmen, zusammenzählen und verbiegen. Und das reicht, damit eine Ente springt.
 
-> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level (File › Example Levels ›
-> Micro Duck), starte Play, übernimm mit F8 und drück **7**. Jeder Servo bekommt in diesem Moment
-> 50-mal pro Sekunde eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall waren.
+> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level (**File › Example Levels ›
+> Micro Duck**), starte Play, übernimm die Ente mit **F8** und drück die **7**. Jeder Servo bekommt in
+> diesem Moment 50-mal pro Sekunde eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall
+> waren.
 
-> **Probier's aus!** Auf der Lehrer-Seite (`/lehrer/` auf kernengine.de) kannst du das Lernen live
-> verfolgen. Setz das Anfangsrauschen einmal groß und einmal klein und vergleiche die Kurven:
-> Neugier gegen Vorsicht.
+> **Probier's aus!** Öffne auf kernengine.de die Lehrer-Seite `/lehrer/` und wähle als Bewegung
+> **Stehen (Schnelltest)**. Trag bei **Aktionsrauschen am Anfang** 1 ein und drück **Start**. Lass es
+> ein paar Dutzend Iterationen laufen, drück **Pause** und merk dir die Kurve der Episodenlänge (wie
+> lange die Enten durchhalten) und die Zahl **Aktionsrauschen**. Lade die Seite neu, trag 0,1 ein und
+> wiederhole das. Was du erwarten kannst: Mit 1 ist die Glocke breit, die Enten probieren wild herum;
+> mit 0,1 bleiben sie nah an ihrer Idee. Schau, wie sich die Zahl Aktionsrauschen beim Üben verändert
+> – das ist σ, das mitlernt. Neugier gegen Vorsicht: Welche Einstellung besser lernt, findest du
+> selbst heraus. Ein Lauf braucht etwas Geduld; der Tab muss dabei offen bleiben.
 
 ## Das nimmst du mit
 
-- Ein neuronales Netz ist ein Mischpult mit vielen Reglern: gewichtete Summen plus Aktivierung,
-  Schicht für Schicht. Der Sprung-Actor hat 197 774 Regler.
-- Lernen heißt, den Verlust zu verkleinern: im Nebel bergab, mit der Lernrate als Schrittlänge.
-- Backpropagation verteilt die Schuld rückwärts; Adam macht gleichmäßige, kluge Schritte.
-- Normalisierung bringt alle Eingänge auf Augenhöhe und gehört fest zum Netz.
-- Nachahmen braucht DAgger, sonst schaukeln sich kleine Fehler auf.
-- Reinforcement Learning lernt aus Belohnung, und die wird wörtlich genommen.
-- PPO verbessert mit Gurt: kleine, sichere Schritte, ein Kritiker schätzt den Vorteil.
-- Variation, Lehrpläne und asymmetrischer Kritiker bauen die Brücke von der Simulation zur
+- Ein neuronales Netz ist ein Mischpult mit vielen Reglern: malnehmen, zusammenzählen, verbiegen,
+  Schicht für Schicht. Das Sprung-Netz hat fast 200 000 Regler.
+- Lernen heißt, den Verlust zu verkleinern: im Nebel der Steigung nach bergab, mit der Lernrate als
+  Schrittlänge.
+- Backpropagation verteilt die Schuld rückwärts; Adam macht gleichmäßige, ruhige Schritte.
+- Der Normalisierer bringt alle Messwerte auf Augenhöhe und gehört fest zum Netz.
+- Nachahmen braucht DAgger: Der Schüler fährt, das Vorbild kommentiert.
+- Lernen durch Belohnung: würfeln, und was besser war als üblich, wird häufiger. Die Belohnung wird
+  wörtlich genommen.
+- PPO lernt an der Leine; der Kritiker schätzt, was üblich ist.
+- Variation, Lehrpläne und der asymmetrische Kritiker bauen die Brücke von der Simulation zur
   Wirklichkeit.
 
 ## Knobelecke
 
-1. Ein Neuron hat x₁ = 1, x₂ = 2, w₁ = 0,5, w₂ = −1, b = 1. Was gibt es mit ELU aus?
-2. Warum wäre ein Netz ohne Aktivierungsfunktion mit 100 Schichten nicht schlauer als eins mit einer?
-3. Du trainierst mit Lernrate 1,1 auf dem Verlust θ². Was passiert?
-4. Mit γ = 0,99: Wie viel zählt eine Belohnung in 100 Schritten im Vergleich zu einer jetzt?
-5. PPO: Vorteil −1, Verhältnis ρ = 1,3. Wird das noch korrigiert?
+1. Ein Neuron hat die Eingänge 1 und 2, die Gewichte 0,5 und −1 und die Grundeinstellung 1. Was
+   gibt es mit ELU aus? (Die Tabelle aus A.1 hilft.)
+2. Warum wäre ein Netz ohne Verbiegen mit 100 Schichten nicht schlauer als eins mit einer?
+3. Du gehst im Tal r² mit Lernrate 1,1 bergab. Was passiert?
+4. Wie viel zählt eine Belohnung in 100 Takten im Vergleich zu einer jetzt?
+5. PPO: Eine Aktion war schlecht (Vorteil negativ), aber das neue Netz wählt sie 1,3-mal so oft wie
+   das alte. Wird das noch korrigiert?
 
 ### Lösungen
 
-1. Summe: 0,5 − 2 + 1 = −0,5. ELU: e^(−0,5) − 1 ≈ −0,39.
-2. Lineare Rechnungen hintereinander sind wieder eine lineare Rechnung; erst die Aktivierung
-   erlaubt krumme Zusammenhänge.
-3. Der Wert springt jedes Mal über das Tal und wird immer größer: 1, −1,2, 1,44 …
-4. Etwa 0,37-mal so viel.
-5. Ja. Die neue Policy wählt die schlechte Aktion häufiger; PPO deckelt nur Verbesserungen, nie
-   Korrekturen von Verschlechterungen.
+1. Summe: 0,5 · 1 − 1 · 2 + 1 = −0,5. Laut Tabelle macht ELU daraus etwa **−0,39**.
+2. Ohne Verbiegen wird nur malgenommen und zusammengezählt; das ergibt hintereinander wieder nur
+   eine gerade Linie. Erst das Verbiegen erlaubt krumme Zusammenhänge.
+3. Der Regler springt jedes Mal über das Tal und landet immer höher: 1, −1,2, 1,44, −1,728 …
+4. Etwa 0,37-mal so viel, gut ein Drittel (Tabelle in A.10).
+5. Ja. PPO deckelt nur Verbesserungen, nie die Korrektur von Fehlern.
 
 ---
 

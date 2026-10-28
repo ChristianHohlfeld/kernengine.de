@@ -2,211 +2,304 @@
 
 > **Kurz gesagt:** Ein Netz aus dem Lehrer soll auf der echten Micro Duck laufen. Dafür muss die
 > Simulation den Roboter gut treffen, und das Netz darf sich auf nichts verlassen, was die
-> Simulation nicht genau weiß. Kern vermisst dazu Servos, vergleicht den ganzen Roboter mit der
-> Simulation und deckt den Rest mit Zufall ab.
+> Simulation nicht genau weiß. Kern vermisst dazu die Motoren, vergleicht den ganzen Roboter mit der
+> Simulation und übt den Rest unter vielen leicht verschiedenen Bedingungen ein.
+
+> **Begriffe vorab:**
+> - **Servo** – ein kleiner Motor, der auf einen vorgegebenen Winkel fährt.
+> - **Netz** – das „Gehirn“ der Ente: Es bekommt Messwerte und antwortet mit Zielen für die Servos.
+> - **Simulation** – die nachgebaute Ente im Computer, die nach den Regeln der Physik läuft.
+> - **Log** – eine Aufzeichnung: Zeile für Zeile, was gesendet und was gemessen wurde.
+> - **Episode** – ein Übungsdurchgang im Training, vom Start bis zum Sturz oder bis die Zeit um ist.
+> - **Streuung** – wie weit ein Wert schwanken darf, etwa „plus/minus zehn Prozent“.
+> - **Variation** – das Training würfelt in jeder Episode etwas andere Bedingungen aus.
+> - **deterministisch** – die Simulation rechnet bei gleichen Eingaben immer haargenau dasselbe.
 
 Kern verfolgt drei Wege und einen Grundsatz:
 
-1. **Gerätemodelle mit Profilen:** Ein Servo mit Regler, Reibung und Verzögerung ist ein kleines
-   Modell mit Zahlen in echten Einheiten, angepasst an Messungen und an anderen Messungen geprüft.
+1. **Gerätemodelle mit Profilen:** Ein Servo bekommt ein kleines Rechenmodell, beschrieben durch
+   wenige Zahlen. Diese Zahlen passt man an Messungen an und prüft sie an anderen Messungen.
 2. **Abgleich:** Eine Aufzeichnung des echten Roboters wird in der Simulation nachgespielt; der
-   Unterschied ist der verbleibende Abstand zur Wirklichkeit.
-3. **Domänen-Randomisierung:** Was die Messung nicht festlegt, variiert das Training zufällig.
-4. **Grundsatz:** Was aus Modell und Physik folgt, misst der Lehrer selbst. Box3D bleibt dabei
-   unangetastet ([Kapitel 6](06-physik.md)).
+   Unterschied ist der Abstand, der zur Wirklichkeit noch fehlt.
+3. **Variation:** Was keine Messung genau festlegt, würfelt das Training in jeder Episode neu aus.
+4. **Grundsatz:** Was aus Modell und Physik folgt, misst der Lehrer in der Simulation, statt es als
+   feste Zahl hineinzuschreiben.
+
+An der Physik-Engine selbst (Box3D, [Kapitel 6](06-physik.md)) wird dabei nichts verändert. Die
+Gerätemodelle sitzen obendrauf, so wie ein Motor auf ein Gelenk geschraubt wird.
 
 > **Stell dir vor …** du übst am Keyboard und spielst morgen auf einem echten Flügel. Du kannst
 > prüfen, wie schwer seine Tasten gehen (Gerätemodell), eine Aufnahme vom Flügel mit deinem Üben
-> vergleichen (Abgleich) und auf vielen verschiedenen Instrumenten üben (Randomisierung).
+> vergleichen (Abgleich) und auf vielen verschiedenen Instrumenten üben (Variation).
 
-> **Achtung, Falle!** Servos unter Last können schnell und kräftig ausschlagen. Prüfstand fest
-> einspannen, Arm und Gewicht sichern, Hände und Kabel aus dem Schwenkbereich, Strom begrenzen,
-> Not-Aus griffbereit. Nie über die Betriebsspannung des Herstellers gehen, Lithium-Akkus nur mit
-> geeignetem Ladegerät und unter Aufsicht laden. Neue Netze zuerst am gehaltenen oder aufgehängten
-> Roboter testen. Alles auf eigenes Risiko (siehe [Impressum](00-impressum.md)).
+> **Achtung, Falle!** Dieses Kapitel beschreibt auch Messungen an echter Hardware. Servos unter Last
+> können schnell und kräftig ausschlagen. Prüfstand fest einspannen, Arm und Gewicht sichern, Hände
+> und Kabel aus dem Schwenkbereich, Strom begrenzen, Not-Aus griffbereit. Nie über die
+> Betriebsspannung des Herstellers gehen, Lithium-Akkus nur mit geeignetem Ladegerät und unter
+> Aufsicht laden. Neue Netze zuerst am gehaltenen oder aufgehängten Roboter testen. Alles auf eigenes
+> Risiko (siehe [Impressum](00-impressum.md)).
 
 ## 16.1 Das Servomodell und sein Profil
 
-Das Servomodell kennst du aus [Kapitel 13](13-micro-duck.md): Zug zum Ziel bis zum Höchstmoment,
-Bremsen, Reibung, Rotorträgheit (Armatur), Verzögerung – gerechnet von derselben Funktion im Studio,
-im Lehrer und auf dem Prüfstand. Die Zahlen stehen in einem **Profil**, einer JSON-Datei (gekürzt):
+Ein Servo wird im Computer nicht Zahnrad für Zahnrad nachgebaut. Kern beschreibt nur, **wie er sich
+anfühlt**: wie fest er zieht, wie er bremst, wie träge und wie spät er reagiert. Diese wenigen Zahlen
+zusammen heißen **Profil**. Ein anderer Servo ist einfach ein anderes Profil.
 
-```json
-{
-  "kind": "servo", "name": "xl330",
-  "stiffness": 0.554, "damping": 0.053,
-  "friction": 0.0048, "torque": 0.963,
-  "armature": 0.0018, "delay": 0.02,
-  "spreadFriction": 0.1, "spreadArmature": 0.1,
-  "delayMin": 0.015, "delayMax": 0.03
-}
+Am einfachsten stellst du dir den Servo als vier Teile vor, die zwischen dem Gelenk und seinem
+Zielwinkel sitzen:
+
+```
+  Zielwinkel                                     Gelenk
+      ●──── Feder ────────────────────────────────●
+      │     zieht zum Ziel, aber nie stärker
+      │     als der Motor kann (Kraftgrenze)
+      │
+      ●──── Stoßdämpfer ──────────────────────────●
+            bremst, je schneller es sich dreht
+
+  dazu: Reibung im Gelenk, ein schweres Schwungrad
+        innen, und Befehle, die etwas spät ankommen
 ```
 
-Zeile für Zeile: Profil xl330; wie fest er zieht und bremst; Reibung und Kraft; wie träge und spät
-(20 ms) er reagiert; Reibung und Armatur dürfen je Exemplar ±10 % abweichen; im Training streut die
-Verzögerung zwischen 15 und 30 ms. Kern prüft jeden Wert auf einen sinnvollen Bereich. Ein anderer Servo ist ein anderes Profil;
-ein grundsätzlich anderes Gerät, etwa ein Linearaktor, bekäme ein eigenes Modell.
+| Eigenschaft | Bild aus dem Alltag | Was sie bewirkt |
+|---|---|---|
+| Steifigkeit | eine Feder, die zum Ziel zieht | je weiter weg, desto kräftiger der Zug |
+| Kraftgrenze | ein Mensch, der nur so fest ziehen kann | weit weg zieht er nicht noch fester |
+| Dämpfung | der Stoßdämpfer am Fahrrad | schnelle Bewegungen werden gebremst |
+| Reibung | ein schwergängiges Scharnier | kleine Kräfte bewegen erst einmal nichts |
+| Armatur | ein schweres Schwungrad | schwer in Gang zu bringen und zu stoppen |
+| Verzögerung | ein Befehl, der per Bote kommt | der Servo reagiert ein paar Hundertstel später |
 
-Die **Streuungen** sind ehrlich zugegebene Unsicherheit: Das Training zieht daraus je Episode und
-Servo eigene Werte. Ein gut gemessener Servo bekommt kleine Streuungen, ein schlecht bekannter große.
-So hängt das Netz nicht an Zahlen, die niemand genau kennt.
+Die **Armatur** braucht einen Satz mehr: Im Servo dreht sich ein kleiner Motor sehr schnell und
+treibt über ein Getriebe das Gelenk. Dieser flinke Motor muss bei jeder Bewegung mit beschleunigt
+werden, darum fühlt sich das Gelenk schwerer an, als seine Teile wiegen.
+
+Dasselbe Modell rechnet im Studio, im Lehrer und auf dem Prüfstand; was an einer Stelle gemessen
+ist, gilt also überall. Ein grundsätzlich anderes Gerät bekäme ein eigenes Modell.
+
+Zu jeder Zahl gehört eine **Streuung**: eine ehrlich zugegebene Unsicherheit. Das Training zieht
+daraus in jeder Episode für jeden Servo eigene Werte. Ein gut gemessener Servo bekommt eine kleine
+Streuung, ein schlecht bekannter eine große. So hängt das Netz nicht an Zahlen, die niemand genau
+kennt.
+
+Die genauen Werte und das Dateiformat des Profils stehen im blauen Buch, Kapitel 16.
+
+> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ **File › Example Levels ›
+> Micro Duck**, starte **Play**, übernimm die Ente mit **F8** und drück die **1** (Sitzen). Schau
+> auf die Beine: Sie springen nicht in die neue Haltung, sondern fahren hinein. Genau das ist das
+> Servomodell bei der Arbeit: Die Feder zieht, die Kraftgrenze und der Stoßdämpfer bremsen.
 
 ## 16.2 Der Prüfstand: einen Servo vermessen
 
+Woher kommen die Zahlen eines Profils? Man misst sie. Dazu spannt man einen einzelnen Servo ein,
+hängt einen Hebelarm mit Gewicht daran, schickt ihm Bewegungsbefehle und zeichnet auf, was er
+wirklich tut. Dieser Teil richtet sich an Bastler mit echter Hardware; zum Verstehen reicht es, das
+Prinzip zu kennen.
+
 ### So misst man
 
-1. **Aufbau:** Servo einspannen, Achse waagerecht, Arm mit Gewicht; Masse (auf 0,1 g) und
-   Schwerpunktabstand messen. Winkel 0 heißt: Arm hängt senkrecht nach unten.
-2. **Wie im Roboter betreiben:** gleiche Firmware-Einstellungen, Spannung (7,4 V, sofern der
-   Hersteller sie zulässt) und Bus-Takt.
-3. **Signale**, mindestens 100-mal pro Sekunde abgefragt: kleine und große Sprünge (etwa ±0,2 und
-   ±0,9 rad), ein Chirp (ein Hin und Her mit 0,5 rad, das von 0,5 auf 4 Hz schneller wird) und ein
-   Rechteck (±0,3 rad).
-4. **Zwei oder drei Lasten**, etwa 50 g an 5 cm und 120 g an 6 cm; mindestens ein Log je Servo nur
-   zum Prüfen.
-5. **Mehrere Servos** messen; ihre Unterschiede werden zur Streuung.
+1. **Aufbau:** Servo fest einspannen, Achse waagerecht, ein Arm mit Gewicht daran, Gewicht und
+   Hebellänge genau messen. In Ruhe hängt der Arm senkrecht nach unten wie ein Uhrpendel.
+2. **Wie im Roboter betreiben:** dieselben Einstellungen und dieselbe Spannung wie in der Ente.
+3. **Verschiedene Befehle senden** und mindestens 100-mal pro Sekunde den Winkel abfragen: kleine
+   Sprünge (etwa 10 Grad) und große (etwa 50 Grad), ein immer schnelleres Hin und Her (ein
+   **Chirp**, wie ein ansteigendes Vogelzwitschern) und ein gleichmäßiges Auf und Ab.
+4. **Zwei oder drei Lasten** ausprobieren. Mindestens eine Messung je Servo legt man beiseite; sie
+   dient später nur zum Prüfen.
+5. **Mehrere Servos** messen. Wie stark sie sich unterscheiden, wird zur Streuung im Profil.
 
-### Log und Prüfstand im Computer
+### Die Messung im Computer nachspielen
 
-Ein Prüfstand-Log ist eine Textdatei: oben Kommentarzeilen zur Last (`# mass`, `# arm` …;
-`# horizontal 1` heißt: Achse waagerecht, die Schwerkraft zieht den Arm wie ein Pendel), dann
-Zeilen mit Zeit, gesendetem und gemessenem Winkel. Kern baut den Servo mit Last in Box3D nach, in
-derselben Umgebung wie die Ente (Maßstab 4, gleiche Schrittrate, Gelenkweichheit und Armatur), spielt die gesendeten Ziele mit Verzögerung ab und
-vergleicht simulierten und gemessenen Winkel. Der Fehler ist der quadratische Mittelwert, kurz **RMS**.
+Die Aufzeichnung (das **Log**) ist eine einfache Textdatei: zu jedem Zeitpunkt der gesendete und
+der gemessene Winkel. Kern baut nun denselben Servo mit derselben Last in der Simulation nach, in
+genau derselben Umgebung wie die Ente, und schickt ihm dieselben Befehle. Heraus kommen zwei Kurven:
+
+```
+  Winkel
+    │      ╭───────╮            ── gemessen
+    │     ╱ ╭──────╮╲           ·· simuliert
+    │    ╱ ╱        ╲╲
+    │───╯╱           ╲╰───
+    └────────────────────────► Zeit
+       Abstand = wie weit die Kurven auseinanderliegen
+```
+
+Je besser das Profil, desto genauer decken sich die Kurven. Den Abstand fasst Kern in **eine Zahl**
+zusammen: den durchschnittlichen Abstand zwischen beiden Kurven, wobei große Ausreißer stärker
+zählen. Fachleute nennen das **RMS-Fehler**.
 
 ### Anpassen und prüfen
 
-```
-kern_lehrer --kalibrieren steps.csv,chirp.csv \
-  --pruefen rechteck.csv --out xl330_unit3.json
-```
-
-Das sucht ein Profil, das die ersten beiden Logs am besten erklärt, und prüft es am dritten. Gesucht
-wird mit **CMA-ES** ([Kapitel 14](14-lehrer.md)): 12 Kandidaten pro Generation, standardmäßig 80
-Generationen. Die sechs Stellschrauben sind die fünf Servowerte (als Faktor zum Startprofil) und die
-Verzögerung. Mit `--profil` beginnt die Suche bei einem eigenen Startprofil, `--iterations` ändert
-die Zahl der Generationen, `--threads` verteilt die Kandidaten auf mehrere Rechenkerne.
+Jetzt sucht der Computer die Profilwerte, bei denen die simulierte Kurve die gemessene am besten
+trifft. Er dreht an sechs Stellschrauben: den fünf Eigenschaften des Servos und der Verzögerung.
+Gesucht wird mit **CMA-ES**, dem Suchverfahren aus [Kapitel 14](14-lehrer.md): Es probiert eine
+Gruppe von Kandidaten aus, rückt zu den besseren hin und probiert in deren Nähe weiter.
 
 > **Stell dir vor …** zwölf Gitarren mit je sechs Wirbeln, jede etwas anders gestimmt. CMA-ES hört
 > hin, welche am besten klingen, und stimmt die nächsten zwölf ähnlich wie die Gewinner.
 
-Entscheidend ist der **Prüf-Fehler** („held out“). Nur er zeigt, ob das Modell den Servo erklärt
-oder die Kurven bloß auswendig kann – wie eine Klassenarbeit mit neuen Aufgaben. Darum gehören ins
-Prüf-Log ein anderes Signal und eine andere Last.
+Entscheidend ist danach der **Prüf-Fehler**: der Abstand auf der Messung, die man beiseitegelegt
+hat. Nur er zeigt, ob das Profil den Servo wirklich erklärt oder die Kurven bloß auswendig kann –
+wie eine Klassenarbeit mit neuen Aufgaben statt der geübten. Darum sollte die Prüfmessung ein anderes
+Signal und eine andere Last haben.
 
-> **Wusstest du?** Im Test weicht ein Servo absichtlich vom Profil ab (Steifigkeit −20 %, Reibung
-> +50 %, 30 ms Verzögerung und mehr). Die Kalibrierung drückt den Prüf-Fehler auf unter ein Fünftel
-> und unter 3 Milliradiant.
+> **Wusstest du?** Kern prüft das Verfahren mit einem absichtlich „verstellten“ Servo: Er zieht
+> schwächer, reibt stärker und reagiert später als das Startprofil. Nach der Anpassung trifft die
+> Simulation auch die Prüfmessung fast genau – der Rest liegt unter einem Fünftel Grad.
 
-Ohne echten Servo schreibt `kern_lehrer --beispiele beispiele/` simulierte Beispiel-Logs (Sprünge,
-Chirp, ein Roboter-Log) und das Profil, um die Kette einmal durchzuspielen.
-
-> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ das Micro-Duck-Level und
-> stelle bei der Ente **Actions to servo goals** auf `robot` (so fährt Pollens Software den echten
-> Roboter). Starte Play, übernimm die Ente mit **F8** und kick den Ball mit der 3. Merkst du den
-> Unterschied?
+Ohne echten Servo kann man die Kette mit Beispiel-Messungen aus der Simulation durchspielen. Die
+Befehle dafür stehen im blauen Buch, Kapitel 16 und 17.
 
 ## 16.3 Abgleich: der ganze Roboter
 
-Für den **Abgleich** braucht man ein Log des echten Roboters mit 50-mal pro Sekunde allen 61
-Beobachtungen und 14 Aktionen, beginnend still in Grundhaltung. (Wie der Roboter es schreibt,
-beschreibt dieses Buch nicht.)
+Der Prüfstand vermisst einen Servo. Der **Abgleich** prüft den ganzen Roboter: Man nimmt eine
+Aufzeichnung der echten Ente – was sie in jedem Moment gemessen und welche Befehle ihr Netz gegeben
+hat – und spielt dieselben Befehle in der Simulation nach. Dann vergleicht man, was die echte und
+was die simulierte Ente dabei gemessen haben.
 
-```
-kern_lehrer --abgleich roboter.csv --profil xl330_unit3.json
-```
+> **Stell dir vor …** zwei Musiker spielen nach denselben Noten, einer auf der Bühne, einer im
+> Proberaum. Du legst die beiden Aufnahmen übereinander. Wo sie auseinanderlaufen, stimmt etwas am
+> Instrument im Proberaum nicht.
 
-Die Simulation startet stehend auf dem sauberen Roboter, bekommt Takt für Takt dieselben Aktionen
-wie im Training (ohne Abschwächung und Glättung) und vergleicht ihre Sensoren mit dem Log:
-Drehung, Schwerkraft, Gelenkwinkel, -geschwindigkeiten – je Gruppe und für jedes Gelenk einzeln.
-Bleibt ein Gelenk auffällig, fehlt dort etwas im Modell, etwa Getriebespiel.
+Die simulierte Ente startet still in ihrer Grundhaltung, ohne Variation, mit den Servos aus dem
+Profil, und bekommt 50-mal pro Sekunde die Befehle aus der Aufzeichnung. Verglichen wird, was ihre
+Sensoren melden – wie sich der Körper dreht, wo „unten“ ist, wie die Gelenke stehen und wie schnell
+sie sich bewegen –, für jedes Gelenk einzeln.
 
-Das Schöne: Ein Log aus der Simulation, mit denselben Servos abgespielt, ergibt Abstand **genau 0**,
-Bit für Bit, denn die Simulation ist deterministisch; mit anderen Servos ergibt sich ein messbarer
-Abstand. Darum ist jeder Unterschied zu einem echten Log ein echter Modellfehler und kein Rauschen.
+Bleibt ein Gelenk auffällig, fehlt dort etwas im Modell. Ein Kandidat ist **Getriebespiel**: ein
+bisschen Wackeln im Getriebe, bevor die Zahnräder greifen. Kerns Servomodell kennt das noch nicht.
 
-> **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die Step rate auf 90 statt
-> 100 und starte Play. Kern meldet, dass der Takt nicht passt:
-> „set World Settings > Step Rate to 100“.
+Das Schöne: Spielt man eine Aufzeichnung **aus der Simulation** mit denselben Servos wieder ab, ist
+der Abstand **genau null**, Bit für Bit, weil die Simulation deterministisch ist. Mit anderen Servos
+ergibt sich ein messbarer Abstand. Darum ist jeder Unterschied zu einer echten Aufzeichnung ein
+echter Fehler im Modell und kein Zufall der Simulation.
+
+Wie der echte Roboter eine solche Aufzeichnung schreibt, beschreibt dieses Buch nicht; den Befehl
+für den Abgleich nennt das blaue Buch, Kapitel 16.
+
+> **Probier's aus!** Wie viel kleine Unterschiede ausmachen, siehst du im Studio. Öffne **File ›
+> Example Levels › Micro Duck** und klick die Ente an. Im **Details**-Panel steht unter **Player
+> Controller › Walker** das Feld **Actions to servo goals**. Lass es auf `training`, starte Play,
+> übernimm die Ente mit **F8**, lauf mit W A S D zum Ball und kick mit der **3**. Stoppe mit
+> **Esc**, stell das Feld auf `robot` und kick noch einmal. `robot` schwächt und glättet die Befehle
+> so, wie Pollens Software den echten Roboter fährt – und nun kippen die Kicks um. Dasselbe Netz,
+> ein etwas anderer Weg zum Motor: Genau solche Unterschiede soll der Abgleich finden.
 
 ## 16.4 Training mit dem eigenen Profil
 
-```
-kern_lehrer --task jump --profil xl330_unit3.json --out jump.onnx
-```
+Hat man seine Servos vermessen, trainiert man neue Netze mit genau diesem Profil, samt seinen
+Streuungen. Bei jeder Episode bekommen die Enten Servos, die innerhalb der Streuung leicht
+voneinander abweichen. Bei der Abschlussbewertung ohne Variation gilt das Profil exakt.
 
-Jetzt trainieren die Enten mit den gemessenen Servos samt Streuungen; bei der Bewertung ohne
-Variation gilt das Profil exakt. Das wirkt auf die Bewegungen; die Spielschicht nutzt derzeit immer
-das XL330-Profil und variiert Reibung und Armatur in dessen Streuung.
+> **Für Neugierige:** Das eigene Profil wirkt auf das Training der Bewegungen, etwa des Sprungs. Die
+> Spielschicht übt derzeit immer mit dem XL330-Profil. Der Befehl dafür steht im blauen Buch,
+> Kapitel 16.
 
-## 16.5 Domänen-Randomisierung
+> **Probier's aus!** Stell im Micro-Duck-Level unter **World Settings** die **Step rate** auf 90
+> statt 100 und starte Play. Kern meldet: „set World Settings > Step Rate to 100“. Warum so streng?
+> Ente und Netz sind auf genau 100 Physikschritte pro Sekunde abgestimmt; daraus folgen ihr Takt und
+> die Verzögerung der Servos. Mit einem anderen Takt wäre die Simulation nicht mehr dieselbe wie
+> beim Training und Vermessen. Stell danach wieder 100 ein.
 
-Was nicht gemessen ist oder streut, würfelt das Training aus:
+## 16.5 Variation: üben unter wechselnden Bedingungen
 
-| Unsicherheit | Wie das Training sie abdeckt |
+Was man nicht gemessen hat oder was von Ente zu Ente schwankt, lässt das Training absichtlich
+schwanken. Jede Episode bekommt etwas andere Motoren, einen etwas anderen Boden, etwas
+unzuverlässigere Sensoren. Ein Netz, das in all diesen Welten zurechtkommt, kommt auch mit der echten
+zurecht – die ist dann nur eine weitere Variante. Fachleute nennen das **Domänen-Randomisierung**.
+
+> **Stell dir vor …** du übst Tischtennis mal mit schwerem, mal mit leichtem Ball, auf rutschigem
+> und auf stumpfem Boden. Am Turniertag ist dir egal, wie der Saal ist.
+
+| Was unsicher ist | Wie das Training es abdeckt |
 |---|---|
-| Servo-Exemplare | eigene Werte je Servo (XL330: ±10 %) |
-| Buslatenz | 15–30 ms |
-| Bau (Akku, Kabel …) | Rumpfmasse und -trägheit ±5 %, Schwerpunkt verschoben |
-| Boden | Sohlenreibung × 0,7–1,3 |
-| Lagesensor, Gelenkgeber | Rauschen, 0–1 Takt Verzögerung, Versatz bis ±0,015 rad |
-| Störungen | Stöße alle 3–6 s, bis ±0,3 m/s |
-| Kamera-Detektor | Positionsrauschen, bis 20 % Aussetzer |
-| Spielzeug | Ballradius 3,5–6 cm, 15–50 g |
+| jeder Servo ein Einzelstück | jeder Servo etwas anders, innerhalb seiner Streuung |
+| Verzögerung auf dem Datenkabel | Befehle kommen mal früher, mal später an |
+| Bau (Akku, Kabel …) | Rumpf mal etwas schwerer, Schwerpunkt etwas verschoben |
+| Boden | mal glatter, mal griffiger |
+| Lagesensor und Gelenksensoren | sie rauschen, hinken nach, sind leicht verstellt |
+| Störungen | ab und zu ein zufälliger Schubs |
+| Kamera | ungenaue Position, manchmal sieht sie gar nichts |
+| Spielzeug | Bälle mal größer, mal kleiner, mal schwerer |
 
-Genaue Bereiche in [Kapitel 14](14-lehrer.md). Ein Trick: Der **Kritiker**, der beim Training
-bewertet, sieht immer den sauberen Zustand; nur der **Actor**, der auf den Roboter kommt, muss mit
-verrauschten Sensoren klarkommen. Getriebespiel variiert nur Pollens Training, über eigene
-Varianten des Bauplans (velstand ist dagegen robust); Kerns eigene Netze lernen ohne.
+Ein Trick dabei: Der **Kritiker** – das zweite Netz, das beim Training nur bewertet, wie gut eine
+Lage ist – sieht immer die saubere Wahrheit. Nur das handelnde Netz, das später auf den Roboter
+kommt, muss mit verrauschten Sensoren klarkommen. Der Kritiker bleibt beim Training, er darf also
+„schummeln“.
+
+Die genauen Bereiche stehen im blauen Buch, Kapitel 14 und 16.
+
+> **Für Neugierige:** Getriebespiel variiert Pollen Robotics in seinem eigenen Training. Kerns
+> eigene Netze lernen bisher ohne.
+
+> **Probier's aus!** Starte Play im Micro-Duck-Level, ohne die Ente zu übernehmen. Du schaust zu und
+> kannst Körper mit der linken Maustaste greifen. Greif den Ball, zieh ihn zur laufenden Ente und
+> lass ihn los, sodass er sie anstößt. Schau, wie sie darauf reagiert. Zufällige Schubse wie dieser
+> gehören zu dem, was im Training variiert wird – damit ein Stoß die Ente nicht überrascht.
 
 ## 16.6 In der Physik messen statt eintragen
 
-Zahlen, die aus Modell und Physik folgen, stimmen als feste Werte im Code nach der nächsten
-Änderung nicht mehr. Also misst Kern sie in der Simulation, wie am echten Roboter:
+Manche Zahlen ergeben sich aus der Physik. Würde man sie fest hineinschreiben, stimmten sie nach der
+nächsten Änderung an Reibung, Modell oder Servo nicht mehr. Also misst Kern sie in der Simulation,
+so wie man sie am echten Roboter messen würde.
 
-- **Die Bissposition:** Wo muss die Socke liegen, damit das Aufheben sie greift und hält? Der
-  Lehrer probiert vor dem ersten Training 99 Stellen und nimmt die zuverlässigste.
-- **Der Nachlauf nach „Stopp“** (`--halt-messen`): Hier gilt die Regel noch nicht ganz – das
-  Vorbild trägt den gemessenen Wert (0,7 cm aus 0,12 m/s) fest ein; nach einer Änderung der Physik
-  misst man neu.
-- **Der Griffsensor:** „hält etwas“ ist das, was der Mund-Servo meldet.
-- **Stillstand:** gemessen über die Fußkontakte, nicht über „kein Laufbefehl“.
+> **Stell dir vor …** ein Kochrezept sagt „20 Minuten backen“. Mit einem neuen Ofen stimmt das nicht
+> mehr. Besser ist „backen, bis der Zahnstocher trocken herauskommt“ – das gilt in jedem Ofen.
 
-Eingetragen ist dagegen die Reibung der Materialpaare, begründet mit typischen Werten – sie wartet
-auf eine Messung am echten Material.
+- **Die Bissposition:** Wo muss die Socke liegen, damit die Ente sie beim Aufheben greift und
+  hält? Der Lehrer probiert vor dem ersten Training 99 Stellen aus und nimmt die zuverlässigste.
+- **„Hält etwas im Schnabel“:** Der Schnabel-Servo ist auf „zu“ gestellt und steht trotzdem ein
+  Stück offen – dann steckt etwas dazwischen.
+- **Stillstand:** beide Füße am Boden, statt „es gibt keinen Laufbefehl“.
+- **Ausnahme, der Nachlauf nach „Stopp“:** Wie weit die Ente beim Anhalten noch geht, wurde einmal
+  gemessen und dann fest eingetragen. Nach einer Änderung der Physik muss man neu messen.
+
+Fest eingetragen ist dagegen die Reibung zwischen Materialien, etwa Stoff auf Holzboden. Diese Werte
+stammen aus typischen Tabellen und warten auf eine Messung am echten Material.
 
 ## 16.7 Grenzen und nächste Schritte
 
-- **Noch keine echten Messdaten** – alles ist mit Logs aus der Simulation geprüft.
-- **Getriebespiel** fehlt; zeigt der Abgleich es, kommt es ins Servomodell.
-- **Armatur** ist eine mitdrehende Scheibe; **Kick rechts** kippt manchmal.
-- **Lagesensor** und **Kamera-Detektor** haben noch keine gemessenen Profile.
-- **Reibungsmischung** und **Maßstab 4** sind harmlos: Boden und Sohle greifen im Beispiel-Level
-  beide mit 1,0, und alles ist in echten Einheiten.
+Ehrlich gesagt: Bisher ist alles nur mit Messungen **aus der Simulation** geprüft; echte Messungen
+fehlen noch. Sobald es sie gibt, funktionieren dieselben Werkzeuge mit ihnen. Außerdem:
+
+- **Getriebespiel** fehlt. Zeigt der Abgleich, dass es gebraucht wird, kommt es ins Servomodell.
+- **Ein bekannter Wackler:** Nach dem Kick mit rechts kippt die Ente in Kern manchmal um. Mögliche
+  Gründe sind Wackeln im Getriebe, zu weiche Kontakte oder die Fußreibung – ein typischer Fall für
+  den Abgleich mit einer echten Aufzeichnung.
+- **Lagesensor und Kamera** haben noch keine eigenen, gemessenen Profile; ihr Rauschen ist bisher
+  eine Annahme des Trainings.
+
+Weitere kleine Vereinfachungen, die sich im Beispiel-Level nicht auswirken, beschreibt das blaue
+Buch, Kapitel 16.
 
 ## Das nimmst du mit
 
-- Drei Wege zum echten Roboter: Gerätemodelle, Abgleich, Randomisierung.
-- Ein Servo ist ein Profil: wenige Zahlen in echten Einheiten plus Streuungen.
-- CMA-ES passt das Profil an Prüfstand-Messungen an; zählen tut der Prüf-Fehler.
-- Der Abgleich zeigt je Gelenk, wo Simulation und Roboter auseinanderlaufen.
-- Determinismus macht jeden Unterschied zu einem echten Modellfehler.
+- Drei Wege zum echten Roboter: Gerätemodelle vermessen, mit Aufzeichnungen abgleichen, unter
+  Variation üben.
+- Ein Servo ist ein Profil: Feder mit Kraftgrenze, Stoßdämpfer, Reibung, Schwungrad und Verzögerung,
+  dazu ehrliche Streuungen.
+- Der Prüfstand vermisst einen Servo; der Computer stimmt das Profil darauf ab. Zählen tut der
+  Fehler auf einer Messung, die beim Anpassen nicht benutzt wurde.
+- Der Abgleich zeigt Gelenk für Gelenk, wo Simulation und Roboter auseinanderlaufen.
+- Weil die Simulation immer exakt gleich rechnet, ist jeder Unterschied ein echter Modellfehler.
 - Was sich messen lässt, misst Kern, statt es einzutragen.
 
 ## Knobelecke
 
-1. Warum reicht es nicht, nur den Fehler auf den Anpassungs-Logs anzuschauen?
+1. Warum reicht es nicht, nur den Fehler auf den Messungen anzuschauen, an die das Profil angepasst
+   wurde?
 2. Ein Servo ist sehr gut vermessen. Sollte seine Streuung groß oder klein sein?
-3. Ein Log aus der Simulation wird mit denselben Servos abgeglichen. Welcher Abstand kommt heraus,
-   und warum?
+3. Eine Aufzeichnung aus der Simulation wird mit denselben Servos abgeglichen. Welcher Abstand kommt
+   heraus, und warum?
 4. Warum ist es riskant, die Bissposition als feste Zahl in den Code zu schreiben?
 
 ### Lösungen
 
-1. Weil das Profil die Kurven sonst nur auswendig lernen könnte. Erst neue Daten zeigen, ob es den
-   Servo wirklich erklärt.
+1. Weil das Profil die Kurven sonst nur auswendig lernen könnte. Erst eine neue Messung zeigt, ob es
+   den Servo wirklich erklärt – wie eine Klassenarbeit mit neuen Aufgaben.
 2. Klein. Große Streuungen sind für Werte, die man nicht genau kennt.
-3. Genau 0, Bit für Bit, weil die Simulation deterministisch ist.
+3. Genau null, Bit für Bit, weil die Simulation bei gleichen Eingaben immer haargenau dasselbe
+   rechnet.
 4. Nach der nächsten Änderung an Reibung, Modell oder Servo stimmt sie nicht mehr. Gemessen passt
    sie immer zur aktuellen Physik.
 
