@@ -3,6 +3,7 @@
 
     python3 kern/tools/buch_umschlag.py --pages 452 [--en] [--out kern-buch-umschlag.pdf]
     python3 kern/tools/buch_umschlag.py --pages 300 --gruen   (the green edition: "Einfach erklärt")
+    python3 kern/tools/buch_umschlag.py --pages 250 --gelb    (the yellow edition for 12 to 16: "Für Entdecker")
 
 The cover's size follows from the trim size and the page count:
   width  = 2 x trim width + spine + 2 x hinge + 2 x (wrap + overhang)
@@ -25,6 +26,7 @@ ap.add_argument("--out", default=None)
 ap.add_argument("--trim", default="7x10", help="trim size in inches")
 ap.add_argument("--spine", type=float, default=0, help="spine width in inches (default: from the page count)")
 ap.add_argument("--gruen", action="store_true", help="the green edition (kern/docs/buch-gruen): same content, explained more simply")
+ap.add_argument("--gelb", action="store_true", help="the yellow edition (kern/docs/buch-gelb) for readers from 12 to 16")
 ap.add_argument("--image", default="studio.png", help="the front picture (in kern/docs/buch/bilder); no duck on the cover of a book that is sold: the robot is Pollen Robotics'")
 a = ap.parse_args()
 
@@ -39,9 +41,11 @@ SAFE, HINGE_SAFE = 0.635, 0.4
 S = a.spine or round(a.pages * 0.002252 + 0.189, 3)
 TW, TH = 2 * W + S + 2 * SPINE_SIDE + 2 * MX, H + 2 * MY
 M = MY
-out = pathlib.Path(a.out or ("kern-book-cover.pdf" if a.en else "kern-gruen-umschlag.pdf" if a.gruen else "kern-buch-umschlag.pdf")).resolve()
+out = pathlib.Path(a.out or ("kern-book-cover.pdf" if a.en else "kern-gruen-umschlag.pdf" if a.gruen else "kern-gelb-umschlag.pdf" if a.gelb else "kern-buch-umschlag.pdf")).resolve()
 # Each edition has its colour: blue for the technical book, green for the simpler one.
-C = (dict(bg1="#1d4a33", bg2="#0f2a1d", bg3="#08170f", acc="#a8e6b8", line="#3ddc84", light="#d8f0df", blurb="#e0f2e6", rights="#93b9a0", grid="#a8e6b8")
+C = (dict(bg1="#5a4400", bg2="#2e2300", bg3="#171100", acc="#ffd84a", line="#ffc400", light="#fff1c2", blurb="#fff6dc", rights="#c9b47a", grid="#ffd84a")
+     if a.gelb else
+     dict(bg1="#1d4a33", bg2="#0f2a1d", bg3="#08170f", acc="#a8e6b8", line="#3ddc84", light="#d8f0df", blurb="#e0f2e6", rights="#93b9a0", grid="#a8e6b8")
      if a.gruen else
      dict(bg1="#1b3358", bg2="#0d1830", bg3="#070d1a", acc="#9cc4ff", line="#3d8bff", light="#d5e2f5", blurb="#dbe5f4", rights="#8ea3c4", grid="#9cc4ff"))
 
@@ -76,7 +80,23 @@ how rendering, physics and neural networks work – and how to train your own mo
 <p><b>Christian Heinrich Hohlfeld</b>, a software engineer since 2010, designed Kern and built it with AI.</p>
 <p>The software is open source and free: <b>kernengine.de</b></p>"""),
 }
-if a.gruen:
+if a.gelb:
+    t = {
+        "book": "Für Entdecker",
+        "sub": "Wie Spiele, Physik und lernende Roboter funktionieren – für Jugendliche ab 12",
+        "tag": "Missionen, Rätsel und echte Technik",
+        "blurb": """<p>Wie kommt ein 3D-Spiel in deinen Browser? Warum fällt ein Würfel genau so, wie er fällt? Und wie lernt ein
+kleiner Roboter laufen, ohne dass ihm jemand jede Bewegung vorschreibt?</p>
+<p><b>Kern</b> ist eine echte 3D-Engine, die im Browser läuft – mit Grafik, Physik, Sound, Mehrspieler und dem Editor
+<b>Kern Studio</b>, in dem du eigene Level und Spiele baust. Mit dem <b>Lehrer</b> lernt darin die Micro Duck, ein
+zweibeiniger Laufroboter, zu laufen, zu springen, einen Ball zu kicken und eine Socke zu holen.</p>
+<p>Dieses Buch erklärt alles davon – vollständig und ohne Abkürzungen, mit Mathe aus der Schule, mit Missionen zum
+Selbermachen und einer Rätsel-Ecke in jedem Kapitel. Die gelbe Ausgabe hat denselben Inhalt wie
+„Kern – Das Buch“ und „Kern – Einfach erklärt“.</p>
+<p><b>Christian Heinrich Hohlfeld</b>, Softwareentwickler seit 2010, hat Kern entworfen und mit KI gebaut.</p>
+<p>Die Software ist Open Source und kostenlos: <b>kernengine.de</b></p>""",
+    }
+elif a.gruen:
     t = {
         "book": "Einfach erklärt",
         "sub": "Die Engine, Kern Studio, ein Laufroboter und der Lehrer – für alle, die verstehen wollen, wie Spiele und lernende Roboter funktionieren",
