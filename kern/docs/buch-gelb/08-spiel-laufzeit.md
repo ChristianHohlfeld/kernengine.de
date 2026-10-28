@@ -14,7 +14,7 @@ laufen mit genau diesem Code.
 > Rezept liegt ordentlich im Kochbuch. Gekocht wird an einer Kopie, damit das Buch sauber bleibt.
 
 Der Code liegt im Bereich `kern::game`: Level, Dateiformat, GameWorld, Soldat, Logik, Sound,
-Touch, Mehrspieler, Micro Duck und Demo-Levels.
+Touch, Mehrspieler, die Micro Duck und Demo-Levels.
 
 ## 8.1 Das ganze Leben eines Spiels in fünf Zeilen
 
@@ -181,7 +181,7 @@ werden oft weggelassen, das hält die Datei klein.
 - Falsche Typen sind Fehler mit Meldung, etwa „friction must be a number“. Die Meldung nennt den
   Actor.
 - Zahlen werden auf ihren Bereich begrenzt: Reibung 0 bis 10, Rauheit 0 bis 1, Schrittrate 15 bis
-  480 Hz, Sichtfeld 20° bis 120° und so weiter. Riesige Werte über 10 Millionen sind verboten.
+  480 Hz, Sichtfeld 20° bis 120° und so weiter. Vektorwerte müssen endlich und höchstens 10 Millionen groß sein.
 - Fehlende oder doppelte Nummern werden neu vergeben. Ein Eltern-Actor, den es nicht gibt, wird zu
   „keiner“, und **Kreise** (A ist Elternteil von B, B von A) werden aufgebrochen.
 
@@ -248,7 +248,7 @@ heißt „an der Welt festgemacht“. Ein positiver Motorwert bewegt den Actor r
 | replica | Kopie eines Server-Spiels im Netz ([Kapitel 10](10-netzwerk.md)) |
 
 Zwischen Simulate und Play kann man mitten im Lauf wechseln (Studio: F8); der Spieler behält seinen
-Zustand. Man kann neu starten, pausieren und genau einen Schritt weitergehen (Taste `.`).
+Zustand. Man kann neu starten (Ctrl+R), pausieren und genau einen Schritt weitergehen (Taste `.`).
 
 > **Mission:** Starte im Physics Lab **Simulate**, drücke **Pause** und dann mehrmals die Taste
 > **.** – die Welt läuft Schritt für Schritt. Greif zwischendurch eine Kiste mit der linken
@@ -294,7 +294,8 @@ die Kamera, und `present` gibt alles an den Renderer: eingesammelte Pickups und 
 bleiben unsichtbar, Verkehr, Schüsse und Partikel kommen dazu, nachts leuchten die Fenster.
 
 **Im Studio** kommen pro Bild dazu: Kameras und Touch, Breakpoints prüfen, Meldungen ins Output Log,
-beim Bearbeiten das Level abgleichen, zuletzt Zeichnen und Audio.
+beim Bearbeiten das Level abgleichen, zuletzt Zeichnen und Audio. Auch hier zählt ein Bild höchstens
+0,1 s.
 
 ## 8.10 Controller: fahren, rollen, laufen, fliegen
 
@@ -348,7 +349,7 @@ schütteln die Kamera. Soldaten haben eine eigene Kamera.
 Das **HUD** zeigt über dem Spiel Status, Titel, Meldung, Punkte, Pickups, Zeit, Restzeit, Tempo,
 Boost, Bestzeit und beim Soldaten Gesundheit und Munition.
 
-![Play im Studio mit HUD: Orb Run mit gesammelten Orbs, Punkten, Zeit und Tempo](../buch/bilder/studio-play.png)
+![Play im Studio mit HUD: Orb Run direkt nach dem Start, mit Zähler für die Orbs, Punkten, Zeit und Tempo](../buch/bilder/studio-play.png)
 
 **Siegbedingungen:**
 
@@ -397,8 +398,11 @@ Der **Soldat** ist das Spielmodell für Ego-Shooter, übernommen aus SpawnCity. 
 Character Mover, duckt, sprintet und springt; ein Druck kurz vor der Landung oder kurz nach einer
 Kante zählt noch. Ein Schuss ist ein Prüfstrahl aus dem Auge, die Streuung ist **deterministisch**
 (aus Actor-Nummer und Schusszahl berechnet). Im Mehrspieler gleicht der Server die Netzverzögerung
-aus (*Lag-Kompensation*, höchstens 0,5 s zurück). Bei 0 Lebenspunkten startet ein Spieler nach einer
-Wartezeit neu. Figur und Waffe sind aus Grundformen gebaut und reine Darstellung. Eine eigene Kamera
+aus (*Lag-Kompensation*, höchstens 0,5 s zurück). Rüstung fängt bis zu zwei Drittel des Schadens ab, frisch
+gespawnte Spieler sind 2,5 s geschützt, und ab 7,7 m/s Landetempo gibt es Fallschaden (ab 15 m/s
+tödlich). Bei 0 Lebenspunkten startet ein Spieler nach einer Wartezeit neu; andere Actors
+verschwinden und kehren, wenn eingestellt, an ihren Platz zurück. Ein Actor mit Explosionsradius
+explodiert dabei und schubst und beschädigt, was in der Nähe ist. Figur und Waffe sind aus Grundformen gebaut und reine Darstellung. Eine eigene Kamera
 gehört dazu.
 
 ## 8.14 Walker
@@ -480,7 +484,8 @@ Unter File › Example Levels und File › New Level findest du die eingebauten 
   und einem Turm. Ziel: 150 Punkte. Auch im Mehrspieler spielbar.
 - **Micro Duck:** ein Zimmer im Maßstab des Roboters (2,5 × 2,5 m echt, 10 × 10 m in der Welt) mit
   Ball und Socken. Die Ente läuft selbstständig, 100 Schritte pro Sekunde, Observer-Kamera. Ein
-  Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht.
+  Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht. Weil Play hier mit der
+  Observer camera beginnt, übernimmst du die Ente mit **F8**.
 - **Basic:** Boden 40 × 40 m und ein Würfel.
 - **Empty:** gar nichts, nicht einmal Boden.
 

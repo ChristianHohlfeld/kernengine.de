@@ -199,12 +199,13 @@ Lautstärke-Flattern (das „Quaken“) und etwas Rauschen als Atem. Es gibt sie
 `greet`, `inquire`, `peck`, `chirp`, `coo`, `wheee` – je 6 bis 12 Varianten, von denen eine zufällig
 gespielt wird. `wheee` hat Anfang, Schleife und Ende, damit es so lange dauert wie eine Fahrt.
 
-> **Krass, aber wahr:** Die Entenstimme ist **bitgenau** wie das Original. Alle 328 Laute haben
-> dieselbe Länge und eine Abweichung von genau 0.
+> **Krass, aber wahr:** Die Entenstimme ist **bitgenau** wie das Original. Vergleicht man alle 328
+> Laute mit dem Rust-Original, haben sie dieselbe Länge und eine Abweichung von genau 0.
 
 Zum Schluss entfernt ein Filter alles unter 300 Hz – so tief kann der kleine Lautsprecher des
 Roboters nicht. Im Spiel klingt jeder Laut auf dem Bus `voice` am **Kopf** der Ente. Ein neuer Laut
-schneidet den alten ab. Weil ein Laut auf dem Handy einige zehn Millisekunden Rechenzeit kostet,
+schneidet den alten ab – wie bei einem einzigen echten Lautsprecher. Während `wheee` werden andere
+Laute weggelassen. Weil ein Laut auf dem Handy einige zehn Millisekunden Rechenzeit kostet,
 berechnet Kern sie vorab, einen pro Bild. Wann die Ente was ruft: [Kapitel 13](13-micro-duck.md).
 
 ## 7.7 Klang im Spiel
@@ -232,14 +233,18 @@ Stimmen und Hintergrund, nie an Musik und Oberfläche) und macht dann:
 > **Vorsicht, Falle:** Ein Knall eine halbe Sekunde nach dem Blitz wirkt kaputt. Zu spät ist
 > schlimmer als nie – darum wirft Kern verspätete Cues weg.
 
-Effekte haben Priorität 10 und verdrängen nie Musik oder Motor. Bei Motor „auto“ bekommen Hover Car
+Cues haben Priorität 10 (auf dem Bus `ui` 50) und verdrängen deshalb nie Musik, Motor oder Loops.
+Warten mehr als 64 Cues, wird abgeschnitten. Der **Lautsprecher-Knopf** in der Statusleiste des
+Studios schaltet den Master stumm; das bleibt auch über Play und Stop hinweg so. Bei Motor „auto“ bekommen Hover Car
 und Flyer `hover`, Vehicle `engine`, die Micro Duck `servo`, die anderen keinen.
 
 ## 7.8 Cues und Aufprallgeräusche
 
 Die Simulation spielt nie selbst Ton. Sie schreibt in den festen Physikschritten **Cues**, kleine
 Bestellzettel: Sound, Ort, Lautstärke, Bus, Actor. Darum sind sie deterministisch. Im Netzwerkspiel
-werden Sounds ohne Garantie verschickt ([Kapitel 10](10-netzwerk.md)).
+werden Sounds ohne Garantie verschickt, wichtige Ereignisse wie ein eingesammeltes Pickup dagegen
+sicher ([Kapitel 10](10-netzwerk.md)). Ohne Zuhörer (zum Beispiel beim Training) hebt Kern nur die
+neuesten 64 Cues auf.
 
 Jeder Rigid Body hat einen **Aufprall-Sound** (Standard `builtin:impact`) und eine Schwelle von
 2,5 m/s. Jeder Collider kann einen eigenen haben – die Sohle der Ente macht `plastic_step`, ihr
@@ -251,8 +256,8 @@ Gehäuse `plastic`. Die Regeln:
    Sohle hüpft winzig und meldet sonst viele Treffer.
 4. **Lautstärke** = (v − Schwelle) / (5 · Schwelle) + 0,2, zwischen 0,2 und 1. Bei Schwelle 2,5 m/s
    und 10 m/s: 7,5 / 12,5 + 0,2 = 0,8.
-5. Leichte Stöße spielen das sanftere `impact_light`.
-6. Schwere Dinge klingen tiefer.
+5. Leichte Stöße (unter dem 2,2-Fachen der Schwelle) spielen das sanftere `impact_light`.
+6. Schwere Dinge klingen tiefer, leichte nur ein wenig höher – sehr hoch klänge es nach Glas.
 
 Die Micro Duck hat die Schwelle 0,12 m/s. Brechende Gelenke spielen `builtin:break`.
 
@@ -293,6 +298,10 @@ Bevorzugt läuft der Ton über ein **AudioWorklet**, ein Mini-Programm nur für 
 Stücke in eine **Warteschlange** und hält anfangs 70 ms Vorrat. Läuft sie leer, kommen 30 ms dazu,
 bis 200 ms; nach 15 s ohne Aussetzer schrumpft der Vorrat wieder. Ist sie doch leer, gleitet der Ton
 in 2 ms auf null statt zu knacken. Ohne Worklet nimmt Kern den älteren *ScriptProcessor*.
+
+**Importierte Dateien** entpackt der Browser (`decodeAudioData`) und gibt die Zahlen an die Engine.
+Hat eine Datei mehr als zwei Kanäle, wird sie vorher auf Stereo gemischt. Klappt das Entpacken nicht,
+meldet KernAudio den Fehler, und Cues mit diesem Sound werden verworfen statt ewig zu warten.
 
 > **So kannst du es dir vorstellen:** ein Wasserkanister mit Hahn. Oben gießt das Spiel nach, unten
 > fließt es gleichmäßig. Lief er einmal leer, füllst du künftig mehr vor.

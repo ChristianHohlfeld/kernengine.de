@@ -29,7 +29,9 @@ Alle drei müssen exakt dasselbe Ergebnis liefern (9.9).
 - **State Machines** (Zustandsautomaten) haben Zustände und Übergänge. Ein Übergang feuert bei einem
   Event, nach einer Zeit, solange eine Bedingung wahr ist, oder sofort. Betreten und Verlassen lösen
   Events aus.
-- **Latente Knoten** wie Delay und Tween pausieren die Kette und machen später weiter.
+- **Latente Knoten** wie Delay und Tween pausieren die Kette und machen später weiter. Ein Delay
+  ignoriert Aufrufe, während es wartet; ein **Retriggerable Delay** fängt dann von vorn an.
+- **Kommentarrahmen** ordnen den Graphen für dich. Auf das Spiel wirken sie nicht.
 
 Das Level hat einen **Level-Graphen**, jeder Actor kann einen eigenen haben. Für ihn ist „Self“ der
 Actor selbst.
@@ -92,7 +94,12 @@ Eine **Runtime** führt alle Graphen einer Welt aus, jeder läuft als **Instanz*
 Jede Instanz kennt ihre Stufe: Interpreter, „compiling“, „compiled (WebAssembly)“ oder „native C++“.
 
 Im **Tick** jedes Schritts laufen erst fällige Wartezeiten weiter, dann das Event „Tick“, dann die
-Übergänge der State Machines. Ein **Event** geht an alle passenden Instanzen.
+Übergänge der State Machines. Ein **Event** geht an alle passenden Instanzen, auch an Graphen von
+Actors, die gerade erst gespawnt wurden.
+
+Eigene Events baust du mit **Custom Event**: Du gibst ihm einen Namen, und ein **Call Event** mit
+diesem Namen löst es aus – in allen Graphen oder nur beim Ziel-Actor. Derselbe Name schaltet auch
+Event-Übergänge von State Machines. „On State Entered“ verrät dir außerdem den vorigen Zustand.
 
 Der Interpreter arbeitet mit einem **Stapel**. Merkt sich ein Knoten etwas für später vor (eine
 Sequence ihre weiteren Ausgänge), kommt es auf den Stapel. Endet ein Zweig, geht es mit dem obersten
@@ -155,11 +162,12 @@ etwa `components.mesh.material.color`.
 **Physik:** Tempo, Stoß, Kraft, Launch, Physik an/aus, Gelenkmotor, Explosion, Line Trace.
 
 **Spiel und Effekte:** Punkte, Show Message, Win, Lose, Schaden, Heilen, Munition, Licht, Farbe,
-Funken, Kamerawackeln, Play Sound.
+Funken, Kamerawackeln, Play Sound und For Each Actor with Tag.
 
 **Roboter:** Die Micro Duck lässt sich lenken (vorwärts bis 0,4 m/s, drehen bis 57° pro Sekunde –
 die trainierten Bereiche), den Kopf drehen, Bewegungen auslösen (Sitzen, Aufheben, Kicks, Rolle,
-Sprung), zwitschern, und man kann ihren Abstandssensor (ToF) und ihre Kamera abfragen. Einzelheiten:
+Sprung), zwitschern („Chirp“), den Schnabel bewegen, die Autonomie an- und ausschalten, und man
+kann ihren Abstandssensor (ToF), ihre Kamera und ihren Zustand abfragen. Einzelheiten:
 [Kapitel 13](13-micro-duck.md).
 
 > **Mission:** Öffne auf https://kernengine.de/ ein **Basic**-Level und klicke in der Toolbar auf
@@ -240,9 +248,9 @@ an, und der Editor springt hin. Beim Spielen siehst du live, welche Knoten liefe
 die Variablen haben.
 
 > **Mission:** Füge im Level-Graphen deines Levels mit dem Rolling Ball über **Templates** die
-> Vorlage **Traffic light (state machine)** ein und drück **Play**: Das HUD zeigt Grün, Gelb, Rot.
-> Wähle dann im Graphen einen Knoten, setze mit **F9** einen Breakpoint und spiel erneut – das Spiel
-> hält an, sobald der Knoten läuft.
+> Vorlage **Traffic light (state machine)** ein und drück **Play**: Das HUD zeigt nacheinander
+> Green, Yellow, Red. Stoppe mit **Esc**, wähle im Graphen einen Knoten, setze mit **F9** einen
+> Breakpoint und drück wieder **Play** – das Spiel hält an, sobald der Knoten läuft.
 
 ## 9.11 Beispiele
 
@@ -268,7 +276,7 @@ Schritt um 5 cm. Bei 60 Schritten pro Sekunde sind das rund 48 Schritte, also et
 **Spawner:** Alle 3 s, solange „Spawned“ unter 10 liegt: einen Physics Cube bei (0, 0, 6) erzeugen und
 „Spawned“ um 1 erhöhen.
 
-**Ampel:** Eine State Machine: Grün → (4 s) → Gelb → (1,5 s) → Rot → (4 s) → Grün. Beim Betreten
+**Ampel:** Eine State Machine „Light“: Green → (4 s) → Yellow → (1,5 s) → Red → (4 s) → Green. Beim Betreten
 jedes Zustands wird sein Name angezeigt.
 
 **Hindernis ausweichen:** Die Micro Duck läuft nicht mehr allein. Alle 0,25 s: Sieht ihr ToF etwas
@@ -299,8 +307,8 @@ Kommentar im Graphen sagt: Das ist eine Demo, kein Verhalten des echten Roboters
 2. Darf man einen Actor-Ausgang mit einem Text-Eingang verbinden?
 3. Ein Text-Eingang bekommt die Zahl 3,9, ein Int-Eingang auch. Was kommt jeweils an?
 4. Du verschiebst nach dem C++-Export ein paar Knoten. Musst du neu exportieren?
-5. **Boss-Rätsel:** Ein Custom Event führt bei jedem Aufruf 4000 Knoten aus. Wie oft darf es in
-   einem Schritt laufen, bevor Kern den Graphen abschaltet?
+5. **Boss-Rätsel:** Ein Custom Event führt bei jedem Aufruf 4000 Knoten aus, sonst läuft keine
+   Logik. Wie oft darf es in einem Schritt laufen, bevor Kern den Graphen abschaltet?
 
 ### Lösungen
 
