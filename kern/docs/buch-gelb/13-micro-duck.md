@@ -26,8 +26,8 @@ der **Sprung** (`jump.onnx`) und die **Spielschicht** (`play.onnx`).
 ## 13.1 Wo der Code liegt
 
 Fast alles steht in `kern/src/game/`: `walker.cpp` (Aufbau, Regler, Sensoren, Steuerung),
-`walker_policy.cpp` (Netze lesen und rechnen), `servo.cpp` (Servomodell), `walker_brain.cpp`
-(selbstständiges Verhalten) und `walker_play.cpp` (Spielschicht). Pollens Netze und Baupläne liegen
+`walker_policy.cpp` (Netze), `servo.cpp`, `walker_brain.cpp` (Verhalten) und `walker_play.cpp`
+(Spielschicht). Pollens Netze und Baupläne liegen
 in `third_party/microduck/`, Kerns eigene Netze in `policies/`.
 
 ## 13.2 Die Grundregel: nicht schummeln
@@ -48,7 +48,8 @@ Ein trainiertes Netz funktioniert nur, wenn die Simulation dieselbe Physik rechn
 ### Bauplan, Glieder, Gelenke
 
 Pollen beschreibt die Ente in einer **MJCF**-Datei, dem Bauplan-Format von MuJoCo. Ein
-Import-Werkzeug macht daraus Kerns Modelldaten und bricht ab, wenn etwas nicht zusammenpasst.
+Import-Werkzeug macht daraus Kerns Modelldaten und bricht ab, wenn etwas nicht zusammenpasst (Namen
+und Reihenfolge der Gelenke, Grundstellung, Aufbau des Netzes).
 
 In Kern hat die Ente **16 Glieder**: Rumpf, 14 Glieder für die Netze und den Unterschnabel. Jedes
 Bein hat fünf Gelenke: Hüfte gieren, rollen, nicken, dann Knie und Knöchel. Dazu kommen Hals, Kopf
@@ -80,7 +81,9 @@ Ente nicht wie auf Eis.
 Seit der Überarbeitung der Spielschicht kennt die Physik **Oberflächen** mit eigenen Paarwerten:
 Baumwolle auf Baumwolle 0,5, TPU auf Baumwolle 0,8, Baumwolle auf Holzboden 0,4. Alle anderen Paare
 mischt Box3D als **geometrisches Mittel** √(a · b). Beispiel: Sohle 1 auf Boden 0,6 ergibt
-√0,6 ≈ 0,77.
+√0,6 ≈ 0,77. Eine Oberfläche tragen Kollider, Meshes oder der Boden der Welt (im Level-JSON
+`groundSurface`); im Micro-Duck-Level ist der Boden `floor`. Box3D duldet bei Kontakten bis 5 mm
+Überlappung (Slop); gemessen stehen die Sohlen nur 0,3–0,6 mm im Boden.
 
 ### Maßstab 4
 
@@ -154,7 +157,8 @@ Weltzeit genau 5 ms Roboterzeit.
 Alle **4 Physikschritte** fragt Kern das Netz – das ist der **Regeltakt**: 20 ms, also 50-mal pro
 Sekunde. Dass nur jeder 4. Schritt zählt, heißt **Decimation**. Auch die Befehlsverzögerung sind
 4 Schritte (20 ms, im Training 15–30 ms): Die Servos bekommen immer das Ziel von vor 4 Schritten.
-Feste Schritte erklärt [Kapitel 8](08-spiel-laufzeit.md).
+Passt die Schrittrate der Welt nicht, rundet Kern auf ganze Schritte und meldet „set World Settings >
+Step Rate to 100“. Feste Schritte erklärt [Kapitel 8](08-spiel-laufzeit.md).
 
 > **So kannst du es dir vorstellen:** Der Schlagzeuger spielt Sechzehntel (Physik), die Sängerin
 > setzt auf jedem vierten Schlag ein (Regeltakt), der Chor nur auf jedem achten – das ist die
@@ -179,8 +183,10 @@ lineare Schicht. Alles andere lehnt es mit Begründung ab. Das eingebaute velsta
 | Rollschuh, Ducken | `roller`, `roller_crouch` |
 | **Sprung** (Kern) | `jump.onnx` |
 
-Laufen läuft dauernd, die anderen sind **Episoden** mit fester Dauer, etwa Kick 0,5 s, Sprung 2 s,
-Aufheben 4 s. Der Schnabel ist ein Servo ohne Netz. Die Gangart wählt **Walking network**.
+Laufen läuft dauernd, die anderen sind **Episoden** mit fester Dauer, etwa Kick 0,5 s, Rolle 1 s,
+Sprung 2 s. Das Aufheben bekommt eine Phase mit 4 s Periode und endet bei 70 %, also nach 2,8 s.
+Sitzen dauert 2 s, Aufstehen 1 s; die Rolle läuft weiter, solange du die Taste hältst. Der Schnabel
+ist ein Servo ohne Netz.
 
 ### Wer gerade dran ist
 
@@ -191,7 +197,7 @@ bekommt genau die Befehle, mit denen es trainiert wurde.
 
 Eine Bewegung startet nur, wenn keine läuft, die Ente nicht sitzt und das Netz geladen ist – sonst
 kommt der Grund zurück. Fehlt ein Netz, springt kein anderes ein: Die Servos halten die
-Grundstellung.
+Grundstellung, und die Ente meldet einmal, welche Datei fehlt.
 
 ### Vom Netz zum Servoziel
 
@@ -200,9 +206,11 @@ trainiert**: Scale 1, ohne Glättung (nur Rollschuh und Ducken: 0,8). Pollens Pr
 Roboter nimmt Scale 0,9 und einen **Tiefpass**: neues Ziel = 0,7 · Netzwert + 0,3 · altes Ziel
 (Kopf: 0,5). Das Feld **Actions to servo goals** wählt `training` (Standard) oder `robot`.
 
-> **Mission:** Stell bei der Ente **Actions to servo goals** auf `robot`, übernimm sie mit F8 und
-> drück **3** für den Kick. Dann dasselbe mit `training`. Gemessen kippen die Kicks mit dem
-> Roboter-Profil um und bleiben mit `training` stehen.
+> **Mission:** Läuft das Level, stopp es mit **Esc** – während Play lässt sich nichts einstellen.
+> Wähl im Outliner die **Micro Duck** und stell im Details-Panel **Actions to servo goals** auf
+> `robot`. Starte Play, übernimm die Ente mit **F8** und drück **3** für den Kick. Dann dasselbe
+> mit `training`. Gemessen kippen die Kicks mit dem Roboter-Profil um und bleiben mit `training`
+> stehen.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 
@@ -250,8 +258,8 @@ trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er bei 0,0°, ein
 3,6–7,8° offen. Er fährt von −5° bis 30°.
 
 > **Mission:** Im Play zeigt das Studio oben rechts **HEAD CAMERA** (Kamerabild und Zustand) und
-> **TOF 8×8**: rot Hindernis (heller, je näher), grün Boden, gelb zu nah. Lenk die Ente auf eine
-> Wand zu und beobachte das Gitter. Die Anzeige schaltest du unter Window › Show › **Robot Camera**.
+> **TOF 8×8**: rot Hindernis (heller, je näher), grün Boden, gelb zu nah. Übernimm die Ente mit
+> **F8**, lenk sie auf eine Wand zu und beobachte das Gitter. Die Anzeige schaltest du unter Window › Show › **Robot Camera**.
 
 ## 13.9 Wer steuert?
 
@@ -273,10 +281,12 @@ Zeilen mit je 63 Messwerten. Heraus kommt eine Wahrscheinlichkeit p für „wird
   Standhaltung, der Zustand heißt „Held“.
 - **Weiter** bei p < 0,35 in 4 Takten, frühestens nach 300 ms. Die Netze starten frisch.
 
-Servoströme hat Kern nicht, aber das Netz liest diese Spalten ohnehin nicht.
+Ausgewertet wird nur eine volle Sekunde, und nur, solange Lauf- oder Stehnetz fahren. Eine
+Bewegung, Sitzen, Rollschuhe oder der Lehrer beenden eine Pause. Servoströme hat Kern nicht, aber
+das Netz liest diese Spalten ohnehin nicht.
 
 > **Mission:** Starte **Simulate** (Alt+S) und zieh die Ente mit der linken Maustaste **am Rumpf**
-> hoch. Der Griff hält sie in ihrer Lage wie eine Hand. Die Beine stoppen. Setz sie ab – sie läuft
+> hoch (im Play geht das beim Zuschauen mit der Observer camera). Der Griff hält sie in ihrer Lage wie eine Hand. Die Beine stoppen. Setz sie ab – sie läuft
 > weiter.
 
 ## 13.10 Selbstständig: das Verhaltensprogramm
@@ -292,8 +302,12 @@ Steuert niemand, wählt ein Programm das Verhalten (im Code „Gehirn“). Es ü
   **BallPlay** und **Kick**.
 
 Eine **Energie** von 0 bis 1 gewichtet den nächsten Zustand. Ein **Hindernismodell** sorgt für
-Abstand: Unter 0,45 m bremst die Ente und weicht aus, unter 0,15 m dreht sie weg und meidet die Stelle 5 Minuten. Mikrofon und Berührungssensor hat
-Kern nicht; Hören und Streicheln kommen über Befehle. Sogar der Zufall ist deterministisch.
+Abstand: Unter 0,45 m bremst die Ente und weicht aus, unter 0,15 m dreht sie weg und meidet die
+Stelle 5 Minuten. Ein **Neuheitsraster** aus 0,5-m-Feldern lässt sie wenig besuchte Ziele
+bevorzugen; dazu kommen Quak-Salven und Hören: Eine Stimme bekommt eine Antwort, ein Geräusch
+weckt sie kurz. Mikrofon und Berührungssensor hat Kern nicht; Hören und Streicheln kommen über
+Befehle. Sogar der Zufall ist deterministisch. Solange eine Bewegung läuft, die Ente sich setzt,
+aufsteht oder gefallen ist, wählt das Programm nichts Neues.
 
 ### BallPlay
 
@@ -302,14 +316,18 @@ kicken. Kern baut ihn nach dieser Beschreibung nach, mit Pollens Kick-Netz. Er i
 **standardmäßig an**:
 
 1. **Sehen:** ein Ball (Kugel mit Tag `ball` oder Namen „Ball“, höchstens 8 cm hoch) im Kamerabild.
-2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis 35 cm.
+2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis 35 cm. Liegt der Ball mehr als 0,6 rad
+   seitlich, dreht sie erst auf der Stelle.
 3. **Ausrichten:** kleine Schritte, bis der Ball 9 cm vor und 4,2 cm neben dem linken Fuß liegt –
-   genau wie im Kick-Training.
-4. **Kicken:** Kopf gerade, 3 s ruhig, Kick, Quaklaute.
-5. **Aufgeben:** nach 6 s ohne Sicht oder 45 s ohne Kick.
+   genau wie im Kick-Training. Verliert sie ihn dicht vor sich, tritt sie zurück, bis sie ihn sieht.
+4. **Kicken:** Kopf gerade, 3 s ruhig, Kick, Quaklaute. Danach ist der Ball 2–5 s uninteressant.
+5. **Aufgeben:** nach 6 s ohne Sicht (wenn er weit weg ist) oder nach 45 s ohne Kick (dann 20 s
+   Ruhe); danach folgt LookAround.
 
-Gekickt wird nur links, weil der rechte Kick in Kern manchmal umkippt. Mit **Kern extras** und
-geladenem `play.onnx` übernimmt statt BallPlay die Spielschicht.
+Gekickt wird nur links, weil der rechte Kick in Kern manchmal umkippt. Der „Detektor“ ist ein
+geometrischer Sichttest, kein Netz im Kamerabild. Mit **Kern extras** und geladenem `play.onnx`
+übernimmt statt BallPlay die Spielschicht; solange sie eingreift, startet das Programm weder
+Aufheben noch Sitzen.
 
 ## 13.11 Die Spielschicht
 
@@ -325,13 +343,15 @@ Kopf, Schnabel und welche Bewegung starten soll (Zustand „Play“). Sie brauch
 greift ein, solange sie ein Objekt kennt, etwas im Schnabel ist oder ihre Bewegung läuft – und
 niemand von Hand oder per Logik steuert.
 
-> **Mission:** Schalte im Beispiel-Level bei der Ente **Kern extras** aus. Jetzt spielt nicht das
-> gelernte Netz, sondern BallPlay. Beobachte den Unterschied, wenn sie den Ball entdeckt.
+> **Mission:** Stopp das Beispiel-Level mit **Esc**, wähl die **Micro Duck** und schalte im
+> Details-Panel **Kern extras** aus. Starte Play: Jetzt spielt nicht das gelernte Netz, sondern
+> BallPlay. Beobachte den Unterschied, wenn sie den Ball entdeckt.
 
 ### Detektor und Tracker
 
 Der **Detektor** ist wie der Servo ein Gerätemodell. Er meldet je Sorte das nächste sichtbare
-Objekt, gemessen in seiner Mitte am Boden. Ein Ball über 8 cm oder eine Socke über 3 cm Höhe zählt
+Objekt, gemessen in seiner Mitte am Boden. Eine Socke ist ein Actor mit Tag `sock`; sie gilt als
+gesehen, wenn ein Teil von ihr sichtbar ist. Ein Ball über 8 cm oder eine Socke über 3 cm Höhe zählt
 nicht – etwa die Socke im Schnabel. Dazu kommen **Rauschen** und **Aussetzer**.
 
 **Rechenbeispiel** mit den Beispielwerten aus dem Code: Die Schätzung streut um 0,002 m +
@@ -339,7 +359,8 @@ nicht – etwa die Socke im Schnabel. Dazu kommen **Rauschen** und **Aussetzer**
 rauschfrei, im Training zieht der Lehrer zufällige Werte.
 
 Der **Tracker** merkt sich ein Objekt, das aus dem Bild verschwindet, 3 s lang (unter 0,35 m vor der
-Ente 30 s). Einen gekickten Ball meldet er 15 s nicht, eine weggetragene Socke 40 s nicht.
+Ente 30 s). Einen gekickten Ball meldet er 15 s nicht, eine weggetragene Socke 40 s nicht – als
+weggetragen gilt sie ab 0,25 m. Ab dem Zugreifen zählt er, wie weit und wie lange die Ente trägt.
 
 ### 23 hinein, 9 heraus
 
@@ -353,16 +374,36 @@ Bewegung läuft. Denn auf „ein wenig vorwärts“ setzt Pollens Gang manchmal 
 
 Die **9 Ausgaben**: vorwärts, seitwärts, drehen, Kopf gieren, Kopf nicken, Schnabel auf, Kick
 links, Aufheben, Hals beugen. Die Laufbefehle haben eine **Totzone** wie ein Gamepad-Stick: Unter
-20 % steht die Ente. Beim Aufheben steuert das Netz den Schnabel selbst.
+20 % steht die Ente. Alle Werte werden zuerst auf ±1,5 begrenzt.
+
+- **Rückwärts** fährt sie an wie Pollens `autod`: 0,6 s mit 0,3 m/s, danach nie unter 0,15 m/s.
+  Langsamer setzt der Gang aus dem Stand gar nicht an.
+- Der Kopf folgt mit Glättung 0,3; Körperpose und „Wheee“ sind aus.
+- Eine Bewegung startet nur, wenn keine läuft und der Schnabel leer ist.
+- Beim Aufheben steuert das Netz den Schnabel selbst (ohne Spielschicht öffnet Kern extras ihn
+  bei Phase 0,16 und beißt bei 0,24).
 
 ### Socke, Ball, Beispiel-Level
 
-Die **Socke** sind sieben Stoffklumpen von 12,5 mm, lose 3,4 cm hoch gehäuft, 25 g, verbunden durch
-weiche Federn: Was der Schnabel packt, zieht den Rest mit. Der **Ball** im Beispiel-Level ist 12 cm groß, 50 g schwer,
-mit Rollwiderstand 0,03 – sonst rollte er ewig.
+Die **Socke** sind sieben Stoffklumpen von 12,5 mm, lose 3,4 cm hoch gehäuft (vier unten, zwei
+darauf, einer oben), zusammen 25 g. Weiche Federn (15 Hz, Dämpfung 0,7) verbinden Nachbarn: Was der
+Schnabel packt, zieht den Rest mit. Jeder Klumpen hat die Oberfläche `cloth` und Rollwiderstand
+0,5 – runde Klumpen würden sonst rollen, und der Haufen kröche davon. Im Code:
 
-Das **Beispiel-Level** ist ein Zimmer von 2,5 × 2,5 m mit Möbeln, Ball und zwei Socken. Ein
-Level-Blueprint lässt die Ente einmal quaken, wenn der Ball ins Kamerabild kommt – eine Vorführung des Blueprints, kein Verhalten der Ente.
+```cpp
+std::vector<game::Actor> sock =
+    game::micro_duck_sock_actors();
+```
+
+Index 0 ist die Wurzel „Sock“. Ids, Eltern und Gelenkziele rechnet man wie bei `add_micro_duck`
+um, dann kommt alles mit `level.add` ins Level.
+
+Der **Ball** im Beispiel-Level ist 12 cm groß, 50 g schwer, mit Rollwiderstand 0,03 – sonst rollte er ewig.
+
+Das **Beispiel-Level** ist ein Zimmer von 2,5 × 2,5 m mit Holzboden (Reibung 1), Schuhkarton,
+Bücherstapel, Kiste, Blumentopf, Ball und zwei Socken. Die Ente ist autonom, Kern extras ist an. Ein
+Level-Blueprint lässt die Ente einmal zwitschern (Knoten **Chirp**), wenn der Ball ins Kamerabild
+kommt – eine Vorführung des Blueprints, kein Verhalten der Ente.
 
 ### Wie gut es klappt
 
@@ -373,9 +414,12 @@ Je 32 Episoden; „Variation“ heißt mit zufälligen Abweichungen bei Bau, Ser
 | Ball weggekickt | 9 von 11 | 7 von 11 |
 | Socke aufgehoben | 4 von 21 | 13 von 21 |
 | aufgehoben, getragen, ausgespuckt | 1 von 21 | 0 von 21 |
+| Griffe, die hielten | 2 von 14 | 1 von 15 |
 | Stürze | 2 von 32 | 10 von 32 |
 
-Ehrlich: Kicken klappt gut, Tragen noch kaum.
+Ehrlich: Kicken klappt gut, Tragen noch kaum. Zwei Tests prüfen, dass
+nur das Netz entscheidet: Einen Ball 30 cm vor ihr kickt die Ente über 25 cm weit, zu einer Socke
+30 cm vor ihr geht sie hin, hebt sie auf und beißt zu.
 
 ## 13.12 Die Ente steuern
 
@@ -390,18 +434,31 @@ Ehrlich: Kicken klappt gut, Tragen noch kaum.
 | „Wheee“ (gehalten) | V | LT / WHEEE |
 | **Sprung** | **7** | – / **HOP** |
 
-Laufen: W/S vor und zurück, A/D drehen, sonst linker Stick oder MOVE-Stick. Die Laute stammen aus
-einer bitgenauen Übertragung von Pollens Synthesizer ([Kapitel 7](07-audio.md)).
+Laufen: W/S vor und zurück (bis 0,4 m/s), A/D drehen (bis 1 rad/s), sonst linker Stick oder
+MOVE-Stick. Am Gamepad gilt eine runde Totzone von 10 % und eine Kurve mit Hochzahl 1,28. Am Telefon liegen QUACK und PICK unten am Daumen.
+
+Die Laute folgen Pollens robotd: „greet“ beim Start und wenn das Gamepad zurückkommt, „inquire“,
+wenn es weg ist, „chirp“ bei jedem neuen Druck auf Quaken, „wheee“ solange gehalten, „peck“ beim
+Hinsetzen. Sie stammen aus einer bitgenauen Übertragung von Pollens Synthesizer, mit eigener Stimme
+je Ente ([Kapitel 7](07-audio.md)).
 
 **Der Sprung:** Taste 7, HOP oder der Logik-Knoten **Robot Move** mit „jump“. Kern wechselt hart auf
 `jump.onnx` und nach 2 s zurück; das Netz erfährt die Zeit über die Plätze 55 und 56, die Pollens
-Netze nie benutzen. Im Studio: 3 von 3 echten Sprüngen, 9,0 mm Steigen, 120 ms Flug, danach steht und
-läuft die Ente wieder.
+Netze nie benutzen. Im Studio: 3 von 3 echten Sprüngen, 9,0 mm Steigen, 120 ms Flug, 8° Neigung,
+danach steht und läuft die Ente wieder.
 
 > **Krass, aber wahr:** In Pollens Netzsatz gibt es keinen Sprung. Dieses Netz hat Kerns eigener Lehrer
 > trainiert, auf derselben Physik, die du im Studio siehst ([Kapitel 14](14-lehrer.md)).
 
-**Details-Panel:** **Autonomous (camera, ToF)**, **Walking network**, **Actions to servo goals**,
+### Netze laden
+
+Nur velstand ist eingebaut. Die übrigen Netze erfragt das Studio bei der Engine und lädt sie:
+Pollens aus dem Ordner `microduck/`, Kerns `jump.onnx` und `play.onnx` aus `policies/`. Lädt eine
+Datei nicht, fragt es nach 5, 10, 20 s … erneut, höchstens einmal pro Minute. Netze, die du mit dem
+Lehrer im Browser trainiert hast, speichert er auf deinem Gerät (IndexedDB „kern-lehrer“). Das
+Studio lädt sie ebenfalls, und offene Studio-Tabs übernehmen ein neues sofort.
+
+**Details-Panel:** **Autonomous (camera, ToF)**, **Walking network** (`velstand` oder `alpha`), **Actions to servo goals**,
 **Kern extras**; nur im Level-JSON `rollers` und `servoDelay` (Standard 0,02 s).
 
 **Blueprint-Kategorie Robots** ([Kapitel 9](09-logik.md)): Walk, Look, Set Autonomous, Chirp, Robot
@@ -418,8 +475,10 @@ bool holds = w.walker_holding(duck);
 ```
 
 Zeile 1: 0,2 m/s vorwärts, 3 s lang. Zeile 2: Kopf gieren und nicken. Zeile 3: Aufheben starten;
-leerer Text heißt „gestartet“, sonst steht der Grund drin. Zeile 4: Ist etwas im Schnabel? Mehr,
-auch für den Lehrer, in [Kapitel 14](14-lehrer.md).
+leerer Text heißt „gestartet“, sonst steht der Grund drin. Zeile 4: Ist etwas im Schnabel?
+Weitere Funktionen liefern die Sensoren (`walker_sensors`, `walker_sees`), das laufende Netz
+(`walker_driving`) und den Zustand (`walker_state`). Was der Lehrer
+zusätzlich braucht, steht in [Kapitel 14](14-lehrer.md).
 
 ## 13.14 Nachgemessen
 
@@ -430,7 +489,9 @@ auch für den Lehrer, in [Kapitel 14](14-lehrer.md).
 | drehen 1 rad/s | ≈ 0,61 rad/s | ≈ 0,97 rad/s |
 | auf dem Rücken | steht nach ≤ 12 s | steht auf |
 
-Ohne Armatur zappelte Kerns Ente gut dreimal so stark. Der Kick links schießt den Ball 4 m weit.
+Ohne Armatur zappelte Kerns Ente gut dreimal so stark. Alle Bewegungen gelingen, der Kick links
+schießt den Ball 4 m weit; der Kick rechts kippt manchmal, und sie steht wieder auf. Kein Gelenk
+überschreitet seine Grenze um mehr als 0,004 rad. BallPlay kickt auch ohne Kern extras, ohne Sturz.
 
 ## 13.15 Was noch fehlt
 

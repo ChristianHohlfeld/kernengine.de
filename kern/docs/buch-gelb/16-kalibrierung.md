@@ -29,11 +29,14 @@ Box3D bleibt unangetastet ([Kapitel 6](06-physik.md)). Das Werkzeug ist `kern_le
 Das Gesetz kennst du aus [Kapitel 13](13-micro-duck.md): Zug `K · (Ziel − Winkel)`, höchstens T,
 dazu Dämpfung D, Reibung F, Armatur A und eine Verzögerung. Ein **Servoprofil** speichert diese
 Zahlen als JSON-Datei, etwa `"stiffness": 0.554` für K. Kern prüft beim Lesen jeden Wert: Ist er
-eine Zahl im erlaubten Bereich? Steifigkeit und Moment müssen größer als 0 sein.
+eine Zahl im erlaubten Bereich? Steifigkeit und Moment müssen größer als 0 sein. Fehlende Werte
+bleiben 0.
 
-Ein anderer Servo ist ein anderes Profil. Dazu kommen **Streuungen**: Beim XL330 streuen Armatur
-und Reibung um ±10 %. Das Training würfelt daraus je Servo und Episode eigene Werte. So verlässt sich
-das Netz nicht auf eine Zahl, die niemand genau kennt.
+Ein anderer Servo ist ein anderes Profil. Ein Gerät, das grundsätzlich anders arbeitet (etwa ein
+Linearmotor), bekommt ein eigenes Modell. Dazu kommen **Streuungen**: Beim XL330 streuen Armatur
+und Reibung um ±10 %. Das Training würfelt daraus je Servo und Episode eigene Werte, dazu je
+Episode eine Busverzögerung zwischen 15 und 30 ms. So verlässt sich das Netz nicht auf eine Zahl, die niemand genau
+kennt. Ein gut gemessener Servo bekommt kleine Streuungen, ein schlecht bekannter große.
 
 ## 16.2 Der Prüfstand
 
@@ -60,12 +63,14 @@ time,target,angle
 0.005,-0.5,-0.0123
 ```
 
-Oben die Last, darunter Zeit, Zielwinkel und gemessener Winkel.
+Oben die Last: Masse in kg, Abstand des Schwerpunkts zur Achse in m, optional `# inertia`.
+`horizontal 1` heißt waagerechte Achse: Die Schwerkraft zieht am Arm wie an einem Pendel. Darunter je Zeile Zeit in s, gesendeter Zielwinkel und gemessener Winkel in rad.
 
 ### Der Prüfstand im Computer
 
-Kern baut den Aufbau in Box3D nach, mit Maßstab und Takt der Ente, spielt die Ziele aus dem Log ab
-und vergleicht die Winkel.
+Kern baut den Aufbau in Box3D nach, genau wie die Ente: Maßstab 4, dieselbe Schrittrate, dieselbe
+Gelenkweichheit, Armatur als Scheibe. Schwerkraft gibt es nur bei waagerechter Achse. Dann spielt
+Kern die Ziele aus dem Log ab, jeweils um die Verzögerung später, und vergleicht die Winkel.
 Der Fehler ist der **RMS-Fehler**: alle Abweichungen quadrieren, den Mittelwert nehmen, die Wurzel
 ziehen. Beispiel: Abweichungen 3 und 4 mrad ergeben √((9 + 16) / 2) ≈ 3,5 mrad.
 
@@ -77,7 +82,10 @@ kern_lehrer --kalibrieren steps.csv,chirp.csv
 ```
 
 (Im Terminal in einer Zeile.) Das Suchverfahren **CMA-ES** probiert je Runde 12 Kandidaten für
-K, D, F, T, A und die Verzögerung und tastet sich in 80 Runden an die besten heran.
+K, D, F, T, A und die Verzögerung und tastet sich in 80 Runden an die besten heran (änderbar mit
+`--iterations`; Start ist `--profil`, sonst XL330). K bis A verändert es als **Faktor**:
+Verdoppeln zählt so viel wie Halbieren, egal wie groß die Zahl ist. Die Verzögerung sucht es
+zwischen 0 und 0,2 s.
 
 > **So kannst du es dir vorstellen:** Topfschlagen mit zwölf Freunden: Alle suchen gleichzeitig,
 > und die nächste Runde startet dort, wo es am lautesten „heiß“ hieß.
@@ -88,20 +96,25 @@ erklärt.
 > **Vorsicht, Falle:** Wer nur an den Anpass-Logs prüft, lernt wie für eine Klassenarbeit mit
 > bekannten Aufgaben. Das Prüf-Log ist die neue Aufgabe – andere Last, anderes Signal.
 
-Im Test sinkt der Prüf-Fehler eines stark abweichenden Servos so auf unter 3 mrad.
+Im Test weicht ein Servo stark vom Nennprofil ab (etwa K −20 %, 30 ms Verzögerung). Nach der
+Anpassung an zwei Logs sinkt der Fehler auf dem dritten auf unter ein Fünftel des Startwerts und unter
+3 mrad.
 
 Ohne echten Servo hilft `kern_lehrer --beispiele DIR`: Es schreibt Beispiel-Logs (`servo_steps.csv`,
-`servo_chirp.csv`, `robot.csv`) und das Profil `xl330.json`, in der Simulation erzeugt.
+`servo_chirp.csv`, `robot.csv`) und das Profil `xl330.json`, in der Simulation erzeugt: 50 g an
+5 cm mit Rechteck ±0,5 rad, 120 g an 6 cm mit Chirp, 250 Regeltakte des ganzen Roboters.
 
 ## 16.3 Abgleich: der ganze Roboter
 
-Dafür braucht man ein Log des Roboters mit 50 Zeilen pro Sekunde, je 61 Beobachtungen und 14
-Aktionen, beginnend still in Grundstellung. Wie der Roboter es schreibt, beschreibt dieses Buch
-nicht. `kern_lehrer --abgleich roboter.csv` spielt die Aktionen in der Simulation ab und vergleicht
-Takt für Takt Drehung, Schwerkraft, Gelenkwinkel und -geschwindigkeiten, dazu jedes Gelenk einzeln.
+Dafür braucht man ein Log des Roboters: eine Kopfzeile, dann 50 Zeilen pro Sekunde mit je 75 Zahlen
+(61 Beobachtungen, 14 Aktionen), beginnend still in Grundstellung. Wie der Roboter es schreibt,
+beschreibt dieses Buch nicht. `kern_lehrer --abgleich roboter.csv --profil …` gibt einer sauberen
+Ente mit den Servos des Profils Takt für Takt die Aktionen aus dem Log (wie im Training: Scale 1,
+kein Tiefpass). Dabei vergleicht es Drehung, Schwerkraft, Gelenkwinkel und -geschwindigkeiten mit
+dem Log und meldet den RMS-Fehler je Gruppe und für jedes Gelenk einzeln.
 
-Ein Log aus der Simulation selbst ergibt Abstand **0**, Bit für Bit. Weil Kern deterministisch
-ist, ist jeder Unterschied zu einem echten Log ein echter Modellfehler, kein Zufall.
+Ein Log aus der Simulation selbst ergibt mit denselben Servos Abstand **0**, Bit für Bit, mit
+anderen Servos einen messbaren Abstand. Weil Kern deterministisch ist, ist jeder Unterschied zu einem echten Log ein echter Modellfehler, kein Zufall.
 
 ## 16.4 Training mit dem eigenen Profil
 
@@ -124,11 +137,12 @@ Was nicht gemessen ist, würfelt das Training ([Kapitel 14](14-lehrer.md)):
 | Spielzeug | Ball 3,5–6 cm, 15–50 g |
 
 Der Bewerter im Training (der **Kritiker**) sieht dabei den sauberen Zustand; nur das Netz, das auf
-den Roboter kommt, bekommt verrauschte Sensoren. Getriebespiel fehlt im Modell.
+den Roboter kommt, bekommt verrauschte Sensoren. Getriebespiel fehlt im Modell; Pollens Training
+variiert es, und velstand ist dagegen robust. Kerns eigene Netze lernen ohne.
 
 > **Mission:** Starte im Micro-Duck-Level **Simulate** (Alt+S), zieh die Ente mit der Maus am Kopf
 > zur Seite und lass los, bis sie umfällt. Pollen hat velstand mit vielen Abweichungen trainiert –
-> gemessen steht sie in Kern nach höchstens 12 s wieder.
+> gemessen steht sie in Kern aus Bauch- oder Rückenlage nach höchstens 12 s wieder.
 
 ## 16.6 In der Physik messen statt eintragen
 
@@ -138,8 +152,8 @@ Manche Zahlen misst Kern in der Simulation, statt sie in den Code zu schreiben: 
 Nachlauf nach „Stopp“ (0,7 cm aus 0,12 m/s, gemessen mit `--halt-messen`) und die Paar-Reibungen der
 Oberflächen – Kandidaten für Messungen am echten Material.
 
-> **Mission:** Starte **Simulate** und schalte das Show-Flag **Contact Points** ein. Du siehst, wo
-> die Sohlen den Boden berühren – genau daran erkennt die Spielschicht, ob die Ente steht.
+> **Mission:** Starte **Simulate** und schalte unter Window › Show **Contact Points** ein. Du
+> siehst, wo die Sohlen den Boden berühren – genau daran erkennt die Spielschicht, ob die Ente steht.
 
 ## 16.7 Grenzen
 
@@ -147,8 +161,9 @@ Noch gibt es **keine echten Messdaten**; alles ist mit Logs aus der Simulation g
 Getriebespiel, Armatur, rechter Kick, IMU-Profil, Reibungsmischung und Kamera-Detektor. Profile
 und Logs sind in echten Einheiten; den Maßstab 4 rechnet Kern nur an der Grenze zu Box3D um.
 
-> **Mission:** Stell bei der Ente **Actions to servo goals** auf `robot` und schau ihr beim Laufen
-> zu. Das ist die Einstellung, mit der Pollens Software den echten Roboter fährt.
+> **Mission:** Läuft das Level, stopp es mit **Esc**. Wähl die **Micro Duck**, stell im
+> Details-Panel **Actions to servo goals** auf `robot`, starte Play und schau ihr beim Laufen zu. Das
+> ist die Einstellung, mit der Pollens Software den echten Roboter fährt.
 
 ## Level geschafft!
 

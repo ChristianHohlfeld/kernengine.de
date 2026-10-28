@@ -89,7 +89,9 @@ lädt Pollens Netze und macht dann **das Erste**, das zutrifft:
 9. `--spielen`: Spiel-Netz durch Nachahmung lernen.
 10. sonst: **Training** der Aufgabe `--task` (`jump` oder `stand`).
 
-Eine unbekannte Option zeigt die Kurzhilfe.
+Vor Nummer 2 prüft er, ob `--task` `jump` oder `stand` ist. `--spielen`, `--spielen-spur`,
+`--biss-fenster`, `--halt-messen` und `--demo-spur` teilen sich einen Schalter: Es gilt der letzte
+auf der Kommandozeile. Eine unbekannte Option zeigt die Kurzhilfe.
 
 ### Die wichtigsten Optionen
 
@@ -98,7 +100,7 @@ Eine unbekannte Option zeigt die Kurzhilfe.
 | `--task` | `jump` | Aufgabe |
 | `--threads N` | Hardware-Threads | Rechen-Threads |
 | `--envs N` | 16 × Threads | Enten gleichzeitig |
-| `--seed N` | 1 | Startwert für Zufall |
+| `--seed N` | 1 | Startwert für Zufall (bei `--demo-spur`: Dauer in s) |
 | `--iterations N` | 600 | Trainingsrunden |
 | `--episodes N` | 10 | Episoden beim Bewerten |
 | `--out FILE` | `<task>.onnx` | Ausgabedatei |
@@ -162,7 +164,8 @@ haben 61 Eingaben und 14 Ausgaben, `play.onnx` hat 23 und 9. Anderes lehnt Kern 
 „expected Elu after a hidden Gemm“. Beim Export schreibt der Lehrer **Metadaten** dazu: Gelenknamen,
 Grundstellung, Aufgabe und „lehrer“. Pollens Pick-up-Detektor hat eine andere Form und ist fest
 eingebaut. Pollens Netze liegen in `kern/third_party/microduck/`, Kerns in `kern/policies/`; im
-Browser trainierte Netze speichert die Lehrer-Seite im Browser (IndexedDB).
+Browser trainierte Netze speichert die Lehrer-Seite im Browser (IndexedDB); auf demselben Gerät
+ersetzen sie die mitgelieferten.
 
 ### Servoprofil (`.json`)
 
@@ -197,7 +200,7 @@ schlichte Liste auf, die **C-ABI**. Die Regeln:
   hinein und übergibt die Adresse (einen **Zeiger**, 32 Bit).
 - Rückgabe 1 heißt Erfolg, 0 Fehler; die Meldung liefert `kern_last_error()`.
 - Texte gehen als Zeiger plus Länge, in UTF-8.
-- Antworten (JSON, Bytes) gehören dem Modul und gelten bis zum nächsten Aufruf.
+- Antworten (JSON, Bytes) gehören dem Modul und gelten bis zum nächsten Aufruf derselben Gruppe.
 
 Umgekehrt braucht das Modul vom Browser: die **WebGL2**-Funktionen (`kern_gl`), Uhrzeit, Log,
 Höhenabfrage, Statustext, Pointer-Lock und das Übersetzen von Logik (`kern_env`) sowie ein paar Grundfunktionen
@@ -271,7 +274,7 @@ ausführlich vorkommt.
 - **Skinning:** ein Mesh mit Knochen verformen, etwa für Figuren (4).
 - **Textur:** ein Bild auf einer Oberfläche (4).
 - **Vertex:** ein Eckpunkt eines Dreiecks (4).
-- **Viewmodel-Ebene:** wird zuletzt gezeichnet, etwa für Gizmos (4).
+- **Viewmodel-Ebene:** wird nach dem Löschen der Tiefe gezeichnet und liegt so immer vorn, etwa für Gizmos (4).
 - **WebGL2:** die Schnittstelle des Browsers zur Grafikkarte (4).
 - **Welding:** doppelte Eckpunkte ohne Verlust zusammenfassen (5).
 
@@ -280,6 +283,7 @@ ausführlich vorkommt.
 - **C++ / JavaScript:** die Programmiersprache der Engine / die Sprache der Webseiten (1).
 - **C-ABI:** die Funktionsliste, über die JavaScript mit der Engine spricht (17).
 - **CI:** automatische Prüfung jeder Änderung auf einem Server (2).
+- **DuckEnv:** die Lehrer-Umgebung: eine Micro Duck in ihrer eigenen Spielwelt (14).
 - **Determinismus:** gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis (6, 14).
 - **`dm`:** Kerns Rechenfunktionen, die überall exakt gleich rechnen (3).
 - **Fehlerkanal:** Kern meldet Fehler mit `fail()` und `last_error()` (3).
@@ -324,7 +328,9 @@ ausführlich vorkommt.
 - **3D-Klang:** Klang, der von einer Stelle im Raum kommt (7).
 - **Client / Server:** Mitspieler / der Rechner, der das Spiel bestimmt (10).
 - **Datagramm:** ein einzelnes Datenpaket im Netz (10).
+- **HostTransport:** Netz, dessen Pakete die Browserseite befördert, etwa per BroadcastChannel oder Relay (10).
 - **Interpolation:** zwischen zwei bekannten Zuständen weich überblenden (10).
+- **LoopbackNetwork:** ein Netz im Speicher, für Tests und Mehrspieler im Editor (10).
 - **NetGame:** Kerns Mehrspieler: ein Server bestimmt, alle bekommen Schnappschüsse (10).
 - **Relay:** ein Vermittler, der Pakete zwischen Browsern weiterreicht (10).
 - **Snapshot:** ein Schnappschuss des Spielzustands (10).
@@ -358,7 +364,7 @@ ausführlich vorkommt.
 - **CMA-ES:** Suchverfahren, das Kandidaten probiert und sich an die besten herantastet (14, 16).
 - **DAgger:** Nachahmen: Das Netz fährt, das Vorbild sagt, was richtig wäre (14).
 - **Domänen-Randomisierung:** Training mit zufälligen Abweichungen (16).
-- **ELU:** die Knickfunktion zwischen den Schichten eines Netzes (A).
+- **ELU:** die Aktivierung zwischen den Schichten: Positives bleibt, Negatives wird sanft auf über −1 gedrückt (A).
 - **Episode:** ein Durchgang von Anfang bis Ende (14).
 - **GAE:** Rechenweg, der schätzt, wie viel besser eine Aktion als erwartet war (A).
 - **Gradientenabstieg:** in kleinen Schritten bergab zum kleinsten Fehler (A).
