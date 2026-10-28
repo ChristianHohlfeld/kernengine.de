@@ -47,7 +47,9 @@ Wer einen Clip abspielt, gibt Einstellungen mit: Lautstärke, Tonhöhe (*Pitch*)
 (*Pan*), Schleife, Einblenden, Bus, Priorität und für 3D-Töne Ort, Geschwindigkeit, Abstände und
 Doppler. Unsinnige Werte werden in den erlaubten Bereich geschoben statt abgelehnt. Zurück kommt eine
 Stimmen-Nummer mit eingebauter „Generation“: Ist der Platz längst neu belegt, passt die alte Nummer
-nicht mehr, und ein verspäteter Befehl verstellt nicht aus Versehen einen fremden Ton.
+nicht mehr, und ein verspäteter Befehl verstellt nicht aus Versehen einen fremden Ton. Mit dieser
+Nummer lässt sich ein laufender Ton später steuern: stoppen, Lautstärke, Tonhöhe, Pan oder Ort
+ändern, pausieren – oder alle auf einmal pausieren, wenn das Spiel anhält.
 
 **Wenn alle Plätze voll sind**, wirft der Mixer die unwichtigste Stimme hinaus – zuerst die mit der
 niedrigsten Priorität, dann die leiseste, dann die älteste. Das heißt *Voice Stealing*. Wichtigere
@@ -64,7 +66,8 @@ sie links und rechts sein soll, und lässt die Lautstärke innerhalb des Häppch
 ein Auto vorbei, springt der Pegel nicht stufig, sondern fließt – ohne kratzendes „Zipper“-Geräusch.
 Dann liest er Sample für Sample den Clip. Liegt die Leseposition zwischen zwei Samples, schätzt er
 den Wert aus vier Nachbarn mit einer weichen Kurve (Hermite-Interpolation), dämpft die Höhen nach
-Entfernung und addiert alles in den Bus.
+Entfernung und addiert alles in den Bus. Danach rückt die Leseposition um Tonhöhe × Doppler weiter.
+Schleifen fangen am Ende nahtlos vorn an, Mono-Clips klingen auf beiden Seiten.
 
 **Virtuelle Stimmen:** Ist ein 3D-Ton praktisch unhörbar weit weg, wird er nicht gemischt – das spart
 Zeit. Seine Position läuft aber heimlich weiter. Kommst du zur brummenden Maschine zurück, brummt sie
@@ -111,11 +114,14 @@ flowchart LR
   U[ui] --> MA
   V[voice] --> MA
   S -. Hall-Anteil .-> H[Hall]
+  V -.-> H
   H --> MA
 ```
 
 Jeder Bus hat Lautstärke, Stummschalter, einen optionalen Tiefpass und einen **Hall-Anteil**. Auch
-hier gleitet alles, sodass selbst Stummschalten nicht klickt.
+hier gleitet alles, sodass selbst Stummschalten nicht klickt. Ab Werk steht Musik auf 0,7 und
+Ambience auf 0,8; Hall bekommen nur `sfx` (0,12) und `voice` (0,08) – bis ein Level es anders
+einstellt (7.9).
 
 > **Stell dir vor …** du klatschst in einem leeren Treppenhaus. Der Knall prallt hundertfach von den
 > Wänden zurück, immer leiser, bis nur ein Rauschen bleibt. Das ist **Hall**.
@@ -124,7 +130,9 @@ Kerns Hall ist **Freeverb**, ein bekanntes Verfahren von Jezar at Dreampoint. Ac
 Kanal wirken wie Bälle, die zwischen zwei Wänden springen: ein Echo nach dem anderen, jedes leiser,
 und die Höhen klingen schneller ab – wie in einem Raum mit Teppich. Die acht haben leicht
 verschiedene Längen und ergeben zusammen eine dichte Echo-Wolke. Vier **Allpässe** verwischen den
-Rest, und der rechte Kanal hat etwas längere Leitungen, damit der Hall breit klingt.
+Rest, und der rechte Kanal hat etwas längere Leitungen, damit der Hall breit klingt. Drei Knöpfe
+steuern ihn: Raumgröße (längeres Nachklingen), Dämpfung (wie schnell die Höhen verschwinden) und
+Nass-Anteil (wie viel Hall dazukommt).
 
 Ganz am Ende wacht der **Limiter**. Würde eine Spitze die Schwelle 0,92 überschreiten, dreht er
 sofort leiser und lässt danach langsam los (etwa 120 ms). Ein weiches „Abrunden“ (Soft-Clip) fängt
@@ -142,7 +150,11 @@ erweitert um Filter, Rauschfarben, FM und Schichtung. Ein Sound ist ein **Patch*
 Wellenform (Rechteck, Säge, Sinus, Dreieck, Puls, weißes oder rosa Rauschen), Hüllkurve (anschwellen,
 halten, verklingen, dazu ein „Punch“ am Anfang), Tonhöhe mit Rutschen, Vibrato und Sprung, Filter
 sowie Effekte wie Tremolo, Wiederholung und „Bitcrush“. Langsame Änderungen wie Vibrato rechnet Kern
-nur alle 16 Samples neu – das spart viel Zeit und ist nicht hörbar.
+nur alle 16 Samples neu – das spart viel Zeit und ist nicht hörbar. Rauschen wird wie bei sfxr im
+Takt der Tonhöhe neu gewürfelt, deshalb klingt tiefes Rauschen dunkler. Die Option *Wiederholung*
+startet die Tonhöhe immer wieder neu (Power-up-Effekt), der Sprung ist der Münz-Effekt unten. Kleine
+Helfer schichten mehrere Klänge mit Zeitversatz, machen aus einem Puffer eine nahtlose Schleife
+(das Ende wird weich über den Anfang geblendet) und gleichen die Lautstärke an.
 
 Das Rezept für den Pickup-Sound, direkt aus dem Code:
 
@@ -173,8 +185,9 @@ in kleine Zeitscheiben – so ruckelt ein Level beim Laden nicht.
 Angesprochen werden Sounds mit `builtin:<name>`. Es gibt 38 in acht Gruppen: Gameplay
 (`pickup`, `jump`, `goal` …), Combat (`gunshot`, `reload` …), Physics (`explosion`, `impact`,
 `plastic` …), Vehicle (`engine`, `hover`, `boost`), Ambience (`wind`, `city`, `hum`), Robot
-(`servo`, `quack`, `beep`), UI (`click`, `confirm`, `error`) und Music. Die vollständige Liste steht
-im blauen Buch.
+(`servo`, `quack`, `beep`), UI (`click`, `confirm`, `error`) und Music. Schleifen sind `engine`,
+`hover`, `wind`, `city`, `hum`, `servo` und die zwei Musikstücke, der Rest sind einmalige Töne. Die
+vollständige Liste steht im blauen Buch.
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und klick einmal irgendwo hin –
 > vorher bleibt der Browser stumm. Im Content Drawer unten spielt der Tab **Sounds** jeden Sound per
@@ -200,7 +213,8 @@ Ein Laut besteht aus sieben Obertönen, einer Tonhöhenkurve mit Vibrato und Zit
 Lautstärke-Wackeln (dem Quaken) und etwas Atemrauschen. Es gibt sieben Lautarten – `alarm`, `greet`,
 `inquire`, `peck`, `chirp`, `coo`, `wheee` – mit je 6 bis 12 Varianten. Gespielt wird eine zufällige,
 damit die Ente nicht wie eine hängende Schallplatte klingt. `wheee` hat Start, Schleife und Ende und
-kann so lange dauern wie eine Rutschpartie.
+kann so lange dauern wie eine Rutschpartie. Jeder Entenlaut ist ein ganz normaler Sound-Name nach
+dem Schema `builtin:duck_<laut>_<seed>_<variante>`.
 
 > **Wusstest du?** Kerns Entenstimme ist **Sample für Sample identisch** mit dem Rust-Original: Ein
 > Vergleich aller 328 Laute ergibt eine Abweichung von genau null. Dafür stimmen Zufallsgenerator,
@@ -210,7 +224,8 @@ kann so lange dauern wie eine Rutschpartie.
 Danach macht Kern den Klang absichtlich „schlechter“: 16 Bit wie auf dem Roboter, und alles unter
 300 Hz weggefiltert, weil der winzige echte Lautsprecher tiefe Töne kaum wiedergibt. Die Laute
 spielen auf dem Bus `voice` am **Kopf** der Ente, wo ihr Lautsprecher sitzt. Ein neuer Laut schneidet
-den alten ab, wie bei einem einzigen Lautsprecher. Weil das Ausrechnen auf Telefonen spürbar dauert,
+den alten ab, wie bei einem einzigen Lautsprecher; während `wheee` werden andere Laute verworfen.
+Wann die Ente welchen Laut ruft, erklärt [Kapitel 13](13-micro-duck.md). Weil das Ausrechnen auf Telefonen spürbar dauert,
 bereitet Kern die Laute jeder Ente vorab vor, einen pro Bild.
 
 ## 7.7 Klang im Spiel: SoundBank und GameAudio
@@ -222,7 +237,10 @@ gespeichert), `""` oder `none` für Stille und `auto` für den passenden Standar
 Die **SoundBank** ist die Plattensammlung: Sie verwandelt solche Referenzen in Clips. Eingebaute
 Sounds rechnet sie in Zeitscheiben aus, importierte lässt sie vom Browser entpacken. Vor dem Start
 fordert sie alles an, was das Level brauchen könnte – Musik, Motor, Aufprälle, Waffen, Pickups,
-Jingles. Play beginnt dann mit allem an seinem Platz.
+Jingles. Play beginnt dann mit allem an seinem Platz. Solange ein Clip noch nicht fertig ist,
+meldet die Bank „noch nicht da“ und bestellt ihn. Kann der Browser eine Datei nicht entpacken, wird
+das gemeldet, und Cues mit diesem Sound fallen weg, statt ewig zu warten. Löschst oder ersetzt du
+einen importierten Sound, wirft die Bank den alten Clip weg.
 
 **GameAudio** ist der Tontechniker. Es überträgt die Ton-Einstellungen des Levels aufs Mischpult und
 erledigt jedes Bild:
@@ -230,17 +248,26 @@ erledigt jedes Bild:
 1. **Pause** übernehmen.
 2. Den **Hörer** an die Kamera setzen. Springt die Kamera schneller als 200 m/s (ein Schnitt), zählt
    ihre Geschwindigkeit als null – sonst gäbe es einen absurden Doppler-Jauler.
-3. **Musik und Hintergrund** starten, sobald sie bereit sind.
+3. **Musik und Hintergrund** starten, sobald sie bereit sind – als 2D-Schleifen mit höchster
+   Priorität (100), sanft eingeblendet.
 4. Den **Motor des Spielers** führen: Lautstärke und Tonhöhe steigen mit Tempo und Gas. Ohne Doppler,
    denn die Kamera fährt ja mit. Bei der Micro Duck surren stattdessen die Servos.
-5. **Audio Sources** an ihren Actors mitführen.
+5. **Audio Sources** an ihren Actors mitführen (ihr Tempo zählt für Doppler). Schleifen starten mit
+   Priorität 40, einmalige Töne mit 20, jeweils nach ihrer Verzögerung. Verschwindet der Actor,
+   wird sein Ton in 0,15 s ausgeblendet.
 6. Die **Cues** der Simulation abspielen. Ist ein Clip noch nicht fertig, wartet der Cue höchstens
-   0,25 s und fällt dann weg – ein zu spätes Geräusch ist schlimmer als keins.
+   0,25 s und fällt dann weg – ein zu spätes Geräusch ist schlimmer als keins. Mehr als 64
+   wartende Cues werden abgeschnitten. Cue-Töne sind bis 3 m voll laut und ab 80 m still.
 
 Prioritäten sorgen für Ordnung: Musik und Motor sind wichtig, kurze Effekte nicht. Eine Explosion
-verdrängt also nie die Musik. Den Motorsound wählt Kern bei `auto` nach Bewegungsart: `hover` für
-Hover Car und Flyer, `engine` für das Vehicle, `servo` für die Micro Duck; Kugel, Figur und Soldat
-haben keinen.
+verdrängt also nie die Musik. Beim Beenden blendet GameAudio alles aus dem Spiel aus. Der
+Stummschalter des Editors schaltet den Master stumm und bleibt über Play-Runden hinweg erhalten.
+
+Den Motorsound wählt Kern bei `auto` nach Bewegungsart: `hover` für Hover Car und Flyer, `engine`
+für das Vehicle, `servo` für die Micro Duck; Kugel, Figur und Soldat haben keinen. Auch andere
+Teile haben eigene Sound-Felder mit Standards: Sprung (`jump`) und Boost (`boost`) am Controller,
+Schuss (`smg`) und Nachladen (`reload`) an Waffen, Treffer (`hit`) und K.-o. (`down`) bei den
+Lebenspunkten, `pickup` bei Pickups und bei Triggern `auto`, passend zu ihrer Aktion.
 
 ## 7.8 Cues und Aufprallgeräusche
 
@@ -250,13 +277,16 @@ haben keinen.
 Genauso spielt die Simulation selbst nie einen Ton ab. Sie schreibt während der Physikschritte kleine
 Zettel, **Cues** („spiel `builtin:jump` hier, so laut, auf diesem Bus“), und GameAudio sammelt sie
 jedes Bild ein. Weil Cues in festen Schritten entstehen, sind sie deterministisch. Hört niemand zu,
-bleiben nur die neuesten 64 liegen.
+bleiben nur die neuesten 64 liegen (etwa im Lehrer). Im Netzwerkspiel werden Sounds ohne
+Zustellgarantie geschickt – fehlt mal einer, ist es egal. Wichtige Ereignisse wie ein gesammeltes
+Pickup kommen dagegen sicher an ([Kapitel 10](10-netzwerk.md)).
 
 Jeder Rigid Body hat einen Aufprall-Sound (Standard `builtin:impact`) und eine **Schwelle** von
 2,5 m/s. Jeder Collider kann einen eigenen Sound tragen – die Sohle der Ente klingt nach
 `plastic_step`, ihr Gehäuse nach `plastic`. Dazu ein paar Regeln:
 
-- Höchstens **6 Aufprallgeräusche pro Physikschritt**; unter der Schwelle bleibt es still.
+- Nur Teile mit Aufprall-Sound melden überhaupt Treffer. Höchstens **6 Aufprallgeräusche pro
+  Physikschritt**; unter der Schwelle bleibt es still.
 - **Entprellen:** Eine Sohle rollt ab und hüpft dabei winzig. Ein Schritt klingt deshalb höchstens
   alle 0,5 s pro Actor, ein Klopfen alle 0,09 s.
 - Härtere Aufprälle sind **lauter**; ganz leichte spielen das sanftere `impact_light`.
@@ -276,9 +306,11 @@ desto mehr bekommen Effekte, Stimmen und Hintergrund ab; Musik und Oberfläche b
 
 Die Komponente **Audio Source** macht jeden Actor zur Schallquelle. Sie hat Sound (Standard
 `builtin:hum`), Lautstärke, Tonhöhe, Schleife, Start beim Spielbeginn mit optionaler Verzögerung,
-3D an/aus, Innen- und Abfallradius (2 m und 40 m), Doppler und **Pitch by speed** – die Tonhöhe
-steigt mit dem Tempo des Actors. Im Katalog liegen fertige Varianten: Audio Source
-(Maschinenbrummen), Ambient Wind, City Ambience und Radio.
+3D an/aus (aus: überall gleich laut auf dem Bus), Innen- und Abfallradius (2 m und 40 m),
+Abfallkurve, Bus, Doppler und **Pitch by speed** – die Tonhöhe steigt mit dem Tempo des Actors. Im
+Katalog liegen fertige Varianten: Audio Source (Maschinenbrummen), Ambient Wind (überall hörbar),
+City Ambience (mit Abfall) und Radio (spielt `music_calm` in 3D). Wie man sie im Editor bedient,
+steht in [Kapitel 11](11-studio.md).
 
 > **Probier's aus!** Zieh im Studio ein **Radio** aus dem Katalog in die Szene und starte Play
 > (Alt+P). Fahr heran, weit weg und einmal drumherum. Hörst du, wie die Musik leiser wird, von links
@@ -289,7 +321,9 @@ steigt mit dem Tempo des Actors. Im Katalog liegen fertige Varianten: Audio Sour
 Der Mixer rechnet, der Browser spielt ab; die Verbindung heißt `KernAudio`. Browser erlauben Ton erst
 **nach einer Nutzergeste** – der erste Klick, Tipp oder Tastendruck weckt ihn. Auf iOS sorgt Kern
 außerdem dafür, dass der Stummschalter des Telefons das Spiel nicht stumm macht. Alle 20 ms füllt ein
-Zeitgeber den Ton nach, so fließt er auch bei langsamen Bildern oder im Hintergrund-Tab.
+Zeitgeber den Ton nach und rechnet nebenbei eingebaute Sounds weiter (5 ms pro Runde). So fließt
+der Ton auch bei langsamen Bildern oder im Hintergrund-Tab. Der Mixer bekommt gleich die Abtastrate
+des Geräts, damit der Browser nichts mehr umrechnen muss.
 
 Am liebsten nutzt Kern ein **AudioWorklet**, einen Browser-Helfer in einem eigenen Faden. Das
 Hauptprogramm schickt ihm fertige Tonstücke, das Worklet spielt sie ab.
@@ -298,8 +332,13 @@ Hauptprogramm schickt ihm fertige Tonstücke, das Worklet spielt sie ab.
 > Kassiererin nie warten. Kern hält das Band etwa 70 ms voraus gefüllt.
 
 Läuft das Band leer, legt Kern 30 ms Vorrat drauf, bis höchstens 200 ms; nach 15 ruhigen Sekunden
-schrumpft er wieder. Bei einer Lücke gleitet der Ton in etwa 2 ms auf null statt zu knacken. Ohne
-AudioWorklet nimmt Kern einen älteren Weg, den `ScriptProcessor`.
+schrumpft er wieder. Bei einer Lücke gleitet der Ton in etwa 2 ms auf null statt zu knacken und
+wird danach wieder eingeblendet. Ohne AudioWorklet nimmt Kern einen älteren Weg, den
+`ScriptProcessor`.
+
+**Importierte Sounds** entpackt der Browser mit seinem eigenen Dekoder (`decodeAudioData`) und
+reicht die Samples an die Engine weiter. Dateien mit mehr als zwei Kanälen werden vorher auf Stereo
+gemischt.
 
 ## 7.11 Tipps für eigene Spiele
 

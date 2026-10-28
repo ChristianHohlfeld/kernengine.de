@@ -25,13 +25,15 @@ Es gibt zwei Sorten Anschlüsse (*Pins*):
   setzen sie fort, **Flow-Knoten** verzweigen, wiederholen oder warten.
 - **Daten-Pins**: Werte wie Zahlen, Text oder Actors. Eingänge **ziehen** sich ihre Werte: Wird ein
   Wert gebraucht, rechnet der verbundene Knoten ihn in diesem Moment aus. Reine Rechenknoten
-  (*Pure*: Mathe, Abfragen) haben gar keinen Exec-Pin. Ist ein Eingang nicht verbunden, gilt der Wert,
-  den du direkt in den Knoten getippt hast.
+  (*Pure*: Mathe, Abfragen) haben gar keinen Exec-Pin. Ausgänge von Aktionsknoten behalten dagegen
+  den Wert ihres letzten Laufs. Ist ein Eingang nicht verbunden, gilt der Wert, den du direkt in den
+  Knoten getippt hast.
 
 Dazu kommen:
 
 - **Variablen** – das Gedächtnis eines Graphen, mit Typ und Startwert.
-- **State Machines** – Zustände mit Übergängen (mehr in 9.4).
+- **State Machines** – Zustände mit Übergängen, im Stil des Zustandseditors von
+  digitalisierungsplanung.de (mehr in 9.4).
 - **Latente Knoten** wie Delay oder Tween – sie halten die Kette an und machen später weiter.
 
 Das **Level** hat einen eigenen Graphen, und jeder **Actor** kann einen tragen. Im Actor-Graphen ist
@@ -49,7 +51,8 @@ Es gibt sieben Typen: Exec, Bool, Int, Float, Vektor, Text und Actor. Nicht jede
 - eine Zahl nach Vektor (in alle drei Richtungen).
 
 Die Umrechnungen sind fest geregelt: Text „0“ oder „false“ ist falsch, ein Vektor als Zahl ist seine
-Länge.
+Länge, eine Kommazahl wird beim Wandeln in eine ganze Zahl abgeschnitten, und Text wird als Zahl
+gelesen.
 
 ### Wie ein Graph gespeichert wird
 
@@ -113,19 +116,27 @@ Alle Graphen einer Welt laufen in einer **Runtime**; jeder Graph wird dort eine 
 seinen Besitzer (Actor oder Level). Gerechnet wird in den festen Simulationsschritten, und zwar nur
 auf der **Autorität** – im Einzelspiel oder auf dem Netzwerk-Server.
 
-In jedem Schritt (**Tick**) passiert dreierlei: Fällige Wartezeiten laufen weiter, das Tick-Ereignis
-feuert, und die State Machines prüfen ihre Übergänge.
+Zu Beginn (**Begin Play**) betreten die State Machines ihren Anfangszustand, und „Begin Play“ feuert.
+In jedem Schritt (**Tick**) passiert dann dreierlei: Fällige Wartezeiten laufen weiter (die früheste
+zuerst), das Tick-Ereignis feuert, und die State Machines prüfen ihre Timer- und
+Bedingungsübergänge. Jede Instanz verrät ihre **Stufe**: „interpreter“, „compiling“, „compiled
+(WebAssembly)“ oder „native C++“ (9.8).
 
 ### Ereignisse und Ketten
 
 Ein **Ereignis** hat einen Typ (etwa „etwas betritt den Sensor“), optional einen Ziel-Actor und
 Zusatzwerte. Kern sucht alle passenden Event-Knoten, schreibt die Werte in deren Ausgänge und lässt
-die Kette laufen.
+die Kette laufen. Actors, die währenddessen entstehen, sind gleich mit dabei. Ein **Custom Event**
+lässt sich gezielt rufen: an alle Graphen oder an einen Actor – und es schaltet zugleich
+State-Machine-Übergänge mit diesem Namen.
 
 Für Verzweigungen hat der Interpreter einen **Stapel** von Merkzetteln. Eine **Sequence** etwa führt
 ihren ersten Ausgang sofort aus und legt Zettel für die übrigen auf den Stapel. Ist ein Zweig zu
 Ende, nimmt Kern den nächsten Zettel. Schleifen funktionieren genauso: Körper ausführen, dann
 mit einem Zettel zum Schleifenknoten zurück.
+
+Hängt ein Eingang an einem Rechenknoten, wird dieser bei **jedem** Lesen neu ausgerechnet (bis zu 48
+Ebenen tief). Hängt er an einem Aktionsknoten, liest er dessen gespeicherten letzten Wert.
 
 ### Schutz vor Endlosschleifen
 
@@ -134,7 +145,8 @@ mit einem Zettel zum Schleifenknoten zurück.
 > Graph abgeschaltet – mit der Meldung „infinite loop? The graph is stopped.“ Der Rest des Spiels
 > läuft weiter.
 
-Außerdem dürfen Ereignisse, die Ereignisse auslösen, höchstens 64 tief verschachtelt sein.
+Außerdem dürfen Ereignisse, die Ereignisse auslösen, höchstens 64 tief verschachtelt sein. Im
+übersetzten Code stoppen mehr als 512 verschachtelte Schleifen oder Sequences die Instanz.
 
 ### State Machines – wie eine Ampel
 
@@ -148,9 +160,11 @@ Jede State Machine hat genau einen Anfangszustand. Ein **Übergang** kann feuern
 - solange eine **Bedingung** (eine Bool-Variable) wahr ist,
 - oder **automatisch** im nächsten Tick.
 
-Ein Übergang kann auch „aus jedem Zustand“ kommen. Pro Maschine und Prüfung gibt es höchstens einen
-Übergang. Betreten und Verlassen eines Zustands lösen eigene Ereignisse aus, an die du Ketten hängen
-kannst.
+Ein Übergang kann auch „aus jedem Zustand“ kommen (aber nicht vom Ziel in sich selbst). Pro
+Maschine und Prüfung gibt es höchstens einen Übergang, eine Kette automatischer Übergänge geht also
+einen Zustand pro Schritt weiter. Betreten und Verlassen eines Zustands lösen eigene Ereignisse aus,
+an die du Ketten hängen kannst; „On State Entered“ verrät auch den vorigen Zustand. **Set State**
+springt direkt in einen Zustand.
 
 ## 9.5 Die Grundknoten
 
@@ -163,7 +177,13 @@ Kern bringt **76 Grundknoten** mit. Die Familien:
   und Call Event.
 - **Variablen:** Get, Set, Add.
 - **Mathe und Logik:** Rechnen, Runden, Sinus, Zufall, Vergleichen, Und/Oder/Nicht, Select.
-- **Werte, Vektoren, Text** und **Hilfen** wie Game Time und Print.
+- **Werte, Vektoren, Text** und **Hilfen** wie Game Time und Print (auf Wunsch auch auf dem Bildschirm).
+
+Ein paar Feinheiten: Every N Seconds zählt seine eigene Zeit. Sequence hat 1 bis 16 Ausgänge, For
+Loop zählt einschließlich des letzten Werts. Ein Delay ignoriert weitere Aufrufe, solange es wartet;
+das Retriggerable Delay fängt dagegen neu an. Tween meldet jeden Schritt einen Wert von 0 bis 1 (linear
+oder sanft) und am Ende „Finished“. Switch verzweigt nach Zahl oder Text, Compare vergleicht mit einer
+winzigen Toleranz (10⁻⁹), und Umlenkknoten (*Reroute*) ordnen nur Drähte.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
 > dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Replays und Netzwerkspiele
@@ -178,28 +198,35 @@ bedeutet immer **Self**.
 
 | Knoten | Feuert, wenn … |
 |---|---|
-| On Begin / End Overlap | etwas einen Sensor betritt oder verlässt |
-| On Hit | es kracht (ab 2 m/s) |
+| On Begin / End Overlap | etwas den Sensor dieses Actors betritt oder verlässt |
+| On Entered Sensor | dieser Actor einen fremden Sensor betritt |
+| On Hit | es kracht (ab 2 m/s, höchstens 32 pro Schritt) |
 | On Collected, On Trigger | ein Pickup eingesammelt oder ein Trigger berührt wird |
 | On Damaged, On Death, On Respawn | Schaden, Tod, Rückkehr |
-| On Interact | der Spieler F (Gamepad: Y) drückt und den Actor ansieht |
+| On Interact | der Spieler F (Gamepad: Y) drückt und den Actor ansieht (bis 3 m) oder danebensteht (2 m) |
 | On Player Joined, On Game Over | ein Spieler kommt dazu, das Spiel endet |
-| On Input Action, On Key | eine Aktion oder Taste gedrückt wird |
+| On Input Action, On Key | eine Aktion (jeder Spieler, jedes Gerät) oder eine Taste (nur lokal) |
 
 Eine Überlappung zählt übrigens den ganzen Besucher: Kapsel und Kopf eines Spielers sind *ein*
 Besucher, nicht zwei.
 
 Die übrigen Knoten in Familien:
 
-- **Actors:** finden (nach Name oder Tag), Ort und Drehung lesen und setzen, verschieben,
-  **Spawn Actor** (eine Kopie erzeugen) und zerstören, und **Set Property**, das jeden Wert einer
-  Komponente über seinen Pfad ändern kann – etwa die Farbe.
-- **Physik:** Geschwindigkeit setzen, Impuls und Kraft, Launch, Physik ein/aus, Gelenkmotoren
+- **Actors:** Self, Spieler und Spielerzahl, finden (nach Name oder Tag, auch zufällig), Tags prüfen,
+  Ort, Drehung, Richtung, Tempo und Abstand lesen, setzen, verschieben, ein- und ausschalten,
+  **Spawn Actor** (eine Kopie mit Kindern und Logik erzeugen) und zerstören, und **Set Property**, das
+  jeden Wert einer Komponente über seinen Pfad wie in der Leveldatei ändern kann – etwa die Farbe.
+- **Physik:** Geschwindigkeit setzen, Impuls und Kraft (für einen Schritt), Launch (behält das
+  waagrechte Tempo), Physik ein/aus (dynamisch ↔ kinematisch), Gelenkmotoren
   (für Türen, Lifte, Winden), Explosionen und Strahltests (*Line Trace*).
-- **Spiel und Kampf:** Punkte, Meldungen, gewinnen, verlieren, Schaden, Heilen, Munition, Licht,
-  Farbe, Funken, Kamerawackeln, Sounds und „For Each Actor with Tag“.
-- **Roboter:** die Micro Duck laufen und schauen lassen, Spezialbewegungen wie Sitzen, Kicken oder
-  Purzelbaum, Schnabel, Zwitschern, Abstandssensor und Kopfkamera ([Kapitel 13](13-micro-duck.md)).
+- **Spiel und Kampf:** Punkte, Meldungen (für alle Spieler), gewinnen, verlieren, Schaden, Heilen,
+  Töten, Munition, Gesundheit lesen, Licht, Farbe, Funken, Kamerawackeln (nur auf diesem Gerät),
+  Sounds (3D oder flach) und „For Each Actor with Tag“.
+- **Roboter:** die Micro Duck laufen lassen (wie mit dem Gamepad, in den trainierten Grenzen: bis
+  0,4 m/s vorwärts, 0,3 m/s seitwärts, 57 °/s drehen) und schauen lassen, ihre Autonomie schalten,
+  Spezialbewegungen wie Sitzen, Aufheben, Kicken, Purzelbaum oder Sprung, Schnabel, Streicheln,
+  Hören, „hält sie etwas?“, Zwitschern, Abstandssensor, Kopfkamera und ihr Zustand
+  ([Kapitel 13](13-micro-duck.md)).
 
 ## 9.7 Logik in der Spielwelt
 
@@ -207,11 +234,14 @@ Die GameWorld startet die Graphen nur in Play oder Simulate, nur auf der Autorit
 Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt.
 
 Ihr **Host** liefert den Graphen die Grundlagen: die **Simulationszeit** (aus den Schritten
-gezählt, nicht die Wanduhr), Ausgaben ins Output Log und einen **deterministischen Zufall**.
+gezählt, nicht die Wanduhr), Ausgaben und Fehler ins Output Log (Print auf Wunsch als HUD-Meldung)
+und einen **deterministischen Zufall**. Gespawnte Actors und neue Spieler bringen ihre Graphen mit.
 
 Wohin gehen Ereignisse? An den Graphen des betroffenen Actors – oder, wenn der keinen hat, an den
 seines nächsten Vorfahren mit Graph. Das ist praktisch: Der eingeschweißte Collider einer Tür gehört
-zur Tür. Außerdem bekommt **immer** der Level-Graph das Ereignis mit. Der Logik-Tick läuft am Ende
+zur Tür. Außerdem bekommt **immer** der Level-Graph das Ereignis mit; Ereignisse ohne Actor (etwa
+Spielende) gehen an alle. Hat ein Level Logik, meldet die Physik Überlappungen aller beweglichen und
+Treffer aller dynamischen Formen – sonst hätten die Graphen nichts zu hören. Der Logik-Tick läuft am Ende
 jedes festen Schritts, nach den Physik-Ereignissen.
 
 **Fürs Netzwerk** schreibt Kern mit, was Logik an der Welt ändert: geänderte Werte, gespawnte Actors,
@@ -230,8 +260,10 @@ Kern hat zwei Übersetzer, die denselben Plan benutzen:
 - **WebAssembly (JIT):** Beim Start von Play oder Simulate schreibt Kern für jeden Graphen ein
   kleines WebAssembly-Modul. Der Browser macht daraus Maschinencode, und Kern hängt es direkt in die
   Engine ein. Kein JavaScript dazwischen.
-- **C++-Export:** Derselbe Graph als lesbarer C++-Quelltext. In ein Spiel gebaut, ersetzt er für
-  diesen Graphen den Interpreter.
+- **C++-Export:** Derselbe Graph als lesbarer C++-Quelltext. In ein Spiel gebaut
+  (`kern/build.sh --studio out.wasm datei.cpp`), ersetzt er für diesen Graphen den Interpreter.
+  Gibt es für einen Graphen exportierten Code, hat der Vorrang. Außerhalb des Browsers gibt es keinen
+  JIT: Dort läuft der Graph im Interpreter oder als exportiertes C++.
 
 Einfache Dinge – Verzweigungen, Schleifen, Zahlen-Variablen, Rechnen, Vergleichen – erzeugt der
 Übersetzer direkt. Alles andere (Spielknoten, Text, Vektoren, Wartezeiten) ruft einfach die
@@ -289,9 +321,16 @@ Actors. Die Oberfläche beschreibt [Kapitel 11](11-studio.md); hier das Wichtigs
   verbunden.
 - **Promote to Variable** macht aus einem Pin mit einem Klick eine neue Variable.
 - Ein Doppelklick auf einen Draht fügt einen Umlenkknoten ein – für ordentliche Drähte.
-- **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen.
-- **F9** setzt einen Haltepunkt: Läuft der Knoten beim Spielen, hält das Spiel an, und der Editor
-  springt hin.
+- Knoten rasten auf ein 8-px-Raster ein. Fehlt einem neuen Knoten seine Variable oder State Machine,
+  legt Kern sie gleich an. Benennst du eine Variable um, ändern sich alle Knoten mit; wechselst du
+  ihren Typ, wird der Wert umgewandelt.
+- Kopieren und Einfügen geht als Graph-JSON, Vorlagen landen unter den vorhandenen Knoten.
+- Zusammengehörige Handgriffe (einen Draht aufnehmen und woanders ablegen, Tippen in denselben Pin)
+  sind zusammen ein Undo-Schritt.
+- **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen (Datei
+  `logic_<level>_<actor>.cpp`).
+- **F9** setzt einen Haltepunkt: Läuft der Knoten beim Spielen, hält das Spiel nach diesem
+  Simulationsschritt an, und der Editor springt hin.
 - Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre Live-Werte.
 
 > **Probier's aus!** Öffne das Basic-Level (File › Example Levels), klick auf **Logic** und dann auf
