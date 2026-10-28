@@ -43,12 +43,18 @@ und in `web/kern.mjs` dazu.
 - **Grafikobjekte sind Nummern.** JavaScript legt das echte Objekt in eine Tabelle und gibt Kern die
   Platznummer, `0` heißt „nichts“. Wie an der Garderobe: Du bekommst eine Marke, nicht den Mantel.
 - **Daten sind „Adresse plus Länge“.** JavaScript schaut durch ein Fenster direkt in Kerns Speicher und
-  reicht die Bytes an WebGL weiter, **ohne zu kopieren**.
+  reicht die Bytes an WebGL weiter, **ohne zu kopieren**. Wächst Kerns Speicher, erneuert `refresh()`
+  diese Fenster.
+
+Außerhalb des Browsers, in den nativen Tests, bleiben die Importe leer; dort hängt eine Attrappe
+(`tests/gl_stub.cpp`) dran, die die GL-Aufrufe nur mitschreibt.
 
 `web/kern.mjs` tut laut Kopfkommentar genau drei Dinge und enthält **keine Engine-Logik**: das Modul
 mit seinen Importen laden (dazu ein winziges WASI für Konsole, Zufall und Uhr – die Engine fasst keine
 Dateien an), die Nummern-Tabellen und den Kontextverlust verwalten und `KernRenderer` anbieten, eine
-bequeme Fassade für JavaScript.
+bequeme Fassade für JavaScript. Ein zweites Importpaket, `kern_env`, liefert der Engine unter anderem
+die Uhrzeit, die Geländehöhe der Seite, Mauszeiger-Sperre, Statusmeldungen und den JIT-Weg der
+Logik-Graphen ([Kapitel 9](09-logik.md)).
 
 Den WebGL2-Zugang (den **Kontext**) legt die Webseite an. Die Engine-Seite verzichtet dabei auf die
 eingebaute Kantenglättung, weil Kern ohnehin in eigene Zwischenbilder malt (4.7); Kern Studio und
@@ -65,7 +71,9 @@ nehmen `KernRenderer`, genau einen pro Modul. Kern Studio hat eine dritte, eigen
 Ein **Programm** besteht aus Vertex-Shader (rechnet jede Ecke) und Fragment-Shader (rechnet jedes
 Pixel). Kern übersetzt beide und meldet Fehler mit einem Namensschild davor, etwa „standard fragment
 shader: …“. Fragt er nach einem Einstellwert, den der Übersetzer wegoptimiert hat, bekommt er die
-Nummer `0` – und alle Setzbefehle ignorieren `0`. Ein unbenutzter Wert kostet nichts.
+Nummer `0` – und alle Setzbefehle ignorieren `0`. Ein unbenutzter Wert kostet nichts. Beim Wegräumen
+unterscheidet Kern zwei Fälle: Lebt die Grafikkarte noch, löscht er das Programm; nach einem
+Kontextverlust ist es schon tot, und er vergisst nur die Nummer.
 
 **Uniforms** sind Werte, die für einen ganzen Zeichenaufruf gleich bleiben: Farbe, Rauheit,
 Sonnenrichtung. Die Grafikkarte merkt sie sich. Der **Uniform-Cache** nutzt das und schickt nur, was
@@ -104,7 +112,7 @@ Andere Angaben gelten **pro Instanz**. Eine Instanz ist eine Kopie des Meshes an
 hundert Bäume aus einer Vorlage. Pro Instanz gibt es die Modellmatrix (Ort, Drehung, Größe), einen
 Farbton (**Tint**) und die Normalenmatrix (damit Normalen nach dem Strecken stimmen, Anhang B). Der
 Clou: **Jedes Mesh ist instanziert**, auch mit nur einer Instanz, und wird mit genau einem
-Zeichenaufruf gemalt. Kaputte Matrizen (etwa auf Größe null gestaucht) lehnt Kern ab.
+Zeichenaufruf gemalt. Die Normalenmatrix rechnet Kern pro Instanz auf der CPU aus. Kaputte Matrizen (etwa auf Größe null gestaucht) lehnt Kern ab.
 
 Grenzen, die du kennen solltest: **32 Knochen**, **6 Punktlichter**, **2 Zusatzströme** und **8
 Zahlen-Parameter** für Erweiterungen.
@@ -114,7 +122,7 @@ Zahlen-Parameter** für Erweiterungen.
 | Feld | Was es tut |
 |---|---|
 | `color` | Grundfarbe mit Deckkraft |
-| `alpha` | undurchsichtig, ausgestanzt oder durchscheinend |
+| `alpha` | undurchsichtig, ausgestanzt (Schwelle 0,5) oder durchscheinend |
 | `roughness`, `metalness` | rau oder glatt, Metall oder nicht |
 | `emissive` | Eigenleuchten, darf über 1 liegen |
 
@@ -149,23 +157,29 @@ zwei Besitzer einen Platz teilen.
 
 Beim Hochladen legt Kern feste Puffer für die Eckendaten an, drei veränderliche für die Instanzen und
 einen für die Eckennummern. Bei **höchstens 65 536 Ecken** speichert er diese Nummern mit 16 statt 32
-Bit – halber Platz im häufigsten Fall. Unbewegte Weltobjekte ab 36 Dreiecken bekommen zusätzlich eine
-**BVH**, ein Inhaltsverzeichnis für schnelle Mausklicks ([Kapitel 5](05-szene-und-geometrie.md)).
+Bit – halber Platz im häufigsten Fall. Unbewegte Weltobjekte ab 36 Dreiecken (eine Instanz am
+Ursprung, ohne Skelett, keine Linien) bekommen zusätzlich eine **BVH**, ein Inhaltsverzeichnis für
+schnelle Mausklicks ([Kapitel 5](05-szene-und-geometrie.md)). `remove` gibt ein Mesh und seine Nummer
+wieder frei.
 
 ### Bewegen mit `update_instances`
 
 Alles Bewegte geht über `update_instances`, sparsam bis ins Mark: Neue Farbtöne allein laden nur den
 Farbton-Puffer hoch. Byte-gleiche Daten bewirken **gar nichts**. Reicht der Platz nicht, wird der
 Puffer mindestens verdoppelt, damit schwankende Instanzzahlen nicht ständig neuen Speicher brauchen.
-Was einen Schattenwerfer betrifft, merkt sich Kern für die Schattenkarte (4.8.1).
+Fehlen passende Farbtöne (nicht genau vier Zahlen pro Instanz), sind alle Instanzen weiß. Weitere
+Stellschrauben: Knochen neu setzen (gleiche Knochenzahl wie beim Anlegen), Sichtbarkeit, Material
+(aus Linien werden dabei keine Dreiecke und umgekehrt) und Ebenen. Was einen Schattenwerfer betrifft,
+merkt sich Kern für die Schattenkarte (4.8.1).
 
-Jedes Mesh hat außerdem eine **Ebenenmaske**, deren Bits wie Lichtschalter wirken. Studio trennt so
-etwa Raster, Gizmos pro Viewport und die Welten mehrerer Netzwerkspieler.
+Jedes Mesh hat außerdem eine **Ebenenmaske**, deren Bits wie Lichtschalter wirken. Pro Bild bestimmt
+die Maske, was gemalt wird und was Schatten wirft; beim Anklicken filtert sie genauso. Studio trennt so
+etwa Raster, Icons, Gizmos pro Viewport, Collider-Darstellung und die Welten mehrerer Netzwerkspieler.
 
 **Texturen** (aufgeklebte Bilder) legt Kern selbst an – mit Optionen für Mipmaps (verkleinerte
 Vorstufen für die Ferne), Wiederholen und pixeligen Look – und behält ihre Pixel als Kopie. Oder die
 Webseite meldet eine eigene Textur an und hinterlegt, wie sie nach einem Kontextverlust neu gefüllt
-wird. Jedes Mesh hat höchstens eine Farbtextur.
+wird. Jedes Mesh hat höchstens eine Farbtextur (Einheit 0; die Schattenkarte liegt auf Einheit 1).
 
 > **Probier's aus!** Öffne https://kernengine.de/, lege mit **File › New Level…** die Vorlage
 > **Basic** an und zieh aus dem Content Drawer (Gruppe *Shapes*) einen **Cube** hinein. Spiele in
@@ -187,7 +201,8 @@ Knochen) ist das klassische „Linear Blend Skinning“: Jede Ecke folgt bis zu 
 Der **Fragment-Shader** rechnet pro Pixel und schreibt **drei Bilder gleichzeitig**: `outColor`, das
 fertige Bild, wie du es siehst; `outHdr`, die echte Lichtmenge vor dem Tonemapping (für das Glühen);
 und `outAo`, einen Datensatz für die Ambient Occlusion. Dazwischen: Textur lesen, Deckkraft
-ausrechnen, ausgestanzte Pixel wegwerfen, Farbe linearisieren, beleuchten, tonemappen, Nebel.
+ausrechnen (Instanz-Deckkraft mal Material mal Texel), bei ausgestanzten Materialien alles unter der
+Schwelle wegwerfen, Farbe linearisieren, beleuchten, tonemappen, Nebel.
 
 ### Licht und Material
 
@@ -229,7 +244,8 @@ zuletzt dazu, linear und **ohne Obergrenze** – Werte über 1 werden später zu
 Kerns Lichtwerte liegen oft über 1 (die Sonne um 2,8), ein Bildschirm kann nur 0 bis 1. Also: echtes
 Licht in `outHdr` sichern, dann mit der **ACES-Filmkurve** (Fassung von three.js, inklusive Belichtung)
 sanft in 0 bis 1 pressen – wie ein Fotofilm, der Helles weich abrundet. Optional folgt Kerns
-**Farbgrading**: Sättigung ×1,14, sanfte S-Kurve, wärmere Lichter, kühlere Schatten. Dann sRGB.
+**Farbgrading**: Sättigung ×1,14, sanfte S-Kurve, wärmere Lichter, kühlere Schatten (abschaltbar
+über die Renderer- und die Bloom-Einstellungen). Dann sRGB.
 
 Der **Nebel** kommt wie bei three.js **nach** der sRGB-Umwandlung, als „FogExp2“. Mit der
 Standarddichte 0,00085 ist er nach 100 m kaum da (0,7 %), nach 1000 m schon gut zur Hälfte (51 %).
@@ -260,11 +276,19 @@ bleibt unverändert.
 | `fragment_input` | Farben als linear behandeln |
 | `fragment_surface` | Grundfarbe, Glas, Leuchten vor dem Licht ändern |
 
-Jeder Schnipsel bekommt eine Kommentarzeile mit dem Namen der Erweiterung, damit Übersetzerfehler sofort
-den Schuldigen zeigen. Außerdem kann eine Erweiterung **eigene Ecken-Daten** mitbringen (höchstens zwei
-Ströme insgesamt, je 1–4 Zahlen; fehlt der Strom, liest der Shader (0, 0, 0, 1)), **ganzzahlige
-Materialparameter** benennen (höchstens 8) und **eigene Uniforms** setzen – deren Nummern sucht sie nach
-jedem Bauen des Programms, auch nach einem Kontextverlust. Ein Beispiel folgt in 4.13.
+Das Spiel reicht seine Erweiterungen beim Start des Renderers herein (in einer `App` über
+`App::extensions()`). Jeder Schnipsel bekommt eine Kommentarzeile mit dem Namen der Erweiterung, damit
+Übersetzerfehler sofort den Schuldigen zeigen. Außerdem kann eine Erweiterung:
+
+- **eigene Ecken-Daten** mitbringen: höchstens zwei Ströme insgesamt (Plätze 14 und 15), je 1–4
+  Zahlen. C++ liefert sie im `MeshInput`, JavaScript als benanntes Feld in `KernRenderer.upsert`.
+  Fehlt der Strom, liest der Shader (0, 0, 0, 1);
+- **ganzzahlige Materialparameter** benennen (höchstens 8) und daraus pro Zeichenaufruf eigene
+  Uniforms setzen;
+- **eigene Uniforms** einmal pro Bild setzen – am besten über den Uniform-Cache, dann spart sie mit.
+  Ihre Nummern sucht sie nach jedem Bauen des Programms, auch nach einem Kontextverlust.
+
+Ein Beispiel folgt in 4.13.
 
 ## 4.7 Der Ablauf eines Frames
 
@@ -283,9 +307,11 @@ flowchart TD
 ```
 
 Zuerst **prüft** Kern Kamera und Bildrechteck, bevor er die Grafikkarte anfasst. Wenn der Browser es
-kann, misst eine **Stoppuhr** die GPU-Zeit. Die **Schattenkarte** wird nur bei Bedarf neu gemalt.
+kann, misst eine **Stoppuhr** die GPU-Zeit; das Ergebnis kommt erst einige Bilder später (bis dahin
+meldet die Statistik −1). Die **Schattenkarte** wird nur bei Bedarf neu gemalt.
 
-Dann wählt Kern das **Ziel**: normalerweise ein eigenes Szenen-Ziel. Malt er nur in einen Teil des
+Dann wählt Kern das **Ziel**: normalerweise ein eigenes Szenen-Ziel, sofern Bloom an und vom Gerät
+unterstützt ist, sonst direkt den Bildschirm. Malt er nur in einen Teil des
 Fensters, etwa einen von vier Viewports, geht es direkt auf den Bildschirm – dann **ohne Bloom und ohne
 Ambient Occlusion**.
 
@@ -324,14 +350,16 @@ Ein **Pass** ist ein eigener Malgang mit eigenem Shader. Kern hat vier.
 Kern malt die Szene einmal **aus Sicht der Sonne** und merkt sich pro Kartenpunkt nur die Entfernung
 zum nächsten Objekt – die **Schattenkarte** (Grundprinzip in [Anhang B](B-grundlagen-rendering.md)).
 Standard: 512 × 512 Punkte über ±120 m, ein kleiner Sicherheitsabstand (Bias 0,0012) und ein Filter
-mit 1, 4 oder 9 Abtastungen. Studio nimmt auf Telefonen 4, am Desktop 9; `?shadowFilter=1`, `4` oder
-`9` in der Adresse überschreibt das.
+mit 1, 4 oder 9 Abtastungen. Erlaubt sind 128 bis 4096 Punkte (Zweierpotenzen), ±10 bis ±2000 m und
+ein Bias unter 0,04. Studio nimmt auf Telefonen 4 Abtastungen, am Desktop 9; `?shadowFilter=1`, `4`
+oder `9` in der Adresse überschreibt das.
 
 **Schattendistanz.** 512 Punkte über 240 m – fast ein halber Meter pro Punkt! Für eine Ente viel zu
 grob. Mit der **Schattendistanz** deckt die Karte nur ab, was du bis zu dieser Entfernung siehst. In
 Levels: **World Settings › Shadow distance** (Standard 80 m, im Micro-Duck-Level 10 m). Genauer
 umschließt die Karte eine **Kugel** um den sichtbaren Kegel der Kamera (nach Valient, 2008). Eine Kugel
-bleibt gleich groß, wie auch immer du dich drehst – also auch die Kartenpunkte.
+bleibt gleich groß, wie auch immer du dich drehst – also auch die Kartenpunkte. Ohne Schattendistanz
+(im Renderer Standard 0) oder bei orthografischer Kamera gilt das feste Quadrat um das Kameraziel.
 
 **Einrasten.** Wandert die Karte um Bruchteile eines Punkts mit, fallen Schattenkanten jedes Mal anders
 aufs Raster und flimmern. Kern rundet ihre Position auf **ganze Kartenpunkte**.
@@ -345,8 +373,8 @@ Schattenwerfer (sie steigt, wenn einer erscheint, verschwindet, sich bewegt oder
 und den aktiven Ebenen bildet Kern einen Schlüssel. Nur wenn er sich ändert, wird neu gemalt. Über einer
 unbewegten Stadt kostet der Schatten bei stehender Kamera **keinen einzigen Zeichenaufruf**.
 
-**Malen und abtasten.** Gemalt wird nur Tiefe, mit einem schlanken Shader und einem kleinen
-Polygon-Offset gegen **Schattenakne** (Streifen, mit denen sich eine Fläche selbst beschattet). Beim
+**Malen und abtasten.** Gemalt wird nur Tiefe – nur Schattenwerfer der aktiven Ebenen, die in der
+Sichtpyramide der Sonne liegen –, mit einem schlanken Shader und einem kleinen Polygon-Offset gegen **Schattenakne** (Streifen, mit denen sich eine Fläche selbst beschattet). Beim
 Nachschlagen kann die Grafikkarte Tiefen direkt vergleichen und vier Nachbarn mischen – Stufe 1. Die
 Stufen 4 und 9 setzen daraus einen größeren, weichen Filter zusammen (nach Castaño, 2013, aus dem Spiel
 „The Witness“): Jede Abtastung sitzt so geschickt **zwischen** den Punkten, dass die eingebaute Mischung
@@ -376,7 +404,9 @@ Stunde** (je tiefer die Sonne, desto oranger der Horizont und violetter der Zeni
 weichem Hof und scharfer Scheibe, nachts **Mond und funkelnde Sterne**, **Wolken** aus fünf
 übereinandergelegten Rauschmustern (vom Wind verschoben, von Explosionen wie von einer Schockwelle
 weggedrückt) und auf Wunsch **Horizontnebel**, in dem sich der Horizont in die Nebelfarbe der Szene
-auflöst. Orthografische Kameras haben keinen Himmel.
+auflöst – je dünner der Nebel der Szene, desto dünner auch dieser Dunst. Sinkt die Sonne unter den
+Horizont, verschwinden Scheibe und Hof; unterhalb des Horizonts geht der Himmel in die Horizontfarbe
+über. Orthografische Kameras haben keinen Himmel; dort bleibt die Löschfarbe stehen.
 
 ### 4.8.3 Bloom und Composite
 
@@ -396,7 +426,8 @@ Neu entwickeln hieße: Nebel weg. Pixel ohne Glühen und Verdeckung kopiert er e
 
 **Der Wächter.** Liegt die gemittelte Bildzeit länger als 3,5 Sekunden über 27 Millisekunden (also
 unter etwa 37 Bildern pro Sekunde), schaltet sich das Glühen für die Sitzung ab, außer es ist erzwungen.
-Der Composite läuft weiter, denn er bringt auch die AO ins Bild.
+Der Composite läuft weiter, denn er bringt auch die AO ins Bild. Ist die Seite verborgen, setzt Kern
+den Wächter zurück – sonst würden gedrosselte Hintergrundbilder das Glühen abschalten.
 
 ### 4.8.4 Ambient Occlusion (GTAO)
 
@@ -422,7 +453,9 @@ zwischen den Wänden hin- und herspringt – eine weiße Zimmerecke wird weniger
 **Qualität** (Richtungen × Schritte pro Seite): low 1 × 2, medium 2 × 2, high 3 × 3, ultra 9 × 3.
 Standard ist medium in halber Auflösung; ein Wächter senkt auf langsamen Geräten erst die Qualität und
 schaltet dann auf halbe Auflösung. Studio und exportierte Spiele nehmen auf Telefonen medium/halb,
-sonst high/voll; `?ao=off|low|medium|high|ultra` und `?aoRes=half|full` überschreiben das. AO läuft nur
+sonst high/voll; `?ao=off|low|medium|high|ultra` und `?aoRes=half|full` überschreiben das. Eine
+Stärke (`power`, Standard 2,2) macht die Verdeckung kräftiger. Der Radius gehört zur Szene, nicht zum
+Gerät: Levels setzen ihn in den World Settings, 0 schaltet AO für diese Szene ab. AO läuft nur
 mit Szenen-Ziel (nicht in Teil-Viewports, nicht ohne Bloom-Unterstützung) und perspektivischer Kamera.
 
 > **Probier's aus!** Stelle in **World Settings** den **Ambient occlusion radius** auf 0: Ecken und
@@ -433,17 +466,21 @@ mit Szenen-Ziel (nicht in Teil-Viewports, nicht ohne Bloom-Unterstützung) und p
 
 Funken, Rauch, Mündungsfeuer: Kerns **Partikel** sind kleine Quadrate, die sich zur Kamera drehen –
 alle zusammen **ein** instanziertes, durchsichtiges Mesh, rein optisch, ohne Physik. Jedes hat
-unter anderem eine Lebensdauer (16 bis 10 000 ms, Standard 350) und eine Größe (Standard 35 cm). Ein System fasst 1 bis 4096 Partikel; ist es voll, wird
+eine Farbe, eine Lebensdauer (16 bis 10 000 ms, Standard 350), eine Größe (Standard 35 cm), auf Wunsch
+Schwerkraft, Wachsen und schnelleres Verblassen. Ein System fasst 1 bis 4096 Partikel; ist es voll, wird
 ein neues abgelehnt und gezählt. Jedes Bild bewegt Kern sie (Startpunkt plus Geschwindigkeit mal Zeit,
-minus Fallen), sortiert sie **von hinten nach vorne** und blendet sie über die Lebenszeit aus. Die
-Spiel-Laufzeit nutzt 512 Partikel.
+minus Fallen), sortiert sie **von hinten nach vorne** und blendet sie über die Lebenszeit aus. Das
+Partikel-Mesh ist unbeleuchtet, zweiseitig, wirft keinen Schatten, wird nie weggecullt und ist
+unsichtbar, solange kein Partikel lebt. Die Spiel-Laufzeit nutzt 512 Partikel; JavaScript erreicht
+dieselbe Klasse über `kern_fx_*`.
 
 > **Achtung, Falle!** Die Partikel-Uhr läuft nie rückwärts. Das ist Absicht: Sonst tauchten längst
 > verblasste Funken nach einer Pause wieder auf wie Gespenster.
 
 Der Shader kennt nur sechs Punktlichter. Hat ein Spiel zwanzig Lampen, wählt der **LightPool** jedes
 Bild die sechs wichtigsten: Helligkeit geteilt durch (1 + Entfernung / Reichweite), wobei die
-Reichweite mindestens als 4 m zählt; bei Gleichstand gewinnt, wer zuerst fragte. Beispiel: Lampe A,
+Reichweite mindestens als 4 m zählt; bei Gleichstand gewinnt, wer zuerst fragte. Helligkeit über 100
+und Reichweite über 1000 m kappt er. Beispiel: Lampe A,
 Helligkeit 10, Reichweite 10 m, 30 m entfernt: 10 / (1 + 3) = 2,5. Lampe B, Helligkeit 4, gleiche
 Reichweite, 5 m entfernt: 4 / 1,5 ≈ 2,7 – die schwächere, aber nähere gewinnt. Orb Run meldet so einen
 Scheinwerfer vor dem Auto und ein Licht pro Orb an.
@@ -452,15 +489,21 @@ Scheinwerfer vor dem Auto und ein Licht pro Orb an.
 
 Die vollständigen Listen stehen im blauen Buch und in [Kapitel 17](17-referenz.md); hier das Wichtigste.
 Grundeinstellungen sind Bildgröße (Standard 960 × 540), Sonnenschatten (Standard aus), Bloom, AO und
-Farbgrading (an). Schatten, Schattendistanz, Filter, AO und Punktlichter lassen sich zur Laufzeit
-ändern.
+Farbgrading (an). Schatten, Schattendistanz, Filter, AO, AO-Radius und Punktlichter lassen sich zur
+Laufzeit ändern; `invalidate` erzwingt ein Neumalen, auf Wunsch samt Schattenkarte.
+
+Jedem Bild gibst du **RenderParams** mit: die Löschfarbe (dunkles Blau, sichtbar, wo kein Himmel ist),
+optional ein Teilrechteck (dann ohne Bloom und AO), ob die Seite verborgen ist (setzt die Wächter
+aus), die Ebenenmaske und ob der Himmel gemalt wird.
 
 Alle Lichtfarben stehen linear und schon mal Stärke im Renderer; die Vorgaben heißen im Code
 „production day“: Sonne schräg von oben aus Richtung (−0,45; −0,52; 0,72), Sonnenfarbe (2,8; 2,47;
 2,11), Nebeldichte 0,00085, Belichtung 1, Umgebungsstärke 0,9. Den Himmel steuern Sonnen- und
 Mondrichtung, Nacht (0 bis 1), Wolken, Wind und Explosionen. In Levels musst du nichts davon von Hand
-setzen: Die Spiel-Laufzeit rechnet alles aus der **Tageszeit**, mit Sonne zu Himmelslicht etwa 5 : 1
-und eingeschaltetem Höhennebel, Sonnenstreuung und Horizontnebel ([Kapitel 8](08-spiel-laufzeit.md)).
+setzen: Die Spiel-Laufzeit rechnet alles aus der **Tageszeit**, mit Sonne zu Himmelslicht etwa 5 : 1,
+dem Hemisphärenlicht nur noch als Nachtaufhellung, einer Bodenfarbe der Umgebungskuppel aus dem Licht,
+das eine Straße zurückwirft, und eingeschaltetem Höhennebel, Sonnenstreuung und Horizontnebel
+([Kapitel 8](08-spiel-laufzeit.md)).
 
 Die **Kamera** hat Augpunkt, Ziel, Oben-Richtung (Z), 60° Öffnung, nahe
 Ebene 0,05 m und ferne 1800 m, wahlweise orthografisch. Die Welt ist **Z-oben, in Metern**.
@@ -487,14 +530,19 @@ Derselbe Mechanismus erlaubt den **Headless-Modus** ganz ohne Grafikkarte, etwa 
 
 - **Instanzieren statt kopieren:** Die Stadt der Laufzeit malt alle Baumstämme als ein Mesh, alle
   Kronen als ein zweites.
+- **Statisches zusammenfassen:** Gebäude- und Straßenbauer packen viele kleine Teile in wenige große
+  Meshes – weniger Zeichenaufrufe, weniger Sortierarbeit.
 - **Nur hochladen, was sich ändert;** gleiche Daten kosten nichts, reine Farbwechsel wenig.
 - **Schatten schonen:** Jede Bewegung eines Schattenwerfers malt die ganze Karte neu. Was keinen
   sichtbaren Schatten braucht, bekommt `cast_shadow = false` – Orb Run tut das für Straßen und Boden.
   Mit Schattendistanz wird außerdem neu gemalt, sobald sich die Kamera um einen Kartenpunkt bewegt.
 - **16-Bit-Indizes** kommen automatisch; `weld` ([Kapitel 5](05-szene-und-geometrie.md)) macht aus losen
   Dreiecken sparsame indizierte Meshes.
+- **Frustum-Culling anlassen:** Abschalten (`frustum_culled = false`) nur für Dinge, deren Hülle nicht
+  stimmt, etwa Partikel.
 - **Messen statt raten:** Die Statistik zeigt Zeichenaufrufe, Schatten-Wiederverwendung, Dreiecke und
-  Zeiten. AO und Bloom passen sich ohnehin selbst an.
+  Zeiten; in JavaScript gibt `KernRenderer.render()` sie als Objekt zurück. AO und Bloom passen sich
+  ohnehin selbst an.
 
 ## 4.13 Beispiel: Fenster, die nachts leuchten (Orb Run)
 

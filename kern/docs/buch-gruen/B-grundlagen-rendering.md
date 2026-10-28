@@ -6,7 +6,8 @@
 > Browser. Bei jedem Grundbegriff erfährst du kurz, wie Kern ihn umsetzt.
 
 Wie Kern die Bausteine im Detail zusammensetzt, steht in [Kapitel 4](04-grafik.md) und
-[Kapitel 5](05-szene-und-geometrie.md). Hier geht es um das „Warum“.
+[Kapitel 5](05-szene-und-geometrie.md). Hier geht es um das „Warum“. Welche Quelldatei welchen
+Baustein enthält, listet das blaue Buch am Anfang von Anhang B.
 
 ## B.1 Koordinatenräume
 
@@ -66,7 +67,9 @@ beschreibt Kern mit **Quaternionen**, vier Zahlen ohne die Tücken von drei Wink
 ### Ansicht und Perspektive
 
 Die **Ansichtsmatrix** (`Mat4::look_at`) baut aus Augpunkt, Zielpunkt und „oben“ drei senkrechte
-Kamera-Achsen. Liegen Blick und „oben“ auf einer Linie (gleich oder genau entgegengesetzt), ist die Kamera unbestimmt; Kern verweigert
+Kamera-Achsen; die Kamera blickt entlang der negativen dritten Achse. Die Matrix ist die Umkehrung der
+Kameralage: Sie dreht und schiebt die Welt so, dass die Kamera im Ursprung landet. Liegen Blick und
+„oben“ auf einer Linie (gleich oder genau entgegengesetzt), ist die Kamera unbestimmt; Kern verweigert
 dann das Bild („degenerate camera direction/up“).
 
 **Perspektive** heißt: Doppelt so weit weg erscheint halb so groß – die Bildposition ist x geteilt durch
@@ -139,9 +142,11 @@ Weil die Perspektive Abstände verzerrt, mischt die Grafikkarte **perspektivisch
 
 Treffen mehrere Dreiecke dasselbe Pixel, entscheidet der **Tiefenpuffer** (Z-Buffer): Er merkt sich pro
 Pixel die kleinste bisherige Tiefe, und nur ein Fragment, das den Test besteht, wird geschrieben. Für
-Undurchsichtiges ist die Reihenfolge damit egal – für die Geschwindigkeit nicht. Kern malt
-Undurchsichtiges von vorne nach hinten, Durchsichtiges von hinten nach vorne, den Himmel in die Lücken
-und die Ego-Ebene nach einem Löschen der Tiefe ([Kapitel 4](04-grafik.md), 4.7).
+Undurchsichtiges ist die Reihenfolge damit egal – für die Geschwindigkeit nicht. Kern testet mit
+„kleiner oder gleich“ und malt Undurchsichtiges von vorne nach hinten (Verdecktes scheitert früh, bevor
+der teure Shader läuft). Durchsichtiges kommt von hinten nach vorne, gemischt nach seiner Deckkraft und
+ohne in den Tiefenpuffer zu schreiben – hier zählt die Reihenfolge. Der Himmel füllt danach die Lücken
+bei Tiefe 1, und die Ego-Ebene kommt nach einem Löschen der Tiefe ([Kapitel 4](04-grafik.md), 4.7).
 
 Bei geschlossenen Körpern sind Dreiecke, die von der Kamera wegzeigen, immer verdeckt. Die
 Grafikkarte erkennt sie am **Umlaufsinn** ihrer Ecken (im oder gegen den Uhrzeigersinn) und verwirft
@@ -177,9 +182,12 @@ vier Arten von Daten:
 | Textur | Bild, abgetastet | Farbbild, Schattenkarte |
 
 **Instancing:** Hundert gleiche Bäume malt man mit **einem** Aufruf; ein Attribut, das „pro Instanz“
-statt pro Ecke vorrückt, gibt jedem Baum Ort und Farbton. In Kern ist jedes Mesh instanziert.
+statt pro Ecke vorrückt, gibt jedem Baum Ort und Farbton. In Kern ist jedes Mesh instanziert; bewegt
+sich etwas, ändern sich nur diese Instanz-Daten, die Geometrie bleibt auf der Grafikkarte. Die
+Attribute haben feste Plätze, im Standard- wie im Schatten-Shader gleich; Erweiterungen hängen eigene
+Attribute, Uniforms und Code an verabredeten Stellen an, ohne den Shader zu kopieren.
 **Skinning:** Bei Figuren folgt jede Ecke bis zu vier Knochen, gewichtet, Gewichte zusammen 1 – in Kern
-mit bis zu 32 Knochen. **Mehrere Ziele:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder
+mit bis zu 32 Knochen, im Standard- und im Schatten-Shader. **Mehrere Ziele:** Ein Fragment-Shader kann gleichzeitig in mehrere Bilder
 schreiben. Kern füllt drei – fertiges Bild, echtes Licht für Bloom, AO-Datensatz – und braucht so für
 Bloom und AO **keinen zweiten Durchgang** über alle Dreiecke.
 
@@ -208,7 +216,9 @@ Sonne im roten Kanal 2,8: 0,5 · 2,8 · 0,707 / π ≈ **0,315**. Metalle haben 
 
 **Punktlichter** werden in Wirklichkeit mit dem Quadrat der Entfernung schwächer, aber nie null – jede
 Lampe müsste die ganze Welt beleuchten. Kern lässt sie deshalb **an der Reichweite glatt auf 0**
-abfallen, bei höchstens 6 Lampen.
+abfallen, bei höchstens 6 Lampen. Jede hat Position, Reichweite, Farbe und Stärke. Den Abstand
+zählt Kern mindestens als 0,2 m (im Quadrat 0,04), damit eine Lampe direkt auf einer Fläche nicht
+unendlich hell wird.
 
 ### Glanz
 
@@ -227,7 +237,9 @@ und bei der Grundfarbe für Metalle. **G**, Geometrie – wie sehr verdecken sic
 Licht, GGX und Schlick für den Sonnen-Glanzpunkt, eine Spiegelung des Himmels. Abkürzungen: Glanz nur
 bei Metall oder Rauheit unter 0,95; ein Schlick, bei dem raue Flächen am Rand weniger glänzen; kein
 eigener G-Term – mit der einfachsten Annahme kürzt sich die Formel bis auf den Faktor 1/4, der im Shader
-steht; und D gedeckelt bei 40 gegen einzelne Riesenpixel.
+steht; und D gedeckelt bei 40 gegen einzelne Riesenpixel. Die Himmelsspiegelung wird je nach Rauheit
+zwischen weichem Himmelslicht und schärferem Himmelsverlauf gemischt und mit F gewichtet. Glas (von
+Erweiterungen gesetzt) spiegelt zusätzlich den Himmel, damit Scheiben nicht schwarz wirken.
 
 **Indirektes Licht** rechnet Kern aus wenigen Farben: ein **Hemisphärenlicht** (oben Himmels-, unten
 Bodenfarbe, gemischt nach der Neigung) und eine **Umgebungskuppel** aus Zenit, Horizont und Boden. Es
@@ -259,7 +271,11 @@ ja, steht etwas davor.
 Kern nutzt für die Sonne eine parallele (orthografische) Projektion, rastet auf ganze Kartenpunkte ein,
 passt die Karte an die Sicht an (Schattendistanz), kombiniert drei Arten Bias (Polygon-Offset, kleiner
 Vergleichsabstand, **Normal Offset**) und filtert mit **PCF** (*percentage closer filtering*: mehrere
-Vergleiche, gemittelt). Wie das zusammenspielt, steht in [Kapitel 4](04-grafik.md), 4.8.1. Warum die
+Vergleiche, gemittelt) – 1, 4 oder 9 Abtastungen, wobei die Grafikkarte in jeder schon vier Nachbarn
+vergleicht und mischt. In die Karte kommt nur Tiefe, und nur von Schattenwerfern; sie wird
+wiederverwendet, solange Sonne, Kartenlage und Schattenwerfer gleich bleiben. Flächen, die von der
+Sonne wegzeigen, fragen gar nicht erst nach. Mit Schattendistanz blendet der Schatten über das letzte
+Zehntel aus. Wie das zusammenspielt, steht in [Kapitel 4](04-grafik.md), 4.8.1. Warum die
 Anpassung so wichtig ist: Mit den Standardwerten (512 Kartenpunkte über ±120 m) ist ein Kartenpunkt
 2 · 120 / 512 ≈ **0,47 m** breit – viel zu grob für etwas so Kleines wie die Micro Duck.
 
@@ -294,7 +310,8 @@ Näherung der Filmkurve, auf 0 bis 1 begrenzen), danach optional sein Farbgradin
 Bildschirme und Bilddateien speichern Farben in **sRGB**: Dunkle Töne bekommen mehr der 256 Stufen,
 weil das Auge dort feiner unterscheidet. Licht addiert sich aber **linear**. Also: Eingangsfarben **nach
 linear** umrechnen, linear rechnen, am Ende **nach sRGB** zurück. Für hellere Werte gilt grob
-sRGB = 1,055 · linear^(1/2,4) − 0,055 (ganz dunkle Werte haben einen kleinen geraden Abschnitt).
+sRGB = 1,055 · linear^(1/2,4) − 0,055, umgekehrt linear = ((sRGB + 0,055) / 1,055)^2,4 (ganz dunkle
+Werte haben einen kleinen geraden Abschnitt).
 
 **Beispiel:** Lineares Mittelgrau 0,18 wird zu 1,055 · 0,18^(1/2,4) − 0,055 ≈ **0,461** – fast die
 halbe Skala, obwohl es nur 18 % des Lichts sind.
@@ -322,8 +339,12 @@ ersetzen **fünf** Zugriffe neun Gewichte. Kerns Gewichte: 0,2270 in der Mitte, 
 und je 0,0703 bei ±3,2308 Texeln – zusammen 0,2270 + 2 · 0,3162 + 2 · 0,0703 = **1**, damit das Bild
 nicht heller oder dunkler wird.
 
-Kern addiert beim Zusammensetzen nur den **Unterschied**, den das Glühen nach dem Tonemapping macht;
-Pixel ohne Glühen bleiben bitgenau. Mehr in Kapitel 4, 4.8.3.
+In Kern schreibt die Szene das echte Licht nebenbei in eine 16-Bit-Kopie. Daraus schneidet der Bloom
+mit weicher Schwelle ab etwa 0,88 das Helle aus, zeichnet es auf einem Viertel und einem Achtel der
+Bildgröße weich (Stärken 0,13 und 0,08) und addiert beim Zusammensetzen nur den **Unterschied**, den
+das Glühen nach dem Tonemapping macht; Pixel ohne Glühen bleiben bitgenau. Braucht das Gerät im Mittel
+3,5 s lang über 27 ms pro Bild, schaltet ein Wächter das Glühen ab, außer es ist erzwungen. Mehr in
+Kapitel 4, 4.8.3.
 
 ## B.8 Umgebungsverdeckung: SSAO und GTAO
 
@@ -355,8 +376,11 @@ einsetzen und über die Scheiben mitteln.
 Kern folgt Intels XeGTAO: Normale aus der Tiefe, Radius in Metern (Standard 1,6), ein 4×4-Muster, das
 die Scheiben dreht und ein kantenbewusster Filter wieder wegmittelt, und eine
 **Mehrfachreflexions-Korrektur**: Helle Flächen gewinnen Licht zurück, das zwischen den Verdeckern
-hin- und herspringt. Weil der Standard-Shader den indirekten Anteil ohnehin kennt, braucht Kern dafür
-keinen zweiten Geometrie-Durchgang (Kapitel 4, 4.8.4).
+hin- und herspringt. Das Ergebnis ist ein kleines Bild mit Sichtbarkeit und Tiefe; die Tiefe sorgt
+beim Hochskalieren dafür, dass nichts über Kanten verläuft. Vier Qualitätsstufen und ein Wächter, der
+auf langsamen Geräten herunterstuft, halten es schnell. Angewendet wird es **nur auf den indirekten
+Anteil**, den der Standard-Shader in seinem dritten Ausgang mitschreibt. Weil er ihn ohnehin kennt,
+braucht Kern dafür keinen zweiten Geometrie-Durchgang (Kapitel 4, 4.8.4).
 
 ## B.9 Himmel und Atmosphäre
 
@@ -368,8 +392,9 @@ hellen Hof.
 
 Echte Himmelsmodelle rechnen diese Streuung entlang des Sichtstrahls aus. Kerns Himmel ist bewusst
 **kein** solches Integral, sondern ein billiges Rezept, das ähnlich aussieht: Farbverlauf, goldene
-Stunde, Sonnenscheibe mit Mie-artigem Hof, Mond, Sterne, Wolken aus Rauschen und ein Übergang in den
-Nebel der Szene – gemalt als bildschirmfüllendes Dreieck, das nur die Lücken füllt (Kapitel 4, 4.8.2).
+Stunde mit einem zur Sonne hin helleren Band, Sonnenscheibe mit Mie-artigem Hof, Mond, funkelnde
+Sterne, Wolken aus fünf Lagen Rauschen (vom Wind verschoben, zur Sonne hin heller) und ein Übergang in
+Nebelfarbe und Sonnenstreuung der Szene – gemalt als bildschirmfüllendes Dreieck, das nur die Lücken füllt (Kapitel 4, 4.8.2).
 
 ## B.10 Culling und Szenenstrukturen
 
@@ -388,8 +413,9 @@ Addieren und Subtrahieren der Zeilen der Kameramatrix direkt ablesen kann. Kern 
 ```
 
 Der Test ist **vorsichtig**: Er wirft nie Sichtbares weg, lässt aber manchmal Unsichtbares durch
-(Kugeln nahe einer Ecke). Figuren mit Skelett prüft Kern nicht so, denn ihre Knochen können die Kugel
-verlassen; bei instanzierten Meshes umschließt die Kugel alle Instanzen.
+(Kugeln nahe einer Ecke). Kern prüft so jedes Mesh, dessen Material `frustum_culled` gesetzt hat –
+außer Figuren mit Skelett, denn ihre Knochen können die Kugel verlassen. Bei instanzierten Meshes
+umschließt die Kugel alle Instanzen. Die Schattenkarte prüft gegen ihre eigene Pyramide.
 
 > **Probier's aus!** Schalte in Kern Studio unter **Show** die **Bounds** ein und sieh die Hüllen, mit
 > denen Kern entscheidet, was in der Sichtpyramide liegt.
@@ -407,7 +433,8 @@ Zahlenraten mit „größer oder kleiner?“, wo zehn Fragen statt tausend Versu
 ```
 
 In Kern dient die BVH dem **Anklicken**, nicht dem Malen: Unbewegte Weltobjekte ab 36 Dreiecken bekommen
-einen Baum, bewegte werden direkt geprüft. Die Physik hat ihre eigene BVH in Box3D
+einen Baum über ihre Dreiecke (immer in der Mitte geteilt), bewegte werden direkt geprüft. Der Strahl
+wird mit dem Slab-Test gegen die Kästen und nach Möller-Trumbore gegen die Dreiecke geprüft. Die Physik hat ihre eigene BVH in Box3D
 ([Anhang C](C-grundlagen-physik.md)).
 
 ## B.11 Draw Calls und Zustandswechsel
@@ -422,7 +449,9 @@ Aufrufe können länger dauern als die eigentliche Arbeit der Grafikkarte. Auch 
 
 Kerns Gegenmittel: **ein** Standardprogramm, Instancing, ein Uniform-Cache, Bild-Werte einmal pro Bild,
 gemerkte Textur und Rückseiten-Einstellung, Schattenkarte nur bei Bedarf, Sichtprüfung vor dem Malen
-und Geometrie nur einmal hochladen. Den Ablauf eines Bildes zeigt [Kapitel 4](04-grafik.md), 4.7.
+und Geometrie nur einmal hochladen. Die Statistik (`RenderStats`) zeigt Zeichenaufrufe, Dreiecke,
+Instanzen, verworfene Meshes und die Zeit auf CPU und – wenn der Browser es kann – GPU. Den Ablauf
+eines Bildes zeigt [Kapitel 4](04-grafik.md), 4.7.
 
 ## B.12 Warum WebAssembly und WebGL2 so verbunden sind
 
@@ -430,8 +459,11 @@ Kern ist C++, der Browser bietet aber nur JavaScript-Schnittstellen. **WebAssemb
 kompaktes Format, das der Browser in Maschinencode übersetzt. Ein WASM-Modul hat einen **linearen
 Speicher** (ein großes Byte-Feld) und darf nur Funktionen aufrufen, die man ihm beim Laden als
 **Importe** gibt. **WebGL2** ist die Grafikschnittstelle des Browsers, im Wesentlichen OpenGL ES 3.0.
-Kern übersetzt mit wasi-sdk; `gl.h` meldet genau die gebrauchten WebGL2-Funktionen an, `kern.mjs`
-übersetzt Nummern in WebGL-Objekte und reicht Daten **ohne Kopie** weiter (Kapitel 4, 4.2).
+Kern übersetzt mit wasi-sdk (Ziel `wasm32-wasip1`); `gl.h` meldet genau die gebrauchten
+WebGL2-Funktionen an, `kern.mjs` übersetzt Nummern in WebGL-Objekte und reicht Daten **ohne Kopie**
+weiter, durch Fenster auf Kerns Speicher, die nach einem Speicherwachstum erneuert werden. Den
+WebGL2-Zugang legt die Seite ohne Kantenglättung und ohne Transparenz an, denn Kern malt in eigene
+Ziele und setzt selbst zusammen (Kapitel 4, 4.2).
 
 ```mermaid
 flowchart LR
@@ -442,7 +474,7 @@ flowchart LR
 
 | Entscheidung | Grund |
 |---|---|
-| alles in C++/WASM | eine Codebasis für Browser, Tests, Lehrer, Server |
+| alles in C++/WASM | eine Codebasis für Browser, Tests, Lehrer, Server; deterministische Physik |
 | JavaScript hauchdünn | Logik in JS wäre doppelt und schlechter testbar |
 | kleine, feste Importliste | alles Gebrauchte steht an einer Stelle |
 | Nummern statt JS-Objekten | WASM kann nur Zahlen halten |
