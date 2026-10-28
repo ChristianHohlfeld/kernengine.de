@@ -180,7 +180,7 @@ body {{ width: {TW}in; height: {TH}in; position: relative; overflow: hidden;
 .back .blurb b {{ color: #fff }}
 .back .shots {{ position: absolute; left: 0.75in; right: 0.65in; top: 6.3in; display: flex; gap: 0.18in }}
 .back .shots img {{ width: 50%; border-radius: 6px; box-shadow: 0 0 0 1px {C["line"]} }}
-.back .rights {{ position: absolute; left: 0.75in; bottom: 0.72in; width: 3.4in; font-size: 7.5pt; line-height: 1.4; color: {C["rights"]} }}
+.back .rights {{ position: absolute; left: 0.75in; bottom: 0.72in; width: 3.9in; font-size: 7.5pt; line-height: 1.4; color: {C["rights"]} }}
 /* KDP prints the ISBN barcode in a 2 x 1.2 in white box in the lower right corner of the back
    cover (at least 0.76 in from the bottom, 0.25 in from the hinge): the area stays empty. */
 </style></head><body><div class="grid"></div>
