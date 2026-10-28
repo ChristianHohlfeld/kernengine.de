@@ -520,7 +520,7 @@ as a night-time brightener, a ground color of the environment dome taken from th
 reflects, and height fog, sun scattering and horizon fog switched on
 ([Chapter 8](08-game-runtime.md)).
 
-The **camera** has an eye point, a target, an up direction (Z), a 60° opening angle, a near plane
+The **camera** has an eye point, a target, an up direction (Z), a 60° opening angle (Kern Studio's editor viewports use 70°), a near plane
 at 0.05 m and a far plane at 1800 m, and can optionally be orthographic. The world is **Z-up, in
 meters**.
 
