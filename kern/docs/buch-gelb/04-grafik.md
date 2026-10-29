@@ -422,7 +422,7 @@ Für die Schatten der Sonne macht Kern ein „Foto“ aus Sicht der Sonne, in de
 das Nächste ist – die **Schattenkarte** ([Anhang B.5](B-grundlagen-rendering.md)). Die Sonne ist so
 weit weg, dass ihre Strahlen parallel sind. Wie gut die Schatten aussehen, hängt an einer einzigen
 Frage: **Wie groß ist ein Kästchen (Texel) der Karte in Metern?** Kleine Kästchen geben scharfe
-Schatten, große Kästchen Schatten wie aus Minecraft-Blöcken. (Die genauen Einstellungen der Karte
+Schatten, große Kästchen Schatten aus groben Klötzchen. (Die genauen Einstellungen der Karte
 stehen im blauen Buch, Kapitel 4.)
 
 **Schattendistanz.** In den **Welteinstellungen** (World Settings) legt das Feld

@@ -16,7 +16,7 @@
 > - **WebAssembly** – eine schnelle Maschinensprache, die jeder Browser ausführen kann. Darin läuft
 >   Kern.
 
-Kern Studio arbeitet nach dem Vorbild der Unreal Engine, die du vielleicht von Fortnite kennst. Die
+Kern Studio ist wie die großen Profi-Editoren aufgebaut, zum Beispiel die Unreal Engine. Die
 wichtigste Idee: **Was du im Editor siehst, ist schon das Spiel.** Der ganze Editor benutzt genau
 dasselbe Programm wie dein fertiges, exportiertes Spiel. Was im Viewport fällt, rollt und leuchtet,
 tut es später genauso (11.16). Wie daraus ein ganzes Spiel wird, zeigt
@@ -107,7 +107,7 @@ Das wichtigste Prinzip des Editors: Eine Welt besteht aus **Actors**, und jeder 
 Würfel“, „fällt herunter“, „leuchtet“, „gibt Punkte“, „macht Musik“. Was ein Ding **kann**, hängt nur
 davon ab, welche Komponenten es trägt.
 
-> **So kannst du es dir vorstellen:** Lego. Ein Actor ist eine Grundplatte. Steckst du Räder drauf,
+> **So kannst du es dir vorstellen:** ein Baukasten. Ein Actor ist eine Grundplatte. Steckst du Räder drauf,
 > fährt sie, steckst du eine Lampe drauf, leuchtet sie. Dieselben Steine passen auf jede Platte.
 
 Darum braucht Kern keine eigene Sorte „Kiste“, „Tür“ oder „Auto“. Eine Kiste ist ein Actor mit Form

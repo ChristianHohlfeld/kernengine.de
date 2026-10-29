@@ -451,7 +451,7 @@ ich bin im Schatten.
 ![Die Schattenkarte speichert je Sonnenstrahl die erste Fläche; der Boden dahinter ist weiter weg und liegt im Schatten](../abbildungen/schattenkarte.svg)
 
 Die Sonnenstrahlen sind parallel, also nimmt man eine orthografische Ansicht. Deckt eine Karte mit
-512 Kästchen 240 m ab, ist ein Kästchen 240 ÷ 512 ≈ 47 cm groß – Schatten wie aus Minecraft-Blöcken.
+512 Kästchen 240 m ab, ist ein Kästchen 240 ÷ 512 ≈ 47 cm groß – Schatten aus groben Klötzchen.
 
 ### Probleme und Gegenmittel
 

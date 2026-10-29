@@ -105,7 +105,7 @@ Ein **Actor** hat:
 
 ## 8.4 Die Komponenten
 
-Komponenten sind wie Lego-Aufsätze: Ein nackter Actor ist nur ein Punkt im Raum. Steckst du ein Mesh
+Komponenten sind wie Aufsätze aus dem Baukasten: Ein nackter Actor ist nur ein Punkt im Raum. Steckst du ein Mesh
 drauf, wird er sichtbar. Steckst du einen **Starrkörper** (Rigid Body) dazu, fällt er herunter. So
 baust du alles aus denselben Bausteinen zusammen.
 

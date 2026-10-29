@@ -31,7 +31,7 @@ Wege benutzen dieselbe Engine, also dieselbe Grafik und dieselbe Physik, und man
 ## 12.1 Weg A: ein Spiel im Studio, ohne Code
 
 Ein Spiel zu bauen heißt hier: fertige Bausteine in eine Welt stellen und ihnen sagen, wie das Spiel
-gewonnen wird. Das ist wie Lego mit Regeln. Wir bauen „Orb Garden“: Eine Figur läuft über eine Fläche
+gewonnen wird. Das ist wie ein Baukasten mit Regeln. Wir bauen „Orb Garden“: Eine Figur läuft über eine Fläche
 mit Hindernissen, sammelt leuchtende Kugeln (**Orbs**) ein, weicht einer Gefahrenzone aus und gewinnt,
 wenn alles eingesammelt ist. Die Bedienung der Panels kennst du aus [Kapitel 11](11-studio.md). Los
 geht's!
@@ -409,7 +409,9 @@ ihre eigenen Lizenzen ([Anhang D](D-lizenzen.md)).
 > enthalten Pollens 3D-Modelle der Ente, und die dürfen nur **nicht kommerziell** genutzt werden. Wer
 > verkaufen will, braucht eine Fassung ohne diese Modelle; die baut ein Programmierer mit einem
 > eigenen Schalter (blaues Buch, Kapitel 12). Dann fehlt das Aussehen, und die Ente ist unsichtbar.
-> Pollens Netze, also das, was die Ente laufen lässt, dürfen dagegen mit ihrer Lizenz mit.
+> Pollens Netze, also das, was die Ente laufen lässt, dürfen dagegen mit ihrer Lizenz mit. Wer ein
+> Spiel mit der Ente kostenlos weitergibt, lässt den Hinweis auf Pollen Robotics und die Lizenz in der
+> Datei stehen und nennt Pollen Robotics, wenn er Bilder der Ente zeigt.
 
 ### Studio-Spiele
 

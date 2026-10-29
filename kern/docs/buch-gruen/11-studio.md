@@ -155,7 +155,7 @@ Actor hat einen Namen, seine Transformation (Ort, Drehung, Größe) und eine Rei
 Actor **ist**, ergibt sich allein aus seinen Komponenten. Gemessen wird in Metern, Sekunden und
 Kilogramm.
 
-> **Stell dir vor …** ein Actor ist eine leere Lego-Platte. Komponenten sind die Steine, die du
+> **Stell dir vor …** ein Actor ist eine leere Grundplatte aus dem Baukasten. Komponenten sind die Steine, die du
 > draufsteckst: Ein Form-Stein macht ihn sichtbar, ein Physik-Stein lässt ihn fallen, ein Pickup-Stein
 > macht ihn einsammelbar. Kombinieren erlaubt!
 
@@ -782,7 +782,7 @@ Weitere Tasten stehen in [Kapitel 17](17-referenz.md), die des Logik-Editors in
 ## Das nimmst du mit
 
 - Ein Level besteht aus **Actors**, und was ein Actor kann, bestimmen seine **Komponenten**, wie Steine
-  auf einer Lego-Platte.
+  auf einer Grundplatte aus dem Baukasten.
 - **Viewports** zeigen die Welt als Foto (perspektivisch) oder als Bauplan (orthografisch).
 - Auswählen mit Klick oder Rahmen, bewegen **nur mit dem Gizmo**; Einrasten hält alles ordentlich.
 - **Rückgängig** (Undo) merkt sich nach jedem Schritt den ganzen Stand, darum geht es nie schief.

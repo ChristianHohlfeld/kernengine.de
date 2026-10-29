@@ -62,7 +62,7 @@ sprechen mit der Engine, nie umgekehrt.** Das hat einen guten Grund: Wüsste die
 SpawnCity, würde sie sich auf SpawnCity verlassen, und man könnte mit ihr nur SpawnCity bauen. Weil
 sie nichts über ein bestimmtes Spiel weiß, passt sie unter jedes.
 
-> **So kannst du es dir vorstellen:** ein Legostein. Er weiß nicht, ob du ein Schiff oder ein Haus
+> **So kannst du es dir vorstellen:** ein Klemmbaustein. Er weiß nicht, ob du ein Schiff oder ein Haus
 > baust – und gerade deshalb passt er in beides. Hätte jemand ihn nur für ein Schiff geformt, könntest
 > du daraus kein Haus mehr bauen.
 
@@ -297,7 +297,7 @@ alle drei. Packt dich ein Thema, schlag im blauen Buch nach!
 1. Browser verstehen kein C++. Darum wird Kern vorher nach WebAssembly übersetzt, und das versteht
    jeder moderne Browser.
 2. Wüsste sie etwas von einem Spiel, würde sie sich darauf verlassen und passte nur zu diesem einen.
-   So aber passt sie wie ein Legostein unter beliebig viele Spiele. Wie im Hochhaus benutzt das
+   So aber passt sie wie ein Klemmbaustein unter beliebig viele Spiele. Wie im Hochhaus benutzt das
    Spiel oben die Engine unten, nie umgekehrt.
 3. Lehrer und Studio benutzen dieselbe Spielwelt, dieselben Motoren und dieselbe Physik, und Kern
    rechnet überall Bit für Bit gleich. Das Netz trifft also auf genau dieselbe Welt, in der es

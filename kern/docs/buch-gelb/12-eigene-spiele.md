@@ -353,7 +353,9 @@ anderen behalten ihre eigenen Regeln ([Anhang D](D-lizenzen.md)).
 kommerziell** benutzt werden, also nicht in einem Spiel, mit dem man Geld verdient. Für ein Spiel
 zum Verkaufen gibt es eine besondere Bauweise von Studio ohne dieses Aussehen (Profis bauen sie aus
 dem Quellcode). Darin hat die Ente **gar kein Aussehen** – du müsstest ihr ein
-eigenes geben. Pollens Netze dürfen mit.
+eigenes geben. Pollens Netze dürfen mit. Gibst du ein Spiel mit der Ente kostenlos weiter, steht
+der Hinweis auf Pollen Robotics und ihre Lizenz schon in der Datei – lösch ihn nicht, und nenne
+Pollen Robotics, wenn du Bilder deiner Ente zeigst.
 
 **Studio-Spiele** lädst du – am besten zusammen mit einem Erwachsenen – auf einen Webspace oder eine
 kostenlose Projektseite, oder du verschickst die Datei einfach. Mit Ente gehören zwei Ordner mit
