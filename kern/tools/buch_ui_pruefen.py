@@ -66,7 +66,7 @@ for f in sorted(pathlib.Path(a.folder).glob("*.md")):
                         problems.append(f"{f.name}:{no}: German label in the English book: {seg!r}")
             continue
         # German: **Deutsch › Pfad** (English › Path); a shortcut in parentheses is not a label.
-        for m in re.finditer(r"\*\*([^*]+)\*\*(?:\s*\(([^()]*)\))?", line):
+        for m in re.finditer(r"\*\*([^*]+)\*\*(?:\s*\(((?:[^()]|\([^()]*\))*)\))?", line):  # one level of brackets inside: (Kill Z (respawn below))
             de, paren = segments(m.group(1)), m.group(2)
             if de and all(SHORTCUT.match(x) for x in de): continue  # **F** (Focus): a key, then what it does
             en = segments(paren) if paren else []
