@@ -74,7 +74,7 @@ canvas.getContext("webgl2", { alpha: false, antialias: false, depth: true,
                               powerPreference: "high-performance", ... });
 ```
 
-`antialias: false` ist gewollt: Der Renderer zeichnet die Szene ohnehin in eigene Framebuffer (siehe 4.7), in denen Multisampling des Standard-Framebuffers nichts bewirken würde. Kern Studio und exportierte Spiele erzeugen ihren Kontext selbst und fordern dabei `antialias: true` an (`web/studio/studio.mjs`, `web/studio/game.mjs`).
+`antialias: false` ist der Standard der Fassade: Mit Bloom zeichnet der Renderer die Szene in eigene Framebuffer (siehe 4.7), in denen Multisampling des Standard-Framebuffers nichts bewirkt. Ohne Bloom und in Teil-Viewports zeichnet er direkt in den Standard-Framebuffer; wer dort Kantenglättung will, übergibt `contextAttributes: {antialias: true}`. Kern Studio und exportierte Spiele erzeugen ihren Kontext selbst und fordern dabei `antialias: true` an (`web/studio/studio.mjs`, `web/studio/game.mjs`).
 
 ### Zwei Arten, den Renderer zu benutzen
 
@@ -263,13 +263,14 @@ vOpacity = iTint.a;
    - `location 2` `outAo`: ein Datensatz für die Ambient Occlusion (siehe 4.8.4).
 2. `kGlslToneMap`: `linearToSrgb`, `srgbToLinear`, ACES-Filmic, Farbgrading.
 3. `kFragmentFunctions`: `envIrradiance`, `skyReflection`.
-4. Hook `fragment_declarations`.
-5. Textur lesen, Alpha berechnen, Alpha-Test.
-6. Hook `fragment_discard`.
-7. `bool linearInput = uLinearColor == 1;` und Hook `fragment_input`.
-8. `kFragmentBase`: Grundfarbe linearisieren, Normale, Sonnenrichtung, `surfaceGlass = 0`, `emissive = uEmissive`.
-9. Hook `fragment_surface`.
-10. `kFragmentLighting`: Beleuchtung, Tonemapping, Nebel, Ausgänge.
+4. `kFragmentShadow`: `shadowTap`, `sunShadow` (PCF nach Castaño, Receiver-Plane-Bias nach Isidoro).
+5. Hook `fragment_declarations`.
+6. Textur lesen, Alpha berechnen, Alpha-Test.
+7. Hook `fragment_discard`.
+8. `bool linearInput = uLinearColor == 1;` und Hook `fragment_input`.
+9. `kFragmentBase`: Grundfarbe linearisieren, Normale, Sonnenrichtung, `surfaceGlass = 0`, `emissive = uEmissive`.
+10. Hook `fragment_surface`.
+11. `kFragmentLighting`: Beleuchtung, Tonemapping, Nebel, Ausgänge.
 
 Alpha entsteht als `clamp(vOpacity * uMaterial.a * texel.a, 0, 1)`. Für `AlphaMode::mask` setzt der Renderer `uAlphaCutoff` auf `alpha_cutoff`, sonst auf 0; darunter wird verworfen.
 
@@ -524,12 +525,19 @@ Warum? Bewegt sich die Karte um Bruchteile eines Texels mit der Kamera, fallen S
 **Abtasten.** Die Tiefentextur hat `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` und lineare Filterung. Ein `texture(sampler2DShadow, ...)` vergleicht dann vier benachbarte Texel in der Hardware und interpoliert die Ergebnisse bilinear – das ist das „Hardware-PCF“, die Stufe 1. Die Stufen 4 und 9 setzen daraus nach Castaño (2013, „The Witness“) einen zeltgefilterten 3 × 3- bzw. 5 × 5-Kern zusammen: Jeder Tap liegt so zwischen den Texeln, dass die bilineare Hardware-Gewichtung genau die Zeltgewichte ergibt (`sunShadow` im Standard-Shader; Summe durch 16 bzw. 144). Der Shader bekommt dafür `uSunShadowFilter` und `uSunShadowTexel` (Kartengröße, ihr Kehrwert, ein Texel in Metern):
 
 ```glsl
+// Normal Offset (Holbert 2011): einen Texel von der Fläche weg entlang der Normale nachschlagen,
+// mehr bei streifendem Licht – keine Akne ohne großen konstanten Bias.
+vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
+vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
+vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
+// Tiefengefälle des Empfängers im Kartenraum (Ableitungen außerhalb der Verzweigung).
+vec3 sdx = dFdx(uvz), sdy = dFdy(uvz);
+float sdet = sdx.x * sdy.y - sdx.y * sdy.x;
+gShadowUV = uvz.xy;
+gShadowGrad = abs(sdet) > 1e-12 ? vec2(sdx.z * sdy.y - sdy.z * sdx.y, sdy.z * sdx.x - sdx.z * sdy.x) / sdet : vec2(0.0);
+float sgl = length(gShadowGrad) * uSunShadowTexel.y;
+if (sgl > 0.004) gShadowGrad *= 0.004 / sgl;
 if (uSunShadowEnabled == 1 && ndl > 0.0) {
-  // Normal Offset (Holbert 2011): einen Texel von der Fläche weg entlang der Normale nachschlagen,
-  // mehr bei streifendem Licht – keine Akne ohne großen konstanten Bias.
-  vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
-  vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
-  vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
   if (uvz.x > 0.0 && uvz.x < 1.0 && uvz.y > 0.0 && uvz.y < 1.0 && uvz.z > 0.0) {
     shadow = sunShadow(uvz);
     float d = length(vWorld - uSunShadowFade.xyz);
@@ -537,6 +545,8 @@ if (uSunShadowEnabled == 1 && ndl > 0.0) {
   }
 }
 ```
+
+Ableitungen (`dFdx`) müssen außerhalb der Verzweigung laufen; aus ihnen entsteht der Receiver-Plane-Bias (Isidoro 2006), mit dem `shadowTap` jeden Tap gegen die Tiefe der Empfängerebene an dieser Stelle vergleicht. Das hält lange, streifende Schatten frei von Streifen.
 
 Außerhalb der Karte gilt eine Fläche als beleuchtet. Flächen, die von der Sonne weg zeigen (`ndl == 0`), lesen die Karte gar nicht. Mit Schattendistanz blendet der Schatten über ihr letztes Zehntel (gemessen vom Auge, `uSunShadowFade`) aus, statt an der Kartengrenze abzureißen; ohne Schattendistanz gibt es kein Ausblenden.
 

@@ -393,10 +393,10 @@ $c = \max(c_A, c_B) \cdot r_\text{max}$ ($r$ der Radius der Kugel oder Kapsel; b
 eingebundenen Stand ein Viertel des Innenradius), und der Solver begrenzt den Dreh-Impuls, der das
 Rollen bremst, auf $c \cdot \sum\lambda_n$ – genau die Form $\tau \le c_{rr}\,r\,F_n$.
 
-**In Kern:** `ShapeMaterial::rolling_resistance`. `docs/lehrer.md` (Abschnitt 8) berichtet, wozu er
-nötig war: „Die Socke kroch von selbst über den Boden (runde Stoffklumpen rollten). Sie hat jetzt
-Rollwiderstand und liegt still.“ und „Der Ball rollte ewig. Er hat jetzt Rollwiderstand wie ein
-Gummiball auf Holz.“
+**In Kern:** `ShapeMaterial::rolling_resistance`. Die Kommentare im Code nennen den Grund: Der Ball
+im Micro-Duck-Level hat 0,03 („a rubber ball on a wooden floor rolls out“, `src/game/demos.cpp`),
+die Socken-Klumpen 0,5 („a lump of cloth does not roll (round lumps would, and the heap crawls)“,
+`src/game/walker.cpp`).
 
 ---
 
@@ -696,7 +696,7 @@ Ein paar Regeln aus `docs/physics.md` (Abschnitt 6), die direkt aus den Grundlag
 Eine Simulation ist **deterministisch**, wenn gleiche Anfangszustände und gleiche Eingaben **Bit für
 Bit** dieselben Ergebnisse liefern. Für Kern ist das zentral: Ein Trainingslauf soll auf jedem Gerät
 dasselbe Netz ergeben, ein Fehler soll reproduzierbar sein, und ein abgespieltes Roboterlog soll
-überall gleich herauskommen (`docs/lehrer.md`, Abschnitt 7).
+überall gleich herauskommen (Kopfkommentar von `include/kern/core/dmath.h`).
 
 Physiksimulationen sind **chaotisch**: Ein Unterschied im letzten Bit wächst exponentiell. „Ein Bit
 wird in einer Robotersimulation in Sekunden zu einem anderen Gang.“ Fast gleich reicht deshalb nicht.
@@ -711,7 +711,7 @@ $$(0{,}1 + 0{,}2) + 0{,}3 = 0{,}6000000000000001,\qquad 0{,}1 + (0{,}2 + 0{,}3) 
 Daraus folgen die Gefahren:
 
 - **Umordnen durch den Compiler.** Mit `-ffast-math` darf er Summen umordnen, um zu vektorisieren.
-  Kern verbietet diese Optionen.
+  Kerns Build-Skripte setzen diese Optionen nicht.
 - **Parallele Summen.** Teilt man eine Summe auf Threads auf, hängt die Reihenfolge von der Zahl der
   Threads ab. Kern summiert in festen Teilen in fester Reihenfolge ([Anhang A](A-grundlagen-neuronale-netze.md),
   A.11.10).
@@ -757,8 +757,9 @@ Determinismus muss man messen. `determinism_fingerprint` (`env.h`) lässt Pollen
 saubere Ente 400 Regeltakte steuern und hasht pro Takt die exakten Bits des Zustands (Rumpflage und
 -geschwindigkeit, alle Gelenkwinkel und -geschwindigkeiten). Zwei Builds sind genau dann bitgleich,
 wenn die Listen gleich sind; der erste abweichende Index sagt, wann sie auseinanderlaufen. Die
-Referenz liegt in `tests/determinism_fingerprint.txt`; laut `docs/lehrer.md` prüft CI sie mit GCC
-auf x86, mit WebAssembly in Node und mit Apple clang auf ARM.
+Referenz liegt in `tests/determinism_fingerprint.txt`; die CI prüft sie mit GCC auf x86
+(`kern/tests/run.sh`), mit WebAssembly in Node (`lehrer_wasm_test.mjs`) und mit Apple clang auf ARM
+(Job `determinism`, `.github/workflows/ci.yml`).
 
 Ein zweiter Test zur Skalierung zeigt, wie fein das ist: Ein frei hängendes Servo-Bein in 1-facher
 und 4-facher Größe läuft **Bit für Bit gleich**, weil die Skalierungsfaktoren Zweierpotenzen sind und

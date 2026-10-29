@@ -16,7 +16,7 @@ Dieses Kapitel beschreibt den Mixer mit 3D-Klang, Bussen, Hall und Limiter, den 
 
 Die Kopfzeilen von `audio.h` nennen die Gründe zwischen den Zeilen: Alles passiert „sample by sample and deterministically“. Ein eigener Mixer bringt drei Dinge, die ein Graph aus Web-Audio-Knoten nicht liefert:
 
-- **Determinismus.** Dieselben Ereignisse erzeugen auf jeder Plattform dieselben Samples. Eingebaute Sounds werden mit festen Seeds synthetisiert, Ereignisse entstehen in den festen Physikschritten.
+- **Determinismus.** Dieselben Ereignisse erzeugen bei gleichem Build dieselben Samples. Eingebaute Sounds werden mit festen Seeds synthetisiert, Ereignisse entstehen in den festen Physikschritten. Mixer und Synthesizer nutzen die libm der Plattform ([Kapitel 3](03-grundlagen.md)); plattformübergreifend bitgleich ist nur die Stimme der Ente (7.6).
 - **Ein Modell für alle Hosts.** Studio, exportierte Spiele und native Tests verwenden denselben C++-Code. Der Browser muss nur Samples abspielen.
 - **Volle Kontrolle über Lautstärke-Rampen, Stimmenverwaltung und Ausgabepegel.** Kein Klick beim Stoppen, kein Übersteuern: Die Ausgabe überschreitet nie ±1.
 
@@ -199,7 +199,7 @@ Der Angriff ist sofort: Die Verstärkung fällt, bevor eine Spitze die Schwelle 
 
 ## 7.5 Der Synthesizer
 
-Kern bringt keine Sound-Dateien mit. Alle eingebauten Sounds entstehen beim Laden aus Code: ein kleiner subtraktiver Synthesizer in der Tradition von sfxr, erweitert um resonante Filter, Rauschfarben, FM und Schichtung, dazu ein Step-Sequencer für Musik-Loops (`synth.h`). Alles wird offline in Clips gerendert, mit festen Seeds und damit auf jeder Plattform gleich.
+Kern bringt keine Sound-Dateien mit. Alle eingebauten Sounds entstehen beim Laden aus Code: ein kleiner subtraktiver Synthesizer in der Tradition von sfxr, erweitert um resonante Filter, Rauschfarben, FM und Schichtung, dazu ein Step-Sequencer für Musik-Loops (`synth.h`). Alles wird offline in Clips gerendert, mit festen Seeds und damit bei jedem Laden gleich (auf derselben Plattform bitgleich).
 
 ### `SynthPatch`
 
@@ -235,7 +235,7 @@ Für Aufprallgeräusche kleiner fester Körper hat die Bibliothek eine zweite Me
 Die beiden Musik-Loops sind Partituren: Jeder Takt stellt seine Noten in eine Warteschlange; gleiche Noten werden nur einmal gerendert und wiederverwendet.
 
 - `music_drive`: 120 BPM, Am–F–C–G, Four-on-the-Floor-Bassdrum, Snare auf 2 und 4, Achtel-Bass, Sechzehntel-Arpeggio, Flächen. 8 Takte zu 2 s.
-- `music_calm`: 80 BPM, Fmaj7–Cmaj7–Am7–G6, Flächen, Bass und eine pentatonische Glockenmelodie. 8 Takte zu 3 s.
+- `music_calm`: 72 BPM, Fmaj7–Cmaj7–Am7–G6: warme Flächen, ein runder Sub-Bass, eine E-Piano-Melodie mit Pausen zwischen den Phrasen, leise Akkord-Stabs, ab Takt 4 weiche Bassdrum und Shaker. 16 Takte zu 3⅓ s.
 
 Beide sind Stereo und nahtlos.
 
@@ -506,7 +506,7 @@ Bevorzugt läuft die Ausgabe über ein AudioWorklet. Der Prozessor-Quelltext ste
 - Der Hauptthread rendert Stücke von 128 bis 2048 Frames (`kern_studio_audio_render`, höchstens 16 384 Frames pro Aufruf), kopiert sie und schickt sie per `postMessage` mit übertragenem Puffer an das Worklet.
 - Das Worklet spielt die Warteschlange ab und meldet alle 4 Blöcke zurück, wie viele Frames es verbraucht hat und wie oft es leer lief.
 - `pump()` hält die Warteschlange `latency` Sekunden voraus, gerundet auf 128 Frames. Der Startwert ist 70 ms. **Adaptiv:** Läuft die Warteschlange leer (der Hauptthread hing länger, als die Warteschlange reichte), kommen 30 ms dazu, bis höchstens 200 ms. Nach 15 Sekunden ohne Aussetzer sinkt der Vorlauf wieder um 5 ms pro Schritt zum Startwert.
-- **Aussetzer ohne Klick:** Ist die Warteschlange leer, springt das Worklet nicht auf Stille. Das letzte Sample gleitet über etwa 2 ms (96 Samples) auf null, und wenn wieder Daten kommen, werden sie eingeblendet. Eine Lücke bleibt hörbar, aber ohne Knacken.
+- **Aussetzer ohne Klick:** Ist die Warteschlange leer, springt das Worklet nicht auf Stille. Das letzte Sample klingt in wenigen Samples exponentiell auf null ab (Faktor 1 − 4/96 je Sample), und wenn wieder Daten kommen, werden sie über 96 Samples (2 ms) linear eingeblendet. Eine Lücke bleibt hörbar, aber ohne Knacken.
 - Nach einem sehr langen Stillstand (mehr als eine Sekunde Rückstand) beginnt die Zählung neu.
 
 Wo kein AudioWorklet verfügbar ist, nimmt `KernAudio` einen `ScriptProcessor` mit 1024 Frames, der in seinem Callback direkt rendert.

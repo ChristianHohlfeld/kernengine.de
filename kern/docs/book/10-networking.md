@@ -253,8 +253,8 @@ both may carry whole snapshots).
 | `kProperty` | reliable | S → C | property changed by logic: actor, path, value as JSON |
 | `kInput` | unreliable | C → S | tick and the last up to four inputs, newest first |
 | `kSnapshot` | unreliable | S → C | tick, server time, HUD, own soldier state, entities |
-| `kCues` | unreliable | S → C | up to 8 sound cues per message |
-| `kShots` | unreliable | S → C | up to 8 shots (tracers, impacts) per message |
+| `kCues` | unreliable | S → C | up to 32 sound cues per message (the server sends 8 at a time) |
+| `kShots` | unreliable | S → C | up to 16 shots (tracers, impacts) per message (the server sends 8 at a time) |
 
 An **input** encodes movement (1/127 each), jump, boost, view direction (yaw 0.1°, pitch 0.05°),
 fire, aim, reload, crouch, interact. A **soldier state** for the client's HUD: health, maximum,

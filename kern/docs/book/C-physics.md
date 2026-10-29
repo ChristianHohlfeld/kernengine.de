@@ -386,12 +386,10 @@ $c = \max(c_A, c_B) \cdot r_\text{max}$ ($r$ the radius of the sphere or capsule
 bundled version, a quarter of the inner radius), and the solver limits the angular impulse that brakes
 rolling to $c \cdot \sum\lambda_n$ – exactly the form $\tau \le c_{rr}\,r\,F_n$.
 
-**In Kern:** `ShapeMaterial::rolling_resistance`. `docs/lehrer.md` (Section 8) reports why it was
-needed: "Die Socke kroch von selbst über den Boden (runde Stoffklumpen rollten). Sie hat jetzt
-Rollwiderstand und liegt still." ("The sock crept across the floor by itself (round lumps of fabric
-rolled). It now has rolling resistance and lies still.") and "Der Ball rollte ewig. Er hat jetzt
-Rollwiderstand wie ein Gummiball auf Holz." ("The ball rolled forever. It now has rolling resistance
-like a rubber ball on wood.")
+**In Kern:** `ShapeMaterial::rolling_resistance`. The comments in the code give the reason: the ball
+in the Micro Duck level has 0.03 ("a rubber ball on a wooden floor rolls out", `src/game/demos.cpp`),
+the sock lumps 0.5 ("a lump of cloth does not roll (round lumps would, and the heap crawls)",
+`src/game/walker.cpp`).
 
 ---
 
@@ -687,7 +685,7 @@ A few rules from `docs/physics.md` (Section 6) that follow directly from the fou
 A simulation is **deterministic** if identical initial states and identical inputs produce **bit for
 bit** the same results. For Kern this is central: a training run should yield the same network on
 every device, a bug should be reproducible, and a replayed robot log should come out the same
-everywhere (`docs/lehrer.md`, Section 7).
+everywhere (header comment of `include/kern/core/dmath.h`).
 
 Physics simulations are **chaotic**: a difference in the last bit grows exponentially. "In a robot
 simulation, one bit becomes a different gait within seconds." Almost the same is therefore not good
@@ -703,8 +701,8 @@ $$(0.1 + 0.2) + 0.3 = 0.6000000000000001,\qquad 0.1 + (0.2 + 0.3) = 0.6\quad(\te
 
 This gives rise to the dangers:
 
-- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorize. Kern
-  forbids these options.
+- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorize. Kern's
+  build scripts do not set these options.
 - **Parallel sums.** If a sum is split across threads, the order depends on the number of threads.
   Kern sums in fixed chunks in a fixed order ([Appendix A](A-neural-networks.md), A.11.10).
 
@@ -750,8 +748,9 @@ Determinism has to be measured. `determinism_fingerprint` (`env.h`) has Pollen's
 control the clean duck for 400 control ticks and hashes the exact bits of the state at every tick
 (torso pose and velocity, all joint angles and joint velocities). Two builds are bit-identical exactly
 when the lists are equal; the first differing index tells when they diverge. The reference is in
-`tests/determinism_fingerprint.txt`; according to `docs/lehrer.md`, CI checks it with GCC on x86,
-with WebAssembly in Node and with Apple clang on ARM.
+`tests/determinism_fingerprint.txt`; CI checks it with GCC on x86 (`kern/tests/run.sh`), with
+WebAssembly in Node (`lehrer_wasm_test.mjs`) and with Apple clang on ARM (job `determinism`,
+`.github/workflows/ci.yml`).
 
 A second test, on scaling, shows how fine-grained this is: a freely hanging servo leg at 1× and 4×
 size runs **bit for bit the same**, because the scaling factors are powers of two and floating point

@@ -133,7 +133,7 @@ englische Beschriftung.
 | `radius` | 0,5 | `radius` | Sphere, Cylinder, Cone, Capsule, Torus (Hauptradius) |
 | `height` | 1 | `height` | Cylinder, Cone, Capsule (gesamt), Torus (Nebenradius) |
 | `segments` | 24 | `segments` | Unterteilung |
-| `asset` | „“ | `asset` | Form `mesh`: ein eingebautes Mesh (z. B. `duck/xl330`, `kern/game/builtin_meshes.h`), mit `size` skaliert |
+| `asset` | „“ | `asset` | Form `mesh`: ein eingebautes Mesh (z. B. `duck/trunk_base`, `kern/game/builtin_meshes.h`), mit `size` skaliert; ein unbekannter Name ergibt einen 10-cm-Würfel |
 | `collision` | `true` | `collision` | erzeugt einen passenden Collider, wenn der Actor keinen eigenen hat |
 | `friction` | 0,6 | `friction` | Reibung dieses automatischen Colliders |
 | `restitution` | 0 | `restitution` | Restitution 0..1 |
@@ -542,8 +542,10 @@ also dasselbe.
 Formregeln (`add_shape`): Skalierung geht exakt in Größen, Radien und Hull-Punkte ein. Bewegte
 Formen sind mindestens 1 cm groß, statische mindestens 2 mm ([Kapitel 6](06-physik.md)).
 Automatische Collider passt `fit_collider` an die Mesh-Form an: Box und Plane werden eine Box,
-Sphere eine Kugel, Capsule eine Kapsel, alle anderen Formen (auch Torus) eine konvexe Hull aus den
-Mesh-Punkten.
+Sphere eine Kugel, Capsule eine Kapsel. Ein statischer Torus wird ein exaktes Dreiecksnetz (eine
+Hull würde sein Loch füllen); alle anderen Formen werden eine konvexe Hull aus den Stützpunkten der
+Form (`shape_hull_points`: Ringe aus 16 Punkten für Zylinder, Kegel und Torus, die Ecken der Rampe,
+die Hull eingebauter Meshes, sonst die 8 Ecken der Bounds).
 
 Test: `game_body_planning` (Wagen mit eingeschweißtem, skaliertem Rad; Wand als impliziter
 statischer Body; Münze als impliziter kinematischer Sensor; Boden).
@@ -704,7 +706,7 @@ Controller › Movement) im Details-Panel (`drive_player`, `drive_soldier`, `dri
 
 | Modus | Umsetzung |
 |---|---|
-| **Hovercar** (Hover car) | Gas als Kraft entlang der Fahrzeugachse (rückwärts 1,25-fach, Boost +42 m/s²), Höchstgeschwindigkeit als Gegenkraft, Rollwiderstand ohne Gas; **Seitenhaftung als Kraft** (stetige Impulse kämpfen gegen den Solver); Lenkung als Gierrate proportional zur Geschwindigkeit bis 9 m/s. Eine **Schwebefeder** über einem Box3D-Strahl hält `hover_height`. Sichtbares Wippen und Neigen sind nur Darstellung. |
+| **Hovercar** (Hover car) | Gas als Kraft entlang der Fahrzeugachse (rückwärts 1,5-fach, Gegengas bremst 2,6-fach, Boost +42 m/s²), Höchstgeschwindigkeit als Gegenkraft, Rollwiderstand ohne Gas; **Seitenhaftung als Kraft** (stetige Impulse kämpfen gegen den Solver); Lenkung als Gierrate proportional zur Geschwindigkeit bis 9 m/s. Eine **Schwebefeder** über einem Box3D-Strahl hält `hover_height`. Sichtbares Wippen und Neigen sind nur Darstellung. |
 | **Fahrzeug** (Vehicle) | wie **Hovercar** ohne Schwebefeder; angetrieben wird nur mit Bodenkontakt (Kugelprobe). |
 | **Rollende Kugel** | Kraft in Bewegungsrichtung; **Sprung als Impuls** m · (`jump_speed` − v_z), nur am Boden; Höchstgeschwindigkeit als Gegenkraft. |
 | **Figur** | Box3Ds **Character Mover** ([Kapitel 6](06-physik.md)): Der Body wird kinematisch, die Kapsel wird aus seinen Formen bemessen (Füße am tiefsten, Kopf am höchsten Punkt, Stufenhöhe 22 % der Höhe), Bodenbewegung wie in klassischen Ego-Shootern, Schwerkraft 1,5-fach (knackiger). Der Körper dreht sich weich in Laufrichtung und folgt per `set_target_pose`. Schritte nach Schrittlänge; Trigger und Pickups über die berührten Ebenen. |
@@ -712,7 +714,7 @@ Controller › Movement) im Details-Panel (`drive_player`, `drive_soldier`, `dri
 | **Soldat (Ego-Shooter)** (Soldier (first person shooter)) | Character Mover mit echter Schwerkraft (Sprung 3,6 m/s → 0,66 m), siehe 8.13. |
 | **Läufer (Roboter auf seinem trainierten Netz)** (Walker (robot on its trained network)) | Die Eingabe geht an den Controller des Roboters, der seine Servos mit der trainierten Policy treibt ([Kapitel 13](13-micro-duck.md)). |
 
-Gemeinsam: Boost ist ein Vorrat 0..1 (−0,45/s beim Boosten, +0,12/s sonst), Landungen nach freiem
+Gemeinsam: Boost ist ein Vorrat 0..1 (−0,45/s beim Boosten, −0,5/s mit den Hubdüsen des Hovercars, +0,22/s sonst), Landungen nach freiem
 Fall über 3,5 m/s spielen `builtin:land`, Sprünge und Boost ihre Sounds.
 
 ### Possession und Pawns
@@ -822,7 +824,7 @@ festen Schritten auf der Autorität.
   die Waffe in der Hand mit Handschuhen und Ärmeln, Mündungsfeuer, Tracer, Einschusslöcher, Splitter
   und Hülsen. Alles ist reine Darstellung und ändert die Simulation nicht – Autorität, Replikas und
   Editor zeigen dasselbe. Die Modelle (Maschinenpistole, Pistole, .50-Scharfschützengewehr, 40-mm-Werfer) sind
-  prozedural aus Grundformen gebaut (`soldier_models.cpp`).
+  prozedural aus einfachen Körpern gebaut (`soldier_models.cpp`).
 
 Test: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 `soldier_models_are_closed_and_outward`, im Netz `net_game_soldier_replication`.
@@ -968,7 +970,7 @@ mitgeschrieben. Alles Weitere in [Kapitel 9](09-logik.md).
 | `physics_lab_level()` | **Physics Lab** | Alle Gelenktypen und Bewegungsarten: Kistenpyramide (schlafend gestartet), Pendel an einem Distance-Gelenk, Tür an einem Scharnier mit Limits und Schließfeder, Seilbrücke aus 12 Planken (drei mittlere Gelenke brechen bei 60 000 N), Drehteller mit Motor (45°/s) und drei Mitfahrern, Lift auf einem Slider mit Motor und Limit, ein selbstfahrender Rover auf vier Wheel-Gelenken mit Federung und Antrieb; der Spieler ist eine rollende Kugel, dazu fünf Sterne, ein rotierender Kehrer mit `hazard`-Trigger und ein `goal`-Trigger; Ziel `reachGoal`. |
 | `shooting_range_level()` | **Shooting Range** | Ego-Shooter-Schießstand: Soldat mit Gewehr, Gesundheit und Kopf; acht Zielpuppen (Gesundheit mit schneller Regeneration, Kopf-Tag) in 10–60 m, Deckung, verschiebbare Kisten und ein Fass, ein Turm mit Rampe; Ziel 150 Punkte; im Mehrspieler unverändert spielbar. |
 | `micro_duck_level()` | **Micro Duck** | Ein Zimmer im Maßstab des Roboters (2,5 × 2,5 m echt, also 10 × 10 m in der Welt): Holzboden (Reibung 1, Oberfläche `floor`), Wände, Schuhkarton, Bücher, Kiste, Blumentopf, ein leichter Ball (Rollwiderstand 0,03), zwei Socken; die Ente autonom und mit Kerns Spielnetz; 100 Hz, 16 Sub-Steps, kein endloser Boden; **Beobachterkamera**; ein Level-Graph lässt die Ente zwitschern, sobald ihre Kopfkamera den Ball sieht. |
-| `basic_level()` | **Grundformen** (Basic) | Boden 40 × 40 m und ein Würfel. |
+| `basic_level()` | **Basis** (Basic) | Boden 40 × 40 m und ein Würfel. |
 | `empty_level()` | **Leer** (Empty) | nichts, auch kein endloser Boden. |
 
 Tests: `game_world_orb_run_play`, `game_world_physics_lab`, `game_shooting_range_template`,

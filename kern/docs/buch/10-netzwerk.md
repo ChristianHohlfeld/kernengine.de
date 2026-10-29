@@ -253,8 +253,8 @@ Zwei Kanäle: 0 zuverlässig-geordnet, 1 unzuverlässig (Nachrichten bis 2048 By
 | `kProperty` | zuverlässig | S → C | von Logik geänderte Eigenschaft: Actor, Pfad, Wert als JSON |
 | `kInput` | unzuverlässig | C → S | Tick und die letzten bis zu vier Eingaben, neueste zuerst |
 | `kSnapshot` | unzuverlässig | S → C | Tick, Serverzeit, HUD, eigener Soldatenzustand, Entitäten |
-| `kCues` | unzuverlässig | S → C | bis zu 8 Sound-Cues pro Nachricht |
-| `kShots` | unzuverlässig | S → C | bis zu 8 Schüsse (Tracer, Einschläge) pro Nachricht |
+| `kCues` | unzuverlässig | S → C | bis zu 32 Sound-Cues pro Nachricht (der Server schickt je 8) |
+| `kShots` | unzuverlässig | S → C | bis zu 16 Schüsse (Tracer, Einschläge) pro Nachricht (der Server schickt je 8) |
 
 Eine **Eingabe** kodiert Bewegung (je 1/127), Sprung, Boost, Blickrichtung (Gieren 0,1°, Nicken
 0,05°), Feuer, Zielen, Nachladen, Ducken, Interact. Ein **Soldatenzustand** für das HUD des
@@ -348,7 +348,7 @@ Spiel gehört. Studio nutzt beim Spielen im Editor das offene Level, exportierte
 ### Anzahl der Spieler (Number of Players)
 
 Wie Unreals „Number of Players“ (Menü **Spielen › Anzahl der Spieler** (Play › Number of Players),
-1–4; die Einträge 1 Player bis 4 Players (listen server) übersetzt Studio nicht): Die Welt des Levels ist ein
+Einträge **1 Spieler** (1 Player) bis **4 Spieler (Listen-Server)** (4 Players (listen server))): Die Welt des Levels ist ein
 **Listen-Server**, jeder weitere Spieler ein Netzwerk-Client mit **eigener GameWorld und eigenem
 Viewport**, verbunden über ein In-Process-Netz (`LoopbackNetwork`).
 
@@ -361,9 +361,10 @@ Viewport**, verbunden über ein In-Process-Netz (`LoopbackNetwork`).
 - **Eingabe:** Nur der aktive Viewport bekommt die Eingabe; die anderen Spieler stehen still.
 - `update_net` taktet Server und Clients. Solange Clients noch beitreten, läuft der Austausch in vier
   Teilschritten pro Frame, damit der Handshake nicht auf gerenderte Frames wartet.
-- **Spielen › Netzwerk-Emulation** (Play › Network Emulation): **Perfekt** (Perfect), LAN (5 ms),
-  Average (50 ms, 1% loss), Bad (150 ms, 5% loss), Terrible (300 ms, 20% loss) – die letzten vier
-  übersetzt Studio nicht –, dazu jeweils Jitter (1, 10, 40, 100 ms) – der `Simulator` des Hubs
+- **Spielen › Netzwerk-Emulation** (Play › Network Emulation): **Perfekt** (Perfect), **LAN (5 ms)**,
+  **Mittel (50 ms, 1 % Verlust)** (Average (50 ms, 1% loss)), **Schlecht (150 ms, 5 % Verlust)**
+  (Bad (150 ms, 5% loss)), **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)),
+  dazu jeweils Jitter (1, 10, 40, 100 ms) – der `Simulator` des Hubs
   (und des Host-Transports).
 - Die Statuszeile zeigt Rolle, Status, Spieler, RTT, Verlust, Bandbreite und je lokalem Client
   Status, RTT, Puffer und HUD (`status().net`).
@@ -378,7 +379,7 @@ messbar vorwärts; nach Stop gibt es keinen Netzstatus mehr.
 
 Für Spieler in anderen Tabs oder auf anderen Rechnern: **Spielen › Online-Spiel hosten...** (Play ›
 Host Online Game...) bzw. **Spielen › Online-Spiel beitreten...** (Play › Join Online Game...). Der
-Dialog fragt im Feld Room (Studio übersetzt es nicht) einen Raum (Standard „kern“) und im Feld
+Dialog fragt im Feld **Raum** (Room) einen Raum (Standard „kern“) und im Feld
 **Relay (optional)** die Adresse eines Relays – leer für Tabs dieses Browsers; für andere Rechner `tools/net_relay.mjs` starten und
 seine Adresse eintragen (`ws://host:8790`). Alle brauchen dasselbe Level. Der Knopf heißt **Hosten**
 (Host) bzw. **Beitreten** (Join).

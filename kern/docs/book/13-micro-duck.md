@@ -736,7 +736,7 @@ demonstration of the blueprint, not behavior of the duck.
 
 ### Results
 
-Measured over 32 episodes per row (`docs/lehrer.md`, section 8; details in
+Measured over 32 episodes per row (`docs/lehrer.md`, section "Ergebnis"; details in
 [Chapter 14](14-lehrer.md)):
 
 | | ball kicked away | sock picked up | picked up, carried off, spat out | grips that held | falls |

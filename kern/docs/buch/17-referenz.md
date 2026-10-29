@@ -533,8 +533,8 @@ obs [1, n] → Sub(obs_mean) → Div(obs_div) → (Gemm, Elu(alpha 1))* → Gemm
 
 - Eingang `obs`, Ausgang `actions`, `float32`. Die Gemm-Gewichte liegen als `[out][in]` mit
   `transB = 1`.
-- Der Normalisierer ist Teil des Graphen: `(obs − mean) / div` (laut `docs/lehrer.md`
-  `div` = σ + 0,01).
+- Der Normalisierer ist Teil des Graphen: `(obs − mean) / div` (`div` = σ + 0,01,
+  `Normalizer::divisor` in `src/lehrer/nn.cpp`).
 - Bewegungsnetze haben 61 Beobachtungen und 14 Aktionen (Pollens `velstand`: 61 → 512 → 256 → 128 →
   14). Das Spiel-Netz `play.onnx` hat 23 → 9 (25 Hz).
 

@@ -128,7 +128,7 @@ describes the format; it also lists the value ranges to which values are clamped
 | `radius` | 0.5 | `radius` | sphere, cylinder, cone, capsule, torus (major radius) |
 | `height` | 1 | `height` | cylinder, cone, capsule (total), torus (minor radius) |
 | `segments` | 24 | `segments` | subdivision |
-| `asset` | "" | `asset` | shape `mesh`: a built-in mesh (e.g. `duck/xl330`, `kern/game/builtin_meshes.h`), scaled by `size` |
+| `asset` | "" | `asset` | shape `mesh`: a built-in mesh (e.g. `duck/trunk_base`, `kern/game/builtin_meshes.h`), scaled by `size`; an unknown name yields a 10 cm cube |
 | `collision` | `true` | `collision` | generates a matching collider if the actor has none of its own |
 | `friction` | 0.6 | `friction` | friction of this automatic collider |
 | `restitution` | 0 | `restitution` | restitution 0..1 |
@@ -536,7 +536,10 @@ same thing.
 Shape rules (`add_shape`): scale goes exactly into sizes, radii and hull points. Moving shapes are at
 least 1 cm in size, static ones at least 2 mm ([Chapter 6](06-physics.md)). `fit_collider` fits
 automatic colliders to the mesh shape: box and plane become a box, sphere a sphere, capsule a
-capsule, and all other shapes (including torus) a convex hull from the mesh points.
+capsule. A static torus becomes an exact triangle mesh (a hull would fill its hole); all other shapes
+become a convex hull from the shape's support points (`shape_hull_points`: rings of 16 points for
+cylinder, cone and torus, the corners of the ramp, the hull of built-in meshes, otherwise the 8
+corners of the bounds).
 
 Test: `game_body_planning` (cart with a welded-in, scaled wheel; wall as an implicit static body;
 coin as an implicit kinematic sensor; ground).
@@ -692,7 +695,7 @@ For rolling ball, character and flyer, movement is **camera-relative**. The mode
 
 | Mode | Implementation |
 |---|---|
-| **Hover Car** | throttle as a force along the vehicle axis (reverse 1.25×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
+| **Hover Car** | throttle as a force along the vehicle axis (reverse 1.5×, throttle against the motion brakes 2.6×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
 | **Vehicle** | like the hovercar without the hover spring; it is only driven with ground contact (sphere probe). |
 | **Rolling Ball** | force in the direction of movement; **jump as an impulse** m · (`jump_speed` − v_z), only on the ground; top speed as a counterforce. |
 | **Character** | Box3D's **character mover** ([Chapter 6](06-physics.md)): the body becomes kinematic, the capsule is sized from its shapes (feet at the lowest, head at the highest point, step height 22 % of the height), classic first-person-shooter ground movement, gravity 1.5× (snappier). The body turns smoothly toward the direction of travel and follows via `set_target_pose`. Footsteps by stride length; triggers and pickups via the touched planes. |
@@ -700,7 +703,7 @@ For rolling ball, character and flyer, movement is **camera-relative**. The mode
 | **Soldier** | character mover with real gravity (jump 3.6 m/s → 0.66 m), see 8.13. |
 | **Walker** | the input goes to the robot's controller, which drives its servos with the trained policy ([Chapter 13](13-micro-duck.md)). |
 
-Common to all: boost is a reserve 0..1 (−0.45/s while boosting, +0.12/s otherwise); landings after a
+Common to all: boost is a reserve 0..1 (−0.45/s while boosting, −0.5/s with the hover car's lift thrusters, +0.22/s otherwise); landings after a
 free fall above 3.5 m/s play `builtin:land`; jumps and boost play their sounds.
 
 ### Possession and pawns

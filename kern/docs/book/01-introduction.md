@@ -93,7 +93,8 @@ editor.
 
 A simulation, a training run or a replayed robot log produces the same result in Kern, bit for bit,
 on all platforms checked in CI (GCC/x86, Apple clang/ARM, WebAssembly).
-This is ensured by the following (`docs/lehrer.md`, section 7):
+This is ensured by the following (`kern/build.sh`, `include/kern/core/dmath.h`,
+`third_party/box3d/README.md`, `src/lehrer/ppo.cpp`):
 
 - **No FMA contraction:** Kern, Box3D and the libm are compiled with `-ffp-contract=off`.
 - **Box3D on the scalar path** (`BOX3D_DISABLE_SIMD`), as in WebAssembly.

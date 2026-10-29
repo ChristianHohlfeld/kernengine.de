@@ -93,7 +93,8 @@ Das Ergebnis: Was ein Spiel tut, steht in C++, ist nativ mit Sanitizern testbar
 
 Eine Simulation, ein Trainingslauf oder ein abgespieltes Roboter-Log kommt in Kern überall gleich
 heraus, Bit für Bit, auf allen in der CI geprüften Plattformen (GCC/x86, Apple clang/ARM,
-WebAssembly). Dafür sorgen (`docs/lehrer.md`, Abschnitt 7):
+WebAssembly). Dafür sorgen (`kern/build.sh`, `include/kern/core/dmath.h`,
+`third_party/box3d/README.md`, `src/lehrer/ppo.cpp`):
 
 - **Keine FMA-Zusammenfassung:** Kern, Box3D und die libm werden mit `-ffp-contract=off` übersetzt.
 - **Box3D im Skalar-Pfad** (`BOX3D_DISABLE_SIMD`), wie in WebAssembly.

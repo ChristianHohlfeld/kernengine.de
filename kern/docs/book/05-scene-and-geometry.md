@@ -249,7 +249,7 @@ footprints.ring(court, 4);                // hole (courtyard)
 
 ### What Happens per Building
 
-1. **Clean the rings** (`clean_ring`): non-finite points and points less than 1.5 cm from their predecessor are dropped, as is the closing duplicate point. If fewer than 3 points remain, or an area ≤ 0.08 m², the ring becomes empty.
+1. **Clean the rings** (`clean_ring`): non-finite points and points at most 1.5 cm from their predecessor are dropped, as is the closing duplicate point. If fewer than 3 points remain, or an area ≤ 0.08 m², the ring becomes empty.
 2. **Normalize the orientation:** outer ring counterclockwise, holes clockwise (`ring_area`, reversed if necessary).
 3. **Reject** if a ring is empty, the wall height is ≤ 0.1 m, Earcut returns nothing or the area deviation exceeds 0.7 %.
 4. **Colors** from the style: wall color `walls[h % n]`, roof color `roofs[(h >> 8) % n]`, cornice color as the mix `mix(wall, trim, trim_mix)` in `f64`, so that it matches a double-precision reference exactly. The storey height lies between 3.1 and 3.6 m, depending on the seed.

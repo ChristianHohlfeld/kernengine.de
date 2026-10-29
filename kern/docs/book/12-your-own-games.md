@@ -332,7 +332,7 @@ The status channel brings text to the page; `hello/index.html` shows it at the b
 ```
 
 An 8×8 grid with 3 m spacing. `Mat4::trs` builds the matrix from translation, rotation (a quaternion
-around Z) and scale; every third crate is taller. The matrix is stored column-major and copied directly
+around Z) and scale; the height alternates in three steps (1×, 1.6× and 2.2×). The matrix is stored column-major and copied directly
 into the instance buffer.
 
 ```cpp
@@ -473,7 +473,7 @@ are two instanced meshes (trunk and crown) with one matrix per tree. How the bui
 
 **Collision without a physics engine.** The example deliberately does not use Box3D. Each building is a
 polygon in a 40 m grid; `City::collide` pushes the car's circle (radius 1.7 m) out of all polygons of the
-neighboring cells and reflects the velocity off the wall. The city edge is a hard boundary.
+neighboring cells, removes the velocity into the wall and gives a 35 % rebound. The city edge is a hard boundary.
 
 **Driving physics** (`drive`). Throttle accelerates forward at 24 m/s², reverse (key S: 0.7 × 30) at
 21 m/s², boost by an additional 42 m/s²; top speed is 36 m/s, 60 m/s with boost. Lateral velocity decays

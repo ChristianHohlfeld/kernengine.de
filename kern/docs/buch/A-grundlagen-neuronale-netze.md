@@ -488,8 +488,8 @@ In Robotik heißt Überanpassung meist: Das Netz hat sich auf **genau diese Simu
 auf diese Masse, diese Reibung, dieses Servo. In der echten Welt ist alles ein wenig anders. Das
 Gegenmittel ist Variation (Domain Randomization, A.12). Kern prüft deshalb jedes Netz zweimal: auf
 dem **sauberen** Roboter und unter **voller Variation** (`kern_lehrer --eval`, `JumpReport`,
-`PlayReport`). Auch die Auswahl der Runde beim Spielnetz (`docs/lehrer.md`, Abschnitt 8)
-ist frühes Aufhören nach einer Bewertung.
+`PlayReport`). Auch die Auswahl der Runde beim Spielnetz (`docs/lehrer.md`, Abschnitt „Ergebnis“;
+Abschnitt 14.8) ist frühes Aufhören nach einer Bewertung.
 
 ---
 
@@ -553,11 +553,12 @@ verschwindet schrittweise.
 - `JumpImitation::round_from` hängt die neuen Daten an alle bisherigen an und passt das Netz an
   **alles** an (`imitate(..., 10, 256, 1e-3f, ...)`: 10 Epochen, Minibatch 256, Lernrate $10^{-3}$).
 
-Das Rezept des Sprungs hat 8 Runden à 96 Episoden; laut `docs/lehrer.md` springt das Netz ab
-Runde 7 zum ersten Mal echt. Das Spielnetz lernt ebenso (`imitate_play`).
+Das Rezept des Sprungs hat 8 Runden à 96 Episoden (`docs/lehrer.md`); nach Runde 7 springt das
+Netz zum ersten Mal echt (Abschnitt 14.9). Das Spielnetz lernt ebenso (`imitate_play`).
 
 Ein Detail, das DAgger überhaupt erst möglich macht: Das Vorbild des Spielnetzes sieht **dasselbe**
-wie das Netz und hat „kein verstecktes Gedächtnis“ (`docs/lehrer.md`, Abschnitt 8). Eine Funktion
+wie das Netz und hat kein verstecktes Gedächtnis („no hidden memory“, Kommentar in
+`src/lehrer/spielen.cpp`). Eine Funktion
 von Beobachtungen kann ein Netz exakt lernen; eine Funktion, die von verborgenen Größen abhängt,
 nicht.
 
@@ -941,7 +942,7 @@ Die Werte von Kerns `PpoConfig`: `steps_per_env = 24` (Sprung: 48), `epochs = 5`
 Kern trennt die beiden Hälften bewusst: Ein `Collector` braucht nur die `Policy` (Actor,
 Normalisierer, Streuung) und gibt einen `Rollout` zurück; der Lerner (`Ppo::learn`) nimmt die
 Rollouts aller Sammler. Beide lassen sich in flache Puffer serialisieren. So können die Sammler
-native Threads sein oder Web Worker im Browser (`docs/lehrer.md`, Abschnitt 6).
+native Threads sein oder Web Worker im Browser (Abschnitt 14.11 in [Kapitel 14](14-lehrer.md)).
 
 ### A.11.10 Determinismus beim Lernen
 
@@ -985,7 +986,7 @@ Bei der **Domänen-Randomisierung** (*domain randomization*) zieht jede Episode 
 und sensorischen Parameter neu aus Verteilungen. Ein Netz, das in allen diesen Welten funktioniert,
 hat gelernt, was ihnen gemeinsam ist.
 
-**In Kern** (`docs/lehrer.md`, Abschnitt 5; `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
+**In Kern** (Abschnitt 14.3 in [Kapitel 14](14-lehrer.md); `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
 
 | Was | Variation |
 |---|---|
@@ -1139,7 +1140,7 @@ obs [1,61] ─► Sub(obs_mean) ─► Div(obs_div) ─► Gemm ─► Elu ─�
 - Metadaten mit denselben Schlüsseln wie bei Pollen, dazu `task` und `lehrer`; das Spielnetz hat
   eigene (`play_metadata`).
 - Der Test `lehrer_exports_onnx_like_pollens_networks` liest die Datei mit Kern und vergleicht bis
-  $10^{-4}$ mit dem Actor; ONNX Runtime lädt sie ebenfalls (`docs/lehrer.md`, Abschnitt 4).
+  $10^{-4}$ mit dem Actor; ONNX Runtime lädt sie ebenfalls (Abschnitt 14.10 in [Kapitel 14](14-lehrer.md)).
 
 Exportiert wird nur der **Mittelwert** der Policy: Auf dem Roboter wird nicht mehr erkundet, die
 Streuung $\sigma$ und der Kritiker bleiben im Lerner.

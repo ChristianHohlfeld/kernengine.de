@@ -480,7 +480,7 @@ simulation** – to this mass, this friction, this servo. In the real world ever
 different. The remedy is variation (domain randomization, A.12). Kern therefore evaluates every
 network twice: on the **clean** robot and under **full variation** (`kern_lehrer --eval`,
 `JumpReport`, `PlayReport`). The choice of round for the play network
-(`docs/lehrer.md`, Section 8; Section 14.8) is likewise early stopping after an evaluation.
+(`docs/lehrer.md`, section "Ergebnis"; Section 14.8) is likewise early stopping after an evaluation.
 
 ---
 
@@ -545,12 +545,11 @@ gradually disappears.
   **everything** (`imitate(..., 10, 256, 1e-3f, ...)`: 10 epochs, minibatch 256, learning rate
   $10^{-3}$).
 
-The jump recipe has 8 rounds of 96 episodes each; according to `docs/lehrer.md` the network jumps
-properly for the first time from round 7. The play network learns the same way (`imitate_play`).
+The jump recipe has 8 rounds of 96 episodes each (`docs/lehrer.md`); after round 7 the network
+jumps properly for the first time (Section 14.9). The play network learns the same way (`imitate_play`).
 
 One detail that makes DAgger possible in the first place: the play network's Vorbild sees **the
-same** as the network and has "kein verstecktes Gedächtnis" ("no hidden memory"; `docs/lehrer.md`,
-Section 8). A network can learn a function of observations exactly; a function that depends on
+same** as the network and has "no hidden memory" (comment in `src/lehrer/spielen.cpp`). A network can learn a function of observations exactly; a function that depends on
 hidden quantities, it cannot.
 
 ---
@@ -928,7 +927,7 @@ The values of Kern's `PpoConfig`: `steps_per_env = 24` (jump: 48), `epochs = 5`,
 Kern deliberately separates the two halves: a `Collector` needs only the `Policy` (actor, normalizer,
 spread) and returns a `Rollout`; the learner (`Ppo::learn`) takes the rollouts of all collectors.
 Both can be serialized into flat buffers. This way the collectors can be native threads or web
-workers in the browser (`docs/lehrer.md`, Section 6).
+workers in the browser (Section 14.11 in [Chapter 14](14-lehrer.md)).
 
 ### A.11.10 Determinism in learning
 
@@ -971,7 +970,7 @@ Two strategies complement each other:
 In **domain randomization**, every episode draws its physical and sensory parameters afresh from
 distributions. A network that works in all these worlds has learned what they have in common.
 
-**In Kern** (`docs/lehrer.md`, Section 5; `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
+**In Kern** (Section 14.3 in [Chapter 14](14-lehrer.md); `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
 
 | What | Variation |
 |---|---|
@@ -1125,7 +1124,7 @@ obs [1,61] ─► Sub(obs_mean) ─► Div(obs_div) ─► Gemm ─► Elu ─�
 - Metadata with the same keys as Pollen's, plus `task` and `lehrer`; the play network has its own
   (`play_metadata`).
 - The test `lehrer_exports_onnx_like_pollens_networks` reads the file with Kern and compares it with
-  the actor to within $10^{-4}$; ONNX Runtime loads it as well (`docs/lehrer.md`, Section 4).
+  the actor to within $10^{-4}$; ONNX Runtime loads it as well (Section 14.10 in [Chapter 14](14-lehrer.md)).
 
 Only the policy's **mean** is exported: on the robot there is no more exploration; the spread
 $\sigma$ and the critic stay in the learner.

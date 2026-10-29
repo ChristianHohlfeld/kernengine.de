@@ -47,7 +47,7 @@ Status according to `docs/lehrer.md`:
 | Variation (domain randomization), learning in the browser, determinism | done |
 | The jump: demonstration → imitation → practice | done |
 | Digital twin: device models, calibration, matching | done (without real measurement data) |
-| Play: kick a ball, pick up a sock, carry it off, spit it out | being reworked (Section 14.8) |
+| Play: kick a ball, pick up a sock, carry it off, spit it out | ball done; sock learned, low success rate (Section 14.8) |
 
 ## 14.2 Architecture
 
@@ -811,7 +811,7 @@ to stand, it finds out for itself. Half the environments are clean, half are var
 
 `kern/policies/play.onnx`: 12 rounds of imitation with 32 episodes of 60 s each, half on a clean robot,
 half with full variation; round 8 was chosen after checking over 32 episodes per row (`docs/lehrer.md`,
-section 8):
+section "Ergebnis"):
 
 | | ball kicked away | sock picked up | picked up, carried off, spat out | grips that held | falls |
 |---|---|---|---|---|---|
@@ -828,7 +828,9 @@ beak like fabric, and the practice phase with rewards.
 ## 14.9 Jump results
 
 `policies/jump.onnx` was created with recipe `recipe_for("jump")`, 32 ducks on 2 cores, seed 1,
-3000 iterations of practice (from `docs/lehrer.md`):
+3000 iterations of practice. The measurements of this run were documented in `docs/lehrer.md` up to
+commit `2c0fc02` and have since been available only in the Git history; `jump.onnx` has not changed
+since then:
 
 | | clean robot (40 episodes) | full variation (40 episodes) |
 |---|---|---|

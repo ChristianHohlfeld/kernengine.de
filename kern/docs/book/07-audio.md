@@ -16,7 +16,7 @@ This chapter describes the mixer with 3D sound, buses, reverb and limiter; the s
 
 The header lines of `audio.h` state the reasons between the lines: everything happens "sample by sample and deterministically". A mixer of its own provides three things that a graph of Web Audio nodes does not:
 
-- **Determinism.** The same events produce the same samples on every platform. Built-in sounds are synthesized with fixed seeds, and events arise in the fixed physics steps.
+- **Determinism.** The same events produce the same samples with the same build. Built-in sounds are synthesized with fixed seeds, and events arise in the fixed physics steps. The mixer and synthesizer use the platform's libm ([Chapter 3](03-foundations.md)); only the duck's voice is bit-identical across platforms (7.6).
 - **One model for all hosts.** Studio, exported games and native tests use the same C++ code. The browser only has to play samples.
 - **Full control over volume ramps, voice management and output level.** No click when stopping, no clipping: the output never exceeds ±1.
 
@@ -199,7 +199,7 @@ The attack is instantaneous: the gain drops before a peak exceeds the 0.92 thres
 
 ## 7.5 The synthesizer
 
-Kern ships no sound files. All built-in sounds are created from code at load time: a small subtractive synthesizer in the tradition of sfxr, extended with resonant filters, noise colors, FM and layering, plus a step sequencer for music loops (`synth.h`). Everything is rendered offline into clips, with fixed seeds and therefore identical on every platform.
+Kern ships no sound files. All built-in sounds are created from code at load time: a small subtractive synthesizer in the tradition of sfxr, extended with resonant filters, noise colors, FM and layering, plus a step sequencer for music loops (`synth.h`). Everything is rendered offline into clips, with fixed seeds and therefore the same on every load (bit-identical on the same platform).
 
 ### `SynthPatch`
 
@@ -235,7 +235,7 @@ For impact sounds of small solid bodies the library has a second method, `struck
 The two music loops are scores: every bar puts its notes into a queue; identical notes are rendered only once and reused.
 
 - `music_drive`: 120 BPM, Am–F–C–G, four-on-the-floor kick drum, snare on 2 and 4, eighth-note bass, sixteenth-note arpeggio, pads. 8 bars of 2 s each.
-- `music_calm`: 80 BPM, Fmaj7–Cmaj7–Am7–G6, pads, bass and a pentatonic bell melody. 8 bars of 3 s each.
+- `music_calm`: 72 BPM, Fmaj7–Cmaj7–Am7–G6: warm pads, a round sub bass, an electric piano melody with space between the phrases, quiet chord stabs, a soft kick and shaker from bar 4. 16 bars of 3⅓ s each.
 
 Both are stereo and seamless.
 
@@ -506,7 +506,7 @@ Preferably, output runs through an AudioWorklet. The processor source is a strin
 - The main thread renders chunks of 128 to 2048 frames (`kern_studio_audio_render`, at most 16,384 frames per call), copies them and sends them to the worklet via `postMessage` with a transferred buffer.
 - The worklet plays the queue and reports back every 4 blocks how many frames it has consumed and how often it ran dry.
 - `pump()` keeps the queue `latency` seconds ahead, rounded to 128 frames. The initial value is 70 ms. **Adaptive:** if the queue runs dry (the main thread stalled longer than the queue lasted), 30 ms are added, up to at most 200 ms. After 15 seconds without dropouts, the lead decreases again by 5 ms per step toward the initial value.
-- **Dropouts without clicks:** if the queue is empty, the worklet does not jump to silence. The last sample glides to zero over about 2 ms (96 samples), and when data arrives again, it is faded in. A gap remains audible, but without a pop.
+- **Dropouts without clicks:** if the queue is empty, the worklet does not jump to silence. The last sample decays exponentially to zero within a few samples (factor 1 − 4/96 per sample), and when data arrives again, it is faded in linearly over 96 samples (2 ms). A gap remains audible, but without a pop.
 - After a very long stall (more than one second behind), counting starts over.
 
 Where no AudioWorklet is available, `KernAudio` uses a `ScriptProcessor` with 1024 frames that renders directly in its callback.

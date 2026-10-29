@@ -74,7 +74,7 @@ canvas.getContext("webgl2", { alpha: false, antialias: false, depth: true,
                               powerPreference: "high-performance", ... });
 ```
 
-`antialias: false` is intentional: the renderer draws the scene into its own framebuffers anyway (see 4.7), where multisampling of the default framebuffer would have no effect. Kern Studio and exported games create their context themselves and request `antialias: true` (`web/studio/studio.mjs`, `web/studio/game.mjs`).
+`antialias: false` is the facade's default: with bloom the renderer draws the scene into its own framebuffers (see 4.7), where multisampling of the default framebuffer has no effect. Without bloom and in partial viewports it draws straight into the default framebuffer; if you want anti-aliasing there, pass `contextAttributes: {antialias: true}`. Kern Studio and exported games create their context themselves and request `antialias: true` (`web/studio/studio.mjs`, `web/studio/game.mjs`).
 
 ### Two Ways to Use the Renderer
 
@@ -263,13 +263,14 @@ vOpacity = iTint.a;
    - `location 2` `outAo`: a record for ambient occlusion (see 4.8.4).
 2. `kGlslToneMap`: `linearToSrgb`, `srgbToLinear`, ACES filmic, color grading.
 3. `kFragmentFunctions`: `envIrradiance`, `skyReflection`.
-4. Hook `fragment_declarations`.
-5. Read the texture, compute alpha, alpha test.
-6. Hook `fragment_discard`.
-7. `bool linearInput = uLinearColor == 1;` and hook `fragment_input`.
-8. `kFragmentBase`: linearize the base color, normal, sun direction, `surfaceGlass = 0`, `emissive = uEmissive`.
-9. Hook `fragment_surface`.
-10. `kFragmentLighting`: lighting, tonemapping, fog, outputs.
+4. `kFragmentShadow`: `shadowTap`, `sunShadow` (PCF after Castaño, receiver-plane bias after Isidoro).
+5. Hook `fragment_declarations`.
+6. Read the texture, compute alpha, alpha test.
+7. Hook `fragment_discard`.
+8. `bool linearInput = uLinearColor == 1;` and hook `fragment_input`.
+9. `kFragmentBase`: linearize the base color, normal, sun direction, `surfaceGlass = 0`, `emissive = uEmissive`.
+10. Hook `fragment_surface`.
+11. `kFragmentLighting`: lighting, tonemapping, fog, outputs.
 
 Alpha is computed as `clamp(vOpacity * uMaterial.a * texel.a, 0, 1)`. For `AlphaMode::mask` the renderer sets `uAlphaCutoff` to `alpha_cutoff`, otherwise to 0; anything below is discarded.
 
@@ -524,12 +525,19 @@ Why? If the map moves with the camera by fractions of a texel, shadow edges land
 **Sampling.** The depth texture has `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` and linear filtering. A `texture(sampler2DShadow, ...)` then compares four neighboring texels in hardware and interpolates the results bilinearly – that is the "hardware PCF", level 1. Levels 4 and 9 build on it, after Castaño (2013, "The Witness"), a tent-filtered 3 × 3 or 5 × 5 kernel: each tap lies between the texels so that the bilinear hardware weighting yields exactly the tent weights (`sunShadow` in the standard shader; sum divided by 16 or 144). For this the shader gets `uSunShadowFilter` and `uSunShadowTexel` (map size, its reciprocal, one texel in meters):
 
 ```glsl
+// Normal offset (Holbert 2011): look the shadow up a texel off the surface along its normal,
+// more where the light grazes it - no acne without a large constant bias.
+vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
+vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
+vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
+// Depth slope of the receiver in map space (derivatives must run outside the branch below).
+vec3 sdx = dFdx(uvz), sdy = dFdy(uvz);
+float sdet = sdx.x * sdy.y - sdx.y * sdy.x;
+gShadowUV = uvz.xy;
+gShadowGrad = abs(sdet) > 1e-12 ? vec2(sdx.z * sdy.y - sdy.z * sdx.y, sdy.z * sdx.x - sdx.z * sdy.x) / sdet : vec2(0.0);
+float sgl = length(gShadowGrad) * uSunShadowTexel.y;
+if (sgl > 0.004) gShadowGrad *= 0.004 / sgl;
 if (uSunShadowEnabled == 1 && ndl > 0.0) {
-  // Normal offset (Holbert 2011): look the shadow up a texel off the surface along its normal,
-  // more where the light grazes it - no acne without a large constant bias.
-  vec3 lookup = vWorld + n * (uSunShadowTexel.z * (0.6 + 1.4 * (1.0 - ndl)));
-  vec4 clip = uSunShadowProjection * vec4(lookup, 1.0);
-  vec3 uvz = clip.xyz / clip.w * 0.5 + 0.5;
   if (uvz.x > 0.0 && uvz.x < 1.0 && uvz.y > 0.0 && uvz.y < 1.0 && uvz.z > 0.0) {
     shadow = sunShadow(uvz);
     float d = length(vWorld - uSunShadowFade.xyz);
@@ -537,6 +545,8 @@ if (uSunShadowEnabled == 1 && ndl > 0.0) {
   }
 }
 ```
+
+Derivatives (`dFdx`) must run outside the branch; they yield the receiver-plane bias (Isidoro 2006), with which `shadowTap` compares every tap against the depth of the receiver's plane at that point. This keeps long, grazing shadows free of stripes.
 
 Outside the map a surface counts as lit. Surfaces facing away from the sun (`ndl == 0`) do not read the map at all. With a shadow distance, the shadow fades out over its last tenth (measured from the eye, `uSunShadowFade`) instead of breaking off at the map's edge; without a shadow distance there is no fade.
 

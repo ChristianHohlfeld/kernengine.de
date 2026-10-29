@@ -46,7 +46,7 @@ Stand laut `docs/lehrer.md`:
 | Variation (Domain Randomization), Lernen im Browser, Determinismus | fertig |
 | Der Sprung: Vorbild → Nachahmen → Üben | fertig |
 | Digitaler Zwilling: Gerätemodelle, Kalibrierung, Abgleich | fertig (ohne echte Messdaten) |
-| Spielen: Ball kicken, Socke aufheben, wegtragen, ausspucken | in Überarbeitung (Abschnitt 14.8) |
+| Spielen: Ball kicken, Socke aufheben, wegtragen, ausspucken | Ball fertig; Socke gelernt, Erfolgsquote niedrig (Abschnitt 14.8) |
 
 ## 14.2 Architektur
 
@@ -812,7 +812,7 @@ sauber, zur Hälfte variiert.
 
 `kern/policies/play.onnx`: 12 Runden Nachahmen mit je 32 Episoden zu 60 s, halb sauberer Roboter, halb
 volle Variation; ausgewählt ist Runde 8 nach Prüfung über 32 Episoden je Zeile (`docs/lehrer.md`,
-Abschnitt 8):
+Abschnitt „Ergebnis“):
 
 | | Ball weggekickt | Socke aufgehoben | aufgehoben, weggetragen, ausgespuckt | Griffe, die hielten | Stürze |
 |---|---|---|---|---|---|
@@ -829,7 +829,8 @@ Stoff in den Schnabel legt, und die Übungsphase mit Belohnung.
 ## 14.9 Ergebnisse des Sprungs
 
 `policies/jump.onnx` entstand mit Rezept `recipe_for("jump")`, 32 Enten auf 2 Kernen, Seed 1,
-3000 Iterationen Üben (aus `docs/lehrer.md`):
+3000 Iterationen Üben. Die Messungen dieses Laufs standen bis Commit `2c0fc02` in `docs/lehrer.md`
+und sind seither nur noch in der Git-Historie zu finden; `jump.onnx` ist seitdem unverändert:
 
 | | sauberer Roboter (40 Episoden) | volle Variation (40 Episoden) |
 |---|---|---|

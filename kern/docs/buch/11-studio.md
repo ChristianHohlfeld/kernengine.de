@@ -51,7 +51,7 @@ die Engine-Doku, das Impressum und die Datenschutzerklärung.
    („Reopened "…", where you worked last time“) bietet **Neu anfangen** (Start fresh) an, um
    stattdessen mit Orb Run neu zu beginnen.
 4. Hatte die letzte Sitzung ungespeicherte Änderungen, fragt Studio
-   **Restore "…" from your last session?** (die Frage ist nicht übersetzt) mit **Wiederherstellen**
+   „„…“ aus deiner letzten Sitzung wiederherstellen?“ („Restore "…" from your last session?“) mit **Wiederherstellen**
    (Restore) und **Schließen** (Dismiss) (Abschnitt 11.15).
 
 Mit **Spielen** (Play), Alt+P, fährt man in Orb Run sofort los.
@@ -68,9 +68,10 @@ Unter `/editor/` ist Studio eine installierbare Web-App:
   immer zuerst aus dem Netz.
 - Jeder Deploy schreibt seine Build-Kennung in die Seite und in `build.json`. Studio fragt beim Start,
   bei jeder Rückkehr zur App, wenn das Netz zurückkommt und alle 60 s nach. Ist ein neuer Build da und
-  kann nichts verloren gehen (Editiermodus, nichts ungespeichert), lädt Studio sofort neu. Sonst
-  erscheint **Neue Version verfügbar** (New version available) mit **Aktualisieren** (Update) und
-  **Später** (Later); beim Aktualisieren wandert das Level über den Autosave in die neue Version.
+  wird gerade bearbeitet (nicht gespielt), lädt Studio sofort neu; ungespeicherte Änderungen gehen
+  dabei über den Autosave mit. Läuft ein Spiel, erscheint **Neue Version verfügbar** (New version
+  available) mit **Aktualisieren** (Update) und **Später** (Later); spätestens beim Stoppen lädt Studio
+  die neue Version, das Level wandert über den Autosave mit.
 - Unten rechts in der Statusleiste steht die laufende Version, mit Hinweis, wenn online eine neuere
   bereitliegt.
 
@@ -123,7 +124,7 @@ Menüzeilen 40 px hoch. Esc schließt jedes Menü.
 | **Speichern unter...** (Save As...) | Strg+Umschalt+S | unter neuem Namen speichern |
 | **Textur importieren...** (Import Texture...) | | Bild (PNG, JPEG, WebP) als Textur ins Level holen |
 | **Spiel verpacken (HTML)...** (Package Game (HTML)...) | | Spiel als eine HTML-Datei exportieren (Abschnitt 11.16) |
-| **Beispiel-Levels** (Example Levels) ▸ | | Orb Run, Physics Lab, Shooting Range, Micro Duck, **Grundformen** (Basic), **Leer** (Empty) |
+| **Beispiel-Levels** (Example Levels) ▸ | | Orb Run, Physics Lab, Shooting Range, Micro Duck, **Basis** (Basic), **Leer** (Empty) |
 
 Die Vorlagen im Dialog **Neues Level** (New Level); ein Doppelklick auf eine Karte erstellt sofort, sonst
 der Knopf **Erstellen** (Create):
@@ -132,9 +133,9 @@ der Knopf **Erstellen** (Create):
 |---|---|
 | Orb Run | „Prozedurale Nachtstadt, Box3D-Hovercar, 24 Orbs zum Sammeln“ |
 | Physics Lab | „Jedes Box3D-Gelenk: Scharnier, Schiene, Rad, Seilbrücke, Motor, Stapel“ |
-| Shooting Range | Ego-Shooter-Soldat (Desktop, Gamepad, Touch), Ziele, Deckung, mehrspielerfähig (im Dialog englisch) |
-| Micro Duck | Pollen Robotics' Laufroboter auf seinem trainierten Netz, läuft selbstständig mit ToF und Kamera (im Dialog englisch) |
-| **Grundformen** | „Boden, Sonne und Himmel – ein sauberer Anfang“; dazu ein Würfel, der Actor „Cube“ |
+| Shooting Range | „Ego-Soldat (Desktop, Gamepad, Touch), Ziele, Deckung – mehrspielerfähig“ |
+| Micro Duck | „Der Laufroboter von Pollen Robotics auf seinem trainierten Netz: streift selbstständig umher, mit ToF und Kamera“ |
+| **Basis** (Basic) | „Boden, Sonne und Himmel – ein sauberer Anfang“; dazu ein Würfel, der Actor „Cube“ |
 | **Leer** | „Gar nichts“ |
 
 Hat das aktuelle Level ungespeicherte Änderungen, weist der Dialog darauf hin, dass sie im Autosave
@@ -236,7 +237,7 @@ Jeder Viewport hat oben eine eigene Leiste:
 | ≡ **Viewport-Optionen** (Viewport options) | **Spielansicht** (G), **Sichtfeld** (Field of View) mit 50°, 70°, 90°, 110°, **Auswahl fokussieren** (F), **Lesezeichen** (Bookmarks) mit **Zu Lesezeichen *n* springen** (Jump to bookmark *n*), Taste 1–9, und **Lesezeichen *n* setzen** (Set bookmark *n*), Strg+1–9, **Aufteilung** (Layout) |
 | Ansichtstyp | **Perspektive** oder orthografisch: **Oben**, **Unten**, **Links**, **Rechts**, **Vorne**, **Hinten** |
 | Ansichtsmodus | **Beleuchtet**, **Unbeleuchtet**, **Drahtgitter**, **Spieler-Kollision** (Player Collision); das Menü **Fenster › Ansichtsmodus** nennt denselben Modus **Kollision** |
-| **Anzeigen** | **Raster**, **Symbole (lights, empties)** (Icons (lights, empties)), **Selection outline**, **Collision shapes**, **Gelenke**, **Contact points**, **Begrenzungen**, **Nebel**, **Himmel**, **Statistik**; die Liste bleibt beim Umschalten offen. Die klein geschriebenen englischen Einträge übersetzt Studio hier nicht |
+| **Anzeigen** | **Raster**, **Symbole (Lichter, leere Actors)** (Icons (lights, empties)), **Auswahlumriss** (Selection outline), **Kollisionsformen** (Collision shapes), **Gelenke**, **Kontaktpunkte** (Contact points), **Begrenzungen**, **Nebel**, **Himmel**, **Statistik**; die Liste bleibt beim Umschalten offen |
 | Maximieren: **Maximieren / wiederherstellen (4er-Aufteilung)** (Maximise / restore (quad layout)) | wechselt zwischen vier Viewports und diesem allein |
 
 Der Klick auf ein Element der Leiste macht den Viewport zum aktiven. Wechselt man von der Perspektive in
@@ -251,7 +252,7 @@ Im Viewport selbst zeigt Studio:
   orthografischen Ansichten die sichtbare Breite in Metern oder Kilometern. Mit **Anzeigen › Statistik**
   zusätzlich Bilder pro Sekunde und während der Simulation Bodies, Kontakte und Schrittzahl.
 - **Hinweiszeile** je nach Zustand, etwa beim Fliegen
-  „Flying · WASD move · Q/E down/up · wheel speed … · Shift faster · Z/C zoom" (nicht übersetzt).
+  „Fliegen · WASD bewegen · Q/E runter/hoch · Mausrad Tempo … · Umschalt schneller · Z/C Zoom“.
 - **Gizmo-Anzeige** beim Ziehen: Verschiebung (Δ in m), Winkel (°) oder Skalierungsfaktoren.
 
 ![Vier Viewports: Perspektive und drei orthografische Ansichten](bilder/studio-quad.png)
@@ -291,7 +292,7 @@ die Abschnitte **Actor**, **Transformation** (Transform) und eine Sektion je Kom
 klappt per Klick auf ihren Kopf zu; Komponenten haben dort einen Papierkorb zum Entfernen.
 
 Bei Mehrfachauswahl erscheinen nur Komponenten, die alle ausgewählten Actors haben. Unterschiedliche
-Werte zeigen „Mehrere Werte“ (Multiple values), Zahlenfelder das nicht übersetzte „Multiple"; eine
+Werte zeigen „Mehrere Werte“ (Multiple values), Zahlenfelder „Mehrere“ (Multiple); eine
 Eingabe setzt sie für alle.
 
 Bearbeiten:
@@ -527,7 +528,7 @@ Der Logik-Editor ist nicht übersetzt; Knöpfe und Knoten heißen dort auch auf 
 | Entf | löschen |
 | F / Pos1 | Auswahl / alles einrahmen |
 | Strg+Z | Rückgängig |
-| Esc | zurück zum Viewport |
+| Esc | Aktionsmenü schließen, sonst Auswahl aufheben, sonst zurück zum Viewport |
 
 Solange der Logik-Editor offen ist, gehören Buchstaben und Entf dem Graphen; nur Strg+Z, Strg+Y, Strg+S
 und F1 erreichen das Level.
@@ -632,7 +633,7 @@ statischen Body, bei Animation durch Rotator oder Beweger (Mover) einen kinemati
 und können mehrfach vorkommen. Die prozedurale Stadt gibt es nur für einen einzelnen Actor ohne Eltern.
 
 Die Tabelle nennt die Komponenten und Felder, wie Details sie zeigt; kursiv stehen die Zwischenüberschriften
-einer Sektion, in eckigen Klammern die Auswahl-Einträge. Englisch gebliebene Namen übersetzt Studio nicht.
+einer Sektion, in eckigen Klammern die Auswahl-Einträge.
 
 | Komponente | Wichtigste Felder |
 |---|---|
@@ -641,15 +642,15 @@ einer Sektion, in eckigen Klammern die Auswahl-Einträge. Englisch gebliebene Na
 | **Starrkörper (Box3D)** (Rigid Body (Box3D)) | **Mobilität** (Mobility) [**Statisch** (Static), **Kinematisch** (Kinematic), **Dynamisch (Physik simulieren)** (Dynamic (simulate physics))], **Masse (0 = aus Dichte)** (Mass (0 = from density)), **Lineare Dämpfung** (Linear damping), **Winkeldämpfung** (Angular damping), **Schwerkraftfaktor** (Gravity scale), **Kontinuierlich (Geschoss)** (Continuous (bullet)), **Wach starten** (Start awake), **Ruhen erlauben** (Allow sleep); *Gelenke* (Constraints): **Position sperren** (Lock position), **Drehung sperren** (Lock rotation), je X/Y/Z; *Anfangszustand* (Initial state): **Anfangsgeschwindigkeit** (Initial velocity), **Anfangsdrehung** (Initial spin); *Sound*: **Aufprallgeräusch** (Impact sound), **Aufprallschwelle** (Impact threshold) |
 | **Kollider** (Collider), mehrere | **Form** [**An Mesh anpassen** (Fit to mesh), **Box**, **Kugel**, **Kapsel**, **Konvexe Hülle** (Convex hull)], **Versatz** (Offset), **Drehung** (Rotation), **Boxgröße** (Box size), **Radius**, **Kapsellänge** (Capsule length); *Physikmaterial* (Physical material): **Dichte** (Density), **Reibung**, **Rückprall (Elastizität)**, **Rollwiderstand**; *Kollision* (Collision): **Sensor (nur Überlappung)** (Sensor (overlap only)), **Kanal-Bits** (Channel bits), **Kollidiert mit Bits** (Collides with bits), **Gruppenindex** (Group index); *Sound*: **Aufprallgeräusch** [**Automatisch** (Automatic) = der des Bodys] |
 | **Gelenk** (Constraint), mehrere | **Typ** (Type) [**Scharnier (Drehgelenk)** (Hinge (revolute)), **Schiene (Schubgelenk)** (Slider (prismatic)), **Kugelgelenk** (Ball (spherical)), **Fest (verschweißt)** (Fixed (weld)), **Abstand / Seil** (Distance / rope), **Rad (Federung)** (Wheel (suspension)), **Motor**, **Parallel**, **Keine Kollision (Filter)** (No collision (filter))], **Verbundener Actor** (Connected actor) [**Welt (fester Punkt)** (World (fixed point)) oder ein Actor], **Anker (lokal)** (Anchor (local)), **Achse (lokal)** (Axis (local)), **Verbundene kollidieren** (Collide connected); *Grenzen* (Limits): **Begrenzung** (Limit), **Unten** (Lower), **Oben** (Upper); *Motor*: **Motor**, **Geschwindigkeit** (Speed), **Max. Kraft / Drehmoment** (Max force / torque); *Feder* (Spring): **Feder**, **Frequenz** (Frequency), **Dämpfungsgrad** (Damping ratio); **Ruhelänge (0 = wie beim Start)** (Rest length (0 = at start)); *Bruch* (Breaking): **Bruchkraft (0 = nie)** (Break force (0 = never)), **Bruchmoment (0 = nie)** (Break torque (0 = never)), **Bruchgeräusch** (Break sound). Eine Info-Zeile nennt die Einheiten (Grad oder Meter) |
-| **Spieler-Steuerung** (Player Controller) | **Bewegung** (Movement) [**Hovercar** (Hover car), **Rollende Kugel** (Rolling ball), **Figur** (Character), **Flieger** (Flyer), **Fahrzeug** (Vehicle), **Soldat (Ego-Shooter)** (Soldier (first person shooter)), **Läufer (Roboter auf seinem trainierten Netz)** (Walker (robot on its trained network))], **Höchstgeschwindigkeit** (Max speed), **Beschleunigung** (Acceleration), **Drehrate** (Turn rate), **Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)), **Boost**, **Boost-Geschwindigkeit** (Boost speed), **Schwebehöhe** (Hover height); *Kamera* (Camera): **Kamera** [**Verfolger** (Chase), **Ego-Perspektive** (First person), **Von oben** (Top down)], **Abstand** (Distance), **Höhe**, **Sichtfeld** (Field of view); *Soldat* (Soldier): **Ducken-Geschwindigkeit** (Crouch speed), **Augenhöhe** (Eye height), **Blickempfindlichkeit** (Look sensitivity), **Kopfwippen** (Head bob); *Läufer* (Walker): **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)), **Laufnetz** (Walking network), **Aktionen zu Servo-Zielen** (Actions to servo goals), **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in the pick)); *Sound*: **Motorschleife** (Engine loop), **Jump**, **Boost** |
-| **Waffe** (Weapon) | **Typ** [**Gewehr** (Rifle), **Pistole** (Pistol), **Schrotflinte** (Shotgun), **Scharfschützengewehr** (Sniper rifle)], **Schaden** (Damage), **Kopftreffer-Faktor** (Headshot multiplier), **Feuerrate** (Fire rate), **Automatisch** (Automatic), **Schrot pro Schuss** (Pellets per shot), **Reichweite** (Range), **Impuls auf Körper** (Impulse on bodies); *Munition* (Ammo): **Magazin** (Magazine), **Reserve**, **Nachladezeit** (Reload time); *Fahrverhalten* (Handling): **Streuung aus der Hüfte** (Hip spread), **Streuung beim Zielen** (Aimed spread), **Rückstoß** (Recoil), **Sichtfeld beim Zielen** (Aim field of view); *Sound*: **Fire**, **Reload** |
-| **Gesundheit** (Health) | **Gesundheit**, **Panzerung** (Armor), **Regeneriert nach (0 = nie)** (Regenerate after (0 = never)), **Regeneration**, **Wiedereinstieg** (Respawn), **Wiedereinstiegs-Verzögerung** (Respawn delay), **Punkte pro Abschuss** (Points for a kill); *Sound*: **Hit**, **Down**; *Explosion*: **Explosionsradius (0 = keiner)** (Explosion radius (0 = none)), **Explosionsschaden** (Explosion damage) |
+| **Spieler-Steuerung** (Player Controller) | **Bewegung** (Movement) [**Hovercar** (Hover car), **Rollende Kugel** (Rolling ball), **Figur** (Character), **Flieger** (Flyer), **Fahrzeug** (Vehicle), **Soldat (Ego-Shooter)** (Soldier (first person shooter)), **Läufer (Roboter auf seinem trainierten Netz)** (Walker (robot on its trained network))], **Höchstgeschwindigkeit** (Max speed), **Beschleunigung** (Acceleration), **Drehrate** (Turn rate), **Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)), **Boost**, **Boost-Geschwindigkeit** (Boost speed), **Schwebehöhe** (Hover height); *Kamera* (Camera): **Kamera** [**Verfolger** (Chase), **Ego-Perspektive** (First person), **Von oben** (Top down)], **Abstand** (Distance), **Höhe**, **Sichtfeld** (Field of view); *Soldat* (Soldier): **Ducken-Geschwindigkeit** (Crouch speed), **Augenhöhe** (Eye height), **Blickempfindlichkeit** (Look sensitivity), **Kopfwippen** (Head bob); *Läufer* (Walker): **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)), **Laufnetz** (Walking network), **Aktionen zu Servo-Zielen** (Actions to servo goals), **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in the pick)); *Sound*: **Motorschleife** (Engine loop), **Sprung** (Jump), **Boost** |
+| **Waffe** (Weapon) | **Typ** [**Gewehr** (Rifle), **Pistole** (Pistol), **Schrotflinte** (Shotgun), **Scharfschützengewehr** (Sniper rifle)], **Schaden** (Damage), **Kopftreffer-Faktor** (Headshot multiplier), **Feuerrate** (Fire rate), **Automatisch** (Automatic), **Schrot pro Schuss** (Pellets per shot), **Reichweite** (Range), **Impuls auf Körper** (Impulse on bodies); *Munition* (Ammo): **Magazin** (Magazine), **Reserve**, **Nachladezeit** (Reload time); *Fahrverhalten* (Handling): **Streuung aus der Hüfte** (Hip spread), **Streuung beim Zielen** (Aimed spread), **Rückstoß** (Recoil), **Sichtfeld beim Zielen** (Aim field of view); *Sound*: **Schuss** (Fire), **Nachladen** (Reload) |
+| **Gesundheit** (Health) | **Gesundheit**, **Panzerung** (Armor), **Regeneriert nach (0 = nie)** (Regenerate after (0 = never)), **Regeneration**, **Wiedereinstieg** (Respawn), **Wiedereinstiegs-Verzögerung** (Respawn delay), **Punkte pro Abschuss** (Points for a kill); *Sound*: **Treffer** (Hit), **Ausgeschaltet** (Down); *Explosion*: **Explosionsradius (0 = keiner)** (Explosion radius (0 = none)), **Explosionsschaden** (Explosion damage) |
 | **Pickup** | **Punkte** (Points), **Funkenfarbe** (Burst color), **Wiedereinstieg nach (0 = nie)** (Respawn after (0 = never)), **Sound**, **Heilt** (Heals), **Munition** |
 | **Trigger** | **Aktion** (Action) [**Ziel (Sieg)** (Goal (win)), **Gefahr (Niederlage)** (Hazard (lose)), **Checkpoint (hier wieder einsteigen)** (Checkpoint (respawn here)), **Nachricht** (Message), **Sprungfeld (Start)** (Jump pad (launch)), **Teleport**, **Schadenszone** (Damage zone), **Nur Logik-Ereignis** (Logic event only)], **Nachricht**, **Nur einmal** (Only once), **Stärke (Start m/s, Schaden)** (Strength (launch m/s, damage)), **Teleport-Ziel** (Teleport target), **Sound** [**Automatisch** = passend zur Aktion] |
 | **Rotator** | **Drehrate** (Rotation rate), °/s je Achse |
 | **Beweger** (Mover) | **Versatz**, **Periode** (Period), **Phase**, **Bewegungsart** (Motion) [**Sinus** (Sine), **Hin und her** (Ping-pong), **Schleife** (Loop)] |
 | **Prozedurale Stadt** (Procedural City) | **Seed**, **Blöcke pro Seite** (Blocks per side), **Blockraster** (Block pitch), **Straßenbreite** (Street width), **Höchstes Gebäude** (Tallest building), **Bäume** (Trees), **Verkehr (Autos)** (Traffic cars), **Erleuchtete Fenster bei Nacht** (Lit windows at night) |
-| **Audioquelle** (Audio Source) | **Sound**, **Lautstärke** (Volume), **Tonhöhe** (Pitch), **Schleife**, **Beim Start abspielen** (Play on start), **Startverzögerung** (Start delay), **Bus**; *Abschwächung* (Attenuation): **Räumlich (3D)** (Spatial (3D)), **Inner radius**, **Abfallentfernung** (Falloff distance), **Abfall** (Roll-off), **Doppler**, **Tonhöhe nach Tempo** (Pitch by speed) |
+| **Audioquelle** (Audio Source) | **Sound**, **Lautstärke** (Volume), **Tonhöhe** (Pitch), **Schleife**, **Beim Start abspielen** (Play on start), **Startverzögerung** (Start delay), **Bus**; *Abschwächung* (Attenuation): **Räumlich (3D)** (Spatial (3D)), **Innerer Radius** (Inner radius), **Abfallentfernung** (Falloff distance), **Abfall** (Roll-off), **Doppler**, **Tonhöhe nach Tempo** (Pitch by speed) |
 
 Was die Felder physikalisch bedeuten und welche Werte sich bewähren, steht in [Kapitel 6](06-physik.md)
 (Body, Kollider, Gelenk), [Kapitel 7](07-audio.md) (Audioquelle, Sounds) und
@@ -696,7 +697,8 @@ der Änderungen ab, nie vom Timing. Studio hält bis zu 500 Schritte.
 - Aufeinanderfolgende Änderungen derselben Eigenschaft innerhalb eines Ziehvorgangs sind ein Schritt
   (Abschnitt 11.2.5).
 - Eine Änderung, die nichts ändert, erzeugt keinen Schritt.
-- Beim Spielen und Simulieren ist das Level gesperrt: „Stop playing to edit the level" (nicht übersetzt).
+- Beim Spielen und Simulieren ist das Level gesperrt: „Beende das Spiel, um das Level zu bearbeiten“ („Stop playing to edit the level“; im
+  Ausgabeprotokoll englisch).
 
 ---
 
@@ -719,7 +721,7 @@ die Elemente mit ihrer ID.
 | **Spieler** | **Rollende Kugel** (Rolling Ball) | `rolling_ball` | Physikkugel zum Rollen und Springen |
 | **Spieler** | **Drohne** (Drone) | `drone` | Flieger: Leertaste/E hoch, Q/Strg runter |
 | **Spieler** | **Micro Duck** | `micro_duck` | Pollen Robotics' Zweibeiner auf seinen trainierten Netzen |
-| **Spieler** | **Micro Duck (Rollers)** | `micro_duck_rollers` | die Micro Duck auf Rollschuhen: `roller.onnx` fährt, 2 duckt sich |
+| **Spieler** | **Micro Duck (Rollschuhe)** (Micro Duck (Rollers)) | `micro_duck_rollers` | die Micro Duck auf Rollschuhen: `roller.onnx` fährt, 2 duckt sich |
 | **Spielablauf** (Gameplay) | **Orb** | `orb` | leuchtendes Pickup, 1 Punkt |
 | **Spielablauf** | **Stern** (Star) | `star` | drehendes Pickup, 10 Punkte |
 | **Spielablauf** | **Medipack** (Health Pack) | `health_pack` | heilt 50; bleibt liegen bei voller Gesundheit; kommt nach 15 s wieder |
@@ -781,7 +783,7 @@ Texturen liegen als Data-URL im Level; die `.klevel`-Datei ist damit in sich vol
 
 Der Tab **Sounds** listet die importierten Sounds und die eingebauten, nach Kategorien.
 
-- Ein Klick spielt einen Sound an (der Knopf oben mit dem nicht übersetzten „Playing preview" stoppt
+- Ein Klick spielt einen Sound an (der Knopf oben bei „Vorschau läuft“ (Playing preview) stoppt
   ihn).
 - Ein Doppelklick setzt ihn als Sound einer **Audioquelle** (Audio Source) auf die Auswahl (die
   Komponente kommt dazu, falls sie fehlt).
@@ -903,8 +905,8 @@ Box3D-Welt, der Spieler bekommt die Steuerung, die Kamera folgt ihm, und das HUD
 Pickups, Punkte, verbleibende oder vergangene Zeit, Bestzeit, Tempo in km/h mit Boost-Balken (beim Soldaten
 Fadenkreuz, Gesundheit, Munition). Leiste und Infozeile des Viewports verschwinden.
 
-1. Auf dem Desktop fängt Studio die Maus (Pointer-Lock). Ist sie frei, steht im Viewport der nicht
-   übersetzte Hinweis „Click the viewport to control the game · Esc stops · F8 ejects"; ein Klick fängt
+1. Auf dem Desktop fängt Studio die Maus (Pointer-Lock). Ist sie frei, steht im Viewport der
+   Hinweis „Klick in den Viewport, um das Spiel zu steuern · Esc beendet · F8 steigt aus“; ein Klick fängt
    sie wieder.
 2. Bei Sieg oder Niederlage erscheint ein Banner „Gewonnen“ („Victory“) bzw. „Spiel vorbei“ („Game
    over“) mit **Nochmal spielen** (Play again).
@@ -929,7 +931,7 @@ steuern. Die Kamera bleibt die des Editors.
   Mouse Joint. Ziehen bewegt ihn, den Zeiger nach oben ziehen hebt ihn hoch, das Mausrad bzw. ein zweiter
   Finger (auseinander/zusammen) holt ihn näher oder schiebt ihn weg, Loslassen wirft ihn mit seinem
   Schwung. Strg ist dafür nicht nötig. Ein kurzer Klick wählt den Körper aus. Der Hinweis im Viewport
-  lautet „Simulating · drag grabs bodies · K keeps poses · Esc stops“ (nicht übersetzt), der Dialog aus
+  lautet „Simuliert · Ziehen greift Körper · K übernimmt Posen · Esc beendet“, der Dialog aus
   **Hilfe › Steuerung...** (Help › Controls...), F1, nennt „Ziehen (Simulieren) – Physikkörper greifen
   und werfen“ („Drag (Simulate) – Grab and throw physics bodies“).
 - **Eine Micro Duck am Rumpf** hält der Griff zusätzlich in ihrer Ausrichtung, wie eine Hand den
@@ -1078,12 +1080,12 @@ Logik steuert die Ente mit den Knoten der Kategorie **Robots** (Walk, Look, Robo
 Robot Move mit der Bewegung „jump" und weitere, [Kapitel 9](09-logik.md)).
 
 **Kopfkamera und ToF:** Während des Spiels zeigt Studio oben rechts im aktiven Viewport, was die Ente
-sieht (**Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Camera), standardmäßig an; die
-Beschriftungen der Anzeige sind nicht übersetzt):
+sieht (**Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Camera), standardmäßig an):
 
-- **HEAD CAMERA** – das Bild ihrer Kopfkamera, dazu ihr Zustand bzw. „Fallen".
+- **KOPFKAMERA** (HEAD CAMERA) – das Bild ihrer Kopfkamera, dazu ihr Zustand (englisch) bzw.
+  „Gestürzt“ („Fallen“).
 - **TOF 8×8** – das 8×8-Gitter ihres Abstandssensors: rot ein Hindernis (heller, je näher), grün Boden,
-  gelb zu nah, dunkel nichts; dazu der kleinste Abstand in echten Metern oder „clear".
+  gelb zu nah, dunkel nichts; dazu der kleinste Abstand in echten Metern oder „frei“ („clear“).
 
 ![Die Micro Duck beim Spielen mit Kopfkamera und ToF-Gitter (Ente in der eigenen Gestaltung dieses Buchs)](bilder/duck-play.png)
 
@@ -1149,7 +1151,7 @@ Der Dateiname ist der Levelname, in dem alles außer Buchstaben, Ziffern, `-` un
 
 **Android** hat kein `showOpenFilePicker`; Studio öffnet dort den normalen Dateidialog. Der kennt die Endung
 `.klevel` nicht und würde mit einem Filter alle gespeicherten Levels ausgrauen. Auf Android filtert Studio
-deshalb nicht; ist die gewählte Datei kein Level, erscheint „… is not a Kern level" (nicht übersetzt),
+deshalb nicht; ist die gewählte Datei kein Level, erscheint „„…“ ist kein Kern-Level“ („… is not a Kern level“),
 und der Editor läuft weiter.
 
 ### 11.15.3 Autosave und Wiederherstellen
@@ -1209,7 +1211,7 @@ unberührt.
 1. **Spieltitel** (Game title) eintragen (vorbelegt mit **Welteinstellungen › Spieltitel** (World
    Settings › Game title) bzw. dem Levelnamen).
 2. **Verpacken** (Package) klicken.
-3. Studio lädt `<Titel>.html` herunter und meldet „Packaged … (*n* MB)" (nicht übersetzt) mit
+3. Studio lädt `<Titel>.html` herunter und meldet „Verpackt: … (*n* MB)“ („Packaged … (*n* MB)“) mit
    **Spielen** (Play it), das die Datei in einem neuen Tab startet.
 
 Die Datei ist ein vollständiges Spiel: Sie enthält das Engine-Modul als Base64, `kern.mjs` und `game.mjs`

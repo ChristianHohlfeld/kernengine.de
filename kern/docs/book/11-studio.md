@@ -64,9 +64,10 @@ Under `/editor/`, Studio is an installable web app:
   from the network first.
 - Every deploy writes its build ID into the page and into `build.json`. Studio checks at startup,
   whenever you return to the app, when the network comes back, and every 60 s. If a new build is
-  available and nothing can be lost (edit mode, nothing unsaved), Studio reloads immediately. Otherwise
-  **New version available** appears with **Update** and **Later**; on update, the level moves into the
-  new version via the autosave.
+  available while you are editing (not playing), Studio reloads immediately; unsaved changes come along
+  via the autosave. While a game is playing, **New version available** appears with **Update** and
+  **Later**; Studio loads the new version at the latest when you stop, and the level moves along via
+  the autosave.
 - The running version is shown at the bottom right of the status bar, with a note when a newer one is
   available online.
 
@@ -509,7 +510,7 @@ Gamepads and touch controls are described in Section 11.12.
 | Del | delete |
 | F / Home | frame selection / everything |
 | Ctrl+Z | undo |
-| Esc | back to the viewport |
+| Esc | close the action menu, otherwise clear the selection, otherwise back to the viewport |
 
 While the logic editor is open, letters and Del belong to the graph; only Ctrl+Z, Ctrl+Y, Ctrl+S and F1
 reach the level.

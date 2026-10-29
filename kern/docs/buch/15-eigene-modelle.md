@@ -63,7 +63,7 @@ kern/build/kern_lehrer --task jump --iterations 3000 \
 ```
 
 Das ist der Weg, auf dem `policies/jump.onnx` entstand (32 Enten auf 2 Kernen, Seed 1,
-3000 Iterationen; `docs/lehrer.md`). Was passiert:
+3000 Iterationen; Abschnitt 14.9 in [Kapitel 14](14-lehrer.md)). Was passiert:
 
 1. **Rezept laden** (`recipe_for("jump")`): Warmstart von velstand, Nachahmung des eingebauten
    Vorbilds (8 Runden à 96 Episoden), danach Üben mit Aktionsrauschen 0,1, Lernrate 10⁻⁴,
@@ -120,8 +120,9 @@ kern/build/kern_lehrer --task jump --vorbild demo2.json --out jump2.onnx
 
 Je Generation erscheint eine Zeile mit der Bewertung und der Messung des Suchzentrums auf dem
 sauberen Roboter (Höhe, Steigen, Flugzeit, Neigung, „a real jump“ / „no real jump“ / „fell“). Das
-eingebaute Vorbild entstand in drei Stufen mit zusammen 370 Generationen; die erste Stufe dauerte
-auf 2 Kernen rund 18 Minuten für rund 2 Millionen Entenschritte (`docs/lehrer.md`).
+eingebaute Vorbild entstand in drei Stufen mit zusammen 370 Generationen (`src/lehrer/vorbild.cpp`);
+die Suche brauchte auf 2 Kernen rund 18 Minuten für rund 2 Millionen Entenschritte (Abschnitt 14.9
+in [Kapitel 14](14-lehrer.md)).
 
 ### Im Browser
 
@@ -244,7 +245,8 @@ Alle PPO-Werte stehen im Rezept; die Kommandozeile überschreibt sie einzeln.
 | `--substeps N` | Box3D-Sub-Steps | 16 | nicht ändern (siehe unten) |
 | `--profil servo.json` | Servoprofil | XL330 | Training mit kalibrierten Servos ([Kapitel 16](16-kalibrierung.md)) |
 
-Hinweise aus den Läufen in `docs/lehrer.md`:
+Hinweise aus den Läufen in `docs/lehrer.md` (teils nur in früheren Fassungen der Datei in der
+Git-Historie):
 
 - **Nach der Nachahmung vorsichtig:** kleine Lernrate (10⁻⁴) und kleines Rauschen (0,1). Ein Actor,
   der schon gut handelt, wird durch große Schritte und großes Rauschen leicht zerstört; deshalb auch
@@ -294,7 +296,7 @@ weit sie danach noch voraus und seitlich ging.
 kern/build/kern_lehrer --spielen --nachahmen 12 --episoden 32 --out play.onnx --checkpoint play.ckpt
 ```
 
-Standard sind 8 Runden à 64 Episoden; `policies/play.onnx` vor der Überarbeitung entstand mit
+Standard sind 8 Runden à 64 Episoden; `policies/play.onnx` entstand mit
 12 Runden à 32 Episoden zu je 60 s (`docs/lehrer.md`). Je Runde misst das Werkzeug das Netz in
 16 Episoden auf dem sauberen Roboter:
 
@@ -303,8 +305,7 @@ Standard sind 8 Runden à 64 Episoden; `policies/play.onnx` vor der Überarbeitu
 ```
 
 **Achtung:** `--out` wird nach **jeder** Runde überschrieben. Wer eine frühere Runde behalten will,
-kopiert die Datei während des Laufs (für `play.onnx` vor der Überarbeitung war Runde 10 von 12 die
-beste). `--checkpoint` speichert den Lerner nach jeder Runde.
+kopiert die Datei während des Laufs (für `play.onnx` war Runde 8 von 12 die beste). `--checkpoint` speichert den Lerner nach jeder Runde.
 
 ### 3. Prüfen
 
@@ -367,7 +368,7 @@ Kerns eigene Netze haben feste Dateinamen: `jump.onnx` und `play.onnx` (`KERN_PO
    Tabs. Das gilt für den Sprung (die Seite trainiert keine Spielschicht).
 3. **Prüfen:** **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) öffnen,
    **Spielen** (Play), **F8** (Ente übernehmen), Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
-   (Spielschicht: **Autonomous (camera, ToF)** – Studio übersetzt es nicht – und **Kern-Extras
+   (Spielschicht: **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) und **Kern-Extras
    (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in
    the pick)) an, Ball oder Socke in Sicht). Die Browser-Konsole meldet
    „Kern: trained network jump.onnx loaded“ für ein Netz aus dem Lehrer und eine Warnung, wenn eine
@@ -539,7 +540,7 @@ Was die Netze in Kern vorleben:
 
 ## 15.11 Fallstricke aus den echten Läufen
 
-Aus `docs/lehrer.md`:
+Aus `docs/lehrer.md` (teils nur in früheren Fassungen der Datei in der Git-Historie):
 
 - **Die Belohnung wird ausgenutzt.** In den ersten PPO-Läufen saß die Ente auf dem Schwanz, machte
   einen Hechtsprung oder stützte sich ab. Jedes Mal half nur eine strengere Regel: Bodenkontakt eines

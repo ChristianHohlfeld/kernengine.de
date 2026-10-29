@@ -433,8 +433,8 @@ Sturz-Befund und die Geschwindigkeit.
 Bild hochkant, 62° hoch und 37,4° breit. `walker_camera(id, cam)` liefert die Kamera,
 `walker_sees(id, target, visible, bearing, distance)` prüft, ob die Mitte eines Actors im Bild liegt
 und der erste Treffer eines Strahls dorthin der Actor selbst ist. Das Studio zeigt das Kamerabild
-beim Spielen oben rechts im Viewport (**Fenster › Anzeigen › Robot Camera** (Window › Show › Robot
-Camera); den Eintrag Robot Camera übersetzt Studio nicht), daneben das ToF-Gitter.
+beim Spielen oben rechts im Viewport (**Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot
+Camera)), daneben das ToF-Gitter.
 
 Blickt die Ente nach unten (Nacken −1,1, Kopf 1,1), schaut die Kamera 87° nach unten und sieht 6–15 cm
 vor dem Rumpf (Test `micro_duck_camera_sees_the_floor_in_front_when_looking_down`).
@@ -460,7 +460,7 @@ In jedem Regeltakt entscheidet `drive_walkers`, wessen Kommando gilt, in dieser 
 2. **Logik:** ein Kommando von **Walk** bzw. **Look** (`walker_command`, `walker_look`), für die
    angegebene Dauer oder bis zum nächsten Kommando.
 3. **Autonomie:** das Gehirn (`think_walker`) und darüber die Spielschicht (`play_walker`), wenn das
-   Feld **Autonomous (camera, ToF)** (`autonomous`; Studio übersetzt es nicht) an ist.
+   Feld **Autonom (Kamera, ToF)** (Autonomous (camera, ToF), `autonomous`) an ist.
 
 Twist, Kopf und Körperpose werden danach begrenzt und mit EMA geglättet (Twist 0,2, Kopf mit der Rate
 des Absenders). Steht die Ente still (kein Twist, keine Bewegung, aufrecht) und hat seit 2 s niemand
@@ -605,7 +605,7 @@ Verfügbar ist sie, wenn
   the pick)) an ist (`kernExtras`),
 - die Ente keine Rollschuhe trägt und einen Mund-Servo hat,
 - `play.onnx` geladen ist (oder der Lehrer sie extern steuert),
-- **Autonomous (camera, ToF)** an ist (Studio übersetzt das Feld nicht): Laufbefehl, Kopf und Schnabel der Spielschicht laufen über den Kanal der
+- **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) an ist: Laufbefehl, Kopf und Schnabel der Spielschicht laufen über den Kanal der
   Autonomie und wirken nur dann.
 
 **Eingeschaltet** („engaged“) ist sie, solange sie ein Objekt kennt, etwas im Schnabel hat oder eine
@@ -741,7 +741,7 @@ Blueprints, nicht Verhalten der Ente.
 
 ### Ergebnisse
 
-Gemessen über 32 Episoden je Zeile (`docs/lehrer.md`, Abschnitt 8; Einzelheiten in
+Gemessen über 32 Episoden je Zeile (`docs/lehrer.md`, Abschnitt „Ergebnis“; Einzelheiten in
 [Kapitel 14](14-lehrer.md)):
 
 | | Ball weggekickt | Socke aufgehoben | aufgehoben, weggetragen, ausgespuckt | Griffe, die hielten | Stürze |
@@ -811,7 +811,7 @@ erneut angefragt. Netze, die der Lehrer im Browser auf demselben Gerät gespeich
 
 | Feld | JSON-Schlüssel | Bedeutung |
 |---|---|---|
-| **Autonomous (camera, ToF)** (Studio übersetzt es nicht) | `autonomous` | eigenes Verhalten, wenn niemand fährt |
+| **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) | `autonomous` | eigenes Verhalten, wenn niemand fährt |
 | **Laufnetz** (Walking network) | `gait` | `velstand` (v8) oder `alpha` (alpha_walking + alpha_stand) |
 | **Aktionen zu Servo-Zielen** (Actions to servo goals) | `actions` | **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), Wert `training`, oder **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)), Wert `robot` |
 | **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in the pick)) | `kernExtras` | Spielschicht (übernimmt dann statt BallPlay), Schnabel beim Aufheben |

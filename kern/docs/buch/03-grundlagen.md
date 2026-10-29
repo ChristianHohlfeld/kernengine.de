@@ -548,12 +548,14 @@ und in `Mat4::perspective`:
 
 ### Die Regel für neuen Code
 
-Aus `docs/lehrer.md`, Abschnitt 7:
+Aus dem Kopfkommentar von `include/kern/core/dmath.h`, aus `src/lehrer/ppo.cpp` und den
+Build-Skripten:
 
 - Alles, was die **Simulation speist**, nutzt `kern::dm::sin` usw. statt `std::sin`.
 - **Keine Gleitkomma-Reihenfolge, die von der Zahl der Threads abhängt** – Summen in fester
   Reihenfolge.
-- **Keine `-ffast-math`-Optionen.**
+- **Keine Optionen, die Gleitkomma-Ausdrücke umformen:** `build.sh` übersetzt mit
+  `-ffp-contract=off` und ohne `-ffast-math`.
 
 Reine Darstellung darf die Plattform-libm benutzen. Im aktuellen Stand rufen etwa der
 Synthesizer und Mixer (`src/audio/`), die Primitive (`src/geo/primitives.cpp`), die Partikel und
@@ -566,9 +568,7 @@ die Physik, einen Controller oder das Training eingehen, muss er auf `kern::dm::
 Der Determinismus-Fingerabdruck (`kern_lehrer --fingerprint 400`, Test
 `determinism_is_bit_identical_across_builds_and_platforms`, `kern/tests/lehrer_wasm_test.mjs`,
 CI-Job `determinism` auf ARM) zeigt jede Abweichung bis auf den Regeltakt genau
-([Kapitel 2](02-bauen-und-testen.md)). Laut `docs/lehrer.md` kostet die eigene libm keine
-Geschwindigkeit: musls Funktionen sind so schnell wie die der Plattform, und die Physik wird von
-Box3Ds Gelenk-Löser bestimmt.
+([Kapitel 2](02-bauen-und-testen.md)).
 
 ---
 
