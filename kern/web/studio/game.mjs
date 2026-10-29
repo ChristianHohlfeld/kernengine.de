@@ -89,6 +89,9 @@ const I18N_DE = {
   "Host Online Game...": "Online-Spiel hosten...", "Host Online Game": "Online-Spiel hosten", "Join Online Game...": "Online-Spiel beitreten...", "Join Online Game": "Online-Spiel beitreten",
   "Leave Online Game": "Online-Spiel verlassen", "Host": "Hosten", "Join": "Beitreten", "Joining the game...": "Trete dem Spiel bei...", "Network Emulation": "Netzwerk-Emulation",
   "Perfect": "Perfekt", "Relay (optional)": "Relay (optional)", "Online play:": "Online spielen:",
+  "1 Player": "1 Spieler", "LAN (5 ms)": "LAN (5 ms)", "Average (50 ms, 1% loss)": "Mittel (50 ms, 1 % Verlust)", "Bad (150 ms, 5% loss)": "Schlecht (150 ms, 5 % Verlust)",
+  "Terrible (300 ms, 20% loss)": "Sehr schlecht (300 ms, 20 % Verlust)", "Room": "Raum", "Place Actor": "Actor platzieren", "Restore": "Wiederherstellen",
+  "Player Collision": "Spieler-Kollision",
   "Controls...": "Steuerung...", "About Kern Studio": "Über Kern Studio",
   "Perspective": "Perspektive", "Top": "Oben", "Bottom": "Unten", "Front": "Vorne", "Back": "Hinten", "Left": "Links", "Right": "Rechts",
   "Lit": "Beleuchtet", "Unlit": "Unbeleuchtet", "Wireframe": "Drahtgitter", "Show": "Anzeigen", "View Mode": "Ansichtsmodus", "Viewport Type": "Viewport-Typ",
@@ -261,6 +264,8 @@ const I18N_PATTERNS = [
   [/^Saving failed: (.+)$/, "Speichern fehlgeschlagen: $1"], [/^Opening failed: (.+)$/, "Öffnen fehlgeschlagen: $1"], [/^Packaging failed: (.+)$/, "Verpacken fehlgeschlagen: $1"],
   [/^Unknown console command: (.+)$/, "Unbekannter Konsolenbefehl: $1"], [/^Camera speed (\d+)$/, "Kamerageschwindigkeit $1"], [/^Grid snap (.+)$/, "Raster $1"],
   [/^Speed (.+)$/, "Tempo $1"],
+  [/^(\d+) Players \(listen server\)$/, "$1 Spieler (Listen-Server)"], [/^Attach to (.+)$/, "Anhängen an $1"],
+  [/^Jump to bookmark (\d)$/, "Zu Lesezeichen $1 springen"], [/^Set bookmark (\d)$/, "Lesezeichen $1 setzen"],
   [/^(\d+) bodies · (\d+) awake · (\d+) joints( \((\d+) broken\))? · (\d+) contacts$/, "$1 Körper · $2 wach · $3 Gelenke · $6 Kontakte"],
   // Only when the named part is a known phrase ("Add Point Light"), never half-translated.
   [/^Add (.+)$/, "$1 hinzufügen", true], [/^Remove (.+)$/, "$1 entfernen", true],
