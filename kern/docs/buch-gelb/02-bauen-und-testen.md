@@ -196,16 +196,18 @@ wie viele verschiedene Farben im Bild sind. Ein leeres Fenster hätte fast nur e
 Auf Wunsch macht der Test Bildschirmfotos. Einige davon siehst du in diesem Buch.
 
 > **Mission:** Sei selbst der Test-Roboter! Halte im Studio die rechte Maustaste und drück **W**
-> zum Fliegen. Klick einen Actor an und drück **F** (Focus): Die Kamera fliegt zu ihm. Drück dann
-> **Play** (Alt+P): Du spielst selbst mit. **Esc** stoppt. Drück **Simulate** (Alt+S): Jetzt läuft nur
-> die Physik, und du schaust mit freier Kamera zu. **Esc**. Alles geklappt? Test bestanden.
+> zum Fliegen. Klick einen Actor an und drück **F**, das heißt **Auswahl fokussieren** (Focus
+> Selection): Die Kamera fliegt zu ihm. Drück dann **Spielen** (Play) (Alt+P): Du spielst selbst mit.
+> **Esc** stoppt. Drück **Simulieren** (Simulate) (Alt+S): Jetzt läuft nur die Physik, und du schaust
+> mit freier Kamera zu. **Esc**. Alles geklappt? Test bestanden.
 
-> **Mission:** Öffne den Content Drawer mit dem Knopf **Content Drawer** ganz links in der
-> Statusleiste (unter Windows und Linux geht auch Ctrl+Space; auf dem Mac nimm lieber den Knopf, weil
-> der Mac diese Tasten oft selbst benutzt). Klick **Cube** an. Drück jetzt **W**, diesmal ohne
-> rechte Maustaste: Dann heißt W nicht „fliegen“, sondern „Move-Werkzeug“. Am Cube erscheinen
-> farbige Pfeile. Zieh dreimal mit der linken Maustaste an einem Pfeil, um ihn zu verschieben. Öffne
-> **Edit → History...** und klick auf einen früheren Schritt.
+> **Mission:** Öffne die **Inhaltsablage** (Content Drawer) mit dem Knopf ganz links in der
+> Statusleiste (unter Windows und Linux geht auch Strg+Leertaste; auf dem Mac nimm lieber den Knopf,
+> weil der Mac diese Tasten oft selbst benutzt). Klick **Würfel** (Cube) an. Drück jetzt **W**,
+> diesmal ohne rechte Maustaste: Dann heißt W nicht „fliegen“, sondern Werkzeug **Verschieben (W)**
+> (Move (W)). Am Würfel erscheinen farbige Pfeile. Zieh dreimal mit der linken Maustaste an einem
+> Pfeil, um ihn zu verschieben. Öffne **Bearbeiten › Verlauf...** (Edit › History...) und klick auf
+> einen früheren Schritt.
 > Das Studio springt exakt dorthin. Auch das prüfen Kerns Tests: Rückgängig muss jedes Mal genau
 > denselben Zustand zurückbringen.
 

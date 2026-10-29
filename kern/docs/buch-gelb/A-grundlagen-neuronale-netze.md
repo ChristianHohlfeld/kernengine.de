@@ -611,8 +611,10 @@ Höhe: der **asymmetrische Kritiker**. Und beim **Warmstart** beginnt das Traini
 sondern mit einem fertigen Netz – Kerns Sprung mit Pollens Laufnetz **velstand**, das schon
 balancieren kann.
 
-> **Mission:** Lade in Kern Studio auf https://kernengine.de/ das Level File › Example Levels › Micro
-> Duck (läuft Play oder Simulate, erst mit Esc stoppen) und starte **Simulate** (Alt+S). Zieh die Ente
+> **Mission:** Lade in Kern Studio auf https://kernengine.de/ das Level
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) – läuft gerade
+> **Spielen** (Play) oder **Simulieren**, erst mit Esc stoppen – und starte **Simulieren** (Simulate)
+> (Alt+S). Zieh die Ente
 > mit der Maus am Kopf zur Seite und lass los, bis sie umfällt. Sie steht von selbst wieder auf.
 > velstand hat das gelernt, weil es im Training ständig geschubst wurde und mit vielen verschiedenen
 > Enten geübt hat.

@@ -296,12 +296,14 @@ Erweiterung (4.6, Beispiel in 4.13). Es spiegelt den Himmel, je flacher du drauf
 **Leuchten** hat keine Obergrenze. Was heller als 1 ist (1 = das Hellste, was der Bildschirm zeigen
 kann, gleich mehr dazu), glüht später.
 
-> **Mission:** Öffne Kern Studio über https://kernengine.de/, wähle **File › New Level...** ›
-> **Basic** und klick in der Werkzeugleiste auf **+ Add** › **Shapes** › **Sphere** (dasselbe findest
-> du auch im Content Drawer, Ctrl+Space). Stell in **Details** unter *Material* **Roughness** auf 1
-> und **Metallic** auf 0: Die Kugel ist matt wie Gummi. Dann Roughness 0,1 und Metallic 1: Sie
-> spiegelt den Himmel wie eine Christbaumkugel. Zum Schluss dreh **Emissive color** auf eine Farbe
-> und **Emissive strength** hoch – sie glüht und strahlt über ihren Rand hinaus.
+> **Mission:** Öffne Kern Studio über https://kernengine.de/, wähle **Datei › Neues Level...** (File ›
+> New Level...) › **Grundformen** (Basic) und klick in der Werkzeugleiste auf **Hinzufügen** (Add) ›
+> **Formen** (Shapes) › **Kugel** (Sphere) (dasselbe findest du auch in der **Inhaltsablage** (Content
+> Drawer), Strg+Leertaste). Stell in **Details** unter **Material** **Rauheit** (Roughness) auf 1 und
+> **Metallisch** (Metallic) auf 0: Die Kugel ist matt wie Gummi. Dann **Rauheit** 0,1 und
+> **Metallisch** 1: Sie spiegelt den Himmel wie eine Christbaumkugel. Zum Schluss dreh **Leuchtfarbe**
+> (Emissive color) auf eine Farbe und **Leuchtstärke** (Emissive strength) hoch – sie glüht und
+> strahlt über ihren Rand hinaus.
 
 ### Vom Rohlicht zum Pixel
 
@@ -395,12 +397,14 @@ Glühen noch Verdeckung. Am Ende zählt Kern Malbefehle, Dreiecke und Instanzen 
 Kern Studio malt jeden Viewport einzeln. Ein einzelner großer Viewport ist kein Teilfenster und
 bekommt Glühen und Verdeckung; in der Vier-Ansicht fehlt beides.
 
-> **Mission:** Lade **File › Example Levels ▸ Orb Run** und zieh in **World Settings** die **Time of
-> day** auf 0,9 – jetzt ist Nacht, und viele Fenster leuchten. Flieg so nah an ein paar Häuser, dass
-> die Fenster gut zu sehen sind. Schalte im Viewport-Menü **≡** unter **Layout** auf
-> **4 viewports**. Nur einer der vier zeigt die Welt mit Perspektive und Licht (die anderen zeigen
-> Drahtgitter von oben, vorn und der Seite); darin suchst du dir dieselben Fenster. Dann
-> machst du ihn mit dem Knopf ganz rechts in seiner Leiste (**Maximise**) wieder einzeln und groß.
+> **Mission:** Lade **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run) und zieh
+> in den **Welteinstellungen** (World Settings) die **Tageszeit** (Time of day) auf 0,9 – jetzt ist
+> Nacht, und viele Fenster leuchten. Flieg so nah an ein paar Häuser, dass die Fenster gut zu sehen
+> sind. Schalte im Menü **≡** des Viewports, **Viewport-Optionen** (Viewport options), unter
+> **Aufteilung** (Layout) auf **4 Viewports** (4 viewports). Nur einer der vier zeigt die Welt mit
+> Perspektive und Licht (die anderen zeigen Drahtgitter von oben, vorn und der Seite); darin suchst du
+> dir dieselben Fenster. Dann machst du ihn mit dem Knopf ganz rechts in seiner Leiste wieder einzeln
+> und groß (sein Tooltip „Maximise this viewport“ ist nicht übersetzt).
 > **Was du siehst:** Groß hat jedes leuchtende Fenster einen weichen Lichtschein, der über seinen
 > Rand hinaus auf die Wand strahlt. In der Vier-Ansicht sind die Fenster nur scharfe, helle Rechtecke
 > ohne Schein. **Was du lernst:** Das Glühen entsteht erst in Kerns eigenen Bildpuffern – im
@@ -421,7 +425,8 @@ Frage: **Wie groß ist ein Kästchen (Texel) der Karte in Metern?** Kleine Käst
 Schatten, große Kästchen Schatten wie aus Minecraft-Blöcken. (Die genauen Einstellungen der Karte
 stehen im blauen Buch, Kapitel 4.)
 
-**Schattendistanz.** In World Settings legt **Shadow distance** fest, wie weit die Schatten in deine
+**Schattendistanz.** In den **Welteinstellungen** (World Settings) legt das Feld
+**Schattenreichweite (kleiner: schärfer)** (Shadow distance (smaller: sharper)) fest, wie weit die Schatten in deine
 Sicht reichen (im Micro-Duck-Level nur 10 m, für sehr scharfe Schatten). Kern deckt dann genau den
 Teil deines Blickfelds bis zu dieser Entfernung mit der Karte ab – und zwar mit einer **Kugel**.
 
@@ -484,7 +489,7 @@ alles als beleuchtet. Mit Schattendistanz blendet der Schatten auf dem letzten Z
 statt an der Kante abzureißen.
 
 > **Mission:** Lade Orb Run und flieg nah an ein Haus heran, bis der Boden weniger als 10 m vor dir
-> liegt. Stell in **World Settings** die **Shadow distance (smaller: sharper)** auf 10, dann 80,
+> liegt. Stell in den **Welteinstellungen** die **Schattenreichweite (kleiner: schärfer)** auf 10, dann 80,
 > dann 500. Bei 10 sind die Schatten direkt vor dir am schärfsten, alles weiter als 10 m hat keinen.
 > Bei 500 reichen sie weit, aber ihre Kanten werden gröber – dieselben Kästchen müssen eine viel
 > größere Kugel abdecken.
@@ -609,10 +614,11 @@ Geräten stuft ein Wächter wie beim Glühen die Qualität herunter und rechnet 
 **Auflösung**, also mit halb so vielen Pixeln in jeder Richtung. AO läuft nur mit Perspektive und
 nur mit Kerns eigenen Bildpuffern – die gehören zum Glühen. Kann das Gerät keine
 Kommazahl-Bildpuffer (4.8.3), gibt es darum auch keine Verdeckung. Den Radius bestimmt die
-Szene selbst: World Settings › **Ambient occlusion radius (0 = off)**. Stufen und Startwerte stehen
+Szene selbst: **Welteinstellungen › Umgebungsverdeckung (0 = aus)** (World Settings › Ambient
+occlusion radius (0 = off)). Stufen und Startwerte stehen
 im blauen Buch, Kapitel 4.
 
-> **Mission:** Stell in **World Settings** den **Ambient occlusion radius (0 = off)** auf 0, dann
+> **Mission:** Stell in den **Welteinstellungen** die **Umgebungsverdeckung (0 = aus)** auf 0, dann
 > auf 3. Schau in einem großen Viewport auf Hausecken im Schatten und den Boden unter Objekten. Der
 > Effekt ist dezent; am deutlichsten ist er im Schatten, denn dort kommt fast nur indirektes Licht
 > an – und nur das dunkelt die Verdeckung ab.
@@ -659,7 +665,7 @@ und jeder Orb ein Licht.
 Alles, was in diesem Kapitel vorkommt, kann man einstellen: Bildgröße, Schatten, Glühen,
 Verdeckung, Farbstimmung, Lichtfarben, Nebel, Belichtung und Kamera. Im Spiel musst du davon fast
 nichts selbst setzen, denn das Spiel rechnet das Licht aus der Tageszeit aus (4.8.2), und in
-Studio stellst du alles in **World Settings** ein. Die Kamera hat, wie überall in Kern, **+Z oben**:
+Studio stellst du alles in den **Welteinstellungen** (World Settings) ein. Die Kamera hat, wie überall in Kern, **+Z oben**:
 Zu x und y aus dem Matheheft kommt eine dritte Achse z, und die zeigt nach oben
 ([Anhang B.1](B-grundlagen-rendering.md)). Die vollständige Liste mit allen Startwerten steht im
 blauen Buch, Kapitel 4.
@@ -694,7 +700,7 @@ mit großem Korb.
 - **Zusammenfassen:** wenige große Meshes statt vieler kleiner – das sind weniger Gänge.
 - **Nur Änderungen schicken**; reine Farbwechsel lassen den Schatten gültig.
 - **Schatten schonen:** Jeder bewegte Schattenwerfer malt die ganze Karte neu. Straßen, Boden und
-  Partikel brauchen keinen Schatten – schalte „wirft Schatten“ bei ihnen aus. Mit Schattendistanz
+  Partikel brauchen keinen Schatten – schalte **Wirft Schatten** (Cast shadow) bei ihnen aus. Mit Schattendistanz
   malt auch eine bewegte Kamera die Karte neu, sobald sie sich um ein Kästchen verschiebt.
 - **Unsichtbares aussortieren lassen** – das Aussortieren nur dort abschalten, wo die gespeicherte
   Hülle (die Kugel aus 4.7) nicht stimmt. Bei Partikeln etwa ist das so: Die Funken fliegen
@@ -702,7 +708,8 @@ mit großem Korb.
 - **Messen:** Kern zählt Malbefehle, Dreiecke, Instanzen und Zeiten. Glühen und Verdeckung schalten
   auf langsamen Geräten ohnehin selbst herunter (4.8.3, 4.8.4).
 
-> **Mission:** Lade Orb Run, schalte in der Leiste des Viewports über **Show** die **Stats** ein und
+> **Mission:** Lade Orb Run, schalte in der Leiste des Viewports über **Anzeigen** (Show) die
+> **Statistik** (Stats) ein und
 > flieg durch die Stadt. **Was du siehst:** Im Viewport steht, wie viele Bilder pro Sekunde (fps)
 > Kern schafft. Bleib erst still stehen, dann dreh dich schnell im Kreis. **Was du lernst:** Obwohl
 > die Stadt aus tausenden Bäumen, Häusern und Fenstern besteht, bleibt die Zahl auf einem normalen
@@ -778,12 +785,13 @@ Der Rest:
 > zeigt das blaue Buch, Kapitel 4.
 
 Kern Studio und exportierte Spiele haben diese Erweiterung immer dabei. Ob die Häuser einer Stadt den
-Datensatz bekommen, entscheidet die Komponente **Procedural City** mit **Lit windows at night**
-([Kapitel 5](05-szene-und-geometrie.md)).
+Datensatz bekommen, entscheidet die Komponente **Prozedurale Stadt** (Procedural City) mit
+**Erleuchtete Fenster bei Nacht** (Lit windows at night) ([Kapitel 5](05-szene-und-geometrie.md)).
 
-> **Mission:** Lade Orb Run und zieh in World Settings **Time of day** auf etwa 0,9 (0,25 ist
-> Sonnenaufgang, 0,5 Mittag, 0,75 Sonnenuntergang; bei 0,9 ist volle Nacht): Die Fenster gehen an.
-> Wähle im Outliner den Actor **City** und schalte in Details **Lit windows at night** aus und wieder
+> **Mission:** Lade Orb Run und zieh in den **Welteinstellungen** (World Settings) die **Tageszeit**
+> (Time of day) auf etwa 0,9 (0,25 ist Sonnenaufgang, 0,5 Mittag, 0,75 Sonnenuntergang; bei 0,9 ist
+> volle Nacht): Die Fenster gehen an. Wähle im Outliner den Actor „City“ und schalte in **Details**
+> **Erleuchtete Fenster bei Nacht** aus und wieder
 > ein. **Was du siehst:** Die Fenster verschwinden, und die Häuser sind nur noch glatte Wände. Wieder
 > an, leuchten die Fenster wieder. **Was du lernst:** Die Form der Häuser bleibt dieselbe, nur das
 > Malprogramm denkt sich die Fenster dazu.

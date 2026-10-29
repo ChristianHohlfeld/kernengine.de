@@ -9,7 +9,7 @@
 > - **Frequenz** – wie oft ein Ton pro Sekunde hin- und herzittert. Hohe Frequenz = hoher Ton.
 > - **Mono / Stereo** – ein Tonkanal für beide Ohren / zwei Kanäle, einer links, einer rechts.
 > - **Clip** – ein fertiges Tonstück im Speicher, zum Beispiel das Geräusch beim Springen.
-> - **Loop** – ein Ton, der sich endlos wiederholt, etwa ein Motorbrummen.
+> - **Schleife** (englisch *Loop*) – ein Ton, der sich endlos wiederholt, etwa ein Motorbrummen.
 > - **Pan** – wie weit links oder rechts ein Ton klingt: −1 ganz links, 0 Mitte, +1 ganz rechts.
 > - **deterministisch** – bei gleichen Eingaben kommt immer genau dasselbe heraus.
 > - **Filter** – ein Sieb für Töne: Ein *Tiefpass* lässt nur die tiefen durch, die hohen bleiben hängen.
@@ -97,8 +97,8 @@ schnelle Schätzung mit der weichen Kurve.
 > Platz inzwischen neu vergeben, passt die alte Nummer nicht mehr und läuft ins Leere, statt aus
 > Versehen eine fremde Stimme zu verstellen.
 
-> **Mission:** Öffne in Kern Studio auf https://kernengine.de/ den Content Drawer (Ctrl+Space), Tab
-> **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
+> **Mission:** Öffne in Kern Studio auf https://kernengine.de/ die **Inhaltsablage** (Content Drawer)
+> mit Strg+Leertaste, Tab **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
 > Tastendruck. Hör aus jeder Kategorie einen an. Dann klick einen langen Sound wie `music_calm` an
 > und, während er läuft, gleich einen zweiten. Achte genau auf den Moment, in dem die Musik aufhört:
 > Sie verschwindet ohne Klicken, so schnell und weich, dass du nur den neuen Sound hörst. Kein
@@ -112,9 +112,9 @@ Kern vier Dinge: Wie laut kommt sie an? Von welcher Seite? Wie dumpf? Wie hoch?
 **Wie laut: Entfernung.** In der Natur gilt: doppelter Abstand, halbe Lautstärke. Kern rechnet
 standardmäßig genauso. Bis zu einem **inneren Radius** ist der Ton voll laut, danach gilt
 Lautstärke = innerer Radius geteilt durch Abstand. Mit 1 m: in 2 m Abstand 0,5, in 4 m 0,25, in 10 m
-0,1. Diese Kurve wird nie ganz null. Darum blendet Kern kurz vor der **Hörweite** (*Falloff
-distance*) zusätzlich aus, damit es dahinter wirklich still ist. Zwei weitere Kurven (gerade und
-steiler) kannst du in Studio unter **Roll-off** wählen.
+0,1. Diese Kurve wird nie ganz null. Darum blendet Kern kurz vor der **Hörweite** (in Studio das
+Feld **Abfallentfernung** (Falloff distance)) zusätzlich aus, damit es dahinter wirklich still ist.
+Zwei weitere Kurven (gerade und steiler) kannst du in Studio unter **Abfall** (Roll-off) wählen.
 
 **Welche Seite: Panning.** Aus der Lage der Quelle wird ein Pan-Wert. Dann verteilt Kern den Ton auf
 den linken und den rechten Lautsprecher. Am einfachsten wäre eine gerade Linie: ganz links 1 / 0,
@@ -135,7 +135,8 @@ Quelle, die vorbeifährt, wird in der Mitte nicht leiser.
 Ganz nahe Quellen schiebt Kern weniger zur Seite, sonst spränge ein Ton am Kopf hart hin und her.
 Und eine Quelle kann auch **breit** sein, dann schiebt der Mixer sie weniger oder gar nicht zur
 Seite. Das passt zu Geräuschen, die dich umgeben, statt aus einem Punkt zu kommen. (Der fertige
-**Ambient Wind** geht noch weiter: Er hat gar keinen Ort im Raum, siehe *Spatial* in 7.9.)
+**Wind** (Ambient Wind) aus dem Katalog geht noch weiter: Er hat gar keinen Ort im Raum, siehe
+**Räumlich (3D)** (Spatial (3D)) in 7.9.)
 
 > **Für Profis:** Trägst du links und rechts als Punkt in ein Koordinatensystem ein, liegen alle
 > Punkte von Kerns Bogen auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
@@ -165,17 +166,19 @@ Schallgeschwindigkeit und v das Tempo der Quelle **auf dich zu** (fährt sie weg
 Beispiel: Ein Auto kommt mit 34,3 m/s auf dich zu. 343 / (343 − 34,3) = 343 / 308,7 ≈ 1,11. Der Ton
 ist 11 % höher. Bewegst du dich selbst, rechnet Kern das mit ein, und der Faktor gleitet sanft.
 
-> **Mission:** Platziere aus Place Actors › Audio ein **Radio**, starte **Simulate** (Alt+S) und
-> flieg mit gehaltener rechter Maustaste und W A S D herum. Dreh dich so, dass das Radio links, rechts
-> und hinter dir ist. Hörst du, wie es leiser, seitlicher und hinten dumpfer wird? Stell dann in der
-> Toolbar die Kamerageschwindigkeit hoch und flieg schnell am Radio vorbei: Hörst du den Doppler,
+> **Mission:** Platziere aus **Actors platzieren › Audio** (Place Actors › Audio) ein **Radio**,
+> starte **Simulieren** (Simulate) (Alt+S) und flieg mit gehaltener rechter Maustaste und W A S D
+> herum. Dreh dich so, dass das Radio links, rechts und hinter dir ist. Hörst du, wie es leiser,
+> seitlicher und hinten dumpfer wird? Stell dann in der Werkzeugleiste die **Kamerageschwindigkeit**
+> (Camera speed) hoch und flieg schnell am Radio vorbei: Hörst du den Doppler,
 > erst etwas höher, dann tiefer?
 
 ## 7.4 Busse, Hall und Limiter
 
 Ein **Bus** ist eine Sammelleitung: Viele Stimmen laufen hinein und lassen sich gemeinsam lauter,
-leiser oder stumm schalten. Kern hat fünf: **Music**, **Effects** (Effekte), **Ambience**
-(Hintergrund), **Interface** (Klicks der Oberfläche) und **Voice** (Stimmen). Alle münden im
+leiser oder stumm schalten. Kern hat fünf: **Musik** (Music), **Effekte** (Effects), **Atmosphäre**
+(Ambience) für den Hintergrund, **Oberfläche** (Interface) für Klicks der Oberfläche und **Stimme**
+(Voice) für Stimmen. Alle münden im
 **Master**, dem Hauptregler.
 
 ```mermaid
@@ -210,11 +213,12 @@ durchrutscht, rundet eine weiche Kurve ab. So bleibt jedes Sample sicher zwische
 
 Die **Pegelanzeige** in der Statusleiste von Studio zeigt, wie laut es gerade ist.
 
-> **Mission:** Lege mit File › New Level... ein **Basic**-Level an, platziere aus Place Actors ›
-> Physics einen **Crate Stack** und starte **Simulate**. Greif eine Kiste mit der linken Maustaste,
-> halt die Taste gedrückt, zieh die Kiste schnell zur Seite und lass los, damit sie fliegt.
-> Beobachte die Pegelanzeige unten. Stoppe mit Esc, setze in **World Settings** › Audio **Reverb**
-> auf 1 und probier es nochmal. Jetzt hallt jeder Aufprall nach, als stündest du in einer großen
+> **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
+> **Grundformen** (Basic) an, platziere aus **Actors platzieren › Physik** (Place Actors › Physics)
+> einen **Kistenstapel** (Crate Stack) und starte **Simulieren** (Simulate). Greif eine Kiste mit der
+> linken Maustaste, halt die Taste gedrückt, zieh die Kiste schnell zur Seite und lass los, damit sie
+> fliegt. Beobachte die Pegelanzeige unten. Stoppe mit Esc, setze in den **Welteinstellungen** (World
+> Settings) unter **Audio** den **Hall** (Reverb) auf 1 und probier es nochmal. Jetzt hallt jeder Aufprall nach, als stündest du in einer großen
 > Halle.
 
 ## 7.5 Der Synthesizer
@@ -287,19 +291,20 @@ Für bestimmte Sounds hat Kern Extra-Tricks:
   einige hundert Millisekunden. Darum rechnet Kern sie **in Häppchen**, etwa einen Takt nach dem
   anderen. So ruckelt das Spiel beim Laden nicht.
 
-Kern bringt 38 eingebaute Sounds in acht Gruppen mit. Alle hörst du im Tab **Sounds** des Content
-Drawers. Im Level heißen sie `builtin:` plus Name. Zum Nachschlagen (* = Loop):
+Kern bringt 38 eingebaute Sounds in acht Gruppen mit. Alle hörst du im Tab **Sounds** der
+**Inhaltsablage** (Content Drawer). Im Level heißen sie `builtin:` plus Name. Zum Nachschlagen
+(* = Schleife; Gruppen, die Studio nicht übersetzt, stehen englisch da):
 
 | Kategorie | Sounds |
 |---|---|
-| Gameplay | pickup, powerup, jump, land, goal, hazard, checkpoint, lose, laser |
+| **Spielablauf** (Gameplay) | pickup, powerup, jump, land, goal, hazard, checkpoint, lose, laser |
 | Combat | gunshot, smg, pistol, sniper, launcher, reload, hit, down |
-| Physics | explosion, impact, impact_light, break, step, plastic, plastic_step |
-| Vehicle | engine*, hover*, boost |
-| Ambience | wind*, city*, hum* |
+| **Physik** (Physics) | explosion, impact, impact_light, break, step, plastic, plastic_step |
+| **Fahrzeug** (Vehicle) | engine*, hover*, boost |
+| **Atmosphäre** (Ambience) | wind*, city*, hum* |
 | Robot | servo*, quack, beep |
 | UI | click, confirm, error |
-| Music | music_drive*, music_calm* |
+| **Musik** (Music) | music_drive*, music_calm* |
 
 Die genauen Regler und Werte jedes Sounds stehen im blauen Buch, Kapitel 7.
 
@@ -353,7 +358,7 @@ an ([Kapitel 10](10-netzwerk.md)). Ein verlorener Knall ist egal, ein verlorener
 
 **Aufprallgeräusche.** Jeder Körper hat einen Aufprall-Sound (normalerweise `impact`) und eine
 **Schwelle**, eine Mindestgeschwindigkeit. Auch jedes Formteil, mit dem die Physik rechnet (ein
-**Collider**, siehe [Kapitel 6](06-physik.md)), kann einen eigenen Sound haben: Die Sohle der Ente
+**Kollider** (Collider), siehe [Kapitel 6](06-physik.md)), kann einen eigenen Sound haben: Die Sohle der Ente
 macht `plastic_step`, ihr Gehäuse `plastic`.
 
 Aufpralle zu melden, kostet die Physik Arbeit. Darum meldet sie nur dort, wo jemand zuhört: bei
@@ -379,7 +384,7 @@ Im Level nennt man einen Sound beim Namen: ein eingebauter, ein importierter (in
 Tonformat; die Datei steckt im Level), „none“ für Stille oder „auto“ für den passenden Standard.
 
 **Vor dem Start** bestellt Kern **alles**, was das Level an Tönen brauchen könnte, und berechnet
-oder entpackt es. So ist bei Play alles bereit.
+oder entpackt es. So ist beim Spielen alles bereit.
 
 **In jedem Bild** passiert dann der Reihe nach:
 
@@ -387,17 +392,17 @@ oder entpackt es. So ist bei Play alles bereit.
 2. Der **Hörer** wird an die Kamera gesetzt.
 3. **Musik und Hintergrund** laufen als Loops.
 4. Der **Motor des Spielers** brummt am Fahrzeug, lauter und höher mit Tempo und Gas. Steht sein
-   Sound auf „auto“, passt Kern ihn an: Das Hover Car schwebt mit `hover`, das Vehicle brummt mit
-   `engine`, bei der Micro Duck surren die Servos.
-5. **Audio Sources** (7.9) folgen ihren Actors.
+   Sound auf „auto“, passt Kern ihn an: Das **Hovercar** (Hover car) schwebt mit `hover`, das
+   **Fahrzeug** (Vehicle) brummt mit `engine`, bei der Micro Duck surren die Servos.
+5. Jede **Audioquelle** (Audio Source) aus 7.9 folgt ihrem Actor.
 6. Die **Cues** aus 7.7 werden gespielt.
 
 Bei vielen Tönen gleichzeitig zählt die Rangliste der **Prioritäten**. Die vergibt Kern von selbst:
 
 1. Musik und Hintergrund
 2. Motor des Spielers
-3. Audio Sources mit Loop (Dauerklänge, etwa eine brummende Maschine)
-4. Audio Sources ohne Loop (spielen einmal und hören auf)
+3. Audioquellen mit **Schleife** (Loop): Dauerklänge, etwa eine brummende Maschine
+4. Audioquellen ohne **Schleife** (spielen einmal und hören auf)
 5. Bestellzettel der Simulation (Sprung, Aufprall, Pickup …)
 
 Ein kurzer Effekt verdrängt also nie die Musik, aber die Musik darf einem Effekt den Platz
@@ -414,31 +419,34 @@ Zwei schlaue Kleinigkeiten:
 > schlimmer als nie. Ist der Clip eines Cues nach einer Viertelsekunde noch nicht fertig, wirft Kern
 > den Cue weg.
 
-## 7.9 Level-Einstellungen und Audio Source
+## 7.9 Level-Einstellungen und Audioquelle
 
-In **World Settings** › Audio stellst du für das ganze Level ein: Master volume, Musik und Hintergrund
-mit ihren Lautstärken, **Reverb** (wie viel Hall) und **Doppler** (wie stark der Effekt ist).
+In den **Welteinstellungen** (World Settings) unter **Audio** stellst du für das ganze Level ein:
+**Gesamtlautstärke** (Master volume), **Musik** (Music) und **Atmosphäre** (Ambience) mit ihren
+Lautstärken, **Hall** (Reverb) und **Doppler** (wie stark der Effekt ist).
 
-Die Komponente **Audio Source** macht jeden Actor zur Schallquelle, etwa eine brummende Maschine oder
-ein Radio:
+Die Komponente **Audioquelle** (Audio Source) macht jeden Actor zur Schallquelle, etwa eine brummende
+Maschine oder ein Radio. Das Feld Inner radius übersetzt Studio nicht:
 
 | Feld | Standard | Bedeutung |
 |---|---|---|
-| Sound | `builtin:hum` | welcher Sound |
-| Volume, Pitch | 1, 1 | Lautstärke, Tonhöhe |
-| Loop, Play on start | an, an | wiederholen, mit Play starten |
-| Spatial (3D) | an | aus: ohne Ort im Raum |
+| **Sound** | `builtin:hum` | welcher Sound |
+| **Lautstärke** (Volume), **Tonhöhe** (Pitch) | 1, 1 | wie laut, wie hoch |
+| **Schleife** (Loop), **Beim Start abspielen** (Play on start) | an, an | wiederholen, beim Spielstart starten |
+| **Räumlich (3D)** (Spatial (3D)) | an | aus: ohne Ort im Raum |
 | Inner radius | 2 m | bis hier voll laut |
-| Falloff distance | 40 m | ab hier still |
-| Pitch by speed | 0 | höher, je schneller |
-| Start delay | 0 s | Wartezeit |
+| **Abfallentfernung** (Falloff distance) | 40 m | ab hier still |
+| **Tonhöhe nach Tempo** (Pitch by speed) | 0 | höher, je schneller |
+| **Startverzögerung** (Start delay) | 0 s | Wartezeit |
 
-Dazu kommen Bus, Roll-off und Doppler. Fertige Varianten im Katalog: Audio Source, Ambient Wind,
-City Ambience und Radio ([Kapitel 11](11-studio.md)).
+Dazu kommen **Bus**, **Abfall** (Roll-off) und **Doppler**. Fertige Varianten im Katalog:
+**Audioquelle**, **Wind** (Ambient Wind), **Stadtatmosphäre** (City Ambience) und **Radio**
+([Kapitel 11](11-studio.md)).
 
-> **Mission:** Platziere einen **Physics Cube** (Place Actors › Physics) und lass ihn ausgewählt.
-> Doppelklicke im Tab **Sounds** auf `engine`, und die Kiste bekommt eine Audio Source. Setze **Pitch
-> by speed** auf 1, starte Simulate und wirf die Kiste. Der Motor heult mit dem Tempo hoch!
+> **Mission:** Platziere einen **Physik-Würfel** (Physics Cube) aus **Actors platzieren › Physik**
+> (Place Actors › Physics) und lass ihn ausgewählt. Doppelklicke im Tab **Sounds** auf `engine`, und
+> die Kiste bekommt eine **Audioquelle**. Setze **Tonhöhe nach Tempo** auf 1, starte **Simulieren**
+> (Simulate) und wirf die Kiste. Der Motor heult mit dem Tempo hoch!
 
 ## 7.10 Die Browser-Anbindung
 
@@ -468,8 +476,8 @@ umrechnen.
 Taste gedrückt hast. Das ist eine Regel der Browser, kein Fehler von Kern: Webseiten sollen nicht
 ungefragt losplärren.
 
-Der **Lautsprecher-Knopf** in der Statusleiste von Studio schaltet alles stumm, auch über Play und
-Stop hinweg.
+Der Lautsprecher-Knopf **Ton an / aus** (Sound on / off) in der Statusleiste von Studio schaltet
+alles stumm, auch über **Spielen** (Play) und **Stopp** (Stop) hinweg.
 
 **Importierte Dateien** packt der Browser aus und gibt die Samples an Kern weiter. Klappt das
 Auspacken nicht, meldet Kern den Fehler, und Cues mit diesem Sound werden verworfen, statt ewig zu
@@ -485,12 +493,13 @@ warten.
 
 - Eingebaute Sounds kosten keinen Download. Eigene Dateien lohnen sich für Musik und besondere
   Geräusche.
-- Leg jeden Ton auf den passenden Bus (Feld **Bus** der Audio Source): Musik auf Music,
-  Dauergeräusche auf Ambience, Effekte auf Effects. Dann wirken Regler und Hall wie erwartet.
-- Setz die **Falloff distance** nicht größer als nötig. Hinter ihr werden Stimmen virtuell und kosten
-  keine Rechenzeit.
-- Überleg, ob ein Ton ein Dauerklang ist. Kern gibt Audio Sources mit **Loop** von selbst Vorrang vor
-  einmaligen Tönen und Effekten (7.8). Ein wichtiges Dauergeräusch sollte also als Loop laufen, damit
+- Leg jeden Ton auf den passenden Bus (Feld **Bus** der **Audioquelle** (Audio Source)): Musik auf
+  **Musik** (Music), Dauergeräusche auf **Atmosphäre** (Ambience), Effekte auf **Effekte** (Effects).
+  Dann wirken Regler und Hall wie erwartet.
+- Setz die **Abfallentfernung** (Falloff distance) nicht größer als nötig. Hinter ihr werden Stimmen
+  virtuell und kosten keine Rechenzeit.
+- Überleg, ob ein Ton ein Dauerklang ist. Kern gibt Audioquellen mit **Schleife** (Loop) von selbst
+  Vorrang vor einmaligen Tönen und Effekten (7.8). Ein wichtiges Dauergeräusch sollte also als Loop laufen, damit
   es bei viel Action nicht geklaut wird.
 - Wähl die Aufprall-Schwelle nicht zu klein. Liegende oder rollende Körper berühren den Boden
   ständig ein winziges bisschen neu. Mit zu kleiner Schwelle zählt jede dieser Mini-Berührungen als

@@ -33,8 +33,8 @@ echtes Gerät wie ein Servo bekommt ein eigenes kleines Modell (6.17).
 
 ![Das Beispiel-Level Physics Lab in Kern Studio: Stapel, Pendel, Tür, Seilbrücke, Drehteller, Lift und Rover](../buch/bilder/studio-physics-lab.png)
 
-> **Mission:** Öffne auf https://kernengine.de/ File › Example Levels › **Physics Lab** und drück
-> **Simulate** (Alt+S). Pack eine Kiste der Pyramide mit der linken Maustaste, heb sie hoch und lass
+> **Mission:** Öffne auf https://kernengine.de/ **Datei › Beispiel-Levels › Physics Lab** (File ›
+> Example Levels › Physics Lab) und drück **Simulieren** (Simulate) (Alt+S). Pack eine Kiste der Pyramide mit der linken Maustaste, heb sie hoch und lass
 > los: Sie fliegt mit Schwung weiter. Stoß das Pendel an und öffne die Tür.
 
 ## 6.1 Aufbau der Schicht
@@ -156,15 +156,17 @@ Die Standardwerte der Welt stehen im blauen Buch, Kapitel 6.
 ## 6.4 Körper
 
 Ein **Körper** ist ein Ding, das sich in der Physik bewegen kann. Es gibt drei Arten. In Kern
-Studio wählst du sie in Details unter **Rigid Body (Box3D)** › **Mobility**:
+Studio wählst du sie in **Details** unter **Starrkörper (Box3D)** (Rigid Body (Box3D)) ›
+**Mobilität** (Mobility):
 
-- **Static** (fest): bewegt sich nie. Boden, Wände, Häuser.
-- **Kinematic** (kinematisch): bewegt sich, wie du es sagst, und lässt sich durch nichts aufhalten.
+- **Statisch** (Static): bewegt sich nie. Boden, Wände, Häuser.
+- **Kinematisch** (Kinematic): bewegt sich, wie du es sagst, und lässt sich durch nichts aufhalten.
   Fahrende Plattformen, Drehbalken, die Autos der Stadt.
-- **Dynamic** (dynamisch): reagiert auf Kräfte, Stöße und Schwerkraft. Echte Physik.
+- **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)): reagiert auf Kräfte, Stöße und
+  Schwerkraft. Echte Physik.
 
-> **So kannst du es dir vorstellen:** Static ist die Hallenwand, Kinematic ist die Rolltreppe (sie
-> fährt, egal wer drauf steht), Dynamic ist der Ball.
+> **So kannst du es dir vorstellen:** Statisch ist die Hallenwand, kinematisch ist die Rolltreppe
+> (sie fährt, egal wer drauf steht), dynamisch ist der Ball.
 
 Ein Körper hat außerdem Lage, Drehung, Anfangstempo und eine Bremse gegen Bewegung (Dämpfung). Er
 kann **schlafen**: Liegt er lange still, rechnet Box3D ihn nicht mehr, bis ihn etwas anstößt. Das
@@ -187,8 +189,8 @@ und die Form sorgt dann nur noch dafür, wo sie anstoßen.
 
 Ein Körper besteht aus einer oder mehreren einfachen **Formen**: **Box**, **Kugel**, **Kapsel**
 (ein Zylinder mit runden Enden, wie eine Tablette), **Hülle** und **Mesh**. In Kern Studio heißt so
-eine Physikform **Collider**. Hat ein Actor keinen eigenen, baut Studio automatisch einen passenden
-zu seiner Grundform.
+eine Physikform **Kollider** (Collider). Hat ein Actor keinen eigenen, baut Studio automatisch einen
+passenden zu seiner Grundform.
 
 Eine **Hülle** ist die Form, die entsteht, wenn du ein Gummiband um eine Handvoll Nägel spannst,
 nur in 3D: außen herum, ohne Dellen nach innen. Solche Formen ohne Dellen heißen **konvex**, und mit
@@ -213,10 +215,10 @@ Jede Form hat ein **Material**. Die Standardwerte in Kern Studio:
 |---|---|---|
 | Dichte | 1000 kg/m³ | wie Wasser |
 | Reibung | 0,6 | wie stark sie bremst |
-| Restitution | 0 | Sprungkraft, 0 bis 1 |
+| Rückprall (Elastizität) | 0 | Sprungkraft, 0 bis 1 |
 | Rollwiderstand | 0 | bremst Rollen |
 | Oberfläche | keine | für Paar-Reibung (6.6) |
-| Sensor | aus | nur Überlappung melden |
+| Sensor (nur Überlappung) | aus | nur Überlappung melden |
 
 Ein **Sensor** stößt nicht an, er meldet nur, wer hineinläuft. So funktionieren Zielzonen und
 Trigger.
@@ -270,9 +272,10 @@ Drei Werte bestimmen, wie sich Dinge berühren:
 - **Rollwiderstand** bremst das Rollen. Eine perfekte Kugel auf einem perfekten Boden würde ewig
   rollen. Echte Bälle und Böden geben ein wenig nach, und das bremst.
 
-In Kern Studio stellst du sie unter Details › Static Mesh › **Physics** ein (für den automatischen
-Collider) oder unter Details › **Collider**. Den endlosen Boden stellst du unter World Settings ›
-Physics (Box3D) › **Ground friction** und **Ground bounciness** ein. Dort steht auch, wie weich
+In Kern Studio stellst du sie unter **Details › Statisches Mesh › Physik** (Details › Static Mesh ›
+Physics) ein (für den automatischen Kollider) oder unter **Details › Kollider** (Details › Collider).
+Den endlosen Boden stellst du unter **Welteinstellungen** (World Settings) › **Physik (Box3D)**
+(Physics (Box3D)) › **Bodenreibung** (Ground friction) und **Bodenelastizität** (Ground bounciness) ein. Dort steht auch, wie weich
 Dinge aufeinanderliegen, die **Kontaktweichheit**. Sie gilt nicht pro Form, sondern für die ganze
 Welt.
 
@@ -282,9 +285,10 @@ Stoffklumpen rollt nicht“. Ohne ihn kroch die Socke von allein über den Boden
 brauchen keinen Rollwiderstand: Sie sind breit, flach und griffig gebaut, damit sie gar nicht erst
 rollen oder rutschen.
 
-> **Mission:** Läuft noch Simulate, stopp mit Esc. Wähle im Physics Lab die oberste Kiste,
-> **Crate 15**. Setz in Details › Collider die **Friction** von 0,7 auf 0 (die Kisten im Physics
-> Lab haben 0,7 statt des Standards 0,6). Starte Simulate, setz die
+> **Mission:** Läuft noch **Simulieren** (Simulate), stopp mit Esc. Wähle im Physics Lab die oberste
+> Kiste, den Actor „Crate 15“. Setz in **Details › Kollider › Reibung** (Details › Collider › Friction)
+> den Wert von 0,7 auf 0 (die Kisten im Physics Lab haben 0,7 statt des Standards 0,6). Starte
+> **Simulieren**, setz die
 > Kiste mit der Maus auf den Boden und schubs sie an. Sie gleitet wie auf Eis. Warum? 0 mal
 > irgendetwas ist 0, und die Wurzel aus 0 ist auch 0.
 
@@ -302,19 +306,20 @@ Linie, um die sich etwas dreht, bei einer Schiene die Linie, entlang der etwas g
    Achse: senkrecht durch ●      ║ ▼  entlang der Schiene
 ```
 
-Die wichtigsten Gelenke in Kern Studio:
+Die wichtigsten Gelenke in Kern Studio (Feld **Typ** (Type) im Abschnitt **Gelenk** (Constraint)):
 
 | Im Studio | Wofür |
 |---|---|
-| Hinge | Scharnier: Tür, Brücke |
-| Slider | Schiene: Lift |
-| Ball | Kugelgelenk wie die Schulter |
-| Distance/rope | fester Abstand oder Seil: Pendel |
-| Wheel | Rad mit Federung und Antrieb |
+| **Scharnier (Drehgelenk)** (Hinge (revolute)) | Tür, Brücke |
+| **Schiene (Schubgelenk)** (Slider (prismatic)) | Lift |
+| **Kugelgelenk** (Ball (spherical)) | wie die Schulter |
+| **Abstand / Seil** (Distance / rope) | fester Abstand oder Seil: Pendel |
+| **Rad (Federung)** (Wheel (suspension)) | Rad mit Federung und Antrieb |
 
-> **Für Profis:** Dazu kommen Spezialgelenke: **Fixed** verbindet starr oder leicht federnd,
-> **Motor** zieht ein Teil zu einer Ziellage, **Parallel** hält ein Teil weich aufrecht (mehr
-> in 6.15), und **No collision** verhindert nur, dass zwei Körper zusammenstoßen.
+> **Für Profis:** Dazu kommen Spezialgelenke: **Fest (verschweißt)** (Fixed (weld)) verbindet starr
+> oder leicht federnd, **Motor** zieht ein Teil zu einer Ziellage, **Parallel** hält ein Teil weich
+> aufrecht (mehr in 6.15), und **Keine Kollision (Filter)** (No collision (filter)) verhindert nur,
+> dass zwei Körper zusammenstoßen.
 
 Je nach Gelenk gibt es eine **Feder** (wie oft sie pro Sekunde schwingen will, in Hz, und wie stark
 sie gedämpft ist), **Grenzen** (die Tür geht nur bis zur Wand auf) und einen **Motor** (dreht oder
@@ -327,15 +332,17 @@ hält sie „halb offen“ für zu, und die Grenze „bis zur Wand“ sitzt an d
 baut man ein Gelenk so, wie es in Ruhe aussieht.
 
 **Brechen:** Man kann einem Gelenk eine **Bruchkraft** geben. Zieht mehr Kraft daran, meldet Box3D
-das. Die Spiel-Laufzeit zerstört das Gelenk dann, zählt es, meldet es im Output Log und spielt ein
+das. Die Spiel-Laufzeit zerstört das Gelenk dann, zählt es, meldet es im **Ausgabeprotokoll**
+(Output Log) und spielt ein
 Bruchgeräusch. Im Physics Lab haben die drei mittleren Gelenke der Brücke so eine Schwelle: die
 Gelenke von Plank 06, 07 und 08, mit je 60 000 N. Das ist eine hohe Schwelle.
 
-> **Mission:** Stopp ein laufendes Simulate mit Esc. Wähle **Plank 06** und trag in Details ›
-> Constraint › Breaking als **Break force** 20 000 ein, also eine viel niedrigere Schwelle als die
-> 60 000. Starte Simulate: Die Brücke hält noch. Pack die Planke mit der Maus (wie das Greifen
-> funktioniert, erklärt 6.11) und zieh sie kräftig zwei, drei Meter hoch. Das Gelenk bricht,
-> das Output Log meldet es, und die Statusleiste zählt mit („1 broken“). Warum? Die straff
+> **Mission:** Läuft **Simulieren** (Simulate), stopp mit Esc. Wähle den Actor „Plank 06“ und trag in
+> **Details › Gelenk › Bruch** (Details › Constraint › Breaking) als **Bruchkraft (0 = nie)** (Break
+> force (0 = never)) 20 000 ein, also eine viel niedrigere Schwelle als die 60 000. Starte
+> **Simulieren**: Die Brücke hält noch. Pack die Planke mit der Maus (wie das Greifen funktioniert,
+> erklärt 6.11) und zieh sie kräftig zwei, drei Meter hoch. Das Gelenk bricht, und das
+> **Ausgabeprotokoll** meldet es. Warum? Die straff
 > gespannte Brücke zieht schon in Ruhe mit über 10 000 N an diesem Gelenk. Das reicht noch nicht,
 > aber dein Griff legt etwas drauf. Probier danach auch 2000: Dann reißt das Gelenk schon gleich
 > nach dem Start, ganz ohne dich.
@@ -374,14 +381,15 @@ Man kann einen Körper auch direkt fragen: An welchen Punkten berührst du gerad
 du, und wie fest? So spürt die Micro Duck, ob ihr Fuß den Boden berührt und ob sie sich selbst
 anstößt ([Kapitel 13](13-micro-duck.md)).
 
-> **Mission:** Schalte im Physics Lab unter Window › Show (oder im Show-Menü oben im Viewport)
-> **Collision Shapes**, **Constraints** und **Contact Points** ein und starte Simulate. Jetzt siehst
+> **Mission:** Schalte im Physics Lab unter **Fenster › Anzeigen** (Window › Show) – oder im Menü
+> **Anzeigen** oben im Viewport – **Kollisionsformen** (Collision Shapes), **Gelenke** (Constraints)
+> und **Kontaktpunkte** (Contact Points) ein und starte **Simulieren** (Simulate). Jetzt siehst
 > du, womit Box3D wirklich rechnet: die einfachen Formen statt der hübschen Meshes, die Gelenke und
 > die Punkte, an denen sich Dinge berühren.
 
 ## 6.11 Der Maus-Griff
 
-Wenn du in Simulate etwas mit der Maus packst, hängt es an einer **unsichtbaren Feder**. Deine Maus
+Wenn du beim **Simulieren** (Simulate) etwas mit der Maus packst, hängt es an einer **unsichtbaren Feder**. Deine Maus
 zieht am einen Ende, das Ding hängt am anderen.
 
 ```
@@ -425,9 +433,9 @@ Pro Schritt rechnet der Mover: bremsen, beschleunigen, springen, fallen. Dann sc
 Wände und Böden er berührt, und schneidet die Bewegung an ihnen ab. **Gegen eine Wand drücken macht
 also nicht schneller**, du gleitest an ihr entlang. Zu steile Flächen gelten nicht als Boden.
 
-Die Spielertypen **Character** und **Soldier** nutzen den Mover ([Kapitel 8](08-spiel-laufzeit.md)).
-Die Character-Figur fällt dabei 1,5-mal so stark wie die Welt, damit Sprünge knackiger wirken; der
-Soldier fällt mit der echten Schwerkraft. Die genauen Werte stehen im blauen Buch, Kapitel 6.
+Die Spielertypen **Figur** (Character) und **Soldat (Ego-Shooter)** (Soldier (first person shooter))
+nutzen den Mover ([Kapitel 8](08-spiel-laufzeit.md)). Die Figur fällt dabei 1,5-mal so stark wie die
+Welt, damit Sprünge knackiger wirken; der Soldat fällt mit der echten Schwerkraft. Die genauen Werte stehen im blauen Buch, Kapitel 6.
 
 ## 6.13 Der Takt: Zeitschritt und Sub-Steps
 
@@ -479,10 +487,11 @@ Kern begrenzt jede Feder so:
 Bei 60 Hz und 4 Sub-Steps schaut die Physik 60 · 4 = 240-mal pro Sekunde hin. Die Hälfte davon
 sind 0,5 · 240 = 120 Hz: höchstens 120 Schwingungen pro Sekunde.
 
-> **Mission:** Starte im Physics Lab Simulate und stoß das Pendel an. Drück dann die Taste
-> **Pause** (oder Play › Pause) und danach mehrmals **.** (Punkt). Jeder Druck ist genau ein
-> fester Schritt: Das Pendel rückt jedes Mal ein winziges Stück weiter. Schrittrate und Sub-Steps
-> findest du unter World Settings › Physics (Box3D) als **Step rate** und **Sub-steps**.
+> **Mission:** Starte im Physics Lab **Simulieren** (Simulate) und stoß das Pendel an. Drück dann die
+> Taste **Pause** (oder **Spielen › Pause** (Play › Pause)) und danach mehrmals **.** (Punkt). Jeder
+> Druck ist genau ein fester Schritt: Das Pendel rückt jedes Mal ein winziges Stück weiter.
+> Schrittrate und Sub-Steps findest du unter **Welteinstellungen** (World Settings) ›
+> **Physik (Box3D)** (Physics (Box3D)) als **Schrittrate** (Step rate) und **Teilschritte** (Sub-steps).
 
 > **Für Profis:** Box3D selbst begrenzt Gelenke und Kontakte noch strenger. Servogelenke bekommen
 > eine besonders steife Einstellung, damit leichte Glieder sich nicht dehnen. Die Werte stehen im
@@ -567,7 +576,7 @@ Ein Spiel baut seine Körper nicht von Hand, sondern aus dem Level: Erst **plant
 Spiel-Laufzeit, welche Körper und Formen nötig sind, dann baut sie die **Körper**, dann die
 **Gelenke** (ein Gelenk braucht ja zwei fertige Körper, die es verbinden kann).
 
-Warum erst ein Plan? Weil Kern Studio **denselben Plan** benutzt, um im Editor die Collider zu
+Warum erst ein Plan? Weil Kern Studio **denselben Plan** benutzt, um im Editor die Kollider zu
 zeichnen. Was du im Editor als Physikform siehst, ist also genau das, womit später im Spiel
 gerechnet wird. Es gibt keine zweite Fassung, die heimlich anders sein könnte.
 
@@ -659,7 +668,7 @@ Warteschlange ist also **4 Schritte** lang.
 
 ### Lösungen
 
-1. **Kinematic**: Sie folgt der Vorgabe und lässt sich nicht bremsen.
+1. **Kinematisch** (Kinematic): Sie folgt der Vorgabe und lässt sich nicht bremsen.
 2. Mit Oberflächen der gemessene Paarwert **0,4**. Ohne Oberflächen gilt die Faustregel, und
    0 mal 0,9 ist 0, also **0**: Die Form bleibt rutschig wie Eis.
 3. Die Physik schaut 100 · 16 = 1600-mal pro Sekunde hin. Eine Feder muss mindestens zweimal pro

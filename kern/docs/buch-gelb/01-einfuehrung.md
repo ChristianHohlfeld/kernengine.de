@@ -36,12 +36,14 @@ Dazu gibt es spielbare Levels wie **Orb Run** und **Physics Lab**.
 ![Kern Studio mit dem Level Orb Run](../buch/bilder/studio.png)
 
 > **Mission:** Öffne Kern Studio: Klick auf https://kernengine.de/ auf **Editor**. Beim allerersten Start ist **Orb Run** geladen (sonst
-> **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem Hovercar los und
-> sammle Orbs. **Esc** beendet das Spiel.
+> **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run)). Drück **Spielen** (Play)
+> (Alt+P), fahr mit dem Hovercar los und sammle Orbs. **Esc** beendet das Spiel.
 
-> **Vorsicht, Falle:** Auf einem deutschen Rechner zeigt Studio deutsche Beschriftungen, etwa
-> „Datei“ statt „File“. Dieses Buch nennt die englischen. Schalte deshalb mit dem Knopf **DE | EN**
-> unten rechts in der Statusleiste auf Englisch um. Studio merkt sich die Wahl auf deinem Gerät.
+> **Gut zu wissen:** Studio zeigt seine Oberfläche auf Deutsch oder Englisch; ohne Vorgabe folgt es
+> der Sprache des Browsers. Dieses Buch nennt die Beschriftungen, wie Studio sie auf Deutsch zeigt, in
+> Klammern die englischen, etwa **Datei** (File). Wer Studio auf Englisch nutzt (Knopf **DE | EN**
+> unten rechts in der Statusleiste oder `?lang=en` in der Adresse), findet sie dort. Studio merkt sich
+> die Wahl auf deinem Gerät.
 
 ## 1.1 Was Kern ist
 
@@ -203,7 +205,7 @@ Runde heißt **Spielschleife** ([Kapitel 12](12-eigene-spiele.md)).
 ([Kapitel 4](04-grafik.md)).
 
 **Studio und exportierte Spiele.** Das ganze Studio steckt in **einer** einzigen Datei, die sogar
-ohne Internet per Doppelklick läuft. **File → Package Game (HTML)…** macht aus deinem Level
+ohne Internet per Doppelklick läuft. **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) macht aus deinem Level
 ebenfalls eine einzige Datei. Darin spielt dein Level mit genau demselben C++-Code wie im Editor
 ([Kapitel 11](11-studio.md)).
 
@@ -216,8 +218,9 @@ In der Micro Duck greift alles ineinander: Physik für ihre Glieder, Motoren in 
 fürs Gehirn, Ton für ihr Quaken, Logik für Befehle – und im Studio ist sie ein Ding im Level wie jedes
 andere.
 
-> **Mission:** Stoppe ein laufendes Spiel mit **Esc**, denn während Play sind die Menüeinträge
-> gesperrt. Lade **File → Example Levels → Micro Duck** und drück **Play**. Erst schaust du zu,
+> **Mission:** Stoppe ein laufendes Spiel mit **Esc**, denn beim Spielen sind die Menüeinträge
+> gesperrt. Lade **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) und
+> drück **Spielen** (Play). Erst schaust du zu,
 > wie die Ente allein herumläuft. **F8** übernimmt sie: **W** läuft, **A**/**D** drehen, die
 > **Leertaste** quakt.
 

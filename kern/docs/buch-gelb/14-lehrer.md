@@ -510,9 +510,11 @@ fünfmal so lange wie mit dem Programm – aber es kommt **dasselbe Netz** herau
 > Bewegungen der Ente würden sich ändern, und das Netz passte nicht mehr zum Studio. Wie hoch und wie
 > lange die Ente fliegt und alle Zeiten stehen im blauen Buch, Kapitel 14.
 
-> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und lade File › Example Levels › Micro Duck
-> (läuft gerade Play oder Simulate, erst mit Esc stoppen). Starte Play, übernimm die Ente mit F8 und
-> drücke **7**. Das ist das Sprungnetz aus diesem Kapitel. Auf dem Handy heißt der Knopf **HOP**.
+> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und lade
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck); läuft gerade
+> **Spielen** (Play) oder **Simulieren** (Simulate), erst mit Esc stoppen. Starte **Spielen**,
+> übernimm die Ente mit F8 und drücke **7**. Das ist das Sprungnetz aus diesem Kapitel. Auf dem Handy
+> heißt der Knopf **HÜPFEN** (HOP).
 > Schau genau hin: Hocke, Abdruck, Anziehen, Landen, Abfedern – erkennst du die fünf Zeitpunkte des
 > Vorbilds wieder?
 

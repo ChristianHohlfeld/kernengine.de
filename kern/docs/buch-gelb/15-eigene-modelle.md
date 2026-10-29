@@ -253,20 +253,24 @@ Studio-Tabs übernehmen jedes neue Netz sofort. Das gilt für den Sprung.
 > **So kannst du es dir vorstellen:** wie ein Spielstand, den zwei Spiele auf deiner Konsole
 > gemeinsam benutzen dürfen. Das eine speichert ihn, das andere lädt ihn.
 
-Zum Prüfen: Micro-Duck-Level öffnen, Play, Taste **7**. Die Spielschicht arbeitet von allein, wenn die
-Ente autonom ist, „Kern extras“ an ist und Ball oder Socke in Sicht sind ([Kapitel 13](13-micro-duck.md)).
+Zum Prüfen: Micro-Duck-Level öffnen, **Spielen** (Play), Taste **7**. Die Spielschicht arbeitet von
+allein, wenn die Ente autonom ist, die Kern-Extras an sind und Ball oder Socke in Sicht sind
+([Kapitel 13](13-micro-duck.md)).
 
 > **Mission:** Hast du im Browser einen Sprung trainiert? Öffne im selben Browser Kern Studio, lade
-> File › Example Levels › Micro Duck (läuft Play, erst mit Esc stoppen), starte Play, drücke F8 und
-> dann **7**. Jetzt springt **dein** Netz. Am Computer kannst du es nachprüfen: Drück F12, wähle den
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) – läuft gerade ein
+> Spiel, erst mit Esc stoppen –, starte **Spielen**, drücke F8 und dann **7**. Jetzt springt **dein** Netz. Am Computer kannst du es nachprüfen: Drück F12, wähle den
 > Reiter „Konsole“, dort steht „Kern: trained network jump.onnx loaded“. Auf dem Handy gibt es diese
 > Konsole nicht – da reicht der Sprung als Beweis.
 
-> **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter Details › Player Controller ›
-> Walker nach **Autonomous** und **Kern extras**. Starte Play einmal mit und einmal ohne Kern extras
-> (zum Umschalten erst mit Esc stoppen). Achte auf Ball und Socke: Mit Kern extras entscheidet die
+> **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter
+> **Details › Spieler-Steuerung › Läufer** (Details › Player Controller › Walker) nach
+> **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) und
+> **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
+> fetching, beak in the pick)). Starte **Spielen** einmal mit und einmal ohne Kern-Extras (zum
+> Umschalten erst mit Esc stoppen). Achte auf Ball und Socke: Mit Kern-Extras entscheidet die
 > gelernte Spielschicht, was die Ente tut – sie geht auch zur Socke und versucht, sie aufzuheben.
-> Ohne Kern extras übernimmt Pollens nachgebautes Ballspiel (BallPlay,
+> Ohne Kern-Extras übernimmt Pollens nachgebautes Ballspiel (BallPlay,
 > [Kapitel 13](13-micro-duck.md)): Die Ente läuft nur zum Ball und kickt ihn; um die Socke kümmert
 > sie sich nicht gezielt.
 

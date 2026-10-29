@@ -126,9 +126,10 @@ passt.
 Ansichten von oben, vorn oder der Seite sind **orthografisch**: Sie teilen nicht, alles bleibt gleich
 groß, egal wie weit weg.
 
-> **Mission:** Öffne Kern Studio über https://kernengine.de/. Stell im Viewport-Menü **≡** das
-> **Field of View** auf 50° und dann auf 110° – bei 110° wirkt alles weiter weg und am Rand verzerrt.
-> Wechsle dann mit Alt+J auf die Ansicht **Top**: orthografisch, nichts wird hinten kleiner.
+> **Mission:** Öffne Kern Studio über https://kernengine.de/. Stell im Viewport-Menü **≡**, also
+> **Viewport-Optionen** (Viewport options), das **Sichtfeld** (Field of View) auf 50° und dann auf
+> 110° – bei 110° wirkt alles weiter weg und am Rand verzerrt. Wechsle dann mit Alt+J auf die Ansicht
+> **Oben** (Top): orthografisch, nichts wird hinten kleiner.
 
 ### Werkzeug: Wie sehr zeigen zwei Pfeile in dieselbe Richtung?
 
@@ -205,8 +206,9 @@ Weil hinten alles enger zusammenrückt, mischt die Grafikkarte dabei **perspekti
 hintere Hälfte eines Dreiecks ist auf dem Bildschirm kleiner, bekommt aber trotzdem ihren vollen
 Anteil. Sonst würden Fliesen auf einem Boden, der nach hinten läuft, verbogen aussehen.
 
-> **Mission:** Schalte in Kern Studio den **View Mode** auf **Wireframe** (Alt+2): Jetzt siehst du
-> die Dreiecke, aus denen alles besteht. Zurück mit **Lit** (Alt+4).
+> **Mission:** Schalte in Kern Studio den **Ansichtsmodus** (View Mode) auf **Drahtgitter**
+> (Wireframe) (Alt+2): Jetzt siehst du die Dreiecke, aus denen alles besteht. Zurück mit
+> **Beleuchtet** (Lit) (Alt+4).
 
 ### Der Tiefenpuffer
 
@@ -561,10 +563,11 @@ Entfernung **quadriert**. Dadurch bleibt die Nähe ganz klar, und die Ferne vers
 Mit Kerns Standard-Nebel ist bei 100 m kaum Nebel zu sehen (0,7 %), bei 1000 m verschwindet schon
 gut die Hälfte (51 %). Kerns Extras wie Höhennebel stehen in [Kapitel 4](04-grafik.md).
 
-> **Mission:** Stell in **World Settings** die **Exposure** auf 0,5 und dann auf 2 – das ist die
+> **Mission:** Stell in den **Welteinstellungen** (World Settings) die **Belichtung** (Exposure) auf
+> 0,5 und dann auf 2 – das ist die
 > Belichtung vor dem Tonemapping. **Was du siehst:** Bei 0,5 wird alles dunkler, bei 2 heller. Doch
 > auch bei 2 werden helle Stellen nicht einfach flach weiß, sondern nur langsam heller: Die Kurve
-> drückt sie sanft zusammen. Dreh danach **Fog density** hoch: Die Nähe bleibt klar, die Ferne
+> drückt sie sanft zusammen. Dreh danach **Nebeldichte** (Fog density) hoch: Die Nähe bleibt klar, die Ferne
 > verschwindet schnell.
 
 ## B.7 Bloom
@@ -711,12 +714,14 @@ Physik hat ihre eigene ([Anhang C](C-grundlagen-physik.md)). Bewegte Dinge prüf
 Dreieck. Ein Baum aus Kisten lohnt sich nur, wenn man ihn einmal baut und oft benutzt – bei etwas,
 das sich ständig bewegt, müsste man ihn immer wieder neu bauen.
 
-> **Mission:** Leg mit **File › New Level...** › **Basic** ein Level an und setz über **+ Add** ›
-> **Shapes** ein paar Formen, etwa **Cube**, **Sphere** und **Cylinder**. Schalte dann im Viewport
-> über **Show** die **Bounds** ein. (Hüllen gibt es als Kugel oder als Kiste; Studio zeigt dir die
+> **Mission:** Leg mit **Datei › Neues Level...** (File › New Level...) › **Grundformen** (Basic) ein
+> Level an und setz über **Hinzufügen** (Add) › **Formen** (Shapes) ein paar Formen, etwa **Würfel**
+> (Cube), **Kugel** (Sphere) und **Zylinder** (Cylinder). Schalte dann im Viewport über **Anzeigen**
+> (Show) die **Begrenzungen** (Bounds) ein. (Hüllen gibt es als Kugel oder als Kiste; Studio zeigt dir die
 > Kiste.) **Was du siehst:** Um jedes Objekt erscheint eine gelbe Kiste aus Linien, deren Kanten
 > genau an den Achsen ausgerichtet sind – das ist seine Hülle, die oberste Kiste. Lichter und leere
-> Actors bekommen ein kleines Würfelchen. Dreh jetzt den Cube mit dem Rotate-Werkzeug (Taste E) um
+> Actors bekommen ein kleines Würfelchen. Dreh jetzt den Würfel mit dem Werkzeug **Drehen (E)**
+> (Rotate (E)) um
 > 45°: Die gelbe Kiste dreht sich **nicht** mit, sondern wird größer, damit der schräge Würfel
 > weiter ganz hineinpasst. **Was du lernst:** Eine Hülle muss nicht genau passen – sie muss nur
 > sicher alles umschließen, damit Tests schnell und trotzdem richtig sind.

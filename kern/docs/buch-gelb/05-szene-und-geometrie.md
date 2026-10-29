@@ -173,9 +173,9 @@ kleinen Beispielprogramm von Kern färbt ein Klick so eine Kiste rot.
 du mit einem Schloss gesperrt hast, lässt es den Strahl einfach durchfliegen. Lichter und leere
 Actors haben kein Mesh, sie wählst du über ihr Symbol im Bild.
 
-> **Mission:** Öffne auf https://kernengine.de/ File › Example Levels › **Orb Run** und klick ein
-> Hochhaus an. Ausgewählt wird der Actor **City**: Im **Outliner** (der Liste aller Actors) ist
-> „City“ markiert, und Details zeigt die Einstellungen der Stadt. Was ist passiert? Der Strahl hat
+> **Mission:** Öffne auf https://kernengine.de/ **Datei › Beispiel-Levels › Orb Run** (File › Example
+> Levels › Orb Run) und klick ein Hochhaus an. Ausgewählt wird der Actor „City“: Im **Outliner** (der
+> Liste aller Actors) ist „City“ markiert, und **Details** zeigt die Einstellungen der Stadt. Was ist passiert? Der Strahl hat
 > ein Dreieck des Hochhauses getroffen, aber das Hochhaus ist kein eigener Actor: Es gehört zur
 > Stadt, also wählt Studio die ganze Stadt aus.
 
@@ -405,13 +405,14 @@ in der Spielwelt.
 ## 5.11 Die prozedurale Stadt
 
 **Prozedural** heißt: nicht von Hand gebaut, sondern nach Regeln berechnet. Die Komponente
-**Procedural City** (in Place Actors, Gruppe **World**) ist der Stadtgenerator von Orb Run. Aus ein
+**Prozedurale Stadt** (Procedural City) (in **Actors platzieren** (Place Actors), Gruppe **Welt**
+(World)) ist der Stadtgenerator von Orb Run. Aus ein
 paar Zahlen erzeugt sie Häuser, Straßen, Bodenplatten, Bäume, Verkehr und die
 **Kollisionskörper**: die unsichtbaren Formen, an denen du in der Physik anstößt.
 
 ![Ein exportiertes Spiel: die prozedurale Stadt mit Gebäuden, Straßen und Bäumen](../buch/bilder/game.png)
 
-In Details stellst du unter anderem ein: den **Seed**, wie viele Blöcke pro Seite, wie weit die
+In **Details** stellst du unter anderem ein: den **Seed**, wie viele Blöcke pro Seite, wie weit die
 Blöcke auseinanderliegen, wie breit die Straßen sind, wie hoch das höchste Haus wird, ob es Bäume
 gibt, wie viele Autos fahren und ob nachts Fenster leuchten. Unsinnige Werte lehnt Kern ab.
 
@@ -468,21 +469,22 @@ die Stadt unverschoben da, bekommt jeder Chunk eine BVH (5.3), und Picking in de
 schnell.
 
 Für die Physik ist die ganze Stadt **ein** fester Körper aus vielen Quadern. Die Autos stehen im
-Editor still und fahren erst los, wenn die Welt läuft: mit **Play** (du spielst selbst mit) oder
-**Simulate** (die Physik läuft, und du schaust nur zu). Stehst du weniger als 10 m vor einem Auto
-auf seiner Spur, hält es an. Mehr zur Physik erklärt [Kapitel 6](06-physik.md).
+Editor still und fahren erst los, wenn die Welt läuft: mit **Spielen** (Play) – du spielst selbst
+mit – oder **Simulieren** (Simulate) – die Physik läuft, und du schaust nur zu. Stehst du weniger als
+10 m vor einem Auto auf seiner Spur, hält es an. Mehr zur Physik erklärt [Kapitel 6](06-physik.md).
 
-> **Mission:** Wähle in Orb Run **City**, ändere in Details den **Seed** und **Tallest building**.
-> Gib dann wieder 20261022 und 84 ein: Die alte Stadt ist exakt zurück. Gleicher Seed, gleiche
-> Stadt.
+> **Mission:** Wähle in Orb Run den Actor „City“, ändere in **Details** den **Seed** und
+> **Höchstes Gebäude** (Tallest building). Gib dann wieder 20261022 und 84 ein: Die alte Stadt ist
+> exakt zurück. Gleicher Seed, gleiche Stadt.
 
-> **Mission:** Exportiere Orb Run mit File › **Package Game (HTML)...** und starte es mit
-> **Play it**. Jetzt fährst du selbst durch die Stadt aus dem Bild oben.
+> **Mission:** Exportiere Orb Run mit **Datei › Spiel verpacken (HTML)...** (File › Package Game
+> (HTML)...) und starte es mit **Spielen** (Play it). Jetzt fährst du selbst durch die Stadt aus dem
+> Bild oben.
 
 ## 5.12 Formen im Level und eingebaute Meshes
 
-Jede Form, die du als **Static Mesh** ins Level stellst, kommt aus dem Baukasten in 5.6. Dazu
-gibt es noch die **Rampe**, einen Keil, der an einer Seite hoch und an der anderen flach ist. Kern
+Jede Form, die du als **Statisches Mesh** (Static Mesh) ins Level stellst, kommt aus dem Baukasten in
+5.6. Dazu gibt es noch die Form **Rampe** (Ramp), einen Keil, der an einer Seite hoch und an der anderen flach ist. Kern
 baut die Form weiß und mit ihrer Mitte genau auf dem **Ursprung** des Actors, also auf dem Punkt,
 den du verschiebst, wenn du den Actor bewegst. Die Farbe kommt erst vom Material. Auch hier laufen
 die UVs bei Quader, Ebene und Rampe in Metern, wie bei den Hauswänden in 5.8: So ist ein Muster

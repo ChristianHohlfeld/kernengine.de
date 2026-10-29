@@ -36,9 +36,9 @@ die **Spielschicht**, die entscheidet, was die Ente mit Ball und Socke macht.
 
 ![Das Micro-Duck-Level im Studio (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-level.png)
 
-> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und wähle **File › Example Levels ›
-> Micro Duck**. Drück **Play** (Alt+P) und schau mit der Observer camera zu, wie die Ente den Raum
-> erkundet. Mit **F8** übernimmst du sie, mit noch einmal F8 schaust du wieder zu.
+> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und wähle
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck). Drück **Spielen**
+> (Play) (Alt+P) und schau mit der Beobachterkamera zu, wie die Ente den Raum erkundet. Mit **F8** übernimmst du sie, mit noch einmal F8 schaust du wieder zu.
 
 ## 13.1 Wo der Code liegt
 
@@ -275,16 +275,22 @@ Grundstellung abweichen soll. Servoziel = Home-Winkel plus Antwort des Netzes.
 Kern nimmt die Antwort **genau so, wie trainiert**. Pollens Programm auf dem echten Roboter macht es
 anders: Es schwächt die Antwort auf 90 % ab und lässt das Ziel weich nachziehen, statt es sofort zu
 setzen – wie ein Hund an der Leine, der nur langsam hinterherkommt. Das ist Feinabstimmung für die
-echte Hardware. Im Details-Panel wählst du mit **Actions to servo goals** zwischen `training` (so wie
-trainiert, Standard) und `robot` (wie auf dem Roboter).
+echte Hardware. Im **Details**-Panel wählst du mit **Aktionen zu Servo-Zielen** (Actions to servo
+goals) zwischen zwei Einträgen:
+
+- **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), der Standard; im
+  Level steht dafür `training`.
+- **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale
+  0.9, low-pass 0.5 / 0.7)), also wie auf dem Roboter; im Level steht dafür `robot`.
 
 Das Prinzip dahinter: **Ein Netz funktioniert am besten genau so, wie es trainiert wurde.** Schon
 kleine Änderungen können es umwerfen.
 
-> **Mission:** Läuft das Level, stopp es mit **Esc** – während Play lässt sich nichts einstellen.
-> Wähl im Outliner die **Micro Duck** und stell im Details-Panel **Actions to servo goals** auf
-> `robot`. Starte Play, übernimm die Ente mit **F8** und drück **3** für den Kick. Dann dasselbe
-> mit `training`. Was du sehen solltest: Mit `robot` kippt sie beim Kick um, mit `training` bleibt
+> **Mission:** Läuft das Level, stopp es mit **Esc** – beim Spielen lässt sich nichts einstellen.
+> Wähl im Outliner den Actor „Micro Duck“ und stell im **Details**-Panel **Aktionen zu Servo-Zielen**
+> auf `robot`, also **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)**. Starte
+> **Spielen** (Play), übernimm die Ente mit **F8** und drück **3** für den Kick. Dann dasselbe mit
+> `training`, also **Wie trainiert (Faktor 1, kein Filter)**. Was du sehen solltest: Mit `robot` kippt sie beim Kick um, mit `training` bleibt
 > sie stehen. Laufen kann sie mit beiden.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
@@ -338,10 +344,11 @@ selbst wieder auf.
 steht trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er ganz, eine Socke hält ihn
 3,6–7,8° offen.
 
-> **Mission:** Im Play zeigt das Studio oben rechts **HEAD CAMERA** (Kamerabild und Zustand) und
-> **TOF 8×8**: rot Hindernis (heller, je näher), grün Boden, gelb zu nah. Übernimm die Ente mit
-> **F8**, lenk sie auf eine Wand zu und beobachte, wie das Gitter von Grün zu immer hellerem Rot
-> wechselt. Die Anzeige schaltest du unter Window › Show › **Robot Camera**.
+> **Mission:** Beim Spielen zeigt das Studio oben rechts **HEAD CAMERA** (Kamerabild und Zustand) und
+> **TOF 8×8** – diese Anzeige übersetzt Studio nicht: rot Hindernis (heller, je näher), grün Boden,
+> gelb zu nah. Übernimm die Ente mit **F8**, lenk sie auf eine Wand zu und beobachte, wie das Gitter
+> von Grün zu immer hellerem Rot wechselt. Die Anzeige schaltest du unter
+> **Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Camera).
 
 ## 13.9 Wer steuert?
 
@@ -349,7 +356,8 @@ Drei können der Ente Befehle geben. Es gilt eine feste Rangfolge:
 
 1. **Hand:** Du mit Stick oder Robot-Taste. Jede Eingabe gibt dir 2 s Vorrang.
 2. **Logik:** die Blueprint-Knoten **Walk** oder **Look** ([Kapitel 9](09-logik.md)).
-3. **Autonomie:** ihr eigenes Verhalten, wenn **Autonomous** an ist.
+3. **Autonomie:** ihr eigenes Verhalten, wenn im **Details**-Panel **Autonom (Kamera, ToF)**
+   (Autonomous (camera, ToF)) an ist.
 
 Steht die Ente still und hat 2 s niemand ihren Kopf gesteuert, übernimmt der **Idle-Blick** aus
 Pollens Software: weiche Kopfbewegungen, langsames Umherschauen und Muster, die Pollen „Dösen“ und
@@ -376,8 +384,8 @@ besten genau so, wie es trainiert wurde (13.6).
 Der echte Roboter misst auch die Ströme seiner Servos; die hat Kern nicht. Das ist kein Problem,
 denn Pollens Netz benutzt diese Werte gar nicht.
 
-> **Mission:** Starte **Simulate** (Alt+S) und zieh die Ente mit der linken Maustaste **am Rumpf**
-> hoch (im Play geht das beim Zuschauen mit der Observer camera). Der Griff hält sie fest wie eine
+> **Mission:** Starte **Simulieren** (Simulate) (Alt+S) und zieh die Ente mit der linken Maustaste
+> **am Rumpf** hoch (beim Spielen geht das, solange du mit der Beobachterkamera zuschaust). Der Griff hält sie fest wie eine
 > Hand. Die Beine stoppen. Setz sie ab – sie läuft weiter.
 
 ## 13.10 Selbstständig: das Verhaltensprogramm
@@ -424,8 +432,9 @@ fünf Schritten:
    sie sich um.
 
 Gekickt wird nur links, weil die Ente beim rechten Kick in Kern manchmal umkippt. Das „Sehen“ ist ein
-geometrischer Sichttest, kein Netz, das Bilder erkennt. Mit **Kern extras** übernimmt statt BallPlay
-die Spielschicht.
+geometrischer Sichttest, kein Netz, das Bilder erkennt. Mit
+**Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
+fetching, beak in the pick)) übernimmt statt BallPlay die Spielschicht.
 
 ## 13.11 Die Spielschicht
 
@@ -437,12 +446,15 @@ Netz, die **Spielschicht**. Drumherum gibt es nur Wahrnehmung, keine handgeschri
 
 Die Spielschicht sitzt an der Stelle, an der sonst ein Mensch mit Gamepad sitzt. 25-mal pro Sekunde
 (Roboterzeit) antwortet sie mit Laufbefehl, Kopf, Schnabel und welche Bewegung starten soll; der
-Zustand heißt dann „Play“. Sie braucht **Kern extras** und **Autonomous** (beides im Details-Panel),
-einen Mund-Servo, keine Rollschuhe und ihr Netz. Sie greift ein, solange sie ein Ding kennt, etwas im
+Zustand heißt dann „Play“. Sie braucht im **Details**-Panel
+**Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
+fetching, beak in the pick)) und **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)), dazu einen
+Mund-Servo, keine Rollschuhe und ihr Netz. Sie greift ein, solange sie ein Ding kennt, etwas im
 Schnabel ist oder ihre Bewegung läuft – und niemand von Hand oder per Logik steuert.
 
-> **Mission:** Stopp das Beispiel-Level mit **Esc**, wähl die **Micro Duck** und schalte im
-> Details-Panel **Kern extras** aus. Starte Play: Jetzt spielt nicht das gelernte Netz, sondern
+> **Mission:** Stopp das Beispiel-Level mit **Esc**, wähl den Actor „Micro Duck“ und schalte im
+> **Details**-Panel **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** aus. Starte
+> **Spielen** (Play): Jetzt spielt nicht das gelernte Netz, sondern
 > BallPlay. Was du sehen solltest: Die Ente kümmert sich nur noch gezielt um den Ball und kickt ihn.
 > Zu den Socken geht sie nicht mehr gezielt – Hingehen, Aufheben und Wegtragen kann nur die
 > Spielschicht.
@@ -495,7 +507,7 @@ Netzantwort die Ente nicht verbiegen.
 - Eine Bewegung startet nur, wenn keine läuft und der Schnabel leer ist.
 - Beim Aufheben steuert das Netz den Schnabel selbst: Es hat gelernt, wann es öffnet und zubeißt.
 
-> **Für Profis:** Ohne Spielschicht öffnet Kern extras den Schnabel beim Aufheben zu einem festen
+> **Für Profis:** Ohne Spielschicht öffnet Kern-Extras den Schnabel beim Aufheben zu einem festen
 > Zeitpunkt und beißt kurz danach zu. Rückwärts fährt die Spielschicht an wie Pollens Programm: erst
 > kurz kräftig, danach nie ganz langsam, weil der Gang aus dem Stand sonst nicht ansetzt. Die genauen
 > Werte stehen im blauen Buch, Kapitel 13.
@@ -507,11 +519,11 @@ Die **Socke** besteht aus sieben weichen Stoffklumpen, lose zu einem 3,4 cm hohe
 Schnabel packt, zieht den Rest mit. Damit die runden Klumpen nicht wegrollen und der Haufen nicht
 davonkriecht, bremst ein **Rollwiderstand** sie.
 
-Der **Ball** ist 12 cm groß und 50 g schwer. Auch er hat einen kleinen Rollwiderstand – sonst rollte
+Der **Ball der Ente** ist 12 cm groß und 50 g schwer. Auch er hat einen kleinen Rollwiderstand – sonst rollte
 er ewig.
 
 Das **Beispiel-Level** ist ein Zimmer von 2,5 × 2,5 m mit Holzboden, Schuhkarton, Bücherstapel,
-Kiste, Blumentopf, Ball und zwei Socken. Die Ente ist autonom, Kern extras ist an. Ein
+Kiste, Blumentopf, Ball und zwei Socken. Die Ente ist autonom, Kern-Extras sind an. Ein
 Level-Blueprint lässt die Ente einmal zwitschern, wenn der Ball ins Kamerabild kommt – eine
 Vorführung der Logik-Knoten, kein Verhalten der Ente.
 
@@ -544,23 +556,24 @@ einer Socke 30 cm vor ihr geht sie hin, hebt sie auf und beißt zu.
 
 | Bewegung | Taste | Gamepad / Touch |
 |---|---|---|
-| Sitzen / Aufstehen | 1 | B / SIT |
-| Aufheben (Rollen: Ducken) | 2 | Y / PICK |
+| Sitzen / Aufstehen | 1 | B / SITZ (SIT) |
+| Aufheben (Rollen: Ducken) | 2 | Y / GREIFEN (PICK) |
 | Kick links / rechts | 3 / 4 | – / KICK L, KICK R |
-| Rolle (gehalten weiter) | 5 | X / ROLL |
-| Schnabel auf / zu | 6 | – / BEAK |
-| Quaken | Leertaste | RT / QUACK |
-| „Wheee“ (gehalten) | V | LT / WHEEE |
-| **Sprung** | **7** | – / **HOP** |
+| Rolle (gehalten weiter) | 5 | X / ROLLEN (ROLL) |
+| Schnabel auf / zu | 6 | – / SCHNABEL (BEAK) |
+| Quaken | Leertaste | RT / QUAK (QUACK) |
+| „Wheee“ (gehalten) | V | LT / HUIII (WHEEE) |
+| **Sprung** | **7** | – / **HÜPFEN** (HOP) |
 
-Laufen: W/S vor und zurück, A/D drehen, sonst linker Stick oder MOVE-Stick. Am Telefon liegen QUACK
-und PICK unten am Daumen. Jede dieser Eingaben gibt dir für 2 s Vorrang (Abschnitt 13.9).
+Die Touch-Knöpfe heißen wie in Studios deutscher Oberfläche, in Klammern englisch. Laufen: W/S vor
+und zurück, A/D drehen, sonst linker Stick oder der Stick LAUFEN (MOVE). Am Telefon liegen QUAK und
+GREIFEN unten am Daumen. Jede dieser Eingaben gibt dir für 2 s Vorrang (Abschnitt 13.9).
 
 Die Laute der Ente – Begrüßen, Fragen, Zwitschern, „Wheee“, ein Picken beim Hinsetzen – kommen aus
 einem genauen Nachbau von Pollens Klangerzeuger, mit einer eigenen Stimme für jede Ente
 ([Kapitel 7](07-audio.md)).
 
-**Der Sprung:** Taste 7, HOP oder der Logik-Knoten **Robot Move** mit „jump“. Kern wechselt auf das
+**Der Sprung:** Taste 7, HÜPFEN oder der Logik-Knoten **Robot Move** mit „jump“. Kern wechselt auf das
 Sprungnetz und nach 2 s zurück. Woher weiß das Netz, wie weit der Sprung schon ist? Kern schreibt die
 Zeit in zwei der 61 Eingaben, die Pollens Netze nie benutzen. Im Studio gelangen 3 von 3 echten
 Sprüngen: ein kleiner Hüpfer von knapp 1 cm, danach steht und läuft die Ente wieder.
@@ -578,9 +591,13 @@ was fehlt.
 Was du mit dem Lehrer im Browser trainierst, speichert er auf deinem Gerät. Studio lädt es von dort
 ebenfalls, und ein offenes Studio übernimmt ein neues Netz sofort – ohne eine Datei zu kopieren.
 
-Im **Details-Panel** stellst du ein, ob die Ente **Autonomous** ist, welche Gangart sie benutzt
-(**Walking network**), wie Netzantworten zu Servozielen werden (**Actions to servo goals**) und ob
-**Kern extras** an sind. In der Logik gibt es eine eigene Kategorie **Robots** mit Knoten wie
+Im **Details**-Panel stellst du in der Gruppe **Läufer** (Walker) ein, ob die Ente
+**Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) ist, welche Gangart sie benutzt
+(**Laufnetz** (Walking network)), wie Netzantworten zu Servozielen werden
+(**Aktionen zu Servo-Zielen** (Actions to servo goals)) und ob die
+**Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
+fetching, beak in the pick)) an sind. In der Logik (der Logik-Editor bleibt englisch) gibt es eine
+eigene Kategorie **Robots** mit Knoten wie
 **Walk**, **Look**, **Robot Move**, **Robot ToF** oder **Robot Holds Something**
 ([Kapitel 9](09-logik.md)). Die genauen Namen und Werte stehen im blauen Buch, Kapitel 13.
 
@@ -609,7 +626,7 @@ macht dasselbe, läuft und dreht aber noch etwas langsamer als das Original.
 
 Ohne Armatur zappelte Kerns Ente gut dreimal so stark. Alle Bewegungen gelingen, der Kick links
 schießt den Ball 4 m weit; der Kick rechts kippt manchmal, und sie steht wieder auf. Kein Gelenk
-überschreitet seine Grenzen nennenswert. BallPlay kickt auch ohne Kern extras, ohne Sturz.
+überschreitet seine Grenzen nennenswert. BallPlay kickt auch ohne Kern-Extras, ohne Sturz.
 
 ## 13.15 Was noch fehlt
 

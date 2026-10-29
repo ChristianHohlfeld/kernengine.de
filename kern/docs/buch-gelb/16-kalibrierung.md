@@ -251,7 +251,7 @@ fest ineinandergreifen. Es fehlt in Kerns Modell. Pollens Laufnetz velstand wurd
 trainiert und kommt damit klar; Kerns eigene Netze kennen es noch nicht. Auf dem echten Roboter ist
 das ein Risiko.
 
-> **Mission:** Starte im Micro-Duck-Level **Simulate** (Alt+S), zieh die Ente mit der Maus am Kopf
+> **Mission:** Starte im Micro-Duck-Level **Simulieren** (Simulate) (Alt+S), zieh die Ente mit der Maus am Kopf
 > zur Seite und lass los, bis sie umfällt. Schau zu, was dann passiert: Sie steht von selbst wieder
 > auf. Das klappt, weil velstand im Training ständig geschubst und mit vielen Abweichungen geübt hat.
 
@@ -275,7 +275,8 @@ Genauso:
 Noch von Hand eingetragen sind zwei Dinge: wie weit die Ente nach „Stopp“ noch weiterläuft und wie
 stark verschiedene Stoffe aneinander reiben. Beide sind Kandidaten für Messungen am echten Material.
 
-> **Mission:** Starte **Simulate** und schalte unter Window › Show **Contact Points** ein. Du
+> **Mission:** Starte **Simulieren** (Simulate) und schalte unter **Fenster › Anzeigen › Kontaktpunkte**
+> (Window › Show › Contact Points) ein. Du
 > siehst, wo die Sohlen den Boden berühren – genau daran erkennt die **Spielschicht** (das Netz, das
 > entscheidet, was die Ente mit Ball und Socke tut), ob die Ente steht.
 
@@ -295,10 +296,13 @@ Offen ist noch:
 > **Für Profis:** Kern rechnet intern mit einer viermal so großen Ente ([Kapitel 13](13-micro-duck.md)).
 > Profile und Logs sind trotzdem in echten Einheiten; umgerechnet wird nur an der Grenze zur Physik.
 
-> **Mission:** Läuft das Level, stopp es mit **Esc**. Wähl die **Micro Duck**, stell im
-> Details-Panel **Actions to servo goals** auf `robot` und starte Play. So fährt Pollens Software den
-> echten Roboter: Sie macht die Befehle des Netzes etwas kleiner und glättet sie. Übernimm die Ente
-> mit **F8** und drück **3** für den Kick. Dann dasselbe mit `training`. Mit `robot` kippt der Kick
+> **Mission:** Läuft das Level, stopp es mit **Esc**. Wähl den Actor „Micro Duck“, stell im
+> **Details**-Panel **Aktionen zu Servo-Zielen** (Actions to servo goals) auf `robot`, also
+> **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale
+> 0.9, low-pass 0.5 / 0.7)), und starte **Spielen** (Play). So fährt Pollens Software den echten
+> Roboter: Sie macht die Befehle des Netzes etwas kleiner und glättet sie. Übernimm die Ente mit
+> **F8** und drück **3** für den Kick. Dann dasselbe mit `training`, also
+> **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)). Mit `robot` kippt der Kick
 > um, mit `training` bleibt sie stehen. Schon so ein kleiner Unterschied ändert das Verhalten. Darum
 > lohnt es sich, Simulation und Wirklichkeit genau abzugleichen.
 

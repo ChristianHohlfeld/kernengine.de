@@ -145,8 +145,9 @@ korrigiert der Solver jedes Gelenk ein bisschen, und die Korrektur muss sich dur
 weitersprechen, wie bei „Stille Post“. Bei vielen kleinen Schritten kommt sie öfter durch, und die
 Kette hängt straffer zusammen.
 
-> **Mission:** Stell im Physics Lab unter World Settings › Physics (Box3D) die **Sub-steps** von 4
-> auf 1, starte Simulate und schau von der Seite auf die Mitte der Seilbrücke. Stopp mit Esc, stell
+> **Mission:** Stell im Physics Lab unter **Welteinstellungen** (World Settings) › **Physik (Box3D)**
+> (Physics (Box3D)) die **Teilschritte** (Sub-steps) von 4 auf 1, starte **Simulieren** (Simulate)
+> und schau von der Seite auf die Mitte der Seilbrücke. Stopp mit Esc, stell
 > 16 ein und vergleiche: Mit 1 Sub-Step hängt die Mitte rund einen Meter tiefer. Tipp: Mach von
 > beiden ein Bildschirmfoto, dann siehst du den Unterschied direkt nebeneinander. Lange
 > Gelenkketten dehnen sich mit wenigen Sub-Steps mehr.
@@ -250,13 +251,16 @@ für beides.
 > **Für Profis:** Box3D rechnet die Reibung einmal für die Mitte der ganzen Kontaktfläche, nicht für
 > jeden Punkt einzeln, und dazu eine Drehreibung, die das Kreiseln auf der Stelle bremst.
 
-> **Mission:** Hol aus Place Actors (Gruppe **Shapes**) eine **Ramp**. Sie ist schon 6 m lang, 3 m
-> breit und 1,5 m hoch, das siehst du in Details › Static Mesh › **Size**. Ihre Steigung ist
+> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Formen** (Shapes), eine
+> **Rampe** (Ramp). Sie ist schon 6 m lang, 3 m breit und 1,5 m hoch, das siehst du in
+> **Details › Statisches Mesh › Größe** (Details › Static Mesh › Size). Ihre Steigung ist
 > 1,5 ÷ 6 = 0,25, also 25 %. Andere Maße kannst du dort eintippen. Hol dann aus der Gruppe
-> **Physics** einen **Physics Cube** und gib ihm in Details › Transform › **Location** dieselben X-
-> und Y-Werte wie der Rampe und ein Z, das 2 m höher ist. In Simulate fällt er auf die Schräge und
-> bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in Details › Static Mesh
-> › Physics die **Friction** auf 0,02 und starte Simulate neu: Jetzt rutscht er, denn
+> **Physik** (Physics) einen **Physik-Würfel** (Physics Cube) und gib ihm in
+> **Details › Transformation › Position** (Details › Transform › Location) dieselben X- und Y-Werte
+> wie der Rampe und ein Z, das 2 m höher ist. Beim **Simulieren** (Simulate) fällt er auf die Schräge
+> und bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in
+> **Details › Statisches Mesh › Physik › Reibung** (Details › Static Mesh › Physics › Friction) den
+> Wert auf 0,02 und starte **Simulieren** neu: Jetzt rutscht er, denn
 > √(0,02 · 0,6) ≈ 0,11 ist kleiner als 0,25. (Die Wurzel aus 0,012 rechnest du am besten mit dem
 > Taschenrechner aus; wie Box3D zwei Reibwerte mischt, steht gleich darunter.)
 
@@ -284,8 +288,11 @@ liegen, e = 1 prallt perfekt. Box3D nimmt das **Größere** beider Formen (warum
 erst, **nachdem** die Physik alle Regeln eingehalten hat (das macht der Solver, C.6), und zwar mit
 dem Tempo von vor dem Aufprall.
 
-> **Mission:** Hol aus Place Actors (Gruppe **Physics**) eine **Physics Sphere**, stell in Details ›
-> Static Mesh › Physics die **Restitution** auf 0,9, heb sie in Simulate hoch und lass sie fallen.
+> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Physik** (Physics), eine
+> **Physik-Kugel** (Physics Sphere), stell in
+> **Details › Statisches Mesh › Physik › Rückprall (Elastizität)** (Details › Static Mesh › Physics ›
+> Restitution (bounce)) den Wert auf 0,9, heb sie beim **Simulieren** (Simulate) hoch und lass sie
+> fallen.
 > Stopp mit Esc, stell 0 ein und probier es noch einmal: Jetzt bleibt sie liegen.
 
 ### Rollwiderstand

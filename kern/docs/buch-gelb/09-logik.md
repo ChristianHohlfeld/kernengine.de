@@ -191,7 +191,8 @@ stopped.“ Ebenso stoppt eine Kette, wenn Events immer wieder neue Events ausl�
 Event B, B ruft wieder A, A wieder B, und so weiter. Wird diese Kette zu lang, bricht Kern sie ab.
 
 > **Vorsicht, Falle:** Ein While Loop, dessen Bedingung nie falsch wird, friert in vielen Engines das
-> ganze Spiel ein. In Kern stoppt nur dein Graph – mit Meldung. Lies sie im Output Log!
+> ganze Spiel ein. In Kern stoppt nur dein Graph – mit Meldung. Lies sie im **Ausgabeprotokoll**
+> (Output Log)!
 
 **State Machines im Takt:** Beim Start betritt jede Maschine ihren Anfangszustand. Pro Schritt darf
 jede Maschine **höchstens einen** Übergang machen. Warum? Gäbe es „sofort“-Übergänge von Gelb nach
@@ -251,8 +252,8 @@ meldet der Besucher: „Ich bin in einen fremden Sensor gekommen.“ Ein Ziel-Fe
 erste, eine Spielfigur, die auf jedes Feld reagieren soll, das zweite.
 
 **Actors:** Self, Get Player, Find Actor by Name oder Tag, Ort, Drehung, Bewegen, Spawn Actor (eine
-Kopie einer Vorlage), Destroy und Set Property. Set Property ändert jeden Wert, den du auch in Details
-einstellen kannst, etwa die Farbe.
+Kopie einer Vorlage), Destroy und Set Property. Set Property ändert jeden Wert, den du auch in
+**Details** einstellen kannst, etwa die Farbe.
 
 **Physik:** Tempo, Stoß, Kraft, Hochschleudern, Physik an/aus, Gelenkmotor, Explosion und **Line
 Trace**, ein Prüfstrahl, der meldet, was er zuerst trifft. Stoß und Kraft unterscheiden sich wie in
@@ -277,21 +278,23 @@ Schnabel bewegen, die Autonomie an- und ausschalten. Man kann ihren Abstandssens
 weit das Nächste vor ihr ist), ihre Kamera und ihren Zustand abfragen. Einzelheiten:
 [Kapitel 13](13-micro-duck.md).
 
-> **Mission:** Öffne auf https://kernengine.de/ ein **Basic**-Level und klicke in der Toolbar auf
-> **Logic**. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
-> message“, Enter, und trage einen Text ein. Zurück mit **Viewport**, platziere einen **Rolling
-> Ball** (er ist dein Spieler: Ohne steuerbaren Actor startet Play gar nicht) und drück **Play**.
-> Dein Text erscheint im HUD!
+> **Mission:** Öffne auf https://kernengine.de/ ein Level mit der Vorlage **Grundformen** (Basic) und
+> klicke in der Werkzeugleiste auf **Logik** (Logic). Der Logik-Editor selbst bleibt auch auf Deutsch
+> englisch. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
+> message“, Enter, und trage einen Text ein. Zurück mit **Viewport**, platziere eine
+> **Rollende Kugel** (Rolling Ball) – sie ist dein Spieler: Ohne steuerbaren Actor startet das Spiel
+> gar nicht – und drück **Spielen** (Play). Dein Text erscheint im HUD!
 
 ## 9.7 Logik in der GameWorld
 
-Die GameWorld startet Logik nur in Play oder Simulate, nur auf dem Computer, der die Wahrheit hat
+Die GameWorld startet Logik nur beim **Spielen** (Play) oder **Simulieren** (Simulate), nur auf dem
+Computer, der die Wahrheit hat
 (siehe Kapitelanfang), und nur, wenn es überhaupt Graphen gibt.
 
 Die Welt gibt der Logik drei Dinge: die **Zeit**, die **Ausgabe** und den **Zufall**. Die Zeit ist
 **Spielzeit**, gezählt in festen Schritten, nicht die Uhr an der Wand. Pausierst du das Spiel, steht
 auch die Zeit der Logik. Und ein Graph tickt auf einem langsamen Computer genauso wie auf einem
-schnellen. Was ein Graph ausgibt, erscheint als „Logic: …“ im Output Log.
+schnellen. Was ein Graph ausgibt, erscheint als „Logic: …“ im **Ausgabeprotokoll** (Output Log).
 
 Ein Ereignis geht an den Graphen des betroffenen Actors. Hat der keinen, sucht Kern beim Eltern-Actor
 weiter, dann bei dessen Eltern-Actor und so weiter nach oben (diese ganze Reihe nennt man
@@ -310,7 +313,8 @@ Server schickt es an alle Mitspieler, auch an die, die erst später dazukommen
 
 ## 9.8 Vom Graphen zu schnellem Code
 
-Kern übersetzt deinen Graphen beim Start von Play oder Simulate **im Hintergrund** in schnellen Code.
+Kern übersetzt deinen Graphen beim Start von **Spielen** (Play) oder **Simulieren** (Simulate)
+**im Hintergrund** in schnellen Code.
 Bis die Übersetzung fertig ist, läuft der Graph im langsamen „Vorlese“-Modus, aber schon richtig.
 Danach ist er etwa **55-mal schneller**. Klappt das Übersetzen einmal nicht, bleibt es einfach beim
 Vorlesen.
@@ -365,7 +369,10 @@ Der Logik-Editor sieht aus wie Unreals Blueprint-Editor; seine Oberfläche besch
 beschreibt, und schickt jede deiner Änderungen als Befehl an die Engine, wie ein Kellner, der
 Bestellungen weitergibt. Die Engine führt die Änderung aus und schreibt sie in dieselbe Liste wie
 jede andere Änderung am Level. Darum ist jede Bearbeitung **ein Undo-Schritt** im Level, und du
-kannst alles mit Ctrl+Z zurücknehmen.
+kannst alles mit Strg+Z zurücknehmen.
+
+Der Logik-Editor bleibt auch in der deutschen Oberfläche englisch: Knöpfe wie **Compile** und
+**Templates**, die Menüs und alle Knotennamen stehen darum hier so, wie Studio sie zeigt.
 
 Du suchst Knoten im **Aktionsmenü**. Ziehst du dabei von einem Pin, zeigt es nur Knoten, die dazu
 passen. Du verbindest Knoten, legst Variablen und State Machines an, prüfst mit **Compile** und
@@ -374,12 +381,13 @@ an und hängt sie gleich an diesen Pin. Mit **F9** setzt du einen **Breakpoint**
 Läuft der Knoten, hält das Spiel nach dem Schritt an, und der Editor springt hin. Beim Spielen
 siehst du live, welche Knoten liefen und welche Werte die Variablen haben.
 
-> **Mission:** Füge im Level-Graphen deines Levels mit dem Rolling Ball über **Templates** die
-> Vorlage **Traffic light (state machine)** ein und drück **Play**: Das HUD zeigt nacheinander
-> Green, Yellow, Red. Stoppe mit **Esc**, klick im Graphen den Knoten **On State Entered** an, setze
-> mit **F9** einen Breakpoint und drück wieder **Play**. Das Spiel hält an, sobald die Ampel einen
-> Zustand betritt (gleich am Anfang bei Green), und der Editor zeigt den Knoten. Mit **Resume** in
-> der Leiste über dem Graphen geht es weiter, bis zum nächsten Wechsel.
+> **Mission:** Füge im Level-Graphen deines Levels mit der rollenden Kugel über **Templates** die
+> Vorlage **Traffic light (state machine)** ein und drück **Spielen** (Play): Das HUD zeigt
+> nacheinander Green, Yellow, Red. Stoppe mit **Esc**, klick im Graphen den Knoten
+> **On State Entered** an, setze mit **F9** einen Breakpoint und drück wieder **Spielen**. Das Spiel
+> hält an, sobald die Ampel einen Zustand betritt (gleich am Anfang bei Green), und der Editor zeigt
+> den Knoten. Mit dem Knopf Resume in der Leiste über dem Graphen (der Logik-Editor bleibt englisch)
+> geht es weiter, bis zum nächsten Wechsel.
 
 ## 9.11 Beispiele
 
@@ -404,7 +412,7 @@ Interact wechselt per Flip Flop zwischen Öffnen und Schließen. Jeder Tween lä
 das Tor in jedem Schritt um 5 cm nach oben oder unten, wie ein Garagentor. Bei 60 Schritten pro
 Sekunde sind das rund 48 Schritte, also etwa 2,4 m.
 
-**Spawner:** Alle 3 s, solange die Variable „Spawned“ unter 10 liegt: einen Physics Cube in 6 m Höhe
+**Spawner:** Alle 3 s, solange die Variable „Spawned“ unter 10 liegt: einen Physik-Würfel in 6 m Höhe
 erzeugen und „Spawned“ um 1 erhöhen. Die Kopien sehen alle Mitspieler.
 
 **Ampel:** die State Machine aus 9.1. Beim Betreten jedes Zustands wird sein Name angezeigt.
@@ -417,9 +425,9 @@ Kopfkamera den Ball, und hat sie ihn vorher **nicht** gesehen? Dann zwitschert s
 „Ball Seen“ merkt sich den letzten Stand, sonst ginge das Zwitschern alle 0,25 s los, solange der Ball
 im Bild ist. Ein Kommentar im Graphen sagt: Das ist eine Demo, kein Verhalten des echten Roboters.
 
-> **Mission:** Öffne File › Example Levels › **Micro Duck** und dort den Level-Graphen (**Logic**).
-> Finde die Variable „Ball Seen“ und den Branch. Starte Play. Play beginnt hier mit der freien
-> Kamera: Greif den Ball mit der linken Maustaste und zieh ihn vor den Kopf der Ente. Sie zwitschert
+> **Mission:** Öffne **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck)
+> und dort den Level-Graphen mit dem Knopf **Logik** (Logic). Finde die Variable „Ball Seen“ und den
+> Branch. Starte **Spielen** (Play). Das Spiel beginnt hier mit der freien Kamera: Greif den Ball mit der linken Maustaste und zieh ihn vor den Kopf der Ente. Sie zwitschert
 > einmal, und erst wieder, wenn der Ball weg war und neu auftaucht.
 
 ## Level geschafft!

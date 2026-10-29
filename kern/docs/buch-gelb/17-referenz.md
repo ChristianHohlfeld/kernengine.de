@@ -18,12 +18,12 @@ Der **Viewport** ist das Fenster, durch das du in die 3D-Welt schaust.
 |---|---|
 | rechte Maustaste + W A S D | fliegen |
 | … + Q / E | runter / hoch |
-| … + Shift | 2,5-mal schneller |
+| … + Umschalt | 2,5-mal schneller |
 | … + Mausrad | Fluggeschwindigkeit 1–8 |
 | Alt + linke Maustaste | um die Auswahl kreisen |
 | mittlere Maustaste | schwenken |
 | F | Auswahl einrahmen |
-| Ctrl+1 … 9 / 1 … 9 | Lesezeichen setzen / anspringen |
+| Strg+1 … 9 / 1 … 9 | Lesezeichen setzen / anspringen |
 
 Am Telefon: ein Finger kreist, zwei Finger zoomen und verschieben, Tippen wählt aus.
 
@@ -34,50 +34,51 @@ Am Telefon: ein Finger kreist, zwei Finger zoomen und verschieben, Tippen wählt
 | Q / W / E / R | Auswählen / Verschieben / Drehen / Skalieren |
 | [ / ] | Raster kleiner / größer |
 | Entf | Auswahl löschen |
-| Ende (End) | Auswahl auf den Boden setzen |
-| H / Ctrl+H | ausblenden / alles einblenden |
-| G | Game View: Ansicht wie im Spiel |
+| Ende | Auswahl auf den Boden setzen |
+| H / Strg+H | ausblenden / alles einblenden |
+| G | **Spielansicht** (Game View): Ansicht wie im Spiel |
 | F2 | umbenennen |
-| Ctrl+Z / Ctrl+Y | rückgängig / wiederholen |
-| Ctrl+C / V / D | kopieren / einfügen / duplizieren |
-| Ctrl+G | gruppieren |
-| Ctrl+S / Ctrl+O / Ctrl+N | speichern / öffnen / neues Level |
-| Ctrl+Space | Content Drawer (Schublade) |
-| Alt+2 | nur Drahtgitter (Wireframe) |
-| Alt+3 | Farben ohne Licht (Unlit) |
-| Alt+4 | normal mit Licht (Lit) |
+| Strg+Z / Strg+Y | rückgängig / wiederholen |
+| Strg+C / V / D | kopieren / einfügen / duplizieren |
+| Strg+G | gruppieren |
+| Strg+S / Strg+O / Strg+N | speichern / öffnen / neues Level |
+| Strg+Leertaste | **Inhaltsablage** (Content Drawer) |
+| Alt+2 | nur **Drahtgitter** (Wireframe) |
+| Alt+3 | Farben ohne Licht: **Unbeleuchtet** (Unlit) |
+| Alt+4 | normal mit Licht: **Beleuchtet** (Lit) |
 | Alt+5 | zeigt, wo der Spieler anstößt |
-| Alt+P / Alt+S | Play / Simulate |
+| Alt+P / Alt+S | **Spielen** (Play) / **Simulieren** (Simulate) |
 
-### Play und Simulate
+### Spielen und Simulieren
 
-Bei **Play** spielst du selbst. Bei **Simulate** läuft nur die Physik, und du kannst weiter im Editor
-arbeiten.
+Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft nur die Physik, und du kannst weiter im
+Editor arbeiten.
 
 | Taste | Wirkung |
 |---|---|
-| Esc | Stop |
+| Esc | **Stopp** (Stop) |
 | F8 | Spieler verlassen / übernehmen |
 | Pause | anhalten / weiter |
 | . | pausiert: einen Schritt weiter |
-| Ctrl+R | Spiel neu starten |
-| K | in Simulate: Lage der Dinge ins Level übernehmen |
-| Shift+F1 | Maus freigeben |
+| Strg+R | Spiel neu starten |
+| K | beim Simulieren: **Simulationsänderungen übernehmen** (Keep Simulation Changes), also die Lage der Dinge ins Level übernehmen |
+| Umschalt+F1 | Maus freigeben |
 
-Die Taste **K** ist praktisch: Lass in Simulate einen Stapel Kisten umfallen, wähl sie aus und drück
-K. Dann liegen sie auch nach dem Stoppen so da, wie die Physik sie hingelegt hat.
+Die Taste **K** ist praktisch: Lass beim Simulieren einen Stapel Kisten umfallen, wähl sie aus und
+drück K. Dann liegen sie auch nach dem Stoppen so da, wie die Physik sie hingelegt hat.
 
-Im Spiel: W A S D bewegen, Maus umsehen, Leertaste springen, Shift Boost, F benutzen.
+Im Spiel: W A S D bewegen, Maus umsehen, Leertaste springen, Umschalt Boost, F benutzen.
 
 ### Logik-Editor
 
 - **F7** kompiliert: Der Logik-Graph wird in schnellen Maschinencode übersetzt.
 - **F9** setzt einen **Haltepunkt**: Das Spiel hält an, wenn dieser Knoten drankommt. So kannst du
   nachsehen, was gerade passiert.
-- **Ctrl+F** sucht, **C** legt einen Kommentar um die Auswahl, **Esc** führt zurück zum Viewport.
+- **Strg+F** sucht, **C** legt einen Kommentar um die Auswahl, **Esc** führt zurück zum Viewport.
 
-> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und drück **F1**. Vergleiche den
-> Controls-Dialog mit diesen Tabellen. Probier dann Ctrl+1 auf einer schönen Kameraposition, flieg
+> **Mission:** Öffne Kern Studio auf https://kernengine.de/ und drück **F1** – das ist
+> **Hilfe › Steuerung...** (Help › Controls...). Vergleiche das Fenster mit diesen Tabellen. Probier
+> dann Strg+1 auf einer schönen Kameraposition, flieg
 > weg und drück **1** – du springst zurück.
 
 ## 17.2 Tasten der Micro Duck
@@ -149,7 +150,7 @@ Kern rechnet in Metern, Sekunden und Kilogramm. **Z zeigt nach oben**: X und Y l
 Boden wie die Achsen auf Karopapier, Z ragt senkrecht in die Höhe. Winkel stehen in Grad, Farben als
 Zahlen von 0 bis 1.
 
-> **Mission:** Speichere ein Level mit **Ctrl+S**. Je nach Browser fragt Studio nach einem
+> **Mission:** Speichere ein Level mit **Strg+S**. Je nach Browser fragt Studio nach einem
 > Speicherort, oder die Datei landet in deinem Download-Ordner. Öffne die `.klevel`-Datei mit einem
 > Texteditor (Editor unter Windows, TextEdit am Mac). Findest du `"kern-level"` und die Namen deiner
 > Actors?
@@ -204,35 +205,40 @@ ausführlich vorkommt (A = Anhang A).
 
 ### Studio und Spiele
 
+Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klammern die englische.
+
 - **Actor:** ein Ding im Level, mit Position und Bausteinen (8).
+- **Aussteigen / übernehmen (F8)** (Eject / possess (F8)): im Spiel den Spieler verlassen / wieder
+  übernehmen (11).
 - **Autosave:** automatische Sicherung ungespeicherter Arbeit (11).
+- **Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)** (Observer camera (Play: fly,
+  watch, drag bodies)): Spielen mit freier Kamera zum Zuschauen (11).
 - **Blueprint / Logik-Graph:** ein Programm aus Knoten und Verbindungen, ohne Tippen (9).
-- **Content Drawer:** die Schublade mit Dingen zum Platzieren (11).
 - **Controller:** bestimmt, wie der Spieler sich bewegt: laufen, rollen, fahren, fliegen (8).
 - **Details:** das Panel mit allen Einstellungen des gewählten Actors (11).
-- **Eject / Possess:** im Spiel den Spieler verlassen / wieder übernehmen (11).
 - **Engine:** das Programm, das eine Spielwelt zeichnet, rechnet und abspielt (1).
-- **Game View:** Ansicht ohne Editor-Hilfen, wie im Spiel (11).
 - **Gizmo:** Pfeile und Ringe zum Verschieben, Drehen, Skalieren (11).
 - **Haltepunkt:** Das Spiel hält an, wenn ein bestimmter Knoten drankommt (9).
 - **HUD:** Anzeigen im Spiel wie Punkte und Zeit (8).
-- **Kill Z:** eine Höhe; fällt der Spieler darunter, wird er zurückgesetzt (11).
+- **Inhaltsablage** (Content Drawer): die Schublade mit Dingen zum Platzieren (11).
+- **Kill-Z (darunter Wiedereinstieg)** (Kill Z (respawn below)): eine Höhe; fällt der Spieler
+  darunter, wird er zurückgesetzt (11).
 - **Knoten:** ein Baustein im Logik-Graphen (9).
 - **Komponente:** ein Baustein eines Actors, etwa Mesh, Kollider oder Sound (8).
 - **Level:** eine Spielwelt, gespeichert als `.klevel` (8).
-- **Observer camera:** Play mit freier Kamera zum Zuschauen (11).
 - **Outliner:** die Liste aller Actors, wie ein Inhaltsverzeichnis des Levels (11).
-- **Package Game:** ein Level als eigenständige Webseiten-Datei exportieren, die man weitergeben
-  kann (11).
 - **Pawn:** die Spielfigur, die einem Spieler gehört (8).
-- **Play / Simulate:** selbst spielen / nur die Physik laufen lassen, während der Editor bedienbar
-  bleibt (11).
 - **Player-only:** Start ohne Editor, für exportierte Spiele (11).
 - **Snapping:** Einrasten auf ein Raster (11).
-- **Transform:** Position, Drehung und Größe eines Actors (8).
+- **Spiel verpacken** (Package Game): ein Level als eigenständige Webseiten-Datei exportieren, die
+  man weitergeben kann (11).
+- **Spielansicht** (Game View): Ansicht ohne Editor-Hilfen, wie im Spiel (11).
+- **Spielen** (Play) / **Simulieren** (Simulate): selbst spielen / nur die Physik laufen lassen,
+  während der Editor bedienbar bleibt (11).
+- **Transformation** (Transform): Position, Drehung und Skalierung eines Actors (8).
 - **Trigger:** ein Bereich, der etwas auslöst, wenn man ihn betritt (8).
 - **Viewport:** das Fenster, durch das du in die 3D-Welt schaust (11).
-- **World Settings:** Einstellungen der ganzen Welt, etwa die Schrittrate (11).
+- **Welteinstellungen** (World Settings): Einstellungen der ganzen Welt, etwa die Schrittrate (11).
 
 ### Grafik und Geometrie
 
@@ -329,7 +335,8 @@ ausführlich vorkommt (A = Anhang A).
 - **Home-Pose:** die Grundstellung der Ente (13).
 - **IMU (Lagesensor):** spürt, wo unten ist und wie schnell sich der Körper dreht (13).
 - **Kalibrieren:** die Simulation so lange nachstellen, bis sie sich wie das echte Gerät verhält (16).
-- **Kern extras:** Schalter für Kerns Zusätze an der Ente (13).
+- **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
+  fetching, beak in the pick)): Schalter für Kerns Zusätze an der Ente (13).
 - **Maßstab 4:** Kern rechnet intern mit einer viermal so großen Ente, weil die Physik mit so
   winzigen Teilen schlecht rechnet (13).
 - **Micro Duck:** zweibeiniger Laufroboter von Pollen Robotics (13).
@@ -346,7 +353,7 @@ ausführlich vorkommt (A = Anhang A).
 - **Spielschicht:** Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut (13).
 - **Tiefpass:** glättet Werte, damit nichts ruckt (13).
 - **ToF:** Abstandssensor, der misst, wie lange Licht hin und zurück braucht (13).
-- **Walker:** Steuerart für Roboter, die ein Netz fährt (13).
+- **Läufer** (Walker): Steuerart für Roboter, die ein Netz fährt (13).
 
 ### Lernen
 
@@ -437,8 +444,9 @@ ausführlich vorkommt (A = Anhang A).
   balancieren kann (14, A).
 - **Wert:** wie viele Belohnungen man von einer Lage aus im Schnitt noch erwartet (A).
 
-> **Mission:** Öffne **File › Example Levels › Physics Lab**, schalte unter Window › Show **Contact
-> Points** ein und starte **Simulate**. Zähl, wie viele Glossar-Wörter du dabei siehst: Körper,
+> **Mission:** Öffne **Datei › Beispiel-Levels › Physics Lab** (File › Example Levels › Physics Lab),
+> schalte unter **Fenster › Anzeigen › Kontaktpunkte** (Window › Show › Contact Points) ein und
+> starte **Simulieren**. Zähl, wie viele Glossar-Wörter du dabei siehst: Körper,
 > Gelenk, Kontakt …
 
 ## Level geschafft!
@@ -451,8 +459,8 @@ ausführlich vorkommt (A = Anhang A).
 
 ## Rätsel-Ecke
 
-1. Mit welcher Taste übernimmst du im Play die Ente?
-2. Was ist der Unterschied zwischen Play und Simulate?
+1. Mit welcher Taste übernimmst du beim Spielen die Ente?
+2. Was ist der Unterschied zwischen **Spielen** (Play) und **Simulieren** (Simulate)?
 3. Welches Glossar-Wort passt: „Der Trainer darf die wahre Höhe der Ente sehen, die Ente selbst
    nicht“?
 4. **Boss-Rätsel:** Lena trainiert mit 16 Enten auf 2 Threads, Tom mit 16 Enten auf 8 Threads, Mia
@@ -462,7 +470,7 @@ ausführlich vorkommt (A = Anhang A).
 ### Lösungen
 
 1. **F8**. Noch einmal F8 verlässt sie wieder.
-2. Bei Play spielst du selbst. Bei Simulate läuft nur die Physik, und du kannst weiter im Editor
+2. Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft nur die Physik, und du kannst weiter im Editor
    arbeiten.
 3. **Asymmetrischer Kritiker.** Den Kritiker gibt es nur beim Lernen, darum darf er mehr sehen.
 4. Lena und Tom bekommen genau dasselbe Netz, weil beide 16 Enten haben. Tom ist schneller, weil

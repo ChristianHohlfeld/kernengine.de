@@ -7,8 +7,9 @@
 > **Wörter, die du brauchst:**
 > - **Actor** – ein Ding im Level: eine Kiste, eine Lampe, ein Auto, die Spielfigur.
 > - **Komponente** – ein Baustein, der einem Actor eine Fähigkeit gibt, etwa „sichtbar sein“.
-> - **Collider** – die unsichtbare Form, mit der die Physik prüft, ob Dinge zusammenstoßen.
-> - **Sensor** – ein Collider, der nichts aufhält, sondern nur meldet, wenn etwas hineinkommt.
+> - **Kollider** (englisch *Collider*) – die unsichtbare Form, mit der die Physik prüft, ob Dinge
+>   zusammenstoßen.
+> - **Sensor** – ein Kollider, der nichts aufhält, sondern nur meldet, wenn etwas hineinkommt.
 > - **statisch / kinematisch / dynamisch** – steht fest / wird vom Spiel bewegt, lässt sich aber
 >   nicht schubsen / echte Physik mit Fallen und Stoßen.
 > - **fester Schritt** – die Physik rechnet in immer gleich langen Zeitstücken, meist 60 pro Sekunde.
@@ -19,7 +20,8 @@
 Ein **Level** ist ein Dokument aus Actors, die Komponenten tragen. Kern Studio bearbeitet Levels und
 speichert sie als Datei mit der Endung `.klevel`. Die **GameWorld** spielt ein Level ab: Sie zeigt es
 an und lässt es mit der Physik-Engine Box3D laufen, mit Steuerung, Kamera, Regeln, Triggern, Ton und
-Logik. Studio benutzt dieselbe GameWorld zum Bearbeiten, für Simulate und für Play. Exportierte Spiele
+Logik. Studio benutzt dieselbe GameWorld zum Bearbeiten, zum **Simulieren** (Simulate) und zum
+**Spielen** (Play). Exportierte Spiele
 laufen mit genau demselben Programm. Die genauen Namen der Programmteile, alle Felder und alle
 Standardwerte stehen im blauen Buch, Kapitel 8.
 
@@ -43,13 +45,13 @@ flowchart LR
 1. **Vorbereiten:** Die GameWorld bringt die 3D-Modelle auf den Stand des Levels und schickt sie an
    die Grafikkarte. Hast du nur eine Kiste verschoben, wird auch nur sie neu geschickt.
 2. **Start:** Die GameWorld legt eine **Kopie** des Levels an, baut daraus die Physikwelt und startet
-   Simulate oder Play.
+   **Simulieren** (Simulate) oder **Spielen** (Play).
 3. **Schritt:** In jedem Bild rechnet sie weiter, bewegt die Kamera und zeichnet (8.9).
 4. **Stopp:** Alles wird abgebaut, und du siehst wieder dein unverändertes Level.
 
 Was während des Spiels passiert, landet also **nicht** in deinem Level. Umgekippte Kisten stehen nach
-Stopp wieder ordentlich da. Wer eine simulierte Lage behalten will, nimmt in Studio **Keep Simulation
-Changes** (Taste K, 8.8).
+dem Stoppen wieder ordentlich da. Wer eine simulierte Lage behalten will, nimmt in Studio
+**Simulationsänderungen übernehmen** (Keep Simulation Changes) (Taste K, 8.8).
 
 ## 8.2 Die Spielregeln für Zahlen
 
@@ -68,20 +70,22 @@ Damit alle Teile von Kern dasselbe meinen, gelten feste Regeln:
   **relativ zu seinem Eltern-Actor**. Ein Rad als Kind eines Autos steht zum Beispiel „1,2 m vor der
   Automitte“, egal wo das Auto gerade ist. Fährt das Auto, fährt das Rad mit.
 - **Angeschweißt:** Hat ein Kind keinen eigenen Physik-Körper, wird es beim Simulieren an den Körper
-  seines Eltern-Actors „angeschweißt“. Beim Hover Car in Orb Run sind Kabine, Spoiler und Düsen solche
+  seines Eltern-Actors „angeschweißt“. Beim Hovercar in Orb Run sind Kabine, Spoiler und Düsen solche
   Kinder: Für die Physik ist das ganze Fahrzeug **ein** Körper aus mehreren Formen.
 
 ## 8.3 Level und Actor
 
 Ein **Level** enthält:
 
-- einen Namen und die **World Settings** (8.5), also Einstellungen für die ganze Welt,
+- einen Namen und die **Welteinstellungen** (World Settings), also Einstellungen für die ganze Welt
+  (8.5),
 - alle Actors,
 - importierte Bilder und Sounds (sie stecken direkt in der Datei),
 - einen Logik-Graphen für das ganze Level ([Kapitel 9](09-logik.md)),
 - die Position der Editor-Kamera.
 
-Der **Spieler** ist der Actor, der in den World Settings als Player eingetragen ist. Fehlt der
+Der **Spieler** ist der Actor, der in den **Welteinstellungen** im Feld
+**Spieler (beim Spielen gesteuert)** (Player (controlled in Play)) eingetragen ist. Fehlt der
 Eintrag, nimmt Kern den ersten Actor mit Steuerung.
 
 Ein **Actor** hat:
@@ -89,8 +93,10 @@ Ein **Actor** hat:
 - eine eindeutige **Nummer** und einen **Namen**. Den Namen siehst du im **Outliner**, der Liste
   aller Actors in Studio,
 - einen **Eltern-Actor** (oder keinen) und optional einen Ordner im Outliner,
-- **Hidden** (unsichtbar) und **Locked** (im Viewport nicht anklickbar),
-- eine **Transform**: Position, Drehung und Größe,
+- **Ausgeblendet (Editor und Spiel)** (Hidden (editor and game)), also unsichtbar, und
+  **Gesperrt (nicht auswählbar)** (Locked (not selectable)), also im Viewport nicht anklickbar,
+- eine **Transformation** (Transform): **Position** (Location), **Drehung** (Rotation) und
+  **Skalierung** (Scale),
 - **Tags**, freie Schlagworte, nach denen die Logik suchen kann,
 - **Komponenten**: von den meisten Arten höchstens eine, von Collidern und Gelenken beliebig viele.
   Ein Ding sieht nur auf eine Art aus, kann aber aus mehreren Stoßformen bestehen und an mehreren
@@ -100,81 +106,83 @@ Ein **Actor** hat:
 ## 8.4 Die Komponenten
 
 Komponenten sind wie Lego-Aufsätze: Ein nackter Actor ist nur ein Punkt im Raum. Steckst du ein Mesh
-drauf, wird er sichtbar. Steckst du einen Rigid Body dazu, fällt er herunter. So baust du alles aus
-denselben Bausteinen zusammen.
+drauf, wird er sichtbar. Steckst du einen **Starrkörper** (Rigid Body) dazu, fällt er herunter. So
+baust du alles aus denselben Bausteinen zusammen.
 
 | Komponente | Was sie kann | Beispiel |
 |---|---|---|
-| Static Mesh | sichtbare Form mit Material | Kiste, Kugel, Rampe |
-| Point Light | Lampe mit Farbe und Reichweite | Straßenlaterne |
-| Rigid Body | macht den Actor zum Physik-Körper | Kiste, die umfällt |
-| Collider | Form für Zusammenstöße | Kopf eines Soldaten |
-| Constraint | Gelenk zu einem anderen Actor | Tür im Scharnier |
-| Player Controller | macht den Actor steuerbar | Hover Car, Kugel |
-| Weapon, Health | Waffe und Lebenspunkte | Schießstand, Fass |
-| Pickup | etwas zum Einsammeln | Orb, Stern |
-| Trigger | unsichtbarer Schalter | Ziel, Sprungfeld |
-| Audio Source | Schallquelle ([Kapitel 7](07-audio.md)) | Radio |
-| Rotator | dreht sich ständig | Drehtür, Stern |
-| Mover | pendelt hin und her | Aufzug, Plattform |
-| City | baut eine ganze Stadt | Orb Run |
+| **Statisches Mesh** (Static Mesh) | sichtbare Form mit Material | Kiste, Kugel, Rampe |
+| **Punktlicht** (Point Light) | Lampe mit Farbe und Reichweite | Straßenlaterne |
+| **Starrkörper** | macht den Actor zum Physik-Körper | Kiste, die umfällt |
+| **Kollider** (Collider) | Form für Zusammenstöße | Kopf eines Soldaten |
+| **Gelenk** (Constraint) | Gelenk zu einem anderen Actor | Tür im Scharnier |
+| **Spieler-Steuerung** (Player Controller) | macht den Actor steuerbar | Hovercar, Kugel |
+| **Waffe** (Weapon), **Gesundheit** (Health) | Waffe und Lebenspunkte | Schießstand, Fass |
+| **Pickup** | etwas zum Einsammeln | Orb, Stern |
+| **Trigger** | unsichtbarer Schalter | Ziel, Sprungfeld |
+| **Audioquelle** (Audio Source) | Schallquelle ([Kapitel 7](07-audio.md)) | Radio |
+| **Rotator** | dreht sich ständig | Drehtür, Stern |
+| **Beweger** (Mover) | pendelt hin und her | Aufzug, Plattform |
+| **Prozedurale Stadt** (Procedural City) | baut eine ganze Stadt | Orb Run |
 
 Ein paar Bausteine im Einzelnen:
 
-**Static Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Ring, Rampe oder
+**Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Ring, Rampe oder
 ein eingebautes Modell, etwa ein Servomotor der Micro Duck. Das **Material** bestimmt das Aussehen:
 Farbe, wie rau oder glänzend, ob metallisch, ob es selbst leuchtet, ob man durchsehen kann. Ein Mesh
-kann automatisch einen passenden Collider mitbringen. Dessen Reibung, Sprungkraft und Oberfläche
-([Kapitel 6](06-physik.md)) stellst du gleich hier ein, unter Mesh › **Physics**. Sie gehören
-neben das Aussehen, denn sie sind die Physik des Dings.
+kann automatisch einen passenden Kollider mitbringen. Dessen Reibung, Sprungkraft und Oberfläche
+([Kapitel 6](06-physik.md)) stellst du gleich hier ein, unter **Statisches Mesh › Physik** (Static
+Mesh › Physics). Sie gehören neben das Aussehen, denn sie sind die Physik des Dings.
 
-**Rigid Body** macht den Actor zum Physik-Körper. In Studio wählst du **Static** (bewegt sich nie),
-**Kinematic** (wird bewegt, lässt sich aber nicht schubsen) oder **Dynamic** (echte Physik). Dazu
-kommen Masse, Schwerkraft-Faktor, Startgeschwindigkeit und **Bullet**. Bullet ist für sehr schnelle
-Körper: In einem einzigen Schritt könnte eine schnelle Kugel von vor der Wand bis hinter die Wand
+**Starrkörper** macht den Actor zum Physik-Körper. In Studio wählst du bei **Mobilität** (Mobility)
+**Statisch** (Static) – bewegt sich nie –, **Kinematisch** (Kinematic) – wird bewegt, lässt sich aber
+nicht schubsen – oder **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)) – echte Physik.
+Dazu kommen Masse, Schwerkraft-Faktor, Startgeschwindigkeit und **Kontinuierlich (Geschoss)**
+(Continuous (bullet)), in Box3D „Bullet“ genannt. Ein Bullet ist für sehr schnelle Körper: In einem einzigen Schritt könnte eine schnelle Kugel von vor der Wand bis hinter die Wand
 springen, ohne sie je zu berühren. Ein Bullet prüft die Strecke dazwischen besonders sorgfältig
 ([Kapitel 6](06-physik.md)), damit nichts durch Wände rutscht.
 
-**Collider** geben die Form für Zusammenstöße an: automatisch ans Mesh angepasst, Box, Kugel, Kapsel
-oder eine eng anliegende Hülle. Jeder Collider hat eine **Dichte**, aus der Kern die Masse
+**Kollider** geben die Form für Zusammenstöße an: automatisch ans Mesh angepasst, Box, Kugel, Kapsel
+oder eine eng anliegende Hülle. Jeder Kollider hat eine **Dichte**, aus der Kern die Masse
 ausrechnet. Im Level ist sie anfangs 1000 kg/m³, so dicht wie Wasser. Ein Würfel mit 1 m
-Kantenlänge wiegt also eine Tonne, wenn du nichts änderst. Trägst du beim Rigid Body dagegen selbst
-eine **Masse** ein, gilt die statt der Dichte. Ein Collider kann ein **Sensor** sein. Mit Kanälen
+Kantenlänge wiegt also eine Tonne, wenn du nichts änderst. Trägst du beim **Starrkörper** dagegen
+selbst eine **Masse** ein, gilt die statt der Dichte. Ein Kollider kann ein **Sensor** sein. Mit Kanälen
 und Gruppen legst du fest, wer mit wem überhaupt zusammenstoßen kann, etwa damit Kugeln durch
 die eigenen Mitspieler hindurchfliegen, aber an Wänden abprallen ([Kapitel 6](06-physik.md)).
 
-**Constraint** ist ein Gelenk: Scharnier, Schiene, Kugelgelenk, verschweißt, Seil, Rad und einige
-mehr. Gelenke können Grenzen, einen Motor und eine Feder haben und bei zu großer Kraft **brechen**.
+Die Komponente **Gelenk** verbindet zwei Actors: Scharnier, Schiene, Kugelgelenk, verschweißt, Seil,
+Rad und einige mehr. Gelenke können Grenzen, einen Motor und eine Feder haben und bei zu großer Kraft **brechen**.
 Ein Scharnier kann ein **Servo** sein, wie die Motoren echter Roboter: Je weiter das Gelenk von
 seinem Zielwinkel weg ist, desto stärker drückt es zurück, und je schneller es sich dreht, desto
 stärker bremst es. Doppelt so weit weg heißt doppelt so starke Drehkraft, wie bei einem Gummiband.
 
-**Rotator** und **Mover** bewegen Dinge ohne Logik: Der Rotator dreht gleichmäßig, der Mover pendelt
+**Rotator** und **Beweger** bewegen Dinge ohne Logik: Der Rotator dreht gleichmäßig, der Beweger pendelt
 weich, hin und zurück oder springt am Ende zurück an den Anfang. Beide rechnen mit der Spielzeit, also
 laufen sie bei jedem Start gleich.
 
-**City** baut aus einer einzigen Zahl (dem Seed) eine ganze Stadt mit Straßen, Häusern, Bäumen,
-Autos und nachts leuchtenden Fenstern ([Kapitel 5](05-szene-und-geometrie.md)).
+**Prozedurale Stadt** baut aus einer einzigen Zahl (dem Seed) eine ganze Stadt mit Straßen, Häusern,
+Bäumen, Autos und nachts leuchtenden Fenstern ([Kapitel 5](05-szene-und-geometrie.md)).
 
-Die übrigen Bausteine (Controller, Waffe, Pickup, Trigger) kommen in 8.10 bis 8.13 dran.
+Die übrigen Bausteine (Spieler-Steuerung, Waffe, Pickup, Trigger) kommen in 8.10 bis 8.13 dran.
 
-> **Für Profis:** Ein Name kann verwirren: In [Kapitel 6](06-physik.md) heißt der Typ Static im
-> Programm „fixed“. Mit dem Gelenk **Fixed (weld)** hat er nichts zu tun. Und wer in Kapitel 6
+> **Für Profis:** Ein Name kann verwirren: In [Kapitel 6](06-physik.md) heißt der Typ **Statisch**
+> im Programm „fixed“. Mit dem Gelenk **Fest (verschweißt)** (Fixed (weld)) hat er nichts zu tun. Und wer in Kapitel 6
 > direkt mit der Physik arbeitet, ohne Level, startet mit einer Dichte von 1 kg/m³ statt 1000.
 
-> **Mission:** Öffne auf https://kernengine.de/ über File › Example Levels das Level **Physics Lab**.
-> Klick die Tür an und schau in Details: Welche Komponenten hat sie? Finde beim Constraint den Typ,
-> die Grenzen und die Feder. Die Grenzen legen fest, wie weit die Tür aufgeht, die Feder zieht sie
-> wieder zu. Starte danach **Simulate** (Alt+S), schubs die Tür mit der linken Maustaste an und prüf,
-> ob das stimmt. Schalte unter Window › Show (oder mit dem Knopf **Show** oben im Viewport)
-> **Collision Shapes** und **Constraints** ein. Die Farben verraten den Typ: statisch grün,
+> **Mission:** Öffne auf https://kernengine.de/ über **Datei › Beispiel-Levels** (File › Example
+> Levels) das Level Physics Lab. Klick die Tür an und schau in **Details**: Welche Komponenten hat
+> sie? Finde beim **Gelenk** den **Typ** (Type), die **Grenzen** (Limits) und die **Feder** (Spring).
+> Die Grenzen legen fest, wie weit die Tür aufgeht, die Feder zieht sie wieder zu. Starte danach
+> **Simulieren** (Simulate) (Alt+S), schubs die Tür mit der linken Maustaste an und prüf, ob das
+> stimmt. Schalte unter **Fenster › Anzeigen** (Window › Show) – oder mit dem Knopf **Anzeigen** oben
+> im Viewport – **Kollisionsformen** (Collision Shapes) und **Gelenke** (Constraints) ein. Die Farben verraten den Typ: statisch grün,
 > kinematisch blau, dynamisch orange, Sensor violett, schlafend grau. „Schlafend“ heißt: Ein Körper
 > liegt schon lange still, darum rechnet die Physik ihn nicht mehr, bis ihn etwas anstößt.
 
-## 8.5 Die World Settings
+## 8.5 Die Welteinstellungen
 
 Manche Einstellungen gelten nicht für ein Ding, sondern für die ganze Welt. Die stehen in den
-**World Settings**:
+**Welteinstellungen** (World Settings):
 
 | Bereich | Beispiele |
 |---|---|
@@ -186,8 +194,10 @@ Manche Einstellungen gelten nicht für ein Ding, sondern für die ganze Welt. Di
 | Audio | Lautstärken, Musik, Hall, Doppler ([Kapitel 7](07-audio.md)) |
 
 Die Tageszeit ist ein Bruchteil des Tages: 0,5 ist die Hälfte, also Mittag. Zwei Besonderheiten:
-**Kill-Z** ist eine Höhe. Fällt ein Spieler tiefer, etwa von der Welt herunter, wird er zurückgesetzt.
-Und mit **Observer camera** startet Play mit einer freien Kamera; mit F8 übernimmst du dann den
+**Kill-Z (darunter Wiedereinstieg)** (Kill Z (respawn below)) ist eine Höhe. Fällt ein Spieler
+tiefer, etwa von der Welt herunter, wird er zurückgesetzt. Und mit
+**Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)** (Observer camera (Play: fly, watch,
+drag bodies)) startet **Spielen** (Play) mit einer freien Kamera; mit F8 übernimmst du dann den
 Spieler.
 
 ## 8.6 Das `.klevel`-Format
@@ -207,7 +217,7 @@ Werten. Du kannst eine `.klevel`-Datei mit jedem Texteditor öffnen. Ein Actor s
 
 Zeile für Zeile: Der Actor hat die Nummer 12, heißt „Door“ und ist ein Kind von Actor 3. Er steht bei
 x = 5,2 m, y = −12 m, z = 1,5 m (relativ zu seinem Eltern-Actor). Er trägt das Schlagwort „door“ und
-hat ein Mesh und einen Rigid Body. Was in den geschweiften Klammern fehlt, bekommt Standardwerte.
+hat ein Mesh und einen Starrkörper. Was in den geschweiften Klammern fehlt, bekommt Standardwerte.
 Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
 
 **Beim Lesen** gilt ein schlauer Grundsatz: **nachsichtig bei Fehlendem, streng bei Falschem.**
@@ -228,17 +238,18 @@ Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
 > entsteht leicht, wenn man Dateien von Hand bearbeitet. Ohne Prüfung würde das Programm endlos „nach
 > oben“ suchen und hängen bleiben.
 
-**Prüfen vor dem Start:** Bevor Play beginnt, sucht Kern nach Problemen. **Fehler** verhindern Play,
-zum Beispiel eine Größe von 0, ein Gelenk, das einen Actor mit sich selbst verbindet, oder eine
-Steuerung ohne Physik-Körper. **Warnungen** landen nur im Output Log, zum Beispiel ein Sound-Name, den
+**Prüfen vor dem Start:** Bevor das Spielen beginnt, sucht Kern nach Problemen. **Fehler**
+verhindern den Start, zum Beispiel eine Größe von 0, ein Gelenk, das einen Actor mit sich selbst
+verbindet, oder eine Steuerung ohne Physik-Körper. **Warnungen** landen nur im **Ausgabeprotokoll**
+(Output Log), zum Beispiel ein Sound-Name, den
 es nicht gibt (dann bleibt es still), oder mehr als ein Spieler.
 
 ## 8.7 Vom Level zur Physikwelt
 
 Bevor simuliert wird, macht Kern einen **Plan**: Welche Physik-Körper braucht dieses Level, und welche
-Formen gehören zu welchem Körper? Das Wichtige daran: **Derselbe Plan** zeichnet auch die Collider im
-Editor. Was du im Editor mit Show › Collision Shapes siehst, ist also genau das, womit später
-gerechnet wird.
+Formen gehören zu welchem Körper? Das Wichtige daran: **Derselbe Plan** zeichnet auch die Kollider im
+Editor. Was du im Editor mit **Anzeigen › Kollisionsformen** (Show › Collision Shapes) siehst, ist
+also genau das, womit später gerechnet wird.
 
 ```mermaid
 flowchart LR
@@ -249,13 +260,13 @@ flowchart LR
 
 Die Regeln des Plans:
 
-1. Jeder Actor mit Rigid Body bekommt einen Körper. Ein statischer Körper mit Rotator oder Mover wird
-   kinematisch, er muss sich ja bewegen.
-2. Manche Dinge brauchen einen Körper, obwohl du keinen Rigid Body gesetzt hast: eine Wand mit
-   Collider, ein Stern zum Einsammeln, ein Trigger. Sie bekommen einen **unsichtbaren eigenen
+1. Jeder Actor mit **Starrkörper** (Rigid Body) bekommt einen Körper. Ein statischer Körper mit
+   **Rotator** oder **Beweger** (Mover) wird kinematisch, er muss sich ja bewegen.
+2. Manche Dinge brauchen einen Körper, obwohl du keinen Starrkörper gesetzt hast: eine Wand mit
+   Kollider, ein Stern zum Einsammeln, ein Trigger. Sie bekommen einen **unsichtbaren eigenen
    Körper**, statisch oder, wenn sie sich bewegen, kinematisch.
 3. Jeder Actor gibt seine Formen an seinen Körper, auch angeschweißte Kinder (8.2). Ein automatischer
-   Collider wird ans Mesh angepasst.
+   Kollider wird ans Mesh angepasst.
 4. Pickups und Trigger werden zu Sensoren. Haben sie gar keine Form, bekommen sie eine Sensor-Kugel
    mit 1 m Radius.
 5. Die Stadt wird ein einziger statischer Körper mit einer Box je Haus.
@@ -263,13 +274,13 @@ Die Regeln des Plans:
 
 ## 8.8 Die GameWorld starten
 
-Drückst du Play, geht die GameWorld diese Schritte durch:
+Drückst du **Spielen** (Play), geht die GameWorld diese Schritte durch:
 
 1. **Prüfen** (8.6). Ein Fehler bricht ab.
 2. **Kopie anlegen.** Gespielt wird mit der Kopie, das Original bleibt unberührt.
 3. **Physikwelt bauen:** Schwerkraft setzen, dann alle Körper, Gelenke und Laufroboter nach dem Plan
    aus 8.7 anlegen, Eltern vor ihren Kindern. Die Autos der Stadt fahren los.
-4. **Spieler übernehmen** (nur bei Play). Er bekommt einen **Pawn**: ein Notizblatt, auf dem Kern
+4. **Spieler übernehmen** (nur beim Spielen). Er bekommt einen **Pawn**: ein Notizblatt, auf dem Kern
    sich alles über die Steuerung dieses Spielers merkt, also letzte Eingabe, Blickrichtung,
    Startpunkt und Boost.
 5. **Regeln und Logik starten:** Punkte, Zeit, Gesundheit und Munition auf Anfang, die Bestzeit
@@ -294,19 +305,20 @@ interessiert, fällt still und spart Rechenzeit.
 |---|---|
 | none | keine Simulation, nur Editor |
 | simulate | Physik und Logik laufen, niemand wird gesteuert, Körper lassen sich greifen |
-| play | wie Simulate, dazu Spieler, Regeln und HUD |
+| play | wie simulate, dazu Spieler, Regeln und HUD |
 | replica | Kopie eines Server-Spiels bei einem Mitspieler ([Kapitel 10](10-netzwerk.md)) |
 
-Zwischen Simulate und Play kannst du mitten im Lauf wechseln (Studio: F8), der Spieler behält dabei
-seinen Zustand. Du kannst neu starten (Ctrl+R), pausieren und genau einen Schritt weitergehen (Taste
-`.`).
+Zwischen **Simulieren** (Simulate) und **Spielen** kannst du mitten im Lauf wechseln (Studio: F8),
+der Spieler behält dabei seinen Zustand. Du kannst neu starten (Strg+R), pausieren und genau einen Schritt
+weitergehen (Taste `.`).
 
-> **Mission:** Starte im Physics Lab **Simulate**, drücke **Pause** (der Pause-Knopf in der
-> Play-Gruppe der Toolbar, oder Alt+Shift+P) und dann mehrmals die Taste **.** – die Welt läuft
-> Schritt für Schritt. Drück noch einmal **Pause**, damit es weiterläuft, und greif eine Kiste mit
-> der linken Maustaste. Klick dann eine umgefallene Kiste im Viewport kurz an (ohne zu ziehen), so
-> wählst du sie aus. Drück **K** (Play › **Keep Simulation Changes**): Die Simulation endet, und die
-> Kiste steht in deinem Level genau so, wie sie lag.
+> **Mission:** Starte im Physics Lab **Simulieren**, drücke **Pause** (den Pause-Knopf
+> neben **Spielen** in der Werkzeugleiste, oder Alt+Umschalt+P) und dann mehrmals die Taste **.** –
+> die Welt läuft Schritt für Schritt. Drück noch einmal **Pause**, damit es weiterläuft, und greif
+> eine Kiste mit der linken Maustaste. Klick dann eine umgefallene Kiste im Viewport kurz an (ohne zu
+> ziehen), so wählst du sie aus. Drück **K** (**Spielen › Simulationsänderungen übernehmen**
+> (Play › Keep Simulation Changes)): Die Simulation endet, und die Kiste steht in deinem Level genau
+> so, wie sie lag.
 
 ## 8.9 Was in einem Bild passiert
 
@@ -341,7 +353,7 @@ flowchart TD
 ```
 
 1. **Spieler:** Für jeden Spieler die Eingabe holen und sein Fahrzeug oder seine Figur bewegen.
-2. **Animation:** Rotator und Mover bekommen ihr Ziel für diesen Schritt.
+2. **Animation:** Rotator und Beweger bekommen ihr Ziel für diesen Schritt.
 3. **Verkehr** (Autos halten vor dem Spieler), Laufroboter, Servos und der **Maus-Griff**.
 4. **Box3D rechnet** einen Physikschritt.
 5. **Ereignisse:** Was wurde eingesammelt, welcher Trigger berührt, wer getroffen, welches Gelenk
@@ -357,7 +369,7 @@ Bildern pro Sekunde flüssig. Zuletzt bewegt sich die Kamera, eingesammelte Pick
 nachts leuchten die Fenster.
 
 **Im Studio** kommt pro Bild noch die Arbeit des Editors dazu, etwa Haltepunkte der Logik prüfen und
-Meldungen ins Output Log schreiben.
+Meldungen ins **Ausgabeprotokoll** (Output Log) schreiben.
 
 ## 8.10 Controller: fahren, rollen, laufen, fliegen
 
@@ -374,21 +386,23 @@ einzigen Zahl.
 > nächste (1 + 2 + 4 = 7, weniger als 8). Darum lässt sich jede Summe nur auf eine Art zerlegen, 66
 > nur als 64 + 2. Mit den Werten 1, 2, 3 ginge das nicht: 3 könnte „3“ heißen oder „1 und 2“.
 
-Bei Rolling Ball, Character und Flyer ist die Bewegung **kamerarelativ**: „Vor“ heißt dorthin, wohin
-die Kamera blickt.
+Bei **Rollende Kugel** (Rolling ball), **Figur** (Character) und **Flieger** (Flyer) ist die
+Bewegung **kamerarelativ**: „Vor“ heißt dorthin, wohin die Kamera blickt.
+
+Die Modi stehen in der **Spieler-Steuerung** (Player Controller) im Feld **Bewegung** (Movement):
 
 | Modus | So bewegt er sich |
 |---|---|
-| Hover Car | schwebt auf einer unsichtbaren Feder über dem Boden, Gas schiebt, eine Seitenkraft verhindert Rutschen; sein Wippen und Neigen ist nur Aussehen |
-| Vehicle | wie das Hover Car, aber auf dem Boden; Gas wirkt nur mit Bodenkontakt |
-| Rolling Ball | eine Kugel, die du anschubst; springen nur vom Boden |
-| Character | eine Spielfigur, die läuft, springt und Stufen hochsteigt |
-| Flyer | fliegt in jede Richtung, auch hoch und runter, die Schwerkraft wird aufgehoben |
-| Soldier | wie Character, für Ego-Shooter (8.13) |
-| Walker | die Micro Duck läuft mit ihren eigenen Motoren (8.14) |
+| **Hovercar** (Hover car) | schwebt auf einer unsichtbaren Feder über dem Boden, Gas schiebt, eine Seitenkraft verhindert Rutschen; sein Wippen und Neigen ist nur Aussehen |
+| **Fahrzeug** (Vehicle) | wie das Hovercar, aber auf dem Boden; Gas wirkt nur mit Bodenkontakt |
+| **Rollende Kugel** | eine Kugel, die du anschubst; springen nur vom Boden |
+| **Figur** | eine Spielfigur, die läuft, springt und Stufen hochsteigt |
+| **Flieger** | fliegt in jede Richtung, auch hoch und runter, die Schwerkraft wird aufgehoben |
+| **Soldat (Ego-Shooter)** (Soldier (first person shooter)) | wie die Figur, für Ego-Shooter (8.13) |
+| **Läufer (Roboter auf seinem trainierten Netz)** (Walker (robot on its trained network)) | die Micro Duck läuft mit ihren eigenen Motoren (8.14) |
 
-Character und Soldier benutzen den **Character Mover** aus [Kapitel 6](06-physik.md). Die
-Spielfigur Character fällt absichtlich schneller als in echt, damit Sprünge knackig wirken und
+Figur und Soldat benutzen den **Character Mover** aus [Kapitel 6](06-physik.md). Die
+Figur fällt absichtlich schneller als in echt, damit Sprünge knackig wirken und
 nicht schwebend. Der Soldat fällt wie in echt, so wie in Ego-Shootern üblich.
 
 Für alle gilt: **Boost** ist ein Vorrat von 0 bis 1. Beim Boosten sinkt er um 0,45 pro Sekunde, sonst
@@ -406,12 +420,12 @@ Startpunkt, jeden neuen Spieler ein Stück weiter außen. So steht keiner auf de
 Die Kamera folgt der **interpolierten** Lage des Spielers (8.9), also immer dem flüssigen
 Zwischenstand:
 
-- **Chase bei Fahrzeugen:** hinter dem Fahrzeug, umso weiter weg, je schneller es fährt.
-- **Chase sonst:** kreist mit Maus oder Stick um den Spieler. Ein **Prüfstrahl**, eine unsichtbare
+- **Verfolger** (Chase) **bei Fahrzeugen:** hinter dem Fahrzeug, umso weiter weg, je schneller es fährt.
+- **Verfolger sonst:** kreist mit Maus oder Stick um den Spieler. Ein **Prüfstrahl**, eine unsichtbare
   Linie vom Spieler zur Kamera, hält sie aus Wänden heraus: Trifft die Linie eine Wand, rückt die
   Kamera davor.
-- **First Person:** die Augen am Körper.
-- **Top Down:** von oben.
+- **Ego-Perspektive** (First person): die Augen am Körper.
+- **Von oben** (Top down): von oben.
 
 Über 30 m/s (etwa 108 km/h) wird das Sichtfeld etwas weiter, das fühlt sich schneller an. Harte
 Treffer schütteln die Kamera. Soldaten haben eine eigene Kamera.
@@ -421,19 +435,21 @@ Treffer schütteln die Kamera. Soldaten haben eine eigene Kamera.
 Das **HUD** ist die Anzeige über dem Spiel: Status, Titel, Meldung, Punkte, Pickups, Zeit, Restzeit,
 Tempo, Boost, Bestzeit und beim Soldaten Gesundheit und Munition.
 
-![Play im Studio mit HUD: Orb Run direkt nach dem Start, mit Zähler für die Orbs, Punkten, Zeit und Tempo](../buch/bilder/studio-play.png)
+![Spielen im Studio mit HUD: Orb Run direkt nach dem Start, mit Zähler für die Orbs, Punkten, Zeit und Tempo](../buch/bilder/studio-play.png)
 
-**Siegbedingungen** (in Studio: World Settings › Win condition):
+**Siegbedingungen** stellst du in Studio unter **Welteinstellungen › Siegbedingung** (World Settings ›
+Win condition) ein:
 
 | Ziel | Gewonnen, wenn … |
 |---|---|
-| None (sandbox) | nie – Sandkasten |
-| Collect all pickups | alle Pickups gesammelt (gibt es ein Goal, danach noch dorthin) |
-| Reach a goal trigger | Goal-Trigger erreicht |
-| Survive the time limit | Zeitlimit überstanden |
-| Reach a target score | Zielpunkte erreicht |
+| **Keine (Sandkasten)** (None (sandbox)) | nie – Sandkasten |
+| **Alle Pickups sammeln** (Collect all pickups) | alle Pickups gesammelt (gibt es einen Ziel-Trigger, danach noch dorthin) |
+| **Ein Ziel erreichen** (Reach a goal trigger) | Ziel-Trigger erreicht |
+| **Das Zeitlimit überleben** (Survive the time limit) | Zeitlimit überstanden |
+| **Eine Punktzahl erreichen** (Reach a target score) | Zielpunkte erreicht |
 
-Mit Zeitlimit verliert man bei 0, außer bei „Survive the time limit“. Ein Hazard verliert immer. Am
+Mit Zeitlimit verliert man bei 0, außer bei **Das Zeitlimit überleben**. Eine Gefahr (Hazard-Trigger)
+verliert immer. Am
 Ende setzt Kern den Status, spielt eine kurze Melodie, merkt sich die Bestzeit und meldet der Logik
 „Spiel vorbei“.
 
@@ -443,28 +459,30 @@ hast. Mit Wiederkehr-Zeit taucht es später wieder auf.
 
 **Trigger-Aktionen:** Ein Trigger ist ein unsichtbarer Schalter. Was er tut, legt seine Aktion fest:
 
-| Aktion | Wirkung | Fertig im Katalog |
+| Aktion in Studio | Wirkung | Fertig im Katalog |
 |---|---|---|
-| goal | gewinnt | Goal |
-| hazard | verliert | Hazard |
-| checkpoint | neuer Startpunkt 1 m darüber | Checkpoint |
-| message | zeigt eine Meldung | Message Trigger |
-| launch | schleudert hoch und nach vorn | Jump Pad |
-| teleport | versetzt zum Ziel-Actor | Teleporter |
-| damage | zieht Lebenspunkte ab | Damage Zone |
-| event | nur ein Ereignis für die Logik | – |
+| **Ziel (Sieg)** (Goal (win)) | gewinnt | **Ziel** (Goal) |
+| **Gefahr (Niederlage)** (Hazard (lose)) | verliert | **Gefahr** (Hazard) |
+| **Checkpoint (hier wieder einsteigen)** (Checkpoint (respawn here)) | neuer Startpunkt 1 m darüber | **Checkpoint** |
+| **Nachricht** (Message) | zeigt eine Meldung | **Nachrichten-Trigger** (Message Trigger) |
+| **Sprungfeld (Start)** (Jump pad (launch)) | schleudert hoch und nach vorn | **Sprungfeld** (Jump Pad) |
+| **Teleport** | versetzt zum Ziel-Actor | **Teleporter** |
+| **Schadenszone** (Damage zone) | zieht Lebenspunkte ab | **Schadenszone** (Damage Zone) |
+| **Nur Logik-Ereignis** (Logic event only) | nur ein Ereignis für die Logik | – |
 
 Jede Aktion spielt ihren passenden Sound. Der Teleporter sperrt sich 1 s lang, damit du nicht sofort
-zurückgebeamt wirst. Jeder Trigger meldet sich vorher bei der Logik. Mit „nur einmal“ ist er danach
-verbraucht, außer Goal und Hazard.
+zurückgebeamt wirst. Jeder Trigger meldet sich vorher bei der Logik. Mit **Nur einmal** (Only once)
+ist er danach verbraucht, außer Ziel und Gefahr.
 
-> **Mission:** Lege mit File › New Level... ein **Basic**-Level an. Platziere aus Place Actors einen
-> **Rolling Ball** (Players), drei **Stars** und ein **Goal** (Gameplay). Stell in World Settings die
-> **Win condition** auf „Collect all pickups“ und drück **Play** (Alt+P). Was passiert, wenn du das
-> Goal vor dem letzten Stern berührst? Und was danach?
+> **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
+> **Grundformen** (Basic) an. Platziere aus **Actors platzieren** (Place Actors) eine
+> **Rollende Kugel** (Rolling Ball) aus der Gruppe **Spieler** (Players), dreimal **Stern** (Star) und ein
+> **Ziel** aus der Gruppe **Spielablauf** (Gameplay). Stell in den **Welteinstellungen** die
+> **Siegbedingung** auf **Alle Pickups sammeln** und drück **Spielen** (Play) (Alt+P). Was passiert,
+> wenn du das Ziel vor dem letzten Stern berührst? Und was danach?
 
-> **Mission:** Baue in dein Level ein **Jump Pad** und einen **Teleporter** (beide unter Gameplay)
-> und probiere sie mit dem Rolling Ball aus. Der Teleporter besteht aus zwei Feldern: Du betrittst A
+> **Mission:** Baue in dein Level ein **Sprungfeld** und einen **Teleporter** (beide unter
+> **Spielablauf**) und probiere sie mit der rollenden Kugel aus. Der Teleporter besteht aus zwei Feldern: Du betrittst A
 > und kommst bei B an.
 
 ## 8.13 Soldaten und Figuren
@@ -491,9 +509,9 @@ andere Actors verschwinden und tauchen, wenn eingestellt, an ihrem Platz wieder 
 Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus Grundformen
 gebaut und reine Darstellung: Sie ändern nichts an der Simulation.
 
-## 8.14 Walker
+## 8.14 Läufer
 
-Ein **Walker** ist ein Roboter mit Gelenken, der mit seinen eigenen Servos läuft. In Kern ist das die
+Ein **Läufer** (Walker) ist ein Roboter mit Gelenken, der mit seinen eigenen Servos läuft. In Kern ist das die
 Micro Duck. Gesteuert wird sie nicht von Regeln, die jemand programmiert hat, sondern von einem
 **Netz**, das Pollen Robotics trainiert hat: Es hat durch sehr viel Üben gelernt, welche
 Motorbewegung zu welcher Lage passt.
@@ -539,19 +557,20 @@ Hauptsteuerung, und eine angesteckte Maus soll die Touch-Knöpfe nicht verschwin
 **Pointer-Lock** gibt es nur mit Maus: Dabei bleibt der Mauszeiger im Spiel gefangen, damit du dich
 endlos umdrehen kannst.
 
-Die **Touch-Steuerung** hat zwei Sticks in den unteren Ecken. Links bewegst du dich (MOVE, bei
-Fahrzeugen STEER / GAS, beim Flyer FLY), rechts schaust du (LOOK). Daneben liegen Knöpfe je nach
-Controller:
+Die **Touch-Steuerung** hat zwei Sticks in den unteren Ecken. Links bewegst du dich (**LAUFEN**
+(MOVE), bei Fahrzeugen **LENKEN / GAS** (STEER / GAS), beim Flieger **FLIEGEN** (FLY)), rechts
+schaust du (**SCHAUEN** (LOOK)). Daneben liegen Knöpfe je nach Bewegungsart (in Klammern die
+englische Beschriftung; KICK L, KICK R, BOOST, DRIFT und LIFT heißen in beiden Sprachen gleich):
 
-| Controller | Knöpfe |
+| Bewegung | Knöpfe |
 |---|---|
-| Soldier | JUMP, RELOAD, AIM, CROUCH, USE |
-| Walker | QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE, HOP |
-| Character | JUMP, USE |
-| Rolling Ball | JUMP, BOOST |
-| Flyer | UP, DOWN, BOOST |
-| Hover Car | BOOST, DRIFT, LIFT, VIEW |
-| Vehicle | BOOST, DRIFT, HOP, VIEW |
+| Soldat | SPRUNG (JUMP), LADEN (RELOAD), ZIELEN (AIM), DUCKEN (CROUCH), NUTZEN (USE) |
+| Läufer | QUAK (QUACK), GREIFEN (PICK), SITZ (SIT), KICK L, KICK R, ROLLEN (ROLL), SCHNABEL (BEAK), HUIII (WHEEE), HÜPFEN (HOP) |
+| Figur | SPRUNG (JUMP), NUTZEN (USE) |
+| Rollende Kugel | SPRUNG (JUMP), BOOST |
+| Flieger | HOCH (UP), RUNTER (DOWN), BOOST |
+| Hovercar | BOOST, DRIFT, LIFT, SICHT (VIEW) |
+| Fahrzeug | BOOST, DRIFT, HÜPFEN (HOP), SICHT (VIEW) |
 
 Jeder Finger bekommt genau eine Aufgabe, und zwar dort, wo er zuerst aufsetzt. Liegt dort ein
 Knopf, drückt er den Knopf und wird nie zum Stick, auch wenn er danach weiterwischt. Liegt dort kein
@@ -563,7 +582,7 @@ vorn heißt Sprinten. Ziehst du den rechten Stick bis an den Rand, drehst du dic
 ## 8.17 Logik in der Welt
 
 Jeder Actor und das Level können einen Logik-Graphen tragen ([Kapitel 9](09-logik.md)). Die GameWorld
-startet sie in Play und Simulate, meldet ihnen **Ereignisse** (Überlappung, Treffer, Pickup, Trigger,
+startet sie beim **Spielen** (Play) und **Simulieren** (Simulate), meldet ihnen **Ereignisse** (Überlappung, Treffer, Pickup, Trigger,
 Schaden, Tod, Taste, Spielende, neuer Spieler …) und lässt sie **Dinge tun** (Werte ändern, Kopien
 erzeugen, schieben, Punkte geben, Spiel beenden …).
 
@@ -575,25 +594,27 @@ es an alle ([Kapitel 10](10-netzwerk.md)).
 
 ## 8.18 Die Demo-Levels
 
-Unter File › Example Levels und File › New Level findest du die eingebauten Levels:
+Unter **Datei › Beispiel-Levels** (File › Example Levels) und **Datei › Neues Level...** (File › New
+Level...) findest du die eingebauten Levels:
 
-- **Orb Run:** eine Stadt mit Verkehr, ein Hover Car und 24 Orbs zum Einsammeln. Es ist später
+- **Orb Run:** eine Stadt mit Verkehr, ein Hovercar und 24 Orbs zum Einsammeln. Es ist später
   Nachmittag, und der Lauf endet in der Nacht. Studio startet mit diesem Level.
 - **Physics Lab:** alle Gelenkarten – Kistenpyramide, Pendel, Tür, Seilbrücke (drei Gelenke können
   brechen), Drehteller, Lift, ein selbstfahrender Rover. Du rollst als Kugel, sammelst fünf Sterne
-  und erreichst das Goal, vorbei an einem drehenden Hazard.
+  und erreichst das Ziel, vorbei an einer drehenden Gefahr.
 - **Shooting Range:** ein Schießstand mit Zielscheiben in 10 bis 60 m, Deckung, Kisten, einem Fass
   und einem Turm. Ziel: 150 Punkte. Auch im Mehrspieler spielbar.
 - **Micro Duck:** ein Zimmer im Maßstab des Roboters mit Ball und Socken. Die Ente läuft
-  selbstständig. Ein Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht. Play
-  beginnt hier mit der Observer camera, mit **F8** übernimmst du die Ente.
-- **Basic:** Boden und ein Würfel.
-- **Empty:** gar nichts, nicht einmal Boden.
+  selbstständig. Ein Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht.
+  **Spielen** (Play) beginnt hier mit eingeschalteter Beobachterkamera, mit **F8** übernimmst du die
+  Ente.
+- **Grundformen** (Basic): Boden und ein Würfel.
+- **Leer** (Empty): gar nichts, nicht einmal Boden.
 
-Automatische Tests spielen diese Levels durch und prüfen zum Beispiel, dass ein Goal gewinnt und ein
-Hazard verliert.
+Automatische Tests spielen diese Levels durch und prüfen zum Beispiel, dass ein Ziel gewinnt und eine
+Gefahr verliert.
 
-> **Mission:** Öffne **Orb Run** und starte **Play** (Alt+P). Sammle ein paar Orbs, dann drück
+> **Mission:** Öffne **Orb Run** und starte **Spielen** (Alt+P). Sammle ein paar Orbs, dann drück
 > **F8**: Du steigst aus, das Spiel läuft weiter, und du fliegst frei herum. Noch einmal **F8**, und
 > du sitzt wieder am Steuer. Wie viele Sekunden brauchst du für alle 24?
 
@@ -609,9 +630,10 @@ Hazard verliert.
 
 ## Rätsel-Ecke
 
-1. Was passiert mit deinen Änderungen, die während Simulate entstehen, wenn du stoppst?
-2. Ein Pickup ohne Mesh und ohne Collider – womit merkt Kern, dass du es berührst?
-3. Die Win condition ist „Collect all pickups“, und es gibt einen Goal-Trigger. Du hast alle Orbs.
+1. Was passiert mit deinen Änderungen, die beim Simulieren entstehen, wenn du stoppst?
+2. Ein Pickup ohne Mesh und ohne Kollider – womit merkt Kern, dass du es berührst?
+3. Die **Siegbedingung** (Win condition) ist **Alle Pickups sammeln** (Collect all pickups), und es
+   gibt einen Ziel-Trigger. Du hast alle Orbs.
    Hast du gewonnen?
 4. Bei der Micro Duck soll gleichzeitig „Sitzen“ (1) und „Zwitschern“ (64) gedrückt werden. Welche
    Zahl schickt die Eingabe?
@@ -622,9 +644,9 @@ Hazard verliert.
 ### Lösungen
 
 1. Sie verschwinden. Simuliert wird an einer Kopie. Behalten kannst du die Lage ausgewählter Actors
-   nur mit „Keep Simulation Changes“ (K).
+   nur mit **Simulationsänderungen übernehmen** (Keep Simulation Changes), Taste K.
 2. Mit einer Sensor-Kugel von 1 m Radius, die Kern beim Planen der Physik automatisch anlegt.
-3. Noch nicht. Erst wenn du danach das Goal erreichst.
+3. Noch nicht. Erst wenn du danach das Ziel erreichst.
 4. 1 + 64 = 65.
 5. Ein Bild dauert 1/20 s = 0,05 s, das sind 3 Schritte zu je 1/60 s. Hängt ein Bild eine Sekunde,
    rechnet Kern trotzdem höchstens 0,1 s nach, also 6 Schritte. Die Welt läuft dann kurz langsamer,

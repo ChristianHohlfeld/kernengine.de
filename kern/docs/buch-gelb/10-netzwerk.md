@@ -316,44 +316,49 @@ lieber nach einer Glocke stellst, die du ohne Umweg hörst.
 
 ## 10.8 Mehrspieler im Studio
 
-![Mehrspieler-Play im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](../buch/bilder/studio-multiplayer.png)
+![Mehrspieler-Spiel im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](../buch/bilder/studio-multiplayer.png)
 
-Im Studio kannst du allein an einem Rechner mit mehreren Spielern testen. **Play › Number of
-Players** (1 bis 4) macht deine Welt zum **Listen-Server**, einem Server, der selbst mitspielt. Jeder
+Im Studio kannst du allein an einem Rechner mit mehreren Spielern testen.
+**Spielen › Anzahl der Spieler** (Play › Number of Players), 1 bis 4, macht deine Welt zum
+**Listen-Server**, einem Server, der selbst mitspielt. Jeder
 weitere Spieler ist ein echter Client mit eigener Welt und eigenem Viewport, verbunden über das Netz
 im Speicher (10.6). War nur ein Viewport offen, schaltet Studio auf vier: Viewport 1 ist der Server,
 Viewport 2 der erste Client, jeder mit eigenem HUD. Nur der **aktive Viewport** bekommt deine Eingabe,
 die anderen Spieler stehen still. Die Statuszeile zeigt Rolle, Spieler, Ping, Verlust, Bandbreite und
 je Client den Puffer.
 
-Mit **Play › Network Emulation** machst du die Leitung absichtlich schlechter:
+Mit **Spielen › Netzwerk-Emulation** (Play › Network Emulation) machst du die Leitung absichtlich
+schlechter:
 
 | Stufe | Verzögerung (± Jitter) | Verlust |
 |---|---|---|
-| Perfect | 0 | 0 |
-| LAN | 5 ms (±1) | 0 |
-| Average | 50 ms (±10) | 1 % |
-| Bad | 150 ms (±40) | 5 % |
-| Terrible | 300 ms (±100) | 20 % |
+| **Perfekt** (Perfect) | 0 | 0 |
+| **LAN (5 ms)** | 5 ms (±1) | 0 |
+| **Mittel (50 ms, 1 % Verlust)** (Average (50 ms, 1% loss)) | 50 ms (±10) | 1 % |
+| **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)) | 150 ms (±40) | 5 % |
+| **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)) | 300 ms (±100) | 20 % |
 
-> **Mission:** Öffne Orb Run in Studio auf https://kernengine.de/, stell **Play › Number of Players**
-> auf **2 Players (listen server)** und drück **Play**. Klick in Viewport 2 und fahr. Gib mit
-> **Shift+F1** die Maus frei (Esc würde stoppen), stell **Play › Network Emulation** auf **Terrible**
+> **Mission:** Öffne Orb Run in Studio auf https://kernengine.de/, stell
+> **Spielen › Anzahl der Spieler** auf **2 Spieler (Listen-Server)** (2 Players (listen server)) und
+> drück **Spielen** (Play). Klick in Viewport 2 und fahr. Gib mit **Umschalt+F1** die Maus frei (Esc
+> würde stoppen), stell **Spielen › Netzwerk-Emulation** auf **Sehr schlecht (300 ms, 20 % Verlust)**
 > und fahr weiter. **Was siehst du?** Ping und Verlust in der Statuszeile steigen stark. Achte auf dein
 > Auto: Es reagiert später auf deine Tasten, denn jede Eingabe muss erst zum Server und das Ergebnis
 > zurück. Gleitet es trotzdem, arbeiten die Zwischenbilder aus 10.7. Springt es, waren die Lücken
 > größer als der Vorrat von 0,1 s. Schau dabei auf den Puffer.
 
-**Online:** Mit **Play › Host Online Game…** bietest du ein Spiel an, mit **Join Online Game…**
-trittst du bei. Beide wählen denselben **Raum** – einen Namen, unter dem ihr euch trefft, wie ein
-Chatraum (Standard „kern“). Bleibt das Feld **Relay** leer, finden sich nur Tabs desselben Browsers;
-für verschiedene Rechner braucht ihr einen Relay (10.10). Alle brauchen dasselbe Level. Ist im Raum
-kein Host, meldet Join das nach ein paar Sekunden. **Leave Online Game** beendet die Sitzung, und der
-Host merkt, wenn ein Gast geht. Ein Host in einem Hintergrund-Tab läuft weiter, damit seine Gäste nicht
+**Online:** Mit **Spielen › Online-Spiel hosten...** (Play › Host Online Game...) bietest du ein
+Spiel an, mit **Online-Spiel beitreten...** (Join Online Game...) trittst du bei. Beide wählen
+denselben **Raum** (Room) – einen Namen, unter dem ihr euch
+trefft, wie ein Chatraum (Standard „kern“). Bleibt das Feld **Relay (optional)** leer, finden sich
+nur Tabs desselben Browsers; für verschiedene Rechner braucht ihr einen Relay (10.10). Alle brauchen
+dasselbe Level. Ist im Raum kein Host, meldet Studio das beim Beitreten nach ein paar Sekunden.
+**Online-Spiel verlassen** (Leave Online Game) beendet die Sitzung, und der Host merkt, wenn ein Gast
+geht. Ein Host in einem Hintergrund-Tab läuft weiter, damit seine Gäste nicht
 rausfliegen.
 
-> **Mission:** Öffne Studio in zwei Tabs mit demselben Level. Tab 1: **Host Online Game…**, Raum
-> „kern“, **Host**. Tab 2: **Join Online Game…**, derselbe Raum, **Join**. Beide Tabs brauchen
+> **Mission:** Öffne Studio in zwei Tabs mit demselben Level. Tab 1: **Online-Spiel hosten...**, Raum
+> „kern“, **Hosten** (Host). Tab 2: **Online-Spiel beitreten...**, derselbe Raum, **Beitreten** (Join). Beide Tabs brauchen
 > dasselbe Level, sonst weist der Host den Gast ab. **Was siehst du?** Fahr in Tab 2 los und schalte
 > zu Tab 1: Dort fährt dein Auto als zweites Auto mit.
 
@@ -396,7 +401,7 @@ Zu große Päckchen oder Päckchen an Unbekannte wirft der Relay weg. Geht der H
 neue Gäste geschlossen.
 
 > **Für Profis:** Der Relay ist ein Node-Programm aus dem Repository von Kern. Starte ihn zusammen
-> mit einem Erwachsenen oder deiner Lehrerin. Danach trägst du im Feld Relay eine Adresse ein, die mit
+> mit einem Erwachsenen oder deiner Lehrerin. Danach trägst du im Feld **Relay (optional)** eine Adresse ein, die mit
 > ws:// beginnt. Befehl, Port und alle Fehlermeldungen stehen im blauen Buch, Kapitel 10.
 
 ---
@@ -425,7 +430,8 @@ Mehrspieler im Studio. Dank des festen Startwerts (10.6) ist jeder Lauf gleich.
 > zwischen 30 und 90 ms, und 10 % kommen doppelt – trotzdem kommt jede Einschreiben-Nachricht
 > vollständig und in der richtigen Reihenfolge an.
 
-> **Mission:** Spiel zu zweit im Studio, einmal mit **Perfect**, einmal mit **Bad**. Wie ändern sich
+> **Mission:** Spiel zu zweit im Studio, einmal mit der Netzwerk-Emulation **Perfekt** (Perfect),
+> einmal mit **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)). Wie ändern sich
 > Ping, Verlust und Puffer? Und merkst du beim Fahren einen Unterschied? Wenn kaum: Dann haben
 > Zwischenbilder und Puffer ihre Arbeit getan.
 

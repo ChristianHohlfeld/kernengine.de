@@ -167,7 +167,7 @@ also die Lage des Dings. Hier heißt der Actor „Cube“. Er ist um 90° gedreh
 > **So kannst du es dir vorstellen:** ein ausgefüllter Steckbrief. Jede Zeile hat eine Überschrift
 > und einen Eintrag. Ein Steckbrief kann sogar einen kleineren Steckbrief enthalten.
 
-> **Mission:** Speichere ein Level mit **Ctrl+S**. Beim ersten Mal fragt dich der Browser nach einem
+> **Mission:** Speichere ein Level mit **Strg+S**. Beim ersten Mal fragt dich der Browser nach einem
 > Ort, oder die Datei landet in deinem Download-Ordner. Die Endung „.klevel“ kennt dein Computer
 > nicht, ein Doppelklick hilft also nicht. Klick die Datei stattdessen mit der rechten Maustaste an,
 > wähl **Öffnen mit** und dann einen einfachen Texteditor (unter Windows „Editor“, auf dem Mac
@@ -229,10 +229,11 @@ flach auf dem Boden wie das Koordinatensystem in deinem Heft.
 Zeigefinger nach vorn und den Mittelfinger nach oben. Daumen ist X, Zeigefinger Y, Mittelfinger Z. Mit
 der linken Hand klappt das nicht – dort zeigt der Mittelfinger nach unten.
 
-> **Mission:** Wähl **File → New Level...**, die Vorlage **Basic** und **Create**. Setz über den
-> Content Drawer (Knopf ganz links in der Statusleiste) einen **Cube**. Unten links zeigt das Achsenkreuz X rot, Y grün, Z blau
-> – nach oben. Zieh mit dem Move-Werkzeug (**W**) am blauen Pfeil und beobachte in **Details** das Feld
-> **Location** Z.
+> **Mission:** Wähl **Datei › Neues Level...** (File › New Level...), die Vorlage **Grundformen**
+> (Basic) und **Erstellen** (Create). Setz über die **Inhaltsablage** (Content Drawer) – der Knopf
+> ganz links in der Statusleiste – einen **Würfel** (Cube). Unten links zeigt das Achsenkreuz X rot, Y grün,
+> Z blau – nach oben. Zieh mit dem Werkzeug **Verschieben (W)** (Move (W)) am blauen Pfeil und
+> beobachte in **Details** das Feld **Position** (Location) Z.
 
 ### Vektoren: Pfeile aus Zahlen
 
@@ -272,7 +273,7 @@ C++-Code rechnet Kern dagegen in **Radiant**. Radiant heißt: Wie weit wanderst 
 Runde (180°) ist etwa 3,14, eine Viertelrunde (90°) etwa 1,57. Für Mathe-Formeln ist Radiant
 bequemer, für Menschen Grad. Darum rechnet Kern zwischen beiden um.
 
-> **Mission:** Tipp in **Details** bei **Rotation** Z deines Cubes `45*2` und drück Enter.
+> **Mission:** Tipp in **Details** bei **Drehung** (Rotation) Z deines Würfels `45*2` und drück Enter.
 > Rechenausdrücke sind erlaubt – der Würfel dreht sich um 90°.
 
 ### Drehungen in vier Zahlen
