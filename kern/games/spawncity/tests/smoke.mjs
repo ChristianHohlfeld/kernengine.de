@@ -120,7 +120,7 @@ async function run({name, url, context, mapped}) {
   };
   // Controls are held for 3 s of game time (software WebGL renders a few frames per second, and the
   // game clamps a frame to 0.1 s), at most `limit` ms of wall time.
-  const holdFor = async (press, release, seconds = 3, limit = 120000) => {
+  const holdFor = async (press, release, seconds = 3, limit = 400000) => {
     const gameTime = async () => { const t = (await hud()).t; if (!Number.isFinite(t)) throw Error("HUD without game time"); return t; };
     const t0 = await gameTime(), end = Date.now() + limit;
     await press();
@@ -192,7 +192,7 @@ async function run({name, url, context, mapped}) {
     await shot("4-jet");
     check(await cmd("eject") === "ok", `[${name}] ejection seat`);
     const t0 = (await hud()).t;
-    await page.waitForFunction(t0 => window.SpawnCity.hud().t > t0 + 1.5, t0, {timeout: 120000});
+    await page.waitForFunction(t0 => window.SpawnCity.hud().t > t0 + 1.5, t0, {timeout: 400000});
     h = await hud();
     check(h.mode === "parachute" && h.chute, `[${name}] the canopy is open (${h.mode}, ${h.agl} m)`);
     await shot("5-parachute");

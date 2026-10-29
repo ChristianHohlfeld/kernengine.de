@@ -176,10 +176,13 @@ void VehicleArt::car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit
     put(bus_body_, chassis, color);
     put(bus_glass_, chassis);
   } else {
-    if (!cockpit_view) put(car_body_, chassis, color);
+    // From the driver's seat only the glass is around the eye; the body and lamps stay outside the view.
     put(car_glass_, chassis);
-    put(car_lights_, chassis);
-    put(car_tail_, chassis, brake_lights ? Vec3{3, 1, 1} : Vec3{1, 1, 1});
+    if (!cockpit_view) {
+      put(car_body_, chassis, color);
+      put(car_lights_, chassis);
+      put(car_tail_, chassis, brake_lights ? Vec3{3, 1, 1} : Vec3{1, 1, 1});
+    }
   }
   if (cockpit_view && !bus) return;
   const f32 r = c.spec().radius, w = c.spec().wheel_width;
