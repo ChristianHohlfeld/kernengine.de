@@ -6,6 +6,8 @@
 > **Wörter, die du brauchst:**
 > - **Programmiersprache** – eine Sprache, in der Menschen einem Computer genaue Anweisungen
 >   aufschreiben. C++ und JavaScript sind zwei davon.
+> - **Maschinensprache** – Befehle, die ein Rechenwerk direkt ausführen kann, ohne sie erst
+>   übersetzen zu müssen.
 > - **Browser** – das Programm, mit dem du Webseiten öffnest, etwa Chrome, Firefox oder Safari.
 > - **Grafikkarte** – der Chip im Computer, der die Bilder zeichnet.
 > - **Bit** – die kleinste Einheit im Computer: eine 0 oder eine 1. Alle Zahlen bestehen aus Bits.
@@ -33,7 +35,7 @@ Dazu gibt es spielbare Levels wie **Orb Run** und **Physics Lab**.
 
 ![Kern Studio mit dem Level Orb Run](../buch/bilder/studio.png)
 
-> **Mission:** Öffne Kern Studio. Beim allerersten Start ist **Orb Run** geladen (sonst
+> **Mission:** Öffne Kern Studio: Klick auf https://kernengine.de/ auf **Editor**. Beim allerersten Start ist **Orb Run** geladen (sonst
 > **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem Hovercar los und
 > sammle Orbs. **Esc** beendet das Spiel.
 
@@ -54,10 +56,16 @@ Kern spricht sie über
 > einmal von C++ nach WebAssembly übersetzt, und dein Browser führt die Übersetzung aus.
 
 Entstanden ist Kern aus dem Spiel **SpawnCity**. Trotzdem kennt die Engine SpawnCity nicht: **Spiele
-sprechen mit der Engine, nie umgekehrt.** Das hat einen guten Grund. Weil die Engine nichts über ein
-bestimmtes Spiel weiß, kann man mit ihr beliebig viele verschiedene Spiele bauen.
+sprechen mit der Engine, nie umgekehrt.** Das hat einen guten Grund: Wüsste die Engine etwas von
+SpawnCity, würde sie sich auf SpawnCity verlassen, und man könnte mit ihr nur SpawnCity bauen. Weil
+sie nichts über ein bestimmtes Spiel weiß, passt sie unter jedes.
 
-Kern besteht aus diesen Teilen:
+> **So kannst du es dir vorstellen:** ein Legostein. Er weiß nicht, ob du ein Schiff oder ein Haus
+> baust – und gerade deshalb passt er in beides. Hätte jemand ihn nur für ein Schiff geformt, könntest
+> du daraus kein Haus mehr bauen.
+
+Kern besteht aus diesen Teilen (die **Spielwelt** ist alles, was beim Spielen passiert, der
+**Kellner** kommt gleich in 1.2):
 
 | Teil | Was er macht | Zum Beispiel |
 |---|---|---|
@@ -65,29 +73,36 @@ Kern besteht aus diesen Teilen:
 | Grafik | Bilder zeichnen | Häuser, Straßen, Gelände |
 | Physik | Stöße, Gelenke, Schwerkraft | eine Kiste fällt um |
 | Ton | Klänge mischen, 3D-Klang | das Quaken wird lauter, wenn die Ente näher kommt |
-| Spiel-Laufzeit | Levels, Spieler, Regeln | Orb einsammeln gibt Punkte |
+| Spielwelt | Levels, Spieler, Regeln | Orb einsammeln gibt Punkte |
 | Logik, Netzwerk | Spielabläufe, Mehrspieler | Tür geht auf, wenn du davorstehst |
 | Studio, Lehrer | Editor und Trainer | Welt bauen, Ente trainieren |
-| JavaScript-Schicht | Brücke zum Browser | Tastendruck weitergeben |
+| Kellner (JavaScript) | Brücke zum Browser | Tastendruck weitergeben |
 
 ## 1.2 Kerns Regeln
 
 Kern folgt drei großen Regeln.
 
-**Alles selbst gemacht.** Kern benutzt keine fremde Grafik-Engine und kein fremdes Gerüst. Der Code,
-der zeichnet, ist Kerns eigener und spricht die Grafikkarte direkt an. So weiß man bei jedem Bild
-genau, woher es kommt.
+**Kein fremder Motor fürs Zeichnen.** Kern benutzt keine fremde Grafik-Engine. Der Code, der
+zeichnet, ist Kerns eigener und spricht die Grafikkarte direkt an. So weiß man bei jedem Bild genau,
+woher es kommt. Zwei Bauteile stammen allerdings aus freien Projekten anderer Leute: die Physik
+namens **Box3D** ([Kapitel 6](06-physik.md)) und eine Mathe-Bibliothek ([Kapitel 3](03-grundlagen.md)).
+Kern baut die Physik **unverändert** ein und übersetzt beide auf jedem Rechner auf genau dieselbe
+Weise.
+
+Außerdem benutzt Kern nur Fähigkeiten, die fast jeder Browser hat. Lieber verzichtet es auf ein paar
+neue Tricks, als dass es auf älteren Geräten nicht läuft.
 
 **JavaScript ist nur der Kellner.** Grafikkarte, Tasten, Töne und Dateien erreicht im Browser nur
 die Programmiersprache JavaScript. Genau das – und nur das – erledigt Kerns JavaScript-Teil. Was ein
-Spiel tut, steht in C++. Selbst die Fenster von Studio zeichnet JavaScript nur nach den Angaben, die
-der Editor in C++ macht.
+Spiel tut, steht in C++.
 
 > **So kannst du es dir vorstellen:** Der Kellner bringt die Bestellung in die Küche und das Essen
-> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche.
+> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche. Und er arbeitet
+> sparsam: Bei jedem Bild nimmt er dasselbe Tablett, statt jedes Mal ein neues zu holen.
 
-Der Vorteil: Alles, was ein Spiel tut, lässt sich auch ohne Browser testen (das zeigt
-[Kapitel 2](02-bauen-und-testen.md)).
+Der Vorteil: C++ kann man auch direkt auf dem Computer laufen lassen, ganz ohne Browser. JavaScript
+braucht dagegen den Browser. Weil alles, was ein Spiel tut, in C++ steht, lässt es sich auch ohne
+Browser testen (das zeigt [Kapitel 2](02-bauen-und-testen.md)).
 
 **Überall exakt gleich.** Eine Simulation kommt auf einem PC, einem Mac und im Browser **Bit
 für Bit** gleich heraus. Das heißt **Determinismus**. Warum ist das schwer? Computer runden. Teil
@@ -108,53 +123,63 @@ Wozu der Aufwand? Läuft etwas schief, läuft es auf jedem Rechner genau gleich 
 den Fehler immer wieder herbeiführen, finden und reparieren.
 
 > **Krass, aber wahr:** Weil Kern so exakt rechnet, liegt ein Unterschied zwischen dem echten Roboter
-> und der Simulation nie am Zufall. Er zeigt, dass das Modell der Ente an einer Stelle noch nicht
-> stimmt – und genau das will man wissen ([Kapitel 16](16-kalibrierung.md)).
+> und der Simulation nie am Zufall. Er zeigt, dass die Beschreibung der Ente im Computer an einer
+> Stelle noch nicht stimmt – und genau das will man wissen ([Kapitel 16](16-kalibrierung.md)).
 
-**Noch drei kleine Regeln:**
+**Noch vier kleine Regeln:**
 
 - **Erst prüfen, dann ändern.** Kern prüft alles, was von außen kommt. Eine kaputte Eingabe ändert
   nichts am Bestehenden.
 - **Keine Schummelei.** Die Micro Duck steht nur durch die Motoren in ihren Gelenken und ihren
-  Kontakt zum Boden. Keine unsichtbare Hand hält sie fest.
+  Kontakt zum Boden. Keine unsichtbare Hand hält sie fest. Warum so streng? Eine Ente, die nur dank
+  einer unsichtbaren Hand steht, würde im Computer laufen und in Wirklichkeit umfallen. Was man in
+  der Simulation lernt, soll aber auch für den echten Roboter gelten.
 - **Eine Welt für alle.** Editor, exportiertes Spiel und Lehrer benutzen dieselbe Spielwelt,
   dieselben Motoren und dieselbe Physik.
+- **Nicht umfallen, wenn die Grafikkarte kurz weg ist.** Manchmal nimmt der Browser einer Webseite
+  die Grafikkarte für einen Moment weg. Dann pausiert Kern und baut danach alles neu auf, aus Kopien,
+  die es selbst aufbewahrt hat ([Kapitel 4](04-grafik.md)).
 
 > **Für Profis:** Kern verzichtet bewusst auf die Grafik-Engine three.js und den Übersetzer
-> Emscripten. Das Modul läuft ab Safari 15 auf jedem Browser mit WebGL2. Verliert der Browser
-> kurz die Grafikkarte, pausiert Kern und baut danach alles neu auf. Die genauen Namen und Werte
-> stehen im blauen Buch, Kapitel 1.
+> Emscripten. Das Modul läuft ab Safari 15 auf jedem Browser mit WebGL2. Die genauen Namen und
+> Werte stehen im blauen Buch, Kapitel 1.
 
 ## 1.3 Der Bauplan: Stockwerke
 
 Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter, nie die darüber. Die Grafik
-weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen.
+weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen. Im Bild heißt
+jeder durchgezogene Pfeil „benutzt“. Die gestrichelte Linie ist die Tür nach draußen.
 
 ```mermaid
 flowchart TD
-  JS["JavaScript, der Kellner"] --> ABI["die Tür"]
-  ABI --> ST["Studio und Lehrer"]
-  ST --> SP["Spielregeln und Levels"]
-  SP --> MID["Physik, Logik, Netzwerk, Ton"]
-  MID --> GFX["Grafik, Szene, Geometrie"]
-  GFX --> CORE["Grundlagen, Mathe"]
+  JS["JavaScript, der Kellner"] <-. "die Tür" .-> HAUS
+  subgraph HAUS["das Hochhaus Kern"]
+    ST["Studio und Lehrer"] --> SP["Spielregeln und Levels"]
+    SP --> MID["Physik, Logik, Netzwerk, Ton"]
+    MID --> GFX["Grafik, Szene, Geometrie"]
+    GFX --> CORE["Grundlagen, Mathe"]
+  end
 ```
+
+Der Kellner ist **kein Stockwerk**. Er steht vor dem Haus an der Tür, bringt Bestellungen hinein und
+Fertiges hinaus. Die Hochhausregel gilt für die Stockwerke im Haus, nicht für ihn.
 
 Nicht jedes Stockwerk ist immer eingebaut. Physik, Spielregeln, Studio und Lehrer kommen nur dazu,
 wenn man sie anfordert. Wer Studio will, bekommt Spielregeln und Physik automatisch mit, weil Studio
 darauf steht. Grafik, Ton, Logik und Netzwerk sind immer dabei.
 
-Zwischen C++ und JavaScript gibt es nur **eine Tür**: einen Speicherbereich, auf den beide Seiten
-zugreifen dürfen.
+Zwischen C++ und JavaScript gibt es für Daten nur **eine Tür**: einen Speicherbereich, auf den beide
+Seiten zugreifen dürfen.
 
 > **So kannst du es dir vorstellen:** eine Wand voller nummerierter Schließfächer. Der Browser legt
 > Zahlen in die Fächer und sagt der Engine nur: „Schau ab Fach 1000 nach.“ Ein Text geht als „ab
 > Fach 2000, so und so viele Zeichen“. Antworten legt die Engine genauso in Fächer zurück.
 
-Umgekehrt kann die Engine den Browser um etwas bitten, etwa „zeichne das“ oder „wie spät ist es?“.
+Weil der Kellner kein Stockwerk ist, darf die Küche ihn auch rufen: Die Engine bittet den Browser
+etwa „zeichne das“ oder „wie spät ist es?“. Das verletzt die Hochhausregel nicht.
 
 > **Vorsicht, Falle:** Beide Seiten müssen genau wissen, in welchem Fach welche Zahl liegt. Ändert
-> man die Reihenfolge nur auf einer Seite, liest die andere Unsinn. Die Liste aller Fächer und Türen
+> man die Reihenfolge nur auf einer Seite, liest die andere Unsinn. Die Liste aller Fächer
 > steht in [Kapitel 17](17-referenz.md) und im blauen Buch, Kapitel 1.
 
 ## 1.4 Vier Formen, ein Code
@@ -197,15 +222,16 @@ andere.
 > **Leertaste** quakt.
 
 > **Mission:** Öffne von der Startseite aus den **Lehrer**. Wähle bei **Bewegung** „Stehen
-> (Schnelltest)“ und drück **Start**. Beobachte die Kurve **Episodenlänge**: Ein Versuch endet,
-> sobald eine Ente stürzt. Steigt die Kurve, halten die Enten länger durch – das Netz lernt gerade.
+> (Schnelltest)“ und drück **Start**. Beobachte die Kurve **Episodenlänge**. Eine **Episode** ist
+> ein Versuch, und er endet, sobald eine Ente stürzt. Steigt die Kurve, halten die Enten länger durch – das Netz lernt gerade.
 > Mit **Pause** hältst du an.
 
 ## 1.5 Wo alles liegt
 
 Der ganze Quellcode von Kern ist **offen** und liegt auf
 https://github.com/ChristianHohlfeld/kernengine.de – jeder darf hineinschauen, daraus lernen,
-Fehler finden und Kern unter den Regeln der Lizenz für eigene Projekte benutzen. Und jeder kann
+Fehler finden und Kern unter den Regeln der **Lizenz** (den Spielregeln, was man mit dem Code machen
+darf) für eigene Projekte benutzen. Und jeder kann
 nachprüfen, ob das, was dieses Buch erzählt, wirklich so im Code steht.
 
 > **Für Profis:** Die Engine liegt im Ordner `kern/`, darin Code, Tests, Beispiele, die
@@ -248,6 +274,9 @@ Eingaben zurück, **Esc** verlässt das Feld. Ein paar Missionen in diesem Buch 
 
 > **Mission:** Klick unten auf **Cmd**, tipp `help` und drück Enter: Studio zeigt alle Befehle. Tipp
 > dann `tod 0.75` – die Tageszeit springt auf Sonnenuntergang. Mit `tod 0.5` ist wieder Mittag.
+> „tod“ hat nichts mit dem Tod zu tun: Es steht für *time of day*, englisch für Tageszeit. Der
+> ganze Tag ist 1. Die Hälfte, 0,5, ist also 12 Uhr, drei Viertel, 0,75, sind 18 Uhr. Getippt wird
+> mit **Punkt** statt Komma, denn Computer schreiben Kommazahlen auf Englisch: `0.75`, nicht `0,75`.
 
 **Drei Bücher, ein Inhalt.** Du liest das **gelbe Buch**. Das **grüne** erklärt alles einfach für
 Erwachsene ohne Vorwissen, das **blaue** geht technisch bis ins letzte Detail und ist die Quelle für
@@ -272,8 +301,9 @@ alle drei. Packt dich ein Thema, schlag im blauen Buch nach!
 
 1. Browser verstehen kein C++. Darum wird Kern vorher nach WebAssembly übersetzt, und das versteht
    jeder moderne Browser.
-2. Dann kann man mit derselben Engine beliebig viele verschiedene Spiele bauen. Wie im Hochhaus
-   benutzt das Spiel oben die Engine unten, nie umgekehrt.
+2. Wüsste sie etwas von einem Spiel, würde sie sich darauf verlassen und passte nur zu diesem einen.
+   So aber passt sie wie ein Legostein unter beliebig viele Spiele. Wie im Hochhaus benutzt das
+   Spiel oben die Engine unten, nie umgekehrt.
 3. Lehrer und Studio benutzen dieselbe Spielwelt, dieselben Motoren und dieselbe Physik, und Kern
    rechnet überall Bit für Bit gleich. Das Netz trifft also auf genau dieselbe Welt, in der es
    geübt hat.

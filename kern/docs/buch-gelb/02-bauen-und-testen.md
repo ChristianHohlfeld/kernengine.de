@@ -10,7 +10,8 @@
 >   kann.
 > - **Modul** – die fertig übersetzte Datei von Kern, die der Browser lädt.
 > - **Prozessor** – das Rechenwerk im Computer. Moderne Prozessoren haben mehrere **Kerne**, die
->   gleichzeitig rechnen können.
+>   gleichzeitig rechnen können. Nicht verwechseln: Diese Prozessorkerne haben mit der Engine Kern
+>   nichts zu tun, sie heißen nur zufällig fast gleich.
 > - **Speicher** – der Arbeitsplatz des Computers, auf dem ein Programm seine Zahlen ablegt.
 > - **Actor** – ein Ding in einem Level von Studio, etwa ein Würfel, eine Lampe oder die Ente.
 > - **GitHub** – eine Webseite, auf der der Quelltext von Kern liegt und von der aus Änderungen
@@ -66,6 +67,11 @@ schneller zu werden, zum Beispiel zwei Rechenschritte zu einem zusammenziehen. K
 das. Dadurch rechnet jeder Rechner exakt gleich. Warum zwei Schritte statt einem einen Unterschied
 machen, rechnest du in [Kapitel 3](03-grundlagen.md) selbst nach.
 
+Aus demselben Grund verzichtet die Physik auf ihren Turbo-Weg. Sie hätte einen eigenen Rechenweg,
+der mit Spezialbefehlen mancher Prozessoren mehrere Zahlen auf einmal rechnet. Im Browser gibt es
+diesen Weg nicht. Darum schaltet Kern ihn überall ab, und die Physik rechnet auf jedem Rechner auf
+demselben einfachen Weg.
+
 **Der Zwischenspeicher.** Kern besteht aus vielen Dutzend Quelltext-Dateien. Alle zu übersetzen
 dauert eine ganze Weile. Darum übersetzt Kern jede Datei einzeln, viele gleichzeitig auf allen
 Prozessorkernen, und legt das Ergebnis in einem **Zwischenspeicher** ab. Beim nächsten Bauen
@@ -74,13 +80,13 @@ Zwischenspeicher. Nur Geändertes wird neu übersetzt. Studio und die Beispielsp
 die fertigen Teile der Engine.
 
 > **So kannst du es dir vorstellen:** dein Hausaufgabenordner. Ändert sich eine Aufgabe, schreibst
-> du nur diese Seite neu ab, nicht den ganzen Ordner. Ändert sich aber das Deckblatt, auf das jede
-> Seite verweist, schreibst du sicherheitshalber alles neu.
+> du nur diese Seite neu ab, nicht den ganzen Ordner. Ändert sich aber die Vorlage, nach der alle
+> Seiten gemacht sind, schreibst du sicherheitshalber alles neu.
 
 Woran erkennt Kern „geändert“? Aus dem Inhalt einer Datei entsteht eine Kennzahl, ein **Hash**
 (mehr dazu in 2.9). Ändert sich auch nur ein Zeichen, ändert sich die Kennzahl.
 
-> **Vorsicht, Falle:** Manche Dateien benutzen fast alle anderen, wie das Deckblatt. Ändert man so
+> **Vorsicht, Falle:** Manche Dateien benutzen fast alle anderen, wie die Vorlage. Ändert man so
 > eine gemeinsame Datei, baut Kern alles neu. Das ist Absicht: lieber eine Minute länger warten als
 > mit einem veralteten Teil weiterarbeiten.
 
@@ -88,9 +94,10 @@ Woran erkennt Kern „geändert“? Aus dem Inhalt einer Datei entsteht eine Ken
 
 Eine Webseite besteht normalerweise aus vielen Dateien: Text, Aussehen, Programme, Bilder. Für Studio
 werden alle diese Teile, samt dem übersetzten Modul, in **eine einzige** Datei gepackt. Das Modul wird
-dafür in gewöhnliche Buchstaben umgeschrieben, damit es wie Text in die Seite passt. Darum läuft
-Studio auch ohne Internet per Doppelklick. Aus Kopien, die ebenfalls in der Datei liegen, schreibt
-Studio sogar deine exportierten Spiele.
+dafür in gewöhnliche Buchstaben umgeschrieben, denn es besteht aus rohen Zahlen, und eine Webseite
+darf nur Text enthalten. Darum läuft Studio auch ohne Internet per Doppelklick. Studio legt sich
+außerdem die Bauteile für fertige Spiele gleich mit in die Datei, damit es daraus dein exportiertes
+Spiel packen kann.
 
 > **So kannst du es dir vorstellen:** ein Umschlag, in dem Brief, Fotos und Bastelanleitung stecken.
 > Wer den Umschlag hat, hat alles und muss nichts nachbestellen.
@@ -102,12 +109,18 @@ Studio sogar deine exportierten Spiele.
 ## 2.5 Der Lehrer als Programm
 
 Das Training der Ente dauert lange. Deshalb gibt es den Lehrer nicht nur im Browser, sondern auch als
-eigenes Programm für Linux- und Mac-Rechner. Als Programm nutzt er alle Kerne des Prozessors
-und malt kein einziges Bild – das spart viel Zeit. So kann er sogar auf einem Server, einem Computer im
-Rechenzentrum ohne Bildschirm, trainieren.
+eigenes Programm für Rechner mit Linux (einem Betriebssystem wie Windows) und für Macs. Als Programm
+nutzt er alle Kerne des Prozessors und malt kein einziges Bild – das spart viel Zeit. So kann er
+sogar auf einem Server, einem Computer im Rechenzentrum ohne Bildschirm, trainieren.
 
-Der Compiler darf dabei die schnellsten Befehle des jeweiligen Prozessors benutzen. Das Ergebnis
-bleibt trotzdem Bit für Bit gleich, denn die Rechnung selbst darf er nicht verändern (2.3).
+Der Compiler darf dabei die schnellsten Befehle des jeweiligen Prozessors benutzen. Ist das nicht
+Tricksen, das in 2.3 verboten wurde? Nein. Verboten ist, die **Rechenschritte** zu ändern, also etwa
+zwei zu einem zusammenzuziehen. Erlaubt ist, dieselben Schritte mit schnelleren Befehlen
+auszuführen. Darum bleibt das Ergebnis Bit für Bit gleich.
+
+> **So kannst du es dir vorstellen:** eine Matheaufgabe. Du darfst mit einem schnelleren Stift
+> schreiben. Aber du musst dieselben Rechenschritte in derselben Reihenfolge machen und an denselben
+> Stellen runden. Dann steht unten dasselbe Ergebnis wie bei deinem Banknachbarn.
 
 ## 2.6 Unit-Tests: Tausende kleine Fragen
 
@@ -120,7 +133,8 @@ Prüfungen, von der Mathe bis zum Studio. Ein paar Fragen, die Kern sich wirklic
 - Kommt eine Nachricht im Mehrspieler-Modus an, auch wenn das Netzwerk schlecht ist?
 
 Bei Kommazahlen fragt ein Test manchmal „ungefähr gleich?“, weil Computer runden (siehe
-[Kapitel 3](03-grundlagen.md)). Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
+[Kapitel 3](03-grundlagen.md)). Das widerspricht dem „Bit für Bit gleich“ aus Kapitel 1 nicht:
+Hier wird mit dem mathematisch **richtigen** Ergebnis verglichen, nicht mit einem anderen Rechner. Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
 gescheitert sind, mit der genauen Stelle im Quelltext. Das kleine Testgerüst hat Kern selbst
 geschrieben.
 
@@ -132,8 +146,9 @@ geschrieben.
 - Der zweite fängt verbotene Rechnungen, zum Beispiel einen **Zahlenüberlauf**. Das ist wie ein
   Kilometerzähler mit fünf Stellen, der nach 99 999 plötzlich wieder 00 000 zeigt.
 
-Findet einer der beiden etwas, bricht der Test sofort ab. Außerdem gilt beim Testen: Jede Warnung des
-Compilers zählt als Fehler.
+Findet einer der beiden etwas, bricht der Test sofort ab. Außerdem gilt beim Testen: Jede
+**Warnung** des Compilers zählt als Fehler. Eine Warnung ist ein Hinweis des Übersetzers: „Das sieht
+verdächtig aus.“
 
 > **So kannst du es dir vorstellen:** ein Schiedsrichter mit Videobeweis. Im Spiel übersieht man
 > ein kleines Foul vielleicht. Der Videobeweis sieht jedes.
@@ -161,16 +176,15 @@ auf drei Wegen ausführen:
 > einprägen oder es gedruckt einem Freund mitgeben. Der Kuchen muss jedes Mal gleich schmecken.
 
 Genau das prüfen die Logik-Tests: Dieselben kleinen Abläufe laufen auf allen drei Wegen, und alle
-müssen Bit für Bit dasselbe Ergebnis liefern. Nebenbei misst ein Test, wie viel schneller der
-übersetzte Weg ist als das Vorlesen.
+müssen Bit für Bit dasselbe Ergebnis liefern.
 
 ## 2.8 Der Roboter, der das Studio bedient
 
-Ein Testprogramm steuert einen echten Browser und klickt sich wie ein Mensch durch das Studio: Menüs,
-Fliegen, Auswählen, Play, Simulate, Rückgängig, Logik-Editor, Micro Duck, Mehrspieler, Spiel packen
-und spielen, alles auch im Handy-Format.
+Ein Testprogramm steuert einen echten Browser und klickt sich wie ein Mensch durch alles Wichtige im
+Studio, auch im Handy-Format.
 
-Dieser Browser hat keine Grafikkarte und schafft deshalb nur etwa **ein Bild pro Sekunde**. Darum
+Der Testcomputer hat keine Grafikkarte. Also muss der Prozessor mühsam selbst zeichnen und schafft
+nur etwa **ein Bild pro Sekunde**. Darum
 wartet jede Prüfung auf ihre **Wirkung** statt auf eine feste Zeit: „Warte, bis das Menü offen ist“
 statt „Warte zwei Sekunden“. Und um zu prüfen, ob wirklich etwas gezeichnet wurde, zählt der Test,
 wie viele verschiedene Farben im Bild sind. Ein leeres Fenster hätte fast nur eine.
@@ -186,8 +200,12 @@ Auf Wunsch macht der Test Bildschirmfotos. Einige davon siehst du in diesem Buch
 > **Play** (Alt+P): Du spielst selbst mit. **Esc** stoppt. Drück **Simulate** (Alt+S): Jetzt läuft nur
 > die Physik, und du schaust mit freier Kamera zu. **Esc**. Alles geklappt? Test bestanden.
 
-> **Mission:** Öffne den Content Drawer (Ctrl+Space), klick **Cube** an und verschieb ihn mit dem
-> Move-Werkzeug (**W**) dreimal. Öffne **Edit → History...** und klick auf einen früheren Schritt.
+> **Mission:** Öffne den Content Drawer mit dem Knopf **Content Drawer** ganz links in der
+> Statusleiste (unter Windows und Linux geht auch Ctrl+Space; auf dem Mac nimm lieber den Knopf, weil
+> der Mac diese Tasten oft selbst benutzt). Klick **Cube** an. Drück jetzt **W**, diesmal ohne
+> rechte Maustaste: Dann heißt W nicht „fliegen“, sondern „Move-Werkzeug“. Am Cube erscheinen
+> farbige Pfeile. Zieh dreimal mit der linken Maustaste an einem Pfeil, um ihn zu verschieben. Öffne
+> **Edit → History...** und klick auf einen früheren Schritt.
 > Das Studio springt exakt dorthin. Auch das prüfen Kerns Tests: Rückgängig muss jedes Mal genau
 > denselben Zustand zurückbringen.
 
@@ -211,9 +229,10 @@ Warum genügt nicht etwas Einfaches wie die Quersumme? Probier es aus: 1234 hat 
 dass zwei Ziffern vertauscht wurden. Ein guter Hash mischt die Zahlen so gründlich, dass schon die
 kleinste Änderung oder Vertauschung eine ganz andere Kennung ergibt.
 
-Für 400 Regeltakte ist die richtige Kennung jedes Takts als **Referenz** gespeichert. Verglichen wird
-auf drei Arten von Rechnern: auf einem PC, im WebAssembly-Modul und auf einem Mac mit Apple-Chip. Stimmen
-alle 400 Kennungen überein, rechnen alle exakt gleich.
+Für 400 Regeltakte, also 8 Sekunden Entenleben (400 : 50 = 8), ist die richtige Kennung jedes Takts
+als **Referenz** gespeichert. Verglichen wird auf drei Arten: auf einem PC, im Browser und auf einem
+Mac, dessen Rechenwerk ganz anders gebaut ist als das im PC. Stimmen alle 400 Kennungen überein,
+rechnen alle exakt gleich.
 
 Weicht etwas ab, gibt es zwei Möglichkeiten:
 
@@ -222,11 +241,13 @@ Weicht etwas ab, gibt es zwei Möglichkeiten:
 - Irgendwo rechnet ein Stück Code **nicht überall gleich**. Zum Beispiel benutzt es eine
   Rechenfunktion des Computers, die an der letzten Stelle anders rundet, oder es zieht zwei
   Rechenschritte zusammen. Oder es zählt Zahlen in einer Reihenfolge zusammen, die davon abhängt,
-  wie viele Helfer gerade gleichzeitig rechnen. Warum die Reihenfolge zählt, zeigt
+  wie viele Helfer gerade gleichzeitig rechnen (etwa auf mehreren Prozessorkernen aus dem
+  Wörterkasten). Warum die Reihenfolge zählt, zeigt
   [Kapitel 3](03-grundlagen.md).
 
-Darum gibt es noch einen zweiten Test: Der Lehrer lernt einmal mit 1, einmal mit 2 und einmal mit 4
-Helfern, die gleichzeitig rechnen. Am Ende müssen alle drei Netze bis aufs letzte Bit gleich sein.
+Darum gibt es noch einen zweiten Test: Der Lehrer lernt dieselbe Aufgabe mehrmals, jedes Mal mit
+unterschiedlich vielen Helfern, die gleichzeitig rechnen. Am Ende müssen alle Netze bis aufs letzte
+Bit gleich sein.
 
 > **Krass, aber wahr:** Geprüft wird jeder einzelne der 400 Takte. Weicht einer ab, nennt der Test
 > den ersten abweichenden Takt. So findet man die Stelle, an der die Rechnung zum ersten Mal
@@ -241,7 +262,8 @@ wenn jemand eine Änderung an Kern auf GitHub hochlädt, startet ein Computer im
 alle Arbeitsgänge: bauen, testen, veröffentlichen. Niemand muss daran denken.
 
 > **So kannst du es dir vorstellen:** ein Fließband mit Qualitätskontrolle. Jedes neue Teil läuft
-> durch dieselben Stationen. Erst was alle Prüfungen besteht, verlässt die Fabrik.
+> durch dieselben Stationen. Ist ein Teil fertig gebaut, kommt es schon in den Laden, während die
+> Kontrolle es noch prüft. Findet sie etwas, sieht man das sofort und bessert nach.
 
 ```mermaid
 flowchart LR
@@ -253,15 +275,21 @@ flowchart LR
 ```
 
 - **Tests mit Prüfern:** alle Unit-Tests mit den Sanitizern.
-- **Fingerabdruck auf dem Mac:** Der Lehrer wird auf einem Mac mit Apple-Chip gebaut und muss die Ente
-  genauso bewegen wie PC und Browser.
-- **Bauen:** Studio, Beispiele und Lehrer werden gebaut (mit dem Zwischenspeicher aus 2.3), der Lehrer
-  und die Logik werden im Modul getestet, und die Webseite wird zusammengestellt.
+- **Fingerabdruck auf dem Mac:** Den Fingerabdruck rechnet der Lehrer aus. Darum wird der Lehrer auf
+  einem Mac gebaut und muss die Ente genauso bewegen wie PC und Browser.
+- **Bauen:** Studio, Beispiele und Lehrer werden gebaut (mit dem Zwischenspeicher aus 2.3). Lehrer
+  und Logik werden dabei auch in ihrer Browser-Form getestet, und die Webseite wird zusammengestellt.
 - **Veröffentlichen:** Die fertige Seite erscheint auf https://kernengine.de/.
 - **Roboter im Browser:** der Test aus 2.8, und zwar mit genau den Dateien, die veröffentlicht werden.
 
 Die Seite geht online, sobald das Bauen fertig ist. Die Tests laufen gleichzeitig weiter und halten
-das nicht auf.
+das nicht auf. Das ist ein bewusster Kompromiss: Ein ganzer Durchlauf dauert gut eine Viertelstunde,
+und so ist eine Änderung schneller bei dir. Meldet ein Test danach einen Fehler, sieht man es sofort
+und bessert nach.
+
+Veröffentlicht wird aber nur, was schon im **Hauptstand** von Kern angekommen ist. Schlägt jemand
+eine Änderung erst vor (das heißt auf GitHub **Pull Request**), baut und prüft die CI sie genauso,
+veröffentlicht sie aber nicht. So kommt ein Vorschlag nie ungeprüft auf die Webseite.
 
 > **Mission:** Öffne das veröffentlichte Studio und schau unten rechts in die Statusleiste. Dort
 > steht „v“ und sieben Zeichen: der Anfang der **Build-Kennung**, die die CI beim Veröffentlichen
@@ -300,7 +328,7 @@ Buch, Kapitel 2.
 
 1. Der Zwischenspeicher hat alle anderen Dateien schon fertig übersetzt. Kern übersetzt nur die eine
    geänderte Datei neu.
-2. Ohne Grafikkarte zeichnet der Browser etwa ein Bild pro Sekunde. Eine feste Zeit wäre mal zu kurz,
+2. Ohne Grafikkarte zeichnet der Testcomputer etwa ein Bild pro Sekunde. Eine feste Zeit wäre mal zu kurz,
    mal Verschwendung.
 3. Zum Beispiel: Eine Rechenfunktion des Computers rundet an der letzten Stelle anders. Oder zwei
    Rechenschritte wurden zu einem zusammengezogen. Oder Zahlen werden in einer Reihenfolge
