@@ -25,69 +25,81 @@ ist. Die Bedienung der einzelnen Panels steht in [Kapitel 11](11-studio.md).
 ### Schritt 1: Ein neues Level
 
 1. Studio öffnen (auf https://kernengine.de/ unter `/editor/` oder `generated/studio.html`).
-2. **File › New Level...**, Vorlage **Basic**, **Create**. Das Level hat einen Boden (40 × 40 m), Sonne,
-   Himmel und einen Würfel.
-3. In **World Settings** den **Level name** und den **Game title** setzen, etwa „Orb Garden".
+2. **Datei › Neues Level...** (File › New Level...), Vorlage **Grundformen** (Basic), **Erstellen**
+   (Create). Das Level hat einen Boden (40 × 40 m), Sonne, Himmel und einen Würfel.
+3. In den **Welteinstellungen** (World Settings) den **Level-Name** (Level name) und den **Spieltitel**
+   (Game title) setzen, etwa „Orb Garden".
 
-Warum Basic und nicht Empty: Empty hat gar nichts, also auch keinen Boden, auf dem eine Figur stehen kann.
-Die World Settings haben zwar einen **Endless ground**; ein sichtbarer Boden mit eigener Farbe und Kollision
-ist für den Anfang aber anschaulicher.
+Warum **Grundformen** und nicht **Leer** (Empty): **Leer** hat gar nichts, also auch keinen Boden, auf dem
+eine Figur stehen kann. Die **Welteinstellungen** haben zwar das Feld **Endloser Boden** (Endless ground);
+ein sichtbarer Boden mit eigener Farbe und Kollision ist für den Anfang aber anschaulicher.
 
 ### Schritt 2: Die Spielfigur
 
-1. Content Drawer öffnen (**Ctrl+Space**), Gruppe **Players**, **Character** in den Viewport ziehen.
-2. Das Log meldet „Character is the player now". Im Outliner trägt der Actor das Abzeichen **PLAYER**.
-3. In **Details › Player Controller** lassen sich Tempo (**Max speed**), **Acceleration**, **Jump speed**
-   und die Kamera (**Chase**, **First person**, **Top down**) einstellen.
+1. Die **Inhaltsablage** (Content Drawer) öffnen (**Strg+Leertaste**), Gruppe **Spieler** (Players),
+   **Figur** (Character) in den Viewport ziehen.
+2. Das Log meldet „Character is the player now". Im Outliner heißt der Actor „Character“ und trägt das
+   Abzeichen **SPIELER** (PLAYER).
+3. In **Details › Spieler-Steuerung** (Details › Player Controller) lassen sich
+   **Höchstgeschwindigkeit** (Max speed), **Beschleunigung** (Acceleration),
+   **Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)) und die Kamera (**Verfolger** (Chase),
+   **Ego-Perspektive** (First person), **Von oben** (Top down)) einstellen.
 
-Ein Druck auf **Play** (Alt+P) testet sofort: W A S D läuft, die Maus schaut, die Leertaste springt,
-**Esc** kehrt zurück. Jeder andere Eintrag aus **Players** funktioniert genauso; der zuletzt platzierte ist
-der Spieler, oder man wählt ihn mit Rechtsklick › **Make Player**.
+Ein Druck auf **Spielen** (Play) oder Alt+P testet sofort: W A S D läuft, die Maus schaut, die Leertaste
+springt, **Esc** kehrt zurück. Jeder andere Eintrag aus **Spieler** funktioniert genauso; der zuletzt
+platzierte ist der Spieler, oder man wählt ihn mit Rechtsklick › **Zum Spieler machen (beim Spielen
+steuern)** (Make Player (control it in Play)).
 
 ### Schritt 3: Hindernisse und Physik
 
-1. Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** platzieren. Mit **W** (Move),
-   **E** (Rotate) und **R** (Scale) und dem Gizmo zurechtrücken; das Grid-Raster (0,5 m) hält die Kanten
-   sauber. **End** setzt die Auswahl auf den Boden.
-2. Aus **Physics** einen **Crate Stack** und eine **Hinged Door** dazu. Diese Actors sind dynamisch bzw.
-   hängen an Gelenken und reagieren auf die Spielfigur.
-3. Aus **Gameplay** eine **Moving Platform** und einen **Spinner**: Beide bewegen sich kinematisch.
-4. Mit **Simulate** (Alt+S) prüfen, ob alles steht, wie es soll. In der Simulation kann man Körper mit der
+1. Aus **Formen** (Shapes) ein paar **Würfel** (Cube), eine **Rampe** (Ramp) und eine **Ebene** (Plane)
+   platzieren. Mit **Verschieben (W)** (Move (W)), **Drehen (E)** (Rotate (E)) und **Skalieren (R)**
+   (Scale (R)) und dem Gizmo zurechtrücken; das Raster (0,5 m) hält die Kanten sauber. **Ende** setzt die
+   Auswahl auf den Boden.
+2. Aus **Physik** (Physics) einen **Kistenstapel** (Crate Stack) und eine **Scharniertür** (Hinged Door)
+   dazu. Diese Actors sind dynamisch bzw. hängen an Gelenken und reagieren auf die Spielfigur.
+3. Aus **Spielablauf** (Gameplay) eine **Bewegliche Plattform** (Moving Platform) und einen
+   **Drehbalken** (Spinner): Beide bewegen sich kinematisch.
+4. Mit **Simulieren** (Simulate) oder Alt+S prüfen, ob alles steht, wie es soll. In der Simulation kann man Körper mit der
    Maus greifen und werfen. **K** übernimmt die simulierte Lage der ausgewählten Actors ins Level, etwa
    für einen Kistenstapel, der natürlich zusammengefallen aussehen soll.
 
 ![Ausgewählter Actor mit Gizmo und seinen Komponenten in Details](bilder/studio-selected.png)
 
-Ein Würfel aus **Shapes** hat Kollision, bewegt sich aber nicht. Soll er fallen, bekommt er in Details
-mit **+ Add › Rigid Body** und **Mobility = Dynamic** eine Box3D-Physik; oder man nimmt gleich die
-**Physics Cube**. Was die Physikfelder bedeuten, erklärt [Kapitel 6](06-physik.md).
+Ein Würfel aus **Formen** hat Kollision, bewegt sich aber nicht. Soll er fallen, bekommt er in **Details**
+mit **+ Hinzufügen › Starrkörper** (+ Add › Rigid Body) und **Mobilität** (Mobility) =
+**Dynamisch (Physik simulieren)** (Dynamic (simulate physics)) eine Box3D-Physik; oder man nimmt gleich
+den **Physik-Würfel** (Physics Cube). Was die Physikfelder bedeuten, erklärt [Kapitel 6](06-physik.md).
 
 ### Schritt 4: Etwas zum Einsammeln
 
-1. Aus **Gameplay** mehrere **Orb** (1 Punkt) und einen **Star** (10 Punkte) verteilen. Ein Orb lässt
-   sich mit **Alt + Gizmo ziehen** schnell vervielfältigen: Jeder Zug zieht eine Kopie.
-2. Alle Orbs auswählen (Rahmenauswahl oder Ctrl+Klick im Outliner) und mit dem Ordner-Knopf im Outliner in
+1. Aus **Spielablauf** mehrere **Orb** (1 Punkt) und einen **Stern** (Star) (10 Punkte) verteilen. Ein Orb
+   lässt sich mit Alt + Gizmo ziehen schnell vervielfältigen: Jeder Zug zieht eine Kopie.
+2. Alle Orbs auswählen (Rahmenauswahl oder Strg+Klick im Outliner) und mit dem Ordner-Knopf im Outliner in
    einen Ordner legen. Das hält den Outliner übersichtlich.
-3. In **World Settings › Win condition** **Collect all pickups** wählen. Wer alle Pickups hat, gewinnt.
+3. In **Welteinstellungen › Siegbedingung** (World Settings › Win condition) **Alle Pickups sammeln**
+   (Collect all pickups) wählen. Wer alle Pickups hat, gewinnt.
 
 ### Schritt 5: Gefahr, Checkpoint und Zeitlimit
 
-1. Ein **Hazard** (Trigger, der das Spiel verliert) oder eine **Damage Zone** platzieren und mit Scale auf
-   die gewünschte Größe ziehen.
-2. Einen **Checkpoint** setzen: Fällt die Figur unter **Kill Z** (World Settings) oder verliert sie, startet
-   sie hier neu.
-3. Optional **Time limit** in World Settings: Das HUD zählt herunter.
+1. Eine **Gefahr** (Hazard; ein Trigger, der das Spiel verliert) oder eine **Schadenszone** (Damage Zone)
+   platzieren und mit **Skalieren (R)** auf die gewünschte Größe ziehen.
+2. Einen **Checkpoint** setzen: Fällt die Figur unter **Kill-Z (darunter Wiedereinstieg)**
+   (Kill Z (respawn below)) in den **Welteinstellungen** oder verliert sie, startet sie hier neu.
+3. Optional **Zeitlimit (0 = keins)** (Time limit (0 = none)) in den **Welteinstellungen**: Das HUD zählt
+   herunter.
 
-Andere Ziele: **Reach a goal trigger** (mit einem **Goal**), **Survive the time limit** oder **Reach a
-target score** (mit **Target score**).
+Andere Ziele: **Ein Ziel erreichen** (Reach a goal trigger) mit einem **Ziel** (Goal), **Das Zeitlimit
+überleben** (Survive the time limit) oder **Eine Punktzahl erreichen** (Reach a target score) mit
+**Zielpunktzahl** (Target score).
 
 ### Schritt 6: Logik ohne Programmieren
 
 Viele Spiele brauchen nichts weiter als die Bausteine oben. Für eigenes Verhalten gibt es Logik-Graphen:
 
-1. Einen **Message Trigger** platzieren und in Details › Trigger die **Action** auf
-   **Logic event only** stellen.
-2. In Details auf **Logic** klicken. Der Logik-Editor öffnet den Graphen dieses Actors.
+1. Einen **Nachrichten-Trigger** (Message Trigger) platzieren und in **Details › Trigger** die **Aktion**
+   (Action) auf **Nur Logik-Ereignis** (Logic event only) stellen.
+2. In **Details** auf **Logik** (Logic) klicken. Der Logik-Editor öffnet den Graphen dieses Actors.
 3. **Templates › Score zone (overlap +10)**: Betritt jemand die Zone, gibt es 10 Punkte, eine Meldung
    „+10" und einen Ton.
 4. **Compile** (F7) prüft den Graphen, **Viewport** führt zurück.
@@ -97,33 +109,36 @@ Machine und ein Verhalten für die Micro Duck. Alle Knoten erklärt [Kapitel 9](
 
 ### Schritt 7: Ton
 
-1. In **World Settings › Audio** eine **Music** und eine **Ambience** wählen.
-2. Aus der Gruppe **Audio** des Content Drawers etwa **Ambient Wind** platzieren, oder im Tab **Sounds**
-   eine eigene Datei importieren und in den Viewport ziehen: Es entsteht eine Audio Source an dieser Stelle.
+1. In **Welteinstellungen › Audio** (World Settings › Audio) eine **Musik** (Music) und eine **Atmosphäre**
+   (Ambience) wählen.
+2. Aus der Gruppe **Audio** der **Inhaltsablage** etwa **Wind** (Ambient Wind) platzieren, oder im Reiter
+   **Sounds** eine eigene Datei importieren und in den Viewport ziehen: Es entsteht an dieser Stelle eine
+   Audioquelle.
 
 Die Spieler-Controller, Pickups und Trigger bringen ihre Geräusche bereits mit ([Kapitel 7](07-audio.md)).
 
 ### Schritt 8: Testen
 
-- **Play** (Alt+P): spielen. **F8** verlässt die Figur, die Welt läuft weiter, man kann sich umsehen;
-  noch einmal F8 übernimmt sie wieder.
-- **Play › Number of Players › 2 Players** testet das Level mit zwei Spielern in zwei Viewports.
-- Fehler im Level (etwa ein Gelenk, das auf einen gelöschten Actor zeigt) verhindern Play und stehen im
-  **Output Log**.
+- **Spielen** oder Alt+P: spielen. **F8** verlässt die Figur, die Welt läuft weiter, man kann sich
+  umsehen; noch einmal F8 übernimmt sie wieder.
+- **Spielen › Anzahl der Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players
+  (listen server)) testet das Level mit zwei Spielern in zwei Viewports.
+- Fehler im Level (etwa ein Gelenk, das auf einen gelöschten Actor zeigt) verhindern das Spielen und stehen
+  im **Ausgabeprotokoll** (Output Log).
 
-![Play im Viewport mit HUD](bilder/studio-play.png)
+![Beim Spielen: Viewport mit HUD](bilder/studio-play.png)
 
 ### Schritt 9: Speichern
 
-**Ctrl+S** speichert das Level als `.klevel`. Die Datei ist JSON und enthält auch Texturen und importierte
-Sounds; man kann sie weitergeben und in jedem Studio wieder öffnen (Ctrl+O oder auf die Seite ziehen).
+**Strg+S** speichert das Level als `.klevel`. Die Datei ist JSON und enthält auch Texturen und importierte
+Sounds; man kann sie weitergeben und in jedem Studio wieder öffnen (Strg+O oder auf die Seite ziehen).
 Ungespeicherte Arbeit sichert Studio zusätzlich im Browser und bietet sie beim nächsten Start an.
 
 ### Schritt 10: Exportieren
 
-1. **File › Package Game (HTML)...**
-2. Titel prüfen, **Package**.
-3. Studio lädt `Orb_Garden.html` herunter und bietet **Play it** an.
+1. **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...)
+2. Titel prüfen, **Verpacken** (Package).
+3. Studio lädt `Orb_Garden.html` herunter und bietet **Spielen** (Play it) an.
 
 Die Datei enthält Engine, Level und Spiel-Host. Sie läuft offline, von `file://`, von jedem Webserver und
 auf dem Telefon mit Touch-Sticks. Wie man sie veröffentlicht, steht in Abschnitt 12.6.
@@ -698,7 +713,7 @@ const game = await startGame({levelText, url: "./kern_studio.wasm"});
 
 `startGame` erwartet ein Canvas mit der Id `gl` (oder `canvas:`) sowie die Elemente aus `PLAYER_BODY`
 (HUD, Ladeanzeige, Hinweis, Neustart-Knopf, Fehlerfeld). Es startet das Modul im Spieler-Modus, öffnet das
-Level, lädt bei Bedarf die Netze der Micro Duck, startet Play und gibt ein Objekt zurück, das auch als
+Level, lädt bei Bedarf die Netze der Micro Duck, startet das Spiel und gibt ein Objekt zurück, das auch als
 `window.KernGame` bereitsteht:
 
 | Mitglied | Zweck |
@@ -824,7 +839,7 @@ kommen ebenfalls auf die Seite. Die veröffentlichte Fassung steht unter https:/
 
 | Punkt | Studio-Spiel | C++-Spiel |
 |---|---|---|
-| Läuft ohne Fehler im Log bzw. in der Konsole | Output Log, Play | Browser-Konsole, `onError` |
+| Läuft ohne Fehler im Log bzw. in der Konsole | **Ausgabeprotokoll** (Output Log), **Spielen** (Play) | Browser-Konsole, `onError` |
 | Startet auf dem Telefon | Export auf dem Telefon öffnen; Touch-Sticks erscheinen von selbst | Touch-Eingabe über `input.touches()` selbst auswerten |
 | Ton | erster Klick oder Tipp startet ihn (Browser-Regel) | eigene Sache des Spiels |
 | Dateien vollständig | eine HTML-Datei (plus Netzordner bei der Ente) | HTML, `.wasm`, `kern.mjs`, `app.mjs` |

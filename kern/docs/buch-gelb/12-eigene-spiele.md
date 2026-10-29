@@ -37,108 +37,127 @@ einer Gefahr aus und gewinnt, wenn alles eingesammelt ist. Die Fenster von Studi
 
 ### Schritt 1: Ein neues Level
 
-**File › New Level...**, Vorlage **Basic**, **Create** – mit Boden (40 × 40 m), Sonne, Himmel und
-einem Würfel. In **World Settings** setzt du **Level name** und **Game title** auf „Orb Garden“.
-Warum nicht Empty? Da gibt es nicht mal einen Boden. **Endless ground** ginge zwar, aber ein
-sichtbarer Boden ist für den Anfang anschaulicher.
+**Datei › Neues Level...** (File › New Level...), Vorlage **Grundformen** (Basic), dann
+**Erstellen** (Create) – mit Boden (40 × 40 m), Sonne, Himmel und einem Würfel. In den
+**Welteinstellungen** (World Settings) setzt du **Level-Name** (Level name) und **Spieltitel** (Game
+title) auf „Orb Garden“. Warum nicht die Vorlage **Leer** (Empty)? Da gibt es nicht mal einen Boden.
+**Endloser Boden** (Endless ground) in den Welteinstellungen ginge zwar, aber ein sichtbarer Boden
+ist für den Anfang anschaulicher.
 
 ### Schritt 2: Die Spielfigur
 
-Content Drawer (**Ctrl+Space**) › **Players** › **Character** in den Viewport ziehen. Das Log meldet
-„Character is the player now“, im Outliner steht **PLAYER**. In **Details › Player Controller**
-stellst du **Max speed**, **Acceleration**, **Jump speed** und die Kamera ein (**Chase**, **First
-person**, **Top down**). **Play** (Alt+P): W A S D läuft, die Leertaste springt, **Esc** führt
-zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick › **Make Player**.
+Öffne die **Inhaltsablage** (Content Drawer, Taste **Strg+Leertaste**) und zieh aus **Spieler**
+(Players) eine **Figur** (Character) in den Viewport. Das **Ausgabeprotokoll** (Output Log) meldet
+„Character is the player now“, und im Outliner trägt der Actor „Character“ das Abzeichen **SPIELER**
+(PLAYER). In **Details › Spieler-Steuerung** (Details › Player Controller) stellst du
+**Höchstgeschwindigkeit** (Max speed), **Beschleunigung** (Acceleration) und
+**Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)) ein. Im Feld **Kamera** (Camera)
+wählst du die Sicht: **Verfolger** (Chase), **Ego-Perspektive** (First person) oder **Von oben**
+(Top down). Dann **Spielen** (Play), Taste Alt+P: W A S D läuft, die Leertaste springt, **Esc** führt
+zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick › **Zum Spieler machen**
+(Make Player).
 
-> **Mission:** Bau Schritt 1 und 2 nach. Spiel einmal mit **Top down** und einmal mit **First
-> person**. Welche Sicht passt besser zu einem Sammelspiel?
+> **Mission:** Bau Schritt 1 und 2 nach. Spiel einmal mit **Von oben** und einmal mit
+> **Ego-Perspektive**. Welche Sicht passt besser zu einem Sammelspiel?
 
 ### Schritt 3: Hindernisse und Physik
 
 Drei Sorten Dinge machen ein Level lebendig: Manche stehen fest, manche reagieren auf Physik, und
 manche bewegen sich von selbst.
 
-1. **Fest:** Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** platzieren und mit
-   **W**, **E**, **R** zurechtrücken; das Raster (0,5 m) hält die Kanten sauber, **End** setzt auf den
-   Boden.
-2. **Physik:** Aus **Physics** einen **Crate Stack** und eine **Hinged Door** – sie reagieren auf
-   deine Figur.
-3. **Von selbst:** Aus **Gameplay** eine **Moving Platform** und einen **Spinner**.
-4. Mit **Simulate** (Alt+S) prüfen, Kisten greifen und werfen. **K** übernimmt die Lage der
-   gewählten Kisten ins Level – praktisch für einen Stapel, der natürlich umgefallen aussehen soll.
-   Wähl dafür in Simulate die **einzelnen Kisten** (Klick, Shift+Klick für weitere), nicht den
-   ganzen Stapel.
+1. **Fest:** Aus **Formen** (Shapes) ein paar **Würfel** (Cube), eine **Rampe** (Ramp) und eine
+   **Ebene** (Plane) platzieren und mit **W**, **E**, **R** zurechtrücken; das Raster (0,5 m) hält
+   die Kanten sauber, **Ende** setzt auf den Boden.
+2. **Mit Physik:** Aus **Physik** (Physics) einen **Kistenstapel** (Crate Stack) und eine
+   **Scharniertür** (Hinged Door) – sie reagieren auf deine Figur.
+3. **Von selbst:** Aus **Spielablauf** (Gameplay) eine **Bewegliche Plattform** (Moving Platform)
+   und einen **Drehbalken** (Spinner).
+4. Mit **Simulieren** (Simulate), Taste Alt+S, prüfen, Kisten greifen und werfen. **K** übernimmt
+   die Lage der gewählten Kisten ins Level – praktisch für einen Stapel, der natürlich umgefallen
+   aussehen soll. Wähl dafür beim Simulieren die einzelnen Kisten (Klick, Umschalt+Klick für
+   weitere), nicht den ganzen Stapel.
 
-> **Vorsicht, Falle:** Ein **Cube** aus Shapes hat Kollision, fällt aber nicht. Gib ihm mit **+ Add ›
-> Rigid Body** einen Körper und stell **Mobility** auf **Dynamic** – das heißt: Er fällt und lässt
-> sich schubsen. Oder nimm gleich die **Physics Cube** ([Kapitel 6](06-physik.md)).
+> **Vorsicht, Falle:** Ein **Würfel** aus **Formen** hat Kollision, fällt aber nicht. Gib ihm mit
+> **Hinzufügen › Starrkörper** (Add › Rigid Body) einen Körper und stell **Mobilität** (Mobility) auf
+> **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)) – das heißt: Er fällt und lässt
+> sich schubsen. Oder nimm gleich einen **Physik-Würfel** (Physics Cube) aus **Physik**
+> ([Kapitel 6](06-physik.md)).
 
 ### Schritt 4: Etwas zum Einsammeln
 
-Verteile **Orbs** (1 Punkt) und einen **Star** (10 Punkte); mit **Alt + Gizmo ziehen** kopierst du
-schnell. Wähle alle Orbs und leg sie mit dem Ordner-Knopf im Outliner in einen Ordner. Dann **World
-Settings › Win condition** auf **Collect all pickups**.
+Verteile aus **Spielablauf** mehrere **Orb** (1 Punkt) und einen **Stern** (Star, 10 Punkte); mit
+**Alt + Gizmo ziehen** kopierst du schnell. Wähle alle Orbs und leg sie mit dem Ordner-Knopf im
+Outliner in einen Ordner. Dann stellst du **Welteinstellungen › Siegbedingung** (World Settings ›
+Win condition) auf **Alle Pickups sammeln** (Collect all pickups).
 
 ### Schritt 5: Gefahr, Checkpoint und Zeitlimit
 
-Jetzt bekommt dein Spiel Spannung. Es gibt zwei Arten von Gefahr, und sie wirken verschieden:
+Jetzt bekommt dein Spiel Spannung. Aus **Spielablauf** gibt es zwei Bausteine, die der Figur
+schaden, und sie wirken verschieden:
 
-- Ein **Hazard** beendet die Runde sofort: Das Spiel ist **verloren**. Ein Checkpoint hilft da nicht.
-- Eine **Damage Zone** nimmt der Figur Gesundheit. Das wirkt nur bei Figuren, die Gesundheit haben:
-  Gib deinem Character dafür mit **+ Add › Health** eine. Ist sie aufgebraucht, taucht die Figur nach
-  einem kurzen Moment wieder auf – am letzten **Checkpoint**, falls sie einen berührt hat, sonst am
-  Start.
+- Eine **Gefahr** (Hazard) beendet die Runde sofort: Das Spiel ist **verloren**. Ein Checkpoint hilft
+  da nicht.
+- Eine **Schadenszone** (Damage Zone) nimmt der Figur Gesundheit. Das wirkt nur bei Figuren, die
+  Gesundheit haben: Gib deiner Figur dafür mit **Hinzufügen › Gesundheit** (Add › Health) eine. Ist
+  sie aufgebraucht, taucht die Figur nach einem kurzen Moment wieder auf – am letzten
+  **Checkpoint**, falls sie einen berührt hat, sonst am Start.
 
-Beide ziehst du mit Scale auf die gewünschte Größe. Ein **Checkpoint** merkt sich, wo die Figur
-neu startet. Das gilt auch, wenn sie unter **Kill Z** fällt – das ist die Höhe, unter der eine Figur
-als heruntergefallen gilt (World Settings). Wer mag, setzt ein **Time limit**; das HUD zählt
-herunter. Andere Ziele: **Reach a goal trigger** (mit **Goal**), **Survive the time limit**, **Reach
-a target score**.
+Beide ziehst du mit dem Skalier-Gizmo (**R**) auf die gewünschte Größe. Ein **Checkpoint** merkt
+sich, wo die Figur neu startet. Das gilt auch, wenn sie unter die Höhe in **Kill-Z (darunter
+Wiedereinstieg)** (Kill Z (respawn below)) fällt – darunter gilt eine Figur als heruntergefallen
+(Welteinstellungen). Wer mag, setzt **Zeitlimit (0 = keins)** (Time limit (0 = none)); das HUD zählt
+herunter. Andere Siegbedingungen: **Ein Ziel erreichen** (Reach a goal trigger) – dazu gehört ein
+**Ziel** (Goal) –, **Das Zeitlimit überleben** (Survive the time limit) und **Eine Punktzahl
+erreichen** (Reach a target score).
 
-> **Mission:** Bau Schritt 3 bis 5 mit 60 Sekunden Zeitlimit. Zu leicht? Leg den Star auf die Moving
-> Platform.
+> **Mission:** Bau Schritt 3 bis 5 mit 60 Sekunden Zeitlimit. Zu leicht? Leg den **Stern** auf die
+> **Bewegliche Plattform**.
 
 ### Schritt 6: Logik ohne Programmieren
 
 Logik heißt: „Wenn das passiert, dann tu jenes.“ Statt sie zu programmieren, steckst du sie aus
 fertigen Kästchen zusammen ([Kapitel 9](09-logik.md)).
 
-1. Einen **Message Trigger** platzieren, in Details › Trigger die **Action** auf **Logic event
-   only**. Damit tut der Trigger nichts Eigenes, sondern sagt nur deiner Logik Bescheid, wenn jemand
-   hineinläuft.
-2. In Details auf **Logic** klicken; der Logik-Editor öffnet den Graphen dieses Actors.
+1. Aus **Spielablauf** einen **Nachrichten-Trigger** (Message Trigger) platzieren und in
+   **Details › Trigger** das Feld **Aktion** (Action) auf **Nur Logik-Ereignis** (Logic event only)
+   stellen. Damit tut der Trigger nichts Eigenes, sondern sagt nur deiner Logik Bescheid, wenn
+   jemand hineinläuft.
+2. In **Details** auf **Logik** (Logic) klicken; der Logik-Editor öffnet den Graphen dieses Actors.
+   Der Logik-Editor bleibt auch im deutschen Studio englisch beschriftet.
 3. **Templates › Score zone (overlap +10)**: Betreten gibt 10 Punkte, „+10“ und einen Ton.
 4. **Compile** (F7): Studio prüft deinen Plan auf Fehler. **Viewport** führt zurück.
 
 Weitere Vorlagen: eine Tür, die aufgeht, wenn die Figur davorsteht und **F** drückt
 (**Interact**), ein Spawner, eine Ampel und ein Verhalten für die Micro Duck.
 
-> **Vorsicht, Falle:** Ein Graph mit Fehlern hält Play nicht auf – Kern schaltet nur ihn ab. Passiert
-> in deiner Zone nichts, schau ins Output Log.
+> **Vorsicht, Falle:** Ein Graph mit Fehlern hält **Spielen** nicht auf – Kern schaltet nur ihn ab.
+> Passiert in deiner Zone nichts, schau ins **Ausgabeprotokoll**.
 
 ### Schritt 7: Ton
 
-In **World Settings › Audio** eine **Music** und eine **Ambience** wählen. Aus **Audio** etwa
-**Ambient Wind** platzieren, oder im Tab **Sounds** eine eigene Datei importieren und in den
-Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche schon mit
+In **Welteinstellungen › Audio** (World Settings › Audio) eine **Musik** (Music) und eine
+**Atmosphäre** (Ambience) wählen. Aus **Audio** in der Inhaltsablage etwa **Wind** (Ambient Wind)
+platzieren, oder im Reiter **Sounds** eine eigene Datei importieren und in den Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche schon mit
 ([Kapitel 7](07-audio.md)).
 
 ### Schritt 8 bis 10: Testen, Speichern, Exportieren
 
-- **Play** testet, **F8** lässt die Figur los und übernimmt sie wieder. **Play › Number of Players ›
-  2 Players** testet zu zweit. **Fehler im Level**, etwa ein Gelenk zu einem gelöschten Actor,
-  verhindern Play und stehen im Output Log.
-- **Ctrl+S** speichert eine Level-Datei samt Texturen und Sounds, die du weitergeben und in jedem
+- **Spielen** testet, **F8** lässt die Figur los und übernimmt sie wieder. **Spielen › Anzahl der
+  Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players (listen server))
+  testet zu zweit. Fehler im Level, etwa ein Gelenk zu einem gelöschten Actor, verhindern das
+  Spielen und stehen im **Ausgabeprotokoll**.
+- **Strg+S** speichert eine Level-Datei samt Texturen und Sounds, die du weitergeben und in jedem
   Studio öffnen kannst. Ungespeichertes sichert Studio zusätzlich im Browser.
-- **File › Package Game (HTML)...**, Titel prüfen, **Package**: Studio lädt die Datei
-  Orb_Garden.html herunter (das Leerzeichen wurde zu einem Unterstrich) und bietet **Play it** an.
+- **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...), Titel prüfen,
+  **Verpacken** (Package): Studio lädt die Datei Orb_Garden.html herunter (das Leerzeichen wurde zu
+  einem Unterstrich) und bietet in der Meldung **Spielen** (Play it) an.
 
 Diese eine Datei enthält alles: die Engine, dein Level und das Programm, das es abspielt. Sie läuft
 ohne Internet, per Doppelklick, von jeder Webseite und auf dem Handy mit Touch-Sticks.
 
 ![Dasselbe Spiel auf dem Telefon: die Engine erkennt Touch und zeichnet Sticks und Knöpfe](../buch/bilder/game-phone.png)
 
-> **Mission:** Exportiere Orb Garden, klick **Play it** und spiel eine Runde. Öffne die Datei dann
+> **Mission:** Exportiere Orb Garden, klick in der Meldung auf **Spielen** und spiel eine Runde. Öffne die Datei dann
 > auf einem Handy oder Tablet (lass dir beim Übertragen ruhig helfen): Die Touch-Sticks erscheinen
 > von allein.
 
@@ -347,7 +366,7 @@ https://kernengine.de/. Der Quellcode liegt auf https://github.com/ChristianHohl
 
 | Prüfliste | Studio-Spiel | C++-Spiel |
 |---|---|---|
-| keine Fehler | Output Log | Fehleranzeige des Browsers |
+| keine Fehler | **Ausgabeprotokoll** (Output Log) | Fehleranzeige des Browsers |
 | Handy | Sticks kommen von selbst | Touch selbst auswerten |
 | Ton | nach erstem Klick | Sache des Spiels |
 | Dateien | eine HTML (plus Ente-Ordner) | Seite, Modul, Plattformschicht |
@@ -362,26 +381,27 @@ https://kernengine.de/. Der Quellcode liegt auf https://github.com/ChristianHohl
 
 - Du kennst die drei Wege zu einem Kern-Spiel.
 - Du hast ein Sammelspiel in zehn Schritten gebaut, gespeichert und exportiert.
-- Du weißt, was Hazard, Damage Zone und Checkpoint unterscheidet.
+- Du weißt, was **Gefahr** (Hazard), **Schadenszone** (Damage Zone) und **Checkpoint** unterscheidet.
 - Du kennst die Spielschleife: Eingabe, Rechnen, Malen – in jedem Bild.
 - Du weißt, warum Spiele mit dt rechnen und warum schnelle Dinge in Teilschritten fahren.
 - Du kennst die Regeln fürs Weitergeben und Verkaufen.
 
 ## Rätsel-Ecke
 
-1. Warum ist **Basic** ein besserer Start als **Empty**?
-2. Dein Shapes-Würfel fällt nicht. Was fehlt?
-3. Deine Figur läuft in eine Damage Zone und hat danach keine Gesundheit mehr. Wo taucht sie wieder
-   auf? Und was passiert stattdessen bei einem Hazard?
+1. Warum ist die Vorlage **Grundformen** (Basic) ein besserer Start als **Leer** (Empty)?
+2. Dein Würfel aus **Formen** (Shapes) fällt nicht. Was fehlt?
+3. Deine Figur läuft in eine **Schadenszone** (Damage Zone) und hat danach keine Gesundheit mehr. Wo
+   taucht sie wieder auf? Und was passiert stattdessen bei einer **Gefahr** (Hazard)?
 4. Warum läuft das exportierte Studio-Spiel per Doppelklick, das C++-Spiel nicht?
 5. **Boss-Rätsel:** Ein Spiel macht in jedem Bild „ändere x um 5 · dt“. Rechner A schafft 50 Bilder
    pro Sekunde, B 25. Wie weit kommt die Figur in 2 Sekunden? Und mit „ändere x um 0,1“ ohne dt?
 
 ### Lösungen
 
-1. Empty hat **keinen Boden** – die Figur fiele ins Leere.
-2. Ein **Rigid Body** mit **Mobility = Dynamic** – oder gleich eine Physics Cube.
-3. Am letzten **Checkpoint**, den sie berührt hat (ohne Checkpoint am Start). Ein Hazard dagegen
+1. **Leer** hat keinen Boden – die Figur fiele ins Nichts.
+2. Ein **Starrkörper** (Rigid Body) mit **Mobilität** (Mobility) auf **Dynamisch (Physik
+   simulieren)** (Dynamic (simulate physics)) – oder gleich ein **Physik-Würfel** (Physics Cube).
+3. Am letzten **Checkpoint**, den sie berührt hat (ohne Checkpoint am Start). Eine **Gefahr** dagegen
    beendet die Runde: Das Spiel ist verloren.
 4. Das Studio-Spiel hat **alles in einer Datei**. Das C++-Spiel lädt Modul und Plattformschicht nach,
    und das erlaubt der Browser nur über einen Webserver.

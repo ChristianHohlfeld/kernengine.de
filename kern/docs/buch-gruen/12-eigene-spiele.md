@@ -38,70 +38,74 @@ geht's!
 
 ### Schritt 1: Ein neues Level
 
-Öffne Kern Studio über https://kernengine.de/, dann **File › New Level...**, Vorlage **Basic**,
-**Create**. Du hast einen Boden von 40 × 40 m, Sonne, Himmel und einen Würfel. Trag in **World
-Settings** den **Level name** und den **Game title** „Orb Garden“ ein.
+Öffne Kern Studio über https://kernengine.de/, dann **Datei › Neues Level...** (File › New Level...),
+Vorlage **Grundformen** (Basic), **Erstellen** (Create). Du hast einen Boden von 40 × 40 m, Sonne,
+Himmel und einen Würfel. Trag in den **Welteinstellungen** (World Settings) als **Level-Name** (Level name)
+und als **Spieltitel** (Game title) „Orb Garden“ ein.
 
-> **Achtung, Falle!** Warum nicht **Empty**? Weil Empty wirklich **nichts** hat, auch keinen Boden.
+> **Achtung, Falle!** Warum nicht **Leer** (Empty)? Weil die Vorlage **Leer** wirklich **nichts** hat, auch keinen Boden.
 > Deine Figur würde ins Bodenlose fallen.
 
 ### Schritt 2: Die Spielfigur
 
-Kurz zur Orientierung im Studio: Der **Viewport** ist das große Bild der Welt in der Mitte. Der
-**Content Drawer** ist die Bauteil-Schublade unten. Der **Outliner** ist die Liste aller Dinge im
+Kurz zur Orientierung im Studio: Der **Viewport** ist das große Bild der Welt in der Mitte. Die
+**Inhaltsablage** (Content Drawer) ist die Bauteil-Schublade unten. Der **Outliner** ist die Liste aller Dinge im
 Level, und **Details** zeigt die Einstellungen des Dings, das du gerade ausgewählt hast. Ein
 beschriftetes Bild des Studios findest du in [Kapitel 11](11-studio.md).
 
-Öffne den Content Drawer (**Ctrl+Space**) und zieh aus **Players** einen **Character** in den Viewport.
-Das Log meldet „Character is the player now“, und im Outliner trägt er das Abzeichen **PLAYER**: Diese
-Figur ist jetzt der Spieler. In **Details › Player Controller** stellst du ein, wie sie sich anfühlt:
+Öffne die **Inhaltsablage** (**Strg+Leertaste**) und zieh aus **Spieler** (Players) eine **Figur** (Character) in den Viewport.
+Das Log meldet „Character is the player now“ (Meldungen im Log zeigt Studio auf Englisch), und im
+Outliner trägt der neue Actor „Character“ das Abzeichen **Spieler** (Player): Diese Figur ist jetzt
+der Spieler. In **Details › Spieler-Steuerung** (Details › Player Controller) stellst du ein, wie sie sich anfühlt:
 Tempo, Beschleunigung, Sprungkraft und die Kamera, die von hinten, aus den Augen der Figur oder von oben
 schauen kann.
 
-> **Probier's aus!** Drück sofort **Play** (Alt+P). W A S D läuft, die Maus schaut, die Leertaste
-> springt, **Esc** bringt dich zurück. Tausch zum Spaß den Character gegen einen **Rolling Ball** oder
-> eine **Drone** aus **Players**: Der zuletzt platzierte ist der Spieler, oder du wählst einen mit
-> Rechtsklick › **Make Player**.
+> **Probier's aus!** Drück sofort **Spielen** (Play) (Alt+P). W A S D läuft, die Maus schaut, die Leertaste
+> springt, **Esc** bringt dich zurück. Tausch zum Spaß die Figur gegen eine **Rollende Kugel** (Rolling
+> Ball) oder eine **Drohne** (Drone) aus **Spieler**: Der zuletzt platzierte ist der Spieler, oder du
+> wählst einen mit Rechtsklick › **Zum Spieler machen (beim Spielen steuern)** (Make Player (control it in Play)).
 
 ### Schritt 3: Hindernisse und Physik
 
-1. Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** setzen und mit dem **Gizmo**
+1. Aus **Formen** (Shapes) ein paar **Würfel** (Cube), eine **Rampe** (Ramp) und eine **Ebene** (Plane) setzen und mit dem **Gizmo**
    zurechtrücken. Das Gizmo sind die bunten Anfasser-Pfeile am ausgewählten Ding: Daran ziehst du, um
    es zu verschieben, zu drehen oder größer zu machen.
-2. Aus **Physics** einen **Crate Stack** und eine **Hinged Door**: Die reagieren auf deine Figur.
-3. Aus **Gameplay** eine **Moving Platform** und einen **Spinner**, die sich von selbst bewegen.
-4. Mit **Simulate** (Alt+S) prüfen. Du kannst Körper greifen und werfen.
+2. Aus **Physik** (Physics) einen **Kistenstapel** (Crate Stack) und eine **Scharniertür** (Hinged Door): Die reagieren auf deine Figur.
+3. Aus **Spielablauf** (Gameplay) eine **Bewegliche Plattform** (Moving Platform) und einen **Drehbalken** (Spinner), die sich von selbst bewegen.
+4. Mit **Simulieren** (Simulate) (Alt+S) prüfen. Du kannst Körper greifen und werfen.
 
-Ein **Cube** aus Shapes ist ein festes Hindernis: Man stößt dagegen, aber er bewegt sich nicht. Soll er
-fallen, musst du ihm Physik geben: in Details mit **+ Add › Rigid Body** und **Mobility = Dynamic**,
-oder du nimmst gleich eine **Physics Cube** ([Kapitel 6](06-physik.md)).
+Ein **Würfel** aus **Formen** ist ein festes Hindernis: Man stößt dagegen, aber er bewegt sich nicht. Soll er
+fallen, musst du ihm Physik geben: in Details mit **Hinzufügen › Starrkörper** (Add › Rigid Body) und
+**Mobilität** (Mobility) auf **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)), oder du
+nimmst gleich einen **Physik-Würfel** (Physics Cube) ([Kapitel 6](06-physik.md)).
 
-> **Für Neugierige:** Nach Simulate übernimmt **K** die simulierte Lage ins Level, etwa für einen
+> **Für Neugierige:** Nach **Simulieren** übernimmt **K** die simulierte Lage ins Level, etwa für einen
 > Kistenstapel, der natürlich eingestürzt aussehen soll.
 
 ### Schritt 4: Etwas zum Einsammeln
 
-1. Aus **Gameplay** mehrere **Orb** (1 Punkt) und einen **Star** (10 Punkte) verteilen. Trick: **Alt +
+1. Aus **Spielablauf** mehrere **Orb** (1 Punkt) und einen **Stern** (Star) (10 Punkte) verteilen. Trick: **Alt +
    Gizmo ziehen** zieht bei jedem Zug eine Kopie heraus.
 2. Alle Orbs auswählen und mit dem Ordner-Knopf im Outliner in einen Ordner legen.
-3. In **World Settings › Win condition** **Collect all pickups** wählen. **Pickups** heißt alles zum
-   Einsammeln, hier also Orbs und Stern.
+3. In **Welteinstellungen › Siegbedingung** (World Settings › Win condition) **Alle Pickups sammeln**
+   (Collect all pickups) wählen. **Pickups** heißt alles zum Einsammeln, hier also Orbs und Stern.
 
 ### Schritt 5: Gefahr, Checkpoint und Zeitlimit
 
-1. Einen **Hazard** setzen und mit Scale auf Größe ziehen: Wer hineinläuft, hat das Spiel verloren,
-   da hilft auch kein Checkpoint.
+1. Eine **Gefahr** (Hazard) setzen und mit **Skalierung** (Scale) auf Größe ziehen: Wer hineinläuft,
+   hat das Spiel verloren, da hilft auch kein Checkpoint.
 2. Einen **Checkpoint** setzen. Hier startet die Figur neu, wenn sie zu tief fällt. Wie tief „zu tief“
-   ist, legt **Kill Z** in World Settings fest: eine Höhe, unter der das Spiel die Figur zurückholt.
-3. Wer mag, setzt in World Settings ein **Time limit**: Das **HUD** (die Anzeige am Bildschirmrand mit
-   Punkten und Zeit) zählt herunter.
+   ist, legt **Kill-Z (darunter Wiedereinstieg)** (Kill Z (respawn below)) in den
+   **Welteinstellungen** fest: eine Höhe, unter der das Spiel die Figur zurückholt.
+3. Wer mag, setzt in den **Welteinstellungen** ein **Zeitlimit (0 = keins)** (Time limit (0 = none)):
+   Das **HUD** (die Anzeige am Bildschirmrand mit Punkten und Zeit) zählt herunter.
 
-> **Achtung, Falle!** Statt eines Hazards gibt es auch eine **Damage Zone**, die Gesundheit kostet.
-> Sie wirkt aber nur auf Figuren, die überhaupt Gesundheit haben. Der Character hat von Haus aus
-> keine; gib sie ihm in Details mit **+ Add › Health**, sonst läuft er unbeschadet durch die Zone.
+> **Achtung, Falle!** Statt einer **Gefahr** gibt es auch eine **Schadenszone** (Damage Zone), die Gesundheit kostet.
+> Sie wirkt aber nur auf Figuren, die überhaupt Gesundheit haben. Die Figur „Character“ hat von Haus aus
+> keine; gib sie ihr in Details mit **Hinzufügen › Gesundheit** (Add › Health), sonst läuft sie unbeschadet durch die Zone.
 
-Andere Siegbedingungen: **Reach a goal trigger** (mit einem **Goal**), **Survive the time limit** oder
-**Reach a target score**.
+Andere Siegbedingungen: **Ein Ziel erreichen** (Reach a goal trigger) (mit einem **Ziel** (Goal)),
+**Das Zeitlimit überleben** (Survive the time limit) oder **Eine Punktzahl erreichen** (Reach a target score).
 
 ### Schritt 6: Logik ohne Programmieren
 
@@ -109,15 +113,16 @@ Bis hierher hat jeder Baustein sein eingebautes Verhalten. Willst du eigenes Ver
 aus **Logik-Graphen**: Kästchen, die du mit Drähten verbindest ([Kapitel 9](09-logik.md)). Wir machen
 eine Zone, die Punkte gibt:
 
-1. Einen **Message Trigger** setzen und in Details › Trigger die **Action** auf **Logic event only**
-   stellen.
-2. In Details auf **Logic** klicken. Der Logik-Editor öffnet den Graphen dieses Triggers.
+1. Einen **Nachrichten-Trigger** (Message Trigger) setzen und in **Details › Trigger** die **Aktion**
+   (Action) auf **Nur Logik-Ereignis** (Logic event only) stellen.
+2. In Details auf **Logik** (Logic) klicken. Der Logik-Editor öffnet den Graphen dieses Triggers. Der
+   Logik-Editor ist nicht übersetzt: Seine Knöpfe heißen auch in der deutschen Oberfläche englisch.
 3. **Templates › Score zone (overlap +10)**: Wer die Zone betritt, bekommt 10 Punkte, eine Meldung „+10“
    und einen Ton.
 4. **Compile** (F7), dann **Viewport**.
 
-Warum **Logic event only**? Normalerweise tut ein Trigger selbst etwas, sobald jemand hineinläuft: Er
-lässt gewinnen, verlieren oder zeigt eine Meldung mit Ton. Mit „Logic event only“ tut er von sich aus
+Warum **Nur Logik-Ereignis**? Normalerweise tut ein Trigger selbst etwas, sobald jemand hineinläuft: Er
+lässt gewinnen, verlieren oder zeigt eine Meldung mit Ton. Mit **Nur Logik-Ereignis** tut er von sich aus
 nichts, sondern sagt nur deiner Logik Bescheid: „Da ist jemand drin.“ So entscheidet allein dein
 Graph, was passiert, und nichts passiert doppelt. Wie ein Türsensor, der nicht selbst klingelt,
 sondern nur meldet: Was dann geschieht, bestimmst du.
@@ -132,29 +137,31 @@ Dinge auftauchen lässt), eine Ampel und ein Verhalten für die Micro Duck.
 
 ### Schritt 7: Ton
 
-In **World Settings › Audio** eine **Music** und eine **Ambience** (Hintergrundklang) wählen. Aus der
-Gruppe **Audio** etwa **Ambient Wind** setzen, oder im Tab **Sounds** eine eigene Datei importieren
+In **Welteinstellungen › Audio** eine **Musik** (Music) und eine **Atmosphäre** (Ambience)
+(Hintergrundklang) wählen. Aus der Gruppe **Audio** etwa **Wind** (Ambient Wind) setzen, oder im
+Reiter **Sounds** der **Inhaltsablage** eine eigene Datei importieren
 und in den Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche schon mit
 ([Kapitel 7](07-audio.md)).
 
 ### Schritt 8: Testen
 
-**Play** und spielen! Mit **F8** steuerst du die Figur nicht mehr, sondern schaust mit einer freien
-Kamera zu, während das Spiel weiterläuft; noch einmal F8, und du steuerst wieder. Mit **Play › Number
-of Players › 2 Players** testest du zu zweit. Findet Studio einen Fehler im Level, startet Play nicht,
-und der Grund steht im **Output Log**, dem Protokoll unten im Content Drawer.
+Drück **Spielen** und leg los! Mit **F8** steuerst du die Figur nicht mehr, sondern schaust mit einer freien
+Kamera zu, während das Spiel weiterläuft; noch einmal F8, und du steuerst wieder. Mit
+**Spielen › Anzahl der Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players (listen server))
+testest du zu zweit. Findet Studio einen Fehler im Level, startet das Spiel nicht, und der Grund
+steht im **Ausgabeprotokoll** (Output Log), dem Protokoll unten in der **Inhaltsablage**.
 
 ### Schritt 9: Speichern
 
-**Ctrl+S** speichert eine `.klevel`-Datei. Sie enthält alles, auch Texturen (die Oberflächenbilder) und
+**Strg+S** speichert eine `.klevel`-Datei. Sie enthält alles, auch Texturen (die Oberflächenbilder) und
 importierte Sounds. Du
-kannst sie weitergeben und in jedem Studio öffnen (Ctrl+O oder auf die Seite ziehen). Ungespeicherte
+kannst sie weitergeben und in jedem Studio öffnen (Strg+O oder auf die Seite ziehen). Ungespeicherte
 Arbeit sichert Studio zusätzlich im Browser und bietet sie beim nächsten Start an.
 
 ### Schritt 10: Exportieren
 
-**File › Package Game (HTML)...**, Titel prüfen, **Package**. Studio lädt `Orb_Garden.html` herunter
-und bietet **Play it** an. Diese eine Datei enthält Engine, Level und Spiel. Sie läuft ohne Internet,
+**Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...), Titel prüfen, **Verpacken**
+(Package). Studio lädt `Orb_Garden.html` herunter und bietet **Spielen** (Play it) an. Diese eine Datei enthält Engine, Level und Spiel. Sie läuft ohne Internet,
 direkt von der Festplatte, von jeder Homepage und am Telefon mit Touch-Sticks. Eine Ausnahme gibt es:
 Die Bewegungen der Micro Duck außer dem Laufen sind eigene Dateien, die das Spiel nachlädt (12.6 und
 [Kapitel 13](13-micro-duck.md)).
@@ -301,8 +308,8 @@ Ferne werden die Fenster kleiner als ein Bildschirmpunkt. Dann würde das Raster
 Karomuster im Fernsehen, darum verschwimmt es dort zu einem sanften Schimmer. Wie solche
 Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 
-> **Probier's aus!** Öffne im Studio **File › Example Levels › Orb Run** und zieh in World Settings an
-> **Time of day**. Auch hier
+> **Probier's aus!** Öffne im Studio **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run)
+> und zieh in den **Welteinstellungen** (World Settings) an **Tageszeit** (Time of day). Auch hier
 > gehen nachts die Fenster an. Dieselbe Idee, nur im Studio-Level.
 
 > **Für Neugierige:** Die Zusatzwerte der Wand reisen „flach“ über die ganze Wand, also unverändert
@@ -429,7 +436,7 @@ Beispiele und stellt alles auf https://kernengine.de/.
 
 | Punkt | Studio-Spiel | C++-Spiel |
 |---|---|---|
-| Fehler finden | Output Log, Play | Fehleranzeige des Browsers |
+| Fehler finden | **Ausgabeprotokoll** (Output Log), **Spielen** (Play) | Fehleranzeige des Browsers |
 | Telefon | Sticks kommen von selbst | Touch selbst programmieren |
 | Ton | startet mit dem ersten Tipp | Sache des Spiels |
 | Dateien | eine HTML (plus Ente-Ordner) | Seite, Modul, zwei Helfer |
@@ -444,8 +451,8 @@ einmal geklickt oder getippt hast.
 
 - Drei Wege zum Spiel: **Studio ohne Code**, **C++** und **JavaScript**, alle auf derselben Engine.
 - Ein Studio-Spiel entsteht in zehn Schritten: Level, Figur, Hindernisse, Pickups, Gefahr, Logik, Ton,
-  Testen, Speichern, Exportieren. **Package Game** macht daraus eine Datei, die überall läuft.
-- „Logic event only“ macht einen Trigger zum reinen Melder für deine Logik; **Compile** prüft die Logik
+  Testen, Speichern, Exportieren. **Spiel verpacken** (Package Game) macht daraus eine Datei, die überall läuft.
+- **Nur Logik-Ereignis** (Logic event only) macht einen Trigger zum reinen Melder für deine Logik; **Compile** prüft die Logik
   vor dem Spielen.
 - Jedes Spiel ist eine **Spielschleife**: einmal vorbereiten, dann in jedem Frame Eingabe lesen, Welt
   weiterrechnen, malen.
@@ -457,8 +464,8 @@ einmal geklickt oder getippt hast.
 
 ## Knobelecke
 
-1. Warum startest du dein Spiel mit **Basic** und nicht mit **Empty**?
-2. Dein Würfel aus **Shapes** fällt nicht herunter. Was fehlt?
+1. Warum startest du dein Spiel mit der Vorlage **Grundformen** (Basic) und nicht mit **Leer** (Empty)?
+2. Dein Würfel aus **Formen** (Shapes) fällt nicht herunter. Was fehlt?
 3. Lena spielt hello auf einem Bildschirm mit 120 Bildern pro Sekunde, Tom auf einem mit 60. Beide
    halten eine Sekunde lang die Pfeiltaste. Wessen Kamera hat sich weiter gedreht?
 4. Dein selbst geschriebenes C++-Spiel startet nicht, wenn du die Seite doppelklickst. Dein
@@ -467,9 +474,9 @@ einmal geklickt oder getippt hast.
 
 ### Lösungen
 
-1. Empty hat keinen Boden; die Figur würde ins Bodenlose fallen.
-2. Physik. Ein Würfel aus Shapes ist ein festes Hindernis; erst mit Physik kann er fallen (oder du
-   nimmst gleich eine **Physics Cube**).
+1. **Leer** hat keinen Boden; die Figur würde ins Bodenlose fallen.
+2. Physik. Ein Würfel aus **Formen** ist ein festes Hindernis; erst mit Physik kann er fallen (oder du
+   nimmst gleich einen **Physik-Würfel** (Physics Cube)).
 3. Keine, beide gleich weit. Lenas Spiel dreht pro Bild nur halb so weit, macht aber doppelt so viele
    Bilder, denn das Spiel rechnet mit der vergangenen Zeit.
 4. Das C++-Spiel lädt sein Modul nach, und das erlauben Browser einer Seite von der Festplatte nicht;
