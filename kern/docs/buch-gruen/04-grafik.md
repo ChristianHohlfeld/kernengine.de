@@ -147,7 +147,8 @@ einen zweiten Blick:
 ### Anlegen: erst prüfen, dann tauschen
 
 Eine neue Form übergibt man Kern als Paket. Pflicht sind nur die Positionen der Ecken. Fehlen
-Normalen, rechnet Kern einfache aus; fehlen Farben, ist alles weiß; fehlt die Angabe der Kopien, gibt
+Normalen, rechnet Kern bei einer einfachen Dreiecksliste flache Flächennormalen aus, sonst zeigen
+alle nach oben; fehlen Farben, ist alles weiß; fehlt die Angabe der Kopien, gibt
 es genau eine.
 
 Das Wichtigste: Kern legt eine Form **ganz oder gar nicht** an. Erst prüft er alles – sind alle Zahlen
@@ -188,7 +189,7 @@ Bewegung flimmert es (dieselbe Falle wie bei den Fenstern in 4.13). Die Briefmar
 schon vorher sauber gemittelt.
 
 > **Probier's aus!** Öffne https://kernengine.de/ und lege mit
-> **Datei › Neues Level...** (File › New Level...) die Vorlage **Grundformen** (Basic) an. Klappe unten in der Statusleiste die
+> **Datei › Neues Level...** (File › New Level...) die Vorlage **Basis** (Basic) an. Klappe unten in der Statusleiste die
 > **Inhaltsablage** (Content Drawer) auf, die Bausteinleiste, und zieh aus der Gruppe **Formen**
 > (Shapes) einen **Würfel** (Cube) hinein. Spiele rechts in **Details** unter *Material* mit
 > **Rauheit** (Roughness), **Metallisch** (Metallic) und **Leuchtstärke** (Emissive strength), dem
@@ -282,7 +283,7 @@ Obergrenze** – alles über Weiß wird später zum Glühen.
 ### Vom Licht zum Bildpunkt – und Nebel
 
 Echtes Licht kann viel heller sein, als ein Bildschirm zeigen kann: Kerns Sonne ist in der Rechnung
-fast dreimal so hell wie das hellste Bildschirm-Weiß. Also sichert Kern zuerst die echte Lichtmenge im
+mehrfach so hell wie das hellste Bildschirm-Weiß (in Levels tagsüber gut viermal). Also sichert Kern zuerst die echte Lichtmenge im
 Lichtmesser-Bild und presst sie dann mit einer **Filmkurve** sanft auf den Bildschirmbereich – wie ein
 Fotofilm, der Helles weich abrundet, statt es hart abzuschneiden (Skizze in Anhang B). Danach kann ein
 **Farbgrading** folgen, wie bei einem Kinofilm: kräftigere Farben, wärmere Lichter, kühlere Schatten.
@@ -331,8 +332,8 @@ Zuerst **prüft** Kern Kamera und Bildausschnitt, bevor er die Grafikkarte über
 aus: Unsichtbares fliegt raus, ebenso alles, was außerhalb der **Sichtpyramide** liegt – des Bereichs,
 den die Kamera überhaupt sieht, wie der Lichtkegel einer Taschenlampe, nur eckig
 ([Anhang B](B-grundlagen-rendering.md), B.10). Geprüft wird dabei nicht jedes Dreieck, sondern eine gedachte
-**Hülle**, die die ganze Form umschließt, wie ein Karton um ein Geschenk. Nur Figuren mit Skelett
-prüft Kern nicht so: Wenn sie Arme und Beine ausstrecken, ragen diese aus ihrem Karton heraus.
+**Kugel**, die die ganze Form umschließt, wie eine Seifenblase um ein Spielzeug. Nur Figuren mit
+Skelett prüft Kern nicht so: Wenn sie Arme und Beine ausstrecken, ragen diese aus ihrer Kugel heraus.
 
 **Undurchsichtiges** malt Kern **von vorne nach hinten**. Warum? Nahe Flächen tragen sich zuerst in
 den Tiefenpuffer ein. Kommt danach etwas, das dahinter liegt, merkt die Grafikkarte das sofort und
@@ -363,7 +364,7 @@ ihre eigene Malfläche dagegen ein.
 > wirken flacher. Zurück auf einen Viewport: Glühen und weiche Eckenschatten sind wieder da. Dein Gerät
 > war also nicht zu langsam – es liegt an der Bauweise. Am deutlichsten siehst du das Glühen nachts in
 > **Orb Run** (**Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run), dann die Tageszeit wie in 4.13 auf `tod 0.95`
-> stellen); im leeren Basic-Level glüht nichts.
+> stellen); im Level **Basis** (Basic) glüht nichts.
 
 ## 4.8 Die Zusatz-Malgänge im Detail
 
@@ -542,8 +543,8 @@ Zahl**.
 
 **Beispiel:** Lampe A hat Helligkeit 10, 10 m Reichweite und ist 30 m entfernt – dreimal ihre
 Reichweite. Kern teilt durch 1 + 3 = 4 und kommt auf 2,5. Lampe B hat Helligkeit 4, dieselbe
-Reichweite und ist nur 5 m entfernt – eine halbe Reichweite. Kern teilt durch 1,5 und kommt auf gut
-2,7. Die schwächere, aber nähere Lampe gewinnt. Orb Run meldet so einen Scheinwerfer vor dem Auto und
+Reichweite und ist nur 5 m entfernt – eine halbe Reichweite. Kern teilt durch 1,5 und kommt auf knapp
+2,7 (genau 2,67). Die schwächere, aber nähere Lampe gewinnt. Orb Run meldet so einen Scheinwerfer vor dem Auto und
 ein Licht pro Orb an.
 
 ## 4.10 Einstellungen
@@ -642,8 +643,8 @@ Spiele haben dieselbe Erweiterung immer an Bord; ob eine **Prozedurale Stadt** (
 automatisch erzeugte Stadt, ihre Gebäude damit ausstattet, entscheidet ihr Schalter **Erleuchtete
 Fenster bei Nacht** (Lit windows at night).
 
-> **Probier's aus!** Lade **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run). Klicke unten in der Statusleiste auf
-> **Cmd**: Das öffnet die Konsole, ein Eingabefeld für Befehle. Tippe `tod 0.75` und Enter – `tod`
+> **Probier's aus!** Lade **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run). Klicke unten in der Statusleiste in
+> das Feld neben **Cmd**: die Konsole, ein Eingabefeld für Befehle. Tippe `tod 0.75` und Enter – `tod`
 > steht für *time of day* und setzt die Tageszeit von 0 bis 1 (0,25 Sonnenaufgang, 0,5 Mittag, 0,75
 > Sonnenuntergang). Die goldene Stunde färbt den Himmel. Dann `tod 0.95` für die späte Nacht: dunkle
 > Glasfenster, warm leuchtende Fenster, in der Ferne ein weicher Schimmer. Wähle nun die Stadt aus:

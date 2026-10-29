@@ -309,7 +309,7 @@ Adam teilt dann die übliche Richtung durch die übliche Größe. Dadurch macht 
 große Schritte, egal ob seine Steigungen winzig oder riesig sind.
 
 **Beispiel:** Im allerersten Schritt sind Richtung und Größe genau gleich groß. Der Schritt ist also
-genau so lang wie die Lernrate, **ob die Steigung 0,000001 oder 1000 ist**.
+fast genau so lang wie die Lernrate, **ob die Steigung 0,000001 oder 1000 ist**.
 
 > **Stell dir vor …** ein erfahrener Wanderer im Nebel. Er macht immer gleich große, ruhige Schritte
 > und achtet vor allem auf die Richtung. Ein einzelner Stein unter dem Schuh bringt ihn nicht vom Weg.
@@ -757,8 +757,8 @@ Kern schreibt seine Netze genau im selben Format wie Pollen Robotics. Exportiert
 Kritiker bleibt zu Hause; er war nur Trainer.
 
 > **Für Neugierige:** Kern braucht für den Export keine fremde Bibliothek, sondern hat einen eigenen,
-> winzigen Schreiber. Zur Probe liest Kern jede Datei wieder ein und vergleicht. Einzelheiten im
-> blauen Buch, Anhang A und Kapitel 14.
+> winzigen Schreiber. Ein automatischer Test liest so eine Datei wieder ein und vergleicht.
+> Einzelheiten im blauen Buch, Anhang A und Kapitel 14.
 
 ## A.15 Wie alles zusammenkommt
 

@@ -257,9 +257,10 @@ veröffentlicht; kommt eine neuere Fassung des Vorschlags, wird der ältere Lauf
 > ein paar Tage später neu, steht dort vielleicht schon ein anderes Kürzel – dann ist inzwischen eine
 > neue Änderung durch das Fließband gelaufen und online gegangen.
 
-> **Wusstest du?** Kern Studio lässt sich wie eine App auf dem Rechner installieren. Diese Fassung
-> merkt selbst, wenn das Fließband eine neue Version veröffentlicht hat: Neben jeder Fassung liegt
-> eine kleine Datei mit ihrer Kennung, und sie vergleicht.
+> **Wusstest du?** Kern Studio lässt sich wie eine App auf dem Rechner installieren. Die
+> veröffentlichte Studio-Seite, ob im Browser-Tab oder als installierte App, merkt selbst, wenn das
+> Fließband eine neue Version veröffentlicht hat: Neben jeder Fassung liegt eine kleine Datei mit
+> ihrer Kennung. Die Seite vergleicht regelmäßig und lädt sich neu, sobald du gerade nicht spielst.
 
 Wie man das ganze Fließband zu Hause nachstellt und was typische Fehlermeldungen bedeuten, steht im
 blauen Buch, Kapitel 2.

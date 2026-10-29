@@ -444,6 +444,8 @@ Daraus folgen Kerns Gegenmittel:
 | Mehrere Rechenkerne addieren in wechselnder Reihenfolge | feste Reihenfolge, die Physik rechnet alles nacheinander |
 | Manche Prozessoren nehmen eine Abkürzung für „mal und plus“ | abgeschaltet, überall |
 | Jedes System rechnet Sinus & Co. minimal anders | Kern bringt seine eigene Sinus-Rechnung mit |
+| Die Bildzeit schwankt | fester Schritt, Zeit zählt Schritte |
+| Zufall | eigener Zufallsgenerator mit festen Startzahlen |
 
 Das **Übersetzungsprogramm** macht aus Kerns Programmtext die Befehle für den Prozessor. Die
 **Abkürzung**: Manche Prozessoren rechnen „a mal b plus c“ in einem Zug und runden nur einmal
@@ -451,8 +453,6 @@ statt zweimal. Das ist sogar genauer, aber eben anders als auf einem Gerät, das
 
 **Sinus & Co.** sind Rechnungen mit Winkeln, etwa: „In welche Richtung zeigt ein Arm, der um 30 Grad
 gedreht ist?“ Die Physik braucht sie ständig.
-| Die Bildzeit schwankt | fester Schritt, Zeit zählt Schritte |
-| Zufall | eigener Zufallsgenerator mit festen Startzahlen |
 
 Plus, Mal und Wurzel schreibt der weltweite Standard für Kommazahlen exakt vor, Sinus und Co. aber
 nicht: Für sie gibt es keine Vorschrift, wie genau gerundet wird. Darum
@@ -468,7 +468,8 @@ Determinismus muss man messen. Ein Test lässt das Netz von Pollen Robotics die 
 steuern und bildet nach jedem Takt einen **Fingerabdruck** ihres Zustands: eine kurze Prüfzahl, die
 sich bei der kleinsten Änderung völlig ändert. Zwei Fassungen von Kern sind genau dann gleich, wenn alle
 Fingerabdrücke gleich sind. Der erste Unterschied zeigt, wann sie auseinanderlaufen. Geprüft wird
-regelmäßig auf einem Linux-PC, auf einem Mac und im Browser.
+bei jeder Änderung auf einem Linux-PC, auf einem Mac und im WebAssembly-Modul, das auch der Browser
+benutzt.
 
 ## Das nimmst du mit
 

@@ -180,8 +180,10 @@ Die Spielschicht lässt sich nur mit dem Werkzeug auf der Kommandozeile trainier
 Wer das nicht vorhat, kann diesen Abschnitt überspringen. Der Ablauf zeigt aber zwei schöne
 Prinzipien:
 
-- **Erst messen, was das Vorbild braucht.** Wo der Schnabel eine Socke greift und wie weit die Ente
-  nach „Stopp“ noch läuft, misst der Lehrer selbst in der aktuellen Physik (Kapitel 14.8). Die
+- **Erst messen, was das Vorbild braucht.** Wo der Schnabel eine Socke greift, misst der Lehrer bei
+  jedem Lauf selbst in der aktuellen Physik (Kapitel 14.8). Wie weit die Ente nach „Stopp“ noch
+  läuft, misst ein eigener Befehl; das Ergebnis ist fest eingetragen und muss nach Physikänderungen
+  neu gemessen werden (16.6). Die
   Nachlaufstrecke braucht das Vorbild, weil Pollens Gang nicht auf der Stelle stoppt, sondern noch
   ein Stück weitergeht.
 - **Das Vorbild messen.** Bevor man das Netz prüft, prüft man das Vorbild. Das zeigt, was das Netz

@@ -290,9 +290,9 @@ Die GameWorld startet die Graphen nur beim **Spielen** (Play) oder **Simulieren*
 auf der Autorität (nicht auf
 Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen:
 
-- die **Spielzeit** – aus den Simulationsschritten gezählt, nicht von der Uhr an der Wand. Pausierst
-  du das Spiel oder ruckelt ein langsamer Rechner, läuft die Spielzeit trotzdem genau gleich, und ein
-  „nach 3 Sekunden“ bedeutet überall dasselbe;
+- die **Spielzeit** – aus den Simulationsschritten gezählt, nicht von der Uhr an der Wand. Ruckelt
+  ein langsamer Rechner, zählt die Spielzeit trotzdem genau gleich, und während einer Pause steht
+  sie still. Ein „nach 3 Sekunden“ bedeutet überall dasselbe;
 - Ausgaben und Fehler ins **Ausgabeprotokoll** (Output Log), Print auf Wunsch als Meldung im HUD;
 - einen **deterministischen Zufall**.
 
@@ -410,7 +410,7 @@ Das Wichtigste beim Bearbeiten:
 **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen. Alle weiteren Handgriffe beschreibt
 [Kapitel 11](11-studio.md).
 
-> **Probier's aus!** Öffne **Datei › Beispiel-Levels › Grundformen** (File › Example Levels › Basic).
+> **Probier's aus!** Öffne **Datei › Beispiel-Levels › Basis** (File › Example Levels › Basic).
 > Das Level hat noch keine Spielfigur: Öffne die **Inhaltsablage** (Content Drawer) mit
 > Strg+Leertaste, Reiter **Actors platzieren** (Place Actors), Gruppe **Spieler** (Players), und klick
 > auf **Rollende Kugel** (Rolling Ball) – die Kugel wird dein Spieler. Klick dann in der
@@ -456,7 +456,7 @@ Variable „Ball Seen“ merkt sich, ob der Ball schon im Bild war – so zwitsc
 wenn der Ball auftaucht, und nicht alle 0,25 s.
 
 > **Probier's aus!** Öffne in einem Level den Logik-Editor, wähle **Templates…** und füge die
-> Ampel ein, den Eintrag **Traffic light (state machine)**. Starte **Spielen** (Play) und schau zu, wie die Meldungen Grün, Gelb und Rot durchschalten. Dann
+> Ampel ein, den Eintrag **Traffic light (state machine)**. Starte **Spielen** (Play) und schau zu, wie die Meldungen **Green**, **Yellow** und **Red** (die Namen der Zustände) durchschalten. Dann
 > ändere einen Timer auf 1 Sekunde und probier es noch einmal.
 
 > **Achtung, Falle!** Der Zwitscher-Graph ist eine Demo der Roboter-Knoten – nicht etwas, das die

@@ -36,7 +36,7 @@ Roboter-Gehirnen das Laufen beibringt, und mit spielbaren Beispiel-Levels.
 
 ## 1.1 Was Kern ist
 
-Eine **Engine** ist der Motor unter der Haube eines Spiels: Sie malt, rechnet Stöße, spielt Töne
+Eine **Spiel-Engine** ist der Motor unter der Haube eines Spiels: Sie malt, rechnet Stöße, spielt Töne
 und liest Maus und Tastatur. Das Spiel sagt nur noch: „Hier steht ein Auto, und bei W fährt es.“
 
 > **Stell dir vor …** Ein Theater. Die Engine ist die Bühnentechnik: Licht, Vorhang, Ton. Das Spiel
@@ -85,9 +85,9 @@ macht, entscheidet es selbst.
 > Zutaten kauft auch er – das Mehl mahlt er nicht selbst. Aber er nimmt sie, wie sie sind, und
 > mischt sie selbst. So weiß er bei jedem Teller, was drin ist.
 
-Kern benutzt außerdem nur die ältesten, einfachsten Fähigkeiten von WebAssembly. Das ist wie ein
-Brief in einfacher Sprache: Ihn versteht jeder. So läuft Kern auf jedem Browser, der 3D-Grafik
-kann, auch auf älteren Safari-Versionen.
+Kern benutzt außerdem nur eine kleine, längst überall verbreitete Auswahl von
+WebAssembly-Fähigkeiten. Das ist wie ein Brief in einfacher Sprache: Ihn versteht jeder. So läuft
+Kern auf jedem Browser, der 3D-Grafik mit WebGL2 kann, bei Safari ab Version 15.
 
 ### Keine Engine-Logik in JavaScript
 
@@ -189,8 +189,8 @@ nimmt deine Eingaben entgegen und reicht sie durch die Übergabestelle nach unte
 der Ente.
 
 Nicht jedes Programm braucht das ganze Haus. Malen, Ton, Logik, Netzwerk und das Fundament sind
-immer dabei. Die übrigen Stockwerke – Physik, Spielregeln, Editor, Trainer – wählt man beim Bauen
-aus, damit ein Programm nicht unnötig groß wird: Ein Spiel, das nur malt, braucht keinen Editor
+immer dabei. Die übrigen Teile – Physik, Spielregeln, Editor, Trainer und die Laufzeit für reine
+C++-Spiele – wählt man beim Bauen aus, damit ein Programm nicht unnötig groß wird: Ein Spiel, das nur malt, braucht keinen Editor
 ([Kapitel 2](02-bauen-und-testen.md)). Wer ein oberes Stockwerk wählt, bekommt die darunter
 automatisch mit: Editor und Trainer brauchen die Spielregeln, und die Spielregeln brauchen die
 Physik.

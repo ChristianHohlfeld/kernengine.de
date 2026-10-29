@@ -154,7 +154,7 @@ Die Sensorfehler bekommt nur das handelnde Netz zu spüren, der Kritiker sieht w
 
 Der Zufall ist trotzdem wiederholbar: Jede Ente bekommt eine eigene **Startzahl** für ihren Würfel
 (Fachwort **Seed**), und dieselbe Startzahl liefert immer dieselben Würfe. Die Startzahl hängt nur
-von der Nummer der Ente ab, nicht davon, welcher Rechenkern sie gerade rechnet. Das wird in 14.7
+von der Startzahl des Laufs und der Nummer der Ente ab, nicht davon, welcher Rechenkern sie gerade rechnet. Das wird in 14.7
 wichtig. Wie man die Streuung echter Motoren misst, erklärt [Kapitel 16](16-kalibrierung.md); die
 genauen Bereiche stehen im blauen Buch, Kapitel 14.3.
 
@@ -215,7 +215,8 @@ flowchart TD
 2. **Sortieren.** Der Trainer legt alle Zettel in eine feste Reihenfolge, Takt für Takt und Ente für
    Ente. Wer welche Ente gerechnet hat, spielt danach keine Rolle mehr, damit auf jedem Gerät
    dasselbe herauskommt (14.7).
-3. **Maß anpassen.** Das gemeinsame Maß aus 14.4 wird an die neuen Zettel angepasst.
+3. **Maß anpassen.** Das gemeinsame Maß aus 14.4 wird an die neuen Zettel angepasst –
+   außer es ist wie beim Sprung von velstand übernommen und festgehalten.
 4. **Besser oder schlechter als erwartet?** Für jede Bewegung vergleicht der Trainer, wie viele
    Punkte danach wirklich kamen, mit dem, was der Kritiker erwartet hatte. Den Unterschied nennt man
    den **Vorteil**. Positiv heißt: Diese Bewegung war besser als gedacht, davon mehr.
@@ -425,7 +426,8 @@ Statt eine Zahl ins Programm zu schreiben, probiert es der Lehrer aus: Er legt d
 Stellen eines Gitters vor eine stehende Ente, lässt sie aufheben und prüft, ob die Socke nach 3
 Sekunden Tragen noch im Schnabel ist. Gewählt wird eine Stelle, um die herum auch viele andere
 halten, denn das Hingehen ist nie millimetergenau. Ändert sich die Physik, misst er einfach neu.
-Genauso misst er, wie weit die Ente nach „Stopp“ noch läuft.
+Auch wie weit die Ente nach „Stopp“ noch läuft, hat er gemessen; diese Zahl ist aber fest eingetragen
+und muss nach einer Physikänderung neu gemessen werden (16.6).
 
 Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8, nicht die letzte
 (warum das oft so ist, steht in [Kapitel 15](15-eigene-modelle.md), 15.4). Ergebnisse:
@@ -487,7 +489,8 @@ Zum Schluss wird das handelnde Netz als Datei gespeichert, im Format **ONNX**. O
 Standard-Dateiformat für Netze, wie PDF für Dokumente: Viele Programme können es lesen. Kern
 speichert das Netz genau so, wie Pollen seine Netze speichert, damit es auch die Software des echten
 Roboters laden kann. Vorn im Netz steckt dabei gleich das gemeinsame Maß aus 14.4, sodass niemand es
-getrennt mitliefern muss. Zur Probe liest Kern die Datei wieder ein und vergleicht (Anhang A.14).
+getrennt mitliefern muss. Ein automatischer Test liest so eine Datei wieder ein und vergleicht sie mit
+dem Netz im Lehrer (Anhang A.14).
 
 Die genauen Bausteine und Beschriftungen der Datei stehen im blauen Buch, Kapitel 14.10.
 

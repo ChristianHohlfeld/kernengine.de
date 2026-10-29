@@ -116,8 +116,9 @@ dieselbe Zahl; ändert sich nur ein Buchstabe, kommt eine völlig andere heraus.
 > **Stell dir vor …** Eine Quersumme, nur viel gründlicher: Bei der Quersumme ergeben 12 und 21
 > dasselbe, ein guter Hash bemerkt die Vertauschung.
 
-Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt eine Einstellung, etwa
-eine Farbe, nur dann neu an die Grafikkarte, wenn ihr Hash anders ist. Auch die **Prüfsumme** aus
+Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt eine lange Einstellung,
+etwa eine ganze Matrix, nur dann neu an die Grafikkarte, wenn ihr Hash anders ist; auch die
+Schattenkarte erkennt so, ob sie neu gemalt werden muss. Auch die **Prüfsumme** aus
 dem Fingerabdruck der Ente in [Kapitel 2](02-bauen-und-testen.md) ist genau so ein Hash – Prüfsumme
 und Hash sind dasselbe.
 
@@ -167,7 +168,7 @@ erwartet wird –, gibt es einen Ersatzwert. Und das Einlesen liefert sein Ergeb
 ganz geklappt hat**; sonst nennt es die Stelle, an der es hakte.
 
 > **Probier's aus!** Schau einem Level unter die Haube.
-> 1. **Datei › Neues Level...** (File › New Level...) und dort **Grundformen** (Basic): ein Boden
+> 1. **Datei › Neues Level...** (File › New Level...) und dort **Basis** (Basic): ein Boden
 >    und ein Würfel.
 > 2. Klick den Würfel an. Rechts in **Details** steht unter **Transformation** (Transform) das Feld
 >    **Position** (Location) mit X, Y und Z. Z zeigt nach oben (mehr dazu in Abschnitt 3.3). Tippe bei Z eine **3** und drück
@@ -305,7 +306,7 @@ Von oben betrachtet sieht sie so aus:
 ![Die Sichtpyramide von oben, zwischen Nah- und Ferngrenze: Was drinnen oder halb am Rand liegt, wird gemalt, was ganz draußen liegt, übersprungen](../abbildungen/sichtpyramide.svg)
 
 Was draußen liegt, muss nicht gemalt werden. Damit die Prüfung schnell geht, steckt Kern jedes Ding
-in eine unsichtbare **Kugel** oder einen **Karton**. Liegt die Kugel ganz außerhalb der Pyramide,
+in eine unsichtbare **Kugel**. Liegt die Kugel ganz außerhalb der Pyramide,
 ist das Ding unsichtbar – eine schnelle Prüfung statt vieler Dreiecke. Hat ein Ding noch gar keine
 gültige Kugel, etwa weil sie noch nicht ausgerechnet wurde, wird es trotzdem gemalt. Kerns Regel:
 **im Zweifel zeichnen** – lieber einmal zu viel als ein Loch in der Welt. Mehr dazu in

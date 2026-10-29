@@ -256,8 +256,8 @@ Namen und Rezepte stehen im blauen Buch, Kapitel 7.
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und klick einmal irgendwo hin –
 > vorher bleibt der Browser stumm. Öffne unten die **Inhaltsablage** (Content Drawer) mit
-> Strg+Leertaste und dort den Reiter **Sounds**: Jeder Klick auf einen Sound spielt ihn ab. Hör dir `pickup`, `explosion` und
-> `music_calm` an. Kaum zu glauben, dass das nur Rechnerei ist!
+> Strg+Leertaste und dort den Reiter **Sounds**: Jeder Klick auf einen Sound spielt ihn ab. Hör dir **Pickup**, **Explosion** und
+> **Ruhe (Musik)** (Calm (music)) an. Kaum zu glauben, dass das nur Rechnerei ist!
 
 ## 7.6 Die Stimme der Micro Duck
 
@@ -371,8 +371,8 @@ Die Micro Duck setzt ihre Schwelle sehr niedrig, damit man schon zarte Berührun
 Gelenke spielen ein Knack-Geräusch. Die genauen Schwellen stehen im blauen Buch, Kapitel 7.
 
 > **Probier's aus!** Öffne über **Datei › Beispiel-Levels** (File › Example Levels) das Level
-> **Physics Lab** und starte **Simulieren** (Simulate) mit Alt+S. Wirf mit der Maus Kisten herum. Knallen harte Würfe lauter als sanfte Stupser? Klingen
-> große Kisten tiefer als kleine?
+> **Physics Lab** und starte **Simulieren** (Simulate) mit Alt+S. Wirf mit der Maus Kisten herum. Knallen harte Würfe lauter als sanfte Stupser? Klingt
+> eine schwere Kiste tiefer als eine leichte Planke der Seilbrücke?
 
 ## 7.9 Ton im Level einstellen
 

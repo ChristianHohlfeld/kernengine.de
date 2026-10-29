@@ -158,8 +158,8 @@ Kern rechnet in diese Prüfsumme heimlich noch eine Kennung mit ein, die so viel
 Fassung 1“. Ein Paket eines anderen Spiels oder einer anderen Kern-Fassung ergibt deshalb nie die
 passende Zahl und fällt heraus, bevor überhaupt jemand seinen Inhalt liest.
 
-> **Für Neugierige:** Die Anfrage des Gastes ist absichtlich mit leeren Bytes auf volle Größe
-> aufgefüllt. Ein Angreifer könnte sonst die Adresse eines Opfers als Absender angeben. Der Server
+> **Für Neugierige:** Die Anfrage des Gastes ist absichtlich mit leeren Bytes auf 1000 Byte
+> aufgefüllt; kürzere Anfragen beachtet der Server nicht. Ein Angreifer könnte sonst die Adresse eines Opfers als Absender angeben. Der Server
 > würde dann dem Opfer antworten, und mit einer kleinen Anfrage brächte der Angreifer ihn dazu, dem
 > Opfer mehr Daten zu schicken, als er selbst investiert hat. Die genauen Namen und Werte stehen im blauen
 > Buch, Kapitel 10.
@@ -249,8 +249,10 @@ zeigen. Jedes Lagebild trägt deshalb die Uhrzeit des Servers.
 
 So macht es auch der Gast: Aus den Uhrzeiten vieler Lagebilder schätzt er, wie weit die Uhr des Servers
 seiner eigenen voraus ist, und korrigiert diese Schätzung behutsam. Dabei zählen nicht alle Briefe
-gleich: Der schnellste Brief verrät die Uhr am besten, denn er hat am wenigsten getrödelt. Einem
-schnellen Lagebild folgt der Gast darum rasch, einem verspäteten nur ein kleines Stück.
+gleich: Ein verspätetes Lagebild zieht die Schätzung rasch nach, ein besonders schnelles nur ein
+kleines Stück. So zeigt der Gast die Welt im Zweifel etwas zu weit in der Vergangenheit statt zu weit
+vorn. Dann hat er fast immer ein Lagebild nach dem Zeitpunkt, den er zeigt, und muss nur selten
+vorausrechnen.
 
 Außerdem brauchen beide Seiten **genau dasselbe Level**. Das Willkommen des Servers trägt deshalb eine
 Prüfsumme über die ganze Level-Datei (nur wo die Editor-Kamera gerade steht, zählt nicht). Passt sie
@@ -275,7 +277,8 @@ Im Studio testest du mit mehreren Spielern, ganz ohne zweiten Rechner:
 **Spielen › Anzahl der Spieler** (Play › Number of Players), 1 bis 4. Die Welt wird ein **Listen-Server**, ein Server, der selbst mitspielt. Jeder weitere Spieler ist
 ein echter Gast mit eigener Welt und eigenem Viewport, verbunden über den Probe-Boten aus 10.6.
 
-- Das Studio schaltet auf **vier Viewports**: 1 ist der Server, 2 der erste Gast und so weiter.
+- Steht Studio auf einem einzigen Viewport (die Voreinstellung), schaltet es auf **vier Viewports**
+  um: 1 ist der Server, 2 der erste Gast und so weiter.
 - Nur der Viewport, in den du zuletzt geklickt hast, bekommt deine Eingaben; die anderen Spieler
   stehen still.
 - **Spielen › Netzwerk-Emulation** (Play › Network Emulation) schaltet den Störsender ein, in Stufen

@@ -60,8 +60,9 @@ Du kannst Studio wie eine App aufs Gerät holen: In Chrome und Edge über den Kn
 **⤓ Installieren** (⤓ Install) oben, auf iPhone und iPad erklärt derselbe Knopf die Schritte
 **Teilen** (Share) und **Zum Home-Bildschirm** (Add to Home Screen). Installiert startet Studio im
 Vollbild und funktioniert auch ohne Internet. Gibt es eine neue Version, holt Studio sie von selbst.
-Hast du gerade Ungespeichertes, fragt es vorher (**Aktualisieren** (Update) oder **Später** (Later)),
-und dein Level kommt über den Autosave mit.
+Beim Bearbeiten lädt es sofort neu, und ungespeicherte Änderungen kommen über den Autosave mit
+(11.12). Läuft gerade ein Spiel, wartet es bis zum Stopp und bietet so lange **Aktualisieren**
+(Update) oder **Später** (Later) an.
 
 ---
 
@@ -103,10 +104,10 @@ erstellt sofort):
 | Vorlage | Was drin ist |
 |---|---|
 | **Orb Run** | Nachtstadt, Hovercar, Orbs zum Einsammeln |
-| **Physics Lab** | alle Arten von Gelenken: Scharnier, Schiene, Rad, Seilbrücke, Motor, dazu ein Kistenstapel |
+| **Physics Lab** | viele Arten von Gelenken: Scharnier, Schiene, Rad, Seil (Pendel), Seilbrücke, Motor, dazu ein Kistenstapel |
 | **Shooting Range** | Ego-Shooter-Soldat, Ziele, Deckung, mehrspielerfähig |
 | **Micro Duck** | die Laufroboter-Ente aus [Kapitel 13](13-micro-duck.md) |
-| **Grundformen** (Basic) | Boden, Sonne, Himmel: ein sauberer Anfang |
+| **Basis** (Basic) | Boden, Sonne, Himmel und ein Würfel: ein sauberer Anfang |
 | **Leer** (Empty) | gar nichts |
 
 ### Die Toolbar
@@ -120,15 +121,14 @@ Die Leiste unter den Menüs hat viele Knöpfe. Die wichtigsten, von links nach r
    Englisch Select, Move, Rotate und Scale.
 5. Abspielknöpfe: Spielen, Simulieren, Pause, Stopp.
 
-Dazwischen liegen Knöpfe für das Einrasten (11.5), die Aufteilung der Fenster, den Logik-Editor
-(**Logik** (Logic), 11.10) und den Export (11.13).
+Zwischen Werkzeugen und Abspielknöpfen liegen die Knöpfe fürs Einrasten (11.5); rechts davon folgen
+die Aufteilung der Fenster, der Logik-Editor (**Logik** (Logic), 11.10) und der Export (11.13).
 
 ### Das Kontextmenü
 
 Ein Rechtsklick auf einen Actor (am Touchscreen: lange halten) öffnet ein Menü mit allem, was du mit
 genau diesem Ding tun kannst: umbenennen, kopieren, löschen, zum Spieler machen, ihm Logik geben, ihn an
-einen anderen hängen oder mit einem Gelenk verbinden. Mit **Place Actor ▸** (der Eintrag bleibt
-auch in der deutschen Oberfläche englisch) setzt du ein neues Bauteil genau an die geklickte Stelle.
+einen anderen hängen oder mit einem Gelenk verbinden. Mit **Actor platzieren ▸** (Place Actor ▸) setzt du ein neues Bauteil genau an die geklickte Stelle.
 Die vollständige Liste steht im blauen Buch, Kapitel 11.
 
 ### Statusleiste und Konsole
@@ -142,7 +142,7 @@ Die drei Zahlen bei `gravity` sagen, in welche Richtung und wie stark es zieht: 
 vorn/hinten, oben/unten. In Kern zeigt die dritte Achse nach oben, das Minus heißt also: nach unten.
 1,6 ist die Schwerkraft des Mondes, auf der Erde sind es etwa 9,8.
 
-> **Probier's aus!** Neues Level **Grundformen** (Basic). Klick unten auf **Cmd** und tippe
+> **Probier's aus!** Neues Level **Basis** (Basic). Klick unten ins Feld neben **Cmd** und tippe
 > `gravity 0 0 -1.6`, dann ein paar Mal `spawn physics_cube`. Drück **Simulieren** (Simulate) oder
 > Alt+S: Die Kisten sinken gemächlich zu Boden, wie auf dem Mond. Ein `gravity` ohne Zahlen stellt die Erdschwerkraft wieder her.
 
@@ -211,7 +211,7 @@ Du kannst einen Actor an einen anderen **anhängen**. Der angehängte heißt **K
 > kommt der Hut mit. Ziehst du nur den Hut ein Stück zur Seite, bleibt die Figur stehen.
 
 So geht's: mehrere Actors wählen, den künftigen Eltern-Actor zuletzt, dann Rechtsklick ›
-**Attach to …** (dieser Eintrag bleibt englisch, dahinter steht der Name des Eltern-Actors); oder im
+**Anhängen an …** (Attach to …); dahinter steht der Name des Eltern-Actors. Oder im
 **Outliner** einen Actor auf einen anderen ziehen. **Strg+G** (Rechtsklick › **Gruppieren** (Group))
 packt die Auswahl unter einen neuen, leeren Gruppen-Actor. Ordner im Outliner dagegen dienen nur der
 Ordnung und bewegen nichts.
@@ -235,7 +235,8 @@ Studio gibt dem hängenden Actor dabei Physik, falls er noch keine hat.
 
 > **Probier's aus!** Setze einen **Würfel** (Cube) und schieb ihn mit dem Gizmo hoch in die Luft,
 > daneben einen **Physik-Würfel** (Physics Cube), ebenfalls ein Stück in der Luft. Im Outliner heißen
-> die beiden „Cube“ und „Physics Cube“. Wähle erst „Physics Cube“, dann mit Strg „Cube“, und verbinde
+> die beiden neuen Actors etwa „Cube 2“ und „Physics Cube 2“, denn Studio vergibt jeden Namen nur
+> einmal. Wähle erst den neuen Physik-Würfel, dann mit Strg den neuen Würfel, und verbinde
 > sie mit **Abstand / Seil**. Jetzt **Simulieren** (Simulate): Die Kiste schwingt am Seil wie ein
 > Pendel. Warum fällt der Würfel nicht mit? Er hat keine Physik-Komponente, also bleibt er wie
 > festgenagelt in der Luft. Er ist dein Aufhängepunkt.
@@ -494,7 +495,7 @@ Ziehen bewegt ihn, und Loslassen **wirft** ihn mit Schwung.
 > Outliner die Kisten (die erste anklicken, die letzte mit Umschalt) und drück **K**: Der eingestürzte
 > Stapel bleibt so liegen, als wäre er immer schon umgefallen.
 
-![Physics Lab: alle Gelenktypen in der Simulation](../buch/bilder/studio-physics-lab.png)
+![Physics Lab: Gelenke in der Simulation](../buch/bilder/studio-physics-lab.png)
 
 ### Zuschauen mit der Beobachterkamera
 
@@ -540,7 +541,7 @@ Ein leerer Graph bietet Startknöpfe an, das sind die Ereignisse, die alles ins 
 es fertige Beispiele: eine Tür, die beim Benutzen aufgeht, eine Zone, die Punkte gibt, einen Spawner,
 der regelmäßig Würfel erzeugt, eine Ampel und eine Micro Duck, die vor Hindernissen abdreht.
 
-> **Probier's aus!** Neues Level **Grundformen** (Basic), dann **Logik** in der Toolbar und
+> **Probier's aus!** Neues Level **Basis** (Basic), dann **Logik** in der Toolbar und
 > **Begin Play**. Am Knoten steht rechts der Ausgang „then“. Zieh von dort mit der Maus einen Draht ins Leere und lass los: Es
 > öffnet sich eine Suche. Tippe „show message“ und drück Enter. Der neue Knoten hängt schon am Draht;
 > trag in sein Textfeld einen Satz ein. Zurück mit **Viewport**. Das Level hat noch keine
@@ -591,8 +592,8 @@ gleichzeitig abtastet). Rot ist ein Hindernis, heller je näher, grün der Boden
 Jede Bewegung der Ente ist ein eigenes Netz. Das Laufen ist fest eingebaut, die übrigen Bewegungen
 (Sitzen, Kicken, Springen …) holt Studio aus dem Internet nach, sobald ein Level eine Ente enthält.
 Klappt das nicht, gibt Studio nicht auf: Es versucht es erneut und wartet dazwischen immer etwas
-länger, damit es die Leitung nicht verstopft. Bis dahin bleibt die Ente bei dieser Bewegung stehen
-und sagt, warum, statt still nichts zu tun.
+länger, damit es die Leitung nicht verstopft. Bis dahin startet diese Bewegung einfach nicht; die Ente
+läuft und steht weiter mit ihrem eingebauten Laufnetz.
 Trainierst du mit dem Kern Lehrer selbst ein neues ([Kapitel 14](14-lehrer.md)), nimmt Studio
 automatisch deins. Die Einzelheiten stehen in [Kapitel 13](13-micro-duck.md).
 
@@ -617,7 +618,7 @@ verschicken.
 
 Genau so arbeitet der Autosave: Kurz nach jeder Änderung legt Studio eine Kopie im Browser ab, aber nur,
 solange etwas ungespeichert ist. Beim nächsten Start bietet es **Wiederherstellen** (Restore) an, um das Level
-wiederherzustellen (dieser Knopf bleibt englisch), oder **Schließen** (Dismiss), um die Kopie zu
+wiederherzustellen, oder **Schließen** (Dismiss), um die Kopie zu
 verwerfen. Ein wiederhergestelltes Level gilt weiter als **ungespeichert**, denn
 sein Inhalt steht ja noch in keiner Datei. Bis du es speicherst, bietet Studio es bei jedem Start
 wieder an.
@@ -675,8 +676,8 @@ Wie Kern Spieler übers Netz verbindet, erklärt [Kapitel 10](10-netzwerk.md). H
 ### Mehrere Spieler auf einem Rechner
 
 1. **Spielen › Anzahl der Spieler** (Play › Number of Players) und dort
-   **2 Players (listen server)**, bis zu 4. Diese Einträge bleiben auch auf Deutsch englisch.
-2. **Spielen**. Studio schaltet auf vier Viewports: 1 zeigt den Server, 2 den ersten Gast. Jeder hat
+   **2 Spieler (Listen-Server)** (2 Players (listen server)), bis zu 4.
+2. **Spielen**. Aus der Einzelansicht schaltet Studio auf vier Viewports: 1 zeigt den Server, 2 den ersten Gast. Jeder hat
    sein eigenes HUD.
 3. Nur der Spieler im aktiven Viewport bekommt deine Eingabe. Ein Klick in einen anderen wechselt.
 4. **Spielen › Netzwerk-Emulation** (Play › Network Emulation) macht die Leitung absichtlich
@@ -804,7 +805,7 @@ Weitere Tasten stehen in [Kapitel 17](17-referenz.md), die des Logik-Editors in
 
 1. Linkes Ziehen zieht immer einen Auswahlrahmen auf. Bewegt wird nur mit dem Gizmo (W).
 2. Beim **Simulieren** (Simulate) einstürzen lassen, die Kisten auswählen, **K** drücken.
-3. Die Physik-Komponente **Starrkörper** (Rigid Body), Bewegungsart **Dynamisch (Physik simulieren)**.
+3. Die Physik-Komponente **Starrkörper** (Rigid Body), **Mobilität** (Mobility) auf **Dynamisch (Physik simulieren)**.
    Ohne sie bleibt ein Actor, wo er steht.
 4. Studio rechnet keine Schritte rückwärts, sondern springt zu einem gemerkten Gesamtstand zurück.
 5. Was du im Editor siehst, verhält sich genau so im fertigen Spiel, und der Editor lässt sich

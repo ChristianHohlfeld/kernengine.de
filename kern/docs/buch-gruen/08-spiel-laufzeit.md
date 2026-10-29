@@ -195,8 +195,8 @@ sortiert in vier Gruppen.
 
 ## 8.6 Die Leveldatei
 
-Ein Level wird als lesbarer Text gespeichert. Was dem Standard entspricht, wird gar nicht erst
-hingeschrieben – so bleibt die Datei schlank.
+Ein Level wird als lesbarer Text gespeichert. Ein paar Angaben, etwa Elternteil, Ordner oder Tags,
+stehen nur in der Datei, wenn sie gesetzt sind; die Bausteine schreiben dagegen alle ihre Felder aus.
 
 Die Datei ist im Format **JSON** geschrieben – reiner Text mit Klammern, Namen und Werten, den du
 sogar mit einem Texteditor lesen kannst. Ein Actor sieht etwa so aus (gekürzt):
@@ -249,7 +249,7 @@ Die Regeln in Kurzform:
    **unsichtbaren eigenen Körper**: statisch, oder kinematisch, wenn es sich bewegt.
 3. Kinder ohne eigenen Starrkörper geben ihre Formen an den Körper ihres Eltern-Actors ab – sie werden
    eingeschweißt (8.2).
-4. Eine ganze Stadt wird ein einziger fester Körper mit einer Box je Gebäude.
+4. Eine ganze Stadt wird ein einziger fester Körper mit einer Box je Gebäudeteil und je Bodenplatte.
 5. Der **endlose Boden** ist in Wahrheit eine riesige Platte.
 
 Ein Beispiel: Eine leuchtende **Energie-Kugel** in Orb Run ist ein Pickup, dreht sich und bewegt
@@ -390,10 +390,10 @@ Zwei Beispiele zeigen, wie verschieden das aussehen kann:
 
 **Hovercar** (Hover car), **das Schwebeauto.** Gas schiebt das Auto nach vorn, und eine unsichtbare **Schwebefeder**
 hält es über dem Boden – wie ein Kissen aus Luft, das stärker drückt, je tiefer das Auto sinkt. Damit
-es in Kurven nicht wie auf Eis rutscht, drückt eine Kraft seitlich dagegen. Gelenkt wird umso stärker,
-je schneller es fährt. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
+es in Kurven nicht wie auf Eis rutscht, drückt eine Kraft seitlich dagegen. Im Stand lenkt es kaum; bis etwa
+9 m/s wird die Lenkung kräftiger, danach bleibt sie gleich. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
 
-**Figur** (Character), **die Lauffigur.** Eine Figur wie in klassischen Ego-Shootern. Sie wird nicht von der Physik
+**Figur** (Character), **die Lauffigur.** Eine Figur, die sich am Boden bewegt wie in klassischen Ego-Shootern. Sie wird nicht von der Physik
 herumgeschubst, sondern von einer **Laufhilfe** gelenkt – wie von einem unsichtbaren Spielleiter, der
 die Figur Schritt für Schritt dorthin setzt, wo sie hindarf: an Wänden entlang, kleine Stufen von
 allein hinauf, nie durch etwas hindurch. Gesprungen wird knackig.
@@ -573,7 +573,7 @@ Sechs fertige Welten zeigen, was mit den Bausteinen geht. Du findest sie unter
 - **Micro Duck:** ein Zimmer im Maßstab des Roboters mit Holzboden, Büchern, Ball und Socken.
   Die Ente läuft selbstständig, die Physik rechnet hier besonders fein, und ein Logik-Graph lässt
   sie zwitschern, wenn sie den Ball sieht.
-- **Grundformen** (Basic): Boden und ein Würfel. **Leer** (Empty): gar nichts.
+- **Basis** (Basic): Boden und ein Würfel. **Leer** (Empty): gar nichts.
 
 > **Probier's aus!** Starte im Studio Orb Run mit **Spielen** (Play), Alt+P, und sammle ein paar
 > Kugeln. Dann stoppe mit Esc, öffne die **Welteinstellungen** (World Settings) und stell die

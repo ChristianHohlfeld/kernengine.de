@@ -131,7 +131,7 @@ Was du siehst, wird also genau so simuliert.
 
 ## 6.3 Formen
 
-Damit ein Körper anstoßen kann, bekommt er **Formen**, gern auch mehrere. Box3D kennt fünf:
+Damit ein Körper anstoßen kann, bekommt er **Formen**, gern auch mehrere. Kern bietet fünf an:
 
 | Form | Alltagsbild |
 |---|---|
@@ -266,7 +266,7 @@ und jede hat ein Vorbild im Alltag:
 | Keine Kollision (Filter) | No collision (filter) | verbindet nichts, verhindert nur Zusammenstöße |
 
 **Das Beispiel Tür:** Ein Scharnier verbindet Türrahmen und Tür. Kern legt am Scharnierpunkt eine
-senkrechte Achse fest, um die sich die Tür drehen darf. Eine **Grenze** von knapp 100 Grad in jede
+senkrechte Achse fest, um die sich die Tür drehen darf. Eine **Grenze** von 100 Grad in jede
 Richtung sorgt dafür, dass die Tür nicht durch die Wand schwingt. Der Winkel null ist die Lage, in
 der Tür und Rahmen gebaut wurden. Darum baut man Gelenke immer in ihrer Ruhelage: Baut man die Tür
 halb offen ein, hält Kern „halb offen“ für null. Der Türstopper säße dann an der falschen Stelle.
@@ -424,8 +424,8 @@ kann. Steifer geht nur mit mehr Teilschritten.
 ## 6.13 Determinismus
 
 Kern ist **Bit für Bit deterministisch**: Gleiche Eingaben ergeben auf einem Linux-PC, auf einem Mac
-und im Browser exakt dasselbe Ergebnis, bis in die letzte Stelle jeder Zahl. Alle drei werden
-regelmäßig geprüft.
+und im WebAssembly-Modul, das auch der Browser benutzt, exakt dasselbe Ergebnis, bis in die letzte
+Stelle jeder Zahl. Alle drei werden bei jeder Änderung geprüft.
 
 Warum so streng? Weil Physik winzige Unterschiede in Sekunden aufschaukelt. Ein Unterschied in der
 letzten Stelle wird bei einem laufenden Roboter schnell zu einem ganz anderen Schritt. Und Kern

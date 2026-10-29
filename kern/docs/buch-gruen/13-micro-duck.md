@@ -141,8 +141,8 @@ nicht über den Boden wie auf Eis.
 
 Neu in Kern: **Materialpaare**. Wie stark zwei Dinge aneinander haften, hängt von beiden ab.
 Normalerweise schätzt eine Physik-Engine die Reibung zweier Stoffe einfach aus deren Einzelwerten, als
-eine Art Mittelwert. Für manche Paare stimmt das nicht: Das weiche Schnabelpolster hält Baumwolle
-besser fest, als dieser Mittelwert sagt. Für solche Paare trägt Kern einen eigenen Wert ein; für die
+eine Art Mittelwert. Für manche Paare stimmt das nicht: Wie fest das weiche Schnabelpolster Baumwolle
+hält, folgt nicht aus den Einzelwerten. Für solche Paare trägt Kern einen eigenen, gemessenen Wert ein; für die
 Socke ist das wichtig. Im Micro-Duck-Level ist der Boden aus Holz.
 
 ### Maßstab 4: die Ente als Riesin
@@ -160,7 +160,7 @@ Und die **Zeit**? Große Dinge bewegen sich gemächlicher. Eine lange Schaukel s
 eine kurze, und ein Stein fällt von einem hohen Turm länger als von einem niedrigen. Die Regel dahinter:
 Ist etwas viermal so groß, dauert eine solche Bewegung **doppelt** so lange, bei neunmal so groß
 dreimal so lange. Die Riesen-Ente
-läuft also in Zeitlupe, halb so schnell wie die echte.
+läuft also in Zeitlupe: Jeder Schritt dauert doppelt so lange wie bei der echten.
 
 Das Netz merkt von alldem nichts. Kern rechnet alles in echte Robotermaße zurück, bevor das Netz es
 sieht, und auch alle Werte, die du über Logik oder Sensoren bekommst, sind echte Meter und Sekunden.
@@ -174,7 +174,7 @@ sieht, und auch alle Werte, die du über Logik oder Sensoren bekommst, sind echt
 Die 3D-Formen der Ente stammen aus Pollens eigenen Modellen. Die dürfen nur nicht kommerziell genutzt
 werden, Kerns Programmtext dagegen frei. Darum zeigt dieses Buch die Ente in eigener Gestaltung.
 
-Es gibt auch eine Variante **„Micro Duck (Rollers)“**: Statt Sohlen trägt sie Kufen mit frei drehenden
+Es gibt auch eine Variante **Micro Duck (Rollschuhe)** (Micro Duck (Rollers)): Statt Sohlen trägt sie Kufen mit frei drehenden
 Rädchen ohne Antrieb, wie Rollschuhe. Fahren muss sie trotzdem selbst, mit einem eigenen Netz.
 
 ## 13.4 Das Servomodell
@@ -289,11 +289,13 @@ Es läuft immer **nur eine** Bewegung. Wollen mehrere gleichzeitig, gilt eine fe
 4. Rollen,
 5. zuletzt Stehen und Laufen.
 
-Aus dem Sitzen heraus startet keine Bewegung. Klappt etwas nicht, sagt die Ente warum, etwa „the robot
-is sitting - stand it up first“.
+Aus dem Sitzen heraus startet keine Bewegung; die Taste bleibt dann einfach ohne Wirkung. (Ein
+Programm, das die Ente steuert, bekommt den Grund als Antwort, etwa „the robot is sitting - stand it
+up first“, 13.13.)
 
-> **Achtung, Falle!** Fehlt das Netz einer Bewegung noch, springt kein anderes ein. Die Ente hält die
-> Grundhaltung und sagt einmal, welches Netz fehlt. Bleibt sie stur stehen, schau in die Meldungen.
+> **Achtung, Falle!** Fehlt das Netz einer Bewegung noch, springt kein anderes ein: Die Bewegung
+> startet dann einfach nicht. Fehlt das Netz der gewählten Gangart, hält die Ente die Grundhaltung und
+> meldet einmal, welches Netz fehlt. Bleibt sie stur stehen, schau in die Meldungen.
 
 ### Vom Befehl zum Servoziel
 
@@ -319,7 +321,8 @@ baut. Pollens Netze liegen in einem Ordner, Kerns eigene (Sprung und Spielschich
 Das läuft wie ein Gespräch: Die Engine meldet, welche Netze ihr fehlen, die Seite holt sie, und die
 Engine prüft jedes. Kern rechnet die Netze selbst und kennt nur Mischpulte, die so verdrahtet sind wie
 Pollens; ein anders verdrahtetes lehnt es mit Begründung ab. Klappt das Laden nicht, versucht die
-Seite es später noch einmal. So lange bleibt die Ente bei dieser Bewegung stehen und sagt warum.
+Seite es später noch einmal. So lange startet diese Bewegung nicht; laufen und stehen kann die Ente mit dem eingebauten Netz
+trotzdem.
 
 > **Wusstest du?** Netze, die du selbst mit dem Kern Lehrer im Browser trainierst
 > ([Kapitel 14](14-lehrer.md)), bleiben im Speicher desselben Browsers. Studio holt sie sich von dort,

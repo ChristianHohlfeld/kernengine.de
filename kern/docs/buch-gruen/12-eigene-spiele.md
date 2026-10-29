@@ -39,7 +39,7 @@ geht's!
 ### Schritt 1: Ein neues Level
 
 Öffne Kern Studio über https://kernengine.de/, dann **Datei › Neues Level...** (File › New Level...),
-Vorlage **Grundformen** (Basic), **Erstellen** (Create). Du hast einen Boden von 40 × 40 m, Sonne,
+Vorlage **Basis** (Basic), **Erstellen** (Create). Du hast einen Boden von 40 × 40 m, Sonne,
 Himmel und einen Würfel. Trag in den **Welteinstellungen** (World Settings) als **Level-Name** (Level name)
 und als **Spieltitel** (Game title) „Orb Garden“ ein.
 
@@ -147,7 +147,7 @@ und in den Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche
 
 Drück **Spielen** und leg los! Mit **F8** steuerst du die Figur nicht mehr, sondern schaust mit einer freien
 Kamera zu, während das Spiel weiterläuft; noch einmal F8, und du steuerst wieder. Mit
-**Spielen › Anzahl der Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players (listen server))
+**Spielen › Anzahl der Spieler › 2 Spieler (Listen-Server)** (Play › Number of Players › 2 Players (listen server))
 testest du zu zweit. Findet Studio einen Fehler im Level, startet das Spiel nicht, und der Grund
 steht im **Ausgabeprotokoll** (Output Log), dem Protokoll unten in der **Inhaltsablage**.
 
@@ -466,7 +466,7 @@ einmal geklickt oder getippt hast.
 
 ## Knobelecke
 
-1. Warum startest du dein Spiel mit der Vorlage **Grundformen** (Basic) und nicht mit **Leer** (Empty)?
+1. Warum startest du dein Spiel mit der Vorlage **Basis** (Basic) und nicht mit **Leer** (Empty)?
 2. Dein Würfel aus **Formen** (Shapes) fällt nicht herunter. Was fehlt?
 3. Lena spielt hello auf einem Bildschirm mit 120 Bildern pro Sekunde, Tom auf einem mit 60. Beide
    halten eine Sekunde lang die Pfeiltaste. Wessen Kamera hat sich weiter gedreht?

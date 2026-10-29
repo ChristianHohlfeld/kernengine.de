@@ -117,8 +117,8 @@ Alles darin liegt weiter weg als der Treffer, den Kern schon hat, kann also nich
 Dreieck sein.
 
 Eine BVH lohnt sich nur für große Dinge, die stillstehen, etwa die Häuser der Stadt. Wird so ein Ding
-bewegt, wirft Kern die Kästen weg und packt neu, sobald es wieder ruht. Kleine oder bewegte Dinge
-prüft Kern einfach Dreieck für Dreieck.
+verschoben, wirft Kern die Kästen weg; neu gepackt wird erst, wenn es wieder genau an seiner
+Ursprungslage steht. Kleine oder bewegte Dinge prüft Kern einfach Dreieck für Dreieck.
 
 > **Für Neugierige:** Weil jede Stufe halbiert, wächst der Kartonturm nur sehr langsam: Für doppelt
 > so viele Dreiecke braucht es nur eine Stufe mehr. Die genauen Bauregeln stehen im blauen Buch,
@@ -197,7 +197,7 @@ entlang, kommst du an Außen- und Innenkante vorbei, ohne abzusetzen. Es ist nur
 
 ## 5.6 Primitive: der Baukasten
 
-**Primitive** sind fertige Grundformen: Quader, Kugel, Kapsel, Torus (Donut), Zylinder, Kegel und
+**Primitive** sind fertige Grundkörper: Quader, Kugel, Kapsel, Torus (Donut), Zylinder, Kegel und
 Ebene, alle mit Z nach oben. Man kann mehrere davon verschoben und gedreht **zu einem einzigen Mesh
 zusammenkleben**.
 
@@ -377,7 +377,7 @@ der anderen Seite wieder auf und halten an, wenn du vor ihnen stehst.
 
 ## 5.12 Formen im Level und eingebaute Meshes
 
-Jedes sichtbare Ding im Level hat eine Form: eine der Grundformen aus 5.6, dazu eine Rampe (ein Keil)
+Jedes sichtbare Ding im Level hat eine Form: einer der Grundkörper aus 5.6, dazu eine Rampe (ein Keil)
 oder ein fertiges Mesh. Kern baut die Form weiß, die Farbe kommt vom **Material**, also der
 Beschaffenheit der Oberfläche: Farbe, Glanz, Muster. Damit eine Textur auf einer großen Wand genauso
 groß aussieht wie auf einer kleinen, wird das Muster nach Metern verteilt, nicht nach der Größe der

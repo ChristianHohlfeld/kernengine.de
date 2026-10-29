@@ -18,8 +18,8 @@ gleichnamige Kapitel der blauen Fassung gemeint.
 
 Kern Studio bedienst du ähnlich wie die großen Spiele-Baukästen, die Profis benutzen. Du musst dir
 nichts merken: **F1** zeigt die wichtigsten Kürzel jederzeit im Studio selbst an. Die Tasten heißen
-hier wie auf deutschen Tastaturen: **Strg**, **Umschalt**, **Entf**, **Leertaste** – so zeigt sie
-auch Studio auf Deutsch an. Nur die Taste **Ende** steht in Studios Menüs als „End“. Auf dem Mac
+hier wie auf deutschen Tastaturen: **Strg**, **Umschalt**, **Entf**, **Ende**, **Leertaste**.
+Studio zeigt sie auf Deutsch genauso an, nur die Taste Entf steht in den Menüs als „Löschen“. Auf dem Mac
 versteht Studio die Cmd-Taste wie Strg. Alle Einzelheiten stehen in
 [Kapitel 11](11-studio.md).
 
@@ -122,7 +122,7 @@ sonst holt sie die Auswahl ins Bild. Die Tasten des Logik-Editors stehen in [Kap
 | Sprung | 7 | – | HÜPFEN (HOP) |
 | Quaken / „Wheee“ | Leertaste / V | rechter / linker Trigger | QUAK / HUIII (QUACK / WHEEE) |
 
-Die Ente gibt es auch als Variante mit Rollschuhen, „Micro Duck (Rollers)“; sie fährt dann, statt
+Die Ente gibt es auch als Variante mit Rollschuhen, **Micro Duck (Rollschuhe)** (Micro Duck (Rollers)); sie fährt dann, statt
 zu gehen ([Kapitel 13](13-micro-duck.md)).
 
 Mit **F8** übernimmst du die Ente; dann hören W A S D und die Zahlentasten auf dich. Jede Eingabe
@@ -174,7 +174,7 @@ Kapitel 17:
 - **Der Lehrer als Kommandozeilenprogramm:** Neben der Lehrer-Seite im Browser gibt es den Lehrer
   auch als Programm, das man mit getippten Befehlen startet – zum Trainieren, Bewerten, Kalibrieren
   und Messen. Alle Befehle mit ihren Einstellungen und Beispielen stehen dort.
-- **Die Schnittstelle zwischen Engine und Browser:** Die **Engine** ist das Herz von Kern, das
+- **Die Schnittstelle zwischen Engine und Browser:** Die Engine ist das Herz von Kern, das
   Programm, das rechnet, zeichnet und die Physik laufen lässt. Sie ist in einer Programmiersprache
   für schnelle Programme geschrieben (C++) und läuft im Browser in einem schnellen Programmformat
   (WebAssembly); die Webseite drumherum ist in der Sprache der Webseiten geschrieben (JavaScript).
@@ -239,7 +239,7 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **C++** | die Programmiersprache, in der Kern geschrieben ist |
 | **Compiler, kompilieren** | Programmtext in Befehle übersetzen, die der Rechner direkt ausführt |
 | **Determinismus** | gleiche Eingaben ergeben bis in die letzte Stelle dasselbe Ergebnis, auf jedem Gerät |
-| **Engine** | das Herz von Kern: das Programm, das rechnet, zeichnet und die Physik laufen lässt |
+| **Engine, Spiel-Engine** | das Herz von Kern: das Programm, das rechnet, zeichnet und die Physik laufen lässt |
 | **Fingerabdruck** | eine Prüfzahl pro Takt; stimmt sie überall, rechnet Kern überall gleich |
 | **Frame** | ein einzelnes Bild auf dem Bildschirm; viele pro Sekunde ergeben Bewegung |
 | **Gelenk** (Constraint) | eine Verbindung zwischen zwei Körpern, etwa ein Scharnier |

@@ -49,8 +49,8 @@ Ein Servo wird im Computer nicht Zahnrad für Zahnrad nachgebaut. Kern beschreib
 anfühlt**: wie fest er zieht, wie er bremst, wie träge und wie spät er reagiert. Diese wenigen Zahlen
 zusammen heißen **Profil**. Ein anderer Servo ist einfach ein anderes Profil.
 
-Am einfachsten stellst du dir den Servo als vier Teile vor, die zwischen dem Gelenk und seinem
-Zielwinkel sitzen:
+Am einfachsten stellst du dir den Servo als Feder und Stoßdämpfer zwischen Gelenk und Zielwinkel
+vor, dazu kommen Reibung, ein Schwungrad und eine kleine Verzögerung:
 
 ![Der Servo als Feder und Stoßdämpfer zwischen Zielwinkel und Gelenk](../abbildungen/servo-modell.svg)
 
@@ -194,8 +194,8 @@ Wie der echte Roboter eine solche Aufzeichnung schreibt, beschreibt dieses Buch 
 für den Abgleich nennt das blaue Buch, Kapitel 16.
 
 > **Probier's aus!** Wie viel kleine Unterschiede ausmachen, siehst du im Studio. Öffne
-> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) und klick die Ente
-> an. Im **Details**-Panel steht unter
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) und wähle im
+> **Outliner** den Actor „Micro Duck“ (oder klick genau auf den Rumpf der Ente). Im **Details**-Panel steht unter
 > **Spieler-Steuerung › Läufer** (Player Controller › Walker) das Feld
 > **Aktionen zu Servo-Zielen** (Actions to servo goals). Lass es auf
 > **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), starte **Spielen**
