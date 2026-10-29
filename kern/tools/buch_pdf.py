@@ -72,12 +72,25 @@ def mermaid(code):
     with pdfplumber.open(pdf) as d: sizes = [c["size"] for c in d.pages[0].chars]
     printed = min(sizes) * width / (pw / 72 * 25.4) if sizes else 99
     if printed < 7: print(f"MERMAID TOO SMALL: diagram {mermaid_n} prints at {printed:.1f} pt (< 7 pt): {code.splitlines()[0]} / {code.splitlines()[1] if len(code.splitlines()) > 1 else ''}", file=sys.stderr)
-    return f"![]({pdf}){{width={width:.1f}mm}}"
+    cap = re.search(r"^\s*%%\s*(?:Bildunterschrift|Caption)\s*:\s*(.+)$", code, flags=re.M | re.I)
+    return placed(pdf, cap.group(1).strip() if cap else "", width, what=f"diagram {mermaid_n}: {code.splitlines()[0]}")
 
 
 edition_name = "gelb" if "gelb" in src.name or "yellow" in src.name else "gruen" if "gruen" in src.name or "green" in src.name else "blau"
 lang_code = "en" if a.en or src.name.startswith("book") else "de"
 figures_built = False
+
+
+def placed(path, caption, width_mm=None, what=""):
+    """A picture, figure or diagram set centred with its caption underneath (small, sans serif),
+    both kept on one page: every picture in the books looks the same."""
+    cap = caption.replace("`", "").replace("*", "")
+    cap = re.sub(r"([&%$#_{}])", r"\\\1", cap).replace("~", r"\textasciitilde{}").replace("^", r"\textasciicircum{}")
+    if not cap.strip() and what: print(f"NO CAPTION: {what}", file=sys.stderr)
+    cap = r"\par\vspace{3pt}{\small\sffamily " + cap + "}" if cap.strip() else ""
+    size = f"[width={width_mm:.1f}mm]" if width_mm else ""
+    return ("`\\begin{center}\\begin{minipage}{\\linewidth}\\centering\\includegraphics" + size + "{" + pathlib.Path(path).as_posix() + "}"
+            + cap + "\\end{minipage}\\end{center}`{=latex}")
 
 
 def figure(m):
@@ -90,12 +103,7 @@ def figure(m):
         figures_built = True
     f = work / "abb" / f"{m.group(2)}.{edition_name}.{lang_code}.pdf"
     if not f.exists(): sys.exit(f"no figure {m.group(2)} for {edition_name}/{lang_code}")
-    # Set centred with its caption underneath (small, sans serif), both kept on one page.
-    cap = m.group(1).replace("`", "").replace("*", "")
-    cap = re.sub(r"([&%$#_{}])", r"\\\1", cap).replace("~", r"\textasciitilde{}").replace("^", r"\textasciicircum{}")
-    cap = r"\par\vspace{3pt}{\small\sffamily " + cap + "}" if cap.strip() else ""
-    return ("`\\begin{center}\\begin{minipage}{\\linewidth}\\centering\\includegraphics{" + f.as_posix() + "}"
-            + cap + "\\end{minipage}\\end{center}`{=latex}")
+    return placed(f, m.group(1), what=f"figure {m.group(2)}")
 
 
 TEXT_W, TEXT_H = w - 39.0, h - 54.0  # mm: the text block (inner 22 + outer 17, top 20 + bottom 24 + head)
@@ -144,7 +152,8 @@ for i, p in enumerate(files):
         if not f.exists():
             print("missing image", path, file=sys.stderr)
             return ""
-        return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
+        if f.name.startswith("autor"): return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
+        return placed(print_copy(f), alt, print_width(f), what=f"picture {path}")
     t = re.sub(r"!\[([^\]]*)\]\(((?:\.\./buch/)?bilder/[^)\s]+)\)", img, t)
     t = re.sub(r"!\[([^\]]*)\]\(\.\./abbildungen/([\w-]+)\.svg\)", figure, t)
     # Links to other chapters (with or without an anchor) point into the book.
