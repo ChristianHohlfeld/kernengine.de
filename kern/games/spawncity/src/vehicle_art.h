@@ -39,7 +39,7 @@ class VehicleArt {
   Part car_body_, car_glass_, car_lights_, car_tail_, wheel_, bus_body_, bus_glass_;
   Part jet_body_, jet_glass_, jet_gear_, jet_flame_;
   Part drone_frame_, drone_motor_, drone_prop_a_, drone_prop_b_, drone_led_;
-  Part chute_, pilot_;
+  Part chute_, chute_lines_, pilot_;
 };
 
 }  // namespace sc

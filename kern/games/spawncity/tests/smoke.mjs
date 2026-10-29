@@ -1,7 +1,7 @@
 // Browser smoke test of SpawnCity on Kern (Playwright + Chromium, software WebGL):
 // loads the page, waits for the world, steers every mode for 3 s and takes screenshots.
 //
-//   node kern/games/spawncity/tests/smoke.mjs [shots-dir]
+//   node kern/games/spawncity/tests/smoke.mjs [shots-dir]      (SC_SMOKE=desktop|phone: one run only)
 //
 // Serves the repository root itself (python3 -m http.server). Two runs:
 //   * desktop with map data: the page's TileJSON and tile requests are answered by the test with
@@ -198,8 +198,9 @@ async function run({name, url, context, mapped}) {
 }
 
 try {
-  await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&mute=1", mapped: true, context: {viewport: {width: 1280, height: 720}}});
-  await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
+  const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
+  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&mute=1", mapped: true, context: {viewport: {width: 1280, height: 720}}});
+  if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});
 } finally {
   await browser.close();

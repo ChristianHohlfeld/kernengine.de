@@ -151,6 +151,7 @@ bool VehicleArt::init(kern::Renderer& r) {
     kern::Material m = mat(0.8f);
     m.double_sided = true;
     if (!make(r, chute_, canopy, m, false)) return false;
+    if (!make(r, chute_lines_, prim::box({0.02f, 0.02f, 1.0f}, {0.9f, 0.9f, 0.85f}), mat(0.8f), false)) return false;
     if (!make(r, pilot_, prim::capsule(0.28f, 1.1f, 10, 6, {0.3f, 0.36f, 0.28f}), mat(0.8f), false)) return false;
   }
   return true;
@@ -158,7 +159,7 @@ bool VehicleArt::init(kern::Renderer& r) {
 
 void VehicleArt::begin() {
   for (Part* p : {&car_body_, &car_glass_, &car_lights_, &car_tail_, &wheel_, &bus_body_, &bus_glass_, &jet_body_, &jet_glass_, &jet_gear_, &jet_flame_,
-                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &pilot_}) {
+                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &chute_lines_, &pilot_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -221,12 +222,23 @@ void VehicleArt::drone(const Mat4& body, const Vec3* motors, const f32* rotor_an
 void VehicleArt::parachute(Vec3 pilot, f32 heading, bool open) {
   const Mat4 base = at(pilot) * rot({0, 0, 1}, heading);
   put(pilot_, base * at({0, 0, 0}));
-  if (open) put(chute_, base * at({0, 0, 5.2f}) * Mat4::scale({3.6f, 2.6f, 1.1f}));
+  if (!open) return;
+  // Canopy 4.6 m above the harness, risers from the shoulders to its rim.
+  const Vec3 top{0, 0, 4.6f};
+  put(chute_, base * at(top) * Mat4::scale({3.4f, 2.5f, 0.9f}));
+  for (Vec2 rim : {Vec2{3.1f, 2.1f}, Vec2{-3.1f, 2.1f}, Vec2{3.1f, -2.1f}, Vec2{-3.1f, -2.1f}}) {
+    const Vec3 a{rim.x * 0.08f, rim.y * 0.08f, 0.55f}, b{rim.x, rim.y, top.z - 0.3f};
+    const Vec3 d = b - a;
+    const f32 len = kern::length(d);
+    const Vec3 n = d * (1.0f / len), axis = kern::cross(Vec3{0, 0, 1}, n);
+    const f32 ang = std::acos(clampf(n.z, -1, 1));
+    put(chute_lines_, base * at((a + b) * 0.5f) * rot(kern::normalize(axis, {1, 0, 0}), ang) * Mat4::scale({1, 1, len}));
+  }
 }
 
 void VehicleArt::end() {
   for (Part* p : {&car_body_, &car_glass_, &car_lights_, &car_tail_, &wheel_, &bus_body_, &bus_glass_, &jet_body_, &jet_glass_, &jet_gear_, &jet_flame_,
-                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &pilot_}) {
+                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &chute_lines_, &pilot_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

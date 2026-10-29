@@ -48,6 +48,10 @@
   body.sc-touch-on .sc-panel { left: auto; right: max(14px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 40px); bottom: auto; min-width: 150px; }
   body.sc-touch-on .sc-ammo { bottom: auto; top: calc(max(12px, env(safe-area-inset-top)) + 40px); right: auto; left: max(14px, env(safe-area-inset-left)); }
   body.sc-touch-on .sc-fps { display: none; }
+  /* Touch: a compact panel that ends above the context buttons over the right stick. */
+  body.sc-touch-on .sc-panel { padding: 6px 10px; min-width: 130px; }
+  body.sc-touch-on .sc-speed b { font-size: 20px; }
+  body.sc-touch-on .sc-rows div:nth-child(n+3) { display: none; }
   @media (max-width: 640px) { .sc-fps { display: none; } .sc-speed b { font-size: 24px; } }
 </style>
 </head>
