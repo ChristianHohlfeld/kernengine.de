@@ -118,14 +118,25 @@ async function run({name, url, context, mapped}) {
     await page.screenshot({path: p, timeout: 180000});
     console.log("   screenshot", p);
   };
-  const hold = async (keys, ms) => { for (const k of keys) await page.keyboard.down(k); await page.waitForTimeout(ms); for (const k of keys) await page.keyboard.up(k); };
-  const touchHold = async (x, y, ms) => {
-    // A finger on a stick: down, a drag, hold, up (CDP touch events).
-    const s = await ctx.newCDPSession(page);
-    await s.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: [{x, y, id: 1}]});
-    await s.send("Input.dispatchTouchEvent", {type: "touchMove", touchPoints: [{x, y: y - 50, id: 1}]});
-    await page.waitForTimeout(ms);
-    await s.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+  // Controls are held for 3 s of game time (software WebGL renders a few frames per second, and the
+  // game clamps a frame to 0.1 s), at most `limit` ms of wall time.
+  const holdFor = async (press, release, seconds = 3, limit = 120000) => {
+    const gameTime = async () => { const t = (await hud()).t; if (!Number.isFinite(t)) throw Error("HUD without game time"); return t; };
+    const t0 = await gameTime(), end = Date.now() + limit;
+    await press();
+    while ((await gameTime()) - t0 < seconds && Date.now() < end) await page.waitForTimeout(150);
+    await release();
+  };
+  const hold = (keys, seconds = 3) => holdFor(async () => { for (const k of keys) await page.keyboard.down(k); },
+    async () => { for (const k of keys) await page.keyboard.up(k); }, seconds);
+  let cdp = null;
+  const touchHold = async (x, y, seconds = 3) => {
+    // A finger on a stick: down, dragged up 50 px, held, lifted (CDP touch events).
+    cdp ||= await ctx.newCDPSession(page);
+    await holdFor(async () => {
+      await cdp.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: [{x, y, id: 1}]});
+      await cdp.send("Input.dispatchTouchEvent", {type: "touchMove", touchPoints: [{x, y: y - 50, id: 1}]});
+    }, () => cdp.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []}), seconds);
   };
   const vw = context.viewport.width, vh = context.viewport.height;
   let h = await hud();
@@ -137,18 +148,17 @@ async function run({name, url, context, mapped}) {
 
   // On foot: walk 3 s.
   const p0 = [h.lon, h.lat];
-  if (context.hasTouch) await touchHold(110, vh - 110, 3000);
-  else { await page.mouse.move(vw / 2, vh / 2); await hold(["KeyW"], 3000); }
+  if (context.hasTouch) await touchHold(110, vh - 110);
+  else await hold(["KeyW"]);
   h = await hud();
   check(Math.hypot(h.lon - p0[0], h.lat - p0[1]) > 1e-6, `[${name}] walked on foot`);
   await shot("1-foot");
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
-  await page.waitForFunction(() => !window.SpawnCity.hud().drone?.calibrating, null, {timeout: 240000});
-  if (context.hasTouch) await touchHold(vw - 110, vh - 110, 3000);
-  else await hold(["Space"], 3000);
-  if (!context.hasTouch) await hold(["KeyW", "Space"], 1500);
+  await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
+  if (context.hasTouch) await touchHold(vw - 110, vh - 110);
+  else { await hold(["Space"], 2); await hold(["KeyW", "Space"], 1); }
   h = await hud();
   check(h.drone && h.drone.armed, `[${name}] drone armed (state ${JSON.stringify(h.drone)})`);
   check(h.agl > 1.0, `[${name}] drone climbed: ${h.agl} m AGL`);
@@ -159,8 +169,8 @@ async function run({name, url, context, mapped}) {
   const car = await cmd("mode car");
   check(car === "car", `[${name}] car mode (${car})`);
   if (car === "car") {
-    if (context.hasTouch) await touchHold(vw - 110, vh - 110, 3000);
-    else await hold(["KeyW"], 3000);
+    if (context.hasTouch) await touchHold(vw - 110, vh - 110);
+    else await hold(["KeyW"]);
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
     await shot("3-car");
@@ -171,13 +181,16 @@ async function run({name, url, context, mapped}) {
   const jet = await cmd("mode jet");
   check(jet === "jet", `[${name}] jet mode (${jet})`);
   if (jet === "jet") {
-    if (context.hasTouch) await touchHold(110, vh - 110, 3000);
-    else await hold(["KeyW"], 3000);
+    if (context.hasTouch) await touchHold(110, vh - 110);
+    else await hold(["KeyW"]);
     h = await hud();
     check(h.agl > 2, `[${name}] the jet lifts off: ${h.agl} m AGL`);
     await shot("4-jet");
     check(await cmd("eject") === "ok", `[${name}] ejection seat`);
-    await page.waitForTimeout(1500);
+    const t0 = (await hud()).t;
+    await page.waitForFunction(t0 => window.SpawnCity.hud().t > t0 + 1.5, t0, {timeout: 120000});
+    h = await hud();
+    check(h.mode === "parachute" && h.chute, `[${name}] the canopy is open (${h.mode}, ${h.agl} m)`);
     await shot("5-parachute");
   }
   check(errors.length === 0, `[${name}] no page errors ${errors.length ? JSON.stringify(errors.slice(0, 5)) : ""}`);

@@ -368,7 +368,15 @@ void Game::toggle_drone() {
   if (mode_ != Mode::foot) return;
   const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
   const f32 yaw = world_->camera_yaw() * kDeg;
+  // 2.9 m ahead of the pilot; if something hangs over that spot (a wing, a balcony) or stands
+  // there, the next free side (left, right, behind) - the drone needs open sky to take off.
   Vec3 at = feet + Vec3{std::cos(yaw), std::sin(yaw), 0} * kDroneAhead;
+  for (f32 turn : {0.0f, 0.5f * kPi, -0.5f * kPi, kPi}) {
+    const Vec3 c = feet + Vec3{std::cos(yaw + turn), std::sin(yaw + turn), 0} * kDroneAhead;
+    const bool open = !cast(world_->physics(), c + Vec3{0, 0, 0.3f}, {0, 0, 1}, 25, body(soldier_)).hit &&
+                      !cast(world_->physics(), feet + Vec3{0, 0, 0.3f}, kern::normalize(c - feet), kDroneAhead + 0.3f, body(soldier_)).hit;
+    if (open) { at = c; break; }
+  }
   const RayResult g = cast(world_->physics(), at + Vec3{0, 0, 3}, {0, 0, -1}, 10, body(soldier_));
   at.z = (g.hit ? g.point.z : feet.z) + 0.0225f;
   world_->set_alive(drone_actor_, true);
@@ -867,26 +875,26 @@ void Game::update_touch_layout() {
       bool near = jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet;
       for (const TrafficCar& c : cars_)
         if (c.placed) { const Vec3 p = matrix_of(c.actor).translation(); near |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCar; }
-      if (near) b.push_back({"enter", "EINSTEIGEN", 0x7a4b12});
+      if (near) b.push_back({"enter", "REIN", 0x7a4b12});
       pad_touch_.set_layout(false, b);
       break;
     }
     case Mode::drone:
-      b.push_back({"mode", "ZU FUSS", 0x17694f});
+      b.push_back({"mode", "FUSS", 0x17694f});
       b.push_back({"arm", drone_.telemetry().armed ? "LANDEN" : "ARM", drone_.telemetry().armed ? 0x7a1a12u : 0x1a5a12u});
-      b.push_back({"cam", "KAMERA", 0x0d1118});
+      b.push_back({"cam", "CAM", 0x0d1118});
       pad_touch_.set_layout(true, b, "FLUG", "HOEHE / DREHEN");
       break;
     case Mode::car:
-      b.push_back({"enter", "AUSSTEIGEN", 0x7a4b12});
-      b.push_back({"hb", "HANDBREMSE", 0x0d1118});
-      b.push_back({"cam", "KAMERA", 0x0d1118});
+      b.push_back({"enter", "RAUS", 0x7a4b12});
+      b.push_back({"hb", "BREMSE", 0x0d1118});
+      b.push_back({"cam", "CAM", 0x0d1118});
       pad_touch_.set_layout(true, b, "LENKEN", "GAS / BREMSE");
       break;
     case Mode::jet:
-      b.push_back({"enter", jet_.telemetry().contacts >= 2 ? "AUSSTEIGEN" : "EJECT", 0x7a1a12});
+      b.push_back({"enter", jet_.telemetry().contacts >= 2 ? "RAUS" : "EJECT", 0x7a1a12});
       b.push_back({"vtol", jet_.mode() == Jet::Mode::hover ? "FLUG" : "SCHWEBEN", 0x17694f});
-      b.push_back({"cam", "KAMERA", 0x0d1118});
+      b.push_back({"cam", "CAM", 0x0d1118});
       pad_touch_.set_layout(true, b, "SCHUB / SEITE", "NICKEN / ROLLEN");
       break;
     case Mode::parachute: pad_touch_.set_layout(true, b, "STEUERN", "UMSEHEN"); break;
@@ -1205,7 +1213,7 @@ std::string Game::hud_json() {
     }
     case Mode::parachute: vel = world_->actor_velocity(chute_actor_); add(",\"chute\":%s", chute_open_ ? "true" : "false"); break;
   }
-  add(",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f", kern::length(vel), vel.z, agl, pos.z);
+  add(",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
   f64 lon, lat;
   unproject(city_.projector(), pos.x, pos.y, lon, lat);
   add(",\"lon\":%.6f,\"lat\":%.6f", lon, lat);

@@ -22,16 +22,16 @@ out="${1:-$root/generated/spawncity.html}"
 mkdir -p "$(dirname "$out")"
 wasm="$here/web/spawncity.wasm"
 if [ "$skip_wasm" = 0 ]; then
-  # Each game source compiles through a generated wrapper that names the hash of the game's
-  # headers: kern/build.sh hashes the source text, so a game header change recompiles the game's
-  # objects only (a -D flag would change the flags key and rebuild the whole engine).
+  # Each game source compiles through a generated wrapper that names the hashes of the game's
+  # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
+  # game's objects only (a -D flag would change the flags key and rebuild the whole engine).
   header_hash="$(find "$here/src" "$here/firmware" -name '*.h' -o -name '*.hpp' | sort | xargs cat | sha256sum | cut -c1-16)"
   wrap="${TMPDIR:-/tmp}/spawncity-wrap"
   rm -rf "$wrap" && mkdir -p "$wrap"
   wrapped=()
   for f in "$here"/src/*.cpp; do
     w="$wrap/sc_$(basename "$f")"
-    printf '// SpawnCity game headers %s\n#include "%s"\n' "$header_hash" "$f" > "$w"
+    printf '// SpawnCity game headers %s, source %s\n#include "%s"\n' "$header_hash" "$(sha256sum "$f" | cut -c1-16)" "$f" > "$w"
     wrapped+=("$w")
   done
   "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"

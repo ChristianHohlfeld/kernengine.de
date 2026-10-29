@@ -42,6 +42,11 @@ Startparameter (Query-String):
 | Jet | W/S Schub bzw. Steigen/Sinken, A/D Seitenruder, Maus nicken/rollen (Rate), Pfeile, **V** Schweben/Flug, C Cockpit, **F** aussteigen (am Boden) bzw. Schleudersitz | LS Schub/Seite, RS nicken/rollen, LB Schweben/Flug, X aussteigen | links Schub/Seite, rechts nicken/rollen, FLUG/SCHWEBEN, EJECT |
 | Fallschirm | WASD steuern | LS | linker Stick |
 
+Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
+(Winkelmodus mit Gashebel). Einen reinen Acro-Modus hat die SpawnCity-Firmware nicht
+(`Arondight45_DroneFC_Core.hpp`: der manuelle Modus ist der Winkelmodus); er wäre eine Änderung an der
+Firmware selbst und ist deshalb nicht nachgebaut.
+
 Ein Steig-Befehl auf einer kalibrierten, nicht scharfen Drohne schaltet ARM ein (wie der ARM-Knopf
 des SpawnCity-HUDs); ARM in der Luft startet die kontrollierte Landung (`simulator.mjs`).
 

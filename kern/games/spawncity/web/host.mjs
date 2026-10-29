@@ -235,7 +235,7 @@ class SpawnCityHud {
       row("Mach", j.mach.toFixed(2));
       row("Kurs", `${Math.round(j.heading)}°`);
       row("G", j.nz.toFixed(1));
-      row("Fahrwerk", j.gear ? "AUS" : "EIN");
+      row("Fahrwerk", j.gear ? "UNTEN" : "OBEN");
       row("Treibstoff", `${Math.round(j.fuel * 100)} %`);
     }
     if (h.chute !== undefined) row("Schirm", h.chute ? "OFFEN" : "FREIFALL");
