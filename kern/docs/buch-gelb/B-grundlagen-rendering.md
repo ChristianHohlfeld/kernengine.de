@@ -56,7 +56,8 @@ Eine **Matrix** ist eine Zahlentabelle, die einen Punkt in einen anderen verwand
 | (1; 0; 0) | 1·2 + 0 + 0 | 2 |
 | (0; 0; 1) | 0 + 0 + 0 | 0 |
 
-Aus (2; 1) wird (−1; 2). Zeichne beide Pfeile ins Heft: genau 90° gedreht.
+Aus (2; 1; 0) wird (−1; 2; 0). Die dritte Zahl bleibt 0, also reichen fürs Heft x und y: Zeichne
+die Pfeile (2; 1) und (−1; 2) ein – genau 90° gedreht.
 
 ### Der Trick mit der vierten Zahl
 
@@ -74,50 +75,52 @@ nach vorn. Jetzt sind alle Umwandlungen 4 × 4-Matrizen, die man hintereinanders
 
 ### Kerns Regeln
 
-Alles in **Metern**, und **Z zeigt nach oben**. Die Achsen folgen der **rechten Hand**: Daumen nach
-rechts ist x, Zeigefinger nach vorn ist y, Mittelfinger nach oben ist z.
+Alles in **Metern**, und **Z zeigt nach oben**. Die Achsen folgen der **rechten Hand**: Halte sie
+mit der Handfläche nach oben. Dann zeigt der Daumen nach rechts (x), der Zeigefinger nach vorn (y),
+und der Mittelfinger, den du nach oben knickst, zeigt nach oben (z).
 
-**Die Reihenfolge zählt.** Werden mehrere Matrizen hintereinandergeschaltet, wirkt die rechte zuerst.
-Für jedes Objekt heißt das bei Kern: erst auf die richtige Größe bringen, dann drehen, zuletzt an
-seinen Platz schieben.
+**Die Reihenfolge zählt.** Kern macht es für jedes Objekt immer in dieser Reihenfolge: erst auf die
+richtige Größe bringen, dann drehen, zuletzt an seinen Platz schieben.
 
 > **Vorsicht, Falle:** Erst 10 cm verschieben, dann um 90° drehen landet ganz woanders als
 > umgekehrt. Probier es mit einem Radiergummi auf dem Tisch.
 
 Drehungen speichert Kern als **Quaternionen**: vier Zahlen, die „um diese Achse, um so viel“
 beschreiben – wie ein Spieß durch einen Apfel, um den du ihn drehst. Der Vorteil: Man kann Drehungen
-sauber hintereinanderschalten und gerät nie in eine Lage, in der zwei Drehachsen zusammenfallen und
-eine Drehrichtung plötzlich fehlt. Das passiert, wenn man Drehungen als drei Winkel nacheinander
-speichert.
+sauber hintereinanderschalten, und keine Drehrichtung geht verloren. Bei drei Winkeln nacheinander
+kann das passieren: Kippt ein Flugzeug erst steil nach oben, bedeuten „nach links drehen“ und „zur
+Seite rollen“ plötzlich dasselbe, und eine Richtung fehlt.
 
 ### Ansicht und Perspektive
 
 Die **Ansicht** verschiebt und dreht die ganze Welt so, dass die Kamera im Nullpunkt steht und
-geradeaus schaut. Dafür muss Kern wissen, wo „rechts“ ist, und das findet es aus Blickrichtung und
-„oben“. Schaut die Kamera genau senkrecht nach oben oder unten, liegen beide auf einer Linie – dann gibt
-es kein eindeutiges „rechts“, und Kern malt lieber nichts.
+geradeaus schaut. Dafür muss Kern wissen, wo „rechts“ ist: Das ist die Richtung, die sowohl zur
+Blickrichtung als auch zu „oben“ im rechten Winkel steht. Schaut die Kamera genau senkrecht nach
+oben oder unten, liegen beide auf einer Linie – dann gibt es kein eindeutiges „rechts“, und Kern
+malt lieber nichts.
 
 **Perspektive** heißt: doppelt so weit weg, halb so groß. Man muss also durch die Entfernung
 **teilen**. Eine Matrix kann nur malnehmen und addieren. Darum schreibt sie die Entfernung in die
 vierte Zahl w, und die Grafikkarte teilt danach alles durch w.
 
-Davor vergrößert die Matrix mit einem **Zoomfaktor**. Er hängt vom Öffnungswinkel der Kamera ab:
-Bei Kerns Standardkamera mit 60° ist er 1,732, bei 70° (so starten Studios Editor-Viewports) ist er
-1,43. Weiterer Winkel, kleinerer Zoom. Weil das Bild breiter als hoch ist, wird waagerecht noch durch
-das Seitenverhältnis geteilt: 960 ÷ 540 = 1,778.
+Davor vergrößert die Matrix mit einem **Zoomfaktor**. Je enger der Blickwinkel der Kamera, desto
+stärker der Zoom, wie beim Fernglas. Bei Kerns Standardkamera mit 60° ist er 1,732, bei 70° (so
+starten Studios Editor-Viewports) ist er 1,43. Weil das Bild breiter als hoch ist, wird waagerecht
+noch durch das Seitenverhältnis geteilt: 960 ÷ 540 = 1,778.
 
 **Durchgerechnet:** Bild 960 × 540 Pixel, Kamera 60°, ein Punkt 1 m rechts, 0,5 m hoch, 10 m vor der
 Kamera.
 
-| Schritt | Rechnung | Ergebnis |
+| Schritt | x (rechts) | y (hoch) |
 |---|---|---|
-| vergrößern | 1,732 ÷ 1,778 · 1; 1,732 · 0,5 | 0,974; 0,866 |
-| durch w = 10 | ÷ 10 | 0,0974; 0,0866 |
-| in Pixel | (Wert + 1) ÷ 2 · (960; 540) | 526,8; 293,4 |
+| vergrößern | 1,732 ÷ 1,778 · 1 = 0,974 | 1,732 · 0,5 = 0,866 |
+| durch w = 10 | 0,0974 | 0,0866 |
+| in Pixel | 1,0974 ÷ 2 · 960 = 526,8 | 1,0866 ÷ 2 · 540 = 293,4 |
 
 Die letzte Zeile braucht eine Erklärung: Nach dem Teilen liegt der sichtbare Bereich zwischen −1
 (linker Rand) und +1 (rechter Rand). Plus 1 macht daraus 0 bis 2, durch 2 macht daraus 0 bis 1, und
-mal 960 ergibt die Pixelspalte. Unser Punkt landet knapp rechts oberhalb der Bildmitte (480; 270) –
+mal 960 ergibt die Pixelspalte. Hier zählen die Pixel von **unten links**, so wie im
+Koordinatensystem im Matheheft. Unser Punkt landet knapp rechts oberhalb der Bildmitte (480; 270) –
 passt.
 
 Ansichten von oben, vorn oder der Seite sind **orthografisch**: Sie teilen nicht, alles bleibt gleich
@@ -140,7 +143,8 @@ Länge 1 rechnet man: Zahlen paarweise malnehmen, dann addieren.
 | (1; 0) und (0; 1) | 0 + 0 = 0 | rechtwinklig |
 | (1; 0) und (−1; 0) | −1 + 0 = −1 | genau entgegen |
 
-Dass (0,707; 0,707) die Länge 1 hat, zeigt Pythagoras: 0,707² + 0,707² ≈ 0,5 + 0,5 = 1.
+Rechne nach: 0,707 · 0,707 ≈ 0,5, und 0,5 + 0,5 = 1. Darum hat der Pfeil (0,707; 0,707) die Länge
+1; das zeigt der Satz des Pythagoras, den du bald lernst.
 
 > **So kannst du es dir vorstellen:** Halte einen Stift über ein Lineal und leuchte mit einer Lampe
 > senkrecht von oben. Der Schatten des Stifts auf dem Lineal ist das Skalarprodukt. Liegt der Stift
@@ -170,9 +174,10 @@ genauso in die Breite wie die Rampe, steht sie schief. Richtig ist es, das
 Strecken **umzukehren**: durch 2 statt mal 2. Kern rechnet diese umgekehrte Matrix für jede Instanz
 aus ([Kapitel 4](04-grafik.md)).
 
-> **Für Profis:** Der Zoomfaktor ist 1 ÷ tan(halber Öffnungswinkel); tan lernst du in Klasse 9 oder
-> 10. Die Normalenmatrix heißt „inverse Transponierte“. Und Kern speichert seine 4 × 4-Matrizen
-> Spalte für Spalte, weil WebGL das so erwartet. Die genauen Formeln stehen im blauen Buch, Anhang B.
+> **Für Profis:** Der Zoomfaktor ist 1 ÷ tan(halber Öffnungswinkel), mit dem Taschenrechner etwa
+> 1 ÷ tan(30°) = 1,732; tan lernst du in Klasse 9 oder 10. Die Normalenmatrix heißt „inverse
+> Transponierte“. Und Kern speichert seine 4 × 4-Matrizen Spalte für Spalte, weil WebGL das so
+> erwartet. Die genauen Formeln stehen im blauen Buch, Anhang B.
 
 ## B.2 Rasterisierung und Tiefenpuffer
 
@@ -193,7 +198,12 @@ v0        v1
 
 Die Werte der drei Ecken (Farbe, Normale, Texturstelle) werden für jedes Fragment gemischt, mit drei
 Anteilen, die zusammen 1 ergeben. Genau in der Mitte bekommt jede Ecke ein Drittel: Ecken rot, rot,
-schwarz ergeben ⅔ rot.
+schwarz ergeben ⅔ rot. Je näher ein Pixel an einer Ecke liegt, desto größer ihr Anteil: Ganz nah an
+der schwarzen Ecke ist das Pixel fast schwarz.
+
+Weil hinten alles enger zusammenrückt, mischt die Grafikkarte dabei **perspektivisch richtig**: Die
+hintere Hälfte eines Dreiecks ist auf dem Bildschirm kleiner, bekommt aber trotzdem ihren vollen
+Anteil. Sonst würden Fliesen auf einem Boden, der nach hinten läuft, verbogen aussehen.
 
 > **Mission:** Schalte in Kern Studio den **View Mode** auf **Wireframe** (Alt+2): Jetzt siehst du
 > die Dreiecke, aus denen alles besteht. Zurück mit **Lit** (Alt+4).
@@ -208,14 +218,17 @@ Gemalt wird nur, was näher oder gleich nah ist; dann wird die neue Tiefe notier
 > auf: „Hier habe ich schon etwas in 12 m Entfernung gemalt.“ Kommt etwas in 20 m, malt er nicht
 > drüber. Kommt etwas in 5 m, malt er und schreibt „5 m“.
 
-Bei deckenden Dingen ist die Reihenfolge damit egal. Kern nutzt das geschickt: Deckendes von vorn
-nach hinten, Durchsichtiges von hinten nach vorn, der Himmel in die Lücken, die Ego-Ebene nach dem
-Löschen ([Kapitel 4](04-grafik.md)).
+Bei deckenden Dingen ist die Reihenfolge damit egal. Durchsichtiges dagegen prüft den Notizblock nur
+und schreibt nichts hinein: Eine Glasscheibe darf nichts aussperren, was hinter ihr liegt und erst
+danach gemalt wird. Kern nutzt das alles geschickt: Deckendes von vorn nach hinten, Durchsichtiges
+von hinten nach vorn, der Himmel in die Lücken, die Ego-Ebene nach dem Löschen
+([Kapitel 4](04-grafik.md)).
 
 ### Tiefe ist ungleich verteilt
 
-Der Tiefenpuffer hat nur endlich viele Stufen (bei Kern 24 Bit). Und er speichert nicht die
-Entfernung selbst, sondern etwas, das sich verhält wie **1 ÷ Entfernung**. Rechne nach:
+Der Tiefenpuffer hat nur endlich viele Stufen: Bei Kern sind es 24 Bit, also 2²⁴, etwa 16 Millionen
+Stufen. Und er speichert nicht die Entfernung selbst, sondern etwas, das sich verhält wie
+**1 ÷ Entfernung**. Rechne nach:
 
 | Nachbarn | 1 ÷ Entfernung | Unterschied |
 |---|---|---|
@@ -235,8 +248,19 @@ Einstellungen ist die kleinste Stufe:
 > **So kannst du es dir vorstellen:** Ein Lineal, dessen Striche nach hinten immer weiter
 > auseinanderliegen. Vorn misst du auf den Millimeter, hinten nur noch auf den Meter.
 
-Am meisten hängt die Genauigkeit an der **nahen Grenze**: Kern malt erst ab 5 cm vor der Kamera.
-Diese Grenze zu verdoppeln, verdoppelt die Genauigkeit überall.
+Am meisten hängt die Genauigkeit an der **nahen Grenze**. Die Kamera malt nichts, was näher als
+5 cm ist; das ist der Nullpunkt des Lineals. Genauer gesagt speichert der Tiefenpuffer etwa
+1 − nahe Grenze ÷ Entfernung. Die nahe Grenze steht also im Zähler. Rechne mit 5 cm nach:
+
+| nahe Grenze | 10 m und 11 m: Unterschied |
+|---|---|
+| 0,05 m | 0,05 ÷ 10 − 0,05 ÷ 11 ≈ 0,00045 |
+| 0,10 m | 0,10 ÷ 10 − 0,10 ÷ 11 ≈ 0,00091 |
+
+Doppelte nahe Grenze, doppelter Unterschied: Zwischen 10 m und 11 m passen jetzt doppelt so viele
+Stufen, und das gilt für jede Entfernung. Diese Grenze zu verdoppeln, verdoppelt also die
+Genauigkeit überall. Darum wählt man sie so groß, wie es geht. Zu groß darf sie aber nicht sein,
+sonst wird abgeschnitten, was dicht vor der Kamera ist.
 
 ### Rückseiten
 
@@ -257,9 +281,10 @@ Uhrzeigersinn, von hinten mit dem Uhrzeigersinn.
 
 Probier es: Zeichne ein Dreieck auf Papier, nummeriere die Ecken gegen den Uhrzeigersinn und halte
 das Blatt von hinten gegen das Licht. Jetzt laufen die Zahlen andersherum. Ein Spiegelbild dreht den
-Umlaufsinn ebenfalls um – darum passt Kern die Regel bei gespiegelten Objekten an.
+Umlaufsinn ebenfalls um – darum passt Kern die Regel bei gespiegelten Objekten an
+([Kapitel 4](04-grafik.md)).
 
-## B.3 Die GPU-Pipeline und Shader
+## B.3 Das Fließband der Grafikkarte und Shader
 
 Ein **Shader** ist ein kleines Programm, das die Grafikkarte für jede Ecke oder jedes Pixel
 gleichzeitig ausführt – wie tausend Schüler, die alle dieselbe Aufgabe mit anderen Zahlen rechnen.
@@ -278,6 +303,10 @@ flowchart LR
   D --> FB["Bildpuffer"]
 ```
 
+Die Grafikkarte arbeitet wie ein **Fließband** (englisch *Pipeline*): Jede Station macht einen
+Schritt und reicht weiter. „Mischen“ am Ende heißt: Durchsichtige Farben werden mit dem gemischt, was
+schon dahinter gemalt ist.
+
 Shader bekommen ihre Zutaten auf drei Wegen:
 
 | Zutat | gilt für | Beispiel |
@@ -291,7 +320,8 @@ Matrix mit – sie gilt dann nicht pro Ecke, sondern pro Baum.
 
 **Knochen (Skinning):** Eine Ecke einer Figur folgt bis zu vier Knochen, gewichtet wie eine
 Zeugnisnote. Würde Knochen A sie auf Höhe 1 bringen und B auf Höhe 2, mit Gewichten 0,75 und 0,25:
-0,75 · 1 + 0,25 · 2 = 1,25.
+0,75 · 1 + 0,25 · 2 = 1,25. Das rechnet auch das Malprogramm für die Schattenkarte: Die Sonne sieht
+die bewegten Arme genauso, und der Schatten bewegt sich mit.
 
 **Mehrere Ausgaben:** Ein Fragment-Shader kann in mehrere Bilder gleichzeitig schreiben. Kern
 schreibt drei und spart sich so zwei weitere Malgänge.
@@ -334,11 +364,15 @@ macht nichts hell. Die Regel:
 
 Die **Albedo** sagt, wie viel Licht die Farbe zurückwirft: weiß 1, mittelgrau 0,5, schwarz 0. Das
 ÷ π ist ein fester Umrechnungsfaktor. Er sorgt dafür, dass auch eine weiße Fläche nie mehr Licht
-abgibt, als bei ihr ankommt.
+abgibt, als bei ihr ankommt. π kommt hinein, weil die Fläche ihr Licht in eine ganze Halbkugel
+verteilt, und bei Kreisen und Kugeln ist immer π dabei.
+
+Jede Farbe und jedes Licht besteht aus drei Zahlen: Rot, Grün und Blau. Kern rechnet alles dreimal,
+für jeden Anteil einmal. Im Beispiel rechnen wir nur Rot.
 
 **Durchgerechnet:** Boden, Normale (0; 0; 1). Die Sonne steht 45° hoch: Richtung (0; 0,707; 0,707).
 Skalarprodukt: 0·0 + 0·0,707 + 1·0,707 = 0,707. Grauer Boden (Albedo 0,5), Kerns Sonne im roten
-Farbanteil 2,8:
+Anteil 2,8:
 
 > 0,5 × 2,8 × 0,707 ÷ 3,1416 ≈ **0,315**
 
@@ -358,9 +392,15 @@ Reichweite² ist der Faktor (1 − q)² ÷ (1 + q):
 
 | Abstand bei Reichweite 10 m | q | Faktor |
 |---|---|---|
+| 0 m | 0 | 1² ÷ 1 = 1 |
 | 2 m | 0,04 | 0,96² ÷ 1,04 ≈ 0,89 |
 | 5 m | 0,25 | 0,75² ÷ 1,25 = 0,45 |
 | 10 m | 1 | 0 |
+
+Und ganz nah? Die Regel aus der Physik teilt durch den Abstand mal Abstand. Bei einem Abstand von
+fast 0 gäbe das riesige Zahlen: Eine Lampe direkt an einer Wand würde unendlich hell. Kerns Kurve
+teilt nicht durch den Abstand. Direkt an der Lampe ist der Faktor genau 1, ihre volle Stärke, und
+nie mehr.
 
 ### Glanz: winzige Spiegel
 
@@ -378,13 +418,17 @@ Daraus folgen drei Regeln:
 3. **Flach draufschauen spiegelt mehr.** Diesen Effekt nennt man **Fresnel**. Metalle spiegeln
    dabei in ihrer eigenen Farbe – Gold glänzt golden.
 
+Dazu kommt eine Kleinigkeit: Bei rauen Flächen stehen sich die Spiegelchen auch gegenseitig im
+Licht und werfen sich winzige Schatten. Kern rechnet das nur vereinfacht.
+
 > **Krass, aber wahr:** Eine spiegelglatte Fläche aus Nichtmetall spiegelt senkrecht nur 4 % des
 > Lichts, ganz flach betrachtet aber fast alles. Darum glänzt eine nasse Straße, wenn du flach über
 > sie schaust, und ein See spiegelt am Horizont den Himmel.
 
 Diesen Ansatz nennt man **PBR** (*physically based rendering*, „physikalisch begründetes Malen“).
 Kern rechnet ein **vereinfachtes PBR**: Lambert für das Matte, einen Glanzpunkt für die Sonne und
-den Himmel als Spiegelung, die mit Fresnel am Rand stärker wird. Metall hat keinen matten Anteil.
+den Himmel als Spiegelung, die mit Fresnel am Rand stärker wird. Glatte Flächen spiegeln den Himmel
+scharf, raue nur verschwommen – wie die zerknüllte Alufolie. Metall hat keinen matten Anteil.
 Den Glanzpunkt sehr glatter Flächen begrenzt Kern, damit keine einzelnen Pixel grell flackern.
 
 > **Für Profis:** Für die Spiegelchen nutzt Kern die Formel **GGX**, für Fresnel die Näherung von
@@ -399,7 +443,12 @@ Das indirekte Licht baut Kern aus wenigen Farben, ohne einen einzigen Lichtstrah
 - **Halbkugel-Licht:** Stell dir vor, du stehst unter einer riesigen Glaskuppel. Oben ist sie
   himmelblau, unten erdbraun. Eine Fläche, die nach oben zeigt, bekommt Himmelsfarbe, eine nach unten
   Bodenfarbe, eine Wand halb und halb.
-- **Himmelsverlauf:** ein Verlauf aus drei Farben – Zenit (genau über dir), Horizont und Boden.
+- **Himmelsverlauf:** ein Verlauf aus drei Farben – Zenit (genau über dir), Horizont und Boden. Er
+  hat also einen eigenen Horizont, und aus ihm kommt auch die Spiegelung des Himmels.
+
+Beide sind Kuppeln, nur verschieden genau gerechnet. Im Spiel liefert der Himmelsverlauf das
+Tageslicht; das einfachere Halbkugel-Licht hellt nur noch die Nacht etwas auf
+([Kapitel 4](04-grafik.md)).
 
 Dieses indirekte Licht führt Kern getrennt mit, damit die Verdeckung in Ecken (B.8) nur es
 abdunkeln kann.
@@ -453,9 +502,10 @@ Gegenstand – er scheint sich zu lösen. Das heißt **Peter Panning**, nach Pet
 in der Geschichte davonläuft und von Wendy wieder angenäht werden muss.
 
 **Treppenkanten:** Ein Kästchen ist größer als ein Pixel, also sieht die Schattenkante eckig aus.
-Das Gegenmittel heißt **PCF**: Kern fragt mehrere Nachbarkästchen und nimmt den hellen Anteil. Sind 3
-von 4 hell, ist der Punkt zu 75 % hell, und die Kante wird weich. Einrasten, Schattendistanz und
-Wiederverwenden zeigt [Kapitel 4](04-grafik.md) mit Zahlen.
+Das Gegenmittel heißt **PCF** (*percentage-closer filtering*, etwa „Prozent-Filter“): Kern fragt
+mehrere Nachbarkästchen und nimmt den hellen Anteil. Sind 3 von 4 hell, ist der Punkt zu 75 % hell,
+und die Kante wird weich. Einrasten, Schattendistanz und Wiederverwenden zeigt
+[Kapitel 4](04-grafik.md) mit Zahlen.
 
 > **Für Profis:** Kern nimmt drei kleine Abstände: einen, der mit der Schräge wächst, einen festen
 > und einen „Normal Offset“ – nachgeschaut wird etwa ein Kästchen vor der Fläche, entlang ihrer
@@ -469,7 +519,7 @@ Wiederverwenden zeigt [Kapitel 4](04-grafik.md) mit Zahlen.
 Kerns Sonne hat die Stärke 2,8, ein Bildschirm zeigt aber nur 0 bis 1. Man rechnet deshalb mit
 beliebig hellen Werten (**HDR**, *high dynamic range*, „großer Helligkeitsumfang“) und quetscht erst
 ganz am Ende alles auf 0 bis 1. Das heißt **Tonemapping**. Eine gute Kurve ist in der Mitte fast
-gerade und drückt nur das sehr Helle sanft zusammen. So bleibt in einer hellen Wolke noch Zeichnung,
+gerade und drückt nur das sehr Helle sanft zusammen. So sieht man in einer hellen Wolke noch Formen,
 statt dass sie einfach weiß wird.
 
 ```
@@ -496,8 +546,9 @@ Licht addiert sich aber **linear**: doppelt so viel Licht heißt doppelt so gro�
 zusammen sind die Summe. Darum: Farben erst linear machen, dann rechnen, am Ende zurück nach sRGB.
 
 Ein Beispiel zeigt, wie groß der Unterschied ist: Lineares Mittelgrau 0,18 – also 18 % des Lichts –
-wird in sRGB zu **0,46**, fast der halben Skala. Was für dein Auge halb hell aussieht, ist in
-Wirklichkeit weniger als ein Fünftel des Lichts.
+wird in sRGB zu **0,46**, fast der halben Skala. Die dunkelsten 18 % des Lichts bekommen also fast
+die Hälfte aller Stufen. Was für dein Auge halb hell aussieht, ist in Wirklichkeit weniger als ein
+Fünftel des Lichts.
 
 > **Für Profis:** Die Umrechnung ist 1,055 · 0,18^(1 ÷ 2,4) − 0,055 ≈ 0,461 – eine Hochzahl, die ein
 > Bruch ist. Für ganz dunkle Werte gilt ein gerades Stück. Beide Formeln stehen im blauen Buch,
@@ -505,13 +556,16 @@ Wirklichkeit weniger als ein Fünftel des Lichts.
 
 ### Nebel
 
-Nebel wird mit der Entfernung stärker – aber nicht gleichmäßig: In Kerns Rechnung (sie stammt von
-three.js) wird die Entfernung **quadriert**. Dadurch bleibt die Nähe ganz klar, und die Ferne
-verschwindet schnell. Mit Kerns Standard-Nebel ist bei 100 m kaum etwas zu sehen (0,7 %), bei 1000 m
-ist es schon gut die Hälfte (51 %). Kerns Extras wie Höhennebel stehen in [Kapitel 4](04-grafik.md).
+Nebel wird mit der Entfernung stärker – aber nicht gleichmäßig: In Kerns Rechnung wird die
+Entfernung **quadriert**. Dadurch bleibt die Nähe ganz klar, und die Ferne verschwindet schnell.
+Mit Kerns Standard-Nebel ist bei 100 m kaum Nebel zu sehen (0,7 %), bei 1000 m verschwindet schon
+gut die Hälfte (51 %). Kerns Extras wie Höhennebel stehen in [Kapitel 4](04-grafik.md).
 
 > **Mission:** Stell in **World Settings** die **Exposure** auf 0,5 und dann auf 2 – das ist die
-> Belichtung vor dem Tonemapping. Dreh danach **Fog density** hoch und sieh die Ferne verschwinden.
+> Belichtung vor dem Tonemapping. **Was du siehst:** Bei 0,5 wird alles dunkler, bei 2 heller. Doch
+> auch bei 2 werden helle Stellen nicht einfach flach weiß, sondern nur langsam heller: Die Kurve
+> drückt sie sanft zusammen. Dreh danach **Fog density** hoch: Die Nähe bleibt klar, die Ferne
+> verschwindet schnell.
 
 ## B.7 Bloom
 
@@ -529,13 +583,19 @@ mit einem einzelnen hellen Pixel:
 
 Das Licht hat sich auf die Nachbarn verteilt – der Anfang eines Lichthofs.
 
-Zwei Tricks machen das schnell. Erstens: Statt jedes Pixel mit allen 9 × 9 = 81 Nachbarn im Quadrat
-zu mischen, mischt man erst 9 waagerecht, dann 9 senkrecht – 18 statt 81 Zugriffe, gleiches
-Ergebnis. Zweitens: Liest man genau **zwischen** zwei Pixeln, liefert die Grafikkarte ihren
-Mittelwert gratis mit. So ersetzen 5 Zugriffe 9 Nachbarn.
+Drei Tricks machen das schnell. Erstens: Man verwischt auf einem **verkleinerten** Bild. Das ist
+billiger, weil es weniger Pixel sind, und der Schein wird von selbst breiter, weil ein kleines Pixel
+viele große abdeckt. Zweitens: Statt jedes Pixel mit allen 9 × 9 = 81 Nachbarn im Quadrat zu mischen,
+mischt man erst 9 waagerecht, dann 9 senkrecht – 18 statt 81 Zugriffe. Das gibt dasselbe Ergebnis,
+denn das Licht wandert erst zur Seite und dann nach oben und unten, und kommt so überall im Quadrat
+an. Drittens: Liest man genau **zwischen** zwei Pixeln, liefert die Grafikkarte ihren Mittelwert
+gratis mit. So reichen für 9 Pixel in einer Reihe 5 Zugriffe: einer für die Mitte, und links wie
+rechts je zwei, die jeweils ein Pixelpaar auf einmal lesen.
 
 Bei Kern setzt das Glühen sanft knapp unter Helligkeit 1 ein und ist ab gut 1,2 voll da – es trifft
-also das, was heller ist, als der Bildschirm zeigen kann ([Kapitel 4](04-grafik.md)).
+also das, was heller ist, als der Bildschirm zeigen kann. Wie Kern das Glühen ins fertige Bild
+bringt, ohne den Nebel zu verlieren, zeigt [Kapitel 4](04-grafik.md) (4.8.3): Es addiert nur den
+Unterschied, den das Glühen macht. Pixel ohne Glühen bleiben genau, wie sie waren.
 
 > **Für Profis:** Kerns Gewichte: Mitte 0,2270, bei ±1,3846 Pixeln je 0,3162, bei ±3,2308 je
 > 0,0703. Probe: 0,2270 + 2 · 0,3162 + 2 · 0,0703 = 1 – die Helligkeit insgesamt bleibt gleich.
@@ -584,14 +644,16 @@ Schatten. Helle Flächen bekommen einen Bonus, weil sie Licht zwischen den Wänd
 
 ## B.9 Himmel und Atmosphäre
 
-Der Himmel ist blau, weil die Luft blaues Licht viel stärker herumstreut als rotes. Blaues Licht hat
-kürzere Wellen, und kürzere Wellen werden von den winzigen Luftteilchen viel öfter abgelenkt
-(**Rayleigh-Streuung**). Dieses gestreute Blau kommt aus allen Richtungen zu dir – der ganze Himmel
-leuchtet blau.
+Der Himmel ist blau, weil die Luft blaues Licht viel stärker herumstreut als rotes. Licht ist eine
+Welle; blaues hat kurze, rotes lange Wellen. Und kürzere Wellen werden von den winzigen Luftteilchen
+viel öfter abgelenkt (**Rayleigh-Streuung**). Dieses gestreute Blau kommt aus allen Richtungen zu
+dir – der ganze Himmel leuchtet blau.
 
-Am Horizont und abends ist der Weg des Lichts durch die Luft viel länger. Unterwegs wird fast alles
-Blau herausgestreut, übrig bleibt Rot und Orange: Abendrot. Größere Teilchen wie Staub oder winzige
-Tröpfchen streuen vor allem nach vorn und machen den hellen Hof um die Sonne (**Mie-Streuung**).
+Am Horizont und abends ist der Weg des Lichts durch die Luft viel länger. Am Horizont wird das Licht
+darum öfter gestreut, und der Himmel ist dort heller als oben. Steht die Sonne tief, wird unterwegs
+fast alles Blau herausgestreut, übrig bleibt Rot und Orange: Abendrot. Größere Teilchen wie Staub
+oder winzige Tröpfchen streuen vor allem nach vorn und machen den hellen Hof um die Sonne
+(**Mie-Streuung**).
 
 Echte Himmelsmodelle rechnen für jeden Blick hunderte Schritte durch die Luft. Kern rechnet das
 **nicht** aus, sondern malt ein schnelles Modell, das so aussieht – und zwar ganz hinten und nur in
@@ -621,6 +683,10 @@ Kugel mit 2 m Radius, Mittelpunkt 3 m hinter der Wand: weg. Nur 1,5 m dahinter: 
 Bild. Der Test wirft **nie** Sichtbares weg, lässt an den Ecken der Pyramide aber manchmal
 Unsichtbares durch. Lieber einmal zu viel malen als einmal zu wenig.
 
+Bei Instanzen umschließt **eine** Kugel alle Kopien zusammen. Ein Wald als ein Mesh wird darum nur
+ganz oder gar nicht aussortiert: Ist auch nur ein Baum im Bild, wird der ganze Wald gemalt. Er ist ja
+ohnehin nur ein Malbefehl.
+
 ### Hüllkörper-Bäume (BVH)
 
 Wenn du klickst, schießt Kern einen unsichtbaren Strahl von der Kamera durch die Maus in die Szene.
@@ -641,16 +707,19 @@ Hierarchy*, „Hüllkörper-Baum“). Verfehlt der Strahl eine Kiste, fällt all
 
 Bei einer Million Dreiecken reichen etwa 20 Stufen, denn 2²⁰ ≈ 1 000 000. Kern nutzt die BVH zum
 **Anklicken** großer, ruhiger Objekte, nicht zum Malen ([Kapitel 5](05-szene-und-geometrie.md)); die
-Physik hat ihre eigene ([Anhang C](C-grundlagen-physik.md)).
+Physik hat ihre eigene ([Anhang C](C-grundlagen-physik.md)). Bewegte Dinge prüft Kern Dreieck für
+Dreieck. Ein Baum aus Kisten lohnt sich nur, wenn man ihn einmal baut und oft benutzt – bei etwas,
+das sich ständig bewegt, müsste man ihn immer wieder neu bauen.
 
 > **Mission:** Leg mit **File › New Level...** › **Basic** ein Level an und setz über **+ Add** ›
 > **Shapes** ein paar Formen, etwa **Cube**, **Sphere** und **Cylinder**. Schalte dann im Viewport
-> über **Show** die **Bounds** ein. **Was du siehst:** Um jedes Objekt erscheint eine gelbe Kiste
-> aus Linien, deren Kanten genau an den Achsen ausgerichtet sind – das ist seine Hülle, die oberste
-> Kiste. Lichter und leere Actors bekommen ein kleines Würfelchen. Dreh jetzt den Cube mit dem
-> Rotate-Werkzeug (Taste E) um 45°: Die gelbe Kiste dreht sich **nicht** mit, sondern wird größer,
-> damit der schräge Würfel weiter ganz hineinpasst. **Was du lernst:** Eine Hülle muss nicht genau
-> passen – sie muss nur sicher alles umschließen, damit Tests schnell und trotzdem richtig sind.
+> über **Show** die **Bounds** ein. (Hüllen gibt es als Kugel oder als Kiste; Studio zeigt dir die
+> Kiste.) **Was du siehst:** Um jedes Objekt erscheint eine gelbe Kiste aus Linien, deren Kanten
+> genau an den Achsen ausgerichtet sind – das ist seine Hülle, die oberste Kiste. Lichter und leere
+> Actors bekommen ein kleines Würfelchen. Dreh jetzt den Cube mit dem Rotate-Werkzeug (Taste E) um
+> 45°: Die gelbe Kiste dreht sich **nicht** mit, sondern wird größer, damit der schräge Würfel
+> weiter ganz hineinpasst. **Was du lernst:** Eine Hülle muss nicht genau passen – sie muss nur
+> sicher alles umschließen, damit Tests schnell und trotzdem richtig sind.
 
 ## B.11 Zeichenbefehle und Zustandswechsel
 
@@ -679,18 +748,20 @@ flowchart TD
 
 ## B.12 Warum WebAssembly und WebGL2 so verbunden sind
 
-Kern ist in C++ geschrieben, der Browser bietet Grafik aber nur für JavaScript an. **WebAssembly**
-ist ein kompaktes Format, das der Browser schnell in Maschinensprache übersetzt. Ein
-WebAssembly-Modul hat einen großen Speicherblock für sich und darf nur die Funktionen benutzen, die
-man ihm beim Laden gibt (**Importe**). **WebGL2** ist die Grafik des Browsers. Wie die Brücke
-zwischen beiden genau aussieht – Nummern statt Dinge, Daten ohne Abschreiben –, zeigt
-[Kapitel 4](04-grafik.md).
+**C++** und **JavaScript** sind zwei Programmiersprachen. Kern ist in C++ geschrieben, der Browser
+bietet Grafik aber nur für JavaScript an. **WebAssembly** ist wie ein Übersetzer-Koffer: Kerns C++
+wird hineingepackt, und der Browser kann den Koffer öffnen und schnell ausführen. Dazu übersetzt er
+ihn in **Maschinensprache**, die Sprache, die der Prozessor direkt versteht. Im Koffer hat Kern
+einen großen Speicherblock für sich. Nach draußen darf es nur durch eine Klappe rufen: Es darf nur
+die Befehle benutzen, die man ihm beim Laden hineinreicht (**Importe**), und durch die Klappe passen
+nur Zahlen. **WebGL2** ist die Grafik des Browsers. Wie die Brücke zwischen beiden genau aussieht –
+Nummern statt Dinge, Daten ohne Abschreiben –, zeigt [Kapitel 4](04-grafik.md).
 
 Warum hat Kern das so gebaut?
 
 | Warum … | Weil … |
 |---|---|
-| alles in C++? | derselbe Code im Browser, in Tests und im Lehrer läuft und überall gleich rechnet. |
+| alles in C++? | derselbe Code im Browser, in Tests und im Lehrer gleich rechnet – der Lehrer übt genau deine Welt. |
 | so wenig JavaScript? | man alles dort doppelt pflegen müsste. |
 | Nummern statt Grafikobjekten? | WebAssembly nur Zahlen festhalten kann. |
 | eigene Kopien von allem? | der Browser die Grafikkarte jederzeit wegnehmen kann. |
@@ -739,7 +810,8 @@ zeigen [Kapitel 4](04-grafik.md) und [Kapitel 5](05-szene-und-geometrie.md).
 3. 0,1 − 0,0909 ≈ 0,0091 und 0,01 − 0,0099 ≈ 0,0001: In 100 m Entfernung macht ein Meter fast
    hundertmal weniger Unterschied als in 10 m. Weit weg teilen sich also viel mehr Meter eine Stufe
    des Tiefenpuffers – zehnmal so weit, hundertmal gröber. Am meisten hilft es, die nahe Grenze
-   weiter weg zu legen.
+   weiter weg zu legen: Sie steht im Zähler, also macht doppelte nahe Grenze jeden Unterschied
+   doppelt so groß.
 4. Die Mauern verdecken zweimal 45° von 180°, der Punkt sieht nur den halben Himmel: Sichtbarkeit
    0,5. Abgedunkelt wird nur das indirekte Licht: 1,0 × 0,5 = 0,5. Die Sonne bleibt bei 2,0.
    Zusammen **2,5** statt 3,0. Das Sonnenlicht abzudunkeln wäre falsch, weil die Sonne den Punkt ja

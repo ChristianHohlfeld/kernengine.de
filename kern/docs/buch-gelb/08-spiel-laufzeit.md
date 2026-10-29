@@ -20,7 +20,8 @@ Ein **Level** ist ein Dokument aus Actors, die Komponenten tragen. Kern Studio b
 speichert sie als Datei mit der Endung `.klevel`. Die **GameWorld** spielt ein Level ab: Sie zeigt es
 an und lässt es mit der Physik-Engine Box3D laufen, mit Steuerung, Kamera, Regeln, Triggern, Ton und
 Logik. Studio benutzt dieselbe GameWorld zum Bearbeiten, für Simulate und für Play. Exportierte Spiele
-laufen mit genau demselben Programm.
+laufen mit genau demselben Programm. Die genauen Namen der Programmteile, alle Felder und alle
+Standardwerte stehen im blauen Buch, Kapitel 8.
 
 > **So kannst du es dir vorstellen:** Das Level ist das Rezept, die GameWorld ist die Küche. Das
 > Rezept liegt ordentlich im Kochbuch. Gekocht wird mit einer Kopie, damit das Buch sauber bleibt.
@@ -50,8 +51,6 @@ Was während des Spiels passiert, landet also **nicht** in deinem Level. Umgekip
 Stopp wieder ordentlich da. Wer eine simulierte Lage behalten will, nimmt in Studio **Keep Simulation
 Changes** (Taste K, 8.8).
 
-Die genauen Namen der Programmteile stehen im blauen Buch, Kapitel 8.
-
 ## 8.2 Die Spielregeln für Zahlen
 
 Damit alle Teile von Kern dasselbe meinen, gelten feste Regeln:
@@ -60,7 +59,8 @@ Damit alle Teile von Kern dasselbe meinen, gelten feste Regeln:
 - **Z zeigt nach oben.** X und Y liegen flach auf dem Boden.
 - **Drehungen** stehen als drei Winkel in Grad.
 
-> **So kannst du es dir vorstellen:** ein Flugzeug. **Rollen** heißt, es kippt um seine Längsachse
+> **So kannst du es dir vorstellen:** ein Flugzeug. Bei Kern schaut ein Fahrzeug in Richtung x,
+> also ist x seine Längsachse von hinten nach vorn. **Rollen** heißt, es kippt um seine Längsachse
 > und eine Tragfläche geht nach unten (Drehung um x). **Nicken** heißt, die Nase geht hoch oder
 > runter (um y). **Gieren** heißt, die Nase schwenkt nach links oder rechts wie beim Lenken (um z).
 
@@ -92,7 +92,9 @@ Ein **Actor** hat:
 - **Hidden** (unsichtbar) und **Locked** (im Viewport nicht anklickbar),
 - eine **Transform**: Position, Drehung und Größe,
 - **Tags**, freie Schlagworte, nach denen die Logik suchen kann,
-- **Komponenten**: von den meisten Arten höchstens eine, von Collidern und Gelenken beliebig viele,
+- **Komponenten**: von den meisten Arten höchstens eine, von Collidern und Gelenken beliebig viele.
+  Ein Ding sieht nur auf eine Art aus, kann aber aus mehreren Stoßformen bestehen und an mehreren
+  Stellen festhängen,
 - einen eigenen **Logik-Graphen**.
 
 ## 8.4 Die Komponenten
@@ -127,18 +129,19 @@ kann automatisch einen passenden Collider mitbringen. Dessen Reibung, Sprungkraf
 neben das Aussehen, denn sie sind die Physik des Dings.
 
 **Rigid Body** macht den Actor zum Physik-Körper. In Studio wählst du **Static** (bewegt sich nie),
-**Kinematic** (wird bewegt, lässt sich aber nicht schubsen) oder **Dynamic** (echte Physik). Begegnet
-dir in [Kapitel 6](06-physik.md) der Name „fixed“: Das ist derselbe Typ, nur sein Name im Programm.
-Mit dem Gelenk **Fixed (weld)** hat er nichts zu tun. Dazu kommen Masse,
-Schwerkraft-Faktor, „Bullet“ für sehr schnelle Körper und Startgeschwindigkeit.
+**Kinematic** (wird bewegt, lässt sich aber nicht schubsen) oder **Dynamic** (echte Physik). Dazu
+kommen Masse, Schwerkraft-Faktor, Startgeschwindigkeit und **Bullet**. Bullet ist für sehr schnelle
+Körper: In einem einzigen Schritt könnte eine schnelle Kugel von vor der Wand bis hinter die Wand
+springen, ohne sie je zu berühren. Ein Bullet prüft die Strecke dazwischen besonders sorgfältig
+([Kapitel 6](06-physik.md)), damit nichts durch Wände rutscht.
 
 **Collider** geben die Form für Zusammenstöße an: automatisch ans Mesh angepasst, Box, Kugel, Kapsel
 oder eine eng anliegende Hülle. Jeder Collider hat eine **Dichte**, aus der Kern die Masse
-ausrechnet. Im Level ist sie anfangs 1000 kg/m³, so dicht wie Wasser. (Wer in [Kapitel 6](06-physik.md)
-direkt mit der Physik arbeitet, ohne Level, startet dort mit 1 kg/m³. Jeder Collider aus einem Level
-bringt seine 1000 mit.) Ein Würfel mit 1 m Kantenlänge wiegt also eine Tonne, wenn du nichts änderst.
-Ein Collider kann ein **Sensor** sein. Mit Kanälen und Gruppen legst du fest, wer mit wem überhaupt
-zusammenstoßen kann.
+ausrechnet. Im Level ist sie anfangs 1000 kg/m³, so dicht wie Wasser. Ein Würfel mit 1 m
+Kantenlänge wiegt also eine Tonne, wenn du nichts änderst. Trägst du beim Rigid Body dagegen selbst
+eine **Masse** ein, gilt die statt der Dichte. Ein Collider kann ein **Sensor** sein. Mit Kanälen
+und Gruppen legst du fest, wer mit wem überhaupt zusammenstoßen kann, etwa damit Kugeln durch
+die eigenen Mitspieler hindurchfliegen, aber an Wänden abprallen ([Kapitel 6](06-physik.md)).
 
 **Constraint** ist ein Gelenk: Scharnier, Schiene, Kugelgelenk, verschweißt, Seil, Rad und einige
 mehr. Gelenke können Grenzen, einen Motor und eine Feder haben und bei zu großer Kraft **brechen**.
@@ -155,15 +158,18 @@ Autos und nachts leuchtenden Fenstern ([Kapitel 5](05-szene-und-geometrie.md)).
 
 Die übrigen Bausteine (Controller, Waffe, Pickup, Trigger) kommen in 8.10 bis 8.13 dran.
 
-> **Für Profis:** Alle Felder jeder Komponente mit ihren Standardwerten stehen im blauen Buch,
-> Kapitel 8. Ein Beispiel daraus: Ein Point Light hat anfangs die Helligkeit 20 und reicht 12 m weit.
+> **Für Profis:** Ein Name kann verwirren: In [Kapitel 6](06-physik.md) heißt der Typ Static im
+> Programm „fixed“. Mit dem Gelenk **Fixed (weld)** hat er nichts zu tun. Und wer in Kapitel 6
+> direkt mit der Physik arbeitet, ohne Level, startet mit einer Dichte von 1 kg/m³ statt 1000.
 
 > **Mission:** Öffne auf https://kernengine.de/ über File › Example Levels das Level **Physics Lab**.
 > Klick die Tür an und schau in Details: Welche Komponenten hat sie? Finde beim Constraint den Typ,
-> die Grenzen und die Feder. Starte danach **Simulate** (Alt+S) und schalte unter Window › Show
-> (oder mit dem Knopf **Show** oben im Viewport) **Collision Shapes** und **Constraints** ein. Die
-> Farben verraten den Typ: statisch grün, kinematisch blau, dynamisch orange, Sensor violett,
-> schlafend grau.
+> die Grenzen und die Feder. Die Grenzen legen fest, wie weit die Tür aufgeht, die Feder zieht sie
+> wieder zu. Starte danach **Simulate** (Alt+S), schubs die Tür mit der linken Maustaste an und prüf,
+> ob das stimmt. Schalte unter Window › Show (oder mit dem Knopf **Show** oben im Viewport)
+> **Collision Shapes** und **Constraints** ein. Die Farben verraten den Typ: statisch grün,
+> kinematisch blau, dynamisch orange, Sensor violett, schlafend grau. „Schlafend“ heißt: Ein Körper
+> liegt schon lange still, darum rechnet die Physik ihn nicht mehr, bis ihn etwas anstößt.
 
 ## 8.5 Die World Settings
 
@@ -209,10 +215,12 @@ Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
 - **Fehlt** etwas, nimmt Kern den Standardwert. Unbekannte Einträge überspringt es. So laden alte
   Dateien auch in neuen Versionen von Kern.
 - **Falsch** ist zum Beispiel Text, wo eine Zahl hingehört. Dann meldet Kern einen Fehler, etwa
-  „friction must be a number“, und nennt den Actor. Eine Datei aus einer neueren Kern-Version lehnt
-  es ab.
-- Zahlen außerhalb ihres sinnvollen Bereichs werden auf den Rand gesetzt, eine Reibung von 50 also auf
-  10.
+  „friction must be a number“, und nennt den Actor.
+- Eine Datei aus einer **neueren** Kern-Version lehnt es ganz ab. Warum nicht einfach das Unbekannte
+  überspringen? Eine neuere Datei könnte Dinge enthalten, die das alte Kern falsch verstehen würde.
+  Dann sähe das Level anders aus als gebaut. Lieber gar nicht laden als falsch.
+- Zahlen außerhalb ihres sinnvollen Bereichs werden auf den nächsten erlaubten Wert gesetzt, so wie
+  ein Lautstärkeregler nicht über „ganz laut“ hinausgeht.
 - Fehlende oder doppelte Nummern werden neu vergeben. Ein Eltern-Actor, den es nicht gibt, wird zu
   „keiner“, und **Kreise** in der Familie werden aufgebrochen.
 
@@ -223,8 +231,7 @@ Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
 **Prüfen vor dem Start:** Bevor Play beginnt, sucht Kern nach Problemen. **Fehler** verhindern Play,
 zum Beispiel eine Größe von 0, ein Gelenk, das einen Actor mit sich selbst verbindet, oder eine
 Steuerung ohne Physik-Körper. **Warnungen** landen nur im Output Log, zum Beispiel ein Sound-Name, den
-es nicht gibt (dann bleibt es still), oder mehr als ein Spieler. Die vollständigen Listen und
-Wertebereiche stehen im blauen Buch, Kapitel 8.
+es nicht gibt (dann bleibt es still), oder mehr als ein Spieler.
 
 ## 8.7 Vom Level zur Physikwelt
 
@@ -270,8 +277,16 @@ Drückst du Play, geht die GameWorld diese Schritte durch:
 
 Spieler-Fahrzeuge bekommen dabei immer die Sonderbehandlung „Bullet“, damit sie bei hohem Tempo nicht
 durch Wände rutschen. Fahrzeuge, Figuren und Flieger werden gegen Umkippen gesichert, nur die
-Rollkugel und die laufende Ente dürfen kippen. Was genau beim Anlegen von Körpern und Gelenken
-passiert, steht im blauen Buch, Kapitel 8.
+Rollkugel und die laufende Ente dürfen kippen.
+
+> **Für Profis:** Ein Gelenk verbindet einen Actor mit seinem **Ziel**. Bewegt wird dabei der Actor
+> gegenüber dem Ziel. Positive Werte, etwa der Weg einer Schiene, der Winkel eines Scharniers oder
+> das Tempo eines Motors, bewegen also den Actor und nicht das Ziel.
+
+**Melden nur, wo jemand zuhört.** Jede Berührung zu melden, kostet die Physik Arbeit. Darum schaltet
+Kern Meldungen nur dort ein, wo sie jemand liest: bei Sensoren, beim Spieler, bei Körpern mit
+Aufprall-Sound und, wenn das Level Logik hat, bei allem Beweglichen. Eine Kiste, die niemanden
+interessiert, fällt still und spart Rechenzeit.
 
 **Die Modi:**
 
@@ -286,21 +301,32 @@ Zwischen Simulate und Play kannst du mitten im Lauf wechseln (Studio: F8), der S
 seinen Zustand. Du kannst neu starten (Ctrl+R), pausieren und genau einen Schritt weitergehen (Taste
 `.`).
 
-> **Mission:** Starte im Physics Lab **Simulate**, drücke **Pause** und dann mehrmals die Taste
-> **.** – die Welt läuft Schritt für Schritt. Greif zwischendurch eine Kiste mit der linken
-> Maustaste. Wähle dann im Outliner eine umgefallene Kiste aus und drück **K** (Play › **Keep Simulation
-> Changes**). Nach Esc steht die Kiste in deinem Level genau so, wie sie lag.
+> **Mission:** Starte im Physics Lab **Simulate**, drücke **Pause** (der Pause-Knopf in der
+> Play-Gruppe der Toolbar, oder Alt+Shift+P) und dann mehrmals die Taste **.** – die Welt läuft
+> Schritt für Schritt. Drück noch einmal **Pause**, damit es weiterläuft, und greif eine Kiste mit
+> der linken Maustaste. Klick dann eine umgefallene Kiste im Viewport kurz an (ohne zu ziehen), so
+> wählst du sie aus. Drück **K** (Play › **Keep Simulation Changes**): Die Simulation endet, und die
+> Kiste steht in deinem Level genau so, wie sie lag.
 
 ## 8.9 Was in einem Bild passiert
 
 Die Bildrate deines Computers schwankt, die Physik will aber **feste Schritte** (warum, erklärt
 [Kapitel 6](06-physik.md)). Darum sammelt die GameWorld die vergangene Zeit wie in einer Spardose und
-zahlt sie in festen Schritten aus. Hängt ein Bild sehr lange, rechnet sie höchstens 0,1 s nach,
-damit kein Rechenstau entsteht.
+zahlt sie in festen Schritten aus.
 
-> **So kannst du es dir vorstellen:** Ein Bus fährt genau alle 10 Minuten, egal wann die Fahrgäste
-> kommen. Kommen viele auf einmal, fahren eben zwei Busse hintereinander. Die Physik ist der Bus,
-> die Bilder sind die Fahrgäste.
+> **So kannst du es dir vorstellen:** Jedes Bild wirft die Zeit, die seit dem letzten Bild vergangen
+> ist, in die Spardose. Die Physik nimmt so lange 1/60-Sekunden-Münzen heraus, wie genug drin ist,
+> und rechnet für jede Münze einen Schritt. Der Rest bleibt fürs nächste Bild liegen. Ein langes
+> Bild wirft viel hinein, dann gibt es mehrere Schritte. Ein kurzes wirft wenig hinein, dann
+> vielleicht gar keinen.
+
+Hängt ein Bild sehr lange, rechnet die Physik höchstens 0,1 s nach, den Rest wirft sie weg. Sonst
+entstünde ein Rechenstau: Das Nachrechnen würde so lange dauern, dass das nächste Bild noch mehr
+nachzurechnen hätte. Die Folge: Die Welt läuft dann kurz langsamer, statt stecken zu bleiben.
+
+Feste Schritte setzen auch eine Grenze: Eine Feder kann nicht schneller hin- und herschwingen, als
+die Physik Schritte rechnet. Darum begrenzt Kern beim Start die Härte jeder Feder und jedes Gelenks
+passend zur Schrittrate. Warum, steht in [Kapitel 6](06-physik.md).
 
 Ein fester Schritt:
 
@@ -338,18 +364,22 @@ Meldungen ins Output Log schreiben.
 Ein **Controller** macht aus Tasten Bewegung. Pro Bild bekommt jeder Spieler eine **Eingabe**: vor
 und zurück, links und rechts (je von −1 bis 1), hoch und runter, Springen, Boost, Kameradrehung, beim
 Soldaten Feuern, Zielen, Nachladen, Ducken und Benutzen. Bei der Micro Duck kommen ihre Bewegungen
-als **Bits** dazu (Sitzen, Aufheben, Kicks, Rolle, Schnabel, Zwitschern, Wheee, Sprung).
+dazu (Sitzen, Aufheben, zwei Kicks, Rolle, Schnabel, Zwitschern, Wheee, Sprung), alle zusammen in einer
+einzigen Zahl.
 
-> **Krass, aber wahr:** Neun Entenbewegungen passen in eine einzige Zahl. Jede Bewegung ist ein Bit
-> mit dem Wert 1, 2, 4, 8, 16 … Willst du gleichzeitig aufheben (2) und zwitschern (64), schickst du
-> einfach 66. Weil jeder Wert nur einmal vorkommt, lässt sich 66 nur als 64 + 2 zerlegen.
+> **Krass, aber wahr:** Neun Entenbewegungen passen in eine einzige Zahl. Jede Bewegung bekommt
+> einen Wert, und jeder Wert ist das Doppelte des vorigen: 1, 2, 4, 8, 16, 32, 64 … So ein Ein-Aus-
+> Schalter heißt **Bit**. Willst du gleichzeitig aufheben (2) und zwitschern (64), schickst du
+> einfach 66. Der Trick mit dem Verdoppeln: Alle kleineren Werte zusammen sind immer kleiner als der
+> nächste (1 + 2 + 4 = 7, weniger als 8). Darum lässt sich jede Summe nur auf eine Art zerlegen, 66
+> nur als 64 + 2. Mit den Werten 1, 2, 3 ginge das nicht: 3 könnte „3“ heißen oder „1 und 2“.
 
 Bei Rolling Ball, Character und Flyer ist die Bewegung **kamerarelativ**: „Vor“ heißt dorthin, wohin
 die Kamera blickt.
 
 | Modus | So bewegt er sich |
 |---|---|
-| Hover Car | schwebt auf einer unsichtbaren Feder über dem Boden, Gas schiebt, eine Seitenkraft verhindert Rutschen |
+| Hover Car | schwebt auf einer unsichtbaren Feder über dem Boden, Gas schiebt, eine Seitenkraft verhindert Rutschen; sein Wippen und Neigen ist nur Aussehen |
 | Vehicle | wie das Hover Car, aber auf dem Boden; Gas wirkt nur mit Bodenkontakt |
 | Rolling Ball | eine Kugel, die du anschubst; springen nur vom Boden |
 | Character | eine Spielfigur, die läuft, springt und Stufen hochsteigt |
@@ -357,10 +387,9 @@ die Kamera blickt.
 | Soldier | wie Character, für Ego-Shooter (8.13) |
 | Walker | die Micro Duck läuft mit ihren eigenen Motoren (8.14) |
 
-Character und Soldier benutzen den **Character Mover** aus [Kapitel 6](06-physik.md). Der hat dort
-von sich aus eine eigene Schwerkraft von 20 m/s². Im Spiel stellt Kern sie neu ein: Beim Character
-auf das 1,5-Fache der Weltschwerkraft (also etwa 14,7 m/s²), damit Sprünge knackiger wirken, beim
-Soldaten auf die echte Schwerkraft, wie in Ego-Shootern üblich.
+Character und Soldier benutzen den **Character Mover** aus [Kapitel 6](06-physik.md). Die
+Spielfigur Character fällt absichtlich schneller als in echt, damit Sprünge knackig wirken und
+nicht schwebend. Der Soldat fällt wie in echt, so wie in Ego-Shootern üblich.
 
 Für alle gilt: **Boost** ist ein Vorrat von 0 bis 1. Beim Boosten sinkt er um 0,45 pro Sekunde, sonst
 wächst er um 0,12 pro Sekunde. Nach einem tiefen Fall spielt eine Landung den Sound `land`.
@@ -378,13 +407,14 @@ Die Kamera folgt der **interpolierten** Lage des Spielers (8.9), also immer dem 
 Zwischenstand:
 
 - **Chase bei Fahrzeugen:** hinter dem Fahrzeug, umso weiter weg, je schneller es fährt.
-- **Chase sonst:** kreist mit Maus oder Stick um den Spieler. Ein Prüfstrahl hält sie aus Wänden
-  heraus.
+- **Chase sonst:** kreist mit Maus oder Stick um den Spieler. Ein **Prüfstrahl**, eine unsichtbare
+  Linie vom Spieler zur Kamera, hält sie aus Wänden heraus: Trifft die Linie eine Wand, rückt die
+  Kamera davor.
 - **First Person:** die Augen am Körper.
 - **Top Down:** von oben.
 
-Über 30 m/s wird das Sichtfeld etwas weiter, das fühlt sich schneller an. Harte Treffer schütteln die
-Kamera. Soldaten haben eine eigene Kamera.
+Über 30 m/s (etwa 108 km/h) wird das Sichtfeld etwas weiter, das fühlt sich schneller an. Harte
+Treffer schütteln die Kamera. Soldaten haben eine eigene Kamera.
 
 ## 8.12 HUD, Regeln und Trigger
 
@@ -397,14 +427,15 @@ Tempo, Boost, Bestzeit und beim Soldaten Gesundheit und Munition.
 
 | Ziel | Gewonnen, wenn … |
 |---|---|
-| none | nie – Sandkasten |
-| collectAll | alle Pickups gesammelt (gibt es ein Goal, danach noch dorthin) |
-| reachGoal | Goal-Trigger erreicht |
-| survive | Zeitlimit überstanden |
-| score | Zielpunkte erreicht |
+| None (sandbox) | nie – Sandkasten |
+| Collect all pickups | alle Pickups gesammelt (gibt es ein Goal, danach noch dorthin) |
+| Reach a goal trigger | Goal-Trigger erreicht |
+| Survive the time limit | Zeitlimit überstanden |
+| Reach a target score | Zielpunkte erreicht |
 
-Mit Zeitlimit verliert man bei 0, außer bei „survive“. Ein Hazard verliert immer. Am Ende setzt Kern
-den Status, spielt eine kurze Melodie, merkt sich die Bestzeit und meldet der Logik „Spiel vorbei“.
+Mit Zeitlimit verliert man bei 0, außer bei „Survive the time limit“. Ein Hazard verliert immer. Am
+Ende setzt Kern den Status, spielt eine kurze Melodie, merkt sich die Bestzeit und meldet der Logik
+„Spiel vorbei“.
 
 **Pickups:** Berührt ein Spieler eines, bekommt er Punkte, Heilung oder Munition, dazu Sound und
 Funken, und die Logik erfährt davon. Ein reines Heilpaket bleibt liegen, solange du volle Gesundheit
@@ -458,8 +489,7 @@ Dazu kommen Rüstung (fängt einen Teil des Schadens ab), kurzer Schutz nach dem
 Fallschaden bei harten Landungen und **Wiederkehr**: Ein Spieler startet nach einer Wartezeit neu,
 andere Actors verschwinden und tauchen, wenn eingestellt, an ihrem Platz wieder auf. Ein Fass mit
 Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus Grundformen
-gebaut und reine Darstellung: Sie ändern nichts an der Simulation. Die genauen Werte stehen im blauen
-Buch, Kapitel 8.
+gebaut und reine Darstellung: Sie ändern nichts an der Simulation.
 
 ## 8.14 Walker
 
@@ -472,14 +502,22 @@ In jedem Schritt läuft ein Kreislauf:
 
 ```mermaid
 flowchart LR
-  S[Fühlen: Sensoren lesen] --> V[Verhalten wählen]
+  S[Fühlen: Sensoren lesen] --> V["Verhalten wählen, z. B. laufen, stehen, Ball suchen"]
   V --> N[Netz fragen]
   N --> M[Servos bewegen]
   M --> S
 ```
 
-Das Netz wird regelmäßig gefragt, aber nicht in jedem einzelnen Physikschritt. Wie bei echten Servos
-kommt sein Befehl mit einer kleinen Verzögerung an den Motoren an, und auch die bildet Kern nach.
+**Verhalten wählen** heißt: Ein Programm entscheidet, was die Ente als Nächstes tun will, etwa
+herumlaufen, ruhig stehen oder mit dem Ball spielen. Das Netz sorgt dann dafür, dass sie dabei nicht
+umfällt.
+
+Das Netz wird regelmäßig gefragt, aber nur alle paar Physikschritte. Genau so oft wurde es beim
+Training gefragt, und so oft fragt es auch der echte Roboter. Wie bei echten Servos kommt sein
+Befehl außerdem mit einer kleinen Verzögerung an den Motoren an, und auch die bildet Kern absichtlich
+nach. Das klingt seltsam: Warum etwas schlechter machen, als es sein könnte? Weil das Netz mit
+genau dieser Verzögerung laufen gelernt hat. Ohne sie würde es sich verschätzen und stolpern. Das
+ist ein Grundsatz des ganzen Buchs: Die Simulation soll sich so verhalten wie der echte Roboter.
 Alles Weitere über die Ente steht in [Kapitel 13](13-micro-duck.md).
 
 ## 8.15 Sound-Anbindung
@@ -496,8 +534,10 @@ exportierte Spiele sie gleich nutzen.
 
 Ein **Schiedsrichter** entscheidet, welches Gerät gerade steuert: Das zuletzt benutzte gewinnt. Ein
 Finger auf dem Bildschirm schaltet auf Touch, jede echte Taste auf Maus und Tastatur, auch am Handy.
-Eine Maus am Tablet schaltet aber **nicht** auf Desktop. Den **Pointer-Lock** gibt es nur mit Maus:
-Dabei bleibt der Mauszeiger im Spiel gefangen, damit du dich endlos umdrehen kannst.
+Eine Maus am Tablet schaltet aber **nicht** auf Desktop: Am Handy oder Tablet ist der Finger die
+Hauptsteuerung, und eine angesteckte Maus soll die Touch-Knöpfe nicht verschwinden lassen. Den
+**Pointer-Lock** gibt es nur mit Maus: Dabei bleibt der Mauszeiger im Spiel gefangen, damit du dich
+endlos umdrehen kannst.
 
 Die **Touch-Steuerung** hat zwei Sticks in den unteren Ecken. Links bewegst du dich (MOVE, bei
 Fahrzeugen STEER / GAS, beim Flyer FLY), rechts schaust du (LOOK). Daneben liegen Knöpfe je nach
@@ -510,11 +550,15 @@ Controller:
 | Character | JUMP, USE |
 | Rolling Ball | JUMP, BOOST |
 | Flyer | UP, DOWN, BOOST |
-| Hover Car, Vehicle | BOOST, HOP, USE |
+| Hover Car | BOOST, DRIFT, LIFT, VIEW |
+| Vehicle | BOOST, DRIFT, HOP, VIEW |
 
-Knöpfe gehen vor Sticks, Sticks vor dem freien Bildschirm. Linker Stick ganz nach vorn heißt
-Sprinten. Ziehst du den rechten Stick bis an den Rand, drehst du dich einfach weiter (**Edge Turn**).
-Gamepads bekommen **Totzonen**: Ganz kleine Wackler am Stick werden ignoriert.
+Jeder Finger bekommt genau eine Aufgabe, und zwar dort, wo er zuerst aufsetzt. Liegt dort ein
+Knopf, drückt er den Knopf und wird nie zum Stick, auch wenn er danach weiterwischt. Liegt dort kein
+Knopf, aber ein Stick, bewegt er den Stick. Setzt er auf dem freien Bildschirm auf, schießt er beim
+Soldaten mit Waffe (und zielt dabei), bei allen anderen schaut er sich um. Linker Stick ganz nach
+vorn heißt Sprinten. Ziehst du den rechten Stick bis an den Rand, drehst du dich einfach weiter
+(**Edge Turn**). Gamepads bekommen **Totzonen**: Ganz kleine Wackler am Stick werden ignoriert.
 
 ## 8.17 Logik in der Welt
 

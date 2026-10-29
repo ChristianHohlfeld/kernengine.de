@@ -38,8 +38,9 @@ schnell:
 >   Nur das Übersetzen selbst dauert einen Moment.
 > - **Gedruckt mitliefern:** Die fertige Übersetzung wird gleich mit ins Spiel gepackt.
 
-Kern beginnt immer mit dem Vorlesen, übersetzt im Hintergrund und wechselt dann um. Wie das geht und
-warum dabei kein einziges Ergebnis anders sein darf, steht in 9.8 und 9.9.
+Liegt dem Spiel schon eine gedruckte Übersetzung bei, nimmt Kern gleich die. Sonst beginnt Kern
+mit dem Vorlesen, übersetzt im Hintergrund und wechselt dann um. Wie das geht und warum dabei kein
+einziges Ergebnis anders sein darf, steht in 9.8 und 9.9.
 
 ## 9.1 Das Modell
 
@@ -60,12 +61,20 @@ Daten-Draht vom Textkästchen.
   Message. **Flow-Knoten** verzweigen (Branch: wenn … dann …), wiederholen oder warten.
 - **Rechenknoten** wie Plus oder Mal haben keine weißen Pins. Sie rechnen erst, wenn ein anderer
   Knoten ihr Ergebnis gerade braucht, so wie du einen Taschenrechner erst benutzt, wenn du das
-  Ergebnis brauchst. Ein Eingang ohne Draht nimmt den Wert, der im Knoten eingetragen ist.
+  Ergebnis brauchst. Und sie rechnen **jedes Mal neu**, wenn jemand fragt. Ein Eingang ohne Draht
+  nimmt den Wert, der im Knoten eingetragen ist.
+- **Aktionen** dagegen rechnen nur, wenn der weiße Draht sie startet. Manche geben dabei einen Wert
+  aus, zum Beispiel liefert **Spawn Actor** die neue Kopie. Diesen Wert **behält** der Ausgang, bis
+  die Aktion das nächste Mal läuft. Liest du ihn später, bekommst du das Ergebnis vom letzten Lauf.
+  So wie ein Kassenzettel: Er zeigt den letzten Einkauf, nicht den, den du gerade vorhast. Darum
+  kann ein solcher Wert „alt“ sein, ein Rechenknoten dagegen nie.
 - **Variablen** gehören zum Graphen, haben einen Typ und einen Startwert.
 - **Wartende Knoten** wie **Delay** (warte ein paar Sekunden) und **Tween** (zähle in einer Zeit weich
-  von 0 bis 1) halten die Kette an und machen später weiter. Ruft man ein wartendes Delay noch einmal
-  auf, überhört es das. Die Variante **Retriggerable Delay** fängt dann stattdessen von vorn an zu
-  warten.
+  von 0 bis 1, damit lässt du zum Beispiel ein Tor in 0,8 Sekunden weich aufgehen, siehe 9.11) halten
+  die Kette an und machen später weiter. Ruft man ein wartendes Delay noch einmal auf, überhört es
+  das. Die Variante **Retriggerable Delay** fängt dann stattdessen von vorn an zu warten. Damit baust
+  du zum Beispiel ein Licht, das 5 Sekunden nach der **letzten** Bewegung ausgeht: Jede neue Bewegung
+  startet das Warten neu.
 - **Kommentarrahmen** ordnen den Graphen für dich. Auf das Spiel wirken sie nicht.
 
 Das Level hat einen **Level-Graphen**, und jeder Actor kann einen eigenen haben. Für ihn ist „Self“
@@ -84,8 +93,11 @@ flowchart LR
 ```
 
 Die Pfeile heißen **Übergänge**. Ein Übergang kann auf vier Arten auslösen: bei einem bestimmten
-Event, nach einer Zeit (wie bei der Ampel), solange eine Bedingung wahr ist, oder sofort. Betritt
-oder verlässt die Maschine einen Zustand, gibt es dafür ein Event. Daran hängst du Aktionen, etwa
+Event, nach einer Zeit (wie bei der Ampel), solange eine Bedingung wahr ist, oder sofort, also beim
+nächsten Schritt (mehr dazu in 9.4). Ein Übergang kann auch **aus jedem Zustand** starten. Das ist
+praktisch für einen Not-Aus: Du könntest einen Übergang bauen, bei dem ein Event „Störung“ die Ampel
+sofort auf Rot schaltet, egal ob sie gerade Grün oder Gelb zeigt. Betritt oder verlässt die
+Maschine einen Zustand, gibt es dafür ein Event. Daran hängst du Aktionen, etwa
 „zeige den Namen des neuen Zustands an“. Genau diese Ampel gibt es als Vorlage (Mission in 9.10).
 
 ### Die Datentypen
@@ -103,8 +115,12 @@ genauer:
 | Text | Buchstaben und Zeichen | „Hallo!“ |
 | Actor | ein Ding im Level | die Tür, der Spieler |
 
-Ein Vector ist wie ein Pfeil im Raum. Seine **Länge** rechnest du mit Pythagoras aus: Der Pfeil
-(3, 4, 0) ist √(9 + 16) = 5 lang.
+Ein Vector ist wie ein Pfeil im Raum. Er hat auch eine **Länge**. Zeichne den Pfeil (3, 4, 0) auf
+Karopapier: 3 Kästchen nach rechts, 4 nach oben. Miss die schräge Linie vom Start bis zur Spitze
+mit dem Lineal: Sie ist genau 5 Kästchen lang.
+
+> **Für Profis:** Ausrechnen kannst du die Länge mit dem Satz des Pythagoras:
+> √(3² + 4²) = √(9 + 16) = √25 = 5. Bei drei Zahlen kommt einfach z² dazu.
 
 **Welche Drähte sind erlaubt?**
 
@@ -115,25 +131,30 @@ Ein Vector ist wie ein Pfeil im Raum. Seine **Länge** rechnest du mit Pythagora
 - Zahl nach Vector (die Zahl kommt in alle drei Stellen).
 
 Die Umwandlungen sind genau festgelegt: Der Text „0“ oder „false“ wird zu falsch, ein Vector als Zahl
-ist seine Länge, eine Kommazahl als Int wird abgeschnitten (3,9 wird 3, nicht gerundet).
+ist seine Länge (beim Pfeil oben also 5), eine Kommazahl als Int wird abgeschnitten (3,9 wird 3,
+nicht gerundet).
 
 ## 9.2 Knoten und die Bibliothek
 
 Hinter jedem Kästchen steckt ein kleines Stück Programm in der Engine. Alle Knotentypen zusammen
 bilden die **Bibliothek**. Jeder Typ hat dort eine Beschreibung: Titel, Kategorie, Hilfetext, seine
-Pins und Einstellungen. Das Aktionsmenü im Editor durchsucht genau diese Bibliothek.
+Pins und Einstellungen. Das Aktionsmenü im Editor durchsucht genau diese Bibliothek. So kennt der
+Editor automatisch jeden Knoten, den die Engine kann. Ein neuer Knoten ist nur ein neuer Eintrag in
+der Bibliothek, und schon taucht er im Menü auf.
 
 Wenn ein Knoten gelaufen ist, sagt er, wie es weitergeht: an welchem weißen Ausgang (ein Branch nimmt
-**True** oder **False**), ob die Kette hier endet oder ob er erst einmal wartet. Manche Knoten ändern
-ihr Aussehen mit ihren Einstellungen, zum Beispiel heißt Every N Seconds mit 3 Sekunden „Every 3 s“.
+**True** oder **False**), ob die Kette hier endet oder ob er erst einmal wartet.
 
 Wie ein Knoten im Programm genau aussieht, steht im blauen Buch, Kapitel 9.
 
 ## 9.3 Prüfen
 
 Bevor ein Graph läuft, sucht Kern nach **Fehlern**: unbekannte Knoten, Drähte zu Pins, die es nicht
-gibt, Typen, die nicht zusammenpassen, zwei Drähte in denselben Dateneingang, Einstellungen, die auf
-eine Variable zeigen, die es nicht gibt, oder eine State Machine ohne genau einen Anfangszustand.
+gibt, Typen, die nicht zusammenpassen, zwei Drähte in denselben Dateneingang (welcher Wert sollte
+dann gelten?), Einstellungen, die auf eine Variable zeigen, die es nicht gibt, oder eine State
+Machine ohne genau einen Anfangszustand. Ein Fehler ist auch ein **Kreis aus Rechenknoten**: Braucht
+Plus das Ergebnis von Mal, und Mal wieder das Ergebnis von Plus, würde jeder auf den anderen warten,
+und keiner käme je zu einem Ergebnis.
 Eine **Warnung** gibt es für Knoten, die nie laufen können, weil kein weißer Draht zu ihnen führt.
 
 Ein Graph mit Fehlern wird beim Start abgeschaltet und gemeldet. Der Rest des Spiels läuft weiter.
@@ -155,7 +176,10 @@ diesem Namen löst es aus, in allen Graphen oder nur beim Ziel-Actor. Derselbe N
 
 **Der Stapel.** Manche Knoten haben mehrere Ausgänge nacheinander, etwa **Sequence** („erst das,
 dann das, dann das“). Kern macht den ersten sofort und legt sich die anderen auf einen **Stapel**.
-Endet ein Zweig, nimmt es den obersten Eintrag vom Stapel und macht dort weiter.
+Endet ein **Zweig** (eine Kette aus weißen Drähten, nach der nichts mehr kommt), nimmt es den
+obersten Eintrag vom Stapel und macht dort weiter. Schleifen benutzen denselben Stapel: Kern legt
+sich die Schleife selbst als Zettel oben drauf, führt einmal den Inhalt aus und kommt danach zur
+Schleife zurück, um zu prüfen, ob noch eine Runde fällig ist.
 
 > **So kannst du es dir vorstellen:** ein Stapel Hausaufgabenzettel. Du arbeitest die aktuelle
 > Aufgabe ab. Fällt dir unterwegs ein „danach noch Mathe“, legst du den Zettel oben drauf. Bist du
@@ -163,16 +187,17 @@ Endet ein Zweig, nimmt es den obersten Eintrag vom Stapel und macht dort weiter.
 
 **Schutz vor Endlosschleifen:** Kern zählt mit, wie viele Knoten ein Graph in einem Schritt ausführt.
 Sind es mehr als **200 000**, schaltet Kern diesen Graphen ab und meldet „infinite loop? The graph is
-stopped.“ Ebenso stoppt eine Kette, wenn Events immer wieder neue Events auslösen und das zu tief
-verschachtelt wird.
+stopped.“ Ebenso stoppt eine Kette, wenn Events immer wieder neue Events auslösen: Event A ruft
+Event B, B ruft wieder A, A wieder B, und so weiter. Wird diese Kette zu lang, bricht Kern sie ab.
 
 > **Vorsicht, Falle:** Ein While Loop, dessen Bedingung nie falsch wird, friert in vielen Engines das
 > ganze Spiel ein. In Kern stoppt nur dein Graph – mit Meldung. Lies sie im Output Log!
 
 **State Machines im Takt:** Beim Start betritt jede Maschine ihren Anfangszustand. Pro Schritt darf
-jede Maschine **höchstens einen** Übergang machen. Hätte die Ampel einen Übergang „sofort“ von Gelb
-nach Rot, stünde sie trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in
-einen Zustand.
+jede Maschine **höchstens einen** Übergang machen. Warum? Gäbe es „sofort“-Übergänge von Gelb nach
+Rot und von Rot zurück nach Gelb, könnte die Maschine sonst in einem einzigen Schritt endlos
+hin- und herspringen. Hätte die Ampel einen Übergang „sofort“ von Gelb nach Rot, stünde sie also
+trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in einen Zustand.
 
 > **Für Profis:** Daten-Drähte werden bei jedem Lesen neu ausgerechnet, durch höchstens 48
 > Rechenknoten hintereinander. Die übrigen Grenzen stehen im blauen Buch, Kapitel 9.
@@ -187,11 +212,19 @@ Kern bringt **76** eingebaute Knoten mit:
 | State Machines | On State Entered/Left, Set State, Current State |
 | Flow | Branch, Sequence, For, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | Variablen | Get, Set, Add |
-| Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Winkelfunktionen |
+| Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Rechnen mit Winkeln |
 | Logik | Compare, AND, OR, XOR, NOT, Select |
 | Vektor | zusammenbauen, zerlegen, Länge, Abstand |
 | Text, Werte | Append, Contains, feste Werte |
 | Utilities | Game Time, Print |
+
+Viele Namen sind englisch. Was aus Scratch bekannt ist:
+
+- **For** = „wiederhole mit Zähler“, **While** = „wiederhole, solange …“.
+- **Switch** = je nach Zahl oder Text einer von mehreren Ausgängen, wie eine Weiche mit vielen
+  Gleisen.
+- **AND, OR, NOT** = „und“, „oder“, „nicht“. **XOR** = „entweder – oder, aber nicht beides“.
+- **Append** = Texte aneinanderhängen, **Contains** = „enthält der Text …?“.
 
 Ein paar Flow-Knoten erklärt: **Do Once** lässt nur beim ersten Mal durch, **Do N** genau N-mal.
 **Gate** ist eine Tür für die Kette, die man öffnen und schließen kann. **Flip Flop** nimmt
@@ -212,15 +245,31 @@ oder Y am Gamepad, wenn du den Actor anschaust oder direkt daneben stehst), On P
 Over, On Input Action und On Key. Eine Überlappung zählt den Besucher als Ganzes: Körper und Kopf
 eines Spielers sind ein Besucher.
 
+Begin Overlap und Entered Sensor klingen gleich, kommen aber von verschiedenen Seiten. **On Begin
+Overlap** meldet der Sensor selbst: „Jemand ist in mich hineingekommen.“ **On Entered Sensor**
+meldet der Besucher: „Ich bin in einen fremden Sensor gekommen.“ Ein Ziel-Feld benutzt also das
+erste, eine Spielfigur, die auf jedes Feld reagieren soll, das zweite.
+
 **Actors:** Self, Get Player, Find Actor by Name oder Tag, Ort, Drehung, Bewegen, Spawn Actor (eine
 Kopie einer Vorlage), Destroy und Set Property. Set Property ändert jeden Wert, den du auch in Details
 einstellen kannst, etwa die Farbe.
 
 **Physik:** Tempo, Stoß, Kraft, Hochschleudern, Physik an/aus, Gelenkmotor, Explosion und **Line
-Trace**, ein Prüfstrahl, der meldet, was er zuerst trifft.
+Trace**, ein Prüfstrahl, der meldet, was er zuerst trifft. Stoß und Kraft unterscheiden sich wie in
+[Kapitel 6](06-physik.md): Ein **Stoß** ist ein einmaliger Schubs, wie ein Tritt gegen einen Ball.
+Eine **Kraft** schiebt nur einen Schritt lang. Soll sie länger schieben, rufst du sie in jedem
+Schritt neu auf, etwa bei Tick.
 
 **Spiel und Effekte:** Punkte, Show Message, Win, Lose, Schaden, Heilen, Munition, Licht, Farbe,
 Funken, Kamerawackeln, Play Sound und For Each Actor with Tag.
+
+**Was alle sehen und was nur einer.** Logik läuft im Mehrspieler nur auf dem Server (Kapitelanfang).
+Manche Knoten wirken trotzdem bei allen: Eine **Show Message** sehen alle Spieler. **Camera Shake**
+wackelt dagegen nur die Kamera des Computers, auf dem die Logik läuft. Stellt dein Freund den
+Server und du spielst mit, wackelt also nur seine Kamera, deine nicht. Bei Tasten ist es ähnlich:
+**On Key** hört nur auf die Tastatur dieses Computers, also auf den Spieler, der dort sitzt. **On Input Action** („springen“, „feuern“ …)
+meldet dagegen jeden Spieler, egal mit welchem Gerät. Für Mehrspieler-Spiele ist On Input Action
+also die richtige Wahl.
 
 **Roboter:** Die Micro Duck lässt sich lenken (in den Grenzen, die ihr Netz trainiert hat), den Kopf
 drehen, Bewegungen auslösen (Sitzen, Aufheben, Kicks, Rolle, Sprung), zwitschern („Chirp“), den
@@ -231,7 +280,8 @@ weit das Nächste vor ihr ist), ihre Kamera und ihren Zustand abfragen. Einzelhe
 > **Mission:** Öffne auf https://kernengine.de/ ein **Basic**-Level und klicke in der Toolbar auf
 > **Logic**. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
 > message“, Enter, und trage einen Text ein. Zurück mit **Viewport**, platziere einen **Rolling
-> Ball** und drück **Play**. Dein Text erscheint im HUD!
+> Ball** (er ist dein Spieler: Ohne steuerbaren Actor startet Play gar nicht) und drück **Play**.
+> Dein Text erscheint im HUD!
 
 ## 9.7 Logik in der GameWorld
 
@@ -243,9 +293,12 @@ Die Welt gibt der Logik drei Dinge: die **Zeit**, die **Ausgabe** und den **Zufa
 auch die Zeit der Logik. Und ein Graph tickt auf einem langsamen Computer genauso wie auf einem
 schnellen. Was ein Graph ausgibt, erscheint als „Logic: …“ im Output Log.
 
-Ein Ereignis geht an den Graphen des betroffenen Actors oder, wenn der keinen hat, an den seines
-nächsten Vorfahren mit Graph. Der Collider einer Tür meldet sich also bei der Tür. Der Level-Graph
-bekommt jedes Ereignis zusätzlich. Die Logik läuft am Ende jedes Schritts, nach der Physik.
+Ein Ereignis geht an den Graphen des betroffenen Actors. Hat der keinen, sucht Kern beim Eltern-Actor
+weiter, dann bei dessen Eltern-Actor und so weiter nach oben (diese ganze Reihe nennt man
+**Vorfahren**, wie Eltern, Großeltern, Urgroßeltern). Der erste mit Graph bekommt das Ereignis. Hat
+die Tür also ein angeschweißtes Kind ohne eigenen Graphen, etwa die Klinke, meldet sich die Klinke
+bei der Tür. Der Level-Graph bekommt jedes Ereignis zusätzlich. Die Logik läuft am Ende jedes
+Schritts, nach der Physik.
 
 Damit Graphen überhaupt von Berührungen erfahren, schaltet Kern in Levels mit Logik die
 Berührungsmeldungen der Physik für alle beweglichen Körper ein ([Kapitel 6](06-physik.md)). Ohne
@@ -259,12 +312,15 @@ Server schickt es an alle Mitspieler, auch an die, die erst später dazukommen
 
 Kern übersetzt deinen Graphen beim Start von Play oder Simulate **im Hintergrund** in schnellen Code.
 Bis die Übersetzung fertig ist, läuft der Graph im langsamen „Vorlese“-Modus, aber schon richtig.
-Danach ist er etwa **55-mal schneller**. Gemessen wird das mit einer Million Schleifendurchläufen.
-Klappt das Übersetzen einmal nicht, bleibt es einfach beim Vorlesen.
+Danach ist er etwa **55-mal schneller**. Klappt das Übersetzen einmal nicht, bleibt es einfach beim
+Vorlesen.
 
-Wie beim Buch wird nicht alles übersetzt: Einfache Dinge wie Verzweigungen, Schleifen, Zahlen und
-Rechnungen werden direkt übersetzt. Für alles andere, etwa „Spawn Actor“, ruft der übersetzte Code
-das fertige Programmstück des Knotens in der Engine auf.
+Übersetzt wird nicht jeder Knoten. Ein Übersetzer lässt Eigennamen ja auch stehen, statt „Berlin“
+neu zu erfinden. Einfache Dinge wie Verzweigungen, Schleifen, Zahlen und Rechnungen werden direkt
+übersetzt. Genau diese Teile laufen in Schleifen oft tausendfach. Für alles andere, etwa „Spawn
+Actor“, ruft der übersetzte Code das fertige Programmstück des Knotens in der Engine auf. Diese
+Programmstücke sind schon fertig übersetzter, schneller Code der Engine. Sie noch einmal zu
+übersetzen, brächte nichts.
 
 Einen Graphen kannst du auch **exportieren**, als fertigen Programmtext, der mit ins Spiel kommt.
 Damit Kern weiß, zu welchem Graphen der Export gehört, bekommt er einen **Fingerabdruck** (*Hash*):
@@ -292,29 +348,38 @@ dann übernimmt der schnelle Code.
 Und Kern ist **deterministisch** ([Kapitel 6](06-physik.md)). Würde der übersetzte Code auch nur ein
 winziges bisschen anders rechnen als das Vorlesen, liefe eine Wiederholung anders als das Original,
 und beim Training der Ente oder bei der Fehlersuche könnte man den Ergebnissen nicht mehr trauen.
-Auch die Grenze gegen Endlosschleifen zählt überall gleich, und Haltepunkte funktionieren auch im
-übersetzten Code.
+Auch die Grenze gegen Endlosschleifen zählt überall gleich, und Haltepunkte (9.10) funktionieren
+auch im übersetzten Code.
 
 Geprüft wird das mit **denselben Testfällen** in allen drei Stufen: Schleifen, Gates, verschachtelte
 While Loops, State Machines, eine absichtliche Endlosschleife. Das Ergebnis muss **identisch** sein.
 
+> **Für Profis:** Ein einfacher Knoten wie Branch steckt damit an drei Stellen: im Vorleser und in
+> den beiden Übersetzern. Wer ihn ändert, muss ihn an allen drei Stellen gleich ändern. Genau dafür
+> gibt es die gemeinsamen Testfälle: Vergisst man eine Stelle, schlägt der Test Alarm.
+
 ## 9.10 Bearbeiten im Studio
 
 Der Logik-Editor sieht aus wie Unreals Blueprint-Editor; seine Oberfläche beschreibt
-[Kapitel 11](11-studio.md). Jede Bearbeitung ist **ein Undo-Schritt** im Level, du kannst also alles
-mit Ctrl+Z zurücknehmen.
+[Kapitel 11](11-studio.md). Der Editor selbst ändert nichts. Er zeichnet nur, was die Engine ihm
+beschreibt, und schickt jede deiner Änderungen als Befehl an die Engine, wie ein Kellner, der
+Bestellungen weitergibt. Die Engine führt die Änderung aus und schreibt sie in dieselbe Liste wie
+jede andere Änderung am Level. Darum ist jede Bearbeitung **ein Undo-Schritt** im Level, und du
+kannst alles mit Ctrl+Z zurücknehmen.
 
 Du suchst Knoten im **Aktionsmenü**. Ziehst du dabei von einem Pin, zeigt es nur Knoten, die dazu
-passen. Du verbindest Knoten, legst Variablen und State Machines an, machst aus einem Pin mit
-**Promote to Variable** eine Variable, prüfst mit **Compile** und exportierst. Mit **F9** setzt du
-einen **Breakpoint** (Haltepunkt): Läuft der Knoten, hält das Spiel nach dem Schritt an, und der
-Editor springt hin. Beim Spielen siehst du live, welche Knoten liefen und welche Werte die Variablen
-haben.
+passen. Du verbindest Knoten, legst Variablen und State Machines an, prüfst mit **Compile** und
+exportierst. Mit **Promote to Variable** an einem Pin legt Kern eine neue Variable vom passenden Typ
+an und hängt sie gleich an diesen Pin. Mit **F9** setzt du einen **Breakpoint** (Haltepunkt):
+Läuft der Knoten, hält das Spiel nach dem Schritt an, und der Editor springt hin. Beim Spielen
+siehst du live, welche Knoten liefen und welche Werte die Variablen haben.
 
 > **Mission:** Füge im Level-Graphen deines Levels mit dem Rolling Ball über **Templates** die
 > Vorlage **Traffic light (state machine)** ein und drück **Play**: Das HUD zeigt nacheinander
-> Green, Yellow, Red. Stoppe mit **Esc**, wähle im Graphen einen Knoten, setze mit **F9** einen
-> Breakpoint und drück wieder **Play** – das Spiel hält an, sobald der Knoten läuft.
+> Green, Yellow, Red. Stoppe mit **Esc**, klick im Graphen den Knoten **On State Entered** an, setze
+> mit **F9** einen Breakpoint und drück wieder **Play**. Das Spiel hält an, sobald die Ampel einen
+> Zustand betritt (gleich am Anfang bei Green), und der Editor zeigt den Knoten. Mit **Resume** in
+> der Leiste über dem Graphen geht es weiter, bis zum nächsten Wechsel.
 
 ## 9.11 Beispiele
 
@@ -323,7 +388,7 @@ Alle sind echte Graphen aus Kern, die meisten gibt es als Vorlage unter **Templa
 **Punktezone:** On Begin Overlap → Add Score (10) → Show Message („+10“) → Play Sound (pickup). Wer
 den Sensor betritt, bekommt 10 Punkte, eine Meldung und einen Ton.
 
-**Tor:**
+**Tor** (Vorlage **Door that opens on Interact**):
 
 ```mermaid
 flowchart LR
