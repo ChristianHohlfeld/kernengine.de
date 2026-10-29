@@ -6,7 +6,7 @@
 
 > **Wörter, die du brauchst:**
 >
-> - **Engine** – das fertige Grundgerüst, das malt, Physik rechnet und Töne spielt; dein Spiel
+> - *Engine* – das fertige Grundgerüst, das malt, Physik rechnet und Töne spielt; dein Spiel
 >   benutzt es.
 > - **Trigger** – eine unsichtbare Zone, die etwas auslöst, sobald jemand hineinläuft.
 > - **Frame** – ein Einzelbild des Spiels, wie eine Seite im Daumenkino.
@@ -37,7 +37,7 @@ einer Gefahr aus und gewinnt, wenn alles eingesammelt ist. Die Fenster von Studi
 
 ### Schritt 1: Ein neues Level
 
-**Datei › Neues Level...** (File › New Level...), Vorlage **Grundformen** (Basic), dann
+**Datei › Neues Level...** (File › New Level...), Vorlage **Basis** (Basic), dann
 **Erstellen** (Create) – mit Boden (40 × 40 m), Sonne, Himmel und einem Würfel. In den
 **Welteinstellungen** (World Settings) setzt du **Level-Name** (Level name) und **Spieltitel** (Game
 title) auf „Orb Garden“. Warum nicht die Vorlage **Leer** (Empty)? Da gibt es nicht mal einen Boden.
@@ -54,8 +54,8 @@ ist für den Anfang anschaulicher.
 **Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)) ein. Im Feld **Kamera** (Camera)
 wählst du die Sicht: **Verfolger** (Chase), **Ego-Perspektive** (First person) oder **Von oben**
 (Top down). Dann **Spielen** (Play), Taste Alt+P: W A S D läuft, die Leertaste springt, **Esc** führt
-zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick › **Zum Spieler machen**
-(Make Player).
+zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick ›
+**Zum Spieler machen (beim Spielen steuern)** (Make Player (control it in Play)).
 
 > **Mission:** Bau Schritt 1 und 2 nach. Spiel einmal mit **Von oben** und einmal mit
 > **Ego-Perspektive**. Welche Sicht passt besser zu einem Sammelspiel?
@@ -120,8 +120,9 @@ fertigen Kästchen zusammen ([Kapitel 9](09-logik.md)).
 
 1. Aus **Spielablauf** einen **Nachrichten-Trigger** (Message Trigger) platzieren und in
    **Details › Trigger** das Feld **Aktion** (Action) auf **Nur Logik-Ereignis** (Logic event only)
-   stellen. Damit tut der Trigger nichts Eigenes, sondern sagt nur deiner Logik Bescheid, wenn
-   jemand hineinläuft.
+   stellen, das Feld **Nachricht** (Message) leeren und **Nur einmal** (Only once) ausschalten,
+   damit die Zone jedes Mal Punkte gibt. Dann tut der Trigger nichts Eigenes, sondern sagt nur
+   deiner Logik Bescheid, wenn jemand hineinläuft.
 2. In **Details** auf **Logik** (Logic) klicken; der Logik-Editor öffnet den Graphen dieses Actors.
    Der Logik-Editor bleibt auch im deutschen Studio englisch beschriftet.
 3. **Templates › Score zone (overlap +10)**: Betreten gibt 10 Punkte, „+10“ und einen Ton.
@@ -142,8 +143,8 @@ platzieren, oder im Reiter **Sounds** eine eigene Datei importieren und in den V
 
 ### Schritt 8 bis 10: Testen, Speichern, Exportieren
 
-- **Spielen** testet, **F8** lässt die Figur los und übernimmt sie wieder. **Spielen › Anzahl der
-  Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players (listen server))
+- **Spielen** testet, **F8** lässt die Figur los und übernimmt sie wieder.
+  **Spielen › Anzahl der Spieler › 2 Spieler (Listen-Server)** (Play › Number of Players › 2 Players (listen server))
   testet zu zweit. Fehler im Level, etwa ein Gelenk zu einem gelöschten Actor, verhindern das
   Spielen und stehen im **Ausgabeprotokoll**.
 - **Strg+S** speichert eine Level-Datei samt Texturen und Sounds, die du weitergeben und in jedem
@@ -390,7 +391,7 @@ https://kernengine.de/. Der Quellcode liegt auf https://github.com/ChristianHohl
 
 ## Rätsel-Ecke
 
-1. Warum ist die Vorlage **Grundformen** (Basic) ein besserer Start als **Leer** (Empty)?
+1. Warum ist die Vorlage **Basis** (Basic) ein besserer Start als **Leer** (Empty)?
 2. Dein Würfel aus **Formen** (Shapes) fällt nicht. Was fehlt?
 3. Deine Figur läuft in eine **Schadenszone** (Damage Zone) und hat danach keine Gesundheit mehr. Wo
    taucht sie wieder auf? Und was passiert stattdessen bei einer **Gefahr** (Hazard)?

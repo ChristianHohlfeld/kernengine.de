@@ -10,7 +10,7 @@
 > - **Mono / Stereo** – ein Tonkanal für beide Ohren / zwei Kanäle, einer links, einer rechts.
 > - **Clip** – ein fertiges Tonstück im Speicher, zum Beispiel das Geräusch beim Springen.
 > - **Schleife** (englisch *Loop*) – ein Ton, der sich endlos wiederholt, etwa ein Motorbrummen.
-> - **Pan** – wie weit links oder rechts ein Ton klingt: −1 ganz links, 0 Mitte, +1 ganz rechts.
+> - **Pan-Wert** – wie weit links oder rechts ein Ton klingt: −1 ganz links, 0 Mitte, +1 ganz rechts.
 > - **deterministisch** – bei gleichen Eingaben kommt immer genau dasselbe heraus.
 > - **Filter** – ein Sieb für Töne: Ein *Tiefpass* lässt nur die tiefen durch, die hohen bleiben hängen.
 
@@ -117,7 +117,7 @@ den linken und den rechten Lautsprecher. Am einfachsten wäre eine gerade Linie:
 in der Mitte 0,5 / 0,5. Doch dann klingt der Ton in der Mitte **leiser**. Für unser Ohr zählt
 nämlich nicht die Zahl selbst, sondern die Zahl **mal sich selbst**. Rechne nach:
 
-| Quelle | gerade Linie | Kerns Bogen |
+| Quelle | gerade Linie | Bogen (gleiche Stärke) |
 |---|---|---|
 | ganz links (links / rechts) | 1 / 0 | 1 / 0 |
 | Mitte (links / rechts) | 0,5 / 0,5 | 0,71 / 0,71 |
@@ -135,8 +135,9 @@ Seite. Das passt zu Geräuschen, die dich umgeben, statt aus einem Punkt zu komm
 **Räumlich (3D)** (Spatial (3D)) in 7.9.)
 
 > **Für Profis:** Trägst du links und rechts als Punkt in ein Koordinatensystem ein, liegen alle
-> Punkte von Kerns Bogen auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
-> Radius². Kern nimmt zusätzlich alles mal √2 ≈ 1,41, damit die Mitte genau 1 / 1 ergibt.
+> Punkte des Bogens auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
+> Radius². Kern nimmt zusätzlich alles mal √2 ≈ 1,41, damit die Mitte genau 1 / 1 ergibt. Darum gibt
+> Kern ganz links 1,41 / 0 aus und in der Mitte 1 / 1.
 
 **Wie dumpf: Luft und Richtung.** Hohe Töne verlieren sich in der Luft schneller, ein fernes
 Gewitter grollt nur noch. Kern schickt jede 3D-Stimme durch einen Tiefpass: nah vor dir kommt alles
@@ -210,7 +211,7 @@ durchrutscht, rundet eine weiche Kurve ab. So bleibt jedes Sample sicher zwische
 Die **Pegelanzeige** in der Statusleiste von Studio zeigt, wie laut es gerade ist.
 
 > **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
-> **Grundformen** (Basic) an, platziere aus **Actors platzieren › Physik** (Place Actors › Physics)
+> **Basis** (Basic) an, platziere aus **Actors platzieren › Physik** (Place Actors › Physics)
 > einen **Kistenstapel** (Crate Stack) und starte **Simulieren** (Simulate). Greif eine Kiste mit der
 > linken Maustaste, halt die Taste gedrückt, zieh die Kiste schnell zur Seite und lass los, damit sie
 > fliegt. Beobachte die Pegelanzeige unten. Stoppe mit Esc, setze in den **Welteinstellungen** (World
@@ -283,17 +284,17 @@ Für bestimmte Sounds hat Kern Extra-Tricks:
 
 Kern bringt 38 eingebaute Sounds in acht Gruppen mit. Alle hörst du im Tab **Sounds** der
 **Inhaltsablage** (Content Drawer). Im Level heißen sie `builtin:` plus Name. Zum Nachschlagen
-(* = Schleife; Gruppen, die Studio nicht übersetzt, stehen englisch da):
+(* = Schleife):
 
 | Kategorie | Sounds |
 |---|---|
 | **Spielablauf** (Gameplay) | pickup, powerup, jump, land, goal, hazard, checkpoint, lose, laser |
-| Combat | gunshot, smg, pistol, sniper, launcher, reload, hit, down |
+| **Kampf** (Combat) | gunshot, smg, pistol, sniper, launcher, reload, hit, down |
 | **Physik** (Physics) | explosion, impact, impact_light, break, step, plastic, plastic_step |
 | **Fahrzeug** (Vehicle) | engine*, hover*, boost |
 | **Atmosphäre** (Ambience) | wind*, city*, hum* |
-| Robot | servo*, quack, beep |
-| UI | click, confirm, error |
+| **Roboter** (Robot) | servo*, quack, beep |
+| **Oberfläche** (UI) | click, confirm, error |
 | **Musik** (Music) | music_drive*, music_calm* |
 
 Die genauen Regler und Werte jedes Sounds stehen im blauen Buch, Kapitel 7.
@@ -416,7 +417,7 @@ In den **Welteinstellungen** (World Settings) unter **Audio** stellst du für da
 Lautstärken, **Hall** (Reverb) und **Doppler** (wie stark der Effekt ist).
 
 Die Komponente **Audioquelle** (Audio Source) macht jeden Actor zur Schallquelle, etwa eine brummende
-Maschine oder ein Radio. Das Feld Inner radius übersetzt Studio nicht:
+Maschine oder ein Radio:
 
 | Feld | Standard | Bedeutung |
 |---|---|---|
@@ -424,7 +425,7 @@ Maschine oder ein Radio. Das Feld Inner radius übersetzt Studio nicht:
 | **Lautstärke** (Volume), **Tonhöhe** (Pitch) | 1, 1 | wie laut, wie hoch |
 | **Schleife** (Loop), **Beim Start abspielen** (Play on start) | an, an | wiederholen, beim Spielstart starten |
 | **Räumlich (3D)** (Spatial (3D)) | an | aus: ohne Ort im Raum |
-| Inner radius | 2 m | bis hier voll laut |
+| **Innerer Radius** (Inner radius) | 2 m | bis hier voll laut |
 | **Abfallentfernung** (Falloff distance) | 40 m | ab hier still |
 | **Tonhöhe nach Tempo** (Pitch by speed) | 0 | höher, je schneller |
 | **Startverzögerung** (Start delay) | 0 s | Wartezeit |

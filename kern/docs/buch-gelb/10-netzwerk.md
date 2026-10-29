@@ -117,8 +117,8 @@ nicht springen lässt.
 > bei 0 an, wie ein Kilometerzähler, der überläuft. Kern kommt damit klar: Nummer 2 gilt als neuer
 > als 65 530, weil sie nur wenige Schritte „hinter der Null“ liegt.
 
-> **Für Profis:** Die ganze Quittung wird auf höchstens 9 Byte zusammengedrückt, und zerlegt wird
-> ab 1024 Byte. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 10.
+> **Für Profis:** Der Kopf eines Päckchens – seine Nummer und die ganze Quittung – wird auf höchstens
+> 9 Byte zusammengedrückt, und zerlegt wird, was größer als 1024 Byte ist. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 10.
 
 ---
 
@@ -176,17 +176,17 @@ kann sie also nicht mischen und nicht richtig antworten. Die Zahlen sind kein Ge
 Weitersagen – entscheidend ist, dass die Rückfrage nur an der echten Adresse ankommt.
 
 Päckchen mit falscher Verbindungsnummer oder von Unbekannten ignoriert Kern. Ist der Server voll,
-wird der Client abgewiesen. Damit eine Verbindung nicht aus Versehen als tot gilt, schicken beide Seiten regelmäßig
-**Lebenszeichen**; kommt eine Weile gar nichts mehr, ist die Verbindung getrennt.
+wird der Client abgewiesen. Damit eine Verbindung nicht aus Versehen als tot gilt, gehen ständig Päckchen hin
+und her, auch wenn gerade nichts zu sagen ist – sie sind **Lebenszeichen**; kommt eine Weile gar
+nichts mehr, ist die Verbindung getrennt.
 
-Eine Besonderheit: Die Anfrage des Clients ist **absichtlich aufgepolstert**, also so groß wie die
-Antwort. Warum? Sonst könnte jemand mit kleinen, gefälschten Anfragen den Server dazu bringen, viele
+Eine Besonderheit: Die Anfrage des Clients ist **absichtlich aufgepolstert**, auf 1000 Byte – viel
+größer als die Antwort des Servers. Warum? Sonst könnte jemand mit kleinen, gefälschten Anfragen den Server dazu bringen, viele
 große Antworten an jemand anderen zu schicken – wie Pizzabestellungen in fremdem Namen. So bekommt man
 nie mehr zurück, als man geschickt hat.
 
 > **Für Profis:** „Mischen“ heißt hier XOR: Bit für Bit wird verglichen, gleich ergibt 0, verschieden
-> ergibt 1. Aus 1010 und 0110 wird 1100. Ohne Päckchen ist nach 6 s Schluss, Lebenszeichen gehen
-> alle 0,1 s raus.
+> ergibt 1. Aus 1010 und 0110 wird 1100. Ohne Päckchen ist nach 6 s Schluss.
 
 ### Die Prüfsumme
 
@@ -248,7 +248,7 @@ Was **ankommen muss**, geht per Einschreiben: das Willkommen, „Spieler kommt�
 Beide brauchen **dasselbe Level**. Das Willkommen enthält darum eine Prüfsumme des Levels; spielt der
 Server ein anderes, wird der Client abgewiesen. Wer später dazukommt, bekommt nach dem Willkommen alle
 Pawns, alle Änderungen durch Logik und die Liste der eingesammelten Pickups. So sieht auch ein
-Nachzügler dieselbe Welt. Ein Online-Spiel nimmt normalerweise bis zu 8 Spieler auf; im Studio an
+Nachzügler dieselbe Welt. Ein Online-Spiel nimmt normalerweise bis zu 8 Gäste auf, dazu den Host; im Studio an
 einem einzigen Rechner testest du mit bis zu 4 (10.8).
 
 **Kein Sprung geht verloren.** Eingaben reisen per Postkarte, und Postkarten gehen manchmal verloren.
@@ -300,8 +300,7 @@ immer **zwei** bekannte Fotos um die gezeigte Zeit herum, und er rechnet dazwisc
 | 1,10 s | Foto B: Auto bei x = 12 m | – |
 
 Fehlt Nachschub, rechnet er die letzte Bewegung noch kurz weiter (höchstens eine Viertelsekunde) und
-hält das Ding dann an. Der **Puffer** in der Statuszeile sagt, wie weit das neueste Foto vor der
-gezeigten Zeit liegt. Ist er groß, ist genug Vorrat da.
+hält das Ding dann an.
 
 Bleibt eine Frage: 0,1 s vor **welcher** Zeit? Jedes Foto trägt die Uhrzeit des Servers. Damit der
 Client weiß, welche Fotos zu „Serverzeit jetzt minus 0,1 s“ gehören, muss er die **Uhr des Servers**
@@ -324,8 +323,7 @@ Im Studio kannst du allein an einem Rechner mit mehreren Spielern testen.
 weitere Spieler ist ein echter Client mit eigener Welt und eigenem Viewport, verbunden über das Netz
 im Speicher (10.6). War nur ein Viewport offen, schaltet Studio auf vier: Viewport 1 ist der Server,
 Viewport 2 der erste Client, jeder mit eigenem HUD. Nur der **aktive Viewport** bekommt deine Eingabe,
-die anderen Spieler stehen still. Die Statuszeile zeigt Rolle, Spieler, Ping, Verlust, Bandbreite und
-je Client den Puffer.
+die anderen Spieler stehen still. Die Statuszeile zeigt Rolle, Spieler, Ping, Verlust und Bandbreite.
 
 Mit **Spielen › Netzwerk-Emulation** (Play › Network Emulation) machst du die Leitung absichtlich
 schlechter:
@@ -345,7 +343,7 @@ schlechter:
 > und fahr weiter. **Was siehst du?** Ping und Verlust in der Statuszeile steigen stark. Achte auf dein
 > Auto: Es reagiert später auf deine Tasten, denn jede Eingabe muss erst zum Server und das Ergebnis
 > zurück. Gleitet es trotzdem, arbeiten die Zwischenbilder aus 10.7. Springt es, waren die Lücken
-> größer als der Vorrat von 0,1 s. Schau dabei auf den Puffer.
+> größer als der Vorrat von 0,1 s.
 
 **Online:** Mit **Spielen › Online-Spiel hosten...** (Play › Host Online Game...) bietest du ein
 Spiel an, mit **Online-Spiel beitreten...** (Join Online Game...) trittst du bei. Beide wählen
@@ -375,8 +373,7 @@ seine **Adresse**: Hinter den Dateinamen kommt ein Fragezeichen und ein Zusatz.
 „klasse7b“ an. Ein Freund öffnet `meinspiel.html?join=klasse7b` und tritt bei. Für verschiedene
 Rechner hängt man noch `&relay=` und die Adresse des Relays an. Ohne Raumnamen gilt „kern“.
 
-Klappt die Verbindung nicht, erscheint „Online play failed: … – playing alone“, und du spielst
-einfach allein weiter.
+Klappt die Verbindung nicht, startet das Spiel einfach allein.
 
 ---
 
@@ -432,8 +429,8 @@ Mehrspieler im Studio. Dank des festen Startwerts (10.6) ist jeder Lauf gleich.
 
 > **Mission:** Spiel zu zweit im Studio, einmal mit der Netzwerk-Emulation **Perfekt** (Perfect),
 > einmal mit **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)). Wie ändern sich
-> Ping, Verlust und Puffer? Und merkst du beim Fahren einen Unterschied? Wenn kaum: Dann haben
-> Zwischenbilder und Puffer ihre Arbeit getan.
+> Ping und Verlust in der Statuszeile? Und merkst du beim Fahren einen Unterschied? Wenn kaum: Dann haben
+> Zwischenbilder und der Vorrat von 0,1 s ihre Arbeit getan.
 
 ---
 

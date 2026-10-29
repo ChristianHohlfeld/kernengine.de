@@ -244,7 +244,7 @@ eine Socke mit dem Schnabel auf. Das weiche Polster am Schnabel muss auf der Soc
 Socke muss aber auf dem Holzboden **rutschen**. Ein einziger Reibwert pro Form kann nicht beides.
 
 Darum kennt Kern **Oberflächen**: Baumwollstrick (*cloth*), weiches gedrucktes Gummi (*tpu*) und
-Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es gemessene Werte:
+Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es eigene Werte, gewählt nach Messwerten aus der Fachliteratur:
 
 | Paar | Reibung | Wie im Alltag |
 |---|---|---|
@@ -253,7 +253,7 @@ Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es ge
 | Strick auf Holz | 0,4 | Socke rutscht übers Parkett |
 
 Box3D bleibt dafür unverändert. Es fragt bei jedem Kontakt: „Welche Reibung gilt hier?“ Kern
-antwortet: Hat das Paar einen gemessenen Wert, gilt der, sonst die Faustregel. Sprungkraft und
+antwortet: Hat das Paar einen eigenen Wert, gilt der, sonst die Faustregel. Sprungkraft und
 Rollwiderstand bleiben, wie sie sind.
 
 Die Sohlen der Ente haben **keine** Oberfläche. Sie behalten die Reibung, mit der Pollen Robotics
@@ -365,7 +365,7 @@ Sensoren, und man kann Körper ausnehmen. Ein Robotersensor sieht so seine eigen
 
 Nach jedem Schritt meldet die Physik, was in **diesem** Schritt passiert ist: Wer hat angefangen
 oder aufgehört, wen zu berühren? Wer ist in einen Sensor gelaufen oder wieder heraus? Wer ist hart
-aufgeprallt (ein **Hit**, mit Punkt und Tempo)? Und welches Gelenk ist über seiner Schwelle?
+aufgeprallt (ein *Hit*, mit Punkt und Tempo)? Und welches Gelenk ist über seiner Schwelle?
 
 **Meldungen kosten Zeit.** Darum schaltet die Spiel-Laufzeit sie nur dort ein, wo das Spiel sie auch
 liest: an Sensoren, am Spieler, an Dingen mit Aufprallgeräusch und in Levels mit Logik (den
@@ -651,7 +651,7 @@ Warteschlange ist also **4 Schritte** lang.
 ### Lösungen
 
 1. **Kinematisch** (Kinematic): Sie folgt der Vorgabe und lässt sich nicht bremsen.
-2. Mit Oberflächen der gemessene Paarwert **0,4**. Ohne Oberflächen gilt die Faustregel, und
+2. Mit Oberflächen der Paarwert **0,4**. Ohne Oberflächen gilt die Faustregel, und
    0 mal 0,9 ist 0, also **0**: Die Form bleibt rutschig wie Eis.
 3. Die Physik schaut 100 · 16 = 1600-mal pro Sekunde hin. Eine Feder muss mindestens zweimal pro
    Schwingung gesehen werden, also höchstens 1600 ÷ 2 = **800 Hz**.

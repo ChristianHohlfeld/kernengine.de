@@ -46,13 +46,14 @@ Am Telefon: ein Finger kreist, zwei Finger zoomen und verschieben, Tippen wählt
 | Alt+2 | nur **Drahtgitter** (Wireframe) |
 | Alt+3 | Farben ohne Licht: **Unbeleuchtet** (Unlit) |
 | Alt+4 | normal mit Licht: **Beleuchtet** (Lit) |
-| Alt+5 | zeigt, wo der Spieler anstößt |
+| Alt+5 | **Spieler-Kollision** (Player Collision): alle Kollisionshüllen über dem abgedunkelten Bild |
 | Alt+P / Alt+S | **Spielen** (Play) / **Simulieren** (Simulate) |
 
 ### Spielen und Simulieren
 
-Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft nur die Physik, und du kannst weiter im
-Editor arbeiten.
+Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft die Welt ohne Spielfigur: Du schaust mit
+der Editor-Kamera zu, greifst Körper und übernimmst Lagen mit K – bearbeiten kannst du das Level erst
+nach dem Stoppen.
 
 | Taste | Wirkung |
 |---|---|
@@ -60,7 +61,7 @@ Editor arbeiten.
 | F8 | Spieler verlassen / übernehmen |
 | Pause | anhalten / weiter |
 | . | pausiert: einen Schritt weiter |
-| Strg+R | Spiel neu starten |
+| Strg+R | Spiel neu starten (nicht beim Soldaten) |
 | K | beim Simulieren: **Simulationsänderungen übernehmen** (Keep Simulation Changes), also die Lage der Dinge ins Level übernehmen |
 | Umschalt+F1 | Maus freigeben |
 
@@ -228,13 +229,12 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Level:** eine Spielwelt, gespeichert als `.klevel` (8).
 - **Outliner:** die Liste aller Actors, wie ein Inhaltsverzeichnis des Levels (11).
 - **Pawn:** die Spielfigur, die einem Spieler gehört (8).
-- **Player-only:** Start ohne Editor, für exportierte Spiele (11).
 - **Snapping:** Einrasten auf ein Raster (11).
 - **Spiel verpacken** (Package Game): ein Level als eigenständige Webseiten-Datei exportieren, die
   man weitergeben kann (11).
 - **Spielansicht** (Game View): Ansicht ohne Editor-Hilfen, wie im Spiel (11).
-- **Spielen** (Play) / **Simulieren** (Simulate): selbst spielen / nur die Physik laufen lassen,
-  während der Editor bedienbar bleibt (11).
+- **Spielen** (Play) / **Simulieren** (Simulate): selbst spielen / die Welt ohne Spielfigur laufen
+  lassen und zuschauen; bearbeiten geht erst nach dem Stoppen (11).
 - **Transformation** (Transform): Position, Drehung und Skalierung eines Actors (8).
 - **Trigger:** ein Bereich, der etwas auslöst, wenn man ihn betritt (8).
 - **Viewport:** das Fenster, durch das du in die 3D-Welt schaust (11).
@@ -272,11 +272,11 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **CI:** automatische Prüfung jeder Änderung auf einem Server (2).
 - **Compiler / kompilieren:** ein Programm, das Code in Maschinensprache übersetzt, die der Prozessor
   direkt ausführt (2).
-- **CSV:** eine Tabelle als Textdatei, die Werte durch Kommas getrennt (16).
+- **CSV:** eine Tabelle als Textdatei, die Werte durch Kommas getrennt (17.4).
 - **Determinismus:** gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis, auf jedem Gerät (6, 14).
 - **Fingerabdruck:** eine Prüfzahl je Takt, die jede kleinste Abweichung verrät (14).
 - **Hertz (Hz):** wie oft etwas pro Sekunde passiert. 50 Hz heißt 50-mal pro Sekunde (16).
-- **Interpreter:** führt einen Logik-Graphen Knoten für Knoten aus (9).
+- **Interpreter:** führt einen Logik-Graphen Knoten für Knoten aus; Kapitel 9 nennt das „Vorlesen“ (9).
 - **JIT:** Ein Logik-Graph wird während des Spiels in schnellen Code übersetzt (9).
 - **JSON:** ein lesbares Textformat für Daten: Namen und Werte in Klammern (3).
 - **Matrix:** eine Zahlentabelle, die Drehen, Verschieben und Skalieren auf einmal beschreibt (3).
@@ -285,9 +285,9 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
   6,28 rad (13).
 - **Seed:** die Startzahl für den Zufall im Computer. Gleicher Seed, gleiche Zufallszahlen – so lässt
   sich jeder Lauf genau wiederholen (14).
-- **Terminal:** ein Fenster, in das man Befehle tippt, statt zu klicken (2).
+- **Terminal:** ein Fenster, in das man Befehle tippt, statt zu klicken (16, 17.4).
 - **Thread:** ein Rechenstrang. Ein Prozessor mit mehreren Kernen rechnet mehrere Threads
-  gleichzeitig (14).
+  gleichzeitig (17.3, A).
 - **Vektor:** ein Pfeil mit Richtung und Länge, etwa (x, y, z) (3).
 - **WebAssembly:** ein Programmformat, das Browser sehr schnell ausführen (1).
 - **Web Worker:** ein Rechenhelfer im Browser, der neben der Webseite herläuft (14).
@@ -344,7 +344,7 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Prüfmessung:** eine Messung, die beim Anpassen nicht benutzt wird. Nur sie zeigt, ob das Modell
   wirklich passt (16).
 - **Prüfstand:** ein eingespannter Servo mit Arm und Gewicht, an dem man misst (16).
-- **Regeltakt:** ein Mal „Netz fragen und Befehl geben“; das passiert 50-mal pro Sekunde (13).
+- **Regeltakt:** ein Mal „Netz fragen und Befehl geben“; das passiert 50-mal pro Sekunde in der Zeit der echten Ente (13).
 - **RMS-Fehler:** fasst viele Abweichungen zu einer Zahl zusammen: quadrieren, mitteln, Wurzel ziehen.
   Große Ausreißer zählen stark (16).
 - **Servo:** Motor mit Getriebe, der auf einen Winkel fährt (13).
@@ -470,8 +470,8 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 ### Lösungen
 
 1. **F8**. Noch einmal F8 verlässt sie wieder.
-2. Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft nur die Physik, und du kannst weiter im Editor
-   arbeiten.
+2. Beim **Spielen** spielst du selbst. Beim **Simulieren** läuft die Welt ohne Spielfigur: Du schaust
+   mit der Editor-Kamera zu und greifst Körper; bearbeiten kannst du das Level erst nach dem Stoppen.
 3. **Asymmetrischer Kritiker.** Den Kritiker gibt es nur beim Lernen, darum darf er mehr sehen.
 4. Lena und Tom bekommen genau dasselbe Netz, weil beide 16 Enten haben. Tom ist schneller, weil
    mehr Threads gleichzeitig rechnen (wenn sein Rechner so viele Kerne hat). Mias Netz ist anders,

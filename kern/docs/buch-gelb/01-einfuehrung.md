@@ -15,7 +15,7 @@
 >   zum Beispiel wie ein Würfel fällt.
 > - **Level** – eine Spielwelt mit allem, was darin steht.
 
-Hallo und willkommen! Unter jedem Spiel steckt eine **Engine**, der Motor unter der Haube. Das
+Hallo und willkommen! Unter jedem Spiel steckt eine *Engine*, der Motor unter der Haube. Das
 Spiel sagt nur: „Hier steht ein Auto, bei W fährt es.“ Zeichnen, Physik und Ton erledigt die Engine.
 
 In diesem Buch nimmst du die Engine **Kern** auseinander. Auf https://kernengine.de/ findest du
@@ -86,10 +86,12 @@ Kern folgt drei großen Regeln.
 
 **Kein fremder Motor fürs Zeichnen.** Kern benutzt keine fremde Grafik-Engine. Der Code, der
 zeichnet, ist Kerns eigener und spricht die Grafikkarte direkt an. So weiß man bei jedem Bild genau,
-woher es kommt. Zwei Bauteile stammen allerdings aus freien Projekten anderer Leute: die Physik
+woher es kommt. Ganz eingebaut sind zwei Bauteile aus freien Projekten anderer Leute: die Physik
 namens **Box3D** ([Kapitel 6](06-physik.md)) und eine Mathe-Bibliothek ([Kapitel 3](03-grundlagen.md)).
 Kern baut die Physik **unverändert** ein und übersetzt beide auf jedem Rechner auf genau dieselbe
-Weise.
+Weise. Daneben hat Kern einzelne Verfahren aus freien Projekten übernommen und selbst nachgeschrieben,
+etwa das Zerschneiden von Vielecken und die Umgebungsverdeckung; die Liste steht in
+[Anhang D](D-lizenzen.md).
 
 Außerdem benutzt Kern nur Fähigkeiten, die fast jeder Browser hat. Lieber verzichtet es auf ein paar
 neue Tricks, als dass es auf älteren Geräten nicht läuft.

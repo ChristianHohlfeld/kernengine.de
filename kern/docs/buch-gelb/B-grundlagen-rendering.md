@@ -656,7 +656,7 @@ Physik hat ihre eigene ([Anhang C](C-grundlagen-physik.md)). Bewegte Dinge prüf
 Dreieck. Ein Baum aus Kisten lohnt sich nur, wenn man ihn einmal baut und oft benutzt – bei etwas,
 das sich ständig bewegt, müsste man ihn immer wieder neu bauen.
 
-> **Mission:** Leg mit **Datei › Neues Level...** (File › New Level...) › **Grundformen** (Basic) ein
+> **Mission:** Leg mit **Datei › Neues Level...** (File › New Level...) › **Basis** (Basic) ein
 > Level an und setz über **Hinzufügen** (Add) › **Formen** (Shapes) ein paar Formen, etwa **Würfel**
 > (Cube), **Kugel** (Sphere) und **Zylinder** (Cylinder). Schalte dann im Viewport über **Anzeigen**
 > (Show) die **Begrenzungen** (Bounds) ein. (Hüllen gibt es als Kugel oder als Kiste; Studio zeigt dir die

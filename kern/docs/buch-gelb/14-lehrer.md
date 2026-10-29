@@ -263,7 +263,8 @@ Wie vorsichtig „nie viel auf einmal“ ist, regelt Kern dreifach:
 
 - Pro Iteration darf eine Bewegung höchstens um etwa ein Fünftel wahrscheinlicher oder
   unwahrscheinlicher werden. Beispiel: Wählte die alte Policy eine Bewegung in 10 von 100 Fällen,
-  darf die neue sie höchstens in etwa 12 von 100 Fällen wählen, auch wenn sie noch so gut war.
+  lohnt es sich ab etwa 12 von 100 für das Lernen nicht mehr, sie noch häufiger zu machen – auch
+  wenn sie noch so gut war.
 - Hat sich die Policy schon stark verändert, wird der nächste Schritt automatisch kleiner. Die Größe
   der Schritte heißt **Lernrate**.
 - Ein kleiner **Neugier-Bonus** sorgt dafür, dass das Rauschen nicht zu früh verschwindet und die Ente
@@ -495,8 +496,8 @@ dahin: Erst suchte der Lehrer einmalig das Vorbild. Danach sprang das Netz schon
 Nachmachens zum ersten Mal echt. Den Rest erledigte das Üben.
 
 Weil alles überall bis zur letzten Stelle gleich gerechnet wird, gelten diese Ergebnisse auf jedem
-Gerät. Nur die **Zeit** ist verschieden: Im Browser dauert es auf demselben Computer vier- bis
-fünfmal so lange wie mit dem Programm – aber es kommt **dasselbe Netz** heraus.
+Gerät. Nur die **Zeit** ist verschieden: Im Browser dauert es auf demselben Computer knapp vier-
+bis fünfmal so lange wie mit dem Programm – aber es kommt **dasselbe Netz** heraus.
 
 > **Für Profis:** Der Browser ist langsamer, weil er ohne bestimmte Beschleuniger rechnet. Die Physik
 > ließe sich auch mit halb so vielen Unterschritten rechnen und wäre dann schneller – aber die
@@ -524,8 +525,8 @@ Lernen gebraucht. Dazu kommt ein **Beipackzettel** (die
 Metadaten): die Namen der Gelenke, die Grundstellung, welche Aufgabe das Netz kann und dass Kern es
 trainiert hat.
 
-Zur Sicherheit liest Kern die Datei nach dem Speichern selbst wieder ein und prüft, dass das Netz
-dasselbe rechnet wie vorher.
+Zur Sicherheit liest ein automatischer Test so eine Datei wieder ein und prüft, dass das Netz bis
+auf 0,0001 dasselbe rechnet wie im Lehrer.
 
 > **Für Profis:** Wie die Datei innen aufgebaut ist und welche Einträge der Beipackzettel genau hat,
 > steht im blauen Buch, Kapitel 14.

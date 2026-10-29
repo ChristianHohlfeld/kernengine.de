@@ -210,7 +210,7 @@ mit kaputtem Dach.
 
 ## 5.6 Primitive: der Baukasten
 
-**Primitive** sind fertige Grundformen, die Kern auf Knopfdruck baut, alle mit Z nach oben:
+**Primitive** sind fertige Grundkörper, die Kern auf Knopfdruck baut, alle mit Z nach oben:
 **Quader**, **Kugel**, **Kapsel** (eine Pille: ein Zylinder mit einer Halbkugel an jedem Ende),
 **Torus** (ein Ring wie ein Donut), **Zylinder**, **Kegel** und **Ebene**. Zylinder und Kegel
 stehen auf dem Boden, die anderen sitzen um ihren Mittelpunkt.
@@ -289,7 +289,7 @@ Pro Haus passiert Folgendes:
    sind **in Metern**: Die UV einer Ecke ist einfach, wie viele Meter sie entlang der Wand und über
    dem Fuß liegt. Ein Muster wird dann wie Fliesen jeden Meter wiederholt, so ist es auf einer
    kurzen und einer langen Wand gleich groß.
-5. **Gesims:** Bei großen Häusern läuft oben ein vorstehendes Band um das Dach, wie ein Rahmen.
+5. **Gesims:** Ist ein Haus höher als 3,5 m, läuft oben ein vorstehendes Band um das Dach, wie ein Rahmen.
 6. **Farben:** Der Seed wählt Wand- und Dachfarbe und die Stockwerkshöhe.
 
 Jede Ecke bekommt außerdem einen kleinen **Wand-Steckbrief**: Wie lang ist diese Wand, wie hoch,

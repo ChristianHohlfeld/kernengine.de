@@ -256,8 +256,8 @@ an einer Kreuzung. In jedem Regeltakt läuft dieselbe Reihenfolge ab wie in Poll
 dem Roboter:
 
 1. Abgelaufene Bewegungen beenden.
-2. Ein Netz wählen. Vorfahrt hat eine laufende Bewegung, dann Aufheben, Sitzen, Rollen, Stehen und
-   zuletzt Laufen.
+2. Ein Netz wählen. Vorfahrt hat eine laufende Bewegung, dann Aufheben, Sitzen, Rollschuhfahren und
+   zuletzt Laufen und Stehen (bei der älteren Gangart ein eigenes Stehnetz).
 3. Das Netz rechnen und seine Antwort in Servoziele umrechnen.
 4. Die Uhren der Bewegungen weiterstellen – jede Bewegung hat ihre eigene Stoppuhr, damit Kern
    weiß, wann sie vorbei ist.
@@ -344,8 +344,8 @@ selbst wieder auf.
 steht trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er ganz, eine Socke hält ihn
 3,6–7,8° offen.
 
-> **Mission:** Beim Spielen zeigt das Studio oben rechts **HEAD CAMERA** (Kamerabild und Zustand) und
-> **TOF 8×8** – diese Anzeige übersetzt Studio nicht: rot Hindernis (heller, je näher), grün Boden,
+> **Mission:** Beim Spielen zeigt das Studio oben rechts **KOPFKAMERA** (HEAD CAMERA) mit
+> Kamerabild und Zustand (der Zustand bleibt englisch) und **TOF 8×8**: rot Hindernis (heller, je näher), grün Boden,
 > gelb zu nah. Übernimm die Ente mit **F8**, lenk sie auf eine Wand zu und beobachte, wie das Gitter
 > von Grün zu immer hellerem Rot wechselt. Die Anzeige schaltest du unter
 > **Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Camera).
@@ -468,8 +468,8 @@ auf dem Boden genau unter dieser Mitte. Liegt die Mitte zu hoch, beim Ball über
 über 3 cm, zählt das Ding nicht – etwa die Socke im Schnabel.
 
 Damit es echt wird, kann der Detektor **Rauschen** (kleine zufällige Fehler im Ort) und **Aussetzer**
-(ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel** mit Beispielwerten aus dem Code: Der
-Fehler ist 0,2 cm plus 1 % der Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
+(ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel** mit ausgedachten Werten aus dem Bereich, den
+der Lehrer würfelt (0 bis 0,4 cm plus 0 bis 3 %): Der Fehler ist 0,2 cm plus 1 % der Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
 desto ungenauer – wie Schätzen mit einem Auge. Im Studio ist der Detektor rauschfrei, im Training
 würfelt der Lehrer die Werte für jede Übungsrunde neu – damit das Netz auch mit schlechten Augen
 zurechtkommt.

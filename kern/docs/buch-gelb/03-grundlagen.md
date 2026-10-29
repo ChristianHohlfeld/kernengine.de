@@ -104,8 +104,8 @@ mit einem kleinen Rundungsschritt (3.1), also runden beide unterschiedlich oft a
 Stellen. Nach ein paar Sekunden steht die Ente auf dem PC woanders als auf dem Tablet, und der
 Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md) wäre kaputt.
 
-Darum zählt Kern feste Schritte. Die Micro Duck zum Beispiel entscheidet 50-mal pro Sekunde
-Simulationszeit neu. Braucht ein langsamer Rechner für diese 50 Schritte zwei echte Sekunden, läuft
+Darum zählt Kern feste Schritte. Die Physik der Micro Duck zum Beispiel rechnet 100 feste Schritte
+pro Sekunde Simulationszeit. Braucht ein langsamer Rechner für diese 100 Schritte zwei echte Sekunden, läuft
 die Ente langsamer über den Bildschirm, aber sie macht genau dieselben Schritte.
 
 ## 3.4 Ausleihen und wiedererkennen
@@ -229,7 +229,7 @@ flach auf dem Boden wie das Koordinatensystem in deinem Heft.
 Zeigefinger nach vorn und den Mittelfinger nach oben. Daumen ist X, Zeigefinger Y, Mittelfinger Z. Mit
 der linken Hand klappt das nicht – dort zeigt der Mittelfinger nach unten.
 
-> **Mission:** Wähl **Datei › Neues Level...** (File › New Level...), die Vorlage **Grundformen**
+> **Mission:** Wähl **Datei › Neues Level...** (File › New Level...), die Vorlage **Basis**
 > (Basic) und **Erstellen** (Create). Setz über die **Inhaltsablage** (Content Drawer) – der Knopf
 > ganz links in der Statusleiste – einen **Würfel** (Cube). Unten links zeigt das Achsenkreuz X rot, Y grün,
 > Z blau – nach oben. Zieh mit dem Werkzeug **Verschieben (W)** (Move (W)) am blauen Pfeil und

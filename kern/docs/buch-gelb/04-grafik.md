@@ -180,7 +180,8 @@ Dreiecken. Darum speichert ein Dreieck nicht drei eigene Ecken, sondern nur drei
 etwa „Ecke 1, 2 und 5“. So steht jede Ecke nur einmal in der Liste.
 
 Ein neues Mesh muss nur die Positionen der Ecken mitbringen; was fehlt, ergänzt Kern (weiß, eine
-Instanz am Nullpunkt, passende Normalen). Dann gilt: **alles oder nichts.** Erst prüft Kern alles:
+Instanz am Nullpunkt; Normalen passend zu jeder Fläche, wenn das Mesh keine Eckennummern hat, sonst
+einfach nach oben). Dann gilt: **alles oder nichts.** Erst prüft Kern alles:
 Sind alle Zahlen echte Zahlen? Zeigt jede Eckennummer auf eine vorhandene Ecke? Passen die Längen
 der Listen? Ergeben die Knochen-Anteile jeder Ecke (siehe 4.5) zusammen 100 %? Nur wenn alles
 stimmt, baut Kern das neue Mesh und tauscht es gegen das alte.
@@ -297,7 +298,7 @@ Erweiterung (4.6, Beispiel in 4.13). Es spiegelt den Himmel, je flacher du drauf
 kann, gleich mehr dazu), glüht später.
 
 > **Mission:** Öffne Kern Studio über https://kernengine.de/, wähle **Datei › Neues Level...** (File ›
-> New Level...) › **Grundformen** (Basic) und klick in der Werkzeugleiste auf **Hinzufügen** (Add) ›
+> New Level...) › **Basis** (Basic) und klick in der Werkzeugleiste auf **Hinzufügen** (Add) ›
 > **Formen** (Shapes) › **Kugel** (Sphere) (dasselbe findest du auch in der **Inhaltsablage** (Content
 > Drawer), Strg+Leertaste). Stell in **Details** unter **Material** **Rauheit** (Roughness) auf 1 und
 > **Metallisch** (Metallic) auf 0: Die Kugel ist matt wie Gummi. Dann **Rauheit** 0,1 und
@@ -404,7 +405,7 @@ bekommt Glühen und Verdeckung; in der Vier-Ansicht fehlt beides.
 > **Aufteilung** (Layout) auf **4 Viewports** (4 viewports). Nur einer der vier zeigt die Welt mit
 > Perspektive und Licht (die anderen zeigen Drahtgitter von oben, vorn und der Seite); darin suchst du
 > dir dieselben Fenster. Dann machst du ihn mit dem Knopf ganz rechts in seiner Leiste wieder einzeln
-> und groß (sein Tooltip „Maximise this viewport“ ist nicht übersetzt).
+> und groß (sein Tooltip: **Diesen Viewport maximieren** (Maximise this viewport)).
 > **Was du siehst:** Groß hat jedes leuchtende Fenster einen weichen Lichtschein, der über seinen
 > Rand hinaus auf die Wand strahlt. In der Vier-Ansicht sind die Fenster nur scharfe, helle Rechtecke
 > ohne Schein. **Was du lernst:** Das Glühen entsteht erst in Kerns eigenen Bildpuffern – im
@@ -633,7 +634,7 @@ sonst tauchten schon verloschene Funken wieder auf.
 > **Für Profis:** Die Höhe ist Starttempo mal Zeit minus ½ · 9,81 · Zeit². Nach 0,5 s: 5 · 0,5 −
 > ½ · 9,81 · 0,25 ≈ 1,27 m. Das ist das Fallgesetz aus dem Physikunterricht.
 
-Der Shader schafft nur **6 Lampen** gleichzeitig. Ein Spiel darf aber beliebig viele anfragen.
+Der Shader schafft nur **6 Lampen** gleichzeitig. Ein Spiel darf aber viel mehr anfragen, bis zu 64 pro Bild.
 Kern wählt in jedem Bild die wichtigsten aus:
 
 > Punkte = Stärke ÷ (1 + Abstand ÷ Reichweite)

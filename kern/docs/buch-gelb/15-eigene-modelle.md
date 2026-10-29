@@ -228,8 +228,9 @@ Programm, nicht im Browser. Spannend ist sie trotzdem, denn sie zeigt den ganzen
 > Küche kann. Dann kochst du nach, schmeckst ab, schaust, wo es anders wurde, verbesserst – und
 > servierst es am Ende den Gästen.
 
-1. **Messen:** Wo greift der Schnabel eine Socke gut? Wie weit läuft die Ente nach „Stopp“ noch? Das
-   misst der Lehrer in der Physik, statt es hinzuschreiben.
+1. **Messen:** Wo greift der Schnabel eine Socke gut? Das misst der Lehrer bei jedem Lauf in der
+   Physik, statt es hinzuschreiben. Wie weit die Ente nach „Stopp“ noch läuft, hat ein Messbefehl
+   einmal ermittelt; diese Zahl steht noch fest im Programm.
 2. **Nachmachen:** Das Netz ahmt das Vorbild der Spielschicht nach, Runde für Runde.
 3. **Prüfen:** Kicks, Aufheben, Ausspucken und Stürze zählen – für das Netz **und** für das Vorbild.
 4. **Ansehen:** eine Episode Entscheidung für Entscheidung, das Vorbild und das Netz nebeneinander.

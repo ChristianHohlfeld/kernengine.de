@@ -128,7 +128,7 @@ baust du alles aus denselben Bausteinen zusammen.
 Ein paar Bausteine im Einzelnen:
 
 **Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Ring, Rampe oder
-ein eingebautes Modell, etwa ein Servomotor der Micro Duck. Das **Material** bestimmt das Aussehen:
+ein eingebautes Modell, etwa ein Glied der Micro Duck wie ihr Hals. Das **Material** bestimmt das Aussehen:
 Farbe, wie rau oder glänzend, ob metallisch, ob es selbst leuchtet, ob man durchsehen kann. Ein Mesh
 kann automatisch einen passenden Kollider mitbringen. Dessen Reibung, Sprungkraft und Oberfläche
 ([Kapitel 6](06-physik.md)) stellst du gleich hier ein, unter **Statisches Mesh › Physik** (Static
@@ -217,8 +217,9 @@ Werten. Du kannst eine `.klevel`-Datei mit jedem Texteditor öffnen. Ein Actor s
 
 Zeile für Zeile: Der Actor hat die Nummer 12, heißt „Door“ und ist ein Kind von Actor 3. Er steht bei
 x = 5,2 m, y = −12 m, z = 1,5 m (relativ zu seinem Eltern-Actor). Er trägt das Schlagwort „door“ und
-hat ein Mesh und einen Starrkörper. Was in den geschweiften Klammern fehlt, bekommt Standardwerte.
-Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
+hat ein Mesh und einen Starrkörper. Was beim Einlesen in den geschweiften Klammern fehlt, bekommt
+Standardwerte. Beim Speichern schreibt Kern jede Komponente vollständig hin; nur leere Angaben wie
+ein fehlender Eltern-Actor oder keine Schlagwörter lässt es weg.
 
 **Beim Lesen** gilt ein schlauer Grundsatz: **nachsichtig bei Fehlendem, streng bei Falschem.**
 
@@ -269,7 +270,8 @@ Die Regeln des Plans:
    Kollider wird ans Mesh angepasst.
 4. Pickups und Trigger werden zu Sensoren. Haben sie gar keine Form, bekommen sie eine Sensor-Kugel
    mit 1 m Radius.
-5. Die Stadt wird ein einziger statischer Körper mit einer Box je Haus.
+5. Die Stadt wird ein einziger statischer Körper aus vielen Boxen: für die Häuser (Hofhäuser und
+   L-Häuser aus mehreren) und für die Bodenplatten.
 6. Der endlose Boden ist eine riesige flache Box, deren Oberseite genau bei z = 0 liegt.
 
 ## 8.8 Die GameWorld starten
@@ -406,10 +408,10 @@ Figur fällt absichtlich schneller als in echt, damit Sprünge knackig wirken un
 nicht schwebend. Der Soldat fällt wie in echt, so wie in Ego-Shootern üblich.
 
 Für alle gilt: **Boost** ist ein Vorrat von 0 bis 1. Beim Boosten sinkt er um 0,45 pro Sekunde, sonst
-wächst er um 0,12 pro Sekunde. Nach einem tiefen Fall spielt eine Landung den Sound `land`.
+wächst er um 0,22 pro Sekunde. Nach einem tiefen Fall spielt eine Landung den Sound `land`.
 
 Rechne mal: Ein voller Boost-Vorrat hält 1 / 0,45 ≈ 2,2 Sekunden. Ganz neu füllen dauert
-1 / 0,12 ≈ 8,3 Sekunden.
+1 / 0,22 ≈ 4,5 Sekunden.
 
 **Mehrere Spieler:** Jeder Spieler hat seinen eigenen **Pawn** (8.8). Kommt im Mehrspieler jemand
 dazu, kopiert Kern die Spielfigur samt Kindern und stellt die Kopie auf eine Spirale um den
@@ -470,12 +472,12 @@ hast. Mit Wiederkehr-Zeit taucht es später wieder auf.
 | **Schadenszone** (Damage zone) | zieht Lebenspunkte ab | **Schadenszone** (Damage Zone) |
 | **Nur Logik-Ereignis** (Logic event only) | nur ein Ereignis für die Logik | – |
 
-Jede Aktion spielt ihren passenden Sound. Der Teleporter sperrt sich 1 s lang, damit du nicht sofort
+Fast jede Aktion spielt ihren passenden Sound. Der Teleporter sperrt sich 1 s lang, damit du nicht sofort
 zurückgebeamt wirst. Jeder Trigger meldet sich vorher bei der Logik. Mit **Nur einmal** (Only once)
-ist er danach verbraucht, außer Ziel und Gefahr.
+ist er danach verbraucht, außer Ziel, Gefahr und Teleporter.
 
 > **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
-> **Grundformen** (Basic) an. Platziere aus **Actors platzieren** (Place Actors) eine
+> **Basis** (Basic) an. Platziere aus **Actors platzieren** (Place Actors) eine
 > **Rollende Kugel** (Rolling Ball) aus der Gruppe **Spieler** (Players), dreimal **Stern** (Star) und ein
 > **Ziel** aus der Gruppe **Spielablauf** (Gameplay). Stell in den **Welteinstellungen** die
 > **Siegbedingung** auf **Alle Pickups sammeln** und drück **Spielen** (Play) (Alt+P). Was passiert,
@@ -506,7 +508,7 @@ du abgedrückt hast**, und prüft den Treffer dort, höchstens eine halbe Sekund
 Dazu kommen Rüstung (fängt einen Teil des Schadens ab), kurzer Schutz nach dem Wiedereinstieg,
 Fallschaden bei harten Landungen und **Wiederkehr**: Ein Spieler startet nach einer Wartezeit neu,
 andere Actors verschwinden und tauchen, wenn eingestellt, an ihrem Platz wieder auf. Ein Fass mit
-Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus Grundformen
+Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus einfachen Körpern
 gebaut und reine Darstellung: Sie ändern nichts an der Simulation.
 
 ## 8.14 Läufer
@@ -608,7 +610,7 @@ Level...) findest du die eingebauten Levels:
   selbstständig. Ein Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht.
   **Spielen** (Play) beginnt hier mit eingeschalteter Beobachterkamera, mit **F8** übernimmst du die
   Ente.
-- **Grundformen** (Basic): Boden und ein Würfel.
+- **Basis** (Basic): Boden, Sonne, Himmel und ein Würfel.
 - **Leer** (Empty): gar nichts, nicht einmal Boden.
 
 Automatische Tests spielen diese Levels durch und prüfen zum Beispiel, dass ein Ziel gewinnt und eine

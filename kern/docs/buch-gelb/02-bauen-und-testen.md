@@ -218,7 +218,9 @@ simulieren?
 
 Kern lässt die Ente mit einem Laufnetz von Pollen erst geradeaus gehen und sich dann auf der Stelle
 drehen. Nach jedem **Regeltakt** (so heißt jeder Moment, in dem das Netz neu entscheidet; das passiert
-50-mal pro Sekunde Simulationszeit) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
+50-mal pro Sekunde, gemessen in der Zeit der echten Ente; weil Kern die Ente vierfach groß und dafür
+doppelt so langsam rechnet, sind es 25 Takte pro Sekunde Simulationszeit, siehe
+[Kapitel 6.2](06-physik.md)) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
 Drehung, Geschwindigkeiten, alle Gelenkwinkel. Daraus macht es eine kurze Kennung aus Buchstaben und
 Ziffern, einen **Hash**. Ändert sich ein einziges Bit irgendwo in diesen Zahlen, kommt eine völlig
 andere Kennung heraus.
@@ -231,7 +233,7 @@ Warum genügt nicht etwas Einfaches wie die Quersumme? Probier es aus: 1234 hat 
 dass zwei Ziffern vertauscht wurden. Ein guter Hash mischt die Zahlen so gründlich, dass schon die
 kleinste Änderung oder Vertauschung eine ganz andere Kennung ergibt.
 
-Für 400 Regeltakte, also 8 Sekunden Entenleben (400 : 50 = 8), ist die richtige Kennung jedes Takts
+Für 400 Regeltakte, also 8 Sekunden im Leben der echten Ente (400 : 50 = 8), ist die richtige Kennung jedes Takts
 als **Referenz** gespeichert. Verglichen wird auf drei Arten: auf einem PC, im Browser und auf einem
 Mac, dessen Rechenwerk ganz anders gebaut ist als das im PC. Stimmen alle 400 Kennungen überein,
 rechnen alle exakt gleich.

@@ -101,12 +101,16 @@ sorgt der **Solver** (C.6) dafür, dass Kontakte und Gelenke eingehalten werden,
 mit dem neuen Tempo. Seine eingebaute **Dämpfung** (Bremse) ist so gebaut, dass sie das Tempo immer
 nur kleiner macht, nie umdreht. Und Box3D begrenzt, wie schnell etwas fliegen und sich drehen darf.
 
-> **Vorsicht, Falle:** Warum verbietet Kern eine selbst gebaute Bremskraft „je schneller, desto
-> stärker bremsen“? Diese Bremse rechnet mit dem *alten* Tempo vom Anfang des Schritts und lässt
-> diese Kraft den ganzen Schritt lang wirken, auch dann noch, wenn das Glied längst stehen müsste.
-> Bei einem sehr leichten Glied (10 g) ist das in einem Schritt viel mehr Bremse, als nötig wäre,
-> um es anzuhalten. Statt bei 0 zu stoppen, schießt es rückwärts, im Beispiel mit 15,7 m/s statt
-> vorher 1 m/s vorwärts. Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht.
+> **Vorsicht, Falle:** Warum sagt Kerns Physik-Regel: Nimm die eingebaute Dämpfung, keine selbst
+> gebaute Bremskraft „je schneller, desto stärker bremsen“? Diese Bremse rechnet mit dem *alten*
+> Tempo vom Anfang des Schritts und lässt diese Kraft den ganzen Schritt lang wirken, auch dann noch,
+> wenn das Glied längst stehen müsste. Bei einem sehr leichten Glied ist das in einem Schritt viel
+> mehr Bremse, als nötig wäre, um es anzuhalten. Rechne ein Beispiel: Das Glied wiegt 10 g =
+> 0,01 kg, die Bremse drückt mit 10 N je 1 m/s Tempo, und Kern rechnet 60 Schritte pro Sekunde.
+> Bei 1 m/s vorwärts bremst sie mit 10 N. Das ändert das Tempo in einem Schritt um
+> 10 ÷ 0,01 ÷ 60 ≈ 16,7 m/s. Aus 1 m/s vorwärts werden 1 − 16,7 ≈ −15,7, also **15,7 m/s
+> rückwärts**. Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht: Sie macht das
+> Tempo in jedem Schritt nur kleiner, nie umgedreht.
 
 ![Die selbst gebaute Bremse: Nach einem einzigen Schritt fliegt das leichte Glied schneller rückwärts, als es vorher vorwärts flog](../abbildungen/bremse-katapult.svg)
 
@@ -256,7 +260,7 @@ gewöhnlichen Mittelwert:
 
 Der Vorteil: Was reibungsfrei ist, bleibt es, egal womit es sich paart. Eis bleibt auch unter einem
 Gummistiefel ziemlich glatt. Trotzdem ist das nur eine Faustregel. Für echte Materialpaare wie
-Schnabel auf Socke kennt Kern darum gemessene **Paarwerte** ([Kapitel 6](06-physik.md), 6.6).
+Schnabel auf Socke kennt Kern darum eigene **Paarwerte** ([Kapitel 6](06-physik.md), 6.6).
 
 ### Sprungkraft
 
@@ -380,8 +384,8 @@ der Ente ist K = 0,554 und D = 0,053. Bei 0,5 rad Fehler (knapp 29°) drückt er
 N·m davon ab.
 
 Zusammen mit der Trägheit des kleinen Motors im Servo ergibt das einen gedämpften Schwinger. Rechnet
-man es mit den Werten des Servos aus, schwingt er etwa **2,8-mal pro Sekunde**, mit einem
-**Dämpfungsgrad** von **0,84**. Diese Rechnung braucht Wurzeln und Mathe aus der Oberstufe, darum
+man es mit den Werten des Servos aus, hat er eine **Eigenfrequenz** von etwa **2,8 Hz** (so oft pro
+Sekunde würde er ohne Dämpfung hin und her schwingen) und einen **Dämpfungsgrad** von **0,84**. Diese Rechnung braucht Wurzeln und Mathe aus der Oberstufe, darum
 nehmen wir hier nur das Ergebnis (die Formeln stehen im blauen Buch, Anhang C). Was diese Zahl
 bedeutet, zeigt eine Tür:
 
@@ -406,7 +410,7 @@ einen Regler ins Schwingen bringen.
 > schneller. Wer immer ein Stück zu spät schubst, schiebt irgendwann gegen die Bewegung, und die
 > Schaukel gerät aus dem Takt.
 
-Wie spät ist „zu spät“? Ein Schwung hin und zurück dauert bei 2,8 Schwüngen pro Sekunde
+Wie spät ist „zu spät“? Ein Schwung hin und zurück dauert bei der Eigenfrequenz von 2,8 Hz
 1000 ÷ 2,8 ≈ 357 ms. Man zählt einen ganzen Schwung wie eine Runde im Kreis, also als 360°. 20 ms
 sind 20 ÷ 357 ≈ 5,6 % davon, und 5,6 % von 360° sind **rund 20°**. Um so viel hinkt der Regler
 hinterher.

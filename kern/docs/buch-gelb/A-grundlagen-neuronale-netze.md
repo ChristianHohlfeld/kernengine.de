@@ -535,7 +535,7 @@ werden gedeckelt, Verschlechterungen nie.
 
 Das Verhältnis „neu geteilt durch alt“ heißt ρ („Rho“): 12 von 100 statt 10 von 100 ergibt
 ρ = 12 / 10 = 1,2. Erlaubt ist ρ zwischen 0,8 und 1,2. Auch der Kritiker darf seine Schätzung pro
-Lernschritt nur begrenzt ändern ([Kapitel 14](14-lehrer.md)).
+Lernschritt nur begrenzt ändern, nach derselben Regel mit 0,2.
 
 > **Für Profis:** Zusätzlich misst Kern, wie verschieden alte und neue Policy insgesamt schon sind (die
 > **KL-Divergenz**). Ändert sich zu viel, verkleinert Kern die Lernrate; ändert sich zu wenig,

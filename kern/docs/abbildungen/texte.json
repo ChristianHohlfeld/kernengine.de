@@ -264,8 +264,8 @@
     "en": {"titel0": "heights of the grid corners (m)", "titel1": "from above at an angle", "fuss": "every square: two triangles, split along the south-west–north-east diagonal"}
   },
   "stadt-hoehen": {
-    "de": {"rand": "Rand", "mitte": "Mitte", "kopf1": "Schnitt durch die Stadt: Obergrenze der Haushöhe je Block,", "kopf2": "jedes Haus zufällig zwischen 10 m und dieser Grenze"},
-    "en": {"rand": "edge", "mitte": "centre", "kopf1": "cut through the city: upper limit of building height per block,", "kopf2": "each building random between 10 m and this limit"}
+    "de": {"rand": "Rand", "mitte": "Mitte", "kopf1": "Schnitt durch die Stadt: Obergrenze der Haushöhe je Block,", "kopf2": "jedes Haus zufällig zwischen 8–12 m und dieser Grenze"},
+    "en": {"rand": "edge", "mitte": "centre", "kopf1": "cut through the city: upper limit of building height per block,", "kopf2": "each building random between 8–12 m and this limit"}
   },
   "perspektive": {
     "de": {"baum1": "1 m hoch, 5 m weit", "baum2": "2 m hoch, 10 m weit", "auge": "Auge", "strahl": "ein Sehstrahl", "fuss": "Der Sehstrahl streift beide Spitzen: Im Bild sind sie gleich groß."},

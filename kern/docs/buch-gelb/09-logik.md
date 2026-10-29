@@ -130,9 +130,9 @@ mit dem Lineal: Sie ist genau 5 Kästchen lang.
 - Actor nach Bool („gibt es ihn?“),
 - Zahl nach Vector (die Zahl kommt in alle drei Stellen).
 
-Die Umwandlungen sind genau festgelegt: Der Text „0“ oder „false“ wird zu falsch, ein Vector als Zahl
-ist seine Länge (beim Pfeil oben also 5), eine Kommazahl als Int wird abgeschnitten (3,9 wird 3,
-nicht gerundet).
+Wo Kern intern umwandelt, ist das genau festgelegt: Der Text „0“ oder „false“ wird zu falsch, ein
+Vector als Zahl ist seine Länge (beim Pfeil oben also 5), eine Kommazahl als Int wird abgeschnitten
+(3,9 wird 3, nicht gerundet). Als Draht sind Text → Bool und Vector → Zahl aber nicht erlaubt.
 
 ## 9.2 Knoten und die Bibliothek
 
@@ -185,8 +185,9 @@ Schleife zurück, um zu prüfen, ob noch eine Runde fällig ist.
 > Aufgabe ab. Fällt dir unterwegs ein „danach noch Mathe“, legst du den Zettel oben drauf. Bist du
 > fertig, nimmst du den obersten.
 
-**Schutz vor Endlosschleifen:** Kern zählt mit, wie viele Knoten ein Graph in einem Schritt ausführt.
-Sind es mehr als **200 000**, schaltet Kern diesen Graphen ab und meldet „infinite loop? The graph is
+**Schutz vor Endlosschleifen:** Kern zählt mit, wie viele Knoten alle Graphen zusammen in einem
+Schritt ausführen. Sind es mehr als **200 000**, schaltet Kern den Graphen ab, der gerade läuft, und
+meldet „infinite loop? The graph is
 stopped.“ Ebenso stoppt eine Kette, wenn Events immer wieder neue Events auslösen: Event A ruft
 Event B, B ruft wieder A, A wieder B, und so weiter. Wird diese Kette zu lang, bricht Kern sie ab.
 
@@ -194,8 +195,9 @@ Event B, B ruft wieder A, A wieder B, und so weiter. Wird diese Kette zu lang, b
 > ganze Spiel ein. In Kern stoppt nur dein Graph – mit Meldung. Lies sie im **Ausgabeprotokoll**
 > (Output Log)!
 
-**State Machines im Takt:** Beim Start betritt jede Maschine ihren Anfangszustand. Pro Schritt darf
-jede Maschine **höchstens einen** Übergang machen. Warum? Gäbe es „sofort“-Übergänge von Gelb nach
+**State Machines im Takt:** Beim Start betritt jede Maschine ihren Anfangszustand. Pro Schritt macht
+jede Maschine von selbst **höchstens einen** Übergang (nach Zeit, Bedingung oder „sofort“);
+Übergänge durch ein Event kommen dazu. Warum die Grenze? Gäbe es „sofort“-Übergänge von Gelb nach
 Rot und von Rot zurück nach Gelb, könnte die Maschine sonst in einem einzigen Schritt endlos
 hin- und herspringen. Hätte die Ampel einen Übergang „sofort“ von Gelb nach Rot, stünde sie also
 trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in einen Zustand.
@@ -278,12 +280,12 @@ Schnabel bewegen, die Autonomie an- und ausschalten. Man kann ihren Abstandssens
 weit das Nächste vor ihr ist), ihre Kamera und ihren Zustand abfragen. Einzelheiten:
 [Kapitel 13](13-micro-duck.md).
 
-> **Mission:** Öffne auf https://kernengine.de/ ein Level mit der Vorlage **Grundformen** (Basic) und
+> **Mission:** Öffne auf https://kernengine.de/ ein Level mit der Vorlage **Basis** (Basic) und
 > klicke in der Werkzeugleiste auf **Logik** (Logic). Der Logik-Editor selbst bleibt auch auf Deutsch
 > englisch. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
 > message“, Enter, und trage einen Text ein. Zurück mit **Viewport**, platziere eine
-> **Rollende Kugel** (Rolling Ball) – sie ist dein Spieler: Ohne steuerbaren Actor startet das Spiel
-> gar nicht – und drück **Spielen** (Play). Dein Text erscheint im HUD!
+> **Rollende Kugel** (Rolling Ball) – sie ist dein Spieler: Ohne steuerbaren Actor simuliert Studio
+> nur, und dann gibt es kein HUD – und drück **Spielen** (Play). Dein Text erscheint im HUD!
 
 ## 9.7 Logik in der GameWorld
 
