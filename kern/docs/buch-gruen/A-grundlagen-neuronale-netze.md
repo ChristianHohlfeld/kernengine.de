@@ -234,7 +234,7 @@ wie ändert sich der Verlust?“ Jeden Regler einzeln anzustupsen und alles neu 
 200 000-mal die ganze Rechnung. **Backpropagation** (Rückwärtsverteilung) schafft es in einem
 einzigen Durchgang von hinten nach vorn.
 
-> **Stell dir vor …** ein Staffellauf ist verloren. Der Trainer fragt die Schlussläuferin: „Wie viel
+> **Stell dir vor …** ein Staffellauf ist verloren. Die Teamchefin fragt die Schlussläuferin: „Wie viel
 > hast du verloren?“ Sie antwortet und gibt die Frage an die Läuferin vor ihr weiter, anteilig nach
 > deren Beitrag. So wandert die Schuld vom Ziel bis zum Start, und jede weiß am Ende, was sie
 > verbessern muss.
@@ -243,52 +243,53 @@ So funktioniert es: Am Ausgang ist klar, wie falsch die Antwort war. Diesen Fehl
 für Schicht nach vorn weiter. Jede Schicht gibt ihn anteilig weiter – viel an die Regler, die viel
 zur Antwort beigetragen haben, wenig an die anderen. Wie viel jemand beigetragen hat, steht auf den
 Zetteln, die die Vorwärtsrechnung liegen gelassen hat (A.2). Die Rechenregel dahinter heißt
-**Kettenregel**; wer mag, rechnet sie unten an einem Mini-Netz nach.
+**Kettenregel**; wer mag, rechnet sie im Kasten unten an einem Mini-Netz nach.
 
 Das Ergebnis eines kleinen Beispiels in Worten: Ein Mini-Netz liegt anfangs mit einem Verlust von
 **1,656** ziemlich daneben. Nach einem einzigen Rückwärtsdurchgang und einem Schritt bergab ist der
 Verlust fast **0**. Bei echten Netzen mit vielen Beispielen, die sich teilweise widersprechen, geht
 es dagegen in winzigen Schritten voran.
 
-### Für Nachrechner: das Mini-Netz von Hand
-
-Ein Eingang x = 1, ein Neuron mit ELU, ein Ausgang ohne Verbiegen, Ziel 1. Die Regler: erstes
-Gewicht 0,5, erste Grundeinstellung −1, zweites Gewicht 2, zweite Grundeinstellung 0,5.
-
-**Vorwärts:** Summe 0,5 · 1 − 1 = −0,5. ELU aus der Tabelle: **−0,393**. Ausgang 2 · (−0,393) + 0,5
-≈ −0,287. Verlust (−0,287 − 1)² ≈ **1,656**.
-
-**Rückwärts.** Eine Regel trägt alles: Die Schuld eines Gewichts ist der Fehler, der bei ihm
-ankommt, mal das, was durch dieses Gewicht hindurchging.
-
-| Was | Rechnung | warum so | Wert |
-|---|---|---|---|
-| Fehler am Ausgang | 2 · (−0,287 − 1) | Steigung des Quadrats (A.4) | −2,574 |
-| Schuld 2. Gewicht | −2,574 · (−0,393) | × sein Eingang | 1,013 |
-| Schuld 2. Grundeinst. | −2,574 · 1 | sie zählt immer voll | −2,574 |
-| ans Neuron weiter | −2,574 · 2 | × das 2. Gewicht | −5,148 |
-| Steigung der ELU | −0,393 + 1 | siehe unten | 0,607 |
-| Fehler im Neuron | −5,148 · 0,607 | × Steigung der ELU | −3,122 |
-| Schuld 1. Gewicht | −3,122 · 1 | × sein Eingang x = 1 | −3,122 |
-| Schuld 1. Grundeinst. | −3,122 · 1 | sie zählt immer voll | −3,122 |
-
-Zwei Kniffe stecken darin. Erstens: Der Fehler am Ausgang ist die Steigung des Quadrats – dieselbe
-Regel „zweimal Abstand“ wie im Tal aus A.4. Zweitens: Im gestauchten Bereich ist die Steigung der
-ELU genau „Ausgabe plus 1“ – man kann sie also aus dem gemerkten Zwischenergebnis ablesen. Und weil
-der Eingang x = 1 ist, haben erstes Gewicht und erste Grundeinstellung dieselbe Schuld.
-
-**Ein Schritt bergab** mit Lernrate 0,1, für jeden Regler: neuer Wert = alter Wert − 0,1 × Schuld.
-
-| Regler | alt | − 0,1 × Schuld | neu |
-|---|---|---|---|
-| 2. Gewicht | 2 | − 0,101 | 1,899 |
-| 2. Grundeinstellung | 0,5 | + 0,257 | 0,757 |
-| 1. Gewicht | 0,5 | + 0,312 | 0,812 |
-| 1. Grundeinstellung | −1 | + 0,312 | −0,688 |
-
-**Noch einmal vorwärts:** Die Summe ist jetzt 0,812 − 0,688 = 0,124 (positiv, ELU lässt sie
-stehen), der Ausgang 1,899 · 0,124 + 0,757 ≈ 0,99, der Verlust fast **0** (ohne Runden gerechnet
-etwa 0,00004).
+> **Für Neugierige: das Mini-Netz zum Nachrechnen.** Diesen Kasten kannst du ohne Verlust
+> überspringen; er zeigt nur für Zahlenfreunde, woher die beiden Zahlen oben kommen.
+>
+> Ein Eingang x = 1, ein Neuron mit ELU, ein Ausgang ohne Verbiegen, Ziel 1. Die Regler: erstes
+> Gewicht 0,5, erste Grundeinstellung −1, zweites Gewicht 2, zweite Grundeinstellung 0,5.
+>
+> **Vorwärts:** Summe 0,5 · 1 − 1 = −0,5. ELU aus der Tabelle: **−0,393**. Ausgang
+> 2 · (−0,393) + 0,5 ≈ −0,287. Verlust (−0,287 − 1)² ≈ **1,656**.
+>
+> **Rückwärts.** Eine Regel trägt alles: Die Schuld eines Gewichts ist der Fehler, der bei ihm
+> ankommt, mal das, was durch dieses Gewicht hindurchging.
+>
+> | Was | Rechnung | warum so | Wert |
+> |---|---|---|---|
+> | Fehler am Ausgang | 2 · (−0,287 − 1) | Steigung des Quadrats (A.4) | −2,574 |
+> | Schuld 2. Gewicht | −2,574 · (−0,393) | × sein Eingang | 1,013 |
+> | Schuld 2. Grundeinst. | −2,574 · 1 | sie zählt immer voll | −2,574 |
+> | ans Neuron weiter | −2,574 · 2 | × das 2. Gewicht | −5,148 |
+> | Steigung der ELU | −0,393 + 1 | siehe unten | 0,607 |
+> | Fehler im Neuron | −5,148 · 0,607 | × Steigung der ELU | −3,122 |
+> | Schuld 1. Gewicht | −3,122 · 1 | × sein Eingang x = 1 | −3,122 |
+> | Schuld 1. Grundeinst. | −3,122 · 1 | sie zählt immer voll | −3,122 |
+>
+> Zwei Kniffe stecken darin. Erstens: Der Fehler am Ausgang ist die Steigung des Quadrats – dieselbe
+> Regel „zweimal Abstand“ wie im Tal aus A.4. Zweitens: Im gestauchten Bereich ist die Steigung der
+> ELU genau „Ausgabe plus 1“. Und weil der Eingang x = 1 ist, haben erstes Gewicht und erste
+> Grundeinstellung dieselbe Schuld.
+>
+> **Ein Schritt bergab** mit Lernrate 0,1: neuer Wert = alter Wert − 0,1 × Schuld.
+>
+> | Regler | alt | − 0,1 × Schuld | neu |
+> |---|---|---|---|
+> | 2. Gewicht | 2 | − 0,101 | 1,899 |
+> | 2. Grundeinstellung | 0,5 | + 0,257 | 0,757 |
+> | 1. Gewicht | 0,5 | + 0,312 | 0,812 |
+> | 1. Grundeinstellung | −1 | + 0,312 | −0,688 |
+>
+> **Noch einmal vorwärts:** Die Summe ist jetzt 0,812 − 0,688 = 0,124 (positiv, ELU lässt sie
+> stehen), der Ausgang 1,899 · 0,124 + 0,757 ≈ 0,99, der Verlust fast **0** (ohne Runden gerechnet
+> etwa 0,00004).
 
 > **Für Neugierige:** Ob die Rückwärtsrechnung stimmt, prüft Kern genau auf die langsame Art aus dem
 > ersten Absatz: einen Regler ein winziges Stück hoch- und runterdrehen und schauen, wie sich der
@@ -305,17 +306,19 @@ Tritt. **Adam** ist ein klügeres Verfahren. Es merkt sich für jeden Regler zwe
 
 Beides sind **gleitende Durchschnitte**: Durchschnitte der letzten Schritte, bei denen neuere mehr
 zählen als ältere, so wie man beim Wetter eher auf die letzten Tage achtet als auf den letzten Monat.
-Adam teilt dann die übliche Richtung durch die übliche Größe. Dadurch macht jeder Regler ähnlich
-große Schritte, egal ob seine Steigungen winzig oder riesig sind.
 
-**Beispiel:** Im allerersten Schritt sind Richtung und Größe genau gleich groß. Der Schritt ist also
-fast genau so lang wie die Lernrate, **ob die Steigung 0,000001 oder 1000 ist**.
+> **Stell dir vor …** ein erfahrener Wanderer im Nebel. Er schaut, wohin seine letzten Schritte
+> gingen, und macht immer ungefähr gleich lange, ruhige Schritte – egal, ob der Hang steil oder flach
+> ist. Ein einzelner Stein unter dem Schuh bringt ihn nicht vom Weg.
 
-> **Stell dir vor …** ein erfahrener Wanderer im Nebel. Er macht immer gleich große, ruhige Schritte
-> und achtet vor allem auf die Richtung. Ein einzelner Stein unter dem Schuh bringt ihn nicht vom Weg.
+So macht es Adam: Die übliche Richtung sagt, **wohin** der Schritt geht; die übliche Größe sorgt
+dafür, dass er **ungefähr so lang wie die Lernrate** wird. Ein Regler mit winzigen Steigungen kommt
+so genauso voran wie einer mit riesigen.
 
-Am Anfang ist Adams Gedächtnis noch leer; ohne Ausgleich wären die ersten Schritte viel zu klein.
-Adam rechnet das heraus – darum ist schon der erste Schritt so lang wie die Lernrate.
+> **Für Neugierige:** Rechnerisch teilt Adam die übliche Richtung durch die übliche Größe. Im
+> allerersten Schritt sind beide genau gleich groß, der Schritt ist also so lang wie die Lernrate,
+> ob die Steigung 0,000001 oder 1000 ist. Weil Adams Gedächtnis am Anfang noch leer ist, gleicht er
+> die ersten Schritte außerdem aus, sonst wären sie viel zu klein.
 
 Jeder, der lernt, bekommt sein **eigenes** Adam-Gedächtnis: der Actor, der Kritiker (A.11) und das
 Nachahmen (A.9) je eines. Wie drei Schüler mit je einem eigenen Notizbuch – was einer sich notiert,
@@ -392,6 +395,7 @@ lang ist: Bei doppelt so langer Fahrt können es bis zu viermal so viele Fehler 
 **es** an dieser Stelle getan hätte.
 
 ```mermaid
+%% Bildunterschrift: DAgger: Das Netz fährt, das Vorbild kommentiert, alle Beispiele werden gesammelt
 flowchart TD
   A["Runde 0: Vorbild fährt"] --> F["Netz lernt aus allen Daten"]
   F --> R["Nächste Runde: Netz fährt"]
@@ -423,6 +427,7 @@ nur, **ob** es gut war.
 ### Der Kreislauf
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf beim Lernen durch Belohnung
 flowchart LR
   Agent["Ente mit ihrem Netz"] -->|"Aktion"| Welt["Simulation"]
   Welt -->|"Beobachtung"| Agent
@@ -431,7 +436,8 @@ flowchart LR
 
 Der Handelnde – Fachwort **Agent**, hier die Ente mit ihrem Netz – sieht eine **Beobachtung**, wählt
 eine **Aktion**, und die Welt antwortet mit einer neuen Lage und einer **Belohnung**. Bei der Ente
-dreht sich dieser Kreis einmal pro Takt, also 50-mal pro Sekunde, bis die Episode durch einen Sturz
+dreht sich dieser Kreis einmal pro Takt, also 50-mal pro Sekunde (in der Zeit der Ente, siehe
+Kapitel 13.5), bis die Episode durch einen Sturz
 oder durch Zeitablauf endet.
 
 > **Für Neugierige:** Fachleute nennen diesen Kreislauf einen Markov-Entscheidungsprozess. „Markov“
@@ -517,7 +523,7 @@ Abweichungen sind häufig, große selten. Wie breit die Glocke ist, sagt eine ei
 **Streuung σ** (gesprochen „Sigma“) – dieselbe Idee wie die Streuung in A.7: wie weit die Werte
 üblicherweise von der Mitte abweichen.
 
-![Zwei Glockenkurven mit gleicher Fläche: breit bei großem σ, schmal bei kleinem σ; getönt ist der Bereich ±σ](../abbildungen/normalverteilung.svg)
+![Zwei Glockenkurven: breit bei großem σ (viel Ausprobieren), schmal und hoch bei kleinem σ (wenig Ausprobieren); getönt ist der Bereich ±σ](../abbildungen/normalverteilung.svg)
 
 | Bereich um „ungefähr so“ | so viele Versuche landen darin |
 |---|---|
@@ -582,8 +588,9 @@ führt aber in eine Lage, von der aus alles besser läuft.
 ![Ein Schritt, der für sich schlechter als erwartet war, aber in eine gute Lage führt, ist im Rückblick gut](../abbildungen/gae-rueckblick.svg)
 
 Genau das macht **GAE** (Fachwort für „gut geschätzter Vorteil“). Man geht **rückwärts** durch die
-Zeit: Jeder Schritt bekommt zuerst seine eigene Überraschung – „Wie viel besser oder schlechter als
-erwartet war es gleich danach?“ – und dazu einen Teil dessen, was danach noch kam. Je weiter weg die
+Zeit: Jeder Schritt bekommt zuerst seine eigene **Überraschung**, also wie viel besser oder schlechter
+es gleich danach lief, als der Kritiker geschätzt hatte. Dazu kommt ein Teil der Überraschungen der
+Schritte, die danach noch kamen. Je weiter weg die
 Folgen, desto weniger zählen sie.
 
 Warum nicht einfach alle echten Punkte bis zum Ende zusammenzählen? Weil die vom Zufall vieler
@@ -613,20 +620,18 @@ eine bestimmte Aktion als das alte? 1 heißt „gleich oft“, 1,2 heißt „20 
 > **Stell dir vor …** ein Hund an der Leine. Er darf schnuppern, wohin er will, aber nur so weit,
 > wie die Leine reicht. Bei der nächsten Runde wird die Leine wieder vom neuen Standort aus gemessen.
 
-![Die Leine von PPO: Eine gute Aktion wird bis zum Verhältnis 1,2 verstärkt, eine schlechte bis 0,8 abgeschwächt, darüber hinaus nicht mehr](../abbildungen/ppo-clip.svg)
+![Die Leine von PPO: Waagerecht steht, wie viel öfter das neue Netz eine Aktion wählt; eine gute Aktion wird bis 1,2 verstärkt, eine schlechte bis 0,8 abgeschwächt, darüber hinaus nicht mehr](../abbildungen/ppo-clip.svg)
 
 - Eine **gute** Aktion (positiver Vorteil) darf pro Runde höchstens 20 Prozent häufiger werden.
   Darüber hinaus wird nicht mehr weiter verstärkt.
 - Eine **schlechte** Aktion darf höchstens 20 Prozent seltener werden. Darüber hinaus wird nicht mehr
   weiter abgeschwächt.
 
-Die Leine bremst nur, wenn das Netz schon in die gewünschte Richtung gelaufen ist. Läuft es in die
-falsche Richtung – wählt es eine schlechte Aktion sogar öfter als vorher –, zieht die Leine nie, und
-das wird immer zurückkorrigiert.
-
-> **Wusstest du?** PPO ist absichtlich vorsichtig, aber nur in eine Richtung. Verbesserungen werden
-> gedeckelt, die Korrektur von Fehlern nie. Wählt das neue Netz eine **schlechte** Aktion öfter als
-> das alte (Vorteil negativ, Verhältnis 1,3), wird das immer korrigiert.
+Ein Zahlenbeispiel in Worten: Eine **gute** Aktion wird statt 1,0-mal schon 1,2-mal so oft gewählt.
+Bis dahin wird sie belohnt, darüber hinaus nicht mehr: Das Ziel für diese Runde ist erreicht. Eine
+**schlechte** Aktion dagegen, die das Netz aus Versehen sogar öfter wählt als vorher (1,3-mal so
+oft), wird **immer** zurückgeschoben. Die Leine bremst also nur das Übertreiben in die richtige
+Richtung, nie das Zurückholen aus der falschen.
 
 > **Für Neugierige:** Zusätzlich passt der Lehrer die Lernrate selbst an: Ändert sich das Verhalten
 > pro Runde zu stark, wird sie kleiner, bleibt es sehr ruhig, wird sie größer. Und auch der Kritiker
@@ -635,6 +640,7 @@ das wird immer zurückkorrigiert.
 ### Eine Trainingsrunde im Ganzen
 
 ```mermaid
+%% Bildunterschrift: Eine Trainingsrunde von PPO im Ganzen
 flowchart TD
   S["Alle Enten üben ein Stück"] --> K["Erfahrung ordnen"]
   K --> G["Für jeden Schritt: besser oder schlechter als erwartet?"]
@@ -643,9 +649,10 @@ flowchart TD
   AD --> Ende["Neues Netz: nächste Runde"]
 ```
 
-Eine solche Runde heißt **Iteration**. Üben und Lernen sind getrennt: Die **Sammler** brauchen nur das
-aktuelle Netz und liefern ihre Erfahrung ab, der **Lerner** verbessert daraus das Netz. Deshalb
-können die Sammler auf mehreren Rechenkernen gleichzeitig arbeiten. Die genauen Einstellungen stehen
+Eine solche Runde heißt **Iteration**. Üben und Lernen sind getrennt: Die **Helfer** (Fachwort
+Sammler) brauchen nur das aktuelle Netz und liefern ihre Erfahrung ab, der **Auswerter** (Fachwort
+Lerner) verbessert daraus das Netz, genau wie in der Sportschule aus Kapitel 14.2. Deshalb können
+die Helfer auf mehreren Rechenkernen gleichzeitig arbeiten. Die genauen Einstellungen stehen
 im blauen Buch, Anhang A.
 
 ### Gleiches Ergebnis auf jedem Rechner
@@ -754,7 +761,7 @@ Die Kette für die Ente ist kurz, dieselbe wie in A.1:
 
 Kern schreibt seine Netze genau im selben Format wie Pollen Robotics. Exportiert wird dabei nur das
 „ungefähr so“ des Netzes, ohne Würfeln: **Auf dem Roboter wird nicht mehr ausprobiert.** Auch der
-Kritiker bleibt zu Hause; er war nur Trainer.
+Kritiker bleibt zu Hause; er hat nur beim Üben beraten.
 
 > **Für Neugierige:** Kern braucht für den Export keine fremde Bibliothek, sondern hat einen eigenen,
 > winzigen Schreiber. Ein automatischer Test liest so eine Datei wieder ein und vergleicht.
@@ -763,6 +770,7 @@ Kritiker bleibt zu Hause; er war nur Trainer.
 ## A.15 Wie alles zusammenkommt
 
 ```mermaid
+%% Bildunterschrift: Vom Vorbild bis zum fertigen Netz: alles außer dem Netz ist Gerüst
 flowchart TD
   V["1. Vorbild suchen"] --> W["Start mit velstand"]
   W --> N["2. Nachahmen: Schüler fährt, Vorbild kommentiert"]
@@ -780,7 +788,7 @@ paar Schichten, die malnehmen, zusammenzählen und verbiegen. Und das reicht, da
 > **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level über
 > **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), starte **Spielen**
 > (Play), übernimm die Ente mit **F8** und drück die **7**. Jeder Servo bekommt in
-> diesem Moment 50-mal pro Sekunde eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall
+> diesem Moment 50-mal pro Entensekunde (13.5) eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall
 > waren.
 
 > **Probier's aus!** Öffne die Lehrer-Seite **kernengine.de/lehrer/** und wähle als Bewegung

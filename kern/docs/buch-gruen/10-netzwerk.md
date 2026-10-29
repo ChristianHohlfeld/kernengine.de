@@ -40,9 +40,12 @@ verstehen und einzeln testen.
 > fehlender auffällt (Zuverlässigkeit), packst die Teile platzsparend (Serialisierung), und ein Bote
 > trägt alles (Transport).
 
-Beim Senden geht ein Paket im Bild von oben (Spiel) nach unten (Bote), beim Empfangen zurück.
+Beim Senden geht ein Paket im Bild von oben (Spiel) nach unten (Bote), beim Empfangen zurück. Die
+folgenden Abschnitte gehen den Stapel von unten nach oben durch: zuerst das Packen, dann Nummern,
+Kanäle und Anmeldung; der Bote ganz unten bekommt zum Schluss einen eigenen Abschnitt (10.6).
 
 ```mermaid
+%% Bildunterschrift: Die Stufen beim Verschicken, vom Spiel bis zum Boten
 flowchart TB
   S[Spiel: Lagebilder und Eingaben] --> V[Verbindung: Anmeldung]
   V --> K[Kanäle: Einschreiben / Postkarte]
@@ -66,8 +69,7 @@ passen, und am anderen Ende zurück. Je weniger Bits, desto mehr passt in ein Pa
 Außerdem **rundet** Kern, wo es niemand merkt: Statt „3,14159265 Meter“ reicht „3,142 Meter“, also
 auf den Millimeter genau. Und es **lässt weg**, was der Empfänger selbst ausrechnen kann. Das ist wie
 beim Wechselgeld: Wer weiß, dass drei Scheine zusammen 30 € ergeben, muss nur zwei davon genannt
-bekommen, den dritten rechnet er selbst aus. Eine Drehung etwa besteht in Kern aus vier Zahlen, die
-nach einer festen Regel zusammenpassen; drei genügen.
+bekommen, den dritten rechnet er selbst aus.
 
 Wichtig ist, **wie** Kern das Format festlegt: Für jede Nachrichtenart gibt es nur **eine einzige**
 Beschreibung, wie ein Formular mit festen Feldern. Der Absender füllt es aus, der Empfänger liest mit
@@ -188,11 +190,10 @@ auftritt, immer wieder genau gleich nachstellen, bis er behoben ist.
 ## 10.7 Ein Spiel, viele Spieler
 
 **Der Server ist der Chef.** Nur er rechnet die Physik, die Spielregeln, das Einsammeln und die Zonen.
-Jeder neue Spieler bekommt eine eigene Spielfigur, eine Kopie der Spielerfigur aus dem Level (im
-Programm heißt sie **Pawn**, Spielstein). 30-mal pro Sekunde schickt der Server jedem Gast ein
+Jeder neue Spieler bekommt eine eigene Spielfigur, eine Kopie der Spielerfigur aus dem Level. 30-mal pro Sekunde schickt der Server jedem Gast ein
 **Lagebild**: das HUD und wo alle beweglichen Dinge gerade stehen.
 
-**Der Gast spielt eine Kopie, eine Replika.** Er lädt dasselbe Level, rechnet aber **keine eigene
+**Der Gast spielt eine Kopie, eine Netz-Kopie (Replica).** Er lädt dasselbe Level, rechnet aber **keine eigene
 Physik**. Seine Dinge stehen einfach dort, wo der Server sie meldet. Selbst schickt er nur, was sein
 Spieler gerade drückt und wohin er schaut. Was die Logik-Graphen des Servers verändern
 ([Kapitel 9](09-logik.md)), etwa eine Tür, die aufgeht, übernimmt er.
@@ -249,14 +250,16 @@ zeigen. Jedes Lagebild trägt deshalb die Uhrzeit des Servers.
 
 So macht es auch der Gast: Aus den Uhrzeiten vieler Lagebilder schätzt er, wie weit die Uhr des Servers
 seiner eigenen voraus ist, und korrigiert diese Schätzung behutsam. Dabei zählen nicht alle Briefe
-gleich: Ein verspätetes Lagebild zieht die Schätzung rasch nach, ein besonders schnelles nur ein
-kleines Stück. So zeigt der Gast die Welt im Zweifel etwas zu weit in der Vergangenheit statt zu weit
-vorn. Dann hat er fast immer ein Lagebild nach dem Zeitpunkt, den er zeigt, und muss nur selten
-vorausrechnen.
+gleich, und der Grund ist einfach: **Lieber eine Spur zu spät zeigen als zu früh.** Für einen
+Zeitpunkt, der zu weit vorn liegt, hat der Gast noch gar kein Lagebild und müsste raten. Darum
+glaubt er einem verspäteten Lagebild schnell und rückt seine Schätzung gleich ein gutes Stück nach
+hinten; einem besonders schnellen Lagebild glaubt er nur ein kleines Stück. So hat er fast immer ein
+Lagebild nach dem Zeitpunkt, den er zeigt, und muss nur selten vorausrechnen.
 
 Außerdem brauchen beide Seiten **genau dasselbe Level**. Das Willkommen des Servers trägt deshalb eine
 Prüfsumme über die ganze Level-Datei (nur wo die Editor-Kamera gerade steht, zählt nicht). Passt sie
-nicht zum Level des Gastes, lehnt der ab: „the server plays a different level“.
+nicht zum Level des Gastes, lehnt der ab und meldet „the server plays a different level“ (der Server
+spielt ein anderes Level).
 
 > **Achtung, Falle!** Du hast beim Host noch schnell einen Würfel verschoben, und dein Freund hat die
 > alte Fassung offen? Dann klappt der Beitritt nicht. Speichere und gib allen genau diese Datei.
@@ -275,14 +278,16 @@ stehen im blauen Buch, Kapitel 10.
 
 Im Studio testest du mit mehreren Spielern, ganz ohne zweiten Rechner:
 **Spielen › Anzahl der Spieler** (Play › Number of Players), 1 bis 4. Die Welt wird ein **Listen-Server**, ein Server, der selbst mitspielt. Jeder weitere Spieler ist
-ein echter Gast mit eigener Welt und eigenem Viewport, verbunden über den Probe-Boten aus 10.6.
+ein echter Gast mit eigener Welt und eigenem **Viewport** (einem Fenster in die 3D-Welt, mehr dazu in
+[Kapitel 11](11-studio.md)), verbunden über den Probe-Boten aus 10.6.
 
 - Steht Studio auf einem einzigen Viewport (die Voreinstellung), schaltet es auf **vier Viewports**
   um: 1 ist der Server, 2 der erste Gast und so weiter.
 - Nur der Viewport, in den du zuletzt geklickt hast, bekommt deine Eingaben; die anderen Spieler
   stehen still.
 - **Spielen › Netzwerk-Emulation** (Play › Network Emulation) schaltet den Störsender ein, in Stufen
-  von **Perfekt** (Perfect), der perfekten Leitung, über **LAN (5 ms)**, das Heimnetz, und
+  von **Perfekt** (Perfect), der perfekten Leitung, über **LAN (5 ms)**, das Heimnetz (LAN heißt
+  „lokales Netz“, ms steht für Millisekunde, eine Tausendstelsekunde), und
   **Mittel (50 ms, 1 % Verlust)** (Average (50 ms, 1% loss)) bis
   **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)) und
   **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)).
@@ -320,7 +325,9 @@ nach einer Weile raus (10.5).
 ## 10.9 Exportierte Spiele im Netz
 
 Auch ein mit **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) exportiertes Spiel ([Kapitel 11](11-studio.md)) kann online
-spielen. Was es tun soll, schreibst du **hinten an die Adresse** in der Adresszeile des Browsers:
+spielen. Was es tun soll, schreibst du **hinten an die Adresse** in der Adresszeile des Browsers.
+Ein **Fragezeichen** leitet einen solchen Zusatzwunsch an die Seite ein, ein **&-Zeichen** hängt einen
+weiteren an, wie „Bitte … und außerdem …“ auf einem Bestellzettel:
 
 | Anhang | Wirkung |
 |---|---|
@@ -332,7 +339,7 @@ Ein Beispiel: Heißt deine Datei `MeinSpiel.html`, öffnest du sie im Browser un
 Adresszeile hinten `?host=party`. In einem zweiten Tab desselben Browsers öffnest du
 `MeinSpiel.html?join=party` und spielst gegen dich selbst. Für einen Freund an einem anderen Rechner
 hängt ihr beide noch `&relay=` mit der Adresse eines Relays an (10.11). Ohne Raumnamen gilt „kern“. Klappt es nicht, meldet das Spiel „Online
-play failed“ und du spielst allein weiter.
+play failed“ (Online-Spiel fehlgeschlagen) und du spielst allein weiter.
 
 ---
 
@@ -382,7 +389,7 @@ Dialog bzw. hinter `&relay=` ein.
 
 ## 10.12 Was wo läuft
 
-| | Server (Host) | Gast (Replika) |
+| | Server (Host) | Gast (Netz-Kopie) |
 |---|---|---|
 | Physik, Regeln, Einsammeln | rechnet | folgt den Lagebildern |
 | Logik-Graphen ([Kapitel 9](09-logik.md)) | laufen | bekommt die Änderungen |

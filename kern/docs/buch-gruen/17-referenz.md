@@ -10,6 +10,12 @@ erklärt), das **blaue** (vollständig und technisch, für Programmierer, mit je
 Option) und das **gelbe** (für Jugendliche). Wenn hier steht „im blauen Buch, Kapitel 17“, ist das
 gleichnamige Kapitel der blauen Fassung gemeint.
 
+> **Begriffe vorab:**
+> - **Glossar** – ein kleines Wörterbuch der Fachwörter, hier in 17.5.
+> - **Tastenkürzel** – eine Taste oder Tastenkombination, die einen Befehl auslöst, ohne Maus.
+> - **Dateiart** (Format) – wie der Inhalt einer Datei aufgebaut ist; man erkennt sie meist an der
+>   Endung hinter dem Punkt, etwa `.klevel`.
+
 > **Stell dir vor …** dieses Kapitel ist der Zettel, der innen an der Werkstatttür hängt: Welcher
 > Schalter macht was, und was heißt eigentlich „Drehmoment“? Die Bedienungsanleitung jeder Maschine
 > steht im Regal (im blauen Buch). Für den Alltag reicht meistens der Zettel.
@@ -120,7 +126,7 @@ sonst holt sie die Auswahl ins Bild. Die Tasten des Logik-Editors stehen in [Kap
 | Rolle (halten: weiter) | 5 | X | ROLLEN (ROLL) |
 | Schnabel auf / zu | 6 | – | SCHNABEL (BEAK) |
 | Sprung | 7 | – | HÜPFEN (HOP) |
-| Quaken / „Wheee“ | Leertaste / V | rechter / linker Trigger | QUAK / HUIII (QUACK / WHEEE) |
+| Quaken / „Wheee“ | Leertaste / V | hintere Schultertaste rechts / links (RT / LT) | QUAK / HUIII (QUACK / WHEEE) |
 
 Die Ente gibt es auch als Variante mit Rollschuhen, **Micro Duck (Rollschuhe)** (Micro Duck (Rollers)); sie fährt dann, statt
 zu gehen ([Kapitel 13](13-micro-duck.md)).
@@ -136,7 +142,8 @@ ist.
 > **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), drück **Spielen**
 > (Play), übernimm die Ente
 > mit **F8** und probier die Tasten von 2 bis 7 der Reihe nach. Warte nach jeder Taste, bis die
-> Bewegung fertig ist: Solange eine läuft, startet keine neue. Drück dann die **1**, damit sie sich
+> Bewegung fertig ist: Solange eine läuft, startet keine neue. Die **2** (Aufheben) zeigt ohne Socke
+> vor dem Schnabel nur ein Bücken, und bei der **5** rollt sie weiter, solange du die Taste hältst. Drück dann die **1**, damit sie sich
 > setzt, und gleich danach die **3**. Nichts passiert: Aus dem Sitzen startet keine Bewegung. Warte,
 > bis sie ganz sitzt, und drück wieder die **1** – erst wenn sie aufgestanden ist, kickt sie.
 
@@ -208,24 +215,38 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Aussteigen / übernehmen (F8)** (Eject / possess (F8)) | im Spiel die Spielfigur loslassen / wieder übernehmen |
 | **Autosave** | Studio sichert deine Arbeit regelmäßig von selbst |
 | **Beispiel-Levels** (Example Levels) | fertige Beispielwelten im Menü **Datei** (File), etwa Orb Run oder Micro Duck |
+| **Beobachterkamera** (Observer camera) | Spielen startet mit freier Kamera zum Zuschauen; F8 übernimmt die Figur ([Kap. 11](11-studio.md)) |
 | **Blueprint / Logik-Graph** | ein Programm aus Kästchen und Verbindungslinien, ohne Tippen ([Kap. 9](09-logik.md)) |
 | **Details** | das Panel mit allen Einstellungen des ausgewählten Dings |
-| **GameWorld** | der Teil von Kern, der ein Level zum Leben erweckt und laufen lässt ([Kap. 8](08-spiel-laufzeit.md)) |
+| **Editor** | ein Bearbeitungsprogramm; hier die Werkstatt Kern Studio |
+| **Einrasten** (Snapping) | Verschieben und Drehen in festen Schritten, wie Magnete auf Kästchenpapier ([Kap. 11](11-studio.md)) |
+| **Figur** (Character) | die Spielfigur, die läuft, rennt und springt ([Kap. 12](12-eigene-spiele.md)) |
 | **Gizmo** | Pfeile und Ringe am ausgewählten Ding zum Verschieben, Drehen, Skalieren |
+| **HTML-Datei** | das Dateiformat von Webseiten; ein exportiertes Spiel ist eine einzige HTML-Datei ([Kap. 11](11-studio.md)) |
 | **HUD** | Anzeigen über dem Spielbild: Punkte, Zeit, Tempo |
 | **Inhaltsablage** (Content Drawer) | die Schublade unten im Studio: Bauteile, Bilder, Klänge, Ausgabeprotokoll |
 | **Kern Studio, Studio** | der Editor im Browser, in dem du Level baust und spielst ([Kap. 11](11-studio.md)) |
+| **Kill-Z** | eine Höhe (Z zeigt nach oben); wer tiefer fällt, wird zurückgesetzt, verliert aber nicht ([Kap. 8](08-spiel-laufzeit.md), [11](11-studio.md)) |
 | **Knoten / Pin** | Kästchen im Logik-Graph / ihre Anschlüsse für Verbindungslinien |
 | **Kollider** (Collider) | die unsichtbare Form, mit der ein Ding in der Physik anstößt |
 | **Komponente** | ein Baustein eines Actors, etwa Licht, Klang oder Physik |
+| **Konsole** (Cmd) | das Feld in der Statusleiste, in das du Befehle tippst, etwa `gravity` |
+| **Kontextmenü** | das Menü beim Rechtsklick (am Touchscreen: lange halten) |
 | **Lesezeichen** (Bookmarks) | eine gemerkte Kameraposition (Strg+1 … 9) |
 | **Level** | eine Spielwelt, gespeichert als `.klevel` |
-| **Outliner** | die Liste aller Dinge im Level, als Baum geordnet |
+| **Logik-Editor** | das Fenster für Logik-Graphen; seine Beschriftungen bleiben englisch ([Kap. 9](09-logik.md)) |
+| **Mobilität** (Mobility) | Feld des Starrkörpers: statisch, kinematisch oder dynamisch ([Kap. 11](11-studio.md)) |
+| **Outliner** | die Liste aller Dinge im Level, rechts oben, als Baum geordnet |
 | **Pickup** | etwas zum Einsammeln, etwa ein leuchtender Orb |
 | **Spiel verpacken** (Package Game) | ein Level als eigenständige Webseite zum Weitergeben speichern |
 | **Spielansicht** (Game View) | Ansicht ohne Editor-Helfer, so wie im fertigen Spiel |
+| **Spielwelt** (GameWorld) | der Teil von Kern, der ein Level zum Leben erweckt und laufen lässt ([Kap. 8](08-spiel-laufzeit.md)) |
 | **Spielen / Simulieren** (Play / Simulate) | selbst spielen / Physik laufen lassen und zuschauen (17.1) |
-| **Trigger** | eine unsichtbare Zone, die etwas auslöst, wenn jemand hineingerät |
+| **Starrkörper** (Rigid Body) | die Physik-Komponente: der Körper fällt, rollt und stößt an, verbiegt sich aber nie ([Kap. 6](06-physik.md)) |
+| **Statusleiste** | die Leiste ganz unten: Meldungen, Konsole, Ton, Sprache |
+| **Toolbar** | die Werkzeugleiste unter den Menüs |
+| **Transformation** (Transform) | Ort, Drehung und Größe eines Actors |
+| **Trigger** | eine unsichtbare Zone, die etwas auslöst, wenn jemand hineingerät (am Gamepad sagt dieses Buch für die gleichnamigen Tasten „hintere Schultertaste“) |
 | **Viewport** | das große Fenster, durch das du in die 3D-Welt schaust |
 | **Welteinstellungen** (World Settings) | Einstellungen der ganzen Welt, etwa Schwerkraft und Schrittrate |
 
@@ -233,7 +254,9 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 
 | Begriff | Bedeutung |
 |---|---|
-| **Bit** | die kleinste Einheit im Computer: ein Kästchen, in dem 0 oder 1 steht |
+| **Autorität** | wer das letzte Wort hat; beim Mehrspieler rechnet nur der Server ([Kap. 9](09-logik.md)) |
+| **Bauskript** | ein kleines Programm, das das Übersetzen von Kern steuert ([Kap. 2](02-bauen-und-testen.md)) |
+| **Bit** | die kleinste Einheit im Computer: ein Kästchen, in dem 0 oder 1 steht; acht Bits sind ein Byte |
 | **Bloom** | das Glühen um sehr helle Stellen, wie Gegenlicht ([Kap. 4](04-grafik.md)) |
 | **Box3D** | die Physik-Engine, die Kern unverändert mitbringt ([Kap. 6](06-physik.md)) |
 | **C++** | die Programmiersprache, in der Kern geschrieben ist |
@@ -243,32 +266,62 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Fingerabdruck** | eine Prüfzahl pro Takt; stimmt sie überall, rechnet Kern überall gleich |
 | **Frame** | ein einzelnes Bild auf dem Bildschirm; viele pro Sekunde ergeben Bewegung |
 | **Gelenk** (Constraint) | eine Verbindung zwischen zwei Körpern, etwa ein Scharnier |
+| **Grafikkarte** | der Teil des Computers, der Bilder malt, sehr schnell und vieles gleichzeitig ([Kap. 4](04-grafik.md)) |
 | **GTAO** | ein Verfahren, das Ecken und Ritzen natürlich abdunkelt ([Kap. 4](04-grafik.md)) |
+| **Handshake** | die Anmeldung mit Rückfrage, bevor beim Mehrspieler Spieldaten fließen ([Kap. 10](10-netzwerk.md)) |
 | **Hash** | eine kurze Zahl aus beliebig vielen Daten; gleiche Daten, gleiche Zahl ([Kap. 3](03-grundlagen.md)) |
-| **Instanz** | eine Kopie derselben Form an anderer Stelle, wie hundert Bäume aus einer Vorlage |
+| **Instanz** (Instancing) | eine Kopie derselben Form an anderer Stelle, wie ein Stempelabdruck ([Kap. 5](05-szene-und-geometrie.md), [12](12-eigene-spiele.md)) |
 | **Interpolation** | Zwischenwerte mischen, etwa zwischen zwei Lagebildern ([Kap. 4](04-grafik.md), [10](10-netzwerk.md)) |
-| **Interpreter** | führt einen Logik-Graphen Kästchen für Kästchen aus, wie ein Dolmetscher |
+| **Interpreter** | der **Dolmetscher**: führt einen Logik-Graphen Kästchen für Kästchen aus; die anderen beiden Wege sind die **Übersetzung** (JIT) und der **C++-Export** ([Kap. 9](09-logik.md)) |
 | **JavaScript** | die Programmiersprache der Webseiten |
-| **JIT** | übersetzt einen Logik-Graphen beim Start in Befehle, die der Rechner direkt ausführt |
+| **Jitter** | Pakete kommen mal schneller, mal langsamer an ([Kap. 10](10-netzwerk.md)) |
+| **JIT** | die **Übersetzung**: macht aus einem Logik-Graphen beim Start Befehle, die der Rechner direkt ausführt ([Kap. 9](09-logik.md)) |
+| **Kanal** | eine Versandart beim Mehrspieler: Einschreiben (zuverlässig) oder Postkarte ([Kap. 10](10-netzwerk.md)) |
 | **Kontakt** | eine Stelle, an der sich zwei Körper berühren |
+| **Lag, Lag-Kompensation** | Verzögerung durch die Leitung / der Server dreht beim Treffer die Zeit kurz zurück ([Kap. 8](08-spiel-laufzeit.md), [10](10-netzwerk.md)) |
+| **Listen-Server** | ein Server, der selbst mitspielt ([Kap. 10](10-netzwerk.md)) |
+| **Lizenz** | die Spielregeln, was man mit einem Werk tun darf; Kern steht unter Apache 2.0 ([Kap. 12](12-eigene-spiele.md)) |
+| **Malauftrag** | ein Befehl an die Grafikkarte, etwas zu zeichnen ([Kap. 4](04-grafik.md)) |
+| **Maschinencode** | die Befehle, die ein Prozessor direkt versteht |
 | **Matrix** | eine Tabelle aus 4 mal 4 Zahlen, die Strecken, Drehen und Verschieben bündelt ([Kap. 3](03-grundlagen.md)) |
 | **Mesh** | eine 3D-Form, gebaut aus vielen kleinen Dreiecken |
+| **Modul** (`.wasm`) | die fertig übersetzte Engine als eine Datei, die der Browser ausführt ([Kap. 12](12-eigene-spiele.md)) |
+| **Normale** | die Richtung, in die eine Fläche „schaut“ ([Kap. 4](04-grafik.md), Anhang B) |
+| **Open Source** | der Programmtext ist offen und darf nach den Regeln der Lizenz genutzt werden |
+| **Paket** | ein kleines Bündel Daten, das als Ganzes übers Netz reist ([Kap. 10](10-netzwerk.md)) |
 | **Partikel** | viele winzige Teilchen für Funken, Staub oder Rauch |
 | **Physikschritt** | ein Bild im Daumenkino der Physik; die Welt rückt ein Stückchen weiter |
+| **Picking** | herausfinden, worauf man geklickt hat, mit einem unsichtbaren Strahl ([Kap. 5](05-szene-und-geometrie.md)) |
+| **Pixel** | ein einzelner Bildpunkt |
+| **Prüfsumme** | eine kleine Zahl aus dem Inhalt; stimmt sie nicht, ist etwas beschädigt oder fremd ([Kap. 10](10-netzwerk.md)) |
 | **Rechenkern** | eines der Rechenwerke im Prozessor; mehrere können gleichzeitig rechnen |
-| **Schrittrate** | wie viele Physikschritte pro Sekunde gerechnet werden; für die Ente 100 |
-| **Server / Client** | beim Mehrspieler: der Rechner, der bestimmt / die Rechner, die mitspielen |
+| **Relay** | ein „Postamt“ im Internet, das Spielpakete zwischen Rechnern weiterreicht ([Kap. 10](10-netzwerk.md)) |
+| **Renderer** | der Teil von Kern, der das Bild malt ([Kap. 4](04-grafik.md)) |
+| **Netz-Kopie** (Replica) | die Kopie des Spiels beim Gast, die den Lagebildern des Servers folgt ([Kap. 8](08-spiel-laufzeit.md), [10](10-netzwerk.md)) |
+| **Plattensammlung / Tontechniker** | im Spiel: hält alle Töne bereit / spielt sie zur rechten Zeit ab ([Kap. 7](07-audio.md)) |
+| **Schnittstelle** (Übergabestelle) | die vereinbarte Stelle, an der zwei Programmteile Dinge austauschen, wie ein Tresen ([Kap. 1](01-einfuehrung.md)) |
+| **Schrittrate** | wie viele Physikschritte pro Sekunde Weltzeit gerechnet werden; mit der Ente 100, das sind 200 in Entenzeit ([Kap. 6](06-physik.md), [13](13-micro-duck.md)) |
+| **Serialisierung** | Daten platzsparend in eine Reihe von Bits packen und zurück ([Kap. 10](10-netzwerk.md)) |
+| **Server / Client** | beim Mehrspieler: der Rechner, der bestimmt / die Rechner, die mitspielen (Gäste) |
 | **Shader** | ein kleines Programm der Grafikkarte, das die Farbe jedes Bildpunkts ausrechnet |
+| **Sichtpyramide** (Frustum) | der Raum, den die Kamera sieht; was draußen liegt, wird nicht gemalt ([Kap. 3](03-grundlagen.md), [5](05-szene-und-geometrie.md), Anhang B) |
 | **Simulation** | die nachgebaute Welt im Computer, die nach den Regeln der Physik weiterläuft |
 | **Snapshot** | ein „Lagebild“ des Servers beim Mehrspieler: wo gerade alles steht ([Kap. 10](10-netzwerk.md)) |
+| **Solver** | der Teil der Physik, der alle Regeln (Gelenke, Kontakte) gemeinsam erfüllt ([Kap. 6](06-physik.md), Anhang C) |
+| **Sparschwein** | sammelt die Zeit der Bildschirmbilder und gibt sie in ganzen Physikschritten aus; der Rest wartet auf das nächste Bild ([Kap. 6](06-physik.md), 6.12) |
 | **Span** | ein „Zettel“, der auf Daten zeigt (wo sie anfangen, wie viele), ohne sie zu besitzen ([Kap. 3](03-grundlagen.md)) |
-| **Starrer Körper** | ein Körper, der sich nie verbiegt; so rechnet Box3D alle Körper |
-| **Sub-Steps** | Unterschritte innerhalb eines Physikschritts, für mehr Genauigkeit |
+| **Spielschleife** | einmal vorbereiten, dann in jedem Frame: Eingabe lesen, Welt weiterrechnen, malen ([Kap. 12](12-eigene-spiele.md)) |
+| **Sub-Steps, Teilschritte** | Zwischenschritte innerhalb eines Physikschritts, für mehr Genauigkeit; für die Ente 16 |
 | **Textur** | ein Bild, das auf eine Oberfläche geklebt wird |
 | **Thread, Worker** | ein Arbeitsstrang; mehrere rechnen gleichzeitig auf mehreren Rechenkernen |
+| **Tiefenpuffer** | merkt sich für jeden Bildpunkt, wie weit das Gemalte entfernt ist ([Kap. 4](04-grafik.md)) |
+| **Umlaufzeit** (Ping) | wie lange ein Paket hin und zurück braucht ([Kap. 10](10-netzwerk.md)) |
+| **UV** | Koordinaten, die sagen, wie ein Bild auf eine Form gelegt wird, wie Geschenkpapier ([Kap. 5](05-szene-und-geometrie.md)) |
 | **Vektor** | eine Wegbeschreibung aus Zahlen, etwa „3 m nach rechts, 1 m nach vorn“ ([Kap. 3](03-grundlagen.md)) |
 | **WebAssembly** | ein Programmformat, das Browser fast so schnell ausführen wie echte Programme |
+| **Webserver** | ein Programm, das Dateien so ausliefert wie eine Internetseite ([Kap. 12](12-eigene-spiele.md)) |
 | **Welding** | „Verschweißen“: doppelte Ecken eines Meshs zu einer verschmelzen ([Kap. 5](05-szene-und-geometrie.md)) |
+| **Z-Fighting** | zwei Flächen fast gleich weit weg flimmern, weil die Tiefe nicht reicht ([Kap. 5](05-szene-und-geometrie.md), Anhang B) |
 
 ### Roboter und Messen
 
@@ -276,9 +329,12 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 |---|---|
 | **Abgleich** | eine Aufzeichnung des echten Roboters in der Simulation nachspielen und vergleichen ([Kap. 16](16-kalibrierung.md)) |
 | **Armatur** | Zusatzträgheit, weil der flinke Motor im Servo jede Bewegung mitmachen muss |
+| **BallPlay** | der Nachbau von Pollens Ballspiel im Gehirn; spielt, wenn die Kern-Extras aus sind ([Kap. 13](13-micro-duck.md)) |
 | **Chirp** | ein Messsignal: ein Hin und Her, das immer schneller wird, wie ansteigendes Vogelzwitschern |
 | **CSV** | eine Tabelle als Textdatei, Spalten durch Kommas getrennt |
+| **Daemon** | das Hintergrundprogramm auf dem echten Roboter, das Befehle an die Servos weitergibt ([Kap. 13](13-micro-duck.md), [16](16-kalibrierung.md)) |
 | **Drehmoment** | Drehkraft: wie fest ein Motor an einem Gelenk drehen kann |
+| **Entenzeit / Weltzeit** | die Zeit, wie die Riesen-Ente sie erlebt / die Zeit auf deiner Uhr; die Ente läuft in Zeitlupe, eine Sekunde Weltzeit ist für sie eine halbe ([Kap. 13](13-micro-duck.md)) |
 | **Gehirn (der Ente)** | in Kapitel 13 Pollens Entscheidungslogik: was die Ente tut, wenn niemand steuert |
 | **Gelenksensor (Encoder)** | misst im Servo, welchen Winkel das Gelenk gerade hat |
 | **Gerätemodell** | ein kleines Rechenmodell eines echten Geräts, etwa eines Servos |
@@ -287,23 +343,31 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Hz (Hertz)** | „mal pro Sekunde“: 50 Hz heißt 50-mal pro Sekunde |
 | **JSON** | ein Textformat aus Namen und Werten |
 | **Kalibrierung** | die Zahlen eines Modells an Messungen anpassen |
-| **Kamera-Detektor** | meldet, wo die Kamera der Ente Ball oder Socke sieht; Kern ahmt ihn nach |
+| **Kamera-Detektor** | das „Auge“ der Spielschicht: meldet, wo die Kamera der Ente Ball oder Socke sieht |
+| **Kern-Extras** | Schalter im Details-Panel der Ente: Spielschicht, Socke holen, Schnabel beim Greifen ([Kap. 13](13-micro-duck.md)) |
 | **Lagesensor (IMU)** | spürt, wo unten ist und wie schnell sich der Körper dreht |
 | **Läufer** (Walker) | die Steuerart im Studio für Laufroboter wie die Ente, die ein Netz bewegt |
-| **Log** | eine Aufzeichnung, Zeile für Zeile: was gesendet und was gemessen wurde |
+| **Log** | eine Aufzeichnung, Zeile für Zeile: was gesendet und was gemessen wurde (im Studio heißt die Meldungsliste Ausgabeprotokoll) |
+| **Maßstab 4** | Kern baut die Ente viermal so groß, damit die Physik stabil rechnet: 64-mal so schwer, halb so schnell ([Kap. 13](13-micro-duck.md)) |
+| **Materialpaar** | zwei Stoffe mit eigenem, gemessenem Reibungswert, etwa Socke auf Holz ([Kap. 13](13-micro-duck.md)) |
 | **Micro Duck** | der zweibeinige Laufroboter von Pollen Robotics ([Kap. 13](13-micro-duck.md)) |
 | **ms (Millisekunde)** | eine tausendstel Sekunde |
+| **Pick-up-Detektor** | ein winziges Netz von Pollen, das erkennt, ob die Ente hochgehoben wird ([Kap. 13](13-micro-duck.md)) |
 | **Pollen Robotics** | die Firma, die die echte Micro Duck und ihre Netze gebaut hat; Kern ist nicht mit ihr verbunden |
 | **Prüfstand** | ein einzelner Servo mit Arm und Gewicht, festgespannt zum Vermessen |
 | **Prüf-Fehler** | der Fehler auf einer Messung, die beim Anpassen nicht benutzt wurde |
 | **rad (Radiant)** | ein Winkelmaß der Technik: 1 rad sind etwa 57 Grad, ein ganzer Kreis etwa 6,28 rad |
-| **Regeltakt, Takt** | der Herzschlag der Steuerung: 50-mal pro Sekunde bekommt jeder Servo ein neues Ziel |
+| **Regeltakt, Takt** | der Herzschlag der Steuerung: 50-mal pro Sekunde (in Entenzeit) bekommt jeder Servo ein neues Ziel |
+| **Reibung** | wie stark etwas haftet, meist eine Zahl von 0 (Eis) bis 1 (Gummi) |
 | **RMS-Fehler** | der durchschnittliche Abstand zweier Kurven, große Ausreißer zählen stärker |
 | **Servo** | ein Motor, der auf einen vorgegebenen Winkel fährt |
 | **Servoprofil** | die wenigen Zahlen, die einen Servotyp beschreiben ([Kap. 16](16-kalibrierung.md)) |
 | **Sim-to-Real-Lücke** | der Unterschied zwischen Simulation und echtem Roboter |
 | **Streuung** | wie weit ein Wert schwanken darf oder von Exemplar zu Exemplar schwankt |
+| **Tiefpass** | ein Filter, der schnelles Zappeln schluckt und nur die ruhige Bewegung durchlässt, wie ein Stoßdämpfer |
 | **ToF** | ein Abstandssensor, der misst, wie lange Licht hin und zurück braucht |
+| **Tracker** | das „Gedächtnis“ der Spielschicht: merkt sich eine Weile, wo Ball oder Socke zuletzt waren |
+| **Trägheit** | wie viel Mühe es kostet, etwas in Bewegung oder Drehung zu bringen |
 
 Ein Bild zu **rad**: Leg eine Schnur, so lang wie der Radius eines Kreises, auf seinen Rand. Der
 Winkel, den sie vom Mittelpunkt aus überspannt, ist 1 rad. Rund sechseinviertel solcher Schnüre
@@ -317,8 +381,10 @@ reichen einmal um den Kreis.
 | **Adam** | ein kluges Verfahren, die Regler in gleichmäßigen, ruhigen Schritten zu verstellen |
 | **Agent** | der Handelnde beim Lernen durch Belohnung, hier die Ente mit ihrem Netz |
 | **Aktion** | was das Netz in einem Takt tut: 14 Zielwinkel für die Servos |
+| **Aktionsrauschen** | der Zufall, der beim Üben zu jedem Befehl kommt: die Neugier der Ente ([Kap. 14](14-lehrer.md), [15](15-eigene-modelle.md)) |
 | **Aktivierung (ELU)** | das „Verbiegen“ im Neuron: positive Zahlen bleiben, negative werden gestaucht |
 | **asymmetrischer Kritiker** | der Kritiker sieht beim Üben mehr als der Actor, etwa die genaue Höhe |
+| **Auswerter / Helfer** | im Lehrer: der Teil, der aus den Zetteln lernt / die Teile, die Enten turnen lassen und mitschreiben; Fachwörter Lerner / Sammler ([Kap. 14](14-lehrer.md)) |
 | **Backpropagation** | den Fehler vom Ausgang rückwärts auf alle Regler verteilen |
 | **Beobachtung** | was die Ente in einem Takt misst: 61 Zahlen über Lage, Gelenke, Befehle |
 | **Belohnung** | Punkte pro Takt, die sagen, wie gut die Ente gerade war |
@@ -330,16 +396,19 @@ reichen einmal um den Kreis.
 | **Epoche** | einmal alle gesammelten Übungsdaten durchgehen |
 | **Episode** | ein Übungsdurchgang, vom Start bis zum Sturz oder bis die Zeit um ist |
 | **GAE** | schätzt den Vorteil eines Schritts: eigene Überraschung plus ein Teil seiner Folgen |
+| **Generation** | eine Runde der Vorbildsuche mit CMA-ES: 16 Versuche werden bewertet ([Kap. 14](14-lehrer.md)) |
 | **Gewicht** | ein Regler im Netz: wie stark ein Eingang zählt |
 | **Gradient** | die Steigung der Verlust-Landschaft: in welche Richtung es bergauf geht |
 | **Gradientenabstieg** | lernen, indem man in der Verlust-Landschaft Schritt für Schritt bergab geht |
-| **Iteration** | eine Trainingsrunde: alle Enten üben ein Stück, dann wird das Netz einmal verbessert |
+| **Iteration, Übungsrunde** | eine Trainingsrunde: alle Enten üben ein Stück, dann wird das Netz einmal verbessert |
 | **Kettenregel** | die Rechenregel, mit der Backpropagation den Fehler Schicht für Schicht zurückreicht |
 | **Kritiker** | das zweite Netz beim Üben; es schätzt, wie gut eine Lage ist, und handelt nie |
 | **Kritiker zuerst** | nach dem Nachahmen lernt eine Weile nur der Kritiker, bis seine Urteile taugen |
 | **Lehrer** | Kerns Trainingssystem für die Netze der Micro Duck ([Kap. 14](14-lehrer.md)) |
+| **Lehrer-Seite** | die Webseite kernengine.de/lehrer/, auf der du im Browser trainierst ([Kap. 14](14-lehrer.md), [15](15-eigene-modelle.md)) |
 | **Lehrplan** | Schwierigkeiten kommen erst nach und nach dazu, wie beim Klavierüben |
 | **Lernrate** | die Schrittlänge beim Verstellen der Regler |
+| **Messung** | eine strenge Prüfung, ob eine Bewegung wirklich gelungen ist, unabhängig von den Punkten ([Kap. 15](15-eigene-modelle.md)) |
 | **Minibatch** | eine kleine, zufällige Handvoll Übungsdaten für einen Lernschritt |
 | **Nachahmen (Verhaltensklonen)** | das Netz lernt, zu tun, was ein Vorbild vormacht |
 | **Netz (neuronales Netz)** | ein Rechenwerk mit vielen Reglern: Zahlen rein, Zahlen raus |
@@ -350,12 +419,14 @@ reichen einmal um den Kreis.
 | **Policy** | die Entscheidungsregel der Ente, also ihr trainiertes Netz |
 | **PPO** | das Lernverfahren des Lehrers: aus Belohnung lernen, in kleinen, vorsichtigen Schritten |
 | **Rauschen, σ (Sigma)** | zufällige Abweichung; σ sagt, wie breit sie ist |
-| **Return** | die Gesamtpunktzahl ab jetzt, spätere Punkte etwas weniger wert |
+| **Return** | womit beim Lernen gerechnet wird: die Punkte ab jetzt, spätere etwas weniger wert ([Anhang A](A-grundlagen-neuronale-netze.md)); nicht dasselbe wie die Rückgabe |
 | **Rezept** | alle Trainingseinstellungen einer Aufgabe zusammen |
-| **Sammler / Lerner** | die Teile des Trainings, die Erfahrung sammeln / daraus lernen |
+| **Rückgabe** (Episoden-Rückgabe) | alle Punkte einer Episode einfach zusammengezählt; so heißt die Anzeige auf der Lehrer-Seite ([Kap. 15](15-eigene-modelle.md)) |
 | **Schicht** | viele Neuronen nebeneinander, die dieselben Eingänge sehen |
+| **Schnappschuss** | ein unterwegs gespeicherter Zwischenstand des Netzes ([Kap. 15](15-eigene-modelle.md)) |
 | **Seed** | die Startzahl für den Zufall: gleicher Seed, gleicher Zufall |
 | **Spielschicht** | Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut |
+| **Training** | die Regler eines Netzes so lange verstellen, bis das Richtige herauskommt |
 | **Überanpassung** | Auswendiglernen statt Verstehen: gut bei Übungen, schlecht bei Neuem |
 | **überwachtes Lernen** | Lernen mit Lösungsheft: zu jeder Aufgabe gibt es die richtige Antwort |
 | **Variation** | jede Episode würfelt etwas andere Bedingungen aus; Fachwort Domänen-Randomisierung |

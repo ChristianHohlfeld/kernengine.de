@@ -12,7 +12,7 @@
 > - **Webserver** – ein Programm, das Dateien so ausliefert, wie eine Internetseite sie ausliefert
 > - **Open Source** – der Programmtext ist offen; jeder darf ihn lesen, nutzen und weitergeben, nach den Regeln der Lizenz
 > - **Lizenz** – die Spielregeln, was man mit einem Werk tun darf
-> - **Shader** – ein kleines Programm, das auf der Grafikkarte läuft und jedes Pixel einfärbt
+> - **Shader** – ein kleines Programm, das auf der Grafikkarte läuft und jeden Bildpunkt (Pixel) einfärbt
 > - **Trigger** – eine unsichtbare Zone, die etwas auslöst, wenn jemand hineinläuft
 >
 > Eine **HTML-Datei** ist das Dateiformat von Webseiten; jeder Browser öffnet sie.
@@ -50,13 +50,15 @@ und als **Spieltitel** (Game title) „Orb Garden“ ein.
 
 Kurz zur Orientierung im Studio: Der **Viewport** ist das große Bild der Welt in der Mitte. Die
 **Inhaltsablage** (Content Drawer) ist die Bauteil-Schublade unten. Der **Outliner** ist die Liste aller Dinge im
-Level, und **Details** zeigt die Einstellungen des Dings, das du gerade ausgewählt hast. Ein
-beschriftetes Bild des Studios findest du in [Kapitel 11](11-studio.md).
+Level, und **Details** zeigt die Einstellungen des Dings, das du gerade ausgewählt hast. Ein Bild
+des Studios mit allen Bereichen und eine Tabelle, wo welcher liegt, findest du in
+[Kapitel 11](11-studio.md), Abschnitt 11.2.
 
 Öffne die **Inhaltsablage** (**Strg+Leertaste**) und zieh aus **Spieler** (Players) eine **Figur** (Character) in den Viewport.
-Das Log meldet „Character is the player now“ (Meldungen im Log zeigt Studio auf Englisch), und im
-Outliner trägt der neue Actor „Character“ das Abzeichen **Spieler** (Player): Diese Figur ist jetzt
-der Spieler. In **Details › Spieler-Steuerung** (Details › Player Controller) stellst du ein, wie sie sich anfühlt:
+Die Statusleiste meldet „Character ist jetzt der Spieler – drück Spielen (Alt+P), um ihn zu steuern“
+(im **Ausgabeprotokoll** (Output Log) steht dieselbe Meldung auf Englisch, denn das Protokoll bleibt
+englisch), und im Outliner trägt der neue Actor „Character“ das Abzeichen **SPIELER** (PLAYER): Diese
+Figur ist jetzt der Spieler. In **Details › Spieler-Steuerung** (Details › Player Controller) stellst du ein, wie sie sich anfühlt:
 Tempo, Beschleunigung, Sprungkraft und die Kamera, die von hinten, aus den Augen der Figur oder von oben
 schauen kann.
 
@@ -86,7 +88,9 @@ nimmst gleich einen **Physik-Würfel** (Physics Cube) ([Kapitel 6](06-physik.md)
 
 1. Aus **Spielablauf** mehrere **Orb** (1 Punkt) und einen **Stern** (Star) (10 Punkte) verteilen. Trick: **Alt +
    Gizmo ziehen** zieht bei jedem Zug eine Kopie heraus.
-2. Alle Orbs auswählen und mit dem Ordner-Knopf im Outliner in einen Ordner legen.
+2. Damit die Liste im Outliner übersichtlich bleibt, legst du die Orbs in einen Ordner: im Outliner
+   den ersten Orb anklicken, die übrigen mit Strg dazuklicken, dann den Ordner-Knopf oben im Outliner
+   drücken. (Ein Ordner dient nur der Ordnung; am Spiel ändert er nichts.)
 3. In **Welteinstellungen › Siegbedingung** (World Settings › Win condition) **Alle Pickups sammeln**
    (Collect all pickups) wählen. **Pickups** heißt alles zum Einsammeln, hier also Orbs und Stern.
 
@@ -167,12 +171,12 @@ Die Bewegungen der Micro Duck außer dem Laufen sind eigene Dateien, die das Spi
 [Kapitel 13](13-micro-duck.md)).
 
 > **Probier's aus!** Spiel `Orb_Garden.html` zuerst am Computer: Doppelklick, und sie öffnet sich im
-> Browser. Wer eine eigene Homepage hat, lädt die Datei dort hoch und öffnet die Adresse im Browser des
-> Telefons. Dann erkennt die Engine den Touchscreen und zeichnet Sticks und Knöpfe von selbst. Du hast
-> gerade ein Handyspiel gebaut! (Eine Datei per Messenger aufs Telefon zu schicken klappt nicht auf
-> jedem Telefon, weil manche sie nicht im Browser öffnen.)
+> Browser. Dann bring sie aufs Telefon wie in 11.13 beschrieben: über einen Cloud-Speicher, den du
+> auch am Telefon benutzt, und dort mit „Öffnen mit“ im Browser. (Wer eine eigene Homepage hat, kann
+> die Datei auch dort hochladen.) Die Engine erkennt den Touchscreen und zeichnet Sticks und Knöpfe von
+> selbst. Du hast gerade ein Handyspiel gebaut!
 
-![Dasselbe Spiel auf dem Telefon: die Engine erkennt Touch und zeichnet Sticks und Knöpfe](../buch/bilder/game-phone.png)
+![Das exportierte Orb Run am Telefon im Querformat: Die Engine erkennt den Touchscreen und zeichnet Sticks und Knöpfe](../buch/bilder/game-phone.png)
 
 ---
 
@@ -273,33 +277,21 @@ Telefon lenkt die linke Bildschirmhälfte, die rechte boostet.
 
 Was man daran lernen kann:
 
-- **Eine Stadt aus dem Zufall.** Jeder Block bekommt per Zufall eine von vier Bebauungen, zur Mitte hin
-  werden die Häuser höher. Der Zufall im Computer ist ein Rechenverfahren, das aus einer Startzahl
+- **Eine Stadt aus dem Zufall.** Jeder Block bekommt per Zufall seine Bebauung. Der Zufall im Computer ist ein Rechenverfahren, das aus einer Startzahl
   eine lange, bunt gemischte Zahlenreihe macht, wie ein Kartenstapel, der bei gleicher Startzahl immer
   gleich gemischt wird. Gleiche Startzahl, gleiche Stadt. Enter wählt eine neue Startzahl und damit
-  eine neue Stadt. Bäume und Verkehr sind gestempelt (Instancing).
-- **Große Arbeit in Häppchen.** Der Gebäudebauer kann seine Arbeit über mehrere Bilder verteilen, ein
-  Stück pro Bild, damit das Spiel beim Bauen nicht stockt. orbrun baut seine Stadt beim Start trotzdem
-  in einem Rutsch.
-- **Zusammenstöße ohne Physik-Engine.** Das Auto ist für die Rechnung ein Kreis, jedes Haus ein
-  Vieleck. Steckt der Kreis in einer Wand, schiebt das Spiel ihn hinaus und lässt ihn abprallen. Für
-  ein Rennspiel reicht das völlig.
+  eine neue Stadt.
 - **Nicht durch Wände „tunneln“.** Ein schnelles Auto springt von Bild zu Bild ein ganzes Stück weiter.
   Ist der Sprung größer als eine Wand dick ist, steht das Auto im einen Bild vor der Wand und im
   nächsten dahinter, und die Wand hat es nie „berührt“. Darum zerlegt orbrun jede Bewegung in kleine
-  Teilschritte von höchstens 60 cm und prüft jeden davon.
-- **Verkehr mit Rücksicht.** Die anderen Autos halten an, wenn du vor ihnen stehst, und wer am
-  Stadtrand hinausfährt, taucht auf der anderen Seite wieder auf.
+  Teilschritte und prüft jeden davon.
 - **Spielgefühl statt echter Physik.** Das Auto rutscht in Kurven kurz und fängt sich, Lenken wirkt erst
   mit Tempo, und die Kamera weicht mit dem Tempo zurück. Das ist keine genaue Physik, sondern so
   gemacht, dass es sich gut anfühlt.
-- **Tag und Nacht.** Sonne, Mond, Himmel und Nebel werden mit der Tageszeit gemischt. Nachts leuchten
-  Scheinwerfer und Orbs stärker. Jedes davon ist ein **Punktlicht**, eine Lampe, die wie eine
-  Glühbirne in alle Richtungen strahlt. Das Einfärbe-Programm, das Kern für alle Dinge benutzt (der
-  Standard-Shader), rechnet mit höchstens sechs Punktlichtern gleichzeitig. Darum wählt das Spiel in
-  jedem Bild die sechs wichtigsten aus.
 
-Das Glanzstück ist eine **Shader-Erweiterung**, die nachts Fenster leuchten lässt. Der Gebäudebauer
+Das Glanzstück ist eine **Shader-Erweiterung**, die nachts Fenster leuchten lässt. (Ein Shader ist
+das kleine Programm auf der Grafikkarte, das jeden Bildpunkt einfärbt; Kern benutzt für alle Dinge
+einen gemeinsamen, den **Standard-Shader**.) Der Gebäudebauer
 gibt jeder Wand ein paar Zusatzinformationen mit: wie lang und hoch sie ist, wie hoch ein Stockwerk
 ist, und eine Zufallszahl. Das kleine Programm auf der Grafikkarte macht daraus beim Einfärben ein
 Raster aus Fenstern, von denen nachts zufällig manche hell sind. Das Besondere: Das Spiel hat dem
@@ -312,9 +304,10 @@ Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 > und zieh in den **Welteinstellungen** (World Settings) an **Tageszeit** (Time of day). Auch hier
 > gehen nachts die Fenster an. Dieselbe Idee, nur im Studio-Level.
 
-> **Für Neugierige:** Die Zusatzwerte der Wand reisen „flach“ über die ganze Wand, also unverändert
-> statt sanft gemischt. Ein Mischen würde die Zufallszahl verwischen, und das Fenstermuster zerfiele.
-> Alle Zahlen zu Stadt, Fahrphysik und Verkehr stehen im blauen Buch, Kapitel 12.
+> **Für Neugierige:** orbrun kann noch mehr: Zusammenstöße ganz ohne Physik-Engine (das Auto ist
+> für die Rechnung ein Kreis, jedes Haus ein Vieleck), Verkehr, der vor dir anhält, und Scheinwerfer
+> als Punktlichter, von denen das Spiel in jedem Bild die wichtigsten auswählt. Alle Zahlen zu Stadt,
+> Fahrphysik und Verkehr stehen im blauen Buch, Kapitel 12.
 
 ---
 
@@ -322,7 +315,7 @@ Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 
 Ein C++-Spiel will sich nicht um Browser-Kleinkram kümmern. Das übernehmen zwei kleine Helferdateien,
 die Kern mitliefert und die immer zusammen nebeneinanderliegen: Die eine startet das Spiel und kümmert
-sich um den Browser, die andere verbindet sie mit dem Modul. Zusammen kümmern sie sich um:
+sich um den Browser, die andere verbindet die Webseite mit dem Modul. Zusammen kümmern sie sich um:
 
 - **Größe:** Die Zeichenfläche passt sich immer dem Fenster an, in voller Bildschirmschärfe.
 - **Tastatur:** Tasten zählen nach ihrer **Position**, nicht nach ihrer Beschriftung. W A S D liegt also
@@ -334,7 +327,8 @@ sich um den Browser, die andere verbindet sie mit dem Modul. Zusammen kümmern s
 - **Maus fangen:** Auf Wunsch des Spiels verschwindet der Mauszeiger, und die Maus steuert nur noch den
   Blick.
 - **Grafikkarte kurz weg:** Verliert der Browser einmal kurz den Zugriff auf die Grafikkarte, pausiert
-  der Zeichenteil der Engine und lädt danach alles aus seinen Kopien neu.
+  der Zeichenteil der Engine. Kern hebt von allem, was es an die Grafikkarte schickt, eine Kopie auf
+  und lädt danach alles aus diesen Kopien neu.
 
 Die genauen Namen und Optionen stehen im blauen Buch, Kapitel 12.
 
@@ -351,25 +345,28 @@ Beispiel das Drohnenspiel SpawnCity.
 
 **Ein Studio-Level in die eigene Seite einbauen.** Deine Seite lädt ein Level aus Studio und spielt es,
 genau wie ein exportiertes Spiel. Dann kann sie dem Spiel Befehle schicken, als wäre sie ein Gamepad
-aus Programmtext, und nachfragen, wie es steht. Das sieht so aus:
+aus Programmtext, und nachfragen, wie es steht: etwa „lauf vorwärts und spring“ schicken und danach
+fragen „Ist das Spiel gewonnen?“, um dann einen eigenen Siegerbildschirm zu zeigen. Solche Befehle
+mischen sich mit Tastatur, Touch und Gamepad. Neben Laufen und Springen gibt es zum Beispiel Boost,
+Feuer, Ducken und Umschauen.
 
-```js
-game.command({cmd: "gameInput", moveY: 1, jump: true});
-game.command({cmd: "gameInput", moveY: 0, jump: false});
-if (game.status.hud?.status === "won") showMyWinScreen();
-```
-
-Zeile für Zeile: Die erste Zeile sagt dem Spiel „lauf vorwärts (1 heißt voll vorwärts) und spring“. Die
-zweite sagt „hör wieder auf“. Die dritte fragt die Anzeige des Spiels: Ist der Stand „gewonnen“? Dann
-zeigt die Seite ihren eigenen Siegerbildschirm (`showMyWinScreen` ist dabei eine Funktion, die du
-selbst schreibst). Solche Befehle mischen sich mit Tastatur, Touch und Gamepad. Neben Laufen und
-Springen gibt es zum Beispiel Boost, Feuer, Ducken und Umschauen.
+> **Für Neugierige:** So sieht das in JavaScript aus. Die erste Zeile heißt „lauf voll vorwärts und
+> spring“, die zweite „hör wieder auf“, die dritte fragt, ob das Spiel gewonnen ist
+> (`showMyWinScreen` schreibst du selbst):
+>
+> ```js
+> game.command({cmd: "gameInput", moveY: 1, jump: true});
+> game.command({cmd: "gameInput", moveY: 0, jump: false});
+> if (game.status.hud?.status === "won") showMyWinScreen();
+> ```
 
 **Logik-Graphen als C++.** Im Logik-Editor lädt der Knopf **C++** deinen Graphen als lesbaren
 Programmtext herunter. Ein Programmierer kann ihn fest in Kern einbauen, dann läuft er am schnellsten.
-Dein Graph kann also auf drei Arten laufen, die sich nur im Tempo unterscheiden, nie im Ergebnis. Das
-ist wie ein Text, den man Wort für Wort vorliest, als vorab übersetzte Fassung oder als fest gedrucktes
-Buch hat: Der Inhalt ist derselbe ([Kapitel 9](09-logik.md)).
+Dein Graph kann also auf drei Arten laufen, die sich nur im Tempo unterscheiden, nie im Ergebnis
+([Kapitel 9](09-logik.md)): Der **Dolmetscher** (Interpreter) liest ihn Kästchen für Kästchen vor;
+die **Übersetzung** (JIT, „just in time“) macht beim Spielstart Maschinencode daraus; und der
+**C++-Export** ist die fest eingebaute Fassung, wie ein fertig gedrucktes Buch. Der Inhalt ist immer
+derselbe.
 
 Alle Befehle und Namen stehen im blauen Buch, Kapitel 12, und in [Kapitel 17](17-referenz.md).
 

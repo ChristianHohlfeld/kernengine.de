@@ -76,8 +76,8 @@ Robotics für den Servo der Micro Duck ermittelt hat. Eigene Messungen verfeiner
 Servos.
 
 Alle Zahlen im Profil stehen in echten Einheiten, so wie man sie am echten Servo misst. Dass die Ente
-im Computer viermal so groß ist ([Kapitel 13](13-micro-duck.md)), rechnet Kern erst ganz zum Schluss
-um, an der Grenze zur Physik. Darum gilt ein Profil, das du am echten Servo gemessen hast, ohne
+im Computer viermal so groß ist ([Kapitel 13](13-micro-duck.md)), rechnet Kern erst im allerletzten
+Moment um: genau dann, wenn es die Kraft des Servos an die Physik-Engine übergibt. Darum gilt ein Profil, das du am echten Servo gemessen hast, ohne
 Umrechnen auch in der Simulation.
 
 Zu jeder Zahl gehört eine **Streuung**: eine ehrlich zugegebene Unsicherheit. Das Training zieht
@@ -89,12 +89,12 @@ Die genauen Werte und das Dateiformat des Profils stehen im blauen Buch, Kapitel
 
 > **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/
 > **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), starte **Spielen**
-> (Play), übernimm die Ente mit **F8** und drück die **1** (Sitzen). Schau
-> auf die Beine: Sie fahren in die neue Haltung, statt hineinzuspringen. Daran arbeiten zwei zusammen:
-> das Netz fürs Sitzen, das 50-mal pro Sekunde neue Ziele schickt, und das Servomodell, das jedes
-> Gelenk mit begrenzter Kraft und gebremst zu seinem Ziel zieht. Welcher Anteil der Bewegung auf
-> welches Konto geht, sieht man von außen nicht. Sicher ist nur: Kein Gelenk der Ente erreicht
-> sein Ziel im selben Augenblick, jedes geht den Weg durch das Servomodell.
+> (Play) und übernimm die Ente **nicht**: Du schaust mit der Beobachterkamera zu und kannst Körper
+> greifen. Fass die stehende Ente mit der Maus an einem Fuß, zieh ihn vorsichtig ein kleines Stück zur
+> Seite und lass los. Das Bein kehrt in seine Haltung zurück, aber weich und ohne hart
+> zurückzuschnappen: Die Feder zieht es zum Ziel, der Stoßdämpfer bremst die Rückkehr. Genau diese
+> zwei Zahlen (wie fest, wie stark gebremst) misst die Kalibrierung. Zieh zu weit, und die Ente
+> kippt; dann steht sie von selbst wieder auf.
 
 ## 16.2 Der Prüfstand: einen Servo vermessen
 
@@ -123,7 +123,7 @@ der gemessene Winkel. Kern baut nun denselben Servo mit derselben Last in der Si
 schickt ihm dieselben Befehle.
 
 Wichtig dabei: Der nachgebaute Prüfstand rechnet mit genau denselben Einstellungen wie die Ente im
-Studio – gleicher Vergrößerungsmaßstab, gleich viele Physikschritte pro Sekunde, gleich weiche
+Studio – gleicher Vergrößerungsmaßstab, gleich viele Physikschritte pro Sekunde Weltzeit, gleich weiche
 Gelenke. Sonst würde ein Profil, das auf dem Prüfstand passt, in der Ente nicht mehr passen – so
 wie eine Hose, die du mit dicken Winterstiefeln anprobiert hast, mit Sandalen anders sitzt.
 
@@ -137,9 +137,11 @@ zählen. Fachleute nennen das **RMS-Fehler**.
 
 > **Probier's aus!** Wie streng Kern auf gleiche Einstellungen achtet, siehst du im Studio. Stell im
 > Micro-Duck-Level unter **Welteinstellungen** (World Settings) die **Schrittrate** (Step rate), also
-> die Zahl der Physikschritte pro Sekunde, auf 90 statt 100 und starte **Spielen** (Play). Kern
-> meldet im **Ausgabeprotokoll** (Output Log): „set World Settings > Step Rate to 100“.
-> Alles – Training, Vermessen, Spielen – rechnet mit 100 Schritten pro Sekunde; mit 90 wäre es eine
+> die Zahl der Physikschritte pro Sekunde Weltzeit, auf 90 statt 100 und starte **Spielen** (Play). Kern
+> meldet im **Ausgabeprotokoll** (Output Log) auf Englisch „set World Settings > Step Rate to 100“,
+> also „stell in den Welteinstellungen die Schrittrate auf 100“. Zurückstellen musst du sie selbst.
+> Alles – Training, Vermessen, Spielen – rechnet mit derselben Schrittrate: 100 Schritte pro Sekunde
+> Weltzeit = 200 in Entenzeit (13.5). Mit 90 wäre es eine
 > andere Welt, und kein Profil und kein Netz wäre mehr darauf abgestimmt. Stell danach wieder 100
 > ein.
 
@@ -177,7 +179,8 @@ was die simulierte Ente dabei gemessen haben.
 > Instrument im Proberaum nicht.
 
 Die simulierte Ente startet still in ihrer Grundhaltung, ohne Variation, mit den Servos aus dem
-Profil, und bekommt 50-mal pro Sekunde die Befehle aus der Aufzeichnung. Verglichen wird, was ihre
+Profil, und bekommt 50-mal pro Sekunde Entenzeit die Befehle aus der Aufzeichnung, genau wie der echte
+Roboter sie bekam. Verglichen wird, was ihre
 Sensoren melden – wie sich der Körper dreht, wo „unten“ ist, wie die Gelenke stehen und wie schnell
 sie sich bewegen –, für jedes Gelenk einzeln.
 

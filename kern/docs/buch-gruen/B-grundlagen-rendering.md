@@ -41,8 +41,8 @@ musst du nicht können – wichtig sind drei Eigenschaften:
 
 Ein Punkt hat drei Koordinaten. Trotzdem hängt man ihm eine **vierte Zahl** an, w genannt. Warum?
 
-Ein Rezept kann nur mit den Zahlen rechnen, die der Punkt mitbringt: Es nimmt jede davon mal eine
-feste Zahl und zählt die Ergebnisse zusammen. „Plus 5 m“ ist aber eine feste Zugabe, die
+Ein Rezept kann nur mit den Zahlen rechnen, die der Punkt mitbringt: Es kann sie malnehmen und
+zusammenzählen, mehr nicht. „Plus 5 m“ ist aber eine feste Zugabe, die
 mit keiner Koordinate des Punkts zu tun hat. Der Trick: Man gibt jedem Punkt eine feste vierte Zahl
 mit, die einfach **1** ist. Dann kann das Rezept sagen: „plus 5 m mal diese vierte Zahl“ – und 5 m
 mal 1 sind genau 5 m.
@@ -51,10 +51,10 @@ Eine **Richtung** dagegen („nach Norden“, „senkrecht nach oben“) bekommt
 „5 m mal 0“ ist nichts: Sie wird gedreht, aber nie verschoben – eine Richtung hat keinen Ort. Beispiel
 mit dem Rezept „5 m nach rechts“:
 
-| Was | vorher (mit w) | nachher |
+| Was | vorher (x; y; z; w) | nachher |
 |---|---|---|
-| Punkt | 1, 2, 3 · w = 1 | **6**, 2, 3 |
-| Richtung | 1, 2, 3 · w = 0 | 1, 2, 3 (unverändert) |
+| Punkt | (1; 2; 3; **1**) | (**6**; 2; 3; 1) |
+| Richtung | (1; 2; 3; **0**) | (1; 2; 3; 0), unverändert |
 
 > **Stell dir vor …** … eine Hausnummer und die Angabe „Richtung Norden“. Zieht die ganze Stadt 5 km
 > nach Osten um, hat dein Haus einen neuen Ort. „Norden“ bleibt Norden.
@@ -71,6 +71,7 @@ landet sie auf Pixeln. Jeder Schritt ist ein anderes Koordinatensystem – ein a
 für jeden Wechsel gibt es ein Rezept:
 
 ```mermaid
+%% Bildunterschrift: Von der eigenen Beschreibung bis auf den Bildschirm: ein Rezept je Wechsel
 flowchart TB
   M["eigene Beschreibung"] -->|"Modell-Rezept"| W["Welt"]
   W -->|"Kamera-Rezept"| K["Blick der Kamera"]
@@ -114,15 +115,14 @@ drei Angaben: wo die Kamera steht, wohin sie schaut und wo „oben“ ist.
 Schaut die Kamera genau in Richtung „oben“ (oder genau entgegen), geht das nicht: Wer senkrecht
 nach oben schaut, weiß nicht mehr, wo oben im Bild sein soll. Kern verweigert dann das Bild, statt Unsinn zu malen.
 
-**Perspektive** heißt: Doppelt so weit weg erscheint halb so groß. Die Position auf dem Bild ist also
-die Größe **geteilt durch die Entfernung**.
+**Perspektive** heißt: Doppelt so weit weg erscheint halb so groß. Wie groß etwas im Bild erscheint,
+ist also seine Größe **geteilt durch die Entfernung**.
 
 ![Perspektive: doppelt so weit weg, halb so groß](../abbildungen/perspektive.svg)
 
 Ein 2 m hoher Baum in 10 m Entfernung erscheint also genauso groß wie ein 1 m hoher in 5 m. Ein
 Rezept kann aber nur malnehmen und zusammenzählen, nicht teilen. Also notiert es die Entfernung in der
-vierten Zahl, und die Grafikkarte teilt am Ende selbst alles durch diese Zahl. Das heißt
-**perspektivische Division**.
+vierten Zahl, und die Grafikkarte teilt am Ende selbst alles durch diese Zahl.
 
 Für Editor-Ansichten gibt es auch die **Parallelansicht** ohne Perspektive: Dort wird Fernes nicht
 kleiner, wie auf einem Bauplan. Kerns Standardwerte für die Kamera stehen im blauen Buch, Anhang B.
@@ -144,9 +144,10 @@ sehr eng, in der Ferne sehr weit.
 > **Stell dir vor …** … ein Lineal, dessen Striche nah am Auge im Abstand von Haaren liegen und hinten
 > im Abstand von Metern. Nah kannst du winzige Unterschiede messen, fern nur grobe.
 
-Warum? Auch die Tiefe läuft durch das Teilen durch die Entfernung aus dem vorigen Abschnitt. Dabei
-wird alles Ferne zusammengedrückt – genauso wie ferne Bäume im Bild klein werden, rücken ferne
-Entfernungen auf der Tiefenskala eng zusammen.
+Warum? Die Grafikkarte teilt am Ende alles durch die Entfernung, wie im vorigen Abschnitt, und die
+Tiefe ist davon nicht ausgenommen. Dasselbe Teilen, das ferne Bäume im Bild klein macht, drückt auch
+ferne Entfernungen auf der Tiefenskala eng zusammen: Zwischen 100 m und 200 m liegen dort kaum mehr
+Striche als zwischen 1 m und 2 m.
 
 Wie grob, zeigt diese kleine Tabelle mit Kerns Einstellungen:
 
@@ -156,9 +157,11 @@ Wie grob, zeigt diese kleine Tabelle mit Kerns Einstellungen:
 | 1000 m | etwa 1,2 m |
 
 Wie eng die Striche vorne liegen, hängt vor allem von der **nahen Ebene** ab: der Entfernung, ab der
-die Kamera überhaupt etwas sieht (in Kern 5 cm). Alles davor wird abgeschnitten. Schiebt man die nahe
-Ebene doppelt so weit hinaus, wird die Tiefe **überall doppelt so genau** – die wertvollen engen Striche
-werden nicht mehr für den leeren Raum direkt vor der Linse verschwendet.
+die Kamera überhaupt etwas sieht (in Kern 5 cm). Alles davor wird abgeschnitten. Das Lineal beginnt
+an der nahen Ebene, und dort liegen seine engsten Striche. Liegt sie ganz dicht vor der Linse, gehen
+viele dieser kostbaren Striche für den leeren Raum direkt vor der Kamera drauf, wo fast nie etwas
+steht. Schiebt man die nahe Ebene doppelt so weit hinaus, rutschen die Striche mit, und die Tiefe
+wird **überall doppelt so genau**.
 
 > **Wusstest du?** Daher flackern in manchen Spielen ferne, dicht beieinanderliegende Flächen
 > („Z-Fighting“): Der Tiefenpuffer kann sie dort schlicht nicht mehr auseinanderhalten und malt mal die
@@ -177,10 +180,10 @@ Staucht man den Pfeil aber einfach mit, kippt er *flacher*. Genau falsch herum!
 
 ![Ein 45°-Dach, auf halbe Höhe gestaucht: Die richtige Normale wird steiler, die einfach mitgestauchte flacher](../abbildungen/normalen-stauchen.svg)
 
-Die Faustregel: Was die Fläche streckt, muss die Normale stauchen, und umgekehrt. Dafür braucht jede
-Kopie eines Dings ein eigenes kleines Rezept nur für ihre Normalen.
+Die Faustregel: Was die Fläche streckt, muss die Normale stauchen, und umgekehrt. Dafür braucht jedes
+Ding ein eigenes kleines Rezept nur für seine Normalen.
 
-**In Kern:** Dieses Normalen-Rezept rechnet Kern einmal pro Kopie aus; ein auf Größe null gestauchtes
+**In Kern:** Dieses Normalen-Rezept rechnet Kern einmal pro Ding aus; ein auf Größe null gestauchtes
 Ding lehnt er ab, weil es dafür keins gibt.
 
 ## B.2 Vom Dreieck zu Bildpunkten
@@ -235,6 +238,7 @@ Die Grafikkarte arbeitet wie ein Fließband. Jeder Malauftrag – ein **Zeichena
 call*), also „Male diese Form“ – läuft durch dieselben Stationen:
 
 ```mermaid
+%% Bildunterschrift: Das Fließband der Grafikkarte für einen Malauftrag
 flowchart TB
   VB["Ecken-Daten"] --> VS["Vertex-Shader: jede Ecke"]
   VS --> R["Rasterisierung"]
@@ -365,11 +369,10 @@ Das klingt einfach, hat aber Tücken:
 | Problem | Ursache | Gegenmittel |
 |---|---|---|
 | feine Streifen („Schattenakne“) | Fläche beschattet sich selbst | kleiner Sicherheitsabstand |
-| Akne bei schrägem Licht | Abstand allein reicht nicht | vorher von der Fläche wegrücken |
 | Schatten löst sich vom Ding | Sicherheitsabstand zu groß | Abstand klein halten |
-| Treppchenkanten | ein Kartenpunkt deckt viele Pixel | mehrere Nachbarn mischen |
-| Flimmern | Karte rutscht um Bruchteile | nur um ganze Punkte schieben |
-| unscharf in der Nähe | Karte deckt zu viel ab | nur das Sichtbare abdecken |
+
+Weitere Tücken wie Treppchenkanten oder Flimmern und ihre Gegenmittel stehen im blauen Buch,
+Anhang B.
 
 Der **Sicherheitsabstand** ist das wichtigste Gegenmittel: Die Fläche gilt erst als beschattet, wenn
 sie ein klein wenig weiter weg ist als das Notierte. Sonst würde sie sich wegen der groben Karte selbst
@@ -398,8 +401,8 @@ mittlere Helligkeiten fast, wie sie sind, und rundet sehr Helles weich ab:
 
 ![Kerns Tonemapping-Kurve: weich bis knapp unter Weiß, statt bei 1 hart abzuschneiden](../abbildungen/tonemapping.svg)
 
-**In Kern:** Die Kurve ist eine bewährte Filmkurve aus der Kinotechnik, wie sie auch die
-Grafikbibliothek three.js benutzt; danach kann noch ein Farbgrading folgen.
+**In Kern:** Die Kurve ist eine bewährte Filmkurve aus der Kinotechnik, wie sie auch andere
+verbreitete Grafikprogramme benutzen; danach kann noch eine Farbkorrektur folgen.
 
 > **Probier's aus!** Dreh im Reiter **Welteinstellungen** (World Settings) die **Belichtung**
 > (Exposure) hoch und runter.
@@ -428,8 +431,7 @@ sRGB-Wert verdoppelt sich nicht. Wer mit sRGB-Zahlen rechnet, rechnet falsch, un
 man Schuhgrößen addieren. Darum gilt: Farben **erst nach linear** umrechnen, linear rechnen, ganz am
 Ende **zurück nach sRGB**.
 
-> **Achtung, Falle!** Wer in sRGB rechnet, bekommt zu dunkle Übergänge und falsche Mischfarben. Und
-> wer Farben schon linear liefert, muss das Kern sagen – sonst rechnet Kern sie ein zweites Mal um.
+> **Achtung, Falle!** Wer in sRGB rechnet, bekommt zu dunkle Übergänge und falsche Mischfarben.
 
 ### Nebel
 
@@ -551,6 +553,26 @@ Umschalten, etwa auf eine andere Textur, kostet.
 > **Stell dir vor …** … du gehst einkaufen. Hundertmal für je eine Zutat in den Laden zu laufen dauert
 > viel länger als einmal mit vollem Korb – obwohl am Ende dasselbe im Kühlschrank steht.
 
+### Der Ablauf eines Bildes
+
+Wie greifen Schatten, Himmel, Eckenschatten und Glühen aus diesem Anhang ineinander? Für jedes Bild
+geht Kern die Arbeit in fester Reihenfolge durch, wie eine Malerin, die erst den Hintergrund und
+zuletzt die Lichter setzt:
+
+```mermaid
+%% Bildunterschrift: Die Reihenfolge, in der Kern ein Bild malt
+flowchart TD
+  A["1. Schattenkarte (B.5), nur wenn nötig"] --> B["2. Undurchsichtiges, von vorn nach hinten"]
+  B --> C["3. Himmel, nur wo noch frei ist (B.9)"]
+  C --> D["4. Durchsichtiges, von hinten nach vorn"]
+  D --> E["5. Eckenschatten (B.8)"]
+  E --> F["6. Ego-Ebene: die Dinge in deiner Hand"]
+  F --> G["7. Zusammensetzen: Glühen (B.7), Farbe"]
+```
+
+Undurchsichtiges kommt von vorn nach hinten, damit verdeckte Bildpunkte gar nicht erst ausgerechnet
+werden; Durchsichtiges von hinten nach vorn, damit Glas das richtig mischt, was dahinter liegt.
+
 **In Kern:** Ein einziges Malprogramm, Kopien statt Duplikate, ein Merkzettel gegen doppelte Werte,
 Schattenkarte nur bei Bedarf und Formen nur einmal hochladen – und eine Statistik zeigt, wie viele
 Aufträge ein Bild gekostet hat ([Kapitel 4](04-grafik.md), 4.7 und 4.12).
@@ -569,9 +591,10 @@ Grafikkarte erreicht allein die Webseite, über **WebGL2**, die Malschnittstelle
 > sie durch die Tür – und auf den Zetteln stehen nur Zahlen.
 
 ```mermaid
+%% Bildunterschrift: Kern reicht seine Malwünsche als Zahlen-Zettel an die Webseite durch
 flowchart TB
   R["Kern: Malen, Physik, Spiel"] --> G["kurze Liste Malbefehle"]
-  G -->|"Nummern, Adresse + Länge"| K["dünne Webseiten-Schicht"]
+  G -->|"Nummern; wo die Zahlen liegen und wie viele"| K["dünne Webseiten-Schicht"]
   K --> W["Grafikkarte über WebGL2"]
 ```
 
@@ -586,7 +609,7 @@ Daraus folgen Kerns wichtigste Entscheidungen, in Alltagssprache:
 | Kopien von allem | Versicherung, falls der Browser die Grafikkarte wegnimmt |
 | wenige Aufträge, Merkzettel | jeder Weg über die Brücke kostet |
 | Malen ohne Bildschirm möglich | der Lehrer rechnet dieselbe Welt ohne Grafik |
-| ein Arbeitsfaden pro Kern | mehr Tempo über Helfer mit eigener Kern-Kopie |
+| ein Arbeitsfaden pro Kern-Kopie | mehr Tempo über Helfer mit eigener Kern-Kopie |
 
 Der **Lehrer** ist Kerns Trainingsschule, die der Micro Duck neue Bewegungen beibringt
 ([Kapitel 14](14-lehrer.md)). Er braucht kein Bild, nur dieselbe Welt mit derselben Physik. Und er

@@ -17,7 +17,7 @@
 > - **Takt** – ein Entscheidungsmoment. Die Ente entscheidet 50-mal pro Sekunde.
 > - **Episode** – ein Übungsdurchgang, vom Start bis zum Sturz oder bis die Zeit um ist.
 > - **Belohnung** – Punkte, die die Ente in jedem Takt bekommt oder verliert. Mehr Punkte heißt besser.
-> - **Übungsrunde** – alle Enten üben ein kurzes Stück, dann stellt der Trainer die Regler einmal
+> - **Übungsrunde** – alle Enten üben ein kurzes Stück, dann stellt der Auswerter die Regler einmal
 >   nach. Fachleute sagen **Iteration**. Tausende Runden ergeben einen Sprung.
 
 Programmierwissen brauchst du nicht. Hilfreich ist, wenn du die Ente aus
@@ -66,14 +66,14 @@ gleichzeitig arbeiten lässt).
 
 > **Stell dir vor …** eine Sportschule. Der **Lehrplan** legt fest, was geübt wird. Die **Aufgabe**
 > sagt, wofür es Punkte gibt. In jeder **Turnhalle** turnt eine Ente. **Helfer mit Klemmbrett**
-> schreiben alles mit, was dort passiert. Der **Trainer** wertet die Zettel aus und gibt neue
+> schreiben alles mit, was dort passiert. Der **Auswerter** wertet die Zettel aus und gibt neue
 > **Anweisungen** heraus. Wie viele Hallen gleichzeitig offen sind, hängt davon ab, wie viele
 > Rechenkerne mitarbeiten.
 
-![Lehrplan, Aufgabe und Turnhallen; der Trainer gibt Anweisungen an die Helfer, die Helfer bringen Zettel zurück](../abbildungen/lehrer-rollen.svg)
+![Die Rollen im Lehrer: Lehrplan, Aufgabe und Turnhallen; der Auswerter gibt Anweisungen an die Helfer, die Helfer bringen Zettel zurück](../abbildungen/lehrer-rollen.svg)
 
 Eine Übungsrunde geht so: Die Helfer lassen alle Enten mit den aktuellen Anweisungen turnen und
-schreiben mit. Der Trainer sammelt alle Zettel ein, wertet sie aus und schreibt bessere Anweisungen.
+schreiben mit. Der Auswerter sammelt alle Zettel ein, wertet sie aus und schreibt bessere Anweisungen.
 Das ist **eine** Runde; Tausende ergeben einen Sprung. Vor jeder Runde schaut der Lehrplan außerdem,
 ob es Zeit für strengere Regeln ist („ab jetzt kostet ein Sturz mehr“).
 
@@ -92,6 +92,7 @@ gezeichnet. Das spart Zeit, denn sehen muss beim Üben niemand etwas.
 Ein Takt dauert für die Ente 1/50 Sekunde und läuft immer gleich ab:
 
 ```mermaid
+%% Bildunterschrift: Ein Takt in der Turnhalle, 1/50 Sekunde für die Ente
 flowchart TB
   B["Befehl des Netzes"] --> P["Physik rechnet"]
   P --> M["Messen: Wie geht es ihr?"]
@@ -177,12 +178,15 @@ beginnt den Sprung nicht mit zufälligen Reglern, sondern mit Pollens fertigem S
 > **Stell dir vor …** du willst Rückwärtssalto lernen. Du fängst nicht als Baby an, das erst laufen
 > lernen muss, sondern als jemand, der schon sicher steht. Die ganze Übungszeit geht ins Neue.
 
-Dabei gibt es zwei Kniffe. Erstens übernimmt das Netz auch das gemeinsame Maß von velstand und hält
-es fest. Die Regler von velstand wurden nämlich für genau diese Lautstärke der Musiker eingestellt.
-Würde man die Lautstärken ändern, stimmte die Mischung nicht mehr. Zweitens bekommt der Sprung ein neues Signal,
-das velstand nie gesehen hat (die Uhr des Sprungs, 14.6). Dieser neue Eingang startet abgeschaltet.
-So handelt die Ente anfangs **genau** wie velstand und lernt dann nach und nach, das neue Signal zu
-nutzen.
+Dabei gibt es zwei Kniffe:
+
+1. **Das Maß bleibt, wie es war.** Das Netz übernimmt auch das gemeinsame Maß von velstand und hält
+   es fest. Die Regler von velstand wurden für genau diese Lautstärke der Musiker eingestellt; würde
+   man die Lautstärken ändern, stimmte die Mischung nicht mehr.
+2. **Der neue Eingang steht zuerst auf null.** Der Sprung bekommt ein neues Signal, das velstand nie
+   gesehen hat (die Uhr des Sprungs, 14.6). Wie ein neuer Regler am Mischpult, der zuerst ganz unten
+   steht, ändert er anfangs nichts. So handelt die Ente zu Beginn **genau** wie velstand und lernt
+   dann nach und nach, das neue Signal zu nutzen.
 
 Verstellt werden die Regler mit einem bewährten Verfahren, das sich merkt, in welche Richtung es
 zuletzt ging, und deshalb gleichmäßig vorankommt (Anhang A.6). Wie genau das alles rechnet, steht im
@@ -202,6 +206,7 @@ In Anhang A.11 heißt das „Verbessern mit Gurt“.
 Eine Übungsrunde in fünf Schritten:
 
 ```mermaid
+%% Bildunterschrift: Eine Übungsrunde mit PPO in fünf Schritten
 flowchart TD
   A["1. Üben: alle Enten turnen, mit etwas Neugier"] --> B
   B["2. Zettel sortieren"] --> C
@@ -212,15 +217,19 @@ flowchart TD
 
 1. **Üben.** Jede Ente turnt ein kurzes Stück. Zu jedem Befehl des Netzes kommt etwas Zufall dazu.
    Dieses **Rauschen** ist die Neugier: Ohne es würde die Ente nie etwas Neues ausprobieren.
-2. **Sortieren.** Der Trainer legt alle Zettel in eine feste Reihenfolge, Takt für Takt und Ente für
-   Ente. Wer welche Ente gerechnet hat, spielt danach keine Rolle mehr, damit auf jedem Gerät
-   dasselbe herauskommt (14.7).
+2. **Sortieren.** Der Auswerter legt alle Zettel in eine feste Reihenfolge, Takt für Takt und Ente für
+   Ente, wie Spielkarten, die man vor dem Zählen immer gleich ordnet. Wer welche Ente gerechnet hat,
+   spielt danach keine Rolle mehr. Das ist wichtig, damit auf jedem Gerät bis zur letzten Stelle
+   dasselbe herauskommt; warum schon die Reihenfolge zählt, erklärt 14.7.
 3. **Maß anpassen.** Das gemeinsame Maß aus 14.4 wird an die neuen Zettel angepasst –
    außer es ist wie beim Sprung von velstand übernommen und festgehalten.
-4. **Besser oder schlechter als erwartet?** Für jede Bewegung vergleicht der Trainer, wie viele
+4. **Besser oder schlechter als erwartet?** Für jede Bewegung vergleicht der Auswerter, wie viele
    Punkte danach wirklich kamen, mit dem, was der Kritiker erwartet hatte. Den Unterschied nennt man
-   den **Vorteil**. Positiv heißt: Diese Bewegung war besser als gedacht, davon mehr.
-5. **Ein kleines Stück verstellen.** Der Trainer verstellt die Regler so, dass gute Bewegungen etwas
+   den **Vorteil**. Positiv heißt: Diese Bewegung war besser als gedacht, davon mehr. Dabei zählt
+   nicht nur, was gleich danach kam, sondern auch ein Teil dessen, was noch später folgte, denn
+   eine Bewegung kann sich erst ein paar Takte danach auszahlen, wie ein Ausholen vor dem Sprung
+   (Fachwort **GAE**, Anhang A.11).
+5. **Ein kleines Stück verstellen.** Der Auswerter verstellt die Regler so, dass gute Bewegungen etwas
    wahrscheinlicher werden und schlechte etwas unwahrscheinlicher – aber eine Bewegung wird pro
    Runde höchstens um etwa ein Fünftel wahrscheinlicher oder unwahrscheinlicher. Er verstellt dabei in
    mehreren kleinen Teilschritten und misst vor jedem, wie weit sich das Netz schon verändert hat;
@@ -235,14 +244,15 @@ nicht zu früh ganz verschwindet und die Ente nie aufhört, Neues zu versuchen.
 nicht mehr, und ein gutes Netz kann in einem einzigen Schritt kaputtgehen. Danach sammelt es
 schlechte Zettel, aus denen es sich kaum erholt.
 
-**Sturz oder Zeitablauf?** Eine Episode kann auf zwei Arten enden, und der Trainer behandelt sie
+**Sturz oder Zeitablauf?** Eine Episode kann auf zwei Arten enden, und der Auswerter behandelt sie
 verschieden. Ein **Sturz** ist ein echtes Ende: Danach kommen keine Punkte mehr. Ist dagegen nur die
-**Zeit um**, hätte die Ente weiterstehen können. Dann zählt der Trainer die Punkte, die noch gekommen
+**Zeit um**, hätte die Ente weiterstehen können. Dann zählt der Auswerter die Punkte, die noch gekommen
 wären, mit dazu, so wie der Kritiker sie schätzt. Sonst würde die Ente lernen, dass gutes Stehen am
 Ende der Zeit plötzlich nichts mehr wert ist.
 
-> **Achtung, Falle! Kritiker zuerst.** Nach dem Nachahmen (14.6) kann das handelnde Netz schon
-> springen, aber der Kritiker hat keine Ahnung, was das wert ist. Würde das Netz sofort mitlernen,
+> **Achtung, Falle! Kritiker zuerst.** Beim Sprung lernt das Netz, bevor es nach Punkten übt, erst
+> einmal durch Nachahmen eines Vorbilds (das erzählt 14.6). Danach kann es schon springen, aber der
+> Kritiker hat keine Ahnung, was das wert ist. Würde das Netz sofort mitlernen,
 > steuerten es die Zufallsurteile des Kritikers – und zerstörten das Gelernte. Deshalb lernt in den
 > ersten 30 Übungsrunden **nur der Kritiker**. Erst wenn er vernünftig schätzt, darf das Netz
 > mitlernen.
@@ -264,7 +274,7 @@ sie nie. Es gab drei Gründe:
 - **Stehen ist sicher.** Stehen bringt verlässlich Punkte, ein missglückter Sprungversuch endet im
   Sturz. Also bleibt die Ente lieber stehen.
 - **Zu wenig Erfahrung pro Runde.** Mit wenigen Dutzend Enten sammelt jede Runde wenig Erfahrung.
-  Die Richtung, in die der Trainer die Regler verstellt, ist dann unsicher.
+  Die Richtung, in die der Auswerter die Regler verstellt, ist dann unsicher.
 
 > **Stell dir vor …** du willst einem Hund einen Salto beibringen und gibst nur dann ein Leckerli,
 > wenn er zufällig einen macht. Du wartest ewig. Zeigst du ihm die Bewegung Stück für Stück, geht
@@ -288,9 +298,11 @@ Welche 15 Zahlen ergeben einen guten Sprung? Ausrechnen lässt sich das nicht �
 eine ganze Physiksimulation. Man kann nur ausprobieren und schauen, wie gut der Sprung wird. Das
 macht ein Suchverfahren namens **CMA-ES** (Anhang A.13).
 
-> **Stell dir vor …** du suchst im Dunkeln die tiefste Stelle eines Sees und wirfst jedes Mal
-> 16 Steine um dich herum. Wo es am tiefsten plumpst, gehst du hin – und merkst dir, in welche
-> Richtung es tiefer wird.
+> **Stell dir vor …** du suchst nachts mit 15 Freunden den tiefsten Punkt eines Sees, jeder mit einem
+> Senklot im eigenen Boot. Ihr verteilt euch wie eine **Wolke** um einen Mittelpunkt, ruft eure
+> Tiefen, und der Mittelpunkt wandert dorthin, wo es am tiefsten war. Merkt ihr, dass der See in
+> einer Richtung lang abfällt, verteilt ihr euch in diese Richtung weiter. (Dasselbe Bild steht in
+> Anhang A.13.)
 
 Jede Runde mit 16 Versuchen heißt **Generation**. Jeder Versuch springt mehrmals, einmal auf dem
 sauberen Roboter und mehrmals mit Variation, und bekommt eine Note: Steigen, Flugzeit und Höhe
@@ -301,10 +313,10 @@ Bonus. Zwei Regeln machen die Suche ehrlich:
   Generation bekommt aber neue. So setzt sich kein Vorbild durch, das nur bei ein paar Glücks-Enten
   funktioniert.
 - **Die Mitte statt des Besten:** Am Ende nimmt der Lehrer nicht den besten Einzelversuch, sondern
-  die Mitte der Steinwolke. Der beste Einzelne kann einfach Glück gehabt haben; die Mitte ist
+  den Mittelpunkt der Bootswolke. Der beste Einzelne kann einfach Glück gehabt haben; die Mitte ist
   verlässlicher.
 
-Das eingebaute Vorbild brauchte zusammen 370 Generationen. Kern benutzt dieselbe Suche auch, um die
+Kern benutzt dieselbe Suche auch, um die
 simulierten Motoren an echte anzupassen ([Kapitel 16](16-kalibrierung.md)).
 
 ### Nachahmen mit Korrektur
@@ -407,8 +419,10 @@ außer Sicht, dazu Variation und eine Kamera, die manchmal danebenliegt oder kur
 Punkte gibt es vor allem für einen weggekickten Ball und eine weggetragene und ausgespuckte Socke.
 Die Punkte darf der Lehrer aus der Wahrheit berechnen, etwa wie nah die Ente dem echten Ziel
 gekommen ist, denn die Punkte gibt es nur beim Lernen. Das handelnde Netz selbst sieht die Wahrheit
-nie. Gelingt der Kick oder ist die Socke abgelegt, endet die Übung wie bei einem Zeitablauf, nicht
-wie bei einem Sturz (14.5): Erfolg ist kein Scheitern.
+nie. Gelingt der Kick oder ist die Socke abgelegt, endet die Übung. Der Auswerter behandelt dieses
+Ende wie einen Zeitablauf, nicht wie einen Sturz (14.5): Nach einem Sturz kommen keine Punkte mehr,
+und das soll die Ente fürchten. Würde ein Erfolg genauso zählen, lernte sie, dass Kicken „tödlich“
+ist, und ließe es lieber. Erfolg ist kein Scheitern.
 
 **Das Vorbild darf nicht mehr wissen als das Netz.** Das ist hier das wichtigste Prinzip. Das Vorbild
 sieht genau dieselben Beobachtungen wie das Netz (13.11), keine wahren Positionen von Ball und Socke. Wüsste es
@@ -435,15 +449,11 @@ Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8, 
 | | sauberer Roboter | volle Variation |
 |---|---|---|
 | Ball weggekickt | 9 von 11 | 7 von 11 |
-| Socke aufgehoben | 4 von 21 | 13 von 21 |
 | Socke getragen und ausgespuckt | 1 von 21 | 0 von 21 |
-| Stürze | 2 von 32 | 10 von 32 |
 
 Der **Ball ist gelernt**: Das Netz stellt den linken Fuß hinter den Ball und startet Pollens Kick;
-passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt zu. Mit Variation hebt
-die Ente die Socke sogar öfter auf, hält sie aber trotzdem fast nie bis zum Ende. Denn der Biss hält
-in der Simulation selten: Von 14 Bissversuchen auf dem sauberen Roboter hielten nur 2 bis zum Schluss.
-Der Engpass ist also der **Griff in dieser Physik**, nicht die Entscheidung. Als Nächstes kommen eine
+passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt zu, aber der Biss hält in
+der Simulation selten, und die Socke rutscht beim Tragen heraus. Der Engpass ist also der **Griff in dieser Physik**, nicht die Entscheidung. Als Nächstes kommen eine
 Socke, die sich wie Stoff in den Schnabel legt, und das Üben nach Punkten.
 
 > **Für Neugierige:** Szenen, Punkte, Toleranzen des Vorbilds und die Größe des Gitters stehen im
@@ -496,18 +506,23 @@ Die genauen Bausteine und Beschriftungen der Datei stehen im blauen Buch, Kapite
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite im Browser](../buch/bilder/lehrer.png)
+![Die Lehrer-Seite im Browser während eines Trainings: oben die Einstellungen, darunter die Anzeigen und die Kurven von Episoden-Rückgabe und Episodenlänge](../buch/bilder/lehrer.png)
 
 Auf der **Lehrer-Seite** (Adresse: kernengine.de/lehrer/) kannst du selbst trainieren, ohne etwas zu
 installieren. Mehrere Hintergrund-Prozesse des Browsers teilen sich die Arbeit: Einige lassen Enten
-turnen (die Helfer), einer lernt (der Trainer).
+turnen (die Helfer), einer lernt (der Auswerter).
 
 Oben wählst du die **Bewegung**: „Sprung“ oder „Stehen (Schnelltest)“. Die übrigen Felder (Worker,
 Enten je Worker, Iterationen, Seed, Aktionsrauschen, Lernrate) kannst du auf ihren Voreinstellungen
 lassen. Die Seite zeigt laufend, wie es steht. Die wichtigsten Anzeigen:
 
-- **mittlere Episoden-Rückgabe:** die Punkte einer ganzen Episode, im Mittel über alle Enten.
-  Steigt sie über viele Runden, lernen die Enten.
+- **mittlere Episoden-Rückgabe:** die Punkte einer ganzen Episode zusammengezählt, im Mittel über
+  alle Enten. Steigt sie über viele Runden, lernen die Enten. (Beim Lernen selbst rechnet der
+  Auswerter mit einer Variante, dem **Return**: nur die Punkte ab jetzt, spätere etwas weniger wert,
+  Anhang A.10.)
+- **Aktionsrauschen (std):** wie viel Zufall noch zu den Befehlen kommt, also die Neugier aus 14.5
+  („std“ ist die Abkürzung für das Fachwort Standardabweichung, ein Maß für die Streuung). Es sinkt,
+  wenn die Ente sicherer wird.
 - **Episodenlänge (s):** wie lange eine Episode im Mittel dauert. Kurz heißt: Die Enten fallen früh
   um. Beim Stehen geht eine Episode höchstens 4 Sekunden, beim Sprung 2.
 - **echte Sprünge:** wie viele von 5 Probesprüngen auf dem sauberen Roboter echt waren. Das ist das
@@ -553,7 +568,8 @@ steht im blauen Buch, Kapitel 14.12.
 1. Warum darf der Kritiker Dinge sehen, die kein Sensor misst, das handelnde Netz aber nicht?
 2. Eine Steh-Episode endet nach 4 Sekunden ohne Sturz. Warum tut der Lehrer nicht so, als kämen
    danach keine Punkte mehr?
-3. Warum nimmt die Vorbildsuche am Ende die Mitte der Steinwolke und nicht den besten Einzelversuch?
+3. Warum nimmt die Vorbildsuche am Ende den Mittelpunkt der Bootswolke und nicht den besten
+   Einzelversuch?
 4. Du lässt denselben Lauf einmal mit 2 und einmal mit 8 Rechenkernen laufen. Was muss gleich
    bleiben, damit dasselbe Netz herauskommt?
 5. Warum endet eine Sprung-Episode, sobald der Schnabel den Boden berührt?

@@ -1,8 +1,8 @@
 # 11 Kern Studio: Deine Werkstatt im Browser
 
 > **Kurz gesagt:** Kern Studio ist der Editor der Kern-Engine. Du baust darin Levels aus Actors und
-> Komponenten, spielst sie mit einem Klick direkt im Fenster und machst daraus eine einzige HTML-Datei,
-> die überall läuft. Dieses Kapitel ist eine geführte Tour: Mach am besten Studio auf und klick mit.
+> Komponenten, spielst sie mit einem Klick direkt im Fenster und machst daraus eine einzige HTML-Datei
+> (HTML ist das Dateiformat von Webseiten, jeder Browser kann es öffnen), die überall läuft. Dieses Kapitel ist eine geführte Tour: Mach am besten Studio auf und klick mit.
 
 > **Begriffe vorab:**
 > - **Editor** – ein Bearbeitungsprogramm, hier: die Werkstatt, in der du Spielwelten baust.
@@ -19,11 +19,12 @@
 Die Tour geht so: Erst schauen wir uns in der Werkstatt um. Dann lernst du, woraus ein Level besteht,
 wie du es von allen Seiten anschaust, Dinge auswählst und bewegst und Fehler rückgängig machst. Danach
 erweckst du dein Level mit **Spielen** (Play) und **Simulieren** (Simulate) zum Leben, gibst ihm
-mit dem Logik-Editor Regeln und machst daraus ein fertiges Spiel. Die Begriffe (Actor, Viewport, Outliner …) sind dieselben wie in
+mit dem Logik-Editor Regeln und machst daraus ein fertiges Spiel. Die Begriffe (Actor, Viewport,
+Outliner …), die du in 11.2 kennenlernst, sind dieselben wie in
 großen Profi-Werkzeugen der Spielebranche, etwa der Unreal Engine; wer die kennt, fühlt sich sofort zu
 Hause.
 
-![Kern Studio mit dem Level Orb Run: Menüleiste, Toolbar, Viewport, Outliner und Details](../buch/bilder/studio.png)
+![Kern Studio mit Orb Run: oben Menüleiste und Toolbar, in der Mitte der Viewport, rechts Outliner und Details, unten die Statusleiste](../buch/bilder/studio.png)
 
 > **Wusstest du?** Was du im Studio siehst, rechnet **genau derselbe Code**, der später dein
 > exportiertes Spiel ausführt. Was im Editor funktioniert, funktioniert also auch im fertigen Spiel
@@ -31,8 +32,9 @@ Hause.
 
 > **Wusstest du?** Auf einem deutschen System zeigt Studio deutsche Beschriftungen. Dieses Buch nennt
 > die Beschriftungen, wie Studio sie auf Deutsch zeigt, in Klammern die englischen, etwa
-> **Datei** (File). Wer Studio auf Englisch nutzt (Knopf **DE | EN** unten rechts in der Statusleiste
-> oder `?lang=en`), findet sie dort. Was du selbst eintippst, etwa Befehle in der Konsole, ist in
+> **Datei** (File). Wer Studio auf Englisch nutzt (Knopf **DE | EN** unten rechts in der
+> Statusleiste), findet sie dort. Nur der Logik-Editor, das Protokoll und die Konsole bleiben auch
+> in der deutschen Oberfläche englisch (11.10). Was du selbst eintippst, etwa Befehle in der Konsole, ist in
 > beiden Sprachen gleich.
 
 ---
@@ -136,7 +138,8 @@ Die vollständige Liste steht im blauen Buch, Kapitel 11.
 Ganz unten stehen die letzte Meldung, der Lautsprecher (Ton an/aus), wie viele Actors ausgewählt sind
 und die laufende Version. Das Feld **Cmd** ist die **Konsole**: eine Zeile, in die du Befehle
 tippst, statt zu klicken. `help` listet alle auf. Ein paar Beispiele: `spawn physics_cube` setzt eine
-Physik-Kiste, `tod 0.8` stellt die Tageszeit, `gravity 0 0 -1.6` ändert die Schwerkraft.
+Physik-Kiste, `tod 0.8` stellt die Tageszeit (englisch „time of day“; die Zahl läuft von 0 bis knapp
+1 einmal durch den ganzen Tag), `gravity 0 0 -1.6` ändert die Schwerkraft.
 
 Die drei Zahlen bei `gravity` sagen, in welche Richtung und wie stark es zieht: links/rechts,
 vorn/hinten, oben/unten. In Kern zeigt die dritte Achse nach oben, das Minus heißt also: nach unten.
@@ -167,10 +170,10 @@ dort, wo du sie hingestellt hast.
 | Komponente | Was sie tut |
 |---|---|
 | **Statisches Mesh** | Form (Würfel, Kugel, Zylinder, Rampe …) mit Farbe und Material |
-| **Starrkörper** | Physik: **Statisch** (Static) steht fest, **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)) fällt und rollt, **Kinematisch** (Kinematic) bewegt sich nach Plan, lässt sich aber nicht schubsen |
+| **Starrkörper** | Physik; das Feld **Mobilität** (Mobility) wählt: **Statisch** (Static) steht fest, **Dynamisch (Physik simulieren)** (Dynamic (simulate physics)) fällt und rollt, **Kinematisch** (Kinematic) bewegt sich nach Plan, lässt sich aber nicht schubsen |
 | **Kollider** (Collider) | eine Form zum Anstoßen, mit Reibung und Sprungkraft |
 | **Gelenk** (Constraint) | Scharnier, Schiene, Seil, Rad, Motor … |
-| **Spieler-Steuerung** (Player Controller) | macht den Actor steuerbar (Hovercar, Ball, Läufer, Soldat …) |
+| **Spieler-Steuerung** (Player Controller) | macht den Actor steuerbar (Hovercar, rollende Kugel, Figur, Soldat, Läufer wie die Ente …) |
 | **Pickup** | einsammelbar: Punkte, Heilung, Munition |
 | **Trigger** | eine unsichtbare Zone: Ziel, Gefahr, Checkpoint, Teleporter … |
 | **Waffe** (Weapon), **Gesundheit** (Health) | Waffe und Lebenspunkte |
@@ -188,13 +191,13 @@ Fertige Actors liegen in der **Inhaltsablage** (Content Drawer), der Bauteil-Sch
 (**Strg+Leertaste**). Unter **Actors platzieren** (Place Actors) findest du über 40 Stück, sortiert in
 Gruppen:
 
-- **Spieler** (Players): Spielfiguren wie Soldat, Läufer, Hovercar, rollende Kugel, Drohne und die
-  Micro Duck.
+- **Spieler** (Players): Spielfiguren wie **Figur** (Character), Soldat, Hovercar, rollende Kugel,
+  Drohne und die Micro Duck.
 - **Spielablauf** (Gameplay): Orbs und Sterne zum Sammeln, Heilpakete, Ziel, Gefahrenzone,
   Checkpoint, Sprungfeld, Teleporter, bewegliche Plattform, explodierendes Fass …
 - **Formen** (Shapes): einfache Formen wie **Würfel** (Cube), **Kugel** (Sphere), **Zylinder**
   (Cylinder), **Rampe** (Ramp).
-- **Physik** (Physics): Kisten, Fässer, ein Kistenstapel, Pendel, Tür, Kette, Wippe und eine Socke in
+- **Physik** (Physics): Kisten wie der **Physik-Würfel** (Physics Cube), Fässer, ein Kistenstapel, Pendel, Tür, Kette, Wippe und eine Socke in
   Entengröße.
 - **Lichter** (Lights), **Audio**, **Welt** (World): Lampen, Klangquellen und die Stadt.
 
@@ -233,8 +236,11 @@ sich dreht. Am schnellsten geht das so:
 
 Studio gibt dem hängenden Actor dabei Physik, falls er noch keine hat.
 
-> **Probier's aus!** Setze einen **Würfel** (Cube) und schieb ihn mit dem Gizmo hoch in die Luft,
-> daneben einen **Physik-Würfel** (Physics Cube), ebenfalls ein Stück in der Luft. Im Outliner heißen
+> **Probier's aus!** (Wie Auswählen und das Gizmo genau gehen, steht in 11.5; für diese Mission
+> genügt: Klick wählt aus, an den bunten Pfeilen ziehst du.) Setze aus **Inhaltsablage › Formen**
+> (Content Drawer › Shapes) einen **Würfel** (Cube) und schieb ihn am blauen Pfeil des Gizmos hoch in
+> die Luft, daneben aus **Inhaltsablage › Physik** (Content Drawer › Physics) einen **Physik-Würfel**
+> (Physics Cube), ebenfalls ein Stück in der Luft. Im Outliner heißen
 > die beiden neuen Actors etwa „Cube 2“ und „Physics Cube 2“, denn Studio vergibt jeden Namen nur
 > einmal. Wähle erst den neuen Physik-Würfel, dann mit Strg den neuen Würfel, und verbinde
 > sie mit **Abstand / Seil**. Jetzt **Simulieren** (Simulate): Die Kiste schwingt am Seil wie ein
@@ -302,9 +308,8 @@ Alle weiteren Kombinationen (Kreisen, Schwenken, Kamera-Lesezeichen) stehen in
 Finger zoomen und verschieben, Tippen wählt aus, zweimal Tippen holt die Auswahl ins Bild, langes Halten
 öffnet das Kontextmenü.
 
-> **Stell dir vor …** du zoomst mit zwei Fingern auf eine Socke und danach auf einen Häuserblock. Es
-> fühlt sich beide Male gleich an, denn Studio misst den Maßstab am Abstand zu dem Punkt unter deinen
-> Fingern. Was unter den Fingern liegt, bleibt dort.
+> **Stell dir vor …** du ziehst eine Landkarte mit zwei Fingern größer: Der Ort unter deinen Fingern
+> bleibt unter deinen Fingern, egal ob du auf eine Socke oder auf einen Häuserblock zoomst.
 
 ---
 
@@ -317,8 +322,10 @@ auswählen wolltest.
 
 ### Auswählen
 
-- Klick wählt aus, Umschalt+Klick fügt hinzu, Strg+Klick schaltet um, ein Klick ins Leere hebt
-  die Auswahl auf.
+- Im Viewport: Klick wählt aus, Umschalt+Klick fügt hinzu, Strg+Klick schaltet um, ein Klick ins
+  Leere hebt die Auswahl auf.
+- Im Outliner wirkt Umschalt+Klick wie bei einer Dateiliste: Es fügt **alles zwischen** dem zuletzt
+  gewählten und dem angeklickten Actor hinzu. Strg+Klick nimmt einzelne dazu oder heraus.
 - Linkes Ziehen fängt alle Actors ein, die im Rahmen liegen.
 - Lampen und leere Actors haben keine sichtbare Form; du wählst sie über ihr Symbol.
 - Der **zuletzt** gewählte Actor ist der wichtigste: An ihm sitzt das Gizmo.
@@ -356,8 +363,9 @@ gerade. Die Schrittweite wählst du in der Toolbar neben den Knöpfen **Am Raste
 
 ### Outliner und Details
 
-Der **Outliner** ist die Liste aller Actors. Hier wählst du aus, benennst um (Doppelklick auf einen
-Ordner, F2 auf einen Actor), blendest mit dem Auge ein und aus und hängst durch Ziehen Actors
+Der **Outliner** ist die Liste aller Actors. Hier wählst du aus, holst einen Actor mit einem
+**Doppelklick** auf seinen Namen ins Bild, benennst um (F2 auf einen Actor, Doppelklick auf einen
+Ordner), blendest mit dem Auge ein und aus und hängst durch Ziehen Actors
 aneinander (11.3). Der Actor, den du beim Spielen steuerst, trägt das Abzeichen **SPIELER** (PLAYER).
 
 **Details** zeigt die Eigenschaften der Auswahl: oben Name und **Transformation** (Transform), darunter
@@ -369,7 +377,7 @@ eine Änderung gilt für alle. Drei Kniffe:
 - Ein kleiner Pfeil rechts neben einem Feld, **Auf Standard zurücksetzen** (Reset to default), setzt
   den Wert auf den Standard zurück.
 
-![Ausgewählter Actor mit Verschiebe-Gizmo und seinen Komponenten in Details](../buch/bilder/studio-selected.png)
+![Ein ausgewählter Actor: am Actor das Gizmo, rechts in Details seine Transformation und Komponenten](../buch/bilder/studio-selected.png)
 
 ---
 
@@ -411,7 +419,7 @@ die Level-Datei bleibt also vollständig.
 
 **Sounds:** Ein Klick hört einen Ton an, ein **Doppelklick** gibt ihn der Auswahl als Klangquelle,
 Ziehen in den Viewport setzt eine Klangquelle an diese Stelle. **Audio importieren** (Import audio)
-nimmt eigene Tondateien (WAV, MP3, OGG, M4A, FLAC).
+nimmt eigene Tondateien in den üblichen Formaten.
 
 > **Achtung, Falle!** Du hörst nichts? Browser erlauben Ton erst nach dem ersten Klick oder
 > Tastendruck. Einmal ins Studio klicken, dann klingt es.
@@ -428,11 +436,12 @@ fürs ganze Level. Er hat vier Gruppen:
 
 - **Spiel** (Game): die Spielregeln. Wann gewinnt man (alle Orbs gesammelt, Ziel erreicht, Zeit
   überlebt, Punktzahl geschafft)? Gibt es ein Zeitlimit? Und **Kill-Z** (Kill Z): eine Höhe, unter die
-  man nicht fallen darf. Wer tiefer fällt, fängt von vorn an.
+  man nicht fallen darf; Z ist die Achse nach oben (Achsenkreuz, 11.4). Wer tiefer fällt, wird
+  zurückgesetzt, etwa an den letzten Checkpoint, und spielt weiter; verloren hat er damit nicht.
 - **Himmel und Licht** (Sky and light): Tageszeit, wie schnell der Tag vergeht, Sonnenstand, Nebel,
   Wolken, Boden.
-- **Physik (Box3D)** (Physics (Box3D)): die Schwerkraft und wie genau und wie oft die Physik rechnet
-  ([Kapitel 6](06-physik.md)).
+- **Physik (Box3D)** (Physics (Box3D)): die Schwerkraft und wie genau und wie oft die Physik rechnet.
+  Box3D ist die Physik-Engine, die in Kern steckt ([Kapitel 6](06-physik.md)).
 - **Audio**: Lautstärken, Hall und den Doppler-Effekt, den Martinshorn-Effekt: Ein vorbeifahrendes
   Martinshorn klingt erst höher, dann tiefer ([Kapitel 7](07-audio.md)).
 
@@ -495,7 +504,7 @@ Ziehen bewegt ihn, und Loslassen **wirft** ihn mit Schwung.
 > Outliner die Kisten (die erste anklicken, die letzte mit Umschalt) und drück **K**: Der eingestürzte
 > Stapel bleibt so liegen, als wäre er immer schon umgefallen.
 
-![Physics Lab: Gelenke in der Simulation](../buch/bilder/studio-physics-lab.png)
+![Physics Lab beim Simulieren: Seilbrücke, Tür, Pendel und Kistenstapel; die Statusleiste zählt Körper und Gelenke](../buch/bilder/studio-physics-lab.png)
 
 ### Zuschauen mit der Beobachterkamera
 
@@ -507,11 +516,12 @@ wieder zu. Das Level Micro Duck startet so.
 ### Am Telefon und mit dem Gamepad
 
 Kern merkt selbst, womit du gerade spielst (Finger, Tastatur oder Gamepad), und schaltet um. Am
-Touchscreen liegen unten zwei Sticks: **LAUFEN** (MOVE) links bewegt, **SCHAUEN** (LOOK) rechts
-schaut. Daneben erscheinen Knöpfe passend zur Figur, beim Soldaten etwa **SPRUNG** (JUMP),
-**LADEN** (RELOAD) und **ZIELEN** (AIM). Oben links stehen **⟵ ENDE** (⟵ EXIT) und **❚❚ PAUSE**.
+Touchscreen liegen unten zwei Sticks: Der linke bewegt, der rechte schaut (**SCHAUEN**, LOOK). Ihre
+Beschriftung und die Knöpfe daneben passen sich der Figur an: Beim Soldaten heißt der linke Stick
+**LAUFEN** (MOVE), daneben liegen etwa **SPRUNG** (JUMP), **LADEN** (RELOAD) und **ZIELEN** (AIM);
+beim Hovercar heißt er **LENKEN / GAS** (STEER / GAS), dazu kommen **BOOST**, **DRIFT** und **LIFT**. Oben links stehen **⟵ ENDE** (⟵ EXIT) und **❚❚ PAUSE**.
 
-![Spielen am Telefon im Hochformat: ⟵ ENDE, ❚❚ PAUSE und die Touch-Sticks](../buch/bilder/phone-play-390.png)
+![Orb Run am Telefon im Hochformat: oben ⟵ ENDE und ❚❚ PAUSE, unten die Touch-Sticks LENKEN / GAS und SCHAUEN](../buch/bilder/phone-play-390.png)
 
 Ein **Gamepad** (Spielecontroller) funktioniert im Studio und im fertigen Spiel: linker Stick bewegen,
 rechter schauen. Kleines Wackeln der Sticks ignoriert Kern. Die ganze Belegung und alle
@@ -591,9 +601,8 @@ gleichzeitig abtastet). Rot ist ein Hindernis, heller je näher, grün der Boden
 
 Jede Bewegung der Ente ist ein eigenes Netz. Das Laufen ist fest eingebaut, die übrigen Bewegungen
 (Sitzen, Kicken, Springen …) holt Studio aus dem Internet nach, sobald ein Level eine Ente enthält.
-Klappt das nicht, gibt Studio nicht auf: Es versucht es erneut und wartet dazwischen immer etwas
-länger, damit es die Leitung nicht verstopft. Bis dahin startet diese Bewegung einfach nicht; die Ente
-läuft und steht weiter mit ihrem eingebauten Laufnetz.
+Klappt das nicht, versucht Studio es später erneut; bis dahin läuft die Ente mit ihrem eingebauten
+Laufnetz weiter.
 Trainierst du mit dem Kern Lehrer selbst ein neues ([Kapitel 14](14-lehrer.md)), nimmt Studio
 automatisch deins. Die Einzelheiten stehen in [Kapitel 13](13-micro-duck.md).
 
@@ -650,7 +659,8 @@ spielen kann.
 3. **Verpacken** (Package) klicken. Studio lädt eine Datei `<Titel>.html` herunter und bietet
    **Spielen** (Play it) an.
 
-Diese **eine Datei** ist ein komplettes Spiel: Die Engine und dein Level stecken darin. Sie braucht
+HTML ist das Dateiformat von Webseiten. Darum öffnet ein Doppelklick auf die Datei sie in deinem
+Browser, genau wie eine Webseite. Diese **eine Datei** ist ein komplettes Spiel: Die Engine und dein Level stecken darin. Sie braucht
 keinen Server und kein Internet, läuft in jedem Browser, auch direkt von der Festplatte und am Telefon,
 und startet sofort das Spiel statt des Editors. Die Steuerung ist dieselbe wie beim Spielen im Studio;
 **P** pausiert, **R** startet nach Sieg oder Niederlage neu. Online spielen kann die Datei auch
@@ -661,11 +671,11 @@ und startet sofort das Spiel statt des Editors. Die Steuerung ist dieselbe wie b
 > der Ente darf nur **nicht kommerziell** genutzt werden. Was du darfst und was du mitgeben musst,
 > steht in [Kapitel 12](12-eigene-spiele.md).
 
-> **Probier's aus!** Exportiere Orb Run und starte die Datei mit **Spielen**. Dann schick sie dir selbst
-> aufs Telefon, zum Beispiel als E-Mail-Anhang (manche Mailprogramme blockieren solche Anhänge, dann
-> nimm einen Cloud-Speicher oder schick sie per Messenger als Datei), und öffne sie dort. Je nach Telefon öffnet sie sich
-> direkt im Browser, sonst wählst du „Öffnen mit“ und deinen Browser. Die Touch-Sticks erscheinen von
-> selbst.
+> **Probier's aus!** Exportiere Orb Run und starte die Datei mit **Spielen**. Dann bring sie aufs
+> Telefon: Am zuverlässigsten legst du sie in einen Cloud-Speicher, den du auch am Telefon benutzt
+> (E-Mail-Anhänge mit HTML-Dateien blockieren manche Mailprogramme). Öffne sie am Telefon; zeigt das
+> Telefon sie nicht gleich als Spiel, wähl „Öffnen mit“ und deinen Browser. Die Touch-Sticks
+> erscheinen von selbst.
 
 ---
 
@@ -685,7 +695,7 @@ Wie Kern Spieler übers Netz verbindet, erklärt [Kapitel 10](10-netzwerk.md). H
 
 Was du dabei beobachten kannst, beschreibt die Mission in [Kapitel 10](10-netzwerk.md), Abschnitt 10.8.
 
-![Zwei Spieler im Editor: Listen-Server und lokaler Client in eigenen Viewports](../buch/bilder/studio-multiplayer.png)
+![Zwei Spieler auf einem Rechner: Server und Gast in eigenen Viewports, jeder mit eigenem HUD](../buch/bilder/studio-multiplayer.png)
 
 ### Online zwischen Browsern
 
@@ -714,9 +724,9 @@ Auf kleinen Bildschirmen räumt Studio die Werkstatt um, damit die Welt Platz ha
   Seite in den Hintergrund, lässt Kern alle Eingaben los. Sonst liefe deine Figur weiter, als hielte
   noch jemand den Stick.
 
-![Studio in einem 820 px breiten Fenster](../buch/bilder/studio-narrow.png)
+![Studio in einem schmalen Fenster: Der Viewport bekommt fast die ganze Fläche](../buch/bilder/studio-narrow.png)
 
-![Telefon im Hochformat: das Dock mit Spielen, Simulieren und dem Knopf Outliner und Details](../buch/bilder/phone-dock-390.png)
+![Studio am Telefon im Hochformat: rechts in der Toolbar das Dock mit Spielen und Simulieren, oben rechts das Symbol für Outliner und Details](../buch/bilder/phone-dock-390.png)
 
 > **Probier's aus!** Öffne Studio auf deinem Telefon. Tipp im Dock auf Spielen, dann auf
 > **⟵ ENDE** (⟵ EXIT). Öffne **Outliner und Details**, wähle im Outliner einen Actor und ändere in

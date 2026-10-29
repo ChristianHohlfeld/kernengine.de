@@ -48,6 +48,7 @@ Eine Ente in Kern besteht aus Schichten, wie ein Tier: ein **Körper** aus Glied
 obendrauf Kerns **Spielschicht** für Ball und Socke. Dieses Kapitel geht von unten nach oben.
 
 ```mermaid
+%% Bildunterschrift: Die Schichten der Ente, vom Körper bis zur Spielschicht
 flowchart BT
   K[Körper und Gelenke] --> S[Servos]
   S --> N[Bewegungsnetze]
@@ -125,8 +126,8 @@ Kerns Physik kann so eine Getriebeträgheit nicht direkt eintragen. Darum bekomm
 schwerfälliger, wie der Motor hinter dem Getriebe. Wie Pollens Training das anders löst, steht im
 blauen Buch, Kapitel 13.
 
-Perfekt ist der Trick nicht, denn die Scheibe dreht sich mit dem Glied statt dreihundertmal so
-schnell. Aber gemessen läuft die Ente damit deutlich näher am Training und zappelt viel weniger
+Perfekt ist der Trick nicht: Die Scheibe dreht sich nur so schnell wie das Glied, nicht
+dreihundertmal so schnell wie der echte Motor. Sie bremst darum nur ungefähr so wie er. Aber gemessen läuft die Ente damit deutlich näher am Training und zappelt viel weniger
 (13.14).
 
 ### Was die Welt berührt
@@ -142,8 +143,9 @@ nicht über den Boden wie auf Eis.
 Neu in Kern: **Materialpaare**. Wie stark zwei Dinge aneinander haften, hängt von beiden ab.
 Normalerweise schätzt eine Physik-Engine die Reibung zweier Stoffe einfach aus deren Einzelwerten, als
 eine Art Mittelwert. Für manche Paare stimmt das nicht: Wie fest das weiche Schnabelpolster Baumwolle
-hält, folgt nicht aus den Einzelwerten. Für solche Paare trägt Kern einen eigenen, gemessenen Wert ein; für die
-Socke ist das wichtig. Im Micro-Duck-Level ist der Boden aus Holz.
+hält, folgt nicht aus den Einzelwerten. Für solche Paare trägt Kern einen eigenen, gemessenen Wert ein.
+Für die Socke ist das wichtig: Der Boden im Micro-Duck-Level ist aus Holz, und wie stark eine
+Baumwollsocke auf Holz haftet, bekommt darum ebenfalls einen eigenen Wert.
 
 ### Maßstab 4: die Ente als Riesin
 
@@ -218,16 +220,26 @@ Die genauen Werte und das Gesetz als Formel stehen im blauen Buch, Kapitel 13.
 ## 13.5 Der Takt
 
 Zwei Uhren ticken in der Ente. Die **Physik** rechnet die Welt in sehr kleinen Schritten weiter. Das
-**Netz** denkt seltener nach: nur bei jedem vierten Physikschritt, 50-mal pro Sekunde. Dazwischen
-halten die Servos einfach ihr letztes Ziel.
+**Netz** denkt seltener nach: nur bei jedem vierten Physikschritt. Dazwischen halten die Servos
+einfach ihr letztes Ziel.
 
 > **Stell dir vor …** die Physik ist der Sekundenzeiger, der unermüdlich tickt. Das Netz ist jemand,
 > der nur bei jedem vierten Tick auf die Uhr schaut und dann entscheidet, was als Nächstes kommt.
 
-Genau so war es im Training, und genau so muss es in Kern sein. Hier hilft die Zeitlupe aus 13.3:
-Weil die Riesen-Ente in Zeitlupe läuft, darf auch jeder Physikschritt doppelt so lang sein. In
-Entenzeit gerechnet ist er genau gleich lang wie im Training. Kern rechnet das beim Start jeder Ente
-selbst aus.
+Genau so war es im Training, und genau so muss es in Kern sein. Im Training rechnet die Physik
+200 Schritte pro Sekunde, und das Netz denkt 50-mal pro Sekunde. Hier hilft die Zeitlupe aus 13.3,
+und ein Zahlenbeispiel macht es klar:
+
+| | pro Sekunde Weltzeit | pro Sekunde Entenzeit |
+|---|---|---|
+| Physikschritte | 100 | 200, wie im Training |
+| Entscheidungen des Netzes | 25 | 50, wie im Training |
+
+**Weltzeit** ist die Zeit auf deiner Uhr, **Entenzeit** die Zeit, wie die Riesen-Ente sie erlebt.
+Studio rechnet 100 Schritte pro Sekunde Weltzeit; darum steht als **Schrittrate** (Step rate) in den
+Welteinstellungen 100. Weil die Riesen-Ente doppelt so langsam lebt, vergeht in einer Sekunde
+Weltzeit für sie nur eine halbe Sekunde. Also gilt: **100 Schritte pro Sekunde Weltzeit = 200 in
+Entenzeit**, genau wie im Training. Kern rechnet das beim Start jeder Ente selbst aus.
 
 Ein Befehl kommt auch nicht sofort beim Servo an. Er braucht ein paar Hundertstelsekunden, wie ein
 Brief, der unterwegs ist. Kern lässt jeden Befehl darum genau so lange warten wie am echten Roboter.
@@ -247,16 +259,13 @@ Gummitier. Viele kleine Schritte halten die Kette fest zusammen.
 > **Schrittrate** (Step rate) und die **Teilschritte** (Sub-steps), also die Zwischenschritte. Einstellen musst du
 > nichts: Die Botschaft ist, dass Studio die Physik für die Ente selbst feiner gestellt hat.
 
-### Das Zeitkonto
+### Das Sparschwein
 
 Der Bildschirm liefert seine Bilder nicht im Takt der Physik. Mal kommt ein Bild früher, mal später.
-Damit die Ente trotzdem in festen Schritten lebt, führt Kern ein **Zeitkonto**: Jedes Bild zahlt die
-vergangene Zeit ein, die Simulation hebt sie nur in ganzen, gleich großen Schritten ab, und der Rest
-wartet auf das nächste Bild. Gezeichnet wird ein weicher Übergang zwischen den letzten beiden
-Schritten, damit nichts ruckelt ([Kapitel 8](08-spiel-laufzeit.md)).
-
-> **Stell dir vor …** ein Sparschwein. Das Taschengeld kommt unregelmäßig, mal mehr, mal weniger. Aber
-> ausgegeben wird nur in ganzen Euro. Was übrig bleibt, bleibt im Schwein bis zum nächsten Mal.
+Damit die Ente trotzdem in festen Schritten lebt, benutzt Kern das **Sparschwein** aus
+[Kapitel 6](06-physik.md), 6.12: Jedes Bild zahlt die vergangene Zeit ein, die Simulation hebt sie
+nur in ganzen, gleich großen Schritten ab, und der Rest wartet im Schwein auf das nächste Bild.
+Gezeichnet wird ein weicher Übergang zwischen den letzten beiden Schritten, damit nichts ruckelt.
 
 ## 13.6 Die Netze der Ente
 
@@ -291,7 +300,7 @@ Es läuft immer **nur eine** Bewegung. Wollen mehrere gleichzeitig, gilt eine fe
 
 Aus dem Sitzen heraus startet keine Bewegung; die Taste bleibt dann einfach ohne Wirkung. (Ein
 Programm, das die Ente steuert, bekommt den Grund als Antwort, etwa „the robot is sitting - stand it
-up first“, 13.13.)
+up first“, auf Deutsch „der Roboter sitzt – stell ihn zuerst auf“, 13.13.)
 
 > **Achtung, Falle!** Fehlt das Netz einer Bewegung noch, springt kein anderes ein: Die Bewegung
 > startet dann einfach nicht. Fehlt das Netz der gewählten Gangart, hält die Ente die Grundhaltung und
@@ -308,7 +317,10 @@ unter **Aktionen zu Servo-Zielen** (Actions to servo goals) umschalten:
 - **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)) gibt die Befehle
   unverändert weiter;
 - **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)**
-  (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)) macht es wie Pollens Software.
+  (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)) macht es wie Pollens Software. Der
+  **Daemon** ist das Hintergrundprogramm auf dem echten Roboter; der **Faktor** 0,9 schwächt jeden
+  Befehl um ein Zehntel ab, und der **Tiefpass** glättet ihn, wie ein Stoßdämpfer, der schnelles
+  Zappeln schluckt und nur die ruhige Bewegung durchlässt.
 
 Gemessen: Laufen klappt mit beidem, die Kicks kippen mit der Robotereinstellung aber um.
 
@@ -389,8 +401,9 @@ die **Logik** deines Levels, und erst wenn keiner von beiden etwas will, entsche
 selbst**.
 
 ```mermaid
+%% Bildunterschrift: Wer die Ente steuert: du vor der Logik vor der Ente selbst
 flowchart LR
-  A[Hand] -->|sonst| B[Logik]
+  A[Du] -->|sonst| B[Logik]
   B -->|sonst| C[Ente selbst]
 ```
 
@@ -399,8 +412,8 @@ hält mit eigenen Ideen still. Sonst gelten Befehle aus Logik-Graphen wie **Walk
 entscheidet die Ente selbst, wenn **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) im Details-Panel an ist (13.10 und 13.11). Alle
 Befehle werden zum Schluss sanft geglättet, damit nichts ruckt.
 
-Steht die Ente still und hat eine Weile niemand ihren Kopf gesteuert, übernimmt der **Idle-Blick** aus
-Pollens Software: weiche Blicke in die Runde, kleine Kopfrucke, langsames Driften, Dösen und ab und zu
+Steht die Ente still und hat eine Weile niemand ihren Kopf gesteuert, übernimmt der **Leerlauf-Blick**
+(englisch „idle“, untätig) aus Pollens Software: weiche Blicke in die Runde, kleine Kopfrucke, langsames Driften, Dösen und ab und zu
 ein Gähnen.
 
 ### Hochgehoben!
@@ -408,8 +421,8 @@ ein Gähnen.
 Eine hochgehobene Ente soll nicht in der Luft weiterstrampeln. Pollen hat dafür ein winziges
 zusätzliches Netz trainiert, den **Pick-up-Detektor**. Er schaut sich das Körpergefühl der letzten
 Sekunde an und schätzt: Wie wahrscheinlich ist es, dass mich gerade jemand festhält? Er urteilt
-erst, wenn er eine ganze Sekunde beisammenhat. Ein halb gefülltes Stück hat er im Training nie
-gesehen, und nach der goldenen Regel aus 13.2 gilt: nur, was geübt wurde.
+erst, wenn eine volle Sekunde Messwerte beisammen ist. Ein halb gefülltes Zeitfenster hat er im
+Training nie gesehen, und nach der goldenen Regel aus 13.2 gilt: nur, was geübt wurde.
 
 Der Trick steckt im Umschalten. Pausiert wird erst, wenn die Schätzung **mehrmals hintereinander
 sehr hoch** ist; weiter geht es erst, wenn sie **mehrmals hintereinander deutlich niedrig** ist.
@@ -468,7 +481,8 @@ das Gehirn still.
 
 Pollens frühere Software hatte einen Zustand BallPlay: hinlaufen, ausrichten, kicken. Deren Programm
 ist nicht öffentlich, aber die Beschreibung schon. Kern baut BallPlay danach mit eigenem Code und
-Pollens echtem Kick-Netz nach. Es ist **von Anfang an eingeschaltet**. Die Geschichte geht so:
+Pollens echtem Kick-Netz nach. Es gehört zum Gehirn und ist darum immer da, sobald die Ente selbst
+entscheidet. Die Geschichte geht so:
 
 1. Die Ente **sieht** einen Ball am Boden (über den Sichttest der Kamera aus 13.8).
 2. Sie **läuft hin**, mit gesenktem Kopf, damit sie ihn im Blick behält. Dabei nickt nur der Kopf,
@@ -482,7 +496,9 @@ Pollens echtem Kick-Netz nach. Es ist **von Anfang an eingeschaltet**. Die Gesch
 Verliert sie den Ball zu lange aus den Augen oder klappt der Kick ewig nicht, gibt sie auf und schaut
 sich lieber um. Gekickt wird nur links, weil der rechte Kick die Ente in Kern manchmal umwirft.
 
-Ist Kerns Spielschicht verfügbar (13.11), übernimmt die statt BallPlay.
+Ist Kerns Spielschicht eingeschaltet (13.11), übernimmt die statt BallPlay. Im Beispiel-Level ist
+sie an, du siehst dort also die Spielschicht. BallPlay springt ein, wenn du die Kern-Extras im
+Details-Panel ausschaltest.
 
 ## 13.11 Die Spielschicht
 
@@ -491,14 +507,13 @@ sieht etwas. Was die Ente mit Ball oder Socke **vorhat** – hinschauen, hingehe
 wegtragen, ausspucken –, entscheidet Kerns eigenes, vom Lehrer trainiertes Netz, die **Spielschicht**.
 Handgeschriebene Spielregeln gibt es darin nicht.
 
-![Die Ente spielt (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-play.png)
+![Die Ente hat den Ball entdeckt: oben rechts ihr Abstandsgitter und das Bild ihrer Kopfkamera, die Spielschicht meldet „Play“ (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-play.png)
 
 > **Stell dir vor …** ein Kind sitzt mit einem Gamepad vor dem Kamerabild der Ente und drückt
 > Knöpfe: vor, drehen, Kopf runter, Schnabel auf, Kick, Aufheben. Die Bewegungen selbst macht die
 > Ente mit Pollens Netzen. Das Kind ist die Spielschicht.
 
-Die Spielschicht entscheidet noch seltener als die Bewegungsnetze: nur bei jedem zweiten Mal, wenn
-diese denken (13.5). Damit sie mitspielt, schaltest du im Details-Panel
+Die Spielschicht entscheidet noch seltener als die Bewegungsnetze. Damit sie mitspielt, schaltest du im Details-Panel
 **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)**
 (Kern extras (ball play, sock fetching, beak in the pick)) und **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) ein (im
 Beispiel-Level ist beides an). Dann greift sie ein, sobald sie Ball oder Socke kennt oder etwas im
@@ -510,8 +525,8 @@ Zwei Helfer liefern ihr die Welt:
   Wie der Servo ist er ein Gerätemodell: Im Training darf er absichtlich ungenau sein, umso mehr, je
   weiter etwas weg ist, und manchmal ein Bild verpassen, wie eine echte Kamera. Im Studio ist er perfekt.
 - Der **Tracker** ist ihr Gedächtnis. Verschwindet etwas aus dem Bild, merkt er sich eine Weile, wo es
-  zuletzt war: meist nur ein paar Sekunden, ein Ding ganz nah vor ihr aber zehnmal so lange. Das liegt
-  dann unter der Kamera und bewegt sich nicht von selbst weg. Einen eben gekickten Ball und eine eben weggetragene Socke lässt er eine Zeit lang in
+  zuletzt war: meist nur ein paar Sekunden, ein Ding ganz nah vor ihr aber viel länger, denn das
+  liegt dann unter der Kamera und bewegt sich nicht von selbst weg. Einen eben gekickten Ball und eine eben weggetragene Socke lässt er eine Zeit lang in
   Ruhe, damit die Ente nicht sofort wieder dasselbe tut.
 
 **Was sie sieht:** alles aus Sicht der Ente, nie die wahren Positionen. Wo Ball und Socke ungefähr
@@ -537,18 +552,12 @@ Ball rollte ewig.
 Blumentopf, einem Ball und zwei Socken. Ein kleiner Logik-Graph lässt die Ente zwitschern, wenn der
 Ball ins Bild kommt. Das ist eine Vorführung der Logik-Knoten, kein Verhalten der Ente.
 
-**Wie gut spielt sie?** Gemessen wird auf zwei Arten. Einmal mit dem **sauberen Roboter**, genau wie
-im Bauplan. Und einmal mit **voller Variation**: Servos, Sensoren und Bau werden absichtlich zufällig
-ein wenig verändert, so wie kein echter Roboter genau dem Bauplan gleicht. Das Ergebnis:
-
-- **Kicken ist gelernt.** Von 32 Testrunden lag in 11 ein Ball als Ziel bereit, in 21 eine
-  Socke. Auf dem sauberen Roboter kickt sie den Ball in 9 der 11 Ballrunden weg. Passt
-  der Fuß nicht, geht sie zurück und setzt neu an.
-- **Bei der Socke hapert es am Griff.** Die Ente geht hin, stellt sich hin, hebt auf und beißt zu.
-  Aber der Biss hält selten, und beim Hochheben rutscht die Socke oft heraus. Das liegt nicht an der
-  Entscheidung, sondern daran, dass das Greifen von Stoff in dieser Physik schwer ist.
-- **Mit Variation fällt sie öfter.** Mit steiferen Servos und rutschigeren Sohlen kippt Pollens Gang
-  vor allem beim Drehen auf der Stelle leichter um.
+**Wie gut spielt sie?** Kurz gesagt: **Den Ball kickt sie meist, die Socke rutscht ihr meist aus dem
+Schnabel.** Zum Socke-Holen geht sie hin, stellt sich hin, hebt auf und beißt zu; nur hält der Biss
+selten. Das liegt nicht an der Entscheidung, sondern daran, dass das Greifen von Stoff in dieser
+Physik schwer ist. Und auf einem absichtlich leicht veränderten Roboter (steifere Servos, rutschigere
+Sohlen) kippt Pollens Gang vor allem beim Drehen auf der Stelle leichter um. Die Messwerte stehen in
+[Kapitel 14](14-lehrer.md), Abschnitt 14.8.
 
 Zwei Tests prüfen im Studio, dass wirklich nur das Netz entscheidet: Ein Ball vor der Ente wird
 gekickt, eine Socke vor ihr geholt und gebissen. Wie es weitergeht, steht in [Kapitel 14](14-lehrer.md).
@@ -564,7 +573,7 @@ gekickt, eine Socke vor ihr geholt und gebissen. Wie es weitergeht, steht in [Ka
 | Rolle | 5 | X | ROLLEN (ROLL) |
 | Schnabel | 6 | – | SCHNABEL (BEAK) |
 | Sprung | 7 | – | HÜPFEN (HOP) |
-| Quaken / „Wheee“ | Leertaste / V | RT / LT | QUAK / HUIII (QUACK / WHEEE) |
+| Quaken / „Wheee“ | Leertaste / V | hintere Schultertaste rechts / links (RT / LT) | QUAK / HUIII (QUACK / WHEEE) |
 
 Im Micro-Duck-Level startet **Spielen** (Play) mit der Beobachterkamera ([Kapitel 11](11-studio.md)): Du fliegst
 frei (W A S D, Q / E runter und hoch, am Telefon mit den Fingern), schaust zu und kannst Ball, Socke

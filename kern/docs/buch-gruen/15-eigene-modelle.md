@@ -9,9 +9,11 @@
 > - **Lehrer-Seite** – die Webseite kernengine.de/lehrer/, auf der du im Browser trainierst.
 > - **Kommandozeile** – ein Fenster, in das man Befehle tippt, statt zu klicken. Für dieses Kapitel
 >   brauchst du sie nicht.
-> - **Rückgabe** – alle Punkte einer Episode zusammengezählt.
+> - **Rückgabe** – alle Punkte einer Episode zusammengezählt; so heißt die Anzeige
+>   „Episoden-Rückgabe“ auf der Lehrer-Seite. (Der **Return** aus Anhang A.10 ist eine Variante, mit
+>   der beim Lernen gerechnet wird: Punkte ab jetzt, spätere etwas weniger wert.)
 > - **Rauschen** – der Zufall, der zu jedem Befehl des Netzes dazukommt: die Neugier der Ente.
-> - **Lernrate** – wie weit der Trainer die Regler pro Schritt verstellt.
+> - **Lernrate** – wie weit der Auswerter (14.2) die Regler pro Schritt verstellt.
 > - **Schnappschuss** – ein unterwegs gespeicherter Zwischenstand des Netzes.
 > - **Messung** – eine strenge Prüfung, ob eine Bewegung wirklich gelungen ist, unabhängig von den
 >   Punkten.
@@ -63,7 +65,8 @@ länger, denn es braucht Tausende Runden. Wie schnell dein Gerät ist, zeigt die
 >
 > Was du lernst: Erst das Vorbild macht den Sprung möglich, das Üben macht ihn danach sicher.
 
-> **Wusstest du?** Gleiche Startzahl, gleich viele Enten und dasselbe Rezept ergeben im Browser
+> **Wusstest du?** Gleiche Startzahl, gleich viele Enten und dasselbe **Rezept** (die festen
+> Einstellungen eines Trainings, mehr in 15.8) ergeben im Browser
 > dasselbe Netz wie auf dem Rechner. Die Zahl der Enten ist **Worker × Enten je Worker**; ein Worker
 > ist ein Helfer im Hintergrund des Browsers, der seine Enten turnen lässt. Das eingebaute
 > Sprung-Netz entstand mit 32 Enten, Startzahl 1 und 3000 Übungsrunden. Mit 4 Workern zu je 8 Enten
@@ -85,7 +88,7 @@ Die Lehrer-Seite zeichnet Rückgabe und Episodenlänge als Kurven und zeigt dazu
 |---|---|---|
 | Episoden-Rückgabe | Punkte einer Episode, im Mittel | soll über viele Runden steigen |
 | Episodenlänge (s) | wie lange eine Episode dauert | Sprung: 2 s heißt ohne Sturz; kürzer heißt Sturz oder Abstützen |
-| Aktionsrauschen | wie viel die Ente herumprobiert | sinkt, wenn sie sicherer wird (14.5) |
+| Aktionsrauschen (std) | wie viel die Ente herumprobiert | sinkt, wenn sie sicherer wird (14.5) |
 | echte Sprünge | von 5 Probesprüngen | **das eigentliche Ziel** |
 | Schritte / s | Tempo des Geräts | sagt nichts über die Qualität |
 
@@ -180,12 +183,9 @@ Die Spielschicht lässt sich nur mit dem Werkzeug auf der Kommandozeile trainier
 Wer das nicht vorhat, kann diesen Abschnitt überspringen. Der Ablauf zeigt aber zwei schöne
 Prinzipien:
 
-- **Erst messen, was das Vorbild braucht.** Wo der Schnabel eine Socke greift, misst der Lehrer bei
-  jedem Lauf selbst in der aktuellen Physik (Kapitel 14.8). Wie weit die Ente nach „Stopp“ noch
-  läuft, misst ein eigener Befehl; das Ergebnis ist fest eingetragen und muss nach Physikänderungen
-  neu gemessen werden (16.6). Die
-  Nachlaufstrecke braucht das Vorbild, weil Pollens Gang nicht auf der Stelle stoppt, sondern noch
-  ein Stück weitergeht.
+- **Erst messen, was das Vorbild braucht.** Das Vorbild muss wissen, wo der Schnabel eine Socke gut
+  greift und wie weit die Ente nach „Stopp“ noch läuft. Beides wird in der Physik gemessen statt
+  geschätzt (Kapitel 14.8 und 16.6).
 - **Das Vorbild messen.** Bevor man das Netz prüft, prüft man das Vorbild. Das zeigt, was das Netz
   durch reines Nachahmen **höchstens** erreichen kann. Schafft schon das Vorbild etwas nicht, liegt es
   nicht am Netz.
