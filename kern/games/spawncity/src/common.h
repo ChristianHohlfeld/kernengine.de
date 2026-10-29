@@ -16,6 +16,7 @@ namespace sc {
 using kern::f32;
 using kern::f64;
 using kern::i32;
+using kern::i64;
 using kern::u32;
 using kern::u64;
 using kern::u8;
