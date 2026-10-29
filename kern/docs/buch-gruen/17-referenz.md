@@ -18,8 +18,9 @@ gleichnamige Kapitel der blauen Fassung gemeint.
 
 Kern Studio bedienst du ähnlich wie die großen Spiele-Baukästen, die Profis benutzen. Du musst dir
 nichts merken: **F1** zeigt die wichtigsten Kürzel jederzeit im Studio selbst an. Die Tasten heißen
-hier so, wie Studio sie anzeigt: **Ctrl** ist auf deutschen Tastaturen die Taste **Strg**, **End** die
-Taste **Ende**. Auf dem Mac versteht Studio die Cmd-Taste wie Ctrl. Alle Einzelheiten stehen in
+hier wie auf deutschen Tastaturen: **Strg**, **Umschalt**, **Entf**, **Leertaste** – so zeigt sie
+auch Studio auf Deutsch an. Nur die Taste **Ende** steht in Studios Menüs als „End“. Auf dem Mac
+versteht Studio die Cmd-Taste wie Strg. Alle Einzelheiten stehen in
 [Kapitel 11](11-studio.md).
 
 ### Kamera im Viewport
@@ -31,17 +32,17 @@ Kamera darin steuerst du so:
 |---|---|
 | Rechte Maustaste halten + W A S D | fliegen wie in einem Spiel (Fly Mode) |
 | … + Q / E | runter / hoch |
-| … + Shift | schneller fliegen |
+| … + Umschalt | schneller fliegen |
 | … + Mausrad | Fluggeschwindigkeit einstellen |
 | Alt + linke Maustaste | um das Ausgewählte herumkreisen wie um eine Skulptur |
 | Mittlere Maustaste ziehen | Bild seitlich verschieben |
 | F | das Ausgewählte ins Bild holen |
 | Doppelklick auf ein Ding | beim Bearbeiten: es auswählen und ins Bild holen |
-| Ctrl+1 … 9 / 1 … 9 | Kameraposition merken / zu ihr zurückspringen |
+| Strg+1 … 9 / 1 … 9 | Kameraposition merken / zu ihr zurückspringen |
 
-Die gemerkten Kamerapositionen heißen **Lesezeichen**: wie Lesezeichen in einem Buch, nur für
-Blickwinkel. Merken und Zurückspringen klappt im Bearbeiten-Modus; in Play steuern die Ziffern zum
-Beispiel die Ente. Ein Doppelklick ins Leere holt nichts ins Bild: Der erste Klick ins Leere hebt
+Die gemerkten Kamerapositionen heißen **Lesezeichen** (Bookmarks): wie Lesezeichen in einem Buch,
+nur für Blickwinkel. Merken und Zurückspringen klappt im Bearbeiten-Modus; beim Spielen steuern die
+Ziffern zum Beispiel die Ente. Ein Doppelklick ins Leere holt nichts ins Bild: Der erste Klick ins Leere hebt
 die Auswahl auf. Am Telefon kreist ein Finger, zwei Finger zoomen und verschieben, zweimal Tippen
 holt die Auswahl ins Bild, langes Halten öffnet das Kontextmenü.
 
@@ -56,67 +57,70 @@ fliegt die Kamera, und Q und E heißen dann „runter“ und „hoch“ (siehe o
 | Leertaste | verschieben → drehen → skalieren reihum |
 | [ / ] | Einrastraster feiner / gröber (das Gitter, an dem Dinge beim Verschieben einrasten) |
 | Entf | Auswahl löschen |
-| End | Auswahl auf den Boden setzen |
-| H / Ctrl+H | ausblenden / alles wieder einblenden |
-| G | Game View: Editor-Helfer aus, Bild wie im fertigen Spiel |
+| Ende | Auswahl auf den Boden setzen |
+| H / Strg+H | ausblenden / alles wieder einblenden |
+| G | Spielansicht (Game View): Editor-Helfer aus, Bild wie im fertigen Spiel |
 | F2 | umbenennen |
-| Ctrl+Z / Ctrl+Y | rückgängig / wiederholen |
-| Ctrl+C / X / V / D | kopieren / ausschneiden / einfügen / duplizieren |
-| Ctrl+G | gruppieren |
-| Ctrl+S / Ctrl+O / Ctrl+N | speichern / öffnen / neues Level |
-| Ctrl+Space | Content Drawer auf- und zuklappen |
-| Alt+P / Alt+S | Play / Simulate |
+| Strg+Z / Strg+Y | rückgängig / wiederholen |
+| Strg+C / X / V / D | kopieren / ausschneiden / einfügen / duplizieren |
+| Strg+G | gruppieren |
+| Strg+S / Strg+O / Strg+N | speichern / öffnen / neues Level |
+| Strg+Leertaste | Inhaltsablage (Content Drawer) auf- und zuklappen |
+| Alt+P / Alt+S | Spielen (Play) / Simulieren (Simulate) |
 
-Der **Content Drawer** ist die Schublade unten im Studio mit Bauteilen, Bildern und Klängen; das
-**Output Log** ist die Liste der Meldungen des Studios. Beide erreichst du auch mit der Maus, über
-einen Knopf in der Statusleiste ganz unten. Das hilft, wenn dein System Ctrl+Space schon für etwas
-anderes benutzt, etwa zum Umschalten der Tastatursprache.
+Die **Inhaltsablage** (Content Drawer) ist die Schublade unten im Studio mit Bauteilen, Bildern und
+Klängen; das **Ausgabeprotokoll** (Output Log) ist die Liste der Meldungen des Studios. Beide
+erreichst du auch mit der Maus, über einen Knopf in der Statusleiste ganz unten. Das hilft, wenn dein
+System Strg+Leertaste schon für etwas anderes benutzt, etwa zum Umschalten der Tastatursprache.
 
-> **Wusstest du?** Kopierte Dinge landen als Text in der Zwischenablage deines Computers. Ein Ctrl+V
+> **Wusstest du?** Kopierte Dinge landen als Text in der Zwischenablage deines Computers. Ein Strg+V
 > in einem anderen Browser-Tab mit Studio fügt sie dort ein – so ziehst du Dinge von einem Level ins
 > andere.
 
-### Play und Simulate
+### Spielen und Simulieren
 
-Zwei Arten, ein Level laufen zu lassen: Bei **Play** spielst du selbst, die Kamera folgt deiner
-Spielfigur. Manche Level, etwa die Micro Duck, starten Play aber als Zuschauer mit freier Kamera
-(World Settings › **Observer camera**); mit **F8** übernimmst du dann die Figur. Bei **Simulate**
-laufen Physik und Spielregeln, aber niemand spielt; du behältst die freie Kamera des Editors und
+Zwei Arten, ein Level laufen zu lassen: Bei **Spielen** (Play) spielst du selbst, die Kamera folgt
+deiner Spielfigur. Manche Level, etwa die Micro Duck, starten das Spielen aber als Zuschauer mit
+freier Kamera, eingestellt in den **Welteinstellungen** (World Settings) mit dem Feld
+**Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)**
+(Observer camera (Play: fly, watch, drag bodies)); mit **F8** übernimmst du dann die Figur. Bei
+**Simulieren** (Simulate) laufen Physik und Spielregeln, aber niemand spielt; du behältst die freie Kamera des Editors und
 kannst Körper mit der Maus greifen, ziehen und werfen. In beiden Fällen ist das Level gesperrt, und
 beim Stoppen ist alles wieder wie vorher – außer du übernimmst die neuen Lagen mit **K**.
 
 | Taste | Wirkung |
 |---|---|
 | Esc | stoppen |
-| F8 | Spielfigur loslassen (Eject) / wieder übernehmen (Possess) |
-| Pause oder Alt+Shift+P | anhalten / weiter |
+| F8 | Spielfigur loslassen / wieder übernehmen (Menü: Aus dem Spieler aussteigen / Spieler übernehmen) |
+| Pause oder Alt+Umschalt+P | anhalten / weiter |
 | . (Punkt) | einen Schritt weiter, wenn angehalten |
-| Ctrl+R | Spiel neu starten |
-| K | in Simulate: die Lagen der ausgewählten Dinge ins Level übernehmen |
+| Strg+R | Spiel neu starten |
+| K | beim Simulieren: die Lagen der ausgewählten Dinge ins Level übernehmen |
 
-Im Spiel selbst gilt das Übliche: W A S D bewegen, Maus umsehen, Leertaste springen, Shift sprinten,
+Im Spiel selbst gilt das Übliche: W A S D bewegen, Maus umsehen, Leertaste springen, Umschalt sprinten,
 F benutzen. Die Taste F hat also zwei Aufgaben: Steuerst du eine Spielfigur, benutzt sie etwas;
 sonst holt sie die Auswahl ins Bild. Die Tasten des Logik-Editors stehen in [Kapitel 9](09-logik.md).
 
-> **Probier's aus!** Öffne auf https://kernengine.de/ **File › Example Levels › Physics Lab** und
-> drück **Alt+S** für Simulate. Drück dann **Pause** und tippe ein paarmal auf den
+> **Probier's aus!** Öffne auf https://kernengine.de/
+> **Datei › Beispiel-Levels › Physics Lab** (File › Example Levels › Physics Lab) und drück **Alt+S**
+> für **Simulieren**. Drück dann **Pause** und tippe ein paarmal auf den
 > **Punkt**. Du siehst die Physik Schritt für Schritt – wie ein Daumenkino, das du selbst
 > umblätterst. Drück noch einmal **Pause**, damit die Zeit weiterläuft. Greif dann mit der linken
 > Maustaste einen Körper und wirf ihn; mit **Esc** ist alles wieder an seinem Platz. (Viele Laptops
-> haben keine Pause-Taste; dann nimm Alt+Shift+P.)
+> haben keine Pause-Taste; dann nimm Alt+Umschalt+P.)
 
 ## 17.2 Tasten der Micro Duck
 
 | Bewegung | Tastatur | Gamepad | Touch |
 |---|---|---|---|
-| Laufen / drehen | W S / A D | linker Stick | MOVE |
-| Sitzen / Aufstehen | 1 | B | SIT |
-| Aufheben (trägt sie Rollschuhe: Ducken) | 2 | Y | PICK |
-| Kick links / rechts | 3 / 4 | – | KICK L / R |
-| Rolle (halten: weiter) | 5 | X | ROLL |
-| Schnabel auf / zu | 6 | – | BEAK |
-| Sprung | 7 | – | HOP |
-| Quaken / „Wheee“ | Leertaste / V | rechter / linker Trigger | QUACK / WHEEE |
+| Laufen / drehen | W S / A D | linker Stick | LAUFEN (MOVE) |
+| Sitzen / Aufstehen | 1 | B | SITZ (SIT) |
+| Aufheben (trägt sie Rollschuhe: Ducken) | 2 | Y | GREIFEN (PICK) |
+| Kick links / rechts | 3 / 4 | – | KICK L / KICK R |
+| Rolle (halten: weiter) | 5 | X | ROLLEN (ROLL) |
+| Schnabel auf / zu | 6 | – | SCHNABEL (BEAK) |
+| Sprung | 7 | – | HÜPFEN (HOP) |
+| Quaken / „Wheee“ | Leertaste / V | rechter / linker Trigger | QUAK / HUIII (QUACK / WHEEE) |
 
 Die Ente gibt es auch als Variante mit Rollschuhen, „Micro Duck (Rollers)“; sie fährt dann, statt
 zu gehen ([Kapitel 13](13-micro-duck.md)).
@@ -125,9 +129,12 @@ Mit **F8** übernimmst du die Ente; dann hören W A S D und die Zahlentasten auf
 zählt als „Hand am Steuer“ für 2 Sekunden. So lange halten Pollens Entscheidungslogik, die
 [Kapitel 13](13-micro-duck.md) das **Gehirn** der Ente nennt, und die Spielschicht (Kerns Netz, das
 selbst entscheidet, ob sie Ball oder Socke holt) still. Drückst du länger nichts, entscheidet die
-Ente wieder selbst, sofern im Details-Panel **Autonomous** an ist.
+Ente wieder selbst, sofern im Details-Panel **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) an
+ist.
 
-> **Probier's aus!** Öffne **File › Example Levels › Micro Duck**, drück Play, übernimm die Ente
+> **Probier's aus!** Öffne
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), drück **Spielen**
+> (Play), übernimm die Ente
 > mit **F8** und probier die Tasten von 2 bis 7 der Reihe nach. Warte nach jeder Taste, bis die
 > Bewegung fertig ist: Solange eine läuft, startet keine neue. Drück dann die **1**, damit sie sich
 > setzt, und gleich danach die **3**. Nichts passiert: Aus dem Sitzen startet keine Bewegung. Warte,
@@ -147,8 +154,8 @@ getrennt – CSV-Dateien öffnet auch jede Tabellenkalkulation.
 | Servoprofil (JSON) | die Zahlen eines Servotyps | [Kapitel 16](16-kalibrierung.md) |
 | Messungen (CSV) | Aufzeichnungen vom Prüfstand oder Roboter | [Kapitel 16](16-kalibrierung.md) |
 
-**Levels.** Ein Level enthält alles, was in der Welt ist: die Dinge mit ihren Bausteinen, die World
-Settings, die Kameraposition des Editors, eingebettete Bilder und Klänge und die Logik. Eine fremde
+**Levels.** Ein Level enthält alles, was in der Welt ist: die Dinge mit ihren Bausteinen, die
+Welteinstellungen, die Kameraposition des Editors, eingebettete Bilder und Klänge und die Logik. Eine fremde
 Datei oder eine aus einem neueren Studio öffnet Kern lieber gar nicht, statt sie halb falsch zu
 lesen.
 
@@ -197,30 +204,30 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | Begriff | Bedeutung |
 |---|---|
 | **Actor (im Studio)** | ein Ding im Level mit Position und Bausteinen ([Kap. 8](08-spiel-laufzeit.md)) |
+| **Ausgabeprotokoll** (Output Log) | die Liste der Meldungen des Studios, mit Uhrzeit |
+| **Aussteigen / übernehmen (F8)** (Eject / possess (F8)) | im Spiel die Spielfigur loslassen / wieder übernehmen |
 | **Autosave** | Studio sichert deine Arbeit regelmäßig von selbst |
+| **Beispiel-Levels** (Example Levels) | fertige Beispielwelten im Menü **Datei** (File), etwa Orb Run oder Micro Duck |
 | **Blueprint / Logik-Graph** | ein Programm aus Kästchen und Verbindungslinien, ohne Tippen ([Kap. 9](09-logik.md)) |
-| **Collider** | die unsichtbare Form, mit der ein Ding in der Physik anstößt |
-| **Content Drawer** | die Schublade unten im Studio: Bauteile, Bilder, Klänge, Output Log |
 | **Details** | das Panel mit allen Einstellungen des ausgewählten Dings |
-| **Eject / Possess** | im Spiel die Spielfigur loslassen / wieder übernehmen (F8) |
-| **Example Levels** | fertige Beispielwelten im Menü File, etwa Orb Run oder Micro Duck |
-| **Game View** | Ansicht ohne Editor-Helfer, so wie im fertigen Spiel |
 | **GameWorld** | der Teil von Kern, der ein Level zum Leben erweckt und laufen lässt ([Kap. 8](08-spiel-laufzeit.md)) |
 | **Gizmo** | Pfeile und Ringe am ausgewählten Ding zum Verschieben, Drehen, Skalieren |
 | **HUD** | Anzeigen über dem Spielbild: Punkte, Zeit, Tempo |
+| **Inhaltsablage** (Content Drawer) | die Schublade unten im Studio: Bauteile, Bilder, Klänge, Ausgabeprotokoll |
 | **Kern Studio, Studio** | der Editor im Browser, in dem du Level baust und spielst ([Kap. 11](11-studio.md)) |
 | **Knoten / Pin** | Kästchen im Logik-Graph / ihre Anschlüsse für Verbindungslinien |
+| **Kollider** (Collider) | die unsichtbare Form, mit der ein Ding in der Physik anstößt |
 | **Komponente** | ein Baustein eines Actors, etwa Licht, Klang oder Physik |
-| **Lesezeichen** | eine gemerkte Kameraposition (Ctrl+1 … 9) |
+| **Lesezeichen** (Bookmarks) | eine gemerkte Kameraposition (Strg+1 … 9) |
 | **Level** | eine Spielwelt, gespeichert als `.klevel` |
 | **Outliner** | die Liste aller Dinge im Level, als Baum geordnet |
-| **Output Log** | die Liste der Meldungen des Studios, mit Uhrzeit |
-| **Package Game** | ein Level als eigenständige Webseite zum Weitergeben speichern |
 | **Pickup** | etwas zum Einsammeln, etwa ein leuchtender Orb |
-| **Play / Simulate** | selbst spielen / Physik laufen lassen und zuschauen (17.1) |
+| **Spiel verpacken** (Package Game) | ein Level als eigenständige Webseite zum Weitergeben speichern |
+| **Spielansicht** (Game View) | Ansicht ohne Editor-Helfer, so wie im fertigen Spiel |
+| **Spielen / Simulieren** (Play / Simulate) | selbst spielen / Physik laufen lassen und zuschauen (17.1) |
 | **Trigger** | eine unsichtbare Zone, die etwas auslöst, wenn jemand hineingerät |
 | **Viewport** | das große Fenster, durch das du in die 3D-Welt schaust |
-| **World Settings** | Einstellungen der ganzen Welt, etwa Schwerkraft und Schrittrate |
+| **Welteinstellungen** (World Settings) | Einstellungen der ganzen Welt, etwa Schwerkraft und Schrittrate |
 
 ### Technik unter der Haube
 
@@ -235,7 +242,7 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Engine** | das Herz von Kern: das Programm, das rechnet, zeichnet und die Physik laufen lässt |
 | **Fingerabdruck** | eine Prüfzahl pro Takt; stimmt sie überall, rechnet Kern überall gleich |
 | **Frame** | ein einzelnes Bild auf dem Bildschirm; viele pro Sekunde ergeben Bewegung |
-| **Gelenk (Constraint)** | eine Verbindung zwischen zwei Körpern, etwa ein Scharnier |
+| **Gelenk** (Constraint) | eine Verbindung zwischen zwei Körpern, etwa ein Scharnier |
 | **GTAO** | ein Verfahren, das Ecken und Ritzen natürlich abdunkelt ([Kap. 4](04-grafik.md)) |
 | **Hash** | eine kurze Zahl aus beliebig vielen Daten; gleiche Daten, gleiche Zahl ([Kap. 3](03-grundlagen.md)) |
 | **Instanz** | eine Kopie derselben Form an anderer Stelle, wie hundert Bäume aus einer Vorlage |
@@ -282,6 +289,7 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Kalibrierung** | die Zahlen eines Modells an Messungen anpassen |
 | **Kamera-Detektor** | meldet, wo die Kamera der Ente Ball oder Socke sieht; Kern ahmt ihn nach |
 | **Lagesensor (IMU)** | spürt, wo unten ist und wie schnell sich der Körper dreht |
+| **Läufer** (Walker) | die Steuerart im Studio für Laufroboter wie die Ente, die ein Netz bewegt |
 | **Log** | eine Aufzeichnung, Zeile für Zeile: was gesendet und was gemessen wurde |
 | **Micro Duck** | der zweibeinige Laufroboter von Pollen Robotics ([Kap. 13](13-micro-duck.md)) |
 | **ms (Millisekunde)** | eine tausendstel Sekunde |
@@ -296,7 +304,6 @@ vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 | **Sim-to-Real-Lücke** | der Unterschied zwischen Simulation und echtem Roboter |
 | **Streuung** | wie weit ein Wert schwanken darf oder von Exemplar zu Exemplar schwankt |
 | **ToF** | ein Abstandssensor, der misst, wie lange Licht hin und zurück braucht |
-| **Walker** | die Steuerart im Studio für Laufroboter wie die Ente, die ein Netz bewegt |
 
 Ein Bild zu **rad**: Leg eine Schnur, so lang wie der Radius eines Kreises, auf seinen Rand. Der
 Winkel, den sie vom Mittelpunkt aus überspannt, ist 1 rad. Rund sechseinviertel solcher Schnüre
@@ -365,7 +372,8 @@ Die genauen Definitionen stehen im Glossar des blauen Buchs, Kapitel 17.
 ## Das nimmst du mit
 
 - **F1** im Studio zeigt die wichtigsten Kürzel; Alt+P spielt, Alt+S simuliert, Esc stoppt.
-- Play heißt selbst spielen, Simulate heißt zuschauen und Körper greifen.
+- **Spielen** (Play) heißt selbst spielen, **Simulieren** (Simulate) heißt zuschauen und Körper
+  greifen.
 - Die Ente steuerst du mit W A S D und den Tasten 1 bis 7.
 - Levels sind Textdateien, Netze `.onnx` im selben Format wie bei Pollen Robotics.
 - Der ganze Editor steckt in der Engine; die Webseite zeichnet nur, was die Engine ihr sagt.
@@ -378,19 +386,19 @@ Die genauen Definitionen stehen im Glossar des blauen Buchs, Kapitel 17.
 2. Du liest „Der Actor lernt aus den Vorteilen, die der Kritiker schätzt.“ Ist hier eine Kiste im
    Level gemeint?
 3. Du drückst bei der Ente die 3, aber nichts passiert. Woran könnte es liegen?
-4. Was ist der Unterschied zwischen Play und Simulate?
+4. Was ist der Unterschied zwischen **Spielen** (Play) und **Simulieren** (Simulate)?
 
 ### Lösungen
 
 1. **F** holt die Auswahl ins Bild, ein Doppelklick auf ihren Namen im Outliner auch. (Ein
    Doppelklick ins Leere hilft nicht, der hebt die Auswahl auf. Und hast du die Kiste mit **H**
-   ausgeblendet, holt **Ctrl+H** sie zurück.)
+   ausgeblendet, holt **Strg+H** sie zurück.)
 2. Nein. Neben dem Kritiker ist der Actor das handelnde Netz beim Lernen, kein Ding im Level.
 3. Vielleicht sitzt die Ente gerade: Aus dem Sitzen startet keine Bewegung. Erst mit der 1
    aufstehen lassen. Oder es läuft noch eine andere Bewegung; dann wartest du, bis sie fertig ist.
    (Und F8 nicht vergessen, damit du die Ente überhaupt steuerst.)
-4. Bei Play spielst du selbst, die Kamera folgt der Spielfigur (in manchen Levels schaust du erst
-   zu und übernimmst mit F8). Bei Simulate laufen Physik und Regeln ohne Spieler; du behältst die
+4. Beim Spielen spielst du selbst, die Kamera folgt der Spielfigur (in manchen Levels schaust du
+   erst zu und übernimmst mit F8). Beim Simulieren laufen Physik und Regeln ohne Spieler; du behältst die
    freie Kamera und kannst Körper greifen und mit K ihre neuen Lagen übernehmen.
 
 ---

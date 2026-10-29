@@ -286,13 +286,14 @@ Die Spielwelt gibt den Graphen alles, was sie brauchen: die Spielzeit, einen pla
 die Ereignisse. Ein Ereignis geht an das betroffene Ding – oder an dessen nächstes „Elternteil“ mit
 Graph. Was die Logik verändert, bekommen alle Mitspieler mit.
 
-Die GameWorld startet die Graphen nur in Play oder Simulate, nur auf der Autorität (nicht auf
+Die GameWorld startet die Graphen nur beim **Spielen** (Play) oder **Simulieren** (Simulate), nur
+auf der Autorität (nicht auf
 Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen:
 
 - die **Spielzeit** – aus den Simulationsschritten gezählt, nicht von der Uhr an der Wand. Pausierst
   du das Spiel oder ruckelt ein langsamer Rechner, läuft die Spielzeit trotzdem genau gleich, und ein
   „nach 3 Sekunden“ bedeutet überall dasselbe;
-- Ausgaben und Fehler ins Output Log (Print auf Wunsch als Meldung im HUD);
+- Ausgaben und Fehler ins **Ausgabeprotokoll** (Output Log), Print auf Wunsch als Meldung im HUD;
 - einen **deterministischen Zufall**.
 
 Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit. Entsteht ein Ding sogar mitten in
@@ -323,8 +324,8 @@ ist viel schneller und übernimmt sogar mitten im Spiel.
 Kern hat einen Dolmetscher, den **Interpreter**, und zwei Übersetzer, die nach demselben Plan
 arbeiten:
 
-- **Die Übersetzung in letzter Sekunde** (*JIT*, „just in time“): Beim Start von Play oder Simulate
-  schreibt Kern jeden Graphen als kleines WebAssembly-Programm. Der Browser macht daraus
+- **Die Übersetzung in letzter Sekunde** (*JIT*, „just in time“): Beim Start von **Spielen** (Play)
+  oder **Simulieren** (Simulate) schreibt Kern jeden Graphen als kleines WebAssembly-Programm. Der Browser macht daraus
   Maschinencode, und Kern hängt ihn direkt in die Engine ein.
 - **Der C++-Export:** Derselbe Graph als lesbarer C++-Programmtext. Wer will, baut ihn fest in sein
   Spiel ein; dann ersetzt er für diesen Graphen den Dolmetscher.
@@ -387,34 +388,37 @@ beim Dolmetscher, als JIT-Code und als exportiertes C++, und die Ergebnisse müs
 Im Logik-Editor ziehst du Drähte, bekommst passende Vorschläge, kannst alles rückgängig machen,
 Haltepunkte setzen und beim Spielen zusehen, welche Kästchen gerade laufen.
 
-Du öffnest ihn über **Logic** in der Toolbar (Level-Graph) oder über **Edit Logic** / **Add Logic
-(Blueprint)** im Kontextmenü eines Actors.
+Du öffnest ihn über **Logik** (Logic) in der Werkzeugleiste (Level-Graph) oder über
+**Logik bearbeiten** (Edit Logic) bzw. **Logik hinzufügen (Blueprint)** (Add Logic (Blueprint)) im
+Kontextmenü eines Actors.
 
 Ein Grundsatz steckt dahinter: Der Editor selbst hat **keine eigene Logik**. Die Webseite zeichnet
 nur, was die Engine ihr beschreibt – wie in [Kapitel 4](04-grafik.md), wo die Seite nur Malbefehle
 weiterreicht. Jeder Handgriff ist ein Befehl an die Engine und damit ein Schritt, den du rückgängig
 machen kannst. Was zusammengehört, zählt als **ein** Schritt: Nimmst du einen Draht auf und legst ihn
-woanders ab, macht ein einziges Undo beides rückgängig.
+woanders ab, macht ein einziges **Rückgängig** (Undo) beides rückgängig.
 
 Das Wichtigste beim Bearbeiten:
 
 - Ziehst du einen Draht von einem Pin ins Leere, schlägt das **Aktionsmenü** nur Knoten vor, die
   dazu passen. Du tippst einen Suchbegriff, drückst Enter – der Knoten erscheint und ist schon
   verbunden.
-- Jede Bearbeitung lässt sich **rückgängig machen** (Undo).
+- Jede Bearbeitung lässt sich mit **Rückgängig** (Strg+Z) zurücknehmen.
 - Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre aktuellen Werte. Mit
   **F9** setzt du einen Haltepunkt: Läuft der Knoten, hält das Spiel an, und der Editor springt hin.
 
 **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen. Alle weiteren Handgriffe beschreibt
 [Kapitel 11](11-studio.md).
 
-> **Probier's aus!** Öffne das Basic-Level (File › Example Levels). Es hat noch keine Spielfigur:
-> Öffne den Content Drawer (Ctrl+Space), Tab **Place Actors**, Gruppe **Players**, und klick auf
-> **Rolling Ball** – die Kugel wird dein Spieler. Klick dann in der Toolbar auf **Logic**. Der
+> **Probier's aus!** Öffne **Datei › Beispiel-Levels › Grundformen** (File › Example Levels › Basic).
+> Das Level hat noch keine Spielfigur: Öffne die **Inhaltsablage** (Content Drawer) mit
+> Strg+Leertaste, Reiter **Actors platzieren** (Place Actors), Gruppe **Spieler** (Players), und klick
+> auf **Rollende Kugel** (Rolling Ball) – die Kugel wird dein Spieler. Klick dann in der
+> Werkzeugleiste auf **Logik**. Der
 > Graph ist noch leer und bietet dir Startknöpfe an; klick auf **Begin Play**, und der Knoten steht
 > auf der Fläche. Zieh von seinem Ausgang „then“ einen Draht ins Leere, tippe
-> „show message“, Enter, und schreib einen Text hinein. Zurück im Viewport startest du **Play**
-> (Alt+P): Dein Text erscheint im HUD. Ein Domino – und er ist gefallen!
+> „show message“, Enter, und schreib einen Text hinein. Zurück im Viewport startest du **Spielen**
+> (Play) mit Alt+P: Dein Text erscheint im HUD. Ein Domino – und er ist gefallen!
 
 ## 9.11 Beispiele zum Nachbauen
 
@@ -452,7 +456,7 @@ Variable „Ball Seen“ merkt sich, ob der Ball schon im Bild war – so zwitsc
 wenn der Ball auftaucht, und nicht alle 0,25 s.
 
 > **Probier's aus!** Öffne in einem Level den Logik-Editor, wähle **Templates…** und füge die
-> **Ampel** ein. Starte Play und schau zu, wie die Meldungen Grün, Gelb und Rot durchschalten. Dann
+> Ampel ein, den Eintrag **Traffic light (state machine)**. Starte **Spielen** (Play) und schau zu, wie die Meldungen Grün, Gelb und Rot durchschalten. Dann
 > ändere einen Timer auf 1 Sekunde und probier es noch einmal.
 
 > **Achtung, Falle!** Der Zwitscher-Graph ist eine Demo der Roboter-Knoten – nicht etwas, das die

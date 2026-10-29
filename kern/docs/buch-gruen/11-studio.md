@@ -268,7 +268,7 @@ Jeder Viewport hat oben eine eigene Leiste:
   **Unten** (Bottom), **Links** (Left), **Rechts** (Right), **Vorne** (Front) oder **Hinten** (Back).
 - **Ansichtsmodus** (View Mode), wie gezeichnet wird: **Beleuchtet** (Lit) mit Licht und Schatten,
   **Unbeleuchtet** (Unlit) ohne Licht, **Drahtgitter** (Wireframe) mit nur dem Drahtgitter der Meshes
-  oder **Player Collision** (bleibt englisch) mit den Formen, an denen der Spieler anstößt.
+  oder **Spieler-Kollision** (Player Collision) mit den Formen, an denen der Spieler anstößt.
 - **Anzeigen** (Show): Hilfsmittel ein- und ausblenden, etwa das Bodenraster, Symbole für Lampen oder
   die Formen, mit denen die Physik rechnet.
 - ein Knopf zum Maximieren eines einzelnen Viewports.
@@ -616,7 +616,7 @@ verschicken.
 > sich heimlich auf, was du noch nicht gespeichert hast, und zerreißt den Zettel, sobald du speicherst.
 
 Genau so arbeitet der Autosave: Kurz nach jeder Änderung legt Studio eine Kopie im Browser ab, aber nur,
-solange etwas ungespeichert ist. Beim nächsten Start bietet es **Restore** an, um das Level
+solange etwas ungespeichert ist. Beim nächsten Start bietet es **Wiederherstellen** (Restore) an, um das Level
 wiederherzustellen (dieser Knopf bleibt englisch), oder **Schließen** (Dismiss), um die Kopie zu
 verwerfen. Ein wiederhergestelltes Level gilt weiter als **ungespeichert**, denn
 sein Inhalt steht ja noch in keiner Datei. Bis du es speicherst, bietet Studio es bei jedem Start
@@ -680,7 +680,7 @@ Wie Kern Spieler übers Netz verbindet, erklärt [Kapitel 10](10-netzwerk.md). H
    sein eigenes HUD.
 3. Nur der Spieler im aktiven Viewport bekommt deine Eingabe. Ein Klick in einen anderen wechselt.
 4. **Spielen › Netzwerk-Emulation** (Play › Network Emulation) macht die Leitung absichtlich
-   schlechter, von **Perfekt** (Perfect) bis **Terrible (300 ms, 20% loss)** (bleibt englisch).
+   schlechter, von **Perfekt** (Perfect) bis **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)).
 
 Was du dabei beobachten kannst, beschreibt die Mission in [Kapitel 10](10-netzwerk.md), Abschnitt 10.8.
 
@@ -691,7 +691,7 @@ Was du dabei beobachten kannst, beschreibt die Mission in [Kapitel 10](10-netzwe
 Alle öffnen dasselbe Level. Einer wählt
 **Spielen › Online-Spiel hosten...** (Play › Host Online Game...), die anderen
 **Spielen › Online-Spiel beitreten...** (Play › Join Online Game...), alle denselben Raumnamen im Feld
-**Room** (bleibt englisch, Standard „kern“). Ohne Eintrag im Feld **Relay (optional)** finden sich
+**Raum** (Room, Standard „kern“). Ohne Eintrag im Feld **Relay (optional)** finden sich
 nur Tabs desselben Browsers; für verschiedene Rechner tragen alle dort die Adresse desselben Relays ein (Kapitel 10, Abschnitt 10.11).
 **Spielen › Online-Spiel verlassen** (Play › Leave Online Game) verlässt das Spiel.
 

@@ -93,9 +93,11 @@ Die Lehre: **Steife Federn und große Schritte vertragen sich nicht** – außer
 > Schwingung dann mit jedem Schritt mehr als dreimal so groß werden, nach zehn Schritten auf das
 > 150 000-Fache.
 
-> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ über **File › Example Levels** das
-> **Physics Lab**, starte Simulate (Alt+S) und halte mit **Play › Pause** (Taste **Pause**) an. Mit
-> **.** (Advance One Frame) rückst du einen Schritt weiter. Du blätterst das Daumenkino Blatt für
+> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ über
+> **Datei › Beispiel-Levels** (File › Example Levels) das Level **Physics Lab**, starte
+> **Simulieren** (Simulate) mit Alt+S und halte mit **Spielen › Pause** (Play › Pause) oder der Taste
+> **Pause** an. Mit **.**, im Menü **Ein Bild weiter** (Advance One Frame), rückst du einen Schritt
+> weiter. Du blätterst das Daumenkino Blatt für
 > Blatt um. Welche Methode dahintersteckt, siehst du dabei nicht, wohl aber die einzelnen Blätter.
 
 ### Was Box3D tut
@@ -327,8 +329,9 @@ das, was die Teilschritte noch sauber erfassen können.
 > **Für Neugierige:** Diese Grenze „mindestens zwei Blicke pro Schwingung“ heißt
 > **Nyquist-Grenze**. Kern hält jede Feder im Level sicher darunter.
 
-> **Probier's aus!** Stelle im Physics Lab unter **World Settings › Physics (Box3D)** die
-> **Sub-steps** einmal auf 1 und einmal auf 16, starte jeweils Simulate und zieh mit der Maus an der
+> **Probier's aus!** Stelle im Physics Lab unter
+> **Welteinstellungen › Physik (Box3D)** (World Settings › Physics (Box3D)) die **Teilschritte**
+> (Sub-steps) einmal auf 1 und einmal auf 16, starte jeweils **Simulieren** (Simulate) und zieh mit der Maus an der
 > Seilbrücke. Achte darauf, wie sehr die Kette nachgibt: Mit wenigen Teilschritten dehnt sie sich
 > stärker, mit vielen hält sie fester zusammen.
 

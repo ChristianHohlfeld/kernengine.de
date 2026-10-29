@@ -68,7 +68,7 @@ Deshalb läuft das Studio per Doppelklick, ohne Internet und ohne Installation.
 
 Im Koffer liegen außerdem die Bauteile für fertige Spiele: die Browser-Teile, die ein Spiel zum
 Laufen braucht, noch einmal extra verpackt. Zusammen mit dem Modul, das ohnehin im Koffer steckt,
-kann **File → Package Game** darum auch ohne Internet ein eigenständiges Spiel packen.
+kann **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) darum auch ohne Internet ein eigenständiges Spiel packen.
 
 ### Der Lehrer ohne Bildschirm
 
@@ -93,7 +93,7 @@ Spieler es findet.
 So klingen Prüfungen in Alltagssprache:
 
 - Startet das Studio mit Orb Run?
-- Macht Undo eine Änderung exakt rückgängig?
+- Macht **Rückgängig** (Undo) eine Änderung exakt rückgängig?
 - Rechnet Kern das Netz der Ente genauso wie die Vorlage von Pollen Robotics?
 - Steht die Ente, läuft sie und dreht sie sich, wenn ihr Netz sie steuert?
 
@@ -142,8 +142,8 @@ gemeinsame Testfälle prüfen genau das.
 In Kern heißt das:
 
 - **Vorlesen:** Kern geht die Kästchen eins nach dem anderen durch und tut, was darin steht.
-- **Übertragen:** Beim Start von Play oder Simulate übersetzt Kern die Kästchen in schnelle
-  Maschinenbefehle, die der Browser direkt ausführt. Der Test macht das genau so wie im Browser.
+- **Übertragen:** Beim Start von **Spielen** (Play) oder **Simulieren** (Simulate) übersetzt Kern
+  die Kästchen in schnelle Maschinenbefehle, die der Browser direkt ausführt. Der Test macht das genau so wie im Browser.
 - **Drucken:** Kern schreibt aus den Kästchen fertigen C++-Quelltext, der fest in ein Programm
   eingebaut werden kann.
 
@@ -157,7 +157,7 @@ für Kästchen vor – langsamer, aber nichts geht kaputt.
 ### Der Testklicker
 
 Die letzte Prüfung ist die größte: Ein ferngesteuerter Browser bedient das Studio wie ein
-unermüdlicher Mensch. Er öffnet Menüs, verschiebt Dinge, drückt Play, packt ein Spiel und spielt
+unermüdlicher Mensch. Er öffnet Menüs, verschiebt Dinge, drückt **Spielen**, packt ein Spiel und spielt
 es, er tut sogar so, als wäre er ein Telefon. Eine echte Grafikkarte bekommt er nicht, sondern eine
 nachgebildete, die die Stadt von Orb Run mit nur etwa **einem Bild pro Sekunde** schafft. Darum
 wartet jede Prüfung, bis ihre Wirkung sichtbar ist, statt eine feste Zeit lang zu warten.
@@ -168,11 +168,11 @@ muss dafür nicht wissen, wie das Bild genau aussehen soll – die Frage „Wurd
 beantwortet die Farbzahl allein, schnell und auch mit der langsamen Ersatz-Grafik. Nebenbei kann er
 Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
 
-![Simulate mit Physik-Ansicht, wie der Testklicker es prüft](../buch/bilder/studio-simulate.png)
+![Simulieren mit Physik-Ansicht, wie der Testklicker es prüft](../buch/bilder/studio-simulate.png)
 
-> **Probier's aus!** Mach, was der Testklicker macht. Wähle **File → New Level → Physics Lab**.
-> Halte die rechte Maustaste gedrückt und drück W: Jetzt fliegt deine **Kamera** nach vorn, die
-> Dinge in der Welt bleiben stehen. Dann **Simulate** (Alt+S), also zuschauen statt mitspielen: Die
+> **Probier's aus!** Mach, was der Testklicker macht. Wähle **Datei › Neues Level...** (File › New Level...)
+> und dort **Physics Lab**. Halte die rechte Maustaste gedrückt und drück W: Jetzt fliegt deine
+> **Kamera** nach vorn, die Dinge in der Welt bleiben stehen. Dann **Simulieren** (Alt+S), also zuschauen statt mitspielen: Die
 > Physik rechnet, das Pendel schwingt, der Drehteller dreht sich, der Rover fährt los. Stell dir
 > vor, du müsstest das nach jeder Änderung hundertmal tun und jedes Mal genau hinsehen – genau das
 > nimmt dir der Testklicker ab, ohne müde zu werden.

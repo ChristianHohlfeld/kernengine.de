@@ -16,7 +16,7 @@
 >   mehr Drehmoment. Gemessen in Newtonmeter (N·m).
 > - **Impuls** – ein kurzer Stoß, wie ein Tritt gegen einen Ball. Eine **Kraft** dagegen schiebt
 >   eine Weile.
-> - **Collider** – die unsichtbare, einfache Form, mit der ein Ding anstößt. Oft gröber als das,
+> - **Kollider** (Collider) – die unsichtbare, einfache Form, mit der ein Ding anstößt. Oft gröber als das,
 >   was man sieht: Ein Auto stößt etwa als Kiste an.
 > - **Solver** – der Teil von Box3D, der in jedem Schritt alle Regeln auf einmal erfüllt: Nichts
 >   steckt im anderen, Gelenke halten zusammen.
@@ -123,7 +123,7 @@ Roboter schlafen allerdings nie. Eine Ente, die ganz langsam geht, sähe für di
 ein ruhendes Ding und würde mitten im Schritt eingefroren.
 
 Spiele bauen ihre Körper nicht von Hand, sondern aus dem Level ([Kapitel 8](08-spiel-laufzeit.md)).
-Studio zeichnet die Collider im Editor aus **demselben Plan**, nach dem das Spiel die Physik baut.
+Studio zeichnet die Kollider im Editor aus **demselben Plan**, nach dem das Spiel die Physik baut.
 Was du siehst, wird also genau so simuliert.
 
 > **Für Neugierige:** Die Welt rechnet alles nacheinander, nicht mehrere Rechnungen gleichzeitig.
@@ -150,15 +150,16 @@ Bei festen Dreiecksnetzen achtet Kern auf die Nähte zwischen den Dreiecken. Son
 Ball an der Naht zwischen zwei Bodenplatten hängen, als wäre dort eine Kante – eine sogenannte
 **Geisterkante**.
 
-> **Probier's aus!** Öffne über **File › Example Levels** das **Physics Lab** und schalte unter
-> **Window › Show** den Punkt **Collision Shapes** ein. Jetzt siehst du die Collider als Linien über
+> **Probier's aus!** Öffne über **Datei › Beispiel-Levels** (File › Example Levels) das Level
+> **Physics Lab** und schalte unter **Fenster › Anzeigen** (Window › Show) den Punkt **Kollisionsformen**
+> (Collision Shapes) ein. Jetzt siehst du die Kollider als Linien über
 > den Dingen: Kästen, Kugeln und andere Formen. Vergleiche: Wo ist die Form gröber als das sichtbare Ding?
 
 ## 6.4 Material
 
 Jede Form hat ein **Material**. Es sagt, wie schwer, wie rutschig und wie sprungfreudig sie ist:
 
-- **Dichte** – wie schwer der Stoff ist. Im Level startet jeder Collider mit **1000 kg/m³**
+- **Dichte** – wie schwer der Stoff ist. Im Level startet jeder Kollider mit **1000 kg/m³**
   (Kilogramm pro Kubikmeter), der Dichte von Wasser. Ein Würfel von 10 cm Kantenlänge wiegt damit 1 kg, einer von 1 m eine Tonne.
 - **Reibung** – wie griffig (6.6).
 - **Restitution** – wie stark etwas abprallt (6.6).
@@ -233,16 +234,18 @@ Kern setzt den Rollwiderstand gezielt ein, und die Kommentare im Code erklären,
 **Roboterfüße** sind breite, flache Formen mit hoher Reibung, damit der Roboter sicher steht und
 nicht wegrutscht.
 
-> **Probier's aus!** Im Details-Panel findest du die Werte unter **Mesh › Physics** für den
-> automatischen Collider eines Dings, unter **Collider** für einen eigenen; den endlosen Boden
-> stellst du unter **World Settings › Physics (Box3D)** mit **Ground friction** und **Ground
-> bounciness** ein. Öffne das **Physics Lab** und wähle eine Kiste. Die Kisten haben eigene
-> Collider, also stellst du im Details-Panel unter **Collider** die **Restitution** auf **0,9**.
-> Starte Simulate (Alt+S), den Probelauf mit Physik, greife die Kiste mit der Maus, heb sie hoch und lass sie fallen. Sie springt
+> **Probier's aus!** Im Details-Panel findest du die Werte unter
+> **Statisches Mesh › Physik** (Static Mesh › Physics) für den automatischen Kollider eines Dings,
+> unter **Kollider** (Collider) für einen eigenen; den endlosen Boden stellst du unter
+> **Welteinstellungen › Physik (Box3D)** (World Settings › Physics (Box3D)) mit **Bodenreibung**
+> (Ground friction) und **Bodenelastizität** (Ground bounciness) ein. Öffne das **Physics Lab** und
+> wähle eine Kiste. Die Kisten haben eigene Kollider, also stellst du im Details-Panel unter
+> **Kollider** das Feld **Rückprall (Elastizität)** (Restitution (bounce)) auf **0,9**. Starte
+> **Simulieren** (Simulate) mit Alt+S, den Probelauf mit Physik, greife die Kiste mit der Maus, heb sie hoch und lass sie fallen. Sie springt
 > jetzt mehrmals auf, jedes Mal etwas niedriger. Stell den Wert auf 0: Sie plumpst und bleibt
 > liegen. Gleiche Kiste, anderes Material.
 
-> **Für Neugierige:** In den World Settings gibt es außerdem Felder dafür, wie weich Kontakte
+> **Für Neugierige:** In den **Welteinstellungen** gibt es außerdem Felder dafür, wie weich Kontakte
 > nachgeben und wie schnell Box3D Ineinandergeratenes wieder auseinanderdrückt.
 
 ## 6.7 Gelenke
@@ -250,17 +253,17 @@ nicht wegrutscht.
 Ein **Gelenk** verbindet zwei Körper und erlaubt nur bestimmte Bewegungen. Box3D kennt neun Arten,
 und jede hat ein Vorbild im Alltag:
 
-| Gelenk (Editor) | Alltagsbild |
-|---|---|
-| Hinge | Türscharnier: dreht um eine Achse |
-| Slider | Schublade: gleitet entlang einer Linie |
-| Ball | Schultergelenk, mit Kegel als Grenze |
-| Fixed | Schweißnaht (darf auch etwas federn) |
-| Distance / rope | Stange oder Seil |
-| Wheel | Rad mit Federung und Antrieb |
-| Motor | zieht das eine Teil in eine bestimmte Lage zum anderen |
-| Parallel | Stehaufmännchen: hält die Ausrichtung weich |
-| No collision | verbindet nichts, verhindert nur Zusammenstöße |
+| Gelenk (Editor) | englisch | Alltagsbild |
+|---|---|---|
+| Scharnier (Drehgelenk) | Hinge (revolute) | Türscharnier: dreht um eine Achse |
+| Schiene (Schubgelenk) | Slider (prismatic) | Schublade: gleitet entlang einer Linie |
+| Kugelgelenk | Ball (spherical) | Schultergelenk, mit Kegel als Grenze |
+| Fest (verschweißt) | Fixed (weld) | Schweißnaht (darf auch etwas federn) |
+| Abstand / Seil | Distance / rope | Stange oder Seil |
+| Rad (Federung) | Wheel (suspension) | Rad mit Federung und Antrieb |
+| Motor | Motor | zieht das eine Teil in eine bestimmte Lage zum anderen |
+| Parallel | Parallel | Stehaufmännchen: hält die Ausrichtung weich |
+| Keine Kollision (Filter) | No collision (filter) | verbindet nichts, verhindert nur Zusammenstöße |
 
 **Das Beispiel Tür:** Ein Scharnier verbindet Türrahmen und Tür. Kern legt am Scharnierpunkt eine
 senkrechte Achse fest, um die sich die Tür drehen darf. Eine **Grenze** von knapp 100 Grad in jede
@@ -281,19 +284,22 @@ ausschalten.
 
 ### Wenn Gelenke brechen
 
-Ein Gelenk kann eine **Bruchschwelle** haben (im Editor *Break force* und *Break torque*). Wird es
+Ein Gelenk kann eine **Bruchschwelle** haben (im Editor die Felder **Bruchkraft (0 = nie)** und **Bruchmoment (0 = nie)**, englisch
+*Break force (0 = never)* und *Break torque (0 = never)*). Wird es
 stärker belastet, bricht es: Die Spiel-Laufzeit entfernt es, schreibt eine Meldung ins Protokoll und
 spielt den Bruch-Sound. So kann die Seilbrücke im Physics Lab reißen: Die Gelenke ihrer mittleren
 Planken haben eine Bruchschwelle von 60 000 N (Newton, die Einheit für Kraft).
 
-> **Probier's aus!** Starte im Physics Lab Simulate und zieh mit der Maus kräftig an einer Planke der
+> **Probier's aus!** Starte im Physics Lab **Simulieren** (Simulate) und zieh mit der Maus kräftig an
+> einer Planke der
 > Seilbrücke: Die Kette gibt nach und schwingt, reißt aber nicht. 60 000 N schafft der Maus-Griff
 > nicht, denn er zieht nie stärker als ein Vielfaches des Gewichts der Planke. Willst du sie reißen
-> sehen? Halte Simulate zuerst mit **Esc** an, denn die Bruchschwelle stellst du im Editor ein.
-> Wähle dann die Planke **Plank 07** (Ordner **Bridge**) und setze in Details unter **Breaking** die
-> **Break force** auf **20000**. Starte Simulate erneut: Die Brücke hängt durch, hält aber. Greif
-> jetzt Plank 07 und zieh sie kräftig 2–3 m nach oben: Das Gelenk bricht, und die Brücke reißt in
-> zwei Hälften. Schalte unter **Window › Show** auch **Constraints** (die Gelenke) ein, dann siehst
+> sehen? Beende das Simulieren zuerst mit **Esc**, denn die Bruchschwelle stellst du im Editor ein.
+> Wähle dann die Planke „Plank 07“ (Ordner „Bridge“) und setze in **Details** unter **Bruch**
+> (Breaking) die **Bruchkraft (0 = nie)** auf **20000**. Starte **Simulieren** erneut: Die Brücke
+> hängt durch, hält aber. Greif jetzt „Plank 07“ und zieh sie kräftig 2–3 m nach oben: Das Gelenk
+> bricht, und die Brücke reißt in zwei Hälften. Schalte unter **Fenster › Anzeigen** (Window › Show)
+> auch **Gelenke** (Constraints) ein, dann siehst
 > du, welches Gelenk fehlt. Zum Vergleich: Unter etwa 10 000 N reißt die gespannte Brücke schon von
 > selbst, unter ihrem eigenen Gewicht.
 
@@ -327,7 +333,8 @@ Ein Gelenk ist gebrochen.
 
 Man kann außerdem direkt fragen: „Welche Körper berührt dieser Körper gerade, und wie fest?“ So weiß
 die Micro Duck, ob ihr Fuß gerade den Boden berührt – genau wie ein Berührungssensor in einer echten
-Sohle. Studio zeigt die Berührpunkte mit **Window › Show › Contact Points**.
+Sohle. Studio zeigt die Berührpunkte mit
+**Fenster › Anzeigen › Kontaktpunkte** (Window › Show › Contact Points).
 
 ## 6.10 MouseGrab: Körper mit der Maus ziehen
 
@@ -341,7 +348,7 @@ pendelt am Griff. Für den Rumpf der Micro Duck hält der Griff zusätzlich die 
 eine Hand, damit sie hochgehoben aufrecht bleibt. Feste und kinematische Körper lassen sich nicht
 greifen.
 
-> **Probier's aus!** In Simulate greifst du jeden dynamischen Körper mit der linken Maustaste (oder
+> **Probier's aus!** Beim **Simulieren** (Simulate) greifst du jeden dynamischen Körper mit der linken Maustaste (oder
 > dem Finger). Zeiger nach oben hebt, das Mausrad holt näher oder schiebt weg, Loslassen wirft.
 
 ## 6.11 Der Character Mover
@@ -358,7 +365,8 @@ Die Figur selbst ist eine Kapsel. In jedem Schritt beschleunigt sie in die gewü
 welche Flächen sie berührt, und gleitet an ihnen entlang statt hineinzulaufen. Drückt sie gegen eine
 Wand, baut sich also keine Geschwindigkeit auf, sonst schösse die Figur los, sobald die Wand zu
 Ende ist. Zu steile Flächen gelten nicht als Boden. Die
-Spiel-Laufzeit nutzt den Character Mover für die Spieler „Character“ und „Soldier“
+Spiel-Laufzeit nutzt den Character Mover für die Spielertypen **Figur** (Character) und **Soldat**
+(Soldier)
 ([Kapitel 8](08-spiel-laufzeit.md)).
 
 > **Für Neugierige:** Der Character Mover hat seine eigene, knackigere Schwerkraft, damit Sprünge sich
@@ -371,7 +379,7 @@ Spiel-Laufzeit nutzt den Character Mover für die Spieler „Character“ und �
 > überspringen, wäre alles ruckelig – und eine Feder könnte sich „aufschaukeln“.
 
 Darum bekommt Box3D **immer gleich große Zeitschritte**, egal wie schnell dein Bildschirm ist.
-Standard sind 60 Schritte pro Sekunde (60 Hz). Mit der Level-Einstellung **Step rate** kannst du das
+Standard sind 60 Schritte pro Sekunde (60 Hz). Mit der Level-Einstellung **Schrittrate** (Step rate) kannst du das
 ändern; die Regeln raten aber, nie unter 30 zu gehen.
 
 Aber Bildschirme liefern ihre Bilder nicht im Takt der Physik. Wie passt das zusammen?
@@ -399,7 +407,7 @@ diesem geglätteten Stand; mit dem rohen Stand wackelten schnelle Autos im Bild.
 ### Sub-Steps
 
 Jeder Schritt wird in Box3D noch einmal in **Sub-Steps** (Teilschritte) zerlegt, einstellbar unter
-**World Settings › Sub-steps** (Standard 4, im Level 1 bis 16). Mehr Teilschritte bedeuten, dass
+**Welteinstellungen › Teilschritte** (World Settings › Sub-steps): Standard 4, im Level 1 bis 16. Mehr Teilschritte bedeuten, dass
 lange Gelenkketten besser zusammenhalten, weil kleine Fehler in kürzeren Schritten weniger Zeit
 haben zu wachsen.
 
@@ -505,7 +513,7 @@ Messungen, für jedes Servo-Gelenk in jedem Physikschritt.
 
 ### Servos im Level
 
-Jedes Scharnier (Hinge) im Level lässt sich zum Servo machen. Es bekommt dann einen Zielwinkel, eine
+Jedes Gelenk vom Typ **Scharnier (Drehgelenk)** (Hinge (revolute)) im Level lässt sich zum Servo machen. Es bekommt dann einen Zielwinkel, eine
 Steifigkeit, eine Dämpfung und eine Reibung; seine Höchstkraft ist die Motorkraft des Gelenks.
 
 ### Profile und Streuung

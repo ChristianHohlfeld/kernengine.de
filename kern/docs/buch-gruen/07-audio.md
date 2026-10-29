@@ -11,7 +11,7 @@
 > - **Level** – eine fertig gebaute Spielwelt, so wie ein Spielbrett mit allen Figuren darauf.
 > - **Actor** – ein Ding im Level: eine Kiste, ein Auto, ein Radio, die Spielfigur.
 > - **Komponente** – ein Steckbaustein, der einem Actor eine Fähigkeit gibt, etwa „kann klingen“.
-> - **Rigid Body und Collider** – Körper und Form eines Dings für die Physik ([Kapitel 6](06-physik.md)).
+> - **Starrkörper** (Rigid Body) und **Kollider** (Collider) – Körper und Form eines Dings für die Physik ([Kapitel 6](06-physik.md)).
 > - **Bild** – ein einzelnes gezeichnetes Bild auf dem Bildschirm; ein Spiel zeigt meist 60 davon
 >   pro Sekunde, wie ein Daumenkino.
 > - **Deterministisch** – „immer gleich“: Dieselben Eingaben ergeben auf jedem Gerät exakt dasselbe.
@@ -255,8 +255,8 @@ Oberfläche und Musik. Manche laufen als Schleife (Motor, Wind), die meisten spi
 Namen und Rezepte stehen im blauen Buch, Kapitel 7.
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und klick einmal irgendwo hin –
-> vorher bleibt der Browser stumm. Öffne unten den Content Drawer (Ctrl+Space) und dort den Tab
-> **Sounds**: Jeder Klick auf einen Sound spielt ihn ab. Hör dir `pickup`, `explosion` und
+> vorher bleibt der Browser stumm. Öffne unten die **Inhaltsablage** (Content Drawer) mit
+> Strg+Leertaste und dort den Reiter **Sounds**: Jeder Klick auf einen Sound spielt ihn ab. Hör dir `pickup`, `explosion` und
 > `music_calm` an. Kaum zu glauben, dass das nur Rechnerei ist!
 
 ## 7.6 Die Stimme der Micro Duck
@@ -354,10 +354,10 @@ im Lehrer), bleiben nur die neuesten liegen. Im Netzwerkspiel dürfen Tonzettel 
 verloren gehen – fehlt ein Klick, ist es egal. Wichtige Ereignisse wie eine eingesammelte Münze kommen
 dagegen sicher an ([Kapitel 10](10-netzwerk.md)).
 
-Jeder Rigid Body hat einen Aufprall-Sound und eine **Schwelle**: Erst ab einem gewissen Tempo klingt
+Jeder **Starrkörper** (Rigid Body) hat einen Aufprall-Sound und eine **Schwelle**: Erst ab einem gewissen Tempo klingt
 ein Stoß. Die Physik meldet Zusammenstöße übrigens nur für Formen, die überhaupt einen Klang haben
 (oder die Spieler und Logik brauchen) – jede Meldung kostet Rechenzeit, und für eine stumme Kiste
-wäre sie verschwendet. Jeder Collider kann einen eigenen Sound tragen – die Sohle der Ente klingt nach Schritt,
+wäre sie verschwendet. Jeder **Kollider** (Collider) kann einen eigenen Sound tragen – die Sohle der Ente klingt nach Schritt,
 ihr Gehäuse nach Plastik. Dazu ein paar Regeln:
 
 - Unter der Schwelle bleibt es still, und pro Physikschritt klingen nur wenige Aufprälle – mehr würde
@@ -370,8 +370,8 @@ ihr Gehäuse nach Plastik. Dazu ein paar Regeln:
 Die Micro Duck setzt ihre Schwelle sehr niedrig, damit man schon zarte Berührungen hört. Brechende
 Gelenke spielen ein Knack-Geräusch. Die genauen Schwellen stehen im blauen Buch, Kapitel 7.
 
-> **Probier's aus!** Öffne über File › Example Levels das **Physics Lab** und starte **Simulate**
-> (Alt+S). Wirf mit der Maus Kisten herum. Knallen harte Würfe lauter als sanfte Stupser? Klingen
+> **Probier's aus!** Öffne über **Datei › Beispiel-Levels** (File › Example Levels) das Level
+> **Physics Lab** und starte **Simulieren** (Simulate) mit Alt+S. Wirf mit der Maus Kisten herum. Knallen harte Würfe lauter als sanfte Stupser? Klingen
 > große Kisten tiefer als kleine?
 
 ## 7.9 Ton im Level einstellen
@@ -379,17 +379,17 @@ Gelenke spielen ein Knack-Geräusch. Die genauen Schwellen stehen im blauen Buch
 Jedes Level hat eigene Ton-Einstellungen, und jedes Ding im Level kann zur Schallquelle werden –
 mit Lautstärke, Reichweite und auf Wunsch mit 3D-Klang.
 
-In den **World Settings** (den Einstellungen fürs ganze Level) gibt es einen Bereich *Audio*:
+In den **Welteinstellungen** (World Settings), den Einstellungen fürs ganze Level, gibt es einen Bereich *Audio*:
 Gesamtlautstärke, Musikstück und Hintergrundklang mit je eigener Lautstärke, Hall und Doppler-Stärke.
 Je mehr Hall, desto mehr bekommen Effekte, Stimmen und Hintergrund ab; Musik und Oberfläche bleiben
 trocken.
 
-Die Komponente **Audio Source** macht jeden Actor zur Schallquelle. Am einfachsten nimmst du eine
-fertige Variante aus dem Katalog:
+Die Komponente **Audioquelle** (Audio Source) macht jeden Actor zur Schallquelle. Am einfachsten
+nimmst du eine fertige Variante aus dem Katalog:
 
-- **Audio Source** – ein Maschinenbrummen an einem Ort,
-- **Ambient Wind** – Wind, der überall gleich laut ist,
-- **City Ambience** – Stadtgeräusche, die mit Abstand leiser werden,
+- **Audioquelle** – ein Maschinenbrummen an einem Ort,
+- **Wind** (Ambient Wind) – Wind, der überall gleich laut ist,
+- **Stadtatmosphäre** (City Ambience) – Stadtgeräusche, die mit Abstand leiser werden,
 - **Radio** – spielt die ruhige Musik als 3D-Ton.
 
 Im Wesentlichen stellst du dann drei Dinge ein: **welcher Sound** (und ob er sich wiederholt), **wie
@@ -398,9 +398,10 @@ Eine nette Extra-Einstellung lässt die Tonhöhe mit dem Tempo des Actors steige
 im blauen Buch, Kapitel 7; die Bedienung im Editor in [Kapitel 11](11-studio.md).
 
 > **Probier's aus!** Studio startet mit **Orb Run**, einem Level, in dem du ein Schwebeauto steuerst.
-> Öffne den Content Drawer (Ctrl+Space), Tab **Place Actors**, Gruppe **Audio**, und klick auf
-> **Radio** – es erscheint dort, wohin die Kamera blickt. Dreh in den World Settings unter *Audio* die
-> Musik leiser, damit du das Radio gut hörst. Starte Play (Alt+P) und fahr heran, weit weg und einmal
+> Öffne die **Inhaltsablage** (Content Drawer) mit Strg+Leertaste, Reiter **Actors platzieren**
+> (Place Actors), Gruppe **Audio**, und klick auf **Radio** – es erscheint dort, wohin die Kamera
+> blickt. Dreh in den **Welteinstellungen** unter *Audio* die **Musiklautstärke** (Music volume)
+> herunter, damit du das Radio gut hörst. Starte **Spielen** (Play) mit Alt+P und fahr heran, weit weg und einmal
 > drumherum. Hörst du, wie die Musik leiser wird, von links nach rechts wandert und hinter dir dumpfer
 > klingt? Das sind die drei 3D-Effekte aus 7.3.
 

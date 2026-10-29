@@ -479,8 +479,9 @@ nicht nutzen kann. Auf dem Testrechner mit 2 Rechenkernen kam der erste echte
 Sprung im Browser nach knapp 9 Minuten, das Nachahmen war nach etwa 11 Minuten fertig. Das
 anschließende Üben dauert deutlich länger. Auf deinem Gerät kann es schneller oder langsamer gehen.
 
-> **Probier's aus!** Öffne auf https://kernengine.de/ das Beispiel-Level (File › Example Levels ›
-> Micro Duck), starte **Play**, übernimm die Ente mit **F8** und drück **7**. Was du siehst, ist das
+> **Probier's aus!** Öffne auf https://kernengine.de/ das Beispiel-Level über
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), starte **Spielen**
+> (Play), übernimm die Ente mit **F8** und drück **7**. Was du siehst, ist das
 > Netz aus dem Lehrer. Achte darauf: Alle Füße sind kurz in der Luft, und die Ente landet aufrecht –
 > genau das zählt als echter Sprung. Es ist ein kleiner Hüpfer, rund einen Zentimeter hoch.
 

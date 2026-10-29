@@ -167,17 +167,18 @@ erwartet wird –, gibt es einen Ersatzwert. Und das Einlesen liefert sein Ergeb
 ganz geklappt hat**; sonst nennt es die Stelle, an der es hakte.
 
 > **Probier's aus!** Schau einem Level unter die Haube.
-> 1. **File → New Level → Basic**: ein Boden und ein Würfel.
-> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transform** das Feld **Location** mit
->    X, Y und Z. Z zeigt nach oben (mehr dazu in Abschnitt 3.3). Tippe bei Z eine **3** und drück
+> 1. **Datei › Neues Level...** (File › New Level...) und dort **Grundformen** (Basic): ein Boden
+>    und ein Würfel.
+> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transformation** (Transform) das Feld
+>    **Position** (Location) mit X, Y und Z. Z zeigt nach oben (mehr dazu in Abschnitt 3.3). Tippe bei Z eine **3** und drück
 >    Enter: Der Würfel schwebt 3 Meter hoch.
-> 3. **File → Save** (Ctrl+S). Chrome und Edge fragen, wohin; andere Browser legen die Datei
+> 3. **Datei › Speichern** (File › Save), Strg+S. Chrome und Edge fragen, wohin; andere Browser legen die Datei
 >    `Untitled.klevel` in den Download-Ordner.
 > 4. Rechtsklick auf die Datei, **Öffnen mit**, dann **Editor** (Windows) bzw. **TextEdit** (Mac).
 >
 > Ganz oben steht `"format": "kern-level"` – daran erkennt Kern seine Levels. Such mit Strg+F (Mac:
-> Cmd+F) nach **Cube**: Darunter steht bei **position** die Zahlenfolge 0, 0, 3 – dein Würfel. Was
-> im Studio **Location** heißt, heißt in der Datei **position**. So sieht ein Level von innen aus:
+> Cmd+F) nach „Cube“, dem Namen des Würfels: Darunter steht bei **position** die Zahlenfolge 0, 0, 3 –
+> dein Würfel. Was im Studio **Position** heißt, heißt in der Datei **position**. So sieht ein Level von innen aus:
 > Namen mit Werten, in fester Reihenfolge.
 
 ### Erst prüfen, dann übernehmen: Servoprofile
@@ -212,8 +213,9 @@ ein einfaches Bild: Lauf am Rand eines Kreises mit 1 Meter Radius entlang. Ein h
 3,14 Meter lang (die Kreiszahl π). Der Winkel in Radiant ist die Strecke am Rand: 180° sind π, 90°
 etwa 1,57. Viele Formeln werden so einfacher.
 
-> **Probier's aus!** Öffne **File → New Level → Physics Lab**. Tippe ins Feld **Cmd** unten in der
-> Statusleiste `gravity 0 0 -2`, drück Enter und starte **Simulate**. Die Schwerkraft zeigt jetzt
+> **Probier's aus!** Öffne über **Datei › Neues Level...** (File › New Level...) das Level Physics
+> Lab. Tippe ins Feld **Cmd** unten in der Statusleiste `gravity 0 0 -2`, drück Enter und starte
+> **Simulieren** (Simulate). Die Schwerkraft zeigt jetzt
 > schwach in Richtung minus Z, nach unten: Alles fällt fast wie auf dem Mond. `gravity` ohne Zahlen
 > stellt die Erde wieder her, rund 0, 0, −9,8: Fallendes wird jede Sekunde um etwa 9,8 Meter pro
 > Sekunde schneller.
@@ -318,9 +320,10 @@ gültige Kugel, etwa weil sie noch nicht ausgerechnet wurde, wird es trotzdem ge
 [Anhang B](B-grundlagen-rendering.md).
 
 > **Probier's aus!** Öffne Orb Run. Klick in der Leiste oben im Viewport auf **≡** und stell
-> **Field of View** erst auf 110°, dann auf 50°: Weitwinkel mit verzerrten Rändern, dann wie
-> herangezoomt. Drück im Viewport **Alt+J**: Die Ansicht springt auf **Top**, die Parallelansicht von
-> oben, wie ein Stadtplan. **Alt+G** holt die Perspektive zurück.
+> **Sichtfeld** (Field of View) erst auf 110°, dann auf 50°: Weitwinkel mit verzerrten Rändern, dann
+> wie herangezoomt. Drück im Viewport **Alt+J**: Die Ansicht springt auf **Oben** (Top), die
+> Parallelansicht von oben, wie ein Stadtplan. **Alt+G** holt die **Perspektive** (Perspective)
+> zurück.
 
 ## 3.4 Mathematik, die überall gleich rechnet
 

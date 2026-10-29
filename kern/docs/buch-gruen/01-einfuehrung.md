@@ -16,8 +16,9 @@
 >   C++ in sie übersetzt. Heraus kommt ein **Modul**: eine einzige Datei, die der Browser lädt.
 > - **Bild** (Fachwort: **Frame**) – eines der vielen Einzelbilder pro Sekunde, aus denen eine
 >   Bewegung auf dem Bildschirm besteht, wie die Blätter eines Daumenkinos.
-> - **Play und Simulate** – zwei Knöpfe in Kern Studio. Bei **Play** spielst du selbst mit und
->   steuerst die Spielfigur. Bei **Simulate** läuft die Welt mit ihrer Physik, und du schaust mit
+> - **Spielen** (Play) und **Simulieren** (Simulate) – zwei Knöpfe in Kern Studio. Bei **Spielen**
+>   spielst du selbst mit und steuerst die Spielfigur. Bei **Simulieren** läuft die Welt mit ihrer
+>   Physik, und du schaust mit
 >   frei beweglicher Kamera zu.
 > - **Schnittstelle** – die vereinbarte Übergabestelle zwischen zwei Programmteilen, wie der Tresen
 >   zwischen Küche und Gastraum.
@@ -230,23 +231,24 @@ es das Spiel SpawnCity ([Kapitel 4](04-grafik.md)).
 
 **Kern Studio und fertige Spiele.** Für alle, die lieber klicken als tippen. Das ganze Studio ist
 **eine** Datei, die sogar ohne Internet per Doppelklick läuft. Du baust ein Level aus **Actors**
-(Dingen in der Welt) und probierst es direkt im Fenster aus: mit **Play** spielst du selbst mit,
-mit **Simulate** schaust du der laufenden Welt zu.
-**File → Package Game** macht daraus ein eigenständiges Spiel, wieder eine einzige Datei, die du
+(Dingen in der Welt) und probierst es direkt im Fenster aus: mit **Spielen** (Play) spielst du
+selbst mit, mit **Simulieren** (Simulate) schaust du der laufenden Welt zu.
+**Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) macht daraus ein eigenständiges Spiel, wieder eine einzige Datei, die du
 verschicken kannst. Sie läuft mit derselben Engine wie der Editor und verhält sich darum genauso
 ([Kapitel 8](08-spiel-laufzeit.md), [Kapitel 11](11-studio.md)).
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim ersten Start ist Orb Run
-> geladen (sonst: **File → Example Levels → Orb Run**). Drück **Play** (Alt+P) und fahr mit dem
-> schwebenden Auto, dem Hovercar, los: **W A S D** oder die Pfeiltasten lenken und geben Gas,
-> **Shift** gibt Schub. Sammle ein paar **Orbs** ein, die leuchtenden Energiekugeln auf den
-> Straßen. Dann **Stop** (Esc). Alles, was du gerade gesehen und
-> gehört hast – Licht, Fahrphysik, Ton –, hat die Engine im Browser gerechnet.
+> geladen (sonst: **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run)). Drück
+> **Spielen** (Alt+P) und fahr mit dem schwebenden Auto, dem Hovercar, los: **W A S D** oder die
+> Pfeiltasten lenken und geben Gas, **Umschalt** gibt Schub. Sammle ein paar **Orbs** ein, die
+> leuchtenden Energiekugeln auf den Straßen. Dann **Stopp** (Stop) oder Esc. Alles, was du gerade
+> gesehen und gehört hast – Licht, Fahrphysik, Ton –, hat die Engine im Browser gerechnet.
 
-> **Achtung, Falle!** Auf einem deutschen System zeigt Kern Studio seine Menüs auf Deutsch („Datei“
-> statt „File“, „Welteinstellungen“ statt „World Settings“). Dieses Buch nennt die englischen Namen.
-> Damit du alles wiederfindest, klick unten rechts in der Statusleiste auf **DE | EN** – Studio
-> merkt sich die Wahl. Oder öffne es gleich mit `?lang=en` am Ende der Adresse.
+> **Wusstest du?** Kern Studio zeigt seine Oberfläche auf Deutsch oder Englisch; ohne Vorgabe folgt
+> es der Sprache des Browsers. Dieses Buch nennt die Beschriftungen, wie Studio sie auf Deutsch
+> zeigt, in Klammern die englischen. Wer Studio auf Englisch nutzt, findet sie dort: Der Knopf
+> **DE | EN** unten rechts in der Statusleiste wechselt die Sprache, ebenso `?lang=de` bzw.
+> `?lang=en` in der Adresse; Studio merkt sich die Wahl auf dem Gerät.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck: auf deinem Rechner als eigenes Programm oder
 im Browser auf der Lehrer-Seite. Dort sammeln mehrere Hintergrund-Helfer gleichzeitig Erfahrungen
@@ -269,8 +271,8 @@ An der Ente sieht man alles auf einmal:
 
 ![Das Micro-Duck-Level im Studio](../buch/bilder/duck-level.png)
 
-> **Probier's aus!** Wähle **File → New Level** und dort eine der sechs Vorlagen, zum Beispiel
-> **Micro Duck**. Drück **Play** und schau zu, wie die Ente losläuft, gesteuert von ihrem gelernten
+> **Probier's aus!** Wähle **Datei › Neues Level...** (File › New Level...) und dort eine der sechs
+> Vorlagen, zum Beispiel **Micro Duck**. Drück **Spielen** und schau zu, wie die Ente losläuft, gesteuert von ihrem gelernten
 > Gehirn. Niemand hat ihr die Schritte vorgeschrieben: Das Netz entscheidet in jedem Augenblick neu,
 > wie sich die Motoren bewegen.
 
@@ -278,7 +280,7 @@ An der Ente sieht man alles auf einmal:
 
 Ganz unten im Studio liegt die **Statusleiste**. Darin steht ein Eingabefeld mit der Aufschrift
 **Cmd** (kurz für „command“, Befehl): die **Konsole**. Hier tippst du Befehle an Studio und schickst
-sie mit Enter ab; `help` zeigt alle Befehle. Die Antworten erscheinen im **Output Log**, das du über
+sie mit Enter ab; `help` zeigt alle Befehle. Die Antworten erscheinen im **Ausgabeprotokoll** (Output Log), das du über
 den gleichnamigen Knopf in der Statusleiste aufklappst. Mit der Cmd-Taste des Mac hat das Feld nichts
 zu tun. In den nächsten Kapiteln benutzt du es öfter.
 

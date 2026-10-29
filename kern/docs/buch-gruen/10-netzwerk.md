@@ -6,7 +6,7 @@
 > wackelige Leitungen, und wie du es im Studio ausprobierst.
 
 > **Begriffe vorab:**
-> - **Server** oder **Host** – der Rechner, der das Spiel ausrichtet und als Einziger wirklich rechnet.
+> - **Server** oder Host (Gastgeber) – der Rechner, der das Spiel ausrichtet und als Einziger wirklich rechnet.
 > - **Client** oder **Gast** – ein Mitspieler, der sich beim Server anmeldet und zeigt, was der meldet.
 > - **Paket** (Päckchen) – ein kleines Bündel Daten, das als Ganzes übers Netz reist.
 > - **Bit** – die kleinste Informationseinheit: ein Ja oder Nein, eine 1 oder 0. Acht Bits sind ein
@@ -269,40 +269,46 @@ stehen im blauen Buch, Kapitel 10.
 
 ## 10.8 Mehrspieler im Studio
 
-### Number of Players
+### Anzahl der Spieler
 
-Im Studio testest du mit mehreren Spielern, ganz ohne zweiten Rechner: **Play › Number of Players**, 1
-bis 4. Die Welt wird ein **Listen-Server**, ein Server, der selbst mitspielt. Jeder weitere Spieler ist
+Im Studio testest du mit mehreren Spielern, ganz ohne zweiten Rechner:
+**Spielen › Anzahl der Spieler** (Play › Number of Players), 1 bis 4. Die Welt wird ein **Listen-Server**, ein Server, der selbst mitspielt. Jeder weitere Spieler ist
 ein echter Gast mit eigener Welt und eigenem Viewport, verbunden über den Probe-Boten aus 10.6.
 
 - Das Studio schaltet auf **vier Viewports**: 1 ist der Server, 2 der erste Gast und so weiter.
 - Nur der Viewport, in den du zuletzt geklickt hast, bekommt deine Eingaben; die anderen Spieler
   stehen still.
-- **Play › Network Emulation** schaltet den Störsender ein, in Stufen von **Perfect** (perfekte
-  Leitung) über **LAN** (Heimnetz) und **Average** (durchschnittlich) bis **Bad** und **Terrible**
-  (furchtbar).
+- **Spielen › Netzwerk-Emulation** (Play › Network Emulation) schaltet den Störsender ein, in Stufen
+  von **Perfekt** (Perfect), der perfekten Leitung, über **LAN (5 ms)**, das Heimnetz, und
+  **Mittel (50 ms, 1 % Verlust)** (Average (50 ms, 1% loss)) bis
+  **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)) und
+  **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)).
 - Die Statuszeile zeigt, wer Server und wer Gast ist, wie viele spielen, die Umlaufzeit und den
   Verlust.
 
-> **Probier's aus!** Öffne Kern Studio über https://kernengine.de/, lade **File › Example Levels ›
-> Shooting Range**, wähle **Play › Number of Players › 2 Players** und drücke **Play**. Klick in
+> **Probier's aus!** Öffne Kern Studio über https://kernengine.de/, lade
+> **Datei › Beispiel-Levels › Shooting Range** (File › Example Levels › Shooting Range), wähle
+> **Spielen › Anzahl der Spieler › 2 Spieler (Listen-Server)**
+> (Play › Number of Players › 2 Players (listen server)) und drücke **Spielen** (Play). Klick in
 > Viewport 2 und lauf mit dem Soldaten des Gastes los. Schau dabei in Viewport 1: Dort läuft er
-> auch, denn der Server rechnet ihn. Dann stell **Network Emulation** auf **Terrible** und steuere
+> auch, denn der Server rechnet ihn. Dann stell **Netzwerk-Emulation** auf
+> **Sehr schlecht (300 ms, 20 % Verlust)** und steuere
 > wieder in Viewport 2. Was du siehst: Der Soldat reagiert spürbar später, denn jeder Tastendruck muss
 > erst zum Server und das Ergebnis zurück. Bewegungen können ruckeln oder kurz stocken, wenn Lagebilder
 > verloren gehen und die Zehntelsekunde Vorrat aus 10.7 nicht mehr reicht. Steuerst du dagegen in
 > Viewport 1, reagiert der Soldat des Servers sofort: Er muss auf niemanden warten.
 
-### Online: Host und Join
+### Online: hosten und beitreten
 
-Für andere Tabs oder Rechner: **Play › Host Online Game…** und **Join Online Game…**. Der Dialog fragt
+Für andere Tabs oder Rechner: **Spielen › Online-Spiel hosten...** (Play › Host Online Game...) und
+**Online-Spiel beitreten...** (Join Online Game...). Der Dialog fragt
 nach einem **Raum** (Standard „kern“) und optional nach einem Relay (10.11). Leer gelassen, finden sich
-nur Tabs desselben Browsers. **Leave Online Game** beendet die Sitzung. Liegt der Tab des Hosts im
+nur Tabs desselben Browsers. **Online-Spiel verlassen** (Leave Online Game) beendet die Sitzung. Liegt der Tab des Hosts im
 Hintergrund, rechnet er trotzdem weiter. Sonst hörten seine Gäste nichts mehr von ihm und flögen
 nach einer Weile raus (10.5).
 
-> **Probier's aus!** Öffne Studio in zwei Tabs mit demselben Beispiel-Level. Im ersten **Host Online
-> Game…**, im zweiten **Join Online Game…**, Raum „kern“, Relay leer. Schon spielt ihr zu zweit. Das
+> **Probier's aus!** Öffne Studio in zwei Tabs mit demselben Beispiel-Level. Im ersten
+> **Online-Spiel hosten...**, im zweiten **Online-Spiel beitreten...**, Raum „kern“, Relay leer. Schon spielt ihr zu zweit. Das
 > Schöne daran: Die beiden Tabs sind zwei völlig getrennte Programme. Sie teilen nichts außer den
 > Paketen, die sie sich durch den Briefkasten des Browsers zuschieben (10.10).
 
@@ -310,7 +316,7 @@ nach einer Weile raus (10.5).
 
 ## 10.9 Exportierte Spiele im Netz
 
-Auch ein mit **File › Package Game** exportiertes Spiel ([Kapitel 11](11-studio.md)) kann online
+Auch ein mit **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) exportiertes Spiel ([Kapitel 11](11-studio.md)) kann online
 spielen. Was es tun soll, schreibst du **hinten an die Adresse** in der Adresszeile des Browsers:
 
 | Anhang | Wirkung |
@@ -406,8 +412,9 @@ Studio.
 - Der **Server** rechnet, der **Gast** zeigt eine Kopie etwa eine Zehntelsekunde in der Vergangenheit.
 - Ein **Prioritätstopf** sorgt dafür, dass jedes Lagebild in ein Paket passt.
 - Alle brauchen **dasselbe Level**; eine Prüfsumme kontrolliert das.
-- Im Studio: **Number of Players**, **Network Emulation**, **Host** und **Join**; zwischen Rechnern das
-  **Relay** als Postamt.
+- Im Studio: **Anzahl der Spieler** (Number of Players), **Netzwerk-Emulation** (Network Emulation),
+  **Online-Spiel hosten...** (Host Online Game...) und
+  **Online-Spiel beitreten...** (Join Online Game...); zwischen Rechnern das **Relay** als Postamt.
 
 ## Knobelecke
 

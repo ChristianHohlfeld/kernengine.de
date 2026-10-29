@@ -845,8 +845,9 @@ existiert nur, solange es lernt.“ Vorbild, Kritiker, Würfeln, Variation – a
 beim Lernen hilft und danach abgebaut wird. Was bleibt, ist eine Umrechnung der Messwerte und ein
 paar Schichten, die malnehmen, zusammenzählen und verbiegen. Und das reicht, damit eine Ente springt.
 
-> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level (**File › Example Levels ›
-> Micro Duck**), starte Play, übernimm die Ente mit **F8** und drück die **7**. Jeder Servo bekommt in
+> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level über
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), starte **Spielen**
+> (Play), übernimm die Ente mit **F8** und drück die **7**. Jeder Servo bekommt in
 > diesem Moment 50-mal pro Sekunde eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall
 > waren.
 

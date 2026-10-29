@@ -150,10 +150,10 @@ kleiner, wie auf einem Bauplan. Kerns Standardwerte für die Kamera stehen im bl
 Das blaue Buch rechnet einen Punkt 10 m vor der Kamera Schritt für Schritt bis auf seinen Bildpunkt
 durch, samt der Zwischenstationen zwischen Kamera und Bildschirm.
 
-> **Probier's aus!** Öffne in Kern Studio oben im Ansichtsfenster das Menü **≡** und schalte den
-> **Field of View** (Öffnungswinkel) zwischen 50° und 110° um – bei 110° wirkt die Welt wie durchs
-> Weitwinkelobjektiv, an den Rändern stark gestreckt. Mit **Alt+J** (Top) springst du in eine
-> Parallelansicht von oben: Ferne Gebäude sind plötzlich so groß wie nahe.
+> **Probier's aus!** Öffne in Kern Studio oben im Ansichtsfenster das Menü **≡** und schalte das
+> **Sichtfeld** (Field of View), also den Öffnungswinkel, zwischen 50° und 110° um – bei 110° wirkt
+> die Welt wie durchs Weitwinkelobjektiv, an den Rändern stark gestreckt. Mit **Alt+J** springst du
+> in die Ansicht **Oben** (Top), eine Parallelansicht von oben: Ferne Gebäude sind plötzlich so groß wie nahe.
 
 ### Tiefe ist ungleich verteilt
 
@@ -262,9 +262,9 @@ im oder gegen den Uhrzeigersinn aufeinanderfolgen, und lässt sie weg (**Backfac
 Spiegelung dreht diesen Umlaufsinn um; deshalb behandelt Kern gespiegelte Kopien gesondert
 ([Kapitel 4](04-grafik.md), 4.4).
 
-> **Probier's aus!** Schalte in Kern Studio mit **Alt+2** auf **Wireframe** (Drahtgitter) und sieh die
-> Dreiecke, aus denen alles besteht. **Alt+3** zeigt **Unlit** (Farbe ohne Licht), **Alt+4** wieder
-> **Lit** (mit Licht).
+> **Probier's aus!** Schalte in Kern Studio mit **Alt+2** auf **Drahtgitter** (Wireframe) und sieh
+> die Dreiecke, aus denen alles besteht. **Alt+3** zeigt **Unbeleuchtet** (Unlit), also Farbe ohne
+> Licht, **Alt+4** wieder **Beleuchtet** (Lit), mit Licht.
 
 ## B.3 Das Fließband der Grafikkarte
 
@@ -457,7 +457,8 @@ Schwarz|/________________________ echtes Licht
 **In Kern:** Die Kurve ist eine bewährte Filmkurve aus der Kinotechnik, wie sie auch die
 Grafikbibliothek three.js benutzt; danach kann noch ein Farbgrading folgen.
 
-> **Probier's aus!** Dreh im Tab **World Settings** die **Exposure** (Belichtung) hoch und runter.
+> **Probier's aus!** Dreh im Reiter **Welteinstellungen** (World Settings) die **Belichtung**
+> (Exposure) hoch und runter.
 > Helle Stellen laufen weich ins Weiß, statt hart abzuschneiden – die Filmkurve bei der Arbeit.
 
 ### Gamma und sRGB
@@ -594,7 +595,8 @@ aus der Kugel ragen können. Ein Paket mit vielen Kopien (B.3) bekommt eine Kuge
 umschließt. Ist auch nur eine Kopie sichtbar, wird das ganze Paket gemalt – es ist ja ein einziger
 Malauftrag.
 
-> **Probier's aus!** Schalte in Kern Studio im Menü **Show** die **Bounds** ein und sieh die Hüllen,
+> **Probier's aus!** Schalte in Kern Studio unter **Fenster › Anzeigen** (Window › Show) die
+> **Begrenzungen** (Bounds) ein und sieh die Hüllen,
 > mit denen Kern entscheidet, was in der Sichtpyramide liegt – auch um Bäume, Gebäude und die Ente.
 
 Ein verwandtes Problem ist das **Anklicken**: Welches Dreieck liegt unter der Maus? Dafür schickt man

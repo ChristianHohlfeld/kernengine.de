@@ -50,9 +50,9 @@ Es gibt zwei Arten, die Dreiecke aufzuschreiben:
 Wer einen eigenen Spezialeffekt malen will, kann jeder Ecke noch ein paar Extra-Zahlen mitgeben. So
 bekommen die Häuser später ihre leuchtenden Fenster (5.8).
 
-> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/, hole dir mit dem Content Drawer, der
-> Bauteil-Kiste (Ctrl+Space), aus der Gruppe **Shapes** eine **Sphere** und schalte mit **Alt+2** auf
-> **Wireframe**. Die glatte Kugel zerfällt in ein Netz aus vielen kleinen, flachen Flächen. Das ist
+> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/, hole dir mit der
+> **Inhaltsablage** (Content Drawer), der Bauteil-Kiste (Strg+Leertaste), aus der Gruppe **Formen**
+> (Shapes) eine **Kugel** (Sphere) und schalte mit **Alt+2** auf **Drahtgitter** (Wireframe). Die glatte Kugel zerfällt in ein Netz aus vielen kleinen, flachen Flächen. Das ist
 > ihr Dreiecksnetz. Mit **Alt+4** kommst du zurück zum normalen Bild.
 
 ## 5.2 Frustum-Culling: Was nicht im Bild ist, wird nicht gemalt
@@ -98,7 +98,8 @@ verlassen.
 > **Für Neugierige:** Kern rechnet die sechs Wände so, dass jeder Test den Abstand in echten Metern
 > ergibt. Dann lässt er sich direkt mit dem Kugelradius vergleichen.
 
-> **Probier's aus!** Schalte in Kern Studio unter **Window › Show** den Punkt **Bounds** ein. Um jedes
+> **Probier's aus!** Schalte in Kern Studio unter **Fenster › Anzeigen** (Window › Show) den Punkt
+> **Begrenzungen** (Bounds) ein. Um jedes
 > Ding erscheint ein gelblicher Linienkasten: seine Hülle, also der Raum, den es höchstens einnimmt.
 > Die Kugel für den Test zeigt Studio nicht. Stell sie dir so vor: Ihr Mittelpunkt sitzt in der Mitte
 > dieses Kastens, und sie ist gerade so groß, dass sie das ganze Ding umschließt. Verschiebe ein Ding,
@@ -343,7 +344,7 @@ Welt. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 5.
 
 ## 5.11 Die prozedurale Stadt
 
-Jetzt kommt alles zusammen. **Procedural City** ist der Stadtgenerator von Orb Run als Baustein für
+Jetzt kommt alles zusammen. **Prozedurale Stadt** (Procedural City) ist der Stadtgenerator von Orb Run als Baustein für
 jedes Level. „Prozedural“ heißt: Niemand hat diese Stadt von Hand gebaut. Sie entsteht aus **Regeln**
 und einem **Seed**. Gebäude, Straßen, Bodenplatten, Bäume, Kollisionskörper (unsichtbare Klötze, an denen Autos und
 Spieler anstoßen) und Verkehr – alles aus
@@ -387,11 +388,11 @@ der anderen Seite wieder auf und halten an, wenn du vor ihnen stehst.
 > blauen Buch, Kapitel 5. Der Zufallsgenerator ist derselbe wie in Orb Run, darum sieht die Stadt
 > dort und im Level gleich aus.
 
-> **Probier's aus!** Öffne den Content Drawer (Ctrl+Space) und setze aus der Gruppe **World** eine
-> **Procedural City** ins Level. Ändere rechts in **Details** den **Seed**: Jede Zahl ergibt eine
+> **Probier's aus!** Öffne die **Inhaltsablage** (Content Drawer) mit Strg+Leertaste und setze aus der
+> Gruppe **Welt** (World) eine **Prozedurale Stadt** ins Level. Ändere rechts in **Details** den **Seed**: Jede Zahl ergibt eine
 > neue Stadt. Tipp die alte Zahl wieder ein, und die alte Stadt ist zurück, Haus für Haus. Mit
-> **Blocks per side** wird die Stadt größer oder kleiner. Mit Simulate (Alt+S), dem Probelauf mit Physik, fährt
-> der Verkehr los.
+> **Blöcke pro Seite** (Blocks per side) wird die Stadt größer oder kleiner. Mit **Simulieren**
+> (Simulate), dem Probelauf mit Physik (Alt+S), fährt der Verkehr los.
 
 ## 5.12 Formen im Level und eingebaute Meshes
 

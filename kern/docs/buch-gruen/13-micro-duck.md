@@ -36,7 +36,8 @@ tut. Obendrauf setzt Kern den **Lehrer** ([Kapitel 14](14-lehrer.md)), den **Spr
 dem echten Roboter [Kapitel 16](16-kalibrierung.md).
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und lade das Beispiel-Level
-> (**File › Example Levels › Micro Duck**). Drück auf Play und schau zu: Die Ente spaziert los, schaut sich um – und
+> (**Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck)). Drück auf
+> **Spielen** (Play) und schau zu: Die Ente spaziert los, schaut sich um – und
 > wenn sie den Ball entdeckt, wird es spannend.
 
 ## 13.1 Die Ente im Überblick
@@ -239,9 +240,11 @@ lange Kette aus Gliedern: Rumpf, Hüfte, Oberschenkel, Knie, Knöchel, Fuß. Rec
 geben die Gelenke in so einer Kette ein wenig nach, und die Ente wird auseinandergezogen wie ein
 Gummitier. Viele kleine Schritte halten die Kette fest zusammen.
 
-> **Probier's aus!** Setz in einem leeren Level aus dem Content Drawer eine **Micro Duck** ein und
-> schau ins **Output Log**: Studio meldet, dass es die World Settings angepasst hat. In **World
-> Settings › Physics** siehst du die neue Schrittrate und die Zwischenschritte. Einstellen musst du
+> **Probier's aus!** Setz in einem leeren Level aus der **Inhaltsablage** (Content Drawer) eine
+> **Micro Duck** ein und schau ins **Ausgabeprotokoll** (Output Log): Studio meldet, dass es die
+> **Welteinstellungen** (World Settings) angepasst hat. Unter
+> **Welteinstellungen › Physik (Box3D)** (World Settings › Physics (Box3D)) siehst du die neue
+> **Schrittrate** (Step rate) und die **Teilschritte** (Sub-steps), also die Zwischenschritte. Einstellen musst du
 > nichts: Die Botschaft ist, dass Studio die Physik für die Ente selbst feiner gestellt hat.
 
 ### Das Zeitkonto
@@ -274,7 +277,7 @@ das Laufnetz.
 | **Sprung** | 7 | Kern |
 | Schnabel auf / zu | 6 | kein Netz, nur der Servo |
 
-Fürs Laufen gibt es zwei Gangarten; du wählst sie im Details-Panel unter **Walking network**.
+Fürs Laufen gibt es zwei Gangarten; du wählst sie im Details-Panel unter **Laufnetz** (Walking network).
 
 ### Wer gerade dran ist
 
@@ -297,8 +300,15 @@ is sitting - stand it up first“.
 Das Netz sagt nicht „Knie auf 30 Grad“, sondern „Knie etwas weiter als in der Grundhaltung“. Das Ziel
 für jeden Servo ist also **Grundhaltung plus Befehl des Netzes**. Kern gibt die Befehle genau so weiter,
 wie das Netz sie im Training gegeben hat. Pollens Software auf dem echten Roboter dämpft und glättet sie
-dagegen ein wenig, als Feinabstimmung für die echte Hardware. Unter **Actions to servo goals** kannst du
-das umschalten. Gemessen: Laufen klappt mit beidem, die Kicks kippen mit der Robotereinstellung aber um.
+dagegen ein wenig, als Feinabstimmung für die echte Hardware. Im Details-Panel kannst du das
+unter **Aktionen zu Servo-Zielen** (Actions to servo goals) umschalten:
+
+- **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)) gibt die Befehle
+  unverändert weiter;
+- **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)**
+  (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)) macht es wie Pollens Software.
+
+Gemessen: Laufen klappt mit beidem, die Kicks kippen mit der Robotereinstellung aber um.
 
 ### Wie die Netze in den Browser kommen
 
@@ -357,9 +367,9 @@ eines Dings im Blickfeld der Kamera liegt und nichts davor steht. Das ist einfac
 Bilderkennung und für jede Ente auf jedem Gerät genau gleich. Schaut die Ente ganz nach unten, sieht
 die Kamera den Boden direkt vor ihren Füßen.
 
-> **Probier's aus!** Starte Play im Micro-Duck-Level. Oben rechts im Viewport siehst du das
-> Kamerabild der Ente und daneben das 8×8-Gitter des Abstandssensors (Show-Flag **Robot Camera**,
-> standardmäßig an). Im Gitter heißt rot Hindernis (heller, je näher), grün Boden, gelb zu nah und
+> **Probier's aus!** Starte **Spielen** (Play) im Micro-Duck-Level. Oben rechts im Viewport siehst
+> du das Kamerabild der Ente und daneben das 8×8-Gitter des Abstandssensors (Schalter
+> **Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Camera), standardmäßig an). Im Gitter heißt rot Hindernis (heller, je näher), grün Boden, gelb zu nah und
 > dunkel nichts. Übernimm die Ente mit **F8**, lauf auf den Ball zu und schau, wie das Gitter rot wird.
 
 **Gleichgewicht.** Ein Lagesensor wie im Handy meldet, wo unten ist. „Gefallen“ heißt wie im Original:
@@ -383,7 +393,7 @@ flowchart LR
 
 Bewegst du den Stick oder drückst eine Ententaste, hast du zwei Sekunden lang das Sagen, und die Ente
 hält mit eigenen Ideen still. Sonst gelten Befehle aus Logik-Graphen wie **Walk** und **Look**. Sonst
-entscheidet die Ente selbst, wenn **Autonomous** im Details-Panel an ist (13.10 und 13.11). Alle
+entscheidet die Ente selbst, wenn **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) im Details-Panel an ist (13.10 und 13.11). Alle
 Befehle werden zum Schluss sanft geglättet, damit nichts ruckt.
 
 Steht die Ente still und hat eine Weile niemand ihren Kopf gesteuert, übernimmt der **Idle-Blick** aus
@@ -411,8 +421,9 @@ Wird sie abgesetzt, starten die Netze frisch, und sie läuft weiter. Aufgepasst 
 und Stehen. Kern rechnet den Detektor selbst nach, und Tests prüfen, dass er genau wie Pollens Original
 antwortet und die Ente nie grundlos pausiert.
 
-> **Probier's aus!** Starte Play im Micro-Duck-Level. Es beginnt mit der **Observer camera**: Du
-> schaust zu und kannst Körper greifen. Zieh die Ente am Rumpf hoch (in **Simulate** geht es genauso).
+> **Probier's aus!** Starte **Spielen** (Play) im Micro-Duck-Level. Es beginnt mit der
+> Beobachterkamera: Du schaust zu und kannst Körper greifen. Zieh die Ente am Rumpf hoch (beim
+> **Simulieren** (Simulate) geht es genauso).
 > Der Griff hält sie aufrecht wie eine Hand, und bald hört sie auf zu strampeln. Setz sie ab – sie
 > läuft weiter.
 
@@ -484,7 +495,9 @@ Handgeschriebene Spielregeln gibt es darin nicht.
 > Ente mit Pollens Netzen. Das Kind ist die Spielschicht.
 
 Die Spielschicht entscheidet noch seltener als die Bewegungsnetze: nur bei jedem zweiten Mal, wenn
-diese denken (13.5). Damit sie mitspielt, schaltest du im Details-Panel **Kern extras** und **Autonomous** ein (im
+diese denken (13.5). Damit sie mitspielt, schaltest du im Details-Panel
+**Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)**
+(Kern extras (ball play, sock fetching, beak in the pick)) und **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) ein (im
 Beispiel-Level ist beides an). Dann greift sie ein, sobald sie Ball oder Socke kennt oder etwas im
 Schnabel hat, und die Ente meldet „Play“. Du und die Logik gehen trotzdem vor.
 
@@ -541,16 +554,16 @@ gekickt, eine Socke vor ihr geholt und gebissen. Wie es weitergeht, steht in [Ka
 
 | Bewegung | Tastatur | Gamepad | Touch |
 |---|---|---|---|
-| Laufen / drehen | W S / A D | linker Stick | MOVE |
-| Sitzen / Aufstehen | 1 | B | SIT |
-| Aufheben | 2 | Y | PICK |
-| Kick links / rechts | 3 / 4 | – | KICK L / R |
-| Rolle | 5 | X | ROLL |
-| Schnabel | 6 | – | BEAK |
-| Sprung | 7 | – | HOP |
-| Quaken / „Wheee“ | Leertaste / V | RT / LT | QUACK / WHEEE |
+| Laufen / drehen | W S / A D | linker Stick | LAUFEN (MOVE) |
+| Sitzen / Aufstehen | 1 | B | SITZ (SIT) |
+| Aufheben | 2 | Y | GREIFEN (PICK) |
+| Kick links / rechts | 3 / 4 | – | KICK L / KICK R |
+| Rolle | 5 | X | ROLLEN (ROLL) |
+| Schnabel | 6 | – | SCHNABEL (BEAK) |
+| Sprung | 7 | – | HÜPFEN (HOP) |
+| Quaken / „Wheee“ | Leertaste / V | RT / LT | QUAK / HUIII (QUACK / WHEEE) |
 
-Im Micro-Duck-Level startet Play mit der **Observer camera** ([Kapitel 11](11-studio.md)): Du fliegst
+Im Micro-Duck-Level startet **Spielen** (Play) mit der Beobachterkamera ([Kapitel 11](11-studio.md)): Du fliegst
 frei (W A S D, Q / E runter und hoch, am Telefon mit den Fingern), schaust zu und kannst Ball, Socke
 oder Ente mit Maus oder Finger anheben. **F8** übernimmt die Ente, noch einmal F8 schaut wieder zu.
 
@@ -558,12 +571,12 @@ Die **Stimme** ist eine genaue Übertragung von Pollens Klangerzeuger, mit einer
 Ente ([Kapitel 7](07-audio.md)). Sie grüßt beim Aufwachen, fragt nach, wenn das Gamepad weg ist,
 zwitschert beim Quaken, ruft „Wheee“, solange du V hältst, und pickt beim Hinsetzen.
 
-**Der Sprung** (Taste 7, HOP oder der Logik-Knoten **Robot Move** mit „jump“) ist Kerns erste eigene
+**Der Sprung** (Taste 7, Touch-Knopf HÜPFEN oder der Logik-Knoten **Robot Move** mit „jump“) ist Kerns erste eigene
 Bewegung, trainiert vom Lehrer. Er läuft wie ein Kick: zwei Sekunden Sprungnetz, dann zurück zum
 Laufen. Im Studio hebt die Ente dabei wirklich ab, nur ein paar Millimeter, aber mit beiden Füßen in
 der Luft, und steht danach sicher wieder.
 
-> **Probier's aus!** Starte Play im Micro-Duck-Level, übernimm die Ente mit **F8** und drück die
+> **Probier's aus!** Starte **Spielen** im Micro-Duck-Level, übernimm die Ente mit **F8** und drück die
 > **7**: Sie springt! Dann steuer sie mit W, A und D nah an den Ball, so dass er knapp vor ihrem
 > linken Fuß liegt, und drück die **3**. Zum Schluss die **1**: Sitz, Ente! Und jetzt probier im
 > Sitzen die **2** – was passiert?
@@ -600,7 +613,7 @@ gelernt. Entscheidend ist darum der Vergleich mit Pollen.
 
 Die unsichtbare Scheibe aus 13.3 macht sich bezahlt: Ohne sie liefe die Ente langsamer, und Rumpf und
 Kopf zappelten mehr als dreimal so stark. Alle Bewegungen gelingen, der linke Kick schießt den Ball
-quer durchs Zimmer, nur der rechte kippt manchmal. Und auch ganz ohne Kern extras sieht die Ente einen Ball, läuft an, richtet ihn aus und kickt, ohne zu
+quer durchs Zimmer, nur der rechte kippt manchmal. Und auch ganz ohne die Kern-Extras sieht die Ente einen Ball, läuft an, richtet ihn aus und kickt, ohne zu
 fallen.
 
 ## 13.15 Was noch fehlt
@@ -615,7 +628,7 @@ Kern sagt ehrlich, wo die Ente noch vom Original abweicht:
   etwas verschieden. Im Beispiel-Level macht das keinen Unterschied.
 - **Kick rechts** kippt manchmal um; die Ursache ist noch offen.
 - **BallPlay** ist ein Nachbau nach Beschreibung, und den Strom in den Servos misst Kern nicht.
-- **Nur in Kern:** die Spielschicht, das Schnabel-Timing beim Aufheben (beide nur mit Kern extras),
+- **Nur in Kern:** die Spielschicht, das Schnabel-Timing beim Aufheben (beide nur mit den Kern-Extras),
   der Sprung und, immer an, Geräusche wie Plastikklacken, Schritte und Servosurren.
 
 Die vollständige Liste der Abweichungen steht im blauen Buch, Kapitel 13.

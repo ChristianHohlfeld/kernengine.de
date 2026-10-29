@@ -161,10 +161,10 @@ schon offenen Tabs. Das gilt für den Sprung.
 > **Probier's aus!** Deine Ente springt mit deinem Netz:
 > 1. Starte auf der Lehrer-Seite einen Sprung-Lauf (15.2).
 > 2. Öffne im selben Browser einen zweiten Tab mit https://kernengine.de/ und dort das Beispiel-Level
->    (File › Example Levels › Micro Duck).
+>    über **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck).
 > 3. Warte, bis die Lehrer-Seite „Für Kern Studio gespeichert als jump.onnx“ meldet. Das passiert
 >    zum ersten Mal nach dem Nachahmen, dann alle 25 Runden.
-> 4. Starte im Studio **Play**, übernimm die Ente mit **F8** und drück **7**.
+> 4. Starte im Studio **Spielen** (Play), übernimm die Ente mit **F8** und drück **7**.
 >
 > Was du siehst: Jetzt springt **dein** Netz, nicht mehr das mitgelieferte – es ersetzt es. Ein
 > früher Stand springt oft noch unsicher. Drück nach einer Weile Übung noch einmal **7** und
@@ -263,8 +263,8 @@ sieben Regeln vor:
   Stehzeit ablesen, wann es so weit ist. Ein plötzliches „Jetzt!“ ohne erkennbaren Grund könnte es
   nicht nachmachen.
 
-> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level und starte **Play**. Es
-> beginnt mit der Observer camera: Du schaust zu und kannst Dinge mit der Maus oder dem Finger
+> **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level und starte **Spielen**
+> (Play). Es beginnt mit der Beobachterkamera: Du schaust zu und kannst Dinge mit der Maus oder dem Finger
 > anheben. Heb den Ball an eine andere Stelle und lass ihn los. Beobachte, wie die Spielschicht nur
 > aus ihren Sensoren neu entscheidet: hinschauen, hingehen, stehen, kicken. Was du lernst: Die Ente
 > „weiß“ nicht, wo der Ball ist – sie muss ihn sehen.

@@ -187,11 +187,12 @@ Bildpunkt zufällig mal einen hellen, mal einen dunklen Fleck des Musters, und b
 Bewegung flimmert es (dieselbe Falle wie bei den Fenstern in 4.13). Die Briefmarke hat das Muster
 schon vorher sauber gemittelt.
 
-> **Probier's aus!** Öffne https://kernengine.de/ und lege mit **File › New Level…** die Vorlage
-> **Basic** an. Klappe unten in der Statusleiste den **Content Drawer** auf, die Bausteinleiste, und
-> zieh aus der Gruppe *Shapes* einen **Cube** hinein. Spiele rechts in **Details** unter *Material*
-> mit **Roughness** (Rauheit), **Metallic** (Metall) und **Emissive** (Eigenleuchten). Schalte dann
-> **Unlit** ein – schon ist der Würfel ein flacher Farbklecks ohne Licht und Schatten. So siehst du,
+> **Probier's aus!** Öffne https://kernengine.de/ und lege mit
+> **Datei › Neues Level...** (File › New Level...) die Vorlage **Grundformen** (Basic) an. Klappe unten in der Statusleiste die
+> **Inhaltsablage** (Content Drawer) auf, die Bausteinleiste, und zieh aus der Gruppe **Formen**
+> (Shapes) einen **Würfel** (Cube) hinein. Spiele rechts in **Details** unter *Material* mit
+> **Rauheit** (Roughness), **Metallisch** (Metallic) und **Leuchtstärke** (Emissive strength), dem
+> Eigenleuchten. Schalte dann **Unbeleuchtet** (Unlit) ein – schon ist der Würfel ein flacher Farbklecks ohne Licht und Schatten. So siehst du,
 > dass jede Zeile der Material-Tabelle oben eine sichtbare Wirkung hat.
 
 ## 4.5 Der Standard-Shader
@@ -357,11 +358,11 @@ ihre eigene Malfläche dagegen ein.
 
 ![Vier Viewports in Kern Studio: Teilansichten zeichnen direkt auf den Bildschirm](../buch/bilder/studio-quad.png)
 
-> **Probier's aus!** Stelle in Kern Studio über **Window › Viewport Layout** vier Ansichtsfenster
+> **Probier's aus!** Stelle in Kern Studio über **Fenster › Viewport-Aufteilung** (Window › Viewport Layout) vier Ansichtsfenster
 > (Viewports) ein. Jedes ist nur ein Teil des Fensters – darum glühen die Lichter nicht mehr, und Ecken
 > wirken flacher. Zurück auf einen Viewport: Glühen und weiche Eckenschatten sind wieder da. Dein Gerät
 > war also nicht zu langsam – es liegt an der Bauweise. Am deutlichsten siehst du das Glühen nachts in
-> **Orb Run** (**File › Example Levels › Orb Run**, dann die Tageszeit wie in 4.13 auf `tod 0.95`
+> **Orb Run** (**Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run), dann die Tageszeit wie in 4.13 auf `tod 0.95`
 > stellen); im leeren Basic-Level glüht nichts.
 
 ## 4.8 Die Zusatz-Malgänge im Detail
@@ -381,7 +382,7 @@ ich weiter von der Sonne weg als das, was auf der Karte steht? Dann liegt etwas 
 240 m breite Fläche, ist jeder Punkt fast einen halben Meter breit. Für eine Ente, die selbst kaum so
 groß ist, viel zu grob – ihr Schatten wäre ein Klecks. Darum gibt es die **Schattendistanz**: Die Karte
 deckt nur ab, was du bis zu dieser Entfernung siehst. Weniger Fläche, gleiche Punktzahl – schärfere
-Schatten. In Levels stellst du sie in den World Settings ein; das Micro-Duck-Level nimmt nur 10 m.
+Schatten. In Levels stellst du sie in den **Welteinstellungen** (World Settings) ein; das Micro-Duck-Level nimmt nur 10 m.
 
 Genauer legt Kern eine **Kugel** um den Bereich, den die Kamera bis zur Schattendistanz sieht, und
 deckt diese Kugel ab. Warum eine Kugel und kein genau passender Kasten? Die Karte liegt fest zur Sonne
@@ -432,8 +433,9 @@ Am Rand der Schattendistanz blendet der Schatten sanft aus, statt abzureißen.
 > Er fragt geschickt *zwischen* den Kartenpunkten, sodass die Grafikkarte die Nachbarn gratis mit den
 > richtigen Anteilen mischt. So wirken neun Abfragen wie ein weicher Filter über 25 Kartenpunkte.
 
-> **Probier's aus!** Lade **File › Example Levels › Micro Duck**, öffne rechts den Tab **World
-> Settings** und stelle die **Shadow distance** (Schattendistanz) von 10 auf 200 m: Die Schatten von
+> **Probier's aus!** Lade
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), öffne rechts den Reiter **Welteinstellungen** und stelle die Schattendistanz, das Feld
+> **Schattenreichweite (kleiner: schärfer)** (Shadow distance (smaller: sharper)), von 10 auf 200 m: Die Schatten von
 > Ente und Ball werden matschig, denn dieselben Kartenpunkte verteilen sich jetzt auf viel mehr
 > Fläche. Zurück auf 10 – gestochen scharf. Kleiner heißt schärfer, reicht aber weniger weit.
 
@@ -531,11 +533,12 @@ dahinter bleiben getrennt. Wie ein Maler, der an der Kante abklebt – so verlä
 
 Die Rechnung ist nicht billig. Darum stellt Kern die Qualität nach dem Gerät ein – auf dem Telefon
 gröber, am Computer feiner –, und ein Wächter stuft sie herunter, wenn es ruckelt. Den **Radius**, also
-wie weit Kern nach Verdeckern sucht, legt dagegen die Szene fest: Er steht in den World Settings, und
+wie weit Kern nach Verdeckern sucht, legt dagegen die Szene fest: Er steht in den **Welteinstellungen**, und
 0 schaltet die Eckenschatten für diese Szene ab. Eckenschatten gibt es nur, wenn Kern das ganze Fenster
 mit Perspektive bemalt (4.7).
 
-> **Probier's aus!** Stelle in **World Settings** den **Ambient occlusion radius** auf 0: Ecken und
+> **Probier's aus!** Stelle in **Welteinstellungen** das Feld **Umgebungsverdeckung (0 = aus)**
+> (Ambient occlusion radius (0 = off)) auf 0: Ecken und
 > Fugen wirken flach, Dinge scheinen zu schweben. Dann 1,6 (der Standard) und probeweise 4 – siehst
 > du, wie die Dinge am Boden „festwachsen“?
 
@@ -663,16 +666,17 @@ jedes Gebäude bekommt Fenster, ganz gleich, wie groß es ist.
 Wie dunkel es ist, sagt dem Shader ein einziger Einstellwert für die Nacht, den die Erweiterung einmal
 pro Bild aus dem Tag-Nacht-Zyklus setzt – über den Merkzettel. Straßen und Bodenplatten bekommen keinen
 Wand-Datensatz; dort liest der Shader null, und die Erweiterung tut nichts. Kern Studio und exportierte
-Spiele haben dieselbe Erweiterung immer an Bord; ob eine **Procedural City** (eine automatisch
-erzeugte Stadt) ihre Gebäude damit ausstattet, entscheidet ihr Schalter **Lit windows at night**.
+Spiele haben dieselbe Erweiterung immer an Bord; ob eine **Prozedurale Stadt** (Procedural City), also eine
+automatisch erzeugte Stadt, ihre Gebäude damit ausstattet, entscheidet ihr Schalter **Erleuchtete
+Fenster bei Nacht** (Lit windows at night).
 
-> **Probier's aus!** Lade **File › Example Levels › Orb Run**. Klicke unten in der Statusleiste auf
+> **Probier's aus!** Lade **Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run). Klicke unten in der Statusleiste auf
 > **Cmd**: Das öffnet die Konsole, ein Eingabefeld für Befehle. Tippe `tod 0.75` und Enter – `tod`
 > steht für *time of day* und setzt die Tageszeit von 0 bis 1 (0,25 Sonnenaufgang, 0,5 Mittag, 0,75
 > Sonnenuntergang). Die goldene Stunde färbt den Himmel. Dann `tod 0.95` für die späte Nacht: dunkle
 > Glasfenster, warm leuchtende Fenster, in der Ferne ein weicher Schimmer. Wähle nun die Stadt aus:
-> Klicke rechts oben im **Outliner** auf den Eintrag, dessen Type **Procedural City** heißt. Schalte
-> dann rechts in **Details** **Lit windows at night** aus – dann bekommen ihre Gebäude keine
+> Klicke rechts oben im **Outliner** auf den Eintrag, dessen **Typ** (Type) **Prozedurale Stadt**
+> heißt. Schalte dann rechts in **Details** **Erleuchtete Fenster bei Nacht** aus – dann bekommen ihre Gebäude keine
 > leuchtenden Fenster mehr. Du siehst: Die Fenster gibt es nur im Malprogramm.
 
 ## Das nimmst du mit

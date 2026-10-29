@@ -98,8 +98,9 @@ kennt.
 
 Die genauen Werte und das Dateiformat des Profils stehen im blauen Buch, Kapitel 16.
 
-> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/ **File › Example Levels ›
-> Micro Duck**, starte **Play**, übernimm die Ente mit **F8** und drück die **1** (Sitzen). Schau
+> **Probier's aus!** Öffne in Kern Studio auf https://kernengine.de/
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck), starte **Spielen**
+> (Play), übernimm die Ente mit **F8** und drück die **1** (Sitzen). Schau
 > auf die Beine: Sie fahren in die neue Haltung, statt hineinzuspringen. Daran arbeiten zwei zusammen:
 > das Netz fürs Sitzen, das 50-mal pro Sekunde neue Ziele schickt, und das Servomodell, das jedes
 > Gelenk mit begrenzter Kraft und gebremst zu seinem Ziel zieht. Welcher Anteil der Bewegung auf
@@ -156,8 +157,9 @@ zusammen: den durchschnittlichen Abstand zwischen beiden Kurven, wobei große Au
 zählen. Fachleute nennen das **RMS-Fehler**.
 
 > **Probier's aus!** Wie streng Kern auf gleiche Einstellungen achtet, siehst du im Studio. Stell im
-> Micro-Duck-Level unter **World Settings** die **Step rate** (die Zahl der Physikschritte pro
-> Sekunde) auf 90 statt 100 und starte Play. Kern meldet: „set World Settings > Step Rate to 100“.
+> Micro-Duck-Level unter **Welteinstellungen** (World Settings) die **Schrittrate** (Step rate), also
+> die Zahl der Physikschritte pro Sekunde, auf 90 statt 100 und starte **Spielen** (Play). Kern
+> meldet im **Ausgabeprotokoll** (Output Log): „set World Settings > Step Rate to 100“.
 > Alles – Training, Vermessen, Spielen – rechnet mit 100 Schritten pro Sekunde; mit 90 wäre es eine
 > andere Welt, und kein Profil und kein Netz wäre mehr darauf abgestimmt. Stell danach wieder 100
 > ein.
@@ -212,12 +214,16 @@ echter Fehler im Modell.
 Wie der echte Roboter eine solche Aufzeichnung schreibt, beschreibt dieses Buch nicht; den Befehl
 für den Abgleich nennt das blaue Buch, Kapitel 16.
 
-> **Probier's aus!** Wie viel kleine Unterschiede ausmachen, siehst du im Studio. Öffne **File ›
-> Example Levels › Micro Duck** und klick die Ente an. Im **Details**-Panel steht unter **Player
-> Controller › Walker** das Feld **Actions to servo goals**. Lass es auf **As trained**, starte Play,
-> übernimm die Ente mit **F8** und kick mit der **3**. Den Ball musst du nicht treffen – schau nur,
-> ob die Ente nach dem Kick stehen bleibt. Stoppe mit **Esc**, stell das Feld auf **As the robot's
-> daemon** und kick noch einmal. Diese Einstellung schwächt und glättet die Befehle so, wie der
+> **Probier's aus!** Wie viel kleine Unterschiede ausmachen, siehst du im Studio. Öffne
+> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) und klick die Ente
+> an. Im **Details**-Panel steht unter
+> **Spieler-Steuerung › Läufer** (Player Controller › Walker) das Feld
+> **Aktionen zu Servo-Zielen** (Actions to servo goals). Lass es auf
+> **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), starte **Spielen**
+> (Play), übernimm die Ente mit **F8** und kick mit der **3**. Den Ball musst du nicht treffen –
+> schau nur, ob die Ente nach dem Kick stehen bleibt. Stoppe mit **Esc**, stell das Feld auf
+> **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)**
+> (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)) und kick noch einmal. Diese Einstellung schwächt und glättet die Befehle so, wie der
 > echte Roboter seine Befehle bekommt – und nun kippen die Kicks um. Das ist noch kein Abgleich,
 > aber es zeigt, warum man ihn braucht: Dasselbe Netz, nur ein etwas anderer Weg zum Motor, und das
 > Ergebnis ist ein anderes. Solche Unterschiede zwischen Simulation und Roboter soll der Abgleich
@@ -266,7 +272,7 @@ Die genauen Bereiche stehen im blauen Buch, Kapitel 14 und 16.
 > Pollens Lauf- und Stehnetz velstand mit wackligen Getrieben zurecht. Kerns eigene Netze lernen
 > bisher ohne.
 
-> **Probier's aus!** Starte Play im Micro-Duck-Level, ohne die Ente zu übernehmen. Du schaust zu und
+> **Probier's aus!** Starte **Spielen** (Play) im Micro-Duck-Level, ohne die Ente zu übernehmen. Du schaust zu und
 > kannst Körper mit der linken Maustaste greifen. Greif den Ball, zieh ihn zur laufenden Ente und
 > lass ihn los, sodass er sie anstößt. Schau, wie sie darauf reagiert. Zufällige Schubse wie dieser
 > gehören zu dem, was im Training variiert wird – damit ein Stoß die Ente nicht überrascht.
