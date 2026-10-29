@@ -40,7 +40,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     throw error;
   }
   const kern = app.kern, e = kern.exports;
-  const str = ptr => kern.string(ptr, e.sc_result_length());
+  // Fresh views each time: the module's memory may have grown (and detached older views).
+  const decoder = new TextDecoder();
+  const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, e.sc_result_length()));
   const command = text => {
     const bytes = new TextEncoder().encode(text), ptr = e.kern_alloc(bytes.length + 1);
     new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);

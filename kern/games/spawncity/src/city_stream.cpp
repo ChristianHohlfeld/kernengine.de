@@ -146,7 +146,7 @@ void CityStream::unload_far(Vec3 focus) {
       it = tiles_.erase(it);
     } else ++it;
   }
-  lanes_.erase(std::remove_if(lanes_.begin(), lanes_.end(), [](const Lane& l) { return !l.alive; }), lanes_.end());
+  // Lanes of unloaded tiles stay as dead entries: traffic holds indices into the list.
 }
 
 std::string CityStream::take_requests() {

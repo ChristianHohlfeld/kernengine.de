@@ -333,8 +333,9 @@ void Game::place_world() {
   world_placed_ = true;
   world_->set_paused(false);
   engine_->set_status("");
-  toast_ = city_.offline() ? "OFFLINE: prozedurale Ersatzstadt (keine echten Kartendaten)" : "Konstanz - echte OSM-Daten";
-  toast_age_ = 0;
+  // Offline the HUD keeps its own banner; with map data a short greeting.
+  toast_ = city_.offline() ? "" : "Willkommen in SpawnCity";
+  toast_age_ = city_.offline() ? 99 : 0;
   if (start_mode_ == "drone") toggle_drone();
   else if (start_mode_ == "jet") command("mode jet");
   else if (start_mode_ == "car") command("mode car");

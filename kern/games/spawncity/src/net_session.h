@@ -12,7 +12,7 @@
 //    stick state, jet seats, wanted stars, the map origin (lon/lat, so everybody streams the same
 //    city: SpawnCity's canonical origin).
 //  * The page moves datagrams with kern/web/studio/game.mjs KernNet (it only needs push/take on the
-//    engine): exports sc_net_push / sc_net_take (see exports.cpp, reserved).
+//    engine): the game will add exports sc_net_push / sc_net_take next to the others in main.cpp.
 #pragma once
 
 #include <vector>

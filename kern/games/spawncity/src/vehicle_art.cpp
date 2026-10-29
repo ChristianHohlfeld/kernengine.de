@@ -35,8 +35,8 @@ bool VehicleArt::make(kern::Renderer& r, Part& p, const MeshData& mesh, const ke
   kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
   in.material = m;
   in.visible = false;
-  static const f32 zero[16] = {0};
-  in.transforms = kern::Span<const f32>(zero, 16);
+  static const Mat4 parked = Mat4::translate({0, 0, -1000});  // hidden until the first frame places it
+  in.transforms = kern::Span<const f32>(parked.m, 16);
   if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; return false; }
   return true;
 }
