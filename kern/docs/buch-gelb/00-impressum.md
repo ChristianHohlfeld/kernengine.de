@@ -6,13 +6,16 @@
 
 **Autor, Herausgeber und Rechteinhaber (Selbstverlag):** Christian Heinrich Hohlfeld\
 Gerhart-Hauptmann-Weg 5, 78464 Konstanz, Deutschland\
-ORCID: [0009-0003-6634-9045](https://orcid.org/0009-0003-6634-9045)\
+ORCID: 0009-0003-6634-9045\
 E-Mail: chris.hohlfeld@gmail.com
+
+ISBN {{ISBN}} (Hardcover)
 
 Dies ist die gelbe Ausgabe für Jugendliche von 12 bis 16 Jahren: derselbe Inhalt wie „Kern – Das Buch“
 (die blaue, technische Ausgabe) und „Kern – Einfach erklärt“ (die grüne Ausgabe).
 
-© 2026 Christian Heinrich Hohlfeld. Alle Rechte vorbehalten.
+© 2026 Christian Heinrich Hohlfeld. Alle Rechte vorbehalten. 1. Auflage 2026.\
+Druck und Bindung: Amazon (Print on Demand, z. B. Amazon Distribution GmbH, Leipzig); den Druckort nennt die letzte Seite.
 
 **Das Buch.** Dieses Buch und seine Abbildungen sind urheberrechtlich geschützt. Jede Verwertung
 außerhalb der engen Grenzen des Urheberrechtsgesetzes ist ohne schriftliche Zustimmung des
@@ -20,18 +23,16 @@ Rechteinhabers unzulässig. Das gilt insbesondere für Vervielfältigung, Übers
 Verbreitung, öffentliche Zugänglichmachung sowie die Einspeicherung und Verarbeitung in
 elektronischen Systemen. Die Nutzung für das Training, Feinabstimmen oder Bewerten von Modellen des
 maschinellen Lernens (Text- und Data-Mining) behält sich der Rechteinhaber nach § 44b Abs. 3 UrhG
-ausdrücklich vor. Kurze Code-Beispiele aus dem Buch dürfen unter der Lizenz der Software genutzt
-werden.
+ausdrücklich vor. Die Code-Beispiele aus dem Buch dürfen unter der Apache License 2.0 genutzt werden; Ausschnitte
+aus portiertem Code von Pollen Robotics bleiben unter deren Apache-2.0-Lizenz (Anhang D).
 
 **Die Software.** Kern (Engine, Kern Studio, der Lehrer, die trainierten Netze, Werkzeuge und
 Beispiele) ist Open Source unter der Apache License 2.0 und kostenlos erhältlich:
 <https://kernengine.de/>, Quellcode unter
 <https://github.com/ChristianHohlfeld/kernengine.de>. Ausgenommen sind die in Kern Studio enthaltenen
 3D-Modelle der Micro Duck von Pollen Robotics: Sie stehen unter CC BY-NC-SA 4.0 und dürfen nur nicht
-kommerziell genutzt werden. Ein kommerzieller Build (kern/build.sh \-\-commercial) lässt sie weg. Die
-Namen „Kern", „Kern Studio", „Kern Lehrer" und das Kern-Logo sind von der Lizenz ausgenommen. Kurse
-und Integrationslizenzen für Schulen und Unternehmen bietet der Rechteinhaber gesondert an;
-Integrationslizenzen umfassen Pollens 3D-Modelle nicht.
+kommerziell genutzt werden. Ein kommerzieller Build (`kern/build.sh --commercial`) lässt sie weg. Die
+Namen „Kern", „Kern Studio", „Kern Lehrer" und das Kern-Logo sind von der Lizenz ausgenommen.
 
 **Bestandteile Dritter.** Kern verwendet und dieses Buch beschreibt Box3D (Erin Catto, MIT), Earcut
 (Mapbox, ISC), musl-Mathematik (MIT), Verfahren aus Intel XeGTAO (MIT) und three.js (MIT) sowie
@@ -42,11 +43,16 @@ diesem Buch nicht enthalten und nicht abgebildet. Die Abbildungen der Ente in di
 Bildschirmfotos aus Kern Studio, entstanden mit einer eigenen Gestaltung des Autors und zeigen
 Pollens 3D-Modelle nicht.
 
+**Abbildungen.** Bildschirmfotos aus Kern Studio, dem Lehrer und mit Kern gebauten Spielen,
+alle Zeichnungen und Diagramme, das Kern-Logo und das Autorenfoto: © 2026 Christian Heinrich Hohlfeld.
+
 **Marken.** „Micro Duck" (auch „Microduck") bezeichnet den Roboter von Pollen Robotics (Hugging
-Face), den Kern simuliert; der Name wird nur zur Beschreibung verwendet. Dieses Buch und Kern sind
-keine Produkte von Pollen Robotics oder Hugging Face und werden von ihnen weder unterstützt noch
+Face), den Kern simuliert; der Name wird nur zur Beschreibung verwendet. Kern und dieses Buch sind
+unabhängig: Pollen Robotics und Hugging Face haben sie weder herausgegeben noch unterstützt oder
 geprüft. Weitere Marken- und Produktnamen (unter anderem Box3D, Unreal Engine, WebAssembly, WebGL,
-ONNX, GitHub, Amazon, Dynamixel (ROBOTIS), MuJoCo, Intel, Xbox) gehören ihren Inhabern und werden nur zur Beschreibung genannt.
+ONNX, GitHub, Amazon, Dynamixel (ROBOTIS), MuJoCo, Intel, Xbox, Windows, Edge, Minecraft (Microsoft),
+Chrome, Android (Google), Safari, iPhone, iPad, macOS (Apple), Firefox (Mozilla), Scratch (MIT),
+Python (Python Software Foundation), Claude (Anthropic)) gehören ihren Inhabern und werden nur zur Beschreibung genannt.
 
 **Entstehung.** Software und Text hat zum größten Teil ein KI-System (Claude von Anthropic) unter der
 Leitung des Autors geschrieben. Idee, Architektur, Auswahl der Komponenten, Prüfung und
@@ -58,9 +64,9 @@ betreibt, tut das auf eigenes Risiko; Autor und Rechteinhaber haften nur für Vo
 Fahrlässigkeit, bei Verletzung von Leben, Körper oder Gesundheit sowie nach zwingenden
 gesetzlichen Vorschriften, insbesondere dem Produkthaftungsgesetz.
 
-**Für Eltern und Lehrkräfte.** Alles in diesem Buch lässt sich gefahrlos im Browser ausprobieren. Der
-Bau, die Kalibrierung und der Betrieb eines echten Roboters (Kapitel 16) gehören nur unter die Aufsicht
-eines Erwachsenen.
+**Für Eltern und Lehrkräfte.** Alles in diesem Buch lässt sich im Browser ausprobieren. Software
+installieren, Spiele ins Internet stellen und der Bau, die Kalibrierung und der Betrieb eines echten
+Roboters (Kapitel 16) gehören unter die Aufsicht eines Erwachsenen.
 
 ## Inhalt
 

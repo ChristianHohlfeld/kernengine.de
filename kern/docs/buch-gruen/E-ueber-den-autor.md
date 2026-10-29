@@ -17,14 +17,12 @@ Kern.
 
 Beruflich hat er Software für Abrechnung und Finanzierung (ines GmbH), eine Handwerksplattform
 (wirsindhandwerk.de) und als Freiberufler unter anderem für die Robert Bosch GmbH entwickelt. Heute
-ist er bei der WOBAK, der städtischen Wohnungsbaugesellschaft in Konstanz, Referent für Digitale
-Transformation und Prozessoptimierung und interner Datenschutzbeauftragter; er leitet dort die
-Projektgruppe Digitalisierung und die interne KI-Pilotgruppe. Daneben baut und betreibt er eigene
+arbeitet er in Konstanz als Referent für Digitale Transformation und Prozessoptimierung und
+leitet Projekte zu Digitalisierung und künstlicher Intelligenz. Daneben baut und betreibt er eigene
 Produkte, darunter digitalisierungsplanung.de, ein Werkzeug, das echte Arbeitsabläufe im Browser
 aufzeichnet und KI-Agenten über einen MCP-Server zugänglich macht.
 
-<https://kernengine.de> · <https://christianhohlfeld.com> · <https://www.linkedin.com/in/christian-hohlfeld/> ·
-<https://github.com/ChristianHohlfeld>
+<https://kernengine.de/> · <https://github.com/ChristianHohlfeld/kernengine.de>
 
 ## Wie Kern und dieses Buch entstanden sind
 

@@ -190,7 +190,7 @@ body {{ width: {TW}in; height: {TH}in; position: relative; overflow: hidden;
   <div class="blurb">{t["blurb"]}</div>
   <div class="shots"><img src="{data('studio-selected.png')}"><img src="{data('studio-physics-lab.png')}"></div>
   <div class="rights">© 2026 Christian Heinrich Hohlfeld · ORCID 0009-0003-6634-9045<br>
-  {"Alle Rechte am Buch vorbehalten. Die Software Kern ist Open Source (Apache 2.0). Kein Produkt von Pollen Robotics oder Hugging Face und nicht von ihnen geprüft." if de else "Book: all rights reserved. The Kern software is open source (Apache 2.0). Not a product of Pollen Robotics or Hugging Face, nor reviewed by them."}</div>
+  {"Alle Rechte am Buch vorbehalten. Die Software Kern ist Open Source (Apache 2.0). Kern und dieses Buch sind unabhängig: Pollen Robotics und Hugging Face haben sie weder herausgegeben noch unterstützt oder geprüft." if de else "Book: all rights reserved. The Kern software is open source (Apache 2.0). Kern and this book are independent: Pollen Robotics and Hugging Face have neither published, endorsed nor reviewed them."}</div>
 </div>
 <div class="panel spine"><div class="inner"><b>Kern</b><span>{t["book"]}</span><span style="color:{C["light"]}">Christian Heinrich Hohlfeld</span></div>
   <div class="mark">{logo}</div></div>

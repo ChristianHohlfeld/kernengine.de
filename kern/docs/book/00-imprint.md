@@ -9,15 +9,18 @@ Gerhart-Hauptmann-Weg 5, 78464 Konstanz, Germany\
 ORCID: 0009-0003-6634-9045\
 Email: chris.hohlfeld@gmail.com
 
-© 2026 Christian Heinrich Hohlfeld. All rights reserved.
+ISBN {{ISBN}} (hardcover)
+
+© 2026 Christian Heinrich Hohlfeld. All rights reserved. First edition 2026.\
+Printed and bound on demand by Amazon (e.g. Amazon Distribution GmbH, Leipzig); the place of printing is given on the last page.
 
 **The book.** This book and its figures are protected by copyright. Any use beyond the narrow
 limits of German copyright law (Urheberrechtsgesetz, UrhG) requires the prior written consent of
 the rights holder. This applies in particular to reproduction, translation, adaptation,
 distribution, making available to the public, and storage and processing in electronic systems.
 The rights holder expressly reserves the use of this work for training, fine-tuning or evaluating
-machine-learning models (text and data mining) pursuant to § 44b(3) UrhG. Short code examples from
-the book may be used under the software's license.
+machine-learning models (text and data mining) pursuant to § 44b(3) UrhG. The code examples in the book may be used under the Apache License 2.0; excerpts
+of code ported from Pollen Robotics remain under their Apache 2.0 license (Appendix D).
 
 **The software.** Kern (the engine, Kern Studio, the Lehrer ("teacher"), the trained networks, tools
 and examples) is open source under the Apache License 2.0 and available free of charge:
@@ -37,11 +40,16 @@ Pollen's 3D models (CC BY-NC-SA 4.0, non-commercial); they are neither included 
 book. The pictures of the duck in this book, including the Studio screenshots, were made with the
 author's own design and do not show Pollen's 3D models.
 
+**Pictures.** Screenshots of Kern Studio, the Lehrer and games built with Kern, all drawings and
+diagrams, the Kern logo and the author's photo: © 2026 Christian Heinrich Hohlfeld.
+
 **Trademarks.** "Micro Duck" (also "Microduck") names Pollen Robotics' (Hugging Face) robot, which
-Kern simulates; the name is used only descriptively. This book and Kern are not products of Pollen
-Robotics or Hugging Face and are neither endorsed nor reviewed by them. Other trademarks
+Kern simulates; the name is used only descriptively. Kern and this book are independent:
+Pollen Robotics and Hugging Face have neither published, endorsed nor reviewed them. Other trademarks
 and product names (among them Box3D, Unreal Engine, WebAssembly, WebGL, ONNX, GitHub, Amazon, Dynamixel
-(ROBOTIS), MuJoCo, Intel, Xbox)
+(ROBOTIS), MuJoCo, Intel, Xbox, Windows, Edge, Minecraft (Microsoft), Chrome, Android (Google), Safari,
+iPhone, iPad, macOS (Apple), Firefox (Mozilla), Scratch (MIT), Python (Python Software Foundation),
+Claude (Anthropic))
 belong to their owners and are used only descriptively.
 
 **How it was made.** Most of the software and the text was written by an AI system (Claude by
