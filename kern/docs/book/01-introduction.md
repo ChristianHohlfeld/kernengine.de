@@ -258,7 +258,7 @@ Both use the same recipes (`include/kern/lehrer/recipe.h`) and the same `GameWor
 the same number of ducks yield the same network – natively as in the browser. The export is ONNX in
 the format of Pollen's networks; the Studio loads it just like those ([Chapter 14](14-lehrer.md)).
 
-![The Lehrer page in the browser with a training run in progress: settings and metrics (German user interface)](../buch/bilder/lehrer.png)
+![The Lehrer page in the browser with a training run in progress: settings and metrics (screenshot of the German interface; like Kern Studio, the page follows the browser language, and **DE | EN** switches it)](../buch/bilder/lehrer.png)
 
 ### The Micro Duck: Everything Working Together
 

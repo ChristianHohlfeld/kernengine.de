@@ -463,8 +463,8 @@ network. The wobble strength is called σ ("sigma") and is learned along with it
 wobble strength σ. If σ shrinks too fast, the agent stops trying things out and sticks with the first
 halfway good solution. A small **entropy bonus** keeps it curious.
 
-> **Mission:** In the Lehrer on https://kernengine.de/, start a run and watch "Aktionsrauschen
-> (std)" (action noise). That's σ. If it gets smaller, the policy is getting surer and tries out
+> **Mission:** In the Lehrer on https://kernengine.de/, start a run and watch **Action noise
+> (std)**. That's σ. If it gets smaller, the policy is getting surer and tries out
 > less.
 
 ## A.11 Actor, Critic and PPO
@@ -578,8 +578,8 @@ same fixed order, the same network comes out everywhere, no matter how many help
 order matters so much is explained in [Chapter 14](14-lehrer.md) in section 14.7; the rule for
 checking it is in [Chapter 17](17-reference.md), section 17.3.
 
-> **Mission:** Start "Stehen (Schnelltest)" (stand, quick test) in the Lehrer and look at the curve
-> (for the jump, it only starts after imitation). The green line is the episode return. If it rises,
+> **Mission:** Start **Stand (quick test)** in the Lehrer and look at the curve (for the jump, it
+> only starts after imitation). The green line is the **Episode return**. If it rises,
 > the ducks are collecting more reward – reinforcement learning live on your device.
 
 ## A.12 From Simulation to Reality

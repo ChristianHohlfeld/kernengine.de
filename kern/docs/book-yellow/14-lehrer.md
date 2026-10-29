@@ -554,24 +554,26 @@ helper is a part of the program that calculates in the background, and each one 
 Each helper is a **collector** with its own group of ducks. One more helper is the **analyst**: it
 has the network copy, learns with PPO, checks the jump every 25 iterations, and saves the network.
 
-The Lehrer page is labeled in German; the labels below are given as they appear there, with their
-meaning. You set: which movement (jump, or "Stehen (Schnelltest)" – stand, quick test), how many
-helpers ("Worker" on the page), how many ducks per helper, how many iterations, and the seed. Two
-more fields for noise and learning rate can be left empty; then the training plan applies. The page
+Just like Studio, the Lehrer page speaks English or German: it follows your browser's language,
+and the **DE | EN** button at the bottom right switches. You set: which movement (**Motion**:
+**Jump**, or **Stand (quick test)**), how many helpers (**Workers** on the page), how many ducks per
+helper (**Ducks per worker**), how many **Iterations**, and the **Seed**. Two more fields,
+**Initial action noise** and **Learning rate**, can be left empty (they say **Recipe**); then the
+training plan applies. The page
 shows you what's happening, as numbers and as a curve. What the numbers mean is explained in
 [Chapter 15](15-your-own-models.md).
 
 Every 25 iterations, the page saves the network **on your device**, and Kern Studio in the same
-browser picks it up right away. With ".onnx herunterladen" (download .onnx) you get the file. The
+browser picks it up right away. With **Download .onnx** you get the file. The
 play layer can't be trained here, only jump and stand.
 
-> **Mission:** Open the Lehrer, choose "Stehen (Schnelltest)" (stand, quick test) and press Start.
-> Do the math: Worker × ducks per Worker = ducks in total. How many steps per second does your
-> device manage? That's the "Schritte / s" (steps / s) display.
+> **Mission:** Open the Lehrer, choose **Stand (quick test)** and press **Start**.
+> Do the math: **Workers** × **Ducks per worker** = ducks in total. How many steps per second does
+> your device manage? That's the **Steps / s** display.
 
-> **Mission:** Test the determinism. Choose "Stehen (Schnelltest)," leave the seed at 1 and enter
-> **20** under "Iterationen" (iterations). Press Start and wait until the page reports "Fertig"
-> (done). Write down the number at "mittlere Episoden-Rückgabe" (mean episode return). Reload the
+> **Mission:** Test the determinism. Choose **Stand (quick test)**, leave the **Seed** at 1 and enter
+> **20** under **Iterations**. Press **Start** and wait until the page reports "Done". Write down
+> the number at **Mean episode return**. Reload the
 > page, enter 20 again, change nothing else, and start once more. Is the number exactly the same?
 > Then try seed 2: now a different number comes out.
 

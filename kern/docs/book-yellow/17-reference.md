@@ -110,13 +110,13 @@ That's exactly how Kern does it:
 **Example:** 32 ducks on 2 threads and 32 ducks on 4 threads give exactly the same network, bit for
 bit. The second run is just faster. 64 ducks give a different network.
 
-> **Mission:** Open the Lehrer on https://kernengine.de/, choose "Stehen (Schnelltest)" (stand,
-> quick test), seed 1, **2 Workers** with **4 ducks** each, and enter **20** under "Iterationen"
-> (iterations). Press Start, wait until the page reports "Fertig" (done), and write down the number
-> at "mittlere Episoden-Rückgabe" (mean episode return). Reload and start the same way, but with
+> **Mission:** Open the Lehrer on https://kernengine.de/, choose **Stand (quick test)**,
+> **Seed** 1, **2 Workers** with **4 ducks** each, and enter **20** under **Iterations**. Press
+> **Start**, wait until the page reports "Done", and write down the number at **Mean episode
+> return**. Reload and start the same way, but with
 > **1 Worker** and **8 ducks** (again 20 iterations). Both times it's 8 ducks in total – the numbers
 > match exactly. For comparison, try 2 Workers with 8 ducks each: now it's 16 ducks, and the number
-> is different. Always compare only at "Fertig": in the middle of a run, the two attempts might be at
+> is different. Always compare only at "Done": in the middle of a run, the two attempts might be at
 > different iterations.
 
 For young explorers, the Lehrer in the browser is the easiest way. The Lehrer also exists as a
@@ -338,7 +338,7 @@ Studio controls are listed here with the English labels Studio shows.
 - **Vector (arrow):** an arrow with a direction and a length, such as (x, y, z) (3, B).
 - **WebAssembly:** a program format that browsers run very fast (1, B).
 - **Web Worker:** a calculation helper in the browser that runs alongside the web page; on the Lehrer
-  page they're called "Worker" (14).
+  page they're called **Workers** (14).
 
 ### Physics
 

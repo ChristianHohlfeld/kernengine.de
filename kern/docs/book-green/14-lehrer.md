@@ -501,29 +501,29 @@ On the **Lehrer page** (address: kernengine.de/lehrer/) you can train yourself, 
 anything. Several of the browser's background processes share the work: some let ducks work out (the
 helpers), one learns (the evaluator).
 
-The page is labeled in German. At the top you choose the "Bewegung" (motion): "Sprung" (jump) or
-"Stehen (Schnelltest)" (stand, quick test). You can leave the other fields (workers, ducks per worker,
-iterations, seed, action noise, learning rate) at their defaults. The page shows continuously how
-things stand. The most important readouts:
+Like Kern Studio, the page speaks German or English: it follows your browser's language, and the
+**DE | EN** button at the bottom right switches. At the top you choose the **Motion**: **Jump** or
+**Stand (quick test)**. You can leave the other fields (**Workers**, **Ducks per worker**,
+**Iterations**, **Seed**, **Initial action noise**, **Learning rate**) at their defaults. The page
+shows continuously how things stand. The most important readouts:
 
-- **mittlere Episoden-Rückgabe** (mean episode return): the points of a whole episode added up,
+- **Mean episode return**: the points of a whole episode added up,
   averaged over all ducks. If it rises over many rounds, the ducks are learning. (When learning
   itself, the evaluator calculates with a variant, the **return**: only the points from now on, later
   ones worth a bit less, Appendix A.10.)
-- **Aktionsrauschen (std)** (action noise): how much randomness is still added to the commands, the
+- **Action noise (std)**: how much randomness is still added to the commands, the
   curiosity from 14.5 ("std" is short for the technical term standard deviation, a measure of spread).
   It drops as the duck gets more confident.
-- **Episodenlänge (s)** (episode length): how long an episode lasts on average. Short means: the ducks
+- **Episode length (s)**: how long an episode lasts on average. Short means: the ducks
   fall over early. For standing, an episode lasts at most 4 seconds, for the jump 2.
-- **echte Sprünge** (real jumps): how many of 5 test jumps on the clean robot were real. That's the
+- **Real jumps (clean robot)**: how many of 5 test jumps on the clean robot were real. That's the
   actual goal.
 
 After imitation, then every 25 rounds, and at the end, the page saves the network **in the browser**
-and reports "Für Kern Studio gespeichert als …" (saved for Kern Studio as …). Open Studio tabs in the
-same browser take over a new jump network immediately. With ".onnx herunterladen" (download .onnx)
-you get the file. The play layer can't be trained in the browser.
+and reports "Saved for Kern Studio as …". Open Studio tabs in the same browser take over a new jump
+network immediately. With **Download .onnx** you get the file. The play layer can't be trained in the browser.
 
-> **Try it!** Open **kernengine.de/lehrer/**, choose "Stehen (Schnelltest)" and press **Start**. At
+> **Try it!** Open **kernengine.de/lehrer/**, choose **Stand (quick test)** and press **Start**. At
 > the beginning the sliders are random and the ducks fall over quickly: the episode length is short.
 > Watch how it grows over the rounds, toward 4 seconds – then the ducks no longer fall over. You don't
 > have to wait until the end; **Pause** stops it. You train the jump in

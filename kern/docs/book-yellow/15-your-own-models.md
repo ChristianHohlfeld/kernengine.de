@@ -22,13 +22,13 @@ install anything, and it can train the jump and standing. The second way is a pr
 command line. Only people who build Kern themselves from the source code get it, and it can do a few
 more things. In this chapter it only appears in the "For pros" boxes.
 
-The Lehrer page is labeled in German; in this chapter its labels are given as they appear, with the
-English meaning next to them.
+The Lehrer page follows your browser's language, just like Studio; the **DE | EN** button at the
+bottom right switches between German and English. This chapter names its labels the way the page
+shows them in English.
 
-> **Mission:** On https://kernengine.de/, open the "Der Lehrer" entry, choose "Sprung" (jump) and
-> press Start. Leave the tab open (plug a phone into its charger). Expect 10 minutes or more before
-> something happens. Watch the "echte Sprünge (sauberer Roboter)" display (real jumps, clean robot):
-> from when on does your network jump?
+> **Mission:** On https://kernengine.de/, open the "Der Lehrer" entry, choose **Jump** and
+> press **Start**. Leave the tab open (plug a phone into its charger). Expect 10 minutes or more
+> before something happens. Watch the **Real jumps (clean robot)** display: from when on does your network jump?
 
 ## 15.1 The Lehrer Page
 
@@ -43,16 +43,16 @@ The fields on the page:
 
 | Field | What it means |
 |---|---|
-| "Bewegung" (movement) | jump, or "Stehen" (stand) as a quick test |
-| "Worker" | how many helpers calculate at the same time |
-| "Enten je Worker" (ducks per Worker) | how many ducks each helper runs |
-| "Iterationen" (iterations) | how many training rounds |
-| "Seed" | the starting number for chance |
-| "Aktionsrauschen am Anfang" (initial action noise) | how much chance at the start (empty: as in the plan) |
-| "Lernrate" (learning rate) | how big the steps are (empty: as in the plan) |
+| **Motion** | **Jump**, or **Stand (quick test)** |
+| **Workers** | how many helpers calculate at the same time |
+| **Ducks per worker** | how many ducks each helper runs |
+| **Iterations** | how many training rounds |
+| **Seed** | the starting number for chance |
+| **Initial action noise** | how much chance at the start (empty, shows **Recipe**: as in the plan) |
+| **Learning rate** | how big the steps are (empty, shows **Recipe**: as in the plan) |
 
-The page suggests the number of workers itself, to suit your device. Below are the buttons Start,
-Pause and ".onnx herunterladen" (download .onnx).
+The page suggests the number of workers itself, to suit your device. Below are the buttons
+**Start**, **Pause** and **Download .onnx**.
 
 > **For pros:** If you build Kern on your own computer ([Chapter 2](02-building-and-testing.md),
 > best together with an adult), a script also gets you the Lehrer program for the command line. It
@@ -95,9 +95,9 @@ The process as a timeline:
 
 1. **Load the recipe:** start from the walking and standing network velstand, which can already
    stand (warm start).
-2. **Create ducks:** as many ducks as Worker × ducks per Worker gives, each with its own chance.
-3. **Copy:** For 8 rounds, the network imitates the role model. The page reports "Nachahmen: Runde …
-   von 8" (imitating: round … of 8) and checks after every round whether the network already jumps.
+2. **Create ducks:** as many ducks as **Workers** × **Ducks per worker** gives, each with its own chance.
+3. **Copy:** For 8 rounds, the network imitates the role model. The page reports "Imitating: round …
+   of 8" and checks after every round whether the network already jumps.
 4. **Critic first:** For the first 30 iterations, only the critic learns.
 5. **Practice:** After that, both practice with PPO, with little noise and full variation.
 6. **Check and save:** Every 25 iterations, the network does 5 test jumps, and the page saves it.
@@ -132,12 +132,12 @@ can the duck do what it's supposed to?
 
 | Display | Meaning | What to look for |
 |---|---|---|
-| "mittlere Episoden-Rückgabe" (mean episode return) | points per attempt | rises over many iterations |
-| "Episodenlänge (s)" (episode length) | how long an attempt lasts | jump: 2 s means no fall |
-| "Aktionsrauschen (std)" (action noise) | wobble strength | falls as the network gets surer |
-| "echte Sprünge" (real jumps) | test: 5 jumps | the actual goal |
-| "Sprunghöhe", "Flugzeit" (jump height, flight time) | how well it jumped | should rise |
-| "Schritte / s" (steps / s) | your device's speed | only speed, not learning |
+| **Mean episode return** | points per attempt | rises over many iterations |
+| **Episode length (s)** | how long an attempt lasts | jump: 2 s means no fall |
+| **Action noise (std)** | wobble strength | falls as the network gets surer |
+| **Real jumps (clean robot)** | test: 5 jumps | the actual goal |
+| **Jump height (mm)**, **Flight time (ms)** | how well it jumped | should rise |
+| **Steps / s** | your device's speed | only speed, not learning |
 
 The curve shows return and episode length over the iterations. A typical good course: it jitters
 from round to round but slowly rises over hundreds of iterations. If the episode length is shorter
@@ -177,7 +177,7 @@ For Kern's jump network, that gave 40 of 40 real jumps clean and 36 of 40 with v
 fall.
 
 In the browser, the page saves the newest state every 25 iterations and overwrites the old one. If
-you see a good state, secure it with ".onnx herunterladen" (download .onnx).
+you see a good state, secure it with **Download .onnx**.
 
 > **For pros:** The program keeps snapshots automatically and measures each with 40 episodes. How
 > that works is in the blue book, Chapter 15.
@@ -205,7 +205,7 @@ suddenly take a bigger frame. A network of a different size has to start from ze
 
 **Rule 2: More ducks change the network, more helpers only the speed.** An example:
 
-| Worker × ducks per Worker | Ducks | Result |
+| Workers × Ducks per worker | Ducks | Result |
 |---|---|---|
 | 2 × 16 | 32 | network A |
 | 4 × 8 | 32 | network A again, just faster |
@@ -476,7 +476,7 @@ you train yourself, you'd otherwise trip over the same stones.
 3. Why does the duck keep learning with small steps and little noise after copying?
 4. You want to teach the duck a bow and give points the lower the head is. What could the duck learn
    instead, and which rule helps?
-5. **Boss puzzle:** Your network keeps getting more points, but "echte Sprünge" (real jumps) always
+5. **Boss puzzle:** Your network keeps getting more points, but **Real jumps (clean robot)** always
    shows 0 of 5. What probably happened, and how do you find out?
 
 ### Solutions

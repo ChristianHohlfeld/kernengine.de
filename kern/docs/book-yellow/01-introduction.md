@@ -222,9 +222,8 @@ the level like any other.
 > play. Load **File › Example Levels › Micro Duck** and press **Play**. First you watch the duck
 > walk around on its own. **F8** takes it over: **W** walks, **A**/**D** turn, **Space** quacks.
 
-> **Mission:** From the start page, open the **Lehrer**. The Lehrer page is in German: under
-> "Bewegung" (motion), pick "Stehen (Schnelltest)" (stand, quick test) and press **Start**. Watch
-> the curve "Episodenlänge" (episode length). An **episode** is one attempt, and it ends as soon as
+> **Mission:** From the start page, open the **Lehrer**. Under **Motion**, pick
+> **Stand (quick test)** and press **Start**. Watch the curve **Episode length**. An **episode** is one attempt, and it ends as soon as
 > a duck falls. If the curve rises, the ducks hold out longer – the network is learning right now.
 > **Pause** stops it.
 

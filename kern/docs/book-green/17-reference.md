@@ -388,7 +388,7 @@ seen from the center is 1 rad. About six and a quarter such strings go once arou
 | **Distribution shift** | an imitating network, when doing things itself, gets into situations it has never seen |
 | **Entropy** | a measure of curiosity: how widely the duck tries things around its best idea |
 | **Episode** | one practice run, from the start until a fall or until time is up |
-| **Episode return** ("Episoden-Rückgabe") | all the points of an episode simply added up; that's the readout on the Lehrer page ([Ch. 15](15-your-own-models.md)) |
+| **Episode return** | all the points of an episode simply added up; that's the readout **Mean episode return** on the Lehrer page ([Ch. 15](15-your-own-models.md)) |
 | **Epoch** | going through all the collected practice data once |
 | **Evaluator / helpers** | in the Lehrer: the part that learns from the notes / the parts that let ducks work out and take notes; technical terms learner / collector ([Ch. 14](14-lehrer.md)) |
 | **Exponential function** | shrinking by the same share per step; ELU uses it to squash negative numbers |

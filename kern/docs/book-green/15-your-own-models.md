@@ -9,8 +9,8 @@
 > - **Lehrer page** – the web page kernengine.de/lehrer/, where you train in the browser.
 > - **Command line** – a window where you type commands instead of clicking. You don't need it for
 >   this chapter.
-> - **Return** – all the points of an episode added up; that's what the "Episoden-Rückgabe" (episode
->   return) readout on the Lehrer page shows. (The **return** in Appendix A.10 is a variant that's used
+> - **Return** – all the points of an episode added up; that's what the **Mean episode return** readout
+>   on the Lehrer page shows. (The **return** in Appendix A.10 is a variant that's used
 >   in the learning calculation: points from now on, later ones worth a bit less.)
 > - **Noise** – the randomness added to each of the network's commands: the duck's curiosity.
 > - **Learning rate** – how far the evaluator (14.2) adjusts the sliders per step.
@@ -43,7 +43,7 @@ recognize progress, how to find the best network, what makes good exercises – 
 A jump run has two phases that you can follow on the page:
 
 1. **Imitating:** for 8 rounds, the network learns from the built-in role model. The status line shows
-   "Nachahmen: Runde … von 8" (imitating: round … of 8). After that the network can usually already
+   "Imitating: round … of 8". After that the network can usually already
    jump, and the page saves it for the Studio for the first time.
 2. **Practicing:** now the duck learns for points, with variation. For the first 30 rounds only the
    critic learns (Chapter 14.5), then both. Every 25 rounds the page does 5 test jumps and saves the
@@ -52,18 +52,16 @@ A jump run has two phases that you can follow on the page:
 **How long does it take?** On a test computer with 2 cores, the first real jump came in the browser
 after just under 9 minutes, and imitation was finished after about 11 minutes. Practicing takes much
 longer, because it needs thousands of rounds. How fast your device is, the page shows under
-"Schritte / s" (steps per second): that's how many decision ticks all ducks together manage per
+**Steps / s** (steps per second): that's how many decision ticks all ducks together manage per
 second.
 
 > **Try it!** Your first jump run:
-> 1. Open **kernengine.de/lehrer/**. Wait until the status line reports "Bereit" (ready).
-> 2. Under "Bewegung" (motion), choose "Sprung" (jump). All other fields stay as they are.
+> 1. Open **kernengine.de/lehrer/**. Wait until the status line reports "Ready".
+> 2. Under **Motion**, choose **Jump**. All other fields stay as they are.
 > 3. Press **Start** and leave the tab open. A phone belongs on its charger.
-> 4. Watch the status line: first "Nachahmen: Runde 1 von 8" (imitating: round 1 of 8) and so on, then
->    "Lernt: Iteration …" (learning: iteration …). Under "echte Sprünge" (real jumps) you see how
->    many of 5 test jumps succeed.
-> 5. As soon as "Für Kern Studio gespeichert als jump.onnx" (saved for Kern Studio as jump.onnx)
->    appears below the buttons, your network is ready for 15.6.
+> 4. Watch the status line: first "Imitating: round 1 of 8" and so on, then "Learning: iteration …".
+>    Under **Real jumps (clean robot)** you see how many of 5 test jumps succeed.
+> 5. As soon as "Saved for Kern Studio as jump.onnx" appears below the buttons, your network is ready for 15.6.
 >
 > What you learn: only the role model makes the jump possible; practicing then makes it reliable.
 
@@ -72,7 +70,7 @@ second.
 > computer. The number of ducks is **workers × ducks per worker**; a worker is a helper in the
 > browser's background that lets its ducks work out. The built-in jump network came from 32 ducks,
 > starting number 1 and 3000 practice rounds. So with 4 workers of 8 ducks each (32 in total),
-> starting number 1 (the "Seed" field) and 3000 iterations, you set exactly the same settings – if you
+> starting number 1 (the **Seed** field) and 3000 iterations, you set exactly the same settings – if you
 > have the time.
 
 ## 15.3 Reading progress
@@ -88,11 +86,11 @@ The Lehrer page draws return and episode length as curves and shows numbers alon
 
 | Readout | Meaning | What to watch for |
 |---|---|---|
-| Episoden-Rückgabe (episode return) | points of an episode, averaged | should rise over many rounds |
-| Episodenlänge (s) (episode length) | how long an episode lasts | jump: 2 s means no fall; shorter means a fall or propping up |
-| Aktionsrauschen (std) (action noise) | how much the duck tries things out | drops as it gets more confident (14.5) |
-| echte Sprünge (real jumps) | out of 5 test jumps | **the actual goal** |
-| Schritte / s (steps per second) | the device's speed | says nothing about quality |
+| **Mean episode return** | points of an episode, averaged | should rise over many rounds |
+| **Episode length (s)** | how long an episode lasts | jump: 2 s means no fall; shorter means a fall or propping up |
+| **Action noise (std)** | how much the duck tries things out | drops as it gets more confident (14.5) |
+| **Real jumps (clean robot)** | out of 5 test jumps | **the actual goal** |
+| **Steps / s** | the device's speed | says nothing about quality |
 
 If the points rise but the real jumps don't, that's a warning sign: maybe the duck is getting its
 points with something that isn't a jump at all (15.9).
@@ -122,7 +120,7 @@ For the built-in network, this measurement gave 40 out of 40 real jumps clean, 3
 variation, and not a single fall.
 
 In the browser, the page keeps only the **newest** state. If the readout currently shows 5 out of 5
-real jumps, you can save this state as a file with ".onnx herunterladen" (download .onnx) before
+real jumps, you can save this state as a file with **Download .onnx** before
 practicing continues.
 
 > **For the curious:** The tool can keep a snapshot every few hundred rounds and measure each one with
@@ -136,8 +134,8 @@ learning rate, little noise, and critic first – otherwise what was learned get
 > **Imagine …** you've just painstakingly taught a dog a trick. If you now yell new commands and wave
 > treats around wildly, the trick is quickly gone again.
 
-That's why the fields "Aktionsrauschen am Anfang" (initial action noise) and "Lernrate" (learning
-rate) on the Lehrer page are empty: then the proven recipe applies. What the real runs also showed:
+That's why the fields **Initial action noise** and **Learning rate** on the Lehrer page are empty
+(they show **Recipe**): then the proven recipe applies. What the real runs also showed:
 
 - **More trying things out doesn't help.** With a lot of noise and no warm start, the duck only
   learned to stand, not to jump.
@@ -146,7 +144,7 @@ rate) on the Lehrer page are empty: then the proven recipe applies. What the rea
 - **The number of ducks determines the result, the number of cores only the speed.** On the page,
   that means: the total workers × ducks per worker decides which network comes out. More workers with
   the same total don't change the network; they just spread the work over more cores. But if you only
-  raise the workers and leave "ducks per worker" as it is, you have more ducks – and a different
+  raise the workers and leave **Ducks per worker** as it is, you have more ducks – and a different
   network.
 - **Don't make the physics coarser.** With more coarsely calculated physics, training would be
   1.6 times faster, but the network would learn a different world from the Studio's.
@@ -165,8 +163,7 @@ that are already open. This applies to the jump.
 > 1. Start a jump run on the Lehrer page (15.2).
 > 2. In the same browser, open a second tab with https://kernengine.de/ and there the example level
 >    via **File › Example Levels › Micro Duck**.
-> 3. Wait until the Lehrer page reports "Für Kern Studio gespeichert als jump.onnx" (saved for Kern
->    Studio as jump.onnx). That happens for the first time after imitation, then every 25 rounds.
+> 3. Wait until the Lehrer page reports "Saved for Kern Studio as jump.onnx". That happens for the first time after imitation, then every 25 rounds.
 > 4. In the Studio, start **Play**, take over the duck with **F8** and press **7**.
 >
 > What you see: now **your** network jumps, not the one that ships with Kern – yours replaces it. An

@@ -784,11 +784,10 @@ jump.
 > **7**. At this moment, each servo gets a number 50 times per duck second (13.5) from just under
 > 200,000 sliders that were once pure randomness.
 
-> **Try it!** Open the Lehrer page **kernengine.de/lehrer/** and choose "Stehen (Schnelltest)"
-> (stand, quick test) as the motion. Enter 1 under "Aktionsrauschen am Anfang" (initial action noise)
-> and press **Start**. Let it run a few dozen iterations (the "Iteration" counter shows how far along
-> it is), press **Pause**, and note the curve of the episode length (how long the ducks hold out) and
-> the "Aktionsrauschen" (action noise) number. Reload the page, enter 0.1, and repeat with just as
+> **Try it!** Open the Lehrer page **kernengine.de/lehrer/** and choose **Stand (quick test)**
+> as the **Motion**. Enter 1 under **Initial action noise** and press **Start**. Let it run a few
+> dozen iterations (the **Iteration** counter shows how far along it is), press **Pause**, and note
+> the curve **Episode length** (how long the ducks hold out) and the **Action noise (std)** number. Reload the page, enter 0.1, and repeat with just as
 > many iterations. What you can expect: with 1 the bell is wide, and the ducks try things out wildly;
 > with 0.1 they stay close to their idea. Watch how the action noise number changes while practicing –
 > that's σ, learning along. How you recognize "better": the curve of the episode length rises faster
