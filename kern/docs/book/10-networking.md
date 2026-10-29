@@ -307,10 +307,12 @@ For each client, `server_send_snapshots` builds a snapshot of its own:
      becomes the local pawn.
    - `kUnpawn`, `kAlive`, `kSpawn` (with the server's ID), `kProperty` (`set_property`).
 3. **Unreliable messages:**
-   - `kSnapshot`: **clock synchronization** – the sample server time − local time; the offset follows
-     larger samples slowly (2 %) and smaller ones quickly (20 %), because the smallest delay is the
-     most honest. Adopt HUD and soldier state; every entity gets a sample (late and duplicate ones
-     are discarded, at most 32 per entity).
+   - `kSnapshot`: **clock synchronization** – the sample is server time − local receive time; the
+     longer a packet was under way, the smaller it is. The offset follows smaller samples quickly
+     (20 %) and larger ones slowly (2 %), so it keeps to the most delayed packets. The render time
+     (step 5) thus errs on the late side: even with varying delay there is usually a sample after the
+     render time, and interpolation does not have to extrapolate.
+     Adopt HUD and soldier state; every entity gets a sample (late and duplicate ones are discarded, at most 32 per entity).
    - `kShots`, `kCues`: into the world's lists – there the client draws or plays them like locally
      generated ones.
 4. **Input** every network tick: the current input with the camera's view direction at the front of

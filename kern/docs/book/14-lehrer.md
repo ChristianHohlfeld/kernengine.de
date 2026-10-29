@@ -242,7 +242,7 @@ y  = z^L                                 (last layer linear)
 `dense()` computes `y[r][o] = b[o] + Σᵢ x[r][i] · w[i][o]`, four rows of the batch per pass over the
 weights. The memory layout turns both directions into contiguous axpy loops that the compiler
 vectorizes without reordering sums (important for determinism, Section 14.7). `expm1` comes from
-Kern's deterministic libm (`kern::dm::expm1`). With a `Cache`, the forward pass remembers all
+Kern's deterministic libm (`kern::dm::expm1`). With a `Cache`, the forward pass keeps all
 activations `act[0..L]` for the backward pass.
 
 **Backward pass** (`backward(cache, dout, grad, dx)`), layer by layer from the back, with
@@ -647,7 +647,7 @@ best values).
 
 A simulation, a training run or a replayed robot log comes out the same on all platforms checked in
 CI (GCC/x86, Apple clang/ARM, WebAssembly). A simulation error is thus a
-fixed, reproducible error and not noise that looks different from machine to machine.
+fixed, reproducible error and not noise that differs from machine to machine.
 
 ### What it takes
 
@@ -692,7 +692,7 @@ floating-point ordering that depends on the number of threads (sums in a fixed o
 
 ## 14.8 Learning the play layer
 
-The play layer (`play.onnx`, [Chapter 13](13-micro-duck.md#1311-the-play-layer-walker_playcpp))
+The play layer (`play.onnx`, Section 13.11 in [Chapter 13](13-micro-duck.md))
 learns like the jump: a demonstration shows the way, the network imitates it from its own sensors
 (DAgger), and then it practices (PPO).
 
@@ -700,8 +700,8 @@ learns like the jump: a demonstration shows the way, the network imitates it fro
 
 `PlayEnv(seed, randomize)` is a duck on a floor with surface `floor` (friction 1), autonomous and
 with Kern extras, whose play layer the Lehrer drives from outside (`set_walker_play_external`).
-Underneath the play layer, Pollen's networks run unchanged. One `step` is one decision (2 control
-ticks, 40 ms); an episode lasts at most 60 s of robot time.
+Underneath the play layer, Pollen's networks run unchanged. One `step` is one decision (2 ticks,
+40 ms); an episode lasts at most 60 s of robot time.
 
 | | Size |
 |---|---|
@@ -856,7 +856,7 @@ The way there:
 | Find a demonstration (once, built in) | about 2 million (18 min on 2 cores) | 16 of 20 clean, 0 falls |
 | Imitation, rounds 1–7 | 43,355 | the network's first real jump (5 of 5) |
 | Imitation, round 8 | 49,936 | 5 of 5 |
-| Practice, 3000 iterations | 2.3 million | robust (table above) |
+| Practice, 3000 iterations | about 4.6 million (3000 × 32 ducks × 48 ticks) | robust (table above) |
 
 Because the run is identical bit for bit everywhere, the number of duck steps holds for every
 device; only the time depends on the device (measured on the same x86 machine with 2 cores):
@@ -869,7 +869,7 @@ device; only the time depends on the device (measured on the same x86 machine wi
 | browser, everything on 1 core | 539 s | 689 s | 336 |
 
 The browser learns the same network (the same 49,936 examples, the same imitation error 0.0108). It
-is about 5 times slower during imitation and just under 4 times slower during practice: WebAssembly
+is about 5 times slower during imitation and just under 4 times during practice: WebAssembly
 without SIMD and without threads inside a worker.
 
 The physics manages about 1300 duck steps/s per core natively (collection only); one step is 4 world
@@ -944,21 +944,20 @@ the BroadcastChannel "kern-lehrer"; open Studio tabs pick it up immediately. ".o
 ("download .onnx") saves the file.
 
 The same seed and the same number of ducks produce the same network as natively. The play layer
-cannot be trained in the browser; the page only knows the tasks `jump` and `stand`.
+cannot be trained in the browser; the page knows only `jump` and `stand`.
 
-On the phone: Chrome's CPU throttling only slows the main thread, not the workers, and is therefore
-no good as a phone profile; the single-core case was measured instead (table in 14.9). On the device
-itself, the page shows the duck steps/s.
+Chrome's CPU throttling slows only the main thread, not the workers, so the single-core case stands
+in for a phone (table in 14.9); on a phone, the page shows its duck steps/s.
 
 ## 14.12 Tests
 
 | Test | checks |
-|---|---|
+|------|---|
 | `lehrer_mlp_gradient_matches_finite_differences` | backward pass of the MLP |
 | `lehrer_adam_fits_a_curve_and_the_normaliser_tracks` | Adam and normalizer |
 | `lehrer_ppo_learns_to_reach` | PPO learns a simple task |
 | `lehrer_ppo_learns_from_collectors_elsewhere` | collecting and learning separated |
-| `lehrer_duck_env_runs_episodes_headless` | velstand holds the duck via the Lehrer path; the same episode bit for bit |
+| `lehrer_duck_env_runs_episodes_headless` | velstand holds the duck, bit for bit |
 | `micro_duck_observation_between_ticks_is_what_its_controller_sees` | observation between ticks |
 | `determinism_is_bit_identical_across_builds_and_platforms` | fingerprint |
 | `lehrer_runs_the_same_on_any_number_of_workers` | 1, 2, 4 workers → the same network |

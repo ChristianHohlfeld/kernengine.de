@@ -22,11 +22,11 @@ Alle Pfade sind relativ zur Repository-Wurzel, sofern nicht anders angegeben.
 | Lehrer im WebAssembly-Modul | `node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm` | eine PPO-Iteration über die C-ABI, Fingerabdruck |
 | Browser-Test | `node kern/tests/e2e/studio_e2e.mjs <base-url>` | Studio, Play, Simulate, Export, Telefon |
 
-Der kürzeste Weg zu einem laufenden Studio und grünen Tests (aus `README.md`):
+Der kürzeste Weg zu einem laufenden Studio und grünen Tests (nach `README.md`):
 
 ```sh
-# wasi-sdk 25 (Linux x86_64)
-curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz | tar xz -C /opt
+# wasi-sdk 25 (Linux x86_64): wasi-sdk-25.0-x86_64-linux.tar.gz aus den Releases
+# des GitHub-Projekts WebAssembly/wasi-sdk nach /opt entpacken
 export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
 
 tools/build_studio.sh                 # Kern Studio als eine Datei -> generated/studio.html
@@ -50,13 +50,13 @@ ohne Editor (weitere Werte laut Kopfkommentar: `physicsLab`, `shootingRange`, `m
 
 ## 2.2 Die Toolchain: wasi-sdk 25
 
-Kern braucht [wasi-sdk](https://github.com/WebAssembly/wasi-sdk), **Release 25**: clang, wasm-ld,
+Kern braucht wasi-sdk (GitHub-Projekt WebAssembly/wasi-sdk), **Release 25**: clang, wasm-ld,
 wasi-libc und libc++ für das Ziel `wasm32-wasip1`. Emscripten wird nicht benutzt.
 
 - Die Umgebungsvariable `WASI_SDK` zeigt auf das Installationsverzeichnis. Ohne sie nimmt
   `kern/build.sh` `/opt/wasi-sdk` an.
 - Die CI lädt `wasi-sdk-25.0-x86_64-linux.tar.gz` von GitHub und entpackt es mit
-  `--strip-components=1` nach `/home/runner/wasi-sdk` (siehe [2.10](#210-die-ci-im-detail)).
+  `--strip-components=1` nach `/home/runner/wasi-sdk` (siehe Abschnitt 2.10).
 - Für native Builds (Tests, Lehrer) genügt ein normaler Host-Compiler (GCC oder Clang; auf macOS
   Apple clang).
 - `tools/build_studio.sh` braucht zusätzlich `python3`; die Node-Tests brauchen Node (die CI nutzt
@@ -67,7 +67,7 @@ wasi-libc und libc++ für das Ziel `wasm32-wasip1`. Emscripten wird nicht benutz
 ## 2.3 `kern/build.sh` – das WebAssembly-Modul
 
 ```
-kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] <out.wasm> [compiler flags / game sources...]
+kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] [--commercial] <out.wasm> [compiler flags / game sources...]
 ```
 
 ### Komponenten
@@ -82,8 +82,13 @@ fügen hinzu:
 | `--app` | App-Laufzeit `kern/src/app` für Spiele gegen `kern::App`; Host ist `kern/web/app.mjs` | – |
 | `--physics` | Box3D (`kern/third_party/box3d`, als C17) und `kern/src/physics` | – |
 | `--game` | Levels, Actors, Komponenten, Spiel-Laufzeit, prozedurale Stadt (`kern/src/game`) | `--physics` |
-| `--studio` | Kern Studio (`kern/src/studio`) und seine C-ABI | `--game` |
-| `--lehrer` | den headless Lehrer (`kern/src/lehrer`) und seine C-ABI für Web Worker | `--game` |
+| `--studio` | Kern Studio (`kern/src/studio`) und seine C-ABI | `--game`, `--physics` |
+| `--lehrer` | den headless Lehrer (`kern/src/lehrer`) und seine C-ABI für Web Worker | `--game`, `--physics` |
+
+`--commercial` fügt nichts hinzu, sondern lässt weg, was nicht kommerziell genutzt werden darf: Pollen
+Robotics' 3D-Modelle der Micro Duck (CC BY-NC-SA 4.0). Das Skript übersetzt dann mit
+`-DKERN_NO_NONCOMMERCIAL_ASSETS`; das Modul enthält kein Pollen-Modell, und die Glieder der Ente
+haben kein Aussehen (`kern/src/game/builtin_meshes.cpp`).
 
 ### Weitere Argumente
 
@@ -170,7 +175,7 @@ Objekte der Engine teilen, gibt es einen Cache:
   einfach und sicher, wie der Kommentar im Skript sagt.
 - **ThinLTO:** Cache in `$KERN_OBJ_CACHE/thinlto`.
 
-Die CI hält den Cache zwischen Läufen (siehe [2.10](#210-die-ci-im-detail)).
+Die CI hält den Cache zwischen Läufen (siehe Abschnitt 2.10).
 
 ---
 
@@ -181,6 +186,7 @@ tools/build_studio.sh [--skip-wasm] [out.html]     (default: generated/studio.ht
 ```
 
 1. `kern/build.sh --studio generated/kern_studio.wasm` – Engine, Box3D, Spiel-Laufzeit, Studio.
+   Ist die Umgebungsvariable `KERN_COMMERCIAL` gesetzt, kommt `--commercial` hinzu (Abschnitt 2.3).
    Mit `--skip-wasm` entfällt dieser Schritt; das Modul muss dann schon existieren, sonst endet das
    Skript mit `missing …/kern_studio.wasm (run without --skip-wasm)`.
 2. Ein Python-Teil setzt die Seite zusammen:
@@ -250,7 +256,7 @@ kern/tests/run.sh micro_duck                 # nur Tests, deren Name "micro_duck
    Anders als `build.sh` gilt hier **`-Werror`**: Jede Warnung bricht den Testbuild ab.
    `-fno-sanitize-recover=undefined` macht undefiniertes Verhalten zum Abbruch.
 4. Das Testprogramm `kern_tests` läuft im Ordner `kern/tests` mit den Argumenten des Skripts.
-5. **Nur ohne Argumente** folgt der Logik-Export-Test (siehe [2.7](#27-logik-tests-drei-stufen-ein-ergebnis)).
+5. **Nur ohne Argumente** folgt der Logik-Export-Test (siehe Abschnitt 2.7).
 
 Umgebungsvariablen: `CXX`/`CC` (Standard `c++`/`cc`), `KERN_TEST_OUT` (Ausgabeordner, Standard
 `$TMPDIR/kern-tests`), `KERN_JOBS`.
@@ -438,7 +444,7 @@ abgebrochen werden nur ältere Läufe eines Pull Requests. Auf `main` läuft jed
 damit jeder grüne Stand veröffentlicht wird (laut Kommentar dauert ein Lauf etwa 17 Minuten).
 Rechte: `contents: write` (für den Push nach `gh-pages`).
 
-### Job `native` (ubuntu-latest, 30 min)
+### Job `native` (ubuntu-24.04, 30 min)
 
 ```yaml
 - name: Native unit tests (ASan/UBSan)
@@ -459,7 +465,7 @@ Alle Unit-Tests mit Sanitizern, danach der Logik-Export-Test.
 Der Lehrer, gebaut mit Apple clang auf ARM und `-mcpu=native`, muss die Ente exakt wie GCC auf x86
 und WebAssembly bewegen.
 
-### Job `build` (ubuntu-latest, 30 min)
+### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
 2. **wasi-sdk 25** aus dem Cache (`wasi-sdk-25.0`), sonst Download nach `/home/runner/wasi-sdk`.
@@ -473,21 +479,23 @@ und WebAssembly bewegen.
    kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
    kern/build.sh --lehrer generated/kern_lehrer.wasm
    for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+   python3 -I tools/kern_notices.py --check
    ```
 
-   `node --check` prüft die Syntax aller JavaScript-Dateien.
+   `node --check` prüft die Syntax aller JavaScript-Dateien, `kern_notices.py --check`, ob die
+   Lizenzhinweise in `kern.mjs` (`KERN_NOTICES`) aktuell sind.
 5. **Lehrer in WebAssembly:** `node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm`. Der
    Test legt über die C-ABI zwei Enten als Sammler und einen Lerner für `jump` an (Einstellung
    `{"steps":8}`), prüft die Nachahmungsrunden des Rezepts (8 Runden à 96 Episoden), führt einen
    Anteil einer DAgger-Runde und eine Nachahmungsrunde aus, sammelt einen Rollout, lernt eine
    PPO-Iteration, exportiert ONNX und vergleicht den Fingerabdruck mit der Referenzdatei.
-6. **Logik-JIT:** wie in [2.7](#27-logik-tests-drei-stufen-ein-ergebnis).
+6. **Logik-JIT:** wie in Abschnitt 2.7.
 7. **Seite zusammenstellen** in `_site/`:
 
    | Ziel | Quelle |
    |---|---|
-   | `index.html` | `site/index.html` |
-   | `LICENSE.txt`, `LICENSES.txt` | `LICENSE` (Wurzel) und `kern/LICENSES.md`; die Fußzeile der Startseite verlinkt beide |
+   | `*.html`, `img/`, ggf. `fonts/` | `site/*.html` (Startseite, Impressum, Datenschutz), `site/img`, `site/fonts`, falls vorhanden |
+   | `LICENSE.txt`, `LICENSES.txt`, `LICENSING.txt` | `LICENSE` (Wurzel), `kern/LICENSES.md` und, falls vorhanden, `LICENSING.md`; die Fußzeile der Startseite verlinkt sie |
    | `editor/index.html` | `generated/studio.html` mit vorangestelltem Kommentar `<!--BUILD_SHA:<sha>-->` |
    | `editor/build.json` | `{"sha":"<sha>"}` für die Update-Prüfung des installierbaren Editors |
    | `editor/` | `site/editor/` (Manifest, Service Worker, Icons) |
@@ -505,14 +513,12 @@ und WebAssembly bewegen.
 ### Job `deploy` (nur `main`, kein Pull Request; braucht `build`)
 
 Lädt das Artefakt `site`, legt darin ein frisches Git-Repository mit dem Branch `gh-pages` an,
-committet alles als `Pages: <sha>` und pusht mit `-f` nach `gh-pages`. Die Gruppe `pages` bricht
+schreibt die Datei `CNAME` (eigene Domain `kernengine.de`), committet alles als `Pages: <sha>` und pusht
+mit `-f` nach `gh-pages`. Die Gruppe `pages` bricht
 einen laufenden Push nicht ab; nur der jüngste wartende folgt. Die Seite erscheint unter
 <https://kernengine.de/>.
 
-Hinweis: `README.md` nennt noch eine eigene `pages.yml`. Im Repository gibt es nur `ci.yml`; die
-Veröffentlichung ist dort der Job `deploy`.
-
-### Job `e2e` (ubuntu-latest, 30 min; braucht `build`)
+### Job `e2e` (ubuntu-24.04, 30 min; braucht `build`)
 
 1. Lädt das Artefakt `site` und stellt daraus `generated/studio.html`, `generated/kern_studio.wasm`
    und die App-Dateien (`manifest.webmanifest`, `sw.js`, `build.json`, `icons`, `microduck`) wieder
@@ -523,7 +529,7 @@ Veröffentlichung ist dort der Job `deploy`.
    `NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771` aus.
 4. Lädt `artifacts/e2e/` als Artefakt `e2e-screenshots` hoch (auch bei Fehlern; fehlt der Ordner
    oder ist er leer, wird das ignoriert). Der Schritt setzt `KERN_E2E_SHOTS` nicht; Screenshots
-   entstehen nur, wenn die Variable gesetzt ist ([2.8](#28-der-browser-test-e2e)).
+   entstehen nur, wenn die Variable gesetzt ist (Abschnitt 2.8).
 
 ---
 
@@ -572,12 +578,12 @@ auf die Anordnung der veröffentlichten Seite (`/lehrer/`) ausgelegt.
 | `<name> source contains '</script'; cannot inline it` | eine JS-Quelle enthält `</script` | die Zeichenfolge im Quelltext vermeiden (z. B. aufteilen) |
 | Testbuild bricht an einer Warnung ab | `run.sh` übersetzt mit `-Werror` | Warnung beheben; `build.sh` ist toleranter, die Tests nicht |
 | Abbruch mit `runtime error:` / `AddressSanitizer` | UBSan/ASan fanden einen Fehler | der Bericht nennt Datei und Zeile; mit Filter einzeln nachstellen (`run.sh <name>`) |
-| `first differing tick: N` bzw. `diff` gegen den Fingerabdruck schlägt fehl | Simulation rechnet plattformabhängig oder wurde geändert | siehe [2.9](#29-der-determinismus-fingerabdruck) |
+| `first differing tick: N` bzw. `diff` gegen den Fingerabdruck schlägt fehl | Simulation rechnet plattformabhängig oder wurde geändert | siehe Abschnitt 2.9 |
 | Logik-Test `runs in "interpreter"` statt `compiled (WebAssembly)` | JIT nicht verfügbar oder Modul nicht übersetzbar | Ausgabe des JIT prüfen; die Engine fällt auf den Interpreter zurück (`logic JIT failed …` in der Konsole) |
 | Jeder kleine Header-Edit baut alles neu | gewollt: Header-Hash im Cache-Schlüssel | – |
 | Browser-Test hängt bei `openStudio` | Seite nicht ausgeliefert oder Modul fehlt; der Test wartet bis 90 s auf `KernStudio.frames() > 5` | Server in der Repository-Wurzel starten, `generated/` bauen |
 | Playwright-Import schlägt fehl | Paket nicht gefunden | `npm install playwright` (CI: 1.56.0) und `NODE_PATH` setzen, wie in der CI |
-| Lehrer-Seite lokal ohne Modul | Pfade auf die veröffentlichte Anordnung ausgelegt | Seite wie in [2.10](#job-build-ubuntu-latest-30-min) zusammenstellen |
+| Lehrer-Seite lokal ohne Modul | Pfade auf die veröffentlichte Anordnung ausgelegt | Seite wie in Abschnitt 2.10 (Job `build`) zusammenstellen |
 
 ---
 

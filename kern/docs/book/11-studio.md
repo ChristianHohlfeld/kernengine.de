@@ -8,7 +8,7 @@ the viewport, and a finished level becomes a single HTML file that runs anywhere
 What makes Studio special lies beneath the surface: the entire editor logic is C++ and runs in the same
 WebAssembly module as the renderer, the Box3D physics and the game runtime. What you see in the viewport
 is rendered and simulated by exactly the code that later runs the exported game. The browser side only
-draws panels and passes input through (section [11.19](#1119-architecture)).
+draws panels and passes input through (Section 11.19).
 
 This chapter is the user manual. How to turn it into a game of your own is shown in
 [Chapter 12](12-your-own-games.md); the logic graphs are described in [Chapter 9](09-logic.md), the physics in
@@ -28,7 +28,7 @@ There are three ways to open Studio:
 
 | Way | What you do | What for |
 |---|---|---|
-| Live | open https://kernengine.de/editor/ | get started immediately, also on phones and tablets |
+| Live | open the path `/editor/` on https://kernengine.de/ | get started immediately, also on phones and tablets |
 | Single file | build `tools/build_studio.sh`, then open `generated/studio.html` | offline, without a server; the file contains everything |
 | Development | serve the repository statically, open `kern/web/studio/index.html` | working on Studio itself (loads `generated/kern_studio.wasm`) |
 
@@ -49,7 +49,7 @@ docs, the engine docs, the imprint and the privacy policy.
    instead.
 4. If the last session had unsaved changes, Studio asks
    **Restore "…" from your last session?** with **Restore** and **Dismiss** (section
-   [11.15](#1115-saving-loading-autosave-and-settings)).
+   11.15).
 
 With **Play** (Alt+P) you can start driving through Orb Run right away.
 
@@ -70,6 +70,15 @@ Under `/editor/`, Studio is an installable web app:
 - The running version is shown at the bottom right of the status bar, with a note when a newer one is
   available online.
 
+### Language
+
+Studio shows its interface in German or English. Without a choice it follows the browser's
+language. The **DE | EN** button at the bottom right of the status bar switches it; the page then
+reloads, and the level is kept through the autosave. `?lang=de` or `?lang=en` in the address sets the
+language as well; Studio remembers the choice on the device. Only the display is translated: product
+and level names stay English, and inputs, actor names and the Output Log stay unchanged
+(`kern/web/studio/game.mjs`). Exported games likewise follow the browser's language or `?lang=`.
+
 ---
 
 ## 11.2 The interface at a glance
@@ -82,7 +91,7 @@ Under `/editor/`, Studio is an installable web app:
 | Outliner | top right | all actors as a tree with folders, search, visibility |
 | Details / World Settings | bottom right | properties of the selection or of the world, as two tabs |
 | Content Drawer | bottom, collapsible | Place Actors, Textures, Sounds, Output Log |
-| Status bar | at the very bottom | Content Drawer, Output Log, console, status message, physics statistics, sound, level meter, selection, version |
+| Status bar | at the very bottom | Content Drawer, Output Log, console, status message, physics statistics, sound, language, level meter, selection, version |
 
 The divider between the viewport and the side panel can be dragged (at least 240 px, at most 60 % of the
 window width), as can the one between the Outliner and Details. Studio remembers both sizes and whether
@@ -105,7 +114,7 @@ high. Esc closes any menu.
 | Save | Ctrl+S | save (with a file dialog the first time) |
 | Save As... | Ctrl+Shift+S | save under a new name |
 | Import Texture... | | bring an image (PNG, JPEG, WebP) into the level as a texture |
-| Package Game (HTML)... | | export the game as a single HTML file ([11.16](#1116-exporting-a-game)) |
+| Package Game (HTML)... | | export the game as a single HTML file (Section 11.16) |
 | Example Levels ▸ | | Orb Run, Physics Lab, Shooting Range, Micro Duck, Basic, Empty |
 
 The templates in the **New Level** dialog (double-clicking a card creates the level immediately):
@@ -116,7 +125,7 @@ The templates in the **New Level** dialog (double-clicking a card creates the le
 | Physics Lab | every Box3D joint: hinge, slider, wheel, rope bridge, motor, stack |
 | Shooting Range | first-person shooter soldier (desktop, gamepad, touch), targets, cover, multiplayer-capable |
 | Micro Duck | Pollen Robotics' walking robot on its trained network, walks on its own with ToF and camera |
-| Basic | ground, sun and sky, a clean start |
+| Basic | ground, a cube (Cube), sun and sky, a clean start |
 | Empty | nothing at all |
 
 If the current level has unsaved changes, the dialog points out that they remain in the autosave until
@@ -136,7 +145,7 @@ you edit the new level.
 | Deselect | Esc | clear the selection |
 | Group | Ctrl+G | parent the selection to a new actor "Group" |
 | Snap to Floor | End | put the selection down on the ground |
-| Preferences... | | camera, mouse, grid (table in [11.15](#1115-saving-loading-autosave-and-settings)) |
+| Preferences... | | camera, mouse, grid (table in Section 11.15) |
 | Reset Settings to Defaults... | | reset all editor settings |
 
 **Window**
@@ -144,7 +153,7 @@ you edit the new level.
 | Entry | Shortcut | Effect |
 |---|---|---|
 | Viewport Layout ▸ | | 1, 2 or 4 viewports |
-| Viewport Type ▸ | Alt+G, Alt+J, Alt+K, Alt+H | Perspective, Top, Bottom, Left, Right, Front, Back (for the active viewport) |
+| Viewport Type ▸ | Alt+G / J / K / H | Perspective (Alt+G), Top (Alt+J), Bottom, Left, Right (Alt+K), Front (Alt+H), Back (for the active viewport) |
 | View Mode ▸ | Alt+4, Alt+3, Alt+2, Alt+5 | Lit, Unlit, Wireframe, Player Collision |
 | Show ▸ | | Grid, Icons, Selection Outline, Collision Shapes, Constraints, Contact Points, Bounds, Fog, Sky, Stats, Robot Camera |
 | Game View | G | all editor helpers off in the active viewport |
@@ -157,7 +166,7 @@ you edit the new level.
 
 | Entry | Shortcut | Effect |
 |---|---|---|
-| Play | Alt+P | play ([11.11](#1111-play-and-simulate)) |
+| Play | Alt+P | play (Section 11.11) |
 | Simulate | Alt+S | run the physics, camera free |
 | Pause / Resume | Pause | pause / resume |
 | Advance One Frame | . | one step forward (only while paused) |
@@ -165,7 +174,7 @@ you edit the new level.
 | Eject from Player / Possess Player | F8 | leave / take over the player |
 | Restart Game | Ctrl+R | restart the game |
 | Keep Simulation Changes | K | apply the simulated poses of the selection to the level |
-| Number of Players ▸ | | 1 Player to 4 Players (listen server) ([11.17](#1117-multiplayer)) |
+| Number of Players ▸ | | 1 Player to 4 Players (listen server) (Section 11.17) |
 | Network Emulation ▸ | | Perfect, LAN (5 ms), Average (50 ms, 1% loss), Bad (150 ms, 5% loss), Terrible (300 ms, 20% loss) |
 | Host Online Game... | | offer the game over the network |
 | Join Online Game... | | join an offered game |
@@ -189,7 +198,7 @@ From left to right:
 |---|---|---|
 | Floppy disk | Ctrl+S | save |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | the tooltip names the step |
-| **+ Add ▾** | | menu with all catalog groups ([11.8](#118-content-drawer-and-built-in-content)); locked during Play |
+| **+ Add ▾** | | menu with all catalog groups (Section 11.8); locked during Play |
 | Select / Move / Rotate / Scale | Q / W / E / R | choose a tool |
 | Globe or cube | Ctrl+` | gizmo in world or local axes |
 | Grid button + dropdown | [ / ] | grid snap on/off, grid size 1 cm to 100 m |
@@ -203,9 +212,9 @@ From left to right:
 | Stop | Esc | stop and return to editing |
 | Eject | F8 | leave / take over the player |
 | Layout | | 1, 2 or 4 viewports |
-| **Logic** | | open the level's logic graph ([11.10](#1110-the-logic-editor)) |
+| **Logic** | | open the level's logic graph (Section 11.10) |
 | Package | | Package Game |
-| Panels | | only on narrow screens: Outliner, Details, World as a sheet ([11.18](#1118-narrow-screens-and-phones)) |
+| Panels | | only on narrow screens: Outliner, Details, World as a sheet (Section 11.18) |
 
 ### 11.2.3 Viewports
 
@@ -305,6 +314,7 @@ are therefore checked and clamped exactly as if they came from a `.klevel` file.
 | Status message | the editor's last message |
 | Statistics | during Simulate/Play: bodies, awake bodies, joints (of which broken), contacts; online additionally role, players, ping, loss, data rate |
 | Speaker | sound on/off |
+| Language button (DE, EN) | interface language (Section 11.1) |
 | Level meter | left/right output level |
 | Selection | "*n* of *m* selected" or the number of actors |
 | Version | running build |
@@ -314,7 +324,7 @@ Console commands (`help` lists them):
 | Command | Effect |
 |---|---|
 | `play`, `simulate`, `stop` | same as the buttons |
-| `spawn <item>` | place a catalog item, e.g. `spawn physics_cube` (IDs in [11.8](#118-content-drawer-and-built-in-content)) |
+| `spawn <item>` | place a catalog item, e.g. `spawn physics_cube` (IDs in Section 11.8) |
 | `select <name>` | select all actors whose name contains the text |
 | `tod <0..1>` | set the time of day |
 | `gravity <x y z>` | set gravity (without values: 0 0 −9.80665) |
@@ -480,9 +490,9 @@ The game keys themselves:
 | C or left Ctrl | crouch |
 | F | use (interact) |
 | Mouse wheel | zoom the game camera |
-| 1–7, V | Micro Duck movements ([11.13](#1113-controlling-the-micro-duck)) |
+| 1–7, V | Micro Duck movements (Section 11.13) |
 
-Gamepads and touch controls are described in [11.12](#1112-mobile-touch-and-gamepad).
+Gamepads and touch controls are described in Section 11.12.
 
 ### 11.4.3 Logic editor
 
@@ -515,7 +525,7 @@ reach the level.
 | Left-click | select; Shift adds, Ctrl toggles |
 | Click into empty space | clear the selection (without Shift/Ctrl) |
 | Drag with left mouse button | marquee selection; Shift adds, Ctrl toggles |
-| Outliner | see [11.2.4](#1124-outliner) |
+| Outliner | see Section 11.2.4 |
 
 Left-dragging never moves the camera and never moves an actor, not even when you start on an actor; it
 always draws a selection rectangle (the actor you started on is then included). As in Unreal, actors are
@@ -657,7 +667,7 @@ never on timing. Studio keeps up to 500 steps.
 
 - **Edit › History...** shows all steps; a click jumps to that state.
 - Consecutive changes to the same property within one drag are a single step
-  ([11.2.5](#1125-details)).
+  (Section 11.2.5).
 - A change that changes nothing does not create a step.
 - During Play and Simulate the level is locked: "Stop playing to edit the level".
 
@@ -771,7 +781,7 @@ level.
 | *Game* | |
 | Game title | title in the HUD and in the exported game |
 | Player (controlled in Play) | which actor is controlled |
-| Observer camera | Play starts with a free camera: fly, watch, drag bodies ([11.11.4](#11114-observer-camera)) |
+| Observer camera | Play starts with a free camera: fly, watch, drag bodies (Section 11.11.4) |
 | Win condition | None (sandbox), Collect all pickups, Reach a goal trigger, Survive the time limit, Reach a target score |
 | Time limit (0 = none) | seconds |
 | Target score | points for "Reach a target score" |
@@ -837,9 +847,10 @@ An example, as the browser test performs it: Basic level, **Logic**, **Begin Pla
 the "then" output into empty space, type "show message", Enter, enter a text, **Viewport**, place a
 Rolling Ball, **Play**: the HUD shows the text.
 
-When Play or Simulate starts, Kern compiles every graph to WebAssembly machine code; graphs with errors
-prevent Play from starting. **C++** downloads the graph as readable C++ source code that runs as native
-code when built into a game ([Chapter 12](12-your-own-games.md#1243-logic-graphs-as-c)). Breakpoints set
+When Play or Simulate starts, Kern compiles every graph to WebAssembly machine code; if a graph is built
+into the game as C++, that code runs instead of the JIT. A graph with errors is switched off at the start
+and reported as "Logic error: …"; the rest of the level keeps running. **C++** downloads the graph as readable C++ source code that runs as native
+code when built into a game (Section 12.4.3 in [Chapter 12](12-your-own-games.md)). Breakpoints set
 with F9 pause the game as soon as the node runs. All nodes, variables, state machines, the controls in
 detail and the three execution tiers are described in [Chapter 9](09-logic.md).
 
@@ -990,7 +1001,7 @@ controlling it in Studio.
 **The example level** (File › Example Levels › Micro Duck): a room at its scale with furniture, a ball
 and two socks. The duck walks autonomously. Even without extras it plays ball as in Pollen's original
 runtime (BallPlay: walk up, line up, kick with the left foot); with **Kern extras** switched on (on in
-the example level), Kern's play layer plays with the ball and socks instead. The level Blueprint makes it quack as soon as its head camera sees the ball. Play starts with
+the example level), Kern's play layer plays with the ball and socks instead. The level Blueprint makes it chirp (node **Chirp**) as soon as its head camera sees the ball. Play starts with
 the observer camera: you watch and can lift the ball with the mouse or a finger; F8 takes over the duck.
 
 **Without input**, the duck walks on its own (Details › Player Controller › Walker › **Autonomous**): it
@@ -1013,7 +1024,7 @@ Lifted by its trunk, it pauses (Robot State "Held") and walks on once set down.
 | **7** | **jump** – Kern's own movement from `jump.onnx` |
 | V | "Wheee" ride, as long as held |
 
-**Touch:** the buttons from [11.12.2](#11122-play-on-touch-devices). **HOP** is the jump (key 7),
+**Touch:** the buttons from Section 11.12.2. **HOP** is the jump (key 7),
 **QUACK** quacks, **WHEEE** starts the ride, and the others correspond to keys 1–6.
 
 **Gamepad:** RT quacks, LT starts the Wheee ride (both open the beak while doing so), B sits down or
@@ -1065,9 +1076,9 @@ replaces the bundled one without copying any file.
 
 On publishing, the CI copies the networks to `editor/microduck/` and `editor/policies/`. If you host an
 exported game with a duck yourself, put these two folders next to the HTML file
-([11.16](#1116-exporting-a-game)). The license of `microduck/` (`kern/third_party/microduck/LICENSE`)
+(Section 11.16). The license of `microduck/` (`kern/third_party/microduck/LICENSE`)
 and the `NOTICE` go with it; a game with the duck's look is non-commercial
-([Chapter 12](12-your-own-games.md#126-publishing)).
+(Section 12.6 in [Chapter 12](12-your-own-games.md)).
 
 ---
 
@@ -1154,7 +1165,9 @@ panel sizes and the Content Drawer. Levels remain untouched.
 The file is a complete game: it contains the engine module as Base64, `kern.mjs` and `game.mjs` as one
 inline module, and the level as JSON. It needs no server and no network and also runs from `file://`. At
 startup it loads the module in player mode (`kern_studio_init(…, player_only = 1)`): no editor, just the
-level, straight into Play.
+level, straight into Play. The module contains Pollen's 3D models of the Micro Duck (CC BY-NC-SA 4.0,
+non-commercial) unless it was built commercially (`KERN_COMMERCIAL=1 tools/build_studio.sh`); see
+Section 12.6 in [Chapter 12](12-your-own-games.md).
 
 ![The exported Orb Run as a standalone HTML file](../buch/bilder/game.png)
 
@@ -1162,14 +1175,14 @@ level, straight into Play.
 
 | Input | Effect |
 |---|---|
-| W A S D / arrows, Space, Shift, mouse | as in Play ([11.4.2](#1142-play-and-simulate)) |
+| W A S D / arrows, Space, Shift, mouse | as in Play (Section 11.4.2) |
 | Click | captures the mouse for mouse look |
 | Esc | releases the mouse and pauses ("Paused – Click to continue") |
 | P | pause |
 | R or Enter after victory/defeat, **Play again** | restart |
 | Ctrl+R | restart |
 | F8 | with the observer camera: take over the player and back |
-| Gamepad | as in [11.12.3](#11123-gamepad) |
+| Gamepad | as in Section 11.12.3 |
 | Touch | sticks and buttons as in Play, plus a ↻ at the top left to restart |
 
 At the bottom there is a hint with the key bindings, hidden on touch devices.
@@ -1178,13 +1191,13 @@ At the bottom there is a hint with the key bindings, hidden on touch devices.
 
 **Playing online with the exported file:** the file understands three parameters in the address:
 `?host=<room>` offers a game, `?join=<room>` joins, `&relay=ws://…` uses a relay for other computers
-([11.17](#1117-multiplayer)). If establishing the connection fails, you keep playing alone.
+(Section 11.17). If establishing the connection fails, you keep playing alone.
 
-**What is not in the file:** the Micro Duck's on-demand networks ([11.14](#1114-loading-policies-jumponnx-playonnx)).
+**What is not in the file:** the Micro Duck's on-demand networks (Section 11.14).
 Walking works without them because `velstand.onnx` is built in. For sitting, kicking, jumping and the play
 layer, the folders `microduck/` and `policies/` belong next to the HTML file, together with the
 license of `microduck/` (`kern/third_party/microduck/LICENSE`) and the `NOTICE`. A game with the duck's
-look is non-commercial ([Chapter 12](12-your-own-games.md#126-publishing)).
+look is non-commercial (Section 12.6 in [Chapter 12](12-your-own-games.md)).
 
 ---
 
@@ -1249,8 +1262,8 @@ compact layout:
 - Up to a width of 900 px, the toolbar hides the grid, angle and scale dropdowns as well as the axes
   button, and the status bar hides the console and physics statistics.
 - The Content Drawer takes up at most just under half the height.
-- Menus open submenus in place with a back row ([11.2.1](#1121-menu-bar)).
-- Play fills the whole screen with EXIT and PAUSE ([11.12.2](#11122-play-on-touch-devices)).
+- Menus open submenus in place with a back row (Section 11.2.1).
+- Play fills the whole screen with EXIT and PAUSE (Section 11.12.2).
 - The page never scrolls sideways.
 
 ![Studio in an 820 px wide window](../buch/bilder/studio-narrow.png)

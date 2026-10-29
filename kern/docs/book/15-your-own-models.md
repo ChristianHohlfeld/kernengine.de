@@ -25,7 +25,7 @@ The script runs on Linux and macOS, on x86 and ARM. It compiles Box3D, the deter
 | `KERN_NATIVE` | 1 (default): `-march=native` or `-mcpu=native` if the compiler supports it; 0: without |
 
 The CPU switches only select instructions; they do not change any result: the network stays the
-same bit for bit as in the browser and in the Studio ([Chapter 14](14-lehrer.md#147-determinism)).
+same bit for bit as in the browser and in the Studio (Section 14.7 in [Chapter 14](14-lehrer.md)).
 How Kern itself is built is described in [Chapter 2](02-building-and-testing.md).
 
 On startup, `kern_lehrer` loads Pollen's networks from `third_party/microduck/` (or
@@ -71,10 +71,10 @@ This is how `policies/jump.onnx` was created (32 ducks on 2 cores, seed 1, 3000 
 2. **Create the ducks:** `--envs` (default 16 per thread) ducks in `--threads` groups
    (`ThreadBackend`). The number is rounded down to a multiple of the threads
    (`envs = (envs / threads) · threads`).
-3. **Imitate** (DAgger, [Section 14.6](14-lehrer.md#146-imitation-demonstrations-and-cma-es)).
+3. **Imitate** (DAgger, Section 14.6 in [Chapter 14](14-lehrer.md)).
    Afterwards the tool writes `jump_nachgeahmt.onnx` ("imitated" – what imitation alone produces)
    and, with `--checkpoint`, the learner to `run.ckpt.nachgeahmt`.
-4. **Practice** (PPO, [Section 14.5](14-lehrer.md#145-ppo-step-by-step-ppocpp)): for the first
+4. **Practice** (PPO, Section 14.5 in [Chapter 14](14-lehrer.md)): for the first
    30 iterations only the critic learns, then both. Every `--eval-every` (10) iterations the network
    jumps 5 episodes on the clean robot.
 5. **Save:** every `--save-every` (25) iterations and at the end, the ONNX to `--out` and the learner
@@ -103,7 +103,7 @@ kern/build/kern_lehrer --task jump --vorbild none --iterations 3000
 
 Pure PPO; the reward then gets the term `track_height` (a reference height over the phase).
 `docs/lehrer.md` documents that this route did not find the take-off
-([Section 14.6](14-lehrer.md#146-imitation-demonstrations-and-cma-es)). For experiments:
+(Section 14.6 in [Chapter 14](14-lehrer.md)). For experiments:
 `--vorbild demo.json` uses a demonstration of your own, `--nachahmen 5 --episoden 64` changes the
 DAgger rounds, `--uebungs-std 0.2` the noise during practice, and `--nachahmungs-lohn 0` ("imitation
 reward") switches the imitation reward off.
@@ -125,7 +125,7 @@ about 18 minutes on 2 cores for about 2 million duck steps (`docs/lehrer.md`).
 ### In the browser
 
 The page `/lehrer/` trains the same recipe with web workers
-([Section 14.11](14-lehrer.md#1411-the-lehrer-in-the-browser)). The same seed and the same total
+(Section 14.11 in [Chapter 14](14-lehrer.md)). The same seed and the same total
 number of ducks (workers × ducks per worker) produce the same network as natively.
 
 ## 15.4 Reading progress
@@ -196,14 +196,14 @@ evaluation during the run has only 5 clean episodes.
 4. Check the candidate in the Studio (Section 15.8).
 
 For `policies/jump.onnx` this measurement gave 40 of 40 clean and 36 of 40 with full variation,
-without a fall ([Section 14.9](14-lehrer.md#149-jump-results)).
+without a fall (Section 14.9 in [Chapter 14](14-lehrer.md)).
 
 ## 15.6 Choosing hyperparameters
 
 ### One iteration in numbers
 
 To see what a switch does, it helps to work through one iteration of the jump recipe with 32 ducks
-(all steps in [Section 14.5](14-lehrer.md#145-ppo-step-by-step-ppocpp)):
+(all steps in Section 14.5 in [Chapter 14](14-lehrer.md)):
 
 | Step | Computation |
 |---|---|
@@ -228,7 +228,7 @@ All PPO values are in the recipe; the command line overrides them individually.
 | Option | Field | Jump recipe | Effect (Section 14.5) |
 |---|---|---|---|
 | `--envs N` | ducks in total | 16 per thread | more data per iteration, less noise in the gradient; **determines the result** |
-| `--threads N` | threads | all cores | speed only; the result does not depend on it |
+| `--threads N` | threads | all cores | speed only if `--envs` is given explicitly (as a multiple of the threads); without `--envs` it changes the number of ducks (16 per thread) and with it the result |
 | `--steps N` | `steps_per_env` | 48 | ticks per duck and iteration; rows per iteration = ducks × steps |
 | `--epochs N`, `--minibatches N` | | 5, 4 | passes over the data, split into minibatches |
 | `--lr X` | `learning_rate` | 10⁻⁴ | initial learning rate; the adaptive rule adjusts it afterwards |
@@ -334,7 +334,7 @@ kern/build/kern_lehrer --spielen-ueben play.onnx --iterations 300 --envs 32 --ou
 ```
 
 Warm start from `play.onnx`, action noise 0.1 (`--uebungs-std`), 20 iterations of critic only, then
-PPO with the play layer's reward ([Section 14.8](14-lehrer.md#148-learning-the-play-layer)). Every
+PPO with the play layer's reward (Section 14.8 in [Chapter 14](14-lehrer.md)). Every
 20 iterations it measures the network in 16 clean episodes and writes `play_geuebt_it0020.onnx` and
 so on, as well as `--out`.
 
@@ -361,7 +361,7 @@ Kern's own networks have fixed file names: `jump.onnx` and `play.onnx` (`KERN_PO
 2. **From the browser Lehrer:** the Lehrer page stores its network on the same device (IndexedDB
    "kern-lehrer"). The Studio loads it on startup and picks up every new one immediately, including
    in open tabs. This applies to the jump (the page does not train a play layer).
-3. **Check:** open the Micro Duck level, Play, key **7** (jump), or leave the duck alone (play
+3. **Check:** open the Micro Duck level, Play, **F8** (take over the duck), key **7** (jump), or leave the duck alone (play
    layer: Autonomous and Kern extras on, ball or sock in view). The browser console reports
    "Kern: trained network jump.onnx loaded" for a network from the Lehrer, and a warning if a file
    fails to load.
@@ -558,7 +558,7 @@ From `docs/lehrer.md`:
   number; now the Lehrer measures it on every run in the current physics (`bite_spot`).
 - **Breaking determinism.** One `std::sin` instead of `kern::dm::sin`, a sum in thread order, or
   `-ffast-math` – and the network is a different one on another device
-  ([Section 14.7](14-lehrer.md#147-determinism)). `kern_lehrer --fingerprint 400` against
+  (Section 14.7 in [Chapter 14](14-lehrer.md)). `kern_lehrer --fingerprint 400` against
   `tests/determinism_fingerprint.txt` shows it.
 - **Different physics from the Studio.** Fewer sub-steps, a different floor, a different servo
   profile: the network then learns a different world. The Lehrer therefore uses the same `GameWorld`

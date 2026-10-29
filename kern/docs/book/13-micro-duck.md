@@ -46,7 +46,7 @@ therefore applies fixed rules to the duck:
 - A servo consists only of Box3D's own joint features: the implicitly solved joint spring and a
   motor with target speed 0 for friction (Section 13.4).
 - Fixed time step, counted in steps rather than wall-clock time. Identical inputs produce a gait
-  that is identical bit for bit on all platforms checked in CI (determinism, [Chapter 14](14-lehrer.md#147-determinism)).
+  that is identical bit for bit on all platforms checked in CI (determinism, Section 14.7 in [Chapter 14](14-lehrer.md)).
 
 The physics itself (Box3D, contacts, joints) is described in [Chapter 6](06-physics.md).
 
@@ -633,7 +633,7 @@ world.set_walker_detector(duck, {0.002f, 0.01f, 0.1f, 42});
 ```
 
 In the Studio the detector is noise-free; the Lehrer draws its values per episode
-([Chapter 14](14-lehrer.md#148-learning-the-play-layer)). The noise comes from a separate,
+(Section 14.8 in [Chapter 14](14-lehrer.md)). The noise comes from a separate,
 deterministic generator.
 
 ### The tracker
@@ -731,7 +731,7 @@ roll forever.
 The Micro Duck level (`game::micro_duck_level()`) is a 2.5 × 2.5 m (real) room with a wooden floor
 (friction 1, surface `floor`), a shoebox, a stack of books, a crate, a flowerpot, a ball and two
 socks. The duck is autonomous and has Kern extras on. A level blueprint demonstrates the Robots
-nodes: it makes the duck quack once when the ball comes into the camera image. This is a
+nodes: it makes the duck chirp once (node **Chirp**) when the ball comes into the camera image. This is a
 demonstration of the blueprint, not behavior of the duck.
 
 ### Results
@@ -751,6 +751,9 @@ walk up, stand, pick, bite) check in Studio physics that only the network makes 
 ## 13.12 Controls in the Studio
 
 ![Touch controls on a phone (shown for Orb Run; the duck shows its own buttons)](../buch/bilder/phone-play-390.png)
+
+In the example level, Play starts with the observer camera: you watch, and only **F8** takes over the duck
+(F8 again returns to watching). Until then the inputs below do not reach it.
 
 The inputs end up in `PlayInput::robot`, a bit field of the robot keys being held:
 
@@ -785,7 +788,7 @@ the phase t / 2 s as cos and sin in observation slots 55 and 56 (`kJumpPhaseSlot
 networks never use; the rest of the command is 0. In the Studio (test
 `micro_duck_jumps_for_real_in_the_studio`): 3 out of 3 real jumps, rise 9.0 mm, flight 120 ms,
 tilt 8°, after which the duck stands and walks again. How the network was created is described in
-[Chapter 14](14-lehrer.md#149-jump-results).
+Section 14.9 in [Chapter 14](14-lehrer.md).
 
 ### Loading networks
 
@@ -815,7 +818,7 @@ minute). Networks that the Lehrer has stored in the browser on the same device (
 | Walk | twist like the gamepad; duration 0 = until the next Walk |
 | Look | head yaw / pitch |
 | Set Autonomous | own behavior on / off |
-| Chirp | quack with open beak |
+| Chirp | chirp with open beak |
 | Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` |
 | Robot Beak | beak open (1) / closed (0) |
 | Pet Robot | a hand on the duck for n seconds |

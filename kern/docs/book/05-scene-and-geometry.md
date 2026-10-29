@@ -268,7 +268,7 @@ If `wall_records` is on (default), every vertex carries four extra values in `Me
 | z | building seed in [0, 1) (`(h % 997) / 997`) |
 | w | storey height |
 
-These values are intended for facade shaders. The shader extension `NightWindows` from [Chapter 4](04-graphics.md#413-example-a-custom-shader-extension-orb-run) reads them as the attribute `aWall` and draws window grids from them.
+These values are intended for facade shaders. The shader extension `NightWindows` from Section 4.13 in [Chapter 4](04-graphics.md) reads them as the attribute `aWall` and draws window grids from them.
 
 ### Chunks and Time Budget
 

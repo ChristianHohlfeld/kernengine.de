@@ -1120,8 +1120,8 @@ are specified in Hansen's tutorial; Kern adopts the formulas verbatim.
 
 `cmaes_minimise` in `cmaes.cpp`, following Hansen's tutorial (2016):
 
-- Population size $\lambda = 4 + \lfloor 3 \ln n\rfloor$ if not specified (for the 6 calibration
-  parameters: 9). The Vorbild search specifies 16.
+- Population size $\lambda = 4 + \lfloor 3 \ln n\rfloor$ if not specified (for 6 parameters that
+  would be 9). The servo calibration specifies 12, the Vorbild search 16.
 - The eigendecomposition of $C$ is done by a Jacobi method ("n is small").
 - Normally distributed numbers in double precision from Kern's own `Rng` and `kern::dm` –
   deterministic; a calibration is reproducible.

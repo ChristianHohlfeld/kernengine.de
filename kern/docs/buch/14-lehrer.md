@@ -690,7 +690,7 @@ Gleitkomma-Reihenfolge, die von der Zahl der Threads abhängt (Summen in fester 
 
 ## 14.8 Die Spielschicht lernen
 
-Die Spielschicht (`play.onnx`, [Kapitel 13](13-micro-duck.md#1311-die-spielschicht-walker_playcpp))
+Die Spielschicht (`play.onnx`, Abschnitt 13.11 in [Kapitel 13](13-micro-duck.md))
 lernt wie der Sprung: Ein Vorbild zeigt den Weg, das Netz ahmt es aus seinen eigenen Sensoren nach
 (DAgger), dann übt es (PPO).
 
@@ -857,7 +857,7 @@ Der Weg dahin:
 | Vorbild suchen (einmalig, eingebaut) | rund 2 Mio. (18 min auf 2 Kernen) | 16 von 20 sauber, 0 Stürze |
 | Nachahmen, Runde 1–7 | 43 355 | erster echter Sprung des Netzes (5 von 5) |
 | Nachahmen, Runde 8 | 49 936 | 5 von 5 |
-| Üben, 3000 Iterationen | 2,3 Mio. | robust (Tabelle oben) |
+| Üben, 3000 Iterationen | rund 4,6 Mio. (3000 × 32 Enten × 48 Takte) | robust (Tabelle oben) |
 
 Weil der Lauf überall Bit für Bit gleich ist, gilt die Zahl der Entenschritte für jedes Gerät; nur
 die Zeit hängt vom Gerät ab (gemessen auf derselben x86-Maschine mit 2 Kernen):

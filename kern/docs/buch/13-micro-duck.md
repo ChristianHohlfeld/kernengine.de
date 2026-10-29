@@ -47,7 +47,7 @@ Deshalb gelten in Kern feste Regeln für die Ente:
 - Ein Servo besteht nur aus Box3Ds eigenen Gelenkteilen: der implizit gelösten Gelenkfeder und
   einem Motor mit Sollgeschwindigkeit 0 für die Reibung (Abschnitt 13.4).
 - Fester Zeitschritt, gezählt in Schritten statt in Wanduhrzeit. Gleiche Eingaben ergeben Bit für
-  Bit denselben Gang, auf jeder Plattform (Determinismus, [Kapitel 14](14-lehrer.md#147-determinismus)).
+  Bit denselben Gang, auf jeder Plattform (Determinismus, Abschnitt 14.7 in [Kapitel 14](14-lehrer.md)).
 
 Die Physik selbst (Box3D, Kontakte, Gelenke) beschreibt [Kapitel 6](06-physik.md).
 
@@ -634,7 +634,7 @@ world.set_walker_detector(duck, {0.002f, 0.01f, 0.1f, 42});
 ```
 
 Im Studio ist der Detektor rauschfrei; der Lehrer zieht seine Werte je Episode
-([Kapitel 14](14-lehrer.md#148-die-spielschicht-lernen)). Das Rauschen kommt aus einem eigenen,
+(Abschnitt 14.8 in [Kapitel 14](14-lehrer.md)). Das Rauschen kommt aus einem eigenen,
 deterministischen Generator.
 
 ### Der Tracker
@@ -730,7 +730,7 @@ Spielball von 50 g mit Rollwiderstand 0,03 (Gummi auf Holz); ohne Rollwiderstand
 Das Micro-Duck-Level (`game::micro_duck_level()`) ist ein Raum von 2,5 × 2,5 m (echt) mit Holzboden
 (Reibung 1, Oberfläche `floor`), Schuhkarton, Bücherstapel, Kiste, Blumentopf, einem Ball und zwei
 Socken. Die Ente ist autonom und hat Kern extras an. Ein Level-Blueprint zeigt die Robots-Knoten:
-Er lässt die Ente einmal quaken, wenn der Ball ins Kamerabild kommt. Das ist eine Vorführung des
+Er lässt die Ente einmal zwitschern (Knoten **Chirp**), wenn der Ball ins Kamerabild kommt. Das ist eine Vorführung des
 Blueprints, nicht Verhalten der Ente.
 
 ### Ergebnisse
@@ -750,6 +750,9 @@ hingehen, stehen, aufheben, zubeißen) prüfen in Studio-Physik, dass nur das Ne
 ## 13.12 Steuerung im Studio
 
 ![Touch-Steuerung am Telefon (hier in Orb Run; bei der Ente erscheinen ihre eigenen Tasten)](bilder/phone-play-390.png)
+
+Im Beispiel-Level startet Play mit der Observer camera: Man schaut zu, und erst **F8** übernimmt die Ente
+(noch einmal F8 schaut wieder zu). Vorher erreichen die folgenden Eingaben sie nicht.
 
 Die Eingaben landen in `PlayInput::robot`, einem Bitfeld der gehaltenen Robot-Tasten:
 
@@ -784,7 +787,7 @@ sieht die Phase t / 2 s als cos und sin in den Beobachtungsplätzen 55 und 56 (`
 Pollens Netze nie nutzen; der Rest des Kommandos ist 0. Im Studio (Test
 `micro_duck_jumps_for_real_in_the_studio`): 3 von 3 echte Sprünge, Steigen 9,0 mm, Flug 120 ms,
 Neigung 8°, danach steht und läuft die Ente wieder. Wie das Netz entstand, steht in
-[Kapitel 14](14-lehrer.md#149-ergebnisse-des-sprungs).
+Abschnitt 14.9 in [Kapitel 14](14-lehrer.md).
 
 ### Netze laden
 
@@ -814,7 +817,7 @@ erneut angefragt. Netze, die der Lehrer im Browser auf demselben Gerät gespeich
 | Walk | Twist wie das Gamepad; Dauer 0 = bis zum nächsten Walk |
 | Look | Kopf gieren / nicken |
 | Set Autonomous | eigenes Verhalten an / aus |
-| Chirp | Quaken mit offenem Schnabel |
+| Chirp | Zwitschern mit offenem Schnabel |
 | Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` |
 | Robot Beak | Schnabel auf (1) / zu (0) |
 | Pet Robot | eine Hand auf der Ente für n Sekunden |

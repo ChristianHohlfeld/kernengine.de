@@ -268,7 +268,7 @@ Ist `wall_records` an (Standard), trägt jeder Vertex vier Zusatzwerte in `MeshD
 | z | Gebäude-Seed in [0, 1) (`(h % 997) / 997`) |
 | w | Stockwerkshöhe |
 
-Diese Werte sind für Fassaden-Shader gedacht. Die Shader-Erweiterung `NightWindows` aus [Kapitel 4](04-grafik.md#413-beispiel-eine-eigene-shader-erweiterung-orb-run) liest sie als Attribut `aWall` und zeichnet daraus Fensterraster.
+Diese Werte sind für Fassaden-Shader gedacht. Die Shader-Erweiterung `NightWindows` aus Abschnitt 4.13 in [Kapitel 4](04-grafik.md) liest sie als Attribut `aWall` und zeichnet daraus Fensterraster.
 
 ### Chunks und Zeitbudget
 

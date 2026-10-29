@@ -10,7 +10,7 @@ Engine: denselben Renderer, dieselbe Physik, dieselbe Plattformschicht.
 | **C** Aus JavaScript über die C-ABI | `kern/web/kern.mjs`, `kern/web/studio/game.mjs` | eigene Seite, die das Modul steuert | bestehende JavaScript-Projekte (wie SpawnCity), Studio-Levels in eigene Seiten einbetten |
 
 Dazu kommt eine Mischform: Logik-Graphen aus Studio lassen sich als C++ exportieren und in ein Modul
-bauen ([12.4.3](#1243-logik-graphen-als-c)).
+bauen (Abschnitt 12.4.3).
 
 Pfade beziehen sich auf das Wurzelverzeichnis des Repositorys; die Engine liegt dort im Ordner `kern/`.
 
@@ -24,7 +24,7 @@ ist. Die Bedienung der einzelnen Panels steht in [Kapitel 11](11-studio.md).
 
 ### Schritt 1: Ein neues Level
 
-1. Studio öffnen (https://kernengine.de/editor/ oder `generated/studio.html`).
+1. Studio öffnen (auf https://kernengine.de/ unter `/editor/` oder `generated/studio.html`).
 2. **File › New Level...**, Vorlage **Basic**, **Create**. Das Level hat einen Boden (40 × 40 m), Sonne,
    Himmel und einen Würfel.
 3. In **World Settings** den **Level name** und den **Game title** setzen, etwa „Orb Garden".
@@ -126,7 +126,7 @@ Ungespeicherte Arbeit sichert Studio zusätzlich im Browser und bietet sie beim 
 3. Studio lädt `Orb_Garden.html` herunter und bietet **Play it** an.
 
 Die Datei enthält Engine, Level und Spiel-Host. Sie läuft offline, von `file://`, von jedem Webserver und
-auf dem Telefon mit Touch-Sticks. Wie man sie veröffentlicht, steht in [12.6](#126-veröffentlichen).
+auf dem Telefon mit Touch-Sticks. Wie man sie veröffentlicht, steht in Abschnitt 12.6.
 
 ![Ein exportiertes Spiel im Browser](bilder/game.png)
 
@@ -375,7 +375,7 @@ Die Seite dazu (`kern/examples/hello/index.html`) ist kurz:
 
 ### 12.2.4 Bauen
 
-Man braucht [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) Release 25; die CI lädt es von GitHub.
+Man braucht wasi-sdk (GitHub-Projekt WebAssembly/wasi-sdk) Release 25; die CI lädt es von GitHub.
 
 ```sh
 export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
@@ -585,7 +585,7 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
    will, nimmt `--physics` dazu ([Kapitel 6](06-physik.md)); wer Levels und die Spiel-Laufzeit braucht,
    `--game` ([Kapitel 8](08-spiel-laufzeit.md)).
 3. Den Ordner zusammen mit `kern/web/kern.mjs` und `kern/web/app.mjs` über einen Webserver ausliefern
-   ([12.5](#125-hosten-mit-webappmjs)).
+   (Abschnitt 12.5).
 
 ---
 
@@ -718,7 +718,7 @@ if (game.status.hud?.status === "won") showMyWinScreen();
 
 `gameInput` kennt `moveX`, `moveY`, `up`, `jump`, `boost`, `fire`, `aim`, `reload`, `crouch`, `interact`,
 `lookX` und `lookY`. Die Werte addieren sich zu Tastatur, Touch und Gamepad. Alle Befehle stehen in
-[Kapitel 11](11-studio.md#11192-die-c-abi-kern_studio_) und [Kapitel 17](17-referenz.md).
+Abschnitt 11.19.2 in [Kapitel 11](11-studio.md) und [Kapitel 17](17-referenz.md).
 
 Die Studio-C-ABI ist dieselbe, mit der Studio selbst arbeitet. Wer die Fassade nicht will, ruft
 `kern_studio_init`, `kern_studio_command`, `kern_studio_frame` usw. direkt auf; `StudioEngine` in
@@ -790,7 +790,7 @@ Telefonen mit Touch-Steuerung.
 
 - **Mit Micro Duck:** die Ordner `microduck/` (Pollens Netze aus `kern/third_party/microduck/*.onnx`) und
   `policies/` (`kern/policies/*.onnx`) neben die HTML-Datei legen, sonst fehlen alle Bewegungen außer dem
-  Laufen ([Kapitel 11](11-studio.md#1114-policies-laden-jumponnx-playonnx)). Zu `microduck/` gehören die
+  Laufen (Abschnitt 11.14 in [Kapitel 11](11-studio.md)). Zu `microduck/` gehören die
   Lizenz (`kern/third_party/microduck/LICENSE`) und die NOTICE; ein Spiel mit dem Aussehen der Ente ist
   nur nicht kommerziell nutzbar (siehe oben).
 - **Online-Spiel:** Die Adresse mit `?host=<raum>` öffnet das Spiel als Host, `?join=<raum>` tritt bei.
@@ -800,7 +800,7 @@ Telefonen mit Touch-Steuerung.
 
 ### C++-Spiele
 
-Hochladen, was [12.5](#125-hosten-mit-webappmjs) zeigt: die HTML-Seite, das `.wasm` und `kern/web/kern.mjs`
+Hochladen, was Abschnitt 12.5 zeigt: die HTML-Seite, das `.wasm` und `kern/web/kern.mjs`
 sowie `kern/web/app.mjs` mit denselben relativen Pfaden. Kern selbst veröffentlicht so auf GitHub Pages;
 die CI (`.github/workflows/ci.yml`) zeigt den vollständigen Ablauf:
 

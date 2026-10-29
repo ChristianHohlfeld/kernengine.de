@@ -16,8 +16,8 @@ and `NOTICE`.
 | `policies/jump.onnx` (warm start from Pollen's `velstand.onnx`) | Christian Heinrich Hohlfeld; Pollen Robotics | Apache License 2.0 |
 | Micro Duck 3D models in Kern Studio (not included in this book) | Pollen Robotics | CC BY-NC-SA 4.0 |
 
-The license text of CC BY-NC-SA 4.0 is available at
-<https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>.
+Creative Commons publishes the license text of CC BY-NC-SA 4.0 under the name
+"Attribution-NonCommercial-ShareAlike 4.0 International".
 
 The book itself is not covered by these licenses (see the [imprint](00-imprint.md)).
 

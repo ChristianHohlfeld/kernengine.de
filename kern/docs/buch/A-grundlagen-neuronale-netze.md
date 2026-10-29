@@ -30,9 +30,9 @@ Eingangsvektor $x$ auf einen Ausgangsvektor $y$ abbildet,
 
 $$y = f_\theta(x).$$
 
-- $x \in \mathbb{R}^n$: die Eingabe. Beim Micro Duck sind das 61 Zahlen (Lage des Rumpfs, Gelenkwinkel,
+- $x \in \mathbb{R}^n$: die Eingabe. Bei der Micro Duck sind das 61 Zahlen (Lage des Rumpfs, Gelenkwinkel,
   Gelenkgeschwindigkeiten, die letzte Aktion, Befehle) – `kObs = 61` in `env.h`.
-- $y \in \mathbb{R}^m$: die Ausgabe. Beim Micro Duck 14 Servoziele – `kActions = 14`.
+- $y \in \mathbb{R}^m$: die Ausgabe. Bei der Micro Duck 14 Servoziele – `kActions = 14`.
 - $\theta$: die **Parameter** (Gewichte und Biases), oft Zehn- oder Hunderttausende Zahlen. Sie werden
   nicht von Hand gesetzt, sondern gelernt.
 
@@ -1134,8 +1134,8 @@ sind in Hansens Tutorial festgelegt; Kern übernimmt die Formeln wörtlich.
 
 `cmaes_minimise` in `cmaes.cpp`, nach Hansens Tutorial (2016):
 
-- Populationsgröße $\lambda = 4 + \lfloor 3 \ln n\rfloor$, wenn nicht angegeben (für die 6 Parameter
-  der Kalibrierung: 9). Die Vorbildsuche gibt 16 vor.
+- Populationsgröße $\lambda = 4 + \lfloor 3 \ln n\rfloor$, wenn nicht angegeben (bei 6 Parametern
+  wären das 9). Die Servokalibrierung gibt 12 vor, die Vorbildsuche 16.
 - Die Eigenzerlegung von $C$ macht ein Jacobi-Verfahren („n is small“).
 - Normalverteilte Zahlen in doppelter Genauigkeit aus Kerns eigenem `Rng` und `kern::dm` –
   deterministisch, eine Kalibrierung ist reproduzierbar.

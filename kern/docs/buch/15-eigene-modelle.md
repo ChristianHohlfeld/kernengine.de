@@ -26,7 +26,7 @@ Das Skript läuft auf Linux und macOS, auf x86 und ARM. Es übersetzt Box3D, die
 | `KERN_NATIVE` | 1 (Standard): `-march=native` bzw. `-mcpu=native`, wenn der Compiler es kennt; 0: ohne |
 
 Die CPU-Schalter wählen nur Befehle aus, sie ändern kein Ergebnis: Das Netz bleibt Bit für Bit
-dasselbe wie im Browser und im Studio ([Kapitel 14](14-lehrer.md#147-determinismus)). Wie Kern selbst
+dasselbe wie im Browser und im Studio (Abschnitt 14.7 in [Kapitel 14](14-lehrer.md)). Wie Kern selbst
 gebaut wird, steht in [Kapitel 2](02-bauen-und-testen.md).
 
 Beim Start lädt `kern_lehrer` Pollens Netze aus `third_party/microduck/` (oder `--policies DIR`); sie
@@ -71,10 +71,10 @@ Das ist der Weg, auf dem `policies/jump.onnx` entstand (32 Enten auf 2 Kernen, S
 2. **Enten anlegen:** `--envs` (Standard 16 je Thread) Enten in `--threads` Gruppen
    (`ThreadBackend`). Die Zahl wird auf ein Vielfaches der Threads abgerundet
    (`envs = (envs / threads) · threads`).
-3. **Nachahmen** (DAgger, [Kapitel 14.6](14-lehrer.md#146-nachahmen-vorbilder-und-cma-es)). Danach
+3. **Nachahmen** (DAgger, Abschnitt 14.6 in [Kapitel 14](14-lehrer.md)). Danach
    schreibt das Werkzeug `jump_nachgeahmt.onnx` (was die Nachahmung allein ergibt) und mit
    `--checkpoint` den Lerner nach `run.ckpt.nachgeahmt`.
-4. **Üben** (PPO, [Kapitel 14.5](14-lehrer.md#145-ppo-schritt-für-schritt-ppocpp)): die ersten
+4. **Üben** (PPO, Abschnitt 14.5 in [Kapitel 14](14-lehrer.md)): die ersten
    30 Iterationen lernt nur der Kritiker, danach beide. Alle `--eval-every` (10) Iterationen springt
    das Netz 5 Episoden auf dem sauberen Roboter.
 5. **Speichern:** alle `--save-every` (25) Iterationen und am Ende das ONNX nach `--out` und den
@@ -104,7 +104,7 @@ kern/build/kern_lehrer --task jump --vorbild none --iterations 3000
 
 Reines PPO; die Belohnung bekommt dann den Term `track_height` (eine Referenzhöhe über die Phase).
 `docs/lehrer.md` dokumentiert, dass dieser Weg den Absprung nicht fand
-([Kapitel 14.6](14-lehrer.md#146-nachahmen-vorbilder-und-cma-es)). Für Experimente:
+(Abschnitt 14.6 in [Kapitel 14](14-lehrer.md)). Für Experimente:
 `--vorbild demo.json` nimmt ein eigenes Vorbild, `--nachahmen 5 --episoden 64` ändert die DAgger-
 Runden, `--uebungs-std 0.2` das Rauschen beim Üben, `--nachahmungs-lohn 0` schaltet die
 Nachahmungsbelohnung ab.
@@ -126,7 +126,7 @@ auf 2 Kernen rund 18 Minuten für rund 2 Millionen Entenschritte (`docs/lehrer.m
 ### Im Browser
 
 Die Seite `/lehrer/` trainiert dasselbe Rezept mit Web Workern
-([Kapitel 14.11](14-lehrer.md#1411-der-lehrer-im-browser)). Gleicher Seed und gleich viele Enten
+(Abschnitt 14.11 in [Kapitel 14](14-lehrer.md)). Gleicher Seed und gleich viele Enten
 insgesamt (Worker × Enten je Worker) ergeben dasselbe Netz wie nativ.
 
 ## 15.4 Fortschritt lesen
@@ -197,14 +197,14 @@ schlechter werden; die Bewertung während des Laufs hat nur 5 saubere Episoden.
 4. Den Kandidaten im Studio prüfen (Abschnitt 15.8).
 
 Für `policies/jump.onnx` ergab diese Messung 40 von 40 sauber und 36 von 40 mit voller Variation,
-ohne Sturz ([Kapitel 14.9](14-lehrer.md#149-ergebnisse-des-sprungs)).
+ohne Sturz (Abschnitt 14.9 in [Kapitel 14](14-lehrer.md)).
 
 ## 15.6 Hyperparameter wählen
 
 ### Eine Iteration in Zahlen
 
 Um zu sehen, was ein Schalter bewirkt, hilft es, eine Iteration des Sprung-Rezepts mit 32 Enten
-durchzurechnen (alle Schritte in [Kapitel 14.5](14-lehrer.md#145-ppo-schritt-für-schritt-ppocpp)):
+durchzurechnen (alle Schritte in Abschnitt 14.5 in [Kapitel 14](14-lehrer.md)):
 
 | Schritt | Rechnung |
 |---|---|
@@ -230,7 +230,7 @@ Alle PPO-Werte stehen im Rezept; die Kommandozeile überschreibt sie einzeln.
 | Option | Feld | Sprung-Rezept | Wirkung (Kapitel 14.5) |
 |---|---|---|---|
 | `--envs N` | Enten insgesamt | 16 je Thread | mehr Daten je Iteration, kleineres Rauschen im Gradienten; **bestimmt das Ergebnis** |
-| `--threads N` | Threads | alle Kerne | nur die Geschwindigkeit; das Ergebnis hängt nicht davon ab |
+| `--threads N` | Threads | alle Kerne | nur die Geschwindigkeit, wenn `--envs` fest angegeben ist (als Vielfaches der Threads); ohne `--envs` ändert es die Zahl der Enten (16 je Thread) und damit das Ergebnis |
 | `--steps N` | `steps_per_env` | 48 | Takte je Ente und Iteration; Zeilen je Iteration = Enten × Schritte |
 | `--epochs N`, `--minibatches N` | | 5, 4 | Durchläufe über die Daten, Teilung in Minibatches |
 | `--lr X` | `learning_rate` | 10⁻⁴ | Startlernrate; die adaptive Regel passt sie danach an |
@@ -337,7 +337,7 @@ kern/build/kern_lehrer --spielen-ueben play.onnx --iterations 300 --envs 32 --ou
 ```
 
 Warmstart von `play.onnx`, Aktionsrauschen 0,1 (`--uebungs-std`), 20 Iterationen nur Kritiker, dann
-PPO mit der Belohnung der Spielschicht ([Kapitel 14.8](14-lehrer.md#148-die-spielschicht-lernen)). Alle
+PPO mit der Belohnung der Spielschicht (Abschnitt 14.8 in [Kapitel 14](14-lehrer.md)). Alle
 20 Iterationen misst es das Netz in 16 sauberen Episoden und schreibt `play_geuebt_it0020.onnx` usw.
 sowie `--out`.
 
@@ -365,7 +365,7 @@ Kerns eigene Netze haben feste Dateinamen: `jump.onnx` und `play.onnx` (`KERN_PO
 2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät (IndexedDB
    „kern-lehrer“). Das Studio lädt es beim Start und übernimmt jedes neue sofort, auch in offenen
    Tabs. Das gilt für den Sprung (die Seite trainiert keine Spielschicht).
-3. **Prüfen:** Micro-Duck-Level öffnen, Play, Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
+3. **Prüfen:** Micro-Duck-Level öffnen, Play, **F8** (Ente übernehmen), Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
    (Spielschicht: Autonomous und Kern extras an, Ball oder Socke in Sicht). Die Browser-Konsole meldet
    „Kern: trained network jump.onnx loaded“ für ein Netz aus dem Lehrer und eine Warnung, wenn eine
    Datei nicht lädt.
@@ -562,7 +562,7 @@ Aus `docs/lehrer.md`:
   jetzt misst der Lehrer sie bei jedem Lauf in der aktuellen Physik (`bite_spot`).
 - **Determinismus brechen.** Ein `std::sin` statt `kern::dm::sin`, eine Summe in Thread-Reihenfolge
   oder `-ffast-math` – und das Netz ist auf einem anderen Gerät ein anderes
-  ([Kapitel 14.7](14-lehrer.md#147-determinismus)). `kern_lehrer --fingerprint 400` gegen
+  (Abschnitt 14.7 in [Kapitel 14](14-lehrer.md)). `kern_lehrer --fingerprint 400` gegen
   `tests/determinism_fingerprint.txt` zeigt es.
 - **Andere Physik als das Studio.** Weniger Sub-Steps, ein anderer Boden, ein anderes Servoprofil:
   Das Netz lernt dann eine andere Welt. Der Lehrer nutzt deshalb dieselbe `GameWorld` und dieselben

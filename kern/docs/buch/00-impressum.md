@@ -6,7 +6,7 @@
 
 **Autor, Herausgeber und Rechteinhaber (Selbstverlag):** Christian Heinrich Hohlfeld\
 Gerhart-Hauptmann-Weg 5, 78464 Konstanz, Deutschland\
-ORCID: [0009-0003-6634-9045](https://orcid.org/0009-0003-6634-9045)\
+ORCID: 0009-0003-6634-9045\
 E-Mail: chris.hohlfeld@gmail.com
 
 ISBN 9798164877255 (Hardcover)

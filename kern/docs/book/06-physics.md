@@ -1,6 +1,6 @@
 # 6 Physics
 
-Kern simulates rigid bodies with [Box3D](https://github.com/erincatto/box3d), Erin Catto's 3D
+Kern simulates rigid bodies with Box3D, Erin Catto's 3D
 successor to Box2D v3. Box3D sits unmodified under `third_party/box3d` and is compiled into the same
 WebAssembly module as the renderer and the game runtime. On top of it sits a thin C++ layer,
 `kern::physics` (`include/kern/physics/physics.h`, `src/physics/physics.cpp`). It is the **only
@@ -650,8 +650,8 @@ soldier players and makes their bodies kinematic for that ([Chapter 8](08-game-r
 ### Fixed time step
 
 Box3D **never gets a variable dt**. The step rate is a level setting (`WorldSettings::step_hz`,
-default 60 Hz, allowed 15..480 Hz; never use coarser than 30 Hz). `GameWorld::step` follows Glenn
-Fiedler's accumulator ([Fix Your Timestep](https://gafferongames.com/post/fix_your_timestep/)):
+default 60 Hz, allowed 15..480 Hz; never use coarser than 30 Hz). `GameWorld::step` follows the accumulator
+from Glenn Fiedler's article "Fix Your Timestep!":
 
 ```cpp
 const f64 h = 1.0 / clamp(level_.world.step_hz, 15.0f, 480.0f);
@@ -672,7 +672,7 @@ const f32 alpha = accumulator_ / h;                       // remainder for inter
 - **Inputs apply per fixed step.** Controllers that compute less often (a policy at 50 Hz) count
   steps, not seconds.
 - Identical inputs thus yield a bit-for-bit identical run
-  ([Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/)).
+  (Glenn Fiedler's article "Deterministic Lockstep").
 
 ### Interpolation when drawing
 
@@ -751,7 +751,7 @@ a ragdoll preset.** The rules rest on three sources: Erin Catto's own documentat
 
 | Rule | Why |
 |---|---|
-| Do not hang heavy bodies from light ones; keep neighboring masses within about 10:1. | Extreme ratios lead to "joint stretching" (Box2D v2.4 `docs/loose_ends.md`, `box3d:docs/loose_ends.md:133-134`). Erin Catto's solution for a tank at 467:1: make light parts heavier and heavy parts lighter ([Discussion #132](https://github.com/erincatto/box3d/discussions/132)). |
+| Do not hang heavy bodies from light ones; keep neighboring masses within about 10:1. | Extreme ratios lead to "joint stretching" (Box2D v2.4 `docs/loose_ends.md`, `box3d:docs/loose_ends.md:133-134`). Erin Catto's solution for a tank at 467:1: make light parts heavier and heavy parts lighter (discussion #132 in Box3D's GitHub project). |
 | A rigid part is **one** body with several shapes. **No-go:** welding bodies together. | "the approximate solver cannot hold many bodies together rigidly" (`box3d:docs/simulation.md:1523-1526`). Kern welds children that have only a mesh into the nearest ancestor with a body as shapes. |
 | Give light links a minimum mass instead of tweaking the solver. | The duck's 5 g hip brackets weigh at least 20 g at real size (×64 at S = 4). |
 

@@ -21,7 +21,7 @@ how the repository is organized. It ends with a reading guide for the book.
 
 ## 1.1 What Kern Is
 
-Kern grew out of [SpawnCity](https://spawncity.de), a game that renders through Kern. The repository
+Kern grew out of SpawnCity, a game that renders through Kern. The repository
 contains the engine together with its commit history from SpawnCity, restricted to the engine files.
 The engine itself knows nothing about SpawnCity; games are written against the engine API only.
 

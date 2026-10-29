@@ -1,6 +1,6 @@
 # 6 Physik
 
-Kern simuliert starre Körper mit [Box3D](https://github.com/erincatto/box3d), Erin Cattos
+Kern simuliert starre Körper mit Box3D, Erin Cattos
 3D-Nachfolger von Box2D v3. Box3D liegt unverändert unter `third_party/box3d` und wird in dasselbe
 WebAssembly-Modul übersetzt wie Renderer und Spiel-Laufzeit. Darüber liegt eine schmale C++-Schicht,
 `kern::physics` (`include/kern/physics/physics.h`, `src/physics/physics.cpp`). Sie ist die **einzige
@@ -9,7 +9,7 @@ Stelle**, an der Kern mit Box3D spricht.
 Dieses Kapitel beschreibt diese Schicht vollständig: Welt, Körper, Formen, Materialien, Gelenke,
 Abfragen, Kontakte, den Maus-Griff und den Character Mover. Danach folgen Zeitschritt, Sub-Steps und
 Determinismus, die verbindlichen Regeln aus `docs/physics.md` und am Ende das Servomodell
-(`game/servo.cpp`), auf dem der Micro Duck in [Kapitel 13](13-micro-duck.md) läuft.
+(`game/servo.cpp`), auf dem die Micro Duck in [Kapitel 13](13-micro-duck.md) läuft.
 
 Eine Grundregel vorweg, weil sie alles Weitere prägt: **Box3D wird nie an Kerns Bedürfnisse
 angepasst.** Weder der Quelltext noch seine Konstanten werden verändert, und Kern verstellt keine
@@ -73,7 +73,7 @@ Die Spiel-Laufzeit setzt das beim Aufbau durch: Formen bewegter Körper werden a
 Kantenlänge (Kugeln: 5 mm Radius) angehoben, statische dürfen bis 2 mm dünn sein
 (`add_shape` in `src/game/runtime.cpp`).
 
-*[gemessen]* Der Micro Duck in echter Größe (Glieder von 2–4 cm): Der Rumpf sank innerhalb von
+*[gemessen]* Die Micro Duck in echter Größe (Glieder von 2–4 cm): Der Rumpf sank innerhalb von
 10 Frames 9 cm durch die Beine, selbst mit verschweißten Gelenken. In 4-facher Größe halten die
 Gelenke.
 
@@ -372,7 +372,7 @@ Die Schlüssel werden nur geschrieben, wenn sie nicht leer sind. Beim Aufbau üb
 Im Details-Panel gibt es (Stand dieses Codes) kein eigenes Feld für die Oberfläche; sie wird im
 Leveldokument gesetzt.
 
-Der Micro Duck nutzt alle drei ([Kapitel 13](13-micro-duck.md)):
+Die Micro Duck nutzt alle drei ([Kapitel 13](13-micro-duck.md)):
 
 - Die Klumpen der Socke (`micro_duck_sock_actors`) sind `cloth`.
 - Die gedruckten Pads des Schnabels (Hull-Collider mit Reibung > 0, die keine Sohlen sind) sind `tpu`.
@@ -656,8 +656,8 @@ Charakter- und Soldaten-Spieler ein und macht deren Körper dafür kinematisch
 
 Box3D bekommt **nie ein variables dt**. Die Schrittrate ist eine Level-Einstellung
 (`WorldSettings::step_hz`, Standard 60 Hz, erlaubt 15..480 Hz; nie gröber als 30 Hz verwenden).
-`GameWorld::step` folgt dem Akkumulator nach Glenn Fiedler
-([Fix Your Timestep](https://gafferongames.com/post/fix_your_timestep/)):
+`GameWorld::step` folgt dem Akkumulator aus Glenn Fiedlers Artikel
+„Fix Your Timestep!“:
 
 ```cpp
 const f64 h = 1.0 / clamp(level_.world.step_hz, 15.0f, 480.0f);
@@ -679,7 +679,7 @@ const f32 alpha = accumulator_ / h;                       // Rest für die Inter
 - **Eingaben gelten pro festem Schritt.** Steuerungen, die seltener rechnen (eine Policy mit
   50 Hz), zählen Schritte, nicht Sekunden.
 - Gleiche Eingaben ergeben damit Bit für Bit denselben Ablauf
-  ([Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/)).
+  (Glenn Fiedlers Artikel „Deterministic Lockstep“).
 
 ### Interpolation beim Zeichnen
 
@@ -760,7 +760,7 @@ vollständig zusammengestellt, jede mit ihrem Grund.
 
 | Regel | Warum |
 |---|---|
-| Schwere Körper nicht an leichten aufhängen; Nachbarmassen innerhalb von etwa 10:1. | Extreme Verhältnisse führen zu „joint stretching“ (Box2D v2.4 `docs/loose_ends.md`, `box3d:docs/loose_ends.md:133-134`). Erin Cattos Lösung für einen Panzer mit 467:1: leichte Teile schwerer, schwere leichter machen ([Diskussion #132](https://github.com/erincatto/box3d/discussions/132)). |
+| Schwere Körper nicht an leichten aufhängen; Nachbarmassen innerhalb von etwa 10:1. | Extreme Verhältnisse führen zu „joint stretching“ (Box2D v2.4 `docs/loose_ends.md`, `box3d:docs/loose_ends.md:133-134`). Erin Cattos Lösung für einen Panzer mit 467:1: leichte Teile schwerer, schwere leichter machen (Diskussion #132 im GitHub-Projekt von Box3D). |
 | Ein starres Teil ist **ein** Body mit mehreren Shapes. **No-Go:** Bodies zusammenschweißen. | „the approximate solver cannot hold many bodies together rigidly“ (`box3d:docs/simulation.md:1523-1526`). Kern schweißt Kinder, die nur ein Mesh haben, als Shapes in den nächsten Vorfahren mit Body ein. |
 | Leichten Gliedern eine Mindestmasse geben, statt den Solver zu verstellen. | Die 5-g-Hüftbügel der Ente wiegen in echter Größe mindestens 20 g (×64 bei S = 4). |
 
@@ -967,7 +967,7 @@ realer starrer Körper, und Box3D gewinnt damit Energie (`add_armature`).
 Physikschritten: Die Ziele laufen durch eine Warteschlange und erreichen `servo_target` erst
 `delay` Schritte später (bei 100 Hz und S = 4: 20 ms echt = 4 Schritte).
 
-Wie der Micro Duck daraus läuft, steht in [Kapitel 13](13-micro-duck.md); wie Profile gemessen und
+Wie die Micro Duck daraus läuft, steht in [Kapitel 13](13-micro-duck.md); wie Profile gemessen und
 angepasst werden, in [Kapitel 16](16-kalibrierung.md).
 
 ---

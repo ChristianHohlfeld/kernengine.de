@@ -22,11 +22,11 @@ All paths are relative to the repository root unless stated otherwise.
 | Lehrer in the WebAssembly module | `node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm` | one PPO iteration through the C ABI, fingerprint |
 | Browser test | `node kern/tests/e2e/studio_e2e.mjs <base-url>` | Studio, Play, Simulate, export, phone |
 
-The shortest path to a running Studio and green tests (from `README.md`):
+The shortest path to a running Studio and green tests (after `README.md`):
 
 ```sh
-# wasi-sdk 25 (Linux x86_64)
-curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz | tar xz -C /opt
+# wasi-sdk 25 (Linux x86_64): unpack wasi-sdk-25.0-x86_64-linux.tar.gz from the releases
+# of the GitHub project WebAssembly/wasi-sdk into /opt
 export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
 
 tools/build_studio.sh                 # Kern Studio as a single file -> generated/studio.html
@@ -51,13 +51,13 @@ the editor (further values according to its header comment: `physicsLab`, `shoot
 
 ## 2.2 The Toolchain: wasi-sdk 25
 
-Kern requires [wasi-sdk](https://github.com/WebAssembly/wasi-sdk), **release 25**: clang, wasm-ld,
+Kern requires wasi-sdk (GitHub project WebAssembly/wasi-sdk), **release 25**: clang, wasm-ld,
 wasi-libc and libc++ for the target `wasm32-wasip1`. Emscripten is not used.
 
 - The environment variable `WASI_SDK` points to the installation directory. Without it,
   `kern/build.sh` assumes `/opt/wasi-sdk`.
 - CI downloads `wasi-sdk-25.0-x86_64-linux.tar.gz` from GitHub and extracts it with
-  `--strip-components=1` into `/home/runner/wasi-sdk` (see [2.10](#210-ci-in-detail)).
+  `--strip-components=1` into `/home/runner/wasi-sdk` (see Section 2.10).
 - For native builds (tests, Lehrer) a normal host compiler is enough (GCC or Clang; Apple clang on
   macOS).
 - `tools/build_studio.sh` additionally needs `python3`; the Node tests need Node (CI uses Node 22);
@@ -68,7 +68,7 @@ wasi-libc and libc++ for the target `wasm32-wasip1`. Emscripten is not used.
 ## 2.3 `kern/build.sh` – The WebAssembly Module
 
 ```
-kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] <out.wasm> [compiler flags / game sources...]
+kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] [--commercial] <out.wasm> [compiler flags / game sources...]
 ```
 
 ### Components
@@ -83,8 +83,13 @@ switches add:
 | `--app` | the app runtime `kern/src/app` for games written against `kern::App`; the host is `kern/web/app.mjs` | – |
 | `--physics` | Box3D (`kern/third_party/box3d`, as C17) and `kern/src/physics` | – |
 | `--game` | levels, actors, components, game runtime, procedural city (`kern/src/game`) | `--physics` |
-| `--studio` | Kern Studio (`kern/src/studio`) and its C ABI | `--game` |
-| `--lehrer` | the headless Lehrer (`kern/src/lehrer`) and its C ABI for Web Workers | `--game` |
+| `--studio` | Kern Studio (`kern/src/studio`) and its C ABI | `--game`, `--physics` |
+| `--lehrer` | the headless Lehrer (`kern/src/lehrer`) and its C ABI for Web Workers | `--game`, `--physics` |
+
+`--commercial` adds nothing; it leaves out what may not be used commercially: Pollen Robotics' Micro
+Duck 3D models (CC BY-NC-SA 4.0). The script then compiles with `-DKERN_NO_NONCOMMERCIAL_ASSETS`;
+the module contains no Pollen model, and the duck's links have no look
+(`kern/src/game/builtin_meshes.cpp`).
 
 ### Further Arguments
 
@@ -170,7 +175,7 @@ engine's objects, there is a cache:
   simple and safe, as the comment in the script puts it.
 - **ThinLTO:** cache in `$KERN_OBJ_CACHE/thinlto`.
 
-CI keeps the cache between runs (see [2.10](#210-ci-in-detail)).
+CI keeps the cache between runs (see Section 2.10).
 
 ---
 
@@ -181,6 +186,7 @@ tools/build_studio.sh [--skip-wasm] [out.html]     (default: generated/studio.ht
 ```
 
 1. `kern/build.sh --studio generated/kern_studio.wasm` – engine, Box3D, game runtime, Studio.
+   If the environment variable `KERN_COMMERCIAL` is set, `--commercial` is added (Section 2.3).
    With `--skip-wasm` this step is skipped; the module must then already exist, otherwise the script
    exits with `missing …/kern_studio.wasm (run without --skip-wasm)`.
 2. A Python part assembles the page:
@@ -251,7 +257,7 @@ kern/tests/run.sh micro_duck                 # only tests whose name contains "m
    `-fno-sanitize-recover=undefined` turns undefined behavior into an abort.
 4. The test program `kern_tests` runs in the `kern/tests` folder with the script's arguments.
 5. **Only when run without arguments** does the logic export test follow (see
-   [2.7](#27-logic-tests-three-tiers-one-result)).
+   Section 2.7).
 
 Environment variables: `CXX`/`CC` (default `c++`/`cc`), `KERN_TEST_OUT` (output folder, default
 `$TMPDIR/kern-tests`), `KERN_JOBS`.
@@ -438,7 +444,7 @@ older runs of a pull request are canceled. On `main`, every push runs to complet
 green state is published (according to the comment, a run takes about 17 minutes).
 Permissions: `contents: write` (for the push to `gh-pages`).
 
-### Job `native` (ubuntu-latest, 30 min)
+### Job `native` (ubuntu-24.04, 30 min)
 
 ```yaml
 - name: Native unit tests (ASan/UBSan)
@@ -459,7 +465,7 @@ All unit tests with sanitizers, followed by the logic export test.
 The Lehrer, built with Apple clang on ARM and `-mcpu=native`, must move the duck exactly as GCC on
 x86 and WebAssembly do.
 
-### Job `build` (ubuntu-latest, 30 min)
+### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
 2. **wasi-sdk 25** from the cache (`wasi-sdk-25.0`), otherwise downloaded to `/home/runner/wasi-sdk`.
@@ -473,21 +479,23 @@ x86 and WebAssembly do.
    kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
    kern/build.sh --lehrer generated/kern_lehrer.wasm
    for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+   python3 -I tools/kern_notices.py --check
    ```
 
-   `node --check` verifies the syntax of all JavaScript files.
+   `node --check` verifies the syntax of all JavaScript files, `kern_notices.py --check` whether the
+   license notices in `kern.mjs` (`KERN_NOTICES`) are up to date.
 5. **Lehrer in WebAssembly:** `node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm`. Via
    the C ABI, the test creates two ducks as collectors and one learner for `jump` (setting
    `{"steps":8}`), checks the recipe's imitation rounds (8 rounds of 96 episodes each), runs part of a
    DAgger round and one imitation round, collects a rollout, learns one PPO iteration, exports ONNX
    and compares the fingerprint with the reference file.
-6. **Logic JIT:** as in [2.7](#27-logic-tests-three-tiers-one-result).
+6. **Logic JIT:** as in Section 2.7.
 7. **Assemble the site** in `_site/`:
 
    | Target | Source |
    |---|---|
-   | `index.html` | `site/index.html` |
-   | `LICENSE.txt`, `LICENSES.txt` | `LICENSE` (root) and `kern/LICENSES.md`; the start page's footer links both |
+   | `*.html`, `img/`, `fonts/` if present | `site/*.html` (start page, Impressum, Datenschutz), `site/img`, `site/fonts` if present |
+   | `LICENSE.txt`, `LICENSES.txt`, `LICENSING.txt` | `LICENSE` (root), `kern/LICENSES.md` and, if present, `LICENSING.md`; the start page's footer links them |
    | `editor/index.html` | `generated/studio.html`, prefixed with the comment `<!--BUILD_SHA:<sha>-->` |
    | `editor/build.json` | `{"sha":"<sha>"}` for the update check of the installable editor |
    | `editor/` | `site/editor/` (manifest, service worker, icons) |
@@ -505,14 +513,12 @@ x86 and WebAssembly do.
 ### Job `deploy` (`main` only, no pull request; needs `build`)
 
 Downloads the `site` artifact, creates a fresh Git repository in it with the branch `gh-pages`,
-commits everything as `Pages: <sha>` and force-pushes (`-f`) to `gh-pages`. The `pages` group does
+writes the file `CNAME` (custom domain `kernengine.de`), commits everything as `Pages: <sha>` and
+force-pushes (`-f`) to `gh-pages`. The `pages` group does
 not cancel a push in progress; only the most recent waiting one follows. The site appears at
 <https://kernengine.de/>.
 
-Note: `README.md` still mentions a separate `pages.yml`. The repository contains only `ci.yml`;
-publishing is done there by the `deploy` job.
-
-### Job `e2e` (ubuntu-latest, 30 min; needs `build`)
+### Job `e2e` (ubuntu-24.04, 30 min; needs `build`)
 
 1. Downloads the `site` artifact and restores from it `generated/studio.html`,
    `generated/kern_studio.wasm` and the app files (`manifest.webmanifest`, `sw.js`, `build.json`,
@@ -523,7 +529,7 @@ publishing is done there by the `deploy` job.
    `NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771`.
 4. Uploads `artifacts/e2e/` as the artifact `e2e-screenshots` (also on failure; if the folder is
    missing or empty, this is ignored). The step does not set `KERN_E2E_SHOTS`; screenshots are only
-   produced when the variable is set ([2.8](#28-the-browser-test-e2e)).
+   produced when the variable is set (Section 2.8).
 
 ---
 
@@ -573,12 +579,12 @@ The development pages load their files relatively: `kern/web/studio/index.html` 
 | `<name> source contains '</script'; cannot inline it` | a JS source contains `</script` | avoid the string in the source (e.g. split it) |
 | Test build aborts on a warning | `run.sh` compiles with `-Werror` | fix the warning; `build.sh` is more tolerant, the tests are not |
 | Abort with `runtime error:` / `AddressSanitizer` | UBSan/ASan found a bug | the report names file and line; reproduce it in isolation with a filter (`run.sh <name>`) |
-| `first differing tick: N`, or the `diff` against the fingerprint fails | the simulation computes in a platform-dependent way or was changed | see [2.9](#29-the-determinism-fingerprint) |
+| `first differing tick: N`, or the `diff` against the fingerprint fails | the simulation computes in a platform-dependent way or was changed | see Section 2.9 |
 | Logic test `runs in "interpreter"` instead of `compiled (WebAssembly)` | JIT unavailable or module not compilable | check the JIT output; the engine falls back to the interpreter (`logic JIT failed …` in the console) |
 | Every small header edit rebuilds everything | intended: header hash in the cache key | – |
 | Browser test hangs at `openStudio` | page not served or module missing; the test waits up to 90 s for `KernStudio.frames() > 5` | start the server in the repository root, build `generated/` |
 | Playwright import fails | package not found | `npm install playwright` (CI: 1.56.0) and set `NODE_PATH`, as in CI |
-| Lehrer page locally without a module | paths are laid out for the published structure | assemble the site as in [2.10](#job-build-ubuntu-latest-30-min) |
+| Lehrer page locally without a module | paths are laid out for the published structure | assemble the site as in Section 2.10 (job `build`) |
 
 ---
 

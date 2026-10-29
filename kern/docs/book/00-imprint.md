@@ -6,7 +6,7 @@
 
 **Author, publisher and rights holder (self-published):** Christian Heinrich Hohlfeld\
 Gerhart-Hauptmann-Weg 5, 78464 Konstanz, Germany\
-ORCID: [0009-0003-6634-9045](https://orcid.org/0009-0003-6634-9045)\
+ORCID: 0009-0003-6634-9045\
 Email: chris.hohlfeld@gmail.com
 
 © 2026 Christian Heinrich Hohlfeld. All rights reserved.
@@ -32,7 +32,7 @@ by the rights holder.
 **Third-party components.** Kern uses, and this book describes, Box3D (Erin Catto, MIT), Earcut
 (Mapbox, ISC), musl math (MIT), Intel XeGTAO (MIT), three.js (MIT) and the Micro Duck's robot
 model, policies and ported software by Pollen Robotics (Apache 2.0). They remain under their own
-licenses; the license texts are in [Appendix D](D-licenses.md). Kern Studio shows the duck with
+licenses; the license texts are in [Appendix D](D-licences.md). Kern Studio shows the duck with
 Pollen's 3D models (CC BY-NC-SA 4.0, non-commercial); they are neither included nor shown in this
 book. The pictures of the duck in this book, including the Studio screenshots, were made with the
 author's own design and do not show Pollen's 3D models.
@@ -63,4 +63,4 @@ provisions, in particular product liability law.
 | **Part I – The Engine** | [1 Introduction](01-introduction.md) · [2 Building and Testing](02-building-and-testing.md) · [3 Foundations](03-foundations.md) · [4 Graphics](04-graphics.md) · [5 Scene and Geometry](05-scene-and-geometry.md) · [6 Physics](06-physics.md) · [7 Audio](07-audio.md) · [8 Game Runtime](08-game-runtime.md) · [9 Logic](09-logic.md) · [10 Networking](10-networking.md) |
 | **Part II – Using Kern** | [11 Kern Studio](11-studio.md) · [12 Your Own Games](12-your-own-games.md) |
 | **Part III – Robots and Learning** | [13 The Micro Duck](13-micro-duck.md) · [14 The Lehrer](14-lehrer.md) · [15 Training Your Own Models](15-your-own-models.md) · [16 Calibration](16-calibration.md) · [17 Reference](17-reference.md) |
-| **Appendices – Background** | [A Neural Networks and Reinforcement Learning](A-neural-networks.md) · [B Real-Time Rendering](B-rendering.md) · [C Physics Simulation](C-physics.md) · [D Licenses](D-licenses.md) · [About the Author](E-about-the-author.md) |
+| **Appendices – Background** | [A Neural Networks and Reinforcement Learning](A-neural-networks.md) · [B Real-Time Rendering](B-rendering.md) · [C Physics Simulation](C-physics.md) · [D Licenses](D-licences.md) · [About the Author](E-about-the-author.md) |

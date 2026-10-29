@@ -10,7 +10,7 @@ engine: the same renderer, the same physics, the same platform layer.
 | **C** From JavaScript via the C ABI | `kern/web/kern.mjs`, `kern/web/studio/game.mjs` | your own page that drives the module | existing JavaScript projects (like SpawnCity), embedding Studio levels in your own pages |
 
 There is also a hybrid: logic graphs from Studio can be exported as C++ and built into a module
-([12.4.3](#1243-logic-graphs-as-c)).
+(Section 12.4.3).
 
 Paths are relative to the root directory of the repository; the engine lives there in the `kern/` folder.
 
@@ -24,7 +24,7 @@ operate the individual panels is described in [Chapter 11](11-studio.md).
 
 ### Step 1: A new level
 
-1. Open Studio (https://kernengine.de/editor/ or `generated/studio.html`).
+1. Open Studio (at https://kernengine.de/ under `/editor/`, or `generated/studio.html`).
 2. **File › New Level...**, template **Basic**, **Create**. The level has a ground (40 × 40 m), sun, sky
    and a cube.
 3. In **World Settings**, set the **Level name** and the **Game title**, for example "Orb Garden".
@@ -127,7 +127,7 @@ backs up unsaved work in the browser and offers it on the next start.
 3. Studio downloads `Orb_Garden.html` and offers **Play it**.
 
 The file contains the engine, the level and the game host. It runs offline, from `file://`, from any web
-server and on phones with touch sticks. How to publish it is described in [12.6](#126-publishing).
+server and on phones with touch sticks. How to publish it is described in Section 12.6.
 
 ![An exported game in the browser](../buch/bilder/game.png)
 
@@ -375,7 +375,7 @@ The accompanying page (`kern/examples/hello/index.html`) is short:
 
 ### 12.2.4 Building
 
-You need [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) release 25; the CI downloads it from GitHub.
+You need wasi-sdk (GitHub project WebAssembly/wasi-sdk) release 25; the CI downloads it from GitHub.
 
 ```sh
 export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
@@ -585,7 +585,7 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
    add `--physics` ([Chapter 6](06-physics.md)); if you need levels and the game runtime, `--game`
    ([Chapter 8](08-game-runtime.md)).
 3. Serve the folder together with `kern/web/kern.mjs` and `kern/web/app.mjs` from a web server
-   ([12.5](#125-hosting-with-webappmjs)).
+   (Section 12.5).
 
 ---
 
@@ -718,7 +718,7 @@ if (game.status.hud?.status === "won") showMyWinScreen();
 
 `gameInput` knows `moveX`, `moveY`, `up`, `jump`, `boost`, `fire`, `aim`, `reload`, `crouch`, `interact`,
 `lookX` and `lookY`. The values add to keyboard, touch and gamepad input. All commands are listed in
-[Chapter 11](11-studio.md#11192-the-c-abi-kern_studio_) and [Chapter 17](17-reference.md).
+Section 11.19.2 in [Chapter 11](11-studio.md) and [Chapter 17](17-reference.md).
 
 The Studio C ABI is the same one Studio itself works with. If you do not want the facade, call
 `kern_studio_init`, `kern_studio_command`, `kern_studio_frame` and so on directly; `StudioEngine` in
@@ -771,7 +771,7 @@ An exported Studio game needs none of this: it is a single file that also runs f
 > with a link is enough) and keeps the copyright notices. The names "Kern" and "Kern Studio" and the
 > logo are not part of the license: "Made with Kern" is fine, calling your own product "Kern" is not
 > (`TRADEMARKS.md`). Third-party components keep their own licenses (`kern/LICENSES.md`,
-> [Appendix D](D-licenses.md)).
+> [Appendix D](D-licences.md)).
 >
 > **Exception:** the Studio module and every game exported from it contain Pollen Robotics' Micro
 > Duck 3D models (CC BY-NC-SA 4.0, non-commercial). For a game that is sold or used commercially,
@@ -790,7 +790,7 @@ controls.
 - **With the Micro Duck:** put the folders `microduck/` (Pollen's networks from
   `kern/third_party/microduck/*.onnx`) and `policies/` (`kern/policies/*.onnx`) next to the HTML file;
   otherwise every movement except walking is missing
-  ([Chapter 11](11-studio.md#1114-loading-policies-jumponnx-playonnx)). The license of `microduck/`
+  (Section 11.14 in [Chapter 11](11-studio.md)). The license of `microduck/`
   (`kern/third_party/microduck/LICENSE`) and the `NOTICE` go with it. A game with the duck's look is
   non-commercial (see the rights note in 12.6).
 - **Online game:** the address with `?host=<room>` opens the game as host, `?join=<room>` joins. For
@@ -800,7 +800,7 @@ controls.
 
 ### C++ games
 
-Upload what [12.5](#125-hosting-with-webappmjs) shows: the HTML page, the `.wasm`, and `kern/web/kern.mjs`
+Upload what Section 12.5 shows: the HTML page, the `.wasm`, and `kern/web/kern.mjs`
 as well as `kern/web/app.mjs` with the same relative paths. Kern itself publishes to GitHub Pages this
 way; the CI (`.github/workflows/ci.yml`) shows the complete process:
 

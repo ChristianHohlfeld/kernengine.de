@@ -20,7 +20,7 @@ zusammenhängen und wie das Repository aufgebaut ist. Am Ende steht eine Leseanl
 
 ## 1.1 Was Kern ist
 
-Kern ist aus [SpawnCity](https://spawncity.de) entstanden, einem Spiel, das über Kern rendert. Das
+Kern ist aus SpawnCity entstanden, einem Spiel, das über Kern rendert. Das
 Repository enthält die Engine mit ihrer Commit-Historie aus SpawnCity, beschränkt auf die
 Engine-Dateien. Die Engine selbst kennt SpawnCity nicht; Spiele werden nur gegen die Engine-API
 geschrieben.

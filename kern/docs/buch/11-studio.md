@@ -8,7 +8,7 @@ Viewport, und ein fertiges Level wird mit einem Klick zu einer einzigen HTML-Dat
 Das Besondere an Studio steckt unter der Oberfläche: Die gesamte Editorlogik ist C++ und läuft im selben
 WebAssembly-Modul wie Renderer, Box3D-Physik und Spiel-Laufzeit. Was man im Viewport sieht, rendert und
 simuliert genau der Code, der später das exportierte Spiel ausführt. Die Browserseite zeichnet nur Panels
-und reicht Eingaben weiter (Abschnitt [11.19](#1119-architektur)).
+und reicht Eingaben weiter (Abschnitt 11.19).
 
 Dieses Kapitel ist das Benutzerhandbuch. Wie man daraus ein eigenes Spiel macht, zeigt
 [Kapitel 12](12-eigene-spiele.md); die Logik-Graphen beschreibt [Kapitel 9](09-logik.md), die Physik
@@ -28,7 +28,7 @@ Es gibt drei Wege, Studio zu öffnen:
 
 | Weg | Was man tut | Wofür |
 |---|---|---|
-| Live | https://kernengine.de/editor/ öffnen | sofort loslegen, auch auf Telefon und Tablet |
+| Live | auf https://kernengine.de/ den Pfad `/editor/` öffnen | sofort loslegen, auch auf Telefon und Tablet |
 | Eine Datei | `tools/build_studio.sh` bauen, dann `generated/studio.html` öffnen | offline, ohne Server; die Datei enthält alles |
 | Entwicklung | Repository statisch ausliefern, `kern/web/studio/index.html` öffnen | am Studio selbst arbeiten (lädt `generated/kern_studio.wasm`) |
 
@@ -49,7 +49,7 @@ die Engine-Doku, das Impressum und die Datenschutzerklärung.
    **Start fresh** an, um stattdessen mit Orb Run neu zu beginnen.
 4. Hatte die letzte Sitzung ungespeicherte Änderungen, fragt Studio
    **Restore "…" from your last session?** mit **Restore** und **Dismiss** (Abschnitt
-   [11.15](#1115-speichern-laden-autosave-und-einstellungen)).
+   Abschnitt 11.15).
 
 Mit **Play** (Alt+P) fährt man in Orb Run sofort los.
 
@@ -71,6 +71,18 @@ Unter `/editor/` ist Studio eine installierbare Web-App:
 - Unten rechts in der Statusleiste steht die laufende Version, mit Hinweis, wenn online eine neuere
   bereitliegt.
 
+### Sprache
+
+Studio zeigt seine Oberfläche auf Deutsch oder Englisch. Ohne Vorgabe folgt es der Sprache des
+Browsers. Der Knopf **DE | EN** unten rechts in der Statusleiste wechselt sie; die Seite lädt dann neu,
+das Level bleibt über den Autosave erhalten. `?lang=de` bzw. `?lang=en` in der Adresse legt die Sprache
+ebenso fest; Studio merkt sich die Wahl auf dem Gerät. Übersetzt wird nur die Anzeige: Produkt- und
+Levelnamen bleiben englisch, Eingaben, Actor-Namen und das Output Log bleiben unverändert
+(`kern/web/studio/game.mjs`). Exportierte Spiele folgen ebenso der Sprache des Browsers bzw. `?lang=`.
+
+Dieses Buch nennt Menüs und ihre Einträge so, wie Studio sie auf Deutsch zeigt, mit dem englischen
+Namen in Klammern, etwa **Datei** (File).
+
 ---
 
 ## 11.2 Die Oberfläche im Überblick
@@ -83,7 +95,7 @@ Unter `/editor/` ist Studio eine installierbare Web-App:
 | Outliner | rechts oben | alle Actors als Baum mit Ordnern, Suche, Sichtbarkeit |
 | Details / World Settings | rechts unten | Eigenschaften der Auswahl bzw. der Welt, als zwei Tabs |
 | Content Drawer | unten, ein- und ausklappbar | Place Actors, Textures, Sounds, Output Log |
-| Statusleiste | ganz unten | Content Drawer, Output Log, Konsole, Statusmeldung, Physik-Statistik, Ton, Pegel, Auswahl, Version |
+| Statusleiste | ganz unten | Content Drawer, Output Log, Konsole, Statusmeldung, Physik-Statistik, Ton, Sprache, Pegel, Auswahl, Version |
 
 Die Trennlinie zwischen Viewport und Seitenleiste lässt sich ziehen (mindestens 240 px, höchstens 60 %
 der Fensterbreite), ebenso die zwischen Outliner und Details. Studio merkt sich beide Größen und ob der
@@ -106,7 +118,7 @@ Menüzeilen 40 px hoch. Esc schließt jedes Menü.
 | Save | Ctrl+S | speichern (beim ersten Mal mit Dateidialog) |
 | Save As... | Ctrl+Shift+S | unter neuem Namen speichern |
 | Import Texture... | | Bild (PNG, JPEG, WebP) als Textur ins Level holen |
-| Package Game (HTML)... | | Spiel als eine HTML-Datei exportieren ([11.16](#1116-spiel-exportieren)) |
+| Package Game (HTML)... | | Spiel als eine HTML-Datei exportieren (Abschnitt 11.16) |
 | Example Levels ▸ | | Orb Run, Physics Lab, Shooting Range, Micro Duck, Basic, Empty |
 
 Die Vorlagen im Dialog **New Level** (ein Doppelklick auf eine Karte erstellt sofort):
@@ -117,7 +129,7 @@ Die Vorlagen im Dialog **New Level** (ein Doppelklick auf eine Karte erstellt so
 | Physics Lab | jedes Box3D-Gelenk: Scharnier, Schiene, Rad, Seilbrücke, Motor, Stapel |
 | Shooting Range | Ego-Shooter-Soldat (Desktop, Gamepad, Touch), Ziele, Deckung, mehrspielerfähig |
 | Micro Duck | Pollen Robotics' Laufroboter auf seinem trainierten Netz, läuft selbstständig mit ToF und Kamera |
-| Basic | Boden, Sonne und Himmel, ein sauberer Anfang |
+| Basic | Boden, ein Würfel (Cube), Sonne und Himmel, ein sauberer Anfang |
 | Empty | gar nichts |
 
 Hat das aktuelle Level ungespeicherte Änderungen, weist der Dialog darauf hin, dass sie im Autosave
@@ -137,7 +149,7 @@ bleiben, bis man das neue Level bearbeitet.
 | Deselect | Esc | Auswahl aufheben |
 | Group | Ctrl+G | Auswahl unter einen neuen Actor „Group" hängen |
 | Snap to Floor | End | Auswahl auf den Boden setzen |
-| Preferences... | | Kamera, Maus, Raster (Tabelle in [11.15](#1115-speichern-laden-autosave-und-einstellungen)) |
+| Preferences... | | Kamera, Maus, Raster (Tabelle in Abschnitt 11.15) |
 | Reset Settings to Defaults... | | alle Editor-Einstellungen zurücksetzen |
 
 **Window**
@@ -145,7 +157,7 @@ bleiben, bis man das neue Level bearbeitet.
 | Eintrag | Kürzel | Wirkung |
 |---|---|---|
 | Viewport Layout ▸ | | 1, 2 oder 4 Viewports |
-| Viewport Type ▸ | Alt+G, Alt+J, Alt+K, Alt+H | Perspective, Top, Bottom, Left, Right, Front, Back (für den aktiven Viewport) |
+| Viewport Type ▸ | Alt+G / J / K / H | Perspective (Alt+G), Top (Alt+J), Bottom, Left, Right (Alt+K), Front (Alt+H), Back (für den aktiven Viewport) |
 | View Mode ▸ | Alt+4, Alt+3, Alt+2, Alt+5 | Lit, Unlit, Wireframe, Player Collision |
 | Show ▸ | | Grid, Icons, Selection Outline, Collision Shapes, Constraints, Contact Points, Bounds, Fog, Sky, Stats, Robot Camera |
 | Game View | G | alle Editor-Helfer im aktiven Viewport aus |
@@ -158,7 +170,7 @@ bleiben, bis man das neue Level bearbeitet.
 
 | Eintrag | Kürzel | Wirkung |
 |---|---|---|
-| Play | Alt+P | spielen ([11.11](#1111-play-und-simulate)) |
+| Play | Alt+P | spielen (Abschnitt 11.11) |
 | Simulate | Alt+S | Physik laufen lassen, Kamera frei |
 | Pause / Resume | Pause | anhalten / fortsetzen |
 | Advance One Frame | . | einen Schritt weiter (nur pausiert) |
@@ -166,7 +178,7 @@ bleiben, bis man das neue Level bearbeitet.
 | Eject from Player / Possess Player | F8 | Spieler verlassen / übernehmen |
 | Restart Game | Ctrl+R | Spiel neu starten |
 | Keep Simulation Changes | K | simulierte Posen der Auswahl ins Level übernehmen |
-| Number of Players ▸ | | 1 Player bis 4 Players (listen server) ([11.17](#1117-multiplayer)) |
+| Number of Players ▸ | | 1 Player bis 4 Players (listen server) (Abschnitt 11.17) |
 | Network Emulation ▸ | | Perfect, LAN (5 ms), Average (50 ms, 1% loss), Bad (150 ms, 5% loss), Terrible (300 ms, 20% loss) |
 | Host Online Game... | | Spiel über das Netz anbieten |
 | Join Online Game... | | einem angebotenen Spiel beitreten |
@@ -190,7 +202,7 @@ Von links nach rechts:
 |---|---|---|
 | Diskette | Ctrl+S | speichern |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | der Tooltip nennt den Schritt |
-| **+ Add ▾** | | Menü mit allen Katalog-Gruppen ([11.8](#118-content-drawer-und-eingebaute-inhalte)); während Play gesperrt |
+| **+ Add ▾** | | Menü mit allen Katalog-Gruppen (Abschnitt 11.8); während Play gesperrt |
 | Select / Move / Rotate / Scale | Q / W / E / R | Werkzeug wählen |
 | Globus bzw. Würfel | Ctrl+` | Gizmo in Welt- oder lokalen Achsen |
 | Raster-Knopf + Auswahl | [ / ] | Grid-Snap an/aus, Rastergröße 1 cm bis 100 m |
@@ -204,9 +216,9 @@ Von links nach rechts:
 | Stop | Esc | anhalten und zurück zum Bearbeiten |
 | Eject | F8 | Spieler verlassen / übernehmen |
 | Layout | | 1, 2 oder 4 Viewports |
-| **Logic** | | Logik-Graph des Levels öffnen ([11.10](#1110-der-logik-editor)) |
+| **Logic** | | Logik-Graph des Levels öffnen (Abschnitt 11.10) |
 | Paket | | Package Game |
-| Panels | | nur auf schmalen Bildschirmen: Outliner, Details, World als Blatt ([11.18](#1118-schmale-bildschirme-und-telefone)) |
+| Panels | | nur auf schmalen Bildschirmen: Outliner, Details, World als Blatt (Abschnitt 11.18) |
 
 ### 11.2.3 Viewports
 
@@ -307,6 +319,7 @@ werden deshalb genauso geprüft und begrenzt, als kämen sie aus einer `.klevel`
 | Statusmeldung | letzte Meldung des Editors |
 | Statistik | während Simulate/Play: Bodies, wache Bodies, Gelenke (davon gebrochen), Kontakte; online zusätzlich Rolle, Spieler, Ping, Verlust, Datenrate |
 | Lautsprecher | Ton an/aus |
+| Sprachknopf (DE, EN) | Sprache der Oberfläche (Abschnitt 11.1) |
 | Pegel | Ausgangspegel links/rechts |
 | Auswahl | „*n* of *m* selected" oder Anzahl der Actors |
 | Version | laufender Build |
@@ -316,7 +329,7 @@ Konsolenbefehle (`help` listet sie):
 | Befehl | Wirkung |
 |---|---|
 | `play`, `simulate`, `stop` | wie die Knöpfe |
-| `spawn <item>` | Katalog-Element platzieren, z. B. `spawn physics_cube` (IDs in [11.8](#118-content-drawer-und-eingebaute-inhalte)) |
+| `spawn <item>` | Katalog-Element platzieren, z. B. `spawn physics_cube` (IDs in Abschnitt 11.8) |
 | `select <name>` | alle Actors auswählen, deren Name den Text enthält |
 | `tod <0..1>` | Tageszeit setzen |
 | `gravity <x y z>` | Schwerkraft setzen (ohne Werte: 0 0 −9,80665) |
@@ -481,9 +494,9 @@ Die Spieltasten selbst:
 | C oder Ctrl links | ducken |
 | F | benutzen (Interact) |
 | Mausrad | Spielkamera zoomen |
-| 1–7, V | Bewegungen der Micro Duck ([11.13](#1113-die-micro-duck-steuern)) |
+| 1–7, V | Bewegungen der Micro Duck (Abschnitt 11.13) |
 
-Gamepads und Touch-Steuerung beschreibt [11.12](#1112-mobil-touch-und-gamepad).
+Gamepads und Touch-Steuerung beschreibt Abschnitt 11.12.
 
 ### 11.4.3 Logik-Editor
 
@@ -516,7 +529,7 @@ und F1 erreichen das Level.
 | Linksklick | auswählen; Shift ergänzt, Ctrl schaltet um |
 | Klick ins Leere | Auswahl aufheben (ohne Shift/Ctrl) |
 | Linke Maustaste ziehen | Rahmenauswahl; Shift ergänzt, Ctrl schaltet um |
-| Outliner | siehe [11.2.4](#1124-outliner) |
+| Outliner | siehe Abschnitt 11.2.4 |
 
 Linkes Ziehen bewegt nie die Kamera und nie einen Actor, auch nicht, wenn man auf einem Actor anfängt;
 es zeichnet immer ein Auswahlrechteck (der Actor, auf dem man begann, gehört dann dazu). Actors bewegt
@@ -654,7 +667,7 @@ der Änderungen ab, nie vom Timing. Studio hält bis zu 500 Schritte.
 
 - **Edit › History...** zeigt alle Schritte; ein Klick springt zu diesem Stand.
 - Aufeinanderfolgende Änderungen derselben Eigenschaft innerhalb eines Ziehvorgangs sind ein Schritt
-  ([11.2.5](#1125-details)).
+  (Abschnitt 11.2.5).
 - Eine Änderung, die nichts ändert, erzeugt keinen Schritt.
 - Während Play und Simulate ist das Level gesperrt: „Stop playing to edit the level".
 
@@ -768,7 +781,7 @@ Level.
 | *Game* | |
 | Game title | Titel im HUD und im exportierten Spiel |
 | Player (controlled in Play) | welcher Actor gesteuert wird |
-| Observer camera | Play startet mit freier Kamera: fliegen, zuschauen, Körper ziehen ([11.11.4](#11114-observer-camera)) |
+| Observer camera | Play startet mit freier Kamera: fliegen, zuschauen, Körper ziehen (Abschnitt 11.11.4) |
 | Win condition | None (sandbox), Collect all pickups, Reach a goal trigger, Survive the time limit, Reach a target score |
 | Time limit (0 = none) | Sekunden |
 | Target score | Punkte für „Reach a target score" |
@@ -834,9 +847,10 @@ Ein Beispiel, wie es der Browser-Test bedient: Basic-Level, **Logic**, **Begin P
 „then" einen Draht ins Leere ziehen, „show message" tippen, Enter, Text eintragen, **Viewport**, einen
 Rolling Ball platzieren, **Play**: Das HUD zeigt den Text.
 
-Beim Start von Play oder Simulate kompiliert Kern jeden Graphen zu WebAssembly-Maschinencode; Graphen mit
-Fehlern lassen Play nicht starten. **C++** lädt den Graphen als lesbaren C++-Quelltext herunter, der in
-ein Spiel gebaut als nativer Code läuft ([Kapitel 12](12-eigene-spiele.md#1243-logik-graphen-als-c)).
+Beim Start von Play oder Simulate kompiliert Kern jeden Graphen zu WebAssembly-Maschinencode; ist ein Graph
+als C++ ins Spiel eingebaut, läuft dieser Code statt des JIT. Ein Graph mit Fehlern wird beim Start
+abgeschaltet und als „Logic error: …“ gemeldet; der Rest des Levels läuft weiter. **C++** lädt den Graphen als lesbaren C++-Quelltext herunter, der in
+ein Spiel gebaut als nativer Code läuft (Abschnitt 12.4.3 in [Kapitel 12](12-eigene-spiele.md)).
 Mit F9 gesetzte Breakpoints halten das Spiel an, sobald der Knoten läuft. Alle Knoten, Variablen, State
 Machines, die Bedienung im Detail und die drei Ausführungsstufen beschreibt [Kapitel 9](09-logik.md).
 
@@ -986,7 +1000,7 @@ Bedienung im Studio.
 **Das Beispiel-Level** (File › Example Levels › Micro Duck): ein Zimmer in ihrem Maßstab mit Möbeln, einem
 Ball und zwei Socken. Die Ente läuft autonom. Schon ohne Zusätze spielt sie Ball wie in Pollens
 ursprünglicher Runtime (BallPlay: hinlaufen, ausrichten, mit links kicken); mit eingeschaltetem
-**Kern extras** (im Beispiel-Level an) spielt stattdessen Kerns Spielschicht mit Ball und Socken. Der Level-Blueprint lässt sie quaken, sobald ihre Kopfkamera den Ball sieht. Play startet mit
+**Kern extras** (im Beispiel-Level an) spielt stattdessen Kerns Spielschicht mit Ball und Socken. Der Level-Blueprint lässt sie zwitschern (Knoten **Chirp**), sobald ihre Kopfkamera den Ball sieht. Play startet mit
 der Observer camera: Man schaut zu und kann den Ball mit Maus oder Finger anheben; F8 übernimmt die Ente.
 
 **Ohne Eingabe** läuft die Ente selbstständig (Details › Player Controller › Walker › **Autonomous**): Sie
@@ -1009,7 +1023,7 @@ wieder auf. Hebt man sie am Rumpf hoch, pausiert sie (Robot State „Held“) un
 | **7** | **springen** – Kerns eigene Bewegung aus `jump.onnx` |
 | V | „Wheee"-Fahrt, solange gehalten |
 
-**Touch:** die Knöpfe aus [11.12.2](#11122-play-auf-touch-geräten). **HOP** ist der Sprung (Taste 7),
+**Touch:** die Knöpfe aus Abschnitt 11.12.2. **HOP** ist der Sprung (Taste 7),
 **QUACK** quakt, **WHEEE** startet die Fahrt, die übrigen entsprechen den Tasten 1–6.
 
 **Gamepad:** RT quakt, LT startet die Wheee-Fahrt (beide öffnen dabei den Schnabel), B setzt sich hin bzw.
@@ -1060,9 +1074,9 @@ ersetzt damit das mitgelieferte, ohne dass man eine Datei kopiert.
 
 Beim Veröffentlichen kopiert die CI die Netze nach `editor/microduck/` und `editor/policies/`. Wer ein
 exportiertes Spiel mit Ente selbst hostet, legt diese beiden Ordner neben die HTML-Datei
-([11.16](#1116-spiel-exportieren)). Zu `microduck/` gehören die Lizenz (`kern/third_party/microduck/LICENSE`)
+(Abschnitt 11.16). Zu `microduck/` gehören die Lizenz (`kern/third_party/microduck/LICENSE`)
 und die NOTICE; ein Spiel mit dem Aussehen der Ente ist nur nicht kommerziell nutzbar
-([Kapitel 12](12-eigene-spiele.md)).
+(Abschnitt 12.6 in [Kapitel 12](12-eigene-spiele.md)).
 
 ---
 
@@ -1153,7 +1167,7 @@ als ein Inline-Modul und das Level als JSON. Sie braucht keinen Server und kein 
 `file://`. Beim Start lädt sie das Modul im Spieler-Modus (`kern_studio_init(…, player_only = 1)`): kein
 Editor, nur das Level, sofort im Play. Das Modul enthält Pollens 3D-Modelle der Micro Duck
 (CC BY-NC-SA 4.0, nicht kommerziell), außer es wurde kommerziell gebaut (`KERN_COMMERCIAL=1
-tools/build_studio.sh`); siehe [Kapitel 12](12-eigene-spiele.md).
+tools/build_studio.sh`); siehe Abschnitt 12.6 in [Kapitel 12](12-eigene-spiele.md).
 
 ![Das exportierte Orb Run als eigenständige HTML-Datei](bilder/game.png)
 
@@ -1161,14 +1175,14 @@ tools/build_studio.sh`); siehe [Kapitel 12](12-eigene-spiele.md).
 
 | Eingabe | Wirkung |
 |---|---|
-| W A S D / Pfeile, Leertaste, Shift, Maus | wie in Play ([11.4.2](#1142-play-und-simulate)) |
+| W A S D / Pfeile, Leertaste, Shift, Maus | wie in Play (Abschnitt 11.4.2) |
 | Klick | fängt die Maus für den Maus-Look |
 | Esc | gibt die Maus frei und pausiert („Paused – Click to continue") |
 | P | Pause |
 | R oder Enter nach Sieg/Niederlage, **Play again** | neu starten |
 | Ctrl+R | neu starten |
 | F8 | bei Observer camera: Spieler übernehmen und zurück |
-| Gamepad | wie in [11.12.3](#11123-gamepad) |
+| Gamepad | wie in Abschnitt 11.12.3 |
 | Touch | Sticks und Knöpfe wie in Play, oben links ein ↻ zum Neustart |
 
 Unten steht ein Hinweis mit der Tastenbelegung, auf Touch-Geräten ausgeblendet.
@@ -1177,13 +1191,13 @@ Unten steht ein Hinweis mit der Tastenbelegung, auf Touch-Geräten ausgeblendet.
 
 **Online spielen mit der exportierten Datei:** Die Datei versteht drei Parameter in der Adresse:
 `?host=<raum>` bietet ein Spiel an, `?join=<raum>` tritt bei, `&relay=ws://…` nutzt ein Relay für andere
-Rechner ([11.17](#1117-multiplayer)). Scheitert der Verbindungsaufbau, spielt man allein weiter.
+Rechner (Abschnitt 11.17). Scheitert der Verbindungsaufbau, spielt man allein weiter.
 
-**Was nicht in der Datei steckt:** Die nachladbaren Netze der Micro Duck ([11.14](#1114-policies-laden-jumponnx-playonnx)).
+**Was nicht in der Datei steckt:** Die nachladbaren Netze der Micro Duck (Abschnitt 11.14).
 Das Laufen funktioniert ohne sie, weil `velstand.onnx` eingebaut ist. Für Sitzen, Kicken, Springen und die
 Spielschicht gehören die Ordner `microduck/` und `policies/` neben die HTML-Datei. Zu `microduck/` gehören
 die Lizenz (`kern/third_party/microduck/LICENSE`) und die NOTICE; ein Spiel mit dem Aussehen der Ente ist
-nur nicht kommerziell nutzbar ([Kapitel 12](12-eigene-spiele.md)).
+nur nicht kommerziell nutzbar (Abschnitt 12.6 in [Kapitel 12](12-eigene-spiele.md)).
 
 ---
 
@@ -1247,8 +1261,8 @@ kompaktes Layout:
 - Bis 900 px Breite blendet die Toolbar Raster-, Winkel- und Skalierungsauswahl sowie den Achsen-Knopf aus,
   die Statusleiste Konsole und Physik-Statistik.
 - Der Content Drawer belegt höchstens knapp die halbe Höhe.
-- Menüs öffnen Untermenüs an Ort und Stelle mit Zurück-Zeile ([11.2.1](#1121-menüleiste)).
-- Play füllt den ganzen Bildschirm mit EXIT und PAUSE ([11.12.2](#11122-play-auf-touch-geräten)).
+- Menüs öffnen Untermenüs an Ort und Stelle mit Zurück-Zeile (Abschnitt 11.2.1).
+- Play füllt den ganzen Bildschirm mit EXIT und PAUSE (Abschnitt 11.12.2).
 - Die Seite scrollt nie seitwärts.
 
 ![Studio in einem 820 px breiten Fenster](bilder/studio-narrow.png)

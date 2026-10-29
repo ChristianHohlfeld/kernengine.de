@@ -827,7 +827,7 @@ Test: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 ## 8.14 Walker
 
 Ein Walker ist ein gelenkiger Roboter, der auf seinen eigenen Servos läuft, getrieben von einer
-Steuer-Policy – der Micro Duck mit dem trainierten Netz von Pollen Robotics. Die GameWorld legt beim
+Steuer-Policy – die Micro Duck mit dem trainierten Netz von Pollen Robotics. Die GameWorld legt beim
 Start für jeden Walker-Controller einen Controller-Zustand an (`create_walkers`), treibt ihn jeden
 Schritt (`drive_walkers`: Sensoren, Verhalten, Netz alle vier Physikschritte, Kommandoverzögerung)
 und die Servos (`drive_servos`). Dazu gibt es eine große Schnittstelle für Sensoren, Befehle,

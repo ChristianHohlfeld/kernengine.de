@@ -108,7 +108,7 @@ fourth component $w$, and the hardware then divides by $w$ (**perspective divisi
 
 $$P = \begin{pmatrix} f/a & 0 & 0 & 0\\ 0 & f & 0 & 0 \\ 0 & 0 & \frac{f_\text{ar}+n}{n - f_\text{ar}} & \frac{2 f_\text{ar} n}{n - f_\text{ar}} \\ 0 & 0 & -1 & 0\end{pmatrix},\qquad f = \frac{1}{\tan(\text{fov}/2)}.$$
 
-- fov: vertical field of view (Kern: $\pi/3$, i.e. 60°),
+- fov: vertical field of view (Kern: $\pi/3$, i.e. 60°; Kern Studio's viewports use 70°),
 - $a$: aspect ratio width/height,
 - $n$, $f_\text{ar}$: near and far clipping planes (Kern: 0.05 m and 1800 m).
 
@@ -469,7 +469,7 @@ front of it.
   shadow casters stay the same, the map is reused (`RenderStats::shadow_reused`).
 - **Depth only:** `colorMask(0, 0, 0, 0)`, an empty fragment shader, target `DEPTH_COMPONENT24`.
 - **Triple bias:** when generating, `polygonOffset(2, 3)` (shifts the depth depending on the slope of
-  the triangle); when sampling, `uSunShadowBias` (default 0.0012) and a **normal offset** (Holbert
+  the triangle); when sampling, `uSunShadowBias` (default 0.0012, in Studio and exported games 0.0014) and a **normal offset** (Holbert
   2011): the lookup happens one texel off the surface along its normal, more where the light grazes
   it. This avoids acne without a large constant bias detaching the shadow from the object.
 - **Hardware PCF:** the depth texture has `TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE` and
@@ -861,8 +861,10 @@ flowchart LR
 - Data flow **without being copied into JavaScript objects**: `bufferData` passes `self.u8` (a view
   onto the WASM memory) with offset and length; `uniformMatrix4fv` reads directly from `self.f32`.
   After the memory grows, the views are renewed (`refresh`).
-- The WebGL2 context is created without antialiasing and without alpha (`antialias: false, alpha:
-  false`) – Kern renders into its own targets and composites itself.
+- `KernRenderer` creates the WebGL2 context without antialiasing and without alpha (`antialias: false,
+  alpha: false`) – Kern renders into its own targets and composites itself. Exception: Kern Studio
+  and exported games create their context themselves and request `antialias: true`
+  (`web/studio/studio.mjs`, `web/studio/game.mjs`).
 
 ### B.12.3 Why this way
 

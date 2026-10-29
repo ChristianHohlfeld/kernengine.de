@@ -364,7 +364,7 @@ struct Quat {
 };
 ```
 
-`axis_angle` computes with `kern::dm::sin` and `kern::dm::cos` ([3.4](#34-deterministic-math-dmathh))
+`axis_angle` computes with `kern::dm::sin` and `kern::dm::cos` (Section 3.4)
 so that rotations that feed into the simulation produce the same bits everywhere.
 
 ### `Mat4`
@@ -452,7 +452,7 @@ struct Camera {
 - `projection_matrix(c, aspect)` chooses `perspective` or `ortho`.
 
 The view-projection matrix is obtained as in `screen_ray` (see
-[3.1](#the-error-channel-fail-and-last_error)):
+Section 3.1):
 
 ```cpp
   const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);

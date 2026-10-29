@@ -307,10 +307,12 @@ Für jeden Client baut `server_send_snapshots` einen eigenen Snapshot:
      der lokale Pawn.
    - `kUnpawn`, `kAlive`, `kSpawn` (mit der ID des Servers), `kProperty` (`set_property`).
 3. **Unzuverlässiges:**
-   - `kSnapshot`: **Uhrabgleich** – die Stichprobe Serverzeit − lokale Zeit; der Versatz folgt
-     größeren Stichproben langsam (2 %), kleineren schnell (20 %), denn die kleinste Verzögerung ist
-     die ehrlichste. HUD und Soldatenzustand übernehmen; jede Entität bekommt eine Stichprobe
-     (verspätete und doppelte werden verworfen, höchstens 32 je Entität).
+   - `kSnapshot`: **Uhrabgleich** – die Stichprobe ist Serverzeit − lokale Empfangszeit; je länger ein
+     Paket unterwegs war, desto kleiner ist sie. Der Versatz folgt kleineren Stichproben schnell (20 %),
+     größeren langsam (2 %), hält sich also an die am stärksten verspäteten Pakete. So liegt die
+     Renderzeit (Schritt 5) eher zu weit zurück als zu weit vorn: Auch bei schwankender Verzögerung
+     gibt es meist eine Stichprobe nach der Renderzeit, und die Interpolation muss nicht extrapolieren.
+     HUD und Soldatenzustand übernehmen; jede Entität bekommt eine Stichprobe (verspätete und doppelte werden verworfen, höchstens 32 je Entität).
    - `kShots`, `kCues`: in die Listen der Welt – dort zeichnet bzw. spielt sie der Client wie lokal
      erzeugte.
 4. **Eingabe** jeden Netz-Tick: die aktuelle Eingabe mit Blickrichtung der Kamera vorn in die

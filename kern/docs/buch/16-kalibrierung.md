@@ -33,7 +33,7 @@ in den Code zu schreiben.
 ## 16.1 Das Servomodell
 
 Ein Positionsservo wie der Dynamixel XL330 wird so simuliert, mit derselben Funktion
-`game::servo_step` im Studio, im Lehrer und auf dem Prüfstand ([Kapitel 13.4](13-micro-duck.md#134-das-servo-modell)):
+`game::servo_step` im Studio, im Lehrer und auf dem Prüfstand (Abschnitt 13.4 in [Kapitel 13](13-micro-duck.md)):
 
 ```
 Moment = clamp(K · (Ziel − Winkel), −T, T) − D · Geschwindigkeit
@@ -138,7 +138,7 @@ time,target,angle
 `simulate_servo(profile, log)` baut den Servo mit seiner Last in Box3D, in derselben Umgebung wie die
 Ente:
 
-- **dieselbe Skalierung** (Maßstab 4, Froude-Faktoren wie in [Kapitel 13.3](13-micro-duck.md#133-das-modell)),
+- **dieselbe Skalierung** (Maßstab 4, Froude-Faktoren wie in Abschnitt 13.3 in [Kapitel 13](13-micro-duck.md)),
 - **dieselbe Schrittrate** (100 Hz Welt, 16 Sub-Steps; ein Schritt = 5 ms echt),
 - **dieselbe Gelenkweichheit** wie die Servogelenke der Ente (Constraint 240 Hz, Dämpfungsgrad 2),
 - ein fester Sockel, ein Glied mit Masse und Schwerpunkt der Last, Trägheit der Last plus Armatur wie
@@ -163,7 +163,7 @@ kern_lehrer --kalibrieren steps.csv,chirp.csv --profil start.json --iterations 1
   K, D, F, T, A als **Logarithmus ihres Verhältnisses** zum Start (eine Einheit = Faktor e, begrenzt
   auf ±4), die Verzögerung in Einheiten von 10 ms (0 … 0,2 s). Im Log-Raum sind alle sechs
   Koordinaten gleich skaliert, wie CMA-ES es braucht.
-- **Suche:** CMA-ES ([Kapitel 14.6](14-lehrer.md#146-nachahmen-vorbilder-und-cma-es)) mit σ = 0,5,
+- **Suche:** CMA-ES (Abschnitt 14.6 in [Kapitel 14](14-lehrer.md)) mit σ = 0,5,
   Population 12, standardmäßig 80 Generationen (`--iterations` ändert das). Kosten: RMS-Fehler über
   alle Anpassungs-Logs zusammen (jedes Log nach seiner Länge gewichtet). Die Kandidaten einer
   Generation laufen auf `--threads` Threads.
@@ -240,8 +240,9 @@ ein Gelenk auffällig, fehlt dort etwas im Modell, etwa Getriebespiel.
 
 Test `lehrer_replays_robot_logs_against_the_simulation`: Ein Log aus der Simulation
 (`simulated_robot_log`, im Test 120 Takte: velstand steht 50 Takte und geht dann mit 0,15 m/s
-vorwärts; ab Takt 150 dreht es zusätzlich mit 0,6 rad/s), abgespielt mit denselben Servos, ergibt Abstand **0** – Bit für Bit, weil die
-Simulation deterministisch ist ([Kapitel 14.7](14-lehrer.md#147-determinismus)). Mit anderen Servos
+vorwärts; die Drehung mit 0,6 rad/s, die `simulated_robot_log` ab Takt 150 hinzufügt, kommt erst in
+längeren Logs vor, etwa den 250 Takten von `--beispiele`), abgespielt mit denselben Servos, ergibt Abstand **0** – Bit für Bit, weil die
+Simulation deterministisch ist (Abschnitt 14.7 in [Kapitel 14](14-lehrer.md)). Mit anderen Servos
 ergibt es einen messbaren Abstand.
 
 Weil die Simulation auf jeder Plattform deterministisch ist, ist ein Unterschied zu einem echten Log
@@ -264,7 +265,7 @@ Bewegungen (`--task`).
 ## 16.5 Domänen-Randomisierung
 
 Was nicht gemessen ist oder streut, variiert das Training. Die vollständigen Bereiche stehen in
-[Kapitel 14.3](14-lehrer.md#143-die-umgebung-der-ente); hier nach ihrer Rolle für Sim-to-Real
+Abschnitt 14.3 in [Kapitel 14](14-lehrer.md); hier nach ihrer Rolle für Sim-to-Real
 geordnet:
 
 | Unsicherheit | Wie das Training sie abdeckt |
@@ -280,7 +281,7 @@ geordnet:
 | Spielzeug (Spielschicht) | Ballradius 3,5–6 cm, Masse 15–50 g, Rollwiderstand 0,01–0,05 |
 
 Der Kritiker sieht dabei immer den sauberen Zustand; nur der Actor, der auf den Roboter kommt, sieht
-die verrauschten Sensoren (asymmetrischer Kritiker, [Kapitel 14.3](14-lehrer.md#143-die-umgebung-der-ente)).
+die verrauschten Sensoren (asymmetrischer Kritiker, Abschnitt 14.3 in [Kapitel 14](14-lehrer.md)).
 
 Getriebespiel ist nicht im Modell. Pollens Training randomisiert es (die MJCF-Varianten
 `robot_*_backlash.xml`), und velstand ist dagegen robust; Kerns eigene Netze lernen ohne.
@@ -296,7 +297,7 @@ Simulation, so wie man sie am echten Roboter messen würde:
   99 Stellen vor eine Ente, die gerade gegangen ist und steht, lässt das Aufheben mit dem
   Schnabelfenster laufen, das das Netz gezeigt bekommt, und nimmt die Stelle, die mit ihren Nachbarn
   am zuverlässigsten hält. Das geschieht einmal pro Prozess vor dem ersten Training; keine
-  Bissposition steht als Zahl im Code ([Kapitel 14.8](14-lehrer.md#148-die-spielschicht-lernen)).
+  Bissposition steht als Zahl im Code (Abschnitt 14.8 in [Kapitel 14](14-lehrer.md)).
 - **Der Nachlauf nach „Stopp“** (`--halt-messen`): wie weit die Ente aus einer langsamen Gangart
   noch geht. Hier ist die Regel noch nicht ganz umgesetzt: Das Vorbild der Spielschicht trägt den mit
   `--halt-messen` gemessenen Wert als Konstante ein (`kCoastM`, 0,7 cm aus 0,12 m/s); nach einer
@@ -308,7 +309,7 @@ Simulation, so wie man sie am echten Roboter messen würde:
 
 Die **Paar-Reibung** der Oberflächen (TPU-Schnabelpolster auf Baumwolle 0,8, Baumwolle auf Baumwolle
 0,5, Baumwolle auf Holzboden 0,4) ist dagegen eingetragen: Haftreibungswerte trockener Materialpaare,
-im Code mit ihren typischen Bereichen begründet ([Kapitel 13.3](13-micro-duck.md#133-das-modell)).
+im Code mit ihren typischen Bereichen begründet (Abschnitt 13.3 in [Kapitel 13](13-micro-duck.md)).
 Sie sind Kandidaten für eine Messung am echten Material.
 
 ## 16.7 Grenzen und nächste Schritte
@@ -318,7 +319,7 @@ Sie sind Kandidaten für eine Messung am echten Material.
 - **Getriebespiel** fehlt im Servomodell. Der Abgleich zeigt, ob es fehlt; dann bekommt `servo_step`
   einen Spielbereich.
 - **Armatur** ist eine mitdrehende Scheibe, kein Rotor mit Übersetzung; dreht sich das Elternglied um
-  dieselbe Achse, ist die Trägheit etwas zu groß ([Kapitel 13.3](13-micro-duck.md#133-das-modell)).
+  dieselbe Achse, ist die Trägheit etwas zu groß (Abschnitt 13.3 in [Kapitel 13](13-micro-duck.md)).
 - **Bekannte Lücke:** `kick_right` kippt in Kern nach dem Tritt manchmal um. Kandidaten: Spiel,
   Kontaktweichheit, Fußreibung – ein Fall für den Abgleich mit einem Roboter-Log.
 - **IMU:** Rauschen und Latenz stehen in der Variation des Trainings (`Task::Noise`). Ein eigenes

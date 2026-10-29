@@ -35,7 +35,7 @@ itself rather than written into the code as numbers.
 
 A position servo such as the Dynamixel XL330 is simulated as follows, with the same function
 `game::servo_step` in the Studio, in the Lehrer and on the test bench
-([Section 13.4](13-micro-duck.md#134-the-servo-model)):
+(Section 13.4 in [Chapter 13](13-micro-duck.md)):
 
 ```
 torque = clamp(K · (target − angle), −T, T) − D · velocity
@@ -140,7 +140,7 @@ time,target,angle
 `simulate_servo(profile, log)` builds the servo with its load in Box3D, in the same environment as
 the duck:
 
-- **the same scaling** (scale 4, Froude factors as in [Section 13.3](13-micro-duck.md#133-the-model)),
+- **the same scaling** (scale 4, Froude factors as in Section 13.3 in [Chapter 13](13-micro-duck.md)),
 - **the same step rate** (100 Hz world, 16 sub-steps; one step = 5 ms real),
 - **the same joint softness** as the duck's servo joints (constraint 240 Hz, damping ratio 2),
 - a fixed base, a link with the mass and center of mass of the load, inertia of the load plus
@@ -167,7 +167,7 @@ kern_lehrer --kalibrieren steps.csv,chirp.csv --profil start.json --iterations 1
   gains K, D, F, T, A as the **logarithm of their ratio** to the start (one unit = a factor of e,
   limited to ±4), the delay in units of 10 ms (0 … 0.2 s). In log space all six coordinates are
   scaled alike, as CMA-ES requires.
-- **Search:** CMA-ES ([Section 14.6](14-lehrer.md#146-imitation-demonstrations-and-cma-es)) with
+- **Search:** CMA-ES (Section 14.6 in [Chapter 14](14-lehrer.md)) with
   σ = 0.5, population 12, 80 generations by default (`--iterations` changes this). Cost: RMS error
   over all fitting logs together (each log weighted by its length). The candidates of a generation
   run on `--threads` threads.
@@ -243,9 +243,10 @@ remains conspicuous, something is missing from the model there, such as gear bac
 
 Test `lehrer_replays_robot_logs_against_the_simulation`: a log from the simulation
 (`simulated_robot_log`, 120 ticks in the test: velstand stands for 50 ticks and then walks forward at
-0.15 m/s; from tick 150 it additionally turns at 0.6 rad/s), replayed with the same servos, yields a
+0.15 m/s; the turn at 0.6 rad/s that `simulated_robot_log` adds from tick 150 on only occurs in longer
+logs, such as the 250 ticks of `--beispiele`), replayed with the same servos, yields a
 gap of **0** – bit for bit, because the simulation is deterministic
-([Section 14.7](14-lehrer.md#147-determinism)). With different servos it yields a measurable gap.
+(Section 14.7 in [Chapter 14](14-lehrer.md)). With different servos it yields a measurable gap.
 
 Because the simulation is deterministic on all platforms checked in CI, a difference from a real log is a real
 model error and not simulation noise.
@@ -267,7 +268,7 @@ friction and armature within its spreads; `--profil` affects the PPO training of
 ## 16.5 Domain randomization
 
 Whatever is not measured or varies, the training varies. The complete ranges are listed in
-[Section 14.3](14-lehrer.md#143-the-ducks-environment); here they are ordered by their role for
+Section 14.3 in [Chapter 14](14-lehrer.md); here they are ordered by their role for
 sim-to-real:
 
 | Uncertainty | How the training covers it |
@@ -283,7 +284,7 @@ sim-to-real:
 | Toys (play layer) | ball radius 3.5–6 cm, mass 15–50 g, rolling resistance 0.01–0.05 |
 
 The critic always sees the clean state; only the actor, which goes onto the robot, sees the noisy
-sensors (asymmetric critic, [Section 14.3](14-lehrer.md#143-the-ducks-environment)).
+sensors (asymmetric critic, Section 14.3 in [Chapter 14](14-lehrer.md)).
 
 Gear backlash is not in the model. Pollen's training randomizes it (the MJCF variants
 `robot_*_backlash.xml`), and velstand is robust to it; Kern's own networks learn without it.
@@ -299,7 +300,7 @@ measures them in the simulation, just as you would measure them on the real robo
   of 99 points in front of a duck that has just walked and is standing, runs the pick with the beak
   window the network is shown, and takes the point that, together with its neighbors, holds most
   reliably. This happens once per process before the first training; no bite position is in the code
-  as a number ([Section 14.8](14-lehrer.md#148-learning-the-play-layer)).
+  as a number (Section 14.8 in [Chapter 14](14-lehrer.md)).
 - **The coasting after "stop"** (`--halt-messen`): how far the duck keeps walking from a slow gait.
   Here the rule is not yet fully implemented: the play layer's demonstration enters the value
   measured with `--halt-messen` as a constant (`kCoastM`, 0.7 cm from 0.12 m/s); after a change in
@@ -311,7 +312,7 @@ measures them in the simulation, just as you would measure them on the real robo
 
 The **pair friction** of the surfaces (TPU beak pad on cotton 0.8, cotton on cotton 0.5, cotton on
 wooden floor 0.4), on the other hand, is hard-coded: static friction values of dry material pairs,
-justified in the code with their typical ranges ([Section 13.3](13-micro-duck.md#133-the-model)).
+justified in the code with their typical ranges (Section 13.3 in [Chapter 13](13-micro-duck.md)).
 They are candidates for a measurement on the real material.
 
 ## 16.7 Limits and next steps
@@ -322,7 +323,7 @@ They are candidates for a measurement on the real material.
   `servo_step` gets a backlash range.
 - **Armature** is a disc that turns with the link, not a geared rotor; if the parent link rotates
   about the same axis, the inertia is slightly too large
-  ([Section 13.3](13-micro-duck.md#133-the-model)).
+  (Section 13.3 in [Chapter 13](13-micro-duck.md)).
 - **Known gap:** in Kern, `kick_right` sometimes tips over after the kick. Candidates: backlash,
   contact softness, foot friction – a case for matching against a robot log.
 - **IMU:** noise and latency are part of the training variation (`Task::Noise`). A dedicated IMU

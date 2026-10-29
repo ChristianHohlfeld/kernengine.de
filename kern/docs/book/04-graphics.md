@@ -486,7 +486,7 @@ Kern Studio renders each viewport with its own `render()` call. A single full-sc
 |---|---|---|---|
 | `resolution` | 512 | power of two 128–4096 | edge length of the map in texels |
 | `extent` | 120 | 10–2000 | half edge length of the covered square in meters (without a shadow distance) |
-| `bias` | 0.0012 | 0 ≤ bias < 0.04 | depth offset for the comparison |
+| `bias` | 0.0012 | 0 ≤ bias < 0.04 | depth offset for the comparison (Studio and exported games: 0.0014, `kern_studio_init`) |
 | `filter` | 9 | 1, 4, 9 | PCF taps: 1 hardware tap (2 × 2), 4 taps (3 × 3 kernel), 9 taps (5 × 5 kernel) |
 
 At runtime `Renderer::set_shadow_filter(taps)` sets the filter level. The Studio page chooses it by device (`defaultShadowFilter` in `web/studio/game.mjs`, via `kern_studio_shadow_filter`): phones (coarse pointer) 4, desktop 9; `?shadowFilter=1|4|9` in the address overrides this.
@@ -720,7 +720,7 @@ The game runtime computes all of this from the time of day (`GameWorld::apply_li
 
 ### Camera
 
-`Renderer::camera` is a `Camera` from `math/math.h`: `eye`, `target`, `up` (default +Z), `fov` (default π/3), `near` 0.05, `far` 1800, optionally `orthographic` with `ortho_height`. The world is Z-up; units are meters.
+`Renderer::camera` is a `Camera` from `math/math.h`: `eye`, `target`, `up` (default +Z), `fov` (default π/3; Kern Studio's viewports use 70°, `ViewCamera::fov`), `near` 0.05, `far` 1800, optionally `orthographic` with `ortho_height`. The world is Z-up; units are meters.
 
 ## 4.11 Context Loss
 

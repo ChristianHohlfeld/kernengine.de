@@ -110,7 +110,7 @@ die Tiefe in die vierte Komponente $w$ schreiben, und die Hardware teilt anschli
 
 $$P = \begin{pmatrix} f/a & 0 & 0 & 0\\ 0 & f & 0 & 0 \\ 0 & 0 & \frac{f_\text{ar}+n}{n - f_\text{ar}} & \frac{2 f_\text{ar} n}{n - f_\text{ar}} \\ 0 & 0 & -1 & 0\end{pmatrix},\qquad f = \frac{1}{\tan(\text{fov}/2)}.$$
 
-- fov: vertikaler Öffnungswinkel (Kern: $\pi/3$, also 60°),
+- fov: vertikaler Öffnungswinkel (Kern: $\pi/3$, also 60°; die Viewports von Kern Studio haben 70°),
 - $a$: Seitenverhältnis Breite/Höhe,
 - $n$, $f_\text{ar}$: nahe und ferne Clipping-Ebene (Kern: 0,05 m und 1800 m).
 
@@ -476,7 +476,7 @@ davor.
   Schattenwerfer gleich bleiben, wird die Karte wiederverwendet (`RenderStats::shadow_reused`).
 - **Nur Tiefe:** `colorMask(0, 0, 0, 0)`, ein leerer Fragment-Shader, Ziel `DEPTH_COMPONENT24`.
 - **Bias dreifach:** beim Erzeugen `polygonOffset(2, 3)` (verschiebt die Tiefe abhängig von der
-  Neigung des Dreiecks), beim Abfragen `uSunShadowBias` (Standard 0,0012) und ein **Normal Offset**
+  Neigung des Dreiecks), beim Abfragen `uSunShadowBias` (Standard 0,0012, in Studio und exportierten Spielen 0,0014) und ein **Normal Offset**
   (Holbert 2011): Nachgeschlagen wird einen Texel von der Fläche weg entlang ihrer Normale, mehr bei
   streifendem Licht. So gibt es keine Akne, ohne dass ein großer konstanter Bias den Schatten vom
   Objekt löst.
@@ -873,8 +873,10 @@ flowchart LR
 - Daten fließen **ohne Kopie in JavaScript-Objekte**: `bufferData` übergibt `self.u8` (eine Sicht auf
   den WASM-Speicher) mit Versatz und Länge; `uniformMatrix4fv` liest direkt aus `self.f32`. Nach
   einem Speicherwachstum werden die Sichten erneuert (`refresh`).
-- Der WebGL2-Kontext wird ohne Antialiasing und ohne Alpha angelegt (`antialias: false, alpha:
-  false`) – Kern rendert in eigene Ziele und setzt selbst zusammen.
+- `KernRenderer` legt den WebGL2-Kontext ohne Antialiasing und ohne Alpha an (`antialias: false, alpha:
+  false`) – Kern rendert in eigene Ziele und setzt selbst zusammen. Ausnahme: Kern Studio und
+  exportierte Spiele erzeugen ihren Kontext selbst und fordern `antialias: true` an
+  (`web/studio/studio.mjs`, `web/studio/game.mjs`).
 
 ### B.12.3 Warum so
 
