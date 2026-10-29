@@ -163,6 +163,8 @@ async function run({name, url, context, mapped}) {
   check(h.drone && h.drone.armed, `[${name}] drone armed (state ${JSON.stringify(h.drone)})`);
   check(h.agl > 1.0, `[${name}] drone climbed: ${h.agl} m AGL`);
   await shot("2-drone");
+  check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
+  await shot("2b-drone-fpv");
   page.evaluate(() => window.SpawnCity.command("mode foot"));
 
   // Car: carjack the nearest car, drive 3 s.
@@ -174,6 +176,8 @@ async function run({name, url, context, mapped}) {
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
     await shot("3-car");
+    check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
+    await shot("3b-car-cockpit");
     await cmd("mode foot");
   }
 
@@ -199,7 +203,7 @@ async function run({name, url, context, mapped}) {
 
 try {
   const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
-  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&mute=1", mapped: true, context: {viewport: {width: 1280, height: 720}}});
+  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});
 } finally {

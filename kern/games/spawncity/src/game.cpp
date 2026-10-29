@@ -1273,6 +1273,13 @@ std::string Game::command(const std::string& cmd) {
     return "unknown mode";
   }
   if (cmd == "eject" && mode_ == Mode::jet) { eject(); return "ok"; }
+  if (cmd == "cam") {
+    // Same as C / View: the mode's next camera.
+    if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; return drone_cam_ == 0 ? "fpv" : drone_cam_ == 1 ? "follow" : "third"; }
+    if (mode_ == Mode::car) { car_cockpit_ = !car_cockpit_; return car_cockpit_ ? "cockpit" : "chase"; }
+    if (mode_ == Mode::jet) { jet_cockpit_ = !jet_cockpit_; return jet_cockpit_ ? "cockpit" : "chase"; }
+    return "none";
+  }
   if (starts("time ")) {
     world_->level();  // time of day is the world's; Kern advances it while playing
     return "ok";
