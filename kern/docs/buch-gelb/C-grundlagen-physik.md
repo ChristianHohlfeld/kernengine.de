@@ -105,14 +105,10 @@ nur kleiner macht, nie umdreht. Und Box3D begrenzt, wie schnell etwas fliegen un
 > stärker bremsen“? Diese Bremse rechnet mit dem *alten* Tempo vom Anfang des Schritts und lässt
 > diese Kraft den ganzen Schritt lang wirken, auch dann noch, wenn das Glied längst stehen müsste.
 > Bei einem sehr leichten Glied (10 g) ist das in einem Schritt viel mehr Bremse, als nötig wäre,
-> um es anzuhalten. Statt bei 0 zu stoppen, schießt es rückwärts:
->
-> ```
->   vorher:   ●──►        1 m/s vorwärts
->   nachher:  ◄───────────────●     15,7 m/s rückwärts
-> ```
->
-> Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht.
+> um es anzuhalten. Statt bei 0 zu stoppen, schießt es rückwärts, im Beispiel mit 15,7 m/s statt
+> vorher 1 m/s vorwärts. Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht.
+
+![Die selbst gebaute Bremse: Nach einem einzigen Schritt fliegt das leichte Glied schneller rückwärts, als es vorher vorwärts flog](../abbildungen/bremse-katapult.svg)
 
 ### Fester Zeitschritt
 
@@ -122,7 +118,7 @@ Fachwort dafür ist *Akkumulator*, „Sammler“). Du kennst es schon aus
 [Kapitel 6](06-physik.md), 6.13:
 
 ```mermaid
-flowchart LR
+flowchart TB
   F["Bildzeit ins Schwein"] --> L{"genug für Schritt?"}
   L -->|ja| S["Schritt rechnen, Schrittzeit herausnehmen"]
   S --> L
@@ -166,13 +162,7 @@ entlang der x-, y- und z-Achse laufen. Ob sich zwei solche Kisten überlappen, i
 geprüft: Für jede der drei Achsen schaut man, ob sich die Bereiche überlappen, das sind je zwei
 Vergleiche, zusammen sechs. Nur Paare mit überlappenden Kisten kommen in die genaue Phase.
 
-```
-  getrennt:                  überlappend:
-  ┌─────┐   ┌─────┐          ┌──────┐
-  │  ●  │   │  ▲  │          │  ●  ┌┼─────┐
-  └─────┘   └─────┘          └─────┼┘  ▲  │
-  nichts zu tun                    └──────┘ genau prüfen
-```
+![Achsenparallele Kisten: getrennt ist nichts zu tun, überlappen sie, prüft die genaue Phase](../abbildungen/aabb-grobphase.svg)
 
 Die Kisten liegen in einem Baum wie die BVH aus [Kapitel 5](05-szene-und-geometrie.md). Sie sind
 etwas größer als nötig, damit der Baum nicht bei jeder kleinen Bewegung umgebaut werden muss. Feste
@@ -184,16 +174,10 @@ konvex, ein L nicht. Für konvexe Formen gibt es schnelle, zuverlässige Tests. 
 
 > **So kannst du es dir vorstellen:** Leuchte mit einer Taschenlampe von der Seite auf zwei Formen
 > und schau dir ihre Schatten an der Wand an. Findest du eine Richtung, in der die Schatten nicht
-> überlappen, berühren sich die Formen sicher nicht.
->
-> ```
->                ▲              ┃▒ Schatten von ▲
->   Lampe ─►                    ┃    Lücke: getrennt
->                ●              ┃▒ Schatten von ●
->                              Wand
-> ```
->
-> Bei konvexen Formen reicht es, eine Handvoll Richtungen auszuprobieren.
+> überlappen, berühren sich die Formen sicher nicht (Bild unten). Bei konvexen Formen reicht es,
+> eine Handvoll Richtungen auszuprobieren.
+
+![Licht von der Seite wirft die Schatten beider Formen an die Wand; bleibt eine Lücke, sind sie getrennt](../abbildungen/trennende-achse.svg)
 
 Das Ergebnis ist ein Kontaktbericht, der **Manifold**: in welche Richtung die Berührung zeigt und an
 welchen Punkten, jeweils mit Abstand.
@@ -236,12 +220,7 @@ Physik aus der Oberstufe; hier darfst du sie einfach benutzen.
 Alle Kräfte, bei denen etwas haftet, bilden zusammen einen **Reibungskegel**. Stell dir eine
 Eistüte vor, die mit der Spitze auf dem Berührpunkt steht. Das Bild zeigt einen Schnitt durch sie:
 
-```
-     ╲    │ n  ╱      Kraft innerhalb: Haften
-      ╲   │   ╱       genau auf dem Rand: gerade noch
-       ╲  │  ╱        Kraft außerhalb: Rutschen
-   ───────●───────    Kontaktfläche
-```
+![Schnitt durch den Reibungskegel um die Richtung n: Kraft innerhalb haftet, auf dem Rand rutscht es](../abbildungen/reibungskegel.svg)
 
 n ist die Richtung, in der der Boden drückt. Eine Kraft, die steil von oben kommt, liegt in der
 Tüte: Haften. Eine Kraft, die flach schiebt, liegt außerhalb: Rutschen. Eigentlich haftet ein
@@ -379,7 +358,7 @@ Ein Servo wie der in der Micro Duck (ein Dynamixel XL330) bekommt einen **Zielwi
 tatsächlichen Winkel, vergleicht und steuert gegen, immer wieder. Das ist ein **Regelkreis**:
 
 ```mermaid
-flowchart LR
+flowchart TB
   Z["Ziel"] --> T["Verzögerung"]
   T --> E["Fehler"]
   E --> R["Regler, begrenzt"]

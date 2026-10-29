@@ -33,7 +33,7 @@ nach dem Stoppen alles wieder wie vorher.
 > umgeworfen, verschoben – und danach stellen die Bühnenarbeiter alles wieder an seinen Platz.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A[Bearbeiten] --> B[Start: Kopie anlegen, Physik bauen]
   B --> C[Schritt, Schritt, Schritt …]
   C --> D[Stopp: Kopie wegwerfen]

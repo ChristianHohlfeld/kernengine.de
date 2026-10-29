@@ -109,15 +109,9 @@ Explicitly, the amplitude grows by a factor of 3.3 per step – after ten steps 
 Semi-implicitly, $h\omega$ is above 2: likewise unstable. Implicitly, the oscillation is heavily
 damped but remains stable.
 
-```
- Amplitude
-   │  explicit  ╱╲    ╱‾‾╲
-   │      ╱╲  ╱  ╲  ╱    ╲   (grows)
-   │ ╱╲  ╱  ╲╱    ╲╱
-   │╱  ╲╱    semi-implicit: ╱╲╱╲╱╲╱╲ (stays)
-   │          implicit:     ╱╲_╱‾‾\__ (decays)
-   └────────────────────────────────── t
-```
+With a small step ($h\omega = 0.25$) the behaviour of the three methods is easy to see:
+
+![The three methods on the spring with hω = 0.25 over 50 steps: explicit grows, semi-implicit stays, implicit decays](../abbildungen/integratoren.svg)
 
 ### C.2.3 What Box3D does
 
@@ -153,7 +147,7 @@ large step, and large steps make springs unstable (C.2.2) and the result machine
 solution is Glenn Fiedler's **accumulator** ("Fix Your Timestep"):
 
 ```mermaid
-flowchart LR
+flowchart TB
   F["Frame: time dt"] --> A["accumulator += min(dt, 0.25 s)"]
   A --> L{"accumulator ≥ h?"}
   L -->|yes| S["one fixed step h; accumulator -= h"]
@@ -192,7 +186,7 @@ With $n$ bodies there are $n(n-1)/2$ pairs – with 1000 bodies almost 500,000. 
 exactly is too expensive. The work is therefore done in two phases:
 
 ```mermaid
-flowchart LR
+flowchart TB
   B["Broad phase: bounding-box tree finds candidate pairs"] --> N["Narrow phase: exact test, contact points (manifold)"]
   N --> S["Solver: contact constraints"]
 ```
@@ -227,13 +221,7 @@ there are efficient, robust methods:
 The result is a **manifold**: a contact normal and up to a few contact points, each with a distance
 (negative when penetrating).
 
-```
- GJK: Minkowski difference A − B
-       ________
-      /        \      origin outside → separated, distance = shortest path
-     /   A−B    \  ·0
-     \__________/
-```
+![GJK: if the origin lies outside the Minkowski difference A − B, the shapes are separated; the shortest path is their distance](../abbildungen/gjk.svg)
 
 ### C.3.4 Convex hulls
 
@@ -302,15 +290,7 @@ As long as the required static force is below the limit, the contact **sticks** 
 is exceeded, the contact **slides** with friction $\mu\lambda_n$ opposite to the sliding direction.
 The permitted forces form a **friction cone** around the normal with half-angle $\arctan\mu$:
 
-```
-          n
-          │      friction cone:
-     ╲    │    ╱  force inside → stick
-      ╲   │   ╱   force on the boundary → slide
-       ╲  │  ╱
-        ╲ │ ╱  arctan μ
-   ──────●──────  contact plane
-```
+![The friction cone around the normal n with half-angle arctan μ](../abbildungen/reibungskegel.svg)
 
 Physically one distinguishes static and kinetic friction ($\mu_s > \mu_k$). Box3D knows only **one**
 coefficient.
@@ -577,7 +557,7 @@ motor so that the joint reaches it. Inside, this is a **control loop**: it measu
 compares it with the target and produces a torque.
 
 ```mermaid
-flowchart LR
+flowchart TB
   Z["Target angle θ*"] --> T["Dead time (bus)"]
   T --> E["Error e = θ* − θ"]
   E --> PD["PD: K·e − D·θ̇, limited to ±T"]

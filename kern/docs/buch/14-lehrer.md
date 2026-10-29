@@ -52,15 +52,7 @@ Stand laut `docs/lehrer.md`:
 
 Der Lehrer trennt fünf Rollen, damit sie an verschiedenen Orten laufen können:
 
-```
-             Recipe ──────────► Task ──► DuckEnv / PlayEnv  (eine Ente, eine GameWorld, headless)
-               │                              ▲
-               │                              │ step(action) / observation()
-               ▼                              │
-   Ppo (Lerner) ──Policy──► Backend ──► Collector ──► Rollout
-        ▲                    (Threads | Web Worker)        │
-        └──────────────────── learn(rollouts) ◄────────────┘
-```
+![Die Rollen des Lehrers: Recipe, Task, Env, Ppo, Backend und Collector](../abbildungen/lehrer-rollen.svg)
 
 - **`Task`** sagt, was gelernt wird: Startzustand, Befehlsplätze der Beobachtung, Belohnung,
   Episodenende, Lehrpläne, privilegierte Beobachtung für den Kritiker.

@@ -112,15 +112,7 @@ nach und dreht an den Zahlen, bis beide gleich aussehen.
 
 Die Bewegungen sind drei Arten von Befehlen. So sehen sie über der Zeit aus:
 
-```
-Stufe:      ____
-                |______         plötzlich ein neues Ziel
-
-Chirp:      /\/\/\/\/\/\/\/     Hin und Her, immer schneller
-
-Rechteck:   __    __    __
-              |__|  |__|        immer hin und zurück
-```
+![Die drei Arten von Befehlen über 2,4 Sekunden: Stufen, ein immer schnellerer Chirp und ein Rechteck](../abbildungen/testsignale.svg)
 
 Die **Stufe** heißt bei Fachleuten „Sprungsignal“ – mit dem Sprung der Ente hat sie nichts zu tun.
 Der „Chirp“ (englisch für Zwitschern) beginnt langsam mit einer halben Schwingung pro Sekunde und

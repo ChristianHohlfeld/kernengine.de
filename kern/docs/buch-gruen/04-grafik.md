@@ -389,16 +389,7 @@ deckt diese Kugel ab. Warum eine Kugel und kein genau passender Kasten? Die Kart
 ausgerichtet. Dreht sich die Kamera, dreht sich ihr Sichtkegel unter der Karte – und ein Kasten, der
 ihn genau umschließt, wird mal schmal, mal breit. Die Kugel passt in jeder Richtung gleich:
 
-```
-  Kasten, Blick geradeaus   Kasten, Blick schräg     Kugel
-  +---------+               +-----------+            .-"""""-.
-  | \     / |               |    /    _.|           /\       /\
-  |  \   /  |               |   /  _.-' |          |  \     /  |
-  |   \ /   |               |  / .-'    |          |   \   /   |
-  |    K    |               | K'        |           \   \ /   /
-  +---------+               +-----------+            '-._K_.-'
-  schmal                    breit                    immer gleich
-```
+![Von oben: Ein Kasten um den Sichtkegel ändert beim Drehen seine Größe, die Kugel bleibt gleich groß](../abbildungen/schattenkugel.svg)
 
 Mit dem Kasten wüchsen und schrumpften die Kartenpunkte bei jeder Kopfdrehung, und die
 Schattenkanten zitterten. Mit der Kugel bleiben die Kartenpunkte gleich groß.
@@ -445,15 +436,7 @@ Der Himmel ist ein einziges riesiges Dreieck, das den ganzen Bildschirm bedeckt 
 liegt. Wie ein Dreieck ein Rechteck bedecken kann? Es ist so groß, dass es über den Rand hinausragt;
 was übersteht, schneidet die Grafikkarte einfach weg:
 
-```
-  |`.
-  |  `.
-  |    `.
-  +------+.
-  | Bild-| `.
-  |schirm|   `.
-  +------+-----`.
-```
+![Ein Dreieck, doppelt so breit und hoch wie der Bildschirm, bedeckt ihn ganz; was übersteht, wird weggeschnitten](../abbildungen/himmel-dreieck.svg)
 
 Kern malt es *nach* dem Undurchsichtigen. Dank Tiefenpuffer kommt es nur dort durch, wo noch nichts
 gemalt ist. Der aufwendige Himmels-Shader läuft also nur dort, wo wirklich Himmel zu sehen ist.
@@ -623,18 +606,7 @@ Zufallszahl pro Gebäude. Außerdem weiß jeder Punkt der Wand, wie viele Meter 
 Boden entfernt ist. Damit legt der Shader ein **unsichtbares Raster** über die Wand: 3 m breite Spalten
 und eine Zeile pro Stockwerk.
 
-```
-  +-------+-------+-------+-------+   ← Dachkante
-  |  [#]  |  [ ]  |  [#]  |  [#]  |   3. Stock
-  +-------+-------+-------+-------+
-  |  [ ]  |  [#]  |  [ ]  |  [#]  |   2. Stock
-  +-------+-------+-------+-------+
-  |  [#]  |  [#]  |  [ ]  |  [ ]  |   1. Stock
-  +-------+-------+-------+-------+
-  |       |       |       |       |   Erdgeschoss: keine Fenster
-  +-------+-------+-------+-------+
-    3 m     3 m     3 m     3 m       [#] leuchtet   [ ] dunkles Glas
-```
+![Das unsichtbare Raster einer Wand: 3 m breite Zellen, je ein Fenster im Mittelteil, nicht im Erdgeschoss und nicht im obersten Meter](../abbildungen/fassade-fenster.svg)
 
 Für jeden Bildpunkt einer Wand fragt der Shader:
 

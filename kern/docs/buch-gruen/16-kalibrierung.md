@@ -52,18 +52,7 @@ zusammen heißen **Profil**. Ein anderer Servo ist einfach ein anderes Profil.
 Am einfachsten stellst du dir den Servo als vier Teile vor, die zwischen dem Gelenk und seinem
 Zielwinkel sitzen:
 
-```
-  Zielwinkel                                     Gelenk
-      ●──── Feder ────────────────────────────────●
-      │     zieht zum Ziel, aber nie stärker
-      │     als der Motor kann (Kraftgrenze)
-      │
-      ●──── Stoßdämpfer ──────────────────────────●
-            bremst, je schneller es sich dreht
-
-  dazu: Reibung im Gelenk, ein schweres Schwungrad
-        innen, und Befehle, die etwas spät ankommen
-```
+![Der Servo als Feder und Stoßdämpfer zwischen Zielwinkel und Gelenk](../abbildungen/servo-modell.svg)
 
 | Eigenschaft | Bild aus dem Alltag | Was sie bewirkt |
 |---|---|---|
@@ -140,17 +129,7 @@ wie eine Hose, die du mit dicken Winterstiefeln anprobiert hast, mit Sandalen an
 
 Heraus kommen zwei Kurven:
 
-```
-  Winkel
-    │          ──────────────       ──  gemessen
-    │        ╱   • • • • • • •      •   simuliert
-    │      ╱   •
-    │    ╱   •
-    │  ╱   •
-    │╱ •
-    └─────────────────────────────► Zeit
-      Abstand = wie weit die beiden Kurven auseinanderliegen
-```
+![Gemessene und simulierte Kurve nach demselben Befehl; der Abstand zwischen ihnen ist das Fehlermaß (Kurvenform schematisch)](../abbildungen/kalibrierung-kurven.svg)
 
 Je besser das Profil, desto genauer decken sich die Kurven. Den Abstand fasst Kern in **eine Zahl**
 zusammen: den durchschnittlichen Abstand zwischen beiden Kurven, wobei große Ausreißer stärker

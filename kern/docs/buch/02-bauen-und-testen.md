@@ -432,14 +432,7 @@ Workern (insgesamt 8 Enten) und vergleicht die Netze Byte für Byte.
 Requests und manuell (`workflow_dispatch`). Die Seite wird einmal gebaut und veröffentlicht, sobald
 sie gebaut ist; native und Browser-Tests laufen parallel und halten die Veröffentlichung nicht auf.
 
-```
-          ┌──────────┐   ┌──────────────┐
- push ──▶ │ native   │   │ determinism  │      (unabhängig, parallel)
-          └──────────┘   └──────────────┘
-          ┌──────────┐
-          │ build    │──┬──▶ deploy  (nur main, kein Pull Request)
-          └──────────┘  └──▶ e2e
-```
+![Die Jobs der CI: native und determinism unabhängig, nach build folgen deploy und e2e](../abbildungen/ci-pipeline.svg)
 
 **Nebenläufigkeit:** Die Gruppe ist `ci-<ref>-pr` für Pull Requests und `ci-<ref>-<sha>` sonst;
 abgebrochen werden nur ältere Läufe eines Pull Requests. Auf `main` läuft jeder Push bis zum Ende,

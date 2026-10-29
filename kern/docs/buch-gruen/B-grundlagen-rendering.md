@@ -71,7 +71,7 @@ landet sie auf Pixeln. Jeder Schritt ist ein anderes Koordinatensystem – ein a
 für jeden Wechsel gibt es ein Rezept:
 
 ```mermaid
-flowchart LR
+flowchart TB
   M["eigene Beschreibung"] -->|"Modell-Rezept"| W["Welt"]
   W -->|"Kamera-Rezept"| K["Blick der Kamera"]
   K -->|"Projektion"| S["Bildschirm"]
@@ -92,24 +92,11 @@ Kern rechnet in **Metern**, und **Z zeigt nach oben** – x und y spannen den Bo
 
 > **Achtung, Falle!** Reihenfolge zählt! Stell dir einen Spielstein in der Mitte eines Tischs vor
 > (● ist die Tischmitte; das Rezept soll um 90° drehen und 5 m nach rechts schieben; die Spitze von
-> ▶ und ▲ zeigt, wohin der Stein schaut).
->
-> ```
->   Bild 1: erst drehen,             Bild 2: erst schieben,
->           dann schieben                    dann drehen
->
->                                      ▲  Ende
->                                      .  ·
->                                      .     ·
->                                      .       ·
->    ● ─ ─ ─ ─ ─► ▲  Ende              ● ─ ─ ─ ─►▶
->    dreht sich auf der Mitte,         fährt nach rechts,
->    fährt dann nach rechts            schwenkt dann auf
->                                      einem Bogen um ●
-> ```
->
-> Im ersten Bild steht der Stein am Ende rechts neben der Mitte, im zweiten über ihr: Die Drehung
-> wirkt immer um die Tischmitte, und wer schon weggefahren ist, wird mit herumgeschwenkt.
+> ▶ und ▲ zeigt, wohin der Stein schaut). Im Bild unten steht der Stein im ersten Fall am Ende rechts
+> neben der Mitte, im zweiten über ihr: Die Drehung wirkt immer um die Tischmitte, und wer schon
+> weggefahren ist, wird mit herumgeschwenkt.
+
+![Um 90° drehen und 5 m schieben: Die Reihenfolge entscheidet, wo der Stein landet](../abbildungen/reihenfolge-transform.svg)
 
 > **Für Neugierige:** In der Formel schreibt man so ein zusammengesetztes Rezept „rückwärts“ als
 > Verschieben · Drehen · Strecken. Das Rezept, das direkt neben dem Punkt steht, wirkt zuerst. Deshalb
@@ -130,14 +117,7 @@ nach oben schaut, weiß nicht mehr, wo oben im Bild sein soll. Kern verweigert d
 **Perspektive** heißt: Doppelt so weit weg erscheint halb so groß. Die Position auf dem Bild ist also
 die Größe **geteilt durch die Entfernung**.
 
-```
-                                     ·┃   2 m hoch, 10 m weit
-                            ·         ┃
-                   ·┃                 ┃
-          ·         ┃ 1 m, 5 m weit   ┃
-  Auge ●════════════┻═════════════════┻════
-  Ein Sehstrahl streift beide Spitzen: Im Bild sind sie gleich groß.
-```
+![Perspektive: doppelt so weit weg, halb so groß](../abbildungen/perspektive.svg)
 
 Ein 2 m hoher Baum in 10 m Entfernung erscheint also genauso groß wie ein 1 m hoher in 5 m. Ein
 Rezept kann aber nur malnehmen und zusammenzählen, nicht teilen. Also notiert es die Entfernung in der
@@ -195,16 +175,7 @@ sie schief. Ein Beispiel: Ein Dach ist 45° geneigt, seine Normale zeigt schräg
 das Haus auf halbe Höhe, wird das Dach flacher – seine Normale müsste also *steiler* nach oben zeigen.
 Staucht man den Pfeil aber einfach mit, kippt er *flacher*. Genau falsch herum!
 
-```
-  vorher: Dachseite 45°       nachher: auf halbe Höhe gestaucht
-
-     ↖  Normale                   ↑  richtig: steiler
-      ↖                           ↑
-       /                 ←──  falsch: einfach mitgestaucht, flacher
-      /                          __.-'
-     /                       __.-'
-    /                    __.-'
-```
+![Ein 45°-Dach, auf halbe Höhe gestaucht: Die richtige Normale wird steiler, die einfach mitgestauchte flacher](../abbildungen/normalen-stauchen.svg)
 
 Die Faustregel: Was die Fläche streckt, muss die Normale stauchen, und umgekehrt. Dafür braucht jede
 Kopie eines Dings ein eigenes kleines Rezept nur für ihre Normalen.
@@ -220,15 +191,7 @@ solchen Pixel entsteht ein **Fragment**, ein Kandidat für einen Bildpunkt – �
 später noch durchfallen kann, etwa wenn schon etwas Näheres an dieser Stelle steht (gleich beim
 Tiefenpuffer).
 
-```
-     v2
-     /\
-    /  \       ■ = Pixelmittelpunkt im Dreieck → Fragment
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+![Pixel, deren Mittelpunkt im Dreieck liegt, werden zu Fragmenten](../abbildungen/rasterisierung.svg)
 
 Was an den Ecken steht – Farbe, Normale, Texturkoordinate –, wird dazwischen **gemischt**
 (interpoliert). Jede Ecke bekommt einen Anteil, und die Anteile ergeben zusammen 100 %. Ein Fragment
@@ -272,7 +235,7 @@ Die Grafikkarte arbeitet wie ein Fließband. Jeder Malauftrag – ein **Zeichena
 call*), also „Male diese Form“ – läuft durch dieselben Stationen:
 
 ```mermaid
-flowchart LR
+flowchart TB
   VB["Ecken-Daten"] --> VS["Vertex-Shader: jede Ecke"]
   VS --> R["Rasterisierung"]
   R --> FS["Fragment-Shader: jeder Bildpunkt"]
@@ -357,10 +320,7 @@ höchstens sechs Lampen gleichzeitig.
 Glänzende Flächen werfen Licht gerichtet zurück, daher der helle Fleck auf einem Apfel. Die heutige
 Erklärung: Eine Fläche besteht aus Millionen winziger, verschieden schief stehender **Spiegelchen**.
 
-```
-   glatt: ‾‾‾‾‾‾‾‾‾‾  alle gleich gerichtet → kleiner, scharfer Punkt
-   rau:   /\/‾\_/\/‾  kreuz und quer        → breiter, matter Schimmer
-```
+![Glatte Spiegelchen werfen das Licht in eine Richtung, raue streuen es](../abbildungen/glanz-mikrofacetten.svg)
 
 Drei Fragen bestimmen den Glanz:
 
@@ -398,13 +358,7 @@ einmal **aus Sicht der Sonne** und notiert für jeden Punkt dieser Karte nur, wi
 getroffene Ding entfernt ist – die **Schattenkarte**. Beim normalen Malen fragt jede Stelle: „Bin ich
 weiter weg als das Notierte?“ Wenn ja, steht etwas davor.
 
-```
-   Sonne ═══╗  (parallele Strahlen)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          notierte Entfernung: Dach
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    Boden dahinter → Schatten
-```
+![Die Schattenkarte notiert je Sonnenstrahl die Entfernung zum ersten Ding; der Boden dahinter ist weiter weg und liegt im Schatten](../abbildungen/schattenkarte.svg)
 
 Das klingt einfach, hat aber Tücken:
 
@@ -442,17 +396,7 @@ wenn es viel heller als Weiß ist (Fachwort **HDR**, *high dynamic range*), und 
 Ende auf den Bildschirmbereich. Dieses Zusammenpressen heißt **Tonemapping**. Eine gute Kurve lässt
 mittlere Helligkeiten fast, wie sie sind, und rundet sehr Helles weich ab:
 
-```
- auf dem
- Bildschirm
-  Weiß |            ____________
-       |        _--
-       |      /
-       |    /
-       |  /
-Schwarz|/________________________ echtes Licht
-       0    1    2    3    4
-```
+![Kerns Tonemapping-Kurve: weich bis knapp unter Weiß, statt bei 1 hart abzuschneiden](../abbildungen/tonemapping.svg)
 
 **In Kern:** Die Kurve ist eine bewährte Filmkurve aus der Kinotechnik, wie sie auch die
 Grafikbibliothek three.js benutzt; danach kann noch ein Farbgrading folgen.
@@ -539,17 +483,7 @@ fertigen Tiefenpuffer, also aus dem, was ohnehin schon auf dem Bildschirm ist. D
 schaut von jedem Punkt in ein paar Richtungen, sucht links und rechts, wie hoch die Umgebung den
 Himmel verdeckt (den **Horizont**), und rechnet aus, wie viel Himmel dazwischen frei bleibt.
 
-```
-                 frei
-             .-~~~~~~~-.
-   ████    /             \    ████
-   ████  /                 \  ████
-   ██████████████●██████████████████
-   linke Wand   Punkt    rechte Wand
-
-  Die Wände verdecken den Himmel bis zu ihrer Kante.
-  Nur der Bogen dazwischen ist frei.
-```
+![Die Wände verdecken den Himmel bis zu ihrer Kante; nur der Bogen dazwischen ist frei](../abbildungen/umgebungsverdeckung.svg)
 
 **In Kern:** Kern nutzt GTAO, dunkelt damit nur das Umgebungslicht ab, das der Shader nebenbei notiert
 hat, und braucht dafür keinen zweiten Durchgang über alle Dreiecke ([Kapitel 4](04-grafik.md), 4.8.4).
@@ -578,14 +512,7 @@ liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide** (englisch *f
 ob ein Ding darin liegt, steckt man es in eine gedachte **Hüllkugel** und fragt: Liegt die Kugel ganz
 hinter einer der Wände der Pyramide? Dann ist das Ding unsichtbar.
 
-```
-       \         /
-        \  ●    /     ● sichtbar
-   ○     \     /      ○ verworfen: ganz hinter der linken Wand
-          \   /
-           \ /
-          Kamera
-```
+![Hüllkugeln an der Sichtpyramide: A liegt ganz draußen und wird übersprungen, B und C werden gemalt](../abbildungen/sichtpyramide.svg)
 
 Der Test ist **vorsichtig**: Er wirft nie Sichtbares weg, lässt aber manchmal Unsichtbares durch, etwa
 Kugeln nahe einer Ecke der Pyramide. Im Zweifel wird eben gemalt.
@@ -606,13 +533,7 @@ um alles, darin zwei kleinere Kästen, darin wieder zwei, bis unten einzelne Dre
 der Strahl einen Kasten nicht, fällt alles darin auf einen Schlag weg – wie beim Zahlenraten mit
 „größer oder kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
 
-```
-            [ alle ]
-           /        \
-     [ links ]    [ rechts ]
-      /    \        /    \
-   [△△]  [△△]   [△△]  [△△]   unten: Dreiecke
-```
+![Der Baum aus Kästen: links im Raum, rechts als Baum mit Dreiecken unten](../abbildungen/bvh.svg)
 
 **In Kern:** Der Baum aus Kästen dient dem **Anklicken** – welches Dreieck liegt unter der Maus? –,
 nicht dem Malen; die Physik hat ihren eigenen ([Anhang C](C-grundlagen-physik.md)). Einen Baum
@@ -648,7 +569,7 @@ Grafikkarte erreicht allein die Webseite, über **WebGL2**, die Malschnittstelle
 > sie durch die Tür – und auf den Zetteln stehen nur Zahlen.
 
 ```mermaid
-flowchart LR
+flowchart TB
   R["Kern: Malen, Physik, Spiel"] --> G["kurze Liste Malbefehle"]
   G -->|"Nummern, Adresse + Länge"| K["dünne Webseiten-Schicht"]
   K --> W["Grafikkarte über WebGL2"]

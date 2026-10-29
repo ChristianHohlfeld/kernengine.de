@@ -53,11 +53,7 @@ $$z = \sum_{i=1}^{n} w_i\, x_i + b, \qquad h = \sigma(z).$$
 - $\sigma$: the **activation function**,
 - $h$: the output of the neuron.
 
-```
- x1 ──w1──┐
- x2 ──w2──┼──► Σ + b ──► z ──► σ(z) ──► h
- x3 ──w3──┘
-```
+![A neuron with three inputs: weighted sum plus bias, then the activation](../abbildungen/neuron.svg)
 
 ### A.1.3 The layer and the multilayer perceptron
 
@@ -73,13 +69,7 @@ $$h^{(0)} = x,\qquad h^{(l)} = \sigma\!\left(W^{(l)} h^{(l-1)} + b^{(l)}\right),
 In Kern the last layer is **linear** (without $\sigma$): servo targets and values may be any real
 number.
 
-```mermaid
-flowchart LR
-  x["Input x (61)"] --> L1["Gemm 61→512 + ELU"]
-  L1 --> L2["Gemm 512→256 + ELU"]
-  L2 --> L3["Gemm 256→128 + ELU"]
-  L3 --> y["Gemm 128→14 (linear)"]
-```
+![The duck's walking network: 61 inputs, normalizer (A.7), three layers with ELU, finally linear to 14 outputs](../abbildungen/mlp-kette.svg)
 
 **In Kern:** `Mlp` in `nn.h`. The shape is given as a list `dims`: inputs, hidden layers, outputs.
 `PpoConfig` (in `ppo.h`) sets `actor_hidden{512, 256, 128}` by default; the recipes give the critic
@@ -117,14 +107,7 @@ Common activations:
 | ReLU | $\max(0,z)$ | $0$ or $1$ | simple, but "dead" neurons for $z<0$ |
 | **ELU** | $z$ for $z>0$, otherwise $e^{z}-1$ | $1$ for $z>0$, otherwise $e^{z}$ | smooth, negative down to $-1$, no dead region |
 
-```
- ELU(z)
-   2 |                    /
-   1 |                 /
-   0 |-------------__/------------ z
-  -1 |_______----
-      -4   -2    0    2
-```
+![ELU: the line z for positive z, eᶻ − 1 for negative z, approaching −1](../abbildungen/elu.svg)
 
 Kern uses **ELU** with $\alpha = 1$ – like rsl_rl, the library with which Pollen Robotics trains the
 Micro Duck's networks. In the code (`Mlp::forward`):
@@ -312,7 +295,7 @@ Over a batch, the weight gradients are summed: $\partial\mathcal{L}/\partial w_{
 \sum_r x_{r,i}\,\delta_{r,o}$.
 
 ```mermaid
-flowchart RL
+flowchart BT
   L["Loss L"] -->|"dL/dy"| y["Output y"]
   y -->|"W^T δ"| h2["h(L-1)"]
   h2 -->|"⊙ σ'"| z2["z(L-1)"]
@@ -528,13 +511,7 @@ data and makes a larger mistake, and so on. The errors compound. This is called 
 shift** (or *covariate shift*): the distribution of states at test time differs from that during
 learning because the network generates the states itself.
 
-```
- Expert:   ●──●──●──●──●──●──●   (always in the middle)
- Clone:    ●──●──●─╲
-                    ●─╲          small error → unknown state
-                       ●──╲      → larger error → ...
-                           ●  fall
-```
+![Distribution shift: the clone strays a little, reaches unknown states and falls](../abbildungen/verteilungsverschiebung.svg)
 
 Quantitatively (Ross and Bagnell): if the clone makes a mistake with probability $\varepsilon$ at
 every step, the total error over $T$ steps can grow like $\varepsilon T^2$ instead of
@@ -793,7 +770,7 @@ simultaneously: the critic learns to predict returns; the actor learns from the 
 computes.
 
 ```mermaid
-flowchart LR
+flowchart TB
   O["Observation o"] --> Actor["Actor μθ(o), σ"]
   Actor --> A["Action a"]
   C["Critic input (o + privileged)"] --> Critic["Critic Vφ"]
@@ -910,14 +887,7 @@ policy chooses the bad action *more often*), then $s_1 = 1.3 > s_2 = 1.2$ – th
 applies, and the gradient corrects the mistake. PPO is pessimistic: improvements are capped,
 deteriorations never. The objective is a lower bound on the true gain.
 
-```
- L(ρ) for Â > 0                L(ρ) for Â < 0
-   │        ____________          │‾‾‾‾‾‾‾‾╲
-   │      ╱                       │          ╲
-   │    ╱                         │            ╲
-   └───┴────┴──── ρ               └───┴────┴─── ρ
-      0.8  1.2                       0.8  1.2
-```
+![The clipped objective L(ρ) for Â > 0 and Â < 0; on the flat parts the gradient is 0](../abbildungen/ppo-clip.svg)
 
 ### A.11.6 Adaptive learning rate via the KL divergence
 
@@ -948,21 +918,7 @@ with weight `value_coef = 1`.
 
 ### A.11.8 A complete PPO update
 
-```mermaid
-flowchart TD
-  S["Collect: T steps × N ducks (Collector)"] --> K["Canonical order: step by step, duck by duck"]
-  K --> N["Update normalizers"]
-  N --> E["Re-evaluate old policy: μ_old, log π_old, V_old"]
-  E --> G["GAE: advantages Â, targets R̂; normalize Â"]
-  G --> P["Draw one permutation"]
-  P --> EP{"Another epoch (of 5)?"}
-  EP -->|yes| MB["Minibatch (of 4)"]
-  MB --> KL["Measure KL, adapt learning rate"]
-  KL --> GR["Gradients in 8 fixed chunks, summed in fixed order"]
-  GR --> AD["Adam (actor + σ, critic)"]
-  AD --> EP
-  EP -->|no| Ende["New policy"]
-```
+![A PPO update: preparation on the left, on the right 5 epochs of 4 minibatches each](../abbildungen/ppo-update.svg)
 
 The values of Kern's `PpoConfig`: `steps_per_env = 24` (jump: 48), `epochs = 5`, `minibatches = 4`,
 `clip = 0.2`, `gamma = 0.99`, `lam = 0.95`, `learning_rate = 1e-3` (jump: $10^{-4}$).
@@ -1089,13 +1045,7 @@ $$x_k = m + \sigma\, y_k,\qquad y_k = B D z_k,\qquad z_k \sim \mathcal N(0, I).$
   eigenvectors, $D$ the square roots of its eigenvalues,
 - $\lambda$ candidates per generation, of which the best $\mu = \lambda/2$ count.
 
-```
- Generation 1          Generation 5            Generation 20
-   ·  ·   ·              · ·                      ·
-  ·  ●  ·  ·            ·●··                     ●:
-   · ·  ·               ·  ·  ↗                  (narrow, along
-  (round, large)       (stretched toward valley) the valley)
-```
+![CMA-ES schematically: the search cloud starts round and large, stretches along the valley and finally becomes narrow](../abbildungen/cma-es.svg)
 
 The update per generation (after sorting the candidates by cost):
 
@@ -1188,25 +1138,7 @@ Now the path from the empty network to the jumping robot can be read as a whole.
 [Chapter 14](14-lehrer.md); how to build your own tasks and networks is in
 [Chapter 15](15-your-own-models.md).
 
-```mermaid
-flowchart TD
-  subgraph V["1. Search for the Vorbild (CMA-ES, A.13)"]
-    V1["15 key values"] --> V2["Simulation on clean + varied robots"]
-    V2 --> V3["Score: rise, flight, tilt, fall, standing"]
-    V3 --> V1
-  end
-  subgraph N["2. Imitate (DAgger, A.9)"]
-    N1["Warm start: velstand (A.12.4)"] --> N2["Round 0: Vorbild drives"]
-    N2 --> N3["Rounds 1–7: network drives, Vorbild labels"]
-    N3 --> N4["Behavior cloning: MSE, Adam (A.3, A.6)"]
-  end
-  subgraph U["3. Practice (PPO, A.11)"]
-    U1["30 iterations critic only"] --> U2["PPO: GAE, clip, KL learning rate, entropy"]
-    U2 --> U3["Full variation, asymmetric critic (A.12)"]
-  end
-  V --> N --> U --> X["Export: ONNX with normalizer (A.14)"]
-  X --> S["Studio / robot: only the network"]
-```
+![The way to the jump: search for the Vorbild, imitate, practice, then export; warm start (A.12.4), behavior cloning (A.3, A.6) and variation (A.12) are explained in those sections](../abbildungen/sprung-ablauf.svg)
 
 | Concept | Section | Where in Kern |
 |---|---|---|

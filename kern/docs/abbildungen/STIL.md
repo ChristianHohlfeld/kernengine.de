@@ -85,4 +85,14 @@ Das Werkzeug meldet als Fehler: fehlende Texte, Text außerhalb der Abbildung, z
    `{{key}}`, oben ein Kommentar mit den Quellen.
 2. Texte in `texte.json` (de, en; gruen/gelb nur wo nötig).
 3. Erzeugen mit `--png`, jede Variante ansehen.
-4. Im Buch einbinden (siehe `buch_pdf.py`).
+4. Im Buch einbinden: `![Bildunterschrift](../abbildungen/<id>.svg)` als eigener Absatz.
+   `buch_pdf.py` setzt dafür die PDF des Bands und der Sprache in Originalgröße, zentriert, mit der
+   Bildunterschrift klein und serifenlos darunter. Die Unterschrift sagt kurz, was man sieht.
+
+## Mermaid
+
+Abläufe, die als Mermaid-Diagramm im Text stehen, bekommen beim Satz denselben Stil (Konfiguration
+in `buch_pdf.py`: DejaVu Sans, Farben wie oben, enge Abstände). Sie müssen gedruckt mindestens 7 pt
+haben; lange Ketten deshalb von oben nach unten (`flowchart TB`) statt von links nach rechts.
+Wird ein Diagramm auch so zu klein oder zu verwinkelt, wird es eine Abbildung in diesem System
+(z. B. `ppo-update`, `sprung-ablauf`).

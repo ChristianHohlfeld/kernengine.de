@@ -137,46 +137,10 @@ Roboter-Log und der Simulation ist ein echter Modellfehler ([Kapitel 16](16-kali
 ## 1.3 Architektur: die Schichten
 
 Das folgende Bild zeigt die Schichten eines Kern-Moduls im Browser, von der Plattformschicht oben
-bis zu den Grundlagen unten. Ein Pfeil nach unten heißt „benutzt“.
+bis zu den Grundlagen unten. Jede Schicht benutzt nur die Schichten darunter; zwischen Browser und
+Modul gibt es nur Importe und Exporte.
 
-```
- Browser (JavaScript, kern/web/)  – nur Plattform, keine Engine-Logik
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │ kern.mjs        Laden des Moduls, Importe kern_gl / kern_env / WASI-Shim,   │
- │                 GPU-Handle-Tabellen, Kontextverlust, Fassade KernRenderer    │
- │ app.mjs         Host für C++-Spiele (kern::App)                              │
- │ studio/*.mjs    Editor-Seite, Spiel-Host + KernNet (game.mjs), Logic-Editor  │
- │ lehrer/*.mjs    Lehrer-Seite, Web Worker (Sammler, Lerner)                   │
- └───────────────▲───────────────────────────────────────────┬─────────────────┘
-                 │ Importe: kern_gl.*, kern_env.*,          │ Exporte (C-ABI):
-                 │ wasi_snapshot_preview1.*                  │ kern_*, kern_app_*, kern_studio_*,
-                 │                                           ▼ kern_lehrer_*, kern_logic_*
- WebAssembly-Modul (C++20, wasi-sdk, Reactor)
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │ C-ABI      src/api/ (Renderer, Partikel, Geometrie), src/app/app.cpp,        │
- │            src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api│
- ├──────────────────────────────┬──────────────────────────────────────────────┤
- │ kern::studio  (--studio)     │ kern::lehrer  (--lehrer)                      │
- │ Editor, Viewports, Gizmos,   │ DuckEnv, MLP, PPO, DAgger, CMA-ES,            │
- │ Details, Katalog, Play       │ ONNX-Export, Kalibrierung                     │
- ├──────────────────────────────┴──────────────────────────────────────────────┤
- │ kern::game  (--game)                                                         │
- │ Level/.klevel, GameWorld, Controller, Regeln, Stadt, Sound, Touch,           │
- │ Walker (Micro Duck), Servo-Profile, Logik-Knoten, NetGame                     │
- ├───────────────┬───────────────┬────────────────┬────────────────────────────┤
- │ kern::physics │ kern::logic   │ kern::net      │ kern::audio                 │
- │ (--physics)   │ Graphen, JIT, │ Bitpacker,     │ Mixer, 3D, Busse,           │
- │ → Box3D (C17) │ C++-Export    │ Acks, Kanäle,  │ Synth                       │
- │               │               │ Client/Server  │                             │
- ├───────────────┴───────────────┴────────────────┴────────────────────────────┤
- │ kern (gfx, scene, geo, app)                                                  │
- │ Renderer, Passes (Schatten, Himmel, Bloom, GTAO), Partikel, BVH, Picking,    │
- │ Earcut, Primitive, Gebäude, Straßen, Terrain, App/Engine/Input (--app)       │
- ├─────────────────────────────────────────────────────────────────────────────┤
- │ kern::core / kern::math / kern::json / kern::dm                              │
- │ base.h, json.h, math.h, dmath.h → third_party/musl_math                      │
- └─────────────────────────────────────────────────────────────────────────────┘
-```
+![Die Schichten von Kern: oben der Browser-Teil, darunter das WebAssembly-Modul](../abbildungen/architektur.svg)
 
 ### Was immer im Modul ist und was zuschaltbar ist
 

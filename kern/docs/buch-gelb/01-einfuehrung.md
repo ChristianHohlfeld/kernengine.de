@@ -149,19 +149,11 @@ den Fehler immer wieder herbeiführen, finden und reparieren.
 ## 1.3 Der Bauplan: Stockwerke
 
 Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter, nie die darüber. Die Grafik
-weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen. Im Bild heißt
-jeder durchgezogene Pfeil „benutzt“. Die gestrichelte Linie ist die Tür nach draußen.
+weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen. Im Bild steht
+jedes Stockwerk auf denen, die es benutzt. Oben, vor dem Haus, steht der Kellner; die Pfeile zeigen,
+was durch die Tür hinein- und hinausgeht.
 
-```mermaid
-flowchart TD
-  JS["JavaScript, der Kellner"] <-. "die Tür" .-> HAUS
-  subgraph HAUS["das Hochhaus Kern"]
-    ST["Studio und Lehrer"] --> SP["Spielregeln und Levels"]
-    SP --> MID["Physik, Logik, Netzwerk, Ton"]
-    MID --> GFX["Grafik, Szene, Geometrie"]
-    GFX --> CORE["Grundlagen, Mathe"]
-  end
-```
+![Das Hochhaus Kern: oben vor dem Haus der Kellner, im Haus die Tür und die Stockwerke bis zu den Grundlagen](../abbildungen/architektur.svg)
 
 Der Kellner ist **kein Stockwerk**. Er steht vor dem Haus an der Tür, bringt Bestellungen hinein und
 Fertiges hinaus. Die Hochhausregel gilt für die Stockwerke im Haus, nicht für ihn.

@@ -429,7 +429,7 @@ meisten gibt es im Logik-Editor unter **Templates**.
 Dominosteine in einer Reihe:
 
 ```mermaid
-flowchart LR
+flowchart TB
   A[On Begin Overlap] --> B[Add Score 10]
   B --> C[Show Message +10]
   C --> D[Play Sound pickup]

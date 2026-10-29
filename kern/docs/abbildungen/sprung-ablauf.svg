@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 240">
+  <!-- Der Weg zum Sprung (blau A.15): 1. Vorbild suchen mit CMA-ES, 2. Nachahmen mit DAgger, 3. Üben mit PPO; danach Export als ONNX mit Normalisierer, im Studio und auf dem Roboter läuft nur das Netz. -->
+  <rect class="ff" x="2" y="4" width="120" height="184" rx="3"/>
+  <text x="62" y="16" class="k m t">{{t1}}</text>
+  <text x="62" y="26" class="k m">{{t1b}}</text>
+  <rect class="fw" x="8" y="34" width="104" height="30" rx="3"/>
+  <text x="60" y="51.7" class="k m">{{v1}}</text>
+  <rect class="fw" x="8" y="72" width="104" height="30" rx="3"/>
+  <text x="60" y="84.95" class="k m">{{v2a}}</text>
+  <text x="60" y="94.45" class="k m">{{v2b}}</text>
+  <path class="l p" d="M60,64 L60,71"/>
+  <rect class="fw" x="8" y="110" width="104" height="30" rx="3"/>
+  <text x="60" y="122.95" class="k m">{{v3a}}</text>
+  <text x="60" y="132.45" class="k m">{{v3b}}</text>
+  <path class="l p" d="M60,102 L60,109"/>
+  <path class="l p" d="M122,101 L129,101"/>
+  <rect class="ff" x="130" y="4" width="120" height="184" rx="3"/>
+  <text x="190" y="16" class="k m t">{{t2}}</text>
+  <text x="190" y="26" class="k m">{{t2b}}</text>
+  <rect class="fw" x="136" y="34" width="104" height="30" rx="3"/>
+  <text x="188" y="51.7" class="k m">{{n1}}</text>
+  <rect class="fw" x="136" y="72" width="104" height="30" rx="3"/>
+  <text x="188" y="89.7" class="k m">{{n2}}</text>
+  <path class="l p" d="M188,64 L188,71"/>
+  <rect class="fw" x="136" y="110" width="104" height="30" rx="3"/>
+  <text x="188" y="122.95" class="k m">{{n3a}}</text>
+  <text x="188" y="132.45" class="k m">{{n3b}}</text>
+  <path class="l p" d="M188,102 L188,109"/>
+  <rect class="fw" x="136" y="148" width="104" height="30" rx="3"/>
+  <text x="188" y="160.95" class="k m">{{n4a}}</text>
+  <text x="188" y="170.45" class="k m">{{n4b}}</text>
+  <path class="l p" d="M188,140 L188,147"/>
+  <path class="l p" d="M250,101 L257,101"/>
+  <rect class="ff" x="258" y="4" width="120" height="184" rx="3"/>
+  <text x="318" y="16" class="k m t">{{t3}}</text>
+  <text x="318" y="26" class="k m">{{t3b}}</text>
+  <rect class="fw" x="264" y="34" width="104" height="30" rx="3"/>
+  <text x="316" y="51.7" class="k m">{{u1}}</text>
+  <rect class="fw" x="264" y="72" width="104" height="30" rx="3"/>
+  <text x="316" y="84.95" class="k m">{{u2a}}</text>
+  <text x="316" y="94.45" class="k m">{{u2b}}</text>
+  <path class="l p" d="M316,64 L316,71"/>
+  <rect class="fw" x="264" y="110" width="104" height="30" rx="3"/>
+  <text x="316" y="122.95" class="k m">{{u3a}}</text>
+  <text x="316" y="132.45" class="k m">{{u3b}}</text>
+  <path class="l p" d="M316,102 L316,109"/>
+  <path class="lad pa" d="M112,125 L117,125 L117,49 L113,49"/>
+  <rect class="fa" x="258" y="206" width="120" height="30" rx="3"/>
+  <text x="318" y="218.95" class="k m">{{xa}}</text>
+  <text x="318" y="228.45" class="k m">{{xb}}</text>
+  <rect class="fa" x="130" y="206" width="120" height="30" rx="3"/>
+  <text x="190" y="218.95" class="k m">{{sa}}</text>
+  <text x="190" y="228.45" class="k m">{{sb}}</text>
+  <path class="l p" d="M318,188 L318,205"/>
+  <path class="l p" d="M258,221 L251,221"/>
+</svg>

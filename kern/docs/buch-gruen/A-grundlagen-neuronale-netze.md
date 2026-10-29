@@ -47,15 +47,12 @@ Der kleinste Baustein ist das künstliche **Neuron**. Es macht drei Dinge:
 2. Alles zusammenzählen und eine **Grundeinstellung** dazurechnen (Fachwort **Bias**).
 3. Das Ergebnis durch eine **Aktivierung** schicken, die es „verbiegt“ (gleich mehr dazu).
 
-```
- Eingang 1 ──Gewicht 1──┐
-                        ├──► Summe + Bias ──► verbiegen ──► Ausgabe
- Eingang 2 ──Gewicht 2──┘
-```
+![Ein Neuron mit drei Eingängen: malnehmen, zusammenzählen, Bias dazu, verbiegen](../abbildungen/neuron.svg)
 
-**Rechnen wir eins durch.** Zwei Eingänge 0,5 und −1, Gewichte 2 und 0,5, Bias 0,1:
+**Rechnen wir eins durch.** Drei Eingänge 0,5, −1 und 0, Gewichte 2, 0,5 und 3, Bias 0,1. Der
+dritte Eingang ist gerade 0 und trägt darum nichts bei:
 
-- Summe: 2 · 0,5 + 0,5 · (−1) + 0,1 = 1 − 0,5 + 0,1 = **0,6**
+- Summe: 2 · 0,5 + 0,5 · (−1) + 3 · 0 + 0,1 = 1 − 0,5 + 0 + 0,1 = **0,6**
 - Die Aktivierung lässt positive Zahlen, wie sie sind: Ausgabe **0,6**.
 
 Jetzt drehen wir nur an der Grundeinstellung: Bias −0,9. Die Summe wird 1 − 0,5 − 0,9 = **−0,4**.
@@ -78,17 +75,7 @@ aber nur bis zum Anschlag“.
 Kern verwendet die Aktivierung **ELU**, wie Pollen Robotics beim Training der Ente. In Worten:
 **Positive Zahlen bleiben, wie sie sind. Negative werden gestaucht, und zwar nie unter −1.**
 
-```
- Ausgabe
-  +2 │                           ●
-  +1 │                       ●
-   0 │───────────────────●─────────────
-−0,6 │               ●
-−0,9 │   ●   ●   ●
-  −1 │ - - - - - - - - - - - - - - -  (wird nie erreicht)
-     └───┬───┬───┬───┬───┬───┬───┬
-        −4  −3  −2  −1   0   1   2   Eingang
-```
+![ELU: Rechts von 0 bleibt alles, wie es ist; links biegt die Kurve ab und kommt der −1 immer näher](../abbildungen/elu.svg)
 
 Rechts von 0 liegen die Punkte auf einer geraden Linie, links biegen sie sanft ab und kommen der −1
 immer näher. Mehr brauchst du nicht; für die Beispiele in diesem Anhang reicht diese Tabelle:
@@ -116,13 +103,7 @@ immer näher. Mehr brauchst du nicht; für die Beispiele in diesem Anhang reicht
 Viele Neuronen nebeneinander, die alle dieselben Eingänge sehen, bilden eine **Schicht**. Mehrere
 Schichten hintereinander ergeben ein Netz. Das Sprung-Netz der Ente sieht so aus:
 
-```mermaid
-flowchart LR
-  x["61 Messwerte"] --> L1["512 Neuronen, verbiegen"]
-  L1 --> L2["256 Neuronen, verbiegen"]
-  L2 --> L3["128 Neuronen, verbiegen"]
-  L3 --> y["14 Servoziele (ohne Verbiegen)"]
-```
+![Das Sprung-Netz der Ente: 61 Messwerte, umrechnen, drei Schichten mit Verbiegen, zuletzt 14 Servoziele ohne Verbiegen](../abbildungen/mlp-kette.svg)
 
 Die letzte Schicht verbiegt nicht, denn ein Servoziel darf jede Zahl sein, auch eine stark negative.
 Zusammen hat das Netz fast **200 000 Regler**.
@@ -148,11 +129,8 @@ hinten die Antwort herauskommt. Das ist alles, was ein fertiges Netz tut, 50-mal
 > nächsten, der gibt es weiter, bis der letzte es ins Feuer kippt. Jede Schicht ist ein Mensch in
 > der Kette: Sie nimmt, was die vorige ihr gibt, rechnet daran und reicht es weiter.
 
-```
- Messwerte ─► Schicht 1 ─► Schicht 2 ─► Schicht 3 ─► Servoziele
-             (Zwischen-   (Zwischen-   (Zwischen-
-              ergebnis)    ergebnis)    ergebnis)
-```
+Im Bild des Sprung-Netzes oben ist das die Reihe von links nach rechts: Jede Schicht liefert ein
+**Zwischenergebnis** an die nächste, die letzte die Servoziele.
 
 Beim **Lernen** gibt es einen Unterschied: Dann merkt sich die Kette jedes Zwischenergebnis, wie
 Zettel, die an jeder Station liegen bleiben. Die braucht man gleich, wenn der Fehler rückwärts
@@ -198,16 +176,7 @@ wie viel höher man dann steht. Steigung = Höhenunterschied geteilt durch die S
 **Ein Tal zum Ausprobieren.** Ein einziger Regler r, und der Verlust ist r · r (kurz **r²**, „r
 hoch 2“). Das ist ein Tal mit dem tiefsten Punkt bei r = 0.
 
-```
- Verlust
-   4 │●                       ●
-   3 │  ╲                   ╱
-   2 │    ╲               ╱
-   1 │      ●           ●   ← Kugel bei r = 1
-   0 │         ╲  ●  ╱
-     └┬─────┬─────┬─────┬─────┬───
-     −2    −1     0     1     2   Regler r
-```
+![Das Tal r²: die Kugel bei r = 1, die Steigung dort ist 2, ein Schritt geht bergab](../abbildungen/gradientenabstieg.svg)
 
 Steht der Regler bei 1, ist der Verlust 1 · 1 = 1. Ein Hundertstel weiter, bei 1,01, ist er
 1,01 · 1,01 = 1,0201. Der Unterschied 0,0201 geteilt durch 0,01 ergibt etwa **2**. So bekommt man
@@ -411,13 +380,7 @@ Lehrer heißt der Experte **Vorbild**.
 > nicht weiter, denn so eine Lage hast du nie gesehen. Du korrigierst falsch, kommst noch weiter ab,
 > und landest im Gebüsch.
 
-```
- Vorbild:  ●──●──●──●──●──●──●   (immer in der Mitte)
- Klon:     ●──●──●─╲
-                    ●─╲          kleiner Fehler → unbekannte Lage
-                       ●──╲      → größerer Fehler → ...
-                           ●  Sturz
-```
+![Das Vorbild bleibt in der Mitte; der Klon weicht ein wenig ab, kommt in unbekannte Lagen und stürzt](../abbildungen/verteilungsverschiebung.svg)
 
 Fachleute nennen das **Verteilungsverschiebung**: Beim Selberfahren gerät das Netz in Lagen, die es
 beim Lernen nie gesehen hat, und kleine Fehler schaukeln sich auf. Und zwar schneller als die Fahrt
@@ -554,15 +517,7 @@ Abweichungen sind häufig, große selten. Wie breit die Glocke ist, sagt eine ei
 **Streuung σ** (gesprochen „Sigma“) – dieselbe Idee wie die Streuung in A.7: wie weit die Werte
 üblicherweise von der Mitte abweichen.
 
-```
-  breite Glocke (σ groß)            schmale Glocke (σ klein)
-
-          _.-‾‾‾-._                            ∧
-      _.-‾         ‾-._                       / \
-  ──‾─────────┼─────────‾──          ────────/──┼──\────────
-        „ungefähr so“                     „ungefähr so“
-  viel Ausprobieren                  wenig Ausprobieren
-```
+![Zwei Glockenkurven mit gleicher Fläche: breit bei großem σ, schmal bei kleinem σ; getönt ist der Bereich ±σ](../abbildungen/normalverteilung.svg)
 
 | Bereich um „ungefähr so“ | so viele Versuche landen darin |
 |---|---|
@@ -624,14 +579,7 @@ führt aber in eine Lage, von der aus alles besser läuft.
 > **Stell dir vor …** beim Schach opferst du eine Figur. Für sich allein ein Verlust. Drei Züge
 > später setzt du matt. Im Rückblick war das Opfer der beste Zug der Partie.
 
-```
-  Schritt 0            Schritt 1             Schritt 2
-  für sich: etwas  ──► führt in eine    ──► es läuft besser
-  schlechter als       gute Lage             als erwartet
-  erwartet
-  ─────────────────────────────────────────────────────────
-  im Rückblick: Schritt 0 war insgesamt GUT
-```
+![Ein Schritt, der für sich schlechter als erwartet war, aber in eine gute Lage führt, ist im Rückblick gut](../abbildungen/gae-rueckblick.svg)
 
 Genau das macht **GAE** (Fachwort für „gut geschätzter Vorteil“). Man geht **rückwärts** durch die
 Zeit: Jeder Schritt bekommt zuerst seine eigene Überraschung – „Wie viel besser oder schlechter als
@@ -665,13 +613,7 @@ eine bestimmte Aktion als das alte? 1 heißt „gleich oft“, 1,2 heißt „20 
 > **Stell dir vor …** ein Hund an der Leine. Er darf schnuppern, wohin er will, aber nur so weit,
 > wie die Leine reicht. Bei der nächsten Runde wird die Leine wieder vom neuen Standort aus gemessen.
 
-```
- Verhältnis neu/alt:   0,8          1,0          1,2
-                        ├────────────┼────────────┤
- gute Aktion:                        ────────────►│ hier Schluss
- schlechte Aktion:     │◄────────────
-                  hier Schluss
-```
+![Die Leine von PPO: Eine gute Aktion wird bis zum Verhältnis 1,2 verstärkt, eine schlechte bis 0,8 abgeschwächt, darüber hinaus nicht mehr](../abbildungen/ppo-clip.svg)
 
 - Eine **gute** Aktion (positiver Vorteil) darf pro Runde höchstens 20 Prozent häufiger werden.
   Darüber hinaus wird nicht mehr weiter verstärkt.
@@ -776,14 +718,7 @@ der Wolke.
 > tiefsten Werten. Merkt ihr, dass der See in einer Richtung lang abfällt, verteilt ihr euch in diese
 > Richtung weiter.
 
-```
- Runde 1              Runde 5                Runde 20
-    ·  ·  ·               · ·                       ·
-  ·   ●   ·              · ● · ·                   ●
-    ·  ·  ·                ·  ·  ·  ↗            (schmal, liegt
-  rund und groß       in Richtung Tal          genau im Tal)
-                      gestreckt
-```
+![Die Suchwolke von CMA-ES, schematisch: erst rund und groß, dann in Richtung Tal gestreckt, zuletzt schmal im Tal](../abbildungen/cma-es.svg)
 
 Pro Runde passiert grob:
 
@@ -813,12 +748,9 @@ Rechenbausteine, mit allen Reglerwerten in derselben Datei.
 > kann es jeder öffnen und es sieht überall gleich aus. ONNX ist das PDF für Netze: Der Roboter muss
 > nicht wissen, womit das Netz trainiert wurde.
 
-Die Kette für die Ente ist kurz:
+Die Kette für die Ente ist kurz, dieselbe wie in A.1:
 
-```
- Messwerte ─► umrechnen (Normalisierer) ─► Schicht ─► verbiegen
-           ─► … ─► Schicht ─► 14 Servoziele
-```
+![Die exportierte Kette: Messwerte umrechnen (Normalisierer), drei Schichten mit Verbiegen, eine ohne, 14 Servoziele](../abbildungen/mlp-kette.svg)
 
 Kern schreibt seine Netze genau im selben Format wie Pollen Robotics. Exportiert wird dabei nur das
 „ungefähr so“ des Netzes, ohne Würfeln: **Auf dem Roboter wird nicht mehr ausprobiert.** Auch der

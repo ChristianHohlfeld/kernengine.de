@@ -53,15 +53,7 @@ Status according to `docs/lehrer.md`:
 
 The Lehrer separates five roles so that they can run in different places:
 
-```
-             Recipe ──────────► Task ──► DuckEnv / PlayEnv  (one duck, one GameWorld, headless)
-               │                              ▲
-               │                              │ step(action) / observation()
-               ▼                              │
-   Ppo (learner) ──Policy──► Backend ──► Collector ──► Rollout
-        ▲                    (threads | web workers)       │
-        └──────────────────── learn(rollouts) ◄────────────┘
-```
+![The Lehrer's roles: Recipe, Task, Env, Ppo, Backend and Collector](../abbildungen/lehrer-rollen.svg)
 
 - **`Task`** says what is learned: start state, command slots of the observation, reward, episode
   end, curricula, privileged observation for the critic.

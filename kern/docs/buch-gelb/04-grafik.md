@@ -434,18 +434,10 @@ Stell dir dein Blickfeld als liegende, eckige Eistüte vor: Die Spitze ist dein 
 ist ein Rechteck in der Schattendistanz – so groß wie das Bild, das du in dieser Entfernung siehst.
 Kern legt eine Kugel um die ganze Tüte. Bei einer weitwinkligen Kamera wie der von Studio liegt der
 Mittelpunkt der Kugel genau in der Mitte dieses Rechtecks, und die Kugel reicht bis zu seinen Ecken.
-(Bei einem sehr engen Blickwinkel rückt der Mittelpunkt etwas näher zu dir.) Das Rechteck von vorn:
+(Bei einem sehr engen Blickwinkel rückt der Mittelpunkt etwas näher zu dir.) Von oben gesehen, rechts
+die Kugel und zum Vergleich links ein Kasten:
 
-```
- +---------------------------+ <- Ecke
- |                       . / |
- |              Radius . /   |
- |                   . /     |  halbe Höhe
- |              ●------------|
- |            Mitte  halbe   |
- |                   Breite  |
- +---------------------------+
-```
+![Von oben: Ein Kasten um das Blickfeld ändert beim Drehen seine Größe, die Kugel bleibt gleich groß](../abbildungen/schattenkugel.svg)
 
 Dein Auge liegt näher an der Mitte als die Ecken, also steckt die ganze Tüte in der Kugel.
 
@@ -499,16 +491,7 @@ statt an der Kante abzureißen.
 Der Himmel wird **nach** allem Deckenden gemalt, als ein riesiges Dreieck ganz hinten, das über
 den ganzen Bildschirm hinausragt und ihn so ganz bedeckt:
 
-```
- +
- | \
- |   \
- |     \
- +------+\
- | Bild-|  \
- |schirm|    \
- +------+------+
-```
+![Ein Dreieck, doppelt so breit und hoch wie der Bildschirm, bedeckt ihn ganz; der Rest wird weggeschnitten](../abbildungen/himmel-dreieck.svg)
 
 Warum ein Dreieck und kein Viereck? Ein Dreieck reicht, wenn es groß genug ist, und es ist für die
 Grafikkarte der einfachste Malauftrag. Der Tiefentest lässt den Himmel nur dort durch, wo noch nichts
@@ -725,16 +708,7 @@ Datensatz: wie lang und hoch die Wand ist, eine Kennzahl für das Haus und die S
 weiß der Shader für jedes Pixel einer Wand, wie viele Meter es vom Wandanfang entfernt ist (u) und
 wie hoch es liegt.
 
-```
-+-----+-----+-----+-----+
-|  #  |  #  |  #  |  #  |   2. Stock
-+-----+-----+-----+-----+
-|  #  |  #  |  #  |  #  |   1. Stock
-+-----+-----+-----+-----+
-|     |     |     |     |   Erdgeschoss
-+-----+-----+-----+-----+
-0 m   3 m   6 m   9 m      # = Fenster
-```
+![Die Wand in Felder geteilt: 3 m breit, ein Stockwerk hoch, in der Mitte jedes Feldes ein Fenster, nicht im Erdgeschoss und nicht im obersten Meter](../abbildungen/fassade-fenster.svg)
 
 Die Idee: Die Wand wird gedanklich in Felder geteilt, **3 m breit** und **ein Stockwerk hoch**. In
 die Mitte jedes Feldes kommt ein Fenster. Das Herzstück, in Worten statt in Shader-Sprache:

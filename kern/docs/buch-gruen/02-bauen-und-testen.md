@@ -221,14 +221,7 @@ Niemand muss daran denken, die Prüfungen zu starten. Bei jeder Änderung auf Gi
 von GitHub erledigen dann alles von selbst: übersetzen, prüfen, Fingerabdruck vergleichen,
 veröffentlichen.
 
-```mermaid
-flowchart LR
-  P["Änderung"] --> N["Tests mit Spürhunden"]
-  P --> D["Fingerabdruck auf dem Mac"]
-  P --> B["Bauen und Grundprüfungen"]
-  B --> DEP["Veröffentlichen"]
-  B --> E["Testklicker"]
-```
+![Das Fließband: Jede Änderung startet drei Stationen; nach dem Bauen folgen Veröffentlichen und Testklicker](../abbildungen/ci-pipeline.svg)
 
 Die Stationen:
 

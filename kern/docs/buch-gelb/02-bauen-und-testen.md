@@ -33,7 +33,7 @@ nachzuweisen, dass diese Dateien auch richtig arbeiten.
 > Vorkoster jedes Stück – das sind die Tests.
 
 ```mermaid
-flowchart LR
+flowchart TB
   Q["Quelltext"] --> B["bauen"]
   B --> F["fertige Dateien"]
   F --> T["Tests"]
@@ -267,14 +267,7 @@ alle Arbeitsgänge: bauen, testen, veröffentlichen. Niemand muss daran denken.
 > durch dieselben Stationen. Ist ein Teil fertig gebaut, kommt es schon in den Laden, während die
 > Kontrolle es noch prüft. Findet sie etwas, sieht man das sofort und bessert nach.
 
-```mermaid
-flowchart LR
-  P["Änderung hochgeladen"] --> N["Tests mit Prüfern"]
-  P --> D["Fingerabdruck auf dem Mac"]
-  P --> B["bauen"]
-  B --> DE["veröffentlichen"]
-  B --> E["Roboter im Browser"]
-```
+![Das Fließband: Eine hochgeladene Änderung startet drei Stationen; nach dem Bauen folgen Veröffentlichen und der Roboter im Browser](../abbildungen/ci-pipeline.svg)
 
 - **Tests mit Prüfern:** alle Unit-Tests mit den Sanitizern.
 - **Fingerabdruck auf dem Mac:** Den Fingerabdruck rechnet der Lehrer aus. Darum wird der Lehrer auf

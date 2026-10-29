@@ -430,14 +430,7 @@ workers (8 ducks in total) and compares the networks byte for byte.
 and manually (`workflow_dispatch`). The site is built once and published as soon as it is built;
 native and browser tests run in parallel and do not hold up publishing.
 
-```
-          ┌──────────┐   ┌──────────────┐
- push ──▶ │ native   │   │ determinism  │      (independent, parallel)
-          └──────────┘   └──────────────┘
-          ┌──────────┐
-          │ build    │──┬──▶ deploy  (main only, no pull request)
-          └──────────┘  └──▶ e2e
-```
+![The CI jobs: native and determinism independent; build is followed by deploy and e2e](../abbildungen/ci-pipeline.svg)
 
 **Concurrency:** the group is `ci-<ref>-pr` for pull requests and `ci-<ref>-<sha>` otherwise; only
 older runs of a pull request are canceled. On `main`, every push runs to completion so that every

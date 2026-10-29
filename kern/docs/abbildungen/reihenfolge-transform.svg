@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 164">
+  <!-- Reihenfolge der Rezepte (grün B, Kerns Gewohnheiten): um 90° drehen und 5 m nach rechts schieben. Erst drehen, dann schieben: der Stein endet rechts neben der Mitte; erst schieben, dann drehen: die Drehung um die Tischmitte schwenkt ihn auf einem Bogen nach oben. -->
+  <text x="85" y="12" class="m t">{{titel0}}</text>
+  <path class="lg" d="M20,122 L160,122"/>
+  <path class="fw gs" d="M48,122 L35.87,118.22 L35.87,125.78 Z"/>
+  <path class="fw gs" d="M40,114 L36.22,126.13 L43.78,126.13 Z"/>
+  <path class="la p" d="M50,122 L121,122"/>
+  <path class="fa" d="M130,114 L126.22,126.13 L133.78,126.13 Z"/>
+  <text x="140" y="118" class="k">{{ende}}</text>
+  <circle class="dot" cx="40" cy="122" r="2.6"/>
+  <text x="20" y="138" class="k">{{unter0a}}</text>
+  <text x="20" y="148" class="k">{{unter0b}}</text>
+  <text x="275" y="12" class="m t">{{titel1}}</text>
+  <path class="lg" d="M210,122 L350,122"/>
+  <path class="fw gs" d="M238,122 L225.87,118.22 L225.87,125.78 Z"/>
+  <path class="la" d="M240,122 L320,122"/>
+  <path class="fw gs" d="M328,122 L315.87,118.22 L315.87,125.78 Z"/>
+  <path class="la gs p" d="M320,122 A90,90 0 0 0 233,32"/>
+  <path class="fa" d="M230,24 L226.22,36.13 L233.78,36.13 Z"/>
+  <text x="220" y="35" class="k e">{{ende}}</text>
+  <circle class="dot" cx="230" cy="122" r="2.6"/>
+  <text x="210" y="138" class="k">{{unter1a}}</text>
+  <text x="210" y="148" class="k">{{unter1b}}</text>
+  <text x="2" y="160" class="k h">{{legende}}</text>
+</svg>

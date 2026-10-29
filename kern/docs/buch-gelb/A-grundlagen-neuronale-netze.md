@@ -36,24 +36,21 @@ Ein künstliches **Neuron** nimmt jeden Eingang mal ein **Gewicht** (wie wichtig
 addiert alles, zählt einen **Bias** dazu (eine Grundeinstellung) und schickt das Ergebnis z durch eine
 **Aktivierung**.
 
-```
-x1 ──w1──┐
-          ├──► Summe + b ──► z ──► ELU ──► h
-x2 ──w2──┘
-```
+![Ein Neuron mit drei Eingängen: jeder Eingang mal sein Gewicht, alles zusammen plus Bias, dann ELU](../abbildungen/neuron.svg)
 
-Ein ausgedachtes Beispiel: Ein Neuron mit **zwei Eingängen** soll entscheiden, wie stark ein Knie
-nachgibt. x1 = 0,5 ist die Neigung des Rumpfs, x2 = 2 sein Tempo nach vorn. Die Gewichte sind
-w1 = 0,8 und w2 = −0,5, der Bias b = 0,1.
+Ein ausgedachtes Beispiel: Ein Neuron mit **drei Eingängen** soll entscheiden, wie stark ein Knie
+nachgibt. x1 = 0,5 ist die Neigung des Rumpfs, x2 = 2 sein Tempo nach vorn, x3 = 0 seine Drehung
+(gerade keine). Die Gewichte sind w1 = 0,8, w2 = −0,5 und w3 = 0,3, der Bias b = 0,1.
 
 | Schritt | Rechnung | Ergebnis |
 |---|---|---|
 | Eingang 1 gewichtet | 0,8 · 0,5 | 0,4 |
 | Eingang 2 gewichtet | −0,5 · 2 | −1,0 |
-| Summe plus Bias z | 0,4 − 1,0 + 0,1 | −0,5 |
+| Eingang 3 gewichtet | 0,3 · 0 | 0 |
+| Summe plus Bias z | 0,4 − 1,0 + 0 + 0,1 | −0,5 |
 | Aktivierung h | ELU(−0,5) | −0,39 |
 
-Mit x2 = 0,2 ergibt sich z = 0,4 − 0,1 + 0,1 = 0,4 und h = 0,4. Warum einmal −0,39 und einmal genau z?
+Mit x2 = 0,2 ergibt sich z = 0,4 − 0,1 + 0 + 0,1 = 0,4 und h = 0,4. Warum einmal −0,39 und einmal genau z?
 Das liegt an der Aktivierung.
 
 ### Die Aktivierung ELU
@@ -77,13 +74,7 @@ Du musst die Rechnung für den negativen Teil nicht können. Lies einfach in der
 | −2 | −0,86 |
 | −4 | −0,98 |
 
-```
-ELU(z)
-  1 |              /
-  0 |---------___/------- z
- -1 |___----
-     -4    -2   0   2
-```
+![ELU: Positives bleibt, Negatives wird zusammengedrückt und kommt nie unter −1](../abbildungen/elu.svg)
 
 Warum der Knick? Ohne ihn wären viele Schichten nicht besser als eine: Mal 2 und dann mal 3 ist
 dasselbe wie mal 6. Erst ein Knick erlaubt Regeln, die nicht einfach „immer doppelt so viel“ sind,
@@ -99,13 +90,7 @@ Viele Neuronen mit denselben Eingängen bilden eine **Schicht**, mehrere Schicht
 **mehrschichtiges Perzeptron (MLP)**. Die letzte Schicht hat keinen Knick: Servoziele dürfen jede
 Zahl sein.
 
-```mermaid
-flowchart LR
-  x["61 Eingänge"] --> A["512 Neuronen"]
-  A --> B["256 Neuronen"]
-  B --> C["128 Neuronen"]
-  C --> y["14 Ausgänge"]
-```
+![Das Laufnetz der Ente: 61 Eingänge, umrechnen, drei Schichten mit ELU, 14 Ausgänge](../abbildungen/mlp-kette.svg)
 
 Die erste Schicht allein hat schon 61 · 512 = 31 232 Gewichte plus 512 Biases, zusammen über
 31 000 Regler. Alle vier Schichten zusammen haben fast **200 000 Regler**.
@@ -342,13 +327,7 @@ Das Netz kennt nur Lagen, in die das Vorbild kommt. Ein kleiner Fehler führt in
 dort folgt ein größerer Fehler – und so weiter. Die Fehler können mit der Länge der Episode sogar
 **quadratisch** wachsen: doppelt so lang, viermal so viel Fehler.
 
-```
-Vorbild: ●──●──●──●──●──●   (immer in der Spur)
-Klon:    ●──●──●─╲
-                  ●─╲       kleiner Fehler
-                     ●─╲    größerer Fehler
-                        ●   Sturz
-```
+![Das Vorbild bleibt in der Spur; der Klon macht einen kleinen Fehler, dann einen größeren und stürzt](../abbildungen/verteilungsverschiebung.svg)
 
 > **So kannst du es dir vorstellen:** Radfahren nur durch Zuschauen. Die Profi-Fahrerin wackelt nie.
 > Wackelst du selbst, weißt du nicht, was zu tun ist – das hast du bei ihr nie gesehen.
@@ -633,16 +612,7 @@ So läuft eine Runde: viele Kandidaten rund um einen Mittelpunkt ausdenken, alle
 bessere Hälfte behalten und den Mittelpunkt zu ihr schieben. **CMA-ES** lernt dabei auch die **Form**
 der Suchwolke:
 
-```
-Runde 1         Runde 5             Runde 20
-
-  · · ·          · · · ·
- · · · ·          · · · · ·  ─►         ●
-  · · ·          · · · ·              (am Tal)
-
-rund und groß   lang gezogen,       klein,
-                Richtung Tal        dicht am Ziel
-```
+![Die Suchwolke von CMA-ES, schematisch: rund und groß, dann lang gezogen in Richtung Tal, zuletzt klein am Ziel](../abbildungen/cma-es.svg)
 
 Geht es lange in **dieselbe** Richtung, wird die Wolke größer und streckt sich in diese Richtung. Ist
 man nah dran und die Schritte heben sich auf, wird sie kleiner.
@@ -696,7 +666,7 @@ Ente zum Springen nicht.
 
 ## Level geschafft!
 
-- Du rechnest ein Neuron mit zwei Eingängen von Hand.
+- Du rechnest ein Neuron mit drei Eingängen von Hand.
 - Du weißt, wie Gradientenabstieg im Nebel bergab führt und was die Lernrate tut.
 - Du verstehst Backpropagation als Getriebe aus multiplizierten Steigungen.
 - Du unterscheidest Nachahmen und Lernen durch Belohnung.

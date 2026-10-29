@@ -34,7 +34,7 @@ Ein Spiel durchläuft immer dieselben vier Stationen: vorbereiten, starten, Schr
 weiterrechnen, stoppen.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A[Vorbereiten] --> B[Start: Kopie anlegen]
   B --> C[Schritt]
   C --> C
@@ -519,7 +519,7 @@ Motorbewegung zu welcher Lage passt.
 In jedem Schritt läuft ein Kreislauf:
 
 ```mermaid
-flowchart LR
+flowchart TB
   S[Fühlen: Sensoren lesen] --> V["Verhalten wählen, z. B. laufen, stehen, Ball suchen"]
   V --> N[Netz fragen]
   N --> M[Servos bewegen]

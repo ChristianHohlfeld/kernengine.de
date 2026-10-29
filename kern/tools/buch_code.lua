@@ -32,13 +32,16 @@ function Code(el)
   return pandoc.RawInline("latex", "\\texttt{" .. breakable(el.text) .. "}")
 end
 
--- Formulas wider than the line are scaled down to fit (adjustbox), instead of reaching into the
--- margin; short ones stay as they are.
+-- Formulas wider than the line are scaled down to fit (\kernfit, defined in buch_pdf.py), instead
+-- of reaching into the margin; short ones stay as they are. Not adjustbox: it takes pandoc's
+-- \setkeys{Gin}{width=\maxwidth,...} as defaults and shrank every formula to half a point.
 function Math(el)
   if el.mathtype == "DisplayMath" then
-    return pandoc.RawInline("latex", "\\[\\adjustbox{max width=\\linewidth}{$\\displaystyle " .. el.text .. "$}\\]")
+    return pandoc.RawInline("latex", "\\[\\kernfit{$\\displaystyle " .. el.text .. "$}\\]")
   elseif #el.text > 30 then
-    return pandoc.RawInline("latex", "\\adjustbox{max width=\\linewidth,valign=c}{$" .. el.text .. "$}")
+    -- \hfil\penalty50\hfilneg: the line may end before the formula, ragged, instead of the formula
+    -- sticking out of the margin; when no break is taken the two glues cancel.
+    return pandoc.RawInline("latex", "\\nobreak\\hfil\\penalty50\\hfilneg\\kernfit{$" .. el.text .. "$}")
   end
 end
 

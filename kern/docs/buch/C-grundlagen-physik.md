@@ -112,15 +112,9 @@ $h\omega = 3{,}14$. Explizit wächst die Amplitude pro Schritt um den Faktor 3,3
 um das 150 000-Fache. Semi-implizit liegt $h\omega$ über 2: ebenfalls instabil. Implizit wird die
 Schwingung stark gedämpft, bleibt aber stabil.
 
-```
- Amplitude
-   │  explizit  ╱╲    ╱‾‾╲
-   │      ╱╲  ╱  ╲  ╱    ╲   (wächst)
-   │ ╱╲  ╱  ╲╱    ╲╱
-   │╱  ╲╱    semi-implizit: ╱╲╱╲╱╲╱╲ (bleibt)
-   │          implizit:     ╱╲_╱‾‾\__ (klingt ab)
-   └────────────────────────────────── t
-```
+Bei einem kleinen Schritt ($h\omega = 0{,}25$) sieht man das Verhalten der drei Verfahren deutlich:
+
+![Die drei Verfahren am Federschwinger mit hω = 0,25 über 50 Schritte: explizit wächst, semi-implizit bleibt, implizit klingt ab](../abbildungen/integratoren.svg)
 
 ### C.2.3 Was Box3D tut
 
@@ -157,7 +151,7 @@ großer Schritt, und große Schritte machen Federn instabil (C.2.2) und das Erge
 Die Lösung ist Glenn Fiedlers **Akkumulator** („Fix Your Timestep“):
 
 ```mermaid
-flowchart LR
+flowchart TB
   F["Frame: Zeit dt"] --> A["Akkumulator += min(dt, 0,25 s)"]
   A --> L{"Akkumulator ≥ h?"}
   L -->|ja| S["ein fester Schritt h; Akkumulator -= h"]
@@ -196,7 +190,7 @@ Bei $n$ Körpern gibt es $n(n-1)/2$ Paare – bei 1000 Körpern fast 500 000. Je
 ist zu teuer. Deshalb arbeitet man in zwei Phasen:
 
 ```mermaid
-flowchart LR
+flowchart TB
   B["Broad Phase: Hüllquader-Baum findet Kandidatenpaare"] --> N["Narrow Phase: exakter Test, Kontaktpunkte (Manifold)"]
   N --> S["Solver: Kontakt-Constraints"]
 ```
@@ -232,13 +226,7 @@ gibt es effiziente, robuste Verfahren:
 Das Ergebnis ist ein **Manifold**: eine Kontaktnormale und bis zu einige Kontaktpunkte, jeweils mit
 Abstand (negativ bei Durchdringung).
 
-```
- GJK: Minkowski-Differenz A − B
-       ________
-      /        \      Ursprung außerhalb → getrennt, Abstand = kürzester Weg
-     /   A−B    \  ·0
-     \__________/
-```
+![GJK: Liegt der Ursprung außerhalb der Minkowski-Differenz A − B, sind die Formen getrennt; der kürzeste Weg ist ihr Abstand](../abbildungen/gjk.svg)
 
 ### C.3.4 Konvexe Hüllen
 
@@ -309,15 +297,7 @@ wird sie überschritten, **gleitet** er mit Reibung $\mu\lambda_n$ entgegen der 
 erlaubten Kräfte bilden einen **Reibungskegel** um die Normale mit halbem Öffnungswinkel
 $\arctan\mu$:
 
-```
-          n
-          │      Reibungskegel:
-     ╲    │    ╱  Kraft innen → Haften
-      ╲   │   ╱   Kraft am Rand → Gleiten
-       ╲  │  ╱
-        ╲ │ ╱  arctan μ
-   ──────●──────  Kontaktebene
-```
+![Der Reibungskegel um die Normale n mit halbem Öffnungswinkel arctan μ](../abbildungen/reibungskegel.svg)
 
 Physikalisch unterscheidet man Haft- und Gleitreibung ($\mu_s > \mu_k$). Box3D kennt nur **einen**
 Koeffizienten.
@@ -586,7 +566,7 @@ den Motor so, dass das Gelenk ihn erreicht. Im Inneren ist das ein **Regelkreis*
 Winkel, vergleicht mit dem Ziel und erzeugt ein Moment.
 
 ```mermaid
-flowchart LR
+flowchart TB
   Z["Zielwinkel θ*"] --> T["Totzeit (Bus)"]
   T --> E["Fehler e = θ* − θ"]
   E --> PD["PD: K·e − D·θ̇, begrenzt auf ±T"]

@@ -36,7 +36,7 @@ Koordinatensystem.
 > viermal anders beschrieben.
 
 ```mermaid
-flowchart LR
+flowchart TB
   M["Modell: eigene Einteilung"] --> W["Welt: Stadtplan"]
   W --> K["Kamera: dein Blick"]
   K --> S["Bildschirm: Pixel und Tiefe"]
@@ -187,15 +187,7 @@ aus ([Kapitel 4](04-grafik.md)).
 Die **Rasterisierung** prüft, welche Pixelmittelpunkte in einem Dreieck liegen. Jedes davon wird ein
 **Fragment** – ein Pixel-Kandidat, für den gleich die Farbe ausgerechnet wird.
 
-```
-     v2
-     /\
-    / ■\       ■ = Pixelmitte im Dreieck
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+![Pixel, deren Mitte im Dreieck liegt, werden zu Fragmenten](../abbildungen/rasterisierung.svg)
 
 Die Werte der drei Ecken (Farbe, Normale, Texturstelle) werden für jedes Fragment gemischt, mit drei
 Anteilen, die zusammen 1 ergeben. Genau in der Mitte bekommt jede Ecke ein Drittel: Ecken rot, rot,
@@ -271,15 +263,7 @@ andere. Die Grafikkarte wirft sie weg, ohne sie zu malen. Woran erkennt sie die?
 Jedes Dreieck hat seine Ecken in fester Reihenfolge 1, 2, 3. Von vorn gesehen laufen sie gegen den
 Uhrzeigersinn, von hinten mit dem Uhrzeigersinn.
 
-```
- von vorn:          von hinten:
-      3                  3
-     / \                / \
-    /   \              /   \
-   1-----2            2-----1
- gegen den          mit dem
- Uhrzeigersinn      Uhrzeigersinn
-```
+![Dieselben Ecken 1, 2, 3: von vorn gegen den Uhrzeigersinn, von hinten mit dem Uhrzeigersinn](../abbildungen/umlaufsinn.svg)
 
 Probier es: Zeichne ein Dreieck auf Papier, nummeriere die Ecken gegen den Uhrzeigersinn und halte
 das Blatt von hinten gegen das Licht. Jetzt laufen die Zahlen andersherum. Ein Spiegelbild dreht den
@@ -296,7 +280,7 @@ Zwei Sorten gibt es:
 - Der **Fragment-Shader** läuft für jedes Fragment und rechnet seine Farbe aus.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A["Ecken + Einstellungen"] --> VS["Vertex-Shader"]
   VS --> R["Rasterisierung"]
   R --> FS["Fragment-Shader"]
@@ -464,13 +448,7 @@ weit weg das Nächste ist** – das ist die **Schattenkarte**. Beim Malen fragt 
 weiter weg von der Sonne als das, was sie an dieser Stelle gesehen hat? Dann liegt etwas davor, und
 ich bin im Schatten.
 
-```
-   Sonne ═══╗  (parallele Strahlen)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          gespeichert: Dach
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    Boden dahinter → Schatten
-```
+![Die Schattenkarte speichert je Sonnenstrahl die erste Fläche; der Boden dahinter ist weiter weg und liegt im Schatten](../abbildungen/schattenkarte.svg)
 
 Die Sonnenstrahlen sind parallel, also nimmt man eine orthografische Ansicht. Deckt eine Karte mit
 512 Kästchen 240 m ab, ist ein Kästchen 240 ÷ 512 ≈ 47 cm groß – Schatten wie aus Minecraft-Blöcken.
@@ -489,14 +467,7 @@ Die Sonnenstrahlen sind parallel, also nimmt man eine orthografische Ansicht. De
 Treppenstufe. Liegt die echte Fläche schräg, ist sie mal über, mal unter der Stufe. Die Punkte
 darunter halten sich für verdeckt – von sich selbst! Es entstehen Streifen.
 
-```
-  ‾‾‾‾‾|                ‾‾‾‾ = gespeicherte Stufe
-   \   |                 \   = echte, schräge Fläche
-     \ ‾‾‾‾‾|
-       \    |           unter der Stufe hält sich
-         \  ‾‾‾‾‾|      die Fläche für verdeckt:
-           \     |      Streifen!
-```
+![Schattenakne: Jedes Kästchen speichert eine Stufe; wo die schräge Fläche darunter liegt, hält sie sich für verdeckt](../abbildungen/schattenakne.svg)
 
 Das Gegenmittel: beim Vergleichen ein kleines Stück **Abstand** dazugeben, also lieber knapp vor der
 Fläche nachschauen. Nimmt man aber zu viel Abstand, beginnt der Schatten erst ein Stück neben dem
@@ -524,14 +495,7 @@ ganz am Ende alles auf 0 bis 1. Das heißt **Tonemapping**. Eine gute Kurve ist 
 gerade und drückt nur das sehr Helle sanft zusammen. So sieht man in einer hellen Wolke noch Formen,
 statt dass sie einfach weiß wird.
 
-```
- Ausgabe
-  1 |            ____________
-    |        _--
-    |    /
-  0 |/________________________ Eingabe
-    0    1    2    3    4
-```
+![Kerns Kurve drückt das sehr Helle sanft zusammen, statt bei 1 hart abzuschneiden](../abbildungen/tonemapping.svg)
 
 Kern nimmt dafür eine Kurve aus der Filmindustrie (sie heißt ACES), davor die **Belichtung** wie bei
 einer Kamera, danach eine Farbstimmung.
@@ -618,17 +582,7 @@ anderen. Freier Boden sieht alles, **100 %**. Steht auf einer Seite eine Mauer, 
 unter 45° siehst, fehlen 45° von 180°: **75 %**. In einer Rinne mit solchen Mauern auf beiden Seiten
 fehlen zweimal 45°: **50 %**.
 
-```
- #                           #
- # \                       / #
- #   \     sichtbar      /   #
- #     \     90°       /     #
- #       \           /       #
- # 45°     \       /     45° #
- #           \   /           #
- #_____________●_____________#
-                         # = Mauer
-```
+![Ein Punkt in einer Rinne: Beide Mauern verdecken je 45°, sichtbar bleiben 90° Himmel](../abbildungen/umgebungsverdeckung.svg)
 
 Strahlen durch die ganze Szene zu schießen, wäre zu teuer. Darum schaut man nur in den
 **Tiefenpuffer**: Für jedes Pixel guckt man in ein paar Richtungen, wie hoch die Nachbarn ringsum
@@ -674,13 +628,7 @@ Pyramidenstumpf (*Frustum*) aus sechs Wänden: links, rechts, oben, unten, nah u
 bekommt eine **Hüllkugel**, die es ganz umschließt. Liegt der Mittelpunkt der Kugel mehr als ihren
 Radius **hinter** einer dieser Wände, ist das Objekt sicher unsichtbar.
 
-```
-       \         /
-        \  ●    /     ● sichtbar
-   ○     \     /      ○ weg: mehr als r hinter der Wand
-          \   /
-          Kamera
-```
+![Hüllkugeln an der Sichtpyramide: A liegt mehr als r hinter der Wand und fällt weg, B und C werden gezeichnet](../abbildungen/sichtpyramide.svg)
 
 Kugel mit 2 m Radius, Mittelpunkt 3 m hinter der Wand: weg. Nur 1,5 m dahinter: Sie ragt noch ins
 Bild. Der Test wirft **nie** Sichtbares weg, lässt an den Ecken der Pyramide aber manchmal
@@ -697,13 +645,7 @@ Welches Dreieck trifft er zuerst? Alle Dreiecke einzeln zu prüfen, dauert bei M
 Darum sortiert man sie in einen Baum aus Kisten in Kisten, eine **BVH** (*Bounding Volume
 Hierarchy*, „Hüllkörper-Baum“). Verfehlt der Strahl eine Kiste, fällt alles darin auf einmal weg.
 
-```
-          [ alle ]
-         /        \
-    [links]      [rechts]
-    /    \        /    \
- [△△]  [△△]   [△△]  [△△]
-```
+![Kisten in Kisten: links im Raum, rechts als Baum mit Dreiecken in den Blättern](../abbildungen/bvh.svg)
 
 > **So kannst du es dir vorstellen:** „Wer bin ich?“ mit Ja-Nein-Fragen. Jede Frage halbiert die
 > Möglichkeiten. Mit 20 Fragen findest du eine Person unter einer Million.

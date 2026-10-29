@@ -93,14 +93,7 @@ für sich rechnen – oder in mehreren Helfern im Browser (14.11).
 > mit. Der **Auswerter am Schreibtisch** (der Lerner) liest alle Notizen und schreibt neue Anweisungen –
 > die neue Policy. Die bekommen die Helfer für die nächste Runde.
 
-```mermaid
-flowchart LR
-  R["Trainingsplan"] --> T["Punkteregeln"]
-  T --> E["Halle: eine Ente"]
-  E --> C["Helfer mit Klemmbrett"]
-  C -->|"Notizen"| P["Auswerter"]
-  P -->|"neue Policy"| C
-```
+![Trainingsplan, Punkteregeln und Halle; der Auswerter gibt die neue Policy an die Helfer, die Helfer bringen Notizen zurück](../abbildungen/lehrer-rollen.svg)
 
 Eine solche Runde – alle Enten probieren, der Auswerter lernt daraus – heißt **Iteration**. Ein
 Training hat Hunderte bis Tausende davon.

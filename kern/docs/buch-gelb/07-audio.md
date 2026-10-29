@@ -73,11 +73,7 @@ höher, so wie eine Frauenstimme dieselbe Melodie höher singt als eine Männers
 schnell abspielen heißt für den Mixer: Er liest nur jede zweite Zahl, also Sample 0, 2, 4 … Bei
 Tonhöhe 1,5 springt er jedes Mal um anderthalb Kästchen weiter:
 
-```
-Kästchen:  0    1    2    3    4    5    6
-gelesen:   ●         ◐    ●         ◐    ●
-           0        1,5   3        4,5   6
-```
+![Tonhöhe 1,5: gelesen wird bei 0, 1,5, 3, 4,5 und 6; dazwischen schätzt eine weiche Kurve durch die Nachbarn den Wert](../abbildungen/abtastung.svg)
 
 Bei 0, 3 und 6 liegt ein Punkt. Bei 1,5 und 4,5 liegt keiner, denn Sample 1,5 gibt es nicht. Kern
 schätzt den Wert dort aus den Nachbarn mit einer weichen Kurve, wie eine Linie, die du durch die
@@ -182,7 +178,7 @@ leiser oder stumm schalten. Kern hat fünf: **Musik** (Music), **Effekte** (Effe
 **Master**, dem Hauptregler.
 
 ```mermaid
-flowchart LR
+flowchart TB
   S[Stimmen] --> B[Busse]
   B --> M[Master]
   B --> H[Hall]
@@ -235,7 +231,7 @@ auf jedem Gerät gleich.
 So entsteht ein Klang:
 
 ```mermaid
-flowchart LR
+flowchart TB
   W[Wellenform] --> T[Tonhöhe: gleiten, springen, zittern]
   T --> F[Filter]
   F --> H[Hüllkurve]
@@ -248,19 +244,13 @@ flowchart LR
 |---|---|---|
 | Sinus | rund wie eine Wasserwelle | weiches Pfeifen, Glocke |
 | Rechteck, Puls | springt zwischen oben und unten | Piepsen alter Videospiele |
-| Sägezahn | steigt schräg, fällt senkrecht | schnarrend, scharf |
+| Sägezahn | fällt schräg, springt senkrecht hoch | schnarrend, scharf |
 | Dreieck | gerade hoch, gerade runter | zwischen Sinus und Rechteck |
 | Rauschen | zufälliges Gezappel | Zischen, Wind, Explosion |
 
-So sehen die fünf Wellen aus, wenn du sie auf Karopapier zeichnest:
+So sehen die fünf Wellen aus, je drei Schwingungen, in der Höhe so groß, wie Kern sie erzeugt:
 
-```
-Sinus      ∿∿∿∿∿∿∿∿
-Rechteck   _|‾|_|‾|_|‾|_|‾|
-Sägezahn   /|/|/|/|/|/|
-Dreieck    /\/\/\/\/\/\
-Rauschen   .:'·:.'·,:'.·:'
-```
+![Die fünf Wellenformen des Synthesizers: Sinus, Rechteck, Sägezahn, Dreieck und Rauschen](../abbildungen/wellenformen.svg)
 
 **2. Die Tonhöhe** kann gleiten (ein Laser zischt von hoch nach tief), zittern (*Vibrato*) oder
 springen. **3. Filter** nehmen Höhen oder Tiefen weg, zum Beispiel macht ein Tiefpass aus Rauschen

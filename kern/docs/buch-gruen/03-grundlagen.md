@@ -302,15 +302,7 @@ sondern damit, wie viele Meter hoch der sichtbare Ausschnitt ist.
 Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide**.
 Von oben betrachtet sieht sie so aus:
 
-```
-   Ferngrenze  ______________________
-               \                    /
-                \     ●            /     ● drinnen: wird gemalt
-         ○       \                /      ○ draußen: wird übersprungen
-                  \______________/   Nahgrenze
-                          ▲
-                        Kamera
-```
+![Die Sichtpyramide von oben, zwischen Nah- und Ferngrenze: Was drinnen oder halb am Rand liegt, wird gemalt, was ganz draußen liegt, übersprungen](../abbildungen/sichtpyramide.svg)
 
 Was draußen liegt, muss nicht gemalt werden. Damit die Prüfung schnell geht, steckt Kern jedes Ding
 in eine unsichtbare **Kugel** oder einen **Karton**. Liegt die Kugel ganz außerhalb der Pyramide,

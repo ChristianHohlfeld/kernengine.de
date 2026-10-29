@@ -36,14 +36,7 @@ kommt eine dritte Achse dazu. Leg das Blatt flach auf den Tisch, wie eine Landka
 rechts (Osten), y nach hinten (Norden), und die neue Achse z zeigt zur Decke. Sie ist die Höhe
 über der Karte. Weil Kern ganze Städte aus Kartendaten baut, ist diese Landkarten-Sicht praktisch.
 
-```
-        z (oben)
-        │   y (hinten, Norden)
-        │  ╱
-        │ ╱
-        │╱
-        └──────── x (rechts, Osten)
-```
+![Kerns Achsen: x nach rechts (Osten), y nach hinten (Norden), z nach oben](../abbildungen/achsen.svg)
 
 In diesem Kapitel kommen mehrere **Bauer** vor. Ein Bauer ist ein Programmteil, der aus ein paar
 Zahlen eine neue Form baut, zum Beispiel aus einem Grundriss ein Haus. Alle Bauer liefern ihr
@@ -66,17 +59,7 @@ Was nicht im Bild ist, muss nicht gezeichnet werden. Die Kamera sieht in eine ab
 Pyramide mit sechs Wänden (links, rechts, oben, unten, nah, fern). Diese Pyramide heißt **Frustum**.
 Alles, was sicher draußen liegt, lässt Kern weg. Das heißt **Culling** (Aussortieren).
 
-```
-  Blick von oben auf das Sichtfeld der Kamera
-
-    ○ A        ╲      ○ B     ╱
-    draußen     ╲    drin    ╱      ◐ C
-                 ╲          ╱     auf der Kante:
-                  ╲        ╱      wird gezeichnet
-                   ╲      ╱
-                    ╲____╱
-                    Kamera
-```
+![Das Sichtfeld der Kamera von oben: A liegt draußen, B drin, C auf der Kante; B und C werden gezeichnet](../abbildungen/sichtpyramide.svg)
 
 Der Test muss viel schneller sein als das Zeichnen, sonst lohnt er nicht. Darum prüft Kern nicht
 tausende Dreiecke, sondern **eine Kugel**, die das ganze Mesh umschließt. Liegt ihr Mittelpunkt
@@ -153,10 +136,7 @@ Bedingungen stehen im blauen Buch, Kapitel 5.
 **Picking** heißt: herausfinden, was du gerade angeklickt hast. Dafür schickt Kern vom Mauszeiger
 aus einen **Strahl** in die Welt. Das erste Dreieck, das er trifft, ist angeklickt.
 
-```
-  Auge ─────► Pixel unter der Maus ─────────► Haus
-            (auf dem Bildschirm)      Strahl: erster Treffer
-```
+![Picking: Ein Strahl vom Auge durch den Pixel unter der Maus; der erste Treffer zählt](../abbildungen/picking-strahl.svg)
 
 Der Strahl beginnt im Auge der Kamera und geht durch den Pixel unter der Maus, also genau durch
 die Pyramide aus 5.2, von ihrer nahen bis zu ihrer fernen Wand. Für jedes Mesh, das in Frage kommt,
@@ -195,19 +175,7 @@ Ecke, deren Dreieck mit den beiden Nachbarecken ganz im Vieleck liegt. Schneides
 ein Vieleck mit einer Ecke weniger. Das wiederholst du, bis nur noch ein Dreieck übrig ist. Es
 entstehen immer **n − 2 Dreiecke**.
 
-```
-  A─────B          L-Form mit 6 Ecken: A B C D E F
-  │     │
-  │     C─────────D
-  │               │
-  F───────────────E
-
-  Schritt  abgeschnitten      übrig bleibt
-  1        Dreieck A B C      A C D E F  (5 Ecken)
-  2        Dreieck D E F      A C D F    (4 Ecken)
-  3        Dreieck C D F      A C F      (3 Ecken)
-  4        Dreieck A C F      nichts mehr
-```
+![Ohren abschneiden an einer L-Form mit 6 Ecken: in 4 Schritten entstehen 4 Dreiecke](../abbildungen/earcut-ohren.svg)
 
 In Schritt 1 ist B das Ohr: Die Linie von A nach C schneidet die Ecke B ab, wie wenn du mit der
 Schere eine Ecke vom Papier schneidest. In Schritt 2 ist E das Ohr, in Schritt 3 ist D das Ohr.
@@ -224,14 +192,7 @@ Linie in zwei Hälften, die es einzeln zerlegt.
 **Brücke** vom Loch zum Außenrand, hin und zurück. Jetzt ist der Innenhof ein Teil des Randes, und
 alles ist wieder ein Ring.
 
-```
-  vorher: Rand und Loch        nachher: ein einziger Ring
-  ┌────────────┐               ┌─────┐┌─────┐
-  │   ┌────┐   │               │   ┌─┘└─┐   │
-  │   │Hof │   │               │   │Hof │   │
-  │   └────┘   │               │   └────┘   │
-  └────────────┘               └────────────┘
-```
+![Eine Brücke verbindet den Hof mit dem Außenrand: Aus Rand und Loch wird ein einziger Ring](../abbildungen/earcut-loch.svg)
 
 Stell dir vor, du fährst mit dem Finger den Rand entlang. Vorher kommst du nie an den Hof heran.
 Nachher läufst du oben durch den schmalen Schlitz hinein, einmal um den Hof herum, durch den
@@ -274,19 +235,13 @@ gleiche Farbe, gleiche UV, bis zur letzten Stelle. Darum geht nichts verloren, u
 bleiben scharf.
 
 > **So kannst du es dir vorstellen:** Schau dir eine Würfelecke an. Dort treffen drei Seiten
-> zusammen: oben, vorn und rechts. Jede Seite hat ihre eigene Normale, also ihren eigenen Pfeil.
->
-> ```
->        ↑ Normale der Oberseite
->        │
->        ●───→ Normale der rechten Seite
->       ╱
->      ↙ Normale der Vorderseite
-> ```
->
-> Gleiche Lage, aber drei verschiedene Pfeile: Das sind für den Computer drei verschiedene Ecken.
-> Die Soup hat 36 Ecken. Welding legt alle zusammen, die wirklich gleich sind, und es bleiben
-> 8 · 3 = 24. Würde Kern alle drei Pfeile zu einem mitteln, sähe der Würfel weich und rund aus.
+> zusammen: oben, vorn und rechts. Jede Seite hat ihre eigene Normale, also ihren eigenen Pfeil
+> (Bild unten). Gleiche Lage, aber drei verschiedene Pfeile: Das sind für den Computer drei
+> verschiedene Ecken. Die Soup hat 36 Ecken. Welding legt alle zusammen, die wirklich gleich sind,
+> und es bleiben 8 · 3 = 24. Würde Kern alle drei Pfeile zu einem mitteln, sähe der Würfel weich und
+> rund aus.
+
+![Eine Würfelecke: drei Seiten, drei Normalen, also drei Ecken für den Computer](../abbildungen/wuerfelecke.svg)
 
 Um gleiche Ecken schnell zu finden, nutzt Kern eine **Hashtabelle**: Aus den Zahlen jeder Ecke
 wird eine Fachnummer berechnet, wie die Fachnummer in einem Schrank mit vielen Schubladen. Gleiche
@@ -311,7 +266,7 @@ Zufallszahl (der **Seed**, siehe 5.11) für Farben und Fassade, die Höhe des Fu
 Dachkante.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A["Grundriss: Punkte"] --> B["Aufräumen"]
   B --> C["Dach: Earcut"]
   C --> D["Wände an jeder Kante"]
@@ -383,13 +338,7 @@ Der Boden einer großen Karte besteht aus **Kacheln**. Eine Kachel ist ein Gitte
 jede Gitterecke hat ihre eigene Höhe, und jedes Quadrat wird an der Diagonale in zwei Dreiecke
 geteilt. Liegen die Ecken verschieden hoch, werden die Dreiecke schräg, und es entstehen Hügel.
 
-```
-  Höhen der Gitterecken        seitlich gesehen
-
-   2   3   5                      ╱╲
-   1   2   4                  ___╱  ╲___
-   1   1   2
-```
+![Eine Kachel mit 3 × 3 Gitterecken: links die Höhen von oben, rechts dieselbe Kachel schräg von oben](../abbildungen/gelaende-hoehen.svg)
 
 Für das Licht braucht jede Ecke eine **Normale**, denn ein Hang zur Sonne ist hell, ein Hang weg von
 ihr dunkel. Kern schaut dafür auf die Nachbarn: Liegt links eine Ecke auf 4 m und rechts eine auf 6
@@ -424,7 +373,7 @@ Startzahl, dem **Seed**, eine lange Folge von Zahlen, die zufällig aussieht, ab
 > Seed ist ein anders gemischter Stapel.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A["Blockraster"] --> B["Höhen"]
   B --> C["Bebauung"]
   C --> D["Straßen"]
@@ -448,15 +397,7 @@ flowchart LR
 
 Warum quadrieren? Schau dir einen Schnitt durch die Stadt an:
 
-```
-  Höhe
-  84 m |               ▇
-       |             ▇ ▇ ▇
-       |           ▇ ▇ ▇ ▇ ▇
-  14 m | ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇ ▇
-       +-------------------------------- 
-        Rand          Mitte          Rand
-```
+![Schnitt durch die mittlere Blockreihe der Beispielstadt: die Höchsthöhe je Block, außen 20 m, in der Mitte 84 m](../abbildungen/stadt-hoehen.svg)
 
 Kleine Zahlen werden beim Quadrieren noch kleiner: 0,5 · 0,5 = 0,25, aber 0,9 · 0,9 = 0,81. Darum
 bleiben die meisten Blöcke niedrig, und nur ganz in der Mitte wächst ein steiler **Hochhausberg**.

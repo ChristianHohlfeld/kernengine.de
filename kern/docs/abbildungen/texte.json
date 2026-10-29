@@ -163,8 +163,8 @@
     "de": {"ausloeser": "push, Pull Request,", "ausloeser2": "manuell", "native": "native", "native_r": "ubuntu-24.04, Sanitizer", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "nur main, kein Pull Request", "e2e": "e2e", "parallel": "unabhängig, parallel"},
     "en": {"ausloeser": "push, pull request,", "ausloeser2": "manual", "native": "native", "native_r": "ubuntu-24.04, sanitizers", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "main only, no pull request", "e2e": "e2e", "parallel": "independent, parallel"},
     "gruen": {
-      "de": {"ausloeser": "Änderung", "ausloeser2": "", "native": "Tests mit Spürhunden", "determinism": "Fingerabdruck auf dem Mac", "build": "Bauen und Grundprüfungen", "deploy": "Veröffentlichen", "e2e": "Testklicker"},
-      "en": {"ausloeser": "change", "ausloeser2": "", "native": "tests with sniffer dogs", "determinism": "fingerprint on the Mac", "build": "build and basic checks", "deploy": "publish", "e2e": "test clicker"}
+      "de": {"ausloeser": "Änderung", "ausloeser2": "(Push)", "native": "Tests mit Spürhunden", "determinism": "Fingerabdruck auf dem Mac", "build": "Bauen und Grundprüfungen", "deploy": "Veröffentlichen", "e2e": "Testklicker"},
+      "en": {"ausloeser": "change", "ausloeser2": "(push)", "native": "tests with sniffer dogs", "determinism": "fingerprint on the Mac", "build": "build and basic checks", "deploy": "publish", "e2e": "test clicker"}
     },
     "gelb": {
       "de": {"ausloeser": "Änderung", "ausloeser2": "hochgeladen", "native": "Tests mit Prüfern", "determinism": "Fingerabdruck auf dem Mac", "build": "bauen", "deploy": "veröffentlichen", "e2e": "Roboter im Browser"},
@@ -192,15 +192,15 @@
     }
   },
   "mlp-kette": {
-    "de": {"ein": "Eingabe", "ein2": "61 Werte", "norm": "Normalisierer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm + ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
-    "en": {"ein": "input", "ein2": "61 values", "norm": "normalizer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm + ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
+    "de": {"ein": "Eingabe", "ein2": "61 Werte", "norm": "Normalisierer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm", "akt2": "+ ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
+    "en": {"ein": "input", "ein2": "61 values", "norm": "normalizer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm", "akt2": "+ ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
     "gruen": {
       "de": {"ein": "Messwerte", "ein2": "61 Zahlen", "norm": "umrechnen", "norm2": "Normalisierer", "l1": "512", "l2": "256", "l3": "128", "akt": "verbiegen", "aus": "14 Servoziele", "aus2": "ohne Verbiegen"},
       "en": {"ein": "readings", "ein2": "61 numbers", "norm": "convert", "norm2": "normalizer", "l1": "512", "l2": "256", "l3": "128", "akt": "bend", "aus": "14 targets", "aus2": "no bending"}
     },
     "gelb": {
-      "de": {"ein": "61 Eingänge", "ein2": "", "norm": "umrechnen", "norm2": "", "l1": "512 Neuronen", "l2": "256 Neuronen", "l3": "128 Neuronen", "akt": "ELU", "aus": "14 Ausgänge", "aus2": ""},
-      "en": {"ein": "61 inputs", "ein2": "", "norm": "convert", "norm2": "", "l1": "512 neurons", "l2": "256 neurons", "l3": "128 neurons", "akt": "ELU", "aus": "14 outputs", "aus2": ""}
+      "de": {"ein": "61", "ein2": "Eingänge", "norm": "umrechnen", "norm2": "(Normalisierer)", "l1": "512", "l2": "256", "l3": "128", "akt": "Neuronen", "akt2": "ELU", "aus": "14", "aus2": "Ausgänge"},
+      "en": {"ein": "61", "ein2": "inputs", "norm": "convert", "norm2": "(normalizer)", "l1": "512", "l2": "256", "l3": "128", "akt": "neurons", "akt2": "ELU", "aus": "14", "aus2": "outputs"}
     }
   },
   "gae-rueckblick": {
@@ -346,5 +346,29 @@
       "de": {"stufe": "Stufe", "stufe_a": "plötzlich ein neues Ziel", "chirp_a": "immer schneller", "rechteck_a": "hin und zurück"},
       "en": {"stufe": "step", "stufe_a": "suddenly a new target", "chirp_a": "faster and faster", "rechteck_a": "back and forth"}
     }
+  },
+  "ppo-update": {
+    "de": {"p1a": "Sammeln: T Schritte × N Enten", "p1b": "(Collector)", "p2a": "kanonisch ordnen:", "p2b": "Schritt für Schritt, Ente für Ente", "p3": "Normalisierer aktualisieren", "p4a": "alte Policy neu bewerten:", "p4b": "μ_alt, log π_alt, V_alt", "p5a": "GAE: Vorteile Â, Ziele R̂;", "p5b": "Â normieren", "p6": "eine Permutation ziehen", "d1": "noch eine Epoche", "d2": "(von 5)?", "ja": "ja", "nein": "nein", "ende": "neue Policy", "m1": "Minibatch (von 4)", "m2": "KL messen, Lernrate anpassen", "m3a": "Gradienten in 8 festen Teilen,", "m3b": "Summe in fester Reihenfolge", "m4": "Adam (Actor + σ, Kritiker)"},
+    "en": {"p1a": "Collect: T steps × N ducks", "p1b": "(Collector)", "p2a": "Canonical order:", "p2b": "step by step, duck by duck", "p3": "Update normalizers", "p4a": "Re-evaluate old policy:", "p4b": "μ_old, log π_old, V_old", "p5a": "GAE: advantages Â, targets R̂;", "p5b": "normalize Â", "p6": "Draw one permutation", "d1": "Another epoch", "d2": "(of 5)?", "ja": "yes", "nein": "no", "ende": "New policy", "m1": "Minibatch (of 4)", "m2": "Measure KL, adapt learning rate", "m3a": "Gradients in 8 fixed chunks,", "m3b": "summed in fixed order", "m4": "Adam (actor + σ, critic)"}
+  },
+  "sprung-ablauf": {
+    "de": {"t1": "1. Vorbild suchen", "t2": "2. Nachahmen", "t3": "3. Üben", "t1b": "CMA-ES (A.13)", "t2b": "DAgger (A.9)", "t3b": "PPO (A.11)", "v1": "15 Schlüsselwerte", "v2a": "Simulation auf sauberen", "v2b": "und variierten Robotern", "v3a": "Bewertung: Steigen, Flug,", "v3b": "Neigung, Sturz, Stehen", "n1": "Warmstart: velstand", "n2": "Runde 0: Vorbild fährt", "n3a": "Runden 1–7: Netz fährt,", "n3b": "Vorbild beschriftet", "n4a": "Verhaltensklonen:", "n4b": "MSE, Adam", "u1": "30 Iterationen nur Kritiker", "u2a": "PPO: GAE, Clip,", "u2b": "KL-Lernrate, Entropie", "u3a": "volle Variation,", "u3b": "asymmetrischer Kritiker", "xa": "Export: ONNX mit", "xb": "Normalisierer (A.14)", "sa": "Studio / Roboter:", "sb": "nur das Netz"},
+    "en": {"t1": "1. Search for the Vorbild", "t2": "2. Imitate", "t3": "3. Practice", "t1b": "CMA-ES (A.13)", "t2b": "DAgger (A.9)", "t3b": "PPO (A.11)", "v1": "15 key values", "v2a": "Simulation on clean", "v2b": "and varied robots", "v3a": "Score: rise, flight,", "v3b": "tilt, fall, standing", "n1": "Warm start: velstand", "n2": "Round 0: Vorbild drives", "n3a": "Rounds 1–7: network", "n3b": "drives, Vorbild labels", "n4a": "Behavior cloning:", "n4b": "MSE, Adam", "u1": "30 iterations critic only", "u2a": "PPO: GAE, clip,", "u2b": "KL learning rate, entropy", "u3a": "Full variation,", "u3b": "asymmetric critic", "xa": "Export: ONNX with", "xb": "normalizer (A.14)", "sa": "Studio / robot:", "sb": "only the network"}
+  },
+  "reihenfolge-transform": {
+    "de": {"titel0": "erst drehen, dann schieben", "titel1": "erst schieben, dann drehen", "ende": "Ende", "unter0a": "dreht sich auf der Mitte,", "unter0b": "fährt dann nach rechts", "unter1a": "fährt nach rechts, schwenkt dann", "unter1b": "auf einem Bogen um die Mitte", "legende": "● Tischmitte · gestrichelt: Start und Zwischenstand · Spitze: Blickrichtung des Steins"},
+    "en": {"titel0": "rotate first, then move", "titel1": "move first, then rotate", "ende": "end", "unter0a": "turns on the centre,", "unter0b": "then moves to the right", "unter1a": "moves to the right, then swings", "unter1b": "on an arc around the centre", "legende": "● table centre · dashed: start and halfway · tip: where the piece faces"}
+  },
+  "wuerfelecke": {
+    "de": {"oben": "Normale der Oberseite", "rechts": "Normale der rechten Seite", "vorn": "Normale der Vorderseite", "fuss1": "gleiche Lage, drei Pfeile:", "fuss2": "für den Computer drei Ecken"},
+    "en": {"oben": "normal of the top", "rechts": "normal of the right side", "vorn": "normal of the front", "fuss1": "same position, three arrows:", "fuss2": "three vertices for the computer"}
+  },
+  "bremse-katapult": {
+    "de": {"vorher": "vorher", "nachher": "nach einem Schritt", "v1": "vorwärts", "v2": "rückwärts, viel schneller", "fuss": "Die Bremse rechnet mit dem alten Tempo und wirkt den ganzen Schritt (Pfeillängen schematisch)."},
+    "en": {"vorher": "before", "nachher": "after one step", "v1": "forward", "v2": "backward, much faster", "fuss": "The brake uses the old speed and acts for the whole step (arrow lengths schematic)."}
+  },
+  "trennende-achse": {
+    "de": {"lampe": "Lampe", "luecke1": "Lücke:", "luecke2": "getrennt", "wand": "Wand"},
+    "en": {"lampe": "lamp", "luecke1": "gap:", "luecke2": "separated", "wand": "wall"}
   }
 }

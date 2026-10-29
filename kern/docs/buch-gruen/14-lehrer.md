@@ -70,14 +70,7 @@ gleichzeitig arbeiten lässt).
 > **Anweisungen** heraus. Wie viele Hallen gleichzeitig offen sind, hängt davon ab, wie viele
 > Rechenkerne mitarbeiten.
 
-```mermaid
-flowchart LR
-  L["Lehrplan"] --> U["Aufgabe"]
-  U --> H["Turnhallen mit Enten"]
-  T["Trainer"] -->|"Anweisungen"| HE["Helfer"]
-  HE -->|"lassen turnen"| H
-  HE -->|"Zettel"| T
-```
+![Lehrplan, Aufgabe und Turnhallen; der Trainer gibt Anweisungen an die Helfer, die Helfer bringen Zettel zurück](../abbildungen/lehrer-rollen.svg)
 
 Eine Übungsrunde geht so: Die Helfer lassen alle Enten mit den aktuellen Anweisungen turnen und
 schreiben mit. Der Trainer sammelt alle Zettel ein, wertet sie aus und schreibt bessere Anweisungen.
@@ -99,7 +92,7 @@ gezeichnet. Das spart Zeit, denn sehen muss beim Üben niemand etwas.
 Ein Takt dauert für die Ente 1/50 Sekunde und läuft immer gleich ab:
 
 ```mermaid
-flowchart LR
+flowchart TB
   B["Befehl des Netzes"] --> P["Physik rechnet"]
   P --> M["Messen: Wie geht es ihr?"]
   M --> PU["Punkte verteilen"]

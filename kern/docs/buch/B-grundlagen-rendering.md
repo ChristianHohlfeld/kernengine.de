@@ -33,7 +33,7 @@ landet schließlich auf bestimmten Pixeln. Jeder dieser Schritte ist ein Wechsel
 Koordinatensystems:
 
 ```mermaid
-flowchart LR
+flowchart TB
   M["Modellraum (lokal)"] -->|"Modellmatrix M"| W["Weltraum"]
   W -->|"Ansichtsmatrix V"| K["Kameraraum"]
   K -->|"Projektionsmatrix P"| C["Clip-Raum (homogen)"]
@@ -184,15 +184,7 @@ $$v = \lambda_0 v_0 + \lambda_1 v_1 + \lambda_2 v_2.$$
 Weil die Perspektive nicht linear ist, interpoliert die GPU **perspektivisch korrekt** (sie
 interpoliert $v/w$ und $1/w$ linear und teilt).
 
-```
-     v2
-     /\
-    /  \       ■ = Pixelmittelpunkt im Dreieck → Fragment
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+![Rasterisierung: Pixel, deren Mittelpunkt im Dreieck liegt, werden zu Fragmenten](../abbildungen/rasterisierung.svg)
 
 ### B.2.2 Der Tiefenpuffer
 
@@ -231,7 +223,7 @@ teils gespiegelt sind und teils nicht, ebenfalls ohne Culling.
 ### B.3.1 Die Pipeline
 
 ```mermaid
-flowchart LR
+flowchart TB
   VB["Vertex-Puffer (Attribute)"] --> VS["Vertex-Shader (pro Ecke)"]
   U["Uniforms (pro Draw Call)"] --> VS
   VS --> R["Rasterisierung + Interpolation"]
@@ -441,13 +433,7 @@ die Tiefe des nächsten Objekts – die **Schattenkarte**. Beim normalen Rendern
 in den Raum der Sonne um und vergleicht: Ist seine Tiefe größer als die gespeicherte, liegt etwas
 davor.
 
-```
-   Sonne ═══╗  (orthografische Projektion)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          gespeicherte Tiefe: Dach
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    Boden hinter dem Dach: Tiefe größer → Schatten
-```
+![Schattenkarte: Pro Strahl der Sonne wird die erste Tiefe gespeichert; der Boden dahinter liegt tiefer und ist im Schatten](../abbildungen/schattenkarte.svg)
 
 ### B.5.2 Die Probleme und ihre Lösungen
 
@@ -521,16 +507,7 @@ statt hart abzuschneiden.
 Die Abbildung von $[0, \infty)$ auf $[0, 1]$ heißt **Tonemapping**. Eine gute Kurve ist im
 Mittelbereich fast linear, komprimiert die Lichter weich und sättigt nie hart:
 
-```
- Ausgabe
-  1 |            ____________
-    |        _--
-    |      /
-    |    /
-    |  /
-  0 |/________________________ Eingabe (linear)
-    0    1    2    3    4
-```
+![Kerns ACES-Kurve (für Grau, Belichtung 1) gegen hartes Abschneiden bei 1](../abbildungen/tonemapping.svg)
 
 **In Kern** ist es die ACES-Filmkurve in der Fassung von three.js (MIT, siehe Anhang D; `acesFilmic` in
 `kGlslToneMap`):
@@ -661,15 +638,7 @@ $$\hat a(h, \gamma) = \tfrac14\left(\cos\gamma + 2h\sin\gamma - \cos(2h - \gamma
    und die Sichtbarkeit der Scheibe ist $\lVert n_\text{proj}\rVert\left(\hat a(h_0,\gamma) + \hat a(h_1,\gamma)\right)$.
 4. Mitteln über die Scheiben.
 
-```
-             Horizont h1
-   Blick ↓      ╲   │n   ╱  Horizont h0
-                 ╲  │   ╱
-   ████████       ╲ │  ╱      ████
-   ████████████────●────────████████
-                  Pixel
-   sichtbarer Himmel: Bogen zwischen h0 und h1
-```
+![Eine Scheibe im Schnitt: Nachbarflächen verdecken den Himmel bis zu den Horizonten h₀ und h₁; sichtbar ist der Bogen dazwischen](../abbildungen/umgebungsverdeckung.svg)
 
 ### B.8.3 In Kern
 
@@ -758,14 +727,7 @@ $a x + b y + c z + d \ge 0$ für alle sechs Ebenen gilt.
 usw.) normiert die Ebenen, und `sphere_visible` testet eine **Hüllkugel**: Sie ist sicher außerhalb,
 wenn ihr Mittelpunkt weiter als der Radius hinter einer Ebene liegt.
 
-```
-       \         /
-        \  ●    /     ● sichtbar
-   ○     \     /      ○ verworfen: Abstand zur linken Ebene < -r
-          \   /
-           \ /
-          Kamera
-```
+![Hüllkugeln an der Sichtpyramide, von oben: A liegt mehr als r hinter einer Ebene und wird verworfen, B und C werden gezeichnet](../abbildungen/sichtpyramide.svg)
 
 Der Test ist **konservativ**: Er verwirft nie etwas Sichtbares, lässt aber manchmal Unsichtbares
 durch (Kugeln nahe einer Ecke des Stumpfs). Der Renderer wendet ihn auf jedes Mesh an, das nicht
@@ -780,13 +742,7 @@ Hierarchy** (BVH) ordnet sie in einen Baum: Jeder Knoten hat einen Hüllquader, 
 umschließt. Trifft ein Strahl oder eine Pyramide einen Knoten nicht, kann der ganze Teilbaum
 übersprungen werden – statt $O(n)$ Tests braucht man typischerweise $O(\log n)$.
 
-```
-            [ alle ]
-           /        \
-     [ links ]    [ rechts ]
-      /    \        /    \
-   [△△]  [△△]   [△△]  [△△]   Blätter: Dreiecke
-```
+![Eine BVH: links räumlich als verschachtelte Hüllquader, rechts als Baum mit Dreiecken in den Blättern](../abbildungen/bvh.svg)
 
 **In Kern** dient die BVH (`Bvh` in `bvh.h`) dem **Picking**, nicht dem Zeichnen: Statische
 Welt-Meshes ab 36 Dreiecken (`kBvhMinTriangles`) bekommen einen Baum über ihre Dreiecke, gebaut mit
@@ -855,16 +811,11 @@ Kern übersetzt mit wasi-sdk für `wasm32-wasip1` (`build.sh`). Die Grenze zum B
 klar:
 
 ```mermaid
-flowchart LR
-  subgraph WASM["WebAssembly-Modul (C++)"]
-    R["Renderer, Szene, Physik, Spiel"] --> GLH["kern::gl:: (gl.h): Importe aus Modul 'kern_gl'"]
-  end
-  subgraph JS["kern.mjs (Plattformschicht)"]
-    T["Handle-Tabellen u32 ↔ WebGL-Objekt"] --> WG["WebGL2RenderingContext"]
-    MEM["Sichten auf den linearen Speicher"]
-  end
-  GLH -->|"u32-Handles, Zeiger + Länge"| T
-  GLH --> MEM
+flowchart TB
+  R["WebAssembly-Modul (C++):<br/>Renderer, Szene, Physik, Spiel"] --> GLH["kern::gl:: (gl.h):<br/>Importe aus Modul 'kern_gl'"]
+  GLH -->|"u32-Handles, Zeiger + Länge"| T["kern.mjs (Plattformschicht):<br/>Handle-Tabellen u32 ↔ WebGL-Objekt"]
+  GLH --> MEM["kern.mjs (Plattformschicht):<br/>Sichten auf den linearen Speicher"]
+  T --> WG["WebGL2RenderingContext"]
 ```
 
 - **`gl.h`** deklariert genau die WebGL2-Funktionen, die die Engine benutzt, mit

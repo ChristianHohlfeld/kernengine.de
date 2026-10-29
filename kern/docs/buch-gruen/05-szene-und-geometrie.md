@@ -70,17 +70,7 @@ nicht jedes Dreieck, sondern legt um jedes Mesh eine **unsichtbare Kugel** und f
 Kugel ganz außerhalb einer der **sechs Wände** der Pyramide (links, rechts, oben, unten, vorn, hinten)?
 Sechs kleine Rechnungen statt tausender Ecken.
 
-```
-   Blick von oben auf die Kamera-Pyramide
-
-        \                         /
-    (A)  \     (B)               /
-          \                     /       (A) ganz draußen: weg
-           \                   /        (B) drinnen: malen
-            \                (C)        (C) halb am Rand: malen
-             \_______________/
-                   Kamera
-```
+![Die Kamera-Pyramide von oben: Kugel A ganz draußen wird übersprungen, B drinnen und C halb am Rand werden gemalt](../abbildungen/sichtpyramide.svg)
 
 Der Test ist **vorsichtig**: Eine Kugel nahe einer Ecke der Pyramide wird manchmal unnötig gemalt,
 aber **nie** fälschlich weggelassen. Lieber einmal zu viel arbeiten, als dass ein Haus fehlt.
@@ -186,7 +176,7 @@ Drei Sonderfälle muss Earcut beherrschen:
   Earcut kein Ohr mehr, räumt es auf, repariert kleine Fehler und teilt notfalls das Vieleck in zwei.
 - **Löcher:** Ohren gehen nur bei einem einzigen Rand. Darum schneidet Earcut von jedem Innenhof
   einen hauchschmalen **Schnitt** zum Außenrand. Danach ist alles ein einziger, verwinkelter Rand
-  (siehe Skizze).
+  (siehe Bild unten).
 - **Große Vielecke:** Bei sehr vielen Ecken wäre es zu langsam, für jedes Ohr alle Ecken zu prüfen.
   Earcut sortiert die Ecken dann nach Gegend und schaut nur noch in der Gegend nach.
 
@@ -195,16 +185,7 @@ Außenrand und einen Innenrand. Schneidest du ihn an einer Stelle von innen nach
 du ihn zu einem langen, gebogenen Streifen aufklappen. Fährst du jetzt mit dem Finger am Rand
 entlang, kommst du an Außen- und Innenkante vorbei, ohne abzusetzen. Es ist nur noch **ein** Rand.
 
-```
-   vorher: zwei Ränder          nachher: ein Rand
-   +-----------------+          +--------++-------+
-   |                 |          |        ||       |
-   |    +-------+    |          |    +---++---+   |
-   |    |  Hof  |    |          |    |  Hof   |   |
-   |    +-------+    |          |    +--------+   |
-   |                 |          |                 |
-   +-----------------+          +-----------------+
-```
+![Ein Schnitt verbindet den Hof mit dem Außenrand: Aus zwei Rändern wird einer](../abbildungen/earcut-loch.svg)
 
 > **Wusstest du?** Nach dem Schneiden vergleicht Kern die Fläche aller Dreiecke mit der des
 > Grundrisses. Weicht sie um mehr als 0,7 % ab, wird das Gebäude weggelassen, statt mit kaputtem Dach

@@ -47,7 +47,7 @@ MERMAID_CFG = ('{"theme":"base","themeVariables":{"fontFamily":"DejaVu Sans","fo
                '"lineColor":"#262626","secondaryColor":"#d9e5f2","secondaryBorderColor":"#1d5c99",'
                '"tertiaryColor":"#ffffff","clusterBkg":"#f7f7f7","clusterBorder":"#8c8c8c",'
                '"edgeLabelBackground":"#ffffff","noteBkgColor":"#d9e5f2","noteBorderColor":"#1d5c99"},'
-               '"flowchart":{"curve":"linear"}}')  # the style of kern/docs/abbildungen (STIL.md)
+               '"flowchart":{"curve":"linear","rankSpacing":24,"nodeSpacing":24}}')  # the style of kern/docs/abbildungen (STIL.md)
 
 
 def mermaid(code):
@@ -89,7 +89,12 @@ def figure(m):
         figures_built = True
     f = work / "abb" / f"{m.group(2)}.{edition_name}.{lang_code}.pdf"
     if not f.exists(): sys.exit(f"no figure {m.group(2)} for {edition_name}/{lang_code}")
-    return f"![{m.group(1)}]({f})"
+    # Set centred with its caption underneath (small, sans serif), both kept on one page.
+    cap = m.group(1).replace("`", "").replace("*", "")
+    cap = re.sub(r"([&%$#_{}])", r"\\\1", cap).replace("~", r"\textasciitilde{}").replace("^", r"\textasciicircum{}")
+    cap = r"\par\vspace{3pt}{\small\sffamily " + cap + "}" if cap.strip() else ""
+    return ("`\\begin{center}\\begin{minipage}{\\linewidth}\\centering\\includegraphics{" + f.as_posix() + "}"
+            + cap + "\\end{minipage}\\end{center}`{=latex}")
 
 
 TEXT_W, TEXT_H = w - 39.0, h - 54.0  # mm: the text block (inner 22 + outer 17, top 20 + bottom 24 + head)
@@ -190,6 +195,8 @@ header.write_text(r"""
 \tolerance=2000
 \hbadness=10000
 \DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\%s}
+\newsavebox\kernfitbox  %% formulas: shrink to the line only when wider (adjustbox would obey pandoc's Gin defaults and shrink them to dust)
+\newcommand\kernfit[1]{\sbox\kernfitbox{#1}\ifdim\wd\kernfitbox>\linewidth\resizebox{\linewidth}{!}{\usebox\kernfitbox}\else\usebox\kernfitbox\fi}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}

@@ -181,17 +181,9 @@ Kern ist in Schichten gebaut wie ein Haus. Jedes Stockwerk benutzt die darunter,
 Der Vorteil: Man kann oben umbauen, ohne dass unten etwas einstürzt, und jedes Stockwerk lässt sich
 für sich prüfen.
 
-```mermaid
-flowchart TB
-  JS["Browser: der Kellner"] --> ABI["Übergabestelle"]
-  ABI --> TOP["Editor und Trainer"]
-  TOP --> GAME["Spielregeln und Levels"]
-  GAME --> MID["Physik, Logik, Netzwerk, Ton"]
-  MID --> GFX["Malen, Szene, Formen"]
-  GFX --> CORE["Fundament: Zahlen und Mathe"]
-```
+![Die Stockwerke von Kern: oben der Browser-Teil, darunter das Programm vom Editor bis zum Fundament](../abbildungen/architektur.svg)
 
-So liest du das Bild: Ein Pfeil heißt „benutzt“. Ganz oben steht der Browser-Teil, der Kellner: Er
+So liest du das Bild: Jedes Stockwerk benutzt die darunter. Ganz oben steht der Browser-Teil, der Kellner: Er
 nimmt deine Eingaben entgegen und reicht sie durch die Übergabestelle nach unten weiter.
 „Netzwerk“ meint hier das Spielen mit mehreren Leuten über das Internet, nicht das neuronale Netz
 der Ente.

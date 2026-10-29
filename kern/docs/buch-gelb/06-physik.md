@@ -298,13 +298,7 @@ Ein **Gelenk** verbindet zwei Körper so, dass sie sich nur noch auf eine bestim
 gegeneinander bewegen können. Jedes Gelenk hat eine **Achse**: Bei einem Scharnier ist es die
 Linie, um die sich etwas dreht, bei einer Schiene die Linie, entlang der etwas gleitet.
 
-```
-   Tür von oben:              Lift von der Seite:
-
-   Rahmen ●──────── Tür          ║ ▲
-          ↻                      ║ █  Kabine gleitet
-   Achse: senkrecht durch ●      ║ ▼  entlang der Schiene
-```
+![Ein Scharnier dreht um seine Achse (Tür von oben), eine Schiene lässt entlang ihrer Achse gleiten (Lift von der Seite)](../abbildungen/gelenke.svg)
 
 Die wichtigsten Gelenke in Kern Studio (Feld **Typ** (Type) im Abschnitt **Gelenk** (Constraint)):
 
@@ -392,11 +386,7 @@ anstößt ([Kapitel 13](13-micro-duck.md)).
 Wenn du beim **Simulieren** (Simulate) etwas mit der Maus packst, hängt es an einer **unsichtbaren Feder**. Deine Maus
 zieht am einen Ende, das Ding hängt am anderen.
 
-```
-   Maus ◉ ~~~~~~~~~~ Feder ~~~~~~~~~~ ▣ Kiste
-        zieht                 hängt am Griffpunkt,
-                              kann kippen und anstoßen
-```
+![Der Maus-Griff: Die Maus zieht über eine Feder an der Kiste](../abbildungen/maus-feder.svg)
 
 Weil es eine Feder ist und kein Teleport, bleibt das Ding ein echter Physikkörper: Es stößt an,
 kippt, schwingt und fliegt beim Loslassen mit seinem Schwung weiter. Die Feder ist so gedämpft,
@@ -419,15 +409,7 @@ Der Trick für Treppen ist eine **Pogo-Feder**: Die Kapsel schwebt auf einer uns
 Stück über dem Boden, wie auf einem Pogo-Stab. Kommt eine Stufe, die niedriger ist als dieser
 Abstand, federt die Kapsel einfach hinauf.
 
-```
-            ┌─┐
-            │ │  Kapsel
-            └┬┘
-             ┊   Pogo-Feder
-   ──────────┘     ┌──────    Stufe niedriger als die Feder:
-                   │          die Kapsel federt hinauf
-   ────────────────┘
-```
+![Die Kapsel schwebt auf einer Pogo-Feder; eine Stufe, die niedriger ist als die Feder, nimmt sie federnd mit](../abbildungen/pogo-feder.svg)
 
 Pro Schritt rechnet der Mover: bremsen, beschleunigen, springen, fallen. Dann schaut er, welche
 Wände und Böden er berührt, und schneidet die Bewegung an ihnen ab. **Gegen eine Wand drücken macht

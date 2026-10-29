@@ -128,7 +128,7 @@ Ergebnis hinge davon ab, wie schnell der Rechner gerade ist.
 > Bild.
 
 ```mermaid
-flowchart LR
+flowchart TB
   F["neues Bild: Zeit einzahlen"] --> L{"genug für einen Schritt?"}
   L -->|ja| S["einen Schritt rechnen, abbuchen"]
   S --> L
@@ -351,7 +351,7 @@ vergleichen, nachdrücken, wieder messen. Das ist ein **Regelkreis**.
 > ankommt, drehst du manchmal zu weit.
 
 ```mermaid
-flowchart LR
+flowchart TB
   Z["Zielwinkel"] --> T["kommt verspätet an"]
   T --> E["Wie weit noch bis zum Ziel?"]
   E --> PD["Motor drückt, höchstens mit voller Kraft"]

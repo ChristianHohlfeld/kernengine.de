@@ -398,15 +398,7 @@ den Sensor betritt, bekommt 10 Punkte, eine Meldung und einen Ton.
 
 **Tor** (Vorlage **Door that opens on Interact**):
 
-```mermaid
-flowchart LR
-  I[On Interact] --> F[Flip Flop]
-  F -- A --> T1[Tween 0,8 s]
-  T1 --> M1[Move By +0,05 hoch]
-  F -- B --> T2[Tween 0,8 s]
-  T2 --> M2[Move By −0,05 runter]
-  I --> S[Play Sound confirm]
-```
+![Der Graph des Tors: Flip Flop wechselt zwischen zwei Tweens, die das Tor um 5 cm je Schritt hoch und runter schieben](../abbildungen/logik-tuer.svg)
 
 Interact wechselt per Flip Flop zwischen Öffnen und Schließen. Jeder Tween läuft 0,8 s und schiebt
 das Tor in jedem Schritt um 5 cm nach oben oder unten, wie ein Garagentor. Bei 60 Schritten pro
