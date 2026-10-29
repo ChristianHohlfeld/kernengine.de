@@ -27,6 +27,7 @@ ap.add_argument("--src", default=None, help="the book's folder in kern/docs (def
 ap.add_argument("--edition", default=None, help="the line under 'Kern' on the title page (default: Das Buch / The Book)")
 ap.add_argument("--subtitle", default=None, help="the subtitle on the title page")
 ap.add_argument("--boxes", action="store_true", help="block quotes as grey boxes with a bar (the green edition's 'Probier's aus!' and friends)")
+ap.add_argument("--isbn", default=None, help="the ISBN for the imprint's {{ISBN}} (KDP assigns one per edition)")
 ap.add_argument("--code-size", default="footnotesize", help="LaTeX size of code blocks (small keeps code at 7 pt or more)")
 a = ap.parse_args()
 
@@ -147,6 +148,11 @@ for i, p in enumerate(files):
         if target in ids: return f"[{text}](#{anchor[1:] if anchor else ids[target]})"
         return m.group(0)
     t = re.sub(r"\[([^\]]+)\]\(([0-9A-Z][^)#\s]*\.md)(#[^)\s]+)?\)", link, t)
+    if "{{ISBN}}" in t:
+        if a.isbn: t = t.replace("{{ISBN}}", a.isbn)
+        else:
+            print("NO ISBN: the imprint keeps a placeholder; pass --isbn", file=sys.stderr)
+            t = t.replace("{{ISBN}}", "[ISBN folgt]" if lang_code == "de" else "[ISBN to follow]")
     if p.name.startswith("00"):  # in print: the imprint alone (the title page and the table of contents are the book's)
         t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\hypertarget{kap-00}{}\\thispagestyle{empty}\\begingroup\\footnotesize\\raggedright\n```\n\n## ", t, count=1, flags=re.S | re.M)
         t = re.sub(r"^## (.+)$", r"## \1 {.unnumbered}", t, flags=re.M)
@@ -189,14 +195,14 @@ header.write_text(r"""
 \usepackage{fvextra}
 \usepackage{xurl}
 \usepackage{adjustbox}
+\newsavebox\kernfitbox  %% formulas: shrink to the line only when wider (adjustbox would obey pandoc's Gin defaults and shrink them to dust)
+\newcommand\kernfit[1]{\sbox\kernfitbox{#1}\ifdim\wd\kernfitbox>\linewidth\resizebox{\linewidth}{!}{\usebox\kernfitbox}\else\usebox\kernfitbox\fi}
 \makeatletter\renewcommand*\@pnumwidth{2.4em}\makeatother  %% three-digit page numbers in the contents
 \binoppenalty=100
 \relpenalty=100
 \tolerance=2000
 \hbadness=10000
 \DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\%s}
-\newsavebox\kernfitbox  %% formulas: shrink to the line only when wider (adjustbox would obey pandoc's Gin defaults and shrink them to dust)
-\newcommand\kernfit[1]{\sbox\kernfitbox{#1}\ifdim\wd\kernfitbox>\linewidth\resizebox{\linewidth}{!}{\usebox\kernfitbox}\else\usebox\kernfitbox\fi}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}
