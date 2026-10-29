@@ -17,8 +17,10 @@ gleichnamige Kapitel der blauen Fassung gemeint.
 ## 17.1 Tasten im Studio
 
 Kern Studio bedienst du ähnlich wie die großen Spiele-Baukästen, die Profis benutzen. Du musst dir
-nichts merken: **F1** zeigt die wichtigsten Kürzel jederzeit im Studio selbst an. Auf dem Mac
-versteht Studio die Cmd-Taste wie Ctrl. Alle Einzelheiten stehen in [Kapitel 11](11-studio.md).
+nichts merken: **F1** zeigt die wichtigsten Kürzel jederzeit im Studio selbst an. Die Tasten heißen
+hier so, wie Studio sie anzeigt: **Ctrl** ist auf deutschen Tastaturen die Taste **Strg**, **End** die
+Taste **Ende**. Auf dem Mac versteht Studio die Cmd-Taste wie Ctrl. Alle Einzelheiten stehen in
+[Kapitel 11](11-studio.md).
 
 ### Kamera im Viewport
 
@@ -29,24 +31,30 @@ Kamera darin steuerst du so:
 |---|---|
 | Rechte Maustaste halten + W A S D | fliegen wie in einem Spiel (Fly Mode) |
 | … + Q / E | runter / hoch |
-| … + Shift | 2,5-mal schneller |
-| … + Mausrad | Fluggeschwindigkeit einstellen (Stufe 1–8) |
+| … + Shift | schneller fliegen |
+| … + Mausrad | Fluggeschwindigkeit einstellen |
 | Alt + linke Maustaste | um das Ausgewählte herumkreisen wie um eine Skulptur |
 | Mittlere Maustaste ziehen | Bild seitlich verschieben |
-| F oder Doppelklick in den Viewport | das Ausgewählte ins Bild holen |
+| F | das Ausgewählte ins Bild holen |
+| Doppelklick auf ein Ding | beim Bearbeiten: es auswählen und ins Bild holen |
 | Ctrl+1 … 9 / 1 … 9 | Kameraposition merken / zu ihr zurückspringen |
 
 Die gemerkten Kamerapositionen heißen **Lesezeichen**: wie Lesezeichen in einem Buch, nur für
-Blickwinkel. Am Telefon kreist ein Finger, zwei Finger zoomen und verschieben, zweimal Tippen holt
-die Auswahl ins Bild, langes Halten öffnet das Kontextmenü.
+Blickwinkel. Merken und Zurückspringen klappt im Bearbeiten-Modus; in Play steuern die Ziffern zum
+Beispiel die Ente. Ein Doppelklick ins Leere holt nichts ins Bild: Der erste Klick ins Leere hebt
+die Auswahl auf. Am Telefon kreist ein Finger, zwei Finger zoomen und verschieben, zweimal Tippen
+holt die Auswahl ins Bild, langes Halten öffnet das Kontextmenü.
 
 ### Bearbeiten
 
+Hier drückst du die Tasten **ohne** gehaltene rechte Maustaste. Mit gehaltener rechter Maustaste
+fliegt die Kamera, und Q und E heißen dann „runter“ und „hoch“ (siehe oben).
+
 | Taste | Wirkung |
 |---|---|
-| Q / W / E / R | Werkzeug: auswählen / verschieben / drehen / skalieren |
+| Q / W / E / R | Werkzeug: auswählen / verschieben / drehen / skalieren (Größe ändern) |
 | Leertaste | verschieben → drehen → skalieren reihum |
-| [ / ] | Einrastraster feiner / gröber |
+| [ / ] | Einrastraster feiner / gröber (das Gitter, an dem Dinge beim Verschieben einrasten) |
 | Entf | Auswahl löschen |
 | End | Auswahl auf den Boden setzen |
 | H / Ctrl+H | ausblenden / alles wieder einblenden |
@@ -59,9 +67,10 @@ die Auswahl ins Bild, langes Halten öffnet das Kontextmenü.
 | Ctrl+Space | Content Drawer auf- und zuklappen |
 | Alt+P / Alt+S | Play / Simulate |
 
-Den **Content Drawer** und das **Output Log** erreichst du auch mit der Maus: Beide haben einen Knopf
-in der Statusleiste ganz unten. Das hilft, wenn dein System Ctrl+Space schon für etwas anderes
-benutzt, etwa zum Umschalten der Tastatursprache.
+Der **Content Drawer** ist die Schublade unten im Studio mit Bauteilen, Bildern und Klängen; das
+**Output Log** ist die Liste der Meldungen des Studios. Beide erreichst du auch mit der Maus, über
+einen Knopf in der Statusleiste ganz unten. Das hilft, wenn dein System Ctrl+Space schon für etwas
+anderes benutzt, etwa zum Umschalten der Tastatursprache.
 
 > **Wusstest du?** Kopierte Dinge landen als Text in der Zwischenablage deines Computers. Ein Ctrl+V
 > in einem anderen Browser-Tab mit Studio fügt sie dort ein – so ziehst du Dinge von einem Level ins
@@ -70,10 +79,11 @@ benutzt, etwa zum Umschalten der Tastatursprache.
 ### Play und Simulate
 
 Zwei Arten, ein Level laufen zu lassen: Bei **Play** spielst du selbst, die Kamera folgt deiner
-Spielfigur. Bei **Simulate** laufen Physik und Spielregeln, aber niemand spielt; du behältst die
-freie Kamera des Editors und kannst Körper mit der Maus greifen, ziehen und werfen. In beiden Fällen
-ist das Level gesperrt, und beim Stoppen ist alles wieder wie vorher – außer du übernimmst die neuen
-Lagen mit **K**.
+Spielfigur. Manche Level, etwa die Micro Duck, starten Play aber als Zuschauer mit freier Kamera
+(World Settings › **Observer camera**); mit **F8** übernimmst du dann die Figur. Bei **Simulate**
+laufen Physik und Spielregeln, aber niemand spielt; du behältst die freie Kamera des Editors und
+kannst Körper mit der Maus greifen, ziehen und werfen. In beiden Fällen ist das Level gesperrt, und
+beim Stoppen ist alles wieder wie vorher – außer du übernimmst die neuen Lagen mit **K**.
 
 | Taste | Wirkung |
 |---|---|
@@ -85,13 +95,15 @@ Lagen mit **K**.
 | K | in Simulate: die Lagen der ausgewählten Dinge ins Level übernehmen |
 
 Im Spiel selbst gilt das Übliche: W A S D bewegen, Maus umsehen, Leertaste springen, Shift sprinten,
-F benutzen. Die Tasten des Logik-Editors stehen in [Kapitel 9](09-logik.md).
+F benutzen. Die Taste F hat also zwei Aufgaben: Steuerst du eine Spielfigur, benutzt sie etwas;
+sonst holt sie die Auswahl ins Bild. Die Tasten des Logik-Editors stehen in [Kapitel 9](09-logik.md).
 
 > **Probier's aus!** Öffne auf https://kernengine.de/ **File › Example Levels › Physics Lab** und
-> drück **Alt+S** für Simulate. Drück dann **Pause** (oder Alt+Shift+P) und tippe ein paarmal auf den
+> drück **Alt+S** für Simulate. Drück dann **Pause** und tippe ein paarmal auf den
 > **Punkt**. Du siehst die Physik Schritt für Schritt – wie ein Daumenkino, das du selbst
-> umblätterst. Greif zum Schluss mit der linken Maustaste einen Körper und wirf ihn; mit **Esc**
-> ist alles wieder an seinem Platz.
+> umblätterst. Drück noch einmal **Pause**, damit die Zeit weiterläuft. Greif dann mit der linken
+> Maustaste einen Körper und wirf ihn; mit **Esc** ist alles wieder an seinem Platz. (Viele Laptops
+> haben keine Pause-Taste; dann nimm Alt+Shift+P.)
 
 ## 17.2 Tasten der Micro Duck
 
@@ -99,28 +111,34 @@ F benutzen. Die Tasten des Logik-Editors stehen in [Kapitel 9](09-logik.md).
 |---|---|---|---|
 | Laufen / drehen | W S / A D | linker Stick | MOVE |
 | Sitzen / Aufstehen | 1 | B | SIT |
-| Aufheben (auf Rollschuhen: Ducken) | 2 | Y | PICK |
+| Aufheben (trägt sie Rollschuhe: Ducken) | 2 | Y | PICK |
 | Kick links / rechts | 3 / 4 | – | KICK L / R |
 | Rolle (halten: weiter) | 5 | X | ROLL |
 | Schnabel auf / zu | 6 | – | BEAK |
 | Sprung | 7 | – | HOP |
 | Quaken / „Wheee“ | Leertaste / V | rechter / linker Trigger | QUACK / WHEEE |
 
-Jede dieser Tasten gibt dir für 2 Sekunden das Steuer. So lange machen das „Gehirn“ der Ente und ihre
-Spielschicht (das Netz, das selbst entscheidet, ob sie Ball oder Socke holt) Pause
-([Kapitel 13](13-micro-duck.md)).
+Die Ente gibt es auch als Variante mit Rollschuhen, „Micro Duck (Rollers)“; sie fährt dann, statt
+zu gehen ([Kapitel 13](13-micro-duck.md)).
+
+Mit **F8** übernimmst du die Ente; dann hören W A S D und die Zahlentasten auf dich. Jede Eingabe
+zählt als „Hand am Steuer“ für 2 Sekunden. So lange halten Pollens Entscheidungslogik, die
+[Kapitel 13](13-micro-duck.md) das **Gehirn** der Ente nennt, und die Spielschicht (Kerns Netz, das
+selbst entscheidet, ob sie Ball oder Socke holt) still. Drückst du länger nichts, entscheidet die
+Ente wieder selbst, sofern im Details-Panel **Autonomous** an ist.
 
 > **Probier's aus!** Öffne **File › Example Levels › Micro Duck**, drück Play, übernimm die Ente
-> mit **F8** und probier alle Tasten von 1 bis 7 der Reihe nach. Drück dann die **1**, damit sie
-> sich setzt, und gleich danach die **3**. Nichts passiert: Aus dem Sitzen startet keine Bewegung.
-> Erst wenn sie mit der 1 wieder aufgestanden ist, kickt sie.
+> mit **F8** und probier die Tasten von 2 bis 7 der Reihe nach. Warte nach jeder Taste, bis die
+> Bewegung fertig ist: Solange eine läuft, startet keine neue. Drück dann die **1**, damit sie sich
+> setzt, und gleich danach die **3**. Nichts passiert: Aus dem Sitzen startet keine Bewegung. Warte,
+> bis sie ganz sitzt, und drück wieder die **1** – erst wenn sie aufgestanden ist, kickt sie.
 
 ## 17.3 Dateien
 
 Kern speichert seine Sachen in wenigen Dateiarten. Die meisten sind einfache **Textdateien**: Man
-kann sie mit jedem Texteditor öffnen. **JSON** ist ein Textformat aus Namen und Werten („name:
-Orb Run“), **CSV** eine Tabelle als Text, eine Zeile pro Zeile, die Spalten durch Kommas getrennt –
-CSV-Dateien öffnet auch jede Tabellenkalkulation.
+kann sie mit jedem Texteditor öffnen. **JSON** ist ein Textformat aus Namen und Werten („name: Orb
+Run“), **CSV** eine Tabelle als Text: eine Tabellenzeile pro Textzeile, die Spalten durch Kommas
+getrennt – CSV-Dateien öffnet auch jede Tabellenkalkulation.
 
 | Datei | Was drin ist | mehr in |
 |---|---|---|
@@ -130,9 +148,9 @@ CSV-Dateien öffnet auch jede Tabellenkalkulation.
 | Messungen (CSV) | Aufzeichnungen vom Prüfstand oder Roboter | [Kapitel 16](16-kalibrierung.md) |
 
 **Levels.** Ein Level enthält alles, was in der Welt ist: die Dinge mit ihren Bausteinen, die World
-Settings, die Kameraposition des Editors, eingebettete Bilder und Klänge und die Logik. Gerechnet
-wird in Metern, Sekunden und Kilogramm, Drehungen stehen in Grad. Eine fremde Datei oder eine aus
-einem neueren Studio öffnet Kern lieber gar nicht, statt sie halb falsch zu lesen.
+Settings, die Kameraposition des Editors, eingebettete Bilder und Klänge und die Logik. Eine fremde
+Datei oder eine aus einem neueren Studio öffnet Kern lieber gar nicht, statt sie halb falsch zu
+lesen.
 
 **Netze.** Kern liest und schreibt Netze in genau der Form, in der Pollen Robotics sie für die Micro
 Duck verwendet. Darum laufen Pollens Netze in Kern und Kerns Netze auf dem Roboter. Ein Netz, das du
@@ -149,19 +167,25 @@ Kapitel 17:
 - **Der Lehrer als Kommandozeilenprogramm:** Neben der Lehrer-Seite im Browser gibt es den Lehrer
   auch als Programm, das man mit getippten Befehlen startet – zum Trainieren, Bewerten, Kalibrieren
   und Messen. Alle Befehle mit ihren Einstellungen und Beispielen stehen dort.
-- **Die Schnittstelle zwischen Engine und Browser:** Kern ist in C++ geschrieben und läuft im Browser
-  als WebAssembly; die Webseite drumherum ist JavaScript. Die beiden reden nur über eine genau
-  festgelegte Liste von Funktionen miteinander, wie über die Durchreiche einer Kantine.
+- **Die Schnittstelle zwischen Engine und Browser:** Die **Engine** ist das Herz von Kern, das
+  Programm, das rechnet, zeichnet und die Physik laufen lässt. Sie ist in einer Programmiersprache
+  für schnelle Programme geschrieben (C++) und läuft im Browser in einem schnellen Programmformat
+  (WebAssembly); die Webseite drumherum ist in der Sprache der Webseiten geschrieben (JavaScript).
+  Die beiden reden nur über eine genau festgelegte Liste von Funktionen miteinander, wie über die
+  Durchreiche einer Kantine. Geht dabei etwas schief, bekommt die Webseite eine Meldung zurück,
+  statt dass das Programm abstürzt. Und die Engine fasst selbst keine Dateien auf deinem Gerät an:
+  Was sie braucht, reicht ihr die Webseite durch.
 
 > **Wusstest du?** Die Webseite des Studios enthält keine Editorlogik. Menüs, Outliner, Details,
 > Gizmos, Rückgängig – all das steckt in der Engine. Die Seite fragt nur über die Durchreiche, was
 > sie anzeigen soll, und zeichnet es. Der Vorteil: Im Editor läuft genau derselbe Code wie im
-> fertigen Spiel, und der ganze Editor lässt sich ohne Browser testen.
+> fertigen Spiel, und der ganze Editor lässt sich ohne Browser testen. So finden automatische
+> Prüfungen Fehler, ohne dass jemand klicken muss.
 
 ## 17.5 Glossar
 
-Alle Fachwörter des grünen Buchs, kurz in Alltagssprache. In Klammern steht, wo sie ausführlich
-vorkommen.
+Die Fachwörter des grünen Buchs, kurz in Alltagssprache. In Klammern steht, wo sie ausführlich
+vorkommen. Fehlt dir ein Wort, hilft das Glossar des blauen Buchs weiter.
 
 > **Achtung, Falle!** Das Wort **Actor** hat in diesem Buch zwei Bedeutungen. Im **Studio** ist ein
 > Actor ein Ding im Level: eine Kiste, eine Lampe, die Ente. Beim **Lernen** (Kapitel 14, Anhang A)
@@ -181,8 +205,10 @@ vorkommen.
 | **Eject / Possess** | im Spiel die Spielfigur loslassen / wieder übernehmen (F8) |
 | **Example Levels** | fertige Beispielwelten im Menü File, etwa Orb Run oder Micro Duck |
 | **Game View** | Ansicht ohne Editor-Helfer, so wie im fertigen Spiel |
+| **GameWorld** | der Teil von Kern, der ein Level zum Leben erweckt und laufen lässt ([Kap. 8](08-spiel-laufzeit.md)) |
 | **Gizmo** | Pfeile und Ringe am ausgewählten Ding zum Verschieben, Drehen, Skalieren |
 | **HUD** | Anzeigen über dem Spielbild: Punkte, Zeit, Tempo |
+| **Kern Studio, Studio** | der Editor im Browser, in dem du Level baust und spielst ([Kap. 11](11-studio.md)) |
 | **Knoten / Pin** | Kästchen im Logik-Graph / ihre Anschlüsse für Verbindungslinien |
 | **Komponente** | ein Baustein eines Actors, etwa Licht, Klang oder Physik |
 | **Lesezeichen** | eine gemerkte Kameraposition (Ctrl+1 … 9) |
@@ -200,30 +226,42 @@ vorkommen.
 
 | Begriff | Bedeutung |
 |---|---|
+| **Bit** | die kleinste Einheit im Computer: ein Kästchen, in dem 0 oder 1 steht |
+| **Bloom** | das Glühen um sehr helle Stellen, wie Gegenlicht ([Kap. 4](04-grafik.md)) |
 | **Box3D** | die Physik-Engine, die Kern unverändert mitbringt ([Kap. 6](06-physik.md)) |
 | **C++** | die Programmiersprache, in der Kern geschrieben ist |
 | **Compiler, kompilieren** | Programmtext in Befehle übersetzen, die der Rechner direkt ausführt |
-| **Determinismus** | gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis, auf jedem Gerät |
+| **Determinismus** | gleiche Eingaben ergeben bis in die letzte Stelle dasselbe Ergebnis, auf jedem Gerät |
+| **Engine** | das Herz von Kern: das Programm, das rechnet, zeichnet und die Physik laufen lässt |
 | **Fingerabdruck** | eine Prüfzahl pro Takt; stimmt sie überall, rechnet Kern überall gleich |
 | **Frame** | ein einzelnes Bild auf dem Bildschirm; viele pro Sekunde ergeben Bewegung |
 | **Gelenk (Constraint)** | eine Verbindung zwischen zwei Körpern, etwa ein Scharnier |
 | **GTAO** | ein Verfahren, das Ecken und Ritzen natürlich abdunkelt ([Kap. 4](04-grafik.md)) |
+| **Hash** | eine kurze Zahl aus beliebig vielen Daten; gleiche Daten, gleiche Zahl ([Kap. 3](03-grundlagen.md)) |
 | **Instanz** | eine Kopie derselben Form an anderer Stelle, wie hundert Bäume aus einer Vorlage |
+| **Interpolation** | Zwischenwerte mischen, etwa zwischen zwei Lagebildern ([Kap. 4](04-grafik.md), [10](10-netzwerk.md)) |
 | **Interpreter** | führt einen Logik-Graphen Kästchen für Kästchen aus, wie ein Dolmetscher |
 | **JavaScript** | die Programmiersprache der Webseiten |
-| **JIT** | übersetzt einen Logik-Graphen beim Start in schnellen Maschinencode |
+| **JIT** | übersetzt einen Logik-Graphen beim Start in Befehle, die der Rechner direkt ausführt |
 | **Kontakt** | eine Stelle, an der sich zwei Körper berühren |
+| **Matrix** | eine Tabelle aus 4 mal 4 Zahlen, die Strecken, Drehen und Verschieben bündelt ([Kap. 3](03-grundlagen.md)) |
 | **Mesh** | eine 3D-Form, gebaut aus vielen kleinen Dreiecken |
 | **Partikel** | viele winzige Teilchen für Funken, Staub oder Rauch |
 | **Physikschritt** | ein Bild im Daumenkino der Physik; die Welt rückt ein Stückchen weiter |
+| **Rechenkern** | eines der Rechenwerke im Prozessor; mehrere können gleichzeitig rechnen |
 | **Schrittrate** | wie viele Physikschritte pro Sekunde gerechnet werden; für die Ente 100 |
 | **Server / Client** | beim Mehrspieler: der Rechner, der bestimmt / die Rechner, die mitspielen |
 | **Shader** | ein kleines Programm der Grafikkarte, das die Farbe jedes Bildpunkts ausrechnet |
+| **Simulation** | die nachgebaute Welt im Computer, die nach den Regeln der Physik weiterläuft |
+| **Snapshot** | ein „Lagebild“ des Servers beim Mehrspieler: wo gerade alles steht ([Kap. 10](10-netzwerk.md)) |
+| **Span** | ein „Zettel“, der auf Daten zeigt (wo sie anfangen, wie viele), ohne sie zu besitzen ([Kap. 3](03-grundlagen.md)) |
 | **Starrer Körper** | ein Körper, der sich nie verbiegt; so rechnet Box3D alle Körper |
 | **Sub-Steps** | Unterschritte innerhalb eines Physikschritts, für mehr Genauigkeit |
 | **Textur** | ein Bild, das auf eine Oberfläche geklebt wird |
-| **Thread, Worker** | ein Arbeitsstrang; mehrere rechnen gleichzeitig auf mehreren Prozessorkernen |
+| **Thread, Worker** | ein Arbeitsstrang; mehrere rechnen gleichzeitig auf mehreren Rechenkernen |
+| **Vektor** | eine Wegbeschreibung aus Zahlen, etwa „3 m nach rechts, 1 m nach vorn“ ([Kap. 3](03-grundlagen.md)) |
 | **WebAssembly** | ein Programmformat, das Browser fast so schnell ausführen wie echte Programme |
+| **Welding** | „Verschweißen“: doppelte Ecken eines Meshs zu einer verschmelzen ([Kap. 5](05-szene-und-geometrie.md)) |
 
 ### Roboter und Messen
 
@@ -231,8 +269,10 @@ vorkommen.
 |---|---|
 | **Abgleich** | eine Aufzeichnung des echten Roboters in der Simulation nachspielen und vergleichen ([Kap. 16](16-kalibrierung.md)) |
 | **Armatur** | Zusatzträgheit, weil der flinke Motor im Servo jede Bewegung mitmachen muss |
+| **Chirp** | ein Messsignal: ein Hin und Her, das immer schneller wird, wie ansteigendes Vogelzwitschern |
 | **CSV** | eine Tabelle als Textdatei, Spalten durch Kommas getrennt |
 | **Drehmoment** | Drehkraft: wie fest ein Motor an einem Gelenk drehen kann |
+| **Gehirn (der Ente)** | in Kapitel 13 Pollens Entscheidungslogik: was die Ente tut, wenn niemand steuert |
 | **Gelenksensor (Encoder)** | misst im Servo, welchen Winkel das Gelenk gerade hat |
 | **Gerätemodell** | ein kleines Rechenmodell eines echten Geräts, etwa eines Servos |
 | **Getriebespiel** | ein bisschen Wackeln im Getriebe, bevor die Zahnräder greifen |
@@ -245,10 +285,10 @@ vorkommen.
 | **Log** | eine Aufzeichnung, Zeile für Zeile: was gesendet und was gemessen wurde |
 | **Micro Duck** | der zweibeinige Laufroboter von Pollen Robotics ([Kap. 13](13-micro-duck.md)) |
 | **ms (Millisekunde)** | eine tausendstel Sekunde |
+| **Pollen Robotics** | die Firma, die die echte Micro Duck und ihre Netze gebaut hat; Kern ist nicht mit ihr verbunden |
 | **Prüfstand** | ein einzelner Servo mit Arm und Gewicht, festgespannt zum Vermessen |
 | **Prüf-Fehler** | der Fehler auf einer Messung, die beim Anpassen nicht benutzt wurde |
 | **rad (Radiant)** | ein Winkelmaß der Technik: 1 rad sind etwa 57 Grad, ein ganzer Kreis etwa 6,28 rad |
-| **Milliradiant** | ein Tausendstel rad, etwa 0,06 Grad |
 | **Regeltakt, Takt** | der Herzschlag der Steuerung: 50-mal pro Sekunde bekommt jeder Servo ein neues Ziel |
 | **RMS-Fehler** | der durchschnittliche Abstand zweier Kurven, große Ausreißer zählen stärker |
 | **Servo** | ein Motor, der auf einen vorgegebenen Winkel fährt |
@@ -268,6 +308,7 @@ reichen einmal um den Kreis.
 |---|---|
 | **Actor (beim Lernen)** | das Netz, das handelt und später auf den Roboter kommt ([Anhang A](A-grundlagen-neuronale-netze.md)) |
 | **Adam** | ein kluges Verfahren, die Regler in gleichmäßigen, ruhigen Schritten zu verstellen |
+| **Agent** | der Handelnde beim Lernen durch Belohnung, hier die Ente mit ihrem Netz |
 | **Aktion** | was das Netz in einem Takt tut: 14 Zielwinkel für die Servos |
 | **Aktivierung (ELU)** | das „Verbiegen“ im Neuron: positive Zahlen bleiben, negative werden gestaucht |
 | **asymmetrischer Kritiker** | der Kritiker sieht beim Üben mehr als der Actor, etwa die genaue Höhe |
@@ -277,12 +318,16 @@ reichen einmal um den Kreis.
 | **Bias** | die Grundeinstellung eines Neurons, die immer dazugezählt wird |
 | **CMA-ES** | Suchverfahren: eine Wolke von Kandidaten probieren, zu den besseren hinrücken |
 | **DAgger** | Nachahmen, bei dem das Netz selbst fährt und das Vorbild jede Lage kommentiert |
+| **e-Funktion** | Schrumpfen um denselben Anteil pro Schritt; ELU staucht damit negative Zahlen |
 | **Entropie** | ein Maß für die Neugier: wie breit die Ente um ihre beste Idee herum ausprobiert |
 | **Epoche** | einmal alle gesammelten Übungsdaten durchgehen |
 | **Episode** | ein Übungsdurchgang, vom Start bis zum Sturz oder bis die Zeit um ist |
+| **GAE** | schätzt den Vorteil eines Schritts: eigene Überraschung plus ein Teil seiner Folgen |
 | **Gewicht** | ein Regler im Netz: wie stark ein Eingang zählt |
 | **Gradient** | die Steigung der Verlust-Landschaft: in welche Richtung es bergauf geht |
+| **Gradientenabstieg** | lernen, indem man in der Verlust-Landschaft Schritt für Schritt bergab geht |
 | **Iteration** | eine Trainingsrunde: alle Enten üben ein Stück, dann wird das Netz einmal verbessert |
+| **Kettenregel** | die Rechenregel, mit der Backpropagation den Fehler Schicht für Schicht zurückreicht |
 | **Kritiker** | das zweite Netz beim Üben; es schätzt, wie gut eine Lage ist, und handelt nie |
 | **Kritiker zuerst** | nach dem Nachahmen lernt eine Weile nur der Kritiker, bis seine Urteile taugen |
 | **Lehrer** | Kerns Trainingssystem für die Netze der Micro Duck ([Kap. 14](14-lehrer.md)) |
@@ -293,22 +338,23 @@ reichen einmal um den Kreis.
 | **Netz (neuronales Netz)** | ein Rechenwerk mit vielen Reglern: Zahlen rein, Zahlen raus |
 | **Neuron** | der kleinste Baustein: malnehmen, zusammenzählen, verbiegen |
 | **Normalisierer** | rechnet jeden Messwert auf ein gemeinsames Maß um: „wie weit über dem Üblichen?“ |
+| **Normalverteilung (Glockenkurve)** | kleine Abweichungen sind häufig, große selten |
 | **ONNX** | ein Austauschformat für Netze, das viele Programme lesen können |
-| **Phasensignal** | eine Art Uhr, die dem Sprung-Netz sagt, wo im Sprung es gerade ist |
 | **Policy** | die Entscheidungsregel der Ente, also ihr trainiertes Netz |
 | **PPO** | das Lernverfahren des Lehrers: aus Belohnung lernen, in kleinen, vorsichtigen Schritten |
 | **Rauschen, σ (Sigma)** | zufällige Abweichung; σ sagt, wie breit sie ist |
 | **Return** | die Gesamtpunktzahl ab jetzt, spätere Punkte etwas weniger wert |
 | **Rezept** | alle Trainingseinstellungen einer Aufgabe zusammen |
-| **Rollout** | gesammelte Erfahrung: was beobachtet, getan und belohnt wurde |
 | **Sammler / Lerner** | die Teile des Trainings, die Erfahrung sammeln / daraus lernen |
 | **Schicht** | viele Neuronen nebeneinander, die dieselben Eingänge sehen |
 | **Seed** | die Startzahl für den Zufall: gleicher Seed, gleicher Zufall |
 | **Spielschicht** | Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut |
 | **Überanpassung** | Auswendiglernen statt Verstehen: gut bei Übungen, schlecht bei Neuem |
+| **überwachtes Lernen** | Lernen mit Lösungsheft: zu jeder Aufgabe gibt es die richtige Antwort |
 | **Variation** | jede Episode würfelt etwas andere Bedingungen aus; Fachwort Domänen-Randomisierung |
 | **velstand** | Pollens Netz zum Laufen und Stehen, in Kern fest eingebaut |
 | **Verlust** | eine Zahl, die sagt, wie falsch das Netz gerade liegt; kleiner ist besser |
+| **Verteilungsverschiebung** | ein nachahmendes Netz gerät beim Selbermachen in Lagen, die es nie gesehen hat |
 | **Vorbild** | eine Vorführung, die ein Netz zuerst nachahmt |
 | **Vorteil** | wie viel besser eine Aktion war als das, was die Ente hier sonst tut |
 | **Warmstart** | ein neues Training beginnt mit einem schon trainierten Netz statt mit Zufall |
@@ -328,7 +374,7 @@ Die genauen Definitionen stehen im Glossar des blauen Buchs, Kapitel 17.
 
 ## Knobelecke
 
-1. Du hast eine Kiste im Viewport ausgewählt, sie ist aber nicht zu sehen. Was hilft?
+1. Du hast eine Kiste ausgewählt, aber sie liegt außerhalb des Bildes. Wie holst du sie ins Bild?
 2. Du liest „Der Actor lernt aus den Vorteilen, die der Kritiker schätzt.“ Ist hier eine Kiste im
    Level gemeint?
 3. Du drückst bei der Ente die 3, aber nichts passiert. Woran könnte es liegen?
@@ -336,13 +382,16 @@ Die genauen Definitionen stehen im Glossar des blauen Buchs, Kapitel 17.
 
 ### Lösungen
 
-1. **F** holt die Auswahl ins Bild, ein Doppelklick in den Viewport auch.
+1. **F** holt die Auswahl ins Bild, ein Doppelklick auf ihren Namen im Outliner auch. (Ein
+   Doppelklick ins Leere hilft nicht, der hebt die Auswahl auf. Und hast du die Kiste mit **H**
+   ausgeblendet, holt **Ctrl+H** sie zurück.)
 2. Nein. Neben dem Kritiker ist der Actor das handelnde Netz beim Lernen, kein Ding im Level.
 3. Vielleicht sitzt die Ente gerade: Aus dem Sitzen startet keine Bewegung. Erst mit der 1
-   aufstehen lassen. (Und F8 nicht vergessen, damit du die Ente überhaupt steuerst.)
-4. Bei Play spielst du selbst, die Kamera folgt der Spielfigur. Bei Simulate laufen Physik und Regeln
-   ohne Spieler; du behältst die freie Kamera und kannst Körper greifen und mit K ihre neuen Lagen
-   übernehmen.
+   aufstehen lassen. Oder es läuft noch eine andere Bewegung; dann wartest du, bis sie fertig ist.
+   (Und F8 nicht vergessen, damit du die Ente überhaupt steuerst.)
+4. Bei Play spielst du selbst, die Kamera folgt der Spielfigur (in manchen Levels schaust du erst
+   zu und übernimmst mit F8). Bei Simulate laufen Physik und Regeln ohne Spieler; du behältst die
+   freie Kamera und kannst Körper greifen und mit K ihre neuen Lagen übernehmen.
 
 ---
 

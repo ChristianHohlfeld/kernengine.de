@@ -1,11 +1,9 @@
 # 9 Logik-Graphen – Spielregeln zum Zusammenstecken
 
 > **Kurz gesagt:** In Kern schreibst du Spielregeln nicht als Programmtext, sondern steckst sie aus
-> Kästchen und Drähten zusammen – so, wie man es aus großen Spiele-Engines kennt. Ein Ereignis stößt
-> eine Kette an, und die Kästchen fallen nacheinander wie Dominosteine. Damit das schnell geht, kann
-> Kern so ein Bild auf drei Wegen ausführen – Schritt für Schritt vorlesen, in schnellen
-> Maschinencode übersetzen oder als lesbaren Programmtext ausgeben – und alle drei liefern exakt
-> dasselbe Ergebnis.
+> Kästchen und Drähten zusammen. Ein Ereignis stößt eine Kette an, und die Kästchen fallen
+> nacheinander wie Dominosteine. Kern kann so ein Bild vorlesen oder übersetzen, und alle Wege
+> liefern exakt dasselbe Ergebnis.
 
 > **Begriffe vorab:**
 > - **Programm** – eine genaue Schritt-für-Schritt-Anleitung für den Computer.
@@ -23,13 +21,15 @@
 
 ## 9.1 Das Modell: Knoten, Drähte, Dominosteine
 
-Ein Logik-Graph ist ein Bild aus Kästchen und Drähten. Weiße Drähte legen fest, **was als Nächstes
-passiert**; andere Drähte liefern **Werte** wie Zahlen oder Namen. Variablen merken sich etwas,
-Zustandsmaschinen merken sich einen Zustand, und manche Kästchen warten eine Weile.
-
 Ein **Logik-Graph** besteht aus **Knoten** (Kästchen, die etwas tun) und **Drähten** (Verbindungen
-zwischen ihnen). Der Graph selbst ist nur eine Beschreibung – eine Liste von Kästchen und Drähten.
-Hinter jeder Kästchensorte steckt ein fertiges Stück Kern, das die eigentliche Arbeit tut.
+zwischen ihnen). Weiße Drähte legen fest, **was als Nächstes passiert**; farbige Drähte liefern
+**Werte** wie Zahlen oder Namen.
+
+Der Graph selbst ist nur eine Beschreibung – eine Liste von Kästchen und Drähten, wie ein
+Schaltplan auf Papier. Hinter jeder Kästchensorte steckt ein fertiges Stück Kern, das die eigentliche
+Arbeit tut. Bevor ein Graph läuft, macht Kern aus dem Schaltplan eine **Nachschlagetabelle**: Für
+jedes Kästchen steht dort, welches Stück Kern es ausführt und wohin jeder Ausgang führt. Beim Spielen
+muss Kern dann nur noch nachschlagen, statt jedes Mal den ganzen Plan zu durchsuchen.
 
 > **Stell dir vor …** eine Reihe Dominosteine. Du stupst den ersten an (ein Ereignis), er kippt den
 > nächsten, der den nächsten … Die weißen Pfeil-Drähte im Graphen sind die Abstände zwischen den
@@ -37,13 +37,19 @@ Hinter jeder Kästchensorte steckt ein fertiges Stück Kern, das die eigentliche
 
 Es gibt zwei Sorten Anschlüsse (*Pins*):
 
-- **Ablauf-Pins** (*Exec*, weiße Pfeile): die Reihenfolge. **Ereignis-Knoten** starten eine Kette,
-  **Aktionsknoten** setzen sie fort, **Ablauf-Knoten** verzweigen, wiederholen oder warten.
+- **Ablauf-Pins** (*Exec*, weiße Pfeile): die Reihenfolge.
 - **Daten-Pins** (farbig): Werte wie Zahlen, Text oder Dinge. Ein Eingang holt sich seinen Wert genau
   dann, wenn er gebraucht wird. Ist er nicht verbunden, gilt der Wert, den du direkt ins Kästchen
   getippt hast.
 
-Bei den Daten gibt es zwei Arten von Kästchen, und der Unterschied ist leicht zu merken:
+Nach ihrer Aufgabe gibt es vier Arten von Kästchen:
+
+- **Ereignis-Knoten** stoßen eine Kette an („Spiel beginnt“, „etwas betritt die Zone“).
+- **Aktionsknoten** tun etwas und geben den Ablauf weiter („gib 10 Punkte“).
+- **Ablauf-Knoten** lenken den Ablauf: verzweigen, wiederholen oder warten.
+- **Rechenknoten** liefern nur Werte und haben gar keinen weißen Draht.
+
+Bei Rechen- und Aktionsknoten lohnt ein genauer Blick, denn sie liefern ihre Werte verschieden:
 
 > **Stell dir vor …** ein **Thermometer** und einen **Kassenbon**. Das Thermometer zeigt dir immer den
 > Wert von *jetzt*, jedes Mal, wenn du hinschaust. Der Kassenbon zeigt, was beim *letzten Einkauf*
@@ -53,6 +59,12 @@ Bei den Daten gibt es zwei Arten von Kästchen, und der Unterschied ist leicht z
 weißen Draht und rechnen jedes Mal frisch, wenn jemand ihren Wert liest. **Aktionsknoten** (Punkte
 geben, ein Ding erzeugen) sind Kassenbons: Ihr Ergebnis bleibt stehen, bis sie das nächste Mal
 laufen.
+
+Wann macht das einen Unterschied? Nimm einen Würfel-Rechenknoten („Zufallszahl von 1 bis 6“) und
+verbinde ihn mit zwei Kästchen. Jedes Kästchen schaut einzeln aufs Thermometer, also würfelt der
+Knoten zweimal – und die beiden bekommen womöglich verschiedene Zahlen. Willst du dieselbe Zahl an
+zwei Stellen, würfle einmal und leg das Ergebnis in eine Variable, wie einen Kassenbon, den du
+aufhebst.
 
 Dazu kommen:
 
@@ -67,8 +79,9 @@ Actors heißt der Actor selbst „Self“.
 
 ### Welche Drähte passen?
 
-Jeder Daten-Draht trägt eine bestimmte **Sorte** von Wert – wie Kabel mit verschiedenen Steckern.
-Nicht jeder Stecker passt in jede Buchse. Es gibt sieben Sorten:
+Jeder Draht trägt eine bestimmte **Sorte** – wie Kabel mit verschiedenen Steckern. Nicht jeder
+Stecker passt in jede Buchse. Es gibt sieben Sorten: Die Ablauf-Drähte sind eine eigene Sorte, die
+übrigen sechs tragen Werte.
 
 | Sorte | im Alltag | Beispiel |
 |---|---|---|
@@ -97,19 +110,24 @@ beim Lesen.
 Hinter jedem Kästchen steckt ein kleines Stück Programm. Wenn es fertig ist, meldet es, **an welchem
 Ausgang es weitergeht** – oder „Stopp, hier endet die Kette“, oder „Ich warte, weck mich später“.
 
-Jede Kästchensorte hat einen Steckbrief: Name, Kategorie im Menü, Hilfetext, Suchwörter, Anschlüsse,
-Einstellungen (etwa ein Variablenname oder eine Taste) und ihre Art – Ereignis, Aktion, Rechnen oder
-Ablauf. Dazu kommt die eigentliche Arbeit.
+Jedes Kästchen gibt nach getaner Arbeit genau eine von drei Antworten:
 
-So sieht der Steckbrief des Kästchens **„Add Score“** (Punkte geben) aus, in Worten:
+- **„Weiter bei Ausgang X“** – der nächste Dominostein fällt.
+- **„Stopp“** – hier endet die Kette.
+- **„Weck mich später“** – die Kette pausiert, etwa bei einer Eieruhr, und läuft nach der Wartezeit
+  an derselben Stelle weiter.
 
-> **Steckbrief „Add Score“:** Art: Aktion. Kategorie: Game. Ein Dateneingang „Points“, eine Zahl,
-> vorbelegt mit 10. Arbeit: Lies den Eingang und gib der Spielwelt so viele Punkte. Danach geht es am
-> Ausgang „then“ weiter. Hilfetext: „Adds points …“, Suchwörter: „points reward“.
+Jede Kästchensorte hat dazu einen Steckbrief: ihre Art, ihre Anschlüsse und ihre Arbeit. So sieht der
+Steckbrief des Kästchens **„Add Score“** (Punkte geben) aus, in Worten:
+
+> **Steckbrief „Add Score“:** Art: Aktion. Ein Dateneingang „Points“, eine Zahl, vorbelegt mit 10.
+> Arbeit: Lies den Eingang und gib der Spielwelt so viele Punkte. Antwort: „Weiter bei Ausgang
+> ‚then‘.“
 
 Den Ablauf-Eingang und den Ausgang „then“ bekommt jede Aktion automatisch dazu. Alle eingebauten
 Kästchen zusammen bilden eine Art **Bausatz-Katalog**, aus dem das Menü im Editor seine Vorschläge
-holt. Wie so ein Steckbrief als C++ aussieht, zeigt das blaue Buch, Kapitel 9.
+holt. Name im Menü, Hilfetext, Suchwörter und wie so ein Steckbrief als C++ aussieht, zeigt das
+blaue Buch, Kapitel 9.
 
 ## 9.3 Prüfen, bevor es losgeht
 
@@ -155,8 +173,12 @@ Ereignis mit einem Namen ausrufen – an alle Graphen oder an ein bestimmtes Din
 
 Verzweigt sich eine Kette, etwa bei **Sequence** („erst das, dann das, dann das“), arbeitet Kern die
 Zweige brav nacheinander ab und merkt sich dabei, welche noch offen sind – wie du mit einer Liste auf
-dem Einkaufszettel. Schleifen funktionieren ähnlich: Inhalt der Schleife ausführen, dann zurück zum
-Schleifenknoten, bis die Bedingung nicht mehr stimmt.
+dem Einkaufszettel.
+
+Eine **Schleife** ist ein Kästchen, das ein Stück Kette wiederholt: „Wiederhole, solange …“ oder
+„Wiederhole zehnmal“. Wie beim Kartoffelschälen: Schäl eine, schau in den Topf, und ist er noch nicht
+voll, nimm die nächste. Kern führt den Inhalt der Schleife aus, kehrt zum Schleifenknoten zurück und
+fragt erneut – bis die Bedingung nicht mehr stimmt.
 
 > **Für Neugierige:** Die offenen Zweige liegen auf einem „Stapel“ von Merkzetteln: Der zuletzt
 > hingelegte wird zuerst abgearbeitet. Wie tief Ketten und Rechnungen geschachtelt sein dürfen, steht
@@ -184,6 +206,11 @@ ausgelöst werden:
 - nach einer **Zeit** (so viele Sekunden im Zustand),
 - sobald eine **Bedingung** (eine Ja/Nein-Variable) wahr ist,
 - oder **automatisch** im nächsten Schritt.
+
+Pro Schritt wechselt jede State Machine **höchstens einmal** den Zustand. Hängen mehrere
+automatische Übergänge hintereinander, geht sie also einen Zustand pro Schritt weiter, nicht alle in
+einem Rutsch – wie eine Ampel, die jede Farbe wenigstens kurz zeigt, statt von Grün direkt auf Rot zu
+springen. So bekommt auch jeder Zwischenzustand seine Ereignisse beim Betreten und Verlassen.
 
 Ein Übergang kann auch „aus jedem Zustand“ kommen, etwa ein Not-Aus. Betreten und Verlassen eines
 Zustands lösen eigene Ereignisse aus, an die du Ketten hängen kannst. **Set State** springt direkt in
@@ -227,14 +254,13 @@ das eigene Ding (Self) gemeint.
 
 | Knoten | Feuert, wenn … |
 |---|---|
-| On Begin / End Overlap | etwas den Sensor dieses Dings betritt oder verlässt |
-| On Entered Sensor | dieses Ding einen fremden Sensor betritt |
+| On Begin Overlap | etwas die Zone dieses Dings betritt |
 | On Hit | es kracht |
-| On Collected, On Trigger | ein Pickup eingesammelt oder ein Trigger berührt wird |
-| On Damaged, On Death, On Respawn | Schaden, Tod, Rückkehr |
+| On Collected | ein Pickup eingesammelt wird |
 | On Interact | der Spieler F (Gamepad: Y) drückt und das Ding ansieht oder danebensteht |
-| On Player Joined, On Game Over | ein Spieler kommt dazu, das Spiel endet |
-| On Input Action, On Key | eine Spieler-Aktion oder eine Taste gedrückt wird |
+
+Dazu gibt es Ereignisse für Schaden, Tod, neue Spieler, Spielende und einzelne Tasten – die ganze
+Liste steht im blauen Buch, Kapitel 9.
 
 Eine Überlappung zählt übrigens den ganzen Besucher: Körper und Kopf eines Spielers sind *ein*
 Besucher, nicht zwei.
@@ -269,7 +295,8 @@ Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen
 - Ausgaben und Fehler ins Output Log (Print auf Wunsch als Meldung im HUD);
 - einen **deterministischen Zufall**.
 
-Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit.
+Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit. Entsteht ein Ding sogar mitten in
+einem Ereignis, hört es dieses Ereignis schon mit.
 
 **Wohin gehen Ereignisse?** An den Graphen des betroffenen Dings – oder, wenn es keinen hat, an den
 seines nächsten Vorfahren mit Graph. Das ist praktisch: Die unsichtbare Form, die in eine Tür
@@ -304,14 +331,22 @@ arbeiten:
 
 Einfache Dinge – Verzweigungen, Schleifen, Zahlen, Rechnen, Vergleichen – schreibt der Übersetzer
 direkt hin. Alles andere, etwa Spielknoten, ruft einfach das fertige Stück Kern auf, das auch der
-Dolmetscher benutzt.
+Dolmetscher benutzt. Und das geschieht ohne Umweg: Der übersetzte Graph spricht die Stücke von Kern
+direkt an, ohne dass die Webseite dazwischen vermitteln muss. Darum ist er so schnell.
+
+> **Für Neugierige:** Direkt hinschreiben kann der Übersetzer nur Zahlen und Ja/Nein-Werte, denn nur
+> die liegen in den gemeinsamen Fächern (9.9). Text, Richtungen und Dinge liest auch der übersetzte
+> Graph über die fertigen Stücke von Kern.
 
 > **Wusstest du?** Laut Messung ist der übersetzte Graph etwa **55-mal schneller** als der
 > Dolmetscher. Gemessen wird das mit einer Million Schleifendurchläufen.
 
-Weil das Übersetzen im Browser einen Moment dauert, startet jeder Graph zunächst beim Dolmetscher.
-Sobald der Maschinencode bereit ist, übernimmt er – mitten im Spiel. Klappt das Übersetzen nicht,
-dolmetscht der Interpreter einfach weiter.
+Welcher Weg läuft? Es gibt eine feste Rangfolge:
+
+1. Ist für einen Graphen ein passender **C++-Export** fest eingebaut, gewinnt der.
+2. Sonst wird der Graph **übersetzt**. Weil das im Browser einen Moment dauert, startet er zunächst
+   beim Dolmetscher; sobald der Maschinencode bereit ist, übernimmt dieser – mitten im Spiel.
+3. Klappt das Übersetzen nicht, **dolmetscht** der Interpreter einfach weiter.
 
 Ein exportierter C++-Text gehört genau zu einem Graphen. Erkannt wird das an einem **Fingerabdruck**:
 einer Zahl, die Kern aus dem Inhalt des Graphen errechnet. Ändert sich der Inhalt, ändert sich die
@@ -320,8 +355,8 @@ also nicht ungültig – jede inhaltliche Änderung aber schon. Dann muss neu ex
 
 > **Für Neugierige:** Das übersetzte Programm ist wie eine Schnitzeljagd mit nummerierten Stationen:
 > ein Zähler sagt, an welcher Station (welchem Knoten) es gerade weitergeht. So funktioniert jede
-> Verdrahtung, auch Kreise. Wie man einen exportierten Graphen ins Spiel baut und wo es keinen JIT
-> gibt, steht im blauen Buch, Kapitel 9.
+> Verdrahtung, auch Kreise. Wie man einen exportierten Graphen ins Spiel baut, steht im blauen
+> Buch, Kapitel 9.
 
 ## 9.9 Warum alle drei Wege gleich rechnen müssen
 
@@ -340,8 +375,8 @@ Warum ist das so wichtig?
   Browser anders rechnen als anderswo, wären Wiederholungen, Training und Fehlersuche wertlos. Sogar
   der Schutz gegen Endlosschleifen zählt auf allen drei Wegen gleich.
 - **Wartezeiten** wie Delay setzen ihre Kette auf jedem Weg gleich fort.
-- **Fehlersuche:** Haltepunkte und die Live-Anzeige laufender Knoten funktionieren auch im übersetzten
-  Code.
+- **Fehlersuche:** Haltepunkte (Stellen, an denen das Spiel anhält, 9.10) und die Live-Anzeige
+  laufender Knoten funktionieren auch im übersetzten Code.
 
 Abgesichert wird das mit einem Satz gemeinsamer Testfälle – Rechen-Schleifen, Schranken,
 verschachtelte Schleifen, State Machines, eine absichtliche Endlosschleife und mehr. Jeder Fall läuft
@@ -353,25 +388,31 @@ Im Logik-Editor ziehst du Drähte, bekommst passende Vorschläge, kannst alles r
 Haltepunkte setzen und beim Spielen zusehen, welche Kästchen gerade laufen.
 
 Du öffnest ihn über **Logic** in der Toolbar (Level-Graph) oder über **Edit Logic** / **Add Logic
-(Blueprint)** im Kontextmenü eines Actors. Die Oberfläche beschreibt [Kapitel 11](11-studio.md);
-hier das Wichtigste:
+(Blueprint)** im Kontextmenü eines Actors.
 
-- Jede Bearbeitung lässt sich **rückgängig machen** (Undo).
+Ein Grundsatz steckt dahinter: Der Editor selbst hat **keine eigene Logik**. Die Webseite zeichnet
+nur, was die Engine ihr beschreibt – wie in [Kapitel 4](04-grafik.md), wo die Seite nur Malbefehle
+weiterreicht. Jeder Handgriff ist ein Befehl an die Engine und damit ein Schritt, den du rückgängig
+machen kannst. Was zusammengehört, zählt als **ein** Schritt: Nimmst du einen Draht auf und legst ihn
+woanders ab, macht ein einziges Undo beides rückgängig.
+
+Das Wichtigste beim Bearbeiten:
+
 - Ziehst du einen Draht von einem Pin ins Leere, schlägt das **Aktionsmenü** nur Knoten vor, die
   dazu passen. Du tippst einen Suchbegriff, drückst Enter – der Knoten erscheint und ist schon
   verbunden.
-- **Promote to Variable** macht aus einem Pin mit einem Klick eine neue Variable.
-- Ein Doppelklick auf einen Draht fügt einen Umlenkpunkt ein – für ordentliche Drähte.
-- Benennst du eine Variable um, ändern sich alle Knoten mit.
-- **Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen.
-- **F9** setzt einen Haltepunkt: Läuft der Knoten beim Spielen, hält das Spiel nach diesem Schritt
-  an, und der Editor springt hin.
-- Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre aktuellen Werte.
+- Jede Bearbeitung lässt sich **rückgängig machen** (Undo).
+- Beim Spielen leuchten die gelaufenen Knoten auf, und Variablen zeigen ihre aktuellen Werte. Mit
+  **F9** setzt du einen Haltepunkt: Läuft der Knoten, hält das Spiel an, und der Editor springt hin.
+
+**Compile** (F7) zeigt Probleme, **C++** exportiert den Graphen. Alle weiteren Handgriffe beschreibt
+[Kapitel 11](11-studio.md).
 
 > **Probier's aus!** Öffne das Basic-Level (File › Example Levels). Es hat noch keine Spielfigur:
 > Öffne den Content Drawer (Ctrl+Space), Tab **Place Actors**, Gruppe **Players**, und klick auf
-> **Rolling Ball** – die Kugel wird dein Spieler. Klick dann in der Toolbar auf **Logic** und
-> wähle den Knoten **Begin Play**. Zieh vom Ausgang „then“ einen Draht ins Leere, tippe
+> **Rolling Ball** – die Kugel wird dein Spieler. Klick dann in der Toolbar auf **Logic**. Der
+> Graph ist noch leer und bietet dir Startknöpfe an; klick auf **Begin Play**, und der Knoten steht
+> auf der Fläche. Zieh von seinem Ausgang „then“ einen Draht ins Leere, tippe
 > „show message“, Enter, und schreib einen Text hinein. Zurück im Viewport startest du **Play**
 > (Alt+P): Dein Text erscheint im HUD. Ein Domino – und er ist gefallen!
 
@@ -390,7 +431,8 @@ flowchart LR
   C --> D[Play Sound pickup]
 ```
 
-**Tür.** Interact führt zu einem Lichtschalter (Flip Flop): Beim ersten Mal öffnet ein Dimmer (Tween)
+**Tür.** Drückt der Spieler an der Tür F (das Ereignis Interact aus 9.6), führt das zu einem
+Lichtschalter (Flip Flop): Beim ersten Mal öffnet ein Dimmer (Tween)
 die Tür in 0,8 s, beim zweiten Mal schließt ein anderer sie wieder – jeden Schritt ein kleines Stück.
 Dazu ein Bestätigungston.
 

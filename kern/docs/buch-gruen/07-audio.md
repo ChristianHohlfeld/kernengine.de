@@ -46,17 +46,23 @@ Physik. Das bringt drei Vorteile:
 ## 7.2 Der Mixer – Kerns Mischpult
 
 Der **Mixer** nimmt alle Töne, die gerade spielen, und rechnet sie zu einem einzigen Stereo-Ton
-zusammen. Er hat nur eine feste Zahl von Plätzen; wird es zu voll, fliegt der unwichtigste Ton
-heraus, und nichts wird je hart abgeschnitten.
+zusammen. Er hat nur eine feste Zahl von Plätzen; wird es zu voll, muss der unwichtigste Ton seinen
+Platz räumen. Gewollte Stopps und Lautstärkewechsel dagegen gleiten immer sanft, damit es nicht klickt.
 
 > **Stell dir vor …** ein Mischpult im Tonstudio. Jede Spur hat einen eigenen Regler, alles läuft in
 > Gruppen zusammen und am Ende in einen Hauptregler zu den Boxen. Kerns Mixer ist genau das, nur in
 > Software.
 
 Jeder gerade laufende Ton belegt eine **Stimme** – einen Platz am Mischpult. Studio hat 64 solche
-Plätze. Die Tonaufnahmen selbst heißen **Clips**. Wurde ein Clip mit einem anderen Messtempo
-aufgenommen als der Lautsprecher braucht, rechnet der Mixer ihn **einmal beim Laden** sorgfältig um.
-Das ist aufwendig, aber danach kostet das Abspielen kaum noch etwas.
+Plätze. Die Tonaufnahmen selbst heißen **Clips**. Wurde ein Clip mit einer anderen Abtastrate – also
+in einem anderen Messtempo – aufgenommen, als der Lautsprecher braucht, rechnet der Mixer ihn **einmal
+beim Laden** sorgfältig um. Das ist aufwendig, aber danach kostet das Abspielen kaum noch etwas.
+
+Sorgfältig heißt vor allem: Muss Kern das Messtempo **senken**, filtert er vorher die höchsten Töne
+heraus – die, die bei weniger Messungen pro Sekunde gar nicht mehr festzuhalten sind. Ließe er sie
+drin, tauchten sie als falsche, tiefere **Spiegeltöne** wieder auf. Das kennst du aus dem Film: Ein
+Wagenrad dreht sich schneller, als die Kamera Bilder macht, und scheint plötzlich langsam rückwärts zu
+laufen.
 
 Wer einen Ton startet, sagt dazu, wie er klingen soll: wie laut, wie hoch, ob links oder rechts, ob er
 sich wiederholt, wie wichtig er ist und – bei 3D-Tönen – wo er im Raum steht. Unsinnige Werte rückt der
@@ -65,12 +71,12 @@ den Ton später stoppen, leiser machen oder verschieben kann.
 
 > **Für Neugierige:** Die Nummer funktioniert wie eine Garderobenmarke mit Datum. Ist der Platz
 > längst an einen neuen Ton vergeben, passt die alte Marke nicht mehr, und ein verspäteter Befehl
-> verstellt nicht aus Versehen einen fremden Ton. Das Umrechnen beim Laden heißt im blauen Buch
-> „Windowed-Sinc-Resampling“; es ist so gebaut, dass dabei keine falschen Zusatztöne entstehen.
+> verstellt nicht aus Versehen einen fremden Ton.
 
 **Wenn alle Plätze voll sind**, wirft der Mixer die unwichtigste Stimme hinaus – zuerst die mit der
 niedrigsten Wichtigkeit (*Priorität*), dann die leiseste, dann die älteste. Das heißt *Voice
-Stealing*, „Stimmenklau“. Stimmen, die wichtiger sind als der Neuankömmling, werden nie gestohlen.
+Stealing*, „Stimmenklau“. Stimmen, die wichtiger sind als der Neuankömmling, werden nie gestohlen. Weil
+es unter den Unwichtigsten zuerst die leiseste trifft, fällt der Wechsel kaum auf.
 
 > **Achtung, Falle!** Ein hart abgeschnittener Ton macht ein hässliches „Klick“, weil die Membran
 > mitten in der Bewegung stehen bleiben müsste. Deshalb blendet Kern beim Stoppen immer kurz aus, und
@@ -78,10 +84,8 @@ Stealing*, „Stimmenklau“. Stimmen, die wichtiger sind als der Neuankömmling
 
 ### So wird gemischt
 
-Der Mixer arbeitet nicht Zahl für Zahl auf Zuruf, sondern in kleinen Häppchen von je 128
-Messzeitpunkten (bei 48 000 pro Sekunde sind das knapp 3 ms). Tontechniker nennen einen solchen
-Messzeitpunkt – links und rechts zusammen – übrigens einen „Frame“. Das hat **nichts** mit einem Bild
-auf dem Bildschirm zu tun; in diesem Buch sagen wir darum „Messwert“ oder „Sample“.
+Der Mixer arbeitet nicht Zahl für Zahl auf Zuruf, sondern in kleinen Häppchen von wenigen
+Tausendstelsekunden.
 
 Pro Häppchen rechnet der Mixer für jede Stimme aus, wie laut sie links und rechts sein soll, und lässt
 die Lautstärke innerhalb des Häppchens **gleiten**. Fährt ein Auto vorbei, springt der Pegel nicht
@@ -90,8 +94,7 @@ stufig, sondern fließt – ohne kratzendes „Zipper“-Geräusch, wie es ein r
 Dann liest er den Clip. Spielt ein Ton etwas höher als aufgenommen, liest der Mixer schneller und
 landet oft **zwischen** zwei gespeicherten Samples. Dann schätzt er den Zwischenwert mit einer
 weichen Kurve durch die Nachbarpunkte – so, wie du mit dem Bleistift eine glatte Linie durch ein paar
-Punkte ziehst, statt sie eckig zu verbinden. Zum Schluss dämpft er die Höhen je nach Entfernung (7.3)
-und legt alles auf die richtige Gruppe (7.4).
+Punkte ziehst, statt sie eckig zu verbinden.
 
 **Virtuelle Stimmen:** Ist ein 3D-Ton praktisch unhörbar weit weg, wird er nicht gemischt – das spart
 Zeit. Seine Position läuft aber heimlich weiter. Kommst du zur brummenden Maschine zurück, brummt sie
@@ -115,12 +118,16 @@ dem Höchstabstand zusätzlich aus. Dahinter ist wirklich Ruhe – und der Ton w
 seitlich liegt. Sehr nahe und „breite“ Quellen werden weniger stark verteilt, damit eine Biene am
 Kopf nicht hart von Ohr zu Ohr springt.
 
-> **Stell dir vor …** zwei Taschenlampen, die auf dieselbe Wand leuchten. Wie hell es wirkt, hängt
-> nicht einfach von der Summe der Regler ab: Ein Regler auf „halb“ liefert nur ein **Viertel** der
-> Kraft (halb mal halb). Stellt man in der Mitte beide auf „halb“, kommt zusammen nur die Hälfte an –
-> ein Loch. Beim Ton ist es genauso: Unser Ohr hört die Kraft, nicht die Reglerstellung.
+Dabei gibt es eine Tücke. Der Regler bestimmt, wie weit die Lautsprechermembran ausschlägt. Unser Ohr
+hört aber die **Kraft** des Schalls, und die wächst mit Ausschlag **mal** Ausschlag: Halber Ausschlag
+bringt nur ein Viertel der Kraft (halb mal halb).
 
-Darum nutzt Kern **Equal-Power-Panning** („gleiche Kraft beim Verteilen“): Steht eine Quelle in der
+> **Stell dir vor …** eine Schaukel. Willst du doppelt so weit schwingen, brauchst du nicht doppelt,
+> sondern viermal so viel Schwung. Umgekehrt: Halb so weit schwingen heißt nur ein Viertel des
+> Schwungs. Mit der Membran eines Lautsprechers ist es genauso.
+
+Stellt man für eine Quelle in der Mitte beide Seiten einfach auf „halb“, kommt also zusammen nur die
+Hälfte der Kraft an – in der Mitte entstünde ein Loch. Darum nutzt Kern **Equal-Power-Panning** („gleiche Kraft beim Verteilen“): Steht eine Quelle in der
 Mitte, bekommt jede Seite nicht die Hälfte dessen, was sie ganz außen bekäme, sondern etwa sieben
 Zehntel. Sieben Zehntel mal sieben Zehntel ist rund die Hälfte der Kraft, und zweimal die Hälfte
 ergibt wieder die volle Kraft. So wird ein Auto, das von links nach rechts fährt, in der Mitte nicht
@@ -172,7 +179,7 @@ Effekte, und Hall bekommen nur Effekte und Stimmen – bis ein Level es anders e
 > **Stell dir vor …** du klatschst in einem leeren Treppenhaus. Der Knall prallt hundertfach von den
 > Wänden zurück, immer leiser, bis nur ein Rauschen bleibt. Das ist **Hall**.
 
-Kerns Hall heißt **Freeverb**, ein bekanntes Verfahren von Jezar at Dreampoint. Es tut genau das aus
+Kerns Hall heißt **Freeverb**, ein bekanntes, frei verfügbares Verfahren. Es tut genau das aus
 dem Treppenhaus: Es erzeugt viele Echos von **verschieden langen** Wegen, jedes leiser als das
 vorige, und die hohen Töne klingen schneller ab – wie in einem Raum mit Teppich. Weil die Wege
 verschieden lang sind, fallen die Echos nie im Gleichtakt zusammen, sondern ergeben eine dichte
@@ -183,11 +190,12 @@ Nass-Anteil (wie viel Hall dazukommt).
 
 Ganz am Ende wacht der **Limiter**, der Begrenzer. Kommt eine Spitze dem Höchstwert zu nahe, dreht er
 sofort leiser und lässt danach langsam wieder los – wie ein Tontechniker mit schneller Hand. Ein
-weiches „Abrunden“ fängt jeden Rest ab, sogar fehlerhafte Zahlen. Nebenbei misst der Mixer die Pegel;
+weiches „Abrunden“ fängt jeden Rest ab, sogar unsinnige Werte, die ein Rechenfehler irgendwo
+erzeugt haben könnte – zum Lautsprecher kommt trotzdem nur Erlaubtes. Nebenbei misst der Mixer die Pegel;
 daraus zeichnet die Statusleiste im Studio ihre Pegelanzeige, deren Spitze wie eine echte Nadel
 langsam abfällt.
 
-> **Für Neugierige:** Freeverb besteht aus acht „Kammfiltern“ (Echo-Schleifen mit leicht
+> **Für Neugierige:** Freeverb stammt von Jezar at Dreampoint und besteht aus acht „Kammfiltern“ (Echo-Schleifen mit leicht
 > verschiedenen Längen) und vier „Allpässen“ (Verwischern) pro Seite. Längen, Schwelle und
 > Loslass-Zeit des Limiters stehen im blauen Buch, Kapitel 7.
 
@@ -210,23 +218,36 @@ Rezept heißt **Patch** und hat vier Zutaten:
 3. **Die Tonhöhe** – fest, rutschend (ein fallender „Piu“-Laser) oder mit einem Sprung.
 4. **Effekte** – Zittern, Filter, Wiederholung oder absichtliches „Kaputtmachen“ für Retro-Klang.
 
+Ein Spartrick steckt im Rechnen selbst: Alles, was sich **langsam** ändert – das Zittern, das
+Rutschen der Tonhöhe, ein Filter, der sich öffnet –, rechnet Kern nicht für jede einzelne Zahl neu,
+sondern nur alle paar Zahlen. Die Schritte dazwischen sind so winzig, dass kein Ohr sie hört. Wie
+beim Autofahren: Du schaust nicht in jeder Sekunde auf den Tacho, und trotzdem fährst du gleichmäßig.
+
 Ein Beispiel als Rezeptkarte – so entsteht das Münzgeräusch:
 
-> **Rezept „Pickup“:** Nimm eine schnarrende Schwingung mit 988 Hz und eine sehr kurze Hüllkurve.
+> **Rezept „Pickup“:** Nimm einen hohen, schnarrenden Ton und eine sehr kurze Hüllkurve.
 > Spring nach 65 ms um das 1,5-Fache nach oben – das ist eine Quinte, das typische „Pling-PLING“.
 > Lege zum Schluss noch einen leisen Glockenton darüber. Fertig.
 
 Für Aufprälle kleiner, fester Dinge gibt es einen zweiten Weg, die **Modalsynthese**. Jeder Gegenstand
 hat ein paar Eigentöne, wie ein Weinglas, das beim Anschlagen immer gleich singt. Kern spielt ein paar
 solcher Töne, lässt sie abklingen und setzt einen winzigen Rauschstoß für den Moment der Berührung
-davor. Der Code begründet das schön: Ein massives Kunststoffteil klingt weder tief noch lang, sonst
+davor. Die Entwickler begründen das schön: Ein massives Kunststoffteil klingt weder tief noch lang, sonst
 wirkt es wie eine hohle Kiste. Darum klingt das Plastik-Geräusch hoch und ist nach Millisekunden
 vorbei.
 
 Die zwei **Musikstücke** sind echte, ausgerechnete Partituren: ein treibendes Stück zum Fahren und ein
-ruhiges mit Flächen und Glockenmelodie. Beide laufen nahtlos im Kreis. Weil ihr Ausrechnen einige
-hundert Millisekunden dauert, verteilt Kern die Arbeit in kleine Zeitscheiben – so ruckelt ein Level
-beim Laden nicht.
+ruhiges mit Flächen und Glockenmelodie. Kommt dieselbe Note mehrmals vor, rechnet Kern sie nur
+einmal aus und setzt sie wieder ein – wie ein Stempel statt immer neu zu zeichnen. Beide Stücke laufen
+nahtlos im Kreis: Noten, die über das Ende hinausklingen, klingen am Anfang weiter. Bei Wind und
+Stadtrauschen legt Kern die letzten Augenblicke sanft überblendet über den Anfang. So fließen Ende und
+Anfang ineinander, und man hört keine Naht.
+Weil das Ausrechnen der Musik einige hundert Millisekunden dauert, verteilt Kern die Arbeit in kleine
+Zeitscheiben – so ruckelt ein Level beim Laden nicht.
+
+> **Für Neugierige:** Das Rauschen würfelt Kern wie das Vorbild sfxr im Takt der Tonhöhe neu. Darum
+> klingt Rauschen auf einer tiefen Note dunkler und auf einer hohen heller – praktisch für Explosionen
+> und Zischen aus demselben Rezept.
 
 Insgesamt gibt es 38 eingebaute Sounds in acht Gruppen: Spielgeschehen (Münze, Sprung, Ziel), Kampf,
 Physik (Explosion, Aufprall), Fahrzeuge (Motor, Schweben), Hintergrund (Wind, Stadt), Roboter,
@@ -264,14 +285,17 @@ Anfang, Mitte und Ende und kann so lange dauern wie eine Rutschpartie.
 
 > **Wusstest du?** Kerns Entenstimme ist **Sample für Sample identisch** mit dem Original: Ein
 > Vergleich aller 328 Laute ergibt eine Abweichung von genau null. Dafür muss sogar der Zufall in
-> exakt derselben Reihenfolge gewürfelt werden wie im Original.
+> exakt derselben Reihenfolge gewürfelt werden wie im Original. Wozu der Aufwand? So klingt eine
+> Ente im Spiel genau wie ihr echtes Gegenstück mit demselben Seed – wer beide nebeneinander hört,
+> hört keinen Unterschied.
 
-Danach macht Kern den Klang absichtlich „schlechter“: so grob gespeichert wie auf dem Roboter, und
-alle tiefen Töne weggefiltert, weil der winzige echte Lautsprecher sie kaum wiedergibt. Die Laute
+Danach macht Kern den Klang absichtlich „schlechter“: Jeder Laut wird so grob gespeichert wie auf
+dem Roboter, also mit weniger Abstufungen pro Messwert – wie ein Foto mit weniger Farben. Und alle
+tiefen Töne werden weggefiltert, weil der winzige echte Lautsprecher sie kaum wiedergibt. Die Laute
 kommen aus dem **Kopf** der Ente, wo ihr Lautsprecher sitzt. Ein neuer Laut schneidet den alten ab,
-wie bei einem einzigen Lautsprecher. Weil das Ausrechnen auf Telefonen spürbar dauert, bereitet Kern
-die Laute jeder Ente vorab vor, einen pro Bild. Wann die Ente welchen Laut ruft, erklärt
-[Kapitel 13](13-micro-duck.md).
+wie bei einem einzigen Lautsprecher; nur während des langen „Wiiieee“ schweigen andere Laute. Weil
+das Ausrechnen auf Telefonen spürbar dauert, bereitet Kern die Laute jeder Ente vorab vor, einen
+Laut pro Bild. Wann die Ente welchen Laut ruft, erklärt [Kapitel 13](13-micro-duck.md).
 
 > **Für Neugierige:** Das Original ist in der Programmiersprache Rust geschrieben, der Seed entsteht
 > mit einem SHA-256-Fingerabdruck (einer Rechnung, die aus jedem Text eine feste, scheinbar zufällige
@@ -331,7 +355,9 @@ verloren gehen – fehlt ein Klick, ist es egal. Wichtige Ereignisse wie eine ei
 dagegen sicher an ([Kapitel 10](10-netzwerk.md)).
 
 Jeder Rigid Body hat einen Aufprall-Sound und eine **Schwelle**: Erst ab einem gewissen Tempo klingt
-ein Stoß. Jeder Collider kann einen eigenen Sound tragen – die Sohle der Ente klingt nach Schritt,
+ein Stoß. Die Physik meldet Zusammenstöße übrigens nur für Formen, die überhaupt einen Klang haben
+(oder die Spieler und Logik brauchen) – jede Meldung kostet Rechenzeit, und für eine stumme Kiste
+wäre sie verschwendet. Jeder Collider kann einen eigenen Sound tragen – die Sohle der Ente klingt nach Schritt,
 ihr Gehäuse nach Plastik. Dazu ein paar Regeln:
 
 - Unter der Schwelle bleibt es still, und pro Physikschritt klingen nur wenige Aufprälle – mehr würde
@@ -384,11 +410,11 @@ Der Browser erlaubt Ton erst nach dem ersten Klick. Und weil das Mischpult und d
 im selben Takt arbeiten, hält Kern immer einen kleinen Vorrat fertigen Tons bereit, damit nichts
 stockt.
 
-Browser erlauben Ton erst **nach einer Nutzergeste** – der erste Klick, Tipp oder Tastendruck weckt
-ihn. Auf iPhones sorgt Kern außerdem dafür, dass der Stummschalter des Telefons das Spiel nicht stumm
-macht. Ein Zeitgeber füllt den Ton regelmäßig nach – auch dann, wenn die Bilder gerade langsam kommen
-oder der Tab im Hintergrund liegt. Der Mixer rechnet gleich im Messtempo des Geräts, damit der
-Browser nichts mehr umrechnen muss.
+Wecken kann den Ton jede **Nutzergeste**: der erste Klick, Tipp oder Tastendruck. Auf iPhones sorgt
+Kern außerdem dafür, dass der Stummschalter des Telefons das Spiel nicht stumm macht. Ein Zeitgeber
+füllt den Ton regelmäßig nach – auch dann, wenn die Bilder gerade langsam kommen oder der Tab im
+Hintergrund liegt. Der Mixer rechnet gleich im Messtempo des Geräts, damit der Browser nichts mehr
+umrechnen muss.
 
 Abgespielt wird am liebsten über einen kleinen Browser-Helfer, der **nebenher** läuft, unabhängig vom
 Rest der Seite. Selbst wenn das Hauptprogramm kurz beschäftigt ist, spielt der Helfer weiter ab, was
@@ -418,9 +444,6 @@ mit seinem eigenen Werkzeug und reicht die Samples an Kerns Mischpult weiter.
 > **Achtung, Falle!** „Mein Spiel hat keinen Ton!“ – Hast du schon geklickt oder eine Taste
 > gedrückt? Vorher bleibt jeder Browser stumm. Das ist seine Regel, kein Fehler von Kern.
 
-Wer eine eigene App baut ([Kapitel 12](12-eigene-spiele.md)), kann Mischpult und Synthesizer direkt
-benutzen, muss die Verbindung zum Browser dann aber selbst bauen.
-
 ## Das nimmst du mit
 
 - Ton ist eine Reihe von Zahlen: 48 000 Samples pro Sekunde und Ohr.
@@ -442,8 +465,10 @@ benutzen, muss die Verbindung zum Browser dann aber selbst bauen.
 
 ### Lösungen
 
-1. Kern verteilt mit „gleicher Kraft“: In der Mitte bekommt jede Seite etwa sieben Zehntel statt
-   der Hälfte. Zusammen ergibt das wieder die volle Kraft – kein Loch.
+1. Das Ohr hört die Kraft, und die wächst mit Ausschlag mal Ausschlag (Schaukel). Zweimal „halb“
+   gäbe nur die halbe Kraft. Darum bekommt in der Mitte jede Seite etwa sieben Zehntel: Sieben
+   Zehntel mal sieben Zehntel ist rund die Hälfte der Kraft, beide Seiten zusammen die volle – kein
+   Loch.
 2. Ihre Stimme war virtuell: nicht gemischt, aber die Position lief weiter.
 3. Musik ist am wichtigsten; Effekte dürfen nur Stimmen klauen, die höchstens so wichtig sind wie sie.
 4. Die Kamera folgt dem Spieler, Ohren und Motor bewegen sich gemeinsam – Doppler wäre falsch.

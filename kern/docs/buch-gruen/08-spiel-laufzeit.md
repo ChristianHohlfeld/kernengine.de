@@ -57,17 +57,22 @@ und darüber, wer an wem hängt.
 
 - Gemessen wird in **Metern, Sekunden und Kilogramm**.
 - **Z zeigt nach oben** (nicht Y, wie in manchen anderen Programmen).
-- Drehungen stehen als **Winkel in Grad** da: Rollen, Nicken, Gieren – genau wie im Editor.
+- Drehungen stehen als **Winkel in Grad** da: Rollen, Nicken, Gieren – genau wie im Editor. Die
+  Wörter kommen aus der Fliegerei: **Rollen** heißt, die Flügel kippen zur Seite; **Nicken** heißt,
+  die Nase geht hoch oder runter; **Gieren** heißt, die Nase schwenkt nach links oder rechts.
 - Farben sind Werte von 0 (aus) bis 1 (voll) für Rot, Grün und Blau.
 - Die Lage eines Actors ist immer **relativ zu seinem Eltern-Actor**. Hängst du ein Rad an ein Auto,
   fährt das Rad mit.
 - Kind-Actors ohne eigenen Körper werden beim Simulieren in den Körper ihres nächsten Vorfahren
   „eingeschweißt“. Die Kabine eines Autos wird so ein Teil des Autos.
 
-> **Für Neugierige:** Die drei Drehungen werden in einer festen Reihenfolge ausgeführt (erst Gieren,
-> dann Nicken, dann Rollen), denn zwei Drehungen nacheinander ergeben je nach Reihenfolge eine andere
-> Lage – probier es mit einem Buch aus. Wie Farben in der Datei stehen, zeigt das blaue Buch,
-> Kapitel 8.
+> **Für Neugierige:** Die drei Drehungen werden in einer festen Reihenfolge ausgeführt, denn zwei
+> Drehungen nacheinander ergeben je nach Reihenfolge eine andere Lage – probier es mit einem Buch aus.
+> Denk dir einen Piloten: Er giert zuerst, nickt dann um seine schon mitgedrehte Querachse und rollt
+> zuletzt um seine mitgedrehte Längsachse. Als Rezept geschrieben steht das „Gieren · Nicken · Rollen“
+> da; liest man die Formel wie in [Anhang B](B-grundlagen-rendering.md) von rechts, also um die festen
+> Achsen der Welt, heißt dieselbe Drehung: erst Rollen, dann Nicken, dann Gieren. Beide Lesarten
+> landen bei genau derselben Lage.
 
 ## 8.3 Level und Actor
 
@@ -79,23 +84,22 @@ Ein **Level** ist das Dokument, das Kern Studio bearbeitet und als Datei speiche
 - einen Namen und die **World Settings** (8.5),
 - die Liste der **Actors**,
 - importierte **Texturen** (Bilder für Oberflächen) und **Sounds**, direkt in der Datei gespeichert,
-- einen **Level-Graphen** für Spielregeln ([Kapitel 9](09-logik.md)),
-- die Position der Editor-Kamera.
+- einen **Level-Graphen** für Spielregeln ([Kapitel 9](09-logik.md)).
 
 Welchen Actor du in Play steuerst, steht in den World Settings. Ist dort keiner eingetragen, nimmt
 Kern den ersten Actor, der sich steuern lässt.
 
-Ein **Actor** ist ein Ding in der Welt: ein Würfel, eine Lampe, ein Auto, eine Ente. Jeder Actor hat
-eine eindeutige Nummer, einen Namen, einen Eltern-Actor und eine **Transform** – Position, Drehung
-und Größe. Im **Outliner**, der Liste aller Dinge im Studio, kann er in einem Ordner liegen. Er kann
-„versteckt“ sein (unsichtbar) oder „gesperrt“ (im **Viewport**, dem 3D-Fenster, nicht anklickbar).
-Dazu kommen freie **Tags** – Schlagworte, über die Spielregeln ihn wiederfinden. Und dann kommen die
-Komponenten.
+Ein **Actor** ist ein Ding in der Welt: ein Würfel, eine Lampe, ein Auto, eine Ente.
 
 > **Stell dir vor …** einen Steckbaustein mit Noppen. Ein nackter Actor ist nur der Grundstein: Er
 > hat einen Ort, sonst nichts. Steck ein **Mesh** drauf, und man sieht ihn. Steck einen **Rigid Body**
 > drauf, und er fällt runter. Steck einen **Player Controller** drauf, und du kannst ihn fahren. So
 > baust du aus wenigen Teilen alles Mögliche.
+
+Der Grundstein selbst trägt nur wenig: einen Namen, seinen Eltern-Actor, eine **Transform** (Position,
+Drehung und Größe) und freie **Tags** – Schlagworte, über die Spielregeln ihn wiederfinden. Alles
+andere steckt in den Bausteinen. Wie man Actors im Studio ordnet, versteckt oder sperrt, zeigt
+[Kapitel 11](11-studio.md).
 
 Von den meisten Komponenten darf ein Actor höchstens eine haben (ein Mesh, ein Licht, einen Body …).
 **Collider** und **Gelenke** dürfen es beliebig viele sein. Dazu kann jeder Actor eigene Spielregeln
@@ -132,23 +136,28 @@ einen passenden Collider.
 
 **Körper und Form sind getrennt.** Der Rigid Body sagt, *wie* sich ein Ding bewegt: statisch,
 kinematisch oder dynamisch. Der Collider sagt, *welche Form* dabei zählt – eine Box, eine Kugel, eine
-Kapsel oder eine Form, die sich ans Mesh anschmiegt. Gibst du keine Masse an, rechnet Kern sie aus
-Größe und **Dichte** der Collider aus. Ab Werk ist die Dichte die von Wasser (1000 kg je
-Kubikmeter): Eine Kiste von 1 m × 1 m × 1 m wiegt also eine Tonne. Ein Collider kann außerdem
-**Sensor** sein – perfekt für Ziellinien und Münzen – und du kannst festlegen, wer mit wem
-zusammenstoßen darf, etwa damit die Teile eines Roboters sich nicht gegenseitig im Weg sind.
+**Kapsel** (wie eine Tablette: ein Zylinder mit runden Enden) oder eine Form, die sich ans Mesh
+anschmiegt. Gibst du keine Masse an, rechnet Kern sie aus Größe und **Dichte** der Collider aus. Ab
+Werk ist die Dichte die von Wasser (1000 kg je Kubikmeter): Eine Kiste von 1 m × 1 m × 1 m wiegt also
+eine Tonne. Aus den Formen ergibt sich auch, wo der **Schwerpunkt** liegt und wie schwer sich das Ding
+drehen lässt. Importierte Roboter wie die Micro Duck bringen diese Angaben dagegen fertig mit, aus
+dem Bauplan des echten Roboters – dann gelten die, und die Formen bestimmen nur noch, wo etwas
+anstößt. Ein Collider kann außerdem **Sensor** sein – perfekt für Ziellinien und Münzen –,
+und du kannst festlegen, wer mit wem zusammenstoßen darf, etwa damit die Teile eines Roboters sich
+nicht gegenseitig im Weg sind.
 
 **Gelenke verbinden Dinge.** Es gibt neun Arten, vom Scharnier über die Schiene und das Seil bis zum
 Rad. Gelenke können Grenzen, Motoren und Federn haben und bei zu viel Kraft **brechen** – so
 entsteht eine Seilbrücke, die unter Last reißt. Ein Scharnier kann außerdem ein **Servo** sein: ein
 kleiner Motor, der einen Zielwinkel ansteuert. Je weiter das Gelenk vom Ziel weg ist, desto stärker
-drückt er zurück, wie ein Gummiband ([Kapitel 6](06-physik.md)).
+drückt er zurück, wie ein Gummiband ([Kapitel 6](06-physik.md)). Ein Gelenk sitzt immer an dem Actor,
+der sich bewegen soll, und zeigt auf sein **Ziel** – das andere Ding oder die Welt. Das Ziel ist der
+feste Bezug: Positive Werte für Winkel, Weg oder Motortempo bewegen den Actor, nicht das Ziel. So
+weißt du beim Einstellen immer, wer sich dreht – die Tür, nicht der Türrahmen.
 
-**Spielfiguren sind auch nur Bausteine.** Der Player Controller hat sieben Bewegungsarten: Schwebeauto
-(*Hover Car*), Fahrzeug, rollende Kugel, Figur (*Character*), Flieger, Soldat und Walker (die Micro
-Duck). Dazu stellst du Tempo, Sprung, Boost und die Kamera-Art ein. Eine Waffe trifft sofort über
-einen unsichtbaren Strahl; Lebenspunkte können sich nach einer Weile erholen, und wer umfällt, kann
-wieder auferstehen. Wie Kern diese Regeln umsetzt, zeigen 8.10 und 8.13.
+**Spielfiguren sind auch nur Bausteine.** Der Player Controller macht ein Ding steuerbar – als
+Schwebeauto, rollende Kugel, Soldat, Micro Duck und mehr (8.10); Waffe und Lebenspunkte sind eigene
+Bausteine (8.13).
 
 **Bewegung ohne Physik.** Der Rotator dreht ein Ding dauernd, der Mover schiebt es hin und her – sanft
 wie ein Pendel oder gleichmäßig. Und die City baut aus einer einzigen Zahl (einem *Seed*) eine
@@ -166,8 +175,8 @@ Alle Felder, Standardwerte und die Werte der einzelnen Waffen stehen im blauen B
 Manches gilt nicht für ein einzelnes Ding, sondern für die ganze Welt: die Schwerkraft, die
 Tageszeit, die Spielregeln, die Musik. Das steht in den **World Settings**, sortiert in vier Gruppen.
 
-- **Physik:** Schwerkraft, wie oft pro Sekunde gerechnet wird, wie fein jeder Schritt noch einmal
-  unterteilt wird (*Unterschritte*), Bodenreibung und wie weich Berührungen nachgeben.
+- **Physik:** Schwerkraft, Bodenreibung und wie genau die Physik rechnet – sie rechnet nämlich in
+  kleinen, festen Schritten, und wie viele davon pro Sekunde, stellst du hier ein (mehr dazu in 8.9).
 - **Himmel und Licht:** Tageszeit (0,25 Sonnenaufgang, 0,5 Mittag, 0,75 Untergang), wie schnell die
   Zeit vergeht (0 = eingefroren), Sonnenrichtung, Nebel, Helligkeit, Schatten, Wolken und ein endloser
   Boden.
@@ -256,24 +265,26 @@ Spielregeln erst, wenn es etwas zu regeln gibt.
 1. Level **prüfen** – ein Fehler bricht ab.
 2. Eine **Kopie** des Levels anlegen, das Original merken.
 3. Die **Physikwelt** mit Schwerkraft bauen.
-4. Actors so ordnen, dass Eltern vor Kindern kommen.
-5. **Körper**, dann **Gelenke**, dann die laufenden Roboter (**Walker**) anlegen.
-6. Den **Stadtverkehr** starten.
-7. Den **Spieler** übernehmen (nur in Play).
-8. **Regeln** zurücksetzen: Punkte, Zeit, Status (die Bestzeit bleibt). In Play erscheint der
-   Titel als Meldung.
-9. Gesundheit und Munition füllen, dann die **Spielregeln aus Kapitel 9** starten.
+4. Erst die **Körper**, dann die **Gelenke** dazwischen anlegen.
+5. Den **Spieler** übernehmen (nur in Play).
+6. Punkte und Zeit auf null, dann die **Spielregeln aus Kapitel 9** starten.
 
 Zwei Feinheiten merkt man beim Spielen: **Spieler schlafen nie** – ein ruhender Körper darf sonst
 „einschlafen“, um Rechenzeit zu sparen, aber deine Figur soll sofort reagieren. Und Fahrzeuge,
 Figuren und Flieger **kippen nicht um**: Kern hält sie aufrecht; nur die rollende Kugel und der
 Walker dürfen sich frei drehen. Kann eine Form nicht gebaut werden, wird sie übersprungen und im Log
-gemeldet.
+gemeldet. Ein unsichtbarer Hilfskörper, der am Ende gar keine Form hat, fällt einfach weg; ein echter
+Rigid Body ohne Form rechnet dagegen als Punkt mit Masse weiter.
 
-> **Für Neugierige:** Schnelle Spielerfahrzeuge werden besonders sorgfältig auf Zusammenstöße
-> geprüft, damit sie nicht durch dünne Wände „tunneln“ (siehe [Kapitel 6](06-physik.md)). Wie Gelenke
-> ausgerichtet werden und warum Federn nicht beliebig hart sein dürfen, steht im blauen Buch,
-> Kapitel 8.
+Beim Aufbau spart Kern auch gleich: Meldungen wie „etwas hat die Zone betreten“ oder „hier hat es
+gekracht“ schaltet er nur dort ein, wo sie jemand liest – bei Sensoren, beim Spieler, bei Dingen mit
+Klang und, wenn das Level Spielregeln hat, bei allem, was sich bewegt. Jede Meldung kostet
+Rechenzeit, und eine, die niemand liest, ist verschwendet.
+
+> **Für Neugierige:** Federn in Gelenken dürfen nicht härter schwingen, als die Physik rechnen kann:
+> höchstens halb so oft pro Sekunde, wie sie Schritte (samt Unterschritten) macht. Eine Feder, die
+> zwischen zwei Rechenschritten schon mehrmals hin- und herschwingen müsste, würde die Simulation
+> aufschaukeln. Kern begrenzt sie deshalb von selbst.
 
 ### Vier Modi
 
@@ -292,8 +303,9 @@ und im Pausenzustand macht die Taste **.** (Punkt) genau einen Schritt. Ein Neus
 ursprüngliche Level frisch.
 
 > **Probier's aus!** Öffne das **Physics Lab** (File › Example Levels), starte Play (Alt+P), drück
-> nach ein paar Sekunden **F8** und schau dir die Szene von außen an. Pausiere und tippe immer wieder
-> auf **.** – du gehst Schritt für Schritt durch die Physik wie durch ein Daumenkino.
+> nach ein paar Sekunden **F8** und schau dir die Szene von außen an. Pausiere mit dem Knopf **Pause**
+> in der Toolbar (oder über das Menü **Play › Pause / Resume**) und tippe dann immer wieder auf **.** –
+> du gehst Schritt für Schritt durch die Physik wie durch ein Daumenkino.
 
 ## 8.9 Ein Frame – das Herz der Spielschleife
 
@@ -313,12 +325,17 @@ anderes heraus. Deshalb rechnet Kern immer in **festen Schritten**, normalerweis
 Das funktioniert wie ein Sparschwein: Jedes Bild wirft die vergangene Zeit hinein. Solange genug für
 einen ganzen Schritt drin ist, nimmt Kern einen Schritt heraus und rechnet ihn. Was übrig bleibt,
 wartet aufs nächste Bild. Damit ein langer Hänger nicht alles durcheinanderbringt, ist das
-Sparschwein begrenzt: Nach einer Pause von mehreren Sekunden holt Kern nicht alles auf einmal nach.
-Mehr dazu in [Kapitel 6](06-physik.md).
+Sparschwein begrenzt: Pro Bild rechnet Kern höchstens eine Zehntelsekunde Spielzeit. Hing der Rechner
+ein paar Sekunden, holt Kern das nicht im Zeitraffer nach – das Spiel läuft danach einfach ruhig
+weiter. Mehr dazu in [Kapitel 6](06-physik.md).
 
 Und weil ein Bild meist zwischen zwei Schritten liegt, schiebt Kern die Körper für die Anzeige
 geschmeidig zwischen der alten und der neuen Lage hin und her. So sieht alles flüssig aus, obwohl
 die Physik in festen Häppchen rechnet.
+
+Auch das Bild selbst hat in Studio eine feste Reihenfolge: erst die Eingaben einsammeln, dann die
+Welt weiterrechnen, dann folgt die Kamera, dann der Ton, und zuletzt wird gemalt. So zeigt jedes
+Bild genau den Stand, den die Welt gerade erreicht hat, und der Ton passt dazu.
 
 ### Was in einem festen Schritt passiert
 
@@ -331,20 +348,14 @@ flowchart TD
   A[Eingaben der Spieler anwenden] --> B[Dauerbewegungen: drehen, schieben]
   B --> C[Verkehr, Roboter, Motoren]
   C --> D[Physik-Schritt]
-  D --> E[Ereignisse: Münzen, Zonen, Treffer, Töne]
+  D --> E[Ereignisse: Münzen, Zonen, Treffer]
   E --> F[Gesundheit und Spielregeln aus Kapitel 9]
   F --> G[Regeln: Zeit, Absturz, Punkte]
 ```
 
-1. **Spieler:** Die Eingabe jedes Spielers wird angewendet – je nach Art fährt, läuft oder fliegt er.
-2. **Dauerbewegung:** Rotatoren und Mover bekommen ihre neue Lage.
-3. **Verkehr** (Autos halten vor dem Spieler), laufende Roboter und ihre Motoren.
-4. **Physik:** Box3D rechnet einen Schritt.
-5. **Ereignisse:** eingesammelte Münzen, berührte Zonen, Treffer, Kamerawackeln, Aufprall-Töne,
-   brechende Gelenke.
-6. **Gesundheit** (Heilen, Wiederauferstehen) und die **Spielregeln** aus [Kapitel 9](09-logik.md).
-7. **Regeln:** Zeitlimit prüfen, wer unter Kill Z fiel, zurücksetzen, Tempo fürs HUD, Punktziel
-   erreicht?
+Grob gesagt: Erst wird alles **bewegt**, was sich von selbst bewegen will – Spieler, Lifte, Autos,
+Roboter. Dann rechnet die **Physik**. Dann wertet Kern aus, was dabei **passiert** ist, und zuletzt
+prüfen die **Regeln**, ob jemand gewonnen oder verloren hat.
 
 Danach läuft die Tageszeit weiter, die Kamera folgt, und die Welt übergibt alles zum Zeichnen.
 Versteckte Dinge, eingesammelte Münzen und benutzte Zonen bleiben dabei unsichtbar. Zum Schluss sagt
@@ -363,17 +374,26 @@ Bei jedem Bild bekommt der Spieler-Actor eine **Eingabe**: Bewegung, hoch und ru
 Boost, Kameradrehung und Zoom. Der Soldat bekommt dazu Schießen, Zielen, Nachladen und Ducken, die
 Micro Duck ihre Spezialbewegungen wie Sitzen, Kicken oder Zwitschern.
 
-- **Hover Car:** Gas schiebt das Auto nach vorn, eine unsichtbare **Schwebefeder** hält es in der
-  Luft über dem Boden. Damit es nicht wie auf Eis rutscht, drückt eine Seitenkraft dagegen. Gelenkt
-  wird umso stärker, je schneller es fährt. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
-- **Vehicle:** wie das Hover Car, aber ohne Schweben – angetrieben wird nur mit Bodenkontakt.
-- **Rolling Ball:** Kraft in Laufrichtung, Sprung als Stoß nach oben, nur am Boden.
-- **Character:** eine Lauffigur wie in klassischen Ego-Shootern. Sie nutzt eine fertige Laufhilfe der
-  Physik, steigt kleine Stufen von allein hinauf und springt knackig. Ihr Körper ist dabei
-  kinematisch: Er geht dorthin, wo die Laufhilfe ihn hinschickt.
-- **Flyer:** fliegt in alle Richtungen, die Schwerkraft ist aufgehoben; er dreht sich zur Kamera.
-- **Soldier:** eine Ego-Shooter-Figur (8.13).
-- **Walker:** Die Eingabe geht an das Netz der Micro Duck, das ihre Servos steuert (8.14).
+Zwei Beispiele zeigen, wie verschieden das aussehen kann:
+
+**Hover Car (Schwebeauto).** Gas schiebt das Auto nach vorn, und eine unsichtbare **Schwebefeder**
+hält es über dem Boden – wie ein Kissen aus Luft, das stärker drückt, je tiefer das Auto sinkt. Damit
+es in Kurven nicht wie auf Eis rutscht, drückt eine Kraft seitlich dagegen. Gelenkt wird umso stärker,
+je schneller es fährt. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
+
+**Character (Lauffigur).** Eine Figur wie in klassischen Ego-Shootern. Sie wird nicht von der Physik
+herumgeschubst, sondern von einer **Laufhilfe** gelenkt – wie von einem unsichtbaren Spielleiter, der
+die Figur Schritt für Schritt dorthin setzt, wo sie hindarf: an Wänden entlang, kleine Stufen von
+allein hinauf, nie durch etwas hindurch. Gesprungen wird knackig.
+
+Die übrigen folgen demselben Muster: Das **Vehicle** fährt wie das Hover Car, aber auf dem Boden; die
+**rollende Kugel** wird angeschoben und hüpft; der **Flyer** fliegt in alle Richtungen ohne
+Schwerkraft; der **Soldier** ist eine Ego-Shooter-Figur (8.13); und beim **Walker** geht die Eingabe
+an das Netz der Micro Duck, das ihre Motoren steuert (8.14).
+
+> **Für Neugierige:** Die Seitenhaftung des Hover Cars ist eine gleichmäßige Kraft, keine Folge
+> kleiner Stöße. Stöße würden in jedem Schritt gegen den Teil der Physik arbeiten, der Berührungen
+> auflöst.
 
 Bei Kugel, Figur und Flieger ist „vorwärts“ immer **dort, wo die Kamera hinschaut**. Gemeinsam haben
 alle: Der Boost ist ein Vorrat, der sich beim Boosten leert und danach langsam auffüllt. Wer hart
@@ -452,7 +472,7 @@ Schritten berechnet. Einige Feinheiten:
 - **Fallschaden** gibt es erst bei hartem Aufprall, ein sehr tiefer Sturz ist tödlich.
 - **Streuung:** Schüsse werden ungenauer, wenn du dich bewegst, springst oder schnell hintereinander
   schießt, und genauer, wenn du dich duckst. Die Streuung wirkt zufällig, ist aber **deterministisch**
-  berechnet – auf jedem Rechner fliegt die Kugel gleich.
+  berechnet, also nach festen Regeln – auf jedem Rechner fliegt die Kugel gleich.
 - **Schüsse** sind unsichtbare Strahlen aus dem Auge. Getroffene Körper bekommen einen Stoß.
 - **Lag-Kompensation:** Wegen des Lags siehst du deinen Gegner dort, wo er vor einem Moment war. Der
   Server dreht darum beim Prüfen die Zeit ein Stück zurück: Er schaut nach, wo die anderen standen,
@@ -473,8 +493,10 @@ Motoren gesteuert wird – mit einer kleinen Verzögerung, genau wie in echt.
 Gemeint ist die Micro Duck mit dem Netz von Pollen Robotics. Die GameWorld treibt jeden Walker in
 jedem Schritt: Sensoren lesen, ein Verhalten wählen,
 regelmäßig das Netz fragen, welche Winkel die Gelenke jetzt haben sollen, und die Servos dann mit
-kurzer Verzögerung bewegen – so, wie der echte Roboter es auch erlebt. Das ist ein Thema für sich,
-nachzulesen in [Kapitel 13](13-micro-duck.md).
+kurzer Verzögerung bewegen – so, wie der echte Roboter es auch erlebt. Die Verzögerung ist Absicht:
+Das Netz soll im Spiel genau die Welt erleben, die es auf dem echten Roboter vorfindet. Nur dann
+funktioniert, was es in der Simulation kann oder dort gelernt hat, später auch in Wirklichkeit. Das
+ist ein Thema für sich, nachzulesen in [Kapitel 13](13-micro-duck.md) und [Kapitel 14](14-lehrer.md).
 
 ## 8.15 Der Ton
 
@@ -548,7 +570,9 @@ Die GameWorld hat noch viele weitere Schalter – für Darstellung, Kampf, Netzw
 Greifen von Körpern mit der Maus. Eine davon ist besonders hübsch zum Verstehen: die
 **Debug-Ansicht**. Sie zeichnet die unsichtbaren Physikformen farbig nach Art – statisch grün,
 kinematisch blau, dynamisch orange, Sensor violett, schlafend grau –, dazu Berührungspunkte und
-Gelenkachsen. Die volle Liste steht im blauen Buch, Kapitel 8.
+Gelenkachsen. Einschalten kannst du sie im Studio über **Window › Show**: **Collision Shapes** zeigt
+die Formen, **Constraints** die Gelenke, **Contact Points** die Berührungen. Die volle Liste steht im
+blauen Buch, Kapitel 8.
 
 Natürlich ist all das durch automatische Tests abgesichert: Kern lädt und speichert Dateien,
 plant Körper, baut Städte und spielt Orb Run und Physics Lab selbst durch, um Fehler früh zu finden.

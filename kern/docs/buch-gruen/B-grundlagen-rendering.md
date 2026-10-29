@@ -41,13 +41,15 @@ musst du nicht können – wichtig sind drei Eigenschaften:
 
 Ein Punkt hat drei Koordinaten. Trotzdem hängt man ihm eine **vierte Zahl** an, w genannt. Warum?
 
-Drehen und Strecken sind Rezepte der Art „jede neue Koordinate ist eine Mischung der alten“. Ein
-Verschieben ist aber „plus 5 m“ – das ist keine Mischung, sondern eine feste Zugabe, und passt nicht
-in so ein Rezept. Der Trick: Man gibt jedem Punkt eine vierte Zahl, die einfach **1** ist. Dann kann
-das Rezept sagen: „Nimm 5 m pro Einheit von w dazu.“ Ein Punkt hat w = 1, bekommt also genau 5 m dazu.
+Ein Rezept kann nur mit den Zahlen rechnen, die der Punkt mitbringt: Es nimmt jede davon mal eine
+feste Zahl und zählt die Ergebnisse zusammen. „Plus 5 m“ ist aber eine feste Zugabe, die
+mit keiner Koordinate des Punkts zu tun hat. Der Trick: Man gibt jedem Punkt eine feste vierte Zahl
+mit, die einfach **1** ist. Dann kann das Rezept sagen: „plus 5 m mal diese vierte Zahl“ – und 5 m
+mal 1 sind genau 5 m.
 
-Eine **Richtung** dagegen („nach Norden“, „senkrecht nach oben“) bekommt **w = 0**. Sie wird gedreht,
-aber nie verschoben – eine Richtung hat keinen Ort. Beispiel mit dem Rezept „5 m nach rechts“:
+Eine **Richtung** dagegen („nach Norden“, „senkrecht nach oben“) bekommt als vierte Zahl eine **0**.
+„5 m mal 0“ ist nichts: Sie wird gedreht, aber nie verschoben – eine Richtung hat keinen Ort. Beispiel
+mit dem Rezept „5 m nach rechts“:
 
 | Was | vorher (mit w) | nachher |
 |---|---|---|
@@ -86,25 +88,34 @@ jede Ecke in einem Rutsch von der eigenen Beschreibung bis auf den Bildschirm.
 
 Kern rechnet in **Metern**, und **Z zeigt nach oben** – x und y spannen den Boden auf
 ([Kapitel 3](03-grundlagen.md)). Die Lage eines Dings baut Kern immer in derselben Reihenfolge: erst
-**strecken**, dann **drehen**, dann **verschieben**. Drehungen speichert Kern als **Quaternion**, vier
-Zahlen statt drei Winkeln. Drei Winkel nacheinander können sich nämlich gegenseitig blockieren, sodass
-plötzlich eine Drehrichtung fehlt; Quaternionen haben diese Tücke nicht.
+**strecken**, dann **drehen**, dann **verschieben**.
 
-> **Achtung, Falle!** Reihenfolge zählt! Stell dir einen Spielstein in der Mitte eines Tischs vor.
-> Erst drehen, dann 5 m schieben: Der Stein dreht sich auf der Stelle und rutscht dann weg. Erst
-> schieben, dann drehen: Die Drehung passiert um die *Tischmitte* – der Stein fährt einen Kreisbogen.
+> **Achtung, Falle!** Reihenfolge zählt! Stell dir einen Spielstein in der Mitte eines Tischs vor
+> (● ist die Tischmitte; das Rezept soll um 90° drehen und 5 m nach rechts schieben; die Spitze von
+> ▶ und ▲ zeigt, wohin der Stein schaut).
 >
 > ```
->  erst drehen, dann schieben     erst schieben, dann drehen
+>   Bild 1: erst drehen,             Bild 2: erst schieben,
+>           dann schieben                    dann drehen
 >
->     ■ ───────► ■                     ■ · · ·
->   (dreht sich hier)                ·       ·
->                                   ●         ■   ● = Tischmitte
+>                                      ▲  Ende
+>                                      .  ·
+>                                      .     ·
+>                                      .       ·
+>    ● ─ ─ ─ ─ ─► ▲  Ende              ● ─ ─ ─ ─►▶
+>    dreht sich auf der Mitte,         fährt nach rechts,
+>    fährt dann nach rechts            schwenkt dann auf
+>                                      einem Bogen um ●
 > ```
+>
+> Im ersten Bild steht der Stein am Ende rechts neben der Mitte, im zweiten über ihr: Die Drehung
+> wirkt immer um die Tischmitte, und wer schon weggefahren ist, wird mit herumgeschwenkt.
 
 > **Für Neugierige:** In der Formel schreibt man so ein zusammengesetztes Rezept „rückwärts“ als
 > Verschieben · Drehen · Strecken. Das Rezept, das direkt neben dem Punkt steht, wirkt zuerst. Deshalb
 > heißt es in Kapitel 3, der Punkt wird „von rechts“ an die Matrix multipliziert – gemeint ist dasselbe.
+> Drehungen speichert Kern übrigens als **Quaternion**, vier Zahlen statt drei Winkeln: Drei Winkel
+> nacheinander können sich gegenseitig blockieren, sodass plötzlich eine Drehrichtung fehlt.
 
 ### Ansicht und Perspektive
 
@@ -128,16 +139,13 @@ die Größe **geteilt durch die Entfernung**.
   Ein Sehstrahl streift beide Spitzen: Im Bild sind sie gleich groß.
 ```
 
-Ein 2 m hoher Baum in 10 m Entfernung erscheint also genauso groß wie ein 1 m hoher in 5 m. Nun kann
-ein Rezept zwar mischen und zugeben, aber nicht teilen. Hier hilft wieder w: Das Rezept schreibt die
-Entfernung in die vierte Zahl, und die Grafikkarte teilt danach alles durch w. Das heißt
+Ein 2 m hoher Baum in 10 m Entfernung erscheint also genauso groß wie ein 1 m hoher in 5 m. Ein
+Rezept kann aber nur malnehmen und zusammenzählen, nicht teilen. Also notiert es die Entfernung in der
+vierten Zahl, und die Grafikkarte teilt am Ende selbst alles durch diese Zahl. Das heißt
 **perspektivische Division**.
 
 Für Editor-Ansichten gibt es auch die **Parallelansicht** ohne Perspektive: Dort wird Fernes nicht
-kleiner, wie auf einem Bauplan.
-
-**In Kern:** Die Kamera hat standardmäßig einen Öffnungswinkel von 60° (von der Unter- zur Oberkante
-des Bildes) und sieht von 5 cm bis 1800 m vor sich.
+kleiner, wie auf einem Bauplan. Kerns Standardwerte für die Kamera stehen im blauen Buch, Anhang B.
 
 Das blaue Buch rechnet einen Punkt 10 m vor der Kamera Schritt für Schritt bis auf seinen Bildpunkt
 durch, samt der Zwischenstationen zwischen Kamera und Bildschirm.
@@ -155,6 +163,10 @@ sehr eng, in der Ferne sehr weit.
 
 > **Stell dir vor …** … ein Lineal, dessen Striche nah am Auge im Abstand von Haaren liegen und hinten
 > im Abstand von Metern. Nah kannst du winzige Unterschiede messen, fern nur grobe.
+
+Warum? Auch die Tiefe läuft durch das Teilen durch die Entfernung aus dem vorigen Abschnitt. Dabei
+wird alles Ferne zusammengedrückt – genauso wie ferne Bäume im Bild klein werden, rücken ferne
+Entfernungen auf der Tiefenskala eng zusammen.
 
 Wie grob, zeigt diese kleine Tabelle mit Kerns Einstellungen:
 
@@ -183,6 +195,17 @@ sie schief. Ein Beispiel: Ein Dach ist 45° geneigt, seine Normale zeigt schräg
 das Haus auf halbe Höhe, wird das Dach flacher – seine Normale müsste also *steiler* nach oben zeigen.
 Staucht man den Pfeil aber einfach mit, kippt er *flacher*. Genau falsch herum!
 
+```
+  vorher: Dachseite 45°       nachher: auf halbe Höhe gestaucht
+
+     ↖  Normale                   ↑  richtig: steiler
+      ↖                           ↑
+       /                 ←──  falsch: einfach mitgestaucht, flacher
+      /                          __.-'
+     /                       __.-'
+    /                    __.-'
+```
+
 Die Faustregel: Was die Fläche streckt, muss die Normale stauchen, und umgekehrt. Dafür braucht jede
 Kopie eines Dings ein eigenes kleines Rezept nur für ihre Normalen.
 
@@ -193,7 +216,9 @@ Ding lehnt er ab, weil es dafür keins gibt.
 
 Nach der Projektion liegen die drei Ecken eines Dreiecks als Punkte auf dem Bildschirm. Nun schaut die
 Grafikkarte nach, welche Pixel innerhalb des Dreiecks liegen. Das heißt **Rasterisierung**. Für jeden
-solchen Pixel entsteht ein **Fragment**, ein Kandidat für einen Bildpunkt.
+solchen Pixel entsteht ein **Fragment**, ein Kandidat für einen Bildpunkt – „Kandidat“, weil es
+später noch durchfallen kann, etwa wenn schon etwas Näheres an dieser Stelle steht (gleich beim
+Tiefenpuffer).
 
 ```
      v2
@@ -209,6 +234,12 @@ Was an den Ecken steht – Farbe, Normale, Texturkoordinate –, wird dazwischen
 (interpoliert). Jede Ecke bekommt einen Anteil, und die Anteile ergeben zusammen 100 %. Ein Fragment
 genau in der Mitte bekommt von jeder Ecke ein Drittel; eines direkt an Ecke v0 fast alles von v0. So
 entstehen weiche Farbverläufe über das Dreieck.
+
+Einen Haken hat das Mischen: Weil Fernes kleiner erscheint, liegt auf einem schräg nach hinten
+laufenden Dreieck die hintere Hälfte auf weniger Bildpunkten als die vordere. Mischte die Grafikkarte
+gleichmäßig über das Bild, verzerrte sich eine Textur – die Fugen eines Fliesenbodens lägen hinten zu
+weit auseinander. Darum mischt sie **perspektivisch richtig**: Sie berücksichtigt beim Mischen die
+Entfernung jeder Ecke, und die Fliesen werden nach hinten gleichmäßig kleiner.
 
 **Der Tiefenpuffer.** Treffen mehrere Dreiecke dasselbe Pixel, muss die Grafikkarte entscheiden, was
 vorne ist. Dafür führt sie den **Tiefenpuffer**: ein unsichtbares zweites Bild, in dem für jeden Pixel
@@ -254,12 +285,14 @@ Zwei Stationen sind programmierbar: Der **Vertex-Shader** läuft einmal pro Ecke
 dem Bildschirm landet. Der **Fragment-Shader** läuft einmal pro Fragment und sagt, welche Farbe es
 bekommt. Dabei arbeiten sie mit vier Arten von Daten:
 
-| Fachbegriff | Alltagsbild | Beispiel |
-|---|---|---|
-| Attribut | Steckbrief jeder Ecke (oder Kopie) | Position, Normale |
-| Uniform | Ansage für den ganzen Malauftrag | Sonnenrichtung, Materialfarbe |
-| Varying | Zwischenwert, der übers Dreieck verläuft | Farbe zwischen den Ecken |
-| Textur | aufgeklebtes Bild | Holzmaserung, Schattenkarte |
+| Art | Beispiel |
+|---|---|
+| Steckbrief jeder Ecke (oder Kopie) | Position, Normale |
+| Ansage für den ganzen Malauftrag | Sonnenrichtung, Materialfarbe |
+| Zwischenwert, der übers Dreieck gemischt wird | Farbe zwischen den Ecken |
+| aufgeklebtes Bild (Textur) | Holzmaserung, Schattenkarte |
+
+Die Fachwörter dafür stehen im blauen Buch, Anhang B.
 
 Drei Tricks machen das Fließband schnell:
 
@@ -308,6 +341,11 @@ Asphalt wenig. Eine graue Fläche mit halber Albedo ist also halb so hell wie ei
 Licht. Diese Regel trägt den Namen ihres Entdeckers **Lambert**. Metalle haben übrigens keinen matten
 Anteil; ihr Licht steckt ganz im Glanz.
 
+Eine Grenze gilt dabei immer: **Keine Fläche wirft mehr Licht zurück, als auf sie fällt** – auch
+blütenweißes Papier nicht. Das Licht wird nur verteilt, nicht vermehrt, wie Wasser aus einem Eimer,
+das man über viele Becher gießt. Kerns Rechnung ist so gebaut, dass sie diese Regel einhält; sonst
+würde eine weiße Wand heller leuchten als die Sonne, die sie bescheint.
+
 **Lampen** werden in Wirklichkeit mit der Entfernung schwächer, aber nie ganz null – jede Lampe müsste
 also die ganze Welt beleuchten. Das wäre viel zu teuer.
 
@@ -327,23 +365,31 @@ Erklärung: Eine Fläche besteht aus Millionen winziger, verschieden schief steh
 Drei Fragen bestimmen den Glanz:
 
 1. **Wie viele Spiegelchen zeigen genau so, dass sie Licht in mein Auge werfen?** Bei glatten Flächen
-   wenige Richtungen, dafür sehr hell; bei rauen viele, dafür schwach.
+   zeigen alle Spiegelchen gleich: Nur aus einer Richtung siehst du den Glanz, dafür sehr hell. Bei
+   rauen zeigen sie kreuz und quer: Aus vielen Richtungen siehst du ein bisschen Glanz, dafür schwach.
 2. **Wie stark spiegelt die Fläche bei diesem Blickwinkel?** Bei flachem Blick viel mehr – wie ein
    See, der schräg betrachtet den Himmel spiegelt, von oben aber durchsichtig wirkt. Das heißt
    **Fresnel-Effekt**. Senkrecht spiegeln Nichtmetalle nur wenig, Metalle dagegen stark und in ihrer
-   eigenen Farbe.
+   eigenen Farbe: Ein Goldring spiegelt eine weiße Lampe golden, eine rote Tasse spiegelt sie weiß.
 3. **Verdecken sich die Spiegelchen gegenseitig?** Bei rauen Flächen werfen sie sich kleine Schatten.
 
-**Indirektes Licht** schätzt man mit wenigen Farben: oben Himmelsfarbe, unten Bodenfarbe, dazwischen
-gemischt nach der Neigung der Fläche, dazu eine bunte Kuppel aus Himmel, Horizont und Boden.
-
 **In Kern:** Zwei Regler, **Rauheit** und **Metall**, steuern ein vereinfachtes Glanzmodell mit
-Sonnen-Glanzpunkt und Himmelsspiegelung, und das indirekte Licht läuft getrennt mit, damit die
-Eckenschatten (B.8) nur dieses abdunkeln.
+Sonnen-Glanzpunkt und Himmelsspiegelung.
 
 > **Für Neugierige:** Die Fachnamen der drei Fragen lauten Verteilung (meist nach „GGX“), Fresnel
 > (meist nach „Schlick“) und Geometrie. Kern beantwortet die dritte Frage mit der einfachsten Annahme
 > und begrenzt die erste nach oben, damit keine einzelnen Riesen-Glanzpunkte flackern.
+
+### Licht aus der Umgebung
+
+Das indirekte Licht – wir nennen es **Umgebungslicht** – kommt nicht von einer Lampe, sondern von
+ringsum: vom blauen Himmel, vom Boden, von Wänden. Genau ausrechnen kann man es nicht, also schätzt
+man es mit wenigen Farben: oben Himmelsfarbe, unten Bodenfarbe, dazwischen gemischt nach der Neigung
+der Fläche. Eine Wand bekommt so halb Himmel, halb Boden; ein Dach fast nur Himmel. Feiner ist eine
+bunte Kuppel, die vom Boden über den Horizont bis zum Himmel über dir verläuft.
+
+**In Kern:** Beides gibt es, und das Umgebungslicht läuft getrennt mit, damit die Eckenschatten (B.8)
+nur dieses abdunkeln.
 
 ## B.5 Schattenkarten
 
@@ -365,6 +411,7 @@ Das klingt einfach, hat aber Tücken:
 | Problem | Ursache | Gegenmittel |
 |---|---|---|
 | feine Streifen („Schattenakne“) | Fläche beschattet sich selbst | kleiner Sicherheitsabstand |
+| Akne bei schrägem Licht | Abstand allein reicht nicht | vorher von der Fläche wegrücken |
 | Schatten löst sich vom Ding | Sicherheitsabstand zu groß | Abstand klein halten |
 | Treppchenkanten | ein Kartenpunkt deckt viele Pixel | mehrere Nachbarn mischen |
 | Flimmern | Karte rutscht um Bruchteile | nur um ganze Punkte schieben |
@@ -375,6 +422,11 @@ sie ein klein wenig weiter weg ist als das Notierte. Sonst würde sie sich wegen
 verdunkeln – wie die Streifen auf einem Foto vom Bildschirm. Ist der Abstand zu groß, schwebt der
 Schatten dagegen ein Stück neben dem Ding; Fachleute nennen das nach der Märchenfigur „Peter Panning“,
 weil Peter Pan seinen Schatten verliert.
+
+Das zweite Gegenmittel ist ein **Schritt zur Seite**: Bevor eine Stelle auf der Karte nachschaut,
+rückt sie ein Stückchen in die Richtung, in die ihre Fläche zeigt – bei schräg einfallendem Licht
+etwas weiter, denn dort ist die Gefahr am größten. So misst die Fläche nicht gegen sich selbst, und
+der Sicherheitsabstand darf klein bleiben.
 
 **In Kern:** Die Karte deckt nur ab, was man bis zur Schattendistanz sieht, rastet auf ganze Punkte ein
 und wird nur neu gemalt, wenn sich etwas ändert – warum das so wichtig ist und wie es zusammenspielt,
@@ -411,7 +463,8 @@ Grafikbibliothek three.js benutzt; danach kann noch ein Farbgrading folgen.
 ### Gamma und sRGB
 
 Bildschirme und Bilddateien speichern Helligkeit nicht so, wie Licht sich verhält, sondern so, wie
-unser Auge es empfindet: Dunkle Töne bekommen viel mehr der 256 Helligkeitsstufen, weil wir dort
+unser Auge es empfindet: Ein Bildschirm kennt pro Grundfarbe nur 256 Helligkeitsstufen, und dunkle
+Töne bekommen viel mehr davon, weil wir dort
 feinere Unterschiede sehen. Diese Schreibweise heißt **sRGB**. Die Schreibweise, die echtes Licht
 abbildet, heißt **linear**: Doppelt so viel Licht ist dort doppelt so viel Zahl.
 
@@ -454,17 +507,16 @@ Sonnenfarbe.
 Rezept: das sehr Helle ausschneiden, unscharf machen und wieder darüberlegen. Das Unscharfmachen
 geschieht gern auf verkleinerten Bildern – das ist billiger und gibt einen breiteren Schein.
 
-Unscharf machen heißt: Jeder Bildpunkt wird mit seinen Nachbarn gemischt. Mischt man jeden Punkt mit
-allen Nachbarn in einem Quadrat von 9 × 9, sind das 81 Lesezugriffe pro Punkt. Viel schneller geht es
-in zwei Durchgängen.
+Unscharf machen heißt: Jeder Bildpunkt wird mit seinen Nachbarn in einem Quadrat gemischt. Das sind
+viele Blicke pro Punkt. Viel schneller geht es in zwei Durchgängen.
 
-> **Stell dir vor …** … du willst ein Kästchenbild verwischen. Statt jedes Kästchen mit allen 80
+> **Stell dir vor …** … du willst ein Kästchenbild verwischen. Statt jedes Kästchen mit allen
 > Nachbarn im Quadrat zu mischen, verwischst du erst jede Zeile nach links und rechts und dann jede
-> Spalte nach oben und unten. Das Ergebnis ist dasselbe – aber 9 + 9 = 18 statt 81 Zugriffe.
+> Spalte nach oben und unten. Das Ergebnis ist dasselbe – aber bei einem Quadrat von 9 × 9 Kästchen
+> brauchst du statt 81 Blicken nur 18.
 
-Und noch ein Trick: Liest man genau **zwischen** zwei Bildpunkten, mischt die Grafikkarte sie gratis.
-So reichen pro Durchgang fünf statt neun Zugriffe. Die Mischanteile ergeben zusammen genau 100 %,
-damit das Bild weder heller noch dunkler wird.
+Die Mischanteile ergeben zusammen genau 100 %, damit das Bild weder heller noch dunkler wird. Weitere
+Spartricks stehen im blauen Buch, Anhang B.
 
 **In Kern:** Das Glühen entsteht aus dem echten Licht des Shaders, wird auf zwei verkleinerten Stufen
 verwischt und als feine Folie über das fertige Foto gelegt ([Kapitel 4](04-grafik.md), 4.8.3).
@@ -476,39 +528,42 @@ ist. Diese **Umgebungsverdeckung** (englisch *ambient occlusion*, kurz AO) läss
 „stehen“ statt schweben. Sie fragt: *Wie viel Himmel über diesem Punkt ist frei?* Dabei zählt Himmel
 direkt über der Fläche mehr als Himmel knapp über dem Horizont – aus demselben Grund wie bei der
 Taschenlampe: Steil einfallendes Licht trifft eine Fläche kräftiger als flaches. Die Sonne hat ihre
-eigenen Schatten; AO betrifft nur das indirekte Licht.
+eigenen Schatten; AO betrifft nur das Umgebungslicht.
 
 > **Stell dir vor …** … du liegst in einer Mulde im Gras und schaust nach oben. Je tiefer die Mulde,
 > desto kleiner dein Stück Himmel – und desto dunkler ist es bei dir, auch ohne Sonnenschatten.
 
 Strahlen durch die ganze Szene zu schicken, wäre zu teuer. Darum schätzt man die Verdeckung aus dem
-fertigen Tiefenpuffer, also aus dem, was ohnehin schon auf dem Bildschirm ist. Ältere Verfahren
-prüfen dabei ein paar Stichproben in der Nachbarschaft – eine grobe Schätzung. Das genauere Verfahren
-**GTAO** geht systematisch vor: Es schaut von jedem Punkt in ein paar Richtungen, sucht links und
-rechts, wie hoch die Umgebung den Himmel verdeckt (den **Horizont**), und rechnet aus, wie viel Himmel
-dazwischen frei bleibt.
+fertigen Tiefenpuffer, also aus dem, was ohnehin schon auf dem Bildschirm ist. Das Verfahren **GTAO**
+schaut von jedem Punkt in ein paar Richtungen, sucht links und rechts, wie hoch die Umgebung den
+Himmel verdeckt (den **Horizont**), und rechnet aus, wie viel Himmel dazwischen frei bleibt.
 
 ```
-             Horizont links
-   Blick ↓      ╲   │   ╱  Horizont rechts
-                 ╲  │   ╱
-   ████████       ╲ │  ╱      ████
-   ████████████────●────────████████
-                  Punkt
-   freier Himmel: der Bogen zwischen den beiden Horizonten
+                 frei
+             .-~~~~~~~-.
+   ████    /             \    ████
+   ████  /                 \  ████
+   ██████████████●██████████████████
+   linke Wand   Punkt    rechte Wand
+
+  Die Wände verdecken den Himmel bis zu ihrer Kante.
+  Nur der Bogen dazwischen ist frei.
 ```
 
-**In Kern:** Kern nutzt GTAO, dunkelt damit nur das indirekte Licht ab, das der Shader nebenbei notiert
+**In Kern:** Kern nutzt GTAO, dunkelt damit nur das Umgebungslicht ab, das der Shader nebenbei notiert
 hat, und braucht dafür keinen zweiten Durchgang über alle Dreiecke ([Kapitel 4](04-grafik.md), 4.8.4).
 
 ## B.9 Himmel und Atmosphäre
 
-Der Himmel ist blau, weil die Luft blaues Licht viel stärker in alle Richtungen streut als rotes. Je
-kürzer die Wellenlänge, desto stärker die Streuung, und zwar sehr steil: Blau wird gut viermal so stark
-gestreut wie Rot. Das heißt **Rayleigh-Streuung**. Am Horizont ist der Weg durch die Luft länger; das
-Licht wird mehrfach gestreut, der Himmel dort heller, und bei tiefer Sonne wird er rötlich. Um die
-Sonne herum streuen größere Teilchen das Licht nach vorne und machen den hellen Hof
-(**Mie-Streuung**).
+Der Himmel ist blau, weil die Luft blaues Licht viel stärker zur Seite ablenkt (**streut**) als
+rotes – um ein Mehrfaches stärker. Von überall am Himmel kommt also abgelenktes
+Blau in dein Auge. Am Horizont ist der Weg durch die Luft länger; das Licht wird mehrfach abgelenkt,
+der Himmel dort heller, und bei tiefer Sonne wird er rötlich – das Blau ist unterwegs schon
+herausgestreut. Um die Sonne herum lenken größere Teilchen wie Staub und Tröpfchen das Licht nur
+wenig ab, fast geradeaus weiter, und machen den hellen Hof.
+
+> **Für Neugierige:** Die Fachnamen lauten **Rayleigh-Streuung** (die Luft, die das Blau streut) und
+> **Mie-Streuung** (die größeren Teilchen, die den Hof um die Sonne machen).
 
 Echte Himmelsmodelle verfolgen das Licht Schritt für Schritt entlang jedes Blicks durch die Luft.
 **In Kern:** Der Himmel ist bewusst keine solche Lichtrechnung, sondern ein billiges Rezept aus
@@ -535,15 +590,19 @@ Der Test ist **vorsichtig**: Er wirft nie Sichtbares weg, lässt aber manchmal U
 Kugeln nahe einer Ecke der Pyramide. Im Zweifel wird eben gemalt.
 
 **In Kern:** So prüft Kern jedes Ding vor dem Malen – außer Figuren mit Skelett, deren Arme und Beine
-aus der Kugel ragen können.
+aus der Kugel ragen können. Ein Paket mit vielen Kopien (B.3) bekommt eine Kugel, die **alle** Kopien
+umschließt. Ist auch nur eine Kopie sichtbar, wird das ganze Paket gemalt – es ist ja ein einziger
+Malauftrag.
 
 > **Probier's aus!** Schalte in Kern Studio im Menü **Show** die **Bounds** ein und sieh die Hüllen,
 > mit denen Kern entscheidet, was in der Sichtpyramide liegt – auch um Bäume, Gebäude und die Ente.
 
-Bei vielen Dingen hilft ein **Baum aus Kästen** (englisch *BVH*): Ganz oben ein Kasten um alles, darin
-zwei kleinere Kästen, darin wieder zwei, bis unten einzelne Dreiecke liegen. Trifft ein Strahl einen
-Kasten nicht, fällt alles darin auf einen Schlag weg – wie beim Zahlenraten mit „größer oder
-kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
+Ein verwandtes Problem ist das **Anklicken**: Welches Dreieck liegt unter der Maus? Dafür schickt man
+einen gedachten **Strahl** vom Auge durch den Mauszeiger in die Welt und sucht das erste Dreieck, das
+er trifft. Bei vielen Dreiecken hilft ein **Baum aus Kästen** (englisch *BVH*): Ganz oben ein Kasten
+um alles, darin zwei kleinere Kästen, darin wieder zwei, bis unten einzelne Dreiecke liegen. Trifft
+der Strahl einen Kasten nicht, fällt alles darin auf einen Schlag weg – wie beim Zahlenraten mit
+„größer oder kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
 
 ```
             [ alle ]
@@ -554,7 +613,10 @@ kleiner?“, wo zehn Fragen statt tausend Versuchen reichen.
 ```
 
 **In Kern:** Der Baum aus Kästen dient dem **Anklicken** – welches Dreieck liegt unter der Maus? –,
-nicht dem Malen; die Physik hat ihren eigenen ([Anhang C](C-grundlagen-physik.md)).
+nicht dem Malen; die Physik hat ihren eigenen ([Anhang C](C-grundlagen-physik.md)). Einen Baum
+bekommen nur **unbewegte** Formen der Welt. Warum? Bewegt sich eine Form, stimmen ihre Kästen im
+nächsten Bild nicht mehr, und der Baum müsste ständig neu gebaut werden. Bewegte Formen prüft Kern
+deshalb direkt, Dreieck für Dreieck.
 
 ## B.11 Wenige große Aufträge
 
@@ -572,11 +634,16 @@ Aufträge ein Bild gekostet hat ([Kapitel 4](04-grafik.md), 4.7 und 4.12).
 
 ## B.12 Warum Kern und Browser so zusammenarbeiten
 
-Kern ist in C++ geschrieben, einer schnellen Programmiersprache. Der Browser versteht aber von Haus aus
-nur JavaScript. Die Brücke heißt **WebAssembly**: ein kompaktes Format, das der Browser fast so schnell
-wie ein normales Programm ausführt. Ein WebAssembly-Programm darf allerdings nur Zahlen austauschen und
-nur das benutzen, was ihm die Webseite beim Start ausdrücklich in die Hand gibt. Die Grafikkarte
-erreicht es über **WebGL2**, die Malschnittstelle des Browsers.
+Kern ist ein eigenes, schnelles Programm, das **in** der Webseite läuft. Geschrieben ist es in einer
+Programmiersprache für schnelle Programme (C++); Browser verstehen von Haus aus aber nur ihre eigene
+Sprache (JavaScript). Die Brücke heißt **WebAssembly**: ein kompaktes Format, das der Browser fast so
+schnell wie ein normales Programm ausführt. Ein WebAssembly-Programm darf allerdings nur Zahlen
+austauschen und nur das benutzen, was ihm die Webseite beim Start ausdrücklich in die Hand gibt. Die
+Grafikkarte erreicht allein die Webseite, über **WebGL2**, die Malschnittstelle des Browsers.
+
+> **Stell dir vor …** … Kern wohnt als Untermieter in der Webseite. Nur die Hauptmieterin, die Seite,
+> hat den Schlüssel zum Keller mit der Grafikkarte. Kern schreibt seine Wünsche auf Zettel und reicht
+> sie durch die Tür – und auf den Zetteln stehen nur Zahlen.
 
 ```mermaid
 flowchart LR
@@ -596,6 +663,14 @@ Daraus folgen Kerns wichtigste Entscheidungen, in Alltagssprache:
 | Kopien von allem | Versicherung, falls der Browser die Grafikkarte wegnimmt |
 | wenige Aufträge, Merkzettel | jeder Weg über die Brücke kostet |
 | Malen ohne Bildschirm möglich | der Lehrer rechnet dieselbe Welt ohne Grafik |
+| ein Arbeitsfaden pro Kern | mehr Tempo über Helfer mit eigener Kern-Kopie |
+
+Der **Lehrer** ist Kerns Trainingsschule, die der Micro Duck neue Bewegungen beibringt
+([Kapitel 14](14-lehrer.md)). Er braucht kein Bild, nur dieselbe Welt mit derselben Physik. Und er
+zeigt die letzte Zeile der Tabelle: Im Browser arbeitet Kern auf einem einzigen **Arbeitsfaden**, wie
+ein Koch, der alles nacheinander erledigt. Soll mehr gleichzeitig geschehen, startet die Webseite
+zusätzliche Helfer (**Web Worker**), und jeder bekommt seine eigene Kopie von Kern – mehrere Köche,
+jeder in seiner eigenen Küche, statt vieler Köche an einem Herd.
 
 Die genauen Namen der Bauteile stehen im blauen Buch, Anhang B.
 
