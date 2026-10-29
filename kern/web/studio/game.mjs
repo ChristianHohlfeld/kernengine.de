@@ -91,7 +91,7 @@ const I18N_DE = {
   "Perfect": "Perfekt", "Relay (optional)": "Relay (optional)", "Online play:": "Online spielen:",
   "1 Player": "1 Spieler", "LAN (5 ms)": "LAN (5 ms)", "Average (50 ms, 1% loss)": "Mittel (50 ms, 1 % Verlust)", "Bad (150 ms, 5% loss)": "Schlecht (150 ms, 5 % Verlust)",
   "Terrible (300 ms, 20% loss)": "Sehr schlecht (300 ms, 20 % Verlust)", "Room": "Raum", "Place Actor": "Actor platzieren", "Restore": "Wiederherstellen",
-  "Player Collision": "Spieler-Kollision",
+  "Player Collision": "Spieler-Kollision", "Robot Camera": "Roboterkamera", "Autonomous (camera, ToF)": "Autonom (Kamera, ToF)",
   "Controls...": "Steuerung...", "About Kern Studio": "Über Kern Studio",
   "Perspective": "Perspektive", "Top": "Oben", "Bottom": "Unten", "Front": "Vorne", "Back": "Hinten", "Left": "Links", "Right": "Rechts",
   "Lit": "Beleuchtet", "Unlit": "Unbeleuchtet", "Wireframe": "Drahtgitter", "Show": "Anzeigen", "View Mode": "Ansichtsmodus", "Viewport Type": "Viewport-Typ",
