@@ -87,7 +87,7 @@ SC_TEST(drone_yaw_and_climb) {
   s.yaw = 0.5f;
   rig.run(1.0f, s);
   const f32 yaw1 = heading_of(rig.state().rotation.rotate({-1, 0, 0}));
-  SC_CHECK(std::fabs(wrap_pi(yaw1 - yaw0)) > 0.4f, "yaw rate command turns the nose (%.2f rad)", wrap_pi(yaw1 - yaw0));
+  SC_CHECK(wrap_pi(yaw1 - yaw0) > 0.4f, "positive yaw stick turns the nose left (counter-clockwise from above): %.2f rad", wrap_pi(yaw1 - yaw0));
   s.yaw = 0;
   s.clearance = 20.0f;
   rig.run(8.0f, s);
@@ -114,4 +114,18 @@ SC_TEST(drone_clearance_law) {
   SC_CHECK(std::fabs(clearance_rate(1.0f) - 12.0f) < 1e-4f, "full stick = 12 m/s");
   SC_CHECK(clearance_lead(0) == 0, "no lead at rest");
   SC_CHECK(clearance_lead(4) > 2 && clearance_lead(-4) < -2, "lead %.2f %.2f", clearance_lead(4), clearance_lead(-4));
+}
+
+SC_TEST(drone_roll_moves_right) {
+  Rig rig;
+  DroneSticks s;
+  s.clearance = 3.0f;
+  rig.run(2.5f, s);
+  s.arm = true;
+  rig.run(4.0f, s);
+  s.roll = 1.0f;
+  rig.run(2.0f, s);
+  const BodyState st = rig.state();
+  const Vec3 nose = st.rotation.rotate({-1, 0, 0}), right = kern::cross(nose, Vec3{0, 0, 1});
+  SC_CHECK(kern::dot(st.velocity, right) > 5.0f, "positive roll flies to the right of the nose: %.1f m/s", kern::dot(st.velocity, right));
 }
