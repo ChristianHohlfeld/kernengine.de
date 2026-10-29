@@ -148,6 +148,8 @@ f' = f · (c − v_l) / (c − v_s)
 
 `c` is `speed_of_sound` (default 343 m/s); `v_l` and `v_s` are the velocities of listener and source along the line source → listener, each scaled by `doppler_factor × PlayParams::doppler` and limited to ±0.9 c. The factor is clamped to 0.5–2 and smoothed toward the new value by 25 % per block, so that fast fly-bys do not sound stepped.
 
+![Doppler effect: a moving source compresses the wavefronts ahead of it (higher frequency) and stretches them behind it (lower frequency)](../abbildungen/doppler.svg)
+
 ## 7.4 Buses, reverb and master
 
 ### Buses

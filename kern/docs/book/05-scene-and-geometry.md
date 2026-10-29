@@ -252,7 +252,7 @@ footprints.ring(court, 4);                // hole (courtyard)
 1. **Clean the rings** (`clean_ring`): non-finite points and points at most 1.5 cm from their predecessor are dropped, as is the closing duplicate point. If fewer than 3 points remain, or an area ≤ 0.08 m², the ring becomes empty.
 2. **Normalize the orientation:** outer ring counterclockwise, holes clockwise (`ring_area`, reversed if necessary).
 3. **Reject** if a ring is empty, the wall height is ≤ 0.1 m, Earcut returns nothing or the area deviation exceeds 0.7 %.
-4. **Colors** from the style: wall color `walls[h % n]`, roof color `roofs[(h >> 8) % n]`, cornice color as the mix `mix(wall, trim, trim_mix)` in `f64`, so that it matches a double-precision reference exactly. The storey height lies between 3.1 and 3.6 m, depending on the seed.
+4. **Colors** from the style: wall color `walls[h % n]`, roof color `roofs[(h >> 8) % n]`, cornice color as the mix `mix(wall, trim, trim_mix)` in `f64`, so that it matches a double-precision reference exactly. The story height lies between 3.1 and 3.6 m, depending on the seed.
 5. **Roof:** every Earcut triangle at height `top`, normal +Z; the winding is flipped per triangle so that the face points upward. Courtyards stay open.
 6. **Walls:** for every edge of every ring (including the courtyard rings), two triangles from `base` to `top`, normal pointing outward. UVs: u = meters along the wall, v = meters above the base.
 7. **Cornice** (if `cornice`, edge > 1.2 m, wall height > 3.5 m): a 0.55 m high band projecting 0.24 m at the eaves, with front, top and bottom faces.
@@ -266,7 +266,7 @@ If `wall_records` is on (default), every vertex carries four extra values in `Me
 | x | wall length in meters; −1 = roof; −2 = cornice |
 | y | wall height (`top − base`) |
 | z | building seed in [0, 1) (`(h % 997) / 997`) |
-| w | storey height |
+| w | story height |
 
 These values are intended for facade shaders. The shader extension `NightWindows` from Section 4.13 in [Chapter 4](04-graphics.md) reads them as the attribute `aWall` and draws window grids from them.
 

@@ -242,7 +242,7 @@
   },
   "fassade-fenster": {
     "de": {"traufe": "Traufe", "einmeter": "oberster Meter: Fenster abgeschnitten", "stock0": "Erdgeschoss", "stock1": "1. Stock", "stock2": "2. Stock", "stock3": "3. Stock", "an": "leuchtet nachts", "aus": "dunkles Glas", "zelle1": "Zelle: 3 m × Stockwerkshöhe,", "zelle2": "Fenster im Mittelteil", "spalte": "Spalte", "mittelteil": "Mittelteil: x 22–78 %, y 28–78 %"},
-    "en": {"traufe": "eaves", "einmeter": "top meter: windows cut off", "stock0": "ground floor", "stock1": "1st floor", "stock2": "2nd floor", "stock3": "3rd floor", "an": "lit at night", "aus": "dark glass", "zelle1": "cell: 3 m × storey height,", "zelle2": "window in the middle part", "spalte": "column", "mittelteil": "middle part: x 22–78%, y 28–78%"},
+    "en": {"traufe": "eaves", "einmeter": "top meter: windows cut off", "stock0": "1st floor", "stock1": "2nd floor", "stock2": "3rd floor", "stock3": "4th floor", "an": "lit at night", "aus": "dark glass", "zelle1": "cell: 3 m × story height,", "zelle2": "window in the middle part", "spalte": "column", "mittelteil": "middle part: x 22–78%, y 28–78%"},
     "gruen": {
       "de": {"traufe": "Dachkante"},
       "en": {"traufe": "roof edge"}

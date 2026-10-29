@@ -155,12 +155,7 @@ wird tiefer.
 > gleichmäßig. Vor ihr drängen sich die Wellenringe dicht zusammen, hinter ihr liegen sie weit
 > auseinander. Beim Schall ist es genauso.
 
-```mermaid
-%% Bildunterschrift: Der Doppler-Effekt: vor dem fahrenden Krankenwagen eng gedrängte Wellen, hinter ihm weit auseinander
-flowchart LR
-  A["hinter dem Wagen:<br/>Wellen weit auseinander<br/>tieferer Ton"] --- K["Krankenwagen<br/>fährt nach rechts"]
-  K --- B["vor dem Wagen:<br/>Wellen eng gedrängt<br/>höherer Ton"]
-```
+![Der Doppler-Effekt: Vor dem fahrenden Krankenwagen liegen die Wellen dicht, hinter ihm weit auseinander](../abbildungen/doppler.svg)
 
 Für einen stehenden Hörer gilt: neue Tonhöhe = Tonhöhe · 343 / (343 − v). Dabei sind 343 m/s die
 Schallgeschwindigkeit und v das Tempo der Quelle **auf dich zu** (fährt sie weg, ist v negativ).

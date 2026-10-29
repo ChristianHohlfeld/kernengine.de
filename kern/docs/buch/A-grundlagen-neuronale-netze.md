@@ -907,6 +907,8 @@ Verschlechterungen nie. Das Ziel ist eine untere Schranke für den wahren Gewinn
 
 ![Das geclippte Ziel L(ρ) für Â > 0 und Â < 0; auf den flachen Stücken ist der Gradient 0](../abbildungen/ppo-clip.svg)
 
+Senkrecht ist der Beitrag $L = \min(\rho \hat A,\ \operatorname{clip}(\rho, 0{,}8, 1{,}2)\,\hat A)$ eines einzelnen Samples zu $L^\text{CLIP}$ aufgetragen, also die Größe, die PPO maximiert; ihre Steigung über $\rho$ ist der Gradient, der beim Update fließt.
+
 ### A.11.6 Adaptive Lernrate über die KL-Divergenz
 
 Zusätzlich zum Clipping regelt Kern (wie rsl_rl) die Lernrate nach der **KL-Divergenz** zwischen

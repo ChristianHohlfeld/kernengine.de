@@ -150,6 +150,8 @@ Die Auflösung folgt aus $\Delta w \approx \Delta d \cdot 2w^2/|P_{32}|$: Sie wi
 Entfernung schlechter und hängt fast nur von $n$ ab. Deshalb ist die nahe Ebene so wichtig: Sie zu
 verdoppeln, verdoppelt die Genauigkeit überall.
 
+![Gleiche Schritte im Tiefenwert d entsprechen ungleichen Entfernungen: dicht an der nahen Ebene, weit in der Ferne](../abbildungen/tiefe-lineal.svg)
+
 Kerns GTAO braucht die echte Entfernung aus dem Tiefenpuffer zurück und rechnet die Formel
 rückwärts, mit genau den Matrixelementen $P_{22}$ und $P_{32}$ als Uniform `uProj`:
 

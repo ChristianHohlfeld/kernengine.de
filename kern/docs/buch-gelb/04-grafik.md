@@ -500,6 +500,10 @@ den ganzen Bildschirm hinausragt und ihn so ganz bedeckt:
 
 ![Ein Dreieck, doppelt so breit und hoch wie der Bildschirm, bedeckt ihn ganz; der Rest wird weggeschnitten](../abbildungen/himmel-dreieck.svg)
 
+Die Zahlen im Bild sind Bildschirmkoordinaten: x und y laufen von −1 am linken und unteren Rand bis 1
+am rechten und oberen Rand, egal wie viele Pixel der Bildschirm hat – eine Ecke bei 3 liegt also weit
+draußen.
+
 Warum ein Dreieck und kein Viereck? Ein Dreieck reicht, wenn es groß genug ist, und es ist für die
 Grafikkarte der einfachste Malauftrag. Der Tiefentest lässt den Himmel nur dort durch, wo noch nichts
 gemalt ist. So rechnet das teure Himmels-Malprogramm nur da, wo man wirklich Himmel sieht.

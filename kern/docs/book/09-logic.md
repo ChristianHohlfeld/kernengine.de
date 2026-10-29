@@ -323,7 +323,7 @@ children and logic, replicated to all players) · `actor.destroy` · `actor.enab
 `actor.set_velocity` · `actor.impulse` Add Impulse · `actor.force` Add Force (for one step) ·
 `actor.launch` Launch (keeps the horizontal velocity, adds this one) · `actor.simulate` Set Simulate
 Physics (dynamic ↔ kinematic) · `actor.joint_motor` Set Joint Motor (hinge, slider, rope: doors,
-lifts, winches) · `actor.explode` Explosion (Box3D radial impulse with flash, sound and falling-off
+elevators, winches) · `actor.explode` Explosion (Box3D radial impulse with flash, sound and falling-off
 damage) · `physics.trace` Line Trace (Box3D ray)
 
 ### Game, combat, effects, audio

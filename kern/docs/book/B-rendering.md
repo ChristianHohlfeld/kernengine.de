@@ -148,6 +148,8 @@ The resolution follows from $\Delta w \approx \Delta d \cdot 2w^2/|P_{32}|$: it 
 quadratically with distance and depends almost only on $n$. That is why the near plane is so
 important: doubling it doubles the precision everywhere.
 
+![Equal steps in the depth value d correspond to unequal distances: dense near the near plane, wide apart in the distance](../abbildungen/tiefe-lineal.svg)
+
 Kern's GTAO needs the true distance back from the depth buffer and computes the formula in reverse,
 with exactly the matrix elements $P_{22}$ and $P_{32}$ as the uniform `uProj`:
 
@@ -182,7 +184,7 @@ $$v = \lambda_0 v_0 + \lambda_1 v_1 + \lambda_2 v_2.$$
 Because perspective is not linear, the GPU interpolates in a **perspective-correct** way (it
 interpolates $v/w$ and $1/w$ linearly and divides).
 
-![Rasterization: pixels whose centre lies inside the triangle become fragments](../abbildungen/rasterisierung.svg)
+![Rasterization: pixels whose center lies inside the triangle become fragments](../abbildungen/rasterisierung.svg)
 
 ### B.2.2 The depth buffer
 

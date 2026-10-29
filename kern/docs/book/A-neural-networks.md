@@ -892,6 +892,8 @@ deteriorations never. The objective is a lower bound on the true gain.
 
 ![The clipped objective L(ρ) for Â > 0 and Â < 0; on the flat parts the gradient is 0](../abbildungen/ppo-clip.svg)
 
+The vertical axis shows a single sample's contribution $L = \min(\rho \hat A,\ \operatorname{clip}(\rho, 0.8, 1.2)\,\hat A)$ to $L^\text{CLIP}$, i.e. the quantity PPO maximizes; its slope over $\rho$ is the gradient that flows during the update.
+
 ### A.11.6 Adaptive learning rate via the KL divergence
 
 In addition to clipping, Kern (like rsl_rl) adjusts the learning rate according to the

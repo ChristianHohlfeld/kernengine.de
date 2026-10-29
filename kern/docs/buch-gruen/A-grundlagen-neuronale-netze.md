@@ -622,6 +622,9 @@ eine bestimmte Aktion als das alte? 1 heißt „gleich oft“, 1,2 heißt „20 
 
 ![Die Leine von PPO: Waagerecht steht, wie viel öfter das neue Netz eine Aktion wählt; eine gute Aktion wird bis 1,2 verstärkt, eine schlechte bis 0,8 abgeschwächt, darüber hinaus nicht mehr](../abbildungen/ppo-clip.svg)
 
+Senkrecht steht der **Nutzen**: wie viel der Lehrer in dieser Runde davon hat, die Aktion weiter zu
+verschieben – wo die Linie flach wird, bringt weiteres Schieben nichts mehr.
+
 - Eine **gute** Aktion (positiver Vorteil) darf pro Runde höchstens 20 Prozent häufiger werden.
   Darüber hinaus wird nicht mehr weiter verstärkt.
 - Eine **schlechte** Aktion darf höchstens 20 Prozent seltener werden. Darüber hinaus wird nicht mehr

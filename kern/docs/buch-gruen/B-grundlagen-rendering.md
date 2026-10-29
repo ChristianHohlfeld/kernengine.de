@@ -144,6 +144,8 @@ sehr eng, in der Ferne sehr weit.
 > **Stell dir vor …** … ein Lineal, dessen Striche nah am Auge im Abstand von Haaren liegen und hinten
 > im Abstand von Metern. Nah kannst du winzige Unterschiede messen, fern nur grobe.
 
+![Das Tiefen-Lineal: Nah an der Kamera liegen die Striche dicht, in der Ferne weit auseinander](../abbildungen/tiefe-lineal.svg)
+
 Warum? Die Grafikkarte teilt am Ende alles durch die Entfernung, wie im vorigen Abschnitt, und die
 Tiefe ist davon nicht ausgenommen. Dasselbe Teilen, das ferne Bäume im Bild klein macht, drückt auch
 ferne Entfernungen auf der Tiefenskala eng zusammen: Zwischen 100 m und 200 m liegen dort kaum mehr

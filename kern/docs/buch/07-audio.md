@@ -148,6 +148,8 @@ f' = f · (c − v_l) / (c − v_s)
 
 `c` ist `speed_of_sound` (Standard 343 m/s), `v_l` und `v_s` sind die Geschwindigkeiten von Hörer und Quelle entlang der Linie Quelle → Hörer, jeweils mit `doppler_factor × PlayParams::doppler` skaliert und auf ±0,9 c begrenzt. Der Faktor wird auf 0,5–2 geklemmt und pro Block mit 25 % zum neuen Wert geglättet, damit schnelle Vorbeifahrten nicht stufig klingen.
 
+![Doppler-Effekt: Eine bewegte Quelle staucht die Wellenfronten vor sich (höhere Frequenz) und dehnt sie hinter sich (tiefere Frequenz)](../abbildungen/doppler.svg)
+
 ## 7.4 Busse, Hall und Master
 
 ### Busse

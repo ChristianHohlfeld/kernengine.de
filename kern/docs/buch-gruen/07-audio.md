@@ -143,6 +143,8 @@ daran „vorn“ und „hinten“.
 > weil seine Schallwellen vorn zusammengedrückt und hinten gedehnt werden. Kern rechnet diesen
 > **Doppler-Effekt** mit der echten Schallgeschwindigkeit von 343 m/s aus.
 
+![Vorn drängen sich die Wellen, hinten liegen sie weit auseinander – darum klingt der Krankenwagen erst höher, dann tiefer](../abbildungen/doppler.svg)
+
 Damit nichts verrückt spielt, ändert sich die Tonhöhe höchstens auf die Hälfte oder das Doppelte,
 und zwar geglättet. Jede Stimme kann Doppler auch abschalten.
 

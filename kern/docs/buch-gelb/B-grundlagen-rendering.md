@@ -241,6 +241,8 @@ Einstellungen ist die kleinste Stufe:
 > **So kannst du es dir vorstellen:** Ein Lineal, dessen Striche nach hinten immer weiter
 > auseinanderliegen. Vorn misst du auf den Millimeter, hinten nur noch auf den Meter.
 
+![Gleich große Stufen im Tiefenpuffer: nah an der Kamera dicht und fein, in der Ferne weit und grob](../abbildungen/tiefe-lineal.svg)
+
 Am meisten hängt die Genauigkeit an der **nahen Grenze**. Die Kamera malt nichts, was näher als
 5 cm ist; das ist der Nullpunkt des Lineals. Die Regel ist einfach: **Doppelte nahe Grenze heißt
 doppelte Genauigkeit überall** – vorn wie hinten. Darum wählt man sie so groß, wie es geht. Zu groß
