@@ -238,7 +238,7 @@ Jeder Viewport hat oben eine eigene Leiste:
 | Ansichtstyp | **Perspektive** oder orthografisch: **Oben**, **Unten**, **Links**, **Rechts**, **Vorne**, **Hinten** |
 | Ansichtsmodus | **Beleuchtet**, **Unbeleuchtet**, **Drahtgitter**, **Spieler-Kollision** (Player Collision); das Menü **Fenster › Ansichtsmodus** nennt denselben Modus **Kollision** |
 | **Anzeigen** | **Raster**, **Symbole (Lichter, leere Actors)** (Icons (lights, empties)), **Auswahlumriss** (Selection outline), **Kollisionsformen** (Collision shapes), **Gelenke**, **Kontaktpunkte** (Contact points), **Begrenzungen**, **Nebel**, **Himmel**, **Statistik**; die Liste bleibt beim Umschalten offen |
-| Maximieren: **Maximieren / wiederherstellen (4er-Aufteilung)** (Maximise / restore (quad layout)) | wechselt zwischen vier Viewports und diesem allein |
+| Maximieren: **Maximieren / wiederherstellen (4er-Aufteilung)** (Maximize / restore (quad layout)) | wechselt zwischen vier Viewports und diesem allein |
 
 Der Klick auf ein Element der Leiste macht den Viewport zum aktiven. Wechselt man von der Perspektive in
 eine orthografische Ansicht, schaltet Studio von **Beleuchtet** auf **Drahtgitter**, zurück in die

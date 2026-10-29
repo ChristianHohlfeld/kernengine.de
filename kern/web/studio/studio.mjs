@@ -487,7 +487,7 @@ class StudioPage {
           <button class="vb" data-vp="mode"></button>
           <button class="vb" data-vp="show">Show</button>
           <span class="spacer"></span>
-          <button class="vb icon" data-vp="maximize" title="Maximise / restore (quad layout)" data-icon="maximize"></button>
+          <button class="vb icon" data-vp="maximize" title="Maximize / restore (quad layout)" data-icon="maximize"></button>
         </div>
         <svg class="vp-axes" viewBox="-22 -22 44 44"></svg>
         <div class="vp-info"></div><div class="vp-gizmo" hidden></div><div class="vp-hint" hidden></div>
@@ -616,7 +616,7 @@ class StudioPage {
       v.mode.textContent = vs.modeName;
       v.bar.style.visibility = vs.active && playing === "playing" && !s.play.ejected ? "hidden" : "";
       v.bar.querySelector('[data-vp="maximize"]').innerHTML = icon(layout === "single" ? "maximize" : "minimize");
-      v.bar.querySelector('[data-vp="maximize"]').title = layout === "single" ? "Show four viewports" : "Maximise this viewport";
+      v.bar.querySelector('[data-vp="maximize"]').title = layout === "single" ? "Show four viewports" : "Maximize this viewport";
     }
   }
 

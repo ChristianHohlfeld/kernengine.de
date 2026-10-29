@@ -410,7 +410,7 @@ glow and occlusion; in the four-way view, both are missing.
 > switch **Layout** to **4 viewports**. Only one of the four shows the world with perspective and
 > light (the others show wireframes from the top, front and side); in that one, find the same
 > windows. Then use the button at the far right of its bar to make it single and large again (its
-> tooltip: **Maximise this viewport**). **What you see:** Large, every lit window has a soft halo
+> tooltip: **Maximize this viewport**). **What you see:** Large, every lit window has a soft halo
 > that shines out past its edge onto the wall. In the four-way view, the windows are just sharp,
 > bright rectangles without a halo. **What you learn:** The glow only comes about in Kern's own
 > picture buffers – in a sub-window it's missing. The same goes for the occlusion, which you try

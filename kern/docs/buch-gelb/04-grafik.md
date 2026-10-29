@@ -408,7 +408,7 @@ bekommt Glühen und Verdeckung; in der Vier-Ansicht fehlt beides.
 > **Aufteilung** (Layout) auf **4 Viewports** (4 viewports). Nur einer der vier zeigt die Welt mit
 > Perspektive und Licht (die anderen zeigen Drahtgitter von oben, vorn und der Seite); darin suchst du
 > dir dieselben Fenster. Dann machst du ihn mit dem Knopf ganz rechts in seiner Leiste wieder einzeln
-> und groß (sein Tooltip: **Diesen Viewport maximieren** (Maximise this viewport)).
+> und groß (sein Tooltip: **Diesen Viewport maximieren** (Maximize this viewport)).
 > **Was du siehst:** Groß hat jedes leuchtende Fenster einen weichen Lichtschein, der über seinen
 > Rand hinaus auf die Wand strahlt. In der Vier-Ansicht sind die Fenster nur scharfe, helle Rechtecke
 > ohne Schein. **Was du lernst:** Das Glühen entsteht erst in Kerns eigenen Bildpuffern – im

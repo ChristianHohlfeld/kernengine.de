@@ -95,7 +95,7 @@ const I18N_DE = {
   "Controls...": "Steuerung...", "About Kern Studio": "Über Kern Studio",
   "Perspective": "Perspektive", "Top": "Oben", "Bottom": "Unten", "Front": "Vorne", "Back": "Hinten", "Left": "Links", "Right": "Rechts",
   "Lit": "Beleuchtet", "Unlit": "Unbeleuchtet", "Wireframe": "Drahtgitter", "Show": "Anzeigen", "View Mode": "Ansichtsmodus", "Viewport Type": "Viewport-Typ",
-  "Viewport options": "Viewport-Optionen", "Layout": "Aufteilung", "Maximise / restore (quad layout)": "Maximieren / wiederherstellen (4er-Aufteilung)",
+  "Viewport options": "Viewport-Optionen", "Layout": "Aufteilung", "Maximize / restore (quad layout)": "Maximieren / wiederherstellen (4er-Aufteilung)",
   "Bookmarks": "Lesezeichen", "Camera speed": "Kamerageschwindigkeit", "Camera speed (1-8)": "Kamerageschwindigkeit (1-8)",
   "Grid size": "Rastergröße", "Grid snapping": "Am Raster einrasten", "Rotation snapping": "Drehung einrasten", "Scale snapping": "Skalierung einrasten",
   "Rotation step": "Drehschritt", "Scale step": "Skalierungsschritt", "Mouse sensitivity": "Mausempfindlichkeit", "Invert mouse Y": "Maus-Y umkehren",
@@ -277,7 +277,7 @@ const I18N_DE = {
     "Der Editor der Kern-Engine: ein C++-Renderer (WebGL2 über WebAssembly) und Box3D-Starrkörperphysik, mit Levels aus Actors und Komponenten, die direkt im Viewport spielen. Alles im Viewport wird vom selben nativen Code gerendert und simuliert, der auch exportierte Spiele ausführt.",
 
   // viewports: tooltips, menus, hints, the robot camera
-  "Maximise this viewport": "Diesen Viewport maximieren", "Icons (lights, empties)": "Symbole (Lichter, leere Actors)", "Selection outline": "Auswahlumriss",
+  "Maximize this viewport": "Diesen Viewport maximieren", "Icons (lights, empties)": "Symbole (Lichter, leere Actors)", "Selection outline": "Auswahlumriss",
   "Collision shapes": "Kollisionsformen", "Contact points": "Kontaktpunkte", "Orthographic": "Orthografisch", "View mode": "Ansichtsmodus", "Is the Player": "Ist der Spieler",
   "Grabbing - release to throw": "Greifen – loslassen zum Werfen", "Click the viewport to control the game · Esc stops · F8 ejects": "Klick in den Viewport, um das Spiel zu steuern · Esc beendet · F8 steigt aus",
   "Ejected · free camera · F8 possess · Esc stop": "Ausgestiegen · freie Kamera · F8 übernimmt · Esc beendet", "Simulating · drag grabs bodies · K keeps poses · Esc stops": "Simuliert · Ziehen greift Körper · K übernimmt Posen · Esc beendet",
