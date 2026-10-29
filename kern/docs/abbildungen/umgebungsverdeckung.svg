@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 150">
+  <!-- Umgebungsverdeckung (GTAO), eine Scheibe im Schnitt: zwei Wände verdecken den Himmel bis zu ihren Oberkanten (Horizonte, hier je 45°); sichtbar ist der Bogen dazwischen (blau B.8). -->
+  <path class="fd" d="M40,132 L40,62 L120,62 L120,132 Z"/>
+  <path class="fd" d="M260,132 L260,62 L340,62 L340,132 Z"/>
+  <path class="l" d="M20,132 L360,132"/>
+  <path class="ffa" d="M190,132 L153.23,95.23 A52,52 0 0 1 226.77,95.23 Z"/>
+  <path class="la" d="M153.23,95.23 A52,52 0 0 1 226.77,95.23"/>
+  <path class="l gs" d="M190,132 L114,56"/>
+  <path class="l gs" d="M190,132 L266,56"/>
+  <path class="l p" d="M190,132 L190,102"/>
+  <text x="194" y="108" class="i">n</text>
+  <circle class="dot" cx="190" cy="132" r="2.4"/>
+  <text x="190" y="144" class="k m">{{punkt}}</text>
+  <text x="112" y="54" class="e">{{h0}}</text>
+  <text x="268" y="54">{{h1}}</text>
+  <text x="190" y="20" class="m a">{{himmel}}</text>
+  <path class="lad" d="M190,24 L190,78"/>
+  <g data-nur="gelb"><text x="148" y="126" class="k m">45°</text><text x="232" y="126" class="k m">45°</text></g>
+  <text x="80.0" y="100.0" class="m w">{{wand}}</text>
+  <text x="300.0" y="100.0" class="m w">{{wand}}</text>
+</svg>

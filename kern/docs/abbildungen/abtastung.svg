@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 148">
+  <!-- Lesen bei Tonhöhe 1,5 (blau 7: 4-Punkt-Hermite, Catmull-Rom): gelesen wird bei 0; 1,5; 3; 4,5; 6. Bei 0, 3, 6 liegt ein Sample (blaue Ringe), bei 1,5 und 4,5 wird zwischen den Nachbarn geschätzt (weiße Punkte auf der Kurve). Sample-Werte sind ein Beispiel. -->
+  <path class="lg" d="M46,72 L371,72"/>
+  <path class="lad" d="M56,68 L58.5,67.2 L61,66.23 L63.5,65.09 L66,63.81 L68.5,62.41 L71,60.9 L73.5,59.31 L76,57.66 L78.5,55.97 L81,54.25 L83.5,52.53 L86,50.82 L88.5,49.14 L91,47.52 L93.5,45.97 L96,44.51 L98.5,43.17 L101,41.95 L103.5,40.89 L106,40 L108.5,39.22 L111,38.48 L113.5,37.79 L116,37.15 L118.5,36.56 L121,36.03 L123.5,35.55 L126,35.14 L128.5,34.78 L131,34.5 L133.5,34.29 L136,34.14 L138.5,34.08 L141,34.09 L143.5,34.19 L146,34.37 L148.5,34.64 L151,35 L153.5,35.45 L156,36 L158.5,36.67 L161,37.49 L163.5,38.43 L166,39.49 L168.5,40.66 L171,41.92 L173.5,43.27 L176,44.7 L178.5,46.2 L181,47.75 L183.5,49.35 L186,50.98 L188.5,52.63 L191,54.3 L193.5,55.97 L196,57.63 L198.5,59.28 L201,60.89 L203.5,62.47 L206,64 L208.5,65.54 L211,67.16 L213.5,68.85 L216,70.59 L218.5,72.38 L221,74.19 L223.5,76.02 L226,77.86 L228.5,79.69 L231,81.5 L233.5,83.28 L236,85.02 L238.5,86.71 L241,88.33 L243.5,89.88 L246,91.33 L248.5,92.68 L251,93.92 L253.5,95.03 L256,96 L258.5,96.87 L261,97.68 L263.5,98.42 L266,99.1 L268.5,99.72 L271,100.27 L273.5,100.74 L276,101.15 L278.5,101.49 L281,101.75 L283.5,101.94 L286,102.05 L288.5,102.08 L291,102.03 L293.5,101.91 L296,101.7 L298.5,101.4 L301,101.02 L303.5,100.56 L306,100 L308.5,99.32 L311,98.48 L313.5,97.5 L316,96.38 L318.5,95.16 L321,93.83 L323.5,92.41 L326,90.91 L328.5,89.36 L331,87.75 L333.5,86.11 L336,84.45 L338.5,82.78 L341,81.11 L343.5,79.47 L346,77.86 L348.5,76.29 L351,74.78 L353.5,73.35 L356,72"/>
+  <path class="ld" d="M56,72 L56,68"/>
+  <circle class="dot" cx="56" cy="68" r="2"/>
+  <text x="56" y="128" class="k m">0</text>
+  <path class="ld" d="M106,72 L106,40"/>
+  <circle class="dot" cx="106" cy="40" r="2"/>
+  <text x="106" y="128" class="k m">1</text>
+  <path class="ld" d="M156,72 L156,36"/>
+  <circle class="dot" cx="156" cy="36" r="2"/>
+  <text x="156" y="128" class="k m">2</text>
+  <path class="ld" d="M206,72 L206,64"/>
+  <circle class="dot" cx="206" cy="64" r="2"/>
+  <text x="206" y="128" class="k m">3</text>
+  <path class="ld" d="M256,72 L256,96"/>
+  <circle class="dot" cx="256" cy="96" r="2"/>
+  <text x="256" y="128" class="k m">4</text>
+  <path class="ld" d="M306,72 L306,100"/>
+  <circle class="dot" cx="306" cy="100" r="2"/>
+  <text x="306" y="128" class="k m">5</text>
+  <path class="ld" d="M356,72 L356,72"/>
+  <circle class="dot" cx="356" cy="72" r="2"/>
+  <text x="356" y="128" class="k m">6</text>
+  <circle class="dota" cx="56" cy="68" r="4" style="fill:none;stroke:#1d5c99;stroke-width:1.2"/>
+  <text x="56" y="142" class="k m a">{{p0}}</text>
+  <circle class="dotw" cx="131" cy="34.5" r="3.2" style="stroke:#1d5c99;stroke-width:1.2"/>
+  <text x="131" y="142" class="k m a">{{p1_5}}</text>
+  <circle class="dota" cx="206" cy="64" r="4" style="fill:none;stroke:#1d5c99;stroke-width:1.2"/>
+  <text x="206" y="142" class="k m a">{{p3}}</text>
+  <circle class="dotw" cx="281" cy="101.75" r="3.2" style="stroke:#1d5c99;stroke-width:1.2"/>
+  <text x="281" y="142" class="k m a">{{p4_5}}</text>
+  <circle class="dota" cx="356" cy="72" r="4" style="fill:none;stroke:#1d5c99;stroke-width:1.2"/>
+  <text x="356" y="142" class="k m a">{{p6}}</text>
+  <text x="46" y="128" class="k e">{{kaestchen}}</text>
+  <text x="46" y="142" class="k e a">{{gelesen}}</text>
+  <text x="2" y="12" class="k h">{{kopf}}</text>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 128">
+  <!-- Verteilungsverschiebung beim Verhaltensklonen (blau A.9.3): der Klon weicht ab, gerät in Zustände ohne Daten, die Fehler wachsen bis zum Sturz. Schematisch. -->
+  <path class="lg gs" d="M20,20 L300,20"/>
+  <path class="lg gs" d="M20,68 L300,68"/>
+  <text x="306" y="23" class="k h">{{spur}}</text>
+  <path class="l" d="M60,40 L90,40 L120,40 L150,40 L180,40 L210,40 L240,40 L270,40"/>
+  <circle class="dot" cx="60" cy="40" r="2.2"/>
+  <circle class="dot" cx="90" cy="40" r="2.2"/>
+  <circle class="dot" cx="120" cy="40" r="2.2"/>
+  <circle class="dot" cx="150" cy="40" r="2.2"/>
+  <circle class="dot" cx="180" cy="40" r="2.2"/>
+  <circle class="dot" cx="210" cy="40" r="2.2"/>
+  <circle class="dot" cx="240" cy="40" r="2.2"/>
+  <circle class="dot" cx="270" cy="40" r="2.2"/>
+  <text x="60" y="34" class="k">{{experte}}</text>
+  <path class="la" d="M60,52 L90,52 L120,52.6 L150,55 L180,61 L210,72 L240,88 L270,108"/>
+  <circle class="dota" cx="60" cy="52" r="2.2"/>
+  <circle class="dota" cx="90" cy="52" r="2.2"/>
+  <circle class="dota" cx="120" cy="52.6" r="2.2"/>
+  <circle class="dota" cx="150" cy="55" r="2.2"/>
+  <circle class="dota" cx="180" cy="61" r="2.2"/>
+  <circle class="dota" cx="210" cy="72" r="2.2"/>
+  <circle class="dota" cx="240" cy="88" r="2.2"/>
+  <path class="la" d="M266,104 L274,112"/><path class="la" d="M266,112 L274,104"/>
+  <text x="278" y="111" class="a">{{sturz}}</text>
+  <text x="53" y="55" class="k a e">{{klon}}</text>
+  <text x="53" y="43" class="k e">{{vorbild}}</text>
+  <path class="ld" d="M150,59 L150,83"/>
+  <text x="154" y="92" class="k e">{{klein}}</text>
+  <text x="218" y="62" class="k">{{gross}}</text>
+</svg>

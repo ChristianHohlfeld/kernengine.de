@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 140">
+  <!-- GJK: Zwei konvexe Formen A und B berühren sich genau dann, wenn ihre Minkowski-Differenz A − B den Ursprung enthält; liegt er außerhalb, ist der kürzeste Weg zum Ursprung der Abstand (blau C.3). -->
+  <path class="fa" d="M60,70 L120,34 L196,44 L226,92 L176,128 L88,120 Z"/>
+  <text x="140" y="86" class="m">A − B</text>
+  <path class="lad ps pa" d="M226,92 L300,66"/>
+  <circle class="dot" cx="300" cy="66" r="2.4"/>
+  <text x="306" y="69">0</text>
+  <text x="263" y="72" class="k a m">{{abstand}}</text>
+  <text x="140" y="16" class="m">{{titel}}</text>
+  <text x="250" y="104" class="k">{{aussen1}}</text>
+  <text x="250" y="114" class="k">{{aussen2}}</text>
+</svg>

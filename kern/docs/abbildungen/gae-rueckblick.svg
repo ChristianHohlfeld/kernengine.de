@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 90">
+  <!-- Vorteil im Rückblick (GAE): Ein Schritt, der für sich schlechter als erwartet war, aber in eine gute Lage führt, bekommt rückwärts gerechnet einen positiven Vorteil Â₀ = δ₀ + γλ δ₁ + (γλ)² δ₂ + … (blau A.11). -->
+  <rect class="fa" x="2" y="8" width="116" height="44" rx="3"/>
+  <text x="60" y="23" class="m">{{s0}}</text>
+  <text x="60" y="33" class="k m">{{s0a}}</text>
+  <text x="60" y="43" class="k m">{{s0b}}</text>
+  <rect class="f" x="132" y="8" width="116" height="44" rx="3"/>
+  <text x="190" y="23" class="m">{{s1}}</text>
+  <text x="190" y="33" class="k m">{{s1a}}</text>
+  <text x="190" y="43" class="k m">{{s1b}}</text>
+  <path class="l p" d="M118,30 L131,30"/>
+  <rect class="f" x="262" y="8" width="116" height="44" rx="3"/>
+  <text x="320" y="23" class="m">{{s2}}</text>
+  <text x="320" y="33" class="k m">{{s2a}}</text>
+  <text x="320" y="43" class="k m">{{s2b}}</text>
+  <path class="l p" d="M248,30 L261,30"/>
+  <path class="la p" d="M320,60 L320,70 L60,70 L60,53"/>
+  <text x="190" y="84" class="m a">{{rueck}}</text>
+</svg>

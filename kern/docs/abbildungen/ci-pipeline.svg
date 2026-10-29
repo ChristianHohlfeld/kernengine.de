@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 144">
+  <!-- Die CI (.github/workflows/ci.yml): native und determinism laufen unabhängig; build, danach deploy (nur main, kein Pull Request) und e2e (needs: build). Grün und gelb: dieselben Jobs mit einfachen Namen. -->
+  <rect class="fa" x="2" y="52" width="92" height="34" rx="3"/>
+  <text x="48" y="67" class="m">{{ausloeser}}</text>
+  <text x="48" y="77" class="k m">{{ausloeser2}}</text>
+  <rect class="f" x="114" y="6" width="134" height="32" rx="3"/>
+  <text x="181" y="25" class="m" data-nur="gruen gelb">{{native}}</text>
+  <text x="181" y="20" class="m" data-nur="blau">{{native}}</text>
+  <text x="181" y="30" class="k m" data-nur="blau">{{native_r}}</text>
+  <path class="l p" d="M94,69 L103,69 L103,22 L113,22"/>
+  <rect class="f" x="114" y="50" width="134" height="32" rx="3"/>
+  <text x="181" y="69" class="m" data-nur="gruen gelb">{{determinism}}</text>
+  <text x="181" y="64" class="m" data-nur="blau">{{determinism}}</text>
+  <text x="181" y="74" class="k m" data-nur="blau">{{determinism_r}}</text>
+  <path class="l p" d="M94,69 L103,69 L103,66 L113,66"/>
+  <rect class="f" x="114" y="94" width="134" height="32" rx="3"/>
+  <text x="181" y="113" class="m" data-nur="gruen gelb">{{build}}</text>
+  <text x="181" y="108" class="m" data-nur="blau">{{build}}</text>
+  <text x="181" y="118" class="k m" data-nur="blau">{{build_r}}</text>
+  <path class="l p" d="M94,69 L103,69 L103,110 L113,110"/>
+  <rect class="f" x="266" y="74" width="112" height="32" rx="3"/>
+  <text x="322" y="93" class="m" data-nur="gruen gelb">{{deploy}}</text>
+  <text x="322" y="88" class="m" data-nur="blau">{{deploy}}</text>
+  <text x="322" y="98" class="k m" data-nur="blau">{{deploy_r}}</text>
+  <rect class="f" x="266" y="116" width="112" height="24" rx="3"/>
+  <text x="322" y="131" class="m">{{e2e}}</text>
+  <path class="l p" d="M248,110 L256,110 L256,90 L265,90"/>
+  <path class="l p" d="M256,110 L256,128 L265,128"/>
+  <path class="lg" data-nur="blau" d="M252,8 L256,8 L256,80"/>
+  <text x="260" y="30" class="k h" data-nur="blau">{{parallel}}</text>
+</svg>

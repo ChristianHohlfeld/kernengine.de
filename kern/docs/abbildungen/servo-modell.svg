@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 156">
+  <!-- Servomodell (blau 16.1, servo_step): Moment = clamp(K·(Ziel − Winkel), −T, T) − D·Geschwindigkeit, dazu Coulomb-Reibung F, Trägheit des Rotors (Armatur) und die Verzögerung delay. Bild: Feder K mit Kraftgrenze T und Dämpfer D zwischen Zielwinkel und Gelenk. -->
+  <rect class="fa" x="26" y="20" width="44" height="92" rx="3"/>
+  <text x="48" y="62" class="k m t">{{ziel1}}</text><text x="48" y="72" class="k m">{{ziel2}}</text>
+  <rect class="f" x="300" y="20" width="62" height="92" rx="3"/>
+  <text x="331" y="62" class="k m t">{{gelenk1}}</text><text x="331" y="72" class="k m">{{gelenk2}}</text>
+  <path class="l" d="M70,40 L120,40 L130,46 L140,34 L150,46 L160,34 L170,46 L180,34 L190,46 L200,34 L210,46 L220,34 L230,46 L240,40 L300,40"/>
+  <text x="180" y="28" class="k m">{{feder}}</text>
+  <text x="180" y="58" class="k m h">{{feder2}}</text>
+  <path class="l" d="M70,92 L160,92"/>
+  <path class="l" d="M160,83 L160,101"/>
+  <path class="l" d="M150,80 L190,80 L190,104 L150,104"/>
+  <path class="l" d="M190,92 L300,92"/>
+  <text x="245" y="86" class="k m">{{daempfer}}</text>
+  <text x="170" y="116" class="k m h">{{daempfer2}}</text>
+  <text x="2" y="140" class="k">{{dazu1}}</text>
+  <text x="2" y="150" class="k">{{dazu2}}</text>
+</svg>

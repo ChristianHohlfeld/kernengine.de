@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 142">
+  <!-- Perspektive (grün B): Ein 1 m hoher Baum in 5 m und ein 2 m hoher in 10 m liegen auf demselben Sehstrahl und erscheinen gleich groß (Größe geteilt durch Entfernung). -->
+  <path class="l" d="M20.66,108 L360,108"/>
+  <path class="la" d="M30,108 L360,23.2"/>
+  <path class="lk" d="M185.66,108 L185.66,68"/>
+  <circle class="dota" cx="185.66" cy="68" r="2.2"/>
+  <text x="179.66" y="104" class="k e">{{baum1}}</text>
+  <path class="lk" d="M341.32,108 L341.32,28"/>
+  <circle class="dota" cx="341.32" cy="28" r="2.2"/>
+  <text x="335.32" y="86" class="k e">{{baum2}}</text>
+  <circle class="dot" cx="30" cy="108" r="2.8"/>
+  <text x="30" y="121" class="k m">{{auge}}</text>
+  <text x="226.13" y="70.6" class="k a">{{strahl}}</text>
+  <text x="190" y="136" class="k m">{{fuss}}</text>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 146">
+  <!-- Architektur des Lehrers (blau 14.2): Recipe → Task → Env; Ppo gibt die Policy über ein Backend (Threads oder Web Worker) an die Collector, die Umgebungen schrittweise führen und Rollouts liefern; Ppo lernt daraus. -->
+  <rect class="f" x="6" y="8" width="84" height="26" rx="3"/>
+  <text x="48" y="24" class="m">{{recipe}}</text>
+  <rect class="f" x="124" y="8" width="68" height="26" rx="3"/>
+  <text x="158" y="24" class="m">{{task}}</text>
+  <rect class="f" x="222" y="8" width="156" height="34" rx="3"/>
+  <text x="300" y="28" class="m" data-nur="gruen gelb">{{env}}</text>
+  <text x="300" y="23" class="m" data-nur="blau">{{env}}</text>
+  <text x="300" y="33" class="k m" data-nur="blau">{{env2}}</text>
+  <path class="l p" d="M90,21 L123,21"/>
+  <path class="l p" d="M192,21 L221,21"/>
+  <rect class="fa" x="6" y="84" width="84" height="26" rx="3"/>
+  <text x="48" y="100" class="m">{{ppo}}</text>
+  <path class="l p" d="M48,34 L48,83"/>
+  <g data-nur="blau">
+  <rect class="f" x="118" y="80" width="92" height="34" rx="3"/>
+  <text x="164" y="95" class="m">{{backend}}</text>
+  <text x="164" y="105" class="k m">{{backend2}}</text>
+  </g>
+  <rect class="f" x="228" y="84" width="104" height="26" rx="3"/>
+  <text x="280" y="100" class="m">{{collector}}</text>
+  <rect class="f" x="338" y="84" width="40" height="26" rx="3"/>
+  <text x="358" y="100" class="m">{{rollout}}</text>
+  <path class="l p" data-nur="blau" d="M90,97 L117,97"/>
+  <path class="l p" data-nur="blau" d="M210,97 L227,97"/>
+  <path class="l p" data-nur="gruen gelb" d="M90,97 L227,97"/>
+  <text x="104" y="92" class="k m a" data-nur="blau">{{policy}}</text>
+  <text x="160" y="92" class="k m a" data-nur="gruen gelb">{{policy}}</text>
+  <path class="l p" d="M332,97 L337,97"/>
+  <path class="l p ps" d="M284,83 L284,43"/>
+  <text x="278" y="66" class="k e">{{step}}</text>
+  <path class="l p" d="M359,110 L359,128 L48,128 L48,111"/>
+  <text x="200" y="140" class="k m">{{learn}}</text>
+</svg>

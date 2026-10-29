@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 144">
+  <!-- Schattenakne (gelb B, blau B.5.2): Licht von oben; jedes Kästchen (Texel) der Schattenkarte speichert eine Tiefe, die der Fläche in seiner Mitte. Auf einer schrägen Fläche liegt in jedem Kästchen die halbe Fläche tiefer als gespeichert und hält sich für verdeckt: Streifen. -->
+  <path class="lg gs" d="M20,22 L20,126"/>
+  <path class="lk" d="M40,46 L60,52" style="stroke-width:3"/>
+  <path class="la" d="M20,46 L60,46"/>
+  <path class="lg gs" d="M60,22 L60,126"/>
+  <path class="lk" d="M80,58 L100,64" style="stroke-width:3"/>
+  <path class="la" d="M60,58 L100,58"/>
+  <path class="lg gs" d="M100,22 L100,126"/>
+  <path class="lk" d="M120,70 L140,76" style="stroke-width:3"/>
+  <path class="la" d="M100,70 L140,70"/>
+  <path class="lg gs" d="M140,22 L140,126"/>
+  <path class="lk" d="M160,82 L180,88" style="stroke-width:3"/>
+  <path class="la" d="M140,82 L180,82"/>
+  <path class="lg gs" d="M180,22 L180,126"/>
+  <path class="lk" d="M200,94 L220,100" style="stroke-width:3"/>
+  <path class="la" d="M180,94 L220,94"/>
+  <path class="lg gs" d="M220,22 L220,126"/>
+  <path class="lk" d="M240,106 L260,112" style="stroke-width:3"/>
+  <path class="la" d="M220,106 L260,106"/>
+  <path class="l" d="M20,40 L260,112"/>
+  <path class="ld p" d="M70,6 L70,18"/>
+  <path class="ld p" d="M150,6 L150,18"/>
+  <path class="ld p" d="M230,6 L230,18"/>
+  <text x="122" y="14" class="k m">{{licht}}</text>
+  <path class="la" d="M272,40 L286,40"/><text x="290" y="43" class="k">{{stufe}}</text>
+  <path class="l" d="M272,58 L286,64"/><text x="290" y="64" class="k">{{flaeche}}</text>
+  <path class="lk" d="M272,84 L286,84" style="stroke-width:3"/><text x="290" y="80" class="k">{{akne1}}</text>
+  <text x="290" y="90" class="k">{{akne2}}</text><text x="290" y="100" class="k">{{akne3}}</text>
+  <text x="140.0" y="138" class="k m">{{texel}}</text>
+</svg>

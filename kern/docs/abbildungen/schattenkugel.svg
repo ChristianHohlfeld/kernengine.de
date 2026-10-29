@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 172">
+  <!-- Schattenkarte mit Schattendistanz, von oben: blau der Sichtkegel bis zur Schattendistanz (Auge = Punkt), grau die Fläche, die die Karte abdecken muss. Ein Kasten in festen Achsen der Sonne ändert beim Drehen seine Größe, die umschließende Kugel nicht. Kugel nach Renderer (blau 4): c = min(f, (f + n)(1 + k)/2), r = √((f − c)² + f²k), gezeichnet für 60° senkrechten Öffnungswinkel und 16:9 (dann c = f). -->
+  <rect class="ffd" x="8.7" y="86" width="102.6" height="50"/>
+  <rect class="l" x="8.7" y="86" width="102.6" height="50"/>
+  <path class="fa" d="M60,136 L8.7,86 L111.3,86 Z"/>
+  <circle class="dot" cx="60" cy="136" r="2"/>
+  <text x="60" y="157" class="m t">{{titel0}}</text>
+  <text x="60" y="168" class="k m">{{folge0}}</text>
+  <rect class="ffd" x="144.7" y="64.72" width="78.6" height="71.28"/>
+  <rect class="l" x="144.7" y="64.72" width="78.6" height="71.28"/>
+  <path class="fa" d="M216.14,136 L144.7,130.67 L223.3,64.72 Z"/>
+  <circle class="dot" cx="216.14" cy="136" r="2"/>
+  <text x="184" y="157" class="m t">{{titel1}}</text>
+  <text x="184" y="168" class="k m">{{folge1}}</text>
+  <circle class="ffd" cx="314" cy="80" r="58.86"/><circle class="l" cx="314" cy="80" r="58.86"/>
+  <path class="fa" d="M314,130 L262.7,80 L365.3,80 Z"/>
+  <circle class="dot" cx="314" cy="130" r="2"/>
+  <circle class="dot" cx="314" cy="80" r="1.8"/>
+  <path class="ld" d="M314,80 L343.43,29.03"/>
+  <text x="328" y="56" class="k">{{radius}}</text>
+  <text x="314" y="92" class="k m">{{mitte}}</text>
+  <text x="314" y="157" class="m t">{{titel2}}</text>
+  <text x="314" y="168" class="k m">{{folge2}}</text>
+  <text x="2" y="10" class="k h">{{kopf}}</text>
+</svg>

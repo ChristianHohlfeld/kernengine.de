@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 174">
+  <!-- Schattenkarte: parallele Sonnenstrahlen (orthografische Projektion), pro Strahl wird die Tiefe der ersten Fläche gespeichert; der Boden hinter dem Dach liegt tiefer als gespeichert und damit im Schatten (blau B.5). -->
+  <path class="l" d="M10,140 L370,140"/>
+  <rect class="ffd" x="210" y="140" width="34" height="6"/>
+  <path class="fd" d="M150,140 L150,100 L180,76 L210,100 L210,140 Z"/>
+  <circle class="fw" cx="34" cy="22" r="10"/>
+  <path class="ld" d="M47,22 L51,22"/>
+  <path class="ld" d="M43.19,31.19 L46.02,34.02"/>
+  <path class="ld" d="M34,35 L34,39"/>
+  <path class="ld" d="M24.81,31.19 L21.98,34.02"/>
+  <path class="ld" d="M21,22 L17,22"/>
+  <path class="ld" d="M24.81,12.81 L21.98,9.98"/>
+  <path class="ld" d="M34,9 L34,5"/>
+  <path class="ld" d="M43.19,12.81 L46.02,9.98"/>
+  <text x="56" y="20">{{sonne}}</text>
+  <text x="56" y="31" class="k">{{strahlen}}</text>
+  <path class="lad pa" d="M10,44 L106,140"/>
+  <path class="lad pa" d="M50,44 L146,140"/>
+  <path class="lad pa" d="M90,44 L150,104"/>
+  <path class="lad pa" d="M150,44 L190,84"/>
+  <path class="lad pa" d="M196,44 L292,140"/>
+  <path class="lad pa" d="M236,44 L332,140"/>
+  <path class="lad pa" d="M270,44 L366,140"/>
+  <path class="lad gp" d="M190,84 L246,140"/>
+  <circle class="dota" cx="190" cy="84" r="2.2"/>
+  <circle class="dotw" cx="246" cy="140" r="2.2"/>
+  <path class="ld" d="M193,82 L250,40"/>
+  <text x="253" y="40" class="k">{{gespeichert}}</text>
+  <path class="ld" d="M244,143 L234,153"/>
+  <text x="231" y="159" class="k e">{{schatten1}}</text>
+  <text x="231" y="169" class="k e">{{schatten2}}</text>
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 164">
+  <!-- Logik-Graph der Vorlage „door“ (src/studio/logic_edit.cpp): On Interact → Flip Flop; A und B starten je einen Tween (0,8 s, smooth), dessen Update ein Move By ausführt; parallel Play Sound builtin:confirm. -->
+  <rect class="fw" x="2" y="40" width="70" height="18" rx="3"/>
+  <path class="fa" d="M2,53 L2,43 Q2,40 5,40 L69,40 Q72,40 72,43 L72,53 Z"/>
+  <text x="7" y="49.6" class="k t">On Interact</text>
+  <rect class="fw" x="92" y="40" width="62" height="40" rx="3"/>
+  <path class="fa" d="M92,53 L92,43 Q92,40 95,40 L151,40 Q154,40 154,43 L154,53 Z"/>
+  <text x="97" y="49.6" class="k t">Flip Flop</text>
+  <rect class="fw" x="176" y="8" width="80" height="40" rx="3"/>
+  <path class="fa" d="M176,21 L176,11 Q176,8 179,8 L253,8 Q256,8 256,11 L256,21 Z"/>
+  <text x="181" y="17.6" class="k t">Tween</text>
+  <text x="181" y="32" class="k">{{tween}}</text>
+  <rect class="fw" x="176" y="64" width="80" height="40" rx="3"/>
+  <path class="fa" d="M176,77 L176,67 Q176,64 179,64 L253,64 Q256,64 256,67 L256,77 Z"/>
+  <text x="181" y="73.6" class="k t">Tween</text>
+  <text x="181" y="88" class="k">{{tween}}</text>
+  <rect class="fw" x="280" y="8" width="98" height="30" rx="3"/>
+  <path class="fa" d="M280,21 L280,11 Q280,8 283,8 L375,8 Q378,8 378,11 L378,21 Z"/>
+  <text x="285" y="17.6" class="k t">Move By</text>
+  <text x="285" y="32" class="k">{{plus}}</text>
+  <rect class="fw" x="280" y="64" width="98" height="30" rx="3"/>
+  <path class="fa" d="M280,77 L280,67 Q280,64 283,64 L375,64 Q378,64 378,67 L378,77 Z"/>
+  <text x="285" y="73.6" class="k t">Move By</text>
+  <text x="285" y="88" class="k">{{minus}}</text>
+  <rect class="fw" x="176" y="118" width="104" height="30" rx="3"/>
+  <path class="fa" d="M176,131 L176,121 Q176,118 179,118 L277,118 Q280,118 280,121 L280,131 Z"/>
+  <text x="181" y="127.6" class="k t">Play Sound</text>
+  <text x="181" y="142" class="k">builtin:confirm</text>
+  <path class="l p" d="M72,49 L91,49"/>
+  <path class="l p" d="M84,49 L84,133 L175,133"/>
+  <text x="148" y="61" class="k e">A</text><text x="148" y="75" class="k e">B</text>
+  <path class="l p" d="M154,58 L164,58 L164,17 L175,17"/>
+  <path class="l p" d="M154,72 L164,72 L164,73 L175,73"/>
+  <text x="252" y="43" class="k e">Update</text>
+  <path class="l p" d="M256,40 L268,40 L268,17 L279,17"/>
+  <text x="252" y="99" class="k e">Update</text>
+  <path class="l p" d="M256,96 L268,96 L268,73 L279,73"/>
+  <text x="2" y="160" class="k h">{{legende}}</text>
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 136">
+  <!-- Ohren abschneiden an einer L-Form mit 6 Ecken: 4 Schritte, 6 − 2 = 4 Dreiecke (gelb 5, Earcut). Die Reihenfolge ist ein Beispiel, wie im Text. -->
+  <path class="ffa" d="M18,28 L64,28 L64,74 Z"/>
+  <path class="ld" d="M18,28 L64,28 L64,74 Z"/>
+  <circle class="fw" cx="48.67" cy="43.33" r="6"/><text x="48.67" y="46.03" class="k m t">1</text>
+  <path class="ff" d="M156,74 L156,120 L18,120 Z"/>
+  <path class="ld" d="M156,74 L156,120 L18,120 Z"/>
+  <circle class="fw" cx="110" cy="104.67" r="6"/><text x="110" y="107.37" class="k m t">2</text>
+  <path class="ffa" d="M64,74 L156,74 L18,120 Z"/>
+  <path class="ld" d="M64,74 L156,74 L18,120 Z"/>
+  <circle class="fw" cx="79.33" cy="89.33" r="6"/><text x="79.33" y="92.03" class="k m t">3</text>
+  <path class="ff" d="M18,28 L64,74 L18,120 Z"/>
+  <path class="ld" d="M18,28 L64,74 L18,120 Z"/>
+  <circle class="fw" cx="33.33" cy="74" r="6"/><text x="33.33" y="76.7" class="k m t">4</text>
+  <path class="lk" d="M18,28 L64,28 L64,74 L156,74 L156,120 L18,120 Z"/>
+  <circle class="dot" cx="18" cy="28" r="1.8"/>
+  <text x="14" y="24" class="t e">A</text>
+  <circle class="dot" cx="64" cy="28" r="1.8"/>
+  <text x="68" y="24" class="t ">B</text>
+  <circle class="dot" cx="64" cy="74" r="1.8"/>
+  <text x="69" y="86" class="t ">C</text>
+  <circle class="dot" cx="156" cy="74" r="1.8"/>
+  <text x="160" y="70" class="t ">D</text>
+  <circle class="dot" cx="156" cy="120" r="1.8"/>
+  <text x="160" y="130" class="t ">E</text>
+  <circle class="dot" cx="18" cy="120" r="1.8"/>
+  <text x="14" y="130" class="t e">F</text>
+  <text x="180" y="22" class="k t">{{kopf1}}</text><text x="250" y="22" class="k t">{{kopf2}}</text>
+  <circle class="fw" cx="184" cy="37" r="6"/><text x="184" y="39.7" class="k m t">1</text>
+  <text x="196" y="40" class="k">A B C</text>
+  <text x="250" y="40" class="k">{{rest0}}</text>
+  <circle class="fw" cx="184" cy="55" r="6"/><text x="184" y="57.7" class="k m t">2</text>
+  <text x="196" y="58" class="k">D E F</text>
+  <text x="250" y="58" class="k">{{rest1}}</text>
+  <circle class="fw" cx="184" cy="73" r="6"/><text x="184" y="75.7" class="k m t">3</text>
+  <text x="196" y="76" class="k">C D F</text>
+  <text x="250" y="76" class="k">{{rest2}}</text>
+  <circle class="fw" cx="184" cy="91" r="6"/><text x="184" y="93.7" class="k m t">4</text>
+  <text x="196" y="94" class="k">A C F</text>
+  <text x="250" y="94" class="k">{{rest3}}</text>
+  <text x="180" y="122" class="k">{{summe}}</text>
+</svg>

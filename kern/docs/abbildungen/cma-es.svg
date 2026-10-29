@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 150">
+  <!-- CMA-ES schematisch: Höhenlinien eines schrägen Tals (grau), Kandidaten einer Generation (Punkte) und ihr Mittelpunkt. Die Wolke ist anfangs rund und groß, wird entlang des Tals gestreckt und zuletzt schmal (blau A.13). Punkte gleichmäßig in der Ellipse verteilt (Sonnenblumenmuster). -->
+  <ellipse class="lg" cx="73.32" cy="52" rx="15" ry="4.5" transform="rotate(-30 73.32 52)"/>
+  <ellipse class="lg" cx="73.32" cy="52" rx="30" ry="9.0" transform="rotate(-30 73.32 52)"/>
+  <ellipse class="lg" cx="73.32" cy="52" rx="45" ry="13.5" transform="rotate(-30 73.32 52)"/>
+  <path class="ld" d="M70.82,49.5 L75.82,54.5 M70.82,54.5 L75.82,49.5"/>
+  <circle class="dot" cx="41.13" cy="82.13" r="1.5"/>
+  <circle class="dot" cx="36.89" cy="88.72" r="1.5"/>
+  <circle class="dot" cx="35.59" cy="77.46" r="1.5"/>
+  <circle class="dot" cx="45.97" cy="86.76" r="1.5"/>
+  <circle class="dot" cx="29.85" cy="86.8" r="1.5"/>
+  <circle class="dot" cx="43.18" cy="74.66" r="1.5"/>
+  <circle class="dot" cx="41.33" cy="94.32" r="1.5"/>
+  <circle class="dot" cx="28.49" cy="77.28" r="1.5"/>
+  <circle class="dot" cx="50.92" cy="81.48" r="1.5"/>
+  <circle class="dot" cx="30.35" cy="94.24" r="1.5"/>
+  <circle class="dot" cx="37.28" cy="69.68" r="1.5"/>
+  <circle class="dot" cx="49.29" cy="93.6" r="1.5"/>
+  <circle class="dot" cx="23.18" cy="83.64" r="1.5"/>
+  <circle class="dot" cx="50.23" cy="72.93" r="1.5"/>
+  <circle class="dota" cx="38.48" cy="83.66" r="3.2"/>
+  <text x="56" y="14" class="m t">{{gen0}}</text>
+  <text x="56" y="124" class="k m">{{form0}}</text>
+  <ellipse class="lg" cx="199.32" cy="52" rx="15" ry="4.5" transform="rotate(-30 199.32 52)"/>
+  <ellipse class="lg" cx="199.32" cy="52" rx="30" ry="9.0" transform="rotate(-30 199.32 52)"/>
+  <ellipse class="lg" cx="199.32" cy="52" rx="45" ry="13.5" transform="rotate(-30 199.32 52)"/>
+  <path class="ld" d="M196.82,49.5 L201.82,54.5 M196.82,54.5 L201.82,49.5"/>
+  <circle class="dot" cx="184.54" cy="62.84" r="1.5"/>
+  <circle class="dot" cx="174.04" cy="70.98" r="1.5"/>
+  <circle class="dot" cx="178.81" cy="62.21" r="1.5"/>
+  <circle class="dot" cx="189.2" cy="63.86" r="1.5"/>
+  <circle class="dot" cx="164.34" cy="73.58" r="1.5"/>
+  <circle class="dot" cx="192.19" cy="55.28" r="1.5"/>
+  <circle class="dot" cx="177.51" cy="73.05" r="1.5"/>
+  <circle class="dot" cx="167.96" cy="66.34" r="1.5"/>
+  <circle class="dot" cx="200.01" cy="56.41" r="1.5"/>
+  <circle class="dot" cx="160.63" cy="79.59" r="1.5"/>
+  <circle class="dot" cx="186.09" cy="54.61" r="1.5"/>
+  <circle class="dot" cx="190.23" cy="67.65" r="1.5"/>
+  <circle class="dot" cx="155.95" cy="74.92" r="1.5"/>
+  <circle class="dot" cx="204.1" cy="49.58" r="1.5"/>
+  <circle class="dota" cx="179.54" cy="65.73" r="3.2"/>
+  <text x="182" y="14" class="m t">{{gen1}}</text>
+  <text x="182" y="124" class="k m">{{form1}}</text>
+  <ellipse class="lg" cx="325.32" cy="52" rx="15" ry="4.5" transform="rotate(-30 325.32 52)"/>
+  <ellipse class="lg" cx="325.32" cy="52" rx="30" ry="9.0" transform="rotate(-30 325.32 52)"/>
+  <ellipse class="lg" cx="325.32" cy="52" rx="45" ry="13.5" transform="rotate(-30 325.32 52)"/>
+  <path class="ld" d="M322.82,49.5 L327.82,54.5 M322.82,54.5 L327.82,49.5"/>
+  <circle class="dot" cx="324.91" cy="52.23" r="1.5"/>
+  <circle class="dot" cx="322.25" cy="54.6" r="1.5"/>
+  <circle class="dot" cx="323.17" cy="51.67" r="1.5"/>
+  <circle class="dot" cx="326.37" cy="52.88" r="1.5"/>
+  <circle class="dot" cx="319.51" cy="54.98" r="1.5"/>
+  <circle class="dot" cx="326.75" cy="49.91" r="1.5"/>
+  <circle class="dot" cx="323.41" cy="55.56" r="1.5"/>
+  <circle class="dot" cx="320.17" cy="52.54" r="1.5"/>
+  <circle class="dot" cx="329.16" cy="50.79" r="1.5"/>
+  <circle class="dot" cx="318.76" cy="56.97" r="1.5"/>
+  <circle class="dot" cx="324.89" cy="49.31" r="1.5"/>
+  <circle class="dot" cx="326.89" cy="54.33" r="1.5"/>
+  <circle class="dot" cx="317.09" cy="54.98" r="1.5"/>
+  <circle class="dot" cx="329.97" cy="48.52" r="1.5"/>
+  <circle class="dota" cx="323.59" cy="53" r="3.2"/>
+  <text x="308" y="14" class="m t">{{gen2}}</text>
+  <text x="308" y="124" class="k m">{{form2}}</text>
+  <circle class="dota" cx="16" cy="140" r="3.2"/><text x="23" y="143" class="k">{{mitte}}</text>
+  <circle class="dot" cx="140" cy="140" r="1.5"/><text x="146" y="143" class="k">{{kandidat}}</text>
+  <path class="ld" d="M246,137.5 L251,142.5 M246,142.5 L251,137.5"/><text x="256" y="143" class="k">{{ziel}}</text>
+</svg>

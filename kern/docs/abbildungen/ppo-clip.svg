@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 160">
+  <!-- PPO-Clip-Ziel L(ρ) = min(ρÂ, clip(ρ, 1 − ε, 1 + ε) Â) mit ε = 0,2 (PpoConfig::clip, ppo.h), links Â = +1, rechts Â = −1. Grau: der Bereich 0,8 bis 1,2. -->
+  <rect class="ff" x="84" y="30" width="44" height="96"/>
+  <path class="l" d="M40,30 L40,126 L172,126"/>
+  <path class="ld" d="M84,126 L84,129"/>
+  <text x="84" y="138" class="k m">{{t08}}</text>
+  <path class="ld" d="M106,126 L106,129"/>
+  <text x="106" y="138" class="k m">{{t10}}</text>
+  <path class="ld" d="M128,126 L128,129"/>
+  <text x="128" y="138" class="k m">{{t12}}</text>
+  <path class="lg gs" d="M84,126 L84,30"/>
+  <path class="lg gs" d="M128,126 L128,30"/>
+  <path class="lk" d="M40,119.14 L84,91.71 L128,64.29"/>
+  <path class="la" d="M128,64.29 L172,64.29"/>
+  <text x="172" y="58.29" class="k a e">{{flach}}</text>
+  <text x="106" y="22" class="m t">{{titel0}}</text>
+  <text x="36" y="40" class="e">{{yachse}}</text>
+  <text x="106" y="150" class="m">{{xachse}}</text>
+  <rect class="ff" x="274" y="30" width="44" height="96"/>
+  <path class="l" d="M230,30 L230,126 L362,126"/>
+  <path class="ld" d="M274,126 L274,129"/>
+  <text x="274" y="138" class="k m">{{t08}}</text>
+  <path class="ld" d="M296,126 L296,129"/>
+  <text x="296" y="138" class="k m">{{t10}}</text>
+  <path class="ld" d="M318,126 L318,129"/>
+  <text x="318" y="138" class="k m">{{t12}}</text>
+  <path class="lg gs" d="M274,126 L274,30"/>
+  <path class="lg gs" d="M318,126 L318,30"/>
+  <path class="la" d="M230,64.29 L274,64.29"/>
+  <path class="lk" d="M274,64.29 L318,91.71 L362,119.14"/>
+  <text x="233" y="77.29" class="k a">{{flach}}</text>
+  <text x="296" y="120.51" class="k m">{{weiter}}</text>
+  <text x="296" y="22" class="m t">{{titel1}}</text>
+  <text x="226" y="40" class="e">{{yachse}}</text>
+  <text x="296" y="150" class="m">{{xachse}}</text>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 156">
+  <!-- Gelände-Kachel (build_terrain_tile, src/geo/roads.cpp): Gitterecken mit eigener Höhe, jedes Quadrat entlang der Diagonale Südwest–Nordost in zwei Dreiecke geteilt; rechts dieselben Höhen schräg von oben, schattiert nach der Neigung (Höhen wie in gelb 5.10). -->
+  <path class="ld" d="M30,118 L74,118 L74,74 L30,74 Z"/>
+  <path class="lg" d="M30,118 L74,74"/>
+  <path class="ld" d="M74,118 L118,118 L118,74 L74,74 Z"/>
+  <path class="lg" d="M74,118 L118,74"/>
+  <path class="ld" d="M30,74 L74,74 L74,30 L30,30 Z"/>
+  <path class="lg" d="M30,74 L74,30"/>
+  <path class="ld" d="M74,74 L118,74 L118,30 L74,30 Z"/>
+  <path class="lg" d="M74,74 L118,30"/>
+  <circle class="fw" cx="30" cy="118" r="7"/><text x="30" y="121" class="k m t">1</text>
+  <circle class="fw" cx="74" cy="118" r="7"/><text x="74" y="121" class="k m t">1</text>
+  <circle class="fw" cx="118" cy="118" r="7"/><text x="118" y="121" class="k m t">2</text>
+  <circle class="fw" cx="30" cy="74" r="7"/><text x="30" y="77" class="k m t">1</text>
+  <circle class="fw" cx="74" cy="74" r="7"/><text x="74" y="77" class="k m t">2</text>
+  <circle class="fw" cx="118" cy="74" r="7"/><text x="118" y="77" class="k m t">4</text>
+  <circle class="fw" cx="30" cy="30" r="7"/><text x="30" y="33" class="k m t">2</text>
+  <circle class="fw" cx="74" cy="30" r="7"/><text x="74" y="33" class="k m t">3</text>
+  <circle class="fw" cx="118" cy="30" r="7"/><text x="118" y="33" class="k m t">5</text>
+  <text x="74" y="14" class="m t">{{titel0}}</text>
+  <path class="lg gs" d="M206,134 L306,134 L366,94 L266,94 Z"/>
+  <path class="lg gs" d="M206,134 L206,125"/>
+  <path class="lg gs" d="M306,134 L306,116"/>
+  <path class="lg gs" d="M366,94 L366,49"/>
+  <path class="lg gs" d="M266,94 L266,76"/>
+  <path style="fill:#f3f3f3;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M236,105 L316,67 L266,76 Z"/>
+  <path style="fill:#f2f2f2;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M286,96 L366,49 L316,67 Z"/>
+  <path style="fill:#f3f3f3;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M236,105 L286,96 L316,67 Z"/>
+  <path style="fill:#f2f2f2;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M286,96 L336,78 L366,49 Z"/>
+  <path style="fill:#dadada;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M206,125 L286,96 L236,105 Z"/>
+  <path style="fill:#f2f2f2;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M256,125 L336,78 L286,96 Z"/>
+  <path style="fill:#e0e0e0;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M206,125 L256,125 L286,96 Z"/>
+  <path style="fill:#f7f7f7;stroke:#262626;stroke-width:0.5;stroke-linejoin:round" d="M256,125 L306,116 L336,78 Z"/>
+  <circle class="dot" cx="206" cy="125" r="1.4"/>
+  <circle class="dot" cx="256" cy="125" r="1.4"/>
+  <circle class="dot" cx="306" cy="116" r="1.4"/>
+  <circle class="dot" cx="236" cy="105" r="1.4"/>
+  <circle class="dot" cx="286" cy="96" r="1.4"/>
+  <circle class="dot" cx="336" cy="78" r="1.4"/>
+  <circle class="dot" cx="266" cy="76" r="1.4"/>
+  <circle class="dot" cx="316" cy="67" r="1.4"/>
+  <circle class="dot" cx="366" cy="49" r="1.4"/>
+  <text x="290" y="14" class="m t">{{titel1}}</text>
+  <text x="2" y="150" class="k h">{{fuss}}</text>
+</svg>

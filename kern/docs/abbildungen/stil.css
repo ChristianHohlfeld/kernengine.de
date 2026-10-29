@@ -1,0 +1,41 @@
+/* The one style of every figure in the three books (see STIL.md). buch_abbildungen.py puts this
+   sheet into each SVG before it is printed. One SVG unit is one printed point (1/72 in). */
+
+text { font-family: "DejaVu Sans"; font-size: 8.5px; fill: #262626; }
+text.k, tspan.k { font-size: 7.5px; }                 /* small: notes, axis numbers (never below 7 pt) */
+text.t, tspan.t { font-weight: bold; }                /* a panel's title */
+text.c, tspan.c { font-family: "DejaVu Sans Mono"; font-size: 7.8px; }  /* names from the code */
+text.a, tspan.a { fill: #1d5c99; }                    /* accent */
+text.h, tspan.h { fill: #6b6b6b; }                    /* quiet (grey) */
+text.w { fill: #ffffff; }
+text.m { text-anchor: middle; }
+text.e { text-anchor: end; }
+text.i, tspan.i { font-style: italic; }
+
+/* lines */
+.l  { fill: none; stroke: #262626; stroke-width: 0.75; stroke-linecap: round; stroke-linejoin: round; }
+.ld { fill: none; stroke: #262626; stroke-width: 0.5; stroke-linecap: round; stroke-linejoin: round; }   /* thin: helpers, axes ticks */
+.lk { fill: none; stroke: #262626; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }   /* thick: the main curve */
+.la { fill: none; stroke: #1d5c99; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }   /* accent curve */
+.lad { fill: none; stroke: #1d5c99; stroke-width: 0.75; stroke-linecap: round; stroke-linejoin: round; }
+.lg { fill: none; stroke: #8c8c8c; stroke-width: 0.5; }                                                   /* grey guide lines */
+.gs { stroke-dasharray: 3 2; }                         /* dashed */
+.gp { stroke-dasharray: 0.1 2.2; stroke-linecap: round; }  /* dotted */
+
+/* areas */
+.f  { fill: #ececec; stroke: #262626; stroke-width: 0.75; stroke-linejoin: round; }   /* a box */
+.fw { fill: #ffffff; stroke: #262626; stroke-width: 0.75; stroke-linejoin: round; }
+.fa { fill: #d9e5f2; stroke: #1d5c99; stroke-width: 0.75; stroke-linejoin: round; }   /* accent box */
+.fd { fill: #bdbdbd; stroke: #262626; stroke-width: 0.75; stroke-linejoin: round; }   /* darker: solid matter, shadow */
+.ff { fill: #ececec; stroke: none; }
+.ffd { fill: #bdbdbd; stroke: none; }
+.ffa { fill: #d9e5f2; stroke: none; }
+.dot  { fill: #262626; stroke: none; }
+.dota { fill: #1d5c99; stroke: none; }
+.dotw { fill: #ffffff; stroke: #262626; stroke-width: 0.75; }
+
+/* arrows: class p (dark) or pa (accent) on a line; both ends: add ps / pas */
+.p  { marker-end: url(#pfeil); }
+.pa { marker-end: url(#pfeil-a); }
+.ps { marker-start: url(#pfeil); }
+.pas { marker-start: url(#pfeil-a); }

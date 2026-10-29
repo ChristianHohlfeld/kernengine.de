@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 145.2">
+  <!-- Nachtfenster (NightWindows, src/game/runtime.cpp): Raster mit 3 m breiten Spalten und Stockwerkshöhe (hier 3,2 m, der Gebäudebauer wählt 3,1 bis 3,6 m); Fenster belegt x 0,22–0,78 und y 0,28–0,78 der Zelle, ab dem ersten Stock bis 1 m unter der Traufe; an, wenn hash(Spalte, Stockwerk, Seed) ≥ 0,42 (hier für Seed 0,5 gerechnet). -->
+  <rect class="fw" x="70" y="14" width="108" height="115.2"/>
+  <rect class="fa" x="75.94" y="77.94" width="15.12" height="14.4"/>
+  <rect class="fd" x="75.94" y="49.14" width="15.12" height="14.4"/>
+  <rect class="fd" x="75.94" y="23" width="15.12" height="11.74"/>
+  <rect class="fd" x="102.94" y="77.94" width="15.12" height="14.4"/>
+  <rect class="fd" x="102.94" y="49.14" width="15.12" height="14.4"/>
+  <rect class="fa" x="102.94" y="23" width="15.12" height="11.74"/>
+  <rect class="fa" x="129.94" y="77.94" width="15.12" height="14.4"/>
+  <rect class="fa" x="129.94" y="49.14" width="15.12" height="14.4"/>
+  <rect class="fa" x="129.94" y="23" width="15.12" height="11.74"/>
+  <rect class="fd" x="156.94" y="77.94" width="15.12" height="14.4"/>
+  <rect class="fd" x="156.94" y="49.14" width="15.12" height="14.4"/>
+  <rect class="fa" x="156.94" y="23" width="15.12" height="11.74"/>
+  <path class="lg gs" d="M97,129.2 L97,14"/>
+  <path class="lg gs" d="M124,129.2 L124,14"/>
+  <path class="lg gs" d="M151,129.2 L151,14"/>
+  <path class="lg gs" d="M70,100.4 L178,100.4"/>
+  <path class="lg gs" d="M70,71.6 L178,71.6"/>
+  <path class="lg gs" d="M70,42.8 L178,42.8"/>
+  <rect class="l" x="70" y="14" width="108" height="115.2"/>
+  <path class="lad" d="M182,23 L188,23"/>
+  <text x="192.0" y="17" class="k">{{traufe}}</text>
+  <text x="192.0" y="26" class="k a">{{einmeter}}</text>
+  <text x="64" y="117.8" class="k e">{{stock0}}</text>
+  <text x="64" y="89" class="k e">{{stock1}}</text>
+  <text x="64" y="60.2" class="k e">{{stock2}}</text>
+  <text x="64" y="31.4" class="k e">{{stock3}}</text>
+  <text x="83.5" y="140.2" class="k m">3 m</text>
+  <text x="110.5" y="140.2" class="k m">3 m</text>
+  <text x="137.5" y="140.2" class="k m">3 m</text>
+  <text x="164.5" y="140.2" class="k m">3 m</text>
+  <rect class="fa" x="192.0" y="77.2" width="9" height="7"/><text x="205.0" y="83.2" class="k">{{an}}</text>
+  <rect class="fd" x="192.0" y="91.2" width="9" height="7"/><text x="205.0" y="97.2" class="k">{{aus}}</text>
+  <text x="192.0" y="111.2" class="k">{{zelle1}}</text>
+  <text x="192.0" y="121.2" class="k">{{zelle2}}</text>
+</svg>

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 150">
+  <!-- Glanz als viele winzige Spiegel (Mikrofacetten, grün B): glatt sind alle gleich gerichtet und werfen das Licht in eine Richtung (kleiner, scharfer Glanzpunkt); rau stehen sie kreuz und quer und streuen es (breiter, matter Schimmer). Spiegelung je Facette gerechnet. -->
+  <rect class="ffd" x="16" y="112" width="160" height="10"/>
+  <path class="lk" d="M16,108 L38.86,108"/>
+  <path class="lk" d="M38.86,108 L61.71,108"/>
+  <path class="ld p" d="M22,79.72 L49.23,106.94"/>
+  <path class="la p" d="M50.29,108 L82.81,75.47"/>
+  <path class="lk" d="M61.71,108 L84.57,108"/>
+  <path class="lk" d="M84.57,108 L107.43,108"/>
+  <path class="ld p" d="M67.72,79.72 L94.94,106.94"/>
+  <path class="la p" d="M96,108 L128.53,75.47"/>
+  <path class="lk" d="M107.43,108 L130.29,108"/>
+  <path class="lk" d="M130.29,108 L153.14,108"/>
+  <path class="ld p" d="M113.43,79.72 L140.65,106.94"/>
+  <path class="la p" d="M141.71,108 L174.24,75.47"/>
+  <path class="lk" d="M153.14,108 L176,108"/>
+  <text x="96" y="12" class="m t">{{titel0}}</text>
+  <text x="96" y="134" class="k m">{{unter0a}}</text>
+  <text x="96" y="144" class="k m">{{unter0b}}</text>
+  <rect class="ffd" x="206" y="112" width="160" height="10"/>
+  <path class="lk" d="M206.83,103.72 L228.02,112.28"/>
+  <path class="lk" d="M229.25,110.96 L251.32,105.04"/>
+  <path class="ld p" d="M212,79.72 L239.23,106.94"/>
+  <path class="la p" d="M240.29,108 L252.19,63.57"/>
+  <path class="lk" d="M251.78,106.81 L274.51,109.19"/>
+  <path class="lk" d="M275.73,113.01 L296.27,102.99"/>
+  <path class="ld p" d="M257.72,79.72 L284.94,106.94"/>
+  <path class="la p" d="M286,108 L280.39,62.34"/>
+  <path class="lk" d="M297.99,104.47 L319.73,111.53"/>
+  <path class="lk" d="M320.4,109.59 L343.03,106.41"/>
+  <path class="ld p" d="M303.43,79.72 L330.65,106.94"/>
+  <path class="la p" d="M331.71,108 L354.02,67.77"/>
+  <path class="lk" d="M343.83,111.91 L365.31,104.09"/>
+  <text x="286" y="12" class="m t">{{titel1}}</text>
+  <text x="286" y="134" class="k m">{{unter1a}}</text>
+  <text x="286" y="144" class="k m">{{unter1b}}</text>
+</svg>
