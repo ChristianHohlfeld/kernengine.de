@@ -1,23 +1,23 @@
 # Appendix D – Licenses
 
-This appendix reproduces the license texts of the software that Kern uses and this book describes.
-Where each part comes from and what was changed is listed in the repository in `kern/LICENSES.md`
-and `NOTICE`.
+This appendix reproduces the license texts of the software that Kern uses and this book
+describes. The texts are legally binding only in their English original; they are therefore
+reproduced as they are. Where each part comes from and what was changed is listed in the
+repository in `kern/LICENSES.md` and `NOTICE`.
 
 | Component | Rights holder | License |
 |---|---|---|
 | Kern (engine, Kern Studio, Lehrer, tools, networks) | Christian Heinrich Hohlfeld | Apache License 2.0 |
 | Box3D | Erin Catto | MIT |
 | Earcut (C++ port) | Mapbox | ISC |
-| musl maths functions | Rich Felker et al. | MIT |
+| musl math functions | Rich Felker et al. | MIT |
+| Micro Duck robot model (MJCF), policies, pick-up detection, ported software (idle look-around, autonomous behavior, voice) | Pollen Robotics | Apache License 2.0 |
+| `policies/jump.onnx` (warm start from Pollen's `velstand.onnx`) | Christian Heinrich Hohlfeld; Pollen Robotics | Apache License 2.0 |
 | Intel XeGTAO (method and presets, `gtao.cpp`) | Intel Corporation | MIT |
 | three.js (ACES fit, fog, `standard_shader.cpp`) | three.js authors | MIT |
-| Micro Duck robot model (MJCF), policies, pick-up detector, ported software (idle look-around, autonomous brain, voice synthesizer) | Pollen Robotics | Apache License 2.0 |
-| `policies/jump.onnx` (warm start from Pollen's `velstand.onnx`) | Christian Heinrich Hohlfeld; Pollen Robotics | Apache License 2.0 |
 | Micro Duck 3D models in Kern Studio (not included in this book) | Pollen Robotics | CC BY-NC-SA 4.0 |
 
-The license text of CC BY-NC-SA 4.0 is available at
-<https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>.
+The repository of Kern (`kern/LICENSES.md`) names the wording of the CC license.
 
 The book itself is not covered by these licenses (see the [imprint](00-imprint.md)).
 
@@ -92,9 +92,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-Some maths functions carry their own permissive notices (among them Sun Microsystems, David
+Some math functions carry their own permissive notices (among them Sun Microsystems, David
 Schultz, Steven G. Kargl, Bruce D. Evans, Stephen L. Moshier, Arm Limited); see
-`kern/third_party/musl_math/COPYRIGHT`.
+`kern/third_party/musl_math/COPYRIGHT` for the wording.
 
 ## D.4 Intel XeGTAO (MIT)
 

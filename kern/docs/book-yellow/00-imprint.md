@@ -6,46 +6,53 @@
 
 **Author, publisher and rights holder (self-published):** Christian Heinrich Hohlfeld\
 Gerhart-Hauptmann-Weg 5, 78464 Konstanz, Germany\
-ORCID: [0009-0003-6634-9045](https://orcid.org/0009-0003-6634-9045)\
+ORCID: 0009-0003-6634-9045\
 Email: chris.hohlfeld@gmail.com
 
-This is the yellow edition for readers aged 12 to 16: the same content as *Kern – The Book* (the
-blue, technical edition) and *Kern – Simply Explained* (the green edition).
+ISBN {{ISBN}} (hardcover)
 
-© 2026 Christian Heinrich Hohlfeld. All rights reserved.
+This is the yellow edition for young readers aged 12 to 16: the same content as "Kern – The Book"
+(the blue, technical edition) and "Kern – Simply Explained" (the green edition).
+
+© 2026 Christian Heinrich Hohlfeld. All rights reserved. First edition 2026.\
+Printed and bound on demand by Amazon (e.g. Amazon Distribution GmbH, Leipzig); the place of printing is given on the last page.
 
 **The book.** This book and its figures are protected by copyright. Any use beyond the narrow
 limits of German copyright law (Urheberrechtsgesetz, UrhG) requires the prior written consent of
 the rights holder. This applies in particular to reproduction, translation, adaptation,
 distribution, making available to the public, and storage and processing in electronic systems.
 The rights holder expressly reserves the use of this work for training, fine-tuning or evaluating
-machine-learning models (text and data mining) pursuant to § 44b(3) UrhG. Short code examples from
-the book may be used under the software's license.
+machine-learning models (text and data mining) pursuant to § 44b(3) UrhG. The code examples in the
+book may be used under the Apache License 2.0; excerpts of code ported from Pollen Robotics remain
+under their Apache 2.0 license (Appendix D).
 
-**The software.** Kern (the engine, Kern Studio, the Lehrer ("teacher"), the trained networks, tools
-and examples) is open source under the Apache License 2.0 and available free of charge:
+**The software.** Kern (the engine, Kern Studio, the Lehrer, the trained networks, tools and
+examples) is open source under the Apache License 2.0 and available free of charge:
 <https://kernengine.de/>, source code at
-<https://github.com/ChristianHohlfeld/kernengine.de>. The names "Kern", "Kern Studio", "Kern Lehrer" and the
-Kern logo are excluded from the license. Also excepted from the Apache license are the Micro Duck
-3D models by Pollen Robotics contained in Kern Studio (CC BY-NC-SA 4.0, non-commercial); they are
-not included in integration licenses either. A commercial build (kern/build.sh \-\-commercial)
-leaves them out. Courses and integration licenses for schools and companies are offered separately
-by the rights holder.
+<https://github.com/ChristianHohlfeld/kernengine.de>. Excepted are the Micro Duck 3D models by
+Pollen Robotics contained in Kern Studio: they are licensed under CC BY-NC-SA 4.0 and may only be
+used non-commercially. A commercial build (`kern/build.sh --commercial`) leaves them out. The
+names "Kern", "Kern Studio", "Kern Lehrer" and the Kern logo are excluded from the license.
 
 **Third-party components.** Kern uses, and this book describes, Box3D (Erin Catto, MIT), Earcut
-(Mapbox, ISC), musl math (MIT), Intel XeGTAO (MIT), three.js (MIT) and the Micro Duck's robot
-model, policies and ported software by Pollen Robotics (Apache 2.0). They remain under their own
-licenses; the license texts are in [Appendix D](D-licences.md). Kern Studio shows the duck with
-Pollen's 3D models (CC BY-NC-SA 4.0, non-commercial); they are neither included nor shown in this
-book. The pictures of the duck in this book, including the Studio screenshots, were made with the
-author's own design and do not show Pollen's 3D models.
+(Mapbox, ISC), musl math (MIT), techniques from Intel XeGTAO (MIT) and three.js (MIT), as well as
+the Micro Duck's robot model, policies and ported software by Pollen Robotics (Apache 2.0). They
+remain under their own licenses; the license texts are in [Appendix D](D-licences.md). Kern
+Studio shows the duck with Pollen's 3D models (CC BY-NC-SA 4.0, non-commercial); they are neither
+included nor shown in this book. The pictures of the duck in this book, including the screenshots
+from Kern Studio, were made with the author's own design and do not show Pollen's 3D models.
 
-**Trademarks.** "Micro Duck" (also "Microduck") names Pollen Robotics' (Hugging Face) robot, which
-Kern simulates; the name is used only descriptively. This book and Kern are not products of Pollen
-Robotics or Hugging Face and are neither endorsed nor reviewed by them. Other trademarks
-and product names (among them Box3D, Unreal Engine, WebAssembly, WebGL, ONNX, GitHub, Amazon, Dynamixel
-(ROBOTIS), MuJoCo, Intel, Xbox)
-belong to their owners and are used only descriptively.
+**Pictures.** Screenshots of Kern Studio, the Lehrer and games built with Kern, all drawings and
+diagrams, the Kern logo and the author's photo: © 2026 Christian Heinrich Hohlfeld.
+
+**Trademarks.** "Micro Duck" (also "Microduck") names Pollen Robotics' (Hugging Face) robot,
+which Kern simulates; the name is used only descriptively. Kern and this book are independent:
+Pollen Robotics and Hugging Face have neither published, endorsed nor reviewed them. Other
+trademarks and product names (among them Box3D, Unreal Engine, WebAssembly, WebGL, ONNX, GitHub,
+Amazon, Dynamixel (ROBOTIS), MuJoCo, Intel, Xbox, Windows, Edge, Minecraft (Microsoft), Chrome,
+Android (Google), Safari, iPhone, iPad, macOS (Apple), Firefox (Mozilla), Scratch (MIT), Python
+(Python Software Foundation), Claude (Anthropic)) belong to their owners and are used only
+descriptively.
 
 **How it was made.** Most of the software and the text was written by an AI system (Claude by
 Anthropic) under the author's direction. Idea, architecture, choice of components, review and
@@ -56,12 +63,12 @@ with the same AI system and lies in the author's responsibility as well.
 **Liability.** All information, programs and instructions were prepared and checked with care,
 without guarantee of correctness or completeness. Anyone who builds, calibrates or operates robots
 following this book does so at their own risk; author and rights holder are liable only for intent
-and gross negligence and for injury to life, body or health, and under mandatory statutory
+and gross negligence, for injury to life, body or health, and under mandatory statutory
 provisions, in particular product liability law.
 
-**For parents and teachers.** Everything in this book can be tried out safely in the browser.
-Building, calibrating and operating a real robot (Chapter 16) should only be done under adult
-supervision.
+**For parents and teachers.** Everything in this book can be tried out in the browser. Installing
+software, putting games on the internet, and building, calibrating and operating a real robot
+(Chapter 16) should happen under the supervision of an adult.
 
 ## Contents
 
