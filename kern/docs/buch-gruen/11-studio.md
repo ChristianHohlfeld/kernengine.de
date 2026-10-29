@@ -259,7 +259,8 @@ Jeder Viewport hat oben eine eigene Leiste:
 
 Unten links zeigt das **Achsenkreuz** die drei Richtungen: X rot, Y grün, Z blau. **Z zeigt nach oben.**
 
-> **Probier's aus!** Stell über die Toolbar die Aufteilung auf vier Viewports. Klick in den
+> **Probier's aus!** Stell über **Window › Viewport Layout** die Aufteilung auf **4 viewports**.
+> Klick in den
 > perspektivischen Viewport und stell seinen Ansichtstyp auf **Top** (Alt+J). Er springt von Lit auf
 > Wireframe: Im Bauplan geht es ums genaue Ausrichten, und dafür zeigt das Drahtgitter die Kanten
 > am klarsten. Alt+G bringt die Perspektive zurück. Mit dem Maximieren-Knopf holst du einen Viewport groß und
@@ -405,7 +406,8 @@ Er hat vier Gruppen:
   darf. Wer tiefer fällt, fängt von vorn an.
 - **Sky and light:** Tageszeit, wie schnell der Tag vergeht, Sonnenstand, Nebel, Wolken, Boden.
 - **Physics:** die Schwerkraft und wie genau und wie oft die Physik rechnet ([Kapitel 6](06-physik.md)).
-- **Audio:** Lautstärken, Hall und den Doppler-Effekt ([Kapitel 7](07-audio.md)).
+- **Audio:** Lautstärken, Hall und den Doppler-Effekt, den Martinshorn-Effekt: Ein vorbeifahrendes
+  Martinshorn klingt erst höher, dann tiefer ([Kapitel 7](07-audio.md)).
 
 > **Probier's aus!** Öffne Orb Run und zieh in World Settings am Namen von **Time of day** langsam
 > hin und her. Die Stadt geht in die Nacht über, und die Fenster fangen an zu leuchten.
@@ -551,6 +553,9 @@ gleichzeitig abtastet). Rot ist ein Hindernis, heller je näher, grün der Boden
 
 Jede Bewegung der Ente ist ein eigenes Netz. Das Laufen ist fest eingebaut, die übrigen Bewegungen
 (Sitzen, Kicken, Springen …) holt Studio aus dem Internet nach, sobald ein Level eine Ente enthält.
+Klappt das nicht, gibt Studio nicht auf: Es versucht es erneut und wartet dazwischen immer etwas
+länger, damit es die Leitung nicht verstopft. Bis dahin bleibt die Ente bei dieser Bewegung stehen
+und sagt, warum, statt still nichts zu tun.
 Trainierst du mit dem Kern Lehrer selbst ein neues ([Kapitel 14](14-lehrer.md)), nimmt Studio
 automatisch deins. Die Einzelheiten stehen in [Kapitel 13](13-micro-duck.md).
 
@@ -575,7 +580,9 @@ verschicken.
 
 Genau so arbeitet der Autosave: Kurz nach jeder Änderung legt Studio eine Kopie im Browser ab, aber nur,
 solange etwas ungespeichert ist. Beim nächsten Start bietet es **Restore** (wiederherstellen) oder
-**Dismiss** (verwerfen) an.
+**Dismiss** (verwerfen) an. Ein wiederhergestelltes Level gilt weiter als **ungespeichert**, denn
+sein Inhalt steht ja noch in keiner Datei. Bis du es speicherst, bietet Studio es bei jedem Start
+wieder an.
 
 > **Achtung, Falle!** Der Autosave ist ein Rettungsring, kein Speicherort. Er hält nur **eine** Kopie im
 > Browser. Wer den Browserspeicher leert, verliert sie. Wichtige Levels speicherst du mit Ctrl+S als
@@ -612,7 +619,8 @@ und startet sofort das Spiel statt des Editors. Die Steuerung ist dieselbe wie i
 > steht in [Kapitel 12](12-eigene-spiele.md).
 
 > **Probier's aus!** Exportiere Orb Run und starte die Datei mit **Play it**. Dann schick sie dir selbst
-> aufs Telefon, zum Beispiel als E-Mail-Anhang, und öffne sie dort. Je nach Telefon öffnet sie sich
+> aufs Telefon, zum Beispiel als E-Mail-Anhang (manche Mailprogramme blockieren solche Anhänge, dann
+> nimm einen Cloud-Speicher oder schick sie per Messenger als Datei), und öffne sie dort. Je nach Telefon öffnet sie sich
 > direkt im Browser, sonst wählst du „Öffnen mit“ und deinen Browser. Die Touch-Sticks erscheinen von
 > selbst.
 
@@ -652,6 +660,9 @@ Auf kleinen Bildschirmen räumt Studio die Werkstatt um, damit die Welt Platz ha
 - **Play und Simulate sind immer einen Tipp entfernt.** Sie stehen in einem **Dock** am rechten Rand
   der Toolbar, das stehen bleibt, während der Rest der Leiste seitwärts scrollt.
 - Weniger Wichtiges wird ausgeblendet.
+- **Nichts bleibt gedrückt hängen.** Hebt sich der letzte Finger vom Bildschirm oder wechselt die
+  Seite in den Hintergrund, lässt Kern alle Eingaben los. Sonst liefe deine Figur weiter, als hielte
+  noch jemand den Stick.
 
 ![Studio in einem 820 px breiten Fenster](../buch/bilder/studio-narrow.png)
 

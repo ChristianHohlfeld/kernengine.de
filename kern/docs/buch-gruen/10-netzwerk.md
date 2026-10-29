@@ -34,10 +34,11 @@ Browsers, zwischen zwei Rechnern oder nur zum Test innerhalb eines Programms hin
 Das Verschicken ist in Stufen aufgeteilt, und jede Stufe hat nur eine Aufgabe. So kann man jede einzeln
 verstehen und einzeln testen.
 
-> **Stell dir vor …** du verschickst ein Möbelstück. Du zerlegst es und packst die Teile platzsparend
-> (Serialisierung), klebst Nummern auf die Kartons, damit ein fehlender auffällt (Zuverlässigkeit),
-> schickst manches per Einschreiben, anderes als Postkarte (Kanäle), meldest dich vorher an, damit man
-> weiß, wer du bist (Verbindung), und ein Bote trägt alles (Transport).
+> **Stell dir vor …** du verschickst ein Möbelstück, Schritt für Schritt von oben nach unten wie in
+> der Skizze: Du meldest dich vorher an, damit man weiß, wer du bist (Verbindung), entscheidest, was
+> per Einschreiben und was als Postkarte geht (Kanäle), klebst Nummern auf die Kartons, damit ein
+> fehlender auffällt (Zuverlässigkeit), packst die Teile platzsparend (Serialisierung), und ein Bote
+> trägt alles (Transport).
 
 Beim Senden geht ein Paket im Bild von oben (Spiel) nach unten (Bote), beim Empfangen zurück.
 
@@ -63,8 +64,10 @@ passen, und am anderen Ende zurück. Je weniger Bits, desto mehr passt in ein Pa
 > genau zehn Bits, nicht mehr.
 
 Außerdem **rundet** Kern, wo es niemand merkt: Statt „3,14159265 Meter“ reicht „3,142 Meter“, also
-auf den Millimeter genau. Und es **lässt weg**, was der Empfänger selbst ausrechnen kann, etwa einen
-Teil jeder Drehung.
+auf den Millimeter genau. Und es **lässt weg**, was der Empfänger selbst ausrechnen kann. Das ist wie
+beim Wechselgeld: Wer weiß, dass drei Scheine zusammen 30 € ergeben, muss nur zwei davon genannt
+bekommen, den dritten rechnet er selbst aus. Eine Drehung etwa besteht in Kern aus vier Zahlen, die
+nach einer festen Regel zusammenpassen; drei genügen.
 
 Wichtig ist, **wie** Kern das Format festlegt: Für jede Nachrichtenart gibt es nur **eine einzige**
 Beschreibung, wie ein Formular mit festen Feldern. Der Absender füllt es aus, der Empfänger liest mit
@@ -156,8 +159,9 @@ Fassung 1“. Ein Paket eines anderen Spiels oder einer anderen Kern-Fassung erg
 passende Zahl und fällt heraus, bevor überhaupt jemand seinen Inhalt liest.
 
 > **Für Neugierige:** Die Anfrage des Gastes ist absichtlich mit leeren Bytes auf volle Größe
-> aufgefüllt. Ein Angreifer mit gefälschtem Absender könnte den Server sonst dazu bringen, einem Opfer
-> mehr Daten zu schicken, als er selbst investiert hat. Die genauen Namen und Werte stehen im blauen
+> aufgefüllt. Ein Angreifer könnte sonst die Adresse eines Opfers als Absender angeben. Der Server
+> würde dann dem Opfer antworten, und mit einer kleinen Anfrage brächte der Angreifer ihn dazu, dem
+> Opfer mehr Daten zu schicken, als er selbst investiert hat. Die genauen Namen und Werte stehen im blauen
 > Buch, Kapitel 10.
 
 ---
@@ -218,7 +222,9 @@ Richtung weiter und hält dann an.
 
 ### Der Prioritätstopf
 
-Ein Lagebild muss in **ein einziges** Paket passen. Sonst müsste der Gast auf mehrere Teile warten, und
+Pakete im Internet dürfen nicht beliebig groß sein; Kern bleibt vorsichtig bei etwa 1400 Byte,
+ungefähr so viel wie eine Buchseite Text. Ein Lagebild muss in **ein einziges** Paket passen. Sonst
+müsste der Gast auf mehrere Teile warten, und
 fehlte eins, wäre das ganze Bild unbrauchbar. In einem großen Level passt aber nicht jedes Ding in jedes
 Lagebild.
 
@@ -242,7 +248,9 @@ zeigen. Jedes Lagebild trägt deshalb die Uhrzeit des Servers.
 > Meinung und passt sie nach und nach an.
 
 So macht es auch der Gast: Aus den Uhrzeiten vieler Lagebilder schätzt er, wie weit die Uhr des Servers
-seiner eigenen voraus ist, und korrigiert diese Schätzung behutsam.
+seiner eigenen voraus ist, und korrigiert diese Schätzung behutsam. Dabei zählen nicht alle Briefe
+gleich: Der schnellste Brief verrät die Uhr am besten, denn er hat am wenigsten getrödelt. Einem
+schnellen Lagebild folgt der Gast darum rasch, einem verspäteten nur ein kleines Stück.
 
 Außerdem brauchen beide Seiten **genau dasselbe Level**. Das Willkommen des Servers trägt deshalb eine
 Prüfsumme über die ganze Level-Datei (nur wo die Editor-Kamera gerade steht, zählt nicht). Passt sie
@@ -254,12 +262,8 @@ nicht zum Level des Gastes, lehnt der ab: „the server plays a different level�
 ### Wie viele können mitspielen?
 
 Der Host spielt selbst mit und hält für Gäste **acht Plätze** frei, zusammen also bis zu neun Spieler.
-Wer selbst programmiert, kann bis zu 64 Plätze einstellen. Im Studio testest du auf einem Rechner mit
-bis zu vier Spielern (10.8).
-
-> **Für Neugierige:** Die Anmelde-Stufe aus 10.5 hätte für sich allein 16 Plätze als Vorgabe. Das
-> Spiel darüber legt aber seine eigene Zahl fest, und die ist acht. Die genauen Namen und Werte stehen
-> im blauen Buch, Kapitel 10.
+Im Studio testest du auf einem Rechner mit bis zu vier Spielern (10.8). Die genauen Namen und Werte
+stehen im blauen Buch, Kapitel 10.
 
 ---
 
@@ -293,7 +297,9 @@ ein echter Gast mit eigener Welt und eigenem Viewport, verbunden über den Probe
 
 Für andere Tabs oder Rechner: **Play › Host Online Game…** und **Join Online Game…**. Der Dialog fragt
 nach einem **Raum** (Standard „kern“) und optional nach einem Relay (10.11). Leer gelassen, finden sich
-nur Tabs desselben Browsers. **Leave Online Game** beendet die Sitzung.
+nur Tabs desselben Browsers. **Leave Online Game** beendet die Sitzung. Liegt der Tab des Hosts im
+Hintergrund, rechnet er trotzdem weiter. Sonst hörten seine Gäste nichts mehr von ihm und flögen
+nach einer Weile raus (10.5).
 
 > **Probier's aus!** Öffne Studio in zwei Tabs mit demselben Beispiel-Level. Im ersten **Host Online
 > Game…**, im zweiten **Join Online Game…**, Raum „kern“, Relay leer. Schon spielt ihr zu zweit. Das

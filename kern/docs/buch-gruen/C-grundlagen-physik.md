@@ -8,8 +8,6 @@
 > **Begriffe vorab:**
 > - **Hertz (Hz)** – „wie oft pro Sekunde“. Eine Schaukel, die zweimal pro Sekunde hin- und
 >   herschwingt, schwingt mit 2 Hz.
-> - **Radiant** – das Winkelmaß der Mathematiker: Ein voller Kreis sind gut 6,28 Radiant, ein
->   Radiant sind etwa 57 Grad.
 > - **Drehmoment** – Drehkraft. Mit einem langen Schraubenschlüssel erzeugt dieselbe Hand mehr
 >   davon. Gemessen in Newtonmeter (N·m).
 > - **Kraft und Impuls** – eine Kraft schiebt eine Weile, ein Impuls ist ein kurzer Stoß, wie ein
@@ -44,7 +42,7 @@ Diese vier Angaben heißen der **Zustand**. Dazu kommen Eigenschaften, die sich 
 
 Die Physik rechnet nun aus, wie sich der Zustand von Augenblick zu Augenblick ändert: Kräfte
 beschleunigen den Körper, Drehmomente bringen ihn ins Drehen. Dazu kommt ein verblüffender Effekt:
-Lange, dünne Körper taumeln, wenn sie sich nicht genau um eine ihrer bevorzugten Achsen drehen.
+Um die längste und um die kürzeste Achse dreht sich ein Ding sauber, um die mittlere taumelt es.
 
 > **Stell dir vor …** du wirfst ein Handy hochkant mit Dreh in die Luft (über dem Bett!). Um die lange
 > und die kurze Achse dreht es sich sauber, um die mittlere fängt es an zu taumeln. Box3D rechnet
@@ -75,6 +73,16 @@ gutes Verfahren sollte daran nichts ändern. Drei Kandidaten:
 | halb-halb | erst neue Geschwindigkeit, dann damit weiterrücken | bleibt gleich, solange die Blätter dicht genug liegen |
 | rückwärts | Kräfte vom Ende des Blatts | wird **kleiner**, bleibt aber immer brav |
 
+Die Unterschiede in Worten:
+
+- **Halb-halb** schaut erst, wie sich das Tempo in diesem Blatt ändert, und rückt dann mit dem
+  **neuen** Tempo weiter, nicht mit dem alten wie „vorwärts“. Ein winziger Unterschied mit großer
+  Wirkung.
+- **Rückwärts** klingt nach Zauberei: Wie kann man die Kräfte am Ende des Blatts kennen, bevor es
+  gezeichnet ist? Man kennt sie nicht, man sucht sie. Gesucht ist die Lage, die zu den Kräften an
+  ihrem **eigenen** Ende passt, wie bei dem Rätsel „Welche Zahl ergibt mit sich selbst
+  malgenommen 49?“. Das ist mehr Rechenarbeit, aber nie explosiv.
+
 Das Problem der mittleren Methode: Schwingt eine Feder sehr schnell, liegen die Blätter des
 Daumenkinos zu weit auseinander, um die Schwingung noch zu erfassen. Dann wird auch sie instabil.
 
@@ -95,8 +103,17 @@ Die Lehre: **Steife Federn und große Schritte vertragen sich nicht** – außer
 Box3D nimmt die **mittlere Methode**. Sie ist schnell, hält Energie gut und passt darum zu Spielen.
 Die eingebaute Dämpfung (eine Bremse, die Bewegungen langsam ausklingen lässt) rechnet Box3D dagegen
 rückwärts, also immer stabil. Daher Kerns Regel: Dämpfung nur über Box3Ds Einstellung, nie selbst
-gebastelt. Eine selbst gebaute Bremse wäre vorwärts gerechnet und würde an leichten Körpern
-explodieren.
+gebastelt. Eine selbst gebaute Bremse wäre vorwärts gerechnet: Sie bremst mit dem Tempo vom Anfang
+des Blatts, auch wenn das Ding längst langsamer ist. Bei einem leichten Körper bremst sie so über das
+Ziel hinaus und schleudert ihn rückwärts, beim nächsten Blatt noch stärker, bis alles explodiert.
+
+Dieselbe Vorsicht gilt für das Taumeln aus C.1: Auch diesen Effekt rechnet Box3D rückwärts, weil er
+vorwärts gerechnet Energie in lange, dünne Körper pumpen würde.
+
+Und wo sitzt der Solver (C.6) in einem Blatt? Genau in der Mitte der halb-halb-Methode: Erst
+erneuert Box3D die Geschwindigkeiten aus den Kräften, **dann** korrigiert der Solver sie, damit
+nichts ineinandersteckt und alle Gelenke halten, und **erst dann** rücken alle Dinge mit diesen
+korrigierten Geschwindigkeiten weiter.
 
 ### Fester Zeitschritt und Teilschritte
 
@@ -204,7 +221,8 @@ es das Verdrehen auf der Stelle, damit sich ein flach liegendes Ding nicht ewig 
 ### Zwei Reibwerte, ein Kontakt
 
 Jede Form hat ihren eigenen Reibwert. Der Kontakt braucht aber **einen**. Box3D nimmt eine besondere
-Art Mittelwert, das **geometrische Mittel**: Man multipliziert die beiden Werte und zieht die Wurzel.
+Art Mittelwert, das **geometrische Mittel**: Man multipliziert die beiden Werte und zieht die Wurzel
+(der Taschenrechner kann das; die Tabelle zeigt die Ergebnisse).
 
 | Material A | Material B | geometrisches Mittel | normaler Mittelwert |
 |---|---|---|---|
@@ -224,7 +242,7 @@ Ein einziger Wert pro Form kann nicht beides.
 
 Die **Restitution** sagt, wie viel Schwung nach einem Aufprall übrig bleibt: 0 heißt liegen
 bleiben, 1 heißt verlustlos zurückspringen. Von zwei Formen zählt die sprungfreudigere – ein
-Gummiball springt auch auf Beton. Ganz leichte Stöße prallen gar nicht ab, sonst würde ein ruhender
+Gummiball springt auch auf Beton. Ganz sanfte, langsame Stöße prallen gar nicht ab, sonst würde ein ruhender
 Körper wegen winziger Reste ewig zittern.
 
 ### Rollwiderstand
@@ -252,7 +270,8 @@ damit sich die Punkte nicht langsam voneinander entfernen.
 
 Welche Gelenke Box3D kennt (Scharnier, Schublade, Kugelgelenk, Seil, Rad …), zeigt die Tabelle in
 [Kapitel 6](06-physik.md). Wichtig für alle: Ein Roboter wird in seiner **Ruhelage** gebaut, denn dort
-liegt der Winkel null, und die Grenzen müssen ihn enthalten.
+liegt der Winkel null, und die Grenzen müssen ihn enthalten. Sonst stünde das Gelenk schon beim Start
+außerhalb seiner Grenzen und würde mit einem Ruck hineingerissen.
 
 > **Für Neugierige:** In Lehrbüchern steht an dieser Stelle die **Jacobi-Matrix**, eine Tabelle, die
 > sagt, wie jede Geschwindigkeit eine Regel beeinflusst. Daraus rechnet der Solver, wie schwer sich
@@ -289,8 +308,9 @@ Fehler sanft in Sekundenbruchteilen abbaut. Weil diese Feder rückwärts gerechn
 sie immer stabil. Ein Millimeter zu tief wird so sanft herausgeschoben statt mit einem Ruck.
 
 Ein letzter Durchgang in jedem Teilschritt, **Relax** genannt, nimmt danach den Extra-Schwung wieder
-heraus, der beim Herausschieben entstanden ist. Ohne ihn würde ein Körper nach einer Korrektur mit
-diesem Schwung weiterfliegen.
+heraus, der beim Herausschieben entstanden ist. Denk an das Kind auf der Matratze: Es wird nach oben
+geschoben und hätte danach noch etwas Schwung nach oben. Ohne Relax würde ein Körper nach einer
+Korrektur mit diesem Schwung weiterfliegen.
 
 ### Grenzen der Steifigkeit
 
@@ -310,7 +330,7 @@ das, was die Teilschritte noch sauber erfassen können.
 > **Probier's aus!** Stelle im Physics Lab unter **World Settings › Physics (Box3D)** die
 > **Sub-steps** einmal auf 1 und einmal auf 16, starte jeweils Simulate und zieh mit der Maus an der
 > Seilbrücke. Achte darauf, wie sehr die Kette nachgibt: Mit wenigen Teilschritten dehnt sie sich
-stärker, mit vielen hält sie fester zusammen.
+> stärker, mit vielen hält sie fester zusammen.
 
 > **Achtung, Falle!** Ein schwerer Körper an einem sehr leichten braucht viele Solver-Runden, bis die
 > Stöße durchgereicht sind; solange dehnen sich die Gelenke. Wie ein Lastwagen, der an einem Fahrrad
@@ -374,18 +394,19 @@ der Regler, ein Motor, der stillstehen will, ist die Reibung, und die Verspätun
 Warteschlange. Dieselbe Rechnung treibt Studio, den Lehrer (das Trainingsprogramm) und den Prüfstand für die Messungen. Wie
 das im Einzelnen geht, erklärt [Kapitel 6](06-physik.md), Abschnitt 6.15.
 
-> **Für Neugierige:** Box3D möchte Federn als „so viele Hertz, so stark gedämpft“ bekommen, Servos
-> werden aber in Drehmoment pro Radiant angegeben. Kern rechnet in jedem Schritt um. Die Formel
-> dafür lautet ω = √(K / m): Die Schwinggeschwindigkeit ω (in Radiant pro Sekunde) ergibt sich aus der
-> Steifigkeit K und davon, wie schwer sich das Gelenk anfühlt (m). Weil sich das mit der Haltung
-> ändert, rechnet Kern jeden Schritt neu.
+Box3D möchte Federn in anderen Einheiten bekommen, als Servos sie angeben. Kern rechnet darum in jedem
+Schritt um, weil sich das mit der Haltung des Roboters ändert.
 
 ## C.8 Was man nicht tun sollte
 
 Aus den Grundlagen folgen ein paar Verbote:
 
-- **Dauerlasten als Kraft, jeden Schritt neu.** Kräfte vergisst die Physik nach jedem Schritt.
+- **Was dauerhaft schieben soll, als Kraft, jeden Schritt neu.** Kräfte vergisst die Physik nach
+  jedem Schritt.
 - **Sprünge als Impuls**, also als kurzer Stoß, nicht als einfach gesetzte Geschwindigkeit.
+  Geschwindigkeit setzen heißt: dem Ding einfach befehlen „du fliegst jetzt so schnell“, ohne dass
+  eine Kraft es angeschoben hat. Ein Stoß dagegen geht durch den Solver, der dabei auch an Gelenke
+  und Boden denkt.
 - **Keine Geschwindigkeiten an Körpern mit Gelenken oder Kontakten setzen.** Das umgeht den Solver,
   kämpft gegen seine Regeln und pumpt Energie hinein.
 - **Keine Hilfskräfte für Roboter.** „In der echten Welt gibt es sie auch nicht.“
@@ -417,13 +438,21 @@ Daraus folgen Kerns Gegenmittel:
 | Gefahr | Gegenmittel |
 |---|---|
 | Das Übersetzungsprogramm sortiert Rechnungen um, damit es schneller geht | verboten |
-| Mehrere Rechenkerne addieren in wechselnder Reihenfolge | feste Reihenfolge, die Physik rechnet mit einem einzigen Faden |
+| Mehrere Rechenkerne addieren in wechselnder Reihenfolge | feste Reihenfolge, die Physik rechnet alles nacheinander |
 | Manche Prozessoren nehmen eine Abkürzung für „mal und plus“ | abgeschaltet, überall |
 | Jedes System rechnet Sinus & Co. minimal anders | Kern bringt seine eigene Sinus-Rechnung mit |
+
+Das **Übersetzungsprogramm** macht aus Kerns Programmtext die Befehle für den Prozessor. Die
+**Abkürzung**: Manche Prozessoren rechnen „a mal b plus c“ in einem Zug und runden nur einmal
+statt zweimal. Das ist sogar genauer, aber eben anders als auf einem Gerät, das zweimal rundet.
+
+**Sinus & Co.** sind Rechnungen mit Winkeln, etwa: „In welche Richtung zeigt ein Arm, der um 30 Grad
+gedreht ist?“ Die Physik braucht sie ständig.
 | Die Bildzeit schwankt | fester Schritt, Zeit zählt Schritte |
 | Zufall | eigener Zufallsgenerator mit festen Startzahlen |
 
-Plus, Mal und Wurzel schreibt der Standard für Kommazahlen exakt vor, Sinus und Co. aber nicht. Darum
+Plus, Mal und Wurzel schreibt der weltweite Standard für Kommazahlen exakt vor, Sinus und Co. aber
+nicht: Für sie gibt es keine Vorschrift, wie genau gerundet wird. Darum
 reicht es nicht, nur die Reihenfolge festzulegen: Kern muss auch die Rechenregeln für Sinus selbst
 mitbringen.
 
