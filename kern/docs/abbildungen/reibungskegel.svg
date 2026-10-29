@@ -6,11 +6,11 @@
   <path class="l p" d="M150,128 L150,16"/>
   <text x="147" y="13" class="i m">n</text>
   <path class="lk p" d="M150,128 L140,46"/>
-  <text x="146" y="38" class="k e">{{innen}}</text>
+  <text x="93" y="47" class="k e">{{innen}}</text>
   <path class="lk p" d="M150,128 L194.93,53.12"/>
   <text x="200.93" y="56.12" class="k">{{rand}}</text>
   <path class="ld" d="M150,88 A40,40 0 0 0 129.42,93.7"/>
-  <text x="124" y="102" class="k e">arctan μ</text>
+  <text x="124" y="102" class="k e">{{winkel}}</text>
   <circle class="dot" cx="150" cy="128" r="2.2"/>
   <text x="268" y="131" class="k">{{ebene}}</text>
   <text x="218.4" y="27" class="k a">{{kegel}}</text>

@@ -14,6 +14,6 @@
   <text x="320" y="33" class="k m">{{s2a}}</text>
   <text x="320" y="43" class="k m">{{s2b}}</text>
   <path class="l p" d="M248,30 L261,30"/>
-  <path class="la p" d="M320,60 L320,70 L60,70 L60,53"/>
+  <path class="la pa" d="M320,53 L320,70 L60,70 L60,53"/>
   <text x="190" y="84" class="m a">{{rueck}}</text>
 </svg>

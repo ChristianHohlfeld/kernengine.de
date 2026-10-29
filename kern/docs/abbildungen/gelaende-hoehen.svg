@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 156">
-  <!-- Gelände-Kachel (build_terrain_tile, src/geo/roads.cpp): Gitterecken mit eigener Höhe, jedes Quadrat entlang der Diagonale Südwest–Nordost in zwei Dreiecke geteilt; rechts dieselben Höhen schräg von oben, schattiert nach der Neigung (Höhen wie in gelb 5.10). -->
+  <!-- Gelände-Kachel (build_terrain_tile, src/geo/roads.cpp): Gitterecken mit eigener Höhe, jedes Quadrat entlang der Diagonale Südwest–Nordost in zwei Dreiecke geteilt; rechts dieselben Höhen schräg von oben, schattiert nach der Neigung (Höhen wie in gelb 5.10, an den Punkten in Metern). -->
   <path class="ld" d="M30,118 L74,118 L74,74 L30,74 Z"/>
   <path class="lg" d="M30,118 L74,74"/>
   <path class="ld" d="M74,118 L118,118 L118,74 L74,74 Z"/>
@@ -17,7 +17,7 @@
   <circle class="fw" cx="30" cy="30" r="7"/><text x="30" y="33" class="k m t">2</text>
   <circle class="fw" cx="74" cy="30" r="7"/><text x="74" y="33" class="k m t">3</text>
   <circle class="fw" cx="118" cy="30" r="7"/><text x="118" y="33" class="k m t">5</text>
-  <text x="74" y="14" class="m t">{{titel0}}</text>
+  <text x="80" y="14" class="m t">{{titel0}}</text>
   <path class="lg gs" d="M206,134 L306,134 L366,94 L266,94 Z"/>
   <path class="lg gs" d="M206,134 L206,125"/>
   <path class="lg gs" d="M306,134 L306,116"/>
@@ -41,5 +41,14 @@
   <circle class="dot" cx="316" cy="67" r="1.4"/>
   <circle class="dot" cx="366" cy="49" r="1.4"/>
   <text x="290" y="14" class="m t">{{titel1}}</text>
+  <text x="201" y="128" class="k t e">1</text>
+  <text x="256" y="132.5" class="k t m">1</text>
+  <text x="310" y="119" class="k t">2</text>
+  <text x="231" y="104" class="k t e">1</text>
+  <text x="293" y="100" class="k t">2</text>
+  <text x="340" y="81" class="k t">4</text>
+  <text x="261" y="78" class="k t e">2</text>
+  <text x="316" y="63" class="k t m">3</text>
+  <text x="370" y="52" class="k t">5</text>
   <text x="2" y="150" class="k h">{{fuss}}</text>
 </svg>

@@ -36,7 +36,7 @@
   <circle class="dota" cx="252" cy="66" r="2"/>
   <circle class="dota" cx="292" cy="34" r="2"/>
   <text x="234" y="91.6">{{rechts}}</text>
-  <text x="56" y="117.84">{{links}}</text>
+  <text x="56" y="108">{{links}}</text>
   <text x="308" y="143.9">{{xachse}}</text>
   <text x="40" y="17.4" class="m">{{yachse}}</text>
 </svg>

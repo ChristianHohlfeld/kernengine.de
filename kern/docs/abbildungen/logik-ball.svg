@@ -24,13 +24,13 @@
   <path class="fa" d="M2,79 L2,69 Q2,66 5,66 L103,66 Q106,66 106,69 L106,79 Z"/>
   <text x="7" y="75.6" class="k t">Robot Camera Sees</text>
   <text x="7" y="90" class="k">Other: Ball</text>
-  <rect class="fw" x="2" y="118" width="84" height="30" rx="3"/>
-  <path class="fa" d="M2,131 L2,121 Q2,118 5,118 L83,118 Q86,118 86,121 L86,131 Z"/>
+  <rect class="fw" x="2" y="118" width="72" height="30" rx="3"/>
+  <path class="fa" d="M2,131 L2,121 Q2,118 5,118 L71,118 Q74,118 74,121 L74,131 Z"/>
   <text x="7" y="127.6" class="k t">Get Variable</text>
   <text x="7" y="142" class="k">Ball Seen</text>
-  <rect class="fw" x="104" y="122" width="40" height="18" rx="3"/>
-  <path class="fa" d="M104,135 L104,125 Q104,122 107,122 L141,122 Q144,122 144,125 L144,135 Z"/>
-  <text x="109" y="131.6" class="k t">NOT</text>
+  <rect class="fw" x="92" y="122" width="40" height="18" rx="3"/>
+  <path class="fa" d="M92,135 L92,125 Q92,122 95,122 L129,122 Q132,122 132,125 L132,135 Z"/>
+  <text x="97" y="131.6" class="k t">NOT</text>
   <rect class="fw" x="160" y="74" width="38" height="30" rx="3"/>
   <path class="fa" d="M160,87 L160,77 Q160,74 163,74 L195,74 Q198,74 198,77 L198,87 Z"/>
   <text x="165" y="83.6" class="k t">AND</text>
@@ -40,10 +40,10 @@
   <path class="l p" d="M308,20 L308,35"/>
   <text x="104" y="90" class="k e a">Visible</text>
   <path class="lad gs pa" d="M106,87 L150,87 L150,84 L159,84"/>
-  <path class="lad gs pa" d="M86,131 L103,131"/>
-  <path class="lad gs pa" d="M144,131 L152,131 L152,97 L159,97"/>
+  <path class="lad gs pa" d="M74,131 L91,131"/>
+  <path class="lad gs pa" d="M132,131 L152,131 L152,97 L159,97"/>
   <path class="lad gs pa" d="M198,89 L206,89 L206,45 L213,45"/>
-  <path class="lad gs pa" d="M106,87 L112,87 L112,154 L273,154 L273,122 L277,122"/>
+  <path class="lad gs pa" d="M106,87 L140,87 L140,154 L273,154 L273,122 L277,122"/>
   <path class="lad gs pa" d="M273,122 L273,62 L277,62"/>
   <text x="190" y="150" class="k a m">Visible → Value</text>
   <text x="2" y="170" class="k h">{{legende}}</text>

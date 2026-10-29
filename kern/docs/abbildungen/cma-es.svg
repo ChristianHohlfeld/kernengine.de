@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 150">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 162">
   <!-- CMA-ES schematisch: Höhenlinien eines schrägen Tals (grau), Kandidaten einer Generation (Punkte) und ihr Mittelpunkt. Die Wolke ist anfangs rund und groß, wird entlang des Tals gestreckt und zuletzt schmal (blau A.13). Punkte gleichmäßig in der Ellipse verteilt (Sonnenblumenmuster). -->
   <ellipse class="lg" cx="73.32" cy="52" rx="15" ry="4.5" transform="rotate(-30 73.32 52)"/>
   <ellipse class="lg" cx="73.32" cy="52" rx="30" ry="9.0" transform="rotate(-30 73.32 52)"/>
@@ -66,4 +66,5 @@
   <circle class="dota" cx="16" cy="140" r="3.2"/><text x="23" y="143" class="k">{{mitte}}</text>
   <circle class="dot" cx="140" cy="140" r="1.5"/><text x="146" y="143" class="k">{{kandidat}}</text>
   <path class="ld" d="M246,137.5 L251,142.5 M246,142.5 L251,137.5"/><text x="256" y="143" class="k">{{ziel}}</text>
+  <ellipse class="lg" cx="16" cy="155" rx="7" ry="3"/><text x="28" y="158" class="k">{{hoehen}}</text>
 </svg>

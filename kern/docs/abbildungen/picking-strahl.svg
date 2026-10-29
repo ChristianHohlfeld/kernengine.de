@@ -6,9 +6,9 @@
   <path class="fw" d="M80,32 L80,96"/><path class="l" d="M80,32 L80,96"/>
   <text x="80" y="26" class="k m">{{schirm}}</text>
   <rect class="fd" x="250" y="50" width="60" height="62"/>
-  <text x="280.0" y="102" class="m w">{{haus}}</text>
+  <text x="280.0" y="102" class="m">{{haus}}</text>
   <rect class="dota" x="77.5" y="62.08" width="5" height="5"/>
-  <path class="la p" d="M22,60 L249,78"/>
+  <path class="la pa" d="M22,60 L249,78"/>
   <path class="lad gs" d="M250,78 L360,86.68"/>
   <circle class="dotw" cx="250" cy="78" r="2.6"/>
   <text x="86" y="78.58" class="k a">{{pixel}}</text>

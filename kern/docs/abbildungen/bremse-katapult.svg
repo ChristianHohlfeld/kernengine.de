@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 96">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 10 380 86">
   <!-- Selbst gebaute Bremse F = −c·v, explizit gerechnet (gelb C, blau C.2.3): bei einem leichten Glied dreht ein einziger Schritt das Tempo um. Pfeillängen schematisch. -->
   <text x="88" y="29" class="e">{{vorher}}</text>
-  <circle class="dot" cx="200" cy="26" r="3"/><path class="l p" d="M200,26 L240,26"/>
+  <circle class="dot" cx="200" cy="26" r="3"/><path class="l p" d="M203,26 L240,26"/>
   <text x="248" y="29" class="k">{{v1}}</text>
   <text x="88" y="67" class="e">{{nachher}}</text>
-  <circle class="dot" cx="200" cy="64" r="3"/><path class="la p" d="M200,64 L96,64"/>
+  <circle class="dot" cx="200" cy="64" r="3"/><path class="la pa" d="M197,64 L96,64"/>
   <text x="208" y="67" class="k a">{{v2}}</text>
   <text x="2" y="92" class="k h">{{fuss}}</text>
 </svg>

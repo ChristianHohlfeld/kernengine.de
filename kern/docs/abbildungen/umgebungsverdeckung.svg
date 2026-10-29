@@ -10,12 +10,15 @@
   <path class="l p" d="M190,132 L190,102"/>
   <text x="194" y="108" class="i">n</text>
   <circle class="dot" cx="190" cy="132" r="2.4"/>
+  <text x="20" y="146" class="k"><tspan class="i">n</tspan> = {{normale}}</text>
   <text x="190" y="144" class="k m">{{punkt}}</text>
   <text x="112" y="54" class="e">{{h0}}</text>
   <text x="268" y="54">{{h1}}</text>
   <text x="190" y="20" class="m a">{{himmel}}</text>
   <path class="lad" d="M190,24 L190,78"/>
   <g data-nur="gelb"><text x="148" y="126" class="k m">45°</text><text x="232" y="126" class="k m">45°</text></g>
-  <text x="80.0" y="100.0" class="m w">{{wand}}</text>
-  <text x="300.0" y="100.0" class="m w">{{wand}}</text>
+  <text x="80.0" y="100.0" class="m">{{wand}}</text>
+  <text x="80.0" y="110.0" class="m">{{wand2}}</text>
+  <text x="300.0" y="100.0" class="m">{{wand}}</text>
+  <text x="300.0" y="110.0" class="m">{{wand2}}</text>
 </svg>

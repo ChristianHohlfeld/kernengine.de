@@ -2,13 +2,13 @@
   <!-- Eine Würfelecke (gelb 5): drei Seiten treffen sich in einem Punkt, jede mit eigener Normale; für die Grafikkarte sind das drei verschiedene Ecken. -->
   <path class="f" d="M110,50 L180,50 L180,120 L110,120 Z"/><path class="ffd" d="M110,50 L140,28 L210,28 L180,50 Z"/><path class="l" d="M110,50 L140,28 L210,28 L180,50 Z"/><path class="fd" d="M180,50 L210,28 L210,98 L180,120 Z"/>
   <circle class="dota" cx="180" cy="50" r="3"/>
-  <path class="la p" d="M180,50 L180,4"/>
-  <path class="la p" d="M180,50 L232,50"/>
-  <path class="la p" d="M180,50 L154,76"/>
+  <path class="la pa" d="M180,50 L180,4"/>
+  <path class="la pa" d="M180,50 L232,50"/>
+  <path class="la pa" d="M180,50 L126,104"/>
   <text x="185" y="10" class="k">{{oben}}</text>
   <text x="236" y="53" class="k">{{rechts}}</text>
   <text x="104" y="80" class="k e">{{vorn}}</text>
-  <path class="ld" d="M106,78 L153,77"/>
+  <path class="ld" d="M106,78 L149,80"/>
   <text x="244" y="96" class="k">{{fuss1}}</text>
   <text x="244" y="106" class="k">{{fuss2}}</text>
 </svg>

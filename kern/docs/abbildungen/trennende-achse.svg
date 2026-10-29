@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 132">
   <!-- Trennende Achse (gelb C, SAT): Licht aus einer Richtung wirft die Schatten zweier Formen an die Wand; bleibt eine Lücke, berühren sich die Formen sicher nicht (Schatten hier vereinfacht als Ausdehnung senkrecht zum Licht). -->
   <circle class="fw" cx="36" cy="64" r="10"/>
-  <text x="36" y="90" class="k m">{{lampe}}</text>
+  <text x="36" y="88" class="k m">{{lampe}}</text>
+  <text x="36" y="97" class="k m">{{lampe2}}</text>
   <path class="lad" d="M56,28 L299,28"/>
   <path class="lad" d="M56,40 L299,40"/>
   <path class="lad" d="M56,52 L299,52"/>
@@ -13,7 +14,7 @@
   <path class="l" d="M300,14 L300,114"/>
   <rect class="ffd" x="301" y="26" width="7" height="26"/>
   <rect class="ffd" x="301" y="75" width="7" height="26"/>
-  <path class="la ps p" d="M314,53 L314,74"/>
+  <path class="la pas pa" d="M314,53 L314,74"/>
   <text x="320" y="62" class="k a">{{luecke1}}</text>
   <text x="320" y="72" class="k a">{{luecke2}}</text>
   <text x="300" y="126" class="k m">{{wand}}</text>

@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 158">
   <!-- Hüllkörper-Hierarchie (BVH): links räumlich (Hüllquader um Dreiecke, verschachtelt), rechts derselbe Baum. Kern: Bvh in bvh.h, Median-Teilung. -->
   <g transform="translate(0,12)">
-  <path class="ffa" d="M22,45.6 L38,44 L29.2,33.6 Z"/>
-  <path class="ffa" d="M44,35.6 L60,34 L51.2,23.6 Z"/>
-  <path class="ffa" d="M32,97.6 L48,96 L39.2,85.6 Z"/>
-  <path class="ffa" d="M54,111.6 L70,110 L61.2,99.6 Z"/>
-  <path class="ffa" d="M104,39.6 L120,38 L111.2,27.6 Z"/>
-  <path class="ffa" d="M126,53.6 L142,52 L133.2,41.6 Z"/>
-  <path class="ffa" d="M110,101.6 L126,100 L117.2,89.6 Z"/>
-  <path class="ffa" d="M132,93.6 L148,92 L139.2,81.6 Z"/>
+  <path class="fa" d="M22,45.6 L38,44 L29.2,33.6 Z"/>
+  <path class="fa" d="M44,35.6 L60,34 L51.2,23.6 Z"/>
+  <path class="fa" d="M32,97.6 L48,96 L39.2,85.6 Z"/>
+  <path class="fa" d="M54,111.6 L70,110 L61.2,99.6 Z"/>
+  <path class="fa" d="M104,39.6 L120,38 L111.2,27.6 Z"/>
+  <path class="fa" d="M126,53.6 L142,52 L133.2,41.6 Z"/>
+  <path class="fa" d="M110,101.6 L126,100 L117.2,89.6 Z"/>
+  <path class="fa" d="M132,93.6 L148,92 L139.2,81.6 Z"/>
   <rect class="l" x="9" y="9" width="152" height="118"/>
   <rect class="lad gs" x="14" y="14" width="64" height="108"/>
   <rect class="lad gs" x="96" y="18" width="60" height="94"/>
@@ -17,6 +17,8 @@
   <rect class="ld" x="101" y="23" width="44" height="36"/>
   <rect class="ld" x="107" y="77" width="44" height="30"/>
   <text x="9" y="5" class="k">{{alle}}</text>
+  <path class="la pa" d="M34,1 L62,124"/>
+  <text x="40" y="5" class="k a">{{strahl}}</text>
   <text x="46" y="138" class="k m a">{{links}}</text>
   <text x="126" y="138" class="k m a">{{rechts}}</text>
   <rect class="f" x="260" y="14" width="60" height="18" rx="3"/>
@@ -26,20 +28,20 @@
   <rect class="fa" x="305" y="58" width="60" height="18" rx="3"/>
   <text x="335" y="70.3" class="m">{{rechts}}</text>
   <rect class="fw" x="204" y="102" width="38" height="22" rx="3"/>
-  <path class="ffa" d="M210.5,116.85 L221.5,115.75 L215.45,108.6 Z"/>
-  <path class="ffa" d="M224.5,116.85 L235.5,115.75 L229.45,108.6 Z"/>
+  <path class="fa" d="M210.5,116.85 L221.5,115.75 L215.45,108.6 Z"/>
+  <path class="fa" d="M224.5,116.85 L235.5,115.75 L229.45,108.6 Z"/>
   <path class="l" d="M245,76 L223,102"/>
   <rect class="fw" x="248" y="102" width="38" height="22" rx="3"/>
-  <path class="ffa" d="M254.5,116.85 L265.5,115.75 L259.45,108.6 Z"/>
-  <path class="ffa" d="M268.5,116.85 L279.5,115.75 L273.45,108.6 Z"/>
+  <path class="fa" d="M254.5,116.85 L265.5,115.75 L259.45,108.6 Z"/>
+  <path class="fa" d="M268.5,116.85 L279.5,115.75 L273.45,108.6 Z"/>
   <path class="l" d="M245,76 L267,102"/>
   <rect class="fw" x="294" y="102" width="38" height="22" rx="3"/>
-  <path class="ffa" d="M300.5,116.85 L311.5,115.75 L305.45,108.6 Z"/>
-  <path class="ffa" d="M314.5,116.85 L325.5,115.75 L319.45,108.6 Z"/>
+  <path class="fa" d="M300.5,116.85 L311.5,115.75 L305.45,108.6 Z"/>
+  <path class="fa" d="M314.5,116.85 L325.5,115.75 L319.45,108.6 Z"/>
   <path class="l" d="M335,76 L313,102"/>
   <rect class="fw" x="338" y="102" width="38" height="22" rx="3"/>
-  <path class="ffa" d="M344.5,116.85 L355.5,115.75 L349.45,108.6 Z"/>
-  <path class="ffa" d="M358.5,116.85 L369.5,115.75 L363.45,108.6 Z"/>
+  <path class="fa" d="M344.5,116.85 L355.5,115.75 L349.45,108.6 Z"/>
+  <path class="fa" d="M358.5,116.85 L369.5,115.75 L363.45,108.6 Z"/>
   <path class="l" d="M335,76 L357,102"/>
   <path class="l" d="M290,32 L245,58"/>
   <path class="l" d="M290,32 L335,58"/>

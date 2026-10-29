@@ -1,4 +1,12 @@
 {
+  "doppler": {
+    "de": {"faehrt": "fährt", "vorn1": "vorn: Wellen dicht", "vorn2": "→ höherer Ton", "hinten1": "hinten: Wellen weit", "hinten2": "→ tieferer Ton"},
+    "en": {"faehrt": "driving", "vorn1": "in front: waves close", "vorn2": "→ higher pitch", "hinten1": "behind: waves wide", "hinten2": "→ lower pitch"}
+  },
+  "tiefe-lineal": {
+    "de": {"kopf": "blau: gleich große Schritte im Tiefenpuffer, grau: Entfernung in Metern", "m0": "0 m", "m10": "10 m", "kamera": "Kamera", "nah": "nahe Grenze: Striche dicht → fein", "fern": "fern: Striche weit → grob"},
+    "en": {"kopf": "blue: equal steps in the depth buffer, gray: distance in meters", "m0": "0 m", "m10": "10 m", "kamera": "camera", "nah": "near limit: marks close → fine", "fern": "far: marks wide apart → coarse"}
+  },
   "neuron": {
     "de": {"x1": "x₁", "x2": "x₂", "x3": "x₃", "w1": "w₁", "w2": "w₂", "w3": "w₃", "summe": "Σ + b", "z": "z", "akt": "σ(z)", "h": "h"},
     "en": {"x1": "x₁", "x2": "x₂", "x3": "x₃", "w1": "w₁", "w2": "w₂", "w3": "w₃", "summe": "Σ + b", "z": "z", "akt": "σ(z)", "h": "h"},
@@ -19,20 +27,20 @@
       "en": {"grenze": "−1 is never reached", "rechts": "stays as it is", "links": "squeezed", "xachse": "input", "yachse": "output"}
     },
     "gelb": {
-      "de": {"grenze": "nie unter −1", "rechts": "positiv: bleibt", "links": "negativ: gestaucht"},
+      "de": {"grenze": "nie unter −1", "rechts": "positiv: bleibt", "links": "negativ: zusammengedrückt"},
       "en": {"grenze": "never below −1", "rechts": "positive: stays", "links": "negative: squeezed"}
     }
   },
   "ppo-clip": {
-    "de": {"t08": "0,8", "t10": "1", "t12": "1,2", "titel0": "Â > 0", "titel1": "Â < 0", "flach": "Gradient 0", "weiter": "Gradient fließt", "yachse": "L", "xachse": "ρ"},
-    "en": {"t08": "0.8", "t10": "1", "t12": "1.2", "titel0": "Â > 0", "titel1": "Â < 0", "flach": "gradient 0", "weiter": "gradient flows", "yachse": "L", "xachse": "ρ"},
+    "de": {"t08": "0,8", "t10": "1", "t12": "1,2", "titel0": "Â > 0", "titel1": "Â < 0", "flach": "Gradient", "flach2": "= 0", "weiter": "Gradient", "weiter2": "fließt", "weiter0": "Gradient", "weiter02": "fließt", "yachse": "L", "xachse": "ρ"},
+    "en": {"t08": "0.8", "t10": "1", "t12": "1.2", "titel0": "Â > 0", "titel1": "Â < 0", "flach": "gradient", "flach2": "= 0", "weiter": "gradient", "weiter2": "flows", "weiter0": "gradient", "weiter02": "flows", "yachse": "L", "xachse": "ρ"},
     "gruen": {
-      "de": {"titel0": "gute Aktion", "titel1": "schlechte Aktion", "flach": "hier Schluss", "weiter": "wird korrigiert", "yachse": "Nutzen", "xachse": "neu/alt"},
-      "en": {"titel0": "good action", "titel1": "bad action", "flach": "stop here", "weiter": "gets corrected", "yachse": "gain", "xachse": "new/old"}
+      "de": {"titel0": "gute Aktion", "titel1": "schlechte Aktion", "flach": "hier", "flach2": "Schluss", "weiter": "wird", "weiter2": "korrigiert", "weiter0": "wird", "weiter02": "verstärkt", "yachse": "Nutzen", "xachse": "neu/alt"},
+      "en": {"titel0": "good action", "titel1": "bad action", "flach": "stop", "flach2": "here", "weiter": "gets", "weiter2": "corrected", "weiter0": "gets", "weiter02": "reinforced", "yachse": "gain", "xachse": "new/old"}
     },
     "gelb": {
-      "de": {"titel0": "gute Aktion", "titel1": "schlechte Aktion", "flach": "hier Schluss", "weiter": "wird korrigiert", "yachse": "Nutzen", "xachse": "neu/alt"},
-      "en": {"titel0": "good action", "titel1": "bad action", "flach": "stop here", "weiter": "gets corrected", "yachse": "gain", "xachse": "new/old"}
+      "de": {"titel0": "gute Aktion", "titel1": "schlechte Aktion", "flach": "hier", "flach2": "Schluss", "weiter": "wird", "weiter2": "korrigiert", "weiter0": "wird", "weiter02": "verstärkt", "yachse": "Nutzen", "xachse": "neu/alt"},
+      "en": {"titel0": "good action", "titel1": "bad action", "flach": "stop", "flach2": "here", "weiter": "gets", "weiter2": "corrected", "weiter0": "gets", "weiter02": "reinforced", "yachse": "gain", "xachse": "new/old"}
     }
   },
   "tonemapping": {
@@ -49,7 +57,11 @@
   },
   "integratoren": {
     "de": {"name0": "explizit", "name1": "semi-implizit", "name2": "implizit", "verhalten0": "wächst", "verhalten1": "bleibt", "verhalten2": "klingt ab", "xachse": "Schritte", "kopf": "Feder, h·ω = 0,25, Start bei 1; gestrichelt: ±1"},
-    "en": {"name0": "explicit", "name1": "semi-implicit", "name2": "implicit", "verhalten0": "grows", "verhalten1": "stays", "verhalten2": "decays", "xachse": "steps", "kopf": "spring, h·ω = 0.25, starting at 1; dashed: ±1"}
+    "en": {"name0": "explicit", "name1": "semi-implicit", "name2": "implicit", "verhalten0": "grows", "verhalten1": "stays", "verhalten2": "decays", "xachse": "steps", "kopf": "spring, h·ω = 0.25, starting at 1; dashed: ±1"},
+    "gruen": {
+      "de": {"name0": "vorwärts", "name1": "halb-halb", "name2": "rückwärts", "kopf": "Feder, Start bei 1; gestrichelt: ±1"},
+      "en": {"name0": "forward", "name1": "half and half", "name2": "backward", "kopf": "spring, starting at 1; dashed: ±1"}
+    }
   },
   "gradientenabstieg": {
     "de": {"bergab": "Schritt bergab", "steigung": "Steigung 2", "kugel": "Kugel bei r = 1", "yachse": "Verlust", "xachse": "Regler r"},
@@ -60,20 +72,20 @@
     "en": {"titel0": "wide bell (large σ)", "titel1": "narrow bell (small σ)", "mitte": "“roughly this”", "folge0": "much trying out", "folge1": "little trying out"}
   },
   "sichtpyramide": {
-    "de": {"kamera": "Kamera", "fern": "Far-Plane", "nah": "Near-Plane", "abstand": "Abstand < −r", "a1": "verworfen:", "a2": "Mittelpunkt mehr als r", "a3": "hinter einer Ebene", "b1": "sichtbar:", "b2": "innen, wird gezeichnet", "b3": "", "c1": "auf der Ebene:", "c2": "wird gezeichnet", "c3": "(konservativ)"},
-    "en": {"kamera": "camera", "fern": "far plane", "nah": "near plane", "abstand": "distance < −r", "a1": "rejected:", "a2": "centre more than r", "a3": "behind a plane", "b1": "visible:", "b2": "inside, is drawn", "b3": "", "c1": "on the plane:", "c2": "is drawn", "c3": "(conservative)"},
+    "de": {"kamera": "Kamera", "fern": "Far-Plane", "nah": "Near-Plane", "abstand": "Abstand < −r", "rdef": "r: Radius der Hüllkugel", "a1": "verworfen:", "a2": "Mittelpunkt mehr als r", "a3": "hinter einer Ebene", "b1": "sichtbar:", "b2": "innen, wird gezeichnet", "b3": "", "c1": "auf der Ebene:", "c2": "wird gezeichnet", "c3": "(konservativ)"},
+    "en": {"kamera": "camera", "fern": "far plane", "nah": "near plane", "abstand": "distance < −r", "rdef": "r: bounding-sphere radius", "a1": "rejected:", "a2": "center more than r", "a3": "behind a plane", "b1": "visible:", "b2": "inside, is drawn", "b3": "", "c1": "on the plane:", "c2": "is drawn", "c3": "(conservative)"},
     "gruen": {
-      "de": {"fern": "Ferngrenze", "nah": "Nahgrenze", "abstand": "ganz draußen", "a1": "ganz draußen:", "a2": "wird übersprungen", "b1": "drinnen:", "b2": "wird gemalt", "c1": "halb am Rand:", "c2": "wird gemalt", "a3": "", "c3": ""},
-      "en": {"fern": "far limit", "nah": "near limit", "abstand": "fully outside", "a1": "fully outside:", "a2": "is skipped", "b1": "inside:", "b2": "is drawn", "c1": "half on the edge:", "c2": "is drawn", "a3": "", "c3": ""}
+      "de": {"fern": "Ferngrenze", "nah": "Nahgrenze", "abstand": "Abstand zur Grenze", "rdef": "", "a1": "ganz draußen:", "a2": "wird übersprungen", "b1": "drinnen:", "b2": "wird gemalt", "c1": "halb am Rand:", "c2": "wird gemalt", "a3": "", "c3": ""},
+      "en": {"fern": "far limit", "nah": "near limit", "abstand": "distance to the limit", "rdef": "", "a1": "fully outside:", "a2": "is skipped", "b1": "inside:", "b2": "is drawn", "c1": "half on the edge:", "c2": "is drawn", "a3": "", "c3": ""}
     },
     "gelb": {
-      "de": {"fern": "ferne Wand", "nah": "nahe Wand", "abstand": "mehr als r draußen", "a1": "draußen:", "a2": "weg, mehr als r", "a3": "hinter der Wand", "b1": "drin:", "b2": "wird gezeichnet", "c1": "auf der Kante:", "c2": "wird gezeichnet", "c3": ""},
-      "en": {"fern": "far wall", "nah": "near wall", "abstand": "more than r outside", "a1": "outside:", "a2": "gone, more than r", "a3": "behind the wall", "b1": "inside:", "b2": "is drawn", "c1": "on the edge:", "c2": "is drawn", "c3": ""}
+      "de": {"fern": "ferne Wand", "nah": "nahe Wand", "abstand": "mehr als r draußen", "rdef": "r: Radius der Kugel", "a1": "draußen:", "a2": "weg, mehr als r", "a3": "hinter der Wand", "b1": "drin:", "b2": "wird gezeichnet", "c1": "auf der Kante:", "c2": "wird gezeichnet", "c3": ""},
+      "en": {"fern": "far wall", "nah": "near wall", "abstand": "more than r outside", "rdef": "r: radius of the sphere", "a1": "outside:", "a2": "gone, more than r", "a3": "behind the wall", "b1": "inside:", "b2": "is drawn", "c1": "on the edge:", "c2": "is drawn", "c3": ""}
     }
   },
   "schattenkarte": {
     "de": {"sonne": "Sonne", "strahlen": "parallele Strahlen (orthografische Projektion)", "gespeichert": "gespeicherte Tiefe: Dach", "schatten1": "Boden hinter dem Dach: Tiefe", "schatten2": "größer als gespeichert → Schatten"},
-    "en": {"sonne": "Sun", "strahlen": "parallel rays (orthographic projection)", "gespeichert": "stored depth: roof", "schatten1": "ground behind the roof: depth", "schatten2": "greater than stored → shadow"},
+    "en": {"sonne": "sun", "strahlen": "parallel rays (orthographic projection)", "gespeichert": "stored depth: roof", "schatten1": "ground behind the roof: depth", "schatten2": "greater than stored → shadow"},
     "gruen": {
       "de": {"strahlen": "parallele Strahlen", "gespeichert": "notierte Entfernung: Dach", "schatten1": "Boden dahinter: weiter weg", "schatten2": "als notiert → Schatten"},
       "en": {"strahlen": "parallel rays", "gespeichert": "noted distance: roof", "schatten1": "ground behind: farther away", "schatten2": "than noted → shadow"}
@@ -85,38 +97,38 @@
   },
   "rasterisierung": {
     "de": {"innen1": "Pixelmittelpunkt im Dreieck", "innen2": "→ Fragment", "aussen1": "Pixelmittelpunkt", "aussen2": "außerhalb"},
-    "en": {"innen1": "pixel centre in the triangle", "innen2": "→ fragment", "aussen1": "pixel centre", "aussen2": "outside"},
+    "en": {"innen1": "pixel center in the triangle", "innen2": "→ fragment", "aussen1": "pixel center", "aussen2": "outside"},
     "gelb": {
-      "de": {"innen1": "Pixelmitte im Dreieck", "innen2": "→ wird gemalt", "aussen1": "Pixelmitte", "aussen2": "draußen"},
-      "en": {"innen1": "pixel centre in triangle", "innen2": "→ gets painted", "aussen1": "pixel centre", "aussen2": "outside"}
+      "de": {"innen1": "Pixelmitte im Dreieck", "innen2": "→ wird ein Fragment", "aussen1": "Pixelmitte", "aussen2": "draußen"},
+      "en": {"innen1": "pixel center in triangle", "innen2": "→ becomes a fragment", "aussen1": "pixel center", "aussen2": "outside"}
     }
   },
   "bvh": {
-    "de": {"alle": "alle", "links": "links", "rechts": "rechts", "blaetter": "Blätter: Dreiecke"},
-    "en": {"alle": "all", "links": "left", "rechts": "right", "blaetter": "leaves: triangles"},
+    "de": {"alle": "alle", "links": "links", "rechts": "rechts", "blaetter": "Blätter: Dreiecke", "strahl": "Strahl: trifft nur links, rechts fällt weg"},
+    "en": {"alle": "all", "links": "left", "rechts": "right", "blaetter": "leaves: triangles", "strahl": "ray: hits only the left, the right is skipped"},
     "gruen": {
       "de": {"blaetter": "unten: Dreiecke"},
       "en": {"blaetter": "at the bottom: triangles"}
     }
   },
   "umgebungsverdeckung": {
-    "de": {"punkt": "Pixel", "h0": "Horizont h₀", "h1": "Horizont h₁", "himmel": "sichtbarer Himmel: Bogen zwischen h₀ und h₁", "wand": "Nachbarfläche"},
-    "en": {"punkt": "pixel", "h0": "horizon h₀", "h1": "horizon h₁", "himmel": "visible sky: arc between h₀ and h₁", "wand": "neighbouring surface"},
+    "de": {"punkt": "Pixel", "h0": "Horizont h₀", "h1": "Horizont h₁", "himmel": "sichtbarer Himmel: Bogen zwischen h₀ und h₁", "wand": "Nachbarfläche", "wand2": "", "normale": "Normale"},
+    "en": {"punkt": "pixel", "h0": "horizon h₀", "h1": "horizon h₁", "himmel": "visible sky: arc between h₀ and h₁", "wand": "neighboring", "wand2": "surface", "normale": "normal"},
     "gruen": {
       "de": {"punkt": "Punkt", "h0": "Kante links", "h1": "Kante rechts", "himmel": "frei: nur der Bogen dazwischen", "wand": "Wand"},
-      "en": {"punkt": "point", "h0": "left edge", "h1": "right edge", "himmel": "free: only the arc in between", "wand": "wall"}
+      "en": {"punkt": "point", "h0": "left edge", "h1": "right edge", "himmel": "free: only the arc in between", "wand": "wall", "wand2": ""}
     },
     "gelb": {
       "de": {"punkt": "Punkt", "h0": "Oberkante", "h1": "Oberkante", "himmel": "sichtbar: 90°", "wand": "Mauer"},
-      "en": {"punkt": "point", "h0": "top edge", "h1": "top edge", "himmel": "visible: 90°", "wand": "wall"}
+      "en": {"punkt": "point", "h0": "top edge", "h1": "top edge", "himmel": "visible: 90°", "wand": "wall", "wand2": ""}
     }
   },
   "reibungskegel": {
-    "de": {"innen": "Kraft innen → Haften", "rand": "Kraft am Rand → Gleiten", "ebene": "Kontaktebene", "kegel": "Reibungskegel"},
-    "en": {"innen": "force inside → stick", "rand": "force on the boundary → slide", "ebene": "contact plane", "kegel": "friction cone"},
+    "de": {"innen": "Kraft innen → Haften", "rand": "Kraft am Rand → Gleiten", "ebene": "Kontaktebene", "kegel": "Reibungskegel", "winkel": "arctan μ"},
+    "en": {"innen": "force inside → stick", "rand": "force on the boundary → slide", "ebene": "contact plane", "kegel": "friction cone", "winkel": "arctan μ"},
     "gelb": {
-      "de": {"innen": "Kraft innerhalb: Haften", "rand": "auf dem Rand: Rutschen", "ebene": "Kontaktfläche"},
-      "en": {"innen": "force inside: sticking", "rand": "on the edge: sliding", "ebene": "contact surface"}
+      "de": {"innen": "Kraft innerhalb: Haften", "rand": "auf dem Rand: Rutschen", "ebene": "Kontaktfläche", "winkel": "Steigung μ"},
+      "en": {"innen": "force inside: sticking", "rand": "on the edge: sliding", "ebene": "contact surface", "winkel": "slope μ"}
     }
   },
   "gjk": {
@@ -136,39 +148,39 @@
     }
   },
   "cma-es": {
-    "de": {"gen0": "Generation 1", "gen1": "Generation 5", "gen2": "Generation 20", "form0": "rund, groß", "form1": "gestreckt Richtung Tal", "form2": "schmal, im Tal", "mitte": "Mittelpunkt m", "kandidat": "Kandidat", "ziel": "tiefster Punkt"},
-    "en": {"gen0": "generation 1", "gen1": "generation 5", "gen2": "generation 20", "form0": "round, large", "form1": "stretched toward the valley", "form2": "narrow, in the valley", "mitte": "centre m", "kandidat": "candidate", "ziel": "lowest point"},
+    "de": {"gen0": "Generation 1", "gen1": "Generation 5", "gen2": "Generation 20", "form0": "rund, groß", "form1": "gestreckt Richtung Tal", "form2": "schmal, im Tal", "mitte": "Mittelpunkt m", "kandidat": "Kandidat", "ziel": "tiefster Punkt", "hoehen": "Höhenlinien des Tals: Auf einer Linie ist jeder Punkt gleich gut"},
+    "en": {"gen0": "generation 1", "gen1": "generation 5", "gen2": "generation 20", "form0": "round, large", "form1": "stretched toward the valley", "form2": "narrow, in the valley", "mitte": "center m", "kandidat": "candidate", "ziel": "lowest point", "hoehen": "contour lines of the valley: every point on a line is equally good"},
     "gruen": {
       "de": {"gen0": "Runde 1", "gen1": "Runde 5", "gen2": "Runde 20", "form0": "rund und groß", "form1": "in Richtung Tal gestreckt", "form2": "schmal, genau im Tal", "mitte": "Mittelpunkt"},
-      "en": {"gen0": "round 1", "gen1": "round 5", "gen2": "round 20", "form0": "round and large", "form1": "stretched toward the valley", "form2": "narrow, right in the valley", "mitte": "centre"}
+      "en": {"gen0": "round 1", "gen1": "round 5", "gen2": "round 20", "form0": "round and large", "form1": "stretched toward the valley", "form2": "narrow, right in the valley", "mitte": "center"}
     },
     "gelb": {
       "de": {"gen0": "Runde 1", "gen1": "Runde 5", "gen2": "Runde 20", "form0": "rund und groß", "form1": "lang gezogen, Richtung Tal", "form2": "klein, dicht am Ziel", "mitte": "Mittelpunkt"},
-      "en": {"gen0": "round 1", "gen1": "round 5", "gen2": "round 20", "form0": "round and big", "form1": "stretched toward the valley", "form2": "small, close to the goal", "mitte": "centre"}
+      "en": {"gen0": "round 1", "gen1": "round 5", "gen2": "round 20", "form0": "round and big", "form1": "stretched toward the valley", "form2": "small, close to the goal", "mitte": "center"}
     }
   },
   "architektur": {
-    "de": {"js_titel": "Browser (JavaScript, kern/web/) – nur Plattform, keine Engine-Logik", "js1a": "Laden des Moduls, Importe kern_gl / kern_env / WASI-Shim,", "js1b": "GPU-Handle-Tabellen, Kontextverlust, Fassade KernRenderer", "js2": "Host für C++-Spiele (kern::App)", "js3": "Editor-Seite, Spiel-Host + KernNet (game.mjs), Logic-Editor", "js4": "Lehrer-Seite, Web Worker (Sammler, Lerner)", "imp1": "Importe: kern_gl.*, kern_env.*,", "imp2": "wasi_snapshot_preview1.*", "exp1": "Exporte (C-ABI): kern_*, kern_app_*,", "exp2": "kern_studio_*, kern_lehrer_*,", "exp3": "kern_logic_*", "wasm_titel": "WebAssembly-Modul (C++20, wasi-sdk, Reactor)", "abi": "C-ABI", "abi1": "src/api/ (Renderer, Partikel, Geometrie), src/app/app.cpp,", "abi2": "src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api", "studio": "kern::studio (--studio)", "st1": "Editor, Viewports, Gizmos,", "st2": "Details, Katalog, Play", "lehrer": "kern::lehrer (--lehrer)", "le1": "DuckEnv, MLP, PPO, DAgger, CMA-ES,", "le2": "ONNX-Export, Kalibrierung", "game": "kern::game (--game)", "ga1": "Level/.klevel, GameWorld, Controller, Regeln, Stadt, Sound, Touch,", "ga2": "Walker (Micro Duck), Servo-Profile, Logik-Knoten, NetGame", "physics": "kern::physics", "ph1": "(--physics)", "ph2": "→ Box3D (C17)", "logic": "kern::logic", "lo1": "Graphen, JIT,", "lo2": "C++-Export", "net": "kern::net", "ne1": "Bitpacker, Acks,", "ne2": "Kanäle,", "ne3": "Client/Server", "audio": "kern::audio", "au1": "Mixer, 3D, Busse,", "au2": "Synth", "kern": "kern (gfx, scene, geo, app)", "ke1": "Renderer, Passes (Schatten, Himmel, Bloom, GTAO), Partikel, BVH, Picking,", "ke2": "Earcut, Primitive, Gebäude, Straßen, Terrain, App/Engine/Input (--app)", "core": "kern::core / kern::math / kern::json / kern::dm", "co1": "base.h, json.h, math.h, dmath.h → third_party/musl_math"},
-    "en": {"js_titel": "Browser (JavaScript, kern/web/) – platform only, no engine logic", "js1a": "module loading, imports kern_gl / kern_env / WASI shim,", "js1b": "GPU handle tables, context loss, KernRenderer facade", "js2": "host for C++ games (kern::App)", "js3": "editor page, game host + KernNet (game.mjs), logic editor", "js4": "Lehrer page, Web Workers (collectors, learner)", "imp1": "imports: kern_gl.*, kern_env.*,", "imp2": "wasi_snapshot_preview1.*", "exp1": "exports (C ABI): kern_*, kern_app_*,", "exp2": "kern_studio_*, kern_lehrer_*,", "exp3": "kern_logic_*", "wasm_titel": "WebAssembly module (C++20, wasi-sdk, reactor)", "abi": "C ABI", "abi1": "src/api/ (renderer, particles, geometry), src/app/app.cpp,", "abi2": "src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api", "studio": "kern::studio (--studio)", "st1": "editor, viewports, gizmos,", "st2": "details, catalog, Play", "lehrer": "kern::lehrer (--lehrer)", "le1": "DuckEnv, MLP, PPO, DAgger, CMA-ES,", "le2": "ONNX export, calibration", "game": "kern::game (--game)", "ga1": "Level/.klevel, GameWorld, controllers, rules, city, sound, touch,", "ga2": "Walker (Micro Duck), servo profiles, logic nodes, NetGame", "physics": "kern::physics", "ph1": "(--physics)", "ph2": "→ Box3D (C17)", "logic": "kern::logic", "lo1": "graphs, JIT,", "lo2": "C++ export", "net": "kern::net", "ne1": "bit packer, acks,", "ne2": "channels,", "ne3": "Client/Server", "audio": "kern::audio", "au1": "mixer, 3D, buses,", "au2": "synth", "kern": "kern (gfx, scene, geo, app)", "ke1": "renderer, passes (shadows, sky, bloom, GTAO), particles, BVH, picking,", "ke2": "Earcut, primitives, buildings, roads, terrain, App/Engine/Input (--app)", "core": "kern::core / kern::math / kern::json / kern::dm", "co1": "base.h, json.h, math.h, dmath.h → third_party/musl_math"},
+    "de": {"js_titel": "Browser (JavaScript, kern/web/) – nur Plattform, keine Engine-Logik", "js1a": "Laden des Moduls, Importe kern_gl / kern_env / WASI-Shim,", "js1b": "GPU-Handle-Tabellen, Kontextverlust, Fassade KernRenderer", "js2": "Host für C++-Spiele (kern::App)", "js3": "Editor-Seite, Spiel-Host + KernNet (game.mjs), Logic-Editor", "js4": "Lehrer-Seite, Web Worker (Sammler, Lerner)", "imp1": "Importe: kern_gl.*, kern_env.*,", "imp2": "wasi_snapshot_preview1.*", "exp1": "Exporte (C-ABI): kern_*, kern_app_*,", "exp2": "kern_studio_*, kern_lehrer_*,", "exp3": "kern_logic_*", "wasm_titel": "WebAssembly-Modul (C++20, wasi-sdk, Reactor)", "abi": "C-ABI", "abi1": "src/api/ (Renderer, Partikel, Geometrie), src/app/app.cpp,", "abi2": "src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api", "studio": "kern::studio (--studio)", "st1": "Editor, Viewports, Gizmos,", "st2": "Details, Katalog, Play", "lehrer": "kern::lehrer (--lehrer)", "le1": "DuckEnv, MLP, PPO, DAgger, CMA-ES,", "le2": "ONNX-Export, Kalibrierung", "game": "kern::game (--game)", "ga1": "Level/.klevel, GameWorld, Controller, Regeln, Stadt, Sound, Touch,", "ga2": "Walker (Micro Duck), Servo-Profile, Logik-Knoten, NetGame", "physics": "kern::physics", "ph1": "(--physics)", "ph2": "→ Box3D (C17)", "logic": "kern::logic", "lo1": "Graphen, JIT,", "lo2": "C++-Export", "net": "kern::net", "ne1": "Bitpacker,", "ne2": "Acks, Kanäle,", "ne3": "Client/Server", "audio": "kern::audio", "au1": "Mixer, 3D,", "au2": "Busse, Synth", "core": "kern::core / kern::math / kern::json / kern::dm", "co1": "base.h, json.h, math.h, dmath.h → third_party/musl_math", "app": "kern::app", "ap1": "Laufzeit für", "ap2": "C++-Spiele (--app)", "geo": "kern::geo", "geo1": "Earcut, Primitive,", "geo2": "Gebäude, Straßen,", "geo3": "Terrain", "gfx": "kern::gfx, scene", "gf1": "Renderer, Passes,", "gf2": "Partikel, BVH,", "gf3": "Picking"},
+    "en": {"js_titel": "Browser (JavaScript, kern/web/) – platform only, no engine logic", "js1a": "module loading, imports kern_gl / kern_env / WASI shim,", "js1b": "GPU handle tables, context loss, KernRenderer facade", "js2": "host for C++ games (kern::App)", "js3": "editor page, game host + KernNet (game.mjs), logic editor", "js4": "Lehrer page, Web Workers (collectors, learner)", "imp1": "imports: kern_gl.*, kern_env.*,", "imp2": "wasi_snapshot_preview1.*", "exp1": "exports (C ABI): kern_*, kern_app_*,", "exp2": "kern_studio_*, kern_lehrer_*,", "exp3": "kern_logic_*", "wasm_titel": "WebAssembly module (C++20, wasi-sdk, reactor)", "abi": "C ABI", "abi1": "src/api/ (renderer, particles, geometry), src/app/app.cpp,", "abi2": "src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api", "studio": "kern::studio (--studio)", "st1": "editor, viewports, gizmos,", "st2": "details, catalog, Play", "lehrer": "kern::lehrer (--lehrer)", "le1": "DuckEnv, MLP, PPO, DAgger, CMA-ES,", "le2": "ONNX export, calibration", "game": "kern::game (--game)", "ga1": "Level/.klevel, GameWorld, controllers, rules, city, sound, touch,", "ga2": "Walker (Micro Duck), servo profiles, logic nodes, NetGame", "physics": "kern::physics", "ph1": "(--physics)", "ph2": "→ Box3D (C17)", "logic": "kern::logic", "lo1": "graphs, JIT,", "lo2": "C++ export", "net": "kern::net", "ne1": "bit packer,", "ne2": "acks, channels,", "ne3": "client/server", "audio": "kern::audio", "au1": "mixer, 3D,", "au2": "buses, synth", "core": "kern::core / kern::math / kern::json / kern::dm", "co1": "base.h, json.h, math.h, dmath.h → third_party/musl_math", "app": "kern::app", "ap1": "runtime for", "ap2": "C++ games (--app)", "geo": "kern::geo", "geo1": "Earcut, primitives,", "geo2": "buildings, roads,", "geo3": "terrain", "gfx": "kern::gfx, scene", "gf1": "renderer, passes,", "gf2": "particles, BVH,", "gf3": "picking"},
     "gruen": {
-      "de": {"wasm_titel": "Das Programm Kern", "js_einfach": "Browser: der Kellner", "exp1": "benutzt", "exp2": "", "imp1": "", "imp2": "", "abi_e": "Übergabestelle", "studio_e": "Editor", "lehrer_e": "Trainer", "game_e": "Spielregeln und Levels", "physics_e": "Physik", "logic_e": "Logik", "net_e": "Netzwerk", "audio_e": "Ton", "kern_e": "Malen, Szene, Formen", "core_e": "Fundament: Zahlen und Mathe"},
-      "en": {"wasm_titel": "The program Kern", "js_einfach": "Browser: the waiter", "exp1": "uses", "exp2": "", "imp1": "", "imp2": "", "abi_e": "hand-over point", "studio_e": "editor", "lehrer_e": "trainer", "game_e": "game rules and levels", "physics_e": "physics", "logic_e": "logic", "net_e": "network", "audio_e": "sound", "kern_e": "painting, scene, shapes", "core_e": "foundation: numbers and maths"}
+      "de": {"wasm_titel": "Das Programm Kern", "js_einfach": "Browser: der Kellner", "exp1": "benutzt", "exp2": "", "imp1": "", "imp2": "", "abi_e": "Übergabestelle", "studio_e": "Editor", "lehrer_e": "Lehrer", "game_e": "Spielregeln und Levels", "physics_e": "Physik", "logic_e": "Logik", "net_e": "Netzwerk", "audio_e": "Ton", "core_e": "Fundament: Zahlen und Mathe", "gfx_e": "Malen, Szene", "geo_e": "Formen", "app_e": "Laufzeit für", "app_e2": "C++-Spiele"},
+      "en": {"wasm_titel": "The program Kern", "js_einfach": "Browser: the waiter", "exp1": "uses", "exp2": "", "imp1": "", "imp2": "", "abi_e": "hand-over point", "studio_e": "editor", "lehrer_e": "Lehrer", "game_e": "game rules and levels", "physics_e": "physics", "logic_e": "logic", "net_e": "network", "audio_e": "sound", "core_e": "foundation: numbers and math", "gfx_e": "painting, scene", "geo_e": "shapes", "app_e": "runtime for", "app_e2": "C++ games"}
     },
     "gelb": {
-      "de": {"wasm_titel": "Das Hochhaus Kern", "js_einfach": "JavaScript, der Kellner", "exp1": "Bestellungen hinein", "exp2": "", "imp1": "Fertiges hinaus", "imp2": "", "abi_e": "die Tür", "studio_e": "Studio", "lehrer_e": "Lehrer", "game_e": "Spielregeln und Levels", "physics_e": "Physik", "logic_e": "Logik", "net_e": "Netzwerk", "audio_e": "Ton", "kern_e": "Grafik, Szene, Geometrie", "core_e": "Grundlagen, Mathe"},
-      "en": {"wasm_titel": "The tower Kern", "js_einfach": "JavaScript, the waiter", "exp1": "orders in", "exp2": "", "imp1": "finished things out", "imp2": "", "abi_e": "the door", "studio_e": "Studio", "lehrer_e": "Lehrer", "game_e": "game rules and levels", "physics_e": "physics", "logic_e": "logic", "net_e": "network", "audio_e": "sound", "kern_e": "graphics, scene, geometry", "core_e": "basics, maths"}
+      "de": {"wasm_titel": "Das Hochhaus Kern", "js_einfach": "JavaScript, der Kellner", "exp1": "Bestellungen hinein", "exp2": "", "imp1": "Fertiges hinaus", "imp2": "", "abi_e": "die Tür", "studio_e": "Studio", "lehrer_e": "Lehrer", "game_e": "Spielregeln und Levels", "physics_e": "Physik", "logic_e": "Logik", "net_e": "Netzwerk", "audio_e": "Ton", "core_e": "Grundlagen, Mathe", "gfx_e": "Grafik, Szene", "geo_e": "Geometrie", "app_e": "Laufzeit für", "app_e2": "C++-Spiele"},
+      "en": {"wasm_titel": "The tower Kern", "js_einfach": "JavaScript, the waiter", "exp1": "orders in", "exp2": "", "imp1": "finished things out", "imp2": "", "abi_e": "the door", "studio_e": "Studio", "lehrer_e": "Lehrer", "game_e": "game rules and levels", "physics_e": "physics", "logic_e": "logic", "net_e": "network", "audio_e": "sound", "core_e": "basics, math", "gfx_e": "graphics, scene", "geo_e": "geometry", "app_e": "runtime for", "app_e2": "C++ games"}
     }
   },
   "ci-pipeline": {
-    "de": {"ausloeser": "push, Pull Request,", "ausloeser2": "manuell", "native": "native", "native_r": "ubuntu-24.04, Sanitizer", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "nur main, kein Pull Request", "e2e": "e2e", "parallel": "unabhängig, parallel"},
-    "en": {"ausloeser": "push, pull request,", "ausloeser2": "manual", "native": "native", "native_r": "ubuntu-24.04, sanitizers", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "main only, no pull request", "e2e": "e2e", "parallel": "independent, parallel"},
+    "de": {"ausloeser": "push, Pull Request,", "ausloeser2": "manuell", "native": "native", "native_r": "ubuntu-24.04, Sanitizer", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "nur main, kein Pull Request", "e2e": "e2e", "parallel": "unabhängig, parallel", "legende": "gestrichelt: läuft nebenher, deploy wartet nicht darauf"},
+    "en": {"ausloeser": "push, pull request,", "ausloeser2": "manual", "native": "native", "native_r": "ubuntu-24.04, sanitizers", "determinism": "determinism", "determinism_r": "macos-14", "build": "build", "build_r": "ubuntu-24.04", "deploy": "deploy", "deploy_r": "main only, no pull request", "e2e": "e2e", "parallel": "independent, parallel", "legende": "dashed: runs alongside, deploy does not wait for it"},
     "gruen": {
-      "de": {"ausloeser": "Änderung", "ausloeser2": "(Push)", "native": "Tests mit Spürhunden", "determinism": "Fingerabdruck auf dem Mac", "build": "Bauen und Grundprüfungen", "deploy": "Veröffentlichen", "e2e": "Testklicker"},
-      "en": {"ausloeser": "change", "ausloeser2": "(push)", "native": "tests with sniffer dogs", "determinism": "fingerprint on the Mac", "build": "build and basic checks", "deploy": "publish", "e2e": "test clicker"}
+      "de": {"ausloeser": "Änderung", "ausloeser2": "", "legende": "gestrichelt: läuft nebenher, die Veröffentlichung wartet nicht darauf", "native": "Tests mit Spürhunden", "determinism": "Fingerabdruck auf dem Mac", "build": "Bauen und Grundprüfungen", "deploy": "Veröffentlichen", "e2e": "Testklicker"},
+      "en": {"ausloeser": "change", "ausloeser2": "", "legende": "dashed: runs alongside, publishing does not wait for it", "native": "tests with sniffer dogs", "determinism": "fingerprint on the Mac", "build": "build and basic checks", "deploy": "publish", "e2e": "test clicker"}
     },
     "gelb": {
-      "de": {"ausloeser": "Änderung", "ausloeser2": "hochgeladen", "native": "Tests mit Prüfern", "determinism": "Fingerabdruck auf dem Mac", "build": "bauen", "deploy": "veröffentlichen", "e2e": "Roboter im Browser"},
-      "en": {"ausloeser": "change", "ausloeser2": "uploaded", "native": "tests with checkers", "determinism": "fingerprint on the Mac", "build": "build", "deploy": "publish", "e2e": "robot in the browser"}
+      "de": {"ausloeser": "Änderung", "ausloeser2": "hochgeladen", "legende": "gestrichelt: läuft nebenher, das Veröffentlichen wartet nicht darauf", "native": "Tests mit Prüfern", "determinism": "Fingerabdruck auf dem Mac", "build": "bauen", "deploy": "veröffentlichen", "e2e": "Roboter im Browser"},
+      "en": {"ausloeser": "change", "ausloeser2": "uploaded", "legende": "dashed: runs alongside, publishing does not wait for it", "native": "tests with checkers", "determinism": "fingerprint on the Mac", "build": "build", "deploy": "publish", "e2e": "robot in the browser"}
     }
   },
   "logik-tuer": {
@@ -183,20 +195,20 @@
     "de": {"recipe": "Recipe", "task": "Task", "env": "DuckEnv / PlayEnv", "env2": "eine Ente, eine GameWorld, headless", "ppo": "Ppo (Lerner)", "backend": "Backend", "backend2": "Threads | Web Worker", "collector": "Collector", "rollout": "Rollout", "policy": "Policy", "step": "step(action) / observation()", "learn": "learn(rollouts)"},
     "en": {"recipe": "Recipe", "task": "Task", "env": "DuckEnv / PlayEnv", "env2": "one duck, one GameWorld, headless", "ppo": "Ppo (learner)", "backend": "Backend", "backend2": "threads | web workers", "collector": "Collector", "rollout": "Rollout", "policy": "Policy", "step": "step(action) / observation()", "learn": "learn(rollouts)"},
     "gruen": {
-      "de": {"recipe": "Lehrplan", "task": "Aufgabe", "env": "Turnhallen mit Enten", "ppo": "Trainer", "collector": "Helfer", "rollout": "Zettel", "policy": "Anweisungen", "step": "lassen turnen", "learn": "Zettel zum Trainer"},
-      "en": {"recipe": "curriculum", "task": "task", "env": "gyms with ducks", "ppo": "trainer", "collector": "helpers", "rollout": "notes", "policy": "instructions", "step": "let them exercise", "learn": "notes to the trainer"}
+      "de": {"recipe": "Lehrplan", "task": "Aufgabe", "env": "Turnhallen mit Enten", "ppo": "Auswerter", "collector": "Helfer", "rollout": "Zettel", "policy": "Anweisungen", "step": "lassen turnen", "learn": "Zettel zum Auswerter"},
+      "en": {"recipe": "curriculum", "task": "task", "env": "gyms with ducks", "ppo": "evaluator", "collector": "helpers", "rollout": "notes", "policy": "instructions", "step": "let them exercise", "learn": "notes to the evaluator"}
     },
     "gelb": {
-      "de": {"recipe": "Trainingsplan", "task": "Punkteregeln", "env": "Halle: eine Ente", "ppo": "Auswerter", "collector": "Helfer mit Klemmbrett", "rollout": "Notizen", "policy": "neue Policy", "step": "turnen lassen", "learn": "Notizen zum Auswerter"},
-      "en": {"recipe": "training plan", "task": "score rules", "env": "hall: one duck", "ppo": "evaluator", "collector": "helper with clipboard", "rollout": "notes", "policy": "new policy", "step": "let it exercise", "learn": "notes to the evaluator"}
+      "de": {"recipe": "Trainingsplan", "task": "Punkteregeln", "env": "Hallen: je eine Ente", "ppo": "Auswerter", "collector": "Helfer mit Klemmbrett", "rollout": "Notizen", "policy": "neue Policy", "step": "turnen lassen", "learn": "Notizen zum Auswerter"},
+      "en": {"recipe": "training plan", "task": "score rules", "env": "halls: one duck each", "ppo": "evaluator", "collector": "helper with clipboard", "rollout": "notes", "policy": "new policy", "step": "let them exercise", "learn": "notes to the evaluator"}
     }
   },
   "mlp-kette": {
     "de": {"ein": "Eingabe", "ein2": "61 Werte", "norm": "Normalisierer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm", "akt2": "+ ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
     "en": {"ein": "input", "ein2": "61 values", "norm": "normalizer", "norm2": "Sub, Div", "l1": "61 → 512", "l2": "512 → 256", "l3": "256 → 128", "akt": "Gemm", "akt2": "+ ELU", "aus": "128 → 14", "aus2": "Gemm, linear"},
     "gruen": {
-      "de": {"ein": "Messwerte", "ein2": "61 Zahlen", "norm": "umrechnen", "norm2": "Normalisierer", "l1": "512", "l2": "256", "l3": "128", "akt": "verbiegen", "aus": "14 Servoziele", "aus2": "ohne Verbiegen"},
-      "en": {"ein": "readings", "ein2": "61 numbers", "norm": "convert", "norm2": "normalizer", "l1": "512", "l2": "256", "l3": "128", "akt": "bend", "aus": "14 targets", "aus2": "no bending"}
+      "de": {"ein": "Messwerte", "ein2": "61 Zahlen", "norm": "umrechnen", "norm2": "Normalisierer", "l1": "512", "l2": "256", "l3": "128", "akt": "Neuronen", "akt2": "verbiegen", "aus": "14 Servoziele", "aus2": "ohne Verbiegen"},
+      "en": {"ein": "readings", "ein2": "61 numbers", "norm": "convert", "norm2": "normalizer", "l1": "512", "l2": "256", "l3": "128", "akt": "neurons", "akt2": "bend", "aus": "14 targets", "aus2": "no bending"}
     },
     "gelb": {
       "de": {"ein": "61", "ein2": "Eingänge", "norm": "umrechnen", "norm2": "(Normalisierer)", "l1": "512", "l2": "256", "l3": "128", "akt": "Neuronen", "akt2": "ELU", "aus": "14", "aus2": "Ausgänge"},
@@ -205,7 +217,7 @@
   },
   "gae-rueckblick": {
     "de": {"s0": "Schritt 0", "s0a": "eigene Überraschung", "s0b": "δ₀ < 0", "s1": "Schritt 1", "s1a": "führt in einen", "s1b": "guten Zustand", "s2": "Schritt 2", "s2a": "besser als erwartet", "s2b": "δ₂ > 0", "rueck": "rückwärts: Â₀ = δ₀ + γλ δ₁ + (γλ)² δ₂ + … > 0"},
-    "en": {"s0": "step 0", "s0a": "own surprise", "s0b": "δ₀ < 0", "s1": "step 1", "s1a": "leads into a", "s1b": "good state", "s2": "step 2", "s2a": "better than expected", "s2b": "δ₂ > 0", "rueck": "backwards: Â₀ = δ₀ + γλ δ₁ + (γλ)² δ₂ + … > 0"},
+    "en": {"s0": "step 0", "s0a": "own surprise", "s0b": "δ₀ < 0", "s1": "step 1", "s1a": "leads into a", "s1b": "good state", "s2": "step 2", "s2a": "better than expected", "s2b": "δ₂ > 0", "rueck": "backward: Â₀ = δ₀ + γλ δ₁ + (γλ)² δ₂ + … > 0"},
     "gruen": {
       "de": {"s0a": "für sich: etwas schlechter", "s0b": "als erwartet", "s1a": "führt in eine", "s1b": "gute Lage", "s2a": "es läuft besser", "s2b": "als erwartet", "rueck": "im Rückblick: Schritt 0 war insgesamt gut"},
       "en": {"s0a": "on its own: a bit worse", "s0b": "than expected", "s1a": "leads into a", "s1b": "good situation", "s2a": "things go better", "s2b": "than expected", "rueck": "looking back: step 0 was good overall"}
@@ -216,20 +228,21 @@
     }
   },
   "schattenkugel": {
-    "de": {"titel0": "Kasten, Blick geradeaus", "titel1": "Kasten, Blick schräg", "titel2": "Kugel", "folge0": "schmal", "folge1": "breit", "folge2": "immer gleich groß", "radius": "Radius", "mitte": "Mitte", "kopf": "von oben · blau: Sichtkegel bis zur Schattendistanz · grau: was die Karte abdeckt"},
-    "en": {"titel0": "box, looking straight", "titel1": "box, looking at an angle", "titel2": "sphere", "folge0": "narrow", "folge1": "wide", "folge2": "always the same size", "radius": "radius", "mitte": "centre", "kopf": "from above · blue: view cone up to the shadow distance · grey: what the map covers"},
+    "de": {"titel0": "Kasten, Blick geradeaus", "titel1": "Kasten, Blick schräg", "titel2": "Kugel", "folge0": "kleiner", "folge1": "größer", "folge2": "immer gleich groß", "radius": "Radius", "mitte": "Mitte", "auge": "Kamera", "kopf": "Sichtkegel bis zur Schattendistanz (von oben gesehen)", "kopf2": "was die Schattenkarte abdecken muss"},
+    "en": {"titel0": "box, looking straight", "titel1": "box, looking at an angle", "titel2": "sphere", "folge0": "smaller", "folge1": "larger", "folge2": "always the same size", "radius": "radius", "mitte": "center", "auge": "camera", "kopf": "view cone up to the shadow distance (seen from above)", "kopf2": "what the shadow map must cover"},
     "gelb": {
-      "de": {"kopf": "von oben · blau: dein Blickfeld bis zur Schattendistanz · grau: was die Karte abdeckt"},
-      "en": {"kopf": "from above · blue: your view up to the shadow distance · grey: what the map covers"}
+      "de": {"kopf": "dein Blickfeld bis zur Schattendistanz (von oben gesehen)"},
+      "en": {"kopf": "your view up to the shadow distance (seen from above)"}
     }
   },
+
   "himmel-dreieck": {
     "de": {"bild": "Bildschirm", "weg1": "was übersteht,", "weg2": "wird weggeschnitten", "rand": "x, y von −1 bis 1"},
     "en": {"bild": "screen", "weg1": "what sticks out", "weg2": "is cut away", "rand": "x, y from −1 to 1"}
   },
   "fassade-fenster": {
-    "de": {"traufe": "Traufe", "einmeter": "1 m darunter: kein Fenster", "stock0": "Erdgeschoss", "stock1": "1. Stock", "stock2": "2. Stock", "stock3": "3. Stock", "an": "leuchtet nachts", "aus": "dunkles Glas", "zelle1": "Zelle: 3 m × Stockwerkshöhe,", "zelle2": "Fenster im Mittelteil"},
-    "en": {"traufe": "eaves", "einmeter": "1 m below: no window", "stock0": "ground floor", "stock1": "1st floor", "stock2": "2nd floor", "stock3": "3rd floor", "an": "lit at night", "aus": "dark glass", "zelle1": "cell: 3 m × storey height,", "zelle2": "window in the middle part"},
+    "de": {"traufe": "Traufe", "einmeter": "oberster Meter: Fenster abgeschnitten", "stock0": "Erdgeschoss", "stock1": "1. Stock", "stock2": "2. Stock", "stock3": "3. Stock", "an": "leuchtet nachts", "aus": "dunkles Glas", "zelle1": "Zelle: 3 m × Stockwerkshöhe,", "zelle2": "Fenster im Mittelteil", "spalte": "Spalte", "mittelteil": "Mittelteil: x 22–78 %, y 28–78 %"},
+    "en": {"traufe": "eaves", "einmeter": "top meter: windows cut off", "stock0": "ground floor", "stock1": "1st floor", "stock2": "2nd floor", "stock3": "3rd floor", "an": "lit at night", "aus": "dark glass", "zelle1": "cell: 3 m × storey height,", "zelle2": "window in the middle part", "spalte": "column", "mittelteil": "middle part: x 22–78%, y 28–78%"},
     "gruen": {
       "de": {"traufe": "Dachkante"},
       "en": {"traufe": "roof edge"}
@@ -240,8 +253,12 @@
     }
   },
   "earcut-loch": {
-    "de": {"titel0": "vorher: zwei Ränder", "titel1": "nachher: ein Rand", "hof": "Hof", "schnitt": "Schnitt", "unter0": "Außenrand und Loch", "unter1": "ein Umlauf ohne Absetzen"},
-    "en": {"titel0": "before: two boundaries", "titel1": "after: one boundary", "hof": "courtyard", "schnitt": "cut", "unter0": "outer boundary and hole", "unter1": "one loop without lifting the pen"},
+    "de": {"titel0": "vorher: zwei Ränder", "titel1": "nachher: ein Rand", "hof": "Hof", "schnitt": "Brücke", "unter0": "Außenrand und Loch", "unter1": "ein Umlauf ohne Absetzen"},
+    "en": {"titel0": "before: two boundaries", "titel1": "after: one boundary", "hof": "courtyard", "schnitt": "bridge", "unter0": "outer boundary and hole", "unter1": "one loop without lifting the pen"},
+    "gruen": {
+      "de": {"unter0": "Außenrand und Hof"},
+      "en": {"unter0": "outer boundary and courtyard"}
+    },
     "gelb": {
       "de": {"titel1": "nachher: ein einziger Ring"},
       "en": {"titel1": "after: one single ring"}
@@ -261,23 +278,23 @@
   },
   "gelaende-hoehen": {
     "de": {"titel0": "Höhen der Gitterecken (m)", "titel1": "schräg von oben", "fuss": "jedes Quadrat: zwei Dreiecke, geteilt an der Diagonale Südwest–Nordost"},
-    "en": {"titel0": "heights of the grid corners (m)", "titel1": "from above at an angle", "fuss": "every square: two triangles, split along the south-west–north-east diagonal"}
+    "en": {"titel0": "heights of the grid corners (m)", "titel1": "from above at an angle", "fuss": "every square: two triangles, split along the southwest–northeast diagonal"}
   },
   "stadt-hoehen": {
     "de": {"rand": "Rand", "mitte": "Mitte", "kopf1": "Schnitt durch die Stadt: Obergrenze der Haushöhe je Block,", "kopf2": "jedes Haus zufällig zwischen 8–12 m und dieser Grenze"},
-    "en": {"rand": "edge", "mitte": "centre", "kopf1": "cut through the city: upper limit of building height per block,", "kopf2": "each building random between 8–12 m and this limit"}
+    "en": {"rand": "edge", "mitte": "center", "kopf1": "cut through the city: upper limit of building height per block,", "kopf2": "each building random between 8–12 m and this limit"}
   },
   "perspektive": {
     "de": {"baum1": "1 m hoch, 5 m weit", "baum2": "2 m hoch, 10 m weit", "auge": "Auge", "strahl": "ein Sehstrahl", "fuss": "Der Sehstrahl streift beide Spitzen: Im Bild sind sie gleich groß."},
     "en": {"baum1": "1 m tall, 5 m away", "baum2": "2 m tall, 10 m away", "auge": "eye", "strahl": "one line of sight", "fuss": "The line of sight touches both tips: in the picture they are the same size."}
   },
   "normalen-stauchen": {
-    "de": {"normale": "Normale", "vorher": "vorher: Dachseite 45°", "nachher": "nachher: auf halbe Höhe gestaucht", "richtig": "richtig: steiler", "falsch": "falsch: mitgestaucht, flacher"},
-    "en": {"normale": "normal", "vorher": "before: roof side 45°", "nachher": "after: squashed to half height", "richtig": "right: steeper", "falsch": "wrong: squashed along, flatter"}
+    "de": {"normale": "Normale", "vorher": "vorher: Dachseite 45°", "nachher": "nachher: auf halbe Höhe gestaucht", "richtig": "richtig: steiler", "falsch": "falsch: mitgestaucht,", "falsch2": "flacher"},
+    "en": {"normale": "normal", "vorher": "before: roof side 45°", "nachher": "after: squashed to half height", "richtig": "right: steeper", "falsch": "wrong: squashed along,", "falsch2": "flatter"}
   },
   "umlaufsinn": {
     "de": {"titel0": "von vorn", "titel1": "von hinten", "sinn0": "gegen den Uhrzeigersinn", "sinn1": "mit dem Uhrzeigersinn"},
-    "en": {"titel0": "from the front", "titel1": "from behind", "sinn0": "counter-clockwise", "sinn1": "clockwise"}
+    "en": {"titel0": "from the front", "titel1": "from behind", "sinn0": "counterclockwise", "sinn1": "clockwise"}
   },
   "glanz-mikrofacetten": {
     "de": {"titel0": "glatt", "titel1": "rau", "unter0a": "alle gleich gerichtet", "unter0b": "→ kleiner, scharfer Glanzpunkt", "unter1a": "kreuz und quer", "unter1b": "→ breiter, matter Schimmer"},
@@ -288,12 +305,12 @@
     "en": {"licht": "light", "stufe": "stored step", "flaeche": "real, sloped surface", "akne1": "below the step:", "akne2": "thinks it is covered", "akne3": "→ stripes", "texel": "one cell (texel) of the map per column"}
   },
   "aabb-grobphase": {
-    "de": {"titel0": "getrennt", "titel1": "überlappend", "unter0": "Kisten getrennt: nichts zu tun", "unter1": "Kisten überlappen: genau prüfen"},
-    "en": {"titel0": "apart", "titel1": "overlapping", "unter0": "boxes apart: nothing to do", "unter1": "boxes overlap: check exactly"}
+    "de": {"titel0": "getrennt", "titel1": "überlappend", "unter0": "Kisten getrennt: nichts zu tun", "unter1": "Kisten überlappen: genau prüfen (hier kein Kontakt)"},
+    "en": {"titel0": "apart", "titel1": "overlapping", "unter0": "boxes apart: nothing to do", "unter1": "boxes overlap: check exactly (no contact here)"}
   },
   "gelenke": {
-    "de": {"titel0": "Scharnier: Tür von oben", "titel1": "Schiene: Lift von der Seite", "rahmen": "Rahmen", "tuer": "Tür", "achse1": "Achse: senkrecht durch den Punkt", "achse2": "Achse", "kabine1": "Kabine gleitet", "kabine2": "entlang der Schiene"},
-    "en": {"titel0": "hinge: door from above", "titel1": "slider: lift from the side", "rahmen": "frame", "tuer": "door", "achse1": "axis: vertical through the dot", "achse2": "axis", "kabine1": "cabin slides", "kabine2": "along the rail"}
+    "de": {"titel0": "Scharnier: Tür von oben", "titel1": "Schiene: Lift von der Seite", "rahmen": "Rahmen", "tuer": "Tür", "achse1": "Achse ⊙: zeigt aus dem Papier heraus", "achse2": "Achse", "kabine1": "Kabine gleitet", "kabine2": "entlang der Schiene"},
+    "en": {"titel0": "hinge: door from above", "titel1": "slider: lift from the side", "rahmen": "frame", "tuer": "door", "achse1": "axis ⊙: points out of the page", "achse2": "axis", "kabine1": "cabin slides", "kabine2": "along the rail"}
   },
   "maus-feder": {
     "de": {"maus": "Maus", "zieht": "zieht", "feder": "Feder", "kiste1": "hängt am Griffpunkt,", "kiste2": "kann kippen und anstoßen"},
@@ -305,15 +322,15 @@
   },
   "abtastung": {
     "de": {"p0": "0", "p1_5": "1,5", "p3": "3", "p4_5": "4,5", "p6": "6", "kaestchen": "Sample", "gelesen": "gelesen", "kopf": "Tonhöhe 1,5: alle 1,5 Samples lesen; dazwischen schätzt eine weiche Kurve durch die Nachbarn"},
-    "en": {"p0": "0", "p1_5": "1.5", "p3": "3", "p4_5": "4.5", "p6": "6", "kaestchen": "sample", "gelesen": "read", "kopf": "pitch 1.5: read every 1.5 samples; in between, a smooth curve through the neighbours estimates"},
+    "en": {"p0": "0", "p1_5": "1.5", "p3": "3", "p4_5": "4.5", "p6": "6", "kaestchen": "sample", "gelesen": "read", "kopf": "pitch 1.5: read every 1.5 samples; in between, a smooth curve through the neighbors estimates"},
     "gelb": {
       "de": {"kaestchen": "Kästchen"},
       "en": {"kaestchen": "box"}
     }
   },
   "wellenformen": {
-    "de": {"sinus": "Sinus", "sinus_a": "±1", "rechteck": "Rechteck", "rechteck_a": "±0,6", "saege": "Sägezahn", "saege_a": "fällt schräg, springt", "dreieck": "Dreieck", "dreieck_a": "±0,8", "rauschen": "Rauschen", "rauschen_a": "Zufallswerte"},
-    "en": {"sinus": "sine", "sinus_a": "±1", "rechteck": "square", "rechteck_a": "±0.6", "saege": "sawtooth", "saege_a": "falls, then jumps", "dreieck": "triangle", "dreieck_a": "±0.8", "rauschen": "noise", "rauschen_a": "random values"}
+    "de": {"sinus": "Sinus", "sinus_a": "±1", "rechteck": "Rechteck", "rechteck_a": "±0,6", "saege": "Sägezahn", "saege_a": "±0,6", "dreieck": "Dreieck", "dreieck_a": "±0,8", "rauschen": "Rauschen", "rauschen_a": "±1, zufällig"},
+    "en": {"sinus": "sine", "sinus_a": "±1", "rechteck": "square", "rechteck_a": "±0.6", "saege": "sawtooth", "saege_a": "±0.6", "dreieck": "triangle", "dreieck_a": "±0.8", "rauschen": "noise", "rauschen_a": "±1, random"}
   },
   "servo-modell": {
     "de": {"ziel1": "Ziel-", "ziel2": "winkel", "gelenk1": "Gelenk", "gelenk2": "(Winkel)", "feder": "Feder K: zieht zum Ziel", "feder2": "höchstens mit dem Moment T", "daempfer": "Dämpfer D", "daempfer2": "bremst nach Geschwindigkeit", "dazu1": "dazu: Coulomb-Reibung F im Gelenk, Trägheit des Rotors (Armatur), und das Kommando", "dazu2": "kommt delay Sekunden nach dem Senden an"},
@@ -340,8 +357,8 @@
     }
   },
   "testsignale": {
-    "de": {"stufe": "Sprünge", "stufe_a": "±0,2 und ±0,9 rad", "chirp": "Chirp", "chirp_a": "0,5 → 4 Hz, 0,5 rad", "rechteck": "Rechteck", "rechteck_a": "±0,3 rad", "zeit": "Zeit (s)", "t0": "0", "t1": "0,4", "t2": "0,8", "t3": "1,2", "t4": "1,6", "t5": "2", "t6": "2,4"},
-    "en": {"stufe": "steps", "stufe_a": "±0.2 and ±0.9 rad", "chirp": "chirp", "chirp_a": "0.5 → 4 Hz, 0.5 rad", "rechteck": "square", "rechteck_a": "±0.3 rad", "zeit": "time (s)", "t0": "0", "t1": "0.4", "t2": "0.8", "t3": "1.2", "t4": "1.6", "t5": "2", "t6": "2.4"},
+    "de": {"stufe": "Sprünge", "stufe_a": "±0,2 und ±0,9 rad", "chirp": "Chirp", "chirp_a": "0,5 → 4 Hz, 0,5 rad", "rechteck": "Rechteck", "rechteck_a": "±0,3 rad", "zeit": "Zeit (s)", "yachse": "senkrecht: Zielwinkel, je Zeile mit eigener Nulllinie (grau)", "t0": "0", "t1": "0,4", "t2": "0,8", "t3": "1,2", "t4": "1,6", "t5": "2", "t6": "2,4"},
+    "en": {"stufe": "steps", "stufe_a": "±0.2 and ±0.9 rad", "chirp": "chirp", "chirp_a": "0.5 → 4 Hz, 0.5 rad", "rechteck": "square", "rechteck_a": "±0.3 rad", "zeit": "time (s)", "yachse": "vertical: target angle, each row with its own zero line (gray)", "t0": "0", "t1": "0.4", "t2": "0.8", "t3": "1.2", "t4": "1.6", "t5": "2", "t6": "2.4"},
     "gelb": {
       "de": {"stufe": "Stufe", "stufe_a": "plötzlich ein neues Ziel", "chirp_a": "immer schneller", "rechteck_a": "hin und zurück"},
       "en": {"stufe": "step", "stufe_a": "suddenly a new target", "chirp_a": "faster and faster", "rechteck_a": "back and forth"}
@@ -357,7 +374,7 @@
   },
   "reihenfolge-transform": {
     "de": {"titel0": "erst drehen, dann schieben", "titel1": "erst schieben, dann drehen", "ende": "Ende", "unter0a": "dreht sich auf der Mitte,", "unter0b": "fährt dann nach rechts", "unter1a": "fährt nach rechts, schwenkt dann", "unter1b": "auf einem Bogen um die Mitte", "legende": "● Tischmitte · gestrichelt: Start und Zwischenstand · Spitze: Blickrichtung des Steins"},
-    "en": {"titel0": "rotate first, then move", "titel1": "move first, then rotate", "ende": "end", "unter0a": "turns on the centre,", "unter0b": "then moves to the right", "unter1a": "moves to the right, then swings", "unter1b": "on an arc around the centre", "legende": "● table centre · dashed: start and halfway · tip: where the piece faces"}
+    "en": {"titel0": "rotate first, then move", "titel1": "move first, then rotate", "ende": "end", "unter0a": "turns on the center,", "unter0b": "then moves to the right", "unter1a": "moves to the right, then swings", "unter1b": "on an arc around the center", "legende": "● table center · dashed: start and halfway · tip: where the piece faces"}
   },
   "wuerfelecke": {
     "de": {"oben": "Normale der Oberseite", "rechts": "Normale der rechten Seite", "vorn": "Normale der Vorderseite", "fuss1": "gleiche Lage, drei Pfeile:", "fuss2": "für den Computer drei Ecken"},
@@ -368,7 +385,7 @@
     "en": {"vorher": "before", "nachher": "after one step", "v1": "forward", "v2": "backward, much faster", "fuss": "The brake uses the old speed and acts for the whole step (arrow lengths schematic)."}
   },
   "trennende-achse": {
-    "de": {"lampe": "Lampe", "luecke1": "Lücke:", "luecke2": "getrennt", "wand": "Wand"},
-    "en": {"lampe": "lamp", "luecke1": "gap:", "luecke2": "separated", "wand": "wall"}
+    "de": {"lampe": "Licht von", "lampe2": "weit weg", "luecke1": "Lücke:", "luecke2": "getrennt", "wand": "Wand"},
+    "en": {"lampe": "light from", "lampe2": "far away", "luecke1": "gap:", "luecke2": "separated", "wand": "wall"}
   }
 }

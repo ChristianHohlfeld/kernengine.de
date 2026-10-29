@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 140">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 34 300 106">
   <!-- Maus-Griff (MouseGrab, blau 6): die Maus zieht über eine Feder am Griffpunkt; der Körper bleibt ein echter Physikkörper und kann kippen und anstoßen. -->
-  <path class="fw" d="M30,56 l0,16 l4,-4 l3,7 l3,-1.5 l-3,-7 l6,0 z"/>
   <text x="34" y="48" class="m">{{maus}}</text>
-  <path class="la" d="M38,62 L60,68 L72,56 L84,68 L96,56 L108,68 L120,56 L132,68 L144,56 L156,68 L168,62"/>
+  <path class="la" d="M31,57 L60,68 L72,56 L84,68 L96,56 L108,68 L120,56 L132,68 L144,56 L156,68 L168,62"/>
   <text x="140" y="50" class="k a m">{{feder}}</text>
   <rect class="fd" x="172" y="52" width="52" height="52" transform="rotate(-14 198 78)"/>
   <circle class="dota" cx="168" cy="62" r="2.6"/>
+  <path class="fw" d="M30,56 l0,16 l4,-4 l3,7 l3,-1.5 l-3,-7 l6,0 z"/>
   <text x="198" y="122" class="k m">{{kiste1}}</text>
   <text x="198" y="132" class="k m">{{kiste2}}</text>
   <text x="34" y="90" class="k m">{{zieht}}</text>

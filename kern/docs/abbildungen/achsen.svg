@@ -2,8 +2,8 @@
   <!-- Kerns Koordinaten: x nach rechts (Osten), y nach hinten (Norden), z nach oben; die x-y-Ebene ist die Landkarte (blau 5). -->
   <path class="lk p" d="M70,96 L180,96"/>
   <path class="lk p" d="M70,96 L70,16"/>
-  <path class="la p" d="M70,96 L132,48"/>
-  <path class="lg" d="M180,96 L242,48 L132,48 L70,96"/>
+  <path class="la pa" d="M70,96 L132,48"/>
+  <path class="lg" d="M180,96 L242,48 L132,48"/>
   <text x="186" y="99"><tspan class="t">x</tspan> {{x}}</text>
   <text x="64" y="12"><tspan class="t">z</tspan> {{z}}</text>
   <text x="138" y="44" class="a"><tspan class="t">y</tspan> {{y}}</text>

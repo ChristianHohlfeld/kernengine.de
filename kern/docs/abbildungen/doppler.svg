@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 162">
+  <!-- Doppler-Effekt (blau/grün/gelb 7.3, src/audio): ein Krankenwagen fährt nach rechts und sendet in gleichen Zeitabständen Wellenberge aus. Jeder Kreis ist ein Wellenberg, um den Ort, an dem er losging: Radius = Schallgeschwindigkeit × Alter, Mittelpunkt = heutiger Ort − Fahrtgeschwindigkeit × Alter. Gezeichnet für Alter 1 bis 5 und Fahrt mit 0,55-facher Schallgeschwindigkeit (stark überzeichnet, damit man es sieht): vorn liegen die Kreise eng (Abstand 0,45), hinten weit (1,55). -->
+  <circle class="lad" cx="161.50" cy="78" r="70"/>
+  <circle class="lad" cx="169.20" cy="78" r="56"/>
+  <circle class="lad" cx="176.90" cy="78" r="42"/>
+  <circle class="lad" cx="184.60" cy="78" r="28"/>
+  <circle class="lad" cx="192.30" cy="78" r="14"/>
+  <rect class="fw" x="190" y="72" width="20" height="12" rx="2"/>
+  <path class="l" d="M197,78 L203,78 M200,75 L200,81"/>
+  <path class="l p" d="M178,156 L222,156"/>
+  <text x="226" y="159" class="k">{{faehrt}}</text>
+  <text x="246" y="74" class="k">{{vorn1}}</text>
+  <text x="246" y="84" class="k a">{{vorn2}}</text>
+  <text x="86" y="74" class="k e">{{hinten1}}</text>
+  <text x="86" y="84" class="k e a">{{hinten2}}</text>
+</svg>

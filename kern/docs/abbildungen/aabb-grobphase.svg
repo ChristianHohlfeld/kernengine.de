@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 112">
-  <!-- Grobe Phase (gelb C): jede Form steckt in einer achsenparallelen Kiste; nur wenn sich die Kisten überlappen (blau getönt), prüft die genaue Phase das Paar. -->
+  <!-- Grobe Phase (gelb C): jede Form steckt in einer achsenparallelen Kiste; nur wenn sich die Kisten überlappen (blau getönt), prüft die genaue Phase das Paar. Rechts überlappen nur die Kisten, die Formen nicht: genau dafür braucht es die genaue Phase. -->
   <text x="90" y="14" class="m t">{{titel0}}</text><text x="260" y="14" class="m t">{{titel1}}</text>
   <circle class="fd" cx="48" cy="60" r="12"/>
   <path class="fd" d="M118,73 L145,71 L134,49 Z"/>
   <rect class="lad gs" x="36" y="48" width="24" height="24"/><rect class="lad gs" x="118" y="49" width="27" height="24"/>
   <text x="90" y="104" class="k m">{{unter0}}</text>
-  <rect class="ffa" x="254" y="57" width="8" height="13"/>
+  <rect class="ffa" x="256" y="61" width="6" height="9"/>
   <circle class="fd" cx="250" cy="58" r="12"/>
-  <path class="fd" d="M254,81 L281,79 L270,57 Z"/>
-  <rect class="lad gs" x="238" y="46" width="24" height="24"/><rect class="lad gs" x="254" y="57" width="27" height="24"/>
+  <path class="fd" d="M256,85 L283,83 L272,61 Z"/>
+  <rect class="lad gs" x="238" y="46" width="24" height="24"/><rect class="lad gs" x="256" y="61" width="27" height="24"/>
   <text x="260" y="104" class="k m">{{unter1}}</text>
 </svg>
