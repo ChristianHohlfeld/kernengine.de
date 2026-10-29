@@ -186,7 +186,7 @@ const I18N_DE = {
   "Headshot multiplier": "Kopftreffer-Faktor", "Points for a kill": "Punkte pro Abschuss", "Armor": "Panzerung", "Respawn after (0 = never)": "Wiedereinstieg nach (0 = nie)",
   "Respawn delay": "Wiedereinstiegs-Verzögerung", "Respawn point": "Wiedereinstiegspunkt", "Regenerate after (0 = never)": "Regeneriert nach (0 = nie)",
   "Explosion damage": "Explosionsschaden", "Explosion radius (0 = none)": "Explosionsradius (0 = keiner)", "Impulse on bodies": "Impuls auf Körper",
-  "Points": "Punkte", "Heals": "Heilt", "Ammo": "Munition", "Only once": "Nur einmal", "Action": "Aktion", "Message": "Nachricht",
+  "Points": "Punkte", "Heals": "Heilt", "Ammo": "Munition", "Only once": "Nur einmal", "Message": "Nachricht",
   "Strength (launch m/s, damage)": "Stärke (Start m/s, Schaden)", "Teleport target": "Teleport-Ziel", "Rotation rate": "Drehrate", "Phase": "Phase",
   "Start delay": "Startverzögerung", "Win condition": "Siegbedingung", "Target score": "Zielpunktzahl", "Time limit (0 = none)": "Zeitlimit (0 = keins)",
   "Kill Z (respawn below)": "Kill-Z (darunter Wiedereinstieg)", "Gravity": "Schwerkraft", "Time of day": "Tageszeit", "Day length (0 = frozen)": "Tageslänge (0 = angehalten)",
@@ -220,7 +220,7 @@ const I18N_DE = {
   "Empty Actor": "Leerer Actor", "Actor": "Actor",
 
   // place actors: groups and descriptions
-  "Basic": "Grundformen", "Shapes": "Formen", "Lights": "Lichter", "Players": "Spieler", "Physics Body": "Physikkörper", "Empty": "Leer",
+  "Shapes": "Formen", "Lights": "Lichter", "Players": "Spieler", "Physics Body": "Physikkörper", "Empty": "Leer",
   "Cube": "Würfel", "Physics Cube": "Physik-Würfel", "Physics Sphere": "Physik-Kugel", "Physics Barrel": "Physik-Fass", "Crate Stack": "Kistenstapel",
   "Hinged Door": "Scharniertür", "Moving Platform": "Bewegliche Plattform", "Spinner": "Drehbalken", "See-Saw": "Wippe", "Chain": "Kette", "Pendulum": "Pendel",
   "Jump Pad": "Sprungfeld", "Teleporter": "Teleporter", "Damage Zone": "Schadenszone", "Health Pack": "Medipack", "Ammo Box": "Munitionskiste",
@@ -252,13 +252,142 @@ const I18N_DE = {
   "STEER / GAS": "LENKEN / GAS", "MOVE": "LAUFEN", "LOOK": "SCHAUEN", "FLY": "FLIEGEN", "JUMP": "SPRUNG", "BOOST": "BOOST", "DRIFT": "DRIFT", "LIFT": "LIFT",
   "VIEW": "SICHT", "HOP": "HÜPFEN", "USE": "NUTZEN", "UP": "HOCH", "DOWN": "RUNTER", "AIM": "ZIELEN", "RELOAD": "LADEN", "CROUCH": "DUCKEN",
   "QUACK": "QUAK", "PICK": "GREIFEN", "SIT": "SITZ", "KICK L": "KICK L", "KICK R": "KICK R", "ROLL": "ROLLEN", "BEAK": "SCHNABEL", "WHEEE": "HUIII",
+  "Reloading": "Lädt nach", "R / X to reload": "R / X lädt nach", "No ammo": "Keine Munition", "Down": "Ausgeschaltet",
+  "Survived!": "Überlebt!", "Time is up": "Die Zeit ist um", "Target score reached!": "Zielpunktzahl erreicht!", "All collected - reach the goal!": "Alles gesammelt – erreiche das Ziel!",
+  "All collected!": "Alles gesammelt!", "Collect everything first": "Sammle zuerst alles ein", "Goal reached!": "Ziel erreicht!", "Hit a hazard": "In eine Gefahr geraten",
+  "The teleporter has no target": "Der Teleporter hat kein Ziel", "Respawned": "Wieder eingestiegen", "You win!": "Gewonnen!",
+  // messages of the example levels and the Message Trigger's first text (level data, shown in the HUD)
+  "Swept away!": "Weggefegt!", "Lab complete!": "Labor geschafft!", "Hello from Kern Studio!": "Hallo aus Kern Studio!",
+
+  // file menu and New Level: the templates ("Basic" is a level with floor, sun and sky)
+  "Basic": "Basis",
+  "First-person Soldier (desktop, gamepad, touch), targets, cover - multiplayer ready": "Ego-Soldat (Desktop, Gamepad, Touch), Ziele, Deckung – mehrspielerfähig",
+  "Pollen Robotics' walking robot on its trained network: roams on its own with ToF and camera": "Der Laufroboter von Pollen Robotics auf seinem trainierten Netz: streift selbstständig umher, mit ToF und Kamera",
+
+  // dialogs
+  "Controls": "Steuerung", "Reset": "Zurücksetzen", "Pan": "Schwenken",
+  "Fly (Unreal fly mode); wheel while flying changes speed, Shift = faster, Z / C zoom": "Fliegen (wie in Unreal); Mausrad beim Fliegen ändert das Tempo, Umschalt = schneller, Z / C zoomt",
+  "Puts every editor setting back to its default: preferences, snapping, sound, viewport layout, view types and modes, show flags (Constraints off) and the panel sizes. Your levels are not touched.":
+    "Setzt jede Editor-Einstellung auf den Standard zurück: Einstellungen, Einrasten, Ton, Viewport-Aufteilung, Ansichtstypen und -modi, Anzeige-Optionen (Gelenke aus) und die Größen der Bereiche. Deine Levels bleiben unberührt.",
+  "Players join with the same room name. Leave the relay empty for players in other tabs of this browser; for other machines run tools/net_relay.mjs and enter its address (ws://host:8790). Everyone needs this level.":
+    "Mitspieler treten mit demselben Raumnamen bei. Lass das Relay leer für Mitspieler in anderen Tabs dieses Browsers; für andere Rechner starte tools/net_relay.mjs und trag seine Adresse ein (ws://host:8790). Alle brauchen dieses Level.",
+  "Enter the room the host chose (and the relay address if the host uses one). You need the same level as the host.":
+    "Gib den Raum ein, den der Host gewählt hat (und die Relay-Adresse, falls der Host eines nutzt). Du brauchst dasselbe Level wie der Host.",
+  "The editor of the Kern engine: a C++ renderer (WebGL2 through WebAssembly) and Box3D rigid-body physics, with levels made of actors and components that play right in the viewport. Everything in the viewport is rendered and simulated by the same native code that runs exported games.":
+    "Der Editor der Kern-Engine: ein C++-Renderer (WebGL2 über WebAssembly) und Box3D-Starrkörperphysik, mit Levels aus Actors und Komponenten, die direkt im Viewport spielen. Alles im Viewport wird vom selben nativen Code gerendert und simuliert, der auch exportierte Spiele ausführt.",
+
+  // viewports: tooltips, menus, hints, the robot camera
+  "Maximise this viewport": "Diesen Viewport maximieren", "Icons (lights, empties)": "Symbole (Lichter, leere Actors)", "Selection outline": "Auswahlumriss",
+  "Collision shapes": "Kollisionsformen", "Contact points": "Kontaktpunkte", "Orthographic": "Orthografisch", "View mode": "Ansichtsmodus", "Is the Player": "Ist der Spieler",
+  "Grabbing - release to throw": "Greifen – loslassen zum Werfen", "Click the viewport to control the game · Esc stops · F8 ejects": "Klick in den Viewport, um das Spiel zu steuern · Esc beendet · F8 steigt aus",
+  "Ejected · free camera · F8 possess · Esc stop": "Ausgestiegen · freie Kamera · F8 übernimmt · Esc beendet", "Simulating · drag grabs bodies · K keeps poses · Esc stops": "Simuliert · Ziehen greift Körper · K übernimmt Posen · Esc beendet",
+  // The robot camera's state ("Chill", "Wander"...) stays English: it is the name the logic node Robot State returns.
+  "HEAD CAMERA": "KOPFKAMERA", "TOF 8×8": "TOF 8×8", "Fallen": "Gestürzt", "clear": "frei",
+
+  // status line and messages
+  "Stop playing to edit the level": "Beende das Spiel, um das Level zu bearbeiten", "Sound is off - click to turn it on": "Ton ist aus – klicken zum Einschalten",
+  "WebGL2 is not available in this browser": "WebGL2 ist in diesem Browser nicht verfügbar", "The relay closed the connection": "Das Relay hat die Verbindung geschlossen",
+  "the decoded audio was rejected": "das dekodierte Audio wurde abgelehnt", "the browser could not decode it": "der Browser konnte ihn nicht dekodieren",
+  "a name cannot be empty": "ein Name darf nicht leer sein", "a level needs a name": "ein Level braucht einen Namen",
+  "a level must be a JSON object": "ein Level muss ein JSON-Objekt sein", "not a Kern level (format must be \"kern-level\")": "kein Kern-Level (format muss \"kern-level\" sein)",
+  "level was written by a newer Kern Studio": "das Level stammt aus einem neueren Kern Studio", "too many actors": "zu viele Actors",
+  "Console: play | simulate | stop | spawn <item> | select <name> | tod <0..1> | gravity <x y z> | camspeed <1-8> | stat | clear":
+    "Konsole: play | simulate | stop | spawn <Element> | select <Name> | tod <0..1> | gravity <x y z> | camspeed <1-8> | stat | clear",
+  // undo history
+  "Add actor": "Actor hinzufügen", "Move": "Verschieben", "Rotate": "Drehen", "Duplicate and move": "Duplizieren und verschieben", "Duplicate and rotate": "Duplizieren und drehen",
+  "Duplicate and scale": "Duplizieren und skalieren", "Keep simulation changes": "Simulationsänderungen übernehmen", "Remove texture": "Textur entfernen",
+  "Rename Sound": "Sound umbenennen", "Connect": "Verbinden",
+  // level checks (status line)
+  "duplicate or missing id": "doppelte oder fehlende ID", "parent does not exist": "das Elternteil existiert nicht", "transform is not finite": "die Transformation ist nicht endlich",
+  "scale must not be zero": "die Skalierung darf nicht null sein", "a joint cannot connect an actor to itself": "ein Gelenk kann einen Actor nicht mit sich selbst verbinden",
+  "joint target does not exist": "das Gelenkziel existiert nicht", "joint axis must not be zero": "die Gelenkachse darf nicht null sein",
+  "a joint needs a body on its actor (it is ignored)": "ein Gelenk braucht einen Körper an seinem Actor (es wird ignoriert)",
+  "joint target has neither a body nor collision (the joint is ignored)": "das Gelenkziel hat weder Körper noch Kollision (das Gelenk wird ignoriert)",
+  "a weapon is only used by a Soldier player controller": "eine Waffe nutzt nur eine Spieler-Steuerung vom Typ Soldat", "the audio source has no sound": "die Audioquelle hat keinen Sound",
+  "a controller needs a body on the same actor": "eine Steuerung braucht einen Körper am selben Actor", "a controller only drives dynamic bodies": "eine Steuerung bewegt nur dynamische Körper",
+  "a city must be a top-level actor": "eine Stadt muss ein Actor der obersten Ebene sein",
+  "pickups and triggers react to sensor colliders; none is marked as sensor": "Pickups und Trigger reagieren auf Sensor-Kollider; keiner ist als Sensor markiert",
+  "more than one actor has a player controller; the first one is possessed": "mehr als ein Actor hat eine Spieler-Steuerung; der erste wird übernommen",
+  "the win condition is \"reach goal\" but no trigger is a goal": "die Siegbedingung ist „Ziel erreichen“, aber kein Trigger ist ein Ziel",
+  "impact sound": "Aufprallgeräusch", "collider impact sound": "Aufprallgeräusch des Kolliders", "joint break sound": "Bruchgeräusch des Gelenks", "engine sound": "Motorgeräusch",
+  "jump sound": "Sprunggeräusch", "boost sound": "Boost-Geräusch", "fire sound": "Schussgeräusch", "reload sound": "Nachladegeräusch", "hit sound": "Treffergeräusch",
+  "down sound": "Ausschaltgeräusch", "pickup sound": "Pickup-Geräusch", "trigger sound": "Trigger-Geräusch", "audio source sound": "Sound der Audioquelle", "world sound": "Welt-Sound",
+
+  // details: fields, units and choices
+  "Inner radius": "Innerer Radius", "Jump": "Sprung", "Fire": "Schuss", "Reload": "Nachladen", "Hit": "Treffer", "Multiple": "Mehrere",
+  "rpm": "Schuss/min", "(rpm)": "(Schuss/min)", "limits in m, speed in m/s (wheel: °/s)": "Grenzen in m, Tempo in m/s (Rad: °/s)", "limits in °, speed in °/s": "Grenzen in °, Tempo in °/s",
+  "velstand (walks and stands, v8)": "velstand (läuft und steht, v8)", "alpha_walking + alpha_stand (older pair)": "alpha_walking + alpha_stand (älteres Paar)",
+
+  // place actors: names and descriptions
+  "Micro Duck (Rollers)": "Micro Duck (Rollschuhe)", "60 rounds for soldiers; returns after 20 s": "60 Schuss für Soldaten; kommt nach 20 s zurück",
+  "1 m box with collision": "1-m-Würfel mit Kollision", "1 m sphere": "1-m-Kugel", "10 x 10 m floor": "10 × 10 m Boden", "8 links on ball joints": "8 Glieder an Kugelgelenken",
+  "3D sound emitter (machine hum)": "3D-Schallquelle (Maschinenbrummen)",
+  "A crumpled sock at Micro Duck scale (soft lumps on springs): the duck picks it up with 2 or on its own": "Eine zerknüllte Socke im Maßstab der Micro Duck (weiche Klumpen an Federn): die Ente hebt sie mit 2 oder von selbst auf",
+
+  // sounds: the built-in sounds and their categories (Sounds tab, sound fields)
+  "Imported": "Importiert", "built-in": "eingebaut", "loop": "Schleife", "Playing preview": "Vorschau läuft",
+  "Sound starts after the first click or key press (browser rule).": "Ton startet nach dem ersten Klick oder Tastendruck (Browser-Regel).",
+  "Sound starts after the first click or key press (browser rule). This browser has no Web Audio: the editor works silently.": "Ton startet nach dem ersten Klick oder Tastendruck (Browser-Regel). Dieser Browser hat kein Web Audio: der Editor arbeitet stumm.",
+  "Combat": "Kampf", "Robot": "Roboter", "UI": "Oberfläche",
+  "Power-up": "Power-up", "Land": "Landung", "Goal fanfare": "Zielfanfare", "Laser": "Laser", "Gunshot": "Gewehrschuss", "SMG shot": "MP-Schuss", "Pistol shot": "Pistolenschuss",
+  "Sniper shot": "Scharfschützenschuss", "Launcher shot": "Werferschuss", "Hit marker": "Trefferanzeige", "Impact": "Aufprall", "Light impact": "Leichter Aufprall",
+  "Joint break": "Gelenkbruch", "Footstep": "Schritt", "Plastic tap": "Plastikklopfen", "Small footstep": "Kleiner Schritt", "Engine": "Motor", "Hover drive": "Schwebeantrieb",
+  "Wind": "Wind", "City": "Stadt", "Electric hum": "Elektrisches Brummen", "Servo": "Servo", "Quack": "Quaken", "Robot beep": "Roboterpiepen", "Click": "Klick",
+  "Confirm": "Bestätigen", "Error": "Fehler", "Drive (music)": "Fahrt (Musik)", "Calm (music)": "Ruhe (Musik)", "Micro Duck voice": "Stimme der Micro Duck",
 };
 
 // Phrases with a variable part (counts, names): [pattern, replacement].
 const I18N_PATTERNS = [
+  // Specific forms first; the general "Saved …", "Deleted …" below would take them otherwise.
+  [/^Deleted 1 actor$/, "1 Actor gelöscht"], [/^Deleted (\d+) actors$/, "$1 Actors gelöscht"], [/^Copied (\d+) actors$/, "$1 Actors kopiert"],
+  [/^Selected (\d+) actors$/, "$1 Actors ausgewählt"], [/^Kept the simulated placement of (\d+) actors$/, "Simulierte Position von $1 Actors übernommen"],
+  [/^Physics set to (\d+) Hz with (\d+) sub-steps for the robot \(World Settings\)$/, "Physik auf $1 Hz mit $2 Teilschritten für den Roboter gestellt (Welteinstellungen)"],
+  [/^(.+) is the player now - press Play \(Alt\+P\) to control it$/, "%1 ist jetzt der Spieler – drück Spielen (Alt+P), um ihn zu steuern"], [/^(.+) is the player now$/, "%1 ist jetzt der Spieler"],
+  [/^Unknown actor type (.+)$/, "Unbekannter Actor-Typ: %1"],
+  [/^Imported (.+) and applied it to the selection$/, "Importiert und auf die Auswahl angewendet: %1"], [/^Imported sound "(.+)"$/, "Sound „%1“ importiert"],
+  [/^Could not use the sound "(.+?)": (.+)$/, "Der Sound „%1“ ließ sich nicht verwenden: $2", "deep"],
+  [/^Could not decode the sound "(.+?)": (.+)$/, "Der Sound „%1“ ließ sich nicht dekodieren: $2", "deep"], [/^Could not decode the sound "(.+)"$/, "Der Sound „%1“ ließ sich nicht dekodieren"],
+  [/^The sound "(.+)" is not available$/, "Der Sound „%1“ ist nicht verfügbar"],
+  [/^Unknown console command: (.+) \(try help\)$/, "Unbekannter Konsolenbefehl: %1 (versuch help)"],
+  [/^Play: (\d+) players \(listen server \+ 1 client\)$/, "Spielen: $1 Spieler (Listen-Server + 1 Client)"],
+  [/^Play: (\d+) players \(listen server \+ (\d+) clients\)$/, "Spielen: $1 Spieler (Listen-Server + $2 Clients)"],
+  [/^(\d+) fps - (\d+) bodies \((\d+) awake\), (\d+) shapes, (\d+) joints \((\d+) broken\), (\d+) contacts$/, "$1 fps – $2 Körper ($3 wach), $4 Formen, $5 Gelenke ($6 gebrochen), $7 Kontakte"],
+  [/^(\d+) fps - (\d+) actors, (\d+) textures$/, "$1 fps – $2 Actors, $3 Texturen"],
+  [/^Restore "(.+)" from your last session\?$/, "„%1“ aus deiner letzten Sitzung wiederherstellen?"],
+  [/^Hosting room "(.+)" - players join with Play > Join Online Game$/, "Raum „%1“ gehostet – Mitspieler treten über Spielen > Online-Spiel beitreten bei"],
+  [/^Joined room "(.+)"$/, "Raum „%1“ beigetreten"], [/^Online play: (.+)$/, "Online spielen: $1", "deep"],
+  [/^no game is hosted in room "(.+)" in this browser$/, "in diesem Browser hostet niemand den Raum „%1“"], [/^the relay (.+) is not reachable$/, "das Relay %1 ist nicht erreichbar"],
+  [/^nobody hosts room "(.+)" on the relay$/, "auf dem Relay hostet niemand den Raum „%1“"],
+  [/^"(.+)" is not a Kern level$/, "„%1“ ist kein Kern-Level"], [/^Packaged (.+) \(([\d.]+) MB\)$/, "Verpackt: %1 ($2 MB)"],
+  [/^(.+) is larger than (\d+) MB - shorten or compress it \(OGG \/ MP3\)$/, "%1 ist größer als $2 MB – kürze oder komprimiere die Datei (OGG / MP3)"],
+  [/^(.+) is not an audio file this browser can play$/, "%1 ist keine Audiodatei, die dieser Browser abspielen kann"], [/^Imported (.+)$/, "Importiert: %1"],
+  [/^The WebGL context could not be restored: (.+)$/, "Der WebGL-Kontext ließ sich nicht wiederherstellen: $1"],
+  [/^Kern Studio failed to start: (.+)$/, "Kern Studio konnte nicht starten: $1"], [/^Studio error: (.+)$/, "Studio-Fehler: $1"],
+  [/^Missing: (.+)$/, "Fehlt: %1"], [/^(.+) - click to listen, double-click to use on the selection$/, "%1 – klicken zum Anhören, Doppelklick setzt ihn bei der Auswahl ein"],
+  [/^Game won: (.*)$/, "Spiel gewonnen: $1", "deep"], [/^Game lost: (.*)$/, "Spiel verloren: $1", "deep"],
+  [/^Joint on "(.+)" ignored: the actor has no body$/, "Gelenk an „%1“ ignoriert: der Actor hat keinen Körper"],
+  [/^Joint on "(.+)" ignored: the target has no body$/, "Gelenk an „%1“ ignoriert: das Ziel hat keinen Körper"],
+  [/^Joint on "(.+)" rejected: (.+)$/, "Gelenk an „%1“ abgelehnt: $2"], [/^Joint on "(.+)" broke$/, "Gelenk an „%1“ gebrochen"],
+  [/^Collider of "(.+)" skipped: (.+)$/, "Kollider von „%1“ übersprungen: $2"],
+  // HUD: who went down, respawn countdown.
+  [/^(.+) down - headshot!$/, "%1 ausgeschaltet – Kopftreffer!"], [/^([^/]+) down$/, "%1 ausgeschaltet"], [/^Respawn in (\d+)$/, "Wiedereinstieg in $1"],
+  // Level checks: "Name": problem, and the sounds that do not exist.
+  [/^(.+) "(.*)" does not exist \(it is silent\)$/, "$1 „%2“ gibt es nicht (bleibt stumm)", "deep"],
+  [/^"(.+)": (.+)$/, "„%1“: $2", "deep"],
+  // Viewport info, hints and the status bar's simulation line.
+  [/^(\S+) {2}([\d.]+ k?m) wide$/, "$1  $2 breit", true],
+  [/^(\d+) fps {2}(\d+) bodies {2}(\d+) contacts {2}step (\d+)$/, "$1 fps  $2 Körper  $3 Kontakte  Schritt $4"],
+  [/^Flying · WASD move · Q\/E down\/up · wheel speed (\S*) · Shift faster · Z\/C zoom$/, "Fliegen · WASD bewegen · Q/E runter/hoch · Mausrad Tempo $1 · Umschalt schneller · Z/C Zoom"],
+  [/^(Server|Client) · (\d+) players? · ([\d.]+) ms · ([\d.]+)% loss · (.+)$/, "$1 · $2 Spieler · $3 ms · $4 % Verlust · $5"],
+  // Undo history: the step's own label is translated too.
+  [/^Undo (.+) \(Ctrl\+Z\)$/, "Rückgängig: $1 (Strg+Z)", "deep"], [/^Redo (.+) \(Ctrl\+Y\)$/, "Wiederholen: $1 (Strg+Y)", "deep"],
+  [/^Undo (.+)$/, "Rückgängig: $1", "deep"], [/^Redo (.+)$/, "Wiederholen: $1", "deep"], [/^History: (.+)$/, "Verlauf: $1", "deep"],
+  [/^Open (.+)$/, "%1 öffnen"], [/^Edit ([a-z][A-Za-z0-9]*)$/, "„%1“ ändern"],
+  [/^Add ([a-z][A-Za-z0-9]*)$/, "Komponente „%1“ hinzufügen"], [/^Remove ([a-z][A-Za-z0-9]*)$/, "Komponente „%1“ entfernen"],
+  [/^(Collider|Constraint) (\d+)$/, "$1 $2", true],  // the second, third... collider or joint of an actor
   [/^(\d+) actors$/, "$1 Actors"], [/^(\d+) actors \((\d+) selected\)$/, "$1 Actors ($2 ausgewählt)"], [/^(\d+) of (\d+) selected$/, "$1 von $2 ausgewählt"],
   [/^Saved (.+)$/, "Gespeichert: $1"], [/^Opened (.+)$/, "Geöffnet: $1"], [/^Deleted (.+)$/, "Gelöscht: $1"], [/^Copied (.+)$/, "Kopiert: $1"],
-  [/^Undo (.+)$/, "Rückgängig: $1"], [/^Redo (.+)$/, "Wiederholen: $1"], [/^New level: (.+)$/, "Neues Level: $1"], [/^Physics set to (.+)$/, "Physik: $1"],
+  [/^New level: (.+)$/, "Neues Level: $1"], [/^Physics set to (.+)$/, "Physik: $1"],
   [/^Reopened "(.+)", where you worked last time$/, "„$1“ wieder geöffnet, wo du zuletzt warst"],
   [/^Kept the simulated placement of (.+)$/, "Simulierte Position übernommen: $1"], [/^Packaging (.+)$/, "Verpacke $1"],
   [/^Saving failed: (.+)$/, "Speichern fehlgeschlagen: $1"], [/^Opening failed: (.+)$/, "Öffnen fehlgeschlagen: $1"], [/^Packaging failed: (.+)$/, "Verpacken fehlgeschlagen: $1"],
@@ -266,12 +395,16 @@ const I18N_PATTERNS = [
   [/^Speed (.+)$/, "Tempo $1"],
   [/^(\d+) Players \(listen server\)$/, "$1 Spieler (Listen-Server)"], [/^Attach to (.+)$/, "Anhängen an $1"],
   [/^Jump to bookmark (\d)$/, "Zu Lesezeichen $1 springen"], [/^Set bookmark (\d)$/, "Lesezeichen $1 setzen"],
-  [/^(\d+) bodies · (\d+) awake · (\d+) joints( \((\d+) broken\))? · (\d+) contacts$/, "$1 Körper · $2 wach · $3 Gelenke · $6 Kontakte"],
+  [/^(\d+) bodies · (\d+) awake · (\d+) joints · (\d+) contacts$/, "$1 Körper · $2 wach · $3 Gelenke · $4 Kontakte"],
+  [/^(\d+) bodies · (\d+) awake · (\d+) joints \((\d+) broken\) · (\d+) contacts$/, "$1 Körper · $2 wach · $3 Gelenke ($4 gebrochen) · $5 Kontakte"],
   // Only when the named part is a known phrase ("Add Point Light"), never half-translated.
   [/^Add (.+)$/, "$1 hinzufügen", true], [/^Remove (.+)$/, "$1 entfernen", true],
   [/^(.+) - drag into a viewport or click$/, "$1 – in einen Viewport ziehen oder anklicken", true],
   [/^(.+) \(([^()]*)\)$/, "$1 ($2)", true],  // a field's tooltip with its unit: "Friction (N)"
 ];
+
+// A text made only of keys ("F  /  End", "H  /  Shift+H  /  Ctrl+H"): the key names follow the keyboard.
+const I18N_KEYS = /^(?:(?:Ctrl|Shift|Alt|Space|Delete|End|Esc|F\d{1,2}|[A-Z0-9]|\d\.\.\d)(?:\s*[+\/,]\s*|\s+|$))+$/;
 
 const I18N_ATTRS = ["title", "placeholder", "aria-label"];
 // What the user wrote or the engine prints stays as it is.
@@ -287,15 +420,17 @@ export function tr(s) {
     for (const [re, rep, known] of I18N_PATTERNS) {
       const m = key.match(re);
       if (!m) continue;
-      if (known && I18N_DE[m[1]] === undefined) continue;
-      // The variable part is translated too when it is a known phrase ("Add Point Light").
-      out = rep.replace(/\$(\d)/g, (_, i) => I18N_DE[m[+i]] ?? m[+i]);
+      if (known === true && I18N_DE[m[1]] === undefined) continue;
+      // The variable part is translated too when it is a known phrase ("Add Point Light");
+      // "deep" patterns translate it like any other text ("Undo Edit friction", a status inside a status).
+      // %1 keeps the part as it is: actor, room, file and sound names.
+      out = rep.replace(/([$%])(\d)/g, (_, k, i) => m[+i] === undefined ? "" : k === "%" ? m[+i] : known === "deep" ? tr(m[+i]) : I18N_DE[m[+i]] ?? m[+i]);
       break;
     }
   }
-  // Shortcuts as German keyboards label them: Strg, Umschalt, Leertaste, Entf.
-  if (out === undefined && /^(Ctrl|Shift|Alt)\+/.test(key))
-    out = key.replace(/\bCtrl\b/g, "Strg").replace(/\bShift\b/g, "Umschalt").replace(/\bSpace\b/g, "Leertaste").replace(/\bDelete\b/g, "Entf");
+  // Shortcuts as German keyboards label them: Strg, Umschalt, Leertaste, Entf, Ende.
+  if (out === undefined && (/^(Ctrl|Shift|Alt)\+/.test(key) || (I18N_KEYS.test(key) && /\b(Ctrl|Shift|Space|Delete|End)\b/.test(key))))
+    out = key.replace(/\bCtrl\b/g, "Strg").replace(/\bShift\b/g, "Umschalt").replace(/\bSpace\b/g, "Leertaste").replace(/\bDelete\b/g, "Entf").replace(/\bEnd\b/g, "Ende");
   if (out === undefined || out === key) return s;
   return s.replace(key, out);
 }

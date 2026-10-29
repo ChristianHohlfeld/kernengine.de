@@ -628,7 +628,7 @@ class StudioPage {
     if (!this.robotEl) {
       this.robotEl = document.createElement("div");
       this.robotEl.className = "robot-pip";
-      this.robotEl.innerHTML = `<div class="rp-cam"><span class="rp-label">HEAD CAMERA</span><span class="rp-state"></span></div><div class="rp-tof"><canvas width="8" height="8"></canvas><span class="rp-label">TOF 8×8</span><span class="rp-near"></span></div>`;
+      this.robotEl.innerHTML = `<div class="rp-cam"><span class="rp-label">HEAD CAMERA</span><span class="rp-state" data-i18n-skip></span></div><div class="rp-tof"><canvas width="8" height="8"></canvas><span class="rp-label">TOF 8×8</span><span class="rp-near"></span></div>`;
     }
     if (this.robotEl.parentElement !== vp) vp.append(this.robotEl);
     this.robotEl.hidden = false;
@@ -637,7 +637,7 @@ class StudioPage {
     cam.style.height = r.h + "px";
     const tof = this.robotEl.querySelector(".rp-tof");
     tof.style.width = tof.style.height = Math.round(Math.min(r.h / 2, 160)) + "px";
-    this.robotEl.querySelector(".rp-state").textContent = r.fallen ? "Fallen" : r.state || "";
+    this.robotEl.querySelector(".rp-state").textContent = r.fallen ? tr("Fallen") : r.state || "";
     this.robotEl.querySelector(".rp-near").textContent = r.nearest >= 0 ? `${r.nearest.toFixed(2)} m` : "clear";
     const g = this.robotEl.querySelector("canvas").getContext("2d");
     const img = g.createImageData(8, 8);
@@ -673,7 +673,7 @@ class StudioPage {
       }
     }
     const netText = st.net ? `${st.net.role === "server" ? "Server" : "Client"} · ${st.net.players} player${st.net.players === 1 ? "" : "s"} · ${st.net.rtt.toFixed(0)} ms · ${st.net.loss.toFixed(1)}% loss · ↑${st.net.up.toFixed(0)} ↓${st.net.down.toFixed(0)} kbit/s   ` : "";
-    $("#simStats").textContent = netText + (st.sim ? `${st.sim.bodies} bodies · ${st.sim.awake} awake · ${st.sim.joints} joints${st.sim.broken ? ` (${st.sim.broken} broken)` : ""} · ${st.sim.contacts} contacts` : "");
+    $("#simStats").textContent = (netText && tr(netText.trim()) + "   ") + tr(st.sim ? `${st.sim.bodies} bodies · ${st.sim.awake} awake · ${st.sim.joints} joints${st.sim.broken ? ` (${st.sim.broken} broken)` : ""} · ${st.sim.contacts} contacts` : "");
     for (const v of this.views) {
       const vs = s.viewports[v.index], vst = st.viewports?.[v.index];
       const active = vs.active;
@@ -704,7 +704,7 @@ class StudioPage {
         if (vs.flags.stats && active) info += `\n${this.fpsShown || 0} fps${st.sim ? `  ${st.sim.bodies} bodies  ${st.sim.contacts} contacts  step ${st.sim.steps}` : ""}`;
       }
       if (st.play === "playing" && active && !s.play.ejected) info = "";
-      if (info !== v.infoKey) { v.infoKey = info; v.info.textContent = info; }
+      if (info !== v.infoKey) { v.infoKey = info; v.info.textContent = info.split("\n").map(line => tr(line)).join("\n"); }
       // Axis tripod (perspective, active view).
       const axesKey = active && vs.type === "perspective" && st.camera && !(st.play === "playing" && !s.play.ejected) ? `${st.camera.yaw},${st.camera.pitch}` : "";
       if (axesKey !== v.axesKey) {
@@ -1230,9 +1230,9 @@ class StudioPage {
         if (snd.imported?.length) opts += `<optgroup label="${tr("Imported")}">${snd.imported.map(x => opt(x.id, x.name)).join("")}</optgroup>`;
         const groups = new Map();
         for (const b of snd.builtin || []) { if (!groups.has(b.category)) groups.set(b.category, []); groups.get(b.category).push(b); }
-        for (const [cat, list] of groups) opts += `<optgroup label="${esc(tr(cat))}">${list.map(b => opt(b.id, b.name + (b.loop ? " (loop)" : ""))).join("")}</optgroup>`;
-        const known = f.value === "" || f.value === "auto" || (snd.builtin || []).some(b => b.id === f.value) || (snd.imported || []).some(x => x.id === f.value);
-        if (!known && !mixed) opts += opt(f.value, `Missing: ${f.value}`);
+        for (const [cat, list] of groups) opts += `<optgroup label="${esc(tr(cat))}">${list.map(b => opt(b.id, tr(b.name) + (b.loop ? ` (${tr("loop")})` : ""))).join("")}</optgroup>`;
+        const known = f.value == null || f.value === "" || f.value === "auto" || (snd.builtin || []).some(b => b.id === f.value) || (snd.imported || []).some(x => x.id === f.value);
+        if (!known && !mixed) opts += opt(f.value, tr(`Missing: ${f.value}`));
         if (mixed) opts = `<option value="__mixed" selected>${tr("Multiple values")}</option>` + opts;
         editor = `<select class="sel" ${attrs}>${opts}</select><button class="ph" data-preview-sound="${p}" title="Preview">${icon("play")}</button>`;
         break;
