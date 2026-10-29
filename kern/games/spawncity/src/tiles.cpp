@@ -76,15 +76,27 @@ void polygons(const mvt::Feature& f, std::vector<std::vector<std::vector<Vec2>>>
   }
 }
 
+/// Tile units -> local metres. Longitude is linear in tile x; latitude is web-mercator in tile y,
+/// interpolated quadratically through the tile's top, middle and bottom (sub-centimetre over a
+/// z14 tile) so a dense tile projects without a trig call per vertex.
 struct Projector {
-  const TileKey& key;
-  const kern::GeoProjector& proj;
-  f64 extent;
+  f64 x0, x1, y0, ym, y1, inv_extent;
+  Projector(const TileKey& key, const kern::GeoProjector& proj, f64 extent) : inv_extent(1.0 / extent) {
+    f64 lon, lat, x;
+    tile_lonlat(key, 0, 0, lon, lat);
+    proj.project(lon, lat, x, y0);
+    x0 = x;
+    tile_lonlat(key, 1, 0.5, lon, lat);
+    proj.project(lon, lat, x, ym);
+    x1 = x;
+    tile_lonlat(key, 1, 1, lon, lat);
+    proj.project(lon, lat, x, y1);
+  }
   Vec2 operator()(Vec2 t) const {
-    f64 lon, lat, x, y;
-    tile_lonlat(key, t.x / extent, t.y / extent, lon, lat);
-    proj.project(lon, lat, x, y);
-    return {static_cast<f32>(x), static_cast<f32>(y)};
+    const f64 fx = t.x * inv_extent, fy = t.y * inv_extent;
+    // Lagrange through (0, y0), (0.5, ym), (1, y1).
+    const f64 y = y0 * (2 * fy - 1) * (fy - 1) + ym * 4 * fy * (1 - fy) + y1 * fy * (2 * fy - 1);
+    return {static_cast<f32>(x0 + fx * (x1 - x0)), static_cast<f32>(y)};
   }
 };
 
@@ -98,7 +110,7 @@ u32 hash_u32(u64 v) {
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
   std::vector<std::vector<std::vector<Vec2>>> polys;
   if (const mvt::Layer* l = tile.layer("building")) {
-    const Projector P{key, proj, static_cast<f64>(l->extent)};
+    const Projector P(key, proj, static_cast<f64>(l->extent));
     for (const mvt::Feature& f : l->features) {
       if (f.type != mvt::GeomType::polygon) continue;
       const mvt::Value* hide = l->tag(f, "hide_3d");
@@ -124,7 +136,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   if (const mvt::Layer* l = tile.layer("transportation")) {
-    const Projector P{key, proj, static_cast<f64>(l->extent)};
+    const Projector P(key, proj, static_cast<f64>(l->extent));
     for (const mvt::Feature& f : l->features) {
       if (f.type != mvt::GeomType::line) continue;
       RoadClass c;
@@ -142,7 +154,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   if (const mvt::Layer* l = tile.layer("waterway")) {
-    const Projector P{key, proj, static_cast<f64>(l->extent)};
+    const Projector P(key, proj, static_cast<f64>(l->extent));
     for (const mvt::Feature& f : l->features) {
       if (f.type != mvt::GeomType::line) continue;
       const std::string_view cls = l->text(f, "class");
@@ -160,7 +172,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
   auto areas = [&](const char* layer, auto kind_of) {
     const mvt::Layer* l = tile.layer(layer);
     if (!l) return;
-    const Projector P{key, proj, static_cast<f64>(l->extent)};
+    const Projector P(key, proj, static_cast<f64>(l->extent));
     for (const mvt::Feature& f : l->features) {
       if (f.type != mvt::GeomType::polygon) continue;
       AreaKind kind;
