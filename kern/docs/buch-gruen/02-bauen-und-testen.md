@@ -7,7 +7,9 @@
 
 > **Begriffe vorab:**
 > - **Quelltext** – der Text eines Programms, so wie Menschen ihn schreiben, hier in C++.
-> - **Header** – eine Art Inhaltsverzeichnis im Quelltext, das viele Programmteile gemeinsam lesen.
+> - **Header** – eine gemeinsame Absprache-Datei im Quelltext, die viele Programmteile mitlesen,
+>   wie eine Hausordnung, die in jeder Wohnung hängt.
+> - **Prozessor** – das Rechenwerk im Computer, das die Befehle tatsächlich ausführt.
 > - **Speicher** – der Arbeitsplatz eines Programms im Rechner, eine lange Reihe nummerierter Fächer
 >   für Zahlen.
 > - **Simulation** – eine nachgerechnete Welt: Der Computer berechnet Schritt für Schritt, wie sich
@@ -35,36 +37,49 @@ WebAssembly-**Modul**, eine einzige Datei, die der Browser lädt.
 
 Der Koch hat zwei feste Hausregeln. Erstens: **keine Rechen-Abkürzungen.** Manche Prozessoren
 können zwei Rechenschritte zu einem verschmelzen und runden dabei anders als andere. Das ist
-verboten, damit Kern überall gleich rechnet ([Kapitel 1](01-einfuehrung.md)). Zweitens: Nur was
-ausdrücklich nach außen gereicht werden soll, ist von außen sichtbar, und Ungenutztes fliegt raus.
+verboten, damit Kern überall gleich rechnet ([Kapitel 1](01-einfuehrung.md)). Zweitens: **nur
+servieren, was bestellt ist.** Der Koch legt nichts auf den Teller, was keiner isst – so bleibt das
+Modul klein und lädt schneller.
 
 ### Der Vorratsschrank
 
 Kern besteht aus vielen Dutzend Quelltext-Stücken. Jedes wird einzeln übersetzt, viele
 gleichzeitig, und am Ende zu einem Modul zusammengefügt. Damit nicht bei jedem Bauen alles neu gekocht wird, kommt
-jedes übersetzte Stück in einen **Vorratsschrank**. Es trägt ein Etikett, das aus seinem Rezept und
-dem Inhalt **aller** Header errechnet wird. Passt das Etikett noch, wird das Stück aus dem Schrank
-genommen statt neu gekocht. Studio und Beispielspiele teilen sich den Schrank, und das Fließband
-aus Abschnitt 2.4 hebt ihn von Lauf zu Lauf auf.
+jedes übersetzte Stück in einen **Vorratsschrank**. Es trägt ein Etikett, eine Art Fingerabdruck
+seines Rezepts und **aller** Header: Ändert sich darin auch nur ein Zeichen, sieht das Etikett völlig
+anders aus (wie so ein Fingerabdruck entsteht, zeigt [Kapitel 3](03-grundlagen.md)). Passt das
+Etikett noch, wird das Stück aus dem Schrank genommen statt neu gekocht. Studio und Beispielspiele
+teilen sich den Schrank, und das Fließband aus Abschnitt 2.4 hebt ihn von Lauf zu Lauf auf.
 
-> **Achtung, Falle!** Du änderst ein einziges Komma in einem Header – und **alles** wird neu
-> übersetzt? Absicht! Weil alle Header ins Etikett eingehen, passt nach jeder Header-Änderung kein
-> Vorratsstück mehr. Das kostet Zeit, ist aber einfach und sicher: Nie bleibt ein veraltetes Teil
-> übrig.
+> **Wusstest du?** Ändert jemand ein einziges Komma in einem Header, wird **alles** neu übersetzt –
+> mit Absicht. Jedes Stück liest die Header mit, wie jede Wohnung die Hausordnung. Herauszufinden,
+> welche Stücke eine Änderung wirklich betrifft, wäre mühsam und fehleranfällig; ein übersehenes
+> Stück bliebe veraltet im Schrank. Also kocht Kern lieber alles neu. Das kostet Zeit, ist aber
+> einfach und sicher.
 
 ### Studio im Koffer
 
-Ein zweites Skript packt Kern Studio in **eine einzige** HTML-Datei: das Modul, die
-JavaScript-Schicht und das Aussehen der Seite, alles in einem Koffer. Das Modul besteht eigentlich
-aus Rohdaten; damit es in eine Textdatei passt, wird es als lange Buchstabenfolge verkleidet,
-ähnlich wie Morsezeichen Buchstaben als Punkte und Striche verkleiden. Deshalb läuft das Studio per
-Doppelklick, ohne Internet und ohne Installation.
+Ein zweites Skript packt Kern Studio in **eine einzige** HTML-Datei – die Art Datei, aus der
+Webseiten bestehen und die ein Browser per Doppelklick öffnet. Hinein kommen das Modul, die
+JavaScript-Schicht und das Aussehen der Seite, alles in einem Koffer. So eine Webseiten-Datei
+besteht nur aus Buchstaben und Zeichen, das Modul aber aus rohen Zahlen. Darum wird es als lange
+Buchstabenfolge verkleidet, ähnlich wie Morsezeichen Buchstaben als Punkte und Striche verkleiden.
+Deshalb läuft das Studio per Doppelklick, ohne Internet und ohne Installation.
+
+Im Koffer liegen außerdem die Bauteile für fertige Spiele: die Browser-Teile, die ein Spiel zum
+Laufen braucht, noch einmal extra verpackt. Zusammen mit dem Modul, das ohnehin im Koffer steckt,
+kann **File → Package Game** darum auch ohne Internet ein eigenständiges Spiel packen.
 
 ### Der Lehrer ohne Bildschirm
 
 Den Lehrer kann man auch als eigenes, schnelles Programm für den eigenen Rechner bauen. Er braucht
 keinen Bildschirm, denn Training muss nichts malen. Darum läuft er sogar auf einem Server ohne
 Monitor. Wie man ihn bedient, zeigt [Kapitel 14](14-lehrer.md).
+
+Für den eigenen Rechner darf der Übersetzer dabei die schnellsten Befehle wählen, die genau dieser
+Prozessor kennt. Das klingt nach einem Widerspruch zur Gleichheit, ist aber keiner: Er wählt nur
+andere Werkzeuge für dieselbe Rechnung. Die Rechen-Abkürzungen bleiben verboten, und so kommt Bit für
+Bit dasselbe heraus – nur schneller.
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 2.
 
@@ -89,9 +104,17 @@ gescheitert.
 
 Beim Prüfen wird Kerns eigener Code mit eingebauten **Spürhunden** übersetzt. Einer bellt, wenn ein
 Programmteil in ein Speicherfach greift, das ihm nicht gehört. Der andere bellt, wenn der Code etwas
-tut, was C++ verbietet. Beide brechen sofort ab und nennen die Stelle. Fremder Code, den Kern
-unverändert übernimmt, läuft ohne Spürhunde – geprüft werden soll Kerns eigener. Außerdem sind die
-Tests strenger als der normale Bau: Schon jede **Warnung** des Übersetzers gilt als Fehler.
+tut, was die Regeln von C++ verbieten – etwa eine Rechnung, deren Ergebnis zu groß für ihr
+Zahlenkästchen wird. Beide brechen sofort ab und nennen die Stelle.
+
+Fremder Code, etwa die Physik-Bibliothek, läuft ohne Spürhunde. Der Grund: Kern verändert fremden
+Code nicht, sondern baut ihn ein, wie er ist ([Kapitel 1](01-einfuehrung.md)). Was die Spürhunde
+dort fänden, könnte Kern also gar nicht selbst beheben. Gesucht wird dort, wo Kern auch reparieren
+kann: im eigenen Code.
+
+Außerdem sind die Tests strenger als der normale Bau. Normalerweise ist eine **Warnung** des
+Übersetzers nur ein Hinweis: „Hier ist etwas verdächtig, ich übersetze aber trotzdem.“ Beim Prüfen
+gilt schon jede Warnung als Fehler.
 
 ### Die Attrappe
 
@@ -116,11 +139,20 @@ gemeinsame Testfälle prüfen genau das.
 > flüssig vortragen (schnell, sobald es losgeht). Oder man lässt sie als fertiges Buch drucken. Wer
 > zuhört, muss jedes Mal dieselbe Geschichte hören.
 
-Fällt der schnelle Weg einmal aus, liest Kern einfach Satz für Satz weiter – langsamer, aber nichts
-geht kaputt.
+In Kern heißt das:
 
-> **Wusstest du?** Am Ende dieses Tests läuft ein Wettrennen: eine Million Schleifendurchläufe,
-> einmal vorgelesen, einmal übersetzt. Ausgegeben wird, wie viel schneller der übersetzte Weg ist.
+- **Vorlesen:** Kern geht die Kästchen eins nach dem anderen durch und tut, was darin steht.
+- **Übertragen:** Beim Start von Play oder Simulate übersetzt Kern die Kästchen in schnelle
+  Maschinenbefehle, die der Browser direkt ausführt. Der Test macht das genau so wie im Browser.
+- **Drucken:** Kern schreibt aus den Kästchen fertigen C++-Quelltext, der fest in ein Programm
+  eingebaut werden kann.
+
+Der schnelle Weg im Spiel ist das Übertragen. Klappt es einmal nicht, liest Kern einfach Kästchen
+für Kästchen vor – langsamer, aber nichts geht kaputt.
+
+> **Wusstest du?** Am Ende dieses Tests läuft ein Wettrennen: Spielregeln mit einer Million
+> Wiederholungen, einmal vorgelesen, einmal übertragen. Ausgegeben wird, wie viel schneller das
+> Übertragen ist.
 
 ### Der Testklicker
 
@@ -128,18 +160,22 @@ Die letzte Prüfung ist die größte: Ein ferngesteuerter Browser bedient das St
 unermüdlicher Mensch. Er öffnet Menüs, verschiebt Dinge, drückt Play, packt ein Spiel und spielt
 es, er tut sogar so, als wäre er ein Telefon. Eine echte Grafikkarte bekommt er nicht, sondern eine
 nachgebildete, die die Stadt von Orb Run mit nur etwa **einem Bild pro Sekunde** schafft. Darum
-wartet jede Prüfung, bis ihre Wirkung sichtbar ist, statt eine feste Zeit.
+wartet jede Prüfung, bis ihre Wirkung sichtbar ist, statt eine feste Zeit lang zu warten.
 
 Ob überhaupt etwas gemalt wurde, verrät ein einfacher Trick: Der Testklicker zählt, wie viele
-**verschiedene Farben** im Bild vorkommen. Ein leeres Bild hat kaum Farben, ein gemaltes viele.
-Nebenbei kann er Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
+**verschiedene Farben** im Bild vorkommen. Ein leeres Bild hat kaum Farben, ein gemaltes viele. Er
+muss dafür nicht wissen, wie das Bild genau aussehen soll – die Frage „Wurde überhaupt gemalt?“
+beantwortet die Farbzahl allein, schnell und auch mit der langsamen Ersatz-Grafik. Nebenbei kann er
+Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
 
 ![Simulate mit Physik-Ansicht, wie der Testklicker es prüft](../buch/bilder/studio-simulate.png)
 
 > **Probier's aus!** Mach, was der Testklicker macht. Wähle **File → New Level → Physics Lab**.
-> Halte die rechte Maustaste gedrückt und flieg mit W nach vorn. Dann **Simulate** (Alt+S): Jetzt
-> rechnet die Physik: Das Pendel schwingt, der Drehteller dreht sich, der Rover fährt los. Der
-> Testklicker prüft genau solche Abläufe – bei jeder Änderung und ohne müde zu werden.
+> Halte die rechte Maustaste gedrückt und drück W: Jetzt fliegt deine **Kamera** nach vorn, die
+> Dinge in der Welt bleiben stehen. Dann **Simulate** (Alt+S), also zuschauen statt mitspielen: Die
+> Physik rechnet, das Pendel schwingt, der Drehteller dreht sich, der Rover fährt los. Stell dir
+> vor, du müsstest das nach jeder Änderung hundertmal tun und jedes Mal genau hinsehen – genau das
+> nimmt dir der Testklicker ab, ohne müde zu werden.
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 2.
 
@@ -164,13 +200,15 @@ einem Linux-PC, auf einem Mac mit Apple-Chip und im WebAssembly-Modul, das auch 
 
 Weicht ein Foto ab, gibt es nur zwei Erklärungen: Entweder wurde die Simulation absichtlich
 geändert – dann muss die Vorlage neu erzeugt und die Änderung begründet werden. Oder irgendwo rechnet
-Code auf verschiedenen Rechnern verschieden, etwa weil er eine Winkelrechnung des Systems statt
-Kerns eigener benutzt ([Kapitel 3](03-grundlagen.md)).
+Code auf verschiedenen Rechnern verschieden, etwa weil er für einen Winkel die Rechenformeln benutzt,
+die der jeweilige Computer von Haus aus mitbringt, statt Kerns eigener ([Kapitel 3](03-grundlagen.md)).
 
 Ein zweiter Test prüft das Lernen: Er trainiert ein Netz mit einem, zwei und vier Helfern, die
-zusammen immer acht Enten betreuen. Alle drei Netze müssen bis aufs letzte Bit gleich sein. Das
-klappt nur, weil Kern immer in derselben Reihenfolge zusammenzählt, egal wie viele Helfer
-mitrechnen.
+zusammen immer acht Enten betreuen. Alle drei Netze müssen bis aufs letzte Bit gleich sein. Das ist
+schwerer, als es klingt: Vier Helfer werden in anderer Reihenfolge fertig als zwei. Würde man ihre
+Ergebnisse in der Reihenfolge zusammenzählen, in der sie eintreffen, käme – wie beim
+Vier-Stellen-Taschenrechner aus [Kapitel 1](01-einfuehrung.md) – etwas anderes heraus. Darum zählt
+Kern immer in derselben, fest vereinbarten Reihenfolge zusammen.
 
 > **Für Neugierige:** Die Prüfsumme heißt FNV-1a und ist 16 Zeichen lang. Wer den Lehrer auf dem
 > eigenen Rechner baut, kann den Fingerabdruck selbst erzeugen und mit der Vorlage vergleichen –
@@ -181,7 +219,7 @@ mitrechnen.
 Niemand muss daran denken, die Prüfungen zu starten. Bei jeder Änderung auf GitHub springt ein
 **Fließband** an, auf Englisch **CI** (*Continuous Integration*, „ständiges Zusammenführen“). Server
 von GitHub erledigen dann alles von selbst: übersetzen, prüfen, Fingerabdruck vergleichen,
-veröffentlichen. Ein Lauf dauert etwa 17 Minuten.
+veröffentlichen.
 
 ```mermaid
 flowchart LR
@@ -197,17 +235,15 @@ Die Stationen:
 - **Tests mit Spürhunden:** alle Prüfungen aus Abschnitt 2.2 auf einem Linux-Rechner.
 - **Fingerabdruck auf dem Mac:** Der Lehrer wird auf einem Mac mit Apple-Chip gebaut und muss die
   Ente exakt wie die anderen bewegen.
-- **Bauen und Grundprüfungen:** übersetzt Studio, Beispielspiele und Lehrer und prüft dabei schon
-  einiges: ob alle JavaScript-Dateien fehlerfrei geschrieben sind, ob der Lehrer im Browser-Modul
-  ein kleines Stück jedes Lernverfahrens schafft und den richtigen Fingerabdruck liefert, und ob die
-  Spielregeln übersetzt so rechnen wie vorgelesen. Dann stellt es die fertige Webseite zusammen.
+- **Bauen und Grundprüfungen:** baut Studio, Beispielspiele und Lehrer, macht die wichtigsten
+  Pflichtprüfungen und stellt die fertige Webseite zusammen.
 - **Veröffentlichen:** stellt die Webseite auf https://kernengine.de/.
 - **Testklicker:** bedient das Studio mit genau den Dateien, die veröffentlicht werden.
 
 Wichtig ist, was **wartet** und was nicht. Veröffentlicht wird, sobald die Station „Bauen und
 Grundprüfungen“ fertig ist. Scheitert dort eine Prüfung, geht nichts online. Die drei anderen
-Prüfstationen laufen dagegen **nebenher**: Die Veröffentlichung wartet nicht auf sie. Darum heißt
-es: Diese Tests halten die Veröffentlichung nicht auf. Fällt eine von ihnen durch, ist die neue
+Prüfstationen laufen dagegen **nebenher**: Die Veröffentlichung wartet nicht auf sie. Fällt eine
+von ihnen durch, ist die neue
 Fassung vielleicht schon online – aber auf GitHub leuchtet sofort eine rote Markierung, und die
 nächste Änderung muss den Fehler beheben.
 
@@ -216,18 +252,21 @@ nächste Änderung muss den Fehler beheben.
 > Verkauf. Schmeckt ihr etwas nicht, wird sofort nachgebessert, aber das Brot im Regal bleibt dort.
 
 Der Vorteil: Jede Änderung ist schnell online. Der Preis: Ein Fehler, den nur die nebenher
-laufenden Tests finden, kann kurz sichtbar sein. Änderungsvorschläge, die erst noch begutachtet
-werden, laufen übrigens ebenfalls über das Fließband, werden aber nie veröffentlicht.
+laufenden Tests finden, kann kurz sichtbar sein.
+
+Auf der Hauptlinie, aus der die Webseite entsteht, läuft jede Änderung bis zum Ende durch – auch
+wenn schon die nächste kommt. So wird jeder geprüfte Stand auch veröffentlicht. Änderungsvorschläge,
+die erst noch begutachtet werden, laufen ebenfalls über das Fließband, werden aber nie
+veröffentlicht; kommt eine neuere Fassung des Vorschlags, wird der ältere Lauf abgebrochen.
 
 > **Probier's aus!** Im Studio steht in der Statusleiste ganz unten die **Version**, etwa „v 1af26d8“:
-> das Kürzel der Änderung, aus der das Fließband diese Fassung gebaut hat. Tippe dann ins Feld **Cmd** in der Statusleiste
-> `stat` und drück Enter. Öffne mit dem Knopf **Output Log** das Protokoll: Dort steht jetzt, wie
-> viele Bilder pro Sekunde dein Rechner schafft. Vergleich das mit dem Testklicker, der sich mit
-> einem Bild pro Sekunde begnügen muss.
+> das Kürzel der Änderung, aus der das Fließband genau diese Fassung gebaut hat. Lädst du die Seite
+> ein paar Tage später neu, steht dort vielleicht schon ein anderes Kürzel – dann ist inzwischen eine
+> neue Änderung durch das Fließband gelaufen und online gegangen.
 
-> **Wusstest du?** Der installierbare Editor merkt selbst, wenn das Fließband eine neue Version
-> veröffentlicht hat: Neben jeder Fassung liegt eine kleine Datei mit ihrer Kennung, und er
-> vergleicht.
+> **Wusstest du?** Kern Studio lässt sich wie eine App auf dem Rechner installieren. Diese Fassung
+> merkt selbst, wenn das Fließband eine neue Version veröffentlicht hat: Neben jeder Fassung liegt
+> eine kleine Datei mit ihrer Kennung, und sie vergleicht.
 
 Wie man das ganze Fließband zu Hause nachstellt und was typische Fehlermeldungen bedeuten, steht im
 blauen Buch, Kapitel 2.
@@ -248,17 +287,19 @@ blauen Buch, Kapitel 2.
 
 1. Warum laufen die Spürhunde nur über Kerns eigenen Code, nicht über übernommenen fremden Code?
 2. Du änderst einen Header. Was passiert beim nächsten Bauen, und warum?
-3. Warum zählt der Testklicker Farben, statt Bildschirmfotos zu vergleichen?
+3. Warum genügt dem Testklicker die Zahl der Farben, um zu prüfen, ob gemalt wurde?
 4. Der Fingerabdruck stimmt bis Takt 211 und weicht ab Takt 212 ab. Was sagt dir das?
 5. Die Tests mit Spürhunden schlagen fehl. Ist die Webseite trotzdem aktualisiert worden?
 
 ### Lösungen
 
-1. Geprüft werden soll Kerns eigener Code; der fremde wird unverändert übernommen.
-2. Alles wird neu übersetzt, denn der Inhalt aller Header steckt in jedem Etikett. Kein veraltetes
-   Vorratsstück kann übrig bleiben.
-3. Die nachgebildete Grafik ist langsam; die Zahl der Farben verrät einfach und zuverlässig, ob
-   überhaupt etwas gemalt wurde.
+1. Kern verändert fremden Code nicht. Was die Spürhunde dort fänden, könnte Kern nicht selbst
+   beheben – also sucht man dort, wo Kern auch reparieren kann.
+2. Alles wird neu übersetzt. Jedes Stück liest die Header mit, darum steckt ihr Inhalt in jedem
+   Etikett. Statt mühsam herauszufinden, welches Stück betroffen ist, kocht Kern alles neu – so bleibt
+   kein veraltetes Vorratsstück übrig.
+3. Ein leeres Bild hat kaum Farben, ein gemaltes viele. Dafür muss der Testklicker nicht wissen, wie
+   das Bild genau aussehen soll, und es klappt auch mit der langsamen Ersatz-Grafik.
 4. Bei Takt 212 kommt zum ersten Mal etwas anderes heraus. Dort setzt die Fehlersuche an, etwa bei
    einer Winkelrechnung, die nicht Kerns eigene Formel benutzt.
 5. Ja, wenn die Bau-Station geklappt hat: Diese Tests laufen nebenher und halten die

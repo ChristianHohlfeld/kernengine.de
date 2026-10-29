@@ -15,6 +15,7 @@
 > - **Achse** – eine gedachte Linie durch den Raum, um die man etwas drehen kann.
 > - **Renderer** – der Teil von Kern, der die Bilder malt.
 > - **Texteditor** – ein schlichtes Schreibprogramm, unter Windows „Editor“, auf dem Mac „TextEdit“.
+> - **Viewport** – das große Fenster in der Mitte von Kern Studio, in dem du die Welt siehst.
 
 Ist der Keller schief, ist es das ganze Haus. Die genauen Namen und Werte zu diesem Kapitel stehen
 im blauen Buch, Kapitel 3.
@@ -23,17 +24,20 @@ im blauen Buch, Kapitel 3.
 
 ### Zahlen mit fester Stellenzahl
 
-Eine Zahl belegt im Computer eine feste Anzahl von Bit-Kästchen. Wie viele, kann je nach Rechner
-verschieden sein, wenn man es nicht festlegt. Kern legt es **immer** fest: 8, 16, 32 oder 64
-Kästchen, mit oder ohne Minuszeichen, ganze Zahl oder Kommazahl.
+Eine Zahl belegt im Computer eine feste Anzahl von Bit-Kästchen. In C++ darf die Größe einer
+gewöhnlichen Zahl von Rechner zu Rechner verschieden sein, wenn man sie nicht ausdrücklich angibt –
+so wie „ein Glas Wasser“ mal 200 und mal 300 Milliliter sein kann. Kern gibt die Größe darum
+**immer** ausdrücklich an.
 
 > **Stell dir vor …** Ein Kilometerzähler mit sechs Stellen springt nach 999 999 auf 000 000, einer
 > mit sieben Stellen erst später. Wer zwei Autos vergleicht, muss wissen, wie viele Stellen jeder
 > Zähler hat.
 
-Ein Zähler aus 8 Kästchen schafft 0 bis 255 und beginnt dann wieder bei 0. Weil Kern die Größe immer
-festlegt, rechnet jeder Rechner mit gleich großen Zählern – und was über den gemeinsamen Speicher
-zum Browser geht, ist auf beiden Seiten gleich groß.
+Ein Beispiel: Jedes Bit-Kästchen kann 0 oder 1 sein, jedes weitere Kästchen verdoppelt also die
+Möglichkeiten. Acht Kästchen ergeben 2 · 2 · 2 · 2 · 2 · 2 · 2 · 2 = 256 Möglichkeiten, also die Zahlen
+0 bis 255 – ungefähr so viel wie ein dreistelliger Zähler. Danach beginnt so ein Zähler wieder bei 0.
+Weil Kern die Größe immer festlegt, rechnet jeder Rechner mit gleich großen Zählern – und was über den
+gemeinsamen Speicher zum Browser geht, ist auf beiden Seiten gleich groß.
 
 ### Wenn etwas schiefgeht: Nein sagen und einen Zettel hinterlassen
 
@@ -54,13 +58,19 @@ lesen und abräumen kann. Nur einige Bausteine, etwa der JSON-Leser, geben ihren
 zurück, der sie gerufen hat.
 
 > **Achtung, Falle!** Die Pinnwand zeigt den **neuesten** Zettel – nicht unbedingt den der Aufgabe,
-> nach der du fragst. Wer sicher gehen will, räumt die Pinnwand vorher ab.
+> nach der du fragst. Wer sicher gehen will, räumt die Pinnwand vorher ab. Und rechnen mehrere
+> Helfer gleichzeitig, teilen sie sich dieselbe eine Pinnwand: Der neueste Zettel kann dann sogar von
+> einem anderen Helfer stammen.
+
+> **Für Neugierige:** Kern prüft gern „ist **nicht** größer als null“ statt „ist kleiner oder
+> gleich null“. Grund ist der Sonderwert **NaN** („not a number“), der etwa bei 0 durch 0 entsteht:
+> Jeder Vergleich mit NaN ist falsch, „nicht größer als null“ also wahr – und der kaputte Wert wird
+> abgewiesen.
 
 ### Die Uhr gehört nicht in die Simulation
 
 Kern hat eine Uhr, die Millisekunden zählt. Sie dient **Messungen**: Wie lange hat etwas gedauert,
-ist das Zeitbudget aufgebraucht? So darf die Sound-Bank beim Start nur eine begrenzte Zeit lang
-Klänge vorrechnen.
+ist die Zeit, die eine Aufgabe beim Start höchstens bekommt, schon aufgebraucht?
 
 In der **Simulation** hat diese Uhr nichts verloren. Physik und Roboter zählen **feste Schritte**:
 Ein Takt ist immer gleich lang, egal wie schnell der Rechner ihn ausrechnet. Schaute die Ente auf die
@@ -70,22 +80,33 @@ Uhr, liefe sie auf einem langsamen Rechner anders als auf einem schnellen
 > **Stell dir vor …** Ein Brettspiel. Man zieht Runde um Runde, nicht nach der Stoppuhr – sonst
 > gewinnt, wer schneller würfelt, statt wer besser spielt. Kerns Simulation zählt Runden.
 
-Außerdem liegen im Werkzeugkasten ein **Protokoll**, das Meldungen von „nur zur Fehlersuche“ bis
-„Fehler“ sammelt, und kleine Helfer, die etwa einen Wert zwischen zwei Grenzen halten. Kann zum
-Beispiel der Glüheffekt nicht starten, protokolliert Kern eine Warnung, und das Spiel läuft ohne
-Glühen weiter.
+### Das Logbuch
+
+Was Kern unterwegs erlebt, schreibt es in ein **Logbuch** (Fachwort: Protokoll). Jede Meldung hat
+eine Stufe, von „nur zur Fehlersuche“ über „Hinweis“ und „Warnung“ bis „Fehler“. Im Browser landen
+die Meldungen in der Entwickler-Konsole des Browsers. Kann zum Beispiel der Glüheffekt nicht
+starten, schreibt Kern eine Warnung ins Logbuch, und das Spiel läuft ohne Glühen weiter – wieder
+„Nein sagen und weitermachen“ statt Absturz.
 
 ### Ein Fenster auf Daten
+
+Kern reicht große Datenmengen nicht herum, sondern nur einen Hinweis, wo sie liegen. Das spart viel
+Zeit: Eine große 3D-Welt kann aus Millionen Zahlen bestehen, und sie bei jeder Übergabe zu
+kopieren, würde spürbar bremsen.
 
 > **Stell dir vor …** Ein Zettel: „Regal 4, die nächsten 20 Bücher.“ Er ist leicht, denn man muss
 > die Bücher nicht herumtragen. Aber er **besitzt** sie nicht. Räumt jemand das Regal aus, zeigt der
 > Zettel ins Leere.
 
-So ein Zettel heißt in Kern **Span** (Spanne): nur zwei Angaben, wo die Daten anfangen und wie viele
-es sind. In dieser Form fließen fast alle Daten in die Engine, ohne dass etwas kopiert werden muss.
-Daraus folgt eine Regel: Wer die Daten **behalten** will, kopiert sie. Der Renderer etwa behält
-Kopien seiner Modelle, um später zu erkennen, worauf du klickst, und um nach dem Verlust der
-Grafikkarte alles neu aufzubauen ([Kapitel 4](04-grafik.md)).
+So ein Zettel enthält nur zwei Angaben: wo die Daten anfangen und wie viele es sind. In dieser Form
+fließen fast alle Daten in die Engine. Daraus folgt eine Regel: Wer die Daten **behalten** will,
+kopiert sie. Der Renderer etwa behält Kopien seiner Modelle, um später zu erkennen, worauf du
+klickst, und um nach dem Verlust der Grafikkarte alles neu aufzubauen ([Kapitel 4](04-grafik.md)).
+Und erinnerst du dich an die Hausregel aus [Kapitel 1](01-einfuehrung.md)? Die Browser-Seite
+benutzt ihren Ablageplatz bei jedem Bild wieder. Was dort liegt, ist beim nächsten Bild
+überschrieben – darum kopiert Kern sich, was es länger braucht.
+
+> **Für Neugierige:** In Kerns Quelltext heißt so ein Zettel **Span** (englisch für „Spanne“).
 
 ### Fingerabdrücke für Daten: Hashes
 
@@ -95,16 +116,19 @@ dieselbe Zahl; ändert sich nur ein Buchstabe, kommt eine völlig andere heraus.
 > **Stell dir vor …** Eine Quersumme, nur viel gründlicher: Bei der Quersumme ergeben 12 und 21
 > dasselbe, ein guter Hash bemerkt die Vertauschung.
 
-Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt einen Wert nur neu an
-die Grafikkarte, wenn sein Hash anders ist. Auch der Fingerabdruck der Ente aus
-[Kapitel 2](02-bauen-und-testen.md) besteht aus Hashes. Ein zweiter Hash mischt Zahlen
-durch, für zufällig aussehende Muster, die trotzdem jedes Mal gleich ausfallen.
-Hashes rechnen nur mit ganzen Zahlen, ohne
-Rundung – das Ergebnis hängt also nur von den Daten ab, nie vom Rechner.
+Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt eine Einstellung, etwa
+eine Farbe, nur dann neu an die Grafikkarte, wenn ihr Hash anders ist. Auch die **Prüfsumme** aus
+dem Fingerabdruck der Ente in [Kapitel 2](02-bauen-und-testen.md) ist genau so ein Hash – Prüfsumme
+und Hash sind dasselbe.
 
-> **Für Neugierige:** Kern prüft gern „ist **nicht** größer als null“ statt „ist kleiner oder
-> gleich null“. Grund ist der Sonderwert **NaN** („not a number“), der etwa bei 0 durch 0 entsteht:
-> Jeder Vergleich mit NaN ist falsch, „nicht größer als null“ also wahr – und der Wert fliegt raus.
+Ein zweiter Hash hat eine andere Aufgabe: Er macht aus einer Zahl eine **zufällig aussehende**
+Zahl, die trotzdem jedes Mal gleich ausfällt. Wozu? Ein Spiel will oft ein wenig Zufall, etwa damit
+die Schüsse einer Spielfigur leicht streuen und nicht jeder Schuss gleich klingt. Echter Zufall würde
+die Welt aber auf jedem Rechner anders laufen lassen. Der Misch-Hash liefert Zufall zum Wiederholen:
+Schuss Nummer 7 streut immer gleich, auf jedem Rechner.
+
+Beide Hashes rechnen nur mit ganzen Zahlen, ohne Rundung – das Ergebnis hängt also nur von den Daten
+ab, nie vom Rechner.
 
 ## 3.2 JSON: Kerns Lieblingsformat
 
@@ -117,24 +141,44 @@ Lehrers und die Liste der Entennetze. Sein JSON-Baustein gibt drei Versprechen.
 an seinem Platz. Ändert sich im Level ein Wert, ändert sich in der Datei nur diese Stelle – so lassen
 sich zwei Fassungen bequem vergleichen.
 
-**2. Zahlen sehen aus wie im Browser.** Kern schreibt jede Zahl mit genau so vielen Ziffern, wie
-nötig sind, um sie beim Wiedereinlesen exakt zurückzubekommen – nach derselben Regel wie JavaScript.
-Eine Datei sieht darum gleich aus, ob Kern oder der Browser sie geschrieben hat.
+**2. Zahlen sehen aus wie im Browser.** Eine Kommazahl im Computer hat sehr viele Stellen. Man
+könnte jede mit 20 Nachkommastellen hinschreiben – das wäre unlesbar. Kern nimmt stattdessen die
+**kürzeste** Schreibweise, die beim Wiedereinlesen wieder genau dieselbe Zahl ergibt, nach derselben
+Regel wie JavaScript im Browser. Eine Datei sieht darum gleich aus, ob Kern oder der Browser sie
+geschrieben hat.
 
 > **Wusstest du?** Rechnet man im Browser 0,1 + 0,2, kommt **0,30000000000000004** heraus, und Kern
-> schreibt genau dasselbe. Das ist Rundung: Computer speichern Kommazahlen im **Zweiersystem**, und
-> dort ist 0,1 ein unendlicher Bruch – so wie 1/3 bei uns 0,3333… ist und nie aufgeht. Gespeichert
-> wird eine Zahl knapp neben 0,1, ebenso bei 0,2, und ihre Summe landet knapp neben der gespeicherten
-> 0,3. Weil sie eine andere Zahl ist, braucht sie mehr Ziffern. Genau solche winzigen Abweichungen
-> machen Kern beim Rechnen so penibel ([Kapitel 1](01-einfuehrung.md)).
+> schreibt genau dasselbe. Das ist Rundung: Computer zählen nur mit 0 und 1, im **Zweiersystem**. Dort
+> geht 0,1 so wenig auf wie 1/3 bei uns (0,3333 …, nie zu Ende). Gespeichert wird darum eine Zahl
+> knapp neben 0,1, ebenso bei 0,2, und ihre Summe landet ein winziges Stück neben der Zahl, die der
+> Computer für 0,3 speichert. Die kurze Schreibweise „0.3“ würde beim Wiedereinlesen aber genau diese
+> gespeicherte 0,3 ergeben – also eine andere Zahl. Um die Summe genau wiederzubekommen, braucht es
+> mehr Ziffern. Genau solche winzigen Abweichungen machen Kern beim Rechnen so penibel
+> ([Kapitel 1](01-einfuehrung.md)).
 
 **3. Misstrauen gegenüber fremden Dateien.** Ein Level kann von irgendwem stammen. Darum lehnt Kern
-unendlich große Zahlen ab, absurd tief geschachtelte Einträge und ein paar Eintragsnamen, die auf der
-Browser-Seite Unheil anrichten könnten.
+unendlich große Zahlen ab, absurd tief **geschachtelte** Einträge – Einträge in Einträgen in
+Einträgen, wie Kisten in Kisten in Kisten – und ein paar Eintragsnamen, die auf der Browser-Seite
+Unheil anrichten könnten.
 
 Dazu kommt Gelassenheit beim Lesen: Fehlt ein Eintrag, gibt es einen leeren Wert statt eines
-Absturzes, bei falschem Typ einen Ersatzwert. Und das Einlesen liefert sein Ergebnis **nur, wenn es
+Absturzes. Hat ein Wert den falschen **Typ** – steht also zum Beispiel ein Text, wo eine Zahl
+erwartet wird –, gibt es einen Ersatzwert. Und das Einlesen liefert sein Ergebnis **nur, wenn es
 ganz geklappt hat**; sonst nennt es die Stelle, an der es hakte.
+
+> **Probier's aus!** Schau einem Level unter die Haube.
+> 1. **File → New Level → Basic**: ein Boden und ein Würfel.
+> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transform** das Feld **Location** mit
+>    X, Y und Z. Z zeigt nach oben (mehr dazu in Abschnitt 3.3). Tippe bei Z eine **3** und drück
+>    Enter: Der Würfel schwebt 3 Meter hoch.
+> 3. **File → Save** (Ctrl+S). Chrome und Edge fragen, wohin; andere Browser legen die Datei
+>    `Untitled.klevel` in den Download-Ordner.
+> 4. Rechtsklick auf die Datei, **Öffnen mit**, dann **Editor** (Windows) bzw. **TextEdit** (Mac).
+>
+> Ganz oben steht `"format": "kern-level"` – daran erkennt Kern seine Levels. Such mit Strg+F (Mac:
+> Cmd+F) nach **Cube**: Darunter steht bei **position** die Zahlenfolge 0, 0, 3 – dein Würfel. Was
+> im Studio **Location** heißt, heißt in der Datei **position**. So sieht ein Level von innen aus:
+> Namen mit Werten, in fester Reihenfolge.
 
 ### Erst prüfen, dann übernehmen: Servoprofile
 
@@ -147,19 +191,12 @@ sonst Abbruch mit dem Namen des schuldigen Eintrags. **Erst ganz am Ende** wird 
 > **Stell dir vor …** Ein Bankschalter. Erst wird das ganze Überweisungsformular geprüft, dann
 > gebucht. Nie wird halb gebucht und dann gemerkt, dass die Kontonummer fehlt.
 
-> **Probier's aus!** Schau einem Level unter die Haube.
-> 1. **File → New Level → Basic**: ein Boden und ein Würfel.
-> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transform** das Feld **Location** mit
->    X, Y und Z. Tippe bei Z eine **3** und drück Enter: Der Würfel schwebt 3 Meter hoch.
-> 3. **File → Save** (Ctrl+S). Chrome und Edge fragen, wohin; andere Browser legen die Datei
->    `Untitled.klevel` in den Download-Ordner.
-> 4. Rechtsklick auf die Datei, **Öffnen mit**, dann **Editor** (Windows) bzw. **TextEdit** (Mac).
->
-> Ganz oben steht `"format": "kern-level"` – daran erkennt Kern seine Levels. Such nach **Cube**:
-> Darunter steht bei **position** die Zahlenfolge 0, 0, 3 – dein Würfel. So sieht ein Level von
-> innen aus: Namen mit Werten, in fester Reihenfolge.
-
 ## 3.3 Mathematik für den 3D-Raum
+
+Die Raum-Mathe ist das meistbenutzte Werkzeug von Kern: Bei jedem Bild braucht jedes bewegte Ding,
+jede Kamera und jeder Klick sie, oft tausendfach. Darum ist sie so gebaut, dass sie ohne Umwege
+rechnet und nie erst neuen Speicher anfordern muss – wie Kleingeld in der Hosentasche statt eines
+Gangs zur Bank.
 
 ### Die Spielregeln
 
@@ -168,7 +205,7 @@ Massen in **Kilogramm**, und **Z zeigt nach oben**.
 
 > **Stell dir vor …** Leg Karopapier auf den Tisch: X zeigt nach rechts, Y nach vorn, Z zur
 > Zimmerdecke. Das heißt **rechtshändig**: Spreiz Daumen, Zeige- und Mittelfinger der rechten Hand
-> rechtwinklig ab – das sind X, Y und Z.
+> rechtwinklig ab – der Daumen ist X, der Zeigefinger Y, der Mittelfinger Z.
 
 Winkel stehen im Studio und in Levels in **Grad**. Innen rechnet Kern in **Radiant**, und das ist
 ein einfaches Bild: Lauf am Rand eines Kreises mit 1 Meter Radius entlang. Ein halber Umlauf ist etwa
@@ -178,31 +215,41 @@ etwa 1,57. Viele Formeln werden so einfacher.
 > **Probier's aus!** Öffne **File → New Level → Physics Lab**. Tippe ins Feld **Cmd** unten in der
 > Statusleiste `gravity 0 0 -2`, drück Enter und starte **Simulate**. Die Schwerkraft zeigt jetzt
 > schwach in Richtung minus Z, nach unten: Alles fällt fast wie auf dem Mond. `gravity` ohne Zahlen
-> stellt die Erde wieder her, 0, 0, −9,80665: Fallendes wird jede Sekunde um rund 9,8 Meter pro
+> stellt die Erde wieder her, rund 0, 0, −9,8: Fallendes wird jede Sekunde um etwa 9,8 Meter pro
 > Sekunde schneller.
 
 ### Vektoren und Drehungen
 
 Ein **Vektor** ist eine Wegbeschreibung aus Zahlen: „3 Meter nach rechts, 4 nach vorn, 1 nach
 oben“, kurz (3, 4, 1). Man kann ihn als Pfeil zeichnen; derselbe Zahlensatz kann auch den Punkt
-meinen, an dem man ankommt. Oft braucht man nur die **Richtung** eines Pfeils und bringt ihn dafür
-auf die Länge 1. Klickt jemand zweimal auf denselben Punkt, entsteht aber ein Pfeil der Länge null
-ohne Richtung. Statt eines Unsinnswerts, der sich wie ein Virus durch alle weiteren Rechnungen
-fräße, liefert Kern dann einen **Ersatz**: im Zweifel „nach oben“.
+meinen, an dem man ankommt.
+
+Oft braucht man nur die **Richtung** eines Pfeils, etwa „wohin schaut die Kamera?“. Dann bringt
+Kern den Pfeil auf die Länge 1: Er sagt nur noch *wohin*, nicht mehr *wie weit* – wie ein Wegweiser
+ohne Kilometerangabe. Aber Vorsicht: Will Kern die Richtung von Punkt A nach Punkt B wissen, und
+beide Punkte sind gleich, gibt es gar keinen Pfeil – er hat die Länge null und zeigt nirgendwohin.
+Statt eines Unsinnswerts, der sich wie ein Virus durch alle weiteren Rechnungen fräße, liefert Kern
+dann einen **Ersatz**: im Zweifel „nach oben“.
 
 Jede **Drehung** im Raum lässt sich durch eine Achse und einen Winkel beschreiben.
 
 > **Stell dir vor …** Ein Grillhähnchen am Spieß. Der Spieß ist die Achse, und das Hähnchen wird um
 > einen Winkel gedreht. Jede Drehung, egal wie schief, ist so ein Spieß mit Winkel.
 
-Kern packt Achse und Winkel in vier Zahlen, eine **Quaternion**. Die Mathematik dahinter ist
-knifflig, der Gebrauch einfach: Achse und Winkel hinein, Drehung heraus. Die vier Zahlen entstehen
-mit Kerns eigenen Winkelformeln aus Abschnitt 3.4, damit jede Drehung überall gleich ausfällt.
+Kern packt Achse und Winkel in vier Zahlen, eine **Quaternion** (lateinisch etwa „Vierer“). Grob
+gesagt stecken in drei Zahlen die Richtung des Spießes und in der vierten der Winkel – geschickt
+ineinander verpackt. Die Mathematik dahinter ist knifflig, der Gebrauch einfach: Achse und Winkel
+hinein, Drehung heraus. Die vier Zahlen entstehen mit Kerns eigenen Winkelformeln aus Abschnitt 3.4,
+damit jede Drehung überall gleich ausfällt.
+
+Zwei Drehungen lassen sich zu einer zusammenhängen, und auch hier zählt die Reihenfolge: Kipp ein
+Buch erst nach vorn und dreh es dann nach links – es liegt anders da, als wenn du es erst nach links
+drehst und dann nach vorn kippst. Probier es mit einem echten Buch aus.
 
 ### Matrizen: eine ganze Bewegung in einem Paket
 
 Ein Ding in der 3D-Welt wird meist auf einmal **gestreckt**, **gedreht** und **verschoben**. Eine
-**Matrix** packt alle drei Schritte in ein Paket: eine Tabelle aus 4 mal 4, also 16 Zahlen. Man
+**Matrix** packt alle drei Schritte in ein Paket: eine kleine Tabelle aus Zahlen. Man
 steckt einen Punkt hinein und bekommt den fertig bewegten Punkt heraus. Der Renderer bekommt für
 jedes Ding so ein Paket; im kleinsten Beispielspiel hat jede der sich drehenden Kisten ihr eigenes.
 
@@ -220,34 +267,55 @@ Ein Test in Kern prüft genau diese Rechnung.
 > anderes als erst umdrehen und dann gehen. Darum legt Kern sie fest: erst strecken, dann drehen,
 > dann verschieben.
 
-Mathematiker schreiben so ein Paket „rückwärts“ auf: Der Punkt steht ganz rechts, die Schritte
-links davon – **Verschieben · Drehen · Strecken · Punkt**. Das ist kein Widerspruch, man liest nur
-vom Punkt aus, also von rechts nach links: Was dem Punkt am nächsten steht, wirkt zuerst. Wie beim
-Anziehen: Außen am Fuß sitzt der Schuh, aber zuerst kam die Socke, die direkt am Fuß anliegt.
+> **Für Neugierige:** Mathematiker schreiben so ein Paket „rückwärts“ auf: **Verschieben · Drehen ·
+> Strecken · Punkt**. Man liest vom Punkt aus, von rechts nach links: Was dem Punkt am nächsten
+> steht, wirkt zuerst – wie beim Anziehen, wo die Socke direkt am Fuß zuerst kommt und der Schuh
+> außen danach. Die Tabelle hat übrigens 4 mal 4 Zahlen; die vierte Zeile und Spalte braucht man,
+> damit auch das Verschieben ins Paket passt. Die genauen Regeln stehen im blauen Buch, Kapitel 3.
 
-Eine Matrix lässt sich auch **umkehren**; dann macht sie die Bewegung rückwärts. Das braucht Kern,
-wenn du in die Szene klickst: Der Weg führt vom Bildschirm zurück in die Welt. Kern rechnet diese
-Umkehrung mit doppelt so vielen Stellen wie sonst, damit auch Klicks auf ferne Dinge treffen.
+Meist lässt sich eine Matrix auch **umkehren**; dann macht sie die Bewegung rückwärts. Das braucht
+Kern, wenn du in die Szene klickst: Der Weg führt vom Bildschirm zurück in die Welt. Kern rechnet
+diese Umkehrung mit doppelt so vielen Stellen wie sonst, damit auch Klicks auf ferne Dinge treffen.
+Aber nicht jede Bewegung lässt sich zurückdrehen: Wurde ein Ding in einer Richtung mit 0 gestreckt,
+also platt gedrückt wie ein Pfannkuchen, weiß niemand mehr, wie dick es vorher war. Dann antwortet
+die Umkehrung schlicht mit „Nein“, statt Unsinn auszurechnen.
 
 ### Kamera und Sichtbereich
 
 Die **Kamera** ist bei Kern keine Matrix, sondern eine **Beschreibung**, wie ein Fotograf sie gäbe:
-Wo stehe ich? Wohin schaue ich? Wo ist oben? Wie weit ist mein Objektiv geöffnet? Kerns
-Standardkamera öffnet **60°**, gemessen von unten nach oben, und malt von 5 Zentimetern bis 1,8
-Kilometern Entfernung. Aus der Beschreibung errechnet Kern zwei Matrizen – eine für den Blick, eine
+Wo stehe ich? Wohin schaue ich? Wo ist oben? Wie weit ist mein Objektiv geöffnet? Dazu kommen eine
+**Nahgrenze** und eine **Ferngrenze**: Was dichter als die Nahgrenze vor der Linse oder weiter weg
+als die Ferngrenze liegt, wird nicht gemalt. Ganz Nahes und unendlich Fernes lässt sich nicht
+sinnvoll aufs Bild bringen, und irgendwo muss die Welt aufhören, damit Kern nicht endlos malt. Die
+Standardwerte stehen im blauen Buch, Kapitel 3. Aus der Beschreibung errechnet Kern zwei Matrizen – eine für den Blick, eine
 für das Objektiv, das den Raum aufs flache Bild drückt – und fasst sie zu **einer** zusammen: dem
 ganzen Weg von der Welt aufs Bild. Eine unmögliche Kamera, etwa mit Auge und Ziel am selben Ort,
 weist Kern mit einem Zettel an der Pinnwand zurück.
 
 Neben der Perspektive gibt es die **Parallelansicht** ohne Fluchtpunkt, wie bei einem Bauplan: Ferne
 Dinge werden nicht kleiner. Studio nutzt sie für die Ansichten von oben, vorn und von der Seite.
+Weil es hier keinen Fluchtpunkt gibt, beschreibt man diese Kamera nicht mit einem Öffnungswinkel,
+sondern damit, wie viele Meter hoch der sichtbare Ausschnitt ist.
 
-Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze (Bild in
-[Anhang B](B-grundlagen-rendering.md)). Was draußen liegt, muss nicht gemalt werden. Damit die
-Prüfung schnell geht, steckt Kern jedes Ding in eine unsichtbare **Kugel** oder einen **Karton**.
-Liegt die Kugel ganz außerhalb der Pyramide, ist das Ding unsichtbar – eine schnelle Prüfung statt
-vieler Dreiecke. Ist eine Kugel ungültig, wird das Ding trotzdem gemalt. Kerns Regel: **im Zweifel
-zeichnen** – lieber einmal zu viel als ein Loch in der Welt.
+Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide**.
+Von oben betrachtet sieht sie so aus:
+
+```
+   Ferngrenze  ______________________
+               \                    /
+                \     ●            /     ● drinnen: wird gemalt
+         ○       \                /      ○ draußen: wird übersprungen
+                  \______________/   Nahgrenze
+                          ▲
+                        Kamera
+```
+
+Was draußen liegt, muss nicht gemalt werden. Damit die Prüfung schnell geht, steckt Kern jedes Ding
+in eine unsichtbare **Kugel** oder einen **Karton**. Liegt die Kugel ganz außerhalb der Pyramide,
+ist das Ding unsichtbar – eine schnelle Prüfung statt vieler Dreiecke. Hat ein Ding noch gar keine
+gültige Kugel, etwa weil sie noch nicht ausgerechnet wurde, wird es trotzdem gemalt. Kerns Regel:
+**im Zweifel zeichnen** – lieber einmal zu viel als ein Loch in der Welt. Mehr dazu in
+[Anhang B](B-grundlagen-rendering.md).
 
 > **Probier's aus!** Öffne Orb Run. Klick in der Leiste oben im Viewport auf **≡** und stell
 > **Field of View** erst auf 110°, dann auf 50°: Weitwinkel mit verzerrten Rändern, dann wie
@@ -268,18 +336,23 @@ das **nicht** so.
 > Kosinus sagt, wie weit er gerade rechts vom Mittelpunkt steht, der Sinus, wie weit oben. Wer etwas
 > drehen will, braucht diese Zahlen ständig.
 
-Solche Werte lassen sich nur annähern. Jedes System – Linux, macOS, Android, WebAssembly – nähert auf
-seine eigene Weise an, und im allerletzten Bit kommt manchmal etwas anderes heraus. In einer
+Solche Werte lassen sich nur annähern: Der Sinus von 1 zum Beispiel hat unendlich viele
+Nachkommastellen, die nie in ein festes Zahlenkästchen passen. Jedes System – Linux, macOS, Android,
+WebAssembly – bringt eigene Rechenformeln mit, nähert auf seine eigene Weise an, und im allerletzten
+Bit kommt manchmal etwas anderes heraus. In einer
 Robotersimulation wird daraus binnen Sekunden ein anderer Gang, und ein im Browser gelerntes Netz
 liefe auf dem eigenen Rechner anders.
 
 Kerns Lösung: **eigene Formeln** für Sinus, Kosinus und Verwandte, aus einer freien
 Programmsammlung. Sie werden überall gleich übersetzt, ohne Rechen-Abkürzungen, und tragen eigene
-Namen, damit sie nie mit denen des Systems verwechselt werden. Die Physik-Bibliothek hat ohnehin
-eigene, überall gleiche Winkelrechnungen. Für neuen Code gilt darum:
+Namen, damit sie nie mit denen des Systems verwechselt werden. Die Physik-Bibliothek – das fremde,
+unverändert übernommene Physikprogramm aus [Kapitel 1](01-einfuehrung.md) – hat ohnehin eigene,
+überall gleiche Winkelrechnungen. Für neuen Code gilt darum:
 
 - Alles, was die **Simulation beeinflusst**, benutzt Kerns eigene Formeln.
-- Keine Summe darf davon abhängen, wie viele Helfer mitrechnen.
+- Summen werden in **fester Reihenfolge** gebildet, egal wie viele Helfer mitrechnen: Helfer werden
+  in wechselnder Reihenfolge fertig, und wie der Vier-Stellen-Taschenrechner aus Kapitel 1 zeigt,
+  ändert eine andere Reihenfolge das Ergebnis.
 - Keine Rechen-Abkürzungen, die „schnell, aber ungefähr“ rechnen.
 
 Reine **Darstellung** – Ton, Funken, Teile des Editors – darf die Formeln des Systems benutzen: Ob ein
@@ -287,7 +360,8 @@ Funke einen Millimeter weiter links fliegt, merkt niemand. Fließt so ein Wert a
 Steuerung oder Training ein, muss er auf Kerns eigene Formeln umziehen.
 
 > **Wusstest du?** Die eigenen Formeln kosten keine Geschwindigkeit: Sie sind so schnell wie die des
-> Systems, und das Tempo der Physik bestimmt ohnehin das Berechnen der Gelenke. Ob alles stimmt,
+> Systems, und die meiste Rechenzeit der Physik geht ohnehin in die Gelenke, nicht in Sinus und
+> Kosinus. Ob alles stimmt,
 > verrät der Fingerabdruck aus [Kapitel 2](02-bauen-und-testen.md).
 
 > **Für Neugierige:** Die Formeln stammen aus der Programmsammlung **musl**; jede bekommt eine
@@ -298,13 +372,15 @@ Steuerung oder Training ein, muss er auf Kerns eigene Formeln umziehen.
 - Kern legt bei jeder Zahl fest, wie viele Bit-Kästchen sie hat.
 - Fehler meldet Kern mit „Nein“ und einem Zettel an einer einzigen Pinnwand.
 - Die Uhr dient Messungen, nie der Simulation: Die zählt feste Schritte wie ein Brettspiel.
-- Ein Span zeigt auf Daten, ohne sie zu besitzen; wer sie behalten will, kopiert sie.
+- Kern reicht Daten als Zettel weiter, der nur sagt, wo sie liegen; wer sie behalten will, kopiert
+  sie.
 - Kerns JSON hält die Reihenfolge, schreibt Zahlen wie der Browser und misstraut fremden Dateien.
 - Meter, Sekunden, Kilogramm, **Z oben**; eine Matrix packt Strecken, Drehen und Verschieben in ein
   Paket, und die Reihenfolge zählt.
 - Die Kamera ist eine Beschreibung wie beim Fotografen; Unsichtbares wird aussortiert, im Zweifel
   aber gemalt.
-- Für die Simulation gelten eigene Winkelformeln, feste Summen und keine Rechen-Abkürzungen.
+- Für die Simulation gelten eigene Winkelformeln, Summen in fester Reihenfolge und keine
+  Rechen-Abkürzungen.
 
 ## Knobelecke
 
@@ -322,8 +398,8 @@ Steuerung oder Training ein, muss er auf Kerns eigene Formeln umziehen.
 2. Drehen macht aus (1, 0, 0) den Punkt (0, 1, 0), Verschieben dann (5, 1, 0).
 3. Für reine Darstellung ist es erlaubt. Schubsen die Funken die Ente, fließen sie in die Physik
    ein, und dann muss Kerns eigene Formel her.
-4. Im Zweiersystem sind 0,1 und 0,2 unendliche Brüche. Gespeichert werden Zahlen knapp daneben, und
-   ihre Summe liegt knapp neben 0,3.
+4. Computer rechnen im Zweiersystem, nur mit 0 und 1. Dort gehen 0,1 und 0,2 nie auf, wie 1/3 bei
+   uns. Gespeichert werden Zahlen knapp daneben, und ihre Summe liegt knapp neben 0,3.
 5. Ein langsamer Rechner zeigte mehr verstrichene Zeit an als ein schneller, und die Ente liefe auf
    beiden verschieden. Mit festen Schritten läuft sie überall gleich.
 

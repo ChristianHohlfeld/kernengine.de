@@ -6,15 +6,19 @@
 > seinen Aufbau – und wie du dieses Buch liest.
 
 > **Begriffe vorab:**
-> - **Programmiersprache** – eine genau festgelegte Schreibweise für Anweisungen an den Computer,
->   so wie ein Strickmuster eine Schreibweise für Maschen ist.
-> - **C++ und JavaScript** – zwei Programmiersprachen. C++ ist sehr schnell und wird für große
->   Programme wie Spiele benutzt; JavaScript versteht jeder Browser von Haus aus.
+> - **C++ und JavaScript** – zwei **Programmiersprachen**, also genau festgelegte Schreibweisen für
+>   Anweisungen an den Computer, so wie ein Strickmuster eine Schreibweise für Maschen ist. C++ ist
+>   sehr schnell und wird für große Programme wie Spiele benutzt; JavaScript versteht jeder Browser
+>   von Haus aus.
 > - **Übersetzer** (Fachwort: **Compiler**) – ein Programm, das Text in einer Programmiersprache in
 >   Befehle verwandelt, die eine Maschine direkt ausführen kann.
 > - **WebAssembly** – eine Befehlssprache, die alle modernen Browser ausführen können. Kern wird aus
->   C++ in sie übersetzt.
-> - **Modul** – das fertig übersetzte Paket, eine einzige Datei, die der Browser lädt und startet.
+>   C++ in sie übersetzt. Heraus kommt ein **Modul**: eine einzige Datei, die der Browser lädt.
+> - **Bild** (Fachwort: **Frame**) – eines der vielen Einzelbilder pro Sekunde, aus denen eine
+>   Bewegung auf dem Bildschirm besteht, wie die Blätter eines Daumenkinos.
+> - **Play und Simulate** – zwei Knöpfe in Kern Studio. Bei **Play** spielst du selbst mit und
+>   steuerst die Spielfigur. Bei **Simulate** läuft die Welt mit ihrer Physik, und du schaust mit
+>   frei beweglicher Kamera zu.
 > - **Schnittstelle** – die vereinbarte Übergabestelle zwischen zwei Programmteilen, wie der Tresen
 >   zwischen Küche und Gastraum.
 > - **Neuronales Netz** – ein Rechenmodell, das durch Übung lernt; hier lernt es, wie die
@@ -44,25 +48,23 @@ Browser lädt wie ein Bild. Zum Malen benutzt Kern die **Grafikschnittstelle** d
 
 Im selben Modul stecken alle Teile der Werkstatt:
 
-- die **Grundlagen**: Zahlen, Fehlermeldungen, ein Datenformat und die Mathematik für den 3D-Raum
+- die **Grundlagen**: Zahlen, Fehlermeldungen und die Mathematik für den 3D-Raum
   ([Kapitel 3](03-grundlagen.md));
-- das **Malen** von Licht, Schatten, Himmel, Glühen und Funken, dazu das Aussortieren von
-  Unsichtbarem und das Erkennen, worauf du klickst;
-- Bausteine für **Häuser, Straßen und Gelände**;
+- das **Malen**: Licht, Schatten, Himmel, dazu Bausteine für Häuser, Straßen und Gelände;
 - die **Physik**: wie Dinge fallen, rollen, zusammenstoßen und durch Gelenke verbunden sind;
-- der **Ton**: Klänge im Raum und ein kleiner Synthesizer;
-- die **Spielregeln**: Levels, Dinge in der Welt, Mehrspieler und Logik zum Zusammenklicken als
-  Kästchen und Pfeile;
-- **Kern Studio**, ein Baukasten-Editor nach dem Vorbild großer Spiele-Werkzeuge;
-- **der Lehrer**, ein Trainer für Roboter-Gehirne, der die Simulation auch mit dem echten Roboter
-  abgleicht.
+- der **Ton**: Klänge, die von links, rechts, nah oder fern kommen;
+- die **Spielregeln**: Levels, Dinge in der Welt, Mehrspieler und Spiellogik zum Zusammenklicken;
+- **Kern Studio**, der Editor, und **der Lehrer**, ein Trainer für Roboter-Gehirne, der die
+  Simulation auch mit Messungen am echten Roboter vergleicht.
 
-Und dann ist da die **Micro Duck**: ein zweibeiniger Roboter von Pollen Robotics. In Kern läuft sie
-mit ihren echten, trainierten neuronalen Netzen (Kern ist mit Pollen Robotics nicht verbunden).
+Und dann ist da die **Micro Duck**: ein kleiner zweibeiniger Roboter. Entworfen hat ihn die
+Robotik-Firma **Pollen Robotics**, die seine Baupläne und seine trainierten neuronalen Netze frei
+veröffentlicht hat. Kern benutzt diese veröffentlichten Pläne und Netze, ist aber ein eigenständiges
+Projekt: Mit der Firma selbst ist es nicht verbunden.
 
-Kern ist aus dem Spiel SpawnCity entstanden. Trotzdem kennt die Engine kein einziges Spiel: Spiele
-sprechen mit der Engine, nie umgekehrt. Darum bleibt sie für jedes Spiel brauchbar, so wie die
-Bühnentechnik nicht für ein einziges Stück gebaut ist.
+Kern ist aus dem Spiel SpawnCity entstanden. Trotzdem kennt die Engine kein einziges Spiel. Im
+Theaterbild: Das Stück benutzt die Bühnentechnik – es sagt „Licht an“ und „Vorhang auf“ –, aber die
+Technik weiß nichts vom Stück. Darum trägt sie morgen ein ganz anderes Stück genauso gut.
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 1.
 
@@ -70,13 +72,17 @@ Die genauen Namen und Werte stehen im blauen Buch, Kapitel 1.
 
 ### Selbst gekocht
 
-Kern setzt auf keine fremde Grafik-Engine und keine fremde Hülle, die im Browser mitläuft. Das Malen
-ist eigener Code, der direkt mit der Grafikschnittstelle spricht, und zum Übersetzen reicht ein
-schlanker Standard-Werkzeugkasten. Die wenigen fremden Bausteine, etwa die Physik, werden unverändert
-mit hineingebaut. Der Gewinn: Man weiß genau, was passiert.
+Kern setzt auf keine fremde Grafik-Engine. Das Malen ist eigener Code, der direkt mit der
+Grafikschnittstelle spricht. Der Gewinn: Man weiß genau, was passiert.
 
-> **Stell dir vor …** Ein Koch, der jede Soße selbst rührt, statt Fertigsoße zu nehmen. Das ist
-> mehr Arbeit – dafür weiß er bei jedem Teller, was drin ist.
+Ganz ohne fremde Teile geht es trotzdem nicht. Für die Physik nimmt Kern eine fertige
+**Physik-Bibliothek** namens Box3D – eine Programmsammlung, die jemand anderes geschrieben und frei
+veröffentlicht hat. Kern verändert sie nicht, sondern baut sie so ein, wie sie ist. Was Kern damit
+macht, entscheidet es selbst.
+
+> **Stell dir vor …** Ein Koch, der jede Soße selbst rührt, statt Fertigsoße zu nehmen. Ein paar
+> Zutaten kauft auch er – das Mehl mahlt er nicht selbst. Aber er nimmt sie, wie sie sind, und
+> mischt sie selbst. So weiß er bei jedem Teller, was drin ist.
 
 Kern benutzt außerdem nur die ältesten, einfachsten Fähigkeiten von WebAssembly. Das ist wie ein
 Brief in einfacher Sprache: Ihn versteht jeder. So läuft Kern auf jedem Browser, der 3D-Grafik
@@ -93,7 +99,7 @@ daran: Jeder Klick im Editor wird ein Befehl an die Engine.
 > bringt das Essen an den Tisch. Gekocht wird aber ausschließlich in der Küche – in C++.
 
 Der Gewinn: Ein Spiel verhält sich im Editor genauso wie als fertiges Spiel, und man kann es auch
-ohne Browser prüfen.
+ohne Browser automatisch prüfen ([Kapitel 2](02-bauen-und-testen.md)).
 
 ### Überall dasselbe Ergebnis
 
@@ -108,8 +114,14 @@ Zusammenzählen nicht egal. Ein Beispiel mit einem Taschenrechner, der nur vier 
 - (1000 + 0,4) + 0,4: Erst gibt es 1000,4, gerundet 1000. Dann wieder 1000,4, gerundet **1000**.
 - 1000 + (0,4 + 0,4): Erst gibt es 0,8. Dann 1000,8, gerundet **1001**.
 
-Echte Computer haben viel mehr Stellen, aber das Prinzip ist dasselbe. Und manche Rechnungen, etwa
-mit Winkeln, rundet jeder Rechner im letzten Bit ein winziges bisschen anders.
+Echte Computer haben viel mehr Stellen, aber das Prinzip ist dasselbe.
+
+Für Plus, Minus, Mal und Geteilt gibt es eine feste, weltweit gleiche Rundungsregel: Daran halten
+sich alle Rechner. Anders bei **Winkelrechnungen**. Winkel braucht ein Spiel ständig – jede Drehung,
+jedes Gelenk der Ente ist ein Winkel. Rechnungen wie der Sinus (mehr in
+[Kapitel 3](03-grundlagen.md)) haben aber unendlich viele Nachkommastellen und lassen sich nur
+annähern. Jeder Computer bringt dafür seine eigenen Formeln mit und landet im letzten Bit manchmal
+ein winziges bisschen woanders.
 
 So ein Unterschied in der letzten Stelle wäre egal – wenn er klein bliebe. In einer **Simulation**,
 einer nachgerechneten Welt, rechnet aber jeder Schritt mit dem Ergebnis des vorigen weiter. Der
@@ -121,12 +133,18 @@ Sekunden ein Fuß anders auf.
 
 Darum hält Kern drei Regeln ein:
 
-- Der Übersetzer darf keine Rechen-Abkürzungen nehmen, die auf verschiedenen Prozessoren
-  verschieden runden.
-- Für Winkelrechnungen bringt Kern **eigene Formeln** mit, die überall gleich runden
-  ([Kapitel 3](03-grundlagen.md)).
-- Beim Lernen wird immer in **derselben Reihenfolge** zusammengezählt, egal wie viele Helfer
-  mitrechnen.
+- **Keine Rechen-Abkürzungen.** Das Rechenwerk im Computer heißt **Prozessor**. Manche Prozessoren
+  rechnen „mal und dann plus“ in einem einzigen Zug und runden dabei nur einmal statt zweimal –
+  schneller, aber mit einem anderen letzten Bit. Der Übersetzer darf solche Abkürzungen nicht
+  benutzen. Auch die Physik-Bibliothek verzichtet auf Sonderbefehle, die nur manche Prozessoren
+  haben, und rechnet überall auf dem einfachen Weg, so wie im Browser.
+- **Eigene Winkelformeln.** Für Winkelrechnungen bringt Kern seine eigenen Formeln mit, die überall
+  gleich rechnen ([Kapitel 3](03-grundlagen.md)).
+- **Feste Reihenfolge beim Zusammenzählen.** Erinnerst du dich an den Taschenrechner? Die
+  Reihenfolge zählt. Wenn die Ente laufen lernt (beim Lehrer, Abschnitt 1.4), rechnen mehrere
+  Helfer gleichzeitig und werden mal in dieser, mal in jener Reihenfolge fertig. Würde man ihre
+  Ergebnisse so zusammenzählen, wie sie eintreffen, käme jedes Mal etwas anderes heraus. Darum legt
+  Kern die Reihenfolge fest, egal wie viele Helfer mitrechnen.
 
 Bewiesen wird das mit einem **Fingerabdruck**: Die Ente läuft ein Stück, und nach jedem Schritt
 wird ihr Zustand zu einer Prüfzahl verdichtet. Diese Liste muss auf allen Rechnern exakt gleich sein
@@ -134,7 +152,7 @@ wird ihr Zustand zu einer Prüfzahl verdichtet. Diese Liste muss auf allen Rechn
 
 > **Wusstest du?** Dank Determinismus ist ein Fehler der Simulation ein fester, wiederholbarer
 > Fehler statt Zufallsrauschen. Läuft die simulierte Ente anders als die echte, liegt das wirklich
-> am Modell und nicht am Rechner ([Kapitel 16](16-kalibrierung.md)).
+> an der Nachbildung der Ente und nicht am Rechner ([Kapitel 16](16-kalibrierung.md)).
 
 ### Noch ein paar Hausregeln
 
@@ -145,11 +163,16 @@ wird ihr Zustand zu einer Prüfzahl verdichtet. Diese Liste muss auf allen Rechn
 - **Die Physik wird nicht geschönt.** Die Micro Duck steht nur durch ihre eigenen Motoren und Füße –
   keine unsichtbare Hand hält sie fest ([Kapitel 6](06-physik.md), [Kapitel 13](13-micro-duck.md)).
 - **Eine Umsetzung für alle Orte.** Editor, fertiges Spiel und Lehrer teilen dieselbe Spielwelt und
-  dieselbe Physik. Darum läuft ein Netz, das im Lehrer gelernt hat, unverändert im Studio.
-- **Kein Wegwerf-Speicher pro Bild.** Die Browser-Seite benutzt für jedes Bild denselben
-  Ablageplatz wieder. Das spart Aufräumarbeit.
-- **Robust:** Nimmt der Browser Kern die Grafikkarte weg, wartet Kern und baut danach alles wieder
-  auf ([Kapitel 4](04-grafik.md)).
+  dieselbe Physik. Darum läuft ein Netz, das im Lehrer (dem Trainer für die Ente, Abschnitt 1.4)
+  gelernt hat, unverändert im Studio.
+- **Kein Wegwerf-Speicher bei jedem Bild.** Bei jedem Bild reicht die Browser-Seite neue Zahlen an
+  Kern weiter. Dafür benutzt sie immer denselben Ablageplatz, statt jedes Mal einen neuen anzulegen
+  und wegzuwerfen. Sonst müsste der Browser ständig hinter ihr aufräumen, und das kostet Zeit
+  mitten im Spiel. Die Kehrseite: Was Kern behalten will, muss es sich kopieren
+  ([Kapitel 3](03-grundlagen.md)).
+- **Robust:** Ein Browser darf einer Seite die Grafikkarte jederzeit wegnehmen – etwa bei
+  Speichermangel, wenn der Grafiktreiber neu startet, oder auf dem Handy, wenn die Seite im
+  Hintergrund liegt. Dann wartet Kern und baut danach alles wieder auf ([Kapitel 4](04-grafik.md)).
 
 ## 1.3 Ein Haus aus Stockwerken
 
@@ -162,14 +185,22 @@ flowchart TB
   JS["Browser: der Kellner"] --> ABI["Übergabestelle"]
   ABI --> TOP["Editor und Trainer"]
   TOP --> GAME["Spielregeln und Levels"]
-  GAME --> MID["Physik, Logik, Netz, Ton"]
+  GAME --> MID["Physik, Logik, Netzwerk, Ton"]
   MID --> GFX["Malen, Szene, Formen"]
   GFX --> CORE["Fundament: Zahlen und Mathe"]
 ```
 
+So liest du das Bild: Ein Pfeil heißt „benutzt“. Ganz oben steht der Browser-Teil, der Kellner: Er
+nimmt deine Eingaben entgegen und reicht sie durch die Übergabestelle nach unten weiter.
+„Netzwerk“ meint hier das Spielen mit mehreren Leuten über das Internet, nicht das neuronale Netz
+der Ente.
+
 Nicht jedes Programm braucht das ganze Haus. Malen, Ton, Logik, Netzwerk und das Fundament sind
-immer dabei. Beim Bauen wählt man, welche Stockwerke mitkommen: Physik, Spielregeln, Editor oder
-Trainer ([Kapitel 2](02-bauen-und-testen.md)).
+immer dabei. Die übrigen Stockwerke – Physik, Spielregeln, Editor, Trainer – wählt man beim Bauen
+aus, damit ein Programm nicht unnötig groß wird: Ein Spiel, das nur malt, braucht keinen Editor
+([Kapitel 2](02-bauen-und-testen.md)). Wer ein oberes Stockwerk wählt, bekommt die darunter
+automatisch mit: Editor und Trainer brauchen die Spielregeln, und die Spielregeln brauchen die
+Physik.
 
 C++ und JavaScript reden nur über einen gemeinsamen Speicherbereich miteinander. JavaScript legt
 dort Daten an vereinbarte Stellen und sagt der Engine, wo sie liegen. Die Engine antwortet auf
@@ -177,7 +208,9 @@ demselben Weg. Braucht sie umgekehrt etwas vom Browser – die Grafikkarte, die 
 Zufallszahl –, ruft sie ihn über eine kleine Liste vereinbarter Anfragen.
 
 > **Stell dir vor …** Zwei Nachbarn ohne gemeinsame Sprache teilen sich einen Briefkasten. Einer
-> legt Zettel hinein, der andere holt sie ab. Mehr Kontakt gibt es nicht.
+> legt Zettel hinein, der andere holt sie ab. Dazu gibt es eine Klingel mit ein paar vereinbarten
+> Zeichen: Die Engine darf klingeln und etwa um die Uhrzeit oder eine Zufallszahl bitten. Mehr
+> Kontakt gibt es nicht.
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 1; alle Funktionen an dieser Grenze
 listet [Kapitel 17](17-referenz.md).
@@ -192,19 +225,22 @@ malt. Das kleinste Beispiel stellt ein Feld sich drehender Kisten auf einen Bode
 Beispiel ist ein ganzes Spiel mit Stadt, Fahrphysik, Verkehr, Tag und Nacht
 ([Kapitel 12](12-eigene-spiele.md)).
 
-**Nur das Malen, für eine Webseite.** Wer schon ein Spiel in JavaScript hat, kann Kern nur zum
-Zeichnen benutzen. So macht es SpawnCity ([Kapitel 4](04-grafik.md)).
+**Nur das Malen, für eine Webseite.** Webseiten können Kern auch nur als Maler benutzen; so macht
+es das Spiel SpawnCity ([Kapitel 4](04-grafik.md)).
 
 **Kern Studio und fertige Spiele.** Für alle, die lieber klicken als tippen. Das ganze Studio ist
 **eine** Datei, die sogar ohne Internet per Doppelklick läuft. Du baust ein Level aus **Actors**
-(Dingen in der Welt) und spielst es mit **Play** oder **Simulate** direkt im Fenster.
+(Dingen in der Welt) und probierst es direkt im Fenster aus: mit **Play** spielst du selbst mit,
+mit **Simulate** schaust du der laufenden Welt zu.
 **File → Package Game** macht daraus ein eigenständiges Spiel, wieder eine einzige Datei, die du
 verschicken kannst. Sie läuft mit derselben Engine wie der Editor und verhält sich darum genauso
 ([Kapitel 8](08-spiel-laufzeit.md), [Kapitel 11](11-studio.md)).
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/. Beim ersten Start ist Orb Run
-> geladen (sonst: **File → Example Levels → Orb Run**). Drück **Play** (Alt+P), fahr mit dem
-> Hovercar los und sammle ein paar Orbs. Dann **Stop** (Esc). Alles, was du gerade gesehen und
+> geladen (sonst: **File → Example Levels → Orb Run**). Drück **Play** (Alt+P) und fahr mit dem
+> schwebenden Auto, dem Hovercar, los: **W A S D** oder die Pfeiltasten lenken und geben Gas,
+> **Shift** gibt Schub. Sammle ein paar **Orbs** ein, die leuchtenden Energiekugeln auf den
+> Straßen. Dann **Stop** (Esc). Alles, was du gerade gesehen und
 > gehört hast – Licht, Fahrphysik, Ton –, hat die Engine im Browser gerechnet.
 
 > **Achtung, Falle!** Auf einem deutschen System zeigt Kern Studio seine Menüs auf Deutsch („Datei“
@@ -212,22 +248,24 @@ verschicken kannst. Sie läuft mit derselben Engine wie der Editor und verhält 
 > Damit du alles wiederfindest, klick unten rechts in der Statusleiste auf **DE | EN** – Studio
 > merkt sich die Wahl. Oder öffne es gleich mit `?lang=en` am Ende der Adresse.
 
-Ganz unten im Studio liegt die **Statusleiste**. Darin steht ein Eingabefeld mit der Aufschrift
-**Cmd** (kurz für „command“, Befehl): die **Konsole**. Hier tippst du Befehle an Studio und schickst
-sie mit Enter ab; `help` zeigt alle Befehle. Die Antworten erscheinen im **Output Log**, das du über
-den gleichnamigen Knopf in der Statusleiste aufklappst. Mit der Cmd-Taste des Mac hat das Feld nichts
-zu tun. In den nächsten Kapiteln benutzt du es öfter.
-
 **Der Lehrer.** Er trainiert Netze für die Micro Duck: auf deinem Rechner als eigenes Programm oder
 im Browser auf der Lehrer-Seite. Dort sammeln mehrere Hintergrund-Helfer gleichzeitig Erfahrungen
 mit simulierten Enten, und einer lernt daraus. Beide Fassungen benutzen dieselben Trainingsrezepte
 und dieselbe Spielwelt. Am Anfang des Lernens steht ein **Startwert** für den Zufall – wie ein
 Kartenspiel, das jedes Mal auf genau dieselbe Weise gemischt wird. Gleicher Startwert, gleich viele
-Enten: **dasselbe Netz**, hier wie dort ([Kapitel 14](14-lehrer.md)).
+Enten: **dasselbe Netz**, hier wie dort. Ein fertiges Netz speichert der Lehrer im selben Format wie
+die Original-Netze von Pollen Robotics; darum lädt das Studio es genauso wie diese
+([Kapitel 14](14-lehrer.md)).
 
-An der Ente greift alles ineinander: Ihr Körper ist ein Stapel Physik-Teile mit Gelenken, ihre
-Motoren sind genau nachgebildet, ihr Gehirn ist ein Netz, das Kern selbst rechnet, ihre Stimme kommt
-aus dem Ton-Mischer, Logik-Bausteine können sie steuern – und im Studio ist sie einfach ein Actor.
+An der Ente sieht man alles auf einmal:
+
+- Ihr **Körper** ist nach den Original-Bauplänen von Pollen Robotics nachgebildet: Physik-Teile,
+  verbunden durch Gelenke.
+- Ihre **Motoren** sind genau nachgebaut, bis hin zu ihrer Kraft und ihrer kleinen Verzögerung.
+- Ihr **Gehirn** ist ein neuronales Netz, das Kern selbst rechnet.
+- Ihre **Stimme** kommt aus dem Ton-Mischer.
+- **Spiellogik** zum Zusammenklicken kann sie steuern.
+- Im Studio ist sie einfach ein **Actor** wie jedes andere Ding.
 
 ![Das Micro-Duck-Level im Studio](../buch/bilder/duck-level.png)
 
@@ -235,6 +273,14 @@ aus dem Ton-Mischer, Logik-Bausteine können sie steuern – und im Studio ist s
 > **Micro Duck**. Drück **Play** und schau zu, wie die Ente losläuft, gesteuert von ihrem gelernten
 > Gehirn. Niemand hat ihr die Schritte vorgeschrieben: Das Netz entscheidet in jedem Augenblick neu,
 > wie sich die Motoren bewegen.
+
+### Ein Werkzeug für später: die Konsole
+
+Ganz unten im Studio liegt die **Statusleiste**. Darin steht ein Eingabefeld mit der Aufschrift
+**Cmd** (kurz für „command“, Befehl): die **Konsole**. Hier tippst du Befehle an Studio und schickst
+sie mit Enter ab; `help` zeigt alle Befehle. Die Antworten erscheinen im **Output Log**, das du über
+den gleichnamigen Knopf in der Statusleiste aufklappst. Mit der Cmd-Taste des Mac hat das Feld nichts
+zu tun. In den nächsten Kapiteln benutzt du es öfter.
 
 ## 1.5 Wo was liegt
 
@@ -303,7 +349,8 @@ Wo fängst du an?
 3. Nein: links kommt 1000 heraus (1000,3 wird zweimal zu 1000 gerundet), rechts 1001 (0,6 dazu
    ergibt 1000,6, gerundet 1001). Beim Computer zählt die Reihenfolge – in einer Simulation wächst so
    ein Unterschied mit jedem Schritt.
-4. Kern wartet, bis die Grafikkarte zurück ist, und baut dann alles wieder auf.
+4. Das darf der Browser, etwa bei Speichermangel oder wenn der Grafiktreiber neu startet. Kern
+   wartet, bis die Grafikkarte zurück ist, und baut dann alles wieder auf.
 
 ---
 
