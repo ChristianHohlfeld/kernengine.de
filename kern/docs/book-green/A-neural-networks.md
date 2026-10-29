@@ -1,151 +1,193 @@
 # Appendix A – How Machines Learn: Networks, Imitation, Reward
 
 > **In short:** This appendix explains, without a math degree, how a neural network works, how it
-> learns by copying and by reward, and why the Micro Duck can jump in the end. All you need is basic
-> arithmetic and a bit of curiosity. Every concept comes first in general, then with an example,
-> then with the place where Kern uses it.
+> learns by imitating and through reward, and why the Micro Duck can jump in the end. Basic
+> arithmetic is enough almost everywhere. Where a bit more comes up – exponents, the exponential
+> function, a slope, the bell curve – we introduce it right there with a picture and a small table.
+> You're welcome to skip the worked examples: the pictures carry the ideas.
 
-How Kern's Lehrer puts all of this into practice is in [Chapter 14](14-lehrer.md), how you train
-yourself is in [Chapter 15](15-your-own-models.md). The code lives in `src/lehrer/`.
+> **Key terms:**
+> - **Servo** – a small motor you give an angle to and that then moves there; the duck has 14 of
+>   them.
+> - **Simulation** – the rebuilt duck inside the computer, which walks and falls by the rules of physics.
+> - **Tick** – the heartbeat of the control: 50 times per second the duck measures and gets new targets.
+> - **Episode** – one practice run, from the start until a fall or until time is up.
+> - **Lehrer** – Kern's training system, which lets the duck's networks learn.
+> - **Seed** – the starting number for randomness: same seed, same randomness.
+> - **velstand** – Pollen Robotics' finished walking and standing network, which ships with Kern.
+> - **Core** – one of the calculating units in the processor; several cores can calculate at the same time.
+
+How Kern's Lehrer puts all this into practice is in [Chapter 14](14-lehrer.md), how you train yourself
+in [Chapter 15](15-your-own-models.md). The exact formulas, names and values are in the blue book,
+Appendix A.
 
 ## A.1 What a neural network is
 
-### A mixing board with lots of knobs
+### A mixing desk with many sliders
 
-> **Imagine …** a giant mixing board. Signals come in at the front, music comes out at the back. In
-> between sit thousands of knobs. At first they are set at random, and it sounds awful. "Learning"
-> means adjusting the knobs until the right thing comes out.
+A neural network is a calculating machine: numbers in, numbers out. In between sit a great many
+sliders, and **learning** means readjusting these sliders until the right thing comes out.
 
-A neural network is exactly that kind of mixing board; mathematically, it is a function: numbers
-in, numbers out. For the Micro Duck, **61 numbers** go in (orientation of the torso, joint angles,
-joint velocities, the last action, commands) and **14 numbers** come out: the targets for the 14
-servos. The knobs are called **parameters** (weights and biases). Nobody sets them by hand; they are
-learned. What counts as "right" is defined by a number that should become as small as possible: the
-loss (A.3).
+> **Imagine …** a giant mixing desk. Signals come in at the front, music comes out at the back. In
+> between are thousands of knobs. At first they're set at random, and it sounds awful.
+> "Learning" means: readjusting the knobs until it sounds good.
+
+For the Micro Duck, **61 numbers** go in: how the torso is lying, how the joints are positioned and
+how fast they're moving, what the duck last did, and which command currently applies. Out come
+**14 numbers**: the target angles for the 14 servos. Nobody sets the sliders by hand; they're learned.
+What counts as "right" is measured by a number that should become as small as possible: the **loss**
+(A.3).
 
 ### The neuron
 
 The smallest building block is the artificial **neuron**. It does three things:
 
-1. Multiply each input by its **weight** (how much does it count? can also be negative).
-2. Add everything up and add a **bias** (a kind of baseline setting).
-3. Send the result through an **activation function** that "bends" it.
+1. Multiply each input by its **weight**: how much does this input count? Weights may also be
+   negative.
+2. Add everything up and add a **base setting** (technical term **bias**).
+3. Send the result through an **activation** that "bends" it (more on that in a moment).
 
-```
- x1 ──w1──┐
-          ├──► sum + b ──► z ──► ELU(z) ──► output
- x2 ──w2──┘
-```
+![A neuron with three inputs: multiply, add up, add the bias, bend](../abbildungen/neuron.svg)
 
-**Let's work one out.** Two inputs x₁ = 0.5 and x₂ = −1, weights w₁ = 2 and w₂ = 0.5, bias b = 0.1:
+**Let's work one through.** Three inputs 0.5, −1 and 0, weights 2, 0.5 and 3, bias 0.1. The third
+input happens to be 0 and therefore contributes nothing:
 
-- Sum: 2 · 0.5 + 0.5 · (−1) + 0.1 = 1 − 0.5 + 0.1 = **0.6**
-- The ELU activation leaves positive numbers unchanged: output **0.6**.
+- Sum: 2 · 0.5 + 0.5 · (−1) + 3 · 0 + 0.1 = 1 − 0.5 + 0 + 0.1 = **0.6**
+- The activation leaves positive numbers as they are: output **0.6**.
 
-Now we turn only the bias: b = −0.9. The sum becomes 1 − 0.5 − 0.9 = **−0.4**. For negative numbers,
-ELU computes e^z − 1 = e^(−0.4) − 1 ≈ 0.670 − 1 = **−0.330**. A single knob has flipped the answer.
-That is exactly how a network learns: it turns thousands of knobs by a tiny amount.
+Now we turn only the base setting: bias −0.9. The sum becomes 1 − 0.5 − 0.9 = **−0.4**. The
+activation squashes negative numbers; according to the table in the next section, −0.4 becomes about
+**−0.33**. A single slider has flipped the answer. That's exactly how a network learns: it turns
+thousands of sliders a tiny bit each.
 
-### Layers and the MLP
+### Why bending matters so much
 
-Many neurons side by side that see the same inputs form a **layer**. Several layers one after the
-other make a **multilayer perceptron** (MLP). Kern builds the jump actor like this:
+Without bending, a network could only **multiply and add up**. That always gives a straight line:
+twice as much in, twice as much out. If you chain such calculations one after another, you again get
+only a straight line. A hundred layers could then do no more than one. Only bending allows "crooked"
+relationships such as "bend the knee more, the faster the torso tips, but only up to the stop."
 
-```mermaid
-flowchart LR
-  x["Input (61)"] --> L1["Layer 512 + ELU"]
-  L1 --> L2["Layer 256 + ELU"]
-  L2 --> L3["Layer 128 + ELU"]
-  L3 --> y["Output 14 (linear)"]
-```
+> **Imagine …** you build a curve out of straight wooden slats. With a single long slat, it never
+> works. With many short slats that each turn at a kink, it does. Each neuron supplies such a kink.
 
-The last layer is **linear**, without activation, because servo targets may be any number. How many
-knobs is that? A layer from n to m neurons has n · m weights and m biases:
-61 · 512 + 512 · 256 + 256 · 128 + 128 · 14 = **196,864 weights**, plus **910 biases**, for a total
-of **197,774 parameters**. Almost 200,000 knobs! In Kern's recipes, the critic has the shape
-(256, 128), and the play layer's network is 23 → 256 → 128 → 9.
+Kern uses the **ELU** activation, as Pollen Robotics does when training the duck. In words:
+**Positive numbers stay as they are. Negative ones get squashed, and never below −1.**
 
-In Kern, this is `Mlp` in `nn.h`. All parameters sit in a single long vector, the weights stored
-"input by input" – [Section 14.4](14-lehrer.md) explains why.
+![ELU: right of 0 everything stays as it is; on the left the curve bends away and gets ever closer to −1](../abbildungen/elu.svg)
 
-### Why the activation matters so much
+Right of 0 the points lie on a straight line; on the left they bend gently away and get ever closer
+to −1. That's all you need; for the examples in this appendix, this table is enough:
 
-Without activation, a deep network would be useless: linear calculations one after another are
-again a linear calculation. A hundred layers could then do no more than one. Only the "bending"
-allows curved relationships such as "bend the knee more the faster the torso tips, but only up to
-the limit."
+| Input | ELU turns it into |
+|---|---|
+| 1 | 1 |
+| 0 | 0 |
+| −0.4 | −0.33 |
+| −0.5 | −0.39 |
+| −1 | −0.63 |
+| −2 | −0.86 |
+| −4 | −0.98 |
 
-Kern uses **ELU**, like the library rsl_rl, which Pollen Robotics uses to train the Micro Duck's
-networks:
+> **For the curious:** Where do the numbers on the left come from? From the **exponential function**,
+> a shrinking by always the same share: each whole step to the left leaves a good third, like a cake
+> of which just under two thirds gets eaten at every step. At −1 there's 0.368 left, at −2 still
+> 0.135. ELU subtracts 1 from that: 0.368 − 1 ≈ −0.63. That's why ELU gets ever closer to −1 without
+> ever reaching it – the cake is never completely gone. Another common activation simply sets all
+> negative numbers to 0; then a neuron can end up in a region where it no longer learns anything. ELU
+> never becomes completely flat on the left and doesn't have this "dead" region.
 
-| z | ELU(z) | z | ELU(z) |
-|---|---|---|---|
-| −4 | −0.98 | 0 | 0 |
-| −1 | −0.63 | 1 | 1 |
-| −0.4 | −0.33 | 2 | 2 |
+### Layers
 
-On the right, ELU is a straight line; on the left, it bends gently and approaches −1. Unlike the
-widespread ReLU (simply 0 on the left), there is no "dead" zone in which a neuron stops learning.
-In code, it is one line:
+Many neurons side by side that all see the same inputs form a **layer**. Several layers one after
+another make a network. The duck's jump network looks like this:
 
-```cpp
-y[k] = y[k] > 0 ? y[k] : kern::dm::expm1(y[k]);  // ELU
-```
+![The duck's jump network: 61 measurements, conversion, three layers with bending, finally 14 servo targets without bending](../abbildungen/mlp-kette.svg)
 
-If the value is positive, it stays; otherwise e^z − 1 is computed. `expm1` does this accurately
-even for tiny numbers, and `kern::dm` is Kern's own math library, which computes bit-identically on
-every device (A.11).
+The last layer doesn't bend, because a servo target may be any number, even a strongly negative one.
+Altogether the network has almost **200,000 sliders**.
+
+> **For the curious:** Here's how to count: a layer with n inputs and m neurons has n · m weights and
+> m base settings. 61 · 512 + 512 · 256 + 256 · 128 + 128 · 14 = 196,864 weights, plus 910 base
+> settings, together 197,774 sliders.
 
 ### The start: random, but small
 
-Setting all knobs to 0 would be fatal: all neurons of a layer would compute the same thing, get the
-same correction and stay **twins** forever. That's why they are drawn at random, and small enough
-that the sums don't explode from layer to layer. Kern does it like PyTorch: uniformly distributed
-between −1/√n and +1/√n, where n is the number of inputs. With 61 inputs, that's about ±0.128. For
-the last layer there is an extra factor (`output_gain`) that can keep the first outputs small.
+Before learning, the sliders have to stand somewhere. All at 0 would be fatal: then all neurons of a
+layer would calculate exactly the same thing, get the same correction, and stay **twins** forever.
+That's why they're set at random, but small. The more inputs a neuron has, the smaller the starting
+values – otherwise the sums would get bigger and bigger from layer to layer and explode.
 
 ## A.2 The forward pass
 
-"Forward" means computing layer by layer, from the input to the output, usually for a whole stack
-(**batch**) of inputs at once; Kern computes four rows at a time. For learning, the forward pass
-remembers all intermediate results (the **cache**); when merely acting, it doesn't.
+**Calculating forward** means: put the input in at the front, pass it on layer by layer, until the
+answer comes out at the back. That's all a finished network does, 50 times per second.
 
-The innermost loop always runs over weights that sit right next to each other in memory, and
-computes "y plus a times x." That way the compiler can speed it up **without changing the order of
-the additions**. That is exactly why the weights are stored input by input: otherwise the compiler
-would have to reorder sums, and reordered floating-point sums are no longer bit-identical (A.11).
+> **Imagine …** a bucket brigade at a fire. The first person takes the water, hands it to the next,
+> who passes it on, until the last one dumps it onto the fire. Each layer is a person in the chain:
+> it takes what the previous one gives it, works on it, and passes it on.
+
+In the picture of the jump network above, that's the row from left to right: each layer delivers an
+**intermediate result** to the next, the last one delivers the servo targets.
+
+When **learning**, there's one difference: then the chain remembers every intermediate result, like
+notes left lying at each station. You'll need them shortly, when the error is spread backward (A.5).
+When just acting on the robot, they're thrown away immediately.
+
+> **For the curious:** Kern arranges the calculation so that the computer can do it quickly,
+> **without** changing the order of the additions. Why that matters is in A.11 under "The same result
+> on every computer."
 
 ## A.3 The loss: how bad am I right now?
 
-For a network to learn, it needs a number that says how wrong it is: the **loss function**. The
-smaller, the better.
+For a network to learn, it needs a number that says how wrong it is: the **loss**. The smaller, the
+better. Learning then simply means: making the loss smaller.
 
-The classic is the **mean squared error** (MSE): for each output, take the distance to the target
-value, square it, average everything. Example: the network says (0.5, 2), the right answer would be
-(1, 1). Errors: (0.5 − 1)² = 0.25 and (2 − 1)² = 1, average **0.625**. Squaring has two advantages:
-minus and plus count the same, and large errors count extra.
+The classic is the **mean squared error**: for each output, take the distance to the target value,
+multiply it by itself ("square" it), then take the average. Example: the network says 0.5 and 2; right
+would be 1 and 1. The distances are −0.5 and 1; squared, 0.25 and 1; average **0.625**. Squaring has
+two advantages: an error downward counts as much as one upward, and big errors count especially much
+(double the distance, four times the loss).
 
-In Kern, imitation uses exactly this loss (`Ppo::imitate`), and the critic also learns with a
-squared error (A.11).
+The Lehrer uses this loss when the network imitates a role model (A.9).
 
-> **Imagine …** the loss is a landscape. Every setting of the knobs is a place, and the loss is the
-> altitude. You want to get to the deepest valley. But the landscape has almost 200,000 directions,
-> and there is no map. You are standing in **thick fog** and can only feel how steep the ground under
-> your feet is.
+> **Imagine …** the loss is a landscape. Every setting of all the sliders is a place, and the loss is
+> the height there. You want to get to the deepest valley. Only this landscape doesn't have two
+> compass directions like a real one, but almost 200,000 – one for each slider. And there's no map.
+> You're standing in **thick fog** and can only feel how steep the ground under your feet is.
 
 ## A.4 Gradient descent: downhill in the fog
 
 ### The basic idea
 
-The slope under your feet is called the **gradient**. It points uphill. So you take a step in the
-opposite direction:
+In the fog you can only feel the **slope** under your feet: which way is uphill, and how steep? So you
+take a step in the opposite direction, downhill. The slope for all sliders together is called the
+**gradient**. The step length is called the **learning rate**.
 
 ```
-new knob = old knob − learning rate × gradient
+ new slider = old slider − learning rate × slope
 ```
 
-The **learning rate** is the step length. An example with just one knob θ and the loss θ² (a
-valley with its lowest point at 0). The gradient is 2θ.
+How do you measure a slope? Without any higher math: step a tiny bit to the side and see how much
+higher you're then standing. Slope = difference in height divided by the step length.
+
+**A valley to try out.** A single slider r, and the loss is r · r (**r²** for short, "r squared").
+That's a valley with its lowest point at r = 0.
+
+![The valley r²: the ball at r = 1, the slope there is 2, a step goes downhill](../abbildungen/gradientenabstieg.svg)
+
+If the slider is at 1, the loss is 1 · 1 = 1. One hundredth further, at 1.01, it's
+1.01 · 1.01 = 1.0201. The difference 0.0201 divided by 0.01 gives about **2**. That's how you get the
+slope at any spot, and for this valley the answer is always "two times r":
+
+| Slider r | Loss r² | Slope there |
+|---|---|---|
+| −2 | 4 | −4 (downhill to the right) |
+| −1 | 1 | −2 |
+| 0 | 0 | 0 (at the very bottom) |
+| 1 | 1 | 2 (downhill to the left) |
+| 2 | 4 | 4 |
+
+Now let's set off, from r = 1, with two different learning rates:
 
 | Step | Learning rate 0.1 | Learning rate 1.1 |
 |---|---|---|
@@ -154,543 +196,637 @@ valley with its lowest point at 0). The gradient is 2θ.
 | 2 | 0.64 | 1.44 |
 | 3 | 0.512 | −1.728 |
 
-With 0.1, you walk obediently into the valley. With 1.1, you jump over the valley every time, land
-higher than before and swing further and further. Steps that are too small, on the other hand, barely
-make progress. That makes the learning rate one of the most important knobs of all.
+With 0.1 it goes obediently into the valley. With 1.1 you jump over the valley every time, land
+higher on the other side than before, and swing yourself up – like a ball that's pushed too hard. In
+this valley the limit is exactly at learning rate 1: then the ball jumps back and forth between 1 and
+−1 forever; below that it arrives at the bottom, above that it swings itself up. Steps that are too
+small, on the other hand, barely make progress. That's why the learning rate is one of the most
+important sliders of all.
 
-### Minibatches and epochs
+### Bites instead of everything: minibatches and epochs
 
-Computing the exact gradient over **all** examples is expensive. So you estimate it from a random
-handful, a **minibatch**, and take many small steps (stochastic gradient descent). The estimate is
-noisy, and small minibatches are noisier. That is exactly what slowed down the jump training with
-only a few dozen ducks. One pass through all the data is called an **epoch**. Kern shuffles the
-order with its own random number generator.
+Calculating the exact slope over **all** practice examples takes a long time. So you estimate it from
+a small, random handful, a **minibatch**, and take many small steps instead.
+
+> **Imagine …** a survey. If you ask five people, you get a shakier result than with a thousand – but
+> you're done much faster and can ask more often.
+
+So small bites give a shakier direction. The duck's jump training felt that. When practicing with
+reward (A.10), the practice examples are what the ducks experienced. If only a few dozen ducks
+practice at once, there's little experience per round – the bites get small and the direction
+correspondingly restless. Going through all the data once is called an **epoch**.
 
 ### The emergency brake
 
-A single outlier can produce a huge gradient and ruin the network in one step. That's why the
-**length** of the whole gradient is limited: if it is larger than 1.0, it is clipped to 1.0. The
-direction stays the same. In Kern, this brake sits in `Adam`; it measures the length in double
-precision and, for the actor, over the network weights **and** σ together.
+A single crazy example can produce a huge slope and ruin the network in a single step. That's why the
+step length is capped: the **direction** stays, but steps that are too big are shortened to a maximum
+length.
 
-## A.5 Backpropagation: whose fault is it?
+> **Imagine …** a car with a speed limiter that can never be driven faster than 130 km/h. You can steer
+> freely; only the speed has an upper limit.
 
-For each of the 200,000 knobs, we need the gradient: "If I turn this knob a little, how does the
-loss change?" Nudging each knob individually and recomputing would mean doing the whole calculation
-200,000 times. **Backpropagation** manages it in a single backward pass.
+## A.5 Backpropagation: who's to blame?
 
-> **Imagine …** a relay race has been lost. The coach asks the anchor runner: "How much did you
-> lose?" She answers and passes the question on to the runner before her, in proportion to that
-> runner's contribution. That way the blame travels from the finish back to the start, and in the
-> end every runner knows what she needs to improve.
+For each of the 200,000 sliders you need the slope: "If I turn this slider a little, how does the
+loss change?" Nudging each slider separately and recalculating everything would mean doing the whole
+calculation 200,000 times. **Backpropagation** (spreading backward) manages it in a single pass from
+back to front.
 
-Mathematically, this is the **chain rule**: the error at the output is passed backward layer by
-layer, each time combined with the weights and the slope of the activation.
+> **Imagine …** a relay race has been lost. The team captain asks the anchor runner: "How much did
+> you lose?" She answers and passes the question on to the runner before her, in proportion to that
+> runner's contribution. That way the blame travels from the finish to the start, and in the end
+> everyone knows what she needs to improve.
 
-### Worked out by hand
+Here's how it works: at the output it's clear how wrong the answer was. You pass this error forward
+layer by layer. Each layer passes it on proportionally – a lot to the sliders that contributed a lot
+to the answer, a little to the others. How much each one contributed is on the notes the forward pass
+left lying around (A.2). The calculation rule behind this is called the **chain rule**; if you like,
+you can work it through on a mini network in the box below.
 
-A mini network: one input x, one ELU neuron, one linear output y, loss (y − t)².
-Starting values: x = 1, target t = 1, w₁ = 0.5, b₁ = −1, w₂ = 2, b₂ = 0.5.
+The result of a small example in words: a mini network starts out quite far off, with a loss of
+**1.656**. After a single backward pass and one step downhill, the loss is almost **0**. With real
+networks and many examples that partly contradict each other, on the other hand, progress comes in
+tiny steps.
 
-**Forward:** z = 0.5 · 1 − 1 = −0.5. h = ELU(−0.5) = e^(−0.5) − 1 ≈ −0.393. y = 2 · (−0.393) + 0.5
-≈ −0.287. Loss (−0.287 − 1)² ≈ **1.656**. Pretty far off.
+> **For the curious: the mini network to work through.** You can skip this box without losing
+> anything; it's only for number fans, to show where the two numbers above come from.
+>
+> One input x = 1, one neuron with ELU, one output without bending, target 1. The sliders: first
+> weight 0.5, first base setting −1, second weight 2, second base setting 0.5.
+>
+> **Forward:** sum 0.5 · 1 − 1 = −0.5. ELU from the table: **−0.393**. Output
+> 2 · (−0.393) + 0.5 ≈ −0.287. Loss (−0.287 − 1)² ≈ **1.656**.
+>
+> **Backward.** One rule carries everything: a weight's blame is the error that arrives at it, times
+> what went through this weight.
+>
+> | What | Calculation | why | Value |
+> |---|---|---|---|
+> | Error at the output | 2 · (−0.287 − 1) | slope of the square (A.4) | −2.574 |
+> | Blame, 2nd weight | −2.574 · (−0.393) | × its input | 1.013 |
+> | Blame, 2nd base setting | −2.574 · 1 | always counts fully | −2.574 |
+> | passed on to the neuron | −2.574 · 2 | × the 2nd weight | −5.148 |
+> | Slope of ELU | −0.393 + 1 | see below | 0.607 |
+> | Error in the neuron | −5.148 · 0.607 | × slope of ELU | −3.122 |
+> | Blame, 1st weight | −3.122 · 1 | × its input x = 1 | −3.122 |
+> | Blame, 1st base setting | −3.122 · 1 | always counts fully | −3.122 |
+>
+> Two tricks are hidden in this. First: the error at the output is the slope of the square – the same
+> rule "two times the distance" as in the valley from A.4. Second: in the squashed region, the slope
+> of ELU is exactly "output plus 1." And because the input x = 1, the first weight and the first base
+> setting get the same blame.
+>
+> **One step downhill** with learning rate 0.1: new value = old value − 0.1 × blame.
+>
+> | Slider | old | − 0.1 × blame | new |
+> |---|---|---|---|
+> | 2nd weight | 2 | − 0.101 | 1.899 |
+> | 2nd base setting | 0.5 | + 0.257 | 0.757 |
+> | 1st weight | 0.5 | + 0.312 | 0.812 |
+> | 1st base setting | −1 | + 0.312 | −0.688 |
+>
+> **Forward once more:** the sum is now 0.812 − 0.688 = 0.124 (positive, ELU leaves it alone), the
+> output 1.899 · 0.124 + 0.757 ≈ 0.99, the loss almost **0** (calculated without rounding, about
+> 0.00004).
 
-**Backward:**
-
-| What | Calculation | Value |
-|---|---|---|
-| Error at the output | 2 · (y − t) | −2.574 |
-| Blame of w₂ | −2.574 · h | 1.013 |
-| on to h | −2.574 · w₂ | −5.148 |
-| Slope of the ELU | h + 1 | 0.607 |
-| Blame of w₁ and b₁ | −5.148 · 0.607 | −3.122 |
-
-The slope of the ELU in the negative range is e^z, and that is exactly h + 1. So you only need the
-neuron's output. Kern uses this trick too.
-
-**One step downhill** with learning rate 0.1: w₂ becomes 1.899, b₂ becomes 0.757, w₁ becomes 0.812,
-b₁ becomes −0.688. **Forward once more:** z = 0.124 (now positive), y ≈ 0.994, loss ≈ **0.00004**.
-Here, a single step has almost eliminated the error. In real networks with many examples that
-contradict each other, progress comes in tiny steps.
-
-In Kern, `Mlp::backward` does this. The gradients are **accumulated** so that parts of a batch can
-be computed on different threads and summed afterward. Whether everything is right is checked by a
-test with **finite differences**: turn a knob up and down by a minimal amount and see how the loss
-changes.
+> **For the curious:** Kern checks whether the backward calculation is right exactly the slow way
+> from the first paragraph: turn a slider a tiny bit up and down and see how the loss changes. Both
+> ways must give the same slope.
 
 ## A.6 Adam: the clever hiker
 
-Plain gradient descent has two weaknesses: all knobs get the same step size, even though some
-gradients are huge and others tiny, and it reacts nervously to noise. **Adam** (Kingma and Ba, 2015)
-keeps two moving averages for each knob:
+Simple downhill walking has two weaknesses: all sliders get the same learning rate, even though some
+slopes are huge and others tiny, and every wobble in the terrain throws the hiker off stride. **Adam**
+is a cleverer method. It remembers two things for each slider:
 
-- the usual **direction** (smoothed gradient, "momentum"),
-- the usual **size** (square root of the smoothed squared gradient).
+- the **usual direction** of the last steps – that gives momentum and smooths out wobbles,
+- the **usual size** of the last slopes.
 
-The step is then roughly learning rate × direction / size. That way, every knob takes steps of
-similar size, no matter how large its numbers are.
+Both are **moving averages**: averages of the last steps in which newer ones count more than older
+ones, just as with the weather you pay more attention to the last few days than to the last month.
 
-**Example:** in the very first step, after Adam's initial correction, direction = g and size = |g|.
-So the step is exactly ± learning rate, **whether the gradient is 0.000001 or 1000**. Like a hiker
-in the fog who always takes steps of the same size and only pays attention to the direction.
+> **Imagine …** an experienced hiker in the fog. They look at where their last steps went and always
+> take roughly equally long, calm steps – no matter whether the slope is steep or flat. A single stone
+> under their shoe doesn't throw them off the path.
 
-Kern uses PyTorch's default values (smoothing 0.9 and 0.999, learning rate 10⁻³). Actor, critic and
-imitation each have their own Adam (the one for imitation is fresh, so that its momentum doesn't
-carry over into the later PPO), and its memory goes into the checkpoint: a resumed run takes exactly
-the steps an uninterrupted one would have taken.
+That's how Adam does it: the usual direction says **where** the step goes; the usual size makes sure
+it becomes **roughly as long as the learning rate**. That way a slider with tiny slopes makes just as
+much progress as one with huge ones.
+
+> **For the curious:** In terms of calculation, Adam divides the usual direction by the usual size.
+> On the very first step, both are exactly the same size, so the step is as long as the learning rate,
+> whether the slope is 0.000001 or 1000. Because Adam's memory is still empty at the beginning, it
+> also compensates the first steps; otherwise they'd be much too small.
+
+Everyone who learns gets their **own** Adam memory: the actor, the critic (A.11) and imitation (A.9)
+one each. Like three students with a notebook each – what one writes down doesn't confuse the others.
+
+Adam's memory is part of the training's saved state: if an interrupted run is continued, it takes
+exactly the steps an uninterrupted one would have taken.
 
 ## A.7 Normalization: everyone on equal footing
 
-The 61 inputs have very different sizes: angles around tenths, joint velocities in the double
-digits, the direction of gravity between −1 and 1. The large inputs would dominate the sums and slow
-down learning. That's why each input is converted to mean 0 and spread 1:
+The duck's 61 measurements differ greatly in size: angles around a few tenths, speeds in double
+digits, the direction of down between −1 and 1. The big ones would dominate the sums and slow down
+learning. That's why each measurement is converted to a common scale: **"How far above or below the
+usual is it?"** The **normalizer** takes care of that.
 
-```
-normalized = (x − mean) / (spread + 0.01)
-```
+> **Imagine …** school grades from different countries: a 2 in Germany, 15 out of 20 in France, a "B"
+> in England. Only when you convert them all into one common system can you compare them.
 
-**Example:** a joint velocity has a mean of 2 and a spread of 4. The value 10 becomes
-(10 − 2) / 4.01 ≈ **2.0**: "two spreads above the usual." The 0.01 prevents a division by zero for
-inputs that are almost constant.
+For this you need two numbers per measurement: the **average** and the **spread**. The spread says
+how far the values usually deviate from the average.
 
-Because a better duck experiences different states, the mean and spread are updated continuously.
-An exact formula (Chan's algorithm) is enough for that, needing only three numbers per input.
+**Example:** a joint speed is 2 on average and usually deviates from that by 4. The value 10 is 8
+above the average, so two usual deviations above it: converted, **2**. The value 2 becomes 0, the
+value −2 becomes −1.
 
-Important: **the normalizer belongs to the network.** Without exactly this conversion, the network is
-worthless, which is why it sits at the very front of the exported network (A.14) and travels with
-the policy to every collector. In a warm start, it is frozen; new inputs get mean 0, divisor 1 and
-weight 0, so that the network initially acts exactly like the old one
-([Section 14.4](14-lehrer.md)).
+Because a better duck experiences different situations, the Lehrer keeps updating the average and the
+spread while practicing.
 
-The learner updates the normalizers once per iteration with all collected observations and then
-re-evaluates the old policy **with the new** values. With only a few dozen ducks, they would
-otherwise drift noticeably, and PPO's ratios (A.11) would be distorted.
+Important: **the normalizer is a fixed part of the network.** Without exactly this conversion, the
+network no longer understands its inputs. That's why it sits at the very front of the finished
+network (A.14).
 
 ## A.8 Memorizing versus understanding
 
-A network with 200,000 knobs can **memorize** a small amount of data: perfect answers to the
-practice problems, nonsense on new ones. This is called **overfitting**. Remedies: more and more
-varied data, testing on data that was never used for learning, stopping in time (taking the best
-network, not the last one) and smaller networks.
+A network with 200,000 sliders can **memorize** a small set of practice problems: perfect answers to
+the known problems, nonsense for new ones. That's called **overfitting**. Remedies: more and more
+varied practice data, testing on problems that were never used for learning, stopping in time (taking
+the best network, not the last one), and smaller networks.
 
-In robotics, overfitting usually means: the network has tuned itself to **exactly this
-simulation**. The remedy is variation (A.12); Kern checks every network clean **and** with
-variation, and picking the best round is "stopping in time."
+> **Imagine …** a student who knows the answers on the worksheet by heart. In the class test with new
+> numbers, that doesn't help one bit.
 
-## A.9 Learning by copying
+In robotics, overfitting usually means: the network has tuned itself to **exactly this simulation**.
+The remedy is variation (A.12). That's why the Lehrer checks every network on the clean **and** on
+varied robots, and choosing the best round at the end is the "stopping in time."
 
-### Supervised learning and behavior cloning
+## A.9 Learning by imitating
 
-In **supervised learning**, there is a right answer for every input, like a workbook with the
-answers in the back. The network minimizes the error, done. In robotics, the "right answer" is the
-action of an expert: you have the expert demonstrate, write down pairs (what it sees, what it does)
-and train the network on them. This is called **behavior cloning**. In Kern, the expert is called
-the **demonstration**.
+### With an answer key: behavior cloning
 
-### The trap: distribution shift
+In **supervised learning**, every problem comes with the right answer, like a workbook with
+solutions. The network makes the loss between its answer and the solution small, done. In robotics,
+the "right answer" is what an expert does: you have the expert demonstrate, write down pairs (what
+they see, what they do), and train the network on them. That's called **behavior cloning**. In the
+Lehrer, the expert is called the **role model**.
 
-> **Imagine …** you learn to ride a bike only by watching someone who always rides perfectly down
-> the middle of the path. Then you ride yourself, drift a few inches off the path – and don't know
+### The trap: situations you've never seen
+
+> **Imagine …** you learn to ride a bike only by watching someone who always rides perfectly in the
+> middle of the path. Then you ride yourself, drift a few centimeters off the path – and don't know
 > what to do, because you've never seen a situation like that. You correct the wrong way, drift even
-> further off, and end up in the bushes.
+> further, and end up in the bushes.
 
-```
- Demo:     ●──●──●──●──●──●──●   (always in the middle)
- Clone:    ●──●──●─╲
-                    ●─╲          small error → unknown situation
-                       ●──╲      → bigger error → ...
-                           ●  fall
-```
+![The role model stays in the middle; the clone deviates a little, gets into unknown situations, and crashes](../abbildungen/verteilungsverschiebung.svg)
 
-This is called **distribution shift**: while driving, the network itself produces states it never
-saw during learning. Researchers have shown that the total error can then grow with the **square**
-of the episode length instead of just with the length.
+Experts call this **distribution shift**: when riding on its own, the network gets into situations it
+never saw while learning, and small errors build up. And faster than the ride is long: on a ride
+twice as long, there can be up to four times as many errors.
 
 ### DAgger: the student drives, the teacher comments
 
-**DAgger** (Ross, Gordon and Bagnell, 2011) turns the tables. The student drives itself, and at
-every moment the demonstration says what **it** would have done.
+**DAgger** turns the tables. The student drives on their own, and at every moment the role model says
+what **it** would have done at that point.
 
 ```mermaid
+%% Caption: DAgger: the network drives, the role model comments, all examples are collected
 flowchart TD
-  A["Round 0: demonstration drives"] --> F["Net learns from all data"]
+  A["Round 0: role model drives"] --> F["Network learns from all data"]
   F --> R["Next round: network drives"]
-  R --> L["Demonstration labels every situation"]
-  L --> D["New pairs added to all the old ones"]
+  R --> L["Role model says what would be right in every situation"]
+  L --> D["Add new pairs to all the old ones"]
   D --> F
 ```
 
-That produces data exactly where the student really ends up, with the right answer for it. In
-Kern, the network drives from round 1 on with a little noise (0.05), so that situations just next
-to its path come up as well; after each round it learns from **all** examples (10 epochs, minibatch
-256, learning rate 10⁻³). For the jump, the network makes its first real jump after 7 rounds. The
-play layer learns the same way. The demonstration is called `JumpTeacher` for the jump and
-`PlayEnv::teacher` for playing.
+That way practice data is created exactly where the student really ends up, along with the right
+answer for it. So that situations just beside its path come up too, the network drives with a little
+randomness. For the duck's jump, the network makes its first real jump after 7 rounds.
 
-One condition is what makes DAgger possible at all: the demonstration may only see what the network
-sees, and must not have any hidden memory. An answer that depends only on the observation can be
-learned exactly by a network; one that depends on something hidden cannot.
+One condition is what makes DAgger possible in the first place: the role model may only see what the
+network sees too.
 
-## A.10 Learning by reward
+> **Imagine …** the driving instructor says "Brake now!" because he saw a child behind the hedge. The
+> student doesn't see the child. He can't learn this rule – for him, the braking comes out of
+> nowhere.
 
-Behavior cloning needs an expert. If there isn't one, or if the network should become better than
-the expert, **reinforcement learning** (RL) helps.
+## A.10 Learning through reward
 
-> **Imagine …** dog training. You don't tell the dog how to move its muscles. It tries something,
-> and if it was good, it gets a treat. Over time, it does more often what earns treats.
+Behavior cloning needs an expert. If there isn't one, or if the network is supposed to get better
+than the expert, **reinforcement learning** helps: you don't say **how** something is done, only
+**whether** it was good.
 
-### The loop
+> **Imagine …** dog training. You don't tell the dog how to move its muscles. It tries something, and
+> if it was good, there's a treat. Over time it does more often what earns treats.
+
+### The cycle
 
 ```mermaid
+%% Caption: The cycle in learning through reward
 flowchart LR
-  Agent["Agent (policy)"] -->|"action"| Welt["Environment (sim)"]
-  Welt -->|"observation"| Agent
-  Welt -->|"reward"| Agent
+  Agent["Duck with its network"] -->|"Action"| Welt["Simulation"]
+  Welt -->|"Observation"| Agent
+  Welt -->|"Reward"| Agent
 ```
 
-The **agent** (the duck with its network) sees an **observation**, chooses an **action**, and the
-environment responds with a new observation and a **reward**. In Kern, the environment is an `Env`;
-in `DuckEnv`, one step is one control tick of 20 ms (50 per second).
+The one acting – technical term **agent**, here the duck with its network – sees an **observation**,
+chooses an **action**, and the world answers with a new situation and a **reward**. For the duck,
+this cycle turns once per tick, so 50 times per second (in the duck's time, see Chapter 13.5), until
+the episode ends with a fall or with time running out.
 
-A step (`step`) delivers the reward and whether the episode ended with a fall or by running out of
-time.
+> **For the curious:** Experts call this cycle a Markov decision process. "Markov" means: what
+> happens next depends only on the situation now, not on how you got there.
 
-Experts call this a **Markov decision process**: states, actions, a physics that determines the next
-state, rewards. "Markov" means: what happens next depends only on the now, not on the history.
+### What the duck knows and what it doesn't
 
-### State versus observation
-
-The duck does not know its state completely. It only sees what its sensors report, with noise and
-delay: joint angles, gyro, direction of gravity, its last action, commands. It does **not** see its
-true height above the ground or its velocity in space. The last action in the observation acts like
-a small memory. Experts call this "partially observable" (POMDP). How much the sensors are noisy and
-delayed is set by `Task::Noise` (numbers in [Chapter 14](14-lehrer.md)).
+The duck doesn't know its situation completely. It only sees what its sensors report, and those are
+noisy and lag a little behind: joint angles, a rotation sensor in the torso, the direction of down,
+its last action, the command. It does **not** see its true height above the floor or its speed in the
+room. The last action in the observation acts like a small memory.
 
 ### Reward and return
 
-The **reward** is one number per step and the only place where you tell the agent what it should
-do. And it takes it **literally**.
+The **reward** is a number per tick and the only place where you tell the duck what it should do. It's
+usually a sum of individual items, each with its own weight – for the jump, for example, for being in
+the air, for the landing, and for staying upright; the list is in [Chapter 14](14-lehrer.md). And the
+duck takes the reward **literally**.
 
-> **Watch out!** In early runs, the duck learned to sit on its tail, do dives or prop itself up –
-> because the reward allowed it. Every loophole had to be closed with a stricter rule
-> ([Section 15.11](15-your-own-models.md)).
+> **Watch out!** In early runs the duck learned to sit on its tail, do dive jumps, or prop itself
+> up – because the reward allowed it. Every loophole had to be closed with a stricter rule
+> ([Chapter 15](15-your-own-models.md)).
 
-In Kern, `Task::reward` delivers the reward, following the mjlab convention, as a sum of weight ×
-term × tick duration; the individual terms stay visible for reports.
+The **return** is the **total score from now on**: all future rewards together. So that it doesn't
+grow to infinity, later rewards count less. Each tick into the future multiplies the reward by 0.99,
+so it costs one percent.
 
-The **return** is the sum of all future rewards. So that it doesn't become infinite, later rewards
-count less: each step into the future multiplies by the **discount factor** γ. Kern uses γ = 0.99.
-A reward 100 steps away then counts only 0.99¹⁰⁰ ≈ 0.37 times as much, and 300 steps away only
-about 0.05 times. So the duck "looks" roughly 100 ticks ahead, which is 2 seconds: exactly as long
-as a whole jump.
+> **Imagine …** an ice cream in the sun that gets one percent smaller every second. An ice cream now
+> is worth more than the same ice cream you only get two minutes from now.
 
-> **Did you know?** The return can be computed backward: return now = reward now +
-> γ × return from the next step on. Almost everything that follows builds on this one line.
+How much is left after many ticks? For that you multiply 0.99 by itself as many times as ticks pass;
+for short, you write this with an **exponent**: 0.99¹⁰⁰ means "multiply by 0.99, 100 times in a
+row."
+
+| Ticks into the future | Seconds | how much the reward still counts |
+|---|---|---|
+| 1 | 0.02 | 0.99 |
+| 10 | 0.2 | 0.90 |
+| 50 | 1 | 0.61 |
+| 100 | 2 | 0.37 |
+| 300 | 6 | 0.05 |
+
+So the duck "looks" roughly 100 ticks ahead, which is 2 seconds: about as long as a whole jump.
+
+> **Did you know?** You can calculate the return backward: total score from now on = reward now +
+> 0.99 × total score from the next tick on. You start at the end of the episode and work back to the
+> beginning.
 
 ### Policy, value and advantage
 
-The **policy** is the decision rule: observation in, action out. For learning, it is **random** (it
-rolls the dice around a mean); on the robot, only the mean is used.
+The **policy** is the duck's decision rule: observation in, action out – in other words, its network.
+For learning it's **a bit random** (more on that in a moment); on the robot you only take its best
+idea.
 
-The **value** V of a situation says: "How much return do I expect from here?" The **action value**
-Q says: "How much return do I expect if I first choose exactly this action and then carry on as
-usual?" The **advantage** of an action is Q minus V, so: "Was it better or worse than what I usually
-do here?" Positive means better. That is exactly what learning needs: do more of what was better
-than usual.
+The **value** of a situation says: "How many points do I expect from here on, if I do what I always
+do?" The **advantage** of an action says: "Was it better or worse than what I usually do here?"
+Positive means better. That's exactly what learning needs: **do more of what was better than usual.**
 
-A simple estimate of the advantage from one step is the **TD error**: what happened (reward plus the
-value of the new situation times γ) minus what was expected (value of the old situation).
+**Example:** at this spot the duck normally still gets 5 points. This time it tried something else and
+got 7. Advantage: **+2**. This action should become more frequent.
 
-### Fall or timeout?
+### Fall or time running out?
 
-An episode can end in two fundamentally different ways. With a **fall**, there is no future; its
-value is 0. With a **timeout**, the duck would still be standing; the time limit is just a property
-of the training. If you treat both the same, you teach the network that effort shortly before the
-end is pointless. That's why Kern tells them apart and, on a timeout, includes an estimate of the
-value of the future ("bootstrapping").
+An episode can end in two fundamentally different ways. After a **fall** there's no future anymore;
+its value is 0. When **time runs out**, the duck would still be standing; the time limit is just a
+property of the training. If you treat both the same, you teach the network that effort shortly before
+the end is pointless. That's why the Lehrer distinguishes them and, when time runs out, estimates how
+many points the duck would still have gotten.
 
-### How does the policy learn? The policy gradient
+### How does the policy learn? Rolling dice and shifting
 
-The reward depends on the action through the physics, and the physics cannot be differentiated. The
-trick: you differentiate only the **probability** of the chosen action. If an action had a positive
-advantage, you make it more likely; if negative, less likely. For that, the policy has to roll the
-dice.
+The reward depends on the action through the whole physics. You can't get a slope here as in A.4: a
+foot touches the floor or it doesn't, the duck falls or it doesn't – the points jump instead of rising
+smoothly. And for 200,000 sliders you'd have to replay the whole episode every time. The trick: the
+duck **rolls dice a little**. The network says "roughly like this," and each time the duck deviates a
+little from it at random. If a deviation was good (positive advantage), you shift the "roughly like
+this" in its direction. If it was bad, away from it.
 
-Kern rolls the dice with a **bell curve** (normal distribution) per servo: action = mean from the
-network + σ × random number. σ is a separate, learnable knob per action: large at the start (lots
-of trying things out), smaller later. For the jump, it starts at 0.3 and is set to 0.1 after
-imitation, so that a network that can already jump doesn't unlearn everything. The lower limit is
-0.001, and the default without a recipe is 1.0. Each duck rolls with its **own** random stream,
-which depends only on the seed and its number, never on which worker computes it.
+How far it deviates follows the **bell curve** (technical term **normal distribution**): small
+deviations are common, big ones rare. How wide the bell is, a single number tells you, the **spread
+σ** (pronounced "sigma") – the same idea as the spread in A.7: how far the values usually deviate
+from the middle.
+
+![Two bell curves: wide with a large σ (lots of trying), narrow and tall with a small σ (little trying); the range ±σ is shaded](../abbildungen/normalverteilung.svg)
+
+| Range around "roughly like this" | how many attempts land in it |
+|---|---|
+| ± 1 σ | about 2 out of 3 |
+| ± 2 σ | about 19 out of 20 |
+| ± 3 σ | almost all |
+
+**Example:** the network says 0.2 for a knee, and σ is 0.1. Then about two out of three attempts land
+between 0.1 and 0.3, almost all between −0.1 and 0.5.
+
+σ is itself a slider the training learns along with everything else, separately for each servo. At
+the beginning the bell is wide (lots of curiosity); later it gets narrower. For the jump, it's
+deliberately set narrow after imitation, so that a network that already jumps doesn't scramble
+everything again. Each duck rolls with its **own** fixed randomness, which depends only on the seed
+and its number.
 
 ### Entropy: keeping curiosity alive
 
-**Entropy** measures how uncertain a distribution is. For the bell curve, it depends only on σ:
-σ = 1 gives 1.419 per action, σ = 0.1 gives −0.884 (for continuous distributions, entropy may be
-negative). Without a countermeasure, σ often shrinks too fast, the duck stops trying things out and
-gets stuck on the first halfway usable solution. A small **entropy bonus** in the loss keeps it
-curious (Kern: 0.01, for the jump 0.005).
+Without a countermeasure, the bell often gets narrow too quickly: the duck stops trying new things and
+gets stuck with the first halfway usable solution. A small bonus for curiosity helps against that.
+Curiosity is measured with **entropy**: a number that says how widely the duck tries things out.
+
+> **Imagine …** a cook who only ever cooks their first halfway good recipe. A small bonus for trying
+> things keeps them open to something better – without them putting something completely new on the
+> table every day.
+
+| Bell | how widely the duck tries things | Entropy |
+|---|---|---|
+| σ = 1 | very widely | high |
+| σ = 0.3 | medium | medium |
+| σ = 0.1 | close around its best idea | low |
+
+The bonus is small. It's only meant to slow down the narrowing, not prevent it.
 
 ## A.11 Actor, critic and PPO
 
 ### Two networks, one team
 
-For the advantage, you need the value V. A second network estimates it: the **critic**. The network
-that acts is called the **actor**. Both learn at the same time: the critic learns to predict
-returns; the actor learns from the advantages the critic works out. Each has its own normalizer and
-its own Adam.
+For the advantage you need to know how many points are **usual** at a spot, that is, its value. A
+second network estimates that, the **critic**. The acting network is called the **actor**. (Watch
+out: in the Studio, "actor" means something else, namely a thing in the level. Here it always means
+the acting network.)
 
-After imitation, the actor is already good, but the critic knows nothing; its judgments would be
-random. That's why in Kern, **only the critic** learns at first (30 iterations).
+> **Imagine …** an athlete and her coach. The athlete does the routine (actor). The coach never does
+> it herself, but after every routine she says: "That was better than usual" or "worse than usual"
+> (critic).
 
-### GAE: the advantage, well estimated
+Both learn at the same time: the critic learns to predict the total score – with the same loss as in
+imitation (A.3), the distance between its estimate and the points actually reached. The actor learns
+from the advantages the critic calculates. After imitation, the actor is already good, but the critic
+doesn't know anything yet; its judgments would be random. That's why at first, for a while, **only
+the critic** learns ("critic first").
 
-The TD error of a single step is not very noisy, but it is skewed if the critic is wrong. The full
-return is very noisy, but honest. **GAE** (Generalized Advantage Estimation) mixes both with a
-second knob λ: you go backward through time, and each advantage is its own TD error plus γ · λ
-times the advantage of the next step. Kern uses λ = 0.95, so γ · λ = 0.9405. With λ = 0, only the TD
-error would remain; with λ = 1, the full return.
+### GAE: a bad step may have been good
 
-**Let's compute three steps:** rewards (1, 0, 2), values V = (5, 4, 6), value afterward 3.
+How good was a single action really? Sometimes a step looks bad on its own but leads into a situation
+from which everything goes better.
 
-| t | TD error | Advantage | Critic's target |
-|---|---|---|---|
-| 2 | 2 + 0.99 · 3 − 6 = −1.03 | −1.03 | 4.97 |
-| 1 | 0 + 0.99 · 6 − 4 = 1.94 | 1.94 − 0.9687 = 0.9713 | 4.9713 |
-| 0 | 1 + 0.99 · 4 − 5 = −0.04 | −0.04 + 0.9135 = 0.8735 | 5.8735 |
+> **Imagine …** in chess you sacrifice a piece. On its own, a loss. Three moves later you checkmate.
+> Looking back, the sacrifice was the best move of the game.
 
-On its own, step 0 looked slightly bad, but overall it was **good**: it led into a situation from
-which things went better than expected. The critic's target is always advantage plus value. In
-Kern, that's three lines:
+![A step that on its own was worse than expected, but leads into a good situation, is good in hindsight](../abbildungen/gae-rueckblick.svg)
 
-```cpp
-const f32 delta = reward + live * cfg_.gamma * next - v;
-adv = delta + live * cfg_.gamma * cfg_.lam * adv;
-return_buf_[row] = adv + v;
-```
+That's exactly what **GAE** does (technical term, roughly "well-estimated advantage"). You go
+**backward** through time: each step first gets its own **surprise**, that is, how much better or
+worse things went right after it than the critic had estimated. To that is added part of the
+surprises of the steps that came afterward. The further away the consequences, the less they count.
 
-Line 1 is the TD error, line 2 the GAE backward sum, line 3 the critic's target. `live` is 0 after
-an episode has ended; then there is no continuation. For the last step of the rollout, the critic
-estimates the value where each duck is currently standing. Finally, all advantages are brought to
-mean 0 and spread 1, so that their size doesn't depend on the size of the rewards.
+Why not simply add up all the real points until the end? Because they're shaken up by the randomness
+of many later steps. And why not just trust the critic? Because it can be wrong. GAE mixes the two: a
+bit of trust in the critic, a bit of real experience.
+
+> **For the curious:** How strongly later consequences count is governed by a second discount factor
+> besides the 0.99, in the Lehrer 0.95. At the end, all advantages are also brought to a common scale,
+> as with the normalizer (A.7). The whole calculation is in the blue book, Appendix A.
 
 ### Why steps that are too big are dangerous
 
-The data comes from the **old** policy. If you take a big step, the new policy is far away, the
-advantages no longer apply to it, and a good policy can break in a single step. Then it collects bad
-data from which it barely recovers. Several epochs on the same data – actually handy, because you
+The experience comes from the **old** behavior. If you change the network a lot all at once, the
+experience no longer fits it, and good behavior can break in a single step. Then the duck collects bad
+experience it can hardly recover from. Several epochs on the same data – actually handy, because you
 make better use of the data – make it even worse.
 
-### PPO: improving with a seatbelt
+> **Imagine …** a teacher gets feedback after a single lesson and thereupon overhauls her whole
+> teaching style. But the feedback applied to the old style, not the new one.
 
-**Proximal Policy Optimization** (Schulman and others, 2017) limits how far the policy may move per
-update. The key is the **ratio** ρ: how much more likely is the new policy to choose the collected
-action than the old one? ρ = 1 means "the same." PPO allows improvements only until ρ leaves the band
-from 0.8 to 1.2 (clip ε = 0.2):
+### PPO: improving with a seat belt
 
-| Advantage | Ratio | Keeps learning? | Meaning |
-|---|---|---|---|
-| positive | up to 1.2 | yes | reinforce a good action |
-| positive | above 1.2 | **no** | reinforced enough already |
-| negative | from 0.8 | yes | weaken a bad action |
-| negative | below 0.8 | **no** | weakened enough already |
+**PPO** is the Lehrer's learning method. Its idea: **per round, the behavior may only change a
+little.** This is measured with a simple ratio: how much more often does the new network choose a
+particular action than the old one? 1 means "equally often," 1.2 means "20 percent more often."
 
-**Example:** advantage 1, ρ = 1.3. Unbraked, the gain would be 1.3; braked, 1.2. PPO takes the more
-cautious value, and because that one is stuck at the cap, no gradient flows: the step that would
-push even further in this direction doesn't happen.
+> **Imagine …** a dog on a leash. It may sniff wherever it likes, but only as far as the leash
+> reaches. In the next round, the leash is measured again from the new spot.
 
-> **Did you know?** PPO is pessimistic on purpose. Improvements are capped, deteriorations never.
-> If the new policy chooses a **bad** action more often than before (advantage negative, ρ = 1.3),
-> that always gets corrected.
+![PPO's leash: the horizontal axis shows how much more often the new network chooses an action; a good action is strengthened up to 1.2, a bad one weakened down to 0.8, but no further](../abbildungen/ppo-clip.svg)
 
-In addition, like rsl_rl, Kern regulates the **learning rate** via the **KL divergence**, a measure
-of how different the old and new policies are: if it is larger than 0.02, the learning rate is
-divided by 1.5; below 0.005, it is multiplied by 1.5, always between 10⁻⁵ and 10⁻². Big steps when
-things are calm, small ones when the policy is jumping around.
-The critic has a brake too: its estimate may move only by ε away from the old value per update.
+The vertical axis shows the **benefit**: how much the Lehrer gains this round from pushing the action
+further – where the line goes flat, further pushing brings nothing more.
 
-### A whole PPO update
+- A **good** action (positive advantage) may become at most 20 percent more frequent per round. Beyond
+  that, it isn't strengthened any further.
+- A **bad** action may become at most 20 percent less frequent. Beyond that, it isn't weakened any
+  further.
+
+A numerical example in words: a **good** action is now chosen 1.2 times as often instead of 1.0
+times. Up to that point it gets rewarded; beyond it, no longer: the goal for this round has been
+reached. A **bad** action, on the other hand, that the network by mistake chooses even more often than
+before (1.3 times as often), is **always** pushed back. So the leash only curbs overdoing it in the
+right direction, never bringing things back from the wrong one.
+
+> **For the curious:** In addition, the Lehrer adjusts the learning rate by itself: if the behavior
+> changes too much per round, it gets smaller; if it stays very calm, it gets bigger. And the critic
+> has a leash too: its estimate may only move a certain distance from the old value per round.
+
+### A training round as a whole
 
 ```mermaid
+%% Caption: A PPO training round as a whole
 flowchart TD
-  S["Collect: ticks × ducks"] --> K["sort, update normalizers"]
-  K --> E["re-evaluate old policy"]
-  E --> G["GAE: advantages and targets"]
-  G --> MB["5 epochs × 4 minibatches"]
-  MB --> KL["measure KL, adjust learning rate"]
-  KL --> AD["gradients in 8 pieces, Adam"]
-  AD --> Ende["new policy"]
+  S["All ducks practice a bit"] --> K["Sort the experience"]
+  K --> G["For each step: better or worse than expected?"]
+  G --> MB["Adjust carefully in bites (on the leash)"]
+  MB --> AD["Readjust the learning rate"]
+  AD --> Ende["New network: next round"]
 ```
 
-Kern's default values: 24 ticks per duck (jump 48), 5 epochs, 4 minibatches, clip 0.2, γ = 0.99,
-λ = 0.95, learning rate 10⁻³ (jump 10⁻⁴).
-
-Collecting and learning are kept separate in Kern: collectors only need the policy and deliver
-rollouts; the learner takes all the rollouts. That's why the collectors can be threads or Web
-Workers.
+Such a round is called an **iteration**. Practicing and learning are separate: the **helpers**
+(technical term collectors) only need the current network and hand in their experience; the
+**evaluator** (technical term learner) improves the network from it, just like in the sports school
+from Chapter 14.2. That's why the helpers can work on several cores at the same time. The exact
+settings are in the blue book, Appendix A.
 
 ### The same result on every computer
 
-Floating-point numbers in a computer are tricky: (0.1 + 0.2) + 0.3 does not give exactly the same
-result in the computer as 0.1 + (0.2 + 0.3) – they differ in the last bit. If you sum gradients in
-an order that depends on the number of threads, you get different networks on 2 and 16 cores. Kern
-prevents that:
+Decimal numbers in a computer are tricky. The computer stores each decimal number with only a limited
+number of digits and rounds after every calculation step – like a pocket calculator with a short
+display. Depending on the order, rounding happens at a different place. That's why (0.1 + 0.2) + 0.3
+doesn't come out exactly the same in a computer as 0.1 + (0.2 + 0.3); they differ in the very last
+digit. If, while learning, you add things up in an order that depends on how many cores are helping,
+you get different networks on 2 and on 16 cores. Kern prevents this:
 
-- Each duck gets its seed from its global number.
-- All rollouts are put in a fixed order, and summing always happens in a fixed order (each
-  minibatch in exactly 8 pieces).
-- All math functions come from `kern::dm`.
-- No FMA: the compiler may not merge "a times b plus c" into a single instruction that rounds
-  differently depending on the processor.
+- Each duck has its own fixed dice, which depend only on its number and the seed.
+- Adding up always happens in the same order, no matter how many cores help.
+- Kern brings its own math functions that round the same way on every device.
+- Kern forbids the computer shortcuts where some processors round differently from others.
 
-The result: same seed, same number of ducks, same network, natively as well as in the browser
-([Section 14.7](14-lehrer.md), [Appendix C](C-physics.md)).
+The result: the same seed, the same number of ducks, **the same network** – on a laptop as well as in
+the browser on a phone ([Chapter 14](14-lehrer.md), [Appendix C](C-physics.md)).
 
 ## A.12 From simulation to reality
 
-A network trained in simulation meets a robot that is different: inaccurately measured masses,
-servos that vary, changing floors, noisy sensors. Bridging this **sim-to-real gap** is the core task
-of robot learning. Two strategies complement each other:
+A network that learned in the simulation meets a robot that's always a bit different: imprecisely
+measured masses, servos that vary, changing floors, noisy sensors. Bridging this **sim-to-real gap**
+is the core task of robot learning. Two approaches complement each other:
 
-1. **Bring the simulation closer to reality:** accurate models calibrated against measurements
+1. **Bring the simulation closer to reality:** precise models fitted to measurements
    ([Chapter 16](16-calibration.md)).
-2. **Make the network insensitive:** it learns in many slightly different worlds, so that the real
-   one is just one more. That is **domain randomization**. Everything Kern varies is listed in
-   [Section 14.3](14-lehrer.md).
+2. **Make the network insensitive:** it practices in many slightly different worlds, so that the real
+   one is just one more. That's **variation** (technical term domain randomization).
 
 > **Imagine …** you practice table tennis sometimes with a heavy ball, sometimes with a light one,
-> sometimes on a slippery floor, sometimes on a grippy one, sometimes with glasses, sometimes
-> without. On tournament day, you don't care what the hall is like.
+> sometimes on a slippery floor, sometimes on a grippy one, sometimes with glasses, sometimes without.
+> On tournament day, you don't care what the hall is like.
 
-Two subtleties: some variation only comes in gradually (**curricula**), because too much chaos at
-the start prevents the movement from emerging at all. For the jump, the center-of-mass spread grows
-from iteration 200 over 600 iterations, and the pushes come from iteration 300 on. And whatever
-can't be measured accurately is **varied**, so that the network doesn't rely on it: the servo
-profile has a spread next to each value, and training draws each servo from it.
+Three refinements help here:
 
-On top of that come the **asymmetric critic**, which may see more during learning than the robot
-(9 extra values for the jump, 6 for the play layer), and the **warm start**: Kern's jump begins as
-Pollen's velstand network, so it can already stand and only has to learn the jump in addition. For
-this, its weights are re-sorted from the ONNX layout into Kern's input-by-input layout.
+- **Curricula:** some variation only gets added step by step, because too much chaos at the beginning
+  prevents the movement from developing at all. Like practicing the piano: first slowly, then faster;
+  first without disturbances, then with. For the jump, for example, the shoves only get added after a
+  few hundred rounds.
+- **Whatever can't be measured precisely gets varied:** every servo value comes with a spread, and
+  training draws each servo from it. That way the network doesn't rely on numbers nobody knows exactly.
+- **The asymmetric critic:** the critic is only needed while practicing. That's why it may see more
+  than the robot, such as the exact height of the torso. That makes its judgments more accurate – and
+  only the actor goes onto the robot anyway.
 
-## A.13 Searching without a gradient: CMA-ES
+On top of that comes the **warm start**: Kern's jump doesn't begin with random sliders but as Pollen's
+velstand network. So it can already stand and balance and only has to learn the jump on top. So that
+nothing breaks in the process, the new network at first acts **exactly** like the original: the new
+input that the old network never knew – the "clock" that says where in the jump the duck is right
+now – starts with weight 0 and only gets used gradually. And the conversion of the measurements (the
+normalizer from A.7) is taken over from velstand and stays fixed – unlike usual, it isn't updated here,
+so that the inherited skill doesn't slip.
 
-Some problems have no usable gradient. For the jump demonstration, 15 numbers are the input and a
-whole simulation with flight, landing and fall is the evaluation; noisy, because each generation
-faces different robots. In calibration, 6 servo parameters are to be chosen so that the simulation
-reproduces measurements.
+## A.13 Searching without a slope: CMA-ES
 
-This is where **evolution strategies** help: roll candidates around a center point, evaluate them,
-shift the center point toward the better ones. **CMA-ES** (after Hansen) also learns the **shape**
-of the cloud of samples:
+Sometimes you can't calculate a slope at all. For the jump role model, 15 numbers are the input
+(target angles of the left leg at five moments of the jump), and a whole simulation with flight,
+landing and maybe a fall is the evaluation; on top of that it's noisy, because every round meets
+different robots. In calibration, 6 servo values are supposed to be chosen so that the simulation
+replays measurements ([Chapter 16](16-calibration.md)).
 
-```
- Generation 1          Generation 5            Generation 20
-   ·  ·   ·              · ·                      ·
-  ·  ●  ·  ·            ·●··                     ●:
-   · ·  ·               ·  ·  ↗                  (narrow, along
-  (round, large)       (stretched toward valley) the valley)
-```
+Then systematic trial and error helps: roll a **cloud** of candidates around a center point, evaluate
+them all, move the center toward the better ones. **CMA-ES** also learns the **shape** of the cloud.
 
-Roughly, per generation:
+> **Imagine …** at night, with friends, you're looking for the deepest point of a lake, each with a
+> plumb line in their own boat. You spread out, call out your depths, and everyone rows toward those
+> with the deepest values. If you notice that the lake slopes down a long way in one direction, you
+> spread out further in that direction.
+
+![The CMA-ES search cloud, schematic: round and big at first, then stretched toward the valley, finally narrow in the valley](../abbildungen/cma-es.svg)
+
+Per round, roughly this happens:
 
 1. Draw candidates from the cloud and evaluate them.
-2. The better half gets weights, the best ones the most.
-3. The center point moves to their weighted mean.
-4. The step size grows when several generations went in the same direction, and shrinks when the
-   steps cancel each other out.
+2. The better half counts, the best ones the most.
+3. The center moves toward them.
+4. If things went in the same direction for several rounds, the steps get bigger; if they cancel out,
+   smaller.
 5. The cloud stretches in the directions where things went well.
 
-Kern wrote CMA-ES itself following Hansen's tutorial (`cmaes.cpp`). Without a setting, it uses
-4 + ⌊3 · ln n⌋ candidates (for 6 parameters that would be 9); calibration uses 12, the
-demonstration search 16. The starting point
-is evaluated first, so the result is never worse. All candidates of a generation are evaluated in
-parallel. What comes back is the best point **and** the center point, and with noisy scores the
-center point is the better answer: the best one may just have been lucky. CMA-ES also computes with
-Kern's own randomness and `kern::dm`, so it is reproducible. The exact formulas are in the blue
-book.
+Two tricks make the method reliable. The starting point is evaluated first, so the result is never
+worse than the beginning. And with noisy evaluations, you take the **center** rather than the best one
+at the end: the best one may just have been lucky. So that the comparison within a round is fair, all
+attempts there jump on the same robots ([Chapter 14](14-lehrer.md)).
 
-For the demonstration, CMA-ES searches freely across the whole number space; only tanh times the
-amplitude turns that into servo targets, which therefore always stay within ±2.5 rad. Each
-candidate jumps 6 episodes (one clean, five with variation), all candidates of a generation on the
-same robots.
+> **For the curious:** Kern wrote CMA-ES itself; it calculates with Kern's own randomness and
+> therefore always delivers the same result for the same seed. The formulas are in the blue book,
+> Appendix A.
 
 ## A.14 ONNX: the network to go
 
-**ONNX** is an open file format for computation graphs. A model is a chain of building blocks
-(operators) with the weights as constants in the same file. Programs such as ONNX Runtime run it, on
-the robot, in the browser or on the server, without knowing the software that trained it. For an
-MLP you need only four: `Sub` and `Div` (the normalization), `Gemm` (a layer: weights times input
-plus bias) and `Elu`.
+A finished network has to get out of the Lehrer: into the Studio, onto the robot, into other programs.
+For that there's a common file format for networks, **ONNX**. It describes the network as a chain of
+simple calculation building blocks, with all slider values in the same file.
 
-```
-obs ─► Sub ─► Div ─► Gemm ─► Elu ─► … ─► Gemm ─► actions
-```
+> **Imagine …** a PDF. No matter which program a document was written with – as a PDF, anyone can
+> open it and it looks the same everywhere. ONNX is the PDF for networks: the robot doesn't need to
+> know what the network was trained with.
 
-Kern writes the file with its **own tiny writer** for the Protobuf format, without a library, in
-the same format as Pollen's networks (61 in, 14 out).
-Only the **mean** of the policy is exported: on the robot, there is no more trying things out; σ
-and the critic stay in the learner. For this, the weights are re-sorted as [output][input], and the
-metadata carries the same keys as with Pollen plus `task` and `lehrer`. A test reads the file back
-in and compares to an accuracy of 10⁻⁴, and ONNX Runtime loads it too. More in
-[Section 14.10](14-lehrer.md).
+The chain for the duck is short, the same as in A.1:
+
+![The exported chain: convert the measurements (normalizer), three layers with bending, one without, 14 servo targets](../abbildungen/mlp-kette.svg)
+
+Kern writes its networks in exactly the same format as Pollen Robotics. Only the network's "roughly
+like this" is exported, without the dice: **on the robot, there's no more trying things out.** The
+critic stays home too; it only advised during practice.
+
+> **For the curious:** Kern doesn't need an outside library for the export; it has its own tiny
+> writer. An automatic test reads such a file back in and compares. Details in the blue book,
+> Appendix A and Chapter 14.
 
 ## A.15 How it all comes together
 
 ```mermaid
+%% Caption: From role model to finished network: everything except the network is scaffolding
 flowchart TD
-  V["1. Find demonstration (CMA-ES)"] --> W["Warm start: velstand"]
-  W --> N["2. Imitate (DAgger, MSE, Adam)"]
+  V["1. Find a role model"] --> W["Start with velstand"]
+  W --> N["2. Imitate: student drives, role model comments"]
   N --> K["Critic first"]
-  K --> U["3. Practice (PPO, GAE, variation)"]
-  U --> X["Export: ONNX with normalizer"]
-  X --> S["Studio / robot: only the network"]
+  K --> U["3. Practice with reward, leash and variation"]
+  U --> X["Export: network with normalizer"]
+  X --> S["Studio and robot: only the network"]
 ```
 
-The guiding principle is in Kern's code: "At run time there is only the network: the demonstration
-exists only while it learns." Demonstration, critic, noise, variation – all of it is **scaffolding**
-that helps during learning and is taken down afterward. What remains is a normalization and a
-handful of matrix multiplications with ELU in between. And that's enough to make a duck jump.
+The guiding principle is in Kern's code, translated: "At runtime there is only the network – the role
+model exists only while it's learning." Role model, critic, dice, variation – it's all
+**scaffolding** that helps while learning and is taken down afterward. What remains is a conversion of
+the measurements and a few layers that multiply, add up and bend. And that's enough to make a duck
+jump.
 
-> **Try it!** On https://kernengine.de/, open the Micro Duck level (File › Example Levels ›
-> Micro Duck), start Play, take control with F8 and press **7**. At that moment, every servo gets a
-> number 50 times per second from just under 200,000 knobs that were once pure chance.
+> **Try it!** At https://kernengine.de/, open the Micro Duck level via
+> **File › Example Levels › Micro Duck**, start **Play**, take over the duck with **F8** and press
+> **7**. At this moment, each servo gets a number 50 times per duck second (13.5) from just under
+> 200,000 sliders that were once pure randomness.
 
-> **Try it!** On the Lehrer page (`/lehrer/` on kernengine.de), you can follow the learning live.
-> Set the initial noise large once and small once, and compare the curves: curiosity versus
-> caution.
+> **Try it!** Open the Lehrer page **kernengine.de/lehrer/** and choose "Stehen (Schnelltest)"
+> (stand, quick test) as the motion. Enter 1 under "Aktionsrauschen am Anfang" (initial action noise)
+> and press **Start**. Let it run a few dozen iterations (the "Iteration" counter shows how far along
+> it is), press **Pause**, and note the curve of the episode length (how long the ducks hold out) and
+> the "Aktionsrauschen" (action noise) number. Reload the page, enter 0.1, and repeat with just as
+> many iterations. What you can expect: with 1 the bell is wide, and the ducks try things out wildly;
+> with 0.1 they stay close to their idea. Watch how the action noise number changes while practicing –
+> that's σ, learning along. How you recognize "better": the curve of the episode length rises faster
+> toward 4 seconds, so the ducks hold out to the end sooner. Which setting manages that, you'll find
+> out yourself. A run takes some patience; the tab has to stay open while it runs.
 
 ## What you take away
 
-- A neural network is a mixing board with lots of knobs: weighted sums plus activation, layer by
-  layer. The jump actor has 197,774 knobs.
-- Learning means making the loss smaller: downhill in the fog, with the learning rate as the step
-  length.
-- Backpropagation distributes the blame backward; Adam takes even, clever steps.
-- Normalization puts all inputs on equal footing and is a fixed part of the network.
-- Imitation needs DAgger; otherwise small errors build up.
-- Reinforcement learning learns from reward, and the reward is taken literally.
-- PPO improves with a seatbelt: small, safe steps, with a critic estimating the advantage.
+- A neural network is a mixing desk with many sliders: multiply, add up, bend, layer by layer. The
+  jump network has almost 200,000 sliders.
+- Learning means making the loss smaller: downhill along the slope in the fog, with the learning rate
+  as the step length.
+- Backpropagation spreads the blame backward; Adam takes even, calm steps.
+- The normalizer puts all measurements on equal footing and is a fixed part of the network.
+- Imitation needs DAgger: the student drives, the role model comments.
+- Learning through reward: roll dice, and whatever was better than usual becomes more frequent. The
+  reward is taken literally.
+- PPO learns on a leash; the critic estimates what's usual.
 - Variation, curricula and the asymmetric critic build the bridge from simulation to reality.
 
 ## Brain teasers
 
-1. A neuron has x₁ = 1, x₂ = 2, w₁ = 0.5, w₂ = −1, b = 1. What does it output with ELU?
-2. Why would a network without an activation function and with 100 layers be no smarter than one
-   with a single layer?
-3. You train with learning rate 1.1 on the loss θ². What happens?
-4. With γ = 0.99: how much does a reward 100 steps away count compared with one right now?
-5. PPO: advantage −1, ratio ρ = 1.3. Does this still get corrected?
+1. A neuron has the inputs 1 and 2, the weights 0.5 and −1, and the base setting 1. What does it
+   output with ELU? (The table from A.1 helps.)
+2. Why would a network without bending, with 100 layers, be no smarter than one with a single layer?
+3. You go downhill in the valley r² with learning rate 1.1. What happens?
+4. How much does a reward 100 ticks from now count compared with one now?
+5. PPO: an action was bad (negative advantage), but the new network chooses it 1.3 times as often as
+   the old one. Does that still get corrected?
 
 ### Solutions
 
-1. Sum: 0.5 − 2 + 1 = −0.5. ELU: e^(−0.5) − 1 ≈ −0.39.
-2. Linear calculations one after another are again a linear calculation; only the activation
-   allows curved relationships.
-3. The value jumps over the valley every time and keeps getting bigger: 1, −1.2, 1.44 …
-4. About 0.37 times as much.
-5. Yes. The new policy chooses the bad action more often; PPO only caps improvements, never
-   corrections of deteriorations.
+1. Sum: 0.5 · 1 − 1 · 2 + 1 = −0.5. According to the table, ELU turns it into about **−0.39**.
+2. Without bending, there's only multiplying and adding up; chained together, that again gives just a
+   straight line. Only bending allows crooked relationships.
+3. The slider jumps over the valley every time and lands higher and higher: 1, −1.2, 1.44, −1.728 …
+4. About 0.37 times as much, a good third (table in A.10).
+5. Yes. PPO only caps improvements, never the correction of mistakes.
 
 ---
 

@@ -1,248 +1,352 @@
 # 1 Welcome to Kern!
 
-> **In short:** Kern is a 3D engine that runs entirely in the browser: it draws worlds, computes
-> physics, plays sounds, runs games and even teaches a little robot to walk. Here you get to know
-> Kern, its rules, how it is built – and how to read this book.
+> **In short:** Kern is a game engine that runs right in your browser – nothing to install. It
+> paints 3D worlds, works out how things fall and collide, plays sounds, runs games and even
+> teaches a little robot to walk. Here you get to know Kern, its rules, how it is built – and how
+> to read this book.
 
-Great to have you here! Picture a workshop with a canvas, a workbench, a mixing desk and a stage –
-and in the corner, a robot duck is learning to walk. This workshop is called **Kern**, and its doors
-are open at https://kernengine.de/ – with **Kern Studio**, the editor where you build worlds and
-play them right away, with **the Lehrer**, which teaches robot brains to walk, with playable levels
-like **Orb Run** and **Physics Lab**, and with the C++ example games `hello` and `orbrun`.
+> **Key terms:**
+> - **C++ and JavaScript** – two **programming languages**, that is, precisely defined ways of
+>   writing instructions for a computer, just as a knitting pattern is a way of writing down
+>   stitches. C++ is very fast and is used for big programs like games; JavaScript is understood
+>   by every browser out of the box.
+> - **Translator** (technical term: **compiler**) – a program that turns text written in a
+>   programming language into instructions a machine can carry out directly.
+> - **WebAssembly** – an instruction language that all modern browsers can run. Kern is translated
+>   into it from C++. The result is a **module**: a single file that the browser loads.
+> - **Frame** – one of the many single pictures per second that make up movement on the screen,
+>   like the pages of a flip book.
+> - **Play** and **Simulate** – two buttons in Kern Studio. With **Play** you join in yourself
+>   and steer the player character. With **Simulate** the world runs with its physics, and you
+>   watch with a camera you can move freely.
+> - **Interface** – the agreed hand-over point between two parts of a program, like the counter
+>   between the kitchen and the dining room.
+> - **Neural network** – a computational model that learns through practice; here it learns how
+>   the robot duck should move its motors (more in [Appendix A](A-neural-networks.md)).
+> - **Bit** – the smallest unit in a computer: a little box holding a 0 or a 1. All numbers are
+>   made of many such boxes.
 
-## 1.1 What Kern Is
+Great to have you here! Picture a workshop: on the **canvas**, pictures appear (the graphics); at
+the **workbench**, things get pushed, pulled and dropped (the physics); at the **mixing desk**,
+sounds are made (the audio); and on the **stage**, the game runs. In the corner, a robot duck is
+learning to walk. This workshop is called **Kern**, and its doors are open at
+https://kernengine.de/ – with **Kern Studio**, the editor where you build worlds and play them
+right away, with **the Lehrer**, which teaches robot brains to walk, and with playable example
+levels.
 
-An **engine** is the motor under the hood of a game: it draws, computes collisions, plays sounds and
-reads input. All the game has to say is: "There's a car here, and when you press W, it drives."
+## 1.1 What Kern is
 
-Kern is written in **C++20** and compiled to **WebAssembly**, a kind of machine language for
-browsers. It draws with **WebGL2**, the browser's graphics interface. Kern grew out of the game
-**SpawnCity** and brings its version history along from there. But the engine knows nothing about
-SpawnCity: games talk only to the engine, never the other way around.
+A **game engine** is the motor under the hood of a game: it paints, works out collisions, plays
+sounds and reads the mouse and keyboard. All the game has to say is: "There's a car here, and
+when you press W, it drives."
 
-The same module contains:
+> **Imagine …** A theater. The engine is the stage machinery: lights, curtain, sound. The game is
+> the play. The same machinery can carry many different plays.
 
-- **Foundations and math:** number types, error messages, JSON, vectors and matrices – in meters,
-  right-handed, Z up ([Chapter 3](03-foundations.md)).
-- a **renderer** (light, shadows, sky, glow, particles) and the **scene**, which sorts out what
-  can't be seen and figures out what you clicked on;
-- **geometry** for buildings, roads and terrain, and an **app runtime** for games written purely in
-  C++;
-- the **physics** engine Box3D with bodies, joints and raycasts, and Kern's own **audio** mixer
-  with 3D sound and a synthesizer;
-- the **game runtime** with levels, actors and multiplayer, **logic** graphs (game rules as boxes
-  and arrows; Kern runs them, compiles them to WebAssembly in a flash or outputs them as C++) and
-  **networking**;
-- **Kern Studio**, an editor modeled on the big game engines, written entirely in C++ and testable
-  without a browser, and **the Lehrer**, which trains networks with learning methods like PPO,
-  saves them in the ONNX format and matches the simulation against the real robot (calibration);
-- a flat **C interface** for JavaScript and a thin JavaScript layer that connects to the browser.
+Kern is written in **C++**, because C++ is fast. But the browser doesn't understand C++ directly.
+That's why Kern is translated into **WebAssembly** beforehand. The result is a **module** that
+the browser loads just like a picture. To paint, Kern uses the browser's **graphics interface** –
+the hand-over point through which a web page is allowed to tell the graphics card what to draw.
 
-And then there's the **Micro Duck**: a two-legged robot by Pollen Robotics. In Kern, it walks with
-its real, trained neural networks (Kern is not affiliated with Pollen Robotics).
+All the parts of the workshop live in that same module:
 
-## 1.2 The Rules Kern Is Built By
+- the **foundations**: numbers, error messages and the math for 3D space
+  ([Chapter 3](03-foundations.md));
+- the **painting**: light, shadows, sky, plus building blocks for houses, streets and terrain;
+- the **physics**: how things fall, roll, collide and are connected by joints;
+- the **audio**: sounds that come from the left, the right, near or far;
+- the **game rules**: levels, things in the world, multiplayer and game logic you click
+  together;
+- **Kern Studio**, the editor, and **the Lehrer**, which teaches robot brains to walk and also
+  compares the simulation with measurements on the real robot.
 
-### Everything Homemade
+And then there's the **Micro Duck**: a small two-legged robot. It was designed by the robotics
+company **Pollen Robotics**, which published its blueprints and its trained neural networks
+freely. Kern uses these published blueprints and networks, but it is an independent project: it
+has no connection with the company itself.
 
-Kern uses neither the graphics library three.js nor the compiler toolchain Emscripten. The renderer
-is Kern's own C++ code, which calls WebGL2 directly; it is compiled with **wasi-sdk**, a lean
-toolbox built around the clang compiler. The module is a **reactor**: instead of having a main
-program, it lets the browser call a start function once and after that whatever it needs at the
-moment. Because Kern uses only the oldest WebAssembly features, it runs in every WebGL2 browser,
-even Safari from version 15 onward.
+Kern grew out of the game SpawnCity. Even so, the engine doesn't know a single game. In the
+theater picture: the play uses the stage machinery – it says "lights on" and "curtain up" – but
+the machinery knows nothing about the play. That's why tomorrow it can carry a completely
+different play just as well.
 
-### No Engine Logic in JavaScript
+The exact names and values are in the blue book, Chapter 1.
 
-Some things in the browser can only be done from JavaScript: the graphics card, mouse and keyboard,
-sound, files. Exactly that – and **only** that – is what the platform layer in `kern/web/` takes
-care of. The Studio sticks to this too: even the logic editor doesn't keep a graph of its own;
-every change is a command sent to the engine.
+## 1.2 The rules Kern is built by
 
-> **Imagine …** The JavaScript layer is a waiter. It takes your order and brings the food to your
+### Home-cooked
+
+Kern doesn't rely on anybody else's graphics engine. The painting is Kern's own code, which talks
+directly to the graphics interface. The payoff: you know exactly what's going on.
+
+It can't be done entirely without outside parts, though. For physics, Kern uses a ready-made
+**physics library** called Box3D – a collection of code that someone else wrote and published
+freely. Kern doesn't change it but builds it in exactly as it is. What Kern does with it, Kern
+decides for itself.
+
+> **Imagine …** A cook who stirs every sauce himself instead of using ready-made sauce. He buys a
+> few ingredients too – he doesn't grind his own flour. But he takes them as they are and mixes
+> them himself. That way he knows what's in every dish.
+
+Kern also asks nothing fancy of the browser. It's like a letter in plain language: everybody
+understands it. That's why Kern runs in every current browser.
+
+### No engine logic in JavaScript
+
+What a game does is written in **one** place: the C++ part. But in the browser, some things can
+only be done by JavaScript – getting to the graphics card, reading the mouse and keyboard,
+playing sound, opening files. Exactly that, and **only** that, is handled by a thin JavaScript
+layer. Kern Studio sticks to this too: every click in the editor becomes a command to the engine.
+
+> **Imagine …** The JavaScript layer is a waiter. He takes your order and brings the food to your
 > table. But all the cooking happens in the kitchen – in C++.
 
-The payoff: whatever a game does lives in one place, can be tested without a browser and behaves
-in the exported game just as it does in the editor.
+The payoff: a game behaves in the editor exactly as it does as a finished game, and it can be
+tested automatically even without a browser ([Chapter 2](02-building-and-testing.md)).
 
-### The Same Result Everywhere
+### The same result everywhere
 
-**Determinism** means: same input, same result – **bit for bit**, whether on a Linux PC, a Mac with
-an ARM chip or in the browser. But computers round some calculations ever so slightly differently.
-Kern prevents that: the compiler may not merge multiplication and addition into a single step,
-Box3D computes without special processor instructions, Kern brings its own trigonometric functions,
-and during training the order of all sums is fixed – no matter how many helpers are computing
-along.
+**Determinism** means: same input, same result – **bit for bit**, whether on a PC, a Mac or in the
+browser. That sounds obvious. But it isn't, because computers **round**.
 
-This is proven with a **fingerprint** (`kern_lehrer --fingerprint 400`): the duck walks for 400
-ticks, after each one its state is turned into a checksum – and the list has to match a reference
-file. CI – the automatic test run on every change – compares this on three platforms: GCC on x86,
-Apple clang on ARM, and WebAssembly ([Chapter 2](02-building-and-testing.md),
-[Chapter 3](03-foundations.md)).
+A computer stores every decimal number with a fixed number of digits. Whatever doesn't fit gets
+rounded off, after every single calculation step. That's why, on a computer, even the order in
+which you add things up matters. Here's an example with a calculator that has only four digits:
 
-> **Did you know?** Thanks to determinism, a bug in the simulation is a fixed, repeatable bug
-> instead of noise. If the simulated duck walks differently from the real one, it really is down to
-> the model ([Chapter 16](16-calibration.md)).
+- (1000 + 0.4) + 0.4: first you get 1000.4, rounded to 1000. Then 1000.4 again, rounded to
+  **1000**.
+- 1000 + (0.4 + 0.4): first you get 0.8. Then 1000.8, rounded to **1001**.
 
-### A Few More House Rules
+Real computers have many more digits, but the principle is the same.
 
-- **No exceptions, no runtime type information (RTTI).** A function reports "that didn't work" and
-  leaves a readable message behind; JavaScript reads it with `kern_last_error()`
+For plus, minus, times and divide there is a fixed rounding rule that is the same worldwide: every
+computer sticks to it. Not so for **angle calculations**. A game needs angles all the time – every
+rotation, every joint of the duck is an angle. But calculations like the sine (more in
+[Chapter 3](03-foundations.md)) have infinitely many digits after the decimal point and can only
+be approximated. Every computer brings its own formulas for this and sometimes lands a tiny bit
+somewhere else in the last bit.
+
+A difference like that in the last digit wouldn't matter – if it stayed small. But in a
+**simulation**, a world that is calculated step by step, each step keeps calculating with the
+result of the one before. The error gets dragged along and grows. With a walking robot duck,
+after a few seconds a foot lands differently.
+
+> **Imagine …** Two kids roll dice to pick a hiking route, one roll at every crossroads. If just
+> the first roll is different, by evening they end up in different villages.
+
+That's why Kern keeps to three rules:
+
+- **No arithmetic shortcuts.** The part of the computer that does the math is called the
+  **processor**. Some processors compute "times, then plus" in a single go and round only once
+  instead of twice – faster, but with a different last bit. The compiler is not allowed to use
+  such shortcuts. The physics library also does without special instructions that only some
+  processors have, and calculates the simple way everywhere, just as in the browser.
+- **Its own angle formulas.** For angle calculations, Kern brings its own formulas, which
+  calculate the same everywhere ([Chapter 3](03-foundations.md)).
+- **A fixed order when adding up.** Remember the calculator? Order matters. When the duck learns
+  to walk (with the Lehrer, Section 1.4), several helpers calculate at the same time and finish
+  sometimes in this order, sometimes in that one. If you added up their results in the order they
+  arrive, you'd get something different every time. That's why Kern fixes the order, no matter how
+  many helpers are calculating.
+
+The proof is a **fingerprint**: the duck walks a little way, and after every step its state is
+boiled down to a check number. This list must be exactly the same on every computer
+([Chapter 2](02-building-and-testing.md)).
+
+> **Did you know?** Thanks to determinism, an error in the simulation is a fixed, repeatable error
+> instead of random noise. If the simulated duck walks differently from the real one, it really
+> is down to how the duck is modeled and not to the computer ([Chapter 16](16-calibration.md)).
+
+### A few more house rules
+
+- **Broken data is turned away before it can do damage.** Every input is checked first and only
+  then accepted. If it's broken, everything stays as it was.
+- **Errors are reported politely.** A task that doesn't work out answers "no" and leaves a note
+  with the reason; the program keeps running ([Chapter 3](03-foundations.md)).
+- **The physics isn't prettied up.** The Micro Duck stands only on its own motors and feet – no
+  invisible hand holds it up ([Chapter 6](06-physics.md), [Chapter 13](13-micro-duck.md)).
+- **One implementation for every place.** The editor, the finished game and the Lehrer share the
+  same game world and the same physics. That's why a network that learned in the Lehrer (the
+  program that teaches the duck to walk, Section 1.4) runs unchanged in Studio.
+- **No disposable dishes.** The JavaScript waiter from before brings Kern new numbers every
+  frame – always on the same tray, instead of fetching a new one each time and throwing it away.
+  Throwing away means clearing up, and clearing up costs time in the middle of a game
   ([Chapter 3](03-foundations.md)).
-- **Input is checked** before anything changes; broken data doesn't destroy anything. The JSON
-  reader rejects nesting that is too deep and dangerous keys like `__proto__`.
-- **No new memory per frame** on the JavaScript side: the JavaScript class `KernRenderer` copies
-  data into an area that is reused over and over.
-- **No cheating on the physics.** Box3D is compiled in unmodified. The Micro Duck stays upright
-  only through its motors and feet – no invisible hand ([Chapter 6](06-physics.md),
-  [Chapter 13](13-micro-duck.md)).
-- **One implementation for every place.** The editor, the game and the Lehrer share the game world
-  and the physics.
-- **Robust:** if the graphics context is lost, Kern pauses and then rebuilds everything
-  ([Chapter 4](04-graphics.md)).
+- **Robust:** a browser may take the graphics card away from a page at any time – for example
+  when memory runs low, when the graphics driver restarts, or on a phone when the page is in the
+  background. Kern then waits and afterwards rebuilds everything ([Chapter 4](04-graphics.md)).
 
-## 1.3 A House with Many Floors
+## 1.3 A house with floors
 
-Kern is built in layers. Each one uses the ones below it, never the ones above:
+Kern is built in layers, like a house. Each floor uses the ones below it, never the ones above.
+The advantage: you can remodel upstairs without anything collapsing downstairs, and every floor
+can be tested on its own.
 
-```mermaid
-flowchart TB
-  JS["Browser: JavaScript layer"] --> ABI["C interface"]
-  ABI --> TOP["Studio and Lehrer"]
-  TOP --> GAME["Game runtime"]
-  GAME --> MID["Physics, logic, networking, audio"]
-  MID --> GFX["Graphics, scene, geometry"]
-  GFX --> CORE["Foundations and math"]
-```
+![Kern's floors: the browser part at the top, below it the program from the editor down to the foundation](../abbildungen/architektur.svg)
 
-Not every program needs everything. Graphics, audio, logic, networking and foundations are always
-included; five **switches** at build time add more ([Chapter 2](02-building-and-testing.md)):
-`--app` for games written purely in C++, `--physics` for Box3D, `--game` for the game runtime
-(including physics), `--studio` and `--lehrer` (both including game and physics).
+How to read the picture: each floor uses the ones below. At the very top is the browser part, the
+waiter: it takes your input and passes it down through the **hand-over point** – the interface
+from the key terms. "Networking" here means playing with several people over the internet, not
+the duck's neural network.
 
-C++ and JavaScript exchange data only through the module's **memory**, one big shared block of
-numbers. JavaScript reserves space there, writes data at fixed positions (which have to be defined
-the same way in C++ and in `kern.mjs`) and tells the engine where it is. Text goes in as a pair of
-start position and length; answers from the Studio come back as JSON text, valid until the next
-call. In the other direction, the engine calls functions of the browser: WebGL2, the clock, the
-console, random numbers and a few more; unknown system calls are answered by a tiny stand-in with
-"not supported."
+Not every program needs the whole house. Painting, audio, logic, networking and the foundation are
+always included. Physics, game rules, editor and Lehrer are chosen when building, so that a
+program doesn't get needlessly big: a game that only paints doesn't need an editor
+([Chapter 2](02-building-and-testing.md)). If you choose an upper floor, you automatically get
+the ones below it: the editor and the Lehrer need the game rules, and the game rules need the
+physics. There's also a small annex that the picture leaves out: a frame for games written
+entirely in C++ (Section 1.4).
+
+C++ and JavaScript talk to each other only through a shared area of memory. JavaScript puts data
+there at agreed places and tells the engine where it is. The engine answers the same way. When
+it needs something from the browser in turn – the graphics card, the time, a random number – it
+calls the browser through a short list of agreed requests.
 
 > **Imagine …** Two neighbors without a common language share a mailbox. One puts notes in, the
-> other takes them out. That's all the contact there is.
+> other picks them up. On top of that there's a doorbell with a few agreed signals: the engine is
+> allowed to ring and ask for, say, the time or a random number. There's no other contact.
 
-[Chapter 17](17-reference.md) lists all the functions at this boundary.
+The exact names and values are in the blue book, Chapter 1; all the functions at this boundary
+are listed in [Chapter 17](17-reference.md).
 
-## 1.4 Four Ways to Use Kern
+## 1.4 Four ways to use Kern
 
-**A game entirely in C++.** You write a class that inherits from `kern::App`. In `start()` you set
-up the world – in the smallest example, `hello`, for instance a gray-green ground that you hand to
-the renderer with `upsert` ("insert or replace"); in `configure()` you choose renderer options such
-as shadows. After that, the browser calls `kern_app_frame` every frame; that calls `update()`, and
-Kern draws ([Chapter 12](12-your-own-games.md)). Its big sibling `orbrun` is a whole game with a
-city, vehicle physics, traffic, day and night and its own add-on for the shader, the graphics
-card's drawing program.
+All four ways are made of the same C++ code, just put together differently.
 
-**Just the renderer, from JavaScript** – this is how SpawnCity uses Kern: `loadKern()` loads the
-module, `new KernRenderer(…)` creates the renderer, and `upsert`, `updateInstances`, `setCamera`,
-`render` and `pick` do the rest ([Chapter 4](04-graphics.md)).
+**A game entirely in C++.** For programmers: you write a small C++ program that sets up the world
+at the start and then, every frame, says what moves; Kern paints. The smallest example puts a
+field of spinning crates on a floor. The big example is a whole game with a city, driving
+physics, traffic, day and night ([Chapter 12](12-your-own-games.md)).
 
-**Kern Studio and exported games.** `tools/build_studio.sh` packs engine, physics, game runtime and
-Studio into **one** HTML file that runs offline, even by double-click. You build a level out of
-actors (things in the world) and play it with **Play** or **Simulate** right in the window.
-**File → Package Game** turns it into a standalone game, once again a single HTML file: engine
-module, two JavaScript files and the level. It starts the same module in player mode, with the same
-C++ classes as in the editor ([Chapter 8](08-game-runtime.md), [Chapter 11](11-studio.md)).
+**Only the painting, for a web page.** Web pages can also use Kern just as a painter; that's what
+the game SpawnCity does ([Chapter 4](04-graphics.md)).
 
-> **Try it!** Open Kern Studio at https://kernengine.de/. On first launch, Orb Run is loaded
-> (otherwise: **File → Example Levels → Orb Run**). Press **Play** (Alt+P), take off in the
-> hovercar and collect a few orbs. Then **Stop** – congratulations, you just played C++ in the
-> browser.
+**Kern Studio and finished games.** For everyone who'd rather click than type. The whole of Studio
+is **one** file, which runs with a double-click, even without internet. You build a level out of
+**Actors** (things in the world) and try it out right in the window: with **Play** you join in
+yourself, with **Simulate** you watch the running world. **File › Package Game (HTML)...** turns
+it into a standalone game, again a single file that you can send to people. It runs on the same
+engine as the editor and therefore behaves the same way ([Chapter 8](08-game-runtime.md),
+[Chapter 11](11-studio.md)).
 
-> **Watch out!** Kern Studio follows your system language: on a German system, its menus are in
-> German. This book uses the English names. To switch, click **DE | EN** at the bottom right of
-> the status bar – Studio remembers your choice. Or add `?lang=en` to the end of the address.
+> **Try it!** Open Kern Studio at https://kernengine.de/. On first start, Orb Run is loaded
+> (otherwise: **File › Example Levels › Orb Run**). Press **Play** (Alt+P) and head off in the
+> floating car, the hovercar: **W A S D** or the arrow keys steer and accelerate, **Shift** gives
+> a boost. Collect a few **orbs**, the glowing energy balls on the streets. Then **Stop** or Esc.
+> Everything you just saw and heard – light, driving physics, sound – was calculated by the
+> engine in the browser.
 
-**The Lehrer.** It trains networks for the Micro Duck – on your computer as the program
-`kern_lehrer` (even without a screen, on a server) or in the browser on the `/lehrer/` page, where
-several Web Workers (background helpers), each with its own module, gather experience and one of
-them learns from it. Both use the same training recipes and the same game world. Same seed, same
-number of ducks: **the same network**, here as there. Networks are saved in the ONNX format, like
-Pollen's networks ([Chapter 14](14-lehrer.md)).
+> **Did you know?** Kern Studio shows its interface in German or English; unless you choose, it
+> follows the browser's language, so in an English browser you see English labels. This book
+> names the labels as Studio shows them in English. The **DE | EN** button at the bottom right of
+> the status bar switches the language; Studio remembers the choice on your device. Three things
+> are always in English: the logic editor ([Chapter 9](09-logic.md)), the messages in the output
+> log and the console commands.
 
-In the duck, everything meshes together: a model by Pollen Robotics, limbs as physics bodies with
-joints, servos (motors) with a device model, networks that Kern computes itself, a voice from the
-mixer, logic nodes in the *Robots* category – and in the Studio, it's simply an actor.
+**The Lehrer.** It trains networks for the Micro Duck: on your computer as a program of its own,
+or in the browser on the Lehrer page. There, several background helpers gather experience with
+simulated ducks at the same time, and one learns from it. Both versions use the same training
+recipes and the same game world. Learning starts with a **seed** for chance – like a deck of
+cards that is shuffled in exactly the same way every time. Same seed, same number of ducks:
+**the same network**, here as there. The Lehrer saves a finished network in the same format as
+Pollen Robotics' original networks; that's why Studio loads it just like those
+([Chapter 14](14-lehrer.md)).
 
-![The Micro Duck level in the Studio](../buch/bilder/duck-level.png)
+The duck shows you everything at once:
 
-> **Try it!** Choose **File → New Level** and pick one of the six templates there – for example
-> **Micro Duck**. Press Play and watch the duck set off, driven by its network.
+- Its **body** is modeled on Pollen Robotics' original blueprints: physics parts connected by
+  joints.
+- Its **motors** are reproduced exactly, right down to their strength and their small delay.
+- Its **brain** is a neural network that Kern calculates itself.
+- Its **voice** comes from the sound mixer.
+- **Game logic** you click together can control it.
+- In Studio it is simply an **Actor** like any other thing.
 
-## 1.5 Where Everything Lives
+![The Micro Duck template in Kern Studio: the duck in a walled room with crates and a ball](../buch/bilder/duck-level.png)
 
-The source code is openly available at https://github.com/ChristianHohlfeld/kernengine.de. The
-engine lives in `kern/`: headers in `include`, implementation in `src`, the JavaScript layer in
-`web`, tests in `tests`, the example games in `examples`, Kern's own networks in `policies`, Box3D,
-musl and the Micro Duck in `third_party`, and this book in `docs`. Next to it are `tools` (Studio
-build, a relay for multiplayer across machines, the Micro Duck import, mesh simplification), `site`
-(start page and app files of the installable editor), `generated` (build outputs) and CI in
-`.github/workflows/ci.yml`. The complete directory map is in the blue book.
+> **Try it!** Choose **File › New Level...** and pick one of the six templates there, for example
+> **Micro Duck**. Press **Play** and watch the duck set off, steered by its trained brain. Nobody
+> wrote out its steps for it: at every moment the network decides afresh how the motors move.
 
-Kern is licensed under the **Apache License 2.0**; `kern/LICENSES.md` lists the third-party
-components with their licenses. The individual documents in `kern/docs/` are the sources of this
-book; for physics and the Micro Duck, `physics.md` and `walker.md` are authoritative.
+### A tool for later: the console
 
-> **Watch out!** `kern/README.md` mentions a few SpawnCity files. You'll look for them here in
-> vain – they live in the SpawnCity repository.
+At the very bottom of Studio is the **status bar**. In it there's an input field labeled **Cmd**
+(short for "command"): the **console**. Here you type commands to Studio and send them with
+Enter; `help` shows all commands. The answers appear in the **Output Log**, which you open with
+the button of the same name in the status bar. The field has nothing to do with the Mac's Cmd
+key. You'll use it more often in the coming chapters.
 
-## 1.6 How to Read This Book
+## 1.5 Where things are
+
+Kern's entire blueprint is open for anyone to see:
+https://github.com/ChristianHohlfeld/kernengine.de. Kern is under the **Apache License 2.0**, a
+license that allows free use; other people's components are listed with their own licenses.
+
+The exact folder map is in the blue book, Chapter 1.
+
+## 1.6 How to read this book
 
 You are reading the **green book**. Its big brother, the **blue book**, has the same content
-chapter by chapter, but technical down to every last option. If a topic grabs you, look it up
+chapter for chapter, but technical right down to every setting. If a topic grabs you, look it up
 there.
 
-Along the way, you'll keep running into the same boxes: **In short** (what it's about),
-**Imagine …** (an everyday comparison), **Try it!** (a task in Kern Studio), **Did you know?** (an
-amazing fact) and **Watch out!** (a typical mistake). At the end of each chapter come **What you
-take away** and the **Brain teasers**, with the solutions right below. No peeking! (Okay, maybe a
-little.)
+Along the way you'll keep meeting the same boxes: **In short**, **Key terms** (the words the
+chapter needs), **Imagine …** (an everyday comparison), **Try it!** (a task in Kern Studio),
+**Did you know?**, **Watch out!** (a typical mistake) and **For the curious** (a technical detail
+you can skip). At the end of each chapter come **What you take away** and the **Brain teasers**,
+with the solutions right below. No peeking! (Well, okay, a little.)
 
 The book is built from the bottom up, just like Kern itself: first building and foundations, then
-graphics, physics, sound, game, logic and networking, then Studio, Micro Duck and Lehrer, and
-finally the [reference](17-reference.md). Appendices explain neural networks
+graphics, physics, audio, game, logic and networking, then Studio, the Micro Duck and the Lehrer,
+and finally the [reference](17-reference.md). Appendices explain neural networks
 ([A](A-neural-networks.md)), real-time graphics ([B](B-rendering.md)) and physics
 ([C](C-physics.md)).
 
-Where should you start? If you want to change Kern: Chapters 2 and 3 (before physics or the robot,
-also 6 and 13). If you're building a game: 11 or 12, plus 8 and 9. If you love the duck: 13, 14,
-16. If you're embedding Kern in a web page: 4 and 17.
+Where do you start?
 
-Code examples come from the real source code. Paths are relative to `kern/` unless they begin with
-`tools/`, `site/` or `generated/` – those are in the root of the repository.
+- **You simply want to understand how games and learning robots work, with no technical
+  background?** Then after this chapter read [Appendix B](B-rendering.md) and
+  [Chapter 4](04-graphics.md) (how pictures are made), then [Appendix C](C-physics.md) and
+  [Chapter 6](06-physics.md) (how things fall and collide), then
+  [Appendix A](A-neural-networks.md), [Chapter 13](13-micro-duck.md) and
+  [Chapter 14](14-lehrer.md) (how the duck learns to walk). In between, it's worth reading
+  [Chapter 11](11-studio.md) so that you can try everything out yourself in Studio. You can skim
+  Chapters 2 and 3 and look things up there when you need to.
+- **You want to build a game?** Chapter 11 (Studio) or 12 (C++), plus 8 and 9.
+- **You love the duck?** Chapters 13, 14 and 16.
+- **You want to change Kern?** Chapters 2 and 3, and before physics or the robot also 6 and 13.
+- **You want to build Kern into a web page?** Chapters 4 and 17.
 
 ## What you take away
 
-- Kern is a 3D engine in C++20 that runs in the browser as WebAssembly and draws with WebGL2.
-- Physics, sound, game, logic, networking, editor and Lehrer all live in the same module.
-- JavaScript is just the waiter: no engine logic.
-- Kern computes the same bit for bit everywhere – a fingerprint proves it.
-- C++ games, the renderer, the Studio and the Lehrer all come from the same code.
-- The green book explains things simply; the blue one goes into depth.
+- Kern is a game engine that runs right in the browser – nothing to install.
+- Kern is written in C++ and translated into WebAssembly for the browser.
+- Painting, physics, audio, game rules, editor and Lehrer all live in the same module.
+- JavaScript is only the waiter: the cooking happens in C++.
+- Computers round; small differences build up. That's why Kern calculates the same everywhere, bit
+  for bit – a fingerprint proves it.
+- The same code gives you C++ games, painting for web pages, Studio and the Lehrer.
+- The green book explains things simply; the blue book goes into depth.
 
 ## Brain teasers
 
-1. Why is it handy that there is no engine logic in JavaScript?
-2. A network was trained in the browser. Why does it run exactly the same in the Studio?
-3. You build with `--studio`. What comes along automatically?
+1. Why is it handy that there's no engine logic in JavaScript?
+2. A network was trained in the browser. Why does it run exactly the same in Studio?
+3. Work it out with the four-digit calculator: does (1000 + 0.3) + 0.3 give the same as
+   1000 + (0.3 + 0.3)? What does that tell you about simulations?
+4. What happens if the browser takes the graphics card away from Kern in the middle of a game?
 
 ### Solutions
 
-1. Everything a game does lives in one place in C++: testable without a browser and the same in
-   the exported game as in the editor.
-2. The Lehrer and the Studio share the game world, servos and physics, and Kern computes the same
+1. Everything a game does is in one place, in C++: testable without a browser, and the same in
+   the finished game as in the editor.
+2. The Lehrer and Studio share the game world, motors and physics, and Kern calculates the same
    everywhere.
-3. The game runtime and the physics; the basic parts are always included.
+3. No: the left side gives 1000 (1000.3 is rounded down to 1000 twice), the right side 1001 (adding
+   0.6 gives 1000.6, rounded to 1001). On a computer, order matters – and in a simulation, such a
+   difference grows with every step.
+4. The browser is allowed to do that, for example when memory runs low or the graphics driver
+   restarts. Kern waits until the graphics card is back and then rebuilds everything.
 
 ---
 

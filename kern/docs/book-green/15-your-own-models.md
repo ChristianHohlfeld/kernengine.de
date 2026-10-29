@@ -1,365 +1,327 @@
 # 15 Training Your Own Models – the Workshop
 
-> **In short:** This is where it gets practical. You build the tool `kern_lehrer`, train a jump,
-> read the progress, pick the best network and bring it into the Studio. Finally, you see how a
-> completely new movement gets added, and you learn about the traps that the real training runs
-> have already fallen into.
+> **In short:** Here you train for yourself. On the Lehrer page in the browser you teach the duck to
+> jump, read its progress from curves, save a good network, and watch it jump in the Studio. On top of
+> that come the rules for building good exercises, and the traps that the real training runs have
+> already fallen into.
 
-How the Lehrer computes on the inside is in [Chapter 14](14-lehrer.md), the foundations are in
-[Appendix A](A-neural-networks.md).
+> **Key terms:**
+> - **Lehrer page** – the web page kernengine.de/lehrer/, where you train in the browser.
+> - **Command line** – a window where you type commands instead of clicking. You don't need it for
+>   this chapter.
+> - **Return** – all the points of an episode added up; that's what the "Episoden-Rückgabe" (episode
+>   return) readout on the Lehrer page shows. (The **return** in Appendix A.10 is a variant that's used
+>   in the learning calculation: points from now on, later ones worth a bit less.)
+> - **Noise** – the randomness added to each of the network's commands: the duck's curiosity.
+> - **Learning rate** – how far the evaluator (14.2) adjusts the sliders per step.
+> - **Snapshot** – an intermediate state of the network saved along the way.
+> - **Measurement** – a strict check of whether a movement really succeeded, independent of the
+>   points.
 
-## 15.1 Building the tool
+How the Lehrer works inside is in [Chapter 14](14-lehrer.md). You'll need its terms again here
+(episode, practice round, critic, variation, role model, imitation).
 
-```
-kern/tools/lehrer.sh              # builds kern/build/kern_lehrer
-kern/tools/lehrer.sh /path/out    # builds /path/out/kern_lehrer
-```
+## 15.1 Two ways: browser or command line
 
-The script runs on Linux and macOS, on x86 and ARM. It compiles everything with full optimization,
-without FMA contraction and with Box3D without SIMD, and only rebuilds what has changed. `CC`/`CXX`
-choose the compiler, `KERN_JOBS` the number of parallel compilers, and `KERN_NATIVE=0` turns off the
-optimization for your own processor.
+There are two ways to train, and with the same settings both give **the same network**:
 
-> **Did you know?** These processor switches only choose instructions; they do **not** change any
-> result. The network stays the same, bit for bit, as in the browser and in the Studio
-> ([Section 14.7](14-lehrer.md)).
+- **The Lehrer page in the browser:** nothing to install, everything with mouse clicks. That's the
+  path of this chapter.
+- **The tool on your own computer:** faster and more versatile, but you have to build it yourself and
+  operate it from the command line.
 
-On startup, `kern_lehrer` loads Pollen's networks from `third_party/microduck/` (or
-`--policies DIR`). It needs them for the warm start (velstand), the demonstration and the play
-layer. How Kern itself is built is described in [Chapter 2](02-building-and-testing.md).
+**What you can skip without the command line:** all the "For the curious" boxes and section 15.7
+(play layer). Nothing in the rest of the text depends on them. The principles in them – how to
+recognize progress, how to find the best network, what makes good exercises – apply to both paths.
 
-## 15.2 Everything the tool can do
+> **For the curious:** How to build the tool, which commands it knows, and which settings there are is
+> in the blue book, Chapters 15.1 and 15.2. The processor settings when building only make it faster;
+> the network stays exactly the same as in the browser, down to the last hair.
 
-| Commands | What for |
-|---|---|
-| `--task jump` / `stand` | train a movement with PPO |
-| `--eval`, `--trace` | measure a network; look at an episode tick by tick |
-| `--vorbild-suchen`, `--vorbild-pruefen` | search for and test a jump demonstration with CMA-ES |
-| `--spielen`, `--spielen-pruefen`, `--spielen-ueben`, `--spielen-spur` | imitate, measure, practice and watch the play layer |
-| `--biss-fenster`, `--halt-messen` | measure the bite and the stopping distance |
-| `--demo-spur` | play the example level as in the Studio |
-| `--fingerprint 400` | check determinism |
-| `--kalibrieren` and friends | calibration ([Chapter 16](16-calibration.md)) |
+## 15.2 Training the jump in the browser
 
-For all of them: `--threads N` (default: all cores) and `--seed N` (default 1).
+A jump run has two phases that you can follow on the page:
 
-## 15.3 Training the jump
+1. **Imitating:** for 8 rounds, the network learns from the built-in role model. The status line shows
+   "Nachahmen: Runde … von 8" (imitating: round … of 8). After that the network can usually already
+   jump, and the page saves it for the Studio for the first time.
+2. **Practicing:** now the duck learns for points, with variation. For the first 30 rounds only the
+   critic learns (Chapter 14.5), then both. Every 25 rounds the page does 5 test jumps and saves the
+   network.
 
-### The standard run
+**How long does it take?** On a test computer with 2 cores, the first real jump came in the browser
+after just under 9 minutes, and imitation was finished after about 11 minutes. Practicing takes much
+longer, because it needs thousands of rounds. How fast your device is, the page shows under
+"Schritte / s" (steps per second): that's how many decision ticks all ducks together manage per
+second.
 
-```
-kern/build/kern_lehrer --task jump --iterations 3000 \
-    --out jump.onnx --log jump.csv \
-    --checkpoint run.ckpt --keep-every 250
-```
+> **Try it!** Your first jump run:
+> 1. Open **kernengine.de/lehrer/**. Wait until the status line reports "Bereit" (ready).
+> 2. Under "Bewegung" (motion), choose "Sprung" (jump). All other fields stay as they are.
+> 3. Press **Start** and leave the tab open. A phone belongs on its charger.
+> 4. Watch the status line: first "Nachahmen: Runde 1 von 8" (imitating: round 1 of 8) and so on, then
+>    "Lernt: Iteration …" (learning: iteration …). Under "echte Sprünge" (real jumps) you see how
+>    many of 5 test jumps succeed.
+> 5. As soon as "Für Kern Studio gespeichert als jump.onnx" (saved for Kern Studio as jump.onnx)
+>    appears below the buttons, your network is ready for 15.6.
+>
+> What you learn: only the role model makes the jump possible; practicing then makes it reliable.
 
-This is exactly how `policies/jump.onnx` was made (32 ducks on 2 cores, seed 1). What happens:
+> **Did you know?** The same starting number, the same number of ducks and the same **recipe** (the
+> fixed settings of a training run, more in 15.8) give the same network in the browser as on the
+> computer. The number of ducks is **workers × ducks per worker**; a worker is a helper in the
+> browser's background that lets its ducks work out. The built-in jump network came from 32 ducks,
+> starting number 1 and 3000 practice rounds. So with 4 workers of 8 ducks each (32 in total),
+> starting number 1 (the "Seed" field) and 3000 iterations, you set exactly the same settings – if you
+> have the time.
 
-1. **Load the recipe:** warm start from velstand, imitation of the built-in demonstration (8 rounds
-   of 96 episodes each), then practice with noise 0.1, learning rate 10⁻⁴ and imitation reward 10.
-   Options on the command line override individual values.
-2. **Create the ducks:** `--envs` (default 16 per thread), rounded down to a multiple of the
-   threads.
-3. **Imitate** with DAgger. Afterward, `jump_nachgeahmt.onnx` is there and, with `--checkpoint`,
-   the learner in `run.ckpt.nachgeahmt`.
-4. **Practice** with PPO: 30 iterations of only the critic, then both. Every 10 iterations, the
-   network jumps 5 times on the clean robot as a test.
-5. **Save:** every 25 iterations and at the end; with `--keep-every`, also snapshots such as
-   `jump_it00250.onnx`.
+## 15.3 Reading progress
 
-When a test reaches at least 4 out of 5 real jumps for the first time, the tool cheers
-`FIRST REAL JUMP at iteration …` and saves immediately. With `--stop-after-jump`, it then stops.
+You read progress from **curves**, not from a single number. The values fluctuate from round to
+round, because each round has different ducks working out with different randomness. What matters is
+the trend over hundreds of rounds.
 
-### Resuming, no demonstration, your own demonstration
+> **Imagine …** the fever chart in a hospital: a single measurement says little, the trend over days
+> says everything.
 
-`--resume run.ckpt` loads the whole learner and skips the imitation.
+The Lehrer page draws return and episode length as curves and shows numbers alongside:
 
-> **Watch out!** When resuming, `--iterations` is the **target**, not the number of additional
-> iterations. If you resume after 3000 with `--iterations 3000`, you won't get a single new one. So
-> for another 3000, use `--iterations 6000`.
-
-With `run.ckpt.nachgeahmt`, practice starts over from the imitation. `--vorbild none` tries pure
-PPO – the route that did not find the takeoff. So that the duck has any direction at all without a
-demonstration, the reward then gets a reference height (`track_height`). Further switches change
-the demonstration, the DAgger rounds, the practice noise and the imitation reward.
-
-This is how you search for your own demonstration:
-
-```
-kern/build/kern_lehrer --vorbild-suchen demo.json --iterations 120
-kern/build/kern_lehrer --vorbild-pruefen demo.json --episodes 20
-kern/build/kern_lehrer --task jump --vorbild demo.json \
-    --out jump2.onnx
-```
-
-For each generation, a line appears with the score and a verdict ("a real jump," "no real jump,"
-"fell"). With `--vorbild start.json`, you continue searching from an older result.
-
-**In the browser,** the page `/lehrer/` trains the same recipe ([Section 14.11](14-lehrer.md)). The
-same seed and the same total number of ducks (workers × ducks per worker) give the same network as
-natively.
-
-## 15.4 Reading progress
-
-Each practice iteration writes a line like `it 512 … return … len … value … std … lr …`, and with
-an evaluation also `| jumps 4/5 up … rise … flight … tilt … falls …`.
-
-| Field | Meaning | What to watch for |
+| Readout | Meaning | What to watch for |
 |---|---|---|
-| `return` | mean return | should rise over hundreds of iterations |
-| `len` | episode length in ticks | 100 = 2 s; shorter: fall or ground contact |
-| `value` | the critic's error | high at first, then falling |
-| `std` | action noise σ | drops as the duck becomes more confident (min. 0.001) |
-| `lr` | learning rate | stuck at 1e-5: the policy is changing too much |
-| `steps/s` | duck steps per second | speed of the device |
-| `jumps n/5` | test on the clean robot | the actual goal |
+| Episoden-Rückgabe (episode return) | points of an episode, averaged | should rise over many rounds |
+| Episodenlänge (s) (episode length) | how long an episode lasts | jump: 2 s means no fall; shorter means a fall or propping up |
+| Aktionsrauschen (std) (action noise) | how much the duck tries things out | drops as it gets more confident (14.5) |
+| echte Sprünge (real jumps) | out of 5 test jumps | **the actual goal** |
+| Schritte / s (steps per second) | the device's speed | says nothing about quality |
 
-During imitation, each round shows the examples, the error and the real jumps. With
-`--log jump.csv`, every iteration ends up as a CSV line in a file you can load straight into a
-spreadsheet (`jumps` is −1 where there was no evaluation).
+If the points rise but the real jumps don't, that's a warning sign: maybe the duck is getting its
+points with something that isn't a jump at all (15.9).
 
-**If something goes wrong,** `--trace` shows an episode tick by tick: height, sole contacts, ground
-contact of other parts, tilt and every reward term.
+> **For the curious:** The tool writes every round as a line of text and, if you want, into a table
+> you can load into a spreadsheet. With the command line you can also look at a single episode tick by
+> tick, with every points item – like an X-ray that shows what the duck really gets its points for.
+> Line format and commands: blue book, Chapter 15.4.
 
-```
-kern/build/kern_lehrer --trace jump_it01000.onnx
-kern/build/kern_lehrer --trace builtin          # the demonstration
-kern/build/kern_lehrer --trace jump.onnx --randomized
-```
+## 15.4 Choosing the best network
 
-That way you see which term brings in the points – and whether the duck is tricking the reward.
+**The last saved network isn't automatically the best one.** While practicing, a network can get
+worse again after a good stage. And the test during the run is small: only 5 jumps on the clean
+robot – a network can look good by chance.
 
-> **Imagine …** the log lines are the fever chart in a hospital: a single measurement says little,
-> the trend over hundreds of iterations says everything. And `--trace` is the X-ray.
+> **Imagine …** you take a series of photos. You don't just take the last one; you lay them all out
+> side by side and pick the best.
 
-## 15.5 Picking the best network
+Here's how to go about it:
 
-The last saved file is not always the best: PPO can get worse again after a good stretch, and the
-test during the run has only 5 episodes. So:
+1. Keep **snapshots** along the way.
+2. Measure each one thoroughly with many jumps, on the clean robot **and** with full variation.
+3. Choose by: first real jumps with variation, then no falls, then height, flight time and tilt.
+4. Check the winner in the Studio (15.6).
 
-1. Keep snapshots with `--keep-every N`.
-2. Measure each one with more episodes:
-   `for f in jump_it*.onnx; do kern/build/kern_lehrer --eval "$f" --episodes 40; done`.
-   You get two lines: "clean robot" and "randomised" (full variation).
-3. Choose by: real jumps with variation, then zero falls, then rise, flight time, tilt.
-4. Check in the Studio (15.8).
+For the built-in network, this measurement gave 40 out of 40 real jumps clean, 36 out of 40 with
+variation, and not a single fall.
 
-For `policies/jump.onnx`, that gave 40 of 40 clean and 36 of 40 with variation, without a fall.
+In the browser, the page keeps only the **newest** state. If the readout currently shows 5 out of 5
+real jumps, you can save this state as a file with ".onnx herunterladen" (download .onnx) before
+practicing continues.
 
-## 15.6 Turning the knobs
+> **For the curious:** The tool can keep a snapshot every few hundred rounds and measure each one with
+> 40 episodes, clean and with variation. Commands: blue book, Chapter 15.5.
 
-### One iteration in numbers
+## 15.5 Gently learning on
 
-What a switch does is easiest to see in a worked-out iteration of the jump recipe with 32 ducks:
+After imitation, the network can already jump. Now the rule is: **keep learning carefully.** A small
+learning rate, little noise, and critic first – otherwise what was learned gets lost.
 
-- **Collect:** 32 ducks × 48 ticks = **1536 rows**, each with noise σ = 0.1.
-- **Normalizers:** the critic's learns from the 1536 rows; the actor's is frozen.
-- **GAE:** per duck, backward over 48 ticks, γ = 0.99, λ = 0.95; then the advantages are brought to
-  mean 0 and spread 1.
-- **Minibatches:** 1536 / 4 = **384 rows**, each split into 8 pieces of 48 rows.
-- **Updates:** 5 epochs × 4 minibatches = **20 Adam steps**, each preceded by the KL measurement.
+> **Imagine …** you've just painstakingly taught a dog a trick. If you now yell new commands and wave
+> treats around wildly, the trick is quickly gone again.
 
-The imitation would have had at most 76,800 examples (8 × 96 episodes × 100 ticks); there were
-49,936, because episodes end earlier on a fall or ground contact. After each round, the actor is
-fitted to all examples so far in 10 epochs (minibatch 256).
+That's why the fields "Aktionsrauschen am Anfang" (initial action noise) and "Lernrate" (learning
+rate) on the Lehrer page are empty: then the proven recipe applies. What the real runs also showed:
 
-### The most important switches
+- **More trying things out doesn't help.** With a lot of noise and no warm start, the duck only
+  learned to stand, not to jump.
+- **Few ducks slow things down.** Few ducks collect little experience per round, and the direction of
+  learning becomes uncertain.
+- **The number of ducks determines the result, the number of cores only the speed.** On the page,
+  that means: the total workers × ducks per worker decides which network comes out. More workers with
+  the same total don't change the network; they just spread the work over more cores. But if you only
+  raise the workers and leave "ducks per worker" as it is, you have more ducks – and a different
+  network.
+- **Don't make the physics coarser.** With more coarsely calculated physics, training would be
+  1.6 times faster, but the network would learn a different world from the Studio's.
 
-| Option | Jump recipe | Effect |
-|---|---|---|
-| `--envs N` | 16 per thread | more data, calmer gradient; **determines the result** |
-| `--threads N` | all cores | the speed – with a fixed `--envs`; without `--envs` you get 16 ducks per thread |
-| `--steps N` | 48 | ticks per duck and iteration |
-| `--lr X`, `--kl X` | 10⁻⁴, 0.01 | starting learning rate, target KL |
-| `--uebungs-std X` | 0.1 | noise during practice |
-| `--entropy X` | 0.005 | slows down the shrinking of the noise |
-| `--substeps N` | 16 | don't change it! |
+> **For the curious:** The tool has switches for all the recipe's settings and can continue a run.
+> Watch out: when continuing, you give the number of rounds as a **target**. If you want 1000 more
+> after 3000 rounds, you write 4000. Everything about it: blue book, Chapters 15.3 and 15.6.
 
-On top of that come epochs, minibatches, network sizes (with a warm start, the actor has to match
-velstand), initial noise (`--init-std`), adaptive learning rate on/off, warm start (only `velstand`
-works; anything else means random weights; only the play layer starts from a file) and
-`--profil servo.json` for calibrated servos ([Chapter 16](16-calibration.md)); everything else is in
-[Chapter 17](17-reference.md).
+## 15.6 Using it in the Studio
 
-> **Imagine …** you have just taught a dog a trick with a lot of effort. If you now shout new
-> commands and wave treats around wildly, the trick is quickly gone again. It's the same with the
-> network: after imitation, a **small learning rate (10⁻⁴) and small noise (0.1)** are a must.
+A network from the Lehrer page lands in the Studio by itself if both run in the **same browser on the
+same device**. The Studio loads it at startup and takes over every new one immediately, even in tabs
+that are already open. This applies to the jump.
 
-Also: more noise does **not** help with finding things (without a warm start, the duck only learned
-to stand with it). Few ducks slow things down, because the gradient gets noisy. And fewer sub-steps
-would be 1.6 times faster, but then the network would learn a different physics than the Studio's.
+> **Try it!** Your duck jumps with your network:
+> 1. Start a jump run on the Lehrer page (15.2).
+> 2. In the same browser, open a second tab with https://kernengine.de/ and there the example level
+>    via **File › Example Levels › Micro Duck**.
+> 3. Wait until the Lehrer page reports "Für Kern Studio gespeichert als jump.onnx" (saved for Kern
+>    Studio as jump.onnx). That happens for the first time after imitation, then every 25 rounds.
+> 4. In the Studio, start **Play**, take over the duck with **F8** and press **7**.
+>
+> What you see: now **your** network jumps, not the one that ships with Kern – yours replaces it. An
+> early state often still jumps unsteadily. After a while of practice, press **7** again and compare.
+
+> **For the curious:** You can also put a network into the source code as a file, and the browser's
+> developer console reports when a network has been loaded. What form the network must have and where
+> the files go: blue book, Chapter 15.8.
 
 ## 15.7 Training the play layer
 
-Six steps:
+The play layer can only be trained with the tool on the command line, not in the browser. If you're
+not planning to do that, you can skip this section. But the process shows two nice principles:
 
-1. **Measure what the demonstration needs:** `--biss-fenster` places a sock on an 11 × 9 grid in
-   front of the duck and prints where the bite holds. `--halt-messen` shows the stopping distance
-   after "stop." Training measures the bite by itself anyway; the commands are for looking things
-   up.
-2. **Imitate:**
-   `kern_lehrer --spielen --nachahmen 12 --episoden 32 --out play.onnx --checkpoint play.ckpt`.
-   The default is 8 rounds of 64 episodes each. For each round, the tool measures the network in
-   16 clean episodes.
-3. **Check:** `--spielen-pruefen vorbild` and `--spielen-pruefen play.onnx`. Measuring the
-   demonstration shows the most the network can reach through pure imitation.
-4. **Watch:** `--spielen-spur --seed 3` shows an episode decision by decision (25 per second); with
-   `--netz play.onnx`, the network drives, and the actions of the demonstration and the network
-   appear side by side. That way you see where they diverge.
-5. **Practice:** `--spielen-ueben play.onnx --iterations 300 --envs 32 --out play_geuebt.onnx`:
-   warm start from the file, noise 0.1, 20 iterations of only the critic, then PPO. Every
-   20 iterations, a measurement and a snapshot.
-6. **Check in the example level:** `--demo-spur --netz play_geuebt.onnx --seed 120` plays the
-   Micro Duck level as the Studio does, for 120 s (here `--seed` is the duration!), one line per
-   second: position, state, what the tracker (the play layer's memory) knows and what the play
-   network answers. It takes `jump.onnx` and your play network (otherwise `play.onnx`). With
-   `KERN_JUMP_AT=SECOND`, it presses key 7 in that second.
+- **First measure what the role model needs.** The role model has to know where the beak grips a sock
+  well and how far the duck keeps walking after "stop." Both are measured in the physics instead of
+  estimated (Chapters 14.8 and 16.6).
+- **Measure the role model.** Before you test the network, you test the role model. That shows what
+  the network can **at most** achieve through pure imitation. If even the role model can't manage
+  something, it's not the network's fault.
 
-> **Watch out!** During imitation, `--out` is overwritten after **every** round. If you want to keep
-> an earlier round, copy the file while the run is going. (For the old `play.onnx`, round 10 of 12
-> was the best.)
+After that come imitation, testing, watching, practicing, and a trial run in the example level.
 
-## 15.8 Using it in the Studio
+> **Watch out!** During imitation, the output file is overwritten after **every** round. If you want
+> to keep an earlier round, you have to copy it during the run. For today's play network, round 8 of
+> 12 was the best (Chapter 14.8), not the last one – exactly the lesson from 15.4.
 
-Kern's own networks have fixed names: `jump.onnx` and `play.onnx`. Three ways into the Studio:
+> **For the curious:** All six steps with commands are in the blue book, Chapter 15.7.
 
-1. **Into the repository:** copy to `kern/policies/`. The developer page loads from there, a
-   deployed page from `policies/` next to it. The engine only fetches a network when a duck needs
-   it.
-2. **From the browser Lehrer:** the Lehrer page saves its network on the same device; the Studio
-   loads it on startup and picks up every new one immediately, even in open tabs (for the jump
-   only).
-3. **Check:** open the Micro Duck level, Play, take control of the duck with **F8**, key **7** for
-   the jump, or leave the duck alone (play layer: Autonomous and Kern extras on, ball or sock in
-   sight). The browser console reports "Kern: trained network jump.onnx loaded" or warns you if
-   something doesn't load.
+## 15.8 Adding a new movement
 
-The network must have the shape of an rsl_rl actor (Sub, Div, Gemm/Elu …, Gemm) – exactly how the
-Lehrer exports it. A play layer without 23 inputs and 9 outputs is not computed (its action stays
-0).
+Suppose the duck should **take a bow**. For that you need five ingredients:
 
-> **Try it!** Train a jump on the Lehrer page while keeping the Micro Duck level open on
-> https://kernengine.de/, start Play, take control of the duck with **F8** and press **7** as soon
-> as the console reports "trained network jump.onnx loaded." Now **your** duck is jumping.
+1. **A task:** How long does the bow last (about 2 seconds)? How does the duck start? What earns
+   points (staying upright, moving calmly, and of course the bow itself), and what ends the episode
+   (a fall)? And what may the critic know in addition?
+2. **A recipe:** the settings for training, such as a warm start from velstand, little noise, a small
+   learning rate. With that, the tool and the browser know the new exercise; on the Lehrer page all
+   that's missing is an entry in the selection.
+3. **A measurement:** a strict check of whether a bow really happened (15.9).
+4. **The connection to the Studio:** a key, a touch button, the name in the **Robot Move** logic node,
+   and the network file. In the Studio the duck then switches to the new network for the duration of
+   the movement and back afterward.
+5. **A role model (often needed):** for hard movements, practicing alone doesn't find the way
+   (Chapter 14.6). Then you need a simple movement plan, a grade for the search, and a role model that
+   knows an answer in **every** situation – otherwise imitating with correction doesn't work.
 
-## 15.9 Adding a new movement
+Each of these ingredients requires programming. The learning machine itself stays the same: practicing
+and imitating only know "a world in which a duck acts and gets points." The play layer, with
+completely different inputs and outputs, learns with exactly this machine too.
 
-A new movement with Pollen's layout (61 observations → 14 actions) needs four things, and difficult
-movements often a fifth:
+> **For the curious:** The blue book shows the skeleton of a bow task in C++ and lists all the places
+> in the Studio you have to extend (Chapter 15.9).
 
-1. **A `Task`** in `src/lehrer/`. As a skeleton, the blue book shows a bow, `BowTask`: 2 s duration,
-   random start, phase signal in slots 55 and 56, four secret values for the critic, a curriculum
-   for the fall penalty, a reward made of named terms. Helpers such as `upright`, `action_rate` and
-   `fell` are already in `tasks.cpp`; a factory function `make_bow_task()` makes the class usable
-   from outside.
-2. **Recipe and name** in `src/lehrer/recipe.cpp`:
+## 15.9 Measurement isn't reward
 
-   ```cpp
-   std::unique_ptr<Task> make_task(const std::string& name) {
-     if (name == "jump") return make_jump_task();
-     if (name == "stand") return make_stand_task();
-     if (name == "bow") return make_bow_task();          // new
-     return nullptr;
-   }
-   ```
+**The measurement checks what a movement is – not how many points it earned.** That may be the most
+important rule of the whole workshop.
 
-   The function translates names into tasks; the new line delivers the bow for "bow," and anything
-   unknown gives nothing. In addition, `recipe_for` gets an entry (warm start, noise, learning
-   rate). After that, `--task bow` and the browser know the task; the Lehrer page only lacks a menu
-   entry.
-3. **A measurement** that checks what the movement **is**, not what the reward counts. `JumpMeter`
-   shows the pattern: observe tick by tick, decide at the end. `--eval` and the test during the run
-   currently only know the jump; a new task needs its own evaluation.
-4. **The wiring in the Studio,** as for the jump: movement list, key, touch button, name in the
-   logic node **Robot Move**, file name and the file in `kern/policies/`. In the Studio, the duck
-   then switches hard to the new network and back again after its duration; the Studio builds the
-   observation exactly as in training (with phase).
-5. **A demonstration (optional):** a small parametrization, a score for CMA-ES and a demonstration
-   object that has an answer in **every** state (otherwise no DAgger). CMA-ES and imitation are
-   general; the demonstration functions are currently tailored to the jump.
+Points are a signpost for learning. But networks find every loophole in them. If you measured success
+by the points, you'd think a network was good when it was just cleverly collecting points. That's why
+the jump has its own strict test: all parts in the air for at least 60 milliseconds, the torso rises,
+at most 30° of tilt, landed upright (Chapter 14.6). Whether the duck got many or few points while doing
+so doesn't matter to the test.
 
-Inputs that velstand has never seen must be declared as new for the warm start (currently the phase
-slots 55 and 56). For a completely different layout, the play layer shows the way: its own runtime
-layer, environment, learner, metadata and evaluation – PPO and imitation stay the same.
+> **Imagine …** a driving test. You can rack up driving lessons however you like. In the test, the
+> only thing that counts is whether you really drive safely.
 
-## 15.10 Designing good tasks
+## 15.10 Designing good exercises
 
-What Kern's networks model for you:
+Anyone building a new exercise designs three things: what the network **sees** (the observation), what
+it can **do** (the actions), and what earns **points** (the reward). Kern's networks model seven rules
+for this:
 
-- **Only what the robot really has.** The actor sees sensor values (IMU, joints, camera detector,
-  mouth encoder), never true positions; the play layer knows ball and sock only with noise and
-  dropouts. The truth belongs in the critic's secret values.
-- **Make time visible.** A movement with a sequence gets a phase signal (cos, sin), not a counter.
-  A network without memory needs time quantities: the play layer sees how long it has been
-  standing, walking and carrying.
-- **Measure instead of command.** "Standing still" means "both soles on the ground, no movement
-  running" – what the legs do, not what was commanded.
-- **Actions like controls:** walking commands with a dead zone like a stick (below 20 % the duck
-  stands), movements via a threshold (above 0.5 they start), limits for head and neck.
-- **Reward made of named terms,** weight × term × dt, with brakes as with Pollen (action change,
-  rotation rate, self-contact); curricula make penalties and variation stricter step by step.
-- **Hard episode ends:** a fall and ground contact by other parts end the episode.
-- **Demonstration without secret knowledge:** it sees only what the network sees; a wish that
-  follows from a duration rises as a ramp.
+- **Only what the robot really has.** The acting network sees sensor values, never true positions. The
+  play layer knows ball and sock only from the camera, noisy and with dropouts. Only the critic gets
+  true knowledge.
+- **Make time visible.** A network has no memory of its own: it only sees the present moment and
+  whatever it's given (such as its own last command, 13.7). That's why you have to tell it how far
+  along a movement is (the jump's clock) or how long it has been standing, walking or carrying.
+- **Measure instead of commanding.** "Standing still" means: both soles on the floor, no movement
+  running. What counts is what the legs do, not what was commanded.
+- **Actions like controls.** Walking commands work like a joystick with a dead zone: small deflections
+  mean "stand." A movement like the kick only starts when its value crosses a threshold.
+- **Named points items.** Each item is visible on its own, small deductions curb fidgeting and wobbling,
+  and curricula make penalties and variation stricter step by step.
+- **A hard episode end.** A fall and floor contact by other body parts end the episode; otherwise
+  propping itself up becomes a safe bet.
+- **A role model without secret knowledge.** The role model only sees what the network sees. That
+  applies to its timing too: the role model doesn't say "Kick now!" from one moment to the next but
+  gets more impatient with every moment of standing still, like a countdown. That way the network can
+  read from the standing time when it's time. A sudden "Now!" without a recognizable reason is
+  something it couldn't copy.
 
-> **Try it!** On https://kernengine.de/, start Play in the Micro Duck level (Kern extras is on there)
-> and lift the ball with the mouse to another spot. Watch how the play layer decides anew from its
-> sensors alone: look, walk over, stand, kick.
+> **Try it!** At https://kernengine.de/, open the Micro Duck level and start **Play**. It begins with
+> the observer camera: you watch and can lift things with the mouse or a finger. Lift the ball to a
+> different spot and let go. Watch how the play layer decides anew from its sensors alone: look, walk
+> over, stand, kick. What you learn: the duck doesn't "know" where the ball is – it has to see it.
 
 ## 15.11 Pitfalls from the real runs
 
-From `docs/lehrer.md`, so you don't fall into them:
+So you don't fall into them – this happened in the real runs:
 
-- **The reward gets exploited.** Early ducks sat on their tails, did dives or propped themselves
-  up. Every time, only a stricter rule helped: ground contact ends the episode, tilt costs, points
-  only when upright.
-- **The measurement was too lax.** The first one let through a duck that merely straightened up and
-  pulled up its feet, tipping by 45°. Since then, only a real jump counts (rise in the air, flight,
-  at most 30° of tilt, landing).
-- **PPO alone does not find rare movements;** without "critic first," what was imitated breaks;
-  drifting normalizers distort the update (all in Chapter 14).
-- **Bugs in the world instead of the network.** Training the play layer brought three to light: the
+- **The reward gets exploited.** Early ducks sat on their tails, did dive jumps, or propped themselves
+  up. Each time, only a stricter rule helped: floor contact ends the episode, tilt costs, points only
+  when upright.
+- **The measurement was too loose.** The first test let through a duck that only straightened up and
+  pulled its feet in, tilting 45° while doing so. Since then, only a real jump counts.
+- **Practicing alone doesn't find rare movements.** Only the role model and imitation brought the jump.
+- **A good student, a clueless critic.** Without "critic first," what had been imitated broke (15.5).
+- **Bugs in the world instead of in the network.** Training the play layer brought three to light: the
   sock crept across the floor by itself, the ball rolled forever, and the idle yawn opened the beak
-  during pick-up. The fix: rolling resistance for sock and ball, and a running movement no longer
-  counts as standing still. If a network fails to learn at some point, `--spielen-spur` and
-  `--trace` often reveal a bug like that.
-- **Hand-entered numbers go stale.** The bite position used to be a number in the docs; now the
-  Lehrer measures it on every run.
-- **Breaking determinism:** one `std::sin`, one sum in thread order or `-ffast-math`, and the
-  network is a different one on another device. `--fingerprint 400` gives it away.
-- **Different physics than the Studio:** fewer sub-steps, a different floor, a different servo
-  profile – and the network learns a different world.
+  during a pickup. If a network just won't learn at some point, it's worth taking a look at the world.
+- **Hand-entered numbers go stale.** Where the beak grips used to be a fixed number in the
+  documentation. Now the Lehrer measures it anew on every run.
+- **Breaking sameness by accident.** Just one math function that rounds differently, or a sum in a
+  changing order – and the network is a different one on another device (Chapter 14.7).
+- **Different physics from the Studio.** Coarser physics, a different floor, different motors: then
+  the network learns a different world from the one it's supposed to run in later.
 
 ## What you take away
 
-- `kern/tools/lehrer.sh` builds the tool; processor switches don't change any result.
-- A standard run first imitates, then practices, and regularly saves snapshots.
-- `return`, `len` and above all `jumps` show the progress; `--trace` shows what goes wrong.
-- The last network is not always the best: measure snapshots with `--eval`, clean and with
-  variation.
-- The number of ducks determines the result, the number of threads only the speed.
-- After imitation: small learning rate, small noise, critic first.
-- A new movement needs a task, a recipe, a measurement, Studio wiring and often a demonstration.
+- The Lehrer page in the browser is the easiest way; the tool on the computer is faster but gives the
+  same network.
+- You read progress from curves, not from one number. The actual goal is real jumps.
+- The last network isn't always the best: save intermediate states and test them thoroughly, clean
+  and with variation.
+- After imitation, keep learning gently: small learning rate, little noise, critic first.
+- The number of ducks determines the result, the number of cores only the speed.
+- A new movement needs a task, a recipe, a measurement, a Studio connection, and often a role model.
+- The measurement checks what a movement is – not how many points it earned.
 
 ## Brain teasers
 
-1. You have trained 3000 iterations and want 1000 more. What value do you give `--iterations`?
-2. Why do you measure the candidates at the end with 40 episodes instead of relying on the 5-episode
-   test?
-3. Your computer suddenly has twice as many cores. Does your network change if you double
-   `--threads`? And if you double `--envs`?
-4. Why shouldn't the measurement of a new movement simply add up the reward?
+1. You train in the browser with 4 workers of 8 ducks each. A friend uses 8 workers of 8 ducks each
+   on her computer, with the same starting number. Does she get the same network? What would she have
+   to set?
+2. Why do you test the candidates at the end with 40 jumps instead of relying on the 5 test jumps
+   during the run?
+3. Why shouldn't you practice with a large learning rate and a lot of noise right after imitation?
+4. Why shouldn't the measurement of a new movement simply add up the points?
+5. A network just won't learn something, no matter how long you practice. Where else besides the
+   network could the error be?
 
 ### Solutions
 
-1. 4000 – `--iterations` is the target.
-2. Five episodes are a very small, noisy test; a network can look good by chance. And only with
-   variation does it become clear whether it is robust.
-3. More threads with a fixed `--envs`: the same network, just faster. Without `--envs`, though,
-   more threads bring more ducks with them (16 per thread) – and more ducks means a different
-   network.
-4. Because networks exploit loopholes in the reward. The measurement has to check whether the
-   movement really happened.
+1. No: she has 64 ducks instead of 32, so a different network. With 8 workers of 4 ducks each (32 in
+   total) she'd get the same network, just faster.
+2. Five jumps are a very small test; a network can look good by chance. And only with variation does
+   it show whether it's robust.
+3. The network can already jump. Big steps and wild trying things out would destroy what was learned
+   before the critic even estimates well.
+4. Because networks exploit loopholes in the reward. The measurement has to check whether the movement
+   really happened.
+5. In the simulated world: with the play layer, for example, the sock crept away by itself.
 
 ---
 

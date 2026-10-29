@@ -1,425 +1,507 @@
-# Appendix C – Foundations: How a Physics Simulation Thinks
+# Appendix C – Background: How a Physics Simulation Thinks
 
 > **In short:** How do you teach a computer that crates fall, balls bounce and doors swing? This
-> appendix explains the ideas behind every rigid body simulation: state, time steps, collisions,
-> friction, joints, the solver, servos as a control loop – and why Kern delivers the same result bit for
-> bit on every computer.
+> appendix explains the ideas behind every physics simulation: state, time steps, collisions,
+> friction, joints, the solver, servos as a control loop – and why Kern gives the same result bit
+> for bit on every computer.
 
-Kern calculates with **Box3D** by Erin Catto. How exactly Kern uses Box3D is in
+> **Key terms:**
+> - **Hertz (Hz)** – "how many times per second". A swing that swings back and forth twice a
+>   second swings at 2 Hz.
+> - **Torque** – turning force. With a long wrench, the same hand produces more of it. Measured in
+>   newton meters (N·m).
+> - **Force and impulse** – a force pushes for a while, an impulse is a short kick, like kicking a
+>   ball.
+> - **Rule (constraint)** – a condition the physics has to keep, such as "these two things aren't
+>   stuck inside each other" or "these two points stay together".
+> - **Solver** – the part of the physics that satisfies all rules at the same time in every step.
+> - **Network** – the Micro Duck's learned control program, a neural network trained through lots
+>   of trial and error in the simulation ([Chapter 13](13-micro-duck.md) and [14](14-lehrer.md)).
+> - **Bit** – the smallest digit of a number in a computer. "The same bit for bit" means: the same
+>   down to the very last digit.
+
+Kern calculates with **Box3D** by Erin Catto. How Kern uses Box3D in practice is in
 [Chapter 6](06-physics.md); here it's about the why.
 
 ## C.1 Rigid bodies and their state
 
-A **rigid body** never deforms: the distance between any two of its points always stays the same.
-That's an approximation (every real body gives a little), but for crates, cars and robot links it's a
-very good one. Its big advantage: a few numbers describe the motion completely.
+A **rigid body** never deforms: two points on it always keep the same distance. That's a
+simplification, because every real thing gives a little. But for crates, cars and robot limbs it
+fits very well. The big advantage: a few details describe the whole movement.
 
-The **state** consists of four quantities: where the center of mass is (position), how the body is
-rotated (orientation, stored as a quaternion), how fast it's moving and how fast it's spinning. On top
-of that come properties that never change: the **mass** (how hard it is to accelerate), the **center
-of mass** and the **inertia tensor** – a 3 × 3 table that says how hard it is to rotate around each
-axis. A long rod turns easily around its long axis, and with difficulty across it. Inside the body
-itself this table is fixed; seen from the world, it rotates along with the body.
+> **Imagine …** you have to describe to someone on the phone exactly what a thrown brick is doing
+> right now. Four details are enough: where it is, how it's rotated, how fast it's flying and how
+> fast it's spinning. Because the brick doesn't bend, that says it all.
 
-In Kern, mass and inertia come from the shapes and their density. Imported robots bring their measured
-values with them ([Chapter 6](06-physics.md)).
+These four details are called the **state**. On top of that come properties that never change:
 
-The motion follows two laws: **Newton** (force = mass × acceleration) for moving along, and **Euler**
-for rotating. Euler's equation contains an extra, the **gyroscopic term**. It makes long, thin bodies
-tumble when they aren't spinning exactly around one of their principal axes. The rotation itself
-changes via a quaternion product with the rotational speed. These equations describe how the state
-*changes*. A simulation has to solve them in small time steps. That's called **integration**.
+- the **mass** – how hard the body is to push,
+- the **center of mass** – the point where you could balance it,
+- the **rotational inertia** – how hard it is to turn around each direction. A long rod is easy to
+  twirl around its long axis, but hard to swing crosswise.
+
+The physics now works out how the state changes from moment to moment: forces accelerate the body,
+torques set it turning. On top of that comes an astonishing effect: a thing spins cleanly around
+its longest and its shortest axis, but around the middle one it wobbles.
+
+> **Imagine …** you toss a phone into the air on its edge with a spin (over the bed!). Around the
+> long and the short axis it spins cleanly; around the middle one it starts to tumble. Box3D
+> calculates this effect too.
+
+Because you can't calculate the movement in one piece, you go in small time steps. That's called
+**integration**.
+
+> **For the curious:** Box3D stores a body's rotation as a **quaternion**: four numbers that
+> record a rotation compactly and without special cases.
 
 ## C.2 Integration: the flip book
 
-> **Imagine …** a flip book. You know the current picture and have to draw the next one. You know how
-> fast everything is moving right now – but while you turn the page, that changes too. Every
-> integration method is a different bet on which speed to use for the whole page.
+Integration means: working out the next picture from the current one. To do that you have to make
+an assumption, and depending on the assumption, a swinging spring stays calm, rocks itself up or is
+slowed down.
 
-The best test object is a mass on a spring. Without friction, it swings equally strongly forever. A
-good method should neither inflate nor destroy its energy. Three candidates:
+> **Imagine …** a flip book. You know the current picture and have to draw the next one. You know
+> how fast everything is moving right now – but while you turn the page, that changes too. Which
+> speed do you take for the whole page? The one from the beginning? The one from the end? Every
+> answer is a different method.
 
-| Method | What it uses | What happens |
+The best test object is a weight on a spring. Without friction, it swings equally far forever. A
+good method shouldn't change that. Three candidates:
+
+| Method | The bet | The swinging … |
 |---|---|---|
-| explicit | everything from the old picture | energy always **grows** – it explodes |
-| semi-implicit | first the new velocity, then the new position with it | energy stays, as long as the step is small enough |
-| implicit | the force at the end of the step | energy **drops**, always stable |
+| forward | speed from the start of the page | **grows** on and on until everything explodes |
+| half-and-half | first the new speed, then move on with it | stays the same, as long as the pages are close enough together |
+| backward | forces from the end of the page | gets **smaller**, but always stays well-behaved |
 
-More precisely: semi-implicit stays stable as long as step size × angular frequency is below 2 (the
-angular frequency is 2π × hertz).
+![The same spring, calculated three times: forward (explicit) the swinging grows, half-and-half (semi-implicit) it stays the same, backward (implicit) it dies away](../abbildungen/integratoren.svg)
 
-**Worked example:** a spring at 30 Hz, step size 1/60 s, so step size × angular frequency ≈ 3.14.
-Explicitly, the oscillation grows by a factor of 3.3 per step – after ten steps, to 150,000 times its
-size. For semi-implicit, the step is too big here; that becomes unstable too. Implicitly, the
-oscillation is heavily damped, but it behaves itself.
+The differences in words:
 
-The lesson: **stiff springs and big steps don't mix** – unless you calculate implicitly.
+- **Half-and-half** first looks at how the speed changes on this page and then moves on with the
+  **new** speed, not with the old one as "forward" does. A tiny difference with a big effect.
+- **Backward** sounds like magic: how can you know the forces at the end of the page before it's
+  drawn? You don't know them; you search for them. What you're looking for is the position that
+  fits the forces at its **own** end, as in the riddle "Which number multiplied by itself gives
+  49?". That's more calculation work, but never explosive.
 
-> **Try it!** In Kern Studio at https://kernengine.de/, open the **Physics Lab** via
-> **File › Example Levels**, start Simulate (Alt+S) and press Pause. With **.** you advance exactly one
-> physics step – one page of the flip book.
+The problem with the middle method: if a spring swings very fast, the pages of the flip book are
+too far apart to still capture the swinging. Then it becomes unstable too.
+
+The lesson: **stiff springs and big steps don't get along** – unless you calculate backward.
+
+> **For the curious:** The technical terms are explicit, semi-implicit and implicit. An example:
+> the physics looks only twice per back-and-forth of a spring. The forward method then makes the
+> swinging more than three times as big with every step, after ten steps 150,000 times as big.
+
+> **Try it!** In Kern Studio at https://kernengine.de/, use **File › Example Levels** to open the
+> level **Physics Lab**, start **Simulate** with Alt+S and stop it with **Play › Pause** or the
+> **Pause** key. With **.**, in the menu **Advance One Frame**, you move on one step. You're
+> turning the pages of the flip book one by one. You don't see which method is behind it, but you
+> do see the individual pages.
 
 ### What Box3D does
 
-Box3D calculates **semi-implicitly**. In every sub-step, the velocities are first updated from forces
-and gravity, then the solver resolves contacts and joints (C.6), then the positions move forward
-**with the new velocity**; the rotation is normalized again afterward.
-
-- The built-in **damping** is applied with a factor between 0 and 1 and is therefore always stable.
-  Kern's rule from this: damping via Box3D's setting, never home-made as a force against the velocity
-  – that would be explicit and becomes unstable on light bodies.
-- Box3D solves the **gyroscopic term** implicitly ("This improves the simulation of long skinny
-  bodies").
-- Velocities are capped: in Kern at 400 m/s, and rotation at most an eighth of a turn (π/4) per time
-  step.
+Box3D uses the **middle method**. It's fast, keeps energy well and therefore suits games. The
+built-in damping (a brake that lets movements die away slowly), on the other hand, Box3D calculates
+backward, so always stably. Hence Kern's rule: damping only through Box3D's setting, never
+home-made. A home-made brake would be calculated forward: it brakes with the speed from the start
+of the page, even when the thing has long since slowed down. With a light body, it brakes past the
+target and flings it backward, even harder on the next page, until everything explodes.
 
 ### Fixed time step and sub-steps
 
-Because big steps blow springs apart, a simulation must **never** calculate with the fluctuating frame
-time. A slow frame would be a giant step, and the result would depend on the computer. The solution is
-Glenn Fiedler's **accumulator**:
+Because big steps blow springs apart, a simulation must **never** calculate with the fluctuating
+time between two screen frames. A single slow frame would be a huge step, and the result would
+depend on how fast the computer happens to be.
+
+The solution is the piggy bank from [Chapter 6](06-physics.md) (6.12): every frame pays in the time
+that has passed, the physics only ever takes out equal portions, and the rest waits for the next
+frame.
 
 ```mermaid
-flowchart LR
-  F["Frame: time dt"] --> A["balance += dt (max. 0.25 s)"]
-  A --> L{"balance ≥ h?"}
-  L -->|yes| S["fixed step h, balance -= h"]
+%% Caption: The piggy bank of time – calculation happens only in whole, equal steps
+flowchart TB
+  F["new frame: pay in time"] --> L{"enough for one step?"}
+  L -->|yes| S["calculate one step, take it out"]
   S --> L
-  L -->|no| R["draw between the last two states"]
+  L -->|no| R["draw the frame"]
 ```
 
-How exactly Kern implements this (60 Hz by default, at most 0.1 s of simulation per frame, time as a
-step counter) is in [Chapter 6](06-physics.md). In addition, Box3D splits each step into
-**sub-steps**: for the Micro Duck that's 100 Hz × 16 sub-steps, so a sub-step of 1/1600 s = 0.625 ms.
-Small steps make chains of joints stiffer.
+On top of that, Box3D splits every step into **sub-steps**. Smaller steps make chains of joints
+stiffer, because errors have less time to build up. How Kern sets step and sub-steps is in
+[Chapter 6](06-physics.md).
 
 ## C.3 Collision detection
 
-With 1000 bodies there are almost 500,000 possible pairs. Checking them all precisely would be far too
-expensive. That's why the work happens in two phases:
+With 1000 bodies there are almost 500,000 possible pairs. Checking them all precisely would be far
+too expensive. So you work in two rounds: first coarse, then precise.
 
-```mermaid
-flowchart LR
-  B["Broad phase: candidates"] --> N["Narrow phase: contact points"]
-  N --> S["Solver"]
-```
+**Coarse:** every shape gets an invisible box that always stands upright and encloses it completely.
+Two shapes can only touch if their boxes overlap – that's quick to check. As in
+[Chapter 5](05-scene-and-geometry.md), the boxes are sorted into boxes inside boxes. That way you
+find the neighbors very quickly: with twice as many bodies, only one small step is added instead of
+the work doubling. And because the boxes have a bit of air, not every body has to be re-sorted in
+every step.
 
-**Broad phase (coarse):** Every shape gets an axis-aligned bounding box. Two shapes can only touch if
-their boxes overlap – six comparisons. The boxes live in a tree (a BVH, as in
-[Chapter 5](05-scene-and-geometry.md)). So that the tree doesn't have to be rebuilt every step, the
-boxes are a bit bigger (up to 50 mm). Only a shape that leaves its box gets re-sorted. Fixed bodies
-have a tree of their own. With the tree, you find a box's neighbors in logarithmic time: with twice as
-many bodies, only one step is added, instead of the work doubling.
+**Precise:** here **convex** shapes count, that is, shapes without dents: the line connecting two
+points always lies completely inside. Sphere, capsule, box and hulls are convex; a banana isn't. For
+convex shapes there are two proven ideas:
 
-**Narrow phase (precise):** Here, **convex** shapes are what count, meaning shapes without dents: the
-line connecting any two points always lies entirely inside. Spheres, capsules, boxes and convex hulls
-are convex. For them, there are robust methods:
+> **Imagine …** two boxes on the table. If you can kneel down so that you see a gap of light
+> between them, they're not touching. If you can't find a gap from any direction, they're touching.
 
-- **GJK** (after Gilbert, Johnson and Keerthi) measures the distance between two convex shapes. The
-  trick: you subtract every point of B from every point of A (the **Minkowski difference**). If the
-  origin lies inside it, the shapes are touching. GJK feels its way toward the origin with simple
-  shapes (point, line segment, triangle, tetrahedron) and needs only one piece of information from each
-  shape: "Which point lies farthest out in this direction?"
-- **SAT** (*separating axis theorem*): two convex bodies are not touching exactly when there is a
-  direction in which you can look through between them – a **separating axis**. The only candidates are
-  the face normals of both bodies and the cross products of their edges. This is how Box3D builds the
-  contacts between hulls, and it remembers the most recently found axis, because it's usually right
-  again in the next step.
+- The **light-gap idea** (technical name SAT) checks exactly that: is there a direction from which
+  you can look through between the bodies?
+- The **distance idea** (technical name GJK) measures how far apart two shapes are. The nice thing:
+  it only needs each shape to answer a single question: "Which of your points lies farthest out in
+  this direction?" That's why it works with any convex shape.
 
-> **Imagine …** two cardboard boxes on a table. If you can kneel down so that you see a sliver of light
-> between them, they aren't touching. That's the whole idea of SAT.
+What comes out is where the two touch and in which direction they have to push each other away.
 
-The result is a **manifold**: one contact direction (normal) and a few contact points with their
-distance (negative if they overlap).
+A **hull** is the smallest convex shape around a cloud of points, like a rubber sheet stretched
+tight around it. Things with dents (a car, a foot with a recess) are put together from several
+hulls. Arbitrary triangle meshes exist only for things that never move.
 
-A **convex hull** is the smallest convex shape around a cloud of points – like a rubber sheet stretched
-around it. Box3D allows up to 128 corners. Things with dents (a car, a foot with a cutout) are put
-together from several hulls. Box3D rejects flat or degenerate point clouds. Arbitrary triangle meshes
-are only available for fixed bodies. For display, Kern builds the triangles of a hull with `hull_mesh`.
+> **For the curious:** The distance idea works with a trick, the **Minkowski difference**: you
+> subtract every point of one shape from every point of the other. If the origin lies inside the
+> shape this produces, the two are touching.
 
-### Speculative contacts
+### Contacts that look ahead
 
-A fast body could fly through a thin wall in a single step (*tunneling*). So Box3D creates contact
-points **before** the bodies touch, starting at a distance of 20 mm, and in that step only allows as
-much approach as there is room for. For very fast bodies there's also **continuous collision**; Kern
-leaves it on and makes fast player vehicles "bullets". The fixed tolerances in meters: 5 mm of allowed
-overlap (linear slop), 20 mm of speculative distance (four times as much), 50 mm for reusing contacts.
-Because these tolerances are fixed in meters, the size rule from [Chapter 6](06-physics.md) applies:
-moving bodies 0.1 to 10 m – which is why the Micro Duck is scaled up fourfold.
+A fast body could "jump" through a thin wall between two pages of the flip book: on one page it's in
+front, on the next already behind. That's called *tunneling*.
+
+> **Imagine …** a tennis ball, photographed at two pictures per second. In the first photo it's
+> flying in front of the net, in the second it's lying behind it. Did it touch the net? You can't
+> tell from the photos.
+
+That's why Box3D creates contacts **shortly before** the touch and allows only as much approach in
+this step as there's room for. For very fast bodies it also checks the whole path between two
+steps. Because this slack is fixed in meters, the size rule from [Chapter 6](06-physics.md) applies.
 
 ## C.4 Contacts, friction and restitution
 
 ### The contact rule
 
-Three simple statements apply to every contact point:
+For every contact point, three simple statements apply:
 
-1. The bodies must not overlap.
-2. A contact can only **push, never pull**.
-3. Either they touch and push, or they're apart and there is no force.
+1. The bodies must not be stuck inside each other.
+2. A contact can only **push, never pull**. (A table holds a cup, but it doesn't suck it down.)
+3. Either they touch and push, or they're apart and there's no force.
 
-Either-or rules like these are called **complementarity conditions**. A solver doesn't satisfy them
-exactly, but it approximates them very well (C.6).
+The solver doesn't satisfy such either-or rules quite exactly, but very well (C.6).
 
-### Coulomb friction
+### Friction
 
-Friction acts in the contact plane against sliding. It's at most **friction coefficient μ × normal
-force**. As long as less than that is needed, the contact **sticks**; if more is demanded, it
-**slides**. The solver calculates with **impulses** (force × time) instead of forces; the impulse
-perpendicular to the surface is called the **normal impulse**.
+Friction holds as long as you don't push too hard. If more is asked of it, things slide.
 
-All the allowed forces form a **friction cone** around the normal: a force inside means sticking, on
-the edge means sliding; the larger μ, the wider the cone (half the opening angle is arctan μ). Physics
-distinguishes between static and sliding friction; Box3D knows only **one** friction coefficient. It
-solves friction once at the center of the manifold, limited by the sum of the normal impulses of all
-the points. The cone really is **round**: a friction impulse that's too large is shortened as a whole,
-not direction by direction. In addition, Box3D brakes twisting around the normal.
+> **Imagine …** you push a heavy wardrobe. First you push and nothing happens: friction holds
+> against you. You push harder, and suddenly it slides. If the wardrobe is full of books, you have
+> to push even harder.
+
+How much friction can hold at most depends on two things: on the **material** (the friction value:
+rubber holds a lot, ice little) and on **how firmly the things press on each other** (the full
+wardrobe). Box3D knows only one friction value, not separate values for sticking and sliding. It
+also brakes twisting on the spot, so that a thing lying flat doesn't spin around itself forever.
+
+> **For the curious:** All the forces that friction can still hold together form a **friction
+> cone**: the grippier the material, the wider the cone. Box3D really calculates it round, equally
+> strong in every sliding direction.
 
 ### Two friction values, one contact
 
-Every shape has its own friction coefficient (default 0.6). But the contact needs one. Box3D takes the
-**geometric mean**: the square root of the product.
+Every shape has its own friction value. But the contact needs **one**. Box3D takes a special kind
+of average, the **geometric mean**: you multiply the two values and take the square root (a
+calculator can do it; the table shows the results).
 
-| μ A | μ B | √(A · B) | ordinary average |
+| Material A | Material B | Geometric mean | Ordinary average |
 |---|---|---|---|
 | 0.6 | 1.0 | 0.775 | 0.8 |
 | 0.05 (ice) | 1.0 (rubber) | 0.224 | 0.525 |
 | 0 | 1.0 | 0 | 0.5 |
 
-The nice property: a frictionless surface stays frictionless, no matter what it's paired with. Ice
-with rubber stays slippery. Still, it's only a rule of thumb; real pairs have their own values. Kern
-gives such pairs their own friction via surfaces like `cloth`, `tpu` and `floor`
-([Chapter 6](06-physics.md)). Why? The Micro Duck picks up a sock with its beak: beak pad on sock has
-to grip, sock on floor has to slide. A single value per shape can't do both.
+The nice property: the geometric mean lies closer to the more slippery partner. Ice with rubber
+stays slippery, and a completely smooth surface stays smooth, whatever it's paired with.
+
+Still, it's only a rule of thumb; real pairs have their own values. That's why Kern gives certain
+pairs their own friction ([Chapter 6](06-physics.md)). The reason is the Micro Duck: it picks up a
+sock with its beak. Beak pad on sock has to grip, sock on floor has to slide. A single value per
+shape can't do both.
 
 ### Restitution
 
-**Restitution** e says how much speed is left after an impact: e = 0 means it stays put, e = 1 is
-perfectly elastic. Box3D takes the **maximum** of both shapes – a rubber ball bounces on concrete, too.
-Impacts below 1 m/s don't bounce at all; otherwise a body at rest would jitter forever because of tiny
-leftovers. Restitution is applied after the actual solving, using the approach speed from before the
-step (Kern: 2 passes).
+**Restitution** says how much momentum is left after an impact: 0 means lying still, 1 means
+bouncing back without loss. Of two shapes, the bouncier one counts – a rubber ball bounces on
+concrete too. Very gentle, slow impacts don't bounce at all, otherwise a resting body would jitter
+forever because of tiny leftovers.
 
 ### Rolling resistance
 
-An ideal sphere on an ideal floor rolls forever, because the contact is a single point. Real spheres
-and floors give a little, and that slows things down: **rolling resistance**. For this, Box3D limits
-the torque that brakes the rolling to coefficient × radius × normal force. Kern's Lehrer notes say why
-you need it: "The sock crawled across the floor by itself (round fabric lumps were rolling)." and "The
-ball rolled forever." Both now have rolling resistance.
+An ideal ball on an ideal floor rolls forever, because it touches it at only one point. Real balls
+and floors give a little, and that brakes: **rolling resistance**. Kern's notes on the Lehrer, its
+training program, say what it's needed for: "The sock crawled across the floor by itself (round
+lumps of fabric rolled)." and "The ball rolled forever." Both have rolling resistance now.
 
 ## C.5 Joints as rules
 
-Mathematically, a **joint** is a condition that should always hold, such as "this point of body A and
-this point of body B coincide". If you differentiate it, you get a rule for the velocities: the two
-points must not move apart. A table called the **Jacobian matrix** says how each velocity affects the
-rule.
+For the physics, a **joint** is a rule that should always apply, such as: "This point of the door
+and this point of the frame stay together." The solver works with velocities here: it makes sure
+the two points don't start moving away from each other in the first place.
 
-The solver then looks for an impulse that satisfies the rule. How big it has to be depends on the
-**effective mass**: how heavy does this movement feel? For a door hinge, that's the door's inertia
-around the hinge axis. A heavy door needs a big impulse, a light one a small one. For a revolute joint
-between two bodies, it's exactly 1 divided by the sum of the "ease of turning" (inverse inertias) of
-both bodies around the axis. A correction part also removes errors that have already crept in (drift).
+In every step, the solver then searches for exactly the kick that keeps the rule. How big it has to
+be depends on **how heavy the movement feels**.
 
-Which joints Box3D knows (hinge, rail, ball joint, rope, wheel …) is shown in the table in
-[Chapter 6](06-physics.md). Important for all of them: a preset is built in its **rest pose**, because
-that's where the zero angle is, and the limits have to include it.
+> **Imagine …** you stop a door that's swinging shut. A light room door you stop with one finger,
+> for a heavy front door you need your whole hand. The joint has to grab "with the whole hand" or
+> "with one finger" in just the same way, depending on what hangs on it.
+
+Because small errors come up when calculating, the solver also nudges a little every step, so that
+the points don't slowly drift apart.
+
+Which joints Box3D knows (hinge, drawer, ball joint, rope, wheel …) is shown in the table in
+[Chapter 6](06-physics.md). Important for all of them: a robot is built in its **resting
+position**, because that's where the angle zero is, and the limits have to include it. Otherwise
+the joint would already be outside its limits at the start and would be yanked into them.
+
+> **For the curious:** In textbooks, this is where the **Jacobian matrix** appears, a table that
+> says how each velocity affects a rule. From it, the solver works out how heavy a movement feels.
 
 ## C.6 The solver
 
 ### Many rules at once
 
-A robot has 15 joints and dozens of contact points. Every impulse in one place disturbs the others.
+A robot has many joints and dozens of contact points. Every kick in one place disturbs the others.
 
-> **Imagine …** a group lining up for a group photo. One person moves to the left, which leaves the
-> next one standing crooked, who corrects themselves, and so on. After a few rounds, everyone is
-> standing neatly. That's how the solver works: rule by rule, several rounds.
+> **Imagine …** a group lines up for a group photo. One person moves to the left, which puts the
+> next one off, who corrects themselves, and so on. After a few rounds everyone is standing neatly.
+> That's how the solver works: rule by rule, several rounds.
 
-This method is called **projected Gauss–Seidel**, and in game physics **sequential impulses**.
-Inequalities like "only push, never pull" apply to the **accumulated** impulse: a single step may take
-back what was too much before; only the sum must never pull.
+**Warm start:** a resting stack needs almost the same kicks every step. If the solver starts with
+the kicks from last time instead of from zero, it's done after a few rounds – as if the group lined
+up for the second photo straight away the way they stood for the first.
 
-**Warm starting:** A stack at rest needs almost the same impulses every step. If you start with the
-impulses from last time instead of zero, the solver is done after just a few rounds.
+> **For the curious:** Experts call the method Gauss-Seidel or *sequential impulses*. The rule
+> "only push, never pull" applies to the sum of all kicks in a step: one round may take back what an
+> earlier one pushed too much.
 
-### Soft rules and the soft step
+And where does the solver sit in a page of the flip book from C.2? Right in the middle of the
+half-and-half method: first Box3D renews the velocities from the forces, **then** the solver
+corrects them so that nothing is stuck inside anything and all joints hold, and **only then** do
+all things move on with these corrected velocities.
 
-A hard constraint corrects errors immediately and completely. That jitters and can pump energy in. So
-Box3D makes **all** constraints soft: each one behaves like a very stiff, damped spring with a frequency
-in hertz and a damping ratio – and is solved **implicitly**, which makes it stable (C.2). From the
-frequency, damping and sub-step length, Box3D computes three numbers: how fast an error is removed, and
-two parts that add up to 1 – one stands for "completely hard", the other for "not at all". Every
-constraint lies somewhere in between.
+### Soft rules
 
-**Worked example** with Kern's contact values (30 Hz, damping 10) for the Micro Duck: an overlap of
-1 mm is pushed out at about 6.6 mm/s – gently instead of with a jolt. Against fixed bodies, such as feet
-on the ground, Box3D calculates with double the frequency and half the damping (60 Hz, 5); there it's
-about 26 mm/s. The maximum is 3 m/s (Kern's Contact push-out speed).
+If every error were corrected immediately and completely, everything would jitter, and energy would
+even get pumped in.
 
-```mermaid
-flowchart TD
-  P["prepare"] --> L{"another sub-step?"}
-  L -->|yes| IV["integrate velocities"]
-  IV --> WS["warm start"]
-  WS --> SO["solve with error removal"]
-  SO --> IP["integrate positions"]
-  IP --> RE["relax: solve without error removal"]
-  RE --> L
-  L -->|no| RS["restitution, store impulses"]
-```
+> **Imagine …** a child has sunk a millimeter into a mattress. If you yank them out, they fly into
+> the air. If you lift them out gently, they simply lie on top again.
 
-The **relax** pass removes the extra velocity that was created while removing errors. Without it, a
-body would keep flying with it after a correction.
+That's why Box3D makes **all** rules soft: each one acts like a very stiff, well-damped spring that
+reduces errors gently in fractions of a second. Because this spring is calculated backward (C.2),
+it always stays stable. A millimeter too deep is pushed out gently instead of with a jolt.
+
+A final pass in every sub-step, called **relax**, then takes out the extra momentum that came from
+pushing out. Think of the child on the mattress: they're pushed upward and would afterwards still
+have some momentum upward. Without relax, a body would fly on with this momentum after a
+correction.
 
 ### Limits of stiffness
 
-A spring can only be calculated if it oscillates more slowly than the sub-steps "look". Box3D limits
-joint springs to a quarter and contact springs to an eighth of the sub-step rate. For the Micro Duck
-(1600 sub-steps per second), that means at most 400 Hz for joints and 200 Hz for contacts; Kern's servo
-joints use 240 Hz. Stiffer is only possible with more sub-steps. On top of that, Kern keeps springs in
-the level below half the sub-step frequency (Nyquist limit: an oscillation needs at least two "looks"
-per period).
+A spring can only be calculated if it swings more slowly than the physics looks.
 
-> **Try it!** In the Physics Lab, set the **Sub-steps** under World Settings › Physics (Box3D) once to
-> 1 and once to 16, start Simulate each time and pull on the rope bridge. Notice how much the chain of
-> joints gives way. Turn on the **Contact Points** under **Window › Show** as well.
+> **Imagine …** you watch a fast swing only once a second. It swings back and forth twice a second.
+> Every time you look, it's in the same spot – you think it's standing still. To capture a swing, you
+> have to look at least twice per back-and-forth.
 
-> **Watch out!** A heavy body on a very light one needs many solver rounds before the impulses are
-> passed through; until then, the joints stretch. Keep neighboring masses within about 10 : 1. That's
-> why Kern gives the duck's 5 g hip brackets a minimum mass and makes rigid parts **one** body with
-> several shapes.
+That's why: **stiffer only works with more sub-steps.** Box3D and Kern limit every spring to what
+the sub-steps can still capture cleanly.
+
+> **For the curious:** This limit of "at least two looks per swing" is called the **Nyquist
+> limit**. Kern keeps every spring in the level safely below it.
+
+> **Try it!** In the Physics Lab, under **World Settings › Physics (Box3D)**, set the
+> **Sub-steps** once to 1 and once to 16, start **Simulate** each time and pull on the rope bridge
+> with the mouse. Watch how much the chain gives: with few sub-steps it stretches more, with many it
+> holds together more firmly.
+
+> **Watch out!** A heavy body on a very light one needs many solver rounds until the kicks have been
+> passed along; until then the joints stretch. Like a truck being towed by a bicycle. That's why
+> neighboring parts shouldn't differ too much in weight, and a rigid part becomes **one** body with
+> several shapes ([Chapter 6](06-physics.md)).
 
 ## C.7 Servos as a control loop
 
-A hobby servo like the Micro Duck's Dynamixel XL330 receives a **target angle** and steers itself
-there: measure, compare with the target, generate torque, measure again. That's a **control loop**.
+A **servo** is a small positioning motor, as in model airplanes. The Micro Duck has one in every
+joint. It gets a **target angle** and steers itself there: measure, compare with the target, push,
+measure again. That's a **control loop**.
+
+> **Imagine …** you adjust the temperature in the shower. Feel: too cold. Turn it up a bit. Feel
+> again: almost right. A little more. And because the warm water only arrives after a moment, you
+> sometimes turn it too far.
 
 ```mermaid
-flowchart LR
-  Z["target angle"] --> T["dead time (bus)"]
-  T --> E["error = target − angle"]
-  E --> PD["PD controller, limited"]
-  PD --> G["joint + link"]
-  G -->|"angle, speed"| E
+%% Caption: A servo's control loop – measure, compare, push
+flowchart TB
+  Z["Target angle"] --> T["arrives late"]
+  T --> E["How far to the target?"]
+  E --> PD["Motor pushes, at most with full force"]
+  PD --> G["Joint moves"]
+  G -->|"new angle"| E
 ```
 
-### The PD controller
+### Spring and shock absorber
 
-The **PD controller** calculates: torque = K × error − D × rotational speed.
+The simplest usable controller has two parts:
 
-> **Imagine …** a torsion spring (K, "pull toward the target") and a shock absorber (D, "not so
-> hectic"), both at the joint. Together with the inertia of the link, they make a damped oscillator.
+> **Imagine …** a torsion spring ("pull toward the target") and a shock absorber ("not so
+> hectic"), both on the joint. The farther the joint is from the target, the harder the spring
+> pulls. The faster it moves, the harder the absorber brakes.
 
-Whether it overshoots the target is decided by the damping ratio: below 1 it overshoots, exactly 1 is
-the fastest way there without overshooting, above 1 it creeps toward it. With the XL330 values from
-Kern (K = 0.554 N·m/rad, D = 0.053 N·m·s/rad, only the rotor inertia of 0.0018 kg·m²), you get a natural
-frequency of about 2.8 Hz and a damping ratio of 0.84: a soft, well-damped servo. With a link attached,
-it gets slower still.
+Experts call this a **PD controller**. How strong the absorber is compared to the spring decides
+the path to the target:
 
-### Saturation, friction, dead time
+| The absorber is … | The joint … |
+|---|---|
+| weak | overshoots the target and swings in |
+| just right | reaches the target the fastest way, without overshooting |
+| strong | creeps slowly toward the target |
 
-- **Saturation:** A motor has a maximum torque T. It's reached at a deviation of T/K, for the XL330
-  0.963/0.554 ≈ 1.74 rad. That's why Kern's Lehrer notes say: "The network has to set targets far
-  beyond the joint limits."
-- **Friction:** The gearbox holds a joint at rest in place up to a small torque (XL330: 0.0048 N·m).
-- **Dead time:** Time passes between a command and its effect (bus, processing). At 2.8 Hz and 20 ms,
-  that's a shift of about 20°. Dead time can make a stable controller oscillate – and a network that has
-  never practiced with dead time fails on the real robot.
+The Micro Duck's servo is **soft and well damped**: it hardly overshoots and gives way when
+something pushes against it.
+
+### Saturation, friction, delay
+
+- **Saturation:** a motor has a maximum force. From a certain distance to the target, it's already
+  pushing with full force – even farther away doesn't help any more. Because the duck's servo is so
+  soft, its network often has to set the target far beyond the spot where the joint is supposed to
+  end up, to get enough force.
+- **Friction:** the gearbox holds a resting joint until enough force is applied.
+- **Delay:** time passes between command and effect, as with the warm water in the shower. That can
+  set an otherwise calm controller swinging. A network that has never practiced with delay fails on
+  the real robot.
 
 ### In Kern
 
-Kern builds the servo only from Box3D's own parts ([Chapter 6](06-physics.md), section 6.17): the PD
-controller **is** the hinge's joint spring and is therefore implicitly stable. Saturation comes from
-limiting the **target** to a distance of at most T/K. Friction is a motor with target speed 0. The
-rotor inertia is a disk on the axis, and the dead time a queue: 20 ms × √4 (time scaling) × 100 Hz =
-4 world steps. The same function drives Studio, the Lehrer and the calibration bench
-([Chapter 16](16-calibration.md)).
+Kern builds the servo only from Box3D's **own** parts, without extra forces: the hinge's spring is
+the controller, a motor that wants to stand still is the friction, and the delay is a queue. The
+same calculation drives Studio, the Lehrer (the training program) and the test bench for the
+measurements. How it works in detail is explained in [Chapter 6](06-physics.md), Section 6.15.
 
-But Box3D wants springs as a frequency and a damping ratio, not in N·m/rad. `set_joint_spring` converts,
-using the effective mass m from C.5: angular frequency ω = √(K / m), frequency = ω / 2π, damping ratio =
-D / (2 · m · ω). Because m depends on the pose, this happens every step. All the values are in a
-**device profile**: K, D, F, T, armature, dead time – and, for training, their spreads.
+Kern has to translate one thing here. Box3D describes a spring by how many times per second it
+swings (in hertz). A servo, on the other hand, says how hard it pulls per degree. But how fast a
+spring swings depends on how much hangs on it – a rubber band with a bunch of keys bobs faster than
+with a shopping bag. How sluggish the parts at a joint are changes with the duck's posture. That's
+why Kern converts anew in every step. And because Box3D calculates this spring "backward" (C.2), it
+stays calm at any stiffness.
 
-## C.8 What not to do
+## C.8 What you shouldn't do
 
-- **Continuous loads as forces, every step** – forces are reset after every step.
-- **Jumps as an impulse** (mass × change in velocity), not a set velocity.
-- **Don't set velocities on bodies with joints or contacts.** That goes around the solver and pumps
-  energy in.
+A few prohibitions follow from the basics:
+
+- **Whatever should push continuously, as a force, anew every step.** The physics forgets forces
+  after every step.
+- **Jumps as an impulse**, that is, as a short kick, not as a simply set velocity. Setting a
+  velocity means simply ordering the thing "you're flying this fast now", without a force having
+  pushed it. A kick, on the other hand, goes through the solver, which also thinks of joints and
+  the ground.
+- **Don't set velocities on bodies with joints or contacts.** That bypasses the solver, fights
+  against its rules and pumps energy in.
 - **No helper forces for robots.** "They don't exist in the real world either."
+
+> **Imagine …** you push a child on a swing – but at the wrong moment, against the movement, and
+> then with it again. The swing jerks, and sometimes it flies higher than expected. Whoever sets
+> velocities past the physics is pushing at the wrong moment in just the same way.
 
 ## C.9 Determinism
 
-A simulation is **deterministic** if the same starting conditions and the same inputs give the same
-result **bit for bit**. For Kern this is central: a training run should produce the same network
-everywhere, a bug should be reproducible, a robot log should play back the same way everywhere. And
-"almost the same" isn't enough, because physics is **chaotic**: "In a robot simulation, one bit turns
-into a different gait within seconds."
+A simulation is **deterministic** if the same starts and the same inputs give the same result **bit
+for bit**. For Kern that's central: a training run should give the same network everywhere, an error
+should be reproducible, and a robot recording should play back the same everywhere.
+
+"Almost the same" isn't enough, because physics is **chaotic**: tiny differences grow quickly. Or as
+Kern's notes put it: "In a robot simulation, one bit turns into a different gait within seconds."
 
 ### The traps of decimal numbers
 
-Computers round after every calculation. Each individual calculation is precisely defined, but the
+Computers round after every calculation. Every single calculation is precisely defined, but the
 **order** matters:
 
-> **Did you know?** (0.1 + 0.2) + 0.3 gives 0.6000000000000001 on a computer, but 0.1 + (0.2 + 0.3)
+> **Did you know?** (0.1 + 0.2) + 0.3 gives 0.6000000000000001 in a computer, but 0.1 + (0.2 + 0.3)
 > gives 0.6.
 
 From this follow Kern's countermeasures:
 
 | Danger | Countermeasure |
 |---|---|
-| The compiler reorders sums (`-ffast-math`) | forbidden |
-| Threads add up in a changing order | fixed parts, fixed order; Box3D with one thread |
-| FMA: a × b + c with one rounding instead of two | `-ffp-contract=off` everywhere, Box3D without SIMD |
-| sin, cos, exp … round differently depending on the system | own library (musl) under `kern::dm::` |
-| Fluctuating time step, time measurement | fixed step, time counts steps |
-| Randomness | own random number generator with fixed seeds |
+| The compiler reorders calculations to go faster | forbidden |
+| Several processor cores add up in changing order | fixed order, the physics calculates everything one after another |
+| Some processors take a shortcut for "times and plus" | switched off, everywhere |
+| Every system calculates sine & co. minimally differently | Kern brings its own sine calculation |
+| The frame time fluctuates | fixed step, time counts steps |
+| Randomness | its own random generator with fixed starting numbers |
 
-FMA is a processor shortcut that calculates a multiplication and an addition in one go. Both results
-are correct, but different – and WebAssembly doesn't do it, while native builds sometimes do. The
-floating-point standard prescribes plus, times and square root exactly, but not sine and friends:
-glibc, Apple's libm, Android's bionic and wasi-libc round them differently in the last bit. That's why
-Kern brings along musl's implementations (MIT license), and everything that feeds the simulation uses
-`kern::dm::sin` instead of `std::sin`. `sqrt`, `fabs` and `floor` are exact and stay `std::`; Box3D has
-its own deterministic trigonometric functions.
+The **compiler** ([Chapter 1](01-introduction.md)) turns Kern's program text into the instructions
+for the processor. The **shortcut**: some processors calculate "a times b plus c" in one go and
+round only once instead of twice. That's even more precise, but just different from a device that
+rounds twice.
+
+**Sine & co.** are calculations with angles, such as: "In which direction does an arm point that's
+turned by 30 degrees?" The physics needs them all the time.
+
+The worldwide standard for decimal numbers prescribes plus, times and square root exactly, but not
+sine and co.: for them there's no rule about how precisely to round. That's why it isn't enough just
+to fix the order: Kern also has to bring along its own rules for calculating the sine.
+
+> **For the curious:** The math library it brings along comes from the free project musl. The exact
+> switches and names are in the blue book, Appendix C.
 
 ### Checking
 
-Determinism has to be measured. One test has Pollen Robotics' network steer the duck for 400 control
-ticks and stores a fingerprint of the exact state for each tick. Two builds are bit-identical exactly
-when all the fingerprints are the same; the first difference shows when they start to drift apart. CI
-checks this with GCC on x86, with WebAssembly and with Apple clang on ARM. And a freely hanging servo
-leg runs bit for bit identically at 1 and 4 times the size, because the scaling factors are powers of
-two, and then everything is rounded identically.
+Determinism has to be measured. A test lets Pollen Robotics' network steer the duck for a while and,
+after every tick, forms a **fingerprint** of its state: a short check number that changes completely
+with the slightest change. Two versions of Kern are the same exactly when all fingerprints are the
+same. The first difference shows when they start to diverge. It's checked with every change on a
+Linux PC, on a Mac and in the WebAssembly module that the browser also uses.
 
 ## What you take away
 
-- A rigid body is completely described by its position, rotation, velocity and rotational speed.
-- Box3D integrates semi-implicitly; stiff springs need small steps or implicit solving.
-- Collision happens in two phases: coarse with bounding boxes, precise with GJK and SAT on convex
-  shapes.
-- Contacts only push; friction is limited by μ × normal force, and two friction values become
-  √(a · b).
-- The solver works rule by rule in rounds, with warm starting and soft, implicitly solved constraints.
-- A servo is a PD controller with saturation, friction and dead time.
-- Bit-for-bit determinism needs fixed orders, no FMA and a math library of its own.
+- A rigid body is completely described by four details: where, how rotated, how fast, how fast
+  spinning.
+- Integration is a flip book; stiff springs need pages close together. Box3D uses the middle method;
+  its damping is always stable.
+- Collision runs in two rounds: coarse with boxes, precise with the light-gap and distance ideas on
+  shapes without dents.
+- Contacts only push; friction holds up to a limit, and two friction values become one mean that
+  leans toward the more slippery one.
+- The solver lines up all rules round by round like a group photo, starts with the result from last
+  time and corrects gently instead of with a jolt.
+- A servo is a spring plus a shock absorber, with maximum force, friction and delay.
+- The same result on every computer needs fixed orders and its own calculation rules for sine & co.
 
 ## Brain teasers
 
-1. Why is a spring at 30 Hz dangerous with a step size of 1/60 s?
-2. Ice (0.05) meets rubber (1.0). Which friction value applies in Box3D, and why is that more plausible
-   than 0.525?
-3. Why does the solver need a relax pass?
-4. An XL330 is 2 rad away from its target. Does it get more torque than at 1.8 rad?
-5. Why isn't "almost the same" good enough for determinism?
+1. A spring swings back and forth 40 times a second, but the physics looks only 50 times a second.
+   What threatens?
+2. Ice (0.05) meets rubber (1.0). Which friction value applies in Box3D, and why is that more
+   plausible than the ordinary average of 0.525?
+3. Why does the solver need the relax pass?
+4. A servo is already so far from its target that it's pushing with full force. You move the target
+   even farther away. Does it push harder now?
+5. Why isn't "almost the same" enough for determinism?
 
 ### Solutions
 
-1. The step is too coarse for such a fast oscillation: explicitly it grows 3.3-fold per step, and it
-   becomes unstable semi-implicitly too.
-2. √(0.05 · 1.0) ≈ 0.224. Ice stays slippery – the geometric mean pulls toward the smaller friction.
-3. It removes the velocity created while removing errors; otherwise the body would fly on with it.
-4. No. From about 1.74 rad on, the maximum torque is reached; more distance doesn't bring more force.
-5. Physics is chaotic: a difference in the last bit grows quickly until the robot walks differently.
+1. Fewer than two looks per swing: the physics can no longer capture the swinging, and the spring
+   becomes unstable. Remedy: more sub-steps or a softer spring.
+2. About 0.224 (the square root of 0.05 times 1.0). Ice stays slippery – the geometric mean leans
+   toward the more slippery partner.
+3. It takes out the momentum that came from gently pushing out; otherwise the body would fly on with
+   it.
+4. No. Full force is full; more distance doesn't bring more force. That's called saturation.
+5. Physics is chaotic: a difference in the last digit grows quickly until the robot walks
+   differently.
 
 ---
 

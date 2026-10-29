@@ -1,362 +1,442 @@
-# 9 Logic Graphs – Game Rules You Snap Together
+# 9 Logic Graphs – Game Rules You Plug Together
 
-> **In short:** In Kern, you don't write game logic as program text. You snap it together from nodes
-> and wires, like the Blueprints in Unreal Engine. An event sets off a chain, and the nodes fall one
-> after another like dominoes. To make that fast, Kern translates every graph into machine code at
-> startup – and, if you like, even into readable C++. All three routes deliver exactly the same
-> result.
+> **In short:** In Kern, you don't write game rules as program text; you plug them together from
+> boxes and wires. An event sets off a chain, and the boxes fall one after another like dominoes.
+> Kern can read such a picture aloud or translate it, and every way gives exactly the same result.
 
-"When the player touches the coin, give them 10 points." That's what game logic sounds like. Kern has
-**no** scripting language for it – you paint logic as a picture, and that picture is a full-fledged
-program.
+> **Key terms:**
+> - **Program** – a precise step-by-step instruction for the computer.
+> - **Machine code** – the language the processor understands directly: very fast, but unreadable
+>   for people.
+> - **C++** – the programming language Kern is written in; readable for programmers.
+> - **WebAssembly** – a form of program that the browser turns into machine code very quickly.
+> - **Variable** – a labeled box in which a program remembers something, such as "Points: 30".
+> - **Authority** – the computer that's in charge: in a single-player game yours, in a network game
+>   the server.
+> - **Sensor and trigger** – zones that notice when something enters them
+>   ([Chapter 8](08-game-runtime.md)).
+> - **Deterministic** – calculated exactly the same on every device.
+
+"When the player touches the coin, give them 10 points." That's what game logic sounds like. Kern
+has **no** scripting language for it – you draw logic as a picture, and that picture is a
+full-fledged program.
 
 ## 9.1 The model: nodes, wires, dominoes
 
-A **logic graph** consists of **nodes** (little boxes that do something) and **wires** (connections
-between them). It is pure data – a list of nodes and wires – and behind every node type there's a
-C++ function in the engine.
+A **logic graph** consists of **nodes** (boxes that do something) and **wires** (connections
+between them). White wires decide **what happens next**; colored wires deliver **values** such as
+numbers or names.
+
+The graph itself is just a description – a list of boxes and wires, like a circuit diagram on
+paper. Behind every kind of box there's a ready-made piece of Kern that does the actual work (how
+Kern prepares the plan for this is in 9.8).
 
 > **Imagine …** a row of dominoes. You nudge the first one (an event), it tips over the next, which
-> tips over the next … The white arrow wires in the graph are the gaps between the dominoes: they
-> decide **what happens next**.
+> tips the next … The white arrow wires in the graph are the gaps between the dominoes: they decide
+> **what happens next**.
 
 There are two kinds of connectors (*pins*):
 
-- **Exec pins** (white arrows): the flow. **Event nodes** start a chain, **action nodes** continue
-  it, **flow nodes** branch, repeat or wait.
-- **Data pins**: values such as numbers, text or actors. Inputs **pull** their values: when a value
-  is needed, the connected node calculates it at that moment. Pure calculation nodes (*pure*: math,
-  queries) have no exec pin at all. Outputs of action nodes, on the other hand, keep the value from
-  their last run. If an input isn't connected, the value you typed directly into the node applies.
+- **Exec pins** (*exec*, white arrows): the order.
+- **Data pins** (colored): values such as numbers, text or things. An input fetches its value
+  exactly when it's needed. If it isn't connected, the value you typed directly into the box
+  applies.
+
+By their job, there are four kinds of boxes:
+
+- **Event nodes** set off a chain ("game begins", "something enters the zone").
+- **Action nodes** do something and pass the flow on ("give 10 points").
+- **Flow nodes** steer the flow: branch, repeat or wait.
+- **Pure nodes** only deliver values and have no white wire at all.
+
+With pure and action nodes, a closer look is worthwhile, because they deliver their values
+differently:
+
+> **Imagine …** a **thermometer** and a **receipt**. The thermometer always shows you the value
+> from *now*, every time you look at it. The receipt shows what happened on your *last shopping
+> trip* – until you go shopping again.
+
+**Pure nodes** (plus, compare, "where is the player?") are thermometers: they have no white wire and
+calculate afresh every time someone reads their value. **Action nodes** (give points, create a
+thing) are receipts: their result stays put until they run the next time.
+
+When does that make a difference? Take a dice pure node ("random number from 1 to 6") and connect
+it to two boxes. Each box looks at the thermometer separately, so the node rolls twice – and the two
+may get different numbers. If you want the same number in two places, roll once and put the result
+in a variable, like a receipt you keep.
 
 On top of that come:
 
 - **Variables** – a graph's memory, with a type and a starting value.
-- **State machines** – states with transitions, in the style of the state editor from
-  digitalisierungsplanung.de (more in 9.4).
-- **Latent nodes** such as Delay or Tween – they pause the chain and continue later.
+- **State machines** – states with transitions, like a traffic light (more in 9.4).
+- **Waiting nodes** such as Delay (wait) or Tween (change smoothly) – they pause the chain and carry
+  on later.
 
-The **level** has a graph of its own, and every **actor** can carry one. In an actor graph, "Self"
-is the actor itself.
+The **level** has its own graph, and every **actor** can carry one. In an actor's graph, the actor
+itself is called "Self".
 
 ### Which wires fit?
 
-There are seven types: Exec, Bool, Int, Float, Vector, Text and Actor. Not every wire fits
-everywhere – just like with plugs. These are allowed:
+Every wire carries a certain **type** – like cables with different plugs. Not every plug fits into
+every socket. There are seven types: the exec wires are a type of their own; the other six carry
+values.
 
-- the same type, always, but Exec only with Exec;
-- **anything to Text** ("everything prints");
-- numbers among each other;
-- Actor to Bool ("is valid?");
-- a number to Vector (in all three directions).
+| Type | In everyday life | Example |
+|---|---|---|
+| Exec | "your turn!" – the flow itself | the white arrow |
+| Bool | yes or no | "Is the door open?" |
+| Int | whole number | number of coins: 7 |
+| Float | decimal number | speed: 3.5 m/s |
+| Vector | three numbers for position or direction | "2 m forward, 1 m left, 3 m up" |
+| Text | letters | "You win!" |
+| Actor | a thing in the level | the door |
 
-The conversions follow fixed rules: the text "0" or "false" is false, a vector as a number is its
-length, a decimal number is cut off when it's converted to a whole number, and text is read as a
-number.
+Allowed are the same types – but exec only with exec –, numbers among each other, and **everything
+to text**, because everything can be printed. A few more conversions are firmly defined, such as
+"thing to yes/no" (does the thing still exist?).
 
-### How a graph is stored
+> **For the curious:** A vector as a number is its length, a decimal number is cut off when
+> converted to a whole number, and the text "0" or "false" counts as no. The complete rules are in
+> the blue book, Chapter 9.
 
-Graphs are stored as JSON directly in the level ([Chapter 8](08-game-runtime.md)). Nodes have a
-number, a type (such as `game.add_score`) and a position; wires are short lists
-`[from, output, to, input]`. Comment frames are saved too, but they don't do anything.
+A graph is saved as text directly in the level file ([Chapter 8](08-game-runtime.md)) – with
+boxes, wires, positions and comment frames. The comments have no effect; they just help with
+reading.
 
 ## 9.2 Nodes from the inside
 
-Every node type has a description: name, category, help text, search words, its pins, its settings
-(such as a variable name or a key) and its **kind** – Event, Action, Pure or Flow. Plus the actual
-C++ function.
+Behind every box there's a small piece of program. When it's done, it reports **which output to
+continue at** – or "Stop, the chain ends here", or "I'm waiting, wake me later".
 
-This function reports back **which exec output to continue from**. Or it says "Stop, the chain ends
-here" – or "I'm waiting, wake me up later" (latent nodes).
+After doing its work, every box gives exactly one of three answers:
 
-Here's what a real game node looks like:
+- **"Continue at output X"** – the next domino falls.
+- **"Stop"** – the chain ends here.
+- **"Wake me later"** – the chain pauses, say at an egg timer, and continues at the same spot after
+  the waiting time.
 
-```cpp
-lib.add(action("game.add_score", "Add Score", "Game",
-    {data("points", "Points", PinType::number, 10.0)}, {},
-    [](Context& c, GameWorld& w) {
-      w.add_score(static_cast<f32>(c.in_number("points")));
-    },
-    "Adds points (wins at the target score ...).",
-    "points reward"));
-```
+On top of that, every kind of box has a profile: its kind, its connectors and its work. This is the
+profile of the box **"Add Score"**, in words:
 
-Line by line:
+> **Profile "Add Score":** Kind: action. One data input "Points", a number, preset to 10. Work: read
+> the input and give the game world that many points. Answer: "Continue at output 'then'."
 
-- A new **action node** with the type `game.add_score`, the title "Add Score", category "Game".
-- It has a data input "Points", a number with a default value of 10.
-- Its job: read the input and give the game world that many points.
-- Then a help text and search words for the menu.
-
-`action` adds the exec input and the "then" output automatically. Nodes see the world through a
-**Context**: read inputs, write outputs, query settings, wait.
-
-All built-in nodes live in a **Library**: the basic nodes plus the game nodes, which register
-themselves when the program starts.
+All the built-in boxes together make up a kind of **parts catalog**, from which the menu in the
+editor takes its suggestions. The name in the menu, the help text, the search words and what such a
+profile looks like in C++ are shown in the blue book, Chapter 9.
 
 ## 9.3 Checking before it starts
 
-Before a graph runs, Kern checks it. **Errors** are, for example:
+Before a graph runs, Kern checks it – like an electrician who tests the wiring before switching on.
+Wrongly wired graphs are switched off, boxes that never get their turn are reported.
 
-- an unknown node type or a wire to a pin that doesn't exist;
-- a wire between types that don't fit, such as Exec to a data pin;
-- two wires into the same data input;
-- calculation nodes that depend on themselves (a circle);
+**Errors** are, for example:
+
+- a wire between types that don't match, such as an exec wire on a data pin;
+- two wires into the same data input – which value should apply then?
+- pure nodes that depend on themselves (a circle that would never finish);
 - settings that point to missing variables or states;
 - a state machine without exactly one initial state.
 
-There's a **warning** for nodes whose exec input isn't connected anywhere – they never run.
+There's a **warning** for boxes whose exec input isn't connected anywhere – they never run.
 
-A graph with errors is switched off at startup and reported. In Studio, **Compile** (F7) shows you
-the result beforehand.
+A graph with errors is switched off at the start and reported. In Studio, **Compile** (F7) shows the
+result beforehand.
 
 ## 9.4 How a graph is run
 
-All the graphs of a world run in one **runtime**; there, every graph becomes an **instance** for its
-owner (actor or level). They're calculated in the fixed simulation steps, and only on the
-**authority** – in a single-player game or on the network server.
+All graphs run in time with the game steps, and only on the computer that's in charge. At the
+start, "Begin Play" fires, and after that "Tick" in every step.
 
-At the start (**Begin Play**), the state machines enter their initial state, and "Begin Play" fires.
-In every step (**tick**), three things then happen: due waiting times move on (the earliest first),
-the tick event fires, and the state machines check their timer and condition transitions. Every
-instance reveals its **tier**: "interpreter", "compiling", "compiled (WebAssembly)" or "native C++"
-(9.8).
+The calculation happens in the fixed steps of the simulation ([Chapter 8](08-game-runtime.md)), and
+only on the **authority** – the computer that's in charge (8.17): in a single-player game on your
+computer, in a network game only on the server. The reason: there should be **one single truth**.
+If two computers decided independently of each other whether a coin has been collected, they could
+disagree. So one decides, and all the others get the result.
+
+At the start (**Begin Play**), the state machines go into their initial state, and "Begin Play"
+fires. In every step (**Tick**), three things then happen: waiting times that have run out carry on,
+the Tick event fires, and the state machines check whether they change state.
 
 ### Events and chains
 
-An **event** has a type (such as "something enters the sensor"), optionally a target actor, and extra
-values. Kern looks for all matching event nodes, writes the values into their outputs and lets the
-chain run. Actors that are created in the meantime are included right away. A **Custom Event** can
-be called on purpose: to all graphs or to one actor – and at the same time it switches state machine
-transitions with that name.
+When something happens in the world, that's an **event** – such as "something enters the sensor",
+often with extra details like "who?". Kern looks for all matching event nodes, gives them the
+details and lets each chain run. With a **Custom Event** you can also announce an event with a name
+yourself – to all graphs or to a particular thing.
 
-For branches, the interpreter has a **stack** of sticky notes. A **Sequence**, for example, runs its
-first output right away and puts notes for the others on the stack. When a branch is finished, Kern
-takes the next note. Loops work the same way: run the body, then go back to the loop node with a
-note.
+If a chain branches, for example at **Sequence** ("first this, then this, then this"), Kern works
+through the branches dutifully one after another and keeps track of which are still open – like you
+with a list on your shopping list.
 
-If an input is connected to a calculation node, that node is recalculated on **every** read (up to
-48 levels deep). If it's connected to an action node, it reads that node's stored last value.
+A **loop** is a box that repeats a piece of chain: "repeat while …" or "repeat ten times". Like
+peeling potatoes: peel one, look in the pot, and if it's not full yet, take the next. Kern runs the
+loop's contents, returns to the loop node and asks again – until the condition no longer holds.
 
-### Protection against infinite loops
+> **For the curious:** The open branches lie on a "stack" of notes: the one put down last is worked
+> through first. How deeply chains and calculations may be nested is in the blue book, Chapter 9.
 
-> **Watch out!** A While loop whose condition always stays true would freeze the game. That's why
-> Kern keeps count: if more than **200,000 nodes** run in one step, the graph is switched off – with
-> the message "infinite loop? The graph is stopped." The rest of the game keeps running.
+### Protection against endless loops
 
-On top of that, events that trigger events may be nested at most 64 deep. In translated code, more
-than 512 nested loops or sequences stop the instance.
+> **Watch out!** A While loop ("while …, repeat") whose condition always stays true would freeze
+> the game. So Kern counts along: if more than **200,000 boxes** run in one step, the graph is
+> switched off – with the message "infinite loop? The graph is stopped." The rest of the game keeps
+> running.
+
+Likewise, there are limits on how often events may set off new events. That way a wired-up circle
+can never bring the whole game to a standstill, at most its own graph.
 
 ### State machines – like a traffic light
 
-> **Imagine …** a traffic light. It's always in exactly one **state**: green, yellow or red. After a
-> while, it jumps to the next one. That's a **state machine**.
+> **Imagine …** a traffic light. It's always in exactly one **state**: green, yellow or red. After
+> a while it jumps to the next one. That's a **state machine**.
 
-Every state machine has exactly one initial state. A **transition** can fire:
+Every state machine has exactly one initial state. A **transition** to the next state can be set
+off:
 
-- on an **event** with a certain name,
-- after a **timer** (so many seconds in the state),
-- while a **condition** (a Bool variable) is true,
-- or **automatically** on the next tick.
+- by an **event** with a certain name (a Custom Event with this name triggers it),
+- after a **time** (so many seconds in the state),
+- as soon as a **condition** (a yes/no variable) is true,
+- or **automatically** in the next step.
 
-A transition can also come "from any state" (but it doesn't fire if the machine is already in the
-target state). There's at most one transition per machine and check, so a chain of automatic
-transitions moves on one state per step. Entering and leaving a state trigger events of their own
-that you can hang chains on; "On State Entered" also tells you the previous state. **Set State**
-jumps directly into a state.
+Per step, each state machine changes state **at most once**. If several automatic transitions are
+chained one after another, it moves on one state per step, not all in one go – like a traffic light
+that shows every color at least briefly instead of jumping straight from green to red. That way
+every in-between state also gets its events for entering and leaving.
+
+A transition can also come "from any state", such as an emergency stop. Entering and leaving a
+state set off their own events, which you can hang chains on. **Set State** jumps directly into a
+state.
 
 ## 9.5 The basic nodes
 
-Kern comes with **76 basic nodes**. The families:
+Kern comes with **76 basic nodes**: for events, flow, memory and calculating. You don't have to know
+them by heart – the menu in the editor suggests matching ones. A few examples show what's in the
+building set:
 
-- **Events:** Begin Play, Event Tick, Every N Seconds, Custom Event.
-- **State machines:** On State Entered/Left, Set State, Current State, Is In State.
-- **Flow:** Branch (if/else), Sequence, For Loop, While Loop, Do Once, Do N, Gate (open/closed),
-  Flip Flop (A and B in turn), Delay, Retriggerable Delay, Tween (smoothly from 0 to 1), Switch and
-  Call Event.
-- **Variables:** Get, Set, Add.
-- **Math and logic:** arithmetic, rounding, sine, random, comparing, And/Or/Not, Select.
-- **Values, vectors, text** and **helpers** such as Game Time and Print (on the screen too, if you
-  like).
+- **Branch – the railroad switch.** A yes/no value comes in, and the flow travels either onto the
+  "True" track or onto "False". "Does the player have enough coins? Then open the door, otherwise
+  show a message."
+- **Delay – the egg timer.** The chain stops and carries on after the set time. If someone presses
+  again during the wait, the egg timer ignores it; a second kind then starts counting again.
+- **Gate – the barrier.** When the flow arrives, it only continues if the barrier is open. Other
+  wires open and close it.
+- **Flip Flop – the light switch.** Every press switches over: once output A, then B, then A again.
+  Perfect for a door that opens and closes.
+- **Tween – the dimmer.** Instead of switching a lamp on hard, it turns a value smoothly from 0 to 1
+  over an adjustable time and reports in every step how far along it is.
+- **Every N Seconds – the alarm clock.** Fires regularly, for example every 3 seconds.
 
-A few fine points: Every N Seconds counts its own time. Sequence has 1 to 16 outputs, and For Loop
-counts up to and including the last value. A Delay ignores further calls while it's waiting; the
-Retriggerable Delay, on the other hand, starts over. Tween reports a value from 0 to 1 every step
-(evenly or with a smooth curve) and "Finished" at the end. Switch branches by number or text,
-Compare compares with a tiny tolerance (10⁻⁹), and reroute nodes (*Reroute*) only tidy up wires.
+On top of that come reading, setting and counting up variables, calculating, comparing, randomness,
+text and **Print**, which writes a text to the log or onto the screen. All 76 nodes with their fine
+points are in the blue book, Chapter 9.
 
 > **Did you know?** Even randomness isn't quite random in Kern. It comes from a generator whose
 > starting value is fixed – **deterministic** per world. That's why replays and network games match.
 
 ## 9.6 The game nodes
 
-On top of that come **71 game nodes** that talk to the game world. An actor input without a wire
-always means **Self**.
+On top of that come **71 game nodes** that talk to the game world. They **listen** to what happens
+in the world, and they can **change** the world. If a thing input has no wire, it always means the
+thing itself (Self).
 
-**Events** – the nudges that start the domino chains:
+**Events** – the nudgers of the domino chains:
 
 | Node | Fires when … |
 |---|---|
-| On Begin / End Overlap | something enters or leaves this actor's sensor |
-| On Entered Sensor | this actor enters someone else's sensor |
-| On Hit | something crashes (from 2 m/s, at most 32 per step) |
-| On Collected, On Trigger | a pickup is collected or a trigger is touched |
-| On Damaged, On Death, On Respawn | damage, death, coming back |
-| On Interact | the player presses F (gamepad: Y) and looks at the actor (up to 3 m) or stands next to it (2 m) |
-| On Player Joined, On Game Over | a player joins, the game ends |
-| On Input Action, On Key | an action (any player, any device) or a key (local only) is pressed |
+| On Begin Overlap | something enters this thing's zone |
+| On Hit | there's a crash |
+| On Collected | a pickup is collected |
+| On Interact | the player presses F (gamepad: Y) while looking at the thing or standing next to it |
 
-By the way, an overlap counts the whole visitor: a player's capsule and head are *one* visitor, not
+On top of that there are events for damage, death, new players, end of game and individual keys –
+the whole list is in the blue book, Chapter 9.
+
+By the way, an overlap counts the whole visitor: a player's body and head are *one* visitor, not
 two.
 
-The remaining nodes in families:
+The **actions** are sorted into families. One example each:
 
-- **Actors:** Self, player and player count, finding (by name or tag, randomly too), checking tags,
-  reading position, rotation, direction, speed and distance, setting, moving, switching on and off,
-  **Spawn Actor** (create a copy with children and logic) and destroying, and **Set Property**,
-  which can change any value of a component via its path, just like in the level file – the color,
-  for example.
-- **Physics:** setting velocity, impulse and force (for one step), Launch (keeps the horizontal
-  speed), physics on/off (dynamic ↔ kinematic), joint motors (for doors, lifts, winches),
-  explosions and ray tests (*Line Trace*).
-- **Game and combat:** points, messages (for all players), winning, losing, damage, healing, killing,
-  ammo, reading health, light, color, sparks, camera shake (only on this device), sounds (3D or flat)
-  and "For Each Actor with Tag".
-- **Robot:** making the Micro Duck walk (like with the gamepad, within the trained limits: up to
-  0.4 m/s forward, 0.3 m/s sideways, turning at 57 °/s) and making it look, switching its autonomy,
-  special moves like sitting, picking up, kicking, somersault or jump, beak, petting, listening,
-  "is it holding something?", chirping, distance sensor, head camera and its state
+- **Things:** **Spawn Actor** creates a copy of a thing – along with its children and game rules.
+  That's how you get a spawner that spits out a crate every few seconds.
+- **Physics:** **Launch** gives a thing a strong boost, for example upward like a trampoline. Other
+  nodes nudge, brake or switch joint motors – for doors, elevators and winches.
+- **Game and combat:** **Add Score** gives points, **Show Message** shows all players a text, others
+  make you win, lose, heal or play a sound.
+- **Robots:** **Walk** makes the duck walk as if with a gamepad – only as fast as it learned in
+  training. Other nodes make it sit, kick or chirp, or query its distance sensor and its head camera
   ([Chapter 13](13-micro-duck.md)).
+
+All 71 game nodes with their limits and values are in the blue book, Chapter 9.
 
 ## 9.7 Logic in the game world
 
-The GameWorld only starts the graphs in Play or Simulate, only on the authority (not on network
-copies) and only if there's any logic at all.
+The game world gives the graphs everything they need: the game time, a predictable randomness and
+the events. An event goes to the thing concerned – or to its nearest "parent" with a graph.
+Whatever the logic changes, all fellow players get to see.
 
-Its **host** supplies the graphs with the basics: the **simulation time** (counted from the steps,
-not the wall clock), output and errors in the Output Log (Print as an HUD message, if you like) and
-a **deterministic random generator**. Spawned actors and new players bring their graphs with them.
+The game world ([Chapter 8](08-game-runtime.md)) only starts the graphs during **Play** or
+**Simulate**, only on the authority (9.4) and only if there is any logic at all. It gives the
+graphs:
 
-Where do events go? To the graph of the actor concerned – or, if it doesn't have one, to that of its
-nearest ancestor with a graph. That's handy: a door's welded-in collider belongs to the door. On top
-of that, the level graph **always** gets the event too; events without an actor (such as the end of
-the game) go to everyone. If a level has logic, the physics reports overlaps of all movable shapes
-and hits of all dynamic shapes – otherwise the graphs would have nothing to listen to. The logic
-tick runs at the end of every fixed step, after the physics events.
+- the **game time** – counted from the simulation steps, not from the clock on the wall. If a slow
+  computer stutters, the game time still counts exactly the same, and during a pause it stands
+  still. An "after 3 seconds" means the same thing everywhere;
+- output and errors to the **Output Log**, and Print, if you want, as a message in the HUD;
+- a **deterministic randomness**.
 
-**For the network**, Kern records what logic changes in the world: changed values, spawned actors,
-moved bodies. The server sends that to everyone – including players who join later
+Created things and new players bring their graphs along right away.
+
+**Where do events go?** To the graph of the thing concerned – or, if it doesn't have one, to that of
+its nearest ancestor with a graph. That's handy: the invisible shape welded into a door belongs to
+the door, and the door hears the event. In addition, the level graph **always** gets the event too;
+events without a thing (such as end of game) go to everyone.
+
+**For the network**, Kern records what the logic changes in the world: changed values, created
+things, moved bodies. The server sends that to everyone – including players who join later
 ([Chapter 10](10-networking.md)).
+
+> **For the curious:** If a level has logic, the physics reports more contacts than usual, so that
+> the graphs have something to listen to. And the logic calculates at the end of every step, after
+> the physics. The details are in the blue book, Chapter 9.
 
 ## 9.8 From picture to machine code
 
+A graph can be "interpreted" step by step or translated once as a whole. The translation is much
+faster and even takes over in the middle of the game. These are the three ways you already know
+from [Chapter 2](02-building-and-testing.md): interpreter, translation and C++ export.
+
 > **Imagine …** you're reading a book in a foreign language. An **interpreter** can read it to you
-> sentence by sentence – that works right away, but it's slow. Or someone **translates** the whole
-> book once, and after that you read it fluently. Kern's interpreter is the person reading
-> aloud, the JIT is the translator.
+> sentence by sentence – that works right away but is slow. Or someone **translates** the whole
+> book once, and after that you read fluently.
 
-Kern has two translators that use the same plan:
+Kern has one interpreter and two translators that work from the same plan. Even the interpreter
+doesn't read the whole circuit diagram every time: before the start, Kern turns it into a **lookup
+table** that says, for every box, which piece of Kern runs it and where each output leads – like a
+table of contents with which you find the right page right away.
 
-- **WebAssembly (JIT):** When Play or Simulate starts, Kern writes a small WebAssembly module for
-  every graph. The browser turns it into machine code, and Kern plugs it directly into the engine.
-  No JavaScript in between.
-- **C++ export:** The same graph as readable C++ source code. Built into a game
-  (`kern/build.sh --studio out.wasm file.cpp`), it replaces the interpreter for that graph. If
-  there's exported code for a graph, it takes precedence. Outside the browser there's no JIT: there,
-  the graph runs in the interpreter or as exported C++.
+- **Last-second translation** (*JIT*, "just in time"): when **Play** or **Simulate** starts, Kern
+  writes every graph as a small WebAssembly program. The browser turns it into machine code, and
+  Kern hooks it directly into the engine.
+- **The C++ export:** the same graph as readable C++ program text. If you want, you build it
+  permanently into your game; then, for this graph, it replaces the interpreter.
 
-The translator generates simple things – branches, loops, number variables, arithmetic, comparisons
-– directly. Everything else (game nodes, text, vectors, waiting times) simply calls the node's C++
-function.
+Simple things – branches, loops, numbers, calculating, comparing – the translator writes down
+directly. Everything else, such as game nodes, simply calls the ready-made piece of Kern that the
+interpreter uses too. And that happens without a detour: the translated graph talks to the pieces
+of Kern directly, without the JavaScript side – the waiter from [Chapter 1](01-introduction.md) –
+having to go between them. That's why it's so fast.
 
-The generated program is a loop with a **program counter**: one case per node, like the numbered
-stations of a scavenger hunt. That way any wiring works, even circles. Here, too, it keeps count and
-stops in case of an infinite loop.
+> **For the curious:** The translator can only write numbers and yes/no values down directly,
+> because only those live in the shared compartments (9.9). Text, directions and things are read by
+> the translated graph through Kern's ready-made pieces too.
 
-The exported C++ code registers itself with a **fingerprint** of the graph. The positions and
-comments do **not** go into this fingerprint. So moving a node doesn't make the export invalid – but
-any change to the content does. Then you have to export again.
+> **Did you know?** According to measurements, the translated graph is about **55 times faster**
+> than the interpreter. It's measured with a million passes through a loop.
 
-> **Did you know?** According to measurements, the JIT is about **55 times faster** than the
-> interpreter. That's measured with a million loop iterations.
+Which way runs? There's a fixed order of precedence:
 
-Because translating in the browser takes a moment, every graph starts out in the interpreter (tier
-"compiling"). As soon as the machine code is ready, it takes over – in the middle of the game. If
-translating doesn't work, the graph simply keeps running in the interpreter.
+1. If a matching **C++ export** is built in permanently for a graph, it wins.
+2. Otherwise the graph is **translated**. Because that takes a moment in the browser, it starts with
+   the interpreter at first; as soon as the machine code is ready, that takes over – in the middle of
+   the game.
+3. If translating doesn't work, the interpreter simply keeps **interpreting**.
 
-## 9.9 Why all three routes must calculate the same way
+An exported C++ text belongs to exactly one graph. That's recognized by a **fingerprint**: a number
+Kern calculates from the graph's content. If the content changes, the number changes. Positions and
+comments are **not** included. So moving a node doesn't make the export invalid – but any change to
+the content does. Then you have to export again.
 
-Interpreter, JIT and C++ export are **interchangeable**, even in the middle of the game. That only
-works because they share one memory.
+> **For the curious:** The translated program is like a scavenger hunt with numbered stations: a
+> counter says at which station (which node) it carries on right now. That way any wiring works,
+> even circles. How to build an exported graph into the game is in the blue book, Chapter 9.
+
+## 9.9 Why all three ways must calculate the same
+
+The interpreter and the translation share the same memory. Only because of that can they switch in
+the middle of the game, and only because of that does exactly the same result come out everywhere.
 
 > **Imagine …** a relay race. The first runner hands over the baton without stopping. For that to
 > work, both have to hold the same baton. In Kern, the baton is the shared memory: variables, loop
-> counters, gates and flip-flops sit in fixed **slots** that the interpreter and the machine code
-> read and write alike. Nothing has to be copied over when switching.
+> counters, barriers and light switches live in fixed compartments (*slots*) that the interpreter
+> and the machine code read and write alike. When switching, nothing has to be copied over.
 
 Why is that so important?
 
-- **Determinism:** Kern calculates the same way everywhere ([Chapter 6](06-physics.md)). If a graph
-  calculated differently in the browser than natively, replays, training and debugging would be
-  worthless. Even the protection against infinite loops counts the same way in all tiers.
-- **Waiting times** such as Delay continue their chain the same way in every tier.
-- **Debugging:** Breakpoints and the live display of running nodes work in translated code too.
+- **Determinism:** Kern calculates the same everywhere ([Chapter 6](06-physics.md)). If a graph
+  calculated differently in the browser than elsewhere, replays, training and debugging would be
+  worthless. Even the protection against endless loops counts the same on all three ways.
+- **Waiting times** such as Delay continue their chain the same way on every path.
+- **Debugging:** breakpoints (places where the game stops, 9.10) and the live display of running
+  nodes work in the translated code too.
 
-This is backed up by a set of shared test cases – math loops, gates and sequences, nested loops,
-state machines, a deliberate infinite loop and more. Every case runs in the interpreter, as JIT code
-and as exported C++, and the results must be **identical**. That's why anyone who changes a node has
-to change it the same way in three places.
+This is safeguarded by a set of shared test cases – calculation loops, barriers, nested loops, state
+machines, a deliberate endless loop and more. Every case runs in the interpreter, as JIT code and as
+exported C++, and the results must be **identical**.
 
 ## 9.10 Editing logic in Studio
 
-The logic editor in Studio follows Unreal's Blueprint editor. You open it via **Logic** in the
-toolbar (level graph) or via **Edit Logic** / **Add Logic (Blueprint)** in an actor's context menu.
-[Chapter 11](11-studio.md) describes the interface; here are the most important points:
+In the logic editor you drag wires, get matching suggestions, can undo everything, set breakpoints
+and watch during play which boxes are running right now.
 
-- Every edit is a command to the engine and therefore one **undo step**.
-- If you drag a wire from a pin into empty space, the **action menu** only suggests nodes that fit.
-  You type a search term and press Enter – the node appears and is already connected.
-- **Promote to Variable** turns a pin into a new variable with one click.
-- Double-clicking a wire inserts a reroute node – for tidy wires.
-- Nodes snap to an 8 px grid. If a new node is missing its variable or state machine, Kern creates it
-  right away. If you rename a variable, all its nodes change along with it; if you change its type,
-  the value is converted.
-- Copy and paste work via the graph as JSON text; pasted templates land below the existing nodes.
-- Moves that belong together (picking up a wire and dropping it somewhere else, typing into the same
-  pin) count as one undo step together.
-- **Compile** (F7) shows problems, **C++** exports the graph (file `logic_<level>_<actor>.cpp`).
-- **F9** sets a breakpoint: if the node runs while playing, the game pauses after that simulation
-  step, and the editor jumps to it.
-- While playing, the nodes that ran light up, and variables show their live values.
+You open it via **Logic** in the toolbar (level graph) or via **Edit Logic** or **Add Logic
+(Blueprint)** in an actor's context menu.
 
-> **Try it!** Open the Basic level (File › Example Levels), click **Logic** and then **Begin Play**.
-> Drag a wire from the "then" output into empty space, type "show message", press Enter and write a
-> text into it. Go back to the **Viewport**, place a Rolling Ball and start **Play**: your text
-> appears in the HUD!
+> **Watch out!** The logic editor is the one place in Studio that always speaks **English** – even
+> when the rest of Studio is shown in German. Its boxes, menus and buttons are called "Begin Play",
+> "Add Score", **Templates…** or **Compile**. This book uses those names, just like everywhere
+> else. The messages in the output log and the console commands also always stay in English.
 
-## 9.11 Examples to rebuild
+There's a principle behind this: the editor itself has **no logic of its own**. The web page only
+draws what the engine describes to it – as in [Chapter 4](04-graphics.md), where the page only
+passes on painting commands. Every action is a command to the engine and therefore a step you can
+undo. Whatever belongs together counts as **one** step: if you pick up a wire and drop it somewhere
+else, a single **Undo** undoes both.
 
-All the examples are real graphs from Kern; most of them are available in the logic editor under
-**Templates**.
+The most important things when editing:
 
-**Score zone.** Whoever enters the sensor gets 10 points, a message and a sound – four dominoes in a
-row:
+- If you drag a wire from a pin into empty space, the **action menu** suggests only nodes that fit.
+  You type a search term, press Enter – the node appears and is already connected.
+- Every edit can be taken back with **Undo** (Ctrl+Z).
+- During play, the nodes that ran light up, and variables show their current values. With **F9** you
+  set a breakpoint: when the node runs, the game stops and the editor jumps to it.
+
+**Compile** (F7) shows problems, **C++** exports the graph. All other actions are described in
+[Chapter 11](11-studio.md).
+
+> **Try it!** Open **File › Example Levels › Basic**. The level doesn't have a player character
+> yet: open the **Content Drawer** with Ctrl+Space, tab **Place Actors**, group **Players**, and
+> click **Rolling Ball** – the ball becomes your player. Then click **Logic** in the toolbar. The
+> graph is still empty and offers you start buttons; click **Begin Play**, and the node is on the
+> canvas. Drag a wire from its output "then" into empty space, type "show message", Enter, and write
+> a text into it. Back in the viewport, start **Play** with Alt+P: your text appears in the HUD. One
+> domino – and it has fallen!
+
+## 9.11 Examples to build yourself
+
+A few boxes are enough for real game rules. All the examples are real graphs from Kern; most of
+them can be found in the logic editor under **Templates**.
+
+**Points zone.** Whoever enters the sensor gets 10 points, a message and a sound – four dominoes in
+a row:
 
 ```mermaid
-flowchart LR
+%% Caption: The points zone as a chain of four boxes (names as in the logic editor)
+flowchart TB
   A[On Begin Overlap] --> B[Add Score 10]
   B --> C[Show Message +10]
   C --> D[Play Sound pickup]
 ```
 
-**Door.** Interact leads to a Flip Flop: the first time, a Tween opens the door in 0.8 s; the second
-time, another one closes it again – a little bit every step. Plus a confirmation sound.
+**Door.** If the player presses F at the door (the Interact event from 9.6), this leads to a light
+switch (Flip Flop): the first time, a dimmer (Tween) opens the door in 0.8 s, the second time
+another one closes it again – a little bit every step. Plus a confirmation sound.
 
-**Spawner.** Every 3 seconds: are there fewer than 10? Then spawn a Physics Cube and keep count. All
-the other players see the copies.
+**Spawner.** Every 3 seconds: are there fewer than 10? Then create a physics cube and count it. All
+fellow players see the copies.
 
 **Traffic light.** A state machine "Light": green → (4 s) → yellow → (1.5 s) → red → (4 s) → green.
-With every new state, a message shows which one it is.
+At every new state, a message shows which one it is.
 
 **Avoiding obstacles.** The Micro Duck switches off its own behavior. Every 0.25 s it looks with its
 distance sensor: if something is closer than 1.6 m, it turns on the spot; otherwise it walks
@@ -364,41 +444,44 @@ straight ahead.
 
 **The duck chirps at the ball.** In the Micro Duck example level, the level graph asks every 0.25 s:
 does the head camera see the ball **and** did it not see it before? Then it chirps. The variable
-"Ball Seen" remembers whether the ball was already in the picture – so the duck chirps once when the
-ball shows up, and not every 0.25 s.
+"Ball Seen" remembers whether the ball was already in view – so the duck chirps once when the ball
+appears, not every 0.25 s.
 
-> **Try it!** In a level, open the logic editor, choose **Templates…** and insert the **traffic
-> light**. Start Play and watch the messages switch through green, yellow and red. Then change one
-> timer to 1 second and try again.
+> **Try it!** In a level, open the logic editor, choose **Templates…** and insert the traffic
+> light, the entry **Traffic light (state machine)**. Start **Play** and watch how the messages
+> **Green**, **Yellow** and **Red** (the names of the states) switch through. Then change a waiting
+> time: it's on the arrows between the states of the state machine "Light" ("after 4 s"). Click one
+> of these arrows, set the field **Seconds** in the details on the right to 1 and try again.
 
-> **Watch out!** The chirp graph is a demo of the robot nodes – not something the real duck does on
-> its own. That's even stated explicitly in a comment frame in the graph.
+> **Watch out!** The chirping graph is a demo of the robot nodes – not something the real duck does
+> by itself. That's even stated explicitly in a comment frame in the graph.
 
 ## What you take away
 
-- Kern has no scripting language: logic is graphs made of nodes and wires.
-- Exec wires set the order like dominoes; data wires deliver values on demand.
-- Variables are the memory, state machines the states, latent nodes wait.
-- Graphs run in the fixed steps, only on the authority; their changes are replicated.
-- A counter (200,000 nodes per step) stops infinite loops.
-- Interpreter, JIT (WebAssembly, about 55 times faster) and C++ export deliver exactly the same.
+- Kern has no scripting language: logic is graphs made of boxes and wires.
+- White wires decide the order like dominoes; data wires deliver values on demand.
+- Pure nodes are thermometers (always fresh), action nodes are receipts (value from the last run).
+- Variables are the memory, state machines the states, waiting nodes carry on later.
+- Graphs run in the fixed steps and only on the computer that's in charge; all others are sent the
+  changes.
+- A counter stops endless loops before they freeze the game.
+- Interpreter, translation (about 55 times faster) and C++ export give exactly the same result.
 - In Studio: Compile (F7), breakpoints (F9), templates and C++ export.
 
 ## Brain teasers
 
-1. After the C++ export, you move a node. Do you have to export again? And what if you change a
-   number in the node?
-2. Why does logic only run on the server in a network game?
-3. What would happen without the variable "Ball Seen" while the ball is in the picture?
-4. Why do the loop counters sit in shared slots instead of in the interpreter?
+1. After the C++ export, you move a node. Do you have to export again? And if you change a number
+   in the node?
+2. Why does logic run only on the server in a network game?
+3. What would happen without the variable "Ball Seen" while the ball is in view?
+4. Why are the loop counters in shared compartments instead of with the interpreter?
 
 ### Solutions
 
-1. Not for moving it, because positions don't count toward the fingerprint. For a changed number,
-   yes.
-2. So that there's only one truth. The server calculates, and the clients get the changes.
+1. Not for moving, because positions don't count toward the fingerprint. For a changed number, yes.
+2. So that there's only one truth. The server decides, the others get the changes.
 3. The duck would chirp every 0.25 s.
-4. So that the JIT code can take over in the middle of the game without copying anything over.
+4. So that the translation can take over in the middle of the game without copying anything over.
 
 ---
 

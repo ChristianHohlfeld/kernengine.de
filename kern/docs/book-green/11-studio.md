@@ -1,941 +1,790 @@
 # 11 Kern Studio: Your Workshop in the Browser
 
-> **In short:** Kern Studio is the editor of the Kern engine. In it, you build levels out of actors and
-> components, play them with one click right in the window and turn them into a single HTML file that
-> runs anywhere. This chapter is a guided tour: it's best to open Studio and click along.
+> **In short:** Kern Studio is the Kern engine's editor. In it you build levels out of actors and
+> components, play them with one click right in the window, and turn them into a single HTML file
+> (HTML is the file format of web pages; every browser can open it) that runs anywhere. This chapter is a guided tour: it's best to open the Studio and click along.
 
-Kern Studio works like the Unreal Engine (Kern is not a product of Epic Games). If you know Unreal,
-you'll feel at home right away; if you don't, you'll learn terms here that everyone in the games
-industry understands. A level consists of **actors** (everything that stands in the world), and every
-actor carries **components** (abilities such as "has a shape", "is a light", "falls down"). You edit in
-**viewports** (windows into the 3D world), in the **Outliner** (the list of all actors), in **Details**
-(the properties) and in the **World Settings** (the settings for the whole level).
+> **Key terms:**
+> - **Editor** – a program for editing things; here, the workshop where you build game worlds.
+> - **Level** – a game world: everything that belongs to a game, in one file.
+> - **Actor** – a thing in the level: a cube, a lamp, a player character, a zone.
+> - **Component** – an ability you plug into an actor: "has a shape," "glows,"
+>   "falls down."
+> - **Transform** – an actor's location, rotation and size.
+> - **Mesh** – the wire frame of triangles that makes up the visible shape of a thing.
+> - **Gizmo** – the colorful handle with arrows and rings you use to move an actor, rotate it,
+>   or stretch it bigger.
+> - **Simulation** – the level runs on its own: things fall, roll, rules kick in.
 
-> **Did you know?** All of Studio's editor logic is C++ and runs in the same WebAssembly module as the
-> renderer, the Box3D physics and the game runtime. So what you see in the viewport is computed by
-> **exactly the code** that will later run your exported game. The browser side only paints the panels
-> and passes your clicks along (11.19).
+Here's how the tour goes: first we'll look around the workshop. Then you'll learn what a level is made
+of, how to look at it from all sides, how to select and move things, and how to undo mistakes. After
+that you bring your level to life with **Play** and **Simulate**, give it rules with the logic editor,
+and turn it into a finished game. The terms (actor, viewport, Outliner …) you'll get to know in 11.2
+are the same as in big professional tools of the game industry, such as Unreal Engine; anyone who
+knows those will feel right at home.
 
-What you put together in Studio uses the logic graphs from [Chapter 9](09-logic.md), the physics from
-[Chapter 6](06-physics.md), the sound from [Chapter 7](07-audio.md) and the game runtime from
-[Chapter 8](08-game-runtime.md). How to turn it into a game of your own is shown in
-[Chapter 12](12-your-own-games.md).
+![Kern Studio with Orb Run: menu bar and toolbar at the top, the viewport in the middle, Outliner and Details on the right, the status bar at the bottom](../buch/bilder/studio.png)
 
-![Kern Studio with the Orb Run level: menu bar, toolbar, viewport, Outliner and Details](../buch/bilder/studio.png)
+> **Did you know?** What you see in the Studio is computed by **exactly the same code** that later
+> runs your exported game. So whatever works in the editor also works in the finished game
+> (11.16).
 
-> **Watch out!** Studio follows your system language. On a German system it shows German labels
-> ("Datei", "Welteinstellungen" …); this chapter uses the English ones. To switch to English, click
-> **DE | EN** at the bottom right of the status bar (Studio remembers your choice) or open Studio with
-> `?lang=en` at the end of the address. Commands, the console, level files and everything you type
-> yourself are the same in both languages.
-
----
-
-## 11.1 Starting Studio
-
-There are three ways to get to Studio:
-
-| Way | What you do | What for |
-|---|---|---|
-| Live | open the editor on https://kernengine.de/ | get going right away, even on a phone |
-| One file | build and open `generated/studio.html` | offline, without a server |
-| Development | serve the repository, open the Studio page | work on Studio itself |
-
-The project's start page also links to the Lehrer, the two example games and two levels you can play
-right away (Orb Run and Physics Lab). Its footer names the rights holder and links to the license
-(Apache 2.0), third-party components, source code, documentation, imprint and privacy policy.
-
-**What happens at startup:** A splash screen "Starting the engine" appears while the module loads. The
-very first time, **Orb Run** is loaded: a procedural city (generated by the computer according to
-rules) with traffic, a Box3D hovercar, 24 energy orbs and a day that turns into night. The Output Log
-reports "Kern Studio ready - Orb Run loaded".
-Later, Studio opens the level you last worked on and offers **Start fresh** in case you'd rather begin
-with Orb Run again. If there were unsaved changes, it asks **Restore "…" from your last session?**
-(11.15).
-
-> **Try it!** Open Studio and press **Alt+P** (Play). You're already driving the hovercar through
-> Orb Run: W A S D steers, Shift boosts. **Esc** takes you back to the editor.
-
-### Installing as an app
-
-Studio is an installable web app. Chrome and Edge show an **⤓ Install** button at the top; on iPhone
-and iPad, the same button explains the two steps **Share** and **Add to Home Screen**. Once installed,
-Studio starts full screen (the notch and status bar stay clear) and also works offline with the most
-recently loaded version; when there is a network, it still fetches the page fresh first.
-
-Studio looks for a new version: at startup, every time you return to the app, when the network comes
-back, and every 60 s. If nothing can be lost (you're editing and nothing is unsaved), it reloads right
-away; otherwise it asks **New version available** with **Update** and **Later**, and your level comes
-along via the autosave. The running version is shown at the bottom right of the status bar, with a
-note when a newer one is waiting online.
+> **Did you know?** In an English browser, the Studio shows English labels, and this book names them
+> as you see them there, for example **File**. The **DE | EN** button at the bottom right of the
+> status bar switches the language. Only the logic editor, the log and the console stay English
+> in the German interface too (11.10). Whatever you type yourself, such as commands in the console, is
+> the same in both languages.
 
 ---
 
-## 11.2 The interface at a glance
+## 11.1 Opening the Studio
 
-> **Imagine …** a workshop. In the middle, the workbench with your model (the viewport). On the wall to
-> the right, the inventory list (Outliner), and below it the note with the measurements of the part in
-> your hand (Details). Down below, a drawer full of parts (the Content Drawer). And at the very top, the
+The Studio is a web page: you open the editor at https://kernengine.de/ and get going, even on your
+phone. You don't have to install anything.
+
+The very first time, the example level **Orb Run** is loaded: a city the computer generated by itself
+from rules, with traffic, a floating hover car, energy orbs to collect, and a day that turns into
+night. Later the Studio opens the level you last worked on. If there were unsaved changes, it offers
+to restore them (11.12).
+
+> **Try it!** Open the Studio, click into the picture once, and press **Alt+P**, the key for
+> **Play**. Off you go with the hover car through Orb Run: W A S D steers, Shift gives
+> thrust. **Esc** takes you back to the editor.
+
+> **For the curious:** If you build Kern yourself, you can also open the Studio as a single file
+> without internet or start it straight from the source code. How that works is in the blue book, Chapter 11.
+
+### Installing it as an app
+
+You can put the Studio on your device like an app: in Chrome and Edge with the **⤓ Install** button
+at the top; on iPhone and iPad the same button explains the steps **Share** and **Add to Home Screen**.
+Once installed, the Studio starts in full screen and also works without internet. When there's a new
+version, the Studio fetches it by itself. While editing, it reloads right away, and unsaved changes
+come along via the autosave (11.12). If a game is running, it waits until you stop and meanwhile
+offers **Update** or **Later**.
+
+---
+
+## 11.2 The workshop at a glance
+
+The Studio is laid out like a workshop: a big workspace in the middle, with lists, tools and supplies
+around it. Each area has exactly one job.
+
+> **Imagine …** a workshop. In the middle, the workbench with your model (the viewport). On the right
+> wall, the inventory list (Outliner) and below it the note with the measurements of the part in your
+> hand (Details). At the bottom, a drawer full of parts (the Content Drawer). And at the very top, the
 > shelf with the tools (toolbar).
 
-| Area | Location | What's in it |
+| Area | Where | What's in it |
 |---|---|---|
-| Title bar | top | menus, level name, frames per second |
-| Toolbar | below it | save, undo, **Add**, tools, grid, Play |
-| Viewports | center | 1, 2 or 4 views |
-| Outliner | top right | all actors as a tree |
-| Details / World Settings | bottom right | properties as two tabs |
-| Content Drawer | bottom, collapsible | parts, textures, sounds, log |
-| Status bar | very bottom | messages, console, physics, sound |
+| Menu bar | very top | menus, level name |
+| Toolbar | below it | save, undo, add, tools, play |
+| Viewports | middle | 1, 2 or 4 windows into the 3D world |
+| **Outliner** | top right | the list of all actors |
+| **Details** / **World Settings** | bottom right | properties of the selected actor or of the whole level |
+| **Content Drawer** | bottom, foldable | parts, images, sounds, log |
+| Status bar | very bottom | messages, console, sound |
 
-You can drag the dividers between the viewport and the sidebar (sidebar from 240 px to 60 % of the
-width) and between the Outliner and Details; Studio remembers the sizes and whether the Content Drawer
-was open. A dot next to the level name means: there are unsaved changes.
+You can drag the dividing lines between the areas; the Studio remembers the sizes. A dot next to the
+level name means there are unsaved changes.
 
-### The menu bar
+### The menus in one sentence each
 
-Five menus: **File**, **Edit**, **Window**, **Play**, **Help**. When one is open, you switch to the next
-just by hovering over it. Submenus open **next to** the menu, never on top of it, so a menu never lies
-under the finger that opened it. If there's no room beside it, or if you tap (finger, pen), the
-submenu replaces the menu in place, with a back row; on a touchscreen, menu rows are 40 px tall.
-**Esc** closes any menu. Entries that couldn't do anything right now (such as **Delete** with nothing
-selected) are grayed out.
+- **File**: new level, open, save, import an image, export a game, **Example Levels**.
+- **Edit**: undo, **History...**, copy and paste, preferences.
+- **Window**: layout of the windows, views, Content Drawer, log, full screen.
+- **Play**: play, simulate, pause, stop, multiplayer.
+- **Help**: the key overview (F1).
 
-- **File:** New Level (Ctrl+N), Open (Ctrl+O), Save (Ctrl+S), Save As, Import Texture, Package Game,
-  **Example Levels** (Orb Run, Physics Lab, Shooting Range, Micro Duck, Basic, Empty).
-- **Edit:** Undo and Redo (with the name of the step), **History…**, Cut, Copy, Paste, Duplicate,
-  Delete, Select All, Deselect, Group, Snap to Floor, Preferences and Reset Settings to Defaults.
-- **Window:** layout, view type, View Mode, show flags, Game View, Focus Selection, Content Drawer,
-  Output Log, full screen (F11).
-- **Play:** Play, Simulate, Pause, Advance One Frame, Stop, Eject/Possess, Restart Game, Keep
-  Simulation Changes, multiplayer (11.17) and online game.
-- **Help:** Controls (F1) and About Kern Studio.
-
-**New Level** offers six templates as cards (a double-click creates one right away):
+**File › New Level...** offers six templates as cards (a double-click creates one right away):
 
 | Template | What's in it |
 |---|---|
-| Orb Run | night city, hovercar, 24 orbs |
-| Physics Lab | every Box3D joint: hinge, slider, wheel, rope bridge, motor, stack |
-| Shooting Range | first-person shooter soldier, targets, cover, multiplayer-capable |
-| Micro Duck | Pollen Robotics' walking robot on its trained network |
-| Basic | ground, sun, sky: a clean start |
-| Empty | nothing at all |
-
-If your current level has unsaved changes, the dialog tells you: they stay in the autosave until you
-edit the new level.
+| **Orb Run** | night city, hover car, orbs to collect |
+| **Physics Lab** | many kinds of joints: hinge, slider, wheel, rope (pendulum), rope bridge, motor, plus a crate stack |
+| **Shooting Range** | first-person-shooter soldier, targets, cover, multiplayer-ready |
+| **Micro Duck** | the walking robot duck from [Chapter 13](13-micro-duck.md) |
+| **Basic** | floor, sun, sky and a cube: a clean start |
+| **Empty** | nothing at all |
 
 ### The toolbar
 
-From left to right: floppy disk (save), undo/redo, **+ Add** (all parts as a menu), the four tools
-**Select/Move/Rotate/Scale** (Q/W/E/R), the button for world or local axes (Ctrl+`), three grid
-buttons with choices for moving (1 cm to 100 m), rotating (1° to 90°) and scaling (0.0625 to 1), the
-camera speed (1 to 8), the Play group (Play, Simulate, Pause, Frame, Stop, Eject), layout, **Logic**
-(the level's logic graph), the package button for exporting and, on narrow screens, **Panels**.
-**+ Add** is locked during Play; Play during Simulate takes over the player.
+The bar below the menus has lots of buttons. The most important ones, from left to right:
 
-### Viewports
+1. Floppy disk: save.
+2. Arrows: undo and redo.
+3. **Add**: add a part.
+4. Tools: **Select (Q)**, **Move (W)**, **Rotate (E)** and **Scale (R)**.
+5. Playback buttons: Play, Simulate, Pause, Stop.
 
-Each viewport has its own bar at the top: the **≡** menu (Game View, field of view 50° to 110°, Focus,
-camera bookmarks, layout), the **view type** (Perspective or flat "orthographic" views from the top,
-bottom, left, right, front, back), the **View Mode** (Lit, Unlit, Wireframe, Player Collision), the
-**Show** list (Grid, Icons, Selection Outline, Collision Shapes, Constraints, Contact Points, Bounds,
-Fog, Sky, Stats; it stays open while you toggle things) and a button for maximizing. A click on the bar
-makes the viewport the active one.
-
-When you switch to an orthographic view, Studio switches to wireframe; back in perspective, to Lit
-again. **Constraints** is off at first; otherwise every chain and every door would paint its helper
-lines.
-
-In the viewport itself, at the bottom left, you see the **axis cross**: X red, Y green, Z blue. **Z
-points up.** An info line shows speed and camera position (in orthographic views, the visible width in
-meters); with the show flag **Stats**, also frames per second and, in the simulation, bodies, contacts
-and steps. A hint line names the keys that apply right now, and while you drag a gizmo it says how far
-you've moved, rotated or scaled.
-
-> **Try it!** Use **Layout** in the toolbar to switch to four viewports. Click into the perspective
-> viewport, set its view type to **Top** (Alt+J) and watch it jump from Lit to Wireframe; Alt+G brings
-> back the perspective. With the maximize button, you blow a viewport up to full size and back again.
-
-### Outliner
-
-The Outliner lists all actors with an eye (visibility), **Label** (name) and **Type**. The type comes
-from the components: Player, Trigger, Pickup, Point Light, Physics Body, Static Mesh, Empty and so on.
-
-- **Click** selects, **Shift+click** selects a range, **Ctrl+click** adds or removes a single one.
-- **Double-click** brings the actor into view (on a folder: rename), **F2** renames right in the row
-  (Enter confirms, Esc cancels).
-- The **eye** shows and hides, for folders everything in them; the **arrow** expands and collapses
-  children and folders.
-- **Dragging** onto another actor attaches it as a child (its position in the world stays), onto a
-  folder moves it there, into empty space detaches it again.
-- The folder button creates a folder "New Folder" for the selection; the search field filters by name,
-  type and tags.
-- **Right-click** opens the context menu as in the viewport, for folders also **Rename Folder** and
-  **Remove Folder (keep actors)**.
-
-The actor you control in Play wears the **PLAYER** badge; locked actors a padlock. The footer counts
-actors and the selection.
-
-### Details
-
-Details shows the selection: at the top the name, the buttons **Logic** (this actor's graph) and
-**+ Add** (add a component), below that a search field and the sections **Actor**, **Transform** and
-one for each component. Every section collapses; components have a trash can. If you select several
-actors, you only see what they all have in common; differing values show "Multiple", and an entry
-applies to all of them.
-
-A few handling tricks you'll love:
-
-- You may **do math** in number fields: `2*3` or `10/4+1`. A comma counts as a decimal point.
-- **Drag the label** of a number field sideways to change the value. Shift makes it ten times faster,
-  Ctrl ten times finer. The arrow keys in the field do the same.
-- Fields from 0 to 1 have a slider. Colors have a color picker that takes effect immediately and stays
-  open while you drag in it, or a hex value like `#ff8800`.
-- Vectors have three fields X, Y, Z; for **Scale**, a padlock keeps the scaling proportional. Choice
-  fields are lists (shape, type, sound, target actor …); you separate tags with commas.
-- If a value differs from the default, an arrow for **resetting** appears on the right. Right-click
-  offers **Reset to Default**, **Copy Value** and **Paste Value** (in text fields also cut, copy,
-  paste, select all).
-
-> **Did you know?** A whole drag on the label, the slider or in the color picker is **one single** undo
-> step, no matter how long you drag. Studio gives every continuous action an ID, and the engine merges
-> all changes with that ID. And every change is checked exactly as if it came from a saved file.
-
-![Selected actor with the Move gizmo and its components in Details](../buch/bilder/studio-selected.png)
-
-### Status bar and console
-
-At the bottom you'll find the Content Drawer, Output Log, the console **Cmd**, the latest message, the
-physics statistics (in Simulate and Play: bodies, awake bodies, joints, contacts; online also role,
-ping, loss), the speaker (sound on/off), the left/right level meter, the selection ("2 of 40
-selected") and the running version.
-
-In the console you type commands; `help` lists them. For example `spawn physics_cube` (place a part),
-`select orb` (select everything with "orb" in its name), `tod 0.8` (time of day), `gravity 0 0 -1.6`
-(gravity), `camspeed 6`, `stat` and `clear`. With ↑/↓ you page through earlier entries; Esc leaves the
-field.
-
-> **Try it!** Open the console and type `gravity 0 0 -1.6`. Then a few `spawn physics_cube` and
-> **Simulate** (Alt+S). Moon gravity! A `gravity` without values restores Earth's gravity
-> (−9.80665).
+Between the tools and the playback buttons are the snapping buttons (11.5); to the right of those come
+the window layout, the logic editor (**Logic**, 11.10), and the export (11.13).
 
 ### The context menu
 
-A right-click (without dragging) in the viewport selects the actor underneath and opens a menu; on a
-touchscreen, a long press (at least 0.5 s) is enough. In it: Focus, Rename, Cut, Copy, Paste,
-Duplicate, Delete, **Edit Logic** or **Add Logic (Blueprint)**, **Make Player**, Snap to Floor, Group,
-**Attach to …** and **Connect with Constraint ▸** (from two actors on), Detach, Hide, Lock, Select
-Children and **Place Actor ▸** (Cube, Sphere, Physics Cube, Point Light, Orb or Empty Actor exactly at
-the spot you clicked). With nothing selected, there's Paste, Select All, Show All and Place Actor; in
-Simulate and Play (with a selection), Focus and Keep Simulation Changes. The browser's own menu never
-shows up anywhere in Studio.
+Right-clicking an actor (on a touchscreen: press and hold) opens a menu with everything you can do
+with exactly that thing: rename it, copy it, delete it, make it the player, give it logic, attach it
+to another one, or connect it with a joint. With **Place Actor ▸** you put a new part exactly where
+you clicked. The complete list is in the blue book, Chapter 11.
+
+### Status bar and console
+
+At the very bottom you'll find the last message, the speaker (sound on/off), how many actors are
+selected, and the running version. The **Cmd** field is the **console**: a line where you type
+commands instead of clicking. `help` lists them all. A few examples: `spawn physics_cube` places a
+physics crate, `tod 0.8` sets the time of day (the number runs from 0 to just under 1 once
+through the whole day), `gravity 0 0 -1.6` changes gravity.
+
+The three numbers after `gravity` say in which direction and how strongly it pulls: left/right,
+front/back, up/down. In Kern the third axis points up, so the minus means: down. 1.6 is the gravity
+of the Moon; on Earth it's about 9.8.
+
+> **Try it!** New level **Basic**. Click into the field next to **Cmd** at the bottom and type
+> `gravity 0 0 -1.6`, then `spawn physics_cube` a few times. Press **Simulate** or
+> Alt+S: the crates drift slowly to the ground, like on the Moon. A `gravity` without numbers brings Earth's gravity back.
 
 ---
 
-## 11.3 Navigating the viewport
+## 11.3 A level made of actors and components
 
-The camera controls follow the Unreal Engine. They always apply to the viewport under the pointer.
+A level is a collection: the world settings, the actors, images, sounds and the logic. Every actor
+has a name, its transform (location, rotation, size) and a set of components. What an actor **is**
+comes entirely from its components. Everything is measured in meters, seconds and kilograms.
 
-### Mouse and keyboard
+> **Imagine …** an actor is an empty baseplate from a building-block set. Components are the bricks you
+> plug onto it: a shape brick makes it visible, a physics brick makes it fall, a pickup brick
+> makes it collectible. Mixing and matching allowed!
 
-The heart of it is **Fly Mode**: hold the **right mouse button** and you fly like in a computer game.
-
-| Input | Effect |
-|---|---|
-| Right mouse button + W A S D | forward, left, back, right |
-| … + Q / E | down / up |
-| … + Shift | 2.5 times faster |
-| … + mouse wheel | speed level 1 to 8 |
-| … + Z / C | zoom in / out |
-| Right + left mouse button | move up, down, sideways |
-| Drag with middle mouse button | pan |
-| Alt + left / right / middle | orbit / closer or farther / pan |
-| Mouse wheel | forward and back |
-| F or double-click | bring the selection into view (F with no selection: everything) |
-| Ctrl+1 … 9 / 1 … 9 | set / jump to a bookmark |
-
-The eight speed levels range from 1 m/s to 160 m/s; each is roughly twice as fast as the one before.
-Level 4 (10 m/s) is the default. In orthographic views, the right and middle mouse buttons pan, and
-the mouse wheel zooms toward the cursor.
-
-Alt+left orbits around the selection as long as the setting **Orbit around selection** is on (the
-default); with nothing selected, the camera orbits around the point under the cursor. While you fly,
-W, E, R, Q belong to the movements; the tools don't switch then.
-
-> **Did you know?** While flying, Studio reads the **position** of the keys, not their labels. On a
-> French AZERTY keyboard, W A S D are therefore in the same place as on yours. Shortcuts like Ctrl+Z,
-> on the other hand, follow the labels.
-
-### With your fingers
-
-On a phone or tablet, you control the camera like in a 3D viewer: **one finger** orbits around the
-point underneath, **two fingers** zoom and pan, **tapping** selects, **double-tapping** brings the
-selection into view, **a long press** opens the context menu. Fingers on a gizmo handle move, rotate
-and scale like the mouse; a finger in another viewport makes it active. In orthographic views, one
-finger pans. The page itself never zooms along.
-
-> **Imagine …** you zoom in with two fingers on a sock and then on a city block. It feels the same both
-> times, because Studio measures the scale by the distance to the point under your fingers. Whatever is
-> under your fingers stays there, and the next one-finger drag orbits around exactly that point.
-
----
-
-## 11.4 Keyboard shortcuts
-
-**F1** shows the most important shortcuts at any time in Studio. The complete list is in the blue book
-and in [Chapter 17](17-reference.md); here are the ones you'll need all the time.
-
-**While building:** Q/W/E/R picks the tool, the **space bar** cycles Move → Rotate → Scale, **[** and
-**]** make the grid smaller or larger (from 1 cm to 100 m), **End** puts the selection on the ground,
-**H** hides it, **Shift+H** everything else, **Ctrl+H** shows everything again, **G** toggles the Game
-View (all helpers off), **Esc** cancels a gizmo drag or clears the selection. Plus the usual
-Ctrl+Z/Y, C/X/V, D, A, G, S, O, N; Delete or Backspace deletes, F2 renames. Alt+G/J/H/K switch the
-view, Alt+2/3/4/5 the View Mode.
-
-> **Did you know?** Copied actors end up as text in your system's clipboard. A Ctrl+V in **another
-> tab** pastes them there. That's how you carry parts from one level to the next.
-
-**While playing:** W A S D and the arrow keys move, the mouse looks, the space bar jumps, Shift boosts
-or sprints. The soldier fires with left, aims with right, reloads with R, crouches with C, uses with
-F. **Esc** stops, **F8** ejects from or takes over the player, **Shift+F1** releases the mouse,
-**Pause** pauses, **.** advances one step, **Ctrl+R** restarts (except with the soldier, where Ctrl
-is crouch and R is reload). Alt+P ends Play, Alt+S switches to Simulate. The flyer climbs with the
-space bar or E and descends with Q, Shift or Ctrl; the mouse wheel zooms the game camera. The click
-that captures the mouse doesn't fire. The Micro Duck has its own keys (11.13).
-
-> **Watch out!** When the browser has captured the mouse, it normally swallows the first Esc to release
-> it. Studio detects that and stops right away anyway. Switching windows, on the other hand, only
-> releases the mouse without stopping.
-
-**In the logic editor:** F7 compiles, Ctrl+F searches, F9 sets a breakpoint, a letter plus a click
-inserts common nodes (B Branch, S Sequence, D Delay …), C puts a comment around the selection, Q
-straightens wires, Shift+W/A/S/D aligns nodes, F or Home frames the selection or everything, Esc goes
-back. While it's open, letters and Delete belong to the graph; only Ctrl+Z, Ctrl+Y, Ctrl+S and F1
-reach the level.
-
----
-
-## 11.5 Selection, gizmos and snapping
-
-### Selecting
-
-Left-click selects, Shift adds, Ctrl toggles, a click into empty space clears the selection. **Dragging
-with the left button always draws a selection rectangle**, never the camera and never an actor, even
-if you start on an actor. Things are moved only with the gizmo, just like in Unreal. The rectangle
-catches every visible, unlocked actor whose origin lies inside it; the procedural city is left out.
-
-Lights and empty actors have no mesh; you select them by their icon (Show › Icons). Locked actors let
-clicks pass through to whatever lies behind them. The actor selected **last** is the **primary**
-selection: the gizmo sits on it.
-
-### Gizmos
-
-A **gizmo** is the colorful handle on the selected actor:
-
-- **Move (W):** three arrows, three small squares (for two axes at once) and a center point.
-- **Rotate (E):** three rings.
-- **Scale (R):** three axes and a center handle for scaling evenly.
-
-The handle under the pointer lights up yellow. With the globe or cube button, the gizmo aligns with
-the world or with the primary actor. All selected actors are moved; children follow their parents.
-
-> **Try it!** Select a cube, hold **Alt** and drag the Move gizmo. You pull out a **copy**, and the
-> original stays put. Copy and move together are one undo step. Press **Esc** while dragging, and
-> everything is as it was.
-
-### Snapping
-
-**Snapping** means clicking into place. At first, Move snaps to a **0.5 m grid** and Rotate to
-**15° steps**; the scale grid (0.25) is off. In world axes, Move snaps to fixed positions; in local
-axes, in steps. Newly placed actors land on the grid, too. When you pick a grid size in the toolbar,
-the grid switches on along with it.
-
----
-
-## 11.6 Levels, actors and components
-
-A level consists of World Settings, actors, textures, sounds, the level's logic graph and the editor
-camera. Units are **meters, seconds, kilograms**, Z points up, rotations are in degrees (x roll,
-y pitch, z yaw), colors in sRGB. An actor has a name, parent actor, folder, tags, Hidden, Locked,
-Transform and components.
-
-### Creating actors
-
-1. Open the Content Drawer (**Ctrl+Space**) and click a part: it appears where the camera is looking
-   (on the thing it hits, otherwise on the ground, otherwise 10 m ahead).
-2. Or **drag** the part into the viewport: it lands exactly under the mouse.
-3. Or **+ Add** in the toolbar, **Place Actor ▸** in the context menu, or `spawn` in the console.
-
-New actors get unique names ("Cube", "Cube 2" …) and are selected right away. If you place a part from
-**Players**, it becomes your player; the log says "… is the player now - press Play (Alt+P) to
-control it".
-
-### Parents, children and folders
-
-- **Attach:** select several actors, the future parent last, then **Attach to …**; or drag onto it in
-  the Outliner.
-- **Detach:** **Detach**, or drag into empty space in the Outliner.
-- **Group:** **Ctrl+G** places an empty actor "Group" in the middle and attaches the selection to it.
-- **Folders** (field **Outliner folder** in Details, or in the Outliner) only help keep things tidy,
-  for top-level actors. **Select Children** selects all children.
-
-Child actors without their own Rigid Body are welded to their ancestor's body when simulating. Things
-with collision but no body automatically get an immovable one; if they rotate or move via Rotator or
-Mover, a "kinematic" one that moves but can't be pushed ([Chapter 6](06-physics.md)).
-
-### Components
-
-> **Imagine …** an actor is an empty Lego baseplate. Components are the bricks you snap onto it: a shape
-> brick makes it visible, a physics brick makes it fall, a pickup brick makes it collectible. Combining
-> is allowed!
-
-**+ Add** in Details only offers what's still missing. Colliders and constraints may appear more than
-once, Procedural City only on a single actor without a parent. The most important components:
+An example: a crate that's supposed to fall off a table needs a shape, the **Static Mesh** component,
+and physics, the **Rigid Body** component. If you also plug in **Pickup**, the player can collect it.
+The same crate without physics simply floats where you put it.
 
 | Component | What it does |
 |---|---|
-| **Static Mesh** | shape (box, sphere, cylinder, cone, capsule, plane, torus, ramp …), collision, material |
-| **Point Light** | colored light with a range |
-| **Rigid Body** | Box3D physics: static, kinematic or dynamic, mass, damping |
-| **Collider** | collision shape and material (friction, bounciness) |
-| **Constraint** | joint: hinge, slider, ball, fixed, rope, wheel, motor … |
-| **Player Controller** | makes the actor controllable (hovercar, ball, runner, flyer, soldier, walker …) |
-| **Weapon, Health** | weapon and health points |
+| **Static Mesh** | shape (cube, sphere, cylinder, ramp …) with color and material |
+| **Rigid Body** | physics; the **Mobility** field chooses: **Static** stays put, **Dynamic (simulate physics)** falls and rolls, **Kinematic** moves according to plan but can't be pushed |
+| **Collider** | a shape to bump into, with friction and bounciness |
+| **Constraint** | hinge, slider, rope, wheel, motor … |
+| **Player Controller** | makes the actor controllable (hover car, rolling ball, character, soldier, walkers like the duck …) |
 | **Pickup** | collectible: points, healing, ammo |
-| **Trigger** | zone: goal, hazard, checkpoint, message, jump pad, teleport … |
-| **Rotator, Mover** | rotates or moves the actor back and forth |
+| **Trigger** | an invisible zone: goal, hazard, checkpoint, teleporter … |
+| **Weapon**, **Health** | weapon and hit points |
+| **Rotator**, **Mover** | rotates the actor, or moves it back and forth |
+| **Point Light**, **Audio Source** | light, or sound source |
 | **Procedural City** | a whole city with traffic |
-| **Audio Source** | sound source in space |
 
-Each has many fields (the complete list is in the blue book); what they mean is explained in
-[Chapter 6](06-physics.md), [Chapter 7](07-audio.md) and [Chapter 8](08-game-runtime.md).
+What the fields of each component mean is explained in [Chapter 6](06-physics.md) (physics),
+[Chapter 7](07-audio.md) (sound) and [Chapter 8](08-game-runtime.md) (game rules). You plug in new
+components in **Details** with **Add**.
 
-### Joints with "Connect"
+### Creating actors
 
-Faster than a constraint by hand:
+Ready-made actors are in the **Content Drawer**, the parts drawer at the bottom (**Ctrl+Space**).
+Under **Place Actors** you'll find over 40 of them, sorted into groups:
 
-1. Select the actor that should **hang**.
-2. With Shift or Ctrl, add the actor it hangs **from**, and do it last.
-3. Right-click › **Connect with Constraint ▸** › Hinge, Slider, Ball, Fixed, Distance / rope, Wheel
-   or Motor.
+- **Players**: player characters such as **Character**, soldier, hover car, rolling ball,
+  drone and the Micro Duck.
+- **Gameplay**: orbs and stars to collect, health packs, goal, hazard zone,
+  checkpoint, jump pad, teleporter, moving platform, exploding barrel …
+- **Shapes**: simple shapes such as **Cube**, **Sphere**, **Cylinder**, **Ramp**.
+- **Physics**: crates such as the **Physics Cube**, barrels, a crate stack, pendulum, door, chain,
+  seesaw and a duck-sized sock.
+- **Lights**, **Audio**, **World**: lamps, sound sources and the city.
 
-Studio puts the joint point halfway between the two (except for rope and wheel) and gives the hanging
-actor a Rigid Body if it doesn't have one. Several hanging actors each get a joint to the one selected
-last.
+A click places the part where the camera is looking; dragging into the viewport places it exactly
+under the mouse. The new actor is selected right away. If you place a character from **Players**, it
+becomes your player.
 
-> **Try it!** Place a **Cube** and use the gizmo to push it up into the air, and next to it a
-> **Physics Cube**, also a bit up in the air. Select the Physics Cube first, then the Cube with Ctrl, and
-> connect them with **Distance / rope**. Now **Simulate**: the crate swings on the rope like a pendulum.
+### Parents and children
+
+You can **attach** one actor to another. The attached one is called the **child**, the other the
+**parent actor**. When you move the parent, the child moves along.
+
+> **Imagine …** you put a hat on a character and attach it to them. When the character walks off,
+> the hat comes along. If you drag just the hat a bit to the side, the character stays put.
+
+Here's how: select several actors, the future parent last, then right-click ›
+**Attach to …**; the parent's name follows. Or, in the **Outliner**, drag one actor onto another.
+**Ctrl+G** (right-click › **Group**) puts the selection under a new, empty group actor. Folders in the
+Outliner, by contrast, are just for keeping things tidy and don't move anything.
+
+> **For the curious:** When simulating, children without physics of their own are welded firmly to
+> their parent's body. The rules for this are in [Chapter 6](06-physics.md).
+
+### Joints with "Connect with Constraint"
+
+Two actors can be connected with a joint so that one hangs from the other, swings, or turns. The
+quickest way:
+
+1. Select the actor that should *hang*.
+2. With Ctrl, add the actor it hangs *from*, as the last one.
+3. Right-click › **Connect with Constraint ▸** and choose a kind of joint:
+   **Hinge**, **Slider**, **Ball** for a ball joint, **Fixed (weld)**, **Distance / rope**,
+   **Wheel** or **Motor**.
+
+The Studio gives the hanging actor physics if it doesn't have any yet.
+
+> **Try it!** (Exactly how selecting and the gizmo work is in 11.5; for this mission, all you need is:
+> a click selects, and you drag the colorful arrows.) From **Content Drawer › Shapes**, place a
+> **Cube** and push it up into the air with the gizmo's blue arrow; next to it, from
+> **Content Drawer › Physics**, place a **Physics Cube**, also a bit up in the air. In the Outliner
+> the two new actors are called something like "Cube 2" and "Physics Cube 2," because the Studio gives
+> out each name only once. First select the new physics cube, then the new cube with Ctrl, and connect
+> them with **Distance / rope**. Now **Simulate**: the crate swings on the rope like a pendulum. Why
+> doesn't the cube fall too? It has no physics component, so it stays in the air as if nailed in
+> place. It's your hanging point.
 
 ### The player and the check before starting
 
-Play controls an actor with a **Player Controller**. You choose it by placing a part from **Players**,
-via right-click › **Make Player (control it in Play)** or in World Settings › **Player**. If there
-isn't one, Play starts a simulation instead and reports "Nothing to control yet".
+**Play** controls the actor with a **Player Controller**. You decide which one by placing a character
+from **Players** or via right-click › **Make Player**. If there's no player, Play starts a simulation
+instead and reports "Nothing to control yet."
 
-Before Play and Simulate, Studio checks the level. **Errors** (such as a joint pointing to a deleted
-actor) prevent the start: "Fix the errors above to play". **Warnings** only appear in the Output Log.
-
----
-
-## 11.7 Undo and History
-
-Every step saves the **entire document** after the change. Undo simply jumps back to the previous
-state. That's exact: there are no backward calculations that could go wrong. Studio keeps up to
-**500 steps**.
-
-> **Try it!** Move a few actors, change a color, delete something. Then **Edit › History…**: every
-> step is listed there by name. A click jumps to exactly that state.
-
-A change that changes nothing creates no step. During Play and Simulate, the level is locked: "Stop
-playing to edit the level".
+Before every start, the Studio checks the level. **Errors** (such as a joint pointing at a deleted
+actor) prevent the start; **warnings** only appear in the log.
 
 ---
 
-## 11.8 Content Drawer and built-in content
+## 11.4 Views: windows into the world
 
-The Content Drawer (**Ctrl+Space**) opens below the viewports, with four tabs and a search field.
+A **viewport** is a window into your 3D world. You can open up to four at once and have each one look
+differently, so you can see a thing from all sides.
 
-### Place Actors
+> **Imagine …** a photo and a floor plan of your house. In the photo, everything gets smaller
+> toward the back, which looks real (the **perspective** view). On the floor plan, all walls are as
+> long as they really are, no matter how far away, and you look exactly from above, from the front or
+> from the side (the **orthographic** view). To look at things, you take the photo; to line things up
+> precisely, the floor plan.
 
-Here you'll find more than 40 ready-made parts, sorted into groups. A click places one; dragging puts it
-exactly at the spot. The tooltip describes each one. A selection:
+Each viewport has its own bar at the top:
 
-- **Players:** Soldier (first-person shooter, online-capable), Character (a runner that jumps and
-  climbs steps), Hover Car, Rolling Ball, Drone, Micro Duck and Micro Duck (Rollers), the duck on
-  roller skates.
-- **Gameplay:** Orb (1 point), Star (10 points), Health Pack (heals 50), Ammo Box (60 rounds), Goal
-  (wins), Hazard (loses), Damage Zone, Checkpoint, Jump Pad, Teleporter (two linked pads), Message
-  Trigger, Moving Platform, Spinner, Target Dummy and Explosive Barrel.
-- **Shapes:** Cube, Sphere, Cylinder, Cone, Capsule, Plane (10 × 10 m), Torus, Ramp, Empty Actor.
-- **Physics:** Physics Cube, Sphere and Barrel, Crate Stack (10 crates), Pendulum, Hinged Door, Chain
-  (8 links), See-Saw and Sock, a crumpled sock at the Micro Duck's scale.
-- **Lights, Audio, World:** Point Light, Audio Source, Ambient Wind, City Ambience, Radio and the
-  Procedural City.
+- Viewport type: **Perspective** or a floor plan from **Top**, **Bottom**, **Left**, **Right**,
+  **Front** or **Back**.
+- **View Mode**, how things are drawn: **Lit** with light and shadows, **Unlit** without light,
+  **Wireframe** with just the meshes' wire frames, or **Player Collision** with the shapes the
+  player bumps into.
+- **Show**: turn helpers on and off, such as the floor grid, icons for lamps, or the shapes the
+  physics calculates with.
+- a button to maximize a single viewport.
 
-> **Did you know?** When you place a Micro Duck, Studio automatically sets the physics to 100 Hz with
-> 16 sub-steps (in-between steps) and reports it in the log. A robot with servos is a long chain of
-> joints that would be pulled apart without enough in-between steps, and its network needs a fixed
-> rhythm.
+At the bottom left, the **axis indicator** shows the three directions: X red, Y green, Z blue.
+**Z points up.**
 
-### Textures
+> **Try it!** Use **Window › Viewport Layout** to set the layout to **4 viewports**. Click into
+> the perspective viewport and set its viewport type to **Top** (Alt+J). It jumps from **Lit** to
+> **Wireframe**: the floor plan is about lining things up precisely, and for that the wire frame shows
+> the edges most clearly. Alt+G brings the perspective back. With the maximize button you blow a
+> viewport up big and back again.
 
-Here you see all the level's textures (images for surfaces). **Import image** (or dragging an image
-onto the page) brings in PNG, JPEG or WebP; above 2048 px, Studio scales it down. If something is
-selected at the time, it gets the texture right away, and its color turns white. A **double-click**
-puts a texture on the selection; the trash can removes it (meshes then lose it). Textures live inside
-the level itself, so the file stays complete.
+### Flying through the world
 
-### Sounds
+Holding down the right mouse button, you fly through the world like in a video game (fly mode, called
+"Fly Mode" in Unreal Engine). The essentials:
 
-A **click** previews a sound, a **double-click** gives it to the selection as an Audio Source,
-**dragging** into the viewport places an Audio Source at that spot. **Import audio** takes WAV, MP3,
-OGG, M4A, FLAC and anything the browser can handle, up to 24 MB per file; undo reverses an import. The
-"Playing preview" button at the top of the tab stops the preview. Every sound field in Details also
-has a preview button.
+| Input | Effect |
+|---|---|
+| Right mouse button + W A S D | fly forward, left, back, right |
+| … + Q / E | down / up |
+| … + mouse wheel | fly faster or slower |
+| Mouse wheel alone | forward and back |
+| F | bring the selected actor into view |
 
-> **Watch out!** You don't hear anything? Browsers only allow sound after the first click or key press.
-> Click into Studio once, and then you'll hear it.
+All other combinations (orbiting, panning, camera bookmarks) are in
+[Chapter 17](17-reference.md).
 
-### Output Log
+**With your fingers** you steer like in a 3D viewer: one finger orbits around the point beneath it,
+two fingers zoom and pan, a tap selects, a double tap brings the selection into view, and a long press
+opens the context menu.
 
-All messages with the time, warnings and errors in color, the last 200 entries. In Play, game events
-show up here too; `clear` empties it.
-
----
-
-## 11.9 World Settings
-
-The **World Settings** tab next to Details applies to the whole level. It has four groups:
-
-- **Game:** Level name, Game title, which actor is the player, **Observer camera** (11.11), the
-  **Win condition** (None, Collect all pickups, Reach a goal trigger, Survive the time limit, Reach a
-  target score), Time limit, Target score and **Kill Z** (whoever falls lower starts over).
-- **Sky and light:** time of day (0 to just under 1), day length (0 = frozen), sun direction, fog,
-  exposure, ambient occlusion, shadow range (2 to 2000 m, default 80; smaller means sharper), clouds,
-  endless ground and ground color.
-- **Physics (Box3D):** gravity, sub-steps (1 to 16), friction and bounciness of the ground, stiffness
-  and damping of contacts, how fast bodies stuck inside each other are pushed apart, and step rate
-  (15 to 480 Hz).
-- **Audio:** master volume, music, ambience, reverb, Doppler.
-
-> **Try it!** Open Orb Run and in World Settings slowly drag the label of **Time of day** back and
-> forth. The city turns to night, and the windows start to glow.
+> **Imagine …** you're spreading a map bigger with two fingers: the spot under your fingers stays
+> under your fingers, whether you're zooming in on a sock or on a city block.
 
 ---
 
-## 11.10 The logic editor
+## 11.5 Selecting and moving
 
-Every actor, and the level itself, can carry a **logic graph**, modeled on the Blueprints in Unreal:
-instead of code, you connect little boxes (nodes) with wires. You open it via **Logic** in the toolbar
-(level), **Logic** in Details or **Edit Logic** / **Add Logic (Blueprint)** in the context menu
-(actor). It then lies on top of the viewports.
+Before you change something, you select it. Moving is then done **only** with the gizmo, the colorful
+handle. Dragging with the left mouse button, on the other hand, always just draws a **selection
+box**, even if you start on an actor. That way you never move something by accident when you only
+meant to select.
 
-The editor has a toolbar (**Viewport** to go back, **Compile** with a traffic light OK/warning/error,
-Save, Find, choice of Blueprint (level or actor), Templates, **C++** export, rectangle selection for
-touch, help), on the left **My Blueprint** with graphs (Event Graph, State Machines), variables (with
-live values while playing) and events, in the middle the graph with tabs, and on the right details on
-the node, variable, comment, state or transition. At the bottom, **Compiler Results** and **Find
-Results** list problems and matches; a click jumps to the node.
+### Selecting
 
-An empty graph offers starter buttons: **Begin Play**, **On Interact**, **On Begin Overlap**, **Event
-Tick** and **Templates…**. The five templates: a door that opens on Interact; a score zone (+10); a
-spawner (a cube every 3 s, at most 10); a traffic light as a state machine; and a Micro Duck that walks
-and turns away when its distance sensor sees something closer than 1.6 m.
+- In the viewport: a click selects, Shift+click adds, Ctrl+click toggles, a click on empty space
+  clears the selection.
+- In the Outliner, Shift+click works like in a file list: it adds **everything between** the last
+  selected actor and the one you clicked. Ctrl+click adds or removes single ones.
+- Dragging with the left button catches all actors inside the box.
+- Lamps and empty actors have no visible shape; you select them via their icon.
+- The **last** selected actor is the most important: that's where the gizmo sits.
 
-> **Try it!** New level **Basic**, then **Logic** in the toolbar, **Begin Play**. Drag a wire from the
-> output "then" into empty space, type "show message", Enter, and fill in a text. Back with
-> **Viewport**, place a **Rolling Ball**, **Play**: your text is in the HUD. Your first program,
-> without any code!
+### The gizmo
 
-When Play starts, Kern compiles every graph to WebAssembly machine code; a graph with errors is
-switched off and reported in the Output Log, and the rest of the game keeps running. **Compile** (F7)
-shows the errors in advance. **C++** downloads the graph as readable source code; built into a game of
-your own, it runs as native code ([Chapter 12](12-your-own-games.md)). Breakpoints set with **F9**
-pause the game as soon as the node runs. Everything else is in [Chapter 9](09-logic.md).
+- **Move (W)**: three arrows for moving along one direction, small squares for two directions at
+  once.
+- **Rotate (E)**: three rings for rotating.
+- **Scale (R)**: three handles for stretching and a center handle for scaling up evenly.
+
+The handle under the pointer lights up yellow. All selected actors are moved, and children move along.
+
+A toolbar button, **World / local coordinates**, decides what the gizmo lines up with: the world, or
+the actor itself (local). It's like "north" versus "forward": north is the same for everyone,
+"forward" depends on where the actor is currently facing. A car standing at an angle can be pushed,
+in local mode, exactly in its driving direction.
+
+> **Try it!** From **Content Drawer › Shapes**, place a **Cube**, select it, hold **Alt** and drag
+> the move gizmo. You pull out a **copy**, and the original stays where it was. Press **Esc** while
+> dragging, and everything is as before.
+
+### Snapping
+
+Snapping means things click into place: when you move, the actor jumps in fixed steps, at first every
+0.5 m; when you rotate, in 15° steps. That way edges line up neatly and walls stand perfectly
+straight. You pick the step size in the toolbar next to the **Grid snap**, **Rotation snap** and
+**Scale snap** buttons.
+
+> **Imagine …** magnets on graph paper: they always snap to the nearest line, so everything stands
+> neatly in a row.
+
+### Outliner and Details
+
+The **Outliner** is the list of all actors. Here you select, bring an actor into view with a
+**double-click** on its name, rename (F2 on an actor, double-click on a folder), show and hide with
+the eye, and attach actors to each other by dragging (11.3). The actor you control when playing
+carries the **PLAYER** badge.
+
+**Details** shows the properties of the selection: at the top, name and **Transform**, below that one
+section per component. If you select several actors, you see what they all have in common, and a
+change applies to all of them. Three tricks:
+
+- You can **do math** in number fields: `2*3` or `10/4+1`.
+- **Drag the name** of a number field sideways to change the value, like turning a knob.
+- A small arrow to the right of a field, **Reset to default**, sets the value back to the default.
+
+![A selected actor: the gizmo on the actor, its transform and components in Details on the right](../buch/bilder/studio-selected.png)
 
 ---
 
-## 11.11 Play and Simulate
+## 11.6 Undo and history
 
-Studio knows three states: **Editing**, **Simulating** and **Playing**. In the two running ones, the
-level is locked, and whatever happens in the simulation disappears again on Stop (unless you keep it).
+Undo means taking something back (**Ctrl+Z**, in the menu **Edit › Undo**). The Studio does this in
+the simplest and safest way: after every step, it remembers the **entire state** of the level. Undo
+simply jumps back to the previous state.
 
-> **Imagine …** you set up dominoes on the table. **Simulate** means: give them one push and watch.
-> **Play** means: be a figure yourself that runs through them. And after Stop, everything stands there
-> exactly as before, as if rebuilt by magic.
+> **Imagine …** you take a photo of your whole craft table after every move. If you want to go back,
+> you lay everything out the way it was in the previous photo. The alternative would be to remember
+> only the moves and carry them out backward: "push the cube 2 m to the left" becomes "2 m to the
+> right." That goes wrong as soon as a backward step doesn't fit exactly. With photos, that can't
+> happen.
+
+The Studio keeps up to **500 steps**. A long drag on the gizmo, a number field or the color picker
+counts as **one** step, no matter how long you drag: the Studio recognizes that it all belongs to one
+move. And a change that doesn't change anything doesn't make a step.
+
+> **Try it!** Move a few actors, change a color, delete something. Then
+> **Edit › History...**: every step is listed there by name. One click jumps
+> to exactly that state.
+
+While playing and simulating, the level is locked; the Studio then reports something like "Stop
+playing to undo."
+
+---
+
+## 11.7 Images, sounds and the log
+
+Besides the parts, the **Content Drawer** has three more tabs.
+
+**Textures** are images you lay onto surfaces, like wallpaper. The **Import image** button brings in
+your own photos, and so does an image you simply drag onto the page. If something is selected at that
+moment, it gets the image right away. A **double-click** puts a texture on the selection. The images
+are then stored in the level itself, so the level file stays complete.
+
+**Sounds:** a click plays a sound, a **double-click** gives it to the selection as a sound source, and
+dragging into the viewport places a sound source at that spot. **Import audio** takes your own sound
+files in the usual formats.
+
+> **Watch out!** You don't hear anything? Browsers only allow sound after the first click or
+> key press. Click into the Studio once, and it plays.
+
+The **Output Log** is the log: all messages with their time, warnings and errors in color. While
+playing, game events show up here too.
+
+---
+
+## 11.8 World Settings
+
+The **World Settings** tab next to **Details** doesn't apply to one actor but to the whole level. It
+has four groups:
+
+- **Game**: the game rules. When do you win (all orbs collected, goal reached, time survived, score
+  reached)? Is there a time limit? And **Kill Z**: a height you must not fall below; Z is the axis
+  pointing up (axis indicator, 11.4). Anyone who falls lower gets reset, for example to the last
+  checkpoint, and keeps playing; that doesn't mean they've lost.
+- **Sky and light**: time of day, how fast the day passes, sun position, fog, clouds, ground.
+- **Physics (Box3D)**: gravity, and how precisely and how often the physics calculates.
+  Box3D is the physics engine inside Kern ([Chapter 6](06-physics.md)).
+- **Audio**: volumes, reverb, and the Doppler effect, the siren effect: a passing siren
+  first sounds higher, then lower ([Chapter 7](07-audio.md)).
+
+> **Try it!** Open Orb Run and in the **World Settings**, slowly drag the name of **Time of day**
+> back and forth. The city turns into night, and the windows start to glow.
+
+All fields with their ranges are in the blue book, Chapter 11.
+
+---
+
+## 11.9 Play and Simulate
+
+The Studio knows three states: editing, **Simulate**, where the world runs and you watch, and
+**Play**, where the world runs and you play along. Important: whatever happens while simulating and
+playing disappears again when you **Stop**. Your level stays untouched, unless you explicitly want to
+keep the result.
+
+> **Imagine …** you set up a domino run on the table. Simulating means: give it one push and watch.
+> Playing means: be a figure yourself who walks through it. And after stopping, everything stands
+> exactly as it did before, as if rebuilt by magic.
 
 ### Play
 
-**Play** (Alt+P) starts the game in the active viewport. The player gets the controls, the camera
-follows, and the HUD shows the title, pickups, score, time, best time and speed with a boost bar (for
-the soldier, crosshair, health and ammo).
+**Play** (Alt+P) starts the game in the active viewport. You control the player, the camera follows
+it, and the HUD (the display on top of the picture) shows points, time and speed, and for the soldier
+crosshair, health and ammo. On a computer, the Studio captures the mouse; if it's free, click into
+the picture once. When you win or lose, **Play again** appears. **Esc** ends playing.
 
-On the desktop, Studio captures the mouse. If it's free, it says "Click the viewport to control the
-game · Esc stops · F8 ejects". On a win or loss, "Victory" or "Game over" appears with **Play again**.
-**Ctrl+R** restarts, **Esc** ends.
+![Playing in the viewport: the hover car in Orb Run with HUD](../buch/bilder/studio-play.png)
 
-![Play in the viewport: the hovercar in Orb Run with HUD](../buch/bilder/studio-play.png)
-
-### Eject and Possess
-
-**F8** lets go of the player: the game keeps running, Studio switches to Simulating, and you fly around
-freely, select things and grab bodies. **F8** again (or Play) takes over the player again.
+**F8** lets go of the player (**Play › Eject from Player**): the game keeps running, you fly around
+freely and can grab things. Pressing **F8** again takes it over again (**Play › Possess Player**).
 
 ### Simulate
 
-**Simulate** (Alt+S) runs physics and rules without you controlling anyone. The best part: **you can
-touch things.** The left mouse button (or a finger) on a movable body grabs it. Dragging moves it,
-dragging upward lifts it, the mouse wheel (or a second finger) brings it closer or pushes it away, and
-letting go **throws** it with momentum. A short click only selects.
+**Simulate** (Alt+S) runs physics and rules without you controlling anyone. The best part:
+**you can touch things.** The left mouse button (or a finger) on a movable body grabs it, dragging
+moves it, and letting go **throws** it with momentum.
 
-> **Did you know?** The grab isn't a trick but real physics: a springy motor joint pulls the grabbed
-> point toward the pointer. That's why the body bumps into things, tips and swings like any other.
-> The grab also holds a Micro Duck upright, the way a hand holds the robot, and when it's lifted up it
-> pauses like the real robot ([Chapter 13](13-micro-duck.md)).
+> **Did you know?** The grab isn't a trick but real physics: a kind of invisible rubber band
+> pulls the grabbed point toward the mouse pointer. That's why the body bumps into things, tips over
+> and swings like any other.
 
-- **K** (Keep Simulation Changes) takes the simulated positions of the selected actors into the level,
-  as one undo step, and ends the simulation.
+- **K**, in the menu **Play › Keep Simulation Changes**, takes over the pose of the selected actors
+  into the level and ends the simulation.
 - **Pause**, then **.**, advances frame by frame, like a flip book.
-- The show flags **Collision Shapes**, **Constraints** and **Contact Points** make visible what Box3D
-  sees. The status bar counts bodies, awake bodies, joints, broken joints and contacts.
+- Under **Window › Show** you can make visible what the physics calculates with:
+  **Collision Shapes**, **Constraints** and **Contact Points**.
 
-![Simulate with collision shapes shown](../buch/bilder/studio-simulate.png)
+![Simulating with collision shapes shown](../buch/bilder/studio-simulate.png)
 
 > **Try it!** Load **File › Example Levels › Physics Lab** and press **Simulate**. Grab the rope
-> bridge, throw a crate at the stack, turn the hinge. Then stop with Esc, place a **Crate Stack**, start
-> **Simulate** again and knock it over with the mouse. Select all the crates in the Outliner
-> (Shift+click) and press **K**: the collapsed stack stays lying there as if it had always fallen over.
+> bridge, throw a crate at the stack, turn the hinge. Then stop with Esc, place a **Crate Stack** from
+> **Content Drawer › Physics**, start **Simulate** again, and knock it over with the mouse. Select the
+> crates in the Outliner (click the first, Shift-click the last) and press **K**: the collapsed
+> stack stays lying there, as if it had always fallen over.
 
-![Physics Lab: all joint types in the simulation](../buch/bilder/studio-physics-lab.png)
+![Physics Lab while simulating: rope bridge, door, pendulum and crate stack; the status bar counts bodies and joints](../buch/bilder/studio-physics-lab.png)
 
-### Observer camera
+### Watching with the observer camera
 
-With World Settings › **Observer camera**, Play doesn't start behind the player but with a free
-camera: the game runs, you watch and step in. On the desktop you fly with W A S D, Q/E and Shift,
-without a mouse button, and dragging into empty space looks around; on a phone, one finger looks
-around, two zoom. Grabbing bodies works as in Simulate, **F8** takes over the player, and F8 again goes
-back to watching. The Micro Duck level starts this way.
+If you turn on the **Observer camera** in the **World Settings**, Play doesn't start behind the
+player but with a free camera: the game runs, you watch, and you can grab things as when simulating.
+**F8** takes over the player, and F8 again goes back to watching. The Micro Duck level starts like
+this.
 
----
+### On the phone and with a gamepad
 
-## 11.12 Mobile, touch and gamepad
+Kern notices by itself what you're playing with right now (fingers, keyboard or gamepad) and switches
+over. On a touchscreen there are two sticks at the bottom: the left one moves, the right one looks
+(**LOOK**). Their labels and the buttons next to them adapt to the character: for the soldier, the
+left stick is called **MOVE**, and next to it there are, for example, **JUMP**, **RELOAD** and
+**AIM**; for the hover car it's called **STEER / GAS**, plus **BOOST**, **DRIFT** and **LIFT**. At the
+top left are **⟵ EXIT** and **❚❚ PAUSE**.
 
-### Which device is in control right now?
+![Orb Run on a phone in portrait mode: ⟵ EXIT and ❚❚ PAUSE at the top, the touch sticks STEER / GAS and LOOK at the bottom](../buch/bilder/phone-play-390.png)
 
-Kern notices by itself what you're playing with and switches to the device used most recently: a
-finger switches to touch, any real key to desktop (even on a phone), a gamepad as soon as a button is
-pressed or a stick is pushed past 0.22. A mouse only switches to desktop on devices with a fine
-pointer; on a tablet it keeps the touch layout. Capturing the mouse (pointer lock) exists only with a
-mouse.
-
-### Play on a touchscreen
-
-Play on a phone fills the whole screen with one viewport. At the top left are **⟵ EXIT** and
-**‖ PAUSE** (or **▶ RESUME**). At the bottom are **two sticks** of 168 px (smaller only if two don't
-fit): the left one moves (**MOVE**, for vehicles **STEER / GAS**, for the flyer **FLY**), the right
-one looks (**LOOK**). If you drag the right stick beyond its ring, the camera keeps turning. Pushing
-the left stick all the way forward means sprinting; the ring then lights up. Dragging on the screen
-also looks around, and with the soldier holding a weapon, a finger on the screen fires and keeps
-aiming as long as it stays there.
-
-Next to them, buttons appear depending on the character: for the soldier JUMP, RELOAD, AIM, CROUCH,
-USE; for the runner JUMP and USE; for the ball JUMP and BOOST; for the flyer UP, DOWN, BOOST; for
-vehicles BOOST, HOP and USE; for the Micro Duck QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE
-and HOP. Buttons only appear if the character has that ability. When the last finger lifts or the page
-goes into the background, the engine lets go of everything; nothing gets stuck.
-
-![Play on a phone in portrait mode: EXIT, PAUSE and the touch sticks](../buch/bilder/phone-play-390.png)
-
-### Gamepad
-
-Gamepads with an Xbox layout work in Studio and in the exported game; as in SpawnCity, Kern filters
-out small wobbles (dead zones) and lets the sticks respond smoothly (curves). Left stick moves, right
-stick looks, RT fires, LT aims, A jumps, B crouches, X reloads, Y uses, L3 or LB sprints, Start
-pauses. For the flyer, RB and LB go up and down.
+A **gamepad** (game controller) works in the Studio and in the finished game: left stick moves,
+right stick looks. Kern ignores small wobbles of the sticks. The full mapping and all touch buttons
+are in the blue book, Chapter 11.
 
 ---
 
-## 11.13 Controlling the Micro Duck
+## 11.10 Logic: rules without code
 
-The Micro Duck is the two-legged robot by Pollen Robotics that walks in Kern on its real, trained
-networks. How it works inside is told in [Chapter 13](13-micro-duck.md); here it's about operating it.
+Every actor and the level itself can carry a **logic graph**: instead of writing program code, you
+connect little boxes (**nodes**) with wires. Each box does one thing, and the wires say what comes
+next. In Unreal Engine something like this is called a **Blueprint**, which is why the word shows up
+in the Studio too. How graphs work inside is explained in [Chapter 9](09-logic.md).
 
-**The example level** (File › Example Levels › Micro Duck) is a room at its scale with furniture, a
-ball and two socks. The duck walks on its own. Even without extras, it plays ball as in Pollen's
-original software: walk up, line up, kick with the left foot. With **Kern extras** (on in the
-example), Kern's own play layer with ball and socks takes over instead. The level graph makes it
-chirp (node "Chirp") as soon as its head camera sees the ball. Play starts with the Observer camera;
-**F8** takes over the duck.
+> **Imagine …** a chain reaction of dominoes: an event pushes the first domino, and the wire
+> passes the push on to the next box, which does something.
 
-**Without input** it is **Autonomous**: it explores the room with its distance sensor (ToF) and
-camera, steers around obstacles and gets back up by itself after a fall. If you lift it by its body,
-it pauses ("Held") and keeps walking once it's set down.
+You open the logic editor via **Logic** in the toolbar (the level's logic), via **Logic** in
+**Details**, or via right-click › **Edit Logic** or **Add Logic (Blueprint)** (an actor's logic). It
+lies on top of the viewports; the **Viewport** button takes you back. In the logic editor itself, the
+labels stay English, even in the German interface.
+
+An empty graph offers start buttons, the events that get everything rolling: **Begin Play** (when the
+game starts), **On Interact** (when the player uses something), **On Begin Overlap** (when someone
+enters a zone) and **Event Tick** (at every moment). Under **Templates…** there are ready-made
+examples: a door that opens when used, a zone that gives points, a spawner that creates cubes
+regularly, a traffic light, and a Micro Duck that turns away from obstacles.
+
+> **Try it!** New level **Basic**, then **Logic** in the toolbar and **Begin Play**. On the right of
+> the node is the output "then." Drag a wire from there into empty space with the mouse and let go: a
+> search opens. Type "show message" and press Enter. The new node is already attached to the wire;
+> enter a sentence in its text field. Back with **Viewport**. The level doesn't have a player character
+> yet, and without one there's nothing to play; so place a **Rolling Ball** from
+> **Content Drawer › Players**, and it becomes your player. Now **Play**: your text is in the HUD.
+> Your first program, without any code!
+
+**Compile** (F7) checks the graph in advance and shows errors with a traffic light.
+
+> **For the curious:** At startup, Kern translates every graph into machine code in a flash, so it
+> runs as fast as a written program. The **C++** button even saves the graph as readable program
+> text ([Chapter 12](12-your-own-games.md)). All nodes and keys of the logic editor are in
+> [Chapter 9](09-logic.md).
+
+---
+
+## 11.11 Controlling the Micro Duck
+
+The Micro Duck is a small two-legged robot by Pollen Robotics. In Kern it walks with the same trained
+**networks** as the real robot: programs that weren't told how to walk but learned it by practicing.
+How that works is told in [Chapter 13](13-micro-duck.md); here it's about operating it.
+
+The example level **File › Example Levels › Micro Duck** is a duck-sized room with furniture, a ball
+and two socks. **Play** starts with the observer camera: the duck walks on its own, explores the room,
+avoids obstacles, plays with the ball, and gets back up after a fall. If you lift it by the torso, it
+holds still and walks on as soon as you set it down. With **F8** you take it over.
 
 | Key | Movement |
 |---|---|
 | W / S, A / D | walk, turn |
-| Space bar | quack |
-| 1 / 2 | sit down or stand up / pick up |
-| 3 / 4 | kick with the left / right foot |
-| 5 / 6 | roll / open and close the beak |
-| 7 | jump (Kern's own movement) |
-| V | "Wheee" ride, as long as held |
+| Space | quack |
+| 1 / 2 | sit down or stand up / pick something up |
+| 3 / 4 | kick with left / right |
+| 7 | jump |
 
-On a touchscreen, **HOP** is the jump, QUACK quacks, WHEEE rides, and the other buttons correspond to
-1–6; on a gamepad, RT quacks, LT starts the Wheee ride (both open the beak), B makes it sit or stand
-up, Y picks up, X rolls. In logic graphs, you control it with the nodes in the **Robots** category
-(Walk, Look, Robot ToF, Robot Camera Sees, Robot Move with "jump" …).
+More keys and the phone and gamepad mapping are in [Chapter 17](17-reference.md).
 
-During the game, Studio shows at the top right what the duck perceives (Window › Show › **Robot
-Camera**): **HEAD CAMERA**, the image from its head camera with its state (or "Fallen"), and **TOF
-8×8**, the grid of its distance sensor: red an obstacle (brighter the closer it is), green floor,
-yellow too close, dark nothing, plus the smallest distance in meters or "clear".
+During the game, the Studio shows at the top right what the duck perceives: the image from its **head
+camera** and the grid of its **distance sensor** (ToF, a distance meter using light that scans
+8 × 8 directions at once). Red is an obstacle, brighter the closer it is, green is the floor, yellow
+is too close.
 
-> **Try it!** Load the Micro Duck level, press **Play** and watch it for a while. Then lift the ball
-> with the mouse and put it down somewhere else. Finally, **F8** and key **7**: the duck jumps!
+> **Try it!** Load the Micro Duck level, press **Play** and watch it for a while. Then grab the ball
+> with the mouse, as when simulating, and put it somewhere else. Finally **F8** and the **7** key:
+> the duck jumps!
 
----
-
-## 11.14 Loading policies (jump.onnx, play.onnx)
-
-The duck's movements are neural networks (**policies**) in the ONNX file format. The walking network
-`velstand.onnx` is built in; the page loads all the others as soon as a level contains a duck:
-
-- **Pollen's networks** (from the `microduck/` folder) for sitting, picking up, kicking, rolling,
-  roller skates.
-- **`jump.onnx`** (from `policies/`), trained by the Kern Lehrer: the jump.
-- **`play.onnx`** (from `policies/`), also from the Lehrer: the play layer with ball and sock, only
-  with **Kern extras**.
-
-The engine reports which files are missing, the page fetches them, and the engine checks each one and
-stores it under its name. If a file fails, the page tries again after 5 s, 10 s, 20 s …; the interval
-grows up to at most one minute. Until then, the duck stays put for that movement and says why.
-
-> **Did you know?** Networks you train yourself with the Kern Lehrer in the browser
-> ([Chapter 14](14-lehrer.md)) end up in the storage of the same browser. Studio loads them at startup
-> and right away again when the Lehrer reports a newer one. So your own `jump.onnx` replaces the one
-> that ships with Kern, without you copying a file.
-
-If you put an exported game with a duck online yourself, put the `microduck/` and `policies/` folders
-next to the HTML file, together with Pollen's license and NOTICE (11.16 and
-[Chapter 12](12-your-own-games.md)).
+Each of the duck's movements is a network of its own. Walking is built in; the other movements
+(sitting, kicking, jumping …) the Studio fetches from the internet as soon as a level contains a duck.
+If that doesn't work, the Studio tries again later; until then the duck keeps walking with its built-in
+walking network.
+If you train a new one yourself with Kern Lehrer ([Chapter 14](14-lehrer.md)), the Studio
+automatically uses yours. The details are in [Chapter 13](13-micro-duck.md).
 
 ---
 
-## 11.15 Saving, loading, autosave and settings
+## 11.12 Saving, autosave and preferences
 
-### The `.klevel` file
+A level is **one single file** with the extension `.klevel`. It really contains everything: the
+actors, the logic, and even your imported images and sounds. So you can simply send it to someone.
 
-A level is a text file in JSON format with the extension `.klevel`. It contains the name, World
-Settings, editor camera, actors, logic and even textures and imported sounds. So a file is
-**complete**; you can send it to someone. If it comes from a newer Studio version, Studio rejects it
-with "level was written by a newer Kern Studio".
-
-### Saving and opening
-
-**Ctrl+S** saves. In Chrome and Edge, Studio asks for the location the first time and after that
-writes straight into the same file; in other browsers, it downloads `<level name>.klevel`.
-**Ctrl+Shift+S** always asks again. The file name is the level name; everything except letters,
-digits, `-` and `_` becomes `_`. **Ctrl+O** opens `.klevel` and `.json` files. Or you just drag a file
-onto the page: levels open, images become textures, audio files become sounds.
-
-On Android, the file dialog doesn't know the `.klevel` extension. So Studio doesn't filter there; if
-you pick something else, it says "… is not a Kern level", and everything keeps running.
+- **Ctrl+S** (**File › Save**) saves. Depending on the browser, the Studio asks for the location or
+  puts the file in your downloads.
+- **Ctrl+O** (**File › Open Level...**) opens a level file.
+- Or you **drag** a file onto the page: levels open, images become textures, sound files become
+  sounds.
 
 ### Autosave
 
-> **Imagine …** a guardian angel who looks over your shoulder but never gets on your nerves. It secretly
-> notes down what you haven't saved yet and tears up the note as soon as you save.
+> **Imagine …** a guardian angel looking over your shoulder who never gets on your nerves. It secretly
+> jots down what you haven't saved yet and tears up the note as soon as you save.
 
-That's exactly how the autosave works: at most 2 s after a change, Studio stores a copy in the browser,
-but only as long as something is unsaved. After saving (or when you undo everything back to the saved
-state), it disappears again. If you open another level, the copy stays until the new one gets changes
-of its own. When you leave the page, when it goes into the background, and before an update, it is
-written immediately; if there's anything unsaved, the browser asks when you leave. During Play and
-Simulate, nothing is written.
+That's exactly how the autosave works: shortly after each change, the Studio stores a copy in the
+browser, but only as long as something is unsaved. At the next start it offers **Restore** to restore
+the level, or **Dismiss** to throw the copy away. A restored level still counts as **unsaved**,
+because its content isn't in any file yet. Until you save it, the Studio offers it again at every
+start.
 
-At the next startup, Studio offers **Restore** or **Dismiss**. Restore loads the copy, but the level
-stays marked as unsaved, because it isn't in any file, after all; until you save, it's offered again
-at every startup. Dismiss deletes the copy. Separately from that, Studio remembers the level you last
-edited and opens it again.
+> **Watch out!** The autosave is a life preserver, not a place to store things. It keeps only **one**
+> copy in the browser. Anyone who clears the browser storage loses it. Save important levels as a
+> file with Ctrl+S.
 
-> **Watch out!** The autosave is a life preserver, not a place to store things. It holds only **one**
-> copy in the browser. If you clear the browser storage, you lose it. Save important levels as a file
-> with Ctrl+S.
+### Preferences
 
-### Settings
-
-Studio only remembers what **you yourself** have changed: Preferences, layout, grids, axes, sound and,
-per viewport, view, View Mode, field of view and show flags. Everything else follows the defaults of
-the respective version. Under **Edit › Preferences…** you set camera speed, mouse sensitivity,
-inverted mouse, orbiting around the selection and the three grids (defaults: speed 4, sensitivity 1,
-grid 0.5 m and 15° on, scaling 0.25 off). **Edit › Reset Settings to Defaults…** asks first and resets
-everything, including panel sizes and the Content Drawer; your levels stay untouched.
+Under **Edit › Preferences...** you set how fast the camera flies, how sensitive the mouse is, and how
+fine the snapping is. The Studio only remembers what **you yourself** changed. Everything else follows
+the default values of the current version; if a new version brings better defaults, you get them
+automatically, without losing your own choices.
+**Edit › Reset Settings to Defaults...** resets everything; your levels stay untouched.
 
 ---
 
-## 11.16 Exporting a game
+## 11.13 Exporting a game
 
-Now comes the magic moment. **File › Package Game (HTML)...** or the package button opens the
-**Package Game** dialog:
+Now comes the magic moment: your level becomes a finished game that anyone can play without the
+Studio.
 
-1. Enter the **Game title**.
-2. Click **Package**.
-3. Studio downloads `<title>.html` and offers **Play it**.
+1. **File › Package Game (HTML)...** or the package button in the toolbar.
+2. Enter a **Game title**.
+3. Click **Package**. The Studio downloads a file `<Title>.html` and offers **Play it**.
 
-This **one file** is a complete game: engine, game host and level are inside it (the engine as Base64
-text, the level as JSON). It needs no server and no internet and runs in the browser, even straight
-from the hard drive (`file://`) and on a phone. At startup it doesn't open an editor window but goes
-straight into the game.
+HTML is the file format of web pages. That's why double-clicking the file opens it in your browser,
+just like a web page. This **one file** is a complete game: the engine and your level are inside it.
+It needs no server and no internet, runs in any browser, even straight from the hard drive and on a
+phone, and starts the game right away instead of the editor. The controls are the same as when
+playing in the Studio; **P** pauses, **R** restarts after winning or losing. The file can also play
+online ([Chapter 10](10-networking.md)).
 
-In the exported game, the controls from Play apply. In addition: a click captures the mouse, **Esc**
-releases it and pauses, **P** pauses, **R** or Enter after a win or loss restarts, as does
-**Ctrl+R**; **F8** switches to the player and back with the Observer camera; on a touchscreen there's
-a ↻ at the top left. At the bottom there's a key hint (hidden on a touchscreen). The file can also
-play online (`?host=`, `?join=`, see [Chapter 10](10-networking.md)).
+> **Watch out!** Games with the Micro Duck need two folders with the duck's loadable movements next
+> to the HTML file when you pass them on; otherwise it can only walk. And the duck's look may only be
+> used **non-commercially**. What you're allowed to do and what you have to include is in
+> [Chapter 12](12-your-own-games.md).
 
-> **Watch out!** There are two things you need to know when passing it on. First, the Micro Duck's
-> loadable networks are **not** in the file: walking works without them, but for sitting, kicking,
-> jumping and playing, the `microduck/` and `policies/` folders belong next to it. Second: the module
-> contains Pollen's 3D models of the Micro Duck, which may only be used non-commercially. If you want
-> to sell, build a commercial version without these models ([Chapter 12](12-your-own-games.md)).
-
-> **Try it!** Export Orb Run, open the file with **Play it** and send it to your own phone. The touch
-> sticks appear there by themselves.
+> **Try it!** Export Orb Run and start the file with **Play it**. Then get it onto your phone: the
+> most reliable way is to put it in a cloud storage you also use on your phone (some mail programs
+> block email attachments with HTML files). Open it on the phone; if the phone doesn't show it as a
+> game right away, choose "Open with" and your browser. The touch sticks appear by themselves.
 
 ---
 
-## 11.17 Multiplayer
+## 11.14 Multiplayer
 
-### Multiple players in the editor
+How Kern connects players over the network is explained in [Chapter 10](10-networking.md). Here's
+just how to operate it.
 
-**Play › Number of Players** starts Play with 2, 3 or 4 players. The world is then a listen server (a
-server that plays along itself), and every additional player is a real network client with its own
-world and its own viewport.
+### Several players on one computer
 
-1. Play › Number of Players › **2 Players (listen server)**.
-2. **Play**. Studio switches to four viewports: 1 shows the server, 2 the first client. Each has its
-   own HUD.
+1. **Play › Number of Players** and there **2 Players (listen server)**, up to 4.
+2. **Play**. From the single view, the Studio switches to four viewports: 1 shows the server, 2 the
+   first guest. Each has its own HUD.
 3. Only the player in the active viewport gets your input. A click into another one switches.
-4. **Play › Network Emulation** makes the connection worse, from "Perfect" to "Terrible (300 ms, 20%
-   loss)".
-5. The status bar shows role, players, ping, loss and data rate.
+4. **Play › Network Emulation** deliberately makes the connection worse, from **Perfect** to
+   **Terrible (300 ms, 20% loss)**.
 
-![Two players in the editor: listen server and local client in their own viewports](../buch/bilder/studio-multiplayer.png)
+What you can observe while doing this is described in the mission in [Chapter 10](10-networking.md),
+section 10.8.
+
+![Two players on one computer: server and guest in their own viewports, each with its own HUD](../buch/bilder/studio-multiplayer.png)
 
 ### Online between browsers
 
-Both open **the same level**. The host chooses **Play › Host Online Game...**, the guest **Join Online
-Game...**, both the same **Room** (default "kern") and, for different computers, the same **Relay**.
-Without a relay, tabs of the same browser find each other; if there's no host in the room, Join reports
-that after 4 s. For different computers, someone starts `node tools/net_relay.mjs` (needs the npm
-package `ws`, default port 8790), and everyone enters its address. **Leave Online Game** leaves the
-game; the host notices when a guest leaves.
-
-A host in a background tab keeps running so its guests don't drop out of the connection. Logic runs
-only on the host; changes reach everyone, including whoever joins later. How it works under the hood
-is in [Chapter 10](10-networking.md).
+Everyone opens the same level. One person chooses **Play › Host Online Game...**, the others
+**Play › Join Online Game...**, all with the same room name in the **Room** field (default "kern").
+With nothing in the **Relay (optional)** field, only tabs of the same browser find each other; for
+different computers, everyone enters the address of the same relay there (Chapter 10, section 10.11).
+**Play › Leave Online Game** leaves the game.
 
 ---
 
-## 11.18 Narrow screens and phones
+## 11.15 On the phone and on narrow screens
 
-Up to a window width of 900 px, or on touch devices with a height of at most 600 px, Studio switches to
-a compact layout:
+On small screens, the Studio rearranges the workshop so the world has room:
 
-- **The viewport gets the whole area.** You open Outliner, Details and World via the **Panels**
-  button as a sheet with large tabs, on the right in landscape, from the bottom in portrait (64 % of
-  the height). With nothing selected, it opens with the Outliner.
-- **Play and Simulate are always one tap away.** Together with Panels, they sit in a **dock** at the
-  right edge of the toolbar that stays put while the rest scrolls sideways. While playing, Pause,
-  Stop and Eject are there; whatever does nothing right now disappears, and the rest is touch-sized
-  (38 px and up).
-- Less important things (grid choice, axes button, console, physics statistics) are hidden, the
-  Content Drawer takes up at most just under half the height, and the page never scrolls sideways.
+- **The viewport gets the whole area.** You open the **Outliner**, **Details** and **World Settings**
+  via the **Outliner and Details** button, an icon without text; they unfold as a sheet, from the
+  bottom in portrait mode.
+- **Play and Simulate are always one tap away.** The buttons for playing and simulating sit in a dock
+  at the right edge of the toolbar that stays in place while the rest of the bar scrolls sideways.
+- Less important things are hidden.
+- **Nothing stays stuck down.** When the last finger leaves the screen or the page goes into the
+  background, Kern releases all input. Otherwise your character would keep walking as if someone
+  were still holding the stick.
 
-![Studio in an 820 px wide window](../buch/bilder/studio-narrow.png)
+![The Studio in a narrow window: the viewport gets almost the whole area](../buch/bilder/studio-narrow.png)
 
-![Phone in portrait mode: the dock with Play, Simulate and Panels](../buch/bilder/phone-dock-390.png)
+![The Studio on a phone in portrait mode: the dock with Play and Simulate on the right of the toolbar, the Outliner and Details icon at the top right](../buch/bilder/phone-dock-390.png)
 
-> **Try it!** Open Studio on your phone. Tap **Play** in the dock, then **EXIT**. Open **Panels**,
-> select an actor in the Outliner and change its color in **Details**.
+> **Try it!** Open the Studio on your phone. Tap Play in the dock, then **⟵ EXIT**. Open
+> **Outliner and Details**, select an actor in the Outliner, and change its color in **Details**.
 
 ---
 
-## 11.19 Architecture: why Studio is built this way
+## 11.16 Why the Studio is built this way
 
-### The editor logic is C++
+### One program for editor and game
 
-Studio is a single C++ class. It owns the document, the history, the selection, the four viewports,
-gizmos, Details, the parts catalog, menus, dialogs, settings, Play and the network game. The browser
-side contains **no** editor logic.
+The whole Studio, meaning selecting, gizmos, undo, playing, saving, is written in **C++**, the
+programming language the engine is written in too. It runs in the same program package as the
+finished game. That has two big advantages. First, there's no second version that could calculate
+differently: whatever works in the editor works the same way in the exported game. Second, the whole
+editor can be tested automatically, without any browser.
 
-That has two big advantages. First, the editor runs exactly the code of the exported game; there is no
-second version that could drift apart. Second, the whole editor can be tested without a browser:
-Kern's tests operate navigation, gizmos, Play, saving and autosave directly in C++.
+### Everything is an order slip
 
-### Everything is a command
+> **Imagine …** a restaurant. The browser page is the waiter: it takes your order (click, key),
+> brings it to the kitchen, and carries the food out (draws the lists and buttons). Cooking happens
+> only in the kitchen, in the C++ part. And every order is a neat slip.
 
-> **Imagine …** a restaurant. The browser side is the waiter: it takes your order (click, key), brings
-> it to the kitchen and carries the food out (draws the panels). The cooking happens only in the
-> kitchen, in the C++ module. And every order is a proper ticket.
+**Everything** you do in the Studio, including every menu item, becomes such a slip, a short
+**command**. Because every action is a slip, an automatic test can write exactly the same slips you do
+and operate the whole Studio that way. The browser page itself only handles what a browser can do and
+C++ can't: opening and saving files, the clipboard, decoding images and sounds, playing sound, and
+sending network packets.
 
-These tickets are small JSON commands like `{"cmd": "spawn", …}`. **Everything** you do in Studio is
-such a command, including every menu entry. There are commands for selection, actors, properties,
-history, Play, network, views, panels, documents, sound, settings and logic. The page talks to the
-module through a set of flat C functions (the **C ABI**, whose names start with `kern_studio_`), for
-example one for each frame, one for keys and one for commands. The `set` command changes properties via
-paths in the actor's JSON form, such as `transform.position`. The complete list is in the blue book
-and in [Chapter 17](17-reference.md).
+> **Did you know?** An automatic browser test operates the whole Studio like a human: menus,
+> flying, tools, undo, playing, simulating, logic, Micro Duck, multiplayer, export and the
+> phone view. Most of the pictures in this chapter come from exactly this test.
 
-### The thin browser side
+The exact commands and interfaces are in the blue book, Chapter 11, and in
+[Chapter 17](17-reference.md).
 
-For each screen frame, the page reports the viewport rectangles, polls the gamepad, lets the module
-compute and draw, tops up the sound and sends network packets. Then it picks up requests (capture the
-mouse, clipboard, dialog, save a file …) and redraws a panel only when its content has changed. Every
-200 ms it loads textures, sounds and networks; every 500 ms it checks autosave and settings. It only
-does what a browser can do and C++ can't: file dialogs, downloads, clipboard, decoding images and
-audio, browser storage, sound output and network packets.
+---
 
-> **Did you know?** An automated browser test operates all of Studio like a human: menus, Fly Mode,
-> tools, Outliner, Details with undo, Play, Simulate, logic, Micro Duck, multiplayer, export, restore
-> and phone layouts. Most of the pictures in this chapter come from exactly this test.
+## 11.17 The most important keys
+
+**F1** shows the shortcuts in the Studio at any time. For starters, these are enough:
+
+| Key | Effect |
+|---|---|
+| Q / W / E / R | Select / Move / Rotate / Scale |
+| Ctrl+Z / Ctrl+Y | undo / redo |
+| Ctrl+C / Ctrl+V, Ctrl+D | copy / paste, duplicate |
+| Delete | delete |
+| F | bring the selection into view |
+| Ctrl+S / Ctrl+O | save / open |
+| Ctrl+Space | open and close the Content Drawer |
+| Alt+P / Alt+S | Play / Simulate |
+| Esc | stop playing, cancel dragging |
+| F8 | let go of or take over the player |
+
+> **Did you know?** Copied actors land as text in your computer's clipboard. A Ctrl+V
+> in **another tab** pastes them there. That's how you carry parts from one level to the next.
+
+More keys are in [Chapter 17](17-reference.md), those of the logic editor in
+[Chapter 9](09-logic.md). The complete list is in the blue book, Chapter 11.
 
 ---
 
 ## What you take away
 
-- Kern Studio works like Unreal: **actors** with **components**, edited in viewports, Outliner,
-  Details and World Settings.
-- **Right mouse button + W A S D** flies, **Q/W/E/R** picks the tool, **Alt + gizmo** pulls out a
-  copy, **F** brings the selection into view.
-- The **Content Drawer** has more than 40 ready-made parts, from Orb to Micro Duck.
-- **Simulate** lets you grab and throw bodies, **K** keeps the result, **Play** makes you the player,
-  **F8** switches between the two.
-- Undo is exact (up to 500 steps); the **autosave** rescues unsaved work but doesn't replace Ctrl+S.
-- **Package Game** turns your level into **one HTML file** that runs anywhere.
-- **Number of Players** and **Host/Join** bring multiplayer, and everything works on a phone too.
-- The editor logic is C++ in the same module as the game; everything is a JSON command.
+- A level consists of **actors**, and what an actor can do is decided by its **components**, like
+  bricks on a baseplate from a building-block set.
+- **Viewports** show the world as a photo (perspective) or as a floor plan (orthographic).
+- Select with a click or a box, move **only with the gizmo**; snapping keeps everything tidy.
+- **Undo** remembers the whole state after every step, so it never goes wrong.
+- **Simulate** means watching and touching, **Play** means playing along, and after stopping
+  everything is as before (unless you keep it with **K**).
+- The logic editor gives the level rules, without any code.
+- **Package Game** turns your level into an HTML file that runs anywhere.
+- Editor and game are the same C++ program; every action is a command.
 
 ## Brain teasers
 
-1. You drag over a cube with the left mouse button. Why doesn't it move?
-2. You made a crate stack collapse and want to keep it exactly like that. How?
-3. A friend gets your exported game with the Micro Duck, but the duck can only walk. What's missing?
-4. Why is a long drag in the color picker only one single undo step?
-5. What's the advantage of the editor logic running in the same C++ module as the exported game?
+1. You drag across a cube with the left mouse button. Why doesn't it move?
+2. You've made a crate stack collapse and want to keep it exactly like that. How?
+3. A crate is supposed to fall off a table but stays hanging in the air. What's it missing?
+4. Why can undo in the Studio never "go wrong"?
+5. What's the advantage of the editor and the exported game being the same program?
 
 ### Solutions
 
-1. Dragging with the left button always draws a selection rectangle. Things are moved only with the
-   gizmo (W).
-2. Let it collapse in **Simulate**, select the crates, press **K**.
-3. The `microduck/` and `policies/` folders with the loadable networks, next to the HTML file.
-4. Studio gives the whole action an ID, and the engine merges all changes with that ID into one step.
-5. What you see in the editor behaves exactly as in the finished game, and the editor can be tested
-   without a browser.
+1. Dragging with the left button always draws a selection box. Moving is done only with the gizmo (W).
+2. Let it collapse while **Simulate** is running, select the crates, press **K**.
+3. The **Rigid Body** physics component, with **Mobility** set to **Dynamic (simulate physics)**.
+   Without it, an actor stays where it is.
+4. The Studio doesn't calculate steps backward; it jumps back to a remembered complete state.
+5. Whatever you see in the editor behaves exactly the same way in the finished game, and the editor
+   can be tested automatically.
 
 ---
 
