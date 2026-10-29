@@ -42,23 +42,55 @@ work = pathlib.Path(tempfile.mkdtemp(prefix="kern-buch-"))
 ids = {p.name: "kap-" + p.stem.split("-")[0].lower() for p in files}
 mermaid_n = 0
 
+MERMAID_CFG = ('{"theme":"base","themeVariables":{"fontFamily":"DejaVu Sans","fontSize":"14px",'
+               '"primaryColor":"#ececec","primaryBorderColor":"#262626","primaryTextColor":"#262626",'
+               '"lineColor":"#262626","secondaryColor":"#d9e5f2","secondaryBorderColor":"#1d5c99",'
+               '"tertiaryColor":"#ffffff","clusterBkg":"#f7f7f7","clusterBorder":"#8c8c8c",'
+               '"edgeLabelBackground":"#ffffff","noteBkgColor":"#d9e5f2","noteBorderColor":"#1d5c99"},'
+               '"flowchart":{"curve":"linear"}}')  # the style of kern/docs/abbildungen (STIL.md)
+
+
 def mermaid(code):
-    """A Mermaid diagram as a print-resolution PNG (4x), set at its natural size or narrower."""
+    """A Mermaid diagram as a vector PDF in the figures' style, set at its natural size or narrower."""
     global mermaid_n
     mermaid_n += 1
-    mmd, png = work / "fig" / f"m{mermaid_n}.mmd", work / "fig" / f"m{mermaid_n}.png"
+    mmd, pdf = work / "fig" / f"m{mermaid_n}.mmd", work / "fig" / f"m{mermaid_n}.pdf"
     mmd.write_text(code)
     cfg = work / "fig" / "mmdc.json"
-    cfg.write_text('{"theme":"neutral","themeVariables":{"fontFamily":"DejaVu Sans"}}')
+    cfg.write_text(MERMAID_CFG)
     for attempt in range(3):  # headless Chromium now and then fails to start on a busy machine
-        if subprocess.run(["mmdc", "-q", "-i", str(mmd), "-o", str(png), "-s", "4", "-b", "white", "-c", str(cfg)]).returncode == 0: break
+        if subprocess.run(["mmdc", "-q", "-i", str(mmd), "-o", str(pdf), "--pdfFit", "-c", str(cfg)]).returncode == 0: break
     else: sys.exit(f"mmdc failed on diagram {mermaid_n}:\n{code}")
-    from PIL import Image
-    pw, ph = Image.open(png).size
+    from pypdf import PdfReader
+    box = PdfReader(pdf).pages[0].mediabox
+    pw, ph = float(box.width), float(box.height)
     text_w, max_h = w - 39.0 - 3.5, 185.0           # mm: the text block's width less the paragraph indent, the tallest a diagram may be
-    natural = pw / 4 / 96 * 25.4 * 0.85             # mm at 96 dpi, a little smaller (the book's type is smaller than the web's)
+    natural = pw / 72 * 25.4 * 0.85                  # mm, a little smaller than on screen (the book's type is smaller than the web's)
     width = min(text_w, natural, max_h * pw / ph)
-    return f"![]({png}){{width={width:.1f}mm}}"
+    import pdfplumber
+    with pdfplumber.open(pdf) as d: sizes = [c["size"] for c in d.pages[0].chars]
+    printed = min(sizes) * width / (pw / 72 * 25.4) if sizes else 99
+    if printed < 7: print(f"MERMAID TOO SMALL: diagram {mermaid_n} prints at {printed:.1f} pt (< 7 pt): {code.splitlines()[0]} / {code.splitlines()[1] if len(code.splitlines()) > 1 else ''}", file=sys.stderr)
+    return f"![]({pdf}){{width={width:.1f}mm}}"
+
+
+edition_name = "gelb" if "gelb" in src.name or "yellow" in src.name else "gruen" if "gruen" in src.name or "green" in src.name else "blau"
+lang_code = "en" if a.en or src.name.startswith("book") else "de"
+figures_built = False
+
+
+def figure(m):
+    """A figure of kern/docs/abbildungen (one SVG, texts per edition and language) as a vector PDF
+    at its own size (kern/tools/buch_abbildungen.py checks that it fits the text block)."""
+    global figures_built
+    if not figures_built:
+        r = subprocess.run([sys.executable, str(here / "buch_abbildungen.py"), "--edition", edition_name, "--lang", lang_code, "--out", str(work / "abb")])
+        if r.returncode: sys.exit("buch_abbildungen.py failed")
+        figures_built = True
+    f = work / "abb" / f"{m.group(2)}.{edition_name}.{lang_code}.pdf"
+    if not f.exists(): sys.exit(f"no figure {m.group(2)} for {edition_name}/{lang_code}")
+    return f"![{m.group(1)}]({f})"
+
 
 TEXT_W, TEXT_H = w - 39.0, h - 54.0  # mm: the text block (inner 22 + outer 17, top 20 + bottom 24 + head)
 
@@ -96,11 +128,14 @@ for i, p in enumerate(files):
     def img(m):
         alt, path = m.group(1), m.group(2)
         f = (src / path).resolve()
+        local = f.parent / lang_code / f.name  # screenshots of Studio in the book's language (bilder/de, bilder/en)
+        if local.exists(): f = local
         if not f.exists():
             print("missing image", path, file=sys.stderr)
             return ""
         return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
     t = re.sub(r"!\[([^\]]*)\]\(((?:\.\./buch/)?bilder/[^)\s]+)\)", img, t)
+    t = re.sub(r"!\[([^\]]*)\]\(\.\./abbildungen/([\w-]+)\.svg\)", figure, t)
     # Links to other chapters (with or without an anchor) point into the book.
     def link(m):
         text, target, anchor = m.group(1), m.group(2), m.group(3)
