@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -1206,7 +1206,7 @@ class StudioPage {
         break;
       }
       case "enum":
-        editor = `<select class="sel" ${attrs}>${mixed ? `<option value="" selected>Multiple values</option>` : ""}${(f.choices || []).map(([val, label]) => `<option value="${esc(val)}" ${!mixed && val === f.value ? "selected" : ""}>${esc(label)}</option>`).join("")}</select>`;
+        editor = `<select class="sel" ${attrs}>${mixed ? `<option value="" selected>${tr("Multiple values")}</option>` : ""}${(f.choices || []).map(([val, label]) => `<option value="${esc(val)}" ${!mixed && val === f.value ? "selected" : ""}>${esc(tr(label))}</option>`).join("")}</select>`;
         break;
       case "color": {
         const hex = typeof f.value === "string" ? f.value : "#ffffff";
@@ -1214,26 +1214,26 @@ class StudioPage {
         break;
       }
       case "actor": {
-        const opts = [`<option value="0">World (fixed point)</option>`].concat(ctx.actors.map(([id, name]) => `<option value="${id}" ${id === f.value ? "selected" : ""}>${esc(name)}</option>`));
+        const opts = [`<option value="0">${tr("World (fixed point)")}</option>`].concat(ctx.actors.map(([id, name]) => `<option value="${id}" ${id === f.value ? "selected" : ""}>${esc(name)}</option>`));
         editor = `<select class="sel" ${attrs}>${opts.join("")}</select>`;
         break;
       }
       case "texture": {
-        const opts = [`<option value="">None</option>`].concat(ctx.textures.map(t => `<option value="${esc(t.id)}" ${t.id === f.value ? "selected" : ""}>${esc(t.name)}</option>`));
+        const opts = [`<option value="">${tr("None")}</option>`].concat(ctx.textures.map(t => `<option value="${esc(t.id)}" ${t.id === f.value ? "selected" : ""}>${esc(t.name)}</option>`));
         editor = `<select class="sel" ${attrs}>${opts.join("")}</select><button class="ph" data-import-texture title="Import an image">${icon("plus")}</button>`;
         break;
       }
       case "sound": {
         const snd = ctx.sounds || {builtin: [], imported: []};
         const opt = (id, label) => `<option value="${esc(id)}" ${id === f.value ? "selected" : ""}>${esc(label)}</option>`;
-        let opts = (f.auto ? opt("auto", "Automatic") : "") + opt("", "None");
-        if (snd.imported?.length) opts += `<optgroup label="Imported">${snd.imported.map(x => opt(x.id, x.name)).join("")}</optgroup>`;
+        let opts = (f.auto ? opt("auto", tr("Automatic")) : "") + opt("", tr("None"));
+        if (snd.imported?.length) opts += `<optgroup label="${tr("Imported")}">${snd.imported.map(x => opt(x.id, x.name)).join("")}</optgroup>`;
         const groups = new Map();
         for (const b of snd.builtin || []) { if (!groups.has(b.category)) groups.set(b.category, []); groups.get(b.category).push(b); }
-        for (const [cat, list] of groups) opts += `<optgroup label="${esc(cat)}">${list.map(b => opt(b.id, b.name + (b.loop ? " (loop)" : ""))).join("")}</optgroup>`;
+        for (const [cat, list] of groups) opts += `<optgroup label="${esc(tr(cat))}">${list.map(b => opt(b.id, b.name + (b.loop ? " (loop)" : ""))).join("")}</optgroup>`;
         const known = f.value === "" || f.value === "auto" || (snd.builtin || []).some(b => b.id === f.value) || (snd.imported || []).some(x => x.id === f.value);
         if (!known && !mixed) opts += opt(f.value, `Missing: ${f.value}`);
-        if (mixed) opts = `<option value="__mixed" selected>Multiple values</option>` + opts;
+        if (mixed) opts = `<option value="__mixed" selected>${tr("Multiple values")}</option>` + opts;
         editor = `<select class="sel" ${attrs}>${opts}</select><button class="ph" data-preview-sound="${p}" title="Preview">${icon("play")}</button>`;
         break;
       }
