@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title data-en="Kern – The Book in Three Editions">Kern – Das Buch in drei Fassungen</title>
+<meta name="description" data-en-content="Kern: a 3D engine in C++ that runs in the browser, and a robot that learns to walk in it. One content, three hardcovers by Christian Heinrich Hohlfeld: Kern – The Book for professionals, Kern – Simply Explained for beginners and Kern – For Explorers for young readers aged 12 to 16. The software is open source and runs right away in your browser." content="Kern: eine 3D-Engine in C++, die im Browser läuft, und ein Roboter, der darin laufen lernt. Ein Inhalt, drei Hardcover von Christian Heinrich Hohlfeld: Kern – Das Buch für Profis, Kern – Einfach erklärt für Einsteiger und Kern – Für Entdecker für Jugendliche von 12 bis 16. Die Software ist Open Source und läuft sofort im Browser.">
+<link rel="canonical" href="https://kernengine.de/">
+<link rel="alternate" hreflang="de" href="https://kernengine.de/?lang=de">
+<link rel="alternate" hreflang="en" href="https://kernengine.de/?lang=en">
+<link rel="alternate" hreflang="x-default" href="https://kernengine.de/">
+<meta property="og:type" content="book">
+<meta property="og:title" data-en-content="Kern – The Book in Three Editions" content="Kern – Das Buch in drei Fassungen">
+<meta property="og:description" data-en-content="A 3D engine in C++ that runs in the browser – and a robot that learns to walk in it. Three books with the same content: for professionals, for beginners and for young readers aged 12 to 16." content="Eine 3D-Engine in C++, die im Browser läuft – und ein Roboter, der darin laufen lernt. Drei Bücher mit demselben Inhalt: für Profis, für Einsteiger und für Jugendliche von 12 bis 16.">
+<meta property="og:url" content="https://kernengine.de/">
+<meta property="og:image" content="https://kernengine.de/img/buch-cover.jpg">
+<meta property="og:locale" data-en-content="en_US" content="de_DE">
+<meta property="og:locale:alternate" data-en-content="de_DE" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0f2244">
+<script>
+// Language as in Kern Studio and the Lehrer (kern/web/studio/game.mjs, kern/web/lehrer/lehrer.mjs):
+// ?lang=de|en (remembered on this device under the same key), else the remembered choice, else the
+// browser's language (de* -> German, anything else -> English). The page is written in German;
+// in English every element with data-en gets its English text and every data-en-<attr> its attribute.
+const I18N_KEY = "kern.lang";
+function i18nPickLanguage() {
+  try {
+    const q = new URLSearchParams(location.search).get("lang");
+    if (q === "de" || q === "en") { localStorage.setItem(I18N_KEY, q); return q; }
+    const kept = localStorage.getItem(I18N_KEY);
+    if (kept === "de" || kept === "en") return kept;
+  } catch { /* storage blocked: follow the browser */ }
+  const langs = (navigator.languages?.length ? navigator.languages : [navigator.language]) || [];
+  return String(langs[0] || "en").toLowerCase().startsWith("de") ? "de" : "en";
+}
+const LANG = i18nPickLanguage();
+document.documentElement.lang = LANG;
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"Book","name":"Kern – Das Buch","alternateName":"Kern: Die Engine, Kern Studio, ein Laufroboter und der Lehrer","author":{"@type":"Person","name":"Christian Heinrich Hohlfeld","url":"https://christianhohlfeld.com"},"inLanguage":"de","bookFormat":"https://schema.org/Hardcover","isbn":"9798164877255","image":"https://kernengine.de/img/kern-blau-de.webp","url":"https://kernengine.de/","workExample":[{"@type":"Book","inLanguage":"en","name":"Kern – The Book","bookFormat":"https://schema.org/Hardcover"}]},
+{"@type":"Book","name":"Kern – Einfach erklärt","isbn":"9798166332516","alternateName":"Kern: Die Engine, Kern Studio, ein Laufroboter und der Lehrer – für alle, die verstehen wollen, wie Spiele und lernende Roboter funktionieren","author":{"@type":"Person","name":"Christian Heinrich Hohlfeld","url":"https://christianhohlfeld.com"},"inLanguage":"de","bookFormat":"https://schema.org/Hardcover","image":"https://kernengine.de/img/kern-gruen-de.webp","url":"https://kernengine.de/","workExample":[{"@type":"Book","inLanguage":"en","name":"Kern – Simply Explained","bookFormat":"https://schema.org/Hardcover"}]},
+{"@type":"Book","name":"Kern – Für Entdecker","isbn":"9798166332837","alternateName":"Kern: Wie Spiele, Physik und lernende Roboter funktionieren – für Jugendliche ab 12","author":{"@type":"Person","name":"Christian Heinrich Hohlfeld","url":"https://christianhohlfeld.com"},"inLanguage":"de","bookFormat":"https://schema.org/Hardcover","image":"https://kernengine.de/img/kern-gelb-de.webp","url":"https://kernengine.de/","typicalAgeRange":"12-16","workExample":[{"@type":"Book","inLanguage":"en","name":"Kern – For Explorers","bookFormat":"https://schema.org/Hardcover"}]}]}
+</script>
+<style>
+/* No third-party fonts, no trackers, no cookies: system fonts only. */
+:root {
+  --bg: #f4f5f2; --surface: #ffffff; --ink: #14181c; --muted: #59626a; --line: #d8dcd6;
+  --navy: #0f2244; --navy-2: #16305d; --sky: #9cc4ff; --blue: #2f7bf6; --blue-ink: #ffffff;
+  --accent: #1f6f5c; --signal: #f5b301;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0e1114; --surface: #161a1e; --ink: #e8ecea; --muted: #9aa39f; --line: #283036; --accent: #4fbf9f; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0e1114; --surface: #161a1e; --ink: #e8ecea; --muted: #9aa39f; --line: #283036; --accent: #4fbf9f; color-scheme: dark; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-text-size-adjust: 100%; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font: 500 12px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); font-stretch: 110%; text-wrap: balance; }
+h2 { margin: 0 0 12px; font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; letter-spacing: -.01em; }
+h3 { margin: 0 0 6px; font-size: 19px; line-height: 1.25; }
+p { margin: 0 0 14px; }
+section { padding-block: clamp(56px, 9vw, 96px); }
+.intro { max-width: 64ch; color: var(--muted); font-size: 18px; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 22px; border-radius: 8px; font: 600 16px/1.2 var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+.btn.primary { background: var(--signal); color: #1a1300; }
+.btn.primary:hover { background: #ffc626; }
+.btn.ghost { border-color: rgba(255,255,255,.35); color: #fff; }
+.btn.ghost:hover { border-color: #fff; }
+.btn.line { border-color: var(--line); background: var(--surface); color: var(--ink); }
+.btn.line:hover { border-color: var(--blue); }
+.btn small { font-weight: 500; opacity: .75; }
+
+/* hero */
+.hero { background: radial-gradient(1200px 600px at 75% 30%, var(--navy-2), var(--navy)); color: #fff; padding-top: max(28px, env(safe-area-inset-top, 0px)); overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 4px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px/1 var(--display); }
+.brand i { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(160deg, #3a8bff, #1f5fd6); display: grid; place-items: center; font-style: normal; font-size: 17px; }
+.nav nav { display: flex; gap: 18px; font-size: 15px; }
+.nav nav a { color: #cfe0ff; text-decoration: none; }
+.nav nav a:hover { color: #fff; }
+.nav-end { display: flex; align-items: center; gap: 18px; }
+.lang { display: inline-flex; padding: 0; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; overflow: hidden; background: transparent; cursor: pointer; font: 600 12px/1 var(--mono); letter-spacing: .06em; }
+.lang span { padding: 7px 8px; color: #cfe0ff; }
+.lang span.on { background: var(--sky); color: var(--navy); }
+.lang:hover { border-color: #fff; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: clamp(28px, 5vw, 64px); align-items: center; padding-block: clamp(36px, 7vw, 84px) clamp(48px, 8vw, 96px); }
+.hero .eyebrow { color: var(--sky); }
+.hero h1 { margin: 14px 0 18px; font-size: clamp(38px, 6.2vw, 66px); line-height: 1.02; letter-spacing: -.02em; }
+.hero h1 em { font-style: normal; color: var(--sky); }
+.hero .lede { font-size: clamp(17px, 2vw, 19px); color: #dce7fb; max-width: 54ch; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.buy-note { margin-top: 14px; font-size: 14px; color: #b9c9e6; max-width: 52ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.14); font-size: 14px; color: #cddbf3; }
+.facts b { color: #fff; font-weight: 600; }
+/* the three books as a fan: green left, yellow right, blue in front */
+.fan { position: relative; width: min(440px, 100%); aspect-ratio: 440 / 430; margin-inline: auto; }
+.fan a { position: absolute; top: 6%; width: 54%; transform-origin: 50% 100%; transition: transform .35s ease; }
+.fan img { width: 100%; border-radius: 3px 7px 7px 3px; box-shadow: -2px 0 0 rgba(0,0,0,.35) inset, 18px 24px 44px rgba(0,0,0,.5), 4px 4px 12px rgba(0,0,0,.3); }
+.fan .f-gruen { left: 0; transform: rotate(-9deg); z-index: 1; }
+.fan .f-gelb { right: 0; transform: rotate(9deg); z-index: 1; }
+.fan .f-blau { left: 23%; top: 0; z-index: 2; }
+@media (prefers-reduced-motion: no-preference) { .fan .f-gruen:hover { transform: rotate(-11deg) translateY(-8px); } .fan .f-gelb:hover { transform: rotate(11deg) translateY(-8px); } .fan .f-blau:hover { transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) { .fan a { transition: none; } }
+.picks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.picks a { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; font-size: 14px; color: #e4ecfa; text-decoration: none; }
+.picks a:hover { border-color: #fff; }
+.picks i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dot-blau { background: #3d8bff; } .dot-gruen { background: #3ddc84; } .dot-gelb { background: #ffc400; }
+
+/* proof strip */
+.proof { background: var(--surface); border-bottom: 1px solid var(--line); }
+.proof .wrap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.proof div { padding: 22px 16px; border-right: 1px solid var(--line); }
+.proof div:last-child { border-right: 0; }
+.proof b { display: block; font: 700 26px/1.1 var(--display); }
+.proof span { font-size: 14px; color: var(--muted); }
+
+/* learn */
+.learn { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 30px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+.card .num { font: 600 13px/1 var(--mono); color: var(--blue); margin-bottom: 12px; display: block; }
+.card p { color: var(--muted); margin: 0; font-size: 16px; }
+
+/* demo */
+.demo { background: #0d1117; color: #e8eef6; }
+.demo .intro { color: #a9b6c6; }
+.demo .eyebrow { color: #7fa6d9; }
+.shots { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 30px; }
+.shot { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid #263040; background: #111823; text-decoration: none; color: #fff; display: block; }
+.shot img { width: 100%; }
+.shot .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 14px; background: linear-gradient(transparent, rgba(5,8,14,.92)); display: flex; justify-content: space-between; align-items: end; gap: 12px; }
+.shot .cap b { font: 600 17px/1.2 var(--display); }
+.shot .cap span { font-size: 14px; color: #ffd45c; white-space: nowrap; }
+.shot:hover { border-color: #3d6fb8; }
+.shot-side { display: grid; gap: 16px; }
+.samples { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.samples a { display: block; height: 100%; padding: 16px 18px; border: 1px solid #263040; border-radius: 10px; text-decoration: none; background: #111823; }
+.samples a:hover { border-color: #3d6fb8; }
+.samples b { display: block; font-size: 16px; margin-bottom: 4px; }
+.samples span { font-size: 14px; color: #a9b6c6; }
+.demo .cta .btn.line { background: transparent; color: #fff; border-color: #3a4656; }
+
+/* contents */
+details.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-top: 26px; }
+details.toc summary { cursor: pointer; padding: 18px 22px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+details.toc summary::-webkit-details-marker { display: none; }
+details.toc summary::after { content: "+"; font: 600 20px/1 var(--mono); color: var(--blue); }
+details.toc[open] summary::after { content: "–"; }
+.toc ol { margin: 0; padding: 0 22px 20px 44px; columns: 2; column-gap: 40px; }
+.toc li { break-inside: avoid; padding: 4px 0; }
+.toc .app { list-style: none; margin: 0; padding: 14px 22px 20px; border-top: 1px solid var(--line); columns: 2; column-gap: 40px; }
+.toc .app b { color: var(--blue); font-weight: 600; margin-right: 6px; }
+.toc li span { color: var(--muted); font-size: 15px; display: block; }
+
+/* the three books: which one fits */
+.bands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 30px; }
+.band { background: var(--surface); border: 1px solid var(--line); border-top: 5px solid var(--band); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.band.blau { --band: #3d8bff; } .band.gruen { --band: #2fbf6f; } .band.gelb { --band: #f2b600; }
+.band .cover { width: 150px; border-radius: 2px 5px 5px 2px; box-shadow: 8px 10px 24px rgba(0,0,0,.28); margin-bottom: 6px; }
+.band .who { align-self: start; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 9px; border-radius: 5px; background: var(--band); color: #0b1220; }
+.band h3 { margin: 4px 0 0; font-size: 21px; }
+.band .sub { color: var(--muted); font-size: 15px; line-height: 1.45; margin: 0; }
+.band p { margin: 0; font-size: 16px; }
+.band ul { margin: 0; padding-left: 20px; font-size: 16px; }
+.band li { margin-bottom: 6px; }
+.band .need { font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: auto; }
+.band .read { font-size: 15px; font-weight: 600; }
+.same { margin-top: 18px; color: var(--muted); font-size: 16px; max-width: 70ch; }
+.samples-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.samples-row .btn i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+/* author */
+.author { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: clamp(20px, 4vw, 44px); align-items: start; }
+.author img { border-radius: 12px; width: 200px; }
+.ai { margin-top: 18px; padding: 18px 20px; border-left: 3px solid var(--blue); background: var(--surface); border-radius: 0 10px 10px 0; font-size: 16px; }
+
+/* editions: three books, each in German and in English */
+.editions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.ed-band { background: var(--surface); border: 1px solid var(--line); border-top: 5px solid var(--band); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.ed-band.blau { --band: #3d8bff; } .ed-band.gruen { --band: #2fbf6f; } .ed-band.gelb { --band: #f2b600; }
+.ed-head { order: -2; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: center; }
+.ed-head img { width: 64px; border-radius: 2px 4px 4px 2px; box-shadow: 4px 5px 12px rgba(0,0,0,.25); }
+.ed-head h3 { margin: 0; font-size: 19px; }
+.ed-head .meta { margin: 2px 0 0; }
+.ed { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ed h4 { margin: 0; font: 600 16px/1.3 var(--body); }
+.ed .price { font: 700 28px/1 var(--display); }
+.ed .meta { color: var(--muted); font-size: 14px; margin: 0; }
+.ed .btn { align-self: stretch; margin-top: 4px; }
+.ed .btn.primary { color: #1a1300; }
+.ed-band .meta { color: var(--muted); font-size: 14px; }
+html[lang="en"] .ed[lang="en"] { order: -1; }
+
+/* faq */
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 18px 0; font-weight: 600; }
+.faq details p { color: var(--muted); }
+
+/* final */
+.final { background: var(--navy); color: #fff; text-align: center; }
+.final h2 { max-width: 22ch; margin-inline: auto; }
+.final .cta { justify-content: center; }
+.final .buy-note { margin-inline: auto; }
+
+footer { padding-block: 28px calc(28px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+footer a { color: var(--muted); }
+
+/* sticky buy bar on phones */
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: none; gap: 10px; padding: 10px max(12px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(15,34,68,.96); backdrop-filter: blur(8px); border-top: 1px solid rgba(255,255,255,.12); }
+.bar .btn { flex: 1; min-height: 46px; padding: 10px 12px; font-size: 15px; }
+
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .fan-wrap { order: -1; }
+  .fan { width: min(330px, 100%); }
+  .learn, .samples { grid-template-columns: minmax(0, 1fr); }
+  .shots, .bands, .editions { grid-template-columns: minmax(0, 1fr); }
+  .band .cover { width: 120px; }
+  .proof .wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .proof div:nth-child(2) { border-right: 0; }
+  .proof div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .toc ol, .toc .app { columns: 1; }
+  .nav nav a.hide-sm { display: none; }
+  .nav-end { gap: 14px; }
+  .author { grid-template-columns: minmax(0, 1fr); }
+  .author img { width: 160px; }
+  .bar { display: flex; }
+  footer { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="nav">
+      <a class="brand" href="./"><i>K</i>Kern</a>
+      <div class="nav-end">
+        <nav aria-label="Seite" data-en-aria-label="Page">
+          <a class="hide-sm" href="#fuer-wen" data-en="Books">Bücher</a>
+          <a class="hide-sm" href="#inhalt" data-en="Contents">Inhalt</a>
+          <a class="hide-sm" href="#autor" data-en="Author">Autor</a>
+          <a href="#ausgaben" data-en="Editions">Ausgaben</a>
+          <a href="./editor/">Editor</a>
+        </nav>
+        <button class="lang" id="langBtn" type="button" title="Sprache: Deutsch (tippen für English)" aria-label="Sprache: Deutsch (tippen für English)" data-en-title="Language: English (tap for Deutsch)" data-en-aria-label="Language: English (tap for Deutsch)"><span class="on">DE</span><span>EN</span></button>
+      </div>
+    </div>
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow" data-en="One content · three books · German and English">Ein Inhalt · drei Bücher · Deutsch und Englisch</div>
+        <h1 data-en="A real 3D engine – and a <em>robot that learns to walk</em>.">Eine echte 3D-Engine – und ein <em>Roboter, der laufen lernt</em>.</h1>
+        <p class="lede" data-en="Kern is a game engine in pure C++ that runs in the browser: graphics, physics, sound, a complete editor and a walking robot that walks, jumps and kicks a ball with neural networks. Three books explain all of it – the same content, told three ways: technical for professionals, simply for beginners and for young readers aged 12 to 16. You can try the engine right now.">Kern ist eine Game-Engine in reinem C++, die im Browser läuft: Grafik, Physik, Sound, ein kompletter Editor und ein Laufroboter, der mit neuronalen Netzen geht, springt und einen Ball kickt. Drei Bücher erklären das alles – derselbe Inhalt, dreimal anders erzählt: technisch für Profis, einfach für Einsteiger und für Jugendliche von 12 bis 16. Die Engine kannst du jetzt gleich ausprobieren.</p>
+        <div class="cta">
+          <a class="btn primary" href="#fuer-wen" data-en="Find the right book">Das passende Buch finden</a>
+          <a class="btn ghost" href="./editor/" data-en="Open the editor in your browser">Editor im Browser öffnen</a>
+        </div>
+        <div class="picks" aria-label="Die drei Bücher" data-en-aria-label="The three books">
+          <a href="#band-blau"><i class="dot-blau"></i><span data-en="The Book · for professionals">Das Buch · für Profis</span></a>
+          <a href="#band-gruen"><i class="dot-gruen"></i><span data-en="Simply Explained · for beginners">Einfach erklärt · für Einsteiger</span></a>
+          <a href="#band-gelb"><i class="dot-gelb"></i><span data-en="For Explorers · ages 12–16">Für Entdecker · 12–16 Jahre</span></a>
+        </div>
+        <p class="buy-note" data-note="all" data-en="Coming as hardcovers on Amazon. Reserving means you get a message as soon as a book can be ordered. It costs nothing and commits you to nothing.">Erscheinen als Hardcover bei Amazon. Vormerken heißt: Du bekommst eine Nachricht, sobald ein Buch bestellbar ist. Kostet nichts und verpflichtet zu nichts.</p>
+        <div class="facts">
+          <span data-en="<b>17 chapters</b> + 4 appendices, in every book"><b>17 Kapitel</b> + 4 Anhänge, in jedem Buch</span>
+          <span data-en="<b>Hardcover</b> 7 × 10 in"><b>Hardcover</b> 17,8 × 25,4 cm</span>
+          <span data-en="<b>Software</b> open source, free"><b>Software</b> Open Source, kostenlos</span>
+        </div>
+      </div>
+      <div class="fan-wrap"><div class="fan">
+        <a class="f-gruen" href="#band-gruen"><img src="img/kern-gruen-de.webp" data-en-src="img/kern-gruen-en.webp" width="720" height="1029" alt="Buchcover: Kern – Einfach erklärt (grün), für Einsteiger." data-en-alt="Book cover: Kern – Simply Explained (green), for beginners."></a>
+        <a class="f-gelb" href="#band-gelb"><img src="img/kern-gelb-de.webp" data-en-src="img/kern-gelb-en.webp" width="720" height="1029" alt="Buchcover: Kern – Für Entdecker (gelb), für Jugendliche von 12 bis 16." data-en-alt="Book cover: Kern – For Explorers (yellow), for young readers aged 12 to 16."></a>
+        <a class="f-blau" href="#band-blau"><img src="img/kern-blau-de.webp" data-en-src="img/kern-blau-en.webp" width="720" height="1029" alt="Buchcover: Kern – Das Buch (blau), für Profis." data-en-alt="Book cover: Kern – The Book (blue), for professionals."></a>
+      </div></div>
+    </div>
+  </div>
+</header>
+
+<div class="proof" aria-label="Kern in Zahlen" data-en-aria-label="Kern in numbers">
+  <div class="wrap">
+    <div><b>C++20</b><span data-en="one codebase for browser and desktop">eine Codebasis für Browser und Desktop</span></div>
+    <div><b data-en="No setup">Kein Setup</b><span data-en="the editor and games run in the browser, on phones too">Editor und Spiele laufen im Browser, auch auf dem Handy</span></div>
+    <div><b data-en="11,000+">11.000+</b><span data-en="automated checks on every build">automatische Prüfungen bei jedem Build</span></div>
+    <div><b>Apache 2.0</b><span data-en="the source code is yours too">der Quellcode gehört auch dir</span></div>
+  </div>
+</div>
+
+<main>
+<section id="fuer-wen" aria-labelledby="fuer-wen-h">
+  <div class="wrap">
+    <div class="eyebrow" data-en="Who it is for">Für wen</div>
+    <h2 id="fuer-wen-h" data-en="Which book is right for you?">Welches Buch passt zu dir?</h2>
+    <p class="intro" data-en="There are three books about Kern. All three have the same content – the same 17 chapters, the same engine, the same robot. They differ in how they tell it.">Es gibt drei Bücher über Kern. Alle drei haben denselben Inhalt – dieselben 17 Kapitel, dieselbe Engine, denselben Roboter. Sie unterscheiden sich darin, wie sie ihn erzählen.</p>
+    <div class="bands">
+      <article class="band blau" id="band-blau">
+        <img class="cover" src="img/kern-blau-de.webp" data-en-src="img/kern-blau-en.webp" width="720" height="1029" loading="lazy" alt="Buchcover: Kern – Das Buch" data-en-alt="Book cover: Kern – The Book">
+        <span class="who" data-en="For professionals">Für Profis</span>
+        <h3 data-en="Kern – The Book">Kern – Das Buch</h3>
+        <p class="sub" data-en="The Engine, Kern Studio, a Walking Robot and the Lehrer">Die Engine, Kern Studio, ein Laufroboter und der Lehrer</p>
+        <p data-en="The technical edition: the real C++ code, the architecture and the reasons behind every decision – rendering, physics, networking and training in depth.">Die technische Ausgabe: der echte C++-Code, die Architektur und die Gründe hinter jeder Entscheidung – Rendering, Physik, Netzwerk und Training in der Tiefe.</p>
+        <ul>
+          <li data-en="for game developers who want to know how engines really work,">für Spieleentwickler, die wissen wollen, wie Engines wirklich funktionieren,</li>
+          <li data-en="for anyone who knows or is learning C++ and wants to study a large, real project,">für alle, die C++ können oder lernen und ein großes, echtes Projekt studieren wollen,</li>
+          <li data-en="for robotics and reinforcement learning.">für Robotik und Reinforcement Learning.</li>
+        </ul>
+        <p class="need" data-en="<b>You should bring:</b> basic programming skills, ideally in C++ or a similar language."><b>Mitbringen solltest du:</b> Grundkenntnisse im Programmieren, idealerweise C++ oder eine ähnliche Sprache.</p>
+        <a class="read" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book/01-introduction.md" data-en="Sample: read Chapter 1 →">Leseprobe: Kapitel 1 lesen →</a>
+      </article>
+      <article class="band gruen" id="band-gruen">
+        <img class="cover" src="img/kern-gruen-de.webp" data-en-src="img/kern-gruen-en.webp" width="720" height="1029" loading="lazy" alt="Buchcover: Kern – Einfach erklärt" data-en-alt="Book cover: Kern – Simply Explained">
+        <span class="who" data-en="For beginners">Für Einsteiger</span>
+        <h3 data-en="Kern – Simply Explained">Kern – Einfach erklärt</h3>
+        <p class="sub" data-en="For everyone who wants to understand how games and learning robots work">Für alle, die verstehen wollen, wie Spiele und lernende Roboter funktionieren</p>
+        <p data-en="The same content for adults without prior knowledge – complete, but told simply: everyday pictures instead of walls of formulas.">Derselbe Inhalt für Erwachsene ohne Vorwissen – vollständig, aber einfach erzählt: Alltagsbilder statt Formelwüsten.</p>
+        <ul>
+          <li data-en="experiments to try yourself in Kern Studio,">Experimente zum Selbermachen in Kern Studio,</li>
+          <li data-en="brain teasers with solutions in every chapter,">eine Knobelecke mit Lösungen in jedem Kapitel,</li>
+          <li data-en="for the curious, career changers and anyone who teaches.">für Neugierige, Quereinsteiger und alle, die unterrichten.</li>
+        </ul>
+        <p class="need" data-en="<b>You should bring:</b> nothing but curiosity and an up-to-date browser."><b>Mitbringen solltest du:</b> nur Neugier und einen aktuellen Browser.</p>
+        <a class="read" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch-gruen/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book-green/01-introduction.md" data-en="Sample: read Chapter 1 →">Leseprobe: Kapitel 1 lesen →</a>
+      </article>
+      <article class="band gelb" id="band-gelb">
+        <img class="cover" src="img/kern-gelb-de.webp" data-en-src="img/kern-gelb-en.webp" width="720" height="1029" loading="lazy" alt="Buchcover: Kern – Für Entdecker" data-en-alt="Book cover: Kern – For Explorers">
+        <span class="who" data-en="For ages 12 to 16">Für 12 bis 16 Jahre</span>
+        <h3 data-en="Kern – For Explorers">Kern – Für Entdecker</h3>
+        <p class="sub" data-en="How Games, Physics and Learning Robots Work">Wie Spiele, Physik und lernende Roboter funktionieren</p>
+        <p data-en="The same content for young readers aged 12 to 16 – complete and without shortcuts, with nothing more than school math.">Derselbe Inhalt für Jugendliche von 12 bis 16 – vollständig und ohne Abkürzungen, mit nicht mehr als Mathe aus der Schule.</p>
+        <ul>
+          <li data-en="missions to try out and a puzzle corner in every chapter,">Missionen zum Ausprobieren und eine Rätsel-Ecke in jedem Kapitel,</li>
+          <li data-en="for parents and relatives looking for a present with substance,">für Eltern und Verwandte, die ein Geschenk mit Substanz suchen,</li>
+          <li data-en="for teachers, computer science lessons and school clubs.">für Lehrkräfte, den Informatikunterricht und AGs.</li>
+        </ul>
+        <p class="need" data-en="<b>Prior knowledge:</b> school math – nothing more. Everything runs in the browser, without an account."><b>Vorwissen:</b> Mathe aus der Schule – mehr nicht. Alles läuft im Browser, ohne Konto.</p>
+        <a class="read" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch-gelb/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book-yellow/01-introduction.md" data-en="Sample: read Chapter 1 →">Leseprobe: Kapitel 1 lesen →</a>
+      </article>
+    </div>
+    <p class="same" data-en="Unsure? Read the first chapter of two books side by side – it is the same chapter, told differently.">Unsicher? Lies das erste Kapitel von zwei Büchern nebeneinander – es ist dasselbe Kapitel, nur anders erzählt.</p>
+  </div>
+</section>
+
+<section aria-labelledby="lernen" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow" data-en="What you learn">Was du lernst</div>
+    <h2 id="lernen" data-en="Not how to use an engine. How to build one.">Nicht wie man eine Engine benutzt. Wie man eine baut.</h2>
+    <p class="intro" data-en="Most books show a finished engine from the outside. The Kern books open up a complete, running engine and go through it layer by layer – and you run everything in your browser alongside.">Die meisten Bücher zeigen eine fertige Engine von außen. Die Kern-Bücher öffnen eine komplette, laufende Engine und gehen sie Schicht für Schicht durch – und du führst alles parallel im Browser aus.</p>
+    <div class="learn">
+      <div class="card"><span class="num">01 · Engine</span><h3 data-en="Graphics, physics, audio">Grafik, Physik, Audio</h3><p data-en="A custom WebGL2 renderer with PBR, shadows and bloom, Box3D physics with every joint, a custom sound engine – and why each decision was made the way it was.">Ein eigener WebGL2-Renderer mit PBR, Schatten und Bloom, Box3D-Physik mit allen Gelenken, eine eigene Sound-Engine – und warum jede Entscheidung so gefallen ist.</p></div>
+      <div class="card"><span class="num" data-en="02 · Tool">02 · Werkzeug</span><h3 data-en="An editor like the big engines">Ein Editor wie bei den großen Engines</h3><p data-en="Kern Studio: levels, gizmos, logic graphs, Play and Simulate, multiplayer – and how to export your own games from it as a single HTML file.">Kern Studio: Levels, Gizmos, Logik-Graphen, Play und Simulate, Mehrspieler – und wie du daraus eigene Spiele als eine einzige HTML-Datei exportierst.</p></div>
+      <div class="card"><span class="num" data-en="03 · AI">03 · KI</span><h3 data-en="A robot learns to walk">Ein Roboter lernt laufen</h3><p data-en="The Micro Duck walks on its maker's original networks. With the Lehrer you train your own motions with reinforcement learning – right in your browser.">Die Micro Duck läuft auf den Original-Netzen ihres Herstellers. Mit dem Lehrer trainierst du per Reinforcement Learning eigene Bewegungen – direkt im Browser.</p></div>
+      <div class="card"><span class="num" data-en="04 · Practice">04 · Praxis</span><h3 data-en="Writing your own games">Eigene Spiele schreiben</h3><p data-en="From the smallest Kern game in 90 lines to a procedural city with a hovercar, traffic and a day-night cycle.">Vom kleinsten Kern-Spiel in 90 Zeilen bis zur prozeduralen Stadt mit Hovercar, Verkehr und Tag-Nacht-Wechsel.</p></div>
+      <div class="card"><span class="num" data-en="05 · Bridge">05 · Brücke</span><h3 data-en="From simulation to the real robot">Von der Simulation zum echten Roboter</h3><p data-en="How to calibrate servos, masses and friction so that a trained network also works in the real world.">Wie man Servos, Massen und Reibung kalibriert, damit ein trainiertes Netz auch in der echten Welt funktioniert.</p></div>
+      <div class="card"><span class="num" data-en="06 · Foundations">06 · Grundlagen</span><h3 data-en="No prior knowledge needed">Ohne Vorwissen verständlich</h3><p data-en="Three appendices explain neural networks, real-time rendering and physics simulation from the ground up. The green and the yellow book tell every chapter without prior knowledge.">Drei Anhänge erklären neuronale Netze, Echtzeit-Rendering und Physiksimulation von Grund auf. Das grüne und das gelbe Buch erzählen jedes Kapitel ohne Vorwissen.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="demo" aria-labelledby="ausprobieren">
+  <div class="wrap">
+    <div class="eyebrow" data-en="No video. The real engine.">Kein Video. Die echte Engine.</div>
+    <h2 id="ausprobieren" data-en="Try it out first – free, right here.">Erst ausprobieren – kostenlos, direkt hier.</h2>
+    <p class="intro" data-en="Everything the books describe runs here in your browser – no installation, no account. Open the editor, press Play and drive off.">Alles, was die Bücher beschreiben, läuft hier in deinem Browser – ohne Installation, ohne Konto. Öffne den Editor, drück Play und fahr los.</p>
+    <div class="shots">
+      <a class="shot" href="./editor/"><img src="img/studio.jpg" width="1600" height="1000" loading="lazy" data-en-alt="Kern Studio in Play mode: Orb Run, a hovercar drives through a procedural city." alt="Kern Studio im Play-Modus: Orb Run, ein Hovercar fährt durch eine prozedurale Stadt."><div class="cap"><b data-en="Kern Studio – the editor">Kern Studio – der Editor</b><span data-en="Open →">Öffnen →</span></div></a>
+      <div class="shot-side">
+        <a class="shot" href="./kern/web/studio/play.html?level=physicsLab"><img src="img/physics-lab.jpg" width="1024" height="640" loading="lazy" data-en-alt="Physics Lab: stacks, pendulums, a rope bridge and joints in Box3D." alt="Physics Lab: Stapel, Pendel, Seilbrücke und Gelenke in Box3D."><div class="cap"><b>Physics Lab</b><span data-en="Play →">Spielen →</span></div></a>
+        <a class="shot" href="./kern/web/studio/play.html?level=orbRun"><img src="img/phone.jpg" width="1200" height="554" loading="lazy" data-en-alt="Orb Run on a phone with touch controls." alt="Orb Run auf dem Handy mit Touch-Steuerung."><div class="cap"><b data-en="Orb Run – on phones too">Orb Run – auch auf dem Handy</b><span data-en="Play →">Spielen →</span></div></a>
+      </div>
+    </div>
+    <ul class="samples">
+      <li><a href="./lehrer/"><b data-en="The Lehrer">Der Lehrer</b><span data-en="Train neural networks for a walking robot, right in your browser.">Trainiere neuronale Netze für einen Laufroboter, direkt in deinem Browser.</span></a></li>
+      <li><a href="./kern/examples/hello/"><b>hello</b><span data-en="The smallest Kern game: 64 boxes, shadows, click selection, about 90 lines of C++.">Das kleinste Kern-Spiel: 64 Boxen, Schatten, Klick-Auswahl, rund 90 Zeilen C++.</span></a></li>
+      <li><a href="./kern/examples/orbrun/"><b>Orb Run in C++</b><span data-en="City, driving physics, traffic and day-night as a pure C++ program.">Stadt, Fahrphysik, Verkehr und Tag-Nacht als reines C++-Programm.</span></a></li>
+    </ul>
+    <div class="cta"><a class="btn primary" href="#fuer-wen" data-en="Find the right book">Das passende Buch finden</a><a class="btn line" href="./editor/" data-en="Open the editor">Editor öffnen</a></div>
+  </div>
+</section>
+
+<section id="inhalt" aria-labelledby="inhalt-h">
+  <div class="wrap">
+    <div class="eyebrow" data-en="Contents">Inhalt</div>
+    <h2 id="inhalt-h" data-en="From the foundations to a walking robot">Von den Grundlagen bis zum laufenden Roboter</h2>
+    <p class="intro" data-en="All three books have the same chapters: first you use the engine, then you understand it and finally you extend it. You can follow every chapter in your browser right away.">Alle drei Bücher haben dieselben Kapitel: Erst benutzt du die Engine, dann verstehst du sie und schließlich erweiterst du sie. Jedes Kapitel lässt sich sofort im Browser nachvollziehen.</p>
+    <details class="toc">
+      <summary data-en="Show all 17 chapters and 4 appendices">Alle 17 Kapitel und 4 Anhänge anzeigen</summary>
+      <ol>
+        <li data-en="Introduction<span>What Kern is and how the books work</span>">Einführung<span>Was Kern ist und wie die Bücher funktionieren</span></li>
+        <li data-en="Building and Testing<span>From C++ to WebAssembly, tests and determinism</span>">Bauen und Testen<span>Von C++ zu WebAssembly, Tests und Determinismus</span></li>
+        <li data-en="Foundations<span>Math, memory, platform</span>">Grundlagen<span>Mathematik, Speicher, Plattform</span></li>
+        <li data-en="Graphics<span>WebGL2, PBR, shadows, post-processing</span>">Grafik<span>WebGL2, PBR, Schatten, Nachbearbeitung</span></li>
+        <li data-en="Scene and Geometry<span>Meshes, instancing, picking</span>">Szene und Geometrie<span>Meshes, Instancing, Picking</span></li>
+        <li data-en="Physics<span>Box3D, joints, vehicles</span>">Physik<span>Box3D, Gelenke, Fahrzeuge</span></li>
+        <li data-en="Audio<span>The custom sound engine</span>">Audio<span>Die eigene Sound-Engine</span></li>
+        <li data-en="The Game Runtime<span>Actors, components, controllers</span>">Die Spiel-Laufzeit<span>Actors, Komponenten, Controller</span></li>
+        <li data-en="Logic Graphs<span>Game logic without code</span>">Logik-Graphen<span>Spiellogik ohne Code</span></li>
+        <li data-en="Networking and Multiplayer<span>Synchronization and prediction</span>">Netzwerk und Mehrspieler<span>Synchronisierung und Vorhersage</span></li>
+        <li data-en="Kern Studio<span>The editor in detail</span>">Kern Studio<span>Der Editor im Detail</span></li>
+        <li data-en="Writing your own games<span>From hello to Orb Run</span>">Eigene Spiele schreiben<span>Von hello bis Orb Run</span></li>
+        <li data-en="The Micro Duck<span>A walking robot in simulation</span>">Die Micro Duck<span>Ein Laufroboter in der Simulation</span></li>
+        <li data-en="The Lehrer<span>Reinforcement learning in the browser</span>">Der Lehrer<span>Reinforcement Learning im Browser</span></li>
+        <li data-en="Training your own models<span>Teaching new motions</span>">Eigene Modelle trainieren<span>Neue Bewegungen beibringen</span></li>
+        <li data-en="Calibration<span>From simulation to the real robot</span>">Kalibrierung<span>Von der Simulation zum echten Roboter</span></li>
+        <li data-en="Reference<span>Everything to look up</span>">Referenz<span>Alles zum Nachschlagen</span></li>
+      </ol>
+      <ul class="app">
+        <li data-en="<b>Appendix A</b> Foundations: Neural Networks, Imitation and Reinforcement Learning"><b>Anhang A</b> Grundlagen: neuronale Netze, Nachahmung und Reinforcement Learning</li>
+        <li data-en="<b>Appendix B</b> Foundations: Real-Time Rendering"><b>Anhang B</b> Grundlagen: Echtzeit-Rendering</li>
+        <li data-en="<b>Appendix C</b> Foundations: Physics Simulation"><b>Anhang C</b> Grundlagen: Physiksimulation</li>
+        <li data-en="<b>Appendix D</b> Licenses"><b>Anhang D</b> Lizenzen</li>
+      </ul>
+    </details>
+    <div class="samples-row">
+      <a class="btn line" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book/01-introduction.md"><i class="dot-blau"></i><span data-en="Sample: Chapter 1 of The Book">Leseprobe: Kapitel 1, Das Buch</span></a>
+      <a class="btn line" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch-gruen/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book-green/01-introduction.md"><i class="dot-gruen"></i><span data-en="Sample: Chapter 1 of Simply Explained">Leseprobe: Kapitel 1, Einfach erklärt</span></a>
+      <a class="btn line" href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/buch-gelb/01-einfuehrung.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book-yellow/01-introduction.md"><i class="dot-gelb"></i><span data-en="Sample: Chapter 1 of For Explorers">Leseprobe: Kapitel 1, Für Entdecker</span></a>
+    </div>
+  </div>
+</section>
+
+<section id="autor" aria-labelledby="autor-h" style="padding-top:0">
+  <div class="wrap author">
+    <img src="img/autor.jpg" width="480" height="600" loading="lazy" alt="Christian Heinrich Hohlfeld">
+    <div>
+      <div class="eyebrow" data-en="The author">Der Autor</div>
+      <h2 id="autor-h">Christian Heinrich Hohlfeld</h2>
+      <p data-en="Software engineer from Konstanz, programming since 2010 – in C++, Java, C#, TypeScript and Python. B.Sc. in Software Engineering from HTWG Konstanz. His Android app MMA News reached around 220,000 downloads, and his game Alien Star Racing placed in the top ten of a Microsoft-sponsored contest. Today he is responsible for digitalization and AI at a municipal company and builds his own products alongside.">Softwareentwickler aus Konstanz, programmiert seit 2010 – in C++, Java, C#, TypeScript und Python. B.Sc. Software Engineering an der HTWG Konstanz. Seine Android-App MMA News erreichte rund 220.000 Downloads, sein Spiel Alien Star Racing kam in einem von Microsoft gesponserten Wettbewerb unter die besten zehn. Heute verantwortet er Digitalisierung und KI bei einem kommunalen Unternehmen und baut daneben eigene Produkte.</p>
+      <p class="ai" data-en="<b>To be clear:</b> Kern and these books were made with artificial intelligence. The idea, the architecture, the choice of building blocks and every decision about what is good enough come from the author; most of the code and text was written by an AI system under his direction. So the books also show what an experienced developer can build alone with AI today."><b>Offen gesagt:</b> Kern und diese Bücher sind mit künstlicher Intelligenz entstanden. Idee, Architektur, Auswahl der Bausteine und jede Entscheidung, was gut genug ist, stammen vom Autor; Code und Text hat zum größten Teil ein KI-System unter seiner Leitung geschrieben. Die Bücher zeigen damit auch, was ein erfahrener Entwickler heute mit KI allein bauen kann.</p>
+      <p><a href="https://christianhohlfeld.com">christianhohlfeld.com</a></p>
+    </div>
+  </div>
+</section>
+
+<section id="ausgaben" aria-labelledby="ausgaben-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow" data-en="Editions">Ausgaben</div>
+    <h2 id="ausgaben-h" data-en="Three books, each in German and in English">Drei Bücher, jedes auf Deutsch und auf Englisch</h2>
+    <p class="intro" data-en="All six editions are hardcovers and appear on Amazon. Reserving sends a short email; you get a reply as soon as your edition can be ordered.">Alle sechs Ausgaben sind Hardcover und erscheinen bei Amazon. Vormerken schickt eine kurze E-Mail; du bekommst eine Antwort, sobald deine Ausgabe bestellbar ist.</p>
+    <div class="editions">
+      <div class="ed-band blau" data-band="blau">
+        <div class="ed-head">
+          <img src="img/kern-blau-de.webp" data-en-src="img/kern-blau-en.webp" width="720" height="1029" loading="lazy" alt="">
+          <div><h3 data-en="Kern – The Book">Kern – Das Buch</h3><p class="meta" data-en="Blue · for professionals">Blau · für Profis</p></div>
+        </div>
+        <div class="ed" data-ed="blau-de">
+          <h4 data-en="German edition: <span lang=&quot;de&quot;>Kern – Das Buch</span>">Deutsche Ausgabe: Kern – Das Buch</h4>
+          <div class="price" data-en="€59.90">59,90 €</div>
+          <p class="meta" data-en="Hardcover · 17.8 × 25.4 cm · ISBN 979-8-1648-7725-5<br>Fixed retail price in Germany">Hardcover · 17,8 × 25,4 cm · ISBN 979-8-1648-7725-5<br>Gebundener Ladenpreis in Deutschland</p>
+          <a class="btn primary" data-buy="blau-de" href="#ausgaben" data-en="Reserve the German edition">Deutsche Ausgabe vormerken</a>
+        </div>
+        <div class="ed" lang="en" data-ed="blau-en">
+          <h4>English edition: Kern – The Book</h4>
+          <div class="price">$69.99</div>
+          <p class="meta">Hardcover · 7 × 10 in · €69.90 (EU) · £59.99 (UK)</p>
+          <a class="btn line" data-buy="blau-en" href="#ausgaben">Reserve the English edition</a>
+        </div>
+      </div>
+      <div class="ed-band gruen" data-band="gruen">
+        <div class="ed-head">
+          <img src="img/kern-gruen-de.webp" data-en-src="img/kern-gruen-en.webp" width="720" height="1029" loading="lazy" alt="">
+          <div><h3 data-en="Kern – Simply Explained">Kern – Einfach erklärt</h3><p class="meta" data-en="Green · for beginners">Grün · für Einsteiger</p></div>
+        </div>
+        <div class="ed" data-ed="gruen-de">
+          <h4 data-en="German edition: <span lang=&quot;de&quot;>Kern – Einfach erklärt</span>">Deutsche Ausgabe: Kern – Einfach erklärt</h4>
+          <p class="meta" data-en="Hardcover · 17.8 × 25.4 cm · ISBN 979-8-1663-3251-6 · price to follow on publication">Hardcover · 17,8 × 25,4 cm · ISBN 979-8-1663-3251-6 · Preis folgt zum Erscheinen</p>
+          <a class="btn primary" data-buy="gruen-de" href="#ausgaben" data-en="Reserve the German edition">Deutsche Ausgabe vormerken</a>
+        </div>
+        <div class="ed" lang="en" data-ed="gruen-en">
+          <h4>English edition: Kern – Simply Explained</h4>
+          <p class="meta">Hardcover · 7 × 10 in · price to follow on publication</p>
+          <a class="btn line" data-buy="gruen-en" href="#ausgaben">Reserve the English edition</a>
+        </div>
+      </div>
+      <div class="ed-band gelb" data-band="gelb">
+        <div class="ed-head">
+          <img src="img/kern-gelb-de.webp" data-en-src="img/kern-gelb-en.webp" width="720" height="1029" loading="lazy" alt="">
+          <div><h3 data-en="Kern – For Explorers">Kern – Für Entdecker</h3><p class="meta" data-en="Yellow · for young readers aged 12 to 16">Gelb · für Jugendliche von 12 bis 16</p></div>
+        </div>
+        <div class="ed" data-ed="gelb-de">
+          <h4 data-en="German edition: <span lang=&quot;de&quot;>Kern – Für Entdecker</span>">Deutsche Ausgabe: Kern – Für Entdecker</h4>
+          <p class="meta" data-en="Hardcover · 17.8 × 25.4 cm · ISBN 979-8-1663-3283-7 · price to follow on publication">Hardcover · 17,8 × 25,4 cm · ISBN 979-8-1663-3283-7 · Preis folgt zum Erscheinen</p>
+          <a class="btn primary" data-buy="gelb-de" href="#ausgaben" data-en="Reserve the German edition">Deutsche Ausgabe vormerken</a>
+        </div>
+        <div class="ed" lang="en" data-ed="gelb-en">
+          <h4>English edition: Kern – For Explorers</h4>
+          <p class="meta">Hardcover · 7 × 10 in · price to follow on publication</p>
+          <a class="btn line" data-buy="gelb-en" href="#ausgaben">Reserve the English edition</a>
+        </div>
+      </div>
+    </div>
+    <p class="meta" data-note="all" style="margin-top:16px;color:var(--muted);font-size:15px" data-en="Coming to Amazon. We’ll tell you the day your edition can be ordered.">Erscheinen bei Amazon. Du bekommst eine Nachricht, sobald deine Ausgabe bestellbar ist.</p>
+  </div>
+</section>
+
+<section class="faq" aria-labelledby="faq-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow" data-en="Questions">Fragen</div>
+    <h2 id="faq-h" data-en="Frequently asked questions">Häufige Fragen</h2>
+    <details><summary data-en="How do the three books differ?">Worin unterscheiden sich die drei Bücher?</summary><p data-en="Only in how they tell it. <b>Kern – The Book</b> (blue) is the technical edition for professionals, with the real code and every detail. <b>Kern – Simply Explained</b> (green) tells the same content for adults without prior knowledge, with everyday pictures and brain teasers. <b>Kern – For Explorers</b> (yellow) is written for young readers aged 12 to 16, with missions and puzzles. Chapters, engine and robot are the same in all three; each is available in German and in English."><b>Nur darin, wie sie erzählen.</b> „Kern – Das Buch“ (blau) ist die technische Ausgabe für Profis, mit dem echten Code und allen Details. „Kern – Einfach erklärt“ (grün) erzählt denselben Inhalt für Erwachsene ohne Vorwissen, mit Alltagsbildern und Knobelaufgaben. „Kern – Für Entdecker“ (gelb) ist für Jugendliche von 12 bis 16 geschrieben, mit Missionen und Rätseln. Kapitel, Engine und Roboter sind in allen dreien gleich; jedes gibt es auf Deutsch und auf Englisch.</p></details>
+    <details><summary data-en="Which book suits a young person or a class?">Welches Buch passt für Jugendliche oder eine Klasse?</summary><p data-en="For ages 12 to 16, the yellow book <i>Kern – For Explorers</i>: it needs nothing beyond school math, and everything it describes runs free in the browser, without an account. For older students and adult beginners, the green book <i>Kern – Simply Explained</i> is a good fit. The sample chapters let you compare before you decide.">Für 12- bis 16-Jährige das gelbe Buch „Kern – Für Entdecker“: Es setzt nur Mathe aus der Schule voraus, und alles, was es beschreibt, läuft kostenlos im Browser, ohne Konto. Für ältere Schüler und erwachsene Einsteiger passt das grüne Buch „Kern – Einfach erklärt“. Mit den Leseproben lässt sich vorher vergleichen.</p></details>
+    <details><summary data-en="The software is free – why buy a book?">Die Software ist kostenlos – warum ein Buch kaufen?</summary><p data-en="The code shows what the engine does. The books explain why: which decisions are behind the renderer, the physics and the training, which alternatives were rejected and how the parts work together. On top of that come three foundations appendices that explain rendering, physics and neural networks from scratch.">Der Code zeigt, was die Engine tut. Die Bücher erklären, warum: welche Entscheidungen hinter Renderer, Physik und Training stehen, welche Alternativen verworfen wurden und wie die Teile zusammenspielen. Dazu kommen drei Grundlagen-Anhänge, die Rendering, Physik und neuronale Netze von Null an erklären.</p></details>
+    <details><summary data-en="What does “reserve” mean?">Was heißt „vormerken“?</summary><p data-en="Amazon does not offer pre-orders for printed books. When you reserve an edition, you send a short email and get a reply as soon as it can be ordered. Your address is used only for that and deleted afterwards.">Amazon bietet für gedruckte Bücher keine Vorbestellung an. Wenn du eine Ausgabe vormerkst, schickst du eine kurze E-Mail und bekommst eine Antwort, sobald sie bestellbar ist. Deine Adresse wird nur dafür verwendet und danach gelöscht.</p></details>
+    <details><summary data-en="Are the books also available as e-books?">Gibt es die Bücher auch als E-Book?</summary><p data-en="At launch they come out as hardcovers. If you would like an e-book, say so when you reserve – enough demand decides.">Zum Start erscheinen sie als Hardcover. Wenn du ein E-Book möchtest, schreib es beim Vormerken dazu – genug Nachfrage entscheidet.</p></details>
+    <details><summary data-en="Do I need a powerful computer?">Brauche ich einen starken Rechner?</summary><p data-en="No. Kern runs in any up-to-date browser with WebGL2, on desktop, tablet and phone. An ordinary laptop is enough to build it from source.">Nein. Kern läuft in jedem aktuellen Browser mit WebGL2, auf Desktop, Tablet und Handy. Für das Bauen aus dem Quellcode reicht ein normaler Laptop.</p></details>
+    <details><summary data-en="May I use Kern for commercial projects?">Darf ich Kern für kommerzielle Projekte nutzen?</summary><p data-en="<b>Yes.</b> Kern is open source under the Apache License 2.0. You may use, modify and sell the engine free of charge in your own games, apps and products – without license fees and without revenue sharing."><b>Ja.</b> Kern ist Open Source unter der Apache License 2.0. Du darfst die Engine kostenlos für eigene Spiele, Apps und Produkte verwenden, verändern und verkaufen – ohne Lizenzgebühren und ohne Umsatzbeteiligung.</p><p data-en="Two things are excepted: the 3D model of the little robot (Micro Duck) belongs to Pollen Robotics and may only be used non-commercially – so for commercial projects there is a build without this model, a single switch when building. And you may not use the name “Kern” or the logo for your own product.">Zwei Dinge sind ausgenommen: Das 3D-Modell des kleinen Roboters (Micro Duck) gehört Pollen Robotics und darf nur nicht kommerziell genutzt werden – für kommerzielle Projekte gibt es deshalb eine Version ohne dieses Modell, ein Schalter beim Bauen. Und den Namen „Kern“ und das Logo darfst du nicht für dein eigenes Produkt verwenden.</p><p data-en="Courses and integration support for schools and companies are available on request.">Für Schulen und Unternehmen gibt es Kurse und Unterstützung bei der Integration auf Anfrage.</p></details>
+    <details><summary data-en="Is this a Pollen Robotics or Hugging Face product?">Ist das ein Produkt von Pollen Robotics oder Hugging Face?</summary><p data-en="No. Kern is an independent project. The Micro Duck is a robot by Pollen Robotics; Kern uses its openly published models and networks under their licenses.">Nein. Kern ist ein unabhängiges Projekt. Die Micro Duck ist ein Roboter von Pollen Robotics; Kern nutzt dessen offen veröffentlichte Modelle und Netze unter ihren Lizenzen.</p></details>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="wrap">
+    <h2 id="final-h" data-en="The engine already runs. Three books explain how.">Die Engine läuft schon. Drei Bücher erklären, wie.</h2>
+    <div class="cta"><a class="btn primary" href="#ausgaben" data-en="Choose an edition">Ausgabe wählen</a><a class="btn ghost" href="./editor/" data-en="Open the editor">Editor öffnen</a></div>
+    <p class="buy-note" data-note="all" data-en="For professionals, for beginners and for ages 12 to 16 – each in German and in English.">Für Profis, für Einsteiger und für 12- bis 16-Jährige – jeweils auf Deutsch und auf Englisch.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Christian Heinrich Hohlfeld</span>
+    <a href="./editor/">Kern Studio</a>
+    <a href="./lehrer/">Kern Lehrer</a>
+    <a href="https://github.com/ChristianHohlfeld/kernengine.de" data-en="Source code">Quellcode</a>
+    <a href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/studio.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book/11-studio.md" data-en="Studio docs">Studio-Doku</a>
+    <a href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/README.md" data-en-href="https://github.com/ChristianHohlfeld/kernengine.de/blob/main/kern/docs/book/01-introduction.md" data-en="Engine docs">Engine-Doku</a>
+    <a href="LICENSING.txt" data-en="License (Apache 2.0)">Lizenz (Apache 2.0)</a>
+    <a href="LICENSES.txt" data-en="Third-party components">Bestandteile Dritter</a>
+    <a href="impressum.html" data-en="Imprint (German)">Impressum</a>
+    <a href="datenschutz.html" data-en="Privacy policy (German)">Datenschutz</a>
+  </div>
+</footer>
+
+<div class="bar" aria-label="Schnellzugriff" data-en-aria-label="Quick access"><a class="btn primary" href="#fuer-wen" data-en="Which book?">Welches Buch?</a><a class="btn ghost" href="./editor/">Editor</a></div>
+
+<script>
+// English: the texts and attributes from data-en / data-en-<attr> (the covers too, via data-en-src).
+// In every book's card the English edition then comes first and gets the highlighted button.
+if (LANG === "en") {
+  for (const el of document.querySelectorAll("*")) {
+    for (const at of [...el.attributes]) {
+      if (at.name === "data-en") el.innerHTML = at.value;
+      else if (at.name.startsWith("data-en-")) el.setAttribute(at.name.slice(8), at.value);
+    }
+  }
+  for (const card of document.querySelectorAll("[data-band]")) {
+    card.querySelector('[data-ed$="-de"] .btn').classList.replace("primary", "line");
+    card.querySelector('[data-ed$="-en"] .btn').classList.replace("line", "primary");
+  }
+  const sw = document.getElementById("langBtn");
+  sw.children[0].classList.remove("on"); sw.children[1].classList.add("on");
+}
+// The DE | EN switch, as in Kern Studio and the Lehrer: remembers the choice and reloads.
+document.getElementById("langBtn").addEventListener("click", () => {
+  const next = LANG === "de" ? "en" : "de";
+  try { localStorage.setItem(I18N_KEY, next); } catch { /* storage blocked */ }
+  const u = new URL(location.href);
+  u.searchParams.delete("lang");
+  // Without storage the address carries the choice.
+  try { if (localStorage.getItem(I18N_KEY) !== next) throw 0; } catch { u.searchParams.set("lang", next); }
+  location.replace(u.href);
+});
+
+// Sobald eine Ausgabe bei Amazon live ist: ihren Produktlink hier eintragen. Dann wird ihr
+// "Vormerken"-Knopf zu "Bestellen" und führt direkt zu Amazon. Drei Bände (blau, gruen, gelb)
+// mal zwei Sprachen (de, en).
+const AMAZON = {
+  "blau-de": "",    // z. B. https://www.amazon.de/dp/…
+  "blau-en": "",    // e.g. https://www.amazon.com/dp/…
+  "gruen-de": "",
+  "gruen-en": "",
+  "gelb-de": "",
+  "gelb-en": ""
+};
+// Preise im Bestellknopf nur, wo die Seite sie schon nennt.
+const PRICE = { "blau-de": { de: " – 59,90 €", en: " – €59.90" } };
+const MAIL = "chris.hohlfeld@gmail.com";
+const TITLE = {
+  blau: { de: "Kern – Das Buch", en: "Kern – The Book" },
+  gruen: { de: "Kern – Einfach erklärt", en: "Kern – Simply Explained" },
+  gelb: { de: "Kern – Für Entdecker", en: "Kern – For Explorers" }
+};
+function reserveMail(key) {
+  const [band, lang] = key.split("-"), t = TITLE[band][lang];
+  return lang === "de"
+    ? { subject: "Vormerken: " + t + " (Deutsch)", body: "Hallo Chris,\n\nbitte gib mir Bescheid, sobald „" + t + "“ als Hardcover bestellbar ist.\n\nE-Book gewünscht: ja / nein\n\nViele Grüße\n" }
+    : { subject: "Reserve: " + t + " (English)", body: "Hi Chris,\n\nplease let me know as soon as the English hardcover of “" + t + "” can be ordered.\n\nWould like an e-book too: yes / no\n\nBest regards\n" };
+}
+for (const a of document.querySelectorAll("[data-buy]")) {
+  const key = a.dataset.buy, live = AMAZON[key];
+  if (live) {
+    a.href = live;
+    a.rel = "noopener";
+    a.textContent = (LANG === "de" ? "Bei Amazon bestellen" : "Order on Amazon") + (PRICE[key]?.[LANG] || "");
+  } else {
+    const m = reserveMail(key);
+    a.href = "mailto:" + MAIL + "?subject=" + encodeURIComponent(m.subject) + "&body=" + encodeURIComponent(m.body);
+  }
+}
+// Hinweise "Erscheint bei Amazon": verschwinden, wenn alle Ausgaben bestellbar sind.
+if (Object.values(AMAZON).every(Boolean)) for (const p of document.querySelectorAll('[data-note="all"]')) p.remove();
+</script>
+</body>
+</html>
