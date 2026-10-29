@@ -30,7 +30,7 @@ DE = table("I18N_DE")
 # Patterns that translate a known phrase inside a longer label (same as tr() in game.mjs).
 PATTERNS = [(re.compile(r"^Add (.+)$"), "{} hinzufügen"), (re.compile(r"^Remove (.+)$"), "{} entfernen")]
 SEP = re.compile(r"\s*[›>]\s*")
-SHORTCUT = re.compile(r"^((Ctrl|Strg|Alt|Shift|Umschalt|Cmd)\+\S+|F\d+|Esc|Entf|Del|Home|Pos1|[A-Z0-9.]|Space|Leertaste)$")
+SHORTCUT = re.compile(r"^((Ctrl|Strg|Alt|Shift|Umschalt|Cmd)\+\S+|F\d+|Esc|Entf|Del|Home|Pos1|End|Ende|[A-Z0-9.]|Space|Leertaste)$")
 
 
 def tr(s):
