@@ -111,10 +111,12 @@ Genau so macht es Kern:
 Bit. Der zweite Lauf ist nur schneller. 64 Enten ergeben ein anderes Netz.
 
 > **Mission:** Öffne den Lehrer auf https://kernengine.de/, wähle „Stehen (Schnelltest)“, Seed 1,
-> **2 Worker** mit je **4 Enten**. Notiere nach ein paar Iterationen die Rückgabe. Lade neu und
-> starte mit **1 Worker** und **8 Enten**. Beide Male sind es 8 Enten insgesamt – die Zahlen stimmen
-> überein. Probier zum Vergleich 2 Worker mit je 8 Enten: Jetzt sind es 16 Enten, und die Zahlen sind
-> anders.
+> **2 Worker** mit je **4 Enten** und trage bei „Iterationen“ **20** ein. Drücke Start, warte, bis
+> die Seite „Fertig“ meldet, und schreib die Zahl bei „mittlere Episoden-Rückgabe“ auf. Lade neu und
+> starte genauso, nur mit **1 Worker** und **8 Enten** (wieder 20 Iterationen). Beide Male sind es
+> 8 Enten insgesamt – die Zahlen stimmen genau überein. Probier zum Vergleich 2 Worker mit je 8 Enten:
+> Jetzt sind es 16 Enten, und die Zahl ist anders. Vergleiche immer erst bei „Fertig“: Mitten im Lauf
+> stehen die beiden Versuche vielleicht gerade bei verschiedenen Iterationen.
 
 Für junge Entdecker ist der Lehrer im Browser der einfachste Weg. Den Lehrer gibt es auch als
 Programm für das **Terminal** (ein Fenster, in das man Befehle tippt). Alle seine Befehle und
@@ -156,8 +158,10 @@ Zahlen von 0 bis 1.
 
 Trainierte Netze werden als **ONNX**-Datei gespeichert. ONNX ist für Netze, was PDF für Texte ist: ein
 Format, das viele Programme lesen können, auf dem Roboter, im Browser und auf dem Server. Kern liest
-Pollens Netze und schreibt seine eigenen im selben Format. Netze, die du im Browser trainierst,
-bleiben auf deinem Gerät und ersetzen dort die mitgelieferten.
+Pollens Netze und schreibt seine eigenen im selben Format. Der Umrechner, der die Messwerte auf
+eine Skala bringt ([Kapitel 14](14-lehrer.md)), steckt mit in der Datei – das Netz kommt also mit
+seinem eigenen Maßband. Netze, die du im Browser trainierst, bleiben auf deinem Gerät und ersetzen
+dort die mitgelieferten.
 
 ### Servoprofil
 
@@ -178,8 +182,20 @@ Die genauen Felder aller Dateien stehen im blauen Buch, Kapitel 17.
 
 Wer eigene Programme mit Kern schreiben will, braucht die Liste aller Funktionen, über die der
 Browser mit der Engine spricht, und alle Befehle des Lehrers. Das steht vollständig im blauen Buch,
-Kapitel 17. Ein schönes Prinzip daraus: **Die Engine fasst nie selbst Dateien an.** Alles, was sie
-braucht, reicht ihr der Browser herein.
+Kapitel 17. Zwei Prinzipien daraus lohnen sich auch für dich:
+
+**Die Engine fasst nie selbst Dateien an.** Alles, was sie braucht – Levels, Bilder, Netze –, reicht
+ihr ihr Gastgeber herein: im Studio der Browser, in den Tests und im Lehrer-Programm das jeweilige
+Programm. Darum läuft dieselbe Engine überall unverändert; nur der Gastgeber, der ihr die Daten
+reicht, ist ein anderer.
+
+> **So kannst du es dir vorstellen:** ein Koch, der nie selbst einkaufen geht. Er kocht nur, was ihm
+> durch die Durchreiche gegeben wird. Darum kann er in jeder Küche arbeiten, ob im Restaurant oder
+> auf einem Schiff.
+
+**Fehler werden gemeldet, nicht verschluckt.** Geht etwas schief, etwa weil eine Datei kaputt ist,
+stürzt die Engine nicht einfach ab. Sie sagt „hat nicht geklappt“ und hinterlegt eine Meldung, was
+falsch war. So erfährst du, woran es lag.
 
 ## 17.6 Glossar
 
@@ -344,17 +360,20 @@ ausführlich vorkommt (A = Anhang A).
   zusammengedrückt, nie unter −1 (A).
 - **Asymmetrischer Kritiker:** Der Kritiker sieht mehr als die Ente, etwa ihre wahre Höhe. Das darf er,
   weil es ihn nur beim Lernen gibt (14, A).
+- **Auswerter:** = Lerner; liest alle Notizen der Helfer und macht daraus eine neue Policy (14).
 - **Backpropagation:** rückwärts ausrechnen, wie viel jeder Regler am Fehler schuld ist (A).
 - **Belohnung:** Punkte, die dem Netz sagen, was gut war (14, A).
 - **Bias:** eine Grundeinstellung, die ein Neuron immer dazuzählt (A).
-- **Checkpoint:** ein gespeicherter Zwischenstand des Lernens, von dem man weitermachen kann (15).
+- **Checkpoint:** ein gespeicherter Zwischenstand des Lernens, von dem man weitermachen kann. Im Text
+  heißt er **Spielstand** (der ganze Lernstand) oder **Schnappschuss** (ein Zwischenstand des Netzes)
+  (14, 15). Nicht verwechseln mit dem **Snapshot** im Netzwerk (10).
 - **CMA-ES:** Suchverfahren wie die Evolution: viele Varianten ausprobieren, die besten behalten, dort
   weitersuchen (14, 16, A).
 - **DAgger:** Das Netz fährt selbst, das Vorbild sagt in jeder Lage, was richtig wäre (14, A).
 - **Entropie:** wie unvorhersehbar die Ente noch handelt. Ein kleiner Bonus dafür hält sie neugierig,
   damit sie nicht zu früh aufhört auszuprobieren (A).
-- **Epoche:** einmal durch alle gesammelten Daten lernen (A).
 - **Episode:** ein Durchgang von Anfang bis Ende, etwa ein Sprung (14).
+- **Epoche:** einmal durch alle gesammelten Daten lernen (A).
 - **GAE:** Rechenweg, der schätzt, wie gut eine Aktion war – auch durch das, was danach kam (A).
 - **Gewicht:** ein Regler im Netz: wie wichtig eine Eingabe ist, auch negativ (A).
 - **Gradient:** die Steigung für alle Regler zusammen. Er zeigt, in welche Richtung der Fehler
@@ -363,20 +382,23 @@ ausführlich vorkommt (A = Anhang A).
 - **Hyperparameter:** Einstellungen des Lernens selbst, etwa Lernrate oder Zahl der Enten. Sie werden
   nicht gelernt, sondern vorher festgelegt (15).
 - **Iteration:** eine Runde des Trainings: Erfahrung sammeln, dann daraus lernen (14).
-- **Kritiker:** das zweite Netz beim Lernen. Er schätzt, wie gut eine Lage ist, wie ein Trainer am
-  Spielfeldrand. Auf den Roboter kommt er nicht (14, A).
 - **KL-Divergenz:** misst, wie verschieden die alte und die neue Ente handeln. Kern passt danach die
   Lernrate an (A).
+- **Kritiker:** das zweite Netz beim Lernen. Er schätzt, wie gut eine Lage ist, wie ein Trainer am
+  Spielfeldrand. Auf den Roboter kommt er nicht (14, A).
 - **Lehrer:** Kerns Trainingssystem, im Browser und als Programm (14).
 - **Lehrplan:** Schwieriges kommt erst später dazu, etwa die Stöße. Zu viel Chaos am Anfang würde das
   Lernen verhindern (14, A).
 - **Lernrate:** wie große Schritte das Lernen macht (A).
-- **MLP (mehrschichtiges Perzeptron):** ein Netz aus mehreren Schichten hintereinander (A).
 - **Minibatch:** eine kleine Auswahl der Daten, aus der ein Lernschritt gemacht wird – wie eine
   Umfrage unter 30 statt unter allen 800 Schülern (A).
+- **MLP (mehrschichtiges Perzeptron):** ein Netz aus mehreren Schichten hintereinander (A).
+- **Neugier-Bonus:** = Entropie-Bonus; ein paar Extrapunkte dafür, dass die Ente noch etwas
+  ausprobiert (14, A).
 - **Neuronales Netz / Neuron:** Rechennetz aus vielen einfachen Recheneinheiten (A).
 - **Normalisieren:** alle Eingaben auf ähnliche Größe bringen, damit große Zahlen nicht alles
   übertönen (A).
+- **Notbremse:** kürzt einen Lernschritt, der zu lang würde, auf eine feste Höchstlänge (14, A).
 - **ONNX:** Dateiformat für trainierte Netze, so etwas wie PDF für Netze (13, A).
 - **Phasensignal:** ein Taktgeber, der dem Sprungnetz sagt, wo im Sprung es gerade ist (14).
 - **Policy:** die Entscheidungsregel der Ente: Beobachtung hinein, Aktion heraus. Beim Lernen ist sie
@@ -384,14 +406,24 @@ ausführlich vorkommt (A = Anhang A).
 - **PPO:** das Lernverfahren des Lehrers. Es verbessert die Ente pro Schritt nur ein bisschen, wie
   mit einem Sicherheitsgurt (14, A).
 - **Reinforcement Learning:** Lernen durch Ausprobieren und Belohnung (A).
-- **Return (Rückgabe):** alle künftigen Belohnungen zusammengezählt, wobei Späteres weniger zählt (A).
+- **Return (Rückgabe):** alle Punkte eines Versuchs zusammengezählt. Genau genommen zählen spätere
+  Punkte dabei etwas weniger (15, A).
 - **Rezept:** die Trainingseinstellungen einer Aufgabe (14).
 - **Rollout:** gesammelte Erfahrung: was die Ente sah, tat und dafür bekam (14).
-- **Sammler / Lerner:** sammelt Erfahrung / lernt daraus (14).
+- **Sammler / Lerner:** sammelt Erfahrung / lernt daraus. Im Text: „Helfer mit Klemmbrett“ und
+  „Auswerter“ (14).
 - **Schicht:** viele Neuronen nebeneinander, die alle dieselben Eingaben bekommen (A).
+- **Schnappschuss:** siehe Checkpoint.
 - **Sim-to-Real:** von der Simulation zum echten Roboter (16, A).
+- **Spielstand:** siehe Checkpoint.
 - **Streuung:** wie weit Werte typischerweise vom Mittelwert entfernt liegen (16, A).
+- **Suchwolke:** die vielen Kandidaten, die CMA-ES um eine Mitte herum ausprobiert (14, A).
+- **Totzone:** ein Bereich, in dem eine kleine Eingabe noch nichts bewirkt, wie beim Gamepad-Stick
+  (15).
 - **Überanpassung:** auswendig lernen statt verstehen (A).
+- **Überraschung (TD-Fehler):** wie viel besser oder schlechter ein einzelner Schritt lief, als der
+  Kritiker erwartet hatte (A).
+- **Umrechner:** = Normalisierer; siehe Normalisieren (14, A).
 - **Variation (Domain Randomization):** Jede Übungsrunde bekommt eine etwas andere Ente in einer etwas
   anderen Welt. Dann ist die echte Ente nur eine Variante mehr (14, 16, A).
 - **velstand:** Pollens Netz zum Laufen und Stehen, in Kern eingebaut (13).
@@ -400,6 +432,7 @@ ausführlich vorkommt (A = Anhang A).
   Radfahren nur durch Zuschauen (A).
 - **Vorbild:** eine Vorführung, die das Netz zuerst nachahmt (14).
 - **Vorteil:** War eine Aktion besser oder schlechter als erwartet? Positiv heißt besser (A).
+- **Wackelstärke:** = Aktionsrauschen σ (A).
 - **Warmstart:** Das Training beginnt nicht bei null, sondern mit einem fertigen Netz, das schon
   balancieren kann (14, A).
 - **Wert:** wie viele Belohnungen man von einer Lage aus im Schnitt noch erwartet (A).

@@ -34,7 +34,13 @@ drei Wege, und ein vierter Grundsatz kommt dazu:
 2. **Den ganzen Roboter vergleichen:** Der echte Roboter schreibt auf, was er tut. Die Simulation
    macht dasselbe nach, und man vergleicht.
 3. **Variation:** Was man nicht genau messen kann, verändert das Training ständig ein bisschen.
-4. **In der Physik messen statt eintragen.**
+4. **In der Physik messen statt eintragen:** Zahlen, die aus der Physik folgen, misst Kern in der
+   Simulation, statt sie von Hand einzutippen (16.6).
+
+Die Physik-Engine selbst bleibt dabei unangetastet. Sie rechnet starre Körper, Gelenke und Berührungen
+([Kapitel 6](06-physik.md)). Was ein echtes Gerät darüber hinaus tut – ein Servo mit Motor, Reibung
+und Verzögerung –, ist ein kleines Modell, das **obendrauf** sitzt. So wie ein Fahrradcomputer, den
+du an den Lenker klemmst: Das Fahrrad bleibt dasselbe, der Computer kommt dazu.
 
 > **So kannst du es dir vorstellen:** Links steht der echte Roboter, rechts die Simulation. Dazwischen
 > läuft immer derselbe Kreis: **messen → anpassen → prüfen**. Jede Runde rückt die beiden näher
@@ -43,13 +49,20 @@ drei Wege, und ein vierter Grundsatz kommt dazu:
 ## 16.1 Das Servomodell
 
 Damit die Simulation einen Servo nachmachen kann, beschreibt Kern ihn als Bild aus wenigen Teilen.
-Jedes Teil hat eine Zahl, und die sechs Zahlen zusammen heißen **Servoprofil**.
+Jedes Teil hat eine Zahl, und die sechs Zahlen zusammen heißen **Servoprofil**: **Feder**,
+**Kraftgrenze**, **Stoßdämpfer**, **Reibung**, **Schwung** und **Verzögerung**. Die Bilder dazu
+kommen jetzt.
+
+Wichtig: Diese eine Servo-Rechnung läuft überall – im Studio, im Lehrer und auf dem Prüfstand (16.2).
+Darum gelten Zahlen, die man auf dem Prüfstand misst, ohne Umrechnung auch für die Ente im Studio
+und im Training.
 
 > **So kannst du es dir vorstellen:** Zwischen dem Arm und seinem Ziel hängt eine **Feder**. Je weiter
 > der Arm vom Ziel weg ist, desto stärker zieht sie ihn zurück. Ein **Motor** liefert diese Kraft,
 > aber er hat eine **Kraftgrenze**: Mehr geht nicht, egal wie weit weg das Ziel ist. Ein
 > **Stoßdämpfer** wie am Fahrrad bremst schnelle Bewegungen, damit der Arm nicht hin- und herschwingt.
-> Dazu kommt etwas **Reibung**, die jede Bewegung ein wenig festhält.
+> Dazu kommt etwas **Reibung**, die jede Bewegung ein wenig festhält. (Der Motor selbst hat keine
+> eigene Zahl: Er liefert nur die Kraft der Feder, bis zur Kraftgrenze.)
 
 Zwei Dinge fehlen noch im Bild:
 
@@ -86,10 +99,12 @@ nach und dreht an den Zahlen, bis beide gleich aussehen.
 
 ### So misst man
 
-1. **Aufbau:** Servo fest einspannen, Achse waagerecht, ein Arm mit Gewicht. Die Masse auf 0,1 g genau
-   wiegen und messen, wie weit der Schwerpunkt von der Achse weg ist (Arm auf einer Kante ausbalancieren).
+1. **Aufbau:** Servo fest einspannen, Achse waagerecht, ein Arm mit Gewicht. Die Masse genau wiegen
+   und messen, wie weit der Schwerpunkt von der Achse weg ist (Arm auf einer Kante ausbalancieren).
    Bei waagerechter Achse zieht die Schwerkraft am Arm wie an einem Pendel.
-2. **Wie im Roboter betreiben:** gleiche Einstellungen, gleiche Spannung.
+2. **Wie im Roboter betreiben:** dieselben Einstellungen im Servo selbst (wie hart er nachregelt) und
+   dieselbe Spannung wie später in der Ente. Sonst misst du einen anderen Servo als den, der später
+   läuft – wie ein Fahrrad, das du mit zu wenig Luft im Reifen testest.
 3. **Bewegungen vorgeben** und mindestens 100-mal pro Sekunde messen, wo der Arm gerade steht.
 4. **Zwei oder drei verschiedene Gewichte** nehmen, etwa 50 g und 120 g. Mindestens eine Messung je
    Servo legst du zur Seite: Das ist die **Prüfmessung**.
@@ -98,7 +113,7 @@ nach und dreht an den Zahlen, bis beide gleich aussehen.
 Die Bewegungen sind drei Arten von Befehlen. So sehen sie über der Zeit aus:
 
 ```
-Sprung:     ____
+Stufe:      ____
                 |______         plötzlich ein neues Ziel
 
 Chirp:      /\/\/\/\/\/\/\/     Hin und Her, immer schneller
@@ -107,6 +122,7 @@ Rechteck:   __    __    __
               |__|  |__|        immer hin und zurück
 ```
 
+Die **Stufe** heißt bei Fachleuten „Sprungsignal“ – mit dem Sprung der Ente hat sie nichts zu tun.
 Der „Chirp“ (englisch für Zwitschern) beginnt langsam mit einer halben Schwingung pro Sekunde und
 endet mit vier. Die Einheit dafür heißt **Hertz (Hz)**: Schwingungen pro Sekunde.
 
@@ -115,7 +131,11 @@ gemessenen Winkel.
 
 ### Der Prüfstand im Computer
 
-Kern baut denselben Aufbau in der Simulation nach: Servo, Arm, Gewicht, Schwerkraft. Dann schickt es
+Kern baut denselben Aufbau in der Simulation nach: Servo, Arm, Gewicht, Schwerkraft. Dabei rechnet
+der Prüfstand im Computer mit **genau derselben Physik wie die Ente**: gleicher Maßstab, gleich viele
+Rechenschritte pro Sekunde, gleich weiche Gelenke. Sonst würden die gefundenen Zahlen zwar zum
+Prüfstand passen, aber nicht zur Ente – wie ein Rezept, das du auf einem Gasherd ausprobierst und
+dann im Backofen kochst. Dann schickt es
 dieselben Befehle aus dem Log, jeweils um die Verzögerung später, und vergleicht Zeitpunkt für
 Zeitpunkt den simulierten mit dem echten Winkel.
 
@@ -139,11 +159,17 @@ will man: Ein Modell, das manchmal weit danebenliegt, soll schlecht abschneiden.
 
 ### Anpassen und prüfen
 
-Jetzt sucht der Computer die sechs Zahlen des Profils, mit denen der Fehler möglichst klein wird. Das macht ein Suchverfahren namens **CMA-ES** ([Anhang A](A-grundlagen-neuronale-netze.md)):
-Es probiert in jeder Runde ein Dutzend Varianten aus und rückt dorthin, wo die besten lagen.
+Jetzt sucht der Computer die sechs Zahlen des Profils, mit denen der Fehler möglichst klein wird.
+Das macht ein Suchverfahren namens **CMA-ES** ([Anhang A](A-grundlagen-neuronale-netze.md)): Es
+probiert in jeder Runde ein Dutzend Varianten aus und rückt dorthin, wo die besten lagen.
 
 > **So kannst du es dir vorstellen:** Topfschlagen mit zwölf Freunden: Alle suchen gleichzeitig,
 > und die nächste Runde startet dort, wo es am lautesten „heiß“ hieß.
+
+Am Ende nimmt Kern hier den **besten** Kandidaten – anders als bei der Vorbildsuche für den Sprung,
+wo die Mitte der Suchwolke gewinnt ([Kapitel 14](14-lehrer.md)). Der Grund: Beim Sprung enthielt jede
+Bewertung Zufall, der Beste konnte Glück gehabt haben. Auf dem Prüfstand gibt es keinen Zufall:
+Dieselben Zahlen ergeben immer denselben Fehler. Wer hier vorne liegt, ist wirklich besser.
 
 Entscheidend ist dann der Fehler auf der **Prüfmessung**, die bei der Suche nicht benutzt wurde. Nur
 er zeigt, ob das Modell den Servo wirklich erklärt.
@@ -170,11 +196,17 @@ gibt es einen eigenen RMS-Fehler.
 > **So kannst du es dir vorstellen:** Eine Tänzerin nimmt ihre Choreografie auf. Eine zweite tanzt
 > sie Schritt für Schritt nach. Wo die beiden auseinanderlaufen, stimmt bei der zweiten etwas nicht.
 
-Kern prüft das Verfahren mit einem Log aus der Simulation selbst: Mit denselben Servos ist der Abstand **genau 0**, Bit für
-Bit. Mit anderen Servos ist er messbar größer.
+Kern prüft das Verfahren mit einem Log aus der Simulation selbst: Mit denselben Servos ist der
+Abstand **genau 0**, „Bit für Bit“ – also bis zur allerletzten Stelle jeder Zahl, nicht nur
+ungefähr. Mit anderen Servos ist er messbar größer.
 
 **Das ist das Prinzip: Weil Kern deterministisch ist ([Kapitel 14](14-lehrer.md)), ist jeder
 Unterschied zu einem echten Log ein echter Fehler im Modell und kein Zufall.**
+
+Und weil es für jedes Gelenk einen eigenen Fehler gibt, zeigt der Abgleich auch, **wo** der Fehler
+sitzt: Wird der Abstand mit besseren Profilen überall kleiner, aber ein einzelnes Gelenk bleibt
+auffällig, dann fehlt im Modell **genau dieses Gelenks** etwas – zum Beispiel Getriebespiel (16.5).
+Wie beim Arzt: Tut nur ein Knie weh, untersucht er das Knie und nicht den ganzen Körper.
 
 ## 16.4 Training mit dem eigenen Profil
 
@@ -182,9 +214,9 @@ Hat man das Profil der eigenen Servos gemessen, trainiert man die Bewegungen dam
 Training bekommen dann genau diese Servos, mit ihren Streuungen. So passt das Netz zu genau deinem
 Roboter.
 
-> **Für Profis:** Das gilt für die Bewegungen wie den Sprung. Die Spielschicht (das Netz fürs Spielen
-> mit Ball und Socke) nimmt derzeit immer
-> das mitgelieferte Servoprofil. Der Befehl steht im blauen Buch, Kapitel 16.
+> **Für Profis:** Das gilt für die Bewegungen wie den Sprung. Die Spielschicht (das Netz fürs
+> Spielen mit Ball und Socke) nimmt derzeit immer das mitgelieferte Servoprofil. Der Befehl steht im
+> blauen Buch, Kapitel 16.
 
 ## 16.5 Variation (Domain Randomization)
 
@@ -298,7 +330,8 @@ Offen ist noch:
 4. Der unsichere. Dann würfelt das Training dort mehr, und das Netz verlässt sich nicht auf eine Zahl,
    die niemand genau kennt.
 5. Im Modell dieses Gelenks fehlt etwas (zum Beispiel Getriebespiel). Zufall kann es nicht sein, weil
-   die Simulation deterministisch ist: Sie rechnet immer gleich.
+   die Simulation deterministisch ist: Sie rechnet immer gleich. Und weil der Fehler nur bei diesem
+   einen Gelenk so groß ist, sitzt die Lücke dort und nicht im ganzen Modell.
 
 ---
 

@@ -89,7 +89,8 @@ aber du solltest wissen, was gerade passiert, wenn du zusiehst.
 Der Ablauf als Zeitstrahl:
 
 1. **Rezept laden:** Start beim Lauf- und Stehnetz velstand, das schon stehen kann (Warmstart).
-2. **Enten anlegen:** Worker × Enten je Worker Enten, jede mit ihrem eigenen Zufall.
+2. **Enten anlegen:** so viele Enten, wie Worker × Enten je Worker ergibt, jede mit ihrem eigenen
+   Zufall.
 3. **Nachmachen:** 8 Runden lang ahmt das Netz das Vorbild nach. Die Seite meldet „Nachahmen: Runde …
    von 8“ und prüft nach jeder Runde, ob das Netz schon springt.
 4. **Kritiker zuerst:** Die ersten 30 Iterationen lernt nur der Kritiker.
@@ -128,7 +129,7 @@ das, was sie soll?
 |---|---|---|
 | mittlere Episoden-Rückgabe | Punkte pro Versuch | steigt über viele Iterationen |
 | Episodenlänge (s) | wie lange ein Versuch dauert | Sprung: 2 s heißt ohne Sturz |
-| Aktionsrauschen (std) | wie viel Zufall | sinkt, wenn das Netz sicherer wird |
+| Aktionsrauschen (std) | Wackelstärke | sinkt, wenn das Netz sicherer wird |
 | echte Sprünge | Probe: 5 Sprünge | das eigentliche Ziel |
 | Sprunghöhe, Flugzeit | wie gut gesprungen | sollen steigen |
 | Schritte / s | Tempo deines Geräts | nur Tempo, kein Lernen |
@@ -138,8 +139,13 @@ zappelt von Runde zu Runde, steigt aber über Hunderte von Iterationen langsam a
 kürzer als 2 Sekunden, enden Versuche zu früh – durch einen Sturz oder weil ein falsches Teil den
 Boden berührt.
 
-Wenn etwas schiefgeht, hilft das **Nachsehen**: Das Programm zeigt eine Episode Takt für Takt, mit
-jedem Punkte-Posten einzeln. So siehst du, ob das Netz springt – oder nur die Belohnung austrickst.
+„std“ ist ein Fachkürzel für die Wackelstärke: wie stark der Zufall die Bewegungen typischerweise
+verschiebt.
+
+Wenn etwas schiefgeht, hilft das **Nachsehen**: Das Kommandozeilen-Programm zeigt eine Episode Takt
+für Takt, mit jedem Punkte-Posten einzeln. So siehst du, ob das Netz springt – oder nur die Belohnung
+austrickst. Die Lehrer-Seite im Browser kann das nicht. Dort schaust du dir dein Netz im Studio genau
+an (15.8): Springt die Ente wirklich, oder macht sie etwas ganz anderes?
 
 > **Für Profis:** Das Programm zeigt zwei Werte mehr. Der Fehler des Kritikers ist nach dem Nachmachen
 > hoch (er kennt die neue Spielerin noch nicht) und soll dann fallen. Die Lernrate passt sich selbst
@@ -184,7 +190,13 @@ um sie zu verstehen.
 Nach dem Nachmachen ist die Ente schon gut. Darum lernt sie danach mit kleinen Schritten und wenig
 Rauschen weiter. Große Schritte und viel Zufall würden ein gutes Netz leicht kaputtmachen. Und mehr
 Rauschen hilft nicht beim Finden: Mit viel Zufall und ohne Startnetz lernte die Ente zu stehen, nicht
-zu springen.
+zu springen – denn Stehen bringt sicher Punkte, und der Zufall trifft den Absprung trotzdem nicht
+(Kapitel 14.6).
+
+**Startnetz und Netzgröße gehören zusammen.** Wer beim fertigen Stehnetz velstand startet, muss
+dessen Größe behalten, also gleich viele Schichten und Regler. Ein Startnetz ist wie ein halb
+fertiges Puzzle: Du kannst weiterlegen, aber nicht plötzlich einen größeren Rahmen nehmen. Ein Netz
+anderer Größe muss bei null anfangen.
 
 **Regel 2: Mehr Enten ändern das Netz, mehr Helfer nur das Tempo.** Ein Beispiel:
 
@@ -253,7 +265,10 @@ Ente autonom ist, „Kern extras“ an ist und Ball oder Socke in Sicht sind ([K
 > **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter Details › Player Controller ›
 > Walker nach **Autonomous** und **Kern extras**. Starte Play einmal mit und einmal ohne Kern extras
 > (zum Umschalten erst mit Esc stoppen). Achte auf Ball und Socke: Mit Kern extras entscheidet die
-> gelernte Spielschicht, was die Ente mit ihnen macht – ohne nicht.
+> gelernte Spielschicht, was die Ente tut – sie geht auch zur Socke und versucht, sie aufzuheben.
+> Ohne Kern extras übernimmt Pollens nachgebautes Ballspiel (BallPlay,
+> [Kapitel 13](13-micro-duck.md)): Die Ente läuft nur zum Ball und kickt ihn; um die Socke kümmert
+> sie sich nicht gezielt.
 
 > **Für Profis:** Wer Kern selbst baut, kann ein Netz auch als Datei in Kerns Ordner für Netze legen.
 > Kern prüft dabei, ob das Netz die richtige Form hat; ein Netz mit falscher Größe wird nicht
@@ -277,14 +292,19 @@ Nehmen wir als Beispiel eine **Verbeugung**:
    Kritiker extra sehen – etwa die wahre Höhe des Rumpfs?
 2. **Das Rezept (der Trainingsplan):** Mit welchem Netz startet das Training, mit wie viel Rauschen
    und welcher Lernrate? Danach kennen Programm und Browser die neue Aufgabe; der Lehrer-Seite fehlt nur
-   noch ein Eintrag im Menü.
+   noch ein Eintrag im Menü. Braucht die Bewegung eine neue Eingabe, die das Startnetz nie gesehen hat
+   (beim Sprung die Zeiger-Uhr), beginnen deren Regler bei 0 – wie in Kapitel 14.4: Erst handelt das
+   neue Netz wie das alte, dann lernt es die neue Eingabe zu nutzen.
 3. **Die Messung (der Schiedsrichter):** Ein Prüfer, der feststellt, ob eine Verbeugung **wirklich**
    gelungen ist – so wie es für den Sprung festgelegt ist, was ein echter Sprung ist.
 4. **Ein Vorbild (nur bei Bedarf):** Findet das Üben die Bewegung nicht, beschreibt man sie mit
    wenigen Zahlen, lässt CMA-ES die besten suchen und baut ein Vorbild, das in **jeder** Lage eine
    Antwort hat. Nur dann kann das Netz es mit DAgger nachmachen.
 5. **Im Studio einbauen (der Spielplan):** eine Taste, ein Knopf fürs Handy, ein Name für den
-   Logik-Knoten **Robot Move** und das Netz selbst.
+   Logik-Knoten **Robot Move** ([Kapitel 13](13-micro-duck.md)) und das Netz selbst. Die neue
+   Bewegung läuft dann wie der Sprung: Drückst du die Taste, wechselt Kern hart auf ihr eigenes Netz,
+   und nach ihrer Dauer (bei der Verbeugung 2 Sekunden) zurück zum Laufnetz. Wie ein Staffelstab:
+   Immer hält genau ein Netz die Beine.
 
 Der wichtigste Satz dieses Abschnitts steht in Schritt 3: **Miss, was die Bewegung ist – nicht, was
 die Punkte zählen.** Die Punkte sind nur ein Lockmittel. Ein Netz findet oft einen Weg, Punkte zu
@@ -361,9 +381,9 @@ nur den richtigen Bereich.
 ### 5. Punkte-Posten mit Namen
 
 Die Belohnung ist keine einzelne Zahl, sondern eine Summe aus Posten mit Namen: „aufrecht“, „landen“,
-„zappeln“, „Sturz“ … Beim Nachsehen kann man jeden Posten einzeln anschauen. Steigen die Punkte, aber
-die Ente springt nicht, sieht man so sofort, **welcher** Posten die Punkte bringt – und findet den
-Trick, mit dem das Netz schummelt.
+„zappeln“, „Sturz“ … Beim Nachsehen im Programm (15.4) kann man jeden Posten einzeln anschauen.
+Steigen die Punkte, aber die Ente springt nicht, sieht man so sofort, **welcher** Posten die Punkte
+bringt – und findet den Trick, mit dem das Netz schummelt.
 
 Dazu kommen kleine Abzüge, die gute Manieren fördern: fürs Zappeln, fürs Wackeln, wenn die Ente sich
 selbst berührt. Und manche Strafen wachsen per **Lehrplan**: Am Anfang darf die Ente noch zappeln und
@@ -406,9 +426,9 @@ trainiert, stolpert sonst über dieselben Steine.
 - **Ein ahnungsloser Kritiker** macht eine gute Spielerin kaputt. Darum lernt nach dem Nachmachen
   zuerst nur der Kritiker.
 - **Fehler in der Welt statt im Netz.** Die Socke kroch von selbst über den Boden, der Ball rollte
-  ewig, und das Gähnen der Ente öffnete beim Aufheben den Schnabel. Lernt ein Netz an einer Stelle
-  einfach nicht, kann ein solcher Fehler der Welt dahinterstecken – das Nachsehen Takt für Takt zeigt
-  ihn.
+  ewig, und das Gähnen der Ente (eine ihrer Leerlauf-Bewegungen, [Kapitel 13](13-micro-duck.md))
+  öffnete beim Aufheben den Schnabel. Lernt ein Netz an einer Stelle einfach nicht, kann ein solcher
+  Fehler der Welt dahinterstecken – das Nachsehen Takt für Takt im Programm zeigt ihn.
 - **Zahlen von Hand veralten.** Wo der Schnabel greift, stand früher als feste Zahl in der
   Beschreibung. Ändert sich die Physik, stimmt sie nicht mehr. Jetzt misst der Lehrer sie bei jedem
   Lauf neu.
@@ -453,8 +473,10 @@ trainiert, stolpert sonst über dieselben Steine.
    keine Verbeugung. Hilfe: ein hartes Ende, wenn ein anderes Teil als die Sohlen den Boden berührt,
    und eine strenge Messung, was eine echte Verbeugung ist.
 5. Das Netz trickst die Belohnung aus: Es hat einen Weg gefunden, Punkte zu holen, ohne zu springen.
-   Schau eine Episode Takt für Takt an und prüfe, **welcher** Punkte-Posten die Punkte bringt. Dann
-   machst du die Regeln strenger.
+   Finde heraus, **welcher** Punkte-Posten die Punkte bringt: Mit dem Kommandozeilen-Programm schaust
+   du eine Episode Takt für Takt an; im Browser lädst du das Netz ins Studio und schaust genau zu,
+   was die Ente stattdessen tut (sich abstützen, sich auf den Schwanz setzen …). Dann machst du die
+   Regeln strenger.
 
 ---
 

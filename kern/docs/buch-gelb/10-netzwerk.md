@@ -8,13 +8,16 @@
 > - **Client** – ein Mitspieler, der sich mit dem Server verbindet.
 > - **Datagramm** – ein einzelnes kleines Datenpäckchen, das ohne Garantie losgeschickt wird.
 > - **Bit** – ein einzelnes Ja oder Nein (1 oder 0). **8 Bit sind 1 Byte.**
-> - **Ping** – wie lange eine Nachricht zum anderen und wieder zurück braucht, in Millisekunden.
-> - **ms** – Millisekunde, also eine tausendstel Sekunde. 100 ms sind 0,1 s.
+> - **Ping** – wie lange eine Nachricht hin und zurück braucht, in **ms** (Millisekunden,
+>   tausendstel Sekunden; 100 ms sind 0,1 s).
+> - **Salt** – eine Zufallszahl, die der Client beim Anklopfen mitschickt.
+> - **Challenge** – die Antwort des Servers mit seiner eigenen Zufallszahl („Beweis es mir!“).
+> - **Slot** – die Spielernummer, die der Server einem Client zuteilt, wie ein fester Sitzplatz.
 
 Das Internet ist wie die Post an einem schlechten Tag: Briefe kommen zu spät, in falscher
 Reihenfolge, doppelt oder gar nicht. Ein Spiel, das zu mehreren läuft, muss damit klarkommen. Kern
-hat dafür ein eigenes Netzwerk-System. Ganz oben sitzt **NetGame**: Es macht **aus jedem Level ein
-Mehrspieler-Spiel**, ohne dass du am Level etwas vorbereiten musst.
+hat dafür ein eigenes Netzwerk-System. Sein oberster Teil macht **aus jedem Level ein
+Mehrspieler-Spiel**, ohne dass du am Level etwas vorbereiten musst (10.7).
 
 Von der Leitung braucht Kern nur eines: Datagramme verschicken und empfangen. Alles andere – Ordnung,
 Quittungen, Handschlag – baut es selbst darauf. Darum läuft es überall: zwischen Tabs, zwischen
@@ -39,7 +42,8 @@ flowchart TB
   B --> T["Transport: der Briefträger"]
 ```
 
-Die folgenden Abschnitte gehen den Stapel von unten nach oben durch.
+Im Bild steht das Spiel oben und der Briefträger unten. Die folgenden Abschnitte gehen den Stapel
+von unten nach oben durch, also im Bild von der untersten Stufe aufwärts.
 
 ---
 
@@ -59,14 +63,17 @@ Bit verdoppelt sich die Zahl der möglichen Werte:
 | 8 | 2⁸ = 256 | 0 bis 255 |
 | 32 | über 4 Milliarden | jede normale Ganzzahl |
 
-**Beispiel:** Der Platz eines Spielers liegt zwischen 0 und 254. Das sind 255 Werte, und 256 reicht.
-Also braucht er **8 Bit** statt der üblichen 32 – ein Viertel des Platzes.
+Normale Ganzzahlen bekommen im Computer 32 Bit, egal wie klein sie gerade sind – so ist für jede
+Zahl Platz. Kern macht es sparsamer:
+
+**Beispiel:** Die Spielernummer (der Slot) liegt zwischen 0 und 254. Das sind 255 Werte, und 256
+reicht. Also braucht sie **8 Bit** statt 32 – ein Viertel des Platzes.
 
 Kern beschreibt jedes Päckchen **nur ein einziges Mal**. Dieselbe Beschreibung packt ein, packt aus
-und zählt vorher die Bits. Sender und Empfänger benutzen also dieselbe Packliste und können nie
-verschiedener Meinung sein, wo welche Zahl steckt.
+und zählt vorher die Bits, damit Kern weiß, ob alles in ein Päckchen passt. Sender und Empfänger
+benutzen also dieselbe Packliste und können nie verschiedener Meinung sein, wo welche Zahl steckt.
 
-**Leser sind misstrauisch.** Beim Auspacken prüft Kern alles: Liegt eine Zahl außerhalb ihres
+**Der Empfänger ist misstrauisch.** Beim Auspacken prüft Kern alles: Liegt eine Zahl außerhalb ihres
 Bereichs, ist das Päckchen zu kurz oder eine Länge falsch, wird das Päckchen weggeworfen. Ein kaputtes
 oder gefälschtes Päckchen kann das Spiel so nie zum Absturz bringen.
 
@@ -86,14 +93,17 @@ Ein Päckchen allein weiß nicht, ob es angekommen ist. Darum trägt jedes eine 
 Päckchen in die Gegenrichtung trägt eine **Quittung**: „Das hier habe ich schon.“
 
 > **So kannst du es dir vorstellen:** Im Klassenchat schreibst du: „Bis Nachricht 500 gelesen, und
-> von den 32 davor fehlen mir nur 497 und 490.“ Eine einzige Antwort bestätigt so 33 Nachrichten
-> auf einmal.
+> von den 32 davor fehlen mir nur 497 und 490.“ Eine einzige Antwort gibt so Auskunft über
+> 33 Nachrichten auf einmal: 31 sind angekommen, 2 fehlen.
 
 Genau so macht es Kern: Die Quittung nennt die neueste angekommene Nummer und dazu für die 32 davor
-je ein Ja/Nein-Bit. Geht eine Quittung verloren, macht das nichts – die nächste enthält dieselbe
+je ein Ja/Nein-Bit. Steht bei einer Nummer „Nein“, weiß der Sender: Dieses Päckchen ist unterwegs
+verloren gegangen. Geht eine Quittung verloren, macht das nichts – die nächste enthält dieselbe
 Information noch einmal.
 
-**Senden wartet nie.** Diese Schicht schickt sofort los und merkt sich nur, was bestätigt wurde. Ob
+**Senden wartet nie.** Man könnte es auch anders machen: nach jedem Brief warten, bis die Quittung
+da ist, und erst dann den nächsten schicken. Bei schlechtem Netz stünde dann alles still. Kern
+schickt einfach weiter, sofort, und merkt sich nur, was bestätigt wurde. Ob
 etwas Verlorenes noch einmal geschickt wird, entscheidet sie nicht selbst. Das macht die Schicht
 darüber, denn manches lohnt sich gar nicht nachzuschicken (10.4). Zu große Päckchen werden in Stücke
 zerlegt und beim Empfänger wieder zusammengesetzt – wie ein Umzug in mehreren Kartons.
@@ -103,8 +113,12 @@ ankommen) und die **Bandbreite** (wie viele Daten pro Sekunde durch die Leitung 
 **geglättet**: Jede neue Messung zählt nur ein bisschen, damit ein einzelner Ausreißer die Anzeige
 nicht springen lässt.
 
-> **Für Profis:** Die Nummer hat 16 Bit, die ganze Quittung wird auf höchstens 9 Byte zusammengedrückt,
-> und zerlegt wird ab 1024 Byte. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 10.
+> **Krass, aber wahr:** Die Nummer hat 16 Bit, reicht also nur bis 65 535. Danach fängt sie wieder
+> bei 0 an, wie ein Kilometerzähler, der überläuft. Kern kommt damit klar: Nummer 2 gilt als neuer
+> als 65 530, weil sie nur wenige Schritte „hinter der Null“ liegt.
+
+> **Für Profis:** Die ganze Quittung wird auf höchstens 9 Byte zusammengedrückt, und zerlegt wird
+> ab 1024 Byte. Die genauen Namen und Werte stehen im blauen Buch, Kapitel 10.
 
 ---
 
@@ -117,6 +131,17 @@ Nicht jede Nachricht ist gleich wichtig. Darum gibt es zwei **Kanäle**:
   Nachrichten reisen in Stücken, eins nach dem anderen.
 - **Postkarte** (unzuverlässig): Die Nachricht fährt einmal mit dem nächsten Päckchen mit. Geht sie
   verloren, ist sie eben weg.
+
+Wie schafft das Einschreiben „genau einmal und in Reihenfolge“? Auch hier mit Nummern. Jede
+Einschreiben-Nachricht hat ihre eigene Nummer. Kommt eine Nummer zum zweiten Mal, wirft der Empfänger
+sie weg. Kommt Nummer 8, während 7 noch fehlt, legt er 8 beiseite und gibt sie erst ans Spiel
+weiter, wenn 7 da ist – wie Kapitel eines Fortsetzungsromans, die du erst liest, wenn die Lücke
+gefüllt ist.
+
+Und wann gilt eine Nachricht als verloren? Kern wartet ungefähr so lange, wie ein Päckchen hin und
+zurück braucht, also etwa einen Ping (aber nie kürzer als eine feste Mindestzeit). Kam bis dahin
+keine Quittung, schickt es die Nachricht neu. Früher wäre unnötig, denn die Quittung könnte ja noch
+unterwegs sein.
 
 Warum überhaupt Postkarten? Weil manches **verspätet wertlos** ist. Wo das Auto deines Freundes vor
 einer halben Sekunde war, interessiert niemanden mehr – das nächste Päckchen bringt schon die neue
@@ -132,18 +157,26 @@ Bevor gespielt wird, müssen Client und Server sicher sein, dass sie wirklich mi
 nicht mit einem Fremden, einem Fälscher oder einem ganz anderen Spiel. Dafür gibt es einen
 **Handschlag**.
 
-> **So kannst du es dir vorstellen:** Ein Geheimhandschlag. Du sagst eine Zahl, ich sage eine Zahl,
-> wir mischen beide zu einer dritten. Nur wer beide kennt, kennt auch die dritte – und gehört dazu.
+> **So kannst du es dir vorstellen:** Der Bestätigungscode per SMS. Du meldest dich irgendwo mit
+> deiner Handynummer an, und der Dienst schickt einen Code an genau diese Nummer. Nur wer das Handy
+> wirklich in der Hand hat, kann den Code eintippen. Wer eine fremde Nummer angibt, sieht den Code nie.
 
-1. Der Client schickt eine Anfrage mit einer Zufallszahl, dem **Salt**.
-2. Der Server antwortet mit einer **Challenge** (Herausforderung), die seine eigene Zufallszahl
-   trägt.
+1. Der Client schickt eine Anfrage mit einer Zufallszahl, dem **Salt**. Auf jedem Päckchen steht
+   wie ein Absender die Adresse, von der es kommt.
+2. Der Server antwortet mit einer **Challenge**, die seine eigene Zufallszahl trägt – und zwar an
+   genau diese Absenderadresse.
 3. Der Client mischt beide Zahlen und schickt das Ergebnis zurück.
-4. Stimmt es, bekommt der Client einen **Slot** (einen festen Platz) und das gemischte Ergebnis wird
-   die **Verbindungsnummer**. Sie steht ab jetzt auf jedem Päckchen.
+4. Stimmt es und kommt es von derselben Adresse, bekommt der Client einen **Slot** (seine
+   Spielernummer), und das gemischte Ergebnis wird die **Verbindungsnummer**. Sie steht ab jetzt auf
+   jedem Päckchen.
 
-Päckchen mit falscher Nummer oder von Unbekannten ignoriert Kern. Ist der Server voll, wird der Client
-abgewiesen. Damit eine Verbindung nicht aus Versehen als tot gilt, schicken beide Seiten regelmäßig
+Warum bleiben Fälscher draußen? Wer eine fremde Absenderadresse auf seine Anfrage schreibt, dessen
+Challenge landet bei dieser fremden Adresse. Der Fälscher bekommt die Zahl des Servers nie zu sehen,
+kann sie also nicht mischen und nicht richtig antworten. Die Zahlen sind kein Geheimnis zum
+Weitersagen – entscheidend ist, dass die Rückfrage nur an der echten Adresse ankommt.
+
+Päckchen mit falscher Verbindungsnummer oder von Unbekannten ignoriert Kern. Ist der Server voll,
+wird der Client abgewiesen. Damit eine Verbindung nicht aus Versehen als tot gilt, schicken beide Seiten regelmäßig
 **Lebenszeichen**; kommt eine Weile gar nichts mehr, ist die Verbindung getrennt.
 
 Eine Besonderheit: Die Anfrage des Clients ist **absichtlich aufgepolstert**, also so groß wie die
@@ -151,15 +184,20 @@ Antwort. Warum? Sonst könnte jemand mit kleinen, gefälschten Anfragen den Serv
 große Antworten an jemand anderen zu schicken – wie Pizzabestellungen in fremdem Namen. So bekommt man
 nie mehr zurück, als man geschickt hat.
 
-**Die Prüfsumme.** Jedes Päckchen beginnt mit einer **Prüfsumme**: einer Zahl, die aus dem ganzen
-Inhalt und einer festen Spielkennung von Kern ausgerechnet wird. Der Empfänger rechnet nach. Passt sie
-nicht, ist das Päckchen kaputt, von einem anderen Spiel oder von einer anderen Kern-Version – und
-fliegt raus, bevor es überhaupt ausgepackt wird. Das ist wie die letzte Ziffer einer ISBN auf einem
-Buch: Sie wird aus den anderen Ziffern berechnet, und ein Tippfehler fällt sofort auf.
-
 > **Für Profis:** „Mischen“ heißt hier XOR: Bit für Bit wird verglichen, gleich ergibt 0, verschieden
-> ergibt 1. Aus 1010 und 0110 wird 1100. Die Prüfsumme heißt CRC32. Ohne Päckchen ist nach 6 s
-> Schluss, Lebenszeichen gehen alle 0,1 s raus.
+> ergibt 1. Aus 1010 und 0110 wird 1100. Ohne Päckchen ist nach 6 s Schluss, Lebenszeichen gehen
+> alle 0,1 s raus.
+
+### Die Prüfsumme
+
+Jedes Päckchen beginnt mit einer **Prüfsumme** (Fachname CRC32): einer Zahl, die aus dem ganzen Inhalt und einer
+festen Spielkennung von Kern ausgerechnet wird. Der Empfänger rechnet nach. Passt sie nicht, ist das
+Päckchen kaputt, von einem anderen Spiel oder von einer anderen Kern-Version – und fliegt raus, bevor
+es überhaupt ausgepackt wird.
+
+> **So kannst du es dir vorstellen:** Der Strichcode an der Supermarktkasse. Seine letzte Ziffer
+> wird aus den anderen berechnet. Liest der Scanner eine Ziffer falsch, passt die Rechnung nicht,
+> und die Kasse piept nicht – sie verlangt einen neuen Versuch.
 
 ---
 
@@ -194,10 +232,11 @@ Regeln, Pickups, Trigger und Logik.
 
 - Jeder, der beitritt, bekommt einen **Pawn**: eine Kopie der Spielfigur des Levels, die ihm gehört.
 - 30-mal pro Sekunde schickt der Server jedem Client einen **Snapshot**, ein Foto der Welt: das HUD
-  und die Lage aller Dinge, die sich bewegen können.
-- Der Client spielt eine **Replika**: dasselbe Level, aber ohne eigene Physik und ohne Logik. Alle
-  beweglichen Dinge sind dort wie Marionetten (**kinematisch**): Sie bewegen sich nur dorthin, wo die
-  Fotos sie hinstellen. Nur der Stadtverkehr fährt bei jedem selbst, weil er reine Dekoration ist.
+  und die Lage aller Dinge, die sich bewegen können. Beim Spielmodell Soldat stecken darin auch
+  Gesundheit und Munition des eigenen Soldaten.
+- Der Client spielt eine **Replika**, eine Nachbildung: dasselbe Level, aber ohne eigene Physik und
+  ohne Logik. Alle beweglichen Dinge sind dort wie Marionetten (kinematisch, siehe
+  [Kapitel 6](06-physik.md)): Sie bewegen sich nur dorthin, wo die Fotos sie hinstellen. Nur der Stadtverkehr fährt bei jedem selbst, weil er reine Dekoration ist.
 - Der Client schickt nur seine **Eingabe**: Bewegung, Sprung, Boost, Blickrichtung, Feuern, Zielen,
   Nachladen, Ducken, Benutzen.
 - Er zeigt die Welt absichtlich etwa **0,1 s in der Vergangenheit**. Warum, erklärt der Abschnitt
@@ -209,12 +248,14 @@ Was **ankommen muss**, geht per Einschreiben: das Willkommen, „Spieler kommt�
 Beide brauchen **dasselbe Level**. Das Willkommen enthält darum eine Prüfsumme des Levels; spielt der
 Server ein anderes, wird der Client abgewiesen. Wer später dazukommt, bekommt nach dem Willkommen alle
 Pawns, alle Änderungen durch Logik und die Liste der eingesammelten Pickups. So sieht auch ein
-Nachzügler dieselbe Welt. Normal sind bis zu 8 Spieler.
+Nachzügler dieselbe Welt. Ein Online-Spiel nimmt normalerweise bis zu 8 Spieler auf; im Studio an
+einem einzigen Rechner testest du mit bis zu 4 (10.8).
 
 **Kein Sprung geht verloren.** Eingaben reisen per Postkarte, und Postkarten gehen manchmal verloren.
 Darum schickt der Client immer seine **letzten vier** Eingaben mit. Springen und Feuern zählen, wenn
 sie in **irgendeiner** davon stehen. Geht ein Päckchen verloren, steht dein Sprung eben im nächsten.
-Beim Spielmodell Soldat schickt der Server außerdem dessen Werte wie Gesundheit und Munition fürs HUD.
+Jede Eingabe trägt eine Nummer. Der Server nimmt je Client nur die neueste; kommt eine ältere zu spät
+oder dieselbe doppelt an, wirft er sie weg. So läuft deine Figur nie rückwärts in der Zeit.
 
 > **Für Profis:** Wenn du schießt, sah deine Welt schon etwas älter aus als die des Servers. Darum dreht
 > der Server für die Treffer-Prüfung die Zeit zurück, um etwa den halben Ping plus die 0,1 s
@@ -255,17 +296,21 @@ immer **zwei** bekannte Fotos um die gezeigte Zeit herum, und er rechnet dazwisc
 | Zeit | Was der Client weiß | Was er zeigt |
 |---|---|---|
 | 1,00 s | Foto A: Auto bei x = 10 m | – |
-| 1,10 s | Foto B: Auto bei x = 12 m | – |
 | 1,05 s | liegt genau in der Mitte | x = 11 m |
+| 1,10 s | Foto B: Auto bei x = 12 m | – |
 
 Fehlt Nachschub, rechnet er die letzte Bewegung noch kurz weiter (höchstens eine Viertelsekunde) und
 hält das Ding dann an. Der **Puffer** in der Statuszeile sagt, wie weit das neueste Foto vor der
 gezeigten Zeit liegt. Ist er groß, ist genug Vorrat da.
 
-Dafür braucht der Client die **Uhr** des Servers. Jeder Snapshot trägt die Serverzeit. Unterwegs
-kann ein Päckchen nur aufgehalten werden, nie schneller sein. Darum vertraut der Client den Päckchen
-am meisten, die am schnellsten ankamen – wie du deine Uhr lieber nach einer Glocke stellst, die du
-ohne Umweg hörst.
+Bleibt eine Frage: 0,1 s vor **welcher** Zeit? Jedes Foto trägt die Uhrzeit des Servers. Damit der
+Client weiß, welche Fotos zu „Serverzeit jetzt minus 0,1 s“ gehören, muss er die **Uhr des Servers**
+kennen – seine eigene Uhr geht anders.
+
+Dazu vergleicht er bei jedem Foto die Uhrzeit darauf mit seiner eigenen. Unterwegs kann ein Päckchen
+nur aufgehalten werden, nie schneller sein. Ist der Abstand zwischen beiden Uhrzeiten besonders
+klein, war dieses Päckchen besonders schnell – und dem glaubt der Client am meisten. Wie du deine Uhr
+lieber nach einer Glocke stellst, die du ohne Umweg hörst.
 
 ---
 
@@ -308,7 +353,9 @@ Host merkt, wenn ein Gast geht. Ein Host in einem Hintergrund-Tab läuft weiter,
 rausfliegen.
 
 > **Mission:** Öffne Studio in zwei Tabs mit demselben Level. Tab 1: **Host Online Game…**, Raum
-> „kern“, **Host**. Tab 2: **Join Online Game…**, derselbe Raum, **Join**. Jetzt fahrt ihr zusammen.
+> „kern“, **Host**. Tab 2: **Join Online Game…**, derselbe Raum, **Join**. Beide Tabs brauchen
+> dasselbe Level, sonst weist der Host den Gast ab. **Was siehst du?** Fahr in Tab 2 los und schalte
+> zu Tab 1: Dort fährt dein Auto als zweites Auto mit.
 
 Die genauen Befehle dazu stehen im blauen Buch, Kapitel 10.
 

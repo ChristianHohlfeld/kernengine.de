@@ -19,7 +19,7 @@
 Kern Studio arbeitet nach dem Vorbild der Unreal Engine, die du vielleicht von Fortnite kennst. Die
 wichtigste Idee: **Was du im Editor siehst, ist schon das Spiel.** Der ganze Editor benutzt genau
 dasselbe Programm wie dein fertiges, exportiertes Spiel. Was im Viewport fällt, rollt und leuchtet,
-tut es später genauso (11.15). Wie daraus ein ganzes Spiel wird, zeigt
+tut es später genauso (11.16). Wie daraus ein ganzes Spiel wird, zeigt
 [Kapitel 12](12-eigene-spiele.md).
 
 Dieses Kapitel geht in der Reihenfolge vor, in der man einen Editor lernt: erst verstehen, woraus eine
@@ -136,23 +136,19 @@ kippen), Nicken (Nase hoch oder runter) und Gieren (nach links oder rechts drehe
 
 ### Woher die Bausteine kommen
 
-Fertige Actors liegen im **Content Drawer** (Ctrl+Space), sortiert in Gruppen: **Players**
-(Spielfiguren wie Character, Hover Car, Rolling Ball, Drone, Soldier, Micro Duck), **Gameplay** (Orb,
-Star, Ziel, Gefahr, Checkpoint, Sprungfeld, Teleporter, bewegliche Plattform …), **Shapes** (Würfel,
-Kugel, Zylinder, Rampe …), **Physics** (Physikkiste, Kugel, Fass, Kistenstapel, Pendel, Tür, Kette,
-Wippe und eine Socke im Maßstab der Micro Duck), **Lights**, **Audio** und **World** (die
-Zufallsstadt).
+Fertige Actors liegen im **Content Drawer** (Ctrl+Space), sortiert in Gruppen wie in einem
+Werkzeugkasten mit Fächern: **Players** (Spielfiguren, etwa Rolling Ball), **Gameplay**
+(Spielelemente, etwa ein Orb), **Shapes** (Formen, etwa ein Würfel), **Physics** (Physik-Dinge, etwa
+eine Physikkiste), **Lights** (Lampen), **Audio** (Töne) und **World** (die Zufallsstadt).
 
 - **Klick** setzt den Baustein dorthin, wohin die Kamera blickt.
 - **Ziehen** in den Viewport setzt ihn genau an die Stelle, wo du loslässt.
-- Oder: **+ Add** in der Toolbar, Rechtsklick › **Place Actor**, oder in der Konsole `spawn` und der
-  Name.
+- Oder: **+ Add** in der Toolbar oder Rechtsklick › **Place Actor**.
 
 Ein neuer Actor ist sofort ausgewählt. Etwas aus **Players** wird automatisch deine Spielfigur.
 
-Im Content Drawer gibt es außerdem die Tabs **Textures** (eigene Bilder als Oberfläche), **Sounds**
-(eigene Töne) und **Output Log**, das Logbuch mit allen Meldungen. Bilder und Töne stecken danach mit
-im Level. Ton startet erst nach deinem ersten Klick in die Seite – das ist eine Regel aller Browser.
+Eigene Bilder und Töne holst du dir über die Tabs **Textures** und **Sounds** im Content Drawer
+(mehr dazu in 11.13). Der Tab **Output Log** ist das Logbuch mit allen Meldungen von Studio.
 
 ### Outliner und Details: Liste und Steckbrief
 
@@ -165,8 +161,8 @@ Drehung, Größe, jeweils drei Zahlen X, Y, Z wie im Koordinatensystem), darunte
 Abschnitt. Mit **+ Add** steckst du eine Komponente dazu, der Papierkorb nimmt sie weg. Zahlen kannst
 du tippen (sogar Rechnungen wie `2*3`), am Namen seitwärts ziehen oder mit den Pfeiltasten ändern.
 
-Jede Änderung prüft Studio so streng, als käme sie aus einer gespeicherten Datei. Ein unmöglicher Wert,
-etwa eine Größe von 0, landet darum nie im Level.
+Studio prüft jeden Wert, bevor er ins Level kommt. Eine Größe von 0 oder ein Wert, der nicht passt,
+landet nie im Level – so kann ein Tippfehler deine Welt nicht kaputt machen.
 
 > **Mission:** Öffne File › Example Levels › **Basic**. Klick den Würfel: Details zeigt ein **Static
 > Mesh**, aber keinen Rigid Body. Platziere aus dem Content Drawer (Gruppe **Physics**) eine
@@ -174,6 +170,11 @@ etwa eine Größe von 0, landet darum nie im Level.
 > **Rigid Body**. Setz bei beiden unter **Transform** die
 > **Location** Z auf 5 und drück **Alt+S**. Was fällt, was schwebt? **Esc** stoppt – und beide sind
 > wieder oben. Warum, erfährst du in 11.8.
+
+Der Würfel ohne Rigid Body ist für die Physik trotzdem da. Hat ein Ding eine Form mit Kollision, aber
+keinen Rigid Body, gibt Studio ihm beim Testen einen unsichtbaren **festen** Körper: Er fällt nicht,
+aber andere Dinge stoßen an ihm an, wie an einer Wand. Darum kann die Physikkiste auf dem Würfel
+landen und deine Spielfigur gegen ihn laufen.
 
 ---
 
@@ -210,13 +211,19 @@ Die Kamera steuerst du wie eine Spielfigur:
 | Ctrl+1 … 9 / 1 … 9 | Lesezeichen setzen / anspringen |
 
 **Mit Fingern:** ein Finger kreist, zwei Finger zoomen und verschieben, Tippen wählt aus. Was unter
-deinen Fingern liegt, bleibt beim Zoomen unter ihnen. Darum fühlt sich dieselbe Geste an einem kleinen
-Ding genauso an wie an einem ganzen Häuserblock.
+deinen Fingern liegt, bleibt beim Zoomen unter ihnen. Wie schnell gezoomt wird, hängt davon ab, wie
+weit dieser Punkt weg ist: Nahes zoomt in kleinen Schritten, Fernes in großen. Darum fühlt sich
+dieselbe Geste an einem kleinen Ding genauso an wie an einem ganzen Häuserblock.
+
+Übrigens: Für W A S D zählt die **Lage** der Taste, nicht was draufsteht. Auf einer französischen
+Tastatur sind die Buchstaben anders verteilt, aber die vier Tasten an der Stelle von W A S D steuern
+genauso. Kürzel wie Ctrl+Z dagegen gehen nach der Beschriftung – Ctrl+Z ist immer die Taste mit Z.
 
 > **Mission:** Flieg in Orb Run mit gehaltener rechter Maustaste über die Stadt und dreh dabei am
 > Mausrad, bis du richtig schnell bist. Lass die Maustaste los und speichere mit **Ctrl+1** einen
-> Blick auf ein Hochhaus. Flieg weg, lass los und drück **1** – du bist sofort zurück. Ohne Tastatur:
-> **≡ › Bookmarks** in der Leiste des Viewports.
+> Blick auf ein Hochhaus. Flieg weg, lass los und drück **1** – du bist sofort zurück. Ohne Tastatur,
+> oder falls dein Browser bei Ctrl+1 zu einem anderen Tab springt: **≡ › Bookmarks** in der Leiste des
+> Viewports, dort **Set bookmark 1** und später **Jump to bookmark 1**.
 
 Alle weiteren Kamera-Tasten stehen in [Kapitel 17](17-referenz.md).
 
@@ -247,8 +254,9 @@ Der rote Pfeil zeigt immer gleich, wie „Norden“ auf einer Karte. Der Würfel
 **Actor selbst** aus: Ist der gedreht, dreht der Gizmo mit, wie „vor mir“ für einen Menschen, der sich
 umdreht.
 
-**Alt + Ziehen** zieht eine **Kopie** heraus, das Original bleibt stehen. **Esc** während des Ziehens
-bricht ab.
+**Alt + Ziehen** zieht eine **Kopie** heraus, das Original bleibt stehen, und ausgewählt ist danach
+die Kopie. **Esc** während des Ziehens bricht ab. Kopierst du Actors mit Ctrl+C, landen sie als Text
+in der Zwischenablage – du kannst sie darum mit Ctrl+V sogar in einem anderen Studio-Tab einfügen.
 
 ### Snapping: Karopapier für die Welt
 
@@ -273,7 +281,7 @@ Die Schrittweiten wählst du in der Toolbar.
 
 > **Mission:** Wähl im Basic-Level den Würfel. Drück **E** und zieh an einem Ring: Er dreht in
 > 15°-Schritten. **Ctrl+Z** nimmt das zurück. Drück **W**, halt **Alt** und zieh den roten Pfeil 1 m
-> – zwei Würfel! Zieh die Kopie (ohne Alt) am blauen Pfeil 0,5 m hoch. Wiederhol das mit der jeweils
+> – zwei Würfel! Ausgewählt ist jetzt die Kopie. Zieh sie (ohne Alt) am blauen Pfeil 0,5 m hoch. Wiederhol das mit der jeweils
 > neuen Kopie, bis eine Treppe aus fünf Stufen steht.
 
 ---
@@ -301,7 +309,8 @@ auch nichts schiefgehen. Es hält **500 Schritte**.
 
 > **Mission:** Öffne nach deiner Treppe **Edit › History…**. Klick den Schritt, mit dem du die erste
 > Kopie gezogen hast: Die Treppe schrumpft auf zwei Würfel. Klick dann den letzten Schritt – alle fünf
-> Stufen sind wieder da.
+> Stufen sind wieder da. Speichere die Treppe jetzt mit **Ctrl+S**, zum Beispiel als
+> `treppe.klevel` (mehr zum Speichern in 11.13). Du brauchst sie in 11.14 wieder.
 
 ---
 
@@ -330,10 +339,12 @@ Motor. So geht es am schnellsten:
 Studio gibt dem hängenden Actor einen Rigid Body, falls er keinen hat. Ein Seil (**Distance / rope**)
 hält genau den Abstand, den die beiden beim Start haben.
 
-> **Mission:** Zieh im Basic-Level den Würfel mit dem blauen Pfeil 4 m nach oben. Platziere eine
+> **Mission:** Öffne Basic neu (**File › Example Levels › Basic**), damit wieder nur ein Würfel
+> dasteht. Zieh den Würfel mit dem blauen Pfeil 4 m nach oben. Platziere eine
 > **Physics Sphere** und schieb sie 3 m zur Seite auf etwa 2 m Höhe. Klick erst die Kugel, dann mit
 > Ctrl den Würfel, Rechtsklick auf den Würfel › **Connect with Constraint › Distance / rope**,
-> **Alt+S**: ein Pendel! Der Würfel schwebt fest, denn ohne Rigid Body fällt er nicht.
+> **Alt+S**: ein Pendel! Der Würfel schwebt fest: Ohne Rigid Body bekommt er einen unsichtbaren
+> festen Körper (11.3), der nicht fällt und das Seil hält.
 
 ---
 
@@ -410,15 +421,23 @@ statt zu klicken. Pfeil nach oben holt den letzten Befehl zurück.
 | Befehl | Wirkung |
 |---|---|
 | `spawn` und ein Name | Baustein platzieren |
-| `gravity x y z` | Schwerkraft ändern (leer: wie auf der Erde) |
+| `gravity x y z` | Schwerkraft ändern (leer: Erde) |
 | `tod` und eine Zahl von 0 bis 1 | Tageszeit |
 | `play`, `simulate`, `stop` | wie die Knöpfe |
 | `help` | alle Befehle anzeigen |
 
+Die Schwerkraft hat eine Stärke **und eine Richtung**. Darum braucht `gravity` drei Zahlen: wie
+stark sie in X-, Y- und Z-Richtung zieht. Z zeigt nach oben, also heißt `gravity 0 0 -9.81`: mit
+9,81 nach unten, wie auf der Erde. Ein Plus bei Z würde alles an die Decke fallen lassen.
+
+Bei `tod` (Tageszeit, englisch „time of day“) ist der Tag ein Kreis von 0 bis 1: **0** ist
+Mitternacht, **0,25** Sonnenaufgang, **0,5** Mittag, **0,75** Sonnenuntergang. Im Befehl schreibst du
+das Komma als Punkt, also `tod 0.5`.
+
 > **Mission:** Öffne File › Example Levels › **Basic**, klick ins Feld **Cmd** und tipp
 > `spawn physics_cube`. Setz in Details unter **Transform** bei **Location** Z auf 10. Tipp
-> `gravity 0 0 -1.6` (etwa Mondschwerkraft, auf der Erde sind es 9,81) und drück **Alt+S**: Wie
-> langsam fällt die Kiste? **Esc** stoppt, dann `gravity` ohne Zahlen – zurück auf der Erde.
+> `gravity 0 0 -1.6` (etwa Mondschwerkraft nach unten, auf der Erde sind es 9,81) und drück
+> **Alt+S**: Wie langsam fällt die Kiste? **Esc** stoppt, dann `gravity` ohne Zahlen – zurück auf der Erde.
 
 ---
 
@@ -540,6 +559,11 @@ Sobald du richtig speicherst, ist die Kopie nicht mehr nötig und verschwindet.
 > **Vorsicht, Falle:** Der Autosave lebt **nur in diesem Browser**. Neuer Rechner oder gelöschte
 > Browserdaten – weg. Echte Sicherheit gibt nur **Ctrl+S**.
 
+**Updates kosten nie Arbeit.** Gibt es eine neue Studio-Version, lädt Studio sie nur dann sofort,
+wenn nichts verloren gehen kann: Du baust gerade und alles ist gespeichert. Sonst fragt es mit
+**New version available**, und du wählst **Update** oder **Later**. Beim Update reist dein Level über
+den Autosave in die neue Version – wie ein Umzug, bei dem die Kisten zuerst sicher im Auto stehen.
+
 **Einstellungen:** Unter **Edit › Preferences** stellst du Kameratempo, Mausempfindlichkeit und die
 Raster ein. Studio merkt sich dabei **nur, was du selbst geändert hast**. Alles andere folgt den
 Standardwerten der jeweiligen Studio-Version. Wird ein Standard in einer neuen Version besser, bekommst
@@ -564,8 +588,9 @@ geht, für alles andere müssen ihre Ordner neben der Datei liegen. Und das Auss
 Pollen Robotics und darf nur **nicht kommerziell** verwendet werden, also nicht in einem Spiel, mit
 dem du Geld verdienst ([Kapitel 12](12-eigene-spiele.md)).
 
-> **Mission:** Gib deinem Treppen-Level aus 11.5 einen **Rolling Ball** als Spieler (einfach aus
-> **Players** platzieren) und exportiere es. Klick **Play it** – und schick die Datei einem Freund.
+> **Mission:** Öffne deine gespeicherte Treppe aus 11.6 mit **Ctrl+O** (zum Beispiel
+> `treppe.klevel`). Gib ihr einen **Rolling Ball** als Spieler (einfach aus **Players** platzieren)
+> und exportiere sie. Klick **Play it** – und schick die Datei einem Freund.
 
 ---
 

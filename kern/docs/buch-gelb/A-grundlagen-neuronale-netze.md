@@ -107,9 +107,12 @@ flowchart LR
   C --> y["14 Ausgänge"]
 ```
 
-Die erste Schicht hat 61 · 512 = 31 232 Gewichte plus 512 Biases, zusammen 31 744. Alle vier
-Schichten zusammen: 31 744 + 131 328 + 32 896 + 1 806 = **197 774 Parameter**, also fast 200 000
-Regler. Das Spielnetz ist kleiner: 23 → 256 → 128 → 9.
+Die erste Schicht allein hat schon 61 · 512 = 31 232 Gewichte plus 512 Biases, zusammen über
+31 000 Regler. Alle vier Schichten zusammen haben fast **200 000 Regler**.
+
+> **Für Profis:** Genau sind es 31 744 + 131 328 + 32 896 + 1 806 = 197 774 Parameter. Die anderen
+> Schichten rechnest du wie die erste: Eingänge mal Neuronen plus ein Bias je Neuron. Das Spielnetz
+> ist kleiner: 23 → 256 → 128 → 9.
 
 ### Der Start: Zufall, aber klein
 
@@ -124,9 +127,14 @@ zwischen −0,13 und +0,13. So wachsen die Summen nicht von Schicht zu Schicht.
 ## A.2 Die Vorwärtsrechnung
 
 **Vorwärts** heißt: die Eingaben Schicht für Schicht durchrechnen, wie beim Neuron oben. Meist rechnet
-das Netz viele Eingaben auf einmal, einen **Batch** (englisch für Stapel). Kern rechnet vier
-Eingaben gleichzeitig, weil der Computer das schneller schafft. Fürs Lernen merkt sich das Netz alle
-Zwischenergebnisse, damit es später rückwärts rechnen kann (A.5).
+das Netz viele Eingaben auf einmal, einen **Batch** (englisch für Stapel). Fürs Lernen merkt sich das
+Netz alle Zwischenergebnisse, damit es später rückwärts rechnen kann (A.5).
+
+Kern rechnet dabei schnell, aber **ohne die Reihenfolge der Additionen zu ändern**. Der Computer
+könnte noch schneller sein, wenn er Summen umsortieren dürfte – doch dann käme an der letzten Stelle
+etwas anderes heraus, wie beim Drei-Ziffern-Taschenrechner in [Kapitel 14](14-lehrer.md). Kern
+legt die Zahlen darum so im Speicher ab, dass das schnelle Rechnen ohne Umsortieren klappt. So bleibt
+das Netz auf jedem Gerät bis zur letzten Stelle gleich.
 
 ## A.3 Der Verlust: Wie schlecht bin ich gerade?
 
@@ -210,23 +218,31 @@ Fehler = (y − Ziel) · (y − Ziel). Start: x = 1, Ziel = 1, w1 = 0,5, b1 = �
 Fehler = (−1,287) · (−1,287) = **1,656**.
 
 **Rückwärts:** Jedes Zahnrad hat eine Steigung: Um wie viel ändert sich das Nächste, wenn man ein
-winziges Stück dreht? Jede kannst du durch **Tasten** wie in A.4 nachprüfen.
+winziges Stück dreht? Jede kannst du durch **Tasten** wie in A.4 nachprüfen. Fangen wir hinten an.
 
-| Zahnrad | Steigung | Warum |
-|---|---|---|
-| y → Fehler | −2,574 | getastet: y + 0,01 senkt den Fehler um etwa 0,026 |
-| w2 → y | −0,393 | w2 + 0,01 ändert y um 0,01 · h |
-| h → y | 2 | h + 0,01 ändert y um 0,01 · w2 |
-| z → h | 0,607 | getastet in der ELU-Tabelle: z + 0,01 ändert h um etwa 0,006 |
-| w1 → z | 1 | w1 + 0,01 ändert z um 0,01 · x |
+**Der Weg von w2 – zwei Zahnräder:**
 
-Multipliziert wie beim Getriebe:
+```
+w2 ──(−0,393)──► y ──(−2,574)──► Fehler
+```
 
-- w2 → Fehler = −2,574 · (−0,393) = **1,013**
-- w1 → Fehler = −2,574 · 2 · 0,607 · 1 = **−3,122**
+- **y → Fehler:** −2,574. Getastet: y + 0,01 senkt den Fehler um etwa 0,026, also Steigung ≈ −2,6.
+- **w2 → y:** −0,393. Dreht man w2 um 0,01, ändert sich y um 0,01 · h, und h ist −0,393.
+- Multipliziert: w2 → Fehler = (−0,393) · (−2,574) = **1,013**.
 
-Ein Bias ist wie ein Eingang, der immer 1 ist. Darum hat b2 dieselbe Steigung wie y (−2,574) und b1
-dieselbe wie w1 (−3,122).
+**Der Weg von w1 – vier Zahnräder:**
+
+```
+w1 ──(1)──► z ──(0,607)──► h ──(2)──► y ──(−2,574)──► Fehler
+```
+
+- **w1 → z:** 1, denn z = w1 · x, und x ist 1.
+- **z → h:** 0,607, getastet in der ELU-Tabelle: z + 0,01 ändert h um etwa 0,006.
+- **h → y:** 2, denn y = w2 · h, und w2 ist 2.
+- **y → Fehler:** −2,574 wie oben.
+- Multipliziert: w1 → Fehler = 1 · 0,607 · 2 · (−2,574) = **−3,122**.
+
+Die beiden Biases b1 und b2 rechnest du genauso; ihre Steigungen sind −3,122 und −2,574.
 
 **Ein Schritt** mit Lernrate 0,1, jeweils neuer Wert = alter Wert − 0,1 · Steigung:
 
@@ -241,6 +257,9 @@ mit vielen, sich widersprechenden Beispielen kommen nur in winzigen Schritten vo
 
 In Kern rechnet das Netz genau so, Schicht für Schicht, und ein Test vergleicht das Ergebnis mit dem
 langsamen Tasten.
+
+> **Für Profis:** Ein Bias wirkt wie ein zusätzlicher Eingang, der immer 1 ist. Darum hat b2 dieselbe
+> Steigung wie der Weg y → Fehler (−2,574) und b1 dieselbe wie w1 (−3,122), denn x ist hier auch 1.
 
 ## A.6 Adam: der kluge Wanderer
 
@@ -287,7 +306,10 @@ Die Umrechnung: neu = (Wert − Mittelwert) / (Streuung + 0,01).
 etwa zwei Streuungen über dem Mittel. Die 0,01 verhindert das Teilen durch 0, falls ein Eingang sich
 nie ändert.
 
-Mittelwert und Streuung werden während des Trainings laufend nachgeführt. Der Normalisierer **gehört
+Mittelwert und Streuung werden während des Trainings laufend nachgeführt. Warum? Eine bessere Ente
+erlebt andere Lagen: Wer springen lernt, dreht sich schneller und hebt ab, was eine stehende Ente nie
+tut. Die Werte wandern also, und der Umrechner muss mitwandern – wie eine Waage, die man neu
+einstellt, wenn plötzlich schwerere Dinge darauf landen. Der Normalisierer **gehört
 zum Netz**: Ohne genau diese Umrechnung ist es wertlos, darum steht er in der Netz-Datei mit drin.
 
 > **Für Profis:** Beim **Warmstart** beginnt das Training mit einem fertigen Netz. Dann übernimmt Kern
@@ -402,6 +424,11 @@ griechische Buchstabe „Gamma“). Zwei Schritte voraus also 0,99 · 0,99 = 0,9
 Eine Belohnung in 100 Takten zählt also nur noch gut ein Drittel, danach wird sie schnell unwichtig.
 Die Ente plant darum etwa **100 Takte** voraus – 2 Sekunden, so lang wie ein Sprung.
 
+Warum wertet man überhaupt ab? Ohne Abwertung würde die Summe bei langen Versuchen immer weiter
+wachsen: Eine Ente, die 1000 Takte steht, hätte zehnmal so viel wie eine, die 100 Takte steht, und bei
+noch längeren Versuchen gäbe es keine Grenze. Mit dem Zukunftsfaktor bleibt die Summe begrenzt, und
+die nahen Folgen einer Bewegung zählen am meisten.
+
 > **So kannst du es dir vorstellen:** Ein Leckerli jetzt ist dem Hund mehr wert als eins in einer
 > Stunde. Trotzdem lohnt sich „Sitz“, wenn danach sicher etwas kommt.
 
@@ -486,14 +513,23 @@ Mit dem Vorteil lernt auch der Kritiker: Was er erwartet hat, plus wie viel bess
 er hätte erwarten sollen. Genau darauf trainiert er.
 
 > **Für Profis:** Die 94 % sind Zukunftsfaktor mal ein zweiter Faktor λ („Lambda“, 0,95), der sagt,
-> wie stark man den späteren Schritten glaubt: 0,99 · 0,95 = 0,9405. Danach normalisiert Kern alle
-> Vorteile wie in A.7 auf Mittelwert 0 und Streuung 1.
+> wie stark man den späteren Schritten glaubt: 0,99 · 0,95 = 0,9405. λ ist eine Abwägung. Glaubt man
+> nur dem nächsten Schritt (λ = 0), ist der Vorteil ruhig, hängt aber ganz davon ab, ob der Kritiker
+> richtig schätzt. Zählt man alles bis zum Ende (λ = 1), ist er ehrlich, aber sehr zappelig.
+> Danach normalisiert Kern alle Vorteile wie in A.7 auf Mittelwert 0 und Streuung 1. So hängt die
+> Größe eines Lernschritts nicht davon ab, ob eine Aufgabe Zehntelpunkte oder Hunderte Punkte
+> vergibt.
 
 ### Warum zu große Schritte gefährlich sind
 
 Die gesammelten Daten stammen von der **alten** Ente. Ändert man das Netz auf einmal zu stark,
 passen diese Daten nicht mehr zur neuen Ente. Eine gute Policy kann so in einem einzigen Schritt
 kaputtgehen – und liefert danach nur noch schlechte Versuche, aus denen sie kaum wieder herauskommt.
+
+Noch schlimmer wird es, wenn man **mehrmals** aus denselben Daten lernt. Genau das möchte man aber:
+Erfahrung zu sammeln ist teuer, und mehrmals daraus zu lernen spart viel Rechenzeit. Mit jedem
+Durchgang entfernt sich die Ente weiter von der, die die Daten gesammelt hat. Ohne Bremse geht das
+schief. Die Bremse heißt PPO.
 
 ### PPO: verbessern mit Sicherheitsgurt
 
@@ -537,11 +573,16 @@ flowchart TD
   P --> S
 ```
 
-Pro Runde lernt Kern fünf Epochen lang aus denselben Daten, jedes Mal in vier Minibatches. Sammeln und Lernen sind getrennt:
-Die Sammler brauchen nur die Policy, der Lerner nur die Daten. Darum können viele Helfer gleichzeitig
-sammeln, auf dem Computer als **Threads** (Rechenstränge) oder im Browser als **Web Worker**. Weil Kern
-die Daten danach immer in dieselbe feste Reihenfolge bringt, entsteht überall dasselbe Netz, egal wie
-viele Helfer sammeln ([Kapitel 17](17-referenz.md)).
+Pro Runde lernt Kern mehrmals aus denselben Daten (fünf Epochen, jede in vier Minibatches). Das spart
+Rechenzeit, und weil es die Ente jedes Mal ein Stück weiter von der sammelnden Ente wegschiebt,
+braucht es genau den Sicherheitsgurt von oben.
+
+Sammeln und Lernen sind getrennt: Die Sammler brauchen nur die Policy, der Lerner nur die Daten.
+Darum können viele Helfer gleichzeitig sammeln, auf dem Computer als **Threads** (Rechenstränge) oder
+im Browser als **Web Worker**. Weil Kern die Daten danach immer in dieselbe feste Reihenfolge bringt,
+entsteht überall dasselbe Netz, egal wie viele Helfer sammeln. Warum die Reihenfolge so wichtig ist,
+erklärt [Kapitel 14](14-lehrer.md) im Abschnitt 14.7; die Regel zum Nachprüfen steht in
+[Kapitel 17](17-referenz.md), Abschnitt 17.3.
 
 > **Mission:** Starte im Lehrer „Stehen (Schnelltest)“ und schau auf die Kurve (beim Sprung beginnt
 > sie erst nach dem Nachahmen). Die grüne Linie ist die Episoden-Rückgabe, der Return. Steigt sie,
@@ -609,6 +650,12 @@ man nah dran und die Schritte heben sich auf, wird sie kleiner.
 
 Bei einer wackeligen Bewertung ist die **Mitte** der Wolke besser als der beste Einzelkandidat, denn
 der könnte nur Glück gehabt haben.
+
+Damit der Vergleich fair ist, probiert Kern in einer Generation **alle Kandidaten an denselben**
+zufälligen Robotern aus; jede neue Generation bekommt andere. Wie bei einer Klassenarbeit: Alle
+bekommen dieselben Aufgaben, sonst kann man die Noten nicht vergleichen. Und weil die Aufgaben jede
+Woche neue sind, gewinnt am Ende, wer es wirklich kann – nicht, wer zufällig die leichten erwischt
+hat.
 
 ## A.14 ONNX: das Austauschformat
 

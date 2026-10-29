@@ -53,7 +53,7 @@ Ein trainiertes Netz funktioniert nur, wenn die Simulation dieselbe Physik rechn
 Darum gelten feste Regeln:
 
 - Keine Hilfskräfte, kein Festhalten, kein Teleport, kein weiches Überblenden von einem Netz zum
-  anderen. Die Ente steht nur durch ihre Servos und ihre Fußkontakte.
+  anderen (also nie zwei Netze, die gleichzeitig halb steuern). Die Ente steht nur durch ihre Servos und ihre Fußkontakte.
 - Ein Servo besteht nur aus Bauteilen, die die Physik-Engine sowieso hat (Abschnitt 13.4).
 - Die Zeit läuft in festen Schritten. Gleiche Eingaben ergeben **Bit für Bit** denselben Gang, auf
   jedem Gerät. Das heißt **Determinismus** ([Kapitel 14](14-lehrer.md)).
@@ -94,9 +94,17 @@ balancieren könnte) und die **Trägheit**.
 
 Im Servo dreht ein winziger Motor über ein Getriebe: 288 Umdrehungen des Motors ergeben eine Umdrehung
 des Gelenks. Der schnell kreiselnde Motor wirkt wie ein kleines Schwungrad und macht jede Bewegung
-des Gelenks träger. Diese Drehmasse des Motors heißt **Armatur**. Kerns Physik kennt keine Getriebe,
+des Gelenks träger. Diese Drehmasse des Motors heißt **Armatur**. Warum macht so ein Winzling so viel
+aus? Weil die Übersetzung doppelt zählt: Will das Gelenk schneller werden, muss der Motor 288-mal so
+stark beschleunigt werden, und seine Gegenwehr kommt über das Getriebe noch einmal 288-fach verstärkt
+am Gelenk an. Darum wirkt er viel träger, als er aussieht. Kerns Physik kennt keine Getriebe,
 darum bekommt jedes Glied eine gedachte dünne Scheibe auf seiner Gelenkachse, die genauso träge macht.
 Nicht exakt, aber ohne sie zappelt die Ente gut dreimal so stark (Abschnitt 13.14).
+
+> **Für Profis:** Warum eine ganze Scheibe und nicht einfach „träge nur um die Achse“? Einen Körper,
+> der nur um eine einzige Achse träge ist, gibt es in Wirklichkeit nicht. Die Physik-Engine würde
+> damit Energie aus dem Nichts gewinnen, und die Ente zappelte immer wilder. Eine dünne Scheibe ist
+> dagegen ein echter, gültiger Körper.
 
 ### Was die Welt berührt
 
@@ -170,7 +178,8 @@ zieht das Gelenk zum Ziel, je weiter weg, desto stärker – aber nur bis zu ein
 | **A** Armatur | Schwungrad-Trägheit des Motors |
 | Verzögerung | Befehle kommen 20 ms später an |
 
-Das Gesetz in Schulmathe: **Zug = K · (Ziel − Winkel)**, aber höchstens T. Drehmoment misst man in
+Das Gesetz in Schulmathe: **Zug = K · (Ziel − Winkel)**, aber höchstens T. Dazu bremsen Dämpfung D
+und Reibung F. Drehmoment misst man in
 Newtonmeter (N·m). Für den Servo der Ente ist K = 0,554 und T = 0,963 N·m – etwa so viel, wie ein
 Kilogramm am Ende eines 10 cm langen Hebels drückt.
 
@@ -180,7 +189,10 @@ N·m. Das ist nicht einmal ein Drittel seiner Höchstkraft. Volle Kraft hat er e
 wie ein Gummiband.
 
 Kern baut dieses Gesetz nur aus Teilen, die die Physik-Engine schon hat: einer Gelenkfeder für das
-Gummiband und einer Gelenkbremse für die Reibung. Ein und dasselbe Stück Code macht das in jedem
+Gummiband und einer Gelenkbremse für die Reibung. Das hat zwei Gründe. Erstens wird nicht geschummelt
+(13.2). Zweitens rechnet die Physik ihre eingebaute Feder so, dass sie bei jeder Steifigkeit ruhig
+bleibt. Eine selbst gebastelte Feder könnte bei sehr steifen Werten anfangen zu zittern und sich
+aufschaukeln. Ein und dasselbe Stück Code macht das in jedem
 Physikschritt, im Studio, im Lehrer und auf dem Prüfstand aus [Kapitel 16](16-kalibrierung.md). Jede
 Ente, sogar jeder einzelne Servo, kann ein eigenes Profil bekommen.
 
@@ -202,8 +214,9 @@ der **Regeltakt**. Die Spielschicht entscheidet nur in jedem zweiten Regeltakt.
 
 Weil die Weltzeit doppelt so schnell zählt (Abschnitt 13.3), sind 10 ms in Kerns Welt genau die 5 ms
 des Trainings. Auch die **Verzögerung** ist in Schritten gezählt: Die Servos bekommen immer das Ziel
-von vor 4 Schritten, das sind 20 ms Roboterzeit (im Training schwankt sie zwischen 15 und 30 ms).
-Ist die Uhr der Welt falsch eingestellt, rundet Kern auf ganze Schritte und meldet das im Studio.
+von vor 4 Schritten, das sind 20 ms Roboterzeit. Im Training war die Verzögerung mal kürzer, mal
+länger; das Netz kommt also mit einem festen Wert aus diesem Bereich gut zurecht. Passt die Uhr der
+Welt nicht zur Ente, sagt Studio dir, was du einstellen musst.
 
 Wie Kern trotz schwankender Bildrate immer mit gleich langen Schritten rechnet, erklärt
 [Kapitel 8](08-spiel-laufzeit.md): Übrige Zeit wird aufgehoben, bis sie für einen ganzen Schritt
@@ -246,7 +259,8 @@ dem Roboter:
 2. Ein Netz wählen. Vorfahrt hat eine laufende Bewegung, dann Aufheben, Sitzen, Rollen, Stehen und
    zuletzt Laufen.
 3. Das Netz rechnen und seine Antwort in Servoziele umrechnen.
-4. Die Uhren der Bewegungen weiterstellen.
+4. Die Uhren der Bewegungen weiterstellen – jede Bewegung hat ihre eigene Stoppuhr, damit Kern
+   weiß, wann sie vorbei ist.
 
 Jedes Netz bekommt genau die Befehle, mit denen es trainiert wurde. Eine Bewegung startet nur, wenn
 keine andere läuft, die Ente nicht sitzt und das Netz geladen ist – sonst sagt Kern, warum nicht.
@@ -289,7 +303,7 @@ In jedem Regeltakt bekommt das Laufnetz **61 Zahlen**, in Gruppen:
 - wie schnell sich die Gelenke drehen (einen Takt alt, genau wie im Training),
 - seine eigene letzte Antwort,
 - der Laufbefehl: vorwärts (bis 0,4 m/s), seitwärts (bis 0,3 m/s), drehen,
-- der Kopfbefehl und die Körperhaltung.
+- der Kopfbefehl und die Körperhaltung (wie hoch der Rumpf sein soll und wie geneigt).
 
 Heraus kommen **14 Zahlen**: die Servoziele für Beine und Hals. Dazwischen rechnet das Netz durch
 drei Schichten aus 512, 256 und 128 Rechenknoten, den **Neuronen**.
@@ -357,6 +371,8 @@ zwischen Pause und Laufen hin- und herflackern. Mit Abstand zwischen den Grenzen
 in Folge entscheidet sie sich klar.
 
 Ausgewertet wird nur, solange Lauf- oder Stehnetz fahren und eine volle Sekunde Messwerte da ist.
+Mit einer nur halb gefüllten Sekunde hat das kleine Netz nie geübt – und ein Netz arbeitet am
+besten genau so, wie es trainiert wurde (13.6).
 Der echte Roboter misst auch die Ströme seiner Servos; die hat Kern nicht. Das ist kein Problem,
 denn Pollens Netz benutzt diese Werte gar nicht.
 
@@ -391,12 +407,14 @@ wählt das Programm nichts Neues.
 
 ### BallPlay
 
-Pollens frühere, nicht öffentliche Software hatte einen Zustand BallPlay. Kern baut ihn nach dieser
-Beschreibung nach, mit Pollens Kick-Netz. Er ist **standardmäßig an** und läuft wie ein Rezept in
+Pollens frühere Software hatte einen Zustand BallPlay. Ihren Code kann niemand lesen, er ist nicht
+öffentlich; es gibt nur eine kurze Beschreibung, was BallPlay tut. Nach dieser Beschreibung hat Kern
+es selbst nachgebaut, mit Pollens Kick-Netz. Er ist **standardmäßig an** und läuft wie ein Rezept in
 fünf Schritten:
 
 1. **Sehen:** Ein Ball liegt im Kamerabild.
-2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis etwa 35 cm. Liegt der Ball weit seitlich, dreht
+2. **Anlaufen:** Kopf gesenkt, immer langsamer, bis etwa 35 cm. Nur der Kopf nickt, der Hals
+   bleibt gerade: Ein gebeugter Hals würde das Gewicht nach vorn verlagern, und der Gang litte. Liegt der Ball weit seitlich, dreht
    sie sich erst auf der Stelle.
 3. **Ausrichten:** kleine Schritte, bis der Ball genau dort vor dem linken Fuß liegt, wo er auch im
    Kick-Training lag. Verliert sie ihn dicht vor sich, tritt sie zurück, bis sie ihn wieder sieht.
@@ -405,7 +423,7 @@ fünf Schritten:
 5. **Aufgeben:** wenn sie ihn lange nicht mehr sieht oder lange nicht zum Kicken kommt; dann schaut
    sie sich um.
 
-Gekickt wird nur links, weil der rechte Kick in Kern manchmal umkippt. Das „Sehen“ ist ein
+Gekickt wird nur links, weil die Ente beim rechten Kick in Kern manchmal umkippt. Das „Sehen“ ist ein
 geometrischer Sichttest, kein Netz, das Bilder erkennt. Mit **Kern extras** übernimmt statt BallPlay
 die Spielschicht.
 
@@ -441,11 +459,13 @@ Damit es echt wird, kann der Detektor **Rauschen** (kleine zufällige Fehler im 
 (ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel** mit Beispielwerten aus dem Code: Der
 Fehler ist 0,2 cm plus 1 % der Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
 desto ungenauer – wie Schätzen mit einem Auge. Im Studio ist der Detektor rauschfrei, im Training
-würfelt der Lehrer die Werte für jede Übungsrunde neu.
+würfelt der Lehrer die Werte für jede Übungsrunde neu – damit das Netz auch mit schlechten Augen
+zurechtkommt.
 
 Der **Tracker** ist das Gedächtnis. Verschwindet ein Ding aus dem Bild, merkt er sich, wo es zuletzt
 war, und wie lange das her ist – so wie du weißt, dass der Ball hinter dem Sofa liegt, obwohl du ihn
-nicht siehst. Nach ein paar Sekunden vergisst er es, bei Dingen direkt vor der Ente erst viel später.
+nicht siehst. Nach ein paar Sekunden vergisst er es, bei Dingen direkt vor der Ente erst viel später: Ein Ding
+dicht vor ihr liegt unter der Kamera, wo sie es nicht sieht, und es läuft ja nicht von selbst weg.
 Einen eben gekickten Ball und eine weggetragene Socke meldet er eine Weile gar nicht, damit die Ente
 nicht sofort wieder hinrennt. Ab dem Zugreifen zählt er, wie weit und wie lange sie trägt.
 
@@ -459,21 +479,26 @@ Die Spielschicht bekommt **23 Zahlen**, alle in echten Metern aus Sicht der Ente
 - **Uhren:** wie weit und lange sie trägt, wie lange sie steht oder geht.
 
 Die wahren Positionen bekommt sie **nie**, nur die Schätzungen des Detektors – genau wie ein echter
-Roboter. **Stehen** misst Kern an den Beinen: Beide Sohlen stehen auf dem Boden, und keine Bewegung
-läuft. Denn auf einen winzigen Laufbefehl setzt Pollens Gang manchmal gar nicht an – befohlen ist
-dann „laufen“, aber die Ente steht.
+Roboter.
+
+Eine der Uhren ist „wie lange steht sie schon still“. Kern zählt das an den Beinen, nicht am Befehl:
+Stehen heißt, beide Sohlen stehen auf dem Boden, und keine Bewegung läuft. Denn auf einen winzigen
+Laufbefehl setzt Pollens Gang manchmal gar nicht an – befohlen ist dann „laufen“, aber die Ente
+steht. Zählte Kern nach dem Befehl, würde die Spielschicht glauben, sie liefe.
 
 Heraus kommen **9 Zahlen**: vorwärts, seitwärts, drehen, Kopf gieren, Kopf nicken, Schnabel auf,
 Kick links, Aufheben, Hals beugen. Die Laufbefehle haben eine **Totzone** wie ein Gamepad-Stick:
-Unter 20 % steht die Ente. Ein Netz, das 0,1 statt 0 antwortet, läuft also nicht los.
+Unter 20 % steht die Ente. Ein Netz, das 0,1 statt 0 antwortet, läuft also nicht los. Außerdem
+begrenzt Kern alle Antworten, und unsinnige Werte setzt es auf 0 – so kann eine verrückte
+Netzantwort die Ente nicht verbiegen.
 
-- **Rückwärts** fährt sie an wie Pollens Programm: erst kurz kräftig, danach nie ganz langsam, weil
-  der Gang aus dem Stand sonst gar nicht ansetzt.
 - Eine Bewegung startet nur, wenn keine läuft und der Schnabel leer ist.
 - Beim Aufheben steuert das Netz den Schnabel selbst: Es hat gelernt, wann es öffnet und zubeißt.
 
 > **Für Profis:** Ohne Spielschicht öffnet Kern extras den Schnabel beim Aufheben zu einem festen
-> Zeitpunkt und beißt kurz danach zu. Die genauen Werte stehen im blauen Buch, Kapitel 13.
+> Zeitpunkt und beißt kurz danach zu. Rückwärts fährt die Spielschicht an wie Pollens Programm: erst
+> kurz kräftig, danach nie ganz langsam, weil der Gang aus dem Stand sonst nicht ansetzt. Die genauen
+> Werte stehen im blauen Buch, Kapitel 13.
 
 ### Socke, Ball, Beispiel-Level
 
@@ -493,20 +518,25 @@ Vorführung der Logik-Knoten, kein Verhalten der Ente.
 ### Wie gut es klappt
 
 Gemessen wurde in 32 Übungsrunden, einmal mit sauberem Roboter, einmal mit **Variation** (zufällige
-kleine Abweichungen bei Bau, Servos und Sensoren). In jeder Runde lag nur ein Ball, nur eine Socke
-oder beides. In **11** der 32 Runden lag nur ein Ball, in den übrigen **21** eine Socke (manchmal
-mit Ball daneben). Darum zählt der Ball „von 11“ und die Socke „von 21“. Die Griffe zählen die
-einzelnen Bisse, die Stürze alle 32 Runden.
+kleine Abweichungen bei Bau, Servos und Sensoren). So wird gezählt:
+
+- In **11** Runden lag nur ein Ball. Nur diese zählen für den Ball.
+- In den übrigen **21** Runden lag eine Socke, manchmal mit Ball daneben. Liegen beide da, ist die
+  Socke die Aufgabe, darum zählen diese Runden für die Socke. „Geschafft“ heißt: aufgehoben, ein
+  Stück weggetragen und wieder ausgespuckt.
+- Stürze zählen in allen 32 Runden.
 
 | Ergebnis | sauber | Variation |
 |---|---|---|
-| Ball weggekickt | 9 von 11 (82 %) | 7 von 11 (64 %) |
-| Socke aufgehoben | 4 von 21 (19 %) | 13 von 21 (62 %) |
-| aufgehoben, getragen, ausgespuckt | 1 von 21 (5 %) | 0 von 21 |
-| Bisse, die hielten | 2 von 14 (14 %) | 1 von 15 (7 %) |
-| Stürze | 2 von 32 (6 %) | 10 von 32 (31 %) |
+| Ball weggekickt | 9 von 11 | 7 von 11 |
+| Socke weggetragen | 1 von 21 | 0 von 21 |
+| Stürze | 2 von 32 | 10 von 32 |
 
-Ehrlich: Kicken klappt gut, Tragen noch kaum – die Socke rutscht oft aus dem Schnabel. Zwei Tests
+Ehrlich: Kicken klappt gut, Tragen noch kaum. Die Ente geht zur Socke, hebt an und beißt zu, aber
+die Socke rutscht meist wieder aus dem Schnabel – der Griff ist in dieser Physik schwer, nicht die
+Entscheidung. Mit Variation fällt die Ente öfter, denn mit steiferen Servos und rutschigeren Sohlen
+kippt Pollens Gang beim Drehen auf der Stelle leichter. Die vollständige Tabelle mit allen
+Zwischenschritten steht im blauen Buch, Kapitel 13. Zwei Tests
 prüfen, dass nur das Netz entscheidet: Einen Ball 30 cm vor ihr kickt die Ente über 25 cm weit; zu
 einer Socke 30 cm vor ihr geht sie hin, hebt sie auf und beißt zu.
 
@@ -592,6 +622,12 @@ Ehrlich gesagt ist Kerns Ente noch nicht perfekt:
 - Der **rechte Kick** kippt manchmal; warum, ist noch offen.
 - **BallPlay** ist ein Nachbau nach einer Beschreibung.
 - **Servoströme** misst Kern nicht.
+
+Warum läuft die Ente trotzdem? Weil sie im Training Störungen geübt hat. Das Getriebespiel wurde
+dort zufällig verändert, also ist das Netz gegen solches Wackeln robust. Und der andere Reibungswert
+läge auf einem Boden mit Reibung 0,6 bei 0,77 – mitten in dem Bereich (0,7 bis 1,3), den das
+Training sowieso durchgespielt hat. Im Beispiel-Level macht er gar keinen Unterschied. Das Prinzip:
+**Wer im Training Störungen übt, verträgt kleine Fehler der Simulation.**
 
 Dafür gibt es nur in Kern die Spielschicht, das Schnabel-Timing beim Aufheben und den Sprung. Wer
 mit dem echten Roboter arbeitet: Die Sicherheitsregeln stehen in

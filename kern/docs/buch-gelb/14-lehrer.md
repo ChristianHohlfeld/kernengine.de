@@ -75,7 +75,7 @@ Was davon schon fertig ist:
 | Simulation, Netz, Lernen mit Belohnung, Speichern als Datei | fertig |
 | Variation, Lernen im Browser, überall gleiches Ergebnis | fertig |
 | Sprung: Vorbild → Nachmachen → Üben | fertig |
-| Servos des echten Roboters nachmessen | fertig (ohne echte Messdaten) |
+| Servos des echten Roboters nachmessen | Werkzeug fertig, echte Messungen fehlen noch |
 | Spielen mit Ball und Socke | in Überarbeitung |
 
 Was „Variation“ und „überall gleiches Ergebnis“ bedeuten, erklären 14.3 und 14.7, das Nachmessen
@@ -135,16 +135,20 @@ Dann beginnt der Kreislauf von vorn.
 
 Die **Aufgabe** sind die Punkteregeln: womit eine Episode beginnt, wofür es Punkte gibt und wann
 Schluss ist. Jeder Punkte-Posten hat einen **Namen**, etwa „aufrecht“ oder „Sturz“. So kann man später
-für jeden Posten einzeln nachsehen, woher die Punkte kamen.
+für jeden Posten einzeln nachsehen, woher die Punkte kamen (mit dem Kommandozeilen-Programm,
+[Kapitel 15](15-eigene-modelle.md)).
 
-Die Punkte werden pro Takt verteilt, und zwar so, dass es auf die **Zeit** ankommt. Rechnen wir das
-für den Posten „aufrecht“ mit dem Gewicht 2 durch: Steht die Ente perfekt gerade, bringt jeder Takt
-2 × 0,02 = 0,04 Punkte. Eine Sekunde hat 50 Takte, also 50 × 0,04 = **2 Punkte pro Sekunde**. Ein
-Sturz dagegen zählt einmal und auf einen Schlag.
+Die Punkte werden pro Takt verteilt, und zwar so, dass es auf die **Zeit** ankommt. Jeder Posten hat
+dazu ein **Gewicht**: eine Zahl, die sagt, wie viel dieser Posten zählt (mit den Gewichten im Netz aus
+[Anhang A](A-grundlagen-neuronale-netze.md) hat das nichts zu tun). Ein Takt dauert 20 Millisekunden,
+das sind **0,02 Sekunden**. Rechnen wir den Posten „aufrecht“ mit dem Gewicht 2 durch: Steht die Ente
+perfekt gerade, bringt jeder Takt Gewicht × Taktdauer = 2 × 0,02 = 0,04 Punkte. Eine Sekunde hat
+50 Takte, also 50 × 0,04 = **2 Punkte pro Sekunde**. Ein Sturz dagegen zählt einmal und auf einen
+Schlag.
 
-Eingebaut sind zwei Aufgaben. **Stehen** ist der Schnelltest: 4 Sekunden stehen bleiben, Punkte für
-aufrecht, Grundstellung und die richtige Höhe, ein kleiner Abzug fürs Zappeln. Ein Sturz kostet
-4 Punkte und beendet die Episode. **Springen** kommt in 14.6.
+Eingebaut sind zwei Aufgaben. **Stehen** ist der Schnelltest: kurz stehen bleiben, Punkte fürs
+Aufrechtbleiben, für die Grundstellung und die richtige Höhe, ein kleiner Abzug fürs Zappeln; ein
+Sturz kostet Punkte und beendet die Episode. **Springen** kommt in 14.6.
 
 ### Der asymmetrische Kritiker
 
@@ -174,10 +178,10 @@ der Boden glatter. Darum baut der Lehrer für jede Episode eine **etwas andere E
 Ein Netz, das nur mit **einer** Masse und **einem** Boden stehen kann, steht auf dem echten Roboter
 nicht. Mit Variation lernt es, sich auf nichts zu verlassen, was die Simulation nicht genau weiß.
 
-Die Schubser kommen erst, wenn die Ente schon etwas kann – wie Stützräder, die man nach und nach
-abnimmt, nur andersherum: Die Übung wird mit der Zeit schwerer. So etwas heißt **Lehrplan**. Gemessen
-wird jedes Netz am Ende zweimal: auf dem **sauberen** Roboter ohne Variation und mit **voller**
-Variation. Die genauen Bereiche stehen im blauen Buch, Kapitel 14.
+Die Schubser kommen erst, wenn die Ente schon etwas kann – wie im Sport: Erst übst du ohne Gegner,
+später kommt einer dazu. Die Übung wird also mit der Zeit schwerer. So etwas heißt **Lehrplan**.
+Gemessen wird jedes Netz am Ende zweimal: auf dem **sauberen** Roboter ohne Variation und mit
+**voller** Variation. Die genauen Bereiche stehen im blauen Buch, Kapitel 14.
 
 ### Zufall, der sich wiederholt
 
@@ -216,8 +220,11 @@ das schon stehen kann. Der Sprung braucht aber eine neue Eingabe, die velstand n
 weit der Sprung schon fortgeschritten ist (14.6). Deren Regler stehen am Anfang auf 0. So handelt das
 neue Netz zuerst genau wie das alte und lernt erst nach und nach, die neue Eingabe zu nutzen.
 
-**Der Regler-Dreher (Adam).** Ein Verfahren namens Adam dreht beim Lernen die Regler. Davor sitzt eine
-Notbremse: Kein Schritt darf zu groß werden (Anhang A).
+**Der Regler-Dreher (Adam).** Ein kluger Regler-Dreher namens Adam dreht beim Lernen die Regler. Er
+wählt für jeden Regler eine passende Schrittgröße und hat etwas Schwung, wie eine rollende Kugel.
+Davor sitzt eine **Notbremse**: Sagt eine Rechnung einmal „dreh alles ganz weit“, wird der Schritt
+trotzdem auf eine feste Höchstlänge gekürzt. So kann ein einziger Ausreißer das Netz nicht
+zerstören. Beides erklärt [Anhang A](A-grundlagen-neuronale-netze.md) mit Bildern.
 
 > **Für Profis:** Die genaue Form der Schichten, die Formel des Umrechners und die Einstellungen von
 > Adam stehen im blauen Buch, Kapitel 14.
@@ -234,13 +241,19 @@ Schritten besser werden.**
 > nach Salz.
 
 Bei der Ente ist es genauso: Alles, was die Helfer aufgeschrieben haben, stammt von der **alten**
-Policy. Ändert sich die Policy auf einmal zu stark, passen diese Notizen nicht mehr – und eine gute
-Ente kann in einem einzigen Schritt alles verlernen.
+Policy. Der Auswerter lernt aber **mehrmals hintereinander aus denselben Notizen** – das spart
+Rechenzeit, denn neue Notizen zu sammeln ist teuer. Mit jedem Durchgang entfernt sich die Policy
+weiter von der, die die Notizen geschrieben hat. Ändert sie sich zu stark, passen die Notizen nicht
+mehr – und eine gute Ente kann in einem einzigen Schritt alles verlernen. Darum braucht PPO eine
+Bremse.
 
 Eine Iteration läuft so ab:
 
 1. **Probieren:** Jede Ente macht 48 Takte. Das Netz nennt in jedem Takt sein Wunschziel, dazu kommt
-   etwas Rauschen. So probiert jede Ente leicht andere Bewegungen.
+   etwas Rauschen. So probiert jede Ente leicht andere Bewegungen. Eine Iteration ist nur ein
+   **Ausschnitt**: Eine Episode (beim Sprung 2 Sekunden = 100 Takte) bricht nach 48 Takten nicht ab,
+   sondern läuft in der nächsten Iteration einfach weiter. Erst ein Sturz oder das Zeitende startet
+   sie neu.
 2. **Ordnen:** Der Auswerter legt alle Notizen in eine **feste Reihenfolge**, Takt für Takt, Ente für
    Ente. Warum das wichtig ist, zeigt 14.7.
 3. **Bewerten:** Für jede Bewegung fragt er: Lief es danach **besser oder schlechter als erwartet**?
@@ -256,7 +269,8 @@ Vorteil −2, und die Bewegung wird seltener.
 Wie vorsichtig „nie viel auf einmal“ ist, regelt Kern dreifach:
 
 - Pro Iteration darf eine Bewegung höchstens um etwa ein Fünftel wahrscheinlicher oder
-  unwahrscheinlicher werden.
+  unwahrscheinlicher werden. Beispiel: Wählte die alte Policy eine Bewegung in 10 von 100 Fällen,
+  darf die neue sie höchstens in etwa 12 von 100 Fällen wählen, auch wenn sie noch so gut war.
 - Hat sich die Policy schon stark verändert, wird der nächste Schritt automatisch kleiner. Die Größe
   der Schritte heißt **Lernrate**.
 - Ein kleiner **Neugier-Bonus** sorgt dafür, dass das Rauschen nicht zu früh verschwindet und die Ente
@@ -271,7 +285,7 @@ Punkte noch gekommen wären. Zeitablauf ist kein Scheitern.
 
 **Kritiker zuerst:** Nach dem Nachmachen (14.6) ist die Spielerin schon gut, der Trainer aber
 ahnungslos – er hat die neue Spielerin noch nie gesehen. Seine falschen Urteile würden ihr alles
-kaputtmachen. Darum lernt in den ersten 30 Iterationen **nur der Kritiker**.
+kaputtmachen. Darum lernt in den ersten Runden **nur der Kritiker**.
 
 **Spielstand:** Der Lehrer kann den ganzen Lernstand speichern, wie einen Spielstand. Ein Training
 lässt sich unterbrechen und genau dort fortsetzen.
@@ -283,13 +297,17 @@ lässt sich unterbrechen und genau dort fortsetzen.
 
 ### Warum Lernen durch Belohnung allein scheiterte
 
-Reines PPO hat den Absprung nie gefunden, egal mit welchen Einstellungen. Zwei Gründe:
+Reines PPO hat den Absprung nie gefunden, egal mit welchen Einstellungen. Drei Gründe:
 
 - Für den Absprung müssen **alle Beinservos gleichzeitig** mit voller Kraft drücken. Die Servos sind
   weich: Volle Kraft geben sie erst, wenn das Ziel weit vom jetzigen Winkel entfernt ist. Das Netz
-  muss also absichtlich weit über den Anschlag hinaus zielen. Durch zufälliges Ausprobieren passiert
-  das praktisch nie.
+  muss also absichtlich weiter zielen, als das Gelenk überhaupt drehen kann. Durch zufälliges
+  Ausprobieren passiert das praktisch nie.
 - Stehen ist sicher und bringt Punkte. Ein missglückter Versuch kostet einen Sturz.
+- Mit nur ein paar Dutzend Enten sind die Notizen jeder Runde wenige und zufällig. Die Richtung, in
+  die gelernt wird, wackelt darum stark, und die Bremse aus 14.5 hält die Schritte klein. Wie eine
+  Umfrage mit nur drei Leuten: Das Ergebnis springt hin und her, und du traust dich nicht, viel
+  daraus zu machen.
 
 > **So kannst du es dir vorstellen:** Du tippst zufällig auf einer Tastatur und hoffst, dass ein
 > Gedicht herauskommt. Ein Buchstabe stimmt vielleicht mal – aber dass alle gleichzeitig stimmen,
@@ -308,6 +326,10 @@ Die 15 Zahlen findet ein Suchverfahren namens **CMA-ES**, das wie die Evolution 
 
 1. Es streut viele Kandidaten um eine Mitte herum – eine **Suchwolke**.
 2. Jeder Kandidat springt mehrmals: einmal auf dem sauberen Roboter, die anderen Male mit Variation.
+   Dabei springen in einer Generation **alle Kandidaten auf denselben** zufälligen Enten, und jede
+   neue Generation bekommt andere. So ist der Vergleich fair – wie bei einem Wettlauf, bei dem alle
+   auf derselben Bahn bei demselben Wind laufen. Und weil die Enten jede Generation wechseln, gewinnt
+   kein Vorbild, das nur auf ein paar bestimmten Enten klappt.
 3. Es gibt Punkte fürs Steigen, für Flugzeit und Höhe, fürs Landen auf beiden Sohlen und für einen
    echten Sprung. Abzug gibt es fürs Kippen und für Stürze – frühe Stürze kosten mehr.
 4. Die Wolke wandert zu den besseren Kandidaten. Dann beginnt die nächste Generation.
@@ -443,25 +465,27 @@ schon steht. Wie man solche Regeln entwirft, steht in [Kapitel 15](15-eigene-mod
 15.10.
 
 **Selbst gemessen statt hingeschrieben:** Wo der Schnabel eine Socke gut greift, misst der Lehrer bei
-jedem Lauf neu: Er legt die Socke an 11 × 9 = 99 Stellen vor die Ente und prüft, wo sie nach 3 Sekunden
+jedem Lauf neu: Er legt die Socke an vielen Stellen vor die Ente und prüft, wo sie nach 3 Sekunden
 Tragen noch im Schnabel ist. Keine Bissstelle steht als feste Zahl im Programm. Ändert sich die Physik,
 stimmt die Messung trotzdem.
 
-**Ergebnis** (Kerns Spielnetz, Runde 8 von 12):
+**Ergebnis.** Kerns Spielnetz wurde in 32 Probe-Episoden geprüft, einmal auf dem sauberen Roboter
+und einmal mit voller Variation. In 11 davon lag nur ein Ball, in den anderen 21 eine Socke (manchmal
+zusätzlich ein Ball). Darum zählt der Ball von 11 und die Socke von 21:
 
 | Ergebnis | sauber | Variation |
 |---|---|---|
 | Ball weggekickt | 9 von 11 | 7 von 11 |
-| Socke aufgehoben | 4 von 21 | 13 von 21 |
-| ganz ausgespuckt | 1 von 21 | 0 von 21 |
+| Socke getragen, ausgespuckt | 1 von 21 | 0 von 21 |
 | Stürze | 2 von 32 | 10 von 32 |
 
-Der **Ball ist gelernt**. Die Socke steuert das Netz genauso richtig an, aber der Biss hält selten:
+Den Ball kickt das Netz meistens weg, die Socke bringt es fast nie ans Ziel. Der **Ball ist
+gelernt**. Die Socke steuert das Netz genauso richtig an, aber der Biss hält selten:
 Der Schnabel rutscht auf der Baumwolle ab. Der Engpass ist also der **Griff in der Physik, nicht die
 Entscheidung**. Darum heißt es in der Tabelle in 14.1: in Überarbeitung.
 
-> **Für Profis:** Wie groß das Spielnetz ist, wie oft Ball und Socke vorkommen und wie viele Punkte
-> jeder Posten bringt, steht im blauen Buch, Kapitel 14.
+> **Für Profis:** Wie groß das Spielnetz ist, wie oft Ball und Socke vorkommen, wie viele Punkte
+> jeder Posten bringt und die ganze Ergebnistabelle stehen im blauen Buch, Kapitel 14.
 
 ## 14.9 Ergebnisse des Sprungs
 
@@ -470,23 +494,21 @@ Kerns Sprungnetz wurde mit 32 Enten trainiert, Seed 1, und dann je 40 Episoden l
 | Messung | sauber | volle Variation |
 |---|---|---|
 | echte Sprünge | 40 von 40 | 36 von 40 |
-| Steigen in der Luft | 11,6 mm | 8,2 mm |
-| Flugzeit | 120 ms | 109 ms |
+| Kippen (größtes, im Mittel) | 8° | 9° |
 | Stürze | 0 | 0 |
 
-Ihre stärkste Neigung pro Sprung lag im Mittel bei 8° (sauber) und 9° (Variation). Der Weg dahin: Die Vorbildsuche dauerte einmalig
-18 Minuten. Danach sprang das Netz schon nach 7 Runden Nachmachen zum ersten Mal echt. Den Rest
-erledigte das Üben.
+Das Netz springt also fast immer echt, auch mit einer veränderten Ente, und fällt dabei nie. Der Weg
+dahin: Erst suchte der Lehrer einmalig das Vorbild. Danach sprang das Netz schon während des
+Nachmachens zum ersten Mal echt. Den Rest erledigte das Üben.
 
 Weil alles überall bis zur letzten Stelle gleich gerechnet wird, gelten diese Ergebnisse auf jedem
-Gerät. Nur die **Zeit** ist verschieden. Auf demselben Computer mit 2 Rechenkernen kam der erste echte
-Sprung mit dem Programm nach knapp 2 Minuten, im Browser nach knapp 9 Minuten. Der Browser lernt
-dabei **dasselbe Netz**, nur langsamer.
+Gerät. Nur die **Zeit** ist verschieden: Im Browser dauert es auf demselben Computer vier- bis
+fünfmal so lange wie mit dem Programm – aber es kommt **dasselbe Netz** heraus.
 
-> **Für Profis:** Der Browser ist langsamer, weil er hier ohne bestimmte Beschleuniger rechnet. Die
-> Physik ließe sich auch mit halb so vielen Unterschritten rechnen und wäre dann schneller – aber die
-> Bewegungen der Ente würden sich ändern, und das Netz passte nicht mehr zum Studio. Alle Zeiten
-> stehen im blauen Buch, Kapitel 14.
+> **Für Profis:** Der Browser ist langsamer, weil er ohne bestimmte Beschleuniger rechnet. Die Physik
+> ließe sich auch mit halb so vielen Unterschritten rechnen und wäre dann schneller – aber die
+> Bewegungen der Ente würden sich ändern, und das Netz passte nicht mehr zum Studio. Wie hoch und wie
+> lange die Ente fliegt und alle Zeiten stehen im blauen Buch, Kapitel 14.
 
 > **Mission:** Öffne Kern Studio auf https://kernengine.de/ und lade File › Example Levels › Micro Duck
 > (läuft gerade Play oder Simulate, erst mit Esc stoppen). Starte Play, übernimm die Ente mit F8 und
@@ -500,8 +522,10 @@ Das fertige Netz wird als Datei im Format **ONNX** gespeichert. ONNX ist wie PDF
 verschiedene Programme können die Datei öffnen – das Studio genauso wie die Software des echten
 Roboters. Kern speichert seine Netze in genau der Form, die auch Pollen Robotics benutzt.
 
-Gespeichert wird nur die **Spielerin**, also der Actor, mit seinem Umrechner vorne dran. Der Kritiker
-bleibt zu Hause; er wird nur beim Lernen gebraucht. Dazu kommt ein **Beipackzettel** (die
+Gespeichert wird nur die **Spielerin**, also der Actor, mit seinem Umrechner vorne dran – und zwar nur
+ihr Wunschziel **ohne das Rauschen**. Das Wackeln war nur zum Ausprobieren beim Lernen da; auf dem
+Roboter soll sie ruhig und immer gleich entscheiden. Der Kritiker bleibt zu Hause; er wird nur beim
+Lernen gebraucht. Dazu kommt ein **Beipackzettel** (die
 Metadaten): die Namen der Gelenke, die Grundstellung, welche Aufgabe das Netz kann und dass Kern es
 trainiert hat.
 

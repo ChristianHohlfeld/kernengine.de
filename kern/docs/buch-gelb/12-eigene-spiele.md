@@ -173,8 +173,11 @@ Dazu kommen zwei Sonderfälle: **einmal am Anfang** alles aufbauen (Formen, Lich
 am Ende** aufräumen. Ein C++-Spiel füllt genau diese Stellen: Aufbauen, die Runde für jedes Bild und
 Aufräumen.
 
-Ein Detail ist wichtig: Ein Tastendruck gilt nur für **das eine Bild**, in dem er passiert. Darum
-liest das Spiel die Eingabe in jeder Runde neu, statt sie für später aufzuheben.
+Ein Detail ist wichtig: Kern kennt zwei Fragen an eine Taste. „Ist sie **gerade eben** gedrückt
+worden?“ – das gilt nur für das eine Bild, in dem du sie herunterdrückst, gut für einen einzelnen
+Sprung. Und „Wird sie **gehalten**?“ – das gilt in jedem Bild, solange dein Finger drauf ist, gut zum
+Laufen oder Drehen. Weil sich beides von Bild zu Bild ändert, fragt das Spiel in jeder Runde neu,
+statt eine alte Antwort aufzuheben.
 
 ### Das wichtigste Prinzip: dt
 
@@ -186,19 +189,30 @@ immer mit dt malgenommen.
 So steht es im kleinsten Kern-Spiel „hello“ (64 Kisten, um die du die Kamera kreisen lässt):
 
 ```cpp
-Input& in = engine.input;
 if (in.down(Key::left)) yaw_ += frame.dt * 1.5f;
 if (in.down(Key::right)) yaw_ -= frame.dt * 1.5f;
 ```
 
-- Zeile 1 holt die Eingabe dieses Bildes.
-- Zeile 2: Hältst du ←, wächst der Drehwinkel `yaw_` um dt × 1,5.
-- Zeile 3: Bei → schrumpft er um dasselbe Stück.
+- `in.down(…)` ist die Frage „Wird die Taste gehalten?“.
+- `yaw_` ist der Name einer Variablen, also eines Kästchens, in dem der Drehwinkel steht. Der
+  Unterstrich gehört einfach zum Namen.
+- `1.5f` ist die Zahl 1,5. Das `f` sagt dem Computer nur: eine Kommazahl.
+- Zeile 1: Hältst du ←, wächst der Drehwinkel um dt × 1,5 (`+=` heißt „erhöhe um“).
+- Zeile 2: Bei → schrumpft er um dasselbe Stück (`-=` heißt „verringere um“).
 
 **Rechne nach:** Bei 60 Bildern pro Sekunde ist dt = 1 ÷ 60. Pro Bild kommen 1,5 ÷ 60 = 0,025
 dazu, nach 60 Bildern also 1,5. Bei 30 Bildern ist dt = 1 ÷ 30, pro Bild kommen 0,05 dazu, nach 30
 Bildern 30 × 0,05 = 1,5. **Gleich schnell – egal wie flott dein Rechner ist.** 1,5 ist hier ein
-Winkel und bedeutet knapp eine Viertelumdrehung pro Sekunde.
+Winkel in Radiant ([Kapitel 3](03-grundlagen.md)) und bedeutet knapp eine Viertelumdrehung pro
+Sekunde.
+
+dt hat eine Obergrenze: höchstens 0,1 s. Hängt der Rechner einmal eine ganze Sekunde, rechnet das
+Spiel trotzdem nur mit 0,1 s weiter. Ohne diese Grenze würde die Figur nach dem Hänger mit einem
+Satz meterweit springen – vielleicht mitten durch eine Wand.
+
+In hello kannst du außerdem eine Kiste anklicken, und sie färbt sich rot. Wie ein Spiel weiß, worauf
+du klickst, kennst du aus [Kapitel 5](05-szene-und-geometrie.md): Es schießt einen Strahl durch den
+Punkt unter der Maus und schaut, was er trifft.
 
 > **Krass, aber wahr:** Die 64 Kisten in hello sind **eine** Form mit 64 Kopien. Jede Kopie hat nur
 > ihre eigene Lage, Drehung, Größe und Farbe. Die Grafikkarte malt alle mit **einem** Zeichenbefehl –
@@ -217,8 +231,16 @@ Namen und Werte stehen im blauen Buch, Kapitel 12.
 
 ### Ein ganzes Spiel: orbrun
 
-Das zweite Beispiel ist ein Rennspiel: Ein Hovercar sammelt in einer Zufallsstadt 24 Orbs, während es
-Nacht wird. Jede Runde der Spielschleife liest es die Eingabe, fährt, bewegt den Verkehr, sammelt
+Das zweite Beispiel heißt **orbrun** und ist ein Rennspiel: Ein Hovercar sammelt in einer
+Zufallsstadt 24 Orbs, während es Nacht wird.
+
+> **Vorsicht, Falle:** Das klingt genau wie das Level **Orb Run** aus Studio – ist aber ein anderes
+> Programm. Orb Run im Studio ist aus Actors und Komponenten gebaut und benutzt die Physik-Engine.
+> orbrun hier ist dieselbe Spielidee, aber von Hand in C++ programmiert, mit eigener Fahrphysik und
+> eigener Kollision. Dieselbe Idee lässt sich also aus Bausteinen zusammenstecken oder selbst
+> schreiben.
+
+Jede Runde der Spielschleife liest orbrun die Eingabe, fährt, bewegt den Verkehr, sammelt
 Orbs, stellt Licht und Kamera ein und schickt das Veränderte an die Grafikkarte. Zwei Ideen daraus
 lohnen sich:
 
@@ -230,6 +252,11 @@ lohnen sich:
 
 **Rechne nach:** Mit Boost fährt das Auto höchstens 60 m/s, das sind 60 × 3,6 = **216 km/h**. Bei 30
 Bildern pro Sekunde sind das 2 m pro Bild – mehr als dreimal so viel wie ein Teilschritt.
+
+Noch eine Idee: Nachts leuchtet vor dem Auto der Scheinwerfer, und jeder Orb hat ein eigenes Licht.
+Die Engine kann aber nur **sechs** solche Punktlichter gleichzeitig malen. Darum sammelt orbrun alle
+Lichtwünsche und gibt der Engine nur die sechs wichtigsten – mehr Wünsche als Platz, also entscheiden
+Prioritäten, wie beim Prioritätstopf in [Kapitel 10](10-netzwerk.md).
 
 > **Für Profis:** Die Häuser bekommen nachts leuchtende Fenster, obwohl die Engine keine Fenster
 > kennt. Das Spiel hängt dafür ein kleines Zusatzprogramm an das Malprogramm der Grafikkarte (einen
@@ -259,14 +286,15 @@ Kapitel 12.
 Bei Weg C schreibt man die eigene Webseite in JavaScript und lässt Kern nur bestimmte Arbeiten
 machen. Drei Möglichkeiten gibt es:
 
-- **Nur malen lassen:** Die Spielregeln stehen in JavaScript, Kern zeichnet. So arbeitet das
-  Drohnenspiel SpawnCity.
+- **Nur malen lassen:** Die Spielregeln stehen in JavaScript, Kern zeichnet. So arbeitet zum
+  Beispiel ein Drohnenspiel namens SpawnCity.
 - **Ein Studio-Level einbauen:** Eine eigene Seite spielt ein Level aus Studio ab und kann es
   steuern – zum Beispiel mit eigenen Bildschirmknöpfen, die die Figur laufen und springen lassen,
   oder mit einem eigenen Siegerbildschirm.
 - **Logik-Graphen als C++:** Der Knopf **C++** im Logik-Editor macht aus deinem Graphen
-  Programmtext. Eingebaut läuft der Graph als fertig übersetztes Programm, statt Schritt für
-  Schritt gedeutet zu werden – mit genau demselben Ergebnis
+  Programmtext. Normalerweise wird der Graph erst beim Spielen vorgelesen oder übersetzt, wie ein
+  Buch, das ein Dolmetscher Satz für Satz vorliest oder kurz vorher übersetzt. Als C++ eingebaut ist
+  die Übersetzung schon fertig mitgeliefert – mit genau demselben Ergebnis
   ([Kapitel 9](09-logik.md)).
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 12, und in
@@ -297,12 +325,16 @@ wie eine Internetseite; für den eigenen Rechner reicht ein ganz einfacher.
 | „Made with Kern“ draufschreiben | die Lizenzhinweise entfernen |
 | deinen eigenen Code geheim halten | das Aussehen der Ente verkaufen |
 
-Wer ein exportiertes Spiel weitergibt, legt einen Hinweis auf die Lizenz bei (im Spiel reicht ein
-Link). Teile von anderen behalten ihre eigenen Regeln ([Anhang D](D-lizenzen.md)).
+Mit dem Spiel gibst du auch Kern selbst weiter, und dazu gehört ein Hinweis auf Kerns Lizenz. Bei
+einem exportierten Studio-Spiel musst du dafür nichts tun: Studio schreibt den Hinweis beim Export
+schon unsichtbar mit in die Datei, ganz oben. Du darfst ihn nur nicht herauslöschen. Teile von
+anderen behalten ihre eigenen Regeln ([Anhang D](D-lizenzen.md)).
 
 **Ausnahme Micro Duck:** Das Aussehen der Ente stammt von Pollen Robotics und darf **nur nicht
 kommerziell** benutzt werden, also nicht in einem Spiel, mit dem man Geld verdient. Für ein Spiel
-zum Verkaufen gibt es eine Bauweise ohne dieses Aussehen. Pollens Netze dürfen mit.
+zum Verkaufen gibt es eine besondere Bauweise von Studio ohne dieses Aussehen (Profis bauen sie aus
+dem Quellcode). Darin hat die Ente **gar kein Aussehen** – du müsstest ihr ein
+eigenes geben. Pollens Netze dürfen mit.
 
 **Studio-Spiele** lädst du – am besten zusammen mit einem Erwachsenen – auf einen Webspace oder eine
 kostenlose Projektseite, oder du verschickst die Datei einfach. Mit Ente gehören zwei Ordner mit
