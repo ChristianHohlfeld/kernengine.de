@@ -255,7 +255,7 @@ Im Viewport selbst zeigt Studio:
   „Fliegen · WASD bewegen · Q/E runter/hoch · Mausrad Tempo … · Umschalt schneller · Z/C Zoom“.
 - **Gizmo-Anzeige** beim Ziehen: Verschiebung (Δ in m), Winkel (°) oder Skalierungsfaktoren.
 
-![Vier Viewports: Perspektive und drei orthografische Ansichten](bilder/studio-quad.png)
+![Vier Viewports: Orb Run bei Nacht in der Perspektive, dazu die orthografischen Ansichten Oben, Vorne und Rechts](bilder/studio-quad.png)
 
 ### 11.2.4 Outliner
 
@@ -947,7 +947,7 @@ steuern. Die Kamera bleibt die des Editors.
 **Gelenke** (Constraints) die Gelenke, **Kontaktpunkte** (Contact Points) die Kontakte. Die Statusleiste
 zählt Bodies, wache Bodies, Gelenke, gebrochene Gelenke und Kontakte.
 
-![Simulieren mit eingeblendeten Kollisionsformen](bilder/studio-simulate.png)
+![Simulieren mit eingeblendeten Kollisionsformen und Kontaktpunkten](bilder/studio-simulate.png)
 
 ![Physics Lab: alle Gelenktypen in der Simulation](bilder/studio-physics-lab.png)
 
@@ -1087,7 +1087,7 @@ sieht (**Fenster › Anzeigen › Roboterkamera** (Window › Show › Robot Cam
 - **TOF 8×8** – das 8×8-Gitter ihres Abstandssensors: rot ein Hindernis (heller, je näher), grün Boden,
   gelb zu nah, dunkel nichts; dazu der kleinste Abstand in echten Metern oder „frei“ („clear“).
 
-![Die Micro Duck beim Spielen mit Kopfkamera und ToF-Gitter (Ente in der eigenen Gestaltung dieses Buchs)](bilder/duck-play.png)
+![Die Micro Duck mit eingeblendeter Kopfkamera und ToF-Gitter (Ente in der eigenen Gestaltung dieses Buchs)](bilder/duck-play.png)
 
 ---
 

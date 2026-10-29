@@ -12,7 +12,7 @@ Live: <https://kernengine.de/> – the start page with Kern Studio (`/editor/`),
 Lehrer (`/lehrer/`), playable levels (`kern/web/studio/play.html?level=orbRun` or `physicsLab`) and
 the C++ examples `orbrun` and `hello`.
 
-![Kern Studio with the Orb Run level](../buch/bilder/studio.png)
+![Kern Studio with the Orb Run level: viewport, Outliner and Details](../buch/bilder/studio.png)
 
 This chapter explains what Kern is, the principles it is built on, how the layers fit together and
 how the repository is organized. It ends with a reading guide for the book.
@@ -242,7 +242,7 @@ standalone HTML file: engine module (base64), `kern.mjs`, `game.mjs` and the lev
 starts the same module in player mode (`kern_studio_init(w, h, 1)`) and plays the level with the same
 C++ classes as the editor ([Chapter 8](08-game-runtime.md), [Chapter 11](11-studio.md)).
 
-![An exported game](../buch/bilder/game.png)
+![Orb Run as an exported game in the browser, with HUD](../buch/bilder/game.png)
 
 ### The Lehrer (`--lehrer` and Native)
 
@@ -258,7 +258,7 @@ Both use the same recipes (`include/kern/lehrer/recipe.h`) and the same `GameWor
 the same number of ducks yield the same network – natively as in the browser. The export is ONNX in
 the format of Pollen's networks; the Studio loads it just like those ([Chapter 14](14-lehrer.md)).
 
-![The Lehrer page in the browser (German user interface)](../buch/bilder/lehrer.png)
+![The Lehrer page in the browser with a training run in progress: settings and metrics (German user interface)](../buch/bilder/lehrer.png)
 
 ### The Micro Duck: Everything Working Together
 

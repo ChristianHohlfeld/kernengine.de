@@ -11,7 +11,7 @@ Live: <https://kernengine.de/> – Startseite mit Kern Studio (`/editor/`), dem 
 (`/lehrer/`), spielbaren Levels (`kern/web/studio/play.html?level=orbRun` bzw. `physicsLab`) und den
 C++-Beispielen `orbrun` und `hello`.
 
-![Kern Studio mit dem Level Orb Run](bilder/studio.png)
+![Kern Studio mit dem Level Orb Run: Viewport, Outliner und Details](bilder/studio.png)
 
 Dieses Kapitel erklärt, was Kern ist, nach welchen Grundsätzen es gebaut ist, wie die Schichten
 zusammenhängen und wie das Repository aufgebaut ist. Am Ende steht eine Leseanleitung für das Buch.
@@ -247,7 +247,7 @@ Studio zeigt seine Oberfläche auf Deutsch oder Englisch. Dieses Buch nennt die 
 Studio sie auf Deutsch zeigt, in Klammern die englischen. Wer Studio auf Englisch nutzt (Knopf
 **DE | EN** unten rechts in der Statusleiste oder `?lang=en`), findet sie dort.
 
-![Ein exportiertes Spiel](bilder/game.png)
+![Orb Run als exportiertes Spiel im Browser, mit HUD](bilder/game.png)
 
 ### Der Lehrer (`--lehrer` und nativ)
 
@@ -262,7 +262,7 @@ Beide benutzen dieselben Rezepte (`include/kern/lehrer/recipe.h`) und dieselbe `
 Seed und gleich viele Enten ergeben dasselbe Netz – nativ wie im Browser. Exportiert wird ONNX im
 Format von Pollens Netzen; das Studio lädt es wie diese ([Kapitel 14](14-lehrer.md)).
 
-![Die Lehrer-Seite im Browser](bilder/lehrer.png)
+![Die Lehrer-Seite im Browser mit laufendem Training: Einstellungen und Kennzahlen](bilder/lehrer.png)
 
 ### Die Micro Duck im Zusammenspiel
 

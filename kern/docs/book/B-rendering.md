@@ -32,6 +32,7 @@ stands at a particular place in the world, is seen by a camera and finally ends 
 pixels. Each of these steps is a change of coordinate system:
 
 ```mermaid
+%% Caption: The coordinate spaces from model space to the screen pixel
 flowchart TB
   M["Model space (local)"] -->|"model matrix M"| W["World space"]
   W -->|"view matrix V"| K["Camera space"]
@@ -219,6 +220,7 @@ not, likewise without culling.
 ### B.3.1 The pipeline
 
 ```mermaid
+%% Caption: The GPU pipeline in WebGL2: vertex shader, rasterization, fragment shader, framebuffer
 flowchart TB
   VB["Vertex buffer (attributes)"] --> VS["Vertex shader (per vertex)"]
   U["Uniforms (per draw call)"] --> VS
@@ -772,6 +774,7 @@ texture, a different cull mode.
 From the header of `renderer.h`:
 
 ```mermaid
+%% Caption: The passes of a frame in Kern's renderer
 flowchart TD
   A["1. Sun shadow map (only when needed)"] --> B["2. Opaque meshes, front to back (MRT: color, HDR, AO share)"]
   B --> C["3. Sky at depth 1, uncovered pixels only"]
@@ -799,6 +802,7 @@ Kern compiles with wasi-sdk for `wasm32-wasip1` (`build.sh`). The boundary to th
 and clear:
 
 ```mermaid
+%% Caption: The boundary between the WebAssembly module and WebGL2: imports from gl.h, handle tables in kern.mjs
 flowchart TB
   R["WebAssembly module (C++):<br/>renderer, scene, physics, game"] --> GLH["kern::gl:: (gl.h):<br/>imports from module 'kern_gl'"]
   GLH -->|"u32 handles, pointer + length"| T["kern.mjs (platform layer):<br/>handle tables u32 ↔ WebGL object"]

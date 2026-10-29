@@ -471,7 +471,7 @@ The three color attachments of the scene target together occupy 16 bytes per pix
 
 Because the sky must write to the same three outputs ("WebGL needs every draw buffer written"), its shader also writes `outHdr` and `outAo = 0`.
 
-![Four viewports in Kern Studio: partial views draw directly into the default framebuffer with a scissor](../buch/bilder/studio-quad.png)
+![Four viewports in Kern Studio: Orb Run at night in perspective, plus Top, Front and Right; each partial view draws directly into the default framebuffer with a scissor](../buch/bilder/studio-quad.png)
 
 Kern Studio renders each viewport with its own `render()` call. A single full-screen viewport renders without a rectangle, so that bloom and AO run; in the quad view, every viewport has a rectangle and therefore neither bloom nor AO.
 

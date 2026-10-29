@@ -817,7 +817,7 @@ movement in fixed steps on the authority.
 Tests: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 `soldier_models_are_closed_and_outward`, and for networking `net_game_soldier_replication`.
 
-![Play in Studio with HUD](../buch/bilder/studio-play.png)
+![Play in Studio: the hover car in Orb Run with HUD](../buch/bilder/studio-play.png)
 
 ---
 

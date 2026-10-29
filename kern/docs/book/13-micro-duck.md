@@ -583,7 +583,7 @@ over instead of BallPlay (Section 13.10); Kern's former hand-written code for Fe
 Carry has been removed. The play layer itself contains no hand-written play logic; around the
 network there is only perception.
 
-![The duck at play (duck shown in this book's own design)](../buch/bilder/duck-play.png)
+![The duck at play: head camera and ToF grid show what it perceives (duck shown in this book's own design)](../buch/bilder/duck-play.png)
 
 ### Where it sits
 

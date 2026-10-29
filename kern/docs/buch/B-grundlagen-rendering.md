@@ -33,6 +33,7 @@ landet schließlich auf bestimmten Pixeln. Jeder dieser Schritte ist ein Wechsel
 Koordinatensystems:
 
 ```mermaid
+%% Bildunterschrift: Die Koordinatenräume vom Modellraum bis zum Bildschirmpixel
 flowchart TB
   M["Modellraum (lokal)"] -->|"Modellmatrix M"| W["Weltraum"]
   W -->|"Ansichtsmatrix V"| K["Kameraraum"]
@@ -223,6 +224,7 @@ teils gespiegelt sind und teils nicht, ebenfalls ohne Culling.
 ### B.3.1 Die Pipeline
 
 ```mermaid
+%% Bildunterschrift: Die GPU-Pipeline in WebGL2: Vertex-Shader, Rasterisierung, Fragment-Shader, Framebuffer
 flowchart TB
   VB["Vertex-Puffer (Attribute)"] --> VS["Vertex-Shader (pro Ecke)"]
   U["Uniforms (pro Draw Call)"] --> VS
@@ -784,6 +786,7 @@ CPU- und (wenn der Browser `EXT_disjoint_timer_query_webgl2` bietet) GPU-Zeit.
 Aus dem Kopf von `renderer.h`:
 
 ```mermaid
+%% Bildunterschrift: Die Durchgänge eines Bildes in Kerns Renderer
 flowchart TD
   A["1. Sonnen-Schattenkarte (nur wenn nötig)"] --> B["2. undurchsichtige Meshes, vorn nach hinten (MRT: Farbe, HDR, AO-Anteil)"]
   B --> C["3. Himmel bei Tiefe 1, nur unbedeckte Pixel"]
@@ -811,6 +814,7 @@ Kern übersetzt mit wasi-sdk für `wasm32-wasip1` (`build.sh`). Die Grenze zum B
 klar:
 
 ```mermaid
+%% Bildunterschrift: Die Grenze zwischen WebAssembly-Modul und WebGL2: Importe aus gl.h, Handle-Tabellen in kern.mjs
 flowchart TB
   R["WebAssembly-Modul (C++):<br/>Renderer, Szene, Physik, Spiel"] --> GLH["kern::gl:: (gl.h):<br/>Importe aus Modul 'kern_gl'"]
   GLH -->|"u32-Handles, Zeiger + Länge"| T["kern.mjs (Plattformschicht):<br/>Handle-Tabellen u32 ↔ WebGL-Objekt"]

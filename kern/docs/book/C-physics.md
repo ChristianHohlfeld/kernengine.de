@@ -147,6 +147,7 @@ large step, and large steps make springs unstable (C.2.2) and the result machine
 solution is Glenn Fiedler's **accumulator** ("Fix Your Timestep"):
 
 ```mermaid
+%% Caption: Fixed timestep with accumulator: fixed steps, rendering between the last two states
 flowchart TB
   F["Frame: time dt"] --> A["accumulator += min(dt, 0.25 s)"]
   A --> L{"accumulator ≥ h?"}
@@ -186,6 +187,7 @@ With $n$ bodies there are $n(n-1)/2$ pairs – with 1000 bodies almost 500,000. 
 exactly is too expensive. The work is therefore done in two phases:
 
 ```mermaid
+%% Caption: Collision detection in two phases, followed by the solver
 flowchart TB
   B["Broad phase: bounding-box tree finds candidate pairs"] --> N["Narrow phase: exact test, contact points (manifold)"]
   N --> S["Solver: contact constraints"]
@@ -507,6 +509,7 @@ $= 0.707$, and 1 mm is resolved at about 26 mm/s.
 The sequence of a fixed step, which Box3D calls the **soft step** (`box3d:src/solver.c`):
 
 ```mermaid
+%% Caption: Box3D's soft step: sub-steps with warm start, solving with bias and relax
 flowchart TD
   P["Prepare constraints (Jacobians, effective masses)"] --> L{"Another sub-step?"}
   L -->|yes| IV["Integrate velocities (gravity, forces, damping)"]
@@ -555,6 +558,7 @@ motor so that the joint reaches it. Inside, this is a **control loop**: it measu
 compares it with the target and produces a torque.
 
 ```mermaid
+%% Caption: A servo's control loop: dead time, PD controller with torque limit, joint
 flowchart TB
   Z["Target angle θ*"] --> T["Dead time (bus)"]
   T --> E["Error e = θ* − θ"]

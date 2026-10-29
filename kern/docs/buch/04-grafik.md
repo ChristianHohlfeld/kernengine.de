@@ -471,7 +471,7 @@ Die drei Farb-Attachments des Szenen-Targets belegen zusammen 16 Byte pro Pixel 
 
 Weil der Himmel an dieselben drei Ausgänge schreiben muss („WebGL needs every draw buffer written“), schreibt auch sein Shader `outHdr` und `outAo = 0`.
 
-![Vier Viewports in Kern Studio: Teilansichten zeichnen mit Scissor direkt in den Standard-Framebuffer](bilder/studio-quad.png)
+![Vier Viewports in Kern Studio: Orb Run bei Nacht in der Perspektive, dazu Oben, Vorne und Rechts; jede Teilansicht zeichnet mit Scissor direkt in den Standard-Framebuffer](bilder/studio-quad.png)
 
 Kern Studio rendert jeden Viewport mit einem eigenen `render()`-Aufruf. Ein einzelner, bildschirmfüllender Viewport rendert ohne Rechteck, damit Bloom und AO laufen; in der Vier-Ansicht hat jeder Viewport ein Rechteck und damit weder Bloom noch AO.
 

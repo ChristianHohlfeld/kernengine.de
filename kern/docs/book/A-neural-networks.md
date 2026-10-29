@@ -295,6 +295,7 @@ Over a batch, the weight gradients are summed: $\partial\mathcal{L}/\partial w_{
 \sum_r x_{r,i}\,\delta_{r,o}$.
 
 ```mermaid
+%% Caption: Backward pass: the error flows from the output to the earlier layers, each layer yields dL/dW
 flowchart BT
   L["Loss L"] -->|"dL/dy"| y["Output y"]
   y -->|"W^T δ"| h2["h(L-1)"]
@@ -523,6 +524,7 @@ $\varepsilon T$.
 expert who drives but the student – and in every state the expert says what **it** would have done.
 
 ```mermaid
+%% Caption: DAgger: the network drives, the Vorbild labels, the data grows from round to round
 flowchart TD
   A["Round 0: Vorbild drives, record data D0"] --> F0["Fit network to D0"]
   F0 --> R["Round k: network drives (with a little noise)"]
@@ -563,6 +565,7 @@ rewards or punishes, and the network learns to obtain more reward.
 ### A.10.1 The loop
 
 ```mermaid
+%% Caption: The reinforcement learning loop: action, observation and reward
 flowchart LR
   Agent["Agent (policy π)"] -->|"action a_t"| Umwelt["Environment (simulation)"]
   Umwelt -->|"observation o_{t+1}"| Agent
@@ -769,6 +772,7 @@ simultaneously: the critic learns to predict returns; the actor learns from the 
 computes.
 
 ```mermaid
+%% Caption: Actor and critic: the critic predicts returns and supplies the advantages for the policy gradient
 flowchart TB
   O["Observation o"] --> Actor["Actor μθ(o), σ"]
   Actor --> A["Action a"]

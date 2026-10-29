@@ -377,7 +377,7 @@ This produces `studio.png`, `studio-selected.png`, `studio-play.png`, `studio-si
 `game-phone.png`, `studio-narrow.png` and, per phone size, `phone-play-<width>.png` and
 `phone-dock-<width>.png`. Some of them are also used in this book.
 
-![Simulate with the physics debug view, as checked by the browser test](../buch/bilder/studio-simulate.png)
+![Simulate with collision shapes and contact points displayed, as recorded by the browser test](../buch/bilder/studio-simulate.png)
 
 ---
 

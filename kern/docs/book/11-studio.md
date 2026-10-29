@@ -244,7 +244,7 @@ In the viewport itself Studio shows:
   "Flying · WASD move · Q/E down/up · wheel speed … · Shift faster · Z/C zoom".
 - **Gizmo readout** while dragging: translation (Δ in m), angle (°) or scale factors.
 
-![Four viewports: perspective and three orthographic views](../buch/bilder/studio-quad.png)
+![Four viewports: Orb Run at night in perspective, plus the orthographic views Top, Front and Right](../buch/bilder/studio-quad.png)
 
 ### 11.2.4 Outliner
 
@@ -908,7 +908,7 @@ The show flag **Collision Shapes** displays the Box3D shapes, **Constraints** th
 **Contact Points** the contacts. The status bar counts bodies, awake bodies, joints, broken joints and
 contacts.
 
-![Simulate with collision shapes displayed](../buch/bilder/studio-simulate.png)
+![Simulate with collision shapes and contact points displayed](../buch/bilder/studio-simulate.png)
 
 ![Physics Lab: all joint types in simulation](../buch/bilder/studio-physics-lab.png)
 
@@ -1042,7 +1042,7 @@ viewport (Window › Show › **Robot Camera**, on by default):
   for floor, yellow for too close, dark for nothing; plus the smallest distance in real meters or
   "clear".
 
-![The Micro Duck in Play with head camera and ToF grid (duck shown in this book's own design)](../buch/bilder/duck-play.png)
+![The Micro Duck with head camera and ToF grid overlays (duck shown in this book's own design)](../buch/bilder/duck-play.png)
 
 ---
 
@@ -1269,7 +1269,7 @@ compact layout:
 
 ![Studio in an 820 px wide window](../buch/bilder/studio-narrow.png)
 
-![Phone in portrait: the dock with Play, Simulate and Panels](../buch/bilder/phone-dock-390.png)
+![Phone in portrait: the dock with the buttons for Play and Simulate and the Outliner and Details button](../buch/bilder/phone-dock-390.png)
 
 ---
 

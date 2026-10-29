@@ -303,6 +303,7 @@ $$\frac{\partial\mathcal{L}}{\partial W} = \delta^{z}\, x^\top,\qquad
 \sum_r x_{r,i}\,\delta_{r,o}$.
 
 ```mermaid
+%% Bildunterschrift: Rückwärtsdurchlauf: Der Fehler läuft von der Ausgabe zu den früheren Schichten, an jeder Schicht entsteht dL/dW
 flowchart BT
   L["Verlust L"] -->|"dL/dy"| y["Ausgabe y"]
   y -->|"W^T δ"| h2["h(L-1)"]
@@ -532,6 +533,7 @@ $\varepsilon T$.
 Experte fährt, sondern der Schüler – und der Experte sagt in jedem Zustand, was **er** getan hätte.
 
 ```mermaid
+%% Bildunterschrift: DAgger: Das Netz fährt, das Vorbild beschriftet, die Daten wachsen von Runde zu Runde
 flowchart TD
   A["Runde 0: Vorbild fährt, Daten D0 aufzeichnen"] --> F0["Netz auf D0 anpassen"]
   F0 --> R["Runde k: Netz fährt (mit wenig Rauschen)"]
@@ -573,6 +575,7 @@ Umgebung belohnt oder bestraft, und das Netz lernt, mehr Belohnung zu bekommen.
 ### A.10.1 Der Kreislauf
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf des bestärkenden Lernens: Aktion, Beobachtung und Belohnung
 flowchart LR
   Agent["Agent (Policy π)"] -->|"Aktion a_t"| Umwelt["Umgebung (Simulation)"]
   Umwelt -->|"Beobachtung o_{t+1}"| Agent
@@ -785,6 +788,7 @@ gleichzeitig: Der Kritiker lernt, Returns vorherzusagen; der Actor lernt aus den
 Kritiker berechnet.
 
 ```mermaid
+%% Bildunterschrift: Actor und Kritiker: Der Kritiker sagt Returns vorher und liefert die Vorteile für den Policy-Gradienten
 flowchart TB
   O["Beobachtung o"] --> Actor["Actor μθ(o), σ"]
   Actor --> A["Aktion a"]

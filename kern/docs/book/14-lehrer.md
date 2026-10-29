@@ -904,7 +904,7 @@ DAgger + PPO on Box3D)`, `rate_hz` = `25` and the names of the 23 observations a
 
 ## 14.11 The Lehrer in the browser
 
-![The Lehrer page in the browser (German user interface)](../buch/bilder/lehrer.png)
+![The Lehrer page in the browser with a training run in progress: settings and metrics (German user interface)](../buch/bilder/lehrer.png)
 
 `kern/build.sh --lehrer` builds `kern_lehrer.wasm`: engine, Box3D, game runtime, `src/lehrer` and
 the C interface (`lehrer_api.cpp`). The page `/lehrer/` (`web/lehrer/`) loads it once and gives the

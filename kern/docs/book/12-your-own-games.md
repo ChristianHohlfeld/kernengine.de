@@ -112,7 +112,7 @@ The player controllers, pickups and triggers already bring their own sounds ([Ch
 - Errors in the level (such as a joint pointing to a deleted actor) prevent Play and are listed in the
   **Output Log**.
 
-![Play in the viewport with HUD](../buch/bilder/studio-play.png)
+![Playing: viewport with HUD](../buch/bilder/studio-play.png)
 
 ### Step 9: Saving
 

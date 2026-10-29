@@ -829,7 +829,7 @@ festen Schritten auf der Autorität.
 Test: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 `soldier_models_are_closed_and_outward`, im Netz `net_game_soldier_replication`.
 
-![Spielen im Studio mit HUD](bilder/studio-play.png)
+![Spielen im Studio: das Hovercar in Orb Run mit HUD](bilder/studio-play.png)
 
 ---
 

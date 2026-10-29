@@ -589,7 +589,7 @@ BallPlay (Abschnitt 13.10); Kerns früherer handgeschriebener Code für Fetch un
 entfernt. Die Spielschicht selbst enthält keine handgeschriebene Spiellogik; um das Netz herum gibt
 es nur Wahrnehmung.
 
-![Die Ente spielt (Ente in der eigenen Gestaltung dieses Buchs)](bilder/duck-play.png)
+![Die Ente spielt: Kopfkamera und ToF-Gitter zeigen, was sie wahrnimmt (Ente in der eigenen Gestaltung dieses Buchs)](bilder/duck-play.png)
 
 ### Wo sie sitzt
 

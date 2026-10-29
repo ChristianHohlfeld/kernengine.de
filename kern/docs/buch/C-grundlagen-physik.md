@@ -151,6 +151,7 @@ großer Schritt, und große Schritte machen Federn instabil (C.2.2) und das Erge
 Die Lösung ist Glenn Fiedlers **Akkumulator** („Fix Your Timestep“):
 
 ```mermaid
+%% Bildunterschrift: Fester Zeitschritt mit Akkumulator: feste Schritte, gerendert wird zwischen den letzten zwei Zuständen
 flowchart TB
   F["Frame: Zeit dt"] --> A["Akkumulator += min(dt, 0,25 s)"]
   A --> L{"Akkumulator ≥ h?"}
@@ -190,6 +191,7 @@ Bei $n$ Körpern gibt es $n(n-1)/2$ Paare – bei 1000 Körpern fast 500 000. Je
 ist zu teuer. Deshalb arbeitet man in zwei Phasen:
 
 ```mermaid
+%% Bildunterschrift: Kollisionserkennung in zwei Phasen, danach der Solver
 flowchart TB
   B["Broad Phase: Hüllquader-Baum findet Kandidatenpaare"] --> N["Narrow Phase: exakter Test, Kontaktpunkte (Manifold)"]
   N --> S["Solver: Kontakt-Constraints"]
@@ -517,6 +519,7 @@ abgebaut.
 Der Ablauf eines festen Schritts, den Box3D **Soft Step** nennt (`box3d:src/solver.c`):
 
 ```mermaid
+%% Bildunterschrift: Der Soft Step von Box3D: Sub-Steps mit Warmstart, Lösen mit Bias und Relax
 flowchart TD
   P["Constraints vorbereiten (Jacobi, effektive Massen)"] --> L{"noch ein Sub-Step?"}
   L -->|ja| IV["Geschwindigkeiten integrieren (Schwerkraft, Kräfte, Dämpfung)"]
@@ -566,6 +569,7 @@ den Motor so, dass das Gelenk ihn erreicht. Im Inneren ist das ein **Regelkreis*
 Winkel, vergleicht mit dem Ziel und erzeugt ein Moment.
 
 ```mermaid
+%% Bildunterschrift: Der Regelkreis eines Servos: Totzeit, PD-Regler mit Momentgrenze, Gelenk
 flowchart TB
   Z["Zielwinkel θ*"] --> T["Totzeit (Bus)"]
   T --> E["Fehler e = θ* − θ"]
