@@ -125,8 +125,13 @@ def print_copy(f):
 
 
 parts = []
+ALLOWED_URLS = ("https://kernengine.de", "https://github.com/ChristianHohlfeld/kernengine.de", "http://127.0.0.1", "http://localhost")
 for i, p in enumerate(files):
     t = p.read_text()
+    # The books name only the project's own addresses (and apache.org inside the licence's own text).
+    for u in re.findall(r"https?://[^\s)>`'\"]+", t):
+        if not u.startswith(ALLOWED_URLS) and not (p.name.startswith("D-") and "apache.org" in u):
+            print(f"FOREIGN URL in {p.name}: {u}", file=sys.stderr)
     t = re.sub(r"\n---\n\n© 20\d\d Christian Heinrich Hohlfeld[^\n]*\n?$", "\n", t)  # the per-chapter notice (the imprint has it)
     t = re.sub(r"```mermaid\n(.*?)```", lambda m: mermaid(m.group(1)), t, flags=re.S)
     # Code blocks without a language: plain text (set by the verbatim environment, wrapped).
