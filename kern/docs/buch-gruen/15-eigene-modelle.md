@@ -34,7 +34,7 @@ erkennt, wie man das beste Netz findet, was gute Übungen ausmacht – gelten f�
 
 > **Für Neugierige:** Wie man das Werkzeug baut, welche Befehle es kennt und welche Einstellungen
 > es gibt, steht im blauen Buch, Kapitel 15.1 und 15.2. Die Prozessor-Einstellungen beim Bauen
-> machen es nur schneller; das Netz bleibt Bit für Bit dasselbe wie im Browser.
+> machen es nur schneller; das Netz bleibt bis aufs Haar dasselbe wie im Browser.
 
 ## 15.2 Den Sprung im Browser trainieren
 
@@ -49,9 +49,8 @@ Ein Sprung-Lauf hat zwei Phasen, die du auf der Seite mitverfolgen kannst:
 
 **Wie lange dauert das?** Auf einem Testrechner mit 2 Rechenkernen kam im Browser der erste echte
 Sprung nach knapp 9 Minuten, das Nachahmen war nach etwa 11 Minuten fertig. Das Üben dauert viel
-länger: Die 3000 Übungsrunden des eingebauten Netzes (rund 2,3 Millionen Entenschritte) hätten dort
-bei etwa 390 Entenschritten pro Sekunde rund anderthalb Stunden gebraucht. Wie schnell dein Gerät
-ist, zeigt die Seite unter „Schritte / s“.
+länger, denn es braucht Tausende Runden. Wie schnell dein Gerät ist, zeigt die Seite unter
+„Schritte / s“: so viele Entscheidungstakte schaffen alle Enten zusammen pro Sekunde.
 
 > **Probier's aus!** Dein erster Sprung-Lauf:
 > 1. Öffne **kernengine.de/lehrer/**. Warte, bis die Statuszeile „Bereit“ meldet.
@@ -64,11 +63,12 @@ ist, zeigt die Seite unter „Schritte / s“.
 >
 > Was du lernst: Erst das Vorbild macht den Sprung möglich, das Üben macht ihn danach sicher.
 
-> **Wusstest du?** Gleiche Startzahl und gleich viele Enten ergeben im Browser dasselbe Netz wie auf
-> dem Rechner. Die Zahl der Enten ist **Worker × Enten je Worker**; ein Worker ist ein Helfer im
-> Hintergrund des Browsers, der seine Enten turnen lässt. Mit 4 Workern zu je 8 Enten
-> (zusammen 32), Startzahl 1 (Feld „Seed“) und 3000 Iterationen rechnest du also genau den Lauf nach, aus dem
-> das eingebaute Sprung-Netz stammt – wenn du die Zeit dafür hast.
+> **Wusstest du?** Gleiche Startzahl, gleich viele Enten und dasselbe Rezept ergeben im Browser
+> dasselbe Netz wie auf dem Rechner. Die Zahl der Enten ist **Worker × Enten je Worker**; ein Worker
+> ist ein Helfer im Hintergrund des Browsers, der seine Enten turnen lässt. Das eingebaute
+> Sprung-Netz entstand mit 32 Enten, Startzahl 1 und 3000 Übungsrunden. Mit 4 Workern zu je 8 Enten
+> (zusammen 32), Startzahl 1 (Feld „Seed“) und 3000 Iterationen stellst du also dieselben
+> Einstellungen ein – wenn du die Zeit dafür hast.
 
 ## 15.3 Fortschritt lesen
 
@@ -85,7 +85,7 @@ Die Lehrer-Seite zeichnet Rückgabe und Episodenlänge als Kurven und zeigt dazu
 |---|---|---|
 | Episoden-Rückgabe | Punkte einer Episode, im Mittel | soll über viele Runden steigen |
 | Episodenlänge (s) | wie lange eine Episode dauert | Sprung: 2 s heißt ohne Sturz; kürzer heißt Sturz oder Abstützen |
-| Aktionsrauschen | wie viel die Ente herumprobiert | sinkt, wenn sie sicherer wird |
+| Aktionsrauschen | wie viel die Ente herumprobiert | sinkt, wenn sie sicherer wird (14.5) |
 | echte Sprünge | von 5 Probesprüngen | **das eigentliche Ziel** |
 | Schritte / s | Tempo des Geräts | sagt nichts über die Qualität |
 
@@ -181,7 +181,9 @@ Wer das nicht vorhat, kann diesen Abschnitt überspringen. Der Ablauf zeigt aber
 Prinzipien:
 
 - **Erst messen, was das Vorbild braucht.** Wo der Schnabel eine Socke greift und wie weit die Ente
-  nach „Stopp“ noch läuft, misst der Lehrer selbst in der aktuellen Physik (Kapitel 14.8).
+  nach „Stopp“ noch läuft, misst der Lehrer selbst in der aktuellen Physik (Kapitel 14.8). Die
+  Nachlaufstrecke braucht das Vorbild, weil Pollens Gang nicht auf der Stelle stoppt, sondern noch
+  ein Stück weitergeht.
 - **Das Vorbild messen.** Bevor man das Netz prüft, prüft man das Vorbild. Das zeigt, was das Netz
   durch reines Nachahmen **höchstens** erreichen kann. Schafft schon das Vorbild etwas nicht, liegt es
   nicht am Netz.
@@ -189,9 +191,8 @@ Prinzipien:
 Danach folgen Nachahmen, Prüfen, Ansehen, Üben und ein Probelauf im Beispiel-Level.
 
 > **Achtung, Falle!** Beim Nachahmen wird die Ausgabedatei nach **jeder** Runde überschrieben. Wer
-> eine frühere Runde behalten will, muss sie während des Laufs kopieren. Bei einer älteren Fassung
-> des Spielnetzes war Runde 10 von 12 die beste; beim heutigen Spielnetz war es Runde 8 (Kapitel
-> 14.8). Beide Male war es nicht die letzte – genau die Lehre aus 15.4.
+> eine frühere Runde behalten will, muss sie während des Laufs kopieren. Beim heutigen Spielnetz war
+> Runde 8 von 12 die beste (Kapitel 14.8), nicht die letzte – genau die Lehre aus 15.4.
 
 > **Für Neugierige:** Alle sechs Schritte mit Befehlen stehen im blauen Buch, Kapitel 15.7.
 
@@ -213,7 +214,9 @@ Angenommen, die Ente soll sich **verbeugen**. Dafür braucht man fünf Zutaten:
    14.6). Dann braucht man einen einfachen Bewegungsplan, eine Note für die Suche und ein Vorbild,
    das in **jeder** Lage eine Antwort weiß – sonst funktioniert das Nachahmen mit Korrektur nicht.
 
-Für jede dieser Zutaten muss man programmieren.
+Für jede dieser Zutaten muss man programmieren. Die Lernmaschine selbst bleibt dabei dieselbe: Üben
+und Nachahmen kennen nur „eine Welt, in der eine Ente handelt und Punkte bekommt“. Auch die
+Spielschicht mit ganz anderen Ein- und Ausgängen lernt mit genau dieser Maschine.
 
 > **Für Neugierige:** Das blaue Buch zeigt das Gerüst einer Verbeugungs-Aufgabe in C++ und listet
 > alle Stellen im Studio, die man ergänzen muss (Kapitel 15.9).
@@ -241,8 +244,9 @@ sieben Regeln vor:
 - **Nur, was der Roboter wirklich hat.** Das handelnde Netz sieht Sensorwerte, nie wahre Positionen.
   Ball und Socke kennt die Spielschicht nur aus der Kamera, verrauscht und mit Aussetzern. Wahres
   Wissen bekommt nur der Kritiker.
-- **Zeit sichtbar machen.** Ein Netz hat kein Gedächtnis: Es sieht nur den jetzigen Augenblick.
-  Darum muss man ihm sagen, wie weit eine Bewegung schon ist (die Uhr des Sprungs) oder wie lange es
+- **Zeit sichtbar machen.** Ein Netz hat kein eigenes Gedächtnis: Es sieht nur den jetzigen
+  Augenblick und das, was man ihm mitgibt (etwa seinen eigenen letzten Befehl, 13.7). Darum muss man
+  ihm sagen, wie weit eine Bewegung schon ist (die Uhr des Sprungs) oder wie lange es
   schon steht, geht oder trägt.
 - **Messen statt befehlen.** „Steht still“ heißt: beide Sohlen am Boden, keine Bewegung läuft. Es
   zählt, was die Beine tun, nicht was befohlen wurde.
@@ -253,9 +257,11 @@ sieben Regeln vor:
   Wackeln, und Lehrpläne machen Strafen und Variation nach und nach strenger.
 - **Hartes Episodenende.** Sturz und Bodenkontakt anderer Körperteile beenden die Episode; sonst wird
   Abstützen zur sicheren Wette.
-- **Vorbild ohne Geheimwissen.** Das Vorbild sieht nur, was das Netz sieht. Ein Wunsch, der aus einer
-  Wartezeit folgt („jetzt kicken“), steigt langsam an, statt plötzlich da zu sein. So kann das Netz
-  ihn aus der Stehzeit ablesen.
+- **Vorbild ohne Geheimwissen.** Das Vorbild sieht nur, was das Netz sieht. Das gilt auch für sein
+  Timing: Das Vorbild sagt nicht von einem Augenblick auf den anderen „Jetzt kicken!“, sondern wird
+  mit jedem Moment Stillstehen ungeduldiger, wie bei einem Countdown. So kann das Netz an der
+  Stehzeit ablesen, wann es so weit ist. Ein plötzliches „Jetzt!“ ohne erkennbaren Grund könnte es
+  nicht nachmachen.
 
 > **Probier's aus!** Öffne auf https://kernengine.de/ das Micro-Duck-Level und starte **Play**. Es
 > beginnt mit der Observer camera: Du schaust zu und kannst Dinge mit der Maus oder dem Finger

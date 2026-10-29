@@ -16,9 +16,8 @@
 > - **Takt** – der feste Rhythmus, in dem gerechnet und entschieden wird
 
 Darf ich vorstellen: die Micro Duck. Etwa 25 cm groß, 0,74 kg schwer, mit 14 Servos in Beinen und
-Hals und einem fünfzehnten für den Unterschnabel.
-
-![Das Micro-Duck-Level im Studio (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-level.png)
+Hals und einem fünfzehnten für den Unterschnabel. Wie das Micro-Duck-Level im Studio aussieht, zeigt
+das Bild in [Kapitel 1](01-einfuehrung.md).
 
 Gebaut hat den Roboter Pollen Robotics. Laufen lernt die Ente dort nicht durch Regeln, die jemand
 aufschreibt („erst linkes Knie, dann …“), sondern durch Training eines neuronalen Netzes in einer
@@ -36,8 +35,8 @@ tut. Obendrauf setzt Kern den **Lehrer** ([Kapitel 14](14-lehrer.md)), den **Spr
 **Spielschicht**. Eigene Netze trainieren erklärt [Kapitel 15](15-eigene-modelle.md), den Abgleich mit
 dem echten Roboter [Kapitel 16](16-kalibrierung.md).
 
-> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und wähle bei **New Level** die
-> Vorlage **Micro Duck**. Drück auf Play und schau zu: Die Ente spaziert los, schaut sich um – und
+> **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/ und lade das Beispiel-Level
+> (**File › Example Levels › Micro Duck**). Drück auf Play und schau zu: Die Ente spaziert los, schaut sich um – und
 > wenn sie den Ball entdeckt, wird es spannend.
 
 ## 13.1 Die Ente im Überblick
@@ -67,11 +66,13 @@ nirgends heimlich helfen.
 Darum gilt:
 
 - **Keine Hilfen:** keine Stützkräfte, kein Festhalten des Rumpfs, kein Versetzen, kein weiches
-  Überblenden von einer Bewegung zur nächsten. Die Ente steht nur durch ihre Servos und ihre Füße.
+  Überblenden von einer Bewegung zur nächsten. Auch Überblenden wäre eine Hilfe: Ein Gemisch aus zwei
+  Netzen hat keines der beiden Netze im Training je erlebt. Darum kommt jeder Befehl ganz von einem
+  Netz. Die Ente steht nur durch ihre Servos und ihre Füße.
 - **Servos aus echten Physik-Bausteinen:** Ein Servo ist in Kern nur das, was die Physik ohnehin für
   Gelenke kennt, eine Feder und eine Bremse, mehr nicht (13.4).
 - **Fester Takt:** Die Zeit wird in Schritten gezählt, nicht mit der Uhr. Gleiche Eingaben ergeben
-  Bit für Bit denselben Gang auf jedem Gerät. Das heißt **Determinismus** ([Kapitel 14](14-lehrer.md)).
+  bis aufs Haar denselben Gang auf jedem Gerät. Das heißt **Determinismus** ([Kapitel 14](14-lehrer.md)).
 
 > **Stell dir vor …** du bringst einem Kind Radfahren mit Stützrädern bei und schraubst sie dann
 > heimlich ab. Genau das passiert, wenn die Simulation „hilft“: Das Netz verlässt sich auf etwas,
@@ -118,14 +119,10 @@ Gelenk **träger an, als seine Teile wiegen**. Diese Zusatzträgheit heißt **Ar
 > Pedale beim Anfahren kaum herum, weil sich hinten alles viel schneller drehen muss als deine Füße.
 > Das Gelenk der Ente ist die Pedale, der Motor im Servo das schnelle Hinterrad.
 
-Pollens Trainingssimulation klebt diese Trägheit einfach direkt auf die Gelenkachse. Box3D kann das
-nicht: Es kennt nur ganz gewöhnliche Körper, die in jede Richtung irgendwie träge sind. Kerns Trick:
-Jedes Glied bekommt eine **dünne gedachte Scheibe** auf seiner Gelenkachse mit. So eine Scheibe ist
-vor allem um ihre Achse träge, also genau dort, wo es zählt, und sie ist trotzdem ein ganz normaler
-Körper, mit dem Box3D umgehen kann.
-
-> **Stell dir vor …** du schwingst einen leeren Eimer. Klebst du innen eine schwere Münze an die
-> Wand, wird der Schwung träger. Die Scheibe ist so eine Münze, nur unsichtbar.
+Kerns Physik kann so eine Getriebeträgheit nicht direkt eintragen. Darum bekommt jedes Glied eine
+**unsichtbare Scheibe** auf seiner Gelenkachse mit. Sie macht genau das Drehen um diese Achse
+schwerfälliger, wie der Motor hinter dem Getriebe. Wie Pollens Training das anders löst, steht im
+blauen Buch, Kapitel 13.
 
 Perfekt ist der Trick nicht, denn die Scheibe dreht sich mit dem Glied statt dreihundertmal so
 schnell. Aber gemessen läuft die Ente damit deutlich näher am Training und zappelt viel weniger
@@ -141,11 +138,11 @@ wie Eis, 1 heißt griffig wie Gummi. Die Sohlen der Ente greifen voll, die Servo
 im Training, und die Schalen von Rumpf und Kopf liegen dazwischen. So rutscht eine umgefallene Ente
 nicht über den Boden wie auf Eis.
 
-Neu in Kern: **Materialpaare**. Wie stark zwei Dinge aneinander haften, hängt von beiden ab, und nicht
-immer vom Durchschnitt. Das weiche Schnabelpolster hält Baumwolle besser fest, als man aus „Polster
-auf Polster“ und „Stoff auf Stoff“ ausrechnen würde. Für solche Paare kennt Kern eigene, gemessene
-Werte; für die Socke ist das wichtig. Im Micro-Duck-Level ist der Boden aus Holz. Setzt eine Sohle
-auf, klingt es nach Plastik.
+Neu in Kern: **Materialpaare**. Wie stark zwei Dinge aneinander haften, hängt von beiden ab.
+Normalerweise schätzt eine Physik-Engine die Reibung zweier Stoffe einfach aus deren Einzelwerten, als
+eine Art Mittelwert. Für manche Paare stimmt das nicht: Das weiche Schnabelpolster hält Baumwolle
+besser fest, als dieser Mittelwert sagt. Für solche Paare trägt Kern einen eigenen Wert ein; für die
+Socke ist das wichtig. Im Micro-Duck-Level ist der Boden aus Holz.
 
 ### Maßstab 4: die Ente als Riesin
 
@@ -160,7 +157,8 @@ wie die kleine bewegt, nur größer.
 
 Und die **Zeit**? Große Dinge bewegen sich gemächlicher. Eine lange Schaukel schwingt langsamer als
 eine kurze, und ein Stein fällt von einem hohen Turm länger als von einem niedrigen. Die Regel dahinter:
-Ist etwas viermal so groß, dauert eine solche Bewegung **doppelt** so lange (denn 2 · 2 = 4). Die Riesen-Ente
+Ist etwas viermal so groß, dauert eine solche Bewegung **doppelt** so lange, bei neunmal so groß
+dreimal so lange. Die Riesen-Ente
 läuft also in Zeitlupe, halb so schnell wie die echte.
 
 Das Netz merkt von alldem nichts. Kern rechnet alles in echte Robotermaße zurück, bevor das Netz es
@@ -193,10 +191,14 @@ seiner Kraft. Die volle Kraft erreicht er erst bei fast 100 Grad Abstand. Die Se
 **weich**, eher eine sanft schiebende Hand als ein Schraubstock. Genau so hat Pollen sie am echten
 Servo vermessen.
 
-Kern nennt so etwas ein **Gerätemodell**: ein kleines Gesetz in echten Einheiten, dessen Zahlen
-(Steifigkeit, Bremse, Reibung, Höchstkraft, Verzögerung) in einem **Profil** stehen. Dasselbe Gesetz
-gilt überall gleich, im Studio, im Lehrer und auf dem Prüfstand der Kalibrierung. Den Zug übernimmt die
-eingebaute Gelenkfeder von Box3D, die Reibung ein Bremsmotor im Gelenk.
+Kern nennt so etwas ein **Gerätemodell**: ein kleines Gesetz in echten Einheiten. Seine Zahlen
+(wie fest er zieht, wie stark er bremst, Reibung, Höchstkraft und wie lange ein Befehl unterwegs ist,
+13.5) stehen in einem **Profil**, einer Art Datenblatt des Servos. Dasselbe Gesetz gilt überall
+gleich, im Studio, im Lehrer und auf dem Prüfstand der Kalibrierung.
+
+Und wenn das Ziel jenseits dessen liegt, was das Gelenk überhaupt kann? Dann zieht der Servo das Gelenk
+bis an seine Grenze und drückt es dort gegen den Anschlag, wie deinen Ellbogen, wenn du ihn ganz
+durchstreckst und noch weiter willst.
 
 Beim Training lässt man diese Zahlen absichtlich ein wenig **streuen**: Jede Übungsente bekommt etwas
 andere Servos, mal träger, mal reibender, mal mit mehr Verzögerung. So lernt das Netz, auch mit Servos
@@ -221,15 +223,13 @@ halten die Servos einfach ihr letztes Ziel.
 > **Stell dir vor …** die Physik ist der Sekundenzeiger, der unermüdlich tickt. Das Netz ist jemand,
 > der nur bei jedem vierten Tick auf die Uhr schaut und dann entscheidet, was als Nächstes kommt.
 
-Genau so war es im Training, und genau so muss es in Kern sein. Hier hilft die Zeitlupe aus 13.3: In
-der viermal so großen Welt läuft alles halb so schnell. Ein Physikschritt in Kern ist deshalb doppelt
-so lang wie im Training und entspricht trotzdem genau einem Trainingsschritt in echter Roboterzeit.
-Kern rechnet das beim Start jeder Ente selbst aus. Passt die Schrittrate der Welt nicht, rundet Kern
-und sagt Bescheid.
+Genau so war es im Training, und genau so muss es in Kern sein. Hier hilft die Zeitlupe aus 13.3:
+Weil die Riesen-Ente in Zeitlupe läuft, darf auch jeder Physikschritt doppelt so lang sein. In
+Entenzeit gerechnet ist er genau gleich lang wie im Training. Kern rechnet das beim Start jeder Ente
+selbst aus.
 
 Ein Befehl kommt auch nicht sofort beim Servo an. Er braucht ein paar Hundertstelsekunden, wie ein
 Brief, der unterwegs ist. Kern lässt jeden Befehl darum genau so lange warten wie am echten Roboter.
-Die Spielschicht schaut noch seltener auf die Uhr, nur bei jedem zweiten Mal, wenn das Netz denkt.
 
 ### Zwischenschritte
 
@@ -241,7 +241,8 @@ Gummitier. Viele kleine Schritte halten die Kette fest zusammen.
 
 > **Probier's aus!** Setz in einem leeren Level aus dem Content Drawer eine **Micro Duck** ein und
 > schau ins **Output Log**: Studio meldet, dass es die World Settings angepasst hat. In **World
-> Settings › Physics** siehst du die neue Schrittrate und die Zwischenschritte.
+> Settings › Physics** siehst du die neue Schrittrate und die Zwischenschritte. Einstellen musst du
+> nichts: Die Botschaft ist, dass Studio die Physik für die Ente selbst feiner gestellt hat.
 
 ### Das Zeitkonto
 
@@ -306,10 +307,9 @@ erst nach, sobald ein Level eine Ente enthält. So muss niemand sie herunterlade
 baut. Pollens Netze liegen in einem Ordner, Kerns eigene (Sprung und Spielschicht) in einem zweiten.
 
 Das läuft wie ein Gespräch: Die Engine meldet, welche Netze ihr fehlen, die Seite holt sie, und die
-Engine prüft jedes. Kern rechnet die Netze selbst und versteht genau die Bauart, mit der Pollen
-trainiert; ein Netz anderer Bauart lehnt es mit Begründung ab. Klappt das Laden nicht, versucht die
-Seite es später noch einmal, mit immer längeren Pausen, höchstens einmal pro Minute. So lange bleibt
-die Ente bei dieser Bewegung stehen und sagt warum.
+Engine prüft jedes. Kern rechnet die Netze selbst und kennt nur Mischpulte, die so verdrahtet sind wie
+Pollens; ein anders verdrahtetes lehnt es mit Begründung ab. Klappt das Laden nicht, versucht die
+Seite es später noch einmal. So lange bleibt die Ente bei dieser Bewegung stehen und sagt warum.
 
 > **Wusstest du?** Netze, die du selbst mit dem Kern Lehrer im Browser trainierst
 > ([Kapitel 14](14-lehrer.md)), bleiben im Speicher desselben Browsers. Studio holt sie sich von dort,
@@ -318,17 +318,18 @@ die Ente bei dieser Bewegung stehen und sagt warum.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 
-Alle Bewegungsnetze bekommen dieselben 61 Zahlen. Sie beschreiben nur, was ein Körper von innen
-spürt:
+Alle Bewegungsnetze bekommen dieselben 61 Zahlen, und jede hat ihren festen Platz, wie ein Kabel in
+einer festen Buchse des Mischpults. Sie beschreiben nur, was ein Körper von innen spürt:
 
 - **Gleichgewichtssinn:** wie schnell sich der Rumpf dreht und wo unten ist,
 - **Gelenkgefühl:** wie jedes der 14 Gelenke steht und wie schnell es sich bewegt,
-- **Gedächtnis:** was das Netz selbst beim letzten Mal befohlen hat,
+- **Rückblick:** was das Netz selbst eben befohlen hat (ein eigenes Gedächtnis hat das Netz nicht,
+  darum bekommt es das mitgeliefert),
 - **Auftrag:** wohin und wie schnell es laufen soll, wohin der Kopf schauen soll und welche
   Körperhaltung gewünscht ist.
 
-Heraus kommen 14 Zahlen, eine pro Gelenk. Kerns Sprung benutzt zwei Plätze, die Pollens Netze nie
-brauchen, als Uhr: So weiß das Sprungnetz, wie weit der Sprung schon ist.
+Heraus kommen 14 Zahlen, eine pro Gelenk. Kerns Sprung benutzt zwei Buchsen, die bei Pollens Netzen
+leer bleiben, als Uhr: So weiß das Sprungnetz, wie weit der Sprung schon ist.
 
 > **Wusstest du?** Das Netz weiß nicht, wo es im Raum ist. Es kennt nur den eigenen Körper.
 > Laufen ist für die Ente reines Körpergefühl, so wie du im Dunkeln gehen kannst, ohne etwas zu sehen.
@@ -363,7 +364,7 @@ die Kamera den Boden direkt vor ihren Füßen.
 
 **Gleichgewicht.** Ein Lagesensor wie im Handy meldet, wo unten ist. „Gefallen“ heißt wie im Original:
 eine Weile deutlich schief. Kurzes Stolpern zählt nicht. Das Laufnetz steht von selbst wieder auf, und
-eine Ente, die selbst entscheidet, meldet dann den Zustand „GetUp“.
+eine Ente, die selbst entscheidet, zeigt dann „GetUp“ an (aufstehen).
 
 **Schnabel als Fühler.** Soll der Schnabel zu sein, steht aber ein Stück offen, dann steckt etwas
 darin. So merkt die Ente, dass sie eine Socke hält, ganz ohne eigenen Sensor dafür.
@@ -393,7 +394,9 @@ ein Gähnen.
 
 Eine hochgehobene Ente soll nicht in der Luft weiterstrampeln. Pollen hat dafür ein winziges
 zusätzliches Netz trainiert, den **Pick-up-Detektor**. Er schaut sich das Körpergefühl der letzten
-Sekunde an und schätzt: Wie wahrscheinlich ist es, dass mich gerade jemand festhält?
+Sekunde an und schätzt: Wie wahrscheinlich ist es, dass mich gerade jemand festhält? Er urteilt
+erst, wenn er eine ganze Sekunde beisammenhat. Ein halb gefülltes Stück hat er im Training nie
+gesehen, und nach der goldenen Regel aus 13.2 gilt: nur, was geübt wurde.
 
 Der Trick steckt im Umschalten. Pausiert wird erst, wenn die Schätzung **mehrmals hintereinander
 sehr hoch** ist; weiter geht es erst, wenn sie **mehrmals hintereinander deutlich niedrig** ist.
@@ -454,10 +457,12 @@ ist nicht öffentlich, aber die Beschreibung schon. Kern baut BallPlay danach mi
 Pollens echtem Kick-Netz nach. Es ist **von Anfang an eingeschaltet**. Die Geschichte geht so:
 
 1. Die Ente **sieht** einen Ball am Boden (über den Sichttest der Kamera aus 13.8).
-2. Sie **läuft hin**, mit gesenktem Kopf, damit sie ihn im Blick behält.
+2. Sie **läuft hin**, mit gesenktem Kopf, damit sie ihn im Blick behält. Dabei nickt nur der Kopf,
+   nicht der Nacken: Den Nacken zu beugen verlagert das Gewicht nach vorn, und der Gang leidet.
 3. Sie **richtet sich aus**, in kleinen Schritten, bis der Ball genau dort vor ihrem linken Fuß liegt,
    wo er im Kick-Training lag.
-4. Sie **wartet**, bis sie ganz ruhig steht, und **kickt**.
+4. Sie **wartet**, bis sie ganz ruhig steht, nimmt den Kopf in die Grundstellung, weil der Kick so
+   trainiert wurde, und **kickt**.
 5. Sie **freut sich** mit fröhlichem Quaken, und der Ball ist kurz uninteressant.
 
 Verliert sie den Ball zu lange aus den Augen oder klappt der Kick ewig nicht, gibt sie auf und schaut
@@ -478,7 +483,8 @@ Handgeschriebene Spielregeln gibt es darin nicht.
 > Knöpfe: vor, drehen, Kopf runter, Schnabel auf, Kick, Aufheben. Die Bewegungen selbst macht die
 > Ente mit Pollens Netzen. Das Kind ist die Spielschicht.
 
-Damit sie mitspielt, schaltest du im Details-Panel **Kern extras** und **Autonomous** ein (im
+Die Spielschicht entscheidet noch seltener als die Bewegungsnetze: nur bei jedem zweiten Mal, wenn
+diese denken (13.5). Damit sie mitspielt, schaltest du im Details-Panel **Kern extras** und **Autonomous** ein (im
 Beispiel-Level ist beides an). Dann greift sie ein, sobald sie Ball oder Socke kennt oder etwas im
 Schnabel hat, und die Ente meldet „Play“. Du und die Logik gehen trotzdem vor.
 
@@ -488,7 +494,8 @@ Zwei Helfer liefern ihr die Welt:
   Wie der Servo ist er ein Gerätemodell: Im Training darf er absichtlich ungenau sein, umso mehr, je
   weiter etwas weg ist, und manchmal ein Bild verpassen, wie eine echte Kamera. Im Studio ist er perfekt.
 - Der **Tracker** ist ihr Gedächtnis. Verschwindet etwas aus dem Bild, merkt er sich eine Weile, wo es
-  zuletzt war. Einen eben gekickten Ball und eine eben weggetragene Socke lässt er eine Zeit lang in
+  zuletzt war: meist nur ein paar Sekunden, ein Ding ganz nah vor ihr aber zehnmal so lange. Das liegt
+  dann unter der Kamera und bewegt sich nicht von selbst weg. Einen eben gekickten Ball und eine eben weggetragene Socke lässt er eine Zeit lang in
   Ruhe, damit die Ente nicht sofort wieder dasselbe tut.
 
 **Was sie sieht:** alles aus Sicht der Ente, nie die wahren Positionen. Wo Ball und Socke ungefähr
@@ -501,8 +508,9 @@ Gamepad-Stick, der in der Mitte ein wenig Spiel hat. Während des Aufhebens geh�
 Netz: Es hat selbst gelernt, wann es zubeißt.
 
 **Die Pointe:** Ob die Ente still steht, misst die Spielschicht an den **Füßen**, nicht am Befehl. Auf
-„ein klein wenig vorwärts“ setzt Pollens Gang nämlich manchmal gar nicht an. Dann steht die Ente in
-Wahrheit, obwohl „laufen“ befohlen ist. Was die Beine tun, ist die Wahrheit.
+„ein klein wenig vorwärts“ setzt Pollens Gang nämlich manchmal gar nicht an; aus dem Stand braucht er
+einen kräftigen Anstoß. Dann steht die Ente in Wahrheit, obwohl „laufen“ befohlen ist. Was die Beine
+tun, ist die Wahrheit.
 
 **Socke und Ball:** Die Socke ist ein kleiner Haufen aus sieben Stoffklümpchen, mit weichen Federn
 verbunden. Sie gibt unter dem Schnabel nach, und was der Schnabel packt, zieht den Rest mit. Der Ball ist
@@ -579,21 +587,20 @@ Lehrer gibt es zusätzliche Eingänge, über die ein lernendes Netz die Ente ste
 Kern misst nach, wie nah die Ente dem Original kommt, und vergleicht mit Pollens eigener
 Trainingssimulation:
 
-| Befehl | Kern | Pollens Simulation |
-|---|---|---|
-| stehen | steht 8 s, rührt sich kaum | steht |
-| volle Kraft voraus | etwa 80 % von Pollens Tempo | Vergleichswert |
-| auf der Stelle drehen | knapp zwei Drittel | Vergleichswert |
-| auf Bauch oder Rücken | steht nach höchstens 12 s wieder auf | steht auf |
+| Befehl | Kern im Vergleich zu Pollen |
+|---|---|
+| stehen | beide stehen; Kerns Ente rührt sich 8 s lang kaum |
+| volle Kraft voraus | etwa 80 % von Pollens Tempo |
+| auf der Stelle drehen | knapp zwei Drittel von Pollens Drehtempo |
+| auf Bauch oder Rücken | beide stehen wieder auf, Kerns Ente nach höchstens 12 s |
 
 Wundere dich nicht: Auch das Original erreicht beim Laufen nicht ganz das befohlene Höchsttempo. Ein
 Befehl ist ein Wunsch an das Netz, und wie schnell es daraus wirklich läuft, hat es im Training
-gelernt. Entscheidend ist darum der Vergleich der beiden Spalten.
+gelernt. Entscheidend ist darum der Vergleich mit Pollen.
 
 Die unsichtbare Scheibe aus 13.3 macht sich bezahlt: Ohne sie liefe die Ente langsamer, und Rumpf und
 Kopf zappelten mehr als dreimal so stark. Alle Bewegungen gelingen, der linke Kick schießt den Ball
-quer durchs Zimmer, nur der rechte kippt manchmal. Kein Gelenk drückt nennenswert über seine Grenze.
-Und auch ganz ohne Kern extras sieht die Ente einen Ball, läuft an, richtet ihn aus und kickt, ohne zu
+quer durchs Zimmer, nur der rechte kippt manchmal. Und auch ganz ohne Kern extras sieht die Ente einen Ball, läuft an, richtet ihn aus und kickt, ohne zu
 fallen.
 
 ## 13.15 Was noch fehlt

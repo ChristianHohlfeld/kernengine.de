@@ -59,17 +59,20 @@ Die genauen Namen der Bausteine und Dateien stehen im blauen Buch, Kapitel 14.
 ## 14.2 Wer macht was?
 
 Ein Training besteht aus wenigen Rollen, die sauber getrennt sind. Dadurch kann jede Rolle dort
-arbeiten, wo gerade Platz ist: auf mehreren Rechenkernen eines Computers oder in mehreren
-Hintergrund-Prozessen eines Browsers.
+arbeiten, wo gerade Platz ist: auf mehreren **Rechenkernen** eines Computers (ein Rechenkern ist
+eines der Rechenwerke in einem Prozessor; heutige Computer haben mehrere, die gleichzeitig arbeiten)
+oder in mehreren **Hintergrund-Prozessen** eines Browsers (Helfern, die der Browser im Hintergrund
+gleichzeitig arbeiten lässt).
 
-> **Stell dir vor …** eine Sportschule. Der **Lehrplan** legt fest, was geübt wird. Die **Übung**
+> **Stell dir vor …** eine Sportschule. Der **Lehrplan** legt fest, was geübt wird. Die **Aufgabe**
 > sagt, wofür es Punkte gibt. In jeder **Turnhalle** turnt eine Ente. **Helfer mit Klemmbrett**
 > schreiben alles mit, was dort passiert. Der **Trainer** wertet die Zettel aus und gibt neue
-> **Anweisungen** heraus. Das **Gebäude** bestimmt, wie viele Hallen gleichzeitig offen sind.
+> **Anweisungen** heraus. Wie viele Hallen gleichzeitig offen sind, hängt davon ab, wie viele
+> Rechenkerne mitarbeiten.
 
 ```mermaid
 flowchart LR
-  L["Lehrplan"] --> U["Übung"]
+  L["Lehrplan"] --> U["Aufgabe"]
   U --> H["Turnhallen mit Enten"]
   T["Trainer"] -->|"Anweisungen"| HE["Helfer"]
   HE -->|"lassen turnen"| H
@@ -111,7 +114,7 @@ Messfehler, wie sie echte Sensoren haben (dazu gleich mehr).
 ### Die Aufgabe: Was gibt Punkte?
 
 Eine **Aufgabe** legt fest, wofür es Punkte gibt, wie lange eine Episode dauert und wann sie vorbei
-ist. Jeder Punkte-Posten hat einen Namen und ein Gewicht. So kann man später nachsehen, wofür die
+ist. Jeder Punkte-Posten hat einen Namen und ein Gewicht, also wie stark er zählt. So kann man später nachsehen, wofür die
 Ente ihre Punkte bekommen hat – und ob sie geschummelt hat.
 
 Eingebaut sind zwei Aufgaben. **Stehen** ist der Schnelltest: 4 Sekunden stehen. Punkte gibt es fürs
@@ -165,7 +168,8 @@ genauen Bereiche stehen im blauen Buch, Kapitel 14.3.
 ## 14.4 Die Netze: mit Vorsprung starten
 
 Das handelnde Netz der Ente ist ein Mischpult mit knapp **200 000 Reglern**: 61 Messwerte gehen
-hinein, 14 Zielwinkel kommen heraus, dazwischen liegen drei Schichten (wie das gerechnet wird,
+hinein, 14 Zielwinkel kommen heraus. Dazwischen liegen drei **Schichten**: drei Mischpulte
+hintereinander, von denen jedes seine Ergebnisse an das nächste weitergibt (wie das gerechnet wird,
 zeigt Anhang A.1).
 
 **Alle Messwerte auf ein gemeinsames Maß.** Bevor die Messwerte ins Netz gehen, werden sie
@@ -181,14 +185,15 @@ beginnt den Sprung nicht mit zufälligen Reglern, sondern mit Pollens fertigem S
 > lernen muss, sondern als jemand, der schon sicher steht. Die ganze Übungszeit geht ins Neue.
 
 Dabei gibt es zwei Kniffe. Erstens übernimmt das Netz auch das gemeinsame Maß von velstand und hält
-es fest, denn die Regler passen genau zu diesem Maß. Zweitens bekommt der Sprung ein neues Signal,
+es fest. Die Regler von velstand wurden nämlich für genau diese Lautstärke der Musiker eingestellt.
+Würde man die Lautstärken ändern, stimmte die Mischung nicht mehr. Zweitens bekommt der Sprung ein neues Signal,
 das velstand nie gesehen hat (die Uhr des Sprungs, 14.6). Dieser neue Eingang startet abgeschaltet.
 So handelt die Ente anfangs **genau** wie velstand und lernt dann nach und nach, das neue Signal zu
 nutzen.
 
-Verstellt werden die Regler mit **Adam**, einem bewährten Verfahren, das sich merkt, in welche
-Richtung es zuletzt ging, und deshalb gleichmäßig vorankommt (Anhang A.6). Wie genau das alles
-rechnet, steht im blauen Buch, Kapitel 14.4.
+Verstellt werden die Regler mit einem bewährten Verfahren, das sich merkt, in welche Richtung es
+zuletzt ging, und deshalb gleichmäßig vorankommt (Anhang A.6). Wie genau das alles rechnet, steht im
+blauen Buch, Kapitel 14.4.
 
 ## 14.5 Üben mit PPO: kleine, vorsichtige Schritte
 
@@ -207,7 +212,7 @@ Eine Übungsrunde in fünf Schritten:
 flowchart TD
   A["1. Üben: alle Enten turnen, mit etwas Neugier"] --> B
   B["2. Zettel sortieren"] --> C
-  C["3. Messlatte nachstellen"] --> D
+  C["3. Maß anpassen"] --> D
   D["4. Jede Bewegung: besser oder schlechter als erwartet?"] --> E
   E["5. Netz ein kleines Stück Richtung besser"]
 ```
@@ -215,18 +220,22 @@ flowchart TD
 1. **Üben.** Jede Ente turnt ein kurzes Stück. Zu jedem Befehl des Netzes kommt etwas Zufall dazu.
    Dieses **Rauschen** ist die Neugier: Ohne es würde die Ente nie etwas Neues ausprobieren.
 2. **Sortieren.** Der Trainer legt alle Zettel in eine feste Reihenfolge, Takt für Takt und Ente für
-   Ente. Wer welche Ente gerechnet hat, spielt danach keine Rolle mehr.
-3. **Messlatte nachstellen.** Das gemeinsame Maß aus 14.4 lernt aus den neuen Zetteln dazu, und die
-   alten Antworten werden mit dem neuen Maß noch einmal bewertet, damit der Vergleich „neu gegen alt“
-   fair bleibt.
+   Ente. Wer welche Ente gerechnet hat, spielt danach keine Rolle mehr, damit auf jedem Gerät
+   dasselbe herauskommt (14.7).
+3. **Maß anpassen.** Das gemeinsame Maß aus 14.4 wird an die neuen Zettel angepasst.
 4. **Besser oder schlechter als erwartet?** Für jede Bewegung vergleicht der Trainer, wie viele
    Punkte danach wirklich kamen, mit dem, was der Kritiker erwartet hatte. Den Unterschied nennt man
    den **Vorteil**. Positiv heißt: Diese Bewegung war besser als gedacht, davon mehr.
 5. **Ein kleines Stück verstellen.** Der Trainer verstellt die Regler so, dass gute Bewegungen etwas
    wahrscheinlicher werden und schlechte etwas unwahrscheinlicher – aber eine Bewegung wird pro
-   Runde höchstens um etwa ein Fünftel wahrscheinlicher oder unwahrscheinlicher. Vor jedem Teilschritt misst er, wie weit sich das Netz schon verändert hat; ist
-   es zu weit, macht er die nächsten Schritte kleiner. Auch der Kritiker lernt dabei, besser zu
+   Runde höchstens um etwa ein Fünftel wahrscheinlicher oder unwahrscheinlicher. Er verstellt dabei in
+   mehreren kleinen Teilschritten und misst vor jedem, wie weit sich das Netz schon verändert hat;
+   ist es zu weit, macht er die nächsten Schritte kleiner. Auch der Kritiker lernt dabei, besser zu
    schätzen.
+
+**Wer senkt die Neugier?** Wie viel die Ente herumprobiert, lernt sie selbst mit: Wird eine Bewegung
+sicherer, bekommt sie weniger Zufall. Ein kleiner Bonus für Neugier sorgt dafür, dass das Rauschen
+nicht zu früh ganz verschwindet und die Ente nie aufhört, Neues zu versuchen.
 
 **Warum so vorsichtig?** Die Zettel stammen vom **alten** Netz. Springt das Netz zu weit, gelten sie
 nicht mehr, und ein gutes Netz kann in einem einzigen Schritt kaputtgehen. Danach sammelt es
@@ -328,7 +337,7 @@ und die Ente lernt unter voller Variation, den Sprung sicher zu machen.
 
 Die Ente bekommt nur ein einziges Signal: eine Art **Uhr des Sprungs**. Stell dir einen Uhrzeiger
 vor, der in 2 Sekunden einmal herumläuft; die Ente bekommt zwei Zahlen, die sagen, wo seine Spitze
-gerade steht. Daran erkennt sie, wie weit der Sprung schon ist. Kein Skript, keine künstlichen
+gerade steht: eine für links-rechts, eine für oben-unten. Daran erkennt sie, wie weit der Sprung schon ist. Kein Skript, keine künstlichen
 Kräfte: Die ganze Bewegung kommt aus dem Netz, über die 14 Zielwinkel der Motoren. Eine Episode
 dauert 2 Sekunden.
 
@@ -369,13 +378,16 @@ Das klingt selbstverständlich, ist es aber nicht.
 > einer Robotersimulation reicht so ein winziger Unterschied, damit die Ente nach ein paar Sekunden
 > einen anderen Gang hat.
 
-Kern sorgt deshalb für drei Dinge:
+Kern sorgt deshalb für vier Dinge:
 
 - **Immer dieselbe Reihenfolge.** Jede Summe wird in derselben Reihenfolge gerechnet, egal wie viele
-  Rechenkerne mithelfen. (Ein **Rechenkern** ist eines der Rechenwerke in einem Prozessor; heutige
-  Computer haben mehrere, die gleichzeitig arbeiten.)
-- **Eigene Rechenfunktionen.** Funktionen wie „Sinus“ runden auf verschiedenen Systemen in der
-  letzten Stelle verschieden. Kern bringt seine eigenen mit, die überall gleich runden.
+  Rechenkerne (14.2) mithelfen.
+- **Eigene Rechenfunktionen.** Eingebaute Rechenfunktionen, etwa für die Winkelrechnung, runden auf
+  verschiedenen Systemen in der letzten Stelle verschieden. Kern bringt seine eigenen mit, die
+  überall gleich runden.
+- **Nichts abkürzen beim Übersetzen.** Auch das Übersetzungsprogramm, das aus dem Programmtext das
+  fertige Programm macht, darf Rechenschritte nicht zusammenfassen oder abkürzen. Sonst rundet es
+  anders, und die letzte Stelle ändert sich.
 - **Startzahl pro Ente.** Der Zufall jeder Ente hängt nur von der Startzahl des Laufs und der Nummer
   der Ente ab.
 
@@ -383,7 +395,8 @@ Darum gilt: **Gleiche Startzahl und gleich viele Enten ergeben dasselbe Netz** �
 Rechenkern, auf 16 oder im Browser. Mehr Rechenkerne machen das Training nur schneller.
 
 Geprüft wird das mit einem **Fingerabdruck**: Eine Ente geht und dreht sich 400 Takte lang, und nach
-jedem Takt wird aus ihrer genauen Lage eine Prüfsumme gebildet. Vergleicht man die Prüfsummen zweier
+jedem Takt wird aus ihrer genauen Lage eine **Prüfsumme** gebildet, eine Art Quersumme, die sich
+schon bei der kleinsten Abweichung ändert. Vergleicht man die Prüfsummen zweier
 Rechner, sieht man sofort, ob und ab welchem Takt sie auseinanderlaufen. Automatische Prüfungen
 vergleichen das auf drei Arten von Systemen, darunter im Browser.
 
@@ -398,21 +411,31 @@ Netze; die Spielschicht gibt ihnen Laufbefehle und startet Kick oder Aufheben. S
 Üben. Jede Szene ist anders: mal ein Ball, mal eine Socke, mal beides, mal direkt vor der Ente, mal
 außer Sicht, dazu Variation und eine Kamera, die manchmal danebenliegt oder kurz nichts erkennt.
 Punkte gibt es vor allem für einen weggekickten Ball und eine weggetragene und ausgespuckte Socke.
+Die Punkte darf der Lehrer aus der Wahrheit berechnen, etwa wie nah die Ente dem echten Ziel
+gekommen ist, denn die Punkte gibt es nur beim Lernen. Das handelnde Netz selbst sieht die Wahrheit
+nie. Gelingt der Kick oder ist die Socke abgelegt, endet die Übung wie bei einem Zeitablauf, nicht
+wie bei einem Sturz (14.5): Erfolg ist kein Scheitern.
 
 **Das Vorbild darf nicht mehr wissen als das Netz.** Das ist hier das wichtigste Prinzip. Das Vorbild
-sieht genau dieselben 23 Werte wie das Netz, keine wahren Positionen von Ball und Socke. Wüsste es
+sieht genau dieselben Beobachtungen wie das Netz (13.11), keine wahren Positionen von Ball und Socke. Wüsste es
 mehr, könnte das Netz es nie nachmachen – es würde Antworten lernen, für die ihm die Gründe fehlen.
 Vereinfacht macht das Vorbild Folgendes: Sieht es nichts, dreht es sich. Sonst geht es zum näheren
 Ziel, kommt langsam heran, bleibt stehen und kickt oder hebt auf. Steht es falsch, geht es ein Stück
 zurück und versucht es neu.
+
+Warum so umständlich? Pollens Gang kann man nur anhalten, nicht millimeterweise setzen, und aus dem
+Stand braucht er einen kräftigen Anstoß. Darum kommt das Vorbild langsam auf einer Linie heran und
+sagt rechtzeitig „Stopp“. Wie weit die Ente nach „Stopp“ noch weitergeht, muss es dafür wissen.
 
 **Messen statt Zahlen eintragen.** Wo muss die Socke liegen, damit der Schnabel sie gut greift?
 Statt eine Zahl ins Programm zu schreiben, probiert es der Lehrer aus: Er legt die Socke an viele
 Stellen eines Gitters vor eine stehende Ente, lässt sie aufheben und prüft, ob die Socke nach 3
 Sekunden Tragen noch im Schnabel ist. Gewählt wird eine Stelle, um die herum auch viele andere
 halten, denn das Hingehen ist nie millimetergenau. Ändert sich die Physik, misst er einfach neu.
+Genauso misst er, wie weit die Ente nach „Stopp“ noch läuft.
 
-Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8. Ergebnisse:
+Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8, nicht die letzte
+(warum das oft so ist, steht in [Kapitel 15](15-eigene-modelle.md), 15.4). Ergebnisse:
 
 | | sauberer Roboter | volle Variation |
 |---|---|---|
@@ -422,8 +445,9 @@ Das aktuelle Spielnetz entstand aus 12 Runden Nachahmen; die beste war Runde 8. 
 | Stürze | 2 von 32 | 10 von 32 |
 
 Der **Ball ist gelernt**: Das Netz stellt den linken Fuß hinter den Ball und startet Pollens Kick;
-passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt zu, aber der Biss hält in
-der Simulation selten: Von 14 Bissversuchen auf dem sauberen Roboter hielten nur 2 bis zum Schluss.
+passt es nicht, setzt es neu an. Die Socke steuert es genauso an und beißt zu. Mit Variation hebt
+die Ente die Socke sogar öfter auf, hält sie aber trotzdem fast nie bis zum Ende. Denn der Biss hält
+in der Simulation selten: Von 14 Bissversuchen auf dem sauberen Roboter hielten nur 2 bis zum Schluss.
 Der Engpass ist also der **Griff in dieser Physik**, nicht die Entscheidung. Als Nächstes kommen eine
 Socke, die sich wie Stoff in den Schnabel legt, und das Üben nach Punkten.
 
@@ -432,7 +456,7 @@ Socke, die sich wie Stoff in den Schnabel legt, und das Üben nach Punkten.
 
 ## 14.9 Ergebnisse des Sprungs
 
-Das fertige Sprung-Netz entstand mit 32 Enten, Startzahl 1 und 3000 Übungsrunden. Geprüft wurde es
+Das fertige Sprung-Netz entstand mit 32 Enten und 3000 Übungsrunden. Geprüft wurde es
 in je 40 Episoden:
 
 | | sauberer Roboter | volle Variation |
@@ -450,7 +474,8 @@ und lief die Ente weiter. (Die 9 mm stammen aus dieser Studio-Messung, die 11,6 
 der Prüfung im Lehrer.)
 
 **Rechner gegen Browser.** Weil das Training überall gleich rechnet, lernt der Browser **dasselbe
-Netz**, nur langsamer, etwa 4- bis 5-mal. Auf dem Testrechner mit 2 Rechenkernen kam der erste echte
+Netz**, nur langsamer, etwa 4- bis 5-mal, weil der Browser manche Beschleuniger des Prozessors
+nicht nutzen kann. Auf dem Testrechner mit 2 Rechenkernen kam der erste echte
 Sprung im Browser nach knapp 9 Minuten, das Nachahmen war nach etwa 11 Minuten fertig. Das
 anschließende Üben dauert deutlich länger. Auf deinem Gerät kann es schneller oder langsamer gehen.
 

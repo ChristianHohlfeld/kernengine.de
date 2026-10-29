@@ -14,6 +14,8 @@
 > - **Lizenz** – die Spielregeln, was man mit einem Werk tun darf
 > - **Shader** – ein kleines Programm, das auf der Grafikkarte läuft und jedes Pixel einfärbt
 > - **Trigger** – eine unsichtbare Zone, die etwas auslöst, wenn jemand hineinläuft
+>
+> Eine **HTML-Datei** ist das Dateiformat von Webseiten; jeder Browser öffnet sie.
 
 | Weg | Was du brauchst | Was herauskommt |
 |---|---|---|
@@ -45,11 +47,16 @@ Settings** den **Level name** und den **Game title** „Orb Garden“ ein.
 
 ### Schritt 2: Die Spielfigur
 
+Kurz zur Orientierung im Studio: Der **Viewport** ist das große Bild der Welt in der Mitte. Der
+**Content Drawer** ist die Bauteil-Schublade unten. Der **Outliner** ist die Liste aller Dinge im
+Level, und **Details** zeigt die Einstellungen des Dings, das du gerade ausgewählt hast. Ein
+beschriftetes Bild des Studios findest du in [Kapitel 11](11-studio.md).
+
 Öffne den Content Drawer (**Ctrl+Space**) und zieh aus **Players** einen **Character** in den Viewport.
-Das Log meldet „Character is the player now“, und im Outliner trägt er das Abzeichen **PLAYER**. In
-**Details › Player Controller** stellst du Tempo (**Max speed**), Beschleunigung (**Acceleration**),
-Sprungkraft (**Jump speed**) und die Kamera ein: von hinten (**Chase**), aus den Augen der Figur
-(**First person**) oder von oben (**Top down**).
+Das Log meldet „Character is the player now“, und im Outliner trägt er das Abzeichen **PLAYER**: Diese
+Figur ist jetzt der Spieler. In **Details › Player Controller** stellst du ein, wie sie sich anfühlt:
+Tempo, Beschleunigung, Sprungkraft und die Kamera, die von hinten, aus den Augen der Figur oder von oben
+schauen kann.
 
 > **Probier's aus!** Drück sofort **Play** (Alt+P). W A S D läuft, die Maus schaut, die Leertaste
 > springt, **Esc** bringt dich zurück. Tausch zum Spaß den Character gegen einen **Rolling Ball** oder
@@ -58,23 +65,27 @@ Sprungkraft (**Jump speed**) und die Kamera ein: von hinten (**Chase**), aus den
 
 ### Schritt 3: Hindernisse und Physik
 
-1. Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** setzen. Mit **W**, **E**, **R** und
-   dem Gizmo zurechtrücken; das 0,5-m-Raster hält die Kanten sauber, **End** setzt auf den Boden.
+1. Aus **Shapes** ein paar **Cube**, eine **Ramp** und eine **Plane** setzen und mit dem **Gizmo**
+   zurechtrücken. Das Gizmo sind die bunten Anfasser-Pfeile am ausgewählten Ding: Daran ziehst du, um
+   es zu verschieben, zu drehen oder größer zu machen.
 2. Aus **Physics** einen **Crate Stack** und eine **Hinged Door**: Die reagieren auf deine Figur.
 3. Aus **Gameplay** eine **Moving Platform** und einen **Spinner**, die sich von selbst bewegen.
-4. Mit **Simulate** (Alt+S) prüfen. Du kannst Körper greifen und werfen, und **K** übernimmt die
-   simulierte Lage, etwa für einen Kistenstapel, der natürlich eingestürzt aussehen soll.
+4. Mit **Simulate** (Alt+S) prüfen. Du kannst Körper greifen und werfen.
 
 Ein **Cube** aus Shapes ist ein festes Hindernis: Man stößt dagegen, aber er bewegt sich nicht. Soll er
-fallen, gib ihm in Details mit **+ Add › Rigid Body** und **Mobility = Dynamic** Physik, oder nimm
-gleich eine **Physics Cube** ([Kapitel 6](06-physik.md)).
+fallen, musst du ihm Physik geben: in Details mit **+ Add › Rigid Body** und **Mobility = Dynamic**,
+oder du nimmst gleich eine **Physics Cube** ([Kapitel 6](06-physik.md)).
+
+> **Für Neugierige:** Nach Simulate übernimmt **K** die simulierte Lage ins Level, etwa für einen
+> Kistenstapel, der natürlich eingestürzt aussehen soll.
 
 ### Schritt 4: Etwas zum Einsammeln
 
 1. Aus **Gameplay** mehrere **Orb** (1 Punkt) und einen **Star** (10 Punkte) verteilen. Trick: **Alt +
    Gizmo ziehen** zieht bei jedem Zug eine Kopie heraus.
 2. Alle Orbs auswählen und mit dem Ordner-Knopf im Outliner in einen Ordner legen.
-3. In **World Settings › Win condition** **Collect all pickups** wählen.
+3. In **World Settings › Win condition** **Collect all pickups** wählen. **Pickups** heißt alles zum
+   Einsammeln, hier also Orbs und Stern.
 
 ### Schritt 5: Gefahr, Checkpoint und Zeitlimit
 
@@ -82,7 +93,8 @@ gleich eine **Physics Cube** ([Kapitel 6](06-physik.md)).
    da hilft auch kein Checkpoint.
 2. Einen **Checkpoint** setzen. Hier startet die Figur neu, wenn sie zu tief fällt. Wie tief „zu tief“
    ist, legt **Kill Z** in World Settings fest: eine Höhe, unter der das Spiel die Figur zurückholt.
-3. Wer mag, setzt in World Settings ein **Time limit**: Das HUD zählt herunter.
+3. Wer mag, setzt in World Settings ein **Time limit**: Das **HUD** (die Anzeige am Bildschirmrand mit
+   Punkten und Zeit) zählt herunter.
 
 > **Achtung, Falle!** Statt eines Hazards gibt es auch eine **Damage Zone**, die Gesundheit kostet.
 > Sie wirkt aber nur auf Figuren, die überhaupt Gesundheit haben. Der Character hat von Haus aus
@@ -115,8 +127,8 @@ Ampel: OK, Warnung oder Fehler. Das ist wichtig, denn ein Graph mit Fehlern wird
 abgeschaltet. Das Spiel läuft dann zwar weiter, aber deine Zone gibt keine Punkte, und du wunderst
 dich. Erst prüfen, dann spielen.
 
-Weitere Vorlagen: eine Tür, die auf **Interact** (Taste F) aufgeht, ein Spawner, eine Ampel und ein
-Verhalten für die Micro Duck.
+Weitere Vorlagen: eine Tür, die auf **Interact** (Taste F) aufgeht, ein Spawner (ein Erzeuger, der
+Dinge auftauchen lässt), eine Ampel und ein Verhalten für die Micro Duck.
 
 ### Schritt 7: Ton
 
@@ -127,13 +139,15 @@ und in den Viewport ziehen. Figuren, Pickups und Trigger bringen ihre Geräusche
 
 ### Schritt 8: Testen
 
-**Play** und spielen! **F8** lässt die Figur los, die Welt läuft weiter, du schaust dich um; noch einmal
-F8 übernimmt sie. Mit **Play › Number of Players › 2 Players** testest du zu zweit. Fehler im Level
-(etwa ein Gelenk, das auf einen gelöschten Actor zeigt) verhindern Play und stehen im **Output Log**.
+**Play** und spielen! Mit **F8** steuerst du die Figur nicht mehr, sondern schaust mit einer freien
+Kamera zu, während das Spiel weiterläuft; noch einmal F8, und du steuerst wieder. Mit **Play › Number
+of Players › 2 Players** testest du zu zweit. Findet Studio einen Fehler im Level, startet Play nicht,
+und der Grund steht im **Output Log**, dem Protokoll unten im Content Drawer.
 
 ### Schritt 9: Speichern
 
-**Ctrl+S** speichert eine `.klevel`-Datei. Sie enthält alles, auch Texturen und importierte Sounds. Du
+**Ctrl+S** speichert eine `.klevel`-Datei. Sie enthält alles, auch Texturen (die Oberflächenbilder) und
+importierte Sounds. Du
 kannst sie weitergeben und in jedem Studio öffnen (Ctrl+O oder auf die Seite ziehen). Ungespeicherte
 Arbeit sichert Studio zusätzlich im Browser und bietet sie beim nächsten Start an.
 
@@ -141,12 +155,15 @@ Arbeit sichert Studio zusätzlich im Browser und bietet sie beim nächsten Start
 
 **File › Package Game (HTML)...**, Titel prüfen, **Package**. Studio lädt `Orb_Garden.html` herunter
 und bietet **Play it** an. Diese eine Datei enthält Engine, Level und Spiel. Sie läuft ohne Internet,
-direkt von der Festplatte, von jeder Homepage und am Telefon mit Touch-Sticks.
+direkt von der Festplatte, von jeder Homepage und am Telefon mit Touch-Sticks. Eine Ausnahme gibt es:
+Die Bewegungen der Micro Duck außer dem Laufen sind eigene Dateien, die das Spiel nachlädt (12.6 und
+[Kapitel 13](13-micro-duck.md)).
 
-> **Probier's aus!** Bring `Orb_Garden.html` aufs Telefon: Am zuverlässigsten lädst du sie auf deine
-> Homepage und öffnest die Adresse im Browser des Telefons. Du kannst sie dir auch schicken und mit dem
-> Browser des Telefons öffnen. Die Engine erkennt den Touchscreen und zeichnet Sticks und Knöpfe von
-> selbst. Du hast gerade ein Handyspiel gebaut!
+> **Probier's aus!** Spiel `Orb_Garden.html` zuerst am Computer: Doppelklick, und sie öffnet sich im
+> Browser. Wer eine eigene Homepage hat, lädt die Datei dort hoch und öffnet die Adresse im Browser des
+> Telefons. Dann erkennt die Engine den Touchscreen und zeichnet Sticks und Knöpfe von selbst. Du hast
+> gerade ein Handyspiel gebaut! (Eine Datei per Messenger aufs Telefon zu schicken klappt nicht auf
+> jedem Telefon, weil manche sie nicht im Browser öffnen.)
 
 ![Dasselbe Spiel auf dem Telefon: die Engine erkennt Touch und zeichnet Sticks und Knöpfe](../buch/bilder/game-phone.png)
 
@@ -193,15 +210,14 @@ jedem Bild die Kamera um ein festes Stück drehen, drehte sie sich auf dem schne
 so schnell. Das wäre unfair und verwirrend.
 
 Die Lösung: Die Engine verrät dem Spiel in jedem Frame, **wie viel Zeit seit dem letzten Bild
-vergangen** ist. Programmierer nennen das **dt** (für „Delta Zeit“). Das Spiel rechnet: Strecke =
-Tempo mal vergangene Zeit.
+vergangen** ist. Das Spiel rechnet: Strecke = Tempo mal vergangene Zeit.
 
-Ein Beispiel: Die Kamera soll sich 1,5 Einheiten pro Sekunde drehen.
+Ein Beispiel: Die Kamera soll sich 90 Grad pro Sekunde drehen.
 
 | Bildschirm | Zeit pro Bild | Drehung pro Bild | Drehung pro Sekunde |
 |---|---|---|---|
-| 60 Bilder/s | 1/60 s | 0,025 | 60 · 0,025 = 1,5 |
-| 120 Bilder/s | 1/120 s | 0,0125 | 120 · 0,0125 = 1,5 |
+| 60 Bilder/s | 1/60 s | 1,5 Grad | 60 · 1,5 = 90 Grad |
+| 120 Bilder/s | 1/120 s | 0,75 Grad | 120 · 0,75 = 90 Grad |
 
 Mehr Bilder, aber kleinere Schritte, und pro Sekunde kommt genau dasselbe heraus. Damit nach einer
 Pause (etwa wenn du kurz einen anderen Tab offen hattest) nicht ein riesiger Sprung entsteht, zählt
@@ -251,9 +267,13 @@ Telefon lenkt die linke Bildschirmhälfte, die rechte boostet.
 Was man daran lernen kann:
 
 - **Eine Stadt aus dem Zufall.** Jeder Block bekommt per Zufall eine von vier Bebauungen, zur Mitte hin
-  werden die Häuser höher. Der Zufall kommt aus einer Startzahl: Gleiche Startzahl, gleiche Stadt.
-  Enter wählt eine neue Startzahl und damit eine neue Stadt. Bäume und Verkehr sind gestempelt
-  (Instancing).
+  werden die Häuser höher. Der Zufall im Computer ist ein Rechenverfahren, das aus einer Startzahl
+  eine lange, bunt gemischte Zahlenreihe macht, wie ein Kartenstapel, der bei gleicher Startzahl immer
+  gleich gemischt wird. Gleiche Startzahl, gleiche Stadt. Enter wählt eine neue Startzahl und damit
+  eine neue Stadt. Bäume und Verkehr sind gestempelt (Instancing).
+- **Große Arbeit in Häppchen.** Der Gebäudebauer kann seine Arbeit über mehrere Bilder verteilen, ein
+  Stück pro Bild, damit das Spiel beim Bauen nicht stockt. orbrun baut seine Stadt beim Start trotzdem
+  in einem Rutsch.
 - **Zusammenstöße ohne Physik-Engine.** Das Auto ist für die Rechnung ein Kreis, jedes Haus ein
   Vieleck. Steckt der Kreis in einer Wand, schiebt das Spiel ihn hinaus und lässt ihn abprallen. Für
   ein Rennspiel reicht das völlig.
@@ -263,19 +283,26 @@ Was man daran lernen kann:
   Teilschritte von höchstens 60 cm und prüft jeden davon.
 - **Verkehr mit Rücksicht.** Die anderen Autos halten an, wenn du vor ihnen stehst, und wer am
   Stadtrand hinausfährt, taucht auf der anderen Seite wieder auf.
+- **Spielgefühl statt echter Physik.** Das Auto rutscht in Kurven kurz und fängt sich, Lenken wirkt erst
+  mit Tempo, und die Kamera weicht mit dem Tempo zurück. Das ist keine genaue Physik, sondern so
+  gemacht, dass es sich gut anfühlt.
 - **Tag und Nacht.** Sonne, Mond, Himmel und Nebel werden mit der Tageszeit gemischt. Nachts leuchten
-  Scheinwerfer und Orbs stärker. Weil die Grafik nur sechs Punktlichter gleichzeitig kann, wählt das
-  Spiel in jedem Bild die sechs wichtigsten aus.
+  Scheinwerfer und Orbs stärker. Jedes davon ist ein **Punktlicht**, eine Lampe, die wie eine
+  Glühbirne in alle Richtungen strahlt. Das Einfärbe-Programm, das Kern für alle Dinge benutzt (der
+  Standard-Shader), rechnet mit höchstens sechs Punktlichtern gleichzeitig. Darum wählt das Spiel in
+  jedem Bild die sechs wichtigsten aus.
 
 Das Glanzstück ist eine **Shader-Erweiterung**, die nachts Fenster leuchten lässt. Der Gebäudebauer
 gibt jeder Wand ein paar Zusatzinformationen mit: wie lang und hoch sie ist, wie hoch ein Stockwerk
 ist, und eine Zufallszahl. Das kleine Programm auf der Grafikkarte macht daraus beim Einfärben ein
 Raster aus Fenstern, von denen nachts zufällig manche hell sind. Das Besondere: Das Spiel hat dem
-Standard-Shader damit einen eigenen Look hinzugefügt, **ohne die Engine selbst zu ändern**. Und in der
-Ferne verschwimmt das Fensterraster zu einem sanften Schimmer, damit nichts flimmert. Wie solche
+Standard-Shader damit einen eigenen Look hinzugefügt, **ohne die Engine selbst zu ändern**. In der
+Ferne werden die Fenster kleiner als ein Bildschirmpunkt. Dann würde das Raster flackern wie ein feines
+Karomuster im Fernsehen, darum verschwimmt es dort zu einem sanften Schimmer. Wie solche
 Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 
-> **Probier's aus!** Öffne Orb Run im Studio und zieh in World Settings an **Time of day**. Auch hier
+> **Probier's aus!** Öffne im Studio **File › Example Levels › Orb Run** und zieh in World Settings an
+> **Time of day**. Auch hier
 > gehen nachts die Fenster an. Dieselbe Idee, nur im Studio-Level.
 
 > **Für Neugierige:** Die Zusatzwerte der Wand reisen „flach“ über die ganze Wand, also unverändert
@@ -286,19 +313,21 @@ Erweiterungen funktionieren, steht in [Kapitel 4](04-grafik.md).
 
 ## 12.3 Der Browser-Helfer
 
-Ein C++-Spiel will sich nicht um Browser-Kleinkram kümmern. Das übernimmt eine kleine Helferdatei, die
-Kern mitliefert. Sie startet das Spiel und kümmert sich um:
+Ein C++-Spiel will sich nicht um Browser-Kleinkram kümmern. Das übernehmen zwei kleine Helferdateien,
+die Kern mitliefert und die immer zusammen nebeneinanderliegen: Die eine startet das Spiel und kümmert
+sich um den Browser, die andere verbindet sie mit dem Modul. Zusammen kümmern sie sich um:
 
 - **Größe:** Die Zeichenfläche passt sich immer dem Fenster an, in voller Bildschirmschärfe.
 - **Tastatur:** Tasten zählen nach ihrer **Position**, nicht nach ihrer Beschriftung. W A S D liegt also
   auch auf einer französischen Tastatur richtig. Pfeile und Leertaste scrollen die Seite nicht mehr.
-- **Maus und Touch:** Position, Tasten, Rad und Finger; kein Kontextmenü auf dem Spiel.
-- **Fokus:** Wechselst du kurz in ein anderes Fenster, lässt die Engine alle Tasten los. Sonst würde die
-  Figur nach Alt+Tab ewig weiterlaufen, weil das Spiel das Loslassen nie mitbekommen hat.
+- **Maus und Touch:** Position, Tasten, Rad und Finger; ein Rechtsklick öffnet auf dem Spiel kein
+  Menü des Browsers.
+- **Fokus:** Wechselst du kurz in ein anderes Fenster (etwa mit Alt+Tab), lässt die Engine alle Tasten
+  los. Sonst würde die Figur ewig weiterlaufen, weil das Spiel das Loslassen nie mitbekommen hat.
 - **Maus fangen:** Auf Wunsch des Spiels verschwindet der Mauszeiger, und die Maus steuert nur noch den
   Blick.
 - **Grafikkarte kurz weg:** Verliert der Browser einmal kurz den Zugriff auf die Grafikkarte, pausiert
-  der Renderer und lädt danach alles aus seinen Kopien neu.
+  der Zeichenteil der Engine und lädt danach alles aus seinen Kopien neu.
 
 Die genauen Namen und Optionen stehen im blauen Buch, Kapitel 12.
 
@@ -309,7 +338,8 @@ Die genauen Namen und Optionen stehen im blauen Buch, Kapitel 12.
 Weg C ist für Leute, die schon eine eigene Webseite oder ein JavaScript-Spiel haben und Kern als
 Baustein darin nutzen wollen. Es gibt zwei fertige Anschlüsse:
 
-**Nur die Grafik von Kern nutzen.** Die Spiellogik bleibt in JavaScript, Kern malt. So arbeitet zum
+**Nur die Grafik von Kern nutzen.** Die Spiellogik, also die Regeln und Abläufe des Spiels, bleibt in
+JavaScript, und Kern malt. So arbeitet zum
 Beispiel das Drohnenspiel SpawnCity.
 
 **Ein Studio-Level in die eigene Seite einbauen.** Deine Seite lädt ein Level aus Studio und spielt es,
@@ -329,10 +359,10 @@ selbst schreibst). Solche Befehle mischen sich mit Tastatur, Touch und Gamepad. 
 Springen gibt es zum Beispiel Boost, Feuer, Ducken und Umschauen.
 
 **Logik-Graphen als C++.** Im Logik-Editor lädt der Knopf **C++** deinen Graphen als lesbaren
-Programmtext herunter. Ein Programmierer kann ihn fest in Kern einbauen. Dann läuft der Graph als
-schnellster übersetzter Code. Wichtig: Ob dein Graph so läuft, im Browser übersetzt wird oder Schritt
-für Schritt abgearbeitet wird, das Ergebnis ist immer genau dasselbe, nur die Geschwindigkeit
-unterscheidet sich ([Kapitel 9](09-logik.md)).
+Programmtext herunter. Ein Programmierer kann ihn fest in Kern einbauen, dann läuft er am schnellsten.
+Dein Graph kann also auf drei Arten laufen, die sich nur im Tempo unterscheiden, nie im Ergebnis. Das
+ist wie ein Text, den man Wort für Wort vorliest, als vorab übersetzte Fassung oder als fest gedrucktes
+Buch hat: Der Inhalt ist derselbe ([Kapitel 9](09-logik.md)).
 
 Alle Befehle und Namen stehen im blauen Buch, Kapitel 12, und in [Kapitel 17](17-referenz.md).
 
@@ -341,7 +371,7 @@ Alle Befehle und Namen stehen im blauen Buch, Kapitel 12, und in [Kapitel 17](17
 ## 12.5 Hosten: Warum C++-Spiele einen Webserver brauchen
 
 Ein selbst geschriebenes C++-Spiel besteht aus ein paar Dateien: der Webseite, dem Modul und den
-beiden Helferdateien von Kern. Beim Start lädt die Webseite das Modul **nach**. Und genau das erlauben
+beiden Helferdateien von Kern aus 12.3. Beim Start lädt die Webseite das Modul **nach**. Und genau das erlauben
 Browser einer Seite, die du einfach von der Festplatte öffnest, aus Sicherheitsgründen nicht: Sonst
 könnte jede heruntergeladene Datei in deinen anderen Dateien stöbern. Darum braucht ein C++-Spiel
 einen **Webserver**, also ein Programm, das die Dateien so ausliefert, wie es eine echte Internetseite
@@ -358,15 +388,17 @@ wo liegen muss, steht im blauen Buch, Kapitel 12.
 ### Die Rechte
 
 Kern ist **Open Source**: Der Programmtext ist offen, und jeder darf ihn nach den Regeln seiner Lizenz
-benutzen. Kerns Lizenz heißt **Apache License 2.0** und ist großzügig. Deine Spiele und Netze darfst du
-benutzen, weitergeben und **verkaufen**, auch ohne deinen eigenen Programmtext offenzulegen. Weil dein
+benutzen. Kerns Lizenz heißt **Apache License 2.0** und ist großzügig. Deine Spiele und deine Netze
+(trainierte neuronale Netze, die zum Beispiel Bewegungen steuern, mehr in
+[Kapitel 13](13-micro-duck.md)) darfst du benutzen, weitergeben und **verkaufen**, auch ohne deinen eigenen Programmtext offenzulegen. Weil dein
 exportiertes Spiel die Engine enthält, legst du beim Weitergeben den Lizenztext und die
 Hinweisdatei (NOTICE, eine kurze Liste, wer woran mitgewirkt hat) bei. Im exportierten Spiel genügt
 ein Hinweis mit Link. Die Namen „Kern“ und „Kern Studio“ und das Logo gehören nicht zur Lizenz: „Made
 with Kern“ darfst du schreiben, dein eigenes Produkt „Kern“ nennen nicht. Teile von anderen behalten
 ihre eigenen Lizenzen ([Anhang D](D-lizenzen.md)).
 
-> **Achtung, Falle!** Die **Micro Duck** ist eine Ausnahme. Das Studio und jedes exportierte Spiel
+> **Achtung, Falle!** Die **Micro Duck** ist eine Ausnahme. Sie ist ein kleiner Laufroboter von
+> Pollen Robotics, einer Firma, die den echten Roboter baut. Das Studio und jedes exportierte Spiel
 > enthalten Pollens 3D-Modelle der Ente, und die dürfen nur **nicht kommerziell** genutzt werden. Wer
 > verkaufen will, braucht eine Fassung ohne diese Modelle; die baut ein Programmierer mit einem
 > eigenen Schalter (blaues Buch, Kapitel 12). Dann fehlt das Aussehen, und die Ente ist unsichtbar.
@@ -377,12 +409,15 @@ ihre eigenen Lizenzen ([Anhang D](D-lizenzen.md)).
 Die HTML-Datei lädst du auf deine Homepage oder verschickst sie einfach. Sie läuft ohne Internet, im
 Vollbild, mit Tastatur, Maus, Gamepad und Touch.
 
-- **Mit Micro Duck:** Die nachladbaren Netze der Ente stecken nicht in der Datei. Leg die beiden
-  Netzordner von Kern (microduck und policies) neben die HTML-Datei, sonst kann die Ente nur laufen.
+- **Mit Micro Duck:** Das ist die Ausnahme aus Schritt 10. Die Bewegungen der Ente sind eigene
+  Dateien, die das Spiel erst nachlädt; nur das Laufen steckt in der HTML-Datei. Leg darum die beiden
+  Ordner mit diesen Dateien, die Kern mitliefert (microduck und policies), neben die HTML-Datei, sonst
+  kann die Ente nur laufen.
   Zu Pollens Ordner gehören seine Lizenz und NOTICE. Warum die Netze nachgeladen werden, erklärt
   [Kapitel 13](13-micro-duck.md).
-- **Online spielen:** Wie mehrere Leute über das Internet gemeinsam spielen, steht in
-  [Kapitel 10](10-netzwerk.md).
+- **Online spielen:** Einer eröffnet das Spiel, die anderen treten bei. Ohne Hilfe finden sich so nur
+  Tabs im selben Browser. Für Spieler an verschiedenen Rechnern braucht es einen Vermittler im Netz,
+  ein kleines Programm auf einem Server, über das alle verbunden sind ([Kapitel 10](10-netzwerk.md)).
 
 ### C++-Spiele
 
@@ -433,7 +468,8 @@ einmal geklickt oder getippt hast.
 ### Lösungen
 
 1. Empty hat keinen Boden; die Figur würde ins Bodenlose fallen.
-2. Physik: ein **Rigid Body** mit **Mobility = Dynamic** (oder gleich eine **Physics Cube** nehmen).
+2. Physik. Ein Würfel aus Shapes ist ein festes Hindernis; erst mit Physik kann er fallen (oder du
+   nimmst gleich eine **Physics Cube**).
 3. Keine, beide gleich weit. Lenas Spiel dreht pro Bild nur halb so weit, macht aber doppelt so viele
    Bilder, denn das Spiel rechnet mit der vergangenen Zeit.
 4. Das C++-Spiel lädt sein Modul nach, und das erlauben Browser einer Seite von der Festplatte nicht;
