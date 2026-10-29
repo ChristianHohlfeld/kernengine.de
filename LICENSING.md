@@ -19,8 +19,10 @@ Die Software kommt ohne Gewährleistung (Abschnitte 7 und 8 der Lizenz).
 
 ### 2. Was nicht unter Apache 2.0 steht
 
-- **Das Buch** „Kern – Das Buch" / „Kern – The Book" (`kern/docs/buch`, `kern/docs/book`, mit
-  seinen Bildern und Umschlägen): alle Rechte vorbehalten, auch das Text- und Data-Mining nach
+- **Die Bücher** „Kern – Das Buch" / „Kern – The Book", „Kern – Einfach erklärt" / „Kern – Simply
+  Explained" und „Kern – Für Entdecker" / „Kern – For Explorers" (`kern/docs/buch`, `kern/docs/book`,
+  `kern/docs/buch-gruen`, `kern/docs/book-green`, `kern/docs/buch-gelb`, `kern/docs/book-yellow`,
+  `kern/docs/abbildungen`, mit ihren Bildern und Umschlägen): alle Rechte vorbehalten, auch das Text- und Data-Mining nach
   § 44b Abs. 3 UrhG. Die Werkzeuge, die das Buch setzen (`kern/tools/buch_*`), stehen unter
   Apache 2.0.
 - **Name und Logo**: „Kern", „Kern Studio", „Kern Lehrer" und das Kern-Logo werden nicht
@@ -54,8 +56,10 @@ das Impressum der Website.
    (the licence governs): anyone may use, change and share Kern free of charge, also commercially
    and in closed products; whoever distributes it includes the licence and [`NOTICE`](NOTICE),
    keeps the copyright notices and marks changed files. No warranty (sections 7 and 8).
-2. **Not under Apache 2.0:** the book "Kern – Das Buch" / "Kern – The Book" (`kern/docs/buch`,
-   `kern/docs/book`, its pictures and covers) – all rights reserved, including text and data mining
+2. **Not under Apache 2.0:** the books "Kern – Das Buch" / "Kern – The Book", "Kern – Einfach
+   erklärt" / "Kern – Simply Explained" and "Kern – Für Entdecker" / "Kern – For Explorers"
+   (`kern/docs/buch`, `kern/docs/book`, `kern/docs/buch-gruen`, `kern/docs/book-green`,
+   `kern/docs/buch-gelb`, `kern/docs/book-yellow`, `kern/docs/abbildungen`, their pictures and covers) – all rights reserved, including text and data mining
    (§ 44b(3) German Copyright Act); the tools that typeset it are Apache 2.0. The names "Kern",
    "Kern Studio", "Kern Lehrer" and the Kern logo are not licensed (section 6 of the licence), see
    [`TRADEMARKS.md`](TRADEMARKS.md). Third-party components keep their own licences, see
