@@ -272,11 +272,15 @@ Studio) und bettet es zusammen mit `kern.mjs`, `game.mjs`, `logic.mjs`, `studio.
 Doppelklick.
 
 Das Studio bearbeitet ein `Level` (Actors mit Komponenten), stellt es mit einer `GameWorld` dar und
-spielt es mit **Play** oder **Simulate** direkt im Viewport. **File → Package Game** schreibt ein
-Spiel als eigenständige HTML-Datei: Engine-Modul (base64), `kern.mjs`, `game.mjs` und das Level.
+spielt es mit **Spielen** (Play) oder **Simulieren** (Simulate) direkt im Viewport. **Datei › Spiel
+verpacken (HTML)...** (File › Package Game (HTML)...) schreibt ein Spiel als eigenständige HTML-Datei: Engine-Modul (base64), `kern.mjs`, `game.mjs` und das Level.
 Das exportierte Spiel startet dasselbe Modul im Player-Modus (`kern_studio_init(w, h, 1)`) und
 spielt das Level mit denselben C++-Klassen wie der Editor ([Kapitel 8](08-spiel-laufzeit.md),
 [Kapitel 11](11-studio.md)).
+
+Studio zeigt seine Oberfläche auf Deutsch oder Englisch. Dieses Buch nennt die Beschriftungen, wie
+Studio sie auf Deutsch zeigt, in Klammern die englischen. Wer Studio auf Englisch nutzt (Knopf
+**DE | EN** unten rechts in der Statusleiste oder `?lang=en`), findet sie dort.
 
 ![Ein exportiertes Spiel](bilder/game.png)
 

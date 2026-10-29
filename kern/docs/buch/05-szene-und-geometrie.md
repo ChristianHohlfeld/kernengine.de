@@ -360,7 +360,7 @@ job.free();
 
 ## 5.12 Die prozedurale Stadt der Spiel-Laufzeit
 
-Die Spiel-Laufzeit hat eine Komponente **Procedural City** (`CityComponent` in `include/kern/game/level.h`). Sie ist der Stadtgenerator von Orb Run als Level-Komponente: Im Studio legt man sie über den Katalogeintrag „Procedural City“ (Gruppe „World“ in `src/studio/catalog.cpp`) in ein Level, und sie erzeugt Gebäude, Straßen, Bodenplatten, Bäume, Kollisionskörper und Verkehr.
+Die Spiel-Laufzeit hat eine Komponente **Prozedurale Stadt** (Procedural City; `CityComponent` in `include/kern/game/level.h`). Sie ist der Stadtgenerator von Orb Run als Level-Komponente: Im Studio legt man sie über den Katalogeintrag **Prozedurale Stadt** (Gruppe **Welt** (World) in `src/studio/catalog.cpp`) in ein Level, und sie erzeugt Gebäude, Straßen, Bodenplatten, Bäume, Kollisionskörper und Verkehr.
 
 ![Ein exportiertes Spiel: die prozedurale Stadt mit Gebäuden, Straßen und Bäumen](bilder/game.png)
 
@@ -412,7 +412,7 @@ Liegt die Stadt im Ursprung ohne Drehung, ist die Instanzmatrix die Einheitsmatr
 
 ### Physik und Verkehr
 
-`plan_bodies` macht aus jeder Stadt einen statischen Box3D-Körper mit einem Quader pro Gebäudeflügel und Bodenplatte (Reibung 0,5); siehe [Kapitel 6](06-physik.md). Der Verkehr (`plan_traffic`, Seed `city.seed ^ 0x7a3f1c9b`) setzt `traffic` Autos auf zufällige Straßenlinien und Fahrtrichtungen, mit 9–15 m/s und einer von fünf Farben. Im Editor stehen sie geparkt; in Play und Simulate sind es kinematische Box3D-Körper, die ihre Spur entlangfahren, am Stadtrand auf die andere Seite springen und anhalten, wenn der Spieler weniger als 10 m vor ihnen auf der Spur steht. Alle Autos sind ein einziges instanziertes Mesh.
+`plan_bodies` macht aus jeder Stadt einen statischen Box3D-Körper mit einem Quader pro Gebäudeflügel und Bodenplatte (Reibung 0,5); siehe [Kapitel 6](06-physik.md). Der Verkehr (`plan_traffic`, Seed `city.seed ^ 0x7a3f1c9b`) setzt `traffic` Autos auf zufällige Straßenlinien und Fahrtrichtungen, mit 9–15 m/s und einer von fünf Farben. Im Editor stehen sie geparkt; beim Spielen und Simulieren sind es kinematische Box3D-Körper, die ihre Spur entlangfahren, am Stadtrand auf die andere Seite springen und anhalten, wenn der Spieler weniger als 10 m vor ihnen auf der Spur steht. Alle Autos sind ein einziges instanziertes Mesh.
 
 `city_street_point(city, rng)` liefert einen zufälligen Punkt auf einer Straßenlinie, etwa zum Verteilen von Orbs.
 
@@ -420,7 +420,7 @@ Liegt die Stadt im Ursprung ohne Drehung, ist die Instanzmatrix die Einheitsmatr
 
 ### `shape_mesh`
 
-Ein Static Mesh im Level (`MeshComponent`) hat eine Form: `box`, `sphere`, `cylinder`, `cone`, `capsule`, `plane`, `torus`, `ramp` oder `mesh`. `shape_mesh(mc)` erzeugt dafür ein Mesh, zentriert auf den Actor-Ursprung, mit weißen Vertexfarben (das Material färbt es). Quader, Ebene und Rampe bekommen UVs in Metern × `tiling`, damit eine Textur auf großen und kleinen Flächen gleich groß erscheint; die runden Formen kommen aus `primitives` mit skalierten UVs, Zylinder und Kegel um die halbe Höhe nach unten verschoben. Die Rampe ist ein Keil, an +X voll hoch, an −X null.
+Ein **Statisches Mesh** (Static Mesh) im Level (`MeshComponent`) hat eine Form: `box`, `sphere`, `cylinder`, `cone`, `capsule`, `plane`, `torus`, `ramp` oder `mesh`. `shape_mesh(mc)` erzeugt dafür ein Mesh, zentriert auf den Actor-Ursprung, mit weißen Vertexfarben (das Material färbt es). Quader, Ebene und Rampe bekommen UVs in Metern × `tiling`, damit eine Textur auf großen und kleinen Flächen gleich groß erscheint; die runden Formen kommen aus `primitives` mit skalierten UVs, Zylinder und Kegel um die halbe Höhe nach unten verschoben. Die Rampe ist ein Keil, an +X voll hoch, an −X null.
 
 Daneben gibt es `shape_bounds`, `shape_hull_points` (Punkte für konvexe Hüllen bei Zylinder, Kegel, Rampe, Torus) und `fit_collider`, das zur Form einen passenden Collider wählt (Box, Kugel, Kapsel, sonst Hülle). Das ist Thema von [Kapitel 6](06-physik.md).
 

@@ -12,7 +12,8 @@ deshalb überall:
 - im Browser über einen **BroadcastChannel** (Tabs auf einem Rechner) oder einen
   **WebSocket-Relay** (verschiedene Rechner),
 - nativ und in Tests über ein **In-Process-Netz** mit Netzwerksimulator,
-- im Studio für „Number of Players“ über dasselbe In-Process-Netz.
+- im Studio für **Spielen › Anzahl der Spieler** (Play › Number of Players) über dasselbe
+  In-Process-Netz.
 
 ---
 
@@ -186,7 +187,7 @@ class Transport {
 ```
 
 - **`LoopbackNetwork`**: ein In-Process-Hub; `create()` liefert Endpunkte mit frischen Adressen, die
-  miteinander reden (Tests, Studios Mehrspieler-Play mit Server und Clients in einem Modul).
+  miteinander reden (Tests, Mehrspieler im Studio mit Server und Clients in einem Modul).
 - **`HostTransport`**: Warteschlangen, die der einbettende Host (die Browser-Seite) füllt und leert
   – `push_incoming(from, data)` für Ankommendes, `take_outgoing(to, data)` für zu Sendendes.
   Die Seite kümmert sich um BroadcastChannel oder Relay (10.10).
@@ -325,7 +326,7 @@ Für jeden Client baut `server_send_snapshots` einen eigenen Snapshot:
 
 ### Die Replika in der GameWorld
 
-- `start_replica(level)` startet das Level wie Play, aber **ohne Logik**, und macht jeden nicht
+- `start_replica(level)` startet das Level wie im Modus `play`, aber **ohne Logik**, und macht jeden nicht
   statischen Body kinematisch: Regeln laufen auf dem Server, die Bodies folgen nur den gesetzten
   Posen. Pawns nutzen keinen Character Mover.
 - `set_replica_pose(id, p, q)` setzt die Pose eines Actors (und seines Bodys).
@@ -336,31 +337,33 @@ Für jeden Client baut `server_send_snapshots` einen eigenen Snapshot:
 ### Level-Prüfsumme
 
 `level_checksum(level)` ist der CRC32 des Leveltexts – **ohne die Editor-Kamera**, die nicht zum
-Spiel gehört. Studios Play-in-Editor nutzt das offene Level, exportierte Spiele das eingebettete.
+Spiel gehört. Studio nutzt beim Spielen im Editor das offene Level, exportierte Spiele das eingebettete.
 
 ---
 
 ## 10.8 Mehrspieler im Studio
 
-![Mehrspieler-Play im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](bilder/studio-multiplayer.png)
+![Mehrspieler beim Spielen im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](bilder/studio-multiplayer.png)
 
-### Number of Players
+### Anzahl der Spieler (Number of Players)
 
-Wie Unreals „Number of Players“ (Menü Play › Number of Players, 1–4): Die Welt des Levels ist ein
+Wie Unreals „Number of Players“ (Menü **Spielen › Anzahl der Spieler** (Play › Number of Players),
+1–4; die Einträge 1 Player bis 4 Players (listen server) übersetzt Studio nicht): Die Welt des Levels ist ein
 **Listen-Server**, jeder weitere Spieler ein Netzwerk-Client mit **eigener GameWorld und eigenem
 Viewport**, verbunden über ein In-Process-Netz (`LoopbackNetwork`).
 
-- `Studio::play` erkennt Mehrspieler (Play und mehr als ein Spieler), legt einen Hub an (Seed 7) und
+- `Studio::play` erkennt Mehrspieler (Modus `play` und mehr als ein Spieler), legt einen Hub an (Seed 7) und
   `NetGame::host` auf der Hauptwelt; `start_local_clients` baut für jeden weiteren Spieler eine
   `GameWorld` auf einem eigenen Render-Layer, einen Hub-Endpunkt und ein `NetGame::join`.
 - Das Layout wechselt von einem auf **vier Viewports**; Client *i* zeigt sich in Viewport *i* + 1
-  mit seiner eigenen Kamera. (Dass Mehrspieler-Play so umschaltet, gilt nicht als
+  mit seiner eigenen Kamera. (Dass das Spielen mit mehreren Spielern so umschaltet, gilt nicht als
   Einstellungsänderung des Nutzers.)
 - **Eingabe:** Nur der aktive Viewport bekommt die Eingabe; die anderen Spieler stehen still.
 - `update_net` taktet Server und Clients. Solange Clients noch beitreten, läuft der Austausch in vier
   Teilschritten pro Frame, damit der Handshake nicht auf gerenderte Frames wartet.
-- **Network Emulation** (Play-Menü): Perfect, LAN (5 ms), Average (50 ms, 1 % Verlust), Bad (150 ms,
-  5 %), Terrible (300 ms, 20 %), dazu jeweils Jitter (1, 10, 40, 100 ms) – der `Simulator` des Hubs
+- **Spielen › Netzwerk-Emulation** (Play › Network Emulation): **Perfekt** (Perfect), LAN (5 ms),
+  Average (50 ms, 1% loss), Bad (150 ms, 5% loss), Terrible (300 ms, 20% loss) – die letzten vier
+  übersetzt Studio nicht –, dazu jeweils Jitter (1, 10, 40, 100 ms) – der `Simulator` des Hubs
   (und des Host-Transports).
 - Die Statuszeile zeigt Rolle, Status, Spieler, RTT, Verlust, Bandbreite und je lokalem Client
   Status, RTT, Puffer und HUD (`status().net`).
@@ -371,26 +374,28 @@ und 2 % Verlust; nach dem Start ist das Layout vierfach, der Server hat drei Paw
 sieht drei Pawns und spielt; mit dem aktiven Viewport 2 läuft der Pawn von Client 2 auf dem Server
 messbar vorwärts; nach Stop gibt es keinen Netzstatus mehr.
 
-### Online: Host und Join
+### Online: hosten und beitreten
 
-Für Spieler in anderen Tabs oder auf anderen Rechnern: Play › **Host Online Game…** bzw. **Join
-Online Game…**. Der Dialog fragt einen **Raum** (Standard „kern“) und optional die Adresse eines
-**Relays** – leer für Tabs dieses Browsers; für andere Rechner `tools/net_relay.mjs` starten und
-seine Adresse eintragen (`ws://host:8790`). Alle brauchen dasselbe Level.
+Für Spieler in anderen Tabs oder auf anderen Rechnern: **Spielen › Online-Spiel hosten...** (Play ›
+Host Online Game...) bzw. **Spielen › Online-Spiel beitreten...** (Play › Join Online Game...). Der
+Dialog fragt im Feld Room (Studio übersetzt es nicht) einen Raum (Standard „kern“) und im Feld
+**Relay (optional)** die Adresse eines Relays – leer für Tabs dieses Browsers; für andere Rechner `tools/net_relay.mjs` starten und
+seine Adresse eintragen (`ws://host:8790`). Alle brauchen dasselbe Level. Der Knopf heißt **Hosten**
+(Host) bzw. **Beitreten** (Join).
 
 Ablauf (`openNetwork` in `web/studio/game.mjs`):
 
 1. Die Seite öffnet `KernNet` (lokal oder Relay) und erfährt ihre eigene Peer-ID und die des Hosts.
 2. `netAddress {self}` gibt dem `HostTransport` der Engine diese Adresse.
-3. `netHost` startet Play als Server über den Host-Transport (`NetGame::host`), `netJoin {server}`
+3. `netHost` startet das Spiel als Server über den Host-Transport (`NetGame::host`), `netJoin {server}`
    tritt als Client bei (`NetGame::join`).
-4. „Leave Online Game“ (`netStop`) beendet die Sitzung.
+4. **Spielen › Online-Spiel verlassen** (Play › Leave Online Game) beendet die Sitzung (`netStop`).
 
 ---
 
 ## 10.9 Exportierte Spiele im Netz
 
-Ein mit File › Package Game exportiertes Spiel ([Kapitel 11](11-studio.md)) liest seine URL:
+Ein mit **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) exportiertes Spiel ([Kapitel 11](11-studio.md)) liest seine URL:
 
 | URL | Wirkung |
 |---|---|
@@ -479,7 +484,7 @@ Clients senden derzeit nichts Zuverlässiges; der Server leert den Kanal nur.
 | `net_game_server_and_clients` | Spiele im Netz |
 | `net_game_soldier_replication` | Soldaten, Schüsse, Treffer über das Netz |
 | `net_game_replicates_logic_changes` | Logik-Änderungen (Spawns, Eigenschaften) erreichen Clients |
-| `studio_multiplayer_play` | Number of Players im Studio |
+| `studio_multiplayer_play` | **Spielen › Anzahl der Spieler** (Play › Number of Players) im Studio |
 
 ---
 

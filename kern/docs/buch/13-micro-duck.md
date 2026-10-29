@@ -209,7 +209,7 @@ const game::ActorId duck = game::add_micro_duck(level, {0, 0, 0});  // Rumpf auf
 
 `add_micro_duck` hängt die Actors an, verdrahtet Eltern und Gelenkziele und stellt die
 Schrittrate der Welt ein. Das Studio fügt die Ente aus dem Katalog genauso ein und meldet die
-geänderten World Settings.
+geänderten **Welteinstellungen** (World Settings).
 
 ## 13.4 Das Servomodell
 
@@ -324,18 +324,19 @@ Kommando-Kodierung, Dauer, Phase und `action_scale`.
 
 | Bewegung | Netz | Art | Kommando | Taste | Pad | Touch |
 |---|---|---|---|---|---|---|
-| Laufen und Stehen | `velstand.onnx` (v8) | dauernd | Twist, Kopf, Körperpose | W A S D | linker Stick | MOVE |
-| Laufen, ältere Gangart | `alpha_walking.onnx` + `alpha_stand.onnx` (unter Twist 0,05) | dauernd | Twist | W A S D | linker Stick | MOVE |
-| Sitzen / Aufstehen | `alpha_sitstand.onnx` | skriptgesteuert | Posture-Flag in vx (1 sitzen, 0 stehen); 2 s Sitzen, 1 s Aufstehen | 1 | B | SIT |
-| Socke aufheben | `alpha_ground_pick.onnx` | episodisch | Phase cos/sin(2π·φ), Periode 4 s, Ende bei φ = 0,7 | 2 | Y | PICK |
-| Kick links / rechts | `ball_kick_left.onnx` / `ball_kick_right.onnx` | episodisch, 0,5 s | null | 3 / 4 | – | KICK L / KICK R |
-| Rolle | `roulade.onnx` | episodisch, 1 s, Kette | null; gehalten rollt sie weiter (Fenster 0,15 s) | 5 (halten) | X | ROLL |
-| Rollschuh fahren | `roller.onnx`, Action-Scale 0,8 | dauernd | Twist | W A S D | linker Stick | MOVE |
-| Ducken auf Rollen | `roller_crouch.onnx`, Action-Scale 0,8 | episodisch | Phase | 2 | Y | PICK |
-| **Sprung** (Kern) | `policies/jump.onnx` | episodisch, 2 s | Phase cos/sin in Plätzen 55/56 | 7 | – | HOP |
-| Schnabel auf / zu | Mund-Servo (kein Netz) | | | 6 | – | BEAK |
+| Laufen und Stehen | `velstand.onnx` (v8) | dauernd | Twist, Kopf, Körperpose | W A S D | linker Stick | **LAUFEN** (MOVE) |
+| Laufen, ältere Gangart | `alpha_walking.onnx` + `alpha_stand.onnx` (unter Twist 0,05) | dauernd | Twist | W A S D | linker Stick | **LAUFEN** |
+| Sitzen / Aufstehen | `alpha_sitstand.onnx` | skriptgesteuert | Posture-Flag in vx (1 sitzen, 0 stehen); 2 s Sitzen, 1 s Aufstehen | 1 | B | **SITZ** (SIT) |
+| Socke aufheben | `alpha_ground_pick.onnx` | episodisch | Phase cos/sin(2π·φ), Periode 4 s, Ende bei φ = 0,7 | 2 | Y | **GREIFEN** (PICK) |
+| Kick links / rechts | `ball_kick_left.onnx` / `ball_kick_right.onnx` | episodisch, 0,5 s | null | 3 / 4 | – | **KICK L** / **KICK R** |
+| Rolle | `roulade.onnx` | episodisch, 1 s, Kette | null; gehalten rollt sie weiter (Fenster 0,15 s) | 5 (halten) | X | **ROLLEN** (ROLL) |
+| Rollschuh fahren | `roller.onnx`, Action-Scale 0,8 | dauernd | Twist | W A S D | linker Stick | **LAUFEN** |
+| Ducken auf Rollen | `roller_crouch.onnx`, Action-Scale 0,8 | episodisch | Phase | 2 | Y | **GREIFEN** |
+| **Sprung** (Kern) | `policies/jump.onnx` | episodisch, 2 s | Phase cos/sin in Plätzen 55/56 | 7 | – | **HÜPFEN** (HOP) |
+| Schnabel auf / zu | Mund-Servo (kein Netz) | | | 6 | – | **SCHNABEL** (BEAK) |
 
-Die Gangart wählt das Feld **Walking network** im Details-Panel (`gait`: `velstand` oder `alpha`).
+Die Gangart wählt das Feld **Laufnetz** (Walking network) im Details-Panel (`gait`: `velstand` oder
+`alpha`).
 
 ### Ablaufsteuerung wie robotd
 
@@ -368,8 +369,10 @@ if (has_previous) t = alpha * t + (1 - alpha) * previous_target[j];             
 - Kern fährt jedes Netz **wie trainiert**: Scale 1, kein Tiefpass. Nur das Action-Scale aus dem
   Manifest gilt (Rollen und Ducken 0,8).
 - Der Daemon fährt den echten Roboter mit Scale 0,9 und einem Tiefpass (Kopf 0,5, Beine 0,7). Das
-  ist Sim-to-Real-Tuning für die Hardware. Im Details-Panel wählt **Actions to servo goals**
-  (`actions`) zwischen `training` (Standard) und `robot` (Daemon-Profil). Gemessen kippen die Kicks
+  ist Sim-to-Real-Tuning für die Hardware. Im Details-Panel wählt **Aktionen zu Servo-Zielen**
+  (Actions to servo goals; `actions`) zwischen **Wie trainiert (Faktor 1, kein Filter)** (As trained
+  (scale 1, no filter); Wert `training`, Standard) und **Wie der Daemon des Roboters (Faktor 0,9,
+  Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7); Wert `robot`). Gemessen kippen die Kicks
   mit 0,9 und Tiefpass um und stehen mit 1,0 ohne Filter; laufen und stehen kann die Ente mit beiden
   (Test `micro_duck_walks_with_the_robot_daemons_action_profile`).
 - Das Ziel bleibt im Verfahrweg des XL330 (±π), nicht im Gelenkbereich: Ein Ziel jenseits der Grenze
@@ -430,7 +433,8 @@ Sturz-Befund und die Geschwindigkeit.
 Bild hochkant, 62° hoch und 37,4° breit. `walker_camera(id, cam)` liefert die Kamera,
 `walker_sees(id, target, visible, bearing, distance)` prüft, ob die Mitte eines Actors im Bild liegt
 und der erste Treffer eines Strahls dorthin der Actor selbst ist. Das Studio zeigt das Kamerabild
-beim Spielen oben rechts im Viewport (Show-Flag **Robot Camera**), daneben das ToF-Gitter.
+beim Spielen oben rechts im Viewport (**Fenster › Anzeigen › Robot Camera** (Window › Show › Robot
+Camera); den Eintrag Robot Camera übersetzt Studio nicht), daneben das ToF-Gitter.
 
 Blickt die Ente nach unten (Nacken −1,1, Kopf 1,1), schaut die Kamera 87° nach unten und sieht 6–15 cm
 vor dem Rumpf (Test `micro_duck_camera_sees_the_floor_in_front_when_looking_down`).
@@ -456,7 +460,7 @@ In jedem Regeltakt entscheidet `drive_walkers`, wessen Kommando gilt, in dieser 
 2. **Logik:** ein Kommando von **Walk** bzw. **Look** (`walker_command`, `walker_look`), für die
    angegebene Dauer oder bis zum nächsten Kommando.
 3. **Autonomie:** das Gehirn (`think_walker`) und darüber die Spielschicht (`play_walker`), wenn das
-   Feld **Autonomous** (`autonomous`) an ist.
+   Feld **Autonomous (camera, ToF)** (`autonomous`; Studio übersetzt es nicht) an ist.
 
 Twist, Kopf und Körperpose werden danach begrenzt und mit EMA geglättet (Twist 0,2, Kopf mit der Rate
 des Absenders). Steht die Ente still (kein Twist, keine Bewegung, aufrecht) und hat seit 2 s niemand
@@ -488,8 +492,9 @@ dann Gemm, ELU, Gemm, Sigmoid).
   leeren das Fenster.
 - Ströme: Kern hat keine Servoströme. Das ausgelieferte Modell liest diese Spalten nicht (der Graph
   verwirft sie per Gather), Kern füllt 0.
-- Im Studio hebt man die Ente in **Simulate** am Rumpf hoch (oder beim Zuschauen mit der Observer
-  camera, wie im Beispiel-Level). Dieser Griff hält den Rumpf in seiner
+- Im Studio hebt man die Ente beim **Simulieren** (Simulate) am Rumpf hoch (oder beim Zuschauen mit
+  der **Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)** (Observer camera (Play: fly,
+  watch, drag bodies)) der Welteinstellungen, wie im Beispiel-Level). Dieser Griff hält den Rumpf in seiner
   Ausrichtung wie eine Hand, statt ihn am Punkt pendeln zu lassen (`MouseGrab::begin` mit
   `hold_rotation`, [Kapitel 6](06-physik.md)).
 
@@ -570,7 +575,7 @@ neuronalen Detektors im Kamerabild. Gekickt wird nur links, weil der rechte Kick
 umkippt (Abschnitt 13.15). Anlauf- und Ausrichtwerte sind Kerns, weil die Werte der Runtime nicht
 lesbar sind.
 
-**Spielschicht statt BallPlay:** Mit Kern extras und geladenem `play.onnx` (`walker_play_available`)
+**Spielschicht statt BallPlay:** Mit Kern-Extras und geladenem `play.onnx` (`walker_play_available`)
 startet das Gehirn kein BallPlay; dann spielt Kerns gelerntes Netz mit Ball und Socke
 (Abschnitt 13.11). Während die Spielschicht eingreift, startet das Gehirn weder Aufheben noch
 Sitzen.
@@ -579,7 +584,7 @@ Sitzen.
 
 Pollens Netze sind die Bewegungen der Ente; keines davon sieht. Was die Ente mit einem Ball oder
 einer Socke tut – hinschauen, hingehen, kicken, aufheben, wegtragen, ausspucken –, entscheidet ein
-eigenes Netz: `policies/play.onnx`. Es ist Kern-eigen (nur mit Kern extras) und übernimmt dann statt
+eigenes Netz: `policies/play.onnx`. Es ist Kern-eigen (nur mit Kern-Extras) und übernimmt dann statt
 BallPlay (Abschnitt 13.10); Kerns früherer handgeschriebener Code für Fetch und Carry ist
 entfernt. Die Spielschicht selbst enthält keine handgeschriebene Spiellogik; um das Netz herum gibt
 es nur Wahrnehmung.
@@ -595,11 +600,12 @@ Schnabel und welche Bewegung sie starten will. Sie ersetzt dann die Kommandos de
 
 Verfügbar ist sie, wenn
 
-- **Kern extras** an ist (`kernExtras`, Details › Controller › „Kern extras (ball play, sock
-  fetching, beak in the pick)“),
+- **Details › Spieler-Steuerung › Läufer › Kern-Extras (Ballspiel, Socke holen, Schnabel beim
+  Greifen)** (Details › Player Controller › Walker › Kern extras (ball play, sock fetching, beak in
+  the pick)) an ist (`kernExtras`),
 - die Ente keine Rollschuhe trägt und einen Mund-Servo hat,
 - `play.onnx` geladen ist (oder der Lehrer sie extern steuert),
-- **Autonomous** an ist: Laufbefehl, Kopf und Schnabel der Spielschicht laufen über den Kanal der
+- **Autonomous (camera, ToF)** an ist (Studio übersetzt das Feld nicht): Laufbefehl, Kopf und Schnabel der Spielschicht laufen über den Kanal der
   Autonomie und wirken nur dann.
 
 **Eingeschaltet** („engaged“) ist sie, solange sie ein Objekt kennt, etwas im Schnabel hat oder eine
@@ -707,7 +713,7 @@ Takten exakt.
 - Eine Bewegung startet nur, wenn keine läuft und der Schnabel leer ist; der Daemon lehnt sonst ab.
   Startet ein Kick, merkt sich der Tracker den Ball 15 s lang nicht.
 - Während eines Aufhebens gehört der Schnabel dem Netz: Es hat gelernt, wann es öffnet und beißt.
-  Ohne Spielschicht öffnet Kern extras den Schnabel bei Phase 0,16 und beißt bei 0,24.
+  Ohne Spielschicht öffnet Kern-Extras den Schnabel bei Phase 0,16 und beißt bei 0,24.
 
 ### Socke und Ball
 
@@ -729,7 +735,7 @@ Spielball von 50 g mit Rollwiderstand 0,03 (Gummi auf Holz); ohne Rollwiderstand
 
 Das Micro-Duck-Level (`game::micro_duck_level()`) ist ein Raum von 2,5 × 2,5 m (echt) mit Holzboden
 (Reibung 1, Oberfläche `floor`), Schuhkarton, Bücherstapel, Kiste, Blumentopf, einem Ball und zwei
-Socken. Die Ente ist autonom und hat Kern extras an. Ein Level-Blueprint zeigt die Robots-Knoten:
+Socken. Die Ente ist autonom und hat Kern-Extras an. Ein Level-Blueprint zeigt die Robots-Knoten:
 Er lässt die Ente einmal zwitschern (Knoten **Chirp**), wenn der Ball ins Kamerabild kommt. Das ist eine Vorführung des
 Blueprints, nicht Verhalten der Ente.
 
@@ -751,26 +757,28 @@ hingehen, stehen, aufheben, zubeißen) prüfen in Studio-Physik, dass nur das Ne
 
 ![Touch-Steuerung am Telefon (hier in Orb Run; bei der Ente erscheinen ihre eigenen Tasten)](bilder/phone-play-390.png)
 
-Im Beispiel-Level startet Play mit der Observer camera: Man schaut zu, und erst **F8** übernimmt die Ente
+Im Beispiel-Level startet **Spielen** (Play) mit der **Beobachterkamera (Spielen: fliegen, zuschauen,
+Körper ziehen)** (Observer camera (Play: fly, watch, drag bodies)) der Welteinstellungen: Man schaut zu, und erst **F8** übernimmt die Ente
 (noch einmal F8 schaut wieder zu). Vorher erreichen die folgenden Eingaben sie nicht.
 
 Die Eingaben landen in `PlayInput::robot`, einem Bitfeld der gehaltenen Robot-Tasten:
 
 | Bit | Bewegung | Tastatur | Gamepad | Touch |
 |---|---|---|---|---|
-| 1 | Sitzen / Aufstehen | 1 | B | SIT |
-| 2 | Aufheben (auf Rollen: Ducken) | 2 | Y | PICK |
-| 4 | Kick links | 3 | – | KICK L |
-| 8 | Kick rechts | 4 | – | KICK R |
-| 16 | Rolle (gehalten: weiter) | 5 | X | ROLL |
-| 32 | Schnabel auf/zu | 6 | – | BEAK |
-| 64 | Quaken (Chirp) | Leertaste | RT | QUACK |
-| 128 | „Wheee“ (gehalten) | V | LT | WHEEE |
-| 256 | **Sprung** (Kern) | **7** | – | **HOP** |
+| 1 | Sitzen / Aufstehen | 1 | B | **SITZ** (SIT) |
+| 2 | Aufheben (auf Rollen: Ducken) | 2 | Y | **GREIFEN** (PICK) |
+| 4 | Kick links | 3 | – | **KICK L** |
+| 8 | Kick rechts | 4 | – | **KICK R** |
+| 16 | Rolle (gehalten: weiter) | 5 | X | **ROLLEN** (ROLL) |
+| 32 | Schnabel auf/zu | 6 | – | **SCHNABEL** (BEAK) |
+| 64 | Quaken (Chirp) | Leertaste | RT | **QUAK** (QUACK) |
+| 128 | „Wheee“ (gehalten) | V | LT | **HUIII** (WHEEE) |
+| 256 | **Sprung** (Kern) | **7** | – | **HÜPFEN** (HOP) |
 
 Laufen: W/S oder linker Stick vorwärts/rückwärts (bis 0,4 m/s), A/D bzw. Stick quer drehen (bis
 1 rad/s). Am Gamepad gilt eine radiale Totzone von 0,10 mit einer Potenzkurve 1,28. Auf dem Telefon
-gibt es den MOVE-Stick und die Tasten oben; QUACK und PICK liegen in der unteren Reihe am Daumen.
+gibt es den Stick **LAUFEN** (MOVE) und die Knöpfe oben; **QUAK** und **GREIFEN** liegen in der
+unteren Reihe am Daumen.
 Jede Robot-Taste und jeder Stickausschlag setzt die Handzeit auf 2 s und pausiert Autonomie und
 Spielschicht.
 
@@ -781,7 +789,7 @@ gehalten, „peck“ beim Hinsetzen. Die Stimme ist eine bitgenaue Portierung vo
 
 ### Der Sprung
 
-Taste **7**, Touch **HOP** oder der Logik-Knoten **Robot Move** mit „jump“ starten Kerns Sprung.
+Taste **7**, Touch **HÜPFEN** (HOP) oder der Logik-Knoten **Robot Move** mit „jump“ starten Kerns Sprung.
 Er läuft wie Pollens Kicks: harter Wechsel auf `jump.onnx`, nach 2 s (`kJumpSeconds`) zurück. Das Netz
 sieht die Phase t / 2 s als cos und sin in den Beobachtungsplätzen 55 und 56 (`kJumpPhaseSlot`), die
 Pollens Netze nie nutzen; der Rest des Kommandos ist 0. Im Studio (Test
@@ -799,14 +807,14 @@ erneut angefragt. Netze, die der Lehrer im Browser auf demselben Gerät gespeich
 „kern-lehrer“), lädt das Studio ebenfalls, und offene Studio-Tabs übernehmen ein neues sofort
 (BroadcastChannel „kern-lehrer“).
 
-### Details-Panel (Walker)
+### Details-Panel (Gruppe **Läufer** (Walker) unter **Spieler-Steuerung** (Player Controller))
 
 | Feld | JSON-Schlüssel | Bedeutung |
 |---|---|---|
-| Autonomous (camera, ToF) | `autonomous` | eigenes Verhalten, wenn niemand fährt |
-| Walking network | `gait` | `velstand` (v8) oder `alpha` (alpha_walking + alpha_stand) |
-| Actions to servo goals | `actions` | `training` (Scale 1, kein Filter) oder `robot` (0,9, Tiefpass 0,5 / 0,7) |
-| Kern extras | `kernExtras` | Spielschicht (übernimmt dann statt BallPlay), Schnabel beim Aufheben |
+| **Autonomous (camera, ToF)** (Studio übersetzt es nicht) | `autonomous` | eigenes Verhalten, wenn niemand fährt |
+| **Laufnetz** (Walking network) | `gait` | `velstand` (v8) oder `alpha` (alpha_walking + alpha_stand) |
+| **Aktionen zu Servo-Zielen** (Actions to servo goals) | `actions` | **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), Wert `training`, oder **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale 0.9, low-pass 0.5 / 0.7)), Wert `robot` |
+| **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in the pick)) | `kernExtras` | Spielschicht (übernimmt dann statt BallPlay), Schnabel beim Aufheben |
 | – | `rollers` | Rollschuh-Modell |
 | – | `servoDelay` | Busverzögerung in Sekunden (Standard 0,02) |
 
@@ -871,7 +879,7 @@ Test `micro_duck_runs_every_move_of_its_set`: Sitzen und Aufstehen, Aufheben (ti
 Kick links (Ball fliegt 4 m echt), Rolle und Ducken auf Rollen gelingen; Kick rechts kippt manchmal
 und steht wieder auf. Kein Gelenk überschreitet seine Grenze um mehr als 0,004 rad.
 
-Test `micro_duck_plays_ball_as_pollens_brain_does` (nur Pollens Software, ohne Kern extras): Die
+Test `micro_duck_plays_ball_as_pollens_brain_does` (nur Pollens Software, ohne Kern-Extras): Die
 Ente sieht den Ball, läuft an, richtet ihn aus und kickt mit Pollens Kick-Netz, ohne zu fallen; der
 Ball rollt mehr als 25 cm (echt) weg. Die Pick-up-Erkennung prüfen die Tests in Abschnitt 13.9.
 
@@ -886,11 +894,11 @@ Ball rollt mehr als 25 cm (echt) weg. Die Pick-up-Erkennung prüfen die Tests in
 - **Kick rechts:** kippt in Kern nach dem Tritt manchmal um. Die Ursache ist offen (Spiel,
   Kontaktweichheit, Fußreibung).
 - **BallPlay:** Kerns Nachbau nach der Beschreibung von Pollens ursprünglicher Runtime, deren Code
-  nicht öffentlich ist; standardmäßig an, ohne Kern extras; Detektor als geometrischer Sichttest, nur der linke Kick (Abschnitt 13.10).
+  nicht öffentlich ist; standardmäßig an, ohne Kern-Extras; Detektor als geometrischer Sichttest, nur der linke Kick (Abschnitt 13.10).
 - **Servoströme:** Kern hat keine. Der Pick-up-Detektor bekommt 0; das ausgelieferte Modell liest
   diese Spalten nicht (Abschnitt 13.9).
 - **Kern-eigen, nicht im Original:** die Spielschicht, das Schnabel-Timing beim Aufheben (beide nur mit
-  Kern extras) und der Sprung. Immer an, weil reiner Klang: Kunststoff- und Schrittgeräusche, das
+  Kern-Extras) und der Sprung. Immer an, weil reiner Klang: Kunststoff- und Schrittgeräusche, das
   Servo-Geräusch aus der Last.
 
 Die vollständige Abweichungstabelle zu Pollens Runtime steht in `docs/walker.md`, Abschnitt 13.

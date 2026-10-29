@@ -365,8 +365,11 @@ Kerns eigene Netze haben feste Dateinamen: `jump.onnx` und `play.onnx` (`KERN_PO
 2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät (IndexedDB
    „kern-lehrer“). Das Studio lädt es beim Start und übernimmt jedes neue sofort, auch in offenen
    Tabs. Das gilt für den Sprung (die Seite trainiert keine Spielschicht).
-3. **Prüfen:** Micro-Duck-Level öffnen, Play, **F8** (Ente übernehmen), Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
-   (Spielschicht: Autonomous und Kern extras an, Ball oder Socke in Sicht). Die Browser-Konsole meldet
+3. **Prüfen:** **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) öffnen,
+   **Spielen** (Play), **F8** (Ente übernehmen), Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
+   (Spielschicht: **Autonomous (camera, ToF)** – Studio übersetzt es nicht – und **Kern-Extras
+   (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock fetching, beak in
+   the pick)) an, Ball oder Socke in Sicht). Die Browser-Konsole meldet
    „Kern: trained network jump.onnx loaded“ für ein Netz aus dem Lehrer und eine Warnung, wenn eine
    Datei nicht lädt.
 
@@ -494,7 +497,7 @@ nach der Dauer zurück. Nötig sind:
 | `policy_set()` in `src/game/walker.cpp` | ein `SkillDef` wie `jump`: `name`, `file`, `duration`, `action_scale`, `phase_slot` und `period`, wenn das Netz eine Phase sieht |
 | `PlayInput::robot` und `drive_walkers` | ein freies Bit und `walker_skill(w.actor, "bow")` beim Drücken |
 | `src/studio/viewport.cpp` | eine Taste (wie `Digit7` → 256) |
-| `src/game/touch.cpp` | ein Touch-Knopf (wie „HOP“) |
+| `src/game/touch.cpp` | ein Touch-Knopf (wie „HOP“); seine deutsche Beschriftung (hier „HÜPFEN“) kommt in `I18N_DE` in `web/studio/game.mjs` |
 | `src/game/logic_nodes.cpp` | die Beschreibung von **Robot Move** um den Namen ergänzen; der Knoten ruft `walker_skill` mit dem Namen |
 | `web/studio/game.mjs` | den Dateinamen in `KERN_POLICIES`, damit das Studio ihn aus `policies/` lädt |
 | `kern/policies/` | die Datei selbst, dazu eine Zeile in `policies/README.md` |

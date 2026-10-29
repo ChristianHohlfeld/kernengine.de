@@ -273,7 +273,7 @@ Funktionen an. JSON-Antworten kommen als Zeiger zurück (gültig bis zum nächst
 
 | Funktion | Beschreibung |
 |---|---|
-| `const char* kern_studio_pointer(u32 viewport, u32 type, f32 x, f32 y, i32 button, i32 buttons, u32 modifiers, f32 wheel)` | Zeiger; `type` 0 down, 1 move, 2 up, 3 cancel, 4 wheel, 5 leave; Modifikatoren 1 Shift, 2 Ctrl/Meta, 4 Alt |
+| `const char* kern_studio_pointer(u32 viewport, u32 type, f32 x, f32 y, i32 button, i32 buttons, u32 modifiers, f32 wheel)` | Zeiger; `type` 0 down, 1 move, 2 up, 3 cancel, 4 wheel, 5 leave; Modifikatoren 1 Umschalt, 2 Strg/Meta, 4 Alt |
 | `i32 kern_studio_touch(u32 type, i32 id, f32 x, f32 y, f64 time_ms)` | Finger/Stift im aktiven Viewport (0 down, 1 move, 2 up, 3 cancel); 1, wenn die Touch-Steuerung ihn benutzt hat |
 | `void kern_studio_look(f32 dx, f32 dy)` | Maus-Look bei Pointer-Lock |
 | `const char* kern_studio_key(const char* key, u32 key_length, const char* code, u32 code_length, i32 down, u32 modifiers, i32 repeat)` | Tastatur (`KeyboardEvent.key`/`.code`); Antwort `{"handled": bool}` |
@@ -507,7 +507,7 @@ Ein Level ist JSON mit `"format": "kern-level"` und `"version": 1`. Der Schreibe
 |---|---|
 | `format`, `version` | `"kern-level"`, `1` |
 | `name` | Name des Levels |
-| `world` | World Settings |
+| `world` | **Welteinstellungen** (World Settings) |
 | `camera` | Editor-Kamera: `position`, `yaw`, `pitch` |
 | `nextId` | nächste freie Actor-Id |
 | `actors` | Actors mit Transform und Komponenten |
@@ -641,7 +641,6 @@ Einzelheiten in [Kapitel 16](16-kalibrierung.md) und `docs/kalibrierung.md`.
 | **C-ABI** | die flachen `extern "C"`-Funktionen des Moduls, über die JavaScript die Engine anspricht |
 | **CMA-ES** | ableitungsfreies Optimierungsverfahren; im Lehrer für Kalibrierung und Vorbildsuche |
 | **Collector / Sammler** | führt Umgebungen mit einer gegebenen Policy aus und liefert Rollouts |
-| **Content Drawer** | Panel des Studios zum Platzieren von Actors |
 | **Critic** | Wertfunktion im PPO; sieht im Lehrer den sauberen Zustand (asymmetrisch) |
 | **DAgger** | Nachahmungslernen: Das Netz fährt, das Vorbild sagt je Takt die richtige Aktion |
 | **Determinismus-Fingerabdruck** | Hash je Regeltakt über den Zustand der gehenden Ente; Referenz in `kern/tests/determinism_fingerprint.txt` |
@@ -652,9 +651,11 @@ Einzelheiten in [Kapitel 16](16-kalibrierung.md) und `docs/kalibrierung.md`.
 | **GameWorld** | stellt ein Level mit dem Renderer dar und spielt es auf Box3D |
 | **GTAO** | Ground-Truth Ambient Occlusion (nach XeGTAO) im Renderer |
 | **HostTransport** | Transport, dessen Datagramme die Browserseite bewegt (BroadcastChannel, WebSocket-Relay) |
+| **Inhaltsablage** (Content Drawer) | Panel des Studios zum Platzieren von Actors |
 | **JIT (Logik)** | Übersetzung eines Logik-Graphen in ein WebAssembly-Modul zur Laufzeit |
 | **`.klevel`** | Dateiformat eines Levels (JSON, `"format": "kern-level"`) |
 | **Lehrer** | Kerns Trainingssystem für Micro-Duck-Netze ([Kapitel 14](14-lehrer.md)) |
+| **Läufer** (Walker) | Controller-Art (Modus `walker`) für gelenkige Roboter, die eine Policy fährt |
 | **Lerner / Learner** | der PPO-Teil, der aus Rollouts lernt |
 | **Logik-Graph** | Blueprint-artiges Programm aus Knoten und Verbindungen; läuft im Interpreter, als JIT oder als exportiertes C++ |
 | **LoopbackNetwork** | In-Process-Netz für Tests und Mehrspieler im Editor |
@@ -663,8 +664,6 @@ Einzelheiten in [Kapitel 16](16-kalibrierung.md) und `docs/kalibrierung.md`.
 | **NightWindows** | Shader-Erweiterung für beleuchtete Fenster in der Nacht |
 | **ONNX** | Austauschformat der Netze; Kern liest und schreibt die rsl_rl-Actor-Form |
 | **Outliner** | Baumansicht der Actors im Studio |
-| **Package Game** | Export eines Levels als eigenständige HTML-Datei |
-| **Play / Simulate** | die Laufmodi im Viewport (`game::SimMode::play` bzw. `simulate`): Play spielt das Level, Simulate lässt Physik und Regeln laufen, während der Editor bedienbar bleibt (Körper greifen, simulierte Posen mit K übernehmen) |
 | **Player-only** | Start des Studio-Moduls ohne Editor, für exportierte Spiele (`kern_studio_init(…, 1)`) |
 | **Policy** | trainiertes Netz, das Beobachtungen auf Aktionen abbildet |
 | **PPO** | Proximal Policy Optimization, das Lernverfahren des Lehrers (nach rsl_rl) |
@@ -674,13 +673,14 @@ Einzelheiten in [Kapitel 16](16-kalibrierung.md) und `docs/kalibrierung.md`.
 | **rsl_rl** | Reinforcement-Learning-Bibliothek, mit der Pollen die Netze trainiert; Vorbild für Kerns PPO und Exportformat |
 | **Servoprofil** | Parameter eines Servotyps (K, D, F, T, A, Totzeit, Streuungen) als JSON |
 | **ShaderExtension** | GLSL-Schnipsel an festen Hook-Punkten des Standard-Shaders, mit dem Spiele eigene Looks hinzufügen ([Kapitel 4](04-grafik.md)) |
+| **Spiel verpacken** (Package Game) | Export eines Levels als eigenständige HTML-Datei, im Menü **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...) |
+| **Spielen / Simulieren** (Play / Simulate) | die Laufmodi im Viewport (`game::SimMode::play` bzw. `simulate`): **Spielen** spielt das Level, **Simulieren** lässt Physik und Regeln laufen, während der Editor bedienbar bleibt (Körper greifen, simulierte Posen mit K übernehmen) |
 | **Span** | nicht besitzende Sicht auf zusammenhängende Elemente (`kern::Span`) |
 | **Substeps** | Unterschritte des Box3D-Lösers je Weltschritt; für die Micro Duck 16 |
 | **Tier (Logik)** | Ausführungsstufe eines Graphen: `interpreter`, `compiling`, `compiled (WebAssembly)`, `native C++` |
 | **velstand** | Pollens Lauf- und Stehnetz der Micro Duck; in Kern eingebaut |
 | **Viewmodel-Ebene** | Renderebene nach einem Depth-Clear, z. B. für Gizmos |
 | **Vorbild** | Demonstration, die das Netz zuerst nachahmt (Sprung, Spielen) |
-| **Walker** | Controller-Art für gelenkige Roboter, die eine Policy fährt |
 | **wasi-sdk** | LLVM-Toolchain für WebAssembly mit wasi-libc und libc++; Kern nutzt Release 25 |
 | **Welding** | verlustfreies Indexieren einer Dreieckssuppe |
 

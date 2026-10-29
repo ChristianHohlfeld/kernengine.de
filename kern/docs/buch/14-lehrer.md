@@ -697,7 +697,7 @@ lernt wie der Sprung: Ein Vorbild zeigt den Weg, das Netz ahmt es aus seinen eig
 ### `PlayEnv`
 
 `PlayEnv(seed, randomize)` ist eine Ente auf einem Boden mit Oberfläche `floor` (Reibung 1), autonom
-und mit Kern extras, deren Spielschicht der Lehrer von außen steuert
+und mit Kern-Extras, deren Spielschicht der Lehrer von außen steuert
 (`set_walker_play_external`). Unter der Spielschicht laufen Pollens Netze unverändert. Ein `step` ist
 eine Entscheidung (2 Regeltakte, 40 ms); die Episode dauert höchstens 60 s Roboterzeit.
 

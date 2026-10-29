@@ -692,7 +692,7 @@ For rolling ball, character and flyer, movement is **camera-relative**. The mode
 
 | Mode | Implementation |
 |---|---|
-| **Hovercar** | throttle as a force along the vehicle axis (reverse 1.25×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
+| **Hover Car** | throttle as a force along the vehicle axis (reverse 1.25×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
 | **Vehicle** | like the hovercar without the hover spring; it is only driven with ground contact (sphere probe). |
 | **Rolling Ball** | force in the direction of movement; **jump as an impulse** m · (`jump_speed` − v_z), only on the ground; top speed as a counterforce. |
 | **Character** | Box3D's **character mover** ([Chapter 6](06-physics.md)): the body becomes kinematic, the capsule is sized from its shapes (feet at the lowest, head at the highest point, step height 22 % of the height), classic first-person-shooter ground movement, gravity 1.5× (snappier). The body turns smoothly toward the direction of travel and follows via `set_target_pose`. Footsteps by stride length; triggers and pickups via the touched planes. |
@@ -910,9 +910,10 @@ SpawnCity's rules:
 | Soldier | JUMP, RELOAD and AIM (both only with a weapon; AIM is a toggle), CROUCH (toggle), USE |
 | Walker | QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE, HOP |
 | Character | JUMP (with jump), USE |
-| Rolling Ball | JUMP, BOOST (if available) |
-| Flyer | UP, DOWN, BOOST |
-| Hovercar, Vehicle | BOOST, HOP (with jump), USE |
+| Rolling Ball | JUMP (with jump), BOOST (if available) |
+| Flyer | UP, DOWN, BOOST (if available) |
+| Hover Car | BOOST (if available), DRIFT (rear handbrake), LIFT (with jump: lift thrusters), VIEW (chase or low interior view) |
+| Vehicle | BOOST (if available), DRIFT (rear handbrake), HOP (with jump), VIEW (chase or low interior view) |
 
 - **Ownership per finger:** buttons before sticks before screen. A finger on the screen fires for the
   soldier (and aims along), otherwise it looks.

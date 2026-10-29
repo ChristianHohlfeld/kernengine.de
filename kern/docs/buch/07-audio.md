@@ -363,9 +363,9 @@ Die Bank macht aus Referenzen Mixer-Clips.
 
 `GameAudio` spielt eine laufende `GameWorld` ab.
 
-**`begin(world)`** übernimmt Musik und Ambience aus den World Settings, bestimmt den Motor-Loop des Spielers und sammelt alle Audio Sources mit `autoplay`.
+**`begin(world)`** übernimmt Musik und Ambience aus den **Welteinstellungen** (World Settings), bestimmt den Motor-Loop des Spielers und sammelt alle Audioquellen mit `autoplay`.
 
-**`apply_settings(w)`** bildet die World Settings des Levels auf den Mixer ab (`update` ruft es jeden Frame):
+**`apply_settings(w)`** bildet die Welteinstellungen des Levels auf den Mixer ab (`update` ruft es jeden Frame):
 
 | Level | Mixer |
 |---|---|
@@ -386,7 +386,7 @@ Die Bank macht aus Referenzen Mixer-Clips.
    pitch   = 0,72 + 0,95 · speed + 0,08 · throttle    (0,5–2,2)
    ```
    Bei der laufenden Ente (`walker`) ist der „Motor“ das Servo-Geräusch: leise, lauter mit der Arbeit der Motoren (Drehmoment × Geschwindigkeit), höher mit ihrer Drehzahl.
-5. **Audio Sources** folgen ihren Actors; ihre Geschwindigkeit wird aus der Positionsänderung geschätzt (für Doppler). Loops starten mit Priorität 40 und 0,3 s Einblenden, One-Shots mit Priorität 20, beide nach ihrer Startverzögerung. Mit `pitch_by_speed` steigt die Tonhöhe mit der Geschwindigkeit des Actors: `pitch · (1 + pitch_by_speed · speed · 0,1)`. Stirbt der Actor, wird die Stimme in 0,15 s ausgeblendet.
+5. **Audioquellen** folgen ihren Actors; ihre Geschwindigkeit wird aus der Positionsänderung geschätzt (für Doppler). Loops starten mit Priorität 40 und 0,3 s Einblenden, One-Shots mit Priorität 20, beide nach ihrer Startverzögerung. Mit `pitch_by_speed` steigt die Tonhöhe mit der Geschwindigkeit des Actors: `pitch · (1 + pitch_by_speed · speed · 0,1)`. Stirbt der Actor, wird die Stimme in 0,15 s ausgeblendet.
 6. **Cues der Simulation** (7.8) werden abgespielt. Ist der Clip eines Cues noch nicht fertig, wartet er bis zu 0,25 s und wird danach verworfen – ein Geräusch, das zu spät kommt, ist schlimmer als keins. Mehr als 64 wartende Cues werden abgeschnitten.
 
 Cue-Stimmen haben `min_distance` 3 m, `max_distance` 80 m und Priorität 50 (Bus `ui`) oder 10 (alles andere). Ein Effekt verdrängt bei Stimmenknappheit also nie einen wichtigen Dauerklang (Musik, Motor, Loops) – umgekehrt schon, denn `play()` stiehlt nur Stimmen mit höchstens gleicher Priorität. `cues_played()` und `cues_dropped()` zählen mit.
@@ -428,7 +428,7 @@ Weil Cues in den festen Schritten entstehen, sind sie deterministisch. Ohne Abne
 
 ### Aufprallgeräusche
 
-Jeder Rigid Body hat `impact_sound` (Standard `builtin:impact`) und `impact_threshold` (2,5 m/s Annäherungsgeschwindigkeit). Jeder Collider hat zusätzlich `impact_sound`, Standard `"auto"` = der Sound seines Körpers. So kann ein Teil eines Körpers anders klingen als ein anderes: Die Sohle der Ente macht `plastic_step`, ihr Gehäuse `plastic`.
+Jeder Starrkörper (`BodyComponent`) hat `impact_sound` (Standard `builtin:impact`) und `impact_threshold` (2,5 m/s Annäherungsgeschwindigkeit). Jeder Collider hat zusätzlich `impact_sound`, Standard `"auto"` = der Sound seines Körpers. So kann ein Teil eines Körpers anders klingen als ein anderes: Die Sohle der Ente macht `plastic_step`, ihr Gehäuse `plastic`.
 
 Der Ablauf in `GameWorld` (`src/game/runtime.cpp`):
 
@@ -442,9 +442,9 @@ Der Ablauf in `GameWorld` (`src/game/runtime.cpp`):
 
 Die Micro Duck setzt ihre Schwelle auf 0,12 m/s, damit schon leichte Berührungen hörbar sind. Brechende Gelenke spielen `break_sound` (`builtin:break`) an der Position ihres Actors.
 
-## 7.9 Level-Einstellungen und die Audio Source
+## 7.9 Level-Einstellungen und die Audioquelle
 
-### World Settings
+### Welteinstellungen (World Settings)
 
 ```cpp
 f32 master_volume = 1;
@@ -458,7 +458,7 @@ f32 doppler = 1;              // Doppler-Skala für alle 3D-Sounds
 
 ### `AudioComponent`
 
-Die Komponente „Audio Source“ macht einen Actor zur Schallquelle – Maschinenbrummen, Radio, Wind, ein einmaliger Sound:
+Die Komponente **Audioquelle** (Audio Source) macht einen Actor zur Schallquelle – Maschinenbrummen, Radio, Wind, ein einmaliger Sound:
 
 | Feld | Standard | Bedeutung |
 |---|---|---|
@@ -466,7 +466,7 @@ Die Komponente „Audio Source“ macht einen Actor zur Schallquelle – Maschin
 | `volume` | 1 | linear, 0–4 |
 | `pitch` | 1 | Abspielrate |
 | `loop` | an | |
-| `autoplay` | an | startet mit Play/Simulate |
+| `autoplay` | an | startet mit **Spielen** (Play) / **Simulieren** (Simulate) |
 | `spatial` | an | 3D am Actor; aus: 2D auf dem Bus |
 | `min_distance`, `max_distance` | 2 m, 40 m | volle Lautstärke innen, still jenseits |
 | `rolloff` | `inverse` | |
@@ -475,7 +475,7 @@ Die Komponente „Audio Source“ macht einen Actor zur Schallquelle – Maschin
 | `pitch_by_speed` | 0 | zusätzliche Tonhöhe pro m/s des Körpers |
 | `delay` | 0 | Sekunden nach dem Start |
 
-Der Studio-Katalog enthält fertige Varianten: Audio Source (Maschinenbrummen), Ambient Wind (überall hörbar), City Ambience (mit Abfall) und Radio (spielt `music_calm` in 3D). Bedienung im Editor: siehe [Kapitel 11](11-studio.md).
+Der Studio-Katalog (**Actors platzieren** (Place Actors), Gruppe **Audio**) enthält fertige Varianten: **Audioquelle** – Maschinenbrummen; **Wind** (Ambient Wind) – überall hörbar; **Stadtatmosphäre** (City Ambience) – mit Abfall; **Radio** – spielt `music_calm` in 3D. Bedienung im Editor: siehe [Kapitel 11](11-studio.md).
 
 ## 7.10 Die Browser-Anbindung
 

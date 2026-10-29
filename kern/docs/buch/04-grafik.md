@@ -493,7 +493,7 @@ Zur Laufzeit setzt `Renderer::set_shadow_filter(taps)` die Filterstufe. Die Stud
 
 **Lichtbasis.** Aus der Sonnenrichtung `dir` entsteht eine Orthonormalbasis `right`, `up` (Hilfsvektor +Z, bei fast senkrechter Sonne +Y).
 
-**An die Sicht angepasst: die Schattendistanz.** `Renderer::set_shadow_distance(m)` (Standard 0 = aus) legt fest, wie weit die Karte in die Sicht reicht. Die Spiel-Laufzeit setzt sie in jedem Frame aus `WorldSettings::shadow_distance` (World Settings › **Shadow distance**, Standard 80 m; das Micro-Duck-Level nimmt 10 m für scharfe Schatten von Ente, Ball und Wänden). Mit einer Schattendistanz und einer perspektivischen Kamera deckt die Karte die **umschließende Kugel des Sichtkegels** von der Near-Plane bis zur Schattendistanz ab (stabile Schattenkarte nach Valient 2008). Für einen symmetrischen Kegel mit den Tangenten der halben Öffnungswinkel `th`, `tv` gilt:
+**An die Sicht angepasst: die Schattendistanz.** `Renderer::set_shadow_distance(m)` (Standard 0 = aus) legt fest, wie weit die Karte in die Sicht reicht. Die Spiel-Laufzeit setzt sie in jedem Frame aus `WorldSettings::shadow_distance` (**Welteinstellungen › Himmel und Licht › Schattenreichweite (kleiner: schärfer)** (World Settings › Sky and light › Shadow distance (smaller: sharper)), Standard 80 m; das Micro-Duck-Level nimmt 10 m für scharfe Schatten von Ente, Ball und Wänden). Mit einer Schattendistanz und einer perspektivischen Kamera deckt die Karte die **umschließende Kugel des Sichtkegels** von der Near-Plane bis zur Schattendistanz ab (stabile Schattenkarte nach Valient 2008). Für einen symmetrischen Kegel mit den Tangenten der halben Öffnungswinkel `th`, `tv` gilt:
 
 ```cpp
 const f32 n = camera.near, f = max_of(camera.near + 0.1f, min_of(shadow_distance_, camera.far));
@@ -540,7 +540,7 @@ if (uSunShadowEnabled == 1 && ndl > 0.0) {
 
 Außerhalb der Karte gilt eine Fläche als beleuchtet. Flächen, die von der Sonne weg zeigen (`ndl == 0`), lesen die Karte gar nicht. Mit Schattendistanz blendet der Schatten über ihr letztes Zehntel (gemessen vom Auge, `uSunShadowFade`) aus, statt an der Kartengrenze abzureißen; ohne Schattendistanz gibt es kein Ausblenden.
 
-Daraus folgt der wichtigste Abstimmungshinweis: Ausdehnung und `resolution` bestimmen zusammen die Texelgröße. Mit Schattendistanz ist die Ausdehnung der Kugelradius: Eine kleinere Schattendistanz macht die Schatten schärfer, reicht aber weniger weit. Kern Studio legt die Karte mit 2048 Texeln an (festes `extent` 110 m) und nutzt in Levels die Schattendistanz der World Settings; das C++-Beispiel Orb Run nutzt 2048 Texel auf festen ±110 m, also gut 10 cm pro Texel, `examples/hello` 1024 Texel auf ±40 m.
+Daraus folgt der wichtigste Abstimmungshinweis: Ausdehnung und `resolution` bestimmen zusammen die Texelgröße. Mit Schattendistanz ist die Ausdehnung der Kugelradius: Eine kleinere Schattendistanz macht die Schatten schärfer, reicht aber weniger weit. Kern Studio legt die Karte mit 2048 Texeln an (festes `extent` 110 m) und nutzt in Levels die Schattendistanz der **Welteinstellungen**; das C++-Beispiel Orb Run nutzt 2048 Texel auf festen ±110 m, also gut 10 cm pro Texel, `examples/hello` 1024 Texel auf ±40 m.
 
 ### 4.8.2 Himmel
 

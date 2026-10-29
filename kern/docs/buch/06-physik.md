@@ -390,15 +390,18 @@ die Policy trainiert wurde (Sohlen 1,0 auf einem Boden mit 1,0 ergibt √(1 · 1
 ## 6.7 Reibung, Restitution, Rollwiderstand
 
 **Kontaktreibung** ist pro Form eingestellt (`ColliderComponent::friction`, Standard 0,6). Im
-Editor: Details › Mesh › **Physics** (Reibung, Restitution, Rollwiderstand des automatisch erzeugten
-Colliders, direkt über dem Render-Material) oder Details › Collider bei eigenen Collidern. Der
-endlose Boden: World Settings › Physics (Box3D) › Ground friction / Ground bounciness.
+Editor: **Details › Statisches Mesh › Physik** (Details › Static Mesh › Physics) mit Reibung,
+Restitution und Rollwiderstand des automatisch erzeugten Colliders, direkt über dem Render-Material,
+oder **Details › Kollider** (Details › Collider) bei eigenen Collidern. Der endlose Boden:
+**Welteinstellungen › Physik (Box3D)** (World Settings › Physics (Box3D)), Felder **Bodenreibung**
+(Ground friction) und **Bodenelastizität** (Ground bounciness).
 
 **Restitution** (0..1) kombiniert Box3D als Maximum der beiden Formen. Stöße unterhalb der
 Restitutionsschwelle (`restitution_threshold`, Standard 1 m/s) prallen nicht ab.
 
-**Kontaktweichheit** (Box3Ds World Definition) stellt man in den World Settings ein: Contact
-stiffness (30 Hz), Contact damping ratio (10), Contact push-out speed (3 m/s).
+**Kontaktweichheit** (Box3Ds World Definition) stellt man in den **Welteinstellungen** ein:
+**Kontaktsteifigkeit** (Contact stiffness), Standard 30 Hz; **Kontaktdämpfung** (Contact damping
+ratio), Standard 10; **Kontakt-Ausstoßgeschwindigkeit** (Contact push-out speed), Standard 3 m/s.
 
 **Rollwiderstand** bremst das Rollen über die Kontaktnormale. In der eingebundenen Box3D-Fassung
 (`box3d:src/contact.c`, `src/contact_solver.c`) gilt:
@@ -557,8 +560,8 @@ Zwei Abfragen lesen Box3Ds Kontaktdaten eines Körpers direkt:
 
 - **`contact_points(body, out)`** liefert alle berührenden Manifold-Punkte als `ContactPoint`
   (Weltposition, Normale von Form A zu B, Separation – negativ bei Durchdringung – und den
-  Normalimpuls des letzten Sub-Steps). `GameWorld::debug_lines` zeichnet damit Kontakte (Show-Flag
-  „Contact Points“ im Viewport).
+  Normalimpuls des letzten Sub-Steps). `GameWorld::debug_lines` zeichnet damit Kontakte (im Viewport
+  **Fenster › Anzeigen › Kontaktpunkte** (Window › Show › Contact Points)).
 - **`touching(body, out)`** liefert die Körper, die `body` gerade berührt (Manifolds mit Punkten),
   jeweils mit der Summe der Normalimpulse des letzten Sub-Steps (N·s) – das, was ein Kontaktsensor
   meldet: eine Sohle auf dem Boden, ein Glied auf einem anderen. Die Walker-Sonde nutzt das für
@@ -599,8 +602,9 @@ So funktioniert es:
 - Statische und kinematische Körper lassen sich nicht greifen (`begin` liefert `false`).
 - Verschwindet der Körper, beendet `update` den Griff selbst.
 
-Studio nutzt den Griff in Simulate, nach Eject und mit der Observer-Kamera
-(`GameWorld::begin_grab` / `move_grab` / `end_grab`; Test `physics_joints_and_grab`,
+Studio nutzt den Griff beim **Simulieren** (Simulate), nach dem Aussteigen aus dem Spieler (F8) und
+mit der **Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)** (Observer camera (Play: fly,
+watch, drag bodies)) der Welteinstellungen (`GameWorld::begin_grab` / `move_grab` / `end_grab`; Test `physics_joints_and_grab`,
 `studio_observer_camera_grabs_bodies`).
 
 ---
@@ -685,7 +689,7 @@ const f32 alpha = accumulator_ / h;                       // Rest für die Inter
 
 Vor jedem festen Schritt merkt sich `GameWorld` die Pose jedes nicht statischen Körpers. Gezeichnet
 wird zwischen den beiden letzten Physikständen (`alpha` = Rest / h; Position linear, Rotation
-normiert linear auf der kürzeren Seite). So ist Bewegung bei jeder Bildrate glatt. Die Play-Kamera
+normiert linear auf der kürzeren Seite). So ist Bewegung bei jeder Bildrate glatt. Die Spielkamera
 folgt der **interpolierten** Pose des Spielers (`presented_player_`). Mit der rohen Physik-Pose
 wackelten schnelle Autos und Kugeln im Bild; `studio_fast_player_does_not_shake_on_screen` sichert
 das ab.

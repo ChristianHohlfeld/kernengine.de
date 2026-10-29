@@ -354,8 +354,11 @@ nutzt eine Abschwächung, die bei der Reichweite $r$ glatt auf 0 geht:
 $$\text{att} = \frac{\left(\max\left(0,\ 1 - d^2/r^2\right)\right)^2}{1 + d^2/r^2}.$$
 
 Bis zu 6 Punktlichter (`kMaxPointLights = 6`), jedes mit Position, Reichweite, Farbe und Intensität
-(`uPointPosRange`, `uPointColorIntensity`); $d^2$ ist nach unten auf 0,04 begrenzt, damit ein Licht
-direkt auf einer Fläche nicht unendlich hell wird.
+(`uPointPosRange`, `uPointColorIntensity`). Die Abschwächung teilt nicht durch den Abstand: Direkt am
+Licht ist $\text{att} = 1$, die Helligkeit bleibt also von selbst endlich. $d^2$ ist nach unten auf
+0,04 begrenzt (`max(dot(delta, delta), 0.04)` in `kern/src/gfx/standard_shader.cpp`) – das schützt nur
+das Normieren der Lichtrichtung (`delta * inversesqrt(d2)`) vor einer Division durch 0, wenn das Licht
+genau auf dem beleuchteten Punkt sitzt.
 
 ### B.4.4 Spiegelnde Reflexion: von Blinn-Phong zu Mikrofacetten
 

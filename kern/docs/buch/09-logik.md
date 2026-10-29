@@ -7,8 +7,8 @@ kleinen Interpreter in den festen Simulationsschritten der Engine ausgeführt �
 (dem Einzelspiel oder dem Netzwerk-Server). Ihre Wirkungen werden wie alles andere, was die
 Simulation tut, repliziert.
 
-Damit Logik nicht langsam ist, übersetzt Kern jeden Graphen beim Start von Play oder Simulate zur
-Laufzeit nach **WebAssembly** (JIT); der Browser macht daraus Maschinencode. Und wer will, exportiert
+Damit Logik nicht langsam ist, übersetzt Kern jeden Graphen beim Start von **Spielen** (Play) oder
+**Simulieren** (Simulate) zur Laufzeit nach **WebAssembly** (JIT); der Browser macht daraus Maschinencode. Und wer will, exportiert
 einen Graphen als **lesbares C++** und kompiliert ihn ins Spiel. Alle drei Stufen müssen exakt
 dasselbe Ergebnis liefern – warum und wie das gesichert ist, steht in Abschnitt 9.9.
 
@@ -353,7 +353,7 @@ Nicken bis 63°) · `walker.autonomous` Set Autonomous · `walker.skill` Robot M
 
 `GameWorld::start_logic` (`src/game/logic_world.cpp`) legt die Runtime nur an, wenn
 
-- der Modus Play oder Simulate ist und die Welt **keine Replika** ist (Logik läuft nur auf der
+- der Modus `play` oder `simulate` ist und die Welt **keine Replika** ist (Logik läuft nur auf der
   Autorität), und
 - das Level oder ein Actor einen nicht leeren Graphen hat.
 
@@ -361,13 +361,13 @@ Dann wird der Level-Graph (Self 0, Name „Level“) und jeder Actor-Graph (Self
 Actorname) hinzugefügt; `start` ruft anschließend `begin`. Gespawnte Actors und neue Pawns bringen
 ihre Graphen mit.
 
-Der **Host** der Welt (`GameWorld::LogicHost`):
+Der **Logik-Host** der Welt (`GameWorld::LogicHost`):
 
 | Methode | Umsetzung |
 |---|---|
 | `time()` | `sim_time_` – die Simulationszeit in Sekunden, aus dem Schrittzähler berechnet, nicht die Wanduhr |
 | `print(text, screen)` | „Logic: …“ in die Meldungen, mit `screen` auch als HUD-Meldung |
-| `error(text)` | „Logic error: …“ in die Meldungen (Studio zeigt sie im Output Log) |
+| `error(text)` | „Logic error: …“ in die Meldungen (Studio zeigt sie im **Ausgabeprotokoll** (Output Log)) |
 | `random()` | Xorshift32, Startwert aus der Zahl der Actors – deterministisch |
 | `game()` | die GameWorld (für die Spiel-Knoten) |
 
@@ -529,7 +529,9 @@ in `logic_cases.h`.
 ## 9.10 Bearbeitung im Studio
 
 Der Blueprint-Editor (`web/studio/logic.mjs`) folgt Unreals Blueprint-Editor; seine Oberfläche
-beschreibt [Kapitel 11](11-studio.md). Die Seite enthält keine Editorlogik: Jede Bearbeitung ist ein
+beschreibt [Kapitel 11](11-studio.md). Er ist auch in der deutschen Oberfläche englisch beschriftet
+(Knoten, Kategorien, Compile; `#logicEditor` steht in `I18N_SKIP` in `web/studio/game.mjs`). Die
+Seite enthält keine Editorlogik: Jede Bearbeitung ist ein
 Befehl an die Engine (`src/studio/logic_edit.cpp`), **jede Bearbeitung ist eine Level-Bearbeitung
 und damit ein Undo-Schritt**; die Seite zeichnet, was `logic_json()` beschreibt (Graph, Knoten mit
 Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zustände, Stufe).

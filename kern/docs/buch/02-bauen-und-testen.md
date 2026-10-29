@@ -20,7 +20,7 @@ Alle Pfade sind relativ zur Repository-Wurzel, sofern nicht anders angegeben.
 | Native Unit-Tests | `kern/tests/run.sh` | Testlauf mit ASan/UBSan, danach Logik-Export-Test |
 | Logik-JIT-Test | `kern/build.sh … logic_wasm_test.cpp` + `node kern/tests/logic_wasm_test.mjs` | Vergleich Interpreter ↔ JIT |
 | Lehrer im WebAssembly-Modul | `node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm` | eine PPO-Iteration über die C-ABI, Fingerabdruck |
-| Browser-Test | `node kern/tests/e2e/studio_e2e.mjs <base-url>` | Studio, Play, Simulate, Export, Telefon |
+| Browser-Test | `node kern/tests/e2e/studio_e2e.mjs <base-url>` | Studio, **Spielen** (Play), **Simulieren** (Simulate), Export, Telefon |
 
 Der kürzeste Weg zu einem laufenden Studio und grünen Tests (nach `README.md`):
 
@@ -349,16 +349,18 @@ Farben im Canvas.
 Geprüft werden unter anderem:
 
 - **Single-File-Build** (`/generated/studio.html`): Start mit Orb Run, Menüs, Fly Mode (rechte Maustaste
-  + W), Werkzeuge, Outliner und Details, Bearbeiten der X-Position, Fokus (F), Content Drawer
-  (Klick und Ziehen), Auswahl und Verschieben mit der linken Maustaste, Sound über Web Audio,
-  Kontextmenüs, deterministisches Undo, Play, Simulate mit Physik-Debug, vier Viewports, neues Level
-  aus Vorlage, Shooting Range, Logik-Editor, Micro Duck mit Kopfkamera und ToF, Hilfe, Mehrspieler
+  + W), Werkzeuge, **Outliner** und **Details**, Bearbeiten der X-Position, **Auswahl fokussieren**
+  (Focus Selection; Taste F), **Inhaltsablage** (Content Drawer; Klick und Ziehen), Auswahl und
+  Verschieben mit der linken Maustaste, Sound über Web Audio, Kontextmenüs, deterministisches
+  **Rückgängig** (Undo), **Spielen** (Play), **Simulieren** (Simulate) mit Physik-Debug, vier
+  Viewports, neues Level aus Vorlage, Shooting Range, Logik-Editor, Micro Duck mit Kopfkamera und ToF,
+  **Hilfe** (Help), Mehrspieler
   im Editor und über zwei Tabs (BroadcastChannel), Spiel packen und das gepackte Spiel spielen, das
   Spiel auf einem Telefon.
 - **Modul-Build** (`/kern/web/studio/index.html`): Start, Farbwähler.
-- **Wiederherstellen** nach einem Neuladen, **Einstellungen** (Standardwerte, Speichern,
-  Zurücksetzen), **schmales Fenster**, **Telefon** (kompaktes Layout, Menüs per Touch, Micro Duck,
-  Play/Simulate/Pause/Stop per Tipp), **Android-Dateiauswahl**.
+- **Wiederherstellen** nach einem Neuladen, **Einstellungen** (Preferences) mit Standardwerten,
+  Speichern und Zurücksetzen, **schmales Fenster**, **Telefon** (kompaktes Layout, Menüs per Touch, Micro Duck,
+  **Spielen**, **Simulieren**, **Pause** und **Stopp** (Stop) per Tipp), **Android-Dateiauswahl**.
 
 Am Ende steht `<n> checks, <m> failures (screenshots: <ordner>)`; der Rückgabewert ist 1 bei
 Fehlern. In GitHub Actions wird jeder Fehler zusätzlich als `::error::`-Annotation ausgegeben.
@@ -377,7 +379,7 @@ Dann entstehen `studio.png`, `studio-selected.png`, `studio-play.png`, `studio-s
 `game-phone.png`, `studio-narrow.png` sowie je Telefongröße `phone-play-<breite>.png` und
 `phone-dock-<breite>.png`. Einige davon verwendet auch dieses Buch.
 
-![Simulate mit Physik-Debug-Ansicht, wie der Browser-Test es prüft](bilder/studio-simulate.png)
+![Simulieren mit Physik-Debug-Ansicht, wie der Browser-Test es prüft](bilder/studio-simulate.png)
 
 ---
 

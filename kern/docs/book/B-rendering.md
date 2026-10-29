@@ -348,8 +348,11 @@ Kern uses an attenuation that goes smoothly to 0 at the range $r$:
 $$\text{att} = \frac{\left(\max\left(0,\ 1 - d^2/r^2\right)\right)^2}{1 + d^2/r^2}.$$
 
 Up to 6 point lights (`kMaxPointLights = 6`), each with position, range, color and intensity
-(`uPointPosRange`, `uPointColorIntensity`); $d^2$ is clamped below at 0.04 so that a light sitting
-directly on a surface does not become infinitely bright.
+(`uPointPosRange`, `uPointColorIntensity`). The attenuation does not divide by the distance: right at
+the light $\text{att} = 1$, so the brightness stays finite on its own. $d^2$ is clamped below at 0.04
+(`max(dot(delta, delta), 0.04)` in `kern/src/gfx/standard_shader.cpp`); this only keeps the
+normalization of the light direction (`delta * inversesqrt(d2)`) from dividing by 0 when the light
+sits exactly on the lit point.
 
 ### B.4.4 Specular reflection: from Blinn–Phong to microfacets
 

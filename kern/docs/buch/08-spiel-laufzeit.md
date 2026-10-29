@@ -4,7 +4,7 @@
 Komponenten – das, was Kern Studio bearbeitet und als `.klevel` speichert. Die **GameWorld** zeigt
 ein Level mit dem Renderer an und spielt es auf Box3D: mit Controllern, Kamera, Regeln, Triggern,
 Sound-Ereignissen und Logik-Graphen. Studio nutzt dieselbe GameWorld für seine Viewports (Editieren,
-Simulate, Play), und exportierte Spiele laufen mit genau diesem Code.
+**Simulieren** (Simulate), **Spielen** (Play)), und exportierte Spiele laufen mit genau diesem Code.
 
 Dieses Kapitel beschreibt das Datenmodell (`include/kern/game/level.h`), das Dateiformat
 (`src/game/level.cpp`), die Laufzeit (`include/kern/game/runtime.h`, `src/game/runtime.cpp`,
@@ -49,9 +49,9 @@ hochgeladen) und wird während einer laufenden Simulation ignoriert. Eine Stadt,
 nicht mehr hat, entfernt `sync` nur mit ihren eigenen Meshes (Chunks, Stämme, Kronen), nicht über die
 Actor-Id: Das neue Level kann dieselbe Id einem anderen Actor geben, etwa dem Boden, der sonst nach
 einem Levelwechsel fehlte. `start` kopiert das Level,
-baut die Box3D-Welt und startet Simulate oder Play. `stop` reißt alles ab und zeigt wieder das
+baut die Box3D-Welt und startet die Simulation oder das Spiel. `stop` reißt alles ab und zeigt wieder das
 Level, das `sync` zuletzt gesehen hat – Änderungen der Simulation gehen also nicht ins Dokument
-(Studio bietet dafür „Keep Simulation Changes“).
+(Studio bietet dafür **Simulationsänderungen übernehmen** (Keep Simulation Changes)).
 
 ---
 
@@ -92,8 +92,8 @@ Aus dem Kopfkommentar von `level.h`:
 Hilfsfunktionen: `find(id)`, `add(actor)` (vergibt eine ID, wenn `actor.id == 0` oder belegt),
 `children(parent)` (0 = oberste Ebene), `world_matrix(id)` (Eltern angewendet), `body_owner(id)`
 (nächster Vorfahr oder der Actor selbst mit Body), `is_ancestor`, `texture(id)`, `sound(id)`.
-`default_player(level)` liefert den Actor, den Play übernimmt: `world.player`, wenn er einen Player
-Controller hat, sonst den ersten mit Controller.
+`default_player(level)` liefert den Actor, den **Spielen** (Play) übernimmt: `world.player`, wenn er
+eine **Spieler-Steuerung** (Player Controller) hat, sonst den ersten mit Controller.
 
 ### Actor
 
@@ -121,7 +121,10 @@ Die Tabellen nennen das C++-Feld, den Standardwert und den Schlüssel in der `.k
 (Abschnitt 8.6 beschreibt das Format; dort stehen auch die Wertebereiche, auf die beim Lesen
 begrenzt wird).
 
-### Static Mesh (`MeshComponent`, Schlüssel `mesh`)
+Die Überschriften nennen die Komponenten so, wie das Details-Panel sie zeigt, in Klammern die
+englische Beschriftung.
+
+### Statisches Mesh (Static Mesh; `MeshComponent`, Schlüssel `mesh`)
 
 | Feld | Standard | Schlüssel | Bedeutung |
 |---|---|---|---|
@@ -153,9 +156,9 @@ begrenzt wird).
 | `tiling` | 1 (Wiederholungen pro Meter bzw. pro Fläche) | `tiling` |
 
 Die Reibungswerte stehen bewusst neben dem Render-Material: Sie sind die Physik des Objekts. Im
-Details-Panel liegen sie unter Mesh › **Physics**.
+Details-Panel liegen sie unter **Statisches Mesh › Physik** (Static Mesh › Physics).
 
-### Point Light (`LightComponent`, `light`)
+### Punktlicht (Point Light; `LightComponent`, `light`)
 
 | Feld | Standard | Schlüssel |
 |---|---|---|
@@ -163,7 +166,7 @@ Details-Panel liegen sie unter Mesh › **Physics**.
 | `intensity` | 20 | `intensity` |
 | `range` | 12 m | `range` |
 
-### Rigid Body (`BodyComponent`, `body`)
+### Starrkörper (Box3D) (Rigid Body (Box3D); `BodyComponent`, `body`)
 
 | Feld | Standard | Schlüssel | Bedeutung |
 |---|---|---|---|
@@ -186,7 +189,7 @@ Tensor (zusammen mit `mass`), wie bei importierten Robotern (MJCF, URDF); sonst 
 und Dichten. Geschrieben werden `centerOfMass` und `inertia` nur in diesem Fall, der Tensor mit
 sieben signifikanten Stellen, weil seine Einträge viele Größenordnungen umfassen.
 
-### Collider (`ColliderComponent`, Liste `colliders`)
+### Kollider (Collider; `ColliderComponent`, Liste `colliders`)
 
 | Feld | Standard | Schlüssel | Bedeutung |
 |---|---|---|---|
@@ -204,7 +207,7 @@ sieben signifikanten Stellen, weil seine Einträge viele Größenordnungen umfas
 | `group` | 0 | `group` | Gruppenindex (negativ: nie untereinander) |
 | `impact_sound` | `auto` | `impactSound` | `auto` = der des Bodys, „“/`none` = still; so klingt eine Sohle anders als ein Gehäuse |
 
-### Constraint (`JointComponent`, Liste `joints`)
+### Gelenk (Constraint; `JointComponent`, Liste `joints`)
 
 | Feld | Standard | Schlüssel | Bedeutung |
 |---|---|---|---|
@@ -234,7 +237,7 @@ Das Servo-Gesetz ist Moment = `servo_stiffness` × (`servo_target` − Winkel) �
 Geschwindigkeit, höchstens `max_motor_force`, mit `servo_friction` Gelenkreibung
 ([Kapitel 6](06-physik.md), Abschnitt 6.17).
 
-### Player Controller (`ControllerComponent`, `controller`)
+### Spieler-Steuerung (Player Controller; `ControllerComponent`, `controller`)
 
 | Feld | Standard | Schlüssel | Bedeutung |
 |---|---|---|---|
@@ -245,7 +248,7 @@ Geschwindigkeit, höchstens `max_motor_force`, mit `servo_friction` Gelenkreibun
 | `jump_speed` | 6 m/s | `jumpSpeed` | 0 = kein Sprung |
 | `boost` | `true` | `boost` | |
 | `boost_speed` | 60 m/s | `boostSpeed` | |
-| `hover_height` | 0,6 m | `hoverHeight` | Hovercar |
+| `hover_height` | 0,6 m | `hoverHeight` | Modus `hovercar` |
 | `camera` | `chase` | `camera` | `chase`, `firstPerson`, `topDown` |
 | `camera_distance`, `camera_height`, `camera_fov` | 12, 4, 62 | `cameraDistance`, `cameraHeight`, `cameraFov` | |
 | `engine_sound` | `auto` | `engineSound` | Loop, Pitch und Lautstärke folgen Tempo und Gas; `auto` = der des Bewegungsmodus |
@@ -265,7 +268,7 @@ Die Walker-Schlüssel werden nur bei `mode = walker` geschrieben (`kernExtras` u
 Beim Lesen wird `gait` auf `velstand`/`alpha` und `actions` auf `training`/`robot` normalisiert.
 Was die Walker-Felder bewirken, beschreibt [Kapitel 13](13-micro-duck.md).
 
-### Waffe (`WeaponComponent`, `weapon`)
+### Waffe (Weapon; `WeaponComponent`, `weapon`)
 
 Eine Hitscan-Waffe für Soldaten-Spieler (im Mehrspieler serverautoritativ und lag-kompensiert).
 
@@ -298,7 +301,7 @@ Eine Hitscan-Waffe für Soldaten-Spieler (im Mehrspieler serverautoritativ und l
 Sounds: Pistole `builtin:pistol`, Schrotflinte `builtin:launcher`, Scharfschützengewehr
 `builtin:sniper`.
 
-### Gesundheit (`HealthComponent`, `health`)
+### Gesundheit (Health; `HealthComponent`, `health`)
 
 | Feld | Standard | Schlüssel |
 |---|---|---|
@@ -335,14 +338,14 @@ Sounds: Pistole `builtin:pistol`, Schrotflinte `builtin:launcher`, Scharfschütz
 | `strength` | 12 | `strength` | Launch: m/s nach oben (plus vorwärts entlang X des Triggers); Damage: Schadenspunkte |
 | `target` | 0 | `target` | Teleport: Actor, an dem man ankommt |
 
-### Audio Source (`AudioComponent`, `audio`)
+### Audioquelle (Audio Source; `AudioComponent`, `audio`)
 
 | Feld | Standard | Schlüssel |
 |---|---|---|
 | `sound` | `builtin:hum` | `sound` (`builtin:<name>` oder importierte Sound-ID) |
 | `volume` | 1 (0..4) | `volume` |
 | `pitch` | 1 | `pitch` |
-| `loop`, `autoplay` | `true`, `true` | `loop`, `autoplay` (startet mit Play/Simulate) |
+| `loop`, `autoplay` | `true`, `true` | `loop`, `autoplay` (startet mit **Spielen** (Play) / **Simulieren** (Simulate)) |
 | `spatial` | `true` (3D am Actor; sonst 2D auf seinem Bus) | `spatial` |
 | `min_distance`, `max_distance` | 2 m, 40 m | `minDistance`, `maxDistance` |
 | `rolloff` | `inverse` | `rolloff` |
@@ -351,7 +354,7 @@ Sounds: Pistole `builtin:pistol`, Schrotflinte `builtin:launcher`, Scharfschütz
 | `pitch_by_speed` | 0 (zusätzlicher Pitch pro m/s des Bodys) | `pitchBySpeed` |
 | `delay` | 0 s nach dem Start | `delay` |
 
-### Rotator, Mover, City
+### Rotator, Beweger (Mover), Prozedurale Stadt (Procedural City)
 
 | Komponente | Feld | Standard | Schlüssel |
 |---|---|---|---|
@@ -401,7 +404,7 @@ Betrag. Beides berechnet `GameWorld::animated_local` aus der Simulationszeit.
 | `time_limit` | 0 | `timeLimit` | Sekunden, 0 = keins |
 | `score_target` | 0 | `scoreTarget` | für `score` |
 | `player` | 0 | `player` | der gesteuerte Actor (0 = der erste mit Controller) |
-| `observer` | `false` | `observer` | Play beginnt mit freier Kamera (fliegen, zuschauen, Körper greifen; F8 übernimmt den Spieler) |
+| `observer` | `false` | `observer` | das Spielen beginnt mit freier Kamera (fliegen, zuschauen, Körper greifen; F8 übernimmt den Spieler) |
 | `master_volume` | 1 | `masterVolume` | |
 | `music`, `music_volume` | „“, 0,6 | `music`, `musicVolume` | Musik-Loop auf dem Music-Bus |
 | `ambience`, `ambience_volume` | „“, 0,6 | `ambience`, `ambienceVolume` | Ambience-Loop |
@@ -494,20 +497,20 @@ abweichen. Die Komponenten-Schlüssel stehen in den Tabellen von 8.4.
 
 ### Prüfen: `validate(level)`
 
-`validate` liefert `Issue`s (`error`, `actor`, `text`). **Fehler** verhindern Play, **Warnungen**
-erscheinen im Output Log.
+`validate` liefert `Issue`s (`error`, `actor`, `text`). **Fehler** verhindern das Spielen
+(**Spielen** (Play)), **Warnungen** erscheinen im **Ausgabeprotokoll** (Output Log).
 
 | Fehler | Warnungen |
 |---|---|
 | fehlende oder doppelte ID | Gelenk an einem Actor ohne Body (wird ignoriert) |
 | Eltern-Actor existiert nicht | Gelenkziel ohne Body und ohne Kollision (wird ignoriert) |
-| Transform nicht endlich | Sound-Referenz existiert nicht (bleibt still) – für Body, Collider, Gelenk, Controller, Waffe, Gesundheit, Pickup, Trigger, Audio Source, Musik, Ambience |
-| Skalierung (nahezu) 0 | Audio Source ohne Sound |
+| Transform nicht endlich | Sound-Referenz existiert nicht (bleibt still) – für Body, Collider, Gelenk, Controller, Waffe, Gesundheit, Pickup, Trigger, Audioquelle, Musik, Ambience |
+| Skalierung (nahezu) 0 | Audioquelle ohne Sound |
 | Gelenk verbindet den Actor mit sich selbst | Waffe ohne Soldaten-Controller |
 | Gelenkziel existiert nicht | Controller an einem nicht dynamischen Body |
 | Gelenkachse ist null | Pickup/Trigger mit Collidern, aber keiner ist Sensor |
-| Controller ohne Body am selben Actor | mehr als ein Player Controller (der erste wird übernommen) |
-| City ist nicht auf oberster Ebene | Ziel „reach goal“, aber kein Goal-Trigger |
+| Controller ohne Body am selben Actor | mehr als eine Spieler-Steuerung (die erste wird übernommen) |
+| City ist nicht auf oberster Ebene | Ziel „reach goal“, aber kein `goal`-Trigger |
 
 `sound_reference_ok` akzeptiert „“, `none`, `auto`, ein bekanntes `builtin:<name>` oder eine
 importierte Sound-ID.
@@ -560,13 +563,14 @@ statischer Body; Münze als impliziter kinematischer Sensor; Boden).
 4. Alle Actors „lebendig“; ob das Level Logik-Graphen hat (davon hängen die Events ab).
 5. **Reihenfolge:** Actors Eltern vor Kindern (`order_`).
 6. **Bodies** aus `plan_bodies` (`create_body`, siehe unten).
-7. **Gelenke** aller Actors (`create_joints`), dann **Walker** (`create_walkers`).
+7. **Gelenke** aller Actors (`create_joints`), dann **Walker-Roboter** (`create_walkers`).
 8. **Stadtverkehr:** kinematische Autos (Box 4 × 1,9 × 1,6 m, schlafen nie) auf den Fahrspuren.
-9. **Spieler** (nur Play): `default_player`, wenn er einen dynamischen Body hat, sonst der erste
+9. **Spieler** (nur beim **Spielen** (Play)): `default_player`, wenn er einen dynamischen Body hat, sonst der erste
    übernehmbare Actor. Er bekommt einen Pawn mit Spawn-Pose; Charaktere und Soldaten wechseln auf
    den Character Mover.
-10. **Regeln:** HUD zurücksetzen (Bestzeit bleibt), Titel, Zahl der Pickups, Status `playing` (Play)
-    bzw. `inactive` (Simulate), Zeitlimit, Boost; in Play erscheint der Titel als Meldung.
+10. **Regeln:** HUD zurücksetzen (Bestzeit bleibt), Titel, Zahl der Pickups, Status `playing` (beim
+    Spielen) bzw. `inactive` (beim **Simulieren** (Simulate)), Zeitlimit, Boost; beim Spielen erscheint
+    der Titel als Meldung.
 11. **Kampf:** Gesundheit und Munition initialisieren.
 12. Weltmatrizen berechnen, **Logik** starten (`start_logic`, dann `begin`).
 
@@ -574,7 +578,7 @@ statischer Body; Münze als impliziter kinematischer Sensor; Boden).
 
 - Typ, Pose und – bei expliziten Bodies – Dämpfung, Gravity Scale, Bullet, Wach/Schlaf und
   Anfangsgeschwindigkeiten (Drehung Grad/s → rad/s).
-- **Spieler-Fahrzeuge** (Hovercar, Vehicle) sind immer Bullets; **Spieler schlafen nie**.
+- **Spieler-Fahrzeuge** (Modi `hovercar` und `vehicle`) sind immer Bullets; **Spieler schlafen nie**.
 - Jede Form: Dichte, Reibung, Restitution, Rollwiderstand, Oberfläche, Sensor, Kanäle, Gruppe;
   der Benutzerwert ist der beitragende Actor (so findet ein Treffer den eingeschweißten Kopf).
 - Events nur, wo sie gelesen werden: Sensor-Events für Sensoren, Spieler und (mit Logik) alles
@@ -582,7 +586,7 @@ statischer Body; Münze als impliziter kinematischer Sensor; Boden).
   Aufprall-Sound oder Logik.
 - Abgelehnte Formen werden übersprungen und gemeldet („Collider of "…" skipped: …“).
 - Masse: `mass > 0` bei dynamischen Bodies → mit explizitem Tensor `set_mass_data`, sonst `set_mass`.
-- Sperren aus der Komponente; Controller außer Rolling Ball und Walker sperren zusätzlich Rollen und
+- Sperren aus der Komponente; Controller außer den Modi `rolling` und `walker` sperren zusätzlich Rollen und
   Nicken (Fahrzeuge, Charaktere und Flieger bleiben aufrecht).
 
 ### `create_joints`
@@ -614,15 +618,17 @@ statischer Body; Münze als impliziter kinematischer Sensor; Boden).
 |---|---|
 | `none` | keine Simulation (Editor) |
 | `simulate` | Physik und Logik laufen, niemand wird gesteuert; Körper lassen sich greifen |
-| `play` | wie Simulate, dazu der übernommene Spieler, Regeln und HUD |
+| `play` | wie `simulate`, dazu der übernommene Spieler, Regeln und HUD |
 | `replica` | Kopie eines Server-Spiels für einen Netzwerk-Client: Körper folgen gesetzten Posen, Regeln laufen auf dem Server ([Kapitel 10](10-netzwerk.md)) |
 
-`set_mode` wechselt zwischen Simulate und Play im Lauf (Studio: F8 „Eject“/„Possess“); der Pawn
-behält seinen Zustand. `restart` startet das ursprüngliche Level neu, `set_paused` hält an,
-`step_once` macht genau einen festen Schritt (auch pausiert; Studio: „Frame“, Taste `.`).
+`set_mode` wechselt zwischen `simulate` und `play` im Lauf (Studio: F8, **Spielen › Aus dem Spieler
+aussteigen** (Play › Eject from Player) bzw. **Spielen › Spieler übernehmen** (Play › Possess
+Player)); der Pawn behält seinen Zustand. `restart` startet das ursprüngliche Level neu, `set_paused`
+hält an, `step_once` macht genau einen festen Schritt (auch pausiert; Studio: **Spielen › Ein Bild
+weiter** (Play › Advance One Frame), Taste `.`).
 `session()` zählt Starts, damit Zuhörer einen neuen Lauf bemerken.
 
-![Simulate im Studio: die Physik läuft, niemand wird gesteuert, Körper lassen sich greifen](bilder/studio-simulate.png)
+![Simulieren im Studio: die Physik läuft, niemand wird gesteuert, Körper lassen sich greifen](bilder/studio-simulate.png)
 
 ---
 
@@ -638,10 +644,10 @@ merkt es sich die Posen beweglicher Körper. Ein fester Schritt, `fixed_step(inp
 1. **Spieler** (nur bei Status `playing`): für jeden Pawn die Eingabe wählen (lokal: die des
    Frames; entfernt: die zuletzt empfangene), Blickrichtung übernehmen, Eingabe-Events für Logik
    (`logic_inputs`), dann je nach Modus `drive_soldier`, `drive_walker` oder `drive_player`. Der
-   lokale Pawn ruht nach Eject in Simulate.
+   lokale Pawn ruht nach dem Aussteigen (F8) im Modus `simulate`.
 2. **Kinematische Animation:** Weltmatrizen für `t + h`, und jeder Rotator-/Mover-Body bekommt per
    `set_target_pose` sein Ziel.
-3. **Verkehr** (`drive_traffic`; Autos halten vor dem Spieler), **Walker** (`drive_walkers`),
+3. **Verkehr** (`drive_traffic`; Autos halten vor dem Spieler), **Walker-Roboter** (`drive_walkers`),
    **Servos** (`drive_servos`), **Maus-Griff** (`grab_.update`).
 4. **`physics_.step(h, substeps)`** (Sub-Steps 1..16).
 5. Schrittzähler und `sim_time_`; HUD-Zeit und Restzeit.
@@ -667,8 +673,8 @@ Danach läuft die Tageszeit weiter (`day_length`), die Walker-Stimmen werden vor
 
 1. Editor-Kameras und Touch-Steuerung aktualisieren.
 2. Beim Spielen: Eingabe sammeln; mit Netz `update_net` ([Kapitel 10](10-netzwerk.md)), sonst
-   `world_->step(dt, input)`; Logik-Breakpoints prüfen; Play-Kamera (`update_camera`); Meldungen
-   der Welt ins Output Log.
+   `world_->step(dt, input)`; Logik-Breakpoints prüfen; Spielkamera (`update_camera`); Meldungen
+   der Welt ins **Ausgabeprotokoll** (Output Log).
 3. Beim Editieren: Level mit der Welt synchronisieren.
 4. Overlays, `present`, Audio (`update_audio`), dann jeden sichtbaren Viewport rendern.
 
@@ -692,18 +698,19 @@ Danach läuft die Tageszeit weiter (`day_length`), die Walker-Stimmen werden vor
 | `look_stick_x`, `look_stick_y`, `gamepad` | rechter Gamepad-Stick, Eingabe vom Pad |
 | `rewind` | Server: Sekunden, die der Schütze die Welt in der Vergangenheit sah (Lag-Kompensation) |
 
-Bewegung ist bei Rolling Ball, Charakter und Flieger **kamerarelativ**. Die Modi
-(`drive_player`, `drive_soldier`, `drive_walker`):
+Bewegung ist bei **Rollende Kugel** (Rolling ball), **Figur** (Character) und **Flieger** (Flyer)
+**kamerarelativ**. Die Modi heißen hier wie in der Auswahl **Spieler-Steuerung › Bewegung** (Player
+Controller › Movement) im Details-Panel (`drive_player`, `drive_soldier`, `drive_walker`):
 
 | Modus | Umsetzung |
 |---|---|
-| **Hovercar** | Gas als Kraft entlang der Fahrzeugachse (rückwärts 1,25-fach, Boost +42 m/s²), Höchstgeschwindigkeit als Gegenkraft, Rollwiderstand ohne Gas; **Seitenhaftung als Kraft** (stetige Impulse kämpfen gegen den Solver); Lenkung als Gierrate proportional zur Geschwindigkeit bis 9 m/s. Eine **Schwebefeder** über einem Box3D-Strahl hält `hover_height`. Sichtbares Wippen und Neigen sind nur Darstellung. |
-| **Vehicle** | wie Hovercar ohne Schwebefeder; angetrieben wird nur mit Bodenkontakt (Kugelprobe). |
-| **Rolling Ball** | Kraft in Bewegungsrichtung; **Sprung als Impuls** m · (`jump_speed` − v_z), nur am Boden; Höchstgeschwindigkeit als Gegenkraft. |
-| **Character** | Box3Ds **Character Mover** ([Kapitel 6](06-physik.md)): Der Body wird kinematisch, die Kapsel wird aus seinen Formen bemessen (Füße am tiefsten, Kopf am höchsten Punkt, Stufenhöhe 22 % der Höhe), Bodenbewegung wie in klassischen Ego-Shootern, Schwerkraft 1,5-fach (knackiger). Der Körper dreht sich weich in Laufrichtung und folgt per `set_target_pose`. Schritte nach Schrittlänge; Trigger und Pickups über die berührten Ebenen. |
-| **Flyer** | Zielgeschwindigkeit inklusive Hoch/Runter, Beschleunigung als Kraft, die die Schwerkraft aufhebt; Gieren zur Kamerarichtung. |
-| **Soldier** | Character Mover mit echter Schwerkraft (Sprung 3,6 m/s → 0,66 m), siehe 8.13. |
-| **Walker** | Die Eingabe geht an den Controller des Roboters, der seine Servos mit der trainierten Policy treibt ([Kapitel 13](13-micro-duck.md)). |
+| **Hovercar** (Hover car) | Gas als Kraft entlang der Fahrzeugachse (rückwärts 1,25-fach, Boost +42 m/s²), Höchstgeschwindigkeit als Gegenkraft, Rollwiderstand ohne Gas; **Seitenhaftung als Kraft** (stetige Impulse kämpfen gegen den Solver); Lenkung als Gierrate proportional zur Geschwindigkeit bis 9 m/s. Eine **Schwebefeder** über einem Box3D-Strahl hält `hover_height`. Sichtbares Wippen und Neigen sind nur Darstellung. |
+| **Fahrzeug** (Vehicle) | wie **Hovercar** ohne Schwebefeder; angetrieben wird nur mit Bodenkontakt (Kugelprobe). |
+| **Rollende Kugel** | Kraft in Bewegungsrichtung; **Sprung als Impuls** m · (`jump_speed` − v_z), nur am Boden; Höchstgeschwindigkeit als Gegenkraft. |
+| **Figur** | Box3Ds **Character Mover** ([Kapitel 6](06-physik.md)): Der Body wird kinematisch, die Kapsel wird aus seinen Formen bemessen (Füße am tiefsten, Kopf am höchsten Punkt, Stufenhöhe 22 % der Höhe), Bodenbewegung wie in klassischen Ego-Shootern, Schwerkraft 1,5-fach (knackiger). Der Körper dreht sich weich in Laufrichtung und folgt per `set_target_pose`. Schritte nach Schrittlänge; Trigger und Pickups über die berührten Ebenen. |
+| **Flieger** | Zielgeschwindigkeit inklusive Hoch/Runter, Beschleunigung als Kraft, die die Schwerkraft aufhebt; Gieren zur Kamerarichtung. |
+| **Soldat (Ego-Shooter)** (Soldier (first person shooter)) | Character Mover mit echter Schwerkraft (Sprung 3,6 m/s → 0,66 m), siehe 8.13. |
+| **Läufer (Roboter auf seinem trainierten Netz)** (Walker (robot on its trained network)) | Die Eingabe geht an den Controller des Roboters, der seine Servos mit der trainierten Policy treibt ([Kapitel 13](13-micro-duck.md)). |
 
 Gemeinsam: Boost ist ein Vorrat 0..1 (−0,45/s beim Boosten, +0,12/s sonst), Landungen nach freiem
 Fall über 3,5 m/s spielen `builtin:land`, Sprünge und Boost ihre Sounds.
@@ -751,12 +758,12 @@ Schadensrichtung, `respawn_in`, `aiming`, `fov`).
 | Ziel | Gewonnen / verloren |
 |---|---|
 | `none` | Sandbox |
-| `collectAll` | alle Pickups gesammelt; gibt es einen Goal-Trigger, muss man ihn danach erreichen („Collect everything first“) |
-| `reachGoal` | Goal-Trigger erreicht |
+| `collectAll` | alle Pickups gesammelt; gibt es einen `goal`-Trigger, muss man ihn danach erreichen („Collect everything first“) |
+| `reachGoal` | `goal`-Trigger erreicht |
 | `survive` | Zeitlimit überstanden |
 | `score` | Zielpunktzahl erreicht |
 
-Mit Zeitlimit verliert man bei 0, außer bei `survive`. Ein Hazard-Trigger verliert immer.
+Mit Zeitlimit verliert man bei 0, außer bei `survive`. Ein `hazard`-Trigger verliert immer.
 `finish` setzt den Status, spielt den Jingle, merkt die Bestzeit (bei `collectAll`/`reachGoal`) und
 feuert das Logik-Event `game.over`.
 
@@ -780,8 +787,8 @@ solange der Sammler volle Gesundheit hat), Punkte, Zähler, Sound, Partikel, Log
 | `damage` | `strength` Schaden für den Spieler | – |
 | `event` | nur das Logik-Event (und die Meldung) | – |
 
-Vor der Aktion feuert jeder Trigger das Logik-Event `game.trigger`. Mit `once` (außer Goal und
-Hazard) ist er danach verbraucht.
+Vor der Aktion feuert jeder Trigger das Logik-Event `game.trigger`. Mit `once` (außer `goal` und
+`hazard`) ist er danach verbraucht.
 
 ---
 
@@ -820,7 +827,7 @@ festen Schritten auf der Autorität.
 Test: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 `soldier_models_are_closed_and_outward`, im Netz `net_game_soldier_replication`.
 
-![Play im Studio mit HUD](bilder/studio-play.png)
+![Spielen im Studio mit HUD](bilder/studio-play.png)
 
 ---
 
@@ -879,20 +886,20 @@ world.stop();  audio.end();
 
 - `SoundBank` macht aus Referenzen Mixer-Clips: Built-ins werden in Zeitscheiben synthetisiert
   (`prepare(budget_ms)`), importierte Dateien dekodiert der Host und liefert PCM (`set_pcm`).
-  `request_level` fordert alles an, was ein Level braucht – Play beginnt dann mit allem an Ort.
+  `request_level` fordert alles an, was ein Level braucht – das Spiel beginnt dann mit allem an Ort.
 - `GameAudio::update` beginnt mit jedem neuen Lauf der Welt (Start, Neustart), pausiert mit ihr, setzt
-  den Hörer an die Kamera, startet Musik, Ambience und Audio Sources, führt den **Motor-Loop** des
+  den Hörer an die Kamera, startet Musik, Ambience und Audioquellen, führt den **Motor-Loop** des
   Spielers (Pitch und Lautstärke folgen Tempo und Gas; ohne Doppler, weil die Kamera folgt) und
   spielt alle Cues. Ein Cue, dessen Clip noch nicht bereit ist, wartet kurz und fällt weg, wenn er
   zu spät käme.
-- `engine_sound_for(controller)`: `auto` ist bei Hovercar und Flyer `builtin:hover`, bei Vehicle
-  `builtin:engine`, bei Walker `builtin:servo`, sonst keiner.
+- `engine_sound_for(controller)`: `auto` ist bei den Modi `hovercar` und `flyer` `builtin:hover`, bei
+  `vehicle` `builtin:engine`, bei `walker` `builtin:servo`, sonst keiner.
 
 ---
 
 ## 8.16 Touch, Maus und Gamepad
 
-`include/kern/game/touch.h` bringt SpawnCitys Touch-System nach C++, damit Studio-Play, exportierte
+`include/kern/game/touch.h` bringt SpawnCitys Touch-System nach C++, damit Studio beim Spielen, exportierte
 Spiele und jeder Controller dieselbe Umsetzung nutzen.
 
 **`InputArbiter`** entscheidet, welches Gerät gerade benutzt wird; das zuletzt benutzte gewinnt, mit
@@ -908,18 +915,21 @@ SpawnCitys Regeln:
 **`TouchControls`** legt das Overlay an und rechnet Finger in `PlayInput` um:
 
 - **Zwei Sticks** von 168 px bündig in den unteren Ecken an den Safe-Area-Rändern (kleiner nur, wenn
-  zwei nicht passen; mindestens 72 px). Links bewegen („STEER / GAS“ bei Fahrzeugen, „FLY“ beim
-  Flieger, sonst „MOVE“), rechts schauen („LOOK“).
-- **Buttons je Controller**, die untere Reihe links neben dem Look-Stick, weitere darüber:
+  zwei nicht passen; mindestens 72 px). Links bewegen (**LENKEN / GAS** (STEER / GAS) bei Fahrzeugen,
+  **FLIEGEN** (FLY) beim Flieger, sonst **LAUFEN** (MOVE)), rechts schauen (**SCHAUEN** (LOOK)).
+  Exportierte Spiele und Studio zeigen die Beschriftungen in der Sprache der Oberfläche.
+- **Knöpfe je Controller**, die untere Reihe links neben dem Look-Stick, weitere darüber
+  (`src/game/touch.cpp`):
 
-| Modus | Buttons |
-|---|---|
-| Soldier | JUMP, RELOAD und AIM (beide nur mit Waffe; AIM ist ein Schalter), CROUCH (Schalter), USE |
-| Walker | QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE, HOP |
-| Character | JUMP (mit Sprung), USE |
-| Rolling Ball | JUMP, BOOST (wenn vorhanden) |
-| Flyer | UP, DOWN, BOOST |
-| Hovercar, Vehicle | BOOST, HOP (mit Sprung), USE |
+| Modus | Knöpfe | Bedingungen |
+|---|---|---|
+| **Soldat** (Soldier) | **SPRUNG** (JUMP), **LADEN** (RELOAD), **ZIELEN** (AIM), **DUCKEN** (CROUCH), **NUTZEN** (USE) | **LADEN** und **ZIELEN** nur mit Waffe; **ZIELEN** und **DUCKEN** sind Schalter |
+| **Läufer** (Walker) | **QUAK** (QUACK), **GREIFEN** (PICK), **SITZ** (SIT), **KICK L**, **KICK R**, **ROLLEN** (ROLL), **SCHNABEL** (BEAK), **HUIII** (WHEEE), **HÜPFEN** (HOP) | – |
+| **Figur** (Character) | **SPRUNG**, **NUTZEN** | **SPRUNG** nur mit Sprung |
+| **Rollende Kugel** (Rolling Ball) | **SPRUNG**, **BOOST** | **SPRUNG** nur mit Sprung, **BOOST** nur mit Boost |
+| **Flieger** (Flyer) | **HOCH** (UP), **RUNTER** (DOWN), **BOOST** | **BOOST** nur mit Boost |
+| **Hovercar** (Hover Car) | **BOOST**, **DRIFT**, **LIFT**, **SICHT** (VIEW) | **BOOST** nur mit Boost; **DRIFT** ist die Handbremse hinten; **LIFT** hebt mit den Hubdüsen, nur mit Sprung; **SICHT** wechselt zwischen Verfolger- und tiefer Innenansicht |
+| **Fahrzeug** (Vehicle) | **BOOST**, **DRIFT**, **HÜPFEN**, **SICHT** | **BOOST** nur mit Boost; **HÜPFEN** nur mit Sprung |
 
 - **Zuständigkeit pro Finger:** Buttons vor Sticks vor Bildschirm. Ein Finger auf dem Bildschirm
   feuert beim Soldaten (und zielt mit), sonst schaut er.
@@ -939,7 +949,7 @@ und die Zielraten des Soldaten an (`web/studio/game.mjs`, `GamepadInput`). Tests
 ## 8.17 Logik in der Welt
 
 Jeder Actor und das Level können einen Logik-Graphen tragen. Die GameWorld startet sie auf der
-Autorität (Standalone oder Server) in Play und Simulate, liefert ihnen Ereignisse (Überlappung,
+Autorität (Standalone oder Server) beim Spielen und Simulieren, liefert ihnen Ereignisse (Überlappung,
 Treffer, Pickup, Trigger, Schaden, Tod, Respawn, Interact, Eingabe, Taste, Spielende, neuer Spieler)
 und bietet ihren Knoten Operationen an (`set_property`, `spawn_copy`, `teleport`, `push_actor`,
 `set_joint_motor`, `line_trace`, `add_score`, `end_game` …). Was Logik ändert, wird für das Netz
@@ -949,17 +959,17 @@ mitgeschrieben. Alles Weitere in [Kapitel 9](09-logik.md).
 
 ## 8.18 Die Demo-Levels
 
-`include/kern/game/demos.h` enthält die eingebauten Levels; Studio bietet sie unter File › Example
-Levels und File › New Level an.
+`include/kern/game/demos.h` enthält die eingebauten Levels; Studio bietet sie unter **Datei › Beispiel-Levels**
+(File › Example Levels) und **Datei › Neues Level...** (File › New Level...) an.
 
 | Funktion | Level | Inhalt |
 |---|---|---|
 | `orb_run_level()` | **Orb Run** | Prozedurale Stadt mit Verkehr; ein Box3D-Hovercar (1200 kg, Box-Collider, Reibung 0,25; Kabine, Spoiler, vier leuchtende Düsen und Scheinwerfer als eingeschweißte Kinder) mit Chase-Kamera; 24 Energie-Orbs (Pickups mit Sensor-Kugel 2,4 m, Rotator, Mover, Licht) auf den Straßen; Ziel `collectAll`; spät am Nachmittag mit 480 s Tageslänge – der Lauf endet in der Nacht; Musik `music_drive`, Ambience `city`. Studio startet mit diesem Level. |
-| `physics_lab_level()` | **Physics Lab** | Alle Gelenktypen und Bewegungsarten: Kistenpyramide (schlafend gestartet), Pendel an einem Distance-Gelenk, Tür an einem Scharnier mit Limits und Schließfeder, Seilbrücke aus 12 Planken (drei mittlere Gelenke brechen bei 60 000 N), Drehteller mit Motor (45°/s) und drei Mitfahrern, Lift auf einem Slider mit Motor und Limit, ein selbstfahrender Rover auf vier Wheel-Gelenken mit Federung und Antrieb; der Spieler ist eine rollende Kugel, dazu fünf Sterne, ein rotierender Hazard-Kehrer und ein Goal; Ziel `reachGoal`. |
+| `physics_lab_level()` | **Physics Lab** | Alle Gelenktypen und Bewegungsarten: Kistenpyramide (schlafend gestartet), Pendel an einem Distance-Gelenk, Tür an einem Scharnier mit Limits und Schließfeder, Seilbrücke aus 12 Planken (drei mittlere Gelenke brechen bei 60 000 N), Drehteller mit Motor (45°/s) und drei Mitfahrern, Lift auf einem Slider mit Motor und Limit, ein selbstfahrender Rover auf vier Wheel-Gelenken mit Federung und Antrieb; der Spieler ist eine rollende Kugel, dazu fünf Sterne, ein rotierender Kehrer mit `hazard`-Trigger und ein `goal`-Trigger; Ziel `reachGoal`. |
 | `shooting_range_level()` | **Shooting Range** | Ego-Shooter-Schießstand: Soldat mit Gewehr, Gesundheit und Kopf; acht Zielpuppen (Gesundheit mit schneller Regeneration, Kopf-Tag) in 10–60 m, Deckung, verschiebbare Kisten und ein Fass, ein Turm mit Rampe; Ziel 150 Punkte; im Mehrspieler unverändert spielbar. |
-| `micro_duck_level()` | **Micro Duck** | Ein Zimmer im Maßstab des Roboters (2,5 × 2,5 m echt, also 10 × 10 m in der Welt): Holzboden (Reibung 1, Oberfläche `floor`), Wände, Schuhkarton, Bücher, Kiste, Blumentopf, ein leichter Ball (Rollwiderstand 0,03), zwei Socken; die Ente autonom und mit Kerns Spielnetz; 100 Hz, 16 Sub-Steps, kein endloser Boden; **Observer-Kamera**; ein Level-Graph lässt die Ente zwitschern, sobald ihre Kopfkamera den Ball sieht. |
-| `basic_level()` | **Basic** | Boden 40 × 40 m und ein Würfel. |
-| `empty_level()` | **Empty** | nichts, auch kein endloser Boden. |
+| `micro_duck_level()` | **Micro Duck** | Ein Zimmer im Maßstab des Roboters (2,5 × 2,5 m echt, also 10 × 10 m in der Welt): Holzboden (Reibung 1, Oberfläche `floor`), Wände, Schuhkarton, Bücher, Kiste, Blumentopf, ein leichter Ball (Rollwiderstand 0,03), zwei Socken; die Ente autonom und mit Kerns Spielnetz; 100 Hz, 16 Sub-Steps, kein endloser Boden; **Beobachterkamera**; ein Level-Graph lässt die Ente zwitschern, sobald ihre Kopfkamera den Ball sieht. |
+| `basic_level()` | **Grundformen** (Basic) | Boden 40 × 40 m und ein Würfel. |
+| `empty_level()` | **Leer** (Empty) | nichts, auch kein endloser Boden. |
 
 Tests: `game_world_orb_run_play`, `game_world_physics_lab`, `game_shooting_range_template`,
 `micro_duck_example_level_runs`, `studio_starts_with_orb_run`.
@@ -991,8 +1001,8 @@ Tests: `game_world_orb_run_play`, `game_world_physics_lab`, `game_shooting_range
 | `game_city_generation` | Stadtgenerator |
 | `game_world_presentation` | Darstellung |
 | `game_world_orb_run_play` | Orb Run spielen |
-| `game_world_physics_lab` | Physics Lab (Gelenke, Bruch, Griff, Play-Wechsel) |
-| `game_world_rules` | Goal gewinnt, Hazard verliert, Bestzeit, Restzeit |
+| `game_world_physics_lab` | Physics Lab (Gelenke, Bruch, Griff, Wechsel zum Spielen) |
+| `game_world_rules` | `goal` gewinnt, `hazard` verliert, Bestzeit, Restzeit |
 | `game_orbit_camera_mouse_sense` | Kamerarichtung |
 | `game_soldier_moves_shoots_and_respawns` | Soldat |
 | `game_character_mover` | Character Mover |
