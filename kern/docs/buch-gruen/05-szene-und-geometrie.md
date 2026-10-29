@@ -52,13 +52,15 @@ bekommen die Häuser später ihre leuchtenden Fenster (5.8).
 
 > **Probier's aus!** Öffne Kern Studio auf https://kernengine.de/, hole dir mit der
 > **Inhaltsablage** (Content Drawer), der Bauteil-Kiste (Strg+Leertaste), aus der Gruppe **Formen**
-> (Shapes) eine **Kugel** (Sphere) und schalte mit **Alt+2** auf **Drahtgitter** (Wireframe). Die glatte Kugel zerfällt in ein Netz aus vielen kleinen, flachen Flächen. Das ist
+> (Shapes) eine **Kugel** (Sphere) – klick sie an, dann erscheint sie dort, wohin die Kamera
+> blickt – und schalte mit **Alt+2** auf **Drahtgitter** (Wireframe). Die glatte Kugel zerfällt in ein Netz aus vielen kleinen, flachen Flächen. Das ist
 > ihr Dreiecksnetz. Mit **Alt+4** kommst du zurück zum normalen Bild.
 
 ## 5.2 Frustum-Culling: Was nicht im Bild ist, wird nicht gemalt
 
-Die Kamera sieht nur einen Ausschnitt der Welt, geformt wie eine liegende Pyramide mit
-abgeschnittener Spitze: das **Frustum**. Was ganz außerhalb liegt, muss nicht gemalt werden. Dieses
+Die Kamera sieht nur einen Ausschnitt der Welt: die **Sichtpyramide** aus
+[Kapitel 3](03-grundlagen.md), eine liegende Pyramide mit abgeschnittener Spitze (Fachwort:
+**Frustum**). Die Abbildung dort zeigt sie von oben. Was ganz außerhalb liegt, muss nicht gemalt werden. Dieses
 Aussortieren heißt **Culling**. Es spart viel Arbeit, denn in einer Stadt liegt meist der größte Teil
 hinter oder neben dir.
 
@@ -69,8 +71,6 @@ Der Trick: Der Test muss viel billiger sein als das Malen, sonst lohnt er nicht.
 nicht jedes Dreieck, sondern legt um jedes Mesh eine **unsichtbare Kugel** und fragt nur: Liegt diese
 Kugel ganz außerhalb einer der **sechs Wände** der Pyramide (links, rechts, oben, unten, vorn, hinten)?
 Sechs kleine Rechnungen statt tausender Ecken.
-
-![Die Kamera-Pyramide von oben: Kugel A ganz draußen wird übersprungen, B drinnen und C halb am Rand werden gemalt](../abbildungen/sichtpyramide.svg)
 
 Der Test ist **vorsichtig**: Eine Kugel nahe einer Ecke der Pyramide wird manchmal unnötig gemalt,
 aber **nie** fälschlich weggelassen. Lieber einmal zu viel arbeiten, als dass ein Haus fehlt.
@@ -117,8 +117,8 @@ Alles darin liegt weiter weg als der Treffer, den Kern schon hat, kann also nich
 Dreieck sein.
 
 Eine BVH lohnt sich nur für große Dinge, die stillstehen, etwa die Häuser der Stadt. Wird so ein Ding
-verschoben, wirft Kern die Kästen weg; neu gepackt wird erst, wenn es wieder genau an seiner
-Ursprungslage steht. Kleine oder bewegte Dinge prüft Kern einfach Dreieck für Dreieck.
+verschoben, wirft Kern die Kästen weg. Kleine oder bewegte Dinge prüft Kern einfach Dreieck für
+Dreieck.
 
 > **Für Neugierige:** Weil jede Stufe halbiert, wächst der Kartonturm nur sehr langsam: Für doppelt
 > so viele Dreiecke braucht es nur eine Stufe mehr. Die genauen Bauregeln stehen im blauen Buch,
@@ -151,7 +151,7 @@ Kern Studio wählt deine Objekte genau so aus. Den Boden und gesperrte Objekte (
 versehentlichem Anklicken geschützt hast, [Kapitel 11](11-studio.md)) durchdringt der Strahl einfach.
 Lichter und leere Objekte haben keine Dreiecke; die wählst du über ihr kleines Symbol.
 
-> **Probier's aus!** Klicke im Viewport (dem großen 3D-Fenster) verschiedene Objekte an. Links im
+> **Probier's aus!** Klicke im Viewport (dem großen 3D-Fenster) verschiedene Objekte an. Rechts im
 > Outliner, der Liste aller Objekte, springt die Markierung mit. Jeder Klick ist ein Strahl auf der
 > Suche nach dem nächsten Dreieck.
 
@@ -251,10 +251,9 @@ Dachkante und einen Seed. Daraus macht er drei Dinge:
 
 1. **Aufräumen:** Punkte, die fast aufeinanderliegen, und winzige Umrisse fliegen raus. Alle
    Außenränder werden in dieselbe Umlaufrichtung gebracht, alle Innenhöfe in die Gegenrichtung. So
-   weiß Kern bei jeder Kante, wo „außen“ ist, und alle Wände schauen nach außen. Das ist wie beim
-   Umrunden eines Hauses mit der rechten Hand an der Wand: Läufst du immer gleich herum, ist „außen“
-   immer links von dir. Um einen Innenhof läufst du andersherum, und dann liegt links der Hof, also
-   die Seite, in die seine Wände schauen.
+   weiß Kern bei jeder Kante, wo „außen“ ist, und alle Wände schauen nach außen – wie
+   Wanderer, die alle im selben Drehsinn um einen See gehen und darum alle wissen, auf welcher
+   Seite das Wasser liegt.
 2. **Bauen:** Das Dach entsteht aus den Earcut-Dreiecken (5.5), Innenhöfe bleiben offen. Entlang jeder
    Kante entsteht eine Wand. Auf Wunsch kommt ein Gesims dazu, das vorstehende Band unter der
    Dachkante. Wandfarbe, Dachfarbe und Stockwerkshöhe würfelt der Seed aus.
@@ -272,6 +271,11 @@ darf wieder ein Bild gemalt werden, dann weiterbauen.
 Stadtplan. Jeder Chunk wird ein eigenes Mesh. Das ist ein Abwägen: Große Chunks bedeuten wenige
 Aufträge an die Grafikkarte (5.6), kleine Chunks lassen sich besser aussortieren (5.2).
 
+**Auch für Webseiten.** Den Häuserbauer – ebenso die Bauer für Straßen und Gelände aus 5.9 und
+5.10 – kann eine Webseite direkt benutzen, die Kern nur als Maler einsetzt. So baut das Spiel
+SpawnCity seine Stadt. Auch dort arbeitet der Bauer häppchenweise, damit die Seite beim Bauen nicht
+einfriert.
+
 > **Für Neugierige:** Die Stockwerkshöhe liegt je nach Seed zwischen 3,1 und 3,6 m. Alle weiteren
 > Maße und die Namen der Bauer stehen im blauen Buch, Kapitel 5.
 
@@ -285,7 +289,7 @@ Kern jede Straße in kurze Stücke, und jede Ecke fragt nach der Bodenhöhe an i
 > **Stell dir vor …** du legst Klebeband auf eine Bettdecke. Ein langes, steifes Brett würde über den
 > Hügeln schweben; viele kurze Stücke Klebeband schmiegen sich an.
 
-Die drei Bänder liegen je gut 2 cm übereinander.
+Die drei Bänder liegen ein kleines Stück übereinander.
 
 > **Achtung, Falle!** Liegen zwei Flächen exakt gleich hoch, weiß der Grafikprozessor nicht, welche
 > vorne ist, und sie flackern um die Wette: **Z-Fighting**. Die um wenige Zentimeter gestaffelten
@@ -402,7 +406,7 @@ Ente wird, erzählt [Kapitel 13](13-micro-duck.md).
 
 - Jede 3D-Form ist ein Netz aus Dreiecken; jede Ecke weiß, wo sie ist, welche Farbe sie hat und
   wohin ihre Fläche schaut (Normale).
-- Culling prüft eine unsichtbare Kugel pro Mesh gegen die Kamera-Pyramide – billig und nie
+- Culling prüft eine unsichtbare Kugel pro Mesh gegen die Sichtpyramide – billig und nie
   fälschlich unsichtbar.
 - Eine BVH sind Kartons in Kartons; sie macht das Anklicken schnell.
 - Picking schickt einen Strahl von der Maus in die Szene und nimmt das nächste Dreieck.

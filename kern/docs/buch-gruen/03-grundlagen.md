@@ -43,9 +43,11 @@ gemeinsamen Speicher zum Browser geht, ist auf beiden Seiten gleich groß.
 
 Viele Programmiersprachen haben für Fehler einen **Notfallknopf** (Fachwort: Ausnahme): Das Programm
 springt mitten aus der Arbeit heraus, bis irgendwo jemand den Notfall auffängt. Kern verzichtet
-darauf. Eine Funktion, die scheitern kann, antwortet schlicht **„Nein“** und hängt vorher einen
-Zettel mit dem Grund an eine Pinnwand. Wer sie aufgerufen hat, entscheidet selbst, was nun geschieht.
-Nichts reißt mitten in der Arbeit ab.
+darauf, denn ein Notfallknopf kann eine halbe Arbeit liegen lassen – wie ein Koch, der mitten im
+Rühren aus der Küche rennt: Der Topf steht noch auf dem Herd, und keiner weiß, wie weit er war.
+Eine Funktion, die scheitern kann, antwortet bei Kern darum schlicht **„Nein“** und hängt vorher
+einen Zettel mit dem Grund an eine Pinnwand. Wer sie aufgerufen hat, entscheidet selbst, was nun
+geschieht. Nichts reißt mitten in der Arbeit ab.
 
 Bekommt der Renderer zum Beispiel ein 3D-Modell mit kaputten Zahlen, antwortet er „Nein“, pinnt den
 Grund an, und das alte Modell bleibt unverändert stehen.
@@ -53,9 +55,7 @@ Grund an, und das alte Modell bleibt unverändert stehen.
 > **Stell dir vor …** Ein Hotel hat genau **eine** Pinnwand. Wer etwas meldet, hängt einen Zettel
 > hin und nimmt dabei den alten ab. Wer nachsieht, liest immer nur den neuesten.
 
-So funktioniert Kerns Fehlerkanal: eine Pinnwand für das ganze Programm, die auch die Browser-Seite
-lesen und abräumen kann. Nur einige Bausteine, etwa der JSON-Leser, geben ihren Zettel direkt dem
-zurück, der sie gerufen hat.
+So funktioniert Kerns Fehlerkanal: eine Pinnwand für das ganze Programm.
 
 > **Achtung, Falle!** Die Pinnwand zeigt den **neuesten** Zettel – nicht unbedingt den der Aufgabe,
 > nach der du fragst. Wer sicher gehen will, räumt die Pinnwand vorher ab. Und rechnen mehrere
@@ -69,8 +69,8 @@ zurück, der sie gerufen hat.
 
 ### Die Uhr gehört nicht in die Simulation
 
-Kern hat eine Uhr, die Millisekunden zählt. Sie dient **Messungen**: Wie lange hat etwas gedauert,
-ist die Zeit, die eine Aufgabe beim Start höchstens bekommt, schon aufgebraucht?
+Kern hat eine Uhr, die Millisekunden zählt. Sie dient **Messungen**: Wie lange hat etwas gedauert?
+Hat eine Aufgabe ihre erlaubte Zeit schon verbraucht?
 
 In der **Simulation** hat diese Uhr nichts verloren. Physik und Roboter zählen **feste Schritte**:
 Ein Takt ist immer gleich lang, egal wie schnell der Rechner ihn ausrechnet. Schaute die Ente auf die
@@ -84,8 +84,9 @@ Uhr, liefe sie auf einem langsamen Rechner anders als auf einem schnellen
 
 Was Kern unterwegs erlebt, schreibt es in ein **Logbuch** (Fachwort: Protokoll). Jede Meldung hat
 eine Stufe, von „nur zur Fehlersuche“ über „Hinweis“ und „Warnung“ bis „Fehler“. Im Browser landen
-die Meldungen in der Entwickler-Konsole des Browsers. Kann zum Beispiel der Glüheffekt nicht
-starten, schreibt Kern eine Warnung ins Logbuch, und das Spiel läuft ohne Glühen weiter – wieder
+die Meldungen in einem versteckten Fenster, das der Browser für Entwickler bereithält – das ist
+nicht die Cmd-Konsole von Studio. Kann zum Beispiel der Glüheffekt (das Leuchten um helle Lampen,
+[Kapitel 4](04-grafik.md)) nicht starten, schreibt Kern eine Warnung ins Logbuch, und das Spiel läuft ohne Glühen weiter – wieder
 „Nein sagen und weitermachen“ statt Absturz.
 
 ### Ein Fenster auf Daten
@@ -117,8 +118,7 @@ dieselbe Zahl; ändert sich nur ein Buchstabe, kommt eine völlig andere heraus.
 > dasselbe, ein guter Hash bemerkt die Vertauschung.
 
 Damit erkennt Kern schnell, ob sich etwas geändert hat: Der Renderer schickt eine lange Einstellung,
-etwa eine ganze Matrix, nur dann neu an die Grafikkarte, wenn ihr Hash anders ist; auch die
-Schattenkarte erkennt so, ob sie neu gemalt werden muss. Auch die **Prüfsumme** aus
+etwa die Lage eines Dings im Raum, nur dann neu an die Grafikkarte, wenn ihr Hash anders ist. Auch die **Prüfsumme** aus
 dem Fingerabdruck der Ente in [Kapitel 2](02-bauen-und-testen.md) ist genau so ein Hash – Prüfsumme
 und Hash sind dasselbe.
 
@@ -152,15 +152,15 @@ geschrieben hat.
 > schreibt genau dasselbe. Das ist Rundung: Computer zählen nur mit 0 und 1, im **Zweiersystem**. Dort
 > geht 0,1 so wenig auf wie 1/3 bei uns (0,3333 …, nie zu Ende). Gespeichert wird darum eine Zahl
 > knapp neben 0,1, ebenso bei 0,2, und ihre Summe landet ein winziges Stück neben der Zahl, die der
-> Computer für 0,3 speichert. Die kurze Schreibweise „0.3“ würde beim Wiedereinlesen aber genau diese
-> gespeicherte 0,3 ergeben – also eine andere Zahl. Um die Summe genau wiederzubekommen, braucht es
-> mehr Ziffern. Genau solche winzigen Abweichungen machen Kern beim Rechnen so penibel
+> Computer für 0,3 speichert. Darum schreibt Kern hier alle nötigen Ziffern hin – mit der kurzen
+> „0.3“ käme beim Wiedereinlesen nicht genau dieselbe Zahl heraus. (Programme schreiben übrigens
+> einen Punkt statt eines Kommas.) Genau solche winzigen Abweichungen machen Kern beim Rechnen so penibel
 > ([Kapitel 1](01-einfuehrung.md)).
 
 **3. Misstrauen gegenüber fremden Dateien.** Ein Level kann von irgendwem stammen. Darum lehnt Kern
 unendlich große Zahlen ab, absurd tief **geschachtelte** Einträge – Einträge in Einträgen in
-Einträgen, wie Kisten in Kisten in Kisten – und ein paar Eintragsnamen, die auf der Browser-Seite
-Unheil anrichten könnten.
+Einträgen, wie Kisten in Kisten in Kisten – und ein paar Eintragsnamen, die in JavaScript eine
+Sonderbedeutung haben und dort Programmteile verbiegen könnten.
 
 Dazu kommt Gelassenheit beim Lesen: Fehlt ein Eintrag, gibt es einen leeren Wert statt eines
 Absturzes. Hat ein Wert den falschen **Typ** – steht also zum Beispiel ein Text, wo eine Zahl
@@ -170,7 +170,7 @@ ganz geklappt hat**; sonst nennt es die Stelle, an der es hakte.
 > **Probier's aus!** Schau einem Level unter die Haube.
 > 1. **Datei › Neues Level...** (File › New Level...) und dort **Basis** (Basic): ein Boden
 >    und ein Würfel.
-> 2. Klick den Würfel an. Rechts in **Details** steht unter **Transformation** (Transform) das Feld
+> 2. Klick den Würfel an (im Outliner heißt er „Cube“). Rechts in **Details** steht unter **Transformation** (Transform) das Feld
 >    **Position** (Location) mit X, Y und Z. Z zeigt nach oben (mehr dazu in Abschnitt 3.3). Tippe bei Z eine **3** und drück
 >    Enter: Der Würfel schwebt 3 Meter hoch.
 > 3. **Datei › Speichern** (File › Save), Strg+S. Chrome und Edge fragen, wohin; andere Browser legen die Datei
@@ -197,7 +197,7 @@ sonst Abbruch mit dem Namen des schuldigen Eintrags. **Erst ganz am Ende** wird 
 
 Die Raum-Mathe ist das meistbenutzte Werkzeug von Kern: Bei jedem Bild braucht jedes bewegte Ding,
 jede Kamera und jeder Klick sie, oft tausendfach. Darum ist sie so gebaut, dass sie ohne Umwege
-rechnet und nie erst neuen Speicher anfordern muss – wie Kleingeld in der Hosentasche statt eines
+rechnet und nie erst Platz im Speicher suchen muss – wie Kleingeld in der Hosentasche statt eines
 Gangs zur Bank.
 
 ### Die Spielregeln
@@ -277,9 +277,7 @@ Ein Test in Kern prüft genau diese Rechnung.
 > damit auch das Verschieben ins Paket passt. Die genauen Regeln stehen im blauen Buch, Kapitel 3.
 
 Meist lässt sich eine Matrix auch **umkehren**; dann macht sie die Bewegung rückwärts. Das braucht
-Kern, wenn du in die Szene klickst: Der Weg führt vom Bildschirm zurück in die Welt. Kern rechnet
-diese Umkehrung mit doppelt so vielen Stellen wie sonst, damit auch Klicks auf ferne Dinge treffen.
-Aber nicht jede Bewegung lässt sich zurückdrehen: Wurde ein Ding in einer Richtung mit 0 gestreckt,
+Kern, wenn du in die Szene klickst: Der Weg führt vom Bildschirm zurück in die Welt. Aber nicht jede Bewegung lässt sich zurückdrehen: Wurde ein Ding in einer Richtung mit 0 gestreckt,
 also platt gedrückt wie ein Pfannkuchen, weiß niemand mehr, wie dick es vorher war. Dann antwortet
 die Umkehrung schlicht mit „Nein“, statt Unsinn auszurechnen.
 
@@ -290,9 +288,8 @@ Wo stehe ich? Wohin schaue ich? Wo ist oben? Wie weit ist mein Objektiv geöffne
 **Nahgrenze** und eine **Ferngrenze**: Was dichter als die Nahgrenze vor der Linse oder weiter weg
 als die Ferngrenze liegt, wird nicht gemalt. Ganz Nahes und unendlich Fernes lässt sich nicht
 sinnvoll aufs Bild bringen, und irgendwo muss die Welt aufhören, damit Kern nicht endlos malt. Die
-Standardwerte stehen im blauen Buch, Kapitel 3. Aus der Beschreibung errechnet Kern zwei Matrizen – eine für den Blick, eine
-für das Objektiv, das den Raum aufs flache Bild drückt – und fasst sie zu **einer** zusammen: dem
-ganzen Weg von der Welt aufs Bild. Eine unmögliche Kamera, etwa mit Auge und Ziel am selben Ort,
+Standardwerte stehen im blauen Buch, Kapitel 3. Aus der Beschreibung errechnet Kern ein
+Matrix-Paket für den ganzen Weg von der Welt aufs Bild. Eine unmögliche Kamera, etwa mit Auge und Ziel am selben Ort,
 weist Kern mit einem Zettel an der Pinnwand zurück.
 
 Neben der Perspektive gibt es die **Parallelansicht** ohne Fluchtpunkt, wie bei einem Bauplan: Ferne
@@ -300,8 +297,8 @@ Dinge werden nicht kleiner. Studio nutzt sie für die Ansichten von oben, vorn u
 Weil es hier keinen Fluchtpunkt gibt, beschreibt man diese Kamera nicht mit einem Öffnungswinkel,
 sondern damit, wie viele Meter hoch der sichtbare Ausschnitt ist.
 
-Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide**.
-Von oben betrachtet sieht sie so aus:
+Was die Kamera sieht, ist eine liegende Pyramide mit abgeschnittener Spitze, die **Sichtpyramide**
+(Fachwort: **Frustum**). Von oben betrachtet sieht sie so aus:
 
 ![Die Sichtpyramide von oben, zwischen Nah- und Ferngrenze: Was drinnen oder halb am Rand liegt, wird gemalt, was ganz draußen liegt, übersprungen](../abbildungen/sichtpyramide.svg)
 

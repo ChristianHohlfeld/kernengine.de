@@ -119,12 +119,12 @@ Das **Material** sagt, wie eine Oberfläche aussieht:
 | Eigenschaft | Was sie bewirkt | Beispiel |
 |---|---|---|
 | Farbe | Grundfarbe und Deckkraft | rotes Auto |
-| Durchsichtigkeit | ganz, ausgestanzt oder halb | Wand, Zaun, Glas |
+| Durchsichtigkeit | undurchsichtig, ausgestanzt, halb durchsichtig | Wand, Zaun, Glas |
 | Rauheit und Metall | matt oder glänzend, Metall oder nicht | Gummi, Chrom |
 | Eigenleuchten | strahlt selbst, auch heller als Weiß | Neonröhre |
 
 Dazu kommen Schalter: **unbeleuchtet** (nur Farbe, kein Licht), **zweiseitig** (auch von hinten
-sichtbar), **wirft Schatten** und **darf weggelassen werden, wenn außer Sicht**. Einige verdienen
+sichtbar) und **wirft Schatten**. Einige Punkte verdienen
 einen zweiten Blick:
 
 - **Farben kommen in der Sprache des Bildschirms**, so wie Farbwähler und Bilddateien sie liefern.
@@ -133,7 +133,8 @@ einen zweiten Blick:
   Schattenkarte (4.8.1) merkt sich pro Punkt nur eine Entfernung, keine Farbe und keine Löcher; eine
   Glasscheibe würde dort einen tiefschwarzen Schatten werfen. Kern vereinfacht lieber.
 - **Die Ego-Ebene** ist für Dinge in deiner Hand: Sie kommen ganz zum Schluss, nachdem Kern den
-  Tiefenpuffer geleert hat. So schneidet eine Wand vor dir die Waffe in deiner Hand nicht ab. Studio
+  Tiefenpuffer geleert hat – Kern vergisst also vorher, was schon wie weit weg war. Darum kann nichts
+  mehr davor liegen, und eine Wand dicht vor dir schneidet die Waffe in deiner Hand nicht ab. Studio
   malt dort auch seine Anfasser zum Verschieben und Drehen.
 - **Linien** statt Dreiecken gibt es für Hilfsdarstellungen. Sie sind immer unbeleuchtet, werfen
   keinen Schatten und lassen sich nicht anklicken.
@@ -146,13 +147,11 @@ einen zweiten Blick:
 
 ### Anlegen: erst prüfen, dann tauschen
 
-Eine neue Form übergibt man Kern als Paket. Pflicht sind nur die Positionen der Ecken. Fehlen
-Normalen, rechnet Kern bei einer einfachen Dreiecksliste flache Flächennormalen aus, sonst zeigen
-alle nach oben; fehlen Farben, ist alles weiß; fehlt die Angabe der Kopien, gibt
-es genau eine.
+Eine neue Form übergibt man Kern als Paket. Pflicht sind nur die Positionen der Ecken; fehlt
+etwas anderes, nimmt Kern einfache Standardwerte.
 
 Das Wichtigste: Kern legt eine Form **ganz oder gar nicht** an. Erst prüft er alles – sind alle Zahlen
-gültig, passen die Längen zusammen, ergeben die Knochenanteile zusammen 100 %? Erst dann tauscht er
+gültig, passen die Längen zusammen? Erst dann tauscht er
 die alte Form gegen die neue. Scheitert die Prüfung, **bleibt die alte Form sichtbar**.
 
 > **Stell dir vor …** … Tapezieren. Die neue Bahn wird erst ganz zugeschnitten und geprüft, dann
@@ -219,11 +218,12 @@ Der **Fragment-Shader** rechnet dann jeden Bildpunkt aus, in dieser Reihenfolge:
 
 Schritt 3 braucht eine Erklärung. Bildschirm und Bilddateien speichern Helligkeit so, wie unser Auge
 sie **empfindet** (Fachwort **sRGB**): Der Wert „halbe Helligkeit“ sieht für uns wie mittleres Grau
-aus, enthält aber nur gut ein Fünftel des Lichts von Weiß. Licht dagegen **addiert** sich ehrlich: Zwei
+aus, enthält aber viel weniger als halb so viel Licht wie Weiß – das Auge empfindet Helligkeit
+anders, als Licht sich zusammenzählt. Licht dagegen **addiert** sich ehrlich: Zwei
 gleiche Lampen geben doppelt so viel Licht. Rechnet man mit den Augen-Zahlen, wird alles falsch –
 zu dunkle Übergänge, falsche Glanzpunkte. Also übersetzt Kern die Farben zuerst in echte Lichtmengen
-(Fachwort **linear**), rechnet damit und übersetzt erst ganz am Ende zurück. Das Eigenleuchten wird
-schon in Lichtmengen angegeben. (Mehr, mit dem Bild von Schuhgrößen, in Anhang B.)
+(Fachwort **linear**), rechnet damit und übersetzt erst ganz am Ende zurück. (Mehr, mit dem Bild
+von Schuhgrößen, in Anhang B.)
 
 Dabei schreibt der Shader **drei Bilder gleichzeitig**, jedes mit einem eigenen Zweck:
 
@@ -231,7 +231,7 @@ Dabei schreibt der Shader **drei Bilder gleichzeitig**, jedes mit einem eigenen 
 |---|---|
 | **fertiges Foto** | zum Anschauen |
 | **Lichtmesser-Bild** (echte Lichtmenge vor dem Tonemapping) | fürs Glühen (4.8.3) |
-| **Notizzettel** | für die Eckenschatten (4.8.4) |
+| **Notizzettel** (wie viel Umgebungslicht hier ist) | für die Eckenschatten (4.8.4) |
 
 Warum gleichzeitig? Sonst müsste Kern die ganze Welt zweimal oder dreimal malen. So fällt alles in
 einem Rutsch ab.
@@ -245,7 +245,7 @@ verhält. Das Licht eines Bildpunkts hat mehrere Zutaten:
 |---|---|
 | Sonne, mit Schatten | Taschenlampe in sehr weiter Ferne |
 | Umgebungslicht von Himmel und Boden | blauer Himmel oben, brauner Acker unten |
-| bis zu 6 Lampen | Glühbirnen mit Reichweite |
+| Lampen | Glühbirnen mit Reichweite |
 | Glanz und Spiegelung | Lichtpunkt auf einem Apfel |
 | Eigenleuchten | Neonröhre |
 
@@ -253,14 +253,14 @@ verhält. Das Licht eines Bildpunkts hat mehrere Zutaten:
 Lichtfleck schräg gehalten größer und blasser wird (Anhang B) – und gar nicht, wo der Schatten liegt.
 **Umgebungslicht** nennen wir alles Licht, das nicht direkt von Sonne oder Lampe kommt, sondern von
 ringsum: Flächen, deren Normale nach oben zeigt, bekommen Himmelsfarbe, nach unten zeigende
-Bodenfarbe. Kern hat dafür eine einfache Fassung mit nur zwei Farben (oben, unten) und eine feinere
-Himmelskuppel, die vom Horizont bis über dir verläuft und auch in Spiegelungen auftaucht. **Lampen**
+Bodenfarbe. **Lampen**
 werden mit der Entfernung schwächer und gehen an ihrer Reichweite **weich auf null**.
 
 Das Umgebungslicht führt Kern getrennt mit. Warum? Später dunkelt er in Ecken und Ritzen **nur dieses**
-Licht ab (die Eckenschatten, 4.8.4); Sonne und Lampen haben ja ihre eigenen Schatten. Metalle haben
-übrigens kein mattes Licht – also nicht das gleichmäßige Licht aus dem Taschenlampen-Bild, das eine
-Fläche in alle Richtungen zurückwirft. Ihre Farbe steckt ganz im Glanz.
+Licht ab (die Eckenschatten, 4.8.4); Sonne und Lampen haben ja ihre eigenen Schatten.
+
+Metall wirft kein mattes Licht zurück, also kein gleichmäßiges Licht in alle Richtungen. Seine Farbe
+sieht man nur im Glanz – denk an einen Kochtopf, der vor allem die Küche spiegelt.
 
 **Glanz** gibt es bei Metall und bei allem, was nicht ganz rau ist: eine Spiegelung des Himmels und ein
 Glanzpunkt der Sonne. Glatte Flächen haben einen kleinen, scharfen Glanzpunkt, raue einen breiten
@@ -270,9 +270,8 @@ Himmel zeigt.
 > **Wusstest du?** Sehr glatte Flächen können rechnerisch absurd helle Glanzpunkte erzeugen – einzelne
 > Bildpunkte, die im Glühen als flackernde Sterne aufblitzen. Kern begrenzt den Glanz deshalb nach oben.
 
-**Glas:** Erklärt eine Erweiterung eine Fläche zu Glas, spiegelt sie den Himmel, stärker bei flachem
-Blick. So wirken Scheiben hell statt schwarz. **Eigenleuchten** kommt zuletzt dazu, **ohne
-Obergrenze** – alles über Weiß wird später zum Glühen.
+**Eigenleuchten** kommt zuletzt dazu, **ohne Obergrenze** – alles über Weiß wird später zum
+Glühen.
 
 > **Für Neugierige:** Kerns Lichtmodell lehnt sich bewusst an das Standardmaterial der verbreiteten
 > Grafikbibliothek three.js an – bis hin zum Nebel, der wie dort erst nach der Rückübersetzung in
@@ -283,17 +282,15 @@ Obergrenze** – alles über Weiß wird später zum Glühen.
 ### Vom Licht zum Bildpunkt – und Nebel
 
 Echtes Licht kann viel heller sein, als ein Bildschirm zeigen kann: Kerns Sonne ist in der Rechnung
-mehrfach so hell wie das hellste Bildschirm-Weiß (in Levels tagsüber gut viermal). Also sichert Kern zuerst die echte Lichtmenge im
+mehrfach so hell wie das hellste Bildschirm-Weiß. Also sichert Kern zuerst die echte Lichtmenge im
 Lichtmesser-Bild und presst sie dann mit einer **Filmkurve** sanft auf den Bildschirmbereich – wie ein
 Fotofilm, der Helles weich abrundet, statt es hart abzuschneiden (Skizze in Anhang B). Danach kann ein
 **Farbgrading** folgen, wie bei einem Kinofilm: kräftigere Farben, wärmere Lichter, kühlere Schatten.
 Zuletzt rechnet Kern die Farbe in sRGB zurück, die Sprache des Bildschirms.
 
 Der **Nebel** kommt danach, mit der Entfernung: Bei 100 m ist er kaum zu sehen, bei einem Kilometer
-schon gut zur Hälfte. Die Nähe bleibt also lange klar, dann zieht der Dunst rasch zu. Drei Extras
-machen ihn lebendig: **Bodennebel** (dicht am Boden, klar über den Dächern), **Sonnenschein im Nebel**
-(in Richtung Sonne leuchtet er sonnenfarben) und **Horizontnebel** (der Himmel verschwimmt am
-Horizont im Dunst der Szene).
+schon gut zur Hälfte. Die Nähe bleibt also lange klar, dann zieht der Dunst rasch zu. Ein paar
+Extras machen ihn lebendig – etwa Bodennebel, der dicht am Boden liegt und die Dächer frei lässt.
 
 ## 4.6 Shader-Erweiterungen
 
@@ -306,7 +303,9 @@ in sein Malprogramm einsetzt. Die Engine selbst bleibt unverändert.
 > nicht kaputtmachen.
 
 Vor allem bestimmt eine Erweiterung, welche Farbe, welchen Glanz und welches Leuchten eine Stelle
-bekommt. Dafür darf sie jeder Form eigene Angaben mitgeben; fehlt einer Form eine solche Angabe, tut
+bekommt. Sie kann eine Stelle zum Beispiel zu **Glas** erklären: Dann spiegelt die Stelle den
+Himmel, stärker bei flachem Blick, und eine Scheibe wirkt hell statt schwarz. Dafür darf die
+Erweiterung jeder Form eigene Angaben mitgeben; fehlt einer Form eine solche Angabe, tut
 die Erweiterung dort einfach nichts. Das Spiel reicht seine Erweiterungen beim Start herein. Wie das
 im Ganzen aussieht, zeigt das Beispiel in 4.13. Die genaue Liste der Einfügestellen steht im blauen
 Buch, Kapitel 4.
@@ -317,9 +316,11 @@ Ein Bild (englisch **Frame**) ist ein Blatt im Daumenkino. Bei 60 Bildern pro Se
 Tausendstelsekunden dafür, und die Reihenfolge der Malgänge ist sorgfältig gewählt:
 
 ```mermaid
+%% Bildunterschrift: Die Malgänge eines Bildes in ihrer festen Reihenfolge
 flowchart TD
   A["Kamera prüfen"] --> B["Sonnenschatten bei Bedarf"]
-  B --> C["Undurchsichtiges, vorne nach hinten"]
+  B --> S["Unsichtbares aussortieren"]
+  S --> C["Undurchsichtiges, vorne nach hinten"]
   C --> D["Himmel in die Lücken"]
   D --> E["Durchsichtiges, hinten nach vorne"]
   E --> F["Eckenschatten ausrechnen"]
@@ -352,19 +353,15 @@ Für eine **Teilansicht**, die nur ein Stück des Fensters bemalt, gibt es kein 
 malt sie deshalb direkt auf den Bildschirm, nur in ihr Rechteck – **ohne Glühen und ohne
 Eckenschatten**.
 
-Aus demselben Grund schaltet Kern die eingebaute **Kantenglättung** des Browsers ab, die Treppchen an
-schrägen Kanten weichzeichnet: Sie wirkt nur auf dem Bildschirm selbst, nicht in Kerns
-Zwischenbildern, und würde dort nichts bewirken. Kern Studio und exportierte Spiele schalten sie für
-ihre eigene Malfläche dagegen ein.
+![Orb Run bei Nacht in vier Viewports: In den Teilansichten leuchten die Lichter, aber nichts glüht](../buch/bilder/studio-quad.png)
 
-![Vier Viewports in Kern Studio: Teilansichten zeichnen direkt auf den Bildschirm](../buch/bilder/studio-quad.png)
-
-> **Probier's aus!** Stelle in Kern Studio über **Fenster › Viewport-Aufteilung** (Window › Viewport Layout) vier Ansichtsfenster
-> (Viewports) ein. Jedes ist nur ein Teil des Fensters – darum glühen die Lichter nicht mehr, und Ecken
-> wirken flacher. Zurück auf einen Viewport: Glühen und weiche Eckenschatten sind wieder da. Dein Gerät
-> war also nicht zu langsam – es liegt an der Bauweise. Am deutlichsten siehst du das Glühen nachts in
-> **Orb Run** (**Datei › Beispiel-Levels › Orb Run** (File › Example Levels › Orb Run), dann die Tageszeit wie in 4.13 auf `tod 0.95`
-> stellen); im Level **Basis** (Basic) glüht nichts.
+> **Probier's aus!** Das Glühen siehst du am besten nachts. Lade **Datei › Beispiel-Levels › Orb
+> Run** (File › Example Levels › Orb Run). Klick unten in der Statusleiste in das Feld **Cmd**, tippe
+> `tod 0.95` und drück Enter: `tod` (time of day) stellt die Tageszeit, 0,95 ist späte Nacht. Die
+> Fenster und Lampen glühen. Stelle jetzt über **Fenster › Viewport-Aufteilung** (Window › Viewport
+> Layout) vier Ansichtsfenster (Viewports) ein. Jedes ist nur ein Teil des Fensters – darum glühen
+> die Lichter nicht mehr, und Ecken wirken flacher. Zurück auf einen Viewport: Glühen und weiche
+> Eckenschatten sind wieder da. Dein Gerät war also nicht zu langsam – es liegt an der Bauweise.
 
 ## 4.8 Die Zusatz-Malgänge im Detail
 
@@ -390,7 +387,7 @@ deckt diese Kugel ab. Warum eine Kugel und kein genau passender Kasten? Die Kart
 ausgerichtet. Dreht sich die Kamera, dreht sich ihr Sichtkegel unter der Karte – und ein Kasten, der
 ihn genau umschließt, wird mal schmal, mal breit. Die Kugel passt in jeder Richtung gleich:
 
-![Von oben: Ein Kasten um den Sichtkegel ändert beim Drehen seine Größe, die Kugel bleibt gleich groß](../abbildungen/schattenkugel.svg)
+![Von oben: Ein Kasten um den Sichtkegel der Kamera ändert beim Drehen seine Größe, die Kugel bleibt gleich groß](../abbildungen/schattenkugel.svg)
 
 Mit dem Kasten wüchsen und schrumpften die Kartenpunkte bei jeder Kopfdrehung, und die
 Schattenkanten zitterten. Mit der Kugel bleiben die Kartenpunkte gleich groß.
@@ -409,15 +406,12 @@ bei stehender Kamera **keinen einzigen Malauftrag**.
 
 **Schattenakne vermeiden.** Weil ein Kartenpunkt ein kleines Stück Fläche abdeckt, kann sich eine
 Fläche selbst beschatten: Es entstehen feine Streifen, die **Schattenakne** – ähnlich den Streifen auf
-einem Foto von einem Bildschirm. Kern hilft auf zwei Arten: mit einem kleinen **Sicherheitsabstand**
-beim Vergleichen, und mit einem **Schritt zur Seite**: Bevor eine Stelle auf der Karte nachschaut,
-rückt sie ein Stückchen in die Richtung, in die ihre Fläche zeigt – bei schräg einfallendem Licht
-etwas weiter. Wie ein Tritt von der Wand weg, bevor man nachmisst: So misst die Fläche nicht mehr
-gegen sich selbst. Die Akne bleibt weg, ohne dass sich der Schatten sichtbar vom Ding löst.
+einem Foto von einem Bildschirm. Darum rückt jede Stelle, bevor sie auf der Karte nachschaut, ein
+Stückchen in die Richtung, in die ihre Fläche zeigt – wie ein Tritt von der Wand weg, bevor man
+nachmisst. So misst die Fläche nicht mehr gegen sich selbst.
 
 **Weiche Kanten.** Statt nur einen Kartenpunkt zu fragen, mischt Kern mehrere Nachbarn. So bekommt die
-Schattenkante einen weichen Übergang statt harter Treppchen. Am Computer mischt Kern mehr Nachbarn als
-auf dem Telefon.
+Schattenkante einen weichen Übergang statt harter Treppchen.
 
 Am Rand der Schattendistanz blendet der Schatten sanft aus, statt abzureißen.
 
@@ -435,7 +429,9 @@ Am Rand der Schattendistanz blendet der Schatten sanft aus, statt abzureißen.
 
 Der Himmel ist ein einziges riesiges Dreieck, das den ganzen Bildschirm bedeckt und **ganz hinten**
 liegt. Wie ein Dreieck ein Rechteck bedecken kann? Es ist so groß, dass es über den Rand hinausragt;
-was übersteht, schneidet die Grafikkarte einfach weg:
+was übersteht, schneidet die Grafikkarte einfach weg. (Die Zahlen im Bild sind die Sprache der
+Grafikkarte: Für sie reicht der Bildschirm von links nach rechts und von unten nach oben jeweils von
+−1 bis 1.)
 
 ![Ein Dreieck, doppelt so breit und hoch wie der Bildschirm, bedeckt ihn ganz; was übersteht, wird weggeschnitten](../abbildungen/himmel-dreieck.svg)
 
@@ -449,7 +445,7 @@ Sterne**, **Wolken** und auf Wunsch **Horizontnebel**, in dem der Horizont in di
 übergeht – je dünner der Nebel der Szene, desto dünner auch dieser Dunst.
 
 Die Wolken entstehen aus **Rauschmustern**: Zufallsmustern, die trotzdem immer gleich aussehen, wie
-die Maserung in Marmor. Fünf davon, fein und grob übereinandergelegt, ergeben Wolken; der Wind
+die Maserung in Marmor. Mehrere davon, fein und grob übereinandergelegt, ergeben Wolken; der Wind
 verschiebt sie, und eine Explosion drückt sie weg wie eine Schockwelle. Sinkt die Sonne unter den
 Horizont, verschwinden Scheibe und Hof.
 
@@ -462,12 +458,14 @@ fertige Foto. Kann ein Gerät die dafür nötigen Zwischenbilder nicht, malt Ker
 
 Beim Zusammensetzen entwickelt Kern das Foto nicht neu. Er rechnet nur aus, **um wie viel** Glühen
 und Eckenschatten das Bild verändern, und legt genau diesen Unterschied darüber. Warum so umständlich?
-Das fertige Foto enthält schon den Nebel, das Lichtmesser-Bild nicht – es wurde ja in 4.5 vor dem
-Nebel abgezweigt. Neu entwickeln hieße: Nebel weg.
-Bildpunkte ohne Glühen und ohne Eckenschatten übernimmt Kern einfach unverändert.
+Erinnere dich an die Reihenfolge im Bildpunkt (4.5): Das Lichtmesser-Bild wird **vor** dem Nebel
+abgezweigt, das fertige Foto ist **mit** Nebel. Entwickelte Kern das Foto aus dem Lichtmesser-Bild
+neu, wäre der Nebel weg. Bildpunkte ohne Glühen und ohne Eckenschatten übernimmt Kern einfach
+unverändert.
 
-> **Stell dir vor …** … ein fertig gerahmtes Foto. Statt es neu zu entwickeln, legst du eine dünne
-> Folie mit dem Glühen darüber. Der Rahmen – der Nebel – bleibt, wie er ist.
+> **Stell dir vor …** … ein fertiges Foto von einem nebligen Abend. Würdest du es neu entwickeln,
+> wäre der Nebel weg. Also legst du nur eine dünne Folie mit dem Glühen darüber – der Nebel im Foto
+> bleibt, wie er ist.
 
 **Der Wächter.** Stockt ein Gerät über mehrere Sekunden, schaltet ein Wächter das Glühen
 für den Rest der Sitzung ab. Das Zusammensetzen läuft weiter, denn es bringt auch die Eckenschatten ins
@@ -483,7 +481,7 @@ Nachbarschaft einen Teil des Himmels verdeckt.
 > **Stell dir vor …** … du liegst in einer Mulde im Gras und schaust nach oben. Je tiefer die Mulde,
 > desto kleiner dein Stück Himmel – und desto dunkler ist es bei dir, auch ohne Sonnenschatten.
 
-Kern nutzt dafür ein bewährtes Verfahren namens GTAO, das Anhang B erklärt. Kerns Besonderheit: Er
+Kern nutzt dafür ein bewährtes Verfahren, das Anhang B erklärt. Kerns Besonderheit: Er
 braucht **keinen zusätzlichen Malgang** über alle Formen.
 
 1. Beim normalen Malen schreibt der Shader nebenbei den Notizzettel aus 4.5: wie viel vom Licht jedes
@@ -504,8 +502,8 @@ ab: Wie sich die Entfernung zum Nachbarpunkt links, rechts, oben und unten ände
 So wie man an den Stufenhöhen sieht, wie steil eine Treppe ist.
 
 **Wenig rechnen, dann klug glätten.** Pro Bildpunkt schaut Kern nur in wenige Richtungen, und jeder
-Nachbarpunkt bekommt etwas gedrehte – ein festes Muster, in dem jede kleine Gruppe von Bildpunkten
-zusammen alle Richtungen abdeckt. Danach glättet Kern über genau diese Gruppen. Dabei mischt er nur
+Nachbarpunkt schaut in etwas gedrehte Richtungen – ein festes Muster, in dem jede kleine Gruppe von
+Bildpunkten zusammen alle Richtungen abdeckt. Danach glättet Kern über genau diese Gruppen. Dabei mischt er nur
 Nachbarn mit ähnlicher Entfernung: Ein Bildpunkt auf einer nahen Kiste und einer auf der fernen Wand
 dahinter bleiben getrennt. Wie ein Maler, der an der Kante abklebt – so verläuft der Schatten nicht
 über Kanten.
@@ -570,7 +568,8 @@ Grafiktreiber neu startet, oder auf dem Handy, wenn die Seite im Hintergrund lie
    Zusatz-Malgänge und Erweiterungen neu und lädt alles aus seinen Kopien wieder hoch.
 3. **Gescheitert?** Kern räumt auf und kann es später sauber erneut versuchen.
 
-Derselbe Mechanismus erlaubt auch das Arbeiten ganz **ohne Bildschirm** („headless“), etwa im
+Weil Kern so auch ganz ohne Grafikkarte weiterarbeiten kann, erlaubt derselbe Mechanismus auch das
+Arbeiten ganz **ohne Bildschirm** („headless“), etwa im
 Lehrer, der Roboter trainiert und dabei nichts malen muss ([Kapitel 14](14-lehrer.md)).
 
 > **Wusstest du?** Genau dafür hält Kern die Kopie im Arbeitsspeicher (Grundsatz 3 aus 4.1). Was nach

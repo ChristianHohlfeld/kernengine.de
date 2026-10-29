@@ -73,6 +73,8 @@ gutes Verfahren sollte daran nichts ändern. Drei Kandidaten:
 | halb-halb | erst neue Geschwindigkeit, dann damit weiterrücken | bleibt gleich, solange die Blätter dicht genug liegen |
 | rückwärts | Kräfte vom Ende des Blatts | wird **kleiner**, bleibt aber immer brav |
 
+![Dieselbe Feder, dreimal gerechnet: vorwärts (explizit) wächst die Schwingung, halb-halb (semi-implizit) bleibt sie gleich, rückwärts (implizit) klingt sie ab](../abbildungen/integratoren.svg)
+
 Die Unterschiede in Worten:
 
 - **Halb-halb** schaut erst, wie sich das Tempo in diesem Blatt ändert, und rückt dann mit dem
@@ -109,28 +111,21 @@ gebastelt. Eine selbst gebaute Bremse wäre vorwärts gerechnet: Sie bremst mit 
 des Blatts, auch wenn das Ding längst langsamer ist. Bei einem leichten Körper bremst sie so über das
 Ziel hinaus und schleudert ihn rückwärts, beim nächsten Blatt noch stärker, bis alles explodiert.
 
-Dieselbe Vorsicht gilt für das Taumeln aus C.1: Auch diesen Effekt rechnet Box3D rückwärts, weil er
-vorwärts gerechnet Energie in lange, dünne Körper pumpen würde.
-
-Und wo sitzt der Solver (C.6) in einem Blatt? Genau in der Mitte der halb-halb-Methode: Erst
-erneuert Box3D die Geschwindigkeiten aus den Kräften, **dann** korrigiert der Solver sie, damit
-nichts ineinandersteckt und alle Gelenke halten, und **erst dann** rücken alle Dinge mit diesen
-korrigierten Geschwindigkeiten weiter.
-
 ### Fester Zeitschritt und Teilschritte
 
 Weil große Schritte Federn sprengen, darf eine Simulation **nie** mit der schwankenden Zeit zwischen
 zwei Bildschirmbildern rechnen. Ein einziges langsames Bild wäre ein riesiger Schritt, und das
 Ergebnis hinge davon ab, wie schnell der Rechner gerade ist.
 
-> **Stell dir vor …** ein Zeitkonto. Jedes Bild zahlt die Zeit ein, die seit dem letzten vergangen
-> ist. Die Physik bucht immer nur gleich große Portionen ab. Was übrig bleibt, wartet auf das nächste
-> Bild.
+Die Lösung ist das Sparschwein aus [Kapitel 6](06-physik.md) (6.12): Jedes Bild zahlt die
+vergangene Zeit ein, die Physik nimmt immer nur gleich große Portionen heraus, der Rest wartet auf
+das nächste Bild.
 
 ```mermaid
+%% Bildunterschrift: Das Sparschwein der Zeit – gerechnet wird nur in ganzen, gleich großen Schritten
 flowchart TB
   F["neues Bild: Zeit einzahlen"] --> L{"genug für einen Schritt?"}
-  L -->|ja| S["einen Schritt rechnen, abbuchen"]
+  L -->|ja| S["einen Schritt rechnen, herausnehmen"]
   S --> L
   L -->|nein| R["Bild zeichnen"]
 ```
@@ -160,8 +155,7 @@ konvexe Formen gibt es zwei bewährte Ideen:
 > Spalt, berühren sie sich.
 
 - Die **Lichtspalt-Idee** (Fachname SAT) prüft genau das: Gibt es eine Richtung, aus der man
-  zwischen den Körpern hindurchschauen kann? Box3D merkt sich die zuletzt gefundene Richtung, denn
-  meist stimmt sie im nächsten Schritt wieder.
+  zwischen den Körpern hindurchschauen kann?
 - Die **Abstands-Idee** (Fachname GJK) misst, wie weit zwei Formen voneinander entfernt sind. Das
   Schöne: Sie muss von jeder Form nur eine einzige Frage beantworten lassen: „Welcher deiner Punkte
   liegt in dieser Richtung am weitesten außen?“ Darum funktioniert sie mit jeder konvexen Form.
@@ -257,8 +251,8 @@ wozu man ihn braucht: „Die Socke kroch von selbst über den Boden (runde Stoff
 ## C.5 Gelenke als Regeln
 
 Ein **Gelenk** ist für die Physik eine Regel, die immer gelten soll, etwa: „Dieser Punkt der Tür und
-dieser Punkt des Rahmens bleiben zusammen.“ Daraus folgt eine Regel für die Bewegung: Die beiden Punkte
-dürfen sich nicht auseinanderbewegen.
+dieser Punkt des Rahmens bleiben zusammen.“ Der Solver arbeitet dabei mit Geschwindigkeiten: Er
+sorgt dafür, dass die beiden Punkte sich gar nicht erst voneinander wegbewegen.
 
 Der Solver sucht dann in jedem Schritt genau den Stoß, der die Regel einhält. Wie groß der sein muss,
 hängt davon ab, **wie schwer sich die Bewegung anfühlt**.
@@ -296,6 +290,11 @@ Gruppe für das zweite Foto gleich wieder so hinstellen wie beim ersten.
 > **Für Neugierige:** Fachleute nennen das Verfahren Gauß-Seidel oder *Sequential Impulses*. Die Regel
 > „nur drücken, nie ziehen“ gilt dabei für die Summe aller Stöße eines Schritts: Eine Runde darf
 > zurücknehmen, was eine frühere zu viel gedrückt hat.
+
+Und wo sitzt der Solver in einem Blatt des Daumenkinos aus C.2? Genau in der Mitte der
+halb-halb-Methode: Erst erneuert Box3D die Geschwindigkeiten aus den Kräften, **dann** korrigiert
+der Solver sie, damit nichts ineinandersteckt und alle Gelenke halten, und **erst dann** rücken alle
+Dinge mit diesen korrigierten Geschwindigkeiten weiter.
 
 ### Weiche Regeln
 
@@ -351,6 +350,7 @@ vergleichen, nachdrücken, wieder messen. Das ist ein **Regelkreis**.
 > ankommt, drehst du manchmal zu weit.
 
 ```mermaid
+%% Bildunterschrift: Der Regelkreis eines Servos – messen, vergleichen, nachdrücken
 flowchart TB
   Z["Zielwinkel"] --> T["kommt verspätet an"]
   T --> E["Wie weit noch bis zum Ziel?"]
@@ -397,8 +397,12 @@ der Regler, ein Motor, der stillstehen will, ist die Reibung, und die Verspätun
 Warteschlange. Dieselbe Rechnung treibt Studio, den Lehrer (das Trainingsprogramm) und den Prüfstand für die Messungen. Wie
 das im Einzelnen geht, erklärt [Kapitel 6](06-physik.md), Abschnitt 6.15.
 
-Box3D möchte Federn in anderen Einheiten bekommen, als Servos sie angeben. Kern rechnet darum in jedem
-Schritt um, weil sich das mit der Haltung des Roboters ändert.
+Eine Sache muss Kern dabei übersetzen. Box3D beschreibt eine Feder dadurch, wie oft sie pro Sekunde
+schwingt (in Hertz). Ein Servo sagt dagegen, wie fest er pro Grad zieht. Wie schnell eine Feder
+schwingt, hängt aber davon ab, wie viel an ihr hängt – ein Gummiband mit Schlüsselbund wippt
+schneller als mit einer Einkaufstasche. Wie träge die Teile an einem Gelenk sind, ändert sich mit
+der Haltung der Ente. Darum rechnet Kern in jedem Schritt neu um. Und weil Box3D diese Feder
+„rückwärts“ rechnet (C.2), bleibt sie bei jeder Steifigkeit ruhig.
 
 ## C.8 Was man nicht tun sollte
 
@@ -440,14 +444,15 @@ Daraus folgen Kerns Gegenmittel:
 
 | Gefahr | Gegenmittel |
 |---|---|
-| Das Übersetzungsprogramm sortiert Rechnungen um, damit es schneller geht | verboten |
+| Der Übersetzer sortiert Rechnungen um, damit es schneller geht | verboten |
 | Mehrere Rechenkerne addieren in wechselnder Reihenfolge | feste Reihenfolge, die Physik rechnet alles nacheinander |
 | Manche Prozessoren nehmen eine Abkürzung für „mal und plus“ | abgeschaltet, überall |
 | Jedes System rechnet Sinus & Co. minimal anders | Kern bringt seine eigene Sinus-Rechnung mit |
 | Die Bildzeit schwankt | fester Schritt, Zeit zählt Schritte |
 | Zufall | eigener Zufallsgenerator mit festen Startzahlen |
 
-Das **Übersetzungsprogramm** macht aus Kerns Programmtext die Befehle für den Prozessor. Die
+Der **Übersetzer** (Compiler, [Kapitel 1](01-einfuehrung.md)) macht aus Kerns Programmtext die
+Befehle für den Prozessor. Die
 **Abkürzung**: Manche Prozessoren rechnen „a mal b plus c“ in einem Zug und runden nur einmal
 statt zweimal. Das ist sogar genauer, aber eben anders als auf einem Gerät, das zweimal rundet.
 

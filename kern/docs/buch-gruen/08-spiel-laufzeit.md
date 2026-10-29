@@ -1,7 +1,7 @@
 # 8 Die Spiel-Laufzeit – wie aus einem Level ein Spiel wird
 
 > **Kurz gesagt:** Ein Level ist ein Bauplan aus Actors, und jeder Actor ist mit Komponenten
-> bestückt wie ein Steckbaustein. Die **GameWorld** erweckt diesen Bauplan zum Leben: Sie baut daraus
+> bestückt wie ein Steckbaustein. Die **Spielwelt** (im Programm *GameWorld*) erweckt diesen Bauplan zum Leben: Sie baut daraus
 > eine Physikwelt, lässt sie in festen Schritten laufen, steuert den Spieler, prüft die Spielregeln
 > und schickt Bild und Ton hinaus. Studio und exportierte Spiele benutzen genau denselben Code.
 
@@ -33,14 +33,14 @@ nach dem Stoppen alles wieder wie vorher.
 > umgeworfen, verschoben – und danach stellen die Bühnenarbeiter alles wieder an seinen Platz.
 
 ```mermaid
-flowchart TB
+%% Bildunterschrift: Der Lebenslauf einer Spielwelt – nach dem Stopp geht es zurück zum Bearbeiten
+flowchart LR
   A[Bearbeiten] --> B[Start: Kopie anlegen, Physik bauen]
   B --> C[Schritt, Schritt, Schritt …]
   C --> D[Stopp: Kopie wegwerfen]
-  D --> A
 ```
 
-- **Bearbeiten:** Die GameWorld zeigt das Level im Editor an. Ändert sich etwas, lädt sie nur das
+- **Bearbeiten:** Die Spielwelt zeigt das Level im Editor an. Ändert sich etwas, lädt sie nur das
   Geänderte neu.
 - **Start:** Sie macht eine Kopie des Levels, baut die Physikwelt und startet **Simulieren** (Simulate)
   oder **Spielen** (Play).
@@ -69,12 +69,9 @@ und darüber, wer an wem hängt.
   „eingeschweißt“. Die Kabine eines Autos wird so ein Teil des Autos.
 
 > **Für Neugierige:** Die drei Drehungen werden in einer festen Reihenfolge ausgeführt, denn zwei
-> Drehungen nacheinander ergeben je nach Reihenfolge eine andere Lage – probier es mit einem Buch aus.
-> Denk dir einen Piloten: Er giert zuerst, nickt dann um seine schon mitgedrehte Querachse und rollt
-> zuletzt um seine mitgedrehte Längsachse. Als Rezept geschrieben steht das „Gieren · Nicken · Rollen“
-> da; liest man die Formel wie in [Anhang B](B-grundlagen-rendering.md) von rechts, also um die festen
-> Achsen der Welt, heißt dieselbe Drehung: erst Rollen, dann Nicken, dann Gieren. Beide Lesarten
-> landen bei genau derselben Lage.
+> Drehungen nacheinander ergeben je nach Reihenfolge eine andere Lage – probier es mit einem Buch aus
+> ([Kapitel 3](03-grundlagen.md)). Denk dir einen Piloten: Er giert zuerst, nickt dann und rollt
+> zuletzt. Die genaue Regel steht im blauen Buch, Kapitel 8.
 
 ## 8.3 Level und Actor
 
@@ -140,14 +137,16 @@ einen passenden Kollider.
 **Körper und Form sind getrennt.** Der Starrkörper sagt, *wie* sich ein Ding bewegt: statisch,
 kinematisch oder dynamisch. Der Kollider sagt, *welche Form* dabei zählt – eine Box, eine Kugel, eine
 **Kapsel** (wie eine Tablette: ein Zylinder mit runden Enden) oder eine Form, die sich ans Mesh
-anschmiegt. Gibst du keine Masse an, rechnet Kern sie aus Größe und **Dichte** der Kollider aus. Ab
-Werk ist die Dichte die von Wasser (1000 kg je Kubikmeter): Eine Kiste von 1 m × 1 m × 1 m wiegt also
-eine Tonne. Aus den Formen ergibt sich auch, wo der **Schwerpunkt** liegt und wie schwer sich das Ding
-drehen lässt. Importierte Roboter wie die Micro Duck bringen diese Angaben dagegen fertig mit, aus
-dem Bauplan des echten Roboters – dann gelten die, und die Formen bestimmen nur noch, wo etwas
-anstößt. Ein Kollider kann außerdem **Sensor** sein – perfekt für Ziellinien und Münzen –,
-und du kannst festlegen, wer mit wem zusammenstoßen darf, etwa damit die Teile eines Roboters sich
-nicht gegenseitig im Weg sind.
+anschmiegt.
+
+Gibst du keine Masse an, rechnet Kern sie aus Größe und **Dichte** der Kollider aus. Ab Werk ist die
+Dichte die von Wasser (1000 kg je Kubikmeter): Eine Kiste von 1 m × 1 m × 1 m wiegt also eine Tonne.
+Wie Schwerpunkt und Drehträgheit dazukommen und was importierte Roboter mitbringen, erklärt
+[Kapitel 6](06-physik.md).
+
+Ein Kollider kann außerdem **Sensor** sein – perfekt für Ziellinien und Münzen –, und du kannst
+festlegen, wer mit wem zusammenstoßen darf, etwa damit die Teile eines Roboters sich nicht
+gegenseitig im Weg sind.
 
 **Gelenke verbinden Dinge.** Es gibt neun Arten, vom Scharnier über die Schiene und das Seil bis zum
 Rad. Gelenke können Grenzen, Motoren und Federn haben und bei zu viel Kraft **brechen** – so
@@ -155,8 +154,7 @@ entsteht eine Seilbrücke, die unter Last reißt. Ein Scharnier kann außerdem e
 kleiner Motor, der einen Zielwinkel ansteuert. Je weiter das Gelenk vom Ziel weg ist, desto stärker
 drückt er zurück, wie ein Gummiband ([Kapitel 6](06-physik.md)). Ein Gelenk sitzt immer an dem Actor,
 der sich bewegen soll, und zeigt auf sein **Ziel** – das andere Ding oder die Welt. Das Ziel ist der
-feste Bezug: Positive Werte für Winkel, Weg oder Motortempo bewegen den Actor, nicht das Ziel. So
-weißt du beim Einstellen immer, wer sich dreht – die Tür, nicht der Türrahmen.
+feste Bezug: So weißt du beim Einstellen immer, wer sich dreht – die Tür, nicht der Türrahmen.
 
 **Spielfiguren sind auch nur Bausteine.** Die Spieler-Steuerung macht ein Ding steuerbar – als
 Schwebeauto, rollende Kugel, Soldat, Micro Duck und mehr (8.10); Waffe und Lebenspunkte sind eigene
@@ -195,10 +193,7 @@ sortiert in vier Gruppen.
 
 ## 8.6 Die Leveldatei
 
-Ein Level wird als lesbarer Text gespeichert. Ein paar Angaben, etwa Elternteil, Ordner oder Tags,
-stehen nur in der Datei, wenn sie gesetzt sind; die Bausteine schreiben dagegen alle ihre Felder aus.
-
-Die Datei ist im Format **JSON** geschrieben – reiner Text mit Klammern, Namen und Werten, den du
+Ein Level wird als lesbarer Text gespeichert. Die Datei ist im Format **JSON** geschrieben – reiner Text mit Klammern, Namen und Werten, den du
 sogar mit einem Texteditor lesen kannst. Ein Actor sieht etwa so aus (gekürzt):
 
 ```json
@@ -213,7 +208,7 @@ sogar mit einem Texteditor lesen kannst. Ein Actor sieht etwa so aus (gekürzt):
 
 Zeile für Zeile: Eine Tür mit Nummer 12, die an Actor 3 hängt. Sie steht an einer bestimmten
 Position, ist nicht gedreht und nicht vergrößert, trägt das Schlagwort „door“ und hat zwei
-Bausteine: ein Mesh und einen Body.
+Bausteine: ein Mesh (ihr Aussehen) und einen Body (ihren Starrkörper).
 
 ### Nachsichtig und streng zugleich
 
@@ -280,14 +275,12 @@ Spielregeln erst, wenn es etwas zu regeln gibt.
 Zwei Feinheiten merkt man beim Spielen: **Spieler schlafen nie** – ein ruhender Körper darf sonst
 „einschlafen“, um Rechenzeit zu sparen, aber deine Figur soll sofort reagieren. Und Fahrzeuge,
 Figuren und Flieger **kippen nicht um**: Kern hält sie aufrecht; nur die rollende Kugel und der
-Läufer (Walker) dürfen sich frei drehen. Kann eine Form nicht gebaut werden, wird sie übersprungen und im Log
-gemeldet. Ein unsichtbarer Hilfskörper, der am Ende gar keine Form hat, fällt einfach weg; ein echter
-Starrkörper ohne Form rechnet dagegen als Punkt mit Masse weiter.
+Läufer – die Micro Duck, 8.14 – dürfen sich frei drehen (ein Roboter muss fallen dürfen,
+[Kapitel 6](06-physik.md)). Kann eine Form nicht gebaut werden, wird sie übersprungen und im
+Protokoll gemeldet.
 
-Beim Aufbau spart Kern auch gleich: Meldungen wie „etwas hat die Zone betreten“ oder „hier hat es
-gekracht“ schaltet er nur dort ein, wo sie jemand liest – bei Sensoren, beim Spieler, bei Dingen mit
-Klang und, wenn das Level Spielregeln hat, bei allem, was sich bewegt. Jede Meldung kostet
-Rechenzeit, und eine, die niemand liest, ist verschwendet.
+Beim Aufbau spart Kern auch gleich: Meldungen wie „etwas hat die Zone betreten“ schaltet er nur
+dort ein, wo sie jemand liest (warum, steht in [Kapitel 6](06-physik.md), 6.9).
 
 > **Für Neugierige:** Federn in Gelenken dürfen nicht härter schwingen, als die Physik rechnen kann:
 > höchstens halb so oft pro Sekunde, wie sie Schritte (samt Unterschritten) macht. Eine Feder, die
@@ -303,7 +296,7 @@ Eine Spielwelt kann in vier Zuständen sein:
 | keiner | Editor, keine Simulation |
 | Simulieren (Simulate) | Physik und Logik laufen, niemand wird gesteuert; Körper lassen sich greifen |
 | Spielen (Play) | wie Simulieren, dazu Spieler, Regeln und HUD |
-| Replica | Kopie eines Server-Spiels im Netz ([Kapitel 10](10-netzwerk.md)) |
+| Netz-Kopie (Replica) | die Kopie eines Spiels, das ein anderer Rechner führt ([Kapitel 10](10-netzwerk.md)) |
 
 Mit **F8** wechselst du mitten im Lauf zwischen **Simulieren** (Simulate) und **Spielen**, ohne dass
 der Spieler seinen Zustand verliert: Im Menü heißt das
@@ -332,18 +325,10 @@ Durchgang heißt **Frame** – hier im Sinn von „ein Bild“.
 
 Bildschirme zeigen unterschiedlich viele Bilder pro Sekunde: 60, 120, manchmal ruckelt es. Würde
 die Physik einfach „so viel Zeit wie seit dem letzten Bild“ rechnen, käme auf jedem Gerät etwas
-anderes heraus. Deshalb rechnet Kern immer in **festen Schritten**, normalerweise 1/60 Sekunde.
-
-Das funktioniert wie ein Sparschwein: Jedes Bild wirft die vergangene Zeit hinein. Solange genug für
-einen ganzen Schritt drin ist, nimmt Kern einen Schritt heraus und rechnet ihn. Was übrig bleibt,
-wartet aufs nächste Bild. Damit ein langer Hänger nicht alles durcheinanderbringt, ist das
-Sparschwein begrenzt: Pro Bild rechnet Kern höchstens eine Zehntelsekunde Spielzeit. Hing der Rechner
-ein paar Sekunden, holt Kern das nicht im Zeitraffer nach – das Spiel läuft danach einfach ruhig
-weiter. Mehr dazu in [Kapitel 6](06-physik.md).
-
-Und weil ein Bild meist zwischen zwei Schritten liegt, schiebt Kern die Körper für die Anzeige
-geschmeidig zwischen der alten und der neuen Lage hin und her. So sieht alles flüssig aus, obwohl
-die Physik in festen Häppchen rechnet.
+anderes heraus. Deshalb rechnet Kern immer in **festen Schritten**, normalerweise 1/60 Sekunde – mit
+dem Sparschwein und den Zwischenbildern aus [Kapitel 6](06-physik.md), 6.12. Ergänzend gilt: Pro
+Bild rechnet Kern höchstens eine Zehntelsekunde Spielzeit nach. Hing der Rechner ein paar Sekunden,
+holt Kern das nicht im Zeitraffer nach – das Spiel läuft danach einfach ruhig weiter.
 
 Auch das Bild selbst hat in Studio eine feste Reihenfolge: erst die Eingaben einsammeln, dann die
 Welt weiterrechnen, dann folgt die Kamera, dann der Ton, und zuletzt wird gemalt. So zeigt jedes
@@ -356,14 +341,19 @@ einmal zuerst die Münze eingesammelt und einmal zuerst das Zeitlimit geprüft, 
 einmal gewonnen und einmal verloren sein.
 
 ```mermaid
+%% Bildunterschrift: Die feste Reihenfolge in einem Physikschritt
 flowchart TD
   A[Eingaben der Spieler anwenden] --> B[Dauerbewegungen: drehen, schieben]
   B --> C[Verkehr, Roboter, Motoren]
   C --> D[Physik-Schritt]
   D --> E[Ereignisse: Münzen, Zonen, Treffer]
-  E --> F[Gesundheit und Spielregeln aus Kapitel 9]
-  F --> G[Regeln: Zeit, Absturz, Punkte]
+  E --> F["Lebenspunkte und Logik-Graphen"]
+  F --> G["Spielregeln: Zeitlimit, Absturz, Zielpunkte"]
 ```
+
+Die Logik-Graphen im vorletzten Kasten sind die Regeln, die du selbst zusammenklickst
+([Kapitel 9](09-logik.md)). Der letzte Kasten sind die festen Regeln aus den Welteinstellungen (8.5): Ist die Zeit um? Ist die
+Zielpunktzahl erreicht? Und „Absturz“: Wer tiefer als die Kill-Z-Höhe fällt, wird zurückgesetzt.
 
 Grob gesagt: Erst wird alles **bewegt**, was sich von selbst bewegen will – Spieler, Lifte, Autos,
 Roboter. Dann rechnet die **Physik**. Dann wertet Kern aus, was dabei **passiert** ist, und zuletzt
@@ -390,8 +380,7 @@ Zwei Beispiele zeigen, wie verschieden das aussehen kann:
 
 **Hovercar** (Hover car), **das Schwebeauto.** Gas schiebt das Auto nach vorn, und eine unsichtbare **Schwebefeder**
 hält es über dem Boden – wie ein Kissen aus Luft, das stärker drückt, je tiefer das Auto sinkt. Damit
-es in Kurven nicht wie auf Eis rutscht, drückt eine Kraft seitlich dagegen. Im Stand lenkt es kaum; bis etwa
-9 m/s wird die Lenkung kräftiger, danach bleibt sie gleich. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
+es in Kurven nicht wie auf Eis rutscht, drückt eine Kraft seitlich dagegen. Im Stand lenkt es kaum; mit dem Tempo wird die Lenkung kräftiger. Das Wippen und Neigen, das du siehst, ist nur Darstellung.
 
 **Figur** (Character), **die Lauffigur.** Eine Figur, die sich am Boden bewegt wie in klassischen Ego-Shootern. Sie wird nicht von der Physik
 herumgeschubst, sondern von einer **Laufhilfe** gelenkt – wie von einem unsichtbaren Spielleiter, der
@@ -504,7 +493,7 @@ stehen im blauen Buch, Kapitel 8.
 Ein **Läufer** (Walker) ist ein Roboter mit Gelenken, der von einem gelernten Programm über seine eigenen
 Motoren gesteuert wird – mit einer kleinen Verzögerung, genau wie in echt.
 
-Gemeint ist die Micro Duck mit dem Netz von Pollen Robotics. Die GameWorld treibt jeden Läufer in
+Gemeint ist die Micro Duck mit dem Netz von Pollen Robotics. Die Spielwelt treibt jeden Läufer in
 jedem Schritt: Sensoren lesen, ein Verhalten wählen,
 regelmäßig das Netz fragen, welche Winkel die Gelenke jetzt haben sollen, und die Servos dann mit
 kurzer Verzögerung bewegen – so, wie der echte Roboter es auch erlebt. Die Verzögerung ist Absicht:
@@ -548,7 +537,7 @@ ebenfalls; Kern glättet ihre Sticks, damit ein leicht zitternder Daumen die Fig
 Jedes Ding und das Level selbst können eigene Spielregeln tragen. Sie hören auf Ereignisse in der
 Welt und können sie verändern.
 
-Diese Spielregeln heißen **Logik-Graphen** ([Kapitel 9](09-logik.md)). Die GameWorld startet sie beim
+Diese Spielregeln heißen **Logik-Graphen** ([Kapitel 9](09-logik.md)). Die Spielwelt startet sie beim
 **Spielen** (Play) und **Simulieren** (Simulate) – aber nur auf dem Rechner, der das Sagen hat (allein oder als Server). Sie schickt
 ihnen Ereignisse: etwas betritt eine Zone, etwas prallt auf, eine Münze wird eingesammelt, jemand
 nimmt Schaden, eine Taste wird gedrückt, das Spiel ist vorbei, ein neuer Spieler kommt. Die Graphen
@@ -580,9 +569,9 @@ Sechs fertige Welten zeigen, was mit den Bausteinen geht. Du findest sie unter
 > **Tageszeit** (Time of day) auf 0,75. Starte erneut – jetzt
 > fährst du in den Sonnenuntergang.
 
-## 8.19 Was die GameWorld sonst noch kann
+## 8.19 Was die Spielwelt sonst noch kann
 
-Die GameWorld hat noch viele weitere Schalter – für Darstellung, Kampf, Netzwerk, Logik und das
+Die Spielwelt hat noch viele weitere Schalter – für Darstellung, Kampf, Netzwerk, Logik und das
 Greifen von Körpern mit der Maus. Eine davon ist besonders hübsch zum Verstehen: die
 **Debug-Ansicht**. Sie zeichnet die unsichtbaren Physikformen farbig nach Art – statisch grün,
 kinematisch blau, dynamisch orange, Sensor violett, schlafend grau –, dazu Berührungspunkte und

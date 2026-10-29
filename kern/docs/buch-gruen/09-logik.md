@@ -27,9 +27,7 @@ zwischen ihnen). Weiße Drähte legen fest, **was als Nächstes passiert**; farb
 
 Der Graph selbst ist nur eine Beschreibung – eine Liste von Kästchen und Drähten, wie ein
 Schaltplan auf Papier. Hinter jeder Kästchensorte steckt ein fertiges Stück Kern, das die eigentliche
-Arbeit tut. Bevor ein Graph läuft, macht Kern aus dem Schaltplan eine **Nachschlagetabelle**: Für
-jedes Kästchen steht dort, welches Stück Kern es ausführt und wohin jeder Ausgang führt. Beim Spielen
-muss Kern dann nur noch nachschlagen, statt jedes Mal den ganzen Plan zu durchsuchen.
+Arbeit tut (wie Kern den Plan dafür vorbereitet, steht in 9.8).
 
 > **Stell dir vor …** eine Reihe Dominosteine. Du stupst den ersten an (ein Ereignis), er kippt den
 > nächsten, der den nächsten … Die weißen Pfeil-Drähte im Graphen sind die Abstände zwischen den
@@ -124,7 +122,7 @@ Steckbrief des Kästchens **„Add Score“** (Punkte geben) aus, in Worten:
 > Arbeit: Lies den Eingang und gib der Spielwelt so viele Punkte. Antwort: „Weiter bei Ausgang
 > ‚then‘.“
 
-Den Ablauf-Eingang und den Ausgang „then“ bekommt jede Aktion automatisch dazu. Alle eingebauten
+Alle eingebauten
 Kästchen zusammen bilden eine Art **Bausatz-Katalog**, aus dem das Menü im Editor seine Vorschläge
 holt. Name im Menü, Hilfetext, Suchwörter und wie so ein Steckbrief als C++ aussieht, zeigt das
 blaue Buch, Kapitel 9.
@@ -155,7 +153,7 @@ Alle Graphen laufen im Takt der Spielschritte, und zwar nur auf dem Rechner, der
 Anfang feuert „Begin Play“, danach in jedem Schritt „Tick“.
 
 Gerechnet wird in den festen Schritten der Simulation ([Kapitel 8](08-spiel-laufzeit.md)), und nur
-auf der **Autorität** – im Einzelspiel auf deinem Rechner, im Netzwerkspiel nur auf dem Server. Der
+auf der **Autorität** – dem Rechner, der das Sagen hat (8.17): im Einzelspiel auf deinem Rechner, im Netzwerkspiel nur auf dem Server. Der
 Grund: Es soll **eine einzige Wahrheit** geben. Würden zwei Rechner unabhängig voneinander
 entscheiden, ob eine Münze eingesammelt ist, könnten sie verschiedener Meinung sein. Also entscheidet
 einer, und alle anderen bekommen das Ergebnis.
@@ -286,9 +284,9 @@ Die Spielwelt gibt den Graphen alles, was sie brauchen: die Spielzeit, einen pla
 die Ereignisse. Ein Ereignis geht an das betroffene Ding – oder an dessen nächstes „Elternteil“ mit
 Graph. Was die Logik verändert, bekommen alle Mitspieler mit.
 
-Die GameWorld startet die Graphen nur beim **Spielen** (Play) oder **Simulieren** (Simulate), nur
-auf der Autorität (nicht auf
-Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen:
+Die Spielwelt ([Kapitel 8](08-spiel-laufzeit.md)) startet die Graphen nur beim **Spielen** (Play)
+oder **Simulieren** (Simulate), nur auf der Autorität (9.4) und nur, wenn es überhaupt Logik gibt.
+Sie liefert den Graphen:
 
 - die **Spielzeit** – aus den Simulationsschritten gezählt, nicht von der Uhr an der Wand. Ruckelt
   ein langsamer Rechner, zählt die Spielzeit trotzdem genau gleich, und während einer Pause steht
@@ -296,8 +294,7 @@ Netzwerk-Kopien) und nur, wenn es überhaupt Logik gibt. Sie liefert den Graphen
 - Ausgaben und Fehler ins **Ausgabeprotokoll** (Output Log), Print auf Wunsch als Meldung im HUD;
 - einen **deterministischen Zufall**.
 
-Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit. Entsteht ein Ding sogar mitten in
-einem Ereignis, hört es dieses Ereignis schon mit.
+Erzeugte Dinge und neue Spieler bringen ihre Graphen gleich mit.
 
 **Wohin gehen Ereignisse?** An den Graphen des betroffenen Dings – oder, wenn es keinen hat, an den
 seines nächsten Vorfahren mit Graph. Das ist praktisch: Die unsichtbare Form, die in eine Tür
@@ -315,14 +312,18 @@ Dinge, versetzte Körper. Der Server schickt das an alle – auch an Spieler, di
 ## 9.8 Vom Bild zum Maschinencode
 
 Ein Graph kann Schritt für Schritt „gedolmetscht“ oder einmal ganz übersetzt werden. Die Übersetzung
-ist viel schneller und übernimmt sogar mitten im Spiel.
+ist viel schneller und übernimmt sogar mitten im Spiel. Das sind die drei Wege, die du schon aus
+[Kapitel 2](02-bauen-und-testen.md) kennst: Dolmetscher, Übersetzung und C++-Export.
 
 > **Stell dir vor …** du liest ein Buch in einer fremden Sprache. Ein **Dolmetscher** kann es dir
 > Satz für Satz vorlesen – das klappt sofort, ist aber langsam. Oder jemand **übersetzt** das ganze
 > Buch einmal, und danach liest du flüssig.
 
 Kern hat einen Dolmetscher, den **Interpreter**, und zwei Übersetzer, die nach demselben Plan
-arbeiten:
+arbeiten. Auch der Dolmetscher liest nicht jedes Mal den ganzen Schaltplan: Vor dem Start macht Kern
+daraus eine **Nachschlagetabelle**, in der für jedes Kästchen steht, welches Stück Kern es ausführt
+und wohin jeder Ausgang führt – wie ein Inhaltsverzeichnis, mit dem man sofort die richtige Seite
+findet.
 
 - **Die Übersetzung in letzter Sekunde** (*JIT*, „just in time“): Beim Start von **Spielen** (Play)
   oder **Simulieren** (Simulate) schreibt Kern jeden Graphen als kleines WebAssembly-Programm. Der Browser macht daraus
@@ -333,7 +334,8 @@ arbeiten:
 Einfache Dinge – Verzweigungen, Schleifen, Zahlen, Rechnen, Vergleichen – schreibt der Übersetzer
 direkt hin. Alles andere, etwa Spielknoten, ruft einfach das fertige Stück Kern auf, das auch der
 Dolmetscher benutzt. Und das geschieht ohne Umweg: Der übersetzte Graph spricht die Stücke von Kern
-direkt an, ohne dass die Webseite dazwischen vermitteln muss. Darum ist er so schnell.
+direkt an, ohne dass die JavaScript-Seite – der Kellner aus [Kapitel 1](01-einfuehrung.md) –
+dazwischen vermitteln muss. Darum ist er so schnell.
 
 > **Für Neugierige:** Direkt hinschreiben kann der Übersetzer nur Zahlen und Ja/Nein-Werte, denn nur
 > die liegen in den gemeinsamen Fächern (9.9). Text, Richtungen und Dinge liest auch der übersetzte
@@ -392,6 +394,12 @@ Du öffnest ihn über **Logik** (Logic) in der Werkzeugleiste (Level-Graph) oder
 **Logik bearbeiten** (Edit Logic) bzw. **Logik hinzufügen (Blueprint)** (Add Logic (Blueprint)) im
 Kontextmenü eines Actors.
 
+> **Achtung, Falle!** Der Logik-Editor ist die eine Stelle in Studio, die immer **Englisch** spricht –
+> auch wenn der Rest von Studio deutsch ist. Seine Kästchen, Menüs und Knöpfe heißen also „Begin
+> Play“, „Add Score“, **Templates…** oder **Compile**. Das Buch nennt sie darum mit ihren englischen
+> Namen und erklärt sie auf Deutsch. Englisch bleiben außerdem die Meldungen im Ausgabeprotokoll und
+> die Befehle der Konsole.
+
 Ein Grundsatz steckt dahinter: Der Editor selbst hat **keine eigene Logik**. Die Webseite zeichnet
 nur, was die Engine ihr beschreibt – wie in [Kapitel 4](04-grafik.md), wo die Seite nur Malbefehle
 weiterreicht. Jeder Handgriff ist ein Befehl an die Engine und damit ein Schritt, den du rückgängig
@@ -429,6 +437,7 @@ meisten gibt es im Logik-Editor unter **Templates**.
 Dominosteine in einer Reihe:
 
 ```mermaid
+%% Bildunterschrift: Die Punktezone als Kette von vier Kästchen (Namen wie im englischen Logik-Editor)
 flowchart TB
   A[On Begin Overlap] --> B[Add Score 10]
   B --> C[Show Message +10]
@@ -457,7 +466,9 @@ wenn der Ball auftaucht, und nicht alle 0,25 s.
 
 > **Probier's aus!** Öffne in einem Level den Logik-Editor, wähle **Templates…** und füge die
 > Ampel ein, den Eintrag **Traffic light (state machine)**. Starte **Spielen** (Play) und schau zu, wie die Meldungen **Green**, **Yellow** und **Red** (die Namen der Zustände) durchschalten. Dann
-> ändere einen Timer auf 1 Sekunde und probier es noch einmal.
+> ändere eine Wartezeit: Sie steht an den Pfeilen zwischen den Zuständen der State Machine „Light“
+> („after 4 s“). Klick einen solchen Pfeil an, stell rechts in den Details das Feld **Seconds** auf 1
+> und probier es noch einmal.
 
 > **Achtung, Falle!** Der Zwitscher-Graph ist eine Demo der Roboter-Knoten – nicht etwas, das die
 > echte Ente von selbst tut. Das steht sogar ausdrücklich in einem Kommentarrahmen im Graphen.

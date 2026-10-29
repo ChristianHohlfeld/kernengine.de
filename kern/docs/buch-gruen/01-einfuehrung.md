@@ -55,7 +55,7 @@ Im selben Modul stecken alle Teile der Werkstatt:
 - die **Physik**: wie Dinge fallen, rollen, zusammenstoßen und durch Gelenke verbunden sind;
 - der **Ton**: Klänge, die von links, rechts, nah oder fern kommen;
 - die **Spielregeln**: Levels, Dinge in der Welt, Mehrspieler und Spiellogik zum Zusammenklicken;
-- **Kern Studio**, der Editor, und **der Lehrer**, ein Trainer für Roboter-Gehirne, der die
+- **Kern Studio**, der Editor, und **der Lehrer**, der Roboter-Gehirnen das Laufen beibringt und die
   Simulation auch mit Messungen am echten Roboter vergleicht.
 
 Und dann ist da die **Micro Duck**: ein kleiner zweibeiniger Roboter. Entworfen hat ihn die
@@ -85,9 +85,8 @@ macht, entscheidet es selbst.
 > Zutaten kauft auch er – das Mehl mahlt er nicht selbst. Aber er nimmt sie, wie sie sind, und
 > mischt sie selbst. So weiß er bei jedem Teller, was drin ist.
 
-Kern benutzt außerdem nur eine kleine, längst überall verbreitete Auswahl von
-WebAssembly-Fähigkeiten. Das ist wie ein Brief in einfacher Sprache: Ihn versteht jeder. So läuft
-Kern auf jedem Browser, der 3D-Grafik mit WebGL2 kann, bei Safari ab Version 15.
+Kern verlangt außerdem vom Browser nichts Ausgefallenes. Das ist wie ein Brief in einfacher
+Sprache: Ihn versteht jeder. So läuft Kern in jedem heutigen Browser.
 
 ### Keine Engine-Logik in JavaScript
 
@@ -164,12 +163,11 @@ wird ihr Zustand zu einer Prüfzahl verdichtet. Diese Liste muss auf allen Rechn
 - **Die Physik wird nicht geschönt.** Die Micro Duck steht nur durch ihre eigenen Motoren und Füße –
   keine unsichtbare Hand hält sie fest ([Kapitel 6](06-physik.md), [Kapitel 13](13-micro-duck.md)).
 - **Eine Umsetzung für alle Orte.** Editor, fertiges Spiel und Lehrer teilen dieselbe Spielwelt und
-  dieselbe Physik. Darum läuft ein Netz, das im Lehrer (dem Trainer für die Ente, Abschnitt 1.4)
-  gelernt hat, unverändert im Studio.
-- **Kein Wegwerf-Speicher bei jedem Bild.** Bei jedem Bild reicht die Browser-Seite neue Zahlen an
-  Kern weiter. Dafür benutzt sie immer denselben Ablageplatz, statt jedes Mal einen neuen anzulegen
-  und wegzuwerfen. Sonst müsste der Browser ständig hinter ihr aufräumen, und das kostet Zeit
-  mitten im Spiel. Die Kehrseite: Was Kern behalten will, muss es sich kopieren
+  dieselbe Physik. Darum läuft ein Netz, das im Lehrer (dem Programm, das der Ente das Laufen
+  beibringt, Abschnitt 1.4) gelernt hat, unverändert im Studio.
+- **Kein Wegwerf-Geschirr.** Der JavaScript-Kellner von eben bringt Kern bei jedem Bild
+  neue Zahlen – und zwar immer auf demselben Tablett, statt jedes Mal ein neues zu holen und
+  wegzuwerfen. Wegwerfen hieße Abräumen, und Abräumen kostet mitten im Spiel Zeit
   ([Kapitel 3](03-grundlagen.md)).
 - **Robust:** Ein Browser darf einer Seite die Grafikkarte jederzeit wegnehmen – etwa bei
   Speichermangel, wenn der Grafiktreiber neu startet, oder auf dem Handy, wenn die Seite im
@@ -183,17 +181,18 @@ für sich prüfen.
 
 ![Die Stockwerke von Kern: oben der Browser-Teil, darunter das Programm vom Editor bis zum Fundament](../abbildungen/architektur.svg)
 
-So liest du das Bild: Jedes Stockwerk benutzt die darunter. Ganz oben steht der Browser-Teil, der Kellner: Er
-nimmt deine Eingaben entgegen und reicht sie durch die Übergabestelle nach unten weiter.
-„Netzwerk“ meint hier das Spielen mit mehreren Leuten über das Internet, nicht das neuronale Netz
-der Ente.
+So liest du das Bild: Jedes Stockwerk benutzt die darunter. Ganz oben steht der Browser-Teil, der
+Kellner: Er nimmt deine Eingaben entgegen und reicht sie durch die **Übergabestelle** – die
+Schnittstelle aus den Begriffen vorab – nach unten weiter. „Netzwerk“ meint hier das Spielen mit
+mehreren Leuten über das Internet, nicht das neuronale Netz der Ente.
 
 Nicht jedes Programm braucht das ganze Haus. Malen, Ton, Logik, Netzwerk und das Fundament sind
-immer dabei. Die übrigen Teile – Physik, Spielregeln, Editor, Trainer und die Laufzeit für reine
-C++-Spiele – wählt man beim Bauen aus, damit ein Programm nicht unnötig groß wird: Ein Spiel, das nur malt, braucht keinen Editor
+immer dabei. Physik, Spielregeln, Editor und Lehrer wählt man beim Bauen aus, damit ein Programm
+nicht unnötig groß wird: Ein Spiel, das nur malt, braucht keinen Editor
 ([Kapitel 2](02-bauen-und-testen.md)). Wer ein oberes Stockwerk wählt, bekommt die darunter
-automatisch mit: Editor und Trainer brauchen die Spielregeln, und die Spielregeln brauchen die
-Physik.
+automatisch mit: Editor und Lehrer brauchen die Spielregeln, und die Spielregeln brauchen die
+Physik. Dazu gibt es noch einen kleinen Anbau, den das Bild weglässt: einen Rahmen für Spiele, die
+ganz in C++ geschrieben sind (Abschnitt 1.4).
 
 C++ und JavaScript reden nur über einen gemeinsamen Speicherbereich miteinander. JavaScript legt
 dort Daten an vereinbarte Stellen und sagt der Engine, wo sie liegen. Die Engine antwortet auf
@@ -238,9 +237,10 @@ verschicken kannst. Sie läuft mit derselben Engine wie der Editor und verhält 
 
 > **Wusstest du?** Kern Studio zeigt seine Oberfläche auf Deutsch oder Englisch; ohne Vorgabe folgt
 > es der Sprache des Browsers. Dieses Buch nennt die Beschriftungen, wie Studio sie auf Deutsch
-> zeigt, in Klammern die englischen. Wer Studio auf Englisch nutzt, findet sie dort: Der Knopf
-> **DE | EN** unten rechts in der Statusleiste wechselt die Sprache, ebenso `?lang=de` bzw.
-> `?lang=en` in der Adresse; Studio merkt sich die Wahl auf dem Gerät.
+> zeigt, in Klammern die englischen. Der Knopf **DE | EN** unten rechts in der Statusleiste
+> wechselt die Sprache; Studio merkt sich die Wahl auf dem Gerät. Drei Dinge bleiben immer
+> englisch: der Logik-Editor ([Kapitel 9](09-logik.md)), die Meldungen im Ausgabeprotokoll und die
+> Befehle der Konsole.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck: auf deinem Rechner als eigenes Programm oder
 im Browser auf der Lehrer-Seite. Dort sammeln mehrere Hintergrund-Helfer gleichzeitig Erfahrungen
@@ -261,7 +261,7 @@ An der Ente sieht man alles auf einmal:
 - **Spiellogik** zum Zusammenklicken kann sie steuern.
 - Im Studio ist sie einfach ein **Actor** wie jedes andere Ding.
 
-![Das Micro-Duck-Level im Studio](../buch/bilder/duck-level.png)
+![Die Vorlage Micro Duck in Kern Studio: die Ente in einem ummauerten Raum mit Kisten und einem Ball](../buch/bilder/duck-level.png)
 
 > **Probier's aus!** Wähle **Datei › Neues Level...** (File › New Level...) und dort eine der sechs
 > Vorlagen, zum Beispiel **Micro Duck**. Drück **Spielen** und schau zu, wie die Ente losläuft, gesteuert von ihrem gelernten

@@ -31,9 +31,10 @@ Ein Programm wird in einer Sprache für Menschen geschrieben. Bevor ein Browser 
 muss es in dessen Befehle übersetzt werden. Bei Kern heißt das: Aus dem C++-Quelltext wird ein
 WebAssembly-**Modul**, eine einzige Datei, die der Browser lädt.
 
-> **Stell dir vor …** Der Quelltext ist das Rezept, das **Bauskript** ist der Koch, das Modul ist
-> das fertige Gericht. Beim Bestellen sagst du, welche Gänge du willst: nur die Grundausstattung
-> (Malen, Ton, Logik, Netzwerk), oder dazu Physik, Spielregeln, den Editor oder den Trainer.
+> **Stell dir vor …** Der Quelltext ist das Rezept, das **Bauskript** – ein kleines Programm, das
+> das Übersetzen steuert – ist der Koch, das Modul ist das fertige Gericht. Beim Bestellen sagst
+> du, welche Gänge du willst: nur die Grundausstattung (Malen, Ton, Logik, Netzwerk), oder dazu
+> Physik, Spielregeln, den Editor oder den Lehrer.
 
 Der Koch hat zwei feste Hausregeln. Erstens: **keine Rechen-Abkürzungen.** Manche Prozessoren
 können zwei Rechenschritte zu einem verschmelzen und runden dabei anders als andere. Das ist
@@ -48,8 +49,7 @@ gleichzeitig, und am Ende zu einem Modul zusammengefügt. Damit nicht bei jedem 
 jedes übersetzte Stück in einen **Vorratsschrank**. Es trägt ein Etikett, eine Art Fingerabdruck
 seines Rezepts und **aller** Header: Ändert sich darin auch nur ein Zeichen, sieht das Etikett völlig
 anders aus (wie so ein Fingerabdruck entsteht, zeigt [Kapitel 3](03-grundlagen.md)). Passt das
-Etikett noch, wird das Stück aus dem Schrank genommen statt neu gekocht. Studio und Beispielspiele
-teilen sich den Schrank, und das Fließband aus Abschnitt 2.4 hebt ihn von Lauf zu Lauf auf.
+Etikett noch, wird das Stück aus dem Schrank genommen statt neu gekocht.
 
 > **Wusstest du?** Ändert jemand ein einziges Komma in einem Header, wird **alles** neu übersetzt –
 > mit Absicht. Jedes Stück liest die Header mit, wie jede Wohnung die Hausordnung. Herauszufinden,
@@ -77,9 +77,10 @@ keinen Bildschirm, denn Training muss nichts malen. Darum läuft er sogar auf ei
 Monitor. Wie man ihn bedient, zeigt [Kapitel 14](14-lehrer.md).
 
 Für den eigenen Rechner darf der Übersetzer dabei die schnellsten Befehle wählen, die genau dieser
-Prozessor kennt. Das klingt nach einem Widerspruch zur Gleichheit, ist aber keiner: Er wählt nur
-andere Werkzeuge für dieselbe Rechnung. Die Rechen-Abkürzungen bleiben verboten, und so kommt Bit für
-Bit dasselbe heraus – nur schneller.
+Prozessor kennt. Widerspricht das nicht Kapitel 1? Nein: Verboten sind dort nur Befehle, die
+**anders runden** – etwa „mal und plus in einem Zug“. Erlaubt sind Befehle, die schneller **dieselbe**
+Rechnung machen, zum Beispiel mehrere gleiche Rechnungen nebeneinander in einem Zug, jede für sich
+genau wie vorher. So kommt Bit für Bit dasselbe heraus – nur schneller.
 
 Die genauen Namen und Werte stehen im blauen Buch, Kapitel 2.
 
@@ -134,25 +135,25 @@ Spielregeln, die man im Studio als Kästchen und Pfeile zusammenklickt ([Kapitel
 kann Kern auf drei Arten ausführen. Alle drei müssen exakt dasselbe Ergebnis liefern, und
 gemeinsame Testfälle prüfen genau das.
 
-> **Stell dir vor …** Eine Geschichte kann man Satz für Satz vom Zettel vorlesen (langsam, aber
-> sofort bereit). Man kann sie kurz vor dem Auftritt in die eigene Sprache übertragen und dann
-> flüssig vortragen (schnell, sobald es losgeht). Oder man lässt sie als fertiges Buch drucken. Wer
-> zuhört, muss jedes Mal dieselbe Geschichte hören.
+> **Stell dir vor …** Ein Buch in einer fremden Sprache. Ein **Dolmetscher** liest es dir Satz
+> für Satz vor (langsam, aber sofort bereit). Oder jemand **übersetzt** es einmal ganz, und danach
+> liest du flüssig. Oder es erscheint als fester Teil eines anderen Buchs. Wer liest, muss jedes Mal
+> dieselbe Geschichte erfahren.
 
-In Kern heißt das:
+In Kern heißt das ([Kapitel 9](09-logik.md) erklärt es genauer):
 
-- **Vorlesen:** Kern geht die Kästchen eins nach dem anderen durch und tut, was darin steht.
-- **Übertragen:** Beim Start von **Spielen** (Play) oder **Simulieren** (Simulate) übersetzt Kern
-  die Kästchen in schnelle Maschinenbefehle, die der Browser direkt ausführt. Der Test macht das genau so wie im Browser.
-- **Drucken:** Kern schreibt aus den Kästchen fertigen C++-Quelltext, der fest in ein Programm
+- **Dolmetscher:** Kern geht die Kästchen eins nach dem anderen durch und tut, was darin steht.
+- **Übersetzung:** Beim Start von **Spielen** (Play) oder **Simulieren** (Simulate) übersetzt Kern
+  die Kästchen in schnelle Maschinenbefehle, die der Browser direkt ausführt.
+- **C++-Export:** Kern schreibt aus den Kästchen fertigen C++-Quelltext, der fest in ein Programm
   eingebaut werden kann.
 
-Der schnelle Weg im Spiel ist das Übertragen. Klappt es einmal nicht, liest Kern einfach Kästchen
-für Kästchen vor – langsamer, aber nichts geht kaputt.
+Der schnelle Weg im Spiel ist die Übersetzung. Klappt sie einmal nicht, dolmetscht Kern einfach
+weiter – langsamer, aber nichts geht kaputt.
 
 > **Wusstest du?** Am Ende dieses Tests läuft ein Wettrennen: Spielregeln mit einer Million
-> Wiederholungen, einmal vorgelesen, einmal übertragen. Ausgegeben wird, wie viel schneller das
-> Übertragen ist.
+> Wiederholungen, einmal gedolmetscht, einmal übersetzt. Ausgegeben wird, wie viel schneller die
+> Übersetzung ist.
 
 ### Der Testklicker
 
@@ -168,7 +169,7 @@ muss dafür nicht wissen, wie das Bild genau aussehen soll – die Frage „Wurd
 beantwortet die Farbzahl allein, schnell und auch mit der langsamen Ersatz-Grafik. Nebenbei kann er
 Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
 
-![Simulieren mit Physik-Ansicht, wie der Testklicker es prüft](../buch/bilder/studio-simulate.png)
+![Simulieren im Physics Lab mit eingeblendeten Kollisionsformen – so bedient auch der Testklicker das Studio](../buch/bilder/studio-simulate.png)
 
 > **Probier's aus!** Mach, was der Testklicker macht. Wähle **Datei › Neues Level...** (File › New Level...)
 > und dort **Physics Lab**. Halte die rechte Maustaste gedrückt und drück W: Jetzt fliegt deine
@@ -235,9 +236,10 @@ Die Stationen:
 
 Wichtig ist, was **wartet** und was nicht. Veröffentlicht wird, sobald die Station „Bauen und
 Grundprüfungen“ fertig ist. Scheitert dort eine Prüfung, geht nichts online. Die drei anderen
-Prüfstationen laufen dagegen **nebenher**: Die Veröffentlichung wartet nicht auf sie. Fällt eine
-von ihnen durch, ist die neue
-Fassung vielleicht schon online – aber auf GitHub leuchtet sofort eine rote Markierung, und die
+Prüfstationen – Tests mit Spürhunden, Fingerabdruck auf dem Mac und Testklicker – laufen dagegen
+**nebenher**: Die Veröffentlichung wartet nicht auf sie. (Der Testklicker braucht zwar die fertig
+gebaute Seite und startet darum erst nach dem Bauen, dann aber gleichzeitig mit dem
+Veröffentlichen.) Fällt eine von ihnen durch, ist die neue Fassung vielleicht schon online – aber auf GitHub leuchtet sofort eine rote Markierung, und die
 nächste Änderung muss den Fehler beheben.
 
 > **Stell dir vor …** Eine Bäckerei. Bevor ein Brot in den Laden kommt, muss es durchgebacken sein –
@@ -246,11 +248,6 @@ nächste Änderung muss den Fehler beheben.
 
 Der Vorteil: Jede Änderung ist schnell online. Der Preis: Ein Fehler, den nur die nebenher
 laufenden Tests finden, kann kurz sichtbar sein.
-
-Auf der Hauptlinie, aus der die Webseite entsteht, läuft jede Änderung bis zum Ende durch – auch
-wenn schon die nächste kommt. So wird jeder geprüfte Stand auch veröffentlicht. Änderungsvorschläge,
-die erst noch begutachtet werden, laufen ebenfalls über das Fließband, werden aber nie
-veröffentlicht; kommt eine neuere Fassung des Vorschlags, wird der ältere Lauf abgebrochen.
 
 > **Probier's aus!** Im Studio steht in der Statusleiste ganz unten die **Version**, etwa „v 1af26d8“:
 > das Kürzel der Änderung, aus der das Fließband genau diese Fassung gebaut hat. Lädst du die Seite

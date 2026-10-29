@@ -14,8 +14,8 @@
 >   gleich“ heißt: gleich bis in die allerletzte Stelle.
 > - **Drehmoment** – Drehkraft. Ein Schraubenschlüssel mit langem Griff gibt bei gleicher Kraft
 >   mehr Drehmoment. Gemessen in Newtonmeter (N·m).
-> - **Impuls** – ein kurzer Stoß, wie ein Tritt gegen einen Ball. Eine **Kraft** dagegen schiebt
->   eine Weile.
+> - **Impuls** – ein kurzer Stoß, wie ein Tritt gegen einen Ball. Eine **Kraft** dagegen schiebt,
+>   solange man sie gibt – bei Kern jeweils für einen Schritt der Simulation.
 > - **Kollider** (Collider) – die unsichtbare, einfache Form, mit der ein Ding anstößt. Oft gröber als das,
 >   was man sieht: Ein Auto stößt etwa als Kiste an.
 > - **Solver** – der Teil von Box3D, der in jedem Schritt alle Regeln auf einmal erfüllt: Nichts
@@ -45,7 +45,8 @@ Die Grundlagen dahinter (wie eine Physiksimulation überhaupt denkt) erklärt
 ## 6.1 Die richtige Größe
 
 Box3D rechnet mit einem festen **Spielraum von ein paar Millimetern**: Körper dürfen sich um etwa
-5 mm durchdringen, und Kontakte werden schon kurz vor der Berührung angelegt. Das ist Absicht: Ganz
+5 mm durchdringen, und Box3D bemerkt eine Berührung schon kurz bevor sie passiert (warum, erklärt
+[Anhang C](C-grundlagen-physik.md)). Das ist Absicht: Ganz
 ohne Spielraum würden Dinge, die aufeinanderliegen, ständig zittern. Ein bisschen Einsinken ist der
 Preis für Ruhe. Für eine Kiste ist das winzig. Für ein Glied von 2 cm Länge ist es riesig.
 
@@ -53,8 +54,9 @@ Preis für Ruhe. Für eine Kiste ist das winzig. Für ein Glied von 2 cm Länge 
 > eine Ameise nicht.
 
 Daraus folgt die erste Regel: **Bewegte Körper gehören zwischen 10 cm und 10 m.** Viel kleiner wird
-es wackelig. Darum macht die Spiel-Laufzeit (der Teil von Kern, der ein Level als Spiel ablaufen
-lässt, [Kapitel 8](08-spiel-laufzeit.md)) bewegte Formen nie kleiner als 1 cm.
+es wackelig. Als Notbremse macht die Spiel-Laufzeit (der Teil von Kern, der ein Level als Spiel
+ablaufen lässt, [Kapitel 8](08-spiel-laufzeit.md)) bewegte Formen zwar nie kleiner als 1 cm – die
+Regel für gutes Verhalten bleibt aber 10 cm.
 
 > **Wusstest du?** Gemessen: Die Micro Duck in echter Größe hat Glieder von 2–4 cm. Ihr Rumpf sank
 > innerhalb von 10 Bildern 9 cm durch die Beine. In vierfacher Größe halten die Gelenke.
@@ -84,13 +86,10 @@ ihn so einfach wie für uns ein Komma verschieben beim Malnehmen mit 10. Es ents
 Rundungsfehler. Auf dem Boden, wo der feste Spielraum mitspielt, liegen sie weniger als einen
 drittel Millimeter auseinander.
 
-Werte, die für die ganze Welt gelten (etwa wie weich Kontakte nachgeben), werden nicht mitskaliert.
-Sie lassen sich nicht für die Ente allein umrechnen, weil im selben Level auch Autos stehen. Darum
-werden sie an Messungen eingestellt statt umgerechnet. Die Folge: Wo die Simulation vom echten
-Roboter abweicht, liegt es an den Modellen für Servo, Kontakt und Massen, nie am Vergrößern. Und
-diese Modelle werden an Messungen angepasst ([Kapitel 16](16-kalibrierung.md)). Eine Garantie, dass der
-echte Roboter sich sicher verhält, ist die Simulation nicht. Ein Roboter anderer Größe bekommt einfach
-einen anderen Faktor.
+Wo die Simulation vom echten Roboter abweicht, liegt es darum an den Modellen von Servo, Kontakt und
+Masse – nie am Vergrößern. Diese Modelle werden an Messungen angepasst
+([Kapitel 16](16-kalibrierung.md)). Eine Garantie, dass sich der echte Roboter sicher verhält, ist
+aber auch die beste Simulation nicht.
 
 > **Für Neugierige:** Bei vierfacher Größe wirkt Box3Ds Spielraum von 5 mm am echten Roboter wie nur
 > 1,25 mm – feiner als in echter Größe. Die vollständige Umrechnungstabelle steht im blauen Buch,
@@ -106,10 +105,15 @@ Schritt weiter, wie die Blätter eines Daumenkinos (6.12). In dieser Welt gibt e
 > genau so, wie die Technik es befiehlt, und schiebt alles mit, was draufsteht: **kinematisch**. Und
 > der Ball, den ein Schauspieler wirft, gehorcht Schwerkraft, Stößen und Reibung: **dynamisch**.
 
+Warum nimmt die Hebebühne mit, was auf ihr steht? Weil Kern sie **fahren** lässt, statt sie von
+Bild zu Bild an den neuen Ort zu versetzen: Sie bekommt in jedem Schritt die Geschwindigkeit, mit
+der sie ihr nächstes Ziel erreicht. Ein Aufzug, der springt statt fährt, ließe seine Fahrgäste in der
+Luft hängen.
+
 Einen dynamischen Körper bewegst du auf zwei Arten:
 
-- Eine **Kraft** wirkt genau **einen** Schritt lang. Was dauerhaft schieben soll, etwa ein Wind,
-  muss jeden Schritt neu wirken.
+- Eine **Kraft** schiebt, solange man sie gibt – bei Kern genau **einen** Schritt lang. Was
+  dauerhaft schieben soll, etwa ein Wind, muss jeden Schritt neu wirken.
 - Ein **Impuls** ist ein einmaliger Stoß, etwa für einen Sprung.
 
 Wie schwer ein Körper ist und wie träge er sich dreht, ergibt sich normalerweise aus seinen Formen
@@ -234,16 +238,17 @@ Kern setzt den Rollwiderstand gezielt ein, und die Kommentare im Code erklären,
 **Roboterfüße** sind breite, flache Formen mit hoher Reibung, damit der Roboter sicher steht und
 nicht wegrutscht.
 
-> **Probier's aus!** Im Details-Panel findest du die Werte unter
-> **Statisches Mesh › Physik** (Static Mesh › Physics) für den automatischen Kollider eines Dings,
-> unter **Kollider** (Collider) für einen eigenen; den endlosen Boden stellst du unter
-> **Welteinstellungen › Physik (Box3D)** (World Settings › Physics (Box3D)) mit **Bodenreibung**
-> (Ground friction) und **Bodenelastizität** (Ground bounciness) ein. Öffne das **Physics Lab** und
-> wähle eine Kiste. Die Kisten haben eigene Kollider, also stellst du im Details-Panel unter
-> **Kollider** das Feld **Rückprall (Elastizität)** (Restitution (bounce)) auf **0,9**. Starte
+> **Probier's aus!** Öffne das **Physics Lab** und wähle eine Kiste. Stell rechts in **Details**
+> unter **Kollider** (Collider) das Feld **Rückprall (Elastizität)** (Restitution (bounce)) auf
+> **0,9**. Starte
 > **Simulieren** (Simulate) mit Alt+S, den Probelauf mit Physik, greife die Kiste mit der Maus, heb sie hoch und lass sie fallen. Sie springt
 > jetzt mehrmals auf, jedes Mal etwas niedriger. Stell den Wert auf 0: Sie plumpst und bleibt
 > liegen. Gleiche Kiste, anderes Material.
+>
+> Gut zu wissen: Dinge ohne eigenen Kollider haben dieselben Felder unter **Statisches Mesh ›
+> Physik** (Static Mesh › Physics); den endlosen Boden stellst du unter **Welteinstellungen › Physik
+> (Box3D)** (World Settings › Physics (Box3D)) mit **Bodenreibung** (Ground friction) und
+> **Bodenelastizität** (Ground bounciness) ein.
 
 > **Für Neugierige:** In den **Welteinstellungen** gibt es außerdem Felder dafür, wie weich Kontakte
 > nachgeben und wie schnell Box3D Ineinandergeratenes wieder auseinanderdrückt.
@@ -407,14 +412,15 @@ diesem geglätteten Stand; mit dem rohen Stand wackelten schnelle Autos im Bild.
 ### Sub-Steps
 
 Jeder Schritt wird in Box3D noch einmal in **Sub-Steps** (Teilschritte) zerlegt, einstellbar unter
-**Welteinstellungen › Teilschritte** (World Settings › Sub-steps): Standard 4, im Level 1 bis 16. Mehr Teilschritte bedeuten, dass
+**Welteinstellungen › Teilschritte** (World Settings › Sub-steps). Mehr Teilschritte bedeuten, dass
 lange Gelenkketten besser zusammenhalten, weil kleine Fehler in kürzeren Schritten weniger Zeit
 haben zu wachsen.
 
 > **Wusstest du?** Gemessen an der Hüfte der Ente: Bei 4 Sub-Steps wuchs die Gelenklücke (der Spalt,
 > der sich zwischen zwei verbundenen Teilen öffnet) unter Last auf
 > 5 cm. Bei 16 Sub-Steps bleibt sie unter 1 mm. Fügt Studio einen Roboter ein, stellt es deshalb
-> 16 Sub-Steps und dessen Schrittrate ein (Micro Duck: 100 Schritte pro Sekunde) und meldet das.
+> 16 Sub-Steps und dessen Schrittrate ein (Micro Duck: 100 Schritte pro Sekunde Weltzeit, siehe
+6.15) und meldet das.
 
 Auch die Steifigkeit hängt an den Teilschritten: **Je steifer eine Feder, desto mehr Teilschritte
 braucht sie.** Eine Feder, die schneller schwingt, als die Physik hinschaut, gerät außer Kontrolle.
@@ -440,7 +446,7 @@ also bringt Kern seine eigene Fassung mit. Warum jeder dieser Punkte nötig ist,
 
 Geprüft wird mit einem **Fingerabdruck**: Die Ente läuft eine kurze Strecke, nach jedem Schritt ihrer Steuerung wird eine
 kurze Prüfzahl ihres Zustands gebildet, und die Liste muss auf allen Plattformen dieselbe sein
-([Kapitel 14](14-lehrer.md)).
+([Kapitel 2](02-bauen-und-testen.md), [Kapitel 14](14-lehrer.md)).
 
 > **Für Neugierige:** Für neuen Code gilt darum: keine Rechen-Abkürzungen, die das Ergebnis in der
 > letzten Stelle ändern dürfen, und Sinus & Co. nur aus Kerns eigener Mathebibliothek. Die genauen
@@ -456,10 +462,12 @@ Grundsätze:
    vergrößert (6.1), statt an der Physik zu drehen.
 2. **Ähnliche Massen.** Benachbarte Teile sollen nicht allzu verschieden schwer sein, höchstens etwa
    zehnmal. Hängt ein Klotz an einem Fädchen, dehnen sich die Gelenke (warum, erklärt
-   [Anhang C](C-grundlagen-physik.md) mit dem Lastwagen am Fahrrad). Ein starres Teil ist **ein**
-   Körper mit mehreren Formen, nicht mehrere zusammengeschweißte: Zusammengeschweißte Körper hält der
-   Solver nie ganz starr, sie wackeln gegeneinander. Ein Körper mit mehreren Formen ist wirklich eins. Zu leichte Glieder bekommen eine
-   Mindestmasse – die 5-g-Hüftbügel der Ente wiegen mindestens 20 g.
+   [Anhang C](C-grundlagen-physik.md) mit dem Lastwagen am Fahrrad). Zu leichte Glieder bekommen
+   darum eine Mindestmasse.
+
+   Und: **Ein starres Teil ist ein Körper.** Es wird als ein Körper mit mehreren Formen gebaut, nicht
+   aus mehreren zusammengeschweißten Körpern – die hält der Solver nie ganz starr, sie wackeln
+   gegeneinander.
 3. **Die Physik nie überlisten.** Keine heimlichen Zusatzkräfte, keine einfach gesetzten
    Geschwindigkeiten an Körpern mit Gelenken oder Kontakten, keine selbst gebastelte Bremse. Das
    kämpft gegen den Solver und pumpt Energie hinein. Gemessen: Ein solcher Trick ließ den Rumpf der
@@ -495,9 +503,20 @@ Das sind die fünf Zutaten:
 
 Kern baut das nur aus Box3Ds **eigenen** Gelenkteilen, ohne Zusatzkräfte. Die Feder des Scharniers
 übernimmt das Ziehen und Bremsen. Warum eine Feder? Box3Ds Gelenkfeder bleibt bei jeder Steifigkeit
-ruhig, und sie gibt nach wie ein echter Servo. Erin Catto kennt noch ein anderes Rezept: einen
-Motor, der umso schneller dreht, je weiter das Ziel weg ist. Der wäre aber starr, und das Netz hat
-beim Training einen nachgiebigen Servo kennengelernt.
+ruhig, weil Box3D sie „rückwärts“ rechnet (das erklärt [Anhang C](C-grundlagen-physik.md)), und
+sie gibt nach wie ein echter Servo.
+
+**Die Feder in Box3Ds Sprache.** Box3D beschreibt eine Feder nicht durch ihre Kraft, sondern
+dadurch, wie oft sie pro Sekunde schwingt – in Hertz, wie im Begriffskasten. Ein Servo sagt dagegen,
+wie fest er pro Grad zieht. Wie schnell eine Feder schwingt, hängt aber davon ab, wie viel an ihr
+hängt: Ein Gummiband mit einem Schlüsselbund wippt schneller als mit einer vollen Einkaufstasche.
+Wie träge die beiden Teile an einem Gelenk sich um seine Achse drehen, hängt aber von ihrer Lage ab –
+und die ändert sich mit jeder Bewegung der Ente. Darum rechnet Kern die Servowerte **in jedem
+Schritt** neu in Box3Ds Sprache um.
+
+> **Für Neugierige:** Erin Catto kennt noch ein anderes Rezept: einen Motor, der umso schneller
+> dreht, je weiter das Ziel weg ist. Der wäre aber starr, und das Netz hat beim Training einen
+> nachgiebigen Servo kennengelernt.
 
 Für die Höchstkraft gibt es einen Trick: Kern rückt das Ziel der Feder nie weiter weg, als die Feder
 mit voller Kraft ziehen kann. Das ist wie ein Gummiband, das man nie weiter als bis zu einer
@@ -537,8 +556,11 @@ rechnet genau an **einer** Stelle um, wenn die Werte in die Ente geschrieben wer
 Verzögerung wird umgerechnet, und zwar in ganze Physikschritte.
 
 **Durchgerechnet:** Der XL330 reagiert 20 ms (Tausendstelsekunden) verzögert. In der vergrößerten Welt
-läuft die Zeit doppelt so lang, also werden daraus 40 ms. Die Ente rechnet 100 Schritte pro Sekunde,
-ein Schritt dauert also 10 ms. 40 ms sind damit genau **4 Schritte**. Die Befehle stehen so lange in
+läuft die Zeit doppelt so lang, also werden daraus 40 ms. Die Welt der Ente rechnet 100 Schritte pro
+Sekunde **Weltzeit** (so steht es bei **Schrittrate** in Studio), ein Schritt dauert also 10 ms. 40 ms
+sind damit genau **4 Schritte**. Gemessen an der Uhr der Ente selbst (der **Entenzeit**, die
+doppelt so langsam läuft) sind das übrigens 200 Schritte pro Sekunde, wie beim Training des echten
+Roboters – beide Zahlen meinen dasselbe ([Kapitel 13](13-micro-duck.md)). Die Befehle stehen so lange in
 einer Warteschlange, bevor sie beim Servo ankommen.
 
 Wie die Micro Duck damit läuft, steht in [Kapitel 13](13-micro-duck.md), wie Profile gemessen werden,

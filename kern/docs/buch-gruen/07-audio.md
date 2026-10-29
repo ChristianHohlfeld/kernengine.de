@@ -160,21 +160,25 @@ fünf: Musik, Effekte, Hintergrund (*Ambience*), Oberfläche (Klicks im Menü) u
 zum Hauptregler (*Master*).
 
 ```mermaid
+%% Bildunterschrift: Fünf Busse fahren zum Hauptregler; ein Teil der Töne nimmt den Umweg über den Hall
 flowchart LR
-  M[Musik] --> MA[Master]
-  S[Effekte] --> MA
-  A[Hintergrund] --> MA
+  M[Musik] --> MA["Hauptregler (Master)"]
   U[Oberfläche] --> MA
+  A[Hintergrund] --> MA
+  S[Effekte] --> MA
   V[Stimmen] --> MA
-  S -. Hall-Anteil .-> H[Hall]
+  S -.-> H[Hall]
   V -.-> H
   H --> MA
 ```
 
+Die gestrichelten Linien sind die Hall-Anteile.
+
 Jeder Bus hat Lautstärke, Stummschalter, einen **Hall-Anteil** und auf Wunsch einen **Tiefpass** –
 einen Filter, der nur die tiefen Töne durchlässt, so als hörtest du Musik durch eine Wand. Auch hier
 gleitet alles, sodass selbst Stummschalten nicht klickt. Ab Werk ist die Musik etwas leiser als die
-Effekte, und Hall bekommen nur Effekte und Stimmen – bis ein Level es anders einstellt (7.9).
+Effekte, und Hall bekommen ab Werk nur Effekte und Stimmen. Ein Level kann zusätzlich den
+Hintergrund verhallen lassen (7.9); Musik und Oberfläche bleiben immer trocken.
 
 > **Stell dir vor …** du klatschst in einem leeren Treppenhaus. Der Knall prallt hundertfach von den
 > Wänden zurück, immer leiser, bis nur ein Rauschen bleibt. Das ist **Hall**.
@@ -183,8 +187,7 @@ Kerns Hall heißt **Freeverb**, ein bekanntes, frei verfügbares Verfahren. Es t
 dem Treppenhaus: Es erzeugt viele Echos von **verschieden langen** Wegen, jedes leiser als das
 vorige, und die hohen Töne klingen schneller ab – wie in einem Raum mit Teppich. Weil die Wege
 verschieden lang sind, fallen die Echos nie im Gleichtakt zusammen, sondern ergeben eine dichte
-Wolke. Danach wird diese Wolke noch einmal „verwischt“, damit man keine einzelnen Echos mehr
-heraushört, und links klingt minimal anders als rechts, damit der Hall breit wirkt. Drei Knöpfe
+Wolke. Drei Knöpfe
 steuern ihn: Raumgröße (längeres Nachklingen), Dämpfung (wie schnell die Höhen verschwinden) und
 Nass-Anteil (wie viel Hall dazukommt).
 
@@ -301,7 +304,7 @@ Laut pro Bild. Wann die Ente welchen Laut ruft, erklärt [Kapitel 13](13-micro-d
 > mit einem SHA-256-Fingerabdruck (einer Rechnung, die aus jedem Text eine feste, scheinbar zufällige
 > Zahl macht). Das Namensschema der Entenlaute steht im blauen Buch, Kapitel 7.
 
-## 7.7 Klang im Spiel: SoundBank und GameAudio
+## 7.7 Klang im Spiel: Plattensammlung und Tontechniker
 
 Im laufenden Spiel arbeiten zwei Helfer zusammen: eine **Plattensammlung**, die alle Töne bereithält,
 und ein **Tontechniker**, der sie zur rechten Zeit abspielt. Ihr wichtigster Grundsatz: Ein zu spätes
@@ -311,13 +314,13 @@ Wo ein Level einen Sound nennt, steht ein kurzer Verweis: auf einen eingebauten 
 eigene, importierte Datei (sie wird direkt im Level gespeichert), auf Stille oder auf „automatisch
 passend“.
 
-Die **SoundBank** ist die Plattensammlung. Eingebaute Sounds rechnet sie in Zeitscheiben aus,
+Die **Plattensammlung** (im Programm *SoundBank*): Eingebaute Sounds rechnet sie in Zeitscheiben aus,
 importierte lässt sie vom Browser entpacken. Vor dem Start bestellt sie alles, was das Level brauchen
 könnte – Musik, Motor, Aufprälle, Waffen, Münzen. So beginnt das Spiel mit allem an seinem Platz.
-Kann eine Datei nicht entpackt werden, meldet die Bank das, und Töne mit dieser Datei fallen weg,
+Kann eine Datei nicht entpackt werden, meldet die Plattensammlung das, und Töne mit dieser Datei fallen weg,
 statt ewig zu warten.
 
-**GameAudio** ist der Tontechniker. Er überträgt die Ton-Einstellungen des Levels aufs Mischpult und
+Der **Tontechniker** (im Programm *GameAudio*) überträgt die Ton-Einstellungen des Levels aufs Mischpult und
 kümmert sich bei jedem Bild um vier Dinge:
 
 1. **Die Ohren folgen der Kamera.** Springt die Kamera bei einem Schnitt an einen ganz anderen Ort,
@@ -328,10 +331,10 @@ kümmert sich bei jedem Bild um vier Dinge:
    Gas, Schallquellen im Level wandern mit ihrem Actor. Verschwindet der Actor, wird sein Ton
    ausgeblendet. Bei der Micro Duck surren statt eines Motors die Servos.
 4. **Zu späte Töne fallen weg.** Die Simulation meldet Geräusche (7.8). Ist der Ton noch nicht fertig
-   ausgerechnet, wartet GameAudio einen Augenblick – und lässt ihn dann lieber ganz aus.
+   ausgerechnet, wartet der Tontechniker einen Augenblick – und lässt ihn dann lieber ganz aus.
 
 Der Motor des Spielers klingt übrigens ohne Doppler: Die Kamera fährt ja mit, Ohren und Motor bewegen
-sich gemeinsam. Beim Beenden blendet GameAudio alles aus, und der Stummschalter des Editors bleibt
+sich gemeinsam. Beim Beenden blendet der Tontechniker alles aus, und der Stummschalter des Editors bleibt
 über mehrere Spielrunden hinweg erhalten.
 
 > **Für Neugierige:** Musik hat die höchste Priorität, Dauerklänge im Level eine mittlere, kurze
@@ -348,7 +351,7 @@ etwas ist.
 > dem Tontechniker hinter der Bühne ein Zeichen – einen Cue.
 
 Genauso schreibt die Simulation während ihrer Physikschritte kleine Zettel, **Cues** („spiel den
-Sprung-Sound hier, so laut“), und GameAudio sammelt sie bei jedem Bild ein. Weil die Physik in festen
+Sprung-Sound hier, so laut“), und der Tontechniker sammelt sie bei jedem Bild ein. Weil die Physik in festen
 Schritten rechnet, entstehen die Zettel auf jedem Gerät gleich. Hört niemand zu (etwa beim Training
 im Lehrer), bleiben nur die neuesten liegen. Im Netzwerkspiel dürfen Tonzettel unterwegs auch mal
 verloren gehen – fehlt ein Klick, ist es egal. Wichtige Ereignisse wie eine eingesammelte Münze kommen
@@ -403,7 +406,8 @@ im blauen Buch, Kapitel 7; die Bedienung im Editor in [Kapitel 11](11-studio.md)
 > blickt. Dreh in den **Welteinstellungen** unter *Audio* die **Musiklautstärke** (Music volume)
 > herunter, damit du das Radio gut hörst. Starte **Spielen** (Play) mit Alt+P und fahr heran, weit weg und einmal
 > drumherum. Hörst du, wie die Musik leiser wird, von links nach rechts wandert und hinter dir dumpfer
-> klingt? Das sind die drei 3D-Effekte aus 7.3.
+> klingt? Das sind drei der vier 3D-Effekte aus 7.3. Den vierten, den Doppler-Effekt, hörst du, wenn
+> du schnell am Radio vorbeifährst: Die Musik klingt beim Heranfahren etwas höher, danach tiefer.
 
 ## 7.10 Die Brücke zum Browser
 
@@ -454,7 +458,7 @@ mit seinem eigenen Werkzeug und reicht die Samples an Kerns Mischpult weiter.
   verhindert Übersteuern.
 - Alle eingebauten Sounds und die Musik werden aus Rezepten ausgerechnet.
 - Jede Ente hat aus ihrem Seed eine eigene Stimme, genau wie im Original.
-- Die Simulation schreibt nur Cues, der Tontechniker GameAudio spielt sie ab – lieber gar nicht als
+- Die Simulation schreibt nur Cues, der Tontechniker spielt sie ab – lieber gar nicht als
   zu spät.
 
 ## Knobelecke
