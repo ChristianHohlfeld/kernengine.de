@@ -148,8 +148,9 @@ Format heißt **JSON**: Namen und Werte, ordentlich in Klammern verpackt. Der An
 - Zeile 5: In den eckigen Klammern steht die Liste aller Actors.
 
 Kern rechnet in Metern, Sekunden und Kilogramm. **Z zeigt nach oben**: X und Y liegen flach auf dem
-Boden wie die Achsen auf Karopapier, Z ragt senkrecht in die Höhe. Winkel stehen in Grad, Farben als
-Zahlen von 0 bis 1.
+Boden wie die Achsen auf Karopapier, Z ragt senkrecht in die Höhe. Winkel stehen in der Datei in
+Grad (intern, etwa bei den Gelenken der Ente, rechnet Kern in Radiant, [Kapitel 13](13-micro-duck.md)),
+Farben als Zahlen von 0 bis 1.
 
 > **Mission:** Speichere ein Level mit **Strg+S**. Je nach Browser fragt Studio nach einem
 > Speicherort, oder die Datei landet in deinem Download-Ordner. Öffne die `.klevel`-Datei mit einem
@@ -208,16 +209,26 @@ ausführlich vorkommt (A = Anhang A).
 
 Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klammern die englische.
 
-- **Actor:** ein Ding im Level, mit Position und Bausteinen (8).
+- **Actor:** ein Ding im Level, mit Position und Bausteinen (8, 11). Nicht verwechseln mit dem
+  **Actor beim Lernen** (siehe Lernen).
 - **Aussteigen / übernehmen (F8)** (Eject / possess (F8)): im Spiel den Spieler verlassen / wieder
   übernehmen (11).
-- **Autosave:** automatische Sicherung ungespeicherter Arbeit (11).
+- **Ausgabeprotokoll** (Output Log): das Logbuch mit allen Meldungen von Studio; viele Meldungen
+  darin bleiben englisch (11).
+- **Autosave:** automatische Sicherung ungespeicherter Arbeit, nur in diesem Browser (11).
 - **Beobachterkamera (Spielen: fliegen, zuschauen, Körper ziehen)** (Observer camera (Play: fly,
   watch, drag bodies)): Spielen mit freier Kamera zum Zuschauen (11).
+- **Beweger** (Mover) / **Rotator:** Komponenten, die ein Ding hin und her fahren / sich drehen
+  lassen (8, 11). Nicht verwechseln mit dem **Character Mover** (siehe Physik).
 - **Blueprint / Logik-Graph:** ein Programm aus Knoten und Verbindungen, ohne Tippen (9).
+- **Box / Quader:** dieselbe Form; Studio nennt sie Box, die Geometrie Quader (5, 8).
 - **Controller:** bestimmt, wie der Spieler sich bewegt: laufen, rollen, fahren, fliegen (8).
 - **Details:** das Panel mit allen Einstellungen des gewählten Actors (11).
+- **Dock:** die Knöpfe zum Spielen und Simulieren, die auf schmalen Bildschirmen immer sichtbar
+  bleiben (11).
+- **dt:** die Zeit seit dem letzten Bild in Sekunden; Bewegung wird damit malgenommen (12).
 - **Engine:** das Programm, das eine Spielwelt zeichnet, rechnet und abspielt (1).
+- **Event:** ein Ereignis, das im Logik-Graphen etwas in Gang setzt (9).
 - **Gizmo:** Pfeile und Ringe zum Verschieben, Drehen, Skalieren (11).
 - **Haltepunkt:** Das Spiel hält an, wenn ein bestimmter Knoten drankommt (9).
 - **HUD:** Anzeigen im Spiel wie Punkte und Zeit (8).
@@ -225,102 +236,178 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Kill-Z (darunter Wiedereinstieg)** (Kill Z (respawn below)): eine Höhe; fällt der Spieler
   darunter, wird er zurückgesetzt (11).
 - **Knoten:** ein Baustein im Logik-Graphen (9).
-- **Komponente:** ein Baustein eines Actors, etwa Mesh, Kollider oder Sound (8).
+- **Komponente:** ein Baustein eines Actors, etwa Mesh, Kollider oder Sound (8, 11).
+- **Konsole** (Feld **Cmd**): Zeile in Studios Statusleiste, in die man Befehle tippt (11).
 - **Level:** eine Spielwelt, gespeichert als `.klevel` (8).
-- **Outliner:** die Liste aller Actors, wie ein Inhaltsverzeichnis des Levels (11).
-- **Pawn:** die Spielfigur, die einem Spieler gehört (8).
+- **Listen-Server:** ein Server, der selbst mitspielt (10).
+- **Logik-Editor:** Studios Werkzeug für Logik-Graphen; seine Beschriftungen bleiben englisch (9, 11).
+- **Modul:** die übersetzte Datei der Engine oder eines Spiels, die der Browser lädt (2, 12).
+- **Outliner:** die Liste aller Actors rechts oben, wie ein Inhaltsverzeichnis des Levels (11).
+- **Pawn:** die Spielfigur, die einem Spieler gehört (8, 10).
+- **Pin / Variable:** Anschluss am Rand eines Knotens / beschriftetes Fach, in dem sich ein Graph
+  einen Wert merkt (9).
+- **Plattformschicht:** kleiner JavaScript-Helfer zwischen C++-Spiel und Browser (12).
 - **Snapping:** Einrasten auf ein Raster (11).
 - **Spiel verpacken** (Package Game): ein Level als eigenständige Webseiten-Datei exportieren, die
   man weitergeben kann (11).
 - **Spielansicht** (Game View): Ansicht ohne Editor-Hilfen, wie im Spiel (11).
 - **Spielen** (Play) / **Simulieren** (Simulate): selbst spielen / die Welt ohne Spielfigur laufen
   lassen und zuschauen; bearbeiten geht erst nach dem Stoppen (11).
+- **Spielschleife:** Eingabe lesen, Welt weiterrechnen, Bild malen – für jedes Bild neu (12).
+- **Starrkörper** (Rigid Body): die Komponente, die ein Ding zum Physik-Körper macht (11).
 - **Transformation** (Transform): Position, Drehung und Skalierung eines Actors (8).
-- **Trigger:** ein Bereich, der etwas auslöst, wenn man ihn betritt (8).
+- **Trigger:** ein Bereich, der etwas auslöst, wenn man ihn betritt (8, 12).
 - **Viewport:** das Fenster, durch das du in die 3D-Welt schaust (11).
-- **Welteinstellungen** (World Settings): Einstellungen der ganzen Welt, etwa die Schrittrate (11).
+- **Webserver:** ein Programm, das Dateien so ausliefert wie eine Internetseite (12).
+- **Welteinstellungen** (World Settings): Einstellungen der ganzen Welt, etwa Schwerkraft und
+  Schrittrate (6, 11).
 
 ### Grafik und Geometrie
 
-- **Bloom:** helle Stellen leuchten über ihren Rand hinaus (4).
+- **Albedo:** wie viel Licht eine Farbe zurückwirft: weiß 1, schwarz 0 (B).
+- **Bildpuffer:** unsichtbares Bild, in das die Grafikkarte malt, bevor es auf den Bildschirm kommt (B).
+- **Bloom (Glühen):** helle Stellen leuchten über ihren Rand hinaus (4, B).
 - **BVH:** Kisten in Kisten. Große Kisten enthalten kleinere, und ganz innen liegen die Dreiecke. Ein
-  Strahl muss nur in die Kisten schauen, die er trifft – das spart viel Suchen (5).
-- **Ego-Ebene:** wird als Letztes gezeichnet und liegt darum immer vorne, etwa für die Gizmos (4).
-- **Frame:** ein einzelnes Bild; viele pro Sekunde ergeben Bewegung (4).
-- **Frustum-Culling:** nicht zeichnen, was außerhalb des Blickfelds liegt (5).
-- **Instancing:** dasselbe Mesh vielfach auf einmal zeichnen (4).
-- **Kontextverlust:** Der Browser nimmt die Grafikkarte kurz weg; Kern baut alles neu auf (4).
+  Strahl muss nur in die Kisten schauen, die er trifft – das spart viel Suchen (5, B).
+- **Ecke** (Vertex): ein Eckpunkt eines Dreiecks, mit Lage und oft Farbe, Normale und UV (5, B).
+- **Ego-Ebene:** wird nach dem Löschen der Tiefe als Letztes gezeichnet und liegt darum immer vorne,
+  etwa für die Waffe in der Hand oder die Gizmos (4, B).
+- **Fragment:** ein Pixel-Kandidat, für den die Grafikkarte die Farbe ausrechnet (4, B).
+- **Frame:** ein einzelnes Bild; viele pro Sekunde ergeben Bewegung (4, 12).
+- **Fresnel:** Flach draufschauen spiegelt mehr – wie bei einer nassen Straße (B).
+- **Frustum-Culling:** nicht zeichnen, was außerhalb der Sichtpyramide liegt (5, B).
+- **Gamma / sRGB:** Umrechnung zwischen „so viel Licht“ und „so, wie das Auge es sieht“; dunkle Töne
+  bekommen mehr Stufen (4, B).
+- **Grafikkarte** (GPU): der Chip, der Bilder malt und tausende kleine Aufgaben gleichzeitig
+  rechnet (4, B).
+- **Indizes:** Nummernliste, welche drei Ecken ein Dreieck bilden (5).
+- **Instanz / Instancing:** dasselbe Mesh noch einmal an einem anderen Ort / alle Kopien mit einem
+  einzigen Malbefehl zeichnen (4, 5, B).
+- **Kontextverlust:** Der Browser nimmt die Grafikkarte kurz weg; Kern baut alles neu auf (4, B).
+- **Malbefehl:** ein Auftrag an die Grafikkarte: „Mal dieses Mesh!“ (4, B).
 - **Material:** wie eine Oberfläche aussieht: Farbe, Rauheit, Metall (4).
 - **Mesh:** eine 3D-Form aus Dreiecken (4).
+- **Normale:** ein Pfeil, der senkrecht aus einer Fläche zeigt; mit ihm rechnet das Licht (5, B).
 - **Partikel:** viele kleine Punkte für Funken, Rauch, Staub (4).
 - **Pass:** ein Durchgang beim Zeichnen, etwa für Schatten (4).
+- **PBR:** „physikalisch begründetes Malen“ mit winzigen Spiegelchen (Mikrofacetten) (B).
 - **Picking:** herausfinden, was unter dem Mauszeiger liegt (5).
-- **Renderer:** der Teil, der die Bilder zeichnet (4).
-- **Shader:** kleines Programm auf der Grafikkarte, das Punkte und Farben berechnet (4).
-- **Skinning:** ein Mesh mit Knochen verformen, etwa für Figuren (4).
-- **Textur:** ein Bild auf einer Oberfläche (4).
-- **Umgebungsverdeckung:** dunkelt Ecken und Ritzen ab, in die wenig Licht kommt (4).
-- **Vertex:** ein Eckpunkt eines Dreiecks (4).
-- **WebGL2:** der Weg, über den der Browser die Grafikkarte benutzt (4).
+- **Rasterisierung:** prüfen, welche Pixelmitten in einem Dreieck liegen (B).
+- **Renderer:** der Teil, der die Bilder zeichnet (3, 4).
+- **Schattenkarte:** ein Bild aus Sicht der Sonne, das sich die Entfernung zur ersten Fläche
+  merkt (4, B).
+- **Shader:** kleines Programm auf der Grafikkarte, das Punkte und Farben berechnet (4, B).
+- **Skalarprodukt:** eine Zahl dafür, wie sehr zwei Pfeile in dieselbe Richtung zeigen (B).
+- **Skinning:** ein Mesh mit Knochen verformen, etwa für Figuren (4, B).
+- **Textur / Texel:** ein Bild auf einer Oberfläche / eines seiner Pixel (4).
+- **Tiefenpuffer:** unsichtbares Bild, in dem für jedes Pixel steht, wie weit das bisher vorderste
+  Ding weg ist (4, B).
+- **Tonemapping:** sehr helles Licht am Ende sanft auf den Bereich des Bildschirms drücken (4, B).
+- **Umgebungsverdeckung:** dunkelt Ecken und Ritzen ab, in die wenig Himmel scheint (4, B).
+- **Umlaufsinn:** die Reihenfolge der Ecken verrät, ob man ein Dreieck von vorn oder hinten sieht (4, B).
+- **UV:** zwei Zahlen pro Ecke, welche Stelle einer Textur dort aufgeklebt wird (5).
+- **WebGL2:** der Weg, über den der Browser die Grafikkarte benutzt (4, B).
 - **Welding:** doppelte Eckpunkte zu einem zusammenfassen (5).
 
 ### Mathe und Technik
 
+- **Bibliothek:** eine Sammlung fertiger Funktionen, die viele Programme mitbenutzen (3).
 - **Bit:** die kleinste Einheit im Computer: 0 oder 1. „Bit für Bit gleich“ heißt: ganz exakt
-  gleich (3).
-- **C++ / JavaScript:** die Programmiersprache der Engine / die Sprache der Webseiten (1).
+  gleich (3, 10).
+- **Browser-Konsole:** verstecktes Fenster im Browser für Meldungen von Webseiten, oft mit F12 (3, 15).
+- **C++ / JavaScript:** die Programmiersprache der Engine / die Sprache der Webseiten (1, 4).
 - **CI:** automatische Prüfung jeder Änderung auf einem Server (2).
 - **Compiler / kompilieren:** ein Programm, das Code in Maschinensprache übersetzt, die der Prozessor
-  direkt ausführt (2).
+  direkt ausführt (2, 12). Im Logik-Editor heißt der Knopf dafür **Compile** (11).
 - **CSV:** eine Tabelle als Textdatei, die Werte durch Kommas getrennt (17.4).
-- **Determinismus:** gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis, auf jedem Gerät (6, 14).
-- **Fingerabdruck:** eine Prüfzahl je Takt, die jede kleinste Abweichung verrät (14).
-- **Hertz (Hz):** wie oft etwas pro Sekunde passiert. 50 Hz heißt 50-mal pro Sekunde (16).
-- **Interpreter:** führt einen Logik-Graphen Knoten für Knoten aus; Kapitel 9 nennt das „Vorlesen“ (9).
-- **JIT:** Ein Logik-Graph wird während des Spiels in schnellen Code übersetzt (9).
-- **JSON:** ein lesbares Textformat für Daten: Namen und Werte in Klammern (3).
-- **Matrix:** eine Zahlentabelle, die Drehen, Verschieben und Skalieren auf einmal beschreibt (3).
-- **Quaternion:** vier Zahlen, die eine Drehung beschreiben (3).
+- **Determinismus / deterministisch:** gleiche Eingaben ergeben Bit für Bit dasselbe Ergebnis, auf
+  jedem Gerät (6, 7, 9, 14).
+- **Fingerabdruck:** eine Prüfzahl, die jede kleinste Abweichung verrät – je Takt für die Simulation
+  (2, 14), für einen Logik-Graphen sein Inhalt (9).
+- **Funktion:** ein kleines Teilprogramm mit Namen, das Werte bekommt und ein Ergebnis liefert (3).
+- **GitHub:** die Webseite, auf der der Quelltext von Kern liegt (2).
+- **Hertz (Hz):** wie oft etwas pro Sekunde passiert. 50 Hz heißt 50-mal pro Sekunde (6, 7, 16).
+- **JSON:** ein lesbares Textformat für Daten: Namen und Werte in Klammern (3, 17.4).
+- **Matrix:** eine Zahlentabelle, die Drehen, Verschieben und Skalieren auf einmal beschreibt (3, B).
+- **Prozessor / Kerne:** das Rechenwerk im Computer / seine Teile, die gleichzeitig rechnen
+  können – mit der Engine Kern haben sie nichts zu tun (2, 14).
+- **Quaternion:** vier Zahlen, die eine Drehung beschreiben (3, B).
+- **Quelltext:** der Text eines Programms, so wie Menschen ihn schreiben (2).
 - **Radiant (rad):** ein anderes Winkelmaß als Grad. 1 rad sind etwa 57°, ein ganzer Kreis etwa
-  6,28 rad (13).
+  6,28 rad (6, 13).
 - **Seed:** die Startzahl für den Zufall im Computer. Gleicher Seed, gleiche Zufallszahlen – so lässt
-  sich jeder Lauf genau wiederholen (14).
-- **Terminal:** ein Fenster, in das man Befehle tippt, statt zu klicken (16, 17.4).
+  sich jeder Lauf genau wiederholen (10, 14).
+- **Terminal / Kommandozeile:** ein Fenster, in das man Befehle tippt, statt zu klicken (15, 16, 17.3).
 - **Thread:** ein Rechenstrang. Ein Prozessor mit mehreren Kernen rechnet mehrere Threads
   gleichzeitig (17.3, A).
-- **Vektor:** ein Pfeil mit Richtung und Länge, etwa (x, y, z) (3).
-- **WebAssembly:** ein Programmformat, das Browser sehr schnell ausführen (1).
-- **Web Worker:** ein Rechenhelfer im Browser, der neben der Webseite herläuft (14).
+- **Vektor (Pfeil):** ein Pfeil mit Richtung und Länge, etwa (x, y, z) (3, B).
+- **Vorlesen / Übersetzen (JIT):** ein Logik-Graph wird Knoten für Knoten ausgeführt / während des
+  Spiels in schnellen Code übersetzt (9).
+- **WebAssembly:** ein Programmformat, das Browser sehr schnell ausführen (1, B).
+- **Web Worker:** ein Rechenhelfer im Browser, der neben der Webseite herläuft; auf der Lehrer-Seite
+  heißen sie „Worker“ (14).
 
 ### Physik
 
 - **Box3D:** die Physik-Engine von Erin Catto, die Kern unverändert mitbringt (6).
+- **Character Mover:** Box3Ds Helfer für Spielfiguren: Die Figur schwebt wie auf einer Pogo-Feder (6).
+- **Dämpfung:** die Bremse beim Schwingen, wie ein Stoßdämpfer (6, 13).
+- **Drehmoment:** Kraft mal Hebel, gemessen in Newtonmeter (N·m) – wie am Schraubenschlüssel
+  (6, 13, C).
 - **Gelenk:** verbindet zwei Körper, etwa als Scharnier (6).
-- **Kinematisch:** ein Körper, der einer Vorgabe folgt und sich von nichts bremsen lässt (6).
+- **Impuls:** ein kurzer Stoß, der das Tempo auf einen Schlag ändert (6, C).
 - **Körper / Form:** was sich bewegt / welche Gestalt es hat (6).
-- **Kollider:** die unsichtbare Form, mit der etwas zusammenstößt (6).
+- **Kollider:** die unsichtbare Form, mit der etwas zusammenstößt (6, 8).
 - **Kontakt:** eine Stelle, an der sich zwei Körper berühren (6).
 - **Konvexe Hülle:** eine Form ohne Dellen nach innen (13).
-- **Moment (Drehmoment):** eine Drehkraft, wie wenn du an einem Schraubenschlüssel ziehst (13).
-- **Ray-Cast:** ein Strahltest: Was trifft ein Strahl zuerst? (6)
-- **Reibung / Restitution / Rollwiderstand:** Haften / Abprallen / Bremsen beim Rollen (6).
-- **Substeps:** Die Physik teilt jeden Schritt in kleinere Stücke, damit sie genauer rechnet; für die
-  Ente in 16 (6).
-- **Trägheit:** wie schwer sich etwas in Bewegung oder Drehung versetzen lässt (6).
-- **Zeitschritt:** die feste Zeit, um die die Physik jedes Mal weiterrechnet (6, 8).
+- **Newton (N):** die Einheit der Kraft; 100 g drücken mit knapp 1 N (6, C).
+- **Ray-Cast (Strahltest):** Was trifft ein Strahl zuerst? (5, 6, 13)
+- **Reibung / Restitution / Rollwiderstand:** Haften / Abprallen / Bremsen beim Rollen (6, 13).
+- **Schrittrate:** wie viele feste Schritte die Physik pro Sekunde rechnet; Standard 60, bei der
+  Micro Duck 100 pro Sekunde Weltzeit (6, 13).
+- **Sensor:** ein Kollider, der nichts aufhält, sondern nur meldet, wenn etwas hineinkommt (8).
+- **Solver:** der Teil der Physik, der alle Kontakte und Gelenke gleichzeitig einzuhalten versucht (C).
+- **Starrer Körper:** ein Ding, das sich nie verbiegt, wie ein Holzklotz (6).
+- **statisch / kinematisch / dynamisch:** steht fest / folgt einer Vorgabe und lässt sich nicht
+  schubsen / echte Physik mit Fallen und Stoßen (6, 8).
+- **Sub-Steps (Teilschritte):** Die Physik teilt jeden Schritt in kleinere Stücke, damit sie genauer
+  rechnet; bei der Micro Duck 16 je Schritt (6, 13, C).
+- **Trägheit / Trägheitsmoment:** wie schwer sich etwas in Bewegung / in Drehung versetzen lässt (6, 13).
+- **Zeitschritt (fester Schritt):** die feste Zeit, um die die Physik jedes Mal weiterrechnet (6, 8).
 
 ### Klang und Netzwerk
 
 - **3D-Klang:** Klang, der von einer Stelle im Raum kommt (7).
+- **Clip / Schleife:** ein fertiges Tonstück / ein Ton, der sich endlos wiederholt (7).
+- **Filter / Tiefpass:** ein Sieb für Töne; ein Tiefpass lässt nur das Tiefe durch und glättet
+  damit auch Werte, damit nichts ruckt (7, 13).
+- **Frequenz:** wie oft ein Ton pro Sekunde zittert; hoch = hoher Ton (7).
 - **Hall:** der Nachklang eines Raums (7).
 - **Mixer:** mischt alle Klänge zu einem (7).
-- **Synthesizer:** erzeugt Klänge aus Rechnung statt aus Aufnahmen (7).
-- **Client / Server:** Mitspieler / der Rechner, der das Spiel bestimmt (10).
-- **Datagramm:** ein einzelnes Datenpaket im Netz (10).
-- **Interpolation:** zwischen zwei bekannten Zuständen weich überblenden (10).
+- **Mono / Stereo:** ein Tonkanal / zwei Kanäle, links und rechts (7).
+- **Pan-Wert:** wie weit links (−1) oder rechts (+1) ein Ton klingt (7).
+- **Synthesizer:** erzeugt Klänge aus Rechnung statt aus Aufnahmen (7, 13).
+- **Autoritativ:** Nur der Server entscheidet, was wirklich passiert – wie ein Schiedsrichter (10).
+- **Client / Server:** Mitspieler / der Rechner, der das Spiel bestimmt (8, 10).
+- **Datagramm:** ein einzelnes Datenpäckchen im Netz, ohne Garantie (10).
+- **Einschreiben / Postkarte:** die zwei Kanäle: kommt sicher und in Reihenfolge an / einmal
+  geschickt, verloren ist verloren (10).
+- **Interpolation:** zwischen zwei bekannten Fotos weich überblenden; dafür zeigt der Client die Welt
+  0,1 s in der Vergangenheit (10).
+- **Jitter:** wie stark die Verzögerung im Netz schwankt (10).
+- **KernNet:** Studios kleiner Bote, der Päckchen zwischen Tabs und Rechnern trägt (10).
+- **Lag-Kompensation:** Der Server dreht für die Treffer-Prüfung die Zeit zurück (8, 10).
 - **Ping:** wie lange eine Nachricht zum anderen und zurück braucht (10).
-- **Relay:** ein Vermittler, der Pakete zwischen Browsern weiterreicht (10).
-- **Snapshot:** ein Schnappschuss des Spielzustands, den der Server an alle schickt (10).
+- **Prioritätstopf:** Punktekonto je Ding: Bewegtes kommt oft in den Snapshot, Ruhendes selten (10).
+- **Prüfsumme (CRC32):** eine Kontrollzahl, die kaputte oder fremde Päckchen verrät (10).
+- **Raum** (Room): der Name, unter dem sich Host und Gäste online treffen (10).
+- **Relay:** ein Vermittler, der Päckchen zwischen Browsern weiterreicht, ohne sie zu öffnen (10).
+- **Replika:** die Nachbildung der Welt beim Client, ohne eigene Physik und Logik (10).
+- **Salt / Challenge:** die Zufallszahl des Clients beim Anklopfen / die Antwort des Servers mit
+  seiner eigenen Zufallszahl (10).
+- **Serialisierung:** Zahlen und Texte eng in Bits packen und wieder auspacken (10).
+- **Slot:** die Spielernummer, die der Server einem Client zuteilt (10).
+- **Snapshot:** ein Foto des Spielzustands, das der Server 30-mal pro Sekunde schickt (10).
 
 ### Roboter
 
@@ -330,17 +417,26 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
   schnell. Darum ist er schwer in Schwung zu bringen – das zählt wie zusätzliches Gewicht am Arm (13, 16).
 - **Encoder (Winkelmesser):** misst, wie ein Gelenk gerade steht (13).
 - **Gerätemodell:** ein kleines Modell eines echten Geräts, beschrieben durch ein Profil (13, 16).
+- **BallPlay:** Kerns Nachbau von Pollens Ballspiel-Verhalten, ein Rezept in fünf Schritten (13).
+- **Daemon:** das Steuerprogramm, das auf dem echten Roboter läuft (13, 16).
+- **Detektor / Tracker:** schätzt aus dem Kamerabild, wo Ball und Socke liegen / merkt sich, wo sie
+  zuletzt waren (13).
 - **Getriebespiel:** kleines Wackeln im Getriebe, wenn die Zahnräder nicht ganz fest ineinandergreifen
-  (16).
-- **Home-Pose:** die Grundstellung der Ente (13).
+  (13, 16).
+- **Gieren / Nicken / Rollen:** die drei Drehrichtungen: „nein“ schütteln, „ja“ nicken, zur Seite
+  kippen (11, 13).
+- **Grundstellung / Home-Winkel:** die Ruhehaltung der Ente / der Winkel jedes Gelenks darin (13).
+- **Hochgehoben (Erkennung):** Pollens kleines Netz merkt, dass die Ente gehalten wird; dann
+  pausieren die Beine (13).
 - **IMU (Lagesensor):** spürt, wo unten ist und wie schnell sich der Körper dreht (13).
 - **Kalibrieren:** die Simulation so lange nachstellen, bis sie sich wie das echte Gerät verhält (16).
 - **Kern-Extras (Ballspiel, Socke holen, Schnabel beim Greifen)** (Kern extras (ball play, sock
   fetching, beak in the pick)): Schalter für Kerns Zusätze an der Ente (13).
+- **Leerlauf-Blick:** weiche Kopfbewegungen aus Pollens Software, wenn die Ente still steht (13).
 - **Maßstab 4:** Kern rechnet intern mit einer viermal so großen Ente, weil die Physik mit so
   winzigen Teilen schlecht rechnet (13).
 - **Micro Duck:** zweibeiniger Laufroboter von Pollen Robotics (13).
-- **Pick-up-Erkennung:** merkt, dass die Ente hochgehoben wird (13).
+- **Neuheitsraster:** merkt sich, wo die Ente schon war, damit sie lieber neue Orte besucht (13).
 - **Prüfmessung:** eine Messung, die beim Anpassen nicht benutzt wird. Nur sie zeigt, ob das Modell
   wirklich passt (16).
 - **Prüfstand:** ein eingespannter Servo mit Arm und Gewicht, an dem man misst (16).
@@ -350,17 +446,22 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Servo:** Motor mit Getriebe, der auf einen Winkel fährt (13).
 - **Servoprofil:** die Zahlen eines Servos: Feder, Kraftgrenze, Bremse, Reibung, Schwung,
   Verzögerung und wie sicher jede Zahl ist (16).
-- **Spielschicht:** Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut (13).
-- **Tiefpass:** glättet Werte, damit nichts ruckt (13).
+- **Spielschicht:** Kerns Netz, das entscheidet, was die Ente mit Ball und Socke tut (13, 14).
+- **Tiefpass:** siehe Filter (13).
 - **ToF:** Abstandssensor, der misst, wie lange Licht hin und zurück braucht (13).
 - **Läufer** (Walker): Steuerart für Roboter, die ein Netz fährt (13).
+- **Verhaltensprogramm:** Pollens Programm, das ohne Eingabe die nächste Tätigkeit der Ente wählt (13).
+- **Weltzeit / Roboterzeit:** die Uhr in Kerns viermal so großer Welt / die Uhr des echten Roboters;
+  1 Sekunde Weltzeit sind ½ Sekunde Roboterzeit (13).
 
 ### Lernen
 
-- **Actor (beim Lernen):** das Netz, das handelt. Nur der Actor kommt später auf den Roboter (14, A).
+- **Actor (beim Lernen):** das Netz, das handelt – die „Spielerin“. Nur der Actor kommt später auf
+  den Roboter (14, A). Nicht verwechseln mit dem Actor im Studio (11).
 - **Adam:** ein kluges Verfahren, das jeden Regler mit passender Schrittgröße und etwas Schwung
   verstellt (A).
-- **Agent / Umgebung:** der, der handelt (das Netz) / die Welt, die darauf antwortet (A).
+- **Agent / Umgebung:** der, der handelt (das Netz) / die Welt, die darauf antwortet (14, A).
+- **Aktion / Beobachtung:** was das Netz antwortet / was es in einem Takt zu sehen bekommt (15, A).
 - **Aktionsrauschen (σ, sprich „Sigma“):** wie stark die Ente beim Lernen zufällig von ihrem Plan
   abweicht, um Neues auszuprobieren. Es wird beim Lernen kleiner (14, A).
 - **Aktivierung / ELU:** der Knick nach jedem Neuron: Positives bleibt, Negatives wird
@@ -393,7 +494,8 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
   Lernrate an (A).
 - **Kritiker:** das zweite Netz beim Lernen. Er schätzt, wie gut eine Lage ist, wie ein Trainer am
   Spielfeldrand. Auf den Roboter kommt er nicht (14, A).
-- **Lehrer:** Kerns Trainingssystem, im Browser und als Programm (14).
+- **Lehrer:** Kerns Trainingsprogramm, im Browser und als Programm für die Kommandozeile (14, 15).
+  Nur der Kritiker heißt im Bild „Trainer“.
 - **Lehrplan:** Schwieriges kommt erst später dazu, etwa die Stöße. Zu viel Chaos am Anfang würde das
   Lernen verhindern (14, A).
 - **Lernrate:** wie große Schritte das Lernen macht (A).
@@ -407,16 +509,16 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
   übertönen (A).
 - **Notbremse:** kürzt einen Lernschritt, der zu lang würde, auf eine feste Höchstlänge (14, A).
 - **ONNX:** Dateiformat für trainierte Netze, so etwas wie PDF für Netze (13, A).
-- **Phasensignal:** ein Taktgeber, der dem Sprungnetz sagt, wo im Sprung es gerade ist (14).
+- **Phasensignal (Zeiger-Uhr):** eine Uhr mit einem Zeiger, die dem Sprungnetz sagt, wo im Sprung es
+  gerade ist (14, 15).
 - **Policy:** die Entscheidungsregel der Ente: Beobachtung hinein, Aktion heraus. Beim Lernen ist sie
-  etwas zufällig, auf dem Roboter nicht (13, A).
+  etwas zufällig, auf dem Roboter nicht (14, A).
 - **PPO:** das Lernverfahren des Lehrers. Es verbessert die Ente pro Schritt nur ein bisschen, wie
   mit einem Sicherheitsgurt (14, A).
 - **Reinforcement Learning:** Lernen durch Ausprobieren und Belohnung (A).
-- **Return (Rückgabe):** alle Punkte eines Versuchs zusammengezählt. Genau genommen zählen spätere
-  Punkte dabei etwas weniger (15, A).
-- **Rezept:** die Trainingseinstellungen einer Aufgabe (14).
-- **Rollout:** gesammelte Erfahrung: was die Ente sah, tat und dafür bekam (14).
+- **Return (Rückgabe):** alle Punkte eines Versuchs zusammengezählt (15). Beim Lernen zählen spätere
+  Punkte dabei etwas weniger, mit dem Zukunftsfaktor (A).
+- **Rezept (Trainingsplan):** die Trainingseinstellungen einer Aufgabe (14, 15).
 - **Sammler / Lerner:** sammelt Erfahrung / lernt daraus. Im Text: „Helfer mit Klemmbrett“ und
   „Auswerter“ (14).
 - **Schicht:** viele Neuronen nebeneinander, die alle dieselben Eingaben bekommen (A).
@@ -426,14 +528,15 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Streuung:** wie weit Werte typischerweise vom Mittelwert entfernt liegen (16, A).
 - **Suchwolke:** die vielen Kandidaten, die CMA-ES um eine Mitte herum ausprobiert (14, A).
 - **Totzone:** ein Bereich, in dem eine kleine Eingabe noch nichts bewirkt, wie beim Gamepad-Stick
-  (15).
+  (8, 13, 15).
 - **Überanpassung:** auswendig lernen statt verstehen (A).
 - **Überraschung (TD-Fehler):** wie viel besser oder schlechter ein einzelner Schritt lief, als der
   Kritiker erwartet hatte (A).
 - **Umrechner:** = Normalisierer; siehe Normalisieren (14, A).
 - **Variation (Domain Randomization):** Jede Übungsrunde bekommt eine etwas andere Ente in einer etwas
   anderen Welt. Dann ist die echte Ente nur eine Variante mehr (14, 16, A).
-- **velstand:** Pollens Netz zum Laufen und Stehen, in Kern eingebaut (13).
+- **velstand:** Pollens Netz zum Laufen und Stehen, in Kern eingebaut; Startpunkt für Kerns
+  Sprung (13, 14).
 - **Verlust:** eine Zahl dafür, wie falsch das Netz gerade liegt (A).
 - **Verteilungsverschiebung:** Wer nur zuschaut, kennt die Lagen nicht, in die er selbst gerät – wie
   Radfahren nur durch Zuschauen (A).

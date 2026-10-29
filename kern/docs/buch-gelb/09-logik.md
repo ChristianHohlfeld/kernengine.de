@@ -49,6 +49,7 @@ Nächstes passiert**. **Farbige Drähte** (zwischen den **Daten-Pins**) tragen *
 eine Zahl oder einen Text.
 
 ```mermaid
+%% Bildunterschrift: Ein kleiner Graph: Der weiße Draht sagt „jetzt“, der Daten-Draht bringt den Text
 flowchart LR
   B[Begin Play] -- weißer Draht --> M[Show Message]
   T[Text: Hallo!] -. Daten-Draht .-> M
@@ -67,15 +68,20 @@ Daten-Draht vom Textkästchen.
   aus, zum Beispiel liefert **Spawn Actor** die neue Kopie. Diesen Wert **behält** der Ausgang, bis
   die Aktion das nächste Mal läuft. Liest du ihn später, bekommst du das Ergebnis vom letzten Lauf.
   So wie ein Kassenzettel: Er zeigt den letzten Einkauf, nicht den, den du gerade vorhast. Darum
-  kann ein solcher Wert „alt“ sein, ein Rechenknoten dagegen nie.
+  kann ein solcher Wert „alt“ sein, ein Rechenknoten dagegen nie. Ein Beispiel: Liest du die „neue
+  Kopie“ von Spawn Actor, **bevor** Spawn Actor diesmal gelaufen ist, bekommst du die Kopie vom
+  letzten Mal.
 - **Variablen** gehören zum Graphen, haben einen Typ und einen Startwert.
-- **Wartende Knoten** wie **Delay** (warte ein paar Sekunden) und **Tween** (zähle in einer Zeit weich
-  von 0 bis 1, damit lässt du zum Beispiel ein Tor in 0,8 Sekunden weich aufgehen, siehe 9.11) halten
-  die Kette an und machen später weiter. Ruft man ein wartendes Delay noch einmal auf, überhört es
-  das. Die Variante **Retriggerable Delay** fängt dann stattdessen von vorn an zu warten. Damit baust
-  du zum Beispiel ein Licht, das 5 Sekunden nach der **letzten** Bewegung ausgeht: Jede neue Bewegung
-  startet das Warten neu.
+- **Wartende Knoten** wie **Delay** (warte ein paar Sekunden) und **Tween** halten die Kette an und
+  machen später weiter. Ein **Tween** läuft eine eingestellte Zeit lang. In **jedem Schritt** dieser
+  Zeit feuert sein Ausgang „Update“, und sein Wert „Alpha“ zählt dabei weich von 0 bis 1 hoch –
+  wie ein Fortschrittsbalken. Am Ende feuert „Finished“. Damit lässt du zum Beispiel ein Tor
+  Schritt für Schritt aufgehen (9.11).
 - **Kommentarrahmen** ordnen den Graphen für dich. Auf das Spiel wirken sie nicht.
+
+> **Für Profis:** Ruft man ein wartendes Delay noch einmal auf, überhört es das. Die Variante
+> **Retriggerable Delay** fängt dann stattdessen von vorn an zu warten. Damit baust du ein Licht, das
+> 5 Sekunden nach der **letzten** Bewegung ausgeht.
 
 Das Level hat einen **Level-Graphen**, und jeder Actor kann einen eigenen haben. Für ihn ist „Self“
 der Actor selbst.
@@ -86,6 +92,7 @@ Eine Ampel ist immer in genau **einem Zustand**: Grün, Gelb oder Rot. Nach eine
 den nächsten. Genau das ist eine **State Machine** (Zustandsautomat).
 
 ```mermaid
+%% Bildunterschrift: Die Ampel als Zustandsautomat: drei Zustände (Grün, Gelb, Rot), die nach festen Zeiten wechseln
 flowchart LR
   G[Green] -- nach 4 s --> Y[Yellow]
   Y -- nach 1,5 s --> R[Red]
@@ -126,13 +133,15 @@ mit dem Lineal: Sie ist genau 5 Kästchen lang.
 
 - gleicher Typ immer, ein weißer Exec-Draht nur mit Exec,
 - **alles nach Text** („alles lässt sich ausdrucken“),
-- Zahlen untereinander (Bool, Int, Float),
+- Zahlen untereinander (Bool, Int, Float; ein Bool zählt dabei als Zahl: wahr ist 1, falsch ist 0),
 - Actor nach Bool („gibt es ihn?“),
 - Zahl nach Vector (die Zahl kommt in alle drei Stellen).
 
-Wo Kern intern umwandelt, ist das genau festgelegt: Der Text „0“ oder „false“ wird zu falsch, ein
-Vector als Zahl ist seine Länge (beim Pfeil oben also 5), eine Kommazahl als Int wird abgeschnitten
-(3,9 wird 3, nicht gerundet). Als Draht sind Text → Bool und Vector → Zahl aber nicht erlaubt.
+Eine Kommazahl, die an einen Int-Pin geht, wird abgeschnitten: 3,9 wird 3, nicht gerundet.
+
+> **Für Profis:** Auch abseits der Drähte wandelt Kern manchmal um, etwa wenn ein Knoten selbst
+> einen Wert prüft. Das ist genau festgelegt: Der Text „0“ oder „false“ zählt als falsch, ein Vector
+> als Zahl ist seine Länge. Als Draht sind Text → Bool und Vector → Zahl aber nicht erlaubt.
 
 ## 9.2 Knoten und die Bibliothek
 
@@ -177,9 +186,19 @@ diesem Namen löst es aus, in allen Graphen oder nur beim Ziel-Actor. Derselbe N
 **Der Stapel.** Manche Knoten haben mehrere Ausgänge nacheinander, etwa **Sequence** („erst das,
 dann das, dann das“). Kern macht den ersten sofort und legt sich die anderen auf einen **Stapel**.
 Endet ein **Zweig** (eine Kette aus weißen Drähten, nach der nichts mehr kommt), nimmt es den
-obersten Eintrag vom Stapel und macht dort weiter. Schleifen benutzen denselben Stapel: Kern legt
-sich die Schleife selbst als Zettel oben drauf, führt einmal den Inhalt aus und kommt danach zur
-Schleife zurück, um zu prüfen, ob noch eine Runde fällig ist.
+obersten Eintrag vom Stapel und macht dort weiter.
+
+Ein Beispiel mit einer Sequence, die drei Ausgänge hat:
+
+| Moment | Kern macht gerade | auf dem Stapel (oben zuerst) |
+|---|---|---|
+| Sequence startet | Ausgang 1 | Zettel „Ausgang 2“, Zettel „Ausgang 3“ |
+| Zweig 1 ist zu Ende | Ausgang 2 | Zettel „Ausgang 3“ |
+| Zweig 2 ist zu Ende | Ausgang 3 | – |
+
+Schleifen benutzen denselben Stapel: Bevor Kern den Inhalt einer Schleife einmal ausführt, legt es
+einen Zettel „zurück zur Schleife“ oben drauf. Ist der Inhalt fertig, findet es diesen Zettel und
+prüft, ob noch eine Runde fällig ist.
 
 > **So kannst du es dir vorstellen:** ein Stapel Hausaufgabenzettel. Du arbeitest die aktuelle
 > Aufgabe ab. Fällt dir unterwegs ein „danach noch Mathe“, legst du den Zettel oben drauf. Bist du
@@ -187,8 +206,8 @@ Schleife zurück, um zu prüfen, ob noch eine Runde fällig ist.
 
 **Schutz vor Endlosschleifen:** Kern zählt mit, wie viele Knoten alle Graphen zusammen in einem
 Schritt ausführen. Sind es mehr als **200 000**, schaltet Kern den Graphen ab, der gerade läuft, und
-meldet „infinite loop? The graph is
-stopped.“ Ebenso stoppt eine Kette, wenn Events immer wieder neue Events auslösen: Event A ruft
+meldet „infinite loop? The graph is stopped.“ (auf Deutsch: „Endlosschleife? Der Graph wird
+angehalten.“). Ebenso stoppt eine Kette, wenn Events immer wieder neue Events auslösen: Event A ruft
 Event B, B ruft wieder A, A wieder B, und so weiter. Wird diese Kette zu lang, bricht Kern sie ab.
 
 > **Vorsicht, Falle:** Ein While Loop, dessen Bedingung nie falsch wird, friert in vielen Engines das
@@ -242,10 +261,10 @@ So stimmen Wiederholungen und alle Mitspieler im Netz überein.
 
 Dazu kommen **71** Spiel-Knoten. Ein Actor-Eingang ohne Draht bedeutet „Self“.
 
-**Events:** On Begin/End Overlap (etwas betritt oder verlässt den Sensor), On Entered Sensor, On Hit
-(Aufprall ab 2 m/s), On Collected, On Trigger, On Damaged, On Death, On Respawn, On Interact (Taste F
-oder Y am Gamepad, wenn du den Actor anschaust oder direkt daneben stehst), On Player Joined, On Game
-Over, On Input Action und On Key. Eine Überlappung zählt den Besucher als Ganzes: Körper und Kopf
+**Events** melden, dass etwas passiert ist, zum Beispiel On Begin Overlap (etwas betritt den
+Sensor), On Hit (ein Aufprall), On Collected (etwas wurde eingesammelt), On Death oder On Interact
+(Taste F oder Y am Gamepad, wenn du den Actor anschaust oder direkt daneben stehst) – und viele
+mehr. Eine Überlappung zählt den Besucher als Ganzes: Körper und Kopf
 eines Spielers sind ein Besucher.
 
 Begin Overlap und Entered Sensor klingen gleich, kommen aber von verschiedenen Seiten. **On Begin
@@ -281,8 +300,9 @@ weit das Nächste vor ihr ist), ihre Kamera und ihren Zustand abfragen. Einzelhe
 [Kapitel 13](13-micro-duck.md).
 
 > **Mission:** Öffne auf https://kernengine.de/ ein Level mit der Vorlage **Basis** (Basic) und
-> klicke in der Werkzeugleiste auf **Logik** (Logic). Der Logik-Editor selbst bleibt auch auf Deutsch
-> englisch. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
+> klicke in der Werkzeugleiste auf **Logik** (Logic). Wichtig: Der Logik-Editor bleibt auch in der
+> deutschen Oberfläche **englisch**, genauso wie die Meldungen im Ausgabeprotokoll und die Konsole.
+> Darum nennt das Buch seine Beschriftungen nur auf Englisch. Klicke **Begin Play**, zieh vom Ausgang „then“ einen Draht ins Leere, tippe „show
 > message“, Enter, und trage einen Text ein. Zurück mit **Viewport**, platziere eine
 > **Rollende Kugel** (Rolling Ball) – sie ist dein Spieler: Ohne steuerbaren Actor simuliert Studio
 > nur, und dann gibt es kein HUD – und drück **Spielen** (Play). Dein Text erscheint im HUD!
@@ -398,12 +418,14 @@ Alle sind echte Graphen aus Kern, die meisten gibt es als Vorlage unter **Templa
 **Punktezone:** On Begin Overlap → Add Score (10) → Show Message („+10“) → Play Sound (pickup). Wer
 den Sensor betritt, bekommt 10 Punkte, eine Meldung und einen Ton.
 
-**Tor** (Vorlage **Door that opens on Interact**):
+**Tor** (Vorlage **Door that opens on Interact**, auf Deutsch „Tür, die bei Interact aufgeht“; sie
+fährt nach oben auf wie ein Garagentor, darum heißt sie hier Tor):
 
-![Der Graph des Tors: Flip Flop wechselt zwischen zwei Tweens, die das Tor um 5 cm je Schritt hoch und runter schieben](../abbildungen/logik-tuer.svg)
+![Der Graph des Tors: Flip Flop wechselt zwischen zwei Tweens; ihr Ausgang Update schiebt das Tor in jedem Schritt um 5 cm hoch oder runter (Offset 0, 0, 0,05 heißt 5 cm nach oben)](../abbildungen/logik-tuer.svg)
 
-Interact wechselt per Flip Flop zwischen Öffnen und Schließen. Jeder Tween läuft 0,8 s und schiebt
-das Tor in jedem Schritt um 5 cm nach oben oder unten, wie ein Garagentor. Bei 60 Schritten pro
+Interact wechselt per Flip Flop zwischen Öffnen und Schließen. Jeder Tween läuft 0,8 s. Sein Ausgang
+„Update“ feuert in jedem Schritt, solange der Tween läuft (9.1), und schiebt das Tor jedes Mal um
+5 cm nach oben oder unten. Den Wert Alpha braucht dieses Beispiel gar nicht. Bei 60 Schritten pro
 Sekunde sind das rund 48 Schritte, also etwa 2,4 m.
 
 **Spawner:** Alle 3 s, solange die Variable „Spawned“ unter 10 liegt: einen Physik-Würfel in 6 m Höhe

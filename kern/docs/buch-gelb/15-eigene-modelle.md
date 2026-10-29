@@ -55,8 +55,10 @@ Start, Pause und „.onnx herunterladen“.
 > zusammen mit einem Erwachsenen), bekommt mit einem Skript auch das Lehrer-Programm für die
 > Kommandozeile. Es kann zusätzlich Spielstände fortsetzen, eigene Vorbilder suchen und die
 > Spielschicht trainieren. Spannend: Das Skript darf das Programm genau für deinen Prozessor
-> beschleunigen – das ändert **kein** Ergebnis, das Netz bleibt bis zur letzten Stelle dasselbe
-> (Kapitel 14.7). Das Bauen und alle Befehle stehen im blauen Buch, Kapitel 15.
+> beschleunigen, **ohne die Reihenfolge oder das Runden der Rechnungen zu ändern**. Es wählt nur
+> schnellere Befehle für dieselben Rechenschritte aus. Darum ändert das kein Ergebnis, das Netz bleibt
+> bis zur letzten Stelle dasselbe – anders als die verbotene „schnelle Mathe“ aus Kapitel 14.7, die
+> Rechnungen umstellt. Das Bauen und alle Befehle stehen im blauen Buch, Kapitel 15.
 
 ## 15.2 Was der Lehrer alles kann
 
@@ -409,8 +411,15 @@ Lösung schaut.
 
 Ein Beispiel aus der Spielschicht: Das Vorbild will kicken, wenn die Ente lange genug steht. Würde es
 das als einen einzelnen Knopfdruck in genau einem Takt melden, müsste das Netz diesen einen Takt
-treffen. Stattdessen steigt der Wunsch als **Rampe**: Nach 1 Sekunde Stehen ist er −1, nach 1,25
-Sekunden 0, nach 1,5 Sekunden +1. Die Stehzeit sieht das Netz (Regel 2). So kann es den Wunsch direkt
+treffen. Stattdessen steigt der Wunsch als **Rampe**, wie eine schräge Linie statt einer Stufe:
+
+| Stehzeit | Kick-Wunsch |
+|---|---|
+| 1 Sekunde | −1 (auf keinen Fall) |
+| 1,25 Sekunden | 0 (unentschieden) |
+| 1,5 Sekunden | +1 (jetzt kicken) |
+
+Dazwischen steigt er gleichmäßig. Die Stehzeit sieht das Netz (Regel 2). So kann es den Wunsch direkt
 aus dem ablesen, was es sieht. Über 0,5 gilt der Knopf als gedrückt (Regel 4).
 
 ## 15.11 Fallstricke aus den echten Läufen
@@ -469,7 +478,7 @@ trainiert, stolpert sonst über dieselben Steine.
 
 ### Lösungen
 
-1. Die **7** (auf dem Handy der Knopf HOP).
+1. Die **7** (auf dem Handy der Knopf **HÜPFEN** (HOP)).
 2. Ja: 2 × 16 = 32 und 4 × 8 = 32 Enten, gleicher Seed – dasselbe Netz, ihres nur schneller. Mit
    4 × 16 = 64 Enten entstehen andere Erfahrungen und darum ein anderes Netz.
 3. Nach dem Nachmachen kann sie schon springen. Große Schritte und viel Zufall könnten das gute Netz

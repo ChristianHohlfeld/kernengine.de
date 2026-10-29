@@ -94,7 +94,7 @@ schnelle Schätzung mit der weichen Kurve.
 > Versehen eine fremde Stimme zu verstellen.
 
 > **Mission:** Öffne in Kern Studio auf https://kernengine.de/ die **Inhaltsablage** (Content Drawer)
-> mit Strg+Leertaste, Tab **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
+> mit dem Knopf ganz links in der Statusleiste (unter Windows und Linux auch mit Strg+Leertaste), Tab **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
 > Tastendruck. Hör aus jeder Kategorie einen an. Dann klick einen langen Sound wie `music_calm` an
 > und, während er läuft, gleich einen zweiten. Achte genau auf den Moment, in dem die Musik aufhört:
 > Sie verschwindet ohne Klicken, so schnell und weich, dass du nur den neuen Sound hörst. Kein
@@ -136,8 +136,8 @@ Seite. Das passt zu Geräuschen, die dich umgeben, statt aus einem Punkt zu komm
 
 > **Für Profis:** Trägst du links und rechts als Punkt in ein Koordinatensystem ein, liegen alle
 > Punkte des Bogens auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
-> Radius². Kern nimmt zusätzlich alles mal √2 ≈ 1,41, damit die Mitte genau 1 / 1 ergibt. Darum gibt
-> Kern ganz links 1,41 / 0 aus und in der Mitte 1 / 1.
+> Radius². Am Ende rechnet Kern noch alle Werte der Tabelle mal √2 ≈ 1,41, damit die Mitte genau
+> 1 / 1 ergibt. Aus 0,71 / 0,71 wird so 1 / 1, und aus 1 / 0 ganz links wird 1,41 / 0.
 
 **Wie dumpf: Luft und Richtung.** Hohe Töne verlieren sich in der Luft schneller, ein fernes
 Gewitter grollt nur noch. Kern schickt jede 3D-Stimme durch einen Tiefpass: nah vor dir kommt alles
@@ -151,7 +151,12 @@ dich zu, treffen die Wellenberge dichter hintereinander ein. Mehr Wellenberge pr
 höhere Frequenz, also ein höherer Ton. Fährt sie weg, kommen sie weiter auseinander an, und der Ton
 wird tiefer.
 
+> **So kannst du es dir vorstellen:** Eine Ente schwimmt über einen glatten Teich und paddelt
+> gleichmäßig. Vor ihr drängen sich die Wellenringe dicht zusammen, hinter ihr liegen sie weit
+> auseinander. Beim Schall ist es genauso.
+
 ```mermaid
+%% Bildunterschrift: Der Doppler-Effekt: vor dem fahrenden Krankenwagen eng gedrängte Wellen, hinter ihm weit auseinander
 flowchart LR
   A["hinter dem Wagen:<br/>Wellen weit auseinander<br/>tieferer Ton"] --- K["Krankenwagen<br/>fährt nach rechts"]
   K --- B["vor dem Wagen:<br/>Wellen eng gedrängt<br/>höherer Ton"]
@@ -179,6 +184,7 @@ leiser oder stumm schalten. Kern hat fünf: **Musik** (Music), **Effekte** (Effe
 **Master**, dem Hauptregler.
 
 ```mermaid
+%% Bildunterschrift: Der Weg des Tons: Stimmen über Busse und Hall zum Master, dann durch den Limiter zum Browser
 flowchart TB
   S[Stimmen] --> B[Busse]
   B --> M[Master]
@@ -232,6 +238,7 @@ auf jedem Gerät gleich.
 So entsteht ein Klang:
 
 ```mermaid
+%% Bildunterschrift: So baut der Synthesizer einen Klang, Schritt für Schritt
 flowchart TB
   W[Wellenform] --> T[Tonhöhe: gleiten, springen, zittern]
   T --> F[Filter]
@@ -249,7 +256,8 @@ flowchart TB
 | Dreieck | gerade hoch, gerade runter | zwischen Sinus und Rechteck |
 | Rauschen | zufälliges Gezappel | Zischen, Wind, Explosion |
 
-So sehen die fünf Wellen aus, je drei Schwingungen, in der Höhe so groß, wie Kern sie erzeugt:
+So sehen die fünf Wellen aus, je drei Schwingungen, in der Höhe so groß, wie Kern sie erzeugt. Eine
+Angabe wie „±0,6“ heißt: Die Welle schwingt von −0,6 bis +0,6.
 
 ![Die fünf Wellenformen des Synthesizers: Sinus, Rechteck, Sägezahn, Dreieck und Rauschen](../abbildungen/wellenformen.svg)
 
@@ -337,8 +345,9 @@ Die Simulation spielt **nie selbst** Ton. Stattdessen schreibt sie in ihren fest
 **Cues**, kleine Bestellzettel: „Spiel den Sound `pickup` an diesem Ort, so laut, auf diesem Bus.“
 Später im Bild holt die Ton-Schicht die Zettel ab und spielt sie (7.8).
 
-> **So kannst du es dir vorstellen:** ein Restaurant. Die Kellner (die Simulation) kochen nicht
-> selbst, sie hängen Bestellzettel an die Küchenleiste. Die Küche (der Mixer) arbeitet sie ab.
+> **So kannst du es dir vorstellen:** eine Einkaufsliste am Kühlschrank. Wer in der Familie merkt,
+> dass die Milch alle ist, schreibt es auf den Zettel, statt sofort loszurennen. Wer einkaufen geht,
+> nimmt später die ganze Liste mit. Die Simulation schreibt die Liste, der Mixer erledigt sie.
 
 Warum der Umweg? Die festen Schritte laufen auf jedem Gerät gleich, also auch die Zettel. Die
 Simulation bleibt deterministisch und läuft sogar ohne Lautsprecher, etwa beim Training der Ente.

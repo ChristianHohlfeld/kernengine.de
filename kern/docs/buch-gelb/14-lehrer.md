@@ -58,6 +58,11 @@ Spielerin: Er entscheidet, was die Ente tut. Der **Kritiker** ist der Trainer am
 viele Punkte von einer Lage aus noch zu erwarten sind. Lief es besser als geschätzt, war die Bewegung
 gut. Auf den Platz, also später ins Studio und auf den Roboter, darf nur die Spielerin.
 
+> **Vorsicht, Falle:** Nicht verwechseln mit dem **Actor** im Studio ([Kapitel 11](11-studio.md)),
+> also einem Ding im Level. Dasselbe englische Wort heißt hier etwas ganz anderes: das Netz, das
+> handelt. Und der „Trainer am Rand“ ist nur ein Bild für den Kritiker – das ganze Trainingsprogramm
+> heißt **Lehrer**.
+
 ## 14.1 Überblick
 
 Der Lehrer bringt der Ente einen Sprung in drei Schritten bei, so wie du vielleicht ein Kunststück
@@ -242,11 +247,8 @@ Bremse.
 
 Eine Iteration läuft so ab:
 
-1. **Probieren:** Jede Ente macht 48 Takte. Das Netz nennt in jedem Takt sein Wunschziel, dazu kommt
-   etwas Rauschen. So probiert jede Ente leicht andere Bewegungen. Eine Iteration ist nur ein
-   **Ausschnitt**: Eine Episode (beim Sprung 2 Sekunden = 100 Takte) bricht nach 48 Takten nicht ab,
-   sondern läuft in der nächsten Iteration einfach weiter. Erst ein Sturz oder das Zeitende startet
-   sie neu.
+1. **Probieren:** Jede Ente macht eine Reihe von Takten. Das Netz nennt in jedem Takt sein
+   Wunschziel, dazu kommt etwas Rauschen. So probiert jede Ente leicht andere Bewegungen.
 2. **Ordnen:** Der Auswerter legt alle Notizen in eine **feste Reihenfolge**, Takt für Takt, Ente für
    Ente. Warum das wichtig ist, zeigt 14.7.
 3. **Bewerten:** Für jede Bewegung fragt er: Lief es danach **besser oder schlechter als erwartet**?
@@ -276,6 +278,10 @@ Punkte noch gekommen wären. Zeitablauf ist kein Scheitern.
 
 > **Krass, aber wahr:** 32 Enten × 48 Takte = 1536 Takte pro Iteration. Jeder Takt sind 0,02 s, also
 > sammelt der Lehrer pro Iteration 1536 × 0,02 s ≈ 31 Sekunden Entenleben.
+
+> **Für Profis:** 48 Takte sind kürzer als eine Sprung-Episode (2 Sekunden = 100 Takte). Eine
+> Iteration ist darum nur ein **Ausschnitt**: Die Episode bricht nicht ab, sondern läuft in der
+> nächsten Iteration einfach weiter. Erst ein Sturz oder das Zeitende startet sie neu.
 
 **Kritiker zuerst:** Nach dem Nachmachen (14.6) ist die Spielerin schon gut, der Trainer aber
 ahnungslos – er hat die neue Spielerin noch nie gesehen. Seine falschen Urteile würden ihr alles
@@ -488,7 +494,7 @@ Kerns Sprungnetz wurde mit 32 Enten trainiert, Seed 1, und dann je 40 Episoden l
 | Messung | sauber | volle Variation |
 |---|---|---|
 | echte Sprünge | 40 von 40 | 36 von 40 |
-| Kippen (größtes, im Mittel) | 8° | 9° |
+| stärkstes Kippen je Sprung (Mittelwert) | 8° | 9° |
 | Stürze | 0 | 0 |
 
 Das Netz springt also fast immer echt, auch mit einer veränderten Ente, und fällt dabei nie. Der Weg
@@ -500,7 +506,7 @@ Gerät. Nur die **Zeit** ist verschieden: Im Browser dauert es auf demselben Com
 bis fünfmal so lange wie mit dem Programm – aber es kommt **dasselbe Netz** heraus.
 
 > **Für Profis:** Der Browser ist langsamer, weil er ohne bestimmte Beschleuniger rechnet. Die Physik
-> ließe sich auch mit halb so vielen Unterschritten rechnen und wäre dann schneller – aber die
+> ließe sich auch mit halb so vielen Sub-Steps ([Kapitel 6](06-physik.md)) rechnen und wäre dann schneller – aber die
 > Bewegungen der Ente würden sich ändern, und das Netz passte nicht mehr zum Studio. Wie hoch und wie
 > lange die Ente fliegt und alle Zeiten stehen im blauen Buch, Kapitel 14.
 
@@ -533,7 +539,7 @@ auf 0,0001 dasselbe rechnet wie im Lehrer.
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite im Browser](../buch/bilder/lehrer.png)
+![Die Lehrer-Seite während eines Trainings: Einstellungen, laufende Zahlen und die Kurve der Rückgabe](../buch/bilder/lehrer.png)
 
 Den Lehrer kannst du selbst im Browser laufen lassen. Die Startseite https://kernengine.de/ verlinkt
 ihn. Damit das schnell geht, verteilt die Seite die Arbeit auf mehrere **Helfer** (Fachwort: Web

@@ -26,8 +26,8 @@
 > - Alles auf eigenes Risiko ([Impressum](00-impressum.md)).
 
 Kalibrieren heißt: die Simulation so lange nachstellen, bis sie sich verhält wie das echte Gerät. Das
-Netz soll sich außerdem auf nichts verlassen, was die Simulation nicht genau weiß. Kern geht dafür
-drei Wege, und ein vierter Grundsatz kommt dazu:
+Netz soll sich außerdem auf nichts verlassen, was die Simulation nicht genau weiß. Kern folgt dafür
+**vier Grundsätzen**:
 
 1. **Ein Modell für jedes Gerät:** Ein Servo wird durch ein paar Zahlen beschrieben. Diese Zahlen
    misst man am echten Servo und prüft sie danach mit einer zweiten, neuen Messung.
@@ -102,7 +102,8 @@ nach und dreht an den Zahlen, bis beide gleich aussehen.
 1. **Aufbau:** Servo fest einspannen, Achse waagerecht, ein Arm mit Gewicht. Die Masse genau wiegen
    und messen, wie weit der Schwerpunkt von der Achse weg ist (Arm auf einer Kante ausbalancieren).
    Bei waagerechter Achse zieht die Schwerkraft am Arm wie an einem Pendel.
-2. **Wie im Roboter betreiben:** dieselben Einstellungen im Servo selbst (wie hart er nachregelt) und
+2. **Wie im Roboter betreiben:** dieselben Einstellungen im Servo selbst (zum Beispiel wie kräftig er
+   gegensteuert, wenn er neben seinem Ziel steht) und
    dieselbe Spannung wie später in der Ente. Sonst misst du einen anderen Servo als den, der später
    läuft – wie ein Fahrrad, das du mit zu wenig Luft im Reifen testest.
 3. **Bewegungen vorgeben** und mindestens 100-mal pro Sekunde messen, wo der Arm gerade steht.
@@ -112,11 +113,15 @@ nach und dreht an den Zahlen, bis beide gleich aussehen.
 
 Die Bewegungen sind drei Arten von Befehlen. So sehen sie über der Zeit aus:
 
-![Die drei Arten von Befehlen über 2,4 Sekunden: Stufen, ein immer schnellerer Chirp und ein Rechteck](../abbildungen/testsignale.svg)
+![Die drei Arten von Befehlen über 2,4 Sekunden (nach oben: der Zielwinkel): Stufen, ein immer schnellerer Chirp und ein Rechteck](../abbildungen/testsignale.svg)
 
-Die **Stufe** heißt bei Fachleuten „Sprungsignal“ – mit dem Sprung der Ente hat sie nichts zu tun.
-Der „Chirp“ (englisch für Zwitschern) beginnt langsam mit einer halben Schwingung pro Sekunde und
-endet mit vier. Die Einheit dafür heißt **Hertz (Hz)**: Schwingungen pro Sekunde.
+Nach oben ist jeweils der **Zielwinkel** aufgetragen, nach rechts die Zeit. Die **Stufe** springt auf
+einen neuen Winkel und bleibt dort; sie heißt bei Fachleuten „Sprungsignal“ – mit dem Sprung der Ente
+hat sie nichts zu tun. Der „Chirp“ (englisch für Zwitschern) schwingt hin und her, beginnt langsam
+mit einer halben Schwingung pro Sekunde und endet mit vier. Die Einheit dafür heißt **Hertz (Hz)**:
+Schwingungen pro Sekunde. Das **Rechteck** springt immer wieder zwischen denselben zwei Winkeln hin
+und her. Drei verschiedene Befehle sind wie drei verschiedene Prüfungsaufgaben: Was nur eine Aufgabe
+abfragt, kann man zufällig richtig haben.
 
 Alles landet in einem **Log**. Jede Zeile enthält die Zeit, den gesendeten Zielwinkel und den
 gemessenen Winkel.
@@ -173,7 +178,9 @@ er zeigt, ob das Modell den Servo wirklich erklärt.
 In Kerns Test weicht ein Servo absichtlich stark vom üblichen Profil ab. Nach der Anpassung an zwei
 Messungen ist der Fehler auf der dritten, unbekannten auf weniger als ein Fünftel geschrumpft.
 
-> **Für Profis:** Das Werkzeug dafür heißt Lehrer und läuft im Terminal. Ohne echten Servo kann es
+> **Für Profis:** Das Werkzeug dafür ist das Lehrer-Programm für die Kommandozeile
+> ([Kapitel 15](15-eigene-modelle.md)). Es läuft im **Terminal**, dem Textfenster, in das man Befehle
+> tippt, statt zu klicken. Ohne echten Servo kann es
 > auch Beispiel-Logs aus der Simulation schreiben, mit denen man die ganze Kette einmal durchspielt.
 > Die genauen Befehle stehen im blauen Buch, Kapitel 16.
 
@@ -244,7 +251,7 @@ trainiert und kommt damit klar; Kerns eigene Netze kennen es noch nicht. Auf dem
 das ein Risiko.
 
 > **Mission:** Starte im Micro-Duck-Level **Simulieren** (Simulate) (Alt+S), zieh die Ente mit der Maus am Kopf
-> zur Seite und lass los, bis sie umfällt. Schau zu, was dann passiert: Sie steht von selbst wieder
+> zur Seite, bis sie kippt, und lass dann los. Schau zu, was dann passiert: Sie steht von selbst wieder
 > auf. Das klappt, weil velstand im Training ständig geschubst und mit vielen Abweichungen geübt hat.
 
 ## 16.6 In der Physik messen statt eintragen

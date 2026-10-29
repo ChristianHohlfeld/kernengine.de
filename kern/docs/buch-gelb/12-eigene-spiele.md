@@ -41,19 +41,16 @@ einer Gefahr aus und gewinnt, wenn alles eingesammelt ist. Die Fenster von Studi
 **Erstellen** (Create) – mit Boden (40 × 40 m), Sonne, Himmel und einem Würfel. In den
 **Welteinstellungen** (World Settings) setzt du **Level-Name** (Level name) und **Spieltitel** (Game
 title) auf „Orb Garden“. Warum nicht die Vorlage **Leer** (Empty)? Da gibt es nicht mal einen Boden.
-**Endloser Boden** (Endless ground) in den Welteinstellungen ginge zwar, aber ein sichtbarer Boden
-ist für den Anfang anschaulicher.
 
 ### Schritt 2: Die Spielfigur
 
 Öffne die **Inhaltsablage** (Content Drawer, Taste **Strg+Leertaste**) und zieh aus **Spieler**
-(Players) eine **Figur** (Character) in den Viewport. Das **Ausgabeprotokoll** (Output Log) meldet
-„Character is the player now“, und im Outliner trägt der Actor „Character“ das Abzeichen **SPIELER**
-(PLAYER). In **Details › Spieler-Steuerung** (Details › Player Controller) stellst du
-**Höchstgeschwindigkeit** (Max speed), **Beschleunigung** (Acceleration) und
-**Sprunggeschwindigkeit (0 = keiner)** (Jump speed (0 = none)) ein. Im Feld **Kamera** (Camera)
-wählst du die Sicht: **Verfolger** (Chase), **Ego-Perspektive** (First person) oder **Von oben**
-(Top down). Dann **Spielen** (Play), Taste Alt+P: W A S D läuft, die Leertaste springt, **Esc** führt
+(Players) eine **Figur** (Character) in den Viewport. Studio meldet, dass „Character“ jetzt der
+Spieler ist, und im Outliner trägt der Actor das Abzeichen **SPIELER** (PLAYER). In
+**Details › Spieler-Steuerung** (Details › Player Controller) stellst du ein, wie schnell die Figur läuft,
+wie flott sie losläuft und wie hoch sie springt. Im Feld **Kamera** (Camera) wählst du die Sicht:
+**Verfolger**, **Ego-Perspektive** oder **Von oben**. Dann **Spielen** (Play), Taste Alt+P:
+W A S D läuft, die Leertaste springt, **Esc** führt
 zurück. Spieler ist die zuletzt platzierte Figur oder die per Rechtsklick ›
 **Zum Spieler machen (beim Spielen steuern)** (Make Player (control it in Play)).
 
@@ -118,11 +115,14 @@ erreichen** (Reach a target score).
 Logik heißt: „Wenn das passiert, dann tu jenes.“ Statt sie zu programmieren, steckst du sie aus
 fertigen Kästchen zusammen ([Kapitel 9](09-logik.md)).
 
-1. Aus **Spielablauf** einen **Nachrichten-Trigger** (Message Trigger) platzieren und in
-   **Details › Trigger** das Feld **Aktion** (Action) auf **Nur Logik-Ereignis** (Logic event only)
-   stellen, das Feld **Nachricht** (Message) leeren und **Nur einmal** (Only once) ausschalten,
-   damit die Zone jedes Mal Punkte gibt. Dann tut der Trigger nichts Eigenes, sondern sagt nur
-   deiner Logik Bescheid, wenn jemand hineinläuft.
+Das Ziel: eine Zone, die selbst nichts tut, sondern nur deiner Logik Bescheid sagt, wenn jemand
+hineinläuft – und das jedes Mal. Was dann passiert, bestimmt allein die Logik.
+
+1. Aus **Spielablauf** einen **Nachrichten-Trigger** (Message Trigger) platzieren. In
+   **Details › Trigger** stellst du dafür drei Dinge ein: **Aktion** (Action) auf **Nur
+   Logik-Ereignis** (Logic event only) – der Trigger tut nichts Eigenes; das Feld **Nachricht**
+   (Message) leeren – er zeigt keinen Text an; und **Nur einmal** (Only once) ausschalten – er
+   meldet sich bei jedem Betreten.
 2. In **Details** auf **Logik** (Logic) klicken; der Logik-Editor öffnet den Graphen dieses Actors.
    Der Logik-Editor bleibt auch im deutschen Studio englisch beschriftet.
 3. **Templates › Score zone (overlap +10)**: Betreten gibt 10 Punkte, „+10“ und einen Ton.
@@ -150,8 +150,8 @@ platzieren, oder im Reiter **Sounds** eine eigene Datei importieren und in den V
 - **Strg+S** speichert eine Level-Datei samt Texturen und Sounds, die du weitergeben und in jedem
   Studio öffnen kannst. Ungespeichertes sichert Studio zusätzlich im Browser.
 - **Datei › Spiel verpacken (HTML)...** (File › Package Game (HTML)...), Titel prüfen,
-  **Verpacken** (Package): Studio lädt die Datei Orb_Garden.html herunter (das Leerzeichen wurde zu
-  einem Unterstrich) und bietet in der Meldung **Spielen** (Play it) an.
+  **Verpacken** (Package): Studio lädt eine HTML-Datei mit dem Namen deines Spiels herunter und
+  bietet in der Meldung **Spielen** (Play it) an.
 
 Diese eine Datei enthält alles: die Engine, dein Level und das Programm, das es abspielt. Sie läuft
 ohne Internet, per Doppelklick, von jeder Webseite und auf dem Handy mit Touch-Sticks.
@@ -179,6 +179,7 @@ Ein Spiel ist ein Daumenkino. Jedes Einzelbild heißt **Frame**, und flüssig wi
 Bildern pro Sekunde. Für jedes Bild läuft dieselbe Runde:
 
 ```mermaid
+%% Bildunterschrift: Die Spielschleife: dieselbe Runde für jedes Bild
 flowchart LR
   A[Eingabe lesen] --> B[Welt weiterrechnen]
   B --> C[Bild malen]
@@ -244,7 +245,7 @@ Ein Browser kann C++ nicht direkt lesen. Ein **Übersetzer** (Compiler) macht au
 eine Datei, die der Browser ausführen kann. Diese Datei heißt **Modul** (im Format WebAssembly).
 Beim Übersetzen wählt man, welche Teile der Engine hinein sollen: Grafik ist immer dabei, Physik,
 Levels oder Studio kommen nur auf Wunsch dazu – wie ein Baukasten, aus dem man nur nimmt, was das
-Spiel braucht. Übersetzt wird nur, was sich seit dem letzten Mal geändert hat.
+Spiel braucht.
 
 Wie man Kern auf dem eigenen Rechner baut, zeigt [Kapitel 2](02-bauen-und-testen.md). Die genauen
 Namen und Werte stehen im blauen Buch, Kapitel 12.
@@ -307,7 +308,7 @@ Bei Weg C schreibt man die eigene Webseite in JavaScript und lässt Kern nur bes
 machen. Drei Möglichkeiten gibt es:
 
 - **Nur malen lassen:** Die Spielregeln stehen in JavaScript, Kern zeichnet. So arbeitet zum
-  Beispiel ein Drohnenspiel namens SpawnCity.
+  Beispiel SpawnCity, ein Drohnenspiel des Autors, das im Browser läuft.
 - **Ein Studio-Level einbauen:** Eine eigene Seite spielt ein Level aus Studio ab und kann es
   steuern – zum Beispiel mit eigenen Bildschirmknöpfen, die die Figur laufen und springen lassen,
   oder mit einem eigenen Siegerbildschirm.
@@ -374,6 +375,9 @@ https://kernengine.de/. Der Quellcode liegt auf https://github.com/ChristianHohl
 | Ton | nach erstem Klick | Sache des Spiels |
 | Dateien | eine HTML (plus Ente-Ordner) | Seite, Modul, Plattformschicht |
 | Auslieferung | beliebig, auch als Datei | Webserver |
+
+Warum „Ton nach erstem Klick“? Browser spielen Ton erst ab, wenn du einmal geklickt, getippt oder eine
+Taste gedrückt hast – damit keine Seite ungefragt losplärrt.
 
 > **Mission:** Geh die Prüfliste für Orb Garden durch: Log ohne Fehler? Läuft es am Handy? Musik nach
 > dem ersten Tipp? Dann: veröffentlichen!

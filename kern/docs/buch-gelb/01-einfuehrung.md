@@ -77,7 +77,7 @@ Kern besteht aus diesen Teilen (die **Spielwelt** ist alles, was beim Spielen pa
 | Ton | Klänge mischen, 3D-Klang | das Quaken wird lauter, wenn die Ente näher kommt |
 | Spielwelt | Levels, Spieler, Regeln | Orb einsammeln gibt Punkte |
 | Logik, Netzwerk | Spielabläufe, Mehrspieler | Tür geht auf, wenn du davorstehst |
-| Studio, Lehrer | Editor und Trainer | Welt bauen, Ente trainieren |
+| Studio, Lehrer | Editor und Trainingsprogramm | Welt bauen, Ente trainieren |
 | Kellner (JavaScript) | Brücke zum Browser | Tastendruck weitergeben |
 
 ## 1.2 Kerns Regeln
@@ -90,7 +90,7 @@ woher es kommt. Ganz eingebaut sind zwei Bauteile aus freien Projekten anderer L
 namens **Box3D** ([Kapitel 6](06-physik.md)) und eine Mathe-Bibliothek ([Kapitel 3](03-grundlagen.md)).
 Kern baut die Physik **unverändert** ein und übersetzt beide auf jedem Rechner auf genau dieselbe
 Weise. Daneben hat Kern einzelne Verfahren aus freien Projekten übernommen und selbst nachgeschrieben,
-etwa das Zerschneiden von Vielecken und die Umgebungsverdeckung; die Liste steht in
+ein paar Rechentricks; die Liste steht in
 [Anhang D](D-lizenzen.md).
 
 Außerdem benutzt Kern nur Fähigkeiten, die fast jeder Browser hat. Lieber verzichtet es auf ein paar
@@ -101,8 +101,10 @@ die Programmiersprache JavaScript. Genau das – und nur das – erledigt Kerns 
 Spiel tut, steht in C++.
 
 > **So kannst du es dir vorstellen:** Der Kellner bringt die Bestellung in die Küche und das Essen
-> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche. Und er arbeitet
-> sparsam: Bei jedem Bild nimmt er dasselbe Tablett, statt jedes Mal ein neues zu holen.
+> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche. Diese Rollen
+> bleiben im ganzen Buch gleich. Und er arbeitet sparsam: Er benutzt bei jedem Bild denselben
+> Speicher wieder, statt jedes Mal neuen anzulegen – wie ein Kellner, der immer dasselbe Tablett
+> nimmt, statt für jeden Gang ein neues zu holen.
 
 Der Vorteil: C++ kann man auch direkt auf dem Computer laufen lassen, ganz ohne Browser. JavaScript
 braucht dagegen den Browser. Weil alles, was ein Spiel tut, in C++ steht, lässt es sich auch ohne
@@ -150,10 +152,12 @@ den Fehler immer wieder herbeiführen, finden und reparieren.
 
 ## 1.3 Der Bauplan: Stockwerke
 
-Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter, nie die darüber. Die Grafik
-weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen. Im Bild steht
-jedes Stockwerk auf denen, die es benutzt. Oben, vor dem Haus, steht der Kellner; die Pfeile zeigen,
-was durch die Tür hinein- und hinausgeht.
+Kern ist wie ein Hochhaus: Ein Stockwerk darf nur Stockwerke **unter** sich benutzen, nie die über
+sich. Die Grafik weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen.
+Das heißt nicht, dass jedes Stockwerk alles darunter braucht: Ton, Logik und Netzwerk kommen mit den
+Grundlagen aus, und die Physik leiht sich aus der Geometrie nur die Beschreibung einer Form. Malen
+kann keines dieser vier. Oben, vor dem Haus, steht der Kellner; die Pfeile zeigen, was durch die Tür
+hinein- und hinausgeht.
 
 ![Das Hochhaus Kern: oben vor dem Haus der Kellner, im Haus die Tür und die Stockwerke bis zu den Grundlagen](../abbildungen/architektur.svg)
 
@@ -188,7 +192,7 @@ Stockwerke zusammengestellt.
 | Spiel ganz in C++ | ein Spiel, das Kern direkt benutzt | die Beispiele Hello und Orb Run |
 | Nur die Grafik | eine Webseite, die mit Kern zeichnet | SpawnCity |
 | Studio | der Editor, auch für fertige Spiele | dein eigenes Level |
-| Lehrer | der Trainer für die Ente | ein neues Sprung-Netz |
+| Lehrer | das Trainingsprogramm für die Ente | ein neues Sprung-Netz |
 
 **Ein Spiel ganz in C++.** Beim Start sagt das Spiel der Engine, was es braucht, zum Beispiel:
 „Ich will Schatten.“ Danach fragt der Browser das Spiel bei jedem Bild, das der Bildschirm zeigt:

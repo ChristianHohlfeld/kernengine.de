@@ -27,11 +27,12 @@ Welt besteht, dann schauen, auswählen und bewegen, dann Fehler rückgängig mac
 Logik hinzufügen und am Ende speichern und verschicken.
 
 Studio zeigt seine Oberfläche auf Deutsch oder Englisch; ohne Vorgabe folgt es der Sprache des
-Browsers. Dieses Buch nennt die Beschriftungen, wie Studio sie auf Deutsch zeigt, in Klammern die
-englischen. Wer Studio auf Englisch nutzt (Knopf **DE | EN** unten rechts in der Statusleiste oder
-`?lang=en`), findet sie dort. Der Knopf **DE | EN** wechselt die Sprache; die Seite lädt dann neu, das
-Level bleibt über den Autosave erhalten. `?lang=de` bzw. `?lang=en` in der Adresse legt die Sprache
-ebenso fest.
+Browsers. Dieses Buch nennt die deutschen Beschriftungen, in Klammern die englischen. Der Knopf
+**DE | EN** unten rechts in der Statusleiste wechselt die Sprache; die Seite lädt neu, und dein Level
+bleibt dabei erhalten.
+
+> **Für Profis:** Die Sprache lässt sich auch in der Adresse festlegen: `?lang=de` oder `?lang=en`
+> hinten anhängen. Studio merkt sich das auf diesem Gerät.
 
 ---
 
@@ -167,7 +168,8 @@ Spielfigur trägt das Schild **SPIELER** (PLAYER).
 (Transform) mit **Position** (Location), **Drehung** (Rotation) und **Skalierung** (Scale), jeweils
 drei Zahlen X, Y, Z wie im Koordinatensystem), darunter je Komponente ein Abschnitt. Mit
 **+ Hinzufügen** steckst du eine Komponente dazu, der Papierkorb nimmt sie weg. Zahlen kannst
-du tippen (sogar Rechnungen wie `2*3`), am Namen seitwärts ziehen oder mit den Pfeiltasten ändern.
+du tippen (sogar Rechnungen wie `2*3`), mit gedrückter Maustaste auf dem Feldnamen nach links
+oder rechts ziehen oder mit den Pfeiltasten ändern.
 
 Studio prüft jeden Wert, bevor er ins Level kommt. Eine Größe von 0 oder ein Wert, der nicht passt,
 landet nie im Level – so kann ein Tippfehler deine Welt nicht kaputt machen.
@@ -220,13 +222,12 @@ Die Kamera steuerst du wie eine Spielfigur:
 | Strg+1 … 9 / 1 … 9 | Lesezeichen setzen / anspringen |
 
 **Mit Fingern:** ein Finger kreist, zwei Finger zoomen und verschieben, Tippen wählt aus. Was unter
-deinen Fingern liegt, bleibt beim Zoomen unter ihnen. Wie schnell gezoomt wird, hängt davon ab, wie
-weit dieser Punkt weg ist: Nahes zoomt in kleinen Schritten, Fernes in großen. Darum fühlt sich
-dieselbe Geste an einem kleinen Ding genauso an wie an einem ganzen Häuserblock.
+deinen Fingern liegt, bleibt beim Zoomen unter ihnen.
 
-Übrigens: Für W A S D zählt die **Lage** der Taste, nicht was draufsteht. Auf einer französischen
-Tastatur sind die Buchstaben anders verteilt, aber die vier Tasten an der Stelle von W A S D steuern
-genauso. Kürzel wie Strg+Z dagegen gehen nach der Beschriftung – Strg+Z ist immer die Taste mit Z.
+> **Für Profis:** Wie schnell gezoomt wird, hängt davon ab, wie weit der Punkt unter den Fingern weg
+> ist: Nahes zoomt in kleinen Schritten, Fernes in großen. Und für W A S D zählt die **Lage** der
+> Taste, nicht was draufsteht – auf einer französischen Tastatur steuern die vier Tasten an derselben
+> Stelle genauso. Kürzel wie Strg+Z gehen dagegen nach der Beschriftung.
 
 > **Mission:** Flieg in Orb Run mit gehaltener rechter Maustaste über die Stadt und dreh dabei am
 > Mausrad, bis du richtig schnell bist. Lass die Maustaste los und speichere mit **Strg+1** einen
@@ -389,7 +390,7 @@ Gelenk zu einem gelöschten Actor) verhindern den Start, Warnungen stehen nur im
 **F8** (aussteigen) lässt die Spielfigur los: Das Spiel läuft weiter, und du fliegst frei herum wie
 beim Bauen. Noch einmal **F8** übernimmt die Figur wieder.
 
-![Simulieren (Simulate) mit eingeblendeten Kollisionsformen](../buch/bilder/studio-simulate.png)
+![Simulieren in Orb Run mit eingeblendeten Kollisionsformen (Anzeigen › Kollisionsformen)](../buch/bilder/studio-simulate.png)
 
 **Simulieren** (Simulate) mit Alt+S lässt die Welt ohne Spieler laufen. Jetzt kannst du Dinge
 **greifen**: Linke Maustaste auf einen Physik-Körper, ziehen bewegt ihn, nach oben ziehen hebt ihn,
@@ -477,8 +478,9 @@ Jeder Actor und das Level selbst können einen solchen **Logik-Graphen** tragen.
 **Logik bearbeiten** (Edit Logic) für einen Actor; hat er noch keinen Graphen, heißt der Eintrag
 **Logik hinzufügen (Blueprint)** (Add Logic (Blueprint)).
 
-Der Logik-Editor selbst ist nicht übersetzt: Seine Knöpfe, Knoten und Vorlagen heißen auch in der
-deutschen Oberfläche englisch. Ein leerer Graph bietet Start-Knoten an: **Begin Play**, **On Interact**
+**Wichtig:** Der Logik-Editor ist nicht übersetzt. Seine Knöpfe, Knoten und Vorlagen heißen auch in
+der deutschen Oberfläche englisch – genau wie die Meldungen im **Ausgabeprotokoll** (Output Log) und
+die Befehle der Konsole. Ab hier siehst du also Deutsch und Englisch gemischt. Ein leerer Graph bietet Start-Knoten an: **Begin Play**, **On Interact**
 (die Figur benutzt den Actor), **On Begin Overlap** (etwas betritt ihn) und **Event Tick** (bei jedem
 Bild). Unter **Templates…** liegen fertige Beispiele:
 
@@ -496,8 +498,9 @@ Bild). Unter **Templates…** liegen fertige Beispiele:
 > **Viewport**, eine **Rollende Kugel** (Rolling Ball) platzieren, **Spielen** (Play): Dein Text
 > steht im HUD.
 
-Beim Start des Spiels übersetzt Kern jeden Graphen in schnelle Maschinensprache. **Compile** (F7)
-prüft vorher, ob dein Graph Fehler hat.
+Beim Start des Spiels übersetzt Kern jeden Graphen in schnelle Maschinensprache. **Compile** heißt
+„übersetzen“: Der Knopf **Compile** (F7) prüft vorher, ob dein Graph Fehler hat. Die Fehler stehen
+dann im Feld **Compiler Results** („Übersetzer-Ergebnisse“) unter dem Graphen.
 
 > **Vorsicht, Falle:** Ein Graph mit Fehlern hält das Spiel **nicht** auf. Kern schaltet beim Start
 > nur diesen Graphen ab, meldet „Logic error: …“ im **Ausgabeprotokoll** (Output Log), und der Rest
@@ -520,10 +523,10 @@ die Touch-Knöpfe.
 
 **Am Touchscreen** füllt das Spiel den ganzen Bildschirm. Oben links stehen **⟵ ENDE** (⟵ EXIT) und
 **❚❚ PAUSE**. Unten liegen **zwei Sticks**: links bewegen, rechts schauen. Dazu kommen nur die Knöpfe,
-die deine Spielfigur wirklich braucht – eine Rollende Kugel bekommt **SPRUNG** (JUMP) und **BOOST**,
-ein Soldat **SPRUNG**, **LADEN** (RELOAD), **ZIELEN** (AIM), **DUCKEN** (CROUCH) und **NUTZEN** (USE),
-ein Hovercar **BOOST**, **DRIFT**, **LIFT** und **SICHT** (VIEW). Hebt sich der letzte Finger, lässt die Engine alles los, damit die Figur nicht
-weiterläuft.
+die deine Spielfigur wirklich braucht – eine Rollende Kugel etwa nur **SPRUNG** (JUMP) und **BOOST**,
+ein Soldat dazu Knöpfe zum Zielen, Nachladen und Ducken. Hebt sich der letzte Finger, lässt die
+Engine alles los, damit die Figur nicht weiterläuft. Welche Figur welche Knöpfe bekommt, steht im
+blauen Buch, Kapitel 11.
 
 **Am Gamepad** (Xbox-Belegung) bewegt der linke Stick, der rechte schaut, A springt. Die ganze
 Belegung steht im blauen Buch, Kapitel 11.

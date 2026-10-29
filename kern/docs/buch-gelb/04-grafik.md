@@ -126,10 +126,18 @@ Farbe, mit der die ganze Kopie eingefärbt wird, etwa ein rot blinkender Gegner.
 Plätze, die der Shader kennt – wie Fächer in einem Setzkasten.
 
 Kern malt **jedes** Mesh als Instanzen, auch wenn es nur einmal vorkommt. So gibt es nur einen
-einzigen Malweg, egal ob für einen Baum oder für tausend. Die Normalen brauchen eine eigene Drehung:
-Zieht man ein Ding in die Breite, würden sie sonst schief stehen. Diese Drehung rechnet Kern selbst
-aus ([Anhang B.1](B-grundlagen-rendering.md), „Extrawurst“). Eine Matrix, die ein Objekt zu einer
-flachen Scheibe zusammendrückt, lehnt es ab. Denn bei einer plattgedrückten Form kann man nicht mehr
+einzigen Malweg, egal ob für einen Baum oder für tausend.
+
+Die **Normalen** (die Pfeile, die senkrecht aus einer Fläche schauen) brauchen dabei eine eigene
+Rechnung. Staucht man ein Dach auf halbe Höhe, wird es flacher, seine Normale muss aber **steiler**
+werden, um weiter senkrecht auf ihm zu stehen. Würde man sie einfach mitstauchen, kippte sie in die
+falsche Richtung:
+
+![Ein 45°-Dach, auf halbe Höhe gestaucht: Die richtige Normale wird steiler, die einfach mitgestauchte flacher](../abbildungen/normalen-stauchen.svg)
+
+Diese Extra-Rechnung macht Kern selbst; nachrechnen kannst du sie in
+[Anhang B.1](B-grundlagen-rendering.md), „Extrawurst“. Eine Matrix, die ein Objekt zu einer ganz
+flachen Scheibe zusammendrückt, lehnt Kern ab. Denn bei einer plattgedrückten Form kann man nicht mehr
 ausrechnen, wohin ihre Flächen zeigen.
 
 > **Für Profis:** Der Shader hat 16 feste Plätze für Eckdaten. Zwei davon sind für Erweiterungen
@@ -167,11 +175,15 @@ Die **Ego-Ebene** ist für die Waffe in der Hand bei einem Ego-Shooter und für 
 bunten Pfeile zum Verschieben in Studio): Kern löscht vorher den Tiefenpuffer und malt sie ganz
 zuletzt. So kann keine Wand, vor der du stehst, deine Hand abschneiden.
 
-Normalerweise lässt Kern die Rückseiten der Dreiecke weg; man erkennt sie daran, dass ihre Ecken
-andersherum laufen ([Anhang B.2](B-grundlagen-rendering.md)). Ein Spiegelbild dreht diesen
-Umlaufsinn um. Sind **alle** Kopien eines Meshes gespiegelt, lässt Kern darum die Vorderseiten weg.
-Sind nur **manche** gespiegelt, lässt es gar nichts weg. Denn ein Malbefehl kann nur eine Regel für
-alle seine Kopien haben.
+Normalerweise lässt Kern die Rückseiten der Dreiecke weg, denn die sieht man bei einem
+geschlossenen Ding ohnehin nie – wie die Innenseite eines Fußballs. Das spart die Hälfte der Arbeit
+([Anhang B.2](B-grundlagen-rendering.md)). Nur Materialien mit **beidseitig** zeigen auch die
+Rückseite, etwa ein dünnes Blatt.
+
+> **Für Profis:** Rückseiten erkennt man daran, dass ihre Ecken andersherum laufen. Ein Spiegelbild
+> dreht diesen Umlaufsinn um. Sind **alle** Kopien eines Meshes gespiegelt, lässt Kern darum die
+> Vorderseiten weg; sind nur **manche** gespiegelt, lässt es gar nichts weg, denn ein Malbefehl kann
+> nur eine Regel für alle seine Kopien haben.
 
 ### Anlegen: alles oder nichts
 
@@ -179,9 +191,8 @@ Erst ein kleines Bild: Ein Würfel hat 8 Ecken, aber 12 Dreiecke. Jede Ecke geh�
 Dreiecken. Darum speichert ein Dreieck nicht drei eigene Ecken, sondern nur drei **Eckennummern**,
 etwa „Ecke 1, 2 und 5“. So steht jede Ecke nur einmal in der Liste.
 
-Ein neues Mesh muss nur die Positionen der Ecken mitbringen; was fehlt, ergänzt Kern (weiß, eine
-Instanz am Nullpunkt; Normalen passend zu jeder Fläche, wenn das Mesh keine Eckennummern hat, sonst
-einfach nach oben). Dann gilt: **alles oder nichts.** Erst prüft Kern alles:
+Ein neues Mesh muss nur die Positionen der Ecken mitbringen; was fehlt, ergänzt Kern mit einfachen
+Ersatzwerten (etwa weiße Farbe). Dann gilt: **alles oder nichts.** Erst prüft Kern alles:
 Sind alle Zahlen echte Zahlen? Zeigt jede Eckennummer auf eine vorhandene Ecke? Passen die Längen
 der Listen? Ergeben die Knochen-Anteile jeder Ecke (siehe 4.5) zusammen 100 %? Nur wenn alles
 stimmt, baut Kern das neue Mesh und tauscht es gegen das alte.
@@ -245,7 +256,6 @@ eigentlichen Welt.
 **Texturen** legt Kern entweder selbst an und behält eine Kopie der Pixel, oder ein
 JavaScript-Programm meldet ein eigenes Bild an und hinterlegt ein Rezept, wie man es neu füllt. Beides
 dient Grundregel 3: Vergisst die Grafikkarte alles, kann Kern jede Textur wiederherstellen (4.11).
-Ein Mesh hat höchstens **eine** Textur.
 
 ## 4.5 Der Standard-Shader
 
@@ -281,10 +291,8 @@ Darum ist es im Schatten nicht stockdunkel. Die Ideen dahinter erklärt
 
 Beim **Himmelsverlauf** zählt, wohin die Fläche zeigt: Ein Dach schaut zum Himmel und bekommt
 Himmelsfarbe, eine senkrechte Wand schaut halb zum Himmel, halb zum Boden und bekommt eine Mischung
-aus beiden. **Zenit** heißt: genau über dir. Das **Halbkugel-Licht** ist eine einfachere Rechnung
-derselben Art, mit nur zwei Farben (Himmel oben, Boden unten). Der Himmelsverlauf hat drei Farben mit
-eigenem Horizont, und aus ihm kommt auch die Spiegelung des Himmels. Im Spiel liefert darum der
-Himmelsverlauf das Tageslicht; das Halbkugel-Licht hellt nur noch die Nacht ein wenig auf.
+aus beiden. **Zenit** heißt: genau über dir. Aus dem Himmelsverlauf kommt auch die Spiegelung des
+Himmels. Das **Halbkugel-Licht** sorgt nur für eine schwache Grundhelligkeit in der Nacht.
 
 Das indirekte Licht führt Kern **getrennt** mit. Warum? Später soll die Verdeckung in Ecken (4.8.4)
 nur dieses Licht abdunkeln – die Sonne hat ja schon ihren eigenen Schatten.
@@ -292,7 +300,7 @@ nur dieses Licht abdunkeln – die Sonne hat ja schon ihren eigenen Schatten.
 **Glanz** ist beides: Der helle Glanzpunkt der Sonne ist direktes Licht, der gespiegelte Himmel
 indirektes. Metall hat keinen matten Anteil, es spiegelt nur. „Ohne Licht“ zeigt die Grundfarbe pur.
 Den Glanzpunkt der Sonne begrenzt Kern nach oben, damit sehr glatte Flächen keine einzelnen
-superhellen Pixel bekommen, die im Glühen flackern würden. **Glas** setzt ein Spiel über eine
+superhellen Pixel bekommen, die im Glühen flackern würden. **Glas** bringt ein Spiel selbst mit, als
 Erweiterung (4.6, Beispiel in 4.13). Es spiegelt den Himmel, je flacher du draufschaust, desto mehr.
 **Leuchten** hat keine Obergrenze. Was heller als 1 ist (1 = das Hellste, was der Bildschirm zeigen
 kann, gleich mehr dazu), glüht später.
@@ -300,7 +308,7 @@ kann, gleich mehr dazu), glüht später.
 > **Mission:** Öffne Kern Studio über https://kernengine.de/, wähle **Datei › Neues Level...** (File ›
 > New Level...) › **Basis** (Basic) und klick in der Werkzeugleiste auf **Hinzufügen** (Add) ›
 > **Formen** (Shapes) › **Kugel** (Sphere) (dasselbe findest du auch in der **Inhaltsablage** (Content
-> Drawer), Strg+Leertaste). Stell in **Details** unter **Material** **Rauheit** (Roughness) auf 1 und
+> Drawer), unter Windows und Linux auch mit Strg+Leertaste). Stell in **Details** unter **Material** **Rauheit** (Roughness) auf 1 und
 > **Metallisch** (Metallic) auf 0: Die Kugel ist matt wie Gummi. Dann **Rauheit** 0,1 und
 > **Metallisch** 1: Sie spiegelt den Himmel wie eine Christbaumkugel. Zum Schluss dreh **Leuchtfarbe**
 > (Emissive color) auf eine Farbe und **Leuchtstärke** (Emissive strength) hoch – sie glüht und
@@ -322,12 +330,6 @@ kommt am Ende eine Kette:
 Beim Nebel hat Kern drei Extras: **Höhennebel** – der Dunst liegt am Boden wie Milch unten im Glas,
 über den Dächern ist es klar. **Sonnenstreuung** – schaust du Richtung Sonne, leuchtet der Nebel in
 ihrer Farbe. **Horizontnebel** – der Himmel verschwimmt am Horizont in der Nebelfarbe (4.8.2).
-
-Auf den Zettel für die Verdeckung schreibt der Shader zwei Dinge. Erstens, **welcher Anteil des
-Lichts indirekt ist**: Kommen von 1,0 Licht 0,3 vom Himmel, steht dort 0,3. Zweitens, **wie hell
-die Farbe der Fläche ist**; das braucht der Mehrfach-Abprall in 4.8.4. Durchsichtiges und die
-Ego-Ebene schreiben 0 – sie werden nie abgedunkelt. Beide fehlen nämlich im Tiefenpuffer, aus dem
-die Verdeckung rechnet (4.7).
 
 ## 4.6 Shader-Erweiterungen
 
@@ -351,6 +353,7 @@ Namen der Lücken stehen im blauen Buch, Kapitel 4.
 Ein Bild entsteht in festen Schritten, jedes Mal 60-mal pro Sekunde:
 
 ```mermaid
+%% Bildunterschrift: Der Ablauf eines Bildes: acht feste Schritte, vom Prüfen bis zum Zusammensetzen
 flowchart TD
   A["0 Prüfen: Kamera und Fenster gültig?"]
   A --> B["1 Schattenkarte, nur wenn nötig"]
@@ -393,7 +396,7 @@ Glühen noch Verdeckung. Am Ende zählt Kern Malbefehle, Dreiecke und Instanzen 
 > Kachelspeicher. Darum ist der Zettel absichtlich grob gespeichert. Die genauen Formate stehen im
 > blauen Buch, Kapitel 4.
 
-![Vier Viewports in Kern Studio: Teilansichten zeichnen direkt auf den Bildschirm](../buch/bilder/studio-quad.png)
+![Die Vier-Ansicht bei Nacht: Die Fenster leuchten, aber ohne Lichtschein, denn Teilansichten malen direkt auf den Bildschirm und bekommen kein Glühen](../buch/bilder/studio-quad.png)
 
 Kern Studio malt jeden Viewport einzeln. Ein einzelner großer Viewport ist kein Teilfenster und
 bekommt Glühen und Verdeckung; in der Vier-Ansicht fehlt beides.
@@ -440,7 +443,10 @@ die Kugel und zum Vergleich links ein Kasten:
 
 ![Von oben: Ein Kasten um das Blickfeld ändert beim Drehen seine Größe, die Kugel bleibt gleich groß](../abbildungen/schattenkugel.svg)
 
-Dein Auge liegt näher an der Mitte als die Ecken, also steckt die ganze Tüte in der Kugel.
+Warum steckt auch die Spitze, dein Auge, in der Kugel? Die Kugel reicht von der Mitte des Rechtecks
+bis zu seinen Ecken. Dein Auge liegt aber näher an dieser Mitte als die Ecken – im Bild ist es der
+Punkt innerhalb der Kugel. Was näher an der Mitte liegt als der Rand, ist drin. Also steckt die ganze
+Tüte in der Kugel.
 
 **Durchgerechnet** mit Studios Kamera: Bei 80 m Schattendistanz ist die Kugel rund 230 m breit.
 Die Karte ist so breit wie die Kugel, und Studio gibt ihr 2048 Kästchen: 230 ÷ 2048 ≈ **11 cm** pro
@@ -481,8 +487,8 @@ fragen die Karte gar nicht erst – die Sonne erreicht sie ohnehin nicht. Außer
 alles als beleuchtet. Mit Schattendistanz blendet der Schatten auf dem letzten Zehntel weich aus,
 statt an der Kante abzureißen.
 
-> **Mission:** Lade Orb Run und flieg nah an ein Haus heran, bis der Boden weniger als 10 m vor dir
-> liegt. Stell in den **Welteinstellungen** die **Schattenreichweite (kleiner: schärfer)** auf 10, dann 80,
+> **Mission:** Lade Orb Run und flieg so tief an ein Haus heran, dass du schräg auf den Boden direkt
+> vor dir schaust und Haus und Boden nur wenige Meter entfernt sind. Stell in den **Welteinstellungen** die **Schattenreichweite (kleiner: schärfer)** auf 10, dann 80,
 > dann 500. Bei 10 sind die Schatten direkt vor dir am schärfsten, alles weiter als 10 m hat keinen.
 > Bei 500 reichen sie weit, aber ihre Kanten werden gröber – dieselben Kästchen müssen eine viel
 > größere Kugel abdecken.
@@ -522,9 +528,11 @@ Das Rohlicht hat Werte über 1. Ein normales Bild kann aber nur 0 bis 1 speicher
 Glühen Bildpuffer mit Kommazahlen, die auch 2,5 festhalten können. Kann das Gerät nicht in solche
 Puffer malen, meldet Kern „nicht unterstützt“ und malt ohne Glühen direkt.
 
-Beim **Zusammensetzen** steckt ein Kniff. Einfach das Glühen dazuzählen geht nicht: Die Filmkurve ist
-krumm. Wie viel heller ein Pixel durch das Glühen wird, sieht man erst, wenn man es durch die Kurve
-schickt. Das Rohlicht samt Glühen einfach neu durch die Kurve zu schicken, geht aber auch nicht: Das
+Beim **Zusammensetzen** steckt ein Kniff. Einfach das Glühen dazuzählen geht nicht: Die Filmkurve aus
+4.5 ist krumm. Im Dunkeln steigt sie steil, da macht etwas mehr Rohlicht auf dem Bildschirm fast
+genauso viel mehr aus. Im Hellen wird sie flach, da macht dasselbe Mehr kaum noch etwas aus – wie bei
+einem Glas, das fast voll ist. Wie viel heller ein Pixel durch das Glühen wird, sieht man also erst,
+wenn man es durch die Kurve schickt. Das Rohlicht samt Glühen einfach neu durch die Kurve zu schicken, geht aber auch nicht: Das
 fertige Bild enthält schon den Nebel, das Rohlicht nicht. Der Nebel wäre weg. Also rechnet Kern
 zweimal durch dieselbe Kurve und addiert nur den **Unterschied**:
 
@@ -556,8 +564,10 @@ ist. Das heißt **Umgebungsverdeckung** (englisch *Ambient Occlusion*, kurz AO).
 Verfahren namens **GTAO**, dessen Idee [Anhang B.8](B-grundlagen-rendering.md) mit Bildern erklärt.
 Das Besondere in Kern ist der Einbau: **Es muss nichts ein zweites Mal gemalt werden.**
 
-1. Beim normalen Malen notiert der Shader auf seinem Zettel, welcher Anteil jedes Pixels
-   indirektes Licht ist (4.5).
+1. Beim normalen Malen notiert der Shader auf seinem Zettel (4.5), **welcher Anteil jedes Pixels
+   indirektes Licht ist**: Kommen von 1,0 Licht 0,3 vom Himmel, steht dort 0,3. Dazu schreibt er,
+   wie hell die Farbe der Fläche ist. Durchsichtiges und die Ego-Ebene schreiben 0 und werden nie
+   abgedunkelt, denn sie stehen nicht im Tiefenpuffer, aus dem die Verdeckung rechnet (4.7).
 2. GTAO schaut nur in den fertigen Tiefenpuffer und rechnet aus, wie versteckt jeder Punkt ist.
 3. Das Zusammensetzen dunkelt **nur** den indirekten Anteil ab. Sonne und Lampen bleiben, wie sie
    sind – sie haben ihre eigenen Schatten.
@@ -577,25 +587,20 @@ stark, gehört er wohl zu einem anderen Ding; dann nimmt Kern lieber den Nachbar
 Seite.
 
 Der **Radius** sagt in Metern, wie weit Kern um einen Punkt nach Verdeckern sucht. Nur die
-Nachbarschaft zählt: Was nahe an diesem Rand liegt, zählt immer weniger, und was weiter weg ist, gar
-nicht. Sonst würde ein Haus in 50 m Entfernung den Boden vor dir abdunkeln.
+Nachbarschaft zählt: Was nahe am Rand dieses Suchkreises liegt, zählt immer weniger, und was weiter
+weg ist, gar nicht. Sonst würde ein Haus in 50 m Entfernung den Boden vor dir abdunkeln.
 
 > **Für Profis:** Damit es schnell geht, sucht Kern pro Pixel nur in wenigen Richtungen und dreht
 > diese Richtungen von Pixel zu Pixel nach einem festen Muster weiter. Ein Filter mittelt das Muster
-> danach glatt, ohne über Kanten zu verschmieren. Einen eigenen Tiefen-Vorabdurchgang spart sich Kern,
-> weil Handy-Grafikchips Verdecktes ohnehin früh wegwerfen.
+> danach glatt, ohne über Kanten zu verschmieren. Es gibt Qualitätsstufen von *low* bis *ultra*
+> (mehr Richtungen, mehr Schritte); auf langsamen Geräten rechnet Kern mit halber Auflösung.
 
-**Mehrfach-Abprall:** Helle Flächen werfen Licht in ihre Ecke zurück, darum werden ihre Ecken
-weniger dunkel. Ein Beispiel: GTAO rechnet für eine Ecke die **Sichtbarkeit** 0,5 aus – nur der halbe
-Himmel ist zu sehen. Bei einer dunklen Fläche, die nur 10 % des Lichts zurückwirft, zählt Kern
-praktisch weiter mit Sichtbarkeit 0,51. Bei einer hellen Fläche, die 80 % zurückwirft, zählt es mit
-Sichtbarkeit 0,81. Die Zahlen kommen aus einer fertigen Formel aus der Forschung. Wichtig ist nur:
-Je heller die Fläche, desto mehr Licht bekommt sie zurück. Wie hell sie ist, steht auf dem Zettel
-aus 4.5.
+**Mehrfach-Abprall:** Helle Flächen hellen ihre Ecken selbst etwas auf, denn sie werfen Licht in die
+Ecke zurück. Eine weiße Hausecke wird darum weniger dunkel als eine schwarze. Wie hell die Fläche
+ist, steht auf dem Zettel aus Schritt 1.
 
-Es gibt Qualitätsstufen von *low* bis *ultra* (mehr Richtungen, mehr Schritte). Auf langsamen
-Geräten stuft ein Wächter wie beim Glühen die Qualität herunter und rechnet dann mit halber
-**Auflösung**, also mit halb so vielen Pixeln in jeder Richtung. AO läuft nur mit Perspektive und
+Auf langsamen Geräten schaltet ein Wächter wie beim Glühen (4.8.3) die Verdeckung in eine
+sparsamere Stufe. AO läuft nur mit Perspektive und
 nur mit Kerns eigenen Bildpuffern – die gehören zum Glühen. Kann das Gerät keine
 Kommazahl-Bildpuffer (4.8.3), gibt es darum auch keine Verdeckung. Den Radius bestimmt die
 Szene selbst: **Welteinstellungen › Umgebungsverdeckung (0 = aus)** (World Settings › Ambient
@@ -634,7 +639,7 @@ sonst tauchten schon verloschene Funken wieder auf.
 > **Für Profis:** Die Höhe ist Starttempo mal Zeit minus ½ · 9,81 · Zeit². Nach 0,5 s: 5 · 0,5 −
 > ½ · 9,81 · 0,25 ≈ 1,27 m. Das ist das Fallgesetz aus dem Physikunterricht.
 
-Der Shader schafft nur **6 Lampen** gleichzeitig. Ein Spiel darf aber viel mehr anfragen, bis zu 64 pro Bild.
+Der Shader schafft nur **6 Lampen** gleichzeitig. Ein Spiel darf aber viel mehr anfragen.
 Kern wählt in jedem Bild die wichtigsten aus:
 
 > Punkte = Stärke ÷ (1 + Abstand ÷ Reichweite)
@@ -729,7 +734,8 @@ Fenster   = x zwischen 0,22 und 0,78
 > (10 : 3 = 3 Rest 1). Gemeint ist der Teil hinter dem Komma: 10 ÷ 3 = 3,33, Rest also 0,33. Er sagt,
 > wie weit du im Feld schon bist: ein Drittel.
 
-Zeile 1: Bei u = 10 m ist 10 ÷ 3 = 3,33, also **Spalte 3**. Zeile 2: genauso die Stockwerke. Zeilen
+Zeile 1: Bei u = 10 m ist 10 ÷ 3 = 3,33, also **Spalte 3**. Gezählt wird ab 0, wie fast immer im
+Computer: Spalte 0 ist das erste Feld, Spalte 3 also das vierte. Zeile 2: genauso die Stockwerke. Zeilen
 3–4: Der Rest sagt, wo du **im Feld** bist: 0,33 heißt „ein Drittel von links“. Zeilen 5–6: Ein
 Fenster ist da, wo der Rest waagerecht zwischen 0,22 und 0,78 liegt und senkrecht zwischen 0,28 und
 0,78. 0,33 passt waagerecht. Stimmt auch die Höhe, stehst du vor einem Fenster.

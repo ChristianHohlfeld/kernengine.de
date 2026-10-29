@@ -33,11 +33,12 @@ nachzuweisen, dass diese Dateien auch richtig arbeiten.
 > Vorkoster jedes Stück – das sind die Tests.
 
 ```mermaid
+%% Bildunterschrift: Bauen und prüfen: Aus den fertigen Dateien werden gleichzeitig die Webseite und die Tests (mehr in 2.10)
 flowchart TB
   Q["Quelltext"] --> B["bauen"]
   B --> F["fertige Dateien"]
   F --> T["Tests"]
-  T --> W["Webseite"]
+  F --> W["Webseite"]
 ```
 
 Kern baut drei Dinge: das Modul für den Browser, das ganze Studio als eine einzige Datei und den
@@ -134,7 +135,10 @@ Prüfungen, von der Mathe bis zum Studio. Ein paar Fragen, die Kern sich wirklic
 
 Bei Kommazahlen fragt ein Test manchmal „ungefähr gleich?“, weil Computer runden (siehe
 [Kapitel 3](03-grundlagen.md)). Das widerspricht dem „Bit für Bit gleich“ aus Kapitel 1 nicht:
-Hier wird mit dem mathematisch **richtigen** Ergebnis verglichen, nicht mit einem anderen Rechner. Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
+Hier wird mit dem mathematisch **richtigen** Ergebnis verglichen, nicht mit einem anderen Rechner.
+Ein Beispiel: Der Test fragt „Ist 1 : 3 ungefähr 0,333?“ Ob der Computer genau 0,3333333 oder
+0,3333334 herausbekommt, ist ihm egal. Dass jeder Rechner **dieselbe** dieser beiden Zahlen bekommt,
+prüft dagegen der Fingerabdruck in 2.9. Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
 gescheitert sind, mit der genauen Stelle im Quelltext. Das kleine Testgerüst hat Kern selbst
 geschrieben.
 
@@ -218,15 +222,17 @@ simulieren?
 
 Kern lässt die Ente mit einem Laufnetz von Pollen erst geradeaus gehen und sich dann auf der Stelle
 drehen. Nach jedem **Regeltakt** (so heißt jeder Moment, in dem das Netz neu entscheidet; das passiert
-50-mal pro Sekunde, gemessen in der Zeit der echten Ente; weil Kern die Ente vierfach groß und dafür
-doppelt so langsam rechnet, sind es 25 Takte pro Sekunde Simulationszeit, siehe
-[Kapitel 6.2](06-physik.md)) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
+50-mal pro Sekunde in der Zeit der echten Ente) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
 Drehung, Geschwindigkeiten, alle Gelenkwinkel. Daraus macht es eine kurze Kennung aus Buchstaben und
 Ziffern, einen **Hash**. Ändert sich ein einziges Bit irgendwo in diesen Zahlen, kommt eine völlig
 andere Kennung heraus.
 
 > **So kannst du es dir vorstellen:** Ein Fingerabdruck verrät einen Menschen, ohne ihn ganz zu
 > beschreiben. Hier verrät eine Zeile Buchstabensalat den kompletten Zustand der Ente.
+
+> **Für Profis:** Kern rechnet die Ente vierfach vergrößert und dafür doppelt so langsam
+> ([Kapitel 6](06-physik.md), Abschnitt 6.2). In der Simulationszeit sind es deshalb 25 Regeltakte
+> pro Sekunde, für die echte Ente 50.
 
 Warum genügt nicht etwas Einfaches wie die Quersumme? Probier es aus: 1234 hat die Quersumme
 1 + 2 + 3 + 4 = 10. Die Zahl 1243 hat aber auch die Quersumme 10. Die Quersumme bemerkt also nicht,

@@ -102,6 +102,7 @@ Kisten in größere Kisten und so weiter. Verfehlt der Strahl eine Kiste, ist ih
 einmal erledigt.
 
 ```mermaid
+%% Bildunterschrift: Kisten in Kisten: Verfehlt der Strahl eine Kiste, ist ihr ganzer Inhalt erledigt
 flowchart TD
   A["Große Kiste: getroffen"] --> B["Links: verfehlt, erledigt"]
   A --> C["Rechts: getroffen"]
@@ -181,12 +182,12 @@ In Schritt 1 ist B das Ohr: Die Linie von A nach C schneidet die Ecke B ab, wie 
 Schere eine Ecke vom Papier schneidest. In Schritt 2 ist E das Ohr, in Schritt 3 ist D das Ohr.
 Was danach übrig ist, ist schon ein Dreieck. Aus 6 Ecken wurden 6 − 2 = 4 Dreiecke.
 
-Ein Ohr muss nach außen zeigen, und keine andere Ecke darf in seinem Dreieck liegen. Bei C zum
-Beispiel zeigt die Ecke nach innen, C ist darum am Anfang kein Ohr.
+Ein Ohr muss eine **Spitze** sein, keine **Delle**: Die Ecke ragt nach außen wie bei B, nicht nach
+innen wie bei C. Außerdem darf keine andere Ecke in seinem Dreieck liegen. C ist darum am Anfang
+kein Ohr.
 
-**Wenn es klemmt:** Kartendaten sind selten sauber. Findet Earcut kein Ohr mehr, räumt es auf
-(doppelte Ecken weg), repariert kleine Überkreuzungen und teilt das Vieleck zuletzt mit einer
-Linie in zwei Hälften, die es einzeln zerlegt.
+**Wenn es klemmt:** Kartendaten sind selten sauber. Findet Earcut kein Ohr mehr, räumt es auf und
+versucht es mit Notlösungen weiter, statt aufzugeben.
 
 **Löcher:** Earcut kann nur einen einzigen Ring zerschneiden. Darum schneidet es vorher eine schmale
 **Brücke** vom Loch zum Außenrand, hin und zurück. Jetzt ist der Innenhof ein Teil des Randes, und
@@ -198,21 +199,20 @@ Stell dir vor, du fährst mit dem Finger den Rand entlang. Vorher kommst du nie 
 Nachher läufst du oben durch den schmalen Schlitz hinein, einmal um den Hof herum, durch den
 Schlitz wieder hinaus und weiter am Außenrand. Ein einziger Weg, also ein einziger Ring.
 
-**Große Vielecke:** Bei vielen Ecken prüft Earcut nur Ecken in der Nähe, statt jedes Mal alle.
-
 **Kontrolle:** Danach vergleicht der Häuserbauer die Fläche aller Dreiecke mit der Fläche des
 Grundrisses. Weichen sie deutlich ab, wird das Haus übersprungen. Lieber ein Haus weniger als eins
 mit kaputtem Dach.
 
 > **Für Profis:** Kern nutzt eine C++-Fassung von Earcut von Mapbox. Die Brücke findet es nach einem
-> Verfahren von David Eberly. Nahe Ecken findet es über Nummern, bei denen nahe Punkte ähnliche
-> Nummern bekommen (z-Order). Version, Lizenz und Grenzwerte stehen im blauen Buch, Kapitel 5.
+> Verfahren von David Eberly. Bei großen Vielecken prüft es nur Ecken in der Nähe; die findet es
+> über Nummern, bei denen nahe Punkte ähnliche Nummern bekommen (z-Order). Klemmt es, repariert es
+> kleine Überkreuzungen und teilt das Vieleck zuletzt mit einer Linie in zwei Hälften. Version, Lizenz und Grenzwerte stehen im blauen Buch, Kapitel 5.
 
 ## 5.6 Primitive: der Baukasten
 
 **Primitive** sind fertige Grundkörper, die Kern auf Knopfdruck baut, alle mit Z nach oben:
-**Quader**, **Kugel**, **Kapsel** (eine Pille: ein Zylinder mit einer Halbkugel an jedem Ende),
-**Torus** (ein Ring wie ein Donut), **Zylinder**, **Kegel** und **Ebene**. Zylinder und Kegel
+**Quader** (in Studio heißt er **Box**), **Kugel**, **Kapsel** (eine Pille: ein Zylinder mit einer
+Halbkugel an jedem Ende), **Torus** (ein Ring wie ein Donut), **Zylinder**, **Kegel** und **Ebene**. Zylinder und Kegel
 stehen auf dem Boden, die anderen sitzen um ihren Mittelpunkt.
 
 Formen lassen sich **aneinanderhängen**, verschoben und gedreht, sodass ein einziges Mesh
@@ -266,6 +266,7 @@ Zufallszahl (der **Seed**, siehe 5.11) für Farben und Fassade, die Höhe des Fu
 Dachkante.
 
 ```mermaid
+%% Bildunterschrift: Der Häuserbauer: vom Grundriss zum fertigen Haus
 flowchart TB
   A["Grundriss: Punkte"] --> B["Aufräumen"]
   B --> C["Dach: Earcut"]
@@ -303,13 +304,13 @@ Grafikkarte, kleine Chunks lassen sich besser aussortieren (5.2). Und der Bauer 
 **Zeitbudget**: In jedem Bild baut er nur so viele Häuser, wie in ein paar Millisekunden passen,
 dann ist das nächste Bild dran. So entsteht auch eine riesige Stadt, ohne dass das Spiel ruckelt.
 
-**Von außen bestellen:** Auch eine Webseite kann bei Kern Häuser bestellen und sie so über viele
-Bilder hinweg bauen lassen. Ist ein Chunk fertig, wird er verschweißt (5.7) und zur Grafikkarte
+**Kern als Geometrie-Baukasten:** Nicht nur Kerns eigene Spiele dürfen den Häuser- und den
+Straßenbauer benutzen. Auch eine ganz andere Webseite kann Kern als reinen Baukasten für Formen
+verwenden: Sie bestellt Häuser, und Kern baut sie über viele Bilder hinweg, so wie ein Bäcker auch
+für ein Café nebenan backt. Ist ein Chunk fertig, wird er verschweißt (5.7) und zur Grafikkarte
 geschickt. Danach wirft Kern den Zwischenspeicher sofort weg, denn die Grafikkarte hat jetzt ihre
 eigene Kopie. Das ist wie ein Schmierzettel, den du wegwirfst, sobald du alles ins Heft
-übertragen hast. Und nennt die Webseite für den Wand-Steckbrief einen Speicherplatz, den es nicht
-gibt, meldet Kern einen Fehler, statt die Daten still woanders abzulegen. Ein Fehler soll
-auffallen, nicht versteckt werden.
+übertragen hast.
 
 Die genauen Namen, Maße und Befehle stehen im blauen Buch, Kapitel 5.
 
@@ -373,6 +374,7 @@ Startzahl, dem **Seed**, eine lange Folge von Zahlen, die zufällig aussieht, ab
 > Seed ist ein anders gemischter Stapel.
 
 ```mermaid
+%% Bildunterschrift: Die prozedurale Stadt entsteht in sechs Schritten
 flowchart TB
   A["Blockraster"] --> B["Höhen"]
   B --> C["Bebauung"]
@@ -386,7 +388,9 @@ flowchart TB
 2. **Höhen:** Jeder Block hat eine **Zentrumsnähe** von 0 (Rand) bis 1 (Mitte). Kern nimmt sie
    **mal sich selbst** (quadriert sie). Die Höchsthöhe reicht dann von 14 m bis zum Wert in Details,
    im Beispiel 84 m. Der Spielraum dazwischen ist 84 − 14 = 70 m. Bei Nähe 0,5 sind das
-   14 + 0,5 · 0,5 · 70 = 14 + 17,5 = 31,5 m.
+   14 + 0,5 · 0,5 · 70 = 14 + 17,5 = 31,5 m. Genau 14 m gälten nur ganz am Rand. Selbst der
+   äußerste Block liegt aber ein Stück weiter innen, darum hat er im Bild unten etwa 20 m. Die
+   Häuser selbst werden dann zufällig höchstens so hoch wie diese Grenze.
 3. **Bebauung:** Jeder Block bekommt eine von vier Arten: ein großes Haus (oft mit Innenhof), vier
    Einzelhäuser mit Gassen, ein L-Haus plus ein kleines oder drei lange Riegel.
 4. **Straßen** an jeder Blockkante, ein Stück über die Stadt hinaus, mit Bordstein und Mittellinie.

@@ -42,10 +42,8 @@ die **Spielschicht**, die entscheidet, was die Ente mit Ball und Socke macht.
 
 ## 13.1 Wo der Code liegt
 
-Der Code der Ente ist nach Aufgaben getrennt: Aufbau und Steuerung, Netze, Servos, eigenes
-Verhalten und Spielschicht stehen jeweils in einem eigenen Teil. Pollens Dateien (Netze, Baupläne)
-liegen getrennt von Kerns eigenen Netzen – so sieht man immer, was von wem stammt. Die genauen Namen
-stehen im blauen Buch, Kapitel 13.
+Kurz gesagt: **Pollens Dateien und Kerns eigene liegen getrennt**, wie zwei beschriftete Kisten im
+Regal. So sieht man immer, was von wem stammt. Die genauen Ordner stehen im blauen Buch, Kapitel 13.
 
 ## 13.2 Die Grundregel: nicht schummeln
 
@@ -97,7 +95,8 @@ des Gelenks. Der schnell kreiselnde Motor wirkt wie ein kleines Schwungrad und m
 des Gelenks träger. Diese Drehmasse des Motors heißt **Armatur**. Warum macht so ein Winzling so viel
 aus? Weil die Übersetzung doppelt zählt: Will das Gelenk schneller werden, muss der Motor 288-mal so
 stark beschleunigt werden, und seine Gegenwehr kommt über das Getriebe noch einmal 288-fach verstärkt
-am Gelenk an. Darum wirkt er viel träger, als er aussieht. Kerns Physik kennt keine Getriebe,
+am Gelenk an. Zusammen macht das 288 × 288 ≈ **83 000**: Am Gelenk wirkt der Motor rund 83 000-mal
+so träge wie für sich allein. Darum wirkt er viel träger, als er aussieht. Kerns Physik kennt keine Getriebe,
 darum bekommt jedes Glied eine gedachte dünne Scheibe auf seiner Gelenkachse, die genauso träge macht.
 Nicht exakt, aber ohne sie zappelt die Ente gut dreimal so stark (Abschnitt 13.14).
 
@@ -131,7 +130,7 @@ eigenen Wert: 0,4. Darum rutscht eine Socke über denselben Boden, auf dem die E
 
 ### Maßstab 4
 
-Kerns Physik-Engine Box3D rechnet am besten mit Körpern von 10 cm bis 10 m. Die Glieder der Ente
+Box3D, Kerns Physik-Engine ([Kapitel 6](06-physik.md)), rechnet am besten mit Körpern von 10 cm bis 10 m. Die Glieder der Ente
 sind aber nur 2 bis 4 cm groß. Darum baut Kern sie **4-mal so groß** und rechnet an genau einer
 Stelle um. Lässt man alles passend mitwachsen, verhält sich die große Welt genau wie die kleine:
 
@@ -156,7 +155,8 @@ Darum zeigen die Bilder dieses Buchs eine eigene Gestaltung. Im Katalog gibt es 
 (Rollers)**: Kufen mit je zwei frei drehenden Rädern statt Sohlen.
 
 Setzt du eine Ente aus dem Katalog in ein Level, stellt Studio die Uhr der Welt gleich passend ein:
-so viele Physikschritte pro Sekunde, wie der Takt der Ente braucht (Abschnitt 13.5). Was es dabei
+eine **Schrittrate** von 100 Physikschritten pro Sekunde Weltzeit mit je 16 Sub-Steps
+([Kapitel 6](06-physik.md)), so wie der Takt der Ente es braucht (Abschnitt 13.5). Was es dabei
 geändert hat, meldet es. Aus einem eigenen Programm geht das genauso; die genauen Namen stehen im
 blauen Buch, Kapitel 13.
 
@@ -213,7 +213,8 @@ der **Regeltakt**. Die Spielschicht entscheidet nur in jedem zweiten Regeltakt.
 | Spielschicht = 8 Schritte | 80 ms | 40 ms, also 25-mal pro Sekunde |
 
 Weil die Weltzeit doppelt so schnell zählt (Abschnitt 13.3), sind 10 ms in Kerns Welt genau die 5 ms
-des Trainings. Auch die **Verzögerung** ist in Schritten gezählt: Die Servos bekommen immer das Ziel
+des Trainings. Dieselbe Uhr, zweimal gezählt: **100 Schritte pro Sekunde Weltzeit** (das ist die
+Schrittrate in den Welteinstellungen) sind 200 Schritte pro Sekunde Roboterzeit. Auch die **Verzögerung** ist in Schritten gezählt: Die Servos bekommen immer das Ziel
 von vor 4 Schritten, das sind 20 ms Roboterzeit. Im Training war die Verzögerung mal kürzer, mal
 länger; das Netz kommt also mit einem festen Wert aus diesem Bereich gut zurecht. Passt die Uhr der
 Welt nicht zur Ente, sagt Studio dir, was du einstellen musst.
@@ -230,6 +231,8 @@ reicht.
 
 Für jede Bewegung gibt es ein eigenes gelerntes Netz. Kern lädt **dieselben Netz-Dateien** wie der
 echte Roboter. Das Netz fürs Laufen und Stehen ist fest eingebaut, die anderen lädt Studio nach.
+Dieses Lauf- und Stehnetz heißt bei Pollen **velstand**. Den Namen brauchst du später noch: Kerns eigener Sprung baut auf ihm auf
+([Kapitel 14](14-lehrer.md)).
 
 Kern liest die Netz-Dateien selbst. Es nimmt nur genau die Bauart an, die Pollens Training erzeugt,
 und lehnt alles andere mit Begründung ab. Ein Test vergleicht das eingebaute Laufnetz mit einer
@@ -237,7 +240,7 @@ genauen Vergleichsrechnung: Die Ergebnisse weichen erst in der fünften Stelle n
 
 | Bewegung | von wem |
 |---|---|
-| Laufen und Stehen (dazu eine ältere Gangart) | Pollen |
+| Laufen und Stehen (velstand, dazu eine ältere Gangart) | Pollen |
 | Sitzen / Aufstehen | Pollen |
 | Socke aufheben | Pollen |
 | Kick links / rechts | Pollen |
@@ -257,10 +260,10 @@ dem Roboter:
 
 1. Abgelaufene Bewegungen beenden.
 2. Ein Netz wählen. Vorfahrt hat eine laufende Bewegung, dann Aufheben, Sitzen, Rollschuhfahren und
-   zuletzt Laufen und Stehen (bei der älteren Gangart ein eigenes Stehnetz).
+   zuletzt Laufen und Stehen.
 3. Das Netz rechnen und seine Antwort in Servoziele umrechnen.
-4. Die Uhren der Bewegungen weiterstellen – jede Bewegung hat ihre eigene Stoppuhr, damit Kern
-   weiß, wann sie vorbei ist.
+4. Die Stoppuhren weiterlaufen lassen: Jede Bewegung hat ihre eigene, damit Kern weiß, wann sie
+   vorbei ist.
 
 Jedes Netz bekommt genau die Befehle, mit denen es trainiert wurde. Eine Bewegung startet nur, wenn
 keine andere läuft, die Ente nicht sitzt und das Netz geladen ist – sonst sagt Kern, warum nicht.
@@ -281,7 +284,10 @@ goals) zwischen zwei Einträgen:
 - **Wie trainiert (Faktor 1, kein Filter)** (As trained (scale 1, no filter)), der Standard; im
   Level steht dafür `training`.
 - **Wie der Daemon des Roboters (Faktor 0,9, Tiefpass 0,5 / 0,7)** (As the robot's daemon (scale
-  0.9, low-pass 0.5 / 0.7)), also wie auf dem Roboter; im Level steht dafür `robot`.
+  0.9, low-pass 0.5 / 0.7)), also wie auf dem Roboter; im Level steht dafür `robot`. Der
+  **Daemon** ist das Steuerprogramm, das auf dem echten Roboter läuft. Ein **Tiefpass** ist ein
+  Glätter: Er lässt das Ziel nur ein Stück nachrücken, damit nichts ruckt – die Leine aus dem
+  Hunde-Bild.
 
 Das Prinzip dahinter: **Ein Netz funktioniert am besten genau so, wie es trainiert wurde.** Schon
 kleine Änderungen können es umwerfen.
@@ -296,6 +302,7 @@ kleine Änderungen können es umwerfen.
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 
 ```mermaid
+%% Bildunterschrift: Das Laufnetz: 61 Zahlen hinein, 14 Servoziele heraus
 flowchart LR
   A[61 Zahlen über Körper und Befehl] --> B[Laufnetz]
   B --> C[14 Servoziele]
@@ -312,7 +319,7 @@ In jedem Regeltakt bekommt das Laufnetz **61 Zahlen**, in Gruppen:
 - der Kopfbefehl und die Körperhaltung (wie hoch der Rumpf sein soll und wie geneigt).
 
 Heraus kommen **14 Zahlen**: die Servoziele für Beine und Hals. Dazwischen rechnet das Netz durch
-drei Schichten aus 512, 256 und 128 Rechenknoten, den **Neuronen**.
+drei Schichten aus Hunderten Rechenknoten, den **Neuronen** ([Anhang A](A-grundlagen-neuronale-netze.md)).
 
 Der Laufbefehl springt nicht sofort auf den neuen Wert, sondern rückt in jedem Takt **20 %** des
 Rests näher, genau wie auf dem Roboter. Von 0 auf 1 geht es also 0,2 – 0,36 – 0,49 … Rechne nach:
@@ -354,12 +361,12 @@ steht trotzdem mehr als 2° offen, steckt etwas drin. Leer schließt er ganz, ei
 
 Drei können der Ente Befehle geben. Es gilt eine feste Rangfolge:
 
-1. **Hand:** Du mit Stick oder Robot-Taste. Jede Eingabe gibt dir 2 s Vorrang.
-2. **Logik:** die Blueprint-Knoten **Walk** oder **Look** ([Kapitel 9](09-logik.md)).
+1. **Hand:** Du mit Stick oder einer der Tasten der Ente (13.12). Jede Eingabe gibt dir 2 s Vorrang.
+2. **Logik:** die Logik-Knoten **Walk** oder **Look** ([Kapitel 9](09-logik.md)).
 3. **Autonomie:** ihr eigenes Verhalten, wenn im **Details**-Panel **Autonom (Kamera, ToF)**
    (Autonomous (camera, ToF)) an ist.
 
-Steht die Ente still und hat 2 s niemand ihren Kopf gesteuert, übernimmt der **Idle-Blick** aus
+Steht die Ente still und hat 2 s niemand ihren Kopf gesteuert, übernimmt der **Leerlauf-Blick** aus
 Pollens Software: weiche Kopfbewegungen, langsames Umherschauen und Muster, die Pollen „Dösen“ und
 „Gähnen“ nennt.
 
@@ -392,19 +399,18 @@ denn Pollens Netz benutzt diese Werte gar nicht.
 
 Steuert niemand, sucht ein Programm aus, was die Ente tut. Kern übernimmt dafür Pollens eigenes
 Verhaltensprogramm mit allen Zuständen und Zahlen. Ein **Zustand** ist eine Tätigkeit, die eine
-Weile dauert; danach wählt das Programm die nächste:
+Weile dauert; danach wählt das Programm die nächste. Es gibt gut ein Dutzend, zum Beispiel
+**Wander** (ein Stück zu einem Ziel laufen), **Nap** (sich setzen und dösen) und **Zoomies** (mit
+vollem Tempo und „Wheee“ herumflitzen). Die ganze Liste steht im blauen Buch, Kapitel 13.
 
-- **Chill** (ruhig stehen), **LookAround** (sich umschauen), **Wander** (1–3 m zu einem Ziel
-  laufen), **TurnInPlace** (auf der Stelle drehen), **Zoomies** (mit vollem Tempo und „Wheee“
-  herumflitzen, nur mit viel Platz),
-- **Stretch** (strecken), **Ruffle** (Federn schütteln), **Dance** (tanzen), **Sneeze** (niesen),
-- **GroundPick** (etwas aufheben), **Nap** (sich setzen und dösen), **Petted** (gestreichelt
-  werden), **BallPlay** und **Kick**.
+> **So kannst du es dir vorstellen:** Wie du an einem freien Nachmittag. Bist du fit, gehst du
+> raus; bist du müde, legst du dich hin. Und du gehst lieber dorthin, wo du lange nicht warst.
 
 Wie das Programm wählt: Eine **Energie** zwischen 0 und 1 macht manche Zustände wahrscheinlicher –
-mit viel Energie eher Wander, Dance oder Zoomies, mit wenig eher Nap. Ein **Neuheitsraster** merkt sich, wo die Ente
-schon war, damit sie lieber neue Orte besucht. Ein **Hindernismodell** sorgt für Abstand: Unter 45 cm
-bremst sie und weicht aus, unter 15 cm dreht sie weg und meidet die Stelle 5 Minuten. Dazu kommen
+mit viel Energie eher Wander oder Zoomies, mit wenig eher Nap. Ein **Neuheitsraster** merkt sich, wo die Ente
+schon war, damit sie lieber neue Orte besucht. Ein **Hindernismodell** sorgt für Abstand: Kommt sie
+einem Hindernis nahe, bremst sie und weicht aus; ganz nah dreht sie weg und meidet die Stelle eine
+Weile. Dazu kommen
 Quak-Salven und Hören. Mikrofon und Berührungssensor hat Kern nicht; Hören und Streicheln kommen
 über Logik-Befehle.
 
@@ -442,7 +448,7 @@ Pollens Netze sind Bewegungen; keins davon sieht. Was die Ente mit Ball oder Soc
 hingehen, kicken, aufheben, wegtragen, ausspucken –, entscheidet bei Kern ein weiteres gelerntes
 Netz, die **Spielschicht**. Drumherum gibt es nur Wahrnehmung, keine handgeschriebenen Spielregeln.
 
-![Die Ente spielt (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-play.png)
+![Die Ente beim Simulieren: Sie läuft selbstständig zum Ball (Ente in der eigenen Gestaltung dieses Buchs)](../buch/bilder/duck-play.png)
 
 Die Spielschicht sitzt an der Stelle, an der sonst ein Mensch mit Gamepad sitzt. 25-mal pro Sekunde
 (Roboterzeit) antwortet sie mit Laufbefehl, Kopf, Schnabel und welche Bewegung starten soll; der
@@ -468,8 +474,8 @@ auf dem Boden genau unter dieser Mitte. Liegt die Mitte zu hoch, beim Ball über
 über 3 cm, zählt das Ding nicht – etwa die Socke im Schnabel.
 
 Damit es echt wird, kann der Detektor **Rauschen** (kleine zufällige Fehler im Ort) und **Aussetzer**
-(ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel** mit ausgedachten Werten aus dem Bereich, den
-der Lehrer würfelt (0 bis 0,4 cm plus 0 bis 3 %): Der Fehler ist 0,2 cm plus 1 % der Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
+(ab und zu sieht er gar nichts) einbauen. **Rechenbeispiel:** Der Fehler sei 0,2 cm plus 1 % der
+Entfernung. Bei 1 m sind das 0,2 cm + 1 cm = 1,2 cm. Je weiter weg,
 desto ungenauer – wie Schätzen mit einem Auge. Im Studio ist der Detektor rauschfrei, im Training
 würfelt der Lehrer die Werte für jede Übungsrunde neu – damit das Netz auch mit schlechten Augen
 zurechtkommt.
@@ -642,8 +648,8 @@ Ehrlich gesagt ist Kerns Ente noch nicht perfekt:
 
 Warum läuft die Ente trotzdem? Weil sie im Training Störungen geübt hat. Das Getriebespiel wurde
 dort zufällig verändert, also ist das Netz gegen solches Wackeln robust. Und der andere Reibungswert
-läge auf einem Boden mit Reibung 0,6 bei 0,77 – mitten in dem Bereich (0,7 bis 1,3), den das
-Training sowieso durchgespielt hat. Im Beispiel-Level macht er gar keinen Unterschied. Das Prinzip:
+läge auf einem Boden mit Reibung 0,6 bei 0,77 (so rechnet es der Profi-Kasten in 13.3 aus) – mitten
+in dem Bereich (0,7 bis 1,3), den das Training sowieso durchgespielt hat. Im Beispiel-Level macht er gar keinen Unterschied. Das Prinzip:
 **Wer im Training Störungen übt, verträgt kleine Fehler der Simulation.**
 
 Dafür gibt es nur in Kern die Spielschicht, das Schnabel-Timing beim Aufheben und den Sprung. Wer

@@ -45,11 +45,8 @@ viel schneller etwas pro Sekunde wird. 10 N machen einen 2-kg-Ball pro Sekunde 5
 denn 10 ÷ 2 = 5. Für das Drehen gilt dasselbe mit Drehmoment und Trägheit.
 
 Dazu kommt ein **Kreiseleffekt**: Ein drehender Körper „will“ seine Drehachse behalten. Darum kippt
-ein schnell drehender Kreisel nicht um. Ein langer, dünner Körper, der schräg zu seiner Längsachse
-kreiselt, gerät dadurch ins **Taumeln**, wie ein geworfener Stift, der in der Luft eiert. Rechnet
-ein Computer diesen Effekt unvorsichtig, pumpt er bei solchen Körpern Schwung hinein, der gar nicht
-da ist, und sie drehen immer wilder. Box3D rechnet den Kreiseleffekt darum mit der stabilen,
-„impliziten“ Rechenweise, die du in C.2 kennenlernst. So bleiben lange, dünne Glieder ruhig.
+ein schnell drehender Kreisel nicht um. Box3D rechnet diesen Effekt besonders vorsichtig, sonst
+würden lange, dünne Glieder wie ein Roboterbein immer wilder drehen.
 
 ## C.2 Integration: das Daumenkino
 
@@ -122,6 +119,7 @@ Fachwort dafür ist *Akkumulator*, „Sammler“). Du kennst es schon aus
 [Kapitel 6](06-physik.md), 6.13:
 
 ```mermaid
+%% Bildunterschrift: Das Zeit-Sparschwein: ganze Schritte rechnen, mit dem Rest zwischen alt und neu zeichnen
 flowchart TB
   F["Bildzeit ins Schwein"] --> L{"genug für Schritt?"}
   L -->|ja| S["Schritt rechnen, Schrittzeit herausnehmen"]
@@ -226,26 +224,15 @@ Eistüte vor, die mit der Spitze auf dem Berührpunkt steht. Das Bild zeigt eine
 
 ![Schnitt durch den Reibungskegel um die Richtung n: Kraft innerhalb haftet, auf dem Rand rutscht es](../abbildungen/reibungskegel.svg)
 
-n ist die Richtung, in der der Boden drückt. Eine Kraft, die steil von oben kommt, liegt in der
+n ist die Richtung, in der der Boden drückt. Wie weit die Tüte offen ist, hängt von μ ab: Ihr Rand
+ist so schräg, dass er pro Meter nach oben genau μ Meter zur Seite geht. Je größer μ, desto weiter die Tüte. (Die Beschriftung „arctan μ“ im Bild meint genau diesen
+Winkel; das Wort brauchst du nicht zu kennen.) Eine Kraft, die steil von oben kommt, liegt in der
 Tüte: Haften. Eine Kraft, die flach schiebt, liegt außerhalb: Rutschen. Eigentlich haftet ein
 ruhendes Ding etwas stärker, als ein rutschendes gebremst wird. Box3D kennt aber nur einen Reibwert
 für beides.
 
 > **Für Profis:** Box3D rechnet die Reibung einmal für die Mitte der ganzen Kontaktfläche, nicht für
 > jeden Punkt einzeln, und dazu eine Drehreibung, die das Kreiseln auf der Stelle bremst.
-
-> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Formen** (Shapes), eine
-> **Rampe** (Ramp). Sie ist schon 6 m lang, 3 m breit und 1,5 m hoch, das siehst du in
-> **Details › Statisches Mesh › Größe** (Details › Static Mesh › Size). Ihre Steigung ist
-> 1,5 ÷ 6 = 0,25, also 25 %. Andere Maße kannst du dort eintippen. Hol dann aus der Gruppe
-> **Physik** (Physics) einen **Physik-Würfel** (Physics Cube) und gib ihm in
-> **Details › Transformation › Position** (Details › Transform › Location) dieselben X- und Y-Werte
-> wie der Rampe und ein Z, das 2 m höher ist. Beim **Simulieren** (Simulate) fällt er auf die Schräge
-> und bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in
-> **Details › Statisches Mesh › Physik › Reibung** (Details › Static Mesh › Physics › Friction) den
-> Wert auf 0,02 und starte **Simulieren** neu: Jetzt rutscht er, denn
-> √(0,02 · 0,6) ≈ 0,11 ist kleiner als 0,25. (Die Wurzel aus 0,012 rechnest du am besten mit dem
-> Taschenrechner aus; wie Box3D zwei Reibwerte mischt, steht gleich darunter.)
 
 ### Zwei Reibwerte, ein Kontakt
 
@@ -261,6 +248,19 @@ gewöhnlichen Mittelwert:
 Der Vorteil: Was reibungsfrei ist, bleibt es, egal womit es sich paart. Eis bleibt auch unter einem
 Gummistiefel ziemlich glatt. Trotzdem ist das nur eine Faustregel. Für echte Materialpaare wie
 Schnabel auf Socke kennt Kern darum eigene **Paarwerte** ([Kapitel 6](06-physik.md), 6.6).
+
+> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Formen** (Shapes), eine
+> **Rampe** (Ramp). Sie ist schon 6 m lang, 3 m breit und 1,5 m hoch, das siehst du in
+> **Details › Statisches Mesh › Größe** (Details › Static Mesh › Size). Ihre Steigung ist
+> 1,5 ÷ 6 = 0,25, also 25 %. Andere Maße kannst du dort eintippen. Hol dann aus der Gruppe
+> **Physik** (Physics) einen **Physik-Würfel** (Physics Cube) und gib ihm in
+> **Details › Transformation › Position** (Details › Transform › Location) dieselben X- und Y-Werte
+> wie der Rampe und ein Z, das 2 m höher ist. Beim **Simulieren** (Simulate) fällt er auf die Schräge
+> und bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in
+> **Details › Statisches Mesh › Physik › Reibung** (Details › Static Mesh › Physics › Friction) den
+> Wert auf 0,02 und starte **Simulieren** neu: Jetzt rutscht er. Mit der Regel von eben ist die
+> Reibung zwischen Würfel und Rampe √(0,02 · 0,6) = √0,012 ≈ 0,11 (am besten mit dem
+> Taschenrechner), und das ist kleiner als die Steigung 0,25.
 
 ### Sprungkraft
 
@@ -362,6 +362,7 @@ Ein Servo wie der in der Micro Duck (ein Dynamixel XL330) bekommt einen **Zielwi
 tatsächlichen Winkel, vergleicht und steuert gegen, immer wieder. Das ist ein **Regelkreis**:
 
 ```mermaid
+%% Bildunterschrift: Der Servo als Regelkreis: Ziel, Verzögerung, Fehler, Regler, Gelenk und zurück
 flowchart TB
   Z["Ziel"] --> T["Verzögerung"]
   T --> E["Fehler"]
@@ -411,7 +412,9 @@ einen Regler ins Schwingen bringen.
 > Schaukel gerät aus dem Takt.
 
 Wie spät ist „zu spät“? Ein Schwung hin und zurück dauert bei der Eigenfrequenz von 2,8 Hz
-1000 ÷ 2,8 ≈ 357 ms. Man zählt einen ganzen Schwung wie eine Runde im Kreis, also als 360°. 20 ms
+1000 ÷ 2,8 ≈ 357 ms. Man zählt einen ganzen Schwung wie eine Runde im Kreis, also als 360° – wie
+der Sekundenzeiger einer Uhr, der bei jedem Hin-und-zurück einmal ganz herumläuft und dann wieder
+oben steht. 20 ms
 sind 20 ÷ 357 ≈ 5,6 % davon, und 5,6 % von 360° sind **rund 20°**. Um so viel hinkt der Regler
 hinterher.
 

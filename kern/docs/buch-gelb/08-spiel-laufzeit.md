@@ -34,10 +34,12 @@ Ein Spiel durchläuft immer dieselben vier Stationen: vorbereiten, starten, Schr
 weiterrechnen, stoppen.
 
 ```mermaid
+%% Bildunterschrift: Das Leben eines Spiels: vorbereiten, starten, Schritt für Schritt rechnen, stoppen
 flowchart TB
   A[Vorbereiten] --> B[Start: Kopie anlegen]
   B --> C[Schritt]
-  C --> C
+  C --> R[nächstes Bild: noch ein Schritt]
+  R --> C
   C --> D[Stopp]
   D --> A
 ```
@@ -127,7 +129,7 @@ baust du alles aus denselben Bausteinen zusammen.
 
 Ein paar Bausteine im Einzelnen:
 
-**Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Ring, Rampe oder
+**Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Torus, Rampe oder
 ein eingebautes Modell, etwa ein Glied der Micro Duck wie ihr Hals. Das **Material** bestimmt das Aussehen:
 Farbe, wie rau oder glänzend, ob metallisch, ob es selbst leuchtet, ob man durchsehen kann. Ein Mesh
 kann automatisch einen passenden Kollider mitbringen. Dessen Reibung, Sprungkraft und Oberfläche
@@ -164,10 +166,6 @@ laufen sie bei jedem Start gleich.
 Bäumen, Autos und nachts leuchtenden Fenstern ([Kapitel 5](05-szene-und-geometrie.md)).
 
 Die übrigen Bausteine (Spieler-Steuerung, Waffe, Pickup, Trigger) kommen in 8.10 bis 8.13 dran.
-
-> **Für Profis:** Ein Name kann verwirren: In [Kapitel 6](06-physik.md) heißt der Typ **Statisch**
-> im Programm „fixed“. Mit dem Gelenk **Fest (verschweißt)** (Fixed (weld)) hat er nichts zu tun. Und wer in Kapitel 6
-> direkt mit der Physik arbeitet, ohne Level, startet mit einer Dichte von 1 kg/m³ statt 1000.
 
 > **Mission:** Öffne auf https://kernengine.de/ über **Datei › Beispiel-Levels** (File › Example
 > Levels) das Level Physics Lab. Klick die Tür an und schau in **Details**: Welche Komponenten hat
@@ -253,10 +251,11 @@ Editor. Was du im Editor mit **Anzeigen › Kollisionsformen** (Show › Collisi
 also genau das, womit später gerechnet wird.
 
 ```mermaid
+%% Bildunterschrift: Ein Plan für beide: Aus ihm entstehen die Physikwelt und die Kollisionsformen im Editor
 flowchart LR
   L[Level] --> P[Plan: Körper und Formen]
   P --> W[Physikwelt]
-  P --> E[Collider im Editor]
+  P --> E[Kollisionsformen im Editor]
 ```
 
 Die Regeln des Plans:
@@ -292,10 +291,6 @@ Spieler-Fahrzeuge bekommen dabei immer die Sonderbehandlung „Bullet“, damit 
 durch Wände rutschen. Fahrzeuge, Figuren und Flieger werden gegen Umkippen gesichert, nur die
 Rollkugel und die laufende Ente dürfen kippen.
 
-> **Für Profis:** Ein Gelenk verbindet einen Actor mit seinem **Ziel**. Bewegt wird dabei der Actor
-> gegenüber dem Ziel. Positive Werte, etwa der Weg einer Schiene, der Winkel eines Scharniers oder
-> das Tempo eines Motors, bewegen also den Actor und nicht das Ziel.
-
 **Melden nur, wo jemand zuhört.** Jede Berührung zu melden, kostet die Physik Arbeit. Darum schaltet
 Kern Meldungen nur dort ein, wo sie jemand liest: bei Sensoren, beim Spieler, bei Körpern mit
 Aufprall-Sound und, wenn das Level Logik hat, bei allem Beweglichen. Eine Kiste, die niemanden
@@ -305,10 +300,10 @@ interessiert, fällt still und spart Rechenzeit.
 
 | Modus | Bedeutung |
 |---|---|
-| none | keine Simulation, nur Editor |
-| simulate | Physik und Logik laufen, niemand wird gesteuert, Körper lassen sich greifen |
-| play | wie simulate, dazu Spieler, Regeln und HUD |
-| replica | Kopie eines Server-Spiels bei einem Mitspieler ([Kapitel 10](10-netzwerk.md)) |
+| Bearbeiten | keine Simulation, du baust im Editor |
+| **Simulieren** (Simulate) | Physik und Logik laufen, niemand wird gesteuert, Körper lassen sich greifen |
+| **Spielen** (Play) | wie Simulieren, dazu Spieler, Regeln und HUD |
+| Mitspieler-Kopie | Kopie eines Server-Spiels bei einem Mitspieler ([Kapitel 10](10-netzwerk.md)) |
 
 Zwischen **Simulieren** (Simulate) und **Spielen** kannst du mitten im Lauf wechseln (Studio: F8),
 der Spieler behält dabei seinen Zustand. Du kannst neu starten (Strg+R), pausieren und genau einen Schritt
@@ -345,8 +340,9 @@ passend zur Schrittrate. Warum, steht in [Kapitel 6](06-physik.md).
 Ein fester Schritt:
 
 ```mermaid
+%% Bildunterschrift: Ein fester Schritt der GameWorld, immer in derselben Reihenfolge
 flowchart TD
-  A[Spieler-Eingaben] --> B[Rotator und Mover]
+  A[Spieler-Eingaben] --> B[Rotator und Beweger]
   B --> C[Verkehr, Laufroboter, Servos, Griff]
   C --> D[Physik rechnen]
   D --> E[Ereignisse]
@@ -521,6 +517,7 @@ Motorbewegung zu welcher Lage passt.
 In jedem Schritt läuft ein Kreislauf:
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf des Läufers in jedem Schritt: fühlen, wählen, Netz fragen, Servos bewegen
 flowchart TB
   S[Fühlen: Sensoren lesen] --> V["Verhalten wählen, z. B. laufen, stehen, Ball suchen"]
   V --> N[Netz fragen]
@@ -561,25 +558,29 @@ endlos umdrehen kannst.
 
 Die **Touch-Steuerung** hat zwei Sticks in den unteren Ecken. Links bewegst du dich (**LAUFEN**
 (MOVE), bei Fahrzeugen **LENKEN / GAS** (STEER / GAS), beim Flieger **FLIEGEN** (FLY)), rechts
-schaust du (**SCHAUEN** (LOOK)). Daneben liegen Knöpfe je nach Bewegungsart (in Klammern die
-englische Beschriftung; KICK L, KICK R, BOOST, DRIFT und LIFT heißen in beiden Sprachen gleich):
+schaust du (**SCHAUEN** (LOOK)). Daneben liegen Knöpfe, je nach Bewegungsart andere: die Ente hat
+zum Beispiel **QUAK** (QUACK), die Kugel **SPRUNG** (JUMP) und **BOOST**.
 
-| Bewegung | Knöpfe |
-|---|---|
-| Soldat | SPRUNG (JUMP), LADEN (RELOAD), ZIELEN (AIM), DUCKEN (CROUCH), NUTZEN (USE) |
-| Läufer | QUAK (QUACK), GREIFEN (PICK), SITZ (SIT), KICK L, KICK R, ROLLEN (ROLL), SCHNABEL (BEAK), HUIII (WHEEE), HÜPFEN (HOP) |
-| Figur | SPRUNG (JUMP), NUTZEN (USE) |
-| Rollende Kugel | SPRUNG (JUMP), BOOST |
-| Flieger | HOCH (UP), RUNTER (DOWN), BOOST |
-| Hovercar | BOOST, DRIFT, LIFT, SICHT (VIEW) |
-| Fahrzeug | BOOST, DRIFT, HÜPFEN (HOP), SICHT (VIEW) |
+> **Für Profis:** Alle Knöpfe zum Nachschlagen (in Klammern die englische Beschriftung; KICK L,
+> KICK R, BOOST, DRIFT und LIFT heißen in beiden Sprachen gleich):
+>
+> | Bewegung | Knöpfe |
+> |---|---|
+> | Soldat | SPRUNG (JUMP), LADEN (RELOAD), ZIELEN (AIM), DUCKEN (CROUCH), NUTZEN (USE) |
+> | Läufer | QUAK (QUACK), GREIFEN (PICK), SITZ (SIT), KICK L, KICK R, ROLLEN (ROLL), SCHNABEL (BEAK), HUIII (WHEEE), HÜPFEN (HOP) |
+> | Figur | SPRUNG (JUMP), NUTZEN (USE) |
+> | Rollende Kugel | SPRUNG (JUMP), BOOST |
+> | Flieger | HOCH (UP), RUNTER (DOWN), BOOST |
+> | Hovercar | BOOST, DRIFT, LIFT, SICHT (VIEW) |
+> | Fahrzeug | BOOST, DRIFT, HÜPFEN (HOP), SICHT (VIEW) |
 
 Jeder Finger bekommt genau eine Aufgabe, und zwar dort, wo er zuerst aufsetzt. Liegt dort ein
 Knopf, drückt er den Knopf und wird nie zum Stick, auch wenn er danach weiterwischt. Liegt dort kein
 Knopf, aber ein Stick, bewegt er den Stick. Setzt er auf dem freien Bildschirm auf, schießt er beim
 Soldaten mit Waffe (und zielt dabei), bei allen anderen schaut er sich um. Linker Stick ganz nach
 vorn heißt Sprinten. Ziehst du den rechten Stick bis an den Rand, drehst du dich einfach weiter
-(**Edge Turn**). Gamepads bekommen **Totzonen**: Ganz kleine Wackler am Stick werden ignoriert.
+(englisch *Edge Turn*, „Drehen am Rand“). Gamepads bekommen **Totzonen**: Ganz kleine Wackler am
+Stick werden ignoriert, so wie eine Waage, die erst ab ein paar Gramm etwas anzeigt.
 
 ## 8.17 Logik in der Welt
 

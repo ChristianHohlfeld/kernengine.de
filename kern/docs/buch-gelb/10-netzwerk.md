@@ -34,6 +34,7 @@ Das Netzwerk ist wie ein Stapel gebaut. Jede Stufe löst genau **ein** Problem u
 die Stufe darunter. Stell es dir als Post vor:
 
 ```mermaid
+%% Bildunterschrift: Der Netzwerk-Stapel als Post: jede Stufe löst ein Problem
 flowchart TB
   S["Spiel: was im Brief steht"] --> V["Verbindung: Händeschütteln"]
   V --> K["Kanäle: Einschreiben oder Postkarte"]
@@ -104,7 +105,7 @@ Information noch einmal.
 **Senden wartet nie.** Man könnte es auch anders machen: nach jedem Brief warten, bis die Quittung
 da ist, und erst dann den nächsten schicken. Bei schlechtem Netz stünde dann alles still. Kern
 schickt einfach weiter, sofort, und merkt sich nur, was bestätigt wurde. Ob
-etwas Verlorenes noch einmal geschickt wird, entscheidet sie nicht selbst. Das macht die Schicht
+etwas Verlorenes noch einmal geschickt wird, entscheidet diese Schicht nicht selbst. Das macht die Schicht
 darüber, denn manches lohnt sich gar nicht nachzuschicken (10.4). Zu große Päckchen werden in Stücke
 zerlegt und beim Empfänger wieder zusammengesetzt – wie ein Umzug in mehreren Kartons.
 
@@ -248,8 +249,7 @@ Was **ankommen muss**, geht per Einschreiben: das Willkommen, „Spieler kommt�
 Beide brauchen **dasselbe Level**. Das Willkommen enthält darum eine Prüfsumme des Levels; spielt der
 Server ein anderes, wird der Client abgewiesen. Wer später dazukommt, bekommt nach dem Willkommen alle
 Pawns, alle Änderungen durch Logik und die Liste der eingesammelten Pickups. So sieht auch ein
-Nachzügler dieselbe Welt. Ein Online-Spiel nimmt normalerweise bis zu 8 Gäste auf, dazu den Host; im Studio an
-einem einzigen Rechner testest du mit bis zu 4 (10.8).
+Nachzügler dieselbe Welt.
 
 **Kein Sprung geht verloren.** Eingaben reisen per Postkarte, und Postkarten gehen manchmal verloren.
 Darum schickt der Client immer seine **letzten vier** Eingaben mit. Springen und Feuern zählen, wenn
@@ -260,7 +260,9 @@ oder dieselbe doppelt an, wirft er sie weg. So läuft deine Figur nie rückwärt
 > **Für Profis:** Wenn du schießt, sah deine Welt schon etwas älter aus als die des Servers. Darum dreht
 > der Server für die Treffer-Prüfung die Zeit zurück, um etwa den halben Ping plus die 0,1 s
 > Verspätung (höchstens 0,5 s). Das heißt **Lag-Kompensation** ([Kapitel 8](08-spiel-laufzeit.md)).
-> Die genauen Namen und Werte stehen im blauen Buch, Kapitel 10.
+> Ein Online-Spiel nimmt normalerweise bis zu 8 Gäste auf, dazu den Host; im Studio an einem
+> einzigen Rechner testest du mit bis zu 4 Spielern (10.8). Die genauen Namen und Werte stehen im
+> blauen Buch, Kapitel 10.
 
 ### Der Prioritätstopf
 
@@ -299,23 +301,37 @@ immer **zwei** bekannte Fotos um die gezeigte Zeit herum, und er rechnet dazwisc
 | 1,05 s | liegt genau in der Mitte | x = 11 m |
 | 1,10 s | Foto B: Auto bei x = 12 m | – |
 
-Fehlt Nachschub, rechnet er die letzte Bewegung noch kurz weiter (höchstens eine Viertelsekunde) und
-hält das Ding dann an.
+Fehlt Nachschub, rechnet er die letzte Bewegung noch kurz weiter und hält das Ding dann an.
 
 Bleibt eine Frage: 0,1 s vor **welcher** Zeit? Jedes Foto trägt die Uhrzeit des Servers. Damit der
 Client weiß, welche Fotos zu „Serverzeit jetzt minus 0,1 s“ gehören, muss er die **Uhr des Servers**
 kennen – seine eigene Uhr geht anders.
 
-Dazu vergleicht er bei jedem Foto die Uhrzeit darauf mit seiner eigenen. Unterwegs kann ein Päckchen
-nur aufgehalten werden, nie schneller sein. Ist der Abstand zwischen beiden Uhrzeiten besonders
-klein, war dieses Päckchen besonders schnell – und dem glaubt der Client am meisten. Wie du deine Uhr
-lieber nach einer Glocke stellst, die du ohne Umweg hörst.
+Dazu vergleicht er bei jedem Foto die Uhrzeit darauf mit seiner eigenen Uhr beim Empfang. Doch jedes
+Foto war eine Weile unterwegs, mal kürzer, mal länger. Ein Foto, das lange gebummelt hat, trägt eine
+schon ziemlich alte Uhrzeit. Nach ihm sieht es so aus, als ginge die Serveruhr weiter **zurück**.
+
+Hier geht Kern absichtlich auf Nummer sicher: Sagt ein Foto „die Serveruhr ist weiter zurück als
+gedacht“, übernimmt der Client das **schnell**. Sagt eines „sie ist weiter vorn“, glaubt er es nur
+**ganz langsam**. Seine Schätzung richtet sich also nach den **am stärksten verspäteten** Päckchen.
+Warum? **Lieber etwas zu weit in der Vergangenheit zeigen als zu weit vorn.** Dann gibt es fast immer
+schon ein Foto *nach* der gezeigten Zeit, und der Client muss nicht raten, wie es weitergeht – auch
+wenn die Verspätung stark schwankt.
+
+> **So kannst du es dir vorstellen:** Ein Live-Stream mit Puffer. Er läuft ein paar Sekunden hinter
+> dem echten Geschehen her. Dafür ist immer schon das nächste Stück geladen, und nichts bleibt
+> hängen. Ein Stream, der ganz vorn an der Live-Kante klebt, stockt beim kleinsten Wackler im Netz.
+
+> **Für Profis:** In Zahlen: Eine Stichprobe „weiter zurück“ zieht die Schätzung um 20 % ihres
+> Abstands mit, eine Stichprobe „weiter vorn“ nur um 2 %. Weiterrechnen ohne Nachschub darf der
+> Client höchstens eine Viertelsekunde lang. Die genauen Namen und Werte stehen im blauen Buch,
+> Kapitel 10.
 
 ---
 
 ## 10.8 Mehrspieler im Studio
 
-![Mehrspieler-Spiel im Studio: Listen-Server und ein lokaler Client, dazu zwei orthografische Ansichten](../buch/bilder/studio-multiplayer.png)
+![Mehrspieler im Studio: Viewport 1 zeigt den Server, Viewport 2 den ersten Client, jeder mit eigenem HUD](../buch/bilder/studio-multiplayer.png)
 
 Im Studio kannst du allein an einem Rechner mit mehreren Spielern testen.
 **Spielen › Anzahl der Spieler** (Play › Number of Players), 1 bis 4, macht deine Welt zum
@@ -330,11 +346,14 @@ schlechter:
 
 | Stufe | Verzögerung (± Jitter) | Verlust |
 |---|---|---|
-| **Perfekt** (Perfect) | 0 | 0 |
-| **LAN (5 ms)** | 5 ms (±1) | 0 |
-| **Mittel (50 ms, 1 % Verlust)** (Average (50 ms, 1% loss)) | 50 ms (±10) | 1 % |
-| **Schlecht (150 ms, 5 % Verlust)** (Bad (150 ms, 5% loss)) | 150 ms (±40) | 5 % |
-| **Sehr schlecht (300 ms, 20 % Verlust)** (Terrible (300 ms, 20% loss)) | 300 ms (±100) | 20 % |
+| **Perfekt** | 0 | 0 |
+| **LAN** | 5 ms (±1) | 0 |
+| **Mittel** | 50 ms (±10) | 1 % |
+| **Schlecht** | 150 ms (±40) | 5 % |
+| **Sehr schlecht** | 300 ms (±100) | 20 % |
+
+Im Menü stehen Verzögerung und Verlust gleich mit im Namen, zum Beispiel **Mittel (50 ms, 1 %
+Verlust)**.
 
 > **Mission:** Öffne Orb Run in Studio auf https://kernengine.de/, stell
 > **Spielen › Anzahl der Spieler** auf **2 Spieler (Listen-Server)** (2 Players (listen server)) und
@@ -384,11 +403,11 @@ aber ohne Garantie. Webseiten können kein UDP senden. Darum hat Studio einen ei
 **KernNet**. Er trägt nur Päckchen hin und her – Nummern, Quittungen und Handschlag macht weiter Kerns
 Netzwerk-System. Für KernNet gibt es zwei Wege:
 
-- **Im selben Browser** reden Tabs direkt miteinander, über einen **BroadcastChannel**: einen
-  Rundfunk-Kanal, den alle Tabs dieses Browsers hören. Ein Server ist dafür nicht nötig.
+- **Im selben Browser** reden Tabs direkt miteinander, über einen **Rundfunk-Kanal**, den alle Tabs
+  dieses Browsers hören. Ein Server ist dafür nicht nötig.
 - **Zwischen Rechnern** braucht es einen **Relay**: ein kleines Programm auf einem Rechner im Netz.
-  Jeder Browser hält eine dauerhafte Leitung zu ihm (eine **WebSocket**-Verbindung). Der Relay gibt
-  jedem eine Nummer, nimmt Päckchen an und stellt sie dem richtigen Empfänger zu.
+  Jeder Browser hält eine dauerhafte Leitung zu ihm. Der Relay gibt jedem eine Nummer, nimmt
+  Päckchen an und stellt sie dem richtigen Empfänger zu.
 
 > **So kannst du es dir vorstellen:** Der Relay ist ein Briefträger, der keine Briefe öffnet. Er hat
 > keine eigene Spiellogik. Ob ein Päckchen echt ist, prüfen die Empfänger selbst – mit der Prüfsumme
@@ -397,7 +416,9 @@ Netzwerk-System. Für KernNet gibt es zwei Wege:
 Zu große Päckchen oder Päckchen an Unbekannte wirft der Relay weg. Geht der Host, ist der Raum für
 neue Gäste geschlossen.
 
-> **Für Profis:** Der Relay ist ein Node-Programm aus dem Repository von Kern. Starte ihn zusammen
+> **Für Profis:** Der Rundfunk-Kanal heißt im Browser **BroadcastChannel**, die dauerhafte Leitung
+> **WebSocket**. Der Relay ist ein Node-Programm (Node führt JavaScript außerhalb des Browsers aus)
+> aus dem Repository von Kern. Starte ihn zusammen
 > mit einem Erwachsenen oder deiner Lehrerin. Danach trägst du im Feld **Relay (optional)** eine Adresse ein, die mit
 > ws:// beginnt. Befehl, Port und alle Fehlermeldungen stehen im blauen Buch, Kapitel 10.
 
@@ -440,7 +461,8 @@ Mehrspieler im Studio. Dank des festen Startwerts (10.6) ist jeder Lauf gleich.
 - Du kennst Nummern und Quittungen, Einschreiben und Postkarte.
 - Du verstehst, wie der Handschlag Fremde aussperrt und wozu die Prüfsumme da ist.
 - Du weißt, warum nur der Server entscheidet und was ein Snapshot ist.
-- Du kannst erklären, wie der Prioritätstopf und die Zwischenbilder arbeiten.
+- Du kannst erklären, wie der Prioritätstopf und die Zwischenbilder arbeiten – und warum der Client
+  die Serveruhr lieber zu spät als zu früh schätzt.
 - Du testest im Studio mit mehreren Spielern und schlechtem Netz.
 
 ## Rätsel-Ecke

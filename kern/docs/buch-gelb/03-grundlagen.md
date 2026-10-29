@@ -161,18 +161,20 @@ Würfel in einem Level ungefähr aus:
 In geschweiften Klammern stehen Paare aus **Name: Wert**. Ein Wert kann eine Zahl sein, ein Text in
 Anführungszeichen, eine Liste in eckigen Klammern oder wieder ein Paar-Block. Die Namen sind
 englisch: „position“ ist der Ort, „rotation“ die Drehung, und „transform“ fasst beide zusammen,
-also die Lage des Dings. Hier heißt der Actor „Cube“. Er ist um 90° gedreht, und er steht 1 Meter
+also die Lage des Dings. Hier heißt der Actor „Cube“. Er ist um 90° um die Hochachse gedreht (die
+dritte Zahl bei „rotation“), und er steht 1 Meter
 über dem Boden, denn bei „position“ ist die dritte Zahl die Höhe. Warum gerade die dritte, zeigt 3.6.
 
 > **So kannst du es dir vorstellen:** ein ausgefüllter Steckbrief. Jede Zeile hat eine Überschrift
 > und einen Eintrag. Ein Steckbrief kann sogar einen kleineren Steckbrief enthalten.
 
-> **Mission:** Speichere ein Level mit **Strg+S**. Beim ersten Mal fragt dich der Browser nach einem
+> **Mission:** Speichere ein Level mit **Strg+S** (auf dem Mac **Cmd+S**). Beim ersten Mal fragt dich der Browser nach einem
 > Ort, oder die Datei landet in deinem Download-Ordner. Die Endung „.klevel“ kennt dein Computer
 > nicht, ein Doppelklick hilft also nicht. Klick die Datei stattdessen mit der rechten Maustaste an,
 > wähl **Öffnen mit** und dann einen einfachen Texteditor (unter Windows „Editor“, auf dem Mac
 > „TextEdit“). Es ist JSON! Finde
-> `"format": "kern-level"` und bei deinen Actors die Drehungen in Grad.
+> ganz oben `"format": "kern-level"` – diese Zeile sagt jedem Programm: „Ich bin eine Kern-Level-Datei.“
+> Such dann bei deinen Actors die Drehungen in Grad.
 
 Kerns JSON-Baustein verspricht drei Dinge:
 
@@ -269,7 +271,8 @@ Kapitel 3.
 
 In Studio und in den Level-Dateien misst du Winkel in **Grad**: Eine ganze Runde hat 360°. Im
 C++-Code rechnet Kern dagegen in **Radiant**. Radiant heißt: Wie weit wanderst du auf einem Kreis mit
-1 Meter Radius? Eine ganze Runde ist der ganze Umfang, etwa 6,28 Meter (das ist 2 · π). Eine halbe
+1 Meter Radius? Eine ganze Runde ist der ganze Umfang. Der Umfang eines Kreises ist 2 · π · Radius,
+wobei die Kreiszahl π ungefähr 3,14 ist. Bei 1 Meter Radius sind das etwa 6,28 Meter. Eine halbe
 Runde (180°) ist etwa 3,14, eine Viertelrunde (90°) etwa 1,57. Für Mathe-Formeln ist Radiant
 bequemer, für Menschen Grad. Darum rechnet Kern zwischen beiden um.
 
@@ -302,7 +305,9 @@ Das Buch liegt am Ende verschieden da! Darum legt Kern genau fest, welche Drehun
 ### Matrizen: alles in einem Rutsch
 
 Ein Ding im Level wird oft **gestreckt**, **gedreht** und **verschoben**. Kern packt alle drei
-Bewegungen in eine Tabelle aus 4 × 4 = 16 Zahlen, eine **Matrix**. Wie eine Matrix einen Punkt
+Bewegungen in eine Tabelle aus 4 × 4 = 16 Zahlen, eine **Matrix**. Warum 4 und nicht 3, obwohl der
+Raum nur drei Achsen hat? Fürs Strecken und Drehen würden 3 × 3 Zahlen reichen. Die zusätzliche
+Spalte nimmt das Verschieben auf, damit alle drei Bewegungen in eine einzige Tabelle passen. Wie eine Matrix einen Punkt
 verändert, erklärt Anhang [B](B-grundlagen-rendering.md) im Abschnitt „Matrizen ohne Angst“. Hier
 genügt das Prinzip: Eine Matrix ist ein Rezept „erst strecken, dann drehen, dann verschieben“, das
 man auf jeden Punkt anwenden kann.
@@ -321,16 +326,11 @@ Matrizen unterscheiden **Punkte** und **Richtungen**. Ein Punkt wird gestreckt, 
 verschoben. Eine Richtung, etwa „nach Norden“, wird nur gestreckt und gedreht, nie verschoben. Denn
 eine Richtung hat keinen Ort.
 
-**Wo die 16 Zahlen liegen.** Im Speicher liegen die 16 Zahlen nicht als Tabelle, sondern in einer
-langen Reihe. Kern legt sie **Spalte für Spalte** ab: erst die vier Zahlen der ersten Spalte, dann
-die der zweiten und so weiter. Das klingt nach Kleinkram, ist aber wichtig: Matrizen wandern durch
-die Schließfachwand aus [Kapitel 1](01-einfuehrung.md). C++ und JavaScript müssen sie also in genau
-derselben Reihenfolge ablegen, sonst liest die andere Seite Unsinn. Welche Zahl auf welchem Platz
-steht, zeigt das blaue Buch, Kapitel 3.
-
-> **Für Profis:** Um herauszufinden, was unter der Maus liegt, muss Kern eine Matrix „rückwärts“
-> rechnen. Das macht es mit doppelt so vielen Bits, damit auch weit entfernte Dinge genau getroffen
-> werden. Alle Matrix-Funktionen stehen im blauen Buch, Kapitel 3.
+> **Für Profis:** Im Speicher liegen die 16 Zahlen nicht als Tabelle, sondern in einer langen
+> Reihe, **Spalte für Spalte**. Weil Matrizen durch die Schließfachwand aus
+> [Kapitel 1](01-einfuehrung.md) wandern, müssen C++ und JavaScript genau dieselbe Reihenfolge
+> benutzen. Und um herauszufinden, was unter der Maus liegt, rechnet Kern eine Matrix „rückwärts“,
+> mit doppelt so vielen Bits. Alles Weitere steht im blauen Buch, Kapitel 3.
 
 ## 3.8 Die Kamera
 
@@ -359,8 +359,9 @@ wie viele Meter das Bild zeigt, so wie der Maßstab einer Landkarte.
 > sich die Zahl ändert. **Alt+G** schaltet zurück zur Perspektive.
 
 **Was die Kamera nicht sieht, wird nicht gezeichnet.** Der Sichtbereich einer Kamera sieht aus wie
-eine Pyramide, die vor der Kamera liegt und deren Spitze an der nahen Grenze abgeschnitten ist. Sie
-hat sechs Wände: links, rechts, oben, unten, nah, fern. Um jedes Ding legt Kern eine einfache
+eine Pyramide, die vor der Kamera liegt und deren Spitze an der nahen Grenze abgeschnitten ist – wie
+ein Lampenschirm, der mit der schmalen Seite zu dir zeigt. Ein Bild davon findest du in
+[Kapitel 5](05-szene-und-geometrie.md), Abschnitt 5.2. Sie hat sechs Wände: links, rechts, oben, unten, nah, fern. Um jedes Ding legt Kern eine einfache
 Hülle, eine Kugel oder eine Kiste. Liegt die Hülle ganz außerhalb der Wände, spart sich Kern das
 Zeichnen ([Kapitel 5](05-szene-und-geometrie.md)). Ist eine Hülle ungültig, etwa weil sie noch leer
 ist, weiß Kern nicht, wo das Ding liegt, und zeichnet es trotzdem. Im Zweifel lieber einmal zu viel zeichnen als ein Loch im Bild.

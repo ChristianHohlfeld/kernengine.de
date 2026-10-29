@@ -117,9 +117,11 @@ Netz alle Zwischenergebnisse, damit es später rückwärts rechnen kann (A.5).
 
 Kern rechnet dabei schnell, aber **ohne die Reihenfolge der Additionen zu ändern**. Der Computer
 könnte noch schneller sein, wenn er Summen umsortieren dürfte – doch dann käme an der letzten Stelle
-etwas anderes heraus, wie beim Drei-Ziffern-Taschenrechner in [Kapitel 14](14-lehrer.md). Kern
-legt die Zahlen darum so im Speicher ab, dass das schnelle Rechnen ohne Umsortieren klappt. So bleibt
-das Netz auf jedem Gerät bis zur letzten Stelle gleich.
+etwas anderes heraus, wie beim Drei-Ziffern-Taschenrechner in [Kapitel 14](14-lehrer.md) (14.7).
+So bleibt das Netz auf jedem Gerät bis zur letzten Stelle gleich.
+
+> **Für Profis:** Damit das schnelle Rechnen trotzdem klappt, legt Kern die Zahlen im Speicher so
+> ab, dass der Computer sie ohne Umsortieren der Reihe nach abarbeiten kann.
 
 ## A.3 Der Verlust: Wie schlecht bin ich gerade?
 
@@ -211,7 +213,9 @@ winziges Stück dreht? Jede kannst du durch **Tasten** wie in A.4 nachprüfen. F
 w2 ──(−0,393)──► y ──(−2,574)──► Fehler
 ```
 
-- **y → Fehler:** −2,574. Getastet: y + 0,01 senkt den Fehler um etwa 0,026, also Steigung ≈ −2,6.
+- **y → Fehler:** −2,574. Getastet: Mit y = −0,287 + 0,01 = −0,277 ist der Fehler
+  (−0,277 − 1) · (−0,277 − 1) = 1,277 · 1,277 ≈ 1,631 statt 1,656. Er sinkt also um etwa 0,026,
+  die Steigung ist −0,026 ÷ 0,01 ≈ −2,6. (Genau gerechnet: 2 · (y − Ziel) = 2 · (−1,287) = −2,574.)
 - **w2 → y:** −0,393. Dreht man w2 um 0,01, ändert sich y um 0,01 · h, und h ist −0,393.
 - Multipliziert: w2 → Fehler = (−0,393) · (−2,574) = **1,013**.
 
@@ -222,7 +226,9 @@ w1 ──(1)──► z ──(0,607)──► h ──(2)──► y ──(−
 ```
 
 - **w1 → z:** 1, denn z = w1 · x, und x ist 1.
-- **z → h:** 0,607, getastet in der ELU-Tabelle: z + 0,01 ändert h um etwa 0,006.
+- **z → h:** 0,607, aus der ELU-Kurve abgelesen: Bei z = −0,5 ist sie etwa 0,6 steil, z + 0,01
+  ändert h um etwa 0,006. (Die Tabelle ist dafür zu grob; wie man es mit dem Taschenrechner tastet,
+  steht im Kasten unten.)
 - **h → y:** 2, denn y = w2 · h, und w2 ist 2.
 - **y → Fehler:** −2,574 wie oben.
 - Multipliziert: w1 → Fehler = 1 · 0,607 · 2 · (−2,574) = **−3,122**.
@@ -245,6 +251,9 @@ langsamen Tasten.
 
 > **Für Profis:** Ein Bias wirkt wie ein zusätzlicher Eingang, der immer 1 ist. Darum hat b2 dieselbe
 > Steigung wie der Weg y → Fehler (−2,574) und b1 dieselbe wie w1 (−3,122), denn x ist hier auch 1.
+> Und z → h mit dem Taschenrechner getastet: ELU(z) = e^z − 1, also
+> ELU(−0,49) − ELU(−0,5) = e^(−0,49) − e^(−0,5) ≈ 0,6126 − 0,6065 = 0,0061. Geteilt durch 0,01
+> ergibt das ≈ 0,61.
 
 ## A.6 Adam: der kluge Wanderer
 
@@ -335,6 +344,7 @@ dort folgt ein größerer Fehler – und so weiter. Die Fehler können mit der L
 ### DAgger: Der Schüler fährt, das Vorbild kommentiert
 
 ```mermaid
+%% Bildunterschrift: DAgger: Das Netz fährt selbst, das Vorbild sagt, was richtig wäre
 flowchart TD
   A["Runde 0: Vorbild fährt"] --> F["Netz lernt aus allem"]
   F --> R["Netz fährt selbst"]
@@ -363,6 +373,7 @@ Ohne Vorbild – oder um besser zu werden als das Vorbild – lernt das Netz dur
 ### Der Kreislauf
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf beim Lernen durch Belohnung
 flowchart LR
   A["Agent: das Netz"] -->|"Aktion"| U["Umgebung"]
   U -->|"Beobachtung, Belohnung"| A
@@ -477,7 +488,9 @@ Gutem geführt hat. **GAE** ist der Rechenweg, der das berücksichtigt.
 Genau so rechnet GAE: Man beginnt beim letzten Schritt und geht nach vorne. Jeder Schritt bekommt seine
 eigene Überraschung plus einen großen Teil (etwa 94 %) des Vorteils des Schritts danach.
 
-**Zur Bestätigung in Zahlen:** drei Schritte, rückwärts gerechnet.
+**Zur Bestätigung in Zahlen:** drei Schritte, rückwärts gerechnet. Die Überraschungen sind für das
+Beispiel ausgedacht (wie man eine ausrechnet, steht in A.10). Die 94 % nimmt Kern; warum gerade
+diese Zahl, erklärt der Kasten darunter.
 
 | Schritt | eigene Überraschung | Vorteil |
 |---|---|---|
@@ -544,6 +557,7 @@ Lernschritt nur begrenzt ändern, nach derselben Regel mit 0,2.
 ### Ein PPO-Update im Ganzen
 
 ```mermaid
+%% Bildunterschrift: Eine PPO-Runde: sammeln, bewerten, vorsichtig verbessern
 flowchart TD
   S["Viele Enten probieren aus"] --> O["Erfahrung sortieren"]
   O --> G["Kritiker bewertet: Vorteile"]
@@ -552,7 +566,7 @@ flowchart TD
   P --> S
 ```
 
-Pro Runde lernt Kern mehrmals aus denselben Daten (fünf Epochen, jede in vier Minibatches). Das spart
+Pro Runde lernt Kern mehrmals aus denselben Daten. Das spart
 Rechenzeit, und weil es die Ente jedes Mal ein Stück weiter von der sammelnden Ente wegschiebt,
 braucht es genau den Sicherheitsgurt von oben.
 
@@ -594,7 +608,7 @@ balancieren kann.
 > **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) – läuft gerade
 > **Spielen** (Play) oder **Simulieren**, erst mit Esc stoppen – und starte **Simulieren** (Simulate)
 > (Alt+S). Zieh die Ente
-> mit der Maus am Kopf zur Seite und lass los, bis sie umfällt. Sie steht von selbst wieder auf.
+> mit der Maus am Kopf zur Seite, bis sie kippt, und lass dann los. Sie steht von selbst wieder auf.
 > velstand hat das gelernt, weil es im Training ständig geschubst wurde und mit vielen verschiedenen
 > Enten geübt hat.
 
@@ -613,6 +627,9 @@ bessere Hälfte behalten und den Mittelpunkt zu ihr schieben. **CMA-ES** lernt d
 der Suchwolke:
 
 ![Die Suchwolke von CMA-ES, schematisch: rund und groß, dann lang gezogen in Richtung Tal, zuletzt klein am Ziel](../abbildungen/cma-es.svg)
+
+Die Ringe im Bild sind wie **Höhenlinien** auf einer Wanderkarte: Jeder Ring verbindet Stellen mit
+gleich gutem Ergebnis, und das × in der Mitte ist der tiefste Punkt des Tals – das Ziel.
 
 Geht es lange in **dieselbe** Richtung, wird die Wolke größer und streckt sich in diese Richtung. Ist
 man nah dran und die Schritte heben sich auf, wird sie kleiner.
@@ -644,6 +661,7 @@ und der Kritiker werden nur beim Lernen gebraucht und bleiben im Lehrer.
 ## A.15 Wie alles zusammenkommt
 
 ```mermaid
+%% Bildunterschrift: Der Weg zum Sprung: Vorbild, Nachahmen, Üben, Export
 flowchart TD
   V["1. Vorbild: CMA-ES"] --> N["2. Nachahmen: DAgger"]
   N --> U["3. Üben: PPO mit Variation"]
