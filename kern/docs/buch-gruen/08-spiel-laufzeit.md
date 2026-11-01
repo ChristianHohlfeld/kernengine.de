@@ -34,7 +34,7 @@ nach dem Stoppen alles wieder wie vorher.
 
 ```mermaid
 %% Bildunterschrift: Der Lebenslauf einer Spielwelt – nach dem Stopp geht es zurück zum Bearbeiten
-flowchart LR
+flowchart TB
   A[Bearbeiten] --> B[Start: Kopie anlegen, Physik bauen]
   B --> C[Schritt, Schritt, Schritt …]
   C --> D[Stopp: Kopie wegwerfen]

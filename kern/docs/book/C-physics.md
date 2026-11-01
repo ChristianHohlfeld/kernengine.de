@@ -490,8 +490,9 @@ $$\omega = 2\pi f,\qquad
 
 The impulse of a contact with penetration $s < 0$ is then (`box3d:src/contact_solver.c`):
 
-$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,\qquad
-\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
+$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,$$
+
+$$\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
 
 - $\text{biasRate}\cdot s$: how fast the penetration is resolved,
 - $v_\text{max}$: upper limit of this push-out velocity (`contact_speed`, Kern: 3 m/s),

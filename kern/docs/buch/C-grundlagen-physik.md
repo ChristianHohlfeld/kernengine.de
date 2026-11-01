@@ -499,8 +499,9 @@ $$\omega = 2\pi f,\qquad
 Der Impuls eines Kontakts mit Durchdringung $s < 0$ ist dann
 (`box3d:src/contact_solver.c`):
 
-$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,\qquad
-\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
+$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,$$
+
+$$\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
 
 - $\text{biasRate}\cdot s$: wie schnell die Durchdringung abgebaut wird,
 - $v_\text{max}$: Obergrenze dieser Ausdrückgeschwindigkeit (`contact_speed`, Kern: 3 m/s),

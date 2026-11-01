@@ -813,7 +813,9 @@ The **critic's target** is then $\hat R_t = \hat A_t + V(s_t)$.
 without the episode ending, rewards $r = (1, 0, 2)$, values $V = (5, 4, 6)$ and the value after the
 last step $V_3 = 3$:
 
-| $t$ | $\delta_t = r_t + \gamma V_{t+1} - V_t$ | $\hat A_t = \delta_t + 0.9405\,\hat A_{t+1}$ | $\hat R_t = \hat A_t + V_t$ |
+$$\delta_t = r_t + \gamma V_{t+1} - V_t,\qquad \hat A_t = \delta_t + 0.9405\,\hat A_{t+1},\qquad \hat R_t = \hat A_t + V_t$$
+
+| $t$ | $\delta_t$ | $\hat A_t$ | $\hat R_t$ |
 |---|---|---|---|
 | 2 | $2 + 2.97 - 6 = -1.03$ | $-1.03$ | $4.97$ |
 | 1 | $0 + 5.94 - 4 = 1.94$ | $1.94 - 0.9687 = 0.9713$ | $4.9713$ |

@@ -31,7 +31,7 @@ and examples) is open source under the Apache License 2.0 and available free of 
 <https://kernengine.de/>, source code at
 <https://github.com/ChristianHohlfeld/kernengine.de>. Excepted are the Micro Duck 3D models by
 Pollen Robotics contained in Kern Studio: they are under CC BY-NC-SA 4.0 and may be used only
-non-commercially. A commercial build (`kern/build.sh --commercial`) leaves them out. The names
+non-commercially. A commercial build (kern/build.sh \-\-commercial) leaves them out. The names
 "Kern", "Kern Studio", "Kern Lehrer" and the Kern logo are excluded from the license. Courses and
 integration licenses for schools and companies are offered separately by the rights holder;
 integration licenses do not include Pollen's 3D models.

@@ -45,7 +45,7 @@ function Math(el)
   end
 end
 
--- Tables with many columns are set smaller, with less space between columns, and may break after
+-- Tables with many columns are set a little smaller (\\small keeps even code in them at 7 pt or more), with less space between columns, and may break after
 -- a slash ("Magazin/Reserve"), so that they fit the type area.
 function Table(tbl)
   tbl = tbl:walk({
@@ -64,7 +64,7 @@ function Table(tbl)
   })
   if #tbl.colspecs < 6 then return tbl end
   return {
-    pandoc.RawBlock("latex", "\\begingroup\\scriptsize\\setlength{\\tabcolsep}{2pt}"),
+    pandoc.RawBlock("latex", "\\begingroup\\small\\setlength{\\tabcolsep}{3pt}"),
     tbl,
     pandoc.RawBlock("latex", "\\endgroup"),
   }

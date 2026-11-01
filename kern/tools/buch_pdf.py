@@ -209,6 +209,7 @@ header.write_text(r"""
 \usepackage{fvextra}
 \usepackage{xurl}
 \usepackage{adjustbox}
+\DeclareMathSizes{10}{10}{8.3}{8}\DeclareMathSizes{9}{9}{8}{7.7}\DeclareMathSizes{8}{8}{7.7}{7.7}  %% indices in formulas print at 7 pt or more (KDP)
 \newsavebox\kernfitbox  %% formulas: shrink to the line only when wider (adjustbox would obey pandoc's Gin defaults and shrink them to dust)
 \newcommand\kernfit[1]{\sbox\kernfitbox{#1}\ifdim\wd\kernfitbox>\linewidth\resizebox{\linewidth}{!}{\usebox\kernfitbox}\else\usebox\kernfitbox\fi}
 \makeatletter\renewcommand*\@pnumwidth{2.4em}\makeatother  %% three-digit page numbers in the contents
@@ -216,7 +217,7 @@ header.write_text(r"""
 \relpenalty=100
 \tolerance=2000
 \hbadness=10000
-\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\%s}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,breaksymbolleft={\normalsize\ensuremath{\hookrightarrow}},fontsize=\%s}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}
