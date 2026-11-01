@@ -297,8 +297,7 @@ def short_chapter_ends():
             if not 0 < len(lines) <= 3: continue  # four more lines still keep KDP's bottom margin
             big = [c for c in nxt.chars if c["size"] > 14]  # a chapter heading opens the next page
             if not big and nxt.extract_words(): continue
-            first = sorted(lines.items())[0][1]
-            words = [w["text"] for w in sorted(first, key=lambda w: w["x0"])]
+            words = [w["text"] for _, ln in sorted(lines.items()) for w in sorted(ln, key=lambda w: w["x0"])]
             found.append((i + 1, words, len(lines)))
     return found
 
@@ -308,10 +307,15 @@ def pull_back(tex, words, n):
     takes the few lines too."""
     tokens = [t for w in words for t in re.findall(r"\w+", w)]
     while tokens and (tokens[0].isdigit() or len(tokens[0]) < 2): tokens.pop(0)  # list numbers
-    tokens = [t for t in tokens if not t.endswith("-")][:5]
-    if len(tokens) < 2 or sum(len(t) for t in tokens) < 10: return tex, False
-    pat = r"[\W_]+(?:\\[a-zA-Z]+\{|\{\})*".join(re.escape(t) for t in tokens)
-    m = re.search(pat, tex)
+    tokens = [t for t in tokens if not t.endswith("-")]
+    m = None
+    for k in (14, 10, 7, 5):  # the longest run that is found exactly once: the same sentence can stand
+        part = tokens[:k]       # in several places (“… in the blue book, Chapter 10.”); a wrong one
+        if len(part) < 2 or sum(len(t) for t in part) < 10: break  # would push a box into the footer
+        pat = r"[\W_]+(?:\\[a-zA-Z]+\{|\{\})*".join(re.escape(t) for t in part)
+        hits = list(re.finditer(pat, tex))
+        if len(hits) == 1: m = hits[0]; break
+        if len(hits) > 1: return tex, False
     if not m: return tex, False
     start = tex.rfind("\n\n", 0, m.start()) + 2
     return tex[:start] + f"\\enlargethispage{{{n + 1}\\baselineskip}}\n" + tex[start:], True
