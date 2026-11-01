@@ -494,7 +494,7 @@ Ziehen bewegt ihn, und Loslassen **wirft** ihn mit Schwung.
   **Kollisionsformen** (Collision Shapes), **Gelenke** (Constraints) und
   **Kontaktpunkte** (Contact Points).
 
-![Simulieren mit eingeblendeten Kollisionsformen](../buch/bilder/studio-simulate.png)
+![Simulieren im Physics Lab: die Physik läuft, Körper lassen sich greifen](../buch/bilder/studio-simulate.png)
 
 > **Probier's aus!** Lade
 > **Datei › Beispiel-Levels › Physics Lab** (File › Example Levels › Physics Lab) und drück

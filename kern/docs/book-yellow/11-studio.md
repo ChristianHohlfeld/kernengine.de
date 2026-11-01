@@ -383,7 +383,7 @@ warnings only appear in the **Output Log**.
 **F8** (eject) lets go of the player character: the game keeps running, and you fly around freely
 like when building. Pressing **F8** again takes over the character again.
 
-![Simulate in Orb Run with collision shapes shown (Show › Collision Shapes)](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab: the physics runs, and you can grab the stack of crates with the mouse](../buch/bilder/studio-simulate.png)
 
 **Simulate** with Alt+S runs the world without a player. Now you can **grab** things: left mouse
 button on a physics body, dragging moves it, dragging upward lifts it, letting go **throws** it.

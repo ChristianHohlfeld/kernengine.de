@@ -169,7 +169,7 @@ muss dafür nicht wissen, wie das Bild genau aussehen soll – die Frage „Wurd
 beantwortet die Farbzahl allein, schnell und auch mit der langsamen Ersatz-Grafik. Nebenbei kann er
 Bildschirmfotos machen – viele Bilder dieses Buchs stammen daher.
 
-![Simulieren im Physics Lab mit eingeblendeten Kollisionsformen – so bedient auch der Testklicker das Studio](../buch/bilder/studio-simulate.png)
+![Simulieren im Physics Lab – so bedient auch der Testklicker das Studio](../buch/bilder/studio-simulate.png)
 
 > **Probier's aus!** Mach, was der Testklicker macht. Wähle **Datei › Neues Level...** (File › New Level...)
 > und dort **Physics Lab**. Halte die rechte Maustaste gedrückt und drück W: Jetzt fliegt deine

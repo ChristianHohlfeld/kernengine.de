@@ -908,7 +908,7 @@ The show flag **Collision Shapes** displays the Box3D shapes, **Constraints** th
 **Contact Points** the contacts. The status bar counts bodies, awake bodies, joints, broken joints and
 contacts.
 
-![Simulate with collision shapes and contact points displayed](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab: the physics runs, bodies can be grabbed](../buch/bilder/studio-simulate.png)
 
 ![Physics Lab: all joint types in simulation](../buch/bilder/studio-physics-lab.png)
 

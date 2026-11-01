@@ -169,7 +169,7 @@ question "Was anything painted at all?" is answered by the number of colors alon
 even with the slow stand-in graphics. Along the way it can take screenshots – many pictures in
 this book come from there.
 
-![Simulate in the Physics Lab with collision shapes shown – this is how the test clicker operates Studio too](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab – this is how the test clicker operates Studio too](../buch/bilder/studio-simulate.png)
 
 > **Try it!** Do what the test clicker does. Choose **File › New Level...** and pick **Physics
 > Lab** there. Hold down the right mouse button and press W: now your **camera** flies forward,

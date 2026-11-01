@@ -390,7 +390,7 @@ Gelenk zu einem gelöschten Actor) verhindern den Start, Warnungen stehen nur im
 **F8** (aussteigen) lässt die Spielfigur los: Das Spiel läuft weiter, und du fliegst frei herum wie
 beim Bauen. Noch einmal **F8** übernimmt die Figur wieder.
 
-![Simulieren in Orb Run mit eingeblendeten Kollisionsformen (Anzeigen › Kollisionsformen)](../buch/bilder/studio-simulate.png)
+![Simulieren im Physics Lab: die Physik läuft, der Kistenstapel lässt sich mit der Maus greifen](../buch/bilder/studio-simulate.png)
 
 **Simulieren** (Simulate) mit Alt+S lässt die Welt ohne Spieler laufen. Jetzt kannst du Dinge
 **greifen**: Linke Maustaste auf einen Physik-Körper, ziehen bewegt ihn, nach oben ziehen hebt ihn,

@@ -947,7 +947,7 @@ steuern. Die Kamera bleibt die des Editors.
 **Gelenke** (Constraints) die Gelenke, **Kontaktpunkte** (Contact Points) die Kontakte. Die Statusleiste
 zählt Bodies, wache Bodies, Gelenke, gebrochene Gelenke und Kontakte.
 
-![Simulieren mit eingeblendeten Kollisionsformen und Kontaktpunkten](bilder/studio-simulate.png)
+![Simulieren im Physics Lab: die Physik läuft, Körper lassen sich greifen](bilder/studio-simulate.png)
 
 ![Physics Lab: alle Gelenktypen in der Simulation](bilder/studio-physics-lab.png)
 

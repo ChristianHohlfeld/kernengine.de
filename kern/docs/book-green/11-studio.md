@@ -472,7 +472,7 @@ moves it, and letting go **throws** it with momentum.
 - Under **Window › Show** you can make visible what the physics calculates with:
   **Collision Shapes**, **Constraints** and **Contact Points**.
 
-![Simulating with collision shapes shown](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab: the physics runs, bodies can be grabbed](../buch/bilder/studio-simulate.png)
 
 > **Try it!** Load **File › Example Levels › Physics Lab** and press **Simulate**. Grab the rope
 > bridge, throw a crate at the stack, turn the hinge. Then stop with Esc, place a **Crate Stack** from

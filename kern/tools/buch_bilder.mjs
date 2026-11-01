@@ -163,14 +163,27 @@ if (want("studio-simulate.png")) await attempt("studio-simulate.png", async () =
   const {ctx, page, cmd} = await studio();
   await cmd({cmd: "new", template: "physicsLab"});
   await frames(page);
-  // From the level's own camera position (closer, the floor and the endless ground z-fight), a narrow lens
-  // on the stack, the pendulum and the door.
-  await cmd(lookAt(0, [-30, -30, 18], [-7, -9, 1]));
-  await cmd({cmd: "fov", viewport: 0, value: 30});
+  // The stack of crates: two physics cubes dropped onto it set it moving (a resting stack sleeps and
+  // reports no contacts).
+  const level = JSON.parse(await page.evaluate(() => window.KernStudio.command({cmd: "packageText"}).text));
+  const crates = level.actors.filter(a => /^Crate/.test(a.name || "")).map(a => a.transform.position);
+  const mid = i => crates.reduce((s, p) => s + p[i], 0) / crates.length;
+  const top = Math.max(...crates.map(p => p[2]));
+  const [cx, cy] = [mid(0), mid(1)];
+  await cmd({cmd: "spawn", item: "physics_cube", at: [cx + 0.3, cy, top + 2.5]});
+  await cmd({cmd: "spawn", item: "physics_cube", at: [cx - 0.6, cy + 0.4, top + 4.5]});
+  await cmd({cmd: "select", ids: []});
+  // From the level's own camera position (closer, the floor and the endless ground z-fight), a long lens.
+  await cmd(lookAt(0, [-30, -30, 18], [cx, cy, top / 2]));
+  await cmd({cmd: "fov", viewport: 0, value: 22});
   for (const flag of ["colliders", "contacts"]) await cmd({cmd: "showFlag", viewport: 0, flag, value: true});
   await page.click("#simBtn");
   await simulating(page);
-  await steps(page, 150);
+  // Until the cubes have hit the stack (the status bar's contact count stays 0 here; the contact points
+  // show in the viewport).
+  await steps(page, 200);
+  await frames(page, 2);
+  console.log("simulate:", JSON.stringify(await page.evaluate(() => window.KernStudio.status.sim)));
   await shot(page, "studio-simulate.png", true);
   await ctx.close();
 });
