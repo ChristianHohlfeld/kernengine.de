@@ -36,7 +36,7 @@ after stopping.
 
 ```mermaid
 %% Caption: The life story of a game world – after stopping, it goes back to editing
-flowchart LR
+flowchart TB
   A[Edit] --> B[Start: make a copy, build physics]
   B --> C[Step, step, step …]
   C --> D[Stop: throw the copy away]
