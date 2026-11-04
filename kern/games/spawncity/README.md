@@ -448,3 +448,8 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
    tauschen kann statt den ganzen Körper.
 7. **Kaskaden-Schatten und LOD/Impostor** für große Sichtweiten (Jet).
 8. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.
+9. **Öffentlicher Transport in `KernNet`** (`kern/web/studio/game.mjs`): WebRTC-Datenkanal mit
+   Signalisierung über MQTT und versiegeltem Broker-Fallback (heute `web/mp_host.mjs` `MpPublicNet`),
+   und ein Autoritätswechsel in `kern::net` (neuer Server aus dem ältesten Client), wenn der Host geht.
+10. **Sprach-Bus im Mixer** (`kern::audio`): eine gestreamte Quelle je Sprecher mit Jitter-Puffer statt
+   des Nachmischens in `Game::audio_render` (`mp::VoiceStream`).
