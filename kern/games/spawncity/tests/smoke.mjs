@@ -338,6 +338,38 @@ async function run({name, url, context, mapped}) {
     await cmd("weapon 1");
   }
 
+  // Street life, ragdolls, interiors (game_life.cpp, M3 life).
+  {
+    check(JSON.parse(await cmd("cows")).cows >= 5, `[${name}] a herd of cows`);
+    check(JSON.parse(await cmd("pigeons")).flocks >= 1, `[${name}] a pigeon flock`);
+    check(JSON.parse(await cmd("ragdoll")).ok, `[${name}] a ragdoll is thrown`);
+    const knocked = await cmd("knock");
+    const tl = (await hud()).t;
+    await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tl, {timeout: 400000}).catch(() => {});
+    const rs = JSON.parse(await cmd("ragdoll state"));
+    check(rs.pelvis && rs.pelvis[2] - rs.ground < 0.6, `[${name}] the ragdoll lies on the ground (${JSON.stringify(rs)})`);
+    let L = JSON.parse(await cmd("life"));
+    if (knocked !== "nobody") check(L.getups >= 1, `[${name}] a knocked-down passer-by gets up again (${JSON.stringify(L)})`);
+    check(JSON.parse(await cmd("cows kill")).dead >= 1, `[${name}] a blast kills a cow`);
+    check(L.birds > 0 && L.trees >= 0, `[${name}] birds over the roofs (${L.birds}), trees (${L.trees})`);
+    const go = await cmd("interior go");
+    if (go !== "no building") {
+      const ti = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 4, ti, {timeout: 400000}).catch(() => {});
+      let s = JSON.parse(await cmd("interior"));
+      check(s.active && s.levels >= 1, `[${name}] the building at the door is enterable (${JSON.stringify(s)})`);
+      if (s.active && s.roof) {
+        await cmd("interior roof");
+        const tr = (await hud()).t;
+        await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2, tr, {timeout: 400000}).catch(() => {});
+        s = JSON.parse(await cmd("interior"));
+        check(Math.abs(s.z - s.top) < 0.6, `[${name}] standing on the roof by the stairs (${JSON.stringify(s)})`);
+        await shot("1c-roof");
+        await cmd("interior door");  // back out in front of the door
+      }
+    }
+  }
+
   // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
   {
     const schema = JSON.parse(await cmd("settings schema"));
@@ -354,13 +386,17 @@ async function run({name, url, context, mapped}) {
     check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
     await shot("0-settings");
     await page.keyboard.press("Escape");
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
     await cmd("set world.people 0");
     await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
     check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
     await cmd("set world.people 1");
     const resets = (await hud()).ui.resets;
-    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    const resetOk = await cmd("reset") === "ok";
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(resetOk && h.ui.resets === resets + 1 && h.mode === "foot", `[${name}] RESET back to the start (${h.ui.resets}, ${h.mode})`);
     // LIVE GPS: two fixes 20 m apart move the player there.
     const o = (await hud()).ui.origin;
     check(await cmd("gps on") === "on", `[${name}] GPS live on`);

@@ -1,6 +1,7 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
 #include "game.h"
 #include "game_world.h"  // WorldLife (M3 world state)
+#include "game_life.h"   // GameLife (M3 life)
 
 #include <algorithm>
 #include <cstdio>
@@ -289,6 +290,7 @@ bool Game::start(kern::Engine& e) {
 }
 
 void Game::stop() {
+  glife_.reset();  // M3 life: its bodies live in the world
   world_.reset();
 }
 
@@ -744,6 +746,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    life_update(dt);   // M3 life: animals, street life, ragdolls, interiors (game_life.cpp)
     update_guided(dt);   // GUIDED missiles (game_guided.cpp)
     update_details(dt);  // critical damage, ballots (game_details.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
@@ -761,6 +764,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
+  life_draw();   // M3 life (game_life.cpp)
   draw_combat();
   look_draw(e, dt);  // speed streaks, weapon models, frame times (game_look.cpp)
   update_sound(dt);
@@ -1020,6 +1024,7 @@ std::string Game::hud_json() {
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
+  life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
   {
     u32 units = 0;
@@ -1205,6 +1210,7 @@ std::string Game::command(const std::string& cmd) {
   {
     std::string out;  // M3 world test commands (game_world.cpp)
     if (world_command(cmd, out)) return out;
+    if (life_command(cmd, out)) return out;  // M3 life test commands (game_life.cpp)
   }
   return "unknown command";
 }
