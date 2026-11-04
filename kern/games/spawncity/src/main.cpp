@@ -121,6 +121,9 @@ KERN_EXPORT(sc_net_take) const kern::u8* sc_net_take() {
   return out.data();
 }
 
+// ---- voice chat: microphone samples (mono, at `rate`) while the mic is on (game_net.cpp) ----
+KERN_EXPORT(sc_voice_push) void sc_voice_push(const kern::f32* samples, kern::u32 count, kern::u32 rate) { sc::game().voice_capture(samples, count, rate); }
+
 // ---- audio: Kern's mixer renders, the page plays (KernAudio) ----
 KERN_EXPORT(sc_audio_init) kern::i32 sc_audio_init(kern::u32 rate) { return sc::game().audio_init(rate) ? 1 : 0; }
 KERN_EXPORT(sc_audio_render) const kern::f32* sc_audio_render(kern::u32 frames) { return sc::game().audio_render(frames); }

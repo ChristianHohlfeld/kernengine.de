@@ -1008,6 +1008,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     }
   }
   if (world_placed_) {
+    mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
     read_input(e, dt);
     update_touch_layout();
     world_->step(dt, play_in_);
@@ -1212,6 +1213,7 @@ const f32* Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
   if (mixer_.ready()) mixer_.render(audio_out_.data(), frames);
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
+  mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
   return audio_out_.data();
 }
 
@@ -1286,6 +1288,7 @@ std::string Game::hud_json() {
       add(",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
           net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
     }
+    s += mp_hud_json();  // multiplayer HUD data (game_net.cpp)
     if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
     if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
   }
@@ -1400,33 +1403,8 @@ std::string Game::command(const std::string& cmd) {
     if (mode_ == Mode::jet) { jet_cockpit_ = !jet_cockpit_; return jet_cockpit_ ? "cockpit" : "chase"; }
     return "none";
   }
-  if (starts("net ")) {
-    // The page opened its transport: "net host <self>" / "net join <self> <server>".
-    const std::string rest = cmd.substr(4);
-    unsigned long long self = 0, server = 0;
-    if (rest.rfind("host ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu", &self) == 1) { net_.host(self, lon_, lat_); return "hosting"; }
-    if (rest.rfind("join ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu %llu", &self, &server) == 2) { net_.join(self, server); rebased_ = false; return "joining"; }
-    if (rest == "stop") { net_.stop(); return "stopped"; }
-    if (rest == "remotes") {
-      std::string o = "[";
-      for (const net::Remote& r : net_.remotes()) {
-        char b[160];
-        std::snprintf(b, sizeof b, "%s{\"slot\":%u,\"mode\":%u,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"hp\":%.0f}", o.size() > 1 ? "," : "", r.state.slot,
-                      static_cast<unsigned>(r.state.mode), r.shown.x, r.shown.y, r.shown.z, r.state.health);
-        o += b;
-      }
-      return o + "]";
-    }
-    if (rest.rfind("hit ", 0) == 0) {
-      // Tests: a shot from 3 m beside the first remote player straight at him.
-      if (net_.remotes().empty()) return "nobody";
-      const Vec3 c = net_.remotes()[0].shown;
-      Vec3 to = c + Vec3{-3, 0, 0};
-      const Vec3 from = c + Vec3{3, 0, 0};
-      return hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4))) ? "hit" : "miss";
-    }
-    return "usage: net host <self> | net join <self> <server> | net stop";
-  }
+  // Multiplayer, voice, pings, big map and navigation (game_net.cpp).
+  if (starts("net ") || starts("mp ") || starts("voice") || starts("ping") || starts("bigmap") || starts("nav ") || starts("qr ")) return net_command(cmd);
   if (cmd == "map") return map_json();
   if (starts("lamps ")) { show_lamps_ = cmd[6] == '1'; return show_lamps_ ? "on" : "off"; }
   if (cmd == "attack") {

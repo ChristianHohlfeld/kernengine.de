@@ -33,6 +33,9 @@
 
 namespace sc {
 
+struct MpLocal;  // multiplayer presentation state (game_net.cpp)
+struct MpLocalDelete { void operator()(MpLocal* m) const; };
+
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
 
@@ -119,6 +122,8 @@ class Game {
   bool audio_init(u32 rate);
   const f32* audio_render(u32 frames);
   void key_down_event() { arbiter_.key_down(); }
+  /// Microphone samples from the page (only while the mic is on; game_net.cpp).
+  void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
   kern::game::NightWindows& windows() { return windows_; }
 
@@ -187,7 +192,15 @@ class Game {
   void drone_attack(bool trigger, bool pressed);
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
-  // multiplayer (game_net.cpp)
+  // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
+  MpLocal& mp_local();
+  void mp_input(kern::Engine& e, f32 dt);
+  std::string mp_hud_json();
+  std::string net_command(const std::string& cmd);
+  std::string bigmap_json(f32 cx, f32 cy, f32 range);
+  void update_nav();
+  bool project_screen(Vec3 p, f32& x, f32& y, f32& depth) const;
+  void mix_voice(f32* out, u32 frames);
   void update_net(f32 dt);
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
@@ -269,6 +282,7 @@ class Game {
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
   u8 my_color_ = 0;
+  std::unique_ptr<MpLocal, MpLocalDelete> mp_;  // pings, feed, voice, big map (game_net.cpp)
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; };
   std::vector<Lamp> lamps_;
