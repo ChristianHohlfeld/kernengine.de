@@ -106,7 +106,8 @@ void SpeedLines::respawn(int i) {
 
 f32 SpeedLines::update(Vec3 eye, f32 dt) {
   if (!seeded) { for (int i = 0; i < kCount; ++i) respawn(i); seeded = true; }
-  if (have_last && dt > 0) {
+  // A jump of more than 25 m in one frame is a teleport (mode switch, respawn), not speed.
+  if (have_last && dt > 0 && kern::length(eye - last) < 25) {
     const f32 d = kern::length(eye - last) / dt;
     speed += (std::fmin(d, 90.0f) - speed) * std::fmin(1.0f, dt * 4);
   }

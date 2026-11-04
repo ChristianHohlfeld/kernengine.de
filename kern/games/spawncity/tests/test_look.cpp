@@ -125,6 +125,10 @@ SC_TEST(look_speed_lines) {
   bool inside = true;
   for (const auto& s : l.s) inside = inside && s.r >= 0.15f && s.r <= 1.15f;
   SC_CHECK(inside, "streaks respawn at the centre");
+  look::SpeedLines t;
+  t.update({0, 0, 0}, 0.1f);
+  t.update({200, 0, 0}, 0.1f);
+  SC_CHECK(t.k == 0 && t.speed == 0, "a teleport is no speed");
 }
 
 SC_TEST(look_day_clock) {

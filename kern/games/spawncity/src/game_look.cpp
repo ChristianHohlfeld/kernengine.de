@@ -596,6 +596,17 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
     out = b;
     return true;
   }
+  if (cmd == "viewmodel") {  // tests: the shown first-person model, where it is relative to the eye
+    if (L.vm_shown < 0) { out = "none"; return true; }
+    const kern::Mesh* m = engine_->renderer.mesh(L.vm_body[L.vm_shown]);
+    if (!m || m->transforms.size() < 16) { out = "no mesh"; return true; }
+    const Vec3 p{m->transforms[12], m->transforms[13], m->transforms[14]};
+    const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    std::snprintf(b, sizeof b, "%s visible %d ahead %.2f off %.2f verts %u", kVmNames[L.vm_shown], m->visible ? 1 : 0, kern::dot(p - cam_.eye, f), kern::length(p - cam_.eye),
+                  m->vertex_count());
+    out = b;
+    return true;
+  }
   if (cmd == "lights") {  // tests: the point lights of the last frame
     const kern::PointLights& pl = engine_->renderer.point_lights();
     out = "[";
