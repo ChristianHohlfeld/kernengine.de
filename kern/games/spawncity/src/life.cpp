@@ -397,7 +397,8 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
   const Vec2 me{view.focus.x, view.focus.y};
   const u32 want = mobile_ ? 3 : 5;  // FLOCKS
   flocks_.erase(std::remove_if(flocks_.begin(), flocks_.end(), [&](const Flock& f) { return !f.air && dist2d(f.at, me) > kDespawn; }), flocks_.end());
-  if (view.people_on && flocks_.size() < want && rng.unit() < 1 - std::exp(-3 * dt)) {
+  if (!view.birds_on) { flocks_.clear(); return; }
+  if (flocks_.size() < want && rng.unit() < 1 - std::exp(-3 * dt)) {
     Vec2 at;
     if (spot_near(view, me, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
   }
@@ -470,6 +471,10 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
 // birds over the roofs and trees along the streets (world_liveliness.mjs)
 
 void Life::update_birds(f32 dt, f32 now, const LifeView& view) {
+  if (!view.birds_on) {
+    for (Bird& b : birds_) b.dead_until = std::fmax(b.dead_until, now + 0.5f);  // switched off: not drawn, not hit
+    return;
+  }
   for (std::size_t i = 0; i < birds_.size(); ++i) {
     Bird& b = birds_[i];
     // their circling centre drifts after the player (SpawnCity circles round the map origin)

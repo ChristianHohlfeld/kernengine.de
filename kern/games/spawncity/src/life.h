@@ -30,7 +30,7 @@ struct LifeView {
   Vec3 focus, player;   // player: his feet (or vehicle)
   Vec3 eye;             // the camera (hearing distance)
   f32 player_speed = 0;
-  bool on_foot = true, people_on = true;
+  bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
   std::vector<LifeCar> cars;
 };
 

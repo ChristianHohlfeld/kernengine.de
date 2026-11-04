@@ -15,6 +15,7 @@
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
+import {installSpawnCityLife} from "./life.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -221,6 +222,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const hud = new SpawnCityHud(hudEl);
   // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
   const ui = installSpawnCityUi({command, params, canvas, statusEl});
+  // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
+  const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
   let frames = 0, last = null;
   const tick = () => {
     frames++;
@@ -231,6 +234,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
     ui.update(last);
+    life.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
   };

@@ -10,9 +10,17 @@
 
 namespace sc {
 
-std::string json_escape(const std::string& s);  // game.cpp
-
 namespace {
+
+std::string json_escape(const std::string& s) {
+  std::string o;
+  for (char c : s) {
+    if (c == '"' || c == '\\') { o += '\\'; o += c; }
+    else if (static_cast<unsigned char>(c) < 0x20) o += ' ';
+    else o += c;
+  }
+  return o;
+}
 
 using kern::audio::SynthPatch;
 using kern::audio::Wave;
@@ -130,6 +138,8 @@ void Game::life_update(f32 dt) {
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.eye = cam_.eye;
   v.on_foot = mode_ == Mode::foot;
+  v.people_on = ui_.settings.on(Opt::world_people);
+  v.birds_on = ui_.settings.on(Opt::world_birds);
   const Vec3 pv = mode_ == Mode::foot ? world_->actor_velocity(soldier_) : Vec3{};
   v.player_speed = std::hypot(pv.x, pv.y);
   for (std::size_t i = 0; i < cars_.size(); ++i) {
@@ -526,6 +536,27 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   if (cmd == "birds") {
     std::snprintf(b, sizeof b, "{\"birds\":%u,\"first\":[%.1f,%.1f,%.1f]}", static_cast<u32>(G.life.birds().size()), G.life.birds()[0].pos.x, G.life.birds()[0].pos.y,
                   G.life.birds()[0].pos.z);
+    out = b;
+    return true;
+  }
+  if (cmd == "interior go") {
+    // Tests: to the door of the nearest building that can be entered (1.5 m in front of it)
+    std::vector<CityStream::BuildingRef> near;
+    city_.buildings_near({me.x, me.y}, 200, near);
+    f32 bd = 1e9f;
+    Vec3 to;
+    for (const CityStream::BuildingRef& r : near) {
+      Interiors::Plan plan;
+      if (std::fabs(r.building->rings[0][0].x - me.x) + std::fabs(r.building->rings[0][0].y - me.y) > bd + 60) continue;
+      if (!Interiors::build(*r.building, r.building->base, plan) || !plan.has_core) continue;
+      const Interiors::Door& d = plan.doors[0];
+      const f32 dd = std::hypot(d.c.x - me.x, d.c.y - me.y);
+      if (dd < bd) { bd = dd; to = {d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f, city_.ground_height(d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f)}; }
+    }
+    if (bd > 1e8f || mode_ != Mode::foot) { out = "no building"; return true; }
+    world_->teleport(soldier_, to + Vec3{0, 0, 0.73f});
+    world_->set_actor_velocity(soldier_, {});
+    std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"distance\":%.0f}", to.x, to.y, bd);
     out = b;
     return true;
   }

@@ -78,6 +78,13 @@ kern/games/spawncity/
     terrain.*     Gelände (M3): Terrarium-Höhen → Bare-Earth-Raster, Wasserbecken, Krater, Bodenkacheln
                   (Render-LOD mit Schürzen, Box3D-Dreiecksnetze mit Überlappung), eine Höhenfunktion für alles
     game_world.*  Welt (M3): HUD/Befehle des Geländes; Wasserphysik, Spuren, Verkehrsregeln, Tiere usw.
+    life.*        Straßenleben (M3): Kühe auf den Wiesen, Taubenschwärme, Vögel über den Dächern, Bäume,
+                  die Laufgruppe, Straßenstimmen (Rufe, Hupen, Schreie) - reine Simulation ohne GameWorld
+    ragdoll.*     Ragdolls (M3): 11 Box3D-Körper mit begrenzten Gelenken und Gelenkreibung, Aufstehen
+    interiors.*   begehbare Gebäude (M3): Stockwerke, Treppenhaus bis aufs Dach, Möbel, Fenster, Türen,
+                  eigene Box3D-Kollision des aktiven Gebäudes
+    life_art.*    Zeichnen des Straßenlebens (instanzierte, getönte Grundkörper)
+    game_life.*   Leben im Spiel (M3): füttert life/ragdoll/interiors, Klänge, Sprache, HUD, Testbefehle
     city_stream.* Kachel-Streaming: Decodieren → BuildingBuilder/RoadBuilder → Meshes → Box3D-Kollision,
                   alles mit Zeitbudget; Entladen ferner Kacheln; Fahrspuren für den Verkehr
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
@@ -199,6 +206,51 @@ kern/games/spawncity/
   Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
   eigene Shader-Erweiterung).
 
+## Leben, Innenräume, Ragdolls (M3)
+
+* **Kühe** (`cows.mjs`): jede Wiese (OpenMapTiles-Landcover `grass`, ab 1800 m²) im Umkreis von 420 m
+  bekommt eine Herde (2–7, Fellfarbe aus dem Schlüssel der Fläche, höchstens 40). Sie grasen auf einem
+  uhrgetriebenen Pfad (alle 24 s ein neuer Fleck im Umkreis von 6 m um den eigenen Platz, 0,55 m/s, Kopf
+  unten), muhen ab und zu, scheuen vor Schüssen (Leuchtspur nahe der Herde) und Explosionen. Ein Treffer
+  tut weh (100 HP), ein langsames Auto schiebt sie beiseite, ab 8 m/s oder in einer Explosion stirbt sie:
+  der 600-kg-Körper fliegt als Box3D-Quader (Auto verliert den übergebenen Impuls).
+* **Tauben** (`pigeons.mjs`): 5 Schwärme (mobil 3) zu 6–12 Vögeln 22–95 m um den Spieler auf freiem
+  Boden (nicht in Häusern oder Wasser, Box3D-Strahl); sie picken und nicken, gurren, und fliegen
+  gemeinsam auf, wenn man auf 6,6 m herankommt, ein Auto vorbeifährt, ein Schuss (40 m) oder Knall (90 m)
+  fällt oder von selbst (25–70 s): Schleifen, dann Gleitflug auf einen neuen Platz 25–55 m weiter.
+* **Vögel und Bäume** (`world_liveliness.mjs`): 16 Vögel (mobil 10) kreisen 8–21 m über den Dächern
+  (abschießbar: fallen trudelnd, 9 s weg, Kreischen aus `animal_audio.mjs`), Bäume alle 37 m an den
+  Straßen, mindestens 2,4 m von Wänden.
+* **Laufgruppe** (`jogger_chain.mjs`): nach 60 s, dann alle 170–280 s zehn Läufer in Neongelb im
+  Gänsemarsch (1,35 m Abstand, 2,9 m/s) auf dem Gehweg einer echten Straße 35–150 m entfernt, Wenden am
+  Ende, nach 95 s weg. Der Vorläufer ruft, die Gruppe antwortet (Sprachausgabe des Browsers, de-DE),
+  Stampfen im 0,4-s-Takt. Wer sie umfährt oder trifft, zählt eine Serie (12 s): „JOGGER x2“, die ganze
+  Gruppe „KOMPLETTE LAUFGRUPPE!“ mit Jingle.
+* **Straßenstimmen** (`street_voices.mjs`): Leute sagen, was sie denken – angerempelt („Hey, pass doch
+  auf!“), knapp verfehlt vom Auto, verängstigt (oder ein Schrei aus Synth-Formanten), wütend, wenn sie
+  zurückschlagen; Fahrer hupen, wenn der Spieler oder ein Passant vor ihnen auf der Fahrbahn steht. Die
+  Zeilen spricht der Browser, die Sprechblase steht über dem Kopf (Position rechnet C++, die Seite zeichnet
+  sie: `web/life.mjs`). Drosseln wie im Original (1,4 s global, 6 s je Person, Hupe 1,2 s / 4 s je Auto).
+* **Ragdolls** (`world_person_ragdoll.mjs`, `people_impacts.mjs`): Getroffene fallen als Box3D-Körper
+  (Becken, Brust, Kopf, Ober-/Unterarme, Ober-/Unterschenkel; Kegel- und Scharniergrenzen,
+  Reibungsmotor; Box3D selbst unverändert), Pool 10 (mobil 6). Von einem Auto angefahren, wer noch lebt,
+  steht wieder auf („Reverse Ragdoll“: Liegen, Knien, Stehen in 1,15 s) und geht von dort weiter; der
+  Wagen verliert den Impuls (75 kg · 0,55). Explosionen stoßen liegende Körper weg.
+* **Innenräume** (`building_interiors.mjs`): das nächste Gebäude im Umkreis von 30 m wird begehbar
+  (eines zur Zeit): Haustür(en) an der längsten Wand (über 260 m² eine zweite gegenüber), Erdgeschoss
+  4 m, darüber die Stockwerkshöhe (3,0–3,6 m, höchstens 12), ein Treppenhaus mit Wendeltreppe
+  (2 × 1,2-m-Läufe, Podeste 1,3 m) bis aufs Dach mit Treppenhaus-Aufbau, Fensteröffnungen, Deckenlicht,
+  Möbel (Schreibtisch, Bett, Regal, Sofa, Tisch, Pflanze, mit Kollision). Die Kollision bringt das
+  Gebäude selbst mit; `CityStream::exclude_building` baut solange die Kachel-Kollision ohne dieses Haus
+  neu (in Zeitscheiben, der alte Körper bleibt bis der neue fertig ist). Nahe Häuser zeigen geschlossene
+  Türen (24 im Umkreis von 95 m). Die Fassade ist von innen nicht gezeichnet (Rückseiten), deshalb zeigen
+  die Fensteröffnungen die Stadt; die offene Tür zeigt von außen ein dunkles Türblatt statt eines echten
+  Ausschnitts (das Hausnetz ist ein gemeinsames Kachelnetz).
+* **WELT-Schalter:** `world.people` schaltet auch die Laufgruppe ab, `world.birds` Tauben und Vögel.
+* **Testbefehle:** `life`, `cows`, `cows kill`, `pigeons`, `pigeons spook`, `joggers`, `birds`, `ragdoll`,
+  `ragdoll state`, `knock` (nächster Passant wird umgestoßen und steht wieder auf), `shout`, `honk`,
+  `interior`, `interior go|in|up|roof|door`.
+
 ## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
 
 * **Einstellungen** (`settings.*`, `game_ui.cpp`): eine Tabelle im Spiel mit SpawnCitys Werten, Bereichen und
@@ -303,7 +355,11 @@ OpenMapTiles-Auswertung, das Streaming (Zeitscheiben, Kollision, Entladen, Ersat
 Wanted-Regeln, den Straßengraph (A*, Pure Pursuit), Treffer und Taten der Leute und Wände bei freier
 Bewegung. Der Smoke-Test lädt die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
 echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
-Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots.
+Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots. `test_life.cpp`
+prüft Ragdolls (Fallen, Liegen, Pool, Aufstehen), den Bauplan eines Gebäudes (Stockwerke, Kern, Dach,
+Tür in der Kollision, ein Character-Mover läuft die erste Treppe hinauf), Kühe (Treffer, Explosion,
+600-kg-Körper), Vögel und die Drosselung der Stimmen; der Smoke-Test die Tiere, einen Ragdoll, das
+Aufstehen und das Betreten eines Hauses bis aufs Dach.
 
 ## CI
 
@@ -328,7 +384,14 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Tiere; Fahrer, die beim Carjacking sichtbar aussteigen.
+* Fahrer, die beim Carjacking sichtbar aussteigen. Hunde und Katzen (`world.dogs`/`world.cats`, die
+  schwarze Katze mit `hiss`/`yowl` aus `animal_audio.mjs`) sind noch nicht gebaut.
+* Leben (M3): Kuhherden und Laufgruppe folgen der Spielzeit, nicht SpawnCitys Weltuhr, und Tode werden
+  nicht an Mitspieler geschickt (SpawnCity repliziert Kuh-Tode und Autotreffer); `player_push.mjs`
+  (Stoßen/Halten von Mitspielern über das Netz) braucht die Gravity-Gun, die Kern-SpawnCity nicht hat.
+* Innenräume: keine echten Ausschnitte in der Fassade (Tür, Dachluke) – Kerns Gebäudenetz ist ein Netz
+  je Kachel; Fenster innen sind an festen Abständen statt an den Fassadenfenstern; keine Glasscheiben,
+  keine Zombie-Barrikaden. Steht das Gelände innen höher als die Tür, liegt der Boden darunter.
 * **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
   sperrt die Drohnen-Nuke (nur GUN/ROCKETS/GUIDED), der Kommentar „LAUNCHER NUKE“ in
   `gameplay_final_runtime_v2.mjs` hat keinen Code-Zweig mehr (`footShotAt` feuert normale Raketen),
@@ -349,9 +412,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Synth-Patches aus `combat_audio_bank.mjs`, kein Retarded-Time-Doppler-Loop für die Jets (nur der
   verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`) für MP/Sniper:
   Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
-* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
+* Zerstörung an Gebäuden (Krater, Fassadenspuren).
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader;
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
 * Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
   mehr Fahrzeugtypen.
@@ -370,4 +433,8 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
    Bodenkachel ein Dreiecksnetz (`terrain.cpp`); dazu `destroy_shape`, damit eine Kachel ihren Shape
    tauschen kann statt den ganzen Körper.
 7. **Kaskaden-Schatten und LOD/Impostor** für große Sichtweiten (Jet).
-8. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.
+8. **Ragdoll-Baustein** (Catto-Mensch aus Kapseln mit Gelenkgrenzen und Reibung, `ragdoll.*`) und
+   ein **Ausschnitt-Mechanismus für Gebäudenetze** (Tür/Dachluke im Kachelnetz, wie SpawnCitys
+   `facadeCutouts`), dazu `destroy_shape`, damit ein Haus seinen Kollisions-Shape abgeben kann, ohne
+   dass die ganze Kachel neu gebaut wird (`CityStream::exclude_building`).
+9. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.

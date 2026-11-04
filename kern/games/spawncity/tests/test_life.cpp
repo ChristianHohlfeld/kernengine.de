@@ -70,7 +70,7 @@ SC_TEST(life_interior_plan_and_stairs) {
   Interiors::Plan P;
   SC_CHECK(Interiors::build(b, 0, P), "the building is enterable");
   SC_CHECK(P.levels.size() >= 3 && P.has_core && P.roof_access, "storeys, stairs and a roof hatch (%zu levels, core %d, roof %d)", P.levels.size(), P.has_core, P.roof_access);
-  SC_CHECK(P.doors.size() == 1 && std::fabs(P.doors[0].c.y) < 0.01f, "one door on a long side (%.1f %.1f)", P.doors[0].c.x, P.doors[0].c.y);
+  SC_CHECK(P.doors.size() == 2 && std::fabs(P.doors[0].c.y) < 0.01f, "front and back door on the long sides (%.1f %.1f)", P.doors[0].c.x, P.doors[0].c.y);
   SC_CHECK(P.furniture > 0 && !P.lamps.empty(), "furniture %u, lamps %zu", P.furniture, P.lamps.size());
   kern::physics::World w;
   make_flat_world(w);
