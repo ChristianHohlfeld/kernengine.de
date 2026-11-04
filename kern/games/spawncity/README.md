@@ -596,3 +596,8 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
     View-Model-Meshes über `Renderer::set_visible` aus) und **Bloom-Parameter** (Stärke, Schwelle) zur Laufzeit.
 12. **Zeichenpuffer-Skalierung im App-Host** (`runKernApp` mit änderbarer Pixelratio) – heute setzt die
     Seite die Canvas-Größe selbst nach `renderScale` und ruft `kern_app_resize`.
+13. **Öffentlicher Transport in `KernNet`** (`kern/web/studio/game.mjs`): WebRTC-Datenkanal mit
+   Signalisierung über MQTT und versiegeltem Broker-Fallback (heute `web/mp_host.mjs` `MpPublicNet`),
+   und ein Autoritätswechsel in `kern::net` (neuer Server aus dem ältesten Client), wenn der Host geht.
+14. **Sprach-Bus im Mixer** (`kern::audio`): eine gestreamte Quelle je Sprecher mit Jitter-Puffer statt
+   des Nachmischens in `Game::audio_render` (`mp::VoiceStream`).
