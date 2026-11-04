@@ -135,6 +135,7 @@ net::PlayerState Game::my_state() const {
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
   s.stars = static_cast<u8>(wanted_.stars());
   s.weapon = static_cast<u8>(foot_weapon_);
+  s.day = look_.tod;  // the host's phase is the session's (game_look.cpp)
   s.thrust = jet_.thrust() / std::fmax(1.0f, jet_.spec().thrust_max);
   u16 f = 0;
   if (player_dead_) f |= net::kDead;

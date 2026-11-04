@@ -433,6 +433,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       if (c.driver && c.placed) {
         // Carjacking: the driver is thrown out; a witness reports it (wanted_system_logic.mjs).
         wanted_.report(wanted::Crime::carjacking, true);
+        eject_driver(vehicle);  // M3: the driver gets out and runs (game_traffic.cpp)
         toast_ = "Auto geklaut! Der Fahrer ist raus.";
         toast_age_ = 0;
       }
@@ -603,6 +604,7 @@ void Game::drive_traffic(f32 h) {
       const f32 to_end = std::hypot(end.x - s.position.x, end.y - s.position.y);
       if (to_end < 18) want_speed = std::fmin(want_speed, 4.5f + to_end * 0.3f);
     }
+    want_speed = std::fmin(want_speed, traffic_rules(static_cast<i32>(i), s.position, fwd, c.car->forward_speed()));  // M3 lights / right of way
     CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, want_speed);
     const f32 v = std::fmax(0.0f, c.car->forward_speed());
     const f32 gap = 1.6f * v + 6;
@@ -1006,6 +1008,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   time_ = f.time;
   if (dt > 0) fps_ = fps_ * 0.95f + (1.0f / dt) * 0.05f;
   toast_age_ += dt;
+  look_begin(e, f);  // frame times, automatic quality, day clock (game_look.cpp)
   update_net(dt);
   ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
@@ -1022,28 +1025,37 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
     read_input(e, dt);
     update_touch_layout();
+    look_lap(perf::Slot::logic);
     world_->step(dt, play_in_);
+    look_lap(perf::Slot::physics);
     static f32 traffic_clock = 0;
     traffic_clock += dt;
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
+    look_lap(perf::Slot::stream);
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    update_guided(dt);   // GUIDED missiles (game_guided.cpp)
+    update_details(dt);  // critical damage, ballots (game_details.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
+  look_lap(perf::Slot::logic);
   update_camera(e, dt);
   ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
+  look_camera(dt);  // FPV stabilizer, camera shake, speed (game_look.cpp)
   e.renderer.camera = cam_;
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
+  look_lighting(dt);  // own day clock, point lights, quality (game_look.cpp)
   world_->present(f.time * 1000.0, cam_.eye);
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
   draw_combat();
+  look_draw(e, dt);  // speed streaks, weapon models, frame times (game_look.cpp)
   update_sound(dt);
 }
 
@@ -1209,6 +1221,7 @@ void Game::draw_vehicles() {
     }
     if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
     draw_remote_vehicles();
+    draw_world_vehicles();  // M3: tow trucks (game_traffic.cpp)
   }
   art_.end();
 }
@@ -1224,6 +1237,7 @@ bool Game::audio_init(u32 rate) {
   if (world_) bank_->request_level(world_->level());
   fx_.init(mixer_);
   ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
+  combat_audio_init();  // combat_audio_bank.mjs sounds (game_details.cpp)
   return true;
 }
 
@@ -1378,9 +1392,12 @@ std::string Game::hud_json() {
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
   combat_hud(s);  // "combat":{...} (game_events.cpp)
+  guided_hud(s);   // "guided":{...} (game_guided.cpp)
+  details_hud(s);  // "details":{...} (game_details.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
+  s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)
   return s + "}";
 }
 
@@ -1388,6 +1405,7 @@ std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
   if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
   if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
+  if (std::string out; details_command(cmd, out)) return out;  // guided / critical / ballot commands (game_details.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);
@@ -1463,9 +1481,9 @@ std::string Game::command(const std::string& cmd) {
     if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted_.stars()) / 1000;  // units are due at once
     return std::to_string(wanted_.stars());
   }
-  if (starts("time ")) {
-    world_->level();  // time of day is the world's; Kern advances it while playing
-    return "ok";
+  {
+    std::string out;  // time, quality, perf, look (game_look.cpp)
+    if (look_command(cmd, out)) return out;
   }
   if (cmd == "offline") { city_.go_offline(); return "ok"; }
   if (cmd == "state") return hud_json();

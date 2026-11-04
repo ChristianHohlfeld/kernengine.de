@@ -59,6 +59,7 @@ struct PlayerState {
   f32 health = 100;       // 0..100
   f32 thrust = 0;         // jet 0..1
   u8 stars = 0, weapon = 0;
+  f32 day = -1;           // time of day 0..1 (day_night_sync.mjs: clients follow the host's)
 };
 
 /// An effect another player sees (vs_multiplayer.mjs fx: shot, explosion, impact).

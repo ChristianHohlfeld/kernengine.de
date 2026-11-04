@@ -212,9 +212,49 @@ async function run({name, url, context, mapped}) {
   check((await cmd("attack")).startsWith("1 "), `[${name}] a rocket is fired`);
   await page.waitForFunction(b => window.SpawnCity.hud().explosions > b, booms, {timeout: 300000}).catch(() => {});
   check((await hud()).explosions > booms, `[${name}] the rocket explodes`);
+  // What blasts leave (terrain_craters.mjs, world_impacts.mjs, facade_marks.mjs): a crater in the
+  // terrain, a scorch, soot and a breach on the wall, rubble as Box3D bodies.
+  {
+    const b = await cmd("blast wall");
+    check(b.startsWith("{"), `[${name}] a blast at a wall (${b})`);
+    if (b.startsWith("{")) {
+      const at = JSON.parse(b), g = JSON.parse(await cmd(`ground ${at.x} ${at.y}`));
+      h = await hud();
+      check(h.marks.craters >= 1 && g.z < at.ground - 0.4, `[${name}] a crater in the ground (${at.ground} -> ${g.z})`);
+      check(h.marks.scorch >= 1 && h.marks.soot >= 1 && h.marks.breach >= 1 && h.marks.rubble >= 2, `[${name}] scorch, soot, breach and rubble (${JSON.stringify(h.marks)})`);
+      await shot("1c-blast-marks");
+    }
+  }
   await cmd("weapon 1");
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
+
+  // Performance and look (game_look.cpp): frame times, quality level, day clock, lights, weapon models.
+  {
+    const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(h.perf && h.perf.ms && h.perf.tier >= 0 && h.renderScale > 0, `[${name}] frame times and quality in the HUD (${JSON.stringify(h.perf)})`);
+    check(await cmd("perf 1") === "on", `[${name}] frame-time line on`);
+    await frame();
+    check(await page.locator(".sc-perf").isVisible(), `[${name}] frame-time line shown`);
+    await cmd("perf 0");
+    check(JSON.parse(await cmd("quality 2")).tier === 2, `[${name}] quality level 2 fixed`);
+    await frame(); await frame();
+    const cw = await page.evaluate(() => { const c = document.getElementById("game"), d = devicePixelRatio || 1; return [c.width, ...[1.5, 2].map(cap => Math.round(c.clientWidth * Math.min(d, cap) * 0.85))]; });
+    check(Math.min(Math.abs(cw[0] - cw[1]), Math.abs(cw[0] - cw[2])) <= 1, `[${name}] the drawing buffer follows the level's scale (${cw})`);
+    check(JSON.parse(await cmd("quality auto")).auto === true, `[${name}] quality back to automatic`);
+    check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
+    await frame(); await frame();
+    h = await hud();
+    check(h.night > 0.6 && h.clock === "22:00", `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);
+    check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
+    await shot("1c-night");
+    await cmd("time 0.40");
+    check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
+    await frame(); await frame();
+    check((await hud()).look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify((await hud()).look)})`);
+    await cmd("weapon 1");
+  }
 
   // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
   {
@@ -312,12 +352,30 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
+  // GUIDED (guided_missile.mjs): a press launches, a second one within 5 s is refused.
+  const g1 = await cmd("guided");
+  check(g1.startsWith("launched"), `[${name}] GUIDED missile launched (${g1})`);
+  check(await cmd("guided") === "denied" && (await hud()).guided?.cd > 3, `[${name}] GUIDED reloads 5 s (${JSON.stringify((await hud()).guided)})`);
+  {
+    const tg = (await hud()).t, booms = (await hud()).explosions;
+    await page.waitForFunction(([t, b]) => { const h = window.SpawnCity.hud(); return h.explosions > b || h.t > t + 25; }, [tg, booms], {timeout: 400000}).catch(() => {});
+    check((await hud()).explosions > booms && (await hud()).guided.flying === 0, `[${name}] the GUIDED missile went off`);
+  }
+  // critical_damage_logic.mjs: the drone at 28 % smokes and blows 2.05 s later.
+  check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
+  check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
+  // Traffic (world_traffic.h): junctions from the street graph, lights on the main roads.
+  {
+    const tr = JSON.parse(await cmd("traffic"));
+    check(tr.junctions > 3 && (mapped ? tr.lights > 0 : true), `[${name}] junctions and traffic lights (${JSON.stringify(tr)})`);
+  }
   const car = await cmd("mode car");
   check(car === "car", `[${name}] car mode (${car})`);
+  check(JSON.parse(await cmd("traffic")).ejected >= 1 || car !== "car", `[${name}] the carjacked driver got out`);
   if (car === "car") {
     if (context.hasTouch) await touchHold(vw - 110, vh - 110);
     else await hold(["KeyW"]);

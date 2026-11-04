@@ -99,6 +99,24 @@ i32 People::add_officer(Vec3 at, f32 yaw, i32 unit, u32 seed) {
   return static_cast<i32>(people_.size() - 1);
 }
 
+i32 People::add_citizen(Vec3 at, f32 yaw, u32 seed) {
+  Person p;
+  p.kind = Kind::citizen;
+  p.state = State::walk;
+  p.pos = at;
+  p.yaw = yaw;
+  p.seed = seed;
+  p.speed = 1.0f + static_cast<f32>((seed >> 7) % 66) / 100;
+  p.fitness = 0.75f + static_cast<f32>((seed >> 11) % 51) / 100;
+  p.shirt = kShirts[(seed >> 3) % 10];
+  p.pants = kPants[(seed >> 9) % 6];
+  p.skin = kSkins[(seed >> 13) % 5];
+  for (std::size_t i = 0; i < people_.size(); ++i)
+    if (people_[i].state == State::gone) { people_[i] = p; return static_cast<i32>(i); }
+  people_.push_back(p);
+  return static_cast<i32>(people_.size() - 1);
+}
+
 i32 People::add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role) {
   Person p;
   p.kind = k;
