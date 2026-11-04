@@ -301,6 +301,8 @@ class Game {
   void life_blast(Vec3 at, f32 radius);
   void life_hud(std::string& s);
   bool life_command(const std::string& cmd, std::string& out);
+  bool life_punch(Vec3 from, Vec3& to);   // fists / knife on animals
+  void life_net_fx(const net::Fx& f);     // cow deaths and pushes from the other players
   // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
   f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
   void eject_driver(i32 car);
@@ -323,6 +325,8 @@ class Game {
   void ui_move_world(f64 lon, f64 lat);
   void ui_gps_update(f32 dt);
   void ui_camera(f32 dt);
+  void ui_draw_gps(f32 dt);
+  void ui_draw_helpers();
   std::string ui_hud_json();
   // equipment (game_equipment.cpp)
   void ui_audio_init();

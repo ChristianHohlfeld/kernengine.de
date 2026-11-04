@@ -19,7 +19,7 @@ struct GameLife {
   LifeOut out;
   Interiors interiors;
   bool ready = false, art_ready = false, sounds_ready = false;
-  kern::audio::ClipId clips[16] = {};
+  kern::audio::ClipId clips[static_cast<u32>(LifeOut::Sound::kCount)] = {};
   // speech for the page (browser speech synthesis), handed out once by the HUD
   std::vector<LifeOut::Say> speech;
   std::string banner;
@@ -30,6 +30,7 @@ struct GameLife {
   struct Blast { Vec3 at; f32 radius; f32 t; };
   std::vector<Blast> blasts;  // this frame's explosions (how hard a fall is thrown)
   u32 falls = 0, getups = 0;
+  u64 test_doll = 0;  // the body of the "ragdoll" test command
   f32 next_honk_check = 0;
 };
 

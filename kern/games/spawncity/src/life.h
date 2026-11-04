@@ -29,6 +29,9 @@ struct LifeView {
   const CityStream* city = nullptr;
   Vec3 focus, player;   // player: his feet (or vehicle)
   Vec3 eye;             // the camera (hearing distance)
+  Vec3 head;            // the player's head (the black cat leaps at it)
+  f64 epoch = 0;        // wall clock in seconds (SpawnCity's Date.now(): every machine the same)
+  bool dogs_on = true, cats_on = true;
   f32 player_speed = 0;
   bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
   std::vector<LifeCar> cars;
@@ -36,7 +39,7 @@ struct LifeView {
 
 /// What the game should do for street life this frame.
 struct LifeOut {
-  enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f };
+  enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f, dog, cat, hiss, yowl, screech, kCount };
   struct Play { Sound sound; Vec3 at; f32 volume, pitch; };
   struct Say { std::string text; f32 pitch = 1, rate = 1, volume = 1, delay = 0; };  // browser speech (de-DE)
   struct Bubble { Vec3 at; std::string text; std::string mood; f32 until; };
@@ -48,7 +51,10 @@ struct LifeOut {
   std::vector<Burst> bursts;
   std::string banner;   // big call-out (jogger streak)
   f32 banner_for = 0;
-  void clear() { sounds.clear(); speech.clear(); impulses.clear(); bursts.clear(); banner.clear(); banner_for = 0; }
+  bool kill_player = false;  // the black cat got him
+  struct CowDeath { Vec3 at, impulse; };
+  std::vector<CowDeath> cow_deaths;  // for the other players (cows.mjs sendDeath)
+  void clear() { sounds.clear(); speech.clear(); impulses.clear(); bursts.clear(); banner.clear(); banner_for = 0; kill_player = false; cow_deaths.clear(); }
 };
 
 class Life {
@@ -86,6 +92,19 @@ class Life {
     Runner runners[10];
   };
   struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; };
+  // dogs and cats (world_procedural_population.mjs ambient animals; #1 is the black cat now and then)
+  enum class Species : u8 { dog, cat, black_cat };
+  struct Pet {
+    f32 radius = 20, omega = 0.05f, phase = 0, wobble_omega = 0.2f, wobble_r = 2, scale = 1;
+    Vec3 pos;
+    f32 yaw = 0, gait = 0, speed = 0, dead_at = -1;
+    bool shown = false, has_pose = false;
+    i32 punches = 0;
+    Vec3 color;
+    kern::physics::Body body;  // the dead animal
+    Quat rot;
+  };
+  struct CatAttack { bool on = false; i32 phase = 0; Vec3 p, from; f32 yaw = 0, start = 0, leap_at = 0, last_cry = -9, away_yaw = 0, leave_at = 0; i32 cries = 0; };
   struct Voice { Vec3 at; std::string text, mood; f32 until; };
 
   void init(kern::physics::World& w, bool mobile);
@@ -94,7 +113,9 @@ class Life {
 
   /// A bullet from `from` to `to`: cows, birds and joggers. Returns true when something was hit
   /// (`to` shortened to the hit).
-  bool shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out);
+  bool shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool melee = false);
+  /// Another player's cow died (cows.mjs onFx): the cow there falls the same way.
+  void remote_cow_death(Vec3 at, Vec3 impulse, f32 now, LifeOut& out);
   /// A shot was fired / passed (scares cows and pigeons).
   void heard_shot(Vec3 from, Vec3 to, f32 now);
   void blast(Vec3 at, f32 radius, f32 now, LifeOut& out);
@@ -115,6 +136,11 @@ class Life {
   const std::vector<Flock>& flocks() const { return flocks_; }
   const std::vector<Bird>& birds() const { return birds_; }
   const std::vector<Tree>& trees() const { return trees_; }
+  const std::vector<Pet>& pets() const { return pets_; }
+  Species species(u32 i, f64 epoch) const;
+  const CatAttack& cat_attack() const { return cat_; }
+  f64 epoch() const { return epoch_; }
+  bool provoke_cat(f32 now);  // tests: the black cat charges
   const Chain* chain() const { return chain_alive_ ? &chain_ : nullptr; }
   const std::vector<Voice>& voices() const { return voices_; }
   u32 cow_hits() const { return cow_hits_; }
@@ -140,6 +166,8 @@ class Life {
   bool spot_near(const LifeView& view, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const;
   void update_birds(f32 dt, f32 now, const LifeView& view);
   void update_trees(const LifeView& view);
+  void update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out);
+  void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);
   void update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
   void kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out);
   Vec3 sample(f32 s, f32& yaw, Vec2& normal) const;
@@ -156,6 +184,10 @@ class Life {
   std::vector<Flock> flocks_;
   std::vector<Bird> birds_;
   std::vector<Tree> trees_;
+  std::vector<Pet> pets_;
+  CatAttack cat_;
+  Vec2 pet_anchor_{1e9f, 1e9f};
+  f64 epoch_ = 0;
   std::size_t tree_lanes_ = 0;
   Chain chain_;
   bool chain_alive_ = false;

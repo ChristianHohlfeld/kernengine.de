@@ -159,6 +159,7 @@ net::PlayerState Game::my_state() const {
     s.jet_rot = j.rotation;
   }
   if (mp_ && mp_->mic && !mp_->muted) f |= net::kTalking;
+  if (ui_.jetpack.thrusting && mode_ == Mode::foot) f |= net::kJetpack;  // game_equipment.cpp
   s.flags = f;
   return s;
 }
@@ -282,6 +283,8 @@ void Game::update_net(f32 dt) {
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
+      case net::Fx::cow_death:
+      case net::Fx::push: life_net_fx(f); break;  // M3 life (game_life.cpp)
       default: break;
     }
   }

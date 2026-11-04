@@ -4,8 +4,10 @@
 // (immersive_soundscape.mjs). The logic lives in equipment.*; this file wires it to the world.
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "game.h"
+#include "nostr.h"
 #include "kern/audio/synth.h"
 
 namespace sc {
@@ -280,6 +282,14 @@ void Game::ui_mix_equipment(f32 dt) {
   // Jetpack roar: level and colour follow the thrust.
   const bool burn = ui_.jetpack.thrusting && !ui_.paused;
   drive_loop(m, ui_.jet_voice, ui_.jet_clip, burn ? 0.75f : 0.0f, kern::audio::Bus::sfx, true, matrix_of(soldier_).translation() - Vec3{0, 0, 0.6f});
+  // Other players' jetpacks roar in 3-D at their position (jetpack_audio.mjs).
+  {
+    const auto& rs = net_.remotes();
+    for (std::size_t i = 0; i < 8; ++i) {
+      const bool on = i < rs.size() && (rs[i].state.flags & net::kJetpack) && !ui_.paused;
+      drive_loop(m, ui_.remote_jet_voice[i], ui_.jet_clip, on ? 0.7f : 0.0f, kern::audio::Bus::sfx, true, on ? rs[i].shown - Vec3{0, 0, 0.6f} : Vec3{});
+    }
+  }
   // City bed: quieter high up, birds by day, crickets at night (ambience bus = the AMBIENT slider).
   const f32 high = clampf(1 - (cam_.eye.z - city_.ground_height(cam_.eye.x, cam_.eye.y)) / 150, 0.15f, 1);
   const bool live = world_placed_ && !ui_.paused;
@@ -301,6 +311,20 @@ void Game::ui_render_music(f32* out, u32 frames) { ui_.music.render_add(out, fra
 
 bool Game::ui_equipment_command(const std::string& cmd, std::string& out) {
   if (cmd == "logbook") { out = ui_.log.json(); return true; }
+  if (cmd.rfind("nostr event ", 0) == 0) {
+    // suggestion_box.mjs: "nostr event <created_at> <secret hex> <aux hex> <tags json> <content>" -> the signed event.
+    std::string rest = cmd.substr(12), part[4];
+    for (std::string& p : part) {
+      const std::size_t sp = rest.find(' ');
+      if (sp == std::string::npos) { out = "usage: nostr event <created_at> <secret> <aux> <tags> <content>"; return true; }
+      p = rest.substr(0, sp);
+      rest = rest.substr(sp + 1);
+    }
+    nostr::Bytes32 sk{}, aux{};
+    if (!nostr::from_hex(part[1], sk.data(), 32) || !nostr::from_hex(part[2], aux.data(), 32) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
+    if (!nostr::event_json(sk, aux, std::atoll(part[0].c_str()), 30078, part[3], rest, out)) out = "sign failed";
+    return true;
+  }
   if (cmd.rfind("radio", 0) == 0) {
     const std::string a = cmd.size() > 6 ? cmd.substr(6) : "next";
     if (a == "next") ui_radio(1);
@@ -337,7 +361,7 @@ std::string Game::ui_equipment_json() {
   std::string s;
   char b[256];
   if (mode_ == Mode::foot && ui_.settings.on(Opt::world_jetpack))
-    std::snprintf(b, sizeof b, ",\"jetpack\":{\"fuel\":%.2f,\"thrusting\":%s}", ui_.jetpack.fuel, ui_.jetpack.thrusting ? "true" : "false"), s += b;
+    std::snprintf(b, sizeof b, ",\"jetpack\":{\"fuel\":%.2f,\"thrusting\":%s,\"ignitions\":%u}", ui_.jetpack.fuel, ui_.jetpack.thrusting ? "true" : "false", ui_.jetpack.ignitions), s += b;
   std::snprintf(b, sizeof b, ",\"logbook\":{\"serial\":%u,\"flights\":%zu,\"flying\":%s}", ui_.log.serial(), ui_.log.flights().size(), ui_.log.flying() ? "true" : "false");
   s += b;
   if (mode_ == Mode::car) {

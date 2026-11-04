@@ -17,7 +17,7 @@ using kern::Mat4;
 // building_interiors.mjs
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8f, kDoorH = 2.55f, kWallIn = 0.3f;
 constexpr u32 kMaxClosedDoors = 24, kMaxLevels = 12;
-constexpr f32 kLane = 1.2f, kCoreW = 2 * kLane + 0.2f, kLand = 1.3f, kRun = 3.6f, kCoreL = 2 * kLand + kRun, kGroundStorey = 4, kSlab = 0.25f, kRoofHouse = 2.7f;
+constexpr f32 kLane = 1.2f, kCoreW = 2 * kLane + 0.2f, kLand = 1.3f, kRun = 3.6f, kCoreL = 2 * kLand + kRun, kSlab = 0.25f, kRoofHouse = 2.7f;
 constexpr f32 kRelease = 45;  // a little more than ACTIVATE: no flicker at the edge
 
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
@@ -230,7 +230,8 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   if (b.rings.empty()) return false;
   P.outer = clean(b.rings[0]);
   if (P.outer.size() < 3) return false;
-  if (signed_area(P.outer) < 0) std::reverse(P.outer.begin(), P.outer.end());
+  const bool reversed = signed_area(P.outer) < 0;  // Kern's facade counts along the original ring
+  if (reversed) std::reverse(P.outer.begin(), P.outer.end());
   for (std::size_t i = 1; i < b.rings.size(); ++i) {
     std::vector<Vec2> h = clean(b.rings[i]);
     if (h.size() < 3) continue;
@@ -254,9 +255,12 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
     const f32 l = std::hypot(d.x, d.y);
     if (l > best) { best = l; axis = d * (1 / l); }
   }
-  // storeys: the ground storey 4 m, then the facade's storey height
+  // storeys line up with the facade: Kern's BuildingBuilder draws every storey at
+  // 3.1 + 0.5 * ((seed >> 12) % 1000) / 1000 m (the windows' rows), as SpawnCity's interiors follow
+  // its facade shader (building_interiors.mjs: facadeParams floorH)
   const u32 seed = b.seed;
-  P.floor_h = 3.0f + 0.6f * h01(seed, 1);
+  P.floor_h = 3.1f + 0.5f * static_cast<f32>((seed >> 12) % 1000) / 1000.0f;
+  const f32 ground_storey = P.floor_h;
   const f32 base0 = std::fmax(b.base, door_ground) + 0.03f;
   P.base = b.base;
   P.top = b.top;
@@ -264,9 +268,9 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   P.levels.push_back(base0);
   bool capped = false;
   CoreFit core;
-  if (P.top - base0 > kGroundStorey + 2.7f) core = find_core(P.inner, P.inner_holes, P.holes, P.doors, centroid, axis);
+  if (P.top - base0 > ground_storey + 2.7f) core = find_core(P.inner, P.inner_holes, P.holes, P.doors, centroid, axis);
   if (core.ok) {
-    for (f32 z = base0 + kGroundStorey; z + 2.7f <= P.top - 0.05f; z += P.floor_h) {
+    for (f32 z = std::fmax(P.base + ground_storey, base0 + 2.7f); z + 2.7f <= P.top - 0.05f; z += P.floor_h) {
       if (P.levels.size() >= kMaxLevels) { capped = true; break; }
       P.levels.push_back(z);
     }
@@ -275,7 +279,7 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   P.core = core.core;
   const u32 F = static_cast<u32>(P.levels.size());
   P.roof_access = P.has_core && !capped && P.top - P.levels[F - 1] <= P.floor_h + 1.8f && P.area < 12000;
-  const f32 ceil_top = capped ? P.levels[F - 1] + P.floor_h - kSlab : F == 1 && P.top - base0 > kGroundStorey + 0.5f ? base0 + kGroundStorey - kSlab : P.top - 0.3f;
+  const f32 ceil_top = capped ? P.levels[F - 1] + P.floor_h - kSlab : F == 1 && P.top - base0 > ground_storey + 0.5f ? P.base + ground_storey - kSlab : P.top - 0.3f;
   auto ceil_of = [&](u32 k) { return k + 1 < F ? P.levels[k + 1] - kSlab : ceil_top; };
   Sink S{&P.mesh, &P.points, &P.indices};
   const Core& C = P.core;
@@ -306,23 +310,35 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
       for (auto [s0, s1] : solid) S.wall(a + u * s0, a + u * s1, P.base - 0.5f, P.top, kWall, false, true);
       if (gap) S.wall(a + u * g0, a + u * g1, base0 + kDoorH, P.top, kWall, false, true);
       if (ring == 0) continue;
-      // inside: per storey, window openings (sill 0.9, head 2.3, every ~2.6 m) that show the city
+      // inside: per storey, window openings exactly where the facade draws its windows (Kern's
+      // facade: a column every 3 m from the ring's edge start, the pane over 22-78 % of it and 28-78 %
+      // of the storey, from the first storey up to 1 m under the roof) - they show the city
+      const f32 len_o = std::hypot(P.outer[(i + 1) % P.outer.size()].x - P.outer[i].x, P.outer[(i + 1) % P.outer.size()].y - P.outer[i].y);
+      const f32 to_inner = len / std::fmax(0.01f, len_o);
       for (u32 k = 0; k < F; ++k) {
         const f32 z0 = P.levels[k], z1 = ceil_of(k), zn = k + 1 < F ? P.levels[k + 1] : z1 + 0.3f;
-        const f32 sill = z0 + 0.9f, head = std::fmin(z1 - 0.15f, z0 + 2.3f);
+        const f32 row = std::floor((z0 + 0.5f - P.base) / P.floor_h);
+        const f32 sill = P.base + (row + 0.28f) * P.floor_h, head = std::fmin(z1 - 0.05f, P.base + (row + 0.78f) * P.floor_h);
         std::vector<std::pair<f32, f32>> wins;
-        const u32 n = len > 2.2f && head > sill + 0.4f ? static_cast<u32>(len / 2.6f) : 0;
-        for (u32 w = 0; w < n; ++w) {
-          const f32 c = (static_cast<f32>(w) + 0.5f) * len / static_cast<f32>(n);
-          if (k == 0 && gap && c > g0 - 1.0f && c < g1 + 1.0f) continue;
-          wins.push_back({c - 0.6f, c + 0.6f});
+        const bool rows = row >= 1 && P.base + (row + 0.78f) * P.floor_h <= P.top - 1 && head > sill + 0.3f;
+        for (f32 c0 = 0; rows && c0 + 2.34f <= len_o; c0 += 3) {
+          f32 w0 = c0 + 0.66f, w1 = c0 + 2.34f;
+          if (reversed) { const f32 t0 = len_o - w1; w1 = len_o - w0; w0 = t0; }
+          wins.push_back({w0 * to_inner, w1 * to_inner});
         }
+        std::sort(wins.begin(), wins.end());
         // the full band below the sill and above the head, solid pieces between the windows
         f32 t = 0;
         for (auto [w0, w1] : wins) {
           S.wall(a + u * t, a + u * w0, z0, z1, kWall, true, false);
           S.wall(a + u * w0, a + u * w1, z0, sill, kWall, true, false);
           S.wall(a + u * w0, a + u * w1, head, z1, kWall, true, false);
+          // the pane (building_interiors.mjs glass: clear, slightly tinted, one transparent mesh),
+          // halfway between the inner face and the facade
+          const Vec2 g0 = a + u * w0 + Vec2{u.y, -u.x} * (kWallIn * 0.5f), g1 = a + u * w1 + Vec2{u.y, -u.x} * (kWallIn * 0.5f);
+          const Vec3 q[4] = {{g0.x, g0.y, sill}, {g1.x, g1.y, sill}, {g1.x, g1.y, head}, {g0.x, g0.y, head}};
+          const Vec3 gn = kern::normalize(kern::cross(q[1] - q[0], q[2] - q[0]), {1, 0, 0});
+          for (int v : {0, 1, 2, 0, 2, 3}) P.glass.push(q[v], gn, {0.62f, 0.70f, 0.74f}, {0, 0});
           t = w1;
         }
         if (k == 0 && gap) {
@@ -437,7 +453,9 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
         const u32 h = hash_key(seed + k * 131, static_cast<u32>(static_cast<i32>(x * 7) * 31 + static_cast<i32>(y * 13)));
         if (h % 100 > 38 || !free_spot(p, 1.3f)) continue;
         const f32 yaw = yaw0 + (h >> 8 & 3) * kPi / 2;
-        switch (k == 0 ? (h >> 12) % 3 + 3 : (h >> 12) % 6) {
+        // the lobby gets a reception desk first (building_interiors.mjs reception), then lounge pieces
+        const u32 kind = k == 0 ? (placed == 0 ? 9u : 3u + (h >> 12) % 3 + ((h >> 14) & 1) * 3u) : (h >> 12) % 9;
+        switch (kind) {
           case 0:  // desk with a screen and a chair
             S.box({p.x, p.y, z + 0.37f}, {1.6f, 0.8f, 0.74f}, yaw, kOak, true);
             S.box(Vec3{p.x, p.y, z + 1.0f} + yaw_quat(yaw).rotate({0, 0.22f, 0}), {0.62f, 0.035f, 0.38f}, yaw, rgb(0x111214), false);
@@ -457,6 +475,33 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
           case 4:  // table
             S.box({p.x, p.y, z + 0.37f}, {0.9f, 0.9f, 0.74f}, yaw, rgb(0xefe9df), true);
             break;
+          case 6: {  // armchair and a floor lamp
+            const Quat q = yaw_quat(yaw);
+            S.box({p.x, p.y, z + 0.22f}, {0.86f, 0.84f, 0.44f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), true);
+            S.box(Vec3{p.x, p.y, z + 0.66f} + q.rotate({0, 0.34f, 0}), {0.86f, 0.18f, 0.56f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), false);
+            S.box(Vec3{p.x, p.y, z + 0.75f} + q.rotate({0.75f, 0.2f, 0}), {0.04f, 0.04f, 1.45f}, yaw, kDark, false);
+            S.box(Vec3{p.x, p.y, z + 1.55f} + q.rotate({0.75f, 0.2f, 0}), {0.36f, 0.36f, 0.26f}, yaw, rgb(0xf4e4c2), false);
+            break;
+          }
+          case 7: {  // dining table with four chairs
+            const Quat q = yaw_quat(yaw);
+            S.box({p.x, p.y, z + 0.38f}, {1.8f, 0.9f, 0.76f}, yaw, rgb(0x5e3f2a), true);
+            for (f32 cx : {-0.45f, 0.45f})
+              for (f32 cy : {-0.68f, 0.68f}) S.box(Vec3{p.x, p.y, z + 0.45f} + q.rotate({cx, cy, 0}), {0.44f, 0.42f, 0.9f}, yaw, rgb(0xb98b5c), false);
+            break;
+          }
+          case 8: {  // kitchen counter
+            S.box({p.x, p.y, z + 0.45f}, {2.4f, 0.6f, 0.9f}, yaw, rgb(0xeeece6), true);
+            S.box({p.x, p.y, z + 0.915f}, {2.44f, 0.64f, 0.04f}, yaw, rgb(0x3d3f42), false);
+            break;
+          }
+          case 9: {  // reception desk with a brass band
+            const Quat q = yaw_quat(yaw);
+            S.box({p.x, p.y, z + 0.55f}, {2.8f, 0.75f, 1.1f}, yaw, rgb(0x5e3f2a), true);
+            S.box({p.x, p.y, z + 1.12f}, {2.9f, 0.85f, 0.05f}, yaw, rgb(0xd9d6cf), false);
+            S.box(Vec3{p.x, p.y, z + 0.55f} + q.rotate({0, -0.39f, 0}), {2.6f, 0.01f, 0.5f}, yaw, rgb(0xc7a35a), false);
+            break;
+          }
           default:  // plant
             S.box({p.x, p.y, z + 0.21f}, {0.4f, 0.4f, 0.42f}, yaw, rgb(0xd9d4ca), true);
             S.box({p.x, p.y, z + 0.9f}, {0.6f, 0.6f, 0.9f}, yaw + 0.4f, rgb(0x3d6b33), false);
@@ -469,6 +514,22 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
       for (f32 y = y0 + 1.8f; y < y1 && lamps < 24; y += 3.6f)
         if (pip({x, y}, P.inner) && ring_dist({x, y}, P.inner) > 0.8f) { P.lamps.push_back({x, y, zc - 0.02f}); ++lamps; }
   }
+  // air conditioners on the roof (building_interiors.mjs ac), clear of the stair house
+  if (P.roof_access) {
+    u32 ac = 0;
+    for (f32 x = x0 + 2; x < x1 - 1 && ac < 3; x += 5)
+      for (f32 y = y0 + 2; y < y1 - 1 && ac < 3; y += 5) {
+        const Vec2 q{x, y};
+        if (!pip(q, P.inner) || ring_dist(q, P.inner) < 1.5f) continue;
+        const Vec2 c = q - C.o;
+        const f32 cu = c.x * C.u.x + c.y * C.u.y, cv = c.x * C.v.x + c.y * C.v.y;
+        if (cu > -2.5f && cu < kCoreW + 2.5f && cv > -3.5f && cv < kCoreL + 2.5f) continue;
+        if (h01(seed, 900 + ac * 7 + static_cast<u32>(x * 3 + y)) > 0.5f) continue;
+        S.box({q.x, q.y, P.top + 0.55f}, {1.5f, 1.1f, 1.1f}, yaw0, rgb(0xa9adb1), true);
+        S.box({q.x, q.y, P.top + 1.12f}, {0.8f, 0.8f, 0.05f}, yaw0, rgb(0x2c2f33), false);
+        ++ac;
+      }
+  }
   return !P.points.empty();
 }
 
@@ -477,6 +538,7 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
 
 void Interiors::clear() {
   if (r_ && mesh_id_) { r_->remove(mesh_id_); mesh_id_ = 0; }
+  if (r_ && glass_id_) { r_->remove(glass_id_); glass_id_ = 0; }
   if (world_ && body_.valid() && world_->body_valid(body_)) world_->destroy_body(body_);
   body_ = {};
   active_ = false;
@@ -513,6 +575,20 @@ void Interiors::activate(const CityStream::BuildingRef& ref, CityStream& city, f
   in.material = m;
   if (!r_->upsert(mesh_id_, in)) { r_->release_id(mesh_id_); mesh_id_ = 0; }
   plan_.mesh = kern::MeshData{};
+  if (plan_.glass.vertex_count()) {
+    glass_id_ = r_->allocate_id();
+    kern::MeshInput gi = plan_.glass.as_input(kern::kMaxExtensionAttributes);
+    kern::Material g;
+    g.roughness = 0.05f;
+    g.color = {1, 1, 1, 0.22f};
+    g.alpha = kern::AlphaMode::blend;
+    g.double_sided = true;
+    g.cast_shadow = false;
+    g.emissive = {0.02f, 0.025f, 0.03f};
+    gi.material = g;
+    if (!r_->upsert(glass_id_, gi)) { r_->release_id(glass_id_); glass_id_ = 0; }
+    plan_.glass = kern::MeshData{};
+  }
   active_ = true;
   tile_ = ref.tile;
   index_ = ref.index;

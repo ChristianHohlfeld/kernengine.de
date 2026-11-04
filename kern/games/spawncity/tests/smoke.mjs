@@ -342,6 +342,8 @@ async function run({name, url, context, mapped}) {
   {
     check(JSON.parse(await cmd("cows")).cows >= 5, `[${name}] a herd of cows`);
     check(JSON.parse(await cmd("pigeons")).flocks >= 1, `[${name}] a pigeon flock`);
+    const pets = JSON.parse(await cmd("pets"));
+    check(pets.pets >= 12 && pets.cats >= 4, `[${name}] dogs and cats (${JSON.stringify(pets)})`);
     check(JSON.parse(await cmd("ragdoll")).ok, `[${name}] a ragdoll is thrown`);
     const knocked = await cmd("knock");
     const tl = (await hud()).t;
@@ -397,6 +399,13 @@ async function run({name, url, context, mapped}) {
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     h = await hud();
     check(resetOk && h.ui.resets === resets + 1 && h.mode === "foot", `[${name}] RESET back to the start (${h.ui.resets}, ${h.mode})`);
+    // The suggestion box signs its Nostr event in the game (nostr.cpp).
+    const ev = await cmd(`nostr event 1700000000 ${"0".repeat(63)}3 ${"0".repeat(64)} [["t","spawncity-suggestion"]] Mehr Jets bitte`);
+    check(ev.startsWith("{") && /"sig":"[0-9a-f]{128}"/.test(ev), `[${name}] suggestion signed as a Nostr event`);
+    check(await cmd("set view.grid 1") === "ok", `[${name}] 1 m grid on`);
+    await page.waitForTimeout(500);
+    await shot("0c-grid");
+    await cmd("set view.grid 0");
     // LIVE GPS: two fixes 20 m apart move the player there.
     const o = (await hud()).ui.origin;
     check(await cmd("gps on") === "on", `[${name}] GPS live on`);
@@ -460,6 +469,12 @@ async function run({name, url, context, mapped}) {
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
+  // The fights above leave burning cars and a damaged jet behind: RESET first (game_reset.mjs), so
+  // the vehicle checks start from a clean world as a player would after a restart.
+  await cmd("military off");
+  await cmd("zombies day");
+  await cmd("reset");
+  { const t = (await hud()).t; await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, t, {timeout: 300000}).catch(() => {}); }
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
   // touch: the altitude pad right of the move stick (simulator.mjs #soloClearance) pushed up

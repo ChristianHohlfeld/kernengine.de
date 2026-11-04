@@ -1,6 +1,7 @@
 // SpawnCity on Kern, milestone 3 (life): animals and street life, ragdolls, walkable buildings
 // in the game (see game_life.h). The simulation is in life.cpp, ragdoll.cpp and interiors.cpp;
 // this file feeds them the world and carries out what they ask for.
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 
@@ -97,6 +98,34 @@ void make_sounds(kern::audio::Mixer& mixer, kern::audio::ClipId* clips) {
     h.frequency = 233; h2.frequency = 294; h.lowpass = h2.lowpass = 1300; h.highpass = h2.highpass = 350; h.sustain = h2.sustain = 0.5f;
     clip(Sound::horn_bus, layered({{h, 0}, {h2, 0}}, rate, 0.75f), "spawncity:life_horn_bus");
   }
+  {  // animal_audio.mjs: dog yelp, cat meow, the black cat's hiss, yowl and attack screech
+    SynthPatch d;
+    d.wave = Wave::saw; d.frequency = 900; d.slide = -3.4f; d.attack = 0.012f; d.sustain = 0.1f; d.release = 0.06f; d.lowpass = 1200; d.resonance = 0.5f;
+    d.vibrato_depth = 1.2f; d.vibrato_rate = 38; d.volume = 0.6f;
+    SynthPatch d2 = d;
+    d2.frequency = 1100; d2.slide = -3.8f; d2.sustain = 0.2f; d2.release = 0.1f; d2.vibrato_rate = 30;
+    clip(Sound::dog, layered({{d, 0}, {d2, 0.18f}}, rate, 0.7f), "spawncity:life_dog");
+    SynthPatch c;
+    c.wave = Wave::triangle; c.frequency = 520; c.slide = 2.9f; c.attack = 0.012f; c.sustain = 0.15f; c.release = 0.07f; c.lowpass = 1500; c.vibrato_depth = 0.8f; c.vibrato_rate = 7; c.volume = 0.5f;
+    SynthPatch c2 = c;
+    c2.frequency = 820; c2.slide = -2.7f; c2.sustain = 0.25f; c2.release = 0.1f; c2.vibrato_rate = 6;
+    clip(Sound::cat, layered({{c, 0}, {c2, 0.2f}}, rate, 0.6f), "spawncity:life_cat");
+    SynthPatch h;
+    h.wave = Wave::noise; h.attack = 0.005f; h.sustain = 0.3f; h.release = 0.12f; h.lowpass = 6500; h.highpass = 3000; h.tremolo_depth = 0.7f; h.tremolo_rate = 9; h.volume = 0.7f; h.seed = 3;
+    SynthPatch g;
+    g.wave = Wave::saw; g.frequency = 240; g.slide = -0.5f; g.sustain = 0.9f; g.release = 0.1f; g.lowpass = 700; g.vibrato_depth = 1.5f; g.vibrato_rate = 23; g.volume = 0.25f;
+    clip(Sound::hiss, layered({{h, 0}, {h, 0.36f}, {h, 0.55f}, {g, 0}}, rate, 0.8f), "spawncity:life_hiss");
+    SynthPatch y;
+    y.wave = Wave::saw; y.frequency = 300; y.slide = 2.3f; y.attack = 0.03f; y.sustain = 0.45f; y.release = 0.1f; y.lowpass = 1500; y.vibrato_depth = 3; y.vibrato_rate = 9; y.volume = 0.6f;
+    SynthPatch y2 = y;
+    y2.frequency = 760; y2.slide = -1.4f; y2.sustain = 0.6f; y2.vibrato_rate = 7;
+    clip(Sound::yowl, layered({{y, 0}, {y2, 0.5f}, {g, 0}}, rate, 0.8f), "spawncity:life_yowl");
+    SynthPatch sc;
+    sc.wave = Wave::saw; sc.frequency = 900; sc.slide = 4; sc.attack = 0.01f; sc.sustain = 0.2f; sc.release = 0.05f; sc.lowpass = 1800; sc.vibrato_depth = 3; sc.vibrato_rate = 44; sc.volume = 0.7f;
+    SynthPatch sc2 = sc;
+    sc2.frequency = 1900; sc2.slide = -2.7f; sc2.sustain = 0.4f; sc2.vibrato_rate = 52;
+    clip(Sound::screech, layered({{sc, 0}, {sc2, 0.24f}, {h, 0}}, rate, 0.85f), "spawncity:life_screech");
+  }
   for (int f = 0; f < 2; ++f) {  // scream "aaah": a buzzy voice through a vowel formant, pitch up and wavering
     SynthPatch v;
     v.wave = Wave::saw; v.frequency = f ? 520 : 330; v.slide = 1.6f; v.attack = 0.04f; v.sustain = 0.12f; v.release = 0.01f;
@@ -140,6 +169,11 @@ void Game::life_update(f32 dt) {
   v.on_foot = mode_ == Mode::foot;
   v.people_on = ui_.settings.on(Opt::world_people);
   v.birds_on = ui_.settings.on(Opt::world_birds);
+  v.dogs_on = ui_.settings.on(Opt::world_dogs);
+  v.cats_on = ui_.settings.on(Opt::world_cats);
+  v.head = mode_ == Mode::foot ? player_position() + Vec3{0, 0, 0.95f} : player_position();
+  // the wall clock (SpawnCity's Date.now()): herds and pets walk the same on every machine
+  v.epoch = static_cast<f64>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0;
   const Vec3 pv = mode_ == Mode::foot ? world_->actor_velocity(soldier_) : Vec3{};
   v.player_speed = std::hypot(pv.x, pv.y);
   for (std::size_t i = 0; i < cars_.size(); ++i) {
@@ -309,6 +343,16 @@ void Game::life_update(f32 dt) {
     mixer_.play(G.clips[static_cast<u32>(s.sound)], pp);
   }
   for (const LifeOut::Burst& b : out.bursts) world_->particle_burst(b.at, b.color);
+  // the black cat got the player (damage 100000, "black-cat")
+  if (out.kill_player && mode_ == Mode::foot) { world_->damage(soldier_, 100000, 0, false, v.head); toast_ = "Die schwarze Katze."; toast_age_ = 0; }
+  // cow deaths go to the other players (cows.mjs sendDeath)
+  for (const LifeOut::CowDeath& d : out.cow_deaths) {
+    net::Fx f;
+    f.kind = net::Fx::cow_death;
+    f.p = d.at;
+    f.dir = d.impulse * (1.0f / 600);
+    net_.send_fx(f);
+  }
   for (const LifeOut::Impulse& im : out.impulses)
     if (im.car >= 0 && im.car < static_cast<i32>(cars_.size())) world_->push_actor(cars_[im.car].actor, im.impulse, true);
   for (const LifeOut::Say& s : out.speech) G.speech.push_back(s);
@@ -363,8 +407,37 @@ bool Game::life_shot(Vec3 from, Vec3& to, f32 damage) {
 
 void Game::life_blast(Vec3 at, f32 radius) {
   if (!glife_ || !glife_->ready) return;
+  // the other players feel the blast on their own machines (player_push.mjs: a velocity change)
+  for (const net::Remote& r : net_.remotes()) {
+    const Vec3 d = r.shown - at;
+    const f32 l = kern::length(d);
+    if (l > radius * 1.5f || l < 0.01f) continue;
+    net::Fx f;
+    f.kind = net::Fx::push;
+    f.p = d * ((1 - l / (radius * 1.5f)) * 8 / l) + Vec3{0, 0, 3 * (1 - l / (radius * 1.5f))};
+    f.dir = {static_cast<f32>(r.state.slot), 0, 0};
+    f.a = 0;
+    net_.send_fx(f);
+  }
   glife_->blasts.push_back({at, radius, world_->sim_time()});
   glife_->life.blast(at, radius, world_->sim_time(), glife_->out);
+}
+
+bool Game::life_punch(Vec3 from, Vec3& to) {
+  if (!glife_ || !glife_->ready) return false;
+  return glife_->life.shot(from, to, 6, world_->sim_time(), glife_->out, true);
+}
+
+void Game::life_net_fx(const net::Fx& f) {
+  if (!glife_ || !glife_->ready || !world_) return;
+  if (f.kind == net::Fx::cow_death) {
+    glife_->life.remote_cow_death(f.p, f.dir * 600.0f, world_->sim_time(), glife_->out);
+  } else if (f.kind == net::Fx::push && static_cast<u8>(f.dir.x + 0.5f) == net_.self_slot() && mode_ == Mode::foot) {
+    // player_push.mjs: the push applies to me, here, with the same physics (at most 40 m/s)
+    const Vec3 dv{clampf(f.p.x, -40, 40), clampf(f.p.y, -40, 40), clampf(f.p.z, -40, 40)};
+    world_->set_actor_velocity(soldier_, world_->actor_velocity(soldier_) + dv);
+    if (f.a > 0) world_->damage(soldier_, std::fmin(100.0f, f.a), 0, false, player_position() - dv);
+  }
 }
 
 void Game::life_hud(std::string& s) {
@@ -419,7 +492,7 @@ void Game::life_hud(std::string& s) {
 bool Game::life_command(const std::string& cmd, std::string& out) {
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (!(starts("cows") || starts("pigeons") || starts("joggers") || starts("ragdoll") || starts("shout") || starts("honk") || starts("interior") || starts("life") ||
-        starts("knock") || starts("birds")))
+        starts("knock") || starts("birds") || starts("pets") || cmd == "cat"))
     return false;
   if (!glife_ || !glife_->ready) { out = "life not ready"; return true; }
   GameLife& G = *glife_;
@@ -477,7 +550,8 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     // Tests: a passer-by-like body thrown in front of the player
     Ragdolls::Colors col;
     const Vec3 at = me + look * 3;
-    const bool ok = G.life.ragdolls().spawn(0x7e570000ull + G.life.ragdolls().spawned(), at, std::atan2(look.y, look.x), look * 4 + Vec3{0, 0, 2}, col, false, now);
+    G.test_doll = 0x7e570000ull + G.life.ragdolls().spawned();
+    const bool ok = G.life.ragdolls().spawn(G.test_doll, at, std::atan2(look.y, look.x), look * 4 + Vec3{0, 0, 2}, col, false, now);
     std::snprintf(b, sizeof b, "{\"ok\":%s,\"active\":%u}", ok ? "true" : "false", G.life.ragdolls().active());
     out = b;
     return true;
@@ -485,8 +559,7 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   if (cmd == "ragdoll state") {
     Vec3 p;
     f32 yaw;
-    const u64 key = 0x7e570000ull + G.life.ragdolls().spawned() - 1;
-    if (!G.life.ragdolls().where(key, p, yaw)) { out = "none"; return true; }
+    if (!G.life.ragdolls().where(G.test_doll, p, yaw)) { out = "{}"; return true; }
     std::snprintf(b, sizeof b, "{\"pelvis\":[%.2f,%.2f,%.2f],\"ground\":%.2f}", p.x, p.y, p.z, city_.ground_height(p.x, p.y));
     out = b;
     return true;
@@ -533,6 +606,29 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
       }
     return true;
   }
+  if (cmd == "pets") {
+    u32 shown = 0, dead = 0, cats = 0;
+    for (std::size_t i = 0; i < G.life.pets().size(); ++i) {
+      const Life::Pet& p = G.life.pets()[i];
+      shown += p.shown ? 1 : 0;
+      dead += p.dead_at >= 0 ? 1 : 0;
+      cats += G.life.species(static_cast<u32>(i), G.life.epoch()) != Life::Species::dog ? 1 : 0;
+    }
+    std::snprintf(b, sizeof b, "{\"pets\":%u,\"shown\":%u,\"dead\":%u,\"cats\":%u,\"blackCat\":%s,\"charging\":%s}", static_cast<u32>(G.life.pets().size()), shown, dead, cats,
+                  G.life.species(1, G.life.epoch()) == Life::Species::black_cat ? "true" : "false", G.life.cat_attack().on ? "true" : "false");
+    out = b;
+    return true;
+  }
+  if (cmd == "pets kill") {
+    // Tests: a blast on the first dog that is out
+    for (std::size_t i = 0; i < G.life.pets().size(); ++i) {
+      const Life::Pet& p = G.life.pets()[i];
+      if (p.shown && p.dead_at < 0 && G.life.species(static_cast<u32>(i), G.life.epoch()) == Life::Species::dog) { life_blast(p.pos, 3); break; }
+    }
+    out = "ok";
+    return true;
+  }
+  if (cmd == "cat") { out = G.life.provoke_cat(now) ? "charging" : "no black cat"; return true; }
   if (cmd == "birds") {
     std::snprintf(b, sizeof b, "{\"birds\":%u,\"first\":[%.1f,%.1f,%.1f]}", static_cast<u32>(G.life.birds().size()), G.life.birds()[0].pos.x, G.life.birds()[0].pos.y,
                   G.life.birds()[0].pos.z);

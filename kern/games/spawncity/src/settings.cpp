@@ -60,12 +60,18 @@ constexpr OptSpec kSpecs[] = {
     {"world.dogs", "welt", "Hunde", "Hunde, die durch das Viertel streifen.", 0, 1, 1, 1, true, false},
     {"world.cats", "welt", "Katzen", "Katzen, auch die schwarze.", 0, 1, 1, 1, true, false},
     {"world.birds", "welt", "Voegel", "Schwaerme am Himmel.", 0, 1, 1, 1, true, false},
-    {"world.zombies", "welt", "Zombies", "Zombienaechte nach Einbruch der Dunkelheit.", 0, 1, 1, 1, true, false},
+    {"world.zombies", "welt", "Zombies", "Zombienaechte nach Einbruch der Dunkelheit.", 0, 1, 1, 1, true, true},
     {"world.police", "welt", "Polizei", "Polizeidrohnen und Beamte, wenn du gesucht wirst.", 0, 1, 1, 1, true, true},
-    {"world.military", "welt", "Militaer", "Soldaten, Panzer und Hubschrauber bei hoher Fahndung.", 0, 1, 1, 1, true, false},
-    {"world.flak", "welt", "Flak", "Ab und zu ein Flakgeschuetz, das auf Drohne und Jet feuert.", 0, 1, 1, 1, true, false},
+    {"world.military", "welt", "Militaer", "Soldaten, Panzer und Hubschrauber bei hoher Fahndung.", 0, 1, 1, 1, true, true},
+    {"world.flak", "welt", "Flak", "Ab und zu ein Flakgeschuetz, das auf Drohne und Jet feuert.", 0, 1, 1, 1, true, true},
     {"world.jetpack", "welt", "Jetpack", "Zweimal springen fuer einen kurzen Jetpack-Schub ueber Haeuser. Laedt sich am Boden auf.", 0, 1, 1, 1, true, true},
     {"world.friendlyFire", "welt", "Friendly Fire", "Spielerwaffen treffen andere Spieler.", 0, 1, 1, 0, true, true},
+    // first_person_control_settings.mjs aimAssistStrengthPercent 0..100 (55); settings_help.mjs view rows
+    {"foot.aimAssist", "fuss", "Zielhilfe", "Sanfter Zug zu Zielen nahe am Fadenkreuz mit Xbox-Pad und Touch. 0 schaltet sie aus.", 0, 100, 1, 55, false, true},
+    {"view.grid", "kamera", "1-m-Raster", "Zeichnet ein Referenzraster von 1 m. Nur Anzeige; hilft, Abstand und Hoehe zu schaetzen.", 0, 1, 1, 0, true, true},
+    {"view.keepLook", "kamera", "Blick halten", "AUS: der Blick schwingt nach vorn zurueck, wenn du loslaesst. AN: er bleibt, wo du ihn gelassen hast.", 0, 1, 1, 0, true, true},
+    {"view.minimapNorth", "kamera", "Minimap nach Norden", "Haelt die Minimap genordet, statt sie mit dir zu drehen.", 0, 1, 1, 0, true, true},
+    {"debug.colliders", "kamera", "Box3D-Kollision zeigen", "Zeigt die Box3D-Kollisionsformen als Drahtgitter. Nur Anzeige, kostet Bildrate.", 0, 1, 1, 0, true, true},
 };
 static_assert(sizeof kSpecs / sizeof kSpecs[0] == static_cast<u32>(Opt::count), "one row per option");
 
