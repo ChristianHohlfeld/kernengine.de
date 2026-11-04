@@ -40,6 +40,7 @@ enum PlayerFlag : u16 {
   kProtected = 128,   // spawn protection
   kTalking = 256,     // the microphone is live
   kCockpit = 512,
+  kJetpack = 1024,    // the jetpack burns (jetpack_audio.mjs: the others hear it in 3-D; game_equipment.cpp)
 };
 
 /// One player's state as the others see it.

@@ -242,7 +242,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     mctx.beginPath(); mctx.arc(R, R, R - 2, 0, Math.PI * 2); mctx.clip();
     // Heading up: rotate the world so the view direction points to the top.
     mctx.translate(R, R);
-    mctx.rotate(m.me[2] - Math.PI / 2);
+    const northUp = !!last?.ui?.northUp;  // settings: minimap north-up (settings_help.mjs worldMinimapAxisLock)
+    if (!northUp) mctx.rotate(m.me[2] - Math.PI / 2);
     mctx.scale(scale, -scale);
     mctx.strokeStyle = "rgba(220, 226, 235, .75)"; mctx.lineWidth = 5 / scale * 0.9; mctx.lineCap = "round";
     for (const l of m.lanes) { mctx.beginPath(); for (let i = 0; i < l.length; i += 2) (i ? mctx.lineTo : mctx.moveTo).call(mctx, l[i], l[i + 1]); mctx.stroke(); }
@@ -252,7 +253,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     for (const p of m.police) dot(p, Math.floor(performance.now() / 250) % 2 ? "#ff4040" : "#4c7dff", 6);
     mctx.restore();
     // The player in the middle: an arrow pointing up.
-    mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
+    mctx.save(); mctx.translate(R, R); if (northUp) mctx.rotate(Math.PI / 2 - m.me[2]);
+    mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(0, -12); mctx.lineTo(8, 9); mctx.lineTo(0, 4); mctx.lineTo(-8, 9); mctx.closePath(); mctx.fill(); mctx.restore();
   }, 250);
   requestAnimationFrame(tick);
   // hud() reads the game's state now (not the copy of the last drawn frame): a test that sends a

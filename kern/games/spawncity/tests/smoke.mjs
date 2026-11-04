@@ -284,6 +284,13 @@ async function run({name, url, context, mapped}) {
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     h = await hud();
     check(resetOk && h.ui.resets === resets + 1 && h.mode === "foot", `[${name}] RESET back to the start (${h.ui.resets}, ${h.mode})`);
+    // The suggestion box signs its Nostr event in the game (nostr.cpp).
+    const ev = await cmd(`nostr event 1700000000 ${"0".repeat(63)}3 ${"0".repeat(64)} [["t","spawncity-suggestion"]] Mehr Jets bitte`);
+    check(ev.startsWith("{") && /"sig":"[0-9a-f]{128}"/.test(ev), `[${name}] suggestion signed as a Nostr event`);
+    check(await cmd("set view.grid 1") === "ok", `[${name}] 1 m grid on`);
+    await page.waitForTimeout(500);
+    await shot("0c-grid");
+    await cmd("set view.grid 0");
     // LIVE GPS: two fixes 20 m apart move the player there.
     const o = (await hud()).ui.origin;
     check(await cmd("gps on") === "on", `[${name}] GPS live on`);
