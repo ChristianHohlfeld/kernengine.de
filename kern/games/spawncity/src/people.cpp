@@ -43,9 +43,10 @@ f32 segment_distance2(Vec3 p0, Vec3 p1, Vec3 q0, Vec3 q1, f32& s, Vec3& on_q) {
   return kern::dot(dd, dd);
 }
 
-bool inside_building(const kern::physics::World& w, Vec3 p) {
-  const RayResult h = cast(w, {p.x, p.y, 60}, {0, 0, -1}, 70, {}, kCatWorld);
-  return h.hit && h.point.z > 0.35f;
+bool inside_building(const kern::physics::World& w, Vec3 p, f32 ground) {
+  // A roof above the ground here (the terrain itself answers at ground height).
+  const RayResult h = cast(w, {p.x, p.y, ground + 60}, {0, 0, -1}, 70, {}, kCatWorld);
+  return h.hit && h.point.z > ground + 0.35f;
 }
 
 }  // namespace
@@ -134,13 +135,13 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     route_point(p, lanes, at, heading);
     const f32 d = dist2d(at, view.focus);
     if (d < near || d > kShow) continue;
-    if (inside_building(*view.physics, at)) {
+    if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
       p.side = -p.side;  // the other pavement, else closer to the kerb
       route_point(p, lanes, at, heading);
-      if (inside_building(*view.physics, at)) {
+      if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
         p.off = L.width * 0.5f + 0.5f;
         route_point(p, lanes, at, heading);
-        if (inside_building(*view.physics, at)) continue;
+        if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) continue;
       }
     }
     const u32 seed = serial_++ * 2654435761u;
@@ -376,6 +377,8 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       walk(p, dt, now, view, rng);
     }
     p.phase += p.v * dt * 3.4f;
+    // On the terrain (terrain.h): everybody stands on the ground's surface.
+    p.pos.z = view.city->ground_height(p.pos.x, p.pos.y);
     // Vehicles: knocked down by anything driving into them (SpawnCity: person-hit / person).
     for (const VehicleView& v : view.vehicles) {
       if (v.airborne) {

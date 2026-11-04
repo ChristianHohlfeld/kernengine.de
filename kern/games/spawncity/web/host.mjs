@@ -3,6 +3,8 @@
 //   * runs the Kern App host (kern/web/app.mjs: canvas, WebGL2, frame loop, keyboard / mouse)
 //   * fetches the map tiles the game asks for (OpenFreeMap vector tiles, (c) OpenStreetMap
 //     contributors) and hands the bytes over; no map service -> the game builds its stand-in town
+//   * fetches the elevation tiles it asks for (Terrarium PNGs, AWS Open Data Terrain Tiles) and
+//     hands over the decoded RGBA pixels (the browser decodes PNGs; the heights are the game's)
 //   * polls the gamepad and routes touch fingers (CSS px) to the game
 //   * plays the samples Kern's mixer renders (KernAudio from kern/web/studio/game.mjs)
 //   * draws the HUD from the game's JSON and the touch controls with Kern's TouchOverlay
@@ -14,6 +16,8 @@ import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
+// Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
+const SC_DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const SC_MAX_FETCHES = 4;
 
 /** Starts the game in the page (index.html). Module: url (dev) or base64 (single file). */
@@ -100,6 +104,34 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (list.length) tiles.queue.push(...list);
     if (!tiles.template || tiles.failed) return;
     while (tiles.active < SC_MAX_FETCHES && tiles.queue.length) fetchTile(tiles.queue.shift());
+  }
+  // ---- elevation tiles -------------------------------------------------------------------------
+  const dem = {template: params.get("demtiles") || SC_DEM, queue: [], active: 0, done: 0};
+  async function fetchDem([z, x, y]) {
+    dem.active++;
+    try {
+      const res = await fetchWithTimeout(dem.template.replace("{z}", z).replace("{x}", x).replace("{y}", y), 12000);
+      if (!res.ok) throw Error("dem " + res.status);
+      const bitmap = await createImageBitmap(await res.blob(), {colorSpaceConversion: "none", premultiplyAlpha: "none"});
+      const c = new OffscreenCanvas(bitmap.width, bitmap.height), g = c.getContext("2d", {willReadFrequently: true});
+      g.drawImage(bitmap, 0, 0);
+      const px = g.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      const ptr = e.kern_alloc(px.length);
+      new Uint8Array(kern.memory.buffer, ptr, px.length).set(px);
+      e.sc_dem_data(z, x, y, ptr, bitmap.width, bitmap.height);
+      e.kern_free(ptr);
+      dem.done++;
+    } catch (error) {
+      console.warn("[spawncity] elevation tile", z, x, y, error?.message || error);
+      e.sc_dem_failed(z, x, y);
+    } finally {
+      dem.active--;
+    }
+  }
+  function pumpDem() {
+    const list = JSON.parse(str(e.sc_dem_requests()));
+    if (list.length) dem.queue.push(...list);
+    while (dem.active < SC_MAX_FETCHES && dem.queue.length) fetchDem(dem.queue.shift());
   }
   if (offline) e.sc_offline();
   else loadTemplate().catch(error => {
@@ -191,6 +223,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     frames++;
     pollPad();
     pumpTiles();
+    pumpDem();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
@@ -254,7 +287,8 @@ class SpawnCityHud {
       <div class="sc-help"></div>
       <div class="sc-attrib"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> ·
         <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ·
-        <a href="https://openmaptiles.org" target="_blank" rel="noopener">© OpenMapTiles</a> · Kern Engine</div>`;
+        <a href="https://openmaptiles.org" target="_blank" rel="noopener">© OpenMapTiles</a> ·
+        <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Höhen: Terrain Tiles (Mapzen, AWS Open Data)</a> · Kern Engine</div>`;
     const q = s => this.root.querySelector(s);
     this.el = {badge: q(".sc-badge"), stars: q(".sc-stars"), fps: q(".sc-fps"), toast: q(".sc-toast"), offline: q(".sc-offline"), cross: q(".sc-cross"),
       speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"),

@@ -97,6 +97,8 @@ struct PoliceDrone {
   u32 shots = 0, serial = 0;
 };
 
+struct WorldLife;  // game_world.h
+
 class Game {
  public:
   Game();
@@ -199,6 +201,15 @@ class Game {
   // world dressing
   void update_lamps();
   std::string map_json();
+  // the world (game_world.cpp, M3): terrain and water physics, craters and marks, traffic rules,
+  // animals and street life, interiors, ragdolls. State lives in WorldLife (game_world.h).
+  void hud_world(std::string& s);
+  void update_world(f32 dt);
+  void step_world(f32 h);
+  void draw_world();
+  bool world_command(const std::string& cmd, std::string& out);
+  void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
+  std::unique_ptr<WorldLife> life_;
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);

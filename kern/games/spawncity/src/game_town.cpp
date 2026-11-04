@@ -223,6 +223,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
     const f32 d = kern::length(matrix_of(c.actor).translation() - at);
     if (d < radius * 1.2f) damage_car(static_cast<i32>(i), damage * 2.7f * weapons::blast_factor(d, radius * 1.2f, false), by_player);
   }
+  world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -387,7 +388,7 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
     for (PoliceUnit::Cop& cop : u.cops) {
       if (!cop.inside || !cop.seed) continue;
       Vec3 at = pos + fwd * 0.25f + left * (1.35f * static_cast<f32>(cop.seat));
-      at.z = 0;
+      at.z = city_.ground_height(at.x, at.y);
       if (!line_of_sight(pos + Vec3{0, 0, 1.0f}, at + Vec3{0, 0, 1.0f})) at = pos - fwd * 2.6f;
       at.z = city_.ground_height(at.x, at.y);
       cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, static_cast<i32>(&u - units_.data()), cop.seed);
@@ -567,7 +568,7 @@ bool Game::update_police_drones(f32 dt) {
       d.vel = d.vel * std::exp(-0.3f * dt);
       const Vec3 step = d.vel * dt;
       const RayResult r = cast(world_->physics(), d.pos, kern::normalize(step, {0, 0, -1}), kern::length(step) + 0.2f, {}, kCatWorld);
-      if (r.hit || d.pos.z < 0.2f) {
+      if (r.hit || d.pos.z < city_.ground_height(d.pos.x, d.pos.y) + 0.2f) {
         explosion(r.hit ? r.point : d.pos, 2.5f, 25, true);
         d.active = false;
         d.destroyed_until = now + kPdRespawn;

@@ -89,6 +89,35 @@ function syntheticTile(z, x, y) {
   return zlib.gzipSync(Buffer.from([...layer("building", houses), ...layer("transportation", roads), ...layer("water", water), ...layer("park", park)]));
 }
 
+// ---- a synthetic Terrarium elevation tile (PNG, RGB = (h + 32768) * 256): rolling hills ----
+function crc32(buf) {
+  let c = ~0;
+  for (const b of buf) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  return ~c >>> 0;
+}
+function png(width, height, rgb) {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]), crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) { raw[y * (width * 3 + 1)] = 0; rgb.copy(raw, y * (width * 3 + 1) + 1, y * width * 3, (y + 1) * width * 3); }
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+function syntheticDem(z, x, y) {
+  const rgb = Buffer.alloc(256 * 256 * 3);
+  for (let j = 0; j < 256; j++)
+    for (let i = 0; i < 256; i++) {
+      const gx = x * 256 + i, gy = y * 256 + j;  // ~13 m per pixel at z13
+      const v = 400 + 18 * Math.sin(gx / 60) + 12 * Math.cos(gy / 45) + 32768;
+      const o = (j * 256 + i) * 3;
+      rgb[o] = Math.floor(v / 256); rgb[o + 1] = Math.floor(v) % 256; rgb[o + 2] = Math.floor((v % 1) * 256);
+    }
+  return png(256, 256, rgb);
+}
+
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
 
 async function run({name, url, context, mapped}) {
@@ -100,6 +129,10 @@ async function run({name, url, context, mapped}) {
   let tileRequests = 0;
   if (mapped) {
     await page.route("https://tiles.test/planet", r => r.fulfill({contentType: "application/json", body: JSON.stringify({tiles: ["https://tiles.test/t/{z}/{x}/{y}.pbf"]})}));
+    await page.route("https://dem.test/**", r => {
+      const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.png/).slice(1).map(Number);
+      return r.fulfill({body: syntheticDem(z, x, y), headers: {"content-type": "image/png"}});
+    });
     await page.route("https://tiles.test/t/**", r => {
       tileRequests++;
       const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.pbf/).slice(1).map(Number);
@@ -144,6 +177,14 @@ async function run({name, url, context, mapped}) {
   check(mapped ? h.realData && !h.offline : h.offline, `[${name}] ${mapped ? "map tiles loaded through the MVT path" : "offline stand-in town"} (tiles ${JSON.stringify(h.tiles)})`);
   check(h.tiles.buildings > 50 && h.tiles.colliders > 50, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
   if (mapped) check(tileRequests >= 1, `[${name}] tiles fetched by the page (${tileRequests})`);
+  // The ground (terrain.h): real elevation through the Terrarium path, water basins, the player on it.
+  if (mapped) check(h.terrain?.dem && h.terrain.max - h.terrain.min > 5, `[${name}] terrain elevation loaded (${JSON.stringify(h.terrain)})`);
+  else check(h.terrain?.settled && !h.terrain.dem, `[${name}] flat ground offline (${JSON.stringify(h.terrain)})`);
+  check(h.terrain?.water > 100 && h.terrain.collision > 4, `[${name}] water cells and ground collision (${JSON.stringify(h.terrain)})`);
+  {
+    const g = JSON.parse(await cmd("ground"));
+    check(Math.abs(g.playerZ - 0.73 - g.z) < 0.3, `[${name}] the player stands on the terrain (${JSON.stringify(g)})`);
+  }
   await shot("0-start");
 
   // On foot: walk 3 s.
@@ -224,7 +265,7 @@ async function run({name, url, context, mapped}) {
 
 try {
   const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
-  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet", mapped: true, context: {viewport: {width: 1280, height: 720}}});
+  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&demtiles=https://dem.test/{z}/{x}/{y}.png", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});
 } finally {

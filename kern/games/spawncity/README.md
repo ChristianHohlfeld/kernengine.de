@@ -9,6 +9,7 @@ Vorlage für Inhalt, Werte und Verhalten ist das laufende SpawnCity (`nostack-de
 
 Stand: **Meilenstein 2** – alle Modi, dazu die Stadt mit Leuten, Polizei und Fahndung, das ganze
 Waffenset mit Explosionen und Fahrzeugschaden, Mehrspieler, Minimap und Straßenlaternen.
+**Meilenstein 3 (Welt, Branch `sc-m3-world`):** echtes Gelände (Höhenkacheln), siehe „Welt (M3)“ unten.
 
 ## Starten
 
@@ -31,6 +32,8 @@ Startparameter (Query-String):
 | `fpvtilt=-15…50` | Neigung der FPV-Kamera (SpawnCity-Standard −15°) |
 | `mouse=20…300` | Mausempfindlichkeit in % |
 | `tilejson=URL`, `tiles=URL-Vorlage` | andere Kartenquelle (Tests) |
+| `dem=0` | ohne Höhenkacheln (flaches Gelände) |
+| `demtiles=URL-Vorlage` | andere Terrarium-Höhenquelle (Tests), `{z}/{x}/{y}` |
 | `mute=1` | ohne Ton |
 | `mp=host&room=NAME` / `mp=join&room=NAME` | Mehrspieler: hosten / beitreten (Tabs eines Browsers über BroadcastChannel) |
 | `relay=wss://…` | dazu: über das Kern-Relay (`tools/net_relay.mjs`) zwischen Rechnern |
@@ -70,6 +73,9 @@ kern/games/spawncity/
     car.*         Fahrzeugmodell (Reifen, Lenkung, Antrieb aus world_vehicle_dynamics.mjs) auf Raycast-Fahrwerk
     mvt.*         Mapbox-Vector-Tile-Decoder (zeitgeteilt) + kleiner Writer (Tests)
     tiles.*       Kachelmathematik, OpenMapTiles-Ebenen → Gebäude/Straßen/Flächen, prozedurale Ersatzstadt
+    terrain.*     Gelände (M3): Terrarium-Höhen → Bare-Earth-Raster, Wasserbecken, Krater, Bodenkacheln
+                  (Render-LOD mit Schürzen, Box3D-Dreiecksnetze mit Überlappung), eine Höhenfunktion für alles
+    game_world.*  Welt (M3): HUD/Befehle des Geländes; Wasserphysik, Spuren, Verkehrsregeln, Tiere usw.
     city_stream.* Kachel-Streaming: Decodieren → BuildingBuilder/RoadBuilder → Meshes → Box3D-Kollision,
                   alles mit Zeitbudget; Entladen ferner Kacheln; Fahrspuren für den Verkehr
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
@@ -113,7 +119,7 @@ kern/games/spawncity/
 * **Welt:** Der Browser holt OpenFreeMap-Vektorkacheln (z14, OpenMapTiles-Schema), C++ decodiert sie.
   3×3 Kacheln um den Spieler (≈ 5 km), Entladen jenseits eines Rings. Jede Stufe hat ein Zeitbudget
   (3–4 ms pro Frame), auch das Hochladen einzelner Chunk-Meshes. Kollision: ein Box3D-Dreiecksnetz je
-  Gebäude (Wände + Dach). Boden: Kerns Ebene (Höhenmodell kommt später). Ohne Netz baut das Spiel eine
+  Gebäude (Wände + Dach). Boden: das Gelände (`terrain.*`, siehe „Welt (M3)“). Ohne Netz baut das Spiel eine
   prozedurale Ersatzstadt; das HUD sagt das deutlich („OFFLINE · prozedurale Ersatzstadt“).
 * **Host-Schnittstelle** (`main.cpp`): `sc_tile_requests/sc_tile_data/sc_tile_failed/sc_offline`,
   `sc_gamepad`, `sc_touch_frame/sc_touch/sc_touch_view`, `sc_hud`, `sc_command`,
@@ -130,6 +136,31 @@ kern/games/spawncity/
 * **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
   verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
   andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
+
+## Welt (M3)
+
+* **Gelände** (`terrain.*`, Vorlage `terrain_elevation.mjs`, `terrain_craters.mjs`, `terrain_tiles.mjs`,
+  `terrain_surface.mjs`): Quelle wie auf spawncity.de die öffentlichen **Terrarium-Höhenkacheln**
+  (Mapzen „Terrain Tiles“ auf AWS Open Data, SRTM/EU-DEM/3DEP u. a.; Namensnennung im Spiel rechts unten).
+  Die Seite holt die PNGs, die das Spiel anfordert, und gibt die RGBA-Pixel weiter (`sc_dem_requests`,
+  `sc_dem_data`, `sc_dem_failed`); C++ decodiert (h = R·256 + G + B/256 − 32768), tastet ein Raster ab
+  und macht aus dem Radar-Oberflächenmodell nacktes Gelände (morphologische Öffnung 160 m, zwei Box-Blurs
+  30 m, `bareEarth`). Höhen relativ zum Ursprung (z = 0 bleibt am Startpunkt). Abweichung von SpawnCity:
+  z13 und 10-m-Raster über 8 km (statt z14/5 m über 2,6 km), weil Kerns Kachelring ≈ 5 km breit ist;
+  nach der 160-m-Öffnung trägt die feinere Stufe keine Information mehr (Quelle ist 30-m-SRTM).
+  Neu geladen nach 2 km Weg. Ohne erste Höhen (Dienst nicht erreichbar, `offline=1`, `dem=0`) bleibt
+  das Gelände flach – nie erfundene Höhen (wie SpawnCity).
+* **Eine Höhenfunktion:** Knoten alle 5 m (Höhe + Krater, Wasserbecken), Dreiecke mit SW–NE-Diagonale.
+  Dieselbe Funktion für Box3D-Boden, Bodennetz, Straßen (RoadBuilder drapiert auf ihr), Flächen
+  (zerschnitten an Raster und Diagonale wie `drapeTerrainTriangle`), Gebäude (stehen auf dem tiefsten
+  Punkt ihres Umrisses, `buildingGroundBase`), Leute, Autos, Spawns, Polizei.
+* **Box3D-Boden:** Kern hat keinen Heightfield-Shape. Deshalb je 160-m-Kachel ein statisches
+  Dreiecksnetz (32×32 Zellen à 5 m) mit einer Zelle Überlappung und abgesenktem Außenring (5 cm) wie
+  `terrain_tiles.mjs` – die Naht ist für beide Kacheln eine innere Kante. Gebaut im Umkreis 420 m um den
+  Fokus und 200 m um den Spieler (zeitgeteilt, neues Netz zuerst, dann das alte weg).
+* **Bodennetz:** 640-m-Blöcke bis 3,2 km (40-m-Knoten); Blöcke nahe dem Spieler als 160-m-Kacheln
+  (5 m nah, 20 m weiter); Schürzen gegen Risse zwischen den Stufen. Straßen und Flächen werden neu
+  verlegt, wenn sich der Boden darunter ändert (Wasser einer Nachbarkachel, Krater).
 
 ## Übernommene SpawnCity-Werte (Auszug)
 
@@ -176,6 +207,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   (`nostack-dev/spawncity-de/esp32`, Christian Hohlfeld) und steht hier ebenfalls unter Apache 2.0.
 * Kartendaten: © OpenStreetMap-Mitwirkende, ODbL 1.0; Vektorkacheln von OpenFreeMap im
   OpenMapTiles-Schema (© OpenMapTiles). Die Namensnennung steht dauerhaft im Spiel (rechts unten).
+* Höhen: „Terrain Tiles“ (Mapzen, auf AWS Open Data, frei nutzbar mit Namensnennung der Quellen
+  SRTM, EU-DEM, 3DEP u. a., siehe https://github.com/tilezen/joerd/blob/master/docs/attribution.md);
+  im Spiel rechts unten genannt.
 * Gebaut mit `--commercial`: keine Micro-Duck-Meshes (CC BY-NC-SA) im Modul. Keine Pollen-Meshes,
   keine fremden Bilder oder Musik; alle Töne sind Synth-Patches im Spielordner.
 * Kein OSM-Snapshot im Repo: die Umgebung dieses Meilensteins hatte keinen Zugriff auf OSM-Quellen,
@@ -187,7 +221,7 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Carjacking sichtbar aussteigen.
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
-* Gelände (DEM), Wasser mit Auftrieb (die Kacheln liefern Wasserflächen, aber ohne Tiefe), Innenräume,
+* Wasser mit Auftrieb, Innenräume,
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
 * Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
   mehr Fahrzeugtypen.
@@ -202,6 +236,8 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 4. **MVT-Decoder und Kachel-Streaming** (`mvt.*`, `city_stream.*`) als `kern/geo`-Bausteine,
    inklusive zeitgeteiltem Hochladen und Kollisionsaufbau.
 5. **Eigene Imports im App-Host** (z. B. Audio-Ausgabe, Gamepad) – heute fragt die Seite per Export ab.
-6. **Heightfield-Kollision** in `kern::physics` (Box3D hat `b3CreateHeightFieldShape`).
+6. **Heightfield-Kollision** in `kern::physics` (Box3D hat `b3CreateHeightFieldShape`) – heute je
+   Bodenkachel ein Dreiecksnetz (`terrain.cpp`); dazu `destroy_shape`, damit eine Kachel ihren Shape
+   tauschen kann statt den ganzen Körper.
 7. **Kaskaden-Schatten und LOD/Impostor** für große Sichtweiten (Jet).
 8. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.

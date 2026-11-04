@@ -1,5 +1,6 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
 #include "game.h"
+#include "game_world.h"  // WorldLife (M3 world state)
 
 #include <algorithm>
 #include <cstdio>
@@ -140,10 +141,10 @@ kern::game::Level Game::build_level() const {
   l.world.fog_density = 0.00085f;     // stylized_world_style.mjs
   l.world.shadow_distance = mobile_ ? 70 : 110;
   l.world.ao_radius = 1.6f;
-  l.world.ground = true;
+  l.world.ground = false;  // the terrain's ground tiles (terrain.h) are the ground
   l.world.ground_color = {0.36f, 0.40f, 0.31f};
   l.world.ground_friction = 0.8f;
-  l.world.kill_z = -60;
+  l.world.kill_z = -3000;  // real terrain lies below the origin in places (heights are relative to it)
   l.world.ambience = "builtin:city";
   l.world.ambience_volume = 0.35f;
   l.world.reverb = 0.2f;
@@ -245,6 +246,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.eye_height = 1.68f;
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
+  life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer, &windows_);
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   soldier_ = world_->find_actor("Player");
@@ -277,7 +279,8 @@ bool Game::start(kern::Engine& e) {
   for (TrafficCar& c : cars_) world_->set_alive(c.actor, false);
   world_->set_paused(true);  // until the ground under the player is built
 
-  city_.start(e.renderer, world_->physics(), lon_, lat_);
+  // Elevation from the Terrarium tiles unless offline or ?dem=0 (terrain.h).
+  city_.start(e.renderer, world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
@@ -320,13 +323,14 @@ bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const {
     const int steps = r == 0 ? 1 : static_cast<int>(2 * kPi * r / 8);
     for (int i = 0; i < steps; ++i) {
       const f32 a = 2 * kPi * static_cast<f32>(i) / static_cast<f32>(steps);
-      const Vec3 c{center.x + r * std::cos(a), center.y + r * std::sin(a), 0};
+      Vec3 c{center.x + r * std::cos(a), center.y + r * std::sin(a), 0};
+      c.z = city_.ground_height(c.x, c.y);
       bool ok = true;
       for (int ix = -2; ix <= 2 && ok; ++ix)
         for (int iy = -2; iy <= 2 && ok; ++iy) {
-          const Vec3 o{c.x + half.x * static_cast<f32>(ix) * 0.5f, c.y + half.y * static_cast<f32>(iy) * 0.5f, 80};
+          const Vec3 o{c.x + half.x * static_cast<f32>(ix) * 0.5f, c.y + half.y * static_cast<f32>(iy) * 0.5f, c.z + 80};
           const RayResult h = cast(w, o, {0, 0, -1}, 90, {});
-          ok = h.hit && h.point.z < 0.3f;
+          ok = h.hit && h.point.z < city_.ground_height(o.x, o.y) + 0.3f && !city_.terrain().water_at(o.x, o.y);
         }
       if (ok) { out = {c, 0}; return true; }
     }
@@ -529,6 +533,7 @@ void Game::fixed_step(f32 h) {
     if (b.valid()) jet_.step(w, b, h, in);
   }
   drive_traffic(h);
+  step_world(h);  // M3 world: buoyancy, water drag (game_world.cpp)
   if (mode_ == Mode::parachute) step_parachute(h);
 }
 
@@ -661,7 +666,7 @@ void Game::manage_traffic() {
       const Vec3 p = matrix_of(c.actor).translation();
       const f32 d = std::hypot(p.x - me.x, p.y - me.y);
       // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
-      replace = d > 420 || p.z < -5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
+      replace = d > 420 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
       // An abandoned car stays where it was left (SpawnCity: 180 s).
     }
     if (!replace) continue;
@@ -1014,9 +1019,11 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     static f32 traffic_clock = 0;
     traffic_clock += dt;
     if (traffic_clock > 0.5f) { traffic_clock = 0; manage_traffic(); }
+    city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
     update_town(dt);
     update_projectiles(dt);
+    update_world(dt);  // M3 world (game_world.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
@@ -1026,6 +1033,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   world_->present(f.time * 1000.0, cam_.eye);
   draw_vehicles();
   draw_town();
+  draw_world();  // M3 world (game_world.cpp)
   update_sound(dt);
 }
 
@@ -1270,6 +1278,7 @@ std::string Game::hud_json() {
   const StreamStats& st = city_.stats();
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
+  hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
   {
     u32 units = 0;
@@ -1373,7 +1382,7 @@ std::string Game::command(const std::string& cmd) {
     if (m == "jet" && jet_placed_) {
       // Walk up to the jet (debug / tests): stand next to it, then board.
       const Vec3 j = matrix_of(jet_actor_).translation();
-      world_->teleport(soldier_, {j.x + 4, j.y, 0.73f});
+      world_->teleport(soldier_, {j.x + 4, j.y, city_.ground_height(j.x + 4, j.y) + 0.73f});
       switch_mode(Mode::jet);
       return mode_name(mode_);
     }
@@ -1463,6 +1472,10 @@ std::string Game::command(const std::string& cmd) {
   }
   if (cmd == "offline") { city_.go_offline(); return "ok"; }
   if (cmd == "state") return hud_json();
+  {
+    std::string out;  // M3 world test commands (game_world.cpp)
+    if (world_command(cmd, out)) return out;
+  }
   return "unknown command";
 }
 
