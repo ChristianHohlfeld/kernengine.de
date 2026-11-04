@@ -14,6 +14,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
 import {installSpawnCityLife} from "./life.mjs";
 
@@ -157,7 +158,11 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const local = ev => { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
   const finger = type => ev => {
     if (ev.pointerType === "mouse") return;
-    for (const c of (type === 1 && ev.getCoalescedEvents?.()) || [ev]) { const [x, y] = local(c); e.sc_touch(type, c.pointerId, x, y, c.timeStamp); }
+    for (const c of (type === 1 && ev.getCoalescedEvents?.()) || [ev]) {
+      const [x, y] = local(c);
+      const used = e.sc_touch(type, c.pointerId, x, y, c.timeStamp);
+      mpPage?.touch(type, c.pointerId, x, y, used);  // a long press on free ground pings
+    }
     ev.preventDefault();
   };
   canvas.addEventListener("pointerdown", finger(0));
@@ -190,33 +195,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else audio = null;
   }
 
-  // ---- multiplayer -------------------------------------------------------------------------
-  const mp = params.get("mp");
-  if (mp === "host" || mp === "join") {
-    const adapter = {
-      netPush(from, bytes) {
-        const ptr = e.kern_alloc(Math.max(1, bytes.length));
-        new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);
-        e.sc_net_push(from % 4294967296, Math.floor(from / 4294967296), ptr, bytes.length);
-        e.kern_free(ptr);
-      },
-      netTake() {
-        const ptr = e.sc_net_take();
-        if (!ptr) return null;
-        const head = new Uint32Array(kern.memory.buffer, ptr, 3);
-        const bytes = new Uint8Array(kern.memory.buffer, ptr + 12, head[0]).slice();
-        return {to: head[1] + head[2] * 4294967296, bytes};
-      },
-    };
-    const net = new KernNet(adapter);
-    const room = params.get("room") || "spawncity", relay = params.get("relay") || "";
-    net.onstatus = text => { statusEl.textContent = text; statusEl.hidden = !text; };
-    net.open({kind: relay ? "relay" : "local", room, hosting: mp === "host", url: relay})
-      .then(r => command(mp === "host" ? `net host ${r.self}` : `net join ${r.self} ${r.host}`))
-      .catch(error => { statusEl.hidden = false; statusEl.textContent = "Mehrspieler: " + (error?.message || error); });
-    setInterval(() => net.flush(), 16);
-    window.SpawnCityNet = net;
-  }
+  // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
+  const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
+  mpPage.connect(KernNet);
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
@@ -225,6 +206,18 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
   const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
   let frames = 0, last = null;
+  // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
+  // browser owns the canvas size, so the page applies it; app.mjs re-sizes on layout changes and the
+  // next frame applies the scale again.
+  const baseRatio = () => Math.min(globalThis.devicePixelRatio || 1, mobile ? 1.5 : 2);
+  const applyRenderScale = h => {
+    const s = h?.renderScale;
+    if (!(s > 0) || !canvas.clientWidth) return;
+    const r = baseRatio() * s, w = Math.max(1, Math.round(canvas.clientWidth * r)), hh = Math.max(1, Math.round(canvas.clientHeight * r));
+    if (canvas.width === w && canvas.height === hh) return;
+    canvas.width = w; canvas.height = hh;
+    e.kern_app_resize(w, hh);
+  };
   const tick = () => {
     frames++;
     pollPad();
@@ -232,7 +225,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pumpDem();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
-    if (last) hud.update(last, tiles);
+    if (last) { hud.update(last, tiles); mpPage?.update(last); }
+    applyRenderScale(last);
     ui.update(last);
     life.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
@@ -292,7 +286,7 @@ class SpawnCityHud {
       <div class="sc-health"><i></i></div>
       <div class="sc-ammo" hidden></div>
       <div class="sc-hint" hidden></div>
-      <div class="sc-banner" hidden></div><div class="sc-pop" hidden></div><div class="sc-scope" hidden><i></i></div>
+      <div class="sc-banner" hidden></div><div class="sc-pop" hidden></div><div class="sc-scope" hidden><i></i></div><div class="sc-guided" hidden></div>
       <div class="sc-help"></div>
       <div class="sc-attrib"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> ·
         <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ·
@@ -300,8 +294,11 @@ class SpawnCityHud {
         <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Höhen: Terrain Tiles (Mapzen, AWS Open Data)</a> · Kern Engine</div>`;
     const q = s => this.root.querySelector(s);
     this.el = {badge: q(".sc-badge"), stars: q(".sc-stars"), fps: q(".sc-fps"), toast: q(".sc-toast"), offline: q(".sc-offline"), cross: q(".sc-cross"),
-      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"),
+      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"), guided: q(".sc-guided"),
       help: q(".sc-help"), panel: q(".sc-panel")};
+    this.el.perf = Object.assign(document.createElement("div"), {className: "sc-perf", hidden: true});
+    this.el.perf.style.cssText = "position:absolute;left:max(14px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 30px);font:600 11px ui-monospace,monospace;color:#cfe3f5;background:rgba(0,0,0,.45);padding:3px 7px;border-radius:5px;white-space:nowrap";
+    this.root.appendChild(this.el.perf);
     this.key = "";
   }
   update(h, tiles) {
@@ -313,6 +310,14 @@ class SpawnCityHud {
     el.fps.textContent = `${h.fps} fps · ${h.tiles.ready} Kacheln${h.tiles.loading ? ` (+${h.tiles.loading})` : ""} · ${h.tiles.buildings} Gebäude`;
     el.toast.hidden = !h.toast;
     if (h.toast) el.toast.textContent = h.toast;
+    // Frame times (command "perf 1"): ms per part of the frame, quality level, point lights.
+    const p = h.perf;
+    el.perf.hidden = !p?.show;
+    if (p?.show) {
+      const m = p.ms;
+      el.perf.textContent = `${p.fps.toFixed(0)} fps · Logik ${m.logic.toFixed(1)} · Physik ${m.physics.toFixed(1)} · Stadt ${m.stream.toFixed(1)} · Zeichnen ${m.draw.toFixed(1)}` +
+        ` · Render ${m.render.toFixed(1)}${m.gpu >= 0 ? ` · GPU ${m.gpu.toFixed(1)}` : ""} ms · Grafik ${p.tierName}${p.auto ? " (auto)" : ""} · ${p.lights} Lichter`;
+    }
     el.offline.hidden = !h.offline;
     el.cross.hidden = h.mode !== "foot";
     if (h.mode === "foot") el.cross.style.setProperty("--spread", `${8 + h.spread * 7}px`);
@@ -374,5 +379,9 @@ class SpawnCityHud {
     el.pop.hidden = !c?.pop;
     if (c?.pop) el.pop.textContent = c.pop;
     el.scope.hidden = !c?.scope;  // sniper_scope.mjs: black tube, mil-dot reticle, red dot
+    // guided_missile.mjs: reload state under the crosshair, the target of the missile in flight
+    const g = h.guided, gw = h.mode === "drone" && h.weapon === "GUIDED" && g;
+    el.guided.hidden = !gw;
+    if (gw) el.guided.textContent = g.flying > 0 ? `LOCK · ${g.lock} · ${Math.round(g.dist)} m` : g.cd > 0 ? `LENKRAKETE LÄDT · ${g.cd.toFixed(1)} s` : "LENKRAKETE BEREIT";
   }
 }

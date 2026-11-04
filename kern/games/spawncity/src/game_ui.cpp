@@ -252,7 +252,7 @@ void Game::ui_apply_settings() {
   fpv_tilt_deg_ = st.get(Opt::cam_fpv_tilt);
   fpv_fov_deg_ = st.get(Opt::cam_fov);
   // WORLD: switched-off kinds do not exist (world_options.mjs: no bodies, no AI, no draw).
-  people_.set_budget(st.on(Opt::world_people) ? (mobile_ ? 44 : 80) : 0);
+  people_.set_budget(look_people_budget());  // the quality level's budget (game_look.cpp)
   if (!st.on(Opt::world_people)) people_.clear();
 }
 

@@ -70,6 +70,13 @@ class CityStream {
   /// A second point that keeps ground collision under it (the pilot while his drone flies).
   Vec3 anchor;
   const StreamStats& stats() const { return stats_; }
+  /// A building wall (one outline edge) as the facade marks see it (facade_marks.mjs wall index):
+  /// start, unit direction, outward normal, length, base / top of the building, its seed.
+  struct Wall { Vec2 a, dir, normal; f32 len = 0, base = 0, top = 0; u32 seed = 0, edge = 0; };
+  /// Walls of loaded buildings whose outline comes within `r` of p.
+  void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
+  /// The building whose footprint contains p (-1: none); its outer ring, base and top.
+  bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
 
   // ---- street life and interiors (M3 life: life.h, interiors.h) ----

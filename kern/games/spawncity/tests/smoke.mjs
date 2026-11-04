@@ -212,9 +212,49 @@ async function run({name, url, context, mapped}) {
   check((await cmd("attack")).startsWith("1 "), `[${name}] a rocket is fired`);
   await page.waitForFunction(b => window.SpawnCity.hud().explosions > b, booms, {timeout: 300000}).catch(() => {});
   check((await hud()).explosions > booms, `[${name}] the rocket explodes`);
+  // What blasts leave (terrain_craters.mjs, world_impacts.mjs, facade_marks.mjs): a crater in the
+  // terrain, a scorch, soot and a breach on the wall, rubble as Box3D bodies.
+  {
+    const b = await cmd("blast wall");
+    check(b.startsWith("{"), `[${name}] a blast at a wall (${b})`);
+    if (b.startsWith("{")) {
+      const at = JSON.parse(b), g = JSON.parse(await cmd(`ground ${at.x} ${at.y}`));
+      h = await hud();
+      check(h.marks.craters >= 1 && g.z < at.ground - 0.4, `[${name}] a crater in the ground (${at.ground} -> ${g.z})`);
+      check(h.marks.scorch >= 1 && h.marks.soot >= 1 && h.marks.breach >= 1 && h.marks.rubble >= 2, `[${name}] scorch, soot, breach and rubble (${JSON.stringify(h.marks)})`);
+      await shot("1c-blast-marks");
+    }
+  }
   await cmd("weapon 1");
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
+
+  // Performance and look (game_look.cpp): frame times, quality level, day clock, lights, weapon models.
+  {
+    const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(h.perf && h.perf.ms && h.perf.tier >= 0 && h.renderScale > 0, `[${name}] frame times and quality in the HUD (${JSON.stringify(h.perf)})`);
+    check(await cmd("perf 1") === "on", `[${name}] frame-time line on`);
+    await frame();
+    check(await page.locator(".sc-perf").isVisible(), `[${name}] frame-time line shown`);
+    await cmd("perf 0");
+    check(JSON.parse(await cmd("quality 2")).tier === 2, `[${name}] quality level 2 fixed`);
+    await frame(); await frame();
+    const cw = await page.evaluate(() => { const c = document.getElementById("game"), d = devicePixelRatio || 1; return [c.width, ...[1.5, 2].map(cap => Math.round(c.clientWidth * Math.min(d, cap) * 0.85))]; });
+    check(Math.min(Math.abs(cw[0] - cw[1]), Math.abs(cw[0] - cw[2])) <= 1, `[${name}] the drawing buffer follows the level's scale (${cw})`);
+    check(JSON.parse(await cmd("quality auto")).auto === true, `[${name}] quality back to automatic`);
+    check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
+    await frame(); await frame();
+    h = await hud();
+    check(h.night > 0.6 && h.clock === "22:00", `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);
+    check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
+    await shot("1c-night");
+    await cmd("time 0.40");
+    check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
+    await frame(); await frame();
+    check((await hud()).look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify((await hud()).look)})`);
+    await cmd("weapon 1");
+  }
 
   // Street life, ragdolls, interiors (game_life.cpp, M3 life).
   {
@@ -344,12 +384,30 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
+  // GUIDED (guided_missile.mjs): a press launches, a second one within 5 s is refused.
+  const g1 = await cmd("guided");
+  check(g1.startsWith("launched"), `[${name}] GUIDED missile launched (${g1})`);
+  check(await cmd("guided") === "denied" && (await hud()).guided?.cd > 3, `[${name}] GUIDED reloads 5 s (${JSON.stringify((await hud()).guided)})`);
+  {
+    const tg = (await hud()).t, booms = (await hud()).explosions;
+    await page.waitForFunction(([t, b]) => { const h = window.SpawnCity.hud(); return h.explosions > b || h.t > t + 25; }, [tg, booms], {timeout: 400000}).catch(() => {});
+    check((await hud()).explosions > booms && (await hud()).guided.flying === 0, `[${name}] the GUIDED missile went off`);
+  }
+  // critical_damage_logic.mjs: the drone at 28 % smokes and blows 2.05 s later.
+  check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
+  check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
+  // Traffic (world_traffic.h): junctions from the street graph, lights on the main roads.
+  {
+    const tr = JSON.parse(await cmd("traffic"));
+    check(tr.junctions > 3 && (mapped ? tr.lights > 0 : true), `[${name}] junctions and traffic lights (${JSON.stringify(tr)})`);
+  }
   const car = await cmd("mode car");
   check(car === "car", `[${name}] car mode (${car})`);
+  check(JSON.parse(await cmd("traffic")).ejected >= 1 || car !== "car", `[${name}] the carjacked driver got out`);
   if (car === "car") {
     if (context.hasTouch) await touchHold(vw - 110, vh - 110);
     else await hold(["KeyW"]);
@@ -401,8 +459,82 @@ async function run({name, url, context, mapped}) {
   await ctx.close();
 }
 
+// ---- multiplayer: two tabs of one browser (BroadcastChannel), host + client --------------------
+async function runMultiplayer() {
+  const ctx = await browser.newContext({viewport: {width: 640, height: 360}});
+  const errors = [];
+  const open = async q => {
+    const p = await ctx.newPage();
+    p.on("pageerror", e => errors.push(e.message));
+    await p.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${q}`);
+    return p;
+  };
+  const room = "smoke" + Math.floor(Math.random() * 1e6);
+  const A = await open(`?offline=1&mute=1&mp=host&room=${room}`);
+  await A.waitForFunction(() => window.SpawnCity?.hud()?.placed, null, {timeout: 300000});
+  // The client starts somewhere else: it must take the host's map origin.
+  const B = await open(`?offline=1&mute=1&mp=join&room=${room}&lat=47.67&lon=9.18`);
+  await B.waitForFunction(() => window.SpawnCity?.hud()?.net?.connected && window.SpawnCity.hud().placed, null, {timeout: 400000});
+  const hud = p => p.evaluate(() => window.SpawnCity.hud());
+  const cmd = (p, c) => p.evaluate(c => window.SpawnCity.command(c), c);
+  const until = (p, fn, arg, ms = 120000) => p.waitForFunction(fn, arg, {timeout: ms}).then(() => true).catch(() => false);
+  check(await until(A, () => window.SpawnCity.hud().mp?.players?.length === 1) && await until(B, () => window.SpawnCity.hud().mp?.players?.length === 1),
+    "[mp] host and client see each other");
+  const ra = JSON.parse(await cmd(B, "net remotes")), rb = JSON.parse(await cmd(A, "net remotes"));
+  check(ra.length === 1 && rb.length === 1, `[mp] poses both ways (${JSON.stringify(ra)} / ${JSON.stringify(rb)})`);
+  check(Math.hypot(rb[0].px - ra[0].px, rb[0].py - ra[0].py) < 40, "[mp] the client spawned near the host (spawn anchor)");
+  const ha = await hud(A), hb = await hud(B);
+  check(ha.mp.index === 1 && hb.mp.index === 2 && ha.mp.color !== hb.mp.color, `[mp] P1 / P2 in their colours (${ha.mp.color} ${hb.mp.color})`);
+  check(await A.evaluate(() => document.querySelectorAll(".mp-plate").length) === 1, "[mp] nameplate of the mate");
+  // Friendly fire is off (world_options.mjs default): a hit does nothing ...
+  const hp0 = (await hud(B)).health;
+  await cmd(A, "weapon 2");
+  check(await cmd(A, "net hit 30") === "hit", "[mp] the round reaches the mate");
+  await A.waitForTimeout(2500);
+  check((await hud(B)).health === hp0, "[mp] friendly fire off: no damage");
+  // ... until everybody agrees (unanimous vote): the client proposes, votes yes; the host proposed it.
+  check(await cmd(B, "mp ff on") === "proposed", "[mp] rule change proposed");
+  check(await until(B, () => window.SpawnCity.hud().mp.votePending), "[mp] the ballot reaches the client");
+  await cmd(B, "mp vote yes");
+  check(await until(A, () => window.SpawnCity.hud().mp.ff) && await until(B, () => window.SpawnCity.hud().mp.ff), "[mp] friendly fire on for both");
+  await cmd(A, "net hit 30");
+  check(await until(B, h0 => window.SpawnCity.hud().health < h0, hp0), "[mp] the authority approved the hit, the victim applied it");
+  check(await until(A, () => window.SpawnCity.hud().mp.hit < 3000), "[mp] hit marker for the shooter");
+  // A second sniper round: down. Kill feed and score board everywhere.
+  await cmd(A, "net hit 30");
+  check(await until(A, () => window.SpawnCity.hud().mp.scores.some(s => s.self && s.k === 1)), "[mp] the kill counts for the host");
+  check(await until(B, () => window.SpawnCity.hud().mp.feed.length > 0), "[mp] kill feed at the victim");
+  check(await until(B, () => !window.SpawnCity.hud().mp.respawnIn && window.SpawnCity.hud().health > 0, null, 300000), "[mp] the victim respawned");
+  // Effects: an explosion of the host is seen by the client.
+  const booms = (await hud(B)).explosions;
+  await cmd(A, "net blast");
+  check(await until(B, b => window.SpawnCity.hud().explosions > b, booms), "[mp] remote explosion");
+  // Ping marker in the world, seen by the mate.
+  check(await cmd(A, "ping") === "set", "[mp] ping set");
+  check(await until(B, () => window.SpawnCity.hud().mp.pings.length === 1), "[mp] the mate sees the ping");
+  // Voice: no microphone headless - the client "speaks" a test tone; the host hears it (in range).
+  await cmd(B, "voice mic");
+  await cmd(B, "voice tone 4");
+  check(await until(A, () => JSON.parse(window.SpawnCity.command("voice state")).speaking > 0, null, 60000), "[mp] proximity voice reaches the host");
+  // Share panel with the join QR code, the big map with a waypoint and guidance.
+  await A.evaluate(() => document.querySelector('#mpBar [data-a="share"]').click());
+  check(await A.evaluate(() => window.__scShareQr?.size >= 21), "[mp] join QR code");
+  await A.screenshot({path: path.join(shots, "mp-A-share.png"), timeout: 900000});
+  await A.evaluate(() => document.getElementById("mpShare")?.remove());
+  await cmd(A, "bigmap open");
+  await cmd(A, "nav set 60 80 Treffpunkt");
+  check(await until(A, () => window.SpawnCity.hud().mp.nav?.name === "Treffpunkt" && !!document.getElementById("mpMap")), "[mp] big map and destination");
+  await A.waitForTimeout(800);
+  await A.screenshot({path: path.join(shots, "mp-A-bigmap.png"), timeout: 900000});
+  await cmd(A, "bigmap close");
+  await B.screenshot({path: path.join(shots, "mp-B.png"), timeout: 900000});
+  check(errors.length === 0, `[mp] no page errors ${errors.length ? JSON.stringify(errors.slice(0, 5)) : ""}`);
+  await ctx.close();
+}
+
 try {
-  const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
+  const only = process.env.SC_SMOKE || "";  // "desktop", "phone" or "mp" runs one of them
+  if (!only || only === "mp") await runMultiplayer();
   if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&demtiles=https://dem.test/{z}/{x}/{y}.png", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});

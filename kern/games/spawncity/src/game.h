@@ -15,9 +15,13 @@
 #include "car.h"
 #include "city_stream.h"
 #include "combat_art.h"
+#include "guided.h"
+#include "combat_detail.h"
+#include "combat_audio.h"
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
+#include "game_look.h"
 #include "jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
@@ -35,6 +39,9 @@
 #include "weapons.h"
 
 namespace sc {
+
+struct MpLocal;  // multiplayer presentation state (game_net.cpp)
+struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
@@ -125,6 +132,8 @@ class Game {
   bool audio_init(u32 rate);
   const f32* audio_render(u32 frames);
   void key_down_event() { arbiter_.key_down(); }
+  /// Microphone samples from the page (only while the mic is on; game_net.cpp).
+  void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
   kern::game::NightWindows& windows() { return windows_; }
 
@@ -193,7 +202,15 @@ class Game {
   void drone_attack(bool trigger, bool pressed);
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
-  // multiplayer (game_net.cpp)
+  // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
+  MpLocal& mp_local();
+  void mp_input(kern::Engine& e, f32 dt);
+  std::string mp_hud_json();
+  std::string net_command(const std::string& cmd);
+  std::string bigmap_json(f32 cx, f32 cy, f32 range);
+  void update_nav();
+  bool project_screen(Vec3 p, f32& x, f32& y, f32& depth) const;
+  void mix_voice(f32* out, u32 frames);
   void update_net(f32 dt);
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
@@ -234,6 +251,19 @@ class Game {
   void update_debris(f32 dt);
   void draw_military();
   void draw_events();
+  // GUIDED missile with target lock (game_guided.cpp, guided_missile.mjs)
+  bool guided_press();
+  void update_guided(f32 dt);
+  void draw_guided();
+  void guided_hud(std::string& s);
+  bool guided_target_at(const guided::Target& t, Vec3& at) const;
+  // more event / combat details: critical damage, bullet momentum, rule ballots (game_details.cpp)
+  void update_details(f32 dt);
+  void details_hud(std::string& s);
+  bool details_command(const std::string& cmd, std::string& out);
+  // SpawnCity's synthesised combat sounds (combat_audio.cpp) registered as "sc:<kind><n>"
+  void combat_audio_init();
+  const char* combat_sfx(combat_audio::Kind k);
   // world dressing
   void update_lamps();
   std::string map_json();
@@ -256,6 +286,14 @@ class Game {
   void life_blast(Vec3 at, f32 radius);
   void life_hud(std::string& s);
   bool life_command(const std::string& cmd, std::string& out);
+  // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
+  f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
+  void eject_driver(i32 car);
+  void update_traffic_world(f32 dt);
+  void step_tow(f32 h);
+  void draw_world_vehicles();
+  void draw_traffic_lights();
+  std::string traffic_json();
 
   // menus, settings, start, equipment, presentation (game_ui.cpp)
   bool ui_command(const std::string& cmd, std::string& out);
@@ -280,6 +318,20 @@ class Game {
   void ui_render_music(f32* out, u32 frames);
   bool ui_equipment_command(const std::string& cmd, std::string& out);
   std::string ui_equipment_json();
+
+  // performance and the look (game_look.cpp): frame times, automatic quality, camera shake,
+  // FPV stabilizer, speed streaks, day/night clock, point lights, own first-person weapon models
+  void look_begin(kern::Engine& e, const kern::Frame& f);
+  void look_lap(perf::Slot s);
+  void look_camera(f32 dt);
+  void look_lighting(f32 dt);
+  void look_draw(kern::Engine& e, f32 dt);
+  void look_blast(Vec3 at, f32 radius);
+  void look_apply_tier();
+  void look_view_models(f32 dt);
+  i32 look_people_budget() const;
+  bool look_command(const std::string& cmd, std::string& out);
+  std::string look_hud_json();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
@@ -332,6 +384,16 @@ class Game {
   PeopleArt people_art_;
   CombatArt combat_art_;
   CombatState combat_;
+  std::vector<guided::Flight> guided_;  // GUIDED missiles in flight (game_guided.cpp)
+  f32 guided_last_ = -99;
+  std::string guided_lock_;
+  // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot
+  std::vector<f32> car_last_hp_, car_burn_seen_;
+  detail::CriticalClock pd_crit_[5], drone_crit_;
+  detail::Vote ballot_;
+  u32 bullet_pushes_ = 0, crit_blasts_ = 0;
+  u32 sfx_cursor_[16] = {};
+  bool combat_audio_ready_ = false;
   RoadGraph roads_;
   std::vector<PoliceUnit> units_;
   PoliceDrone pdrones_[5];
@@ -352,6 +414,7 @@ class Game {
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
   u8 my_color_ = 0;
+  std::unique_ptr<MpLocal, MpLocalDelete> mp_;  // pings, feed, voice, big map (game_net.cpp)
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; };
   std::vector<Lamp> lamps_;
@@ -381,6 +444,8 @@ class Game {
   bool mobile_ = false;
   // menus, settings, start, equipment, presentation (game_ui.h)
   UiState ui_;
+  // performance and the look (game_look.h)
+  LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
 
