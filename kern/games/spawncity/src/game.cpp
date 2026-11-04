@@ -1,5 +1,6 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
 #include "game.h"
+#include "game_world.h"  // WorldLife (M3 world state)
 
 #include <algorithm>
 #include <cstdio>
@@ -140,10 +141,10 @@ kern::game::Level Game::build_level() const {
   l.world.fog_density = 0.00085f;     // stylized_world_style.mjs
   l.world.shadow_distance = mobile_ ? 70 : 110;
   l.world.ao_radius = 1.6f;
-  l.world.ground = true;
+  l.world.ground = false;  // the terrain's ground tiles (terrain.h) are the ground
   l.world.ground_color = {0.36f, 0.40f, 0.31f};
   l.world.ground_friction = 0.8f;
-  l.world.kill_z = -60;
+  l.world.kill_z = -3000;  // real terrain lies below the origin in places (heights are relative to it)
   l.world.ambience = "builtin:city";
   l.world.ambience_volume = 0.35f;
   l.world.reverb = 0.2f;
@@ -245,6 +246,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.eye_height = 1.68f;
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
+  life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer, &windows_);
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   soldier_ = world_->find_actor("Player");
@@ -277,10 +279,12 @@ bool Game::start(kern::Engine& e) {
   for (TrafficCar& c : cars_) world_->set_alive(c.actor, false);
   world_->set_paused(true);  // until the ground under the player is built
 
-  city_.start(e.renderer, world_->physics(), lon_, lat_);
+  // Elevation from the Terrarium tiles unless offline or ?dem=0 (terrain.h).
+  city_.start(e.renderer, world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
+  if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
   init_weapons();
   foot_touch_.set_controller(&soldier_controller_, true, true);
@@ -320,13 +324,14 @@ bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const {
     const int steps = r == 0 ? 1 : static_cast<int>(2 * kPi * r / 8);
     for (int i = 0; i < steps; ++i) {
       const f32 a = 2 * kPi * static_cast<f32>(i) / static_cast<f32>(steps);
-      const Vec3 c{center.x + r * std::cos(a), center.y + r * std::sin(a), 0};
+      Vec3 c{center.x + r * std::cos(a), center.y + r * std::sin(a), 0};
+      c.z = city_.ground_height(c.x, c.y);
       bool ok = true;
       for (int ix = -2; ix <= 2 && ok; ++ix)
         for (int iy = -2; iy <= 2 && ok; ++iy) {
-          const Vec3 o{c.x + half.x * static_cast<f32>(ix) * 0.5f, c.y + half.y * static_cast<f32>(iy) * 0.5f, 80};
+          const Vec3 o{c.x + half.x * static_cast<f32>(ix) * 0.5f, c.y + half.y * static_cast<f32>(iy) * 0.5f, c.z + 80};
           const RayResult h = cast(w, o, {0, 0, -1}, 90, {});
-          ok = h.hit && h.point.z < 0.3f;
+          ok = h.hit && h.point.z < city_.ground_height(o.x, o.y) + 0.3f && !city_.terrain().water_at(o.x, o.y);
         }
       if (ok) { out = {c, 0}; return true; }
     }
@@ -386,6 +391,8 @@ void Game::toggle_drone() {
     return;
   }
   if (mode_ != Mode::foot) return;
+  // player_vitals_logic.mjs: a shot-down drone is replaced after 8 s
+  if (world_->sim_time() < combat_.drone_ready_at) { toast_ = "Neue Drohne in " + std::to_string(static_cast<int>(std::ceil(combat_.drone_ready_at - world_->sim_time()))) + " s"; toast_age_ = 0; return; }
   const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
   const f32 yaw = world_->camera_yaw() * kDeg;
   // 2.9 m ahead of the pilot; if something hangs over that spot (a wing, a balcony) or stands
@@ -529,6 +536,7 @@ void Game::fixed_step(f32 h) {
     if (b.valid()) jet_.step(w, b, h, in);
   }
   drive_traffic(h);
+  step_world(h);  // M3 world: buoyancy, water drag (game_world.cpp)
   if (mode_ == Mode::parachute) step_parachute(h);
 }
 
@@ -661,7 +669,7 @@ void Game::manage_traffic() {
       const Vec3 p = matrix_of(c.actor).translation();
       const f32 d = std::hypot(p.x - me.x, p.y - me.y);
       // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
-      replace = d > 420 || p.z < -5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
+      replace = d > 420 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
       // An abandoned car stays where it was left (SpawnCity: 180 s).
     }
     if (!replace) continue;
@@ -714,6 +722,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   if (pad.active) arbiter_.gamepad_used();
   touch_mode_ = arbiter_.touch();
   if (!touch_mode_ && in.button_pressed(0)) e.request_pointer_lock(true);
+  ui_before_input(e);  // settings: invert mouse Y (game_ui.cpp)
 
   const bool enter = in.pressed(Key::f) || in.pressed(Key::e) || pad.hit(kPadX) || pad_touch_.take_pressed("enter");
   const bool drone_key = in.pressed(Key::v) || pad.hit(kPadDown) || pad_touch_.take_pressed("mode") || pad_touch_.take_pressed("drone");
@@ -741,6 +750,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
     case Mode::jet: jet_input(e, dt); break;
     case Mode::parachute: parachute_input(e, dt); break;
   }
+  ui_after_input(dt);  // settings: curves, inversions, speeds (game_ui.cpp)
 }
 
 PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
@@ -997,6 +1007,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   if (dt > 0) fps_ = fps_ * 0.95f + (1.0f / dt) * 0.05f;
   toast_age_ += dt;
   update_net(dt);
+  ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
     city_.update({0, 0, 0}, 8);
     if (city_.ready_at({0, 0, 0})) place_world();
@@ -1007,26 +1018,32 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
       e.set_status(buf);
     }
   }
-  if (world_placed_) {
+  if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
     read_input(e, dt);
     update_touch_layout();
     world_->step(dt, play_in_);
     static f32 traffic_clock = 0;
     traffic_clock += dt;
-    if (traffic_clock > 0.5f) { traffic_clock = 0; manage_traffic(); }
+    if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
+    city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
     update_town(dt);
     update_projectiles(dt);
+    update_world(dt);  // M3 world (game_world.cpp)
+    update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
+  ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   e.renderer.camera = cam_;
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
   world_->present(f.time * 1000.0, cam_.eye);
   draw_vehicles();
   draw_town();
+  draw_world();  // M3 world (game_world.cpp)
+  draw_combat();
   update_sound(dt);
 }
 
@@ -1206,12 +1223,16 @@ bool Game::audio_init(u32 rate) {
   game_audio_ = std::make_unique<kern::game::GameAudio>(mixer_, *bank_);
   if (world_) bank_->request_level(world_->level());
   fx_.init(mixer_);
+  ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
   return true;
 }
 
 const f32* Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
-  if (mixer_.ready()) mixer_.render(audio_out_.data(), frames);
+  if (mixer_.ready()) {
+    mixer_.render(audio_out_.data(), frames);
+    ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+  }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
   mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
   return audio_out_.data();
@@ -1220,6 +1241,7 @@ const f32* Game::audio_render(u32 frames) {
 void Game::update_sound(f32 dt) {
   if (!mixer_.ready() || !world_) return;
   bank_->prepare(3);
+  ui_mix_cues();  // settings: shots / steps before GameAudio plays the cues (game_ui.cpp)
   game_audio_->update(*world_, cam_, dt);
   SoundState s;
   if (drone_out_) {
@@ -1257,6 +1279,7 @@ void Game::update_sound(f32 dt) {
     if (d < best) { best = d; s.siren.active = true; s.siren.position = p; s.siren.velocity = world_->actor_velocity(cars_[u.car].actor); }
   }
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
+  ui_mix_audio(s);  // settings: audio sliders (game_ui.cpp)
   fx_.update(s, dt);
 }
 
@@ -1272,6 +1295,7 @@ std::string Game::hud_json() {
   const StreamStats& st = city_.stats();
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
+  hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
   {
     u32 units = 0;
@@ -1353,13 +1377,17 @@ std::string Game::hud_json() {
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
+  combat_hud(s);  // "combat":{...} (game_events.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
+  s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   return s + "}";
 }
 
 std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
+  if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
+  if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);
@@ -1376,7 +1404,7 @@ std::string Game::command(const std::string& cmd) {
     if (m == "jet" && jet_placed_) {
       // Walk up to the jet (debug / tests): stand next to it, then board.
       const Vec3 j = matrix_of(jet_actor_).translation();
-      world_->teleport(soldier_, {j.x + 4, j.y, 0.73f});
+      world_->teleport(soldier_, {j.x + 4, j.y, city_.ground_height(j.x + 4, j.y) + 0.73f});
       switch_mode(Mode::jet);
       return mode_name(mode_);
     }
@@ -1441,6 +1469,10 @@ std::string Game::command(const std::string& cmd) {
   }
   if (cmd == "offline") { city_.go_offline(); return "ok"; }
   if (cmd == "state") return hud_json();
+  {
+    std::string out;  // M3 world test commands (game_world.cpp)
+    if (world_command(cmd, out)) return out;
+  }
   return "unknown command";
 }
 

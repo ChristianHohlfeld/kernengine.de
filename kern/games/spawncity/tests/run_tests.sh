@@ -26,9 +26,10 @@ for p in "${pids[@]}"; do wait "$p"; done
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub), then the game's simulation sources (no GameWorld) and the tests.
 sources=()
-for d in core physics geo gfx scene net; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
+for d in core physics geo gfx scene audio net; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
 sources+=("$kern/tests/gl_stub.cpp")
-for f in drone car jet mvt tiles city_stream wanted road_graph people mp_rules net_session qr_code; do [ -f "$game/src/$f.cpp" ] && sources+=("$game/src/$f.cpp"); done
+# Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
+for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
 while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
 flags=(-std=c++20 -O1 -g -ffp-contract=off -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests")

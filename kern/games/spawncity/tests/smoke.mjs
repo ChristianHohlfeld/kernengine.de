@@ -89,6 +89,35 @@ function syntheticTile(z, x, y) {
   return zlib.gzipSync(Buffer.from([...layer("building", houses), ...layer("transportation", roads), ...layer("water", water), ...layer("park", park)]));
 }
 
+// ---- a synthetic Terrarium elevation tile (PNG, RGB = (h + 32768) * 256): rolling hills ----
+function crc32(buf) {
+  let c = ~0;
+  for (const b of buf) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  return ~c >>> 0;
+}
+function png(width, height, rgb) {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]), crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) { raw[y * (width * 3 + 1)] = 0; rgb.copy(raw, y * (width * 3 + 1) + 1, y * width * 3, (y + 1) * width * 3); }
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+function syntheticDem(z, x, y) {
+  const rgb = Buffer.alloc(256 * 256 * 3);
+  for (let j = 0; j < 256; j++)
+    for (let i = 0; i < 256; i++) {
+      const gx = x * 256 + i, gy = y * 256 + j;  // ~13 m per pixel at z13
+      const v = 400 + 18 * Math.sin(gx / 60) + 12 * Math.cos(gy / 45) + 32768;
+      const o = (j * 256 + i) * 3;
+      rgb[o] = Math.floor(v / 256); rgb[o + 1] = Math.floor(v) % 256; rgb[o + 2] = Math.floor((v % 1) * 256);
+    }
+  return png(256, 256, rgb);
+}
+
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
 
 async function run({name, url, context, mapped}) {
@@ -100,6 +129,10 @@ async function run({name, url, context, mapped}) {
   let tileRequests = 0;
   if (mapped) {
     await page.route("https://tiles.test/planet", r => r.fulfill({contentType: "application/json", body: JSON.stringify({tiles: ["https://tiles.test/t/{z}/{x}/{y}.pbf"]})}));
+    await page.route("https://dem.test/**", r => {
+      const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.png/).slice(1).map(Number);
+      return r.fulfill({body: syntheticDem(z, x, y), headers: {"content-type": "image/png"}});
+    });
     await page.route("https://tiles.test/t/**", r => {
       tileRequests++;
       const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.pbf/).slice(1).map(Number);
@@ -144,6 +177,14 @@ async function run({name, url, context, mapped}) {
   check(mapped ? h.realData && !h.offline : h.offline, `[${name}] ${mapped ? "map tiles loaded through the MVT path" : "offline stand-in town"} (tiles ${JSON.stringify(h.tiles)})`);
   check(h.tiles.buildings > 50 && h.tiles.colliders > 50, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
   if (mapped) check(tileRequests >= 1, `[${name}] tiles fetched by the page (${tileRequests})`);
+  // The ground (terrain.h): real elevation through the Terrarium path, water basins, the player on it.
+  if (mapped) check(h.terrain?.dem && h.terrain.max - h.terrain.min > 5, `[${name}] terrain elevation loaded (${JSON.stringify(h.terrain)})`);
+  else check(h.terrain?.settled && !h.terrain.dem, `[${name}] flat ground offline (${JSON.stringify(h.terrain)})`);
+  check(h.terrain?.water > 100 && h.terrain.collision > 4, `[${name}] water cells and ground collision (${JSON.stringify(h.terrain)})`);
+  {
+    const g = JSON.parse(await cmd("ground"));
+    check(Math.abs(g.playerZ - 0.73 - g.z) < 0.3, `[${name}] the player stands on the terrain (${JSON.stringify(g)})`);
+  }
   await shot("0-start");
 
   // On foot: walk 3 s.
@@ -175,6 +216,91 @@ async function run({name, url, context, mapped}) {
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
 
+  // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
+  {
+    const schema = JSON.parse(await cmd("settings schema"));
+    check(schema.some(o => o.key === "world.jetpack") && schema.some(o => o.key === "car.maxKmh"), `[${name}] settings table (${schema.length} rows)`);
+    check(await cmd("set mouse.sensitivity 150") === "ok" && await cmd("get mouse.sensitivity") === "150", `[${name}] a setting changes`);
+    await cmd("set mouse.sensitivity 100");
+    await cmd("pause 1");
+    const tp = (await hud()).t;
+    await page.waitForTimeout(1500);
+    h = await hud();
+    check(h.ui?.paused && Math.abs(h.t - tp) < 0.05, `[${name}] paused: the game stands (${tp} -> ${h.t})`);
+    await cmd("pause 0");
+    await page.evaluate(() => window.SpawnCity.ui.open("settings"));
+    check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
+    await shot("0-settings");
+    await page.keyboard.press("Escape");
+    check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
+    await cmd("set world.people 0");
+    await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
+    check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
+    await cmd("set world.people 1");
+    const resets = (await hud()).ui.resets;
+    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    // LIVE GPS: two fixes 20 m apart move the player there.
+    const o = (await hud()).ui.origin;
+    check(await cmd("gps on") === "on", `[${name}] GPS live on`);
+    await cmd(`gps fix ${o[0]} ${o[1]} 5`);
+    await page.waitForTimeout(1200);
+    await cmd(`gps fix ${o[0] + 0.00018} ${o[1]} 5`);
+    await page.waitForTimeout(2500);
+    h = await hud();
+    check(h.gps?.fix && h.gps.accepted === 2, `[${name}] GPS fixes taken (${JSON.stringify(h.gps)})`);
+    check(await cmd("gps view follow") === "follow", `[${name}] GPS follow view`);
+    await shot("0b-gps-follow");
+    await cmd("gps off");
+    // Another start place: the world moves and is built there.
+    const moves = h.ui.moves;
+    check(await cmd(`start ${o[0] + 0.004} ${o[1] + 0.004} Testort`) === "moving", `[${name}] start place command`);
+    await page.waitForFunction(m => { const h = window.SpawnCity.hud(); return h.placed && h.ui.moves > m; }, moves, {timeout: 400000}).catch(() => {});
+    h = await hud();
+    check(h.placed && Math.abs(h.ui.origin[0] - o[0] - 0.004) < 1e-5, `[${name}] the world moved to the new start place (${h.ui.origin})`);
+  }
+
+  // Jetpack (WORLD option): a jump with ignition lifts the player over 2 m.
+  {
+    check(await cmd("jetpack burn") === "ok", `[${name}] jetpack ignition`);
+    const t0 = (await hud()).t;
+    let top = 0;
+    while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
+    const jp = JSON.parse(await cmd("jetpack"));
+    check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  }
+
+  // Combat and events (game_military.cpp, game_events.cpp).
+  {
+    const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
+    const before = (await hud()).explosions;
+    check(await cmd("strike 0 150") === "ok", `[${name}] air strike called`);
+    await until(() => window.SpawnCity.hud().combat.jets > 0);
+    check((await hud()).combat.jets === 2, `[${name}] the strike pair is in the air`);
+    await until(b => window.SpawnCity.hud().explosions > b + 3, 300000, before);
+    await shot("1c-airstrike");
+    check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
+    check(await cmd("military start") === "on", `[${name}] military called in`);
+    await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
+    let c = (await hud()).combat;
+    check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers`);
+    await shot("1d-military");
+    check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
+    await cmd("military on");
+    check(await cmd("enemy swat") === "SWAT" && (await hud()).combat.enemies === 1, `[${name}] a sandbox enemy`);
+    check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
+    await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
+    c = (await hud()).combat;
+    check(c.zombies.night && c.zombies.round === 1 && c.zombies.alive > 0, `[${name}] zombies rise (${JSON.stringify(c.zombies)})`);
+    await shot("1e-zombies");
+    await cmd("zombies day");
+    const prov = await cmd("provoke");
+    check(/^(gun|knife|fists) /.test(prov), `[${name}] a passer-by squares up (${prov})`);
+    check(await cmd("race") === "on" && (await cmd("race fly")).startsWith("0 lap 1"), `[${name}] race track: start gate passed`);
+    check(!!(await hud()).combat.race, `[${name}] race HUD`);
+    await cmd("race");
+    check((await cmd("contract")).startsWith("AUFTRAG"), `[${name}] next contract`);
+  }
+
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
@@ -186,7 +312,8 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
-  page.evaluate(() => window.SpawnCity.command("mode foot"));
+  await cmd("mode foot");
+  check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
   const car = await cmd("mode car");
@@ -197,8 +324,28 @@ async function run({name, url, context, mapped}) {
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
     await shot("3-car");
+    check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
     await shot("3b-car-cockpit");
+    await cmd("cam");
+    // Water (world_water.mjs): the car floats on the lake (buoyancy), the pilot swims.
+    const wet = await cmd("water car");
+    check(wet.startsWith("{"), `[${name}] the car is put on the water (${wet})`);
+    if (wet.startsWith("{")) {
+      const tw0 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2.5, tw0, {timeout: 400000}).catch(() => {});
+      const g = JSON.parse(await cmd("ground")), lake = JSON.parse(wet);
+      check(g.water && g.playerZ > lake.bed + 1.2 && g.playerZ < g.level + 1.5, `[${name}] the car floats (${JSON.stringify(g)})`);
+      check((await hud()).splashes > 0, `[${name}] a splash when it hit the water`);
+      await shot("3c-car-water");
+      await cmd("mode foot");
+      const tw1 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, tw1, {timeout: 400000}).catch(() => {});
+      h = await hud();
+      const gs = JSON.parse(await cmd("ground"));
+      check(h.swimming && Math.abs(gs.playerZ - (gs.level - 0.53)) < 0.3, `[${name}] the pilot swims, head above the water (${JSON.stringify(gs)})`);
+      await shot("3d-swim");
+    }
     await cmd("mode foot");
   }
 
@@ -298,7 +445,7 @@ async function runMultiplayer() {
 try {
   const only = process.env.SC_SMOKE || "";  // "desktop", "phone" or "mp" runs one of them
   if (!only || only === "mp") await runMultiplayer();
-  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet", mapped: true, context: {viewport: {width: 1280, height: 720}}});
+  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&demtiles=https://dem.test/{z}/{x}/{y}.png", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});
 } finally {

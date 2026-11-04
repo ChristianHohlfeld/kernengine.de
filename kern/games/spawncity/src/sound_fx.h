@@ -20,6 +20,7 @@ struct EngineSound {
 struct SoundState {
   EngineSound drone, car, jet, siren;
   f32 wind = 0;   // m/s of the player (air rush)
+  f32 drone_mix = 1, vehicle_mix = 1;  // settings: drone / vehicle sliders relative to SpawnCity's mix (game_ui.cpp)
 };
 
 class SoundFx {

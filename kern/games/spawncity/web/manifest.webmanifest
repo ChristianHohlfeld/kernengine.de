@@ -1,0 +1,14 @@
+{
+  "name": "SpawnCity auf Kern",
+  "short_name": "SpawnCity",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "icons": [{"src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}],
+  "description": "SpawnCity – Drohne, zu Fuß, Auto und Jet in deiner echten Stadt. Nativ auf der Kern-Engine.",
+  "lang": "de"
+}

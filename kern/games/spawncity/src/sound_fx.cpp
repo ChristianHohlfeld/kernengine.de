@@ -156,12 +156,12 @@ void SoundFx::drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch,
 void SoundFx::update(const SoundState& s, f32 dt) {
   (void)dt;
   // Drone: SpawnCity mixes it at 50 % (audio_settings.mjs drone 50).
-  drive(rotor_, s.drone.active, s.drone.position, s.drone.velocity, 0.5f * clampf(0.15f + s.drone.rate, 0, 1), 0.35f + 1.9f * s.drone.rate, true, 140);
-  drive(prop_wash_, s.drone.active, s.drone.position, s.drone.velocity, 0.35f * s.drone.load, 0.7f + 0.6f * s.drone.rate, true, 90);
+  drive(rotor_, s.drone.active, s.drone.position, s.drone.velocity, s.drone_mix * 0.5f * clampf(0.15f + s.drone.rate, 0, 1), 0.35f + 1.9f * s.drone.rate, true, 140);
+  drive(prop_wash_, s.drone.active, s.drone.position, s.drone.velocity, s.drone_mix * 0.35f * s.drone.load, 0.7f + 0.6f * s.drone.rate, true, 90);
   // Vehicle 58 %.
-  drive(engine_, s.car.active, s.car.position, s.car.velocity, 0.58f * (0.35f + 0.65f * s.car.load), 0.75f + 2.2f * s.car.rate, true, 120);
-  drive(turbine_, s.jet.active, s.jet.position, s.jet.velocity, 0.45f * clampf(0.2f + s.jet.rate, 0, 1), 0.55f + 0.8f * s.jet.rate, true, 900);
-  drive(roar_, s.jet.active, s.jet.position, s.jet.velocity, 0.9f * s.jet.load, 0.7f + 0.5f * s.jet.load, true, 1500);
+  drive(engine_, s.car.active, s.car.position, s.car.velocity, s.vehicle_mix * 0.58f * (0.35f + 0.65f * s.car.load), 0.75f + 2.2f * s.car.rate, true, 120);
+  drive(turbine_, s.jet.active, s.jet.position, s.jet.velocity, s.vehicle_mix * 0.45f * clampf(0.2f + s.jet.rate, 0, 1), 0.55f + 0.8f * s.jet.rate, true, 900);
+  drive(roar_, s.jet.active, s.jet.position, s.jet.velocity, s.vehicle_mix * 0.9f * s.jet.load, 0.7f + 0.5f * s.jet.load, true, 1500);
   drive(siren_, s.siren.active, s.siren.position, s.siren.velocity, 0.42f, 1.0f, true, 260);
   drive(wind_, true, {}, {}, clampf((s.wind - 6) / 60, 0, 0.7f), 0.8f + std::fmin(0.6f, s.wind / 120), false, 0);
 }

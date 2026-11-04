@@ -447,7 +447,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       if (!r.ok || b.members != roster()) return;  // a different roster: the vote is not ours
       b.expires_ms = now_ms() + mp::kBallotMs;
       remote_ballot_ = b;
-      vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt (J / N)";
+      vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt";
       return;
     }
     case kBallotResult: {

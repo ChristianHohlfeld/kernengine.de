@@ -101,6 +101,7 @@ struct MpLocal {
   u32 fetch_id = 0;          // > 0: the page should fetch a road route (no street graph to the goal)
   std::string fetch_json;
   u32 frames = 0;
+  bool ff_setting = false, ff_rule = false;  // the FRIENDLY FIRE setting / the session's rule as last seen
 };
 
 void MpLocalDelete::operator()(MpLocal* m) const { delete m; }
@@ -166,7 +167,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   lon_ = lon;
   lat_ = lat;
   city_.clear();
-  city_.start(engine_->renderer, world_->physics(), lon_, lat_);
+  city_.start(engine_->renderer, world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
   if (engine_->arg_number("offline", 0) > 0) city_.go_offline();
   for (TrafficCar& c : cars_) {
     if (c.placed) world_->set_alive(c.actor, false);
@@ -205,6 +206,18 @@ void Game::update_net(f32 dt) {
   if (world_placed_) update_nav();
   if (!net_.active()) return;
 
+  // Changing FRIENDLY FIRE in the settings during a session asks everybody (game_rules_sync.mjs);
+  // the rule that counts is the session's, and the setting follows it.
+  const bool ff_setting = ui_.settings.on(Opt::world_friendly_fire);
+  if (ff_setting != m.ff_setting) {
+    m.ff_setting = ff_setting;
+    if (ff_setting != net_.friendly_fire() && !net_.propose_rule(ff_setting) && net_.hosting() && net_.remotes().empty()) net_.set_friendly_fire_initial(ff_setting);
+  }
+  if (m.ff_rule != net_.friendly_fire()) {
+    m.ff_rule = net_.friendly_fire();
+    ui_.settings.set(Opt::world_friendly_fire, m.ff_rule ? 1.0f : 0.0f);
+    m.ff_setting = m.ff_rule;
+  }
   net_.update(time_, dt, world_placed_ ? my_state() : net::PlayerState{}, world_placed_);  // no pose before the world stands
   // The client takes the host's map origin once.
   f64 lon, lat;
@@ -330,22 +343,19 @@ void Game::update_net(f32 dt) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// input (H mic, K mute, Z / middle mouse ping, M big map, J / N vote; pad R3 / R3+Y / Menu)
+// input (H mic, K mute, Z / middle mouse ping, M big map; pad R3 / R3+Y / R3+right / Menu)
 
 void Game::mp_input(kern::Engine& e, f32 dt) {
   (void)dt;
   MpLocal& m = mp_local();
   kern::Input& in = e.input;
   using kern::Key;
-  if (in.pressed(Key::h)) command("voice mic");
+  if (in.pressed(Key::h)) command("voice mic");  // solo too (nothing is sent without mates)
   if (in.pressed(Key::k) && mode_ != Mode::drone) command("voice mute");  // K in the drone: motors off
   if (in.pressed(Key::z) || in.button_pressed(1)) command("ping");
   if (in.pressed(Key::m) || pad.hit(kPadMenu)) command("bigmap toggle");
   if (in.pressed(Key::escape) && m.map_open) command("bigmap close");
-  if (net_.vote_pending()) {
-    if (in.pressed(Key::j)) command("mp vote yes");
-    if (in.pressed(Key::n)) command("mp vote no");
-  }
+  // The vote is answered with the JA / NEIN buttons (J is the air strike, N the radio here).
   // Pad (voice_control_bindings.mjs): R3 tap toggles the mic on release, R3+Y mutes; R3 + D-pad
   // right pings (D-pad right alone is the weapon here).
   const bool r3 = pad.down(kPadR3), y = pad.down(kPadY);
@@ -789,7 +799,9 @@ std::string Game::net_command(const std::string& cmd) {
     unsigned long long self = 0, server = 0;
     if (rest.rfind("host ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu", &self) == 1) {
       net_.host(self, lon_, lat_);
-      net_.set_friendly_fire_initial(engine_ && engine_->arg_number("ff", 0) > 0);  // the first player sets the rule
+      // The first player sets the rule (world_options.mjs FRIENDLY FIRE, off by default).
+      net_.set_friendly_fire_initial(ui_.settings.on(Opt::world_friendly_fire) || (engine_ && engine_->arg_number("ff", 0) > 0));
+      m.ff_setting = ui_.settings.on(Opt::world_friendly_fire);
       return "hosting";
     }
     if (rest.rfind("join ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu %llu", &self, &server) == 2) { net_.join(self, server); rebased_ = false; return "joining"; }

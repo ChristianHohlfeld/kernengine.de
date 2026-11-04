@@ -438,7 +438,7 @@ export class MpPage {
     $.shield.className = m.shield ? "show" : "";
     $.respawn.hidden = m.respawnIn === undefined;
     if (m.respawnIn !== undefined) $.respawn.querySelector("span").textContent = m.respawnIn > 0 ? `RESPAWN IN ${Math.ceil(m.respawnIn)}` : "RESPAWN ...";
-    const vote = m.votePending ? `${mpEsc(m.vote)}<button data-v="yes">JA (J)</button><button data-v="no">NEIN (N)</button>` : mpEsc(m.vote);
+    const vote = m.votePending ? `${mpEsc(m.vote)}<button data-v="yes">JA</button><button data-v="no">NEIN</button>` : mpEsc(m.vote);
     $.vote.hidden = !m.votePending && !/Abstimmung|angenommen|Abgelehnt|gesendet/i.test(m.vote);
     if (vote !== this.voteKey) { $.vote.innerHTML = vote; this.voteKey = vote; }
   }
