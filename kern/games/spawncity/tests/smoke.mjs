@@ -154,6 +154,18 @@ async function run({name, url, context, mapped}) {
   check(Math.hypot(h.lon - p0[0], h.lat - p0[1]) > 1e-6, `[${name}] walked on foot`);
   await shot("1-foot");
 
+  // The town: people on the pavements; a wanted level brings a police unit with its crew.
+  h = await hud();
+  check(h.people >= 10, `[${name}] people in the streets: ${h.people}`);
+  check(await cmd("wanted 2") === "2", `[${name}] wanted level 2`);
+  const tw = (await hud()).t;
+  await page.waitForFunction(() => window.SpawnCity.hud().police > 0, null, {timeout: 300000}).catch(() => {});
+  h = await hud();
+  check(h.police > 0 && h.stars > 0, `[${name}] a police unit is on its way (${h.police} units, ${h.stars} stars)`);
+  await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tw, {timeout: 400000}).catch(() => {});
+  await shot("1b-police");
+  check(await cmd("wanted 0") === "0", `[${name}] wanted level cleared`);
+
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});

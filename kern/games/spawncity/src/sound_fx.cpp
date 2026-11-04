@@ -108,6 +108,22 @@ bool SoundFx::init(kern::audio::Mixer& mixer) {
     air.seed = 21;
     wind_.clip = mixer.adopt_clip(loop_of({air}, rate, 3.0f), 1, "spawncity:wind", true);
   }
+  // Police siren: a wail sweeping 650..1450 Hz (two cycles in the 4 s loop) with a little grit.
+  {
+    SynthPatch wail;
+    wail.wave = Wave::triangle;
+    wail.frequency = 970;
+    wail.vibrato_depth = 7;  // semitones: about 650 .. 1450 Hz
+    wail.vibrato_rate = 0.5f;
+    wail.lowpass = 3200;
+    wail.volume = 0.7f;
+    SynthPatch grit = wail;
+    grit.wave = Wave::square;
+    grit.duty = 0.5f;
+    grit.lowpass = 2200;
+    grit.volume = 0.12f;
+    siren_.clip = mixer.adopt_clip(loop_of({wail, grit}, rate, 4.0f), 1, "spawncity:siren", true);
+  }
   return rotor_.clip && engine_.clip && turbine_.clip && roar_.clip && wind_.clip;
 }
 
@@ -146,6 +162,7 @@ void SoundFx::update(const SoundState& s, f32 dt) {
   drive(engine_, s.car.active, s.car.position, s.car.velocity, 0.58f * (0.35f + 0.65f * s.car.load), 0.75f + 2.2f * s.car.rate, true, 120);
   drive(turbine_, s.jet.active, s.jet.position, s.jet.velocity, 0.45f * clampf(0.2f + s.jet.rate, 0, 1), 0.55f + 0.8f * s.jet.rate, true, 900);
   drive(roar_, s.jet.active, s.jet.position, s.jet.velocity, 0.9f * s.jet.load, 0.7f + 0.5f * s.jet.load, true, 1500);
+  drive(siren_, s.siren.active, s.siren.position, s.siren.velocity, 0.42f, 1.0f, true, 260);
   drive(wind_, true, {}, {}, clampf((s.wind - 6) / 60, 0, 0.7f), 0.8f + std::fmin(0.6f, s.wind / 120), false, 0);
 }
 

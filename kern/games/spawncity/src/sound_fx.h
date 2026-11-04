@@ -18,7 +18,7 @@ struct EngineSound {
 };
 
 struct SoundState {
-  EngineSound drone, car, jet;
+  EngineSound drone, car, jet, siren;
   f32 wind = 0;   // m/s of the player (air rush)
 };
 
@@ -37,7 +37,7 @@ class SoundFx {
   void drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch, bool spatial, f32 max_distance);
 
   kern::audio::Mixer* mixer_ = nullptr;
-  Loop rotor_, prop_wash_, engine_, turbine_, roar_, wind_;
+  Loop rotor_, prop_wash_, engine_, turbine_, roar_, wind_, siren_;
 };
 
 }  // namespace sc

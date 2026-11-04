@@ -21,10 +21,14 @@
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
 #include "kern/game/touch.h"
+#include "people.h"
+#include "people_art.h"
+#include "road_graph.h"
 #include "sound_fx.h"
 #include "touch_pad.h"
 #include "vehicle_art.h"
 #include "wanted.h"
+#include "weapons.h"
 
 namespace sc {
 
@@ -50,6 +54,46 @@ struct TrafficCar {
   i32 lane = -1, index = 0, dir = 1;
   f32 target_speed = 10, stuck = 0;
   CarInput input;  // what the driver (AI or player) does this step
+  // police cruisers and damage (police_ground_units.mjs: 300 HP, burning below 25 %)
+  bool police = false;
+  i32 unit = -1;          // the police unit using it
+  f32 hp = 300, burn_until = -1, wreck_at = -1;
+  bool wreck = false, hit_by_player = false;
+  Vec3 last_velocity;
+};
+
+/// A police unit: a cruiser with two officers (police_ground_units.mjs).
+struct PoliceUnit {
+  enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck };
+  i32 car = -1;
+  State state = State::pursuit;
+  struct Cop { i32 person = -1; u32 seed = 0; bool inside = true; f32 next_shot = 0, los_at = 0; bool los = false; i32 seat = 1; };
+  Cop cops[2];
+  std::vector<Vec2> path;
+  f32 path_at = -99, recover_until = -1, recover_start = 0, stuck_since = -1, turn_since = -1, corner_speed = 17;
+  Vec2 last_target;
+  Vec3 progress_at;
+  f32 progress_t = 0;
+  f32 left_at = -1;
+};
+
+/// A grenade, rocket, missile or bomb in flight.
+struct Projectile {
+  weapons::Id id = weapons::Id::grenade_launcher;
+  Vec3 pos, vel;
+  f32 born = 0, fuse = 12;
+  bool by_player = true, gravity = false, guided = false, alive = true;
+  i32 bounces = 0;
+  kern::physics::Body ignore;
+};
+
+/// A police drone (wanted_police_drones.mjs): flies in a ring around the player at about his
+/// height, sees within the detection radius, shoots now and then; EMP or bullets bring it down.
+struct PoliceDrone {
+  bool active = false, sees = false, emp = false, retreating = false;
+  Vec3 pos, vel, target, retreat_goal;
+  f32 hp = 100, yaw = 0, next_sensor = 0, next_shot = 0, sight_since = 0, destroyed_until = -1, retreat_until = -1, distance = 0, roof = 0, roof_at = -1;
+  u32 shots = 0, serial = 0;
 };
 
 class Game {
@@ -109,6 +153,38 @@ class Game {
   void drive_traffic(f32 h);
   void manage_traffic();
   void step_parachute(f32 h);
+  // the town: people, police, damage (game_town.cpp)
+  void update_town(f32 dt);
+  PeopleView people_view() const;
+  void handle_shots();
+  void update_police(f32 dt);
+  void spawn_police_unit();
+  void drive_police(PoliceUnit& u, f32 dt);
+  void step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt);
+  bool player_driving() const { return mode_ == Mode::car || mode_ == Mode::jet || mode_ == Mode::drone; }
+  bool line_of_sight(Vec3 a, Vec3 b) const;
+  bool update_police_drones(f32 dt);  // true: a drone sees the player
+  void spawn_police_drones();
+  void emp_pulse();
+  void damage_car(i32 car, f32 amount, bool by_player);
+  void wreck_car(i32 car);
+  void damage_player_vehicle(f32 amount);
+  void explosion(Vec3 at, f32 radius, f32 damage, bool by_player);
+  void draw_town();
+  // weapons (game_weapons.cpp)
+  void init_weapons();
+  void select_foot_weapon(weapons::Id id);
+  void cycle_foot_weapon(i32 step);
+  bool game_weapon_in_hand() const;
+  Vec3 aim_ray(Vec3& dir) const;
+  bool hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, kern::physics::Body ignore, kern::game::ShotEvent& out);
+  void fire_projectile(weapons::Id id, Vec3 from, Vec3 vel, bool by_player, kern::physics::Body ignore);
+  void update_projectiles(f32 dt);
+  void foot_attack(bool trigger, bool pressed);
+  void throw_grenade();
+  void drone_attack(bool trigger, bool pressed);
+  void jet_attack(bool gun, bool missile, bool bomb);
+  void draw_projectiles();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
@@ -156,6 +232,27 @@ class Game {
   bool touch_mode_ = false;
   f32 frame_w_ = 960, frame_h_ = 540;
   kern::game::PlayInput play_in_;
+  // the town
+  People people_;
+  PeopleArt people_art_;
+  RoadGraph roads_;
+  std::vector<PoliceUnit> units_;
+  PoliceDrone pdrones_[5];
+  Vec3 last_known_;
+  f32 last_contact_ = -99, next_drone_wave_ = -1, emp_ready_at_ = 0, last_drone_shot_ = -99, last_player_hit_ = -99;
+  u32 drone_serial_ = 0;
+  bool drone_wave_live_ = false;
+  // weapons
+  std::vector<Projectile> projectiles_;
+  weapons::Id foot_weapon_ = weapons::Id::glock;
+  i32 ammo_mag_[16] = {}, ammo_reserve_[16] = {};
+  i32 grenades_ = 4, drone_weapon_ = 0;
+  f32 next_attack_ = 0, next_grenade_ = 0, next_drone_fire_ = 0, next_jet_gun_ = 0, next_jet_missile_ = 0, next_jet_bomb_ = 0;
+  bool trigger_was_ = false;
+  u32 explosions_ = 0;
+  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 600, town_clock_ = 0;
+  i32 last_stars_ = 0;
+  bool player_dead_ = false;
   // rules / feedback
   wanted::Tracker wanted_;
   std::string hint_, toast_;

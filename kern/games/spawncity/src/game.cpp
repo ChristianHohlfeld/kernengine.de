@@ -194,6 +194,12 @@ kern::game::Level Game::build_level() const {
     const CarSpec spec = i == n ? CarSpec::bus() : CarSpec::car();
     l.add(vehicle_actor(name, Car::rigid_spec(spec), {static_cast<f32>(i) * 10, 0, -400}, 0));
   }
+  // Police cruisers (police_ground_units.mjs: at most three units).
+  for (u32 i = 0; i < 3; ++i) {
+    char name[32];
+    std::snprintf(name, sizeof name, "Police %u", i + 1);
+    l.add(vehicle_actor(name, Car::rigid_spec(CarSpec::car()), {static_cast<f32>(i) * 10, 20, -400}, 0));
+  }
   // Parachute (pilot + canopy): an upright capsule body carried by the canopy's drag.
   {
     RigidSpec rs;
@@ -256,6 +262,17 @@ bool Game::start(kern::Engine& e) {
     c.target_speed = i == n ? 8 : 9 + static_cast<f32>(i % 4);
     cars_.push_back(std::move(c));
   }
+  for (u32 i = 0; i < 3; ++i) {
+    char name[32];
+    std::snprintf(name, sizeof name, "Police %u", i + 1);
+    TrafficCar c;
+    c.actor = world_->find_actor(name);
+    c.car = std::make_unique<Car>(CarSpec::car());
+    c.color = {0.93f, 0.94f, 0.96f};
+    c.police = true;
+    c.driver = false;
+    cars_.push_back(std::move(c));
+  }
   for (ActorId a : {drone_actor_, jet_actor_, chute_actor_}) world_->set_alive(a, false);
   for (TrafficCar& c : cars_) world_->set_alive(c.actor, false);
   world_->set_paused(true);  // until the ground under the player is built
@@ -263,6 +280,9 @@ bool Game::start(kern::Engine& e) {
   city_.start(e.renderer, world_->physics(), lon_, lat_);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;
+  if (!people_art_.init(e.renderer)) return false;
+  people_.set_budget(mobile_ ? 44 : 80);
+  init_weapons();
   foot_touch_.set_controller(&soldier_controller_, true, true);
   e.set_status("SpawnCity: Karte wird geladen ...");
   cam_.eye = {-30, -40, 60};
@@ -520,11 +540,11 @@ void Game::drive_traffic(f32 h) {
     if (!c.placed) continue;
     const kern::physics::Body b = body(c.actor);
     if (!b.valid()) continue;
-    if (static_cast<i32>(i) == car_index_ && mode_ == Mode::car) {
+    if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
       c.car->step(w, b, h, c.input);
       continue;
     }
-    if (!c.driver || c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) {
+    if (c.wreck || !c.driver || c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) {
       CarInput parked;
       parked.handbrake = true;
       parked.pedal = c.driver ? -0.3f * sign0(c.car->forward_speed()) : 0;
@@ -619,6 +639,16 @@ void Game::manage_traffic() {
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     if (static_cast<i32>(i) == car_index_) continue;
+    if (c.police) {
+      // An abandoned cruiser far away is put back into the pool.
+      if (c.placed && c.unit < 0 && std::hypot(matrix_of(c.actor).translation().x - me.x, matrix_of(c.actor).translation().y - me.y) > 420) {
+        world_->set_alive(c.actor, false);
+        c.placed = false;
+        c.wreck = false;
+        c.hp = 300;
+      }
+      continue;
+    }
     bool replace = !c.placed;
     if (c.placed) {
       const Vec3 p = matrix_of(c.actor).translation();
@@ -652,6 +682,10 @@ void Game::manage_traffic() {
       c.car->reset();
       c.placed = true;
       c.driver = true;
+      c.hp = 300;
+      c.wreck = false;
+      c.hit_by_player = false;
+      c.burn_until = -1;
       c.lane = li;
       c.dir = dir;
       c.index = dir > 0 ? k + 1 : k;
@@ -731,6 +765,25 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     p.gamepad = pad.active || p.gamepad;
   }
   if (touch_mode_) foot_touch_.update(dt, p, world_->hud().fov);
+  // Weapons: 1 MP, 2 Glock, 3 Sniper, 5 grenade launcher, 6 rocket launcher, 7 fists, 8 knife;
+  // T hand grenade, G EMP (gameplay_final_runtime_v2.mjs / hand_grenade.mjs / wanted EMP).
+  const std::pair<Key, weapons::Id> keys[] = {{Key::digit1, weapons::Id::smg}, {Key::digit2, weapons::Id::glock}, {Key::digit3, weapons::Id::sniper},
+                                              {Key::digit5, weapons::Id::grenade_launcher}, {Key::digit6, weapons::Id::rocket}, {Key::digit7, weapons::Id::fists},
+                                              {Key::digit8, weapons::Id::knife}};
+  for (const auto& [k, id] : keys)
+    if (in.pressed(k)) select_foot_weapon(id);
+  if (pad.hit(kPadRight) || pad_touch_.take_pressed("wpn")) cycle_foot_weapon(1);
+  if (pad.hit(kPadLeft)) cycle_foot_weapon(-1);
+  if (in.pressed(Key::t) || pad.hit(kPadY) || pad_touch_.take_pressed("nade")) throw_grenade();
+  if (in.pressed(Key::g) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
+  if (game_weapon_in_hand()) {
+    // The game fires these itself: Kern's trigger stays off.
+    const bool trigger = p.fire;
+    foot_attack(trigger, trigger && !trigger_was_);
+    trigger_was_ = trigger;
+    p.fire = false;
+    p.reload = false;
+  } else trigger_was_ = p.fire;
   return p;
 }
 
@@ -757,6 +810,17 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   sticks_.yaw = clampf(yaw, -1, 1);
   if (in.pressed(Key::g)) sticks_.game_mode = !sticks_.game_mode;  // GAME (height hold) / ANGLE (manual throttle)
   sticks_.kill = in.down(Key::k);
+  // Weapons: LMB / RB / FEUER fire, 1 gun, 2 rockets, 3 GUIDED, Y / WAFFE cycles.
+  if (in.pressed(Key::digit1)) drone_weapon_ = 0;
+  if (in.pressed(Key::digit2)) drone_weapon_ = 1;
+  if (in.pressed(Key::digit3)) drone_weapon_ = 2;
+  if (pad.hit(kPadY) || pad_touch_.take_pressed("wpn")) drone_weapon_ = (drone_weapon_ + 1) % 3;
+  if (in.pressed(Key::g) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
+  {
+    const bool trigger = in.button(0) || pad.down(kPadRB) || pad_touch_.held("fire");
+    drone_attack(trigger, trigger && !trigger_was_);
+    trigger_was_ = trigger;
+  }
 
   // ARM (R / A / touch): arm on the ground; in the air it starts a controlled landing (simulator.mjs).
   const bool arm_key = in.pressed(Key::r) || pad.hit(kPadA) || pad_touch_.take_pressed("arm");
@@ -828,6 +892,9 @@ void Game::jet_input(kern::Engine& e, f32 dt) {
   j.brake = jet_.telemetry().contacts > 0 && j.lift <= 0 ? 1.0f : 0.0f;
   if (pad.hit(kPadLB)) jet_.toggle_mode();
   jet_in_ = j;
+  // Weapons (jet_mode.mjs): LMB / Space gun, R missile, B bomb; pad RT, RB, Y.
+  jet_attack(in.button(0) || in.down(Key::space) || pad.rt > 0.5f || pad_touch_.held("fire"), in.pressed(Key::r) || pad.hit(kPadRB) || pad_touch_.take_pressed("rkt"),
+             in.pressed(Key::b) || pad.hit(kPadY) || pad_touch_.take_pressed("bomb"));
 }
 
 void Game::parachute_input(kern::Engine& e, f32 dt) {
@@ -876,6 +943,9 @@ void Game::update_touch_layout() {
       for (const TrafficCar& c : cars_)
         if (c.placed) { const Vec3 p = matrix_of(c.actor).translation(); near |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCar; }
       if (near) b.push_back({"enter", "REIN", 0x7a4b12});
+      b.push_back({"wpn", "WAFFE", 0x0d1118});
+      b.push_back({"nade", "GRANATE", 0x3a3a12});
+      if (wanted_.stars() > 0) b.push_back({"emp", "EMP", 0x12305a});
       pad_touch_.set_layout(false, b);
       break;
     }
@@ -883,6 +953,8 @@ void Game::update_touch_layout() {
       b.push_back({"mode", "FUSS", 0x17694f});
       b.push_back({"arm", drone_.telemetry().armed ? "LANDEN" : "ARM", drone_.telemetry().armed ? 0x7a1a12u : 0x1a5a12u});
       b.push_back({"cam", "CAM", 0x0d1118});
+      b.push_back({"fire", "FEUER", 0x7a1a12});
+      b.push_back({"wpn", drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "RAKETEN" : "GUIDED", 0x0d1118});
       pad_touch_.set_layout(true, b, "FLUG", "HOEHE / DREHEN");
       break;
     case Mode::car:
@@ -895,6 +967,9 @@ void Game::update_touch_layout() {
       b.push_back({"enter", jet_.telemetry().contacts >= 2 ? "RAUS" : "EJECT", 0x7a1a12});
       b.push_back({"vtol", jet_.mode() == Jet::Mode::hover ? "FLUG" : "SCHWEBEN", 0x17694f});
       b.push_back({"cam", "CAM", 0x0d1118});
+      b.push_back({"fire", "FEUER", 0x7a1a12});
+      b.push_back({"rkt", "RAKETE", 0x7a4b12});
+      b.push_back({"bomb", "BOMBE", 0x3a3a12});
       pad_touch_.set_layout(true, b, "SCHUB / SEITE", "NICKEN / ROLLEN");
       break;
     case Mode::parachute: pad_touch_.set_layout(true, b, "STEUERN", "UMSEHEN"); break;
@@ -932,7 +1007,8 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     traffic_clock += dt;
     if (traffic_clock > 0.5f) { traffic_clock = 0; manage_traffic(); }
     city_.update(focus_position(), mobile_ ? 3 : 4);
-    wanted_.update(dt, false);
+    update_town(dt);
+    update_projectiles(dt);
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
@@ -941,6 +1017,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   world_->apply_lighting(cam_.eye);
   world_->present(f.time * 1000.0, cam_.eye);
   draw_vehicles();
+  draw_town();
   update_sound(dt);
 }
 
@@ -1160,6 +1237,14 @@ void Game::update_sound(f32 dt) {
     s.jet.rate = clampf(jet_.thrust() / jet_.spec().thrust_dry, 0, 1.3f);
     s.jet.load = clampf(jet_.thrust() / jet_.spec().thrust_max, 0, 1);
   }
+  // The closest cruiser on a call wails.
+  f32 best = 1e9f;
+  for (const PoliceUnit& u : units_) {
+    if (u.car < 0 || u.state == PoliceUnit::State::abandoned || u.state == PoliceUnit::State::wreck || u.state == PoliceUnit::State::leave) continue;
+    const Vec3 p = matrix_of(cars_[u.car].actor).translation();
+    const f32 d = kern::length(p - cam_.eye);
+    if (d < best) { best = d; s.siren.active = true; s.siren.position = p; s.siren.velocity = world_->actor_velocity(cars_[u.car].actor); }
+  }
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
   fx_.update(s, dt);
 }
@@ -1176,10 +1261,32 @@ std::string Game::hud_json() {
   const StreamStats& st = city_.stats();
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
-  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d", fps_, touch_mode_ ? "true" : "false", wanted_.stars());
+  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
+  {
+    u32 units = 0;
+    for (const PoliceUnit& u : units_) units += u.car >= 0 ? 1 : 0;
+    add(",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
+    if (mode_ == Mode::car && car_index_ >= 0) add(",\"carHp\":%.0f", cars_[car_index_].hp);
+    const f32 now = world_->sim_time();
+    add(",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
+        : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    u32 drones = 0;
+    for (const PoliceDrone& d : pdrones_) drones += d.active ? 1 : 0;
+    add(",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
+    if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
+  }
   const kern::game::Hud& h = world_->hud();
+  // Launchers and melee are the game's: their rounds (melee: none) instead of Kern's magazine.
+  i32 ammo = h.ammo, mag = h.magazine, reserve = h.reserve;
+  if (game_weapon_in_hand()) {
+    const u8 slot = static_cast<u8>(foot_weapon_);
+    ammo = ammo_mag_[slot];
+    mag = foot_weapon_ == weapons::Id::rocket ? 1 : 6;
+    reserve = ammo_reserve_[slot];
+  }
   add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"respawn\":%.1f", h.health,
-      h.max_health, h.ammo, h.magazine, h.reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
+      h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
   Vec3 pos = focus_position(), vel;
   f32 agl = pos.z - city_.ground_height(pos.x, pos.y);
   switch (mode_) {
@@ -1279,6 +1386,34 @@ std::string Game::command(const std::string& cmd) {
     if (mode_ == Mode::car) { car_cockpit_ = !car_cockpit_; return car_cockpit_ ? "cockpit" : "chase"; }
     if (mode_ == Mode::jet) { jet_cockpit_ = !jet_cockpit_; return jet_cockpit_ ? "cockpit" : "chase"; }
     return "none";
+  }
+  if (cmd == "attack") {
+    // Tests: one attack with the weapon in hand (as a click).
+    const std::size_t before = projectiles_.size();
+    if (mode_ == Mode::foot) foot_attack(true, true);
+    else if (mode_ == Mode::drone) drone_attack(true, true);
+    else if (mode_ == Mode::jet) jet_attack(true, true, false);
+    std::string r = std::to_string(projectiles_.size() - before) + " " + std::to_string(next_attack_ - world_->sim_time()) + " mag " + std::to_string(ammo_mag_[static_cast<u8>(foot_weapon_)]);
+    if (!projectiles_.empty()) {
+      const Projectile& p = projectiles_.back();
+      char b[160];
+      std::snprintf(b, sizeof b, " pos %.1f %.1f %.1f vel %.1f %.1f %.1f", p.pos.x, p.pos.y, p.pos.z, p.vel.x, p.vel.y, p.vel.z);
+      r += b;
+    }
+    return r;
+  }
+  if (starts("weapon ")) {
+    const int n = std::atoi(cmd.c_str() + 7);
+    if (n >= 0 && n < 8) select_foot_weapon(static_cast<weapons::Id>(n));
+    return weapons::spec(foot_weapon_).name;
+  }
+  if (starts("wanted ")) {
+    // Tests / debugging: raise the wanted level to N stars (0 clears it).
+    const int n = std::atoi(cmd.c_str() + 7);
+    wanted_.clear();
+    for (int k = 0; k < 64 && wanted_.stars() < n; ++k) wanted_.report(wanted::Crime::police_officer, true);
+    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted_.stars()) / 1000;  // units are due at once
+    return std::to_string(wanted_.stars());
   }
   if (starts("time ")) {
     world_->level();  // time of day is the world's; Kern advances it while playing
