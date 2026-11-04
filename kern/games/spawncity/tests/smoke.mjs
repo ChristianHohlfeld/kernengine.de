@@ -514,7 +514,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);  // LENKEN / GAS: the left stick up
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
+    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast})`);
     await shot("3-car");
     check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
@@ -548,7 +548,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.agl > 2, `[${name}] the jet lifts off: ${h.agl} m AGL`);
+    check(h.agl > 2, `[${name}] the jet lifts off: ${h.agl} m AGL (mode ${h.mode}, hp ${h.jetHp}, jet ${JSON.stringify(h.jet)}, toast ${h.toast})`);
     await shot("4-jet");
     check(await cmd("eject") === "ok", `[${name}] ejection seat`);
     const t0 = (await hud()).t;
