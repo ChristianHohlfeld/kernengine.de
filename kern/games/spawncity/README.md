@@ -167,6 +167,27 @@ kern/games/spawncity/
   führt den Spieler zu Fuß mit; Tätigkeit aus dem Tempo (steht/gehen/laufen/Rad/Fahrt), Tempo bzw. Pace,
   Strecke, Zeit, Genauigkeit; Ansichten AUGE, FOLGEN, KARTE (`gps view`). Kein Schaden, keine Fahndung.
   Bildschirm bleibt an (Wake Lock). Offen: der blaue Positionspunkt und die Spurlinie am Boden.
+* **Jetpack** (`equipment.*`, `game_equipment.cpp`; `player_walk_mode_v4.mjs`, `jetpack_audio.mjs`): WELT-Schalter
+  (an). Zweiter Sprung in der Luft zündet (Stoß 0,6 s), Sprung halten fliegt weiter: Steigen bis 8 m/s
+  (Beschleunigung g + (8 − vz)·3, höchstens 13,8 m/s²), Luftsteuerung 14 m/s², Tank ≈ 5 s, füllt sich in
+  4 s am Boden (in der Luft nach 0,35 s ohne Schub), kurz vor einem harten Aufprall zündet er selbst
+  (21 m/s²). Der Schub ist ein Impuls auf Kerns Charakter (75 kg). Ton: Zünd-„Wumm“ (Druckstoß,
+  Flammenstoß, Klick) und ein Brüllen aus gefiltertem Rauschen mit Knistern; Tankanzeige unten.
+* **Logbuch** (`flight_logbook.mjs`): jeder Drohnenflug von ARM bis DISARM (Dauer, Strecke, Spitze,
+  größte Höhe über Grund, Akku Start/Minimum, Grund des Endes, Pfad alle 0,5 s, höchstens 50 Flüge) und
+  die Netzereignisse; das Spiel zeichnet auf (`logbook`), die Seite hält die Geschichte in localStorage,
+  EXPORT JSON / LEEREN im Pausemenü → LOGBUCH.
+* **Musik und Autoradio** (`music_player.mjs`, `car_radio.mjs`): SpawnCity spielt im Menü eine
+  Musikdatei und im Auto echte Radiosender der Gegend. Hier ist beides erzeugt (`MusicSynth`: 16tel-Sequencer
+  über vier Akkorde, Drums aus Rauschen und Sinus, Bass, Lead, Pad, Echo): die Titelmusik (8-Bit) läuft
+  nur in den Menüs, im Auto das Radio mit fünf Sendern (KERN FM Synthwave, BODENSEE BEATS House,
+  LOFI LAGUNE, 8-BIT RADIO, NACHTSCHICHT Techno). N / B oder D-Pad →/← wechseln, nach dem letzten
+  Sender kommt RADIO AUS; Sendername als Banner; Touch: 📻-Knopf. Lautstärke = MUSIK (Radio mindestens
+  55 %, ×0,85; Titel ×0,45 wie SpawnCity). `radio next|prev|on|off`, `music`.
+* **Geräuschkulisse** (`immersive_soundscape.mjs`): Stadtrauschen, Vögel am Tag, Grillen in der Nacht
+  (Umgebungs-Bus, leiser in der Höhe) und ein dumpfer Schlag bei harten Stößen des eigenen Autos
+  (ab 1,8 m/s Geschwindigkeitssprung) mit etwas Kamerawackeln. Schritte und Motor kommen wie bisher
+  aus Kerns GameAudio und `sound_fx.*`.
 * **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
   verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
   Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als

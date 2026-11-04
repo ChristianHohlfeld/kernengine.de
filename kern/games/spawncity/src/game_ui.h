@@ -4,7 +4,9 @@
 
 #include <string>
 
+#include "equipment.h"
 #include "gps_live.h"
+#include "kern/audio/audio.h"
 #include "settings.h"
 
 namespace sc {
@@ -22,6 +24,21 @@ struct UiState {
   std::string place;        // name of the start place the page chose ("" = GPS / default)
   Vec3 gps_cam_eye, gps_cam_look;
   bool gps_cam_init = false;
+  // equipment (game_equipment.cpp)
+  Jetpack jetpack;
+  bool jump_was = false, jet_pending = false;  // jet_pending: tests ignite at the next airborne frame
+  kern::audio::VoiceId jet_voice = 0, city_voice = 0, birds_voice = 0, crickets_voice = 0;
+  kern::audio::ClipId jet_clip = 0, whoomp_clip = 0, thump_clip = 0, city_clip = 0, birds_clip = 0, crickets_clip = 0;
+  FlightLog log;
+  std::string net_status;
+  MusicSynth music;
+  i32 station = 0;
+  bool radio_on = true;
+  std::string banner, banner_sub;
+  f32 banner_age = 99;
+  Vec3 car_vel;
+  bool car_vel_valid = false;
+  u32 thumps = 0;
 };
 
 }  // namespace sc

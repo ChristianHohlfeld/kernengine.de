@@ -1209,12 +1209,16 @@ bool Game::audio_init(u32 rate) {
   game_audio_ = std::make_unique<kern::game::GameAudio>(mixer_, *bank_);
   if (world_) bank_->request_level(world_->level());
   fx_.init(mixer_);
+  ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
   return true;
 }
 
 const f32* Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
-  if (mixer_.ready()) mixer_.render(audio_out_.data(), frames);
+  if (mixer_.ready()) {
+    mixer_.render(audio_out_.data(), frames);
+    ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+  }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
   return audio_out_.data();
 }

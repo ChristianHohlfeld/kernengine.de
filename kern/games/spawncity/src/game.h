@@ -215,6 +215,15 @@ class Game {
   void ui_gps_update(f32 dt);
   void ui_camera(f32 dt);
   std::string ui_hud_json();
+  // equipment (game_equipment.cpp)
+  void ui_audio_init();
+  void ui_jetpack(f32 dt);
+  void ui_equipment(f32 dt);
+  void ui_radio(i32 dir);
+  void ui_mix_equipment(f32 dt);
+  void ui_render_music(f32* out, u32 frames);
+  bool ui_equipment_command(const std::string& cmd, std::string& out);
+  std::string ui_equipment_json();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);

@@ -24,6 +24,7 @@ f32 pad_deadzone(f32 v, f32 dz) {
 
 bool Game::ui_command(const std::string& cmd, std::string& out) {
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
+  if (ui_equipment_command(cmd, out)) return true;
   Settings& st = ui_.settings;
   if (cmd == "settings" || cmd == "settings schema") { out = st.schema_json(); return true; }
   if (cmd == "settings values") { out = st.values_json(); return true; }
@@ -232,6 +233,7 @@ void Game::ui_after_input(f32 dt) {
     default: break;
   }
   if (mode_ != Mode::drone) ui_.drone_seen = false;
+  ui_jetpack(dt);  // game_equipment.cpp
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -257,6 +259,7 @@ void Game::ui_apply_settings() {
 void Game::ui_update(f32 dt) {
   ui_apply_settings();
   ui_gps_update(dt);
+  if (world_placed_) ui_equipment(dt);
   const Settings& st = ui_.settings;
   if (!world_placed_) return;
   if (!st.on(Opt::world_traffic)) {
@@ -303,6 +306,7 @@ void Game::ui_mix_audio(SoundState& s) {
     m.set_all_paused(ui_.paused);
     ui_.audio_paused = ui_.paused;
   }
+  ui_mix_equipment(0);
 }
 
 void Game::ui_mix_cues() {
@@ -370,7 +374,7 @@ std::string Game::ui_hud_json() {
                   g.has_fix() ? "true" : "false", g.activity_label(), g.speed(), g.distance(), g.elapsed(time_), g.accuracy(), view, g.accepted, g.rejected);
     s += b;
   }
-  return s;
+  return s + ui_equipment_json();
 }
 
 }  // namespace sc

@@ -218,6 +218,16 @@ async function run({name, url, context, mapped}) {
     check(h.placed && Math.abs(h.ui.origin[0] - o[0] - 0.004) < 1e-5, `[${name}] the world moved to the new start place (${h.ui.origin})`);
   }
 
+  // Jetpack (WORLD option): a jump with ignition lifts the player over 2 m.
+  {
+    check(await cmd("jetpack burn") === "ok", `[${name}] jetpack ignition`);
+    const t0 = (await hud()).t;
+    let top = 0;
+    while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
+    const jp = JSON.parse(await cmd("jetpack"));
+    check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  }
+
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
@@ -229,7 +239,8 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
-  page.evaluate(() => window.SpawnCity.command("mode foot"));
+  await cmd("mode foot");
+  check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
   const car = await cmd("mode car");
@@ -240,6 +251,7 @@ async function run({name, url, context, mapped}) {
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
     await shot("3-car");
+    check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
     await shot("3b-car-cockpit");
     await cmd("mode foot");

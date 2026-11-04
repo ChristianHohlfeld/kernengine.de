@@ -14,6 +14,7 @@
 const SCUI_STORE = "spawnCityKernSettingsV1";
 const SCUI_SUGGEST = "spawnCityKernSuggestV1";
 const SCUI_PLACE = "spawnCityKernStartPlaceV1", SCUI_RECENT = "spawnCityKernStartPlaceRecentV1";
+const SCUI_LOGBOOK = "spawnCityKernLogbookV1";
 const SCUI_PHOTON = "https://photon.komoot.io/api/";
 // world_location_selector.mjs WORLD_LOCATION_PRESETS (+ Konstanz, the game's home)
 const SCUI_PRESETS = [["Konstanz", 47.6600, 9.1766], ["New York", 40.7128, -74.0060], ["Berlin", 52.5200, 13.4050], ["Zürich", 47.3769, 8.5417],
@@ -93,6 +94,13 @@ body.scui-playing .sc-top{top:calc(max(12px,env(safe-area-inset-top)) + 38px)}
 #scPlacePanel .sp-on{border-color:#ffb02e}#scPlacePanel h4{margin:10px 0 6px;font:900 10px system-ui;letter-spacing:.14em;color:#8fe8ff}
 #scGps{position:fixed;z-index:21;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 46px);transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:8px 12px;border-radius:12px;background:#0d1117d9;border:1px solid #4285f4aa;color:#fff;font:700 12px/1.2 Inter,system-ui,sans-serif}
 #scGps[hidden]{display:none}#scGps b{font-size:15px;color:#9cc2ff}#scGps span{color:#b8c2cc}#scGps button{padding:6px 9px;border-radius:8px;border:1px solid #ffffff38;background:#162437;color:#fff;font:800 10px system-ui;letter-spacing:.1em;cursor:pointer}
+#scBanner{position:fixed;z-index:21;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 54px);transform:translateX(-50%);padding:8px 16px 7px;border-radius:12px;background:#0d1117d9;border:1px solid #ffffff2a;color:#fff;text-align:center;pointer-events:none;transition:opacity .35s;max-width:min(80vw,420px)}
+#scBanner b{display:block;font:900 15px/1.15 Inter,system-ui,sans-serif;letter-spacing:.05em;color:#ffd36a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#scBanner small{font:700 11px/1.3 system-ui;color:#b8c2cc}
+#scRadio{position:fixed;z-index:21;right:max(14px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 160px);width:44px;height:44px;border-radius:50%;border:1px solid #ffffff38;background:#0a0d12b0;font-size:20px;cursor:pointer}
+#scRadio[hidden],#scJet[hidden]{display:none}
+#scJet{position:fixed;z-index:19;left:50%;bottom:calc(max(34px,env(safe-area-inset-bottom) + 24px) + 12px);transform:translateX(-50%);width:min(160px,30vw);height:4px;border-radius:2px;background:#ffffff26;overflow:hidden}
+#scJet i{display:block;height:100%;background:linear-gradient(90deg,#ff8a2a,#ffd36a)}#scJet.burn i{background:#ff5a2a}
+.scui-log .lb-stats{font:600 11.5px/1.4 ui-monospace,monospace;color:#c7d2dc}
 #scIdea textarea{width:100%;min-height:70px;box-sizing:border-box;border-radius:8px;border:1px solid #ffffff33;background:#0c1118;color:#fff;font:500 13px/1.4 system-ui;padding:8px}
 `;
 
@@ -144,6 +152,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       <button class="scui-btn" data-act="world" type="button">WELT</button>
       <button class="scui-btn" data-act="reset" type="button">RESET</button>
       <button class="scui-btn" data-act="gps" type="button">GPS LIVE</button>
+      <button class="scui-btn" data-act="logbook" type="button">LOGBUCH</button>
       <button class="scui-btn" data-act="exit" type="button">HAUPTMENUE</button>
     </div></div></div>`);
   const settings = el(`<div class="scui-panel" id="scSettings" hidden><div class="scui-card"><h2>EINSTELLUNGEN</h2>
@@ -171,7 +180,15 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     <div class="scui-actions"><button class="scui-btn scui-hot" data-act="close" type="button">SCHLIESSEN</button></div></div></div>`);
   const gpsCard = el(`<div id="scGps" hidden><b data-k="act">🧍 STEHT</b><span data-k="speed">0 km/h</span><span data-k="dist">0 m</span><span data-k="time">0:00</span>
     <span data-k="acc">± – m</span><button type="button" data-act="gps-view">AUGE</button><button type="button" data-act="gps">STOP</button></div>`);
-  for (const n of [menu, pause, settings, world, log, quit, idea, corner, placePanel, gpsCard]) document.body.appendChild(n);
+  const logbook = el(`<div class="scui-panel" id="scLogbook" hidden><div class="scui-card"><h2>LOGBUCH</h2>
+    <p class="scui-sub">Jeder Drohnenflug von ARM bis DISARM und die Netzereignisse. Nur auf diesem Geraet gespeichert; fliesst nie in Flugregler oder Physik.</p>
+    <div class="scui-log" data-k="flights"></div><h4 class="scui-sub">NETZ / MEHRSPIELER</h4><div class="scui-log" data-k="events"></div>
+    <div class="scui-actions"><button class="scui-btn" data-act="lb-export" type="button">EXPORT JSON</button><button class="scui-btn" data-act="lb-clear" type="button">LEEREN</button>
+    <button class="scui-btn scui-hot" data-act="close" type="button">SCHLIESSEN</button></div></div></div>`);
+  const banner = el(`<div id="scBanner" style="opacity:0"><b></b><small></small></div>`);
+  const radioBtn = el(`<button id="scRadio" type="button" data-act="radio" aria-label="Autoradio: naechster Sender" hidden>📻</button>`);
+  const jetBar = el(`<div id="scJet" hidden><i></i></div>`);
+  for (const n of [menu, pause, settings, world, log, quit, idea, corner, placePanel, gpsCard, logbook, banner, radioBtn, jetBar]) document.body.appendChild(n);
   const startBtn = menu.querySelector("#scStart"), menuStatus = menu.querySelector("#scMenuStatus");
 
   // ---- open / close: a stack of panels; the game pauses while anything is open ---------------
@@ -280,6 +297,18 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       case "place": renderPlaces([]); openPanel(placePanel); placePanel.querySelector("input").focus(); break;
       case "gps": if (gpsLive.on) stopGps(); else { while (ui.open.length) closeTop(); startGps(); } break;
       case "gps-view": command("gps view next"); break;
+      case "logbook": syncLogbook(); renderLogbook(); openPanel(logbook); break;
+      case "radio": command("radio next"); break;
+      case "lb-export": {
+        const blob = new Blob([JSON.stringify({version: 1, exportedAt: new Date().toISOString(), ...scuiLoad(SCUI_LOGBOOK, {flights: [], events: []})}, null, 2)], {type: "application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `spawncity-logbuch-${new Date().toISOString().replaceAll(":", "-")}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        break;
+      }
+      case "lb-clear": scuiSave(SCUI_LOGBOOK, {flights: [], events: []}); renderLogbook(); break;
       case "copy": navigator.clipboard?.writeText(idea.querySelector("textarea").value.slice(0, 240)).catch(() => {}); break;
       case "github": {
         const text = idea.querySelector("textarea").value.trim().slice(0, 240);
@@ -290,7 +319,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       }
     }
   }
-  for (const root of [menu, pause, settings, world, log, idea, corner, placePanel, gpsCard])
+  for (const root of [menu, pause, settings, world, log, idea, corner, placePanel, gpsCard, logbook, radioBtn])
     root.addEventListener("click", ev => { const b = ev.target.closest("[data-act]"); if (b) { ev.stopPropagation(); act(b.dataset.act); } });
 
   // ---- title screen --------------------------------------------------------------------------
@@ -505,6 +534,39 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     gpsCard.querySelector('[data-act="gps-view"]').textContent = g.view;
   }
 
+  // ---- flight logbook (flight_logbook.mjs): the game records, the page keeps the history ----------
+  const session = Date.now().toString(36);
+  let logSerial = -1;
+  function syncLogbook() {
+    let fresh;
+    try { fresh = JSON.parse(command("logbook")); } catch { return; }
+    const book = scuiLoad(SCUI_LOGBOOK, {flights: [], events: []});
+    const known = new Set(book.flights.map(f => f.key));
+    for (const f of fresh.flights.slice().reverse()) {
+      const key = `${session}-${f.id}`;
+      if (known.has(key)) continue;
+      book.flights.unshift({key, at: new Date().toISOString(), origin: last?.ui?.origin || null, ...f});
+    }
+    const ekeys = new Set(book.events.map(e => e.key));
+    for (const ev of fresh.events.slice().reverse()) {
+      const key = `${session}-${ev.t}-${ev.stage}`;
+      if (!ekeys.has(key)) book.events.unshift({key, at: new Date().toISOString(), ...ev});
+    }
+    book.flights = book.flights.slice(0, 50);
+    book.events = book.events.slice(0, 120);
+    scuiSave(SCUI_LOGBOOK, book);
+  }
+  const dur = s => { const m = Math.floor(s / 60), r = s - m * 60; return m ? `${m}m ${r.toFixed(1)}s` : `${r.toFixed(1)}s`; };
+  function renderLogbook() {
+    const book = scuiLoad(SCUI_LOGBOOK, {flights: [], events: []});
+    logbook.querySelector('[data-k="flights"]').innerHTML = book.flights.length ? book.flights.map(f => `<article><time>${scuiEsc(new Date(f.at).toLocaleString())}</time>
+      <b>${last?.offline ? "ERSATZSTADT" : "WELT"} · ${dur(f.duration)} · ${scuiEsc(String(f.reason).replaceAll("_", " "))}</b>
+      <div class="lb-stats">STRECKE ${f.distance.toFixed(1)} m · MAX ${(f.maxSpeed * 3.6).toFixed(0)} km/h · AGL ${f.maxAgl.toFixed(1)} m · AKKU ${f.voltsStart.toFixed(1)} → ${f.voltsMin.toFixed(1)} V · ${f.path.length} Punkte</div></article>`).join("")
+      : `<article><b>NOCH KEINE FLUEGE</b></article>`;
+    logbook.querySelector('[data-k="events"]').innerHTML = book.events.length ? book.events.slice(0, 30).map(e => `<article><time>${scuiEsc(new Date(e.at).toLocaleString())}</time><b>${scuiEsc(e.stage)}</b></article>`).join("")
+      : `<article><b>KEINE NETZEREIGNISSE</b></article>`;
+  }
+
   // ---- suggestion card (suggestion_box.mjs): after 15 min of play, once, snooze 10 min -------
   function markIdeaDone() { const s = scuiLoad(SCUI_SUGGEST, {}); s.done = true; scuiSave(SCUI_SUGGEST, s); }
   setInterval(() => {
@@ -523,6 +585,15 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       if (!h) return;
       last = h;
       renderGps(h.gps);
+      if (h.logbook && h.logbook.serial !== logSerial) { logSerial = h.logbook.serial; if (logSerial > 0) syncLogbook(); }
+      // car radio banner and the touch button (car_radio.mjs)
+      if (h.banner) { banner.querySelector("b").textContent = h.banner; banner.querySelector("small").textContent = h.bannerSub || ""; }
+      banner.style.opacity = h.banner ? "1" : "0";
+      radioBtn.hidden = !(h.mode === "car" && h.touch);
+      // jetpack fuel (player_walk_mode_v4.mjs jetHud): only while it is not full
+      const jp = h.jetpack;
+      jetBar.hidden = !jp || (jp.fuel > 0.995 && !jp.thrusting) || !!h.ui?.paused;
+      if (!jetBar.hidden) { jetBar.querySelector("i").style.width = `${Math.round(jp.fuel * 100)}%`; jetBar.classList.toggle("burn", jp.thrusting); }
       const ready = !!h.placed;
       if (startBtn.disabled === ready) { startBtn.disabled = !ready; startBtn.textContent = ready ? "START" : "LADEN"; }
       const status = ready ? (h.offline ? "OFFLINE · PROZEDURALE ERSATZSTADT" : "BEREIT") : (statusEl?.textContent || "STADT WIRD VORBEREITET").toUpperCase();
