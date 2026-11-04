@@ -26,7 +26,8 @@ if [ "$skip_wasm" = 0 ]; then
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).
   header_hash="$(find "$here/src" "$here/firmware" -name '*.h' -o -name '*.hpp' | sort | xargs cat | sha256sum | cut -c1-16)"
-  wrap="${TMPDIR:-/tmp}/spawncity-wrap"
+  # One wrapper folder per checkout (parallel builds of several worktrees must not share it).
+  wrap="${TMPDIR:-/tmp}/spawncity-wrap-$(printf '%s' "$here" | sha256sum | cut -c1-12)"
   rm -rf "$wrap" && mkdir -p "$wrap"
   wrapped=()
   for f in "$here"/src/*.cpp; do

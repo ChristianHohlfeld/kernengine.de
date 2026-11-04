@@ -605,7 +605,7 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 * Fahrer, die beim Carjacking sichtbar aussteigen.
 * Innenräume: die offene Tür und die Dachluke sind von außen kein echter Ausschnitt im Fassadennetz
   (Kerns Gebäudenetz ist ein Netz je Kachel, SpawnCity schneidet per Shader-Uniform `facadeCutouts`) –
-  ein dunkles Türblatt steht davor; braucht Engine-Punkt 13. Das „Halten“ aus `player_push.mjs` gehört
+  ein dunkles Türblatt steht davor; braucht Engine-Punkt 15. Das „Halten“ aus `player_push.mjs` gehört
   zur Gravity-Gun (eigener Bereich); der Netzweg dafür (Fx `push`) ist da. Autotreffer an Passanten
   werden nicht verschickt, weil Passanten auf Kern lokal sind (siehe Mehrspieler).
 * **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
@@ -676,7 +676,12 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
     View-Model-Meshes über `Renderer::set_visible` aus) und **Bloom-Parameter** (Stärke, Schwelle) zur Laufzeit.
 12. **Zeichenpuffer-Skalierung im App-Host** (`runKernApp` mit änderbarer Pixelratio) – heute setzt die
     Seite die Canvas-Größe selbst nach `renderScale` und ruft `kern_app_resize`.
-13. **Ragdoll-Baustein** (Catto-Mensch aus Kapseln mit Gelenkgrenzen und Reibung, `ragdoll.*`) und
+13. **Öffentlicher Transport in `KernNet`** (`kern/web/studio/game.mjs`): WebRTC-Datenkanal mit
+   Signalisierung über MQTT und versiegeltem Broker-Fallback (heute `web/mp_host.mjs` `MpPublicNet`),
+   und ein Autoritätswechsel in `kern::net` (neuer Server aus dem ältesten Client), wenn der Host geht.
+14. **Sprach-Bus im Mixer** (`kern::audio`): eine gestreamte Quelle je Sprecher mit Jitter-Puffer statt
+   des Nachmischens in `Game::audio_render` (`mp::VoiceStream`).
+15. **Ragdoll-Baustein** (Catto-Mensch aus Kapseln mit Gelenkgrenzen und Reibung, `ragdoll.*`) und
     ein **Ausschnitt-Mechanismus für Gebäudenetze** (Tür/Dachluke im Kachelnetz, wie SpawnCitys
     `facadeCutouts`), dazu `destroy_shape`, damit ein Haus seinen Kollisions-Shape abgeben kann, ohne
     dass die ganze Kachel neu gebaut wird (`CityStream::exclude_building`).

@@ -259,7 +259,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
   }, 250);
   requestAnimationFrame(tick);
-  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles, ui};
+  // hud() reads the game's state now (not the copy of the last drawn frame): a test that sends a
+  // command sees its effect at once, however slow the frames are.
+  const hudNow = () => { try { return JSON.parse(str(e.sc_hud())); } catch { return last; } };
+  window.SpawnCity = {app, command, hud: hudNow, frames: () => frames, tiles, ui};
   return window.SpawnCity;
 }
 
