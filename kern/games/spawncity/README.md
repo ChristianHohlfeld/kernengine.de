@@ -175,6 +175,71 @@ kern/games/spawncity/
   Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
   eigene Shader-Erweiterung).
 
+## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
+
+* **Einstellungen** (`settings.*`, `game_ui.cpp`): eine Tabelle im Spiel mit SpawnCitys Werten, Bereichen und
+  Hilfezeilen – Maus (Empfindlichkeit 20–300 %, Y invertieren), zu Fuß (Stick-Kurven, Blicktempo,
+  Totzone, Invertieren), Drohne (Stick-Kurven, Invertieren, Höchstgeschwindigkeit 5–90 km/h,
+  Schwebehöhe), Auto (Lenkung/Gas 55–150 %, 45–180 km/h, rückwärts, Kamera-Abstand/-Höhe), Kamera
+  (FPV-Neigung, Sichtfeld, Third-Person-Abstand, 3D nebeneinander), Ton (Hauptschalter, Drohne,
+  Schüsse, Effekte, Schritte, Fahrzeuge, Umgebung, Musik) und die WELT-Schalter. Die Seite baut ihre
+  Menüs aus `settings schema` und schickt jede Änderung als `set <key> <wert>`; localStorage hält nur
+  eine Kopie, die beim Start wieder abgespielt wird (`settings values`, `get <key>`, `settings reset [bereich]`).
+* **WELT** (`world_options.mjs`): Leute, Verkehr und Polizei gibt es nicht, wenn sie aus sind (keine
+  Körper, keine KI); Jetpack; Friendly Fire (Standard aus, wie SpawnCity: Treffer und Explosionen
+  erreichen andere Spieler nur, wenn es an ist). Hunde, Katzen, Vögel, Zombies, Militär und Flak hat das
+  Spiel auf Kern noch nicht – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+* **Menüs** (`web/ui.mjs`, nur DOM): Titelbildschirm (START, WELT, EINSTELLUNGEN, NEU / CHANGELOG;
+  automatisierte Browser und `?autostart=1` überspringen ihn, `?menu=1` erzwingt ihn), Pausemenü (Esc,
+  MENÜ, Pad-Menütaste, Verlassen des Pointer-Locks), „Zurück zum Hauptmenü?“ (Enter/Y – Esc/N),
+  EXIT / MENÜ / RESET oben links, Steuerung der Menüs mit dem Pad (D-Pad, A, B). Solange ein Menü offen
+  ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
+* **RESET** (`game_reset.mjs`, allein): zurück zum Start – Startmodus und Startpunkt, Pistole, volle
+  Gesundheit, keine Fahndung, Polizei weg, Fahrzeuge repariert, neue Passanten.
+* **Startort** (`start_location.mjs`, `world_location_selector.mjs`, `auto_flight_start.mjs`): der „📍“-Knopf
+  im Titel – MEIN STANDORT (GPS, Standard), die Städte-Liste von SpawnCity (+ Konstanz), die letzten fünf
+  Orte und eine Suche (Stadt, Straße, Adresse) über Photon von komoot (© OpenStreetMap-Mitwirkende,
+  Namensnennung im Suchfenster). Der gewählte Ort gilt nur für diese Browser-Sitzung. START holt einen
+  frischen GPS-Fix (nach 12 s die Netzwerkposition; ein genauer Fix bis 60 s danach, der über 300 m
+  daneben liegt, verlegt die Welt noch einmal). `?lat=&lon=` in der Adresse ersetzt das GPS. Im Spiel:
+  `start <lat> <lon> [name]` streamt die Stadt am neuen Ort und setzt den Spieler dort ab (nicht im
+  Mehrspieler – dort gilt die Stadt des Hosts), `origin` meldet den Ursprung.
+* **LIVE GPS** (`gps_live.*`, `gps_live_mode.mjs`): Pausemenü → GPS LIVE. Die Seite gibt die Fixes von
+  `watchPosition` weiter (`gps fix <lat> <lon> <genauigkeit> [tempo] [kurs]`, Kompass `gps compass`), das
+  Spiel filtert sie wie SpawnCity (über 65 m Ungenauigkeit verworfen, Sprünge über 75 m/s verworfen,
+  Vorhersage mit konstanter Geschwindigkeit, Neuanfang nach 12 s Lücke, Welt wandert mit ab 40 km) und
+  führt den Spieler zu Fuß mit; Tätigkeit aus dem Tempo (steht/gehen/laufen/Rad/Fahrt), Tempo bzw. Pace,
+  Strecke, Zeit, Genauigkeit; Ansichten AUGE, FOLGEN, KARTE (`gps view`). Kein Schaden, keine Fahndung.
+  Bildschirm bleibt an (Wake Lock). Offen: der blaue Positionspunkt und die Spurlinie am Boden.
+* **Jetpack** (`equipment.*`, `game_equipment.cpp`; `player_walk_mode_v4.mjs`, `jetpack_audio.mjs`): WELT-Schalter
+  (an). Zweiter Sprung in der Luft zündet (Stoß 0,6 s), Sprung halten fliegt weiter: Steigen bis 8 m/s
+  (Beschleunigung g + (8 − vz)·3, höchstens 13,8 m/s²), Luftsteuerung 14 m/s², Tank ≈ 5 s, füllt sich in
+  4 s am Boden (in der Luft nach 0,35 s ohne Schub), kurz vor einem harten Aufprall zündet er selbst
+  (21 m/s²). Der Schub ist ein Impuls auf Kerns Charakter (75 kg). Ton: Zünd-„Wumm“ (Druckstoß,
+  Flammenstoß, Klick) und ein Brüllen aus gefiltertem Rauschen mit Knistern; Tankanzeige unten.
+* **Logbuch** (`flight_logbook.mjs`): jeder Drohnenflug von ARM bis DISARM (Dauer, Strecke, Spitze,
+  größte Höhe über Grund, Akku Start/Minimum, Grund des Endes, Pfad alle 0,5 s, höchstens 50 Flüge) und
+  die Netzereignisse; das Spiel zeichnet auf (`logbook`), die Seite hält die Geschichte in localStorage,
+  EXPORT JSON / LEEREN im Pausemenü → LOGBUCH.
+* **Musik und Autoradio** (`music_player.mjs`, `car_radio.mjs`): SpawnCity spielt im Menü eine
+  Musikdatei und im Auto echte Radiosender der Gegend. Hier ist beides erzeugt (`MusicSynth`: 16tel-Sequencer
+  über vier Akkorde, Drums aus Rauschen und Sinus, Bass, Lead, Pad, Echo): die Titelmusik (8-Bit) läuft
+  nur in den Menüs, im Auto das Radio mit fünf Sendern (KERN FM Synthwave, BODENSEE BEATS House,
+  LOFI LAGUNE, 8-BIT RADIO, NACHTSCHICHT Techno). N / B oder D-Pad →/← wechseln, nach dem letzten
+  Sender kommt RADIO AUS; Sendername als Banner; Touch: 📻-Knopf. Lautstärke = MUSIK (Radio mindestens
+  55 %, ×0,85; Titel ×0,45 wie SpawnCity). `radio next|prev|on|off`, `music`.
+* **Geräuschkulisse** (`immersive_soundscape.mjs`): Stadtrauschen, Vögel am Tag, Grillen in der Nacht
+  (Umgebungs-Bus, leiser in der Höhe) und ein dumpfer Schlag bei harten Stößen des eigenen Autos
+  (ab 1,8 m/s Geschwindigkeitssprung) mit etwas Kamerawackeln. Schritte und Motor kommen wie bisher
+  aus Kerns GameAudio und `sound_fx.*`.
+* **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
+  verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
+  Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als
+  Vorschlag im öffentlichen GitHub-Repository öffnen.
+* **App/Vollbild** (`pwa_fullscreen_policy.mjs`): `web/manifest.webmanifest` (Vollbild, quer) mit
+  eigenem SVG-Symbol; auf Touch-Geräten startet START das Vollbild, außer die installierte App läuft
+  schon im eigenen Fenster.
+
 ## Übernommene SpawnCity-Werte (Auszug)
 
 | Bereich | Werte | Quelle |

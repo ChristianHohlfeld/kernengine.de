@@ -216,6 +216,59 @@ async function run({name, url, context, mapped}) {
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
 
+  // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
+  {
+    const schema = JSON.parse(await cmd("settings schema"));
+    check(schema.some(o => o.key === "world.jetpack") && schema.some(o => o.key === "car.maxKmh"), `[${name}] settings table (${schema.length} rows)`);
+    check(await cmd("set mouse.sensitivity 150") === "ok" && await cmd("get mouse.sensitivity") === "150", `[${name}] a setting changes`);
+    await cmd("set mouse.sensitivity 100");
+    await cmd("pause 1");
+    const tp = (await hud()).t;
+    await page.waitForTimeout(1500);
+    h = await hud();
+    check(h.ui?.paused && Math.abs(h.t - tp) < 0.05, `[${name}] paused: the game stands (${tp} -> ${h.t})`);
+    await cmd("pause 0");
+    await page.evaluate(() => window.SpawnCity.ui.open("settings"));
+    check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
+    await shot("0-settings");
+    await page.keyboard.press("Escape");
+    check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
+    await cmd("set world.people 0");
+    await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
+    check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
+    await cmd("set world.people 1");
+    const resets = (await hud()).ui.resets;
+    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    // LIVE GPS: two fixes 20 m apart move the player there.
+    const o = (await hud()).ui.origin;
+    check(await cmd("gps on") === "on", `[${name}] GPS live on`);
+    await cmd(`gps fix ${o[0]} ${o[1]} 5`);
+    await page.waitForTimeout(1200);
+    await cmd(`gps fix ${o[0] + 0.00018} ${o[1]} 5`);
+    await page.waitForTimeout(2500);
+    h = await hud();
+    check(h.gps?.fix && h.gps.accepted === 2, `[${name}] GPS fixes taken (${JSON.stringify(h.gps)})`);
+    check(await cmd("gps view follow") === "follow", `[${name}] GPS follow view`);
+    await shot("0b-gps-follow");
+    await cmd("gps off");
+    // Another start place: the world moves and is built there.
+    const moves = h.ui.moves;
+    check(await cmd(`start ${o[0] + 0.004} ${o[1] + 0.004} Testort`) === "moving", `[${name}] start place command`);
+    await page.waitForFunction(m => { const h = window.SpawnCity.hud(); return h.placed && h.ui.moves > m; }, moves, {timeout: 400000}).catch(() => {});
+    h = await hud();
+    check(h.placed && Math.abs(h.ui.origin[0] - o[0] - 0.004) < 1e-5, `[${name}] the world moved to the new start place (${h.ui.origin})`);
+  }
+
+  // Jetpack (WORLD option): a jump with ignition lifts the player over 2 m.
+  {
+    check(await cmd("jetpack burn") === "ok", `[${name}] jetpack ignition`);
+    const t0 = (await hud()).t;
+    let top = 0;
+    while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
+    const jp = JSON.parse(await cmd("jetpack"));
+    check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  }
+
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
@@ -227,7 +280,8 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
-  page.evaluate(() => window.SpawnCity.command("mode foot"));
+  await cmd("mode foot");
+  check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
   const car = await cmd("mode car");
@@ -238,6 +292,7 @@ async function run({name, url, context, mapped}) {
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
     await shot("3-car");
+    check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
     await shot("3b-car-cockpit");
     await cmd("cam");

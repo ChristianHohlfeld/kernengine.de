@@ -14,6 +14,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {installSpawnCityUi} from "./ui.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -218,6 +219,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
+  // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
+  const ui = installSpawnCityUi({command, params, canvas, statusEl});
   let frames = 0, last = null;
   const tick = () => {
     frames++;
@@ -227,8 +230,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
+    ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
+  };
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
@@ -255,17 +260,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     // The player in the middle: an arrow pointing up.
     mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
   }, 250);
-  };
   requestAnimationFrame(tick);
-  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles};
+  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles, ui};
   return window.SpawnCity;
 }
 
 const SC_MODE_LABEL = {foot: "ZU FUSS", drone: "DROHNE", car: "AUTO", jet: "JET", parachute: "FALLSCHIRM"};
 const SC_HELP = {
-  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne",
+  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne · 2× Leertaste Jetpack · Esc Menü",
   drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · V zurück",
-  car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · F aussteigen",
+  car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · N/B Radio · F aussteigen",
   jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · Maus links/Leertaste Kanone · R Rakete · B Bombe · C Cockpit · F aussteigen / Schleudersitz",
   parachute: "WASD steuern",
 };
