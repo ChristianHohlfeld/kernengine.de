@@ -307,13 +307,17 @@ async function run({name, url, context, mapped}) {
     check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
     await shot("0-settings");
     await page.keyboard.press("Escape");
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
     await cmd("set world.people 0");
     await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
     check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
     await cmd("set world.people 1");
     const resets = (await hud()).ui.resets;
-    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    const resetOk = await cmd("reset") === "ok";
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(resetOk && h.ui.resets === resets + 1 && h.mode === "foot", `[${name}] RESET back to the start (${h.ui.resets}, ${h.mode})`);
     // LIVE GPS: two fixes 20 m apart move the player there.
     const o = (await hud()).ui.origin;
     check(await cmd("gps on") === "on", `[${name}] GPS live on`);
