@@ -205,9 +205,9 @@ void Game::update_projectiles(f32 dt) {
           if (d.active && kern::length(d.pos - (p.pos + step * 0.5f)) < 1.2f + len * 0.5f) { boom = true; at = d.pos; }
     }
     p.pos = at;
-    if (boom || at.z < -5 || now - p.born > 20) {
+    if (boom || at.z < city_.ground_height(at.x, at.y) - 5 || now - p.born > 20) {
       const weapons::Spec& s = weapons::spec(p.id);
-      if (s.radius_m > 0 && at.z > -5) explosion(at, s.radius_m, s.damage, p.by_player);
+      if (s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player);
       // Blasts reach police drones too.
       for (PoliceDrone& d : pdrones_) {
         if (!d.active) continue;

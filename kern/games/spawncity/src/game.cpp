@@ -433,6 +433,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       if (c.driver && c.placed) {
         // Carjacking: the driver is thrown out; a witness reports it (wanted_system_logic.mjs).
         wanted_.report(wanted::Crime::carjacking, true);
+        eject_driver(vehicle);  // M3: the driver gets out and runs (game_traffic.cpp)
         toast_ = "Auto geklaut! Der Fahrer ist raus.";
         toast_age_ = 0;
       }
@@ -603,6 +604,7 @@ void Game::drive_traffic(f32 h) {
       const f32 to_end = std::hypot(end.x - s.position.x, end.y - s.position.y);
       if (to_end < 18) want_speed = std::fmin(want_speed, 4.5f + to_end * 0.3f);
     }
+    want_speed = std::fmin(want_speed, traffic_rules(static_cast<i32>(i), s.position, fwd, c.car->forward_speed()));  // M3 lights / right of way
     CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, want_speed);
     const f32 v = std::fmax(0.0f, c.car->forward_speed());
     const f32 gap = 1.6f * v + 6;
@@ -1208,6 +1210,7 @@ void Game::draw_vehicles() {
     }
     if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
     draw_remote_vehicles();
+    draw_world_vehicles();  // M3: tow trucks (game_traffic.cpp)
   }
   art_.end();
 }

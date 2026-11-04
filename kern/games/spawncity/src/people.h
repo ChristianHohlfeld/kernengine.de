@@ -94,6 +94,9 @@ class People {
 
   // officers (Police places and moves them; they share hits and drawing with everybody else)
   i32 add_officer(Vec3 at, f32 yaw, i32 unit, u32 seed);
+  /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
+  /// his pavement route (lane, seg, along, side, off) and what he does.
+  i32 add_citizen(Vec3 at, f32 yaw, u32 seed);
   Person& at(i32 i) { return people_[static_cast<std::size_t>(i)]; }
   const std::vector<Person>& all() const { return people_; }
   /// A free step along `dir` that does not go through walls (tries turned directions).
