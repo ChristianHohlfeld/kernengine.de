@@ -64,7 +64,113 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "reset") { ui_reset(); out = "ok"; return true; }
+  // ---- start place (start_location.mjs, auto_flight_start.mjs) ----
+  if (starts("start ")) {
+    double lat = 0, lon = 0;
+    char name[96] = {};
+    const int n = std::sscanf(cmd.c_str() + 6, "%lf %lf %95[^\n]", &lat, &lon, name);
+    if (n < 2 || !std::isfinite(lat) || !std::isfinite(lon) || std::fabs(lat) > 85 || std::fabs(lon) > 180) { out = "usage: start <lat> <lon> [name]"; return true; }
+    if (net_.active()) { out = "im Mehrspieler nicht"; return true; }  // the host's city is everybody's
+    ui_.place = name;
+    ui_move_world(lon, lat);
+    out = "moving";
+    return true;
+  }
+  if (cmd == "origin") {
+    char b[96];
+    std::snprintf(b, sizeof b, "{\"lat\":%.6f,\"lon\":%.6f}", lat_, lon_);
+    out = b;
+    return true;
+  }
+  // ---- LIVE GPS (gps_live_mode.mjs) ----
+  if (starts("gps ")) {
+    const std::string rest = cmd.substr(4);
+    GpsLive& g = ui_.gps;
+    if (rest == "on") { if (!g.active()) g.start(time_); out = "on"; return true; }
+    if (rest == "off") { g.stop(); ui_.gps_cam_init = false; out = "off"; return true; }
+    if (rest.rfind("view", 0) == 0) {
+      const std::string v = rest.size() > 5 ? rest.substr(5) : "next";
+      g.view = v == "eye" ? GpsLive::View::eye : v == "follow" ? GpsLive::View::follow : v == "map" ? GpsLive::View::map
+                                                                                              : static_cast<GpsLive::View>((static_cast<u8>(g.view) + 1) % 3);
+      ui_.gps_cam_init = false;
+      out = g.view == GpsLive::View::eye ? "eye" : g.view == GpsLive::View::follow ? "follow" : "map";
+      return true;
+    }
+    if (rest.rfind("compass ", 0) == 0) { g.compass(static_cast<f32>(std::atof(rest.c_str() + 8))); out = "ok"; return true; }
+    double lat = 0, lon = 0, acc = 0, speed = -1, course = -1;
+    if (rest.rfind("fix ", 0) == 0 && std::sscanf(rest.c_str() + 4, "%lf %lf %lf %lf %lf", &lat, &lon, &acc, &speed, &course) >= 3) {
+      if (!g.active()) { out = "off"; return true; }
+      if (!world_placed_) { out = "loading"; return true; }
+      f64 x = 0, y = 0;
+      city_.projector().project(lon, lat, x, y);
+      if (std::hypot(x, y) / 1000 > GpsLive::kReanchorKm && !net_.active()) {
+        // Far from the world's origin: the world moves to you.
+        ui_move_world(lon, lat);
+        g.start(time_);
+        out = "reanchor";
+        return true;
+      }
+      out = g.fix(time_, static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(acc), static_cast<f32>(speed),
+                  course >= 0 ? static_cast<f32>(course * kDeg) : -1.0f) ? "ok" : "rejected";
+      return true;
+    }
+    out = "usage: gps on|off|view [eye|follow|map]|fix <lat> <lon> <acc> [speed] [course deg]|compass <rad>";
+    return true;
+  }
   return false;
+}
+
+// The world moves to another place: the city streams there and the player starts anew.
+void Game::ui_move_world(f64 lon, f64 lat) {
+  rebase_origin(lon, lat);
+  ++ui_.moves;
+  ui_.gps_cam_init = false;
+  toast_ = ui_.place.empty() ? "Neuer Startort - die Stadt wird geladen" : "Startort: " + ui_.place;
+  toast_age_ = 0;
+}
+
+void Game::ui_gps_update(f32 dt) {
+  GpsLive& g = ui_.gps;
+  if (!g.active() || !world_placed_ || ui_.paused) return;
+  // The game can't hurt you in this mode: it mirrors real life (on foot, no damage, no wanted level).
+  if (mode_ != Mode::foot) command("mode foot");
+  g.frame(time_, dt);
+  if (g.has_fix()) {
+    const Vec2 p = g.shown();
+    world_->teleport(soldier_, {p.x, p.y, city_.ground_height(p.x, p.y) + 0.73f});
+    world_->set_actor_velocity(soldier_, {});
+  }
+  wanted_.clear();
+  world_->heal(soldier_, 1000);
+}
+
+void Game::ui_camera(f32 dt) {
+  (void)dt;
+  const GpsLive& g = ui_.gps;
+  if (!g.active() || !g.has_fix() || g.view == GpsLive::View::eye || mode_ != Mode::foot) return;
+  // FOLLOW (behind and above, navigation style) or MAP (top-down, heading up), gps_live_mode.mjs.
+  const Vec2 p = g.shown();
+  const f32 h = g.heading(), fx = std::sin(h), fy = std::cos(h), gz = city_.ground_height(p.x, p.y), fast = clampf(g.speed() / 12, 0, 1);
+  Vec3 eye, look, up{0, 0, 1};
+  f32 fov = 62;
+  if (g.view == GpsLive::View::follow) {
+    const f32 back = 9 + 10 * fast, high = 6 + 6 * fast;
+    eye = {p.x - fx * back, p.y - fy * back, gz + high};
+    look = {p.x + fx * (6 + 10 * fast), p.y + fy * (6 + 10 * fast), gz + 1};
+  } else {
+    eye = {p.x - fx * 0.01f, p.y - fy * 0.01f, gz + 90 + 160 * fast};
+    look = {p.x, p.y, gz};
+    up = {fx, fy, 0};
+    fov = 55;
+  }
+  if (!ui_.gps_cam_init) { ui_.gps_cam_eye = eye; ui_.gps_cam_look = look; ui_.gps_cam_init = true; }
+  ui_.gps_cam_eye = ui_.gps_cam_eye + (eye - ui_.gps_cam_eye) * 0.18f;
+  ui_.gps_cam_look = ui_.gps_cam_look + (look - ui_.gps_cam_look) * 0.25f;
+  cam_.eye = ui_.gps_cam_eye;
+  cam_.target = ui_.gps_cam_look;
+  cam_.up = up;
+  cam_.fov = fov * kDeg;
+  cam_.near = 0.25f;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -149,8 +255,8 @@ void Game::ui_apply_settings() {
 }
 
 void Game::ui_update(f32 dt) {
-  (void)dt;
   ui_apply_settings();
+  ui_gps_update(dt);
   const Settings& st = ui_.settings;
   if (!world_placed_) return;
   if (!st.on(Opt::world_traffic)) {
@@ -252,10 +358,19 @@ void Game::ui_reset() {
 // HUD
 
 std::string Game::ui_hud_json() {
-  char b[160];
-  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u}", world_placed_ ? "true" : "false", ui_.paused ? "true" : "false",
-                ui_.settings.version(), ui_.resets);
-  return b;
+  char b[512];
+  std::string s;
+  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f]}",
+                world_placed_ ? "true" : "false", ui_.paused ? "true" : "false", ui_.settings.version(), ui_.resets, ui_.moves, lat_, lon_);
+  s += b;
+  const GpsLive& g = ui_.gps;
+  if (g.active()) {
+    const char* view = g.view == GpsLive::View::eye ? "AUGE" : g.view == GpsLive::View::follow ? "FOLGEN" : "KARTE";
+    std::snprintf(b, sizeof b, ",\"gps\":{\"fix\":%s,\"activity\":\"%s\",\"speed\":%.2f,\"distance\":%.1f,\"time\":%.0f,\"accuracy\":%.0f,\"view\":\"%s\",\"accepted\":%u,\"rejected\":%u}",
+                  g.has_fix() ? "true" : "false", g.activity_label(), g.speed(), g.distance(), g.elapsed(time_), g.accuracy(), view, g.accepted, g.rejected);
+    s += b;
+  }
+  return s;
 }
 
 }  // namespace sc

@@ -152,6 +152,21 @@ kern/games/spawncity/
   ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
 * **RESET** (`game_reset.mjs`, allein): zurück zum Start – Startmodus und Startpunkt, Pistole, volle
   Gesundheit, keine Fahndung, Polizei weg, Fahrzeuge repariert, neue Passanten.
+* **Startort** (`start_location.mjs`, `world_location_selector.mjs`, `auto_flight_start.mjs`): der „📍“-Knopf
+  im Titel – MEIN STANDORT (GPS, Standard), die Städte-Liste von SpawnCity (+ Konstanz), die letzten fünf
+  Orte und eine Suche (Stadt, Straße, Adresse) über Photon von komoot (© OpenStreetMap-Mitwirkende,
+  Namensnennung im Suchfenster). Der gewählte Ort gilt nur für diese Browser-Sitzung. START holt einen
+  frischen GPS-Fix (nach 12 s die Netzwerkposition; ein genauer Fix bis 60 s danach, der über 300 m
+  daneben liegt, verlegt die Welt noch einmal). `?lat=&lon=` in der Adresse ersetzt das GPS. Im Spiel:
+  `start <lat> <lon> [name]` streamt die Stadt am neuen Ort und setzt den Spieler dort ab (nicht im
+  Mehrspieler – dort gilt die Stadt des Hosts), `origin` meldet den Ursprung.
+* **LIVE GPS** (`gps_live.*`, `gps_live_mode.mjs`): Pausemenü → GPS LIVE. Die Seite gibt die Fixes von
+  `watchPosition` weiter (`gps fix <lat> <lon> <genauigkeit> [tempo] [kurs]`, Kompass `gps compass`), das
+  Spiel filtert sie wie SpawnCity (über 65 m Ungenauigkeit verworfen, Sprünge über 75 m/s verworfen,
+  Vorhersage mit konstanter Geschwindigkeit, Neuanfang nach 12 s Lücke, Welt wandert mit ab 40 km) und
+  führt den Spieler zu Fuß mit; Tätigkeit aus dem Tempo (steht/gehen/laufen/Rad/Fahrt), Tempo bzw. Pace,
+  Strecke, Zeit, Genauigkeit; Ansichten AUGE, FOLGEN, KARTE (`gps view`). Kein Schaden, keine Fahndung.
+  Bildschirm bleibt an (Wake Lock). Offen: der blaue Positionspunkt und die Spurlinie am Boden.
 * **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
   verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
   Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als

@@ -198,6 +198,24 @@ async function run({name, url, context, mapped}) {
     await cmd("set world.people 1");
     const resets = (await hud()).ui.resets;
     check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    // LIVE GPS: two fixes 20 m apart move the player there.
+    const o = (await hud()).ui.origin;
+    check(await cmd("gps on") === "on", `[${name}] GPS live on`);
+    await cmd(`gps fix ${o[0]} ${o[1]} 5`);
+    await page.waitForTimeout(1200);
+    await cmd(`gps fix ${o[0] + 0.00018} ${o[1]} 5`);
+    await page.waitForTimeout(2500);
+    h = await hud();
+    check(h.gps?.fix && h.gps.accepted === 2, `[${name}] GPS fixes taken (${JSON.stringify(h.gps)})`);
+    check(await cmd("gps view follow") === "follow", `[${name}] GPS follow view`);
+    await shot("0b-gps-follow");
+    await cmd("gps off");
+    // Another start place: the world moves and is built there.
+    const moves = h.ui.moves;
+    check(await cmd(`start ${o[0] + 0.004} ${o[1] + 0.004} Testort`) === "moving", `[${name}] start place command`);
+    await page.waitForFunction(m => { const h = window.SpawnCity.hud(); return h.placed && h.ui.moves > m; }, moves, {timeout: 400000}).catch(() => {});
+    h = await hud();
+    check(h.placed && Math.abs(h.ui.origin[0] - o[0] - 0.004) < 1e-5, `[${name}] the world moved to the new start place (${h.ui.origin})`);
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.

@@ -13,6 +13,12 @@
 
 const SCUI_STORE = "spawnCityKernSettingsV1";
 const SCUI_SUGGEST = "spawnCityKernSuggestV1";
+const SCUI_PLACE = "spawnCityKernStartPlaceV1", SCUI_RECENT = "spawnCityKernStartPlaceRecentV1";
+const SCUI_PHOTON = "https://photon.komoot.io/api/";
+// world_location_selector.mjs WORLD_LOCATION_PRESETS (+ Konstanz, the game's home)
+const SCUI_PRESETS = [["Konstanz", 47.6600, 9.1766], ["New York", 40.7128, -74.0060], ["Berlin", 52.5200, 13.4050], ["Zürich", 47.3769, 8.5417],
+  ["London", 51.5074, -0.1278], ["Paris", 48.8566, 2.3522], ["Tokyo", 35.6762, 139.6503], ["Los Angeles", 34.0522, -118.2437], ["Singapore", 1.3521, 103.8198],
+  ["Dubai", 25.2048, 55.2708], ["Sydney", -33.8688, 151.2093], ["Rio de Janeiro", -22.9068, -43.1729]];
 const SCUI_SECTIONS = [["maus", "MAUS"], ["fuss", "ZU FUSS"], ["drohne", "DROHNE"], ["auto", "AUTO"], ["kamera", "KAMERA"], ["ton", "TON"]];
 
 // changelog_menu.mjs: newest first, one line a player understands, only what is new in that update.
@@ -79,6 +85,14 @@ const SCUI_CSS = `
 .scui-corner button{min-height:30px;padding:6px 10px;border-radius:8px;border:1px solid #ffffff2a;background:#0a0d12a0;color:#fff;font:800 11px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;cursor:pointer}
 .scui-corner[hidden]{display:none}
 body.scui-playing .sc-top{top:calc(max(12px,env(safe-area-inset-top)) + 38px)}
+#scPlace{display:flex;align-items:center;gap:8px;max-width:min(86vw,420px);padding:8px 14px;border-radius:999px;border:1px solid #ffffff40;background:#0a0d12b0;color:#fff;font:700 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.06em;cursor:pointer}
+#scPlace b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#scPlace i{font-style:normal;color:#ffb02e;font-size:10px;letter-spacing:.14em}
+#scPlacePanel input{width:100%;box-sizing:border-box;margin:0 0 10px;padding:11px 12px;border-radius:10px;border:1px solid #ffffff38;background:#0c1118;color:#fff;font:600 14px system-ui}
+#scPlacePanel .sp-item{display:block;width:100%;margin:0 0 6px;padding:9px 12px;border-radius:10px;border:1px solid #ffffff1f;background:#ffffff0a;color:#eef0f2;text-align:left;cursor:pointer;font:inherit}
+#scPlacePanel .sp-item b{display:block;font:800 13px/1.2 system-ui}#scPlacePanel .sp-item small{color:#aab4be;font:500 11.5px/1.3 system-ui}
+#scPlacePanel .sp-on{border-color:#ffb02e}#scPlacePanel h4{margin:10px 0 6px;font:900 10px system-ui;letter-spacing:.14em;color:#8fe8ff}
+#scGps{position:fixed;z-index:21;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 46px);transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:8px 12px;border-radius:12px;background:#0d1117d9;border:1px solid #4285f4aa;color:#fff;font:700 12px/1.2 Inter,system-ui,sans-serif}
+#scGps[hidden]{display:none}#scGps b{font-size:15px;color:#9cc2ff}#scGps span{color:#b8c2cc}#scGps button{padding:6px 9px;border-radius:8px;border:1px solid #ffffff38;background:#162437;color:#fff;font:800 10px system-ui;letter-spacing:.1em;cursor:pointer}
 #scIdea textarea{width:100%;min-height:70px;box-sizing:border-box;border-radius:8px;border:1px solid #ffffff33;background:#0c1118;color:#fff;font:500 13px/1.4 system-ui;padding:8px}
 `;
 
@@ -117,6 +131,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       <div class="gm-title" aria-label="SpawnCity"><span>SPAWN</span><span>CITY</span></div>
       <div class="gm-sub">DROHNE · AUTOS · JET</div>
       <button id="scStart" type="button" disabled>LADEN</button>
+      <button id="scPlace" type="button" data-act="place"><span>📍</span><b>MEIN STANDORT (GPS)</b><i>ÄNDERN</i></button>
       <div id="scMenuStatus">STADT WIRD VORBEREITET</div>
       <button class="scui-btn gm-wide" data-act="world" type="button">WELT</button>
       <button class="scui-btn gm-wide" data-act="settings" type="button">EINSTELLUNGEN</button>
@@ -128,6 +143,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       <button class="scui-btn" data-act="settings" type="button">EINSTELLUNGEN</button>
       <button class="scui-btn" data-act="world" type="button">WELT</button>
       <button class="scui-btn" data-act="reset" type="button">RESET</button>
+      <button class="scui-btn" data-act="gps" type="button">GPS LIVE</button>
       <button class="scui-btn" data-act="exit" type="button">HAUPTMENUE</button>
     </div></div></div>`);
   const settings = el(`<div class="scui-panel" id="scSettings" hidden><div class="scui-card"><h2>EINSTELLUNGEN</h2>
@@ -149,7 +165,13 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     <div class="scui-actions"><button class="scui-btn" data-act="copy" type="button">KOPIEREN</button><button class="scui-btn" data-act="github" type="button">GITHUB</button><button class="scui-btn scui-hot" data-act="close" type="button">SPAETER</button></div></div></div>`);
   const corner = el(`<div class="scui-corner" hidden><button type="button" data-act="exit" aria-label="Zurueck zum Hauptmenue">EXIT</button>
     <button type="button" data-act="pause" aria-label="Menue">MENUE</button><button type="button" data-act="reset" aria-label="Zurueck zum Start">RESET</button></div>`);
-  for (const n of [menu, pause, settings, world, log, quit, idea, corner]) document.body.appendChild(n);
+  const placePanel = el(`<div class="scui-panel" id="scPlacePanel" role="dialog" aria-label="Startort waehlen" hidden><div class="scui-card"><h2>WO WILLST DU SPIELEN?</h2>
+    <input type="search" placeholder="Stadt, Strasse oder Adresse ..." autocomplete="off" enterkeyhint="search" aria-label="Ort suchen">
+    <div class="sp-list"></div><small class="scui-sub">Suche: © OpenStreetMap-Mitwirkende (Photon von komoot)</small>
+    <div class="scui-actions"><button class="scui-btn scui-hot" data-act="close" type="button">SCHLIESSEN</button></div></div></div>`);
+  const gpsCard = el(`<div id="scGps" hidden><b data-k="act">🧍 STEHT</b><span data-k="speed">0 km/h</span><span data-k="dist">0 m</span><span data-k="time">0:00</span>
+    <span data-k="acc">± – m</span><button type="button" data-act="gps-view">AUGE</button><button type="button" data-act="gps">STOP</button></div>`);
+  for (const n of [menu, pause, settings, world, log, quit, idea, corner, placePanel, gpsCard]) document.body.appendChild(n);
   const startBtn = menu.querySelector("#scStart"), menuStatus = menu.querySelector("#scMenuStatus");
 
   // ---- open / close: a stack of panels; the game pauses while anything is open ---------------
@@ -255,6 +277,9 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       case "exit": askQuit(); break;
       case "reset": while (ui.open.length) closeTop(); command("reset"); relock(); break;
       case "reset-section": command(`settings reset ${ui.tab}`); { const copy = scuiLoad(SCUI_STORE, {}); for (const o of ui.schema) if (o.section === ui.tab) delete copy[o.key]; scuiSave(SCUI_STORE, copy); } readSchema(); renderSettings(); break;
+      case "place": renderPlaces([]); openPanel(placePanel); placePanel.querySelector("input").focus(); break;
+      case "gps": if (gpsLive.on) stopGps(); else { while (ui.open.length) closeTop(); startGps(); } break;
+      case "gps-view": command("gps view next"); break;
       case "copy": navigator.clipboard?.writeText(idea.querySelector("textarea").value.slice(0, 240)).catch(() => {}); break;
       case "github": {
         const text = idea.querySelector("textarea").value.trim().slice(0, 240);
@@ -265,13 +290,14 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       }
     }
   }
-  for (const root of [menu, pause, settings, world, log, idea, corner])
+  for (const root of [menu, pause, settings, world, log, idea, corner, placePanel, gpsCard])
     root.addEventListener("click", ev => { const b = ev.target.closest("[data-act]"); if (b) { ev.stopPropagation(); act(b.dataset.act); } });
 
   // ---- title screen --------------------------------------------------------------------------
   function showTitle() { menu.hidden = false; ui.playing = false; try { document.exitPointerLock?.(); } catch { /* none */ } focusFirst(menu); sync(); }
   function start() {
     if (startBtn.disabled) return;
+    startPlace();
     menu.hidden = true;
     ui.started = ui.playing = true;
     ui.lockWanted = !coarse;
@@ -349,6 +375,136 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   }
   addEventListener("pointerdown", () => document.body.classList.remove("scui-pad"), {capture: true});
 
+  // ---- start place (start_location.mjs, world_location_selector.mjs, auto_flight_start.mjs) -----
+  // The chosen place lives only for this browser session: every new start of the app is at your GPS
+  // position. Search: Photon (OpenStreetMap), live suggestions.
+  const validPlace = p => p && Number.isFinite(+p.lat) && Number.isFinite(+p.lon) && Math.abs(+p.lat) <= 85 && Math.abs(+p.lon) <= 180;
+  let place = null;
+  try { place = JSON.parse(sessionStorage.getItem(SCUI_PLACE) || "null"); } catch { place = null; }
+  if (!validPlace(place)) place = null;
+  const explicitStart = params.has("lat") && params.has("lon");  // the URL names the place: no GPS
+  function renderPill() {
+    const b = menu.querySelector("#scPlace b");
+    b.textContent = place ? place.name : explicitStart ? "STARTORT AUS DER ADRESSE" : "MEIN STANDORT (GPS)";
+    menu.querySelector("#scPlace").title = place ? `${place.name} · ${place.sub || ""}` : "Start an deinem GPS-Standort";
+  }
+  function choosePlace(p) {
+    place = p && validPlace(p) ? {name: String(p.name || "").slice(0, 80), sub: String(p.sub || "").slice(0, 120), lat: +p.lat, lon: +p.lon} : null;
+    try { sessionStorage.setItem(SCUI_PLACE, JSON.stringify(place)); } catch { /* private */ }
+    if (place) scuiSave(SCUI_RECENT, [place, ...scuiLoad(SCUI_RECENT, []).filter(q => Math.abs(q.lat - place.lat) > 1e-4 || Math.abs(q.lon - place.lon) > 1e-4)].slice(0, 5));
+    renderPill();
+    // Picked while a game runs: the world moves there now.
+    if (place && ui.started) moveTo(place.lat, place.lon, place.name);
+  }
+  const placeRow = p => `<button type="button" class="sp-item${place && p && Math.abs(place.lat - p.lat) < 1e-5 && Math.abs(place.lon - p.lon) < 1e-5 ? " sp-on" : ""}" data-lat="${p ? p.lat : ""}" data-lon="${p ? p.lon : ""}" data-name="${scuiEsc(p ? p.name : "")}" data-sub="${scuiEsc(p ? p.sub : "")}"><b>${scuiEsc(p ? p.name : "📡 MEIN STANDORT (GPS)")}</b><small>${scuiEsc(p ? p.sub : "wo du gerade bist")}</small></button>`;
+  function renderPlaces(results) {
+    const recent = scuiLoad(SCUI_RECENT, []).filter(validPlace);
+    const presets = SCUI_PRESETS.map(([name, lat, lon]) => ({name, sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}`, lat, lon}));
+    placePanel.querySelector(".sp-list").innerHTML = (results.length ? `<h4>TREFFER</h4>${results.map(placeRow).join("")}` : "") + placeRow(null) +
+      (recent.length ? `<h4>ZULETZT</h4>${recent.map(placeRow).join("")}` : "") + `<h4>STAEDTE</h4>${presets.map(placeRow).join("")}`;
+  }
+  function labelOf(pr) {
+    const street = pr.street ? `${pr.street}${pr.housenumber ? " " + pr.housenumber : ""}` : "", head = pr.name || street || pr.city || pr.state || "";
+    const tail = [pr.name && street ? street : "", [pr.postcode, pr.city || pr.town || pr.village].filter(Boolean).join(" "), pr.country].filter(x => x && x !== head);
+    return {name: head, sub: tail.join(", ")};
+  }
+  let searchTimer = 0, searchSeq = 0;
+  async function search(q) {
+    const seq = ++searchSeq;
+    if (q.length < 2) { renderPlaces([]); return; }
+    try {
+      const res = await fetch(`${SCUI_PHOTON}?q=${encodeURIComponent(q)}&limit=6&lang=${(navigator.language || "de").startsWith("de") ? "de" : "en"}`);
+      const json = await res.json();
+      if (seq !== searchSeq) return;
+      renderPlaces((json.features || []).map(f => ({...labelOf(f.properties || {}), lon: f.geometry?.coordinates?.[0], lat: f.geometry?.coordinates?.[1]})).filter(validPlace));
+    } catch { if (seq === searchSeq) placePanel.querySelector(".sp-list").insertAdjacentHTML("afterbegin", "<h4>SUCHE NICHT ERREICHBAR</h4>"); }
+  }
+  placePanel.querySelector("input").addEventListener("input", ev => { clearTimeout(searchTimer); const q = ev.target.value.trim(); searchTimer = setTimeout(() => search(q), 280); });
+  placePanel.addEventListener("click", ev => {
+    const it = ev.target.closest(".sp-item");
+    if (!it) return;
+    choosePlace(it.dataset.lat ? {lat: it.dataset.lat, lon: it.dataset.lon, name: it.dataset.name, sub: it.dataset.sub} : null);
+    closeTop();
+    if (!it.dataset.lat && ui.started) gpsStart();
+  });
+  renderPill();
+  const metres = (a, b) => { const k = Math.PI / 180, x = (b.lon - a.lon) * k * Math.cos((a.lat + b.lat) / 2 * k), y = (b.lat - a.lat) * k; return Math.hypot(x, y) * 6371000; };
+  function origin() { const o = last?.ui?.origin; return o ? {lat: o[0], lon: o[1]} : null; }
+  let last = null;
+  function moveTo(lat, lon, name = "") {
+    const o = origin();
+    if (o && metres(o, {lat, lon}) < 150) return false;  // already there
+    command(`start ${lat.toFixed(6)} ${lon.toFixed(6)} ${name}`.trim());
+    return true;
+  }
+  function startPlace() {
+    if (place) { moveTo(place.lat, place.lon, place.name); return; }
+    if (!explicitStart) gpsStart();
+  }
+  // Every START begins where you really are: a fresh fix (never a cached one); after 12 s the network
+  // position; a precise fix that comes within a minute and is far from the rough one moves the world.
+  function gpsStart() {
+    if (!navigator.geolocation) return;
+    let used = null, done = false;
+    const take = (pos, precise) => {
+      const p = {lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy || 0};
+      if (!used) { used = p; moveTo(p.lat, p.lon); return; }
+      if (precise && p.acc < 50 && metres(used, p) > 300) { used = p; moveTo(p.lat, p.lon); }
+    };
+    const fallback = setTimeout(() => { if (!used) navigator.geolocation.getCurrentPosition(pos => take(pos, false), () => {}, {enableHighAccuracy: false, maximumAge: 60000, timeout: 20000}); }, 12000);
+    const watch = navigator.geolocation.watchPosition(pos => { take(pos, true); if (pos.coords.accuracy < 50) finish(); }, () => {}, {enableHighAccuracy: true, maximumAge: 0, timeout: 60000});
+    const finish = () => { if (done) return; done = true; clearTimeout(fallback); navigator.geolocation.clearWatch(watch); };
+    setTimeout(finish, 60000);
+  }
+
+  // ---- LIVE GPS (gps_live_mode.mjs): the phone's fixes go to the game, which moves you ---------
+  const gpsLive = {on: false, watch: null, coarse: null, wake: null};
+  const gpsFix = pos => {
+    const c = pos.coords;
+    command(`gps fix ${c.latitude.toFixed(7)} ${c.longitude.toFixed(7)} ${(c.accuracy || 0).toFixed(1)} ${Number.isFinite(c.speed) && c.speed !== null ? c.speed.toFixed(2) : -1} ${Number.isFinite(c.heading) && c.heading !== null ? c.heading.toFixed(1) : -1}`);
+  };
+  const onCompass = e => {
+    const h = Number.isFinite(e.webkitCompassHeading) ? e.webkitCompassHeading : (e.absolute && Number.isFinite(e.alpha) ? (360 - e.alpha) % 360 : null);
+    if (h !== null) command(`gps compass ${(h * Math.PI / 180).toFixed(4)}`);
+  };
+  async function startGps() {
+    if (!navigator.geolocation) { gpsCard.hidden = false; gpsCard.querySelector('[data-k="act"]').textContent = "KEIN GPS IN DIESEM BROWSER"; return; }
+    gpsLive.on = true;
+    command("gps on");
+    // Ask for the position first, still inside the tap (Android shows no prompt after an await).
+    gpsLive.watch = navigator.geolocation.watchPosition(gpsFix, err => { gpsCard.querySelector('[data-k="acc"]').textContent = err?.code === 1 ? "STANDORT BLOCKIERT" : "KEIN GPS-SIGNAL"; },
+      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000});
+    setTimeout(() => { if (gpsLive.on && !last?.gps?.fix && gpsLive.coarse === null) gpsLive.coarse = navigator.geolocation.watchPosition(gpsFix, () => {}, {enableHighAccuracy: false, maximumAge: 60000, timeout: 30000}); }, 9000);
+    try { if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") await DeviceOrientationEvent.requestPermission().catch(() => {}); } catch { /* none */ }
+    addEventListener("deviceorientationabsolute", onCompass, true);
+    addEventListener("deviceorientation", onCompass, true);
+    try { gpsLive.wake = await navigator.wakeLock?.request?.("screen"); } catch { /* none */ }
+  }
+  function stopGps() {
+    gpsLive.on = false;
+    command("gps off");
+    if (gpsLive.watch !== null) navigator.geolocation.clearWatch(gpsLive.watch);
+    if (gpsLive.coarse !== null) navigator.geolocation.clearWatch(gpsLive.coarse);
+    gpsLive.watch = gpsLive.coarse = null;
+    removeEventListener("deviceorientationabsolute", onCompass, true);
+    removeEventListener("deviceorientation", onCompass, true);
+    try { gpsLive.wake?.release?.(); } catch { /* none */ }
+    gpsLive.wake = null;
+  }
+  const GPS_ICON = {STEHT: "🧍", GEHEN: "🚶", LAUFEN: "🏃", RAD: "🚴", FAHRT: "🚗"};
+  function renderGps(g) {
+    gpsCard.hidden = !g;
+    if (!g) return;
+    const q = k => gpsCard.querySelector(`[data-k="${k}"]`);
+    q("act").textContent = g.fix ? `${GPS_ICON[g.activity] || ""} ${g.activity}` : "GPS SUCHT ...";
+    const pace = g.speed > 0.8 && (g.activity === "LAUFEN" || g.activity === "GEHEN") ? 1000 / g.speed / 60 : 0;
+    q("speed").textContent = pace ? `${Math.floor(pace)}:${String(Math.round(pace % 1 * 60)).padStart(2, "0")} /km` : `${(g.speed * 3.6).toFixed(0)} km/h`;
+    q("dist").textContent = g.distance >= 1000 ? `${(g.distance / 1000).toFixed(2)} km` : `${Math.round(g.distance)} m`;
+    q("time").textContent = `${Math.floor(g.time / 60)}:${String(Math.floor(g.time % 60)).padStart(2, "0")}`;
+    if (g.fix) q("acc").textContent = `± ${g.accuracy} m`;
+    gpsCard.querySelector('[data-act="gps-view"]').textContent = g.view;
+  }
+
   // ---- suggestion card (suggestion_box.mjs): after 15 min of play, once, snooze 10 min -------
   function markIdeaDone() { const s = scuiLoad(SCUI_SUGGEST, {}); s.done = true; scuiSave(SCUI_SUGGEST, s); }
   setInterval(() => {
@@ -365,6 +521,8 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     update(h) {
       pollPad();
       if (!h) return;
+      last = h;
+      renderGps(h.gps);
       const ready = !!h.placed;
       if (startBtn.disabled === ready) { startBtn.disabled = !ready; startBtn.textContent = ready ? "START" : "LADEN"; }
       const status = ready ? (h.offline ? "OFFLINE · PROZEDURALE ERSATZSTADT" : "BEREIT") : (statusEl?.textContent || "STADT WIRD VORBEREITET").toUpperCase();

@@ -211,6 +211,9 @@ class Game {
   void ui_mix_audio(SoundState& s);
   void ui_mix_cues();
   void ui_reset();
+  void ui_move_world(f64 lon, f64 lat);
+  void ui_gps_update(f32 dt);
+  void ui_camera(f32 dt);
   std::string ui_hud_json();
 
   // presentation

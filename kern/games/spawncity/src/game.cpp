@@ -1023,6 +1023,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
+  ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   e.renderer.camera = cam_;
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
