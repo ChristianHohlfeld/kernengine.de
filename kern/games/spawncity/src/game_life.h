@@ -30,6 +30,7 @@ struct GameLife {
   struct Blast { Vec3 at; f32 radius; f32 t; };
   std::vector<Blast> blasts;  // this frame's explosions (how hard a fall is thrown)
   u32 falls = 0, getups = 0;
+  u64 test_doll = 0;  // the body of the "ragdoll" test command
   f32 next_honk_check = 0;
 };
 

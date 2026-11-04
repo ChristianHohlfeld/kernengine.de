@@ -550,7 +550,8 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     // Tests: a passer-by-like body thrown in front of the player
     Ragdolls::Colors col;
     const Vec3 at = me + look * 3;
-    const bool ok = G.life.ragdolls().spawn(0x7e570000ull + G.life.ragdolls().spawned(), at, std::atan2(look.y, look.x), look * 4 + Vec3{0, 0, 2}, col, false, now);
+    G.test_doll = 0x7e570000ull + G.life.ragdolls().spawned();
+    const bool ok = G.life.ragdolls().spawn(G.test_doll, at, std::atan2(look.y, look.x), look * 4 + Vec3{0, 0, 2}, col, false, now);
     std::snprintf(b, sizeof b, "{\"ok\":%s,\"active\":%u}", ok ? "true" : "false", G.life.ragdolls().active());
     out = b;
     return true;
@@ -558,8 +559,7 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   if (cmd == "ragdoll state") {
     Vec3 p;
     f32 yaw;
-    const u64 key = 0x7e570000ull + G.life.ragdolls().spawned() - 1;
-    if (!G.life.ragdolls().where(key, p, yaw)) { out = "none"; return true; }
+    if (!G.life.ragdolls().where(G.test_doll, p, yaw)) { out = "{}"; return true; }
     std::snprintf(b, sizeof b, "{\"pelvis\":[%.2f,%.2f,%.2f],\"ground\":%.2f}", p.x, p.y, p.z, city_.ground_height(p.x, p.y));
     out = b;
     return true;
