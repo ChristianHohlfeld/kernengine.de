@@ -51,7 +51,7 @@ Startparameter (Query-String):
 | Jet | W/S Schub bzw. Steigen/Sinken, A/D Seitenruder, Maus nicken/rollen (Rate), Pfeile, **V** Schweben/Flug, C Cockpit, **F** aussteigen (am Boden) bzw. Schleudersitz | LS Schub/Seite, RS nicken/rollen, LB Schweben/Flug, X aussteigen | links Schub/Seite, rechts nicken/rollen, FLUG/SCHWEBEN, EJECT |
 | Fallschirm | WASD steuern | LS | linker Stick |
 | Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
-| Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (folgt der Kamera) | RB feuern, Y wechseln | FEUER, Waffenknopf |
+| Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (schaltet auf das Ziel am Fadenkreuz auf und startet; 5 s Nachladen) | RB feuern, Y wechseln | FEUER, Waffenknopf |
 | Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
 | Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **O** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
 
@@ -138,6 +138,12 @@ kern/games/spawncity/
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert),
                   ui.mjs (Menüs, nur DOM), manifest.webmanifest + icon.svg (installierbare App)
 
+    guided.*      GUIDED-Lenkrakete als reine Logik (Zielwahl am Fadenkreuz, Reiseflug, Sturzflug,
+                  2,2 g, Zünder 2,4 m, Ausweichen durch Sprinten); game_guided.cpp setzt sie in die Welt
+    combat_detail.* kritischer Schaden (Auto/Bus/Polizeidrohne/Drohne), Geschossimpuls p = m·v,
+                  Abstimmung über Spielregeln (einstimmig, 30 s); game_details.cpp wendet sie an
+    combat_audio.* SpawnCitys Kampf-Klangbank als Synthese (Schuss, Pistole, Treffer, Crack, Schaden,
+                  Schrei, Explosion, Schritt, Abprall, Belohnung, Fehlschlag), als „sc:<art><n>“ in Kerns SoundBank
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
                   + mp_host.mjs (Transporte, Mikrofon, Mehrspieler-HUD, große Karte, Teilen/QR)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
@@ -235,6 +241,18 @@ kern/games/spawncity/
   Photon. Die Route rechnet C++ über den Straßengraph (A*); reicht er nicht bis zum Ziel, holt die Seite
   eine Straßenroute bei routing.openstreetmap.de (nur die neueste Anfrage zählt). Führung: eine Zeile
   „↗ 1,2 km · Ziel · rechts in 90 m“ und ein Chevron, wo die Route hingeht; Ankunft in 25 m löscht das Ziel.
+* **GUIDED und Kampfdetails** (`game_guided.cpp`, `game_details.cpp`): Ein Druck wählt, was dem
+  Fadenkreuz am nächsten liegt (70 px, bis 600 m: Leute, Autos/Busse, Polizeidrohnen, Mitspieler;
+  sonst den Zielpunkt) und startet sofort: 0,32 s fällt die Rakete von der Schiene, dann Reiseflug auf
+  max(Start + 8 m, Ziel + 28 m) und ≥ 18 m über Grund mit 34 m/s, ab 70 m Sturzflug; ein sprintender
+  Fußgänger (≥ 5,8 m/s für 0,35 s) schüttelt sie ab. Kritischer Schaden nach
+  `critical_damage_logic.mjs`: Bus 3,1 s statt 2,45 s, ein weiterer Treffer verkürzt auf 0,62/0,72 s,
+  Polizeidrohnen bei 34 % (2,2 s), die eigene Drohne bei 28 % (2,05 s). Kugeln geben Box3D-Körpern
+  ihren Impuls (9 mm 2,9 N·s, 5,56 mm 3,8 N·s, .50 BMG 41 N·s, `ballistics.mjs`). Kampfklänge sind
+  SpawnCitys synthetisierte Bank (`combat_audio_bank.mjs`), beim Audio-Start einmal berechnet.
+* **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
+  verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
+  andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
 
 ## Welt (M3)
 
@@ -397,7 +415,7 @@ kern/games/spawncity/
 | Sandbox | COP/SWAT/HEAVY (Treffer, Tempo, Reichweite, Takt, Salve, Schaden, Genauigkeit, Punkte), Budget 0/1/2/4/6/8, 6 s, Combo 3,2 s × bis 8 | `sandbox_game.mjs` |
 | Aufträge | 5 Aufträge, Combo 5,5 s, Overdrive 8 s, Momentum 4, Punkte je Tat, Risikobank, Versicherung 50 %, Drohnenverlust 20 %, Gnade | `gameplay_fun_logic.mjs` |
 | Rennen | 8 Tore (×2,25), 3 Runden, Durchflugprüfung, Rundenzeiten | `race_track.mjs` |
-| Kampfdetails | Drohnenraketen 31 m/s, 220 m, 950 ms, 8 m / 100, 7,2 s; GUIDED 2,2 g; Auto kritisch 20 %, 2,45 s / 0,62 s; neue Drohne nach 8 s; Trümmer 9 Teile, 6,5 s, Abprall 0,30 / 0,76 | `direct_fire_missiles.mjs`, `guided_balance.mjs`, `critical_damage_logic.mjs`, `player_vitals_logic.mjs`, `world_car_explosion.mjs` |
+| Kampfdetails | Drohnenraketen 31 m/s, 220 m, 950 ms, 8 m / 100, 7,2 s; GUIDED 34 m/s, 2,2 g, 70 px / 600 m, Reiseflug +8/+28/18 m, Sturz 70 m (×1,4 / ×1,12), Zünder 2,4 m, 22 s, Ausweichen 5,8 m/s · 0,35 s; Bus 3,1 s / 0,72 s, Polizeidrohne 34 % 2,2 s / 0,56 s, Drohne 28 % 2,05 s / 0,54 s; Geschossimpuls 9 mm / 5,56 / .50; Auto kritisch 20 %, 2,45 s / 0,62 s; neue Drohne nach 8 s; Trümmer 9 Teile, 6,5 s, Abprall 0,30 / 0,76 | `direct_fire_missiles.mjs`, `guided_balance.mjs`, `guided_missile.mjs`, `ballistics.mjs`, `critical_damage_logic.mjs`, `player_vitals_logic.mjs`, `world_car_explosion.mjs` |
 
 ## Tests
 
@@ -460,9 +478,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   noch nicht hat; die Zombies laufen deshalb nur draußen.
 * Der Panzer ist ein leichter Agent auf dem Straßengraph (Strahl gegen Wände), kein Box3D-Fahrzeug wie
   in SpawnCity (`physics.upsertBody kind:"bus"`); Box3D-Körper zur Laufzeit wären ein Level-Actor mehr.
-* Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler);
-  die Abstimmung über Spielregeln (`rules_vote_engine.mjs`) braucht Netz-Nachrichten – lokal gibt es die
-  Schalter als Befehle (`military on|off`, `zombies on|off`).
+* Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler).
+  Die Abstimmung über Spielregeln ist als Logik da (`combat_detail.h`, `create_ballot`/`cast_vote`,
+  Befehl `ballot`); das Verschicken der Stimmen zwischen den Spielern fehlt noch (Netz).
 * Trainingslevel (`training_test_level_v2.mjs`, `training_showcase.mjs`) ersetzen in SpawnCity die
   Welt ohne Geodaten; auf Kern übernimmt das die prozedurale Ersatzstadt (`city_stream`) – nicht
   nachgebaut, um die Stadt-Streaming-Arbeit nicht zu kreuzen. Die Rennstrecke (L) gibt es überall.
@@ -471,6 +489,12 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`) für MP/Sniper:
   Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
 * Ragdolls; Glassprünge in Fenstern (siehe „Krater und Spuren“).
+* Kampfton: die Bank aus `combat_audio_bank.mjs` ist nachgebaut; Sniper, Werfer, Nachladen und Jets
+  nutzen weiter Kerns eingebaute Klänge (SpawnCitys Bank hat dafür keine), kein Retarded-Time-Doppler-Loop
+  für die Jets (nur der verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`)
+  für MP/Sniper: Kerns Soldatenwaffen sind Hitscan (das wäre eine Engine-Änderung an `WeaponComponent`).
+  Die GUIDED zieht keinen Rauchschweif und hat keinen eigenen Motorton (Kerns Partikel/Klänge). `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
+* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
 
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.

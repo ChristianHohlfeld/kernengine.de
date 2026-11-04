@@ -269,7 +269,7 @@ class SpawnCityHud {
       <div class="sc-health"><i></i></div>
       <div class="sc-ammo" hidden></div>
       <div class="sc-hint" hidden></div>
-      <div class="sc-banner" hidden></div><div class="sc-pop" hidden></div><div class="sc-scope" hidden><i></i></div>
+      <div class="sc-banner" hidden></div><div class="sc-pop" hidden></div><div class="sc-scope" hidden><i></i></div><div class="sc-guided" hidden></div>
       <div class="sc-help"></div>
       <div class="sc-attrib"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> ·
         <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ·
@@ -277,7 +277,7 @@ class SpawnCityHud {
         <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Höhen: Terrain Tiles (Mapzen, AWS Open Data)</a> · Kern Engine</div>`;
     const q = s => this.root.querySelector(s);
     this.el = {badge: q(".sc-badge"), stars: q(".sc-stars"), fps: q(".sc-fps"), toast: q(".sc-toast"), offline: q(".sc-offline"), cross: q(".sc-cross"),
-      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"),
+      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"), guided: q(".sc-guided"),
       help: q(".sc-help"), panel: q(".sc-panel")};
     this.key = "";
   }
@@ -351,5 +351,9 @@ class SpawnCityHud {
     el.pop.hidden = !c?.pop;
     if (c?.pop) el.pop.textContent = c.pop;
     el.scope.hidden = !c?.scope;  // sniper_scope.mjs: black tube, mil-dot reticle, red dot
+    // guided_missile.mjs: reload state under the crosshair, the target of the missile in flight
+    const g = h.guided, gw = h.mode === "drone" && h.weapon === "GUIDED" && g;
+    el.guided.hidden = !gw;
+    if (gw) el.guided.textContent = g.flying > 0 ? `LOCK · ${g.lock} · ${Math.round(g.dist)} m` : g.cd > 0 ? `LENKRAKETE LÄDT · ${g.cd.toFixed(1)} s` : "LENKRAKETE BEREIT";
   }
 }

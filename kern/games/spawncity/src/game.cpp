@@ -1033,6 +1033,8 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    update_guided(dt);   // GUIDED missiles (game_guided.cpp)
+    update_details(dt);  // critical damage, ballots (game_details.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
@@ -1227,6 +1229,7 @@ bool Game::audio_init(u32 rate) {
   if (world_) bank_->request_level(world_->level());
   fx_.init(mixer_);
   ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
+  combat_audio_init();  // combat_audio_bank.mjs sounds (game_details.cpp)
   return true;
 }
 
@@ -1381,6 +1384,8 @@ std::string Game::hud_json() {
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
   combat_hud(s);  // "combat":{...} (game_events.cpp)
+  guided_hud(s);   // "guided":{...} (game_guided.cpp)
+  details_hud(s);  // "details":{...} (game_details.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
@@ -1391,6 +1396,7 @@ std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
   if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
   if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
+  if (std::string out; details_command(cmd, out)) return out;  // guided / critical / ballot commands (game_details.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);

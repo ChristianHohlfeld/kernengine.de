@@ -55,7 +55,7 @@ void Game::select_foot_weapon(Id id) {
     set("headshot", Value(3.0));  // VS zones: head x3
     for (const Loadout& l : kFoot)
       if (l.id == id) set("magazine", Value(static_cast<f64>(l.magazine)));
-    set("fireSound", Value(id == Id::smg ? "builtin:smg" : id == Id::sniper ? "builtin:sniper" : "builtin:pistol"));
+    set("fireSound", Value(id == Id::smg ? "sc:shot0" : id == Id::sniper ? "builtin:sniper" : "sc:pistol0"));
     set("pellets", Value(1.0));
     if (world_->soldier_state(soldier_, st)) {
       st.ammo = ammo_mag_[static_cast<u8>(id)];
@@ -191,7 +191,7 @@ void Game::update_projectiles(f32 dt) {
           const f32 vn = kern::dot(p.vel, n);
           p.vel = (p.vel - n * (1.35f * vn)) * 0.7f;
           at = r.point + n * 0.05f;
-          if (++p.bounces < 3) world_->play_sound("builtin:impact_light", r.point, 0.5f, 1.4f, true);
+          if (++p.bounces < 3) world_->play_sound(combat_sfx(combat_audio::Kind::bounce), r.point, 0.5f, 1.4f, true);
         } else {
           boom = true;
           at = r.point - step * (0.05f / len);
@@ -244,7 +244,7 @@ void Game::foot_attack(bool trigger, bool pressed) {
       next_attack_ = now + s.interval_ms / 1000;
       Vec3 to = eye + dir * (s.range_m + 0.4f);
       const i32 hit = people_.shot(eye, to, s.damage, true, now);
-      world_->play_sound(hit >= 0 ? "builtin:hit" : "builtin:click", eye + dir, 0.7f, foot_weapon_ == Id::knife ? 1.3f : 0.8f, true);
+      world_->play_sound(hit >= 0 ? combat_sfx(combat_audio::Kind::hit) : "builtin:click", eye + dir, 0.7f, foot_weapon_ == Id::knife ? 1.3f : 0.8f, true);
       return;
     }
     case Id::grenade_launcher:
@@ -303,7 +303,9 @@ void Game::drone_attack(bool trigger, bool pressed) {
     kern::game::ShotEvent e;
     hit_scan(nose, dir, g.range_m, g.damage, true, body(drone_actor_), e);
     world_->shots().push_back(e);
-    world_->play_sound("builtin:smg", nose, 0.55f, 1.35f, true);
+    world_->play_sound(combat_sfx(combat_audio::Kind::shot), nose, 0.55f, 1.35f, true);
+  } else if (pressed && drone_weapon_ == 2) {
+    guided_press();  // lock on what is nearest the crosshair and launch (game_guided.cpp)
   } else if (pressed) {
     const Id id = drone_weapon_ == 1 ? Id::drone_rockets : Id::drone_guided;
     const weapons::Spec& g = weapons::spec(id);

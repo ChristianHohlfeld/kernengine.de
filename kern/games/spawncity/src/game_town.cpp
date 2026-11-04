@@ -210,7 +210,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   world_->physics().explode(at, radius, radius * 0.5f, 6.0f);
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
-  world_->play_sound("builtin:explosion", at, 1, 1, true);
+  world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 1, 1, true);
   const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
@@ -367,7 +367,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
     s.surface = r.hit ? 1 : 0;
   }
   world_->shots().push_back(s);
-  world_->play_sound("builtin:pistol", from, 0.85f, 1.0f, true);
+  world_->play_sound(combat_sfx(combat_audio::Kind::pistol), from, 0.85f, 1.0f, true);
 }
 
 void Game::drive_police(PoliceUnit& u, f32 dt) {
@@ -653,7 +653,7 @@ bool Game::update_police_drones(f32 dt) {
     s.surface = accurate ? 3 : (r.hit ? 1 : 0);
     s.normal = r.normal;
     world_->shots().push_back(s);
-    world_->play_sound("builtin:smg", d.pos, 0.6f, 1.25f, true);
+    world_->play_sound(combat_sfx(combat_audio::Kind::shot), d.pos, 0.6f, 1.25f, true);
     if (accurate && now - last_player_hit_ >= kPdDamageCooldown) {
       last_player_hit_ = now;
       if (mode_ == Mode::foot) world_->damage(soldier_, std::max(2.0f, std::round(wanted::police_damage(stars))), 0, false, d.pos);
@@ -884,6 +884,7 @@ void Game::draw_town() {
     for (const People::Person& p : people_.all())
       if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < 220) people_art_.person(p, now);
     draw_projectiles();
+    draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {
       const PoliceDrone& d = pdrones_[i];
       if (d.active) people_art_.police_drone(d.pos, d.yaw, clampf(-d.vel.y * 0.04f, -0.3f, 0.3f), clampf(d.vel.x * 0.04f, -0.3f, 0.3f), !d.emp, now, i);
