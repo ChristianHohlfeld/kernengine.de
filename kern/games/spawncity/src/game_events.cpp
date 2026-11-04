@@ -534,6 +534,8 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "military start") {
+    // Tests: five stars at the trigger heat, then the army at once (no hold, no alert)
+    for (int k = 0; k < 200 && wanted_.heat() < kTriggerHeat; ++k) wanted_.report(wanted::Crime::police_officer, true);
     C.military.active = true;
     C.military.alert_at = -1;
     C.military.next_reinforce = now + kFirstReinforceS;
