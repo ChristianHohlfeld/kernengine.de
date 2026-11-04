@@ -79,6 +79,20 @@ class CityStream {
   bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
 
+  // ---- street life and interiors (M3 life: life.h, interiors.h) ----
+  /// A building or area of a built tile: tile hash + index (stable while the tile is loaded).
+  struct BuildingRef { u64 tile = 0; u32 index = 0; const MapFeatures::Building* building = nullptr; };
+  struct AreaRef { u64 key = 0; const MapFeatures::Area* area = nullptr; };
+  /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
+  void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
+  /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
+  void areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const;
+  /// Leaves one building out of the static collision (an entered interior brings its own); the
+  /// tile's collision is rebuilt in time slices. `tile` 0 restores every building.
+  void exclude_building(u64 tile, i32 index);
+  /// True once the collision matches the last exclude_building() call.
+  bool exclusion_done() const;
+
  private:
   struct Tile;
   Tile* tile(const TileKey& k);
@@ -106,6 +120,9 @@ class CityStream {
   StreamStats stats_;
   Terrain terrain_;
   std::vector<kern::Vec4> terrain_changes_;
+  void recollide(Tile& t);
+  u64 excl_tile_ = 0;  // the building left out of the collision (interiors)
+  i32 excl_index_ = -1;
 };
 
 }  // namespace sc

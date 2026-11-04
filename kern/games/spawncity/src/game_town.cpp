@@ -106,7 +106,7 @@ void Game::handle_shots() {
     if (drone_hit) continue;
     if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
-    if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0) {
+    if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
       s.to = to;
       s.surface = 3;  // flesh: no decal
       s.impact = true;
@@ -230,6 +230,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
     if (d < radius * 1.2f) damage_car(static_cast<i32>(i), damage * 2.7f * weapons::blast_factor(d, radius * 1.2f, false), by_player);
   }
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
+  life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -888,7 +889,7 @@ void Game::draw_town() {
         people_art_.street_lamp(l.foot, l.yaw, night_);
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
-      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m) people_art_.person(p, now);
+      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
     draw_projectiles();
     draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {
@@ -911,6 +912,7 @@ void Game::draw_town() {
     }
   }
   draw_remote_people();
+  life_draw_people();  // M3 life: the running club
   people_art_.end();
 }
 
