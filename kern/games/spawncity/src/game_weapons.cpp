@@ -82,6 +82,8 @@ bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_
 // hits
 
 Vec3 Game::aim_ray(Vec3& dir) const {
+  // touch: the shot goes through the finger (foot_touch_controller.mjs fireAt, game_controls.cpp)
+  if (ctl_.aim_point) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
   dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   return cam_.eye;
 }
@@ -325,7 +327,15 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     const weapons::Spec& g = weapons::spec(Id::jet_cannon);
     next_jet_gun_ = now + g.interval_ms / 1000;
     const Vec3 o = s.position + fwd * 10.5f;
-    Vec3 d = fwd + Vec3{rng_.range(-0.003f, 0.003f), rng_.range(-0.003f, 0.003f), rng_.range(-0.003f, 0.003f)};
+    Vec3 aim = fwd;
+    if (ctl_.jet_aim) {
+      // jet_mode.mjs tapAim: through the finger, clamped to a 0.62 rad cone around the nose
+      Vec3 from;
+      ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, aim);
+      const f32 c = kern::dot(aim, fwd);
+      if (c < std::cos(0.62f)) aim = kern::normalize(fwd * std::cos(0.62f) + kern::normalize(aim - fwd * c, fwd) * std::sin(0.62f), fwd);
+    }
+    Vec3 d = aim + Vec3{rng_.range(-0.003f, 0.003f), rng_.range(-0.003f, 0.003f), rng_.range(-0.003f, 0.003f)};
     d = kern::normalize(d, fwd);
     kern::game::ShotEvent e;
     const bool hit = hit_scan(o, d, g.range_m, g.damage, true, body(jet_actor_), e);

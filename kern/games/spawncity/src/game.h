@@ -33,7 +33,8 @@
 #include "people_art.h"
 #include "road_graph.h"
 #include "sound_fx.h"
-#include "touch_pad.h"
+#include "game_controls.h"  // controls state (game_controls.cpp)
+#include "touch_play.h"     // touch controls of every mode (touch_play.cpp)
 #include "vehicle_art.h"
 #include "wanted.h"
 #include "weapons.h"
@@ -131,7 +132,10 @@ class Game {
   std::string command(const std::string& cmd);
   bool audio_init(u32 rate);
   const f32* audio_render(u32 frames);
-  void key_down_event() { arbiter_.key_down(); }
+  void key_down_event() { ctl_.dev.key(); }
+  /// Mouse movement under the pointer lock (CSS px, clamped per event) and the lock state (game_controls.cpp).
+  void mouse_move(f32 dx, f32 dy) { ctl_.mouse.x += dx; ctl_.mouse.y += dy; }
+  void pointer_locked(bool locked) { ctl_.locked = locked; }
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
@@ -165,6 +169,17 @@ class Game {
   void jet_input(kern::Engine& e, f32 dt);
   void parachute_input(kern::Engine& e, f32 dt);
   void update_touch_layout();
+  // controls (game_controls.cpp, CONTROLS.md): devices, pad actions, strike aiming, grenade cook, head look
+  bool ctl_command(const std::string& cmd, std::string& out);
+  std::string ctl_hud_json();
+  void ctl_discrete(kern::Engine& e, f32 dt);
+  void ctl_grenade(bool hold_key, bool hold_pad, f32 dt);
+  void ctl_strike_start();
+  void ctl_strike_confirm(bool at_point, f32 x, f32 y);
+  bool ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const;
+  void ctl_camera(kern::Camera& c);
+  void ctl_enter(bool jet_first);
+  bool ctl_touch_shot(f32 x, f32 y);
 
   // simulation pieces
   void drive_traffic(f32 h);
@@ -376,10 +391,9 @@ class Game {
   f32 sensitivity_ = 1;
   f32 dpr_ = 1;
   // input devices
-  kern::game::InputArbiter arbiter_;
-  kern::game::TouchControls foot_touch_;
   kern::game::ControllerComponent soldier_controller_;
-  TouchPad pad_touch_;
+  TouchPlay pad_touch_;   // every mode's touch controls (touch_play.h)
+  ControlsState ctl_;     // game_controls.h
   bool touch_mode_ = false;
   f32 frame_w_ = 960, frame_h_ = 540;
   kern::game::PlayInput play_in_;

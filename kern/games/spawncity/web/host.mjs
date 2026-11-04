@@ -147,6 +147,15 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const probe = document.createElement("div");
   probe.style.cssText = "position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
   document.body.appendChild(probe);
+  // Portrait phones: the CSS-rotated landscape (index.html .sc-css-landscape); fingers map back.
+  const rotated = () => document.documentElement.classList.contains("sc-css-landscape");
+  const orient = () => {
+    const turn = (coarse || params.get("rotate") === "1") && matchMedia("(orientation: portrait)").matches && params.get("rotate") !== "0";
+    document.documentElement.classList.toggle("sc-css-landscape", turn);
+  };
+  orient();
+  matchMedia("(orientation: portrait)").addEventListener?.("change", () => { orient(); frame(); });
+  visualViewport?.addEventListener("resize", () => { orient(); frame(); });
   const frame = () => {
     const c = getComputedStyle(probe), px = v => parseFloat(v) || 0;
     e.sc_touch_frame(canvas.clientWidth, canvas.clientHeight, px(c.paddingLeft), px(c.paddingTop), px(c.paddingRight), px(c.paddingBottom),
@@ -155,7 +164,11 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   frame();
   addEventListener("resize", frame);
   addEventListener("orientationchange", frame);
-  const local = ev => { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  const local = ev => {
+    if (rotated()) return [ev.clientY, innerWidth - ev.clientX];  // control_semantics.mjs quarter turn
+    const r = canvas.getBoundingClientRect();
+    return [ev.clientX - r.left, ev.clientY - r.top];
+  };
   const finger = type => ev => {
     if (ev.pointerType === "mouse") return;
     for (const c of (type === 1 && ev.getCoalescedEvents?.()) || [ev]) {
@@ -170,6 +183,39 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   canvas.addEventListener("pointerup", finger(2));
   canvas.addEventListener("pointercancel", finger(3));
   const overlay = new TouchOverlay(document.getElementById("stage"));
+
+  // ---- devices and the mouse (desktop_controls.mjs; the game decides, game_controls.cpp) ------------
+  // The platform: a fine hovering primary pointer or no touch = desktop; ?coarse= forces it (tests).
+  if (!params.has("coarse"))
+    command(`device platform ${matchMedia("(hover: hover) and (pointer: fine)").matches ? 1 : 0} ${coarse ? 1 : 0} ${navigator.maxTouchPoints || 0}`);
+  const UI_SELECTOR = "button,input,select,textarea,a,label,dialog,[role=button],.sc-map";
+  addEventListener("pointerdown", ev => command(ev.pointerType === "mouse" ? "device mouse" : "device touch"), {capture: true});
+  let mouseSeen = 0;
+  addEventListener("pointermove", ev => {
+    if (ev.pointerType !== "mouse" || document.pointerLockElement || !(ev.movementX || ev.movementY)) return;
+    if (ev.target instanceof Element && ev.target.closest(UI_SELECTOR)) return;
+    const t = performance.now();
+    if (t - mouseSeen > 200) { mouseSeen = t; command("device mousemove"); }
+  }, {capture: true});
+  // One movement stream: mousemove under the lock (precision touchpads keep sending it while
+  // pointermove stalls), each event clamped to +-420 px (MAX_EVENT_PX), never dropped.
+  addEventListener("mousemove", ev => {
+    if (document.pointerLockElement !== canvas) return;
+    const c = v => Math.max(-420, Math.min(420, Number(v) || 0));
+    e.sc_mouse(c(ev.movementX), c(ev.movementY));
+  }, {capture: true});
+  document.addEventListener("pointerlockchange", () => e.sc_pointer_lock(document.pointerLockElement === canvas ? 1 : 0));
+  // Keys Kern's input does not carry, and page buttons: + / - car zoom, P multiplayer, L GPS LIVE
+  addEventListener("keydown", ev => {
+    if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.target instanceof Element && ev.target.closest("input,textarea,select,[contenteditable]")) return;
+    if (ui?.playing === false) return;
+    if (ev.code === "Equal" || ev.code === "NumpadAdd") command("zoom in");
+    else if (ev.code === "Minus" || ev.code === "NumpadSubtract") command("zoom out");
+    else if (ev.code === "KeyP" && !last?.ctl?.dead) { ev.preventDefault(); mpPage?.goMulti(); }  // pad_actions.mjs
+    else if (ev.code === "KeyL") ui?.open("gps");  // gps_live_mode.mjs
+    else if (ev.code === "NumpadEnter" && last?.ctl?.aiming) command("strike go");
+  });
 
   // ---- gamepad (Xbox standard mapping) ------------------------------------------------------
   function pollPad() {
@@ -235,6 +281,33 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
+  // The minimap (real_world_bootstrap.mjs): a drag turns the head (0.85 deg/px, -0.62 deg/px,
+  // -75..60), letting go springs back; a double tap within 360 ms opens the big map.
+  if (mapCanvas) {
+    mapCanvas.style.pointerEvents = "auto";
+    mapCanvas.style.touchAction = "none";
+    let drag = null, lastTap = 0;
+    mapCanvas.addEventListener("pointerdown", ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const look = last?.ctl?.look || [0, 0];
+      drag = {id: ev.pointerId, x: ev.clientX, y: ev.clientY, yaw: look[0], pitch: look[1], moved: false};
+      mapCanvas.setPointerCapture?.(ev.pointerId);
+    });
+    mapCanvas.addEventListener("pointermove", ev => {
+      if (!drag || ev.pointerId !== drag.id) return;
+      const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+      if (Math.hypot(dx, dy) >= 8) drag.moved = true;
+      if (drag.moved) command(`look set ${(drag.yaw + dx * 0.85).toFixed(2)} ${(drag.pitch - dy * 0.62).toFixed(2)}`);
+    });
+    const up = ev => {
+      if (!drag || ev.pointerId !== drag.id) return;
+      if (!drag.moved) { const t = performance.now(); if (t - lastTap < 360) { lastTap = 0; command("bigmap toggle"); } else lastTap = t; }
+      command("look release");
+      drag = null;
+    };
+    mapCanvas.addEventListener("pointerup", up);
+    mapCanvas.addEventListener("pointercancel", up);
+  }
   setInterval(() => {
     if (!mctx) return;
     let m;
@@ -269,13 +342,6 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 }
 
 const SC_MODE_LABEL = {foot: "ZU FUSS", drone: "DROHNE", car: "AUTO", jet: "JET", parachute: "FALLSCHIRM"};
-const SC_HELP = {
-  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne · 2× Leertaste Jetpack · J Luftschlag · O Auftrag · Esc Menü",
-  drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · J Luftschlag · L Rennstrecke · V zurück",
-  car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · N/B Radio · F aussteigen",
-  jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · Maus links/Leertaste Kanone · R Rakete · B Bombe · C Cockpit · F aussteigen / Schleudersitz",
-  parachute: "WASD steuern",
-};
 
 /** The HUD, drawn from the game's JSON (sc_hud): numbers only, no game logic. */
 class SpawnCityHud {
@@ -354,7 +420,7 @@ class SpawnCityHud {
     if (h.carHp !== undefined) row("Zustand", `${Math.round(h.carHp / 3)} %`, h.carHp < 75 ? "warn" : "");
     if (h.droneHp !== undefined) row("Zustand", `${Math.round(h.droneHp)} %`, h.droneHp < 30 ? "warn" : "");
     if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 6)} %`, h.jetHp < 150 ? "warn" : "");
-    if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : "bereit (X)"}`, "hot");
+    if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : (h.ctl?.pad ? "bereit (B)" : "bereit (G)")}`, "hot");
     if (h.net) row("Mehrspieler", h.net.status, h.net.connected ? "" : "warn");
     const c = h.combat;  // combat and events (game_events.cpp): numbers and texts from C++
     if (c) {
@@ -365,7 +431,7 @@ class SpawnCityHud {
       row("Punkte", `${c.fun.score.toLocaleString("de-DE")}${c.fun.risk ? ` · Risiko ${c.fun.risk}` : ""} · x${c.fun.mult.toFixed(2)}`);
       row("Chaos", `${c.chaos.score.toLocaleString("de-DE")}${c.chaos.combo > 1 ? ` · x${c.chaos.combo}` : ""}`);
       row("Auftrag", `${c.fun.contract} ${c.fun.done ? "✓" : `${c.fun.progress}/${c.fun.target}`}`);
-      row("Luftschlag", c.strike > 0 ? `${Math.ceil(c.strike)} s` : "bereit (J)");
+      row("Luftschlag", c.strike > 0 ? `${Math.ceil(c.strike)} s` : (h.ctl?.pad ? "bereit (D-PAD ⬆)" : "bereit (4)"));
       if (c.race) row("Rennen", `Runde ${c.race.lap}/${c.race.laps} · ${c.race.next} · ${c.race.time} · Best ${c.race.best}`, "hot");
     }
     const key = rows.join("");
@@ -378,7 +444,17 @@ class SpawnCityHud {
     if (!el.ammo.hidden) el.ammo.innerHTML = `<b>${h.mag}</b> / ${h.reserve}${h.reload >= 0 ? " · LADEN" : ""}`;
     el.hint.hidden = !h.hint;
     if (h.hint) el.hint.textContent = h.hint;
-    el.help.textContent = h.touch ? "" : SC_HELP[h.mode] || "";
+    // desktop_controls.mjs key line: desktop only, not while the pad is in use; fades 12 s after a change
+    const ctl = h.ctl || {};
+    document.body.classList.toggle("pad-input", !!ctl.pad);
+    const help = !h.touch && ctl.device === "desktop" && !ctl.pad ? ctl.hint || "" : "";
+    if (el.help.textContent !== help) el.help.textContent = help;
+    el.help.classList.toggle("faded", !!ctl.hintFaded);
+    if (ctl.aiming) {
+      // fighter_jets.mjs targeting overlay
+      el.hint.hidden = false;
+      el.hint.textContent = h.touch ? "ZIEL MARKIEREN · Tippen = Laser auf das Ziel · die Jets kommen" : "ZIEL MARKIEREN · LMB / J / ENTER = Luftschlag · RMB / ESC = abbrechen";
+    }
     el.banner.hidden = !c?.banner;
     if (c?.banner) el.banner.textContent = c.banner;
     el.pop.hidden = !c?.pop;

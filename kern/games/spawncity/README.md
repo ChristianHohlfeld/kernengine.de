@@ -45,29 +45,35 @@ Startparameter (Query-String):
 
 ## Steuerung
 
-| Modus | Tastatur/Maus (Pointer-Lock per Klick) | Gamepad (Xbox) | Touch |
+Exakt wie spawncity.de auf jedem Gerät: die vollständige Tabelle (Tastatur/Maus, Laptop-Touchpad,
+Xbox-Controller, Touch; zu Fuß, Drohne, Auto/Bus, Jet, Fallschirm, Menüs, Luftschlag, Karte, Voice) mit
+Quelle je Zeile steht in [CONTROLS.md](CONTROLS.md), dort auch die behobenen Abweichungen.
+Kurzfassung:
+
+| Modus | Tastatur/Maus (Pointer-Lock per LMB/RMB) | Xbox | Touch |
 |---|---|---|---|
-| zu Fuß | WASD, Shift Sprint, Leertaste Sprung, Strg ducken, LMB Feuer, RMB zielen, R nachladen, **F** einsteigen, **V** Drohne | LS laufen, RS schauen, A Sprung, B ducken, RT Feuer, LT zielen, RB nachladen, **X** einsteigen, **D-Pad ↓** Drohne | Kerns Soldaten-Layout (Sticks, Feuer am Finger, Knöpfe) + DROHNE / EINSTEIGEN |
-| Drohne | R ARM / Landen, WASD fliegen (GAME: Geschwindigkeit), Leertaste/Shift Höhe, Maus X drehen, Maus Y Körperneigung, Q/E drehen, C Kamera (FPV/Follow/Third), G GAME/ANGLE, K Motoren aus, **V** zurück | LS fliegen, RS drehen/neigen, LT/RT Höhe, A ARM, View Kamera | linker Stick fliegen, rechter Stick Höhe/Drehen, ARM, KAMERA, ZU FUSS |
-| Auto | W Gas, S Bremse/rückwärts, A/D lenken, Leertaste Handbremse, C Cockpit, Maus Kopf, **F** aussteigen | LS lenken, RT Gas, LT Bremse, B Handbremse, X aussteigen | links lenken, rechts Gas/Bremse, HANDBREMSE, AUSSTEIGEN |
-| Jet | W/S Schub bzw. Steigen/Sinken, A/D Seitenruder, Maus nicken/rollen (Rate), Pfeile, **V** Schweben/Flug, C Cockpit, **F** aussteigen (am Boden) bzw. Schleudersitz | LS Schub/Seite, RS nicken/rollen, LB Schweben/Flug, X aussteigen | links Schub/Seite, rechts nicken/rollen, FLUG/SCHWEBEN, EJECT |
-| Fallschirm | WASD steuern | LS | linker Stick |
-| Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
-| Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (schaltet auf das Ziel am Fadenkreuz auf und startet; 5 s Nachladen) | RB feuern, Y wechseln | FEUER, Waffenknopf |
-| Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
-| Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **O** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
+| überall | Esc Hauptmenü-Frage, Tab Menü, M Karte, P MULTI, Z/MMB Ping, H/K Mikro/stumm, L GPS LIVE, 4/J Luftschlag zielen (J/Enter/LMB los, RMB/Esc ab) | D-Pad ↑ Luftschlag, → Ping, ↓ Fuß/Drohne, X ein/aus, VIEW Kamera (halten: Karte), MENU Menü, R3 Mikro, R3+Y stumm | Minikarte ziehen = Kopf, 2× tippen = Karte |
+| zu Fuß | WASD, Shift, Leertaste (2× Jetpack), LMB Feuer, RMB zielen, 1 2 3 5 6 7 8, Q/Rad Waffe, T halten Granate, G EMP, E/F einsteigen, V Drohne | LS, RS, RT Feuer, LT zielen, A Sprung, L3 Sprint, LB Granate, Y/←→ Waffe, B EMP | Sticks, Feuer am Finger, JUMP, Waffe, SCOPE, GRANATE, STRIKE, ⇄ DRONE, 🚗/✈, EMP |
+| Drohne | WASD, Pfeile, Maus (Rate), RMB Blick, Leertaste/Shift Höhe, LMB Feuer, R ARM, C Kamera, 1/2, Q/Rad, V | LS, RS, RT−LT Höhe, RB Feuer, A ARM, Schema AIM: LB Blick | Sticks, Höhenschieber, Feuer am Finger, Waffe, ARM, STOP, ⇄ FPS, STRIKE, EMP |
+| Auto | W/S, A/D, Leertaste Handbremse, Maus Kopf, C Kamera, + − Rad Zoom, E/F aus, N/B Radio | LS lenken, RT/LT, RS Kopf, B Handbremse | LENKEN / GAS, UMSCHAUEN, ↗, CAM, HANDBREMSE, zwei Finger Zoom |
+| Jet | W/S, A/D, Pfeile/Maus, Leertaste/LMB Kanone, R RAKETE wählen, B Bombe, V Schweben/Flug, C, E/F | LS, RS, RT Kanone/Rakete, LT RAKETE, RB Bombe, LB Schweben/Flug | STEIGEN / SCHUB, KNÜPPEL, KANONE, Tipp-Feuer, ⇄ FLUG, RAKETE, BOMBE, CAM, EJECT (650 ms halten) |
+| Fallschirm | Pfeile / Maus | RS | rechter Stick |
+
+Befehle ohne Taste im Original: `race` (Rennstrecke), `contract` (nächster Auftrag), `dronemode`
+(GAME/ANGLE), `scheme aim|classic` (Xbox-Schema), `strike aim|go|cancel`, `look set|release|keep`,
+`zoom in|out`, `device ...` (die Seite meldet Gerätewechsel), `controls` (Zustand als JSON).
 
 Mehrspieler (alle Modi; `voice_control_bindings.mjs`, `ping_marker.mjs`, `world_map_full.mjs`):
 
 | Aktion | Tastatur/Maus | Gamepad | Touch |
 |---|---|---|---|
 | Mikrofon an/aus (Sprachchat in 70 m) | **H** | **R3** antippen (beim Loslassen) | 🎤 MIC |
-| Sprachchat stumm | **K** (in der Drohne ist K Motoren aus) | **R3 + Y** | 🔈 |
+| Sprachchat stumm | **K** | **R3 + Y** | 🔈 |
 | Überall hörbar (Funk) | – | – | ÜBERALL |
-| Ping-Marker (gleicher Ort: entfernen) | **Z** / mittlere Maustaste | **R3 + D-Pad →** | 0,6 s lang drücken |
-| Große Karte | **M**, Esc schließt | **Menu**; dort LS schieben, LT/RT Zoom, A Wegpunkt, X Ziel löschen, Y Suche, B schließen | KARTE; Tippen = Wegpunkt |
-| Abstimmung JA / NEIN | Knöpfe JA / NEIN | – | JA / NEIN |
-| Öffentliche Lobby | – | – | MULTI |
+| Ping-Marker (gleicher Ort: entfernen) | **Z** / mittlere Maustaste | **D-Pad →** | 0,6 s lang drücken |
+| Große Karte | **M**, Esc schließt, **/** Suche | **VIEW** halten; dort LS schieben, LT/RT Zoom, ←→ Zoom-Stufe, A Wegpunkt, X Ziel löschen, Y Suche, R3 mir folgen, B/VIEW schließen | Minikarte 2× tippen |
+| Abstimmung JA / NEIN | Knöpfe JA / NEIN | A / B | JA / NEIN |
+| Öffentliche Lobby | **P** | – | MULTI |
 | Einladen (QR-Code, Teilen) | – | – | TEILEN |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
@@ -106,7 +112,10 @@ kern/games/spawncity/
                   alles mit Zeitbudget; Entladen ferner Kacheln; Fahrspuren für den Verkehr
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
     sound_fx.*    Synth-Patches (Rotor, Motor, Turbine, Jet-Röhren, Wind) auf Kerns Mixer
-    touch_pad.*   Touch-Sticks/Knöpfe der Fahrzeuge (Overlay = Kerns TouchOverlay)
+    controls.*    Steuerungs-Mathematik nach SpawnCity (Totzonen, Kurven, Raten, Latches, Granate, Geräte)
+    touch_play.*  Touch-Steuerung aller Modi (Sticks, Feuer am Finger, Höhenschieber, Knöpfe nach
+                  edge_hud_layout.mjs; Overlay = Kerns TouchOverlay)
+    game_controls.* Eingabe je Modus, Pad-Aktionen, Luftschlag-Zielen, Kopfblick (CONTROLS.md)
     wanted.*      Wanted-Regeln (Heat, Sterne, Polizei-Antwort, Fluchtzeit, Trefferchance, EMP)
     people.*      Fußgänger auf den Gehwegen (Routen von Straße zu Straße, Panik, Zeugen) und Beamte:
                   leichte Agenten, Box3D-Strahlen gegen Wände, Treffer auf Kapseln, Überfahren
@@ -701,3 +710,10 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
     ein **Ausschnitt-Mechanismus für Gebäudenetze** (Tür/Dachluke im Kachelnetz, wie SpawnCitys
     `facadeCutouts`), dazu `destroy_shape`, damit ein Haus seinen Kollisions-Shape abgeben kann, ohne
     dass die ganze Kachel neu gebaut wird (`CityStream::exclude_building`).
+16. **Steuerung** (gebaut in `touch_play.*`, `controls.*`, `game_controls.cpp`): `TouchControls` mit
+    frei belegbarem Layout je Modus (Knopfliste, Halten/Tippen, Höhenschieber, Pinch) statt des festen
+    Soldaten-Layouts; `InputArbiter` mit Pad-Eingabe-Zustand und Plattformmeldung; im App-Host ein
+    `mousemove`-Strom unter Pointer-Lock (begrenzt je Ereignis) und ein Lock-Status; `Key` um `+ - /`
+    erweitern; im Soldaten: Schuss durch einen Bildschirmpunkt (Touch-Feuer am Finger für die
+    Kern-Waffen MP/Glock/Sniper), Sprint in jede Richtung, Respawn per Aufruf statt nach Zeit,
+    Blickkurve/Raten der Pad-Sticks als Parameter (heute rechnet das Spiel sie und gibt Grad weiter).

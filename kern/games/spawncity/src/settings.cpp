@@ -14,11 +14,13 @@ constexpr OptSpec kSpecs[] = {
     {"mouse.sensitivity", "maus", "Maus-Empfindlichkeit", "Drehgeschwindigkeit der Maus in allen Modi (zu Fuss, Drohne, Auto, Jet).", 20, 300, 5, 100, false, true},
     {"mouse.invertY", "maus", "Maus Y invertieren", "Maus nach oben = nach unten schauen (Flugsimulator-Stil).", 0, 1, 1, 0, true, true},
     // control_semantics.mjs DEFAULT_PHONE_SETTINGS (fineness 1..10 = 10, 90 km/h, hover 1.2 m)
-    {"drone.leftFineness", "drohne", "Feinheit Hoehe / Drehen", "Kurve von Hoehe und Gieren. Hoeher = feiner um die Mitte, volle Rate erst am Anschlag.", 1, 10, 1, 10, false, true},
-    {"drone.rightFineness", "drohne", "Feinheit Nicken / Rollen", "Kurve von Nicken und Rollen. Hoeher fuer ruhiges Schweben und Zielen, niedriger fuer schnelle Manoever.", 1, 10, 1, 10, false, true},
-    {"drone.invertYaw", "drohne", "Gieren invertieren", "Vertauscht links/rechts beim Drehen.", 0, 1, 1, 0, true, true},
-    {"drone.invertRoll", "drohne", "Rollen invertieren", "Vertauscht links/rechts beim Seitwaertsflug.", 0, 1, 1, 0, true, true},
-    {"drone.invertPitch", "drohne", "Nicken invertieren", "Vertauscht vor/zurueck.", 0, 1, 1, 0, true, true},
+    // control_semantics.mjs applyGameStick: left = translation (roll / pitch), right = yaw / body pitch;
+    // invertLeftHorizontal, invertRightHorizontal, invertRightVertical (default ON)
+    {"drone.leftFineness", "drohne", "Feinheit linker Stick", "Kurve des linken Sticks (Fliegen vor/zurueck/seitwaerts). Hoeher = feiner um die Mitte, volle Geschwindigkeit erst am Anschlag.", 1, 10, 1, 10, false, true},
+    {"drone.rightFineness", "drohne", "Feinheit rechter Stick", "Kurve des rechten Sticks (Drehen und Neigen). Hoeher fuer ruhiges Schweben und Zielen, niedriger fuer schnelle Manoever.", 1, 10, 1, 10, false, true},
+    {"drone.invertYaw", "drohne", "Rechts horizontal invertieren", "Vertauscht links/rechts beim Drehen.", 0, 1, 1, 0, true, true},
+    {"drone.invertRoll", "drohne", "Links horizontal invertieren", "Vertauscht links/rechts beim Seitwaertsflug.", 0, 1, 1, 0, true, true},
+    {"drone.invertPitch", "drohne", "Rechts vertikal invertieren", "Neigung: Stick nach unten = Nase runter (Standard an).", 0, 1, 1, 1, true, true},
     {"drone.maxSpeedKmh", "drohne", "Hoechstgeschwindigkeit", "Was der Flugregler im GAME-Modus erlaubt. Langsamer ist leichter zwischen Haeusern.", 5, 90, 1, 90, false, true},
     {"drone.hoverAgl", "drohne", "Schwebehoehe", "Hoehe ueber Grund, auf der die Drohne nach dem Start von selbst haelt.", 0.5f, 10, 0.1f, 1.2f, false, true},
     // first_person_control_settings.mjs
