@@ -44,8 +44,11 @@ struct CrimeReport {
 
 class People {
  public:
-  enum class Kind : u8 { citizen, officer };
-  enum class State : u8 { walk, wait, flee, down, gone, officer };
+  // soldier / zombie / enemy: driven by game_military.cpp / game_events.cpp like the officers
+  // (military_response.mjs, zombie_nights.mjs, sandbox_game.mjs); `fight`: a citizen who squares
+  // up to the player (pedestrian_agents.mjs provoke), moved by game_events.cpp.
+  enum class Kind : u8 { citizen, officer, soldier, zombie, enemy };
+  enum class State : u8 { walk, wait, flee, down, gone, officer, fight };
   struct Person {
     Kind kind = Kind::citizen;
     State state = State::walk;
@@ -67,7 +70,13 @@ class People {
     i32 unit = -1;
     bool aiming = false;
     u32 seed = 0;
+    // fighting back (pedestrian_agents.mjs) and the scripted kinds
+    f32 provoked_at = -99, fight_until = 0, last_attack = -99;
+    bool provoked_hit = false;
+    u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
   };
+  /// A death since the last take_deaths() (points, kill feed).
+  struct Death { i32 index; Kind kind; bool by_player; bool head; };
 
   void set_budget(u32 people) { budget_ = people; }
   void clear() { people_.clear(); }
@@ -92,6 +101,11 @@ class People {
   /// Someone sees the place (a living citizen within 45 m): crimes there are witnessed.
   bool witnessed(Vec3 at) const;
   u32 count(Kind k, bool alive_only = true) const;
+  /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
+  i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
+  void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
+  /// Whether the last hit of shot() was on the head (headshot_feedback.mjs).
+  bool last_head() const { return last_head_; }
 
  private:
   void spawn(const PeopleView& view, Rng& rng, f32 now);
@@ -100,6 +114,8 @@ class People {
   bool route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& out, f32& heading) const;
   std::vector<Person> people_;
   std::vector<CrimeReport> reports_;
+  std::vector<Death> deaths_;
+  bool last_head_ = false;
   u32 budget_ = 60, serial_ = 1;
 };
 
