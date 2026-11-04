@@ -1150,7 +1150,8 @@ std::string Game::command(const std::string& cmd) {
       i32 best = -1;
       f32 bd = 1e9f;
       for (std::size_t i = 0; i < cars_.size(); ++i) {
-        if (!cars_[i].placed || cars_[i].car->spec().radius > 0.4f) continue;
+        // A drivable one: not a bus, not burning or burnt out (the nearest after a fight may be).
+        if (!cars_[i].placed || cars_[i].car->spec().radius > 0.4f || cars_[i].wreck || cars_[i].burn_until >= 0 || cars_[i].police) continue;
         const Vec3 p = matrix_of(cars_[i].actor).translation();
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
         if (d < bd) { bd = d; best = static_cast<i32>(i); }

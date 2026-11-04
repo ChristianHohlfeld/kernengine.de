@@ -469,6 +469,12 @@ async function run({name, url, context, mapped}) {
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
+  // The fights above leave burning cars and a damaged jet behind: RESET first (game_reset.mjs), so
+  // the vehicle checks start from a clean world as a player would after a restart.
+  await cmd("military off");
+  await cmd("zombies day");
+  await cmd("reset");
+  { const t = (await hud()).t; await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, t, {timeout: 300000}).catch(() => {}); }
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
   // touch: the altitude pad right of the move stick (simulator.mjs #soloClearance) pushed up
