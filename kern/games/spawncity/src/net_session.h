@@ -32,6 +32,7 @@ struct PlayerState {
   f32 yaw = 0, pitch = 0, speed = 0;
   f32 health = 100;
   u8 stars = 0, weapon = 0;
+  f32 day = -1;           // time of day 0..1 (day_night_sync.mjs: clients follow the host's)
 };
 
 struct Hit {

@@ -216,6 +216,33 @@ async function run({name, url, context, mapped}) {
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
 
+  // Performance and look (game_look.cpp): frame times, quality level, day clock, lights, weapon models.
+  {
+    const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(h.perf && h.perf.ms && h.perf.tier >= 0 && h.renderScale > 0, `[${name}] frame times and quality in the HUD (${JSON.stringify(h.perf)})`);
+    check(await cmd("perf 1") === "on", `[${name}] frame-time line on`);
+    await frame();
+    check(await page.locator(".sc-perf").isVisible(), `[${name}] frame-time line shown`);
+    await cmd("perf 0");
+    check(JSON.parse(await cmd("quality 2")).tier === 2, `[${name}] quality level 2 fixed`);
+    await frame(); await frame();
+    const cw = await page.evaluate(() => { const c = document.getElementById("game"); return [c.width, Math.round(c.clientWidth * Math.min(devicePixelRatio || 1, 2) * 0.85)]; });
+    check(Math.abs(cw[0] - cw[1]) <= 1, `[${name}] the drawing buffer follows the level's scale (${cw})`);
+    check(JSON.parse(await cmd("quality auto")).auto === true, `[${name}] quality back to automatic`);
+    check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
+    await frame(); await frame();
+    h = await hud();
+    check(h.night > 0.6 && h.clock === "22:00", `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);
+    check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
+    await shot("1c-night");
+    await cmd("time 0.40");
+    check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
+    await frame(); await frame();
+    check((await hud()).look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify((await hud()).look)})`);
+    await cmd("weapon 1");
+  }
+
   // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
   {
     const schema = JSON.parse(await cmd("settings schema"));

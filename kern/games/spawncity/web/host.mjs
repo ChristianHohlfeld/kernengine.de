@@ -222,6 +222,18 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
   const ui = installSpawnCityUi({command, params, canvas, statusEl});
   let frames = 0, last = null;
+  // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
+  // browser owns the canvas size, so the page applies it; app.mjs re-sizes on layout changes and the
+  // next frame applies the scale again.
+  const baseRatio = () => Math.min(globalThis.devicePixelRatio || 1, mobile ? 1.5 : 2);
+  const applyRenderScale = h => {
+    const s = h?.renderScale;
+    if (!(s > 0) || !canvas.clientWidth) return;
+    const r = baseRatio() * s, w = Math.max(1, Math.round(canvas.clientWidth * r)), hh = Math.max(1, Math.round(canvas.clientHeight * r));
+    if (canvas.width === w && canvas.height === hh) return;
+    canvas.width = w; canvas.height = hh;
+    e.kern_app_resize(w, hh);
+  };
   const tick = () => {
     frames++;
     pollPad();
@@ -230,6 +242,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
+    applyRenderScale(last);
     ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
@@ -298,6 +311,9 @@ class SpawnCityHud {
     this.el = {badge: q(".sc-badge"), stars: q(".sc-stars"), fps: q(".sc-fps"), toast: q(".sc-toast"), offline: q(".sc-offline"), cross: q(".sc-cross"),
       speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"),
       help: q(".sc-help"), panel: q(".sc-panel")};
+    this.el.perf = Object.assign(document.createElement("div"), {className: "sc-perf", hidden: true});
+    this.el.perf.style.cssText = "position:absolute;left:max(14px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 30px);font:600 11px ui-monospace,monospace;color:#cfe3f5;background:rgba(0,0,0,.45);padding:3px 7px;border-radius:5px;white-space:nowrap";
+    this.root.appendChild(this.el.perf);
     this.key = "";
   }
   update(h, tiles) {
@@ -309,6 +325,14 @@ class SpawnCityHud {
     el.fps.textContent = `${h.fps} fps · ${h.tiles.ready} Kacheln${h.tiles.loading ? ` (+${h.tiles.loading})` : ""} · ${h.tiles.buildings} Gebäude`;
     el.toast.hidden = !h.toast;
     if (h.toast) el.toast.textContent = h.toast;
+    // Frame times (command "perf 1"): ms per part of the frame, quality level, point lights.
+    const p = h.perf;
+    el.perf.hidden = !p?.show;
+    if (p?.show) {
+      const m = p.ms;
+      el.perf.textContent = `${p.fps.toFixed(0)} fps · Logik ${m.logic.toFixed(1)} · Physik ${m.physics.toFixed(1)} · Stadt ${m.stream.toFixed(1)} · Zeichnen ${m.draw.toFixed(1)}` +
+        ` · Render ${m.render.toFixed(1)}${m.gpu >= 0 ? ` · GPU ${m.gpu.toFixed(1)}` : ""} ms · Grafik ${p.tierName}${p.auto ? " (auto)" : ""} · ${p.lights} Lichter`;
+    }
     el.offline.hidden = !h.offline;
     el.cross.hidden = h.mode !== "foot";
     if (h.mode === "foot") el.cross.style.setProperty("--spread", `${8 + h.spread * 7}px`);

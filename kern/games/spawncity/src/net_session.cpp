@@ -71,6 +71,7 @@ std::vector<u8> pack(const PlayerState& s) {
   put(b, s.health);
   put(b, s.stars);
   put(b, s.weapon);
+  put(b, s.day);
   return b;
 }
 
@@ -78,7 +79,7 @@ bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
   u8 mode = 0;
   if (!(get(b, at, s.slot) && get(b, at, mode) && get(b, at, s.color) && get(b, at, s.flags) && get(b, at, s.position) && get(b, at, s.velocity) &&
         get(b, at, s.rotation) && get(b, at, s.pilot) && get(b, at, s.yaw) && get(b, at, s.pitch) && get(b, at, s.speed) && get(b, at, s.health) && get(b, at, s.stars) &&
-        get(b, at, s.weapon)))
+        get(b, at, s.weapon) && get(b, at, s.day)))
     return false;
   if (mode > static_cast<u8>(PlayerMode::parachute)) return false;
   s.mode = static_cast<PlayerMode>(mode);

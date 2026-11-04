@@ -34,6 +34,7 @@ net::PlayerState Game::my_state() const {
   s.health = world_->hud().health;
   s.stars = static_cast<u8>(wanted_.stars());
   s.weapon = static_cast<u8>(foot_weapon_);
+  s.day = look_.tod;  // the host's phase is the session's (game_look.cpp)
   u8 f = 0;
   if (player_dead_) f |= 1;
   if (drone_.telemetry().armed) f |= 2;
