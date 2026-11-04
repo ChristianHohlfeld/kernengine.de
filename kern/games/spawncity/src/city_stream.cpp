@@ -569,6 +569,62 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   stats_.last_slice_ms = kern::now_ms() - start;
 }
 
+void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {
+  out.clear();
+  for (const auto& [k, tp] : tiles_) {
+    const Tile& t = *tp;
+    if (t.state != Tile::State::ready) continue;
+    if (p.x < t.bounds.x - r - 200 || p.x > t.bounds.z + r + 200 || p.y < t.bounds.y - r - 200 || p.y > t.bounds.w + r + 200) continue;
+    for (const MapFeatures::Building& b : t.features.buildings) {
+      if (b.rings.empty() || b.rings[0].empty()) continue;
+      const Vec2 q = b.rings[0][0];
+      if (std::fabs(q.x - p.x) > r + 150 || std::fabs(q.y - p.y) > r + 150) continue;
+      u32 edge = 0;
+      for (std::size_t ri = 0; ri < b.rings.size(); ++ri) {
+        const auto& ring = b.rings[ri];
+        if (ring.size() < 3) continue;
+        // Outward: right of the edge for a counter-clockwise outer ring (left for courtyards).
+        const bool ccw = signed_area(ring) > 0;
+        const f32 s = (ccw == (ri == 0)) ? 1.0f : -1.0f;
+        for (std::size_t i = 0; i < ring.size(); ++i, ++edge) {
+          const Vec2 a = ring[i], c = ring[(i + 1) % ring.size()];
+          const f32 len = std::hypot(c.x - a.x, c.y - a.y);
+          if (len < 0.05f) continue;
+          const Vec2 d{(c.x - a.x) / len, (c.y - a.y) / len};
+          const f32 u = (p.x - a.x) * d.x + (p.y - a.y) * d.y;
+          const Vec2 n{d.y * s, -d.x * s};
+          const f32 side = (p.x - a.x) * n.x + (p.y - a.y) * n.y;
+          if (u < -r || u > len + r || std::fabs(side) > r) continue;
+          out.push_back({a, d, n, len, b.base, b.top, b.seed, edge});
+        }
+      }
+    }
+  }
+}
+
+bool CityStream::building_at(Vec2 p, std::vector<Vec2>* ring_out, f32* base, f32* top, u32* seed) const {
+  for (const auto& [k, tp] : tiles_) {
+    const Tile& t = *tp;
+    if (t.state != Tile::State::ready) continue;
+    if (p.x < t.bounds.x - 200 || p.x > t.bounds.z + 200 || p.y < t.bounds.y - 200 || p.y > t.bounds.w + 200) continue;
+    for (const MapFeatures::Building& b : t.features.buildings) {
+      if (b.rings.empty() || b.rings[0].size() < 3) continue;
+      const auto& ring = b.rings[0];
+      if (std::fabs(ring[0].x - p.x) > 150 || std::fabs(ring[0].y - p.y) > 150) continue;
+      bool inside = false;
+      for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++)
+        if ((ring[i].y > p.y) != (ring[j].y > p.y) && p.x < (ring[j].x - ring[i].x) * (p.y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) inside = !inside;
+      if (!inside) continue;
+      if (ring_out) *ring_out = ring;
+      if (base) *base = b.base;
+      if (top) *top = b.top;
+      if (seed) *seed = b.seed;
+      return true;
+    }
+  }
+  return false;
+}
+
 bool CityStream::street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32& heading) const {
   if (lanes_.empty()) return false;
   for (int attempt = 0; attempt < 48; ++attempt) {

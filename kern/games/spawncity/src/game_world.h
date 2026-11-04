@@ -7,6 +7,8 @@
 
 #include "common.h"
 #include "kern/audio/audio.h"
+#include "world_art.h"
+#include "world_marks.h"
 
 namespace sc {
 
@@ -24,6 +26,10 @@ struct WorldLife {
   struct Splash { Vec3 at; f32 size; };
   std::vector<Splash> pending_splashes;  // found in the fixed step, shown in the frame
   WorldSounds sounds;
+  // drawing and what blasts leave behind (world_art.h, world_marks.h)
+  WorldArt art;
+  bool art_ready = false;
+  Marks marks;
 };
 
 }  // namespace sc

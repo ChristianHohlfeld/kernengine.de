@@ -212,6 +212,19 @@ async function run({name, url, context, mapped}) {
   check((await cmd("attack")).startsWith("1 "), `[${name}] a rocket is fired`);
   await page.waitForFunction(b => window.SpawnCity.hud().explosions > b, booms, {timeout: 300000}).catch(() => {});
   check((await hud()).explosions > booms, `[${name}] the rocket explodes`);
+  // What blasts leave (terrain_craters.mjs, world_impacts.mjs, facade_marks.mjs): a crater in the
+  // terrain, a scorch, soot and a breach on the wall, rubble as Box3D bodies.
+  {
+    const b = await cmd("blast wall");
+    check(b.startsWith("{"), `[${name}] a blast at a wall (${b})`);
+    if (b.startsWith("{")) {
+      const at = JSON.parse(b), g = JSON.parse(await cmd(`ground ${at.x} ${at.y}`));
+      h = await hud();
+      check(h.marks.craters >= 1 && g.z < at.ground - 0.4, `[${name}] a crater in the ground (${at.ground} -> ${g.z})`);
+      check(h.marks.scorch >= 1 && h.marks.soot >= 1 && h.marks.breach >= 1 && h.marks.rubble >= 2, `[${name}] scorch, soot, breach and rubble (${JSON.stringify(h.marks)})`);
+      await shot("1c-blast-marks");
+    }
+  }
   await cmd("weapon 1");
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);

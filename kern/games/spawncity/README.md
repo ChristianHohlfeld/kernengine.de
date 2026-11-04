@@ -174,6 +174,16 @@ kern/games/spawncity/
   Oberfläche: ein Netz je 320-m-Abschnitt (volle 64-m-Blöcke als ein Viereck, sonst Zeilenläufe),
   Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
   eigene Shader-Erweiterung).
+* **Krater und Spuren** (`world_marks.*`, Vorlage `terrain_craters.mjs`, `world_impacts.mjs`,
+  `facade_marks.mjs`): Große Explosionen (Radius ≥ 8 m: Granaten, Raketen, Bomben) am Boden graben einen
+  Krater mit dem Schüssel-und-Wall-Profil von `craterProfile`, auf die Explosion skaliert (Radius 0,45 r,
+  höchstens 8 m, Tiefe 0,18 R; SpawnCity kennt Krater nur für die Atombombe mit 210 m) – Box3D-Boden,
+  Bodennetz, Straßen und Flächen folgen (höchstens 32 Krater). Dazu ein Brandfleck auf dem Boden (40),
+  Ruß an bis zu zwei Wänden in Reichweite, auf die Wand begrenzt (48), und ein Wanddurchbruch je 2-m-Feld,
+  der bei jedem weiteren Treffer weiter aufbricht (64), mit Betonbrocken als Box3D-Körpern (2400 kg/m³,
+  36 Stück, 25 s). Die Wände kommen aus denselben Umrissen wie die Gebäude (`CityStream::walls_near`).
+  Glassprünge in Fenstern fehlen noch: Kerns `BuildingBuilder` legt die Fensterraster im Shader an, das
+  Spiel kennt die Scheiben nicht (Einschusslöcher macht Kerns Soldaten-Decal).
 
 ## Übernommene SpawnCity-Werte (Auszug)
 

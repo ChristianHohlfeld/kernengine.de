@@ -113,12 +113,18 @@ void Game::hud_world(std::string& s) {
   if (!life_) return;
   std::snprintf(b, sizeof b, ",\"swimming\":%s,\"splashes\":%u", life_->swimming ? "true" : "false", life_->splashes);
   s += b;
+  const Marks::Stats& m = life_->marks.stats();
+  std::snprintf(b, sizeof b, ",\"marks\":{\"scorch\":%u,\"soot\":%u,\"breach\":%u,\"rubble\":%u,\"craters\":%u}", m.scorches, m.soots, m.breaches, m.rubble,
+                m.craters);
+  s += b;
 }
 
 void Game::update_world(f32 dt) {
   if (!life_ || !world_placed_) return;
   WorldLife& L = *life_;
   if (!L.sounds.ready && mixer_.ready()) init_world_sounds(mixer_, L.sounds);
+  if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer);
+  L.marks.update(world_->sim_time(), world_->physics());
   const Terrain& t = city_.terrain();
   // Swimming (player_walk_mode_v4.mjs standHeightAt): in deep water the head stays above the
   // surface - the pilot floats with his eyes 0.42 m over it and walks / swims as on land.
@@ -191,10 +197,15 @@ void Game::step_world(f32 h) {
     if (cars_[i].placed) water(static_cast<u32>(i + 3), cars_[i].actor, cars_[i].car->spec().half, false);
 }
 
-void Game::draw_world() {}
+void Game::draw_world() {
+  if (!life_ || !life_->art_ready) return;
+  WorldLife& L = *life_;
+  L.art.begin();
+  L.marks.draw(L.art, world_->physics(), world_->sim_time());
+  L.art.end();
+}
 
 void Game::world_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
-  (void)damage;
   (void)by_player;
   if (!life_) return;
   const Terrain& t = city_.terrain();
@@ -203,6 +214,8 @@ void Game::world_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
     life_->pending_splashes.push_back({{at.x, at.y, t.water_level(at.x, at.y)}, 2 + radius * 0.8f});
     return;
   }
+  // Craters, scorch, soot and breaches, rubble (world_marks.h); strength as facade_marks.mjs.
+  life_->marks.blast(at, radius, std::fmin(1.4f, damage / 110), city_, world_->physics(), rng_, world_->sim_time());
 }
 
 bool Game::world_command(const std::string& cmd, std::string& out) {
@@ -217,6 +230,30 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
     std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"z\":%.2f,\"elevation\":%.2f,\"normal\":[%.3f,%.3f,%.3f],\"water\":%s,\"level\":%.2f,\"playerZ\":%.2f}", p.x,
                   p.y, t.height(p.x, p.y), t.elevation(p.x, p.y), n.x, n.y, n.z, t.water_at(p.x, p.y) ? "true" : "false", t.water_level(p.x, p.y),
                   player_position().z);
+    out = b;
+    return true;
+  }
+  if (starts("blast")) {
+    // Tests: "blast" = a rocket's blast (9.5 m, 160) 6 m in front of the player at knee height,
+    // "blast wall" = against the nearest wall within 40 m.
+    Vec3 me = player_position();
+    const f32 yaw = world_->camera_yaw() * kDeg;
+    Vec3 at{me.x + std::cos(yaw) * 6, me.y + std::sin(yaw) * 6, 0};
+    if (cmd == "blast wall") {
+      std::vector<CityStream::Wall> walls;
+      city_.walls_near({me.x, me.y}, 40, walls);
+      f32 best = 1e9f;
+      for (const CityStream::Wall& wl : walls) {
+        const f32 u = clampf((me.x - wl.a.x) * wl.dir.x + (me.y - wl.a.y) * wl.dir.y, 1, wl.len - 1);
+        const Vec2 p = wl.a + wl.dir * u + wl.normal * 1.5f;
+        const f32 d = std::hypot(p.x - me.x, p.y - me.y);
+        if (d < best && wl.len > 3) { best = d; at = {p.x, p.y, 0}; }
+      }
+      if (best > 1e8f) { out = "no wall"; return true; }
+    }
+    at.z = city_.ground_height(at.x, at.y) + 0.5f;
+    explosion(at, 9.5f, 160, true);
+    std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"ground\":%.2f}", at.x, at.y, at.z, city_.ground_height(at.x, at.y));
     out = b;
     return true;
   }
