@@ -117,6 +117,24 @@ i32 People::add_citizen(Vec3 at, f32 yaw, u32 seed) {
   return static_cast<i32>(people_.size() - 1);
 }
 
+i32 People::add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role) {
+  Person p;
+  p.kind = k;
+  p.state = State::officer;  // moved by its owner, not by walk()
+  p.pos = at;
+  p.yaw = yaw;
+  p.hp = hp;
+  p.seed = seed;
+  p.shirt = shirt;
+  p.pants = pants;
+  p.skin = skin;
+  p.role = role;
+  for (std::size_t i = 0; i < people_.size(); ++i)
+    if (people_[i].state == State::gone) { people_[i] = p; return static_cast<i32>(i); }
+  people_.push_back(p);
+  return static_cast<i32>(people_.size() - 1);
+}
+
 u32 People::count(Kind k, bool alive_only) const {
   u32 n = 0;
   for (const Person& p : people_)
@@ -185,7 +203,7 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
 
 void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
   for (Person& p : people_) {
-    if (p.kind != Kind::citizen || p.state == State::down || p.state == State::gone) continue;
+    if (p.kind != Kind::citizen || p.state == State::down || p.state == State::gone || p.state == State::fight) continue;
     const f32 d = dist2d(p.pos, at);
     if (d > radius) continue;
     // Close by everyone runs; further out about half do (pedestrian_agents.mjs frighten).
@@ -218,10 +236,13 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   p.v = 0;
   const f32 l = std::hypot(from_dir.x, from_dir.y);
   p.fall_dir = l > 1e-3f ? Vec3{from_dir.x / l, from_dir.y / l, 0} : Vec3{std::cos(p.yaw), std::sin(p.yaw), 0};
-  if (by_player) {
+  deaths_.push_back({static_cast<i32>(&p - people_.data()), p.kind, by_player, last_head_});
+  // Soldiers and zombies are no crime (military_response.mjs, zombie_nights.mjs); a sandbox
+  // enemy down counts as "police-kill" severity 1 (sandbox_game.mjs killEnemy).
+  if (by_player && (p.kind == Kind::citizen || officer)) {
     const wanted::Crime c = officer ? wanted::Crime::police_officer : wanted::Crime::person;
     reports_.push_back({c, at, officer || witnessed(at)});
-  }
+  } else if (by_player && p.kind == Kind::enemy) reports_.push_back({wanted::Crime::person_hit, at, true});
   (void)hit_by_car;
   frighten(at, 22, now, 1.2f);
 }
@@ -248,9 +269,12 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now) {
       hit_point = from + (to - from) * std::fmax(0.0f, s - back);
     }
   }
+  last_head_ = false;
   if (best < 0) return -1;
   Person& p = people_[static_cast<std::size_t>(best)];
   to = hit_point;
+  last_head_ = head;
+  if (by_player && p.kind == Kind::citizen) { p.provoked_at = now; p.provoked_hit = true; }
   p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
   const Vec3 dir = to - from;
   if (p.hp <= 0) kill(p, dir, by_player, now, false);
@@ -392,7 +416,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
     }
     if (p.kind == Kind::citizen) {
       if (dist2d(p.pos, view.focus) > kHide) { p.state = State::gone; continue; }
-      walk(p, dt, now, view, rng);
+      if (p.state != State::fight) walk(p, dt, now, view, rng);
     }
     p.phase += p.v * dt * 3.4f;
     // On the terrain (terrain.h): everybody stands on the ground's surface.

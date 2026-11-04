@@ -284,6 +284,7 @@ bool Game::start(kern::Engine& e) {
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
+  if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
   init_weapons();
   foot_touch_.set_controller(&soldier_controller_, true, true);
@@ -390,6 +391,8 @@ void Game::toggle_drone() {
     return;
   }
   if (mode_ != Mode::foot) return;
+  // player_vitals_logic.mjs: a shot-down drone is replaced after 8 s
+  if (world_->sim_time() < combat_.drone_ready_at) { toast_ = "Neue Drohne in " + std::to_string(static_cast<int>(std::ceil(combat_.drone_ready_at - world_->sim_time()))) + " s"; toast_age_ = 0; return; }
   const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
   const f32 yaw = world_->camera_yaw() * kDeg;
   // 2.9 m ahead of the pilot; if something hangs over that spot (a wing, a balcony) or stands
@@ -721,6 +724,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   if (pad.active) arbiter_.gamepad_used();
   touch_mode_ = arbiter_.touch();
   if (!touch_mode_ && in.button_pressed(0)) e.request_pointer_lock(true);
+  ui_before_input(e);  // settings: invert mouse Y (game_ui.cpp)
 
   const bool enter = in.pressed(Key::f) || in.pressed(Key::e) || pad.hit(kPadX) || pad_touch_.take_pressed("enter");
   const bool drone_key = in.pressed(Key::v) || pad.hit(kPadDown) || pad_touch_.take_pressed("mode") || pad_touch_.take_pressed("drone");
@@ -748,6 +752,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
     case Mode::jet: jet_input(e, dt); break;
     case Mode::parachute: parachute_input(e, dt); break;
   }
+  ui_after_input(dt);  // settings: curves, inversions, speeds (game_ui.cpp)
 }
 
 PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
@@ -1004,6 +1009,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   if (dt > 0) fps_ = fps_ * 0.95f + (1.0f / dt) * 0.05f;
   toast_age_ += dt;
   update_net(dt);
+  ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
     city_.update({0, 0, 0}, 8);
     if (city_.ready_at({0, 0, 0})) place_world();
@@ -1014,21 +1020,23 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
       e.set_status(buf);
     }
   }
-  if (world_placed_) {
+  if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     read_input(e, dt);
     update_touch_layout();
     world_->step(dt, play_in_);
     static f32 traffic_clock = 0;
     traffic_clock += dt;
-    if (traffic_clock > 0.5f) { traffic_clock = 0; manage_traffic(); }
+    if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
+  ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   e.renderer.camera = cam_;
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
@@ -1036,6 +1044,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
+  draw_combat();
   update_sound(dt);
 }
 
@@ -1216,12 +1225,16 @@ bool Game::audio_init(u32 rate) {
   game_audio_ = std::make_unique<kern::game::GameAudio>(mixer_, *bank_);
   if (world_) bank_->request_level(world_->level());
   fx_.init(mixer_);
+  ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
   return true;
 }
 
 const f32* Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
-  if (mixer_.ready()) mixer_.render(audio_out_.data(), frames);
+  if (mixer_.ready()) {
+    mixer_.render(audio_out_.data(), frames);
+    ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+  }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
   return audio_out_.data();
 }
@@ -1229,6 +1242,7 @@ const f32* Game::audio_render(u32 frames) {
 void Game::update_sound(f32 dt) {
   if (!mixer_.ready() || !world_) return;
   bank_->prepare(3);
+  ui_mix_cues();  // settings: shots / steps before GameAudio plays the cues (game_ui.cpp)
   game_audio_->update(*world_, cam_, dt);
   SoundState s;
   if (drone_out_) {
@@ -1266,6 +1280,7 @@ void Game::update_sound(f32 dt) {
     if (d < best) { best = d; s.siren.active = true; s.siren.position = p; s.siren.velocity = world_->actor_velocity(cars_[u.car].actor); }
   }
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
+  ui_mix_audio(s);  // settings: audio sliders (game_ui.cpp)
   fx_.update(s, dt);
 }
 
@@ -1362,13 +1377,17 @@ std::string Game::hud_json() {
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
+  combat_hud(s);  // "combat":{...} (game_events.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
+  s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   return s + "}";
 }
 
 std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
+  if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
+  if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);

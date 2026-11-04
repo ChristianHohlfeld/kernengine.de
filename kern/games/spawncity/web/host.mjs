@@ -14,6 +14,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {installSpawnCityUi} from "./ui.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -218,6 +219,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
+  // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
+  const ui = installSpawnCityUi({command, params, canvas, statusEl});
   let frames = 0, last = null;
   const tick = () => {
     frames++;
@@ -227,8 +230,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
+    ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
+  };
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
@@ -255,17 +260,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     // The player in the middle: an arrow pointing up.
     mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
   }, 250);
-  };
   requestAnimationFrame(tick);
-  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles};
+  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles, ui};
   return window.SpawnCity;
 }
 
 const SC_MODE_LABEL = {foot: "ZU FUSS", drone: "DROHNE", car: "AUTO", jet: "JET", parachute: "FALLSCHIRM"};
 const SC_HELP = {
-  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne",
-  drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · V zurück",
-  car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · F aussteigen",
+  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne · 2× Leertaste Jetpack · J Luftschlag · H Auftrag · Esc Menü",
+  drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · J Luftschlag · L Rennstrecke · V zurück",
+  car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · N/B Radio · F aussteigen",
   jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · Maus links/Leertaste Kanone · R Rakete · B Bombe · C Cockpit · F aussteigen / Schleudersitz",
   parachute: "WASD steuern",
 };
@@ -284,6 +288,7 @@ class SpawnCityHud {
       <div class="sc-health"><i></i></div>
       <div class="sc-ammo" hidden></div>
       <div class="sc-hint" hidden></div>
+      <div class="sc-banner" hidden></div><div class="sc-pop" hidden></div><div class="sc-scope" hidden><i></i></div>
       <div class="sc-help"></div>
       <div class="sc-attrib"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> ·
         <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ·
@@ -291,7 +296,7 @@ class SpawnCityHud {
         <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Höhen: Terrain Tiles (Mapzen, AWS Open Data)</a> · Kern Engine</div>`;
     const q = s => this.root.querySelector(s);
     this.el = {badge: q(".sc-badge"), stars: q(".sc-stars"), fps: q(".sc-fps"), toast: q(".sc-toast"), offline: q(".sc-offline"), cross: q(".sc-cross"),
-      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"),
+      speed: q(".sc-speed b"), rows: q(".sc-rows"), health: q(".sc-health"), healthBar: q(".sc-health i"), ammo: q(".sc-ammo"), hint: q(".sc-hint"), banner: q(".sc-banner"), pop: q(".sc-pop"), scope: q(".sc-scope"),
       help: q(".sc-help"), panel: q(".sc-panel")};
     this.key = "";
   }
@@ -337,6 +342,18 @@ class SpawnCityHud {
     if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 6)} %`, h.jetHp < 150 ? "warn" : "");
     if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : "bereit (X)"}`, "hot");
     if (h.net) row("Mehrspieler", h.net.status, h.net.connected ? "" : "warn");
+    const c = h.combat;  // combat and events (game_events.cpp): numbers and texts from C++
+    if (c) {
+      if (c.mil !== "off") row("Militär", c.mil === "alert" ? "ALARM" : `${c.helis} Hubschrauber · ${c.tanks} Panzer · ${c.soldiers} Soldaten`, "hot");
+      if (c.zombies.night) row("Zombies", `Runde ${c.zombies.round} · ${c.zombies.alive} · ${c.zombies.points} P`, "hot");
+      if (c.enemies) row("Gegner", c.enemies, "hot");
+      if (c.flak && (h.mode === "drone" || h.mode === "jet")) row("Flak", `${c.flak} Geschütz(e)`, c.flakRounds ? "warn" : "");
+      row("Punkte", `${c.fun.score.toLocaleString("de-DE")}${c.fun.risk ? ` · Risiko ${c.fun.risk}` : ""} · x${c.fun.mult.toFixed(2)}`);
+      row("Chaos", `${c.chaos.score.toLocaleString("de-DE")}${c.chaos.combo > 1 ? ` · x${c.chaos.combo}` : ""}`);
+      row("Auftrag", `${c.fun.contract} ${c.fun.done ? "✓" : `${c.fun.progress}/${c.fun.target}`}`);
+      row("Luftschlag", c.strike > 0 ? `${Math.ceil(c.strike)} s` : "bereit (J)");
+      if (c.race) row("Rennen", `Runde ${c.race.lap}/${c.race.laps} · ${c.race.next} · ${c.race.time} · Best ${c.race.best}`, "hot");
+    }
     const key = rows.join("");
     if (key !== this.key) { el.rows.innerHTML = key; this.key = key; }
     const hp = h.health >= 0 ? h.health / (h.maxHealth || 100) : 1;
@@ -348,5 +365,10 @@ class SpawnCityHud {
     el.hint.hidden = !h.hint;
     if (h.hint) el.hint.textContent = h.hint;
     el.help.textContent = h.touch ? "" : SC_HELP[h.mode] || "";
+    el.banner.hidden = !c?.banner;
+    if (c?.banner) el.banner.textContent = c.banner;
+    el.pop.hidden = !c?.pop;
+    if (c?.pop) el.pop.textContent = c.pop;
+    el.scope.hidden = !c?.scope;  // sniper_scope.mjs: black tube, mil-dot reticle, red dot
   }
 }

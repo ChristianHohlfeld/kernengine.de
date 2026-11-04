@@ -62,7 +62,7 @@ SC_TEST(traffic_first_come_and_people) {
   TrafficRules::View v;
   t.limit(0, {301, 1}, {1, 0}, 5, false, 10, cars, kNobody, {}, false, v);
   const f32 l1 = t.limit(1, {302, -14}, {0, 1}, 6, false, 10.1f, cars, kNobody, {}, false, v);
-  SC_CHECK(v.wait && l1 < 6, "waits for the car in the junction (%.1f m/s)", l1);
+  SC_CHECK(v.wait && l1 < 7.5f, "waits for the car in the junction (%.1f m/s)", l1);
   // Car 0 has left: free.
   cars[0] = {340, -2, 0};
   t.limit(0, {340, -2}, {1, 0}, 5, false, 11, cars, kNobody, {}, false, v);

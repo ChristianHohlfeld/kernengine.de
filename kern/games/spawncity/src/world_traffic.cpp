@@ -62,7 +62,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     // The axis: the widest arm (the main road)
     for (const Arm& a : n.arms)
       if (a.width >= wmax) { j.axis = a.dir; break; }
-    const u32 h = static_cast<u32>(static_cast<i32>(n.p.x * 7.0f) * 73856093) ^ static_cast<u32>(static_cast<i32>(n.p.y * 7.0f) * 19349663);
+    const u32 h = static_cast<u32>(static_cast<i32>(n.p.x * 7.0f)) * 73856093u ^ static_cast<u32>(static_cast<i32>(n.p.y * 7.0f)) * 19349663u;
     j.offset = static_cast<f32>(h % 3800) / 100.0f;
     junctions_.push_back(j);
     const i32 id = static_cast<i32>(junctions_.size() - 1);
@@ -143,7 +143,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   if (view.junction < 0) blocked_[car].wait_since = -1;
   if (view.junction >= 0) {
     Junction& j = junctions_[view.junction];
-    const f32 stop = std::fmax(0.0f, view.distance - 1);
+    const f32 stop = std::fmax(0.0f, view.distance - 1.5f);  // the stop line 1.5 m before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
     if (view.light == 2) must_stop = true;

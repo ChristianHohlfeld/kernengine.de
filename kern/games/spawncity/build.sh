@@ -47,6 +47,7 @@ sources = {
     "kern": (web / "kern.mjs").read_text(),
     "app": (web / "app.mjs").read_text(),
     "game": (web / "studio/game.mjs").read_text(),
+    "ui": (here / "web/ui.mjs").read_text(),
     "host": (here / "web/host.mjs").read_text(),
 }
 for name, text in sources.items():
@@ -58,7 +59,7 @@ def strip(text):
     text = re.sub(r'^import \{[^}]*\} from "[^"]+";\n', "", text, flags=re.M)
     return re.sub(r"^export (?=(const|let|function|async function|class) )", "", text, flags=re.M)
 b64 = base64.b64encode(wasm.read_bytes()).decode()
-bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "host"))
+bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')

@@ -13,7 +13,7 @@ using weapons::Id;
 
 namespace {
 constexpr f32 kGrenadeFuse = 2.5f, kGrenadeThrow = 14;  // hand_grenade.mjs
-constexpr f32 kGuidedTurn = 2.6f;                       // guided_missile.mjs: steered by the camera
+constexpr f32 kGuidedTurnG = 2.2f;                      // guided_balance.mjs turnG: lateral acceleration limit
 bool hitscan_on_foot(Id id) { return id == Id::smg || id == Id::glock || id == Id::sniper; }
 
 struct Loadout { Id id; i32 magazine, reserve; };
@@ -150,7 +150,7 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   p.by_player = by_player;
   p.ignore = ignore;
   p.gravity = id == Id::grenade_launcher || id == Id::hand_grenade || id == Id::jet_bomb;
-  p.fuse = id == Id::hand_grenade ? kGrenadeFuse : 12;
+  p.fuse = id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : 12;
   p.guided = id == Id::drone_guided;
   projectiles_.push_back(p);
   const char* snd = id == Id::hand_grenade || id == Id::jet_bomb ? "builtin:jump" : "builtin:launcher";
@@ -172,7 +172,9 @@ void Game::update_projectiles(f32 dt) {
       const f32 speed = kern::length(p.vel);
       const Vec3 want = kern::normalize(goal - p.pos, p.vel * (1.0f / std::fmax(1e-3f, speed)));
       const Vec3 cur = p.vel * (1.0f / std::fmax(1e-3f, speed));
-      const Vec3 turned = kern::normalize(cur + (want - cur) * clampf(kGuidedTurn * dt, 0, 1), cur);
+      const f32 max_turn = kGuidedTurnG * kG / std::fmax(1.0f, speed) * dt;  // rad this step
+      const f32 ang = std::acos(clampf(kern::dot(cur, want), -1, 1));
+      const Vec3 turned = ang <= max_turn || ang < 1e-5f ? want : kern::normalize(cur + (want - cur) * (max_turn / ang), cur);
       p.vel = turned * speed;
     }
     if (p.gravity) p.vel.z -= kG * dt;
