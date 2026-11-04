@@ -51,7 +51,7 @@ Startparameter (Query-String):
 | Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
 | Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (schaltet auf das Ziel am Fadenkreuz auf und startet; 5 s Nachladen) | RB feuern, Y wechseln | FEUER, Waffenknopf |
 | Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
-| Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **H** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
+| Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **O** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
 (Winkelmodus mit Gashebel). Einen reinen Acro-Modus hat die SpawnCity-Firmware nicht
