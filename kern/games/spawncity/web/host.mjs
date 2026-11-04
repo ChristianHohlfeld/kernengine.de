@@ -14,6 +14,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
@@ -156,7 +157,11 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const local = ev => { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
   const finger = type => ev => {
     if (ev.pointerType === "mouse") return;
-    for (const c of (type === 1 && ev.getCoalescedEvents?.()) || [ev]) { const [x, y] = local(c); e.sc_touch(type, c.pointerId, x, y, c.timeStamp); }
+    for (const c of (type === 1 && ev.getCoalescedEvents?.()) || [ev]) {
+      const [x, y] = local(c);
+      const used = e.sc_touch(type, c.pointerId, x, y, c.timeStamp);
+      mpPage?.touch(type, c.pointerId, x, y, used);  // a long press on free ground pings
+    }
     ev.preventDefault();
   };
   canvas.addEventListener("pointerdown", finger(0));
@@ -189,33 +194,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else audio = null;
   }
 
-  // ---- multiplayer -------------------------------------------------------------------------
-  const mp = params.get("mp");
-  if (mp === "host" || mp === "join") {
-    const adapter = {
-      netPush(from, bytes) {
-        const ptr = e.kern_alloc(Math.max(1, bytes.length));
-        new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);
-        e.sc_net_push(from % 4294967296, Math.floor(from / 4294967296), ptr, bytes.length);
-        e.kern_free(ptr);
-      },
-      netTake() {
-        const ptr = e.sc_net_take();
-        if (!ptr) return null;
-        const head = new Uint32Array(kern.memory.buffer, ptr, 3);
-        const bytes = new Uint8Array(kern.memory.buffer, ptr + 12, head[0]).slice();
-        return {to: head[1] + head[2] * 4294967296, bytes};
-      },
-    };
-    const net = new KernNet(adapter);
-    const room = params.get("room") || "spawncity", relay = params.get("relay") || "";
-    net.onstatus = text => { statusEl.textContent = text; statusEl.hidden = !text; };
-    net.open({kind: relay ? "relay" : "local", room, hosting: mp === "host", url: relay})
-      .then(r => command(mp === "host" ? `net host ${r.self}` : `net join ${r.self} ${r.host}`))
-      .catch(error => { statusEl.hidden = false; statusEl.textContent = "Mehrspieler: " + (error?.message || error); });
-    setInterval(() => net.flush(), 16);
-    window.SpawnCityNet = net;
-  }
+  // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
+  const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
+  mpPage.connect(KernNet);
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
@@ -229,7 +210,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pumpDem();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
-    if (last) hud.update(last, tiles);
+    if (last) { hud.update(last, tiles); mpPage?.update(last); }
     ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);

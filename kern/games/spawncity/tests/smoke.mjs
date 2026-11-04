@@ -388,8 +388,82 @@ async function run({name, url, context, mapped}) {
   await ctx.close();
 }
 
+// ---- multiplayer: two tabs of one browser (BroadcastChannel), host + client --------------------
+async function runMultiplayer() {
+  const ctx = await browser.newContext({viewport: {width: 640, height: 360}});
+  const errors = [];
+  const open = async q => {
+    const p = await ctx.newPage();
+    p.on("pageerror", e => errors.push(e.message));
+    await p.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${q}`);
+    return p;
+  };
+  const room = "smoke" + Math.floor(Math.random() * 1e6);
+  const A = await open(`?offline=1&mute=1&mp=host&room=${room}`);
+  await A.waitForFunction(() => window.SpawnCity?.hud()?.placed, null, {timeout: 300000});
+  // The client starts somewhere else: it must take the host's map origin.
+  const B = await open(`?offline=1&mute=1&mp=join&room=${room}&lat=47.67&lon=9.18`);
+  await B.waitForFunction(() => window.SpawnCity?.hud()?.net?.connected && window.SpawnCity.hud().placed, null, {timeout: 400000});
+  const hud = p => p.evaluate(() => window.SpawnCity.hud());
+  const cmd = (p, c) => p.evaluate(c => window.SpawnCity.command(c), c);
+  const until = (p, fn, arg, ms = 120000) => p.waitForFunction(fn, arg, {timeout: ms}).then(() => true).catch(() => false);
+  check(await until(A, () => window.SpawnCity.hud().mp?.players?.length === 1) && await until(B, () => window.SpawnCity.hud().mp?.players?.length === 1),
+    "[mp] host and client see each other");
+  const ra = JSON.parse(await cmd(B, "net remotes")), rb = JSON.parse(await cmd(A, "net remotes"));
+  check(ra.length === 1 && rb.length === 1, `[mp] poses both ways (${JSON.stringify(ra)} / ${JSON.stringify(rb)})`);
+  check(Math.hypot(rb[0].px - ra[0].px, rb[0].py - ra[0].py) < 40, "[mp] the client spawned near the host (spawn anchor)");
+  const ha = await hud(A), hb = await hud(B);
+  check(ha.mp.index === 1 && hb.mp.index === 2 && ha.mp.color !== hb.mp.color, `[mp] P1 / P2 in their colours (${ha.mp.color} ${hb.mp.color})`);
+  check(await A.evaluate(() => document.querySelectorAll(".mp-plate").length) === 1, "[mp] nameplate of the mate");
+  // Friendly fire is off (world_options.mjs default): a hit does nothing ...
+  const hp0 = (await hud(B)).health;
+  await cmd(A, "weapon 2");
+  check(await cmd(A, "net hit 30") === "hit", "[mp] the round reaches the mate");
+  await A.waitForTimeout(2500);
+  check((await hud(B)).health === hp0, "[mp] friendly fire off: no damage");
+  // ... until everybody agrees (unanimous vote): the client proposes, votes yes; the host proposed it.
+  check(await cmd(B, "mp ff on") === "proposed", "[mp] rule change proposed");
+  check(await until(B, () => window.SpawnCity.hud().mp.votePending), "[mp] the ballot reaches the client");
+  await cmd(B, "mp vote yes");
+  check(await until(A, () => window.SpawnCity.hud().mp.ff) && await until(B, () => window.SpawnCity.hud().mp.ff), "[mp] friendly fire on for both");
+  await cmd(A, "net hit 30");
+  check(await until(B, h0 => window.SpawnCity.hud().health < h0, hp0), "[mp] the authority approved the hit, the victim applied it");
+  check(await until(A, () => window.SpawnCity.hud().mp.hit < 3000), "[mp] hit marker for the shooter");
+  // A second sniper round: down. Kill feed and score board everywhere.
+  await cmd(A, "net hit 30");
+  check(await until(A, () => window.SpawnCity.hud().mp.scores.some(s => s.self && s.k === 1)), "[mp] the kill counts for the host");
+  check(await until(B, () => window.SpawnCity.hud().mp.feed.length > 0), "[mp] kill feed at the victim");
+  check(await until(B, () => !window.SpawnCity.hud().mp.respawnIn && window.SpawnCity.hud().health > 0, null, 300000), "[mp] the victim respawned");
+  // Effects: an explosion of the host is seen by the client.
+  const booms = (await hud(B)).explosions;
+  await cmd(A, "net blast");
+  check(await until(B, b => window.SpawnCity.hud().explosions > b, booms), "[mp] remote explosion");
+  // Ping marker in the world, seen by the mate.
+  check(await cmd(A, "ping") === "set", "[mp] ping set");
+  check(await until(B, () => window.SpawnCity.hud().mp.pings.length === 1), "[mp] the mate sees the ping");
+  // Voice: no microphone headless - the client "speaks" a test tone; the host hears it (in range).
+  await cmd(B, "voice mic");
+  await cmd(B, "voice tone 4");
+  check(await until(A, () => JSON.parse(window.SpawnCity.command("voice state")).speaking > 0, null, 60000), "[mp] proximity voice reaches the host");
+  // Share panel with the join QR code, the big map with a waypoint and guidance.
+  await A.evaluate(() => document.querySelector('#mpBar [data-a="share"]').click());
+  check(await A.evaluate(() => window.__scShareQr?.size >= 21), "[mp] join QR code");
+  await A.screenshot({path: path.join(shots, "mp-A-share.png"), timeout: 900000});
+  await A.evaluate(() => document.getElementById("mpShare")?.remove());
+  await cmd(A, "bigmap open");
+  await cmd(A, "nav set 60 80 Treffpunkt");
+  check(await until(A, () => window.SpawnCity.hud().mp.nav?.name === "Treffpunkt" && !!document.getElementById("mpMap")), "[mp] big map and destination");
+  await A.waitForTimeout(800);
+  await A.screenshot({path: path.join(shots, "mp-A-bigmap.png"), timeout: 900000});
+  await cmd(A, "bigmap close");
+  await B.screenshot({path: path.join(shots, "mp-B.png"), timeout: 900000});
+  check(errors.length === 0, `[mp] no page errors ${errors.length ? JSON.stringify(errors.slice(0, 5)) : ""}`);
+  await ctx.close();
+}
+
 try {
-  const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
+  const only = process.env.SC_SMOKE || "";  // "desktop", "phone" or "mp" runs one of them
+  if (!only || only === "mp") await runMultiplayer();
   if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&demtiles=https://dem.test/{z}/{x}/{y}.png", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});

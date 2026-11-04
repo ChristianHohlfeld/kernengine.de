@@ -9,15 +9,21 @@ namespace sc::net {
 
 namespace {
 
-enum : u16 { kPose = 1, kPoses = 2, kHit = 3, kWelcome = 4 };
+enum : u16 {
+  kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
+  kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
+  kBallotResult = 21, kLeft = 22,
+};
 enum : int { kReliable = 0, kUnreliable = 1 };
-constexpr f64 kSendInterval = 1.0 / 15;  // vs_pose_sync: ~15 Hz
-constexpr u8 kHost = 255;
+constexpr f64 kSendInterval = 0.033;     // lan_vs.mjs SEND_MS
+constexpr f64 kQuietS = 6;               // a player silent this long is gone
+constexpr f64 kScoresEvery = 2;          // the board is re-sent now and then (late joiners)
+constexpr f64 kRulesEvery = 4;           // game_rules_sync.mjs SEND_MS
 
 kern::net::ClientServerConfig config() {
   kern::net::ClientServerConfig c;
-  c.protocol_id = 0x53504157534e3031ull;  // "SPAWSN01": SpawnCity sessions only
-  c.max_clients = 15;
+  c.protocol_id = 0x53504157534e3032ull;  // "SPAWSN02": SpawnCity sessions only
+  c.max_clients = mp::kMaxPlayers - 1;
   kern::net::ChannelConfig reliable;
   reliable.type = kern::net::ChannelType::reliable_ordered;
   kern::net::ChannelConfig unreliable;
@@ -28,60 +34,70 @@ kern::net::ClientServerConfig config() {
   return c;
 }
 
-template <class T>
-void put(std::vector<u8>& b, const T& v) {
-  const u8* p = reinterpret_cast<const u8*>(&v);
-  b.insert(b.end(), p, p + sizeof(T));
-}
-template <class T>
-bool get(const std::vector<u8>& b, std::size_t& at, T& v) {
-  if (at + sizeof(T) > b.size()) return false;
-  std::memcpy(&v, b.data() + at, sizeof(T));
-  at += sizeof(T);
-  return true;
-}
-
-std::vector<u8> pack_hit(const Hit& h) {
+struct W {
   std::vector<u8> b;
-  put(b, h.target);
-  put(b, h.damage);
-  put(b, h.from);
-  return b;
-}
-bool unpack_hit(const std::vector<u8>& b, Hit& h) {
+  template <class T> W& put(const T& v) { const u8* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
+  W& bytes(const std::vector<u8>& v) { put(static_cast<u16>(v.size())); b.insert(b.end(), v.begin(), v.end()); return *this; }
+};
+struct R {
+  const std::vector<u8>& b;
   std::size_t at = 0;
-  return get(b, at, h.target) && get(b, at, h.damage) && get(b, at, h.from);
+  bool ok = true;
+  template <class T> T get() {
+    T v{};
+    if (at + sizeof(T) > b.size()) { ok = false; return v; }
+    std::memcpy(&v, b.data() + at, sizeof(T));
+    at += sizeof(T);
+    return v;
+  }
+  std::vector<u8> bytes() {
+    const u16 n = get<u16>();
+    if (!ok || at + n > b.size()) { ok = false; return {}; }
+    std::vector<u8> v(b.begin() + static_cast<std::ptrdiff_t>(at), b.begin() + static_cast<std::ptrdiff_t>(at + n));
+    at += n;
+    return v;
+  }
+};
+
+bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6f && std::fabs(v.y) < 1e6f && std::fabs(v.z) < 1e5f; }
+
+std::vector<u8> pack_hit(const Hit& h) { return W().put(h.target).put(h.by).put(h.weapon).put(h.zone).put(h.damage).put(h.from).b; }
+bool unpack_hit(const std::vector<u8>& b, Hit& h) {
+  R r{b};
+  h.target = r.get<u8>(); h.by = r.get<u8>(); h.weapon = r.get<u8>(); h.zone = r.get<u8>(); h.damage = r.get<f32>(); h.from = r.get<Vec3>();
+  return r.ok && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 100 && sane(h.from);
+}
+std::vector<u8> pack_fx(const Fx& f) { return W().put(f.kind).put(f.owner).put(f.p).put(f.dir).put(f.a).b; }
+bool unpack_fx(const std::vector<u8>& b, Fx& f) {
+  R r{b};
+  f.kind = r.get<u8>(); f.owner = r.get<u8>(); f.p = r.get<Vec3>(); f.dir = r.get<Vec3>(); f.a = r.get<f32>();
+  return r.ok && f.kind <= Fx::rocket && sane(f.p) && sane(f.dir) && std::isfinite(f.a);
 }
 
 }  // namespace
 
 std::vector<u8> pack(const PlayerState& s) {
-  std::vector<u8> b;
-  put(b, s.slot);
-  put(b, static_cast<u8>(s.mode));
-  put(b, s.color);
-  put(b, s.flags);
-  put(b, s.position);
-  put(b, s.velocity);
-  put(b, s.rotation);
-  put(b, s.pilot);
-  put(b, s.yaw);
-  put(b, s.pitch);
-  put(b, s.speed);
-  put(b, s.health);
-  put(b, s.stars);
-  put(b, s.weapon);
-  return b;
+  W w;
+  w.put(s.slot).put(static_cast<u8>(s.mode)).put(s.color).put(s.flags).put(s.t_ms).put(s.position).put(s.velocity).put(s.rotation).put(s.avatar).put(s.avatar_yaw);
+  if (s.flags & kDroneOut) w.put(s.drone_pos).put(s.drone_rot);
+  if (s.flags & kJetOut) w.put(s.jet_pos).put(s.jet_rot);
+  w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon);
+  return w.b;
 }
 
 bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
-  u8 mode = 0;
-  if (!(get(b, at, s.slot) && get(b, at, mode) && get(b, at, s.color) && get(b, at, s.flags) && get(b, at, s.position) && get(b, at, s.velocity) &&
-        get(b, at, s.rotation) && get(b, at, s.pilot) && get(b, at, s.yaw) && get(b, at, s.pitch) && get(b, at, s.speed) && get(b, at, s.health) && get(b, at, s.stars) &&
-        get(b, at, s.weapon)))
-    return false;
-  if (mode > static_cast<u8>(PlayerMode::parachute)) return false;
+  R r{b, at};
+  s.slot = r.get<u8>();
+  const u8 mode = r.get<u8>();
+  s.color = r.get<u8>(); s.flags = r.get<u16>(); s.t_ms = r.get<u32>();
+  s.position = r.get<Vec3>(); s.velocity = r.get<Vec3>(); s.rotation = r.get<Quat>(); s.avatar = r.get<Vec3>(); s.avatar_yaw = r.get<f32>();
+  if (s.flags & kDroneOut) { s.drone_pos = r.get<Vec3>(); s.drone_rot = r.get<Quat>(); }
+  if (s.flags & kJetOut) { s.jet_pos = r.get<Vec3>(); s.jet_rot = r.get<Quat>(); }
+  s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>();
+  if (!r.ok || mode > static_cast<u8>(PlayerMode::parachute) || !sane(s.position) || !sane(s.velocity) || !sane(s.avatar) || !std::isfinite(s.health)) return false;
   s.mode = static_cast<PlayerMode>(mode);
+  s.health = clampf(s.health, 0, 100);
+  at = r.at;
   return true;
 }
 
@@ -92,12 +108,14 @@ bool Session::host(u64 self, f64 lon, f64 lat) {
   stop();
   transport_.set_address({self});
   server_ = std::make_unique<kern::net::Server>(transport_, config(), self ^ 0x9e3779b97f4a7c15ull);
-  server_->start(15);
+  server_->start(mp::kMaxPlayers - 1);
   role_ = Role::host;
   self_slot_ = kHost;
   lon_ = lon;
   lat_ = lat;
   have_origin_ = true;
+  scores_.clear();
+  scores_.ensure(kHost);
   return true;
 }
 
@@ -109,6 +127,7 @@ bool Session::join(u64 self, u64 server) {
   connect_pending_ = true;
   role_ = Role::client;
   have_origin_ = false;
+  scores_.clear();
   return true;
 }
 
@@ -118,6 +137,8 @@ void Session::stop() {
   client_.reset();
   server_.reset();
   remotes_.clear();
+  protected_.clear();
+  ballot_ = remote_ballot_ = mp::Ballot{};
   role_ = Role::none;
 }
 
@@ -133,54 +154,375 @@ bool Session::origin(f64& lon, f64& lat) const {
   return true;
 }
 
-void Session::on_pose(const PlayerState& s, f64 time) {
-  if (s.slot == self_slot_) return;
-  for (Remote& r : remotes_)
-    if (r.state.slot == s.slot) {
-      r.state = s;
-      r.received = time;
-      r.fresh = true;
-      return;
-    }
-  Remote r;
-  r.state = s;
-  r.shown = s.position;
-  r.shown_rotation = s.rotation;
-  r.received = time;
-  r.fresh = true;
-  remotes_.push_back(r);
+const Remote* Session::remote(u8 slot) const {
+  for (const Remote& r : remotes_) if (r.state.slot == slot) return &r;
+  return nullptr;
 }
 
-void Session::route_hit(const Hit& h) {
-  if (h.target == self_slot_) { hits_.push_back(h); return; }
-  if (role_ == Role::host && server_) {
-    if (server_->client_connected(h.target)) server_->send(h.target, kReliable, kHit, pack_hit(h));
-  } else if (client_ && client_->connected()) {
-    client_->send(kReliable, kHit, pack_hit(h));  // the host forwards it
+std::vector<u8> Session::roster() const {
+  std::vector<u8> r{self_slot_};
+  for (const Remote& x : remotes_) r.push_back(x.state.slot);
+  std::sort(r.begin(), r.end());
+  r.erase(std::unique(r.begin(), r.end()), r.end());
+  return r;
+}
+
+u32 Session::color_of(u8 slot) const {
+  const std::vector<u8> r = roster();
+  std::vector<std::string> ids;
+  for (u8 s : r) ids.push_back(std::to_string(s));
+  const std::vector<u32> c = mp::assign_colors(ids);
+  for (std::size_t i = 0; i < r.size(); ++i) if (r[i] == slot) return c[i];
+  return mp::kPalette[mp::hash_id(std::to_string(slot)) % mp::kPalette.size()];
+}
+
+u32 Session::index_of(u8 slot) const {
+  // The host is P1 (the oldest), then the clients in slot order.
+  std::vector<u8> r = roster();
+  std::stable_partition(r.begin(), r.end(), [](u8 s) { return s == kHost; });
+  for (std::size_t i = 0; i < r.size(); ++i) if (r[i] == slot) return static_cast<u32>(i + 1);
+  return 0;
+}
+
+bool Session::protected_now(u8 slot, f64 now) const {
+  for (const auto& [s, until] : protected_) if (s == slot && now < until) return true;
+  return false;
+}
+
+Vec3 Session::focus_of(u8 slot) const {
+  if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
+  const Remote* r = remote(slot);
+  if (!r) return {};
+  return r->state.mode == PlayerMode::foot || r->state.mode == PlayerMode::drone ? r->person_shown : r->shown;
+}
+
+f32 Session::hp_of(u8 slot) const {
+  if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
+  const Remote* r = remote(slot);
+  return r ? (r->state.flags & kDead ? 0 : r->state.health) : 0;
+}
+
+// ---- routing ------------------------------------------------------------------------------------
+
+void Session::to_client(u8 slot, int ch, u16 type, const std::vector<u8>& data) {
+  if (role_ == Role::host && server_ && slot < server_->max_clients() && server_->client_connected(slot)) server_->send(slot, ch, type, data);
+}
+void Session::to_all(int ch, u16 type, const std::vector<u8>& data, u8 except) {
+  if (role_ != Role::host || !server_) return;
+  for (int c = 0; c < server_->max_clients(); ++c)
+    if (c != except && server_->client_connected(c)) server_->send(c, ch, type, data);
+}
+void Session::to_host(int ch, u16 type, const std::vector<u8>& data) {
+  if (role_ == Role::host) dispatch(kHost, type, data);
+  else if (client_ && client_->connected()) client_->send(ch, type, data);
+}
+
+void Session::send_fx(Fx f) {
+  if (role_ == Role::none) return;
+  f.owner = self_slot_;
+  to_host(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f));
+}
+void Session::request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from) {
+  if (role_ == Role::none || damage < 1) return;
+  Hit h{target, self_slot_, weapon, zone, clampf(std::round(damage), 1, 100), from};
+  to_host(kReliable, kHitReq, pack_hit(h));
+}
+void Session::report_death(u8 by, u8 weapon, u8 zone) { if (role_ != Role::none) to_host(kReliable, kDeath, W().put(by).put(weapon).put(zone).b); }
+void Session::report_respawn() { if (role_ != Role::none) to_host(kReliable, kRespawn, {}); }
+void Session::send_ping(bool on, Vec3 p, u32 color) { if (role_ != Role::none) to_host(kReliable, kPingMsg, W().put(self_slot_).put(static_cast<u8>(on)).put(p).put(color).b); }
+void Session::send_voice(u32 seq, bool all, const std::vector<u8>& d) {
+  if (role_ != Role::none && !remotes_.empty()) to_host(kUnreliable, kVoice, W().put(self_slot_).put(seq).put(static_cast<u8>(all)).bytes(d).b);
+}
+bool Session::propose_rule(bool ff) {
+  if (role_ == Role::none || roster().size() < 2 || ff == friendly_fire_) return false;
+  to_host(kReliable, kPropose, W().put(static_cast<u8>(0)).put(static_cast<u8>(ff)).b);
+  return true;
+}
+bool Session::vote(bool approve) {
+  if (!remote_ballot_.id || role_ != Role::client) return false;
+  to_host(kReliable, kVote, W().put(remote_ballot_.id).put(static_cast<u8>(approve)).b);
+  vote_text_ = approve ? "JA gesendet" : "NEIN gesendet";
+  remote_ballot_ = mp::Ballot{};
+  return true;
+}
+
+// ---- authority (host) ----------------------------------------------------------------------------
+
+void Session::judge(u8 shooter, const Hit& req) {
+  const std::vector<u8> r = roster();
+  const bool target_known = std::find(r.begin(), r.end(), req.target) != r.end(), shooter_known = std::find(r.begin(), r.end(), shooter) != r.end();
+  f64 until = 0;
+  for (const auto& [s, u] : protected_) if (s == req.target) until = u;
+  const mp::HitVerdict v = mp::judge_hit(target_known, shooter_known, req.target == shooter, friendly_fire_, now_ms(), until, hp_of(req.target));
+  if (v != mp::HitVerdict::applied) return;
+  Hit h = req;
+  h.by = shooter;
+  const std::vector<u8> bytes = pack_hit(h);
+  if (h.target == self_slot_) hits_.push_back(h);
+  else to_client(h.target, kReliable, kHitMsg, bytes);
+  if (shooter != h.target) {
+    if (shooter == self_slot_) confirms_.push_back(h);
+    else to_client(shooter, kReliable, kConfirm, bytes);
   }
 }
 
-void Session::send_hit(const Hit& h) { route_hit(h); }
+void Session::send_scores() {
+  W w;
+  w.put(static_cast<u8>(scores_.rows().size()));
+  for (const mp::Score& s : scores_.rows()) w.put(s.slot).put(s.kills).put(s.deaths);
+  to_all(kReliable, kScores, w.b, kNobody);
+}
 
-void Session::update(f64 time, f32 dt, const PlayerState& me) {
+void Session::send_rules() { to_all(kReliable, kRules, W().put(static_cast<u8>(friendly_fire_)).b, kNobody); }
+
+void Session::send_anchor(u8 slot) {
+  // The largest fresh group in the shared frame; dead or quiet players do not pull.
+  std::vector<Vec2> pts;
+  const Vec3 mine = focus_of(self_slot_);
+  if (!(me_.flags & kDead)) pts.push_back({mine.x, mine.y});
+  for (const Remote& r : remotes_)
+    if (r.state.slot != slot && !(r.state.flags & kDead) && now_ms() - r.received_ms < 3500) { const Vec3 p = focus_of(r.state.slot); pts.push_back({p.x, p.y}); }
+  Vec2 c{mine.x, mine.y};
+  mp::group_spawn_center(pts, c);
+  to_client(slot, kReliable, kAnchor, W().put(Vec3{c.x, c.y, mine.z}).b);
+}
+
+void Session::begin_ballot(bool value) {
+  if (role_ != Role::host || ballot_.id || value == friendly_fire_) return;
+  if (!mp::create_ballot(ballot_, ++ballot_serial_, 0, value, self_slot_, roster(), now_ms())) return;
+  W w;
+  w.put(ballot_.id).put(ballot_.key).put(static_cast<u8>(value)).put(static_cast<u8>(ballot_.members.size()));
+  for (u8 m : ballot_.members) w.put(m);
+  to_all(kReliable, kBallotMsg, w.b, kNobody);
+  char t[96];
+  std::snprintf(t, sizeof t, "FRIENDLY FIRE: %s - Abstimmung 1/%zu", value ? "EIN" : "AUS", ballot_.members.size());
+  vote_text_ = t;
+}
+
+void Session::finish_ballot(mp::Ballot::Status s) {
+  const u8 result = s == mp::Ballot::Status::approved ? 1 : s == mp::Ballot::Status::rejected ? 2 : 3;
+  if (s == mp::Ballot::Status::approved) { friendly_fire_ = ballot_.value; send_rules(); }
+  to_all(kReliable, kBallotResult, W().put(ballot_.id).put(result).b, kNobody);
+  vote_text_ = result == 1 ? "Einstimmig angenommen" : result == 2 ? "Abgelehnt" : "Abstimmung abgelaufen / Spielerwechsel";
+  ballot_ = mp::Ballot{};
+}
+
+void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
+  switch (type) {
+    case kFxMsg: {
+      Fx f;
+      if (!unpack_fx(d, f)) return;
+      f.owner = from;
+      if (from != self_slot_) fx_.push_back(f);
+      to_all(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f), from);
+      return;
+    }
+    case kHitReq: {
+      Hit h;
+      if (unpack_hit(d, h)) judge(from, h);
+      return;
+    }
+    case kDeath: {
+      R r{d};
+      Kill k{from, r.get<u8>(), r.get<u8>(), r.get<u8>()};
+      if (!r.ok) return;
+      const std::vector<u8> ro = roster();
+      if (std::find(ro.begin(), ro.end(), k.by) == ro.end()) k.by = kNobody;
+      scores_.died(k.victim, k.by == kNobody ? -1 : k.by);
+      kills_.push_back(k);
+      to_all(kReliable, kKillMsg, W().put(k.victim).put(k.by).put(k.weapon).put(k.zone).b, kNobody);
+      send_scores();
+      return;
+    }
+    case kRespawn: {
+      const f64 until = now_ms() + mp::kSpawnProtectMs;
+      bool found = false;
+      for (auto& [s, u] : protected_) if (s == from) { u = until; found = true; }
+      if (!found) protected_.push_back({from, until});
+      to_all(kReliable, kProtect, W().put(from).put(static_cast<f32>(mp::kSpawnProtectMs)).b, kNobody);
+      return;
+    }
+    case kPingMsg: {
+      R r{d};
+      r.get<u8>();
+      PingEvent p{from, r.get<u8>() != 0, r.get<Vec3>(), r.get<u32>()};
+      if (!r.ok || !sane(p.p)) return;
+      if (from != self_slot_) pings_.push_back(p);
+      to_all(kReliable, kPingMsg, W().put(from).put(static_cast<u8>(p.on)).put(p.p).put(p.color).b, from);
+      return;
+    }
+    case kVoice: {
+      R r{d};
+      r.get<u8>();
+      VoiceFrame v{from, r.get<u32>(), r.get<u8>() != 0, r.bytes()};
+      if (!r.ok || v.data.size() < 4 || v.data.size() > 800) return;
+      // Only mates in range hear it (proximity_voice.mjs transmit), unless "everywhere".
+      const Vec3 at = focus_of(from);
+      if (from != self_slot_ && (v.everywhere || kern::length(focus_of(self_slot_) - at) <= mp::kVoiceRadius)) voice_.push_back(v);
+      const std::vector<u8> bytes = W().put(from).put(v.seq).put(static_cast<u8>(v.everywhere)).bytes(v.data).b;
+      for (const Remote& x : remotes_)
+        if (x.state.slot != from && (v.everywhere || kern::length(focus_of(x.state.slot) - at) <= mp::kVoiceRadius)) to_client(x.state.slot, kUnreliable, kVoice, bytes);
+      return;
+    }
+    case kPropose: {
+      R r{d};
+      r.get<u8>();
+      const bool value = r.get<u8>() != 0;
+      if (r.ok) begin_ballot(value);
+      return;
+    }
+    case kVote: {
+      R r{d};
+      const u32 id = r.get<u32>();
+      const bool yes = r.get<u8>() != 0;
+      if (!r.ok || !ballot_.id || id != ballot_.id) return;
+      const mp::Ballot::Status s = mp::cast_vote(ballot_, from, yes, roster(), now_ms());
+      if (s == mp::Ballot::Status::pending) {
+        char t[96];
+        std::snprintf(t, sizeof t, "FRIENDLY FIRE: %zu/%zu JA", ballot_.yes.size(), ballot_.members.size());
+        vote_text_ = t;
+      } else {
+        finish_ballot(s);
+      }
+      return;
+    }
+    default: return;
+  }
+}
+
+void Session::deliver(u16 type, const std::vector<u8>& d) {
+  R r{d};
+  switch (type) {
+    case kWelcome: {
+      self_slot_ = r.get<u8>();
+      lon_ = r.get<f64>();
+      lat_ = r.get<f64>();
+      friendly_fire_ = r.get<u8>() != 0;
+      if (r.ok) have_origin_ = true;
+      return;
+    }
+    case kPoseRelay: {
+      PlayerState s;
+      std::size_t at = 0;
+      if (unpack(d, at, s)) on_pose(s);
+      return;
+    }
+    case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
+    case kHitMsg: { Hit h; if (unpack_hit(d, h) && h.target == self_slot_) hits_.push_back(h); return; }
+    case kConfirm: { Hit h; if (unpack_hit(d, h)) confirms_.push_back(h); return; }
+    case kKillMsg: { Kill k{r.get<u8>(), r.get<u8>(), r.get<u8>(), r.get<u8>()}; if (r.ok) kills_.push_back(k); return; }
+    case kScores: {
+      const u8 n = r.get<u8>();
+      std::vector<mp::Score> rows;
+      for (u8 i = 0; i < n && r.ok; ++i) { mp::Score s; s.slot = r.get<u8>(); s.kills = r.get<u16>(); s.deaths = r.get<u16>(); rows.push_back(s); }
+      if (r.ok) scores_.set(rows);
+      return;
+    }
+    case kProtect: {
+      const u8 slot = r.get<u8>();
+      const f32 ms = r.get<f32>();
+      if (!r.ok) return;
+      bool found = false;
+      for (auto& [s, u] : protected_) if (s == slot) { u = now_ms() + ms; found = true; }
+      if (!found) protected_.push_back({slot, now_ms() + ms});
+      return;
+    }
+    case kAnchor: { const Vec3 p = r.get<Vec3>(); if (r.ok && sane(p)) { anchor_ = p; anchor_ready_ = true; } return; }
+    case kPingMsg: {
+      PingEvent p{r.get<u8>(), r.get<u8>() != 0, r.get<Vec3>(), r.get<u32>()};
+      if (r.ok && p.owner != self_slot_ && sane(p.p)) pings_.push_back(p);
+      return;
+    }
+    case kVoice: {
+      VoiceFrame v{r.get<u8>(), r.get<u32>(), r.get<u8>() != 0, r.bytes()};
+      if (r.ok && v.from != self_slot_ && v.data.size() >= 4 && v.data.size() <= 800) voice_.push_back(v);
+      return;
+    }
+    case kRules: { const u8 ff = r.get<u8>(); if (r.ok) friendly_fire_ = ff != 0; return; }
+    case kBallotMsg: {
+      mp::Ballot b;
+      b.id = r.get<u32>(); b.key = r.get<u8>(); b.value = r.get<u8>() != 0;
+      const u8 n = r.get<u8>();
+      for (u8 i = 0; i < n && r.ok; ++i) b.members.push_back(r.get<u8>());
+      if (!r.ok || b.members != roster()) return;  // a different roster: the vote is not ours
+      b.expires_ms = now_ms() + mp::kBallotMs;
+      remote_ballot_ = b;
+      vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt";
+      return;
+    }
+    case kBallotResult: {
+      r.get<u32>();
+      const u8 res = r.get<u8>();
+      remote_ballot_ = mp::Ballot{};
+      vote_text_ = res == 1 ? "Angenommen" : res == 2 ? "Abgelehnt" : "Abstimmung abgebrochen";
+      return;
+    }
+    case kLeft: {
+      const u8 slot = r.get<u8>();
+      remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
+      return;
+    }
+    default: return;
+  }
+}
+
+void Session::on_pose(const PlayerState& s) {
+  if (s.slot == self_slot_) return;
+  const f64 now = now_ms();
+  Remote* r = nullptr;
+  for (Remote& x : remotes_) if (x.state.slot == s.slot) r = &x;
+  if (!r) {
+    remotes_.emplace_back();
+    r = &remotes_.back();
+    r->shown = s.position;
+    r->shown_rotation = s.rotation;
+    r->person_shown = s.avatar;
+    if (role_ == Role::host) { scores_.ensure(s.slot); send_scores(); }
+  }
+  // A mode change or a jump (respawn, new vehicle) starts the timelines over.
+  if (r->state.mode != s.mode || kern::length(r->body.last_position() - s.position) > mp::kTeleportM) r->body.reset();
+  if (kern::length(r->person.last_position() - s.avatar) > mp::kTeleportM) r->person.reset();
+  r->state = s;
+  r->received_ms = now;
+  r->body.push(s.position, s.rotation, s.velocity, true, s.t_ms, now);
+  r->person.push(s.avatar, yaw_quat(s.avatar_yaw), {}, false, s.t_ms, now);
+  if (s.mode == PlayerMode::car || s.mode == PlayerMode::jet) {
+    const Vec3 fwd = s.rotation.rotate(s.mode == PlayerMode::jet ? Vec3{0, 1, 0} : Vec3{1, 0, 0});
+    r->nav.push(s.position, std::atan2(fwd.x, fwd.y), static_cast<u8>(s.mode), now);
+  } else {
+    r->nav.reset();
+  }
+}
+
+void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
   (void)dt;
   if (role_ == Role::none) return;
+  time_ = time;
   me_ = me;
   me_.slot = self_slot_;
+  me_.t_ms = static_cast<u32>(time * 1000);
+  if (protected_now(self_slot_, now_ms())) me_.flags |= kProtected;
   transport_.advance_time(time);
+  const bool tick = time - send_clock_ >= kSendInterval;
+  if (tick) send_clock_ = time;
   if (role_ == Role::host) {
     server_->advance_time(time);
     server_->receive_packets();
     for (const auto& [index, up] : server_->take_events()) {
+      const u8 slot = static_cast<u8>(index);
       if (up) {
-        // Welcome: the slot and the map origin, so the client streams the same city.
-        std::vector<u8> b;
-        put(b, static_cast<u8>(index));
-        put(b, lon_);
-        put(b, lat_);
-        server_->send(index, kReliable, kWelcome, b);
+        // Welcome: the slot, the map origin (everybody streams the same city) and the rules.
+        server_->send(index, kReliable, kWelcome, W().put(slot).put(lon_).put(lat_).put(static_cast<u8>(friendly_fire_)).b);
+        pending_anchor_.push_back(slot);
+        scores_.ensure(slot);
+        send_scores();
+        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
       } else {
-        remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == index; }), remotes_.end());
+        remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
+        scores_.remove(slot);
+        to_all(kReliable, kLeft, W().put(slot).b, kNobody);
+        send_scores();
+        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);
       }
     }
     for (int c = 0; c < server_->max_clients(); ++c) {
@@ -190,55 +532,40 @@ void Session::update(f64 time, f32 dt, const PlayerState& me) {
           if (m->type == kPose) {
             std::size_t at = 0;
             PlayerState s;
-            if (unpack(m->data, at, s)) { s.slot = static_cast<u8>(c); on_pose(s, time); }
-          } else if (m->type == kHit) {
-            Hit h;
-            if (unpack_hit(m->data, h)) route_hit(h);
+            if (unpack(m->data, at, s)) {
+              s.slot = static_cast<u8>(c);
+              if (protected_now(s.slot, now_ms())) s.flags |= kProtected;
+              on_pose(s);
+              // Relay at once (no extra 33 ms): the others' timelines run on the sender's clock.
+              to_all(kUnreliable, kPoseRelay, pack(s), static_cast<u8>(c));
+            }
+          } else {
+            dispatch(static_cast<u8>(c), m->type, m->data);
           }
         }
     }
-    if (time - send_clock_ >= kSendInterval) {
-      send_clock_ = time;
-      // Everybody's pose to everybody (the receiver skips his own).
-      std::vector<u8> all;
-      const std::vector<u8> mine = pack(me_);
-      all.insert(all.end(), mine.begin(), mine.end());
-      for (const Remote& r : remotes_)
-        if (time - r.received < 3) {
-          const std::vector<u8> b = pack(r.state);
-          all.insert(all.end(), b.begin(), b.end());
-        }
-      for (int c = 0; c < server_->max_clients(); ++c)
-        if (server_->client_connected(c)) server_->send(c, kUnreliable, kPoses, all);
-    }
+    // A joining player gets his anchor once his first pose is in (the group is known then).
+    for (std::size_t i = 0; i < pending_anchor_.size();)
+      if (remote(pending_anchor_[i])) { send_anchor(pending_anchor_[i]); pending_anchor_.erase(pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
+      else ++i;
+    if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
+    if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
+    if (time - rules_clock_ > kRulesEvery) { rules_clock_ = time; send_rules(); }
+    if (ballot_.id && (now_ms() >= ballot_.expires_ms || roster() != ballot_.members)) finish_ballot(mp::Ballot::Status::cancelled);
     server_->send_packets();
   } else {
     if (connect_pending_) { client_->connect(server_addr_, time); connect_pending_ = false; }
     client_->advance_time(time);
     client_->receive_packets();
     for (int ch : {kReliable, kUnreliable})
-      while (auto m = client_->receive(ch)) {
-        if (m->type == kWelcome) {
-          std::size_t at = 0;
-          u8 slot = 0;
-          if (get(m->data, at, slot) && get(m->data, at, lon_) && get(m->data, at, lat_)) { self_slot_ = slot; have_origin_ = true; }
-        } else if (m->type == kPoses) {
-          std::size_t at = 0;
-          PlayerState s;
-          while (unpack(m->data, at, s)) on_pose(s, time);
-        } else if (m->type == kHit) {
-          Hit h;
-          if (unpack_hit(m->data, h) && h.target == self_slot_) hits_.push_back(h);
-        }
-      }
-    if (client_->connected() && have_origin_ && time - send_clock_ >= kSendInterval) {
-      send_clock_ = time;
-      client_->send(kUnreliable, kPose, pack(me_));
-    }
+      while (auto m = client_->receive(ch)) deliver(m->type, m->data);
+    if (client_->connected() && have_origin_ && tick && send_pose) { client_->send(kUnreliable, kPose, pack(me_)); ++sent_poses_; }
+    if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
     client_->send_packets();
   }
+  protected_.erase(std::remove_if(protected_.begin(), protected_.end(), [&](const auto& p) { return now_ms() > p.second; }), protected_.end());
   // Players who went quiet are gone.
-  remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return time - r.received > 6; }), remotes_.end());
+  remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
 }
 
 std::string Session::status() const {

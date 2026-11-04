@@ -36,8 +36,10 @@ Startparameter (Query-String):
 | `dem=0` | ohne Höhenkacheln (flaches Gelände) |
 | `demtiles=URL-Vorlage` | andere Terrarium-Höhenquelle (Tests), `{z}/{x}/{y}` |
 | `mute=1` | ohne Ton |
-| `mp=host&room=NAME` / `mp=join&room=NAME` | Mehrspieler: hosten / beitreten (Tabs eines Browsers über BroadcastChannel) |
+| `mp=host&room=NAME` / `mp=join&room=NAME` / `mp=auto` | Mehrspieler: hosten / beitreten / beitreten, sonst hosten (Standard: Tabs eines Browsers über BroadcastChannel) |
+| `net=public` | dazu: öffentlich wie spawncity.de – WebRTC-Datenkanal, Signalisierung über SpawnCitys öffentliche MQTT-Broker (Ende-zu-Ende verschlüsselt), solange kein Kanal steht über die Broker selbst; ohne `room` die eine öffentliche Lobby |
 | `relay=wss://…` | dazu: über das Kern-Relay (`tools/net_relay.mjs`) zwischen Rechnern |
+| `ff=1` | Host: Friendly Fire von Anfang an an (SpawnCity-Standard: aus; „der erste Spieler bestimmt“) |
 
 ## Steuerung
 
@@ -52,6 +54,19 @@ Startparameter (Query-String):
 | Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (folgt der Kamera) | RB feuern, Y wechseln | FEUER, Waffenknopf |
 | Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
 | Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **O** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
+
+Mehrspieler (alle Modi; `voice_control_bindings.mjs`, `ping_marker.mjs`, `world_map_full.mjs`):
+
+| Aktion | Tastatur/Maus | Gamepad | Touch |
+|---|---|---|---|
+| Mikrofon an/aus (Sprachchat in 70 m) | **H** | **R3** antippen (beim Loslassen) | 🎤 MIC |
+| Sprachchat stumm | **K** (in der Drohne ist K Motoren aus) | **R3 + Y** | 🔈 |
+| Überall hörbar (Funk) | – | – | ÜBERALL |
+| Ping-Marker (gleicher Ort: entfernen) | **Z** / mittlere Maustaste | **R3 + D-Pad →** | 0,6 s lang drücken |
+| Große Karte | **M**, Esc schließt | **Menu**; dort LS schieben, LT/RT Zoom, A Wegpunkt, X Ziel löschen, Y Suche, B schließen | KARTE; Tippen = Wegpunkt |
+| Abstimmung JA / NEIN | Knöpfe JA / NEIN | – | JA / NEIN |
+| Öffentliche Lobby | – | – | MULTI |
+| Einladen (QR-Code, Teilen) | – | – | TEILEN |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
 (Winkelmodus mit Gashebel). Einen reinen Acro-Modus hat die SpawnCity-Firmware nicht
@@ -101,6 +116,17 @@ kern/games/spawncity/
     equipment.*   Jetpack, Flug-Logbuch, MusicSynth (Titelmusik, Autoradio)
     game_ui.*     Menü-/Einstellungs-Seite des Spiels: Anwenden der Einstellungen, Pause, RESET, Startort, LIVE GPS
     game_equipment.cpp  Jetpack am Soldaten, Logbuch, Radio, Geräuschkulisse
+
+    net_session.* Mehrspieler-Protokoll: Kerns Client/Server über HostTransport, Posen 30 Hz, der Host
+                  als Autorität (Treffer, Kills, Rang, Regeln, Abstimmung, Spawn-Anker), Effekte,
+                  Pings und Sprache über den Host
+    mp_rules.*    reine Mehrspieler-Logik: Posen-Zeitleiste (Jitter-Puffer), Farben, Schaden je Waffe
+                  und Zone, Regeneration, Respawn, Gruppen-Spawn, Abstimmung, µ-law-Sprache mit
+                  Abstands-Lautstärke, Routen-Hinweise, Karten-Rand, Pings
+    qr_code.*     QR-Encoder (Byte-Modus, Stufe L) für den Beitritts-Link
+    mp_art.*      Pings, fremde Leuchtspuren und Explosionen, Farbakzente fremder Drohnen, Schutzblase
+    game_net.cpp  Mehrspieler im Spiel: eigene Pose, die anderen aus ihren Zeitleisten (auch
+                  geparkte Drohnen und Jets), Treffer, Tod/Respawn, Sprache, Pings, Karte/Navigation, HUD-Daten
     combat_rules.* reine Kampf-/Ereignisregeln (Militär-Eskalation, Flak-Zellen, Luftschlag-Timing,
                   Temperamente, Zombie-Runden, Sandbox-Gegner + Chaos-Punkte, Aufträge/Risikobank, Rennstrecke)
     combat_art.*  prozedurale Modelle: Kampfhubschrauber, Panzer, Flak, Kampfjets, Bomben, Tore,
@@ -111,6 +137,9 @@ kern/games/spawncity/
                   Rennstrecke, Auto-Trümmer, Scope/Headshot, HUD-Teil und Testbefehle
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert),
                   ui.mjs (Menüs, nur DOM), manifest.webmanifest + icon.svg (installierbare App)
+
+  web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
+                  + mp_host.mjs (Transporte, Mikrofon, Mehrspieler-HUD, große Karte, Teilen/QR)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
   build.sh        wasm + Einzeldatei-HTML
 ```
@@ -163,9 +192,49 @@ kern/games/spawncity/
   ab Runde 3 Sprinter). Ab einem Stern kommen Sandbox-Gegner zu Fuß (COP, SWAT, HEAVY mit Rakete).
   Punkte: Chaos-Score mit Combo (`sandbox_game.mjs`) und Aufträge mit Risikobank, die erst beim
   Entkommen gutgeschrieben wird (`gameplay_fun_logic.mjs`).
-* **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
-  verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
-  andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
+* **Mehrspieler** (`vs_multiplayer.mjs`, `lan_vs.mjs`, `vs_pose_sync.mjs`, `vs_combat_presentation.mjs`,
+  `vs_group_spawn.mjs`, `game_rules_sync.mjs`, `mp_fun_hud.mjs`): jeder simuliert seine Welt in der Stadt
+  des Hosts (Kartenursprung im Willkommen). Posen alle 33 ms: der gesteuerte Körper, die Person selbst,
+  dazu geparkte Drohne und Jet (alle sehen die abgestellten Fahrzeuge der anderen). Darstellung über
+  SpawnCitys Zeitleiste auf der Uhr des Senders: Uhrversatz als gleitendes Minimum, 90 ms Verzögerung,
+  Interpolation, höchstens 100 ms Extrapolation, dann Halten; Sprung > 35 m setzt neu an.
+  Die **Autorität ist der Host** (bei SpawnCity der älteste Teilnehmer): er prüft jede Schadensanfrage
+  (Friendly-Fire-Regel – Standard aus –, 2,5 s Spawn-Schutz, schon am Boden), schickt den genehmigten
+  Treffer an das Opfer und eine Trefferbestätigung an den Schützen, zählt Kills/Tode (Killfeed, Tafel),
+  gibt Beitretenden einen Spawn-Anker in der größten Gruppe (65 m, Medoid; Ring 7/10/13 m) und führt die
+  einstimmige Regelabstimmung (30 s, jeder Spielerwechsel bricht ab). Schaden je Runde wie SpawnCity
+  (MP 13, Glock 26, Sniper 95, Fäuste 12, sonst 20; Kopf ×3, Beine ×0,65), Explosionen mit ihrem
+  Flächenschaden. Abweichung: das Opfer wendet den genehmigten Treffer auf Kerns Soldaten an (Kerns Tod
+  und Respawn bleiben lokal) und meldet seinen Tod der Autorität; die Lebenspunkte gehen in der Pose mit.
+  Nach dem Tod Respawn 3–5 m vom Ort (Kern: 3 s), Regeneration nach 5 s ohne Schaden 12 HP/s.
+  Effekte: Leuchtspuren (210 m/s, Farbe des Schützen), Explosionen (Blitz, Partikel, Ton, Wackeln),
+  Einschläge. Polizei und Passanten bleiben lokal (wie in SpawnCity). Ein Kill an einem Mitspieler ist
+  eine Tat (`Crime::player`).
+* **Verbindung** (`lan_vs.mjs`, `direct_udp_peer.mjs`, `mqtt_data_relay.mjs`, `share_button.mjs`,
+  `qr_pairing.mjs`): die Bytes laufen über `sc_net_push`/`sc_net_take`; `web/mp_host.mjs` trägt sie
+  per BroadcastChannel, Kern-Relay oder – wie spawncity.de – öffentlich: WebRTC-Datenkanal (ungeordnet,
+  ohne Wiederholung, also UDP-artig; STUN Cloudflare/Google), Signalisierung über SpawnCitys öffentliche
+  MQTT-Broker (shiftr.io, EMQX, Mosquitto, HiveMQ), jede Nachricht ECDH-P-256/AES-GCM-versiegelt;
+  bis ein Kanal steht, gehen die versiegelten Datagramme über die Broker. MULTI führt in die eine
+  öffentliche Lobby (beitreten, sonst hosten). TEILEN zeigt den Beitritts-Link als QR-Code (in C++
+  erzeugt) und öffnet das Teilen-Menü des Systems. SpawnCitys zweiter Weg über Nostr-Relays
+  (`nostr_data_relay.mjs`) ist nicht nachgebaut: er braucht Schnorr-Signaturen auf secp256k1, die der
+  Browser nicht mitbringt (eine eigene Krypto-Bibliothek wäre nötig); der MQTT-Weg deckt dasselbe ab.
+  Fällt der Host weg, endet die Runde (SpawnCitys Autoritätswechsel zum nächstältesten ist offen).
+* **Sprachchat** (`proximity_voice.mjs`, `voice_codec.mjs`): das Mikrofon öffnet die Seite erst, wenn
+  der Spieler es einschaltet (H / R3 / Knopf), und schließt es beim Ausschalten. C++ teilt die Samples
+  auf 8 kHz herunter (Schrittweite), µ-law, 640 Samples (80 ms) je Paket; der Host leitet nur an Spieler
+  in 70 m weiter (oder an alle bei „überall“). Beim Hörer rechnet C++ die Lautstärke aus den Posen
+  (1 bis 5 m, 0 ab 70 m; „überall“ ≥ 0,85), plant jedes Paket 30–150 ms voraus und mischt es in die
+  Audioausgabe des Spiels. Der Sprecher bekommt 🎙 am Namensschild.
+* **Karte und Navigation** (`world_map_full.mjs`, `nav_ar_route_math.mjs`, `nav_marker_timeline.mjs`,
+  `nav_route_request_gate.mjs`, `map_peer_edge.mjs`, `mobile_peer_marker_layout.mjs`, `ping_marker.mjs`):
+  Namensschilder (P1…, Entfernung, Leben; außerhalb am Rand mit Pfeil; auf Telefonen weg von den
+  Sticks), Pings (ein Marker je Spieler, 90 s, gleicher Ort entfernt ihn), große Karte aus den gestreamten
+  Straßen mit Mitspielern (außerhalb am Rand), Pings, Jet, Ziel und Route; Wegpunkt per Tippen, Suche über
+  Photon. Die Route rechnet C++ über den Straßengraph (A*); reicht er nicht bis zum Ziel, holt die Seite
+  eine Straßenroute bei routing.openstreetmap.de (nur die neueste Anfrage zählt). Führung: eine Zeile
+  „↗ 1,2 km · Ziel · rechts in 90 m“ und ein Chevron, wo die Route hingeht; Ankunft in 25 m löscht das Ziel.
 
 ## Welt (M3)
 
@@ -332,6 +401,11 @@ kern/games/spawncity/
 
 ## Tests
 
+Mehrspieler-Testbefehle (`SpawnCity.command`): `net remotes`, `net hit N` (Runde auf den ersten
+Mitspieler), `net blast`, `mp ff on|off`, `mp vote yes|no`, `mp state`, `voice mic|mute|all|tone N|state`,
+`ping [x y]`, `bigmap open|close|toggle|follow R|X Y R`, `nav set X Y Name | geo LON LAT Name | clear`,
+`qr TEXT`.
+
 ```sh
 kern/games/spawncity/tests/run_tests.sh          # nativ, ohne GL, ASan/UBSan
 node kern/games/spawncity/tests/smoke.mjs [dir]  # Browser (Playwright, Chromium mit SwiftShader)
@@ -343,7 +417,12 @@ Start, Schweben, Übergang in den Flügelflug, Hochziehen, Kurve, weiche Landung
 (Fahrhöhe, Beschleunigen, Bremsen/Rückwärts, Lenkrichtung, KI-Fahrer), MVT-Decoder und
 OpenMapTiles-Auswertung, das Streaming (Zeitscheiben, Kollision, Entladen, Ersatzstadt) und die
 Wanted-Regeln, den Straßengraph (A*, Pure Pursuit), Treffer und Taten der Leute und Wände bei freier
-Bewegung. Der Smoke-Test lädt die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
+Bewegung. Die Mehrspieler-Tests prüfen die Posen-Zeitleiste, Schaden/Regeln/Abstimmung, µ-law und
+Sprach-Wiedergabe, die Routen-Mathematik, den QR-Encoder und drei Sitzungen (Host + zwei Clients) über
+eine Schleife: Friendly Fire aus, Abstimmung, genehmigter Treffer, Kill und Tafel, Spawn-Schutz, Effekte,
+Pings, Sprache nur in Reichweite. Der Smoke-Test spielt zuerst zwei Tabs (BroadcastChannel): sehen sich,
+Spawn-Anker, Farben, Namensschild, Friendly Fire aus/Abstimmung/Treffer/Kill/Respawn, Explosion, Ping,
+Sprache (Testton), QR-Code, große Karte mit Ziel. Danach lädt er die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
 echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
 Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots.
 
@@ -393,6 +472,12 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
 * Ragdolls; Glassprünge in Fenstern (siehe „Krater und Spuren“).
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
+
+* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
+* Mehrspieler: Autoritätswechsel, wenn der Host geht (heute endet die Runde); Nostr als zweiter
+  öffentlicher Weg; synchronisierte Gebäudezerstörung und Atombombe (`world_sync.mjs`) – Kern-SpawnCity
+  hat beides noch nicht, der Fx-Kanal ist dafür vorbereitet; Mikrofon im Headless-Test nicht prüfbar
+  (der Test spricht mit `voice tone N`). Polizei und Passanten bleiben lokal (wie in SpawnCity).
 * Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
 * Verkehr: mehr Fahrzeugtypen; Fahrer, die beim Carjacking zurückschlagen.
