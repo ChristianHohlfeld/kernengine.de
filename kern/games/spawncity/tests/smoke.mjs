@@ -240,6 +240,25 @@ async function run({name, url, context, mapped}) {
     await shot("3-car");
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
     await shot("3b-car-cockpit");
+    await cmd("cam");
+    // Water (world_water.mjs): the car floats on the lake (buoyancy), the pilot swims.
+    const wet = await cmd("water car");
+    check(wet.startsWith("{"), `[${name}] the car is put on the water (${wet})`);
+    if (wet.startsWith("{")) {
+      const tw0 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2.5, tw0, {timeout: 400000}).catch(() => {});
+      const g = JSON.parse(await cmd("ground")), lake = JSON.parse(wet);
+      check(g.water && g.playerZ > lake.bed + 1.2 && g.playerZ < g.level + 1.5, `[${name}] the car floats (${JSON.stringify(g)})`);
+      check((await hud()).splashes > 0, `[${name}] a splash when it hit the water`);
+      await shot("3c-car-water");
+      await cmd("mode foot");
+      const tw1 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, tw1, {timeout: 400000}).catch(() => {});
+      h = await hud();
+      const gs = JSON.parse(await cmd("ground"));
+      check(h.swimming && Math.abs(gs.playerZ - (gs.level - 0.53)) < 0.3, `[${name}] the pilot swims, head above the water (${JSON.stringify(gs)})`);
+      await shot("3d-swim");
+    }
     await cmd("mode foot");
   }
 

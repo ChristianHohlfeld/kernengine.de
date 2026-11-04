@@ -161,6 +161,19 @@ kern/games/spawncity/
 * **Bodennetz:** 640-m-Blöcke bis 3,2 km (40-m-Knoten); Blöcke nahe dem Spieler als 160-m-Kacheln
   (5 m nah, 20 m weiter); Schürzen gegen Risse zwischen den Stufen. Straßen und Flächen werden neu
   verlegt, wenn sich der Boden darunter ändert (Wasser einer Nachbarkachel, Krater).
+* **Wasser** (`world_water.mjs`, `world_rigid_body_physics.mjs`, `player_walk_mode_v4.mjs`): Seen/Häfen
+  (Polygone) und Flüsse/Kanäle/Bäche (Linien, Breite je Klasse 18/12/4,5 m) aus den Vektorkacheln werden
+  auf ein 4-m-Raster gelegt; der Boden darunter ist ein Becken 2,6 m tief, die Oberfläche liegt 0,18 m
+  unter dem Ufer. Brücken (`brunnel=bridge`) behalten den Boden. Strömung je Zelle aus dem nächsten
+  Wasserlauf (Fluss 1,6, Kanal 0,5, sonst 1,1 m/s, bis 30 m neben dem Ufer abklingend). Kräfte im festen
+  Schritt (kein Box3D-Eingriff): Auftrieb ρ·g·V·Anteil·0,62 aus dem Box-Volumen, Widerstand
+  k = Anteil·(1,6 + 0,9·v)·m·0,35 gegen die Strömung (vertikal ×1,4), Drehdämpfung – für Autos, Bus,
+  Polizei, Jet, Fallschirm; die Drohne bekommt wie in SpawnCity keinen Auftrieb, nur Widerstand.
+  Zu Fuß schwimmt der Spieler (Augen 0,42 m über der Oberfläche, Wasserwiderstand). Spritzer
+  (Partikel + Synth-Klang) beim Eintauchen und bei Explosionen über Wasser (statt Spuren).
+  Oberfläche: ein Netz je 320-m-Abschnitt (volle 64-m-Blöcke als ein Viereck, sonst Zeilenläufe),
+  Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
+  eigene Shader-Erweiterung).
 
 ## Übernommene SpawnCity-Werte (Auszug)
 
@@ -221,7 +234,7 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Carjacking sichtbar aussteigen.
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
-* Wasser mit Auftrieb, Innenräume,
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
 * Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
   mehr Fahrzeugtypen.

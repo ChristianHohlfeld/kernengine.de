@@ -3,15 +3,27 @@
 // Kept apart from game.h so the other modules' headers do not change with it.
 #pragma once
 
+#include <vector>
+
 #include "common.h"
+#include "kern/audio/audio.h"
 
 namespace sc {
 
+/// The world's own synth sounds (splash, animals, voices, horn): Kern's mixer, made once.
+struct WorldSounds {
+  bool ready = false;
+  kern::audio::ClipId splash = 0, splash_small = 0, moo = 0, coo = 0, flap = 0, horn = 0, tow = 0, chatter[4] = {};
+};
+
 struct WorldLife {
   // water (world_water.mjs, world_rigid_body_physics.mjs)
-  f32 swim_since = -1;     // the player swims (on foot in deep water)
+  bool swimming = false;
   u32 splashes = 0;
-  bool in_water[32] = {};  // per body slot: last step in the water (splash on entry)
+  f32 in_water[32] = {};   // per body slot: submerged fraction last step (splash on entry)
+  struct Splash { Vec3 at; f32 size; };
+  std::vector<Splash> pending_splashes;  // found in the fixed step, shown in the frame
+  WorldSounds sounds;
 };
 
 }  // namespace sc
