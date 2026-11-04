@@ -714,6 +714,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   if (pad.active) arbiter_.gamepad_used();
   touch_mode_ = arbiter_.touch();
   if (!touch_mode_ && in.button_pressed(0)) e.request_pointer_lock(true);
+  ui_before_input(e);  // settings: invert mouse Y (game_ui.cpp)
 
   const bool enter = in.pressed(Key::f) || in.pressed(Key::e) || pad.hit(kPadX) || pad_touch_.take_pressed("enter");
   const bool drone_key = in.pressed(Key::v) || pad.hit(kPadDown) || pad_touch_.take_pressed("mode") || pad_touch_.take_pressed("drone");
@@ -741,6 +742,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
     case Mode::jet: jet_input(e, dt); break;
     case Mode::parachute: parachute_input(e, dt); break;
   }
+  ui_after_input(dt);  // settings: curves, inversions, speeds (game_ui.cpp)
 }
 
 PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
@@ -997,6 +999,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   if (dt > 0) fps_ = fps_ * 0.95f + (1.0f / dt) * 0.05f;
   toast_age_ += dt;
   update_net(dt);
+  ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
     city_.update({0, 0, 0}, 8);
     if (city_.ready_at({0, 0, 0})) place_world();
@@ -1007,13 +1010,13 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
       e.set_status(buf);
     }
   }
-  if (world_placed_) {
+  if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     read_input(e, dt);
     update_touch_layout();
     world_->step(dt, play_in_);
     static f32 traffic_clock = 0;
     traffic_clock += dt;
-    if (traffic_clock > 0.5f) { traffic_clock = 0; manage_traffic(); }
+    if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     city_.update(focus_position(), mobile_ ? 3 : 4);
     update_town(dt);
     update_projectiles(dt);
@@ -1218,6 +1221,7 @@ const f32* Game::audio_render(u32 frames) {
 void Game::update_sound(f32 dt) {
   if (!mixer_.ready() || !world_) return;
   bank_->prepare(3);
+  ui_mix_cues();  // settings: shots / steps before GameAudio plays the cues (game_ui.cpp)
   game_audio_->update(*world_, cam_, dt);
   SoundState s;
   if (drone_out_) {
@@ -1255,6 +1259,7 @@ void Game::update_sound(f32 dt) {
     if (d < best) { best = d; s.siren.active = true; s.siren.position = p; s.siren.velocity = world_->actor_velocity(cars_[u.car].actor); }
   }
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
+  ui_mix_audio(s);  // settings: audio sliders (game_ui.cpp)
   fx_.update(s, dt);
 }
 
@@ -1352,11 +1357,13 @@ std::string Game::hud_json() {
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
+  s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   return s + "}";
 }
 
 std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
+  if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);

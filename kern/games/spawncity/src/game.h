@@ -15,6 +15,7 @@
 #include "car.h"
 #include "city_stream.h"
 #include "drone.h"
+#include "game_ui.h"
 #include "jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
@@ -200,6 +201,18 @@ class Game {
   void update_lamps();
   std::string map_json();
 
+  // menus, settings, start, equipment, presentation (game_ui.cpp)
+  bool ui_command(const std::string& cmd, std::string& out);
+  void ui_before_input(kern::Engine& e);
+  void ui_after_input(f32 dt);
+  void ui_apply_settings();
+  void ui_update(f32 dt);
+  void ui_clear_police();
+  void ui_mix_audio(SoundState& s);
+  void ui_mix_cues();
+  void ui_reset();
+  std::string ui_hud_json();
+
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
   void draw_vehicles();
@@ -296,6 +309,8 @@ class Game {
   f64 lon_ = kKonstanzLon, lat_ = kKonstanzLat;
   std::string start_mode_;
   bool mobile_ = false;
+  // menus, settings, start, equipment, presentation (game_ui.h)
+  UiState ui_;
 };
 
 Game& game();

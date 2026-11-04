@@ -131,6 +131,35 @@ kern/games/spawncity/
   verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
   andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
 
+## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
+
+* **Einstellungen** (`settings.*`, `game_ui.cpp`): eine Tabelle im Spiel mit SpawnCitys Werten, Bereichen und
+  Hilfezeilen – Maus (Empfindlichkeit 20–300 %, Y invertieren), zu Fuß (Stick-Kurven, Blicktempo,
+  Totzone, Invertieren), Drohne (Stick-Kurven, Invertieren, Höchstgeschwindigkeit 5–90 km/h,
+  Schwebehöhe), Auto (Lenkung/Gas 55–150 %, 45–180 km/h, rückwärts, Kamera-Abstand/-Höhe), Kamera
+  (FPV-Neigung, Sichtfeld, Third-Person-Abstand, 3D nebeneinander), Ton (Hauptschalter, Drohne,
+  Schüsse, Effekte, Schritte, Fahrzeuge, Umgebung, Musik) und die WELT-Schalter. Die Seite baut ihre
+  Menüs aus `settings schema` und schickt jede Änderung als `set <key> <wert>`; localStorage hält nur
+  eine Kopie, die beim Start wieder abgespielt wird (`settings values`, `get <key>`, `settings reset [bereich]`).
+* **WELT** (`world_options.mjs`): Leute, Verkehr und Polizei gibt es nicht, wenn sie aus sind (keine
+  Körper, keine KI); Jetpack; Friendly Fire (Standard aus, wie SpawnCity: Treffer und Explosionen
+  erreichen andere Spieler nur, wenn es an ist). Hunde, Katzen, Vögel, Zombies, Militär und Flak hat das
+  Spiel auf Kern noch nicht – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+* **Menüs** (`web/ui.mjs`, nur DOM): Titelbildschirm (START, WELT, EINSTELLUNGEN, NEU / CHANGELOG;
+  automatisierte Browser und `?autostart=1` überspringen ihn, `?menu=1` erzwingt ihn), Pausemenü (Esc,
+  MENÜ, Pad-Menütaste, Verlassen des Pointer-Locks), „Zurück zum Hauptmenü?“ (Enter/Y – Esc/N),
+  EXIT / MENÜ / RESET oben links, Steuerung der Menüs mit dem Pad (D-Pad, A, B). Solange ein Menü offen
+  ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
+* **RESET** (`game_reset.mjs`, allein): zurück zum Start – Startmodus und Startpunkt, Pistole, volle
+  Gesundheit, keine Fahndung, Polizei weg, Fahrzeuge repariert, neue Passanten.
+* **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
+  verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
+  Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als
+  Vorschlag im öffentlichen GitHub-Repository öffnen.
+* **App/Vollbild** (`pwa_fullscreen_policy.mjs`): `web/manifest.webmanifest` (Vollbild, quer) mit
+  eigenem SVG-Symbol; auf Touch-Geräten startet START das Vollbild, außer die installierte App läuft
+  schon im eigenen Fenster.
+
 ## Übernommene SpawnCity-Werte (Auszug)
 
 | Bereich | Werte | Quelle |

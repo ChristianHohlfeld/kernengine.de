@@ -12,6 +12,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {installSpawnCityUi} from "./ui.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 const SC_MAX_FETCHES = 4;
@@ -186,6 +187,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
+  // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
+  const ui = installSpawnCityUi({command, params, canvas, statusEl});
   let frames = 0, last = null;
   const tick = () => {
     frames++;
@@ -194,8 +197,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) hud.update(last, tiles);
+    ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
+  };
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
@@ -222,9 +227,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     // The player in the middle: an arrow pointing up.
     mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
   }, 250);
-  };
   requestAnimationFrame(tick);
-  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles};
+  window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles, ui};
   return window.SpawnCity;
 }
 

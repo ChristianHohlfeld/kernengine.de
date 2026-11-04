@@ -175,6 +175,31 @@ async function run({name, url, context, mapped}) {
   const map = JSON.parse(await cmd("map"));
   check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
 
+  // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
+  {
+    const schema = JSON.parse(await cmd("settings schema"));
+    check(schema.some(o => o.key === "world.jetpack") && schema.some(o => o.key === "car.maxKmh"), `[${name}] settings table (${schema.length} rows)`);
+    check(await cmd("set mouse.sensitivity 150") === "ok" && await cmd("get mouse.sensitivity") === "150", `[${name}] a setting changes`);
+    await cmd("set mouse.sensitivity 100");
+    await cmd("pause 1");
+    const tp = (await hud()).t;
+    await page.waitForTimeout(1500);
+    h = await hud();
+    check(h.ui?.paused && Math.abs(h.t - tp) < 0.05, `[${name}] paused: the game stands (${tp} -> ${h.t})`);
+    await cmd("pause 0");
+    await page.evaluate(() => window.SpawnCity.ui.open("settings"));
+    check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
+    await shot("0-settings");
+    await page.keyboard.press("Escape");
+    check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
+    await cmd("set world.people 0");
+    await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
+    check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
+    await cmd("set world.people 1");
+    const resets = (await hud()).ui.resets;
+    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+  }
+
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});

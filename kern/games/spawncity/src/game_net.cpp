@@ -101,7 +101,7 @@ void Game::update_net(f32 dt) {
 }
 
 bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
-  if (!net_.active()) return false;
+  if (!net_.active() || !ui_.settings.on(Opt::world_friendly_fire)) return false;  // world_options.mjs FRIENDLY FIRE (off by default)
   const Vec3 seg = to - from;
   const f32 l2 = std::fmax(1e-6f, kern::dot(seg, seg));
   i32 best = -1;
@@ -139,7 +139,7 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
 }
 
 void Game::blast_remotes(Vec3 at, f32 radius, f32 damage) {
-  if (!net_.active()) return;
+  if (!net_.active() || !ui_.settings.on(Opt::world_friendly_fire)) return;  // world_options.mjs FRIENDLY FIRE
   for (const net::Remote& r : net_.remotes()) {
     if (r.state.flags & 1) continue;
     const f32 d = kern::length(r.shown - at);
