@@ -267,6 +267,36 @@ async function run({name, url, context, mapped}) {
     while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
     const jp = JSON.parse(await cmd("jetpack"));
     check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  // Combat and events (game_military.cpp, game_events.cpp).
+  {
+    const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
+    const before = (await hud()).explosions;
+    check(await cmd("strike 0 150") === "ok", `[${name}] air strike called`);
+    await until(() => window.SpawnCity.hud().combat.jets > 0);
+    check((await hud()).combat.jets === 2, `[${name}] the strike pair is in the air`);
+    await until(b => window.SpawnCity.hud().explosions > b + 3, 300000, before);
+    await shot("1c-airstrike");
+    check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
+    check(await cmd("military start") === "on", `[${name}] military called in`);
+    await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
+    let c = (await hud()).combat;
+    check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers`);
+    await shot("1d-military");
+    check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
+    await cmd("military on");
+    check(await cmd("enemy swat") === "SWAT" && (await hud()).combat.enemies === 1, `[${name}] a sandbox enemy`);
+    check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
+    await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
+    c = (await hud()).combat;
+    check(c.zombies.night && c.zombies.round === 1 && c.zombies.alive > 0, `[${name}] zombies rise (${JSON.stringify(c.zombies)})`);
+    await shot("1e-zombies");
+    await cmd("zombies day");
+    const prov = await cmd("provoke");
+    check(/^(gun|knife|fists) /.test(prov), `[${name}] a passer-by squares up (${prov})`);
+    check(await cmd("race") === "on" && (await cmd("race fly")).startsWith("0 lap 1"), `[${name}] race track: start gate passed`);
+    check(!!(await hud()).combat.race, `[${name}] race HUD`);
+    await cmd("race");
+    check((await cmd("contract")).startsWith("AUFTRAG"), `[${name}] next contract`);
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.

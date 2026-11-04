@@ -284,6 +284,7 @@ bool Game::start(kern::Engine& e) {
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
+  if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
   init_weapons();
   foot_touch_.set_controller(&soldier_controller_, true, true);
@@ -390,6 +391,8 @@ void Game::toggle_drone() {
     return;
   }
   if (mode_ != Mode::foot) return;
+  // player_vitals_logic.mjs: a shot-down drone is replaced after 8 s
+  if (world_->sim_time() < combat_.drone_ready_at) { toast_ = "Neue Drohne in " + std::to_string(static_cast<int>(std::ceil(combat_.drone_ready_at - world_->sim_time()))) + " s"; toast_age_ = 0; return; }
   const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
   const f32 yaw = world_->camera_yaw() * kDeg;
   // 2.9 m ahead of the pilot; if something hangs over that spot (a wing, a balcony) or stands
@@ -1027,6 +1030,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   update_camera(e, dt);
@@ -1038,6 +1042,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
+  draw_combat();
   update_sound(dt);
 }
 
@@ -1369,6 +1374,7 @@ std::string Game::hud_json() {
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
   else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
+  combat_hud(s);  // "combat":{...} (game_events.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
@@ -1378,6 +1384,7 @@ std::string Game::hud_json() {
 std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
   if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
+  if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);

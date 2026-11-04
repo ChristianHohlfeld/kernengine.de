@@ -14,8 +14,10 @@
 
 #include "car.h"
 #include "city_stream.h"
+#include "combat_art.h"
 #include "drone.h"
 #include "game_ui.h"
+#include "game_combat.h"
 #include "jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
@@ -199,6 +201,38 @@ class Game {
   void blast_remotes(Vec3 at, f32 radius, f32 damage);
   void draw_remote_people();
   void draw_remote_vehicles();
+  // combat and events (game_military.cpp, game_events.cpp) - hooked into update, draw, hud_json,
+  // command, handle_shots and explosion
+  void update_combat(f32 dt);
+  void draw_combat();
+  void combat_hud(std::string& s);
+  bool combat_command(const std::string& cmd, std::string& out);
+  bool combat_shot(kern::game::ShotEvent& s);  // true: a combat target took the bullet
+  void combat_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
+  bool combat_target(Vec3& at, Vec3& vel, bool& drone, bool& air) const;  // what enemies shoot at
+  void hurt_player(f32 foot_damage, f32 vehicle_damage, Vec3 from);
+  void combat_tracer(Vec3 a, Vec3 b, Vec3 color = {3, 2.4f, 1.2f});
+  void combat_banner(const std::string& text);
+  bool spawn_unseen(Vec3 p, f32 height) const;
+  void update_military(f32 dt);
+  void spawn_heli(Vec3 target);
+  bool spawn_tank(Vec3 target);
+  i32 spawn_squad(Vec3 target, i32 n);
+  void step_heli(Heli& h, f32 dt);
+  void step_tank(Tank& t, f32 dt);
+  void step_soldier(SoldierAi& s, f32 dt);
+  void update_flak(f32 dt);
+  void update_jets(f32 dt);
+  void launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset);
+  bool air_strike(Vec3 target);
+  void update_fighters_back(f32 dt);
+  void update_zombies(f32 dt);
+  void update_enemies(f32 dt);
+  void update_scores(f32 dt);
+  void update_race();
+  void update_debris(f32 dt);
+  void draw_military();
+  void draw_events();
   // world dressing
   void update_lamps();
   std::string map_json();
@@ -285,6 +319,8 @@ class Game {
   // the town
   People people_;
   PeopleArt people_art_;
+  CombatArt combat_art_;
+  CombatState combat_;
   RoadGraph roads_;
   std::vector<PoliceUnit> units_;
   PoliceDrone pdrones_[5];
