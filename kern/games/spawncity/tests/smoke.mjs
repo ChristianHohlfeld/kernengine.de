@@ -280,6 +280,8 @@ async function run({name, url, context, mapped}) {
     while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
     const jp = JSON.parse(await cmd("jetpack"));
     check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  }
+
   // Combat and events (game_military.cpp, game_events.cpp).
   {
     const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
