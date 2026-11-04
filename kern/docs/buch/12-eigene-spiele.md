@@ -25,12 +25,12 @@ ist. Die Bedienung der einzelnen Panels steht in [Kapitel 11](11-studio.md).
 ### Schritt 1: Ein neues Level
 
 1. Studio öffnen (auf https://kernengine.de/ unter `/editor/` oder `generated/studio.html`).
-2. **Datei › Neues Level...** (File › New Level...), Vorlage **Grundformen** (Basic), **Erstellen**
+2. **Datei › Neues Level...** (File › New Level...), Vorlage **Basis** (Basic), **Erstellen**
    (Create). Das Level hat einen Boden (40 × 40 m), Sonne, Himmel und einen Würfel.
 3. In den **Welteinstellungen** (World Settings) den **Level-Name** (Level name) und den **Spieltitel**
    (Game title) setzen, etwa „Orb Garden".
 
-Warum **Grundformen** und nicht **Leer** (Empty): **Leer** hat gar nichts, also auch keinen Boden, auf dem
+Warum **Basis** und nicht **Leer** (Empty): **Leer** hat gar nichts, also auch keinen Boden, auf dem
 eine Figur stehen kann. Die **Welteinstellungen** haben zwar das Feld **Endloser Boden** (Endless ground);
 ein sichtbarer Boden mit eigener Farbe und Kollision ist für den Anfang aber anschaulicher.
 
@@ -121,7 +121,7 @@ Die Spieler-Controller, Pickups und Trigger bringen ihre Geräusche bereits mit 
 
 - **Spielen** oder Alt+P: spielen. **F8** verlässt die Figur, die Welt läuft weiter, man kann sich
   umsehen; noch einmal F8 übernimmt sie wieder.
-- **Spielen › Anzahl der Spieler › 2 Players (listen server)** (Play › Number of Players › 2 Players
+- **Spielen › Anzahl der Spieler › 2 Spieler (Listen-Server)** (Play › Number of Players › 2 Players
   (listen server)) testet das Level mit zwei Spielern in zwei Viewports.
 - Fehler im Level (etwa ein Gelenk, das auf einen gelöschten Actor zeigt) verhindern das Spielen und stehen
   im **Ausgabeprotokoll** (Output Log).
@@ -347,7 +347,7 @@ Der Statuskanal bringt Text auf die Seite; `hello/index.html` zeigt ihn unten li
 ```
 
 Ein 8×8-Raster im Abstand von 3 m. `Mat4::trs` baut die Matrix aus Translation, Rotation (Quaternion um Z)
-und Skalierung; jede dritte Kiste ist höher. Die Matrix ist spaltenweise gespeichert und wird direkt in
+und Skalierung; die Höhe wechselt in drei Stufen (1-, 1,6- und 2,2-fach). Die Matrix ist spaltenweise gespeichert und wird direkt in
 den Instanzpuffer kopiert.
 
 ```cpp
@@ -488,7 +488,7 @@ steht in [Kapitel 5](05-szene-und-geometrie.md).
 
 **Kollision ohne Physik-Engine.** Das Beispiel nutzt bewusst kein Box3D. Jedes Gebäude ist ein Polygon in
 einem 40-m-Gitter; `City::collide` schiebt den Kreis des Autos (Radius 1,7 m) aus allen Polygonen der
-Nachbarzellen heraus und spiegelt die Geschwindigkeit an der Wand. Der Stadtrand ist eine feste Grenze.
+Nachbarzellen heraus, nimmt die Geschwindigkeit in die Wand weg und gibt einen Rückprall von 35 %. Der Stadtrand ist eine feste Grenze.
 
 **Fahrphysik** (`drive`). Gas beschleunigt mit 24 m/s² vorwärts, Rückwärtsgas (Taste S: 0,7 × 30) mit 21 m/s², Boost mit
 zusätzlich 42 m/s²; die Höchstgeschwindigkeit ist 36 m/s, mit Boost 60 m/s. Seitliche Geschwindigkeit

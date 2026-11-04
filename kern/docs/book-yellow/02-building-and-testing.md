@@ -1,242 +1,335 @@
 # 2 Build, Check, Prove
 
-> **Your level:** This is where source code becomes a running engine – and you'll see how Kern keeps
-> an eye on itself: with thousands of checks, a robot that clicks its way through Studio, and a
+> **Your level:** Here, source code turns into a running engine – and you see how Kern watches
+> over itself: with thousands of checks, a robot that clicks its way through Studio, and a
 > fingerprint that gives away every wrong bit.
 
+> **Words you need:**
+> - **Source code** – the text of a program, the way people write it.
+> - **Compiler** – a translator program: it turns source code into commands a computer can carry
+>   out.
+> - **Module** – the fully translated file of Kern that the browser loads.
+> - **Processor** – the computer's calculating unit. Modern processors have several **cores** that
+>   can calculate at the same time. Don't mix them up: these processor cores have nothing to do
+>   with the engine Kern; the names just happen to sound almost the same.
+> - **Memory** – the computer's workspace, where a program puts down its numbers.
+> - **Actor** – a thing in a Studio level, such as a cube, a lamp or the duck.
+> - **GitHub** – a website where Kern's source code lives and from which changes are checked and
+>   published.
+
 Imagine you change one line in the physics. Does the Micro Duck now stumble after three seconds?
-Does Studio still run on a phone? Does the Mac still compute like the PC? Nobody can check all that
-by hand after every change. That's why pros write **tests**: programs that do it every time, in
-minutes.
+Does Studio still run on a phone? Does the Mac still calculate like the PC? Nobody can check that
+by hand after every change. That's why pros write **tests**: programs that do it automatically,
+every time, in minutes.
 
-## 2.1 The Big Picture
+## 2.1 The Overview
 
-For **building**, there are three scripts: `kern/build.sh` (a WebAssembly module),
-`tools/build_studio.sh` (Studio as a single file) and `kern/tools/lehrer.sh` (the Lehrer as a
-program). For **checking**, there are the unit tests `kern/tests/run.sh`, two tests under Node
-(logic and the Lehrer in the module) and the browser test. The shortest route:
+Between the source code and the engine in your browser lie two jobs: **building** and
+**checking**. Building means translating the source code into finished files. Checking means
+proving with tests that these files actually work correctly.
 
-```sh
-export WASI_SDK=/opt/wasi-sdk-25.0-x86_64-linux
-tools/build_studio.sh
-CXX=g++ CC=gcc kern/tests/run.sh
+> **Picture it like this:** a bakery. The recipe is the source code. The oven turns it into a
+> cake – that's building. Before the cake goes into the shop, a taster tries every piece – those
+> are the tests.
+
+```mermaid
+%% Caption: Build and check: the finished files become the website and the tests at the same time (more in 2.10)
+flowchart TB
+  Q["source code"] --> B["build"]
+  B --> F["finished files"]
+  F --> T["tests"]
+  F --> W["website"]
 ```
 
-Line 1 says where the toolkit is, line 2 builds `generated/studio.html`, which then runs offline
-with a double-click, and line 3 starts all the unit tests. For development, you serve the
-repository folder with a small web server and open `kern/web/studio/index.html`.
-`play.html?level=orbRun` plays a level without the editor (also `physicsLab`, `shootingRange`,
-`microDuck`, `basic`). `kern/build.sh --app` builds the C++ examples, for example
-`kern/examples/hello/hello.cpp` into `hello.wasm`. For the browser test, you first start a
-web server: `python3 -m http.server 8771`.
+Kern builds three things: the module for the browser, all of Studio as one single file, and the
+Lehrer as a separate program. It's checked in three ways: with lots of small tests, with a robot
+that operates Studio in the browser, and with the duck's fingerprint.
 
-## 2.2 The Toolkit
+The exact commands, paths and settings are in the blue book, Chapter 2.
 
-Kern needs **wasi-sdk 25**: the compiler clang, the linker wasm-ld and libraries for WebAssembly,
-no Emscripten. `WASI_SDK` points to the folder (otherwise `/opt/wasi-sdk`). For the tests and the
-Lehrer, a normal compiler is enough (GCC, Clang, Apple clang). On top of that: `python3` for Studio,
-Node (the CI uses Node 22) and Playwright with Chromium for the browser test.
+## 2.2 The Toolbox
+
+A **compiler** is a translator: it reads C++ and writes machine language. For the browser, Kern
+needs a special compiler that writes WebAssembly. For the tests and the Lehrer, which run directly
+on your computer, an ordinary compiler is enough, the kind every programmer has. Kern uses only
+simple, freely available tools for this and no big outside construction kit.
+
+> **For pros:** The toolbox is called wasi-sdk (version 25). Which other programs and versions you
+> need is in the blue book, Chapter 2.
 
 ## 2.3 Building the Module
 
-Without switches, `kern/build.sh` builds the basic set; `--app`, `--physics`, `--game`, `--studio`
-and `--lehrer` add floors ([Chapter 1](01-introduction.md)). Arguments ending in `.cpp` or `.cc` are
-compiled along as game sources; others go to the compiler as options. Variables:
-`KERN_BUILD=debug` optimizes less (the linker still always throws out debug info), `KERN_JOBS`
-controls how many things run in parallel, `KERN_OBJ_CACHE` the cache.
+**Building to order.** When translating, you say which floors from
+[Chapter 1](01-introduction.md) should go into the module: just graphics, plus physics, plus game
+rules, Studio or Lehrer. A game can have its own source code translated along with it.
 
-The options are strict: `-ffp-contract=off` everywhere ([Chapter 3](03-foundations.md)), Box3D on
-the simple scalar path, musl just as strict, C++ without exceptions and RTTI, only what's marked is
-visible to the outside, and anything unused gets thrown out. The module becomes a reactor with a
-1 MiB stack, 32 MiB of starting memory (2 GiB at most) and a growable function table, where the
-logic JIT puts its graphs ([Chapter 9](09-logic.md)). At the very end: `built <out> (<n> bytes)`.
+**Strict rules for translating.** A compiler is normally allowed to cheat a little to get faster,
+for example by merging two calculation steps into one. Kern forbids that. As a result, every
+computer calculates exactly the same. Why two steps instead of one make a difference is something
+you'll work out yourself in [Chapter 3](03-foundations.md).
 
-Each source is compiled in parallel and stored; Studio and the examples share the objects. The key
-of an object contains the source path, the source content and the content of **all** headers.
+For the same reason, the physics does without its turbo path. It would have its own way of
+calculating that uses special commands of some processors to calculate several numbers at once.
+That path doesn't exist in the browser. So Kern switches it off everywhere, and the physics
+calculates the same simple way on every computer.
 
-> **Watch out, trap:** A changed header rebuilds everything. That's on purpose: simple and safe.
+**The cache.** Kern is made of many dozens of source files. Translating all of them takes quite a
+while. So Kern translates each file on its own, many at the same time on all processor cores, and
+puts the result into a **cache**. The next time it builds, Kern checks: has this file changed? If
+not, it takes the finished part from the cache. Only what changed gets translated again. Studio
+and the example games share the finished parts of the engine.
+
+> **Picture it like this:** your homework binder. If one assignment changes, you only copy out
+> that page again, not the whole binder. But if the template that all the pages are based on
+> changes, you redo everything just to be safe.
+
+How does Kern recognize "changed"? A code number, a **hash**, is made from the content of a file
+(more on this in 2.9). If even a single character changes, the code number changes.
+
+> **Watch out, trap:** Some files are used by almost all the others, like the template. If you
+> change a shared file like that, Kern rebuilds everything. That's on purpose: better to wait a
+> minute longer than to keep working with an outdated part.
 
 ## 2.4 Studio in One File
 
-`tools/build_studio.sh` first builds `generated/kern_studio.wasm` (with `--skip-wasm`, it uses an
-existing one). Then a Python part glues everything into one page: the stylesheet, the module as
-base64 text and the four JavaScript files as **one** embedded script. That's why the page runs even
-under strict security rules. `kern.mjs` and `game.mjs` are also inside it as text – Studio uses them
-to write exported games.
+A website normally consists of many files: text, look, programs, pictures. For Studio, all these
+parts, together with the translated module, are packed into **one single** file. For that, the
+module is rewritten into ordinary letters, because it consists of raw numbers, and a website may
+only contain text. That's why Studio even runs without internet with a double-click. Studio also
+puts the building blocks for finished games right into the file, so that it can pack your
+exported game from them.
 
-> **Crazy but true:** If a source contains the characters `</script`, the build stops. The browser
-> would think the embedded script ended right there.
+> **Picture it like this:** an envelope with a letter, photos and craft instructions inside.
+> Whoever has the envelope has everything and doesn't need to order anything else.
+
+> **For pros:** Websites mark program parts with `<script>` at the beginning and `</script>` at
+> the end, like brackets. If this end mark happened to appear in the middle of the packed program,
+> the browser would think it ended there. That's why building stops with a message in that case.
 
 ## 2.5 The Lehrer as a Program
 
-`kern/tools/lehrer.sh` builds `kern_lehrer` for Linux and macOS, x86 and ARM, fully optimized, from
-all sources except Studio and App, plus the WebGL stand-in (the Lehrer doesn't draw anything). With
-`KERN_NATIVE=1`, the compiler uses the processor's best instructions – the result stays the same,
-because `-ffp-contract=off` applies ([Chapter 14](14-lehrer.md), [Chapter 17](17-reference.md)).
+Training the duck takes a long time. That's why the Lehrer exists not only in the browser but also
+as a separate program for computers running Linux (an operating system like Windows) and for Macs.
+As a program, it uses all the processor's cores and doesn't paint a single picture – that saves a
+lot of time. So it can even train on a server, a computer in a data center without a screen.
+
+Here the compiler may use the fastest commands of each processor. Isn't that the cheating that was
+forbidden in 2.3? No. What's forbidden is changing the **calculation steps**, for example merging
+two into one. What's allowed is carrying out the same steps with faster commands. That's why the
+result stays the same bit for bit.
+
+> **Picture it like this:** a math problem. You may write with a faster pen. But you have to do
+> the same calculation steps in the same order and round at the same places. Then the same result
+> is at the bottom as on your desk neighbor's sheet.
 
 ## 2.6 Unit Tests: Thousands of Small Questions
 
-`kern/tests/run.sh` starts all tests; `kern/tests/run.sh micro_duck` starts only those whose name
-contains `micro_duck`. A test is a question with a fixed answer. `CHECK(...)` checks it,
-`CHECK_NEAR(a, b, eps)` checks "roughly equal". At the end it says `<n> checks, <m> failures`, with
-file and line for any failures. Kern wrote its little test framework itself. A few real names:
-`micro_duck_stands_walks_and_turns_on_its_policy`, `lehrer_ppo_learns_to_reach`,
-`net_reliable_channel_under_bad_network`. Everything gets tested, from math to Studio.
+A **unit test** is a question to a small piece of Kern that has exactly one right answer. "What's
+2 + 3?" – "5." If the answer is right, the test passes. Kern has thousands of such checks, from the
+math to Studio. A few questions Kern really asks itself:
 
-**Sanitizers.** For the tests, Kern's code is compiled with **AddressSanitizer**, which notices when
-code reaches past the edge of a memory area, and with **UndefinedBehaviorSanitizer**, which catches
-"undefined behavior" like a number overflow and stops immediately. Box3D and musl run without them.
-On top of that, `-Werror` applies: every warning stops the test build.
+- Does the Micro Duck stand, walk and turn with its network?
+- Does the Lehrer learn a simple task?
+- Does a message arrive in multiplayer mode, even when the network is bad?
 
-> **Picture it like this:** A referee with video replay. During a match you might miss a small
-> foul. The video replay sees every one.
+With decimal numbers, a test sometimes asks "roughly equal?", because computers round (see
+[Chapter 3](03-foundations.md)). That doesn't contradict the "same bit for bit" from Chapter 1:
+here the comparison is with the mathematically **correct** result, not with another computer. An
+example: the test asks "Is 1 : 3 roughly 0.333?" Whether the computer gets exactly 0.3333333 or
+0.3333334 doesn't matter to it. That every computer gets the **same** one of these two numbers is
+checked instead by the fingerprint in 2.9. At the end, the test reports how many checks there were
+and how many failed, with the exact spot in the source code. Kern wrote the small test framework
+itself.
 
-**The GL stand-in.** No browser, no WebGL. `gl_stub.cpp` plays the graphics card and writes down
-what the renderer asks for. That way, the renderer can be tested without a graphics card – even the
-case where the browser loses the graphics card (context loss). The same stub is inside the Lehrer.
+**Extra checkers.** While the tests run, two watchdogs run along, called **sanitizers**:
 
-## 2.7 Logic: Three Paths, One Result
+- The first notices when a program reaches past the edge of its memory area. That's like reading
+  row 11 in a table with 10 rows: something is written there, just not what you're looking for.
+- The second catches forbidden calculations, for example a **number overflow**. That's like a
+  five-digit odometer that suddenly shows 00000 again after 99999.
 
-A logic graph runs in the **interpreter**, as a **JIT** or as **exported C++**
-([Chapter 9](09-logic.md)). All three must deliver the same thing bit for bit. The shared test
-cases are small graphs as JSON in `kern/tests/logic_cases.h`. `run.sh` checks the interpreter and
-(only without a filter) the exported C++; the CI tests the JIT under Node, just like in the
-browser, and on the side measures a million loop iterations in both tiers.
+If either of the two finds something, the test stops immediately. Also, when testing, every
+**warning** from the compiler counts as an error. A warning is a hint from the translator: "This
+looks suspicious."
+
+> **Picture it like this:** a referee with video review. During the game, you might miss a small
+> foul. Video review sees every one.
+
+**The graphics dummy.** The tests run without a browser, so also without a graphics card. A
+**dummy** therefore plays the graphics card: it draws nothing, but writes down exactly what the
+engine asks of it. That way you check whether the engine gives the right commands. The dummy can
+even pretend that the browser briefly took the graphics card away, so you can test whether Kern
+rebuilds everything afterwards. The Lehrer uses it too, since it doesn't draw anything.
+
+> **Picture it like this:** a crash-test dummy. It doesn't drive the car itself, but the sensors
+> in it reveal exactly what would happen in an accident.
+
+## 2.7 Logic: Three Ways, One Result
+
+In Studio you can plug game sequences together out of building blocks, for example "When the
+player touches the door, it opens." Such a sequence is called **logic** ([Chapter 9](09-logic.md)).
+Kern can run it in three ways:
+
+1. read it out step by step and carry it out (the slowest way),
+2. translate it lightning-fast into machine language during play and then run it,
+3. output it as C++ source code that's built firmly into a game.
+
+> **Picture it like this:** a recipe. You can read it out while cooking, memorize it beforehand,
+> or give it to a friend in print. The cake has to taste the same every time.
+
+That's exactly what the logic tests check: the same small sequences run in all three ways, and all
+of them must deliver the same result bit for bit.
 
 ## 2.8 The Robot That Operates Studio
 
-`kern/tests/e2e/studio_e2e.mjs` controls a real Chromium browser and clicks its way through Studio:
-menus, flying, selecting, Play, Simulate, Undo, four viewports, the logic editor, the Micro Duck
-with its head camera, multiplayer across two tabs, packaging and playing a game, all of it in phone
-format too.
+A test program controls a real browser and clicks its way through everything important in Studio
+like a human, in phone format too.
 
-It computes the graphics without a graphics card, at about **one frame per second**. That's why
-every check waits for its effect instead of a fixed time, and `ink()` counts the colors in the
-image to see whether anything was really drawn. Screenshots are only taken when `KERN_E2E_SHOTS`
-names a folder. You'll see some of them in this book.
+The test computer has no graphics card. So the processor has to draw by itself, laboriously, and
+manages only about **one picture per second**. That's why every check waits for its **effect**
+instead of a fixed time: "Wait until the menu is open" instead of "Wait two seconds." And to check
+whether something was really drawn, the test counts how many different colors are in the picture.
+An empty window would have almost only one.
+
+> **Picture it like this:** You wait for the bus until it's there, not exactly five minutes. If it
+> comes earlier, you get on earlier. If it comes later, you're not left standing on an empty street
+> for nothing.
+
+On request, the test takes screenshots. You'll see some of them in this book.
 
 > **Mission:** Be the test robot yourself! In Studio, hold the right mouse button and press **W**
-> to fly. Click an actor, press **F**, then **Play** (Alt+P), **Esc**, **Simulate** (Alt+S),
-> **Esc**. Did it all work? Check passed.
+> to fly. Click an actor and press **F**, which means **Focus Selection**: the camera flies to it.
+> Then press **Play** (Alt+P): you play along yourself. **Esc** stops. Press **Simulate** (Alt+S):
+> now only the physics runs, and you watch with a free camera. **Esc**. Did everything work? Test
+> passed.
 
-> **Mission:** Open the Content Drawer (Ctrl+Space), click **Cube** and move it three times with
-> the Move tool (**W**). Open **Edit → History...** and click an earlier step. Studio jumps exactly
-> back there.
+> **Mission:** Open the **Content Drawer** with the button at the far left of the status bar (on
+> Windows and Linux, Ctrl+Space works too; on a Mac, better use the button, because the Mac often
+> uses these keys itself). Click **Cube**. Now press **W**, this time without the right mouse
+> button: then W doesn't mean "fly" but the tool **Move (W)**. Colored arrows appear on the cube.
+> Drag one arrow three times with the left mouse button to move it. Open **Edit › History...** and
+> click an earlier step. Studio jumps exactly there. Kern's tests check this too: undo has to bring
+> back exactly the same state every time.
 
 ## 2.9 The Fingerprint
 
-Now for the heart of it all: how do you prove that a Mac, a PC and a browser simulate the Micro
-Duck **exactly** the same?
+Now the centerpiece: how do you prove that Mac, PC and browser simulate the Micro Duck **exactly**
+the same?
 
-Kern makes the duck walk with Pollen's walking network `velstand`: 150 ticks straight ahead, then it
-turns on the spot. After every control tick, Kern throws the position, rotation, velocities and all
-joint angles into a **hash** (FNV-1a). It turns lots of numbers into a short ID. If a single bit
-changes, a completely different ID comes out.
+Kern lets the duck, with a walking network from Pollen, first walk straight ahead and then turn on
+the spot. After every **control tick** (that's what each moment is called in which the network
+decides anew; it happens 50 times per second in the real duck's time), Kern takes all the numbers
+that describe the duck: position, rotation, speeds, all joint angles. From them it makes a short
+code of letters and digits, a **hash**. If a single bit changes anywhere in these numbers, a
+completely different code comes out.
 
-> **Picture it like this:** A fingerprint identifies a person without describing them completely.
-> Here, one line of letter soup gives away the duck's complete state.
+> **Picture it like this:** A fingerprint gives a person away without describing them completely.
+> Here, one line of jumbled letters gives away the duck's complete state.
 
-The reference for 400 ticks is in `kern/tests/determinism_fingerprint.txt` and starts like this:
+> **For pros:** Kern calculates the duck four times larger and twice as slow for it
+> ([Chapter 6](06-physics.md), section 6.2). In simulation time, that's why there are 25 control
+> ticks per second, for the real duck 50.
 
-```
-0 7588b1a57dfadf95
-1 46e1d239a7ed5cfe
-```
+Why isn't something simple like the digit sum enough? Try it: 1234 has the digit sum
+1 + 2 + 3 + 4 = 10. But the number 1243 also has the digit sum 10. So the digit sum doesn't notice
+that two digits were swapped. A good hash mixes the numbers so thoroughly that even the smallest
+change or swap produces a completely different code.
 
-The comparison happens three times: with GCC on x86 including sanitizers, in the WebAssembly module
-under Node, and with Apple clang on ARM. By hand, you first build the Lehrer and then compare:
+For 400 control ticks, that is 8 seconds in the life of the real duck (400 : 50 = 8), the correct
+code of every tick is stored as a **reference**. The comparison happens in three ways: on a PC, in
+the browser and on a Mac whose calculating unit is built quite differently from the one in a PC.
+If all 400 codes match, everyone calculates exactly the same.
 
-```sh
-kern/tools/lehrer.sh
-kern/build/kern_lehrer --fingerprint 400 \
-  | diff - kern/tests/determinism_fingerprint.txt
-```
+If something differs, there are two possibilities:
 
-The Lehrer prints 400 fingerprints, and `diff` compares them. No output means: everything's the same.
+- Someone changed the simulation **on purpose**. Then it gets a new reference, with a reason.
+- Somewhere a piece of code **doesn't calculate the same everywhere**. For example, it uses a
+  calculating function of the computer that rounds differently at the last digit, or it merges
+  two calculation steps. Or it adds up numbers in an order that depends on how many helpers are
+  calculating at the same time (say, on several processor cores from the word box). Why the order
+  matters is shown in [Chapter 3](03-foundations.md).
 
-If something differs, either the simulation was changed on purpose (then a new reference, with a
-reason) or some code computes in a platform-dependent way: `std::sin` instead of `kern::dm::sin`,
-a missing `-ffp-contract=off` option, a sum whose order depends on the number of threads. A second
-test learns with 1, 2 and 4 workers (8 ducks in total) and compares the networks byte for byte.
+That's why there's a second test: the Lehrer learns the same task several times, each time with a
+different number of helpers calculating at the same time. At the end, all networks must be the
+same down to the last bit.
 
-> **Crazy but true:** Every single one of the 400 ticks gets checked. If one differs, the unit test
-> names the first tick that differs (`first differing tick`). That's how you find the spot where the
-> calculation drifts apart for the first time.
+> **Crazy but true:** Every single one of the 400 ticks is checked. If one differs, the test names
+> the first tick that differs. That's how you find the spot where the calculation first starts to
+> drift apart.
 
-## 2.10 The CI: The Tireless Checker
+The command to compare the fingerprint yourself is in the blue book, Chapter 2.
 
-The **CI** (`.github/workflows/ci.yml`) runs on every push to `main`, on pull requests and at the
-push of a button:
+## 2.10 CI: the Tireless Checker
 
-```mermaid
-flowchart LR
-  P["Push"] --> N["native"]
-  P --> D["determinism"]
-  P --> B["build"]
-  B --> DE["deploy"]
-  B --> E["e2e"]
-```
+**CI** stands for *continuous integration*, meaning roughly "constantly merging together." Every
+time someone uploads a change to Kern on GitHub, a computer on the internet automatically starts
+all the jobs: building, testing, publishing. Nobody has to remember to do it.
 
-- **native:** all unit tests with sanitizers.
-- **determinism:** build the Lehrer with Apple clang on ARM, compare the fingerprint.
-- **build:** build Studio, the examples and the Lehrer (with a cache), check the JavaScript syntax,
-  test the Lehrer in the module (two ducks collecting, one learner, one PPO step, ONNX export,
-  fingerprint), test the logic JIT, put together the website including the build ID and networks.
-- **deploy:** only on `main`; pushes the site into the `gh-pages` branch, and it shows up at
-  https://kernengine.de/.
-- **e2e:** the browser test with Playwright 1.56.0 on the published files.
+> **Picture it like this:** an assembly line with quality control. Every new part runs through the
+> same stations. Once a part is built, it already goes into the shop while quality control is still
+> checking it. If they find something, you see it right away and fix it.
 
-The site goes online as soon as `build` is done; the tests run in parallel and don't hold that up.
-On `main`, every push runs to the end, so that every green state goes online; a run takes about
-17 minutes. On pull requests, a new push cancels the older run.
+![The assembly line: an uploaded change starts three stations; after building come publishing and the robot in the browser](../abbildungen/ci-pipeline.svg)
 
-> **Mission:** Open the published Studio and look at the bottom right of the status bar. It shows
-> "v" and seven characters: the beginning of the build ID that the CI wrote into the page when
-> publishing it.
+- **Tests with checkers:** all unit tests with the sanitizers.
+- **Fingerprint on the Mac:** The Lehrer calculates the fingerprint. That's why the Lehrer is built
+  on a Mac and has to move the duck exactly like the PC and the browser do.
+- **Building:** Studio, examples and Lehrer are built (with the cache from 2.3). The Lehrer and the
+  logic are also tested in their browser form, and the website is put together.
+- **Publishing:** The finished site appears at https://kernengine.de/.
+- **Robot in the browser:** the test from 2.8, and with exactly the files that get published.
 
-> **For pros:** The `README.md` still mentions a `pages.yml`. It doesn't exist; the `deploy` job
-> takes care of that.
+The site goes online as soon as building is done. The tests keep running at the same time and
+don't hold it up. That's a deliberate compromise: a whole run takes a good quarter of an hour, and
+this way a change gets to you faster. If a test then reports an error, you see it right away and
+fix it.
 
-## 2.11 At Home Like the CI
+But only what has already arrived in Kern's **main version** gets published. If someone only
+proposes a change (on GitHub that's called a **pull request**), the CI builds and checks it just
+the same but doesn't publish it. So a proposal never gets onto the website unchecked.
 
-The same order works locally: unit tests, fingerprint, modules, Node tests, web server on port
-8771, browser test. The development pages load their files relatively; only the Lehrer page expects
-the folders of the published site.
+> **Mission:** Open the published Studio and look at the bottom right of the status bar. There it
+> says "v" and seven characters: the beginning of the **build ID** that the CI wrote into the page
+> when publishing. That way you always know which version you're using. If you report a bug, this
+> ID lets people find exactly the change your version comes from.
 
-## 2.12 When Things Get Stuck
+## 2.11 Build It Yourself
 
-| Message | Cause | Fix |
-|---|---|---|
-| `clang++ not found` | `WASI_SDK` wrong | set the variable |
-| `missing …kern_studio.wasm` | `--skip-wasm` | build without it |
-| `runtime error` | sanitizer finding | run the test alone |
-| `first differing tick` | calculation depends on platform | see 2.9 |
-| `runs in "interpreter"` | JIT failed | read the console |
-| test hangs at start | server/module missing | start both |
-| Playwright missing | not installed | `npm install` |
+Everything the CI does, you can also do at home on your own computer, in the same order: first
+the tests, then the fingerprint, then building, and finally the robot in the browser. And if
+something gets stuck, the message usually already tells you where: which test, which line, which
+tick.
+
+The exact commands, paths and a table of typical errors and how to fix them are in the blue book,
+Chapter 2.
 
 ## Level complete!
 
 - You know why pros test every change automatically.
-- You know the build scripts and the cache.
-- You know what sanitizers and the GL stand-in do.
-- You know the robot that clicks its way through Studio.
-- You understand the fingerprint and why one bit counts.
-- You know the five jobs of the CI.
+- You know what "translating" means and how the cache saves time.
+- You know that a test is a question with a fixed answer.
+- You know what sanitizers and the graphics dummy do.
+- You know why the test robot waits for effects instead of time.
+- You understand the fingerprint and why one bit matters.
+- You know how the CI, like an assembly line, checks and publishes every change.
 
 ## Puzzle corner
 
-1. What does `kern/tests/run.sh micro_duck` do?
+1. You change a single file that nothing else uses. Why is the next build much faster than the
+   first one?
 2. Why does the browser test wait for effects instead of fixed times?
-3. **Boss puzzle:** On the Mac, the fingerprint differs from tick 212 on. Name two possible causes.
+3. **Boss puzzle:** The fingerprint on the Mac differs from tick 212 on, even though nobody changed
+   the simulation on purpose. Name two possible reasons why a computer might calculate differently.
 
 ### Solutions
 
-1. It runs only the tests whose name contains `micro_duck`.
-2. Without a graphics card, the browser draws about one frame per second; a fixed time would
-   sometimes be too short and sometimes a waste.
-3. For example, `std::sin` instead of `kern::dm::sin`, a missing `-ffp-contract=off` option or a sum
-   whose order depends on the number of threads.
+1. The cache already has all the other files fully translated. Kern only translates the one changed
+   file again.
+2. Without a graphics card, the test computer draws about one picture per second. A fixed time
+   would sometimes be too short, sometimes a waste.
+3. For example: a calculating function of the computer rounds differently at the last digit. Or two
+   calculation steps were merged into one. Or numbers are added up in an order that depends on how
+   many helpers are calculating along.
 
 ---
 

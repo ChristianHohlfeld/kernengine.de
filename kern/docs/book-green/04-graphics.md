@@ -1,648 +1,699 @@
 # 4 Graphics – How Kern Paints Pictures
 
-> **In short:** Here you look over the shoulder of Kern's painter: how the C++ code in the browser
-> reaches the graphics card, what meshes and materials are made of, what the one big standard shader
-> computes in every pixel and in what order a picture comes together – with sun shadows, sky, glow
-> and soft shadows in corners. At the end, we make the windows of a city at night light up.
+> **In short:** Here you look over the shoulder of Kern's painter: how Kern reaches the graphics
+> card, what shapes and materials are made of, what the one big paint program calculates for
+> every pixel, and in what order a picture comes together – with sun shadows, sky, glow and soft
+> corner shadows. At the end, we make the windows of a city at night light up.
 
-The general foundations – how triangles become pixels, what matrices do, how light and color
-work – are in [Appendix B](B-rendering.md). If a term here sounds like Greek to you, feel free to
-flip over there. This chapter is about what **Kern** makes of all that.
+> **Key terms:**
+> - **Graphics card** (also GPU) – the special chip that colors in millions of pixels at the same
+>   time.
+> - **Mesh** – the wire frame of triangles that a 3D thing is made of.
+> - **Shader** – a small paint program that runs on the graphics card.
+> - **Normal** – an imaginary arrow pointing straight out of a surface: where the surface
+>   "looks".
+> - **Depth buffer** – an invisible second picture that remembers, for every pixel, how far away
+>   whatever was painted there is.
+> - **Draw call** – a single "Paint this!" to the graphics card. Each one costs time before any
+>   painting even happens; so better a few big ones than lots of small ones.
+
+Other words – such as how Kern calculates with light and color – we explain where they're needed.
+If you want to get to know the craft behind it at your leisure – how triangles become pixels, how
+light and color work – it's best to read **[Appendix B](B-rendering.md) first**; but you don't
+have to. Here it's about what **Kern** makes of it. The exact names and values are in the blue
+book, Chapter 4.
 
 ## 4.1 Overview
 
-Kern's **renderer** – the part that produces pictures – is surprisingly small: a bridge to WebGL2,
-a shader construction kit, meshes and materials, the renderer itself, four extra painting passes
-(shadows, sky, bloom, ambient occlusion), plus particles and lights. Three principles shape
-everything:
+Kern's **renderer** is the part that produces pictures. It paints the things in the world and, in
+separate painting passes, adds sun shadows, sky, **bloom** (the glow around bright spots) and
+**ambient occlusion** (the soft corner shadows). Important for everything that follows: the
+graphics card has its **own memory**, separate from the computer's main memory. Whatever is in
+there, the browser can delete at any time. Three principles shape everything:
 
-1. **One program for everything.** Every object is painted with the same **standard shader** (a
-   shader is a small program on the graphics card). Games that want to look different plug small
-   **extensions** into this one shader instead of writing their own.
-2. **Upload once, then only movement.** A shape travels to the graphics card once; after that, only
-   *where* it stands changes. The work per frame follows what moves, not the size of the world.
-3. **The copy in main memory is the truth.** Kern also keeps every shape in working memory. From it,
-   Kern works out what is visible and what you click on – and uses it to rebuild everything when
-   the browser takes the graphics card away (4.11).
+1. **One paint program for everything.** Every thing is painted with the same **standard
+   shader**. Games that want to look different plug small **extensions** into this one program
+   instead of writing their own.
+2. **Upload once, then only movement.** A shape travels into the graphics card's memory once;
+   after that, only *where* it is changes. The work per frame follows what moves, not the size of
+   the world.
+3. **The copy in main memory is the truth.** Because the graphics card's memory can be lost, Kern
+   also keeps every shape in the computer's main memory. From it, Kern works out what is visible
+   and what you click on – and it uses it to rebuild everything when the browser clears the
+   graphics card's memory (4.11).
 
 > **Imagine …** … a theater. The sets are carried onto the stage once; in every performance only
-> the actors move. And for every set there is a blueprint in the drawer – if the stage burns down,
-> everything stands there again tomorrow exactly as before.
+> the actors move. And for every set there's a blueprint in the drawer – if the stage burns
+> down, everything stands exactly as before by tomorrow.
 
-## 4.2 The WebGL2 Binding
+## 4.2 The bridge to the graphics card
 
-Kern is compiled with wasi-sdk to **WebAssembly**, a compact format that the browser runs almost as
-fast as machine code – without Emscripten and without automatically generated JavaScript "glue."
-The graphics commands are plain **imports**: When it loads, the module says "I need
-`drawElementsInstanced` from the package `kern_gl`," and the web page hands the function in. The
-list in `gl.h` is, according to its comment, "exactly what the engine uses"; a new command gets
-added there and in `web/kern.mjs`.
+Kern isn't the web page itself but a separate, fast program that runs **inside** the web page – in
+a format called **WebAssembly**, which browsers run almost as fast as a normal program
+([Appendix B](B-rendering.md), B.12). A program like that may only exchange numbers and use only
+what the web page hands it. In the browser, only the web page itself may talk to the graphics
+card, through **WebGL2**, the browser's painting interface. So Kern passes every painting command
+across a narrow bridge to the web page, and the page hands it on to the graphics card.
 
-**Only numbers** cross the border between WebAssembly and JavaScript:
+> **Imagine …** … Kern lives in the web page as a subtenant. Only the main tenant, the page, has
+> the key to the basement where the graphics card is. Kern writes its wishes on notes and passes
+> them through the door – and the notes contain only numbers.
 
-- **Graphics objects are numbers.** JavaScript puts the real object into a table and gives Kern the
-  slot number; `0` means "nothing." It's like a coat check: You get a ticket, not the coat.
-- **Data is "address plus length."** JavaScript looks through a window directly into Kern's memory
-  and passes the bytes on to WebGL **without copying**. When Kern's memory grows, `refresh()`
-  renews these windows.
+**Only numbers** go across this bridge:
 
-Outside the browser, in the native tests, the imports stay empty; there a stand-in
-(`tests/gl_stub.cpp`) is attached that merely records the GL calls.
+- **Graphics things are numbers.** The web page keeps the real thing and gives Kern a slot
+  number. Like at a coat check: you get a ticket, not the coat.
+- **Data is "address plus length".** Kern's memory is like a long shelf with numbered
+  compartments; each compartment holds a small number (a **byte**). Instead of copying a big
+  mountain of data, Kern just says: "From compartment 5000, the next 300 compartments." The web
+  page looks directly into this shelf and passes the data on – without a copy.
 
-According to its header comment, `web/kern.mjs` does exactly three things and contains **no engine
-logic**: load the module with its imports (plus a tiny WASI for the console, random numbers and the
-clock – the engine never touches files), manage the number tables and the context loss, and offer
-`KernRenderer`, a convenient facade for JavaScript. A second import package, `kern_env`, supplies
-the engine with, among other things, the time, the page's terrain height, pointer lock, status
-messages and the route by which logic graphs compiled to WebAssembly get into the module
-([Chapter 9](09-logic.md)).
+The bridge is deliberately thin: the web page loads Kern, manages the numbers and the case where
+the graphics card is lost – nothing more. Everything that makes up the picture is in Kern. Whether
+a finished game, a web page or Kern Studio has it paint: inside, it's always the same renderer at
+work.
 
-The web page creates the access to WebGL2 (the **context**). On the engine side, the page does without the
-built-in antialiasing, because Kern paints into its own intermediate pictures anyway (4.7); Kern
-Studio and exported games create their context themselves and switch it on.
+## 4.3 Paint programs and the memo pad
 
-You can use the renderer in two ways: **C++ games** write a `kern::App`, in which every frame first
-runs the game (`update`) and then the painting (`render`) – that's how the "hello" example and Orb
-Run work ([Chapter 12](12-your-own-games.md)). **JavaScript programs** such as SpawnCity use
-`KernRenderer`, exactly one per module. Kern Studio has a third interface of its own
-([Chapter 11](11-studio.md)); inside, the same renderer is at work.
+A **paint program** has two parts: the **vertex shader** works out each corner of a shape – where
+it lands on the screen. The **fragment shader** then works out each pixel – what color it gets.
+Two parts, because these are two very different amounts: a few thousand corners, but millions of
+pixels.
 
-## 4.3 Programs and the Uniform Cache
+Many details are the same for a whole draw call: the color of a material, the direction of the
+sun. The graphics card remembers such **settings** until you tell it something new. For this,
+Kern keeps a **memo pad**: before sending a value, it checks whether exactly this value is already
+there. If so, it sends nothing.
 
-A **program** consists of a vertex shader (computes every corner) and a fragment shader (computes
-every pixel). Kern compiles both and reports errors with a name tag in front, such as "standard
-fragment shader: …". If it asks for a setting that the compiler optimized away, it gets the number
-`0` – and every set command ignores `0`. An unused value costs nothing. When cleaning up, Kern
-distinguishes two cases: If the graphics card is still alive, it deletes the program; after a
-context loss, the program is already dead, and Kern just forgets the number.
+> **Imagine …** … every sentence to the graphics card costs postage. If you say "The color is
+> blue" ten times, you pay ten times. The memo pad is the colleague who says: "You already said
+> that, it's still there."
 
-**Uniforms** are values that stay the same for an entire draw call: color, roughness, sun
-direction. The graphics card remembers them. The **uniform cache** takes advantage of that and
-only sends what has really changed:
+That's worth it, because every command travels across the bridge from 4.2, and the browser checks
+it once more on the way. With hundreds of shapes with the same material, most of the mail falls
+away like this.
 
-```cpp
-void UniformCache::set_float(u32 location, f32 v) {
-  if (!location) return;
-  Entry& e = entry(location);
-  if (e.kind == 2 && e.count == 1 && e.f[0] == v) return;
-  e.kind = 2; e.count = 1; e.f[0] = v;
-  gl::uniform1f(location, v);
-}
-```
+> **For the curious:** The memo pad doesn't compare long values such as whole matrices number by
+> number but via a fingerprint. Only the bones of animated characters bypass the memo pad – they
+> change every frame anyway. And if a paint program doesn't use a setting at all, Kern quietly
+> ignores it: it costs nothing and doesn't cause an error.
 
-Line by line: Number 0? Return right away. Fetch the note for this number. If exactly this value is
-already written there, return. Otherwise update the note and only then actually send. Large values
-such as matrices are compared by the cache using a **fingerprint** (hash) instead of number by
-number. Only the bones of animated characters go through uncached – they change every frame anyway.
+## 4.4 Shape, material and copies
 
-> **Imagine …** … every sentence to the graphics card costs postage. If you say "The color is blue"
-> ten times, you pay ten times. The cache is the colleague who says: "You already said that, it's
-> still there."
+### Corners and instances
 
-This pays off because every command travels from WebAssembly through JavaScript into WebGL, which
-checks it once more.
+Every shape consists of triangles, and every corner carries a small **profile**: its position,
+its normal, its color and its **texture coordinate** (which point of a stuck-on picture lies
+here). For characters with a skeleton, it also says which bones the corner hangs on.
 
-## 4.4 Mesh, Material and MeshInput
+Other details apply **per instance**. An instance is a copy of the shape in another place – like
+a hundred trees from one template. Per instance, Kern remembers position, rotation and size as
+well as a color tint. Kern paints all the copies of a shape with **a single draw call** – so a
+hundred trees don't cost a hundred "Paint this!", but one. And **every shape is painted as such
+an instance package**, even if there's only one copy. Why? That way there's just a single way to
+paint, with no special cases for "one thing" and "many things" – less that can go wrong.
 
-### Corners and Instances
+> **Imagine …** … a rubber stamp. The shape is the stamp, the instances are the prints on the
+> paper. A hundred prints don't need a hundred stamps.
 
-A **mesh** is a shape made of triangles. Every corner (**vertex**) carries a position, a **normal**
-(where the surface points), a color and a **texture coordinate** (which image point sticks here);
-characters with a skeleton also carry four bone numbers and weights each. Two slots are free for
-extensions.
+### The material
 
-Other data applies **per instance**. An instance is a copy of the mesh in another place – like a
-hundred trees from one template. Per instance there is the model matrix (position, rotation,
-size), a color shade (**tint**) and the normal matrix (so that normals are still right after
-stretching, Appendix B). The clever part: **Every mesh is instanced**, even with only one instance,
-and is painted with exactly one draw call. Kern computes the normal matrix per instance on the CPU.
-Kern rejects broken matrices (for example, squashed to size zero).
+The **material** says what a surface looks like:
 
-Limits you should know: **32 bones**, **6 point lights**, **2 extra streams** and **8 number
-parameters** for extensions.
+| Property | What it does | Example |
+|---|---|---|
+| Color | base color and opacity | red car |
+| Transparency | opaque, cut out, semi-transparent | wall, fence, glass |
+| Roughness and metal | matte or shiny, metal or not | rubber, chrome |
+| Self-glow | shines by itself, even brighter than white | neon tube |
 
-### The Material
+On top of that come switches: **unlit** (only color, no light), **two-sided** (visible from behind
+too) and **casts shadows**. A few points deserve a second look:
 
-| Field | What it does |
-|---|---|
-| `color` | base color with opacity |
-| `alpha` | opaque, cut out (threshold 0.5) or translucent |
-| `roughness`, `metalness` | rough or smooth, metal or not |
-| `emissive` | self-illumination, may be above 1 |
+- **Colors come in the screen's language**, the way color pickers and image files deliver them.
+  Before calculating, Kern translates them into the language of real light (why is in 4.5).
+- **Only completely opaque things cast shadows** – glass and cut-out fences don't. The shadow map
+  (4.8.1) remembers only a distance per point, no color and no holes; a pane of glass would cast a
+  pitch-black shadow there. Kern would rather simplify.
+- **The first-person layer** is for things in your hand: they come at the very end, after Kern
+  has cleared the depth buffer – so Kern forgets beforehand what was how far away. That's why
+  nothing can be in front of them any more, and a wall right in front of you doesn't cut off the
+  weapon in your hand. Studio also paints its handles for moving and rotating there.
+- **Lines** instead of triangles exist for helper displays. They're always unlit, cast no shadow
+  and can't be clicked.
 
-On top of that come switches such as `unlit` (color only, no light), `double_sided`, `cast_shadow`
-and `frustum_culled` (may be left out when out of view). Some deserve a second look:
+> **For the curious:** The graphics card normally leaves out the back sides of triangles – with
+> closed things you never see them anyway, and that saves half the work. But mirroring swaps front
+> and back, like a glove turned inside out. If **all** copies of a package are mirrored, Kern
+> therefore leaves out the front sides instead of the back sides. If only some are mirrored, no
+> rule fits all of them; then Kern simply shows both sides.
 
-- **Colors are sRGB**, the usual color space of images and color pickers. Kern multiplies vertex
-  color, tint, material color and texture pixel and converts the result into linear light (why:
-  Appendix B). With `linear_colors` that step is skipped; `emissive` is already linear.
-- **Only opaque things cast shadows.**
-- **`viewmodel`** is the first-person layer: These meshes come at the very end, after the depth is
-  cleared. A wall in front of you doesn't cut off the weapon in your hand. Studio paints its gizmos
-  there.
-- **`lines`** turns the mesh into lines – automatically unlit, without shadows, not clickable.
+### Creating: check first, then swap
 
-The graphics card normally throws away the back sides of triangles. Kern keeps them for
-double-sided materials, lines and instances that are mirrored in a mixed way; if *all* instances
-are mirrored, it throws away the front sides instead.
+You hand a new shape to Kern as a package. Only the positions of the corners are required; if
+anything else is missing, Kern uses simple defaults.
 
-> **Did you know?** To the graphics card, a mirrored object is "turned inside out," because the
-> winding order of its corners flips. That's why mirrored and normal copies can't be handled
-> correctly in a single draw call – so Kern simply shows both sides.
+The most important thing: Kern creates a shape **all or nothing**. First it checks everything –
+are all the numbers valid, do the lengths match? Only then does it swap the old shape for the new
+one. If the check fails, **the old shape stays visible**.
 
-### Creating with `upsert`
+> **Imagine …** … wallpapering. The new strip is first cut to size completely and checked, then
+> swapped in – never half torn off.
 
-You hand over new meshes as a **MeshInput**. Only the positions are required; if normals are
-missing, Kern computes flat ones for loose triangles (otherwise they point up); if colors are
-missing, everything is white; if instances are missing, there is one. `upsert` (from *update* and
-*insert*) creates a mesh or replaces it – **atomically**: first check everything (finite numbers,
-valid indices, matching lengths, bone weights that add up to 1, no broken matrices), then swap.
-If the check fails, **the old mesh stays visible**. For an editor that is worth its weight in gold:
-A half-finished intermediate state deletes nothing. The renderer hands out the mesh numbers itself,
-so that two owners never share one slot.
+For an editor that's worth its weight in gold: a half-finished in-between state doesn't delete
+anything. Larger shapes in the world that don't move also get a table of contents when uploaded,
+which makes mouse clicks fast ([Chapter 5](05-scene-and-geometry.md)).
 
-When uploading, Kern creates fixed buffers for the vertex data, three changeable ones for the
-instances and one for the vertex numbers. With **at most 65,536 vertices**, it stores these numbers
-with 16 instead of 32 bits – half the space in the most common case. Static world objects with 36
-triangles or more (exactly one instance, not moved, rotated or stretched, without a skeleton, not
-lines) also get a **BVH**, a table of contents for fast mouse clicks
-([Chapter 5](05-scene-and-geometry.md)). `remove` releases a mesh and its number again.
+### Moving: only what's needed
 
-### Moving with `update_instances`
+Everything that moves changes only the details of the instances, and sparingly: if only the color
+tint changes, only the color tint is uploaded. If the new data is exactly the same as the old,
+**nothing happens at all**. Bones, visibility and material can be changed separately in the same
+way.
 
-Everything that moves goes through `update_instances`, frugal to the bone: New tints alone upload
-only the tint buffer. Byte-identical data does **nothing at all**. If there isn't enough room, the
-buffer is at least doubled, so that fluctuating instance counts don't keep needing new memory. If
-matching tints are missing (not exactly four numbers per instance), all instances are white. More
-adjustment knobs: setting new bones (same number of bones as when the mesh was created), visibility,
-material (lines don't turn into triangles this way, and vice versa) and layers. Anything that
-affects a shadow caster is noted by Kern for the shadow map (4.8.1).
+If there are more copies than space has been reserved for, Kern generously gets new space – at
+least twice as much as before. That way, if the number of copies fluctuates from frame to frame,
+it doesn't have to request new space with every fluctuation. Like moving into an apartment with a
+spare room: better to go bigger once than to move every year.
 
-Every mesh also has a **layer mask** whose bits work like light switches. For each frame, the mask
-decides what is painted and what casts shadows; when clicking, it filters the same way. This is how
-Studio separates, for example, the grid, icons, gizmos per viewport, the collider display and the
-worlds of several network players.
+Every shape also has a **layer mask**, which works like a row of light switches. For every frame
+you say which switches are on; only those shapes are painted, cast shadows and can be clicked.
+Studio uses this, for example, to separate the floor grid and helper symbols from the actual game
+world.
 
-Kern creates **textures** (pictures stuck onto surfaces) itself – with options for mipmaps (shrunken
-versions for distant views), repeating and a pixelated look – and keeps a copy of their pixels. Or
-the web page registers a texture of its own and leaves instructions for how it gets refilled after
-a context loss. Every mesh has at most one color texture (unit 0; the shadow map sits on unit 1).
+### Textures
 
-> **Try it!** Open https://kernengine.de/, create the template **Basic** with **File › New Level…**
-> and drag a **Cube** into it from the Content Drawer (group *Shapes*). In **Details**, under
-> *Material*, play with **Roughness**, **Metallic** and **Emissive**. Then switch on **Unlit** – and
-> the cube is suddenly a flat blob of color without light and shadow.
+A **texture** is a picture that is stuck onto a shape, like a sticker. Every shape has at most one
+color texture. Kern creates textures itself and keeps their pixels as a copy; if you want, with
+**mipmaps**, shrunken versions for the distance – like postage-stamp versions of a poster. Why?
+In the distance, the pattern is finer than a pixel. Without a small version, each pixel randomly
+hits sometimes a bright, sometimes a dark spot of the pattern, and at the slightest movement it
+flickers (the same trap as with the windows in 4.13). The postage stamp has already averaged the
+pattern neatly beforehand.
 
-## 4.5 The Standard Shader
+> **Try it!** Open https://kernengine.de/ and use **File › New Level...** to create the
+> **Basic** template. Open the **Content Drawer** at the bottom of the status bar, the
+> building-block bar, and drag a **Cube** in from the **Shapes** group. On the right in
+> **Details**, under *Material*, play with **Roughness**, **Metallic** and **Emissive strength**,
+> the self-glow. Then switch on **Unlit** – and the cube is already a flat blob of color without
+> light or shadow. That way you see that every row of the material table above has a visible
+> effect.
 
-At startup, Kern assembles its one shader from fixed building blocks and inserts the extensions'
-snippets at agreed-upon places. The result is exactly **one** program.
+## 4.5 The standard shader
 
-The **vertex shader** builds the model matrix for each corner from the instance data, applies the
-skeleton for characters and computes the world position, normal and screen position. The
-**skinning** (skin follows bones) is the classic "linear blend skinning": Every corner follows up to
-four bones according to their weights.
+At startup, Kern assembles its one paint program from fixed building blocks and inserts the
+extensions' snippets at agreed spots. The result is exactly **one** program.
 
-> **Imagine …** … a corner at your elbow hangs 60% on your upper arm and 40% on your forearm. When
+The **vertex shader** takes each corner, puts it at the place of its instance and calculates where
+it lands on the screen. For characters, it first bends the skin according to the skeleton: each
+corner follows up to four bones, each with a share.
+
+> **Imagine …** … a corner at your elbow hangs 60% on the upper arm and 40% on the forearm. When
 > you bend your arm, it ends up in between – the skin doesn't kink, it bends smoothly.
 
-The **fragment shader** computes per pixel and writes **three pictures at the same time**:
-`outColor`, the finished picture as you see it; `outHdr`, the real amount of light before tone
-mapping (for the glow); and `outAo`, a record for the ambient occlusion. In between: read the
-texture, compute the opacity (instance opacity times material times texel), throw away everything
-below the threshold for cut-out materials, linearize the color, light it, tone-map it, add fog.
+The **fragment shader** then works out every pixel, in this order:
 
-### Light and Material
+1. Look up the stuck-on picture, determine the opacity.
+2. For cut-out materials (such as a fence), leave out transparent spots completely.
+3. Translate the color from the screen's language into the language of light.
+4. Light it: sun, sky, lamps, shine, self-glow.
+5. **Tone mapping:** gently squeeze light that's too bright into what the screen can show.
+6. Mix in fog.
 
-The model is based on the standard material of three.js – a simplified **PBR** (physically based
-rendering, Appendix B). The light of a pixel has several ingredients:
+Step 3 needs explaining. Screens and image files store brightness the way our eye **perceives**
+it (technical term **sRGB**): the value "half brightness" looks like middle gray to us, but
+contains much less than half as much light as white – the eye perceives brightness differently
+from the way light adds up. Light, on the other hand, **adds up** honestly: two identical lamps
+give twice as much light. If you calculate with the eye numbers, everything goes wrong – transitions
+that are too dark, wrong highlights. So Kern first translates the colors into real amounts of
+light (technical term **linear**), calculates with those and only translates back at the very end.
+(More, with the picture of shoe sizes, in Appendix B.)
+
+While doing this, the shader writes **three pictures at the same time**, each with its own
+purpose:
+
+| Picture | What for |
+|---|---|
+| **finished photo** | for looking at |
+| **light-meter picture** (real amount of light before tone mapping) | for the glow (4.8.3) |
+| **memo** (how much ambient light there is here) | for the corner shadows (4.8.4) |
+
+Why at the same time? Otherwise Kern would have to paint the whole world two or three times. This
+way everything comes out in one go.
+
+### Light and material
+
+Kern's lighting model is **physically based**, but simplified: it imitates how real light behaves.
+The light of a pixel has several ingredients:
 
 | Ingredient | Everyday picture |
 |---|---|
-| Sun, with shadows | a flashlight very, very far away |
-| Hemisphere light | blue sky above, brown field below |
-| Sky irradiance | light from a colorful dome |
-| up to 6 point lights | light bulbs with a range |
-| Shine and reflection | a highlight on an apple |
-| Self-illumination | a neon tube |
+| Sun, with shadows | flashlight very far away |
+| Ambient light from sky and ground | blue sky above, brown field below |
+| Lamps | light bulbs with a range |
+| Shine and reflection | highlight on an apple |
+| Self-glow | neon tube |
 
-**Sun:** The more directly it shines on a surface, the brighter (Lambert, Appendix B), times the
-shadow factor (1 = lit, 0 = shadow). **Hemisphere light:** Surfaces pointing up get the sky color,
-surfaces pointing down get the ground color (Z is up). **Point lights** fade **smoothly to zero** up
-to their range.
+**Sun:** the more directly it shines on a surface, the brighter – like a flashlight whose spot of
+light gets bigger and paler when held at an angle (Appendix B) – and not at all where the shadow
+falls. **Ambient light** is what we call all light that doesn't come directly from the sun or a
+lamp but from all around: surfaces whose normal points up get sky color, those pointing down get
+ground color. **Lamps** get weaker with distance and go **smoothly to zero** at their range.
 
-Kern carries sky and ground light along in a variable of its own, `indirect`. Why? Later, the
-ambient occlusion should darken **only this** light; the sun and lamps have their own shadows. By
-the way, metals have no diffuse light – their color is entirely in their shine.
+Kern carries the ambient light along separately. Why? Later it darkens **only this** light in
+corners and cracks (the corner shadows, 4.8.4); after all, the sun and lamps have their own
+shadows.
 
-**Shine** only exists for metal or roughness below 0.95: a reflection of the sky and a sun
-highlight. It includes **Fresnel** after Schlick (at a grazing angle everything reflects more
-strongly – think of a lake) and the **GGX distribution** (size and sharpness of the highlight).
-Non-metals reflect only 4% when viewed head-on, metals reflect in their base color.
+Metal doesn't throw back matte light, that is, no even light in all directions. You only see its
+color in the shine – think of a cooking pot that mostly reflects the kitchen.
 
-> **Did you know?** Very smooth surfaces can produce absurdly bright highlights in the math –
-> single pixels that flash up as flickering stars in the bloom. That's why Kern caps the GGX value
-> at 40.
+**Shine** exists on metal and on everything that isn't completely rough: a reflection of the sky
+and a highlight from the sun. Smooth surfaces have a small, sharp highlight, rough ones a broad
+sheen. And at a shallow viewing angle, everything reflects more strongly – think of a lake that
+shows the sky when you look at it at a slant.
 
-**Glass:** If an extension declares a surface to be glass (`surfaceGlass`), it reflects the sky,
-more strongly at a grazing angle. That way, panes look bright instead of black.
-**Self-illumination** (`emissive`) is added last, linear and **without an upper limit** – values
-above 1 later turn into glow.
+> **Did you know?** Very smooth surfaces can mathematically produce absurdly bright highlights –
+> single pixels that flash up in the glow as flickering stars. That's why Kern caps the shine.
 
-### From Light to Pixel – and Fog
+**Self-glow** is added last, **with no upper limit** – everything above white later becomes glow.
 
-Kern's light values are often above 1 (the sun around 2.8), but a screen can only show 0 to 1. So:
-save the real light in `outHdr`, then squeeze it gently into 0 to 1 with the **ACES film curve**
-(the three.js version, including exposure) – like photographic film that rounds off bright areas
-softly. Kern's **color grading** optionally follows: saturation ×1.14, a gentle S-curve, warmer
-highlights, cooler shadows (can be switched off in the renderer and bloom settings). Then sRGB.
+> **For the curious:** Kern's lighting model is deliberately modeled on the standard material of
+> the widely used graphics library three.js – right down to the fog, which, as there, is only
+> added after translating back into screen colors. That way scenes look the way you know them from
+> there. The technical names for the shine calculation are "GGX" (how many tiny little mirrors
+> point into the eye) and "Fresnel after Schlick" (how much is reflected at which viewing angle);
+> Appendix B explains both with pictures.
 
-As in three.js, the **fog** comes **after** the sRGB conversion, as "FogExp2." With the default
-density of 0.00085, it is barely there after 100 m (0.7%), and after 1000 m it is already a good
-half (51%). Three extras bring it to life: **height falloff** (haze on the ground, clear above the
-rooftops), **sun scattering** (toward the sun it glows in the sun's color) and **horizon fog**
-(4.8.2). If all of them are off, it looks just like in three.js.
+### From light to pixel – and fog
 
-Finally, the **AO record** contains, per pixel, what share of the light is indirect (per color
-channel, already reduced by the fog) and the brightness of the base color. Transparent things and
-the first-person layer count as unoccluded.
+Real light can be much brighter than a screen can show: in the calculation, Kern's sun is several
+times as bright as the brightest screen white. So Kern first saves the real amount of light in the
+light-meter picture and then gently squeezes it into the screen range with a **film curve** – like
+photo film, which rounds off bright areas softly instead of cutting them off hard (sketch in
+Appendix B). After that, **color grading** can follow, like in a movie: stronger colors, warmer
+lights, cooler shadows. Finally, Kern converts the color back into sRGB, the screen's language.
 
-## 4.6 Shader Extensions
+The **fog** comes after that, with distance: at 100 m it's barely visible, at one kilometer
+already a good half. So what's close stays clear for a long time, then the haze closes in quickly.
+A few extras bring it to life – such as ground fog, which lies close to the ground and leaves the
+roofs clear.
 
-Your game needs glowing windows or a force-field dome? Then you write a **ShaderExtension**: GLSL
-snippets (GLSL is the shader language) for fixed insertion points. The engine stays unchanged.
+## 4.6 Shader extensions
 
-> **Imagine …** … a finished paint-by-numbers picture with six fields marked "You may add something
-> here." Your extension fills in exactly these fields – it can make the picture prettier, but it
+A game needs glowing windows or a shimmering force-field dome? Then it writes a **shader
+extension**: small snippets in the shader language that Kern inserts into its paint program at
+firmly agreed spots. The engine itself stays unchanged.
+
+> **Imagine …** … a finished paint-by-numbers picture with six fields marked "You may add things
+> here". Your extension fills exactly these fields – it can make the picture prettier, but it
 > can't break the rest.
 
-| Point | What you may do there |
-|---|---|
-| `vertex_declarations` | declare your own values in the vertex shader |
-| `vertex` | change the color, opacity, UV of a corner |
-| `fragment_declarations` | declare your own values and functions |
-| `fragment_discard` | throw pixels away early |
-| `fragment_input` | treat colors as linear |
-| `fragment_surface` | change base color, glass, glow before lighting |
+Above all, an extension decides what color, what shine and what glow a spot gets. For example, it
+can declare a spot to be **glass**: then the spot reflects the sky, more strongly at a shallow
+angle, and a pane looks bright instead of black. For this, the extension may give every shape its
+own details; if a shape lacks such a detail, the extension simply does nothing there. The game
+hands in its extensions at startup. What it all looks like is shown by the example in 4.13. The
+exact list of insertion points is in the blue book, Chapter 4.
 
-The game hands in its extensions when the renderer starts (in an `App` via `App::extensions()`).
-Every snippet gets a comment line with the extension's name, so that compiler errors point to the
-culprit right away. An extension can also:
+## 4.7 How a frame comes together
 
-- bring along **its own vertex data**: at most two streams in total (slots 14 and 15), 1–4 numbers
-  each. C++ supplies them in the `MeshInput`, JavaScript as a named field in
-  `KernRenderer.upsert`. If the stream is missing, the shader reads (0, 0, 0, 1);
-- name **integer material parameters** (at most 8) and set its own uniforms from them per draw
-  call;
-- set **its own uniforms** once per frame – ideally through the uniform cache, so it saves along
-  with everything else. It looks up their numbers each time the program is built, including after
-  a context loss.
-
-An example follows in 4.13.
-
-## 4.7 The Sequence of a Frame
-
-A **frame** is one picture – one page in a flip book. At 60 frames per second, Kern has a little
-over 16 milliseconds for it:
+A frame is one page in the flip book. At 60 frames per second, Kern has just over 16 thousandths
+of a second for it, and the order of the painting passes is chosen carefully:
 
 ```mermaid
+%% Caption: The painting passes of a frame in their fixed order
 flowchart TD
-  A["Check: camera, rectangle"] --> B["Sun shadows if needed"]
-  B --> C["Opaque, front to back"]
+  A["Check camera"] --> B["Sun shadows if needed"]
+  B --> S["Sort out the invisible"]
+  S --> C["Opaque things, front to back"]
   C --> D["Sky into the gaps"]
-  D --> E["Transparent, back to front"]
-  E --> F["Ambient occlusion"]
+  D --> E["Transparent things, back to front"]
+  E --> F["Work out corner shadows"]
   F --> G["First-person layer"]
-  G --> H["Composite: bloom and AO"]
+  G --> H["Combine: glow, corner shadows"]
 ```
 
-First, Kern **checks** the camera and the picture rectangle before it touches the graphics card. If
-the browser supports it, a **stopwatch** measures the GPU time; the result only arrives a few frames
-later (until then the statistics report −1). The **shadow map** is only repainted when needed.
+First, Kern **checks** the camera and the image section before it touches the graphics card at
+all. The **shadow map** is only repainted if something has changed (4.8.1). Then Kern **sorts
+out**: invisible things are thrown out, as is everything outside the **view pyramid** – the area
+the camera can see at all, like the beam of a flashlight, only angular
+([Appendix B](B-rendering.md), B.10). What gets checked isn't every triangle but an imaginary
+**sphere** that encloses the whole shape, like a soap bubble around a toy. Only characters with a
+skeleton aren't checked this way: when they stretch out their arms and legs, these stick out of
+their sphere.
 
-Then Kern chooses the **target**: normally a scene target of its own, as long as bloom is on and
-supported by the device; otherwise it goes directly to the screen. If it paints into only part of
-the window, for example one of four viewports, it goes directly to the screen – and then **without
-bloom and without ambient occlusion**.
+Kern paints **opaque** things **from front to back**. Why? Nearby surfaces enter themselves in the
+depth buffer first. If something comes along afterwards that lies behind, the graphics card
+notices right away and saves itself the expensive coloring in. **Transparent** things come **from
+back to front**, like transparencies on an overhead projector – otherwise the mix isn't right. In
+between, Kern paints the **sky** into the gaps. There's one draw call per shape; settings that
+stay the same, Kern doesn't send again.
 
-During **sorting**, anything invisible gets thrown out, as does everything outside the view
-pyramid – except characters with a skeleton, whose pose can stick out of their resting hull. Opaque
-things are painted **front to back**: Near surfaces fill the depth buffer, and everything behind
-them fails the depth test before the expensive shader runs. Transparent things are painted **back
-to front**, like transparencies on an overhead projector. Kern sets the camera and light once per
-frame; there is one draw call per mesh, and textures or back-face settings are only switched when
-they change.
+After that, Kern works out the **corner shadows**, and does so *before* the first-person layer:
+that one clears the depth buffer, after all, and the corner-shadow calculation still needs it.
+Finally, Kern **combines** everything (glow and corner shadows into the finished photo) and keeps
+**statistics** on how many draw calls and triangles the frame cost.
 
-After that come the sky, transparent things, ambient occlusion (before the first-person layer,
-because its depth clear would wipe out the world depth), the first-person layer, the **composite**
-and a **statistics** report with draw calls, triangles, instances and times.
+Glow and corner shadows need the three pictures from 4.5 as their own in-between pictures. These
+are always as big as the whole window: one sheet for the whole picture, which is combined as a
+whole at the end. For a **partial view**, which paints only a piece of the window, there's no
+matching sheet. So Kern paints it directly onto the screen, only into its rectangle – **without
+glow and without corner shadows**.
 
-The scene target has three color layers: the finished picture (4 bytes per pixel), real light as
-16-bit floating-point numbers (8 bytes) and the AO record (4 bytes). Together that's **16 bytes** –
-according to a code comment, exactly the budget that tile-based phone graphics chips keep per pixel
-in their fast memory. That's why the AO record deliberately uses only 8 bits per channel.
+![Orb Run at night in four viewports: in the partial views the lights shine, but nothing glows](../buch/bilder/studio-quad.png)
 
-> **Watch out!** WebGL requires every draw call to write into **all** attached color layers. That's
-> why even the sky delivers an empty AO record. If you build your own painting passes and forget
-> this, you get errors.
+> **Try it!** You see the glow best at night. Load **File › Example Levels › Orb Run**. Click the
+> **Cmd** field at the bottom of the status bar, type `tod 0.95` and press Enter: `tod` (time of
+> day) sets the time of day, 0.95 is late night. The windows and lamps glow. Now use **Window ›
+> Viewport Layout** to set up four viewports. Each is only part of the window – that's why the
+> lights don't glow any more, and corners look flatter. Back to one viewport: glow and soft corner
+> shadows are back. So your device wasn't too slow – it's down to how it's built.
 
-![Four viewports in Kern Studio: partial views draw directly onto the screen](../buch/bilder/studio-quad.png)
+## 4.8 The extra painting passes in detail
 
-So if you set up four viewports in Kern Studio via **Window › Viewport Layout**, the lights stop
-glowing and corners look flatter. With one viewport, the glow and the soft corner shadows are back.
+A **pass** is a separate painting pass with its own shader that contributes something special.
+Kern has four: sun shadows, sky, glow and corner shadows.
 
-## 4.8 The Passes in Detail
+### 4.8.1 Sun shadows
 
-A **pass** is a separate painting run with its own shader. Kern has four.
+A point is in shadow if something is between it and the sun. So Kern paints the world once **from
+the sun's point of view** and remembers, for each point of this map, only how far away the first
+thing hit is – the **shadow map**. During normal painting, every spot then asks: "Am I farther
+from the sun than what's on the map? Then something is in front – shadow." (Sketch in
+[Appendix B](B-rendering.md).)
 
-### 4.8.1 Sun Shadows
+**The map has only a limited number of points.** An example: if you stretch 512 map points over a
+240 m wide area, each point is almost half a meter wide. Far too coarse for a duck that's barely
+that big itself – its shadow would be a blob. That's why there's the **shadow distance**: the map
+only covers what you see up to this distance. Less area, same number of points – sharper shadows.
+In levels you set it in the **World Settings**; the Micro Duck level uses only 10 m.
 
-Kern paints the scene once **from the sun's point of view** and, for each map point, remembers only
-the distance to the nearest object – the **shadow map** (basic principle in
-[Appendix B](B-rendering.md)). Default: 512 × 512 points over ±120 m, a small safety margin (bias
-0.0012) and a filter with 1, 4 or 9 samples. Allowed are 128 to 4096 points (powers of two), ±10
-to ±2000 m and a bias below 0.04. Studio uses 4 samples on phones and 9 on desktops; `?shadowFilter=1`,
-`4` or `9` in the address overrides that.
+More precisely, Kern puts a **sphere** around the area the camera sees up to the shadow distance,
+and covers this sphere. Why a sphere and not a box that fits exactly? The map is fixed in line with
+the sun. When the camera turns, its view cone turns under the map – and a box that encloses it
+exactly gets sometimes narrow, sometimes wide. The sphere fits the same in every direction:
 
-**Shadow distance.** 512 points over 240 m – almost half a meter per point! Far too coarse for a
-duck. With the **shadow distance**, the map only covers what you see up to that distance. In
-levels: **World Settings › Shadow distance** (default 80 m, 10 m in the Micro Duck level). More
-precisely, the map encloses a **sphere** around the camera's visible cone (after Valient, 2008). A
-sphere stays the same size however you turn – and so do the map points. Without a shadow distance
-(the renderer's default is 0) or with an orthographic camera, the fixed square around the camera
-target applies.
+![From above: a box around the camera's view cone changes size as it turns, the sphere stays the same size](../abbildungen/schattenkugel.svg)
 
-**Snapping.** If the map moves along by fractions of a point, shadow edges land on the grid
-differently each time and flicker. Kern rounds its position to **whole map points**.
+With the box, the map points would grow and shrink with every turn of the head, and the shadow
+edges would tremble. With the sphere, the map points stay the same size.
 
-> **Imagine …** … you draw a slanted line on tiles. If you shift the tile pattern a little, the
-> staircase edge looks different every time. If you only shift by whole tiles, the little stairs
-> stay the same – and hardly stand out.
+**Snapping.** If the map moves along with the camera by fractions of a point, shadow edges fall
+onto the grid differently each time and flicker. That's why Kern moves the map only by **whole
+map points**.
 
-**Reuse.** From the map position, sun direction, extent, a counter for shadow casters (it goes up
-when one appears, disappears, moves or changes its material) and the active layers, Kern forms a
-key. Only when it changes is the map repainted. Over a static city with a camera that stands still,
+> **Imagine …** … you paint a slanted line on tiles. If you shift the tile pattern a little, the
+> staircase edge looks different every time. If you shift only by whole tiles, the little stairs
+> stay the same – and are hardly noticeable.
+
+**Reuse.** Kern repaints the map only if something important has changed: the sun, the position
+of the map or a thing that casts shadows. Over a motionless city with the camera standing still,
 the shadow costs **not a single draw call**.
 
-**Painting and sampling.** Only depth is painted – only shadow casters on the active layers that
-lie within the sun's view pyramid – with a lean shader and a small polygon offset against **shadow
-acne** (stripes where a surface shadows itself). When looking things up, the graphics card can
-compare depths directly and blend four neighbors – level 1. Levels 4 and 9 combine this into a
-larger, soft filter (after Castaño, 2013, from the game "The Witness"): Every sample sits so
-cleverly **between** the points that the built-in blending delivers exactly the right weights. On
-top of that comes the **normal offset** (after Holbert, 2011): Kern looks up the shadow a tiny bit
-away from the surface, along the normal, more so with grazing light. That prevents acne without a
-large bias detaching the shadow from the object.
+**Avoiding shadow acne.** Because a map point covers a small piece of area, a surface can shade
+itself: fine stripes appear, the **shadow acne** – similar to the stripes on a photo of a screen.
+That's why every spot, before it looks at the map, moves a tiny bit in the direction its surface
+faces – like stepping away from the wall before you measure. That way the surface no longer
+measures against itself.
 
-Outside the map, everything counts as lit; surfaces that point away from the sun don't even look.
-With a shadow distance, the shadow fades out gently over the last tenth.
+**Soft edges.** Instead of asking just one map point, Kern mixes several neighbors. That gives the
+shadow edge a soft transition instead of hard little stairs.
 
-**Rule of thumb:** Extent and resolution together determine the point size. Orb Run uses 2048
-points over ±110 m, so 220 m / 2048 ≈ **a little over 10 cm per point**; "hello" uses 1024 points
-over ±40 m. Studio creates the map with 2048 points and uses the shadow distance in levels.
+At the edge of the shadow distance, the shadow fades out gently instead of breaking off.
 
-> **Try it!** Load **File › Example Levels › Micro Duck** and set the **Shadow distance** in
-> **World Settings** from 10 to 200 m: The shadows of the duck and the ball get mushy. Back to 10 –
-> razor sharp. Smaller means sharper, but doesn't reach as far.
+> **For the curious:** When mixing the neighbors, Kern uses a trick from the game "The Witness":
+> it cleverly asks *between* the map points, so that the graphics card mixes the neighbors with
+> the right shares for free. That way nine lookups work like a soft filter over 25 map points.
+
+> **Try it!** Load **File › Example Levels › Micro Duck**, open the **World Settings** tab on the
+> right and set the shadow distance, the field **Shadow distance (smaller: sharper)**, from 10 to
+> 200 m: the shadows of the duck and the ball go mushy, because the same map points are now spread
+> over much more area. Back to 10 – razor sharp. Smaller means sharper, but doesn't reach as far.
 
 ### 4.8.2 Sky
 
-The sky is a single screen-filling triangle **all the way at the back**. Kern paints it *after* the
-opaque things, with the depth test on – only pixels where nothing lies yet pass. So the elaborate
-sky shader only runs where sky is actually visible.
+The sky is a single huge triangle that covers the whole screen and lies **at the very back**. How
+can a triangle cover a rectangle? It's so big that it sticks out over the edge; whatever sticks
+out, the graphics card simply cuts off. (The numbers in the picture are the graphics card's
+language: for it, the screen runs from −1 to 1 from left to right and from bottom to top.)
 
-Per pixel it mixes: a **gradient** from horizon color to zenith color (dark blue at night), the
-**golden hour** (the lower the sun, the more orange the horizon and the more violet the zenith), a
-**sun** with a soft halo and a sharp disk, at night **the moon and twinkling stars**, **clouds**
-made of five layered noise patterns (pushed along by the wind, pushed away by explosions as if by a
-shock wave) and, if you like, **horizon fog**, in which the horizon dissolves into the scene's fog
-color – the thinner the scene's fog, the thinner this haze as well. When the sun sinks a little
-below the horizon, the disk and halo disappear; below the horizon, the sky blends into the horizon
-color. Orthographic cameras have no sky; there the clear color remains, the base color every
-picture starts with.
+![A triangle twice as wide and high as the screen covers it completely; whatever sticks out is cut off](../abbildungen/himmel-dreieck.svg)
 
-### 4.8.3 Bloom and Composite
+Kern paints it *after* the opaque things. Thanks to the depth buffer, it only comes through where
+nothing has been painted yet. So the elaborate sky shader only runs where sky really can be seen.
 
-**Bloom** is the glow around very bright spots. It needs intermediate pictures with floating-point
-numbers; if the device can't do that, Kern reports "unsupported" and paints directly. The steps:
-**cut out the bright parts** (at a quarter of the size, with a soft transition starting at about
-0.88), **blur** – horizontally, then vertically, nine weights with only five reads (trick in
-Appendix B) –, **once more** at an eighth of the size for the wide glow, then **composite**.
+For every pixel it mixes: a **gradient** from the horizon to the sky above you (dark blue at
+night), the **golden hour** (the lower the sun, the more orange the horizon and the more violet
+the sky above it), a **sun** with a soft halo and a sharp disk, at night **moon and twinkling
+stars**, **clouds** and, if you want, **horizon fog**, in which the horizon blends into the
+scene's fog color – the thinner the scene's fog, the thinner this haze too.
 
-The composite is smarter than it looks: It takes the finished picture and adds only the
-**difference** between "light with glow and AO, through the film curve" and "light without them,
-through the same curve." Why so complicated? The finished picture already contains the fog, which
-is missing from the copy of the light. Developing it anew would mean: fog gone. Pixels without glow
-and occlusion are simply copied.
+The clouds are made from **noise patterns**: random patterns that still always look the same, like
+the veins in marble. Several of them, fine and coarse laid on top of each other, give clouds; the
+wind shifts them, and an explosion pushes them away like a shock wave. When the sun sinks below
+the horizon, the disk and halo disappear.
 
-> **Imagine …** … a photo that's already framed. Instead of developing it again, you lay a thin
-> sheet of film with the glow over it. The frame – the fog – stays as it is.
+### 4.8.3 Glow (bloom) and combining
 
-**The guard.** If the averaged frame time stays above 27 milliseconds for longer than 3.5 seconds
-(so below about 37 frames per second), the glow switches itself off for the session, unless it is
-forced. The composite keeps running, because it also brings the AO into the picture. When the page
-is hidden, Kern resets the guard – otherwise throttled background frames would switch off the glow.
+**Bloom** is the glow around very bright spots, like backlight in your eye. Kern does it in three
+steps: from the light-meter picture it **cuts out** everything very bright, **blurs** it on
+shrunken pictures (that's cheaper and gives a broader glow) and **lays** it over the finished
+photo. If a device can't handle the in-between pictures this needs, Kern paints without glow.
 
-### 4.8.4 Ambient Occlusion (GTAO)
+When combining, Kern doesn't develop the photo anew. It only works out **by how much** glow and
+corner shadows change the picture and lays exactly this difference on top. Why so complicated?
+Remember the order inside the pixel (4.5): the light-meter picture is split off **before** the
+fog, the finished photo is **with** fog. If Kern developed the photo anew from the light-meter
+picture, the fog would be gone. Pixels without glow and without corner shadows Kern simply takes
+over unchanged.
 
-**Ambient occlusion** (AO) means the soft shadows in corners, cracks and under things, where less
-skylight gets in. Kern uses **GTAO** (after Jimenez and colleagues, 2016) in the form of Intel's
-XeGTAO; Appendix B explains the method. What's special about Kern: **no extra painting pass** for
-the geometry.
+> **Imagine …** … a finished photo of a foggy evening. If you developed it again, the fog would be
+> gone. So you lay just a thin transparent sheet with the glow over it – the fog in the photo
+> stays as it is.
 
-1. During normal painting, the shader also writes down the indirect share of the light (4.5).
-2. GTAO computes from the finished depth how strongly each point is occluded.
-3. The composite darkens **exactly the indirect share**. Sun and lamps stay untouched.
+**The watchdog.** If a device stutters over several seconds, a watchdog switches the glow off for
+the rest of the session. Combining keeps running, because it also brings the corner shadows into
+the picture. If the page is hidden at the moment, for example in a background tab, Kern resets the
+watchdog – the browser deliberately slows such pages down, and that shouldn't switch off the glow.
 
-That way, the AO sits in the physically right place. Kern also skips a pre-pass because Apple and
-Mali graphics chips throw away hidden pixels in hardware anyway.
+### 4.8.4 Corner shadows (ambient occlusion)
 
-Simplified, the main pass does this: It reconstructs the position from the depth value, also gets
-the normal from the depth (per direction, the neighbor with the smaller depth jump counts),
-converts the **radius** (default 1.6 m) into pixels and searches in a few directions, left and
-right, for the **highest horizon**. The directions rotate according to a 4×4 pattern, which an
-edge-aware filter averages away again. When the result is applied, **multi-bounce** helps: Bright
-surfaces get back light that bounces back and forth between the walls – a white corner of a room
-gets less dark than a black one.
+**Ambient occlusion** – "surround blocking", here corner shadows for short – are the soft dark spots
+in corners, cracks and under things. Less ambient light gets there, because the surroundings block
+part of the sky.
 
-**Quality** (directions × steps per side): low 1 × 2, medium 2 × 2, high 3 × 3, ultra 9 × 3.
-The default is medium at half resolution; on slow devices a guard first lowers the quality and then
-switches to half resolution. Studio and exported games use medium/half on phones, otherwise
-high/full; `?ao=off|low|medium|high|ultra` and `?aoRes=half|full` override that. A strength
-(`power`, default 2.2) makes the occlusion stronger. The radius belongs to the scene, not the
-device: Levels set it in the World Settings, and 0 switches AO off for that scene. AO only runs with
-a scene target (not in partial viewports, not without bloom support) and a perspective camera.
+> **Imagine …** … you're lying in a hollow in the grass, looking up. The deeper the hollow, the
+> smaller your piece of sky – and the darker it is where you are, even without sun shadows.
 
-> **Try it!** In **World Settings**, set the **Ambient occlusion radius** to 0: Corners and joints
-> look flat, objects float. Then 1.6 (the default) and, as a test, 4 – do you see how things
-> "grow into" the ground?
+For this, Kern uses a proven technique that Appendix B explains. Kern's special feature: it needs
+**no extra painting pass** over all shapes.
 
-## 4.9 Particles and Point Lights
+1. During normal painting, the shader writes the memo from 4.5 on the side: how much of each
+   pixel's light is ambient light and how bright its base color is.
+2. From the finished depth buffer, Kern calculates how strongly each spot is blocked by its
+   surroundings: it looks in a few directions and searches for how high the surroundings block the
+   sky.
+3. When combining, it darkens **exactly the ambient light**. Sun and lamps stay untouched.
 
-Sparks, smoke, muzzle flashes: Kern's **particles** are small squares that turn toward the camera –
-all together **one** instanced, transparent mesh, purely visual, without physics. Each one has a
-color, a lifetime (16 to 10,000 ms, default 350), a size (default 35 cm) and, if you like, gravity,
-growth and faster fading. A system holds 1 to 4096 particles; when it's full, a new one is rejected
-and counted. Every frame, Kern moves them (starting point plus velocity times time, minus falling),
-sorts them **back to front** and fades them out over their lifetime. The particle mesh is unlit,
-double-sided, casts no shadow, is never culled and is invisible as long as no particle is alive. The
-game runtime uses 512 particles; JavaScript reaches the same class through `kern_fx_*`.
+That way the corner shadows sit in the physically right place. On top of that comes a correction
+for light that bounces back and forth between bright walls – that's what the base color on the
+memo is for: a white corner of a room gets less dark than a black one. Transparent things and the
+first-person layer get no corner shadows.
 
-> **Watch out!** The particle clock never runs backward. That's on purpose: Otherwise sparks that
-> faded long ago would reappear after a pause like ghosts.
+**The direction of surfaces from depth.** For the calculation, Kern has to know where each surface
+faces – but it doesn't paint a separate picture with normals. It reads the direction off the depth
+picture: how the distance to the neighboring point on the left, right, above and below changes
+reveals the slope. Just as you can tell from the heights of the steps how steep a staircase is.
 
-The shader only knows six point lights. If a game has twenty lamps, the **LightPool** picks the six
-most important ones every frame: brightness divided by (1 + distance / range), where the range
-counts as at least 4 m; in a tie, whoever asked first wins. It caps brightness above 100 and range
-above 1000 m. Example: Lamp A, brightness 10, range 10 m, 30 m away: 10 / (1 + 3) = 2.5. Lamp B,
-brightness 4, same range, 5 m away: 4 / 1.5 ≈ 2.7 – the weaker but closer one wins. That's how Orb
-Run registers a headlight in front of the car and one light per orb.
+**Calculate little, then smooth cleverly.** Per pixel, Kern looks in only a few directions, and
+each neighboring pixel looks in slightly rotated directions – a fixed pattern in which every small
+group of pixels together covers all directions. Afterwards Kern smooths over exactly these groups.
+In doing so, it only mixes neighbors at a similar distance: a pixel on a nearby crate and one on
+the distant wall behind it stay separate. Like a painter who tapes off the edge – that way the
+shadow doesn't bleed across edges.
+
+> **For the curious:** A common approach would be to paint a separate pass just for depth
+> beforehand. Kern saves itself that for good reason: the graphics chips of Apple devices and some
+> Android phones throw away hidden surfaces by themselves anyway before coloring them in. The
+> extra pass would hardly help there and would cost a whole painting pass.
+
+The calculation isn't cheap. That's why Kern sets the quality according to the device – coarser
+on the phone, finer on the computer – and a watchdog turns it down when things stutter. The
+**radius**, that is, how far Kern searches for things that block, is set by the scene, though: it's
+in the **World Settings**, and 0 switches off the corner shadows for this scene. Corner shadows
+only exist when Kern paints the whole window with perspective (4.7).
+
+> **Try it!** In **World Settings**, set the field **Ambient occlusion radius (0 = off)** to 0:
+> corners and joints look flat, things seem to float. Then 1.6 (the default) and, as a test, 4 –
+> do you see how things "grow into" the ground?
+
+## 4.9 Sparks and lamps
+
+Sparks, smoke, muzzle flashes: Kern's **particles** are small squares that always turn toward the
+camera. All of them together are **one** shape with many copies (4.4), purely visual, with no
+physics – they don't bounce off anything. Every particle has a color, a lifetime and a size, and
+if you want, gravity, growing and faster fading. Every frame, Kern moves them on, sorts them from
+back to front (they're transparent, after all) and lets them fade over their lifetime. For
+particles, Kern keeps a fixed number of places ready, like chairs in a hall. If all are taken, a
+new particle is turned away until an old one goes out.
+
+The shader knows only **six lamps** at once. If a game has twenty, Kern picks the six most
+important in every frame. Important means: bright and close. The rule in words: Kern counts **how
+many ranges** the lamp is away from the camera and divides its brightness by **1 plus that
+number**.
+
+**Example:** lamp A has brightness 10, a range of 10 m and is 30 m away – three times its range.
+Kern divides by 1 + 3 = 4 and gets 2.5. Lamp B has brightness 4, the same range and is only 5 m
+away – half a range. Kern divides by 1.5 and gets just under 2.7 (exactly 2.67). The weaker but
+closer lamp wins. Orb Run registers a headlight in front of the car this way, and one light per
+orb.
 
 ## 4.10 Settings
 
-The complete lists are in the blue book and in [Chapter 17](17-reference.md); here are the most
-important points. The basic settings are the picture size (default 960 × 540), sun shadows (default
-off), bloom, AO and color grading (on). Shadows, shadow distance, filter, AO, AO radius and point
-lights can be changed at runtime; `invalidate` forces a repaint, including the shadow map if you
-want.
+Almost everything in this chapter can be adjusted: picture size, shadows, glow, corner shadows,
+color grading, light colors, fog, sky and camera – the complete list is in the blue book, Chapter
+4, and in [Chapter 17](17-reference.md). In levels you don't have to set any of this by hand: Kern
+works out sun, ambient light, fog and sky from the **time of day**
+([Chapter 8](08-game-runtime.md)). It makes sure the amounts of light fit together as they do
+outdoors: the sun delivers about five times as much light as the whole sky put together, and Kern
+derives the light from the ground from how much of this light a gray street throws back.
 
-With every frame you pass **RenderParams**: the clear color (dark blue, visible where there is no
-sky), optionally a partial rectangle (then without bloom and AO), whether the page is hidden
-(suspends the guards), the layer mask and whether the sky is painted.
+## 4.11 When the browser takes the graphics card away
 
-All light colors are stored in the renderer as linear values already multiplied by their strength;
-in the code, the defaults are called "production day": sun at a slant from above from the direction
-(−0.45, −0.52, 0.72), sun color (2.8, 2.47, 2.11), fog density 0.00085, exposure 1, environment
-strength 0.9. The sky is controlled by the sun and moon direction, night (0 to 1), clouds, wind and
-explosions. In levels you don't have to set any of this by hand: The game runtime computes
-everything from the **time of day**, with sun to skylight at about 5 : 1, the hemisphere light only
-as a night-time brightener, a ground color of the environment dome taken from the light a road
-reflects, and height fog, sun scattering and horizon fog switched on
-([Chapter 8](08-game-runtime.md)).
+A browser may take the graphics card away from a page at any time – when memory runs low, when the
+graphics driver restarts, or on a phone when the page is in the background. This is called
+**context loss**. Many web pages then show nothing but black. Not Kern:
 
-The **camera** has an eye point, a target, an up direction (Z), a 60° opening angle (Kern Studio's editor viewports use 70°), a near plane
-at 0.05 m and a far plane at 1800 m, and can optionally be orthographic. The world is **Z-up, in
-meters**.
+1. **Loss:** the page tells the browser "I want that back!" (otherwise there'd be no restoring).
+   Kern forgets all its coat-check tickets for the graphics card and stops painting for now.
+   Shapes and textures are kept as copies, and you can even keep creating new ones.
+2. **Restoring:** first the page refills its own textures, then Kern rebuilds paint programs,
+   extra painting passes and extensions and uploads everything again from its copies.
+3. **Failed?** Kern cleans up and can try again cleanly later.
 
-## 4.11 Context Loss
+Because Kern can keep working entirely without a graphics card this way, the same mechanism also
+allows working completely **without a screen** ("headless"), for example in the Lehrer, which
+trains robots and doesn't have to paint anything while doing so ([Chapter 14](14-lehrer.md)).
 
-A browser may take the graphics card away from you at any time – when memory runs low, when the
-driver restarts or on a phone in the background. Many websites then show nothing but black. Not
-Kern:
+> **Did you know?** This is exactly why Kern keeps the copy in main memory (principle 3 from 4.1).
+> What looks like wasted memory is an insurance policy.
 
-1. **Loss:** The page tells the browser "I want that back!" (otherwise there would be no
-   restoration). Kern forgets all graphics numbers; `render()` politely declines with "GL context
-   lost; waiting for restoration". Meshes and textures remain as copies, and `upsert` keeps working.
-2. **Restoration:** First the page refills its own textures, then Kern rebuilds programs, passes and
-   extensions and uploads everything from the copies.
-3. **Failed?** Kern cleans up and can cleanly try again later.
+## 4.12 How a game stays smooth
 
-The same mechanism allows **headless mode** without any graphics card at all, for example in the
-Lehrer ([Chapter 14](14-lehrer.md)).
+Every draw call costs time, no matter how small it is. A game stays smooth if it gives Kern few,
+big jobs and doesn't send anything again unnecessarily.
 
-> **Did you know?** This is exactly why Kern keeps the copy in main memory (principle 3). What
-> looks like wasted memory is really an insurance policy.
+> **Imagine …** … you go shopping. Running to the store a hundred times for one ingredient each
+> takes much longer than going once with a full basket – even though the same things end up in
+> the fridge.
 
-## 4.12 Performance Notes
+- **Copies instead of duplicates:** many identical things are one shape with many instances. The
+  game runtime's city paints all tree trunks as one shape, all treetops as a second.
+- **Combine small things:** the building and street builders pack many small parts into a few big
+  shapes – fewer jobs, less sorting work.
+- **Only upload what changes:** identical data costs nothing, pure color changes little.
+- **Go easy on shadows:** every movement of a thing that casts shadows repaints the whole shadow
+  map. Whatever doesn't need a visible shadow doesn't get one – Orb Run switches it off for streets
+  and ground.
+- **Measure instead of guessing:** the statistics show draw calls, reused shadows, triangles and
+  times. Glow and corner shadows adapt by themselves anyway.
 
-- **Instance instead of copying:** The runtime's city paints all tree trunks as one mesh and all
-  treetops as a second one.
-- **Combine static things:** The building and road builders pack many small parts into a few large
-  meshes – fewer draw calls, less sorting work.
-- **Only upload what changes;** identical data costs nothing, pure color changes cost little.
-- **Go easy on shadows:** Every movement of a shadow caster repaints the whole map. Anything that
-  doesn't need a visible shadow gets `cast_shadow = false` – Orb Run does that for roads and the
-  ground. With a shadow distance, the map is also repainted as soon as the camera moves by one map
-  point.
-- **16-bit indices** come automatically; `weld` ([Chapter 5](05-scene-and-geometry.md)) turns loose
-  triangles into lean indexed meshes.
-- **Leave frustum culling on:** Switch it off (`frustum_culled = false`) only for things whose hull
-  isn't right, such as particles.
-- **Measure instead of guessing:** The statistics show draw calls, shadow reuse, triangles and
-  times; in JavaScript, `KernRenderer.render()` returns them as an object. AO and bloom adapt
-  themselves anyway.
+## 4.13 Example: windows that light up at night (Orb Run)
 
-## 4.13 Example: Windows That Light Up at Night (Orb Run)
+In Orb Run, the city's windows light up at night – but the buildings **don't have any windows at
+all**. They're smooth boxes! The windows are only painted by the shader, with an extension called
+"NightWindows".
 
-In Orb Run, the city's windows light up at night – but the buildings **have no windows at all**.
-They're smooth boxes! The windows are only painted by the shader, with an extension called
-`NightWindows`.
+The building builder ([Chapter 5](05-scene-and-geometry.md)) gives every corner of a wall a small
+**wall record**: how long and high the wall is, how high a story is, and a random number per
+building. In addition, every point of the wall knows how many meters it is from the start of the
+wall and from the ground. With that, the shader lays an **invisible grid** over the wall: columns
+3 m wide and one row per story.
 
-The building builder ([Chapter 5](05-scene-and-geometry.md)) gives every corner a **wall record**
-with four numbers: wall length (−1 for the roof, −2 for the cornice), wall height, a random seed per
-building and the story height. The texture coordinates are meters along the wall (u) and above the
-ground (v). Over every wall, the shader lays an invisible grid of 3 m wide columns and story rows.
-An excerpt from `fragment_surface`:
+![The invisible grid of a wall: cells 3 m wide, one window in the middle part of each, not on the first floor (ground level) and not in the top meter](../abbildungen/fassade-fenster.svg)
 
-```glsl
-float column = floor(u / 3.0), floorIndex = floor(z / storey);
-vec2 cell = vec2(fract(u / 3.0), fract(z / storey));
-base = mix(base, vec3(0.05, 0.06, 0.08), win * 0.85);
-surfaceGlass = max(surfaceGlass, win * (1.0 - lit * uNight) * 0.7);
-```
+For every pixel of a wall, the shader asks:
 
-- Line 1: Which column, which story am I in? (`floor` rounds down.)
-- Line 2: Where in the cell am I, from 0 to 1? (`fract` takes the part after the decimal point.) If
-  the point lies in the middle part, there's a window here (`win`).
-- Line 3: Window areas become almost black.
-- Line 4: Unlit windows become glass and reflect the sky – all of them during the day, only the
-  dark ones at night.
-
-The rest in words: The snippet only acts on roughly vertical walls, from one story above the ground up
-to 1 m below the roof edge. Whether a window is lit is decided by a **hash** of column, story and seed –
-about **58%** are on. Lit windows get a warm `emissive` times `uNight` and glow thanks to bloom. In
-the distance, the grid would become finer than a pixel and flicker wildly (**aliasing**); `fwidth`
-measures that, and Kern then replaces the windows with an average glow of the facade. The vertex
-shader passes the wall record on **`flat`**, that is, without interpolation: It is constant per
-wall, and tiny rounding errors would scramble the hash – windows would flicker on and off. The
-extension sets the uniform `uNight` once per frame through the cache, from the day-night cycle.
+1. Which column and which story am I in?
+2. Am I in the middle part of my cell? Then I'm a window. (Not on the first floor, at ground level, and not right
+   under the roof.)
+3. Is this window on? That's decided by a "die" rolled from column, story and the building's
+   random number – a good half of the windows are on.
+4. Every window surface gets a dark glass color and reflects the sky – all windows during the day,
+   only the switched-off ones at night. At night, switched-on windows instead get a warm self-glow
+   and glow thanks to bloom.
 
 > **Imagine …** … a die that **always rolls the same number** for the same window. That's exactly
-> what the hash is: Window 7 on the 12th floor is lit every night, and nobody had to remember it.
+> what the die here is (technical term: hash): window 7 on the 13th floor is lit every night, and
+> nobody had to remember it.
 
-The extension is plugged in via `App::extensions()`. Building chunks get the wall stream in slot 0,
-roads and ground tiles get none – there the shader reads a wall length of 0, and the snippet does
-nothing. The game runtime has a class `kern::game::NightWindows` with identical shader code, which
-Studio and exported games always register; whether a **Procedural City** supplies the stream is
-decided by its switch **Lit windows at night**.
+**Against flickering:** in the distance, the grid would get finer than a pixel; the windows would
+jump wildly on and off (**aliasing**). The shader notices how fast the grid changes from pixel to
+pixel and replaces the windows in the distance with an even, medium glow of the facade.
 
-> **Try it!** Load **File › Example Levels › Orb Run** and type into the console at the bottom
-> (**Cmd**) first `tod 0.75` – the golden hour colors the sky – and then `tod 0.95` for night. Dark
-> glass windows, warmly glowing windows, a soft shimmer in the distance. Select the city and switch
-> off **Lit windows at night** in **Details** – then its buildings no longer get glowing windows.
+That way the city needs not a single extra corner and no memory for thousands of windows, and
+every building gets windows, no matter how big it is.
+
+> **For the curious:** Normally the graphics card blends the values of the corners across the
+> triangle, like a color gradient (technical term **interpolation**). The wall record, on the
+> other hand, Kern passes unchanged to every pixel – it's the same for the whole wall, after all.
+> Even tiny rounding errors while blending could make the die roll a different result, and windows
+> would flicker on and off.
+
+How dark it is, the shader learns from a single setting for the night, which the extension sets
+once per frame from the day-night cycle – via the memo pad. Streets and ground tiles get no wall
+record; there the shader reads zero, and the extension does nothing. Kern Studio and exported
+games always have the same extension on board; whether a **Procedural City**, that is, an
+automatically generated city, equips its buildings with it is decided by its switch **Lit windows
+at night**.
+
+> **Try it!** Load **File › Example Levels › Orb Run**. Click into the field next to **Cmd** at the
+> bottom of the status bar: the console, an input field for commands. Type `tod 0.75` and Enter –
+> `tod` stands for *time of day* and sets the time of day from 0 to 1 (0.25 sunrise, 0.5 noon, 0.75
+> sunset). The golden hour colors the sky. Then `tod 0.95` for late night: dark glass windows,
+> warmly glowing windows, a soft shimmer in the distance. Now select the city: at the top right in
+> the **Outliner**, click the entry whose **Type** is **Procedural City**. Then, on the right in
+> **Details**, switch off **Lit windows at night** – and its buildings no longer get glowing
+> windows. You see: the windows exist only in the paint program.
 
 ## What you take away
 
-- Kern paints **everything with one standard shader**; games extend it through six insertion
-  points.
-- Shapes are **uploaded once**; after that only instances change, and identical data costs nothing.
-- The uniform cache saves every call that says nothing new.
-- Every pixel ends up in **three pictures**: the finished picture, the real light, the AO record.
-- The shadow map covers a **sphere** around the view, snaps to the grid and is only repainted when
-  needed.
-- AO darkens **only indirect light** and needs no second geometry pass.
-- Kern survives a **context loss** thanks to the copies in memory.
-- Partial viewports have neither bloom nor AO.
+- Kern paints **everything with one paint program**; games add to it at agreed spots.
+- Shapes are **uploaded once**; after that only their copies change; identical data costs nothing.
+- A **memo pad** saves every command to the graphics card that says nothing new.
+- Every pixel ends up in **three pictures**: finished photo, real light for the glow, notes for the
+  corner shadows.
+- The shadow map covers a **sphere** around the view, snaps to whole points and is only repainted
+  when needed.
+- Corner shadows darken **only the ambient light** and need no second painting pass.
+- Kern survives **losing the graphics card** thanks to its copies in main memory.
+- Partial views have neither glow nor corner shadows.
 
 ## Brain teasers
 
-1. Why does Kern sort opaque things front to back, but transparent things the other way around?
-2. A game moves a small ball that casts a shadow every frame. What does that cost, and how can you
-   save?
-3. Why is the shadow map with a shadow distance a sphere and not a box that fits exactly?
+1. Why does Kern paint opaque things from front to back, but transparent things the other way
+   around?
+2. A game moves a small ball that casts a shadow in every frame. What does that cost, and how do
+   you save?
+3. Why is the shadow map with shadow distance a sphere and not a box that fits exactly?
 4. Nothing glows in the four-viewport view. Is your device too slow?
-5. Why is the night windows' wall record passed on `flat`?
+5. The windows in Orb Run don't exist as a shape at all. Why is it still smart to let them appear
+   only in the paint program?
 
 ### Solutions
 
-1. That way, hidden things fail the depth test early and save shader time. With transparent things,
-   the order of the layers matters – so the back comes first.
-2. Every movement repaints the whole shadow map. If the ball doesn't need a visible shadow:
-   `cast_shadow = false`.
-3. A sphere stays the same size when you turn, and so do the map points – the edges don't flicker.
-4. No: Partial viewports paint with a rectangle directly onto the screen, without bloom and AO.
-5. It is constant per wall; interpolation would only bring rounding noise that scrambles the window
-   hash.
+1. Front first: hidden things fail the depth buffer test right away and cost no coloring in. With
+   transparent things, the order of the layers matters as with transparencies – so back first.
+2. Every movement repaints the whole shadow map. If the ball doesn't need a visible shadow, you
+   switch it off for the ball.
+3. The map is fixed in line with the sun. A box that fits the view cone exactly gets sometimes
+   narrow, sometimes wide as it turns, and the map points with it. A sphere fits the same in every
+   direction – the map points stay the same size, the edges don't tremble.
+4. No: partial views paint directly onto the screen, without the in-between pictures for glow and
+   corner shadows.
+5. It needs no extra triangles and no memory for thousands of windows; every building gets
+   windows, no matter how big it is; a single value switches between day and night; and because
+   the die always rolls the same, nobody has to remember which window is on.
 
 ---
 

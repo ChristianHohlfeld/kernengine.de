@@ -249,7 +249,7 @@ footprints.ring(court, 4);                // Loch (Innenhof)
 
 ### Was pro Gebäude passiert
 
-1. **Ringe reinigen** (`clean_ring`): nicht-endliche Punkte und Punkte unter 1,5 cm Abstand zum Vorgänger fallen weg, ebenso der schließende Duplikatpunkt. Bleiben weniger als 3 Punkte oder eine Fläche ≤ 0,08 m², wird der Ring leer.
+1. **Ringe reinigen** (`clean_ring`): nicht-endliche Punkte und Punkte mit höchstens 1,5 cm Abstand zum Vorgänger fallen weg, ebenso der schließende Duplikatpunkt. Bleiben weniger als 3 Punkte oder eine Fläche ≤ 0,08 m², wird der Ring leer.
 2. **Orientierung vereinheitlichen:** äußerer Ring gegen den Uhrzeigersinn, Löcher im Uhrzeigersinn (`ring_area`, nötigenfalls umdrehen).
 3. **Verwerfen**, wenn ein Ring leer ist, die Wandhöhe ≤ 0,1 m ist, Earcut nichts liefert oder die Flächenabweichung über 0,7 % liegt.
 4. **Farben** aus dem Stil: Wandfarbe `walls[h % n]`, Dachfarbe `roofs[(h >> 8) % n]`, Gesimsfarbe als Mischung `mix(Wand, trim, trim_mix)` in `f64`, damit sie exakt einer Referenz in doppelter Genauigkeit entspricht. Die Stockwerkshöhe liegt zwischen 3,1 und 3,6 m, abhängig vom Seed.

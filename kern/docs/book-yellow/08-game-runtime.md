@@ -1,163 +1,200 @@
-# 8 The Game Runtime – From Blueprint to Game
+# 8 The Game Runtime – from Blueprint to Game
 
-> **Your level:** This is where Kern becomes a real game engine. You'll find out what a level is
-> made of, how it's saved and what happens in every single frame while you play. After that you'll
-> know how vehicles drive, triggers fire and games are won.
+> **Your level:** Here Kern becomes a real game engine. You find out what a level is made of, how
+> it's saved, and what happens in every single picture while you play. After that, you know how
+> vehicles drive, triggers go off and games are won.
 
-A **level** is a document made of **actors**, meaning things in the world that carry
-**components**. Kern Studio edits levels and saves them as `.klevel` files. The **GameWorld**
-displays a level and plays it with the Box3D physics engine: with controls, camera, rules,
-triggers, sound and logic. Studio uses the same GameWorld for editing, Simulate and Play, and
-exported games run on exactly this code.
+> **Words you need:**
+> - **Actor** – a thing in the level: a crate, a lamp, a car, the player character.
+> - **Component** – a building block that gives an actor an ability, such as "being visible."
+> - **Collider** – the invisible shape the physics uses to check whether things collide.
+> - **Sensor** – a collider that doesn't stop anything but only reports when something comes in.
+> - **Static / kinematic / dynamic** – stands fixed / is moved by the game but can't be pushed /
+>   real physics with falling and bumping.
+> - **Fixed step** – the physics calculates in time slices that are always the same length,
+>   usually 60 per second.
+> - **Server** – in multiplayer, the one computer that decides what really happens.
+> - **Network** – a program that learned by practicing for a long time instead of being programmed
+>   rule by rule.
 
-> **Picture it like this:** The level is the recipe, the GameWorld is the kitchen. The recipe sits
-> neatly in the cookbook. The cooking happens on a copy, so the book stays clean.
+A **level** is a document made of actors that carry components. Kern Studio edits levels and saves
+them as a file with the ending `.klevel`. The **GameWorld** plays a level: it shows it and runs it
+with the physics engine Box3D, with controls, camera, rules, triggers, sound and logic. Studio uses
+the same GameWorld for editing, for **Simulate** and for **Play**. Exported games run with exactly
+the same program. The exact names of the program parts, all fields and all default values are in
+the blue book, Chapter 8.
 
-The code lives in the `kern::game` area: level, file format, GameWorld, soldier, logic, sound,
-touch, multiplayer, the Micro Duck and demo levels.
+> **Picture it like this:** The level is the recipe; the GameWorld is the kitchen. The recipe stays
+> neatly in the cookbook. The cooking happens with a copy, so that the book stays clean.
 
-## 8.1 The whole life of a game in five lines
+## 8.1 The Whole Life of a Game
 
-```cpp
-GameWorld world(renderer, &night_windows);
-world.sync(level);
-world.start(level, SimMode::play);
-world.step(dt, input);
-world.stop();
+A game always goes through the same four stations: prepare, start, calculate on step by step,
+stop.
+
+```mermaid
+%% Caption: The life of a game: prepare, start, calculate step by step, stop
+flowchart TB
+  A[Prepare] --> B[Start: make a copy]
+  B --> C[Step]
+  C --> R[next picture: one more step]
+  R --> C
+  C --> D[Stop]
+  D --> A
 ```
 
-1. The GameWorld is created with the renderer.
-2. `sync` brings the 3D models up to date with the level. Only what changed gets uploaded again.
-   While a simulation is running, `sync` is ignored.
-3. `start` copies the level, builds the physics world and starts Simulate or Play.
-4. Every frame: `step` keeps computing. On top of that come the camera (`update_camera`) and
-   drawing (`present`).
-5. `stop` tears everything down and shows the edited level again.
+1. **Prepare:** The GameWorld brings the 3D models up to the level's state and sends them to the
+   graphics card. If you only moved one crate, only that one is sent again.
+2. **Start:** The GameWorld makes a **copy** of the level, builds the physics world from it and
+   starts **Simulate** or **Play**.
+3. **Step:** In every picture, it calculates on, moves the camera and draws (8.9).
+4. **Stop:** Everything is taken down, and you see your unchanged level again.
 
-So whatever happens during the game does **not** end up in the document. If you want to keep
-simulated poses, use "Keep Simulation Changes" in Studio.
+So whatever happens during the game does **not** end up in your level. Crates that fell over stand
+neatly again after stopping. If you want to keep a simulated position, use **Keep Simulation
+Changes** in Studio (key K, 8.8).
 
-> **For pros:** When switching levels, `sync` removes an old city through its own models, not
-> through the actor number. The new level could give that same number to the ground – which would
-> otherwise go missing.
+## 8.2 The Rules for Numbers
 
-## 8.2 The ground rules for numbers
+So that all parts of Kern mean the same thing, fixed rules apply:
 
-- Units: meters, seconds, kilograms. **Z points up.**
-- Rotations are stored as three angles in degrees: x = roll, y = pitch, z = yaw, applied like a
-  rotator in the editor.
-- Colors are sRGB from 0 to 1, in the file as `#rrggbb`.
-- An actor's position is **relative to its parent actor**.
-- Child actors without a body of their own get "welded" onto the body of their nearest ancestor
-  during simulation. Several shapes then form one shared body (*compound*).
+- **Units:** meters, seconds, kilograms.
+- **Z points up.** X and Y lie flat on the ground.
+- **Rotations** are written as three angles in degrees.
 
-## 8.3 Level and actor
+> **Picture it like this:** an airplane. In Kern, a vehicle looks in the x direction, so x is its
+> long axis from back to front. **Roll** means it tips around its long axis and one wing goes down
+> (rotation around x). **Pitch** means the nose goes up or down (around y). **Yaw** means the nose
+> swings left or right, as when steering (around z).
 
-A **level** contains a name, **World Settings** (8.5), actors, imported images and sounds (inside
-the file itself), a logic graph, the editor camera and the next free actor number. The **player**
-is the actor listed as Player in the World Settings that has a Player Controller – otherwise the
-first one with a controller.
+- **Parents and children:** An actor can be placed under another one. Its position then applies
+  **relative to its parent actor**. A wheel as a child of a car stands, for example, "1.2 m in
+  front of the middle of the car," no matter where the car is right now. If the car drives, the
+  wheel drives along.
+- **Welded on:** If a child has no physics body of its own, it's "welded" onto its parent actor's
+  body when simulating. With the hovercar in Orb Run, cabin, spoiler and jets are such children:
+  for the physics, the whole vehicle is **one** body made of several shapes.
+
+## 8.3 Level and Actor
+
+A **level** contains:
+
+- a name and the **World Settings**, that is, settings for the whole world (8.5),
+- all actors,
+- imported pictures and sounds (they're right inside the file),
+- a logic graph for the whole level ([Chapter 9](09-logic.md)),
+- the position of the editor camera.
+
+The **player** is the actor entered in the **World Settings** in the field **Player (controlled in
+Play)**. If the entry is missing, Kern takes the first actor with controls.
 
 An **actor** has:
 
-- a unique **number** (0 means "none") and a **name** in the Outliner,
-- a **parent actor** and an **Outliner folder**,
-- **Hidden** (invisible) and **Locked** (can't be clicked in the Viewport),
-- a **transform**: position, rotation, scale,
-- **tags**, free keywords (for logic or as the head marker `head`),
-- **components**: at most one of most kinds, as many colliders and joints as you like,
+- a unique **number** and a **name**. You see the name in the **Outliner**, the list of all actors
+  in Studio,
+- a **parent actor** (or none) and optionally a folder in the Outliner,
+- **Hidden (editor and game)**, so invisible, and **Locked (not selectable)**, so not clickable in
+  the Viewport,
+- a **Transform**: **Location**, **Rotation** and **Scale**,
+- **tags**, free keywords the logic can search for,
+- **components**: of most kinds at most one, of colliders and joints as many as you like. A thing
+  only looks one way, but it can be made of several collision shapes and be attached in several
+  places,
 - a **logic graph** of its own.
 
-## 8.4 The components
+## 8.4 The Components
 
-Components are like Lego attachments: each one gives the actor an ability. In the file every field
-has a key, and when reading, numbers are clamped to sensible ranges (8.6).
+Components are like add-ons from a construction kit: a bare actor is just a point in space. Plug a
+mesh onto it, and it becomes visible. Add a **Rigid Body**, and it falls down. That way you build
+everything from the same building blocks.
 
-**Static Mesh** – the visible shape: Box, Sphere, Cylinder, Cone, Capsule, Plane, Torus, Ramp or a
-built-in model (such as one of the Micro Duck's servo motors). It can automatically create a
-matching collider, with friction (0.6), bounciness (*restitution*), rolling resistance and
-**surface** ([Chapter 6](06-physics.md)) – in Details under Mesh › Physics. Then there's the
-**material**: color, roughness, metal, glow, transparency, shadows, texture.
+| Component | What it can do | Example |
+|---|---|---|
+| **Static Mesh** | visible shape with material | crate, ball, ramp |
+| **Point Light** | lamp with color and range | streetlight |
+| **Rigid Body** | makes the actor a physics body | crate that falls over |
+| **Collider** | shape for collisions | a soldier's head |
+| **Constraint** | joint to another actor | door on its hinge |
+| **Player Controller** | makes the actor controllable | hovercar, ball |
+| **Weapon**, **Health** | weapon and hit points | shooting range, barrel |
+| **Pickup** | something to collect | orb, star |
+| **Trigger** | invisible switch | goal, jump pad |
+| **Audio Source** | sound source ([Chapter 7](07-audio.md)) | radio |
+| **Rotator** | keeps turning | revolving door, star |
+| **Mover** | moves back and forth | elevator, platform |
+| **Procedural City** | builds a whole city | Orb Run |
 
-**Point Light** – a lamp with color, brightness (20) and range (12 m).
+A few building blocks in detail:
 
-**Rigid Body** – turns the actor into a physics body. It's `static` (never moves), `kinematic` (is
-moved, but can't be pushed) or `dynamic` (real physics). Plus: mass (0 = from density), damping,
-gravity factor, "Bullet" for very fast bodies, sleeping, axis locks, starting velocity, impact sound
-([Chapter 7](07-audio.md)). Imported robots may set their center of mass and inertia exactly.
+**Static Mesh** is the visible shape: box, sphere, cylinder, cone, capsule, plane, torus, ramp or a
+built-in model, such as a limb of the Micro Duck like its neck. The **material** determines the
+look: color, how rough or shiny, whether metallic, whether it glows by itself, whether you can see
+through it. A mesh can automatically bring a fitting collider along. You set its friction,
+bounciness and surface ([Chapter 6](06-physics.md)) right here, under **Static Mesh › Physics**.
+They belong next to the look, because they're the thing's physics.
 
-**Collider** – the shape for collisions: automatically fitted to the mesh, box, sphere, capsule or
-convex hull. Plus offset, density (1000 kg/m³, like water), friction, bounciness, **sensor** (only
-notices overlaps), collision channels, group and an impact sound of its own.
+**Rigid Body** makes the actor a physics body. In Studio, under **Mobility**, you choose **Static**
+– never moves –, **Kinematic** – gets moved but can't be pushed – or **Dynamic (simulate physics)**
+– real physics. Add to that mass, gravity factor, starting speed and **Continuous (bullet)**, called
+"bullet" in Box3D. A bullet is for very fast bodies: in a single step, a fast ball could jump from
+in front of the wall to behind the wall without ever touching it. A bullet checks the distance in
+between especially carefully ([Chapter 6](06-physics.md)), so that nothing slips through walls.
 
-**Constraint** – a joint to another actor or to the world: Hinge, Slider (rail), Ball (ball joint),
-Fixed (welded), Distance (rope), Wheel, Motor, Parallel and No Collision. Joints have an anchor, an
-axis, limits (default −45° to 45°), a motor, a spring and a **break force** (0 = unbreakable) with a
-break sound. A hinge can be a **servo**, like the motors of real robots. Then this applies:
+**Colliders** give the shape for collisions: automatically fitted to the mesh, box, sphere,
+capsule or a tight-fitting hull. Every collider has a **density** from which Kern calculates the
+mass. In the level it's 1000 kg/m³ at first, as dense as water. So a cube with 1 m edges weighs a
+ton if you don't change anything. If you enter a **mass** yourself on the **Rigid Body** instead,
+that applies instead of the density. A collider can be a **sensor**. With channels and groups you
+decide who can collide with whom at all, for example so that bullets fly through your own teammates
+but bounce off walls ([Chapter 6](06-physics.md)).
 
-```
-torque = stiffness · (target − angle)
-         − damping · angular velocity
-```
+The component **Constraint** connects two actors: hinge, slider, ball joint, weld, rope, wheel and
+a few more. Joints can have limits, a motor and a spring, and they can **break** under too much
+force. A hinge can be a **servo**, like the motors of real robots: the farther the joint is from
+its target angle, the harder it pushes back, and the faster it turns, the harder it brakes. Twice
+as far away means twice as strong a turning force, like a rubber band.
 
-At most up to the maximum force, plus a bit of joint friction. A number example with a stiffness of
-50 N·m/rad: If the joint is 0.1 rad (just under 6°) away from its target and standing still, the
-servo pushes back with 5 N·m. The farther away, the stronger – like a rubber band.
+**Rotator** and **Mover** move things without logic: the Rotator turns evenly; the Mover swings
+softly, back and forth, or jumps back to the start at the end. Both calculate with game time, so
+they run the same at every start.
 
-**Player Controller** – makes the actor controllable. Movement types: Hover Car, Rolling Ball,
-Character, Flyer, Vehicle, Soldier and Walker (the Micro Duck). Adjustable: top speed (36 m/s),
-acceleration, turn rate, jump (6 m/s, 0 = none), boost, hover height, camera type (Chase, First
-Person, Top Down) and sounds. The soldier has crouch speed, eye height and mouse sensitivity; the
-walker has fields like "walks on its own," gait and roller skates ([Chapter 13](13-micro-duck.md)).
+**Procedural City** builds a whole city with streets, houses, trees, cars and windows that glow at
+night from a single number (the seed) ([Chapter 5](05-scene-and-geometry.md)).
 
-**Weapon** and **Health** – for the first-person-shooter game model. The weapon comes as a rifle,
-pistol, shotgun or sniper rifle. Each type brings its own values for damage, fire rate, magazine,
-reload, spread and range. A shot is a straight test ray (*hitscan*). Health gives hit points (100),
-armor, regeneration, respawn, points and optionally an explosion – for targets and barrels too.
+The remaining building blocks (Player Controller, Weapon, Pickup, Trigger) come up in 8.10 to 8.13.
 
-**Pickup** – something to collect: points (1), particle color, respawn (0 = gone), sound, healing,
-ammo.
-
-**Trigger** – an invisible switch with an action (8.12), message text, "only once," sound, strength
-and teleport target.
-
-**Audio Source** – a sound source, covered in detail in [Chapter 7](07-audio.md).
-
-**Rotator, Mover, City** – movement and city:
-
-- The **Rotator** spins constantly, by default 60° per second around Z.
-- The **Mover** swings around an offset (default 1 m up) with a period (2 s). Mode `sine` glides
-  smoothly, `pingPong` goes back and forth, `loop` jumps back. The GameWorld computes both from the
-  simulation time.
-- **City** builds a whole city from a seed: 7 × 7 blocks, an 80 m grid, 16 m wide streets,
-  buildings up to 84 m, trees, 22 cars and windows that light up at night.
-
-> **Mission:** Open the **Physics Lab** level on https://kernengine.de/ via File › Example Levels.
-> Click the door and look in Details: Which components does it have? Find the type, the limits and
-> the spring on the Constraint. Then start **Simulate** (Alt+S) and, in the Viewport under Show,
-> turn on **Collision Shapes** and **Constraints**.
+> **Mission:** On https://kernengine.de/, open the level Physics Lab via **File › Example
+> Levels**. Click the door and look in **Details**: which components does it have? On the
+> **Constraint**, find the **Type**, the **Limits** and the **Spring**. The limits set how far the
+> door opens; the spring pulls it closed again. Then start **Simulate** (Alt+S), give the door a
+> push with the left mouse button and check whether that's right. Under **Window › Show** – or with
+> the **Show** button at the top of the Viewport – switch on **Collision Shapes** and
+> **Constraints**. The colors give away the type: static green, kinematic blue, dynamic orange,
+> sensor violet, sleeping gray. "Sleeping" means: a body has been lying still for a long time, so
+> the physics stops calculating it until something bumps it.
 
 ## 8.5 The World Settings
 
-The World Settings apply to the whole level:
+Some settings don't apply to one thing but to the whole world. They're in the **World Settings**:
 
-| Area | Settings |
+| Area | Examples |
 |---|---|
-| Physics | gravity −9.80665 m/s², 4 sub-steps, 60 steps/s, contact softness |
-| Sky | time of day (0.25 sunrise, 0.5 noon, 0.75 sunset), day length, sun position |
-| Image | fog, exposure, ambient occlusion, shadow distance, clouds |
-| Ground | endless ground on/off, color, friction, bounciness |
-| Game | title, win condition, time limit, target score, player, Kill-Z |
-| Audio | volumes, music, ambience, reverb, Doppler |
+| physics | strength of gravity, how many fixed steps per second |
+| sky | time of day (0.25 sunrise, 0.5 noon, 0.75 sunset), day length |
+| picture | fog, brightness, clouds |
+| ground | endless ground on or off, color, friction |
+| game | title, win condition, time limit, player, kill Z |
+| audio | volumes, music, reverb, Doppler ([Chapter 7](07-audio.md)) |
 
-Two special features: **Kill-Z** (−50 m) resets a player who falls below it. And with **Observer
-camera**, Play starts with a free camera; F8 then takes over the player.
+The time of day is a fraction of the day: 0.5 is half, so noon. Two special features: **Kill Z
+(respawn below)** is a height. If a player falls lower, for example off the world, they're reset.
+And with **Observer camera (Play: fly, watch, drag bodies)**, **Play** starts with a free camera;
+with F8 you then take over the player.
 
-## 8.6 The `.klevel` format
+## 8.6 The `.klevel` Format
 
-A level is a **JSON file**, which means easy-to-read text. At the very top come
-`"format": "kern-level"`, a version (1), name, World Settings, editor camera, next free number, the
-actors (at most 100,000), images, sounds and the level graph. An actor looks like this (shortened):
+A level is saved as **JSON**. That's completely normal, readable text with brackets, names and
+values. You can open a `.klevel` file with any text editor. An actor looks like this (shortened):
 
 ```json
 {
@@ -168,368 +205,441 @@ actors (at most 100,000), images, sounds and the level graph. An actor looks lik
 }
 ```
 
-**When writing**, values are rounded to six decimal places, and −0 becomes 0. Fields with default
-values are often left out, which keeps the file small.
+Line by line: the actor has the number 12, is called "Door" and is a child of actor 3. It stands at
+x = 5.2 m, y = −12 m, z = 1.5 m (relative to its parent actor). It carries the keyword "door" and
+has a mesh and a rigid body. Whatever is missing in the curly braces when reading in gets default
+values. When saving, Kern writes every component out completely; it only leaves out empty entries
+like a missing parent actor or no keywords.
 
-**When reading**, Kern is forgiving about missing things and strict about wrong things:
+**When reading**, a clever principle applies: **forgiving about what's missing, strict about
+what's wrong.**
 
-- Unknown keys are ignored, missing ones get default values. That way old files load in new
-  versions. A file with a version that's too new is rejected.
-- Wrong types are errors with a message, such as "friction must be a number." The message names the
-  actor.
-- Numbers are clamped to their range: friction 0 to 10, roughness 0 to 1, step rate 15 to 480 Hz,
-  field of view 20° to 120° and so on. Vector values must be finite and at most 10 million in size.
-- Missing or duplicate numbers are reassigned. A parent actor that doesn't exist becomes "none,"
-  and **loops** (A is the parent of B, B of A) are broken up.
+- If something is **missing**, Kern takes the default value. It skips unknown entries. That way old
+  files also load in new versions of Kern.
+- **Wrong** is, for example, text where a number belongs. Then Kern reports an error, such as
+  "friction must be a number," and names the actor.
+- It rejects a file from a **newer** Kern version completely. Why not simply skip the unknown parts?
+  A newer file could contain things that the old Kern would misunderstand. Then the level would look
+  different from how it was built. Better not to load at all than to load wrongly.
+- Numbers outside their sensible range are set to the nearest allowed value, the way a volume knob
+  doesn't go beyond "full volume."
+- Missing or duplicate numbers are handed out again. A parent actor that doesn't exist becomes
+  "none," and **loops** in the family are broken up.
 
-> **Watch out, trap:** Parent loops happen easily when you edit files by hand. Without this check,
-> the program would search "upward" forever and hang.
+> **Watch out, trap:** A loop means: A is B's parent, and B is A's parent. Something like that
+> easily happens when you edit files by hand. Without a check, the program would search "upward"
+> forever and get stuck.
 
-**Checking before the start:** A check (`validate`) looks for problems. **Errors** prevent Play –
-for example duplicate numbers, a scale of 0, a joint that connects an actor to itself, a controller
-without a body, or a city that isn't at the very top of the tree. **Warnings** only go to the Output
-Log – for example a sound name that doesn't exist (then it stays silent), a weapon without a
-soldier, or more than one player.
+**Checking before the start:** Before playing begins, Kern looks for problems. **Errors** prevent
+the start, for example a size of 0, a joint that connects an actor with itself, or controls without
+a physics body. **Warnings** only end up in the **Output Log**, for example a sound name that
+doesn't exist (then it stays quiet), or more than one player.
 
-## 8.7 From level to physics world
+## 8.7 From Level to Physics World
 
-Before simulating, Kern plans which Box3D bodies it needs. The same plan also draws the colliders
-in the editor – so both see exactly the same thing.
+Before simulating, Kern makes a **plan**: which physics bodies does this level need, and which
+shapes belong to which body? The important thing about it: **the same plan** also draws the
+colliders in the editor. So what you see in the editor with **Show › Collision Shapes** is exactly
+what will be calculated with later.
 
-1. Actors with a Rigid Body get a body. A static body with a Rotator or Mover becomes kinematic.
-2. Actors with colliders, colliding meshes, pickups and triggers that don't belong to any body get
-   an **invisible body of their own**: static or, if they're animated, kinematic.
-3. Every actor hands its shapes to its body. An automatic collider is fitted to the mesh: Box and
-   Plane become a box, Sphere a sphere, Capsule a capsule, everything else a convex hull. Pickups
-   and triggers become sensors; without a shape, they get a sensor sphere with a 1 m radius.
-4. Invisible bodies without a shape are dropped.
-5. The city becomes a static body with one box per building and sidewalk.
-6. The endless ground is a static box of 20 × 20 km whose top edge is at z = 0.
+```mermaid
+%% Caption: One plan for both: the physics world and the collision shapes in the editor come from it
+flowchart LR
+  L[Level] --> P[Plan: bodies and shapes]
+  P --> W[Physics world]
+  P --> E[Collision shapes in the editor]
+```
 
-Scale goes exactly into the dimensions. Moving shapes are at least 1 cm in size, fixed ones at
-least 2 mm.
+The plan's rules:
+
+1. Every actor with a **Rigid Body** gets a body. A static body with a **Rotator** or **Mover**
+   becomes kinematic; after all, it has to move.
+2. Some things need a body even though you didn't set a rigid body: a wall with a collider, a star
+   to collect, a trigger. They get an **invisible body of their own**, static or, if they move,
+   kinematic.
+3. Every actor gives its shapes to its body, including welded-on children (8.2). An automatic
+   collider is fitted to the mesh.
+4. Pickups and triggers become sensors. If they have no shape at all, they get a sensor sphere with
+   a 1 m radius.
+5. The city becomes a single static body made of many boxes: for the houses (courtyard houses and
+   L-houses from several) and for the ground slabs.
+6. The endless ground is a huge flat box whose top lies exactly at z = 0.
 
 ## 8.8 Starting the GameWorld
 
-`start` goes through these steps:
+When you press **Play**, the GameWorld goes through these steps:
 
-1. Check the level. An error stops everything.
-2. Create a working copy and remember the original.
-3. Build the Box3D world with gravity and contact softness. A hit counts from 2 m/s (for logic and
-   camera shake); for quiet impact sounds the threshold is lowered, but never below 0.05 m/s.
-4. Set all actors to "alive," sort parents before children.
-5. Create bodies, then joints, then walkers.
-6. Start the city traffic: kinematic cars on the lanes.
-7. Take over the **player** (only in Play). It gets a **pawn** with a starting point.
-8. Reset rules, HUD, health and ammo. The best time stays.
-9. Start the **logic**.
+1. **Check** (8.6). An error stops it.
+2. **Make a copy.** Playing happens with the copy; the original stays untouched.
+3. **Build the physics world:** set gravity, then create all bodies, joints and walking robots
+   according to the plan from 8.7, parents before their children. The city's cars start driving.
+4. **Take over the player** (only when playing). The player gets a **pawn**: a notepad on which Kern
+   remembers everything about this player's controls, that is, last input, viewing direction,
+   starting point and boost.
+5. **Start rules and logic:** points, time, health and ammo back to the start; the best time stays.
+   Then the logic graphs start running.
 
-**Creating bodies:** Player vehicles are always "bullets," and players never sleep. Vehicles,
-characters and flyers are locked against tipping over; only Rolling Ball and Walker are allowed to
-tip. Box3D only reports events where someone reads them. Rejected shapes are skipped with a message.
+Player vehicles always get the special "bullet" treatment, so that they don't slip through walls at
+high speed. Vehicles, characters and flyers are secured against tipping over; only the rolling ball
+and the walking duck may tip.
 
-**Creating joints:** If one end is missing its body, the joint is skipped with a message. Target 0
-means "attached to the world." A positive motor value moves the actor relative to its target (for
-the wheel, Box3D's own ordering applies). Springs are limited so they stay stable.
+**Only report where someone is listening.** Reporting every touch costs the physics work. That's
+why Kern only switches reports on where someone reads them: for sensors, for the player, for bodies
+with an impact sound and, if the level has logic, for everything that moves. A crate nobody cares
+about falls quietly and saves calculating time.
 
 **The modes:**
 
 | Mode | Meaning |
 |---|---|
-| none | no simulation, editor only |
-| simulate | physics and logic run, nobody is controlled, bodies can be grabbed |
-| play | like Simulate, plus player, rules and HUD |
-| replica | copy of a server game over the network ([Chapter 10](10-networking.md)) |
+| editing | no simulation, you build in the editor |
+| **Simulate** | physics and logic run, nobody is controlled, bodies can be grabbed |
+| **Play** | like Simulate, plus player, rules and HUD |
+| client copy | copy of a server game on another player's computer ([Chapter 10](10-networking.md)) |
 
-You can switch between Simulate and Play in the middle of a run (Studio: F8); the player keeps its
-state. You can restart (Ctrl+R), pause and advance by exactly one step (the `.` key).
+You can switch between **Simulate** and **Play** in the middle of a run (Studio: F8); the player
+keeps their state. You can restart (Ctrl+R), pause and go forward exactly one step (key `.`).
 
-> **Mission:** In the Physics Lab, start **Simulate**, press **Pause** and then press the **.** key
-> several times – the world runs step by step. In between, grab a crate with the left mouse button.
-> With **K** you copy the poses of the selected actors into the level.
+> **Mission:** In the Physics Lab, start **Simulate**, press **Pause** (the pause button next to
+> **Play** in the toolbar, or Alt+Shift+P) and then press the **.** key several times – the world
+> runs step by step. Press **Pause** once more so that it keeps running, and grab a crate with the
+> left mouse button. Then briefly click a fallen crate in the Viewport (without dragging); that's
+> how you select it. Press **K** (**Play › Keep Simulation Changes**): the simulation ends, and the
+> crate stands in your level exactly the way it was lying.
 
-## 8.9 What happens in a frame
+## 8.9 What Happens in One Picture
 
-The frame rate wobbles, but physics wants **fixed steps** (60 per second by default). So `step`
-collects time like in a piggy bank and pays it out in fixed steps. A frame counts for at most
-0.25 s and simulates at most 0.1 s, so a hiccup doesn't set off an avalanche
-([Chapter 6](06-physics.md)).
+Your computer's frame rate varies, but the physics wants **fixed steps** (why is explained in
+[Chapter 6](06-physics.md)). That's why the GameWorld collects the time that has passed as if in a
+piggy bank and pays it out in fixed steps.
 
-> **Picture it like this:** A bus leaves exactly every 10 minutes, no matter when the passengers
-> show up. If lots of them come at once, two buses just leave one after the other. The physics is
-> the bus, the frames are the passengers.
+> **Picture it like this:** Every picture throws the time that has passed since the last picture
+> into the piggy bank. The physics takes out 1/60-second coins as long as there's enough in it and
+> calculates one step for every coin. The rest stays there for the next picture. A long picture
+> throws in a lot, then there are several steps. A short one throws in little, then maybe none at
+> all.
+
+If a picture hangs for a very long time, the physics catches up at most 0.1 s and throws the rest
+away. Otherwise there'd be a calculation traffic jam: catching up would take so long that the next
+picture would have even more to catch up. The result: the world then runs a bit slower for a
+moment instead of getting stuck.
+
+Fixed steps also set a limit: a spring can't swing back and forth faster than the physics
+calculates steps. That's why at startup Kern limits the stiffness of every spring and every joint
+to match the step rate. Why is in [Chapter 6](06-physics.md).
 
 One fixed step:
 
 ```mermaid
+%% Caption: One fixed step of the GameWorld, always in the same order
 flowchart TD
-  A[Player input] --> B[Rotator and Mover]
-  B --> C[Traffic, walkers, servos, grab]
-  C --> D[Box3D step]
+  A[Player inputs] --> B[Rotator and Mover]
+  B --> C[Traffic, walking robots, servos, grip]
+  C --> D[Calculate physics]
   D --> E[Events]
   E --> F[Health and logic]
-  F --> G[Time limit, Kill-Z, win]
+  F --> G[Time limit, kill Z, win]
 ```
 
-1. **Players:** For every pawn, get the input (local, or the latest received over the network),
-   turn it into events for the logic, and drive the controller.
-2. **Animation:** Rotator and Mover bodies get their target for the step.
-3. **Traffic** (cars stop in front of the player), **walkers**, **servos** and the **mouse grab**.
-4. **Box3D computes** with its sub-steps.
-5. Advance the step counter and game time.
-6. **Events:** pickups, triggers, overlaps, hits, camera shake, impact sounds, breaking joints.
-7. **Health** (healing, respawn) and the **logic tick**.
-8. Respawning pickups, time limit, Kill-Z, speed for the HUD, target score.
+1. **Players:** For every player, get the input and move their vehicle or character.
+2. **Animation:** Rotator and Mover get their target for this step.
+3. **Traffic** (cars stop in front of the player), walking robots, servos and the **mouse grip**.
+4. **Box3D calculates** one physics step.
+5. **Events:** What was collected, which trigger touched, who hit, which joint broken? The impact
+   sounds come from this too.
+6. **Health** (healing, respawn) and the **logic** ([Chapter 9](09-logic.md)).
+7. **Rules:** time limit, kill Z, score, won or lost?
 
-After that, the time of day moves on, and the poses are **interpolated** between the last two
-steps – that keeps movement smooth even at 144 frames per second. Then the camera moves, and
-`present` hands everything to the renderer: collected pickups and used triggers stay invisible,
-traffic, shots and particles are added, and at night the windows light up.
+After that, the drawing happens. Screens often show more pictures per second than the physics makes
+steps. That's why Kern doesn't simply draw the last step but an **in-between state** between the
+last two steps. That's called **interpolating**. If a picture lies exactly in the middle, the crate
+stands exactly in the middle between its two last positions. That way the movement stays smooth
+even at 144 pictures per second. Finally, the camera moves, collected pickups disappear, and at
+night the windows glow.
 
-**In Studio**, these are added every frame: cameras and touch, checking breakpoints, messages to the
-Output Log, syncing the level while editing, and finally drawing and audio. Here too, a frame counts
-for at most 0.1 s.
+**In Studio**, the editor's work comes on top in every picture, such as checking the logic's
+breakpoints and writing messages to the **Output Log**.
 
-## 8.10 Controllers: driving, rolling, walking, flying
+## 8.10 Controllers: Driving, Rolling, Walking, Flying
 
-Every frame, each player gets an **input**: movement forward/back and left/right (each −1 to 1),
-up/down, jump, boost, camera rotation, zoom; for the soldier fire, aim, reload, crouch and use;
-gamepad values; and for the Micro Duck, moves as **bits** (sit, pick up, kicks, roll, beak, chirp,
-wheee, jump).
+A **controller** turns keys into movement. In every picture, every player gets an **input**:
+forward and back, left and right (each from −1 to 1), up and down, jump, boost, camera turning,
+and for the Soldier fire, aim, reload, crouch and use. For the Micro Duck, its moves come on top
+(sit, pick up, two kicks, roll, beak, chirp, wheee, jump), all together in a single number.
 
-> **Crazy but true:** Nine duck moves fit into a single number. Each move is a bit: 1, 2, 4, 8,
-> 16 … If you want to pick up (2) and chirp (64) at the same time, you simply send 66.
+> **Crazy but true:** Nine duck moves fit into a single number. Every move gets a value, and every
+> value is double the one before: 1, 2, 4, 8, 16, 32, 64 … Such an on-off switch is called a
+> **bit**. If you want to pick up (2) and chirp (64) at the same time, you simply send 66. The trick
+> with the doubling: all the smaller values together are always smaller than the next one
+> (1 + 2 + 4 = 7, less than 8). That's why every sum can be split up in only one way, 66 only as
+> 64 + 2. With the values 1, 2, 3 that wouldn't work: 3 could mean "3" or "1 and 2."
 
-For Rolling Ball, Character and Flyer, movement is **camera-relative**: "forward" means wherever the
-camera is looking.
+With **Rolling ball**, **Character** and **Flyer**, the movement is **camera-relative**: "forward"
+means wherever the camera is looking.
+
+The modes are in the **Player Controller** in the field **Movement**:
 
 | Mode | How it moves |
 |---|---|
-| Hover Car | throttle as a force, side grip as a force, steering based on speed; a spring over a ray keeps the hover height |
-| Vehicle | like Hover Car without hovering, drive only with ground contact |
-| Rolling Ball | force in the direction of travel, jump as an impulse, only on the ground |
-| Character | Box3D's Character Mover: capsule, steps up to 22% of its height, 1.5 times gravity |
-| Flyer | desired speed including up and down, gravity is canceled out |
-| Soldier | Character Mover with real gravity (8.13) |
-| Walker | the Micro Duck's trained network drives its servos |
+| **Hover car** | floats above the ground on an invisible spring, throttle pushes, a side force prevents sliding; its bobbing and leaning are just looks |
+| **Vehicle** | like the hovercar, but on the ground; throttle only works with ground contact |
+| **Rolling ball** | a ball you push; jumping only from the ground |
+| **Character** | a game character that walks, jumps and climbs steps |
+| **Flyer** | flies in every direction, up and down too; gravity is canceled out |
+| **Soldier (first person shooter)** | like the Character, for first-person shooters (8.13) |
+| **Walker (robot on its trained network)** | the Micro Duck walks with its own motors (8.14) |
 
-For all of them: **Boost** is a supply from 0 to 1 that drops by 0.45 per second while boosting and
-otherwise grows by 0.12 per second. After a fall faster than 3.5 m/s, a landing plays the `land`
-sound.
+Character and Soldier use the **character mover** from [Chapter 6](06-physics.md). The Character
+deliberately falls faster than in reality, so that jumps feel snappy and not floaty. The Soldier
+falls like in reality, as usual in first-person shooters.
 
-Do the math: A full boost supply lasts 1 / 0.45 ≈ 2.2 seconds. Refilling it completely takes
-1 / 0.12 ≈ 8.3 seconds.
+For all of them: **boost** is a supply from 0 to 1. While boosting, it drops by 0.45 per second;
+otherwise it grows by 0.22 per second. After a deep fall, a landing plays the sound `land`.
 
-**Pawns:** A pawn is a player's control state – actors, last input, view direction, starting point,
-boost. When someone joins in multiplayer, Kern copies the player actor along with its children onto
-a ring around the start: the angle grows by about 2.4 rad per player, the radius with the square
-root of the number of players. That way nobody stands on top of anybody else.
+Do the math: a full boost supply lasts 1 / 0.45 ≈ 2.2 seconds. Refilling it completely takes
+1 / 0.22 ≈ 4.5 seconds.
+
+**Several players:** Every player has their own **pawn** (8.8). When someone joins in multiplayer,
+Kern copies the player character along with its children and places the copy on a spiral around
+the starting point, each new player a bit farther out. That way nobody stands on top of anyone
+else.
 
 ## 8.11 Camera
 
-The camera follows the player's **interpolated** pose:
+The camera follows the player's **interpolated** position (8.9), so always the smooth in-between
+state:
 
-- **Chase for vehicles:** behind the vehicle, farther away the faster it goes.
-- **Chase otherwise:** circles around the player with the mouse or stick. A ray keeps it out of
-  walls.
-- **First Person:** the eyes on the body.
-- **Top Down:** from above.
+- **Chase** **with vehicles:** behind the vehicle, the farther away the faster it drives.
+- **Chase otherwise:** circles around the player with the mouse or stick. A **check ray**, an
+  invisible line from the player to the camera, keeps it out of walls: if the line hits a wall, the
+  camera moves in front of it.
+- **First person**: the eyes on the body.
+- **Top down**: from above.
 
-Above 30 m/s the field of view gets wider (up to 10.5° more) – that feels faster. Hard hits shake
-the camera. Soldiers have a camera of their own.
+Above 30 m/s (about 108 km/h), the field of view gets a bit wider, which feels faster.
+Hard hits shake the camera. Soldiers have a camera of their own.
 
-## 8.12 HUD, rules and triggers
+## 8.12 HUD, Rules and Triggers
 
-The **HUD** shows, on top of the game, status, title, message, points, pickups, time, remaining
-time, speed, boost, best time and, for the soldier, health and ammo.
+The **HUD** is the display over the game: status, title, message, points, pickups, time, time left,
+speed, boost, best time and, for the Soldier, health and ammo.
 
-![Play in Studio with the HUD: Orb Run right after the start, with a counter for the orbs, points, time and speed](../buch/bilder/studio-play.png)
+![Playing in Studio with HUD: Orb Run right after the start, with counter for the orbs, points, time and speed](../buch/bilder/studio-play.png)
 
-**Win conditions:**
+You set **win conditions** in Studio under **World Settings › Win condition**:
 
-| Goal | You win when … |
+| Goal | Won when … |
 |---|---|
-| none | never – sandbox |
-| collectAll | all pickups are collected (if there's a Goal, you then still have to get there) |
-| reachGoal | the Goal trigger is reached |
-| survive | you outlast the time limit |
-| score | the target score is reached |
+| **None (sandbox)** | never – sandbox |
+| **Collect all pickups** | all pickups collected (if there's a goal trigger, then you still have to get there) |
+| **Reach a goal trigger** | goal trigger reached |
+| **Survive the time limit** | time limit survived |
+| **Reach a target score** | target points reached |
 
-With a time limit, you lose at 0, except with `survive`. A Hazard always makes you lose. At the end,
-Kern sets the status, plays a short melody, remembers the best time and tells the logic "game over."
+With a time limit, you lose at 0, except with **Survive the time limit**. A danger (hazard trigger)
+always loses. At the end, Kern sets the status, plays a short melody, remembers the best time and
+reports "game over" to the logic.
 
-**Pickups:** When a player touches one, they get healing and ammo, points, a sound, particles, and
-the logic hears about it. A pure health pack stays where it is as long as you have full health.
+**Pickups:** If a player touches one, they get points, healing or ammo, plus sound and sparks, and
+the logic finds out about it. A pure health pack stays where it is as long as you have full health.
 With a respawn time, it shows up again later.
 
-**Trigger actions:**
+**Trigger actions:** A trigger is an invisible switch. What it does is set by its action:
 
-| Action | Effect | Sound |
+| Action in Studio | Effect | Ready-made in the catalog |
 |---|---|---|
-| goal | wins | goal |
-| hazard | loses | hazard |
-| checkpoint | new starting point 1 m above it | checkpoint |
-| message | shows a message | confirm |
-| launch | flings up and forward | boost |
-| teleport | moves you to the target actor | powerup |
-| damage | takes away hit points | – |
-| event | just an event for the logic | – |
+| **Goal (win)** | wins | **Goal** |
+| **Hazard (lose)** | loses | **Hazard** |
+| **Checkpoint (respawn here)** | new starting point 1 m above it | **Checkpoint** |
+| **Message** | shows a message | **Message Trigger** |
+| **Jump pad (launch)** | flings you up and forward | **Jump Pad** |
+| **Teleport** | moves you to the target actor | **Teleporter** |
+| **Damage zone** | takes away hit points | **Damage Zone** |
+| **Logic event only** | only an event for the logic | – |
 
-The teleporter locks itself for 1 s so you don't get beamed straight back. Every trigger reports to
-the logic first. With "only once," it's used up afterward – except Goal and Hazard.
+Almost every action plays its fitting sound. The teleporter locks itself for 1 s, so that you don't
+get beamed right back. Every trigger reports to the logic first. With **Only once**, it's used up
+afterwards, except goal, hazard and teleporter.
 
-> **Mission:** Use File › New Level... to create a **Basic** level. From Place Actors, place a
-> **Rolling Ball** (Players), three **Stars** and a **Goal** (Gameplay). In World Settings, set the
-> **Win condition** to "Collect all pickups" and press **Play** (Alt+P). What happens if you touch
-> the Goal before the last star?
+> **Mission:** With **File › New Level...**, create a level with the template **Basic**. From
+> **Place Actors**, place a **Rolling Ball** from the group **Players**, three times **Star** and a
+> **Goal** from the group **Gameplay**. In the **World Settings**, set the **Win condition** to
+> **Collect all pickups** and press **Play** (Alt+P). What happens if you touch the goal before the
+> last star? And what afterwards?
 
-> **Mission:** Build a **Jump Pad** and a **Teleporter** into your level and try both out with the
-> Rolling Ball.
+> **Mission:** Build a **Jump Pad** and a **Teleporter** into your level (both under **Gameplay**)
+> and try them out with the rolling ball. The teleporter consists of two pads: you step onto A and
+> arrive at B.
 
-## 8.13 Soldiers and figures
+## 8.13 Soldiers and Characters
 
-The **soldier** is the game model for first-person shooters, taken from SpawnCity. It moves with the
-Character Mover, crouches, sprints and jumps; a press just before landing or just after leaving an
-edge still counts. A shot is a test ray from the eye, and the spread is **deterministic** (computed
-from the actor number and the shot count). In multiplayer, the server makes up for network delay
-(*lag compensation*, at most 0.5 s back). Armor absorbs up to two-thirds of the damage, freshly
-spawned players are protected for 2.5 s, and from a landing speed of 7.7 m/s there's fall damage
-(deadly from 15 m/s). At 0 hit points, a player restarts after a waiting time; other actors
-disappear and, if set up that way, return to their place. An actor with an explosion radius
-explodes in the process and pushes and damages whatever is nearby. The figure and weapon are built
-from basic shapes and are purely for show. A camera of its own comes with it.
+The **Soldier** is the game model for first-person shooters, taken over from Kern's predecessor
+game SpawnCity. It walks with the character mover, crouches, sprints and jumps. A jump press just
+before landing or just after an edge still counts, which feels fair.
+
+A shot is a straight **check ray** from the eye. The bullet doesn't really fly; Kern only checks
+what gets hit first along the line. The spread is **deterministic**: it's calculated from the
+shooter's number and the count of their shots instead of rolled. That way the server and every
+replay calculate exactly the same hits.
+
+**Lag compensation:** In multiplayer, your shot arrives at the server with a bit of delay. In the
+meantime, the others have moved on. So the server looks up **where the opponent was when you
+pulled the trigger** and checks the hit there, at most half a second back.
+
+> **Picture it like this:** a referee with video review. He rewinds to the moment you fired and
+> then decides.
+
+On top of that come armor (catches part of the damage), brief protection after respawning, fall
+damage on hard landings and **respawn**: a player starts again after a waiting time; other actors
+disappear and, if set up that way, reappear in their place. A barrel with an explosion radius
+explodes and pushes whatever is nearby. Character and weapon are built from simple bodies and are
+pure display: they change nothing in the simulation.
 
 ## 8.14 Walkers
 
-A **walker** is a robot with joints that walks on its own servos – the Micro Duck with Pollen
-Robotics' trained network. At the start, the GameWorld creates a control state for every walker.
-Every step, it reads its sensors, chooses the behavior, asks the network (every four physics
-steps), waits out the servos' delay and then drives the servos. On top of that there are lots of
-interfaces for sensors, commands, training and play. Everything else is in
-[Chapter 13](13-micro-duck.md).
+A **Walker** is a robot with joints that walks with its own servos. In Kern, that's the Micro Duck.
+It's not controlled by rules that someone programmed but by a **network** that Pollen Robotics
+trained: through a great deal of practice, it has learned which motor movement fits which
+position.
 
-## 8.15 Sound connection
+In every step, a cycle runs:
 
-The simulation never plays sound itself. In its fixed steps it writes **sound cues**, little order
-slips, and so stays deterministic:
-
-```cpp
-struct SoundCue {
-  std::string sound;
-  Vec3 position;
-  f32 volume = 1, pitch = 1;
-  bool spatial = true;
-  audio::Bus bus = audio::Bus::sfx;
-  ActorId actor = 0;
-  bool voice = false, silence = false;
-};
+```mermaid
+%% Caption: The walker's cycle in every step: sense, choose, ask the network, move the servos
+flowchart TB
+  S[Sense: read sensors] --> V["Pick: walk, stand, ball"]
+  V --> N[Ask the network]
+  N --> M[Move servos]
+  M --> S
 ```
 
-Line by line: which sound, where, how loud and how high, whether it has a position in space, on
-which bus, for which actor and whether it's that actor's voice (one at a time). At most 64 cues are
-collected – for jumps, landings, pickups, triggers, hits, explosions, impacts and more. The impact
-rules and playback through GameAudio are in [Chapter 7](07-audio.md).
+**Choosing a behavior** means: a program decides what the duck wants to do next, such as walk
+around, stand still or play with the ball. The network then makes sure it doesn't fall over while
+doing so.
 
-## 8.16 Touch, mouse and gamepad
+The network is asked regularly, but only every few physics steps. It was asked exactly that often
+during training, and the real robot asks it that often too. As with real servos, its command also
+arrives at the motors with a small delay, and Kern deliberately rebuilds that too. That sounds
+strange: why make something worse than it could be? Because the network learned to walk with
+exactly this delay. Without it, it would misjudge and stumble. That's a principle of the whole
+book: the simulation should behave like the real robot. Everything else about the duck is in
+[Chapter 13](13-micro-duck.md).
 
-The touch controls also come from SpawnCity and run in C++, so Studio and exported games use them
-the same way.
+## 8.15 Sound Connection
 
-A **referee** decides which device is in control – the one used last wins. A finger switches to
-touch, any real key to mouse and keyboard (on a phone too). A mouse on a tablet does **not** switch
-to desktop. Pointer lock is only available with a mouse.
+The simulation never plays sound itself but writes **cues** in its fixed steps, order slips for
+noises: for jumps, landings, pickups, triggers, hits, explosions, impacts and more. That's why it
+stays deterministic. How the slips come about and get played is in [Chapter 7](07-audio.md),
+sections 7.7 and 7.8.
 
-The **touch controls** have two sticks of 168 px in the bottom corners (smaller only if two don't
-fit). On the left you move (MOVE; STEER / GAS for vehicles; FLY for the Flyer), on the right you
-look (LOOK). Next to them are buttons depending on the controller:
+## 8.16 Touch, Mouse and Gamepad
 
-| Controller | Buttons |
-|---|---|
-| Soldier | JUMP, RELOAD, AIM, CROUCH, USE |
-| Walker | QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE, HOP |
-| Character | JUMP, USE |
-| Rolling Ball | JUMP, BOOST |
-| Flyer | UP, DOWN, BOOST |
-| Hover Car, Vehicle | BOOST, HOP, USE |
+The touch controls also come from SpawnCity and are built into the engine, so that Studio and
+exported games use them the same way.
 
-Buttons come before sticks, sticks before the screen. Pushing the left stick all the way forward
-means sprinting. If you pull the right stick past 92% of its radius, you keep turning (**Edge
-Turn**). Gamepads get dead zones so small wobbles don't move anything.
+A **referee** decides which device is in control right now: the one used last wins. A finger on
+the screen switches to touch; any real key switches to mouse and keyboard, on a phone too. But a
+mouse on a tablet does **not** switch to desktop: on a phone or tablet, the finger is the main
+control, and a plugged-in mouse shouldn't make the touch buttons disappear. **Pointer lock** only
+exists with a mouse: the mouse pointer stays trapped in the game, so that you can turn around
+endlessly.
 
-## 8.17 Logic in the world
+The **touch controls** have two sticks in the bottom corners. On the left you move (**MOVE**, with
+vehicles **STEER / GAS**, with the Flyer **FLY**), on the right you look (**LOOK**). Next to them are
+buttons, different ones depending on the kind of movement: the duck, for example, has **QUACK**, the
+ball **JUMP** and **BOOST**.
 
-Every actor and the level can carry a logic graph. The GameWorld starts them in Play and Simulate,
-but only where the game holds "the truth": in a single-player game or on the server. It delivers
-events to them (overlap, hit, pickup, trigger, damage, death, interact, key, game over, new player
-…) and lets them take actions (set values, spawn copies, push, give points, end the game …).
-Whatever the logic changes is recorded for the network. More in [Chapter 9](09-logic.md).
+> **For pros:** All buttons for reference:
+>
+> | Movement | Buttons |
+> |---|---|
+> | Soldier | JUMP, RELOAD, AIM, CROUCH, USE |
+> | Walker | QUACK, PICK, SIT, KICK L, KICK R, ROLL, BEAK, WHEEE, HOP |
+> | Character | JUMP, USE |
+> | Rolling ball | JUMP, BOOST |
+> | Flyer | UP, DOWN, BOOST |
+> | Hover car | BOOST, DRIFT, LIFT, VIEW |
+> | Vehicle | BOOST, DRIFT, HOP, VIEW |
 
-## 8.18 The demo levels
+Every finger gets exactly one job, and it's decided where it first touches down. If there's a
+button there, it presses the button and never becomes a stick, even if it keeps swiping afterwards.
+If there's no button but a stick there, it moves the stick. If it touches down on the free screen,
+it fires for a Soldier with a weapon (and aims while doing so); for all others, it looks around.
+Left stick all the way forward means sprinting. If you pull the right stick to the edge, you simply
+keep turning (*edge turn*). Gamepads get **dead zones**: very small wobbles on the stick are
+ignored, like a scale that only shows something from a few grams on.
 
-Under File › Example Levels and File › New Level you'll find the built-in levels:
+## 8.17 Logic in the World
 
-- **Orb Run:** a city with traffic, a Hover Car (1200 kg), 24 orbs to collect. A day lasts 480 s,
-  and the run ends at night. Studio starts with this level.
-- **Physics Lab:** every kind of joint – crate pyramid, pendulum, door, rope bridge (three joints
-  break at 60,000 N), turntable, lift, rover. You roll as a ball, collect five stars and reach the
-  Goal, past a spinning Hazard.
+Every actor and the level can carry a logic graph ([Chapter 9](09-logic.md)). The GameWorld starts
+them during **Play** and **Simulate**, reports **events** to them (overlap, hit, pickup, trigger,
+damage, death, key, game end, new player …) and lets them **do things** (change values, spawn
+copies, push, give points, end the game …).
+
+Logic only runs where the game **"has the truth."** Alone, that's your own computer. In
+multiplayer, it's only the **server**: it decides what happens, and the other players get the
+result sent to them. If every computer calculated its own logic, a door could be open on one and
+closed on the other. That's why Kern records everything the logic changes, and the server sends it
+to everyone ([Chapter 10](10-networking.md)).
+
+## 8.18 The Demo Levels
+
+Under **File › Example Levels** and **File › New Level...** you'll find the built-in levels:
+
+- **Orb Run:** a city with traffic, a hovercar and 24 orbs to collect. It's late afternoon, and the
+  run ends at night. Studio starts with this level.
+- **Physics Lab:** all kinds of joints – crate pyramid, pendulum, door, rope bridge (three joints
+  can break), turntable, elevator, a self-driving rover. You roll as a ball, collect five stars and
+  reach the goal, past a spinning hazard.
 - **Shooting Range:** a shooting range with targets at 10 to 60 m, cover, crates, a barrel and a
-  tower. Goal: 150 points. Also playable in multiplayer.
-- **Micro Duck:** a room at the robot's scale (2.5 × 2.5 m in reality, 10 × 10 m in the world) with
-  a ball and socks. The duck walks on its own, 100 steps per second, observer camera. A level graph
-  makes it chirp when its head camera sees the ball. Because Play starts with the Observer camera
-  here, you take over the duck with **F8**.
-- **Basic:** 40 × 40 m of ground and a cube.
-- **Empty:** nothing at all, not even ground.
+  tower. Goal: 150 points. Playable in multiplayer too.
+- **Micro Duck:** a room at the robot's scale with a ball and socks. The duck walks on its own. A
+  level graph makes it chirp when its head camera sees the ball. **Play** starts here with the
+  observer camera switched on; with **F8** you take over the duck.
+- **Basic**: ground, sun, sky and a cube.
+- **Empty**: nothing at all, not even ground.
+
+Automatic tests play through these levels and check, for example, that a goal wins and a hazard
+loses.
 
 > **Mission:** Open **Orb Run** and start **Play** (Alt+P). Collect a few orbs, then press **F8**:
-> you get out, the game keeps running, and you fly around freely. Press **F8** again, and you're
-> back behind the wheel. How many seconds do you need for all 24?
-
-## 8.19 What else the GameWorld can do
-
-There are more interfaces for display, state, messages, combat, network, logic, grabbing and debug
-lines (colliders in color: static green, kinematic blue, dynamic orange, sensor purple, sleeping
-gray). If you want to know every detail: the blue book.
-
-## 8.20 Tests
-
-Automatic tests check rotations, saving and loading, body planning, the city, Orb Run, Physics Lab,
-the rules (Goal wins, Hazard loses), the camera, the soldier, the Character Mover, sound fields and
-physics materials.
+> you get out, the game keeps running, and you fly around freely. Press **F8** once more, and
+> you're back at the wheel. How many seconds do you need for all 24?
 
 ## Level complete!
 
 - You know how levels, actors and components fit together.
-- You know the most important components and what they do.
-- You can read a `.klevel` file and know how Kern handles errors in it.
-- You understand how a level becomes a physics world.
-- You know what happens in every fixed step and why poses are interpolated.
+- You know the most important components and their jobs.
+- You can read a `.klevel` file and know: forgiving about what's missing, strict about what's
+  wrong.
+- You understand why the editor and the game use the same plan for the physics.
+- You know what happens in every fixed step and why Kern interpolates between two steps.
 - You know the controllers, win conditions and trigger actions.
 - You can build a small game with a goal yourself.
 
 ## Puzzle corner
 
-1. What happens to the changes made during Simulate when you stop?
-2. A pickup with no mesh and no collider – how does Kern notice that you touch it?
-3. The win condition is "Collect all pickups," and there's a Goal trigger. You have all the orbs.
-   Have you won?
-4. For the Micro Duck, "sit" (1) and "chirp" (64) should be pressed at the same time. Which number
+1. What happens to your changes made while simulating when you stop?
+2. A pickup without a mesh and without a collider – how does Kern notice that you touch it?
+3. The **Win condition** is **Collect all pickups**, and there's a goal trigger. You have all the
+   orbs. Have you won?
+4. On the Micro Duck, "sit" (1) and "chirp" (64) should be pressed at the same time. Which number
    does the input send?
-5. **Boss puzzle:** The physics runs at 60 steps per second. Your computer is only managing 20
-   frames per second right now. How many fixed steps does Kern compute per frame on average? And
-   what's the most it would be if one frame hangs for a whole second?
+5. **Boss puzzle:** The physics runs at 60 steps per second. Your computer only manages 20 pictures
+   per second right now. How many fixed steps does Kern calculate per picture on average? And how
+   many would it be at most if a picture hangs for a whole second?
 
 ### Solutions
 
-1. They disappear. The simulation runs on a copy. You can only keep poses with "Keep Simulation
-   Changes" (K).
-2. With a sensor sphere with a 1 m radius that Kern creates automatically.
-3. Not yet. Only once you reach the Goal afterward.
+1. They disappear. Simulating happens on a copy. You can only keep the position of selected actors
+   with **Keep Simulation Changes**, key K.
+2. With a sensor sphere with a 1 m radius, which Kern creates automatically when planning the
+   physics.
+3. Not yet. Only once you reach the goal afterwards.
 4. 1 + 64 = 65.
-5. One frame takes 1/20 s = 0.05 s, which is 3 steps of 1/60 s each. If a frame hangs for a second,
-   Kern still simulates at most 0.1 s, so 6 steps. The world then runs a little slower for a moment
-   instead of getting stuck in a computing avalanche.
+5. A picture takes 1/20 s = 0.05 s; that's 3 steps of 1/60 s each. If a picture hangs for a second,
+   Kern still catches up at most 0.1 s, so 6 steps. The world then runs a bit slower for a moment
+   instead of getting stuck in a calculation traffic jam.
 
 ---
 

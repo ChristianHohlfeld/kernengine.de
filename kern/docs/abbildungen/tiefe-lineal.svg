@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 12 380 68">
+  <!-- Tiefe ist ungleich verteilt (blau/grün/gelb B.1): Der Tiefenpuffer speichert etwa d = 1 − n ÷ z. Blau: 20 gleich große Tiefenschritte (d = 0; 0,05; … 0,95), eingetragen bei ihrer Entfernung z = n ÷ (1 − d); grau: Meter. Schematisch mit nahe Grenze n = 0,5 m statt Kerns 5 cm, damit man die Striche auseinanderhalten kann; die Form (vorn dicht, hinten weit) ist dieselbe. -->
+  <text x="2" y="24" class="k h">{{kopf}}</text>
+  <path class="lg" d="M30,44 L30,50"/>
+  <path class="lg" d="M62,44 L62,50"/>
+  <path class="lg" d="M94,44 L94,50"/>
+  <path class="lg" d="M126,44 L126,50"/>
+  <path class="lg" d="M158,44 L158,50"/>
+  <path class="lg" d="M190,44 L190,50"/>
+  <path class="lg" d="M222,44 L222,50"/>
+  <path class="lg" d="M254,44 L254,50"/>
+  <path class="lg" d="M286,44 L286,50"/>
+  <path class="lg" d="M318,44 L318,50"/>
+  <path class="lg" d="M350,44 L350,50"/>
+  <text x="30" y="40" class="k m">{{m0}}</text>
+  <text x="94" y="40" class="k m">2</text>
+  <text x="158" y="40" class="k m">4</text>
+  <text x="222" y="40" class="k m">6</text>
+  <text x="286" y="40" class="k m">8</text>
+  <text x="350" y="40" class="k m">{{m10}}</text>
+  <path class="l" d="M30,50 L350,50"/>
+  <path class="lad" d="M46.00,50 L46.00,60"/>
+  <path class="lad" d="M46.84,50 L46.84,60"/>
+  <path class="lad" d="M47.78,50 L47.78,60"/>
+  <path class="lad" d="M48.82,50 L48.82,60"/>
+  <path class="lad" d="M50.00,50 L50.00,60"/>
+  <path class="lad" d="M51.33,50 L51.33,60"/>
+  <path class="lad" d="M52.86,50 L52.86,60"/>
+  <path class="lad" d="M54.62,50 L54.62,60"/>
+  <path class="lad" d="M56.67,50 L56.67,60"/>
+  <path class="lad" d="M59.09,50 L59.09,60"/>
+  <path class="lad" d="M62.00,50 L62.00,60"/>
+  <path class="lad" d="M65.56,50 L65.56,60"/>
+  <path class="lad" d="M70.00,50 L70.00,60"/>
+  <path class="lad" d="M75.71,50 L75.71,60"/>
+  <path class="lad" d="M83.33,50 L83.33,60"/>
+  <path class="lad" d="M94.00,50 L94.00,60"/>
+  <path class="lad" d="M110.00,50 L110.00,60"/>
+  <path class="lad" d="M136.67,50 L136.67,60"/>
+  <path class="lad" d="M190.00,50 L190.00,60"/>
+  <path class="lad" d="M350.00,50 L350.00,60"/>
+  <path class="fd" d="M12,45 L12,55 L22,50 Z"/>
+  <text x="17" y="72" class="k m">{{kamera}}</text>
+  <text x="46" y="72" class="k a">{{nah}}</text>
+  <text x="350" y="72" class="k a e">{{fern}}</text>
+</svg>

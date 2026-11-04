@@ -3,9 +3,9 @@
   <text x="50" y="19" class="e">{{x1}}</text>
   <text x="50" y="49" class="e">{{x2}}</text>
   <text x="50" y="79" class="e">{{x3}}</text>
-  <path class="l p" d="M55,16 L139,39"/>
+  <path class="l p" d="M55,16 L140.6,39.4"/>
   <path class="l p" d="M55,46 L139,46"/>
-  <path class="l p" d="M55,76 L139,53"/>
+  <path class="l p" d="M55,76 L140.6,52.6"/>
   <text x="80" y="17" class="k a">{{w1}}</text>
   <text x="80" y="42" class="k a">{{w2}}</text>
   <text x="80" y="82" class="k a">{{w3}}</text>

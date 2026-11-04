@@ -170,8 +170,8 @@ Objekte der Engine teilen, gibt es einen Cache:
   (`box3d-<key>`, `musl-math-<key>`); ein Objekt wird neu übersetzt, wenn es fehlt oder älter als
   seine Quelle oder der neueste Header ist.
 - **C++:** Ordner `cpp-<flags_key>`; jedes Objekt heißt `<name>-<key>.o`, wobei der Schlüssel aus
-  dem Hash **aller** Header-Inhalte (unter `include`, `src` und Box3Ds `include`), dem Quellpfad und
-  dem Quellinhalt entsteht. Folge: **Jede Header-Änderung übersetzt alle C++-Quellen neu** –
+  dem Hash **aller** Header und eingebundenen Datendateien (`*.h`, `*.inl`, `*.inc` unter `include`,
+  `src`, Box3Ds `include` und `third_party/microduck`), dem Quellpfad und dem Quellinhalt entsteht. Folge: **Jede Header-Änderung übersetzt alle C++-Quellen neu** –
   einfach und sicher, wie der Kommentar im Skript sagt.
 - **ThinLTO:** Cache in `$KERN_OBJ_CACHE/thinlto`.
 
@@ -349,8 +349,7 @@ Farben im Canvas.
 Geprüft werden unter anderem:
 
 - **Single-File-Build** (`/generated/studio.html`): Start mit Orb Run, Menüs, Fly Mode (rechte Maustaste
-  + W), Werkzeuge, **Outliner** und **Details**, Bearbeiten der X-Position, **Auswahl fokussieren**
-  (Focus Selection; Taste F), **Inhaltsablage** (Content Drawer; Klick und Ziehen), Auswahl und
+  + W), Werkzeuge, **Outliner** und **Details**, Bearbeiten der X-Position, **Inhaltsablage** (Content Drawer; Klick und Ziehen), Auswahl und
   Verschieben mit der linken Maustaste, Sound über Web Audio, Kontextmenüs, deterministisches
   **Rückgängig** (Undo), **Spielen** (Play), **Simulieren** (Simulate) mit Physik-Debug, vier
   Viewports, neues Level aus Vorlage, Shooting Range, Logik-Editor, Micro Duck mit Kopfkamera und ToF,
@@ -379,7 +378,7 @@ Dann entstehen `studio.png`, `studio-selected.png`, `studio-play.png`, `studio-s
 `game-phone.png`, `studio-narrow.png` sowie je Telefongröße `phone-play-<breite>.png` und
 `phone-dock-<breite>.png`. Einige davon verwendet auch dieses Buch.
 
-![Simulieren mit Physik-Debug-Ansicht, wie der Browser-Test es prüft](bilder/studio-simulate.png)
+![Simulieren im Physics Lab, wie der Browser-Test es aufnimmt](bilder/studio-simulate.png)
 
 ---
 
@@ -422,7 +421,7 @@ eine fehlende `-ffp-contract=off`-Option oder eine Summe, deren Reihenfolge von 
 abhängt ([Kapitel 3](03-grundlagen.md), [Kapitel 14](14-lehrer.md)).
 
 Der Test `lehrer_runs_the_same_on_any_number_of_workers` ergänzt das: Er lernt mit 1, 2 und 4
-Workern (insgesamt 8 Enten) und vergleicht die Netze Byte für Byte.
+Workern (insgesamt 8 Umgebungen der kleinen Testaufgabe `ReachEnv`) und vergleicht die Netze Byte für Byte.
 
 ---
 
@@ -432,14 +431,7 @@ Workern (insgesamt 8 Enten) und vergleicht die Netze Byte für Byte.
 Requests und manuell (`workflow_dispatch`). Die Seite wird einmal gebaut und veröffentlicht, sobald
 sie gebaut ist; native und Browser-Tests laufen parallel und halten die Veröffentlichung nicht auf.
 
-```
-          ┌──────────┐   ┌──────────────┐
- push ──▶ │ native   │   │ determinism  │      (unabhängig, parallel)
-          └──────────┘   └──────────────┘
-          ┌──────────┐
-          │ build    │──┬──▶ deploy  (nur main, kein Pull Request)
-          └──────────┘  └──▶ e2e
-```
+![Die Jobs der CI: native und determinism unabhängig, nach build folgen deploy und e2e](../abbildungen/ci-pipeline.svg)
 
 **Nebenläufigkeit:** Die Gruppe ist `ci-<ref>-pr` für Pull Requests und `ci-<ref>-<sha>` sonst;
 abgebrochen werden nur ältere Läufe eines Pull Requests. Auf `main` läuft jeder Push bis zum Ende,
@@ -470,7 +462,7 @@ und WebAssembly bewegen.
 ### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
-2. **wasi-sdk 25** aus dem Cache (`wasi-sdk-25.0`), sonst Download nach `/home/runner/wasi-sdk`.
+2. **wasi-sdk 25** aus dem Cache (Schlüssel `wasi-sdk-25.0-v2`), sonst Download nach `/home/runner/wasi-sdk`.
 3. **Objekt-Cache** `/home/runner/kern-obj` (`KERN_OBJ_CACHE`), Schlüssel `kern-obj-<sha>`, wiederhergestellt
    mit dem Präfix `kern-obj-` – also vom jüngsten früheren Lauf.
 4. **Bauen:**

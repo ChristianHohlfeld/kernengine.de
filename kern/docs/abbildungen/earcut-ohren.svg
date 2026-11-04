@@ -18,7 +18,7 @@
   <circle class="dot" cx="64" cy="28" r="1.8"/>
   <text x="68" y="24" class="t ">B</text>
   <circle class="dot" cx="64" cy="74" r="1.8"/>
-  <text x="69" y="86" class="t ">C</text>
+  <text x="68" y="70" class="t ">C</text>
   <circle class="dot" cx="156" cy="74" r="1.8"/>
   <text x="160" y="70" class="t ">D</text>
   <circle class="dot" cx="156" cy="120" r="1.8"/>

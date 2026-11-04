@@ -15,7 +15,7 @@
 >   zum Beispiel wie ein Würfel fällt.
 > - **Level** – eine Spielwelt mit allem, was darin steht.
 
-Hallo und willkommen! Unter jedem Spiel steckt eine **Engine**, der Motor unter der Haube. Das
+Hallo und willkommen! Unter jedem Spiel steckt eine *Engine*, der Motor unter der Haube. Das
 Spiel sagt nur: „Hier steht ein Auto, bei W fährt es.“ Zeichnen, Physik und Ton erledigt die Engine.
 
 In diesem Buch nimmst du die Engine **Kern** auseinander. Auf https://kernengine.de/ findest du
@@ -62,7 +62,7 @@ sprechen mit der Engine, nie umgekehrt.** Das hat einen guten Grund: Wüsste die
 SpawnCity, würde sie sich auf SpawnCity verlassen, und man könnte mit ihr nur SpawnCity bauen. Weil
 sie nichts über ein bestimmtes Spiel weiß, passt sie unter jedes.
 
-> **So kannst du es dir vorstellen:** ein Legostein. Er weiß nicht, ob du ein Schiff oder ein Haus
+> **So kannst du es dir vorstellen:** ein Klemmbaustein. Er weiß nicht, ob du ein Schiff oder ein Haus
 > baust – und gerade deshalb passt er in beides. Hätte jemand ihn nur für ein Schiff geformt, könntest
 > du daraus kein Haus mehr bauen.
 
@@ -77,7 +77,7 @@ Kern besteht aus diesen Teilen (die **Spielwelt** ist alles, was beim Spielen pa
 | Ton | Klänge mischen, 3D-Klang | das Quaken wird lauter, wenn die Ente näher kommt |
 | Spielwelt | Levels, Spieler, Regeln | Orb einsammeln gibt Punkte |
 | Logik, Netzwerk | Spielabläufe, Mehrspieler | Tür geht auf, wenn du davorstehst |
-| Studio, Lehrer | Editor und Trainer | Welt bauen, Ente trainieren |
+| Studio, Lehrer | Editor und Trainingsprogramm | Welt bauen, Ente trainieren |
 | Kellner (JavaScript) | Brücke zum Browser | Tastendruck weitergeben |
 
 ## 1.2 Kerns Regeln
@@ -86,10 +86,12 @@ Kern folgt drei großen Regeln.
 
 **Kein fremder Motor fürs Zeichnen.** Kern benutzt keine fremde Grafik-Engine. Der Code, der
 zeichnet, ist Kerns eigener und spricht die Grafikkarte direkt an. So weiß man bei jedem Bild genau,
-woher es kommt. Zwei Bauteile stammen allerdings aus freien Projekten anderer Leute: die Physik
+woher es kommt. Ganz eingebaut sind zwei Bauteile aus freien Projekten anderer Leute: die Physik
 namens **Box3D** ([Kapitel 6](06-physik.md)) und eine Mathe-Bibliothek ([Kapitel 3](03-grundlagen.md)).
 Kern baut die Physik **unverändert** ein und übersetzt beide auf jedem Rechner auf genau dieselbe
-Weise.
+Weise. Daneben hat Kern einzelne Verfahren aus freien Projekten übernommen und selbst nachgeschrieben,
+ein paar Rechentricks; die Liste steht in
+[Anhang D](D-lizenzen.md).
 
 Außerdem benutzt Kern nur Fähigkeiten, die fast jeder Browser hat. Lieber verzichtet es auf ein paar
 neue Tricks, als dass es auf älteren Geräten nicht läuft.
@@ -99,8 +101,10 @@ die Programmiersprache JavaScript. Genau das – und nur das – erledigt Kerns 
 Spiel tut, steht in C++.
 
 > **So kannst du es dir vorstellen:** Der Kellner bringt die Bestellung in die Küche und das Essen
-> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche. Und er arbeitet
-> sparsam: Bei jedem Bild nimmt er dasselbe Tablett, statt jedes Mal ein neues zu holen.
+> an den Tisch. Kochen tut er nicht. JavaScript ist der Kellner, C++ die Küche. Diese Rollen
+> bleiben im ganzen Buch gleich. Und er arbeitet sparsam: Er benutzt bei jedem Bild denselben
+> Speicher wieder, statt jedes Mal neuen anzulegen – wie ein Kellner, der immer dasselbe Tablett
+> nimmt, statt für jeden Gang ein neues zu holen.
 
 Der Vorteil: C++ kann man auch direkt auf dem Computer laufen lassen, ganz ohne Browser. JavaScript
 braucht dagegen den Browser. Weil alles, was ein Spiel tut, in C++ steht, lässt es sich auch ohne
@@ -148,20 +152,14 @@ den Fehler immer wieder herbeiführen, finden und reparieren.
 
 ## 1.3 Der Bauplan: Stockwerke
 
-Kern ist wie ein Hochhaus: Jedes Stockwerk benutzt nur die darunter, nie die darüber. Die Grafik
-weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen. Im Bild heißt
-jeder durchgezogene Pfeil „benutzt“. Die gestrichelte Linie ist die Tür nach draußen.
+Kern ist wie ein Hochhaus: Ein Stockwerk darf nur Stockwerke **unter** sich benutzen, nie die über
+sich. Die Grafik weiß also nichts von Spielregeln, aber die Spielregeln können die Grafik benutzen.
+Das heißt nicht, dass jedes Stockwerk alles darunter braucht: Ton, Logik und Netzwerk kommen mit den
+Grundlagen aus, und die Physik leiht sich aus der Geometrie nur die Beschreibung einer Form. Malen
+kann keines dieser vier. Oben, vor dem Haus, steht der Kellner; die Pfeile zeigen, was durch die Tür
+hinein- und hinausgeht.
 
-```mermaid
-flowchart TD
-  JS["JavaScript, der Kellner"] <-. "die Tür" .-> HAUS
-  subgraph HAUS["das Hochhaus Kern"]
-    ST["Studio und Lehrer"] --> SP["Spielregeln und Levels"]
-    SP --> MID["Physik, Logik, Netzwerk, Ton"]
-    MID --> GFX["Grafik, Szene, Geometrie"]
-    GFX --> CORE["Grundlagen, Mathe"]
-  end
-```
+![Das Hochhaus Kern: oben vor dem Haus der Kellner, im Haus die Tür und die Stockwerke bis zu den Grundlagen](../abbildungen/architektur.svg)
 
 Der Kellner ist **kein Stockwerk**. Er steht vor dem Haus an der Tür, bringt Bestellungen hinein und
 Fertiges hinaus. Die Hochhausregel gilt für die Stockwerke im Haus, nicht für ihn.
@@ -194,7 +192,7 @@ Stockwerke zusammengestellt.
 | Spiel ganz in C++ | ein Spiel, das Kern direkt benutzt | die Beispiele Hello und Orb Run |
 | Nur die Grafik | eine Webseite, die mit Kern zeichnet | SpawnCity |
 | Studio | der Editor, auch für fertige Spiele | dein eigenes Level |
-| Lehrer | der Trainer für die Ente | ein neues Sprung-Netz |
+| Lehrer | das Trainingsprogramm für die Ente | ein neues Sprung-Netz |
 
 **Ein Spiel ganz in C++.** Beim Start sagt das Spiel der Engine, was es braucht, zum Beispiel:
 „Ich will Schatten.“ Danach fragt der Browser das Spiel bei jedem Bild, das der Bildschirm zeigt:
@@ -305,7 +303,7 @@ alle drei. Packt dich ein Thema, schlag im blauen Buch nach!
 1. Browser verstehen kein C++. Darum wird Kern vorher nach WebAssembly übersetzt, und das versteht
    jeder moderne Browser.
 2. Wüsste sie etwas von einem Spiel, würde sie sich darauf verlassen und passte nur zu diesem einen.
-   So aber passt sie wie ein Legostein unter beliebig viele Spiele. Wie im Hochhaus benutzt das
+   So aber passt sie wie ein Klemmbaustein unter beliebig viele Spiele. Wie im Hochhaus benutzt das
    Spiel oben die Engine unten, nie umgekehrt.
 3. Lehrer und Studio benutzen dieselbe Spielwelt, dieselben Motoren und dieselbe Physik, und Kern
    rechnet überall Bit für Bit gleich. Das Netz trifft also auf genau dieselbe Welt, in der es

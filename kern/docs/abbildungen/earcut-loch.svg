@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 140">
-  <!-- Earcut und Löcher: Ein Schnitt verbindet den Innenhof mit dem Außenrand; danach ist der Grundriss ein einziger Rand (Pfeile: Umlauf). Der Schnitt ist hier zur Deutlichkeit 3 pt breit gezeichnet, in Wirklichkeit hat er die Breite 0. -->
+  <!-- Earcut und Löcher: Eine Brücke verbindet den Innenhof mit dem Außenrand; danach ist der Grundriss ein einziger Rand (Pfeile: Umlauf, Außenrand gegen den Uhrzeigersinn, Hof mit ihm, wie blau 5 und ring_area). Die Brücke ist hier zur Deutlichkeit 3 pt breit gezeichnet, in Wirklichkeit hat er die Breite 0. -->
   <text x="95" y="12" class="m t">{{titel0}}</text>
   <path class="ffa" d="M20,20 L170,20 L170,120 L20,120 Z M65,50 L125,50 L125,90 L65,90 Z" fill-rule="evenodd"/>
   <path class="l" d="M20,20 L170,20 L170,120 L20,120 Z"/><path class="la" d="M65,50 L125,50 L125,90 L65,90 Z"/>
@@ -9,9 +9,9 @@
   <path class="ffa" d="M286.5,20 L360,20 L360,120 L210,120 L210,20 L283.5,20 L283.5,50 L255,50 L255,90 L315,90 L315,50 L286.5,50 Z"/>
   <path class="l" d="M286.5,20 L360,20 L360,120 L210,120 L210,20 L283.5,20 L283.5,50 L255,50 L255,90 L315,90 L315,50 L286.5,50 Z"/>
   <text x="291" y="38" class="k a">{{schnitt}}</text>
-  <path class="lad pa" d="M360,60 L360,90"/>
-  <path class="lad pa" d="M270,120 L240,120"/>
-  <path class="lad pa" d="M270,90 L300,90"/>
+  <path class="lad pa" d="M360,90 L360,60"/>
+  <path class="lad pa" d="M240,120 L270,120"/>
+  <path class="lad pa" d="M300,90 L270,90"/>
   <text x="285" y="73" class="m">{{hof}}</text>
   <text x="285" y="134" class="k m">{{unter1}}</text>
 </svg>

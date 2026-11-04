@@ -32,17 +32,20 @@ function Code(el)
   return pandoc.RawInline("latex", "\\texttt{" .. breakable(el.text) .. "}")
 end
 
--- Formulas wider than the line are scaled down to fit (adjustbox), instead of reaching into the
--- margin; short ones stay as they are.
+-- Formulas wider than the line are scaled down to fit (\kernfit, defined in buch_pdf.py), instead
+-- of reaching into the margin; short ones stay as they are. Not adjustbox: it takes pandoc's
+-- \setkeys{Gin}{width=\maxwidth,...} as defaults and shrank every formula to half a point.
 function Math(el)
   if el.mathtype == "DisplayMath" then
-    return pandoc.RawInline("latex", "\\[\\adjustbox{max width=\\linewidth}{$\\displaystyle " .. el.text .. "$}\\]")
+    return pandoc.RawInline("latex", "\\[\\kernfit{$\\displaystyle " .. el.text .. "$}\\]")
   elseif #el.text > 30 then
-    return pandoc.RawInline("latex", "\\adjustbox{max width=\\linewidth,valign=c}{$" .. el.text .. "$}")
+    -- \hfil\penalty50\hfilneg: the line may end before the formula, ragged, instead of the formula
+    -- sticking out of the margin; when no break is taken the two glues cancel.
+    return pandoc.RawInline("latex", "\\nobreak\\hfil\\penalty50\\hfilneg\\kernfit{$" .. el.text .. "$}")
   end
 end
 
--- Tables with many columns are set smaller, with less space between columns, and may break after
+-- Tables with many columns are set a little smaller (\\small keeps even code in them at 7 pt or more), with less space between columns, and may break after
 -- a slash ("Magazin/Reserve"), so that they fit the type area.
 function Table(tbl)
   tbl = tbl:walk({
@@ -61,7 +64,7 @@ function Table(tbl)
   })
   if #tbl.colspecs < 6 then return tbl end
   return {
-    pandoc.RawBlock("latex", "\\begingroup\\scriptsize\\setlength{\\tabcolsep}{2pt}"),
+    pandoc.RawBlock("latex", "\\begingroup\\small\\setlength{\\tabcolsep}{3pt}"),
     tbl,
     pandoc.RawBlock("latex", "\\endgroup"),
   }

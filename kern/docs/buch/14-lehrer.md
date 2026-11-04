@@ -46,21 +46,13 @@ Stand laut `docs/lehrer.md`:
 | Variation (Domain Randomization), Lernen im Browser, Determinismus | fertig |
 | Der Sprung: Vorbild → Nachahmen → Üben | fertig |
 | Digitaler Zwilling: Gerätemodelle, Kalibrierung, Abgleich | fertig (ohne echte Messdaten) |
-| Spielen: Ball kicken, Socke aufheben, wegtragen, ausspucken | in Überarbeitung (Abschnitt 14.8) |
+| Spielen: Ball kicken, Socke aufheben, wegtragen, ausspucken | Ball fertig; Socke gelernt, Erfolgsquote niedrig (Abschnitt 14.8) |
 
 ## 14.2 Architektur
 
 Der Lehrer trennt fünf Rollen, damit sie an verschiedenen Orten laufen können:
 
-```
-             Recipe ──────────► Task ──► DuckEnv / PlayEnv  (eine Ente, eine GameWorld, headless)
-               │                              ▲
-               │                              │ step(action) / observation()
-               ▼                              │
-   Ppo (Lerner) ──Policy──► Backend ──► Collector ──► Rollout
-        ▲                    (Threads | Web Worker)        │
-        └──────────────────── learn(rollouts) ◄────────────┘
-```
+![Die Rollen des Lehrers: Recipe, Task, Env, Ppo, Backend und Collector](../abbildungen/lehrer-rollen.svg)
 
 - **`Task`** sagt, was gelernt wird: Startzustand, Befehlsplätze der Beobachtung, Belohnung,
   Episodenende, Lehrpläne, privilegierte Beobachtung für den Kritiker.
@@ -820,7 +812,7 @@ sauber, zur Hälfte variiert.
 
 `kern/policies/play.onnx`: 12 Runden Nachahmen mit je 32 Episoden zu 60 s, halb sauberer Roboter, halb
 volle Variation; ausgewählt ist Runde 8 nach Prüfung über 32 Episoden je Zeile (`docs/lehrer.md`,
-Abschnitt 8):
+Abschnitt „Ergebnis“):
 
 | | Ball weggekickt | Socke aufgehoben | aufgehoben, weggetragen, ausgespuckt | Griffe, die hielten | Stürze |
 |---|---|---|---|---|---|
@@ -837,7 +829,8 @@ Stoff in den Schnabel legt, und die Übungsphase mit Belohnung.
 ## 14.9 Ergebnisse des Sprungs
 
 `policies/jump.onnx` entstand mit Rezept `recipe_for("jump")`, 32 Enten auf 2 Kernen, Seed 1,
-3000 Iterationen Üben (aus `docs/lehrer.md`):
+3000 Iterationen Üben. Die Messungen dieses Laufs standen bis Commit `2c0fc02` in `docs/lehrer.md`
+und sind seither nur noch in der Git-Historie zu finden; `jump.onnx` ist seitdem unverändert:
 
 | | sauberer Roboter (40 Episoden) | volle Variation (40 Episoden) |
 |---|---|---|
@@ -911,7 +904,7 @@ DAgger + PPO on Box3D)`, `rate_hz` = `25` und die Namen der 23 Beobachtungen und
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite im Browser](bilder/lehrer.png)
+![Die Lehrer-Seite im Browser mit laufendem Training: Einstellungen und Kennzahlen](bilder/lehrer.png)
 
 `kern/build.sh --lehrer` baut `kern_lehrer.wasm`: Engine, Box3D, Spiel-Laufzeit, `src/lehrer` und die
 C-Schnittstelle (`lehrer_api.cpp`). Die Seite `/lehrer/` (`web/lehrer/`) lädt sie einmal und gibt das

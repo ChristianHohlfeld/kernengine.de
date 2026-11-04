@@ -53,11 +53,7 @@ $$z = \sum_{i=1}^{n} w_i\, x_i + b, \qquad h = \sigma(z).$$
 - $\sigma$: die **Aktivierungsfunktion**,
 - $h$: die Ausgabe des Neurons.
 
-```
- x1 ──w1──┐
- x2 ──w2──┼──► Σ + b ──► z ──► σ(z) ──► h
- x3 ──w3──┘
-```
+![Ein Neuron mit drei Eingängen: gewichtete Summe plus Bias, dann die Aktivierung](../abbildungen/neuron.svg)
 
 ### A.1.3 Die Schicht und das mehrschichtige Perzeptron
 
@@ -75,13 +71,7 @@ $$h^{(0)} = x,\qquad h^{(l)} = \sigma\!\left(W^{(l)} h^{(l-1)} + b^{(l)}\right),
 Die letzte Schicht ist in Kern **linear** (ohne $\sigma$): Servoziele und Werte dürfen jede reelle
 Zahl sein.
 
-```mermaid
-flowchart LR
-  x["Eingabe x (61)"] --> L1["Gemm 61→512 + ELU"]
-  L1 --> L2["Gemm 512→256 + ELU"]
-  L2 --> L3["Gemm 256→128 + ELU"]
-  L3 --> y["Gemm 128→14 (linear)"]
-```
+![Das Laufnetz der Ente: 61 Eingänge, Normalisierer (A.7), drei Schichten mit ELU, zuletzt linear auf 14 Ausgänge](../abbildungen/mlp-kette.svg)
 
 **In Kern:** `Mlp` in `nn.h`. Die Form wird als Liste `dims` angegeben: Eingänge, verborgene
 Schichten, Ausgänge. `PpoConfig` (in `ppo.h`) setzt standardmäßig `actor_hidden{512, 256, 128}`;
@@ -121,14 +111,7 @@ Gebräuchliche Aktivierungen:
 | ReLU | $\max(0,z)$ | $0$ oder $1$ | einfach, aber „tote“ Neuronen bei $z<0$ |
 | **ELU** | $z$ für $z>0$, sonst $e^{z}-1$ | $1$ für $z>0$, sonst $e^{z}$ | glatt, negativ bis $-1$, kein totes Gebiet |
 
-```
- ELU(z)
-   2 |                    /
-   1 |                 /
-   0 |-------------__/------------ z
-  -1 |_______----
-      -4   -2    0    2
-```
+![ELU: für positive z die Gerade z, für negative eᶻ − 1, das sich −1 nähert](../abbildungen/elu.svg)
 
 Kern verwendet **ELU** mit $\alpha = 1$ – wie rsl_rl, die Bibliothek, mit der Pollen Robotics die
 Netze der Micro Duck trainiert. Im Code (`Mlp::forward`):
@@ -320,7 +303,8 @@ $$\frac{\partial\mathcal{L}}{\partial W} = \delta^{z}\, x^\top,\qquad
 \sum_r x_{r,i}\,\delta_{r,o}$.
 
 ```mermaid
-flowchart RL
+%% Bildunterschrift: Rückwärtsdurchlauf: Der Fehler läuft von der Ausgabe zu den früheren Schichten, an jeder Schicht entsteht dL/dW
+flowchart BT
   L["Verlust L"] -->|"dL/dy"| y["Ausgabe y"]
   y -->|"W^T δ"| h2["h(L-1)"]
   h2 -->|"⊙ σ'"| z2["z(L-1)"]
@@ -505,8 +489,8 @@ In Robotik heißt Überanpassung meist: Das Netz hat sich auf **genau diese Simu
 auf diese Masse, diese Reibung, dieses Servo. In der echten Welt ist alles ein wenig anders. Das
 Gegenmittel ist Variation (Domain Randomization, A.12). Kern prüft deshalb jedes Netz zweimal: auf
 dem **sauberen** Roboter und unter **voller Variation** (`kern_lehrer --eval`, `JumpReport`,
-`PlayReport`). Auch die Auswahl der Runde beim Spielnetz (`docs/lehrer.md`, Abschnitt 8)
-ist frühes Aufhören nach einer Bewertung.
+`PlayReport`). Auch die Auswahl der Runde beim Spielnetz (`docs/lehrer.md`, Abschnitt „Ergebnis“;
+Abschnitt 14.8) ist frühes Aufhören nach einer Bewertung.
 
 ---
 
@@ -537,13 +521,7 @@ dort hat es keine Daten und macht einen größeren Fehler, und so weiter. Die Fe
 heißt **Verteilungsverschiebung** (*distribution shift* oder *covariate shift*): Die Verteilung der
 Zustände beim Testen ist eine andere als beim Lernen, weil das Netz die Zustände selbst erzeugt.
 
-```
- Experte:  ●──●──●──●──●──●──●   (immer in der Mitte)
- Klon:     ●──●──●─╲
-                    ●─╲          kleiner Fehler → unbekannter Zustand
-                       ●──╲      → größerer Fehler → ...
-                           ●  Sturz
-```
+![Verteilungsverschiebung: Der Klon weicht ein wenig ab, landet in unbekannten Zuständen und stürzt](../abbildungen/verteilungsverschiebung.svg)
 
 Quantitativ (Ross und Bagnell): Macht der Klon in jedem Schritt mit Wahrscheinlichkeit $\varepsilon$
 einen Fehler, kann der Gesamtfehler über $T$ Schritte wie $\varepsilon T^2$ wachsen statt wie
@@ -555,6 +533,7 @@ $\varepsilon T$.
 Experte fährt, sondern der Schüler – und der Experte sagt in jedem Zustand, was **er** getan hätte.
 
 ```mermaid
+%% Bildunterschrift: DAgger: Das Netz fährt, das Vorbild beschriftet, die Daten wachsen von Runde zu Runde
 flowchart TD
   A["Runde 0: Vorbild fährt, Daten D0 aufzeichnen"] --> F0["Netz auf D0 anpassen"]
   F0 --> R["Runde k: Netz fährt (mit wenig Rauschen)"]
@@ -576,11 +555,12 @@ verschwindet schrittweise.
 - `JumpImitation::round_from` hängt die neuen Daten an alle bisherigen an und passt das Netz an
   **alles** an (`imitate(..., 10, 256, 1e-3f, ...)`: 10 Epochen, Minibatch 256, Lernrate $10^{-3}$).
 
-Das Rezept des Sprungs hat 8 Runden à 96 Episoden; laut `docs/lehrer.md` springt das Netz ab
-Runde 7 zum ersten Mal echt. Das Spielnetz lernt ebenso (`imitate_play`).
+Das Rezept des Sprungs hat 8 Runden à 96 Episoden (`docs/lehrer.md`); nach Runde 7 springt das
+Netz zum ersten Mal echt (Abschnitt 14.9). Das Spielnetz lernt ebenso (`imitate_play`).
 
 Ein Detail, das DAgger überhaupt erst möglich macht: Das Vorbild des Spielnetzes sieht **dasselbe**
-wie das Netz und hat „kein verstecktes Gedächtnis“ (`docs/lehrer.md`, Abschnitt 8). Eine Funktion
+wie das Netz und hat kein verstecktes Gedächtnis („no hidden memory“, Kommentar in
+`src/lehrer/spielen.cpp`). Eine Funktion
 von Beobachtungen kann ein Netz exakt lernen; eine Funktion, die von verborgenen Größen abhängt,
 nicht.
 
@@ -595,6 +575,7 @@ Umgebung belohnt oder bestraft, und das Netz lernt, mehr Belohnung zu bekommen.
 ### A.10.1 Der Kreislauf
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf des bestärkenden Lernens: Aktion, Beobachtung und Belohnung
 flowchart LR
   Agent["Agent (Policy π)"] -->|"Aktion a_t"| Umwelt["Umgebung (Simulation)"]
   Umwelt -->|"Beobachtung o_{t+1}"| Agent
@@ -807,7 +788,8 @@ gleichzeitig: Der Kritiker lernt, Returns vorherzusagen; der Actor lernt aus den
 Kritiker berechnet.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Actor und Kritiker: Der Kritiker sagt Returns vorher und liefert die Vorteile für den Policy-Gradienten
+flowchart TB
   O["Beobachtung o"] --> Actor["Actor μθ(o), σ"]
   Actor --> A["Aktion a"]
   C["Kritiker-Eingabe (o + privilegiert)"] --> Critic["Kritiker Vφ"]
@@ -847,7 +829,9 @@ Das **Ziel des Kritikers** ist dann $\hat R_t = \hat A_t + V(s_t)$.
 Schritten ohne Episodenende, Belohnungen $r = (1, 0, 2)$, Werten $V = (5, 4, 6)$ und dem Wert nach
 dem letzten Schritt $V_3 = 3$:
 
-| $t$ | $\delta_t = r_t + \gamma V_{t+1} - V_t$ | $\hat A_t = \delta_t + 0{,}9405\,\hat A_{t+1}$ | $\hat R_t = \hat A_t + V_t$ |
+$$\delta_t = r_t + \gamma V_{t+1} - V_t,\qquad \hat A_t = \delta_t + 0{,}9405\,\hat A_{t+1},\qquad \hat R_t = \hat A_t + V_t$$
+
+| $t$ | $\delta_t$ | $\hat A_t$ | $\hat R_t$ |
 |---|---|---|---|
 | 2 | $2 + 2{,}97 - 6 = -1{,}03$ | $-1{,}03$ | $4{,}97$ |
 | 1 | $0 + 5{,}94 - 4 = 1{,}94$ | $1{,}94 - 0{,}9687 = 0{,}9713$ | $4{,}9713$ |
@@ -923,14 +907,9 @@ Policy wählt die schlechte Aktion *häufiger*), ist $s_1 = 1{,}3 > s_2 = 1{,}2$
 gilt, und der Gradient korrigiert den Fehler. PPO ist pessimistisch: Verbesserungen werden gedeckelt,
 Verschlechterungen nie. Das Ziel ist eine untere Schranke für den wahren Gewinn.
 
-```
- L(ρ) für Â > 0                L(ρ) für Â < 0
-   │        ____________          │‾‾‾‾‾‾‾‾╲
-   │      ╱                       │          ╲
-   │    ╱                         │            ╲
-   └───┴────┴──── ρ               └───┴────┴─── ρ
-      0.8  1.2                       0.8  1.2
-```
+![Das geclippte Ziel L(ρ) für Â > 0 und Â < 0; auf den flachen Stücken ist der Gradient 0](../abbildungen/ppo-clip.svg)
+
+Senkrecht ist der Beitrag $L = \min(\rho \hat A,\ \operatorname{clip}(\rho, 0{,}8, 1{,}2)\,\hat A)$ eines einzelnen Samples zu $L^\text{CLIP}$ aufgetragen, also die Größe, die PPO maximiert; ihre Steigung über $\rho$ ist der Gradient, der beim Update fließt.
 
 ### A.11.6 Adaptive Lernrate über die KL-Divergenz
 
@@ -961,21 +940,7 @@ mit Gewicht `value_coef = 1`.
 
 ### A.11.8 Ein PPO-Update im Ganzen
 
-```mermaid
-flowchart TD
-  S["Sammeln: T Schritte × N Enten (Collector)"] --> K["kanonisch ordnen: Schritt für Schritt, Ente für Ente"]
-  K --> N["Normalisierer aktualisieren"]
-  N --> E["alte Policy neu bewerten: μ_alt, log π_alt, V_alt"]
-  E --> G["GAE: Vorteile Â, Ziele R̂; Â normieren"]
-  G --> P["eine Permutation ziehen"]
-  P --> EP{"noch eine Epoche (von 5)?"}
-  EP -->|ja| MB["Minibatch (von 4)"]
-  MB --> KL["KL messen, Lernrate anpassen"]
-  KL --> GR["Gradienten in 8 festen Teilen, Summe in fester Reihenfolge"]
-  GR --> AD["Adam (Actor + σ, Kritiker)"]
-  AD --> EP
-  EP -->|nein| Ende["neue Policy"]
-```
+![Ein PPO-Update: links die Vorbereitung, rechts 5 Epochen zu je 4 Minibatches](../abbildungen/ppo-update.svg)
 
 Die Werte von Kerns `PpoConfig`: `steps_per_env = 24` (Sprung: 48), `epochs = 5`, `minibatches = 4`,
 `clip = 0.2`, `gamma = 0.99`, `lam = 0.95`, `learning_rate = 1e-3` (Sprung: $10^{-4}$).
@@ -985,7 +950,7 @@ Die Werte von Kerns `PpoConfig`: `steps_per_env = 24` (Sprung: 48), `epochs = 5`
 Kern trennt die beiden Hälften bewusst: Ein `Collector` braucht nur die `Policy` (Actor,
 Normalisierer, Streuung) und gibt einen `Rollout` zurück; der Lerner (`Ppo::learn`) nimmt die
 Rollouts aller Sammler. Beide lassen sich in flache Puffer serialisieren. So können die Sammler
-native Threads sein oder Web Worker im Browser (`docs/lehrer.md`, Abschnitt 6).
+native Threads sein oder Web Worker im Browser (Abschnitt 14.11 in [Kapitel 14](14-lehrer.md)).
 
 ### A.11.10 Determinismus beim Lernen
 
@@ -1029,7 +994,7 @@ Bei der **Domänen-Randomisierung** (*domain randomization*) zieht jede Episode 
 und sensorischen Parameter neu aus Verteilungen. Ein Netz, das in allen diesen Welten funktioniert,
 hat gelernt, was ihnen gemeinsam ist.
 
-**In Kern** (`docs/lehrer.md`, Abschnitt 5; `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
+**In Kern** (Abschnitt 14.3 in [Kapitel 14](14-lehrer.md); `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
 
 | Was | Variation |
 |---|---|
@@ -1103,13 +1068,7 @@ $$x_k = m + \sigma\, y_k,\qquad y_k = B D z_k,\qquad z_k \sim \mathcal N(0, I).$
   Eigenvektoren, $D$ die Wurzeln ihrer Eigenwerte,
 - $\lambda$ Kandidaten pro Generation, die besten $\mu = \lambda/2$ zählen.
 
-```
- Generation 1          Generation 5            Generation 20
-   ·  ·   ·              · ·                      ·
-  ·  ●  ·  ·            ·●··                     ●:
-   · ·  ·               ·  ·  ↗                  (schmal, entlang
-  (rund, groß)         (gestreckt Richtung Tal)    des Tals)
-```
+![CMA-ES schematisch: Die Suchwolke ist erst rund und groß, streckt sich entlang des Tals und wird zuletzt schmal](../abbildungen/cma-es.svg)
 
 Die Aktualisierung pro Generation (nach dem Sortieren der Kandidaten nach Kosten):
 
@@ -1189,7 +1148,7 @@ obs [1,61] ─► Sub(obs_mean) ─► Div(obs_div) ─► Gemm ─► Elu ─�
 - Metadaten mit denselben Schlüsseln wie bei Pollen, dazu `task` und `lehrer`; das Spielnetz hat
   eigene (`play_metadata`).
 - Der Test `lehrer_exports_onnx_like_pollens_networks` liest die Datei mit Kern und vergleicht bis
-  $10^{-4}$ mit dem Actor; ONNX Runtime lädt sie ebenfalls (`docs/lehrer.md`, Abschnitt 4).
+  $10^{-4}$ mit dem Actor; ONNX Runtime lädt sie ebenfalls (Abschnitt 14.10 in [Kapitel 14](14-lehrer.md)).
 
 Exportiert wird nur der **Mittelwert** der Policy: Auf dem Roboter wird nicht mehr erkundet, die
 Streuung $\sigma$ und der Kritiker bleiben im Lerner.
@@ -1202,25 +1161,7 @@ Jetzt lässt sich der Weg vom leeren Netz zum springenden Roboter als Ganzes les
 stehen in [Kapitel 14](14-lehrer.md); wie man eigene Aufgaben und Netze baut, in
 [Kapitel 15](15-eigene-modelle.md).
 
-```mermaid
-flowchart TD
-  subgraph V["1. Vorbild suchen (CMA-ES, A.13)"]
-    V1["15 Schlüsselwerte"] --> V2["Simulation auf sauberen + variierten Robotern"]
-    V2 --> V3["Bewertung: Steigen, Flug, Neigung, Sturz, Stehen"]
-    V3 --> V1
-  end
-  subgraph N["2. Nachahmen (DAgger, A.9)"]
-    N1["Warmstart: velstand (A.12.4)"] --> N2["Runde 0: Vorbild fährt"]
-    N2 --> N3["Runden 1–7: Netz fährt, Vorbild beschriftet"]
-    N3 --> N4["Verhaltensklonen: MSE, Adam (A.3, A.6)"]
-  end
-  subgraph U["3. Üben (PPO, A.11)"]
-    U1["30 Iterationen nur Kritiker"] --> U2["PPO: GAE, Clip, KL-Lernrate, Entropie"]
-    U2 --> U3["volle Variation, asymmetrischer Kritiker (A.12)"]
-  end
-  V --> N --> U --> X["Export: ONNX mit Normalisierer (A.14)"]
-  X --> S["Studio / Roboter: nur das Netz"]
-```
+![Der Weg zum Sprung: Vorbild suchen, nachahmen, üben, dann exportieren; Warmstart (A.12.4), Verhaltensklonen (A.3, A.6) und Variation (A.12) sind in den Abschnitten erklärt](../abbildungen/sprung-ablauf.svg)
 
 | Grundbegriff | Abschnitt | Wo in Kern |
 |---|---|---|

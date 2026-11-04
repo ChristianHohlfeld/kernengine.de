@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 132">
-  <!-- Gelenke (gelb 6): ein Scharnier dreht um seine Achse (Tür von oben, Achse senkrecht durch den Punkt), eine Schiene lässt entlang ihrer Achse gleiten (Lift von der Seite). -->
+  <!-- Gelenke (gelb 6): ein Scharnier dreht um seine Achse (Tür von oben, Achse senkrecht durch den Punkt, gezeichnet als ⊙ = zeigt aus dem Papier heraus), eine Schiene lässt entlang ihrer Achse gleiten (Lift von der Seite). -->
   <rect class="fd" x="30" y="76" width="30" height="8"/>
   <path class="lk" d="M60,80 L160,80" style="stroke-width:3"/>
   <path class="l gs" d="M60,80 L141.92,22.64"/>
-  <path class="la p" d="M129.83,75.12 A70,70 0 0 0 120,43.95"/>
-  <circle class="dota" cx="60" cy="80" r="3.4"/>
+  <path class="la pa" d="M129.83,75.12 A70,70 0 0 0 120,43.95"/>
+  <circle class="fw" cx="60" cy="80" r="4.2"/><circle class="dota" cx="60" cy="80" r="1.6"/>
   <text x="45" y="98" class="k m">{{rahmen}}</text>
   <text x="140" y="94" class="k m">{{tuer}}</text>
   <text x="60" y="114" class="k a">{{achse1}}</text>
   <text x="90" y="14" class="m t">{{titel0}}</text>
   <rect class="fd" x="223" y="22" width="6" height="104"/>
   <rect class="fa" x="231" y="56" width="30" height="34"/>
-  <path class="la p ps" d="M274,40 L274,106"/>
+  <path class="la pa pas" d="M274,40 L274,106"/>
   <text x="282" y="70" class="k">{{kabine1}}</text>
   <text x="282" y="80" class="k">{{kabine2}}</text>
   <text x="218" y="40" class="k e a">{{achse2}}</text>

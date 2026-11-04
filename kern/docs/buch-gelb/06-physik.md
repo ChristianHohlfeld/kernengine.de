@@ -31,7 +31,7 @@ Modell** angepasst: vergrößert, Massen anders verteilt, feiner gerechnet. Das 
 Fußball: Wenn deine Taktik nicht funktioniert, änderst du die Taktik, nicht die Spielregeln. Ein
 echtes Gerät wie ein Servo bekommt ein eigenes kleines Modell (6.17).
 
-![Das Beispiel-Level Physics Lab in Kern Studio: Stapel, Pendel, Tür, Seilbrücke, Drehteller, Lift und Rover](../buch/bilder/studio-physics-lab.png)
+![Das Beispiel-Level Physics Lab beim Simulieren: Stapel, Pendel, Tür, Seilbrücke, Drehteller, Lift und Rover](../buch/bilder/studio-physics-lab.png)
 
 > **Mission:** Öffne auf https://kernengine.de/ **Datei › Beispiel-Levels › Physics Lab** (File ›
 > Example Levels › Physics Lab) und drück **Simulieren** (Simulate) (Alt+S). Pack eine Kiste der Pyramide mit der linken Maustaste, heb sie hoch und lass
@@ -46,6 +46,7 @@ herauskam). Box3D bekommt nur Sauberes. Wie bei einem Türsteher: Wer nicht
 passt, kommt gar nicht erst hinein, und der Fehler wird gemeldet ([Kapitel 3](03-grundlagen.md)).
 
 ```mermaid
+%% Bildunterschrift: Der einzige Weg zu Box3D führt durch die Physik-Schicht
 flowchart LR
   L["Level"] --> R["Spiel-Laufzeit"]
   R --> P["Physik-Schicht"]
@@ -244,7 +245,7 @@ eine Socke mit dem Schnabel auf. Das weiche Polster am Schnabel muss auf der Soc
 Socke muss aber auf dem Holzboden **rutschen**. Ein einziger Reibwert pro Form kann nicht beides.
 
 Darum kennt Kern **Oberflächen**: Baumwollstrick (*cloth*), weiches gedrucktes Gummi (*tpu*) und
-Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es gemessene Werte:
+Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es eigene Werte, gewählt nach Messwerten aus der Fachliteratur:
 
 | Paar | Reibung | Wie im Alltag |
 |---|---|---|
@@ -253,7 +254,7 @@ Holz- oder Laminatboden (*floor*). Für Paare aus diesen Oberflächen gibt es ge
 | Strick auf Holz | 0,4 | Socke rutscht übers Parkett |
 
 Box3D bleibt dafür unverändert. Es fragt bei jedem Kontakt: „Welche Reibung gilt hier?“ Kern
-antwortet: Hat das Paar einen gemessenen Wert, gilt der, sonst die Faustregel. Sprungkraft und
+antwortet: Hat das Paar einen eigenen Wert, gilt der, sonst die Faustregel. Sprungkraft und
 Rollwiderstand bleiben, wie sie sind.
 
 Die Sohlen der Ente haben **keine** Oberfläche. Sie behalten die Reibung, mit der Pollen Robotics
@@ -276,8 +277,8 @@ In Kern Studio stellst du sie unter **Details › Statisches Mesh › Physik** (
 Physics) ein (für den automatischen Kollider) oder unter **Details › Kollider** (Details › Collider).
 Den endlosen Boden stellst du unter **Welteinstellungen** (World Settings) › **Physik (Box3D)**
 (Physics (Box3D)) › **Bodenreibung** (Ground friction) und **Bodenelastizität** (Ground bounciness) ein. Dort steht auch, wie weich
-Dinge aufeinanderliegen, die **Kontaktweichheit**. Sie gilt nicht pro Form, sondern für die ganze
-Welt.
+Dinge aufeinanderliegen: in den Feldern **Kontaktsteifigkeit** (Contact stiffness) und
+**Kontaktdämpfung** (Contact damping ratio). Sie gelten nicht pro Form, sondern für die ganze Welt.
 
 Rollwiderstand setzt Kern bei runden Dingen. Der Ball im Micro-Duck-Level hat 0,03, denn „ein
 Gummiball auf Holzboden rollt aus“. Die Socke besteht aus runden Stoffklumpen und hat 0,5, denn „ein
@@ -298,13 +299,7 @@ Ein **Gelenk** verbindet zwei Körper so, dass sie sich nur noch auf eine bestim
 gegeneinander bewegen können. Jedes Gelenk hat eine **Achse**: Bei einem Scharnier ist es die
 Linie, um die sich etwas dreht, bei einer Schiene die Linie, entlang der etwas gleitet.
 
-```
-   Tür von oben:              Lift von der Seite:
-
-   Rahmen ●──────── Tür          ║ ▲
-          ↻                      ║ █  Kabine gleitet
-   Achse: senkrecht durch ●      ║ ▼  entlang der Schiene
-```
+![Ein Scharnier dreht um seine Achse (Tür von oben), eine Schiene lässt entlang ihrer Achse gleiten (Lift von der Seite)](../abbildungen/gelenke.svg)
 
 Die wichtigsten Gelenke in Kern Studio (Feld **Typ** (Type) im Abschnitt **Gelenk** (Constraint)):
 
@@ -371,7 +366,7 @@ Sensoren, und man kann Körper ausnehmen. Ein Robotersensor sieht so seine eigen
 
 Nach jedem Schritt meldet die Physik, was in **diesem** Schritt passiert ist: Wer hat angefangen
 oder aufgehört, wen zu berühren? Wer ist in einen Sensor gelaufen oder wieder heraus? Wer ist hart
-aufgeprallt (ein **Hit**, mit Punkt und Tempo)? Und welches Gelenk ist über seiner Schwelle?
+aufgeprallt (ein *Hit*, mit Punkt und Tempo)? Und welches Gelenk ist über seiner Schwelle?
 
 **Meldungen kosten Zeit.** Darum schaltet die Spiel-Laufzeit sie nur dort ein, wo das Spiel sie auch
 liest: an Sensoren, am Spieler, an Dingen mit Aufprallgeräusch und in Levels mit Logik (den
@@ -392,11 +387,7 @@ anstößt ([Kapitel 13](13-micro-duck.md)).
 Wenn du beim **Simulieren** (Simulate) etwas mit der Maus packst, hängt es an einer **unsichtbaren Feder**. Deine Maus
 zieht am einen Ende, das Ding hängt am anderen.
 
-```
-   Maus ◉ ~~~~~~~~~~ Feder ~~~~~~~~~~ ▣ Kiste
-        zieht                 hängt am Griffpunkt,
-                              kann kippen und anstoßen
-```
+![Der Maus-Griff: Die Maus zieht über eine Feder an der Kiste](../abbildungen/maus-feder.svg)
 
 Weil es eine Feder ist und kein Teleport, bleibt das Ding ein echter Physikkörper: Es stößt an,
 kippt, schwingt und fliegt beim Loslassen mit seinem Schwung weiter. Die Feder ist so gedämpft,
@@ -419,15 +410,7 @@ Der Trick für Treppen ist eine **Pogo-Feder**: Die Kapsel schwebt auf einer uns
 Stück über dem Boden, wie auf einem Pogo-Stab. Kommt eine Stufe, die niedriger ist als dieser
 Abstand, federt die Kapsel einfach hinauf.
 
-```
-            ┌─┐
-            │ │  Kapsel
-            └┬┘
-             ┊   Pogo-Feder
-   ──────────┘     ┌──────    Stufe niedriger als die Feder:
-                   │          die Kapsel federt hinauf
-   ────────────────┘
-```
+![Die Kapsel schwebt auf einer Pogo-Feder; eine Stufe, die niedriger ist als die Feder, nimmt sie federnd mit](../abbildungen/pogo-feder.svg)
 
 Pro Schritt rechnet der Mover: bremsen, beschleunigen, springen, fallen. Dann schaut er, welche
 Wände und Böden er berührt, und schneidet die Bewegung an ihnen ab. **Gegen eine Wand drücken macht
@@ -451,10 +434,10 @@ Bild dauert wieder 25 ms, jetzt sind 33,3 ms drin, also zwei Schritte.
 
 Kerns Sicherungen dabei:
 
-- **Kein Teufelskreis:** Hängt der Computer einmal lange, zählt Kern höchstens eine Viertelsekunde
-  und rechnet pro Bild höchstens 0,1 s nach. Sonst könnte jeder Nachholschritt das nächste Bild noch
-  langsamer machen, und die Physik holt nie mehr auf (die „Spiral of Death“). Im Notfall fallen
-  lieber ein paar Schritte weg.
+- **Kein Teufelskreis:** Hängt der Computer einmal lange, rechnet Kern pro Bild höchstens 0,1 s
+  nach. Sonst könnte jeder Nachholschritt das nächste Bild noch langsamer machen, und die Physik
+  holte nie mehr auf – wie jemand, der so viele Hausaufgaben nachholen will, dass er dabei die
+  neuen verpasst. Im Notfall fallen lieber ein paar Schritte weg.
 - **Schritte zählen:** Die Spielzeit ist „Anzahl Schritte geteilt durch Schrittrate“. Würde Kern
   stattdessen jedes Mal 0,0167 dazuzählen, sammelten sich winzige Rundungsfehler an, denn ein
   Computer rundet nach jeder Rechnung ein klein wenig (mehr dazu in 6.14).
@@ -488,7 +471,8 @@ Bei 60 Hz und 4 Sub-Steps schaut die Physik 60 · 4 = 240-mal pro Sekunde hin. D
 sind 0,5 · 240 = 120 Hz: höchstens 120 Schwingungen pro Sekunde.
 
 > **Mission:** Starte im Physics Lab **Simulieren** (Simulate) und stoß das Pendel an. Drück dann die
-> Taste **Pause** (oder **Spielen › Pause** (Play › Pause)) und danach mehrmals **.** (Punkt). Jeder
+> Taste **Pause**, auf Laptops ohne diese Taste **Alt+Umschalt+P** (oder im Menü **Spielen › Pause**
+> (Play › Pause)), und danach mehrmals **.** (Punkt). Jeder
 > Druck ist genau ein fester Schritt: Das Pendel rückt jedes Mal ein winziges Stück weiter.
 > Schrittrate und Sub-Steps findest du unter **Welteinstellungen** (World Settings) ›
 > **Physik (Box3D)** (Physics (Box3D)) als **Schrittrate** (Step rate) und **Teilschritte** (Sub-steps).
@@ -529,7 +513,8 @@ gerechnet wird:
 Geprüft wird das mit einem **Fingerabdruck**: Die Ente läuft 400 **Regeltakte**. Ein Regeltakt
 ist ein Mal, in dem das Netz der Ente neue Befehle gibt. Nach jedem Takt wird ihr ganzer Zustand
 zu einer langen Prüfnummer verrechnet. Ändert sich auch nur ein Bit, ändert sich die Nummer. Alle
-400 Nummern müssen eine gespeicherte Liste treffen ([Kapitel 14](14-lehrer.md)).
+400 Nummern müssen eine gespeicherte Liste treffen. Wie das genau geht, erklärt
+[Kapitel 2](02-bauen-und-testen.md), Abschnitt 2.9.
 
 > **Für Profis:** Geprüft wird mit GCC auf x86, Apple clang auf ARM und WebAssembly. Box3D läuft
 > ohne Vektorbefehle, alles wird ohne zusammengefasste Multiplikation-plus-Addition übersetzt, und
@@ -564,6 +549,11 @@ Kern. Die wichtigsten Grundsätze, jeder mit seinem Grund:
    Spieler und Roboter schlafen nie, denn langsames Gehen sähe für Box3D wie Stillstand aus.
 7. **Dauerkräfte jeden Schritt neu geben**, denn eine Kraft gilt nur einen Schritt. Ein Sprung ist
    dagegen ein einzelner Impuls.
+8. **Kinematische Körper fahren, statt zu springen.** Eine Plattform bekommt ein Tempo oder ein
+   Ziel, das sie bis zum nächsten Schritt erreichen soll – wie eine Rolltreppe, die fährt, statt sich
+   woandershin zu beamen. Mitten im Spiel einfach umsetzen kostet Box3D doppelt Arbeit. Und Vorsicht:
+   Ein Ziel, zu dem der Körper nur ganz langsam kriechen müsste, „verschläft“ Box3D, weil so ein
+   langsamer Körper für Box3D wie ein schlafender aussieht (6.4).
 
 Zu jedem neuen Roboter gehört ein **Test**, der drei Dinge prüft: Er steht. Seine Gelenke halten
 (die Lücke in einem Gelenk bleibt unter 1 % der Gliedlänge, bei einem 10-cm-Bein also unter 1 mm).
@@ -627,14 +617,16 @@ Die Werte stehen in einem **Profil**: Steifigkeit, Dämpfung, Reibung, Höchstkr
 Motors und Verzögerung. Die **Trägheit des Motors** kommt so zustande: Im Servo dreht sich ein
 kleiner Motor über ein Getriebe sehr schnell mit. Dadurch lässt sich das Gelenk schwerer andrehen,
 als das Bein allein vermuten lässt. Box3D kennt so etwas nicht. Kern täuscht es nicht mit einer
-erfundenen Zahl vor, denn die würde Energie aus dem Nichts erzeugen. Stattdessen setzt Kern eine
+erfundenen Zahl vor. Stattdessen setzt Kern eine
 echte dünne Scheibe mit derselben Trägheit auf die Gelenkachse, also etwas, das es in Box3D wirklich
 geben kann. Das ist eine feste Regel in Kern: Was Box3D gar nicht abbilden kann, wird
 aufgeschrieben, nicht mit erfundenen Zahlen vorgetäuscht.
 
 Ein anderer Servo ist einfach ein anderes Profil. Weil keine Messung ganz genau ist, steht im Profil
-auch, **wie sicher** jeder Wert ist. Beim Training bekommt jeder Servo eigene Werte in diesem
-Bereich. So verlässt sich das Netz nicht auf etwas, das niemand genau weiß. Eingebaut ist der Servo
+auch, **wie sicher** jeder Wert ist. Beim Training bekommt jeder Servo absichtlich leicht
+verschiedene Werte aus diesem Bereich. So lernt das Netz, mit leicht verschiedenen Servos
+klarzukommen, statt sich auf eine Zahl zu verlassen, die niemand genau weiß – wie eine Fußballerin,
+die auf vielen verschiedenen Plätzen trainiert und darum auf jedem Rasen sicher spielt. Eingebaut ist der Servo
 der Micro Duck, so wie Pollen Robotics ihn trainiert hat. Wie Profile gemessen werden, zeigt
 [Kapitel 16](16-kalibrierung.md).
 
@@ -669,7 +661,7 @@ Warteschlange ist also **4 Schritte** lang.
 ### Lösungen
 
 1. **Kinematisch** (Kinematic): Sie folgt der Vorgabe und lässt sich nicht bremsen.
-2. Mit Oberflächen der gemessene Paarwert **0,4**. Ohne Oberflächen gilt die Faustregel, und
+2. Mit Oberflächen der Paarwert **0,4**. Ohne Oberflächen gilt die Faustregel, und
    0 mal 0,9 ist 0, also **0**: Die Form bleibt rutschig wie Eis.
 3. Die Physik schaut 100 · 16 = 1600-mal pro Sekunde hin. Eine Feder muss mindestens zweimal pro
    Schwingung gesehen werden, also höchstens 1600 ÷ 2 = **800 Hz**.

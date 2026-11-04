@@ -22,7 +22,7 @@ The basic concepts this chapter assumes (rigid-body state, integration, collisio
 constraints, solvers, servos as control loops, determinism) are explained in
 [Appendix C](C-physics.md).
 
-![The Physics Lab sample level in Kern Studio: stack, pendulum, door, rope bridge, turntable, lift and rover](../buch/bilder/studio-physics-lab.png)
+![The Physics Lab sample level in Kern Studio: stack, pendulum, door, rope bridge, turntable, elevator and rover](../buch/bilder/studio-physics-lab.png)
 
 ---
 
@@ -969,7 +969,7 @@ measured and fitted, in [Chapter 16](16-calibration.md).
 | `physics_scale_is_a_unit_system` | scaling as a change of units (bit for bit when hanging, < 1 mm on the ground) |
 | `physics_hull_mesh` | hull triangles, orientation, flat point sets |
 | `physics_materials_of_meshes_and_the_ground` | friction, restitution, rolling resistance and contact softness pass through level file and body plan down to the Box3D shapes |
-| `game_world_physics_lab` | pendulum, turntable, lift, rover, bridge, breaking, debug lines, grab |
+| `game_world_physics_lab` | pendulum, turntable, elevator, rover, bridge, breaking, debug lines, grab |
 | `game_character_mover` | the character mover |
 | `determinism_is_bit_identical_across_builds_and_platforms` | fingerprint over 400 control ticks |
 

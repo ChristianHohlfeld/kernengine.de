@@ -53,11 +53,7 @@ $$z = \sum_{i=1}^{n} w_i\, x_i + b, \qquad h = \sigma(z).$$
 - $\sigma$: the **activation function**,
 - $h$: the output of the neuron.
 
-```
- x1 ──w1──┐
- x2 ──w2──┼──► Σ + b ──► z ──► σ(z) ──► h
- x3 ──w3──┘
-```
+![A neuron with three inputs: weighted sum plus bias, then the activation](../abbildungen/neuron.svg)
 
 ### A.1.3 The layer and the multilayer perceptron
 
@@ -73,13 +69,7 @@ $$h^{(0)} = x,\qquad h^{(l)} = \sigma\!\left(W^{(l)} h^{(l-1)} + b^{(l)}\right),
 In Kern the last layer is **linear** (without $\sigma$): servo targets and values may be any real
 number.
 
-```mermaid
-flowchart LR
-  x["Input x (61)"] --> L1["Gemm 61→512 + ELU"]
-  L1 --> L2["Gemm 512→256 + ELU"]
-  L2 --> L3["Gemm 256→128 + ELU"]
-  L3 --> y["Gemm 128→14 (linear)"]
-```
+![The duck's walking network: 61 inputs, normalizer (A.7), three layers with ELU, finally linear to 14 outputs](../abbildungen/mlp-kette.svg)
 
 **In Kern:** `Mlp` in `nn.h`. The shape is given as a list `dims`: inputs, hidden layers, outputs.
 `PpoConfig` (in `ppo.h`) sets `actor_hidden{512, 256, 128}` by default; the recipes give the critic
@@ -117,14 +107,7 @@ Common activations:
 | ReLU | $\max(0,z)$ | $0$ or $1$ | simple, but "dead" neurons for $z<0$ |
 | **ELU** | $z$ for $z>0$, otherwise $e^{z}-1$ | $1$ for $z>0$, otherwise $e^{z}$ | smooth, negative down to $-1$, no dead region |
 
-```
- ELU(z)
-   2 |                    /
-   1 |                 /
-   0 |-------------__/------------ z
-  -1 |_______----
-      -4   -2    0    2
-```
+![ELU: the line z for positive z, eᶻ − 1 for negative z, approaching −1](../abbildungen/elu.svg)
 
 Kern uses **ELU** with $\alpha = 1$ – like rsl_rl, the library with which Pollen Robotics trains the
 Micro Duck's networks. In the code (`Mlp::forward`):
@@ -312,7 +295,8 @@ Over a batch, the weight gradients are summed: $\partial\mathcal{L}/\partial w_{
 \sum_r x_{r,i}\,\delta_{r,o}$.
 
 ```mermaid
-flowchart RL
+%% Caption: Backward pass: the error flows from the output to the earlier layers, each layer yields dL/dW
+flowchart BT
   L["Loss L"] -->|"dL/dy"| y["Output y"]
   y -->|"W^T δ"| h2["h(L-1)"]
   h2 -->|"⊙ σ'"| z2["z(L-1)"]
@@ -497,7 +481,7 @@ simulation** – to this mass, this friction, this servo. In the real world ever
 different. The remedy is variation (domain randomization, A.12). Kern therefore evaluates every
 network twice: on the **clean** robot and under **full variation** (`kern_lehrer --eval`,
 `JumpReport`, `PlayReport`). The choice of round for the play network
-(`docs/lehrer.md`, Section 8; Section 14.8) is likewise early stopping after an evaluation.
+(`docs/lehrer.md`, section "Ergebnis"; Section 14.8) is likewise early stopping after an evaluation.
 
 ---
 
@@ -528,13 +512,7 @@ data and makes a larger mistake, and so on. The errors compound. This is called 
 shift** (or *covariate shift*): the distribution of states at test time differs from that during
 learning because the network generates the states itself.
 
-```
- Expert:   ●──●──●──●──●──●──●   (always in the middle)
- Clone:    ●──●──●─╲
-                    ●─╲          small error → unknown state
-                       ●──╲      → larger error → ...
-                           ●  fall
-```
+![Distribution shift: the clone strays a little, reaches unknown states and falls](../abbildungen/verteilungsverschiebung.svg)
 
 Quantitatively (Ross and Bagnell): if the clone makes a mistake with probability $\varepsilon$ at
 every step, the total error over $T$ steps can grow like $\varepsilon T^2$ instead of
@@ -546,6 +524,7 @@ $\varepsilon T$.
 expert who drives but the student – and in every state the expert says what **it** would have done.
 
 ```mermaid
+%% Caption: DAgger: the network drives, the Vorbild labels, the data grows from round to round
 flowchart TD
   A["Round 0: Vorbild drives, record data D0"] --> F0["Fit network to D0"]
   F0 --> R["Round k: network drives (with a little noise)"]
@@ -568,12 +547,11 @@ gradually disappears.
   **everything** (`imitate(..., 10, 256, 1e-3f, ...)`: 10 epochs, minibatch 256, learning rate
   $10^{-3}$).
 
-The jump recipe has 8 rounds of 96 episodes each; according to `docs/lehrer.md` the network jumps
-properly for the first time from round 7. The play network learns the same way (`imitate_play`).
+The jump recipe has 8 rounds of 96 episodes each (`docs/lehrer.md`); after round 7 the network
+jumps properly for the first time (Section 14.9). The play network learns the same way (`imitate_play`).
 
 One detail that makes DAgger possible in the first place: the play network's Vorbild sees **the
-same** as the network and has "kein verstecktes Gedächtnis" ("no hidden memory"; `docs/lehrer.md`,
-Section 8). A network can learn a function of observations exactly; a function that depends on
+same** as the network and has "no hidden memory" (comment in `src/lehrer/spielen.cpp`). A network can learn a function of observations exactly; a function that depends on
 hidden quantities, it cannot.
 
 ---
@@ -587,6 +565,7 @@ rewards or punishes, and the network learns to obtain more reward.
 ### A.10.1 The loop
 
 ```mermaid
+%% Caption: The reinforcement learning loop: action, observation and reward
 flowchart LR
   Agent["Agent (policy π)"] -->|"action a_t"| Umwelt["Environment (simulation)"]
   Umwelt -->|"observation o_{t+1}"| Agent
@@ -793,7 +772,8 @@ simultaneously: the critic learns to predict returns; the actor learns from the 
 computes.
 
 ```mermaid
-flowchart LR
+%% Caption: Actor and critic: the critic predicts returns and supplies the advantages for the policy gradient
+flowchart TB
   O["Observation o"] --> Actor["Actor μθ(o), σ"]
   Actor --> A["Action a"]
   C["Critic input (o + privileged)"] --> Critic["Critic Vφ"]
@@ -833,7 +813,9 @@ The **critic's target** is then $\hat R_t = \hat A_t + V(s_t)$.
 without the episode ending, rewards $r = (1, 0, 2)$, values $V = (5, 4, 6)$ and the value after the
 last step $V_3 = 3$:
 
-| $t$ | $\delta_t = r_t + \gamma V_{t+1} - V_t$ | $\hat A_t = \delta_t + 0.9405\,\hat A_{t+1}$ | $\hat R_t = \hat A_t + V_t$ |
+$$\delta_t = r_t + \gamma V_{t+1} - V_t,\qquad \hat A_t = \delta_t + 0.9405\,\hat A_{t+1},\qquad \hat R_t = \hat A_t + V_t$$
+
+| $t$ | $\delta_t$ | $\hat A_t$ | $\hat R_t$ |
 |---|---|---|---|
 | 2 | $2 + 2.97 - 6 = -1.03$ | $-1.03$ | $4.97$ |
 | 1 | $0 + 5.94 - 4 = 1.94$ | $1.94 - 0.9687 = 0.9713$ | $4.9713$ |
@@ -910,14 +892,9 @@ policy chooses the bad action *more often*), then $s_1 = 1.3 > s_2 = 1.2$ – th
 applies, and the gradient corrects the mistake. PPO is pessimistic: improvements are capped,
 deteriorations never. The objective is a lower bound on the true gain.
 
-```
- L(ρ) for Â > 0                L(ρ) for Â < 0
-   │        ____________          │‾‾‾‾‾‾‾‾╲
-   │      ╱                       │          ╲
-   │    ╱                         │            ╲
-   └───┴────┴──── ρ               └───┴────┴─── ρ
-      0.8  1.2                       0.8  1.2
-```
+![The clipped objective L(ρ) for Â > 0 and Â < 0; on the flat parts the gradient is 0](../abbildungen/ppo-clip.svg)
+
+The vertical axis shows a single sample's contribution $L = \min(\rho \hat A,\ \operatorname{clip}(\rho, 0.8, 1.2)\,\hat A)$ to $L^\text{CLIP}$, i.e. the quantity PPO maximizes; its slope over $\rho$ is the gradient that flows during the update.
 
 ### A.11.6 Adaptive learning rate via the KL divergence
 
@@ -948,21 +925,7 @@ with weight `value_coef = 1`.
 
 ### A.11.8 A complete PPO update
 
-```mermaid
-flowchart TD
-  S["Collect: T steps × N ducks (Collector)"] --> K["Canonical order: step by step, duck by duck"]
-  K --> N["Update normalizers"]
-  N --> E["Re-evaluate old policy: μ_old, log π_old, V_old"]
-  E --> G["GAE: advantages Â, targets R̂; normalize Â"]
-  G --> P["Draw one permutation"]
-  P --> EP{"Another epoch (of 5)?"}
-  EP -->|yes| MB["Minibatch (of 4)"]
-  MB --> KL["Measure KL, adapt learning rate"]
-  KL --> GR["Gradients in 8 fixed chunks, summed in fixed order"]
-  GR --> AD["Adam (actor + σ, critic)"]
-  AD --> EP
-  EP -->|no| Ende["New policy"]
-```
+![A PPO update: preparation on the left, on the right 5 epochs of 4 minibatches each](../abbildungen/ppo-update.svg)
 
 The values of Kern's `PpoConfig`: `steps_per_env = 24` (jump: 48), `epochs = 5`, `minibatches = 4`,
 `clip = 0.2`, `gamma = 0.99`, `lam = 0.95`, `learning_rate = 1e-3` (jump: $10^{-4}$).
@@ -972,7 +935,7 @@ The values of Kern's `PpoConfig`: `steps_per_env = 24` (jump: 48), `epochs = 5`,
 Kern deliberately separates the two halves: a `Collector` needs only the `Policy` (actor, normalizer,
 spread) and returns a `Rollout`; the learner (`Ppo::learn`) takes the rollouts of all collectors.
 Both can be serialized into flat buffers. This way the collectors can be native threads or web
-workers in the browser (`docs/lehrer.md`, Section 6).
+workers in the browser (Section 14.11 in [Chapter 14](14-lehrer.md)).
 
 ### A.11.10 Determinism in learning
 
@@ -1015,7 +978,7 @@ Two strategies complement each other:
 In **domain randomization**, every episode draws its physical and sensory parameters afresh from
 distributions. A network that works in all these worlds has learned what they have in common.
 
-**In Kern** (`docs/lehrer.md`, Section 5; `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
+**In Kern** (Section 14.3 in [Chapter 14](14-lehrer.md); `Task::Start`, `Task::Noise`, `DuckEnv::servo`):
 
 | What | Variation |
 |---|---|
@@ -1089,13 +1052,7 @@ $$x_k = m + \sigma\, y_k,\qquad y_k = B D z_k,\qquad z_k \sim \mathcal N(0, I).$
   eigenvectors, $D$ the square roots of its eigenvalues,
 - $\lambda$ candidates per generation, of which the best $\mu = \lambda/2$ count.
 
-```
- Generation 1          Generation 5            Generation 20
-   ·  ·   ·              · ·                      ·
-  ·  ●  ·  ·            ·●··                     ●:
-   · ·  ·               ·  ·  ↗                  (narrow, along
-  (round, large)       (stretched toward valley) the valley)
-```
+![CMA-ES schematically: the search cloud starts round and large, stretches along the valley and finally becomes narrow](../abbildungen/cma-es.svg)
 
 The update per generation (after sorting the candidates by cost):
 
@@ -1175,7 +1132,7 @@ obs [1,61] ─► Sub(obs_mean) ─► Div(obs_div) ─► Gemm ─► Elu ─�
 - Metadata with the same keys as Pollen's, plus `task` and `lehrer`; the play network has its own
   (`play_metadata`).
 - The test `lehrer_exports_onnx_like_pollens_networks` reads the file with Kern and compares it with
-  the actor to within $10^{-4}$; ONNX Runtime loads it as well (`docs/lehrer.md`, Section 4).
+  the actor to within $10^{-4}$; ONNX Runtime loads it as well (Section 14.10 in [Chapter 14](14-lehrer.md)).
 
 Only the policy's **mean** is exported: on the robot there is no more exploration; the spread
 $\sigma$ and the critic stay in the learner.
@@ -1188,25 +1145,7 @@ Now the path from the empty network to the jumping robot can be read as a whole.
 [Chapter 14](14-lehrer.md); how to build your own tasks and networks is in
 [Chapter 15](15-your-own-models.md).
 
-```mermaid
-flowchart TD
-  subgraph V["1. Search for the Vorbild (CMA-ES, A.13)"]
-    V1["15 key values"] --> V2["Simulation on clean + varied robots"]
-    V2 --> V3["Score: rise, flight, tilt, fall, standing"]
-    V3 --> V1
-  end
-  subgraph N["2. Imitate (DAgger, A.9)"]
-    N1["Warm start: velstand (A.12.4)"] --> N2["Round 0: Vorbild drives"]
-    N2 --> N3["Rounds 1–7: network drives, Vorbild labels"]
-    N3 --> N4["Behavior cloning: MSE, Adam (A.3, A.6)"]
-  end
-  subgraph U["3. Practice (PPO, A.11)"]
-    U1["30 iterations critic only"] --> U2["PPO: GAE, clip, KL learning rate, entropy"]
-    U2 --> U3["Full variation, asymmetric critic (A.12)"]
-  end
-  V --> N --> U --> X["Export: ONNX with normalizer (A.14)"]
-  X --> S["Studio / robot: only the network"]
-```
+![The way to the jump: search for the Vorbild, imitate, practice, then export; warm start (A.12.4), behavior cloning (A.3, A.6) and variation (A.12) are explained in those sections](../abbildungen/sprung-ablauf.svg)
 
 | Concept | Section | Where in Kern |
 |---|---|---|

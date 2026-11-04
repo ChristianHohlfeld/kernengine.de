@@ -23,6 +23,10 @@ header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margi
 h1 { font-size: 20px; margin: 0; color: var(--text-hi); font-weight: 650; letter-spacing: .01em; }
 header p { margin: 0; color: var(--dim); }
 header a { color: var(--dim); margin-left: auto; }
+/* DE | EN, bottom right as in Kern Studio's status bar */
+#langBtn { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); z-index: 1; min-height: 0; font: 600 10px/1 var(--font); letter-spacing: .04em; flex: none; display: inline-flex; gap: 0; padding: 0; background: var(--bg2); border: 1px solid var(--line2); border-radius: 4px; overflow: hidden; }
+#langBtn span { padding: 3px 6px; color: var(--dim); }
+#langBtn span.on { background: var(--accent); color: #fff; }
 .panel { background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; }
 label { display: grid; gap: 4px; color: var(--dim); font-size: 12px; }

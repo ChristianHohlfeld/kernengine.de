@@ -4,14 +4,14 @@
   <circle class="dot" cx="30" cy="110" r="2"/><text x="30" y="124" class="m t">1</text>
   <circle class="dot" cx="150" cy="110" r="2"/><text x="150" y="124" class="m t">2</text>
   <circle class="dot" cx="90" cy="22" r="2"/><text x="90" y="16" class="m t">3</text>
-  <path class="la p" d="M76.21,93.57 A18,18 0 1 0 76.21,70.43"/>
+  <path class="la pa" d="M76.21,93.57 A18,18 0 1 0 76.21,70.43"/>
   <text x="90" y="138" class="m t">{{titel0}}</text>
   <text x="90" y="149" class="k m">{{sinn0}}</text>
   <path class="fa" d="M220,110 L340,110 L280,22 Z"/>
   <circle class="dot" cx="220" cy="110" r="2"/><text x="220" y="124" class="m t">2</text>
   <circle class="dot" cx="340" cy="110" r="2"/><text x="340" y="124" class="m t">1</text>
   <circle class="dot" cx="280" cy="22" r="2"/><text x="280" y="16" class="m t">3</text>
-  <path class="la p" d="M293.79,93.57 A18,18 0 1 1 293.79,70.43"/>
+  <path class="la pa" d="M293.79,93.57 A18,18 0 1 1 293.79,70.43"/>
   <text x="280" y="138" class="m t">{{titel1}}</text>
   <text x="280" y="149" class="k m">{{sinn1}}</text>
 </svg>

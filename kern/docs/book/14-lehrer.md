@@ -47,21 +47,13 @@ Status according to `docs/lehrer.md`:
 | Variation (domain randomization), learning in the browser, determinism | done |
 | The jump: demonstration → imitation → practice | done |
 | Digital twin: device models, calibration, matching | done (without real measurement data) |
-| Play: kick a ball, pick up a sock, carry it off, spit it out | being reworked (Section 14.8) |
+| Play: kick a ball, pick up a sock, carry it off, spit it out | ball done; sock learned, low success rate (Section 14.8) |
 
 ## 14.2 Architecture
 
 The Lehrer separates five roles so that they can run in different places:
 
-```
-             Recipe ──────────► Task ──► DuckEnv / PlayEnv  (one duck, one GameWorld, headless)
-               │                              ▲
-               │                              │ step(action) / observation()
-               ▼                              │
-   Ppo (learner) ──Policy──► Backend ──► Collector ──► Rollout
-        ▲                    (threads | web workers)       │
-        └──────────────────── learn(rollouts) ◄────────────┘
-```
+![The Lehrer's roles: Recipe, Task, Env, Ppo, Backend and Collector](../abbildungen/lehrer-rollen.svg)
 
 - **`Task`** says what is learned: start state, command slots of the observation, reward, episode
   end, curricula, privileged observation for the critic.
@@ -819,7 +811,7 @@ to stand, it finds out for itself. Half the environments are clean, half are var
 
 `kern/policies/play.onnx`: 12 rounds of imitation with 32 episodes of 60 s each, half on a clean robot,
 half with full variation; round 8 was chosen after checking over 32 episodes per row (`docs/lehrer.md`,
-section 8):
+section "Ergebnis"):
 
 | | ball kicked away | sock picked up | picked up, carried off, spat out | grips that held | falls |
 |---|---|---|---|---|---|
@@ -836,7 +828,9 @@ beak like fabric, and the practice phase with rewards.
 ## 14.9 Jump results
 
 `policies/jump.onnx` was created with recipe `recipe_for("jump")`, 32 ducks on 2 cores, seed 1,
-3000 iterations of practice (from `docs/lehrer.md`):
+3000 iterations of practice. The measurements of this run were documented in `docs/lehrer.md` up to
+commit `2c0fc02` and have since been available only in the Git history; `jump.onnx` has not changed
+since then:
 
 | | clean robot (40 episodes) | full variation (40 episodes) |
 |---|---|---|
@@ -910,7 +904,7 @@ DAgger + PPO on Box3D)`, `rate_hz` = `25` and the names of the 23 observations a
 
 ## 14.11 The Lehrer in the browser
 
-![The Lehrer page in the browser (German user interface)](../buch/bilder/lehrer.png)
+![The Lehrer page in the browser with a training run in progress: settings and metrics](../buch/bilder/lehrer.png)
 
 `kern/build.sh --lehrer` builds `kern_lehrer.wasm`: engine, Box3D, game runtime, `src/lehrer` and
 the C interface (`lehrer_api.cpp`). The page `/lehrer/` (`web/lehrer/`) loads it once and gives the
@@ -932,16 +926,19 @@ as pointers with `kern_lehrer_result_length()` bytes. The learner accepts JSON s
 the recipe: `learningRate`, `initStd`, `entropyCoef`, `desiredKl`, `steps`, `epochs`, `minibatches`,
 `warmStart` (`velstand` | `none`), `imitate`.
 
-**The page** offers motion (jump, or stand as a quick test), workers (default: cores − 1, at most 8),
-ducks per worker (default 8), iterations (default 1500), seed, initial action noise and learning
-rate (empty = recipe). It shows iteration, duck steps, steps/s, mean episode return and length,
-action noise, real jumps, jump height and flight time, and plots return and length over the
-iterations. It keeps the screen awake (Wake Lock).
+**The page** offers **Motion** (**Jump**, or **Stand (quick test)**), **Workers** (default: cores − 1,
+at most 8), **Ducks per worker** (default 8), **Iterations** (default 1500), **Seed**, **Initial
+action noise** and **Learning rate** (empty = **Recipe**). It shows **Iteration**, **Duck steps**,
+**Steps / s**, **Mean episode return**, **Episode length (s)**, **Action noise (std)**, **Real jumps
+(clean robot)**, **Jump height (mm)** and **Flight time (ms)**, and plots **Episode return** and
+**Episode length** over the iterations. It keeps the screen awake (Wake Lock). Like Kern Studio, it
+follows the browser language (or `?lang=de|en`); the **DE | EN** button at the bottom right switches
+it.
 
 Every 25 iterations and at the end it stores the network for Kern Studio on the device (IndexedDB
 "kern-lehrer", store "policies", key `<task>.onnx`, `jump.onnx` for the jump) and announces it via
-the BroadcastChannel "kern-lehrer"; open Studio tabs pick it up immediately. ".onnx herunterladen"
-("download .onnx") saves the file.
+the BroadcastChannel "kern-lehrer"; open Studio tabs pick it up immediately. **Download .onnx** saves the
+file.
 
 The same seed and the same number of ducks produce the same network as natively. The play layer
 cannot be trained in the browser; the page knows only `jump` and `stand`.

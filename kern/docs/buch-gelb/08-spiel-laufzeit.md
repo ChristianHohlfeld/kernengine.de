@@ -34,10 +34,12 @@ Ein Spiel durchläuft immer dieselben vier Stationen: vorbereiten, starten, Schr
 weiterrechnen, stoppen.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Das Leben eines Spiels: vorbereiten, starten, Schritt für Schritt rechnen, stoppen
+flowchart TB
   A[Vorbereiten] --> B[Start: Kopie anlegen]
   B --> C[Schritt]
-  C --> C
+  C --> R[nächstes Bild: noch ein Schritt]
+  R --> C
   C --> D[Stopp]
   D --> A
 ```
@@ -105,7 +107,7 @@ Ein **Actor** hat:
 
 ## 8.4 Die Komponenten
 
-Komponenten sind wie Lego-Aufsätze: Ein nackter Actor ist nur ein Punkt im Raum. Steckst du ein Mesh
+Komponenten sind wie Aufsätze aus dem Baukasten: Ein nackter Actor ist nur ein Punkt im Raum. Steckst du ein Mesh
 drauf, wird er sichtbar. Steckst du einen **Starrkörper** (Rigid Body) dazu, fällt er herunter. So
 baust du alles aus denselben Bausteinen zusammen.
 
@@ -127,8 +129,8 @@ baust du alles aus denselben Bausteinen zusammen.
 
 Ein paar Bausteine im Einzelnen:
 
-**Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Ring, Rampe oder
-ein eingebautes Modell, etwa ein Servomotor der Micro Duck. Das **Material** bestimmt das Aussehen:
+**Statisches Mesh** ist die sichtbare Form: Box, Kugel, Zylinder, Kegel, Kapsel, Ebene, Torus, Rampe oder
+ein eingebautes Modell, etwa ein Glied der Micro Duck wie ihr Hals. Das **Material** bestimmt das Aussehen:
 Farbe, wie rau oder glänzend, ob metallisch, ob es selbst leuchtet, ob man durchsehen kann. Ein Mesh
 kann automatisch einen passenden Kollider mitbringen. Dessen Reibung, Sprungkraft und Oberfläche
 ([Kapitel 6](06-physik.md)) stellst du gleich hier ein, unter **Statisches Mesh › Physik** (Static
@@ -164,10 +166,6 @@ laufen sie bei jedem Start gleich.
 Bäumen, Autos und nachts leuchtenden Fenstern ([Kapitel 5](05-szene-und-geometrie.md)).
 
 Die übrigen Bausteine (Spieler-Steuerung, Waffe, Pickup, Trigger) kommen in 8.10 bis 8.13 dran.
-
-> **Für Profis:** Ein Name kann verwirren: In [Kapitel 6](06-physik.md) heißt der Typ **Statisch**
-> im Programm „fixed“. Mit dem Gelenk **Fest (verschweißt)** (Fixed (weld)) hat er nichts zu tun. Und wer in Kapitel 6
-> direkt mit der Physik arbeitet, ohne Level, startet mit einer Dichte von 1 kg/m³ statt 1000.
 
 > **Mission:** Öffne auf https://kernengine.de/ über **Datei › Beispiel-Levels** (File › Example
 > Levels) das Level Physics Lab. Klick die Tür an und schau in **Details**: Welche Komponenten hat
@@ -217,8 +215,9 @@ Werten. Du kannst eine `.klevel`-Datei mit jedem Texteditor öffnen. Ein Actor s
 
 Zeile für Zeile: Der Actor hat die Nummer 12, heißt „Door“ und ist ein Kind von Actor 3. Er steht bei
 x = 5,2 m, y = −12 m, z = 1,5 m (relativ zu seinem Eltern-Actor). Er trägt das Schlagwort „door“ und
-hat ein Mesh und einen Starrkörper. Was in den geschweiften Klammern fehlt, bekommt Standardwerte.
-Kern schreibt Standardwerte meist gar nicht erst hin, das hält die Datei klein.
+hat ein Mesh und einen Starrkörper. Was beim Einlesen in den geschweiften Klammern fehlt, bekommt
+Standardwerte. Beim Speichern schreibt Kern jede Komponente vollständig hin; nur leere Angaben wie
+ein fehlender Eltern-Actor oder keine Schlagwörter lässt es weg.
 
 **Beim Lesen** gilt ein schlauer Grundsatz: **nachsichtig bei Fehlendem, streng bei Falschem.**
 
@@ -252,10 +251,11 @@ Editor. Was du im Editor mit **Anzeigen › Kollisionsformen** (Show › Collisi
 also genau das, womit später gerechnet wird.
 
 ```mermaid
+%% Bildunterschrift: Ein Plan für beide: Aus ihm entstehen die Physikwelt und die Kollisionsformen im Editor
 flowchart LR
   L[Level] --> P[Plan: Körper und Formen]
   P --> W[Physikwelt]
-  P --> E[Collider im Editor]
+  P --> E[Kollisionsformen im Editor]
 ```
 
 Die Regeln des Plans:
@@ -269,7 +269,8 @@ Die Regeln des Plans:
    Kollider wird ans Mesh angepasst.
 4. Pickups und Trigger werden zu Sensoren. Haben sie gar keine Form, bekommen sie eine Sensor-Kugel
    mit 1 m Radius.
-5. Die Stadt wird ein einziger statischer Körper mit einer Box je Haus.
+5. Die Stadt wird ein einziger statischer Körper aus vielen Boxen: für die Häuser (Hofhäuser und
+   L-Häuser aus mehreren) und für die Bodenplatten.
 6. Der endlose Boden ist eine riesige flache Box, deren Oberseite genau bei z = 0 liegt.
 
 ## 8.8 Die GameWorld starten
@@ -290,10 +291,6 @@ Spieler-Fahrzeuge bekommen dabei immer die Sonderbehandlung „Bullet“, damit 
 durch Wände rutschen. Fahrzeuge, Figuren und Flieger werden gegen Umkippen gesichert, nur die
 Rollkugel und die laufende Ente dürfen kippen.
 
-> **Für Profis:** Ein Gelenk verbindet einen Actor mit seinem **Ziel**. Bewegt wird dabei der Actor
-> gegenüber dem Ziel. Positive Werte, etwa der Weg einer Schiene, der Winkel eines Scharniers oder
-> das Tempo eines Motors, bewegen also den Actor und nicht das Ziel.
-
 **Melden nur, wo jemand zuhört.** Jede Berührung zu melden, kostet die Physik Arbeit. Darum schaltet
 Kern Meldungen nur dort ein, wo sie jemand liest: bei Sensoren, beim Spieler, bei Körpern mit
 Aufprall-Sound und, wenn das Level Logik hat, bei allem Beweglichen. Eine Kiste, die niemanden
@@ -303,10 +300,10 @@ interessiert, fällt still und spart Rechenzeit.
 
 | Modus | Bedeutung |
 |---|---|
-| none | keine Simulation, nur Editor |
-| simulate | Physik und Logik laufen, niemand wird gesteuert, Körper lassen sich greifen |
-| play | wie simulate, dazu Spieler, Regeln und HUD |
-| replica | Kopie eines Server-Spiels bei einem Mitspieler ([Kapitel 10](10-netzwerk.md)) |
+| Bearbeiten | keine Simulation, du baust im Editor |
+| **Simulieren** (Simulate) | Physik und Logik laufen, niemand wird gesteuert, Körper lassen sich greifen |
+| **Spielen** (Play) | wie Simulieren, dazu Spieler, Regeln und HUD |
+| Mitspieler-Kopie | Kopie eines Server-Spiels bei einem Mitspieler ([Kapitel 10](10-netzwerk.md)) |
 
 Zwischen **Simulieren** (Simulate) und **Spielen** kannst du mitten im Lauf wechseln (Studio: F8),
 der Spieler behält dabei seinen Zustand. Du kannst neu starten (Strg+R), pausieren und genau einen Schritt
@@ -343,8 +340,9 @@ passend zur Schrittrate. Warum, steht in [Kapitel 6](06-physik.md).
 Ein fester Schritt:
 
 ```mermaid
+%% Bildunterschrift: Ein fester Schritt der GameWorld, immer in derselben Reihenfolge
 flowchart TD
-  A[Spieler-Eingaben] --> B[Rotator und Mover]
+  A[Spieler-Eingaben] --> B[Rotator und Beweger]
   B --> C[Verkehr, Laufroboter, Servos, Griff]
   C --> D[Physik rechnen]
   D --> E[Ereignisse]
@@ -406,10 +404,10 @@ Figur fällt absichtlich schneller als in echt, damit Sprünge knackig wirken un
 nicht schwebend. Der Soldat fällt wie in echt, so wie in Ego-Shootern üblich.
 
 Für alle gilt: **Boost** ist ein Vorrat von 0 bis 1. Beim Boosten sinkt er um 0,45 pro Sekunde, sonst
-wächst er um 0,12 pro Sekunde. Nach einem tiefen Fall spielt eine Landung den Sound `land`.
+wächst er um 0,22 pro Sekunde. Nach einem tiefen Fall spielt eine Landung den Sound `land`.
 
 Rechne mal: Ein voller Boost-Vorrat hält 1 / 0,45 ≈ 2,2 Sekunden. Ganz neu füllen dauert
-1 / 0,12 ≈ 8,3 Sekunden.
+1 / 0,22 ≈ 4,5 Sekunden.
 
 **Mehrere Spieler:** Jeder Spieler hat seinen eigenen **Pawn** (8.8). Kommt im Mehrspieler jemand
 dazu, kopiert Kern die Spielfigur samt Kindern und stellt die Kopie auf eine Spirale um den
@@ -470,12 +468,12 @@ hast. Mit Wiederkehr-Zeit taucht es später wieder auf.
 | **Schadenszone** (Damage zone) | zieht Lebenspunkte ab | **Schadenszone** (Damage Zone) |
 | **Nur Logik-Ereignis** (Logic event only) | nur ein Ereignis für die Logik | – |
 
-Jede Aktion spielt ihren passenden Sound. Der Teleporter sperrt sich 1 s lang, damit du nicht sofort
+Fast jede Aktion spielt ihren passenden Sound. Der Teleporter sperrt sich 1 s lang, damit du nicht sofort
 zurückgebeamt wirst. Jeder Trigger meldet sich vorher bei der Logik. Mit **Nur einmal** (Only once)
-ist er danach verbraucht, außer Ziel und Gefahr.
+ist er danach verbraucht, außer Ziel, Gefahr und Teleporter.
 
 > **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
-> **Grundformen** (Basic) an. Platziere aus **Actors platzieren** (Place Actors) eine
+> **Basis** (Basic) an. Platziere aus **Actors platzieren** (Place Actors) eine
 > **Rollende Kugel** (Rolling Ball) aus der Gruppe **Spieler** (Players), dreimal **Stern** (Star) und ein
 > **Ziel** aus der Gruppe **Spielablauf** (Gameplay). Stell in den **Welteinstellungen** die
 > **Siegbedingung** auf **Alle Pickups sammeln** und drück **Spielen** (Play) (Alt+P). Was passiert,
@@ -506,7 +504,7 @@ du abgedrückt hast**, und prüft den Treffer dort, höchstens eine halbe Sekund
 Dazu kommen Rüstung (fängt einen Teil des Schadens ab), kurzer Schutz nach dem Wiedereinstieg,
 Fallschaden bei harten Landungen und **Wiederkehr**: Ein Spieler startet nach einer Wartezeit neu,
 andere Actors verschwinden und tauchen, wenn eingestellt, an ihrem Platz wieder auf. Ein Fass mit
-Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus Grundformen
+Explosionsradius explodiert und schubst, was in der Nähe ist. Figur und Waffe sind aus einfachen Körpern
 gebaut und reine Darstellung: Sie ändern nichts an der Simulation.
 
 ## 8.14 Läufer
@@ -519,7 +517,8 @@ Motorbewegung zu welcher Lage passt.
 In jedem Schritt läuft ein Kreislauf:
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Der Kreislauf des Läufers in jedem Schritt: fühlen, wählen, Netz fragen, Servos bewegen
+flowchart TB
   S[Fühlen: Sensoren lesen] --> V["Verhalten wählen, z. B. laufen, stehen, Ball suchen"]
   V --> N[Netz fragen]
   N --> M[Servos bewegen]
@@ -559,25 +558,29 @@ endlos umdrehen kannst.
 
 Die **Touch-Steuerung** hat zwei Sticks in den unteren Ecken. Links bewegst du dich (**LAUFEN**
 (MOVE), bei Fahrzeugen **LENKEN / GAS** (STEER / GAS), beim Flieger **FLIEGEN** (FLY)), rechts
-schaust du (**SCHAUEN** (LOOK)). Daneben liegen Knöpfe je nach Bewegungsart (in Klammern die
-englische Beschriftung; KICK L, KICK R, BOOST, DRIFT und LIFT heißen in beiden Sprachen gleich):
+schaust du (**SCHAUEN** (LOOK)). Daneben liegen Knöpfe, je nach Bewegungsart andere: die Ente hat
+zum Beispiel **QUAK** (QUACK), die Kugel **SPRUNG** (JUMP) und **BOOST**.
 
-| Bewegung | Knöpfe |
-|---|---|
-| Soldat | SPRUNG (JUMP), LADEN (RELOAD), ZIELEN (AIM), DUCKEN (CROUCH), NUTZEN (USE) |
-| Läufer | QUAK (QUACK), GREIFEN (PICK), SITZ (SIT), KICK L, KICK R, ROLLEN (ROLL), SCHNABEL (BEAK), HUIII (WHEEE), HÜPFEN (HOP) |
-| Figur | SPRUNG (JUMP), NUTZEN (USE) |
-| Rollende Kugel | SPRUNG (JUMP), BOOST |
-| Flieger | HOCH (UP), RUNTER (DOWN), BOOST |
-| Hovercar | BOOST, DRIFT, LIFT, SICHT (VIEW) |
-| Fahrzeug | BOOST, DRIFT, HÜPFEN (HOP), SICHT (VIEW) |
+> **Für Profis:** Alle Knöpfe zum Nachschlagen (in Klammern die englische Beschriftung; KICK L,
+> KICK R, BOOST, DRIFT und LIFT heißen in beiden Sprachen gleich):
+>
+> | Bewegung | Knöpfe |
+> |---|---|
+> | Soldat | SPRUNG (JUMP), LADEN (RELOAD), ZIELEN (AIM), DUCKEN (CROUCH), NUTZEN (USE) |
+> | Läufer | QUAK (QUACK), GREIFEN (PICK), SITZ (SIT), KICK L, KICK R, ROLLEN (ROLL), SCHNABEL (BEAK), HUIII (WHEEE), HÜPFEN (HOP) |
+> | Figur | SPRUNG (JUMP), NUTZEN (USE) |
+> | Rollende Kugel | SPRUNG (JUMP), BOOST |
+> | Flieger | HOCH (UP), RUNTER (DOWN), BOOST |
+> | Hovercar | BOOST, DRIFT, LIFT, SICHT (VIEW) |
+> | Fahrzeug | BOOST, DRIFT, HÜPFEN (HOP), SICHT (VIEW) |
 
 Jeder Finger bekommt genau eine Aufgabe, und zwar dort, wo er zuerst aufsetzt. Liegt dort ein
 Knopf, drückt er den Knopf und wird nie zum Stick, auch wenn er danach weiterwischt. Liegt dort kein
 Knopf, aber ein Stick, bewegt er den Stick. Setzt er auf dem freien Bildschirm auf, schießt er beim
 Soldaten mit Waffe (und zielt dabei), bei allen anderen schaut er sich um. Linker Stick ganz nach
 vorn heißt Sprinten. Ziehst du den rechten Stick bis an den Rand, drehst du dich einfach weiter
-(**Edge Turn**). Gamepads bekommen **Totzonen**: Ganz kleine Wackler am Stick werden ignoriert.
+(englisch *Edge Turn*, „Drehen am Rand“). Gamepads bekommen **Totzonen**: Ganz kleine Wackler am
+Stick werden ignoriert, so wie eine Waage, die erst ab ein paar Gramm etwas anzeigt.
 
 ## 8.17 Logik in der Welt
 
@@ -608,7 +611,7 @@ Level...) findest du die eingebauten Levels:
   selbstständig. Ein Level-Graph lässt sie zwitschern, wenn ihre Kopfkamera den Ball sieht.
   **Spielen** (Play) beginnt hier mit eingeschalteter Beobachterkamera, mit **F8** übernimmst du die
   Ente.
-- **Grundformen** (Basic): Boden und ein Würfel.
+- **Basis** (Basic): Boden, Sonne, Himmel und ein Würfel.
 - **Leer** (Empty): gar nichts, nicht einmal Boden.
 
 Automatische Tests spielen diese Levels durch und prüfen zum Beispiel, dass ein Ziel gewinnt und eine

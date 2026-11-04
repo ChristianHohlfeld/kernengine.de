@@ -112,15 +112,9 @@ $h\omega = 3{,}14$. Explizit wächst die Amplitude pro Schritt um den Faktor 3,3
 um das 150 000-Fache. Semi-implizit liegt $h\omega$ über 2: ebenfalls instabil. Implizit wird die
 Schwingung stark gedämpft, bleibt aber stabil.
 
-```
- Amplitude
-   │  explizit  ╱╲    ╱‾‾╲
-   │      ╱╲  ╱  ╲  ╱    ╲   (wächst)
-   │ ╱╲  ╱  ╲╱    ╲╱
-   │╱  ╲╱    semi-implizit: ╱╲╱╲╱╲╱╲ (bleibt)
-   │          implizit:     ╱╲_╱‾‾\__ (klingt ab)
-   └────────────────────────────────── t
-```
+Bei einem kleinen Schritt ($h\omega = 0{,}25$) sieht man das Verhalten der drei Verfahren deutlich:
+
+![Die drei Verfahren am Federschwinger mit hω = 0,25 über 50 Schritte: explizit wächst, semi-implizit bleibt, implizit klingt ab](../abbildungen/integratoren.svg)
 
 ### C.2.3 Was Box3D tut
 
@@ -157,7 +151,8 @@ großer Schritt, und große Schritte machen Federn instabil (C.2.2) und das Erge
 Die Lösung ist Glenn Fiedlers **Akkumulator** („Fix Your Timestep“):
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Fester Zeitschritt mit Akkumulator: feste Schritte, gerendert wird zwischen den letzten zwei Zuständen
+flowchart TB
   F["Frame: Zeit dt"] --> A["Akkumulator += min(dt, 0,25 s)"]
   A --> L{"Akkumulator ≥ h?"}
   L -->|ja| S["ein fester Schritt h; Akkumulator -= h"]
@@ -196,7 +191,8 @@ Bei $n$ Körpern gibt es $n(n-1)/2$ Paare – bei 1000 Körpern fast 500 000. Je
 ist zu teuer. Deshalb arbeitet man in zwei Phasen:
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Kollisionserkennung in zwei Phasen, danach der Solver
+flowchart TB
   B["Broad Phase: Hüllquader-Baum findet Kandidatenpaare"] --> N["Narrow Phase: exakter Test, Kontaktpunkte (Manifold)"]
   N --> S["Solver: Kontakt-Constraints"]
 ```
@@ -232,13 +228,7 @@ gibt es effiziente, robuste Verfahren:
 Das Ergebnis ist ein **Manifold**: eine Kontaktnormale und bis zu einige Kontaktpunkte, jeweils mit
 Abstand (negativ bei Durchdringung).
 
-```
- GJK: Minkowski-Differenz A − B
-       ________
-      /        \      Ursprung außerhalb → getrennt, Abstand = kürzester Weg
-     /   A−B    \  ·0
-     \__________/
-```
+![GJK: Liegt der Ursprung außerhalb der Minkowski-Differenz A − B, sind die Formen getrennt; der kürzeste Weg ist ihr Abstand](../abbildungen/gjk.svg)
 
 ### C.3.4 Konvexe Hüllen
 
@@ -309,15 +299,7 @@ wird sie überschritten, **gleitet** er mit Reibung $\mu\lambda_n$ entgegen der 
 erlaubten Kräfte bilden einen **Reibungskegel** um die Normale mit halbem Öffnungswinkel
 $\arctan\mu$:
 
-```
-          n
-          │      Reibungskegel:
-     ╲    │    ╱  Kraft innen → Haften
-      ╲   │   ╱   Kraft am Rand → Gleiten
-       ╲  │  ╱
-        ╲ │ ╱  arctan μ
-   ──────●──────  Kontaktebene
-```
+![Der Reibungskegel um die Normale n mit halbem Öffnungswinkel arctan μ](../abbildungen/reibungskegel.svg)
 
 Physikalisch unterscheidet man Haft- und Gleitreibung ($\mu_s > \mu_k$). Box3D kennt nur **einen**
 Koeffizienten.
@@ -413,10 +395,10 @@ $c = \max(c_A, c_B) \cdot r_\text{max}$ ($r$ der Radius der Kugel oder Kapsel; b
 eingebundenen Stand ein Viertel des Innenradius), und der Solver begrenzt den Dreh-Impuls, der das
 Rollen bremst, auf $c \cdot \sum\lambda_n$ – genau die Form $\tau \le c_{rr}\,r\,F_n$.
 
-**In Kern:** `ShapeMaterial::rolling_resistance`. `docs/lehrer.md` (Abschnitt 8) berichtet, wozu er
-nötig war: „Die Socke kroch von selbst über den Boden (runde Stoffklumpen rollten). Sie hat jetzt
-Rollwiderstand und liegt still.“ und „Der Ball rollte ewig. Er hat jetzt Rollwiderstand wie ein
-Gummiball auf Holz.“
+**In Kern:** `ShapeMaterial::rolling_resistance`. Die Kommentare im Code nennen den Grund: Der Ball
+im Micro-Duck-Level hat 0,03 („a rubber ball on a wooden floor rolls out“, `src/game/demos.cpp`),
+die Socken-Klumpen 0,5 („a lump of cloth does not roll (round lumps would, and the heap crawls)“,
+`src/game/walker.cpp`).
 
 ---
 
@@ -517,8 +499,9 @@ $$\omega = 2\pi f,\qquad
 Der Impuls eines Kontakts mit Durchdringung $s < 0$ ist dann
 (`box3d:src/contact_solver.c`):
 
-$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,\qquad
-\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
+$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,$$
+
+$$\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
 
 - $\text{biasRate}\cdot s$: wie schnell die Durchdringung abgebaut wird,
 - $v_\text{max}$: Obergrenze dieser Ausdrückgeschwindigkeit (`contact_speed`, Kern: 3 m/s),
@@ -537,6 +520,7 @@ abgebaut.
 Der Ablauf eines festen Schritts, den Box3D **Soft Step** nennt (`box3d:src/solver.c`):
 
 ```mermaid
+%% Bildunterschrift: Der Soft Step von Box3D: Sub-Steps mit Warmstart, Lösen mit Bias und Relax
 flowchart TD
   P["Constraints vorbereiten (Jacobi, effektive Massen)"] --> L{"noch ein Sub-Step?"}
   L -->|ja| IV["Geschwindigkeiten integrieren (Schwerkraft, Kräfte, Dämpfung)"]
@@ -586,7 +570,8 @@ den Motor so, dass das Gelenk ihn erreicht. Im Inneren ist das ein **Regelkreis*
 Winkel, vergleicht mit dem Ziel und erzeugt ein Moment.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Der Regelkreis eines Servos: Totzeit, PD-Regler mit Momentgrenze, Gelenk
+flowchart TB
   Z["Zielwinkel θ*"] --> T["Totzeit (Bus)"]
   T --> E["Fehler e = θ* − θ"]
   E --> PD["PD: K·e − D·θ̇, begrenzt auf ±T"]
@@ -716,7 +701,7 @@ Ein paar Regeln aus `docs/physics.md` (Abschnitt 6), die direkt aus den Grundlag
 Eine Simulation ist **deterministisch**, wenn gleiche Anfangszustände und gleiche Eingaben **Bit für
 Bit** dieselben Ergebnisse liefern. Für Kern ist das zentral: Ein Trainingslauf soll auf jedem Gerät
 dasselbe Netz ergeben, ein Fehler soll reproduzierbar sein, und ein abgespieltes Roboterlog soll
-überall gleich herauskommen (`docs/lehrer.md`, Abschnitt 7).
+überall gleich herauskommen (Kopfkommentar von `include/kern/core/dmath.h`).
 
 Physiksimulationen sind **chaotisch**: Ein Unterschied im letzten Bit wächst exponentiell. „Ein Bit
 wird in einer Robotersimulation in Sekunden zu einem anderen Gang.“ Fast gleich reicht deshalb nicht.
@@ -731,7 +716,7 @@ $$(0{,}1 + 0{,}2) + 0{,}3 = 0{,}6000000000000001,\qquad 0{,}1 + (0{,}2 + 0{,}3) 
 Daraus folgen die Gefahren:
 
 - **Umordnen durch den Compiler.** Mit `-ffast-math` darf er Summen umordnen, um zu vektorisieren.
-  Kern verbietet diese Optionen.
+  Kerns Build-Skripte setzen diese Optionen nicht.
 - **Parallele Summen.** Teilt man eine Summe auf Threads auf, hängt die Reihenfolge von der Zahl der
   Threads ab. Kern summiert in festen Teilen in fester Reihenfolge ([Anhang A](A-grundlagen-neuronale-netze.md),
   A.11.10).
@@ -777,8 +762,9 @@ Determinismus muss man messen. `determinism_fingerprint` (`env.h`) lässt Pollen
 saubere Ente 400 Regeltakte steuern und hasht pro Takt die exakten Bits des Zustands (Rumpflage und
 -geschwindigkeit, alle Gelenkwinkel und -geschwindigkeiten). Zwei Builds sind genau dann bitgleich,
 wenn die Listen gleich sind; der erste abweichende Index sagt, wann sie auseinanderlaufen. Die
-Referenz liegt in `tests/determinism_fingerprint.txt`; laut `docs/lehrer.md` prüft CI sie mit GCC
-auf x86, mit WebAssembly in Node und mit Apple clang auf ARM.
+Referenz liegt in `tests/determinism_fingerprint.txt`; die CI prüft sie mit GCC auf x86
+(`kern/tests/run.sh`), mit WebAssembly in Node (`lehrer_wasm_test.mjs`) und mit Apple clang auf ARM
+(Job `determinism`, `.github/workflows/ci.yml`).
 
 Ein zweiter Test zur Skalierung zeigt, wie fein das ist: Ein frei hängendes Servo-Bein in 1-facher
 und 4-facher Größe läuft **Bit für Bit gleich**, weil die Skalierungsfaktoren Zweierpotenzen sind und

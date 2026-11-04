@@ -12,7 +12,10 @@
   <path class="lg gs" d="M128,126 L128,30"/>
   <path class="lk" d="M40,119.14 L84,91.71 L128,64.29"/>
   <path class="la" d="M128,64.29 L172,64.29"/>
-  <text x="172" y="58.29" class="k a e">{{flach}}</text>
+  <text x="150" y="48" class="k a m">{{flach}}</text>
+  <text x="150" y="57" class="k a m">{{flach2}}</text>
+  <text x="106" y="111" class="k m">{{weiter0}}</text>
+  <text x="106" y="120" class="k m">{{weiter02}}</text>
   <text x="106" y="22" class="m t">{{titel0}}</text>
   <text x="36" y="40" class="e">{{yachse}}</text>
   <text x="106" y="150" class="m">{{xachse}}</text>
@@ -28,8 +31,10 @@
   <path class="lg gs" d="M318,126 L318,30"/>
   <path class="la" d="M230,64.29 L274,64.29"/>
   <path class="lk" d="M274,64.29 L318,91.71 L362,119.14"/>
-  <text x="233" y="77.29" class="k a">{{flach}}</text>
-  <text x="296" y="120.51" class="k m">{{weiter}}</text>
+  <text x="252" y="48" class="k a m">{{flach}}</text>
+  <text x="252" y="57" class="k a m">{{flach2}}</text>
+  <text x="340" y="73" class="k m">{{weiter}}</text>
+  <text x="340" y="82" class="k m">{{weiter2}}</text>
   <text x="296" y="22" class="m t">{{titel1}}</text>
   <text x="226" y="40" class="e">{{yachse}}</text>
   <text x="296" y="150" class="m">{{xachse}}</text>

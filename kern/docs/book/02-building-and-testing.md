@@ -170,8 +170,8 @@ engine's objects, there is a cache:
   version (`box3d-<key>`, `musl-math-<key>`); an object is recompiled if it is missing or older than
   its source or the newest header.
 - **C++:** folder `cpp-<flags_key>`; each object is named `<name>-<key>.o`, where the key is built
-  from the hash of **all** header contents (under `include`, `src` and Box3D's `include`), the source
-  path and the source contents. Consequence: **every header change recompiles all C++ sources** –
+  from the hash of **all** headers and included data files (`*.h`, `*.inl`, `*.inc` under `include`,
+  `src`, Box3D's `include` and `third_party/microduck`), the source path and the source contents. Consequence: **every header change recompiles all C++ sources** –
   simple and safe, as the comment in the script puts it.
 - **ThinLTO:** cache in `$KERN_OBJ_CACHE/thinlto`.
 
@@ -349,7 +349,7 @@ distinct colors in the canvas.
 Among other things, the test checks:
 
 - **Single-file build** (`/generated/studio.html`): startup with Orb Run, menus, Fly Mode (right mouse
-  button + W), tools, Outliner and Details, editing the X position, focus (F), Content Drawer (click
+  button + W), tools, Outliner and Details, editing the X position, Content Drawer (click
   and drag), selecting and moving with the left mouse button, sound via Web Audio, context menus,
   deterministic undo, Play, Simulate with physics debug, four viewports, a new level from a template,
   Shooting Range, the logic editor, the Micro Duck with head camera and ToF, help, multiplayer in the
@@ -377,7 +377,7 @@ This produces `studio.png`, `studio-selected.png`, `studio-play.png`, `studio-si
 `game-phone.png`, `studio-narrow.png` and, per phone size, `phone-play-<width>.png` and
 `phone-dock-<width>.png`. Some of them are also used in this book.
 
-![Simulate with the physics debug view, as checked by the browser test](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab, as recorded by the browser test](../buch/bilder/studio-simulate.png)
 
 ---
 
@@ -420,7 +420,7 @@ missing `-ffp-contract=off` option, or a sum whose order depends on the number o
 ([Chapter 3](03-foundations.md), [Chapter 14](14-lehrer.md)).
 
 The test `lehrer_runs_the_same_on_any_number_of_workers` complements this: it trains with 1, 2 and 4
-workers (8 ducks in total) and compares the networks byte for byte.
+workers (8 environments of the small test task `ReachEnv` in total) and compares the networks byte for byte.
 
 ---
 
@@ -430,14 +430,7 @@ workers (8 ducks in total) and compares the networks byte for byte.
 and manually (`workflow_dispatch`). The site is built once and published as soon as it is built;
 native and browser tests run in parallel and do not hold up publishing.
 
-```
-          ┌──────────┐   ┌──────────────┐
- push ──▶ │ native   │   │ determinism  │      (independent, parallel)
-          └──────────┘   └──────────────┘
-          ┌──────────┐
-          │ build    │──┬──▶ deploy  (main only, no pull request)
-          └──────────┘  └──▶ e2e
-```
+![The CI jobs: native and determinism independent; build is followed by deploy and e2e](../abbildungen/ci-pipeline.svg)
 
 **Concurrency:** the group is `ci-<ref>-pr` for pull requests and `ci-<ref>-<sha>` otherwise; only
 older runs of a pull request are canceled. On `main`, every push runs to completion so that every
@@ -468,7 +461,7 @@ x86 and WebAssembly do.
 ### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
-2. **wasi-sdk 25** from the cache (`wasi-sdk-25.0`), otherwise downloaded to `/home/runner/wasi-sdk`.
+2. **wasi-sdk 25** from the cache (key `wasi-sdk-25.0-v2`), otherwise downloaded to `/home/runner/wasi-sdk`.
 3. **Object cache** `/home/runner/kern-obj` (`KERN_OBJ_CACHE`), key `kern-obj-<sha>`, restored with
    the prefix `kern-obj-` – that is, from the most recent earlier run.
 4. **Build:**

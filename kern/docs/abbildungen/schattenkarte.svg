@@ -24,7 +24,7 @@
   <path class="lad gp" d="M190,84 L246,140"/>
   <circle class="dota" cx="190" cy="84" r="2.2"/>
   <circle class="dotw" cx="246" cy="140" r="2.2"/>
-  <path class="ld" d="M193,82 L250,40"/>
+  <path class="lg gp" d="M193,82 L250,40"/>
   <text x="253" y="40" class="k">{{gespeichert}}</text>
   <path class="ld" d="M244,143 L234,153"/>
   <text x="231" y="159" class="k e">{{schatten1}}</text>

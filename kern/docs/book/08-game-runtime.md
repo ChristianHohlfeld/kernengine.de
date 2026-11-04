@@ -128,7 +128,7 @@ describes the format; it also lists the value ranges to which values are clamped
 | `radius` | 0.5 | `radius` | sphere, cylinder, cone, capsule, torus (major radius) |
 | `height` | 1 | `height` | cylinder, cone, capsule (total), torus (minor radius) |
 | `segments` | 24 | `segments` | subdivision |
-| `asset` | "" | `asset` | shape `mesh`: a built-in mesh (e.g. `duck/xl330`, `kern/game/builtin_meshes.h`), scaled by `size` |
+| `asset` | "" | `asset` | shape `mesh`: a built-in mesh (e.g. `duck/trunk_base`, `kern/game/builtin_meshes.h`), scaled by `size`; an unknown name yields a 10 cm cube |
 | `collision` | `true` | `collision` | generates a matching collider if the actor has none of its own |
 | `friction` | 0.6 | `friction` | friction of this automatic collider |
 | `restitution` | 0 | `restitution` | restitution 0..1 |
@@ -536,7 +536,10 @@ same thing.
 Shape rules (`add_shape`): scale goes exactly into sizes, radii and hull points. Moving shapes are at
 least 1 cm in size, static ones at least 2 mm ([Chapter 6](06-physics.md)). `fit_collider` fits
 automatic colliders to the mesh shape: box and plane become a box, sphere a sphere, capsule a
-capsule, and all other shapes (including torus) a convex hull from the mesh points.
+capsule. A static torus becomes an exact triangle mesh (a hull would fill its hole); all other shapes
+become a convex hull from the shape's support points (`shape_hull_points`: rings of 16 points for
+cylinder, cone and torus, the corners of the ramp, the hull of built-in meshes, otherwise the 8
+corners of the bounds).
 
 Test: `game_body_planning` (cart with a welded-in, scaled wheel; wall as an implicit static body;
 coin as an implicit kinematic sensor; ground).
@@ -692,7 +695,7 @@ For rolling ball, character and flyer, movement is **camera-relative**. The mode
 
 | Mode | Implementation |
 |---|---|
-| **Hover Car** | throttle as a force along the vehicle axis (reverse 1.25×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
+| **Hover Car** | throttle as a force along the vehicle axis (reverse 1.5×, throttle against the motion brakes 2.6×, boost +42 m/s²), top speed as a counterforce, rolling resistance without throttle; **lateral grip as a force** (continuous impulses fight the solver); steering as a yaw rate proportional to speed up to 9 m/s. A **hover spring** over a Box3D ray holds `hover_height`. Visible bobbing and leaning are presentation only. |
 | **Vehicle** | like the hovercar without the hover spring; it is only driven with ground contact (sphere probe). |
 | **Rolling Ball** | force in the direction of movement; **jump as an impulse** m · (`jump_speed` − v_z), only on the ground; top speed as a counterforce. |
 | **Character** | Box3D's **character mover** ([Chapter 6](06-physics.md)): the body becomes kinematic, the capsule is sized from its shapes (feet at the lowest, head at the highest point, step height 22 % of the height), classic first-person-shooter ground movement, gravity 1.5× (snappier). The body turns smoothly toward the direction of travel and follows via `set_target_pose`. Footsteps by stride length; triggers and pickups via the touched planes. |
@@ -700,7 +703,7 @@ For rolling ball, character and flyer, movement is **camera-relative**. The mode
 | **Soldier** | character mover with real gravity (jump 3.6 m/s → 0.66 m), see 8.13. |
 | **Walker** | the input goes to the robot's controller, which drives its servos with the trained policy ([Chapter 13](13-micro-duck.md)). |
 
-Common to all: boost is a reserve 0..1 (−0.45/s while boosting, +0.12/s otherwise); landings after a
+Common to all: boost is a reserve 0..1 (−0.45/s while boosting, −0.5/s with the hover car's lift thrusters, +0.22/s otherwise); landings after a
 free fall above 3.5 m/s play `builtin:land`; jumps and boost play their sounds.
 
 ### Possession and pawns
@@ -814,7 +817,7 @@ movement in fixed steps on the authority.
 Tests: `game_soldier_moves_shoots_and_respawns`, `soldier_art_in_play`,
 `soldier_models_are_closed_and_outward`, and for networking `net_game_soldier_replication`.
 
-![Play in Studio with HUD](../buch/bilder/studio-play.png)
+![Play in Studio: the hover car in Orb Run with HUD](../buch/bilder/studio-play.png)
 
 ---
 
@@ -951,7 +954,7 @@ Levels and File › New Level.
 | Function | Level | Content |
 |---|---|---|
 | `orb_run_level()` | **Orb Run** | Procedural city with traffic; a Box3D hovercar (1200 kg, box collider, friction 0.25; cabin, spoiler, four glowing thrusters and headlights as welded-in children) with a chase camera; 24 energy orbs (pickups with a 2.4 m sensor sphere, rotator, mover, light) on the streets; goal `collectAll`; late afternoon with a 480 s day length – the run ends at night; music `music_drive`, ambience `city`. Studio starts with this level. |
-| `physics_lab_level()` | **Physics Lab** | All joint types and kinds of motion: pyramid of crates (started asleep), pendulum on a distance joint, door on a hinge with limits and a closing spring, rope bridge of 12 planks (three middle joints break at 60,000 N), turntable with a motor (45°/s) and three riders, lift on a slider with motor and limit, a self-driving rover on four wheel joints with suspension and drive; the player is a rolling ball, plus five stars, a rotating hazard sweeper and a goal; goal `reachGoal`. |
+| `physics_lab_level()` | **Physics Lab** | All joint types and kinds of motion: pyramid of crates (started asleep), pendulum on a distance joint, door on a hinge with limits and a closing spring, rope bridge of 12 planks (three middle joints break at 60,000 N), turntable with a motor (45°/s) and three riders, elevator on a slider with motor and limit, a self-driving rover on four wheel joints with suspension and drive; the player is a rolling ball, plus five stars, a rotating hazard sweeper and a goal; goal `reachGoal`. |
 | `shooting_range_level()` | **Shooting Range** | First-person-shooter range: soldier with rifle, health and head; eight target dummies (health with fast regeneration, head tag) at 10–60 m, cover, pushable crates and a barrel, a tower with a ramp; goal 150 points; playable unchanged in multiplayer. |
 | `micro_duck_level()` | **Micro Duck** | A room at the robot's scale (2.5 × 2.5 m real, i.e. 10 × 10 m in the world): wooden floor (friction 1, surface `floor`), walls, shoebox, books, crate, flower pot, a light ball (rolling resistance 0.03), two socks; the duck autonomous and with Kern's play network; 100 Hz, 16 sub-steps, no endless ground; **observer camera**; a level graph makes the duck chirp as soon as its head camera sees the ball. |
 | `basic_level()` | **Basic** | ground 40 × 40 m and a cube. |

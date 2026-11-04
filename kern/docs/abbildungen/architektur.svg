@@ -1,74 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 392">
-  <!-- Schichten von Kern (blau 1, Architektur): oben der Browser-Teil (kern/web), darunter das WebAssembly-Modul; jede Schicht nutzt nur die darunter. Grün und gelb zeigen dieselben Schichten mit einfachen Namen. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 402">
+  <!-- Schichten von Kern (blau 1, Architektur; Abhängigkeiten nach den #include der Module und kern/build.sh): oben der Browser-Teil (kern/web), darunter das WebAssembly-Modul. Jede Schicht nutzt nur die darunter, aber nicht jede alles: Ton, Logik und Netzwerk stehen direkt auf den Grundlagen, die Physik nur auf der Geometrie (geo/mesh_data.h), die Laufzeit für C++-Spiele (--app) auf der Grafik. Spielregeln (--game) stehen auf der Physik, Studio und Lehrer auf den Spielregeln. Grün und gelb zeigen dieselben Schichten mit einfachen Namen. -->
   <text x="2" y="10" class="t" data-nur="blau">{{js_titel}}</text>
   <rect class="fw" x="1" y="16" width="378" height="62" rx="2"/>
   <text x="8" y="28" class="c" data-nur="blau">kern.mjs</text>
   <text x="70" y="28" class="k" data-nur="blau">{{js1a}}</text>
-  <text x="70" y="38.5" class="k" data-nur="blau">{{js1b}}</text>
   <text x="8" y="49" class="c" data-nur="blau">app.mjs</text>
   <text x="70" y="49" class="k" data-nur="blau">{{js2}}</text>
   <text x="8" y="59.5" class="c" data-nur="blau">studio/*.mjs</text>
   <text x="70" y="59.5" class="k" data-nur="blau">{{js3}}</text>
   <text x="8" y="70" class="c" data-nur="blau">lehrer/*.mjs</text>
   <text x="70" y="70" class="k" data-nur="blau">{{js4}}</text>
+  <text x="70" y="38.5" class="k" data-nur="blau">{{js1b}}</text>
   <text x="190" y="51" class="m t" data-nur="gruen gelb">{{js_einfach}}</text>
-  <path class="la p" data-nur="blau gelb" d="M40,120 L40,80"/>
-  <path class="la p" d="M220,80 L220,120"/>
+  <path class="la pa" data-nur="blau gelb" d="M40,141 L40,80"/>
+  <path class="la pa" d="M340,80 L340,140.6"/>
   <text x="46" y="94" class="k a">{{imp1}}</text>
   <text x="46" y="104" class="k a">{{imp2}}</text>
-  <text x="226" y="94" class="k a">{{exp1}}</text>
-  <text x="226" y="104" class="k a">{{exp2}}</text>
-  <text x="226" y="114" class="k a" data-nur="blau">{{exp3}}</text>
-  <text x="2" y="132" class="t">{{wasm_titel}}</text>
-  <rect class="ff" x="1" y="137" width="378" height="253" rx="2"/>
+  <text x="334" y="94" class="k a e">{{exp1}}</text>
+  <text x="334" y="104" class="k a e">{{exp2}}</text>
+  <text x="334" y="114" class="k a e" data-nur="blau">{{exp3}}</text>
+  <text x="190" y="132" class="m t">{{wasm_titel}}</text>
+  <rect class="ff" x="1" y="137" width="378" height="262.5" rx="2"/>
   <rect class="fa" x="5" y="141" width="370" height="37.5" rx="2"/>
-  <text x="10" y="152" class="c" data-nur="blau">{{abi}}</text>
-  <text x="10" y="162" class="k" data-nur="blau">{{abi1}}</text>
-  <text x="10" y="171.5" class="k" data-nur="blau">{{abi2}}</text>
-  <text x="191" y="162.75" class="m" data-nur="gruen gelb">{{abi_e}}</text>
-  <rect class="fw" x="5" y="182.5" width="185" height="37.5" rx="2"/>
-  <text x="10" y="193.5" class="c" data-nur="blau">{{studio}}</text>
-  <text x="10" y="203.5" class="k" data-nur="blau">{{st1}}</text>
-  <text x="10" y="213" class="k" data-nur="blau">{{st2}}</text>
-  <text x="98.5" y="204.25" class="m" data-nur="gruen gelb">{{studio_e}}</text>
-  <rect class="fw" x="191.5" y="182.5" width="183.5" height="37.5" rx="2"/>
-  <text x="195" y="193.5" class="c" data-nur="blau">{{lehrer}}</text>
-  <text x="195" y="203.5" class="k" data-nur="blau">{{le1}}</text>
-  <text x="195" y="213" class="k" data-nur="blau">{{le2}}</text>
-  <text x="283.5" y="204.25" class="m" data-nur="gruen gelb">{{lehrer_e}}</text>
+  <text x="9" y="152" class="c" data-nur="blau">{{abi}}</text>
+  <text x="9" y="162" class="k" data-nur="blau">{{abi1}}</text>
+  <text x="9" y="171.5" class="k" data-nur="blau">{{abi2}}</text>
+  <text x="190" y="162.75" class="m" data-nur="gruen gelb">{{abi_e}}</text>
+  <rect class="fw" x="5" y="182.5" width="184.25" height="37.5" rx="2"/>
+  <text x="9" y="193.5" class="c" data-nur="blau">{{studio}}</text>
+  <text x="9" y="203.5" class="k" data-nur="blau">{{st1}}</text>
+  <text x="9" y="213" class="k" data-nur="blau">{{st2}}</text>
+  <text x="97.125" y="204.25" class="m" data-nur="gruen gelb">{{studio_e}}</text>
+  <rect class="fw" x="190.75" y="182.5" width="184.25" height="37.5" rx="2"/>
+  <text x="194.75" y="193.5" class="c" data-nur="blau">{{lehrer}}</text>
+  <text x="194.75" y="203.5" class="k" data-nur="blau">{{le1}}</text>
+  <text x="194.75" y="213" class="k" data-nur="blau">{{le2}}</text>
+  <text x="282.875" y="204.25" class="m" data-nur="gruen gelb">{{lehrer_e}}</text>
   <rect class="fw" x="5" y="224" width="370" height="37.5" rx="2"/>
-  <text x="10" y="235" class="c" data-nur="blau">{{game}}</text>
-  <text x="10" y="245" class="k" data-nur="blau">{{ga1}}</text>
-  <text x="10" y="254.5" class="k" data-nur="blau">{{ga2}}</text>
-  <text x="191" y="245.75" class="m" data-nur="gruen gelb">{{game_e}}</text>
-  <rect class="fw" x="5" y="265.5" width="92.5" height="47" rx="2"/>
-  <text x="10" y="276.5" class="c" data-nur="blau">{{physics}}</text>
-  <text x="10" y="286.5" class="k" data-nur="blau">{{ph1}}</text>
-  <text x="10" y="296" class="k" data-nur="blau">{{ph2}}</text>
-  <text x="52.25" y="292" class="m" data-nur="gruen gelb">{{physics_e}}</text>
-  <rect class="fw" x="99" y="265.5" width="91" height="47" rx="2"/>
-  <text x="102.5" y="276.5" class="c" data-nur="blau">{{logic}}</text>
-  <text x="102.5" y="286.5" class="k" data-nur="blau">{{lo1}}</text>
-  <text x="102.5" y="296" class="k" data-nur="blau">{{lo2}}</text>
-  <text x="144.75" y="292" class="m" data-nur="gruen gelb">{{logic_e}}</text>
-  <rect class="fw" x="191.5" y="265.5" width="91" height="47" rx="2"/>
-  <text x="195" y="276.5" class="c" data-nur="blau">{{net}}</text>
-  <text x="195" y="286.5" class="k" data-nur="blau">{{ne1}}</text>
-  <text x="195" y="296" class="k" data-nur="blau">{{ne2}}</text>
-  <text x="195" y="305.5" class="k" data-nur="blau">{{ne3}}</text>
-  <text x="237.25" y="292" class="m" data-nur="gruen gelb">{{net_e}}</text>
-  <rect class="fw" x="284" y="265.5" width="91" height="47" rx="2"/>
-  <text x="287.5" y="276.5" class="c" data-nur="blau">{{audio}}</text>
-  <text x="287.5" y="286.5" class="k" data-nur="blau">{{au1}}</text>
-  <text x="287.5" y="296" class="k" data-nur="blau">{{au2}}</text>
-  <text x="329.75" y="292" class="m" data-nur="gruen gelb">{{audio_e}}</text>
-  <rect class="fw" x="5" y="316.5" width="370" height="37.5" rx="2"/>
-  <text x="10" y="327.5" class="c" data-nur="blau">{{kern}}</text>
-  <text x="10" y="337.5" class="k" data-nur="blau">{{ke1}}</text>
-  <text x="10" y="347" class="k" data-nur="blau">{{ke2}}</text>
-  <text x="191" y="338.25" class="m" data-nur="gruen gelb">{{kern_e}}</text>
-  <rect class="fw" x="5" y="358" width="370" height="28" rx="2"/>
-  <text x="10" y="369" class="c" data-nur="blau">{{core}}</text>
-  <text x="10" y="379" class="k" data-nur="blau">{{co1}}</text>
-  <text x="191" y="375" class="m" data-nur="gruen gelb">{{core_e}}</text>
+  <text x="9" y="235" class="c" data-nur="blau">{{game}}</text>
+  <text x="9" y="245" class="k" data-nur="blau">{{ga1}}</text>
+  <text x="9" y="254.5" class="k" data-nur="blau">{{ga2}}</text>
+  <text x="190" y="245.75" class="m" data-nur="gruen gelb">{{game_e}}</text>
+  <rect class="fw" x="5" y="265.5" width="84" height="47" rx="2"/>
+  <text x="9" y="276.5" class="c" data-nur="blau">{{physics}}</text>
+  <text x="9" y="286.5" class="k" data-nur="blau">{{ph1}}</text>
+  <text x="9" y="296" class="k" data-nur="blau">{{ph2}}</text>
+  <text x="47" y="292" class="m" data-nur="gruen gelb">{{physics_e}}</text>
+  <rect class="fw" x="90.5" y="265.5" width="84" height="47" rx="2"/>
+  <text x="94.5" y="276.5" class="c" data-nur="blau">{{app}}</text>
+  <text x="94.5" y="286.5" class="k" data-nur="blau">{{ap1}}</text>
+  <text x="94.5" y="296" class="k" data-nur="blau">{{ap2}}</text>
+  <text x="132.5" y="287.5" class="m" data-nur="gruen gelb">{{app_e}}</text>
+  <text x="132.5" y="297.5" class="m" data-nur="gruen gelb">{{app_e2}}</text>
+  <rect class="fw" x="5" y="316.5" width="84" height="47" rx="2"/>
+  <text x="9" y="327.5" class="c" data-nur="blau">{{geo}}</text>
+  <text x="9" y="337.5" class="k" data-nur="blau">{{geo1}}</text>
+  <text x="9" y="347" class="k" data-nur="blau">{{geo2}}</text>
+  <text x="9" y="356.5" class="k" data-nur="blau">{{geo3}}</text>
+  <text x="47" y="343" class="m" data-nur="gruen gelb">{{geo_e}}</text>
+  <rect class="fw" x="90.5" y="316.5" width="84" height="47" rx="2"/>
+  <text x="94.5" y="327.5" class="c" data-nur="blau">{{gfx}}</text>
+  <text x="94.5" y="337.5" class="k" data-nur="blau">{{gf1}}</text>
+  <text x="94.5" y="347" class="k" data-nur="blau">{{gf2}}</text>
+  <text x="94.5" y="356.5" class="k" data-nur="blau">{{gf3}}</text>
+  <text x="132.5" y="343" class="m" data-nur="gruen gelb">{{gfx_e}}</text>
+  <rect class="fw" x="176" y="265.5" width="65.3333" height="98" rx="2"/>
+  <text x="180" y="276.5" class="c" data-nur="blau">{{audio}}</text>
+  <text x="180" y="286.5" class="k" data-nur="blau">{{au1}}</text>
+  <text x="180" y="296" class="k" data-nur="blau">{{au2}}</text>
+  <text x="208.667" y="317.5" class="m" data-nur="gruen gelb">{{audio_e}}</text>
+  <rect class="fw" x="242.833" y="265.5" width="65.3333" height="98" rx="2"/>
+  <text x="246.833" y="276.5" class="c" data-nur="blau">{{logic}}</text>
+  <text x="246.833" y="286.5" class="k" data-nur="blau">{{lo1}}</text>
+  <text x="246.833" y="296" class="k" data-nur="blau">{{lo2}}</text>
+  <text x="275.5" y="317.5" class="m" data-nur="gruen gelb">{{logic_e}}</text>
+  <rect class="fw" x="309.667" y="265.5" width="65.3333" height="98" rx="2"/>
+  <text x="313.667" y="276.5" class="c" data-nur="blau">{{net}}</text>
+  <text x="313.667" y="286.5" class="k" data-nur="blau">{{ne1}}</text>
+  <text x="313.667" y="296" class="k" data-nur="blau">{{ne2}}</text>
+  <text x="313.667" y="305.5" class="k" data-nur="blau">{{ne3}}</text>
+  <text x="342.333" y="317.5" class="m" data-nur="gruen gelb">{{net_e}}</text>
+  <rect class="fw" x="5" y="367.5" width="370" height="28" rx="2"/>
+  <text x="9" y="378.5" class="c" data-nur="blau">{{core}}</text>
+  <text x="9" y="388.5" class="k" data-nur="blau">{{co1}}</text>
+  <text x="190" y="384.5" class="m" data-nur="gruen gelb">{{core_e}}</text>
 </svg>

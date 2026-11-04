@@ -2,14 +2,15 @@
   <!-- Normalen beim ungleichmäßigen Stauchen (grün B): ein 45°-Dach, auf halbe Höhe gestaucht (Neigung 26,6°). Richtig steht die Normale senkrecht zur neuen Fläche (63,4° über der Waagerechten, steiler), einfach mitgestaucht kippt sie auf 26,6° (flacher). Kern rechnet dafür eine eigene Normalenmatrix (inverse Transponierte). -->
   <path class="ffd" d="M40,110 L120,30 L120,110 Z"/>
   <path class="lk" d="M40,110 L120,30"/>
-  <path class="la p" d="M80,70 L48.89,38.89"/>
+  <path class="la pa" d="M80,70 L48.89,38.89"/>
   <text x="44.89" y="34.89" class="k a e">{{normale}}</text>
   <text x="80" y="128" class="k m">{{vorher}}</text>
   <path class="ffd" d="M230,110 L310,70 L310,110 Z"/>
   <path class="lk" d="M230,110 L310,70"/>
-  <path class="la p" d="M270,90 L250.32,50.65"/>
+  <path class="la pa" d="M270,90 L250.32,50.65"/>
   <text x="246.32" y="47.65" class="k a e">{{richtig}}</text>
   <path class="l gs p" d="M270,90 L230.65,70.32"/>
-  <text x="225.65" y="68.32" class="k e">{{falsch}}</text>
+  <text x="225.65" y="64" class="k e">{{falsch}}</text>
+  <text x="225.65" y="73" class="k e">{{falsch2}}</text>
   <text x="270" y="128" class="k m">{{nachher}}</text>
 </svg>

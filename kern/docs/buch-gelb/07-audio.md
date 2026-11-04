@@ -10,7 +10,7 @@
 > - **Mono / Stereo** – ein Tonkanal für beide Ohren / zwei Kanäle, einer links, einer rechts.
 > - **Clip** – ein fertiges Tonstück im Speicher, zum Beispiel das Geräusch beim Springen.
 > - **Schleife** (englisch *Loop*) – ein Ton, der sich endlos wiederholt, etwa ein Motorbrummen.
-> - **Pan** – wie weit links oder rechts ein Ton klingt: −1 ganz links, 0 Mitte, +1 ganz rechts.
+> - **Pan-Wert** – wie weit links oder rechts ein Ton klingt: −1 ganz links, 0 Mitte, +1 ganz rechts.
 > - **deterministisch** – bei gleichen Eingaben kommt immer genau dasselbe heraus.
 > - **Filter** – ein Sieb für Töne: Ein *Tiefpass* lässt nur die tiefen durch, die hohen bleiben hängen.
 
@@ -73,11 +73,7 @@ höher, so wie eine Frauenstimme dieselbe Melodie höher singt als eine Männers
 schnell abspielen heißt für den Mixer: Er liest nur jede zweite Zahl, also Sample 0, 2, 4 … Bei
 Tonhöhe 1,5 springt er jedes Mal um anderthalb Kästchen weiter:
 
-```
-Kästchen:  0    1    2    3    4    5    6
-gelesen:   ●         ◐    ●         ◐    ●
-           0        1,5   3        4,5   6
-```
+![Tonhöhe 1,5: gelesen wird bei 0, 1,5, 3, 4,5 und 6; dazwischen schätzt eine weiche Kurve durch die Nachbarn den Wert](../abbildungen/abtastung.svg)
 
 Bei 0, 3 und 6 liegt ein Punkt. Bei 1,5 und 4,5 liegt keiner, denn Sample 1,5 gibt es nicht. Kern
 schätzt den Wert dort aus den Nachbarn mit einer weichen Kurve, wie eine Linie, die du durch die
@@ -98,7 +94,7 @@ schnelle Schätzung mit der weichen Kurve.
 > Versehen eine fremde Stimme zu verstellen.
 
 > **Mission:** Öffne in Kern Studio auf https://kernengine.de/ die **Inhaltsablage** (Content Drawer)
-> mit Strg+Leertaste, Tab **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
+> mit dem Knopf ganz links in der Statusleiste (unter Windows und Linux auch mit Strg+Leertaste), Tab **Sounds**. Ein Klick auf einen Sound spielt ihn an. Ton gibt es erst nach deinem ersten Klick oder
 > Tastendruck. Hör aus jeder Kategorie einen an. Dann klick einen langen Sound wie `music_calm` an
 > und, während er läuft, gleich einen zweiten. Achte genau auf den Moment, in dem die Musik aufhört:
 > Sie verschwindet ohne Klicken, so schnell und weich, dass du nur den neuen Sound hörst. Kein
@@ -121,7 +117,7 @@ den linken und den rechten Lautsprecher. Am einfachsten wäre eine gerade Linie:
 in der Mitte 0,5 / 0,5. Doch dann klingt der Ton in der Mitte **leiser**. Für unser Ohr zählt
 nämlich nicht die Zahl selbst, sondern die Zahl **mal sich selbst**. Rechne nach:
 
-| Quelle | gerade Linie | Kerns Bogen |
+| Quelle | gerade Linie | Bogen (gleiche Stärke) |
 |---|---|---|
 | ganz links (links / rechts) | 1 / 0 | 1 / 0 |
 | Mitte (links / rechts) | 0,5 / 0,5 | 0,71 / 0,71 |
@@ -139,8 +135,9 @@ Seite. Das passt zu Geräuschen, die dich umgeben, statt aus einem Punkt zu komm
 **Räumlich (3D)** (Spatial (3D)) in 7.9.)
 
 > **Für Profis:** Trägst du links und rechts als Punkt in ein Koordinatensystem ein, liegen alle
-> Punkte von Kerns Bogen auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
-> Radius². Kern nimmt zusätzlich alles mal √2 ≈ 1,41, damit die Mitte genau 1 / 1 ergibt.
+> Punkte des Bogens auf einem Viertelkreis um den Ursprung. Pythagoras sagt: links² + rechts² =
+> Radius². Am Ende rechnet Kern noch alle Werte der Tabelle mal √2 ≈ 1,41, damit die Mitte genau
+> 1 / 1 ergibt. Aus 0,71 / 0,71 wird so 1 / 1, und aus 1 / 0 ganz links wird 1,41 / 0.
 
 **Wie dumpf: Luft und Richtung.** Hohe Töne verlieren sich in der Luft schneller, ein fernes
 Gewitter grollt nur noch. Kern schickt jede 3D-Stimme durch einen Tiefpass: nah vor dir kommt alles
@@ -154,11 +151,11 @@ dich zu, treffen die Wellenberge dichter hintereinander ein. Mehr Wellenberge pr
 höhere Frequenz, also ein höherer Ton. Fährt sie weg, kommen sie weiter auseinander an, und der Ton
 wird tiefer.
 
-```mermaid
-flowchart LR
-  A["hinter dem Wagen:<br/>Wellen weit auseinander<br/>tieferer Ton"] --- K["Krankenwagen<br/>fährt nach rechts"]
-  K --- B["vor dem Wagen:<br/>Wellen eng gedrängt<br/>höherer Ton"]
-```
+> **So kannst du es dir vorstellen:** Eine Ente schwimmt über einen glatten Teich und paddelt
+> gleichmäßig. Vor ihr drängen sich die Wellenringe dicht zusammen, hinter ihr liegen sie weit
+> auseinander. Beim Schall ist es genauso.
+
+![Der Doppler-Effekt: Vor dem fahrenden Krankenwagen liegen die Wellen dicht, hinter ihm weit auseinander](../abbildungen/doppler.svg)
 
 Für einen stehenden Hörer gilt: neue Tonhöhe = Tonhöhe · 343 / (343 − v). Dabei sind 343 m/s die
 Schallgeschwindigkeit und v das Tempo der Quelle **auf dich zu** (fährt sie weg, ist v negativ).
@@ -182,7 +179,8 @@ leiser oder stumm schalten. Kern hat fünf: **Musik** (Music), **Effekte** (Effe
 **Master**, dem Hauptregler.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Der Weg des Tons: Stimmen über Busse und Hall zum Master, dann durch den Limiter zum Browser
+flowchart TB
   S[Stimmen] --> B[Busse]
   B --> M[Master]
   B --> H[Hall]
@@ -214,7 +212,7 @@ durchrutscht, rundet eine weiche Kurve ab. So bleibt jedes Sample sicher zwische
 Die **Pegelanzeige** in der Statusleiste von Studio zeigt, wie laut es gerade ist.
 
 > **Mission:** Lege mit **Datei › Neues Level...** (File › New Level...) ein Level mit der Vorlage
-> **Grundformen** (Basic) an, platziere aus **Actors platzieren › Physik** (Place Actors › Physics)
+> **Basis** (Basic) an, platziere aus **Actors platzieren › Physik** (Place Actors › Physics)
 > einen **Kistenstapel** (Crate Stack) und starte **Simulieren** (Simulate). Greif eine Kiste mit der
 > linken Maustaste, halt die Taste gedrückt, zieh die Kiste schnell zur Seite und lass los, damit sie
 > fliegt. Beobachte die Pegelanzeige unten. Stoppe mit Esc, setze in den **Welteinstellungen** (World
@@ -235,7 +233,8 @@ auf jedem Gerät gleich.
 So entsteht ein Klang:
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: So baut der Synthesizer einen Klang, Schritt für Schritt
+flowchart TB
   W[Wellenform] --> T[Tonhöhe: gleiten, springen, zittern]
   T --> F[Filter]
   F --> H[Hüllkurve]
@@ -248,19 +247,14 @@ flowchart LR
 |---|---|---|
 | Sinus | rund wie eine Wasserwelle | weiches Pfeifen, Glocke |
 | Rechteck, Puls | springt zwischen oben und unten | Piepsen alter Videospiele |
-| Sägezahn | steigt schräg, fällt senkrecht | schnarrend, scharf |
+| Sägezahn | fällt schräg, springt senkrecht hoch | schnarrend, scharf |
 | Dreieck | gerade hoch, gerade runter | zwischen Sinus und Rechteck |
 | Rauschen | zufälliges Gezappel | Zischen, Wind, Explosion |
 
-So sehen die fünf Wellen aus, wenn du sie auf Karopapier zeichnest:
+So sehen die fünf Wellen aus, je drei Schwingungen, in der Höhe so groß, wie Kern sie erzeugt. Eine
+Angabe wie „±0,6“ heißt: Die Welle schwingt von −0,6 bis +0,6.
 
-```
-Sinus      ∿∿∿∿∿∿∿∿
-Rechteck   _|‾|_|‾|_|‾|_|‾|
-Sägezahn   /|/|/|/|/|/|
-Dreieck    /\/\/\/\/\/\
-Rauschen   .:'·:.'·,:'.·:'
-```
+![Die fünf Wellenformen des Synthesizers: Sinus, Rechteck, Sägezahn, Dreieck und Rauschen](../abbildungen/wellenformen.svg)
 
 **2. Die Tonhöhe** kann gleiten (ein Laser zischt von hoch nach tief), zittern (*Vibrato*) oder
 springen. **3. Filter** nehmen Höhen oder Tiefen weg, zum Beispiel macht ein Tiefpass aus Rauschen
@@ -293,17 +287,17 @@ Für bestimmte Sounds hat Kern Extra-Tricks:
 
 Kern bringt 38 eingebaute Sounds in acht Gruppen mit. Alle hörst du im Tab **Sounds** der
 **Inhaltsablage** (Content Drawer). Im Level heißen sie `builtin:` plus Name. Zum Nachschlagen
-(* = Schleife; Gruppen, die Studio nicht übersetzt, stehen englisch da):
+(* = Schleife):
 
 | Kategorie | Sounds |
 |---|---|
 | **Spielablauf** (Gameplay) | pickup, powerup, jump, land, goal, hazard, checkpoint, lose, laser |
-| Combat | gunshot, smg, pistol, sniper, launcher, reload, hit, down |
+| **Kampf** (Combat) | gunshot, smg, pistol, sniper, launcher, reload, hit, down |
 | **Physik** (Physics) | explosion, impact, impact_light, break, step, plastic, plastic_step |
 | **Fahrzeug** (Vehicle) | engine*, hover*, boost |
 | **Atmosphäre** (Ambience) | wind*, city*, hum* |
-| Robot | servo*, quack, beep |
-| UI | click, confirm, error |
+| **Roboter** (Robot) | servo*, quack, beep |
+| **Oberfläche** (UI) | click, confirm, error |
 | **Musik** (Music) | music_drive*, music_calm* |
 
 Die genauen Regler und Werte jedes Sounds stehen im blauen Buch, Kapitel 7.
@@ -346,8 +340,9 @@ Die Simulation spielt **nie selbst** Ton. Stattdessen schreibt sie in ihren fest
 **Cues**, kleine Bestellzettel: „Spiel den Sound `pickup` an diesem Ort, so laut, auf diesem Bus.“
 Später im Bild holt die Ton-Schicht die Zettel ab und spielt sie (7.8).
 
-> **So kannst du es dir vorstellen:** ein Restaurant. Die Kellner (die Simulation) kochen nicht
-> selbst, sie hängen Bestellzettel an die Küchenleiste. Die Küche (der Mixer) arbeitet sie ab.
+> **So kannst du es dir vorstellen:** eine Einkaufsliste am Kühlschrank. Wer in der Familie merkt,
+> dass die Milch alle ist, schreibt es auf den Zettel, statt sofort loszurennen. Wer einkaufen geht,
+> nimmt später die ganze Liste mit. Die Simulation schreibt die Liste, der Mixer erledigt sie.
 
 Warum der Umweg? Die festen Schritte laufen auf jedem Gerät gleich, also auch die Zettel. Die
 Simulation bleibt deterministisch und läuft sogar ohne Lautsprecher, etwa beim Training der Ente.
@@ -426,7 +421,7 @@ In den **Welteinstellungen** (World Settings) unter **Audio** stellst du für da
 Lautstärken, **Hall** (Reverb) und **Doppler** (wie stark der Effekt ist).
 
 Die Komponente **Audioquelle** (Audio Source) macht jeden Actor zur Schallquelle, etwa eine brummende
-Maschine oder ein Radio. Das Feld Inner radius übersetzt Studio nicht:
+Maschine oder ein Radio:
 
 | Feld | Standard | Bedeutung |
 |---|---|---|
@@ -434,7 +429,7 @@ Maschine oder ein Radio. Das Feld Inner radius übersetzt Studio nicht:
 | **Lautstärke** (Volume), **Tonhöhe** (Pitch) | 1, 1 | wie laut, wie hoch |
 | **Schleife** (Loop), **Beim Start abspielen** (Play on start) | an, an | wiederholen, beim Spielstart starten |
 | **Räumlich (3D)** (Spatial (3D)) | an | aus: ohne Ort im Raum |
-| Inner radius | 2 m | bis hier voll laut |
+| **Innerer Radius** (Inner radius) | 2 m | bis hier voll laut |
 | **Abfallentfernung** (Falloff distance) | 40 m | ab hier still |
 | **Tonhöhe nach Tempo** (Pitch by speed) | 0 | höher, je schneller |
 | **Startverzögerung** (Start delay) | 0 s | Wartezeit |

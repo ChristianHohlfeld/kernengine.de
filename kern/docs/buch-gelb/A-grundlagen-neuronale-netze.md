@@ -36,24 +36,21 @@ Ein künstliches **Neuron** nimmt jeden Eingang mal ein **Gewicht** (wie wichtig
 addiert alles, zählt einen **Bias** dazu (eine Grundeinstellung) und schickt das Ergebnis z durch eine
 **Aktivierung**.
 
-```
-x1 ──w1──┐
-          ├──► Summe + b ──► z ──► ELU ──► h
-x2 ──w2──┘
-```
+![Ein Neuron mit drei Eingängen: jeder Eingang mal sein Gewicht, alles zusammen plus Bias, dann ELU](../abbildungen/neuron.svg)
 
-Ein ausgedachtes Beispiel: Ein Neuron mit **zwei Eingängen** soll entscheiden, wie stark ein Knie
-nachgibt. x1 = 0,5 ist die Neigung des Rumpfs, x2 = 2 sein Tempo nach vorn. Die Gewichte sind
-w1 = 0,8 und w2 = −0,5, der Bias b = 0,1.
+Ein ausgedachtes Beispiel: Ein Neuron mit **drei Eingängen** soll entscheiden, wie stark ein Knie
+nachgibt. x1 = 0,5 ist die Neigung des Rumpfs, x2 = 2 sein Tempo nach vorn, x3 = 0 seine Drehung
+(gerade keine). Die Gewichte sind w1 = 0,8, w2 = −0,5 und w3 = 0,3, der Bias b = 0,1.
 
 | Schritt | Rechnung | Ergebnis |
 |---|---|---|
 | Eingang 1 gewichtet | 0,8 · 0,5 | 0,4 |
 | Eingang 2 gewichtet | −0,5 · 2 | −1,0 |
-| Summe plus Bias z | 0,4 − 1,0 + 0,1 | −0,5 |
+| Eingang 3 gewichtet | 0,3 · 0 | 0 |
+| Summe plus Bias z | 0,4 − 1,0 + 0 + 0,1 | −0,5 |
 | Aktivierung h | ELU(−0,5) | −0,39 |
 
-Mit x2 = 0,2 ergibt sich z = 0,4 − 0,1 + 0,1 = 0,4 und h = 0,4. Warum einmal −0,39 und einmal genau z?
+Mit x2 = 0,2 ergibt sich z = 0,4 − 0,1 + 0 + 0,1 = 0,4 und h = 0,4. Warum einmal −0,39 und einmal genau z?
 Das liegt an der Aktivierung.
 
 ### Die Aktivierung ELU
@@ -77,13 +74,7 @@ Du musst die Rechnung für den negativen Teil nicht können. Lies einfach in der
 | −2 | −0,86 |
 | −4 | −0,98 |
 
-```
-ELU(z)
-  1 |              /
-  0 |---------___/------- z
- -1 |___----
-     -4    -2   0   2
-```
+![ELU: Positives bleibt, Negatives wird zusammengedrückt und kommt nie unter −1](../abbildungen/elu.svg)
 
 Warum der Knick? Ohne ihn wären viele Schichten nicht besser als eine: Mal 2 und dann mal 3 ist
 dasselbe wie mal 6. Erst ein Knick erlaubt Regeln, die nicht einfach „immer doppelt so viel“ sind,
@@ -99,13 +90,7 @@ Viele Neuronen mit denselben Eingängen bilden eine **Schicht**, mehrere Schicht
 **mehrschichtiges Perzeptron (MLP)**. Die letzte Schicht hat keinen Knick: Servoziele dürfen jede
 Zahl sein.
 
-```mermaid
-flowchart LR
-  x["61 Eingänge"] --> A["512 Neuronen"]
-  A --> B["256 Neuronen"]
-  B --> C["128 Neuronen"]
-  C --> y["14 Ausgänge"]
-```
+![Das Laufnetz der Ente: 61 Eingänge, umrechnen, drei Schichten mit ELU, 14 Ausgänge](../abbildungen/mlp-kette.svg)
 
 Die erste Schicht allein hat schon 61 · 512 = 31 232 Gewichte plus 512 Biases, zusammen über
 31 000 Regler. Alle vier Schichten zusammen haben fast **200 000 Regler**.
@@ -132,9 +117,11 @@ Netz alle Zwischenergebnisse, damit es später rückwärts rechnen kann (A.5).
 
 Kern rechnet dabei schnell, aber **ohne die Reihenfolge der Additionen zu ändern**. Der Computer
 könnte noch schneller sein, wenn er Summen umsortieren dürfte – doch dann käme an der letzten Stelle
-etwas anderes heraus, wie beim Drei-Ziffern-Taschenrechner in [Kapitel 14](14-lehrer.md). Kern
-legt die Zahlen darum so im Speicher ab, dass das schnelle Rechnen ohne Umsortieren klappt. So bleibt
-das Netz auf jedem Gerät bis zur letzten Stelle gleich.
+etwas anderes heraus, wie beim Drei-Ziffern-Taschenrechner in [Kapitel 14](14-lehrer.md) (14.7).
+So bleibt das Netz auf jedem Gerät bis zur letzten Stelle gleich.
+
+> **Für Profis:** Damit das schnelle Rechnen trotzdem klappt, legt Kern die Zahlen im Speicher so
+> ab, dass der Computer sie ohne Umsortieren der Reihe nach abarbeiten kann.
 
 ## A.3 Der Verlust: Wie schlecht bin ich gerade?
 
@@ -226,7 +213,9 @@ winziges Stück dreht? Jede kannst du durch **Tasten** wie in A.4 nachprüfen. F
 w2 ──(−0,393)──► y ──(−2,574)──► Fehler
 ```
 
-- **y → Fehler:** −2,574. Getastet: y + 0,01 senkt den Fehler um etwa 0,026, also Steigung ≈ −2,6.
+- **y → Fehler:** −2,574. Getastet: Mit y = −0,287 + 0,01 = −0,277 ist der Fehler
+  (−0,277 − 1) · (−0,277 − 1) = 1,277 · 1,277 ≈ 1,631 statt 1,656. Er sinkt also um etwa 0,026,
+  die Steigung ist −0,026 ÷ 0,01 ≈ −2,6. (Genau gerechnet: 2 · (y − Ziel) = 2 · (−1,287) = −2,574.)
 - **w2 → y:** −0,393. Dreht man w2 um 0,01, ändert sich y um 0,01 · h, und h ist −0,393.
 - Multipliziert: w2 → Fehler = (−0,393) · (−2,574) = **1,013**.
 
@@ -237,7 +226,9 @@ w1 ──(1)──► z ──(0,607)──► h ──(2)──► y ──(−
 ```
 
 - **w1 → z:** 1, denn z = w1 · x, und x ist 1.
-- **z → h:** 0,607, getastet in der ELU-Tabelle: z + 0,01 ändert h um etwa 0,006.
+- **z → h:** 0,607, aus der ELU-Kurve abgelesen: Bei z = −0,5 ist sie etwa 0,6 steil, z + 0,01
+  ändert h um etwa 0,006. (Die Tabelle ist dafür zu grob; wie man es mit dem Taschenrechner tastet,
+  steht im Kasten unten.)
 - **h → y:** 2, denn y = w2 · h, und w2 ist 2.
 - **y → Fehler:** −2,574 wie oben.
 - Multipliziert: w1 → Fehler = 1 · 0,607 · 2 · (−2,574) = **−3,122**.
@@ -260,6 +251,9 @@ langsamen Tasten.
 
 > **Für Profis:** Ein Bias wirkt wie ein zusätzlicher Eingang, der immer 1 ist. Darum hat b2 dieselbe
 > Steigung wie der Weg y → Fehler (−2,574) und b1 dieselbe wie w1 (−3,122), denn x ist hier auch 1.
+> Und z → h mit dem Taschenrechner getastet: ELU(z) = e^z − 1, also
+> ELU(−0,49) − ELU(−0,5) = e^(−0,49) − e^(−0,5) ≈ 0,6126 − 0,6065 = 0,0061. Geteilt durch 0,01
+> ergibt das ≈ 0,61.
 
 ## A.6 Adam: der kluge Wanderer
 
@@ -342,13 +336,7 @@ Das Netz kennt nur Lagen, in die das Vorbild kommt. Ein kleiner Fehler führt in
 dort folgt ein größerer Fehler – und so weiter. Die Fehler können mit der Länge der Episode sogar
 **quadratisch** wachsen: doppelt so lang, viermal so viel Fehler.
 
-```
-Vorbild: ●──●──●──●──●──●   (immer in der Spur)
-Klon:    ●──●──●─╲
-                  ●─╲       kleiner Fehler
-                     ●─╲    größerer Fehler
-                        ●   Sturz
-```
+![Das Vorbild bleibt in der Spur; der Klon macht einen kleinen Fehler, dann einen größeren und stürzt](../abbildungen/verteilungsverschiebung.svg)
 
 > **So kannst du es dir vorstellen:** Radfahren nur durch Zuschauen. Die Profi-Fahrerin wackelt nie.
 > Wackelst du selbst, weißt du nicht, was zu tun ist – das hast du bei ihr nie gesehen.
@@ -356,6 +344,7 @@ Klon:    ●──●──●─╲
 ### DAgger: Der Schüler fährt, das Vorbild kommentiert
 
 ```mermaid
+%% Bildunterschrift: DAgger: Das Netz fährt selbst, das Vorbild sagt, was richtig wäre
 flowchart TD
   A["Runde 0: Vorbild fährt"] --> F["Netz lernt aus allem"]
   F --> R["Netz fährt selbst"]
@@ -384,6 +373,7 @@ Ohne Vorbild – oder um besser zu werden als das Vorbild – lernt das Netz dur
 ### Der Kreislauf
 
 ```mermaid
+%% Bildunterschrift: Der Kreislauf beim Lernen durch Belohnung
 flowchart LR
   A["Agent: das Netz"] -->|"Aktion"| U["Umgebung"]
   U -->|"Beobachtung, Belohnung"| A
@@ -498,7 +488,9 @@ Gutem geführt hat. **GAE** ist der Rechenweg, der das berücksichtigt.
 Genau so rechnet GAE: Man beginnt beim letzten Schritt und geht nach vorne. Jeder Schritt bekommt seine
 eigene Überraschung plus einen großen Teil (etwa 94 %) des Vorteils des Schritts danach.
 
-**Zur Bestätigung in Zahlen:** drei Schritte, rückwärts gerechnet.
+**Zur Bestätigung in Zahlen:** drei Schritte, rückwärts gerechnet. Die Überraschungen sind für das
+Beispiel ausgedacht (wie man eine ausrechnet, steht in A.10). Die 94 % nimmt Kern; warum gerade
+diese Zahl, erklärt der Kasten darunter.
 
 | Schritt | eigene Überraschung | Vorteil |
 |---|---|---|
@@ -556,7 +548,7 @@ werden gedeckelt, Verschlechterungen nie.
 
 Das Verhältnis „neu geteilt durch alt“ heißt ρ („Rho“): 12 von 100 statt 10 von 100 ergibt
 ρ = 12 / 10 = 1,2. Erlaubt ist ρ zwischen 0,8 und 1,2. Auch der Kritiker darf seine Schätzung pro
-Lernschritt nur begrenzt ändern ([Kapitel 14](14-lehrer.md)).
+Lernschritt nur begrenzt ändern, nach derselben Regel mit 0,2.
 
 > **Für Profis:** Zusätzlich misst Kern, wie verschieden alte und neue Policy insgesamt schon sind (die
 > **KL-Divergenz**). Ändert sich zu viel, verkleinert Kern die Lernrate; ändert sich zu wenig,
@@ -565,6 +557,7 @@ Lernschritt nur begrenzt ändern ([Kapitel 14](14-lehrer.md)).
 ### Ein PPO-Update im Ganzen
 
 ```mermaid
+%% Bildunterschrift: Eine PPO-Runde: sammeln, bewerten, vorsichtig verbessern
 flowchart TD
   S["Viele Enten probieren aus"] --> O["Erfahrung sortieren"]
   O --> G["Kritiker bewertet: Vorteile"]
@@ -573,7 +566,7 @@ flowchart TD
   P --> S
 ```
 
-Pro Runde lernt Kern mehrmals aus denselben Daten (fünf Epochen, jede in vier Minibatches). Das spart
+Pro Runde lernt Kern mehrmals aus denselben Daten. Das spart
 Rechenzeit, und weil es die Ente jedes Mal ein Stück weiter von der sammelnden Ente wegschiebt,
 braucht es genau den Sicherheitsgurt von oben.
 
@@ -615,7 +608,7 @@ balancieren kann.
 > **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) – läuft gerade
 > **Spielen** (Play) oder **Simulieren**, erst mit Esc stoppen – und starte **Simulieren** (Simulate)
 > (Alt+S). Zieh die Ente
-> mit der Maus am Kopf zur Seite und lass los, bis sie umfällt. Sie steht von selbst wieder auf.
+> mit der Maus am Kopf zur Seite, bis sie kippt, und lass dann los. Sie steht von selbst wieder auf.
 > velstand hat das gelernt, weil es im Training ständig geschubst wurde und mit vielen verschiedenen
 > Enten geübt hat.
 
@@ -633,16 +626,10 @@ So läuft eine Runde: viele Kandidaten rund um einen Mittelpunkt ausdenken, alle
 bessere Hälfte behalten und den Mittelpunkt zu ihr schieben. **CMA-ES** lernt dabei auch die **Form**
 der Suchwolke:
 
-```
-Runde 1         Runde 5             Runde 20
+![Die Suchwolke von CMA-ES, schematisch: rund und groß, dann lang gezogen in Richtung Tal, zuletzt klein am Ziel](../abbildungen/cma-es.svg)
 
-  · · ·          · · · ·
- · · · ·          · · · · ·  ─►         ●
-  · · ·          · · · ·              (am Tal)
-
-rund und groß   lang gezogen,       klein,
-                Richtung Tal        dicht am Ziel
-```
+Die Ringe im Bild sind wie **Höhenlinien** auf einer Wanderkarte: Jeder Ring verbindet Stellen mit
+gleich gutem Ergebnis, und das × in der Mitte ist der tiefste Punkt des Tals – das Ziel.
 
 Geht es lange in **dieselbe** Richtung, wird die Wolke größer und streckt sich in diese Richtung. Ist
 man nah dran und die Schritte heben sich auf, wird sie kleiner.
@@ -674,6 +661,7 @@ und der Kritiker werden nur beim Lernen gebraucht und bleiben im Lehrer.
 ## A.15 Wie alles zusammenkommt
 
 ```mermaid
+%% Bildunterschrift: Der Weg zum Sprung: Vorbild, Nachahmen, Üben, Export
 flowchart TD
   V["1. Vorbild: CMA-ES"] --> N["2. Nachahmen: DAgger"]
   N --> U["3. Üben: PPO mit Variation"]
@@ -696,7 +684,7 @@ Ente zum Springen nicht.
 
 ## Level geschafft!
 
-- Du rechnest ein Neuron mit zwei Eingängen von Hand.
+- Du rechnest ein Neuron mit drei Eingängen von Hand.
 - Du weißt, wie Gradientenabstieg im Nebel bergab führt und was die Lernrate tut.
 - Du verstehst Backpropagation als Getriebe aus multiplizierten Steigungen.
 - Du unterscheidest Nachahmen und Lernen durch Belohnung.

@@ -547,11 +547,13 @@ and in `Mat4::perspective`:
 
 ### The Rule for New Code
 
-From `docs/lehrer.md`, section 7:
+From the header comment of `include/kern/core/dmath.h`, from `src/lehrer/ppo.cpp` and the build
+scripts:
 
 - Everything that **feeds the simulation** uses `kern::dm::sin` etc. instead of `std::sin`.
 - **No floating-point ordering that depends on the number of threads** – sums in a fixed order.
-- **No `-ffast-math` options.**
+- **No options that rewrite floating-point expressions:** `build.sh` compiles with
+  `-ffp-contract=off` and without `-ffast-math`.
 
 Pure presentation may use the platform libm. In the current state, for example, the synthesizer and
 mixer (`src/audio/`), the primitives (`src/geo/primitives.cpp`), the particles and parts of the
@@ -564,9 +566,7 @@ feed into the physics, a controller or training, it must be switched to `kern::d
 The determinism fingerprint (`kern_lehrer --fingerprint 400`, test
 `determinism_is_bit_identical_across_builds_and_platforms`, `kern/tests/lehrer_wasm_test.mjs`, CI job
 `determinism` on ARM) reveals any deviation down to the exact control tick
-([Chapter 2](02-building-and-testing.md)). According to `docs/lehrer.md`, Kern's own libm costs no
-speed: musl's functions are as fast as the platform's, and the physics is dominated by Box3D's joint
-solver.
+([Chapter 2](02-building-and-testing.md)).
 
 ---
 

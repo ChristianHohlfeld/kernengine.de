@@ -33,11 +33,12 @@ nachzuweisen, dass diese Dateien auch richtig arbeiten.
 > Vorkoster jedes Stück – das sind die Tests.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Bauen und prüfen: Aus den fertigen Dateien werden gleichzeitig die Webseite und die Tests (mehr in 2.10)
+flowchart TB
   Q["Quelltext"] --> B["bauen"]
   B --> F["fertige Dateien"]
   F --> T["Tests"]
-  T --> W["Webseite"]
+  F --> W["Webseite"]
 ```
 
 Kern baut drei Dinge: das Modul für den Browser, das ganze Studio als eine einzige Datei und den
@@ -134,7 +135,10 @@ Prüfungen, von der Mathe bis zum Studio. Ein paar Fragen, die Kern sich wirklic
 
 Bei Kommazahlen fragt ein Test manchmal „ungefähr gleich?“, weil Computer runden (siehe
 [Kapitel 3](03-grundlagen.md)). Das widerspricht dem „Bit für Bit gleich“ aus Kapitel 1 nicht:
-Hier wird mit dem mathematisch **richtigen** Ergebnis verglichen, nicht mit einem anderen Rechner. Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
+Hier wird mit dem mathematisch **richtigen** Ergebnis verglichen, nicht mit einem anderen Rechner.
+Ein Beispiel: Der Test fragt „Ist 1 : 3 ungefähr 0,333?“ Ob der Computer genau 0,3333333 oder
+0,3333334 herausbekommt, ist ihm egal. Dass jeder Rechner **dieselbe** dieser beiden Zahlen bekommt,
+prüft dagegen der Fingerabdruck in 2.9. Am Ende meldet der Test, wie viele Prüfungen es gab und wie viele
 gescheitert sind, mit der genauen Stelle im Quelltext. Das kleine Testgerüst hat Kern selbst
 geschrieben.
 
@@ -218,7 +222,7 @@ simulieren?
 
 Kern lässt die Ente mit einem Laufnetz von Pollen erst geradeaus gehen und sich dann auf der Stelle
 drehen. Nach jedem **Regeltakt** (so heißt jeder Moment, in dem das Netz neu entscheidet; das passiert
-50-mal pro Sekunde Simulationszeit) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
+50-mal pro Sekunde in der Zeit der echten Ente) nimmt Kern alle Zahlen, die die Ente beschreiben: Position,
 Drehung, Geschwindigkeiten, alle Gelenkwinkel. Daraus macht es eine kurze Kennung aus Buchstaben und
 Ziffern, einen **Hash**. Ändert sich ein einziges Bit irgendwo in diesen Zahlen, kommt eine völlig
 andere Kennung heraus.
@@ -226,12 +230,16 @@ andere Kennung heraus.
 > **So kannst du es dir vorstellen:** Ein Fingerabdruck verrät einen Menschen, ohne ihn ganz zu
 > beschreiben. Hier verrät eine Zeile Buchstabensalat den kompletten Zustand der Ente.
 
+> **Für Profis:** Kern rechnet die Ente vierfach vergrößert und dafür doppelt so langsam
+> ([Kapitel 6](06-physik.md), Abschnitt 6.2). In der Simulationszeit sind es deshalb 25 Regeltakte
+> pro Sekunde, für die echte Ente 50.
+
 Warum genügt nicht etwas Einfaches wie die Quersumme? Probier es aus: 1234 hat die Quersumme
 1 + 2 + 3 + 4 = 10. Die Zahl 1243 hat aber auch die Quersumme 10. Die Quersumme bemerkt also nicht,
 dass zwei Ziffern vertauscht wurden. Ein guter Hash mischt die Zahlen so gründlich, dass schon die
 kleinste Änderung oder Vertauschung eine ganz andere Kennung ergibt.
 
-Für 400 Regeltakte, also 8 Sekunden Entenleben (400 : 50 = 8), ist die richtige Kennung jedes Takts
+Für 400 Regeltakte, also 8 Sekunden im Leben der echten Ente (400 : 50 = 8), ist die richtige Kennung jedes Takts
 als **Referenz** gespeichert. Verglichen wird auf drei Arten: auf einem PC, im Browser und auf einem
 Mac, dessen Rechenwerk ganz anders gebaut ist als das im PC. Stimmen alle 400 Kennungen überein,
 rechnen alle exakt gleich.
@@ -267,14 +275,7 @@ alle Arbeitsgänge: bauen, testen, veröffentlichen. Niemand muss daran denken.
 > durch dieselben Stationen. Ist ein Teil fertig gebaut, kommt es schon in den Laden, während die
 > Kontrolle es noch prüft. Findet sie etwas, sieht man das sofort und bessert nach.
 
-```mermaid
-flowchart LR
-  P["Änderung hochgeladen"] --> N["Tests mit Prüfern"]
-  P --> D["Fingerabdruck auf dem Mac"]
-  P --> B["bauen"]
-  B --> DE["veröffentlichen"]
-  B --> E["Roboter im Browser"]
-```
+![Das Fließband: Eine hochgeladene Änderung startet drei Stationen; nach dem Bauen folgen Veröffentlichen und der Roboter im Browser](../abbildungen/ci-pipeline.svg)
 
 - **Tests mit Prüfern:** alle Unit-Tests mit den Sanitizern.
 - **Fingerabdruck auf dem Mac:** Den Fingerabdruck rechnet der Lehrer aus. Darum wird der Lehrer auf

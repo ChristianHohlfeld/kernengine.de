@@ -63,7 +63,7 @@ kern/build/kern_lehrer --task jump --iterations 3000 \
 ```
 
 This is how `policies/jump.onnx` was created (32 ducks on 2 cores, seed 1, 3000 iterations;
-`docs/lehrer.md`). What happens:
+Section 14.9 in [Chapter 14](14-lehrer.md)). What happens:
 
 1. **Load the recipe** (`recipe_for("jump")`): warm start from velstand, imitation of the built-in
    demonstration (8 rounds of 96 episodes each), then practice with action noise 0.1, learning rate
@@ -119,8 +119,9 @@ kern/build/kern_lehrer --task jump --vorbild demo2.json --out jump2.onnx
 
 For each generation a line appears with the score and the measurement of the search center on the
 clean robot (height, rise, flight time, tilt, "a real jump" / "no real jump" / "fell"). The built-in
-demonstration was created in three stages with a total of 370 generations; the first stage took
-about 18 minutes on 2 cores for about 2 million duck steps (`docs/lehrer.md`).
+demonstration was created in three stages with a total of 370 generations (`src/lehrer/vorbild.cpp`);
+the search took about 18 minutes on 2 cores for about 2 million duck steps (Section 14.9 in
+[Chapter 14](14-lehrer.md)).
 
 ### In the browser
 
@@ -242,7 +243,7 @@ All PPO values are in the recipe; the command line overrides them individually.
 | `--substeps N` | Box3D sub-steps | 16 | do not change (see below) |
 | `--profil servo.json` | servo profile | XL330 | training with calibrated servos ([Chapter 16](16-calibration.md)) |
 
-Notes from the runs in `docs/lehrer.md`:
+Notes from the runs in `docs/lehrer.md` (partly only in its earlier versions in the Git history):
 
 - **Be careful after imitation:** small learning rate (10⁻⁴) and small noise (0.1). An actor that
   already acts well is easily destroyed by large steps and large noise; hence also "critic first".
@@ -291,7 +292,7 @@ how far it then kept going ahead and sideways.
 kern/build/kern_lehrer --spielen --nachahmen 12 --episoden 32 --out play.onnx --checkpoint play.ckpt
 ```
 
-The default is 8 rounds of 64 episodes; `policies/play.onnx` before the rework was created with
+The default is 8 rounds of 64 episodes; `policies/play.onnx` was created with
 12 rounds of 32 episodes of 60 s each (`docs/lehrer.md`). For each round the tool measures the
 network in 16 episodes on the clean robot:
 
@@ -300,7 +301,7 @@ network in 16 episodes on the clean robot:
 ```
 
 **Caution:** `--out` is overwritten after **every** round. If you want to keep an earlier round,
-copy the file during the run (for `play.onnx` before the rework, round 10 of 12 was the best).
+copy the file during the run (for `play.onnx`, round 8 of 12 was the best).
 `--checkpoint` saves the learner after each round.
 
 ### 3. Check
@@ -531,7 +532,7 @@ What Kern's networks demonstrate:
 
 ## 15.11 Pitfalls from the real runs
 
-From `docs/lehrer.md`:
+From `docs/lehrer.md` (partly only in its earlier versions in the Git history):
 
 - **The reward gets exploited.** In the first PPO runs the duck sat on its tail, did a dive or
   propped itself up. Each time, only a stricter rule helped: ground contact of another part ends the

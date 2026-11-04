@@ -64,9 +64,10 @@ Under `/editor/`, Studio is an installable web app:
   from the network first.
 - Every deploy writes its build ID into the page and into `build.json`. Studio checks at startup,
   whenever you return to the app, when the network comes back, and every 60 s. If a new build is
-  available and nothing can be lost (edit mode, nothing unsaved), Studio reloads immediately. Otherwise
-  **New version available** appears with **Update** and **Later**; on update, the level moves into the
-  new version via the autosave.
+  available while you are editing (not playing), Studio reloads immediately; unsaved changes come along
+  via the autosave. While a game is playing, **New version available** appears with **Update** and
+  **Later**; Studio loads the new version at the latest when you stop, and the level moves along via
+  the autosave.
 - The running version is shown at the bottom right of the status bar, with a note when a newer one is
   available online.
 
@@ -243,7 +244,7 @@ In the viewport itself Studio shows:
   "Flying · WASD move · Q/E down/up · wheel speed … · Shift faster · Z/C zoom".
 - **Gizmo readout** while dragging: translation (Δ in m), angle (°) or scale factors.
 
-![Four viewports: perspective and three orthographic views](../buch/bilder/studio-quad.png)
+![Four viewports: Orb Run at night in perspective, plus the orthographic views Top, Front and Right](../buch/bilder/studio-quad.png)
 
 ### 11.2.4 Outliner
 
@@ -509,7 +510,7 @@ Gamepads and touch controls are described in Section 11.12.
 | Del | delete |
 | F / Home | frame selection / everything |
 | Ctrl+Z | undo |
-| Esc | back to the viewport |
+| Esc | close the action menu, otherwise clear the selection, otherwise back to the viewport |
 
 While the logic editor is open, letters and Del belong to the graph; only Ctrl+Z, Ctrl+Y, Ctrl+S and F1
 reach the level.
@@ -907,7 +908,7 @@ The show flag **Collision Shapes** displays the Box3D shapes, **Constraints** th
 **Contact Points** the contacts. The status bar counts bodies, awake bodies, joints, broken joints and
 contacts.
 
-![Simulate with collision shapes displayed](../buch/bilder/studio-simulate.png)
+![Simulate in the Physics Lab: the physics runs, bodies can be grabbed](../buch/bilder/studio-simulate.png)
 
 ![Physics Lab: all joint types in simulation](../buch/bilder/studio-physics-lab.png)
 
@@ -1041,7 +1042,7 @@ viewport (Window › Show › **Robot Camera**, on by default):
   for floor, yellow for too close, dark for nothing; plus the smallest distance in real meters or
   "clear".
 
-![The Micro Duck in Play with head camera and ToF grid (duck shown in this book's own design)](../buch/bilder/duck-play.png)
+![The Micro Duck with head camera and ToF grid overlays (duck shown in this book's own design)](../buch/bilder/duck-play.png)
 
 ---
 
@@ -1268,7 +1269,7 @@ compact layout:
 
 ![Studio in an 820 px wide window](../buch/bilder/studio-narrow.png)
 
-![Phone in portrait: the dock with Play, Simulate and Panels](../buch/bilder/phone-dock-390.png)
+![Phone in portrait: the dock with the buttons for Play and Simulate and the Outliner and Details button](../buch/bilder/phone-dock-390.png)
 
 ---
 

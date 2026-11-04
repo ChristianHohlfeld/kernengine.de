@@ -30,7 +30,7 @@
   <path class="l p" d="M84,49 L84,133 L175,133"/>
   <text x="148" y="61" class="k e">A</text><text x="148" y="75" class="k e">B</text>
   <path class="l p" d="M154,58 L164,58 L164,17 L175,17"/>
-  <path class="l p" d="M154,72 L164,72 L164,73 L175,73"/>
+  <path class="l p" d="M154,73 L175,73"/>
   <text x="252" y="43" class="k e">Update</text>
   <path class="l p" d="M256,40 L268,40 L268,17 L279,17"/>
   <text x="252" y="99" class="k e">Update</text>

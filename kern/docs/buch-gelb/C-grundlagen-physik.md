@@ -45,11 +45,8 @@ viel schneller etwas pro Sekunde wird. 10 N machen einen 2-kg-Ball pro Sekunde 5
 denn 10 ÷ 2 = 5. Für das Drehen gilt dasselbe mit Drehmoment und Trägheit.
 
 Dazu kommt ein **Kreiseleffekt**: Ein drehender Körper „will“ seine Drehachse behalten. Darum kippt
-ein schnell drehender Kreisel nicht um. Ein langer, dünner Körper, der schräg zu seiner Längsachse
-kreiselt, gerät dadurch ins **Taumeln**, wie ein geworfener Stift, der in der Luft eiert. Rechnet
-ein Computer diesen Effekt unvorsichtig, pumpt er bei solchen Körpern Schwung hinein, der gar nicht
-da ist, und sie drehen immer wilder. Box3D rechnet den Kreiseleffekt darum mit der stabilen,
-„impliziten“ Rechenweise, die du in C.2 kennenlernst. So bleiben lange, dünne Glieder ruhig.
+ein schnell drehender Kreisel nicht um. Box3D rechnet diesen Effekt besonders vorsichtig, sonst
+würden lange, dünne Glieder wie ein Roboterbein immer wilder drehen.
 
 ## C.2 Integration: das Daumenkino
 
@@ -101,18 +98,18 @@ sorgt der **Solver** (C.6) dafür, dass Kontakte und Gelenke eingehalten werden,
 mit dem neuen Tempo. Seine eingebaute **Dämpfung** (Bremse) ist so gebaut, dass sie das Tempo immer
 nur kleiner macht, nie umdreht. Und Box3D begrenzt, wie schnell etwas fliegen und sich drehen darf.
 
-> **Vorsicht, Falle:** Warum verbietet Kern eine selbst gebaute Bremskraft „je schneller, desto
-> stärker bremsen“? Diese Bremse rechnet mit dem *alten* Tempo vom Anfang des Schritts und lässt
-> diese Kraft den ganzen Schritt lang wirken, auch dann noch, wenn das Glied längst stehen müsste.
-> Bei einem sehr leichten Glied (10 g) ist das in einem Schritt viel mehr Bremse, als nötig wäre,
-> um es anzuhalten. Statt bei 0 zu stoppen, schießt es rückwärts:
->
-> ```
->   vorher:   ●──►        1 m/s vorwärts
->   nachher:  ◄───────────────●     15,7 m/s rückwärts
-> ```
->
-> Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht.
+> **Vorsicht, Falle:** Warum sagt Kerns Physik-Regel: Nimm die eingebaute Dämpfung, keine selbst
+> gebaute Bremskraft „je schneller, desto stärker bremsen“? Diese Bremse rechnet mit dem *alten*
+> Tempo vom Anfang des Schritts und lässt diese Kraft den ganzen Schritt lang wirken, auch dann noch,
+> wenn das Glied längst stehen müsste. Bei einem sehr leichten Glied ist das in einem Schritt viel
+> mehr Bremse, als nötig wäre, um es anzuhalten. Rechne ein Beispiel: Das Glied wiegt 10 g =
+> 0,01 kg, die Bremse drückt mit 10 N je 1 m/s Tempo, und Kern rechnet 60 Schritte pro Sekunde.
+> Bei 1 m/s vorwärts bremst sie mit 10 N. Das ändert das Tempo in einem Schritt um
+> 10 ÷ 0,01 ÷ 60 ≈ 16,7 m/s. Aus 1 m/s vorwärts werden 1 − 16,7 ≈ −15,7, also **15,7 m/s
+> rückwärts**. Die „Bremse“ katapultiert. Box3Ds eingebaute Dämpfung kann das nicht: Sie macht das
+> Tempo in jedem Schritt nur kleiner, nie umgedreht.
+
+![Die selbst gebaute Bremse: Nach einem einzigen Schritt fliegt das leichte Glied schneller rückwärts, als es vorher vorwärts flog](../abbildungen/bremse-katapult.svg)
 
 ### Fester Zeitschritt
 
@@ -122,7 +119,8 @@ Fachwort dafür ist *Akkumulator*, „Sammler“). Du kennst es schon aus
 [Kapitel 6](06-physik.md), 6.13:
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Das Zeit-Sparschwein: ganze Schritte rechnen, mit dem Rest zwischen alt und neu zeichnen
+flowchart TB
   F["Bildzeit ins Schwein"] --> L{"genug für Schritt?"}
   L -->|ja| S["Schritt rechnen, Schrittzeit herausnehmen"]
   S --> L
@@ -166,13 +164,7 @@ entlang der x-, y- und z-Achse laufen. Ob sich zwei solche Kisten überlappen, i
 geprüft: Für jede der drei Achsen schaut man, ob sich die Bereiche überlappen, das sind je zwei
 Vergleiche, zusammen sechs. Nur Paare mit überlappenden Kisten kommen in die genaue Phase.
 
-```
-  getrennt:                  überlappend:
-  ┌─────┐   ┌─────┐          ┌──────┐
-  │  ●  │   │  ▲  │          │  ●  ┌┼─────┐
-  └─────┘   └─────┘          └─────┼┘  ▲  │
-  nichts zu tun                    └──────┘ genau prüfen
-```
+![Achsenparallele Kisten: getrennt ist nichts zu tun, überlappen sie, prüft die genaue Phase](../abbildungen/aabb-grobphase.svg)
 
 Die Kisten liegen in einem Baum wie die BVH aus [Kapitel 5](05-szene-und-geometrie.md). Sie sind
 etwas größer als nötig, damit der Baum nicht bei jeder kleinen Bewegung umgebaut werden muss. Feste
@@ -184,16 +176,10 @@ konvex, ein L nicht. Für konvexe Formen gibt es schnelle, zuverlässige Tests. 
 
 > **So kannst du es dir vorstellen:** Leuchte mit einer Taschenlampe von der Seite auf zwei Formen
 > und schau dir ihre Schatten an der Wand an. Findest du eine Richtung, in der die Schatten nicht
-> überlappen, berühren sich die Formen sicher nicht.
->
-> ```
->                ▲              ┃▒ Schatten von ▲
->   Lampe ─►                    ┃    Lücke: getrennt
->                ●              ┃▒ Schatten von ●
->                              Wand
-> ```
->
-> Bei konvexen Formen reicht es, eine Handvoll Richtungen auszuprobieren.
+> überlappen, berühren sich die Formen sicher nicht (Bild unten). Bei konvexen Formen reicht es,
+> eine Handvoll Richtungen auszuprobieren.
+
+![Licht von der Seite wirft die Schatten beider Formen an die Wand; bleibt eine Lücke, sind sie getrennt](../abbildungen/trennende-achse.svg)
 
 Das Ergebnis ist ein Kontaktbericht, der **Manifold**: in welche Richtung die Berührung zeigt und an
 welchen Punkten, jeweils mit Abstand.
@@ -236,33 +222,17 @@ Physik aus der Oberstufe; hier darfst du sie einfach benutzen.
 Alle Kräfte, bei denen etwas haftet, bilden zusammen einen **Reibungskegel**. Stell dir eine
 Eistüte vor, die mit der Spitze auf dem Berührpunkt steht. Das Bild zeigt einen Schnitt durch sie:
 
-```
-     ╲    │ n  ╱      Kraft innerhalb: Haften
-      ╲   │   ╱       genau auf dem Rand: gerade noch
-       ╲  │  ╱        Kraft außerhalb: Rutschen
-   ───────●───────    Kontaktfläche
-```
+![Schnitt durch den Reibungskegel um die Richtung n: Kraft innerhalb haftet, auf dem Rand rutscht es](../abbildungen/reibungskegel.svg)
 
-n ist die Richtung, in der der Boden drückt. Eine Kraft, die steil von oben kommt, liegt in der
+n ist die Richtung, in der der Boden drückt. Wie weit die Tüte offen ist, hängt von μ ab: Ihr Rand
+ist so schräg, dass er pro Meter nach oben genau μ Meter zur Seite geht. Je größer μ, desto weiter die Tüte. (Die Beschriftung „arctan μ“ im Bild meint genau diesen
+Winkel; das Wort brauchst du nicht zu kennen.) Eine Kraft, die steil von oben kommt, liegt in der
 Tüte: Haften. Eine Kraft, die flach schiebt, liegt außerhalb: Rutschen. Eigentlich haftet ein
 ruhendes Ding etwas stärker, als ein rutschendes gebremst wird. Box3D kennt aber nur einen Reibwert
 für beides.
 
 > **Für Profis:** Box3D rechnet die Reibung einmal für die Mitte der ganzen Kontaktfläche, nicht für
 > jeden Punkt einzeln, und dazu eine Drehreibung, die das Kreiseln auf der Stelle bremst.
-
-> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Formen** (Shapes), eine
-> **Rampe** (Ramp). Sie ist schon 6 m lang, 3 m breit und 1,5 m hoch, das siehst du in
-> **Details › Statisches Mesh › Größe** (Details › Static Mesh › Size). Ihre Steigung ist
-> 1,5 ÷ 6 = 0,25, also 25 %. Andere Maße kannst du dort eintippen. Hol dann aus der Gruppe
-> **Physik** (Physics) einen **Physik-Würfel** (Physics Cube) und gib ihm in
-> **Details › Transformation › Position** (Details › Transform › Location) dieselben X- und Y-Werte
-> wie der Rampe und ein Z, das 2 m höher ist. Beim **Simulieren** (Simulate) fällt er auf die Schräge
-> und bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in
-> **Details › Statisches Mesh › Physik › Reibung** (Details › Static Mesh › Physics › Friction) den
-> Wert auf 0,02 und starte **Simulieren** neu: Jetzt rutscht er, denn
-> √(0,02 · 0,6) ≈ 0,11 ist kleiner als 0,25. (Die Wurzel aus 0,012 rechnest du am besten mit dem
-> Taschenrechner aus; wie Box3D zwei Reibwerte mischt, steht gleich darunter.)
 
 ### Zwei Reibwerte, ein Kontakt
 
@@ -277,7 +247,20 @@ gewöhnlichen Mittelwert:
 
 Der Vorteil: Was reibungsfrei ist, bleibt es, egal womit es sich paart. Eis bleibt auch unter einem
 Gummistiefel ziemlich glatt. Trotzdem ist das nur eine Faustregel. Für echte Materialpaare wie
-Schnabel auf Socke kennt Kern darum gemessene **Paarwerte** ([Kapitel 6](06-physik.md), 6.6).
+Schnabel auf Socke kennt Kern darum eigene **Paarwerte** ([Kapitel 6](06-physik.md), 6.6).
+
+> **Mission:** Hol aus **Actors platzieren** (Place Actors), Gruppe **Formen** (Shapes), eine
+> **Rampe** (Ramp). Sie ist schon 6 m lang, 3 m breit und 1,5 m hoch, das siehst du in
+> **Details › Statisches Mesh › Größe** (Details › Static Mesh › Size). Ihre Steigung ist
+> 1,5 ÷ 6 = 0,25, also 25 %. Andere Maße kannst du dort eintippen. Hol dann aus der Gruppe
+> **Physik** (Physics) einen **Physik-Würfel** (Physics Cube) und gib ihm in
+> **Details › Transformation › Position** (Details › Transform › Location) dieselben X- und Y-Werte
+> wie der Rampe und ein Z, das 2 m höher ist. Beim **Simulieren** (Simulate) fällt er auf die Schräge
+> und bleibt liegen (beide haben Reibung 0,6). Stopp mit Esc, stell beim Würfel in
+> **Details › Statisches Mesh › Physik › Reibung** (Details › Static Mesh › Physics › Friction) den
+> Wert auf 0,02 und starte **Simulieren** neu: Jetzt rutscht er. Mit der Regel von eben ist die
+> Reibung zwischen Würfel und Rampe √(0,02 · 0,6) = √0,012 ≈ 0,11 (am besten mit dem
+> Taschenrechner), und das ist kleiner als die Steigung 0,25.
 
 ### Sprungkraft
 
@@ -379,7 +362,8 @@ Ein Servo wie der in der Micro Duck (ein Dynamixel XL330) bekommt einen **Zielwi
 tatsächlichen Winkel, vergleicht und steuert gegen, immer wieder. Das ist ein **Regelkreis**:
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Der Servo als Regelkreis: Ziel, Verzögerung, Fehler, Regler, Gelenk und zurück
+flowchart TB
   Z["Ziel"] --> T["Verzögerung"]
   T --> E["Fehler"]
   E --> R["Regler, begrenzt"]
@@ -401,8 +385,8 @@ der Ente ist K = 0,554 und D = 0,053. Bei 0,5 rad Fehler (knapp 29°) drückt er
 N·m davon ab.
 
 Zusammen mit der Trägheit des kleinen Motors im Servo ergibt das einen gedämpften Schwinger. Rechnet
-man es mit den Werten des Servos aus, schwingt er etwa **2,8-mal pro Sekunde**, mit einem
-**Dämpfungsgrad** von **0,84**. Diese Rechnung braucht Wurzeln und Mathe aus der Oberstufe, darum
+man es mit den Werten des Servos aus, hat er eine **Eigenfrequenz** von etwa **2,8 Hz** (so oft pro
+Sekunde würde er ohne Dämpfung hin und her schwingen) und einen **Dämpfungsgrad** von **0,84**. Diese Rechnung braucht Wurzeln und Mathe aus der Oberstufe, darum
 nehmen wir hier nur das Ergebnis (die Formeln stehen im blauen Buch, Anhang C). Was diese Zahl
 bedeutet, zeigt eine Tür:
 
@@ -427,8 +411,10 @@ einen Regler ins Schwingen bringen.
 > schneller. Wer immer ein Stück zu spät schubst, schiebt irgendwann gegen die Bewegung, und die
 > Schaukel gerät aus dem Takt.
 
-Wie spät ist „zu spät“? Ein Schwung hin und zurück dauert bei 2,8 Schwüngen pro Sekunde
-1000 ÷ 2,8 ≈ 357 ms. Man zählt einen ganzen Schwung wie eine Runde im Kreis, also als 360°. 20 ms
+Wie spät ist „zu spät“? Ein Schwung hin und zurück dauert bei der Eigenfrequenz von 2,8 Hz
+1000 ÷ 2,8 ≈ 357 ms. Man zählt einen ganzen Schwung wie eine Runde im Kreis, also als 360° – wie
+der Sekundenzeiger einer Uhr, der bei jedem Hin-und-zurück einmal ganz herumläuft und dann wieder
+oben steht. 20 ms
 sind 20 ÷ 357 ≈ 5,6 % davon, und 5,6 % von 360° sind **rund 20°**. Um so viel hinkt der Regler
 hinterher.
 

@@ -12,7 +12,7 @@ Live: <https://kernengine.de/> – the start page with Kern Studio (`/editor/`),
 Lehrer (`/lehrer/`), playable levels (`kern/web/studio/play.html?level=orbRun` or `physicsLab`) and
 the C++ examples `orbrun` and `hello`.
 
-![Kern Studio with the Orb Run level](../buch/bilder/studio.png)
+![Kern Studio with the Orb Run level: viewport, Outliner and Details](../buch/bilder/studio.png)
 
 This chapter explains what Kern is, the principles it is built on, how the layers fit together and
 how the repository is organized. It ends with a reading guide for the book.
@@ -93,7 +93,8 @@ editor.
 
 A simulation, a training run or a replayed robot log produces the same result in Kern, bit for bit,
 on all platforms checked in CI (GCC/x86, Apple clang/ARM, WebAssembly).
-This is ensured by the following (`docs/lehrer.md`, section 7):
+This is ensured by the following (`kern/build.sh`, `include/kern/core/dmath.h`,
+`third_party/box3d/README.md`, `src/lehrer/ppo.cpp`):
 
 - **No FMA contraction:** Kern, Box3D and the libm are compiled with `-ffp-contract=off`.
 - **Box3D on the scalar path** (`BOX3D_DISABLE_SIMD`), as in WebAssembly.
@@ -137,46 +138,10 @@ simulation is a genuine modeling error ([Chapter 16](16-calibration.md)).
 ## 1.3 Architecture: The Layers
 
 The following diagram shows the layers of a Kern module in the browser, from the platform layer at
-the top down to the foundations at the bottom. A downward arrow means "uses".
+the top down to the foundations at the bottom. Each layer uses only the layers below it; between the
+browser and the module there are only imports and exports.
 
-```
- Browser (JavaScript, kern/web/)  – platform only, no engine logic
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │ kern.mjs        module loading, imports kern_gl / kern_env / WASI shim,      │
- │                 GPU handle tables, context loss, KernRenderer facade         │
- │ app.mjs         host for C++ games (kern::App)                               │
- │ studio/*.mjs    editor page, game host + KernNet (game.mjs), logic editor    │
- │ lehrer/*.mjs    Lehrer page, Web Workers (collectors, learner)               │
- └───────────────▲───────────────────────────────────────────┬─────────────────┘
-                 │ imports: kern_gl.*, kern_env.*,           │ exports (C ABI):
-                 │ wasi_snapshot_preview1.*                  │ kern_*, kern_app_*, kern_studio_*,
-                 │                                           ▼ kern_lehrer_*, kern_logic_*
- WebAssembly module (C++20, wasi-sdk, reactor)
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │ C ABI      src/api/ (renderer, particles, geometry), src/app/app.cpp,        │
- │            src/studio/api.cpp, src/lehrer/lehrer_api.cpp, src/logic/logic_api│
- ├──────────────────────────────┬──────────────────────────────────────────────┤
- │ kern::studio  (--studio)     │ kern::lehrer  (--lehrer)                      │
- │ editor, viewports, gizmos,   │ DuckEnv, MLP, PPO, DAgger, CMA-ES,            │
- │ details, catalog, Play       │ ONNX export, calibration                      │
- ├──────────────────────────────┴──────────────────────────────────────────────┤
- │ kern::game  (--game)                                                         │
- │ Level/.klevel, GameWorld, controllers, rules, city, sound, touch,            │
- │ Walker (Micro Duck), servo profiles, logic nodes, NetGame                    │
- ├───────────────┬───────────────┬────────────────┬────────────────────────────┤
- │ kern::physics │ kern::logic   │ kern::net      │ kern::audio                 │
- │ (--physics)   │ graphs, JIT,  │ bit packer,    │ mixer, 3D, buses,           │
- │ → Box3D (C17) │ C++ export    │ acks, channels,│ synth                       │
- │               │               │ client/server  │                             │
- ├───────────────┴───────────────┴────────────────┴────────────────────────────┤
- │ kern (gfx, scene, geo, app)                                                  │
- │ renderer, passes (shadows, sky, bloom, GTAO), particles, BVH, picking,       │
- │ Earcut, primitives, buildings, roads, terrain, App/Engine/Input (--app)      │
- ├─────────────────────────────────────────────────────────────────────────────┤
- │ kern::core / kern::math / kern::json / kern::dm                              │
- │ base.h, json.h, math.h, dmath.h → third_party/musl_math                      │
- └─────────────────────────────────────────────────────────────────────────────┘
-```
+![Kern's layers: the browser part at the top, the WebAssembly module below](../abbildungen/architektur.svg)
 
 ### What Is Always in the Module and What Is Optional
 
@@ -277,7 +242,7 @@ standalone HTML file: engine module (base64), `kern.mjs`, `game.mjs` and the lev
 starts the same module in player mode (`kern_studio_init(w, h, 1)`) and plays the level with the same
 C++ classes as the editor ([Chapter 8](08-game-runtime.md), [Chapter 11](11-studio.md)).
 
-![An exported game](../buch/bilder/game.png)
+![Orb Run as an exported game in the browser, with HUD](../buch/bilder/game.png)
 
 ### The Lehrer (`--lehrer` and Native)
 
@@ -293,7 +258,7 @@ Both use the same recipes (`include/kern/lehrer/recipe.h`) and the same `GameWor
 the same number of ducks yield the same network – natively as in the browser. The export is ONNX in
 the format of Pollen's networks; the Studio loads it just like those ([Chapter 14](14-lehrer.md)).
 
-![The Lehrer page in the browser (German user interface)](../buch/bilder/lehrer.png)
+![The Lehrer page in the browser with a training run in progress: settings and metrics](../buch/bilder/lehrer.png)
 
 ### The Micro Duck: Everything Working Together
 

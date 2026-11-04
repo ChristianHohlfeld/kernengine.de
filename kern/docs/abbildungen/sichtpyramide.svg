@@ -9,15 +9,16 @@
   <text x="150" y="25" class="k m">{{fern}}</text>
   <text x="168.25" y="151" class="k">{{nah}}</text>
   <circle class="fw gs" cx="44" cy="92" r="12"/>
-  <text x="44" y="95" class="m">A</text>
-  <path class="lad pa" d="M86.98,65.14 L54.18,85.64"/>
-  <path class="lad" d="M54.18,85.64 L44,92"/>
-  <text x="40" y="116" class="k a m">{{abstand}}</text>
+  <text x="39.5" y="99.5" class="m">A</text>
+  <path class="lad pa" data-nur="blau gelb" d="M86.98,65.14 L54.18,85.64"/>
+  <path class="lad" data-nur="blau gelb" d="M54.18,85.64 L44,92"/>
+  <text x="40" y="116" class="k a m" data-nur="blau gelb">{{abstand}}</text>
+  <text x="2" y="127" class="k" data-nur="blau gelb">{{rdef}}</text>
   <circle class="fa" cx="150" cy="84" r="15"/>
   <text x="150" y="87" class="m">B</text>
   <circle class="fa" cx="196.74" cy="96" r="13"/>
   <path class="l" d="M161.25,148 L234.98,30"/>
-  <text x="196.74" y="99" class="m">C</text>
+  <text x="203" y="99" class="m">C</text>
   <text x="258" y="40" class="t">A</text>
   <text x="268" y="40">{{a1}}</text>
   <text x="268" y="51" class="k">{{a2}}</text>

@@ -1,537 +1,661 @@
-# Appendix B – Foundations: How Triangles Become Pictures
+# Appendix B – Basics: How Triangles Become Pictures
 
-> **In short:** This appendix explains the craft behind every 3D game: how coordinates and matrices
-> bring a figure to the right spot on the screen, how the graphics card turns triangles into pixels
-> and how light, shadow, shine and color are computed – 60 times per second in the browser. For
-> every basic concept, you briefly learn how Kern puts it into practice.
+> **In short:** This appendix explains the craft behind every 3D game: how a thing gets to the right
+> spot on the screen, how the graphics card turns triangles into pixels, and how light, shadow, gloss
+> and color come about – 60 times per second in the browser. For each basic concept you'll briefly
+> learn how Kern implements it.
 
-How Kern assembles the building blocks in detail is described in [Chapter 4](04-graphics.md) and
-[Chapter 5](05-scene-and-geometry.md). Here it's about the "why." Which source file contains which
-building block is listed in the blue book at the beginning of Appendix B.
+> **Key terms:**
+> - **Pixel** – a single dot on the screen; a picture is made of millions of them.
+> - **Coordinates** – three numbers that say where something is: how far to the right, forward, up.
+> - **Graphics card** (also GPU) – the special chip that colors in millions of pixels at once.
+> - **Mesh** – the wire frame of triangles a 3D thing is made of.
+> - **Shader** – a small painting program that runs on the graphics card.
+> - **Texture** – an image glued onto a mesh like a sticker.
 
-## B.1 Coordinate Spaces
+It's best to read this appendix **before** [Chapter 4](04-graphics.md): that chapter is about how Kern
+puts the building blocks together; here it's about the "why." The exact names and values are in the
+blue book, Appendix B.
 
-### Why There Are Several Spaces
+## B.1 Coordinate spaces
 
-The body of the Micro Duck is described once in its **own** coordinate system. Then the duck stands
-somewhere in the world, a camera looks at it, and in the end it lands on pixels. Every step changes
-the coordinate system:
+### The matrix: a recipe for every point
+
+A thing in a 3D game has to be moved all the time: shifted, rotated, made bigger or smaller. For that
+you use a **matrix**. Picture it as a **recipe** that's applied to every single point of a thing:
+"Stretch it to double, rotate it by 90 degrees, push it 5 m to the right." You throw a point in, and
+the new point comes out. If you apply the same recipe to all the corners of a mesh, the whole thing
+moves.
+
+Written down, such a recipe is a small table of 4 × 4 = 16 numbers. You don't need to know how to
+calculate with it – what matters are three properties:
+
+- **One recipe for everything:** stretching, rotating and moving fit into a single matrix.
+- **Recipes can be combined:** two recipes one after the other make another recipe. That's called
+  **multiplying** matrices. The graphics card then only has to apply one recipe instead of many.
+- **The order matters:** first rotating, then moving is something different from first moving, then
+  rotating (see the trap in a moment).
+
+### The fourth number w
+
+A point has three coordinates. Even so, you attach a **fourth number** to it, called w. Why?
+
+A recipe can only calculate with the numbers the point brings along: it can multiply and add them up,
+nothing more. But "plus 5 m" is a fixed extra that has nothing to do with any of the point's
+coordinates. The trick: you give every point a fixed fourth number that's simply **1**. Then the
+recipe can say: "plus 5 m times this fourth number" – and 5 m times 1 is exactly 5 m.
+
+A **direction**, on the other hand ("north," "straight up"), gets a **0** as its fourth number.
+"5 m times 0" is nothing: it gets rotated but never moved – a direction has no location. An example
+with the recipe "5 m to the right":
+
+| What | before (x; y; z; w) | after |
+|---|---|---|
+| Point | (1; 2; 3; **1**) | (**6**; 2; 3; 1) |
+| Direction | (1; 2; 3; **0**) | (1; 2; 3; 0), unchanged |
+
+> **Imagine …** a house number and the direction "north." If the whole town moves 5 km east, your
+> house has a new location. "North" stays north.
+
+Later, w helps a second time, with perspective (further below).
+
+**In Kern:** there are two ways of calculating, one for points (w = 1) and one for directions
+(w = 0).
+
+### Why there are several spaces
+
+The Micro Duck's torso is defined once in its **own** description: "The head sits a bit above the
+middle." Then the duck stands somewhere in the world, a camera looks at it, and in the end it lands on
+pixels. Each step is a different coordinate system – a different **space** – and for each change
+there's a recipe:
 
 ```mermaid
-flowchart LR
-  M["Model space"] -->|"Model matrix"| W["World space"]
-  W -->|"View matrix"| K["Camera space"]
-  K -->|"Projection"| C["Clip space"]
-  C -->|"÷ w"| N["NDC cube"]
-  N -->|"Viewport"| S["Pixels and depth"]
+%% Caption: From its own description onto the screen: one recipe per change
+flowchart TB
+  M["own description"] -->|"model recipe"| W["World"]
+  W -->|"camera recipe"| K["camera's view"]
+  K -->|"projection"| S["Screen"]
 ```
 
-> **Imagine …** … the way to your favorite table at the café: "at the back on the left, by the
-> window" (model space), "the café is at 12 Main Street" (world space), "diagonally ahead of me to
-> the right" (camera space), "top right in the photo on my phone" (screen). One table, four
+> **Imagine …** the way to your favorite table in a café: "in the back on the left by the window"
+> (the café's own description), "the café is at 12 Main Street" (world), "from where I am, diagonally
+> ahead to the right" (camera's view), "top right in the photo on my phone" (screen). One table, four
 > descriptions.
 
-In **camera space**, the camera sits at the origin and looks along −z. In **NDC** ("normalized
-device coordinates"), everything visible lies in the cube from −1 to 1; on the **screen** there are
-pixels and a depth value between 0 and 1.
+Because all the steps are recipes, you combine them into a single one. That way the graphics card
+calculates each corner in one go, from its own description all the way onto the screen.
 
-### Homogeneous Coordinates: The Trick with the Fourth Number
+### Kern's habits
 
-A 3×3 matrix can rotate and stretch, but it can't move things – "plus 5 m to the right" is not a
-multiplication. The trick: a **fourth number w**. A **point** gets w = 1, a **direction** w = 0.
-The translation sits in the last column of a 4×4 matrix and only has an effect where w = 1.
+Kern calculates in **meters**, and **Z points up** – x and y span the floor
+([Chapter 3](03-foundations.md)). Kern always builds a thing's pose in the same order: first
+**stretch**, then **rotate**, then **move**.
 
-Example: a translation by (5, 0, 0). The point (1, 2, 3, **1**) becomes (6, 2, 3, 1). The direction
-(1, 2, 3, **0**) stays as it is – a direction has no location. And because all the steps are now
-4×4 matrices, you can multiply them one after another:
+> **Watch out!** Order matters! Picture a game piece in the middle of a table (● is the middle of
+> the table; the recipe is supposed to rotate by 90° and push 5 m to the right; the tip of ▶ and ▲
+> shows where the piece is facing). In the picture below, the piece ends up to the right of the
+> middle in the first case and above it in the second: the rotation always works around the middle of
+> the table, and anything that has already moved away gets swung around with it.
 
-```
-p_clip = P · V · M · p_model
-```
+![Rotate by 90° and push 5 m: the order decides where the piece lands](../abbildungen/reihenfolge-transform.svg)
 
-(M is the model matrix, V the view matrix, P the projection matrix.) In Kern, `Mat4::transform_point`
-computes with w = 1, `transform_vector` with w = 0.
+> **For the curious:** In a formula, such a combined recipe is written "backward," as
+> move · rotate · stretch. The recipe standing right next to the point acts first. That's why
+> Chapter 3 says the point is multiplied onto the matrix "from the right" – it means the same thing.
+> By the way, Kern stores rotations as a **quaternion**, four numbers instead of three angles: three
+> angles one after another can block each other, so that suddenly a direction of rotation is missing.
 
-### Kern's Conventions
+### View and perspective
 
-The header of `math.h` says it in one sentence: column-major 4×4 matrices in the OpenGL layout,
-meters, right-handed, Z up. So: lengths are in **meters**; **Z points up**, x and y span the ground
-(the default camera stands at (0, −18, 8) and looks at (0, 0, 2); physics and the sky compute the
-same way). Matrices are stored **column by column**, and the translation sits in fields 12–14 –
-exactly the layout WebGL expects. A matrix acts **from the left**: In A · B, B acts first. Kern
-describes rotations with **quaternions**, four numbers without the pitfalls of three angles.
+The **camera recipe** does something surprising: it doesn't move the camera, but the **whole
+world** – until the camera stands in the middle and looks straight ahead. Like filming in a car:
+instead of driving the car, you pull the scenery past the window. The recipe is built from three
+pieces of information: where the camera stands, where it's looking, and where "up" is.
 
-> **Watch out!** Order matters! First rotating and then moving 5 m is something different from
-> first moving and then rotating – in the second case, the object swings along a circle around the
-> origin. That's why Kern's "translate · rotate · scale" means: first scale, then rotate, then
-> translate.
+If the camera looks exactly in the "up" direction (or exactly the opposite), that doesn't work:
+someone looking straight up no longer knows where up should be in the picture. Kern then refuses the picture instead of painting nonsense.
 
-### View and Perspective
+**Perspective** means: twice as far away appears half as big. So how big something appears in the
+picture is its size **divided by the distance**.
 
-The **view matrix** (`Mat4::look_at`) builds three perpendicular camera axes from the eye point,
-the target point and "up"; the camera looks along the negative third axis. The matrix is the
-inverse of the camera's placement: It rotates and moves the world so that the camera ends up at the
-origin. If the view direction and "up" lie on one line (the same or exactly opposite), the camera
-is undefined; Kern then refuses the picture ("degenerate camera direction/up").
+![Perspective: twice as far away, half as big](../abbildungen/perspektive.svg)
 
-**Perspective** means: Twice as far away looks half as big – the picture position is x divided by
-the distance. A matrix can't divide, but it can write the distance into w, and the graphics card
-then divides by w: the **perspective division**. Kern's projection has a vertical opening angle of
-60°, so the zoom factor is f = 1 / tan(30°) ≈ 1.732, and a near and a far plane at 0.05 m and
-1800 m.
+So a 2 m tall tree 10 m away appears just as big as a 1 m tall one 5 m away. But a recipe can only
+multiply and add up, not divide. So it notes the distance in the fourth number, and at the end the
+graphics card itself divides everything by this number.
 
-**Worked example:** a 960 × 540 picture (aspect ratio 1.778, horizontal factor 1.732 / 1.778 ≈
-0.974), a point in camera space at (1, 0.5, −10), so 10 m in front of the camera:
+For editor views there's also the **parallel view** without perspective: there, distant things don't
+get smaller, as on a floor plan. Kern's default values for the camera are in the blue book,
+Appendix B.
 
-| Step | Calculation | Result |
-|---|---|---|
-| Clip x, y, w | 0.974 · 1, 1.732 · 0.5, 10 | 0.974, 0.866, 10 |
-| NDC | divide by w | 0.0974, 0.0866 |
-| Pixel | (NDC + 1) / 2 · (960, 540) | (526.8, 293.4) |
+The blue book works a point 10 m in front of the camera through step by step to its pixel, including
+the intermediate stations between camera and screen.
 
-The point lands just to the right of and above the center of the picture (480, 270), counted from
-the bottom left. For editor views there is the **parallel** projection (`Mat4::ortho`), in which
-distant things don't get smaller.
+> **Try it!** In Kern Studio, open the **≡** menu at the top of the viewport and switch the **Field
+> of View**, the opening angle, between 50° and 110° – at 110° the world looks as if seen through a
+> wide-angle lens, strongly stretched at the edges. With **Alt+J** you jump to the **Top** view, a
+> parallel view from above: distant buildings are suddenly as big as nearby ones.
 
-> **Try it!** In Kern Studio, switch the **Field of View** in the viewport menu **≡** between 50°
-> and 110° – at 110° the world looks as if seen through a wide-angle lens, strongly stretched at the
-> edges. With **Alt+J** (Top) you jump into an orthographic view: Distant buildings are suddenly as
-> big as near ones.
+### Depth is unevenly distributed
 
-### Depth Is Distributed Unevenly
+For each pixel, the graphics card remembers how far away what was painted there is (the depth buffer,
+B.2). But it doesn't store this depth like a normal tape measure. Close to the camera the marks are
+very tight, in the distance very wide.
 
-The stored depth value is (apart from constants) proportional to **1 / distance**. The values crowd
-toward 1 in the distance. With Kern's planes and a 24-bit depth buffer:
+> **Imagine …** a ruler whose marks are a hair's width apart close to your eye and meters apart at
+> the back. Up close you can measure tiny differences, far away only coarse ones.
 
-| Distance | Depth value | smallest separable gap |
-|---|---|---|
-| 1 m | 0.950026 | |
-| 10 m | 0.995028 | ≈ 0.1 mm |
-| 100 m | 0.999528 | ≈ 1.2 cm |
-| 1000 m | 0.999978 | ≈ 1.2 m |
+![The depth ruler: close to the camera the marks are tight, in the distance far apart](../abbildungen/tiefe-lineal.svg)
 
-Already at 1 m, 95% of the value range is used up! The precision gets worse with the **square** of
-the distance and depends almost only on the near plane: Doubling it doubles the precision
-everywhere. Kern's ambient occlusion runs the formula backward to get the real distance back
-(`viewDepth`).
+Why? At the end, the graphics card divides everything by the distance, as in the previous section,
+and depth is no exception. The same division that makes distant trees small in the picture also
+squeezes distant distances tightly together on the depth scale: between 100 m and 200 m there are
+hardly more marks there than between 1 m and 2 m.
 
-> **Did you know?** That's why distant surfaces lying close together flicker in some games
-> ("z-fighting"): The depth buffer simply can't tell them apart there anymore.
+How coarse it gets is shown by this small table with Kern's settings:
+
+| Distance | smallest gap the depth can still tell apart |
+|---|---|
+| 10 m | about 0.1 mm |
+| 1000 m | about 1.2 m |
+
+How tight the marks are at the front depends mainly on the **near plane**: the distance from which the
+camera sees anything at all (in Kern 5 cm). Everything in front of it is cut off. The ruler starts at
+the near plane, and that's where its tightest marks are. If it's very close to the lens, many of these
+precious marks get used up on the empty space right in front of the camera, where there's almost never
+anything. If you push the near plane twice as far out, the marks slide along, and the depth becomes
+**twice as precise everywhere**.
+
+> **Did you know?** That's why in some games distant surfaces lying close together flicker
+> ("Z-fighting"): there, the depth buffer simply can't tell them apart anymore and paints sometimes
+> one, sometimes the other.
 
 ### Normals
 
-A **normal** points perpendicularly away from a surface. If you squash an object unevenly, a normal
-that was simply transformed along with it would end up crooked. The right thing is the **inverse
-transpose** of the 3×3 part of the model matrix – roughly: Whatever stretches the surface has to
-squash the normal. Kern computes it on the CPU, once per instance. It rejects a matrix with a scale
-of 0, because such a matrix has no inverse.
+A **normal** is an imaginary arrow pointing straight out of a surface. It's the surface's "gaze" and
+determines how bright the surface is in the light: if it faces the sun, it's bright; if it faces away,
+dark (B.4).
 
-## B.2 Rasterization and the Depth Buffer
+If you squash a thing unevenly, you mustn't simply squash the normals along with it – otherwise they'd
+stand crooked. An example: a roof is tilted at 45°, and its normal points diagonally upward. If you
+squash the house to half its height, the roof gets flatter – so its normal should point *more steeply*
+upward. But if you simply squash the arrow along, it tips *flatter*. Exactly the wrong way around!
 
-After the projection, the corners of a triangle are available as screen points.
-**Rasterization** checks which pixel centers lie inside; for each one, a **fragment** is created, a
-pixel candidate.
+![A 45° roof squashed to half height: the correct normal gets steeper, the one simply squashed along gets flatter](../abbildungen/normalen-stauchen.svg)
 
-```
-     v2
-     /\
-    /  \       ■ = pixel center in the triangle → fragment
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+The rule of thumb: whatever stretches the surface has to squash the normal, and vice versa. For that,
+each thing needs a small recipe of its own just for its normals.
 
-Whatever sits at the corners (color, normal, texture coordinate) is **blended** in between, with
-three weights that add up to 1 – a fragment exactly in the middle gets one third from each corner.
-Because perspective distorts distances, the graphics card blends **perspective-correctly**.
+**In Kern:** Kern calculates this normal recipe once per thing; it rejects a thing squashed to size
+zero, because there's no such recipe for it.
 
-If several triangles hit the same pixel, the **depth buffer** (z-buffer) decides: It remembers the
-smallest depth so far for each pixel, and only a fragment that passes the test gets written. For
-opaque things the order therefore doesn't matter – but for speed it does. Kern tests with "less
-than or equal" and paints opaque things front to back (hidden things fail early, before the
-expensive shader runs). Transparent things come back to front, blended according to their opacity
-and without writing into the depth buffer – here the order matters. After that, the sky fills the
-gaps at depth 1, and the first-person layer comes after a depth clear
-([Chapter 4](04-graphics.md), 4.7).
+## B.2 From triangle to pixels
 
-With closed bodies, triangles that point away from the camera are always hidden. The graphics card
-recognizes them by the **winding order** of their corners (clockwise or counterclockwise) and throws
-them away: **backface culling**. A mirroring reverses the winding order, which is why Kern treats
-mirrored instances separately (Chapter 4, 4.4).
+After projection, the three corners of a triangle lie as points on the screen. Now the graphics card
+checks which pixels lie inside the triangle. That's called **rasterization**. For each such pixel a
+**fragment** is created, a candidate for a pixel – "candidate" because it can still fail later, for
+example if something closer is already at that spot (more on that with the depth buffer in a moment).
 
-> **Try it!** In Kern Studio, switch to **Wireframe** with **Alt+2** and see the triangles that
-> everything is made of. **Alt+3** shows **Unlit** (color without light), **Alt+4** goes back to
-> **Lit**.
+![Pixels whose center lies inside the triangle become fragments](../abbildungen/rasterisierung.svg)
 
-## B.3 The GPU Pipeline and Shaders
+Whatever is at the corners – color, normal, texture coordinate – gets **mixed** in between
+(interpolated). Each corner gets a share, and together the shares add up to 100%. A fragment exactly
+in the middle gets a third from each corner; one right at corner v0 gets almost everything from v0.
+That's how soft color gradients come about across the triangle.
 
-The graphics card works like an assembly line:
+Mixing has one catch: because distant things appear smaller, on a triangle running diagonally toward
+the back, the back half lies on fewer pixels than the front half. If the graphics card mixed evenly
+across the picture, a texture would get distorted – the joints of a tiled floor would be too far apart
+at the back. That's why it mixes **with correct perspective**: when mixing, it takes into account the
+distance of each corner, and the tiles get evenly smaller toward the back.
+
+**The depth buffer.** If several triangles hit the same pixel, the graphics card has to decide what's
+in front. For that it keeps the **depth buffer**: an invisible second picture that stores, for each
+pixel, how far away what has been painted so far is. A new fragment is only painted if it's closer.
+
+> **Imagine …** a painter who notes next to every brushstroke how far away what was painted was. When
+> a new stroke for the same spot comes along, he looks at his notes: if the new one lies further back,
+> he doesn't even paint it.
+
+For opaque things, the order then doesn't matter – for speed it does. Kern paints opaque things **from
+front to back**: that way hidden things fail early, before the expensive shader runs. **Transparent**
+things come afterward, **from back to front**, and are mixed with what's behind them; here the order
+matters, as with sheets of foil on top of each other. The **sky** only fills the gaps, and the things
+in your hand (the first-person layer) come last ([Chapter 4](04-graphics.md), 4.7).
+
+**Back faces.** For closed bodies, triangles facing away from the camera are always hidden – like the
+back of a cube. The graphics card recognizes them by whether their corners follow each other clockwise
+or counterclockwise on the screen, and leaves them out (**backface culling**). A mirroring reverses
+this winding order; that's why Kern treats mirrored copies separately ([Chapter 4](04-graphics.md),
+4.4).
+
+> **Try it!** In Kern Studio, switch to **Wireframe** with **Alt+2** and see the triangles everything
+> is made of. **Alt+3** shows **Unlit**, color without light, and **Alt+4** goes back to **Lit**, with
+> light.
+
+## B.3 The graphics card's assembly line
+
+The graphics card works like an assembly line. Every painting job – a **draw call**, meaning "Paint
+this shape" – runs through the same stations:
 
 ```mermaid
-flowchart LR
-  VB["Vertex data"] --> VS["Vertex shader"]
+%% Caption: The graphics card's assembly line for one draw call
+flowchart TB
+  VB["Corner data"] --> VS["Vertex shader: every corner"]
   VS --> R["Rasterization"]
-  R --> FS["Fragment shader"]
+  R --> FS["Fragment shader: every pixel"]
   T["Textures"] --> FS
   FS --> D["Depth test, blending"]
-  D --> FB["Picture(s)"]
+  D --> FB["finished pictures"]
 ```
 
-Two stations are programmable: The **vertex shader** runs per corner and delivers its screen
-position, the **fragment shader** runs per fragment and delivers colors. They work with four kinds
-of data:
+Two stations are programmable: the **vertex shader** runs once per corner and says where it lands on
+the screen. The **fragment shader** runs once per fragment and says what color it gets. While doing
+so, they work with four kinds of data:
 
-| Term | changes | Example |
-|---|---|---|
-| Attribute | per corner or instance | position, normal, model matrix |
-| Uniform | per draw call | sun direction, material color |
-| Varying | blended per fragment | world position, color |
-| Texture | picture, sampled | color image, shadow map |
+| Kind | Example |
+|---|---|
+| Profile of each corner (or copy) | position, normal |
+| Announcement for the whole draw call | sun direction, material color |
+| Intermediate value mixed across the triangle | color between the corners |
+| Glued-on image (texture) | wood grain, shadow map |
 
-In Kern, the attributes have fixed slots, the same in the standard shader and the shadow shader.
-Extensions attach their own attributes, uniforms and code at agreed-upon places without copying the
-shader. Three tricks make the assembly line fast:
+The technical terms for these are in the blue book, Appendix B.
 
-- **Instancing:** You paint a hundred identical trees with **one** call; an attribute that advances
-  "per instance" instead of per corner gives each tree its position and tint. In Kern every mesh is
-  instanced; when something moves, only this instance data changes, and the geometry stays on the
-  graphics card.
-- **Skinning:** For characters, every corner follows up to four bones, weighted, with weights that
-  add up to 1 – in Kern with up to 32 bones, in the standard shader and in the shadow shader.
-- **Several targets:** A fragment shader can write into several pictures at the same time. Kern
-  fills three – the finished picture, the real light for bloom, the AO record – and so needs **no
-  second pass** over all triangles for bloom and AO.
+Three tricks make the assembly line fast:
+
+- **Instancing (copies):** you paint a hundred identical trees with **one** draw call. The shape
+  exists only once; each copy only brings its location and color tint along. If something moves, only
+  this information changes – the shape itself stays on the graphics card.
+- **Skinning (skin over bones):** for characters, each corner follows up to four bones, each with a
+  share, together 100% – that's how the skin bends softly at the elbow.
+- **Several pictures at once:** a fragment shader can write into several pictures at the same time.
+  That saves a second pass over all the triangles.
+
+**In Kern:** every shape is painted as a package of copies, and the one standard shader writes three
+pictures at once – the finished photo, the real light for the glow (B.7), and notes for the corner
+shadows (B.8).
 
 ## B.4 Lighting
 
-### What Makes a Pixel Bright
+### What makes a pixel bright
 
-The **rendering equation** (after Kajiya) says in words: *light that comes out = self-illumination
-+ all incoming light, weighted by how the surface throws it toward the eye and by the angle of
-incidence.* How a surface redirects light is described by the **BRDF** – its "character profile."
-Adding everything up is too expensive; real-time rendering splits it into **direct light** (sun,
-lamps, computed exactly) and **indirect light** from the surroundings (greatly simplified).
+The light that comes from a surface into your eye is its **own glow** plus all the light that falls on
+it and that it **throws back in your direction**. How a surface does this is its "character profile":
+a mirror throws everything in one direction, a wall spreads it out evenly.
 
-### Lambert: Matte Surfaces
+Adding up all the light in the world, including what bounces off walls, would be far too expensive.
+Games therefore split it up: **direct light** (sun, lamps) is calculated precisely, **indirect light**
+from the surroundings only roughly estimated.
 
-A matte surface scatters light evenly in all directions. Its brightness depends only on the
-**angle of incidence**.
+### Matte surfaces
 
-> **Imagine …** … a flashlight pointing straight down at the table: a small, bright circle. If you
-> tilt it, the spot becomes a long, pale oval – the same light, more area.
+A matte surface, such as paper or a field, spreads light evenly in all directions. How bright it is
+depends only on **how steeply the light hits it**.
 
-Formula: brightness = albedo / π · light intensity · cos(angle of incidence); light from behind
-counts as 0. The **albedo** is the share that the surface reflects; the 1/π keeps a white surface
-from giving off more light than it receives. **Example:** a gray surface (0.5), the sun at 45°
-(cos = 0.707), Kern's sun at 2.8 in the red channel: 0.5 · 2.8 · 0.707 / π ≈ **0.315**. Metals have
-no matte share.
+> **Imagine …** a flashlight pointed straight down at the table: a small, bright circle. If you tilt
+> it, the spot becomes a long, pale oval – the same light, more area.
 
-**Point lights** in reality get weaker with the square of the distance, but never reach zero –
-every lamp would have to light the whole world. That's why Kern lets them fall off **smoothly to 0
-at their range**, with at most 6 lamps. Each one has a position, range, color and strength. Kern
-counts the distance as at least 0.2 m (0.04 squared), so that a lamp sitting directly on a surface
-doesn't become infinitely bright.
+| Light falls … | share of full brightness |
+|---|---|
+| straight on | 100% |
+| tilted by 45° | a good 70% |
+| tilted by 60° | 50% |
+| grazing (90°) | 0% |
+| from behind | 0% |
 
-### Shine
+Then there's the **albedo**: how much light a surface throws back at all – snow a lot, asphalt
+little. So a gray surface with half the albedo is half as bright as a white one in the same light.
+This rule bears the name of its discoverer, **Lambert**. By the way, metals have no matte share; their
+light is all in the gloss.
 
-Shiny surfaces reflect light in a particular direction. The classic **Blinn–Phong** takes the
-**half vector** exactly between the light and the eye: If the normal lies close to it, you see a
-highlight.
+One limit always applies: **no surface throws back more light than falls on it** – not even
+brilliant white paper. The light is only spread out, not multiplied, like water from a bucket poured
+into many cups. Kern's calculation is built to obey this rule; otherwise a white wall would shine more
+brightly than the sun shining on it.
 
-Modern **PBR** (physically based rendering) uses **microfacet theory**: A rough surface consists of
-millions of tiny mirrors, each tilted differently. Three questions determine the shine (the
-Cook–Torrance formula): **D**, the distribution – how many little mirrors throw light into the eye?
-(usually after **GGX**; smooth means a small, sharp spot, rough means a broader shimmer). **F**,
-Fresnel – how much gets reflected at all? Much more at a grazing angle, like a lake that mirrors the
-sky when you look at it from the side; the approximation after **Schlick** starts head-on at about
-**4%** for non-metals and at the base color for metals. **G**, geometry – how much do the little
-mirrors hide one another?
+**Lamps** in reality get weaker with distance but never quite reach zero – so every lamp would have to
+light the whole world. That would be far too expensive.
 
-**Kern** has two knobs, roughness and metalness, and a **simplified PBR**: Lambert for matte light,
-GGX and Schlick for the sun highlight, a reflection of the sky. Shortcuts: shine only for metal or
-roughness below 0.95; a Schlick in which rough surfaces shine less at the edge; no G term of its
-own – with the simplest assumption, the formula cancels down to the factor 1/4 that's in the
-shader; and D capped at 40 against single giant pixels. Depending on roughness, the sky reflection
-is blended between soft skylight and the sharper sky gradient and weighted with F. Glass (set by
-extensions) additionally reflects the sky, so that panes don't look black.
+**In Kern:** every lamp has a range at which its light fades softly to zero, and at most six lamps
+shine at the same time.
 
-Kern computes **indirect light** from just a few colors: a **hemisphere light** (sky color above,
-ground color below, blended according to the tilt) and an **environment dome** made of zenith,
-horizon and ground. It is carried along separately, so that the ambient occlusion (B.8) darkens
-only this share.
+### Gloss
 
-## B.5 Shadow Maps
+Glossy surfaces throw light back in a particular direction, hence the bright spot on an apple. Today's
+explanation: a surface consists of millions of tiny **little mirrors**, tilted at different angles.
 
-A point lies in shadow if something is between it and the sun. So you paint the scene once **from
-the sun's point of view** and note down, for each map point, only the distance to the first object
-– the **shadow map**. During normal painting, every point asks: "Am I farther away than what was
+![Smooth little mirrors throw the light in one direction, rough ones scatter it](../abbildungen/glanz-mikrofacetten.svg)
+
+Three questions determine the gloss:
+
+1. **How many little mirrors are pointing exactly so that they throw light into my eye?** On smooth
+   surfaces all the little mirrors point the same way: you see the gloss from only one direction, but
+   very bright. On rough ones they point every which way: you see a bit of gloss from many directions,
+   but faint.
+2. **How strongly does the surface reflect at this viewing angle?** Much more at a shallow angle –
+   like a lake that mirrors the sky when seen at a slant but looks transparent from above. That's
+   called the **Fresnel effect**. Head-on, non-metals reflect only a little, metals on the other hand
+   strongly and in their own color: a gold ring reflects a white lamp as gold, a red cup reflects it
+   as white.
+3. **Do the little mirrors hide each other?** On rough surfaces they cast small shadows on each other.
+
+**In Kern:** two sliders, **roughness** and **metallic**, control a simplified gloss model with a sun
+highlight and sky reflection.
+
+> **For the curious:** The technical names of the three questions are distribution (usually after
+> "GGX"), Fresnel (usually after "Schlick") and geometry. Kern answers the third question with the
+> simplest assumption and caps the first, so that no individual giant highlights flicker.
+
+### Light from the surroundings
+
+Indirect light – we call it **ambient light** – doesn't come from a lamp but from all around: from
+the blue sky, the ground, walls. You can't calculate it exactly, so you estimate it with a few colors:
+sky color above, ground color below, mixed in between according to the tilt of the surface. A wall
+thus gets half sky, half ground; a roof almost only sky. Finer is a colorful dome that runs from the
+ground over the horizon to the sky above you.
+
+**In Kern:** both exist, and the ambient light is carried along separately, so that the corner shadows
+(B.8) darken only it.
+
+## B.5 Shadow maps
+
+A point lies in shadow if something stands between it and the sun. So you paint the scene once **from
+the sun's point of view** and note, for each point of this map, only how far away the first thing hit
+is – the **shadow map**. During normal painting, each spot asks: "Am I farther away than what was
 noted?" If so, something is in front of it.
 
-```
-   Sun ═════╗  (parallel rays)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          stored depth: roof
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    ground behind → shadow
-```
+![The shadow map notes, per sunbeam, the distance to the first thing; the ground behind it is farther away and lies in shadow](../abbildungen/schattenkarte.svg)
+
+That sounds simple but has its pitfalls:
 
 | Problem | Cause | Remedy |
 |---|---|---|
-| Shadow acne (stripes) | surface shadows itself | bias, polygon offset |
-| Peter Panning | too much bias, shadow detaches | keep the bias small |
-| Jagged edges | one map point covers many pixels | filtering (PCF) |
-| Flickering | map slides by fractions | snap to the grid |
-| Blurry up close | map covers too much | fit it to the view |
+| fine stripes ("shadow acne") | surface shadows itself | small safety margin |
+| shadow detaches from the thing | safety margin too big | keep the margin small |
 
-For the sun, Kern uses a parallel (orthographic) projection, snaps to whole map points, fits the map
-to the view (shadow distance), combines three kinds of bias (polygon offset, a small comparison
-margin, **normal offset**) and filters with **PCF** (*percentage closer filtering*: several
-comparisons, averaged) – 1, 4 or 9 samples, where the graphics card already compares and blends
-four neighbors in each one. Only depth goes into the map, and only from shadow casters; it is
-reused as long as the sun, the map position and the shadow casters stay the same. Surfaces that
-point away from the sun don't even ask. With a shadow distance, the shadow fades out over the last
-tenth. How all of this works together is described in [Chapter 4](04-graphics.md), 4.8.1. Why the
-fitting matters so much: With the default values (512 map points over ±120 m), one map point is
-2 · 120 / 512 ≈ **0.47 m** wide – much too coarse for something as small as the Micro Duck.
+More pitfalls, such as stair-step edges or shimmering, and their remedies are in the blue book,
+Appendix B.
 
-## B.6 HDR, Tone Mapping and Gamma
+The **safety margin** is the most important remedy: the surface only counts as shadowed if it's a tiny
+bit farther away than what was noted. Otherwise it would darken itself because of the coarse map – like
+the stripes in a photo of a screen. If the margin is too big, on the other hand, the shadow floats a
+bit beside the thing; experts call this "Peter Panning," after the storybook character, because Peter
+Pan loses his shadow.
 
-### Tone Mapping
+The second remedy is a **step to the side**: before a spot looks something up on the map, it moves a
+little in the direction its surface is facing – a bit further when light falls at a slant, because
+that's where the danger is greatest. That way the surface doesn't measure against itself, and the
+safety margin can stay small.
 
-Real light has a huge range; Kern's sun goes up to 2.8, but a screen can only show 0 to 1. That's
-why you compute in **linear HDR** (*high dynamic range*) and only squeeze the result onto the screen
-at the end. This mapping is called **tone mapping**. A good curve is almost straight in the middle
-and rounds off the highlights softly:
+**In Kern:** the map only covers what you can see up to the shadow distance, snaps to whole points,
+and is only repainted when something changes – why that matters so much and how it all fits together
+is in [Chapter 4](04-graphics.md), 4.8.1.
 
-```
- Output
-  1 |            ____________
-    |        _--
-    |      /
-    |    /
-    |  /
-  0 |/________________________ Input (linear)
-    0    1    2    3    4
-```
+## B.6 Bright light, screen and color
 
-Kern uses the **ACES film curve** in the three.js version (factor in the exposure, a rational
-approximation of the film curve, clamp to 0 to 1), optionally followed by its color grading.
+### Tone mapping
 
-> **Try it!** Turn the **Exposure** in the **World Settings** up and down. Bright spots run softly
-> into white instead of being cut off hard – the film curve at work.
+Real light has an enormous range, from almost dark to blindingly bright. A screen, on the other hand,
+can only go from black to white. So you calculate with the **real** light, even when it's much
+brighter than white (technical term **HDR**, *high dynamic range*), and only squeeze it into the
+screen's range at the very end. This squeezing is called **tone mapping**. A good curve leaves medium
+brightnesses almost as they are and rounds off very bright ones softly:
+
+![Kern's tone mapping curve: soft up to just below white, instead of cutting off hard at 1](../abbildungen/tonemapping.svg)
+
+**In Kern:** the curve is a proven film curve from cinema technology, as other widespread graphics
+programs use too; a color correction can follow after it.
+
+> **Try it!** In the **World Settings** tab, turn the **Exposure** up and down. Bright spots run
+> softly into white instead of cutting off hard – the film curve at work.
 
 ### Gamma and sRGB
 
-Screens and image files store colors in **sRGB**: Dark tones get more of the 256 steps, because the
-eye distinguishes more finely there. But light adds up **linearly**. So: convert input colors **to
-linear**, compute linearly, and at the end convert back **to sRGB**. For brighter values, roughly
-sRGB = 1.055 · linear^(1/2.4) − 0.055, and the other way around linear = ((sRGB + 0.055) /
-1.055)^2.4 (very dark values have a small straight section).
+Screens and image files don't store brightness the way light behaves, but the way our eye perceives
+it: a screen knows only 256 brightness levels per primary color, and dark tones get many more of
+them, because we see finer differences there. This way of writing it is called **sRGB**. The way of
+writing that reflects real light is called **linear**: twice as much light is twice as big a number
+there.
 
-**Example:** Linear middle gray 0.18 becomes 1.055 · 0.18^(1/2.4) − 0.055 ≈ **0.461** – almost
-half the scale, even though it's only 18% of the light.
+| real light (linear) | stored as an sRGB value |
+|---|---|
+| 5% | about 25% |
+| 18% | about 46% |
+| 50% | about 74% |
+| 100% | 100% |
 
-> **Watch out!** If you compute in sRGB, you get transitions that are too dark and wrong mixed
-> colors. If colors are already linear, you have to say so – in Kern via `linear_colors`, or in the
-> browser via `markLinearColors` – otherwise they get converted twice.
+The second row is famous: the eye perceives 18% of the light as **middle gray**, and in sRGB it
+actually sits almost in the middle of the scale.
+
+The problem: light adds up **linearly**. Two lamps make twice as much light – but the sRGB value
+doesn't double. If you calculate with sRGB numbers, you calculate wrong, roughly as if you were adding
+up shoe sizes. That's why the rule is: convert colors **to linear first**, calculate linearly, and
+convert **back to sRGB** at the very end.
+
+> **Watch out!** If you calculate in sRGB, you get transitions that are too dark and wrong mixed
+> colors.
 
 ### Fog
 
-After tone mapping, Kern mixes in fog, like three.js: fog share = 1 − e^(−(density ·
-distance)²). With the default density of 0.00085, that's 0.085² ≈ 0.0072 at 100 m, so **0.7%**, and
-at 1000 m it's 0.85² ≈ 0.72 and 1 − e^(−0.72) ≈ **51%**. Because of the square, the near range stays
-clear for a long time, and then the haze closes in quickly. With height falloff it gets thinner
-higher up; with sun scattering it glows in the direction of the sun.
+Fog gets denser with distance. Kern mixes it in so that nearby things stay clear for a long time and
+the haze then closes in quickly. With Kern's standard fog:
 
-## B.7 Bloom
+| Distance | share of fog |
+|---|---|
+| 100 m | barely any, under 1% |
+| 500 m | about 17% |
+| 1000 m | about half |
+| 2000 m | almost all |
 
-**Bloom** is the halo of light around very bright spots, like backlight in your eye. Recipe: cut out
-the bright parts, blur them (preferably on shrunken pictures – cheaper and wider), add them back.
+**In Kern:** if you like, the fog gets thinner toward the top and glows in the sun's color in the
+direction of the sun.
 
-A Gaussian blur is **separable**: Instead of 9 × 9 = 81 reads, 9 horizontal plus 9 vertical reads
-are enough. Even cheaper: If you read **between** two texels, the hardware blends them for free, so
-**five** reads replace nine weights. Kern's weights: 0.2270 in the middle, 0.3162 each at ±1.3846
-and 0.0703 each at ±3.2308 texels – together 0.2270 + 2 · 0.3162 + 2 · 0.0703 = **1**, so that the
-picture gets neither brighter nor darker.
+## B.7 Bloom: the glow
 
-In Kern, the scene also writes the real light into a copy made of 16-bit floating-point numbers.
-From it, the bloom cuts out the bright parts with a soft threshold starting at about 0.88, blurs
-them at a quarter and an eighth of the picture size (strengths 0.13 and 0.08) and, when combining,
-adds only the **difference** that the glow makes after tone mapping; pixels without glow stay
-bit-exact. If the device needs more than 27 ms per frame on average for 3.5 s, a guard switches the
-glow off, unless it is forced. More in Chapter 4, 4.8.3.
+**Bloom** is the halo around very bright spots, like backlight in the eye or in a camera. The recipe:
+cut out the very bright parts, blur them, and lay them back on top. The blurring is often done on
+shrunken pictures – that's cheaper and gives a wider glow.
 
-## B.8 Ambient Occlusion: SSAO and GTAO
+Blurring means: each pixel is mixed with its neighbors in a square. That's many looks per point. It's
+much faster in two passes.
 
-In corners, joints and under things, less ambient light arrives, because part of the sky is
-covered. This **ambient occlusion** (AO) makes things "stand" on the ground instead of floating. It
-asks: *How much of the sky above this point is open?* – where steep directions count more than flat
-ones. The sun has its own shadows; AO only affects indirect light.
+> **Imagine …** you want to blur a picture made of little squares. Instead of mixing each square with
+> all its neighbors in a square, you first blur each row to the left and right and then each column up
+> and down. The result is the same – but for a square of 9 × 9 little squares you need only 18 looks
+> instead of 81.
 
-> **Imagine …** … you're lying in a hollow in the grass and looking up. The deeper the hollow, the
-> smaller your piece of sky – and the darker it is where you are, even without a sun shadow.
+The mixing shares add up to exactly 100%, so the picture gets neither brighter nor darker. More
+money-saving tricks are in the blue book, Appendix B.
 
-Rays through the whole scene are too expensive. **SSAO** (*screen-space AO*) uses the depth buffer
-and checks with random samples whether neighboring pixels lie "above" the point – a rough estimate.
-**GTAO** (*ground-truth AO*, Jimenez and colleagues 2016) goes about it systematically: For each
-pixel, choose a few directions ("slices"), in each one search left and right for the **horizon** –
-the highest angle at which neighboring geometry covers the sky –, plug a **ready-made formula** in
-for the open arc in between and average over the slices.
+**In Kern:** the glow comes from the shader's real light, is blurred on two shrunken levels, and is
+laid over the finished photo as a thin film ([Chapter 4](04-graphics.md), 4.8.3).
 
-```
-             Horizon h1
-   View ↓       ╲   │n   ╱  Horizon h0
-                 ╲  │   ╱
-   ████████       ╲ │  ╱      ████
-   ████████████────●────────████████
-                  Pixel
-   visible sky: arc between h0 and h1
-```
+## B.8 Corner shadows: ambient occlusion
 
-Kern follows Intel's XeGTAO: the normal from the depth, a radius in meters (default 1.6), a 4×4
-pattern that rotates the slices and that an edge-aware filter averages away again, and a
-**multi-bounce correction**: Bright surfaces win back light that bounces back and forth between the
-occluders. The result is a picture of its own (default: half resolution) with visibility and depth;
-the depth makes sure that nothing bleeds across edges when scaling up. Four quality levels and a
-guard that steps down on slow devices keep it fast. It is applied **only to the indirect share**,
-which the standard shader writes along in its third output. Because the shader knows that share
-anyway, Kern needs no second geometry pass for it (Chapter 4, 4.8.4).
+In corners, joints and under things, less ambient light arrives, because part of the sky is blocked.
+This **ambient occlusion** (AO for short) makes things "stand" on the ground instead of floating. It
+asks: *how much sky above this point is free?* Sky directly above the surface counts more than sky
+just above the horizon – for the same reason as with the flashlight: steeply falling light hits a
+surface more strongly than shallow light. The sun has its own shadows; AO only affects the ambient
+light.
 
-## B.9 Sky and Atmosphere
+> **Imagine …** you're lying in a hollow in the grass looking up. The deeper the hollow, the smaller
+> your piece of sky – and the darker it is where you are, even without sun shadows.
 
-The sky is blue because air molecules scatter blue light much more strongly than red light – the
-**Rayleigh scattering**, proportional to 1 / wavelength⁴. Blue (about 450 nm) is thus scattered a
-good four times more strongly than red (about 650 nm). At the horizon, the path through the air is
-longer, the light brighter and, with a low sun, reddish. Around the sun, larger particles scatter
-forward: The **Mie scattering** creates the bright halo.
+Sending rays through the whole scene would be too expensive. That's why you estimate the occlusion
+from the finished depth buffer, that is, from what's already on the screen anyway. The **GTAO** method
+looks in a few directions from each point, searches left and right for how high the surroundings block
+the sky (the **horizon**), and calculates how much sky stays free in between.
 
-Real sky models compute this scattering along the view ray. Kern's sky is deliberately **not** such
-an integral, but a cheap recipe that looks similar: a color gradient, a golden hour with a band that
-gets brighter toward the sun, a sun disk with a Mie-like halo, the moon, twinkling stars, clouds
-from five layers of noise (pushed along by the wind, brighter toward the sun) and a transition into
-the scene's fog color and sun scattering – painted as a screen-filling triangle that only fills the
-gaps (Chapter 4, 4.8.2).
+![The walls block the sky up to their edge; only the arc in between is free](../abbildungen/umgebungsverdeckung.svg)
 
-## B.10 Culling and Scene Structures
+**In Kern:** Kern uses GTAO, uses it to darken only the ambient light the shader noted along the way,
+and needs no second pass over all the triangles for it ([Chapter 4](04-graphics.md), 4.8.4).
 
-What lies outside the picture doesn't need to be painted. A camera's visible region is a **truncated
-pyramid** (*frustum*) made of six planes. Gribb and Hartmann showed that you can read them off
-directly by adding and subtracting the rows of the camera matrix. For each mesh, Kern tests a
-**bounding sphere**: If its center lies more than one radius behind a plane, the mesh is invisible.
+## B.9 Sky and atmosphere
 
-```
-       \         /
-        \  ●    /     ● visible
-   ○     \     /      ○ rejected: fully behind the left plane
-          \   /
-           \ /
-          Camera
-```
+The sky is blue because the air deflects (**scatters**) blue light to the side much more strongly than
+red – several times more strongly. So deflected blue reaches your eye from everywhere in the sky. At
+the horizon the path through the air is longer; the light gets deflected several times, the sky there
+is brighter, and when the sun is low it turns reddish – the blue has already been scattered out along
+the way. Around the sun, bigger particles such as dust and droplets deflect the light only a little,
+on almost straight ahead, and create the bright halo.
 
-The test is **cautious**: It never throws away anything visible, but sometimes lets something
-invisible through (spheres near a corner). Kern checks every mesh this way whose material has
-`frustum_culled` set – except characters with a skeleton, because their bones can leave the sphere.
-For instanced meshes, the sphere encloses all instances. The shadow map tests against its own
-pyramid.
+> **For the curious:** The technical names are **Rayleigh scattering** (the air, which scatters the
+> blue) and **Mie scattering** (the bigger particles, which make the halo around the sun).
 
-> **Try it!** In Kern Studio, switch on **Bounds** under **Show** and look at the hulls Kern uses to
-> decide what lies inside the view pyramid.
+Real sky models follow the light step by step along every line of sight through the air.
+**In Kern:** the sky is deliberately not such a light calculation but a cheap recipe of color
+gradient, golden hour, sun, moon, stars and clouds that looks similar and only fills the gaps
+([Chapter 4](04-graphics.md), 4.8.2).
 
-With many objects, a **BVH** (*bounding volume hierarchy*) helps: a tree in which every node has a
-bounding box around all its children. If a ray misses a node, the whole branch drops out – like in
-a number-guessing game with "higher or lower?", where ten questions are enough instead of a thousand
-tries.
+## B.10 Leaving out what's invisible
 
-```
-            [ all ]
-           /        \
-     [ left ]     [ right ]
-      /    \        /    \
-   [△△]  [△△]   [△△]  [△△]   leaves: triangles
-```
+Whatever lies outside the picture doesn't need to be painted. The region a camera sees is a pyramid
+lying on its side with its tip cut off, the **viewing pyramid** (*frustum*). To check whether a thing
+lies inside it, you put it in an imaginary **bounding sphere** and ask: does the sphere lie completely
+behind one of the pyramid's walls? Then the thing is invisible.
 
-In Kern, the BVH is used for **clicking**, not for painting: Static world objects with 36 triangles
-or more get a tree over their triangles (always split in the middle), and moving ones are checked
-directly. The ray is tested against the boxes with the slab test and against the triangles after
-Möller–Trumbore. The physics has its own BVH in Box3D ([Appendix C](C-physics.md)).
+![Bounding spheres at the viewing pyramid: A lies completely outside and is skipped, B and C are painted](../abbildungen/sichtpyramide.svg)
 
-## B.11 Draw Calls and State Changes
+The test is **cautious**: it never throws away anything visible, but sometimes lets something
+invisible through, for example spheres near a corner of the pyramid. When in doubt, it just gets
+painted.
 
-Every **draw call** costs processor time: checking state, binding buffers, uploading uniforms – and
-in the browser also the trip from WebAssembly through JavaScript, including a check. Thousands of
-small calls can take longer than the graphics card's actual work. **State changes** (a different
-program, a different texture) cost something too.
+**In Kern:** that's how Kern checks every thing before painting – except characters with a skeleton,
+whose arms and legs can stick out of the sphere. A package with many copies (B.3) gets a sphere that
+encloses **all** the copies. If even one copy is visible, the whole package is painted – after all,
+it's a single draw call.
 
-> **Imagine …** … you go shopping. Walking to the store a hundred times for one ingredient each
-> takes much longer than going once with a full basket – even though the same things end up in the
-> fridge.
+> **Try it!** In Kern Studio, under **Window › Show**, turn on **Bounds** and see the hulls Kern uses
+> to decide what lies inside the viewing pyramid – including around trees, buildings and the duck.
 
-Kern's remedies: **one** standard program, instancing, a uniform cache, per-frame values set once
-per frame, remembered texture and back-face settings, a shadow map only when needed, a visibility
-check before painting and uploading geometry only once. The statistics (`RenderStats`) show draw
-calls, triangles, instances, rejected meshes and the time on the CPU and – if the browser supports
-it – on the GPU. The sequence of a frame is shown in [Chapter 4](04-graphics.md), 4.7.
+A related problem is **clicking**: which triangle is under the mouse? For that you send an imaginary
+**ray** from the eye through the mouse pointer into the world and look for the first triangle it hits.
+With many triangles, a **tree of boxes** (*BVH*) helps: at the top, a box around everything, inside it
+two smaller boxes, inside those two more, until single triangles lie at the bottom. If the ray misses a
+box, everything inside drops out in one go – like in the number-guessing game with "bigger or
+smaller?", where ten questions are enough instead of a thousand attempts.
 
-## B.12 Why WebAssembly and WebGL2 Are Connected This Way
+![The tree of boxes: on the left in space, on the right as a tree with triangles at the bottom](../abbildungen/bvh.svg)
 
-Kern is C++, but the browser only offers JavaScript interfaces. **WebAssembly** (WASM) is a compact
-format that the browser translates into machine code. A WASM module has a **linear memory** (one big
-array of bytes) and may only call functions that it is given as **imports** when it loads.
-**WebGL2** is the browser's graphics interface, essentially OpenGL ES 3.0. Kern compiles with
-wasi-sdk (target `wasm32-wasip1`); `gl.h` declares exactly the WebGL2 functions that are used,
-`kern.mjs` translates numbers into WebGL objects and passes data on **without copying**, through
-windows onto Kern's memory that are renewed after the memory grows. The page creates the WebGL2
-access without antialiasing and without transparency, because Kern paints into its own targets and
-does the compositing itself; only Kern Studio and exported games switch antialiasing on (Chapter
-4, 4.2).
+**In Kern:** the tree of boxes serves **clicking** – which triangle is under the mouse? – not
+painting; the physics has its own ([Appendix C](C-physics.md)). Only the world's **unmoving** shapes
+get a tree. Why? If a shape moves, its boxes no longer fit in the next picture, and the tree would
+constantly have to be rebuilt. So Kern checks moving shapes directly, triangle by triangle.
+
+## B.11 Few big jobs
+
+Every **draw call** costs time before the graphics card even starts: checking settings, preparing
+data, sending values – and in the browser, on top of that, the trip across the bridge to the web page,
+including checks. Thousands of small calls can take longer than the actual painting work. Every switch,
+say to a different texture, costs too.
+
+> **Imagine …** you go shopping. Running to the store a hundred times for one ingredient each takes
+> much longer than going once with a full basket – even though the same things end up in the fridge.
+
+### How a picture comes together
+
+How do the shadows, sky, corner shadows and glow from this appendix mesh with each other? For every
+picture, Kern goes through the work in a fixed order, like a painter who puts in the background first
+and the highlights last:
 
 ```mermaid
-flowchart LR
-  R["C++: renderer, physics, game"] --> G["gl.h: imports"]
-  G -->|"numbers, address + length"| K["kern.mjs"]
-  K --> W["WebGL2 in the browser"]
+%% Caption: The order in which Kern paints a picture
+flowchart TD
+  A["1. Shadow map (B.5), only when needed"] --> B["2. Opaque things, front to back"]
+  B --> C["3. Sky, only where still free (B.9)"]
+  C --> D["4. Transparent things, back to front"]
+  D --> E["5. Corner shadows (B.8)"]
+  E --> F["6. First-person layer: the things in your hand"]
+  F --> G["7. Compositing: glow (B.7), color"]
 ```
 
-| Decision | Reason |
+Opaque things come front to back, so that hidden pixels aren't even calculated; transparent things
+back to front, so that glass correctly mixes in what lies behind it.
+
+**In Kern:** a single painting program, copies instead of duplicates, a memo against repeated values,
+a shadow map only when needed, and shapes uploaded only once – and a statistic shows how many jobs a
+picture cost ([Chapter 4](04-graphics.md), 4.7 and 4.12).
+
+## B.12 Why Kern and the browser work together this way
+
+Kern is a fast program of its own that runs **inside** the web page. It's written in a programming
+language for fast programs (C++); out of the box, though, browsers only understand their own language
+(JavaScript). The bridge is called **WebAssembly**: a compact format the browser runs almost as fast
+as a normal program. A WebAssembly program, however, may only exchange numbers and may only use what
+the web page explicitly hands it at startup. Only the web page can reach the graphics card, via
+**WebGL2**, the browser's painting interface.
+
+> **Imagine …** Kern lives as a subtenant in the web page. Only the main tenant, the page, has the key
+> to the basement with the graphics card. Kern writes its wishes on notes and passes them through the
+> door – and only numbers are written on the notes.
+
+```mermaid
+%% Caption: Kern passes its painting wishes to the web page as notes full of numbers
+flowchart TB
+  R["Kern: painting, physics, game"] --> G["short list of painting commands"]
+  G -->|"numbers; where the numbers are and how many"| K["thin web page layer"]
+  K --> W["graphics card via WebGL2"]
+```
+
+From this follow Kern's most important decisions, in everyday language:
+
+| Decision | Why |
 |---|---|
-| everything in C++/WASM | one codebase for browser, tests, Lehrer, server; deterministic physics |
-| wafer-thin JavaScript | logic in JS would be duplicated and harder to test |
-| small, fixed import list | everything that's used is in one place |
-| numbers instead of JS objects | WASM can only hold numbers |
-| copies of all meshes, textures | rebuilding after a context loss |
-| few calls, uniform cache | every call crosses the border |
-| headless mode | the Lehrer computes the same world without graphics |
-| one thread in WASM | Box3D single-threaded; parallelism via web workers |
+| everything in one language | then it calculates the same everywhere – in the browser, in tests, in the Lehrer |
+| wafer-thin web page layer | nothing twice, nothing that could calculate differently |
+| short, fixed list of painting commands | everything needed is in one place |
+| numbers instead of things | only numbers fit across the bridge (coat check tickets) |
+| copies of everything | insurance in case the browser takes the graphics card away |
+| few jobs, memo | every trip across the bridge costs |
+| painting without a screen possible | the Lehrer calculates the same world without graphics |
+| one thread per Kern copy | more speed via helpers with their own Kern copy |
+
+The **Lehrer** is Kern's training school, which teaches the Micro Duck new movements
+([Chapter 14](14-lehrer.md)). It doesn't need a picture, only the same world with the same physics.
+And it illustrates the last row of the table: in the browser, Kern works on a single **thread**, like
+a cook who does everything one after another. If more is supposed to happen at once, the web page
+starts additional helpers (**Web Workers**), and each gets its own copy of Kern – several cooks, each
+in their own kitchen, instead of many cooks at one stove.
+
+The exact names of the components are in the blue book, Appendix B.
 
 ## What you take away
 
-- A point travels through **model, world, camera and clip space** onto the screen; the fourth
-  number w turns translation and perspective into matrix multiplications.
-- Kern computes in **meters, Z up**, with column-major matrices.
-- The depth buffer is extremely precise up close and coarse far away; the **near plane** decides.
-- Vertex shaders compute corners, fragment shaders compute pixels.
-- Light = matte share (Lambert) + shine (GGX, Fresnel) + simplified ambient light.
-- Shadow maps are a photo from the sun's point of view; bias, snapping and PCF keep them clean.
-- Compute **linearly in HDR**, squeeze with a **film curve**, and finish with **sRGB**.
-- Few draw calls make a game in the browser fast.
+- A **matrix** is a recipe that stretches, rotates and moves every point; recipes can be combined into
+  one, and the order matters.
+- The **fourth number w** is 1 for locations and 0 for directions – the house number moves, "north"
+  doesn't.
+- Like the café table, a thing travels through four descriptions onto the screen.
+- **Twice as far away, half as big**; for that, the graphics card divides by w.
+- The depth buffer measures very finely up close and coarsely far away; the **near plane** decides.
+- Vertex shaders calculate corners, fragment shaders pixels.
+- Light = matte share (flashlight) + gloss (little mirrors, lake) + rough ambient light.
+- Shadow maps are a photo from the sun's point of view, with a small safety margin.
+- Calculations use **real, linear light**; a **film curve** squeezes it onto the screen.
+- Few big jobs make a game fast – shopping once with a full basket.
 
 ## Brain teasers
 
-1. Why does a direction get w = 0 and a point w = 1?
-2. One point is twice as far away as another. How big does it look?
-3. You want to separate distant surfaces more precisely. What helps the most?
-4. Why can't you simply add colors in sRGB?
-5. Why does Kern paint the sky *after* the opaque objects?
+1. Why does a direction get w = 0 and a location w = 1?
+2. A thing is twice as far away as another one of the same size. How big does it appear?
+3. In the distance, two surfaces lying close together flicker. What helps most?
+4. Why can't you simply add colors as sRGB numbers?
+5. Why does Kern paint the sky *after* the opaque things?
 
 ### Solutions
 
-1. With w = 0, the translation has no effect – a direction has no location.
-2. Half as big: The perspective division divides by the distance.
-3. Move the near plane farther out: twice as far out means twice as precise everywhere.
-4. Light adds up linearly; in sRGB, mixes and gradients come out wrong, usually too dark.
-5. Then only free pixels pass the depth test, and the expensive sky shader only runs where there is
-   sky.
+1. With w = 0 nothing is moved – a direction has no location. The house number moves, "north" stays
+   north.
+2. Half as big: the graphics card divides by the distance.
+3. Push the near plane farther out: twice as far means twice as precise everywhere, because the fine
+   marks are no longer used up on the empty space right in front of the camera.
+4. Light adds up linearly, but sRGB numbers don't – like shoe sizes. Mixtures and gradients then come
+   out wrong, usually too dark.
+5. Then the sky only comes through at spots where nothing is lying yet, and the expensive sky shader
+   only runs where there really is sky.
 
 ---
 

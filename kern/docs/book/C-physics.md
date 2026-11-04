@@ -109,15 +109,9 @@ Explicitly, the amplitude grows by a factor of 3.3 per step – after ten steps 
 Semi-implicitly, $h\omega$ is above 2: likewise unstable. Implicitly, the oscillation is heavily
 damped but remains stable.
 
-```
- Amplitude
-   │  explicit  ╱╲    ╱‾‾╲
-   │      ╱╲  ╱  ╲  ╱    ╲   (grows)
-   │ ╱╲  ╱  ╲╱    ╲╱
-   │╱  ╲╱    semi-implicit: ╱╲╱╲╱╲╱╲ (stays)
-   │          implicit:     ╱╲_╱‾‾\__ (decays)
-   └────────────────────────────────── t
-```
+With a small step ($h\omega = 0.25$) the behaviour of the three methods is easy to see:
+
+![The three methods on the spring with hω = 0.25 over 50 steps: explicit grows, semi-implicit stays, implicit decays](../abbildungen/integratoren.svg)
 
 ### C.2.3 What Box3D does
 
@@ -153,7 +147,8 @@ large step, and large steps make springs unstable (C.2.2) and the result machine
 solution is Glenn Fiedler's **accumulator** ("Fix Your Timestep"):
 
 ```mermaid
-flowchart LR
+%% Caption: Fixed timestep with accumulator: fixed steps, rendering between the last two states
+flowchart TB
   F["Frame: time dt"] --> A["accumulator += min(dt, 0.25 s)"]
   A --> L{"accumulator ≥ h?"}
   L -->|yes| S["one fixed step h; accumulator -= h"]
@@ -192,7 +187,8 @@ With $n$ bodies there are $n(n-1)/2$ pairs – with 1000 bodies almost 500,000. 
 exactly is too expensive. The work is therefore done in two phases:
 
 ```mermaid
-flowchart LR
+%% Caption: Collision detection in two phases, followed by the solver
+flowchart TB
   B["Broad phase: bounding-box tree finds candidate pairs"] --> N["Narrow phase: exact test, contact points (manifold)"]
   N --> S["Solver: contact constraints"]
 ```
@@ -227,13 +223,7 @@ there are efficient, robust methods:
 The result is a **manifold**: a contact normal and up to a few contact points, each with a distance
 (negative when penetrating).
 
-```
- GJK: Minkowski difference A − B
-       ________
-      /        \      origin outside → separated, distance = shortest path
-     /   A−B    \  ·0
-     \__________/
-```
+![GJK: if the origin lies outside the Minkowski difference A − B, the shapes are separated; the shortest path is their distance](../abbildungen/gjk.svg)
 
 ### C.3.4 Convex hulls
 
@@ -302,15 +292,7 @@ As long as the required static force is below the limit, the contact **sticks** 
 is exceeded, the contact **slides** with friction $\mu\lambda_n$ opposite to the sliding direction.
 The permitted forces form a **friction cone** around the normal with half-angle $\arctan\mu$:
 
-```
-          n
-          │      friction cone:
-     ╲    │    ╱  force inside → stick
-      ╲   │   ╱   force on the boundary → slide
-       ╲  │  ╱
-        ╲ │ ╱  arctan μ
-   ──────●──────  contact plane
-```
+![The friction cone around the normal n with half-angle arctan μ](../abbildungen/reibungskegel.svg)
 
 Physically one distinguishes static and kinetic friction ($\mu_s > \mu_k$). Box3D knows only **one**
 coefficient.
@@ -406,12 +388,10 @@ $c = \max(c_A, c_B) \cdot r_\text{max}$ ($r$ the radius of the sphere or capsule
 bundled version, a quarter of the inner radius), and the solver limits the angular impulse that brakes
 rolling to $c \cdot \sum\lambda_n$ – exactly the form $\tau \le c_{rr}\,r\,F_n$.
 
-**In Kern:** `ShapeMaterial::rolling_resistance`. `docs/lehrer.md` (Section 8) reports why it was
-needed: "Die Socke kroch von selbst über den Boden (runde Stoffklumpen rollten). Sie hat jetzt
-Rollwiderstand und liegt still." ("The sock crept across the floor by itself (round lumps of fabric
-rolled). It now has rolling resistance and lies still.") and "Der Ball rollte ewig. Er hat jetzt
-Rollwiderstand wie ein Gummiball auf Holz." ("The ball rolled forever. It now has rolling resistance
-like a rubber ball on wood.")
+**In Kern:** `ShapeMaterial::rolling_resistance`. The comments in the code give the reason: the ball
+in the Micro Duck level has 0.03 ("a rubber ball on a wooden floor rolls out", `src/game/demos.cpp`),
+the sock lumps 0.5 ("a lump of cloth does not roll (round lumps would, and the heap crawls)",
+`src/game/walker.cpp`).
 
 ---
 
@@ -510,8 +490,9 @@ $$\omega = 2\pi f,\qquad
 
 The impulse of a contact with penetration $s < 0$ is then (`box3d:src/contact_solver.c`):
 
-$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,\qquad
-\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
+$$\Delta\lambda = -m_\text{eff}\left(\text{massScale}\cdot v_n + \text{bias}\right) - \text{impulseScale}\cdot\lambda,$$
+
+$$\text{bias} = \max\left(\text{massScale}\cdot\text{biasRate}\cdot s,\ -v_\text{max}\right).$$
 
 - $\text{biasRate}\cdot s$: how fast the penetration is resolved,
 - $v_\text{max}$: upper limit of this push-out velocity (`contact_speed`, Kern: 3 m/s),
@@ -529,6 +510,7 @@ $= 0.707$, and 1 mm is resolved at about 26 mm/s.
 The sequence of a fixed step, which Box3D calls the **soft step** (`box3d:src/solver.c`):
 
 ```mermaid
+%% Caption: Box3D's soft step: sub-steps with warm start, solving with bias and relax
 flowchart TD
   P["Prepare constraints (Jacobians, effective masses)"] --> L{"Another sub-step?"}
   L -->|yes| IV["Integrate velocities (gravity, forces, damping)"]
@@ -577,7 +559,8 @@ motor so that the joint reaches it. Inside, this is a **control loop**: it measu
 compares it with the target and produces a torque.
 
 ```mermaid
-flowchart LR
+%% Caption: A servo's control loop: dead time, PD controller with torque limit, joint
+flowchart TB
   Z["Target angle θ*"] --> T["Dead time (bus)"]
   T --> E["Error e = θ* − θ"]
   E --> PD["PD: K·e − D·θ̇, limited to ±T"]
@@ -707,7 +690,7 @@ A few rules from `docs/physics.md` (Section 6) that follow directly from the fou
 A simulation is **deterministic** if identical initial states and identical inputs produce **bit for
 bit** the same results. For Kern this is central: a training run should yield the same network on
 every device, a bug should be reproducible, and a replayed robot log should come out the same
-everywhere (`docs/lehrer.md`, Section 7).
+everywhere (header comment of `include/kern/core/dmath.h`).
 
 Physics simulations are **chaotic**: a difference in the last bit grows exponentially. "In a robot
 simulation, one bit becomes a different gait within seconds." Almost the same is therefore not good
@@ -723,8 +706,8 @@ $$(0.1 + 0.2) + 0.3 = 0.6000000000000001,\qquad 0.1 + (0.2 + 0.3) = 0.6\quad(\te
 
 This gives rise to the dangers:
 
-- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorize. Kern
-  forbids these options.
+- **Reordering by the compiler.** With `-ffast-math` it may reorder sums in order to vectorize. Kern's
+  build scripts do not set these options.
 - **Parallel sums.** If a sum is split across threads, the order depends on the number of threads.
   Kern sums in fixed chunks in a fixed order ([Appendix A](A-neural-networks.md), A.11.10).
 
@@ -770,8 +753,9 @@ Determinism has to be measured. `determinism_fingerprint` (`env.h`) has Pollen's
 control the clean duck for 400 control ticks and hashes the exact bits of the state at every tick
 (torso pose and velocity, all joint angles and joint velocities). Two builds are bit-identical exactly
 when the lists are equal; the first differing index tells when they diverge. The reference is in
-`tests/determinism_fingerprint.txt`; according to `docs/lehrer.md`, CI checks it with GCC on x86,
-with WebAssembly in Node and with Apple clang on ARM.
+`tests/determinism_fingerprint.txt`; CI checks it with GCC on x86 (`kern/tests/run.sh`), with
+WebAssembly in Node (`lehrer_wasm_test.mjs`) and with Apple clang on ARM (job `determinism`,
+`.github/workflows/ci.yml`).
 
 A second test, on scaling, shows how fine-grained this is: a freely hanging servo leg at 1× and 4×
 size runs **bit for bit the same**, because the scaling factors are powers of two and floating point

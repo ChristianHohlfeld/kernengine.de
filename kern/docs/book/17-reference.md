@@ -536,8 +536,8 @@ obs [1, n] → Sub(obs_mean) → Div(obs_div) → (Gemm, Elu(alpha 1))* → Gemm
 
 - Input `obs`, output `actions`, `float32`. The Gemm weights are stored as `[out][in]` with
   `transB = 1`.
-- The normalizer is part of the graph: `(obs − mean) / div` (according to `docs/lehrer.md`,
-  `div` = σ + 0.01).
+- The normalizer is part of the graph: `(obs − mean) / div` (`div` = σ + 0.01,
+  `Normalizer::divisor` in `src/lehrer/nn.cpp`).
 - Motion networks have 61 observations and 14 actions (Pollen's `velstand`: 61 → 512 → 256 → 128 →
   14). The play network `play.onnx` has 23 → 9 (25 Hz).
 

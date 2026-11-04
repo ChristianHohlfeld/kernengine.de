@@ -32,7 +32,8 @@ stands at a particular place in the world, is seen by a camera and finally ends 
 pixels. Each of these steps is a change of coordinate system:
 
 ```mermaid
-flowchart LR
+%% Caption: The coordinate spaces from model space to the screen pixel
+flowchart TB
   M["Model space (local)"] -->|"model matrix M"| W["World space"]
   W -->|"view matrix V"| K["Camera space"]
   K -->|"projection matrix P"| C["Clip space (homogeneous)"]
@@ -147,6 +148,8 @@ The resolution follows from $\Delta w \approx \Delta d \cdot 2w^2/|P_{32}|$: it 
 quadratically with distance and depends almost only on $n$. That is why the near plane is so
 important: doubling it doubles the precision everywhere.
 
+![Equal steps in the depth value d correspond to unequal distances: dense near the near plane, wide apart in the distance](../abbildungen/tiefe-lineal.svg)
+
 Kern's GTAO needs the true distance back from the depth buffer and computes the formula in reverse,
 with exactly the matrix elements $P_{22}$ and $P_{32}$ as the uniform `uProj`:
 
@@ -181,15 +184,7 @@ $$v = \lambda_0 v_0 + \lambda_1 v_1 + \lambda_2 v_2.$$
 Because perspective is not linear, the GPU interpolates in a **perspective-correct** way (it
 interpolates $v/w$ and $1/w$ linearly and divides).
 
-```
-     v2
-     /\
-    /  \       ■ = pixel center inside the triangle → fragment
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+![Rasterization: pixels whose center lies inside the triangle become fragments](../abbildungen/rasterisierung.svg)
 
 ### B.2.2 The depth buffer
 
@@ -227,7 +222,8 @@ not, likewise without culling.
 ### B.3.1 The pipeline
 
 ```mermaid
-flowchart LR
+%% Caption: The GPU pipeline in WebGL2: vertex shader, rasterization, fragment shader, framebuffer
+flowchart TB
   VB["Vertex buffer (attributes)"] --> VS["Vertex shader (per vertex)"]
   U["Uniforms (per draw call)"] --> VS
   VS --> R["Rasterization + interpolation"]
@@ -434,13 +430,7 @@ depth of the nearest object – the **shadow map**. During normal rendering ever
 into the sun's space and compared: if its depth is greater than the stored one, something lies in
 front of it.
 
-```
-   Sun ═════╗  (orthographic projection)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          stored depth: roof
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    ground behind the roof: depth greater → shadow
-```
+![Shadow map: for each ray of the sun the first depth is stored; the ground behind lies deeper and is in shadow](../abbildungen/schattenkarte.svg)
 
 ### B.5.2 The problems and their solutions
 
@@ -511,16 +501,7 @@ screen range only at the end, bright regions remain differentiated instead of be
 The mapping from $[0, \infty)$ to $[0, 1]$ is called **tone mapping**. A good curve is almost linear
 in the mid-range, compresses the highlights softly and never saturates hard:
 
-```
- Output
-  1 |            ____________
-    |        _--
-    |      /
-    |    /
-    |  /
-  0 |/________________________ Input (linear)
-    0    1    2    3    4
-```
+![Kern's ACES curve (for grey, exposure 1) against hard clipping at 1](../abbildungen/tonemapping.svg)
 
 **In Kern** it is the ACES filmic curve in the three.js version (MIT, see Appendix D) (`acesFilmic` in `kGlslToneMap`):
 
@@ -649,15 +630,7 @@ $$\hat a(h, \gamma) = \tfrac14\left(\cos\gamma + 2h\sin\gamma - \cos(2h - \gamma
    and the visibility of the slice is $\lVert n_\text{proj}\rVert\left(\hat a(h_0,\gamma) + \hat a(h_1,\gamma)\right)$.
 4. Average over the slices.
 
-```
-             horizon h1
-   view ↓       ╲   │n   ╱  horizon h0
-                 ╲  │   ╱
-   ████████       ╲ │  ╱      ████
-   ████████████────●────────████████
-                  pixel
-   visible sky: arc between h0 and h1
-```
+![One slice in section: neighbouring surfaces hide the sky up to the horizons h₀ and h₁; the arc between them is visible](../abbildungen/umgebungsverdeckung.svg)
 
 ### B.8.3 In Kern
 
@@ -747,14 +720,7 @@ for all six planes.
 etc.) normalizes the planes, and `sphere_visible` tests a **bounding sphere**: it is certainly
 outside if its center lies further than its radius behind a plane.
 
-```
-       \         /
-        \  ●    /     ● visible
-   ○     \     /      ○ rejected: distance to left plane < -r
-          \   /
-           \ /
-          camera
-```
+![Bounding spheres against the frustum, from above: A lies more than r behind a plane and is rejected, B and C are drawn](../abbildungen/sichtpyramide.svg)
 
 The test is **conservative**: it never rejects anything visible but sometimes lets invisible things
 through (spheres near a corner of the frustum). The renderer applies it to every mesh that is not
@@ -769,13 +735,7 @@ hierarchy** (BVH) arranges them in a tree: each node has a bounding box that enc
 children. If a ray or a frustum misses a node, the entire subtree can be skipped – instead of $O(n)$
 tests one typically needs $O(\log n)$.
 
-```
-            [  all  ]
-           /        \
-     [ left ]     [ right ]
-      /    \        /    \
-   [△△]  [△△]   [△△]  [△△]   leaves: triangles
-```
+![A BVH: on the left in space as nested bounding boxes, on the right as a tree with triangles in the leaves](../abbildungen/bvh.svg)
 
 **In Kern** the BVH (`Bvh` in `bvh.h`) serves **picking**, not drawing: static world meshes with 36
 triangles or more (`kBvhMinTriangles`) get a tree over their triangles, built with median splits
@@ -816,6 +776,7 @@ texture, a different cull mode.
 From the header of `renderer.h`:
 
 ```mermaid
+%% Caption: The passes of a frame in Kern's renderer
 flowchart TD
   A["1. Sun shadow map (only when needed)"] --> B["2. Opaque meshes, front to back (MRT: color, HDR, AO share)"]
   B --> C["3. Sky at depth 1, uncovered pixels only"]
@@ -843,16 +804,12 @@ Kern compiles with wasi-sdk for `wasm32-wasip1` (`build.sh`). The boundary to th
 and clear:
 
 ```mermaid
-flowchart LR
-  subgraph WASM["WebAssembly module (C++)"]
-    R["Renderer, scene, physics, game"] --> GLH["kern::gl:: (gl.h): imports from module 'kern_gl'"]
-  end
-  subgraph JS["kern.mjs (platform layer)"]
-    T["Handle tables u32 ↔ WebGL object"] --> WG["WebGL2RenderingContext"]
-    MEM["Views onto the linear memory"]
-  end
-  GLH -->|"u32 handles, pointer + length"| T
-  GLH --> MEM
+%% Caption: The boundary between the WebAssembly module and WebGL2: imports from gl.h, handle tables in kern.mjs
+flowchart TB
+  R["WebAssembly module (C++):<br/>renderer, scene, physics, game"] --> GLH["kern::gl:: (gl.h):<br/>imports from module 'kern_gl'"]
+  GLH -->|"u32 handles, pointer + length"| T["kern.mjs (platform layer):<br/>handle tables u32 ↔ WebGL object"]
+  GLH --> MEM["kern.mjs (platform layer):<br/>views onto the linear memory"]
+  T --> WG["WebGL2RenderingContext"]
 ```
 
 - **`gl.h`** declares exactly the WebGL2 functions the engine uses, with `import_module("kern_gl")`.

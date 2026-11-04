@@ -18,16 +18,16 @@
   <text x="164" y="95" class="m">{{backend}}</text>
   <text x="164" y="105" class="k m">{{backend2}}</text>
   </g>
-  <rect class="f" x="228" y="84" width="104" height="26" rx="3"/>
-  <text x="280" y="100" class="m">{{collector}}</text>
-  <rect class="f" x="338" y="84" width="40" height="26" rx="3"/>
+  <rect class="f" x="222" y="84" width="104" height="26" rx="3"/>
+  <text x="274" y="100" class="m">{{collector}}</text>
+  <rect class="f" x="340" y="84" width="38" height="26" rx="3"/>
   <text x="358" y="100" class="m">{{rollout}}</text>
   <path class="l p" data-nur="blau" d="M90,97 L117,97"/>
-  <path class="l p" data-nur="blau" d="M210,97 L227,97"/>
-  <path class="l p" data-nur="gruen gelb" d="M90,97 L227,97"/>
+  <path class="l p" data-nur="blau" d="M210,97 L221,97"/>
+  <path class="l p" data-nur="gruen gelb" d="M90,97 L221,97"/>
   <text x="104" y="92" class="k m a" data-nur="blau">{{policy}}</text>
-  <text x="160" y="92" class="k m a" data-nur="gruen gelb">{{policy}}</text>
-  <path class="l p" d="M332,97 L337,97"/>
+  <text x="156" y="92" class="k m a" data-nur="gruen gelb">{{policy}}</text>
+  <path class="l p" d="M326,97 L339,97"/>
   <path class="l p ps" d="M284,83 L284,43"/>
   <text x="278" y="66" class="k e">{{step}}</text>
   <path class="l p" d="M359,110 L359,128 L48,128 L48,111"/>

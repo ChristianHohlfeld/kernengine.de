@@ -36,7 +36,8 @@ Koordinatensystem.
 > viermal anders beschrieben.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Vier Beschreibungen desselben Punkts: Modell, Welt, Kamera, Bildschirm
+flowchart TB
   M["Modell: eigene Einteilung"] --> W["Welt: Stadtplan"]
   W --> K["Kamera: dein Blick"]
   K --> S["Bildschirm: Pixel und Tiefe"]
@@ -86,10 +87,13 @@ richtige Größe bringen, dann drehen, zuletzt an seinen Platz schieben.
 > umgekehrt. Probier es mit einem Radiergummi auf dem Tisch.
 
 Drehungen speichert Kern als **Quaternionen**: vier Zahlen, die „um diese Achse, um so viel“
-beschreiben – wie ein Spieß durch einen Apfel, um den du ihn drehst. Der Vorteil: Man kann Drehungen
-sauber hintereinanderschalten, und keine Drehrichtung geht verloren. Bei drei Winkeln nacheinander
-kann das passieren: Kippt ein Flugzeug erst steil nach oben, bedeuten „nach links drehen“ und „zur
-Seite rollen“ plötzlich dasselbe, und eine Richtung fehlt.
+beschreiben – wie ein Spieß durch einen Apfel, um den du ihn drehst. Mit diesen vier Zahlen lassen
+sich Drehungen sauber hintereinanderschalten.
+
+> **Für Profis:** Warum nicht einfach drei Winkel? Bei drei Winkeln nacheinander kann eine
+> Drehrichtung verloren gehen: Kippt ein Flugzeug erst steil nach oben, bedeuten „nach links drehen“
+> und „zur Seite rollen“ plötzlich dasselbe. Das heißt „Gimbal Lock“; Quaternionen kennen das Problem
+> nicht.
 
 ### Ansicht und Perspektive
 
@@ -104,24 +108,18 @@ malt lieber nichts.
 vierte Zahl w, und die Grafikkarte teilt danach alles durch w.
 
 Davor vergrößert die Matrix mit einem **Zoomfaktor**. Je enger der Blickwinkel der Kamera, desto
-stärker der Zoom, wie beim Fernglas. Bei Kerns Standardkamera mit 60° ist er 1,732, bei 70° (so
-starten Studios Editor-Viewports) ist er 1,43. Weil das Bild breiter als hoch ist, wird waagerecht
-noch durch das Seitenverhältnis geteilt: 960 ÷ 540 = 1,778.
+stärker der Zoom, wie beim Fernglas.
 
-**Durchgerechnet:** Bild 960 × 540 Pixel, Kamera 60°, ein Punkt 1 m rechts, 0,5 m hoch, 10 m vor der
-Kamera.
+**Beispiel fürs Teilen:** Ein Punkt 1 m rechts der Blickrichtung. Steht er 10 m vor der Kamera, ist
+w = 10, und nach dem Teilen bleibt 1 ÷ 10 = 0,1. Steht er 20 m weit weg, bleibt 1 ÷ 20 = 0,05 – halb
+so weit von der Bildmitte entfernt. Doppelt so weit weg, halb so groß.
 
-| Schritt | x (rechts) | y (hoch) |
-|---|---|---|
-| vergrößern | 1,732 ÷ 1,778 · 1 = 0,974 | 1,732 · 0,5 = 0,866 |
-| durch w = 10 | 0,0974 | 0,0866 |
-| in Pixel | 1,0974 ÷ 2 · 960 = 526,8 | 1,0866 ÷ 2 · 540 = 293,4 |
-
-Die letzte Zeile braucht eine Erklärung: Nach dem Teilen liegt der sichtbare Bereich zwischen −1
-(linker Rand) und +1 (rechter Rand). Plus 1 macht daraus 0 bis 2, durch 2 macht daraus 0 bis 1, und
-mal 960 ergibt die Pixelspalte. Hier zählen die Pixel von **unten links**, so wie im
-Koordinatensystem im Matheheft. Unser Punkt landet knapp rechts oberhalb der Bildmitte (480; 270) –
-passt.
+> **Für Profis:** Die ganze Rechnung bis zum Pixel. Bild 960 × 540, Kamera 60° (Zoomfaktor 1,732),
+> Punkt 1 m rechts, 0,5 m hoch, 10 m vor der Kamera. Waagerecht wird zusätzlich durch das
+> Seitenverhältnis 960 ÷ 540 = 1,778 geteilt. Vergrößern: x = 1,732 ÷ 1,778 = 0,974, y = 1,732 · 0,5
+> = 0,866. Durch w = 10: 0,0974 und 0,0866. Der sichtbare Bereich geht jetzt von −1 bis +1; plus 1,
+> durch 2, mal Bildgröße ergibt Pixel: 1,0974 ÷ 2 · 960 ≈ 527 und 1,0866 ÷ 2 · 540 ≈ 293, gezählt von
+> unten links – knapp rechts oberhalb der Bildmitte (480; 270).
 
 Ansichten von oben, vorn oder der Seite sind **orthografisch**: Sie teilen nicht, alles bleibt gleich
 groß, egal wie weit weg.
@@ -187,15 +185,7 @@ aus ([Kapitel 4](04-grafik.md)).
 Die **Rasterisierung** prüft, welche Pixelmittelpunkte in einem Dreieck liegen. Jedes davon wird ein
 **Fragment** – ein Pixel-Kandidat, für den gleich die Farbe ausgerechnet wird.
 
-```
-     v2
-     /\
-    / ■\       ■ = Pixelmitte im Dreieck
-   / ■■ \
-  / ■■■■ \
- /________\
-v0        v1
-```
+![Pixel, deren Mitte im Dreieck liegt, werden zu Fragmenten](../abbildungen/rasterisierung.svg)
 
 Die Werte der drei Ecken (Farbe, Normale, Texturstelle) werden für jedes Fragment gemischt, mit drei
 Anteilen, die zusammen 1 ergeben. Genau in der Mitte bekommt jede Ecke ein Drittel: Ecken rot, rot,
@@ -223,8 +213,9 @@ Gemalt wird nur, was näher oder gleich nah ist; dann wird die neue Tiefe notier
 Bei deckenden Dingen ist die Reihenfolge damit egal. Durchsichtiges dagegen prüft den Notizblock nur
 und schreibt nichts hinein: Eine Glasscheibe darf nichts aussperren, was hinter ihr liegt und erst
 danach gemalt wird. Kern nutzt das alles geschickt: Deckendes von vorn nach hinten, Durchsichtiges
-von hinten nach vorn, der Himmel in die Lücken, die Ego-Ebene nach dem Löschen
-([Kapitel 4](04-grafik.md)).
+von hinten nach vorn, der Himmel in die Lücken. Ganz zum Schluss löscht Kern den Notizblock und malt
+die **Ego-Ebene**, etwa die Waffe in der Hand bei Ego-Sicht – so kann sie nie in einer Wand
+verschwinden ([Kapitel 4](04-grafik.md)).
 
 ### Tiefe ist ungleich verteilt
 
@@ -250,19 +241,16 @@ Einstellungen ist die kleinste Stufe:
 > **So kannst du es dir vorstellen:** Ein Lineal, dessen Striche nach hinten immer weiter
 > auseinanderliegen. Vorn misst du auf den Millimeter, hinten nur noch auf den Meter.
 
+![Gleich große Stufen im Tiefenpuffer: nah an der Kamera dicht und fein, in der Ferne weit und grob](../abbildungen/tiefe-lineal.svg)
+
 Am meisten hängt die Genauigkeit an der **nahen Grenze**. Die Kamera malt nichts, was näher als
-5 cm ist; das ist der Nullpunkt des Lineals. Genauer gesagt speichert der Tiefenpuffer etwa
-1 − nahe Grenze ÷ Entfernung. Die nahe Grenze steht also im Zähler. Rechne mit 5 cm nach:
+5 cm ist; das ist der Nullpunkt des Lineals. Die Regel ist einfach: **Doppelte nahe Grenze heißt
+doppelte Genauigkeit überall** – vorn wie hinten. Darum wählt man sie so groß, wie es geht. Zu groß
+darf sie aber nicht sein, sonst wird abgeschnitten, was dicht vor der Kamera ist.
 
-| nahe Grenze | 10 m und 11 m: Unterschied |
-|---|---|
-| 0,05 m | 0,05 ÷ 10 − 0,05 ÷ 11 ≈ 0,00045 |
-| 0,10 m | 0,10 ÷ 10 − 0,10 ÷ 11 ≈ 0,00091 |
-
-Doppelte nahe Grenze, doppelter Unterschied: Zwischen 10 m und 11 m passen jetzt doppelt so viele
-Stufen, und das gilt für jede Entfernung. Diese Grenze zu verdoppeln, verdoppelt also die
-Genauigkeit überall. Darum wählt man sie so groß, wie es geht. Zu groß darf sie aber nicht sein,
-sonst wird abgeschnitten, was dicht vor der Kamera ist.
+> **Für Profis:** Genauer gesagt speichert der Tiefenpuffer etwa 1 − nahe Grenze ÷ Entfernung; die
+> nahe Grenze steht im Zähler. Zwischen 10 m und 11 m ergibt das mit 5 cm einen Unterschied von
+> 0,05 ÷ 10 − 0,05 ÷ 11 ≈ 0,00045, mit 10 cm ≈ 0,00091 – doppelt so viel.
 
 ### Rückseiten
 
@@ -271,15 +259,7 @@ andere. Die Grafikkarte wirft sie weg, ohne sie zu malen. Woran erkennt sie die?
 Jedes Dreieck hat seine Ecken in fester Reihenfolge 1, 2, 3. Von vorn gesehen laufen sie gegen den
 Uhrzeigersinn, von hinten mit dem Uhrzeigersinn.
 
-```
- von vorn:          von hinten:
-      3                  3
-     / \                / \
-    /   \              /   \
-   1-----2            2-----1
- gegen den          mit dem
- Uhrzeigersinn      Uhrzeigersinn
-```
+![Dieselben Ecken 1, 2, 3: von vorn gegen den Uhrzeigersinn, von hinten mit dem Uhrzeigersinn](../abbildungen/umlaufsinn.svg)
 
 Probier es: Zeichne ein Dreieck auf Papier, nummeriere die Ecken gegen den Uhrzeigersinn und halte
 das Blatt von hinten gegen das Licht. Jetzt laufen die Zahlen andersherum. Ein Spiegelbild dreht den
@@ -296,7 +276,8 @@ Zwei Sorten gibt es:
 - Der **Fragment-Shader** läuft für jedes Fragment und rechnet seine Farbe aus.
 
 ```mermaid
-flowchart LR
+%% Bildunterschrift: Das Fließband der Grafikkarte: von den Ecken zum fertigen Bild
+flowchart TB
   A["Ecken + Einstellungen"] --> VS["Vertex-Shader"]
   VS --> R["Rasterisierung"]
   R --> FS["Fragment-Shader"]
@@ -309,13 +290,12 @@ Die Grafikkarte arbeitet wie ein **Fließband** (englisch *Pipeline*): Jede Stat
 Schritt und reicht weiter. „Mischen“ am Ende heißt: Durchsichtige Farben werden mit dem gemischt, was
 schon dahinter gemalt ist.
 
-Shader bekommen ihre Zutaten auf drei Wegen:
+Shader bekommen ihre Zutaten auf drei Wegen: manche für jede Ecke einzeln (etwa ihre Position),
+manche für alle gleich (etwa die Richtung der Sonne) und Bilder zum Nachschlagen (etwa die
+Schattenkarte).
 
-| Zutat | gilt für | Beispiel |
-|---|---|---|
-| Attribut | jede Ecke einzeln | Position, Normale |
-| Uniform | alle gleich | die Richtung der Sonne |
-| Textur | Bild zum Nachschlagen | Schattenkarte |
+> **Für Profis:** Die drei Wege heißen **Attribut** (je Ecke), **Uniform** (für alle gleich) und
+> **Textur** (Bild zum Nachschlagen).
 
 **Instanzen:** Hundert gleiche Bäume sind **ein** Malbefehl. Jeder Baum bekommt nur seine eigene
 Matrix mit – sie gilt dann nicht pro Ecke, sondern pro Baum.
@@ -326,7 +306,8 @@ Zeugnisnote. Würde Knochen A sie auf Höhe 1 bringen und B auf Höhe 2, mit Gew
 die bewegten Arme genauso, und der Schatten bewegt sich mit.
 
 **Mehrere Ausgaben:** Ein Fragment-Shader kann in mehrere Bilder gleichzeitig schreiben. Kern
-schreibt drei und spart sich so zwei weitere Malgänge.
+schreibt drei: die fertige Farbe, das helle Licht fürs Glühen (B.7) und das indirekte Licht für die
+Umgebungsverdeckung (B.8). So muss es die Szene für diese beiden Effekte nicht noch einmal malen.
 
 > **Für Profis:** Werte, die der Vertex-Shader ausrechnet und die dann zwischen den Ecken gemischt
 > beim Fragment-Shader ankommen, heißen **Varyings** – etwa die Lage jedes Pixels in der Welt.
@@ -389,15 +370,17 @@ Lichts.
 
 In der Physik wird das Licht so zwar immer schwächer, aber nie ganz 0. Kern nimmt stattdessen eine
 Kurve, die bei der **Reichweite** der Lampe genau 0 erreicht, und zwar sanft. So hat jede Lampe eine
-klare Grenze, und ihr Licht hört weich auf statt mit einer harten Kante. Mit q = Abstand² ÷
-Reichweite² ist der Faktor (1 − q)² ÷ (1 + q):
+klare Grenze, und ihr Licht hört weich auf statt mit einer harten Kante:
 
-| Abstand bei Reichweite 10 m | q | Faktor |
-|---|---|---|
-| 0 m | 0 | 1² ÷ 1 = 1 |
-| 2 m | 0,04 | 0,96² ÷ 1,04 ≈ 0,89 |
-| 5 m | 0,25 | 0,75² ÷ 1,25 = 0,45 |
-| 10 m | 1 | 0 |
+| Abstand bei Reichweite 10 m | Anteil des Lichts |
+|---|---|
+| 0 m | 100 % |
+| 2 m | etwa 89 % |
+| 5 m | etwa 45 % |
+| 10 m | 0 % |
+
+> **Für Profis:** Mit q = Abstand² ÷ Reichweite² ist der Anteil (1 − q)² ÷ (1 + q). Bei 5 m:
+> q = 25 ÷ 100 = 0,25, also 0,75² ÷ 1,25 = 0,45.
 
 Und ganz nah? Die Regel aus der Physik teilt durch den Abstand mal Abstand. Bei einem Abstand von
 fast 0 gäbe das riesige Zahlen: Eine Lampe direkt an einer Wand würde unendlich hell. Kerns Kurve
@@ -464,16 +447,10 @@ weit weg das Nächste ist** – das ist die **Schattenkarte**. Beim Malen fragt 
 weiter weg von der Sonne als das, was sie an dieser Stelle gesehen hat? Dann liegt etwas davor, und
 ich bin im Schatten.
 
-```
-   Sonne ═══╗  (parallele Strahlen)
-            ║  ↓   ↓   ↓   ↓
-            ║     ███          gespeichert: Dach
-            ║  ↓  ███  ↓   ↓
-            ║  ── ─── ─────    Boden dahinter → Schatten
-```
+![Die Schattenkarte speichert je Sonnenstrahl die erste Fläche; der Boden dahinter ist weiter weg und liegt im Schatten](../abbildungen/schattenkarte.svg)
 
 Die Sonnenstrahlen sind parallel, also nimmt man eine orthografische Ansicht. Deckt eine Karte mit
-512 Kästchen 240 m ab, ist ein Kästchen 240 ÷ 512 ≈ 47 cm groß – Schatten wie aus Minecraft-Blöcken.
+512 Kästchen 240 m ab, ist ein Kästchen 240 ÷ 512 ≈ 47 cm groß – Schatten aus groben Klötzchen.
 
 ### Probleme und Gegenmittel
 
@@ -489,14 +466,7 @@ Die Sonnenstrahlen sind parallel, also nimmt man eine orthografische Ansicht. De
 Treppenstufe. Liegt die echte Fläche schräg, ist sie mal über, mal unter der Stufe. Die Punkte
 darunter halten sich für verdeckt – von sich selbst! Es entstehen Streifen.
 
-```
-  ‾‾‾‾‾|                ‾‾‾‾ = gespeicherte Stufe
-   \   |                 \   = echte, schräge Fläche
-     \ ‾‾‾‾‾|
-       \    |           unter der Stufe hält sich
-         \  ‾‾‾‾‾|      die Fläche für verdeckt:
-           \     |      Streifen!
-```
+![Schattenakne: Jedes Kästchen speichert eine Stufe; wo die schräge Fläche darunter liegt, hält sie sich für verdeckt](../abbildungen/schattenakne.svg)
 
 Das Gegenmittel: beim Vergleichen ein kleines Stück **Abstand** dazugeben, also lieber knapp vor der
 Fläche nachschauen. Nimmt man aber zu viel Abstand, beginnt der Schatten erst ein Stück neben dem
@@ -524,14 +494,7 @@ ganz am Ende alles auf 0 bis 1. Das heißt **Tonemapping**. Eine gute Kurve ist 
 gerade und drückt nur das sehr Helle sanft zusammen. So sieht man in einer hellen Wolke noch Formen,
 statt dass sie einfach weiß wird.
 
-```
- Ausgabe
-  1 |            ____________
-    |        _--
-    |    /
-  0 |/________________________ Eingabe
-    0    1    2    3    4
-```
+![Kerns Kurve drückt das sehr Helle sanft zusammen, statt bei 1 hart abzuschneiden](../abbildungen/tonemapping.svg)
 
 Kern nimmt dafür eine Kurve aus der Filmindustrie (sie heißt ACES), davor die **Belichtung** wie bei
 einer Kamera, danach eine Farbstimmung.
@@ -546,6 +509,7 @@ dunkle Töne mehr davon bekommen, denn das Auge unterscheidet dort feiner.
 
 Licht addiert sich aber **linear**: doppelt so viel Licht heißt doppelt so große Zahl, zwei Lampen
 zusammen sind die Summe. Darum: Farben erst linear machen, dann rechnen, am Ende zurück nach sRGB.
+Diese Umrechnung zwischen „so viel Licht“ und „so wie das Auge es sieht“ nennt man **Gamma**.
 
 Ein Beispiel zeigt, wie groß der Unterschied ist: Lineares Mittelgrau 0,18 – also 18 % des Lichts –
 wird in sRGB zu **0,46**, fast der halben Skala. Die dunkelsten 18 % des Lichts bekommen also fast
@@ -618,17 +582,7 @@ anderen. Freier Boden sieht alles, **100 %**. Steht auf einer Seite eine Mauer, 
 unter 45° siehst, fehlen 45° von 180°: **75 %**. In einer Rinne mit solchen Mauern auf beiden Seiten
 fehlen zweimal 45°: **50 %**.
 
-```
- #                           #
- # \                       / #
- #   \     sichtbar      /   #
- #     \     90°       /     #
- #       \           /       #
- # 45°     \       /     45° #
- #           \   /           #
- #_____________●_____________#
-                         # = Mauer
-```
+![Ein Punkt in einer Rinne (n = seine Normale): Beide Mauern verdecken je 45°, sichtbar bleiben 90° Himmel](../abbildungen/umgebungsverdeckung.svg)
 
 Strahlen durch die ganze Szene zu schießen, wäre zu teuer. Darum schaut man nur in den
 **Tiefenpuffer**: Für jedes Pixel guckt man in ein paar Richtungen, wie hoch die Nachbarn ringsum
@@ -674,13 +628,7 @@ Pyramidenstumpf (*Frustum*) aus sechs Wänden: links, rechts, oben, unten, nah u
 bekommt eine **Hüllkugel**, die es ganz umschließt. Liegt der Mittelpunkt der Kugel mehr als ihren
 Radius **hinter** einer dieser Wände, ist das Objekt sicher unsichtbar.
 
-```
-       \         /
-        \  ●    /     ● sichtbar
-   ○     \     /      ○ weg: mehr als r hinter der Wand
-          \   /
-          Kamera
-```
+![Hüllkugeln an der Sichtpyramide, von oben gesehen: A liegt mehr als ihren Radius r hinter einer Wand und fällt weg, B und C werden gezeichnet](../abbildungen/sichtpyramide.svg)
 
 Kugel mit 2 m Radius, Mittelpunkt 3 m hinter der Wand: weg. Nur 1,5 m dahinter: Sie ragt noch ins
 Bild. Der Test wirft **nie** Sichtbares weg, lässt an den Ecken der Pyramide aber manchmal
@@ -697,13 +645,7 @@ Welches Dreieck trifft er zuerst? Alle Dreiecke einzeln zu prüfen, dauert bei M
 Darum sortiert man sie in einen Baum aus Kisten in Kisten, eine **BVH** (*Bounding Volume
 Hierarchy*, „Hüllkörper-Baum“). Verfehlt der Strahl eine Kiste, fällt alles darin auf einmal weg.
 
-```
-          [ alle ]
-         /        \
-    [links]      [rechts]
-    /    \        /    \
- [△△]  [△△]   [△△]  [△△]
-```
+![Kisten in Kisten: links im Raum, rechts als Baum mit Dreiecken in den Blättern](../abbildungen/bvh.svg)
 
 > **So kannst du es dir vorstellen:** „Wer bin ich?“ mit Ja-Nein-Fragen. Jede Frage halbiert die
 > Möglichkeiten. Mit 20 Fragen findest du eine Person unter einer Million.
@@ -714,7 +656,7 @@ Physik hat ihre eigene ([Anhang C](C-grundlagen-physik.md)). Bewegte Dinge prüf
 Dreieck. Ein Baum aus Kisten lohnt sich nur, wenn man ihn einmal baut und oft benutzt – bei etwas,
 das sich ständig bewegt, müsste man ihn immer wieder neu bauen.
 
-> **Mission:** Leg mit **Datei › Neues Level...** (File › New Level...) › **Grundformen** (Basic) ein
+> **Mission:** Leg mit **Datei › Neues Level...** (File › New Level...) › **Basis** (Basic) ein
 > Level an und setz über **Hinzufügen** (Add) › **Formen** (Shapes) ein paar Formen, etwa **Würfel**
 > (Cube), **Kugel** (Sphere) und **Zylinder** (Cylinder). Schalte dann im Viewport über **Anzeigen**
 > (Show) die **Begrenzungen** (Bounds) ein. (Hüllen gibt es als Kugel oder als Kiste; Studio zeigt dir die
@@ -741,6 +683,7 @@ Einstellungen und Texturen nur bei Änderung, Schatten nur wenn nötig und Unsic
 aussortieren. So läuft ein Bild ab (Details in [Kapitel 4](04-grafik.md)):
 
 ```mermaid
+%% Bildunterschrift: Die Reihenfolge, in der Kern ein Bild malt
 flowchart TD
   A["1 Schattenkarte, nur wenn nötig"]
   A --> B["2 Deckendes, vorn nach hinten"]
@@ -769,7 +712,7 @@ Warum hat Kern das so gebaut?
 | alles in C++? | derselbe Code im Browser, in Tests und im Lehrer gleich rechnet – der Lehrer übt genau deine Welt. |
 | so wenig JavaScript? | man alles dort doppelt pflegen müsste. |
 | Nummern statt Grafikobjekten? | WebAssembly nur Zahlen festhalten kann. |
-| eigene Kopien von allem? | der Browser die Grafikkarte jederzeit wegnehmen kann. |
+| eigene Kopien von allem? | der Browser die Grafikkarte jederzeit wegnehmen kann (Kontextverlust, [Kapitel 4](04-grafik.md)). |
 | so wenige Malbefehle? | jeder über die Grenze zu JavaScript muss. |
 | geht es ohne Grafik? | die Kopien reichen – so rechnet der Lehrer dieselbe Welt, ohne zu malen. |
 
@@ -815,8 +758,7 @@ zeigen [Kapitel 4](04-grafik.md) und [Kapitel 5](05-szene-und-geometrie.md).
 3. 0,1 − 0,0909 ≈ 0,0091 und 0,01 − 0,0099 ≈ 0,0001: In 100 m Entfernung macht ein Meter fast
    hundertmal weniger Unterschied als in 10 m. Weit weg teilen sich also viel mehr Meter eine Stufe
    des Tiefenpuffers – zehnmal so weit, hundertmal gröber. Am meisten hilft es, die nahe Grenze
-   weiter weg zu legen: Sie steht im Zähler, also macht doppelte nahe Grenze jeden Unterschied
-   doppelt so groß.
+   weiter weg zu legen: Doppelte nahe Grenze heißt doppelte Genauigkeit überall.
 4. Die Mauern verdecken zweimal 45° von 180°, der Punkt sieht nur den halben Himmel: Sichtbarkeit
    0,5. Abgedunkelt wird nur das indirekte Licht: 1,0 × 0,5 = 0,5. Die Sonne bleibt bei 2,0.
    Zusammen **2,5** statt 3,0. Das Sonnenlicht abzudunkeln wäre falsch, weil die Sonne den Punkt ja

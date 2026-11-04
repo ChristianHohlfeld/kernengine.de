@@ -27,6 +27,7 @@ ap.add_argument("--src", default=None, help="the book's folder in kern/docs (def
 ap.add_argument("--edition", default=None, help="the line under 'Kern' on the title page (default: Das Buch / The Book)")
 ap.add_argument("--subtitle", default=None, help="the subtitle on the title page")
 ap.add_argument("--boxes", action="store_true", help="block quotes as grey boxes with a bar (the green edition's 'Probier's aus!' and friends)")
+ap.add_argument("--isbn", default=None, help="the ISBN for the imprint's {{ISBN}} (KDP assigns one per edition)")
 ap.add_argument("--code-size", default="footnotesize", help="LaTeX size of code blocks (small keeps code at 7 pt or more)")
 a = ap.parse_args()
 
@@ -47,7 +48,7 @@ MERMAID_CFG = ('{"theme":"base","themeVariables":{"fontFamily":"DejaVu Sans","fo
                '"lineColor":"#262626","secondaryColor":"#d9e5f2","secondaryBorderColor":"#1d5c99",'
                '"tertiaryColor":"#ffffff","clusterBkg":"#f7f7f7","clusterBorder":"#8c8c8c",'
                '"edgeLabelBackground":"#ffffff","noteBkgColor":"#d9e5f2","noteBorderColor":"#1d5c99"},'
-               '"flowchart":{"curve":"linear"}}')  # the style of kern/docs/abbildungen (STIL.md)
+               '"flowchart":{"curve":"linear","rankSpacing":24,"nodeSpacing":24}}')  # the style of kern/docs/abbildungen (STIL.md)
 
 
 def mermaid(code):
@@ -71,12 +72,25 @@ def mermaid(code):
     with pdfplumber.open(pdf) as d: sizes = [c["size"] for c in d.pages[0].chars]
     printed = min(sizes) * width / (pw / 72 * 25.4) if sizes else 99
     if printed < 7: print(f"MERMAID TOO SMALL: diagram {mermaid_n} prints at {printed:.1f} pt (< 7 pt): {code.splitlines()[0]} / {code.splitlines()[1] if len(code.splitlines()) > 1 else ''}", file=sys.stderr)
-    return f"![]({pdf}){{width={width:.1f}mm}}"
+    cap = re.search(r"^\s*%%\s*(?:Bildunterschrift|Caption)\s*:\s*(.+)$", code, flags=re.M | re.I)
+    return placed(pdf, cap.group(1).strip() if cap else "", width, what=f"diagram {mermaid_n}: {code.splitlines()[0]}")
 
 
 edition_name = "gelb" if "gelb" in src.name or "yellow" in src.name else "gruen" if "gruen" in src.name or "green" in src.name else "blau"
 lang_code = "en" if a.en or src.name.startswith("book") else "de"
 figures_built = False
+
+
+def placed(path, caption, width_mm=None, what=""):
+    """A picture, figure or diagram set centred with its caption underneath (small, sans serif),
+    both kept on one page: every picture in the books looks the same."""
+    cap = caption.replace("`", "").replace("*", "")
+    cap = re.sub(r"([&%$#_{}])", r"\\\1", cap).replace("~", r"\textasciitilde{}").replace("^", r"\textasciicircum{}")
+    if not cap.strip() and what: print(f"NO CAPTION: {what}", file=sys.stderr)
+    cap = r"\par\vspace{3pt}{\small\sffamily " + cap + "}" if cap.strip() else ""
+    size = f"[width={width_mm:.1f}mm]" if width_mm else ""
+    return ("`\\begin{center}\\begin{minipage}{\\linewidth}\\centering\\includegraphics" + size + "{" + pathlib.Path(path).as_posix() + "}"
+            + cap + "\\end{minipage}\\end{center}`{=latex}")
 
 
 def figure(m):
@@ -89,7 +103,7 @@ def figure(m):
         figures_built = True
     f = work / "abb" / f"{m.group(2)}.{edition_name}.{lang_code}.pdf"
     if not f.exists(): sys.exit(f"no figure {m.group(2)} for {edition_name}/{lang_code}")
-    return f"![{m.group(1)}]({f})"
+    return placed(f, m.group(1), what=f"figure {m.group(2)}")
 
 
 TEXT_W, TEXT_H = w - 39.0, h - 54.0  # mm: the text block (inner 22 + outer 17, top 20 + bottom 24 + head)
@@ -119,8 +133,13 @@ def print_copy(f):
 
 
 parts = []
+ALLOWED_URLS = ("https://kernengine.de", "https://github.com/ChristianHohlfeld/kernengine.de", "http://127.0.0.1", "http://localhost")
 for i, p in enumerate(files):
     t = p.read_text()
+    # The books name only the project's own addresses (and apache.org inside the licence's own text).
+    for u in re.findall(r"https?://[^\s)>`'\"]+", t):
+        if not u.startswith(ALLOWED_URLS) and not (p.name.startswith("D-") and "apache.org" in u):
+            print(f"FOREIGN URL in {p.name}: {u}", file=sys.stderr)
     t = re.sub(r"\n---\n\n© 20\d\d Christian Heinrich Hohlfeld[^\n]*\n?$", "\n", t)  # the per-chapter notice (the imprint has it)
     t = re.sub(r"```mermaid\n(.*?)```", lambda m: mermaid(m.group(1)), t, flags=re.S)
     # Code blocks without a language: plain text (set by the verbatim environment, wrapped).
@@ -133,7 +152,8 @@ for i, p in enumerate(files):
         if not f.exists():
             print("missing image", path, file=sys.stderr)
             return ""
-        return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
+        if f.name.startswith("autor"): return f"![{alt}]({print_copy(f)}){{width={print_width(f):.1f}mm}}"
+        return placed(print_copy(f), alt, print_width(f), what=f"picture {path}")
     t = re.sub(r"!\[([^\]]*)\]\(((?:\.\./buch/)?bilder/[^)\s]+)\)", img, t)
     t = re.sub(r"!\[([^\]]*)\]\(\.\./abbildungen/([\w-]+)\.svg\)", figure, t)
     # Links to other chapters (with or without an anchor) point into the book.
@@ -142,6 +162,11 @@ for i, p in enumerate(files):
         if target in ids: return f"[{text}](#{anchor[1:] if anchor else ids[target]})"
         return m.group(0)
     t = re.sub(r"\[([^\]]+)\]\(([0-9A-Z][^)#\s]*\.md)(#[^)\s]+)?\)", link, t)
+    if "{{ISBN}}" in t:
+        if a.isbn: t = t.replace("{{ISBN}}", a.isbn)
+        else:
+            print("NO ISBN: the imprint keeps a placeholder; pass --isbn", file=sys.stderr)
+            t = t.replace("{{ISBN}}", "[ISBN folgt]" if lang_code == "de" else "[ISBN to follow]")
     if p.name.startswith("00"):  # in print: the imprint alone (the title page and the table of contents are the book's)
         t = re.sub(r"\A.*?^## ", lambda m: "```{=latex}\n\\hypertarget{kap-00}{}\\thispagestyle{empty}\\begingroup\\footnotesize\\raggedright\n```\n\n## ", t, count=1, flags=re.S | re.M)
         t = re.sub(r"^## (.+)$", r"## \1 {.unnumbered}", t, flags=re.M)
@@ -184,12 +209,15 @@ header.write_text(r"""
 \usepackage{fvextra}
 \usepackage{xurl}
 \usepackage{adjustbox}
+\DeclareMathSizes{10}{10}{8.3}{8}\DeclareMathSizes{9}{9}{8}{7.7}\DeclareMathSizes{8}{8}{7.7}{7.7}  %% indices in formulas print at 7 pt or more (KDP)
+\newsavebox\kernfitbox  %% formulas: shrink to the line only when wider (adjustbox would obey pandoc's Gin defaults and shrink them to dust)
+\newcommand\kernfit[1]{\sbox\kernfitbox{#1}\ifdim\wd\kernfitbox>\linewidth\resizebox{\linewidth}{!}{\usebox\kernfitbox}\else\usebox\kernfitbox\fi}
 \makeatletter\renewcommand*\@pnumwidth{2.4em}\makeatother  %% three-digit page numbers in the contents
 \binoppenalty=100
 \relpenalty=100
 \tolerance=2000
 \hbadness=10000
-\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\%s}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,breaksymbolleft={\normalsize\ensuremath{\hookrightarrow}},fontsize=\%s}
 \usepackage[headsepline]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \automark[section]{chapter}
@@ -269,8 +297,7 @@ def short_chapter_ends():
             if not 0 < len(lines) <= 3: continue  # four more lines still keep KDP's bottom margin
             big = [c for c in nxt.chars if c["size"] > 14]  # a chapter heading opens the next page
             if not big and nxt.extract_words(): continue
-            first = sorted(lines.items())[0][1]
-            words = [w["text"] for w in sorted(first, key=lambda w: w["x0"])]
+            words = [w["text"] for _, ln in sorted(lines.items()) for w in sorted(ln, key=lambda w: w["x0"])]
             found.append((i + 1, words, len(lines)))
     return found
 
@@ -280,10 +307,15 @@ def pull_back(tex, words, n):
     takes the few lines too."""
     tokens = [t for w in words for t in re.findall(r"\w+", w)]
     while tokens and (tokens[0].isdigit() or len(tokens[0]) < 2): tokens.pop(0)  # list numbers
-    tokens = [t for t in tokens if not t.endswith("-")][:5]
-    if len(tokens) < 2 or sum(len(t) for t in tokens) < 10: return tex, False
-    pat = r"[\W_]+(?:\\[a-zA-Z]+\{|\{\})*".join(re.escape(t) for t in tokens)
-    m = re.search(pat, tex)
+    tokens = [t for t in tokens if not t.endswith("-")]
+    m = None
+    for k in (14, 10, 7, 5):  # the longest run that is found exactly once: the same sentence can stand
+        part = tokens[:k]       # in several places (“… in the blue book, Chapter 10.”); a wrong one
+        if len(part) < 2 or sum(len(t) for t in part) < 10: break  # would push a box into the footer
+        pat = r"[\W_]+(?:\\[a-zA-Z]+\{|\{\})*".join(re.escape(t) for t in part)
+        hits = list(re.finditer(pat, tex))
+        if len(hits) == 1: m = hits[0]; break
+        if len(hits) > 1: return tex, False
     if not m: return tex, False
     start = tex.rfind("\n\n", 0, m.start()) + 2
     return tex[:start] + f"\\enlargethispage{{{n + 1}\\baselineskip}}\n" + tex[start:], True

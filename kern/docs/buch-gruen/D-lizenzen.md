@@ -17,7 +17,7 @@ unübersetzt wiedergegeben. Die Liste mit Herkunft und Änderungen steht im Repo
 | three.js (ACES-Fit, Nebel, `standard_shader.cpp`) | three.js-Autoren | MIT |
 | Micro-Duck-3D-Modelle in Kern Studio (in diesem Buch nicht enthalten) | Pollen Robotics | CC BY-NC-SA 4.0 |
 
-Den Wortlaut der CC-Lizenz nennt das Repository von Kern (`kern/LICENSES.md`).
+Wo der Wortlaut der CC-Lizenz zu finden ist, nennt das Repository von Kern (`kern/LICENSES.md`).
 
 Das Buch selbst steht nicht unter diesen Lizenzen (siehe [Impressum](00-impressum.md)).
 

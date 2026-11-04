@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 222">
+  <!-- Ein PPO-Update in Kern (blau A.11.8): sammeln, kanonisch ordnen, Normalisierer, alte Policy neu bewerten, GAE, eine Permutation; dann 5 Epochen zu je 4 Minibatches mit KL-geregelter Lernrate, Gradienten in 8 festen Teilen und Adam. -->
+  <rect class="fa" x="2" y="10" width="170" height="28" rx="3"/>
+  <text x="87" y="21.95" class="k m">{{p1a}}</text>
+  <text x="87" y="31.45" class="k m">{{p1b}}</text>
+  <rect class="f" x="2" y="46" width="170" height="28" rx="3"/>
+  <text x="87" y="57.95" class="k m">{{p2a}}</text>
+  <text x="87" y="67.45" class="k m">{{p2b}}</text>
+  <path class="l p" d="M87,38 L87,45"/>
+  <rect class="f" x="2" y="82" width="170" height="28" rx="3"/>
+  <text x="87" y="98.7" class="k m">{{p3}}</text>
+  <path class="l p" d="M87,74 L87,81"/>
+  <rect class="f" x="2" y="118" width="170" height="28" rx="3"/>
+  <text x="87" y="129.95" class="k m">{{p4a}}</text>
+  <text x="87" y="139.45" class="k m">{{p4b}}</text>
+  <path class="l p" d="M87,110 L87,117"/>
+  <rect class="f" x="2" y="154" width="170" height="28" rx="3"/>
+  <text x="87" y="165.95" class="k m">{{p5a}}</text>
+  <text x="87" y="175.45" class="k m">{{p5b}}</text>
+  <path class="l p" d="M87,146 L87,153"/>
+  <rect class="f" x="2" y="190" width="170" height="28" rx="3"/>
+  <text x="87" y="206.7" class="k m">{{p6}}</text>
+  <path class="l p" d="M87,182 L87,189"/>
+  <path class="l p" d="M172,204 L180,204 L180,3 L242,3 L242,9"/>
+  <rect class="fw" x="196" y="10" width="92" height="28" rx="3"/>
+  <text x="242" y="21.95" class="k m">{{d1}}</text>
+  <text x="242" y="31.45" class="k m">{{d2}}</text>
+  <rect class="fa" x="316" y="10" width="62" height="28" rx="3"/>
+  <text x="347" y="26.7" class="k m">{{ende}}</text>
+  <path class="l p" d="M288,24 L315,24"/>
+  <text x="302" y="20" class="k m">{{nein}}</text>
+  <rect class="f" x="196" y="54" width="182" height="28" rx="3"/>
+  <text x="287" y="70.7" class="k m">{{m1}}</text>
+  <path class="l p" d="M242,38 L242,53"/>
+  <rect class="f" x="196" y="90" width="182" height="28" rx="3"/>
+  <text x="287" y="106.7" class="k m">{{m2}}</text>
+  <path class="l p" d="M242,82 L242,89"/>
+  <rect class="f" x="196" y="126" width="182" height="28" rx="3"/>
+  <text x="287" y="137.95" class="k m">{{m3a}}</text>
+  <text x="287" y="147.45" class="k m">{{m3b}}</text>
+  <path class="l p" d="M242,118 L242,125"/>
+  <rect class="f" x="196" y="162" width="182" height="28" rx="3"/>
+  <text x="287" y="178.7" class="k m">{{m4}}</text>
+  <path class="l p" d="M242,154 L242,161"/>
+  <text x="246" y="49" class="k">{{ja}}</text>
+  <path class="la pa" d="M196,176 L188,176 L188,30 L195,30"/>
+</svg>

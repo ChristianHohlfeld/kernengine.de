@@ -50,7 +50,8 @@ C = (dict(bg1="#7a5c00", bg2="#3d2e00", bg3="#1e1700", acc="#ffd84a", line="#ffc
      dict(bg1="#1b3358", bg2="#0d1830", bg3="#070d1a", acc="#9cc4ff", line="#3d8bff", light="#d5e2f5", blurb="#dbe5f4", rights="#8ea3c4", grid="#9cc4ff"))
 
 def data(name):
-    p = img_dir / name
+    p = img_dir / ("en" if a.en else "de") / name  # screenshots in the book's language (bilder/de, bilder/en)
+    if not p.exists(): p = img_dir / name
     if not p.exists(): p = img_dir / "studio.png"
     return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
 
