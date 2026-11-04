@@ -52,7 +52,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   lon_ = lon;
   lat_ = lat;
   city_.clear();
-  city_.start(engine_->renderer, world_->physics(), lon_, lat_);
+  city_.start(engine_->renderer, world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
   if (engine_->arg_number("offline", 0) > 0) city_.go_offline();
   for (TrafficCar& c : cars_) {
     if (c.placed) world_->set_alive(c.actor, false);

@@ -79,6 +79,14 @@ KERN_EXPORT(sc_tile_data) void sc_tile_data(kern::i32 z, kern::i32 x, kern::i32 
 KERN_EXPORT(sc_tile_failed) void sc_tile_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().fail(sc::TileKey{z, x, y}); }
 KERN_EXPORT(sc_offline) void sc_offline() { sc::game().city().go_offline(); }
 
+// ---- elevation tiles (Terrarium PNGs): the page decodes the image, the game the heights ----
+KERN_EXPORT(sc_dem_requests) const char* sc_dem_requests() { return result(sc::game().city().terrain().take_requests()); }
+/// RGBA pixels of a requested elevation tile (width x height x 4 bytes, copied).
+KERN_EXPORT(sc_dem_data) void sc_dem_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 width, kern::u32 height) {
+  sc::game().city().terrain().provide(sc::TileKey{z, x, y}, rgba, width, height);
+}
+KERN_EXPORT(sc_dem_failed) void sc_dem_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().terrain().fail(sc::TileKey{z, x, y}); }
+
 // ---- input the App host does not forward ----
 KERN_EXPORT(sc_gamepad) void sc_gamepad(kern::i32 connected, kern::f32 lx, kern::f32 ly, kern::f32 rx, kern::f32 ry, kern::f32 lt, kern::f32 rt, kern::u32 buttons,
                                         kern::i32 active) {

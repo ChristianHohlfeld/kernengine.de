@@ -32,8 +32,8 @@ constexpr Spec kTable[] = {
     {"Messer", 380, 1.6f, 45, 0, 0, 8},
     {"Handgranate", 4000, 40, 125, 8.5f, 0, 0},
     {"Drohnen-MG", 92, 650, 13, 0, 0, 0},
-    {"Drohnen-Raketen", 520, 300, 70, 5, 44, 0},
-    {"GUIDED", 5000, 600, 34, 4, 34, 0},
+    {"Drohnen-Raketen", 950, 220, 100, 8, 31, 0},  // direct_fire_missiles.mjs: 31 m/s, 220 m, 950 ms, 8 m / 100 (the live rocket)
+    {"GUIDED", 5000, 600, 34, 4, 34, 0},  // guided_balance.mjs: 34 m/s, 2.2 g, 4 m / 34, 5 s
     {"Bordkanone", 55, 1800, 30, 0, 0, 0},
     {"Luft-Rakete", 2400, 1300, 120, 8, 260, 0},
     {"Bombe", 450, 0, 170, 17, 0, 0},

@@ -89,6 +89,35 @@ function syntheticTile(z, x, y) {
   return zlib.gzipSync(Buffer.from([...layer("building", houses), ...layer("transportation", roads), ...layer("water", water), ...layer("park", park)]));
 }
 
+// ---- a synthetic Terrarium elevation tile (PNG, RGB = (h + 32768) * 256): rolling hills ----
+function crc32(buf) {
+  let c = ~0;
+  for (const b of buf) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  return ~c >>> 0;
+}
+function png(width, height, rgb) {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]), crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) { raw[y * (width * 3 + 1)] = 0; rgb.copy(raw, y * (width * 3 + 1) + 1, y * width * 3, (y + 1) * width * 3); }
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+function syntheticDem(z, x, y) {
+  const rgb = Buffer.alloc(256 * 256 * 3);
+  for (let j = 0; j < 256; j++)
+    for (let i = 0; i < 256; i++) {
+      const gx = x * 256 + i, gy = y * 256 + j;  // ~13 m per pixel at z13
+      const v = 400 + 18 * Math.sin(gx / 60) + 12 * Math.cos(gy / 45) + 32768;
+      const o = (j * 256 + i) * 3;
+      rgb[o] = Math.floor(v / 256); rgb[o + 1] = Math.floor(v) % 256; rgb[o + 2] = Math.floor((v % 1) * 256);
+    }
+  return png(256, 256, rgb);
+}
+
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
 
 async function run({name, url, context, mapped}) {
@@ -100,6 +129,10 @@ async function run({name, url, context, mapped}) {
   let tileRequests = 0;
   if (mapped) {
     await page.route("https://tiles.test/planet", r => r.fulfill({contentType: "application/json", body: JSON.stringify({tiles: ["https://tiles.test/t/{z}/{x}/{y}.pbf"]})}));
+    await page.route("https://dem.test/**", r => {
+      const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.png/).slice(1).map(Number);
+      return r.fulfill({body: syntheticDem(z, x, y), headers: {"content-type": "image/png"}});
+    });
     await page.route("https://tiles.test/t/**", r => {
       tileRequests++;
       const [z, x, y] = r.request().url().match(/(\d+)\/(\d+)\/(\d+)\.pbf/).slice(1).map(Number);
@@ -144,6 +177,14 @@ async function run({name, url, context, mapped}) {
   check(mapped ? h.realData && !h.offline : h.offline, `[${name}] ${mapped ? "map tiles loaded through the MVT path" : "offline stand-in town"} (tiles ${JSON.stringify(h.tiles)})`);
   check(h.tiles.buildings > 50 && h.tiles.colliders > 50, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
   if (mapped) check(tileRequests >= 1, `[${name}] tiles fetched by the page (${tileRequests})`);
+  // The ground (terrain.h): real elevation through the Terrarium path, water basins, the player on it.
+  if (mapped) check(h.terrain?.dem && h.terrain.max - h.terrain.min > 5, `[${name}] terrain elevation loaded (${JSON.stringify(h.terrain)})`);
+  else check(h.terrain?.settled && !h.terrain.dem, `[${name}] flat ground offline (${JSON.stringify(h.terrain)})`);
+  check(h.terrain?.water > 100 && h.terrain.collision > 4, `[${name}] water cells and ground collision (${JSON.stringify(h.terrain)})`);
+  {
+    const g = JSON.parse(await cmd("ground"));
+    check(Math.abs(g.playerZ - 0.73 - g.z) < 0.3, `[${name}] the player stands on the terrain (${JSON.stringify(g)})`);
+  }
   await shot("0-start");
 
   // On foot: walk 3 s.
@@ -226,6 +267,36 @@ async function run({name, url, context, mapped}) {
     while ((await hud()).t < t0 + 1.2) { top = Math.max(top, (await hud()).agl); await page.waitForTimeout(100); }
     const jp = JSON.parse(await cmd("jetpack"));
     check(jp.ignitions >= 1 && top > 1.5, `[${name}] the jetpack lifts (${top.toFixed(1)} m, ${JSON.stringify(jp)})`);
+  // Combat and events (game_military.cpp, game_events.cpp).
+  {
+    const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
+    const before = (await hud()).explosions;
+    check(await cmd("strike 0 150") === "ok", `[${name}] air strike called`);
+    await until(() => window.SpawnCity.hud().combat.jets > 0);
+    check((await hud()).combat.jets === 2, `[${name}] the strike pair is in the air`);
+    await until(b => window.SpawnCity.hud().explosions > b + 3, 300000, before);
+    await shot("1c-airstrike");
+    check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
+    check(await cmd("military start") === "on", `[${name}] military called in`);
+    await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
+    let c = (await hud()).combat;
+    check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers`);
+    await shot("1d-military");
+    check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
+    await cmd("military on");
+    check(await cmd("enemy swat") === "SWAT" && (await hud()).combat.enemies === 1, `[${name}] a sandbox enemy`);
+    check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
+    await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
+    c = (await hud()).combat;
+    check(c.zombies.night && c.zombies.round === 1 && c.zombies.alive > 0, `[${name}] zombies rise (${JSON.stringify(c.zombies)})`);
+    await shot("1e-zombies");
+    await cmd("zombies day");
+    const prov = await cmd("provoke");
+    check(/^(gun|knife|fists) /.test(prov), `[${name}] a passer-by squares up (${prov})`);
+    check(await cmd("race") === "on" && (await cmd("race fly")).startsWith("0 lap 1"), `[${name}] race track: start gate passed`);
+    check(!!(await hud()).combat.race, `[${name}] race HUD`);
+    await cmd("race");
+    check((await cmd("contract")).startsWith("AUFTRAG"), `[${name}] next contract`);
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
@@ -254,6 +325,25 @@ async function run({name, url, context, mapped}) {
     check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
     await shot("3b-car-cockpit");
+    await cmd("cam");
+    // Water (world_water.mjs): the car floats on the lake (buoyancy), the pilot swims.
+    const wet = await cmd("water car");
+    check(wet.startsWith("{"), `[${name}] the car is put on the water (${wet})`);
+    if (wet.startsWith("{")) {
+      const tw0 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2.5, tw0, {timeout: 400000}).catch(() => {});
+      const g = JSON.parse(await cmd("ground")), lake = JSON.parse(wet);
+      check(g.water && g.playerZ > lake.bed + 1.2 && g.playerZ < g.level + 1.5, `[${name}] the car floats (${JSON.stringify(g)})`);
+      check((await hud()).splashes > 0, `[${name}] a splash when it hit the water`);
+      await shot("3c-car-water");
+      await cmd("mode foot");
+      const tw1 = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, tw1, {timeout: 400000}).catch(() => {});
+      h = await hud();
+      const gs = JSON.parse(await cmd("ground"));
+      check(h.swimming && Math.abs(gs.playerZ - (gs.level - 0.53)) < 0.3, `[${name}] the pilot swims, head above the water (${JSON.stringify(gs)})`);
+      await shot("3d-swim");
+    }
     await cmd("mode foot");
   }
 
@@ -279,7 +369,7 @@ async function run({name, url, context, mapped}) {
 
 try {
   const only = process.env.SC_SMOKE || "";  // "desktop" or "phone" runs one of the two
-  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet", mapped: true, context: {viewport: {width: 1280, height: 720}}});
+  if (!only || only === "desktop") await run({name: "desktop", url: "?tilejson=https://tiles.test/planet&demtiles=https://dem.test/{z}/{x}/{y}.png", mapped: true, context: {viewport: {width: 1280, height: 720}}});
   if (!only || only === "phone") await run({name: "phone", url: "?offline=1&mute=1", mapped: false,
     context: {viewport: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true}});
 } finally {

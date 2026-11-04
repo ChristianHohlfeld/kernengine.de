@@ -55,10 +55,54 @@ f64 signed_area(const std::vector<Vec2>& r) {
   return a * 0.5;
 }
 
+// Convex polygon clip against a half plane (distance >= 0 kept).
+template <class F>
+void clip_poly(const std::vector<Vec2>& in, std::vector<Vec2>& out, F distance) {
+  out.clear();
+  if (in.empty()) return;
+  Vec2 a = in.back();
+  f32 da = distance(a);
+  for (Vec2 b : in) {
+    const f32 db = distance(b);
+    if ((da >= 0) != (db >= 0)) {
+      const f32 t = da / (da - db);
+      out.push_back({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t});
+    }
+    if (db >= 0) out.push_back(b);
+    a = b;
+    da = db;
+  }
+}
+
+/// terrain_surface.mjs drapeTerrainTriangle: the triangle cut along grid lines and diagonals.
+template <class Emit>
+void drape_triangle(Vec2 a, Vec2 b, Vec2 c, f32 step, std::vector<Vec2>& p, std::vector<Vec2>& q, Emit emit) {
+  const i32 lo_x = static_cast<i32>(std::floor(std::fmin(a.x, std::fmin(b.x, c.x)) / step)), hi_x = static_cast<i32>(std::floor(std::fmax(a.x, std::fmax(b.x, c.x)) / step));
+  const i32 lo_y = static_cast<i32>(std::floor(std::fmin(a.y, std::fmin(b.y, c.y)) / step)), hi_y = static_cast<i32>(std::floor(std::fmax(a.y, std::fmax(b.y, c.y)) / step));
+  for (i32 iy = lo_y; iy <= hi_y; ++iy)
+    for (i32 ix = lo_x; ix <= hi_x; ++ix) {
+      const f32 x = ix * step, y = iy * step;
+      p = {a, b, c};
+      clip_poly(p, q, [&](Vec2 v) { return v.x - x; });
+      clip_poly(q, p, [&](Vec2 v) { return x + step - v.x; });
+      clip_poly(p, q, [&](Vec2 v) { return v.y - y; });
+      clip_poly(q, p, [&](Vec2 v) { return y + step - v.y; });
+      const std::vector<Vec2> cell = p;
+      for (f32 sign : {1.0f, -1.0f}) {
+        clip_poly(cell, q, [&](Vec2 v) { return sign * ((v.x - x) - (v.y - y)); });
+        for (std::size_t i = 1; i + 1 < q.size(); ++i) {
+          const Vec2 A = q[0], B = q[i], C = q[i + 1];
+          if (std::fabs((B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x)) < 1e-6f) continue;
+          emit(A, B, C);
+        }
+      }
+    }
+}
+
 }  // namespace
 
 struct CityStream::Tile {
-  enum class State : u8 { requested, decoding, building, roads, areas, collision, ready, failed } state = State::requested;
+  enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed } state = State::requested;
   TileKey key;
   bool procedural = false;
   std::vector<u8> bytes;
@@ -73,16 +117,21 @@ struct CityStream::Tile {
   std::size_t collide_next = 0, upload_next = 0;
   u32 colliders = 0, triangles = 0;
   Vec2 center;
+  // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
+  kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
+  std::vector<u32> lay_meshes, old_lay;
+  bool relay = false;
 };
 
 CityStream::CityStream() = default;
 CityStream::~CityStream() = default;
 
-void CityStream::start(kern::Renderer& renderer, kern::physics::World& world, f64 lon, f64 lat) {
+void CityStream::start(kern::Renderer& renderer, kern::physics::World& world, f64 lon, f64 lat, bool dem) {
   clear();
   r_ = &renderer;
   world_ = &world;
   proj_.init(lon, lat);
+  terrain_.start(&renderer, &world, proj_, dem);
   origin_tile_ = tile_at(lon, lat);
   offline_ = false;
   real_tiles_ = 0;
@@ -94,12 +143,17 @@ void CityStream::clear() {
   requests_.clear();
   lanes_.clear();
   stats_ = {};
+  terrain_.clear();
+  terrain_changes_.clear();
 }
 
 void CityStream::remove(Tile& t) {
   if (r_)
-    for (u32 id : t.meshes) r_->remove(id);
+    for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
+      for (u32 id : *list) r_->remove(id);
   t.meshes.clear();
+  t.lay_meshes.clear();
+  t.old_lay.clear();
   if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = {};
   for (Lane& l : lanes_)
@@ -129,6 +183,12 @@ void CityStream::request_around(Vec3 focus) {
     tile_lonlat(k, 0.5, 0.5, lo, la);
     proj_.project(lo, la, x, y);
     t->center = {static_cast<f32>(x), static_cast<f32>(y)};
+    f64 x0, y0, x1, y1;
+    tile_lonlat(k, 0, 1, lo, la);
+    proj_.project(lo, la, x0, y0);
+    tile_lonlat(k, 1, 0, lo, la);
+    proj_.project(lo, la, x1, y1);
+    t->bounds = {static_cast<f32>(x0), static_cast<f32>(y0), static_cast<f32>(x1), static_cast<f32>(y1)};
     tiles_[k.hash()] = std::move(t);
     requests_.push_back(k);
   }
@@ -182,16 +242,21 @@ void CityStream::go_offline() {
   tiles_.clear();
   requests_.clear();
   lanes_.clear();
+  // No map service: no elevation service either (flat ground, the stand-in town's lake).
+  terrain_.clear();
+  terrain_.disable_dem();
   auto t = std::make_unique<Tile>();
   t->procedural = true;
   t->key = TileKey{0, -1, -1};
   procedural_city(0, 0, 760, 20261029, t->features);
+  feed_terrain(*t);
   t->state = Tile::State::building;
   finish_features(*t);
   tiles_[t->key.hash()] = std::move(t);
 }
 
 bool CityStream::ready_at(Vec3 p) const {
+  if (!terrain_.ready_at(p)) return false;
   if (offline_) {
     for (const auto& [k, t] : tiles_)
       if (t->procedural) return t->state == Tile::State::ready;
@@ -204,15 +269,34 @@ bool CityStream::ready_at(Vec3 p) const {
   return it != tiles_.end() && (it->second->state == Tile::State::ready || it->second->state == Tile::State::failed);
 }
 
+void CityStream::feed_terrain(Tile& t) {
+  // world_water.mjs: lakes / harbours (polygons) and waterways (lines with a width per class)
+  // become basins in the terrain; bridges keep a solid road over them.
+  for (const MapFeatures::Area& a : t.features.areas)
+    if (a.kind == AreaKind::water) terrain_.add_water_polygon(a.rings);
+  for (const MapFeatures::Road& r : t.features.roads) {
+    if (road_is_water(r.cls)) terrain_.add_waterway(r.points, road_width(r.cls), r.cls == RoadClass::river ? 1.6f : r.cls == RoadClass::canal ? 0.5f : 1.1f);
+    else if (r.bridge)
+      for (std::size_t i = 0; i + 1 < r.points.size(); ++i) terrain_.add_bridge(r.points[i], r.points[i + 1], road_width(r.cls));
+  }
+}
+
 void CityStream::finish_features(Tile& t) {
   // Footprint and road streams for the engine's builders, lanes for the traffic.
-  for (const MapFeatures::Building& b : t.features.buildings) {
+  for (MapFeatures::Building& b : t.features.buildings) {
+    // terrain_craters.mjs buildingGroundBase: a house stands on the lowest ground of its outline.
+    if (!b.rings.empty()) {
+      const f32 g = terrain_.footprint_base(b.rings[0]);
+      b.base += g;
+      b.top += g;
+    }
     t.footprints.begin(b.seed, b.base, b.top);
     for (const auto& ring : b.rings) t.footprints.ring(ring.data(), static_cast<u32>(ring.size()));
   }
   for (const MapFeatures::Road& r : t.features.roads) {
     const f32 w = road_width(r.cls);
     const bool water = road_is_water(r.cls);
+    if (water) continue;  // drawn by the terrain's water surface
     const bool major = static_cast<u8>(r.cls) <= static_cast<u8>(RoadClass::tertiary);
     const u32 color = water ? kWater : r.cls == RoadClass::pedestrian ? kPaving
                       : (r.cls == RoadClass::path || r.cls == RoadClass::track) ? kPath
@@ -244,7 +328,10 @@ void CityStream::build_areas(Tile& t) {
   kern::Earcut earcut;
   std::vector<f64> xy;
   std::vector<u32> holes, tris;
+  const bool drape = terrain_.has_dem() || terrain_.crater_count() > 0;
+  std::vector<Vec2> poly, clipped;
   for (const MapFeatures::Area& a : t.features.areas) {
+    if (a.kind == AreaKind::water) continue;  // the terrain's water surface
     xy.clear();
     holes.clear();
     tris.clear();
@@ -262,7 +349,15 @@ void CityStream::build_areas(Tile& t) {
       for (int k = 0; k < 3; ++k) p[k] = {static_cast<f32>(xy[tris[i + k] * 2]), static_cast<f32>(xy[tris[i + k] * 2 + 1]), z};
       // Faces up: counter-clockwise seen from above.
       if (kern::cross(p[1] - p[0], p[2] - p[0]).z < 0) std::swap(p[1], p[2]);
-      for (int k = 0; k < 3; ++k) mesh.push(p[k], {0, 0, 1}, c, {p[k].x * 0.1f, p[k].y * 0.1f});
+      if (!drape) {
+        for (int k = 0; k < 3; ++k) mesh.push(p[k], {0, 0, 1}, c, {p[k].x * 0.1f, p[k].y * 0.1f});
+        continue;
+      }
+      // terrain_surface.mjs drapeTerrainTriangle: split along the 5 m grid and the cells'
+      // SW-NE diagonal, so the patch lies on the ground instead of cutting through it.
+      drape_triangle({p[0].x, p[0].y}, {p[1].x, p[1].y}, {p[2].x, p[2].y}, Terrain::kStep, poly, clipped, [&](Vec2 q0, Vec2 q1, Vec2 q2) {
+        for (Vec2 q : {q0, q1, q2}) mesh.push({q.x, q.y, terrain_.height(q.x, q.y) + z}, terrain_.normal(q.x, q.y), c, {q.x * 0.1f, q.y * 0.1f});
+      });
     }
   }
   if (mesh.vertex_count() == 0) return;
@@ -273,8 +368,32 @@ void CityStream::build_areas(Tile& t) {
   const u32 id = r_->allocate_id();
   kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
   in.material = m;
-  if (r_->upsert(id, in)) t.meshes.push_back(id);
+  if (r_->upsert(id, in)) t.lay_meshes.push_back(id);
   else r_->release_id(id);
+}
+
+void CityStream::begin_roads(Tile& t) {
+  kern::RoadOptions ro;
+  ro.center_x = t.center.x;
+  ro.center_y = t.center.y;
+  ro.radius = 4000;
+  ro.segment_length = 4;  // follows the 5 m terrain nodes
+  ro.palette = road_palette();
+  t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
+  t.upload_next = 0;
+  t.state = Tile::State::roads;
+}
+
+void CityStream::relay(const kern::Vec4& rect) {
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *tp;
+    if (t.state != Tile::State::ready || t.relay) continue;
+    if (rect.x > t.bounds.z || rect.z < t.bounds.x || rect.y > t.bounds.w || rect.w < t.bounds.y) continue;
+    t.relay = true;
+    t.old_lay = std::move(t.lay_meshes);
+    t.lay_meshes.clear();
+    begin_roads(t);
+  }
 }
 
 bool CityStream::build_collision(Tile& t, f64 deadline) {
@@ -348,6 +467,12 @@ bool CityStream::work(Tile& t, f64 deadline) {
       t.bytes.clear();
       t.bytes.shrink_to_fit();
       ++real_tiles_;
+      feed_terrain(t);
+      t.state = S::terrain_wait;
+      return kern::now_ms() > deadline ? false : work(t, deadline);
+    case S::terrain_wait:
+      // Buildings and streets stand on the terrain: wait until its shape is decided.
+      if (!terrain_.settled()) return true;
       finish_features(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
     case S::building: {
@@ -364,14 +489,7 @@ bool CityStream::work(Tile& t, f64 deadline) {
       chunks.clear();
       chunks.shrink_to_fit();
       t.upload_next = 0;
-      kern::RoadOptions ro;
-      ro.center_x = t.center.x;
-      ro.center_y = t.center.y;
-      ro.radius = 4000;
-      ro.palette = road_palette();
-      kern::HeightSampler flat;
-      t.road_builder.begin(t.roads.data(), t.roads.size(), ro, flat);
-      t.state = S::roads;
+      begin_roads(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
     case S::roads: {
@@ -382,7 +500,11 @@ bool CityStream::work(Tile& t, f64 deadline) {
       m.double_sided = true;
       auto& chunks = t.road_builder.chunks();
       while (t.upload_next < chunks.size()) {
+        const std::size_t before = t.meshes.size();
         upload(t, chunks[t.upload_next], m, false);
+        // road meshes are the re-layable ones
+        t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
+        t.meshes.resize(before);
         chunks[t.upload_next++].mesh = kern::MeshData{};
         if (kern::now_ms() > deadline) return false;
       }
@@ -394,13 +516,20 @@ bool CityStream::work(Tile& t, f64 deadline) {
     }
     case S::areas:
       build_areas(t);
+      if (t.relay) {
+        // New layer in place: the old one goes now (no frame without roads).
+        for (u32 id : t.old_lay) r_->remove(id);
+        t.old_lay.clear();
+        t.relay = false;
+        t.state = S::ready;
+        return true;
+      }
       t.state = S::collision;
       return kern::now_ms() > deadline ? false : work(t, deadline);
     case S::collision:
       if (!build_collision(t, deadline)) return false;
       t.state = S::ready;
-      t.features.areas.clear();
-      t.features.roads.clear();
+      t.features.roads.clear();  // areas stay for re-laying them on a changed ground
       return true;
   }
   return true;
@@ -411,6 +540,10 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   const f64 start = kern::now_ms(), deadline = start + budget_ms;
   request_around(focus);
   unload_far(focus);
+  terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
+  terrain_.take_changes(terrain_changes_);
+  for (const kern::Vec4& r : terrain_changes_) relay(r);
+  terrain_changes_.clear();
   // Nearest unfinished tile first.
   std::vector<Tile*> order;
   for (auto& [k, t] : tiles_) order.push_back(t.get());
@@ -431,7 +564,7 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     stats_.buildings += static_cast<u32>(t->features.buildings.size());
     stats_.colliders += t->colliders;
     stats_.triangles += t->triangles;
-    stats_.meshes += static_cast<u32>(t->meshes.size());
+    stats_.meshes += static_cast<u32>(t->meshes.size() + t->lay_meshes.size());
   }
   stats_.last_slice_ms = kern::now_ms() - start;
 }

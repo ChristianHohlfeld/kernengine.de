@@ -141,7 +141,7 @@ void PeopleArt::person(const People::Person& p, f32 now) {
   }
   const Mat4 head = body * at({0, 0, 0.73f});
   put(head_, head, p.skin);
-  if (p.kind == People::Kind::officer) put(cap_, head * at({0, 0, 0.06f}));
+  if (p.kind == People::Kind::officer || p.kind == People::Kind::soldier || p.kind == People::Kind::enemy) put(cap_, head * at({0, 0, 0.06f}));
 }
 
 void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {

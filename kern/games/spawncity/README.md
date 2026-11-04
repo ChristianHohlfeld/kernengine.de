@@ -7,8 +7,10 @@ und Box3D über Kern. Kein three.js, keine Spiellogik in JavaScript. Die Seite i
 Vorlage für Inhalt, Werte und Verhalten ist das laufende SpawnCity (`nostack-dev/spawncity-de`, Commit
 `9108537`, `sim/*.mjs`, `esp32/*.hpp`). Die Zahlen stehen mit Quellenangabe im Code.
 
-Stand: **Meilenstein 2** – alle Modi, dazu die Stadt mit Leuten, Polizei und Fahndung, das ganze
+Stand: **Meilenstein 3 (Kampf und Ereignisse)** – dazu Militär, Flak, Kampfjets und Luftschlag, Passanten, die
+zurückschlagen, Zombie-Nächte, Sandbox-Gegner, Punkte und Aufträge, Rennstrecke. Meilenstein 2: alle Modi, dazu die Stadt mit Leuten, Polizei und Fahndung, das ganze
 Waffenset mit Explosionen und Fahrzeugschaden, Mehrspieler, Minimap und Straßenlaternen.
+**Meilenstein 3 (Welt, Branch `sc-m3-world`):** echtes Gelände (Höhenkacheln), siehe „Welt (M3)“ unten.
 
 ## Starten
 
@@ -31,6 +33,8 @@ Startparameter (Query-String):
 | `fpvtilt=-15…50` | Neigung der FPV-Kamera (SpawnCity-Standard −15°) |
 | `mouse=20…300` | Mausempfindlichkeit in % |
 | `tilejson=URL`, `tiles=URL-Vorlage` | andere Kartenquelle (Tests) |
+| `dem=0` | ohne Höhenkacheln (flaches Gelände) |
+| `demtiles=URL-Vorlage` | andere Terrarium-Höhenquelle (Tests), `{z}/{x}/{y}` |
 | `mute=1` | ohne Ton |
 | `mp=host&room=NAME` / `mp=join&room=NAME` | Mehrspieler: hosten / beitreten (Tabs eines Browsers über BroadcastChannel) |
 | `relay=wss://…` | dazu: über das Kern-Relay (`tools/net_relay.mjs`) zwischen Rechnern |
@@ -47,6 +51,7 @@ Startparameter (Query-String):
 | Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
 | Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (folgt der Kamera) | RB feuern, Y wechseln | FEUER, Waffenknopf |
 | Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
+| Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **H** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
 (Winkelmodus mit Gashebel). Einen reinen Acro-Modus hat die SpawnCity-Firmware nicht
@@ -70,6 +75,9 @@ kern/games/spawncity/
     car.*         Fahrzeugmodell (Reifen, Lenkung, Antrieb aus world_vehicle_dynamics.mjs) auf Raycast-Fahrwerk
     mvt.*         Mapbox-Vector-Tile-Decoder (zeitgeteilt) + kleiner Writer (Tests)
     tiles.*       Kachelmathematik, OpenMapTiles-Ebenen → Gebäude/Straßen/Flächen, prozedurale Ersatzstadt
+    terrain.*     Gelände (M3): Terrarium-Höhen → Bare-Earth-Raster, Wasserbecken, Krater, Bodenkacheln
+                  (Render-LOD mit Schürzen, Box3D-Dreiecksnetze mit Überlappung), eine Höhenfunktion für alles
+    game_world.*  Welt (M3): HUD/Befehle des Geländes; Wasserphysik, Spuren, Verkehrsregeln, Tiere usw.
     city_stream.* Kachel-Streaming: Decodieren → BuildingBuilder/RoadBuilder → Meshes → Box3D-Kollision,
                   alles mit Zeitbudget; Entladen ferner Kacheln; Fahrspuren für den Verkehr
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
@@ -93,6 +101,14 @@ kern/games/spawncity/
     equipment.*   Jetpack, Flug-Logbuch, MusicSynth (Titelmusik, Autoradio)
     game_ui.*     Menü-/Einstellungs-Seite des Spiels: Anwenden der Einstellungen, Pause, RESET, Startort, LIVE GPS
     game_equipment.cpp  Jetpack am Soldaten, Logbuch, Radio, Geräuschkulisse
+    combat_rules.* reine Kampf-/Ereignisregeln (Militär-Eskalation, Flak-Zellen, Luftschlag-Timing,
+                  Temperamente, Zombie-Runden, Sandbox-Gegner + Chaos-Punkte, Aufträge/Risikobank, Rennstrecke)
+    combat_art.*  prozedurale Modelle: Kampfhubschrauber, Panzer, Flak, Kampfjets, Bomben, Tore,
+                  Leuchtspur, Mündungsfeuer, Luftsprengpunkte, Feuerbälle, Trümmer (instanzierte Grundkörper)
+    game_combat.h Zustand von Kampf und Ereignissen (ein Member `combat_` in Game)
+    game_military.cpp Militär (Hubschrauber, Panzer, Trupp), Flak, Kampfjets und Luftschlag, Treffer/Explosionen
+    game_events.cpp   Passanten, die zurückschlagen, Zombie-Nächte, Sandbox-Gegner, Punkte/Aufträge,
+                  Rennstrecke, Auto-Trümmer, Scope/Headshot, HUD-Teil und Testbefehle
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert),
                   ui.mjs (Menüs, nur DOM), manifest.webmanifest + icon.svg (installierbare App)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
@@ -119,7 +135,7 @@ kern/games/spawncity/
 * **Welt:** Der Browser holt OpenFreeMap-Vektorkacheln (z14, OpenMapTiles-Schema), C++ decodiert sie.
   3×3 Kacheln um den Spieler (≈ 5 km), Entladen jenseits eines Rings. Jede Stufe hat ein Zeitbudget
   (3–4 ms pro Frame), auch das Hochladen einzelner Chunk-Meshes. Kollision: ein Box3D-Dreiecksnetz je
-  Gebäude (Wände + Dach). Boden: Kerns Ebene (Höhenmodell kommt später). Ohne Netz baut das Spiel eine
+  Gebäude (Wände + Dach). Boden: das Gelände (`terrain.*`, siehe „Welt (M3)“). Ohne Netz baut das Spiel eine
   prozedurale Ersatzstadt; das HUD sagt das deutlich („OFFLINE · prozedurale Ersatzstadt“).
 * **Host-Schnittstelle** (`main.cpp`): `sc_tile_requests/sc_tile_data/sc_tile_failed/sc_offline`,
   `sc_gamepad`, `sc_touch_frame/sc_touch/sc_touch_view`, `sc_hud`, `sc_command`,
@@ -133,9 +149,61 @@ kern/games/spawncity/
   alle 4–5 s) und nach der Anfahrzeit Streifenwagen (Spawn 70–125 m, A* über den Straßengraph, Pure
   Pursuit, Rangieren bei Hängenbleiben, zwei Beamte steigen aus, halten 6–15 m Abstand und schießen).
   Die Fluchtuhr läuft erst, wenn die Polizei da ist. Tod löscht die Fahndung.
+* **Kampf und Ereignisse** (Meilenstein 3, `game_military.cpp`, `game_events.cpp`): Ab fünf Sternen,
+  40 s gehalten bei Heat ≥ 36 (oder Heat ≥ 55), folgt ein 15-s-Alarm; danach übernimmt das Militär:
+  ein Kampfhubschrauber kreist (72 m Radius, MG-Salven zu 7), ein Trupp Soldaten rückt über den
+  Straßengraph vor (Dreiersalven, höchstens drei Salven je 1,4 s), ein Panzer fährt A* über die Straßen
+  und schießt Granaten (130 m/s, 6 m). Bei ≤ 3 Sternen zieht es ab. Soldaten, Zombies und Gegner sind
+  Leute (`People::Kind::soldier/zombie/enemy`, von ihrem Besitzer bewegt), Hubschrauber und Panzer
+  leichte Agenten mit Box3D-Strahlen. Flak steht wie in SpawnCity per Hash in 700-m-Zellen
+  (32 %), schießt nur auf Drohne/Jet über 18 m AGL (30 Schuss/s, Vorhalt, Luftsprengpunkte 7 m).
+  Kampfjets fliegen alle 75–150 s in 55–85 m vorbei (Ton beim Eintreffen des Schalls, Kamerawackeln),
+  der Luftschlag (J) legt 10 Bomben (17 m / 170) über 130 m. Aggressive Passanten (6 %) schlagen
+  zurück (Faust 8, Messer 16, wenige mit Pistole 10). Nachts kommen Zombies in Runden (6 + 4·Runde,
+  ab Runde 3 Sprinter). Ab einem Stern kommen Sandbox-Gegner zu Fuß (COP, SWAT, HEAVY mit Rakete).
+  Punkte: Chaos-Score mit Combo (`sandbox_game.mjs`) und Aufträge mit Risikobank, die erst beim
+  Entkommen gutgeschrieben wird (`gameplay_fun_logic.mjs`).
 * **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
   verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
   andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
+
+## Welt (M3)
+
+* **Gelände** (`terrain.*`, Vorlage `terrain_elevation.mjs`, `terrain_craters.mjs`, `terrain_tiles.mjs`,
+  `terrain_surface.mjs`): Quelle wie auf spawncity.de die öffentlichen **Terrarium-Höhenkacheln**
+  (Mapzen „Terrain Tiles“ auf AWS Open Data, SRTM/EU-DEM/3DEP u. a.; Namensnennung im Spiel rechts unten).
+  Die Seite holt die PNGs, die das Spiel anfordert, und gibt die RGBA-Pixel weiter (`sc_dem_requests`,
+  `sc_dem_data`, `sc_dem_failed`); C++ decodiert (h = R·256 + G + B/256 − 32768), tastet ein Raster ab
+  und macht aus dem Radar-Oberflächenmodell nacktes Gelände (morphologische Öffnung 160 m, zwei Box-Blurs
+  30 m, `bareEarth`). Höhen relativ zum Ursprung (z = 0 bleibt am Startpunkt). Abweichung von SpawnCity:
+  z13 und 10-m-Raster über 8 km (statt z14/5 m über 2,6 km), weil Kerns Kachelring ≈ 5 km breit ist;
+  nach der 160-m-Öffnung trägt die feinere Stufe keine Information mehr (Quelle ist 30-m-SRTM).
+  Neu geladen nach 2 km Weg. Ohne erste Höhen (Dienst nicht erreichbar, `offline=1`, `dem=0`) bleibt
+  das Gelände flach – nie erfundene Höhen (wie SpawnCity).
+* **Eine Höhenfunktion:** Knoten alle 5 m (Höhe + Krater, Wasserbecken), Dreiecke mit SW–NE-Diagonale.
+  Dieselbe Funktion für Box3D-Boden, Bodennetz, Straßen (RoadBuilder drapiert auf ihr), Flächen
+  (zerschnitten an Raster und Diagonale wie `drapeTerrainTriangle`), Gebäude (stehen auf dem tiefsten
+  Punkt ihres Umrisses, `buildingGroundBase`), Leute, Autos, Spawns, Polizei.
+* **Box3D-Boden:** Kern hat keinen Heightfield-Shape. Deshalb je 160-m-Kachel ein statisches
+  Dreiecksnetz (32×32 Zellen à 5 m) mit einer Zelle Überlappung und abgesenktem Außenring (5 cm) wie
+  `terrain_tiles.mjs` – die Naht ist für beide Kacheln eine innere Kante. Gebaut im Umkreis 420 m um den
+  Fokus und 200 m um den Spieler (zeitgeteilt, neues Netz zuerst, dann das alte weg).
+* **Bodennetz:** 640-m-Blöcke bis 3,2 km (40-m-Knoten); Blöcke nahe dem Spieler als 160-m-Kacheln
+  (5 m nah, 20 m weiter); Schürzen gegen Risse zwischen den Stufen. Straßen und Flächen werden neu
+  verlegt, wenn sich der Boden darunter ändert (Wasser einer Nachbarkachel, Krater).
+* **Wasser** (`world_water.mjs`, `world_rigid_body_physics.mjs`, `player_walk_mode_v4.mjs`): Seen/Häfen
+  (Polygone) und Flüsse/Kanäle/Bäche (Linien, Breite je Klasse 18/12/4,5 m) aus den Vektorkacheln werden
+  auf ein 4-m-Raster gelegt; der Boden darunter ist ein Becken 2,6 m tief, die Oberfläche liegt 0,18 m
+  unter dem Ufer. Brücken (`brunnel=bridge`) behalten den Boden. Strömung je Zelle aus dem nächsten
+  Wasserlauf (Fluss 1,6, Kanal 0,5, sonst 1,1 m/s, bis 30 m neben dem Ufer abklingend). Kräfte im festen
+  Schritt (kein Box3D-Eingriff): Auftrieb ρ·g·V·Anteil·0,62 aus dem Box-Volumen, Widerstand
+  k = Anteil·(1,6 + 0,9·v)·m·0,35 gegen die Strömung (vertikal ×1,4), Drehdämpfung – für Autos, Bus,
+  Polizei, Jet, Fallschirm; die Drohne bekommt wie in SpawnCity keinen Auftrieb, nur Widerstand.
+  Zu Fuß schwimmt der Spieler (Augen 0,42 m über der Oberfläche, Wasserwiderstand). Spritzer
+  (Partikel + Synth-Klang) beim Eintauchen und bei Explosionen über Wasser (statt Spuren).
+  Oberfläche: ein Netz je 320-m-Abschnitt (volle 64-m-Blöcke als ein Viereck, sonst Zeilenläufe),
+  Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
+  eigene Shader-Erweiterung).
 
 ## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
 
@@ -216,6 +284,15 @@ kern/games/spawncity/
 | Welt | Straßenbreiten und -farben, Standardhöhe 8 m, Nebel 0,00085, Tag/Nacht 480 s, Schatten 2048/110 m (mobil 1024/70 m) | `world_city_roads.mjs`, `real_world_bootstrap.mjs`, `stylized_world_style.mjs` |
 | Regeln | Wanted-Schwellen 4/9/15/22/30, Schwere je Tat, Einheiten, Radien, Fluchtzeit, Polizeischaden, Trefferchance, EMP | `wanted_system_logic.mjs` |
 | Ton-Mix | Drohne 50 %, Fahrzeug 58 % | `audio_settings.mjs` |
+| Militär | Heat 36 / 40 s / 55, Alarm 15 s, Ende ≤ 3 Sterne, Trupp 4 (max. 8), HP Soldat 100 / Heli 420 / Panzer 900, Treffer 25 (Panzer 4), Schaden Heli 4/6, Soldat 3/4, Granate 30, Reaktion 0,9 s, 3 Salven je 1,4 s, Trefferchancen, Verstärkung alle 45 s | `military_response.mjs` |
+| Flak | Zelle 700 m, 32 %, 1100 m, 18 m AGL, 900 m/s, 30/s, 2,6 s an / 1,7 s aus, Streuung 0,012, 7 m Luftsprengpunkt 14·(1−d/7)+2, HP 60, Sniper 35 / sonst 4 | `flak_battery.mjs` |
+| Kampfjets | 255 m/s, 55–85 m, 2600 m Anflug, alle 75–150 s, Luftschlag 30 s, 10 Bomben 17 m / 170 über 130 m | `fighter_jets.mjs` |
+| Passanten | 6 % aggressiv, 30 % Läufer; Messer/Pistole; Faust 8, Messer 16, Pistole 10 (Chance 0,52−0,014 d−0,045 v), Abstand 6–14 m | `pedestrian_agents.mjs`, `gangsters.mjs` |
+| Zombies | 28 max., HP 100+12·Runde, Treffer 34, Biss 11 alle 1,15 s, 34–70 m, 10/60 Punkte, 9 s Pause | `zombie_nights.mjs` |
+| Sandbox | COP/SWAT/HEAVY (Treffer, Tempo, Reichweite, Takt, Salve, Schaden, Genauigkeit, Punkte), Budget 0/1/2/4/6/8, 6 s, Combo 3,2 s × bis 8 | `sandbox_game.mjs` |
+| Aufträge | 5 Aufträge, Combo 5,5 s, Overdrive 8 s, Momentum 4, Punkte je Tat, Risikobank, Versicherung 50 %, Drohnenverlust 20 %, Gnade | `gameplay_fun_logic.mjs` |
+| Rennen | 8 Tore (×2,25), 3 Runden, Durchflugprüfung, Rundenzeiten | `race_track.mjs` |
+| Kampfdetails | Drohnenraketen 31 m/s, 220 m, 950 ms, 8 m / 100, 7,2 s; GUIDED 2,2 g; Auto kritisch 20 %, 2,45 s / 0,62 s; neue Drohne nach 8 s; Trümmer 9 Teile, 6,5 s, Abprall 0,30 / 0,76 | `direct_fire_missiles.mjs`, `guided_balance.mjs`, `critical_damage_logic.mjs`, `player_vitals_logic.mjs`, `world_car_explosion.mjs` |
 
 ## Tests
 
@@ -247,6 +324,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   (`nostack-dev/spawncity-de/esp32`, Christian Hohlfeld) und steht hier ebenfalls unter Apache 2.0.
 * Kartendaten: © OpenStreetMap-Mitwirkende, ODbL 1.0; Vektorkacheln von OpenFreeMap im
   OpenMapTiles-Schema (© OpenMapTiles). Die Namensnennung steht dauerhaft im Spiel (rechts unten).
+* Höhen: „Terrain Tiles“ (Mapzen, auf AWS Open Data, frei nutzbar mit Namensnennung der Quellen
+  SRTM, EU-DEM, 3DEP u. a., siehe https://github.com/tilezen/joerd/blob/master/docs/attribution.md);
+  im Spiel rechts unten genannt.
 * Gebaut mit `--commercial`: keine Micro-Duck-Meshes (CC BY-NC-SA) im Modul. Keine Pollen-Meshes,
   keine fremden Bilder oder Musik; alle Töne sind Synth-Patches im Spielordner.
 * Kein OSM-Snapshot im Repo: die Umgebung dieses Meilensteins hatte keinen Zugriff auf OSM-Quellen,
@@ -254,11 +334,30 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Militär (ab hohen Sternen), Tiere, Gangster, Passanten, die zurückschlagen; Fahrer, die beim
-  Carjacking sichtbar aussteigen.
+* Tiere; Fahrer, die beim Carjacking sichtbar aussteigen.
+* **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
+  sperrt die Drohnen-Nuke (nur GUN/ROCKETS/GUIDED), der Kommentar „LAUNCHER NUKE“ in
+  `gameplay_final_runtime_v2.mjs` hat keinen Code-Zweig mehr (`footShotAt` feuert normale Raketen),
+  `world_options.mjs` hat keinen Nuke-Schalter, und niemand löst `arondight:nuke-impact` oder eine
+  Explosion `kind:"nuke"` aus. `nuke_destruction.mjs`/`nuke_shock_field.mjs` sind dort toter Code.
+  Ebenso ist der Pilotenschild (`player_shield.mjs`) „retired“ (immer aus) – nicht nachgebaut.
+* Zombie-Barrikaden (Türen mit Brettern, REPARIEREN) brauchen begehbare Innenräume, die Kern-SpawnCity
+  noch nicht hat; die Zombies laufen deshalb nur draußen.
+* Der Panzer ist ein leichter Agent auf dem Straßengraph (Strahl gegen Wände), kein Box3D-Fahrzeug wie
+  in SpawnCity (`physics.upsertBody kind:"bus"`); Box3D-Körper zur Laufzeit wären ein Level-Actor mehr.
+* Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler);
+  die Abstimmung über Spielregeln (`rules_vote_engine.mjs`) braucht Netz-Nachrichten – lokal gibt es die
+  Schalter als Befehle (`military on|off`, `zombies on|off`).
+* Trainingslevel (`training_test_level_v2.mjs`, `training_showcase.mjs`) ersetzen in SpawnCity die
+  Welt ohne Geodaten; auf Kern übernimmt das die prozedurale Ersatzstadt (`city_stream`) – nicht
+  nachgebaut, um die Stadt-Streaming-Arbeit nicht zu kreuzen. Die Rennstrecke (L) gibt es überall.
+* Kampfton: Kerns eingebaute Klänge (`builtin:smg/pistol/explosion/boost/...`) statt der eigenen
+  Synth-Patches aus `combat_audio_bank.mjs`, kein Retarded-Time-Doppler-Loop für die Jets (nur der
+  verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`) für MP/Sniper:
+  Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
-* Gelände (DEM), Wasser mit Auftrieb (die Kacheln liefern Wasserflächen, aber ohne Tiefe), Innenräume,
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
 * Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
   mehr Fahrzeugtypen.
@@ -273,6 +372,8 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 4. **MVT-Decoder und Kachel-Streaming** (`mvt.*`, `city_stream.*`) als `kern/geo`-Bausteine,
    inklusive zeitgeteiltem Hochladen und Kollisionsaufbau.
 5. **Eigene Imports im App-Host** (z. B. Audio-Ausgabe, Gamepad) – heute fragt die Seite per Export ab.
-6. **Heightfield-Kollision** in `kern::physics` (Box3D hat `b3CreateHeightFieldShape`).
+6. **Heightfield-Kollision** in `kern::physics` (Box3D hat `b3CreateHeightFieldShape`) – heute je
+   Bodenkachel ein Dreiecksnetz (`terrain.cpp`); dazu `destroy_shape`, damit eine Kachel ihren Shape
+   tauschen kann statt den ganzen Körper.
 7. **Kaskaden-Schatten und LOD/Impostor** für große Sichtweiten (Jet).
 8. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.

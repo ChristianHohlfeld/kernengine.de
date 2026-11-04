@@ -13,6 +13,7 @@
 #include "kern/geo/buildings.h"
 #include "kern/geo/roads.h"
 #include "kern/gfx/renderer.h"
+#include "terrain.h"
 #include "tiles.h"
 
 namespace sc {
@@ -36,7 +37,8 @@ class CityStream {
   ~CityStream();
 
   /// Starts a world around lon/lat (origin of the local metres). `world` gets the static collision.
-  void start(kern::Renderer& renderer, kern::physics::World& world, f64 lon, f64 lat);
+  /// `dem`: ask the host for real elevation (terrain.h), else flat ground.
+  void start(kern::Renderer& renderer, kern::physics::World& world, f64 lon, f64 lat, bool dem = false);
   void clear();
   const kern::GeoProjector& projector() const { return proj_; }
 
@@ -60,8 +62,13 @@ class CityStream {
   const std::vector<Lane>& lanes() const { return lanes_; }
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   bool street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32& heading) const;
-  /// Ground height (flat in this milestone; the DEM comes later).
-  f32 ground_height(f32 x, f32 y) const { (void)x; (void)y; return 0; }
+  /// Ground height: the terrain's static surface (elevation, water basins, craters).
+  f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
+  /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
+  Terrain& terrain() { return terrain_; }
+  const Terrain& terrain() const { return terrain_; }
+  /// A second point that keeps ground collision under it (the pilot while his drone flies).
+  Vec3 anchor;
   const StreamStats& stats() const { return stats_; }
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
 
@@ -76,6 +83,9 @@ class CityStream {
   void upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls);
   void build_areas(Tile& t);
   void remove(Tile& t);
+  void feed_terrain(Tile& t);
+  void begin_roads(Tile& t);
+  void relay(const kern::Vec4& rect);
 
   kern::Renderer* r_ = nullptr;
   kern::physics::World* world_ = nullptr;
@@ -87,6 +97,8 @@ class CityStream {
   bool offline_ = false;
   u32 real_tiles_ = 0;
   StreamStats stats_;
+  Terrain terrain_;
+  std::vector<kern::Vec4> terrain_changes_;
 };
 
 }  // namespace sc
