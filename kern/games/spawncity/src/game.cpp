@@ -766,7 +766,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   }
   if (touch_mode_) foot_touch_.update(dt, p, world_->hud().fov);
   // Weapons: 1 MP, 2 Glock, 3 Sniper, 5 grenade launcher, 6 rocket launcher, 7 fists, 8 knife;
-  // T hand grenade, G EMP (gameplay_final_runtime_v2.mjs / hand_grenade.mjs / wanted EMP).
+  // T hand grenade, X EMP (gameplay_final_runtime_v2.mjs / hand_grenade.mjs / wanted EMP).
   const std::pair<Key, weapons::Id> keys[] = {{Key::digit1, weapons::Id::smg}, {Key::digit2, weapons::Id::glock}, {Key::digit3, weapons::Id::sniper},
                                               {Key::digit5, weapons::Id::grenade_launcher}, {Key::digit6, weapons::Id::rocket}, {Key::digit7, weapons::Id::fists},
                                               {Key::digit8, weapons::Id::knife}};
@@ -775,7 +775,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   if (pad.hit(kPadRight) || pad_touch_.take_pressed("wpn")) cycle_foot_weapon(1);
   if (pad.hit(kPadLeft)) cycle_foot_weapon(-1);
   if (in.pressed(Key::t) || pad.hit(kPadY) || pad_touch_.take_pressed("nade")) throw_grenade();
-  if (in.pressed(Key::g) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
+  if (in.pressed(Key::x) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
   if (game_weapon_in_hand()) {
     // The game fires these itself: Kern's trigger stays off.
     const bool trigger = p.fire;
@@ -815,7 +815,7 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   if (in.pressed(Key::digit2)) drone_weapon_ = 1;
   if (in.pressed(Key::digit3)) drone_weapon_ = 2;
   if (pad.hit(kPadY) || pad_touch_.take_pressed("wpn")) drone_weapon_ = (drone_weapon_ + 1) % 3;
-  if (in.pressed(Key::g) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
+  if (in.pressed(Key::x) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
   {
     const bool trigger = in.button(0) || pad.down(kPadRB) || pad_touch_.held("fire");
     drone_attack(trigger, trigger && !trigger_was_);
@@ -989,6 +989,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   time_ = f.time;
   if (dt > 0) fps_ = fps_ * 0.95f + (1.0f / dt) * 0.05f;
   toast_age_ += dt;
+  update_net(dt);
   if (!world_placed_) {
     city_.update({0, 0, 0}, 8);
     if (city_.ready_at({0, 0, 0})) place_world();
@@ -1182,6 +1183,7 @@ void Game::draw_vehicles() {
       art_.drone(matrix_of(drone_actor_), motors, angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
     }
     if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
+    draw_remote_vehicles();
   }
   art_.end();
 }
@@ -1273,6 +1275,10 @@ std::string Game::hud_json() {
     u32 drones = 0;
     for (const PoliceDrone& d : pdrones_) drones += d.active ? 1 : 0;
     add(",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    if (net_.active()) {
+      add(",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
+          net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
+    }
     if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
     if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
   }
@@ -1386,6 +1392,33 @@ std::string Game::command(const std::string& cmd) {
     if (mode_ == Mode::car) { car_cockpit_ = !car_cockpit_; return car_cockpit_ ? "cockpit" : "chase"; }
     if (mode_ == Mode::jet) { jet_cockpit_ = !jet_cockpit_; return jet_cockpit_ ? "cockpit" : "chase"; }
     return "none";
+  }
+  if (starts("net ")) {
+    // The page opened its transport: "net host <self>" / "net join <self> <server>".
+    const std::string rest = cmd.substr(4);
+    unsigned long long self = 0, server = 0;
+    if (rest.rfind("host ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu", &self) == 1) { net_.host(self, lon_, lat_); return "hosting"; }
+    if (rest.rfind("join ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu %llu", &self, &server) == 2) { net_.join(self, server); rebased_ = false; return "joining"; }
+    if (rest == "stop") { net_.stop(); return "stopped"; }
+    if (rest == "remotes") {
+      std::string o = "[";
+      for (const net::Remote& r : net_.remotes()) {
+        char b[160];
+        std::snprintf(b, sizeof b, "%s{\"slot\":%u,\"mode\":%u,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"hp\":%.0f}", o.size() > 1 ? "," : "", r.state.slot,
+                      static_cast<unsigned>(r.state.mode), r.shown.x, r.shown.y, r.shown.z, r.state.health);
+        o += b;
+      }
+      return o + "]";
+    }
+    if (rest.rfind("hit ", 0) == 0) {
+      // Tests: a shot from 3 m beside the first remote player straight at him.
+      if (net_.remotes().empty()) return "nobody";
+      const Vec3 c = net_.remotes()[0].shown;
+      Vec3 to = c + Vec3{-3, 0, 0};
+      const Vec3 from = c + Vec3{3, 0, 0};
+      return hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4))) ? "hit" : "miss";
+    }
+    return "usage: net host <self> | net join <self> <server> | net stop";
   }
   if (cmd == "attack") {
     // Tests: one attack with the weapon in hand (as a click).

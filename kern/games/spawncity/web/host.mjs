@@ -6,10 +6,12 @@
 //   * polls the gamepad and routes touch fingers (CSS px) to the game
 //   * plays the samples Kern's mixer renders (KernAudio from kern/web/studio/game.mjs)
 //   * draws the HUD from the game's JSON and the touch controls with Kern's TouchOverlay
+//   * multiplayer (?mp=host|join&room=NAME[&relay=wss://...]): moves the game's datagrams with
+//     Kern's KernNet (BroadcastChannel between tabs, or the Kern relay between machines)
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
-import {KernAudio, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 const SC_MAX_FETCHES = 4;
@@ -154,6 +156,34 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else audio = null;
   }
 
+  // ---- multiplayer -------------------------------------------------------------------------
+  const mp = params.get("mp");
+  if (mp === "host" || mp === "join") {
+    const adapter = {
+      netPush(from, bytes) {
+        const ptr = e.kern_alloc(Math.max(1, bytes.length));
+        new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);
+        e.sc_net_push(from % 4294967296, Math.floor(from / 4294967296), ptr, bytes.length);
+        e.kern_free(ptr);
+      },
+      netTake() {
+        const ptr = e.sc_net_take();
+        if (!ptr) return null;
+        const head = new Uint32Array(kern.memory.buffer, ptr, 3);
+        const bytes = new Uint8Array(kern.memory.buffer, ptr + 12, head[0]).slice();
+        return {to: head[1] + head[2] * 4294967296, bytes};
+      },
+    };
+    const net = new KernNet(adapter);
+    const room = params.get("room") || "spawncity", relay = params.get("relay") || "";
+    net.onstatus = text => { statusEl.textContent = text; statusEl.hidden = !text; };
+    net.open({kind: relay ? "relay" : "local", room, hosting: mp === "host", url: relay})
+      .then(r => command(mp === "host" ? `net host ${r.self}` : `net join ${r.self} ${r.host}`))
+      .catch(error => { statusEl.hidden = false; statusEl.textContent = "Mehrspieler: " + (error?.message || error); });
+    setInterval(() => net.flush(), 16);
+    window.SpawnCityNet = net;
+  }
+
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
   let frames = 0, last = null;
@@ -174,10 +204,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
 const SC_MODE_LABEL = {foot: "ZU FUSS", drone: "DROHNE", car: "AUTO", jet: "JET", parachute: "FALLSCHIRM"};
 const SC_HELP = {
-  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · F einsteigen · V Drohne",
-  drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · V zurück",
+  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne",
+  drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · V zurück",
   car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · F aussteigen",
-  jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · C Cockpit · F aussteigen / Schleudersitz",
+  jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · Maus links/Leertaste Kanone · R Rakete · B Bombe · C Cockpit · F aussteigen / Schleudersitz",
   parachute: "WASD steuern",
 };
 
@@ -239,6 +269,13 @@ class SpawnCityHud {
       row("Treibstoff", `${Math.round(j.fuel * 100)} %`);
     }
     if (h.chute !== undefined) row("Schirm", h.chute ? "OFFEN" : "FREIFALL");
+    if (h.weapon && h.mode !== "car" && h.mode !== "parachute") row("Waffe", h.weapon);
+    if (h.mode === "foot") row("Granaten", h.grenades);
+    if (h.carHp !== undefined) row("Zustand", `${Math.round(h.carHp / 3)} %`, h.carHp < 75 ? "warn" : "");
+    if (h.droneHp !== undefined) row("Zustand", `${Math.round(h.droneHp)} %`, h.droneHp < 30 ? "warn" : "");
+    if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 6)} %`, h.jetHp < 150 ? "warn" : "");
+    if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : "bereit (X)"}`, "hot");
+    if (h.net) row("Mehrspieler", h.net.status, h.net.connected ? "" : "warn");
     const key = rows.join("");
     if (key !== this.key) { el.rows.innerHTML = key; this.key = key; }
     const hp = h.health >= 0 ? h.health / (h.maxHealth || 100) : 1;

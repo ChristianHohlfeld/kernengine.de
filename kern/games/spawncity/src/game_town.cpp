@@ -105,7 +105,7 @@ void Game::handle_shots() {
     }
     if (drone_hit) continue;
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
-    if (people_.shot(s.from, to, damage, true, now) >= 0) {
+    if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0) {
       s.to = to;
       s.surface = 3;  // flesh: no decal
       s.impact = true;
@@ -210,6 +210,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
+  if (by_player) blast_remotes(at, radius, damage);
   // The player on foot (weapons.h blast_factor: buildings in between shield most of it).
   if (mode_ == Mode::foot) {
     const Vec3 me = matrix_of(soldier_).translation();
@@ -808,6 +809,7 @@ void Game::draw_town() {
       }
     }
   }
+  draw_remote_people();
   people_art_.end();
 }
 

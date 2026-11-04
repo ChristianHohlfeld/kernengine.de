@@ -6,6 +6,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "game.h"
 #include "kern/api/c_api.h"
@@ -101,6 +102,24 @@ KERN_EXPORT(sc_touch_view) const char* sc_touch_view() { return result(sc::game(
 // ---- presentation ----
 KERN_EXPORT(sc_hud) const char* sc_hud() { return result(sc::game().hud_json()); }
 KERN_EXPORT(sc_command) const char* sc_command(const char* text, kern::u32 length) { return result(sc::game().command(std::string(text, length))); }
+
+// ---- multiplayer: the page moves the datagrams (KernNet) ----
+/// A datagram from peer `from` (split into two 32-bit halves).
+KERN_EXPORT(sc_net_push) void sc_net_push(kern::u32 from_lo, kern::u32 from_hi, const kern::u8* bytes, kern::u32 length) {
+  sc::game().net().push((static_cast<kern::u64>(from_hi) << 32) | from_lo, bytes, length);
+}
+/// The next datagram to send: [u32 length][u32 to_lo][u32 to_hi][bytes], or 0 when none.
+KERN_EXPORT(sc_net_take) const kern::u8* sc_net_take() {
+  static std::vector<kern::u8> out;
+  kern::u64 to = 0;
+  std::vector<kern::u8> bytes;
+  if (!sc::game().net().take(to, bytes)) return nullptr;
+  out.resize(12 + bytes.size());
+  const kern::u32 head[3] = {static_cast<kern::u32>(bytes.size()), static_cast<kern::u32>(to), static_cast<kern::u32>(to >> 32)};
+  std::memcpy(out.data(), head, 12);
+  std::memcpy(out.data() + 12, bytes.data(), bytes.size());
+  return out.data();
+}
 
 // ---- audio: Kern's mixer renders, the page plays (KernAudio) ----
 KERN_EXPORT(sc_audio_init) kern::i32 sc_audio_init(kern::u32 rate) { return sc::game().audio_init(rate) ? 1 : 0; }

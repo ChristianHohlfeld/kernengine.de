@@ -116,7 +116,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       return true;
     }
   }
-  if (people_.shot(from, to, damage, by_player, now) >= 0) {
+  if ((by_player && hit_remotes(from, to, damage)) || people_.shot(from, to, damage, by_player, now) >= 0) {
     out.to = to;
     out.surface = 3;
     out.impact = true;

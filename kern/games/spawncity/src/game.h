@@ -21,6 +21,7 @@
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
 #include "kern/game/touch.h"
+#include "net_session.h"
 #include "people.h"
 #include "people_art.h"
 #include "road_graph.h"
@@ -107,6 +108,7 @@ class Game {
   void fixed_step(f32 h);
 
   // ---- host interface (exports.cpp) ----
+  net::Session& net() { return net_; }
   CityStream& city() { return city_; }
   PadState pad;
   void set_touch_frame(f32 w, f32 h, f32 sl, f32 st, f32 sr, f32 sb, f32 dpr);
@@ -185,6 +187,15 @@ class Game {
   void drone_attack(bool trigger, bool pressed);
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
+  // multiplayer (game_net.cpp)
+  void update_net(f32 dt);
+  net::PlayerState my_state() const;
+  void rebase_origin(f64 lon, f64 lat);
+  /// A shot or blast against the other players: their machines apply the damage.
+  bool hit_remotes(Vec3 from, Vec3& to, f32 damage);
+  void blast_remotes(Vec3 at, f32 radius, f32 damage);
+  void draw_remote_people();
+  void draw_remote_vehicles();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
@@ -250,6 +261,11 @@ class Game {
   f32 next_attack_ = 0, next_grenade_ = 0, next_drone_fire_ = 0, next_jet_gun_ = 0, next_jet_missile_ = 0, next_jet_bomb_ = 0;
   bool trigger_was_ = false;
   u32 explosions_ = 0;
+  // multiplayer
+  net::Session net_;
+  std::unique_ptr<Car> remote_car_, remote_bus_;
+  bool rebased_ = false;
+  u8 my_color_ = 0;
   f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 600, town_clock_ = 0;
   i32 last_stars_ = 0;
   bool player_dead_ = false;
