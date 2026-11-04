@@ -45,29 +45,35 @@ Startparameter (Query-String):
 
 ## Steuerung
 
-| Modus | Tastatur/Maus (Pointer-Lock per Klick) | Gamepad (Xbox) | Touch |
+Exakt wie spawncity.de auf jedem Gerät: die vollständige Tabelle (Tastatur/Maus, Laptop-Touchpad,
+Xbox-Controller, Touch; zu Fuß, Drohne, Auto/Bus, Jet, Fallschirm, Menüs, Luftschlag, Karte, Voice) mit
+Quelle je Zeile steht in [CONTROLS.md](CONTROLS.md), dort auch die behobenen Abweichungen.
+Kurzfassung:
+
+| Modus | Tastatur/Maus (Pointer-Lock per LMB/RMB) | Xbox | Touch |
 |---|---|---|---|
-| zu Fuß | WASD, Shift Sprint, Leertaste Sprung, Strg ducken, LMB Feuer, RMB zielen, R nachladen, **F** einsteigen, **V** Drohne | LS laufen, RS schauen, A Sprung, B ducken, RT Feuer, LT zielen, RB nachladen, **X** einsteigen, **D-Pad ↓** Drohne | Kerns Soldaten-Layout (Sticks, Feuer am Finger, Knöpfe) + DROHNE / EINSTEIGEN |
-| Drohne | R ARM / Landen, WASD fliegen (GAME: Geschwindigkeit), Leertaste/Shift Höhe, Maus X drehen, Maus Y Körperneigung, Q/E drehen, C Kamera (FPV/Follow/Third), G GAME/ANGLE, K Motoren aus, **V** zurück | LS fliegen, RS drehen/neigen, LT/RT Höhe, A ARM, View Kamera | linker Stick fliegen, rechter Stick Höhe/Drehen, ARM, KAMERA, ZU FUSS |
-| Auto | W Gas, S Bremse/rückwärts, A/D lenken, Leertaste Handbremse, C Cockpit, Maus Kopf, **F** aussteigen | LS lenken, RT Gas, LT Bremse, B Handbremse, X aussteigen | links lenken, rechts Gas/Bremse, HANDBREMSE, AUSSTEIGEN |
-| Jet | W/S Schub bzw. Steigen/Sinken, A/D Seitenruder, Maus nicken/rollen (Rate), Pfeile, **V** Schweben/Flug, C Cockpit, **F** aussteigen (am Boden) bzw. Schleudersitz | LS Schub/Seite, RS nicken/rollen, LB Schweben/Flug, X aussteigen | links Schub/Seite, rechts nicken/rollen, FLUG/SCHWEBEN, EJECT |
-| Fallschirm | WASD steuern | LS | linker Stick |
-| Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
-| Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (schaltet auf das Ziel am Fadenkreuz auf und startet; 5 s Nachladen) | RB feuern, Y wechseln | FEUER, Waffenknopf |
-| Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
-| Kampf/Ereignisse | **J** Luftschlag auf den anvisierten Punkt (30 s), **O** nächster Auftrag, **L** Rennstrecke (Drohne) | – | – |
+| überall | Esc Hauptmenü-Frage, Tab Menü, M Karte, P MULTI, Z/MMB Ping, H/K Mikro/stumm, L GPS LIVE, 4/J Luftschlag zielen (J/Enter/LMB los, RMB/Esc ab) | D-Pad ↑ Luftschlag, → Ping, ↓ Fuß/Drohne, X ein/aus, VIEW Kamera (halten: Karte), MENU Menü, R3 Mikro, R3+Y stumm | Minikarte ziehen = Kopf, 2× tippen = Karte |
+| zu Fuß | WASD, Shift, Leertaste (2× Jetpack), LMB Feuer, RMB zielen, 1 2 3 5 6 7 8, Q/Rad Waffe, T halten Granate, G EMP, E/F einsteigen, V Drohne | LS, RS, RT Feuer, LT zielen, A Sprung, L3 Sprint, LB Granate, Y/←→ Waffe, B EMP | Sticks, Feuer am Finger, JUMP, Waffe, SCOPE, GRANATE, STRIKE, ⇄ DRONE, 🚗/✈, EMP |
+| Drohne | WASD, Pfeile, Maus (Rate), RMB Blick, Leertaste/Shift Höhe, LMB Feuer, R ARM, C Kamera, 1/2, Q/Rad, V | LS, RS, RT−LT Höhe, RB Feuer, A ARM, Schema AIM: LB Blick | Sticks, Höhenschieber, Feuer am Finger, Waffe, ARM, STOP, ⇄ FPS, STRIKE, EMP |
+| Auto | W/S, A/D, Leertaste Handbremse, Maus Kopf, C Kamera, + − Rad Zoom, E/F aus, N/B Radio | LS lenken, RT/LT, RS Kopf, B Handbremse | LENKEN / GAS, UMSCHAUEN, ↗, CAM, HANDBREMSE, zwei Finger Zoom |
+| Jet | W/S, A/D, Pfeile/Maus, Leertaste/LMB Kanone, R RAKETE wählen, B Bombe, V Schweben/Flug, C, E/F | LS, RS, RT Kanone/Rakete, LT RAKETE, RB Bombe, LB Schweben/Flug | STEIGEN / SCHUB, KNÜPPEL, KANONE, Tipp-Feuer, ⇄ FLUG, RAKETE, BOMBE, CAM, EJECT (650 ms halten) |
+| Fallschirm | Pfeile / Maus | RS | rechter Stick |
+
+Befehle ohne Taste im Original: `race` (Rennstrecke), `contract` (nächster Auftrag), `dronemode`
+(GAME/ANGLE), `scheme aim|classic` (Xbox-Schema), `strike aim|go|cancel`, `look set|release|keep`,
+`zoom in|out`, `device ...` (die Seite meldet Gerätewechsel), `controls` (Zustand als JSON).
 
 Mehrspieler (alle Modi; `voice_control_bindings.mjs`, `ping_marker.mjs`, `world_map_full.mjs`):
 
 | Aktion | Tastatur/Maus | Gamepad | Touch |
 |---|---|---|---|
 | Mikrofon an/aus (Sprachchat in 70 m) | **H** | **R3** antippen (beim Loslassen) | 🎤 MIC |
-| Sprachchat stumm | **K** (in der Drohne ist K Motoren aus) | **R3 + Y** | 🔈 |
+| Sprachchat stumm | **K** | **R3 + Y** | 🔈 |
 | Überall hörbar (Funk) | – | – | ÜBERALL |
-| Ping-Marker (gleicher Ort: entfernen) | **Z** / mittlere Maustaste | **R3 + D-Pad →** | 0,6 s lang drücken |
-| Große Karte | **M**, Esc schließt | **Menu**; dort LS schieben, LT/RT Zoom, A Wegpunkt, X Ziel löschen, Y Suche, B schließen | KARTE; Tippen = Wegpunkt |
-| Abstimmung JA / NEIN | Knöpfe JA / NEIN | – | JA / NEIN |
-| Öffentliche Lobby | – | – | MULTI |
+| Ping-Marker (gleicher Ort: entfernen) | **Z** / mittlere Maustaste | **D-Pad →** | 0,6 s lang drücken |
+| Große Karte | **M**, Esc schließt, **/** Suche | **VIEW** halten; dort LS schieben, LT/RT Zoom, ←→ Zoom-Stufe, A Wegpunkt, X Ziel löschen, Y Suche, R3 mir folgen, B/VIEW schließen | Minikarte 2× tippen |
+| Abstimmung JA / NEIN | Knöpfe JA / NEIN | A / B | JA / NEIN |
+| Öffentliche Lobby | **P** | – | MULTI |
 | Einladen (QR-Code, Teilen) | – | – | TEILEN |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
@@ -95,11 +101,21 @@ kern/games/spawncity/
     terrain.*     Gelände (M3): Terrarium-Höhen → Bare-Earth-Raster, Wasserbecken, Krater, Bodenkacheln
                   (Render-LOD mit Schürzen, Box3D-Dreiecksnetze mit Überlappung), eine Höhenfunktion für alles
     game_world.*  Welt (M3): HUD/Befehle des Geländes; Wasserphysik, Spuren, Verkehrsregeln, Tiere usw.
+    life.*        Straßenleben (M3): Kühe auf den Wiesen, Taubenschwärme, Vögel über den Dächern, Bäume,
+                  die Laufgruppe, Straßenstimmen (Rufe, Hupen, Schreie) - reine Simulation ohne GameWorld
+    ragdoll.*     Ragdolls (M3): 11 Box3D-Körper mit begrenzten Gelenken und Gelenkreibung, Aufstehen
+    interiors.*   begehbare Gebäude (M3): Stockwerke, Treppenhaus bis aufs Dach, Möbel, Fenster, Türen,
+                  eigene Box3D-Kollision des aktiven Gebäudes
+    life_art.*    Zeichnen des Straßenlebens (instanzierte, getönte Grundkörper)
+    game_life.*   Leben im Spiel (M3): füttert life/ragdoll/interiors, Klänge, Sprache, HUD, Testbefehle
     city_stream.* Kachel-Streaming: Decodieren → BuildingBuilder/RoadBuilder → Meshes → Box3D-Kollision,
                   alles mit Zeitbudget; Entladen ferner Kacheln; Fahrspuren für den Verkehr
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
     sound_fx.*    Synth-Patches (Rotor, Motor, Turbine, Jet-Röhren, Wind) auf Kerns Mixer
-    touch_pad.*   Touch-Sticks/Knöpfe der Fahrzeuge (Overlay = Kerns TouchOverlay)
+    controls.*    Steuerungs-Mathematik nach SpawnCity (Totzonen, Kurven, Raten, Latches, Granate, Geräte)
+    touch_play.*  Touch-Steuerung aller Modi (Sticks, Feuer am Finger, Höhenschieber, Knöpfe nach
+                  edge_hud_layout.mjs; Overlay = Kerns TouchOverlay)
+    game_controls.* Eingabe je Modus, Pad-Aktionen, Luftschlag-Zielen, Kopfblick (CONTROLS.md)
     wanted.*      Wanted-Regeln (Heat, Sterne, Polizei-Antwort, Fluchtzeit, Trefferchance, EMP)
     people.*      Fußgänger auf den Gehwegen (Routen von Straße zu Straße, Panik, Zeugen) und Beamte:
                   leichte Agenten, Box3D-Strahlen gegen Wände, Treffer auf Kapseln, Überfahren
@@ -116,6 +132,7 @@ kern/games/spawncity/
     settings.*    Einstellungstabelle (Werte, Bereiche, Hilfe aus SpawnCity), `set`/`get`/`settings schema`
     gps_live.*    LIVE-GPS-Filter (Sprünge verwerfen, Vorhersage, Tätigkeit)
     equipment.*   Jetpack, Flug-Logbuch, MusicSynth (Titelmusik, Autoradio)
+    nostr.*       SHA-256, secp256k1, BIP-340-Signatur für das Nostr-Ereignis der Ideen-Karte
     game_ui.*     Menü-/Einstellungs-Seite des Spiels: Anwenden der Einstellungen, Pause, RESET, Startort, LIVE GPS
     game_equipment.cpp  Jetpack am Soldaten, Logbuch, Radio, Geräuschkulisse
 
@@ -389,6 +406,69 @@ kern/games/spawncity/
   nach `update()`; zwei Augen in zwei Bildhälften brauchen eine Engine-Änderung (siehe unten). Die
   Einstellung `cam.stereo` hat deshalb noch keine Wirkung (`look.stereo` im HUD-JSON ist `false`).
 
+## Leben, Innenräume, Ragdolls (M3)
+
+* **Kühe** (`cows.mjs`): jede Wiese (OpenMapTiles-Landcover `grass`, ab 1800 m²) im Umkreis von 420 m
+  bekommt eine Herde (2–7, Fellfarbe aus dem Schlüssel der Fläche, höchstens 40). Sie grasen auf einem
+  uhrgetriebenen Pfad (alle 24 s ein neuer Fleck im Umkreis von 6 m um den eigenen Platz, 0,55 m/s, Kopf
+  unten), muhen ab und zu, scheuen vor Schüssen (Leuchtspur nahe der Herde) und Explosionen. Ein Treffer
+  tut weh (100 HP), ein langsames Auto schiebt sie beiseite, ab 8 m/s oder in einer Explosion stirbt sie:
+  der 600-kg-Körper fliegt als Box3D-Quader (Auto verliert den übergebenen Impuls). Der Weidepfad läuft
+  auf der Weltuhr (wie `Date.now()` in SpawnCity): auf allen Rechnern grasen dieselben Kühe am selben Ort,
+  und der Tod einer Kuh geht an die Mitspieler (Fx `cow_death`), die dieselbe Kuh fallen lassen.
+* **Tauben** (`pigeons.mjs`): 5 Schwärme (mobil 3) zu 6–12 Vögeln 22–95 m um den Spieler auf freiem
+  Boden (nicht in Häusern oder Wasser, Box3D-Strahl); sie picken und nicken, gurren, und fliegen
+  gemeinsam auf, wenn man auf 6,6 m herankommt, ein Auto vorbeifährt, ein Schuss (40 m) oder Knall (90 m)
+  fällt oder von selbst (25–70 s): Schleifen, dann Gleitflug auf einen neuen Platz 25–55 m weiter.
+* **Hunde und Katzen** (`world_procedural_population.mjs`, `animal_audio.mjs`): 20 Tiere (mobil 12) auf
+  Kreisbahnen (13–58 m, eigenes Tempo, Schlenker) um den Ankerpunkt des Viertels (neu verankert nach 2,5 km),
+  jedes dritte eine Katze, sonst Hunde (Fellfarben aus SpawnCity). Alle zwei Minuten (Weltuhr) ist Tier #1
+  die **schwarze Katze**: wer sie anschießt, den greift sie an – faucht und jault, rennt mit 11 m/s heran,
+  springt bei 1,6 m und tötet den Spieler, dann schlendert sie davon (1,3 m/s). Die anderen sterben an
+  Schuss, Explosion oder Auto (rollen als Box3D-Quader auf die Seite, nach 7 s weg, nach 25 s kommt ein
+  neues), Fäuste brauchen drei Schläge (Hund) bzw. zwei (Katze). Jaulen, Miauen, Fauchen, Kreischen als
+  Synth-Patches. WELT-Schalter `world.dogs` / `world.cats`.
+* **Vögel und Bäume** (`world_liveliness.mjs`): 16 Vögel (mobil 10) kreisen 8–21 m über den Dächern
+  (abschießbar: fallen trudelnd, 9 s weg, Kreischen aus `animal_audio.mjs`), Bäume alle 37 m an den
+  Straßen, mindestens 2,4 m von Wänden.
+* **Laufgruppe** (`jogger_chain.mjs`): nach 60 s, dann alle 170–280 s zehn Läufer in Neongelb im
+  Gänsemarsch (1,35 m Abstand, 2,9 m/s) auf dem Gehweg einer echten Straße 35–150 m entfernt, Wenden am
+  Ende, nach 95 s weg. Der Vorläufer ruft, die Gruppe antwortet (Sprachausgabe des Browsers, de-DE),
+  Stampfen im 0,4-s-Takt. Wer sie umfährt oder trifft, zählt eine Serie (12 s): „JOGGER x2“, die ganze
+  Gruppe „KOMPLETTE LAUFGRUPPE!“ mit Jingle.
+* **Straßenstimmen** (`street_voices.mjs`): Leute sagen, was sie denken – angerempelt („Hey, pass doch
+  auf!“), knapp verfehlt vom Auto, verängstigt (oder ein Schrei aus Synth-Formanten), wütend, wenn sie
+  zurückschlagen; Fahrer hupen, wenn der Spieler oder ein Passant vor ihnen auf der Fahrbahn steht. Die
+  Zeilen spricht der Browser, die Sprechblase steht über dem Kopf (Position rechnet C++, die Seite zeichnet
+  sie: `web/life.mjs`). Drosseln wie im Original (1,4 s global, 6 s je Person, Hupe 1,2 s / 4 s je Auto).
+* **Ragdolls** (`world_person_ragdoll.mjs`, `people_impacts.mjs`): Getroffene fallen als Box3D-Körper
+  (Becken, Brust, Kopf, Ober-/Unterarme, Ober-/Unterschenkel; Kegel- und Scharniergrenzen,
+  Reibungsmotor; Box3D selbst unverändert), Pool 10 (mobil 6). Von einem Auto angefahren, wer noch lebt,
+  steht wieder auf („Reverse Ragdoll“: Liegen, Knien, Stehen in 1,15 s) und geht von dort weiter; der
+  Wagen verliert den Impuls (75 kg · 0,55). Explosionen stoßen liegende Körper weg.
+* **Stöße zwischen Spielern** (`player_push.mjs`): ein Stoß gegen einen Mitspieler geht als Fx `push`
+  (Geschwindigkeitsänderung, Schaden, Ziel-Slot) an dessen Rechner, der ihn auf sich selbst anwendet
+  (höchstens 40 m/s); heute lösen ihn Explosionen in der Nähe eines Mitspielers aus.
+* **Innenräume** (`building_interiors.mjs`): das nächste Gebäude im Umkreis von 30 m wird begehbar
+  (eines zur Zeit): Haustür(en) an der längsten Wand (über 260 m² eine zweite gegenüber), das Erdgeschoss
+  und alle Stockwerke in der Höhe der Fassadenfenster (Kerns Gebäudenetz: 3,1–3,6 m je Haus, höchstens 12),
+  ein Treppenhaus mit Wendeltreppe
+  (2 × 1,2-m-Läufe, Podeste 1,3 m) bis aufs Dach mit Treppenhaus-Aufbau, Fensteröffnungen, Deckenlicht,
+  Möbel mit Kollision (Empfang in der Lobby, Schreibtisch, Bett, Regal, Sofa, Sessel mit Stehlampe,
+  Esstisch mit Stühlen, Küchenzeile, Tisch, Pflanze; Klimageräte auf dem Dach). Die Fensteröffnungen
+  sitzen genau dort, wo die Fassade ihre Fenster zeichnet (alle 3 m ab Kantenanfang, 22–78 % der Spalte,
+  28–78 % des Stockwerks), mit leicht getönten Glasscheiben (ein transparentes Netz). Die Kollision bringt das
+  Gebäude selbst mit; `CityStream::exclude_building` baut solange die Kachel-Kollision ohne dieses Haus
+  neu (in Zeitscheiben, der alte Körper bleibt bis der neue fertig ist). Nahe Häuser zeigen geschlossene
+  Türen (24 im Umkreis von 95 m). Die Fassade ist von innen nicht gezeichnet (Rückseiten), deshalb zeigen
+  die Fensteröffnungen die Stadt; die offene Tür zeigt von außen ein dunkles Türblatt statt eines echten
+  Ausschnitts (das Hausnetz ist ein gemeinsames Kachelnetz).
+* **WELT-Schalter:** `world.people` schaltet auch die Laufgruppe ab, `world.birds` Tauben und Vögel,
+  `world.dogs`/`world.cats` die Hunde und Katzen.
+* **Testbefehle:** `life`, `cows`, `cows kill`, `pigeons`, `pigeons spook`, `joggers`, `birds`, `ragdoll`,
+  `ragdoll state`, `pets`, `pets kill`, `cat` (die schwarze Katze greift an), `knock` (nächster Passant wird umgestoßen und steht wieder auf), `shout`, `honk`,
+  `interior`, `interior go|in|up|roof|door`.
+
 ## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
 
 * **Einstellungen** (`settings.*`, `game_ui.cpp`): eine Tabelle im Spiel mit SpawnCitys Werten, Bereichen und
@@ -401,13 +481,23 @@ kern/games/spawncity/
   eine Kopie, die beim Start wieder abgespielt wird (`settings values`, `get <key>`, `settings reset [bereich]`).
 * **WELT** (`world_options.mjs`): Leute, Verkehr und Polizei gibt es nicht, wenn sie aus sind (keine
   Körper, keine KI); Jetpack; Friendly Fire (Standard aus, wie SpawnCity: Treffer und Explosionen
-  erreichen andere Spieler nur, wenn es an ist). Hunde, Katzen, Vögel, Zombies, Militär und Flak hat das
-  Spiel auf Kern noch nicht – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+  erreichen andere Spieler nur, wenn es an ist); Militär, Zombie-Nächte und Flak schalten die Kampfsysteme
+  (`military on|off`, `zombies on|off`, Flak prüft den Schalter selbst). Hunde, Katzen und Vögel hat das
+  Spiel auf Kern noch nicht (Tiere: anderer Bereich) – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+* **Ansicht und Helfer** (`settings_help.mjs`): 1-m-Raster um den Spieler, Blick halten (das Cockpit
+  schwingt nicht zurück), Minimap genordet, Box3D-Kollisionsformen als Drahtgitter (Kerns
+  `debug_lines`), Zielhilfe mit Pad und Touch (0–100 %, Standard 55: sanfter Zug zum nächsten Gegner
+  innerhalb 6° und 70 m). Im Einstellungsdialog oben „was du steuerst“ (ZU FUSS / DROHNE / AUTO / JET)
+  und STARTORT.
 * **Menüs** (`web/ui.mjs`, nur DOM): Titelbildschirm (START, WELT, EINSTELLUNGEN, NEU / CHANGELOG;
   automatisierte Browser und `?autostart=1` überspringen ihn, `?menu=1` erzwingt ihn), Pausemenü (Esc,
   MENÜ, Pad-Menütaste, Verlassen des Pointer-Locks), „Zurück zum Hauptmenü?“ (Enter/Y – Esc/N),
-  EXIT / MENÜ / RESET oben links, Steuerung der Menüs mit dem Pad (D-Pad, A, B). Solange ein Menü offen
-  ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
+  EXIT / MENÜ / RESET oben links, der Moduswechsel unten links mit seinem Ziel („ZUR DROHNE · V“,
+  „AUSSTEIGEN · F“, „EJECT · F“; Touch hat ihn im Touch-Layout), Ton- und Musikschalter (im Titel oben
+  rechts, im Spiel neben EXIT), HOME SCREEN (Installieren: Chromes Abfrage, auf iOS die zwei Tipps),
+  TEILEN (Teilen-Dialog, sonst Link kopieren, sonst ein Post auf X), NEU / CHANGELOG mit den Kern-Meilensteinen
+  und darunter dem vollständigen Changelog von spawncity.de. Steuerung der Menüs mit dem Pad (D-Pad, A, B).
+  Solange ein Menü offen ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
 * **RESET** (`game_reset.mjs`, allein): zurück zum Start – Startmodus und Startpunkt, Pistole, volle
   Gesundheit, keine Fahndung, Polizei weg, Fahrzeuge repariert, neue Passanten.
 * **Startort** (`start_location.mjs`, `world_location_selector.mjs`, `auto_flight_start.mjs`): der „📍“-Knopf
@@ -424,13 +514,15 @@ kern/games/spawncity/
   Vorhersage mit konstanter Geschwindigkeit, Neuanfang nach 12 s Lücke, Welt wandert mit ab 40 km) und
   führt den Spieler zu Fuß mit; Tätigkeit aus dem Tempo (steht/gehen/laufen/Rad/Fahrt), Tempo bzw. Pace,
   Strecke, Zeit, Genauigkeit; Ansichten AUGE, FOLGEN, KARTE (`gps view`). Kein Schaden, keine Fahndung.
-  Bildschirm bleibt an (Wake Lock). Offen: der blaue Positionspunkt und die Spurlinie am Boden.
+  Bildschirm bleibt an (Wake Lock). Am Boden der blaue Positionspunkt (Genauigkeitskreis, Ring, Punkt,
+  Blickkeil) und die Spurlinie (ein Punkt alle 2 m, höchstens 4000).
 * **Jetpack** (`equipment.*`, `game_equipment.cpp`; `player_walk_mode_v4.mjs`, `jetpack_audio.mjs`): WELT-Schalter
   (an). Zweiter Sprung in der Luft zündet (Stoß 0,6 s), Sprung halten fliegt weiter: Steigen bis 8 m/s
   (Beschleunigung g + (8 − vz)·3, höchstens 13,8 m/s²), Luftsteuerung 14 m/s², Tank ≈ 5 s, füllt sich in
   4 s am Boden (in der Luft nach 0,35 s ohne Schub), kurz vor einem harten Aufprall zündet er selbst
   (21 m/s²). Der Schub ist ein Impuls auf Kerns Charakter (75 kg). Ton: Zünd-„Wumm“ (Druckstoß,
-  Flammenstoß, Klick) und ein Brüllen aus gefiltertem Rauschen mit Knistern; Tankanzeige unten.
+  Flammenstoß, Klick), ein oranges Aufblitzen an den Bildrändern, ein Brüllen aus gefiltertem Rauschen mit
+  Knistern; die Jetpacks der anderen Spieler hört man in 3-D an ihrer Stelle (Flag `kJetpack`); Tankanzeige unten.
 * **Logbuch** (`flight_logbook.mjs`): jeder Drohnenflug von ARM bis DISARM (Dauer, Strecke, Spitze,
   größte Höhe über Grund, Akku Start/Minimum, Grund des Endes, Pfad alle 0,5 s, höchstens 50 Flüge) und
   die Netzereignisse; das Spiel zeichnet auf (`logbook`), die Seite hält die Geschichte in localStorage,
@@ -446,13 +538,16 @@ kern/games/spawncity/
   (Umgebungs-Bus, leiser in der Höhe) und ein dumpfer Schlag bei harten Stößen des eigenen Autos
   (ab 1,8 m/s Geschwindigkeitssprung) mit etwas Kamerawackeln. Schritte und Motor kommen wie bisher
   aus Kerns GameAudio und `sound_fx.*`.
-* **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
-  verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
-  Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als
-  Vorschlag im öffentlichen GitHub-Repository öffnen.
+* **Idee fürs nächste Update** (`suggestion_box.mjs`, `nostr.*`): nach 15 min Spielzeit dieser Version fragt
+  die Karte im Titel einmal (SENDEN / SPÄTER = 10 min / NEIN DANKE). Wie SpawnCity geht die Zeile anonym als
+  signiertes Nostr-Ereignis (Art 30078, Tags `spawncity-suggestion` und Build) mit einem Wegwerf-Schlüssel an
+  die öffentlichen Relays relay.damus.io, nos.lol, relay.primal.net und relay-rpi.edufeed.org. SpawnCity
+  nutzt dafür `nostr-tools`; hier signiert das Spiel selbst (SHA-256, secp256k1, BIP-340 in `nostr.cpp`,
+  geprüft mit den BIP-340-Testvektoren), die Seite öffnet nur die WebSockets.
 * **App/Vollbild** (`pwa_fullscreen_policy.mjs`): `web/manifest.webmanifest` (Vollbild, quer) mit
-  eigenem SVG-Symbol; auf Touch-Geräten startet START das Vollbild, außer die installierte App läuft
-  schon im eigenen Fenster.
+  eigenem SVG-Symbol; `web/sw.js` hält wie SpawnCitys Service Worker eine Kopie für den Start ohne Netz
+  (Netz zuerst, nur eigene Dateien); auf Touch-Geräten startet START das Vollbild, außer die installierte
+  App läuft schon im eigenen Fenster.
 
 ## Parität (sc-m3-gaps)
 
@@ -549,6 +644,11 @@ Pings, Sprache nur in Reichweite. Der Smoke-Test spielt zuerst zwei Tabs (Broadc
 Spawn-Anker, Farben, Namensschild, Friendly Fire aus/Abstimmung/Treffer/Kill/Respawn, Explosion, Ping,
 Sprache (Testton), QR-Code, große Karte mit Ziel. Danach lädt er die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
 echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
+Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots. `test_life.cpp`
+prüft Ragdolls (Fallen, Liegen, Pool, Aufstehen), den Bauplan eines Gebäudes (Stockwerke, Kern, Dach,
+Tür in der Kollision, ein Character-Mover läuft die erste Treppe hinauf), Kühe (Treffer, Explosion,
+600-kg-Körper), Vögel und die Drosselung der Stimmen; der Smoke-Test die Tiere, einen Ragdoll, das
+Aufstehen und das Betreten eines Hauses bis aufs Dach.
 Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots.
 `test_look.cpp` prüft Frame-Zeit-Runden, die Qualitätsleiter (runter unter 50 fps, hoch mit Reserve,
 Sperre zu schwerer Stufen, Telefon-Obergrenze, feste Stufe), Kamera-Wackeln, FPV-Stabilisator,
@@ -579,15 +679,20 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Tiere.
+* Fahrer, die beim Carjacking sichtbar aussteigen.
+* Innenräume: die offene Tür und die Dachluke sind von außen kein echter Ausschnitt im Fassadennetz
+  (Kerns Gebäudenetz ist ein Netz je Kachel, SpawnCity schneidet per Shader-Uniform `facadeCutouts`) –
+  ein dunkles Türblatt steht davor; braucht Engine-Punkt 15. Das „Halten“ aus `player_push.mjs` gehört
+  zur Gravity-Gun (eigener Bereich); der Netzweg dafür (Fx `push`) ist da. Autotreffer an Passanten
+  werden nicht verschickt, weil Passanten auf Kern lokal sind (siehe Mehrspieler).
 * **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
   sperrt die Drohnen-Nuke (nur GUN/ROCKETS/GUIDED), der Kommentar „LAUNCHER NUKE“ in
   `gameplay_final_runtime_v2.mjs` hat keinen Code-Zweig mehr (`footShotAt` feuert normale Raketen),
   `world_options.mjs` hat keinen Nuke-Schalter, und niemand löst `arondight:nuke-impact` oder eine
   Explosion `kind:"nuke"` aus. `nuke_destruction.mjs`/`nuke_shock_field.mjs` sind dort toter Code.
   Ebenso ist der Pilotenschild (`player_shield.mjs`) „retired“ (immer aus) – nicht nachgebaut.
-* Zombie-Barrikaden (Türen mit Brettern, REPARIEREN) brauchen begehbare Innenräume, die Kern-SpawnCity
-  noch nicht hat; die Zombies laufen deshalb nur draußen.
+* Zombie-Barrikaden (Türen mit Brettern, REPARIEREN): die Innenräume (M3 life) gibt es jetzt, die
+  Barrikaden selbst fehlen noch; die Zombies laufen deshalb nur draußen.
 * Der Panzer ist ein leichter Agent auf dem Straßengraph (Strahl gegen Wände), kein Box3D-Fahrzeug wie
   in SpawnCity (`physics.upsertBody kind:"bus"`); Box3D-Körper zur Laufzeit wären ein Level-Actor mehr.
 * Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler).
@@ -601,24 +706,24 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Synth-Patches aus `combat_audio_bank.mjs`, kein Retarded-Time-Doppler-Loop für die Jets (nur der
   verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`) für MP/Sniper:
   Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
-* Ragdolls; Glassprünge in Fenstern (siehe „Krater und Spuren“).
+* Glassprünge in Fenstern (siehe „Krater und Spuren“).
 * Kampfton: die Bank aus `combat_audio_bank.mjs` ist nachgebaut; Sniper, Werfer, Nachladen und Jets
   nutzen weiter Kerns eingebaute Klänge (SpawnCitys Bank hat dafür keine), kein Retarded-Time-Doppler-Loop
   für die Jets (nur der verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`)
   für MP/Sniper: Kerns Soldatenwaffen sind Hitscan (das wäre eine Engine-Änderung an `WeaponComponent`).
   Die GUIDED zieht keinen Rauchschweif und hat keinen eigenen Motorton (Kerns Partikel/Klänge). `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
-* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
+* Zerstörung an Gebäuden (Krater, Fassadenspuren).
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
 
-* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
+* Zerstörung an Gebäuden (Krater, Fassadenspuren).
 * Mehrspieler: Autoritätswechsel, wenn der Host geht (heute endet die Runde); Nostr als zweiter
   öffentlicher Weg; synchronisierte Gebäudezerstörung und Atombombe (`world_sync.mjs`) – Kern-SpawnCity
   hat beides noch nicht, der Fx-Kanal ist dafür vorbereitet; Mikrofon im Headless-Test nicht prüfbar
   (der Test spricht mit `voice tone N`). Polizei und Passanten bleiben lokal (wie in SpawnCity).
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume, GPS-Start.
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader; GPS-Start.
 * Verkehr: mehr Fahrzeugtypen; Fahrer, die beim Carjacking zurückschlagen.
 * Nach einem Mehrspieler-Ursprungswechsel bleiben Spuren/Abschleppwagen der alten Stadt bis zum Ablauf.
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume, GPS-Start.
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. GPS-Start.
 * 3D nebeneinander (Kreuzblick) – braucht Engine-Punkt 9. Bloom-Stärke/Schwelle von `neon_bloom.mjs`
   (0,13/0,08, Schwelle 0,88) lassen sich in Kern nicht einstellen; Kerns Bloom bleibt wie er ist.
 * Messer-Schnittspur (Band hinter der Klinge) und Waffen-Skins anderer Seltenheit.
@@ -653,3 +758,14 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
    und ein Autoritätswechsel in `kern::net` (neuer Server aus dem ältesten Client), wenn der Host geht.
 14. **Sprach-Bus im Mixer** (`kern::audio`): eine gestreamte Quelle je Sprecher mit Jitter-Puffer statt
    des Nachmischens in `Game::audio_render` (`mp::VoiceStream`).
+15. **Ragdoll-Baustein** (Catto-Mensch aus Kapseln mit Gelenkgrenzen und Reibung, `ragdoll.*`) und
+    ein **Ausschnitt-Mechanismus für Gebäudenetze** (Tür/Dachluke im Kachelnetz, wie SpawnCitys
+    `facadeCutouts`), dazu `destroy_shape`, damit ein Haus seinen Kollisions-Shape abgeben kann, ohne
+    dass die ganze Kachel neu gebaut wird (`CityStream::exclude_building`).
+16. **Steuerung** (gebaut in `touch_play.*`, `controls.*`, `game_controls.cpp`): `TouchControls` mit
+    frei belegbarem Layout je Modus (Knopfliste, Halten/Tippen, Höhenschieber, Pinch) statt des festen
+    Soldaten-Layouts; `InputArbiter` mit Pad-Eingabe-Zustand und Plattformmeldung; im App-Host ein
+    `mousemove`-Strom unter Pointer-Lock (begrenzt je Ereignis) und ein Lock-Status; `Key` um `+ - /`
+    erweitern; im Soldaten: Schuss durch einen Bildschirmpunkt (Touch-Feuer am Finger für die
+    Kern-Waffen MP/Glock/Sniper), Sprint in jede Richtung, Respawn per Aufruf statt nach Zeit,
+    Blickkurve/Raten der Pad-Sticks als Parameter (heute rechnet das Spiel sie und gibt Grad weiter).

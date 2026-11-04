@@ -195,6 +195,87 @@ async function run({name, url, context, mapped}) {
   check(Math.hypot(h.lon - p0[0], h.lat - p0[1]) > 1e-6, `[${name}] walked on foot`);
   await shot("1-foot");
 
+  // Controls (CONTROLS.md, game_controls.cpp): keyboard, a synthetic Xbox pad, touch.
+  {
+    const gameWait = async s => { const t = (await hud()).t; await page.waitForFunction(([t, s]) => window.SpawnCity.hud().t > t + s, [t, s], {timeout: 300000}).catch(() => {}); };
+    const ctl = async () => (await hud()).ctl || {};
+    if (!context.hasTouch) {
+      check((await ctl()).device === "desktop", `[${name}] desktop device (${JSON.stringify(await ctl())})`);
+      check((await page.locator(".sc-help").textContent()).includes("WASD move"), `[${name}] the key line (desktop_controls.mjs HINTS)`);
+      let w0 = (await hud()).weapon;
+      await page.keyboard.press("KeyQ"); await gameWait(0.3);
+      check((await hud()).weapon !== w0, `[${name}] Q: next weapon (${w0} -> ${(await hud()).weapon})`);
+      await page.keyboard.press("Digit4"); await gameWait(0.2);
+      check((await ctl()).aiming, `[${name}] 4: air strike aiming`);
+      await page.keyboard.press("Escape"); await gameWait(0.2);
+      check(!(await ctl()).aiming && await page.locator("#scQuit").isHidden(), `[${name}] Esc cancels the aiming (no quit dialog)`);
+      const c0 = (await ctl()).nade.carry;
+      await page.keyboard.down("KeyT"); await gameWait(0.6);
+      check((await ctl()).nade.left > 2.5 && (await ctl()).nade.left < 4, `[${name}] T held: the grenade cooks (${JSON.stringify((await ctl()).nade)})`);
+      await page.keyboard.up("KeyT"); await gameWait(0.2);
+      check((await ctl()).nade.carry === c0 - 1 && (await ctl()).nade.left < 0, `[${name}] T released: thrown (${JSON.stringify((await ctl()).nade)})`);
+      // A synthetic Xbox pad (standard mapping) through navigator.getGamepads.
+      await page.evaluate(() => {
+        const pad = {connected: true, mapping: "standard", id: "Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e)", index: 0, axes: [0, 0, 0, 0],
+          buttons: Array.from({length: 17}, () => ({pressed: false, value: 0}))};
+        window.__pad = pad;
+        window.__padSet = (i, on) => { pad.buttons[i] = {pressed: on, value: on ? 1 : 0}; };
+        navigator.getGamepads = () => [pad];
+      });
+      const tap = async (i, s = 0.25) => { await page.evaluate(i => window.__padSet(i, true), i); await gameWait(s); await page.evaluate(i => window.__padSet(i, false), i); await gameWait(0.2); };
+      w0 = (await hud()).weapon;
+      await tap(3);
+      check((await hud()).weapon !== w0 && (await ctl()).pad, `[${name}] pad Y: next weapon, pad-input (${w0} -> ${(await hud()).weapon})`);
+      check(await page.locator(".sc-help").evaluate(e => !e.textContent), `[${name}] pad-input hides the key line`);
+      const p1 = [(await hud()).lon, (await hud()).lat];
+      await page.evaluate(() => { window.__pad.axes[1] = -1; });
+      await gameWait(2);
+      await page.evaluate(() => { window.__pad.axes[1] = 0; });
+      check(Math.hypot((await hud()).lon - p1[0], (await hud()).lat - p1[1]) > 1e-6, `[${name}] pad LS walks`);
+      await tap(12);
+      check((await ctl()).aiming, `[${name}] D-pad up: strike aiming`);
+      await tap(1);
+      check(!(await ctl()).aiming, `[${name}] B cancels`);
+      await tap(8, 0.7);
+      check(await page.locator("#mpMap").count() === 1, `[${name}] VIEW held: the big map`);
+      await tap(1);
+      check(await page.locator("#mpMap").count() === 0, `[${name}] B closes the map`);
+      await tap(13);
+      check((await hud()).mode === "drone", `[${name}] D-pad down: drone`);
+      await tap(13);
+      check((await hud()).mode === "foot", `[${name}] D-pad down: back on foot`);
+      await page.evaluate(() => { navigator.getGamepads = () => []; });
+      await page.keyboard.press("KeyZ"); await gameWait(0.2);
+      check(!(await ctl()).pad, `[${name}] a key ends pad-input`);
+    } else {
+      cdp ||= await ctx.newCDPSession(page);
+      const touchTap = async (x, y) => {
+        await cdp.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: [{x, y, id: 7}]});
+        await gameWait(0.15);
+        await cdp.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+        await gameWait(0.15);
+      };
+      const box = async id => page.locator(`.k-touch [data-touch="${id}"]`).boundingBox();
+      check((await ctl()).device === "touch", `[${name}] touch device`);
+      for (const id of ["jump", "wpn", "mode", "strike", "nade"]) check(!!(await box(id)), `[${name}] touch button ${id}`);
+      const w0 = (await hud()).weapon, b = await box("wpn");
+      if (b) await touchTap(b.x + b.width / 2, b.y + b.height / 2);
+      check((await hud()).weapon !== w0, `[${name}] the thumb weapon button cycles (${w0} -> ${(await hud()).weapon})`);
+      await cmd("weapon 1");  // the Glock (Kern fires it): a tap on the screen shoots
+      await gameWait(0.4);
+      const m0 = (await hud()).mag;
+      await touchTap(vw * 0.55, vh * 0.35);
+      check((await hud()).mag < m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).mag})`);
+      const s = await box("strike");
+      if (s) await touchTap(s.x + s.width / 2, s.y + s.height / 2);
+      check((await ctl()).aiming, `[${name}] STRIKE: aiming`);
+      const c = await box("strike_cancel");
+      if (c) await touchTap(c.x + c.width / 2, c.y + c.height / 2);
+      check(!(await ctl()).aiming, `[${name}] ABBRECHEN`);
+      await cmd("weapon 1");
+    }
+  }
+
   // The town: people on the pavements; a wanted level brings a police unit with its crew.
   h = await hud();
   check(h.people >= 10, `[${name}] people in the streets: ${h.people}`);
@@ -271,6 +352,40 @@ async function run({name, url, context, mapped}) {
     check(["yes", "no"].includes(await cmd("canspawn 0 0")), `[${name}] spawn gate answers`);
   }
 
+  // Street life, ragdolls, interiors (game_life.cpp, M3 life).
+  {
+    check(JSON.parse(await cmd("cows")).cows >= 5, `[${name}] a herd of cows`);
+    check(JSON.parse(await cmd("pigeons")).flocks >= 1, `[${name}] a pigeon flock`);
+    const pets = JSON.parse(await cmd("pets"));
+    check(pets.pets >= 12 && pets.cats >= 4, `[${name}] dogs and cats (${JSON.stringify(pets)})`);
+    check(JSON.parse(await cmd("ragdoll")).ok, `[${name}] a ragdoll is thrown`);
+    const knocked = await cmd("knock");
+    const tl = (await hud()).t;
+    await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tl, {timeout: 400000}).catch(() => {});
+    const rs = JSON.parse(await cmd("ragdoll state"));
+    check(rs.pelvis && rs.pelvis[2] - rs.ground < 0.6, `[${name}] the ragdoll lies on the ground (${JSON.stringify(rs)})`);
+    let L = JSON.parse(await cmd("life"));
+    if (knocked !== "nobody") check(L.getups >= 1, `[${name}] a knocked-down passer-by gets up again (${JSON.stringify(L)})`);
+    check(JSON.parse(await cmd("cows kill")).dead >= 1, `[${name}] a blast kills a cow`);
+    check(L.birds > 0 && L.trees >= 0, `[${name}] birds over the roofs (${L.birds}), trees (${L.trees})`);
+    const go = await cmd("interior go");
+    if (go !== "no building") {
+      const ti = (await hud()).t;
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 4, ti, {timeout: 400000}).catch(() => {});
+      let s = JSON.parse(await cmd("interior"));
+      check(s.active && s.levels >= 1, `[${name}] the building at the door is enterable (${JSON.stringify(s)})`);
+      if (s.active && s.roof) {
+        await cmd("interior roof");
+        const tr = (await hud()).t;
+        await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2, tr, {timeout: 400000}).catch(() => {});
+        s = JSON.parse(await cmd("interior"));
+        check(Math.abs(s.z - s.top) < 0.6, `[${name}] standing on the roof by the stairs (${JSON.stringify(s)})`);
+        await shot("1c-roof");
+        await cmd("interior door");  // back out in front of the door
+      }
+    }
+  }
+
   // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
   {
     const schema = JSON.parse(await cmd("settings schema"));
@@ -287,13 +402,24 @@ async function run({name, url, context, mapped}) {
     check(await page.locator("#scSettings").isVisible(), `[${name}] settings dialog open`);
     await shot("0-settings");
     await page.keyboard.press("Escape");
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     check(!(await page.locator("#scSettings").isVisible()) && !(await hud()).ui.paused, `[${name}] Esc closes it and the game runs`);
     await cmd("set world.people 0");
     await page.waitForFunction(() => window.SpawnCity.hud().people === 0, null, {timeout: 60000}).catch(() => {});
     check((await hud()).people === 0, `[${name}] WORLD: people switched off`);
     await cmd("set world.people 1");
     const resets = (await hud()).ui.resets;
-    check(await cmd("reset") === "ok" && (await hud()).ui.resets === resets + 1 && (await hud()).mode === "foot", `[${name}] RESET back to the start`);
+    const resetOk = await cmd("reset") === "ok";
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    h = await hud();
+    check(resetOk && h.ui.resets === resets + 1 && h.mode === "foot", `[${name}] RESET back to the start (${h.ui.resets}, ${h.mode})`);
+    // The suggestion box signs its Nostr event in the game (nostr.cpp).
+    const ev = await cmd(`nostr event 1700000000 ${"0".repeat(63)}3 ${"0".repeat(64)} [["t","spawncity-suggestion"]] Mehr Jets bitte`);
+    check(ev.startsWith("{") && /"sig":"[0-9a-f]{128}"/.test(ev), `[${name}] suggestion signed as a Nostr event`);
+    check(await cmd("set view.grid 1") === "ok", `[${name}] 1 m grid on`);
+    await page.waitForTimeout(500);
+    await shot("0c-grid");
+    await cmd("set view.grid 0");
     // LIVE GPS: two fixes 20 m apart move the player there.
     const o = (await hud()).ui.origin;
     check(await cmd("gps on") === "on", `[${name}] GPS live on`);
@@ -359,7 +485,8 @@ async function run({name, url, context, mapped}) {
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
-  if (context.hasTouch) await touchHold(vw - 110, vh - 110);
+  // touch: the altitude pad right of the move stick (simulator.mjs #soloClearance) pushed up
+  if (context.hasTouch) await touchHold(168 + 8 + 24, vh - 10 - 66);
   else { await hold(["Space"], 2); await hold(["KeyW", "Space"], 1); }
   h = await hud();
   check(h.drone && h.drone.armed, `[${name}] drone armed (state ${JSON.stringify(h.drone)})`);
@@ -392,7 +519,7 @@ async function run({name, url, context, mapped}) {
   check(car === "car", `[${name}] car mode (${car})`);
   check(JSON.parse(await cmd("traffic")).ejected >= 1 || car !== "car", `[${name}] the carjacked driver got out`);
   if (car === "car") {
-    if (context.hasTouch) await touchHold(vw - 110, vh - 110);
+    if (context.hasTouch) await touchHold(110, vh - 110);  // LENKEN / GAS: the left stick up
     else await hold(["KeyW"]);
     h = await hud();
     check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);

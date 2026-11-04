@@ -1,6 +1,7 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
 #include "game.h"
 #include "game_world.h"  // WorldLife (M3 world state)
+#include "game_life.h"   // GameLife (M3 life)
 
 #include <algorithm>
 #include <cstdio>
@@ -21,7 +22,6 @@ namespace {
 constexpr f32 kStepHz = 240;                 // fixed physics rate: the firmware runs 4 ticks per step (~1 kHz)
 constexpr f32 kEnterCar = 5.2f, kEnterJet = 9;  // player_car_mode.mjs ENTER_RADIUS_M, jet_mode.mjs ENTER_M
 constexpr f32 kDroneAhead = 2.9f;            // player_vehicle_runtime_v2.mjs: the drone starts 2.9 m ahead
-constexpr f32 kMouseRad = 0.0026f;           // player_walk_mode_v4.mjs: raw mouse 0.0026 rad per px
 constexpr f32 kPlayerHealth = 100 * 1.18f;   // player_vitals_runtime.mjs: +18 % tougher
 constexpr f32 kChuteOpen = 1.1f, kChuteSink = 6.5f, kChuteSteer = 4, kEjectUp = 28;  // jet_mode.mjs
 
@@ -31,11 +31,6 @@ Vec3 car_color(u32 i) {
   static const Vec3 c[] = {{0.62f, 0.05f, 0.04f}, {0.08f, 0.16f, 0.42f}, {0.85f, 0.85f, 0.86f}, {0.06f, 0.06f, 0.07f}, {0.45f, 0.47f, 0.5f},
                            {0.12f, 0.32f, 0.18f}, {0.9f, 0.62f, 0.08f}, {0.3f, 0.5f, 0.75f}, {0.55f, 0.36f, 0.22f}, {0.7f, 0.7f, 0.66f}};
   return c[i % (sizeof c / sizeof c[0])];
-}
-
-f32 deadzone(f32 v, f32 dz = 0.14f) {  // xbox_gamepad.mjs deadzone .14
-  const f32 a = std::fabs(v);
-  return a <= dz ? 0 : sign0(v) * (a - dz) / (1 - dz);
 }
 
 kern::game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 pos, f32 yaw_deg) {
@@ -236,7 +231,7 @@ bool Game::start(kern::Engine& e) {
 
   register_node();
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
-  arbiter_.set_platform(!coarse, coarse, coarse ? 5 : 0);
+  ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_controller_ = kern::game::ControllerComponent{};
   soldier_controller_.mode = kern::game::ControlMode::soldier;
   soldier_controller_.camera = kern::game::CameraMode::first_person;
@@ -288,7 +283,6 @@ bool Game::start(kern::Engine& e) {
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
   init_weapons();
-  foot_touch_.set_controller(&soldier_controller_, true, true);
   e.set_status("SpawnCity: Karte wird geladen ...");
   cam_.eye = {-30, -40, 60};
   cam_.target = {0, 0, 0};
@@ -297,6 +291,7 @@ bool Game::start(kern::Engine& e) {
 }
 
 void Game::stop() {
+  glife_.reset();  // M3 life: its bodies live in the world
   world_.reset();
 }
 
@@ -638,11 +633,11 @@ void Game::step_parachute(f32 h) {
   } else {
     // Canopy: vertical drag for a 6.5 m/s sink, glide steered at up to 4 m/s.
     f.z = -m * kG / (kChuteSink * kChuteSink) * s.velocity.z * std::fabs(s.velocity.z);
-    const f32 yaw = world_->camera_yaw() * kDeg;
-    const Vec2 fw{std::cos(yaw), std::sin(yaw)}, rt{std::sin(yaw), -std::cos(yaw)};
-    const Vec2 want = (fw * chute_steer_.y + rt * chute_steer_.x) * kChuteSteer;
-    f.x = m * 1.5f * (want.x - s.velocity.x);
-    f.y = m * 1.5f * (want.y - s.velocity.y);
+    // jet_mode.mjs stepPara: v.x -> rollIn * 4, v.y -> -pitchIn * 4 (world axes), at 0.8 /s
+    // (chute_steer_ = {rollIn, -pitchIn}, game_controls.cpp)
+    const Vec2 want = chute_steer_ * kChuteSteer;
+    f.x = m * 0.8f * (want.x - s.velocity.x);
+    f.y = m * 0.8f * (want.y - s.velocity.y);
   }
   w.apply_force_to_center(b, f);
 }
@@ -716,293 +711,7 @@ void Game::manage_traffic() {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// input
-
-void Game::read_input(kern::Engine& e, f32 dt) {
-  kern::Input& in = e.input;
-  using kern::Key;
-  // Device arbitration (touch / mouse + keyboard / pad) as SpawnCity decides it.
-  for (u32 k = 1; k < static_cast<u32>(Key::count); ++k)
-    if (in.pressed(static_cast<Key>(k))) { arbiter_.key_down(); break; }
-  if (pad.active) arbiter_.gamepad_used();
-  touch_mode_ = arbiter_.touch();
-  if (!touch_mode_ && in.button_pressed(0)) e.request_pointer_lock(true);
-  ui_before_input(e);  // settings: invert mouse Y (game_ui.cpp)
-
-  const bool enter = in.pressed(Key::f) || in.pressed(Key::e) || pad.hit(kPadX) || pad_touch_.take_pressed("enter");
-  const bool drone_key = in.pressed(Key::v) || pad.hit(kPadDown) || pad_touch_.take_pressed("mode") || pad_touch_.take_pressed("drone");
-  const bool cam_key = in.pressed(Key::c) || pad.hit(kPadView) || pad_touch_.take_pressed("cam");
-  if (enter) {
-    if (mode_ == Mode::foot) try_enter();
-    else if (mode_ == Mode::car || mode_ == Mode::jet) exit_vehicle();
-  }
-  if (drone_key) {
-    if (mode_ == Mode::foot || mode_ == Mode::drone) toggle_drone();
-    else if (mode_ == Mode::jet) jet_.toggle_mode();  // V in the jet: hover / flight (jet_mode.mjs)
-  }
-  if (cam_key) {
-    if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; }
-    else if (mode_ == Mode::car) car_cockpit_ = !car_cockpit_;
-    else if (mode_ == Mode::jet) jet_cockpit_ = !jet_cockpit_;
-  }
-  if (pad_touch_.take_pressed("vtol") && mode_ == Mode::jet) jet_.toggle_mode();
-
-  play_in_ = PlayInput{};
-  switch (mode_) {
-    case Mode::foot: play_in_ = foot_input(e, dt); break;
-    case Mode::drone: drone_input(e, dt); break;
-    case Mode::car: car_input(e, dt); break;
-    case Mode::jet: jet_input(e, dt); break;
-    case Mode::parachute: parachute_input(e, dt); break;
-  }
-  ui_after_input(dt);  // settings: curves, inversions, speeds (game_ui.cpp)
-}
-
-PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
-  using kern::Key;
-  kern::Input& in = e.input;
-  PlayInput p;
-  p.move_x = (in.down(Key::d) ? 1.0f : 0.0f) - (in.down(Key::a) ? 1.0f : 0.0f);
-  p.move_y = (in.down(Key::w) ? 1.0f : 0.0f) - (in.down(Key::s) ? 1.0f : 0.0f);
-  p.jump = in.down(Key::space);
-  p.boost = in.down(Key::shift_left) || in.down(Key::shift_right);
-  p.crouch = in.down(Key::control_left);
-  p.reload = in.pressed(Key::r);
-  p.fire = in.button(0);
-  p.aim = in.button(2);
-  const Vec2 md = in.pointer_delta() * (1.0f / dpr_);
-  p.look_x = md.x * kMouseRad / kDeg * sensitivity_;
-  p.look_y = md.y * kMouseRad / kDeg * sensitivity_;
-  if (pad.connected) {
-    p.move_x = clampf(p.move_x + deadzone(pad.lx), -1, 1);
-    p.move_y = clampf(p.move_y + deadzone(pad.ly), -1, 1);
-    p.look_stick_x = deadzone(pad.rx, 0.05f);
-    p.look_stick_y = -deadzone(pad.ry, 0.05f);
-    p.jump |= pad.down(kPadA);
-    p.boost |= pad.down(kPadL3);
-    p.crouch |= pad.down(kPadB);
-    p.reload |= pad.hit(kPadRB);
-    p.fire |= pad.rt > 0.5f;
-    p.aim |= pad.lt > 0.5f;
-    p.gamepad = pad.active || p.gamepad;
-  }
-  if (touch_mode_) foot_touch_.update(dt, p, world_->hud().fov);
-  // Weapons: 1 MP, 2 Glock, 3 Sniper, 5 grenade launcher, 6 rocket launcher, 7 fists, 8 knife;
-  // T hand grenade, X EMP (gameplay_final_runtime_v2.mjs / hand_grenade.mjs / wanted EMP).
-  const std::pair<Key, weapons::Id> keys[] = {{Key::digit1, weapons::Id::smg}, {Key::digit2, weapons::Id::glock}, {Key::digit3, weapons::Id::sniper},
-                                              {Key::digit5, weapons::Id::grenade_launcher}, {Key::digit6, weapons::Id::rocket}, {Key::digit7, weapons::Id::fists},
-                                              {Key::digit8, weapons::Id::knife}};
-  for (const auto& [k, id] : keys)
-    if (in.pressed(k)) select_foot_weapon(id);
-  if (pad.hit(kPadRight) || pad_touch_.take_pressed("wpn")) cycle_foot_weapon(1);
-  if (pad.hit(kPadLeft)) cycle_foot_weapon(-1);
-  if (in.pressed(Key::t) || pad.hit(kPadY) || pad_touch_.take_pressed("nade")) throw_grenade();
-  if (in.pressed(Key::x) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
-  if (game_weapon_in_hand()) {
-    // The game fires these itself: Kern's trigger stays off.
-    const bool trigger = p.fire;
-    foot_attack(trigger, trigger && !trigger_was_);
-    trigger_was_ = trigger;
-    p.fire = false;
-    p.reload = false;
-  } else trigger_was_ = p.fire;
-  return p;
-}
-
-void Game::drone_input(kern::Engine& e, f32 dt) {
-  using kern::Key;
-  kern::Input& in = e.input;
-  const DroneTelemetry& t = drone_.telemetry();
-  const Vec2 md = in.pointer_delta() * (1.0f / dpr_);
-  // Sticks: W/S A/D move (GAME: velocity), Q/E and the mouse turn (rate), Space / Shift height.
-  f32 roll = (in.down(Key::d) ? 1.0f : 0.0f) - (in.down(Key::a) ? 1.0f : 0.0f) + deadzone(pad.lx) + pad_touch_.left().x;
-  f32 pitch = (in.down(Key::w) ? 1.0f : 0.0f) - (in.down(Key::s) ? 1.0f : 0.0f) + deadzone(pad.ly) + pad_touch_.left().y;
-  // Turning right = negative yaw stick on this airframe (the FC's yaw axis).
-  const f32 mouse_yaw = clampf(md.x * sensitivity_ / std::fmax(dt, 1e-3f) / 900.0f, -1, 1);
-  drone_yaw_rate_ += (mouse_yaw - drone_yaw_rate_) * damp_alpha(20, dt);
-  f32 yaw = -((in.down(Key::e) ? 1.0f : 0.0f) - (in.down(Key::q) ? 1.0f : 0.0f)) - drone_yaw_rate_ - deadzone(pad.rx) - pad_touch_.right().x;
-  f32 axis = (in.down(Key::space) ? 1.0f : 0.0f) - (in.down(Key::shift_left) || in.down(Key::shift_right) ? 1.0f : 0.0f) + (pad.rt - pad.lt) +
-             (touch_mode_ ? pad_touch_.right().y : 0.0f);
-  axis = clampf(axis, -1, 1);
-  // Body pitch (GAME channel 7): the mouse's vertical / the right stick's vertical, held.
-  sticks_.body_pitch = clampf(sticks_.body_pitch - md.y * 0.004f * sensitivity_ - deadzone(pad.ry) * dt * 1.5f, -1, 1);
-  if (in.pressed(Key::b)) sticks_.body_pitch = 0;
-  sticks_.roll = clampf(roll, -1, 1);
-  sticks_.pitch = clampf(pitch, -1, 1);
-  sticks_.yaw = clampf(yaw, -1, 1);
-  if (in.pressed(Key::g)) sticks_.game_mode = !sticks_.game_mode;  // GAME (height hold) / ANGLE (manual throttle)
-  sticks_.kill = in.down(Key::k);
-  // Weapons: LMB / RB / FEUER fire, 1 gun, 2 rockets, 3 GUIDED, Y / WAFFE cycles.
-  if (in.pressed(Key::digit1)) drone_weapon_ = 0;
-  if (in.pressed(Key::digit2)) drone_weapon_ = 1;
-  if (in.pressed(Key::digit3)) drone_weapon_ = 2;
-  if (pad.hit(kPadY) || pad_touch_.take_pressed("wpn")) drone_weapon_ = (drone_weapon_ + 1) % 3;
-  if (in.pressed(Key::x) || pad.hit(kPadUp) || pad_touch_.take_pressed("emp")) emp_pulse();
-  {
-    const bool trigger = in.button(0) || pad.down(kPadRB) || pad_touch_.held("fire");
-    drone_attack(trigger, trigger && !trigger_was_);
-    trigger_was_ = trigger;
-  }
-
-  // ARM (R / A / touch): arm on the ground; in the air it starts a controlled landing (simulator.mjs).
-  const bool arm_key = in.pressed(Key::r) || pad.hit(kPadA) || pad_touch_.take_pressed("arm");
-  const f32 agl = t.agl >= 0 ? t.agl : 0;
-  if (arm_key) {
-    if (!t.armed && !sticks_.arm) { sticks_.arm = true; landing_ = false; }
-    else if (t.armed && agl > 0.7f) landing_ = true;
-    else { sticks_.arm = false; landing_ = false; }
-  }
-  // Climbing on a disarmed, calibrated drone arms it (the touch ARM habit of SpawnCity's HUD).
-  if (axis > 0.3f && !t.armed && !t.calibrating && !t.fault && !landing_) sticks_.arm = true;
-  if (t.fault && !t.armed) sticks_.arm = false;  // the switch goes low for the power cycle
-
-  if (sticks_.game_mode) {
-    if (landing_) {
-      axis = -(agl > 6 ? 1.0f : std::fmax(0.35f, agl / 6));
-      if (agl <= 0.7f && std::fabs(t.vz) < 0.35f) landing_still_ += dt;
-      else landing_still_ = 0;
-      if (landing_still_ > 0.25f) { sticks_.arm = false; landing_ = false; landing_still_ = 0; }
-    }
-    const bool have_agl = t.agl >= 0;
-    if (std::fabs(axis) > 1e-4f) {
-      height_held_ = true;
-      const f32 rate = clearance_rate(axis);
-      sticks_.clearance = have_agl ? clampf(agl + clearance_lead(rate), 0.5f, 120) : clampf(sticks_.clearance + axis * 12 * dt, 0.5f, 120);
-    } else if (height_held_) {
-      height_held_ = false;
-      if (have_agl) sticks_.clearance = clampf(agl + clearance_lead(t.vz), 0.5f, 120);
-    }
-  } else {
-    sticks_.throttle = clampf(sticks_.throttle + axis * dt * 0.8f, 0, 1);
-  }
-}
-
-void Game::car_input(kern::Engine& e, f32 dt) {
-  using kern::Key;
-  kern::Input& in = e.input;
-  if (car_index_ < 0) return;
-  TrafficCar& c = cars_[car_index_];
-  CarInput ci;
-  // vehicle_control_settings.mjs: 115 km/h, reverse 32 km/h; player_car_mode.mjs: WASD, Space handbrake,
-  // pad LS steer, RT gas, LT brake / reverse, B handbrake.
-  ci.max_speed = 115 / 3.6f;
-  ci.max_reverse = 32 / 3.6f;
-  ci.pedal = clampf((in.down(Key::w) ? 1.0f : 0.0f) - (in.down(Key::s) ? 1.0f : 0.0f) + pad.rt - pad.lt + pad_touch_.right().y, -1, 1);
-  ci.steer = clampf((in.down(Key::a) ? 1.0f : 0.0f) - (in.down(Key::d) ? 1.0f : 0.0f) - deadzone(pad.lx) - pad_touch_.left().x, -1, 1);
-  ci.handbrake = in.down(Key::space) || pad.down(kPadB) || pad_touch_.held("hb");
-  c.input = ci;
-  // Head look in the cockpit (1.75 rad yaw, 0.7 rad pitch).
-  const Vec2 md = in.pointer_delta() * (1.0f / dpr_);
-  head_yaw_ = clampf(head_yaw_ - md.x * kMouseRad * sensitivity_ - deadzone(pad.rx) * dt * 2, -1.75f, 1.75f);
-  head_pitch_ = clampf(head_pitch_ - md.y * kMouseRad * sensitivity_ + deadzone(pad.ry) * dt * 2, -0.7f, 0.7f);
-  if (!in.button(2) && md.x == 0 && pad.rx == 0) head_yaw_ *= std::exp(-dt * 1.5f);
-}
-
-void Game::jet_input(kern::Engine& e, f32 dt) {
-  using kern::Key;
-  kern::Input& in = e.input;
-  JetInput j;
-  j.lift = clampf((in.down(Key::w) ? 1.0f : 0.0f) - (in.down(Key::s) ? 1.0f : 0.0f) + deadzone(pad.ly) + pad_touch_.left().y, -1, 1);
-  j.yaw = clampf((in.down(Key::d) ? 1.0f : 0.0f) - (in.down(Key::a) ? 1.0f : 0.0f) + deadzone(pad.lx) + pad_touch_.left().x, -1, 1);
-  // Mouse: rate command d/dt / 730 with a 25 ms lag (jet_mode.mjs:266-267); arrows as keys.
-  const Vec2 md = in.pointer_delta() * (1.0f / dpr_);
-  const f32 a = damp_alpha(1.0f / 0.025f, dt);
-  jet_pitch_rate_ += (clampf(-md.y * sensitivity_ / std::fmax(dt, 1e-3f) / 730, -1, 1) - jet_pitch_rate_) * a;
-  jet_roll_rate_ += (clampf(md.x * sensitivity_ / std::fmax(dt, 1e-3f) / 730, -1, 1) - jet_roll_rate_) * a;
-  j.pitch = clampf(jet_pitch_rate_ + (in.down(Key::down) ? 1.0f : 0.0f) - (in.down(Key::up) ? 1.0f : 0.0f) - deadzone(pad.ry) + pad_touch_.right().y, -1, 1);
-  j.roll = clampf(jet_roll_rate_ + (in.down(Key::right) ? 1.0f : 0.0f) - (in.down(Key::left) ? 1.0f : 0.0f) + deadzone(pad.rx) + pad_touch_.right().x, -1, 1);
-  j.brake = jet_.telemetry().contacts > 0 && j.lift <= 0 ? 1.0f : 0.0f;
-  if (pad.hit(kPadLB)) jet_.toggle_mode();
-  jet_in_ = j;
-  // Weapons (jet_mode.mjs): LMB / Space gun, R missile, B bomb; pad RT, RB, Y.
-  jet_attack(in.button(0) || in.down(Key::space) || pad.rt > 0.5f || pad_touch_.held("fire"), in.pressed(Key::r) || pad.hit(kPadRB) || pad_touch_.take_pressed("rkt"),
-             in.pressed(Key::b) || pad.hit(kPadY) || pad_touch_.take_pressed("bomb"));
-}
-
-void Game::parachute_input(kern::Engine& e, f32 dt) {
-  using kern::Key;
-  kern::Input& in = e.input;
-  chute_steer_ = {clampf((in.down(Key::d) ? 1.0f : 0.0f) - (in.down(Key::a) ? 1.0f : 0.0f) + deadzone(pad.lx) + pad_touch_.left().x, -1, 1),
-                  clampf((in.down(Key::w) ? 1.0f : 0.0f) - (in.down(Key::s) ? 1.0f : 0.0f) + deadzone(pad.ly) + pad_touch_.left().y, -1, 1)};
-  // Look around while hanging under the canopy.
-  PlayInput p;
-  const Vec2 md = in.pointer_delta() * (1.0f / dpr_);
-  head_yaw_ -= md.x * kMouseRad * sensitivity_ + deadzone(pad.rx) * dt * 2 + pad_touch_.right().x * dt * 2;
-  (void)p;
-  // Landed: on foot again where the pilot touched down.
-  const BodyState s = state_of(chute_actor_);
-  const RayResult g = cast(world_->physics(), s.position, {0, 0, -1}, 2.0f, body(chute_actor_));
-  if (g.hit && g.distance < 1.0f && chute_time_ > 0.5f) {
-    world_->set_alive(chute_actor_, false);
-    show_soldier(g.point, world_->camera_yaw());
-    mode_ = Mode::foot;
-  }
-}
-
-void Game::set_touch_frame(f32 w, f32 h, f32 sl, f32 st, f32 sr, f32 sb, f32 dpr) {
-  frame_w_ = w;
-  frame_h_ = h;
-  dpr_ = dpr > 0 ? dpr : 1;
-  foot_touch_.set_frame(w, h, sl, st, sr, sb);
-  pad_touch_.set_frame(w, h, sl, st, sr, sb);
-}
-
-bool Game::touch(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
-  if (type == 0) arbiter_.pointer_down(true);
-  if (pad_touch_.pointer(type, id, x, y)) return true;
-  if (mode_ == Mode::foot) return foot_touch_.pointer(type, id, x, y, t_ms);
-  return false;
-}
-
-void Game::update_touch_layout() {
-  std::vector<PadButton> b;
-  switch (mode_) {
-    case Mode::foot: {
-      b.push_back({"mode", "DROHNE", 0x17694f});
-      // The context button appears near a vehicle (mobile_gameplay_ui.mjs).
-      const Vec3 me = matrix_of(soldier_).translation();
-      bool near = jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet;
-      for (const TrafficCar& c : cars_)
-        if (c.placed) { const Vec3 p = matrix_of(c.actor).translation(); near |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCar; }
-      if (near) b.push_back({"enter", "REIN", 0x7a4b12});
-      b.push_back({"wpn", "WAFFE", 0x0d1118});
-      b.push_back({"nade", "GRANATE", 0x3a3a12});
-      if (wanted_.stars() > 0) b.push_back({"emp", "EMP", 0x12305a});
-      pad_touch_.set_layout(false, b);
-      break;
-    }
-    case Mode::drone:
-      b.push_back({"mode", "FUSS", 0x17694f});
-      b.push_back({"arm", drone_.telemetry().armed ? "LANDEN" : "ARM", drone_.telemetry().armed ? 0x7a1a12u : 0x1a5a12u});
-      b.push_back({"cam", "CAM", 0x0d1118});
-      b.push_back({"fire", "FEUER", 0x7a1a12});
-      b.push_back({"wpn", drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "RAKETEN" : "GUIDED", 0x0d1118});
-      pad_touch_.set_layout(true, b, "FLUG", "HOEHE / DREHEN");
-      break;
-    case Mode::car:
-      b.push_back({"enter", "RAUS", 0x7a4b12});
-      b.push_back({"hb", "BREMSE", 0x0d1118});
-      b.push_back({"cam", "CAM", 0x0d1118});
-      pad_touch_.set_layout(true, b, "LENKEN", "GAS / BREMSE");
-      break;
-    case Mode::jet:
-      b.push_back({"enter", jet_.telemetry().contacts >= 2 ? "RAUS" : "EJECT", 0x7a1a12});
-      b.push_back({"vtol", jet_.mode() == Jet::Mode::hover ? "FLUG" : "SCHWEBEN", 0x17694f});
-      b.push_back({"cam", "CAM", 0x0d1118});
-      b.push_back({"fire", "FEUER", 0x7a1a12});
-      b.push_back({"rkt", "RAKETE", 0x7a4b12});
-      b.push_back({"bomb", "BOMBE", 0x3a3a12});
-      pad_touch_.set_layout(true, b, "SCHUB / SEITE", "NICKEN / ROLLEN");
-      break;
-    case Mode::parachute: pad_touch_.set_layout(true, b, "STEUERN", "UMSEHEN"); break;
-  }
-}
-
-std::string Game::touch_view_json() {
-  if (!touch_mode_) return "null";
-  return pad_touch_.view_json(mode_ == Mode::foot ? &foot_touch_.view() : nullptr);
-}
+// input: read_input, foot / drone / car / jet / parachute input, touch: game_controls.cpp
 
 // ---------------------------------------------------------------------------------------------
 // frame
@@ -1041,6 +750,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_town(dt);
     update_projectiles(dt);
     update_world(dt);  // M3 world (game_world.cpp)
+    life_update(dt);   // M3 life: animals, street life, ragdolls, interiors (game_life.cpp)
     update_guided(dt);   // GUIDED missiles (game_guided.cpp)
     update_details(dt);  // critical damage, ballots (game_details.cpp)
     gaps_update(dt);  // dispatch, critical smoke, organic hits, impact bursts (game_gaps.cpp)
@@ -1059,6 +769,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
+  life_draw();   // M3 life (game_life.cpp)
   draw_combat();
   gaps_draw();  // critical smoke (game_gaps.cpp)
   look_draw(e, dt);  // speed streaks, weapon models, frame times (game_look.cpp)
@@ -1159,7 +870,9 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         rig(pos, s.velocity, {fwd.x, fwd.y}, 9, 9, 6, 0.6f);
         const Vec3 hd = kern::normalize(Vec3{cam_heading_.x, cam_heading_.y, 0});
         const Vec3 look_dir = Quat::axis_angle({0, 0, 1}, head_yaw_).rotate(hd);
-        const Vec3 want = cam_anchor_ - look_dir * (5.4f * zoom) + Vec3{0, 0, 2.15f * zoom};
+        // zoom (pinch / wheel / + -, player_car_mode.mjs): distance 5.4 z, height 2.15 (.55 + .45 z)
+        const f32 cz = ctl_.car_zoom;
+        const Vec3 want = cam_anchor_ - look_dir * (5.4f * zoom * cz) + Vec3{0, 0, 2.15f * zoom * (0.55f + 0.45f * cz)};
         c.eye = collide(cam_anchor_ + Vec3{0, 0, 1.2f}, want, body(tc.actor));
         c.target = cam_anchor_ + look_dir * 2.0f + Vec3{0, 0, 0.9f * zoom};
         c.up = {0, 0, 1};
@@ -1204,7 +917,8 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
       break;
     }
   }
-  gaps_camera(c);  // camera_collision_guard.mjs (game_gaps.cpp)
+  ctl_camera(c);  // the shared head look in the drone, jet and parachute (game_controls.cpp)
+  gaps_camera(c);  // camera_collision_guard.mjs, riding in a mate's jet (game_gaps.cpp)
   cam_ = c;
 }
 
@@ -1312,6 +1026,7 @@ std::string Game::hud_json() {
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
+  life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
   {
     u32 units = 0;
@@ -1384,15 +1099,18 @@ std::string Game::hud_json() {
   hint_.clear();
   if (mode_ == Mode::foot && world_placed_) {
     const Vec3 me = matrix_of(soldier_).translation();
-    if (jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet) hint_ = "F: Jet fliegen";
-    for (const TrafficCar& c : cars_) {
-      if (!c.placed) continue;
-      const Vec3 p = matrix_of(c.actor).translation();
-      if (std::hypot(p.x - me.x, p.y - me.y) < kEnterCar) { hint_ = c.driver ? "F: Auto klauen" : "F: Einsteigen"; break; }
+    // player_car_mode.mjs / jet_mode.mjs renderButtons: the key of the device in use (touch: the round buttons)
+    const char* k = ctl_.dev.pad ? "\u24CD  " : "F · ";
+    if (!touch_mode_) {
+      if (jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet) hint_ = std::string(k) + "\u2708 JET EINSTEIGEN";
+      for (const TrafficCar& c : cars_) {
+        if (!c.placed) continue;
+        const Vec3 p = matrix_of(c.actor).translation();
+        if (std::hypot(p.x - me.x, p.y - me.y) < kEnterCar) { hint_ = std::string(k) + "\U0001F697 EINSTEIGEN"; break; }
+      }
     }
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
-  else if (mode_ == Mode::drone && !drone_.telemetry().armed) hint_ = "R / Leertaste: ARM und steigen";
   combat_hud(s);  // "combat":{...} (game_events.cpp)
   guided_hud(s);   // "guided":{...} (game_guided.cpp)
   details_hud(s);  // "details":{...} (game_details.cpp)
@@ -1401,11 +1119,13 @@ std::string Game::hud_json() {
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)
+  s += ctl_hud_json();   // "ctl":{...} device, hint line, aiming (game_controls.cpp)
   return s + "}";
 }
 
 std::string Game::command(const std::string& cmd) {
   if (!world_) return "no world";
+  if (std::string out; ctl_command(cmd, out)) return out;  // controls / devices (game_controls.cpp)
   if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
   if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   if (std::string out; details_command(cmd, out)) return out;  // guided / critical / ballot commands (game_details.cpp)
@@ -1494,6 +1214,7 @@ std::string Game::command(const std::string& cmd) {
   {
     std::string out;  // M3 world test commands (game_world.cpp)
     if (world_command(cmd, out)) return out;
+    if (life_command(cmd, out)) return out;  // M3 life test commands (game_life.cpp)
   }
   return "unknown command";
 }

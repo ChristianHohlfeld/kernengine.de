@@ -519,6 +519,7 @@ void Game::update_military(f32 dt) {
 
 void Game::update_flak(f32 dt) {
   CombatState& C = combat_;
+  if (!ui_.settings.on(Opt::world_flak)) { C.flak.clear(); return; }  // WORLD option FLAK (world_options.mjs, game_ui.cpp)
   const f32 now = world_->sim_time();
   // scan: the 3x3 cells of 700 m around the listener, a hash decides gun and spot
   if (now - C.flak_scan > 1.5f) {

@@ -34,7 +34,8 @@
 #include "people_art.h"
 #include "road_graph.h"
 #include "sound_fx.h"
-#include "touch_pad.h"
+#include "game_controls.h"  // controls state (game_controls.cpp)
+#include "touch_play.h"     // touch controls of every mode (touch_play.cpp)
 #include "vehicle_art.h"
 #include "wanted.h"
 #include "weapons.h"
@@ -109,6 +110,7 @@ struct PoliceDrone {
 };
 
 struct WorldLife;  // game_world.h
+struct GameLife;   // game_life.h (M3 life)
 
 class Game {
  public:
@@ -131,7 +133,10 @@ class Game {
   std::string command(const std::string& cmd);
   bool audio_init(u32 rate);
   const f32* audio_render(u32 frames);
-  void key_down_event() { arbiter_.key_down(); }
+  void key_down_event() { ctl_.dev.key(); }
+  /// Mouse movement under the pointer lock (CSS px, clamped per event) and the lock state (game_controls.cpp).
+  void mouse_move(f32 dx, f32 dy) { ctl_.mouse.x += dx; ctl_.mouse.y += dy; }
+  void pointer_locked(bool locked) { ctl_.locked = locked; }
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
@@ -165,6 +170,17 @@ class Game {
   void jet_input(kern::Engine& e, f32 dt);
   void parachute_input(kern::Engine& e, f32 dt);
   void update_touch_layout();
+  // controls (game_controls.cpp, CONTROLS.md): devices, pad actions, strike aiming, grenade cook, head look
+  bool ctl_command(const std::string& cmd, std::string& out);
+  std::string ctl_hud_json();
+  void ctl_discrete(kern::Engine& e, f32 dt);
+  void ctl_grenade(bool hold_key, bool hold_pad, f32 dt);
+  void ctl_strike_start();
+  void ctl_strike_confirm(bool at_point, f32 x, f32 y);
+  bool ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const;
+  void ctl_camera(kern::Camera& c);
+  void ctl_enter(bool jet_first);
+  bool ctl_touch_shot(f32 x, f32 y);
 
   // simulation pieces
   void drive_traffic(f32 h);
@@ -276,6 +292,18 @@ class Game {
   bool world_command(const std::string& cmd, std::string& out);
   void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
   std::unique_ptr<WorldLife> life_;
+  // street life, animals, ragdolls, walkable buildings (game_life.cpp, M3 life; state in
+  // GameLife, game_life.h, declared last so it goes before the world it has bodies in)
+  void life_update(f32 dt);
+  void life_draw();
+  void life_draw_people();  // the running club, inside draw_town's people drawing
+  bool life_hides_person(i32 index) const;  // lies as a ragdoll
+  bool life_shot(Vec3 from, Vec3& to, f32 damage);
+  void life_blast(Vec3 at, f32 radius);
+  void life_hud(std::string& s);
+  bool life_command(const std::string& cmd, std::string& out);
+  bool life_punch(Vec3 from, Vec3& to);   // fists / knife on animals
+  void life_net_fx(const net::Fx& f);     // cow deaths and pushes from the other players
   // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
   f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
   void eject_driver(i32 car);
@@ -298,6 +326,8 @@ class Game {
   void ui_move_world(f64 lon, f64 lat);
   void ui_gps_update(f32 dt);
   void ui_camera(f32 dt);
+  void ui_draw_gps(f32 dt);
+  void ui_draw_helpers();
   std::string ui_hud_json();
   // equipment (game_equipment.cpp)
   void ui_audio_init();
@@ -403,10 +433,9 @@ class Game {
   f32 sensitivity_ = 1;
   f32 dpr_ = 1;
   // input devices
-  kern::game::InputArbiter arbiter_;
-  kern::game::TouchControls foot_touch_;
   kern::game::ControllerComponent soldier_controller_;
-  TouchPad pad_touch_;
+  TouchPlay pad_touch_;   // every mode's touch controls (touch_play.h)
+  ControlsState ctl_;     // game_controls.h
   bool touch_mode_ = false;
   f32 frame_w_ = 960, frame_h_ = 540;
   kern::game::PlayInput play_in_;
@@ -477,6 +506,7 @@ class Game {
   UiState ui_;
   // performance and the look (game_look.h)
   LookState look_;
+  std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
 
 Game& game();

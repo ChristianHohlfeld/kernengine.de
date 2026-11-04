@@ -97,6 +97,10 @@ KERN_EXPORT(sc_gamepad) void sc_gamepad(kern::i32 connected, kern::f32 lx, kern:
   p.buttons = buttons;
   p.active = active != 0;
 }
+/// Mouse movement under the pointer lock (movementX/Y of mousemove, CSS px, clamped +-420 per event
+/// by the page: desktop_controls.mjs MAX_EVENT_PX) and the lock state (game_controls.cpp).
+KERN_EXPORT(sc_mouse) void sc_mouse(kern::f32 dx, kern::f32 dy) { sc::game().mouse_move(dx, dy); }
+KERN_EXPORT(sc_pointer_lock) void sc_pointer_lock(kern::i32 locked) { sc::game().pointer_locked(locked != 0); }
 /// Viewport in CSS px, safe-area insets and the device pixel ratio.
 KERN_EXPORT(sc_touch_frame) void sc_touch_frame(kern::f32 w, kern::f32 h, kern::f32 sl, kern::f32 st, kern::f32 sr, kern::f32 sb, kern::f32 dpr) {
   sc::game().set_touch_frame(w, h, sl, st, sr, sb, dpr);
