@@ -74,6 +74,7 @@ class People {
     f32 provoked_at = -99, fight_until = 0, last_attack = -99;
     bool provoked_hit = false;
     u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
+    f32 knocked_until = 0;          // thrown by a car and getting up again (ragdoll.h, M3 life)
   };
   /// A death since the last take_deaths() (points, kill feed).
   struct Death { i32 index; Kind kind; bool by_player; bool head; };
@@ -104,6 +105,12 @@ class People {
   /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
   i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
+  /// A fall since the last take_falls() (ragdolls, M3 life): `push` is the car's throw (m/s,
+  /// people_impacts.mjs) for `car`, else the direction of the shot or blast; `alive`: knocked down
+  /// by a car and getting up again (the person waits until stand_up()).
+  struct Fall { i32 index; Vec3 push; bool car; bool alive; };
+  void take_falls(std::vector<Fall>& out) { out.insert(out.end(), falls_.begin(), falls_.end()); falls_.clear(); }
+  void stand_up(i32 i, Vec3 feet, f32 yaw) { Person& p = at(i); p.pos = feet; p.yaw = yaw; p.knocked_until = 0; }
   /// Whether the last hit of shot() was on the head (headshot_feedback.mjs).
   bool last_head() const { return last_head_; }
 
@@ -115,6 +122,7 @@ class People {
   std::vector<Person> people_;
   std::vector<CrimeReport> reports_;
   std::vector<Death> deaths_;
+  std::vector<Fall> falls_;
   bool last_head_ = false;
   u32 budget_ = 60, serial_ = 1;
 };

@@ -101,6 +101,7 @@ struct PoliceDrone {
 };
 
 struct WorldLife;  // game_world.h
+struct GameLife;   // game_life.h (M3 life)
 
 class Game {
  public:
@@ -245,6 +246,16 @@ class Game {
   bool world_command(const std::string& cmd, std::string& out);
   void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
   std::unique_ptr<WorldLife> life_;
+  // street life, animals, ragdolls, walkable buildings (game_life.cpp, M3 life; state in
+  // GameLife, game_life.h, declared last so it goes before the world it has bodies in)
+  void life_update(f32 dt);
+  void life_draw();
+  void life_draw_people();  // the running club, inside draw_town's people drawing
+  bool life_hides_person(i32 index) const;  // lies as a ragdoll
+  bool life_shot(Vec3 from, Vec3& to, f32 damage);
+  void life_blast(Vec3 at, f32 radius);
+  void life_hud(std::string& s);
+  bool life_command(const std::string& cmd, std::string& out);
 
   // menus, settings, start, equipment, presentation (game_ui.cpp)
   bool ui_command(const std::string& cmd, std::string& out);
@@ -370,6 +381,7 @@ class Game {
   bool mobile_ = false;
   // menus, settings, start, equipment, presentation (game_ui.h)
   UiState ui_;
+  std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
 
 Game& game();

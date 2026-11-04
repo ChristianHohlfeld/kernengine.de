@@ -121,6 +121,10 @@ struct CityStream::Tile {
   kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false;
+  // interiors (M3 life): one building left out, the collision rebuilt beside the old body
+  i32 skip = -1;
+  kern::physics::Body old_body;
+  bool recollide = false;
 };
 
 CityStream::CityStream() = default;
@@ -156,6 +160,8 @@ void CityStream::remove(Tile& t) {
   t.old_lay.clear();
   if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = {};
+  if (world_ && t.old_body.valid() && world_->body_valid(t.old_body)) world_->destroy_body(t.old_body);  // M3 life
+  t.old_body = {};
   for (Lane& l : lanes_)
     if (l.tile == t.key.hash()) l.alive = false;
 }
@@ -407,6 +413,7 @@ bool CityStream::build_collision(Tile& t, f64 deadline) {
   std::vector<u32> holes, tris, idx;
   std::vector<Vec3> pts;
   while (t.collide_next < t.features.buildings.size()) {
+    if (static_cast<i32>(t.collide_next) == t.skip) { ++t.collide_next; continue; }  // an entered interior (M3 life)
     const MapFeatures::Building& b = t.features.buildings[t.collide_next++];
     xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
     std::vector<std::vector<Vec2>> rings = b.rings;
@@ -556,6 +563,15 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     if (kern::now_ms() > deadline) break;
     if (!work(*t, deadline)) break;
   }
+  // Interiors (M3 life): a tile whose collision leaves a building out is rebuilt beside the old
+  // body (at least 1.5 ms a frame), then the old body goes.
+  for (auto& [k, t] : tiles_) {
+    if (!t->recollide || t->state != Tile::State::ready) continue;
+    if (!build_collision(*t, std::fmax(deadline, kern::now_ms() + 1.5))) break;
+    if (t->old_body.valid() && world_->body_valid(t->old_body)) world_->destroy_body(t->old_body);
+    t->old_body = {};
+    t->recollide = false;
+  }
   stats_ = {};
   for (auto& [k, t] : tiles_) {
     if (t->state == Tile::State::ready) ++stats_.tiles_ready;
@@ -587,6 +603,71 @@ bool CityStream::street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32&
     return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------------------------
+// street life and interiors (M3 life)
+
+void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const {
+  for (const auto& [k, t] : tiles_) {
+    if (t->state != Tile::State::ready && t->state != Tile::State::collision) continue;
+    for (std::size_t i = 0; i < t->features.buildings.size(); ++i) {
+      const MapFeatures::Building& b = t->features.buildings[i];
+      if (b.rings.empty() || b.rings[0].size() < 3) continue;
+      f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+      for (Vec2 q : b.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
+      if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
+      out.push_back({k, static_cast<u32>(i), &b});
+    }
+  }
+}
+
+void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
+  for (const auto& [k, t] : tiles_) {
+    if (t->state != Tile::State::ready) continue;
+    for (std::size_t i = 0; i < t->features.areas.size(); ++i) {
+      const MapFeatures::Area& a = t->features.areas[i];
+      if (a.kind != kind || a.rings.empty() || a.rings[0].size() < 3) continue;
+      f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+      for (Vec2 q : a.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
+      if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
+      out.push_back({k * 65536 + i, &a});
+    }
+  }
+}
+
+void CityStream::recollide(Tile& t) {
+  if (t.state != Tile::State::ready) return;  // not built yet: the skip applies as it is built
+  if (t.recollide) {
+    // A rebuild in progress: drop the partial body, keep the complete old one.
+    if (t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
+  } else {
+    t.old_body = t.body;
+  }
+  t.body = {};
+  t.collide_next = 0;
+  t.colliders = 0;
+  t.recollide = true;
+}
+
+void CityStream::exclude_building(u64 tile, i32 index) {
+  if (tile == excl_tile_ && index == excl_index_) return;
+  if (excl_tile_) {
+    auto it = tiles_.find(excl_tile_);
+    if (it != tiles_.end()) { it->second->skip = -1; recollide(*it->second); }
+  }
+  excl_tile_ = tile;
+  excl_index_ = tile ? index : -1;
+  if (tile) {
+    auto it = tiles_.find(tile);
+    if (it != tiles_.end()) { it->second->skip = index; recollide(*it->second); }
+  }
+}
+
+bool CityStream::exclusion_done() const {
+  for (const auto& [k, t] : tiles_)
+    if (t->recollide) return false;
+  return true;
 }
 
 }  // namespace sc

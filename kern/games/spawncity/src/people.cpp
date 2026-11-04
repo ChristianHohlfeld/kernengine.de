@@ -219,6 +219,7 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   const f32 l = std::hypot(from_dir.x, from_dir.y);
   p.fall_dir = l > 1e-3f ? Vec3{from_dir.x / l, from_dir.y / l, 0} : Vec3{std::cos(p.yaw), std::sin(p.yaw), 0};
   deaths_.push_back({static_cast<i32>(&p - people_.data()), p.kind, by_player, last_head_});
+  falls_.push_back({static_cast<i32>(&p - people_.data()), from_dir, hit_by_car, false});  // ragdoll (M3 life)
   // Soldiers and zombies are no crime (military_response.mjs, zombie_nights.mjs); a sandbox
   // enemy down counts as "police-kill" severity 1 (sandbox_game.mjs killEnemy).
   if (by_player && (p.kind == Kind::citizen || officer)) {
@@ -396,6 +397,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       if (now - p.down_at > kBodySeconds || dist2d(p.pos, view.focus) > kHide) p.state = State::gone;
       continue;
     }
+    if (now < p.knocked_until) continue;  // lying on the street as a ragdoll (M3 life)
     if (p.kind == Kind::citizen) {
       if (dist2d(p.pos, view.focus) > kHide) { p.state = State::gone; continue; }
       if (p.state != State::fight) walk(p, dt, now, view, rng);
@@ -420,9 +422,15 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       p.hp -= damage;
       if (p.hp <= 0) kill(p, v.velocity, v.player, now, true);
       else {
-        // Thrown aside, out of the footprint.
-        const Vec3 side = v.rotation.rotate({0, local.y >= 0 ? 1.0f : -1.0f, 0});
-        p.pos = p.pos + side * (v.half.y + 0.6f - std::fabs(local.y));
+        // Thrown aside as a ragdoll that gets up again (people_impacts.mjs: the car's momentum,
+        // sideways 1.4 + 0.12 v, up 1.2 + 0.16 v, at most 15 m/s).
+        const f32 sd = local.y >= 0 ? 1.0f : -1.0f;
+        Vec3 push = Vec3{v.velocity.x, v.velocity.y, 0} * 1.05f + v.rotation.rotate({0, sd, 0}) * (1.4f + speed * 0.12f) + Vec3{0, 0, 1.2f + speed * 0.16f};
+        const f32 pl = kern::length(push);
+        if (pl > 15) push = push * (15 / pl);
+        falls_.push_back({static_cast<i32>(&p - people_.data()), push, true, true});
+        p.knocked_until = now + 6;
+        p.v = 0;
         if (v.player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
         if (p.kind == Kind::citizen) frighten(p.pos, 8, now, 1.4f);
       }
