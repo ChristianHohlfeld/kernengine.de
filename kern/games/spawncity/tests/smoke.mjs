@@ -478,7 +478,8 @@ async function runMultiplayer() {
   await cmd(A, "net blast");
   check(await until(B, b => window.SpawnCity.hud().explosions > b, booms), "[mp] remote explosion");
   // Ping marker in the world, seen by the mate.
-  check(await cmd(A, "ping") === "set", "[mp] ping set");
+  // At a point low on the screen (the ground in front; the crosshair may look at the sky).
+  check(await cmd(A, "ping 320 330") === "set", "[mp] ping set");
   check(await until(B, () => window.SpawnCity.hud().mp.pings.length === 1), "[mp] the mate sees the ping");
   // Voice: no microphone headless - the client "speaks" a test tone; the host hears it (in range).
   await cmd(B, "voice mic");
