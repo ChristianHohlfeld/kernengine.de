@@ -16,7 +16,7 @@ namespace {
 constexpr f32 kStopFoot = 17, kEngageMin = 6, kEngageMax = 15, kReturnM = 42, kRunMps = 3.7f;
 constexpr f32 kSpawnMin = 70, kSpawnMax = 125, kDespawn = 230, kPathSeconds = 1.8f, kSightSeconds = 0.3f;
 constexpr f32 kVolleyGap = 0.48f, kCopHitScale = 0.5f;
-constexpr f32 kCarHp = 300, kCarHit = 22, kCarCritical = 0.25f, kCarBurn = 2.6f, kCrashDv = 7, kCrashDamage = 16;
+constexpr f32 kCarHp = 300, kCarHit = 22, kCarCritical = 0.20f, kCarBurn = 2.45f /* critical_damage_logic.mjs car: 20 %, 2450 ms */, kCrashDv = 7, kCrashDamage = 16;
 constexpr f32 kDroneHp = 100, kDroneHit = 25, kJetHp = 600, kJetHit = 22;
 // wanted_police_drones.mjs
 constexpr f32 kPdHp = 100, kPdHit = 34, kPdRespawn = 9, kPdSensor = 0.17f, kPdReaction = 0.75f, kPdVolley = 0.65f, kPdDamageCooldown = 1.05f;
@@ -104,6 +104,7 @@ void Game::handle_shots() {
       }
     }
     if (drone_hit) continue;
+    if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
     if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0) {
       s.to = to;
@@ -139,7 +140,7 @@ void Game::damage_car(i32 i, f32 amount, bool by_player) {
   c.hp = std::fmax(0.0f, c.hp - amount);
   if (c.hp <= kCarHp * kCarCritical) {
     if (c.burn_until < 0) c.burn_until = now + kCarBurn;
-    else if (c.hp <= 0) c.burn_until = std::fmin(c.burn_until, now + 0.5f);
+    else if (c.hp <= 0) c.burn_until = std::fmin(c.burn_until, now + 0.62f);  // acceleratedMs 620
   }
   if (by_player) c.hit_by_player = true;
 }
@@ -187,6 +188,9 @@ void Game::damage_player_vehicle(f32 amount) {
       toast_age_ = 0;
       toggle_drone();
       drone_hp_ = kDroneHp;
+      combat_.drone_ready_at = world_->sim_time() + 8;  // player_vitals_logic.mjs DRONE_REPLACEMENT_COOLDOWN_MS
+      combat_.pop = combat_.fun.apply(combat::FunEvent::drone_destroyed, world_->sim_time(), wanted_.stars());  // gameplay_fun_logic.mjs
+      combat_.pop_at = world_->sim_time();
     }
   } else if (mode_ == Mode::jet) {
     jet_hp_ -= amount;
@@ -210,6 +214,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
+  combat_blast(at, radius, damage, by_player);  // army, flak, rockets (game_military.cpp)
   if (by_player) blast_remotes(at, radius, damage);
   // The player on foot (weapons.h blast_factor: buildings in between shield most of it).
   if (mode_ == Mode::foot) {
