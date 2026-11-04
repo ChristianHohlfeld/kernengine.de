@@ -257,6 +257,20 @@ async function run({name, url, context, mapped}) {
     await cmd("weapon 1");
   }
 
+  // sc-m3-gaps (game_gaps.cpp, PARITY.md): lamps, critical smoke, jet damage, spawn gate.
+  {
+    let g = JSON.parse(await cmd("gaps"));
+    check(g.lamps > 0, `[${name}] street lamps placed (${g.lamps})`);
+    const lb = await cmd("lampbreak 2");
+    g = JSON.parse(await cmd("gaps"));
+    check(/^lamp /.test(lb) && g.lampsBroken >= 1 && g.lampsFallen >= 1, `[${name}] a lamp post knocked down (${lb})`);
+    let burnt = "";
+    for (let i = 0; i < 16 && burnt !== "burning"; i++) burnt = await cmd("burn " + i);
+    g = JSON.parse(await cmd("gaps"));
+    check(burnt === "burning" && g.smoke >= 1, `[${name}] critical smoke on a burning car (${JSON.stringify({smoke: g.smoke, puffs: g.puffs})})`);
+    check(["yes", "no"].includes(await cmd("canspawn 0 0")), `[${name}] spawn gate answers`);
+  }
+
   // Menus and settings (game_ui.cpp, ui.mjs): the table, a change, pause, the dialog, WORLD, RESET.
   {
     const schema = JSON.parse(await cmd("settings schema"));

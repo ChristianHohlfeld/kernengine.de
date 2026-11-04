@@ -8,6 +8,7 @@
 // vehicles knock people down by their footprint and speed.
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "city_stream.h"
@@ -32,6 +33,7 @@ struct PeopleView {
   Vec3 player;            // the player's feet (or vehicle)
   f32 player_speed = 0;
   bool player_on_foot = true, player_alive = true;
+  std::function<bool(Vec3)> can_spawn;  // spawn_visibility_guard.mjs: may someone appear here unseen?
   std::vector<VehicleView> vehicles;
 };
 

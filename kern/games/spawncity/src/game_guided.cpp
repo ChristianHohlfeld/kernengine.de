@@ -92,7 +92,8 @@ bool Game::guided_press() {
     const RayResult r = cast(world_->physics(), eye, fwd, guided::kRange, body(drone_actor_));
     best_at = r.hit ? r.point : eye + fwd * guided::kRange;
   } else {
-    world_->play_sound("builtin:click", eye, 0.5f, 2.2f, false);  // lock tone
+    gaps_guided_sounds();
+    world_->play_sound("sc:locktone", eye, 1, 1, false);  // lockTone: two 1760 Hz beeps (game_gaps.cpp)
   }
   const BodyState s = state_of(drone_actor_);
   bool pedestrian = best.kind == guided::TargetKind::person;
@@ -111,7 +112,7 @@ bool Game::guided_press() {
     toast_ = std::string("GUIDED LOCK - ") + best.label + " - SPRINT ZUM AUSWEICHEN";
     toast_age_ = 0;
   }
-  world_->play_sound("builtin:launcher", s.position, 0.8f, 0.9f, true);
+  // no launch sound: it drops off the rail; the ignition bang and the motor come when it lights (game_gaps.cpp)
   people_.frighten(s.position, 18, now, 1);
   return true;
 }

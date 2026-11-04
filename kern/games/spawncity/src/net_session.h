@@ -25,6 +25,7 @@
 #include "common.h"
 #include "kern/net/client_server.h"
 #include "kern/net/transport.h"
+#include "jet_seats.h"
 #include "mp_rules.h"
 
 namespace sc::net {
@@ -40,6 +41,7 @@ enum PlayerFlag : u16 {
   kProtected = 128,   // spawn protection
   kTalking = 256,     // the microphone is live
   kCockpit = 512,
+  kPassenger = 1024,  // rides in a mate's jet (jet_mode.mjs passenger): not drawn on foot
 };
 
 /// One player's state as the others see it.
@@ -64,7 +66,9 @@ struct PlayerState {
 
 /// An effect another player sees (vs_multiplayer.mjs fx: shot, explosion, impact).
 struct Fx {
-  enum Kind : u8 { shot, explosion, impact, rocket };
+  // lamp: street_lamps.mjs sendBreak (p foot, dir x/y + state); strike / flyover: fighter_jets.mjs
+  // (p mark, a alt, dir.x offset); mil_tracer / mil_shell: military_response.mjs (p from, dir to)
+  enum Kind : u8 { shot, explosion, impact, rocket, lamp, strike, flyover, mil_tracer, mil_shell, kLast = mil_shell };
   u8 kind = shot, owner = 0;
   Vec3 p, dir;
   f32 a = 0;              // shot: speed; explosion: radius
@@ -126,6 +130,11 @@ class Session {
   /// Ask for a rule change (friendly fire); the host starts the vote.
   bool propose_rule(bool friendly_fire);
   bool vote(bool approve);
+  /// Jet seats (jet_seat_coordinator.mjs): ask the authority to claim / release a seat in
+  /// `owner`'s jet (alone the table is local). The answer arrives with the table.
+  void seat_request(bool claim, u8 owner, seats::Seat seat);
+  const seats::Table& seats() const { return seats_; }
+  seats::Table& seats() { return seats_; }
 
   // ---- incoming (since the last call) ----
   std::vector<Hit> take_hits() { return std::move(hits_); }
@@ -170,6 +179,8 @@ class Session {
   void send_rules();
   void send_scores();
   void send_anchor(u8 slot);
+  void send_seats();
+  void judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat);
   Vec3 focus_of(u8 slot) const;
   f32 hp_of(u8 slot) const;
 
@@ -197,6 +208,8 @@ class Session {
   u32 ballot_serial_ = 0;
   std::string vote_text_ = "Aenderungen nur einstimmig";
   u32 sent_poses_ = 0;
+  seats::Table seats_;
+  f64 seats_clock_ = 0;
 };
 
 /// Byte packing of the pose (also used by the tests).

@@ -50,7 +50,9 @@ void Game::combat_banner(const std::string& text) {
 }
 
 bool Game::spawn_unseen(Vec3 p, f32 height) const {
-  // __spawnVisibilityGuard: out of the drawn view, or behind a building.
+  // __spawnVisibilityGuard.canSpawnAt (spawn_guard.h via game_gaps.cpp): 24 m from every viewer,
+  // outside every player's view cone unless a building hides it.
+  if (gaps_) return gaps_can_spawn(p, height, 0);
   const Vec3 top = p + Vec3{0, 0, height};
   const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), to = top - cam_.eye;
   const f32 d = kern::length(to);
@@ -285,6 +287,7 @@ void Game::step_heli(Heli& h, f32 dt) {
     s.normal = r.normal;
     world_->shots().push_back(s);
     combat_tracer(from, s.to);
+    gaps_send_military(false, from, s.to);  // military_response.mjs sendFx tracer (game_gaps.cpp)
     world_->play_sound("builtin:smg", from, 0.6f, 0.55f, true);
   }
 }
@@ -358,6 +361,7 @@ void Game::step_tank(Tank& k, f32 dt) {
     const Vec3 aim{tp.x + tv.x * 0.4f + (rng_.unit() - 0.5f) * err * 2, tp.y + tv.y * 0.4f + (rng_.unit() - 0.5f) * err * 2,
                    std::fmax(city_.ground_height(tp.x, tp.y), tp.z - 1.2f)};
     combat_.shells.push_back({muzzle, kern::normalize(aim - muzzle) * 130.0f, 3});
+    gaps_send_military(true, muzzle, aim);  // sendFx shell (game_gaps.cpp)
     world_->particle_burst(muzzle, {1.6f, 1.2f, 0.7f});
     world_->play_sound(combat_sfx(combat_audio::Kind::explosion), muzzle, 0.9f, 1.35f, true);
   }
@@ -431,6 +435,7 @@ void Game::step_soldier(SoldierAi& s, f32 dt) {
   e.normal = r.normal;
   world_->shots().push_back(e);
   combat_tracer(from, e.to);
+  gaps_send_military(false, from, e.to);  // military_response.mjs sendFx tracer (game_gaps.cpp)
   world_->play_sound("builtin:smg", from, 0.45f, 0.9f, true);
 }
 
@@ -502,7 +507,8 @@ void Game::update_military(f32 dt) {
     bool hit = r.hit || s.p.z <= city_.ground_height(s.p.x, s.p.y) + 0.2f;
     Vec3 at = r.hit ? r.point : s.p;
     if (!hit && have && kern::length(s.p - tp) < 2.2f) hit = true;
-    if (hit) { explosion(at, 6, kShellDmg, false); s.life = -1; }
+    if (hit && s.remote) { world_->particle_burst(at, {3.0f, 1.2f, 0.3f}); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 0.8f, 1, true); s.life = -1; }
+    else if (hit) { explosion(at, 6, kShellDmg, false); s.life = -1; }
     else if (s.life > 0) combat_tracer(prev, s.p, {3.0f, 1.6f, 0.6f});
   }
   std::erase_if(C.shells, [](const Shell& s) { return s.life <= 0; });
@@ -612,7 +618,7 @@ void Game::update_flak(f32 dt) {
 // ---------------------------------------------------------------------------------------------
 // fighter_jets.mjs
 
-void Game::launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset) {
+void Game::launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset, bool remote) {
   const f32 z = city_.ground_height(cx, cy) + alt;
   // a pair heading north: the wingman 26 m left, 42 m behind, 6 m higher
   for (int k = 0; k < 2; ++k) {
@@ -623,6 +629,7 @@ void Game::launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset)
     j.t0 = at;
     j.strike = strike && k == 0;
     j.target = {cx, cy};
+    j.remote = remote;
     combat_.jets.push_back(j);
   }
 }
@@ -634,6 +641,7 @@ bool Game::air_strike(Vec3 p) {
   p.z = city_.ground_height(p.x, p.y);
   combat_.flares.push_back({p, now, now + 9});
   launch_jets(p.x, p.y, true, strike_launch_time(now), 70, 0);
+  gaps_send_jets(true, p, 0, 70);  // fighter_jets.mjs sendFx strike (game_gaps.cpp)
   combat_banner("LUFTSCHLAG ANGEFORDERT");
   return true;
 }
@@ -644,7 +652,9 @@ void Game::update_jets(f32 dt) {
   // ambient: a pair every 75..150 s, 55..85 m over the listener
   if (now > C.next_ambient) {
     C.next_ambient = now + kAmbientMinS + rng_.unit() * (kAmbientMaxS - kAmbientMinS);
-    launch_jets(cam_.eye.x, cam_.eye.y, false, now, kJetAltMin + rng_.unit() * (kJetAltMax - kJetAltMin), (rng_.unit() - 0.5f) * 160);
+    const f32 alt = kJetAltMin + rng_.unit() * (kJetAltMax - kJetAltMin), off = (rng_.unit() - 0.5f) * 160;
+    launch_jets(cam_.eye.x, cam_.eye.y, false, now, alt, off);
+    gaps_send_jets(false, cam_.eye, off, alt);  // fighter_jets.mjs sendFx flyover (game_gaps.cpp)
   }
   for (FighterJet& j : C.jets) {
     const f32 y = j.y0 + kJetSpeed * (now - j.t0);
@@ -655,7 +665,7 @@ void Game::update_jets(f32 dt) {
     const f32 closest_y = cam_.eye.y, closest = std::hypot(j.x - cam_.eye.x, j.z - cam_.eye.z);
     if (!j.heard && now >= j.t0 && y > closest_y && (y - closest_y) / kJetSpeed >= closest / kSoundMps) {
       j.heard = true;
-      world_->play_sound("builtin:boost", {j.x, closest_y, j.z}, clampf(std::pow(85 / std::fmax(8.0f, closest), 1.35f) * 0.77f, 0.05f, 1.6f), 0.55f, true);
+      // the roar itself is a looping voice per jet with retarded time and Doppler (game_gaps.cpp gaps_jet_audio)
     }
     if (!j.shook && d < 160) { j.shook = true; world_->shake_camera(std::fmin(0.85f, 0.35f + 60 / d)); }
     // strike run: a stick of 10 across the mark, released 380 m before it
@@ -663,7 +673,7 @@ void Game::update_jets(f32 dt) {
       for (i32 k = j.dropped; k < kStick; ++k) {
         Vec3 to{j.target.x + (rng_.unit() - 0.5f) * 5, j.target.y - kStickLen / 2 + static_cast<f32>(k) * kStickLen / (kStick - 1), 0};
         to.z = city_.ground_height(to.x, to.y);
-        C.bombs.push_back({p + Vec3{0, -2, -1.2f}, to, now + static_cast<f32>(k) * (kStickLen / (kStick - 1)) / kJetSpeed, 1.5f + rng_.unit() * 0.25f});
+        C.bombs.push_back({p + Vec3{0, -2, -1.2f}, to, now + static_cast<f32>(k) * (kStickLen / (kStick - 1)) / kJetSpeed, 1.5f + rng_.unit() * 0.25f, j.remote});
       }
       j.dropped = kStick;
     }
@@ -671,7 +681,7 @@ void Game::update_jets(f32 dt) {
   std::erase_if(C.jets, [&](const FighterJet& j) { return j.y0 + kJetSpeed * (now - j.t0) > j.y0 + 2 * kJetSpan; });
   for (Bomb& b : C.bombs) {
     if (now - b.t0 >= b.dur) {
-      explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, true);
+      explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, !b.remote);  // a mate's strike is not our crime
       C.blasts.push_back({b.to, now, 1});
       b.dur = -1;
     }

@@ -180,6 +180,7 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
         if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) continue;
       }
     }
+    if (view.can_spawn && !view.can_spawn(at)) continue;  // nobody may see them appear
     const u32 seed = serial_++ * 2654435761u;
     p.seed = seed;
     p.pos = at;

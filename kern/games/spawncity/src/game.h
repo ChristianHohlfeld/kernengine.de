@@ -21,6 +21,7 @@
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
+#include "game_gaps.h"
 #include "game_look.h"
 #include "jet.h"
 #include "kern/app/app.h"
@@ -240,7 +241,7 @@ class Game {
   void step_soldier(SoldierAi& s, f32 dt);
   void update_flak(f32 dt);
   void update_jets(f32 dt);
-  void launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset);
+  void launch_jets(f32 cx, f32 cy, bool strike, f32 at, f32 alt, f32 offset, bool remote = false);
   bool air_strike(Vec3 target);
   void update_fighters_back(f32 dt);
   void update_zombies(f32 dt);
@@ -321,6 +322,47 @@ class Game {
   i32 look_people_budget() const;
   bool look_command(const std::string& cmd, std::string& out);
   std::string look_hud_json();
+
+  // sc-m3-gaps (game_gaps.cpp, PARITY.md): sirens, police dispatch, critical smoke, organic hit
+  // sound, impact bursts, spawn gates, camera guard, jet damage
+  void gaps_init(kern::Engine& e);
+  void gaps_update(f32 dt);
+  void gaps_sirens(f32 dt);
+  void gaps_jet_audio(f32 dt);
+  void gaps_guided(f32 dt);
+  void gaps_guided_sounds();
+  void gaps_draw();
+  void gaps_hud(std::string& s);
+  bool gaps_command(const std::string& cmd, std::string& out);
+  void gaps_camera(kern::Camera& c);
+  bool gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const;
+  bool gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const;
+  bool gaps_drone_due(u32 slot, i32 stars);
+  void gaps_drone_revealed(u32 slot, i32 stars);
+  void gaps_jet_damage(f32 amount);
+  kern::Mat4 gaps_drone_matrix();
+  // street lamps (game_lamps.cpp, street_lamps.mjs)
+  void gaps_lamps_init(kern::Renderer& r);
+  void gaps_lamps_sounds();
+  void gaps_lamps_place();
+  void gaps_lamps_mirror();
+  void gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net);
+  void gaps_lamps_remote(const net::Fx& f);
+  void gaps_lamps_blast(Vec3 at, f32 radius);
+  void gaps_lamps_update(f32 dt);
+  void gaps_lamps_reset();
+  void gaps_lamps_draw();
+  void gaps_remote_fx(const net::Fx& f);
+  void gaps_send_jets(bool strike, Vec3 p, f32 offset, f32 alt);
+  void gaps_send_military(bool shell, Vec3 from, Vec3 to);
+  // riding along in a mate's jet (game_seats.cpp, jet_mode.mjs passenger, jet_seats.h)
+  bool gaps_riding() const;
+  bool gaps_ride_pose(Vec3& p, Quat& q) const;
+  bool gaps_seat_press();
+  void gaps_leave_ride();
+  void gaps_seats_update(f32 dt);
+  bool gaps_ride_camera(kern::Camera& c);
+  std::unique_ptr<GapsState> gaps_;
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
@@ -405,12 +447,12 @@ class Game {
   u8 my_color_ = 0;
   std::unique_ptr<MpLocal, MpLocalDelete> mp_;  // pings, feed, voice, big map (game_net.cpp)
   // street lamps and night
-  struct Lamp { Vec3 foot; f32 yaw; u32 lane; };
+  struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
   std::size_t lamp_lanes_ = 0;  // lanes already given their lamps (the lane list only grows)
   f32 night_ = 0;
   bool show_lamps_ = true;
-  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 600, town_clock_ = 0;
+  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400, town_clock_ = 0;  // jet: jet_mode.mjs HP_MAX 400
   i32 last_stars_ = 0;
   bool player_dead_ = false;
   // rules / feedback

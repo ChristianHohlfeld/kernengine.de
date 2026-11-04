@@ -16,6 +16,7 @@ import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
+import {GapsHud} from "./gaps_hud.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -215,6 +216,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     canvas.width = w; canvas.height = hh;
     e.kern_app_resize(w, hh);
   };
+  const gapsHud = new GapsHud(hudEl);  // impact bursts, police dispatch (gaps_hud.mjs)
   const tick = () => {
     frames++;
     pollPad();
@@ -222,7 +224,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pumpDem();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
-    if (last) { hud.update(last, tiles); mpPage?.update(last); }
+    if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }
     applyRenderScale(last);
     ui.update(last);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
@@ -347,7 +349,7 @@ class SpawnCityHud {
     if (h.mode === "foot") row("Granaten", h.grenades);
     if (h.carHp !== undefined) row("Zustand", `${Math.round(h.carHp / 3)} %`, h.carHp < 75 ? "warn" : "");
     if (h.droneHp !== undefined) row("Zustand", `${Math.round(h.droneHp)} %`, h.droneHp < 30 ? "warn" : "");
-    if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 6)} %`, h.jetHp < 150 ? "warn" : "");
+    if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 4)} %`, h.jetHp < 100 ? "warn" : "");  // jet_mode.mjs HP_MAX 400
     if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : "bereit (X)"}`, "hot");
     if (h.net) row("Mehrspieler", h.net.status, h.net.connected ? "" : "warn");
     const c = h.combat;  // combat and events (game_events.cpp): numbers and texts from C++

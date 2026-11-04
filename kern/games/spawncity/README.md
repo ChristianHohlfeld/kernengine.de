@@ -152,8 +152,14 @@ kern/games/spawncity/
                   Blaulicht-Takte (reine Modelle, in den nativen Tests)
     game_look.*   Look im Spiel: Qualität anwenden, eigene Tageszeit, Punktlichter, Speed-Lines,
                   eigene Ego-Modelle für Werfer/Fäuste/Messer, HUD-Teil und Befehle (`look_` in Game)
+    spawn_guard.* Spawn-Regeln: nichts entsteht im Blick eines Spielers, keine überlappenden Fahrzeuge
+    gaps_rules.*  reine Regeln der in sc-m3-gaps geschlossenen Lücken (Sirenen, Polizei-Anflug,
+                  Rauch des kritischen Schadens, Knacken beim Tod, Darstellungs-Glättung der Drohne)
+    lamps.*       Straßenlaternen als reine Regeln (Platz, Schuss, Explosion, Auto)
+    game_gaps.*   wendet sie an (`gaps_` in Game); game_lamps.cpp die Laternen
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
                   + mp_host.mjs (Transporte, Mikrofon, Mehrspieler-HUD, große Karte, Teilen/QR)
+                  + gaps_hud.mjs (Funkenstern am Einschlag, Polizei-Anflug im HUD)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
   build.sh        wasm + Einzeldatei-HTML
 ```
@@ -448,6 +454,52 @@ kern/games/spawncity/
   eigenem SVG-Symbol; auf Touch-Geräten startet START das Vollbild, außer die installierte App läuft
   schon im eigenen Fenster.
 
+## Parität (sc-m3-gaps)
+
+`PARITY.md` listet alle 250 Module von spawncity.de mit Status und Kern-Dateien. In diesem Schritt
+geschlossen (Quellen in Klammern, Werte im Code):
+
+* **Sirenen** (`police_sirens.mjs`): Martinshorn der Streifenwagen (466/622 Hz, 0,66 s je Ton, Säge +
+  Rechteck + Dreieck durch einen 1650-Hz-Formanten), steigendes „Whoop“ der Polizeidrohnen
+  (760 → 1480 Hz in 0,7 s); je eine Stimme für die nächste Einheit, Pegel 0,06/0,032 ÷ (1 + (d/14)^1,25)
+  bis 260 m, Höhenverlust mit der Entfernung (zwei Klänge, hell und tiefpassgefiltert, nach
+  5200 − 16·d Hz überblendet – Kerns Mixer hat keinen Filter je Stimme), Doppler aus der
+  Abstandsänderung. Ersetzt die alte Heulsirene.
+* **Polizei-Anflug** (`wanted_dispatch_guard.mjs`, `wanted_police_pre_guard.mjs`): eine Polizeidrohne
+  kommt erst nach der Anfahrzeit (16 s − 1,3 s je Stufe, ≥ 9 s), dann Gnadenfrist
+  max(450, 720 − 45·Sterne) ms vor dem ersten Schuss; HUD „POLIZEI-EINSATZ · n DROHNEN IM ANFLUG“.
+  Drohnen sehen (und schießen) nur in Feuerreichweite min(35, 28 + 1,4·Stufe) m.
+* **Rauch vor der Explosion** (`world_critical_damage_fx.mjs`): flache dunkle Scheiben mit hellem
+  Rand, die steigen, wachsen und sich drehen; spät im Countdown Glut. Für Autos/Busse (statt der
+  Flammen vor der Explosion), Polizeidrohnen, die eigene Drohne und den Jet.
+* **Jet-Schaden** (`jet_mode.mjs damageAirframe`): 400 HP, Schub fällt mit dem Schaden, bei 15 %
+  brennt er 12 s, dann zerfällt er (14 m / 180) und nimmt den Piloten mit.
+* **Knacken beim Tod** eines Menschen (`world_organic_hit_audio.mjs`), **Funkenstern** am Einschlag
+  des Drohnen-MGs (`impact_explosion_overlay.mjs`, die Seite zeichnet ihn am Punkt, den C++ projiziert).
+* **Spawn-Regeln** (`spawn_visibility_guard.mjs`, `vehicle_spawn_clearance.mjs`): nichts erscheint
+  näher als 24 m an einem Spieler oder in seinem Blickkegel (halbes Sichtfeld + 20°; auch die
+  Blicke der Mitspieler), außer ein Gebäude verdeckt es (bis 420 m); Leute ab 150 m (Telefon 125 m),
+  Verkehr ab 600 m dürfen auch im Blick ankommen; die ersten 6 s nach dem Start gilt das nicht.
+  Fahrzeuge werden nie ineinander gesetzt (Trennachsen-Test, 0,35 m).
+* **Kamera** (`camera_collision_guard.mjs`, `fpv_view_height.mjs`, `visual_pose_stabilization.mjs`):
+  nie unter dem Boden (+0,12 m), die Verfolgerkamera steigt über das Autodach, wenn eine Wand sie
+  heranschiebt; FPV-Auge 4,5 cm höher; die Drohne in follow/third gedämpft gezeichnet.
+* **Straßenlaternen** (`street_lamps.mjs`): Platz, Aussehen, Licht wie im Original; ausschießen,
+  umknicken (Box3D-Prop), Autos stoppen oder knicken sie, Sync an die Mitspieler, RESET.
+* **Kampfjets** (`fighter_jets.mjs`): Triebwerks-Loop je Jet mit Retarded-Time und Doppler (statt
+  des einen Knalls); Luftschlag und Überflug gehen an die Mitspieler (Bomben eines Mitspielers sind
+  keine eigene Tat). Militär-Leuchtspuren und Panzergranaten sehen die Mitspieler auch.
+* **GUIDED** (`guided_missile.mjs`): Lock-Ton, Zündknall, Motorstimme und Rauchspur.
+* **Mitfliegen im Jet** (`jet_mode.mjs`, `jet_seat_table.mjs`, `jet_seat_coordinator.mjs`): F am
+  gelandeten Jet eines Mitspielers (9 m, Pilot drin) fragt beim Host den Beifahrersitz an; der Host
+  führt die Sitztabelle (nur der Besitzer fliegt, ein Beifahrer, Pilot raus = Beifahrer raus, wer
+  geht, verliert seine Sitze). Als Beifahrer sitzt die Kamera im Jet; F steigt aus (über 10 m am
+  Schirm). Nachrichten `kSeatReq`/`kSeatState` in `net_session.cpp`.
+* Regel-Abstimmung: im Original gibt es genau eine Regel (Friendly Fire, `GAME_RULE_KEYS`); ihre
+  Abstimmung läuft schon über das Netz (`Session::propose_rule/vote`), siehe unten.
+
+Testbefehle: `gaps` (Zustand), `canspawn X Y`, `burn N`, `jetdamage N`, `lampbreak 1|2`, `seats`, `board`.
+
 ## Übernommene SpawnCity-Werte (Auszug)
 
 | Bereich | Werte | Quelle |
@@ -539,8 +591,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 * Der Panzer ist ein leichter Agent auf dem Straßengraph (Strahl gegen Wände), kein Box3D-Fahrzeug wie
   in SpawnCity (`physics.upsertBody kind:"bus"`); Box3D-Körper zur Laufzeit wären ein Level-Actor mehr.
 * Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler).
-  Die Abstimmung über Spielregeln ist als Logik da (`combat_detail.h`, `create_ballot`/`cast_vote`,
-  Befehl `ballot`); das Verschicken der Stimmen zwischen den Spielern fehlt noch (Netz).
+  Die Abstimmung über Spielregeln läuft über das Netz (`Session::propose_rule/vote`, mp::Ballot); im
+  Original ist Friendly Fire die einzige Regel (`world_options.mjs GAME_RULE_KEYS`). `combat_detail.h`
+  `create_ballot`/`cast_vote` ist dieselbe Logik für den lokalen Testbefehl `ballot`.
 * Trainingslevel (`training_test_level_v2.mjs`, `training_showcase.mjs`) ersetzen in SpawnCity die
   Welt ohne Geodaten; auf Kern übernimmt das die prozedurale Ersatzstadt (`city_stream`) – nicht
   nachgebaut, um die Stadt-Streaming-Arbeit nicht zu kreuzen. Die Rennstrecke (L) gibt es überall.
@@ -562,8 +615,7 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   öffentlicher Weg; synchronisierte Gebäudezerstörung und Atombombe (`world_sync.mjs`) – Kern-SpawnCity
   hat beides noch nicht, der Fx-Kanal ist dafür vorbereitet; Mikrofon im Headless-Test nicht prüfbar
   (der Test spricht mit `voice tone N`). Polizei und Passanten bleiben lokal (wie in SpawnCity).
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
-  echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume, GPS-Start.
 * Verkehr: mehr Fahrzeugtypen; Fahrer, die beim Carjacking zurückschlagen.
 * Nach einem Mehrspieler-Ursprungswechsel bleiben Spuren/Abschleppwagen der alten Stadt bis zum Ablauf.
 * Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume, GPS-Start.

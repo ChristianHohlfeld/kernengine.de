@@ -318,8 +318,8 @@ void Game::look_lighting(f32 dt) {
         std::vector<std::pair<f32, Vec3>> near;
         const std::vector<Lane>& lanes = city_.lanes();
         for (const Lamp& l : lamps_) {
-          if (l.lane >= lanes.size() || !lanes[l.lane].alive) continue;
-          const Vec3 head = l.foot + Vec3{std::cos(l.yaw) * 1.2f, std::sin(l.yaw) * 1.2f, 5.75f};
+          if (l.state || l.lane >= lanes.size() || !lanes[l.lane].alive) continue;  // a broken lamp gives no light
+          const Vec3 head = l.foot + Vec3{std::cos(l.yaw) * 1.42f, std::sin(l.yaw) * 1.42f, 5.75f};  // [hx, hy, z + 5.75]
           const f32 d = std::hypot(head.x - eye.x, head.y - eye.y);
           if (d <= 70) near.push_back({d, head});
         }

@@ -30,7 +30,7 @@ struct Tank {
   bool leaving = false, wreck = false, dead = false, has_exit = false;
 };
 
-struct Shell { Vec3 p, v; f32 life = 3; };
+struct Shell { Vec3 p, v; f32 life = 3; bool remote = false; };  // remote: a mate's tank (seen, no damage here)
 
 struct SoldierAi {
   i32 person = -1;
@@ -50,8 +50,8 @@ struct FlakGun {
 struct FlakRound { Vec3 p, v; f32 until = 0; };
 struct Puff { Vec3 p; f32 born = 0; };
 
-struct FighterJet { f32 x = 0, y0 = 0, z = 0, t0 = 0; bool strike = false; Vec2 target; i32 dropped = 0; bool shook = false, heard = false; };
-struct Bomb { Vec3 from, to; f32 t0 = 0, dur = 1.5f; };
+struct FighterJet { f32 x = 0, y0 = 0, z = 0, t0 = 0; bool strike = false; Vec2 target; i32 dropped = 0; bool shook = false, heard = false, remote = false; };  // remote: a mate's (fighter_jets.mjs onFx)
+struct Bomb { Vec3 from, to; f32 t0 = 0, dur = 1.5f; bool remote = false; };
 struct Blast { Vec3 p; f32 born = 0, scale = 1; };
 struct Flare { Vec3 p; f32 born = 0, until = 0; };
 

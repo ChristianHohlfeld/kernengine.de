@@ -15,7 +15,7 @@ Status:
   `sim/edge_hud_layout.mjs` und alle statischen/dynamischen Importe) nie importiert.
 * **in Arbeit (sc-m3-…)** – gehört einem anderen laufenden Branch (Steuerung, Leben, Menüs).
 
-Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilweise: 16 · in Arbeit (sc-m3-ui): 15 · fehlt: 13 · in Arbeit (sc-m3-life): 11
+Stand: gebaut: 129 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · in Arbeit (sc-m3-ui): 15 · in Arbeit (sc-m3-life): 11 · teilweise: 7 · fehlt: 5
 
 | Modul | Zweck | Status | Kern-Datei(en) | Begründung / Beleg |
 |---|---|---|---|---|
@@ -28,7 +28,7 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `box3d_hitscan` | Eigene Box3D-Welt nur für Treffer-Strahlen | entfällt | game_weapons.cpp (`hit_scan`) | (b) Technik: eine zweite Box3D-Welt, weil three.js-Gebäude nicht in der Physikwelt lagen. Auf Kern liegen Gebäude, Boden und Körper in EINER Box3D-Welt; Treffer sind Box3D-Strahlen darin (`Game::hit_scan`). Sichtbares Verhalten (Hitscan, Boden = Geländefläche) gleich. |
 | `box3d_human` | Box3D-Ragdoll-Mensch (Port von human.c) | in Arbeit (sc-m3-life) |  |  |
 | `building_interiors` | Begehbare Innenräume aller Gebäude | in Arbeit (sc-m3-life) |  |  |
-| `camera_collision_guard` | Kamera nie in Wänden/unter Boden; Verfolgerkamera steigt über das Autodach | teilweise | game.cpp (`collide`), game_gaps.cpp (`gaps_camera`) | Box3D-Kugelsweep gebaut; fehlt: Bodenhöhe +0,12 m und das Steigen über das Autodach bei Kollision. |
+| `camera_collision_guard` | Kamera nie in Wänden/unter Boden; Verfolgerkamera steigt über das Autodach | gebaut | game.cpp (`collide`), game_gaps.cpp (`gaps_camera`) | Boden +0,12 m, Near 0,045–0,08, über das Dach bei Kollision < 3,2 m (Lift 1,25 + 0,75·(3,2−h)), Blick auf das Auto; Jet/Schirm frei. Neu in sc-m3-gaps. |
 | `camera_pitch_contract` | Neigungsgrenzen zu Fuß (Eingabe vor Anzeige-Grenze) | in Arbeit (sc-m3-controls) | `game.cpp` |  |
 | `camera_settings` | Kamera-Einstellungen (FPV-Neigung, FOV, Third-Abstand) | gebaut | `settings.cpp`, `game.cpp`, `game_ui.cpp` | Stichprobe: Neigung −15°, FOV 105 |
 | `camera_shake` | Trauma-Modell fürs Kamerawackeln | gebaut | `look.cpp`, `look.h`, `game_look.cpp` | Stichprobe: Abbau 1,35/s, 0,055 rad, 19 Hz |
@@ -57,7 +57,7 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `edge_hud_layout` | Touch-Knöpfe an den Rändern | gebaut | `touch_pad.h`, `web/ui.mjs` |  |
 | `emp_button_layout` | EMP-Knopf-Platz | in Arbeit (sc-m3-controls) |  |  |
 | `facade_marks` | Ruß, Durchbrüche und Glassprünge an Fassaden | teilweise | `world_marks.cpp`, `city_stream.h`, `game_world.cpp` | Ruß und Wanddurchbrüche gebaut; Glassprünge in Fenstern fehlen (Kerns BuildingBuilder legt Fensterraster im Shader an, das Spiel kennt die Scheiben nicht). |
-| `fighter_jets` | Kampfjets im Tiefflug, Luftschlag | teilweise | `combat_art.cpp`, `combat_rules.h`, `game_military.cpp` | Flug, Knall, Luftschlag gebaut. Fehlt: Triebwerks-Loop mit Retarded-Time-Doppler (`jetEngineAudio`), Senden von Luftschlag/Überflug an Mitspieler (`sendFx kind strike/flyover`). |
+| `fighter_jets` | Kampfjets im Tiefflug, Luftschlag | gebaut | `combat_art.cpp`, `combat_rules.h`, `game_military.cpp`, game_gaps.cpp (`gaps_jet_audio`) | Flug, Luftschlag; Triebwerks-Loop je Jet (4 s Rumpeln/Brüllen/Zischen + Turbine 1180/2360 Hz) mit Retarded-Time und Doppler (0,45 … 2,6), Pegel min(1,8; (85/d)^1,35)·0,9·0,85, Tiefpass 900 + 60000/d; Luftschlag/Überflug an Mitspieler (Fx `strike`/`flyover`). Neu in sc-m3-gaps. |
 | `first_person_control_settings` | Einstellungen zu Fuß | in Arbeit (sc-m3-controls) | `settings.cpp` |  |
 | `first_person_controller_v5` | Zielsteuerung zu Fuß | in Arbeit (sc-m3-controls) |  |  |
 | `first_person_fire_contract_v1` | Feuer-Vertrag zu Fuß | in Arbeit (sc-m3-controls) |  |  |
@@ -70,7 +70,7 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `foot_touch_controller` | Touch zu Fuß | in Arbeit (sc-m3-controls) |  |  |
 | `fps_control_math` | Stickkurven zu Fuß | in Arbeit (sc-m3-controls) |  |  |
 | `fpv_optical_stabilizer` | FPV-Bildstabilisator | entfällt | `look.cpp`, `game_look.cpp` | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): trotzdem nachgebaut (README „FPV-Stabilisator“); stört nicht, da nur in der FPV-Kamera. Hinweis an den Nutzer: für exakte Parität müsste er AUS sein. |
-| `fpv_view_height` | FPV-Kamera 4,5 cm höher entlang der Rumpf-Hochachse | teilweise | game.cpp (FPV-Auge) | FPV-Auge 0,028 m über der Rumpfmitte; die zusätzlichen 0,045 m fehlen. |
+| `fpv_view_height` | FPV-Kamera 4,5 cm höher entlang der Rumpf-Hochachse | gebaut | game.cpp (FPV-Auge) | Auge jetzt 0,028 + 0,045 m über der Rumpfmitte (neu in sc-m3-gaps). |
 | `game_exit_button` | EXIT-Knopf | in Arbeit (sc-m3-ui) | `web/ui.mjs` |  |
 | `game_reset` | RESET | gebaut | `game_town.cpp`, `game_ui.cpp` |  |
 | `game_rules_sync` | Regeln des ersten Spielers, Abstimmung | gebaut | `net_session.cpp`, `mp_rules.h`, `game_net.cpp` | Einzige Regel im Original: friendlyFire (`GAME_RULE_KEYS`); einstimmig, 30 s, Rosterwechsel bricht ab – über das Netz in `Session::propose_rule/vote`. |
@@ -87,20 +87,20 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `gps_live_mode` | LIVE GPS | gebaut | `gps_live.cpp`, `game_ui.cpp` |  |
 | `gta_runtime_v1` | Alte GTA-Laufzeit | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): toter Code. |
 | `guided_balance` | GUIDED-Werte, Ausweichen | gebaut | `guided.cpp`, `game_guided.cpp` |  |
-| `guided_missile` | GUIDED-Lenkrakete | teilweise | `guided.cpp`, `game_guided.cpp` | Lenkung, Zielwahl, Zünder gebaut; Rauchschweif und eigener Motorton fehlen. |
+| `guided_missile` | GUIDED-Lenkrakete | gebaut | `guided.cpp`, `game_guided.cpp`, game_gaps.cpp (`gaps_guided`) | Lenkung, Zielwahl, Zünder; Lock-Ton (2 × 1760 Hz), Zündknall (110 → 40 Hz), Motorstimme (Rauschen durch 700-Hz-Bandpass + 1300-Hz-Säge, 0,5 → 0,28), Rauchspur (160 Wölkchen 0,9 m hinter der Rakete, 1,6 m, 0,42, 2,6 s, steigend). Ton und Rauch neu in sc-m3-gaps. |
 | `hand_grenade` | Handgranate (Kochen) | gebaut | `game_weapons.cpp`, `weapons.h` |  |
 | `headshot_feedback` | Kopftreffer-Klick | gebaut | `game_events.cpp` |  |
 | `immersive_soundscape` | Geräuschkulisse | in Arbeit (sc-m3-ui) | `game_equipment.cpp` |  |
-| `impact_explosion_overlay` | Funkenstern am Einschlagpunkt des Drohnen-MGs | fehlt | `game_gaps.cpp`, `web/host.mjs` | Funkenstern am Einschlagpunkt fehlt. |
+| `impact_explosion_overlay` | Funkenstern am Einschlagpunkt des Drohnen-MGs | gebaut | `game_gaps.cpp`, `web/host.mjs` | Bildschirm-Burst (Kern, Ring, 9 Funken, 330 ms, Pool 12) am projizierten Einschlagpunkt; C++ liefert die Punkte im HUD-JSON (`gaps.bursts`), die Seite zeichnet. Neu in sc-m3-gaps. |
 | `jet_flight_dynamics` | 6-DoF-Jet | gebaut | `jet.cpp`, `jet.h` |  |
-| `jet_mode` | Jet: Einsteigen, Cockpit, Schleudersitz, Mitflieger | teilweise | `jet.h`, `game.cpp`, `game_weapons.cpp` | Pilot, Schweben/Flug, Schleudersitz gebaut; Mitfliegen im Jet eines Mitspielers fehlt (siehe jet_seat_*). |
-| `jet_seat_coordinator` | Sitzvergabe Pilot/Beifahrer über die Autorität | fehlt |  | Mitflieger-Sitz im Mehrspieler nicht gebaut. |
-| `jet_seat_table` | Sitz-Zustandsautomat | fehlt |  | wie jet_seat_coordinator. |
+| `jet_mode` | Jet: Einsteigen, Cockpit, Schleudersitz, Schaden, Mitflieger | gebaut | `jet.h`, `game.cpp`, `game_weapons.cpp`, game_gaps.cpp (`gaps_jet_damage`), `game_seats.cpp` | Pilot, Schweben/Flug, Schleudersitz; Schaden wie `damageAirframe` (400 HP, Schub 0,35 + hp/200·0,65, bei 15 % 12 s Brand mit Rauch, dann Zerfall: Explosion 14 m / 180, Pilot tot daneben); Mitfliegen (F am gelandeten Jet eines Mitspielers mit Pilot, 9 m; Kamera (0,48; 2,5; 1,25), 72°; Aussteigen über 10 m am Schirm, sonst 5 m voraus). Schaden und Mitflieger neu in sc-m3-gaps. |
+| `jet_seat_coordinator` | Sitzvergabe Pilot/Beifahrer über die Autorität | gebaut | net_session.cpp (`seat_request`, `kSeatReq/kSeatState)`, `game_seats.cpp` | Der Host führt die Tabelle, Anfragen gehen an ihn, die Tabelle alle 1,5 s und nach jeder Änderung an alle; wer geht, verliert seine Sitze; allein lokal. Neu in sc-m3-gaps. |
+| `jet_seat_table` | Sitz-Zustandsautomat | gebaut | `jet_seats.cpp`, `jet_seats.h`, `tests/test_gaps.cpp` | Nur der Besitzer fliegt, ein Beifahrer nur mit Pilot, ein Sitz je Spieler, Pilot raus = Beifahrer raus, Laden mit Prüfung. Neu in sc-m3-gaps. |
 | `jetpack_audio` | Jetpack-Ton | gebaut | `game_equipment.cpp` |  |
 | `jogger_chain` | Laufgruppe | in Arbeit (sc-m3-life) |  |  |
 | `lan_vs` | Mehrspieler-Sitzung, Autorität, Transport | teilweise | `net_session.cpp`, `web/mp_host.mjs` | Autoritätswechsel zum Nächstältesten, wenn der Host geht, fehlt (die Runde endet). |
 | `map_peer_edge` | Mitspieler am Kartenrand | gebaut | `mp_rules.h`, `web/mp_host.mjs` |  |
-| `military_response` | Militär ab 5 Sternen | teilweise | `combat_rules.cpp`, `game_military.cpp` | Ablauf und Werte gebaut. Abweichung: Panzer ist ein leichter Agent statt Box3D-Körper (`upsertBody kind bus 9200 kg`); Leuchtspuren/Granaten gehen nicht an Mitspieler (`sendFx tracer/shell`). |
+| `military_response` | Militär ab 5 Sternen | teilweise | `combat_rules.cpp`, `game_military.cpp`, `game_gaps.cpp` | Ablauf und Werte gebaut; Leuchtspuren und Granaten gehen an Mitspieler (Fx `mil_tracer`/`mil_shell`, neu in sc-m3-gaps). Fehlt: Panzer als Box3D-Körper (`upsertBody kind bus 9200 kg`, heute leichter Agent) und die Schnappschüsse der Einheiten an Mitspieler (`mil-snap`/`mil-hit`). |
 | `mobile_gameplay_ui` | Kompaktes Handy-HUD | gebaut | `web/ui.mjs`, `game.cpp` |  |
 | `mobile_peer_marker_layout` | Namensschilder weg von den Sticks | gebaut | `mp_rules.h` |  |
 | `mobile_zoom_guard` | Kein Doppeltipp-Zoom | in Arbeit (sc-m3-controls) |  |  |
@@ -167,7 +167,7 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `player_walk_mode` | Alter Fußmodus | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): ersetzt durch v4. |
 | `player_walk_mode_v4` | Zu Fuß, Schwimmen, Jetpack | gebaut | `game.cpp`, `equipment.cpp` |  |
 | `police_ground_units` | Streifenwagen mit Beamten | gebaut | `game.cpp`, `game_town.cpp` |  |
-| `police_sirens` | Martinshorn 466/622 Hz, Drohnen-Whoop, Doppler | teilweise | `game_gaps.cpp`, `sound_fx.cpp` | Kern spielt eine Heulsirene 650–1450 Hz statt Martinshorn 466/622 Hz; keine Drohnen-Sirene. |
+| `police_sirens` | Martinshorn 466/622 Hz, Drohnen-Whoop, Doppler | gebaut | `game_gaps.cpp`, `sound_fx.cpp` | Zwei Stimmen (nächster Wagen, nächste Drohne), 0,66 s je Ton, Whoop 760→1480 Hz in 0,7 s, Pegel 0,06/0,032 /(1+(d/14)^1,25), bis 260 m, Tiefpass 5200−16·d, Doppler aus der Abstandsänderung. Neu in sc-m3-gaps. |
 | `projectile_ballistics` | Geschossflug mit Fallen | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): nur Bibliothek + Architekturtest; live ist jeder Schuss Hitscan (`flight_fire_fx.mjs`: „damage is immediate hitscan now“). Kern ebenso. |
 | `propulsion_authority` | Akku/Motor-Grenzen | gebaut | `drone.cpp` |  |
 | `proximity_voice` | Sprachchat | gebaut | `game_net.cpp`, `mp_rules.cpp`, `web/mp_host.mjs` |  |
@@ -190,12 +190,12 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `site_config` | Produktname, Host-URLs | entfällt |  | (b) Konfiguration der Website ohne Spielverhalten. |
 | `sniper_scope` | Zielfernrohr | gebaut | `game_events.cpp`, `web/host.mjs` |  |
 | `solo_layout` | Solo-HUD-Layout | in Arbeit (sc-m3-controls) |  |  |
-| `spawn_visibility_guard` | Nichts entsteht im Blick eines Spielers | teilweise | `spawn_guard.cpp`, `spawn_guard.h`, game_military.cpp (`spawn_unseen`) | `spawn_unseen` ohne 24-m-Mindestabstand, ohne Mitspieler-Blick, nur für Kampf-Spawns. |
+| `spawn_visibility_guard` | Nichts entsteht im Blick eines Spielers | gebaut | `spawn_guard.cpp`, `spawn_guard.h`, game_military.cpp (`spawn_unseen`) | Mindestabstand 24 m, Sichtkegel = halbes Sichtfeld + 20°, verdeckt nur durch Gebäude bis 420 m, bis 1500 m, auch die Blickkegel der Mitspieler; für Polizei, Militär, Zombies, Gegner, Passanten und Verkehr. Neu in sc-m3-gaps. |
 | `speed_lines` | Speed-Lines | gebaut | `look.cpp`, `game_look.cpp` |  |
 | `start_location` | Startort | in Arbeit (sc-m3-ui) | `game_ui.cpp`, `web/ui.mjs` |  |
 | `start_pose_guard` | Drohne beim Start auf dem Boden, ARM-Knopf oben | gebaut | game.cpp (`place_world`) | Start auf dem Boden (unterster Punkt = Geländehöhe); ARM-Knopf im HUD. |
 | `stereo_sbs` | 3D nebeneinander | fehlt | `settings.cpp` | braucht mehrere Ansichten pro Frame im App-Host (Engine-Punkt 9) – mit dem Nutzer klären. |
-| `street_lamps` | Laternen: umknicken, dunkel, Sync | teilweise | `game_town.cpp` | Laternen stehen und leuchten; fehlt: Umknicken ab 3,5 m/s (Box3D-Prop 140 kg), Dunkelwerden bei Treffern/Explosionen, Sync an Mitspieler. |
+| `street_lamps` | Laternen: Abstand, Licht, umknicken, dunkel, Sync | gebaut | `lamps.cpp`, `lamps.h`, `game_lamps.cpp`, `game_look.cpp` | Alle 34 m, abwechselnd, 1,15 m hinter dem Rand, Mast 6,2 m, Kopf 1,42 m draußen, Glühen 0xffb35a×3,2 und Lichtfleck 13 m ab der Dämmerung; Schuss zu Fuß durch den Kopf (0,38 m) → dunkel + Glas; Explosion: innen 60 % Mast fällt (Box3D-Prop 140 kg, Stoß 140·min(6; 1,2+0,45·v)), sonst dunkel; Auto > 3,5 m/s knickt den Mast (und verliert min(0,22 v; 2,4) m/s), langsamer wird es gestoppt (Klang); höchstens 14 liegende Masten; Sync an Mitspieler (Fx `lamp`), RESET stellt alle auf. Neu in sc-m3-gaps. |
 | `street_voices` | Hupen, Rufe | in Arbeit (sc-m3-life) |  |  |
 | `stylized_world_style` | Look der Welt | gebaut | `game.cpp`, `game_town.cpp`, `main.cpp` |  |
 | `suggestion_box` | Ideen-Box | in Arbeit (sc-m3-ui) | `web/ui.mjs` |  |
@@ -209,10 +209,10 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `training_test_level_v2` | Trainingslevel (Welt ohne Geodaten) | fehlt |  | wie training_showcase. |
 | `vehicle_control_settings` | Fahrzeug-Einstellungen | in Arbeit (sc-m3-controls) | `settings.cpp` |  |
 | `vehicle_models` | Fahrzeugmodelle | gebaut | `vehicle_art.h`, `vehicle_art.cpp` |  |
-| `vehicle_spawn_clearance` | Keine überlappenden Fahrzeug-Spawns (SAT, 0,35 m) | fehlt | `spawn_guard.h`, game.cpp (`manage_traffic`) | Verkehrs-Spawns prüfen keine Überlappung. |
+| `vehicle_spawn_clearance` | Keine überlappenden Fahrzeug-Spawns (SAT, 0,35 m) | gebaut | `spawn_guard.h`, game.cpp (`manage_traffic`) | Neu in sc-m3-gaps. |
 | `viewmodel_arms` | Ego-Arme | gebaut | `game_look.cpp` |  |
 | `viewmodel_pass` | Ego-Waffe in eigenem Pass (nie in der Wand) | gebaut | `Kerns WeaponComponent-View-Model` | Kern zeichnet das Ego-Modell mit eigenem Tiefenbereich; eigene Modelle (game_look.cpp) ebenso über Kerns View-Model-Ebene. |
-| `visual_pose_stabilization` | Geglättete Drohnen-Darstellung in follow/third | fehlt |  | Darstellung der Drohne folgt der Physik ungeglättet. |
+| `visual_pose_stabilization` | Geglättete Drohnen-Darstellung in follow/third | gebaut | gaps_rules.cpp (`VisualPose`), game_gaps.cpp (`gaps_drone_matrix`) | Versatz zum Kamera-Anker gedämpft (follow 9/s, third 5,2/s), Drehung 12/7 pro s, weiche/harte Grenzen 0,025/0,10 m und 3°/10° (third 0,05/0,18 m, 5°/14°). Neu in sc-m3-gaps. |
 | `voice_codec` | µ-law | gebaut | `mp_rules.h` |  |
 | `voice_control_bindings` | Mikrofon-Tasten | gebaut | `game_net.cpp` |  |
 | `voice_hud_layout` | Sprach-Knöpfe | in Arbeit (sc-m3-controls) |  |  |
@@ -227,10 +227,10 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `walk_profile_contract` | Datensatz-Marker des Lauf-Profils | entfällt |  | (b) setzt nur `data-walk-control-profile` am DOM. |
 | `walk_ui_layout_hotfix` | Handy-HUD zu Fuß im Bild halten | gebaut | `web/ui.mjs` |  |
 | `walk_world_experience_hotfix` | Panik, Ziel-HP, Schrei | gebaut | `people.cpp`, `game_town.cpp` |  |
-| `wanted_dispatch_guard` | Polizeidrohnen erst nach Anfahrzeit sichtbar, „DISPATCH“-HUD | fehlt | `game_gaps.cpp`, `game_town.cpp` | Polizeidrohnen erscheinen sofort. |
+| `wanted_dispatch_guard` | Polizeidrohnen erst nach Anfahrzeit sichtbar, „DISPATCH“-HUD | gebaut | `game_gaps.cpp`, `game_town.cpp` | Drohne wartet unsichtbar am Spawnpunkt bis Spawn + Anfahrzeit (16 s − 1,3 s·Stufe, ≥ 9 s), dann Gnadenfrist 720 − 45·Sterne (≥ 450 ms) + 120 ms je Index bis zum ersten Schuss; HUD „POLICE DISPATCH · n DRONES INBOUND · x s“. Neu in sc-m3-gaps. |
 | `wanted_police_drones` | Polizeidrohnen | gebaut | `game_town.cpp`, `game_details.cpp` |  |
 | `wanted_police_fairness_v5` | Fairness-Regeln Polizei | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): toter Code. |
-| `wanted_police_pre_guard` | Polizeidrohnen sehen nur in Feuerreichweite | fehlt | `game_gaps.cpp`, `game_town.cpp` | Polizeidrohnen sehen im ganzen Erfassungsradius (59–87 m) statt nur in Feuerreichweite. |
+| `wanted_police_pre_guard` | Polizeidrohnen sehen nur in Feuerreichweite | gebaut | `game_gaps.cpp`, `game_town.cpp` | Sicht nur bis min(35, 28 + 1,4·Stufe) m und nur, wenn die Drohne schon da ist. Neu in sc-m3-gaps. |
 | `wanted_system_logic` | Fahndungsregeln | gebaut | `wanted.cpp` | Stichprobe: 4/9/15/22/30, EMP 30 m / 18 s, Anfahrzeit, Trefferchance |
 | `weapon_models` | Ego-Waffenmodelle | gebaut | `game_look.cpp` |  |
 | `world_action_feedback` | Partikel, Decals, Ton und Reaktion bei jedem Schuss | gebaut | `game_town.cpp`, `game_weapons.cpp` |  |
@@ -243,7 +243,7 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `world_car_explosion` | Autoexplosion, Trümmer | gebaut | `game_events.cpp` |  |
 | `world_city_buildings` | Gebäude auf dem Gelände | gebaut | `city_stream.cpp` |  |
 | `world_city_roads` | Straßen, Parks, Wasser | gebaut | `city_stream.cpp`, `tiles.h` |  |
-| `world_critical_damage_fx` | Rauch (dunkle Scheiben) und Glut vor der Explosion | teilweise | `game_gaps.cpp`, `game_details.cpp` | Kritischer Schaden zählt herunter und raucht mit Kern-Partikeln, ohne die dunklen Scheiben und die Glut. |
+| `world_critical_damage_fx` | Rauch (dunkle Scheiben) und Glut vor der Explosion | gebaut | `game_gaps.cpp`, `game_details.cpp` | Rauchwolken je Effekt: Takt 155 − 72·Fortschritt ms, Glut ab 67 % (jede 5.), Lebensdauer 1,25–1,77 s, Pool 78 (mobil 48). Neu in sc-m3-gaps. |
 | `world_crowd_density_v1` | Passanten-Dichte | in Arbeit (sc-m3-life) |  |  |
 | `world_destruction_state` | Gebäudeschaden (Dach tiefer, eingeebnet) | entfällt |  | (c) einzige Schreiber sind die Atombombe (`nuke_destruction.mjs`) und deren Sync – im Original nicht erreichbar. |
 | `world_ground` | Bodenfarbe aus Luftbildern (Albedo je 10-m-Zelle) | fehlt |  | Kern färbt den Boden aus den Flächen der Vektorkacheln. |
@@ -253,10 +253,10 @@ Stand: gebaut: 112 · entfällt: 61 · in Arbeit (sc-m3-controls): 22 · teilwei
 | `world_map_full` | Große Karte | gebaut | `game_net.cpp`, `web/mp_host.mjs` |  |
 | `world_options` | WELT-Schalter | gebaut | `game_ui.cpp`, `mp_rules.h` |  |
 | `world_options_menu` | WELT-Menü | in Arbeit (sc-m3-ui) | `web/ui.mjs` |  |
-| `world_organic_hit_audio` | Knacken beim Tod von Mensch/Tier | fehlt | `game_gaps.cpp` | Kein Knacken beim Tod. |
+| `world_organic_hit_audio` | Knacken beim Tod von Mensch/Tier | gebaut | `game_gaps.cpp` | Bank-„crack“, Pegel 0,34 · Effekte/100, Rate Mensch 1,0 (Vogel 1,16 / Tier 0,94 in gaps_rules.h für die Tiere von sc-m3-life), ≥ 24 ms Abstand. Neu in sc-m3-gaps. |
 | `world_person_ragdoll` | Box3D-Ragdoll | in Arbeit (sc-m3-life) |  |  |
 | `world_population` | Alte Bevölkerung | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): toter Code. |
-| `world_procedural_population` | Bevölkerung: Leute, Verkehr | teilweise | `game_town.cpp`, `game_traffic.cpp`, `people.cpp` | Leben gebaut; der Tod eines Passanten geht nicht an Mitspieler (`sendFx npc-death`). |
+| `world_procedural_population` | Bevölkerung: Leute, Verkehr | teilweise | `game_town.cpp`, `game_traffic.cpp`, `people.cpp` | Leben gebaut. Fehlt: gleiche Passanten auf allen Rechnern (im Original deterministische Agenten mit gemeinsamer Id, deren Tod per `npc-death` an die Mitspieler geht); auf Kern sind Passanten je Rechner zufällig. |
 | `world_rigid_body_physics` | Box3D-Welt der Körper | gebaut | `game_world.cpp`, `common.h` |  |
 | `world_rigid_body_runtime` | Fester Physikschritt, Fehlerfang | gebaut | game.cpp (Logic-Knoten, `240 Hz)` | Fester Schritt über Kern; Kern fängt Fehler im Schritt selbst. |
 | `world_spawn_guard` | Startpunkt nicht in einem Gebäude | gebaut | game.cpp (`clear_spot`) |  |
