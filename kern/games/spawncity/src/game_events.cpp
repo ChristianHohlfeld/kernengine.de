@@ -408,7 +408,7 @@ void Game::update_combat(f32 dt) {
   kern::Input& in = engine_->input;
   using kern::Key;
   const f32 now = world_->sim_time();
-  // J: air strike on the aimed spot (fighter_jets.mjs: KeyJ); L: race track (drone); H: next contract
+  // J: air strike on the aimed spot (fighter_jets.mjs: KeyJ); L: race track (drone); O: next contract (H/K are voice keys)
   if (in.pressed(Key::j) || pad_touch_.take_pressed("strike")) {
     Vec3 dir;
     const Vec3 eye = aim_ray(dir);
@@ -417,7 +417,7 @@ void Game::update_combat(f32 dt) {
     if (!air_strike(at)) { toast_ = "Luftschlag laedt (" + std::to_string(static_cast<int>(kStrikeCooldownS - (now - C.last_strike))) + " s)"; toast_age_ = 0; }
   }
   if (in.pressed(Key::l)) command("race");
-  if (in.pressed(Key::h)) { C.pop = C.fun.apply(FunEvent::cycle_contract, now, wanted_.stars()); C.pop_at = now; }
+  if (in.pressed(Key::o)) { C.pop = C.fun.apply(FunEvent::cycle_contract, now, wanted_.stars()); C.pop_at = now; }
   C.scope = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper && world_->hud().aiming && !player_dead_;
   // player rockets / grenades that fly into the helicopter, the tank or a flak gun go off there
   for (Projectile& p : projectiles_) {
