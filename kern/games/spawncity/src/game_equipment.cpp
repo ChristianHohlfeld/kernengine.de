@@ -233,8 +233,9 @@ void Game::ui_equipment(f32 dt) {
   // switch, with one RADIO AUS slot between the last and the first station.
   const bool in_car = mode_ == Mode::car && !ui_.paused;
   if (in_car && engine_) {
-    const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
-    const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
+    // car_radio.mjs: N / B only (the D-pad is ping / weapons, pad_actions.mjs)
+    const bool next = engine_->input.pressed(kern::Key::n) || pad_touch_.take_pressed("radio");
+    const bool prev = engine_->input.pressed(kern::Key::b);
     if (next || prev) ui_radio(next ? 1 : -1);
   }
   ui_.banner_age += dt;

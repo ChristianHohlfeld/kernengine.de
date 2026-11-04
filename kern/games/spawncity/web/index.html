@@ -56,8 +56,15 @@
   .sc-scope i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #ff2a1a; }
   .sc-hint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); padding: 6px 12px; border-radius: 8px; background: var(--glass); border: 1px solid var(--accent);
     color: var(--accent); font-weight: 700; }
-  .sc-help { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); right: 340px; color: var(--muted); font-size: 11px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* desktop_controls.mjs #desktopKeyHints: centred under the top bar, fades 12 s after a change */
+  .sc-help { position: absolute; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 102px); transform: translateX(-50%); max-width: min(70vw, 860px); padding: 4px 10px;
+    border-radius: 6px; background: #0b0f1680; color: #dfe7f2cc; font: 600 10px/1.35 Inter, system-ui, sans-serif; letter-spacing: .04em; text-align: center; transition: opacity .6s; }
+  .sc-help:empty { display: none; }
+  .sc-help.faded { opacity: 0; }
+  body.pad-input, body.pad-input canvas { cursor: none; }
+  /* simulator.mjs syncSoloPresentationOrientation: a portrait phone plays a landscape turned by 90 deg
+     (logical x = screen y, logical y = screen width - screen x); menus turn with it */
+  html.sc-css-landscape body { position: fixed; left: 100vw; top: 0; width: 100vh; width: 100dvh; height: 100vw; transform: rotate(90deg); transform-origin: 0 0; overflow: hidden; }
   .sc-attrib { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 10.5px; color: rgba(255, 255, 255, .78);
     pointer-events: auto; background: rgba(0, 0, 0, .35); padding: 2px 6px; border-radius: 4px; }
   .sc-attrib a { color: inherit; text-decoration: none; }

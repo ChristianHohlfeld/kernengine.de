@@ -12,13 +12,6 @@
 
 namespace sc {
 
-namespace {
-f32 pad_deadzone(f32 v, f32 dz) {
-  const f32 a = std::fabs(v);
-  return a <= dz ? 0.0f : sign0(v) * (a - dz) / (1 - dz);
-}
-}  // namespace
-
 // ---------------------------------------------------------------------------------------------
 // commands
 
@@ -178,11 +171,8 @@ void Game::ui_camera(f32 dt) {
 // input: the settings on top of what read_input decided
 
 void Game::ui_before_input(kern::Engine& e) {
-  // mouse_settings.mjs scaleMouseDelta: invert Y for every mode.
-  if (ui_.settings.on(Opt::mouse_invert_y)) {
-    const Vec2 d = e.input.pointer_delta();
-    e.input.pointer_move(e.input.pointer(), {0, -2 * d.y});
-  }
+  // mouse_settings.mjs scaleMouseDelta (invert Y) is applied to the mouse stream in game_controls.cpp.
+  (void)e;
 }
 
 void Game::ui_after_input(f32 dt) {
@@ -190,30 +180,11 @@ void Game::ui_after_input(f32 dt) {
   const Settings& st = ui_.settings;
   switch (mode_) {
     case Mode::foot: {
-      kern::game::PlayInput& p = play_in_;
-      const f32 h = st.get(Opt::foot_look_h) / 100, v = st.get(Opt::foot_look_v) / 100;
-      const f32 ih = st.on(Opt::foot_invert_look_h) ? -1.0f : 1.0f, iv = st.on(Opt::foot_invert_look_v) ? -1.0f : 1.0f;
-      if (pad.connected && pad.active && !touch_mode_) {
-        // The pad's look stick: SpawnCity's deadzone (2..20 %) and curve instead of the fixed 5 %.
-        p.look_stick_x = fineness_axis(pad_deadzone(pad.rx, st.get(Opt::foot_deadzone) / 100), st.get(Opt::foot_look_fineness));
-        p.look_stick_y = -fineness_axis(pad_deadzone(pad.ry, st.get(Opt::foot_deadzone) / 100), st.get(Opt::foot_look_fineness));
-        p.move_x = fineness_axis(p.move_x, st.get(Opt::foot_move_fineness));
-        p.move_y = fineness_axis(p.move_y, st.get(Opt::foot_move_fineness));
-      }
-      p.look_x *= h * ih;
-      p.look_y *= v * iv;
-      p.look_stick_x *= h * ih;
-      p.look_stick_y *= v * iv;
-      if (st.on(Opt::foot_invert_move_h)) p.move_x = -p.move_x;
+      // curves, dead zone, sensitivities and inversions: game_controls.cpp (first_person_control_settings.mjs)
       break;
     }
     case Mode::drone: {
-      // Stick curves (phoneAxis), inversions and the GAME top speed (gameHorizontalSpeedScale: km/h / 90).
-      const f32 right = st.get(Opt::drone_right_fineness), left = st.get(Opt::drone_left_fineness);
-      const f32 speed = sticks_.game_mode ? st.get(Opt::drone_max_speed_kmh) / 90 : 1.0f;
-      sticks_.roll = fineness_axis(sticks_.roll, right) * speed * (st.on(Opt::drone_invert_roll) ? -1.0f : 1.0f);
-      sticks_.pitch = fineness_axis(sticks_.pitch, right) * speed * (st.on(Opt::drone_invert_pitch) ? -1.0f : 1.0f);
-      sticks_.yaw = fineness_axis(sticks_.yaw, left) * (st.on(Opt::drone_invert_yaw) ? -1.0f : 1.0f);
+      // Stick curves, inversions and the GAME top speed: applyGameStick in game_controls.cpp (control_semantics.mjs).
       if (!ui_.drone_seen) {
         // A freshly launched drone holds the chosen hover height (defaultHoverAgl).
         sticks_.clearance = st.get(Opt::drone_hover_agl);

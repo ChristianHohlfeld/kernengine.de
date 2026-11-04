@@ -339,7 +339,8 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   function fullscreenForGame() {
     const installed = matchMedia("(display-mode: fullscreen)").matches || matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
     if (!coarse || installed || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
-    document.documentElement.requestFullscreen({navigationUI: "hide"}).catch(() => {});
+    // then the landscape lock (simulator.mjs:903); iOS ignores it and plays the CSS-rotated landscape
+    document.documentElement.requestFullscreen({navigationUI: "hide"}).then(() => screen.orientation?.lock?.("landscape")).catch(() => {});
   }
   // Automated browsers and ?autostart=1 skip the title (auto_flight_start.mjs); ?menu=1 forces it.
   const skipTitle = params.get("menu") !== "1" && (navigator.webdriver || params.get("autostart") === "1");
@@ -350,15 +351,27 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   addEventListener("keydown", ev => {
     const typing = ev.target instanceof HTMLElement && (ev.target.tagName === "TEXTAREA" || (ev.target.tagName === "INPUT" && ev.target.type !== "range"));
     if (!quit.hidden) {
-      if (ev.key === "Enter" || ev.code === "KeyY" || ev.code === "KeyZ") answerQuit(true);
+      // quit_confirm.mjs: Enter / Y / J = yes, Esc / N = no
+      if (ev.key === "Enter" || ev.code === "KeyY" || ev.code === "KeyJ") answerQuit(true);
       else if (ev.key === "Escape" || ev.code === "KeyN") answerQuit(false);
       ev.stopImmediatePropagation(); ev.preventDefault();
       return;
     }
     if (ev.key === "Escape") {
+      // desktop_controls.mjs: Esc asks "back to the main menu?"; it closes a menu, the big map, the strike aiming first
       ev.stopImmediatePropagation(); ev.preventDefault();
       if (ui.open.length) closeTop();
-      else if (menu.hidden && ui.started) openPanel(pause);
+      else if (document.getElementById("mpMap")) command("bigmap close");
+      else if (last?.ctl?.aiming) command("strike cancel");
+      else if (menu.hidden && ui.started && !last?.ctl?.dead) askQuit();
+      return;
+    }
+    if (ev.key === "Tab" && !ev.repeat && menu.hidden && ui.started && !visible() && !last?.ctl?.dead) {
+      // Tab: the pause / settings menu, the mouse is freed for it (desktop_controls.mjs openMenu)
+      ev.stopImmediatePropagation(); ev.preventDefault();
+      ui.wantMenu = true;
+      try { document.exitPointerLock?.(); } catch { /* none */ }
+      openPanel(pause);
       return;
     }
     if (visible()) {
@@ -367,11 +380,14 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       ev.stopImmediatePropagation();
     }
   }, {capture: true});
-  // Leaving the pointer lock while playing (Esc on desktop) opens the pause menu.
+  // Losing the pointer lock while playing (the browser's Esc) asks "back to the main menu?"
+  // (desktop_controls.mjs pointerlockchange): not for Tab (the menu), the big map or while dead.
   let hadLock = false;
   document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
-    if (!locked && hadLock && ui.playing && !visible()) openPanel(pause);
+    if (!locked && hadLock && ui.playing && !visible() && !ui.wantMenu && !document.getElementById("mpMap") && !last?.ctl?.dead)
+      setTimeout(() => { if (document.pointerLockElement !== canvas && ui.playing && !visible()) askQuit(); }, 0);
+    ui.wantMenu = false;
     hadLock = locked;
   });
   function topRoot() { return !quit.hidden ? quit : ui.open.length ? ui.open[ui.open.length - 1] : !menu.hidden ? menu : null; }
@@ -383,24 +399,48 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   }
   // settings_controller_nav.mjs: D-pad up/down moves, left/right changes a slider, A selects, B closes; MENU opens the pause menu.
   const padPrev = new Set();
+  let stickY = 0, stickX = 0;
   function pollPad() {
     const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(p => p && p.connected) : [];
     const p = pads.find(g => g.mapping === "standard") || pads[0];
-    if (!p) return;
+    if (!p) { stickX = stickY = 0; return; }
     const hit = i => { const on = !!p.buttons[i]?.pressed, was = padPrev.has(i); if (on) padPrev.add(i); else padPrev.delete(i); return on && !was; };
-    const a = hit(0), b = hit(1), y = hit(3), menuBtn = hit(9), up = hit(12), down = hit(13), left = hit(14), right = hit(15);
-    if (menuBtn && ui.started && menu.hidden) { if (ui.open.length) closeTop(); else openPanel(pause); }
-    if (!visible()) return;
+    const a = hit(0), b = hit(1), y = hit(3), lb = hit(4), rb = hit(5), view = hit(8), menuBtn = hit(9), up = hit(12), down = hit(13), left = hit(14), right = hit(15);
+    if (menuBtn && ui.started && menu.hidden && quit.hidden) { if (ui.open.length) closeTop(); else openPanel(pause); return; }
+    if (menuBtn && !menu.hidden && !ui.open.length && quit.hidden) { startBtn.click(); return; }  // pad_actions.mjs titleNav: MENU = START
+    if (!visible()) { stickX = stickY = 0; return; }
     document.body.classList.add("scui-pad");
-    if (!quit.hidden) { if (a || y) answerQuit(true); else if (b) answerQuit(false); return; }
-    if (up || down) moveFocus(down ? 1 : -1);
-    const f = document.activeElement;
-    if ((left || right) && f?.closest?.(".scui-row")) {
-      const range = f.closest(".scui-row").querySelector("input[type=range]");
-      if (range) { range.value = String(+range.value + (right ? 1 : -1) * (+range.step || 1)); range.dispatchEvent(new Event("input", {bubbles: true})); }
+    // pad_actions.mjs vote / quit: A = yes (or the focused button), B = no, left / right move the focus
+    if (!quit.hidden) {
+      if (a) { const f = document.activeElement; if (f && quit.contains(f) && f.matches("button")) f.click(); else answerQuit(true); }
+      else if (b) answerQuit(false);
+      else if (left || right) moveFocus(right ? 1 : -1);
+      return;
     }
-    if (a && f && f !== document.body) f.click();
-    if (b) { if (ui.open.length) closeTop(); }
+    // settings_controller_nav.mjs: D-pad or the left stick (fires past .72, re-arms under .35)
+    const ax = +p.axes[0] || 0, ay = +p.axes[1] || 0;
+    const navY = down ? 1 : up ? -1 : Math.abs(ay) > 0.72 && stickY === 0 ? Math.sign(ay) : 0;
+    const navX = right ? 1 : left ? -1 : Math.abs(ax) > 0.72 && stickX === 0 ? Math.sign(ax) : 0;
+    if (Math.abs(ay) < 0.35) stickY = 0; else if (navY) stickY = Math.sign(ay) || navY;
+    if (Math.abs(ax) < 0.35) stickX = 0; else if (navX) stickX = Math.sign(ax) || navX;
+    if (b || view) { if (ui.open.length) closeTop(); return; }
+    if (lb || rb) {
+      // previous / next section (the tabs)
+      const tabs = Array.from(document.querySelectorAll(".scui-tabs [data-tab]")).filter(t => t.offsetParent !== null);
+      if (tabs.length) { const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true"); tabs[((i < 0 ? 0 : i) + (rb ? 1 : -1) + tabs.length) % tabs.length].click(); }
+      return;
+    }
+    if (navY) { moveFocus(navY); return; }
+    const f = document.activeElement;
+    if (navX && f?.closest?.(".scui-row")) {
+      const row = f.closest(".scui-row"), range = row.querySelector("input[type=range]");
+      if (range) { range.value = String(+range.value + navX * (+range.step || 1)); range.dispatchEvent(new Event("input", {bubbles: true})); }
+      else if (row.classList.contains("scui-toggle")) row.click();  // a checkbox toggles
+      return;
+    }
+    if (a && f && f !== document.body && !(f instanceof HTMLInputElement && f.type === "range")) f.click();
+    else if (a && !menu.hidden && !ui.open.length) startBtn.click();  // nothing focused on the title: START
+    void y;
   }
   addEventListener("pointerdown", () => document.body.classList.remove("scui-pad"), {capture: true});
 

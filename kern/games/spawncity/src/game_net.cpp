@@ -349,26 +349,10 @@ void Game::update_net(f32 dt) {
 void Game::mp_input(kern::Engine& e, f32 dt) {
   (void)dt;
   MpLocal& m = mp_local();
-  kern::Input& in = e.input;
-  using kern::Key;
-  if (in.pressed(Key::h)) command("voice mic");  // solo too (nothing is sent without mates)
-  if (in.pressed(Key::k) && mode_ != Mode::drone) command("voice mute");  // K in the drone: motors off
-  if (in.pressed(Key::z) || in.button_pressed(1)) command("ping");
-  if (in.pressed(Key::m) || pad.hit(kPadMenu)) command("bigmap toggle");
-  if (in.pressed(Key::escape) && m.map_open) command("bigmap close");
-  // The vote is answered with the JA / NEIN buttons (J is the air strike, N the radio here).
-  // Pad (voice_control_bindings.mjs): R3 tap toggles the mic on release, R3+Y mutes; R3 + D-pad
-  // right pings (D-pad right alone is the weapon here).
-  const bool r3 = pad.down(kPadR3), y = pad.down(kPadY);
-  const bool mute = r3 && y && !m.y_was;
-  if (mute) command("voice mute");
-  if (r3 && pad.hit(kPadRight)) { command("ping"); m.r3_latched = true; }
-  const bool latched = r3 && (m.r3_latched || mute);
-  if (!r3 && m.r3_was && !m.r3_latched) command("voice mic");
-  m.r3_latched = latched;
-  m.r3_was = r3;
-  m.y_was = y;
-  if (r3) { pad.pressed &= ~((1u << kPadY) | (1u << kPadRight)); }  // the combo is not the weapon key
+  (void)e;
+  // H / K, Z / middle mouse, M and the pad's R3, R3+Y, D-pad right, VIEW hold are read with every
+  // other control in game_controls.cpp (voice_control_bindings.mjs, ping_marker.mjs, pad_actions.mjs).
+  // The vote is answered with the JA / NEIN buttons.
   if (m.map_open) {
     // The big map takes the pad (the page pans / zooms with it); the game gets nothing.
     pad.lx = pad.ly = pad.rx = pad.ry = pad.lt = pad.rt = 0;

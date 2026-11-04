@@ -206,7 +206,12 @@ Touch:
 36. Knopf-Layout (2er-Gitter über den Sticks) → `edge_hud_layout.mjs`-Packung. **behoben**
 37. Minikarte: kein Ziehen/Doppeltipp → Ziehen = Kopfblick (Drohne, Auto, Jet, Fallschirm), Doppeltipp = große Karte. **behoben**
 
-Bleibt (Engine oder Seite, siehe README „Später in die Engine“): Treffer der Kern-Schusswaffen (MP,
-Glock, Sniper) gehen durch die Bildschirmmitte, nicht durch den Finger; Sprint nur vorwärts (Kerns
-Soldat); Respawn automatisch nach 3 s statt per Taste; Hochkant ohne CSS-Drehung (Kern zeichnet in
-Fenstergröße); Aim-Assist der Kern-Soldaten statt `fpsAimAssist`; Kopfblick zu Fuß über die Minikarte.
+38. Touch-Feuer der Kern-Waffen (MP, Glock, Sniper) ging durch die Bildschirmmitte → das Spiel feuert
+    den Schuss selbst durch den Finger (Kerns Magazin, SpawnCitys Schaden/Reichweite). **behoben**
+39. Hochkant ohne Drehung → gedrehtes Querformat per CSS wie `simulator.mjs` (Finger werden
+    zurückgerechnet), Vollbild + Querformat-Sperre beim Start. **behoben**
+
+Bleibt (nur mit Engine-Änderung, siehe README „Später in die Engine“): Sprint nur bei Vorwärts-
+Anteil > 0,3 (Kerns Soldat; SpawnCity sprintet in jede Richtung); Respawn automatisch nach 3 s statt
+per Taste/Knopf (die Tasten werden dafür verschluckt); Kerns eigene Zielhilfe für Pad/Touch statt
+`fpsAimAssist`; Kopfblick zu Fuß über die Minikarte (Kerns Soldatenkamera hat keinen Zusatzblick).

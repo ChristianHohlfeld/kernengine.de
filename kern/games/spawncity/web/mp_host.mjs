@@ -507,6 +507,8 @@ class MpBigMap {
       if (b === "me") this.follow = true;
     });
     this.input.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Escape") page.command("bigmap close"); });
+    this.onSlash = ev => { if (ev.code === "Slash" && document.activeElement !== this.input) { ev.preventDefault(); this.input.focus(); } };
+    addEventListener("keydown", this.onSlash, true);
     this.input.addEventListener("input", () => { clearTimeout(this.searchTimer); this.searchTimer = setTimeout(() => this.search(), 350); });
     this.cv.addEventListener("wheel", ev => { this.zoom = Math.max(0.05, Math.min(12, this.zoom * Math.exp(-ev.deltaY * 0.0015))); ev.preventDefault(); }, {passive: false});
     this.cv.addEventListener("pointerdown", ev => { this.pointers.set(ev.pointerId, {x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY}); this.cv.setPointerCapture(ev.pointerId); });
@@ -562,16 +564,27 @@ class MpBigMap {
     this.draw();
   }
   padInput() {
+    // world_map_full.mjs:355-362: LS pans -s|s| 900 px/s (dead zone .15, rescaled), RT/LT zoom
+    // (rt - lt) 2.2 /s, A waypoint at the centre, X clears it, Y search, D-pad left/right zoom -1/+1,
+    // R3 follows me, B or VIEW closes (VIEW held when the map opened does not close it).
     const p = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g?.connected) : null;
+    const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - (this.padAt || now)) / 1000));
+    this.padAt = now;
     if (!p) return;
-    const ax = i => Math.abs(p.axes[i] || 0) > 0.15 ? p.axes[i] : 0, b = i => p.buttons[i]?.pressed;
-    if (ax(0) || ax(1)) { this.cx += ax(0) * 12 / this.zoom; this.cy -= ax(1) * 12 / this.zoom; this.follow = false; }
-    this.zoom = Math.max(0.05, Math.min(12, this.zoom * (1 + ((p.buttons[7]?.value || 0) - (p.buttons[6]?.value || 0)) * 0.04)));
-    const pressed = i => b(i) && !this.padWas?.[i];
+    const ax = i => { const v = +p.axes[i] || 0, a = Math.abs(v); return a <= 0.15 ? 0 : Math.sign(v) * (a - 0.15) / 0.85; }, b = i => !!p.buttons[i]?.pressed;
+    const sx = ax(0), sy = ax(1);
+    if (sx || sy) { this.cx += sx * Math.abs(sx) * 900 * dt / this.zoom; this.cy -= sy * Math.abs(sy) * 900 * dt / this.zoom; this.follow = false; }
+    const tz = (p.buttons[7]?.value || 0) - (p.buttons[6]?.value || 0);
+    if (tz) this.zoom = Math.max(0.05, Math.min(12, this.zoom * Math.exp(tz * 2.2 * dt)));
+    if (!this.padWas) this.padWas = p.buttons.map(x => x.pressed);  // buttons held as the map opened
+    const pressed = i => b(i) && !this.padWas[i];
     if (pressed(0)) this.page.command(`nav set ${this.cx.toFixed(1)} ${this.cy.toFixed(1)} Wegpunkt`);
     if (pressed(2)) this.page.command("nav clear");
     if (pressed(3)) this.input.focus();
-    if (pressed(1)) this.page.command("bigmap close");
+    if (pressed(14)) this.zoom = Math.max(0.05, this.zoom / 2);
+    if (pressed(15)) this.zoom = Math.min(12, this.zoom * 2);
+    if (pressed(11)) this.follow = true;
+    if (pressed(1) || pressed(8)) this.page.command("bigmap close");
     this.padWas = p.buttons.map(x => x.pressed);
   }
   draw() {
@@ -612,5 +625,5 @@ class MpBigMap {
     const m = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find(v => v * this.zoom > 70) || 5000;
     g.fillStyle = "#fff"; g.fillRect(w - 20 - m * this.zoom, h - 30, m * this.zoom, 3); g.font = "700 11px system-ui"; g.fillText(m >= 1000 ? `${m / 1000} km` : `${m} m`, w - 20 - m * this.zoom, h - 36);
   }
-  close() { this.el.remove(); }
+  close() { removeEventListener("keydown", this.onSlash, true); this.el.remove(); }
 }
