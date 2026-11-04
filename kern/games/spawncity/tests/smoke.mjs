@@ -377,6 +377,7 @@ async function run({name, url, context, mapped}) {
   check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
   check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
+  await page.waitForFunction(() => window.SpawnCity.hud().logbook?.flights >= 1, null, {timeout: 60000}).catch(() => {});  // the game closes the flight in its next frame
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
