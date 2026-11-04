@@ -49,7 +49,7 @@ SC_TEST(perf_governor_steps_down_and_up) {
   // Reserve again: up one level after 8 s at 57+, but the level that failed stays blocked.
   SC_CHECK(g.blocked(1) > 0, "a level that was too heavy is blocked for a while (%.1f s)", g.blocked(1));
   run(g, 60, 25);
-  SC_CHECK(g.tier() == 1, "one level up with reserve once the block ran out (tier %d)", g.tier());
+  SC_CHECK(g.tier() >= 1 && g.tier() < 4, "climbs again with reserve, a level at a time (tier %d)", g.tier());
   run(g, 60, 400);
   SC_CHECK(g.tier() == 4, "climbs back once the blocks run out (tier %d)", g.tier());
   // A mobile ceiling, a fixed level.

@@ -36,6 +36,7 @@ Startparameter (Query-String):
 | `dem=0` | ohne Höhenkacheln (flaches Gelände) |
 | `demtiles=URL-Vorlage` | andere Terrarium-Höhenquelle (Tests), `{z}/{x}/{y}` |
 | `mute=1` | ohne Ton |
+| `quality=0…4` | Grafikstufe fest (0 minimal … 4 maximal), sonst automatisch (Desktop startet bei 4, Telefon bei 2) |
 | `mp=host&room=NAME` / `mp=join&room=NAME` | Mehrspieler: hosten / beitreten (Tabs eines Browsers über BroadcastChannel) |
 | `relay=wss://…` | dazu: über das Kern-Relay (`tools/net_relay.mjs`) zwischen Rechnern |
 
@@ -104,6 +105,12 @@ kern/games/spawncity/
     game_military.cpp Militär (Hubschrauber, Panzer, Trupp), Flak, Kampfjets und Luftschlag, Treffer/Explosionen
     game_events.cpp   Passanten, die zurückschlagen, Zombie-Nächte, Sandbox-Gegner, Punkte/Aufträge,
                   Rennstrecke, Auto-Trümmer, Scope/Headshot, HUD-Teil und Testbefehle
+    perf.*        Frame-Zeit-Messung (Logik, Physik, Stadt, Zeichnen; Kerns Render-CPU/GPU) und die
+                  automatische Qualitätsstufe (Leiter aus 5 Stufen, Grenzen im Header)
+    look.*        Kamera-Wackeln, FPV-Stabilisator, Speed-Lines, Tag/Nacht-Licht, Licht-Umrechnung,
+                  Blaulicht-Takte (reine Modelle, in den nativen Tests)
+    game_look.*   Look im Spiel: Qualität anwenden, eigene Tageszeit, Punktlichter, Speed-Lines,
+                  eigene Ego-Modelle für Werfer/Fäuste/Messer, HUD-Teil und Befehle (`look_` in Game)
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
   build.sh        wasm + Einzeldatei-HTML
@@ -198,6 +205,53 @@ kern/games/spawncity/
   Oberfläche: ein Netz je 320-m-Abschnitt (volle 64-m-Blöcke als ein Viereck, sonst Zeilenläufe),
   Farbe/Rauheit aus `world_water.mjs`. Noch ohne animierte Wellen-Normalen und Ufer-Schaum (bräuchte eine
   eigene Shader-Erweiterung).
+
+## Leistung und Darstellung (Meilenstein 3)
+
+* **Frame-Zeiten** (`perf.*`): jeder Frame wird in Runden zerlegt – Spiellogik (Eingabe, Stadtleben,
+  Kampf), Physik-Schritte (Box3D + Fahrzeugmodelle), Stadt-Streaming, Zeichnen-Vorbereitung – dazu
+  Kerns Render-CPU-Zeit und, wenn der Browser den Timer-Query hat, die GPU-Zeit. Im HUD-JSON unter
+  `perf.ms`, als Zeile im HUD mit dem Befehl `perf 1` (Menü-Schalter baut die UI).
+* **Automatische Qualität** (Vorbild: SpawnCitys „performance first“, `neon_bloom.mjs`,
+  `dynamic_lights.mjs`): fünf Stufen (minimal, niedrig, mittel, hoch, maximal) mit Passanten-Budget
+  16/30/44/64/80, Schattendistanz 35/50/70/90/110 m, PCF 1/4/4/9/9, AO aus/aus/niedrig-halb/mittel-halb/
+  mittel-voll, Laternen-Sichtweite 70–170 m, Leute-Sichtweite 90–220 m, 2–6 Punktlichter, Pixelratio
+  ×0,6–1,0. Gleitender Mittelwert der Frame-Zeit (τ 1 s): unter 50 fps für 2 s → eine Stufe runter;
+  ab 57 fps für 8 s → eine Stufe hoch; nach jedem Wechsel 3 s Ruhe, 3 s Anlauf nach dem Start. Eine
+  Stufe, die zu schwer war, wird 30 s nicht wieder versucht (bei jedem weiteren Scheitern doppelt so
+  lange, bis 4 min). Desktop startet bei „maximal“ (die bisherigen Werte), Telefone bei „mittel“ (das
+  alte Telefon-Profil) und gehen höchstens bis „hoch“. Die Pixelratio setzt die Seite (`renderScale` im
+  HUD-JSON; der Browser besitzt die Canvas-Größe). `quality auto|0…4|Name`, `?quality=N`.
+* **Tag und Nacht** (`look.*`, `day_night_sync.mjs`): das Spiel führt die Tageszeit selbst (480 s pro
+  Tag, Start 0,40) und setzt Licht, Himmel und Nebel mit demselben Sonnenlauf wie Kerns GameWorld –
+  so kann `time 21:30` / `time 0.75` sie setzen. Im Mehrspieler folgt jeder Client der Phase des Hosts
+  (sie reist mit der Pose): kleine Abweichung wird halb ausgeglichen, große springt.
+* **Punktlichter** (`scene_lighting.mjs` über `dynamic_lights.mjs`, Kerns 6 Slots über `LightPool`):
+  die drei nächsten Straßenlaternen bis 70 m ab der Dämmerung (warm, 46/26 m), Scheinwerfer 7 m vor dem
+  eigenen Auto, Mündungsfeuer (Drohnen-MG, Bordkanone, Werfer: 55 ms), Leuchtspur-Glanz (45 ms),
+  Raketen im Flug, Explosionen (420 ms, Reichweite 4 × Radius), die Jetpack-Flamme, Blaulicht der
+  Streifenwagen (110-ms-Takt, `police_ground_units.mjs`) und der Polizeidrohnen (92-ms-Takt,
+  `wanted_police_drones.mjs`). Kerns eigene Lichter (Licht-Komponenten, Mündungsfeuer des Soldaten)
+  bleiben im Pool. three.js-Stärken (1/d², BRDF/π) werden auf Kerns gefensterten Abfall umgerechnet,
+  gleich hell im jeweiligen Bezugsabstand (`kern_intensity`).
+* **Kamera-Wackeln** (`camera_shake.mjs`): Trauma 0…1, Abbau 1,35/s, sichtbar Trauma², 0,055 rad /
+  0,09 m, 19 Hz; Quellen: Drohnen-MG/Bordkanone (Dauerfeuer bis 0,42), Raketen/Granaten, Explosionen
+  nach Abstand und Größe, harte Stöße von Auto und Drohne (ab 2,5 m/s). Zu Fuß wackelt Kerns
+  Soldatenkamera selbst (`shake_camera`).
+* **FPV-Stabilisator** (`fpv_optical_stabilizer.mjs`): nur in der FPV-Kamera, Position 55 Hz,
+  Ausrichtung 45 Hz, Sprung ab 0,35 m / 2,5 m.
+* **Speed-Lines** (`speed_lines.mjs`): 26 radiale Striche ab 13 m/s Kamerageschwindigkeit, voll bei
+  40 m/s, als ein instanziertes, durchscheinendes Mesh 0,3 m vor dem Auge.
+* **Ego-Modelle** (`weapon_models.mjs`, `viewmodel_arms.mjs`): eigene Modelle für BOOMSTICK 40 mm
+  (Trommelwerfer mit Warnstreifen, glühender Mündungsring), Raketenwerfer (Rohr, Führungseinheit mit
+  rotem Laser), Fäuste (zwei getapte Fäuste, abwechselnde Geraden) und Messer (Klinge mit Hohlkehle,
+  Schnitt quer durchs Bild); Ärmel und Handschuh am Griff, Laufwippen, Rückstoß, Hochnehmen nach dem
+  Wechsel. Kerns eigenes Ego-Modell wird solange ausgeblendet (über die Renderer-Sichtbarkeit).
+* **Neon-Bloom** (`neon_bloom.mjs`): Kerns Bloom ist an und schaltet sich auf langsamen Geräten selbst
+  ab; glühende Teile (Laternenköpfe, Blaulicht, Waffenglühen) sind HDR-Farben über 1.
+* **Nicht gebaut: 3D nebeneinander** (`stereo_sbs.mjs`): Kerns App-Host rendert genau einen Frame
+  nach `update()`; zwei Augen in zwei Bildhälften brauchen eine Engine-Änderung (siehe unten). Die
+  Einstellung `cam.stereo` hat deshalb noch keine Wirkung (`look.stereo` im HUD-JSON ist `false`).
 
 ## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
 
@@ -304,6 +358,11 @@ Wanted-Regeln, den Straßengraph (A*, Pure Pursuit), Treffer und Taten der Leute
 Bewegung. Der Smoke-Test lädt die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
 echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
 Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots.
+`test_look.cpp` prüft Frame-Zeit-Runden, die Qualitätsleiter (runter unter 50 fps, hoch mit Reserve,
+Sperre zu schwerer Stufen, Telefon-Obergrenze, feste Stufe), Kamera-Wackeln, FPV-Stabilisator,
+Speed-Lines, die Tageszeit (Licht, `time`-Parser, Mehrspieler-Folgen) und die Licht-Umrechnung/-Takte;
+der Smoke-Test die Frame-Zeit-Zeile, die Pixelratio einer festen Stufe, Nacht mit Punktlichtern und
+das eigene Messer-Modell.
 
 ## CI
 
@@ -351,8 +410,10 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
-  echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
+* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume, GPS-Start.
+* 3D nebeneinander (Kreuzblick) – braucht Engine-Punkt 9. Bloom-Stärke/Schwelle von `neon_bloom.mjs`
+  (0,13/0,08, Schwelle 0,88) lassen sich in Kern nicht einstellen; Kerns Bloom bleibt wie er ist.
+* Messer-Schnittspur (Band hinter der Klinge) und Waffen-Skins anderer Seltenheit.
 * Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
   mehr Fahrzeugtypen.
 
@@ -371,3 +432,11 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
    tauschen kann statt den ganzen Körper.
 7. **Kaskaden-Schatten und LOD/Impostor** für große Sichtweiten (Jet).
 8. `build.sh` sollte Header außerhalb von `kern/include`/`kern/src` in den Cache-Schlüssel nehmen.
+9. **Mehrere Ansichten pro Frame im App-Host** (z. B. `App::render_views()` oder eine Liste von
+   `RenderParams` mit Viewport und Kamera, Schattenkarte geteilt) – für 3D nebeneinander (`stereo_sbs.mjs`).
+10. **`GameWorld::set_time_of_day()`** – heute rechnet das Spiel das Tageslicht mit eigener Uhr nach
+    (`look::day_lighting`, dieselben Formeln wie `apply_lighting`).
+11. **Ego-Modell abschalten / eigenes Ego-Modell** in `WeaponComponent` (heute blendet das Spiel Kerns
+    View-Model-Meshes über `Renderer::set_visible` aus) und **Bloom-Parameter** (Stärke, Schwelle) zur Laufzeit.
+12. **Zeichenpuffer-Skalierung im App-Host** (`runKernApp` mit änderbarer Pixelratio) – heute setzt die
+    Seite die Canvas-Größe selbst nach `renderScale` und ruft `kern_app_resize`.
