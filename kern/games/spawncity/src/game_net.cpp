@@ -159,6 +159,7 @@ net::PlayerState Game::my_state() const {
     s.jet_rot = j.rotation;
   }
   if (mp_ && mp_->mic && !mp_->muted) f |= net::kTalking;
+  if (ui_.jetpack.thrusting && mode_ == Mode::foot) f |= net::kJetpack;  // game_equipment.cpp
   s.flags = f;
   return s;
 }

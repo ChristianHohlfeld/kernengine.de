@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "game.h"
+#include "kern/geo/primitives.h"
 
 namespace sc {
 
@@ -87,7 +88,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   if (starts("gps ")) {
     const std::string rest = cmd.substr(4);
     GpsLive& g = ui_.gps;
-    if (rest == "on") { if (!g.active()) g.start(time_); out = "on"; return true; }
+    if (rest == "on") { if (!g.active()) { g.start(time_); ui_.trail.clear(); ui_.trail_dirty = true; } out = "on"; return true; }
     if (rest == "off") { g.stop(); ui_.gps_cam_init = false; out = "off"; return true; }
     if (rest.rfind("view", 0) == 0) {
       const std::string v = rest.size() > 5 ? rest.substr(5) : "next";
@@ -111,8 +112,18 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
         out = "reanchor";
         return true;
       }
+      const bool first = !g.has_fix();
       out = g.fix(time_, static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(acc), static_cast<f32>(speed),
                   course >= 0 ? static_cast<f32>(course * kDeg) : -1.0f) ? "ok" : "rejected";
+      if (out == "ok") {
+        // gps_live_mode.mjs addTrail: a point every 2 m, at most 4000.
+        const Vec2 p = g.position();
+        if (first || ui_.trail.empty() || std::hypot(p.x - ui_.trail.back().x, p.y - ui_.trail.back().y) >= 2) {
+          ui_.trail.push_back(p);
+          if (ui_.trail.size() > 4000) ui_.trail.erase(ui_.trail.begin());
+          ui_.trail_dirty = true;
+        }
+      }
       return true;
     }
     out = "usage: gps on|off|view [eye|follow|map]|fix <lat> <lon> <acc> [speed] [course deg]|compass <rad>";
@@ -143,6 +154,127 @@ void Game::ui_gps_update(f32 dt) {
   }
   wanted_.clear();
   world_->heal(soldier_, 1000);
+}
+
+// The position puck and the track line on the ground (gps_live_mode.mjs ensureScene / pushTrailPoint).
+void Game::ui_draw_gps(f32 dt) {
+  kern::Renderer& r = engine_->renderer;
+  if (!ui_.puck_acc) {
+    namespace prim = kern::primitives;
+    auto make = [&](u32& id, const kern::MeshData& m, Vec3 color, f32 alpha) {
+      kern::Material mat;
+      mat.unlit = true;
+      mat.cast_shadow = false;
+      mat.color = {color.x, color.y, color.z, alpha};
+      mat.alpha = alpha < 1 ? kern::AlphaMode::blend : kern::AlphaMode::opaque;
+      mat.double_sided = true;
+      id = r.allocate_id();
+      kern::MeshInput in = m.as_input();
+      in.material = mat;
+      in.visible = false;
+      if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+    };
+    const Vec3 blue{0.26f, 0.52f, 0.96f};  // 0x4285f4
+    make(ui_.puck_acc, prim::cylinder(1, 0.01f, 40), blue, 0.16f);
+    make(ui_.puck_ring, prim::cylinder(0.62f, 0.012f, 28), {1, 1, 1}, 1);
+    make(ui_.puck_dot, prim::cylinder(0.48f, 0.014f, 28), blue, 1);
+    kern::MeshData wedge;
+    const Vec3 c{1, 1, 1};
+    for (int i = 0; i < 12; ++i) {  // a fan of 60 degrees, 4.2 m long, ahead of the dot
+      const f32 a0 = -0.5f + i / 12.0f, a1 = -0.5f + (i + 1) / 12.0f;
+      wedge.push({0, 0, 0}, {0, 0, 1}, c, {0, 0});
+      wedge.push({std::sin(a0) * 4.2f, std::cos(a0) * 4.2f, 0}, {0, 0, 1}, c, {0, 0});
+      wedge.push({std::sin(a1) * 4.2f, std::cos(a1) * 4.2f, 0}, {0, 0, 1}, c, {0, 0});
+    }
+    make(ui_.puck_wedge, wedge, blue, 0.28f);
+  }
+  const GpsLive& g = ui_.gps;
+  const bool show = g.active() && g.has_fix() && world_placed_;
+  for (u32 id : {ui_.puck_acc, ui_.puck_ring, ui_.puck_dot, ui_.puck_wedge})
+    if (id) r.set_visible(id, show);
+  if (show) {
+    const Vec2 p = g.shown();
+    const f32 z = city_.ground_height(p.x, p.y) + 0.05f, acc = std::fmax(1.0f, g.accuracy());
+    auto put = [&](u32 id, const kern::Mat4& m) { if (id) r.update_instances(id, kern::Span<const f32>(m.m, 16), {}); };
+    put(ui_.puck_acc, kern::Mat4::trs({p.x, p.y, z}, {}, {acc, acc, 1}));
+    put(ui_.puck_ring, kern::Mat4::translate({p.x, p.y, z + 0.01f}));
+    put(ui_.puck_dot, kern::Mat4::translate({p.x, p.y, z + 0.02f}));
+    // heading: clockwise from north (+y); the wedge points along +y
+    put(ui_.puck_wedge, kern::Mat4::trs({p.x, p.y, z + 0.03f}, Quat::axis_angle({0, 0, 1}, -g.heading()), {1, 1, 1}));
+  }
+  // The track line, re-uploaded at most twice a second.
+  ui_.trail_upload += dt;
+  if (ui_.trail_dirty && ui_.trail_upload > 0.5f) {
+    ui_.trail_dirty = false;
+    ui_.trail_upload = 0;
+    if (!ui_.trail_mesh) ui_.trail_mesh = r.allocate_id();
+    if (ui_.trail.size() < 2) r.set_visible(ui_.trail_mesh, false);
+    else {
+      kern::MeshData line;
+      const Vec3 blue{0.26f, 0.52f, 0.96f};
+      for (std::size_t i = 1; i < ui_.trail.size(); ++i) {
+        for (const Vec2& q : {ui_.trail[i - 1], ui_.trail[i]}) line.push({q.x, q.y, city_.ground_height(q.x, q.y) + 0.12f}, {0, 0, 1}, blue, {0, 0});
+      }
+      kern::MeshInput in = line.as_input();
+      in.material.lines = true;
+      in.material.unlit = true;
+      in.material.cast_shadow = false;
+      in.material.frustum_culled = false;
+      in.visible = true;
+      if (!r.upsert(ui_.trail_mesh, in)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
+    }
+  }
+  if (ui_.trail_mesh && !g.active()) r.set_visible(ui_.trail_mesh, false);
+  else if (ui_.trail_mesh && ui_.trail.size() >= 2 && !ui_.trail_dirty) r.set_visible(ui_.trail_mesh, true);
+}
+
+// settings_help.mjs worldGrid (1 m reference grid around the player) and box3dColliderDebug (Box3D's
+// collision shapes as wire frames). Visual only.
+void Game::ui_draw_helpers() {
+  kern::Renderer& r = engine_->renderer;
+  const Settings& st = ui_.settings;
+  auto line_mesh = [&](u32& id, const std::vector<f32>& pos, const std::vector<f32>* col, Vec3 color) {
+    if (!id) id = r.allocate_id();
+    kern::MeshData m;
+    for (std::size_t i = 0; i + 2 < pos.size(); i += 3) {
+      const Vec3 c = col ? Vec3{(*col)[i], (*col)[i + 1], (*col)[i + 2]} : color;
+      m.push({pos[i], pos[i + 1], pos[i + 2]}, {0, 0, 1}, c, {0, 0});
+    }
+    kern::MeshInput in = m.as_input();
+    in.material.lines = true;
+    in.material.unlit = true;
+    in.material.cast_shadow = false;
+    in.material.frustum_culled = false;
+    in.material.linear_colors = col != nullptr;
+    in.visible = !pos.empty();
+    if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+  };
+  const bool grid = st.on(Opt::view_grid) && world_placed_;
+  if (grid) {
+    const Vec3 me = player_position();
+    const f32 cx = std::round(me.x), cy = std::round(me.y);
+    if (!ui_.grid_mesh || std::fabs(cx - ui_.grid_at.x) >= 1 || std::fabs(cy - ui_.grid_at.y) >= 1) {
+      ui_.grid_at = {cx, cy, 0};
+      std::vector<f32> p;
+      const int n = 20;  // 40 x 40 m around the player
+      for (int i = -n; i <= n; ++i) {
+        for (int k = -n; k < n; ++k) {
+          const f32 a = static_cast<f32>(k), b = static_cast<f32>(k + 1), o = static_cast<f32>(i);
+          p.insert(p.end(), {cx + a, cy + o, city_.ground_height(cx + a, cy + o) + 0.03f, cx + b, cy + o, city_.ground_height(cx + b, cy + o) + 0.03f});
+          p.insert(p.end(), {cx + o, cy + a, city_.ground_height(cx + o, cy + a) + 0.03f, cx + o, cy + b, city_.ground_height(cx + o, cy + b) + 0.03f});
+        }
+      }
+      line_mesh(ui_.grid_mesh, p, nullptr, {0.55f, 0.85f, 1.0f});
+    }
+  } else if (ui_.grid_mesh) { r.set_visible(ui_.grid_mesh, false); ui_.grid_at = {1e9f, 1e9f, 0}; }
+  if (st.on(Opt::debug_colliders) && world_placed_) {
+    ui_.collider_clock += 1;
+    if (static_cast<int>(ui_.collider_clock) % 6 == 0) {  // ten times a second is plenty
+      std::vector<f32> pos, col;
+      world_->debug_lines(true, false, false, pos, col);
+      line_mesh(ui_.collider_mesh, pos, &col, {});
+    }
+  } else if (ui_.collider_mesh) r.set_visible(ui_.collider_mesh, false);
 }
 
 void Game::ui_camera(f32 dt) {
@@ -178,6 +310,8 @@ void Game::ui_camera(f32 dt) {
 // input: the settings on top of what read_input decided
 
 void Game::ui_before_input(kern::Engine& e) {
+  ui_.head_yaw_before = head_yaw_;
+  ui_.head_pitch_before = head_pitch_;
   // mouse_settings.mjs scaleMouseDelta: invert Y for every mode.
   if (ui_.settings.on(Opt::mouse_invert_y)) {
     const Vec2 d = e.input.pointer_delta();
@@ -200,8 +334,35 @@ void Game::ui_after_input(f32 dt) {
         p.move_x = fineness_axis(p.move_x, st.get(Opt::foot_move_fineness));
         p.move_y = fineness_axis(p.move_y, st.get(Opt::foot_move_fineness));
       }
-      p.look_x *= h * ih;
-      p.look_y *= v * iv;
+      // first_person_control_settings.mjs aim assist (Xbox and touch): a gentle pull towards the
+      // nearest target within 6 degrees of the crosshair and 70 m.
+      const f32 assist = st.get(Opt::foot_aim_assist) / 100;
+      f32 assist_x = 0, assist_y = 0;  // degrees, added after the sensitivity and inversion
+      if (assist > 0 && (touch_mode_ || (pad.connected && pad.active))) {
+        const Vec3 eye = cam_.eye, fwd = kern::normalize(cam_.target - cam_.eye);
+        f32 best = 6 * kDeg;
+        Vec3 aim{};
+        bool found = false;
+        for (const People::Person& q : people_.all()) {
+          if (q.state == People::State::down || q.state == People::State::gone) continue;
+          if (q.kind == People::Kind::citizen && q.state != People::State::fight) continue;
+          const Vec3 to = q.pos + Vec3{0, 0, 1.3f} - eye;
+          const f32 d = kern::length(to);
+          if (d < 1 || d > 70) continue;
+          const f32 ang = std::acos(clampf(kern::dot(to * (1 / d), fwd), -1, 1));
+          if (ang < best) { best = ang; aim = to * (1 / d); found = true; }
+        }
+        if (found) {
+          const f32 yaw_err = wrap_pi(std::atan2(aim.y, aim.x) - std::atan2(fwd.y, fwd.x));
+          const f32 pitch_err = std::asin(clampf(aim.z, -1, 1)) - std::asin(clampf(fwd.z, -1, 1));
+          const f32 k = assist * clampf(dt * 6, 0, 1);
+          assist_x = -yaw_err * k / kDeg;   // GameWorld: camera_yaw -= look_x
+          assist_y = -pitch_err * k / kDeg;  // camera_pitch += look_y (positive = down)
+          ++ui_.assists;
+        }
+      }
+      p.look_x = p.look_x * h * ih + assist_x;
+      p.look_y = p.look_y * v * iv + assist_y;
       p.look_stick_x *= h * ih;
       p.look_stick_y *= v * iv;
       if (st.on(Opt::foot_invert_move_h)) p.move_x = -p.move_x;
@@ -222,6 +383,8 @@ void Game::ui_after_input(f32 dt) {
       break;
     }
     case Mode::car:
+      // settings_help.mjs worldKeepLook: ON, the cockpit view stays where you left it.
+      if (st.on(Opt::view_keep_look) && engine_ && engine_->input.pointer_delta().x == 0 && pad.rx == 0) { head_yaw_ = ui_.head_yaw_before; head_pitch_ = ui_.head_pitch_before; }
       if (car_index_ >= 0) {
         CarInput& ci = cars_[car_index_].input;
         ci.max_speed = st.get(Opt::car_max_kmh) / 3.6f;
@@ -254,11 +417,17 @@ void Game::ui_apply_settings() {
   // WORLD: switched-off kinds do not exist (world_options.mjs: no bodies, no AI, no draw).
   people_.set_budget(look_people_budget());  // the quality level's budget (game_look.cpp)
   if (!st.on(Opt::world_people)) people_.clear();
+  // Military and zombie nights live in the combat systems (game_military.cpp, game_events.cpp); flak checks the option itself.
+  // Only a change of the switch is passed on (the combat test commands may set them too).
+  const i32 mil = st.on(Opt::world_military) ? 1 : 0, zom = st.on(Opt::world_zombies) ? 1 : 0;
+  if (mil != ui_.world_military) { ui_.world_military = mil; if (ui_.world_military >= 0 && (mil == 0 || !combat_.military_enabled)) command(mil ? "military on" : "military off"); }
+  if (zom != ui_.world_zombies) { ui_.world_zombies = zom; if (zom == 0 || !combat_.zombies_enabled) command(zom ? "zombies on" : "zombies off"); }
 }
 
 void Game::ui_update(f32 dt) {
   ui_apply_settings();
   ui_gps_update(dt);
+  if (engine_) { ui_draw_gps(dt); ui_draw_helpers(); }
   if (world_placed_) ui_equipment(dt);
   const Settings& st = ui_.settings;
   if (!world_placed_) return;
@@ -364,8 +533,9 @@ void Game::ui_reset() {
 std::string Game::ui_hud_json() {
   char b[512];
   std::string s;
-  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f]}",
-                world_placed_ ? "true" : "false", ui_.paused ? "true" : "false", ui_.settings.version(), ui_.resets, ui_.moves, lat_, lon_);
+  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f],\"northUp\":%s,\"assists\":%u}",
+                world_placed_ ? "true" : "false", ui_.paused ? "true" : "false", ui_.settings.version(), ui_.resets, ui_.moves, lat_, lon_,
+                ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists);
   s += b;
   const GpsLive& g = ui_.gps;
   if (g.active()) {

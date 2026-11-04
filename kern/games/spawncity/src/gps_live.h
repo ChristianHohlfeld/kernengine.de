@@ -27,6 +27,7 @@ class GpsLive {
   void frame(f64 now, f32 dt);
   bool has_fix() const { return has_fix_; }
   Vec2 shown() const { return shown_; }
+  Vec2 position() const { return {x_, y_}; }  // the filtered track (trail points)
   f32 heading() const { return heading_; }       // radians, clockwise from +y (north)
   f32 speed() const { return speed_avg_; }
   f32 distance() const { return distance_; }

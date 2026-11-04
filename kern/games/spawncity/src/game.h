@@ -310,6 +310,8 @@ class Game {
   void ui_move_world(f64 lon, f64 lat);
   void ui_gps_update(f32 dt);
   void ui_camera(f32 dt);
+  void ui_draw_gps(f32 dt);
+  void ui_draw_helpers();
   std::string ui_hud_json();
   // equipment (game_equipment.cpp)
   void ui_audio_init();

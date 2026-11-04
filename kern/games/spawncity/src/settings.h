@@ -31,6 +31,8 @@ enum class Opt : u8 {
   // world options (world_options.mjs)
   world_people, world_traffic, world_dogs, world_cats, world_birds, world_zombies, world_police, world_military, world_flak, world_jetpack,
   world_friendly_fire,
+  // view and helpers (settings_help.mjs: worldGrid, worldKeepLook, worldMinimapAxisLock, box3dColliderDebug; aim assist)
+  foot_aim_assist, view_grid, view_keep_look, view_minimap_north, debug_colliders,
   count
 };
 

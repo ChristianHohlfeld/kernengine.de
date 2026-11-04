@@ -123,6 +123,7 @@ kern/games/spawncity/
     settings.*    Einstellungstabelle (Werte, Bereiche, Hilfe aus SpawnCity), `set`/`get`/`settings schema`
     gps_live.*    LIVE-GPS-Filter (Sprünge verwerfen, Vorhersage, Tätigkeit)
     equipment.*   Jetpack, Flug-Logbuch, MusicSynth (Titelmusik, Autoradio)
+    nostr.*       SHA-256, secp256k1, BIP-340-Signatur für das Nostr-Ereignis der Ideen-Karte
     game_ui.*     Menü-/Einstellungs-Seite des Spiels: Anwenden der Einstellungen, Pause, RESET, Startort, LIVE GPS
     game_equipment.cpp  Jetpack am Soldaten, Logbuch, Radio, Geräuschkulisse
 
@@ -465,13 +466,23 @@ kern/games/spawncity/
   eine Kopie, die beim Start wieder abgespielt wird (`settings values`, `get <key>`, `settings reset [bereich]`).
 * **WELT** (`world_options.mjs`): Leute, Verkehr und Polizei gibt es nicht, wenn sie aus sind (keine
   Körper, keine KI); Jetpack; Friendly Fire (Standard aus, wie SpawnCity: Treffer und Explosionen
-  erreichen andere Spieler nur, wenn es an ist). Hunde, Katzen, Vögel, Zombies, Militär und Flak hat das
-  Spiel auf Kern noch nicht – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+  erreichen andere Spieler nur, wenn es an ist); Militär, Zombie-Nächte und Flak schalten die Kampfsysteme
+  (`military on|off`, `zombies on|off`, Flak prüft den Schalter selbst). Hunde, Katzen und Vögel hat das
+  Spiel auf Kern noch nicht (Tiere: anderer Bereich) – ihre Schalter werden gespeichert und als „bald“ gezeigt.
+* **Ansicht und Helfer** (`settings_help.mjs`): 1-m-Raster um den Spieler, Blick halten (das Cockpit
+  schwingt nicht zurück), Minimap genordet, Box3D-Kollisionsformen als Drahtgitter (Kerns
+  `debug_lines`), Zielhilfe mit Pad und Touch (0–100 %, Standard 55: sanfter Zug zum nächsten Gegner
+  innerhalb 6° und 70 m). Im Einstellungsdialog oben „was du steuerst“ (ZU FUSS / DROHNE / AUTO / JET)
+  und STARTORT.
 * **Menüs** (`web/ui.mjs`, nur DOM): Titelbildschirm (START, WELT, EINSTELLUNGEN, NEU / CHANGELOG;
   automatisierte Browser und `?autostart=1` überspringen ihn, `?menu=1` erzwingt ihn), Pausemenü (Esc,
   MENÜ, Pad-Menütaste, Verlassen des Pointer-Locks), „Zurück zum Hauptmenü?“ (Enter/Y – Esc/N),
-  EXIT / MENÜ / RESET oben links, Steuerung der Menüs mit dem Pad (D-Pad, A, B). Solange ein Menü offen
-  ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
+  EXIT / MENÜ / RESET oben links, der Moduswechsel unten links mit seinem Ziel („ZUR DROHNE · V“,
+  „AUSSTEIGEN · F“, „EJECT · F“; Touch hat ihn im Touch-Layout), Ton- und Musikschalter (im Titel oben
+  rechts, im Spiel neben EXIT), HOME SCREEN (Installieren: Chromes Abfrage, auf iOS die zwei Tipps),
+  TEILEN (Teilen-Dialog, sonst Link kopieren, sonst ein Post auf X), NEU / CHANGELOG mit den Kern-Meilensteinen
+  und darunter dem vollständigen Changelog von spawncity.de. Steuerung der Menüs mit dem Pad (D-Pad, A, B).
+  Solange ein Menü offen ist, steht das Spiel (`pause 1`: keine Eingabe, kein Physikschritt, Ton pausiert).
 * **RESET** (`game_reset.mjs`, allein): zurück zum Start – Startmodus und Startpunkt, Pistole, volle
   Gesundheit, keine Fahndung, Polizei weg, Fahrzeuge repariert, neue Passanten.
 * **Startort** (`start_location.mjs`, `world_location_selector.mjs`, `auto_flight_start.mjs`): der „📍“-Knopf
@@ -488,13 +499,15 @@ kern/games/spawncity/
   Vorhersage mit konstanter Geschwindigkeit, Neuanfang nach 12 s Lücke, Welt wandert mit ab 40 km) und
   führt den Spieler zu Fuß mit; Tätigkeit aus dem Tempo (steht/gehen/laufen/Rad/Fahrt), Tempo bzw. Pace,
   Strecke, Zeit, Genauigkeit; Ansichten AUGE, FOLGEN, KARTE (`gps view`). Kein Schaden, keine Fahndung.
-  Bildschirm bleibt an (Wake Lock). Offen: der blaue Positionspunkt und die Spurlinie am Boden.
+  Bildschirm bleibt an (Wake Lock). Am Boden der blaue Positionspunkt (Genauigkeitskreis, Ring, Punkt,
+  Blickkeil) und die Spurlinie (ein Punkt alle 2 m, höchstens 4000).
 * **Jetpack** (`equipment.*`, `game_equipment.cpp`; `player_walk_mode_v4.mjs`, `jetpack_audio.mjs`): WELT-Schalter
   (an). Zweiter Sprung in der Luft zündet (Stoß 0,6 s), Sprung halten fliegt weiter: Steigen bis 8 m/s
   (Beschleunigung g + (8 − vz)·3, höchstens 13,8 m/s²), Luftsteuerung 14 m/s², Tank ≈ 5 s, füllt sich in
   4 s am Boden (in der Luft nach 0,35 s ohne Schub), kurz vor einem harten Aufprall zündet er selbst
   (21 m/s²). Der Schub ist ein Impuls auf Kerns Charakter (75 kg). Ton: Zünd-„Wumm“ (Druckstoß,
-  Flammenstoß, Klick) und ein Brüllen aus gefiltertem Rauschen mit Knistern; Tankanzeige unten.
+  Flammenstoß, Klick), ein oranges Aufblitzen an den Bildrändern, ein Brüllen aus gefiltertem Rauschen mit
+  Knistern; die Jetpacks der anderen Spieler hört man in 3-D an ihrer Stelle (Flag `kJetpack`); Tankanzeige unten.
 * **Logbuch** (`flight_logbook.mjs`): jeder Drohnenflug von ARM bis DISARM (Dauer, Strecke, Spitze,
   größte Höhe über Grund, Akku Start/Minimum, Grund des Endes, Pfad alle 0,5 s, höchstens 50 Flüge) und
   die Netzereignisse; das Spiel zeichnet auf (`logbook`), die Seite hält die Geschichte in localStorage,
@@ -510,13 +523,16 @@ kern/games/spawncity/
   (Umgebungs-Bus, leiser in der Höhe) und ein dumpfer Schlag bei harten Stößen des eigenen Autos
   (ab 1,8 m/s Geschwindigkeitssprung) mit etwas Kamerawackeln. Schritte und Motor kommen wie bisher
   aus Kerns GameAudio und `sound_fx.*`.
-* **Idee fürs nächste Update** (`suggestion_box.mjs`): nach 15 min Spielzeit einmal gefragt. SpawnCity
-  verschickt die Zeile als signiertes Nostr-Ereignis (`nostr-tools`, secp256k1-Schnorr); eine
-  Fremdbibliothek und ein eigener Sammeldienst passen nicht zum dünnen Host. Hier: Kopieren oder als
-  Vorschlag im öffentlichen GitHub-Repository öffnen.
+* **Idee fürs nächste Update** (`suggestion_box.mjs`, `nostr.*`): nach 15 min Spielzeit dieser Version fragt
+  die Karte im Titel einmal (SENDEN / SPÄTER = 10 min / NEIN DANKE). Wie SpawnCity geht die Zeile anonym als
+  signiertes Nostr-Ereignis (Art 30078, Tags `spawncity-suggestion` und Build) mit einem Wegwerf-Schlüssel an
+  die öffentlichen Relays relay.damus.io, nos.lol, relay.primal.net und relay-rpi.edufeed.org. SpawnCity
+  nutzt dafür `nostr-tools`; hier signiert das Spiel selbst (SHA-256, secp256k1, BIP-340 in `nostr.cpp`,
+  geprüft mit den BIP-340-Testvektoren), die Seite öffnet nur die WebSockets.
 * **App/Vollbild** (`pwa_fullscreen_policy.mjs`): `web/manifest.webmanifest` (Vollbild, quer) mit
-  eigenem SVG-Symbol; auf Touch-Geräten startet START das Vollbild, außer die installierte App läuft
-  schon im eigenen Fenster.
+  eigenem SVG-Symbol; `web/sw.js` hält wie SpawnCitys Service Worker eine Kopie für den Start ohne Netz
+  (Netz zuerst, nur eigene Dateien); auf Touch-Geräten startet START das Vollbild, außer die installierte
+  App läuft schon im eigenen Fenster.
 
 ## Übernommene SpawnCity-Werte (Auszug)
 
