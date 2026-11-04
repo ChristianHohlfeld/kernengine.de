@@ -7,7 +7,8 @@ und Box3D über Kern. Kein three.js, keine Spiellogik in JavaScript. Die Seite i
 Vorlage für Inhalt, Werte und Verhalten ist das laufende SpawnCity (`nostack-dev/spawncity-de`, Commit
 `9108537`, `sim/*.mjs`, `esp32/*.hpp`). Die Zahlen stehen mit Quellenangabe im Code.
 
-Stand: **Meilenstein 1** – spielbares Grundgerüst mit allen Modi in der Breite.
+Stand: **Meilenstein 2** – alle Modi, dazu die Stadt mit Leuten, Polizei und Fahndung, das ganze
+Waffenset mit Explosionen und Fahrzeugschaden, Mehrspieler, Minimap und Straßenlaternen.
 
 ## Starten
 
@@ -31,6 +32,8 @@ Startparameter (Query-String):
 | `mouse=20…300` | Mausempfindlichkeit in % |
 | `tilejson=URL`, `tiles=URL-Vorlage` | andere Kartenquelle (Tests) |
 | `mute=1` | ohne Ton |
+| `mp=host&room=NAME` / `mp=join&room=NAME` | Mehrspieler: hosten / beitreten (Tabs eines Browsers über BroadcastChannel) |
+| `relay=wss://…` | dazu: über das Kern-Relay (`tools/net_relay.mjs`) zwischen Rechnern |
 
 ## Steuerung
 
@@ -41,6 +44,9 @@ Startparameter (Query-String):
 | Auto | W Gas, S Bremse/rückwärts, A/D lenken, Leertaste Handbremse, C Cockpit, Maus Kopf, **F** aussteigen | LS lenken, RT Gas, LT Bremse, B Handbremse, X aussteigen | links lenken, rechts Gas/Bremse, HANDBREMSE, AUSSTEIGEN |
 | Jet | W/S Schub bzw. Steigen/Sinken, A/D Seitenruder, Maus nicken/rollen (Rate), Pfeile, **V** Schweben/Flug, C Cockpit, **F** aussteigen (am Boden) bzw. Schleudersitz | LS Schub/Seite, RS nicken/rollen, LB Schweben/Flug, X aussteigen | links Schub/Seite, rechts nicken/rollen, FLUG/SCHWEBEN, EJECT |
 | Fallschirm | WASD steuern | LS | linker Stick |
+| Waffen zu Fuß | **1** MP, **2** Glock, **3** Sniper, **5** Granatwerfer, **6** Raketenwerfer, **7** Fäuste, **8** Messer, **T** Handgranate, **X** EMP (gegen Polizeidrohnen, 30 m, 18 s) | D-Pad ←/→ Waffe, **Y** Granate, D-Pad ↑ EMP | WAFFE, GRANATE, EMP |
+| Waffen Drohne | LMB feuern, **1** MG, **2** Raketen, **3** GUIDED (folgt der Kamera) | RB feuern, Y wechseln | FEUER, Waffenknopf |
+| Waffen Jet | LMB / Leertaste Bordkanone, **R** Rakete, **B** Bombe | RT, RB, Y | FEUER, RAKETE, BOMBE |
 
 Flugmodi der Drohne: **GAME** (Zustandsregler mit Höhenhaltung, SpawnCitys Standard) und **ANGLE**
 (Winkelmodus mit Gashebel). Einen reinen Acro-Modus hat die SpawnCity-Firmware nicht
@@ -69,10 +75,19 @@ kern/games/spawncity/
     vehicle_art.* prozedurale Fahrzeugmodelle, instanziert
     sound_fx.*    Synth-Patches (Rotor, Motor, Turbine, Jet-Röhren, Wind) auf Kerns Mixer
     touch_pad.*   Touch-Sticks/Knöpfe der Fahrzeuge (Overlay = Kerns TouchOverlay)
-    wanted.*      Wanted-Regeln (Heat, Sterne, Polizei-Antwort) – Grundlage Polizei
-    population.h  Schnittstelle Bevölkerung/Verkehr (nächster Meilenstein)
-    weapons.h     Waffentabelle mit SpawnCity-Werten (nächster Meilenstein)
-    net_session.h Schnittstelle Mehrspieler über Kerns NetGame/Relay (nächster Meilenstein)
+    wanted.*      Wanted-Regeln (Heat, Sterne, Polizei-Antwort, Fluchtzeit, Trefferchance, EMP)
+    people.*      Fußgänger auf den Gehwegen (Routen von Straße zu Straße, Panik, Zeugen) und Beamte:
+                  leichte Agenten, Box3D-Strahlen gegen Wände, Treffer auf Kapseln, Überfahren
+    people_art.*  prozedurale Menschen (Gang, Hände hoch, zielen, liegen), Blaulicht, Polizeidrohnen,
+                  Feuer, Projektile, Straßenlaternen
+    road_graph.*  Straßengraph aus den Fahrspuren, A* und Pure Pursuit für die Streifenwagen
+    game_town.cpp Stadt: Schüsse, Polizei (Streifenwagen + Beamte, Polizeidrohnen, EMP), Fahndung mit
+                  Fluchtuhr, Fahrzeugschaden, Brand und Explosion, Minimap, Laternen
+    weapons.h     Waffentabelle mit SpawnCity-Werten
+    game_weapons.cpp  Waffen: Kerns Soldatenwaffen (MP/Glock/Sniper), Werfer, Nahkampf, Handgranate,
+                  Drohne (MG, Raketen, GUIDED), Jet (Kanone, Rakete, Bombe), Projektile
+    net_session.* Mehrspieler: Kerns Client/Server über HostTransport, Posen 15 Hz, Treffer
+    game_net.cpp  Mehrspieler im Spiel: eigene Pose, andere Spieler zeichnen, Treffer senden/anwenden
   web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
   build.sh        wasm + Einzeldatei-HTML
@@ -102,7 +117,19 @@ kern/games/spawncity/
   prozedurale Ersatzstadt; das HUD sagt das deutlich („OFFLINE · prozedurale Ersatzstadt“).
 * **Host-Schnittstelle** (`main.cpp`): `sc_tile_requests/sc_tile_data/sc_tile_failed/sc_offline`,
   `sc_gamepad`, `sc_touch_frame/sc_touch/sc_touch_view`, `sc_hud`, `sc_command`,
-  `sc_audio_init/sc_audio_render`. JavaScript fragt ab (Pull-Modell), Kern-Imports bleiben unverändert.
+  `sc_audio_init/sc_audio_render`, `sc_net_push/sc_net_take`. JavaScript fragt ab (Pull-Modell),
+  Kern-Imports bleiben unverändert.
+* **Stadt und Polizei:** Leute sind leichte Agenten wie in SpawnCity (kein Box3D-Körper je Person):
+  Gehweg neben der Fahrspur, Weiterlaufen an Straßenenden, Flucht bei Schüssen (10 m alle, bis 22 m
+  ein Teil), Tiefflug unter 14 m, Explosionen; freie Bewegung prüft den Weg mit einem Box3D-Strahl in
+  Hüfthöhe. Zeugen (lebende Passanten im Umkreis von 45 m) melden Taten an `wanted::Tracker`. Ab einem
+  Stern kommen Polizeidrohnen (Ring um den Spieler auf seiner Höhe, Sicht im Erfassungsradius, Schüsse
+  alle 4–5 s) und nach der Anfahrzeit Streifenwagen (Spawn 70–125 m, A* über den Straßengraph, Pure
+  Pursuit, Rangieren bei Hängenbleiben, zwei Beamte steigen aus, halten 6–15 m Abstand und schießen).
+  Die Fluchtuhr läuft erst, wenn die Polizei da ist. Tod löscht die Fahndung.
+* **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
+  verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
+  andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
 
 ## Übernommene SpawnCity-Werte (Auszug)
 
@@ -131,19 +158,17 @@ der Nase, Gieren, Steigen, ANGLE-Modus, Höhenstick-Gesetz), Jet (Stehen auf dem
 Start, Schweben, Übergang in den Flügelflug, Hochziehen, Kurve, weiche Landung), Auto und Bus
 (Fahrhöhe, Beschleunigen, Bremsen/Rückwärts, Lenkrichtung, KI-Fahrer), MVT-Decoder und
 OpenMapTiles-Auswertung, das Streaming (Zeitscheiben, Kollision, Entladen, Ersatzstadt) und die
-Wanted-Regeln. Der Smoke-Test lädt die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
-echten MVT-Pfad, Telefon mit Touch offline), steuert jeden Modus 3 s und macht Screenshots.
+Wanted-Regeln, den Straßengraph (A*, Pure Pursuit), Treffer und Taten der Leute und Wände bei freier
+Bewegung. Der Smoke-Test lädt die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
+echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
+Rakete mit Explosion und die Minimap, steuert jeden Modus 3 s und macht Screenshots.
 
-## Was CI braucht (noch nicht in `.github/workflows` eingetragen)
+## CI
 
-1. Job `native`: `kern/games/spawncity/tests/run_tests.sh` (Host-Compiler, wie `kern/tests/run.sh`).
-2. Job `build`: nach dem Studio-Build `kern/games/spawncity/build.sh` (nutzt den wasi-sdk- und den
-   Objekt-Cache des Jobs); `node --check kern/games/spawncity/web/host.mjs`.
-3. Site: `kern/games/spawncity/web/{index.html,host.mjs,spawncity.wasm}` nach
-   `_site/kern/games/spawncity/web/` kopieren (`kern/web` liegt dort schon) und optional
-   `generated/spawncity.html`; Link auf der Landingpage.
-4. Job `e2e`: `node kern/games/spawncity/tests/smoke.mjs` nach dem Build (Playwright + Chromium wie beim
-   Studio-Test), Screenshots als Artefakt.
+`.github/workflows/ci.yml` führt die nativen Tests (`run_tests.sh`, Job `native`) aus und baut das Spiel
+im Job `build` (`build.sh`, `node --check web/host.mjs`). Noch nicht eingerichtet: SpawnCity auf der
+Website (die Seite `kern/games/spawncity/web/` nach `_site/` kopieren) und der Playwright-Smoke-Test in
+CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als Artefakt).
 
 ## Lizenzen und Namensnennung
 
@@ -158,13 +183,14 @@ echten MVT-Pfad, Telefon mit Touch offline), steuert jeden Modus 3 s und macht S
 
 ## Offen / nächste Meilensteine
 
-* Bevölkerung (Fußgänger mit Panik, Zeugen), Fahrer, die aussteigen; Polizei mit A* über die Spuren,
-  Wanted-Anzeige mit Verfolgung; Militär, Tiere.
-* Waffenset jenseits der Pistole (MP, Sniper, Granaten, Raketen, Fäuste, Messer), Drohnen- und Jetwaffen,
-  Explosionen, Zerstörung.
-* Mehrspieler über `NetGame` + Relay (`net_session.h`), Voice.
-* Gelände (DEM), Wasser mit Auftrieb, Innenräume, Laternen und Nachtlicht, Minimap/Karte, GPS-Start.
-* Verkehr auf echtem Straßengraph (Kreuzungen, Vorfahrt), mehr Fahrzeugtypen.
+* Militär (ab hohen Sternen), Tiere, Gangster, Passanten, die zurückschlagen; Fahrer, die beim
+  Carjacking sichtbar aussteigen.
+* Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
+* Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
+* Gelände (DEM), Wasser mit Auftrieb (die Kacheln liefern Wasserflächen, aber ohne Tiefe), Innenräume,
+  echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
+* Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
+  mehr Fahrzeugtypen.
 
 ## Später in die Engine (gebaut im Spielordner)
 

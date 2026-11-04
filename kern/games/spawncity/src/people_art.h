@@ -23,6 +23,8 @@ class PeopleArt {
   void police_drone(Vec3 at, f32 yaw, f32 tilt_x, f32 tilt_y, bool lights, f32 now, u32 index);
   /// A projectile: grenade, rocket or bomb (oriented along `dir`, length in metres).
   void projectile(Vec3 at, Vec3 dir, f32 radius, f32 length, bool flame);
+  /// A street lamp on the pavement (head lit by `night` 0..1).
+  void street_lamp(Vec3 foot, f32 arm_yaw, f32 night);
   void end();
 
  private:
@@ -34,7 +36,7 @@ class PeopleArt {
   bool make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m, bool tinted);
   void put(Part& p, const kern::Mat4& m, Vec3 tint = {1, 1, 1});
   kern::Renderer* r_ = nullptr;
-  Part leg_, torso_, arm_, head_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_;
+  Part leg_, torso_, arm_, head_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
 };
 
 }  // namespace sc

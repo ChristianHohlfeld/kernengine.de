@@ -115,7 +115,7 @@ async function run({name, url, context, mapped}) {
   const shot = async file => {
     await page.waitForTimeout(400);
     const p = path.join(shots, `${name}-${file}.png`);
-    await page.screenshot({path: p, timeout: 180000});
+    await page.screenshot({path: p, timeout: 900000});
     console.log("   screenshot", p);
   };
   // Controls are held for 3 s of game time (software WebGL renders a few frames per second, and the
@@ -159,12 +159,21 @@ async function run({name, url, context, mapped}) {
   check(h.people >= 10, `[${name}] people in the streets: ${h.people}`);
   check(await cmd("wanted 2") === "2", `[${name}] wanted level 2`);
   const tw = (await hud()).t;
-  await page.waitForFunction(() => window.SpawnCity.hud().police > 0, null, {timeout: 300000}).catch(() => {});
+  await page.waitForFunction(() => { const h = window.SpawnCity.hud(); return h.police > 0 && h.policeDrones > 0; }, null, {timeout: 300000}).catch(() => {});
   h = await hud();
-  check(h.police > 0 && h.stars > 0, `[${name}] a police unit is on its way (${h.police} units, ${h.stars} stars)`);
+  check(h.police > 0 && h.policeDrones > 0 && h.stars > 0, `[${name}] police on its way (${h.police} cruisers, ${h.policeDrones} drones, ${h.stars} stars)`);
   await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tw, {timeout: 400000}).catch(() => {});
   await shot("1b-police");
   check(await cmd("wanted 0") === "0", `[${name}] wanted level cleared`);
+  // Weapons: the rocket launcher fires a rocket that explodes; the minimap has streets.
+  check(await cmd("weapon 4") === "Raketenwerfer", `[${name}] rocket launcher in hand`);
+  const booms = (await hud()).explosions;
+  check((await cmd("attack")).startsWith("1 "), `[${name}] a rocket is fired`);
+  await page.waitForFunction(b => window.SpawnCity.hud().explosions > b, booms, {timeout: 300000}).catch(() => {});
+  check((await hud()).explosions > booms, `[${name}] the rocket explodes`);
+  await cmd("weapon 1");
+  const map = JSON.parse(await cmd("map"));
+  check(map.lanes && map.lanes.length > 0, `[${name}] minimap streets (${map.lanes?.length})`);
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);

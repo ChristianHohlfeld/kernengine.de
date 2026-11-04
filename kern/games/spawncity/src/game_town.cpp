@@ -783,9 +783,97 @@ void Game::update_town(f32 dt) {
   update_police(dt);
 }
 
+void Game::update_lamps() {
+  // Street lamps every 32 m along alternating kerbs of the streamed streets (stylized_world_style.mjs),
+  // placed once per lane as lanes arrive (a few lanes per frame), drawn while their lane is alive.
+  const std::vector<Lane>& lanes = city_.lanes();
+  if (lamp_lanes_ > lanes.size()) { lamps_.clear(); lamp_lanes_ = 0; }  // the city was restarted
+  for (int budget = 0; lamp_lanes_ < lanes.size() && budget < 24; ++budget, ++lamp_lanes_) {
+    const Lane& L = lanes[lamp_lanes_];
+    if (!L.alive || L.points.size() < 2 || L.width < 4.5f) continue;
+    f32 carry = 10;
+    for (std::size_t k = 0; k + 1 < L.points.size(); ++k) {
+      const Vec2 a = L.points[k], b = L.points[k + 1], d = b - a;
+      const f32 len = std::hypot(d.x, d.y);
+      if (len < 1) continue;
+      const Vec2 u = d * (1.0f / len), right{u.y, -u.x};
+      for (f32 t = carry; t < len; t += 32) {
+        const f32 side = (static_cast<i32>(t) / 32 + static_cast<i32>(k)) % 2 ? 1.0f : -1.0f;
+        const Vec2 c = a + u * t + right * (side * (L.width * 0.5f + 0.6f));
+        const RayResult roof = cast(world_->physics(), {c.x, c.y, 40}, {0, 0, -1}, 45, {}, kCatWorld);
+        if (roof.hit && roof.point.z > 0.35f) continue;  // a building stands there
+        lamps_.push_back({{c.x, c.y, 0}, std::atan2(-right.y * side, -right.x * side), static_cast<u32>(lamp_lanes_)});
+      }
+      carry = std::fmod(carry + 32 - std::fmod(len, 32.0f), 32.0f);
+    }
+  }
+}
+
+std::string Game::map_json() {
+  // The minimap (host page): streets, the player, police and other players around him.
+  if (!world_placed_) return "{}";
+  const Vec3 me = focus_position();
+  const f32 range = 180;
+  std::string o;
+  char b[96];
+  const Vec3 look = cam_.target - cam_.eye;
+  std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.3f],\"lanes\":[", me.x, me.y, std::atan2(look.y, look.x));
+  o += b;
+  bool first = true;
+  for (const Lane& L : city_.lanes()) {
+    if (!L.alive) continue;
+    bool near = false;
+    for (const Vec2& p : L.points)
+      if (std::fabs(p.x - me.x) < range && std::fabs(p.y - me.y) < range) { near = true; break; }
+    if (!near) continue;
+    o += first ? "[" : ",[";
+    first = false;
+    for (std::size_t i = 0; i < L.points.size(); ++i) {
+      std::snprintf(b, sizeof b, "%s%.0f,%.0f", i ? "," : "", L.points[i].x - me.x, L.points[i].y - me.y);
+      o += b;
+    }
+    o += "]";
+  }
+  o += "],\"police\":[";
+  first = true;
+  for (const PoliceUnit& u : units_) {
+    if (u.car < 0) continue;
+    const Vec3 p = matrix_of(cars_[u.car].actor).translation();
+    std::snprintf(b, sizeof b, "%s[%.0f,%.0f]", first ? "" : ",", p.x - me.x, p.y - me.y);
+    o += b;
+    first = false;
+  }
+  for (const PoliceDrone& d : pdrones_) {
+    if (!d.active) continue;
+    std::snprintf(b, sizeof b, "%s[%.0f,%.0f]", first ? "" : ",", d.pos.x - me.x, d.pos.y - me.y);
+    o += b;
+    first = false;
+  }
+  o += "],\"players\":[";
+  first = true;
+  for (const net::Remote& r : net_.remotes()) {
+    std::snprintf(b, sizeof b, "%s[%.0f,%.0f]", first ? "" : ",", r.shown.x - me.x, r.shown.y - me.y);
+    o += b;
+    first = false;
+  }
+  o += "]";
+  if (jet_placed_ && mode_ != Mode::jet) {
+    const Vec3 j = matrix_of(jet_actor_).translation();
+    std::snprintf(b, sizeof b, ",\"jet\":[%.0f,%.0f]", j.x - me.x, j.y - me.y);
+    o += b;
+  }
+  return o + "}";
+}
+
 void Game::draw_town() {
   people_art_.begin();
   if (world_placed_) {
+    if (show_lamps_) update_lamps();
+    const std::vector<Lane>& lanes = city_.lanes();
+    if (show_lamps_)
+    for (const Lamp& l : lamps_)
+      if (l.lane < lanes.size() && lanes[l.lane].alive && std::fabs(l.foot.x - cam_.eye.x) < 170 && std::fabs(l.foot.y - cam_.eye.y) < 170)
+        people_art_.street_lamp(l.foot, l.yaw, night_);
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
       if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < 220) people_art_.person(p, now);

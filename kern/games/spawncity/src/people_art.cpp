@@ -77,11 +77,27 @@ bool PeopleArt::init(kern::Renderer& r) {
   MeshData shell;
   prim::append(shell, prim::capsule(1.0f, 2.0f, 10, 5, {0.25f, 0.27f, 0.22f}), Mat4{});
   if (!make(r, shell_, shell, mat(0.6f, 0.3f), false)) return false;
+  // Street lamp: a 6 m pole with an arm over the road and a lamp head.
+  MeshData pole;
+  prim::append(pole, prim::cylinder(0.07f, 6.0f, 8, {0.22f, 0.24f, 0.26f}), Mat4{});
+  prim::append(pole, prim::box({1.3f, 0.07f, 0.07f}, {0.22f, 0.24f, 0.26f}), at({0.62f, 0, 5.95f}));
+  if (!make(r, pole_, pole, mat(0.5f, 0.6f), false)) return false;
+  kern::Material head = mat(0.3f, 0, {3.2f, 2.7f, 1.8f});
+  head.unlit = true;
+  head.cast_shadow = false;
+  if (!make(r, lamp_head_, prim::box({0.42f, 0.2f, 0.08f}, white), head, true)) return false;
   return true;
 }
 
+void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
+  const Mat4 m = at(foot) * rot({0, 0, 1}, arm_yaw);
+  put(pole_, m);
+  const f32 k = 0.18f + 0.82f * clampf(night, 0, 1);  // dull by day, bright at night
+  put(lamp_head_, m * at({1.2f, 0, 5.88f}), Vec3{k, k * 0.92f, k * 0.75f});
+}
+
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -173,7 +189,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

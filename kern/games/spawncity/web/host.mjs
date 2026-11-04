@@ -196,6 +196,32 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (last) hud.update(last, tiles);
     overlay.update(JSON.parse(str(e.sc_touch_view())));
     requestAnimationFrame(tick);
+
+  // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
+  const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
+  setInterval(() => {
+    if (!mctx) return;
+    let m;
+    try { m = JSON.parse(command("map")); } catch { return; }
+    const W = mapCanvas.width, R = W / 2, scale = R / 150;  // 150 m to the rim
+    mctx.clearRect(0, 0, W, W);
+    if (!m.me) return;
+    mctx.save();
+    mctx.beginPath(); mctx.arc(R, R, R - 2, 0, Math.PI * 2); mctx.clip();
+    // Heading up: rotate the world so the view direction points to the top.
+    mctx.translate(R, R);
+    mctx.rotate(m.me[2] - Math.PI / 2);
+    mctx.scale(scale, -scale);
+    mctx.strokeStyle = "rgba(220, 226, 235, .75)"; mctx.lineWidth = 5 / scale * 0.9; mctx.lineCap = "round";
+    for (const l of m.lanes) { mctx.beginPath(); for (let i = 0; i < l.length; i += 2) (i ? mctx.lineTo : mctx.moveTo).call(mctx, l[i], l[i + 1]); mctx.stroke(); }
+    const dot = (p, color, r) => { mctx.fillStyle = color; mctx.beginPath(); mctx.arc(p[0], p[1], r / scale, 0, Math.PI * 2); mctx.fill(); };
+    if (m.jet) dot(m.jet, "#7fd3ff", 5);
+    for (const p of m.players) dot(p, "#3ee07a", 6);
+    for (const p of m.police) dot(p, Math.floor(performance.now() / 250) % 2 ? "#ff4040" : "#4c7dff", 6);
+    mctx.restore();
+    // The player in the middle: an arrow pointing up.
+    mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(R, R - 12); mctx.lineTo(R + 8, R + 9); mctx.lineTo(R, R + 4); mctx.lineTo(R - 8, R + 9); mctx.closePath(); mctx.fill();
+  }, 250);
   };
   requestAnimationFrame(tick);
   window.SpawnCity = {app, command, hud: () => last, frames: () => frames, tiles};
@@ -217,6 +243,7 @@ class SpawnCityHud {
     this.root = root;
     this.root.innerHTML = `
       <div class="sc-top"><span class="sc-badge"></span><span class="sc-stars"></span><span class="sc-fps"></span></div>
+      <canvas class="sc-map" width="300" height="300"></canvas>
       <div class="sc-toast" hidden></div>
       <div class="sc-offline" hidden>OFFLINE · prozedurale Ersatzstadt (keine echten Kartendaten)</div>
       <div class="sc-cross" hidden></div>

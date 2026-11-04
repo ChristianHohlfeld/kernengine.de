@@ -196,6 +196,9 @@ class Game {
   void blast_remotes(Vec3 at, f32 radius, f32 damage);
   void draw_remote_people();
   void draw_remote_vehicles();
+  // world dressing
+  void update_lamps();
+  std::string map_json();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
@@ -266,6 +269,12 @@ class Game {
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
   u8 my_color_ = 0;
+  // street lamps and night
+  struct Lamp { Vec3 foot; f32 yaw; u32 lane; };
+  std::vector<Lamp> lamps_;
+  std::size_t lamp_lanes_ = 0;  // lanes already given their lamps (the lane list only grows)
+  f32 night_ = 0;
+  bool show_lamps_ = true;
   f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 600, town_clock_ = 0;
   i32 last_stars_ = 0;
   bool player_dead_ = false;

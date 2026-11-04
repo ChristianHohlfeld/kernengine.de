@@ -588,7 +588,14 @@ void Game::drive_traffic(f32 h) {
         }
       }
     }
-    CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, c.target_speed);
+    // Approaching the end of the street (a junction): slow down to turn (SpawnCity aiInput).
+    f32 want_speed = c.target_speed;
+    {
+      const Vec2 end = c.dir > 0 ? L.points.back() : L.points.front();
+      const f32 to_end = std::hypot(end.x - s.position.x, end.y - s.position.y);
+      if (to_end < 18) want_speed = std::fmin(want_speed, 4.5f + to_end * 0.3f);
+    }
+    CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, want_speed);
     const f32 v = std::fmax(0.0f, c.car->forward_speed());
     const f32 gap = 1.6f * v + 6;
     const Vec3 nose = s.position + fwd * (c.car->spec().half.x + 0.2f) + Vec3{0, 0, 0.1f};
@@ -1015,7 +1022,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   update_camera(e, dt);
   e.renderer.camera = cam_;
   world_->set_view(cam_);
-  world_->apply_lighting(cam_.eye);
+  night_ = world_->apply_lighting(cam_.eye);
   world_->present(f.time * 1000.0, cam_.eye);
   draw_vehicles();
   draw_town();
@@ -1420,6 +1427,8 @@ std::string Game::command(const std::string& cmd) {
     }
     return "usage: net host <self> | net join <self> <server> | net stop";
   }
+  if (cmd == "map") return map_json();
+  if (starts("lamps ")) { show_lamps_ = cmd[6] == '1'; return show_lamps_ ? "on" : "off"; }
   if (cmd == "attack") {
     // Tests: one attack with the weapon in hand (as a click).
     const std::size_t before = projectiles_.size();
