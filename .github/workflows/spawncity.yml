@@ -1,0 +1,70 @@
+name: SpawnCity
+
+# SpawnCity on Kern (kern/games/spawncity): build, native tests and the full browser smoke test on
+# GitHub's runners - for the work branches (sc-*, spawncity-*) and on demand. Screenshots of every
+# mode are kept as an artifact. main is covered by ci.yml (native tests + build).
+on:
+  push:
+    branches: ['sc-*', 'spawncity-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spawncity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spawncity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      KERN_OBJ_CACHE: /home/runner/kern-obj
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: wasi-sdk 25 (cached)
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/wasi-sdk
+          key: wasi-sdk-25.0-v2
+      - name: Install wasi-sdk 25
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /home/runner/wasi-sdk
+          curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
+          tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
+      - name: Object cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/kern-obj
+          key: sc-obj-${{ github.sha }}
+          restore-keys: |
+            sc-obj-
+            kern-obj-
+      - name: Native tests (ASan/UBSan)
+        run: CXX=g++ CC=gcc kern/games/spawncity/tests/run_tests.sh
+      - name: Build the game
+        run: |
+          set -euo pipefail
+          export WASI_SDK=/home/runner/wasi-sdk
+          kern/games/spawncity/build.sh
+          node --check kern/games/spawncity/web/host.mjs
+      - name: Playwright + Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Browser smoke test (desktop with map tiles, phone offline)
+        run: node kern/games/spawncity/tests/smoke.mjs generated/spawncity-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spawncity-shots
+          path: generated/spawncity-shots
+          retention-days: 7
