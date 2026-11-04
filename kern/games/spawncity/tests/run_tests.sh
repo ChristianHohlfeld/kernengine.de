@@ -26,7 +26,7 @@ for p in "${pids[@]}"; do wait "$p"; done
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub), then the game's simulation sources (no GameWorld) and the tests.
 sources=()
-for d in core physics geo gfx scene; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
+for d in core physics geo gfx scene audio net; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
 sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
