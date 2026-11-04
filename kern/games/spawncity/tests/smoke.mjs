@@ -263,9 +263,9 @@ async function run({name, url, context, mapped}) {
       check((await hud()).weapon !== w0, `[${name}] the thumb weapon button cycles (${w0} -> ${(await hud()).weapon})`);
       await cmd("weapon 1");  // the Glock (Kern fires it): a tap on the screen shoots
       await gameWait(0.4);
-      const m0 = (await hud()).mag;
+      const m0 = (await hud()).ammo;
       await touchTap(vw * 0.55, vh * 0.35);
-      check((await hud()).mag < m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).mag})`);
+      check((await hud()).ammo < m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).ammo})`);
       const s = await box("strike");
       if (s) await touchTap(s.x + s.width / 2, s.y + s.height / 2);
       check((await ctl()).aiming, `[${name}] STRIKE: aiming`);

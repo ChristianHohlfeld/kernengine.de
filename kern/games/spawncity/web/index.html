@@ -62,6 +62,8 @@
   .sc-help:empty { display: none; }
   .sc-help.faded { opacity: 0; }
   body.pad-input, body.pad-input canvas { cursor: none; }
+  /* touch play: the credits stay readable but never take a thumb's touch from the controls */
+  body.sc-touch-on .sc-attrib { pointer-events: none; font-size: 9px; }
   /* simulator.mjs syncSoloPresentationOrientation: a portrait phone plays a landscape turned by 90 deg
      (logical x = screen y, logical y = screen width - screen x); menus turn with it */
   html.sc-css-landscape body { position: fixed; left: 100vw; top: 0; width: 100vh; width: 100dvh; height: 100vw; transform: rotate(90deg); transform-origin: 0 0; overflow: hidden; }

@@ -33,6 +33,8 @@ constexpr f32 kRad = 180.0f / 3.14159265358979f;
 
 f32 key(const kern::Input& in, Key k) { return in.down(k) ? 1.0f : 0.0f; }
 
+std::string g_last_exit;  // what left the last vehicle (the "controls" state for tests)
+
 const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
   // desktop_controls.mjs WEAPON_NAMES (sniper, fists, knife and GUIDED have none)
   if (m == Mode::drone) return drone == 0 ? "GUN" : drone == 1 ? "MISSILE" : "";
@@ -176,12 +178,12 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   const bool key_e = in.pressed(Key::e), key_f = in.pressed(Key::f);
   if (key_e || key_f || ph(kPadX)) {
     if (on_foot) ctl_enter(key_f && !key_e);
-    else if (mode_ == Mode::car || mode_ == Mode::jet) exit_vehicle();
+    else if (mode_ == Mode::car || mode_ == Mode::jet) { g_last_exit = key_e ? "E" : key_f ? "F" : "pad X"; exit_vehicle(); }
   }
   if (on_foot && pad_touch_.take_pressed("enter")) ctl_enter(false);
   if (on_foot && pad_touch_.take_pressed("jet")) ctl_enter(true);
-  if (mode_ == Mode::car && pad_touch_.take_pressed("enter")) exit_vehicle();
-  if (mode_ == Mode::jet && pad_touch_.take_pressed("eject")) exit_vehicle();  // held 650 ms (touch_play.cpp)
+  if (mode_ == Mode::car && pad_touch_.take_pressed("enter")) { g_last_exit = "touch exit"; exit_vehicle(); }
+  if (mode_ == Mode::jet && pad_touch_.take_pressed("eject")) { g_last_exit = "touch eject"; exit_vehicle(); }  // held 650 ms (touch_play.cpp)
   if (in.pressed(Key::v)) {
     if (on_foot || drone) toggle_drone();
     else if (mode_ == Mode::jet) jet_.toggle_mode();
@@ -189,7 +191,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   if (ph(kPadDown) || pad_touch_.take_pressed("mode")) {
     // the mode button: foot <-> drone; in the car / jet it leaves the vehicle
     if (mode_ == Mode::foot || mode_ == Mode::drone) toggle_drone();
-    else if (mode_ == Mode::car || mode_ == Mode::jet) exit_vehicle();
+    else if (mode_ == Mode::car || mode_ == Mode::jet) { g_last_exit = ph(kPadDown) ? "pad down" : "touch mode"; exit_vehicle(); }
   }
   if (camera) {
     if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; }
@@ -770,6 +772,7 @@ std::string Game::ctl_hud_json() {
                 C.scope_on ? "true" : "false", C.car_zoom, C.look.yaw_deg, C.look.pitch_deg, C.nade.carry, C.nade.cooking ? C.nade.left(C.clock) : -1.0f);
   s += b;
   const bool fade = C.clock - C.hint_at > 12 && !player_dead_;
+  s += "\"lastExit\":\"" + g_last_exit + "\",";
   s += "\"hint\":\"" + C.hint + "\",\"hintFaded\":";
   s += fade ? "true" : "false";
   std::snprintf(b, sizeof b, ",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"head\":[%.3f,%.3f]", sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, head_yaw_, head_pitch_);
@@ -834,12 +837,6 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     // GAME / ANGLE (no key on spawncity.de; kept as a command)
     sticks_.game_mode = !sticks_.game_mode;
     out = sticks_.game_mode ? "game" : "angle";
-    return true;
-  }
-  if (starts("contract")) {
-    combat_.pop = combat_.fun.apply(FunEvent::cycle_contract, world_->sim_time(), wanted_.stars());
-    combat_.pop_at = world_->sim_time();
-    out = "ok";
     return true;
   }
   if (cmd == "controls") {

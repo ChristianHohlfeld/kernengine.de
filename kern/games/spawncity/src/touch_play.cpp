@@ -14,6 +14,7 @@ constexpr f32 kSafe = 10, kGap = 8;  // edge_hud_layout.mjs SAFE / GAP
 std::string esc(const std::string& s) {
   std::string o;
   for (char c : s) {
+    if (static_cast<unsigned char>(c) < 0x20) { o += ' '; continue; }
     if (c == '"' || c == '\\') o += '\\';
     o += c;
   }
@@ -99,7 +100,7 @@ void TouchPlay::layout() {
   place_row(left, std::max(kSafe, Lx + 10), Ly - 8, 1, std::max(kStick, 190.0f));
   if (m == TouchMode::drone) {
     // the altitude pad right of the move stick (simulator.mjs #soloClearance 48 x 132)
-    TouchBtn p = btn("clearance", "▲\nHÖHE\n▼", 48, 132, 0x101820, false);
+    TouchBtn p = btn("clearance", "▲ HÖHE ▼", 48, 132, 0x101820, false);
     p.x = Lx + kStick + 8;
     p.y = h_ - kSafe - p.h;
     pad_x_ = p.x; pad_y_ = p.y; pad_w_ = p.w; pad_h_ = p.h;
