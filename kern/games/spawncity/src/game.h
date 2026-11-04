@@ -15,6 +15,9 @@
 #include "car.h"
 #include "city_stream.h"
 #include "combat_art.h"
+#include "guided.h"
+#include "combat_detail.h"
+#include "combat_audio.h"
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
@@ -233,6 +236,19 @@ class Game {
   void update_debris(f32 dt);
   void draw_military();
   void draw_events();
+  // GUIDED missile with target lock (game_guided.cpp, guided_missile.mjs)
+  bool guided_press();
+  void update_guided(f32 dt);
+  void draw_guided();
+  void guided_hud(std::string& s);
+  bool guided_target_at(const guided::Target& t, Vec3& at) const;
+  // more event / combat details: critical damage, bullet momentum, rule ballots (game_details.cpp)
+  void update_details(f32 dt);
+  void details_hud(std::string& s);
+  bool details_command(const std::string& cmd, std::string& out);
+  // SpawnCity's synthesised combat sounds (combat_audio.cpp) registered as "sc:<kind><n>"
+  void combat_audio_init();
+  const char* combat_sfx(combat_audio::Kind k);
   // world dressing
   void update_lamps();
   std::string map_json();
@@ -321,6 +337,16 @@ class Game {
   PeopleArt people_art_;
   CombatArt combat_art_;
   CombatState combat_;
+  std::vector<guided::Flight> guided_;  // GUIDED missiles in flight (game_guided.cpp)
+  f32 guided_last_ = -99;
+  std::string guided_lock_;
+  // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot
+  std::vector<f32> car_last_hp_, car_burn_seen_;
+  detail::CriticalClock pd_crit_[5], drone_crit_;
+  detail::Vote ballot_;
+  u32 bullet_pushes_ = 0, crit_blasts_ = 0;
+  u32 sfx_cursor_[16] = {};
+  bool combat_audio_ready_ = false;
   RoadGraph roads_;
   std::vector<PoliceUnit> units_;
   PoliceDrone pdrones_[5];

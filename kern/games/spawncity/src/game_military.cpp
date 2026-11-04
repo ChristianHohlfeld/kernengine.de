@@ -76,7 +76,7 @@ bool Game::combat_shot(kern::game::ShotEvent& s) {
       s.to = s.from + seg * t;
       s.surface = 2;
       h.hp -= kMilHit;  // military_response.mjs hit(): HIT 25
-      if (h.hp <= 0) { h.state = Heli::State::down; h.v.z = std::fmin(h.v.z, 2.0f); world_->play_sound("builtin:explosion", h.p, 0.8f, 0.8f, true); }
+      if (h.hp <= 0) { h.state = Heli::State::down; h.v.z = std::fmin(h.v.z, 2.0f); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), h.p, 0.8f, 0.8f, true); }
       return true;
     }
   for (Tank& k : combat_.tanks)
@@ -359,7 +359,7 @@ void Game::step_tank(Tank& k, f32 dt) {
                    std::fmax(city_.ground_height(tp.x, tp.y), tp.z - 1.2f)};
     combat_.shells.push_back({muzzle, kern::normalize(aim - muzzle) * 130.0f, 3});
     world_->particle_burst(muzzle, {1.6f, 1.2f, 0.7f});
-    world_->play_sound("builtin:explosion", muzzle, 0.9f, 1.35f, true);
+    world_->play_sound(combat_sfx(combat_audio::Kind::explosion), muzzle, 0.9f, 1.35f, true);
   }
   if (k.leaving && d > 300 && spawn_unseen(k.p, 2)) k.dead = true;
 }

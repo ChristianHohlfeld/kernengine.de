@@ -310,7 +310,19 @@ async function run({name, url, context, mapped}) {
   await shot("2-drone");
   check(await cmd("cam") === "third" && await cmd("cam") === "fpv", `[${name}] drone cameras follow -> third -> FPV`);
   await shot("2b-drone-fpv");
+  // GUIDED (guided_missile.mjs): a press launches, a second one within 5 s is refused.
+  const g1 = await cmd("guided");
+  check(g1.startsWith("launched"), `[${name}] GUIDED missile launched (${g1})`);
+  check(await cmd("guided") === "denied" && (await hud()).guided?.cd > 3, `[${name}] GUIDED reloads 5 s (${JSON.stringify((await hud()).guided)})`);
+  {
+    const tg = (await hud()).t, booms = (await hud()).explosions;
+    await page.waitForFunction(([t, b]) => { const h = window.SpawnCity.hud(); return h.explosions > b || h.t > t + 25; }, [tg, booms], {timeout: 400000}).catch(() => {});
+    check((await hud()).explosions > booms && (await hud()).guided.flying === 0, `[${name}] the GUIDED missile went off`);
+  }
+  // critical_damage_logic.mjs: the drone at 28 % smokes and blows 2.05 s later.
+  check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
+  check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
