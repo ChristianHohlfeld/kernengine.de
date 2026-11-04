@@ -116,7 +116,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       return true;
     }
   }
-  if ((by_player && hit_remotes(from, to, damage)) || people_.shot(from, to, damage, by_player, now) >= 0) {
+  if ((by_player && hit_remotes(from, to, damage)) || people_.shot(from, to, damage, by_player, now) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
     out.to = to;
     out.surface = 3;
     out.impact = true;
@@ -243,7 +243,8 @@ void Game::foot_attack(bool trigger, bool pressed) {
       if (!pressed) return;  // one blow per click
       next_attack_ = now + s.interval_ms / 1000;
       Vec3 to = eye + dir * (s.range_m + 0.4f);
-      const i32 hit = people_.shot(eye, to, s.damage, true, now);
+      i32 hit = people_.shot(eye, to, s.damage, true, now);
+      if (hit < 0 && life_punch(eye, to)) hit = 0;  // animals (M3 life)
       world_->play_sound(hit >= 0 ? combat_sfx(combat_audio::Kind::hit) : "builtin:click", eye + dir, 0.7f, foot_weapon_ == Id::knife ? 1.3f : 0.8f, true);
       return;
     }

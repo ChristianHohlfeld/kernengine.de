@@ -38,6 +38,7 @@ class Interiors {
     bool has_core = false, roof_access = false;
     Core core;
     kern::MeshData mesh;         // everything visible inside (vertex colours)
+    kern::MeshData glass;        // the window panes (one transparent mesh)
     std::vector<Vec3> points;    // collision triangles
     std::vector<u32> indices;
     std::vector<Vec3> lamps;     // ceiling light panels
@@ -71,7 +72,7 @@ class Interiors {
   u64 tile_ = 0;
   u32 index_ = 0;
   Plan plan_;
-  u32 mesh_id_ = 0;
+  u32 mesh_id_ = 0, glass_id_ = 0;
   kern::physics::Body body_;
   std::vector<f32> door_angle_;
   struct Closed { Vec3 at; f32 yaw; };

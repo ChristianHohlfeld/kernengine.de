@@ -397,11 +397,21 @@ kern/games/spawncity/
   uhrgetriebenen Pfad (alle 24 s ein neuer Fleck im Umkreis von 6 m um den eigenen Platz, 0,55 m/s, Kopf
   unten), muhen ab und zu, scheuen vor Schüssen (Leuchtspur nahe der Herde) und Explosionen. Ein Treffer
   tut weh (100 HP), ein langsames Auto schiebt sie beiseite, ab 8 m/s oder in einer Explosion stirbt sie:
-  der 600-kg-Körper fliegt als Box3D-Quader (Auto verliert den übergebenen Impuls).
+  der 600-kg-Körper fliegt als Box3D-Quader (Auto verliert den übergebenen Impuls). Der Weidepfad läuft
+  auf der Weltuhr (wie `Date.now()` in SpawnCity): auf allen Rechnern grasen dieselben Kühe am selben Ort,
+  und der Tod einer Kuh geht an die Mitspieler (Fx `cow_death`), die dieselbe Kuh fallen lassen.
 * **Tauben** (`pigeons.mjs`): 5 Schwärme (mobil 3) zu 6–12 Vögeln 22–95 m um den Spieler auf freiem
   Boden (nicht in Häusern oder Wasser, Box3D-Strahl); sie picken und nicken, gurren, und fliegen
   gemeinsam auf, wenn man auf 6,6 m herankommt, ein Auto vorbeifährt, ein Schuss (40 m) oder Knall (90 m)
   fällt oder von selbst (25–70 s): Schleifen, dann Gleitflug auf einen neuen Platz 25–55 m weiter.
+* **Hunde und Katzen** (`world_procedural_population.mjs`, `animal_audio.mjs`): 20 Tiere (mobil 12) auf
+  Kreisbahnen (13–58 m, eigenes Tempo, Schlenker) um den Ankerpunkt des Viertels (neu verankert nach 2,5 km),
+  jedes dritte eine Katze, sonst Hunde (Fellfarben aus SpawnCity). Alle zwei Minuten (Weltuhr) ist Tier #1
+  die **schwarze Katze**: wer sie anschießt, den greift sie an – faucht und jault, rennt mit 11 m/s heran,
+  springt bei 1,6 m und tötet den Spieler, dann schlendert sie davon (1,3 m/s). Die anderen sterben an
+  Schuss, Explosion oder Auto (rollen als Box3D-Quader auf die Seite, nach 7 s weg, nach 25 s kommt ein
+  neues), Fäuste brauchen drei Schläge (Hund) bzw. zwei (Katze). Jaulen, Miauen, Fauchen, Kreischen als
+  Synth-Patches. WELT-Schalter `world.dogs` / `world.cats`.
 * **Vögel und Bäume** (`world_liveliness.mjs`): 16 Vögel (mobil 10) kreisen 8–21 m über den Dächern
   (abschießbar: fallen trudelnd, 9 s weg, Kreischen aus `animal_audio.mjs`), Bäume alle 37 m an den
   Straßen, mindestens 2,4 m von Wänden.
@@ -420,19 +430,27 @@ kern/games/spawncity/
   Reibungsmotor; Box3D selbst unverändert), Pool 10 (mobil 6). Von einem Auto angefahren, wer noch lebt,
   steht wieder auf („Reverse Ragdoll“: Liegen, Knien, Stehen in 1,15 s) und geht von dort weiter; der
   Wagen verliert den Impuls (75 kg · 0,55). Explosionen stoßen liegende Körper weg.
+* **Stöße zwischen Spielern** (`player_push.mjs`): ein Stoß gegen einen Mitspieler geht als Fx `push`
+  (Geschwindigkeitsänderung, Schaden, Ziel-Slot) an dessen Rechner, der ihn auf sich selbst anwendet
+  (höchstens 40 m/s); heute lösen ihn Explosionen in der Nähe eines Mitspielers aus.
 * **Innenräume** (`building_interiors.mjs`): das nächste Gebäude im Umkreis von 30 m wird begehbar
-  (eines zur Zeit): Haustür(en) an der längsten Wand (über 260 m² eine zweite gegenüber), Erdgeschoss
-  4 m, darüber die Stockwerkshöhe (3,0–3,6 m, höchstens 12), ein Treppenhaus mit Wendeltreppe
+  (eines zur Zeit): Haustür(en) an der längsten Wand (über 260 m² eine zweite gegenüber), das Erdgeschoss
+  und alle Stockwerke in der Höhe der Fassadenfenster (Kerns Gebäudenetz: 3,1–3,6 m je Haus, höchstens 12),
+  ein Treppenhaus mit Wendeltreppe
   (2 × 1,2-m-Läufe, Podeste 1,3 m) bis aufs Dach mit Treppenhaus-Aufbau, Fensteröffnungen, Deckenlicht,
-  Möbel (Schreibtisch, Bett, Regal, Sofa, Tisch, Pflanze, mit Kollision). Die Kollision bringt das
+  Möbel mit Kollision (Empfang in der Lobby, Schreibtisch, Bett, Regal, Sofa, Sessel mit Stehlampe,
+  Esstisch mit Stühlen, Küchenzeile, Tisch, Pflanze; Klimageräte auf dem Dach). Die Fensteröffnungen
+  sitzen genau dort, wo die Fassade ihre Fenster zeichnet (alle 3 m ab Kantenanfang, 22–78 % der Spalte,
+  28–78 % des Stockwerks), mit leicht getönten Glasscheiben (ein transparentes Netz). Die Kollision bringt das
   Gebäude selbst mit; `CityStream::exclude_building` baut solange die Kachel-Kollision ohne dieses Haus
   neu (in Zeitscheiben, der alte Körper bleibt bis der neue fertig ist). Nahe Häuser zeigen geschlossene
   Türen (24 im Umkreis von 95 m). Die Fassade ist von innen nicht gezeichnet (Rückseiten), deshalb zeigen
   die Fensteröffnungen die Stadt; die offene Tür zeigt von außen ein dunkles Türblatt statt eines echten
   Ausschnitts (das Hausnetz ist ein gemeinsames Kachelnetz).
-* **WELT-Schalter:** `world.people` schaltet auch die Laufgruppe ab, `world.birds` Tauben und Vögel.
+* **WELT-Schalter:** `world.people` schaltet auch die Laufgruppe ab, `world.birds` Tauben und Vögel,
+  `world.dogs`/`world.cats` die Hunde und Katzen.
 * **Testbefehle:** `life`, `cows`, `cows kill`, `pigeons`, `pigeons spook`, `joggers`, `birds`, `ragdoll`,
-  `ragdoll state`, `knock` (nächster Passant wird umgestoßen und steht wieder auf), `shout`, `honk`,
+  `ragdoll state`, `pets`, `pets kill`, `cat` (die schwarze Katze greift an), `knock` (nächster Passant wird umgestoßen und steht wieder auf), `shout`, `honk`,
   `interior`, `interior go|in|up|roof|door`.
 
 ## Menüs, Einstellungen, Ausstattung (Meilenstein 3)
@@ -584,14 +602,12 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Fahrer, die beim Carjacking sichtbar aussteigen. Hunde und Katzen (`world.dogs`/`world.cats`, die
-  schwarze Katze mit `hiss`/`yowl` aus `animal_audio.mjs`) sind noch nicht gebaut.
-* Leben (M3): Kuhherden und Laufgruppe folgen der Spielzeit, nicht SpawnCitys Weltuhr, und Tode werden
-  nicht an Mitspieler geschickt (SpawnCity repliziert Kuh-Tode und Autotreffer); `player_push.mjs`
-  (Stoßen/Halten von Mitspielern über das Netz) braucht die Gravity-Gun, die Kern-SpawnCity nicht hat.
-* Innenräume: keine echten Ausschnitte in der Fassade (Tür, Dachluke) – Kerns Gebäudenetz ist ein Netz
-  je Kachel; Fenster innen sind an festen Abständen statt an den Fassadenfenstern; keine Glasscheiben,
-  keine Zombie-Barrikaden. Steht das Gelände innen höher als die Tür, liegt der Boden darunter.
+* Fahrer, die beim Carjacking sichtbar aussteigen.
+* Innenräume: die offene Tür und die Dachluke sind von außen kein echter Ausschnitt im Fassadennetz
+  (Kerns Gebäudenetz ist ein Netz je Kachel, SpawnCity schneidet per Shader-Uniform `facadeCutouts`) –
+  ein dunkles Türblatt steht davor; braucht Engine-Punkt 13. Das „Halten“ aus `player_push.mjs` gehört
+  zur Gravity-Gun (eigener Bereich); der Netzweg dafür (Fx `push`) ist da. Autotreffer an Passanten
+  werden nicht verschickt, weil Passanten auf Kern lokal sind (siehe Mehrspieler).
 * **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
   sperrt die Drohnen-Nuke (nur GUN/ROCKETS/GUIDED), der Kommentar „LAUNCHER NUKE“ in
   `gameplay_final_runtime_v2.mjs` hat keinen Code-Zweig mehr (`footShotAt` feuert normale Raketen),

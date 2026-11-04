@@ -282,6 +282,8 @@ void Game::update_net(f32 dt) {
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
+      case net::Fx::cow_death:
+      case net::Fx::push: life_net_fx(f); break;  // M3 life (game_life.cpp)
       default: break;
     }
   }

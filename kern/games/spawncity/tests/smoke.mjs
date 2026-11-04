@@ -260,6 +260,8 @@ async function run({name, url, context, mapped}) {
   {
     check(JSON.parse(await cmd("cows")).cows >= 5, `[${name}] a herd of cows`);
     check(JSON.parse(await cmd("pigeons")).flocks >= 1, `[${name}] a pigeon flock`);
+    const pets = JSON.parse(await cmd("pets"));
+    check(pets.pets >= 12 && pets.cats >= 4, `[${name}] dogs and cats (${JSON.stringify(pets)})`);
     check(JSON.parse(await cmd("ragdoll")).ok, `[${name}] a ragdoll is thrown`);
     const knocked = await cmd("knock");
     const tl = (await hud()).t;

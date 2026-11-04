@@ -64,7 +64,9 @@ struct PlayerState {
 
 /// An effect another player sees (vs_multiplayer.mjs fx: shot, explosion, impact).
 struct Fx {
-  enum Kind : u8 { shot, explosion, impact, rocket };
+  // cow_death: p where, dir impulse / 600 kg (cows.mjs sendDeath); push: p the velocity change,
+  // dir.x the target's slot, a damage (player_push.mjs) - M3 life
+  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push };
   u8 kind = shot, owner = 0;
   Vec3 p, dir;
   f32 a = 0;              // shot: speed; explosion: radius

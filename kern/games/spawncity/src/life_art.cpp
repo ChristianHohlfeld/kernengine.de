@@ -123,6 +123,34 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
     const f32 flap = now < b.dying_until ? 0.2f : (b.flap - 0.82f) * 3;
     for (f32 sd : {-1.0f, 1.0f}) box(M * rot({1, 0, 0}, sd * flap) * at({-0.08f, sd * 0.42f, 0}) * sc3({0.32f, 0.78f, 0.03f}), col);
   }
+  // dogs and cats (world_procedural_population.mjs quadrupedBody/Head/Leg, gait, the black cat)
+  for (std::size_t i = 0; i < life.pets().size(); ++i) {
+    const Life::Pet& p = life.pets()[i];
+    if (!p.shown || !near(p.pos)) continue;
+    const bool dead = p.dead_at >= 0;
+    if (dead && now - p.dead_at > 7) continue;
+    const bool dog = life.species(static_cast<u32>(i), life.epoch()) == Life::Species::dog;
+    const f32 sc = dog ? p.scale : p.scale * 0.62f;
+    Mat4 M = dead ? Mat4::trs(p.pos, p.rot, {sc, sc, sc}) * at({0, 0, -0.27f}) : at(p.pos) * rot({0, 0, 1}, p.yaw) * sc3({sc, sc, sc});
+    const Life::CatAttack& cat = life.cat_attack();
+    if (!dead && i == 1 && cat.on && cat.phase == 1) M = M * rot({0, 1, 0}, -0.5f);
+    const f32 bob = dead ? 0 : std::fabs(std::sin(p.gait * kPi * 2)) * std::fmin(0.03f, p.speed * 0.01f);
+    const f32 torso = 0.25f + 0.11f + bob;  // the box over the ground (.25) + ANIMAL_TORSO_UP
+    box(M * at({0, 0, torso}) * sc3({0.66f, 0.26f, 0.27f}), p.color);
+    box(M * at({-0.44f, 0, torso + 0.1f}) * rot({0, 1, 0}, -0.6f) * sc3({0.3f, 0.055f, 0.055f}), p.color);  // tail
+    box(M * at({0.3f, 0, torso + 0.12f}) * rot({0, 1, 0}, 0.5f) * sc3({0.16f, 0.16f, 0.2f}), p.color);    // neck
+    const Mat4 H = M * at({0.43f, 0, torso + 0.16f});
+    ball(H * sc3({0.3f, 0.3f, 0.3f}), p.color);
+    box(H * at({0.13f, 0, -0.04f}) * sc3({0.15f, 0.1f, 0.09f}), p.color);
+    for (f32 s : {-1.0f, 1.0f}) box(H * at({-0.02f, s * 0.08f, 0.14f}) * sc3({0.06f, 0.05f, 0.11f}), p.color);  // ears
+    const f32 amp = dead ? 0 : std::fmin(0.7f, p.speed * 0.35f);
+    const f32 offs[4] = {0.25f, 0.75f, 0, 0.5f};
+    const f32 hips[4][2] = {{0.24f, 0.09f}, {0.24f, -0.09f}, {-0.24f, 0.09f}, {-0.24f, -0.09f}};
+    for (int k = 0; k < 4; ++k) {
+      const f32 sw = dead ? 0.35f * (k < 2 ? 1 : -1) : amp * std::sin((p.gait + offs[k]) * kPi * 2);
+      box(M * at({hips[k][0], hips[k][1], torso - 0.1f}) * rot({0, 1, 0}, sw) * at({0, 0, -0.135f}) * sc3({0.075f, 0.075f, 0.27f}), p.color);
+    }
+  }
   // trees: trunk 2.3 m and a crown
   for (const Life::Tree& t : life.trees()) {
     if (!near(t.foot)) continue;

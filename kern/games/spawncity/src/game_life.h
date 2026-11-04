@@ -19,7 +19,7 @@ struct GameLife {
   LifeOut out;
   Interiors interiors;
   bool ready = false, art_ready = false, sounds_ready = false;
-  kern::audio::ClipId clips[16] = {};
+  kern::audio::ClipId clips[static_cast<u32>(LifeOut::Sound::kCount)] = {};
   // speech for the page (browser speech synthesis), handed out once by the HUD
   std::vector<LifeOut::Say> speech;
   std::string banner;

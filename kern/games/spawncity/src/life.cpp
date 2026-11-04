@@ -81,6 +81,18 @@ f32 Life::ring_area(const std::vector<Vec2>& r) {
 void Life::init(kern::physics::World& w, bool mobile) {
   world_ = &w;
   mobile_ = mobile;
+  // world_procedural_population.mjs AMBIENT_ANIMAL_COUNT, their circling paths and sizes
+  pets_.assign(mobile ? 12 : 20, {});
+  for (u32 i = 0; i < pets_.size(); ++i) {
+    Pet& p = pets_[i];
+    const u64 h = mix(0xa11a, i);
+    p.radius = 13 + 45 * hash01(h + 1);
+    p.omega = (0.55f + 0.9f * hash01(h + 2)) / p.radius;
+    p.phase = hash01(h + 3) * 2 * kPi;
+    p.wobble_omega = 0.12f + 0.18f * hash01(h + 4);
+    p.wobble_r = 1.2f + 2.3f * hash01(h + 5);
+    p.scale = 0.72f + 0.46f * hash01(h + 6);
+  }
   ragdolls_.init(w, mobile);
   // world_liveliness.mjs BIRD_COUNT
   const u32 n = mobile ? 10 : 16;
@@ -89,6 +101,14 @@ void Life::init(kern::physics::World& w, bool mobile) {
 }
 
 void Life::clear() {
+  for (Pet& p : pets_) {
+    if (p.body.valid() && world_ && world_->body_valid(p.body)) world_->destroy_body(p.body);
+    p.body = {};
+    p.dead_at = -1;
+    p.shown = false;
+  }
+  cat_ = {};
+  pet_anchor_ = {1e9f, 1e9f};
   for (Cow& c : cows_)
     if (c.body.valid() && world_ && world_->body_valid(c.body)) world_->destroy_body(c.body);
   cows_.clear();
@@ -111,6 +131,7 @@ void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out)
   update_pigeons(dt, now, view, rng, out);
   update_birds(dt, now, view);
   update_trees(view);
+  update_pets(dt, now, view, out);
   update_joggers(dt, now, view, rng, out);
   update_voices(dt, now, view, out);
   ragdolls_.update(dt, now);
@@ -240,6 +261,7 @@ void Life::kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out) {
   c.dead = true;
   c.hp = 0;
   dead_cows_.push_back(c.key);
+  out.cow_deaths.push_back({c.pos, impulse});
   out.sounds.push_back({LifeOut::Sound::moo_pain, c.pos + Vec3{0, 0, 1.4f}, 1, 1.4f});
   // The 600 kg body thrown as a Box3D rigid body (cows.mjs kill: halfExtents .82/.34/.38).
   ph::BodySettings bs;
@@ -279,10 +301,12 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       }
       continue;
     }
-    const i64 k = static_cast<i64>(std::floor(now / kPeriod));
+    // the clock-driven grazing walk on the wall clock: the same on every machine (cows.mjs pathPose)
+    const f64 clock = view.epoch > 0 ? view.epoch : now;
+    const i64 k = static_cast<i64>(std::floor(clock / kPeriod));
     const Vec2 A = graze_spot(c, k), B = graze_spot(c, k + 1), d = B - A;
     const f32 len = std::hypot(d.x, d.y), walk = std::fmin(kPeriod * 0.75f, len / kWalk);
-    const f32 u = std::fmin(1.0f, (now - static_cast<f32>(k) * kPeriod) / std::fmax(0.001f, walk));
+    const f32 u = std::fmin(1.0f, static_cast<f32>(clock - static_cast<f64>(k) * kPeriod) / std::fmax(0.001f, walk));
     const Vec2 base = A + d * u;
     const bool running = now < c.flee_until;
     if (running) c.off = c.off + c.flee_v * dt;
@@ -528,6 +552,164 @@ void Life::update_trees(const LifeView& view) {
   }
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// dogs and cats (world_procedural_population.mjs): 20 (mobile 12) wander on circling paths round
+// the neighbourhood's anchor; every third is a cat, the rest dogs; every other two minutes #1 is
+// the BLACK CAT - shoot it and it charges at 11 m/s, leaps at 1.6 m and that is the end of you,
+// then it saunters off. A shot, a blast or a car kills the others (the body rolls over as a
+// Box3D box, gone after 25 s); fists take three blows for a dog, two for a cat.
+
+namespace {
+const u32 kDogColors[5] = {0x8a6a4a, 0xc49a5a, 0x3b2c22, 0xe8dcc8, 0x6e5a46}, kCatColors[4] = {0x8d8d8d, 0xd88a3a, 0x5b5048, 0xe9e2d6};
+constexpr f32 kPetTorso = 0.11f;
+}  // namespace
+
+Life::Species Life::species(u32 i, f64 epoch) const {
+  if (i == 1 && (static_cast<i64>(std::floor(epoch / 120)) % 2 == 0 || cat_.on)) return Species::black_cat;
+  return i % 3 == 2 ? Species::cat : Species::dog;
+}
+
+bool Life::provoke_cat(f32 now) {
+  if (pets_.size() < 2 || !pets_[1].shown || cat_.on) return false;
+  cat_ = {};
+  cat_.on = true;
+  cat_.p = pets_[1].pos;
+  cat_.yaw = pets_[1].yaw;
+  cat_.start = now;
+  return true;
+}
+
+void Life::kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out) {
+  Pet& p = pets_[i];
+  if (p.dead_at >= 0) return;
+  const Species sp = species(i, epoch_);
+  p.dead_at = now;
+  out.sounds.push_back({sp == Species::dog ? LifeOut::Sound::dog : LifeOut::Sound::cat, p.pos, 0.8f, 1});
+  // the legs give way and the body rolls over onto its side, away from the shot (collapseAnimal)
+  const f32 sc = sp == Species::dog ? p.scale : p.scale * 0.62f;
+  const Vec3 half = Vec3{0.33f, 0.13f, 0.27f} * sc;
+  const f32 mass = (sp == Species::dog ? 22.0f : 4.0f) * sc * sc * sc;
+  ph::BodySettings bs;
+  bs.type = ph::BodyType::dynamic;
+  bs.position = {p.pos.x, p.pos.y, p.pos.z + half.z};
+  bs.rotation = yaw_quat(p.yaw);
+  bs.linear_damping = 0.9f;
+  bs.angular_damping = 2.5f;
+  p.body = world_->create_body(bs);
+  ph::ShapeSettings ss;
+  ss.kind = ph::ShapeKind::box;
+  ss.size = half * 2.0f;
+  ss.material.density = mass / (8 * half.x * half.y * half.z);
+  ss.material.friction = 0.7f;
+  ss.material.category_bits = kCatWorld;
+  world_->create_shape(p.body, ss);
+  const Vec3 f{std::cos(p.yaw), std::sin(p.yaw), 0};
+  const f32 side = dir.x * -f.y + dir.y * f.x >= 0 ? 1.0f : -1.0f;
+  const f32 w = 2 * half.y, h = 2 * half.z, I = mass * (w * w + h * h) / 3;
+  world_->apply_angular_impulse(p.body, f * (I * 5 * side));
+  world_->apply_linear_impulse_to_center(p.body, Vec3{dir.x, dir.y, std::fmax(0.0f, dir.z)} * mass);
+}
+
+void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
+  epoch_ = view.epoch;
+  // the anchor: the neighbourhood (re-anchored when the player is 2.5 km away, REANCHOR_M)
+  const Vec2 me{view.focus.x, view.focus.y};
+  if (dist2d(pet_anchor_, me) > 2500) {
+    pet_anchor_ = {std::round(me.x / 100) * 100, std::round(me.y / 100) * 100};
+    for (Pet& p : pets_) { p.shown = false; p.has_pose = false; }
+  }
+  const f32 t = static_cast<f32>(std::fmod(view.epoch, 86400.0 * 4));
+  // the black cat's charge (updateCatAttack)
+  if (cat_.on) {
+    if (!view.cats_on) cat_.on = false;
+    const Vec3 head = view.head;
+    const f32 dx = head.x - cat_.p.x, dy = head.y - cat_.p.y, d = std::hypot(dx, dy);
+    if (cat_.phase == 2) {
+      cat_.p = cat_.p + Vec3{std::cos(cat_.away_yaw), std::sin(cat_.away_yaw), 0} * (1.3f * dt);
+      cat_.yaw = cat_.away_yaw;
+      cat_.p.z = ground(view, cat_.p.x, cat_.p.y);
+      if (d > 28 || now - cat_.leave_at > 20) cat_.on = false;
+    } else if (!view.on_foot) {
+      cat_.on = false;
+    } else {
+      cat_.yaw = std::atan2(dy, dx);
+      if (cat_.phase == 0) {
+        if (now - cat_.last_cry > 0.78f) { cat_.last_cry = now; ++cat_.cries; out.sounds.push_back({cat_.cries % 2 ? LifeOut::Sound::yowl : LifeOut::Sound::hiss, cat_.p, 1, 1}); }
+        const f32 step = std::fmin(d, 11 * dt);
+        cat_.p.x += dx / std::fmax(1e-3f, d) * step;
+        cat_.p.y += dy / std::fmax(1e-3f, d) * step;
+        cat_.p.z = ground(view, cat_.p.x, cat_.p.y) + std::fabs(std::sin(now / 0.055f)) * 0.12f;
+        if (d < 1.6f) { cat_.phase = 1; cat_.leap_at = now; cat_.from = cat_.p; out.sounds.push_back({LifeOut::Sound::screech, cat_.p, 1, 1}); }
+        if (now - cat_.start > 25) cat_.on = false;
+      } else {
+        const f32 k = std::fmin(1.0f, (now - cat_.leap_at) / 0.34f);
+        cat_.p.x = cat_.from.x + (head.x - cat_.from.x) * k;
+        cat_.p.y = cat_.from.y + (head.y - cat_.from.y) * k;
+        cat_.p.z = std::fmax(ground(view, cat_.p.x, cat_.p.y) + 0.18f, cat_.from.z + (head.z - 0.05f - cat_.from.z) * k + std::sin(k * kPi) * 0.55f);
+        if (k >= 1) {
+          out.kill_player = true;
+          cat_.phase = 2;
+          cat_.leave_at = now;
+          cat_.away_yaw = cat_.yaw + kPi + (hash01(static_cast<u64>(now * 1000)) - 0.5f) * 0.8f;
+        }
+      }
+    }
+  }
+  for (u32 i = 0; i < pets_.size(); ++i) {
+    Pet& p = pets_[i];
+    const Species sp = species(i, view.epoch);
+    const bool allowed = sp == Species::dog ? view.dogs_on : view.cats_on;
+    const u32 seed = static_cast<u32>(hash01(mix(0xc010, i)) * 1000);
+    p.color = sp == Species::black_cat ? rgb(0x0d0d0f) : sp == Species::cat ? rgb(kCatColors[seed % 4]) : rgb(kDogColors[seed % 5]);
+    auto drop = [&]() {
+      if (p.body.valid() && world_->body_valid(p.body)) world_->destroy_body(p.body);
+      p.body = {};
+    };
+    if (!allowed) { drop(); p.shown = false; p.dead_at = -1; continue; }
+    if (p.dead_at >= 0) {
+      // a dead animal is gone after a while (25 s); another wanders in later
+      if (now - p.dead_at > 25) { drop(); p.dead_at = -1; p.shown = false; p.has_pose = false; continue; }
+      if (p.body.valid() && world_->body_valid(p.body)) { const ph::Pose q = world_->pose(p.body); p.pos = q.position; p.rot = q.rotation; }
+      continue;
+    }
+    if (cat_.on && i == 1) {
+      const f32 cs = cat_.phase == 2 ? 1.3f : 11;
+      p.pos = cat_.p;
+      p.yaw = cat_.yaw;
+      p.speed = cs;
+      p.gait += cs * dt / 0.4f;
+      p.shown = true;
+      continue;
+    }
+    const f32 a = p.phase + p.omega * t;
+    const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r;
+    const Vec2 last{p.pos.x, p.pos.y};
+    if (p.has_pose && dist2d(q, last) > 1e-4f) p.yaw = std::atan2(q.y - last.y, q.x - last.x);
+    p.speed = p.has_pose && dt > 0 ? dist2d(q, last) / dt : 0;
+    if (p.speed > 6) p.speed = 0;  // re-anchored
+    p.pos = {q.x, q.y, ground(view, q.x, q.y)};
+    p.gait += p.speed * dt / (0.55f * p.scale);
+    p.has_pose = true;
+    // in a building or the water: not there (the path goes on, it reappears outside)
+    p.shown = !blocked(view, q);
+    if (!p.shown) continue;
+    // cars (a blow that changes its velocity this hard kills it)
+    for (const LifeCar& c : view.cars) {
+      if (c.airborne) continue;
+      const f32 sp2 = std::hypot(c.velocity.x, c.velocity.y);
+      if (sp2 < 3) continue;
+      const Vec3 l = to_local(c.rotation, p.pos - c.position);
+      if (std::fabs(l.x) < c.half.x + 0.3f && std::fabs(l.y) < c.half.y + 0.25f && std::fabs(l.z) < 2) {
+        if (sp == Species::black_cat) continue;  // it jumps aside
+        kill_pet(i, Vec3{c.velocity.x, c.velocity.y, 0} * 0.9f + Vec3{0, 0, 2.5f}, now, out);
+        break;
+      }
+    }
+  }
+  (void)kPetTorso;
+}
+
 // ---------------------------------------------------------------------------------------------
 // the running club (jogger_chain.mjs)
 
@@ -705,7 +887,7 @@ void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
 // ---------------------------------------------------------------------------------------------
 // hits
 
-bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out) {
+bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool melee) {
   f32 best = 2;
   i32 kind = -1, which = -1;
   // cows: the body as an oriented box
@@ -743,6 +925,13 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out) {
         if (t >= 0 && t < best) { best = t; kind = 2; which = static_cast<i32>(i); }
       }
     }
+  for (std::size_t i = 0; i < pets_.size(); ++i) {
+    const Pet& p = pets_[i];
+    if (!p.shown || p.dead_at >= 0) continue;
+    const f32 sc = species(static_cast<u32>(i), epoch_) == Species::dog ? p.scale : p.scale * 0.62f;
+    const f32 t = seg_sphere(from, to, p.pos + Vec3{0, 0, 0.38f * sc}, 0.34f * sc);
+    if (t >= 0 && t < best) { best = t; kind = 3; which = static_cast<i32>(i); }
+  }
   if (kind < 0) return false;
   to = from + (to - from) * best;
   Vec3 dir = to - from;
@@ -754,13 +943,14 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out) {
     c.last_hit = now;
     ++cow_hits_;
     out.sounds.push_back({LifeOut::Sound::thud, to, 0.5f, 1});
+    if (melee) damage = 6;  // cows.mjs: a fist does 6
     c.hp -= damage;
     if (c.hp <= 0) {
       const f32 k = std::fmin(4.0f, 1 + damage / 120);
       kill_cow(c, {dir.x * kCowMass * k, dir.y * kCowMass * k, kCowMass * 1.2f}, now, out);
     } else {
       // a hit rocks the 600 kg animal a step aside, then it bolts
-      c.off = c.off + Vec2{dir.x, dir.y} * 0.12f;
+      c.off = c.off + Vec2{dir.x, dir.y} * (melee ? 0.35f : 0.12f);
       c.flinch_at = now;
       scare_cow(c, {c.pos.x - dir.x * 3, c.pos.y - dir.y * 3}, now, 5.5f);
       out.sounds.push_back({LifeOut::Sound::moo_pain, c.pos + Vec3{0, 0, 1.4f}, 0.9f, 1.45f});
@@ -774,10 +964,33 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out) {
     b.spin = 4 + hash01(mix(b.seed, static_cast<u64>(now * 100))) * 4;
     out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.8f, 1});
     out.bursts.push_back({b.pos, {0.8f, 0.75f, 0.66f}});
-  } else {
+  } else if (kind == 2) {
     kill_runner(which, {dir.x * 2.5f, dir.y * 2.5f, 1.4f}, now, out);
+  } else {
+    const u32 i = static_cast<u32>(which);
+    const Species sp = species(i, epoch_);
+    if (sp == Species::black_cat) {
+      // shoot the black cat and it charges (world_procedural_population.mjs killAnimal)
+      if (!cat_.on && provoke_cat(now)) out.sounds.push_back({LifeOut::Sound::hiss, pets_[i].pos, 1, 1});
+    } else if (melee) {
+      Pet& p = pets_[i];
+      out.sounds.push_back({sp == Species::cat ? LifeOut::Sound::cat : LifeOut::Sound::dog, p.pos, 0.8f, 1});
+      if (++p.punches >= (sp == Species::cat ? 2 : 3)) { p.punches = 0; kill_pet(i, dir * 3.0f, now, out); }
+    } else {
+      kill_pet(i, dir * 4.0f, now, out);
+    }
   }
   return true;
+}
+
+void Life::remote_cow_death(Vec3 at, Vec3 impulse, f32 now, LifeOut& out) {
+  Cow* best = nullptr;
+  f32 bd = 4;
+  for (Cow& c : cows_)
+    if (!c.dead && dist2d(c.pos, at) < bd) { bd = dist2d(c.pos, at); best = &c; }
+  if (!best) return;
+  kill_cow(*best, impulse, now, out);
+  out.cow_deaths.pop_back();  // not sent back
 }
 
 void Life::heard_shot(Vec3 from, Vec3 to, f32 now) {
@@ -822,6 +1035,13 @@ void Life::blast(Vec3 at, f32 radius, f32 now, LifeOut& out) {
     b.dead_until = now + 9;
     b.fall_v = (b.pos - at) * 0.5f;
     b.spin = 6;
+  }
+  for (u32 i = 0; i < pets_.size(); ++i) {
+    Pet& p = pets_[i];
+    if (!p.shown || p.dead_at >= 0 || (cat_.on && i == 1)) continue;
+    const Vec3 d = p.pos - at;
+    const f32 dist = kern::length(d);
+    if (dist < r) kill_pet(i, (dist > 0.1f ? d * (1 / dist) : Vec3{0, 0, 1}) * (8 * (1 - dist / r)) + Vec3{0, 0, 3}, now, out);
   }
   ragdolls_.blast(at, r * 1.2f, 6);
 }

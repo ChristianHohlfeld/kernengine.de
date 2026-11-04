@@ -149,3 +149,45 @@ SC_TEST(life_cows_birds_shots) {
   SC_CHECK(life.shout({0, 0, 0}, "bump", 1, now + 5, 5, out) && !out.speech.empty(), "a shout is spoken");
   SC_CHECK(!life.shout({0, 0, 0}, "bump", 2, now + 5.5f, 5, out), "and not again within 1.4 s");
 }
+
+SC_TEST(life_dogs_cats_black_cat) {
+  kern::physics::World w;
+  make_flat_world(w);
+  CityStream city;
+  Life life;
+  life.init(w, false);
+  LifeView v;
+  v.physics = &w;
+  v.city = &city;
+  v.focus = v.player = v.eye = {0, 0, 0};
+  v.head = {0, 0, 1.68f};
+  v.epoch = 1000;  // floor(1000 / 120) = 8: the black cat is out (every other two minutes)
+  Rng rng(9);
+  LifeOut out;
+  f32 now = 1;
+  for (int i = 0; i < 10; ++i) {
+    now += 1.0f / 30;
+    v.epoch += 1.0 / 30;
+    life.update(1.0f / 30, now, v, rng, out);
+  }
+  SC_CHECK(life.pets().size() == 20, "20 dogs and cats (%zu)", life.pets().size());
+  SC_CHECK(life.species(2, v.epoch) == Life::Species::cat && life.species(0, v.epoch) == Life::Species::dog, "every third a cat");
+  SC_CHECK(life.species(1, v.epoch) == Life::Species::black_cat && life.species(1, 1150) == Life::Species::dog, "the black cat now and then (else a dog)");
+  // a dog shot dead rolls over as a body
+  const Vec3 dog = life.pets()[0].pos;
+  Vec3 to = dog + Vec3{0, 20, 0.3f};
+  SC_CHECK(life.shot(dog + Vec3{0, -20, 0.3f}, to, 30, now, out) && life.pets()[0].dead_at >= 0 && life.pets()[0].body.valid(), "a dog shot dead");
+  // the black cat charges when shot and gets the player
+  const Vec3 cat = life.pets()[1].pos;
+  to = cat + Vec3{0, 20, 0.2f};
+  SC_CHECK(life.shot(cat + Vec3{0, -20, 0.2f}, to, 30, now, out) && life.cat_attack().on, "the black cat charges");
+  bool killed = false;
+  for (int i = 0; i < 30 * 15 && !killed; ++i) {
+    out.clear();
+    now += 1.0f / 30;
+    v.epoch += 1.0 / 30;
+    life.update(1.0f / 30, now, v, rng, out);
+    killed = out.kill_player;
+  }
+  SC_CHECK(killed, "and that is the end of you");
+}
