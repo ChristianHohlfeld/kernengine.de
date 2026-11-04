@@ -96,6 +96,11 @@ kern/games/spawncity/
                   Drohne (MG, Raketen, GUIDED), Jet (Kanone, Rakete, Bombe), Projektile
     net_session.* Mehrspieler: Kerns Client/Server über HostTransport, Posen 15 Hz, Treffer
     game_net.cpp  Mehrspieler im Spiel: eigene Pose, andere Spieler zeichnen, Treffer senden/anwenden
+    settings.*    Einstellungstabelle (Werte, Bereiche, Hilfe aus SpawnCity), `set`/`get`/`settings schema`
+    gps_live.*    LIVE-GPS-Filter (Sprünge verwerfen, Vorhersage, Tätigkeit)
+    equipment.*   Jetpack, Flug-Logbuch, MusicSynth (Titelmusik, Autoradio)
+    game_ui.*     Menü-/Einstellungs-Seite des Spiels: Anwenden der Einstellungen, Pause, RESET, Startort, LIVE GPS
+    game_equipment.cpp  Jetpack am Soldaten, Logbuch, Radio, Geräuschkulisse
     combat_rules.* reine Kampf-/Ereignisregeln (Militär-Eskalation, Flak-Zellen, Luftschlag-Timing,
                   Temperamente, Zombie-Runden, Sandbox-Gegner + Chaos-Punkte, Aufträge/Risikobank, Rennstrecke)
     combat_art.*  prozedurale Modelle: Kampfhubschrauber, Panzer, Flak, Kampfjets, Bomben, Tore,
@@ -104,7 +109,8 @@ kern/games/spawncity/
     game_military.cpp Militär (Hubschrauber, Panzer, Trupp), Flak, Kampfjets und Luftschlag, Treffer/Explosionen
     game_events.cpp   Passanten, die zurückschlagen, Zombie-Nächte, Sandbox-Gegner, Punkte/Aufträge,
                   Rennstrecke, Auto-Trümmer, Scope/Headshot, HUD-Teil und Testbefehle
-  web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert)
+  web/            index.html + host.mjs (dünner Host, nutzt kern/web/app.mjs, kern.mjs, studio/game.mjs unverändert),
+                  ui.mjs (Menüs, nur DOM), manifest.webmanifest + icon.svg (installierbare App)
   tests/          native Unit-Tests (run_tests.sh) und Playwright-Smoke-Test (smoke.mjs)
   build.sh        wasm + Einzeldatei-HTML
 ```
