@@ -209,6 +209,7 @@ async function run({name, url, context, mapped}) {
   // Weapons: the rocket launcher fires a rocket that explodes; the minimap has streets.
   check(await cmd("weapon 4") === "Raketenwerfer", `[${name}] rocket launcher in hand`);
   const booms = (await hud()).explosions;
+  { const t = (await hud()).t; await page.waitForFunction(t => window.SpawnCity.hud().t > t + 0.4, t, {timeout: 120000}).catch(() => {}); }  // the launcher comes up (0.25 s)
   check((await cmd("attack")).startsWith("1 "), `[${name}] a rocket is fired`);
   await page.waitForFunction(b => window.SpawnCity.hud().explosions > b, booms, {timeout: 300000}).catch(() => {});
   check((await hud()).explosions > booms, `[${name}] the rocket explodes`);

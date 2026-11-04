@@ -829,9 +829,14 @@ std::string Game::map_json() {
   bool first = true;
   for (const Lane& L : city_.lanes()) {
     if (!L.alive) continue;
+    // Near when any segment passes within the range (streets can have far-apart vertices).
     bool near = false;
-    for (const Vec2& p : L.points)
-      if (std::fabs(p.x - me.x) < range && std::fabs(p.y - me.y) < range) { near = true; break; }
+    for (std::size_t k = 0; k + 1 < L.points.size() && !near; ++k) {
+      const Vec2 a = L.points[k], d = L.points[k + 1] - a;
+      const f32 l2 = std::fmax(1e-6f, d.x * d.x + d.y * d.y);
+      const f32 t = clampf(((me.x - a.x) * d.x + (me.y - a.y) * d.y) / l2, 0, 1);
+      near = std::hypot(a.x + d.x * t - me.x, a.y + d.y * t - me.y) < range;
+    }
     if (!near) continue;
     o += first ? "[" : ",[";
     first = false;
