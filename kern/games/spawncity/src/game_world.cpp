@@ -44,44 +44,12 @@ static void init_world_sounds(kern::audio::Mixer& mixer, WorldSounds& s) {
     n.sustain = 0.03f; n.release = 0.18f; n.lowpass = 7000;
     s.splash_small = mixer.adopt_clip(one_shot({n}, rate), 1, "spawncity:splash_small");
   }
-  {  // cow (cows.mjs moo): a low saw with a slow vibrato through a closing filter
-    SynthPatch m;
-    m.wave = Wave::saw; m.frequency = 128; m.slide = -0.25f; m.attack = 0.12f; m.sustain = 0.9f; m.release = 0.35f;
-    m.vibrato_depth = 0.5f; m.vibrato_rate = 5; m.lowpass = 900; m.lowpass_sweep = -0.6f; m.resonance = 0.4f; m.volume = 0.7f;
-    SynthPatch f = m;
-    f.wave = Wave::sine; f.frequency = 256; f.volume = 0.25f; f.lowpass = 0;
-    s.moo = mixer.adopt_clip(one_shot({m, f}, rate), 1, "spawncity:moo");
-  }
-  {  // pigeon coo (pigeons.mjs): two soft sine hoots with FM
-    SynthPatch c;
-    c.wave = Wave::sine; c.frequency = 420; c.slide = -0.6f; c.attack = 0.03f; c.sustain = 0.18f; c.release = 0.12f;
-    c.fm_ratio = 0.5f; c.fm_depth = 1.2f; c.tremolo_depth = 0.6f; c.tremolo_rate = 18; c.volume = 0.45f;
-    std::vector<f32> a = kern::audio::synthesize(c, rate);
-    std::vector<f32> out;
-    kern::audio::mix_into(out, a, 0, rate, 1);
-    kern::audio::mix_into(out, a, 0.42f, rate, 0.8f);
-    kern::audio::normalize(out, 0.6f);
-    s.coo = mixer.adopt_clip(std::move(out), 1, "spawncity:coo");
-    SynthPatch w;
-    w.wave = Wave::noise; w.lowpass = 1800; w.highpass = 300; w.sustain = 0.5f; w.tremolo_depth = 0.9f; w.tremolo_rate = 11; w.volume = 0.5f; w.seed = 5;
-    s.flap = mixer.adopt_clip(one_shot({w}, rate), 1, "spawncity:flap");
-  }
-  {  // car horn (world_traffic_routes.mjs: impatient drivers): two detuned squares
+  {  // car horn (world_procedural_population.mjs honk): two detuned squares
     SynthPatch h;
     h.wave = Wave::square; h.frequency = 392; h.sustain = 0.45f; h.release = 0.05f; h.lowpass = 2400; h.volume = 0.4f;
     SynthPatch h2 = h;
     h2.frequency = 494;
     s.horn = mixer.adopt_clip(one_shot({h, h2}, rate), 1, "spawncity:horn");
-    SynthPatch beep = h;
-    beep.frequency = 1046; beep.sustain = 0.2f; beep.repeat = 0.5f;
-    s.tow = mixer.adopt_clip(one_shot({beep}, rate), 1, "spawncity:tow_beep");
-  }
-  for (u32 i = 0; i < 4; ++i) {  // street voices (street_voices.mjs): murmured syllables, formant-ish
-    SynthPatch v;
-    v.wave = Wave::pulse; v.duty = 0.18f; v.frequency = i < 2 ? 120.0f + 15 * i : 210.0f + 20 * i; v.attack = 0.02f; v.sustain = 0.9f; v.release = 0.2f;
-    v.vibrato_depth = 2.5f; v.vibrato_rate = 4.5f + i; v.lowpass = 1100 + 250 * i; v.resonance = 0.5f; v.tremolo_depth = 0.85f; v.tremolo_rate = 5.5f + i * 0.7f;
-    v.volume = 0.35f; v.seed = 20 + i;
-    s.chatter[i] = mixer.adopt_clip(one_shot({v}, rate), 1, "spawncity:voice");
   }
   s.ready = true;
 }
@@ -125,6 +93,7 @@ void Game::update_world(f32 dt) {
   if (!L.sounds.ready && mixer_.ready()) init_world_sounds(mixer_, L.sounds);
   if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer);
   L.marks.update(world_->sim_time(), world_->physics());
+  update_traffic_world(dt);
   const Terrain& t = city_.terrain();
   // Swimming (player_walk_mode_v4.mjs standHeightAt): in deep water the head stays above the
   // surface - the pilot floats with his eyes 0.42 m over it and walks / swims as on land.
@@ -195,6 +164,7 @@ void Game::step_world(f32 h) {
   if (mode_ == Mode::parachute) water(2, chute_actor_, {0.3f, 0.3f, 0.85f}, false);
   for (std::size_t i = 0; i < cars_.size() && i + 3 < 32; ++i)
     if (cars_[i].placed) water(static_cast<u32>(i + 3), cars_[i].actor, cars_[i].car->spec().half, false);
+  step_tow(h);
 }
 
 void Game::draw_world() {
@@ -202,6 +172,7 @@ void Game::draw_world() {
   WorldLife& L = *life_;
   L.art.begin();
   L.marks.draw(L.art, world_->physics(), world_->sim_time());
+  draw_traffic_lights();
   L.art.end();
 }
 
@@ -213,6 +184,12 @@ void Game::world_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
   if (t.water_at(at.x, at.y) && at.z - t.water_level(at.x, at.y) < radius) {
     life_->pending_splashes.push_back({{at.x, at.y, t.water_level(at.x, at.y)}, 2 + radius * 0.8f});
     return;
+  }
+  // Tow trucks are cars like any other (tow_service.mjs onExplosion: 1.3 x damage, falling off).
+  for (WorldLife::TowTruck& tt : life_->trucks) {
+    if (!tt.body.valid() || !world_->physics().body_valid(tt.body)) continue;
+    const f32 d = kern::length(world_->physics().pose(tt.body).position - at);
+    if (d < radius) tt.hp -= damage * 1.3f * std::pow(1 - d / radius, 1.2f);
   }
   // Craters, scorch, soot and breaches, rubble (world_marks.h); strength as facade_marks.mjs.
   life_->marks.blast(at, radius, std::fmin(1.4f, damage / 110), city_, world_->physics(), rng_, world_->sim_time());
@@ -233,6 +210,7 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
     out = b;
     return true;
   }
+  if (starts("traffic")) { out = traffic_json(); return true; }
   if (starts("blast")) {
     // Tests: "blast" = a rocket's blast (9.5 m, 160) 6 m in front of the player at knee height,
     // "blast wall" = against the nearest wall within 40 m.

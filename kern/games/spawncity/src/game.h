@@ -210,6 +210,14 @@ class Game {
   bool world_command(const std::string& cmd, std::string& out);
   void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
   std::unique_ptr<WorldLife> life_;
+  // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
+  f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
+  void eject_driver(i32 car);
+  void update_traffic_world(f32 dt);
+  void step_tow(f32 h);
+  void draw_world_vehicles();
+  void draw_traffic_lights();
+  std::string traffic_json();
 
   // presentation
   void update_camera(kern::Engine& e, f32 dt);

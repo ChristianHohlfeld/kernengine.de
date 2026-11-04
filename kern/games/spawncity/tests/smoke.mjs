@@ -243,8 +243,14 @@ async function run({name, url, context, mapped}) {
   page.evaluate(() => window.SpawnCity.command("mode foot"));
 
   // Car: carjack the nearest car, drive 3 s.
+  // Traffic (world_traffic.h): junctions from the street graph, lights on the main roads.
+  {
+    const tr = JSON.parse(await cmd("traffic"));
+    check(tr.junctions > 3 && (mapped ? tr.lights > 0 : true), `[${name}] junctions and traffic lights (${JSON.stringify(tr)})`);
+  }
   const car = await cmd("mode car");
   check(car === "car", `[${name}] car mode (${car})`);
+  check(JSON.parse(await cmd("traffic")).ejected >= 1 || car !== "car", `[${name}] the carjacked driver got out`);
   if (car === "car") {
     if (context.hasTouch) await touchHold(vw - 110, vh - 110);
     else await hold(["KeyW"]);

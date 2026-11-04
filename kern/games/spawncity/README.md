@@ -184,6 +184,32 @@ kern/games/spawncity/
   36 Stück, 25 s). Die Wände kommen aus denselben Umrissen wie die Gebäude (`CityStream::walls_near`).
   Glassprünge in Fenstern fehlen noch: Kerns `BuildingBuilder` legt die Fensterraster im Shader an, das
   Spiel kennt die Scheiben nicht (Einschusslöcher macht Kerns Soldaten-Decal).
+* **Verkehr** (`world_traffic.*`, `game_traffic.cpp`): Kreuzungen sind die Knoten der Straßenmittellinien,
+  an denen drei oder mehr Arme zusammenkommen. SpawnCity selbst hat keine Ampeln; seine Fahrer bremsen
+  für Leute im Fahrkorridor und hupen (`world_procedural_population.mjs` `yieldsToPedestrian`: Reichweite
+  6 m, Bus 9 m, + 0,5 s + v²/9, halbe Breite 1,6/1,95 m; `honkCheck`: Spieler nach 2,6 s, Passant nach 7 s,
+  dann alle 9–16 s) – übernommen. **Eigene Regeln** (Wunsch für M3): Kreuzungen mit einer Hauptstraße
+  (Arm ≥ 9 m, ab secondary) bekommen Ampeln mit zwei Phasen (Achse der breitesten Straße / quer dazu),
+  je 14 s Grün, 3 s Gelb, 2 s Alles-Rot (38-s-Umlauf, Versatz je Kreuzung); bei Gelb hält, wer noch bequem
+  halten kann (4 m/s²); gebremst wird auf die Haltelinie mit 3,5 m/s². Ohne Ampel: wer in der Kreuzung
+  ist, hat sie; die anderen warten am Rand; rechts vor links für gleichzeitig Ankommende (nach 4 s Warten
+  fährt man trotzdem – sonst stünden vier Autos ewig). Gezeichnet werden die Ampeln (Mast, Kasten, drei
+  Lichter) im Umkreis von 160 m.
+* **Carjacking:** Der Fahrer steigt sichtbar aus (1,8 m auf der Fahrerseite, `ejectDriver`) und rennt weg –
+  oder bleibt erst 2,6 s stehen und starrt, dann rennt er. Er ist danach ein normaler Passant auf seinem
+  Gehweg. (Prügeln wie in SpawnCity gibt es noch nicht: Passanten schlagen hier nicht zurück.)
+* **Abschleppdienst** (`tow_service.mjs`): Verkehr, der umgekippt (2,5 s), festgefahren (9 s, nicht beim
+  Warten an einer Kreuzung) oder von seiner Straße abgekommen ist (9 m für 7 s), und ausgebrannte Wracks
+  nach 20 s bekommen einen gelben Abschleppwagen (höchstens zwei): Start an einem Straßenpunkt 170–320 m
+  entfernt und > 140 m vom Spieler, A* über den Straßengraph, Pure Pursuit, Zurücksetzen bei Hängenbleiben,
+  Anhaken 1,8 s, Schleppen mit 9 m/s 30 m weiter auf der eigenen Spur, dort aufrecht absetzen (das Auto
+  fährt weiter); Wracks nimmt er mit (zurück in den Pool). Danach zurück, weg, wenn weit genug. Eigener
+  Box3D-Körper mit dem Fahrzeugmodell der Autos, 110 HP (Explosionen ×1,3), Bett/Ausleger/Haken und
+  blinkender Gelbbalken. Übernimmt der Spieler das Auto, bricht der Auftrag ab. Gibt nach 70 s auf.
+* Nicht übernommen: `world_traffic_motion_guard_v1.mjs` (richtet in SpawnCity schiebende Autos per Impuls
+  gerade, eine Korrektur für SpawnCitys Fahrer-KI; Kerns Fahrer folgen der Spur per Pure Pursuit und
+  brauchen sie nicht). `world_traffic_routes.mjs` ist in SpawnCity nur das Einlesen der Routen aus den
+  Kacheln – das macht hier `CityStream` (Fahrspuren).
 
 ## Übernommene SpawnCity-Werte (Auszug)
 
@@ -240,14 +266,13 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Militär (ab hohen Sternen), Tiere, Gangster, Passanten, die zurückschlagen; Fahrer, die beim
-  Carjacking sichtbar aussteigen.
+* Militär (ab hohen Sternen), Tiere, Gangster, Passanten, die zurückschlagen.
 * Zerstörung an Gebäuden (Krater, Fassadenspuren), Ragdolls.
 * Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
 * Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. Innenräume,
   echte Punktlichter der Laternen (heute leuchten nur die Köpfe), GPS-Start.
-* Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
-  mehr Fahrzeugtypen.
+* Verkehr: mehr Fahrzeugtypen; Fahrer, die beim Carjacking zurückschlagen.
+* Nach einem Mehrspieler-Ursprungswechsel bleiben Spuren/Abschleppwagen der alten Stadt bis zum Ablauf.
 
 ## Später in die Engine (gebaut im Spielordner)
 
