@@ -280,7 +280,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
 const SC_MODE_LABEL = {foot: "ZU FUSS", drone: "DROHNE", car: "AUTO", jet: "JET", parachute: "FALLSCHIRM"};
 const SC_HELP = {
-  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne · 2× Leertaste Jetpack · J Luftschlag · H Auftrag · Esc Menü",
+  foot: "WASD laufen · Shift sprinten · Leertaste springen · Maus zielen/schießen · R nachladen · 1–8 Waffe · T Granate · X EMP · F einsteigen · V Drohne · 2× Leertaste Jetpack · J Luftschlag · O Auftrag · Esc Menü",
   drone: "R / Leertaste ARM · WASD fliegen · Leertaste/Shift Höhe · Maus drehen/neigen · Q/E drehen · C Kamera · G GAME/ANGLE · Maus links feuern · 1/2/3 MG/Raketen/GUIDED · X EMP · J Luftschlag · L Rennstrecke · V zurück",
   car: "W Gas · S Bremse/rückwärts · A/D lenken · Leertaste Handbremse · C Cockpit · N/B Radio · F aussteigen",
   jet: "W/S Schub · A/D Seitenruder · Maus nicken/rollen · V Schweben/Flug · Maus links/Leertaste Kanone · R Rakete · B Bombe · C Cockpit · F aussteigen / Schleudersitz",
