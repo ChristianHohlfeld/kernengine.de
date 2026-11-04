@@ -207,6 +207,7 @@ void Game::damage_player_vehicle(f32 amount) {
 void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   const f32 now = world_->sim_time();
   ++explosions_;
+  look_blast(at, radius);  // light, camera shake (game_look.cpp)
   world_->physics().explode(at, radius, radius * 0.5f, 6.0f);
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
@@ -878,11 +879,11 @@ void Game::draw_town() {
     const std::vector<Lane>& lanes = city_.lanes();
     if (show_lamps_)
     for (const Lamp& l : lamps_)
-      if (l.lane < lanes.size() && lanes[l.lane].alive && std::fabs(l.foot.x - cam_.eye.x) < 170 && std::fabs(l.foot.y - cam_.eye.y) < 170)
+      if (l.lane < lanes.size() && lanes[l.lane].alive && std::fabs(l.foot.x - cam_.eye.x) < look_.lamp_m && std::fabs(l.foot.y - cam_.eye.y) < look_.lamp_m)
         people_art_.street_lamp(l.foot, l.yaw, night_);
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
-      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < 220) people_art_.person(p, now);
+      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m) people_art_.person(p, now);
     draw_projectiles();
     draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {

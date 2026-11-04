@@ -81,7 +81,7 @@ std::vector<u8> pack(const PlayerState& s) {
   w.put(s.slot).put(static_cast<u8>(s.mode)).put(s.color).put(s.flags).put(s.t_ms).put(s.position).put(s.velocity).put(s.rotation).put(s.avatar).put(s.avatar_yaw);
   if (s.flags & kDroneOut) w.put(s.drone_pos).put(s.drone_rot);
   if (s.flags & kJetOut) w.put(s.jet_pos).put(s.jet_rot);
-  w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon);
+  w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon).put(s.day);
   return w.b;
 }
 
@@ -93,7 +93,7 @@ bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
   s.position = r.get<Vec3>(); s.velocity = r.get<Vec3>(); s.rotation = r.get<Quat>(); s.avatar = r.get<Vec3>(); s.avatar_yaw = r.get<f32>();
   if (s.flags & kDroneOut) { s.drone_pos = r.get<Vec3>(); s.drone_rot = r.get<Quat>(); }
   if (s.flags & kJetOut) { s.jet_pos = r.get<Vec3>(); s.jet_rot = r.get<Quat>(); }
-  s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>();
+  s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>(); s.day = r.get<f32>();
   if (!r.ok || mode > static_cast<u8>(PlayerMode::parachute) || !sane(s.position) || !sane(s.velocity) || !sane(s.avatar) || !std::isfinite(s.health)) return false;
   s.mode = static_cast<PlayerMode>(mode);
   s.health = clampf(s.health, 0, 100);

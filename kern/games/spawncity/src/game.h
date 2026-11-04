@@ -21,6 +21,7 @@
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
+#include "game_look.h"
 #include "jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
@@ -307,6 +308,20 @@ class Game {
   bool ui_equipment_command(const std::string& cmd, std::string& out);
   std::string ui_equipment_json();
 
+  // performance and the look (game_look.cpp): frame times, automatic quality, camera shake,
+  // FPV stabilizer, speed streaks, day/night clock, point lights, own first-person weapon models
+  void look_begin(kern::Engine& e, const kern::Frame& f);
+  void look_lap(perf::Slot s);
+  void look_camera(f32 dt);
+  void look_lighting(f32 dt);
+  void look_draw(kern::Engine& e, f32 dt);
+  void look_blast(Vec3 at, f32 radius);
+  void look_apply_tier();
+  void look_view_models(f32 dt);
+  i32 look_people_budget() const;
+  bool look_command(const std::string& cmd, std::string& out);
+  std::string look_hud_json();
+
   // presentation
   void update_camera(kern::Engine& e, f32 dt);
   void draw_vehicles();
@@ -418,6 +433,8 @@ class Game {
   bool mobile_ = false;
   // menus, settings, start, equipment, presentation (game_ui.h)
   UiState ui_;
+  // performance and the look (game_look.h)
+  LookState look_;
 };
 
 Game& game();
