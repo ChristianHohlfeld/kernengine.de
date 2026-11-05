@@ -315,35 +315,9 @@ void Game::ui_after_input(f32 dt) {
     case Mode::foot: {
       kern::game::PlayInput& p = play_in_;
       // curves, dead zone, sensitivities and inversions: game_controls.cpp (first_person_control_settings.mjs)
-      // first_person_control_settings.mjs aim assist (Xbox and touch): a gentle pull towards the
-      // nearest target within 6 degrees of the crosshair and 70 m.
-      const f32 assist = st.get(Opt::foot_aim_assist) / 100;
-      f32 assist_x = 0, assist_y = 0;  // degrees, added after the sensitivity and inversion
-      if (assist > 0 && (touch_mode_ || (pad.connected && pad.active))) {
-        const Vec3 eye = cam_.eye, fwd = kern::normalize(cam_.target - cam_.eye);
-        f32 best = 6 * kDeg;
-        Vec3 aim{};
-        bool found = false;
-        for (const People::Person& q : people_.all()) {
-          if (q.state == People::State::down || q.state == People::State::gone) continue;
-          if (q.kind == People::Kind::citizen && q.state != People::State::fight) continue;
-          const Vec3 to = q.pos + Vec3{0, 0, 1.3f} - eye;
-          const f32 d = kern::length(to);
-          if (d < 1 || d > 70) continue;
-          const f32 ang = std::acos(clampf(kern::dot(to * (1 / d), fwd), -1, 1));
-          if (ang < best) { best = ang; aim = to * (1 / d); found = true; }
-        }
-        if (found) {
-          const f32 yaw_err = wrap_pi(std::atan2(aim.y, aim.x) - std::atan2(fwd.y, fwd.x));
-          const f32 pitch_err = std::asin(clampf(aim.z, -1, 1)) - std::asin(clampf(fwd.z, -1, 1));
-          const f32 k = assist * clampf(dt * 6, 0, 1);
-          assist_x = -yaw_err * k / kDeg;   // GameWorld: camera_yaw -= look_x
-          assist_y = -pitch_err * k / kDeg;  // camera_pitch += look_y (positive = down)
-          ++ui_.assists;
-        }
-      }
-      p.look_x += assist_x;
-      p.look_y += assist_y;
+      // aim assist (first_person_control_settings.mjs / fps_control_math.mjs fpsAimAssist): applied to
+      // the pad and touch look rates in game_controls.cpp (ctl_assist)
+      (void)p;
       break;
     }
     case Mode::drone: {
@@ -356,8 +330,7 @@ void Game::ui_after_input(f32 dt) {
       break;
     }
     case Mode::car:
-      // settings_help.mjs worldKeepLook: ON, the cockpit view stays where you left it.
-      if (st.on(Opt::view_keep_look) && engine_ && engine_->input.pointer_delta().x == 0 && pad.rx == 0) { head_yaw_ = ui_.head_yaw_before; head_pitch_ = ui_.head_pitch_before; }
+      // settings_help.mjs worldKeepLook: the head look stays (controls::WorldLook, game_controls.cpp)
       if (car_index_ >= 0) {
         CarInput& ci = cars_[car_index_].input;
         ci.max_speed = st.get(Opt::car_max_kmh) / 3.6f;
@@ -507,9 +480,10 @@ void Game::ui_reset() {
 std::string Game::ui_hud_json() {
   char b[512];
   std::string s;
-  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f],\"northUp\":%s,\"assists\":%u}",
+  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f],\"northUp\":%s,\"assists\":%u,\"audioOn\":%s,\"musicOn\":%s}",
                 world_placed_ ? "true" : "false", ui_.paused ? "true" : "false", ui_.settings.version(), ui_.resets, ui_.moves, lat_, lon_,
-                ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists);
+                ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists, ui_.settings.on(Opt::audio_on) ? "true" : "false",
+                ui_.settings.on(Opt::music_on) ? "true" : "false");
   s += b;
   const GpsLive& g = ui_.gps;
   if (g.active()) {

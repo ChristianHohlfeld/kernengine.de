@@ -678,6 +678,11 @@ void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& ou
   }
 }
 
+void CityStream::ready_features(std::vector<const MapFeatures*>& out) const {
+  for (const auto& [k, t] : tiles_)
+    if (t->state == Tile::State::ready || t->state == Tile::State::collision) out.push_back(&t->features);
+}
+
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
   for (const auto& [k, t] : tiles_) {
     if (t->state != Tile::State::ready) continue;

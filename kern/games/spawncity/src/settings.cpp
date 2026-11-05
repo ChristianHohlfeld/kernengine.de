@@ -68,6 +68,7 @@ constexpr OptSpec kSpecs[] = {
     {"world.friendlyFire", "welt", "Friendly Fire", "Spielerwaffen treffen andere Spieler.", 0, 1, 1, 0, true, true},
     // first_person_control_settings.mjs aimAssistStrengthPercent 0..100 (55); settings_help.mjs view rows
     {"foot.aimAssist", "fuss", "Zielhilfe", "Sanfter Zug zu Zielen nahe am Fadenkreuz mit Xbox-Pad und Touch. 0 schaltet sie aus.", 0, 100, 1, 55, false, true},
+    {"pad.aimScheme", "drohne", "Xbox-Schema AIM", "Drohne mit dem Xbox-Pad: LB halten = rechter Stick schaut (Fadenkreuz) statt zu drehen. Aus = CLASSIC.", 0, 1, 1, 0, true, true},
     {"view.grid", "kamera", "1-m-Raster", "Zeichnet ein Referenzraster von 1 m. Nur Anzeige; hilft, Abstand und Hoehe zu schaetzen.", 0, 1, 1, 0, true, true},
     {"view.keepLook", "kamera", "Blick halten", "AUS: der Blick schwingt nach vorn zurueck, wenn du loslaesst. AN: er bleibt, wo du ihn gelassen hast.", 0, 1, 1, 0, true, true},
     {"view.minimapNorth", "kamera", "Minimap nach Norden", "Haelt die Minimap genordet, statt sie mit dir zu drehen.", 0, 1, 1, 0, true, true},

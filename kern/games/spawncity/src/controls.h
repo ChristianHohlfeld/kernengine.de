@@ -50,6 +50,14 @@ struct LookAxis {
 /// Out: yaw right-positive, pitch up-positive (rad).
 void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch);
 
+/// fpsAimAssist (fps_control_math.mjs) with the profile scaled by the strength s = percent / 100
+/// (first_person_control_settings.mjs): window 7 x 5.6 deg, 90 m, slowdown .30 s, gain 4 s, cap .38 s rad/s.
+/// Errors and inputs: yaw right-positive, pitch up-positive (rad, rad/s).
+struct AimAssist { bool active = false; f32 slowdown = 1, yaw = 0, pitch = 0; };
+AimAssist fps_aim_assist(f32 yaw_err, f32 pitch_err, f32 dist, f32 input, f32 in_yaw, f32 in_pitch, f32 s);
+/// The candidate's place in the window (>= 1: outside) and its score (ellipse + dist / 90 * .12).
+inline f32 aim_ellipse(f32 yaw_err, f32 pitch_err) { return std::hypot(yaw_err / (7.0f * kPi / 180), pitch_err / (5.6f * kPi / 180)); }
+
 // ---- gamepad dead zones --------------------------------------------------------------------
 /// Linear rescale outside the dead zone (xbox_gamepad.mjs gamepadAxis, car .08, map .15).
 f32 gamepad_axis(f32 v, f32 dz = 0.14f);

@@ -57,6 +57,9 @@ void Game::select_foot_weapon(Id id) {
       if (l.id == id) set("magazine", Value(static_cast<f64>(l.magazine)));
     set("fireSound", Value(id == Id::smg ? "sc:shot0" : id == Id::sniper ? "builtin:sniper" : "sc:pistol0"));
     set("pellets", Value(1.0));
+    // first_person_controller_v5.mjs ADS: x 1.45 for the guns, the sniper's scope x 8 (true
+    // magnification through tan; Kern zooms by tan(fov / 2) / tan(aimFov / 2) from the 59 deg view)
+    set("aimFov", Value(id == Id::sniper ? 8.09 : 42.6));
     if (world_->soldier_state(soldier_, st)) {
       st.ammo = ammo_mag_[static_cast<u8>(id)];
       st.reserve = ammo_reserve_[static_cast<u8>(id)];

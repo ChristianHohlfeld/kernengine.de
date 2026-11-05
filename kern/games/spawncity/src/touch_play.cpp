@@ -14,6 +14,7 @@ constexpr f32 kSafe = 10, kGap = 8;  // edge_hud_layout.mjs SAFE / GAP
 std::string esc(const std::string& s) {
   std::string o;
   for (char c : s) {
+    if (static_cast<unsigned char>(c) < 0x20) { o += ' '; continue; }
     if (c == '"' || c == '\\') o += '\\';
     o += c;
   }
@@ -97,9 +98,9 @@ void TouchPlay::layout() {
     left.push_back(g);
   }
   place_row(left, std::max(kSafe, Lx + 10), Ly - 8, 1, std::max(kStick, 190.0f));
-  if (m == TouchMode::drone) {
+  if (m == TouchMode::drone && !lay_.pad_drone) {
     // the altitude pad right of the move stick (simulator.mjs #soloClearance 48 x 132)
-    TouchBtn p = btn("clearance", "▲\nHÖHE\n▼", 48, 132, 0x101820, false);
+    TouchBtn p = btn("clearance", "▲ HÖHE ▼", 48, 132, 0x101820, false);
     p.x = Lx + kStick + 8;
     p.y = h_ - kSafe - p.h;
     pad_x_ = p.x; pad_y_ = p.y; pad_w_ = p.w; pad_h_ = p.h;
@@ -110,8 +111,10 @@ void TouchPlay::layout() {
   if (m == TouchMode::car) low.push_back(btn("enter", "↗", 54, 54, 0xff6b5a, true, false));
   else if (m == TouchMode::drone) {
     low.push_back(btn("wpn", "⇄ " + lay_.weapon, 60, 60, amber, true));
-    low.push_back(btn("arm", lay_.armed ? "ARMED" : "ARM", 104, 44, lay_.armed ? green : 0xf5b301, false, false));
-    low.push_back(btn("stop", "STOP", 94, 44, red, false, false));
+    if (!lay_.pad_drone) {
+      low.push_back(btn("arm", lay_.armed ? "ARMED" : "ARM", 104, 44, lay_.armed ? green : 0xf5b301, false, false));
+      low.push_back(btn("stop", "STOP", 94, 44, red, false, false));
+    }
   } else if (m == TouchMode::foot) {
     low.push_back(btn("wpn", "⇄ " + lay_.weapon, 60, 60, amber, true));
     low.push_back(btn("jump", "JUMP", 64, 64, dark, true));
@@ -178,6 +181,25 @@ void TouchPlay::layout() {
   }
   for (TouchBtn& b : buttons_)
     if (std::find(down.begin(), down.end(), b.id) != down.end()) b.pressed = true;
+  apply_dom_rects();
+}
+
+void TouchPlay::set_dom_rects(std::vector<DomRect> rects) {
+  dom_ = std::move(rects);
+  layout();
+}
+
+void TouchPlay::apply_dom_rects() {
+  // The page draws the original's buttons (web/view.mjs, the original's DOM and CSS laid out by its
+  // own edge_hud_layout.mjs / thumb_layout.mjs); a finger counts where the player sees the button.
+  for (const DomRect& d : dom_) {
+    if (d.id == "clearance") {
+      if (pad_w_ > 0) { pad_x_ = d.x; pad_y_ = d.y; pad_w_ = d.w; pad_h_ = d.h; }
+      continue;
+    }
+    for (TouchBtn& b : buttons_)
+      if (b.id == d.id) { b.x = d.x; b.y = d.y; b.w = d.w; b.h = d.h; }
+  }
 }
 
 bool TouchPlay::in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const { return std::hypot(x - cx, y - cy) <= r; }
@@ -214,14 +236,14 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       if (b->id == "nade") nade_up_ = 0;
     } else if (lay_.aiming) {
       f.kind = Finger::strike;
-    } else if (lay_.alive && in_circle(Lcx, Lcy, r, x, y)) {
+    } else if (lay_.alive && !no_sticks() && in_circle(Lcx, Lcy, r, x, y)) {
       // The newest finger takes the stick over; deflection counts from where it lands.
       fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::move; }), fingers_.end());
       f.kind = Finger::move;
       f.base = {};
       move_id_ = id;
       move_ = {};
-    } else if (lay_.alive && in_circle(Rcx, Rcy, r, x, y)) {
+    } else if (lay_.alive && !no_sticks() && in_circle(Rcx, Rcy, r, x, y)) {
       fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
       f.kind = Finger::look;
       look_id_ = id;
@@ -250,7 +272,7 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       f.kind = Finger::none;
     }
     fingers_.push_back(f);
-    return true;
+    return !(f.kind == Finger::pinch || f.kind == Finger::none || (f.kind == Finger::fire && lay_.mode == TouchMode::drone));
   }
   if (it == fingers_.end()) return false;
   Finger& f = *it;
@@ -420,7 +442,7 @@ std::string TouchPlay::view_json() const {
   const char* rl = lay_.mode == TouchMode::car ? "UMSCHAUEN" : lay_.mode == TouchMode::jet ? "KNÜPPEL" : "";
   // The overlay draws the knob at 50 + 31 k %; the drone's knob travels 42 % (control_semantics.mjs).
   const f32 kk = lay_.mode == TouchMode::drone ? 42.0f / 31.0f : 1.0f;
-  const bool aiming = lay_.aiming;
+  const bool aiming = no_sticks();
   auto stick = [&](f32 x, Vec2 k, bool live, bool accent, const char* label) {
     std::snprintf(buf, sizeof buf, "{\"x\":%.1f,\"y\":%.1f,\"size\":%.1f,\"kx\":%.3f,\"ky\":%.3f,\"live\":%s,\"accent\":%s,\"label\":\"%s\"}", aiming ? -9999.0f : x, Ly, kStick,
                   k.x * kk, k.y * kk, live ? "true" : "false", accent ? "true" : "false", label);

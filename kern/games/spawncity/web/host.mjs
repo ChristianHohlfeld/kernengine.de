@@ -18,6 +18,8 @@ import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
 import {GapsHud} from "./gaps_hud.mjs";
 import {installSpawnCityLife} from "./life.mjs";
+import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
+import {installOriginalMenus} from "./view_menu.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -27,6 +29,9 @@ const SC_MAX_FETCHES = 4;
 /** Starts the game in the page (index.html). Module: url (dev) or base64 (single file). */
 export async function startSpawnCity({url = null, base64 = null} = {}) {
   const params = new URLSearchParams(location.search);
+  // The original's view layer (view.mjs): its DOM, CSS and layout; Kern's canvas takes the place of
+  // the original's three.js canvas.
+  const originalView = params.get("view") === "original" && await mountOriginalView();
   const canvas = document.getElementById("game");
   const statusEl = document.getElementById("status");
   const hudEl = document.getElementById("hud");
@@ -179,10 +184,36 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     }
     ev.preventDefault();
   };
-  canvas.addEventListener("pointerdown", finger(0));
-  canvas.addEventListener("pointermove", finger(1));
-  canvas.addEventListener("pointerup", finger(2));
-  canvas.addEventListener("pointercancel", finger(3));
+  if (originalView) {
+    // The original's buttons lie over the canvas: a finger on them is still the game's (the game
+    // knows their rectangles, view.mjs), except on the page's own buttons (menu, settings, map).
+    const vp = document.getElementById("viewport"), owned = new Set();
+    const route = type => {
+      const f = finger(type);
+      return ev => {
+        if (ev.pointerType === "mouse") return;
+        if (type === 0) { if (!fingerForGame(ev)) return; owned.add(ev.pointerId); }
+        else if (!owned.has(ev.pointerId)) return;
+        if (type >= 2) owned.delete(ev.pointerId);
+        f(ev);
+      };
+    };
+    vp.addEventListener("pointerdown", route(0), {capture: true});
+    addEventListener("pointermove", route(1), {capture: true});
+    addEventListener("pointerup", route(2), {capture: true});
+    addEventListener("pointercancel", route(3), {capture: true});
+  } else {
+    canvas.addEventListener("pointerdown", finger(0));
+    canvas.addEventListener("pointermove", finger(1));
+    canvas.addEventListener("pointerup", finger(2));
+    canvas.addEventListener("pointercancel", finger(3));
+  }
+  // foot_touch_controller.mjs: every finger is let go when the page hides, on pagehide, and when a
+  // touchend / touchcancel leaves no touch on the glass (the ground truth); blur keeps them.
+  const releaseFingers = () => command("touch release");
+  document.addEventListener("visibilitychange", () => { if (document.hidden) releaseFingers(); });
+  addEventListener("pagehide", releaseFingers);
+  for (const t of ["touchend", "touchcancel"]) addEventListener(t, ev => { if (ev.touches.length === 0) releaseFingers(); }, {capture: true, passive: true});
   const overlay = new TouchOverlay(document.getElementById("stage"));
 
   // ---- devices and the mouse (desktop_controls.mjs; the game decides, game_controls.cpp) ------------
@@ -252,7 +283,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const ui = installSpawnCityUi({command, params, canvas, statusEl});
   // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
   const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
+  const view = originalView ? new OriginalView({command, ui, mp: mpPage}) : null;
+  if (originalView) installOriginalMenus({command, ui, mp: mpPage});
   let frames = 0, last = null;
+  const vib = {me: null, peers: new Map()};
   // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
   // browser owns the canvas size, so the page applies it; app.mjs re-sizes on layout changes and the
   // next frame applies the scale again.
@@ -274,15 +308,28 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }
+    // vs_combat_presentation.mjs playExplosion: in a multiplayer round the phone buzzes when you
+    // go down ([70, 35, 120]) and when a mate does ([65]); the pad never rumbles in SpawnCity.
+    if (last?.net) {
+      const me = !!last.ctl?.dead;
+      if (me && vib.me === false) navigator.vibrate?.([70, 35, 120]);
+      vib.me = me;
+      for (const p of last.mp?.players || []) {
+        if (p.dead && vib.peers.get(p.slot) === false) navigator.vibrate?.([65]);
+        vib.peers.set(p.slot, !!p.dead);
+      }
+    }
     applyRenderScale(last);
     ui.update(last);
     life.update(last);
-    overlay.update(JSON.parse(str(e.sc_touch_view())));
+    const touchView = JSON.parse(str(e.sc_touch_view()));
+    if (view) view.update(last, touchView);
+    else overlay.update(touchView);
     requestAnimationFrame(tick);
   };
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
-  const mapCanvas = hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
+  const mapCanvas = (originalView && document.querySelector("#worldLookHud .world-mini-canvas")) || hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");
   // The minimap (real_world_bootstrap.mjs): a drag turns the head (0.85 deg/px, -0.62 deg/px,
   // -75..60), letting go springs back; a double tap within 360 ms opens the big map.
   if (mapCanvas) {
@@ -311,16 +358,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     mapCanvas.addEventListener("pointercancel", up);
   }
   setInterval(() => {
-    if (!mctx) return;
+    if (!mctx || originalView) return;  // the original view draws its own (view.mjs minimap)
     let m;
     try { m = JSON.parse(command("map")); } catch { return; }
-    const W = mapCanvas.width, R = W / 2, scale = R / 150;  // 150 m to the rim
-    mctx.clearRect(0, 0, W, W);
+    const W = mapCanvas.width, H = mapCanvas.height, R = Math.min(W, H) / 2, scale = R / 150;  // 150 m to the rim
+    mctx.clearRect(0, 0, W, H);
     if (!m.me) return;
     mctx.save();
-    mctx.beginPath(); mctx.arc(R, R, R - 2, 0, Math.PI * 2); mctx.clip();
+    if (!originalView) { mctx.beginPath(); mctx.arc(R, R, R - 2, 0, Math.PI * 2); mctx.clip(); }
     // Heading up: rotate the world so the view direction points to the top.
-    mctx.translate(R, R);
+    mctx.translate(W / 2, H / 2);
     const northUp = !!last?.ui?.northUp;  // settings: minimap north-up (settings_help.mjs worldMinimapAxisLock)
     if (!northUp) mctx.rotate(m.me[2] - Math.PI / 2);
     mctx.scale(scale, -scale);
@@ -332,7 +379,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     for (const p of m.police) dot(p, Math.floor(performance.now() / 250) % 2 ? "#ff4040" : "#4c7dff", 6);
     mctx.restore();
     // The player in the middle: an arrow pointing up.
-    mctx.save(); mctx.translate(R, R); if (northUp) mctx.rotate(Math.PI / 2 - m.me[2]);
+    mctx.save(); mctx.translate(W / 2, H / 2); if (northUp) mctx.rotate(Math.PI / 2 - m.me[2]);
     mctx.fillStyle = "#ffd23e"; mctx.beginPath(); mctx.moveTo(0, -12); mctx.lineTo(8, 9); mctx.lineTo(0, 4); mctx.lineTo(-8, 9); mctx.closePath(); mctx.fill(); mctx.restore();
   }, 250);
   requestAnimationFrame(tick);

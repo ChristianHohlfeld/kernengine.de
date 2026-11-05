@@ -11,6 +11,7 @@ namespace sc {
 
 struct ControlsState {
   controls::Devices dev;
+  bool near_car = false, near_jet = false;  // on foot within reach (the page's EINSTEIGEN buttons, web/view.mjs)
   // mouse + keyboard (desktop_controls.mjs)
   bool locked = false;          // the page reports document.pointerLockElement
   bool swallow_lmb = false;     // the click that captured the mouse never fires
@@ -33,6 +34,7 @@ struct ControlsState {
   controls::CarHeadSpring car_head;
   f32 car_zoom = 1;             // chase camera zoom (0.55 .. 2.6)
   bool aim_scheme = false;      // xbox_control_mode.mjs AIM (LB = head look in the drone)
+  bool pad_drone = false;       // XBOX CONTROLLER switch: on with the first pad press
   bool keep_look = false;       // WORLD: KEEP 360 LOOK
   // hand grenade (hand_grenade.mjs)
   controls::GrenadeCook nade;

@@ -181,6 +181,7 @@ class Game {
   void ctl_camera(kern::Camera& c);
   void ctl_enter(bool jet_first);
   bool ctl_touch_shot(f32 x, f32 y);
+  controls::AimAssist ctl_assist(f32 in_yaw, f32 in_pitch, f32 input);
 
   // simulation pieces
   void drive_traffic(f32 h);
@@ -283,6 +284,7 @@ class Game {
   // world dressing
   void update_lamps();
   std::string map_json();
+  std::string minimap_json();  // the original's minimap (real_world_bootstrap.mjs drawMinimap), game_town.cpp
   // the world (game_world.cpp, M3): terrain and water physics, craters and marks, traffic rules,
   // animals and street life, interiors, ragdolls. State lives in WorldLife (game_world.h).
   void hud_world(std::string& s);

@@ -52,6 +52,8 @@ sources = {
     "ui": (here / "web/ui.mjs").read_text(),
     "gaps_hud": (here / "web/gaps_hud.mjs").read_text(),
     "life": (here / "web/life.mjs").read_text(),
+    "view": (here / "web/view.mjs").read_text(),
+    "view_menu": (here / "web/view_menu.mjs").read_text(),
     "host": (here / "web/host.mjs").read_text(),
 }
 for name, text in sources.items():
@@ -63,7 +65,19 @@ def strip(text):
     text = re.sub(r'^import \{[^}]*\} from "[^"]+";\n', "", text, flags=re.M)
     return re.sub(r"^export (?=(const|let|function|async function|class) )", "", text, flags=re.M)
 b64 = base64.b64encode(wasm.read_bytes()).decode()
-bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "host"))
+# The original's view layer (web/view, view.mjs): markup, CSS with the fonts as data: URLs, and its
+# layout modules as one function (their top-level names stay their own).
+view_dir = here / "web/view"
+css = (view_dir / "original.css").read_text()
+for font in ("InterVariable.woff2", "InterVariable-Italic.woff2"):
+    css = css.replace(f'url("fonts/{font}")', 'url("data:font/woff2;base64,' + base64.b64encode((view_dir / "fonts" / font).read_bytes()).decode() + '")')
+import json
+layouts = "\n".join("{\n" + strip((view_dir / f).read_text()) + "\n}" for f in ("edge_hud_layout.mjs", "thumb_layout.mjs"))
+view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.html").read_text()) + ";\n" +
+               "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
+               "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
+               "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n};\n").replace("</script", "<\\/script")
+bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "view", "view_menu", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')
