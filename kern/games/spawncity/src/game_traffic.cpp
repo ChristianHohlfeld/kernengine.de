@@ -314,7 +314,7 @@ void Game::step_tow(f32 h) {
         world_->set_alive(c.actor, false);
         c.placed = false;
         c.wreck = false;
-        c.hp = 300;
+        c.hp = car_max_hp(c);
         ++L.tow_done;
       }
       if (t.body.valid() && w.body_valid(t.body)) w.destroy_body(t.body);

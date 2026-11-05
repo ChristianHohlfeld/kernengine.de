@@ -122,6 +122,17 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
     }
   }
   if ((by_player && hit_remotes(from, to, damage)) || people_.shot(from, to, damage, by_player, now) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
+    // a touch shot with the Glock or the sniper goes through bodies too (glockShotAt / sniperShotAt:
+    // up to three, 0.6 m on past each), as handle_shots does for Kern's own rounds
+    if (by_player && mode_ == Mode::foot && (foot_weapon_ == Id::glock || foot_weapon_ == Id::sniper)) {
+      const Vec3 end = r.hit ? r.point : from + dir * range;
+      Vec3 at = to + dir * 0.6f;
+      for (int pierced = 1; pierced < 3 && kern::dot(end - at, dir) > 0.5f; ++pierced) {
+        Vec3 next = end;
+        if (!(hit_remotes(at, next, damage) || people_.shot(at, next, damage, true, now) >= 0 || life_shot(at, next, damage))) break;
+        at = next + dir * 0.6f;
+      }
+    }
     out.to = to;
     out.surface = 3;
     out.impact = true;
@@ -137,7 +148,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       const Vec3 local = to_local(b.rotation, r.point - b.position);
       const Vec3 h = c.car->spec().half;
       if (std::fabs(local.x) < h.x + 0.4f && std::fabs(local.y) < h.y + 0.4f && std::fabs(local.z) < 2.0f) {
-        damage_car(static_cast<i32>(i), std::fmax(22.0f, damage), by_player);
+        car_bullet(static_cast<i32>(i), by_player);  // a round per kind: 22 / 30 / 26, sniper share (game_vehicle_damage.cpp)
         out.surface = 2;
         break;
       }

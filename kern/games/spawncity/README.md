@@ -602,6 +602,15 @@ geschlossen (Quellen in Klammern, Werte im Code):
   Kopftreffer tötet (MP 165, Glock/Sniper 999); wer liegt, ist kein Ziel. Explosionen treffen einmal
   (Abfall > 0,22). Fäuste/Messer: Taumeln, bei ≤ 35 HP zu Boden. Autos: min(260, max(6, (v − 1,5)·8,5))
   ab 2,2 m/s.
+* **Fahrzeugschaden** (`walk_world_experience_hotfix.mjs`, `critical_damage_logic.mjs`,
+  `police_ground_units.mjs`, `game_vehicle_damage.cpp`): Auto 180 HP / 30 je Treffer, Bus 320 / 26,
+  Streifenwagen 300 / 22; kritisch bei 20 % (Streifenwagen 25 %), dann brennt es 2,45 s (Bus 3,1 s,
+  Streifenwagen 2,6 s) und jeder weitere Treffer verkürzt; Explosionen geben ceil(3f) bzw. ceil(4f)
+  Treffer, Streifenwagen linear; nur Streifenwagen nehmen Crash-Schaden.
+* **Jet-Kamera und Schirm** (`jet_mode.mjs`): Verfolger 22 + v/40 m hinter dem Jet, FOV 66 + v/30;
+  Schleudersitz entlang der Jet-Hochachse; der offene Schirm sinkt mit gut 12 m/s.
+* **EMP** (`wanted_police_drones.mjs`): waagerechter Stoß + Druck nach unten auf 18 kg, Fall mit
+  1,35 g, Neustart nach 12 s.
 * **Zombie-Barrikaden** (`zombie_nights.mjs`, `building_interiors.mjs`): nachts trägt jede Tür des
   begehbaren Hauses sechs Bretter; Zombies schlagen sich an der Tür (1,15 m davor) Brett für Brett
   durch (je Tür ein Brett alle 3,4 s), steigen 1,8 m hinein und jagen den Spieler im Haus; durch

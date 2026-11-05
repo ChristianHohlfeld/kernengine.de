@@ -141,7 +141,7 @@ void Game::handle_shots() {
         const Vec3 local = to_local(b.rotation, s.to - b.position);
         const Vec3 h = c.car->spec().half;
         if (std::fabs(local.x) < h.x + 0.4f && std::fabs(local.y) < h.y + 0.4f && std::fabs(local.z) < 2.0f) {
-          damage_car(static_cast<i32>(i), kCarHit, true);
+          car_bullet(static_cast<i32>(i), true);  // per kind (game_vehicle_damage.cpp)
           break;
         }
       }
@@ -157,10 +157,16 @@ void Game::damage_car(i32 i, f32 amount, bool by_player) {
   TrafficCar& c = cars_[i];
   if (c.wreck || !(amount > 0)) return;
   const f32 now = world_->sim_time();
+  // a cruiser the player drives takes nothing (police_ground_units.mjs damageCar: playerDriven)
+  if (c.police && mode_ == Mode::car && i == car_index_) return;
   c.hp = std::fmax(0.0f, c.hp - amount);
-  if (c.hp <= kCarHp * kCarCritical) {
-    if (c.burn_until < 0) c.burn_until = now + kCarBurn;
-    else if (c.hp <= 0) c.burn_until = std::fmin(c.burn_until, now + 0.62f);  // acceleratedMs 620
+  const bool bus = c.car->spec().radius > 0.4f;
+  // critical: a cruiser at 25 % burns 2.6 s, at 0 at most 0.5 s more (police_ground_units.mjs);
+  // a car / bus at 20 % 2.45 / 3.1 s, and every further hit cuts it to 0.62 / 0.72 s
+  // (critical_damage_logic.mjs PROFILES, walk_world_experience_hotfix.mjs armCriticalDamage)
+  if (c.hp <= car_max_hp(c) * (c.police ? 0.25f : kCarCritical)) {
+    if (c.burn_until < 0) c.burn_until = now + (c.police ? 2.6f : bus ? 3.1f : kCarBurn);
+    else if (!c.police || c.hp <= 0) c.burn_until = std::fmin(c.burn_until, now + (c.police ? 0.5f : bus ? 0.72f : 0.62f));
   }
   if (by_player) c.hit_by_player = true;
 }
@@ -188,8 +194,11 @@ void Game::wreck_car(i32 i) {
   }
   // A burnt-out car (critical_damage_logic.mjs): explodes, jumps and stays.
   const bool by_player = c.hit_by_player;
-  explosion(at, 7, 110, by_player);
-  world_->push_actor(c.actor, {0, 0, 1450 * 3.5f}, true);
+  // a cruiser 7 m / 110 and 1450 x 5.5 up (police_ground_units.mjs wreckCar); a car or bus goes off with
+  // the default blast 8 m / 100 (world_car_explosion.mjs -> dispatchExplosion)
+  if (c.police) explosion(at, 7, 110, by_player);
+  else explosion(at, 8, 100, by_player);
+  world_->push_actor(c.actor, {0, 0, 1450 * (c.police ? 5.5f : 3.5f)}, true);
   if (by_player && c.police) wanted_.report(wanted::Crime::police_car, true);
   else if (by_player) wanted_.report(c.car->spec().radius > 0.4f ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
 }
@@ -235,15 +244,12 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
     const Vec3 me = matrix_of(soldier_).translation();
     const f32 d = kern::length(me - at);
     // dispatchExplosion: only an amount above 2 counts (gameplay_final_runtime_v2.mjs)
-    const f32 amount = d < radius ? damage * weapons::blast_factor(d, radius, !line_of_sight(at, me)) : 0;
+    // dispatchExplosion clamps the blast to 2..18 m and 10..160 damage
+    const f32 rr = clampf(radius, 2, 18), dmg = clampf(damage, 10, 160);
+    const f32 amount = d < rr ? dmg * weapons::blast_factor(d, rr, !line_of_sight(at, me)) : 0;
     if (amount > 2) world_->damage(soldier_, amount, 0, false, at);
   }
-  for (std::size_t i = 0; i < cars_.size(); ++i) {
-    const TrafficCar& c = cars_[i];
-    if (!c.placed || c.wreck) continue;
-    const f32 d = kern::length(matrix_of(c.actor).translation() - at);
-    if (d < radius * 1.2f) damage_car(static_cast<i32>(i), damage * 2.7f * weapons::blast_factor(d, radius * 1.2f, false), by_player);
-  }
+  blast_cars(at, radius, damage, by_player);  // hits per car / bus, cruisers linear (game_vehicle_damage.cpp)
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
   life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)
   gaps_lamps_blast(at, radius);  // street_lamps.mjs onExplosion (game_lamps.cpp)
@@ -283,7 +289,7 @@ void Game::spawn_police_unit() {
   c.car->reset();
   c.placed = true;
   c.driver = true;
-  c.hp = kCarHp;
+  c.hp = car_max_hp(c);
   c.wreck = false;
   c.hit_by_player = false;
   c.burn_until = -1;
@@ -571,8 +577,14 @@ void Game::emp_pulse() {
     if (impulse <= 0) continue;
     d.emp = true;
     d.sees = false;
-    const Vec3 away = dist > 0.1f ? (d.pos - me) * (1.0f / dist) : Vec3{0, 0, 1};
-    d.vel += away * (impulse / 6.0f) + Vec3{0, 0, 1.5f};  // a 6 kg drone
+    // triggerEmp: the kick is horizontal, away from the player, plus max(16, 0.16 J) N s downwards, on
+    // the 18 kg body (massKg 18); its HP drop to 34 % at most
+    Vec3 away{d.pos.x - me.x, d.pos.y - me.y, 0};
+    const f32 al = std::hypot(away.x, away.y);
+    if (al < 1e-2f) { const f32 a = static_cast<f32>(&d - pdrones_) / 5 * 2 * kPi; away = {std::cos(a), std::sin(a), 0}; }
+    else away = away * (1.0f / al);
+    d.vel += (away * impulse + Vec3{0, 0, -std::fmax(16.0f, impulse * 0.16f)}) * (1.0f / 18.0f);
+    d.hp = std::fmin(d.hp, std::ceil(kPdHp * 0.34f));
     ++hit;
   }
   world_->particle_burst(me + Vec3{0, 0, 1.2f}, {0.4f, 0.8f, 2.4f});
@@ -595,15 +607,15 @@ bool Game::update_police_drones(f32 dt) {
     PoliceDrone& d = pdrones_[i];
     if (!d.active) continue;
     if (d.emp) {
-      // Knocked out: falls, and breaks on the ground.
-      d.vel.z -= kG * dt;
+      // Knocked out: falls under 1.35 g (EMP_GRAVITY_SCALE), and breaks on the ground.
+      d.vel.z -= kG * 1.35f * dt;
       d.vel = d.vel * std::exp(-0.3f * dt);
       const Vec3 step = d.vel * dt;
       const RayResult r = cast(world_->physics(), d.pos, kern::normalize(step, {0, 0, -1}), kern::length(step) + 0.2f, {}, kCatWorld);
       if (r.hit || d.pos.z < city_.ground_height(d.pos.x, d.pos.y) + 0.2f) {
         explosion(r.hit ? r.point : d.pos, 2.5f, 25, true);
         d.active = false;
-        d.destroyed_until = now + kPdRespawn;
+        d.destroyed_until = now + 12;  // EMP_RESPAWN_MS 12000 (POLICE_RESPAWN_MS 9000 otherwise)
         continue;
       }
       d.pos += step;
@@ -749,7 +761,7 @@ void Game::update_police(f32 dt) {
           c.unit = -1;
           c.wreck = false;
           c.hit_by_player = false;
-          c.hp = kCarHp;
+          c.hp = car_max_hp(c);
         }
       }
       u = PoliceUnit{};
@@ -781,7 +793,8 @@ void Game::update_town(f32 dt) {
     const Vec3 v = world_->actor_velocity(c.actor);
     const Vec3 dv3 = v - c.last_velocity;
     const f32 dv = std::sqrt(dv3.x * dv3.x + dv3.y * dv3.y + 0.25f * dv3.z * dv3.z);
-    if (dv > kCrashDv && dt < 0.1f) damage_car(static_cast<i32>(i), (dv - kCrashDv) * kCrashDamage, false);
+    // crashCheck: only the cruisers take crash damage (police_ground_units.mjs CRASH_DV 7, CRASH_DMG 16)
+    if (c.police && dv > kCrashDv && dt < 0.1f) damage_car(static_cast<i32>(i), (dv - kCrashDv) * kCrashDamage, false);
     c.last_velocity = v;
     if (c.burn_until >= 0 && now >= c.burn_until) wreck_car(static_cast<i32>(i));
   }

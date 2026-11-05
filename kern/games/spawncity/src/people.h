@@ -82,6 +82,7 @@ class People {
   struct Death { i32 index; Kind kind; bool by_player; bool head; };
 
   void set_budget(u32 people) { budget_ = people; }
+  void set_ranges(f32 show, f32 hide) { show_ = show; hide_ = hide; }
   void clear() { people_.clear(); }
   /// Walks, flees, spawns and retires people around the focus; knocks people down under vehicles.
   void update(f32 dt, f32 now, const PeopleView& view, Rng& rng);
@@ -140,6 +141,7 @@ class People {
   std::vector<Fall> falls_;
   bool last_head_ = false;
   u32 budget_ = 60, serial_ = 1;
+  f32 show_ = 170, hide_ = 190;
 };
 
 }  // namespace sc

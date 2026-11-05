@@ -455,7 +455,7 @@ void Game::ui_reset() {
   people_.clear();
   for (TrafficCar& c : cars_) {
     if (c.police) continue;
-    c.hp = 300;
+    c.hp = car_max_hp(c);
     c.wreck = false;
     c.burn_until = -1;
   }

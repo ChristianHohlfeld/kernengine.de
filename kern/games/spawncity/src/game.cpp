@@ -282,6 +282,7 @@ bool Game::start(kern::Engine& e) {
   if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
+  if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
   init_weapons();
   e.set_status("SpawnCity: Karte wird geladen ...");
   cam_.eye = {-30, -40, 60};
@@ -506,12 +507,12 @@ void Game::exit_vehicle() {
 }
 
 void Game::eject() {
-  // Ejection seat (jet_mode.mjs): +28 m/s upwards, the canopy opens after 1.1 s.
+  // Ejection seat (jet_mode.mjs exit): 2.8 m and +28 m/s along the jet's own up, the canopy opens after 1.1 s.
   const BodyState s = state_of(jet_actor_);
   jet_.pilot = false;
   world_->set_alive(chute_actor_, true);
-  world_->teleport(chute_actor_, s.position + s.rotation.rotate({0, 0, 3.0f}));
-  world_->set_actor_velocity(chute_actor_, s.velocity + Vec3{0, 0, kEjectUp});
+  world_->teleport(chute_actor_, s.position + s.rotation.rotate({0, 0, 2.8f}));
+  world_->set_actor_velocity(chute_actor_, s.velocity + s.rotation.rotate({0, 0, kEjectUp}));
   chute_time_ = 0;
   chute_open_ = false;
   mode_ = Mode::parachute;
@@ -628,19 +629,15 @@ void Game::step_parachute(f32 h) {
   const f32 m = w.mass(b);
   chute_time_ += h;
   chute_open_ = chute_time_ >= kChuteOpen;
-  Vec3 f;
-  const f32 speed = kern::length(s.velocity);
-  if (!chute_open_) {
-    // Free fall: air drag with a terminal speed of about 55 m/s (player_walk_mode_v4.mjs).
-    f = s.velocity * (-(m * kG / (55 * 55)) * speed);
-  } else {
-    // Canopy: vertical drag for a 6.5 m/s sink, glide steered at up to 4 m/s.
-    f.z = -m * kG / (kChuteSink * kChuteSink) * s.velocity.z * std::fabs(s.velocity.z);
-    // jet_mode.mjs stepPara: v.x -> rollIn * 4, v.y -> -pitchIn * 4 (world axes), at 0.8 /s
-    // (chute_steer_ = {rollIn, -pitchIn}, game_controls.cpp)
+  // jet_mode.mjs stepPara: gravity, the horizontal speed damped .25 /s throughout; once the canopy is
+  // open (1.1 s) v.z eases towards -6.5 at 1.6 /s (against gravity: a ~12.6 m/s sink) and v.x / v.y
+  // towards rollIn * 4 / -pitchIn * 4 at 0.8 /s (chute_steer_ = {rollIn, -pitchIn}, game_controls.cpp)
+  Vec3 f{-m * 0.25f * s.velocity.x, -m * 0.25f * s.velocity.y, 0};
+  if (chute_open_) {
+    f.z = m * 1.6f * (-kChuteSink - s.velocity.z);
     const Vec2 want = chute_steer_ * kChuteSteer;
-    f.x = m * 0.8f * (want.x - s.velocity.x);
-    f.y = m * 0.8f * (want.y - s.velocity.y);
+    f.x += m * 0.8f * (want.x - s.velocity.x);
+    f.y += m * 0.8f * (want.y - s.velocity.y);
   }
   w.apply_force_to_center(b, f);
 }
@@ -663,7 +660,7 @@ void Game::manage_traffic() {
         world_->set_alive(c.actor, false);
         c.placed = false;
         c.wreck = false;
-        c.hp = 300;
+        c.hp = car_max_hp(c);
       }
       continue;
     }
@@ -708,7 +705,7 @@ void Game::manage_traffic() {
       c.car->reset();
       c.placed = true;
       c.driver = true;
-      c.hp = 300;
+      c.hp = car_max_hp(c);
       c.wreck = false;
       c.hit_by_player = false;
       c.burn_until = -1;
@@ -896,34 +893,34 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
       const Vec3 pos = m.translation();
       const Vec3 nose = s.rotation.rotate({0, 1, 0}), up = s.rotation.rotate({0, 0, 1});
       if (jet_cockpit_) {
+        // jet_mode.mjs applyCamera cockpit: cockpitEye (0, 3.5, 1.42), along the nose, near .5
         c.eye = (m * kern::Mat4::translate({0, 3.5f, 1.42f})).translation();
         c.target = c.eye + nose * 10.0f;
         c.up = up;
-        c.fov = 72 * kDeg * 0.8f;
-        c.near = 0.1f;
+        c.near = 0.5f;
       } else {
-        const f32 nl = std::hypot(nose.x, nose.y);
-        rig(pos, s.velocity, nl > 0.2f ? Vec2{nose.x / nl, nose.y / nl} : cam_heading_, 6, 8, 4, 2.5f);
-        const Vec3 hd{cam_heading_.x, cam_heading_.y, 0};
-        const f32 pitch = std::asin(clampf(nose.z, -1, 1)) * 0.6f;
-        const Vec3 back = hd * std::cos(pitch) + Vec3{0, 0, std::sin(pitch)};
-        const Vec3 want = cam_anchor_ - back * 24.0f + Vec3{0, 0, 6.5f};
-        c.eye = collide(cam_anchor_ + Vec3{0, 0, 2}, want, body(jet_actor_));
-        c.target = cam_anchor_ + back * 12.0f + Vec3{0, 0, 2.0f};
-        c.up = {0, 0, 1};
-        c.fov = (60 + std::fmin(12.0f, kern::length(s.velocity) * 0.04f)) * kDeg;
+        // jet_mode.mjs applyCamera chase: 22 + min(14, v / 40) m behind and 6.5 m above the airframe (in
+        // its own frame), eased with 1 - e^(-6 dt); up 35 % towards the world's; looking 30 m ahead
+        const f32 sp = kern::length(s.velocity), dist = 22 + std::fmin(14.0f, sp / 40);
+        const Vec3 want = nose * -dist + up * 6.5f;
+        if (!rig_init_) { jet_cam_off_ = want; rig_init_ = true; }
+        jet_cam_off_ = jet_cam_off_ + (want - jet_cam_off_) * (1 - std::exp(-std::fmin(dt, 0.1f) * 6));
+        c.eye = collide(pos + up * 2.0f, pos + jet_cam_off_, body(jet_actor_));
+        c.target = pos + nose * 30.0f;
+        c.up = kern::normalize(up + (Vec3{0, 0, 1} - up) * 0.35f, {0, 0, 1});
+        c.near = 1;
       }
+      c.fov = clampf(66 + kern::length(s.velocity) / 30, 66, 90) * kDeg;  // both views
       c.far = 6000;
       break;
     }
     case Mode::parachute: {
       const Vec3 pos = matrix_of(chute_actor_).translation();
-      const f32 yaw = world_->camera_yaw() * kDeg + head_yaw_;
-      const Vec3 hd{std::cos(yaw), std::sin(yaw), 0};
-      c.eye = collide(pos, pos - hd * 9.0f + Vec3{0, 0, 3.5f}, body(chute_actor_));
-      c.target = pos + hd * 4.0f;
+      // jet_mode.mjs applyCamera (para): 14 m south and 7 m above the canopy, at 2 m above it, fov 70
+      c.eye = collide(pos, pos + Vec3{0, -14, 7}, body(chute_actor_));
+      c.target = pos + Vec3{0, 0, 2};
       c.up = {0, 0, 1};
-      c.fov = 60 * kDeg;
+      c.fov = 70 * kDeg;
       break;
     }
   }

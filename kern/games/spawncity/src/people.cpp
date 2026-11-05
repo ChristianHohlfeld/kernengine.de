@@ -9,7 +9,7 @@ namespace sc {
 namespace {
 
 // pedestrian_agents.mjs / world_procedural_population.mjs
-constexpr f32 kShow = 170, kHide = 190;       // people appear within 170 m and go beyond 190 m
+// world_procedural_population.mjs PEOPLE_SHOW_M / PEOPLE_HIDE_M: 170 / 190 m (phone 140 / 160), set_ranges
 constexpr f32 kPavement = 1.6f;               // pavement centre beyond the carriageway edge
 constexpr f32 kWitness = 45;                  // wanted_system_logic: a witness within sight
 constexpr f32 kBodySeconds = 25;              // a body stays this long
@@ -170,7 +170,7 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     f32 heading;
     route_point(p, lanes, at, heading);
     const f32 d = dist2d(at, view.focus);
-    if (d < near || d > kShow) continue;
+    if (d < near || d > show_) continue;
     if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
       p.side = -p.side;  // the other pavement, else closer to the kerb
       route_point(p, lanes, at, heading);
@@ -334,7 +334,13 @@ void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
       else knock(p, p.pos - at, now);
       continue;
     }
-    p.hp -= damage * t * t * (3 - 2 * t);
+    if (p.kind == Kind::officer) {
+      // police_ground_units.mjs onExplosion: an officer out of the car within r (2..60) takes
+      // COP_HP (1 - d / r) 1.6 + 20, d across the ground
+      const f32 r = clampf(radius, 2, 60), d2 = dist2d(p.pos, at);
+      if (d2 < r) p.hp -= 100 * (1 - d2 / r) * 1.6f + 20;
+    } else
+      p.hp -= damage * t * t * (3 - 2 * t);
     if (p.hp <= 0) kill(p, p.pos - at, by_player, now, false);
   }
   frighten(at, radius * 2.5f, now, 1.6f);
@@ -454,12 +460,12 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
   for (Person& p : people_) {
     if (p.state == State::gone) continue;
     if (p.state == State::down) {
-      if (now - p.down_at > kBodySeconds || dist2d(p.pos, view.focus) > kHide) p.state = State::gone;
+      if (now - p.down_at > kBodySeconds || dist2d(p.pos, view.focus) > hide_) p.state = State::gone;
       continue;
     }
     if (now < p.knocked_until) continue;  // lying on the street as a ragdoll (M3 life)
     if (p.kind == Kind::citizen) {
-      if (dist2d(p.pos, view.focus) > kHide) { p.state = State::gone; continue; }
+      if (dist2d(p.pos, view.focus) > hide_) { p.state = State::gone; continue; }
       if (p.state != State::fight) walk(p, dt, now, view, rng);
     }
     p.phase += p.v * dt * 3.4f;
