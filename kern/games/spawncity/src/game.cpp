@@ -793,10 +793,10 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
   const f32 aspect = e.aspect();
   (void)aspect;
   if (!world_placed_) {
-    // Overview while the city loads.
-    const f32 a = static_cast<f32>(time_) * 0.05f;
-    c.eye = {std::cos(a) * 220, std::sin(a) * 220, 140};
-    c.target = {0, 0, 0};
+    // While the city loads the view stands at the start place at eye height (the original never
+    // shows an overview from above: the game view starts on the ground).
+    c.eye = {0, 0, city_.ground_height(0, 0) + 1.68f};
+    c.target = c.eye + Vec3{10, 0, 0};
     c.up = {0, 0, 1};
     c.fov = 50 * kDeg;
     cam_ = c;
