@@ -220,19 +220,6 @@ void Game::update_projectiles(f32 dt) {
       // a jet rocket whose 5 s run out is gone without a blast (stepRockets: blast only on a hit)
       const bool spent = p.id == Id::jet_missile && now - p.born > p.fuse;
       if (!spent && s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player);
-      // Blasts reach police drones too.
-      for (PoliceDrone& d : pdrones_) {
-        if (!d.active) continue;
-        const f32 dd = kern::length(d.pos - at);
-        if (dd < s.radius_m * 1.3f) {
-          d.hp -= s.damage * weapons::blast_factor(dd, s.radius_m * 1.3f, false);
-          if (d.hp <= 0) {
-            d.active = false;
-            d.destroyed_until = now + 9;
-            if (p.by_player) wanted_.report(wanted::Crime::police_drone, true);
-          }
-        }
-      }
       p.alive = false;
     }
   }

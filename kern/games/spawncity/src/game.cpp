@@ -436,6 +436,8 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       }
       c.driver = false;
       car_index_ = vehicle;
+      // a parked car may be asleep in Box3D: the throttle must reach it at once
+      if (world_->physics().body_valid(body(c.actor))) world_->physics().set_awake(body(c.actor), true);
       hide_soldier();
       car_cockpit_ = false;
       break;
@@ -1081,7 +1083,16 @@ std::string Game::hud_json() {
     case Mode::car:
       if (car_index_ >= 0) {
         vel = world_->actor_velocity(cars_[car_index_].actor);
-        add(",\"car\":{\"gear\":\"%s\",\"bus\":%s}", cars_[car_index_].car->gear() < 0 ? "R" : "D", cars_[car_index_].car->spec().radius > 0.4f ? "true" : "false");
+      {
+        // tests: why a car does not drive (throttle, wheels on the ground, height over the ground, how far it was jacked from)
+        const Car& cc = *cars_[car_index_].car;
+        const Vec3 cp = matrix_of(cars_[car_index_].actor).translation();
+        i32 contacts = 0;
+        for (int w = 0; w < 4; ++w) contacts += cc.wheel(w).contact ? 1 : 0;
+        add(",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
+            cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
+            world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
+      }
       }
       break;
     case Mode::jet: {
@@ -1181,6 +1192,7 @@ std::string Game::command(const std::string& cmd) {
                       city_.lanes().size());
         return why;
       }
+      jacked_at_ = bd;  // tests: how far away the car was
       switch_mode(Mode::car, best);
       return mode_name(mode_);
     }

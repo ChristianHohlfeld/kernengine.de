@@ -544,7 +544,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);  // LENKEN / GAS: the left stick up
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast})`);
+    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast}, car ${JSON.stringify(h.car)}, ctl ${(await cmd("controls")).slice(0, 160)})`);
     await shot("3-car");
     check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);

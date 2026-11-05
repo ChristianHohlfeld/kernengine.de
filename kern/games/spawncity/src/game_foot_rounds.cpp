@@ -174,6 +174,26 @@ bool Game::foot_remote_detonate(f32 now) {
   return any;
 }
 
+void Game::blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player) {
+  // dispatchExplosion: a police drone in the blast takes min(3, round(amount / 34)) hits of 34
+  // (amount = damage x falloff x exposure; registerPoliceHit, wanted_police_drones.mjs)
+  const f32 now = world_->sim_time();
+  for (PoliceDrone& d : pdrones_) {
+    if (!d.active) continue;
+    const f32 dd = kern::length(d.pos - at);
+    if (dd >= radius) continue;
+    const f32 amount = damage * weapons::blast_factor(dd, radius, !line_of_sight(at, d.pos));
+    const f32 hits = std::fmin(3.0f, std::fmax(0.0f, std::round(amount / 34)));
+    if (hits <= 0) continue;
+    d.hp -= 34 * hits;
+    if (d.hp <= 0) {
+      d.active = false;
+      d.destroyed_until = now + 9;
+      if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+    }
+  }
+}
+
 void Game::foot_rocket_launched() {
   // launchFootRocket: a new rocket takes the laser over, the one still in the air flies on unguided
   for (std::size_t i = 0; i + 1 < projectiles_.size(); ++i)

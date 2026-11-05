@@ -234,7 +234,9 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   if (mode_ == Mode::foot) {
     const Vec3 me = matrix_of(soldier_).translation();
     const f32 d = kern::length(me - at);
-    if (d < radius) world_->damage(soldier_, damage * weapons::blast_factor(d, radius, !line_of_sight(at, me)), 0, false, at);
+    // dispatchExplosion: only an amount above 2 counts (gameplay_final_runtime_v2.mjs)
+    const f32 amount = d < radius ? damage * weapons::blast_factor(d, radius, !line_of_sight(at, me)) : 0;
+    if (amount > 2) world_->damage(soldier_, amount, 0, false, at);
   }
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
@@ -245,6 +247,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
   life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)
   gaps_lamps_blast(at, radius);  // street_lamps.mjs onExplosion (game_lamps.cpp)
+  blast_police_drones(at, radius, damage, by_player);  // every blast reaches them (game_foot_rounds.cpp)
 }
 
 // ---------------------------------------------------------------------------------------------
