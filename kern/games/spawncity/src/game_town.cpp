@@ -533,8 +533,14 @@ void Game::emp_pulse() {
   // EMP (wanted_police_drones.mjs): 30 m, 18 s cooldown; drones in range drop out of the sky.
   const f32 now = world_->sim_time();
   if (now < emp_ready_at_ || wanted_.stars() <= 0) { toast_ = now < emp_ready_at_ ? "EMP laedt ..." : "EMP: keine Ziele"; toast_age_ = 0; return; }
-  emp_ready_at_ = now + wanted::kEmpCooldownMs / 1000;
   const Vec3 me = player_position();
+  {
+    // wanted_police_drones.mjs triggerEmp: nothing in range = "NO TARGET IN RANGE" for 1.1 s, no cooldown
+    i32 targets = 0;
+    for (const PoliceDrone& d : pdrones_) targets += d.active && !d.emp && kern::length(d.pos - me) <= wanted::kEmpRange ? 1 : 0;
+    if (targets == 0) { ctl_.emp_miss_until = now + 1.1f; return; }
+  }
+  emp_ready_at_ = now + wanted::kEmpCooldownMs / 1000;
   u32 hit = 0;
   for (PoliceDrone& d : pdrones_) {
     if (!d.active || d.emp) continue;

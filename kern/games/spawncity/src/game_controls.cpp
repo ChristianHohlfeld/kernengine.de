@@ -317,6 +317,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   const bool inv_move = st.on(Opt::foot_invert_move_h);
   const weapons::Id w = foot_weapon_;
   const bool melee = w == weapons::Id::fists || w == weapons::Id::knife;
+  C.assist_on = false;
   const bool locked = C.aim_lock_until > now;  // strike aiming: weapons rest (fighter_jets.mjs lockInput)
   // keyboard (player_walk_mode_v4.mjs update): WASD, Shift sprint, Space jump / jetpack
   f32 forward = key(in, Key::w) - key(in, Key::s), strafe = key(in, Key::d) - key(in, Key::a);
@@ -501,7 +502,185 @@ controls::AimAssist Game::ctl_assist(f32 in_yaw, f32 in_pitch, f32 input) {
     if (!point(g_aim.kind, g_aim.index, p)) return {};
   }
   errors(p, ye, pe, d);
-  return controls::fps_aim_assist(ye, pe, d, input, in_yaw, in_pitch, s);
+  const controls::AimAssist a = controls::fps_aim_assist(ye, pe, d, input, in_yaw, in_pitch, s);
+  ctl_.assist_on |= a.active && 1 - a.slowdown > 0.0015f;  // #footReticle.aim-assisted (strength > .015)
+  return a;
+}
+
+namespace {
+// What the original's HUD modules show and the game state does not say directly (ctl_view_json).
+struct ViewTrack {
+  i32 last_stars = 0;
+  f32 banner_until = -1;
+  bool busted = false;
+  f32 last_hp = -1, last_drone_hp = -1, last_car_hp = -1, last_jet_hp = -1;
+  u32 dmg = 0;
+  bool was_dead = false;
+  Fun fun;
+  bool fun_valid = false;
+  u32 toast_serial = 0;
+  std::vector<std::string> toasts;  // JSON objects, newest last (gameplay_fun_runtime.mjs toastFor)
+  bool drone_was_alive = true;
+} g_view;
+
+std::string jesc(const std::string& s) {
+  std::string o;
+  for (char c : s) {
+    if (c == '"' || c == '\\') o += '\\';
+    if (static_cast<unsigned char>(c) < 0x20) continue;
+    o += c;
+  }
+  return o;
+}
+}  // namespace
+
+std::string Game::ctl_view_json() {
+  ControlsState& C = ctl_;
+  ViewTrack& V = g_view;
+  const f32 now = world_->sim_time();
+  std::string s = ",\"view\":{";
+  char b[640];
+  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
+  auto screen = [&](Vec3 p, f32& x, f32& y) {
+    f32 nx, ny, depth;
+    const bool on = project_screen(p, nx, ny, depth);
+    x = (nx + 1) / 2 * frame_w_;
+    y = (1 - ny) / 2 * frame_h_;
+    return on && depth > 0;
+  };
+  // ---- the camera (speed_lines.mjs measures its speed itself)
+  add("\"eye\":[%.2f,%.2f,%.2f]", cam_.eye.x, cam_.eye.y, cam_.eye.z);
+  // ---- damage taken (flight_fire_fx.mjs arondight:combat-damage -> .combat-damage-vignette)
+  {
+    const f32 hp = world_->hud().health, dhp = drone_hp_, jhp = jet_hp_, chp = car_index_ >= 0 ? cars_[car_index_].hp : -1;
+    if ((V.last_hp >= 0 && hp >= 0 && hp < V.last_hp - 0.01f) || (mode_ == Mode::drone && dhp < V.last_drone_hp - 0.01f) || (mode_ == Mode::jet && jhp < V.last_jet_hp - 0.01f) ||
+        (mode_ == Mode::car && chp >= 0 && V.last_car_hp >= 0 && chp < V.last_car_hp - 0.01f))
+      ++V.dmg;
+    V.last_hp = hp; V.last_drone_hp = dhp; V.last_jet_hp = jhp; V.last_car_hp = chp;
+  }
+  add(",\"dmg\":%u,\"droneHits\":%u,\"assist\":%s", V.dmg, C.drone_hits, C.assist_on ? "true" : "false");
+  // ---- car (player_car_mode.mjs commandSpeed: along the car)
+  if (mode_ == Mode::car && car_index_ >= 0) add(",\"carKmh\":%.0f", std::fabs(cars_[car_index_].car->forward_speed()) * 3.6f);
+  add(",\"cockpit\":%s", car_cockpit_ ? "true" : "false");
+  // xbox_control_mode.mjs: the AIM scheme's crosshair while LB looks (the drone)
+  add(",\"xboxAim\":%s", C.aim_scheme && mode_ == Mode::drone && pad.connected && pad.down(kPadLB) ? "true" : "false");
+  // ---- jet (jet_mode.mjs renderHud / renderCityCue / renderButtons)
+  if (mode_ == Mode::jet && jet_placed_) {
+    const JetTelemetry& t = jet_.telemetry();
+    const BodyState st = state_of(jet_actor_);
+    const f32 v = kern::length(st.velocity);
+    f32 fx = 0, fy = 0;
+    bool fpm = false;
+    if (v > 15) fpm = screen(st.position + st.velocity * 4.0f, fx, fy);
+    const bool landed = jet_.landed() || (t.contacts >= 2 && v < 4);
+    const f32 rocket_left = std::fmax(0.0f, next_jet_missile_ - now) * 1000;
+    add(",\"jet\":{\"kmh\":%.0f,\"mach\":%.3f,\"agl\":%.1f,\"nz\":%.2f,\"alpha\":%.2f,\"flight\":%s,\"nozzleCos\":%.3f,\"lever\":%.3f,"
+        "\"thrust\":%.3f,\"landed\":%s,\"hp\":%.0f,\"burning\":%s,\"rocketLeft\":%.0f,\"fpm\":%s,\"fx\":%.1f,\"fy\":%.1f}",
+        v * 3.6f, t.mach, t.agl, t.nz, v > 20 ? t.alpha / kDeg : 0.0f, jet_.mode() == Jet::Mode::flight ? "true" : "false", std::cos(jet_.nozzle()), jet_.lever(),
+        clampf(jet_.thrust() / jet_.spec().thrust_max, 0, 1), landed ? "true" : "false", std::round(jet_hp_ / 400 * 100),
+        gaps_ && gaps_->jet_burning ? "true" : "false", rocket_left, fpm ? "true" : "false", fx, fy);
+  }
+  // ---- wanted (wanted_police_drones.mjs renderHud / renderEmpControl)
+  {
+    const i32 stars = wanted_.stars();
+    if (V.last_stars > 0 && stars == 0) { V.banner_until = now + 2.1f; V.busted = player_dead_; }
+    V.last_stars = stars;
+    i32 active = 0, in_range = 0;
+    f32 inbound = 1e9f;
+    const Vec3 me = player_position();
+    for (const PoliceDrone& d : pdrones_) {
+      if (!d.active) continue;
+      ++active;
+      if (!d.emp && kern::length(d.pos - me) <= wanted::kEmpRange) ++in_range;
+      if (d.shots == 0) inbound = std::fmin(inbound, d.next_shot - now);
+    }
+    const bool searching = stars > 0 && wanted_.hidden_ms() > 0;
+    const f32 escape_left = stars > 0 ? std::fmax(0.0f, wanted::escape_ms(stars) - wanted_.hidden_ms()) : 0;
+    const f32 next_wave = active == 0 && next_drone_wave_ > now ? (next_drone_wave_ - now) * 1000 : -1;
+    add(",\"wanted\":{\"stars\":%d,\"active\":%d,\"searching\":%s,\"escapeMs\":%.0f,\"inboundMs\":%.0f,\"nextWaveMs\":%.0f,\"banner\":%s,\"busted\":%s,"
+        "\"empMs\":%.0f,\"inRange\":%d,\"miss\":%s}",
+        stars, active, searching ? "true" : "false", escape_left, inbound < 1e8f ? std::fmax(0.0f, inbound) * 1000 : 0.0f, next_wave, now < V.banner_until ? "true" : "false",
+        V.busted ? "true" : "false", std::fmax(0.0f, emp_ready_at_ - now) * 1000, in_range, now < C.emp_miss_until ? "true" : "false");
+  }
+  // ---- the contract and its toasts (gameplay_fun_runtime.mjs render / toastFor)
+  {
+    const Fun& f = combat_.fun;
+    const Contract& k = contract(f.contract_index);
+    if (V.fun_valid) {
+      const Fun& p = V.fun;
+      auto toast = [&](const std::string& body) {
+        V.toasts.push_back("{\"id\":" + std::to_string(++V.toast_serial) + "," + body + "}");
+        if (V.toasts.size() > 5) V.toasts.erase(V.toasts.begin());
+      };
+      const bool died = player_dead_ && !V.was_dead;
+      const bool drone_lost = !drone_out_ && V.drone_was_alive && drone_hp_ <= 0;
+      if (f.contract_complete && !p.contract_complete) {
+        const Contract& pk = contract(p.contract_index);
+        toast("\"type\":\"contractComplete\",\"name\":\"" + jesc(pk.name) + "\",\"reward\":" + std::to_string(pk.reward));
+      }
+      if (died && p.at_risk > 0) toast("\"type\":\"insurance\",\"insured\":" + std::to_string(std::max(0, f.score - p.score)) + ",\"lost\":" + std::to_string(std::max(0, p.at_risk - f.at_risk - std::max(0, f.score - p.score))));
+      else if (drone_lost && p.at_risk > f.at_risk) toast("\"type\":\"setback\",\"label\":\"" + jesc(f.last_label) + "\",\"lost\":" + std::to_string(p.at_risk - f.at_risk) + ",\"mercy\":" + std::to_string(f.mercy));
+      else if (f.score > p.score && f.at_risk == 0 && p.at_risk > 0)
+        toast("\"type\":\"bank\",\"points\":" + std::to_string(f.score - p.score) + ",\"peakStars\":" + std::to_string(std::max(p.max_stars, p.stars)) + ",\"score\":" + std::to_string(f.score));
+      if (f.overdrive_until > p.overdrive_until + 0.01f && f.overdrive_until > now)
+        toast("\"type\":\"overdrive\",\"durationMs\":" + std::to_string(static_cast<int>(kOverdriveS * 1000)) + ",\"bonus\":" + std::to_string(std::max(0, f.at_risk - p.at_risk)));
+      else if (f.last_award != p.last_award && f.combo >= 2 && f.at_risk > p.at_risk) {
+        std::snprintf(b, sizeof b, "\"type\":\"award\",\"points\":%d,\"label\":\"%s\",\"combo\":%d,\"multiplier\":%.2f", f.at_risk - p.at_risk, jesc(f.last_label).c_str(), f.combo, f.multiplier(now));
+        toast(b);
+      }
+      if (p.combo >= 2 && f.combo == 0 && f.score == p.score && !died) toast("\"type\":\"comboBreak\",\"combo\":" + std::to_string(p.combo));
+    }
+    V.fun = f;
+    V.fun_valid = true;
+    V.was_dead = player_dead_;
+    V.drone_was_alive = drone_out_;
+    add(",\"fun\":{\"reward\":%d,\"complete\":%s,\"overdrive\":%s,\"momentum\":%d,\"mercy\":%d,\"damageScale\":%.2f,\"risk\":%d,\"score\":%d,\"high\":%d,"
+        "\"mult\":%.2f,\"name\":\"%s\",\"hint\":\"%s\",\"progress\":%d,\"target\":%d,\"stars\":%d,\"toasts\":[",
+        k.reward, f.contract_complete ? "true" : "false", now < f.overdrive_until ? "true" : "false", f.momentum, f.mercy, f.police_damage_scale(), f.at_risk, f.score,
+        f.high_score, f.multiplier(now), jesc(k.name).c_str(), jesc(k.hint).c_str(), f.contract_progress, k.target, wanted_.stars());
+    for (std::size_t i = 0; i < V.toasts.size(); ++i) s += (i ? "," : "") + V.toasts[i];
+    s += "]}";
+  }
+  // ---- GUIDED (guided_missile.mjs renderLock / renderCooldown, gameplay_final_runtime_v2.mjs updateDroneAim)
+  if (mode_ == Mode::drone) {
+    f32 lx = 0, ly = 0, ld = 0;
+    bool lock = false;
+    std::string label;
+    if (!guided_.empty() && guided_.back().m.tracking) {
+      const guided::Flight& g = guided_.back();
+      lock = screen(g.m.goal, lx, ly);
+      ld = kern::length(g.m.goal - cam_.eye);
+      label = g.t.label;
+    }
+    // the centre ray: a vehicle, a drone or a person under the crosshair = "ZIEL"
+    Vec3 dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    const RayResult r = cast(world_->physics(), cam_.eye, dir, 600, body(drone_actor_), kCatVehicle | kCatDrone | kCatWorld);
+    bool actor = false;
+    for (const TrafficCar& c : cars_)
+      if (r.hit && c.placed && kern::length(matrix_of(c.actor).translation() - r.point) < c.car->spec().half.x + 1.5f) actor = true;
+    const f32 reach = r.hit ? r.distance : 600;
+    for (const auto& q : people_.all()) {
+      if (q.state == People::State::gone || q.state == People::State::down) continue;
+      const Vec3 to = q.pos + Vec3{0, 0, 1} - cam_.eye;
+      const f32 along = kern::dot(to, dir);
+      if (along > 0 && along < reach && kern::length(to - dir * along) < 1.2f) { actor = true; break; }
+    }
+    add(",\"guidedView\":{\"lock\":%s,\"x\":%.1f,\"y\":%.1f,\"d\":%.0f,\"label\":\"%s\",\"denied\":%s,\"actor\":%s,\"cdMs\":%.0f}", lock ? "true" : "false", lx, ly, ld,
+        jesc(label).c_str(), now < C.guided_denied_until ? "true" : "false", actor ? "true" : "false", std::fmax(0.0f, guided_last_ + guided::kCooldown - now) * 1000);
+  }
+  // ---- the strike's recharge (fighter_jets.mjs renderButton --cool)
+  add(",\"strikeK\":%.3f", clampf((now - combat_.last_strike) / kStrikeCooldownS, 0, 1));
+  // the drone's last impact marks [serial, x, y] (screen px); the page shows the ones it has not shown
+  s += ",\"impacts\":[";
+  bool first = true;
+  for (u32 i = C.impact_serial > 8 ? C.impact_serial - 8 : 0; i < C.impact_serial; ++i) {
+    f32 x, y;
+    if (!screen(C.impacts[i % 8], x, y)) continue;
+    add("%s[%u,%.0f,%.0f]", first ? "" : ",", i + 1, x, y);
+    first = false;
+  }
+  s += "]";
+  return s + "}";
 }
 
 bool Game::ctl_touch_shot(f32 x, f32 y) {
@@ -597,6 +776,8 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
     f.fresh = false;
   }
   if (locked) trigger = pressed = false;
+  // guided_missile.mjs press(): denied while it reloads -> body.guided-denied for 900 ms
+  if (pressed && drone_weapon_ == 2 && world_->sim_time() < guided_last_ + guided::kCooldown) C.guided_denied_until = world_->sim_time() + 0.9f;
   drone_attack(trigger, pressed);
   C.aim_point = false;
   trigger_was_ = trigger;
@@ -883,6 +1064,7 @@ std::string Game::ctl_hud_json() {
   s += C.pad_drone ? ",\"padDrone\":true" : ",\"padDrone\":false";
   std::snprintf(b, sizeof b, ",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"head\":[%.3f,%.3f]", sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, head_yaw_, head_pitch_);
   s += b;
+  s += ctl_view_json();
   return s + "}";
 }
 
@@ -926,7 +1108,11 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
   }
   if (starts("strike")) {
     // "strike aim" (4 / J / D-pad up), "strike go", "strike cancel" (Esc, RMB, B)
-    if (cmd == "strike aim") ctl_strike_start();
+    f32 sx = 0, sy = 0;
+    if (std::sscanf(cmd.c_str(), "strike at %f %f", &sx, &sy) == 2) {
+      // fighter_jets.mjs overlay pointerup: the laser on the ground under the finger, then the run
+      if (C.aiming) ctl_strike_confirm(true, sx, sy);
+    } else if (cmd == "strike aim") ctl_strike_start();
     else if (cmd == "strike go") ctl_strike_confirm(false, 0, 0);
     else if (cmd == "strike cancel") C.aiming = false;
     else return false;
@@ -960,6 +1146,24 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     pad_touch_.set_dom_rects(std::move(rects));
     out = "ok";
     return true;
+  }
+  {
+    // jet_mode.mjs renderCityCue: a place on the screen ("project <lon> <lat>"; the page looks the
+    // town up, the game knows where it is): {"x","y","front","dist"} in CSS px, behind = mirrored
+    f64 lon = 0, lat = 0;
+    if (std::sscanf(cmd.c_str(), "project %lf %lf", &lon, &lat) == 2) {
+      f64 x = 0, y = 0;
+      city_.projector().project(lon, lat, x, y);
+      const Vec3 me = mode_ == Mode::parachute ? matrix_of(chute_actor_).translation() : mode_ == Mode::jet ? matrix_of(jet_actor_).translation() : player_position();
+      const Vec3 p{static_cast<f32>(x), static_cast<f32>(y), city_.ground_height(static_cast<f32>(x), static_cast<f32>(y)) + 20};
+      f32 nx, ny, depth;
+      project_screen(p, nx, ny, depth);
+      char b[160];
+      std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"front\":%s,\"dist\":%.0f}", (nx + 1) / 2 * frame_w_, (1 - ny) / 2 * frame_h_, depth > 0 ? "true" : "false",
+                    std::hypot(p.x - me.x, p.y - me.y));
+      out = b;
+      return true;
+    }
   }
   if (cmd == "touch release") {
     // foot_touch_controller.mjs releaseAll: the page is hidden, or no finger is left on the glass

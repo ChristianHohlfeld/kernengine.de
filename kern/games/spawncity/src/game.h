@@ -183,6 +183,7 @@ class Game {
   void ctl_camera(kern::Camera& c);
   void ctl_enter(bool jet_first);
   bool ctl_touch_shot(f32 x, f32 y);
+  std::string ctl_view_json();  // what the original's HUD modules show (web/view_modes.mjs)
   controls::AimAssist ctl_assist(f32 in_yaw, f32 in_pitch, f32 input);
 
   // simulation pieces
