@@ -1,0 +1,59 @@
+name: SpawnCity Touch-Vergleich
+
+# The original (spawncity.de) and SpawnCity on Kern on an emulated touch phone, landscape and
+# portrait, driven only by taps (tests/touch_compare.mjs): screenshots, HUD dumps and diff.md to the
+# branch touch-ergebnis. With kern_ref, Kern's page comes from that branch (served from the
+# checkout, with the deployed spawncity.wasm) - for checking view-layer changes before they ship.
+on:
+  workflow_dispatch:
+    inputs:
+      kern_ref:
+        description: branch to take Kern's page from (empty = the deployed kernengine.de)
+        default: ''
+      only:
+        description: run only "original" or "kern" (empty = both)
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  touch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright + Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Kern's page from a branch
+        if: inputs.kern_ref != ''
+        run: |
+          set -euo pipefail
+          git fetch -q origin "${{ inputs.kern_ref }}"
+          mkdir -p /tmp/kernsite && git --work-tree=/tmp/kernsite checkout FETCH_HEAD -- .
+          curl -fsSL --retry 3 -o /tmp/kernsite/kern/games/spawncity/web/spawncity.wasm https://kernengine.de/kern/games/spawncity/web/spawncity.wasm
+          (cd /tmp/kernsite && nohup python3 -m http.server 8123 >/tmp/http.log 2>&1 &)
+          sleep 2
+      - name: Compare
+        env:
+          TOUCH_ONLY: ${{ inputs.only }}
+        run: |
+          set -euo pipefail
+          KURL=https://kernengine.de/kern/games/spawncity/web/index.html
+          if [ -n "${{ inputs.kern_ref }}" ]; then KURL=http://localhost:8123/kern/games/spawncity/web/index.html; fi
+          node kern/games/spawncity/tests/touch_compare.mjs generated/spawncity-touch https://spawncity.de/drone_simulator.html "$KURL"
+      - name: Results to branch touch-ergebnis
+        if: always()
+        run: |
+          set -euo pipefail
+          cd generated/spawncity-touch
+          git init -q -b touch-ergebnis
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Touch ${{ github.run_id }} kern_ref=${{ inputs.kern_ref }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" touch-ergebnis
