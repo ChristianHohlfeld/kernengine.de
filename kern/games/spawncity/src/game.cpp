@@ -682,7 +682,14 @@ void Game::manage_traffic() {
       const Vec2 a = L.points[k], bpt = L.points[k + 1];
       const f32 seg = std::hypot(bpt.x - a.x, bpt.y - a.y);
       if (seg < 8) continue;
-      const Vec2 mid = (a + bpt) * 0.5f;
+      // a spot along the segment (a long street segment's middle can be far away while the street
+      // itself runs right past the player: the synthetic test town, long OSM ways)
+      f32 along = seg * 0.5f;
+      if (seg > 16) {
+        const f32 t0 = clampf(((me.x - a.x) * (bpt.x - a.x) + (me.y - a.y) * (bpt.y - a.y)) / seg, 0, seg);  // nearest to the player
+        along = clampf(t0 + (rng_.unit() < 0.5f ? -1.0f : 1.0f) * rng_.range(45, 240), 4, seg - 4);
+      }
+      const Vec2 mid = a + (bpt - a) * (along / seg);
       const f32 d = std::hypot(mid.x - me.x, mid.y - me.y);
       if (d < 45 || d > 280) continue;
       const i32 dir = rng_.unit() < 0.5f ? 1 : -1;
