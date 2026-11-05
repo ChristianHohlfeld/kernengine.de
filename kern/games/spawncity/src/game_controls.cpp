@@ -924,6 +924,12 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     out = cmd == "scheme aim" ? "aim" : "classic";
     return true;
   }
+  if (cmd == "touch release") {
+    // foot_touch_controller.mjs releaseAll: the page is hidden, or no finger is left on the glass
+    pad_touch_.release_all();
+    out = "ok";
+    return true;
+  }
   if (starts("xbox ")) {
     // the XBOX CONTROLLER switch (drone_control_settings.mjs xboxControllerEnabled): hides the drone's touch controls
     C.pad_drone = cmd == "xbox on";

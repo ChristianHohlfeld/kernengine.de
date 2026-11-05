@@ -182,6 +182,12 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   canvas.addEventListener("pointermove", finger(1));
   canvas.addEventListener("pointerup", finger(2));
   canvas.addEventListener("pointercancel", finger(3));
+  // foot_touch_controller.mjs: every finger is let go when the page hides, on pagehide, and when a
+  // touchend / touchcancel leaves no touch on the glass (the ground truth); blur keeps them.
+  const releaseFingers = () => command("touch release");
+  document.addEventListener("visibilitychange", () => { if (document.hidden) releaseFingers(); });
+  addEventListener("pagehide", releaseFingers);
+  for (const t of ["touchend", "touchcancel"]) addEventListener(t, ev => { if (ev.touches.length === 0) releaseFingers(); }, {capture: true, passive: true});
   const overlay = new TouchOverlay(document.getElementById("stage"));
 
   // ---- devices and the mouse (desktop_controls.mjs; the game decides, game_controls.cpp) ------------
