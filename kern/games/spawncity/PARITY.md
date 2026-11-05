@@ -62,7 +62,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `first_person_controller_v5` | Zielsteuerung zu Fuß | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `first_person_fire_contract_v1` | Feuer-Vertrag zu Fuß | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `first_person_weapon_runtime_v3` | Ego-Waffen-Laufzeit | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
-| `flak_battery` | Stationäre Flak | gebaut | `combat_art.cpp`, `combat_rules.cpp`, `game_military.cpp` | Stichprobe: Zelle 700 m, 32 %, 18 m AGL |
+| `flak_battery` | Stationäre Flak | gebaut | `combat_art.cpp`, `combat_rules.cpp`, `game_military.cpp` | Stichprobe: Zelle 700 m, 32 %, 18 m AGL Stichprobe: alle Konstanten (Zelle 700, 32 %, 1100 m, 18 m, 900 m/s, 30/s, 2,6/1,7 s, 0,012, 7 m, HP 60) wie `flak_battery.mjs`. |
 | `flight_fire_fx` | Drohnen-MG: Hitscan, Leuchtspur, Einschlag, Rückstoß | gebaut | `game_weapons.cpp` | Hitscan 650 m, 92 ms Takt, Decals/Leuchtspuren (Kern), Geschossimpuls. |
 | `flight_first_cleanup` | Touch-Feuer zu Fuß, SMG-Takt | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `flight_logbook` | Flug-Logbuch | gebaut | `game_ui.cpp`, `game_equipment.cpp`, `web/ui.mjs` | README „Menüs, Einstellungen, Ausstattung“ (sc-m3-ui). |
@@ -100,7 +100,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `jogger_chain` | Laufgruppe | gebaut | `game_life.cpp`, `web/life.mjs` | README „Laufgruppe“ (sc-m3-life). |
 | `lan_vs` | Mehrspieler-Sitzung, Autorität, Transport | teilweise | `net_session.cpp`, `web/mp_host.mjs` | Autoritätswechsel zum Nächstältesten, wenn der Host geht, fehlt (die Runde endet). |
 | `map_peer_edge` | Mitspieler am Kartenrand | gebaut | `mp_rules.h`, `web/mp_host.mjs` |  |
-| `military_response` | Militär ab 5 Sternen | teilweise | `combat_rules.cpp`, `game_military.cpp`, `game_gaps.cpp` | Ablauf und Werte gebaut; Leuchtspuren und Granaten gehen an Mitspieler (Fx `mil_tracer`/`mil_shell`, neu in sc-m3-gaps). Fehlt: Panzer als Box3D-Körper (`upsertBody kind bus 9200 kg`, heute leichter Agent) und die Schnappschüsse der Einheiten an Mitspieler (`mil-snap`/`mil-hit`). |
+| `military_response` | Militär ab 5 Sternen | teilweise | `combat_rules.cpp`, `game_military.cpp`, `game_gaps.cpp` | Ablauf und Werte gebaut; Leuchtspuren und Granaten gehen an Mitspieler (Fx `mil_tracer`/`mil_shell`, neu in sc-m3-gaps). Fehlt: Panzer als Box3D-Körper (`upsertBody kind bus 9200 kg`, heute leichter Agent) und die Schnappschüsse der Einheiten an Mitspieler (`mil-snap`/`mil-hit`). Stichprobe: Heat 36/40 s/55, Alarm 15 s, ≤ 3 Sterne, Trupp 4/8, HP 100/420/900, Treffer 25, Schaden 4/6/3/4, Granate 30, 0,9 s, 3 Salven/1,4 s, Verstärkung 50/45 s.  |
 | `mobile_gameplay_ui` | Kompaktes Handy-HUD | gebaut | `web/ui.mjs`, `game.cpp` |  |
 | `mobile_peer_marker_layout` | Namensschilder weg von den Sticks | gebaut | `mp_rules.h` |  |
 | `mobile_zoom_guard` | Kein Doppeltipp-Zoom | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
@@ -165,7 +165,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `player_vitals_logic` | Lebenspunkte, Drohnen-Ersatz | gebaut | `game_details.cpp` |  |
 | `player_vitals_runtime` | −18 % Schaden für Spieler | gebaut | `game.cpp` | Stichprobe: Gesundheit 118 |
 | `player_walk_mode` | Alter Fußmodus | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): ersetzt durch v4. |
-| `player_walk_mode_v4` | Zu Fuß, Schwimmen, Jetpack | gebaut | `game.cpp`, `equipment.cpp` |  |
+| `player_walk_mode_v4` | Zu Fuß, Schwimmen, Jetpack | gebaut | `game.cpp`, `equipment.cpp` | Stichprobe Jetpack: 21, 0,6 s, 0,2/s, 4 s, 14, 0,02, 0,35 s, 13,8, 8 m/s. |
 | `police_ground_units` | Streifenwagen mit Beamten | gebaut | `game.cpp`, `game_town.cpp` |  |
 | `police_sirens` | Martinshorn 466/622 Hz, Drohnen-Whoop, Doppler | gebaut | `game_gaps.cpp`, `sound_fx.cpp` | Zwei Stimmen (nächster Wagen, nächste Drohne), 0,66 s je Ton, Whoop 760→1480 Hz in 0,7 s, Pegel 0,06/0,032 /(1+(d/14)^1,25), bis 260 m, Tiefpass 5200−16·d, Doppler aus der Abstandsänderung. Neu in sc-m3-gaps. |
 | `projectile_ballistics` | Geschossflug mit Fallen | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): nur Bibliothek + Architekturtest; live ist jeder Schuss Hitscan (`flight_fire_fx.mjs`: „damage is immediate hitscan now“). Kern ebenso. |
@@ -179,7 +179,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `render_fast_paths` | Leere Instanz-Meshes nicht zeichnen | entfällt |  | (a) three.js-Draw-Call-Abkürzung; Kerns Renderer zeichnet leere Instanzlisten nicht. |
 | `render_stability` | Pixelratio-Profil je Gerät | gebaut | `perf.h`, web/host.mjs (`renderScale`) |  |
 | `rules_vote_engine` | Einstimmige Abstimmung (Zustandsautomat) | gebaut | `mp_rules.h`, `net_session.cpp`, `combat_detail.h` | Netz-Abstimmung in `Session` (mp::Ballot); `combat_detail` ist die gleiche Logik für den Testbefehl `ballot`. |
-| `sandbox_game` | Sandbox-Gegner, Chaos-Punkte | gebaut | `combat_rules.cpp`, `game_events.cpp` |  |
+| `sandbox_game` | Sandbox-Gegner, Chaos-Punkte | gebaut | `combat_rules.cpp`, `game_events.cpp` | Stichprobe: Budget 0/1/2/4/6/8, höchstens 8, 6 s, Combo 3,2 s. |
 | `scene_lighting` | Licht der leuchtenden Dinge | gebaut | `game_look.cpp` |  |
 | `settings_controller_nav` | Menüs mit dem Pad | gebaut | `game_ui.cpp`, `game_equipment.cpp`, `web/ui.mjs` | README „Menüs, Einstellungen, Ausstattung“ (sc-m3-ui). |
 | `settings_help` | Hilfezeilen der Einstellungen | gebaut | `game_ui.cpp`, `game_equipment.cpp`, `web/ui.mjs` | README „Menüs, Einstellungen, Ausstattung“ (sc-m3-ui). |
@@ -204,7 +204,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `terrain_surface` | Dreiecks-Diagonale | gebaut | `terrain.cpp` |  |
 | `terrain_tiles` | Box3D-Bodenkacheln | gebaut | `terrain.cpp` |  |
 | `thumb_layout` | Daumen-Layout | gebaut | `touch_pad.h` |  |
-| `tow_service` | Abschleppdienst | gebaut | `game_traffic.cpp`, `world_traffic.cpp` |  |
+| `tow_service` | Abschleppdienst | gebaut | `game_traffic.cpp`, `world_traffic.cpp`, `game_gaps.cpp` | Stichprobe: 2 Wagen, 2,5/9/7 s, 9 m, 170–320 m, Haken 7,5 m / 1,8 s, 9/14 m/s, 70 s, 110 HP. Neu in sc-m3-gaps: Kugeln des Spielers zu Fuß treffen den Abschleppwagen (MP 5, Glock 9, Sniper 70, sonst 8; `onTracer`). |
 | `training_showcase` | Trainingswelt-Deko | fehlt |  | Welt ohne Geodaten: im Original das Trainingslevel, auf Kern die prozedurale Ersatzstadt. |
 | `training_test_level_v2` | Trainingslevel (Welt ohne Geodaten) | fehlt |  | wie training_showcase. |
 | `vehicle_control_settings` | Fahrzeug-Einstellungen | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |

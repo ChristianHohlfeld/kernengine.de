@@ -25,6 +25,7 @@
 #include "game.h"
 #include "kern/audio/synth.h"
 #include "kern/geo/primitives.h"
+#include "game_world.h"
 #include "spawn_guard.h"
 
 namespace sc {
@@ -484,6 +485,18 @@ void Game::gaps_update(f32 dt) {
   g.smoke.update(now, dt);
   if (!combat_.zombies.active) g.zombie_doors.clear();  // dawn: the dead are gone
   gaps_lamps_update(dt);  // street lamps: shots, cars (game_lamps.cpp)
+  // tow_service.mjs onTracer: a round from the player on foot that ends within 2.3 m of a tow truck
+  // hurts it (MP 5, Glock 9, Sniper 70, anything else 8 of its 110 HP)
+  if (life_) {
+    for (const kern::game::ShotEvent& s : world_->shots()) {
+      if (s.shooter != soldier_) continue;
+      const f32 dmg = foot_weapon_ == weapons::Id::smg ? 5.0f : foot_weapon_ == weapons::Id::glock ? 9.0f : foot_weapon_ == weapons::Id::sniper ? 70.0f : 8.0f;
+      for (WorldLife::TowTruck& tt : life_->trucks) {
+        if (!tt.body.valid() || !world_->physics().body_valid(tt.body)) continue;
+        if (kern::length(world_->physics().pose(tt.body).position - s.to) < 2.3f) { tt.hp -= dmg; break; }
+      }
+    }
+  }
   gaps_seats_update(dt);  // jet seats (game_seats.cpp)
   gaps_guided(dt);  // GUIDED smoke trail and motor (game_gaps.cpp)
   // ---- a person died: the bank's crack (world_organic_hit_audio.mjs, "arondight:world-kill")
