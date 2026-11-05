@@ -32,6 +32,7 @@ struct TouchLayout {
   bool cockpit = false;            // car camera (label INNEN / AUSSEN)
   bool hover = false, rocket = false, ground = false;  // jet: hover mode, rocket selected, on its gear
   bool drone_cooldown = false;     // the mode button shows DRONE while a new drone is not ready
+  bool pad_drone = false;          // XBOX CONTROLLER on: no drone sticks, altitude pad, ARM / STOP (simulator.mjs)
 };
 
 /// One button of the overlay.
@@ -61,7 +62,8 @@ class TouchPlay {
 
   void set_frame(f32 w, f32 h, f32 sl, f32 st, f32 sr, f32 sb);
   void set_layout(const TouchLayout& l);
-  /// type 0 down, 1 move, 2 up, 3 cancel; t in ms. True when the controls used the finger.
+  /// type 0 down, 1 move, 2 up, 3 cancel; t in ms. True when the controls own the finger (a finger
+  /// they do not own - car pinch, the drone's tap fire, free screen - may also be a long-press ping).
   bool pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms);
   void release_all();
 
@@ -104,6 +106,7 @@ class TouchPlay {
     Vec2 base;
   };
   void layout();
+  bool no_sticks() const { return lay_.aiming || (lay_.mode == TouchMode::drone && lay_.pad_drone); }
   TouchBtn* button_at(f32 x, f32 y);
   bool in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const;
   void place_row(std::vector<TouchBtn>& items, f32 x0, f32 bottom, f32 dir, f32 max_w);

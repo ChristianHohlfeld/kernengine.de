@@ -211,7 +211,18 @@ Touch:
 39. Hochkant ohne Drehung → gedrehtes Querformat per CSS wie `simulator.mjs` (Finger werden
     zurückgerechnet), Vollbild + Querformat-Sperre beim Start. **behoben**
 
+40. Zielhilfe: eine eigene Näherung → `fpsAimAssist` exakt (Fenster 7° × 5,6°, 90 m, Bremse .30·s,
+    Zug 4·s bis .38·s rad/s, Spur-Faktor), Ziele Leute / Polizeidrohnen / Mitspieler (+1,24 m) mit
+    Sichtlinie, neu gewählt alle 115 ms; Pad und Touch-Stick voll, Touch-Ziehen mit Bremse ×0,3, Maus ohne. **behoben**
+41. Zielen: Kerns Waffen-Zoom (Pistole ×1,15, Sniper ×3,7) → ×1,45 für alle Waffen, Sniper ×8. **behoben**
+42. Vibration fehlte → im Mehrspieler `navigator.vibrate([70,35,120])` beim eigenen Tod, `[65]` beim
+    Tod eines Mitspielers; Ping 25 ms; nie Rumble am Pad. **behoben**
+43. XBOX CONTROLLER: das erste Pad-Drücken blendet die Drohnen-Touch-Steuerung aus (Sticks,
+    Höhenschieber, ARM/STOP), Befehl `xbox on|off`; Schema AIM/CLASSIC als Einstellung `pad.aimScheme`. **behoben**
+44. Langer Druck = Ping: in Drohne und Auto (Tipp-Feuer / Pinch lassen ihn durch), zu Fuß und im Jet
+    nicht (der Feuerfinger gehört der Waffe). **behoben**
+45. Touch-Schüsse halten die Kadenz der Waffe (Glock 110 ms, Sniper 1150 ms; MP holt nach). **behoben**
+
 Bleibt (nur mit Engine-Änderung, siehe README „Später in die Engine“): Sprint nur bei Vorwärts-
 Anteil > 0,3 (Kerns Soldat; SpawnCity sprintet in jede Richtung); Respawn automatisch nach 3 s statt
-per Taste/Knopf (die Tasten werden dafür verschluckt); Kerns eigene Zielhilfe für Pad/Touch statt
-`fpsAimAssist`; Kopfblick zu Fuß über die Minikarte (Kerns Soldatenkamera hat keinen Zusatzblick).
+per Taste/Knopf (die Tasten werden dafür verschluckt); Kopfblick zu Fuß über die Minikarte (Kerns Soldatenkamera hat keinen Zusatzblick).

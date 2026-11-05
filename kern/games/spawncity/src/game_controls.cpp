@@ -35,7 +35,8 @@ f32 key(const kern::Input& in, Key k) { return in.down(k) ? 1.0f : 0.0f; }
 
 std::string g_last_exit;
 // player_walk_mode_v4.mjs scanAimTarget: the assist target, rescanned every 115 ms
-struct AimTarget { int kind = 0; i32 index = -1; f32 scan_at = -99; } g_aim;  // what left the last vehicle (the "controls" state for tests)
+struct AimTarget { int kind = 0; i32 index = -1; f32 scan_at = -99; } g_aim;
+f32 g_touch_next = 0;  // the next touch shot the gun in hand allows (sim time)  // what left the last vehicle (the "controls" state for tests)
 
 const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
   // desktop_controls.mjs WEAPON_NAMES (sniper, fists, knife and GUIDED have none)
@@ -67,7 +68,10 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   C.pad_now = pad.connected ? pad.buttons : 0;
   C.pad_hit = C.pad_now & ~C.pad_prev;
   C.pad_prev = C.pad_now;
-  if (C.pad_now || (pad.connected && (pad.lt > 0.5f || pad.rt > 0.5f))) C.dev.pad_button();
+  if (C.pad_now || (pad.connected && (pad.lt > 0.5f || pad.rt > 0.5f))) {
+    C.dev.pad_button();
+    C.pad_drone = true;  // pad_actions.mjs enablePadPlay: XBOX CONTROLLER on with the first press (stays on)
+  }
   if (in.button_pressed(0) || in.button_pressed(1) || in.button_pressed(2)) C.dev.mouse_down();
   touch_mode_ = !C.dev.desktop;
 
@@ -106,7 +110,8 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   // hand grenade (hand_grenade.mjs): T held / LB held / the button held = cooking, let go = throw;
   // regeneration in every mode, a cooking grenade drops when the pilot leaves the foot mode
   ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB), dt);
-  C.keep_look = ui_.settings.on(Opt::view_keep_look);  // WORLD: KEEP 360 LOOK (the head look stays)
+  C.keep_look = ui_.settings.on(Opt::view_keep_look);
+  C.aim_scheme = ui_.settings.on(Opt::pad_aim_scheme);  // xbox_control_mode.mjs CLASSIC / AIM  // WORLD: KEEP 360 LOOK (the head look stays)
   ui_after_input(dt);  // vehicle settings, the jetpack (game_ui.cpp, game_equipment.cpp)
   grenades_ = C.nade.carry;
 }
@@ -506,6 +511,10 @@ bool Game::ctl_touch_shot(f32 x, f32 y) {
   if (!world_->soldier_state(soldier_, st) || st.dead) return false;
   if (st.reload >= 0) return false;
   if (st.ammo <= 0) return true;
+  // the weapon's own rate (first_person_weapon_runtime_v3.mjs: a shot inside its interval is dropped)
+  const f32 t = world_->sim_time();
+  if (t < g_touch_next && foot_weapon_ != weapons::Id::smg) return false;  // SMG: missed rounds are caught up
+  g_touch_next = t + weapons::spec(foot_weapon_).interval_ms / 1000 * 0.95f;
   --st.ammo;
   world_->apply_soldier_state(st);
   const weapons::Spec& s = weapons::spec(foot_weapon_);
@@ -805,6 +814,7 @@ void Game::update_touch_layout() {
     }
   }
   l.alive = !player_dead_;
+  l.pad_drone = ctl_.pad_drone;
   l.aiming = ctl_.aiming;
   if (mode_ == Mode::foot) {
     const Vec3 me = matrix_of(soldier_).translation();
@@ -909,9 +919,15 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (starts("scheme ")) {
-    // xbox_control_mode.mjs: CLASSIC / AIM
-    C.aim_scheme = cmd == "scheme aim";
-    out = C.aim_scheme ? "aim" : "classic";
+    // xbox_control_mode.mjs: CLASSIC / AIM (the setting pad.aimScheme)
+    ui_.settings.set(Opt::pad_aim_scheme, cmd == "scheme aim" ? 1.0f : 0.0f);
+    out = cmd == "scheme aim" ? "aim" : "classic";
+    return true;
+  }
+  if (starts("xbox ")) {
+    // the XBOX CONTROLLER switch (drone_control_settings.mjs xboxControllerEnabled): hides the drone's touch controls
+    C.pad_drone = cmd == "xbox on";
+    out = C.pad_drone ? "on" : "off";
     return true;
   }
   if (starts("dronemode")) {

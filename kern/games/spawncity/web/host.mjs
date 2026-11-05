@@ -252,6 +252,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
   const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
   let frames = 0, last = null;
+  const vib = {me: null, peers: new Map()};
   // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
   // browser owns the canvas size, so the page applies it; app.mjs re-sizes on layout changes and the
   // next frame applies the scale again.
@@ -272,6 +273,17 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) { hud.update(last, tiles); mpPage?.update(last); }
+    // vs_combat_presentation.mjs playExplosion: in a multiplayer round the phone buzzes when you
+    // go down ([70, 35, 120]) and when a mate does ([65]); the pad never rumbles in SpawnCity.
+    if (last?.net) {
+      const me = !!last.ctl?.dead;
+      if (me && vib.me === false) navigator.vibrate?.([70, 35, 120]);
+      vib.me = me;
+      for (const p of last.mp?.players || []) {
+        if (p.dead && vib.peers.get(p.slot) === false) navigator.vibrate?.([65]);
+        vib.peers.set(p.slot, !!p.dead);
+      }
+    }
     applyRenderScale(last);
     ui.update(last);
     life.update(last);
