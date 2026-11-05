@@ -609,6 +609,13 @@ geschlossen (Quellen in Klammern, Werte im Code):
   Treffer, Streifenwagen linear; nur Streifenwagen nehmen Crash-Schaden.
 * **Jet-Kamera und Schirm** (`jet_mode.mjs`): Verfolger 22 + v/40 m hinter dem Jet, FOV 66 + v/30;
   Schleudersitz entlang der Jet-Hochachse; der offene Schirm sinkt mit gut 12 m/s.
+* **Verkehr und Passanten in Originalstärke** (`world_procedural_population.mjs`,
+  `game_traffic_far.cpp`): 42 Autos + 8 Busse (Telefon 28 + 5), 100 Passanten (Telefon 68) auf jeder
+  Qualitätsstufe. Wie im Original haben Autos nur in der Nähe Physik (unter 150 m an, über 180 m aus);
+  weiter weg fahren sie als kinematische Spurfolger. Die KI-Reifen rechnen mit 60 Hz (FIXED_DT 1/60),
+  die Kräfte gelten über Kerns 240-Hz-Schritte dazwischen. Gemessen (Headless): Physik 4,65 ms mit
+  11 Autos, 8,74 ms mit 50.
+* **Pilot** (`player_vitals_runtime.mjs`): 100 HP, jeder Treffer ÷ 1,18, keine Regeneration.
 * **EMP** (`wanted_police_drones.mjs`): waagerechter Stoß + Druck nach unten auf 18 kg, Fall mit
   1,35 g, Neustart nach 12 s.
 * **Zombie-Barrikaden** (`zombie_nights.mjs`, `building_interiors.mjs`): nachts trägt jede Tür des

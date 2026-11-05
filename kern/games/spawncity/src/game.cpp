@@ -166,6 +166,7 @@ kern::game::Level Game::build_level() const {
   s.weapon = weapon_preset(WeaponKind::pistol);
   HealthComponent h;
   h.max_health = kPlayerHealth;
+  h.regen_delay = 0;  // player_vitals_runtime.mjs: no regeneration (only a RESET or a respawn heals)
   h.respawn = true;
   s.health = h;
   const ActorId sid = l.add(s).id;
@@ -183,12 +184,14 @@ kern::game::Level Game::build_level() const {
   // Vehicles: bodies only (the game draws them).
   l.add(vehicle_actor("Drone", Drone::rigid_spec(), {0, 0, -200}, 0));
   l.add(vehicle_actor("Jet", Jet::rigid_spec(), {0, 0, -300}, 0));
-  const u32 n = mobile_ ? 6 : 10;
-  for (u32 i = 0; i <= n; ++i) {
+  // world_procedural_population.mjs CAR_COUNT 42 (phone 28), BUS_COUNT 8 (phone 5)
+  const u32 n = mobile_ ? 28 : 42, nb = mobile_ ? 5 : 8;
+  for (u32 i = 0; i < n + nb; ++i) {
     char name[32];
-    std::snprintf(name, sizeof name, i == n ? "Bus" : "Car %u", i + 1);
-    const CarSpec spec = i == n ? CarSpec::bus() : CarSpec::car();
-    l.add(vehicle_actor(name, Car::rigid_spec(spec), {static_cast<f32>(i) * 10, 0, -400}, 0));
+    if (i < n) std::snprintf(name, sizeof name, "Car %u", i + 1);
+    else std::snprintf(name, sizeof name, "Bus %u", i - n + 1);
+    const CarSpec spec = i >= n ? CarSpec::bus() : CarSpec::car();
+    l.add(vehicle_actor(name, Car::rigid_spec(spec), {static_cast<f32>(i % 20) * 10, static_cast<f32>(i / 20) * 12 - 40, -400}, 0));
   }
   // Police cruisers (police_ground_units.mjs: at most three units).
   for (u32 i = 0; i < 3; ++i) {
@@ -248,15 +251,17 @@ bool Game::start(kern::Engine& e) {
   drone_actor_ = world_->find_actor("Drone");
   jet_actor_ = world_->find_actor("Jet");
   chute_actor_ = world_->find_actor("Parachute");
-  const u32 n = mobile_ ? 6 : 10;
-  for (u32 i = 0; i <= n; ++i) {
+  const u32 n = mobile_ ? 28 : 42, nb = mobile_ ? 5 : 8;  // CAR_COUNT / BUS_COUNT (world_procedural_population.mjs)
+  for (u32 i = 0; i < n + nb; ++i) {
     char name[32];
-    std::snprintf(name, sizeof name, i == n ? "Bus" : "Car %u", i + 1);
+    if (i < n) std::snprintf(name, sizeof name, "Car %u", i + 1);
+    else std::snprintf(name, sizeof name, "Bus %u", i - n + 1);
+    const bool bus = i >= n;
     TrafficCar c;
     c.actor = world_->find_actor(name);
-    c.car = std::make_unique<Car>(i == n ? CarSpec::bus() : CarSpec::car());
-    c.color = i == n ? Vec3{0.92f, 0.78f, 0.1f} : car_color(i);
-    c.target_speed = i == n ? 8 : 9 + static_cast<f32>(i % 4);
+    c.car = std::make_unique<Car>(bus ? CarSpec::bus() : CarSpec::car());
+    c.color = bus ? Vec3{0.92f, 0.78f, 0.1f} : car_color(i);
+    c.target_speed = bus ? 8 : 9 + static_cast<f32>(i % 4);
     cars_.push_back(std::move(c));
   }
   for (u32 i = 0; i < 3; ++i) {
@@ -281,7 +286,7 @@ bool Game::start(kern::Engine& e) {
   if (!people_art_.init(e.renderer)) return false;
   if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
-  people_.set_budget(mobile_ ? 44 : 80);
+  people_.set_budget(mobile_ ? 68 : 100);  // PERSON_SLOTS (world_procedural_population.mjs)
   if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
   init_weapons();
   e.set_status("SpawnCity: Karte wird geladen ...");
@@ -551,6 +556,7 @@ void Game::drive_traffic(f32 h) {
     if (!c.placed) continue;
     const kern::physics::Body b = body(c.actor);
     if (!b.valid()) continue;
+    if (c.far) { traffic_far_step(c, h); continue; }  // no physics far away (game_traffic_far.cpp)
     if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
       c.car->step(w, b, h, c.input);
       continue;
@@ -562,6 +568,9 @@ void Game::drive_traffic(f32 h) {
       c.car->step(w, b, h, parked);
       continue;
     }
+    // AI traffic at 60 Hz (world_rigid_body_runtime.mjs FIXED_DT 1/60): its tyres are solved every 4th
+    // 240 Hz step (staggered over the cars), the forces held in between
+    if ((steps_ + i) % 4 != 0) { c.car->reapply(w, b); continue; }
     // AI driver: follow the lane on its right-hand side (SpawnCity aiInput), keep 1.6 s + 6 m.
     const Lane& L = lanes[c.lane];
     const BodyState s = read_body(w, b);
@@ -575,30 +584,7 @@ void Game::drive_traffic(f32 h) {
     d = dl > 1e-3f ? d * (1.0f / dl) : Vec2{fwd.x, fwd.y};
     const f32 off = std::fmin(L.width * 0.25f, 1.8f);
     const Vec3 target{p.x + d.y * off, p.y - d.x * off, 0};
-    if (std::hypot(target.x - s.position.x, target.y - s.position.y) < 7) {
-      c.index += c.dir;
-      if (c.index < 0 || c.index >= n) {
-        // End of the street: continue on a street that starts here, else turn round.
-        const Vec2 end = L.points[c.index < 0 ? 0 : n - 1];
-        i32 next = -1, next_dir = 1;
-        const u32 start = rng_.next();
-        for (std::size_t k = 0; k < lanes.size() && next < 0; ++k) {
-          const std::size_t j = (start + k) % lanes.size();
-          if (static_cast<i32>(j) == c.lane || !lanes[j].alive || lanes[j].points.size() < 2) continue;
-          const Vec2 a = lanes[j].points.front(), z = lanes[j].points.back();
-          if (std::hypot(a.x - end.x, a.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = 1; }
-          else if (std::hypot(z.x - end.x, z.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = -1; }
-        }
-        if (next >= 0) {
-          c.lane = next;
-          c.dir = next_dir;
-          c.index = next_dir > 0 ? 1 : static_cast<i32>(lanes[next].points.size()) - 2;
-        } else {
-          c.dir = -c.dir;
-          c.index = std::clamp(c.index + 2 * c.dir, 0, n - 1);
-        }
-      }
-    }
+    if (std::hypot(target.x - s.position.x, target.y - s.position.y) < 7) traffic_advance(c);
     // Approaching the end of the street (a junction): slow down to turn (SpawnCity aiInput).
     f32 want_speed = c.target_speed;
     {
@@ -614,10 +600,37 @@ void Game::drive_traffic(f32 h) {
     const RayResult ahead = cast(w, nose, fwd, gap, b);
     if (ahead.hit) in.pedal = std::fmin(in.pedal, ahead.distance < 6 ? -1.0f : -0.3f);
     // Stuck against something: back off a little, then try again.
-    c.stuck = (in.pedal > 0.2f && v < 0.3f) ? c.stuck + h : 0;
+    c.stuck = (in.pedal > 0.2f && v < 0.3f) ? c.stuck + h * 4 : 0;  // a 60 Hz step
     if (c.stuck > 3) { in.pedal = -0.6f; in.steer = -in.steer; if (c.stuck > 5) c.stuck = 0; }
     c.input = in;
-    c.car->step(w, b, h, in);
+    c.car->step(w, b, h * 4, in);
+  }
+}
+
+void Game::traffic_advance(TrafficCar& c) {
+  // the next lane point; at the end of the street on to a street that starts here, else turn round
+  const std::vector<Lane>& lanes = city_.lanes();
+  const i32 n = static_cast<i32>(lanes[c.lane].points.size());
+  const Lane& L = lanes[c.lane];
+  c.index += c.dir;
+  if (c.index >= 0 && c.index < n) return;
+  const Vec2 end = L.points[c.index < 0 ? 0 : n - 1];
+  i32 next = -1, next_dir = 1;
+  const u32 start = rng_.next();
+  for (std::size_t k = 0; k < lanes.size() && next < 0; ++k) {
+    const std::size_t j = (start + k) % lanes.size();
+    if (static_cast<i32>(j) == c.lane || !lanes[j].alive || lanes[j].points.size() < 2) continue;
+    const Vec2 a = lanes[j].points.front(), z = lanes[j].points.back();
+    if (std::hypot(a.x - end.x, a.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = 1; }
+    else if (std::hypot(z.x - end.x, z.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = -1; }
+  }
+  if (next >= 0) {
+    c.lane = next;
+    c.dir = next_dir;
+    c.index = next_dir > 0 ? 1 : static_cast<i32>(lanes[next].points.size()) - 2;
+  } else {
+    c.dir = -c.dir;
+    c.index = std::clamp(c.index + 2 * c.dir, 0, n - 1);
   }
 }
 
@@ -651,6 +664,7 @@ void Game::manage_traffic() {
   i32 alive_lanes = 0;
   for (const Lane& l : lanes) alive_lanes += l.alive ? 1 : 0;
   if (alive_lanes == 0) return;
+  traffic_far_switch();  // physics only near the focus (game_traffic_far.cpp)
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     if (static_cast<i32>(i) == car_index_) continue;
@@ -669,7 +683,8 @@ void Game::manage_traffic() {
       const Vec3 p = matrix_of(c.actor).translation();
       const f32 d = std::hypot(p.x - me.x, p.y - me.y);
       // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
-      replace = d > 420 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
+      // VEHICLE_RELOCATE_M 330 (world_procedural_population.mjs)
+      replace = d > 330 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
       // An abandoned car stays where it was left (SpawnCity: 180 s).
     }
     if (!replace) continue;
@@ -690,7 +705,7 @@ void Game::manage_traffic() {
       }
       const Vec2 mid = a + (bpt - a) * (along / seg);
       const f32 d = std::hypot(mid.x - me.x, mid.y - me.y);
-      if (d < 45 || d > 280) continue;
+      if (d < 45 || d > 240) continue;  // VEHICLE_PLACE_MIN_M / VEHICLE_PLACE_MAX_M
       const i32 dir = rng_.unit() < 0.5f ? 1 : -1;
       const Vec2 dv = (dir > 0 ? bpt - a : a - bpt) * (1.0f / seg);
       const f32 off = std::fmin(L.width * 0.25f, 1.8f);
@@ -850,7 +865,8 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         c.eye = collide(cam_anchor_, want, body(drone_actor_));
         c.target = cam_anchor_ + hd * ahead + Vec3{0, 0, look_up};
         c.up = {0, 0, 1};
-        c.fov = clampf((third ? 62 : 52) * fpv_fov_deg_ / 105, 30, 100) * kDeg;
+        // simulator.mjs: third clamp(62 x fov / 105, 35, 100), follow clamp(52 x fov / 105, 30, 90)
+        c.fov = (third ? clampf(62 * fpv_fov_deg_ / 105, 35, 100) : clampf(52 * fpv_fov_deg_ / 105, 30, 90)) * kDeg;
         c.near = 0.06f;
       }
       break;
@@ -869,7 +885,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         const Vec3 look = s.rotation.rotate({std::cos(head_yaw_) * std::cos(head_pitch_), std::sin(head_yaw_) * std::cos(head_pitch_), std::sin(head_pitch_)});
         c.target = c.eye + look * 5.0f;
         c.up = s.rotation.rotate({0, 0, 1});
-        c.fov = 80 * kDeg * 0.75f;
+        c.fov = 80 * kDeg;  // player_car_mode.mjs cockpit: camera.fov = 80 (vertical, as Kern's)
         c.near = bus ? 0.22f : 0.04f;
       } else {
         // Chase (player_car_mode.mjs): 5.4 m back, 2.15 m up, heading smoothing 1 - exp(-6 dt); bus x 1.75.
@@ -879,11 +895,14 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         const Vec3 look_dir = Quat::axis_angle({0, 0, 1}, head_yaw_).rotate(hd);
         // zoom (pinch / wheel / + -, player_car_mode.mjs): distance 5.4 z, height 2.15 (.55 + .45 z)
         const f32 cz = ctl_.car_zoom;
-        const Vec3 want = cam_anchor_ - look_dir * (5.4f * zoom * cz) + Vec3{0, 0, 2.15f * zoom * (0.55f + 0.45f * cz)};
-        c.eye = collide(cam_anchor_ + Vec3{0, 0, 1.2f}, want, body(tc.actor));
-        c.target = cam_anchor_ + look_dir * 2.0f + Vec3{0, 0, 0.9f * zoom};
+        // player_car_mode.mjs: the target 1.05 m ahead of the car and 1.2 m up, the eye d back and h above
+        // the target; fov min(80, 70 + |v| x .25)
+        const Vec3 tgt = cam_anchor_ + look_dir * 1.05f + Vec3{0, 0, 1.2f};
+        const Vec3 want = tgt - look_dir * (5.4f * zoom * cz) + Vec3{0, 0, 2.15f * zoom * (0.55f + 0.45f * cz)};
+        c.eye = collide(tgt, want, body(tc.actor));
+        c.target = tgt;
         c.up = {0, 0, 1};
-        c.fov = (58 + std::fmin(14.0f, std::fabs(tc.car->forward_speed()) * 0.25f)) * kDeg;
+        c.fov = std::fmin(80.0f, 70 + std::fabs(tc.car->forward_speed()) * 0.25f) * kDeg;
       }
       break;
     }
@@ -1060,8 +1079,10 @@ std::string Game::hud_json() {
   // gameplay_final_runtime_v2.mjs: the weapons on foot have no magazines and no ammo counter (-1 hides it)
   ammo = mag = reserve = -1;
   (void)h.ammo;
-  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"respawn\":%.1f", h.health,
-      h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
+  // player_vitals_runtime.mjs: PLAYER_MAX_HP 100, every hit divided by PLAYER_DAMAGE_TOLERANCE 1.18. Kern's
+  // soldier holds 118 (the same thing for every source of damage, falls included): shown as 0..100
+  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"respawn\":%.1f",
+      h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
   Vec3 pos = focus_position(), vel;
   f32 agl = pos.z - city_.ground_height(pos.x, pos.y);
   switch (mode_) {

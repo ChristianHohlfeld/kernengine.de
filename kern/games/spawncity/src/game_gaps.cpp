@@ -801,7 +801,10 @@ void Game::gaps_hud(std::string& s) {
     s += b;
     first = false;
   }
-  std::snprintf(b, sizeof b, "],\"footShots\":%u,\"rocketSmoke\":%u}", g.foot_shots, static_cast<u32>(std::count_if(g.rocket_smoke.begin(), g.rocket_smoke.end(), [](const GapsState::RocketPuff& r) { return r.born >= 0; })));
+  u32 placed = 0, far = 0;
+  for (const TrafficCar& c : cars_) { placed += c.placed ? 1 : 0; far += c.far ? 1 : 0; }  // far traffic (game_traffic_far.cpp)
+  std::snprintf(b, sizeof b, "],\"footShots\":%u,\"rocketSmoke\":%u,\"carsPlaced\":%u,\"farCars\":%u}", g.foot_shots,
+                static_cast<u32>(std::count_if(g.rocket_smoke.begin(), g.rocket_smoke.end(), [](const GapsState::RocketPuff& r) { return r.born >= 0; })), placed, far);
   s += b;
 }
 

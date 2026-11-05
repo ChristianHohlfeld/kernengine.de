@@ -76,10 +76,27 @@ f32 Car::wheel_speed() const {
   return m * s_.radius;
 }
 
+void Car::push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, bool center) {
+  if (center) world.apply_force_to_center(body, f);
+  else world.apply_force(body, f, p);
+  if (n_applied_ < 10) applied_[n_applied_++] = {to_local(q, p - origin), to_local(q, f), center};
+}
+
+void Car::reapply(kern::physics::World& world, kern::physics::Body body) const {
+  const BodyState st = read_body(world, body);
+  for (i32 i = 0; i < n_applied_; ++i) {
+    const Applied& a = applied_[i];
+    const Vec3 f = st.rotation.rotate(a.f);
+    if (a.center) world.apply_force_to_center(body, f);
+    else world.apply_force(body, f, st.position + st.rotation.rotate(a.p));
+  }
+}
+
 void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, const CarInput& input) {
   const CarSpec& spec = s_;
   const BodyState st = read_body(world, body);
   const Quat q = st.rotation;
+  n_applied_ = 0;
   const Vec3 forward = q.rotate({1, 0, 0}), left = q.rotate({0, 1, 0}), up = q.rotate({0, 0, 1});
   const Vec3 com = st.position + q.rotate(Vec3{spec.com_x, 0, spec.com_z});
   auto point_velocity = [&](Vec3 p) { return st.velocity + kern::cross(st.angular, p - com); };
@@ -131,7 +148,7 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     w.hub = hub[i];
     normal[i] = w.contact ? kern::normalize(hit.normal) : up;
     patch[i] = w.contact ? hit.point : hub[i] - up * r;
-    if (N > 0) world.apply_force(body, up * N, attach);  // the spring and damper push the chassis at the mount
+    if (N > 0) push(world, body, q, st.position, up * N, attach, false);  // the spring and damper push the chassis at the mount
   }
 
   // ---- steering: equilibrium of hand torque + assist against the aligning torque
@@ -243,9 +260,9 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     w.fy = fy;
     w.kappa = (om * r - vx) / V;
     w.alpha = std::atan(tan_a);
-    if (N > 0 && w.contact) world.apply_force(body, fw * fx + lw * fy, patch[i]);
+    if (N > 0 && w.contact) push(world, body, q, st.position, fw * fx + lw * fy, patch[i], false);
   }
-  if (spec.drag_area > 0 && speed > 0.5f) world.apply_force_to_center(body, st.velocity * (-0.5f * 1.2f * spec.drag_area * speed));
+  if (spec.drag_area > 0 && speed > 0.5f) push(world, body, q, st.position, st.velocity * (-0.5f * 1.2f * spec.drag_area * speed), st.position, true);
   vf_ = vf;
 }
 
