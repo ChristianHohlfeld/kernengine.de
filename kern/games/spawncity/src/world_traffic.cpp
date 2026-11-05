@@ -2,6 +2,7 @@
 #include "world_traffic.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace sc {
 
@@ -48,6 +49,53 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
       };
       if (i > 0) arm(l.points[i - 1]);
       if (i + 1 < l.points.size()) arm(l.points[i + 1]);
+    }
+  }
+  // Streets that cross without a shared vertex (a tile cut, the stand-in town's straight streets
+  // laid across each other) meet where their segments intersect: that point is a node with an arm
+  // along each street in both directions.
+  {
+    struct Seg { Vec2 a, b; f32 width; u32 lane; };
+    std::vector<Seg> segs;
+    std::unordered_map<u64, std::vector<u32>> buckets;
+    for (u32 li = 0; li < lanes.size(); ++li) {
+      const Lane& l = lanes[li];
+      if (!l.alive || l.points.size() < 2) continue;
+      for (std::size_t i = 0; i + 1 < l.points.size(); ++i) {
+        const Seg s{l.points[i], l.points[i + 1], l.width, li};
+        const u32 si = static_cast<u32>(segs.size());
+        segs.push_back(s);
+        const i32 x0 = static_cast<i32>(std::floor(std::fmin(s.a.x, s.b.x) / kCell)), x1 = static_cast<i32>(std::floor(std::fmax(s.a.x, s.b.x) / kCell));
+        const i32 y0 = static_cast<i32>(std::floor(std::fmin(s.a.y, s.b.y) / kCell)), y1 = static_cast<i32>(std::floor(std::fmax(s.a.y, s.b.y) / kCell));
+        for (i32 x = x0; x <= x1; ++x)
+          for (i32 y = y0; y <= y1; ++y) buckets[cell(x, y)].push_back(si);
+      }
+    }
+    for (const auto& [key, list] : buckets) {
+      (void)key;
+      for (std::size_t m = 0; m < list.size(); ++m)
+        for (std::size_t n = m + 1; n < list.size(); ++n) {
+          const Seg& s = segs[list[m]];
+          const Seg& t = segs[list[n]];
+          if (s.lane == t.lane) continue;
+          const Vec2 r = s.b - s.a, q = t.b - t.a;
+          const f32 den = r.x * q.y - r.y * q.x;
+          if (std::fabs(den) < 1e-6f) continue;  // parallel
+          const Vec2 w = t.a - s.a;
+          const f32 u = (w.x * q.y - w.y * q.x) / den, v = (w.x * r.y - w.y * r.x) / den;
+          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+          const Vec2 p = s.a + r * u;
+          const i32 ni = node_at(p);
+          for (const Seg* g : {&s, &t})
+            for (const Vec2 end : {g->a, g->b}) {
+              const f32 d = std::hypot(end.x - p.x, end.y - p.y);
+              if (d < 0.5f) continue;
+              const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
+              bool dup = false;
+              for (const Arm& a : nodes[ni].arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
+              if (!dup) nodes[ni].arms.push_back({dir, g->width});
+            }
+        }
     }
   }
   for (const Node& n : nodes) {

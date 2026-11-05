@@ -41,8 +41,12 @@ void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics:
   const f32 above = at.z - t.height(at.x, at.y);
   // The big ones dig into the ground (terrain_craters.mjs profile, scaled to the blast).
   if (r >= 8 && above < 1.5f) {
-    const f32 R = std::fmin(r * 0.45f, 8.0f);
-    t.add_crater({at.x, at.y}, R, R * 0.18f);
+    // The ground is a 5 m node grid (one height function for Box3D and the mesh): a bowl smaller
+    // than a cell falls between the nodes and leaves no dent at all. So the crater sits on the node
+    // nearest the blast and spans at least 5.5 m (its bowl then always reaches that node).
+    const f32 R = std::fmax(std::fmin(r * 0.45f, 8.0f), 5.5f);
+    const Vec2 c{std::round(at.x / 5) * 5, std::round(at.y / 5) * 5};
+    t.add_crater(c, R, R * 0.18f);
     ++stats_.craters;
   }
   // world_impacts.mjs: a scorch if the blast is low enough

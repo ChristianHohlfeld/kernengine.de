@@ -442,6 +442,7 @@ void Game::ui_mix_cues() {
 
 void Game::ui_reset() {
   if (!world_placed_) return;
+  gaps_lamps_reset();  // street_lamps.mjs onReset: every lamp stands and burns again (game_lamps.cpp)
   if (mode_ == Mode::parachute) {
     world_->set_alive(chute_actor_, false);
     show_soldier(matrix_of(chute_actor_).translation(), world_->camera_yaw());
@@ -459,7 +460,7 @@ void Game::ui_reset() {
     c.burn_until = -1;
   }
   drone_hp_ = 100;
-  jet_hp_ = 600;
+  jet_hp_ = 400;  // jet_mode.mjs HP_MAX
   jet_.fuel = 1;
   player_dead_ = false;
   // Fresh weapons, the pistol in hand (Kern's weapon component follows select_foot_weapon).

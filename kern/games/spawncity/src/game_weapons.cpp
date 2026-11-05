@@ -237,6 +237,7 @@ void Game::update_projectiles(f32 dt) {
 
 void Game::foot_attack(bool trigger, bool pressed) {
   const f32 now = world_->sim_time();
+  if (gaps_riding()) return;  // a passenger has nothing to fire (game_seats.cpp)
   if (!trigger || now < next_attack_ || player_dead_) return;
   const weapons::Spec& s = weapons::spec(foot_weapon_);
   Vec3 dir;

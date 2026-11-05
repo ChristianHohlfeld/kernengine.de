@@ -17,7 +17,7 @@ constexpr f32 kStopFoot = 17, kEngageMin = 6, kEngageMax = 15, kReturnM = 42, kR
 constexpr f32 kSpawnMin = 70, kSpawnMax = 125, kDespawn = 230, kPathSeconds = 1.8f, kSightSeconds = 0.3f;
 constexpr f32 kVolleyGap = 0.48f, kCopHitScale = 0.5f;
 constexpr f32 kCarHp = 300, kCarHit = 22, kCarCritical = 0.20f, kCarBurn = 2.45f /* critical_damage_logic.mjs car: 20 %, 2450 ms */, kCrashDv = 7, kCrashDamage = 16;
-constexpr f32 kDroneHp = 100, kDroneHit = 25, kJetHp = 600, kJetHit = 22;
+constexpr f32 kDroneHp = 100, kDroneHit = 25, kJetHit = 22;
 // wanted_police_drones.mjs
 constexpr f32 kPdHp = 100, kPdHit = 34, kPdRespawn = 9, kPdSensor = 0.17f, kPdReaction = 0.75f, kPdVolley = 0.65f, kPdDamageCooldown = 1.05f;
 constexpr f32 kPdFormation[5] = {0, 0.08f, -0.08f, 0.15f, -0.15f};
@@ -45,6 +45,7 @@ PeopleView Game::people_view() const {
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.player_on_foot = mode_ == Mode::foot;
   v.player_alive = !player_dead_;
+  v.can_spawn = [this](Vec3 p) { return gaps_can_spawn(p, 1.9f, mobile_ ? 125.0f : 150.0f); };  // spawn_visibility_guard.mjs (game_gaps.cpp)
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
     if (!c.placed || !world_->actor_alive(c.actor)) continue;
@@ -193,14 +194,7 @@ void Game::damage_player_vehicle(f32 amount) {
       combat_.pop_at = world_->sim_time();
     }
   } else if (mode_ == Mode::jet) {
-    jet_hp_ -= amount;
-    if (jet_hp_ <= 0) {
-      const Vec3 at = matrix_of(jet_actor_).translation();
-      eject();
-      explosion(at, 9, 140, false);
-      jet_.engine_on = false;
-      jet_hp_ = kJetHp;
-    }
+    gaps_jet_damage(amount);  // jet_mode.mjs damageAirframe: 400 HP, thrust loss, burning, break-up (game_gaps.cpp)
   }
 }
 
@@ -231,6 +225,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   }
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
   life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)
+  gaps_lamps_blast(at, radius);  // street_lamps.mjs onExplosion (game_lamps.cpp)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -509,6 +504,7 @@ void Game::spawn_police_drones() {
   for (u32 i = 0; i < 5 && active < desired; ++i) {
     PoliceDrone& d = pdrones_[i];
     if (d.active || now < d.destroyed_until) continue;
+    if (!gaps_drone_due(i, stars)) { ++active; continue; }  // wanted_dispatch_guard.mjs: on its way (game_gaps.cpp)
     const f32 base = forward + kPi + (static_cast<f32>(i) - 2) * 0.34f;
     bool placed = false;
     for (int k = 0; k < 12 && !placed; ++k) {
@@ -526,6 +522,7 @@ void Game::spawn_police_drones() {
       d.hp = kPdHp;
       d.next_shot = now + wanted::engage_delay_ms(stars) / 1000;
       d.serial = ++drone_serial_;
+      gaps_drone_revealed(i, stars);  // arrived: the grace before the first shot (game_gaps.cpp)
       placed = true;
       ++active;
     }
@@ -594,7 +591,8 @@ bool Game::update_police_drones(f32 dt) {
     if (now >= d.next_sensor) {
       d.next_sensor = now + kPdSensor + static_cast<f32>(i) * 0.007f;
       const bool had = d.sees;
-      d.sees = !player_dead_ && d.distance <= radius && line_of_sight(d.pos, me_center);
+      // wanted_police_pre_guard.mjs: a drone only sees (and so shoots) within its fire range
+      d.sees = !player_dead_ && d.distance <= radius && d.distance <= wanted::fire_range(stars) && line_of_sight(d.pos, me_center);
       if (d.sees && !had) d.sight_since = now;
     }
     if (d.sees) { sees = true; last_known_ = me; last_contact_ = now; }
@@ -792,29 +790,8 @@ void Game::update_town(f32 dt) {
 }
 
 void Game::update_lamps() {
-  // Street lamps every 32 m along alternating kerbs of the streamed streets (stylized_world_style.mjs),
-  // placed once per lane as lanes arrive (a few lanes per frame), drawn while their lane is alive.
-  const std::vector<Lane>& lanes = city_.lanes();
-  if (lamp_lanes_ > lanes.size()) { lamps_.clear(); lamp_lanes_ = 0; }  // the city was restarted
-  for (int budget = 0; lamp_lanes_ < lanes.size() && budget < 24; ++budget, ++lamp_lanes_) {
-    const Lane& L = lanes[lamp_lanes_];
-    if (!L.alive || L.points.size() < 2 || L.width < 4.5f) continue;
-    f32 carry = 10;
-    for (std::size_t k = 0; k + 1 < L.points.size(); ++k) {
-      const Vec2 a = L.points[k], b = L.points[k + 1], d = b - a;
-      const f32 len = std::hypot(d.x, d.y);
-      if (len < 1) continue;
-      const Vec2 u = d * (1.0f / len), right{u.y, -u.x};
-      for (f32 t = carry; t < len; t += 32) {
-        const f32 side = (static_cast<i32>(t) / 32 + static_cast<i32>(k)) % 2 ? 1.0f : -1.0f;
-        const Vec2 c = a + u * t + right * (side * (L.width * 0.5f + 0.6f));
-        const RayResult roof = cast(world_->physics(), {c.x, c.y, 40}, {0, 0, -1}, 45, {}, kCatWorld);
-        if (roof.hit && roof.point.z > 0.35f) continue;  // a building stands there
-        lamps_.push_back({{c.x, c.y, 0}, std::atan2(-right.y * side, -right.x * side), static_cast<u32>(lamp_lanes_)});
-      }
-      carry = std::fmod(carry + 32 - std::fmod(len, 32.0f), 32.0f);
-    }
-  }
+  // street_lamps.mjs: placement, breakage and drawing live in game_lamps.cpp (sc-m3-gaps).
+  gaps_lamps_place();
 }
 
 std::string Game::map_json() {
@@ -883,10 +860,8 @@ void Game::draw_town() {
   if (world_placed_) {
     if (show_lamps_) update_lamps();
     const std::vector<Lane>& lanes = city_.lanes();
-    if (show_lamps_)
-    for (const Lamp& l : lamps_)
-      if (l.lane < lanes.size() && lanes[l.lane].alive && std::fabs(l.foot.x - cam_.eye.x) < look_.lamp_m && std::fabs(l.foot.y - cam_.eye.y) < look_.lamp_m)
-        people_art_.street_lamp(l.foot, l.yaw, night_);
+    (void)lanes;
+    gaps_lamps_draw();  // street_lamps.mjs (game_lamps.cpp)
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
       if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
@@ -906,7 +881,8 @@ void Game::draw_town() {
       }
       if (c.burn_until >= 0 || c.wreck) {
         const Vec3 at = matrix_of(c.actor).translation();
-        if (c.burn_until >= 0) people_art_.fire(at + Vec3{0, 0, 0.6f}, 0.7f, now);
+        // critical (burn_until): SpawnCity shows smoke and embers only (world_critical_damage_fx.mjs, game_gaps.cpp)
+        if (c.burn_until >= 0) {}
         else if (now - c.wreck_at < 40) people_art_.fire(at + Vec3{0, 0, 0.4f}, 0.35f, now);
       }
     }

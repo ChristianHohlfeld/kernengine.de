@@ -280,6 +280,7 @@ bool Game::start(kern::Engine& e) {
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
   if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
+  gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 44 : 80);
   init_weapons();
   e.set_status("SpawnCity: Karte wird geladen ...");
@@ -377,6 +378,7 @@ void Game::show_soldier(Vec3 feet, f32 yaw_deg) {
 }
 
 void Game::toggle_drone() {
+  if (gaps_riding()) return;  // riding in a mate's jet (game_seats.cpp)
   if (mode_ == Mode::drone) {
     // Stow the drone (killDrone): back to the pilot.
     world_->set_alive(drone_actor_, false);
@@ -451,6 +453,8 @@ void Game::switch_mode(Mode m, i32 vehicle) {
 }
 
 void Game::try_enter() {
+  if (gaps_seat_press()) return;  // a mate's jet as passenger, or out of it (game_seats.cpp)
+  if (gaps_repair_barricade()) return;  // zombie night: F boards a door up again (game_barricades.cpp)
   const Vec3 me = matrix_of(soldier_).translation();
   i32 best = -1;
   f32 best_d = kEnterCar;
@@ -687,6 +691,7 @@ void Game::manage_traffic() {
       const Vec3 pos{mid.x + dv.y * off, mid.y - dv.x * off, city_.ground_height(mid.x, mid.y) + Car::ground_offset(c.car->spec()) + 0.05f};
       // Nothing in the way (another car, a building corner).
       if (cast(world_->physics(), pos + Vec3{0, 0, 3}, {0, 0, -1}, 3.2f, {}).hit) continue;
+      if (!gaps_vehicle_spawn_ok(static_cast<i32>(i), pos, std::atan2(dv.y, dv.x))) continue;  // no overlap, unseen (game_gaps.cpp)
       if (!world_->actor_alive(c.actor)) world_->set_alive(c.actor, true);
       const Vec3 rot{0, 0, std::atan2(dv.y, dv.x) / kDeg};
       world_->teleport(c.actor, pos, &rot);
@@ -749,6 +754,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     life_update(dt);   // M3 life: animals, street life, ragdolls, interiors (game_life.cpp)
     update_guided(dt);   // GUIDED missiles (game_guided.cpp)
     update_details(dt);  // critical damage, ballots (game_details.cpp)
+    gaps_update(dt);  // dispatch, critical smoke, organic hits, impact bursts (game_gaps.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
@@ -766,6 +772,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   draw_world();  // M3 world (game_world.cpp)
   life_draw();   // M3 life (game_life.cpp)
   draw_combat();
+  gaps_draw();  // critical smoke (game_gaps.cpp)
   look_draw(e, dt);  // speed streaks, weapon models, frame times (game_look.cpp)
   update_sound(dt);
 }
@@ -819,7 +826,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         // FPV: rigid on the frame, tilted (camera_settings.mjs -15 .. 50 deg), FOV 105.
         const f32 t = fpv_tilt_deg_ * kDeg;
         const Vec3 f = fwd * std::cos(t) + up * std::sin(t), u = up * std::cos(t) - fwd * std::sin(t);
-        c.eye = pos + fwd * 0.102f + up * 0.028f;
+        c.eye = pos + fwd * 0.102f + up * (0.028f + 0.045f);  // + fpv_view_height.mjs FPV_VIEW_EXTRA_UP_M
         c.target = c.eye + f * 4.0f;
         c.up = u;
         c.fov = fpv_fov_deg_ * kDeg;
@@ -912,6 +919,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
     }
   }
   ctl_camera(c);  // the shared head look in the drone, jet and parachute (game_controls.cpp)
+  gaps_camera(c);  // camera_collision_guard.mjs, riding in a mate's jet (game_gaps.cpp)
   cam_ = c;
 }
 
@@ -931,7 +939,8 @@ void Game::draw_vehicles() {
       Vec3 motors[4];
       f32 angles[4];
       for (int i = 0; i < 4; ++i) { motors[i] = drone_.motor_position(i); angles[i] = drone_.rotor_angle(i); }
-      art_.drone(matrix_of(drone_actor_), motors, angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
+      art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
+                 angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
     }
     if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
     draw_remote_vehicles();
@@ -998,14 +1007,8 @@ void Game::update_sound(f32 dt) {
     s.jet.rate = clampf(jet_.thrust() / jet_.spec().thrust_dry, 0, 1.3f);
     s.jet.load = clampf(jet_.thrust() / jet_.spec().thrust_max, 0, 1);
   }
-  // The closest cruiser on a call wails.
-  f32 best = 1e9f;
-  for (const PoliceUnit& u : units_) {
-    if (u.car < 0 || u.state == PoliceUnit::State::abandoned || u.state == PoliceUnit::State::wreck || u.state == PoliceUnit::State::leave) continue;
-    const Vec3 p = matrix_of(cars_[u.car].actor).translation();
-    const f32 d = kern::length(p - cam_.eye);
-    if (d < best) { best = d; s.siren.active = true; s.siren.position = p; s.siren.velocity = world_->actor_velocity(cars_[u.car].actor); }
-  }
+  gaps_sirens(dt);  // police_sirens.mjs: horn and drone whoop (game_gaps.cpp)
+  gaps_jet_audio(dt);  // fighter_jets.mjs: roar with retarded time and Doppler (game_gaps.cpp)
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
   ui_mix_audio(s);  // settings: audio sliders (game_ui.cpp)
   fx_.update(s, dt);
@@ -1112,11 +1115,16 @@ std::string Game::hud_json() {
   combat_hud(s);  // "combat":{...} (game_events.cpp)
   guided_hud(s);   // "guided":{...} (game_guided.cpp)
   details_hud(s);  // "details":{...} (game_details.cpp)
+  gaps_hud(s);  // "gaps":{...} (game_gaps.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)
   s += ctl_hud_json();   // "ctl":{...} device, hint line, aiming (game_controls.cpp)
+  // JSON allows no raw control characters (a line break in a hint or name broke JSON.parse on the
+  // page); outside strings none are ever written, so every one becomes a space.
+  for (char& c : s)
+    if (static_cast<unsigned char>(c) < 0x20) c = ' ';
   return s + "}";
 }
 
@@ -1126,6 +1134,7 @@ std::string Game::command(const std::string& cmd) {
   if (std::string out; ui_command(cmd, out)) return out;  // settings, menus, start, equipment (game_ui.cpp)
   if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   if (std::string out; details_command(cmd, out)) return out;  // guided / critical / ballot commands (game_details.cpp)
+  if (std::string out; gaps_command(cmd, out)) return out;  // sc-m3-gaps test commands (game_gaps.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);
@@ -1156,7 +1165,18 @@ std::string Game::command(const std::string& cmd) {
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
         if (d < bd) { bd = d; best = static_cast<i32>(i); }
       }
-      if (best < 0) return "no car";
+      if (best < 0) {
+        // Tests: say why (placed / bus / wrecked / burning / police / alive in the world)
+        u32 placed = 0, bus = 0, wreck = 0, burn = 0, police = 0, alive = 0;
+        for (const TrafficCar& c : cars_) {
+          placed += c.placed; bus += c.car->spec().radius > 0.4f; wreck += c.wreck; burn += c.burn_until >= 0; police += c.police;
+          alive += world_->actor_alive(c.actor);
+        }
+        char why[160];
+        std::snprintf(why, sizeof why, "no car (of %zu: placed %u, bus %u, wreck %u, burning %u, police %u, alive %u, lanes %zu)", cars_.size(), placed, bus, wreck, burn, police, alive,
+                      city_.lanes().size());
+        return why;
+      }
       switch_mode(Mode::car, best);
       return mode_name(mode_);
     }

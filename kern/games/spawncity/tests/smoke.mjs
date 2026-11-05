@@ -263,7 +263,7 @@ async function run({name, url, context, mapped}) {
       check((await hud()).weapon !== w0, `[${name}] the thumb weapon button cycles (${w0} -> ${(await hud()).weapon})`);
       await cmd("weapon 1");  // the Glock (Kern fires it): a tap on the screen shoots
       await gameWait(0.4);
-      const m0 = (await hud()).ammo;
+      const m0 = (await hud()).ammo;  // the rounds left (mag is the magazine size)
       await touchTap(vw * 0.55, vh * 0.35);
       check((await hud()).ammo < m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).ammo})`);
       const s = await box("strike");
@@ -281,9 +281,10 @@ async function run({name, url, context, mapped}) {
   check(h.people >= 10, `[${name}] people in the streets: ${h.people}`);
   check(await cmd("wanted 2") === "2", `[${name}] wanted level 2`);
   const tw = (await hud()).t;
-  await page.waitForFunction(() => { const h = window.SpawnCity.hud(); return h.police > 0 && h.policeDrones > 0; }, null, {timeout: 300000}).catch(() => {});
+  // wanted_dispatch_guard.mjs: the drones are dispatched first and show up after the dispatch delay
+  await page.waitForFunction(() => { const h = window.SpawnCity.hud(); return h.police > 0 && (h.policeDrones > 0 || h.gaps?.inbound > 0); }, null, {timeout: 300000}).catch(() => {});
   h = await hud();
-  check(h.police > 0 && h.policeDrones > 0 && h.stars > 0, `[${name}] police on its way (${h.police} cruisers, ${h.policeDrones} drones, ${h.stars} stars)`);
+  check(h.police > 0 && (h.policeDrones > 0 || h.gaps?.inbound > 0) && h.stars > 0, `[${name}] police on its way (${h.police} cruisers, ${h.policeDrones} drones, ${h.gaps?.inbound} inbound, ${h.stars} stars)`);
   await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tw, {timeout: 400000}).catch(() => {});
   await shot("1b-police");
   check(await cmd("wanted 0") === "0", `[${name}] wanted level cleared`);
@@ -328,14 +329,30 @@ async function run({name, url, context, mapped}) {
     check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
     await frame(); await frame();
     h = await hud();
-    check(h.night > 0.6 && h.clock === "22:00", `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);
+    check(h.night > 0.6 && /^22:0\d$/.test(h.clock), `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);  // the clock runs on (480 s a day)
     check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
     await shot("1c-night");
     await cmd("time 0.40");
     check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
     await frame(); await frame();
-    check((await hud()).look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify((await hud()).look)})`);
+    await page.waitForFunction(() => window.SpawnCity.hud().look?.viewModel === "KNIFE", null, {timeout: 30000}).catch(() => {});
+    { const hk = await hud(); check(hk.look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify(hk.look)}, mode ${hk.mode}, weapon ${hk.weapon}, health ${hk.health}, ${await cmd("viewmodel")})`); }
     await cmd("weapon 1");
+  }
+
+  // sc-m3-gaps (game_gaps.cpp, PARITY.md): lamps, critical smoke, jet damage, spawn gate.
+  {
+    let g = JSON.parse(await cmd("gaps"));
+    check(g.lamps > 0, `[${name}] street lamps placed (${g.lamps})`);
+    const lb = await cmd("lampbreak 2");
+    g = JSON.parse(await cmd("gaps"));
+    check(/^lamp /.test(lb) && g.lampsBroken >= 1 && g.lampsFallen >= 1, `[${name}] a lamp post knocked down (${lb})`);
+    let burnt = "";
+    for (let i = 0; i < 16 && burnt !== "burning"; i++) burnt = await cmd("burn " + i);
+    await page.waitForFunction(() => window.SpawnCity.hud().gaps?.smoke >= 1, null, {timeout: 30000}).catch(() => {});  // smoke starts on the next frame
+    g = JSON.parse(await cmd("gaps"));
+    check(burnt === "burning" && g.smoke >= 1, `[${name}] critical smoke on a burning car (${JSON.stringify({smoke: g.smoke, puffs: g.puffs})})`);
+    check(["yes", "no"].includes(await cmd("canspawn 0 0")), `[${name}] spawn gate answers`);
   }
 
   // Street life, ragdolls, interiors (game_life.cpp, M3 life).
@@ -441,8 +458,9 @@ async function run({name, url, context, mapped}) {
     const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
     const before = (await hud()).explosions;
     check(await cmd("strike 0 150") === "ok", `[${name}] air strike called`);
-    await until(() => window.SpawnCity.hud().combat.jets > 0);
-    check((await hud()).combat.jets === 2, `[${name}] the strike pair is in the air`);
+    // an ambient pass may be in the sky as well: the strike adds its pair (fighter_jets.mjs)
+    await until(() => window.SpawnCity.hud().combat.jets >= 2);
+    check((await hud()).combat.jets >= 2, `[${name}] the strike pair is in the air (${(await hud()).combat.jets} jets)`);
     await until(b => window.SpawnCity.hud().explosions > b + 3, 300000, before);
     await shot("1c-airstrike");
     check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
@@ -453,7 +471,11 @@ async function run({name, url, context, mapped}) {
     await shot("1d-military");
     check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
     await cmd("military on");
-    check(await cmd("enemy swat") === "SWAT" && (await hud()).combat.enemies === 1, `[${name}] a sandbox enemy`);
+    // the wanted level from the army run may already have sent enemies of its own: one more is the check
+    const enemiesBefore = (await hud()).combat.enemies;
+    const enemyCmd = await cmd("enemy swat");
+    await until(b => window.SpawnCity.hud().combat.enemies >= b + 1, 30000, enemiesBefore);
+    check(enemyCmd === "SWAT" && (await hud()).combat.enemies >= enemiesBefore + 1, `[${name}] a sandbox enemy (${enemyCmd}, ${enemiesBefore} -> ${(await hud()).combat.enemies})`);
     check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
     await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
     c = (await hud()).combat;
@@ -496,9 +518,14 @@ async function run({name, url, context, mapped}) {
     check((await hud()).explosions > booms && (await hud()).guided.flying === 0, `[${name}] the GUIDED missile went off`);
   }
   // critical_damage_logic.mjs: the drone at 28 % smokes and blows 2.05 s later.
-  check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
+  // flak may have hit the drone on its climb: hurt it down to 25 % from where it is
+  const droneHp = (await hud()).droneHp ?? 100;
+  const hurtOut = await cmd(`hurt ${Math.max(1, droneHp - 25)}`);
+  await page.waitForFunction(() => window.SpawnCity.hud().details?.droneCritical, null, {timeout: 30000}).catch(() => {});  // armed on the next frame
+  check(hurtOut.startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${hurtOut}, ${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
   check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
+  await page.waitForFunction(() => window.SpawnCity.hud().logbook?.flights >= 1, null, {timeout: 30000}).catch(() => {});  // the flight ends on the next frame
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.

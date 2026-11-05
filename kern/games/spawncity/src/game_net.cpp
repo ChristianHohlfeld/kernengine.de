@@ -160,6 +160,12 @@ net::PlayerState Game::my_state() const {
   }
   if (mp_ && mp_->mic && !mp_->muted) f |= net::kTalking;
   if (ui_.jetpack.thrusting && mode_ == Mode::foot) f |= net::kJetpack;  // game_equipment.cpp
+  if (Vec3 rp; gaps_riding()) {
+    // riding in a mate's jet (game_seats.cpp): where we are is his jet, and nobody walks there
+    Quat rq;
+    if (gaps_ride_pose(rp, rq)) { s.position = rp; s.avatar = rp; s.rotation = rq; s.velocity = {}; s.speed = 0; }
+    f |= net::kPassenger;
+  }
   s.flags = f;
   return s;
 }
@@ -280,12 +286,13 @@ void Game::update_net(f32 dt) {
         world_->play_sound("builtin:explosion", f.p, 1, 1, true);
         world_->shake_camera(clampf(1.4f - kern::length(cam_.eye - f.p) / (std::fmax(2.0f, f.a) * 3), 0, 1.2f));
         ++explosions_;
+        gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
       case net::Fx::cow_death:
       case net::Fx::push: life_net_fx(f); break;  // M3 life (game_life.cpp)
-      default: break;
+      default: gaps_remote_fx(f); break;  // sc-m3-gaps effects (game_gaps.cpp)
     }
   }
   for (const net::PingEvent& p : net_.take_pings()) {
@@ -462,6 +469,7 @@ void Game::draw_remote_people() {
     p.skin = {0.86f, 0.66f, 0.5f};
     p.phase = r.phase;
     p.yaw = r.state.avatar_yaw;
+    if (r.state.flags & net::kPassenger) continue;  // in a jet (game_seats.cpp)
     if (r.state.flags & net::kDead) {
       p.state = People::State::down;
       p.fall_dir = {std::cos(r.state.avatar_yaw), std::sin(r.state.avatar_yaw), 0};

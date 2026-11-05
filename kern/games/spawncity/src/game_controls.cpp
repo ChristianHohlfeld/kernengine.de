@@ -843,7 +843,16 @@ void Game::update_touch_layout() {
 
 std::string Game::touch_view_json() {
   if (!touch_mode_) return "null";
-  return pad_touch_.view_json();
+  // A label's line break ("▲\nHÖHE\n▼") must reach JSON.parse escaped (it broke the page's parse).
+  const std::string raw = pad_touch_.view_json();
+  std::string out;
+  out.reserve(raw.size() + 16);
+  for (char c : raw) {
+    if (c == '\n') out += "\\n";
+    else if (static_cast<unsigned char>(c) < 0x20) out += ' ';
+    else out += c;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -940,6 +949,12 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     // GAME / ANGLE (no key on spawncity.de; kept as a command)
     sticks_.game_mode = !sticks_.game_mode;
     out = sticks_.game_mode ? "game" : "angle";
+    return true;
+  }
+  if (starts("contract")) {
+    combat_.pop = combat_.fun.apply(FunEvent::cycle_contract, world_->sim_time(), wanted_.stars());
+    combat_.pop_at = world_->sim_time();
+    out = combat_.pop;  // the new contract's line ("AUFTRAG ...")
     return true;
   }
   if (cmd == "controls") {

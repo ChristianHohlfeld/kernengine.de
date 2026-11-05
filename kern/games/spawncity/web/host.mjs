@@ -16,6 +16,7 @@ import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
+import {GapsHud} from "./gaps_hud.mjs";
 import {installSpawnCityLife} from "./life.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
@@ -271,6 +272,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     canvas.width = w; canvas.height = hh;
     e.kern_app_resize(w, hh);
   };
+  const gapsHud = new GapsHud(hudEl, command);  // impact bursts, police dispatch (gaps_hud.mjs)
   const tick = () => {
     frames++;
     pollPad();
@@ -278,7 +280,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pumpDem();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
-    if (last) { hud.update(last, tiles); mpPage?.update(last); }
+    if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }
     // vs_combat_presentation.mjs playExplosion: in a multiplayer round the phone buzzes when you
     // go down ([70, 35, 120]) and when a mate does ([65]); the pad never rumbles in SpawnCity.
     if (last?.net) {
@@ -437,7 +439,7 @@ class SpawnCityHud {
     if (h.mode === "foot") row("Granaten", h.grenades);
     if (h.carHp !== undefined) row("Zustand", `${Math.round(h.carHp / 3)} %`, h.carHp < 75 ? "warn" : "");
     if (h.droneHp !== undefined) row("Zustand", `${Math.round(h.droneHp)} %`, h.droneHp < 30 ? "warn" : "");
-    if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 6)} %`, h.jetHp < 150 ? "warn" : "");
+    if (h.jetHp !== undefined) row("Zustand", `${Math.round(h.jetHp / 4)} %`, h.jetHp < 100 ? "warn" : "");  // jet_mode.mjs HP_MAX 400
     if (h.stars > 0) row("Polizei", `${h.police} Wagen · ${h.policeDrones} Drohnen · EMP ${h.emp > 0 ? h.emp.toFixed(0) + " s" : (h.ctl?.pad ? "bereit (B)" : "bereit (G)")}`, "hot");
     if (h.net) row("Mehrspieler", h.net.status, h.net.connected ? "" : "warn");
     const c = h.combat;  // combat and events (game_events.cpp): numbers and texts from C++
@@ -459,7 +461,7 @@ class SpawnCityHud {
     el.healthBar.style.width = `${Math.max(0, Math.min(1, hp)) * 100}%`;
     el.health.classList.toggle("low", hp < 0.3);
     el.ammo.hidden = h.mode !== "foot" || h.ammo < 0;
-    if (!el.ammo.hidden) el.ammo.innerHTML = `<b>${h.mag}</b> / ${h.reserve}${h.reload >= 0 ? " · LADEN" : ""}`;
+    if (!el.ammo.hidden) el.ammo.innerHTML = `<b>${h.ammo}</b> / ${h.reserve}${h.reload >= 0 ? " · LADEN" : ""}`;
     el.hint.hidden = !h.hint;
     if (h.hint) el.hint.textContent = h.hint;
     // desktop_controls.mjs key line: desktop only, not while the pad is in use; fades 12 s after a change

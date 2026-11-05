@@ -12,8 +12,9 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24,
 };
+constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
 constexpr f64 kSendInterval = 0.033;     // lan_vs.mjs SEND_MS
 constexpr f64 kQuietS = 6;               // a player silent this long is gone
@@ -71,7 +72,7 @@ std::vector<u8> pack_fx(const Fx& f) { return W().put(f.kind).put(f.owner).put(f
 bool unpack_fx(const std::vector<u8>& b, Fx& f) {
   R r{b};
   f.kind = r.get<u8>(); f.owner = r.get<u8>(); f.p = r.get<Vec3>(); f.dir = r.get<Vec3>(); f.a = r.get<f32>();
-  return r.ok && f.kind <= Fx::rocket && sane(f.p) && sane(f.dir) && std::isfinite(f.a);
+  return r.ok && f.kind <= Fx::kLast && sane(f.p) && sane(f.dir) && std::isfinite(f.a);
 }
 
 }  // namespace
@@ -307,8 +308,34 @@ void Session::finish_ballot(mp::Ballot::Status s) {
   ballot_ = mp::Ballot{};
 }
 
+void Session::seat_request(bool claim, u8 owner, seats::Seat seat) {
+  // no session: single-player runs locally; the host judges its own requests at once
+  if (role_ == Role::none) { const u8 me = self_slot_; claim ? seats_.claim(owner, me, seat) : seats_.release(owner, me, seat); return; }
+  if (role_ == Role::host) { judge_seat(self_slot_, claim, owner, seat); return; }
+  to_host(kReliable, kSeatReq, W().put(static_cast<u8>(claim)).put(owner).put(static_cast<u8>(seat)).b);
+}
+
+void Session::judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat) {
+  const seats::Result r = claim ? seats_.claim(owner, from, seat) : seats_.release(owner, from, seat);
+  if (r == seats::Result::ok) send_seats();
+}
+
+void Session::send_seats() {
+  if (role_ != Role::host) return;
+  W w;
+  w.put(seats_.revision()).put(static_cast<u8>(seats_.rows().size()));
+  for (const seats::Row& r : seats_.rows()) w.put(r.owner).put(r.pilot).put(r.passenger);
+  to_all(kReliable, kSeatState, w.b, kNobody);
+}
+
 void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
   switch (type) {
+    case kSeatReq: {
+      R r{d};
+      const u8 claim = r.get<u8>(), owner = r.get<u8>(), seat = r.get<u8>();
+      if (r.ok && seat <= 1) judge_seat(from, claim != 0, owner, static_cast<seats::Seat>(seat));
+      return;
+    }
     case kFxMsg: {
       Fx f;
       if (!unpack_fx(d, f)) return;
@@ -408,6 +435,14 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       return;
     }
     case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
+    case kSeatState: {
+      const u32 rev = r.get<u32>();
+      const u8 n = r.get<u8>();
+      std::vector<seats::Row> rows;
+      for (u8 i = 0; i < n && r.ok; ++i) { seats::Row q; q.owner = r.get<u8>(); q.pilot = r.get<u8>(); q.passenger = r.get<u8>(); rows.push_back(q); }
+      if (r.ok) seats_.load(rev, rows);
+      return;
+    }
     case kHitMsg: { Hit h; if (unpack_hit(d, h) && h.target == self_slot_) hits_.push_back(h); return; }
     case kConfirm: { Hit h; if (unpack_hit(d, h)) confirms_.push_back(h); return; }
     case kKillMsg: { Kill k{r.get<u8>(), r.get<u8>(), r.get<u8>(), r.get<u8>()}; if (r.ok) kills_.push_back(k); return; }
@@ -520,6 +555,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
       } else {
         remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
         scores_.remove(slot);
+        if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
         to_all(kReliable, kLeft, W().put(slot).b, kNobody);
         send_scores();
         if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);
@@ -551,6 +587,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
     if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
     if (time - rules_clock_ > kRulesEvery) { rules_clock_ = time; send_rules(); }
+    if (time - seats_clock_ > kSeatsEvery) { seats_clock_ = time; send_seats(); }
     if (ballot_.id && (now_ms() >= ballot_.expires_ms || roster() != ballot_.members)) finish_ballot(mp::Ballot::Status::cancelled);
     server_->send_packets();
   } else {

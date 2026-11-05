@@ -225,13 +225,15 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
         const f32 u = clampf((me.x - wl.a.x) * wl.dir.x + (me.y - wl.a.y) * wl.dir.y, 1, wl.len - 1);
         const Vec2 p = wl.a + wl.dir * u + wl.normal * 1.5f;
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
+        if (t.water_at(p.x, p.y)) continue;  // over water a blast only throws up spray (no marks to test)
         if (d < best && wl.len > 3) { best = d; at = {p.x, p.y, 0}; }
       }
       if (best > 1e8f) { out = "no wall"; return true; }
     }
+    const f32 before = t.height(at.x, at.y);  // "ground": the height before the blast (the crater test compares)
     at.z = city_.ground_height(at.x, at.y) + 0.5f;
     explosion(at, 9.5f, 160, true);
-    std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"ground\":%.2f}", at.x, at.y, at.z, city_.ground_height(at.x, at.y));
+    std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"ground\":%.2f}", at.x, at.y, at.z, before);
     out = b;
     return true;
   }

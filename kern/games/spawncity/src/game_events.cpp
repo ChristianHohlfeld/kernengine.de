@@ -160,15 +160,19 @@ void Game::update_zombies(f32 dt) {
     if (p.hp < z.last_hp) C.zombies.points += kZombieHitPts;  // every hit 10 points
     z.last_hp = p.hp;
     const Vec3 target = foot ? me : player_position();
+    // a player in a boarded-up building: to the door, break the planks, in (game_barricades.cpp)
+    bool walled = false, hold = false;
+    const Vec3 goal = gaps_zombie_goal(z.person, p.pos, target, now, walled, hold);
+    const f32 gx = goal.x - p.pos.x, gy = goal.y - p.pos.y, gd = std::hypot(gx, gy);
     const f32 dx = target.x - p.pos.x, dy = target.y - p.pos.y, d = std::hypot(dx, dy);
     p.aiming = true;  // arms reaching forward
-    if (d > 0.9f) {
-      const bool ok = people_.free_move(world_->physics(), p, {dx / d, dy / d}, std::fmin(d, z.speed * dt), false);
+    if (!hold && gd > (goal.x == target.x && goal.y == target.y ? 0.9f : 0.05f)) {
+      const bool ok = people_.free_move(world_->physics(), p, {gx / gd, gy / gd}, std::fmin(gd, z.speed * dt), false);
       p.v = ok ? z.speed : 0;
     } else p.v = 0;
-    p.yaw = approach_angle(p.yaw, std::atan2(dy, dx), dt * 8);
+    p.yaw = approach_angle(p.yaw, std::atan2(gy, gx), dt * 8);
     p.phase += p.v * dt * 3.4f;
-    if (foot && d < 1.35f && now >= z.next_hit) {
+    if (foot && d < 1.35f && !walled && now >= z.next_hit) {  // nobody is clawed through an intact barricade
       z.next_hit = now + kZombieMeleeS;
       z.swing = now;
       world_->damage(soldier_, kZombieMelee, 0, false, p.pos + Vec3{0, 0, 1.3f});
