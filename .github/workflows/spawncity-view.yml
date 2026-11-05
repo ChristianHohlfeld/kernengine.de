@@ -1,0 +1,35 @@
+name: SpawnCity Ansicht pruefen
+
+# Quick check of the original view (?view=original) on the deployed page: no build, a few minutes.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: page to check
+        default: https://kernengine.de/kern/games/spawncity/web/index.html?view=original&menu=1
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - run: node kern/games/spawncity/tests/view_check.mjs "${{ inputs.url }}" generated/spawncity-view
+      - name: Results to branch ansicht-ergebnis
+        if: always()
+        run: |
+          set -euo pipefail
+          cd generated/spawncity-view
+          git init -q -b ansicht-ergebnis
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Ansicht ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ansicht-ergebnis

@@ -67,7 +67,8 @@ const GAMES = {
       await page.waitForFunction(() => { const b = document.querySelector("html.sc-original-view #gameMenuStart") || document.getElementById("scStart"); return b && !b.disabled; }, null, {timeout: 120000});
     },
     async start(page) {
-      await page.click(await page.$("html.sc-original-view #gameMenuStart") ? "#gameMenuStart" : "#scStart");
+      await page.waitForFunction(() => window.SpawnCity?.hud?.()?.placed, null, {timeout: 120000, polling: 1000}).catch(() => {});
+      await page.evaluate(() => (document.querySelector("html.sc-original-view #gameMenuStart") || document.getElementById("scStart")).click());
       await page.waitForFunction(() => document.getElementById("scMenu")?.hidden === true || getComputedStyle(document.getElementById("scMenu")).display === "none", null, {timeout: 60000}).catch(() => {});
     },
     mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(`mode ${m}`), m),
@@ -96,6 +97,13 @@ try {
         let ui = null, state = null;
         try { ui = await page.evaluate(dumpUi); } catch (e) { ui = {error: String(e)}; }
         try { state = await g.state(page); } catch (e) { state = {error: String(e)}; }
+        // the same frame measurement in both games: requestAnimationFrame for 2 s
+        try {
+          state.raf = await page.evaluate(() => new Promise(res => { const t = []; let last = performance.now(); const t0 = last;
+            const f = now => { t.push(now - last); last = now; if (now - t0 < 2000) requestAnimationFrame(f); else { t.sort((a, b) => a - b);
+              res({fps: +(t.length / ((now - t0) / 1000)).toFixed(1), p95: +t[Math.floor(t.length * 0.95)].toFixed(1), max: +t[t.length - 1].toFixed(1)}); } };
+            requestAnimationFrame(f); }));
+        } catch (e) { state.raf = {error: String(e)}; }
         // The full page as the player sees it: markup (without canvases' pixels) and every CSS rule,
         // including the rules modules inject at run time - the source for translating the HUD 1:1.
         try {
@@ -148,5 +156,16 @@ try {
     lines.push(`errors original: ${o.errors.join(" | ")}`, `errors kern: ${k.errors.join(" | ")}`, "");
   }
   fs.writeFileSync(path.join(out, "texts.md"), lines.join("\n"));
+  // frame rate side by side (fps, 95th percentile and worst frame in ms)
+  const perf = ["| device | step | original fps / p95 / max | kern fps / p95 / max |", "|---|---|---|---|"];
+  for (const dev of Object.keys(DEVICES)) {
+    const o = report.runs.find(r => r.device === dev && r.game === "original"), k = report.runs.find(r => r.device === dev && r.game === "kern");
+    if (!o || !k) continue;
+    for (const st of o.steps) {
+      const ks = k.steps.find(x => x.label === st.label), f = r => r ? `${r.fps} / ${r.p95} / ${r.max}` : "-";
+      perf.push(`| ${dev} | ${st.label} | ${f(st.state?.raf)} | ${f(ks?.state?.raf)} |`);
+    }
+  }
+  fs.writeFileSync(path.join(out, "perf.md"), perf.join("\n") + "\n");
   await browser.close();
 }

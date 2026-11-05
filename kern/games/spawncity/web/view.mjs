@@ -30,7 +30,8 @@ export async function mountOriginalView(base = "./view/") {
   style.textContent = css.replace(/url\("fonts\//g, `url("${globalThis.__scViewFonts || base + "fonts/"}`);
   document.head.prepend(style);
   // Kern's own page bits that the original does not have (stage, status, Kern HUD) give way.
-  $("stage")?.remove?.();
+  // Kern's stage (its canvas) goes; an empty one stays for Kern's (unused) touch overlay.
+  { const st = $("stage"); if (st) { st.querySelector("canvas")?.remove(); st.style.display = "none"; } }
   // Kern's load status stays as the source of the menu's status line (view.mjs), not shown itself.
   const status = $("status");
   if (status) status.style.display = "none";
@@ -47,7 +48,8 @@ export async function mountOriginalView(base = "./view/") {
     html.sc-original-view #hud{position:absolute;inset:0;pointer-events:none;z-index:20}
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
     html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
-    html.sc-original-view #game{display:block;width:100%;height:100%;outline:none;touch-action:none}`;
+    html.sc-original-view #game{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;outline:none;touch-action:none}
+    html.sc-original-view .scui-corner{display:none!important}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
   const walk = {mode: "drone"};
