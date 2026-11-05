@@ -29,14 +29,14 @@ const PROBE = {
     const jump = globalThis.__arondightWalkJump;
     const wpn = document.getElementById("mobileGameplayWeapon")?.textContent?.trim() || "";
     return {mode, x, y, z, yaw, pitch, footYaw, jumpZ: jump?.z ?? null, kmh: car ? Math.abs(C.speedMps) * 3.6 : null, carHeading: car ? C.heading * 180 / Math.PI : null,
-      t: globalThis.__cmpClock ?? performance.now() / 1000, locked: !!document.pointerLockElement, weapon: wpn, body: document.body.className.slice(0, 300)};
+      t: globalThis.__cmpClock ?? performance.now() / 1000, locked: !!document.pointerLockElement, lockEl: document.pointerLockElement?.id || document.pointerLockElement?.tagName || "", weapon: wpn, body: document.body.className.slice(0, 300)};
   },
   kern: () => {
     const h = window.SpawnCity?.hud?.() || {}, v = h.ctl?.view || {}, p = v.probe;
     const e = v.eye || [null, null, null];
     return {mode: h.mode, x: p ? p.x : e[0], y: p ? p.y : e[1], z: p ? p.z : e[2], ground: p?.ground ?? null, yaw: p?.yaw ?? null, pitch: p?.pitch ?? null,
       kmh: h.mode === "car" ? (v.carKmh ?? (h.speed ?? 0) * 3.6) : null, agl: h.agl ?? null, fps: h.fps ?? null, t: p?.time ?? performance.now() / 1000, wall: performance.now() / 1000,
-      locked: !!document.pointerLockElement, weapon: document.getElementById("mobileGameplayWeapon")?.textContent?.trim() || h.weapon || "", body: document.body.className.slice(0, 300)};
+      locked: !!document.pointerLockElement, lockEl: document.pointerLockElement?.id || document.pointerLockElement?.tagName || "", aiming: !!h.aiming, device: h.ctl?.device, weapon: document.getElementById("mobileGameplayWeapon")?.textContent?.trim() || h.weapon || "", body: document.body.className.slice(0, 300)};
   },
 };
 
@@ -113,6 +113,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
             if (typeof v.m === "number") v.mps = +(Math.hypot(c.x - a.x, c.y - a.y) / held).toFixed(2);
             if (typeof v.deg === "number") v.degps = +(v.deg / held).toFixed(1);
             if (typeof v.dz === "number") v.dzps = +((c.z - a.z) / held).toFixed(2);
+            if (typeof v.kmh === "number" && c.kmh != null) v.kmhps = +(((c.kmh ?? 0) - (a.kmh ?? 0)) / held).toFixed(1);
           }
           run.results[label] = {...v, shot: await shot(label), from: a.mode, to: b.mode, held: +held.toFixed(2), wall: +(performance.now() / 1000 - wall0).toFixed(2), fps: b.fps ?? undefined};
         } catch (e) { run.errors.push(`${label}: ${String(e.message || e).slice(0, 300)}`); run.results[label] = {error: String(e.message || e).slice(0, 200)}; }
@@ -124,10 +125,14 @@ export async function measureControls({browser, out, games, devices, gps}) {
       const peak = (a, s) => +Math.max(0, ...s.map(x => (x.jumpZ ?? x.z) - (a.jumpZ ?? a.z))).toFixed(2);
       const hold = async (keys, ms) => { for (const k of keys) await page.keyboard.down(k); await pause(ms); for (const k of [...keys].reverse()) await page.keyboard.up(k); };
       const centre = async () => { const vp = page.viewportSize(); return {x: vp.width / 2, y: vp.height / 2}; };
+      // Under the pointer lock a mouse only reports movementX/Y; headless Chromium's synthetic mouse
+      // gives none, so the events carry it themselves, on the locked element like the browser does
+      // (both games read window "mousemove" under the lock: desktop_controls.mjs onMouseMove, host.mjs).
       const mouseMove = async (dx, dy, steps = 10) => {
-        const c = await centre();
-        await page.mouse.move(c.x, c.y);
-        for (let i = 1; i <= steps; i++) { await page.mouse.move(c.x + dx * i / steps, c.y + dy * i / steps); await pause(16); }
+        for (let i = 0; i < steps; i++) {
+          await page.evaluate(([x, y]) => (document.pointerLockElement || document.body).dispatchEvent(new MouseEvent("mousemove", {bubbles: true, cancelable: true, movementX: x, movementY: y})), [dx / steps, dy / steps]);
+          await pause(16);
+        }
       };
       const cdp = dev === "phone" ? await ctx.newCDPSession(page) : null;
       const touch = async (type, pts) => cdp.send("Input.dispatchTouchEvent", {type, touchPoints: pts.map((p, i) => ({x: p.x, y: p.y, id: p.id ?? i, radiusX: 8, radiusY: 8, force: 1}))});
@@ -172,7 +177,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await measure("Maus 200 px rechts", () => mouseMove(200, 0), (a, s, b) => ({deg: dyaw(a, b), pitch: dpitch(a, b), locked: a.locked}));
           await measure("Maus 100 px runter", () => mouseMove(0, 100), (a, s, b) => ({deg: dpitch(a, b), yaw: dyaw(a, b), locked: a.locked}));
           await measure("Q (Waffe)", () => page.keyboard.press("KeyQ"), (a, s, b) => ({weapon: `${a.weapon} -> ${b.weapon}`}));
-          await measure("RMB (zielen)", async () => { await page.mouse.down({button: "right"}); await pause(600); }, (a, s, b) => ({body: b.body.match(/ads-active|scope-active/g)?.join(" ") || ""}), 100);
+          await measure("RMB (zielen)", async () => { await page.mouse.down({button: "right"}); await pause(600); }, (a, s, b, c) => ({body: c.body.match(/ads-active|scope-active/g)?.join(" ") || "", lockEl: c.lockEl, aiming: c.aiming}), 100);
           await page.mouse.up({button: "right"}).catch(() => {});
           // drone
           await toMode("drone", 3500);
@@ -182,6 +187,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await measure("Drohne A 1 s", () => hold(["KeyA"], 1000), (a, s, b) => ({deg: dyaw(a, b), m: dist(a, b)}));
           // car: F near a car (the setup brings one close), then W
           await toMode("car", 3500);
+          run.results.car = {mode: (await probe()).mode};
           await measure("Auto W 2 s", () => hold(["KeyW"], 2000), (a, s, b) => ({kmh: +(Math.max(0, ...s.map(x => x.kmh ?? 0), b.kmh ?? 0)).toFixed(1), m: dist(a, b)}), 100);
           await measure("Auto W+A 1 s", () => hold(["KeyW", "KeyA"], 1000), (a, s, b) => ({deg: a.carHeading != null ? +wrap(b.carHeading - a.carHeading).toFixed(1) : dyaw(a, b)}), 100);
           await measure("Auto S 2 s (Bremse)", () => hold(["KeyS"], 2000), (a, s, b) => ({kmh: +(b.kmh ?? 0).toFixed(1)}), 100);
@@ -241,7 +247,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
   rows.length = 0;
   // ---- table: value original | Kern | deviation
   const fmt = r => { if (!r) return "–"; if (r.error) return `Fehler: ${r.error.slice(0, 60)}`; const v = Object.entries(r).filter(([k]) => !["shot", "from", "to", "wall"].includes(k)).map(([k, x]) => `${k} ${x}`).join(", "); return v || `${r.from} → ${r.to}`; };
-  const num = r => r && !r.error ? (r.mps ?? r.degps ?? r.dzps ?? r.m ?? r.deg ?? r.kmh ?? r.dz) : undefined;
+  const num = r => r && !r.error ? (r.mps ?? r.degps ?? r.dzps ?? r.kmhps ?? r.m ?? r.deg ?? r.kmh ?? r.dz) : undefined;
   const md = ["# Steuerung: Original und Kern mit echten Eingaben", "", "Gemessen von tests/compare_controls.mjs (Workflow „SpawnCity Vergleich“). Werte: m = Meter, deg = Grad (Gierwinkel, gegen den Uhrzeigersinn positiv), kmh, dz = Höhenänderung; mps, degps, dzps = je Sekunde der Spielzeit, solange die Eingabe gehalten wurde (held s); die Abweichung vergleicht diese Raten.", ""];
   for (const dev of Object.keys(profiles)) {
     const o = runs.find(r => r.device === dev && r.game === "original"), k = runs.find(r => r.device === dev && r.game === "kern");

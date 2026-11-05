@@ -38,6 +38,10 @@ export async function mountOriginalView(base = "./view/") {
   const kernHud = $("hud");
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
+  // #thumbWeapon is built by thumb_layout.mjs itself (ensure()); the copy the extracted markup carries
+  // would be the one getElementById finds - never shown, so edge_hud_layout.mjs moved JUMP onto the
+  // weapon button's place and the game's weapon touch area had no element (compare-controls.md).
+  tpl.content.querySelectorAll("#thumbWeapon").forEach(e => e.remove());
   document.body.prepend(tpl.content);
   // The Kern HUD root (speech bubbles, banners, perf line from life.mjs / gaps_hud.mjs) lives in
   // the game view, above the picture like the original's overlays.
@@ -88,9 +92,10 @@ export function fingerForGame(ev) {
   return !t.closest(PAGE_BUTTONS);
 }
 
-const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", Granatwerfer: "WERFER", Raketenwerfer: "RAKETEN", "Fäuste": "FÄUSTE", Messer: "MESSER"};
+// the game's weapon names (weapons.h) -> the original's labels
+const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", "Sniper .50": "SNIPER", Granatwerfer: "WERFER", "Granatwerfer 40 mm": "WERFER", Raketenwerfer: "RAKETEN", "Fäuste": "FÄUSTE", Faeuste: "FÄUSTE", Messer: "MESSER"};
 const FOOT_ORDER = ["MP", "GLOCK", "SNIPER", "WERFER", "RAKETEN", "FÄUSTE", "MESSER"];  // first_person_weapon_runtime_v3.mjs WEAPON_ORDER
-const DRONE_NAMES = {MG: "GUN", RAKETEN: "ROCKETS", GUIDED: "GUIDED"};                  // drone_weapon_modes.mjs
+const DRONE_NAMES = {MG: "GUN", "Drohnen-MG": "GUN", RAKETEN: "ROCKETS", "Drohnen-Raketen": "ROCKETS", GUIDED: "GUIDED"};                  // drone_weapon_modes.mjs
 
 // Binders of other areas (view_modes.mjs, ...): fn(h, touchView, view) runs every frame after the
 // core bindings below; each repeats the DOM writes of the original modules it names.

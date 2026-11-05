@@ -242,6 +242,9 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.max_speed = 5.5f;
   soldier_controller_.boost_speed = 8.1f;
   soldier_controller_.jump_speed = 3.6f;
+  // player_walk_mode_v4.mjs moves at the shaped input speed at once (dx = input * speed * dt, no ramp):
+  // the fastest ramp of Kern's mover (accelerate = acceleration / max_speed * 2, clamped to 30 per s)
+  soldier_controller_.acceleration = 30 * 5.5f / 2;
   soldier_controller_.eye_height = 1.68f;
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
