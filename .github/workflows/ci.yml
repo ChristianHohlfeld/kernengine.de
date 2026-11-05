@@ -86,7 +86,7 @@ jobs:
             kern/build.sh --lehrer generated/kern_lehrer.wasm
             kern/games/spawncity/build.sh
             for f in kern/games/spawncity/web/*.mjs; do node --check "$f"; done
-            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
           set -o pipefail
@@ -129,7 +129,7 @@ jobs:
           cp generated/kern_lehrer.wasm _site/generated/
           # Its old address (/train/) leads there.
           mkdir -p _site/train && printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../lehrer/"><a href="../lehrer/">Kern Lehrer</a>\n' > _site/train/index.html
-          cp kern/web/kern.mjs kern/web/app.mjs _site/kern/web/
+          cp kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs _site/kern/web/
           cp kern/web/studio/*.mjs kern/web/studio/*.html kern/web/studio/*.css _site/kern/web/studio/
           for g in hello orbrun; do
             mkdir -p _site/kern/examples/$g
