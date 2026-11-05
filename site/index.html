@@ -203,6 +203,22 @@ details.toc[open] summary::after { content: "–"; }
 .ed .btn.primary { color: #1a1300; }
 .ed-band .meta { color: var(--muted); font-size: 14px; }
 html[lang="en"] .ed[lang="en"] { order: -1; }
+/* rows line up across the three cards: each card spans 9 rows of the editions grid
+   (head, then per edition: title, price, meta, button) and shares them via subgrid */
+@supports (grid-template-rows: subgrid) {
+  .ed-band { display: grid; grid-template-rows: subgrid; grid-row: span 9; row-gap: 16px; }
+  .ed { display: grid; grid-template-rows: subgrid; grid-row: span 4; row-gap: 8px; }
+  .ed > h4 { grid-row: 1; }
+  .ed > .price { grid-row: 2; }
+  .ed > .meta { grid-row: 3; }
+  .ed:not(:has(> .price)) > .meta { grid-row: 2 / span 2; }
+  .ed > .btn { grid-row: 4; align-self: end; }
+}
+/* without subgrid: each edition fills half the card, its button at the bottom */
+@supports not (grid-template-rows: subgrid) {
+  .ed { flex: 1 1 auto; }
+  .ed .btn { margin-top: auto; }
+}
 
 /* faq */
 .faq details { border-bottom: 1px solid var(--line); }
