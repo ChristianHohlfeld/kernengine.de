@@ -12,12 +12,13 @@ namespace sc {
 namespace {
 
 kern::BuildingStyle konstanz_style() {
-  // Old-town plaster facades and tiled roofs (colours, not data: the shapes and heights are OSM's).
+  // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
+  auto hex = [](u32 h) { return kern::Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
   kern::BuildingStyle s;
-  s.walls = {{0.86, 0.82, 0.74}, {0.84, 0.74, 0.58}, {0.80, 0.66, 0.58}, {0.74, 0.76, 0.74}, {0.90, 0.88, 0.84},
-             {0.70, 0.78, 0.72}, {0.82, 0.70, 0.48}, {0.78, 0.72, 0.66}};
-  s.roofs = {{0.55, 0.27, 0.18}, {0.47, 0.24, 0.17}, {0.33, 0.30, 0.30}, {0.42, 0.30, 0.24}};
-  s.trim = {0.95, 0.93, 0.89};
+  s.walls = {hex(0xc9bfae), hex(0xb9a88c), hex(0x8e5443), hex(0x9c9a94), hex(0xd8d2c4), hex(0xa87c5f), hex(0x7d8590), hex(0xcbb79a)};
+  s.roofs = {hex(0x4a4c50), hex(0x3b3d40), hex(0x6e4334), hex(0x55585c)};
+  s.trim = hex(0xf4efe4);
+  s.trim_mix = 0.45;
   return s;
 }
 

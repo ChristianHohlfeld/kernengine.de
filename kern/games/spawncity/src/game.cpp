@@ -245,7 +245,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer, &windows_);
+  world_ = std::make_unique<GameWorld>(e.renderer);  // the night of the facades: game_look.cpp (windows_.night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");

@@ -14,6 +14,7 @@
 
 #include "car.h"
 #include "city_stream.h"
+#include "facades.h"
 #include "combat_art.h"
 #include "guided.h"
 #include "combat_detail.h"
@@ -144,7 +145,7 @@ class Game {
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
-  kern::game::NightWindows& windows() { return windows_; }
+  Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
@@ -434,7 +435,7 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
-  kern::game::NightWindows windows_;
+  Facades windows_;
   std::unique_ptr<kern::game::GameWorld> world_;
   CityStream city_;
   VehicleArt art_;
