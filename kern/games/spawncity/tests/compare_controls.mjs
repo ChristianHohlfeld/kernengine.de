@@ -29,7 +29,7 @@ const PROBE = {
     const jump = globalThis.__arondightWalkJump;
     const wpn = document.getElementById("mobileGameplayWeapon")?.textContent?.trim() || "";
     return {mode, x, y, z, yaw, pitch, footYaw, jumpZ: jump?.z ?? null, kmh: car ? Math.abs(C.speedMps) * 3.6 : null, carHeading: car ? C.heading * 180 / Math.PI : null,
-      t: performance.now() / 1000, locked: !!document.pointerLockElement, weapon: wpn, body: document.body.className.slice(0, 300)};
+      t: globalThis.__cmpClock ?? performance.now() / 1000, locked: !!document.pointerLockElement, weapon: wpn, body: document.body.className.slice(0, 300)};
   },
   kern: () => {
     const h = window.SpawnCity?.hud?.() || {}, v = h.ctl?.view || {}, p = v.probe;
@@ -44,7 +44,12 @@ const PROBE = {
 const SETUP = {
   original: {
     mode: (page, m) => page.evaluate(m => {
-      if (m === "car") { globalThis.__arondightWalkMode?.setMode?.("foot", {persist: false, reason: "compare"}); return globalThis.__arondightVehicleDrive?.enterNearest?.() ?? "no car api"; }
+      if (m === "car") {
+        globalThis.__arondightWalkMode?.setMode?.("foot", {persist: false, reason: "compare"});
+        const r = globalThis.__arondightVehicleDrive?.enterNearest?.();
+        if (!globalThis.__arondightVehicleDrive?.active) globalThis.__arondightGtaRuntime?.setMode?.("vehicle");  // compare.mjs
+        return r ?? "no car api";
+      }
       if (globalThis.__arondightVehicleDrive?.active) globalThis.__arondightVehicleDrive.exit?.();
       return globalThis.__arondightWalkMode?.setMode?.(m, {persist: false, reason: "compare"}) ?? "no walk mode";
     }, m),
@@ -54,6 +59,15 @@ const SETUP = {
     mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(`mode ${m}`), m),
     wanted: page => page.evaluate(() => window.SpawnCity?.command?.("wanted 2")),
   },
+};
+
+// The original's own clock: requestAnimationFrame time, each frame at most 50 ms (player_walk_mode_v4.mjs
+// frame(): dt=Math.min(.05,elapsed)) - Kern's counterpart is its sim time (ctl.view.probe.time).
+const CLOCK = () => {
+  globalThis.__cmpClock = 0;
+  let last = performance.now();
+  const f = n => { globalThis.__cmpClock += Math.min(0.05, Math.max(0, (n - last) / 1000)); last = n; requestAnimationFrame(f); };
+  requestAnimationFrame(f);
 };
 
 const PAD_STUB = () => {
@@ -72,6 +86,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
       const run = {device: dev, game: name, results: {}, errors: []};
       runs.push(run);
       const ctx = await browser.newContext({...profile, geolocation: gps, permissions: ["geolocation"], locale: "de-DE"});
+      await ctx.addInitScript(CLOCK);
       if (dev === "pad") await ctx.addInitScript(PAD_STUB);
       const page = await ctx.newPage();
       page.on("pageerror", e => run.errors.push(String(e.message || e).slice(0, 300)));
@@ -135,8 +150,10 @@ export async function measureControls({browser, out, games, devices, gps}) {
       try {
         const url = new URL(g.url); url.searchParams.set("menu", "1");
         await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000});
-        await g.boot(page);
-        await g.start(page);
+        // loading takes long on the CI runner (SwiftShader): wait up to 4 minutes for the title's START
+        await g.boot(page).catch(async e => { run.errors.push(`boot: ${e.message.slice(0, 120)}`); await g.boot(page); }).catch(async () => g.boot(page));
+        if (name === "kern") await page.waitForFunction(() => window.SpawnCity?.hud?.()?.placed, null, {timeout: 240000, polling: 1000}).catch(() => run.errors.push("kern: not placed after 240 s"));
+        await g.start(page).catch(e => run.errors.push(`start: ${String(e.message || e).slice(0, 120)}`));
         await pause(4000);
         if (dev === "pad") { await padIdle(); await page.evaluate(() => window.dispatchEvent(Object.assign(new Event("gamepadconnected"), {gamepad: navigator.getGamepads()[0]}))); await pause(500); }
         // ---- on foot
@@ -152,8 +169,8 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await measure("D 1 s", () => hold(["KeyD"], 1000), (a, s, b) => ({m: dist(a, b)}));
           await measure("Shift+W 1 s", () => hold(["ShiftLeft", "KeyW"], 1000), (a, s, b) => ({m: dist(a, b)}));
           await measure("Space (Sprung)", () => page.keyboard.press("Space"), (a, s) => ({m: peak(a, s)}), 1400);
-          await measure("Maus 200 px rechts", () => mouseMove(200, 0), (a, s, b) => ({deg: dyaw(a, b), pitch: dpitch(a, b)}));
-          await measure("Maus 100 px runter", () => mouseMove(0, 100), (a, s, b) => ({deg: dpitch(a, b), yaw: dyaw(a, b)}));
+          await measure("Maus 200 px rechts", () => mouseMove(200, 0), (a, s, b) => ({deg: dyaw(a, b), pitch: dpitch(a, b), locked: a.locked}));
+          await measure("Maus 100 px runter", () => mouseMove(0, 100), (a, s, b) => ({deg: dpitch(a, b), yaw: dyaw(a, b), locked: a.locked}));
           await measure("Q (Waffe)", () => page.keyboard.press("KeyQ"), (a, s, b) => ({weapon: `${a.weapon} -> ${b.weapon}`}));
           await measure("RMB (zielen)", async () => { await page.mouse.down({button: "right"}); await pause(600); }, (a, s, b) => ({body: b.body.match(/ads-active|scope-active/g)?.join(" ") || ""}), 100);
           await page.mouse.up({button: "right"}).catch(() => {});
@@ -214,9 +231,14 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await measure("Auto Tippen Aussteigen", () => tap("#driveModeButton,#enterCarButton"), (a, s, b) => ({mode: `${a.mode} -> ${b.mode}`}), 1500);
         }
       } catch (e) { run.errors.push(String(e.message || e).slice(0, 300)); }
-      await ctx.close();
+      console.log("controls", dev, name, "errors:", run.errors.join(" | ") || "none");
+      await Promise.race([ctx.close().catch(() => {}), pause(20000)]);
+      write();
     }
   }
+  return write();
+  function write() {
+  rows.length = 0;
   // ---- table: value original | Kern | deviation
   const fmt = r => { if (!r) return "–"; if (r.error) return `Fehler: ${r.error.slice(0, 60)}`; const v = Object.entries(r).filter(([k]) => !["shot", "from", "to", "wall"].includes(k)).map(([k, x]) => `${k} ${x}`).join(", "); return v || `${r.from} → ${r.to}`; };
   const num = r => r && !r.error ? (r.mps ?? r.degps ?? r.dzps ?? r.m ?? r.deg ?? r.kmh ?? r.dz) : undefined;
@@ -237,4 +259,5 @@ export async function measureControls({browser, out, games, devices, gps}) {
   fs.writeFileSync(path.join(out, "controls.json"), JSON.stringify({runs, rows}, null, 1));
   fs.writeFileSync(path.join(out, "compare-controls.md"), md.join("\n") + "\n");
   return {runs, rows};
+  }
 }
