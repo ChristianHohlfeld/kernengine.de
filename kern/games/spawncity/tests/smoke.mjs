@@ -263,9 +263,10 @@ async function run({name, url, context, mapped}) {
       check((await hud()).weapon !== w0, `[${name}] the thumb weapon button cycles (${w0} -> ${(await hud()).weapon})`);
       await cmd("weapon 1");  // the Glock (Kern fires it): a tap on the screen shoots
       await gameWait(0.4);
-      const m0 = (await hud()).ammo;  // the rounds left (mag is the magazine size)
+      const m0 = (await hud()).gaps?.footShots ?? 0;  // shots on foot (no magazines: gameplay_final_runtime_v2.mjs)
       await touchTap(vw * 0.55, vh * 0.35);
-      check((await hud()).ammo < m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).ammo})`);
+      await page.waitForFunction(m => (window.SpawnCity.hud().gaps?.footShots ?? 0) > m, m0, {timeout: 30000}).catch(() => {});
+      check(((await hud()).gaps?.footShots ?? 0) > m0, `[${name}] a tap on the screen fires (${m0} -> ${(await hud()).gaps?.footShots})`);
       const s = await box("strike");
       if (s) await touchTap(s.x + s.width / 2, s.y + s.height / 2);
       check((await ctl()).aiming, `[${name}] STRIKE: aiming`);
@@ -302,6 +303,8 @@ async function run({name, url, context, mapped}) {
     check(b.startsWith("{"), `[${name}] a blast at a wall (${b})`);
     if (b.startsWith("{")) {
       const at = JSON.parse(b), g = JSON.parse(await cmd(`ground ${at.x} ${at.y}`));
+      // the marks' counts reach the HUD on the next frames (a slow phone: wait for them)
+      await page.waitForFunction(() => { const m = window.SpawnCity.hud().marks; return m && m.soot >= 1 && m.breach >= 1 && m.rubble >= 2; }, null, {timeout: 60000}).catch(() => {});
       h = await hud();
       check(h.marks.craters >= 1 && g.z < at.ground - 0.4, `[${name}] a crater in the ground (${at.ground} -> ${g.z})`);
       check(h.marks.scorch >= 1 && h.marks.soot >= 1 && h.marks.breach >= 1 && h.marks.rubble >= 2, `[${name}] scorch, soot, breach and rubble (${JSON.stringify(h.marks)})`);
@@ -467,7 +470,7 @@ async function run({name, url, context, mapped}) {
     check(await cmd("military start") === "on", `[${name}] military called in`);
     await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
     let c = (await hud()).combat;
-    check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers`);
+    { const hm = await hud(); check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers (mode ${hm.mode}, health ${hm.health}, stars ${hm.stars}, mil ${c.mil}, spawn ${JSON.stringify({a: hm.gaps?.spawnAllowed, d: hm.gaps?.spawnDenied})})`); }
     await shot("1d-military");
     check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
     await cmd("military on");

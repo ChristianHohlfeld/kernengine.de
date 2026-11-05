@@ -1058,12 +1058,9 @@ std::string Game::hud_json() {
   const kern::game::Hud& h = world_->hud();
   // Launchers and melee are the game's: their rounds (melee: none) instead of Kern's magazine.
   i32 ammo = h.ammo, mag = h.magazine, reserve = h.reserve;
-  if (game_weapon_in_hand()) {
-    const u8 slot = static_cast<u8>(foot_weapon_);
-    ammo = ammo_mag_[slot];
-    mag = foot_weapon_ == weapons::Id::rocket ? 1 : 6;
-    reserve = ammo_reserve_[slot];
-  }
+  // gameplay_final_runtime_v2.mjs: the weapons on foot have no magazines and no ammo counter (-1 hides it)
+  ammo = mag = reserve = -1;
+  (void)h.ammo;
   add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"respawn\":%.1f", h.health,
       h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
   Vec3 pos = focus_position(), vel;

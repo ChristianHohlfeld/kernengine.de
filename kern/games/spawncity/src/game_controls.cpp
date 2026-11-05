@@ -298,7 +298,8 @@ void Game::ctl_grenade(bool hold_key, bool hold_pad, f32 dt) {
     fire_projectile(weapons::Id::hand_grenade, origin, d * speed + Vec3{jv.x, jv.y, 0}, true, body(soldier_));
     if (!projectiles_.empty()) projectiles_.back().fuse = left;
   }
-  if (g.step(now)) explosion(eye + dir * 0.45f, 6, 90, true);  // cooked off in the hand
+  // cooked off in the hand: explodeAt = GRENADE_BLAST_RADIUS_M 8.5 / GRENADE_MAX_DAMAGE 125 (gameplay_final_runtime_v2.mjs)
+  if (g.step(now)) explosion(eye + dir * 0.45f, weapons::spec(weapons::Id::hand_grenade).radius_m, weapons::spec(weapons::Id::hand_grenade).damage, true);
 }
 
 // ---------------------------------------------------------------------------------------------

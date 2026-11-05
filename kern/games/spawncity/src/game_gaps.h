@@ -82,6 +82,13 @@ struct GapsState {
   u32 lamps_broken_events = 0;
   std::vector<kern::physics::Body> fallen;
   Part lamp_pole, lamp_glow, lamp_pool, lamp_fallen;
+  // gameplay_final_runtime_v2.mjs on foot (game_foot_rounds.cpp): fists per hand, the knife's
+  // strike frame, the foot rocket's smoke (pool of 90 sprites)
+  f32 fist_last[2] = {-99, -99}, knife_last = -99, knife_due = -1;
+  struct RocketPuff { Vec3 p; f32 born = -1, life = 1, rot = 0; };
+  std::vector<RocketPuff> rocket_smoke = std::vector<RocketPuff>(90);
+  u32 rocket_cursor = 0, foot_shots = 0;
+  Part rocket_part;
 };
 
 }  // namespace sc

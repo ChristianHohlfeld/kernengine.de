@@ -585,6 +585,17 @@ geschlossen (Quellen in Klammern, Werte im Code):
   des einen Knalls); Luftschlag und Überflug gehen an die Mitspieler (Bomben eines Mitspielers sind
   keine eigene Tat). Militär-Leuchtspuren und Panzergranaten sehen die Mitspieler auch.
 * **GUIDED** (`guided_missile.mjs`): Lock-Ton, Zündknall, Motorstimme und Rauchspur.
+* **Waffen zu Fuß, Werte geprüft** (`gameplay_final_runtime_v2.mjs`, `game_foot_rounds.cpp`):
+  Granatwerfer 40 m/s gerade entlang des Blicks, Zünder 2,8 s, prallt nur vom Boden ab (Normale
+  z ≥ 0,58; Rückprall 0,58, Dämpfung 0,88, bis 7×), an Wand, Auto, Person geht er hoch; ein Druck,
+  solange eine Granate fliegt, zündet sie (Fernzünder, danach 380 ms Pause). Rakete startet mit
+  22 m/s, beschleunigt mit 55 m/s² auf 40 m/s und folgt dem Laserpunkt (Fadenkreuz-Treffer bis 420 m,
+  höchstens 2,8 rad/s); eine neue Rakete übernimmt den Laser, die alte fliegt ungelenkt weiter;
+  Rauchspur alle 25 ms. Schüsse durch eine liegende Granate (0,35 m) zünden sie. Fäuste mit zwei
+  Händen (rechts 300 ms / 24, links 250 ms / 16, Kombo binnen 430 ms ×1,35), Messer trifft 130 ms
+  nach dem Druck; trifft der Strahl niemanden, trifft es den Nächsten im 40°-Kegel. Handgranate
+  4 s Zünder, explodiert in der Hand mit 8,5 m / 125. Keine Magazine, kein Nachladen (das Original
+  hat keine Munition).
 * **Zombie-Barrikaden** (`zombie_nights.mjs`, `building_interiors.mjs`): nachts trägt jede Tür des
   begehbaren Hauses sechs Bretter; Zombies schlagen sich an der Tür (1,15 m davor) Brett für Brett
   durch (je Tür ein Brett alle 3,4 s), steigen 1,8 m hinein und jagen den Spieler im Haus; durch

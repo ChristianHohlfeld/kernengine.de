@@ -163,6 +163,11 @@ void Game::gaps_init(kern::Engine& e) {
     static const Mat4 parked = Mat4::translate({0, 0, -1000});
     in.transforms = kern::Span<const f32>(parked.m, 16);
     if (!e.renderer.upsert(g.trail_part.id, in)) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
+    // the foot rocket's smoke (gameplay_final_runtime_v2.mjs ensureSmoke: 0xd8d8d8 sprites)
+    m.color = {0.847f, 0.847f, 0.847f, 1};
+    in.material = m;
+    g.rocket_part.id = e.renderer.allocate_id();
+    if (!e.renderer.upsert(g.rocket_part.id, in)) { e.renderer.release_id(g.rocket_part.id); g.rocket_part.id = 0; }
   }
 }
 
@@ -499,6 +504,7 @@ void Game::gaps_update(f32 dt) {
   }
   gaps_seats_update(dt);  // jet seats (game_seats.cpp)
   gaps_guided(dt);  // GUIDED smoke trail and motor (game_gaps.cpp)
+  foot_rounds_update(dt);  // rocket smoke, shots through grenades, the knife's strike (game_foot_rounds.cpp)
   // ---- a person died: the bank's crack (world_organic_hit_audio.mjs, "arondight:world-kill")
   if (g.death_scan < 0) g.death_scan = now;
   for (const People::Person& p : people_.all()) {
@@ -753,7 +759,17 @@ void Game::gaps_draw() {
     g.trail_part.transforms.insert(g.trail_part.transforms.end(), m.m, m.m + 16);
     g.trail_part.tints.insert(g.trail_part.tints.end(), {1, 1, 1, 0.42f});
   }
-  for (GapsState::Part* p : {&g.disc, &g.ember, &g.trail_part}) {
+  // updateRocketSmoke: scale .18 + 1.1 sqrt(t), opacity .7 (1 - t)^1.6 (gameplay_final_runtime_v2.mjs)
+  g.rocket_part.transforms.clear();
+  g.rocket_part.tints.clear();
+  for (const GapsState::RocketPuff& r : g.rocket_smoke) {
+    if (r.born < 0) continue;
+    const f32 t = clampf((now - r.born) / r.life, 0, 1);
+    const Mat4 m = billboard(r.p, right, up, f * -1.0f, (0.18f + 1.1f * std::sqrt(t)) * 0.5f, r.rot);
+    g.rocket_part.transforms.insert(g.rocket_part.transforms.end(), m.m, m.m + 16);
+    g.rocket_part.tints.insert(g.rocket_part.tints.end(), {1, 1, 1, 0.7f * std::pow(1 - t, 1.6f)});
+  }
+  for (GapsState::Part* p : {&g.disc, &g.ember, &g.trail_part, &g.rocket_part}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { g.renderer->set_visible(p->id, false); continue; }
     g.renderer->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
@@ -785,7 +801,8 @@ void Game::gaps_hud(std::string& s) {
     s += b;
     first = false;
   }
-  s += "]}";
+  std::snprintf(b, sizeof b, "],\"footShots\":%u,\"rocketSmoke\":%u}", g.foot_shots, static_cast<u32>(std::count_if(g.rocket_smoke.begin(), g.rocket_smoke.end(), [](const GapsState::RocketPuff& r) { return r.born >= 0; })));
+  s += b;
 }
 
 bool Game::gaps_command(const std::string& cmd, std::string& out) {

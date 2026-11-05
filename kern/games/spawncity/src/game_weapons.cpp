@@ -12,7 +12,7 @@ namespace sc {
 using weapons::Id;
 
 namespace {
-constexpr f32 kGrenadeFuse = 2.5f, kGrenadeThrow = 14;  // hand_grenade.mjs
+constexpr f32 kGrenadeFuse = 4.0f, kGrenadeThrow = 14;  // hand_grenade.mjs FUSE_MS 4000
 constexpr f32 kGuidedTurnG = 2.2f;                      // guided_balance.mjs turnG: lateral acceleration limit
 bool hitscan_on_foot(Id id) { return id == Id::smg || id == Id::glock || id == Id::sniper; }
 
@@ -155,7 +155,9 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   p.by_player = by_player;
   p.ignore = ignore;
   p.gravity = id == Id::grenade_launcher || id == Id::hand_grenade || id == Id::jet_bomb;
-  p.fuse = id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : 12;
+  // GRENADE_FUSE_MS 2800 / ROCKET_FOOT_TTL_MS 9000 (gameplay_final_runtime_v2.mjs)
+  p.fuse = id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : id == Id::grenade_launcher ? 2.8f : id == Id::rocket ? 9.0f : 12;
+  if (id == Id::hand_grenade) p.next_collision = p.born + 0.06f;  // throwHandGrenade nextCollisionAt +60 ms
   p.guided = id == Id::drone_guided;
   projectiles_.push_back(p);
   const char* snd = id == Id::hand_grenade || id == Id::jet_bomb ? "builtin:jump" : "builtin:launcher";
@@ -170,6 +172,13 @@ void Game::update_projectiles(f32 dt) {
   const Vec3 aim_from = aim_ray(aim_dir);
   for (Projectile& p : projectiles_) {
     if (!p.alive) continue;
+    bool boom = false;
+    Vec3 at = p.pos;
+    if (p.id == Id::grenade_launcher || p.id == Id::rocket || p.id == Id::hand_grenade) {
+      boom = foot_round_step(p, dt, now, at);  // gameplay_final_runtime_v2.mjs (game_foot_rounds.cpp)
+      p.pos = at;
+      goto settle;
+    }
     if (p.guided && mode_ == Mode::drone) {
       // GUIDED: the missile turns towards where the camera looks.
       const RayResult r = cast(world_->physics(), aim_from, aim_dir, 600, body(drone_actor_));
@@ -183,33 +192,27 @@ void Game::update_projectiles(f32 dt) {
       p.vel = turned * speed;
     }
     if (p.gravity) p.vel.z -= kG * dt;
+    {
     Vec3 step = p.vel * dt;
     const f32 len = kern::length(step);
-    bool boom = now - p.born > p.fuse;
-    Vec3 at = p.pos + step;
+    boom = now - p.born > p.fuse;
+    at = p.pos + step;
     if (len > 1e-5f) {
       const RayResult r = cast(world_->physics(), p.pos, step * (1.0f / len), len, p.ignore);
       if (r.hit) {
-        if (p.id == Id::hand_grenade) {
-          // Bounces (restitution 0.35, friction), the fuse decides.
-          const Vec3 n = r.normal;
-          const f32 vn = kern::dot(p.vel, n);
-          p.vel = (p.vel - n * (1.35f * vn)) * 0.7f;
-          at = r.point + n * 0.05f;
-          if (++p.bounces < 3) world_->play_sound(combat_sfx(combat_audio::Kind::bounce), r.point, 0.5f, 1.4f, true);
-        } else {
-          boom = true;
-          at = r.point - step * (0.05f / len);
-        }
+        boom = true;
+        at = r.point - step * (0.05f / len);
       }
       // A person or a police drone in the way.
       Vec3 seg_to = p.pos + step;
-      if (!boom && p.id != Id::hand_grenade && people_.shot(p.pos, seg_to, 0, false, now) >= 0) { boom = true; at = seg_to; }
-      if (!boom && p.id != Id::hand_grenade)
+      if (!boom && people_.shot(p.pos, seg_to, 0, false, now) >= 0) { boom = true; at = seg_to; }
+      if (!boom)
         for (const PoliceDrone& d : pdrones_)
           if (d.active && kern::length(d.pos - (p.pos + step * 0.5f)) < 1.2f + len * 0.5f) { boom = true; at = d.pos; }
     }
     p.pos = at;
+    }
+  settle:
     if (boom || at.z < city_.ground_height(at.x, at.y) - 5 || now - p.born > 20) {
       const weapons::Spec& s = weapons::spec(p.id);
       if (s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player);
@@ -238,6 +241,8 @@ void Game::update_projectiles(f32 dt) {
 void Game::foot_attack(bool trigger, bool pressed) {
   const f32 now = world_->sim_time();
   if (gaps_riding()) return;  // a passenger has nothing to fire (game_seats.cpp)
+  // launchFootGrenade: the clacker comes before the cooldown - a press while a round flies sets it off
+  if (trigger && pressed && !player_dead_ && foot_weapon_ == Id::grenade_launcher && foot_remote_detonate(now)) return;
   if (!trigger || now < next_attack_ || player_dead_) return;
   const weapons::Spec& s = weapons::spec(foot_weapon_);
   Vec3 dir;
@@ -247,32 +252,20 @@ void Game::foot_attack(bool trigger, bool pressed) {
     case Id::fists:
     case Id::knife: {
       if (!pressed) return;  // one blow per click
-      next_attack_ = now + s.interval_ms / 1000;
-      Vec3 to = eye + dir * (s.range_m + 0.4f);
-      i32 hit = people_.shot(eye, to, s.damage, true, now);
-      if (hit < 0 && life_punch(eye, to)) hit = 0;  // animals (M3 life)
-      world_->play_sound(hit >= 0 ? combat_sfx(combat_audio::Kind::hit) : "builtin:click", eye + dir, 0.7f, foot_weapon_ == Id::knife ? 1.3f : 0.8f, true);
+      melee_attack();  // two fists with combos, the knife's strike frame (game_foot_rounds.cpp)
       return;
     }
     case Id::grenade_launcher:
     case Id::rocket: {
       if (!pressed) return;
-      if (ammo_mag_[slot] <= 0) {
-        if (ammo_reserve_[slot] > 0) {
-          const i32 take = std::min(ammo_reserve_[slot], foot_weapon_ == Id::rocket ? 1 : 6);
-          ammo_mag_[slot] = take;
-          ammo_reserve_[slot] -= take;
-          next_attack_ = now + (foot_weapon_ == Id::rocket ? 2.2f : 2.6f);
-          world_->play_sound("builtin:reload", eye, 0.8f, 1, true);
-        } else world_->play_sound("builtin:click", eye, 0.6f, 1, true);
-        return;
-      }
-      --ammo_mag_[slot];
+      // gameplay_final_runtime_v2.mjs has no magazines: only the cooldown (760 / 900 ms) gates a shot
+      (void)slot;
       next_attack_ = now + s.interval_ms / 1000;
       const Vec3 muzzle = eye + dir * 0.8f + Vec3{0, 0, -0.15f};
-      Vec3 v = dir * s.speed_mps;
-      if (foot_weapon_ == Id::grenade_launcher) v.z += 2.5f;  // a lobbed 40 mm round
+      // GRENADE_SPEED_MPS 40 straight along the aim; the rocket leaves at ROCKET_FOOT_LAUNCH_MPS 22
+      const Vec3 v = dir * (foot_weapon_ == Id::rocket ? 22.0f : s.speed_mps);
       fire_projectile(foot_weapon_, muzzle, v, true, body(soldier_));
+      if (foot_weapon_ == Id::rocket) foot_rocket_launched();
       world_->shake_camera(foot_weapon_ == Id::rocket ? 0.35f : 0.2f);
       return;
     }
