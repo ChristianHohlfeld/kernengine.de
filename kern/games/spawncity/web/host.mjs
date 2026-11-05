@@ -34,7 +34,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const params = new URLSearchParams(location.search);
   // The original's view layer (view.mjs): its DOM, CSS and layout; Kern's canvas takes the place of
   // the original's three.js canvas.
-  const originalView = params.get("view") === "original" && await mountOriginalView();
+  // The original spawncity.de view is the default; ?view=kern shows Kern's own HUD (tests, debugging).
+  const originalView = params.get("view") !== "kern" && await mountOriginalView();
   const canvas = document.getElementById("game");
   const statusEl = document.getElementById("status");
   const hudEl = document.getElementById("hud");
