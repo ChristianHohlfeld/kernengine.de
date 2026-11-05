@@ -16,6 +16,7 @@ struct LookState {
   perf::Meter meter;
   perf::Governor gov;
   bool show_perf = false;        // the HUD's frame-time line ("perf 1")
+  bool software = false;         // a software rasterizer (the page: "render software"): no shadows, like the original
   bool started = false;
   i32 applied_tier = -1;
   u32 applied_settings = 0;

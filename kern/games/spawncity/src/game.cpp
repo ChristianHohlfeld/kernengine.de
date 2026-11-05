@@ -735,7 +735,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   update_net(dt);
   ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
-    city_.update({0, 0, 0}, 8);
+    city_.update({0, 0, 0}, 24);  // loading behind the title: nothing to keep smooth (the title draws no 3D)
     if (city_.ready_at({0, 0, 0})) place_world();
     else {
       const StreamStats& s = city_.stats();
@@ -1244,6 +1244,14 @@ std::string Game::command(const std::string& cmd) {
     if (look_command(cmd, out)) return out;
   }
   if (cmd == "offline") { city_.go_offline(); return "ok"; }
+  if (cmd == "camera") {
+    // tests: where the view is (the overview while loading, else the mode's camera)
+    char b[256];
+    std::snprintf(b, sizeof b, "{\"eye\":[%.1f,%.1f,%.1f],\"target\":[%.1f,%.1f,%.1f],\"valid\":%s,\"soldier\":%s,\"placed\":%s,\"mode\":\"%s\"}", cam_.eye.x, cam_.eye.y,
+                  cam_.eye.z, cam_.target.x, cam_.target.y, cam_.target.z, cam_valid_ ? "true" : "false", world_->actor_alive(soldier_) ? "true" : "false", world_placed_ ? "true" : "false",
+                  mode_name(mode_));
+    return b;
+  }
   if (cmd == "state") return hud_json();
   {
     std::string out;  // M3 world test commands (game_world.cpp)
