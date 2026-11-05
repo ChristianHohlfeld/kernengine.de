@@ -1177,8 +1177,14 @@ std::string Game::command(const std::string& cmd) {
         // A drivable one: not a bus, not burning or burnt out (the nearest after a fight may be).
         if (!cars_[i].placed || cars_[i].car->spec().radius > 0.4f || cars_[i].wreck || cars_[i].burn_until >= 0 || cars_[i].police) continue;
         const Vec3 p = matrix_of(cars_[i].actor).translation();
-        const f32 d = std::hypot(p.x - me.x, p.y - me.y);
-        if (d < bd) { bd = d; best = static_cast<i32>(i); }
+        f32 d = std::hypot(p.x - me.x, p.y - me.y);
+        // tests: rather one on its four wheels and rolling than one stuck on rubble or nosed into a
+        // wall (CI: 0 wheels on the ground 2.4 m up / standing with the throttle on)
+        i32 on = 0;
+        for (int w = 0; w < 4; ++w) on += cars_[i].car->wheel(w).contact ? 1 : 0;
+        const f32 agl = p.z - city_.ground_height(p.x, p.y);
+        const f32 score = d + (on < 4 || agl > 1.2f ? 2000.0f : 0.0f) + (std::fabs(cars_[i].car->forward_speed()) < 0.5f ? 400.0f : 0.0f);
+        if (score < bd) { bd = score; best = static_cast<i32>(i); }
       }
       if (best < 0) {
         // Tests: say why (placed / bus / wrecked / burning / police / alive in the world)
@@ -1192,7 +1198,10 @@ std::string Game::command(const std::string& cmd) {
                       city_.lanes().size());
         return why;
       }
-      jacked_at_ = bd;  // tests: how far away the car was
+      {
+        const Vec3 p = matrix_of(cars_[best].actor).translation();
+        jacked_at_ = std::hypot(p.x - me.x, p.y - me.y);  // tests: how far away the car was
+      }
       switch_mode(Mode::car, best);
       return mode_name(mode_);
     }

@@ -469,7 +469,14 @@ async function run({name, url, context, mapped}) {
     await shot("1c-airstrike");
     check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
     check(await cmd("military start") === "on", `[${name}] military called in`);
-    await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
+    // a player the police cannot see shakes the stars off in ~9 s (wanted_system_logic.mjs escape) and
+    // the army turns back: keep five stars up while waiting for it (the phone stands on a roof here)
+    for (let i = 0; i < 90; i++) {
+      const hw = await hud();
+      if (hw.combat.helis > 0 && hw.combat.soldiers > 0) break;
+      if (hw.stars < 5 || hw.combat.mil !== "on") await cmd("military start");
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2, hw.t, {timeout: 120000}).catch(() => {});
+    }
     let c = (await hud()).combat;
     { const hm = await hud(); check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers (mode ${hm.mode}, health ${hm.health}, stars ${hm.stars}, mil ${c.mil}, spawn ${JSON.stringify({a: hm.gaps?.spawnAllowed, d: hm.gaps?.spawnDenied})})`); }
     await shot("1d-military");
