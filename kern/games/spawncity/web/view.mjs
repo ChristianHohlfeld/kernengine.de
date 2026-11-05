@@ -49,7 +49,7 @@ export async function mountOriginalView(base = "./view/") {
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
     html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;outline:none;touch-action:none}
-    html.sc-original-view .scui-corner{display:none!important}`;
+    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
   const walk = {mode: "drone"};
@@ -67,7 +67,7 @@ export async function mountOriginalView(base = "./view/") {
   }
   // The title screen's flyover city (drone_simulator.html inline script, unchanged).
   if (globalThis.__scViewFlyover) globalThis.__scViewFlyover();
-  else { const sc = document.createElement("script"); sc.src = base + "menu_flyover.js"; document.body.appendChild(sc); }
+  else for (const f of ["menu_flyover.js", "install_app.js"]) { const sc = document.createElement("script"); sc.src = base + f; document.body.appendChild(sc); }
   return true;
 }
 
