@@ -281,9 +281,10 @@ async function run({name, url, context, mapped}) {
   check(h.people >= 10, `[${name}] people in the streets: ${h.people}`);
   check(await cmd("wanted 2") === "2", `[${name}] wanted level 2`);
   const tw = (await hud()).t;
-  await page.waitForFunction(() => { const h = window.SpawnCity.hud(); return h.police > 0 && h.policeDrones > 0; }, null, {timeout: 300000}).catch(() => {});
+  // wanted_dispatch_guard.mjs: the drones are dispatched first and show up after the dispatch delay
+  await page.waitForFunction(() => { const h = window.SpawnCity.hud(); return h.police > 0 && (h.policeDrones > 0 || h.gaps?.inbound > 0); }, null, {timeout: 300000}).catch(() => {});
   h = await hud();
-  check(h.police > 0 && h.policeDrones > 0 && h.stars > 0, `[${name}] police on its way (${h.police} cruisers, ${h.policeDrones} drones, ${h.stars} stars)`);
+  check(h.police > 0 && (h.policeDrones > 0 || h.gaps?.inbound > 0) && h.stars > 0, `[${name}] police on its way (${h.police} cruisers, ${h.policeDrones} drones, ${h.gaps?.inbound} inbound, ${h.stars} stars)`);
   await page.waitForFunction(t => window.SpawnCity.hud().t > t + 6, tw, {timeout: 400000}).catch(() => {});
   await shot("1b-police");
   check(await cmd("wanted 0") === "0", `[${name}] wanted level cleared`);
@@ -348,6 +349,7 @@ async function run({name, url, context, mapped}) {
     check(/^lamp /.test(lb) && g.lampsBroken >= 1 && g.lampsFallen >= 1, `[${name}] a lamp post knocked down (${lb})`);
     let burnt = "";
     for (let i = 0; i < 16 && burnt !== "burning"; i++) burnt = await cmd("burn " + i);
+    await page.waitForFunction(() => window.SpawnCity.hud().gaps?.smoke >= 1, null, {timeout: 30000}).catch(() => {});  // smoke starts on the next frame
     g = JSON.parse(await cmd("gaps"));
     check(burnt === "burning" && g.smoke >= 1, `[${name}] critical smoke on a burning car (${JSON.stringify({smoke: g.smoke, puffs: g.puffs})})`);
     check(["yes", "no"].includes(await cmd("canspawn 0 0")), `[${name}] spawn gate answers`);

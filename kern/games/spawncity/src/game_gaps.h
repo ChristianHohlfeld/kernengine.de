@@ -57,6 +57,10 @@ struct GapsState {
   kern::audio::ClipId motor_clip = 0;
   bool guided_sounds = false;
   Part trail_part;
+  // wanted_police_drones.mjs reportCrime: the last heat / stars seen, the star tones
+  f32 last_heat = 0;
+  i32 last_stars = 0;
+  bool star_tones = false;
   // jet_mode.mjs passenger (game_seats.cpp)
   bool riding = false, pilot_held = false;
   u8 ride_owner = 0, pending_owner = 0;

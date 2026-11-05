@@ -391,6 +391,41 @@ void Game::gaps_update(f32 dt) {
   if (g.world_shown < 0) g.world_shown = now;
   if (wanted_.stars() <= 0 || player_dead_)
     for (f32& d : g.pd_due) d = -1;
+  // reportCrime: a crime that keeps (or raises) a wanted level reveals the player - the last contact
+  // is now and the last known position is where he is (the drones search there); a new star sounds
+  // a short square chirp 520 + 90 s -> 760 + 100 s Hz (0.16 s, .022).
+  {
+    const f32 heat = wanted_.heat();
+    const i32 stars = wanted_.stars();
+    if (heat > g.last_heat + 1e-3f && stars > 0) {
+      last_contact_ = now;
+      last_known_ = player_position();
+      if (mode_ == Mode::foot) last_known_.z -= 0.73f;
+    }
+    if (stars > g.last_stars && stars > 0) {
+      if (bank_ && !g.star_tones) {
+        const u32 rate = 44100;
+        for (i32 s = 1; s <= 5; ++s) {
+          std::vector<f32> pcm(static_cast<std::size_t>(rate * 0.16f));
+          f64 ph = 0;
+          const f64 f0 = 520 + 90 * s, f1 = 760 + 100 * s;
+          for (std::size_t i = 0; i < pcm.size(); ++i) {
+            const f64 t = static_cast<f64>(i) / rate;
+            ph += f0 * std::pow(f1 / f0, t / 0.16) / rate;  // exponential ramp (playTone endFrequency)
+            const f32 env = static_cast<f32>(std::fmin(1.0, t / 0.005) * std::pow(0.001 / 1.0, t / 0.16));
+            pcm[i] = (std::fmod(ph, 1.0) < 0.5 ? 0.022f : -0.022f) * env;
+          }
+          const std::string id = "sc:star" + std::to_string(s);
+          bank_->request(id);
+          bank_->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, rate);
+        }
+        g.star_tones = true;
+      }
+      if (g.star_tones) world_->play_sound("sc:star" + std::to_string(std::min(5, stars)), cam_.eye, 1, 1, false);
+    }
+    g.last_heat = heat;
+    g.last_stars = stars;
+  }
   // ---- critical smoke (world_critical_damage_fx.mjs) for everything with a countdown
   if (g.car_crit.size() != cars_.size()) g.car_crit.assign(cars_.size(), -1);
   for (std::size_t i = 0; i < cars_.size(); ++i) {
