@@ -555,8 +555,8 @@ std::string Game::ctl_view_json() {
   {
     const Vec3 d = cam_.target - cam_.eye, p = focus_position();
     const f32 hz = std::sqrt(d.x * d.x + d.y * d.y);
-    add(",\"probe\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"ground\":%.3f,\"yaw\":%.3f,\"pitch\":%.3f}", p.x, p.y, p.z, city_.ground_height(p.x, p.y),
-        std::atan2(d.y, d.x) / kDeg, std::atan2(d.z, hz) / kDeg);
+    add(",\"probe\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"ground\":%.3f,\"yaw\":%.3f,\"pitch\":%.3f,\"time\":%.3f}", p.x, p.y, p.z, city_.ground_height(p.x, p.y),
+        std::atan2(d.y, d.x) / kDeg, std::atan2(d.z, hz) / kDeg, now);
   }
   // ---- damage taken (flight_fire_fx.mjs arondight:combat-damage -> .combat-damage-vignette)
   {

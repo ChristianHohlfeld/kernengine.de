@@ -35,7 +35,7 @@ const PROBE = {
     const h = window.SpawnCity?.hud?.() || {}, v = h.ctl?.view || {}, p = v.probe;
     const e = v.eye || [null, null, null];
     return {mode: h.mode, x: p ? p.x : e[0], y: p ? p.y : e[1], z: p ? p.z : e[2], ground: p?.ground ?? null, yaw: p?.yaw ?? null, pitch: p?.pitch ?? null,
-      kmh: h.mode === "car" ? (v.carKmh ?? (h.speed ?? 0) * 3.6) : null, agl: h.agl ?? null, t: h.t ?? performance.now() / 1000, wall: performance.now() / 1000,
+      kmh: h.mode === "car" ? (v.carKmh ?? (h.speed ?? 0) * 3.6) : null, agl: h.agl ?? null, fps: h.fps ?? null, t: p?.time ?? performance.now() / 1000, wall: performance.now() / 1000,
       locked: !!document.pointerLockElement, weapon: document.getElementById("mobileGameplayWeapon")?.textContent?.trim() || h.weapon || "", body: document.body.className.slice(0, 300)};
   },
 };
@@ -82,15 +82,24 @@ export async function measureControls({browser, out, games, devices, gps}) {
       // one measurement: act() while sampling the probe every 60 ms, then read(start, samples, end)
       const measure = async (label, act, read, settle = 600) => {
         try {
-          const a = await probe(), samples = [];
+          const a = await probe(), samples = [], wall0 = performance.now() / 1000;
           let on = true;
           const sampler = (async () => { while (on) { samples.push(await probe()); await pause(60); } })();
           await act();
+          const c = await probe();
           await pause(settle);
           on = false; await sampler;
           const b = await probe();
-          const v = read(a, samples, b);
-          run.results[label] = {...v, shot: await shot(label), from: a.mode, to: b.mode, dt: +(b.t - a.t).toFixed(2)};
+          const v = read(a, samples, b, c);
+          // per second of the game's own clock while the input was held (slow frames on the CI runner
+          // stretch the wall clock; the original runs on the wall clock, Kern on its sim time)
+          const held = c.t - a.t;
+          if (held > 0.05) {
+            if (typeof v.m === "number") v.mps = +(Math.hypot(c.x - a.x, c.y - a.y) / held).toFixed(2);
+            if (typeof v.deg === "number") v.degps = +(v.deg / held).toFixed(1);
+            if (typeof v.dz === "number") v.dzps = +((c.z - a.z) / held).toFixed(2);
+          }
+          run.results[label] = {...v, shot: await shot(label), from: a.mode, to: b.mode, held: +held.toFixed(2), wall: +(performance.now() / 1000 - wall0).toFixed(2), fps: b.fps ?? undefined};
         } catch (e) { run.errors.push(`${label}: ${String(e.message || e).slice(0, 300)}`); run.results[label] = {error: String(e.message || e).slice(0, 200)}; }
         console.log("controls", dev, name, label, JSON.stringify(run.results[label]).slice(0, 220));
       };
@@ -124,7 +133,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
       const toMode = async (m, wait = 2500) => { await S.mode(page, m).catch(e => run.errors.push(`mode ${m}: ${e.message}`)); await pause(wait); };
 
       try {
-        const url = new URL(g.url);
+        const url = new URL(g.url); url.searchParams.set("menu", "1");
         await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000});
         await g.boot(page);
         await g.start(page);
@@ -209,9 +218,9 @@ export async function measureControls({browser, out, games, devices, gps}) {
     }
   }
   // ---- table: value original | Kern | deviation
-  const fmt = r => { if (!r) return "–"; if (r.error) return `Fehler: ${r.error.slice(0, 60)}`; const v = Object.entries(r).filter(([k]) => !["shot", "from", "to", "dt"].includes(k)).map(([k, x]) => `${k} ${x}`).join(", "); return v || `${r.from} → ${r.to}`; };
-  const num = r => r && !r.error ? (r.m ?? r.deg ?? r.kmh ?? r.dz) : undefined;
-  const md = ["# Steuerung: Original und Kern mit echten Eingaben", "", "Gemessen von tests/compare_controls.mjs (Workflow „SpawnCity Vergleich“). Werte: m = Meter, deg = Grad (Gierwinkel, gegen den Uhrzeigersinn positiv), kmh, dz = Höhenänderung.", ""];
+  const fmt = r => { if (!r) return "–"; if (r.error) return `Fehler: ${r.error.slice(0, 60)}`; const v = Object.entries(r).filter(([k]) => !["shot", "from", "to", "wall"].includes(k)).map(([k, x]) => `${k} ${x}`).join(", "); return v || `${r.from} → ${r.to}`; };
+  const num = r => r && !r.error ? (r.mps ?? r.degps ?? r.dzps ?? r.m ?? r.deg ?? r.kmh ?? r.dz) : undefined;
+  const md = ["# Steuerung: Original und Kern mit echten Eingaben", "", "Gemessen von tests/compare_controls.mjs (Workflow „SpawnCity Vergleich“). Werte: m = Meter, deg = Grad (Gierwinkel, gegen den Uhrzeigersinn positiv), kmh, dz = Höhenänderung; mps, degps, dzps = je Sekunde der Spielzeit, solange die Eingabe gehalten wurde (held s); die Abweichung vergleicht diese Raten.", ""];
   for (const dev of Object.keys(profiles)) {
     const o = runs.find(r => r.device === dev && r.game === "original"), k = runs.find(r => r.device === dev && r.game === "kern");
     if (!o || !k) continue;
