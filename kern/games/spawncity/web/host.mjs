@@ -19,6 +19,8 @@ import {installSpawnCityUi} from "./ui.mjs";
 import {GapsHud} from "./gaps_hud.mjs";
 import {installSpawnCityLife} from "./life.mjs";
 import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
+// the mode binders register themselves (view_modes.mjs)
+import {VIEW_MODES} from "./view_modes.mjs";
 import {installOriginalMenus} from "./view_menu.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";

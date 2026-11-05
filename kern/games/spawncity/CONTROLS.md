@@ -193,7 +193,7 @@ Xbox:
 25. RB lud nach (Fuß) → nichts; RT/LT-Schwellen .5 / .35. **behoben**
 26. Fuß-LS linear .14 → .10 mit Exponent 1,28; RS mit Kerns fester Kurve → Original-Kurve (Feinheit, Totzone, Raten-Integration) im Spielordner, an Kern als Grad übergeben. **behoben**
 27. Drohne: Höhe RT−LT ohne Totband .05; Schema AIM fehlte; Release-Latch fehlte. **behoben**
-28. Auto: D-Pad ←/→ Radio → D-Pad gehört Ping/Waffe wie im Original (Radio N/B, Touch RADIO). **behoben**
+28. Auto: D-Pad ←/→ wechselt den Sender wie im Original (`car_radio.mjs` padTick: rechts = nächster, links = voriger); Tastatur N/B, Touch 📻 tippen = nächster, 550 ms halten = aus. **behoben**
 29. Karte mit dem Pad: linear 12 px/Bild → −s·|s|·900 px/s, Zoom 2,2/s, ←→ Zoom, R3 folgen, VIEW schließt. **behoben**
 30. Menüs: LS-Navigation, LB/RB Abschnitt, VIEW schließt, Schalter mit ←→ fehlten. **behoben**
 
