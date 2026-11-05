@@ -54,6 +54,9 @@ export async function mountOriginalView(base = "./view/") {
     await import(base + "edge_hud_layout.mjs").catch(e => console.warn("[spawncity] edge layout", e));
     await import(base + "thumb_layout.mjs").catch(e => console.warn("[spawncity] thumb layout", e));
   }
+  // The title screen's flyover city (drone_simulator.html inline script, unchanged).
+  if (globalThis.__scViewFlyover) globalThis.__scViewFlyover();
+  else { const sc = document.createElement("script"); sc.src = base + "menu_flyover.js"; document.body.appendChild(sc); }
   return true;
 }
 
@@ -77,6 +80,11 @@ export function fingerForGame(ev) {
 const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", Granatwerfer: "WERFER", Raketenwerfer: "RAKETEN", "Fäuste": "FÄUSTE", Messer: "MESSER"};
 const FOOT_ORDER = ["MP", "GLOCK", "SNIPER", "WERFER", "RAKETEN", "FÄUSTE", "MESSER"];  // first_person_weapon_runtime_v3.mjs WEAPON_ORDER
 const DRONE_NAMES = {MG: "GUN", RAKETEN: "ROCKETS", GUIDED: "GUIDED"};                  // drone_weapon_modes.mjs
+
+// Binders of other areas (view_modes.mjs, ...): fn(h, touchView, view) runs every frame after the
+// core bindings below; each repeats the DOM writes of the original modules it names.
+const BINDERS = [];
+export function registerViewBinder(name, fn) { BINDERS.push({name, fn}); }
 
 export class OriginalView {
   constructor({command, ui, mp}) {
@@ -201,6 +209,7 @@ export class OriginalView {
     if (hints) { setText(hints, desktop && !ctl.pad ? ctl.hint || "" : ""); hints.classList.toggle("faded", !!ctl.hintFaded); }
     // ---- sticks (foot_touch_controller.mjs paintKnob, simulator.mjs solo knobs)
     if (touch) this.sticks(touch, mode);
+    for (const b of BINDERS) { try { b.fn(h, touch, this); } catch (e) { if (!b.warned) { b.warned = true; console.warn(`[spawncity] view ${b.name}`, e); } } }
     // ---- touch buttons: the game's hit areas follow what the original's layout drew
     this.sendRects(touch, mode);
   }
