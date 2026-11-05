@@ -19,6 +19,7 @@ import {installSpawnCityUi} from "./ui.mjs";
 import {GapsHud} from "./gaps_hud.mjs";
 import {installSpawnCityLife} from "./life.mjs";
 import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
+import {VIEW_MODES} from "./view_modes.mjs";  // the mode binders register themselves (view_modes.mjs)
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).

@@ -38,6 +38,8 @@ class Tracker {
   /// `seen`: a police unit or witness sees the player right now.
   void update(f32 dt, bool seen);
   void clear() { heat_ = 0; hidden_ms_ = 0; }
+  /// How long the police have not seen the player (the escape clock, wanted_police_drones.mjs searching).
+  f32 hidden_ms() const { return hidden_ms_; }
   f32 heat() const { return heat_; }
   i32 stars() const { return stars_for_heat(heat_); }
 

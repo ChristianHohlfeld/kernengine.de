@@ -49,6 +49,13 @@ struct ControlsState {
   bool jet_aim = false;         // jet tap fire: aim through the finger within 35 deg of the nose
   // touch fire repeat (foot_touch_controller.mjs) and the drone's STOP
   f32 kill_until = -1;
+  // web/view_modes.mjs (the original's HUD modules): counters and timers the page cannot see
+  f32 emp_miss_until = -1;      // wanted_police_drones.mjs empFeedbackUntil (sim time)
+  f32 guided_denied_until = -1; // guided_missile.mjs body.guided-denied (900 ms)
+  u32 drone_hits = 0;           // flight_fire_fx.mjs hit-confirm on the crosshair
+  bool assist_on = false;       // player_walk_mode_v4.mjs #footReticle.aim-assisted
+  Vec3 impacts[8];              // flight_fire_fx.mjs screenImpact: where the drone's rounds struck
+  u32 impact_serial = 0;
   // hint line (desktop_controls.mjs): text and when it last changed
   std::string hint;
   f32 hint_at = 0;

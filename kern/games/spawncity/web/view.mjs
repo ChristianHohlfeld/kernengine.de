@@ -64,7 +64,7 @@ export async function mountOriginalView(base = "./view/") {
 const TOUCH_DOM = {
   jump: "footJump", wpn: "thumbWeapon", scope: "scopeButton", nade: "handGrenadeBtn", strike: "airStrikeButton",
   mode: "mobileGameplayMode", jet: "enterJetButton", emp: "wantedEmpButton", arm: "soloArm", stop: "soloKill",
-  hb: "vehicleBrakeButton", radio: "carRadioButton",
+  hb: "vehicleBrakeButton", radio: "carRadioButton", fire: "footFire",
 };
 const JET_DOM = {vtol: "mode", rkt: "rocket", bomb: "bomb", cam: "cam", eject: "exit"};
 // Original elements a finger uses as page buttons (their own click), never as game input.

@@ -235,9 +235,9 @@ void Game::ui_equipment(f32 dt) {
   // switch, with one RADIO AUS slot between the last and the first station.
   const bool in_car = mode_ == Mode::car && !ui_.paused;
   if (in_car && engine_) {
-    // car_radio.mjs: N / B only (the D-pad is ping / weapons, pad_actions.mjs)
-    const bool next = engine_->input.pressed(kern::Key::n) || pad_touch_.take_pressed("radio");
-    const bool prev = engine_->input.pressed(kern::Key::b);
+    // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
+    const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
+    const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
     if (next || prev) ui_radio(next ? 1 : -1);
   }
   ui_.banner_age += dt;
@@ -267,11 +267,12 @@ void Game::ui_radio(i32 dir) {
   else if ((dir > 0 && ui_.station == n - 1) || (dir < 0 && ui_.station == 0)) ui_.radio_on = false;
   else ui_.station = (ui_.station + dir + n) % n;
   if (ui_.radio_on) {
-    ui_.banner = std::string("RADIO ") + MusicSynth::kStations[ui_.station].name;
-    char b[64];
-    std::snprintf(b, sizeof b, "%d/%d - %s", ui_.station + 1, n, MusicSynth::kStations[ui_.station].genre);
+    // car_radio.mjs showBanner(`📻 ${s.name}`, `${index+1}/${n} · city`) - here the station's genre
+    ui_.banner = std::string("\U0001F4FB ") + MusicSynth::kStations[ui_.station].name;
+    char b[96];
+    std::snprintf(b, sizeof b, "%d/%d \u00B7 %s", ui_.station + 1, n, MusicSynth::kStations[ui_.station].genre);
     ui_.banner_sub = b;
-  } else { ui_.banner = "RADIO AUS"; ui_.banner_sub.clear(); }
+  } else { ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); }
   ui_.banner_age = 0;
 }
 
@@ -329,7 +330,13 @@ bool Game::ui_equipment_command(const std::string& cmd, std::string& out) {
     const std::string a = cmd.size() > 6 ? cmd.substr(6) : "next";
     if (a == "next") ui_radio(1);
     else if (a == "prev") ui_radio(-1);
-    else if (a == "off") { ui_.radio_on = false; ui_.banner = "RADIO AUS"; ui_.banner_age = 0; }
+    else if (a == "off") { ui_.radio_on = false; ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); ui_.banner_age = 0; }
+    else if (a == "toggle") {
+      // car_radio.mjs toggleOff (the radio button held 550 ms): off, or back on at the station
+      ui_.radio_on = !ui_.radio_on;
+      if (ui_.radio_on) ui_radio(0);
+      else { ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); ui_.banner_age = 0; }
+    }
     else if (a == "on") { ui_.radio_on = true; ui_radio(0); }
     out = ui_.radio_on ? MusicSynth::kStations[ui_.station].name : "off";
     return true;
