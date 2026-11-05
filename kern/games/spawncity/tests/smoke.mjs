@@ -327,7 +327,8 @@ async function run({name, url, context, mapped}) {
     await cmd("perf 0");
     check(JSON.parse(await cmd("quality 2")).tier === 2, `[${name}] quality level 2 fixed`);
     await frame(); await frame();
-    const cw = await page.evaluate(() => { const c = document.getElementById("game"), d = devicePixelRatio || 1; return [c.width, ...[1.5, 2].map(cap => Math.round(c.clientWidth * Math.min(d, cap) * 0.85))]; });
+    // the host's pixel-ratio ceiling (render_stability.mjs renderPlatformProfile: software 0.30) x the level's 0.85
+    const cw = await page.evaluate(() => { const c = document.getElementById("game"), k = window.SpawnCity.platform?.ceiling ?? 1; return [c.width, Math.round(c.clientWidth * k * 0.85), Math.max(1, Math.round(c.clientWidth * k * 0.85))]; });
     check(Math.min(Math.abs(cw[0] - cw[1]), Math.abs(cw[0] - cw[2])) <= 1, `[${name}] the drawing buffer follows the level's scale (${cw})`);
     check(JSON.parse(await cmd("quality auto")).auto === true, `[${name}] quality back to automatic`);
     check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);

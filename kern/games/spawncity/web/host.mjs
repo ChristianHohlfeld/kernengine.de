@@ -403,7 +403,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // hud() reads the game's state now (not the copy of the last drawn frame): a test that sends a
   // command sees its effect at once, however slow the frames are.
   const hudNow = () => { try { return JSON.parse(str(e.sc_hud())); } catch { return last; } };
-  window.SpawnCity = {app, command, hud: hudNow, frames: () => frames, tiles, ui};
+  window.SpawnCity = {app, command, hud: hudNow, platform, frames: () => frames, tiles, ui};
   return window.SpawnCity;
 }
 
