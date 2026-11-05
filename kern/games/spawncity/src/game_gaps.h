@@ -10,6 +10,7 @@
 #include "gaps_rules.h"
 #include "lamps.h"
 #include "kern/audio/audio.h"
+#include "kern/game/runtime.h"
 #include "kern/gfx/renderer.h"
 
 namespace sc {
@@ -88,6 +89,8 @@ struct GapsState {
   struct RocketPuff { Vec3 p; f32 born = -1, life = 1, rot = 0; };
   std::vector<RocketPuff> rocket_smoke = std::vector<RocketPuff>(90);
   u32 rocket_cursor = 0, foot_shots = 0;
+  struct SniperRound { kern::game::ShotEvent s; f32 due = 0; };
+  std::vector<SniperRound> sniper_rounds;
   Part rocket_part;
 };
 

@@ -14,6 +14,7 @@
 
 #include "car.h"
 #include "city_stream.h"
+#include "facades.h"
 #include "combat_art.h"
 #include "guided.h"
 #include "combat_detail.h"
@@ -142,7 +143,7 @@ class Game {
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
-  kern::game::NightWindows& windows() { return windows_; }
+  Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
@@ -362,13 +363,20 @@ class Game {
   // sound, impact bursts, spawn gates, camera guard, jet damage
   // on-foot projectiles and melee (game_foot_rounds.cpp, gameplay_final_runtime_v2.mjs)
   bool foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at);
+  void gaps_sniper_rounds(const std::vector<kern::game::ShotEvent>& shots, std::vector<kern::game::ShotEvent>& arrived, f32 now);
   void grenade_bounce(Projectile& p, Vec3 point, Vec3 n, f32 now);
   bool car_near_point(Vec3 point) const;
+  bool soft_target_near(Vec3 p) const;
   bool foot_remote_detonate(f32 now);
   void foot_rocket_launched();
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
-  bool melee_hit(f32 reach, f32 sweep, f32 damage, bool knife);
+  void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);
+  // cars and buses as the original (game_vehicle_damage.cpp)
+  f32 car_max_hp(const TrafficCar& c) const;
+  void car_bullet(i32 car, bool by_player);
+  void blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player);
+  bool melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_ns);
   void melee_attack();
   void gaps_init(kern::Engine& e);
   void gaps_update(f32 dt);
@@ -421,7 +429,7 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
-  kern::game::NightWindows windows_;
+  Facades windows_;
   std::unique_ptr<kern::game::GameWorld> world_;
   CityStream city_;
   VehicleArt art_;
@@ -487,6 +495,9 @@ class Game {
   weapons::Id foot_weapon_ = weapons::Id::glock;
   i32 ammo_mag_[16] = {}, ammo_reserve_[16] = {};
   i32 grenades_ = 4, drone_weapon_ = 0;
+  f32 jet_rocket_side_ = 1;
+  f32 jacked_at_ = -1;
+  Vec3 jet_cam_off_;         // jet_mode.mjs camOff (the chase camera's eased offset)       // tests: distance of the car "mode car" took  // jet_mode.mjs rocketSide: the pods fire in turn
   f32 next_attack_ = 0, next_grenade_ = 0, next_drone_fire_ = 0, next_jet_gun_ = 0, next_jet_missile_ = 0, next_jet_bomb_ = 0;
   bool trigger_was_ = false;
   u32 explosions_ = 0;

@@ -12,12 +12,13 @@ namespace sc {
 namespace {
 
 kern::BuildingStyle konstanz_style() {
-  // Old-town plaster facades and tiled roofs (colours, not data: the shapes and heights are OSM's).
+  // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
+  auto hex = [](u32 h) { return kern::Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
   kern::BuildingStyle s;
-  s.walls = {{0.86, 0.82, 0.74}, {0.84, 0.74, 0.58}, {0.80, 0.66, 0.58}, {0.74, 0.76, 0.74}, {0.90, 0.88, 0.84},
-             {0.70, 0.78, 0.72}, {0.82, 0.70, 0.48}, {0.78, 0.72, 0.66}};
-  s.roofs = {{0.55, 0.27, 0.18}, {0.47, 0.24, 0.17}, {0.33, 0.30, 0.30}, {0.42, 0.30, 0.24}};
-  s.trim = {0.95, 0.93, 0.89};
+  s.walls = {hex(0xc9bfae), hex(0xb9a88c), hex(0x8e5443), hex(0x9c9a94), hex(0xd8d2c4), hex(0xa87c5f), hex(0x7d8590), hex(0xcbb79a)};
+  s.roofs = {hex(0x4a4c50), hex(0x3b3d40), hex(0x6e4334), hex(0x55585c)};
+  s.trim = hex(0xf4efe4);
+  s.trim_mix = 0.45;
   return s;
 }
 
@@ -663,7 +664,9 @@ bool CityStream::work(Tile& t, f64 deadline) {
         return true;
       }
       t.state = S::ready;  // collision: the working set around the player (update_collision)
-      near_.dirty = true;
+      // a new set only when this tile brings buildings into the 340 m around the player
+      for (Vec2 c : t.cent)
+        if (std::hypot(c.x - focus_.x, c.y - focus_.y) <= 340) { near_.dirty = true; break; }
       return true;
     case S::collision:
       t.state = S::ready;
@@ -684,6 +687,9 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   terrain_.take_changes(terrain_changes_);
   for (const kern::Vec4& r : terrain_changes_) relay(r);
   terrain_changes_.clear();
+  // The collision around the player first (the player must never stand where no wall is): half
+  // the budget while a set is built, at least 1.5 ms.
+  update_collision(focus, kern::now_ms() + std::fmax(1.5, budget_ms * 0.5));
   // Nearest unfinished tile first.
   std::vector<Tile*> order;
   for (auto& [k, t] : tiles_) order.push_back(t.get());
@@ -696,9 +702,8 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     if (kern::now_ms() > deadline) break;
     if (!work(*t, deadline)) break;
   }
-  // The collision around the player: at least 1.5 ms a frame while a set is built (the player must
-  // never stand where no wall is).
-  update_collision(focus, std::fmax(deadline, kern::now_ms() + 1.5));
+  // what is left of the budget goes on with the collision set
+  if (kern::now_ms() < deadline) update_collision(focus, deadline);
   stats_ = {};
   for (auto& [k, t] : tiles_) {
     if (t->state == Tile::State::ready) ++stats_.tiles_ready;

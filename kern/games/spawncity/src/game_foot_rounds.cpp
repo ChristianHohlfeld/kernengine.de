@@ -7,6 +7,7 @@
 
 #include "game.h"
 #include "game_gaps.h"
+#include "game_life.h"
 
 namespace sc {
 
@@ -34,6 +35,24 @@ constexpr f32 kKnifeRecover = 0.38f, kKnifeReach = 1.6f, kKnifeDmg = 45, kKnifeS
 
 bool foot_round(Id id) { return id == Id::grenade_launcher || id == Id::rocket || id == Id::hand_grenade; }
 }  // namespace
+
+bool Game::soft_target_near(Vec3 p) const {
+  // softTargetNear: lamp posts (0.35 m round the post up to 6.4 m, 0.45 m / 0.4 m at the head 6 m up)
+  // and cows (1.05 m, up to 1.7 m over the ground) are not in the round's raycast set: it goes off there
+  if (gaps_)
+    for (const lamps::Lamp& l : gaps_->lamps.all()) {
+      if (l.state == 2) continue;
+      if (std::fabs(l.foot.x - p.x) < 0.35f && std::fabs(l.foot.y - p.y) < 0.35f && p.z > l.foot.z && p.z < l.foot.z + 6.4f) return true;
+      if (std::fabs(l.head.x - p.x) < 0.45f && std::fabs(l.head.y - p.y) < 0.45f && std::fabs(l.foot.z + 6 - p.z) < 0.4f) return true;
+    }
+  if (glife_ && glife_->ready)
+    for (const Life::Cow& c : glife_->life.cows()) {
+      if (c.dead) continue;
+      const f32 dx = p.x - c.pos.x, dy = p.y - c.pos.y;
+      if (dx * dx + dy * dy < 1.1f && p.z < city_.ground_height(c.pos.x, c.pos.y) + 1.7f) return true;
+    }
+  return false;
+}
 
 bool Game::car_near_point(Vec3 point) const {
   // grenadeImpactMode "target": a car (by its footprint, as hit_scan finds one)
@@ -108,7 +127,8 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       const RayResult r = cast(world_->physics(), p.pos, dir, trav + 0.2f, p.ignore);
       if (r.hit && r.distance <= trav + 0.2f) { at = r.point; return true; }
       Vec3 seg_to = p.pos + dir * trav;
-      if (people_.shot(p.pos, seg_to, 0, false, now) >= 0) { at = seg_to; return true; }  // softTargetNear / organic
+      if (people_.shot(p.pos, seg_to, 0, false, now) >= 0) { at = seg_to; return true; }  // organic
+      if (soft_target_near(p.pos)) { at = p.pos; return true; }
       for (const PoliceDrone& d : pdrones_)
         if (d.active && kern::length(d.pos - p.pos) < 1.2f + trav) { at = d.pos; return true; }
       const Vec3 next = p.pos + dir * trav;
@@ -143,6 +163,7 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       // organic: a person (or a police drone) on the way sets a launcher round off
       Vec3 seg_to = p.pos + dir * travel;
       if (people_.shot(p.pos, seg_to, 0, false, now) >= 0) { at = seg_to; return true; }
+      if (soft_target_near(p.pos)) { at = p.pos; return true; }
       for (const PoliceDrone& d : pdrones_)
         if (d.active && kern::length(d.pos - p.pos) < 1.2f + travel) { at = d.pos; return true; }
     }
@@ -172,6 +193,26 @@ bool Game::foot_remote_detonate(f32 now) {
     if (p.alive && p.by_player && (p.id == Id::grenade_launcher || p.id == Id::rocket)) { p.fuse = 0; p.born = now - 1; any = true; }
   if (any) next_attack_ = now + weapons::spec(Id::grenade_launcher).interval_ms / 1000 * 0.5f;
   return any;
+}
+
+void Game::blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player) {
+  // dispatchExplosion: a police drone in the blast takes min(3, round(amount / 34)) hits of 34
+  // (amount = damage x falloff x exposure; registerPoliceHit, wanted_police_drones.mjs)
+  const f32 now = world_->sim_time();
+  for (PoliceDrone& d : pdrones_) {
+    if (!d.active) continue;
+    const f32 dd = kern::length(d.pos - at);
+    if (dd >= radius) continue;
+    const f32 amount = damage * weapons::blast_factor(dd, radius, !line_of_sight(at, d.pos));
+    const f32 hits = std::fmin(3.0f, std::fmax(0.0f, std::round(amount / 34)));
+    if (hits <= 0) continue;
+    d.hp -= 34 * hits;
+    if (d.hp <= 0) {
+      d.active = false;
+      d.destroyed_until = now + 9;
+      if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+    }
+  }
 }
 
 void Game::foot_rocket_launched() {
@@ -235,16 +276,31 @@ void Game::foot_rounds_update(f32 dt) {
   // knifeAt: the blade connects at the strike frame, 130 ms after the press, along the ray then
   if (g.knife_due >= 0 && now >= g.knife_due) {
     g.knife_due = -1;
-    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife) melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true);
+    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife) melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true, 12);  // knifeStrike momentumNs 12
   }
 }
 
-bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife) {
+void Game::gaps_sniper_rounds(const std::vector<kern::game::ShotEvent>& shots, std::vector<kern::game::ShotEvent>& arrived, f32 now) {
+  // sniperShotAt atArrival: the round's effects at distance / 850 m/s (handle_shots, game_town.cpp)
+  if (!gaps_) {
+    for (const kern::game::ShotEvent& s : shots)
+      if (s.shooter == soldier_ && mode_ == Mode::foot && foot_weapon_ == Id::sniper) arrived.push_back(s);
+    return;
+  }
+  GapsState& g = *gaps_;
+  for (const kern::game::ShotEvent& s : shots)
+    if (s.shooter == soldier_ && mode_ == Mode::foot && foot_weapon_ == Id::sniper) g.sniper_rounds.push_back({s, now + kern::length(s.to - s.from) / 850.0f});
+  for (const GapsState::SniperRound& r : g.sniper_rounds)
+    if (now >= r.due) arrived.push_back(r.s);
+  std::erase_if(g.sniper_rounds, [&](const GapsState::SniperRound& r) { return now >= r.due; });
+}
+
+bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_ns) {
   const f32 now = world_->sim_time();
   Vec3 dir;
   const Vec3 eye = aim_ray(dir);
   Vec3 to = eye + dir * reach;
-  i32 hit = people_.shot(eye, to, damage, true, now);
+  i32 hit = people_.shot(eye, to, damage, true, now, momentum_ns);
   if (hit < 0 && life_punch(eye, to)) hit = 0;  // animals (M3 life)
   if (hit < 0) {
     // meleeFallback: nobody on the line - whoever stands in front within reach (+.35 for a person),
@@ -267,9 +323,15 @@ bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife) {
         const Vec3 chest = all[static_cast<std::size_t>(best)].pos + Vec3{0, 0, 1.1f};
         Vec3 aim = kern::normalize(chest - eye, dir);
         Vec3 end = chest + aim * 0.6f;
-        hit = people_.shot(eye, end, damage, true, now);
+        hit = people_.shot(eye, end, damage, true, now, momentum_ns);
       }
     }
+  }
+  if (hit < 0) {
+    // punchAt / knifeStrike: a loose body in reach (crate, drum, cone, car) takes the blow's momentum
+    // (pushHitBody: dir x momentumNs at the hit point)
+    const kern::physics::RayHit h = world_->physics().cast_ray(eye, dir * reach, ~0ull, body(soldier_));
+    if (h.hit && h.body.valid()) world_->physics().apply_linear_impulse(h.body, dir * momentum_ns, h.point);
   }
   world_->play_sound(hit >= 0 ? combat_sfx(combat_audio::Kind::hit) : "builtin:click", eye + dir, 0.7f, knife ? 1.3f : 0.8f, true);
   return hit >= 0;
@@ -298,7 +360,8 @@ void Game::melee_attack() {
     if (now - g.fist_last[h] < kFistRecover[h]) continue;
     const bool combo = now - g.fist_last[1 - h] < kCombo;
     g.fist_last[h] = now;
-    melee_hit(kPunchReach + 0.4f, 1.25f, std::round(kFistDmg[h] * (combo ? 1.35f : 1.0f)), false);
+    // PUNCH_NS [40, 26] x 1.2 on a combo
+    melee_hit(kPunchReach + 0.4f, 1.25f, std::round(kFistDmg[h] * (combo ? 1.35f : 1.0f)), false, (h ? 26.0f : 40.0f) * (combo ? 1.2f : 1.0f));
   }
 }
 

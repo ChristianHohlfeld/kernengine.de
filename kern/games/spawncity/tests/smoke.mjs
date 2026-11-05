@@ -327,7 +327,8 @@ async function run({name, url, context, mapped}) {
     await cmd("perf 0");
     check(JSON.parse(await cmd("quality 2")).tier === 2, `[${name}] quality level 2 fixed`);
     await frame(); await frame();
-    const cw = await page.evaluate(() => { const c = document.getElementById("game"), d = devicePixelRatio || 1; return [c.width, ...[1.5, 2].map(cap => Math.round(c.clientWidth * Math.min(d, cap) * 0.85))]; });
+    // the host's pixel-ratio ceiling (render_stability.mjs renderPlatformProfile: software 0.30) x the level's 0.85
+    const cw = await page.evaluate(() => { const c = document.getElementById("game"), k = window.SpawnCity.platform?.ceiling ?? 1; return [c.width, Math.round(c.clientWidth * k * 0.85), Math.max(1, Math.round(c.clientWidth * k * 0.85))]; });
     check(Math.min(Math.abs(cw[0] - cw[1]), Math.abs(cw[0] - cw[2])) <= 1, `[${name}] the drawing buffer follows the level's scale (${cw})`);
     check(JSON.parse(await cmd("quality auto")).auto === true, `[${name}] quality back to automatic`);
     check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
@@ -469,7 +470,14 @@ async function run({name, url, context, mapped}) {
     await shot("1c-airstrike");
     check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
     check(await cmd("military start") === "on", `[${name}] military called in`);
-    await until(() => { const c = window.SpawnCity.hud().combat; return c.helis > 0 && c.soldiers > 0; });
+    // a player the police cannot see shakes the stars off in ~9 s (wanted_system_logic.mjs escape) and
+    // the army turns back: keep five stars up while waiting for it (the phone stands on a roof here)
+    for (let i = 0; i < 90; i++) {
+      const hw = await hud();
+      if (hw.combat.helis > 0 && hw.combat.soldiers > 0) break;
+      if (hw.stars < 5 || hw.combat.mil !== "on") await cmd("military start");
+      await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2, hw.t, {timeout: 120000}).catch(() => {});
+    }
     let c = (await hud()).combat;
     { const hm = await hud(); check(c.mil === "on" && c.helis > 0, `[${name}] army: ${c.helis} heli, ${c.tanks} tank, ${c.soldiers} soldiers (mode ${hm.mode}, health ${hm.health}, stars ${hm.stars}, mil ${c.mil}, spawn ${JSON.stringify({a: hm.gaps?.spawnAllowed, d: hm.gaps?.spawnDenied})})`); }
     await shot("1d-military");
@@ -545,7 +553,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);  // LENKEN / GAS: the left stick up
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast})`);
+    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast}, car ${JSON.stringify(h.car)}, ctl ${(await cmd("controls")).slice(0, 160)})`);
     await shot("3-car");
     check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);

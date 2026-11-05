@@ -570,6 +570,19 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     setTimeout(finish, 60000);
   }
 
+  // Behind the title the city already loads where START will begin: the chosen place, or - when
+  // the browser already allows the location (no prompt) - the last known position. START still
+  // takes a fresh fix and moves only when that is far (moveTo: 150 m), so nothing is built twice.
+  (function preload() {
+    const chosen = globalThis.__arondightStartPlace?.get?.() || (place ? place : null);
+    if (chosen) { moveTo(+chosen.lat, +chosen.lon, chosen.name || ""); return; }
+    if (!navigator.geolocation || !navigator.permissions?.query) return;
+    navigator.permissions.query({name: "geolocation"}).then(st => {
+      if (st.state !== "granted" || ui.started) return;
+      navigator.geolocation.getCurrentPosition(pos => { if (!ui.started) moveTo(pos.coords.latitude, pos.coords.longitude); }, () => {}, {enableHighAccuracy: false, maximumAge: 600000, timeout: 10000});
+    }).catch(() => {});
+  })();
+
   // ---- LIVE GPS (gps_live_mode.mjs): the phone's fixes go to the game, which moves you ---------
   const gpsLive = {on: false, watch: null, coarse: null, wake: null};
   const gpsFix = pos => {
