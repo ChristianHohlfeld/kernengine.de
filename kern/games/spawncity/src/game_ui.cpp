@@ -480,9 +480,10 @@ void Game::ui_reset() {
 std::string Game::ui_hud_json() {
   char b[512];
   std::string s;
-  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f],\"northUp\":%s,\"assists\":%u}",
+  std::snprintf(b, sizeof b, ",\"ui\":{\"placed\":%s,\"paused\":%s,\"settings\":%u,\"resets\":%u,\"moves\":%u,\"origin\":[%.6f,%.6f],\"northUp\":%s,\"assists\":%u,\"audioOn\":%s,\"musicOn\":%s}",
                 world_placed_ ? "true" : "false", ui_.paused ? "true" : "false", ui_.settings.version(), ui_.resets, ui_.moves, lat_, lon_,
-                ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists);
+                ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists, ui_.settings.on(Opt::audio_on) ? "true" : "false",
+                ui_.settings.on(Opt::music_on) ? "true" : "false");
   s += b;
   const GpsLive& g = ui_.gps;
   if (g.active()) {

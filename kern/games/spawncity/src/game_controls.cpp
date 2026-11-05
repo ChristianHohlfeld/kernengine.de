@@ -1060,6 +1060,7 @@ std::string Game::ctl_hud_json() {
   s += fade ? "true" : "false";
   s += C.near_car ? ",\"nearCar\":true" : ",\"nearCar\":false";
   s += C.near_jet ? ",\"nearJet\":true" : ",\"nearJet\":false";
+  s += C.pad_drone ? ",\"padDrone\":true" : ",\"padDrone\":false";
   std::snprintf(b, sizeof b, ",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"head\":[%.3f,%.3f]", sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, head_yaw_, head_pitch_);
   s += b;
   s += ctl_view_json();

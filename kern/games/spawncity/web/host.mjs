@@ -20,6 +20,7 @@ import {GapsHud} from "./gaps_hud.mjs";
 import {installSpawnCityLife} from "./life.mjs";
 import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
 import {VIEW_MODES} from "./view_modes.mjs";  // the mode binders register themselves (view_modes.mjs)
+import {installOriginalMenus} from "./view_menu.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -284,6 +285,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
   const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
   const view = originalView ? new OriginalView({command, ui, mp: mpPage}) : null;
+  if (originalView) installOriginalMenus({command, ui, mp: mpPage});
   let frames = 0, last = null;
   const vib = {me: null, peers: new Map()};
   // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
@@ -357,7 +359,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     mapCanvas.addEventListener("pointercancel", up);
   }
   setInterval(() => {
-    if (!mctx) return;
+    if (!mctx || originalView) return;  // the original view draws its own (view.mjs minimap)
     let m;
     try { m = JSON.parse(command("map")); } catch { return; }
     const W = mapCanvas.width, H = mapCanvas.height, R = Math.min(W, H) / 2, scale = R / 150;  // 150 m to the rim

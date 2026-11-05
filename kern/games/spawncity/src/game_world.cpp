@@ -226,6 +226,9 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
         const Vec2 p = wl.a + wl.dir * u + wl.normal * 1.5f;
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
         if (t.water_at(p.x, p.y)) continue;  // over water a blast only throws up spray (no marks to test)
+        // open ground in front of the wall: not inside or on top of the next house (terraced rows)
+        if (std::fabs(city_.ground_height(p.x, p.y) - t.height(p.x, p.y)) > 0.5f) continue;
+        if (cast(world_->physics(), {p.x, p.y, t.height(p.x, p.y) + 0.3f}, {0, 0, 1}, 25, {}, kCatWorld).hit) continue;
         if (d < best && wl.len > 3) { best = d; at = {p.x, p.y, 0}; }
       }
       if (best > 1e8f) { out = "no wall"; return true; }

@@ -899,3 +899,75 @@ void Game::draw_town() {
 }
 
 }  // namespace sc
+
+namespace sc {
+
+std::string Game::minimap_json() {
+  // real_world_bootstrap.mjs drawMinimap / cacheMinimapFeatures: the map's roads (transportation),
+  // water (water, waterway), green areas (park, wood, grass, pitch) and buildings around the
+  // subject, at most 80 features, every path thinned to <= 28 points; positions relative to the
+  // subject in metres (east, north). The page draws them exactly as the original (web/view.mjs).
+  if (!world_placed_) return "{}";
+  const Vec3 me = focus_position();
+  const f32 range = 420;  // the expanded map shows up to 380 m from the subject
+  struct Feat { char kind; bool poly; const std::vector<Vec2>* pts; f32 d; };
+  std::vector<Feat> feats;
+  std::vector<const MapFeatures*> tiles;
+  city_.ready_features(tiles);
+  auto dist = [&](const std::vector<Vec2>& pts) {
+    f32 best = 1e9f;
+    for (std::size_t k = 0; k + 1 < pts.size(); ++k) {
+      const Vec2 a = pts[k], d = pts[k + 1] - a;
+      const f32 l2 = std::fmax(1e-6f, d.x * d.x + d.y * d.y);
+      const f32 t = clampf(((me.x - a.x) * d.x + (me.y - a.y) * d.y) / l2, 0, 1);
+      best = std::fmin(best, std::hypot(a.x + d.x * t - me.x, a.y + d.y * t - me.y));
+    }
+    return best;
+  };
+  for (const MapFeatures* f : tiles) {
+    for (const auto& r : f->roads)
+      if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, &r.points, dist(r.points)});
+    for (const auto& a : f->areas) {
+      if (a.rings.empty() || a.rings[0].size() < 3) continue;
+      const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
+      if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
+    }
+    for (const auto& b : f->buildings)
+      if (!b.rings.empty() && b.rings[0].size() >= 3) feats.push_back({'b', true, &b.rings[0], dist(b.rings[0])});
+  }
+  std::erase_if(feats, [&](const Feat& f) { return f.d > range; });
+  std::sort(feats.begin(), feats.end(), [](const Feat& a, const Feat& b) { return a.d < b.d; });
+  if (feats.size() > 80) feats.resize(80);
+  // draw order of the original: the map's layer order (water, green, roads, buildings)
+  auto order = [](char k) { return k == 'w' ? 0 : k == 'g' ? 1 : k == 'r' ? 2 : 3; };
+  std::stable_sort(feats.begin(), feats.end(), [&](const Feat& a, const Feat& b) { return order(a.kind) < order(b.kind); });
+  // the subject's heading (compass degrees) and the view's (the minimap turns with the look)
+  const Vec3 look = cam_.target - cam_.eye;
+  auto compass = [](f32 x, f32 y) { return 90.0f - std::atan2(y, x) * 180.0f / kPi; };
+  Vec3 fwd = look;
+  kern::game::ActorId a = soldier_;
+  if (mode_ == Mode::car && car_index_ >= 0) a = cars_[car_index_].actor;
+  else if (mode_ == Mode::jet) a = jet_actor_;
+  else if (mode_ == Mode::drone && drone_out_) a = drone_actor_;
+  if (a != soldier_) { const kern::Mat4 m = matrix_of(a); fwd = {m.m[0], m.m[1], 0}; }
+  std::string o;
+  char b[160];
+  std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.1f],\"bearing\":%.2f,\"look\":%.2f,\"mode\":\"%s\",\"f\":[", me.x, me.y, me.z - city_.ground_height(me.x, me.y),
+                compass(fwd.x, fwd.y), compass(look.x, look.y), mode_name(mode_));
+  o += b;
+  for (std::size_t i = 0; i < feats.size(); ++i) {
+    const Feat& f = feats[i];
+    const std::vector<Vec2>& p = *f.pts;
+    const std::size_t step = std::max<std::size_t>(1, (p.size() + 27) / 28);
+    std::snprintf(b, sizeof b, "%s[\"%c%s\"", i ? "," : "", f.kind, f.poly ? "p" : "");
+    o += b;
+    for (std::size_t k = 0; k < p.size(); k += step) {
+      std::snprintf(b, sizeof b, ",%.1f,%.1f", p[k].x - me.x, p[k].y - me.y);
+      o += b;
+    }
+    o += "]";
+  }
+  return o + "]}";
+}
+
+}  // namespace sc

@@ -63,6 +63,31 @@ for t in body.find_all(True):
         if t.has_attr(a):
             del t[a]
 
+# Elements other states created that this one does not have (the quit question, dialogs opened later,
+# mode HUDs): taken from the first snapshot that has them, at the same parent (body or #viewport).
+have = {t.get("id") for t in body.find_all(True) if t.get("id")}
+for f in sorted(src.glob("*-original.html")):
+    if f.name == f"{BASE}.html":
+        continue
+    other = BeautifulSoup(f.read_text(), "lxml").body
+    for parent_id in (None, "viewport"):
+        parent = other if parent_id is None else other.find(id=parent_id)
+        mine = body if parent_id is None else body.find(id=parent_id)
+        if not parent or not mine:
+            continue
+        for c in list(parent.find_all(True, recursive=False)):
+            cid = c.get("id")
+            if not cid or cid in have or c.name in ("script", "noscript") or cid in ("pairDialog",):
+                continue
+            ids = {t.get("id") for t in c.find_all(True) if t.get("id")}
+            if ids & have:
+                continue
+            for t in c.find_all(["script", "noscript"]):
+                t.decompose()
+            mine.append(c.extract())
+            have |= ids | {cid}
+            print("added", parent_id or "body", cid)
+
 # Kern's canvas takes the three.js canvas's place (the bare <canvas> child of #viewport).
 vp = body.find(id="viewport")
 for c in vp.find_all("canvas", recursive=False):

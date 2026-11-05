@@ -30,7 +30,10 @@ export async function mountOriginalView(base = "./view/") {
   style.textContent = css.replace(/url\("fonts\//g, `url("${globalThis.__scViewFonts || base + "fonts/"}`);
   document.head.prepend(style);
   // Kern's own page bits that the original does not have (stage, status, Kern HUD) give way.
-  for (const id of ["stage", "status"]) $(id)?.remove?.();
+  $("stage")?.remove?.();
+  // Kern's load status stays as the source of the menu's status line (view.mjs), not shown itself.
+  const status = $("status");
+  if (status) status.style.display = "none";
   const kernHud = $("hud");
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
@@ -43,7 +46,7 @@ export async function mountOriginalView(base = "./view/") {
   extra.textContent = `
     html.sc-original-view #hud{position:absolute;inset:0;pointer-events:none;z-index:20}
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
-    html.sc-original-view #scMenu,html.sc-original-view .k-touch{display:none!important}
+    html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{display:block;width:100%;height:100%;outline:none;touch-action:none}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
@@ -93,6 +96,7 @@ export class OriginalView {
     this.mp = mp;
     this.rectKey = "";
     this.wire();
+    setInterval(() => { try { this.minimap(); } catch (e) { if (!this.mapWarned) { this.mapWarned = true; console.warn("[spawncity] minimap", e); } } }, 125);  // WORLD_MINIMAP_DRAW_MS
   }
 
   wire() {
@@ -118,6 +122,36 @@ export class OriginalView {
     click("gpsLiveButton", () => kernAct("gps"));
     click("proximityVoicePtt", () => this.command("voice mic"));
     click("proximityVoiceMute", () => this.command("voice mute"));
+    // EFFECTS / MUSIC toggles (drone_simulator.html inline script): the game's audio.on / music.on
+    const toggle = (id, key) => {
+      const b = $(id);
+      if (!b) return;
+      b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
+      b.addEventListener("click", ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        const on = Number(this.command(`get ${key}`)) > 0.5;
+        this.command(`set ${key} ${on ? 0 : 1}`);
+        try { const k = "spawnCityKernSettingsV1", c = JSON.parse(localStorage.getItem(k) || "{}"); c[key] = on ? 0 : 1; localStorage.setItem(k, JSON.stringify(c)); } catch { /* none */ }
+      });
+    };
+    toggle("soundSwitch", "audio.on");
+    toggle("musicSwitch", "music.on");
+    // dock(): in game just left of RESET, else the menu's top-right spot (every 400 ms, as the original)
+    const dock = () => {
+      const btn = $("soundSwitch"), mbtn = $("musicSwitch");
+      if (btn && mbtn && !(document.body.classList.contains("edge-hud") || btn.dataset.edgeAdopted)) {
+        let reset = null;
+        for (const id of ["mobileGameplayReset", "soloReset"]) { const el = $(id); if (!el || !el.offsetParent) continue; const q = el.getBoundingClientRect(); if (q.width < 4 || q.height < 4) continue; if (!reset || q.top < reset.getBoundingClientRect().top - 2) reset = el; }
+        const menu = $("gameMenu"), inGame = menu && menu.hidden && reset;
+        if (inGame) { const r = reset.getBoundingClientRect(), right = innerWidth - r.left + 6; btn.style.top = r.top + "px"; btn.style.right = right + "px"; btn.style.height = r.height + "px"; mbtn.style.top = r.top + "px"; mbtn.style.right = (right + btn.offsetWidth + 6) + "px"; mbtn.style.height = r.height + "px"; }
+        else for (const b of [btn, mbtn]) { b.style.top = ""; b.style.right = ""; b.style.height = ""; }
+      }
+      // gps_live_mode.mjs: the GPS button sits left of the music switch
+      const g = $("gpsLiveButton"), m = $("musicSwitch")?.getBoundingClientRect?.();
+      if (g && !g.dataset.edgeAdopted) { if (m && m.width) { g.style.top = `${Math.round(m.top)}px`; g.style.right = `${Math.round(innerWidth - m.left + 8)}px`; } else { g.style.top = "10px"; g.style.right = "150px"; } }
+      setTimeout(dock, 400);
+    };
+    dock();
     for (const b of document.querySelectorAll("#worldLookHud [data-map-expand]")) b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); this.command("bigmap toggle"); });
   }
 
@@ -144,6 +178,11 @@ export class OriginalView {
     const start = $("gameMenuStart");
     if (start) { const ready = !!h.placed; start.disabled = !ready; setText(start, ready ? "START" : "LOADING"); }
     setText($("gameMenuStatus"), h.placed ? (h.offline ? "OFFLINE" : "READY") : "");
+    // ---- the toggles' state (drone_simulator.html inline script render / renderMusic)
+    for (const [id, on] of [["soundSwitch", h.ui?.audioOn], ["musicSwitch", h.ui?.musicOn]]) {
+      const b = $(id);
+      if (b && on !== undefined) { setData(b, "on", on ? "1" : "0"); b.setAttribute("aria-pressed", on ? "true" : "false"); }
+    }
     // ---- vitals (player_vitals_runtime.mjs)
     const vit = $("playerVitalsHud");
     if (vit) {
@@ -212,6 +251,68 @@ export class OriginalView {
     for (const b of BINDERS) { try { b.fn(h, touch, this); } catch (e) { if (!b.warned) { b.warned = true; console.warn(`[spawncity] view ${b.name}`, e); } } }
     // ---- touch buttons: the game's hit areas follow what the original's layout drew
     this.sendRects(touch, mode);
+  }
+
+  /** real_world_bootstrap.mjs drawMinimap (every 125 ms) and renderLookHud's title / readout. */
+  minimap() {
+    const canvas = document.querySelector("#worldLookHud .world-mini-canvas"), h = this.last;
+    if (!canvas || !h) return;
+    let m, mates = [];
+    try { m = JSON.parse(this.command("minimap")); } catch { return; }
+    try { mates = JSON.parse(this.command("map")).players || []; } catch {}
+    if (!m.me) return;
+    const ctx = canvas.getContext("2d"), w = canvas.width, hh = canvas.height;
+    const locked = !!h.ui?.northUp, miniBearing = !document.fullscreenElement && !locked ? (h.ctl?.look?.[0] || 0) : 0;
+    const rad = miniBearing * Math.PI / 180, c = Math.cos(rad), si = Math.sin(rad);
+    const expanded = $("worldLookHud")?.classList.contains("expanded"), zoom = this.mapZoom || 1, fovScale = 1;  // fpvFovDeg 105
+    const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+    const radius = clamp(((55 + (m.mode === "drone" ? Math.max(0, m.me[2]) : 0) * 2) * fovScale) / (expanded ? zoom : 1), expanded ? 15 : 42, expanded ? 380 : 190);
+    const scale = w / (radius * 2), baseY = hh * 0.5;
+    const P = (dx, dy) => { const rx = dx * c - dy * si, ry = dx * si + dy * c; return [w / 2 + rx * scale, baseY - ry * scale]; };
+    ctx.fillStyle = "#2a3026"; ctx.fillRect(0, 0, w, hh);
+    if (h.ui?.grid !== false) {
+      ctx.lineWidth = 1;
+      // the grid is anchored to the world (every 20 m), like the original's projectLocal of the subject's cell
+      for (let v = -Math.ceil(radius / 20) * 20; v <= radius; v += 20)
+        for (const axis of [0, 1]) {
+          const a = axis ? P(-radius, v) : P(v, -radius), b = axis ? P(radius, v) : P(v, radius);
+          ctx.strokeStyle = v === 0 ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.1)";
+          ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+        }
+    }
+    for (const f of m.f) {
+      const kind = f[0], pts = [];
+      for (let i = 1; i + 1 < f.length; i += 2) pts.push(P(f[i], f[i + 1]));
+      if (pts.length < 2) continue;
+      const poly = kind.length > 1, path = () => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); };
+      if (kind[0] === "r") { ctx.strokeStyle = "#b9b9b4"; ctx.lineWidth = 2; path(); ctx.stroke(); continue; }
+      if (kind[0] === "w") { ctx.fillStyle = "#2f5f86"; ctx.strokeStyle = "#3c76a3"; ctx.lineWidth = 1; path(); if (poly) { ctx.closePath(); ctx.fill(); } ctx.stroke(); continue; }
+      if (kind[0] === "g") { ctx.fillStyle = "#34482a"; path(); ctx.closePath(); ctx.fill(); continue; }
+      ctx.fillStyle = "#5b5e63"; ctx.strokeStyle = "#7b7e83"; ctx.lineWidth = 1; path(); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    // every remote player, clamped to the edge (vs_multiplayer.mjs minimapPlayers)
+    ctx.save(); ctx.font = "bold 11px system-ui,sans-serif"; ctx.textAlign = "center";
+    for (const mate of mates) {
+      const [rx, ry] = P(mate[0], mate[1]);
+      const mx = clamp(rx, 12, w - 12), my = clamp(ry, 13, hh - 14), off = mx !== rx || my !== ry;
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(((mate[3] ?? 0) * Math.PI / 180) - rad);
+      ctx.fillStyle = mate[4] ? "#777777" : "#40dcff"; ctx.strokeStyle = "#081019"; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 6); ctx.lineTo(0, 3); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      if (off) { ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+      ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#101010"; ctx.lineWidth = 3;
+      const label = "P" + String(mate[2] ?? "?"); ctx.strokeText(label, mx, my + 20); ctx.fillText(label, mx, my + 20);
+    }
+    ctx.restore();
+    const rel = (m.bearing - miniBearing) * Math.PI / 180;
+    ctx.save(); ctx.translate(w / 2, baseY); ctx.rotate(rel); ctx.fillStyle = "#f5b301"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 4); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = "#ffffff"; ctx.font = "600 11px Inter,system-ui,sans-serif"; ctx.fillText(Math.abs(miniBearing) < .01 ? "N↑" : "VIEW↑", 7, 15);
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.font = "600 9px Inter,system-ui,sans-serif";
+    if (m.mode === "drone") ctx.fillText(`${Math.round(m.me[2])}m`, 7, hh - 7);
+    setText(document.querySelector("#worldLookHud [data-world-minimap-title]"), Math.abs(miniBearing) < .01 ? "MINIMAP · N↑ · TOP" : "MINIMAP · VIEW↑ · TOP");
+    const yaw = Math.round(miniBearing);
+    setText(document.querySelector("#worldLookHud [data-world-look-readout]"), h.ctl?.pad && h.ctl?.lookActive ? `AIM · ${yaw}°` : this.lookDragging ? `${yaw}°` : h.ctl?.keepLook ? `KEEP · ${yaw}°` : h.ctl?.lookSnapping ? "SNAP ↺" : "SNAP");
   }
 
   sticks(t, mode) {

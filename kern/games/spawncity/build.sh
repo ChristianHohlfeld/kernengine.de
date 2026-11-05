@@ -54,6 +54,7 @@ sources = {
     "life": (here / "web/life.mjs").read_text(),
     "view": (here / "web/view.mjs").read_text(),
     "view_modes": (here / "web/view_modes.mjs").read_text(),
+    "view_menu": (here / "web/view_menu.mjs").read_text(),
     "host": (here / "web/host.mjs").read_text(),
 }
 for name, text in sources.items():
@@ -77,7 +78,7 @@ view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.h
                "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
                "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
                "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n};\n").replace("</script", "<\\/script")
-bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "view", "view_modes", "host"))
+bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "view", "view_modes", "view_menu", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')
