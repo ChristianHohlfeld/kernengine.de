@@ -1012,7 +1012,10 @@ const f32* Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
   if (mixer_.ready()) {
     mixer_.render(audio_out_.data(), frames);
-    ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+    // the page plays the original's own sound (game_audio_web.cpp): Kern's mix is not heard and
+    // its music not made
+    if (web_audio_) std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
+    else ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
   }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
   mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
@@ -1189,6 +1192,7 @@ std::string Game::command(const std::string& cmd) {
   if (std::string out; combat_command(cmd, out)) return out;  // combat / event commands (game_events.cpp)
   if (std::string out; details_command(cmd, out)) return out;  // guided / critical / ballot commands (game_details.cpp)
   if (std::string out; gaps_command(cmd, out)) return out;  // sc-m3-gaps test commands (game_gaps.cpp)
+  if (std::string out; web_audio_command(cmd, out)) return out;  // the original's sound on the page (game_audio_web.cpp)
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (starts("mode ")) {
     const std::string m = cmd.substr(5);

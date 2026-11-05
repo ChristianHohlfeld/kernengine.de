@@ -56,6 +56,7 @@ sources = {
     "view": (here / "web/view.mjs").read_text(),
     "view_modes": (here / "web/view_modes.mjs").read_text(),
     "view_menu": (here / "web/view_menu.mjs").read_text(),
+    "audio": (here / "web/audio.mjs").read_text(),
     "host": (here / "web/host.mjs").read_text(),
 }
 for name, text in sources.items():
@@ -81,9 +82,37 @@ view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.h
                "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
                "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
                "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n" + (view_dir / "install_app.js").read_text() + "\n};\n").replace("</script", "<\\/script")
+# The original's sound (web/audio, audio.mjs): each of its modules becomes a function scope whose
+# exports land in __scAudio[name]; its imports read them from there. The music file stays a file
+# (sim/audio/8_bits_only.m4a, 4.4 MB): the page loads it next to itself (copied there below).
+AUDIO_MODULES = ["audio_settings", "combat_audio_bank", "site_config", "music_player", "motor_sound", "police_sirens", "jetpack_audio", "animal_audio",
+                 "immersive_soundscape", "car_radio", "world_organic_hit_audio", "headshot_feedback", "original_sfx"]
+def audio_imports(text):
+    def named(m):
+        names = ", ".join(n.strip().replace(" as ", ": ") for n in m.group(1).split(",") if n.strip())
+        return f'const {{{names}}} = __scAudio["{m.group(2)}"];'
+    text = re.sub(r'import\s*\{([^}]*)\}\s*from\s*"\./(?:audio/)?([a-z_]+)\.mjs";', named, text)
+    text = re.sub(r'import\s*\*\s*as\s+(\w+)\s+from\s*"\./(?:audio/)?([a-z_]+)\.mjs";', lambda m: f'const {m.group(1)} = __scAudio["{m.group(2)}"];', text)
+    if re.search(r'\bimport\s*["{*]', text): sys.exit("audio: an import left over")
+    return text
+audio_dir = here / "web/audio"
+audio_inline = "globalThis.__scAudio = {};\n"
+for name in AUDIO_MODULES:
+    text = audio_imports((audio_dir / f"{name}.mjs").read_text())
+    exports = re.findall(r"\bexport (?:const|let|class|function|async function) ([A-Za-z_$][\w$]*)", text)
+    text = re.sub(r"\bexport (?=(?:const|let|class|function|async function) )", "", text)
+    audio_inline += f'__scAudio["{name}"] = (() => {{\n{text}\nreturn {{{", ".join(exports)}}};\n}})();\n'
+audio_inline += "globalThis.__scMenuMusic = () => {\n" + (audio_dir / "menu_music.js").read_text() + "\n};\n"
+if "</script" in audio_inline.lower(): sys.exit("audio sources contain '</script'")
+sources["audio"] = audio_imports(sources["audio"])
+view_inline += audio_inline
+music = here / "web/sim/audio/8_bits_only.m4a"
+(out.parent / "sim/audio").mkdir(parents=True, exist_ok=True)
+import shutil
+shutil.copyfile(music, out.parent / "sim/audio/8_bits_only.m4a")
 # the job workers load kern.mjs from this text (no module URL in a single file)
 view_inline += "globalThis.__kernSource = " + json.dumps(sources["kern"]).replace("</script", "<\\/script") + ";\n"
-bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "jobs", "view", "view_modes", "view_menu", "host"))
+bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "jobs", "view", "view_modes", "view_menu", "audio", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')

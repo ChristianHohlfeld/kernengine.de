@@ -138,8 +138,10 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   gaps_lamps_sounds();
   const f32 fx_d = kern::length(l.foot - cam_.eye), vol = std::fmax(0.0f, 1 - fx_d / 90) * 0.5f;
   if (was < 1 && vol > 0) world_->play_sound("sc:lampglass", cam_.eye, vol, 1, false);
+  if (was < 1) osfx("street_lamps.glass", {l.head.x, l.head.y, l.foot.z + lamps::kPoleH - 0.2f});
   if (state == 2) {
     if (vol > 0) world_->play_sound("sc:lampclang", cam_.eye, vol, 1, false);
+    osfx("street_lamps.clang", l.foot + Vec3{0, 0, 0.4f}, 1);
     // topple(): the post becomes a 140 kg box (0.22 x 0.22 x 6.2 m) and gets a push at 80 % height
     kern::physics::World& w = world_->physics();
     kern::physics::BodySettings bs;
@@ -218,6 +220,7 @@ void Game::gaps_lamps_update(f32 dt) {
           gaps_lamps_sounds();
           const f32 vol = std::fmax(0.0f, 1 - kern::length(s.position - cam_.eye) / 90) * 0.5f * 0.5f;
           if (vol > 0) world_->play_sound("sc:lampclang", cam_.eye, vol, 1, false);
+          osfx("street_lamps.clang", g.lamps.all()[static_cast<std::size_t>(h.lamp)].foot + Vec3{0, 0, 0.5f}, 0.5f);
         }
       }
     }

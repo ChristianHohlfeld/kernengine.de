@@ -112,6 +112,7 @@ bool Game::gaps_repair_barricade() {
   ++gaps_->planks[best->key][static_cast<std::size_t>(best->i)];
   combat_.zombies.points -= kRepairCost;
   world_->play_sound(combat_sfx(combat_audio::Kind::bounce), cam_.eye, 0.4f, 0.7f, false);  // playCombatAudio "bounce" .4 / .7
+  osfx("zombie_nights.repairKnock", cam_.eye);
   return true;
 }
 

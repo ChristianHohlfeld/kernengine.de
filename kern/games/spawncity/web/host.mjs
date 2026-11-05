@@ -6,7 +6,9 @@
 //   * fetches the elevation tiles it asks for (Terrarium PNGs, AWS Open Data Terrain Tiles) and
 //     hands over the decoded RGBA pixels (the browser decodes PNGs; the heights are the game's)
 //   * polls the gamepad and routes touch fingers (CSS px) to the game
-//   * plays the samples Kern's mixer renders (KernAudio from kern/web/studio/game.mjs)
+//   * plays the original's sound (audio.mjs: spawncity.de's music, audio modules and sound
+//     functions, fed from the game's audio state and events); Kern's mixer (KernAudio from
+//     kern/web/studio/game.mjs) only carries the other players' voices then (?audio=kern: Kern's own)
 //   * draws the HUD from the game's JSON and the touch controls with Kern's TouchOverlay
 //   * multiplayer (?mp=host|join&room=NAME[&relay=wss://...]): moves the game's datagrams with
 //     Kern's KernNet (BroadcastChannel between tabs, or the Kern relay between machines)
@@ -23,6 +25,7 @@ import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
 // the mode binders register themselves (view_modes.mjs)
 import {VIEW_MODES} from "./view_modes.mjs";
 import {installOriginalMenus} from "./view_menu.mjs";
+import {installOriginalAudio, exemptVoice} from "./audio.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
@@ -36,6 +39,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // the original's three.js canvas.
   // The original spawncity.de view is the default; ?view=kern shows Kern's own HUD (tests, debugging).
   const originalView = params.get("view") !== "kern" && await mountOriginalView();
+  // The original's sound (audio.mjs): its music, its audio modules, its sound functions - the title
+  // music starts now, before the game has loaded, as on spawncity.de.
+  const originalAudio = originalView && params.get("mute") !== "1" && params.get("audio") !== "kern" ? installOriginalAudio() : null;
   const canvas = document.getElementById("game");
   const statusEl = document.getElementById("status");
   const hudEl = document.getElementById("hud");
@@ -296,6 +302,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else if (c.state !== "running") c.resume?.().catch(() => {});
   });
   addEventListener("pagehide", () => audio?.context?.suspend?.().catch(() => {}));
+  originalAudio?.attach(command);
+  let voiceExempt = !originalAudio;
+  // With the original's sound every game sound is a Web Audio node scheduled on the audio thread
+  // (audio.mjs): a long frame only delays a parameter change. Kern's own output stream (rendered in
+  // wasm on the main thread, a short queue that underruns on every long frame) is then not used for
+  // the game at all - it is only connected for the other players' voices in a multiplayer round.
+  if (originalAudio && audio) {
+    const kernConnect = audio.connect.bind(audio);
+    audio.connect = async () => { if (last?.net) return kernConnect(); };
+  }
 
   // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
   const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
@@ -361,6 +377,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     }
     applyRenderScale(last);
     ui.update(last);
+    originalAudio?.update(last, ui);
+    if (originalAudio && audio && last?.net && !audio.node) audio.connect();
+    if (!voiceExempt && audio) voiceExempt = exemptVoice(audio);
     life.update(last);
     const touchView = JSON.parse(str(e.sc_touch_view()));
     if (view) view.update(last, touchView);
@@ -426,7 +445,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // hud() reads the game's state now (not the copy of the last drawn frame): a test that sends a
   // command sees its effect at once, however slow the frames are.
   const hudNow = () => { try { return JSON.parse(str(e.sc_hud())); } catch { return last; } };
-  window.SpawnCity = {app, command, hud: hudNow, platform, frames: () => frames, tiles, ui};
+  window.SpawnCity = {app, command, hud: hudNow, platform, frames: () => frames, tiles, ui, audio: originalAudio};
   return window.SpawnCity;
 }
 

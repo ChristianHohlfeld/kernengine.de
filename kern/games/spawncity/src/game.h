@@ -538,6 +538,12 @@ class Game {
   std::unique_ptr<kern::game::GameAudio> game_audio_;
   SoundFx fx_;
   std::vector<f32> audio_out_;
+  // the original's sound on the page (game_audio_web.cpp): events and state for web/audio.mjs
+  bool web_audio_ = false;
+  std::string osfx_;
+  void osfx(const char* fn, Vec3 at, f32 a = 0, f32 b = 0, f32 c = 0);
+  std::string web_audio_state();
+  bool web_audio_command(const std::string& cmd, std::string& out);
   // start parameters
   f64 lon_ = kKonstanzLon, lat_ = kKonstanzLat;
   std::string start_mode_;

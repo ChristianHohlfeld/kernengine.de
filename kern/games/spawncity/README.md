@@ -527,17 +527,20 @@ kern/games/spawncity/
   größte Höhe über Grund, Akku Start/Minimum, Grund des Endes, Pfad alle 0,5 s, höchstens 50 Flüge) und
   die Netzereignisse; das Spiel zeichnet auf (`logbook`), die Seite hält die Geschichte in localStorage,
   EXPORT JSON / LEEREN im Pausemenü → LOGBUCH.
-* **Musik und Autoradio** (`music_player.mjs`, `car_radio.mjs`): SpawnCity spielt im Menü eine
-  Musikdatei und im Auto echte Radiosender der Gegend. Hier ist beides erzeugt (`MusicSynth`: 16tel-Sequencer
-  über vier Akkorde, Drums aus Rauschen und Sinus, Bass, Lead, Pad, Echo): die Titelmusik (8-Bit) läuft
-  nur in den Menüs, im Auto das Radio mit fünf Sendern (KERN FM Synthwave, BODENSEE BEATS House,
-  LOFI LAGUNE, 8-BIT RADIO, NACHTSCHICHT Techno). N / B oder D-Pad →/← wechseln, nach dem letzten
-  Sender kommt RADIO AUS; Sendername als Banner; Touch: 📻-Knopf. Lautstärke = MUSIK (Radio mindestens
-  55 %, ×0,85; Titel ×0,45 wie SpawnCity). `radio next|prev|on|off`, `music`.
-* **Geräuschkulisse** (`immersive_soundscape.mjs`): Stadtrauschen, Vögel am Tag, Grillen in der Nacht
-  (Umgebungs-Bus, leiser in der Höhe) und ein dumpfer Schlag bei harten Stößen des eigenen Autos
-  (ab 1,8 m/s Geschwindigkeitssprung) mit etwas Kamerawackeln. Schritte und Motor kommen wie bisher
-  aus Kerns GameAudio und `sound_fx.*`.
+* **Ton: der des Originals** (`web/audio.mjs`, `web/audio/`, `game_audio_web.cpp`): auf der Seite
+  klingt alles wie spawncity.de, weil es dessen eigener Ton ist - die Titelmusik ist die Originaldatei
+  (`web/sim/audio/8_bits_only.m4a`, nur im Menü, MUSIC_HEADROOM .45, Regler 32 %), die Audio-Module
+  laufen unverändert (`audio_settings`, `combat_audio_bank`, `music_player`, `motor_sound`,
+  `police_sirens`, `jetpack_audio`, `animal_audio`, `immersive_soundscape`, `car_radio` mit den echten
+  Sendern der Gegend, `world_organic_hit_audio`, `headshot_feedback`, dazu das Menümusik-Skript aus
+  `drone_simulator.html`), und die Klangfunktionen der Spielmodule (Schüsse, Einschläge, Explosionen,
+  Granaten, Fäuste/Messer, Gangster, Polizei, Militär, Flak, Jets, Lenkrakete, Kühe, Tauben, Jogger,
+  Hupen, Schreie, Laternen …) sind aus deren Quelltext herausgeschnitten (`web/audio/original_sfx.mjs`,
+  erzeugt von `tools/take_original_audio.py`). Das Spiel meldet nur, was passiert (`osfx`: das Ereignis
+  nennt die Originalfunktion) und was läuft (Hörer, Motoren der Drohne, Auto, Jetpack, Sirenen, Jets,
+  Raketen; `audio frame`). Kerns Mixer läuft weiter, wird auf der Seite aber nicht gehört (`audio web 1`),
+  außer den Stimmen der Mitspieler. `?audio=kern` oder `?view=kern`: Kerns eigener Ton (Synth-Patches,
+  `MusicSynth`, wie in nativen Builds).
 * **Idee fürs nächste Update** (`suggestion_box.mjs`, `nostr.*`): nach 15 min Spielzeit dieser Version fragt
   die Karte im Titel einmal (SENDEN / SPÄTER = 10 min / NEIN DANKE). Wie SpawnCity geht die Zeile anonym als
   signiertes Nostr-Ereignis (Art 30078, Tags `spawncity-suggestion` und Build) mit einem Wegwerf-Schlüssel an
@@ -713,7 +716,9 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
   SRTM, EU-DEM, 3DEP u. a., siehe https://github.com/tilezen/joerd/blob/master/docs/attribution.md);
   im Spiel rechts unten genannt.
 * Gebaut mit `--commercial`: keine Micro-Duck-Meshes (CC BY-NC-SA) im Modul. Keine Pollen-Meshes,
-  keine fremden Bilder oder Musik; alle Töne sind Synth-Patches im Spielordner.
+  keine fremden Bilder. Der Ton der Seite ist der von SpawnCity (spawncity.de, derselbe Autor): seine
+  Musikdatei und seine Audio-Module in `web/audio/`, `web/sim/audio/`; Kerns eigene Töne sind
+  Synth-Patches im Spielordner.
 * Kein OSM-Snapshot im Repo: die Umgebung dieses Meilensteins hatte keinen Zugriff auf OSM-Quellen,
   im SpawnCity- und im Kern-Repo liegt keiner. Der Offline-Fall nutzt deshalb die prozedurale Stadt.
 

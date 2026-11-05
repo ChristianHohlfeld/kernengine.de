@@ -113,6 +113,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       out.impact = true;
       d.hp -= damage > 60 ? damage : 34;  // wanted_police_drones.mjs POLICE_HIT_DAMAGE
       if (d.hp <= 0) {
+        osfx("wanted_police_drones.down", d.pos);
         explosion(d.pos, 3, 40, by_player);
         if (by_player) wanted_.report(wanted::Crime::police_drone, true);
         d.active = false;
@@ -121,7 +122,9 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       return true;
     }
   }
-  if ((by_player && hit_remotes(from, to, damage)) || people_.shot(from, to, damage, by_player, now) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
+  i32 person = -1;
+  if ((by_player && hit_remotes(from, to, damage)) || (person = people_.shot(from, to, damage, by_player, now)) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
+    if (person >= 0 && by_player) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
     // a touch shot with the Glock or the sniper goes through bodies too (glockShotAt / sniperShotAt:
     // up to three, 0.6 m on past each), as handle_shots does for Kern's own rounds
     if (by_player && mode_ == Mode::foot && (foot_weapon_ == Id::glock || foot_weapon_ == Id::sniper)) {
@@ -173,6 +176,7 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   projectiles_.push_back(p);
   const char* snd = id == Id::hand_grenade || id == Id::jet_bomb ? "builtin:jump" : "builtin:launcher";
   world_->play_sound(snd, from, 0.9f, id == Id::jet_missile ? 0.8f : 1.0f, true);
+  osfx("launch", from, static_cast<f32>(static_cast<i32>(id)), by_player ? 1 : 0);  // audio.mjs: the weapon's own launch sound
   if (by_player) people_.frighten(from, 18, world_->sim_time(), 1);
 }
 
@@ -309,6 +313,7 @@ void Game::drone_attack(bool trigger, bool pressed) {
     if (e.impact) ctl_.impacts[ctl_.impact_serial++ % 8] = e.to;
     if (e.surface >= 2) ++ctl_.drone_hits;
     world_->play_sound(combat_sfx(combat_audio::Kind::shot), nose, 0.55f, 1.35f, true);
+    osfx("flight_fire_fx.fire", e.to, e.impact ? e.surface : 0);  // shotSound + playShotBody(1) + playImpactSound(kind)
   } else if (pressed && drone_weapon_ == 2) {
     guided_press();  // lock on what is nearest the crosshair and launch (game_guided.cpp)
   } else if (pressed) {
@@ -346,6 +351,7 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     // A third of the rounds burst (jet_mode.mjs: 34 %, 3.2 m, 70).
     if (hit && rng_.unit() < 0.34f) explosion(e.to, 3.2f, 70, true);
     world_->play_sound("builtin:smg", o, 0.5f, 0.7f, true);
+    osfx("jet_mode.gun", o);
   }
   if (missile && now >= next_jet_missile_ && jet_.telemetry().contacts == 0) {
     // jet_mode.mjs fireRocket: from the wing pods, left and right in turn (3.2 m out, 2 m ahead,

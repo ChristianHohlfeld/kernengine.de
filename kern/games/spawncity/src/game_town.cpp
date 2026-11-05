@@ -103,6 +103,7 @@ void Game::handle_shots() {
         s.surface = 2;
         d.hp -= kPdHit;
         if (d.hp <= 0) {
+          osfx("wanted_police_drones.down", d.pos);
           explosion(d.pos, 3, 40, true);
           wanted_.report(wanted::Crime::police_drone, true);
           d.active = false;
@@ -115,7 +116,9 @@ void Game::handle_shots() {
     if (drone_hit) continue;
     if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
-    if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
+    i32 person = -1;
+    if (hit_remotes(s.from, to, damage) || (person = people_.shot(s.from, to, damage, true, now)) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
+      if (person >= 0) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
       // Glock and sniper go through bodies: up to three, 0.6 m on past each, walls stop them
       // (glockShotAt / sniperShotAt pierced < 3); the end point stays where the round really ends
       if (damage >= 26) {
@@ -234,6 +237,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
   world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 1, 1, true);
+  osfx("player_vehicle_runtime_v2.playExplosion", at);  // "arondight:world-explosion"
   const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
@@ -393,6 +397,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
   }
   world_->shots().push_back(s);
   world_->play_sound(combat_sfx(combat_audio::Kind::pistol), from, 0.85f, 1.0f, true);
+  osfx("police_ground_units.playShot", from);
 }
 
 void Game::drive_police(PoliceUnit& u, f32 dt) {
@@ -589,6 +594,7 @@ void Game::emp_pulse() {
   }
   world_->particle_burst(me + Vec3{0, 0, 1.2f}, {0.4f, 0.8f, 2.4f});
   world_->play_sound("builtin:hazard", me, 0.9f, 1.4f, true);
+  osfx("wanted_police_drones.emp", me);
   toast_ = hit ? "EMP! " + std::to_string(hit) + " Drohne(n) getroffen" : "EMP: keine Drohne in Reichweite";
   toast_age_ = 0;
 }
@@ -613,6 +619,7 @@ bool Game::update_police_drones(f32 dt) {
       const Vec3 step = d.vel * dt;
       const RayResult r = cast(world_->physics(), d.pos, kern::normalize(step, {0, 0, -1}), kern::length(step) + 0.2f, {}, kCatWorld);
       if (r.hit || d.pos.z < city_.ground_height(d.pos.x, d.pos.y) + 0.2f) {
+        osfx("wanted_police_drones.down", d.pos);
         explosion(r.hit ? r.point : d.pos, 2.5f, 25, true);
         d.active = false;
         d.destroyed_until = now + 12;  // EMP_RESPAWN_MS 12000 (POLICE_RESPAWN_MS 9000 otherwise)
@@ -694,6 +701,7 @@ bool Game::update_police_drones(f32 dt) {
     s.normal = r.normal;
     world_->shots().push_back(s);
     world_->play_sound(combat_sfx(combat_audio::Kind::shot), d.pos, 0.6f, 1.25f, true);
+    osfx("wanted_police_drones.shot", d.pos);
     if (accurate && now - last_player_hit_ >= kPdDamageCooldown) {
       last_player_hit_ = now;
       if (mode_ == Mode::foot) world_->damage(soldier_, std::max(2.0f, std::round(wanted::police_damage(stars))), 0, false, d.pos);

@@ -430,6 +430,8 @@ void Game::ui_mix_cues() {
   const f32 fx = std::fmax(0.01f, st.get(Opt::audio_fx) / 72);
   for (kern::game::SoundCue& c : world_->sound_cues()) {
     const std::string& n = c.sound;
+    // the soldier's own rounds (the weapon's fireSound, game_weapons.cpp): the original's foot weapon sound
+    if (c.actor == soldier_ && (n == "sc:shot0" || n == "sc:pistol0" || n == "builtin:sniper")) osfx("foot.shot", c.position, static_cast<f32>(static_cast<i32>(foot_weapon_)));
     if (n == "builtin:step" || n == "builtin:land") c.volume *= st.get(Opt::audio_steps) / 30 / fx;
     else if (n == "builtin:pistol" || n == "builtin:smg" || n == "builtin:sniper" || n == "builtin:rifle" || n == "builtin:shotgun")
       c.volume *= st.get(Opt::audio_shots) / 82 / fx;

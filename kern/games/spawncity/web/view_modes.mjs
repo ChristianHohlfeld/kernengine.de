@@ -65,7 +65,8 @@ function installViewModes() {
       attr(b, "aria-label", active ? "Exit vehicle" : near ? "Enter nearby car" : "No drivable car nearby");
     }
     // the radio button (prepended to #vehicleButtons the first time a car is entered): tap = next station, hold 550 ms = off
-    if (active && !S.radioMounted) {
+    // (with the original's sound, audio.mjs, car_radio.mjs itself builds its button and banner)
+    if (active && !S.radioMounted && !globalThis.__arondightCarRadio) {
       const row = $("vehicleButtons");
       if (row && !$("carRadioButton")) {
         const r = document.createElement("button");
@@ -311,13 +312,13 @@ function installViewModes() {
     drainToast();
   }
   function toastFor(e) {
-    if (e.type === "contractComplete") return {title: "CONTRACT COMPLETE", detail: `${e.name} · +${fmtPts(e.reward)}`, kind: "bank"};
-    if (e.type === "bank") return {title: `BANKED +${fmtPts(e.points)}`, detail: `ESCAPED ${e.peakStars}★ · SCORE ${fmtPts(e.score)}`, kind: "bank"};
-    if (e.type === "overdrive") return {title: "OVERDRIVE!", detail: `1.75× FOR ${(e.durationMs / 1000).toFixed(0)}s · +${fmtPts(e.bonus)}`, kind: "bank"};
-    if (e.type === "award" && e.combo >= 2) return {title: `+${fmtPts(e.points)}`, detail: `${e.label} · ${e.combo} COMBO · ×${e.multiplier.toFixed(2)}`, kind: "award"};
-    if (e.type === "comboBreak") return {title: "COMBO LOST", detail: `${e.combo} STREAK ENDED`, kind: "fail"};
-    if (e.type === "setback") return {title: e.label || "SETBACK", detail: `-${fmtPts(e.lost)} · COMEBACK SHIELD ${e.mercy}/2`, kind: "fail"};
-    if (e.type === "insurance") return {title: "SECOND CHANCE", detail: `SAVED ${fmtPts(e.insured)} · LOST ${fmtPts(e.lost)}`, kind: "fail"};
+    if (e.type === "contractComplete") return {title: "CONTRACT COMPLETE", detail: `${e.name} · +${fmtPts(e.reward)}`, kind: "bank", sound: "reward", gain: .36};
+    if (e.type === "bank") return {title: `BANKED +${fmtPts(e.points)}`, detail: `ESCAPED ${e.peakStars}★ · SCORE ${fmtPts(e.score)}`, kind: "bank", sound: "reward", gain: .34};
+    if (e.type === "overdrive") return {title: "OVERDRIVE!", detail: `1.75× FOR ${(e.durationMs / 1000).toFixed(0)}s · +${fmtPts(e.bonus)}`, kind: "bank", sound: "reward", gain: .40};
+    if (e.type === "award" && e.combo >= 2) return {title: `+${fmtPts(e.points)}`, detail: `${e.label} · ${e.combo} COMBO · ×${e.multiplier.toFixed(2)}`, kind: "award", sound: "reward", gain: .19};
+    if (e.type === "comboBreak") return {title: "COMBO LOST", detail: `${e.combo} STREAK ENDED`, kind: "fail", sound: "fail", gain: .17};
+    if (e.type === "setback") return {title: e.label || "SETBACK", detail: `-${fmtPts(e.lost)} · COMEBACK SHIELD ${e.mercy}/2`, kind: "fail", sound: "fail", gain: .25};
+    if (e.type === "insurance") return {title: "SECOND CHANCE", detail: `SAVED ${fmtPts(e.insured)} · LOST ${fmtPts(e.lost)}`, kind: "fail", sound: "fail", gain: .29};
     return null;
   }
   function drainToast() {
@@ -330,6 +331,7 @@ function installViewModes() {
     toast.querySelector("strong").textContent = item.title;
     toast.querySelector("small").textContent = item.detail;
     toast.classList.add("active");
+    globalThis.__scPlayReward?.(item.sound, item.gain);  // playReward (the original's sound, audio.mjs)
     S.toastTimer = setTimeout(() => { S.toastTimer = 0; toast.classList.remove("active"); drainToast(); }, 820);
   }
 

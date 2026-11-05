@@ -147,6 +147,9 @@ export class OriginalView {
         ev.preventDefault(); ev.stopPropagation();
         const on = Number(this.command(`get ${key}`)) > 0.5;
         this.command(`set ${key} ${on ? 0 : 1}`);
+        // the music switch also stops / starts the menu's element right away (audio.mjs plays it)
+        const m = key === "music.on" && window.__oppMusicElement;
+        if (m) { if (on) m.pause(); else m.play().catch(() => {}); }
         try { const k = "spawnCityKernSettingsV1", c = JSON.parse(localStorage.getItem(k) || "{}"); c[key] = on ? 0 : 1; localStorage.setItem(k, JSON.stringify(c)); } catch { /* none */ }
       });
     };

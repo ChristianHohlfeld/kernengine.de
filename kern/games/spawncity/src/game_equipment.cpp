@@ -198,8 +198,10 @@ void Game::ui_jetpack(f32 dt) {
       mixer_.play(ui_.whoomp_clip, p);
     }
     world_->shake_camera(0.12f);
+    osfx("jetpack.ignition", pos);  // jetpack_audio.mjs: "arondight:player-jetpack"
   }
   const f32 acc = j.update(dt, now, airborne, v.z, height, jump);
+  ui_.jet_acc = acc;
   if (acc > 0) {
     world_->push_actor(soldier_, {0, 0, acc * dt * 75}, true);  // GameWorld's character mass: 75 kg
     // Strong air control while it burns (JET_AIR_ACCEL 14 m/s^2 towards the stick).
@@ -234,7 +236,7 @@ void Game::ui_equipment(f32 dt) {
   // Car radio: in a car it comes on (the title music fades out under it); N / B or D-pad right / left
   // switch, with one RADIO AUS slot between the last and the first station.
   const bool in_car = mode_ == Mode::car && !ui_.paused;
-  if (in_car && engine_) {
+  if (in_car && engine_ && !web_audio_) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
     // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
     const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
     const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
@@ -246,6 +248,7 @@ void Game::ui_equipment(f32 dt) {
     const Vec3 v = world_->actor_velocity(cars_[car_index_].actor);
     if (ui_.car_vel_valid) {
       const f32 dv = kern::length(v - ui_.car_vel) - 9.81f * dt * 1.5f;
+      if (dv > 1.8f) osfx("world-physics-impact", matrix_of(cars_[car_index_].actor).translation(), dv);
       if (dv > 1.8f && mixer_.ready() && ui_.thump_clip) {
         kern::audio::PlayParams p;
         p.volume = clampf(0.25f + dv * 0.06f, 0.3f, 1);

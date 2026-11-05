@@ -428,6 +428,7 @@ void Game::gaps_update(f32 dt) {
         g.star_tones = true;
       }
       if (g.star_tones) world_->play_sound("sc:star" + std::to_string(std::min(5, stars)), cam_.eye, 1, 1, false);
+      osfx("wanted_police_drones.star", cam_.eye, static_cast<f32>(stars));
     }
     g.last_heat = heat;
     g.last_stars = stars;
@@ -467,6 +468,7 @@ void Game::gaps_update(f32 dt) {
       // the 12 s are over: the airframe breaks up (destroyAirframe)
       g.jet_burning = false;
       const Vec3 at = m.translation();
+      osfx("jet_mode.boom", at);  // destroyAirframe -> boom()
       explosion(at, 14, 180, false);  // blast radius 14 m, 180 (also the army's and the look's)
       jet_hp_ = kJetHpMax;
       jet_.thrust_scale = 1;
@@ -513,6 +515,7 @@ void Game::gaps_update(f32 dt) {
     g.last_organic = now;
     ++g.organic_plays;
     world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, gaps::kOrganicGain * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
+    osfx("world-kill", p.pos, 0);  // kind person
   }
   g.death_scan = now;
   // ---- flight-fire impacts (impact_explosion_overlay.mjs): the drone MG's rounds that hit something
