@@ -147,6 +147,13 @@ async function run({name, url, context, mapped}) {
   console.log(`[${name}] world placed after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   const hud = () => page.evaluate(() => window.SpawnCity.hud());
   const cmd = c => page.evaluate(c => window.SpawnCity.command(c), c);
+  // in single player a fallen pilot stays down until a RESET (player_vitals_runtime.mjs): the tests
+  // that need him standing (bombs and police can hit him before) call it first
+  const revive = async () => {
+    if (!(await hud()).ctl?.dead) return;
+    await cmd("reset");
+    await page.waitForFunction(() => !window.SpawnCity.hud().ctl?.dead || window.SpawnCity.command("reset") === "x", null, {timeout: 120000, polling: 500}).catch(() => {});
+  };
   const shot = async file => {
     await page.waitForTimeout(400);
     const p = path.join(shots, `${name}-${file}.png`);
@@ -353,6 +360,7 @@ async function run({name, url, context, mapped}) {
     check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
     await shot("1c-night");
     await cmd("time 0.40");
+    await revive();
     check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
     await frame(); await frame();
     await page.waitForFunction(() => window.SpawnCity.hud().look?.viewModel === "KNIFE", null, {timeout: 30000}).catch(() => {});
@@ -490,6 +498,7 @@ async function run({name, url, context, mapped}) {
     for (let i = 0; i < 90; i++) {
       const hw = await hud();
       if (hw.combat.helis > 0 && hw.combat.soldiers > 0) break;
+      if (hw.ctl?.dead) await revive();
       if (hw.stars < 5 || hw.combat.mil !== "on") await cmd("military start");
       await page.waitForFunction(t => window.SpawnCity.hud().t > t + 2, hw.t, {timeout: 120000}).catch(() => {});
     }
@@ -575,6 +584,7 @@ async function run({name, url, context, mapped}) {
     await shot("3b-car-cockpit");
     await cmd("cam");
     // Water (world_water.mjs): the car floats on the lake (buoyancy), the pilot swims.
+    await revive();
     const wet = await cmd("water car");
     check(wet.startsWith("{"), `[${name}] the car is put on the water (${wet})`);
     if (wet.startsWith("{")) {
