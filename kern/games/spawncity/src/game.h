@@ -488,6 +488,7 @@ class Game {
   weapons::Id foot_weapon_ = weapons::Id::glock;
   i32 ammo_mag_[16] = {}, ammo_reserve_[16] = {};
   i32 grenades_ = 4, drone_weapon_ = 0;
+  f32 jet_rocket_side_ = 1;  // jet_mode.mjs rocketSide: the pods fire in turn
   f32 next_attack_ = 0, next_grenade_ = 0, next_drone_fire_ = 0, next_jet_gun_ = 0, next_jet_missile_ = 0, next_jet_bomb_ = 0;
   bool trigger_was_ = false;
   u32 explosions_ = 0;

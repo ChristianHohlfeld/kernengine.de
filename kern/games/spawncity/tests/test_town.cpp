@@ -31,15 +31,16 @@ SC_TEST(town_people_hits_and_crimes) {
   kern::physics::World w;
   make_flat_world(w);
   People people;
-  // An officer is a person like any other for bullets: four Glock hits (30) or two to the head.
+  // An officer (police_ground_units.mjs): 100 HP, 25 per counted hit - an MP round counts once
+  // (head 3 times), a Glock round 6 times.
   const i32 cop = people.add_officer({10, 0, 0}, 0, 0, 7);
   Vec3 to{30, 0, 1.2f};
-  SC_CHECK(people.shot({0, 0, 1.2f}, to, 30, true, 1) == cop, "the bullet hits the officer");
+  SC_CHECK(people.shot({0, 0, 1.2f}, to, 13, true, 1) == cop, "the bullet hits the officer");
   SC_CHECK(std::fabs(to.x - (10 - 0.32f)) < 0.05f, "the shot ends at his body (%.2f)", to.x);
-  SC_CHECK(people.at(cop).hp == 70 && people.at(cop).state != People::State::down, "a body hit takes 30 of 100");
+  SC_CHECK(people.at(cop).hp == 75 && people.at(cop).state != People::State::down, "an MP body hit takes 25 of 100");
   to = {30, 0, 1.62f};
-  people.shot({0, 0, 1.62f}, to, 30, true, 2);
-  SC_CHECK(people.at(cop).state == People::State::down, "a headshot (x3) finishes him");
+  people.shot({0, 0, 1.62f}, to, 13, true, 2);
+  SC_CHECK(people.at(cop).state == People::State::down, "an MP headshot (3 x 25) finishes him");
   std::vector<CrimeReport> reports;
   people.take_reports(reports);
   SC_CHECK(reports.size() == 1 && reports[0].crime == wanted::Crime::police_officer && reports[0].witnessed, "killing an officer is always seen");

@@ -303,7 +303,14 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     }
     return best;
   }
-  p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
+  if (p.kind == Kind::officer && damage > 0 && melee_ns < 0) {
+    // police_ground_units.mjs registerPoliceHit: HIT_DAMAGE 25 per counted hit; the gun decides how
+    // often a round counts (gameplay_final_runtime_v2.mjs): MP 1 (head 3, routeKill max 3), Glock and
+    // sniper 6 (hitWeight; head 10)
+    const f32 hits = damage >= 26 ? (head ? 10.0f : 6.0f) : (head ? 3.0f : 1.0f);
+    p.hp -= 25 * hits;
+  } else
+    p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
   if (p.hp <= 0) kill(p, dir, by_player, now, false);
   else {
     if (by_player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});

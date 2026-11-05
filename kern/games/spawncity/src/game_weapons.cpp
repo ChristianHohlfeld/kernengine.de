@@ -156,7 +156,7 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   p.ignore = ignore;
   p.gravity = id == Id::grenade_launcher || id == Id::hand_grenade || id == Id::jet_bomb;
   // GRENADE_FUSE_MS 2800 / ROCKET_FOOT_TTL_MS 9000 (gameplay_final_runtime_v2.mjs)
-  p.fuse = id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : id == Id::grenade_launcher ? 2.8f : id == Id::rocket ? 9.0f : 12;
+  p.fuse = id == Id::jet_missile ? 5.0f /* jet_mode.mjs life 5 s */ : id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : id == Id::grenade_launcher ? 2.8f : id == Id::rocket ? 9.0f : 12;
   if (id == Id::hand_grenade) p.next_collision = p.born + 0.06f;  // throwHandGrenade nextCollisionAt +60 ms
   p.guided = id == Id::drone_guided;
   projectiles_.push_back(p);
@@ -192,6 +192,8 @@ void Game::update_projectiles(f32 dt) {
       p.vel = turned * speed;
     }
     if (p.gravity) p.vel.z -= kG * dt;
+    if (p.id == Id::jet_missile) p.vel.z -= kG * 0.15f * dt;    // jet_mode.mjs stepRockets: G * .15
+    if (p.id == Id::jet_bomb) p.vel = p.vel * (1 - 0.04f * dt);  // jet_mode.mjs stepBombs: drag .04 / s
     {
     Vec3 step = p.vel * dt;
     const f32 len = kern::length(step);
@@ -215,7 +217,9 @@ void Game::update_projectiles(f32 dt) {
   settle:
     if (boom || at.z < city_.ground_height(at.x, at.y) - 5 || now - p.born > 20) {
       const weapons::Spec& s = weapons::spec(p.id);
-      if (s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player);
+      // a jet rocket whose 5 s run out is gone without a blast (stepRockets: blast only on a hit)
+      const bool spent = p.id == Id::jet_missile && now - p.born > p.fuse;
+      if (!spent && s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player);
       // Blasts reach police drones too.
       for (PoliceDrone& d : pdrones_) {
         if (!d.active) continue;
@@ -345,10 +349,20 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     if (hit && rng_.unit() < 0.34f) explosion(e.to, 3.2f, 70, true);
     world_->play_sound("builtin:smg", o, 0.5f, 0.7f, true);
   }
-  if (missile && now >= next_jet_missile_) {
+  if (missile && now >= next_jet_missile_ && jet_.telemetry().contacts == 0) {
+    // jet_mode.mjs fireRocket: from the wing pods, left and right in turn (3.2 m out, 2 m ahead,
+    // 0.6 m down), along the aim (tapAim) at 260 m/s on top of the jet's velocity; not on the ground
     const weapons::Spec& m = weapons::spec(Id::jet_missile);
     next_jet_missile_ = now + m.interval_ms / 1000;
-    fire_projectile(Id::jet_missile, s.position + fwd * 6.0f + s.rotation.rotate({0, 0, -1.2f}), fwd * m.speed_mps + s.velocity, true, body(jet_actor_));
+    Vec3 aim = fwd;
+    if (ctl_.jet_aim) {
+      Vec3 from;
+      ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, aim);
+      const f32 c = kern::dot(aim, fwd);
+      if (c < std::cos(0.62f)) aim = kern::normalize(fwd * std::cos(0.62f) + kern::normalize(aim - fwd * c, fwd) * std::sin(0.62f), fwd);
+    }
+    jet_rocket_side_ = -jet_rocket_side_;
+    fire_projectile(Id::jet_missile, s.position + s.rotation.rotate({jet_rocket_side_ * 3.2f, 0, 0}) + fwd * 2.0f + s.rotation.rotate({0, 0, -0.6f}), aim * m.speed_mps + s.velocity, true, body(jet_actor_));
   }
   if (bomb && now >= next_jet_bomb_ && jet_.telemetry().contacts == 0) {
     next_jet_bomb_ = now + weapons::spec(Id::jet_bomb).interval_ms / 1000;
