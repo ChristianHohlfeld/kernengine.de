@@ -284,6 +284,7 @@ class Game {
   // world dressing
   void update_lamps();
   std::string map_json();
+  std::string minimap_json();  // the original's minimap (real_world_bootstrap.mjs drawMinimap), game_town.cpp
   // the world (game_world.cpp, M3): terrain and water physics, craters and marks, traffic rules,
   // animals and street life, interiors, ragdolls. State lives in WorldLife (game_world.h).
   void hud_world(std::string& s);

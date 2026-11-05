@@ -356,7 +356,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     mapCanvas.addEventListener("pointercancel", up);
   }
   setInterval(() => {
-    if (!mctx) return;
+    if (!mctx || originalView) return;  // the original view draws its own (view.mjs minimap)
     let m;
     try { m = JSON.parse(command("map")); } catch { return; }
     const W = mapCanvas.width, H = mapCanvas.height, R = Math.min(W, H) / 2, scale = R / 150;  // 150 m to the rim

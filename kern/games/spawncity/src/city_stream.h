@@ -85,6 +85,8 @@ class CityStream {
   struct AreaRef { u64 key = 0; const MapFeatures::Area* area = nullptr; };
   /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
   void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
+  /// The map features of every built tile (the minimap, web/view.mjs).
+  void ready_features(std::vector<const MapFeatures*>& out) const;
   /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
   void areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const;
   /// Leaves one building out of the static collision (an entered interior brings its own); the

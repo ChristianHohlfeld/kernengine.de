@@ -1193,6 +1193,7 @@ std::string Game::command(const std::string& cmd) {
   // Multiplayer, voice, pings, big map and navigation (game_net.cpp).
   if (starts("net ") || starts("mp ") || starts("voice") || starts("ping") || starts("bigmap") || starts("nav ") || starts("qr ")) return net_command(cmd);
   if (cmd == "map") return map_json();
+  if (cmd == "minimap") return minimap_json();
   if (starts("lamps ")) { show_lamps_ = cmd[6] == '1'; return show_lamps_ ? "on" : "off"; }
   if (cmd == "attack") {
     // Tests: one attack with the weapon in hand (as a click).
