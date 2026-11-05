@@ -102,13 +102,33 @@ class CityStream {
   void unload_far(Vec3 focus);
   bool work(Tile& t, f64 deadline);
   void finish_features(Tile& t);
-  bool build_collision(Tile& t, f64 deadline);
   void upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls);
   void build_areas(Tile& t);
   void remove(Tile& t);
   void feed_terrain(Tile& t);
   void begin_roads(Tile& t);
   void relay(const kern::Vec4& rect);
+  // The original's working sets around the focus: the drawn buildings (world_city_buildings.mjs:
+  // VISUAL_RADIUS_M 900, MAX_FOOTPRINTS 2600, MAX_VERTICES 96, re-synced after RESYNC_MOVE_M 140
+  // or RESYNC_MS 2500) and the collision (world_building_collisions.mjs: RADIUS_M 340,
+  // MAX_FOOTPRINTS 480, MAX_VERTICES 64), the streets (world_city_roads.mjs: RADIUS_M 720).
+  struct NearCollision {
+    kern::physics::Body body, old_body;
+    Vec2 at{1e9f, 1e9f};
+    f64 at_ms = -1e9;
+    std::vector<std::pair<u64, u32>> list;
+    std::size_t next = 0;
+    bool building = false, dirty = true, built = false;
+    u32 colliders = 0;
+  };
+  NearCollision near_;
+  Vec3 focus_{};
+  Vec2 vis_at_{1e9f, 1e9f};
+  f64 vis_ms_ = -1e9;
+  void select_visual(Vec3 focus);
+  void begin_visual(Tile& t);
+  void update_collision(Vec3 focus, f64 deadline);
+  bool build_near(f64 deadline);
 
   kern::Renderer* r_ = nullptr;
   kern::physics::World* world_ = nullptr;

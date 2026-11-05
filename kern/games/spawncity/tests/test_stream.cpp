@@ -59,7 +59,20 @@ SC_TEST(stream_tile_pipeline) {
   SC_CHECK(city.ready_at({0, 0, 0}), "tile built after %d frames", frames);
   SC_CHECK(frames > 1, "built over several frames (%d)", frames);
   SC_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on)", worst);
-  SC_CHECK(city.stats().colliders == 401, "one collider per building (%u)", city.stats().colliders);
+  // world_building_collisions.mjs: one collider for each of the nearest 480 buildings within 340 m
+  // (the sample tile's 401 houses; the ones whose centre is within 340 m of the player)
+  {
+    std::vector<CityStream::BuildingRef> near;
+    city.buildings_near({0, 0}, 340, near);
+    u32 within = 0;
+    for (const auto& b : near) {
+      Vec2 c{};
+      for (Vec2 q : b.building->rings[0]) c = c + q;
+      c = c * (1.0f / static_cast<f32>(b.building->rings[0].size()));
+      within += std::hypot(c.x, c.y) <= 340 ? 1 : 0;
+    }
+    SC_CHECK(within > 0 && city.stats().colliders == std::min<u32>(within, 480), "a collider per building of the working set (%u of %u)", city.stats().colliders, within);
+  }
   SC_CHECK(city.stats().meshes >= 2, "building and road meshes (%u)", city.stats().meshes);
   SC_CHECK(city.lanes().size() == 1, "one drivable lane");
   // The block in the middle: 21 m high.
