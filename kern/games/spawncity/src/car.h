@@ -65,6 +65,10 @@ class Car {
 
   void reset();
   void step(kern::physics::World& world, kern::physics::Body body, f32 h, const CarInput& in);
+  /// The forces of the last step() again, in the chassis frame (no rays): AI traffic runs its
+  /// tyres at 60 Hz as the original (world_rigid_body_runtime.mjs FIXED_DT 1/60) and holds them
+  /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
+  void reapply(kern::physics::World& world, kern::physics::Body body) const;
   const CarSpec& spec() const { return s_; }
   const WheelState& wheel(int i) const { return w_[i]; }
   f32 steer_angle() const { return steer_; }
@@ -79,6 +83,10 @@ class Car {
   WheelState w_[4];
   f32 steer_ = 0, steer_eq_f_ = 0, vf_ = 0, throttle_ = 0;
   i32 gear_ = 1;
+  struct Applied { Vec3 p, f; bool center; };  // chassis-local point and force
+  Applied applied_[10];
+  i32 n_applied_ = 0;
+  void push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, bool center);
 };
 
 /// SpawnCity's AI driver (world_vehicle_dynamics.mjs aiInput): steer to the target, slow for bends.

@@ -23,7 +23,7 @@ const char* slot_name(Slot s);
 /// was level 2: shadows 70 m, AO low at half resolution, 44 people, pixel ratio 1.5).
 struct Tier {
   const char* name;
-  i32 people;            // pedestrian budget (people.h set_budget; SpawnCity crowd: 80 desktop, 44 phone)
+  i32 people;            // not used for the crowd any more: PERSON_SLOTS 100 / phone 68 at every level (look_people_budget)
   f32 shadow_m;          // shadow distance (stylized_world_style.mjs: 110 desktop, 70 phone)
   i32 shadow_filter;     // PCF taps (Kern: 9 desktop, 4 phone)
   i32 ao;                // 0 off, 1 low at half resolution, 2 medium at half resolution, 3 medium full resolution
