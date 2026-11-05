@@ -72,6 +72,24 @@ void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch) {
   pitch = -dy * 0.0059f * gain;
 }
 
+AimAssist fps_aim_assist(f32 yaw, f32 pitch, f32 dist, f32 input, f32 in_yaw, f32 in_pitch, f32 s) {
+  AimAssist a;
+  input = clampf(input, 0, 1);
+  dist = std::fmax(0.0f, dist);
+  const f32 ellipse = aim_ellipse(yaw, pitch);
+  if (input <= 0.02f || ellipse >= 1 || dist > 90 || s <= 0) return a;
+  const f32 prox = smoothstep01(1 - ellipse), dist_s = 1 - 0.65f * smoothstep01(clampf((dist - 8) / 82, 0, 1));
+  const f32 il = std::hypot(in_yaw, in_pitch), el = std::hypot(yaw, pitch);
+  const f32 track = el < 0.002f || il < 1e-6f ? 1.0f : clampf((in_yaw * yaw + in_pitch * pitch) / (il * el), 0, 1);
+  const f32 act = prox * dist_s * input * (0.35f + 0.65f * track);
+  const f32 cap = 0.38f * s;
+  a.active = true;
+  a.yaw = clampf(yaw * 4.0f * s * act, -cap, cap);
+  a.pitch = clampf(pitch * 4.0f * s * act, -cap, cap);
+  a.slowdown = 1 - 0.30f * s * prox * dist_s;
+  return a;
+}
+
 f32 gamepad_axis(f32 v, f32 dz) {
   const f32 x = clampf(v, -1, 1), a = std::fabs(x), z = clampf(dz, 0, 0.5f);
   return a <= z ? 0.0f : sign0(x) * (a - z) / (1 - z);

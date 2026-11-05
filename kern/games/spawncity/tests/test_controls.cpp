@@ -235,3 +235,15 @@ SC_TEST(controls_touch_vehicles) {
   t.pointer(1, 6, 600, 100, 10);
   SC_CHECK(near(t.take_zoom(), 0.5f), "pinch out zooms in");
 }
+
+SC_TEST(controls_aim_assist) {
+  // fpsAimAssist: inactive outside the window, beyond 90 m or without input; a pull towards the
+  // target, capped at .38 s rad/s, and a slowdown of up to .30 s on top of it
+  SC_CHECK(!fps_aim_assist(0.2f, 0, 20, 1, 1, 0, 0.55f).active, "outside the 7 deg window");
+  SC_CHECK(!fps_aim_assist(0.01f, 0, 95, 1, 1, 0, 0.55f).active && !fps_aim_assist(0.01f, 0, 20, 0.01f, 1, 0, 0.55f).active, "too far / no input");
+  const AimAssist a = fps_aim_assist(0.05f, 0, 8, 1, 1, 0, 1);
+  SC_CHECK(a.active && a.yaw > 0 && a.yaw <= 0.38f + 1e-6f && a.slowdown < 1 && a.slowdown >= 0.7f, "pull %g, slowdown %g", a.yaw, a.slowdown);
+  SC_CHECK(near(fps_aim_assist(0, 0, 8, 1, 1, 0, 1).slowdown, 0.7f), "on the target: slowdown 1 - .30");
+  const AimAssist away = fps_aim_assist(0.05f, 0, 8, 1, -1, 0, 1);
+  SC_CHECK(away.yaw < a.yaw, "moving away tracks less (%g < %g)", away.yaw, a.yaw);
+}

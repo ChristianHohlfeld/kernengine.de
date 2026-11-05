@@ -180,6 +180,7 @@ class Game {
   void ctl_camera(kern::Camera& c);
   void ctl_enter(bool jet_first);
   bool ctl_touch_shot(f32 x, f32 y);
+  controls::AimAssist ctl_assist(f32 in_yaw, f32 in_pitch, f32 input);
 
   // simulation pieces
   void drive_traffic(f32 h);

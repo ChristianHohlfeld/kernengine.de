@@ -33,7 +33,9 @@ constexpr f32 kRad = 180.0f / 3.14159265358979f;
 
 f32 key(const kern::Input& in, Key k) { return in.down(k) ? 1.0f : 0.0f; }
 
-std::string g_last_exit;  // what left the last vehicle (the "controls" state for tests)
+std::string g_last_exit;
+// player_walk_mode_v4.mjs scanAimTarget: the assist target, rescanned every 115 ms
+struct AimTarget { int kind = 0; i32 index = -1; f32 scan_at = -99; } g_aim;  // what left the last vehicle (the "controls" state for tests)
 
 const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
   // desktop_controls.mjs WEAPON_NAMES (sniper, fists, knife and GUIDED have none)
@@ -104,6 +106,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   // hand grenade (hand_grenade.mjs): T held / LB held / the button held = cooking, let go = throw;
   // regeneration in every mode, a cooking grenade drops when the pilot leaves the foot mode
   ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB), dt);
+  C.keep_look = ui_.settings.on(Opt::view_keep_look);  // WORLD: KEEP 360 LOOK (the head look stays)
   ui_after_input(dt);  // vehicle settings, the jetpack (game_ui.cpp, game_equipment.cpp)
   grenades_ = C.nade.carry;
 }
@@ -339,7 +342,10 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     // right stick (fps_control_math.mjs): dead zone %, dynamic curve, 3.75 / 3.40 rad/s, rate ramp
     const f32 rx = pad.rx * ih, ry = -pad.ry * iv;  // raw axes: y down
     const Vec2 s = controls::shape_fps_stick(rx, ry, st.get(Opt::foot_deadzone) / 100, k);
-    const f32 dyaw = C.pad_yaw.step(s.x * 3.75f * hs, dt), dpitch = C.pad_pitch.step(-s.y * 3.40f * vs, dt);
+    // desired rate x slowdown + the assist's correction, then the rate ramp (player_walk_mode_v4.mjs:242)
+    const f32 want_yaw = s.x * 3.75f * hs, want_pitch = -s.y * 3.40f * vs;
+    const controls::AimAssist as = ctl_assist(want_yaw, want_pitch, std::fmin(1.0f, std::hypot(s.x, s.y)));
+    const f32 dyaw = C.pad_yaw.step(want_yaw * as.slowdown + as.yaw, dt), dpitch = C.pad_pitch.step(want_pitch * as.slowdown + as.pitch, dt);
     p.look_x += dyaw * kRad;
     p.look_y -= dpitch * kRad;
     if (std::hypot(pad.rx, pad.ry) > 0.22f && pad_touch_.look_live()) pad_touch_.release_all();  // gameplay_final_input_extras.mjs
@@ -355,13 +361,24 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     p.boost |= pad_touch_.sprint();
     // look: the 1:1 drag plus the edge turn (touch profile: inner .025, 4.2 / 3.3 rad/s)
     const Vec2 d = pad_touch_.take_drag();
-    p.look_x += d.x * hs * ih * kRad;
-    p.look_y -= d.y * vs * iv * kRad;
+    const f32 ld = std::clamp(dt, 1 / 240.0f, 0.05f);
+    if (d.x != 0 || d.y != 0) {
+      // applyProfiledLookDelta (touch drag): input |px| / 20, the slowdown only a hint (x .3)
+      const f32 yaw = d.x * hs * ih, pitch = d.y * vs * iv;
+      const f32 input = clampf(std::hypot(d.x / 0.0068f, d.y / 0.0059f) / 20, 0, 1);
+      const controls::AimAssist as = ctl_assist(yaw / ld, pitch / ld, input);
+      const f32 slow = 1 - (1 - as.slowdown) * 0.3f;
+      p.look_x += (yaw * slow + as.yaw * ld) * kRad;
+      p.look_y -= (pitch * slow + as.pitch * ld) * kRad;
+    }
     const Vec2 edge = pad_touch_.look_edge();
     if (edge.x != 0 || edge.y != 0) {
+      // applyTouchLookStick: touch profile (inner .025), 4.2 / 3.3 rad/s, the assist as for the pad
       const Vec2 s = controls::shape_fps_stick(edge.x * ih, edge.y * iv, 0.025f, k);
-      p.look_x += s.x * 4.2f * hs * std::clamp(dt, 0.0f, 0.05f) * kRad;
-      p.look_y += s.y * 3.3f * vs * std::clamp(dt, 0.0f, 0.05f) * kRad;
+      const f32 yaw = s.x * 4.2f * hs, pitch = -s.y * 3.3f * vs;
+      const controls::AimAssist as = ctl_assist(yaw, pitch, std::fmin(1.0f, std::hypot(s.x, s.y)));
+      p.look_x += (yaw * as.slowdown + as.yaw) * std::clamp(dt, 0.0f, 0.05f) * kRad;
+      p.look_y -= (pitch * as.slowdown + as.pitch) * std::clamp(dt, 0.0f, 0.05f) * kRad;
     }
     p.jump |= pad_touch_.held("jump");
     if (pad_touch_.take_pressed("scope") && w == weapons::Id::sniper) C.scope_on = !C.scope_on;
@@ -415,6 +432,70 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   C.aim_point = false;
   trigger_was_ = p.fire;
   return p;
+}
+
+controls::AimAssist Game::ctl_assist(f32 in_yaw, f32 in_pitch, f32 input) {
+  // player_walk_mode_v4.mjs aimAssistForInput / scanAimTarget: people, police drones and the other
+  // players (aim point +1.24 m on people), the best of ellipse + distance / 90 * .12 in the window,
+  // in line of sight, rescanned every 115 ms; fps_control_math.mjs fpsAimAssist (pad and touch only).
+  const f32 s = ui_.settings.get(Opt::foot_aim_assist) / 100;
+  if (s <= 0 || input <= 0.02f || player_dead_) return {};
+  const Vec3 eye = cam_.eye, fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+  const f32 fyaw = std::atan2(fwd.y, fwd.x), fpitch = std::asin(clampf(fwd.z, -1, 1));
+  auto point = [&](int kind, i32 i, Vec3& p) {
+    if (kind == 1) {
+      const auto& all = people_.all();
+      if (i < 0 || i >= static_cast<i32>(all.size()) || all[i].state == People::State::down || all[i].state == People::State::gone) return false;
+      p = all[i].pos + Vec3{0, 0, 1.24f};
+      return true;
+    }
+    if (kind == 2) {
+      if (i < 0 || i >= 5 || !pdrones_[i].active) return false;
+      p = pdrones_[i].pos;
+      return true;
+    }
+    if (kind == 3) {
+      const auto& r = net_.remotes();
+      if (i < 0 || i >= static_cast<i32>(r.size())) return false;
+      p = r[i].state.mode == net::PlayerMode::foot ? r[i].person_shown + Vec3{0, 0, 1.24f} : r[i].shown;
+      return true;
+    }
+    return false;
+  };
+  auto errors = [&](Vec3 p, f32& ye, f32& pe, f32& d) {
+    const Vec3 to = p - eye;
+    d = kern::length(to);
+    ye = -wrap_pi(std::atan2(to.y, to.x) - fyaw);  // right-positive
+    pe = std::asin(clampf(to.z / std::fmax(d, 1e-3f), -1, 1)) - fpitch;
+  };
+  Vec3 p;
+  f32 ye = 0, pe = 0, d = 0;
+  const f32 now = ctl_.clock;
+  if (now - g_aim.scan_at >= 0.115f || !point(g_aim.kind, g_aim.index, p)) {
+    g_aim = AimTarget{};
+    g_aim.scan_at = now;
+    f32 best = 1e9f;
+    auto consider = [&](int kind, i32 i) {
+      Vec3 q;
+      if (!point(kind, i, q)) return;
+      f32 y, pt, dd;
+      errors(q, y, pt, dd);
+      const f32 e = controls::aim_ellipse(y, pt);
+      if (e >= 1 || dd > 90 || dd < 0.5f) return;
+      const f32 score = e + dd / 90 * 0.12f;
+      if (score >= best) return;
+      if (cast(world_->physics(), eye, (q - eye) * (1 / dd), dd - 0.4f, body(soldier_), kCatWorld).hit) return;  // behind a wall
+      best = score;
+      g_aim.kind = kind;
+      g_aim.index = i;
+    };
+    for (i32 i = 0; i < static_cast<i32>(people_.all().size()); ++i) consider(1, i);
+    for (i32 i = 0; i < 5; ++i) consider(2, i);
+    for (i32 i = 0; i < static_cast<i32>(net_.remotes().size()); ++i) consider(3, i);
+    if (!point(g_aim.kind, g_aim.index, p)) return {};
+  }
+  errors(p, ye, pe, d);
+  return controls::fps_aim_assist(ye, pe, d, input, in_yaw, in_pitch, s);
 }
 
 bool Game::ctl_touch_shot(f32 x, f32 y) {
