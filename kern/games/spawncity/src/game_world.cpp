@@ -225,6 +225,7 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
         const f32 u = clampf((me.x - wl.a.x) * wl.dir.x + (me.y - wl.a.y) * wl.dir.y, 1, wl.len - 1);
         const Vec2 p = wl.a + wl.dir * u + wl.normal * 1.5f;
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
+        if (t.water_at(p.x, p.y)) continue;  // over water a blast only throws up spray (no marks to test)
         if (d < best && wl.len > 3) { best = d; at = {p.x, p.y, 0}; }
       }
       if (best > 1e8f) { out = "no wall"; return true; }

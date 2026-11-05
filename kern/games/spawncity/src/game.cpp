@@ -1120,6 +1120,10 @@ std::string Game::hud_json() {
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)
   s += ctl_hud_json();   // "ctl":{...} device, hint line, aiming (game_controls.cpp)
+  // JSON allows no raw control characters (a line break in a hint or name broke JSON.parse on the
+  // page); outside strings none are ever written, so every one becomes a space.
+  for (char& c : s)
+    if (static_cast<unsigned char>(c) < 0x20) c = ' ';
   return s + "}";
 }
 
@@ -1160,7 +1164,18 @@ std::string Game::command(const std::string& cmd) {
         const f32 d = std::hypot(p.x - me.x, p.y - me.y);
         if (d < bd) { bd = d; best = static_cast<i32>(i); }
       }
-      if (best < 0) return "no car";
+      if (best < 0) {
+        // Tests: say why (placed / bus / wrecked / burning / police / alive in the world)
+        u32 placed = 0, bus = 0, wreck = 0, burn = 0, police = 0, alive = 0;
+        for (const TrafficCar& c : cars_) {
+          placed += c.placed; bus += c.car->spec().radius > 0.4f; wreck += c.wreck; burn += c.burn_until >= 0; police += c.police;
+          alive += world_->actor_alive(c.actor);
+        }
+        char why[160];
+        std::snprintf(why, sizeof why, "no car (of %zu: placed %u, bus %u, wreck %u, burning %u, police %u, alive %u, lanes %zu)", cars_.size(), placed, bus, wreck, burn, police, alive,
+                      city_.lanes().size());
+        return why;
+      }
       switch_mode(Mode::car, best);
       return mode_name(mode_);
     }

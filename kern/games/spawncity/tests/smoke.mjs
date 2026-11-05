@@ -328,7 +328,7 @@ async function run({name, url, context, mapped}) {
     check((await cmd("time 22:00")).endsWith("22:00"), `[${name}] time of day set`);
     await frame(); await frame();
     h = await hud();
-    check(h.night > 0.6 && h.clock === "22:00", `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);
+    check(h.night > 0.6 && /^22:0\d$/.test(h.clock), `[${name}] night after "time 22:00" (${h.night}, ${h.clock})`);  // the clock runs on (480 s a day)
     check(JSON.parse(await cmd("lights")).length >= 1, `[${name}] point lights at night (${await cmd("lights")})`);
     await shot("1c-night");
     await cmd("time 0.40");
@@ -456,8 +456,9 @@ async function run({name, url, context, mapped}) {
     const until = (f, ms = 240000, arg = null) => page.waitForFunction(f, arg, {timeout: ms}).catch(() => {});
     const before = (await hud()).explosions;
     check(await cmd("strike 0 150") === "ok", `[${name}] air strike called`);
-    await until(() => window.SpawnCity.hud().combat.jets > 0);
-    check((await hud()).combat.jets === 2, `[${name}] the strike pair is in the air`);
+    // an ambient pass may be in the sky as well: the strike adds its pair (fighter_jets.mjs)
+    await until(() => window.SpawnCity.hud().combat.jets >= 2);
+    check((await hud()).combat.jets >= 2, `[${name}] the strike pair is in the air (${(await hud()).combat.jets} jets)`);
     await until(b => window.SpawnCity.hud().explosions > b + 3, 300000, before);
     await shot("1c-airstrike");
     check((await hud()).explosions > before + 3, `[${name}] the bombs fall (${(await hud()).explosions - before} explosions)`);
@@ -471,6 +472,7 @@ async function run({name, url, context, mapped}) {
     // the wanted level from the army run may already have sent enemies of its own: one more is the check
     const enemiesBefore = (await hud()).combat.enemies;
     const enemyCmd = await cmd("enemy swat");
+    await until(b => window.SpawnCity.hud().combat.enemies >= b + 1, 30000, enemiesBefore);
     check(enemyCmd === "SWAT" && (await hud()).combat.enemies >= enemiesBefore + 1, `[${name}] a sandbox enemy (${enemyCmd}, ${enemiesBefore} -> ${(await hud()).combat.enemies})`);
     check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
     await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
@@ -517,9 +519,11 @@ async function run({name, url, context, mapped}) {
   // flak may have hit the drone on its climb: hurt it down to 25 % from where it is
   const droneHp = (await hud()).droneHp ?? 100;
   const hurtOut = await cmd(`hurt ${Math.max(1, droneHp - 25)}`);
+  await page.waitForFunction(() => window.SpawnCity.hud().details?.droneCritical, null, {timeout: 30000}).catch(() => {});  // armed on the next frame
   check(hurtOut.startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${hurtOut}, ${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
   check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
+  await page.waitForFunction(() => window.SpawnCity.hud().logbook?.flights >= 1, null, {timeout: 30000}).catch(() => {});  // the flight ends on the next frame
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
 
   // Car: carjack the nearest car, drive 3 s.
