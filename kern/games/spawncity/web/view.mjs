@@ -30,7 +30,10 @@ export async function mountOriginalView(base = "./view/") {
   style.textContent = css.replace(/url\("fonts\//g, `url("${globalThis.__scViewFonts || base + "fonts/"}`);
   document.head.prepend(style);
   // Kern's own page bits that the original does not have (stage, status, Kern HUD) give way.
-  for (const id of ["stage", "status"]) $(id)?.remove?.();
+  $("stage")?.remove?.();
+  // Kern's load status stays as the source of the menu's status line (view.mjs), not shown itself.
+  const status = $("status");
+  if (status) status.style.display = "none";
   const kernHud = $("hud");
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
@@ -119,6 +122,36 @@ export class OriginalView {
     click("gpsLiveButton", () => kernAct("gps"));
     click("proximityVoicePtt", () => this.command("voice mic"));
     click("proximityVoiceMute", () => this.command("voice mute"));
+    // EFFECTS / MUSIC toggles (drone_simulator.html inline script): the game's audio.on / music.on
+    const toggle = (id, key) => {
+      const b = $(id);
+      if (!b) return;
+      b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
+      b.addEventListener("click", ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        const on = Number(this.command(`get ${key}`)) > 0.5;
+        this.command(`set ${key} ${on ? 0 : 1}`);
+        try { const k = "spawnCityKernSettingsV1", c = JSON.parse(localStorage.getItem(k) || "{}"); c[key] = on ? 0 : 1; localStorage.setItem(k, JSON.stringify(c)); } catch { /* none */ }
+      });
+    };
+    toggle("soundSwitch", "audio.on");
+    toggle("musicSwitch", "music.on");
+    // dock(): in game just left of RESET, else the menu's top-right spot (every 400 ms, as the original)
+    const dock = () => {
+      const btn = $("soundSwitch"), mbtn = $("musicSwitch");
+      if (btn && mbtn && !(document.body.classList.contains("edge-hud") || btn.dataset.edgeAdopted)) {
+        let reset = null;
+        for (const id of ["mobileGameplayReset", "soloReset"]) { const el = $(id); if (!el || !el.offsetParent) continue; const q = el.getBoundingClientRect(); if (q.width < 4 || q.height < 4) continue; if (!reset || q.top < reset.getBoundingClientRect().top - 2) reset = el; }
+        const menu = $("gameMenu"), inGame = menu && menu.hidden && reset;
+        if (inGame) { const r = reset.getBoundingClientRect(), right = innerWidth - r.left + 6; btn.style.top = r.top + "px"; btn.style.right = right + "px"; btn.style.height = r.height + "px"; mbtn.style.top = r.top + "px"; mbtn.style.right = (right + btn.offsetWidth + 6) + "px"; mbtn.style.height = r.height + "px"; }
+        else for (const b of [btn, mbtn]) { b.style.top = ""; b.style.right = ""; b.style.height = ""; }
+      }
+      // gps_live_mode.mjs: the GPS button sits left of the music switch
+      const g = $("gpsLiveButton"), m = $("musicSwitch")?.getBoundingClientRect?.();
+      if (g && !g.dataset.edgeAdopted) { if (m && m.width) { g.style.top = `${Math.round(m.top)}px`; g.style.right = `${Math.round(innerWidth - m.left + 8)}px`; } else { g.style.top = "10px"; g.style.right = "150px"; } }
+      setTimeout(dock, 400);
+    };
+    dock();
     for (const b of document.querySelectorAll("#worldLookHud [data-map-expand]")) b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); this.command("bigmap toggle"); });
   }
 
@@ -145,6 +178,11 @@ export class OriginalView {
     const start = $("gameMenuStart");
     if (start) { const ready = !!h.placed; start.disabled = !ready; setText(start, ready ? "START" : "LOADING"); }
     setText($("gameMenuStatus"), h.placed ? (h.offline ? "OFFLINE" : "READY") : "");
+    // ---- the toggles' state (drone_simulator.html inline script render / renderMusic)
+    for (const [id, on] of [["soundSwitch", h.ui?.audioOn], ["musicSwitch", h.ui?.musicOn]]) {
+      const b = $(id);
+      if (b && on !== undefined) { setData(b, "on", on ? "1" : "0"); b.setAttribute("aria-pressed", on ? "true" : "false"); }
+    }
     // ---- vitals (player_vitals_runtime.mjs)
     const vit = $("playerVitalsHud");
     if (vit) {
