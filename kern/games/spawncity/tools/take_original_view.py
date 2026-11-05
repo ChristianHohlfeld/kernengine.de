@@ -4,7 +4,7 @@ tests/compare.mjs: the markup of everything the player sees (title menu, the gam
 settings, logbook, exit question) and every CSS rule the page had at run time, including the rules
 the modules inject. SpawnCity on Kern shows exactly this DOM; web/view.mjs binds it to the game.
 
-  tools/take_original_view.py <compare-dir> <web/view dir>
+  tools/take_original_view.py <compare-dir>[,<compare-dir>...] <web/view dir>
 
 What is left out: scripts, the engineering panel and telemetry (not shown in the game), the
 three.js / MapLibre canvases (Kern's canvas takes the three.js canvas's place), and the inline
@@ -17,11 +17,12 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Comment
 
-src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+srcs, dst = [Path(p) for p in sys.argv[1].split(",")], Path(sys.argv[2])
+src = srcs[0]
 dst.mkdir(parents=True, exist_ok=True)
 
 # The richest states: phone (touch HUD) and desktop (key hints, desktop dock), title and in game.
-BASE = "phone-04-drone-again-original"
+BASE = next(p.stem for p in sorted(src.glob("phone-*-drone-again-original.html")))
 soup = BeautifulSoup((src / f"{BASE}.html").read_text(), "lxml")
 body = soup.body
 for t in body.find_all(["script", "noscript"]):
@@ -66,11 +67,11 @@ for t in body.find_all(True):
 # Elements other states created that this one does not have (the quit question, dialogs opened later,
 # mode HUDs): taken from the first snapshot that has them, at the same parent (body or #viewport).
 have = {t.get("id") for t in body.find_all(True) if t.get("id")}
-for f in sorted(src.glob("*-original.html")):
+for f in [f for d in srcs for f in sorted(d.glob("*-original.html"))]:
     if f.name == f"{BASE}.html":
         continue
     other = BeautifulSoup(f.read_text(), "lxml").body
-    for parent_id in (None, "viewport"):
+    for parent_id in (None, "viewport", "gameMenu"):
         parent = other if parent_id is None else other.find(id=parent_id)
         mine = body if parent_id is None else body.find(id=parent_id)
         if not parent or not mine:
@@ -120,7 +121,7 @@ html = re.sub(r"\n\s*\n+", "\n", html)
 # CSS: every rule of every captured state, first appearance order, no duplicates. The Google Fonts
 # sheet is replaced by the local Inter (web/view/fonts, SIL OFL 1.1).
 rules, seen = [], set()
-for f in sorted(src.glob("*-original.css"), key=lambda p: (p.name != f"{BASE}.css", p.name)):
+for f in sorted([f for d in srcs for f in d.glob("*-original.css")], key=lambda p: (p.name != f"{BASE}.css", p.name)):
     text = f.read_text()
     # compare.mjs joined cssRules with "\n"; a rule never starts with whitespace, nested lines do.
     cur = []

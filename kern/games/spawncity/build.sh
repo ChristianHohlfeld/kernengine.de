@@ -73,7 +73,9 @@ css = (view_dir / "original.css").read_text()
 for font in ("InterVariable.woff2", "InterVariable-Italic.woff2"):
     css = css.replace(f'url("fonts/{font}")', 'url("data:font/woff2;base64,' + base64.b64encode((view_dir / "fonts" / font).read_bytes()).decode() + '")')
 import json
-layouts = "\n".join("{\n" + strip((view_dir / f).read_text()) + "\n}" for f in ("edge_hud_layout.mjs", "thumb_layout.mjs"))
+layouts = "\n".join("{\n" + strip((view_dir / f).read_text()) + "\n}" for f in ("edge_hud_layout.mjs", "thumb_layout.mjs", "start_location.mjs"))
+# world_options_menu.mjs imports world_options.mjs: one block for both (its names stay visible to it)
+layouts += "\n{\n" + strip((view_dir / "world_options.mjs").read_text()) + "\n" + strip((view_dir / "world_options_menu.mjs").read_text()) + "\n}\n{\n" + strip((view_dir / "changelog_menu.mjs").read_text()) + "\n}"
 view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.html").read_text()) + ";\n" +
                "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
                "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
