@@ -43,7 +43,7 @@ export async function mountOriginalView(base = "./view/") {
   extra.textContent = `
     html.sc-original-view #hud{position:absolute;inset:0;pointer-events:none;z-index:20}
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
-    html.sc-original-view #scMenu,html.sc-original-view .k-touch{display:none!important}
+    html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{display:block;width:100%;height:100%;outline:none;touch-action:none}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
