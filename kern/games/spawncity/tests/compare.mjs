@@ -96,6 +96,17 @@ try {
         let ui = null, state = null;
         try { ui = await page.evaluate(dumpUi); } catch (e) { ui = {error: String(e)}; }
         try { state = await g.state(page); } catch (e) { state = {error: String(e)}; }
+        // The full page as the player sees it: markup (without canvases' pixels) and every CSS rule,
+        // including the rules modules inject at run time - the source for translating the HUD 1:1.
+        try {
+          const snap = await page.evaluate(() => {
+            const css = []; for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) css.push(r.cssText); } catch { css.push(`/* ${sh.href} (cross-origin) */`); } }
+            const vars = {}; const rs = getComputedStyle(document.documentElement); for (const n of rs) if (n.startsWith("--")) vars[n] = rs.getPropertyValue(n);
+            return {html: document.body.outerHTML, bodyClass: document.body.className, css: css.join("\n"), vars};
+          });
+          fs.writeFileSync(path.join(out, file.replace(/\.png$/, ".html")), snap.html);
+          fs.writeFileSync(path.join(out, file.replace(/\.png$/, ".css")), `/* body class: ${snap.bodyClass} */\n/* vars: ${JSON.stringify(snap.vars)} */\n${snap.css}`);
+        } catch (e) { run.errors.push(`snap ${label}: ${e.message}`); }
         run.steps.push({label, ms: Date.now() - t, note: note === undefined ? undefined : note, shot: file, state, ui});
         console.log(dev, name, label, JSON.stringify(state).slice(0, 200));
       };
