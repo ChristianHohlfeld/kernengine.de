@@ -15,12 +15,17 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
   const p = await ctx.newPage(), errs = [];
   p.on("pageerror", e => errs.push(String(e.stack || e).slice(0, 500)));
   p.on("console", m => { if (m.type() === "error") errs.push("console: " + m.text().slice(0, 300)); });
-  const state = () => p.evaluate(() => { const h = window.SpawnCity?.hud?.(); return JSON.stringify({mode: h?.mode, placed: h?.placed, playing: window.SpawnCity?.ui?.playing,
+  const state = () => p.evaluate(() => { const h = window.SpawnCity?.hud?.(); return JSON.stringify({mode: h?.mode, placed: h?.placed, tiles: h?.tiles, playing: window.SpawnCity?.ui?.playing,
     scStart: document.getElementById("scStart")?.disabled, menu: document.getElementById("gameMenu")?.hidden, body: document.body.className}); }).catch(e => "state error " + e.message);
   const shot = async n => { await p.screenshot({path: path.join(out, `${dev}-${n}.png`)}).catch(() => {}); console.log(dev, n, await state()); };
   try {
     await p.goto(url, {timeout: 90000});
-    await p.waitForFunction(() => { const s = document.getElementById("gameMenuStart"); return s && !s.disabled; }, null, {timeout: 150000});
+    const t0 = Date.now();
+    await p.waitForFunction(() => window.SpawnCity?.hud?.()?.placed, null, {timeout: 180000, polling: 1000}).catch(async e => {
+      console.log(dev, "never placed:", await p.evaluate(() => JSON.stringify(window.SpawnCity?.hud?.()?.tiles)).catch(() => "?"));
+      throw e;
+    });
+    console.log(dev, "placed after", Date.now() - t0, "ms", await p.evaluate(() => JSON.stringify(window.SpawnCity.hud().tiles)));
     await shot("title");
     await p.evaluate(() => document.getElementById("gameMenuStart").click());
     await p.waitForTimeout(6000);
