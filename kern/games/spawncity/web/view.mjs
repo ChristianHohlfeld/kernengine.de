@@ -190,6 +190,22 @@ export class OriginalView {
     }
     // what start_location.mjs reads of the running world (search bias, "far from here")
     { const o = h.ui?.origin, w = globalThis.__arondightRealWorld; if (w) { w.active = !!h.placed; if (o) { w.originLat = o[0]; w.originLon = o[1]; } } }
+    // ---- what is there while you play: simulator.mjs enterSolo (soloHud), game_exit_button.mjs
+    // sync (EXIT, MULTI right after it), proximity_voice.mjs updateLayout (the voice bar)
+    setHidden($("soloHud"), !playing);
+    setHidden($("proximityVoiceBar"), !playing);
+    const exit = $("gameExitButton"), multi = $("mobileGameplayMultiplayer");
+    setHidden(exit, !playing);
+    if (multi) {
+      multi.classList.remove("split-left");
+      multi.classList.toggle("hud-after-exit", playing);
+      if (playing && exit?.offsetWidth) {
+        const l = `${exit.offsetLeft + exit.offsetWidth + 6}px`;
+        if (multi.style.getPropertyValue("left") !== l) multi.style.setProperty("left", l, "important");
+        const st = $("mobileGameplayMultiplayerStatus");
+        if (st && st.style.getPropertyValue("left") !== l) st.style.setProperty("left", l, "important");
+      }
+    }
     // ---- vitals (player_vitals_runtime.mjs)
     const vit = $("playerVitalsHud");
     if (vit) {
