@@ -4,9 +4,22 @@
 #include "../src/jet_seats.h"
 #include "../src/lamps.h"
 #include "../src/spawn_guard.h"
+#include "../src/world_traffic.h"
 #include "test_util.h"
 
 using namespace sc;
+
+SC_TEST(gaps_crossing_junctions) {
+  // two streets laid across each other without a shared vertex still meet in a junction
+  std::vector<Lane> lanes(2);
+  lanes[0].points = {{-100, 0}, {100, 0}};
+  lanes[0].width = 12;
+  lanes[1].points = {{0, -100}, {0, 100}};
+  lanes[1].width = 6;
+  TrafficRules t;
+  t.rebuild(lanes);
+  SC_CHECK(t.junctions().size() == 1 && t.junctions()[0].arms.size() == 4 && t.junctions()[0].lights, "junctions %zu", t.junctions().size());
+}
 
 SC_TEST(spawn_guard_rules) {
   spawn::Viewer v;

@@ -381,6 +381,10 @@ void Game::draw_traffic_lights() {
 std::string Game::traffic_json() {
   if (!life_) return "{}";
   WorldLife& L = *life_;
+  if (L.rules.built_from != lane_signature(city_.lanes())) {  // the junctions of the streets as they are now
+    L.rules.rebuild(city_.lanes());
+    L.rules.built_from = lane_signature(city_.lanes());
+  }
   u32 lights = 0, waiting = 0;
   for (const TrafficRules::Junction& j : L.rules.junctions()) lights += j.lights ? 1 : 0;
   for (const TrafficRules::View& v : L.car_view) waiting += v.wait ? 1 : 0;

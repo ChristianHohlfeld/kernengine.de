@@ -334,7 +334,8 @@ async function run({name, url, context, mapped}) {
     await cmd("time 0.40");
     check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
     await frame(); await frame();
-    check((await hud()).look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify((await hud()).look)})`);
+    await page.waitForFunction(() => window.SpawnCity.hud().look?.viewModel === "KNIFE", null, {timeout: 30000}).catch(() => {});
+    { const hk = await hud(); check(hk.look?.viewModel === "KNIFE", `[${name}] own first-person knife model (${JSON.stringify(hk.look)}, mode ${hk.mode}, weapon ${hk.weapon}, health ${hk.health}, ${await cmd("viewmodel")})`); }
     await cmd("weapon 1");
   }
 
@@ -467,7 +468,10 @@ async function run({name, url, context, mapped}) {
     await shot("1d-military");
     check(await cmd("military off") === "off" && (await hud()).combat.helis === 0, `[${name}] military switched off`);
     await cmd("military on");
-    check(await cmd("enemy swat") === "SWAT" && (await hud()).combat.enemies === 1, `[${name}] a sandbox enemy`);
+    // the wanted level from the army run may already have sent enemies of its own: one more is the check
+    const enemiesBefore = (await hud()).combat.enemies;
+    const enemyCmd = await cmd("enemy swat");
+    check(enemyCmd === "SWAT" && (await hud()).combat.enemies >= enemiesBefore + 1, `[${name}] a sandbox enemy (${enemyCmd}, ${enemiesBefore} -> ${(await hud()).combat.enemies})`);
     check(await cmd("zombies force") === "force", `[${name}] zombie night forced`);
     await until(() => window.SpawnCity.hud().combat.zombies.alive > 0);
     c = (await hud()).combat;
@@ -504,7 +508,10 @@ async function run({name, url, context, mapped}) {
     check((await hud()).explosions > booms && (await hud()).guided.flying === 0, `[${name}] the GUIDED missile went off`);
   }
   // critical_damage_logic.mjs: the drone at 28 % smokes and blows 2.05 s later.
-  check((await cmd("hurt 75")).startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${JSON.stringify((await hud()).details)})`);
+  // flak may have hit the drone on its climb: hurt it down to 25 % from where it is
+  const droneHp = (await hud()).droneHp ?? 100;
+  const hurtOut = await cmd(`hurt ${Math.max(1, droneHp - 25)}`);
+  check(hurtOut.startsWith("drone 25") && (await hud()).details?.droneCritical, `[${name}] drone critical (${hurtOut}, ${JSON.stringify((await hud()).details)})`);
   await cmd("mode foot");
   check(await cmd("ballot new zombies 0 1 1 2") === "pending" && await cmd("ballot vote 2 1 1 2") === "approved", `[${name}] rule ballot (rules_vote_engine.mjs)`);
   check((await hud()).logbook?.flights >= 1, `[${name}] the flight is in the logbook (${JSON.stringify((await hud()).logbook)})`);
