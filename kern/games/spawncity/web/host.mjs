@@ -443,7 +443,7 @@ class SpawnCityHud {
     el.healthBar.style.width = `${Math.max(0, Math.min(1, hp)) * 100}%`;
     el.health.classList.toggle("low", hp < 0.3);
     el.ammo.hidden = h.mode !== "foot" || h.ammo < 0;
-    if (!el.ammo.hidden) el.ammo.innerHTML = `<b>${h.mag}</b> / ${h.reserve}${h.reload >= 0 ? " · LADEN" : ""}`;
+    if (!el.ammo.hidden) el.ammo.innerHTML = `<b>${h.ammo}</b> / ${h.reserve}${h.reload >= 0 ? " · LADEN" : ""}`;
     el.hint.hidden = !h.hint;
     if (h.hint) el.hint.textContent = h.hint;
     // desktop_controls.mjs key line: desktop only, not while the pad is in use; fades 12 s after a change
