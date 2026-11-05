@@ -187,6 +187,10 @@ class Game {
   void ctl_enter(bool jet_first);
   bool ctl_touch_shot(f32 x, f32 y);
   std::string ctl_view_json();  // what the original's HUD modules show (web/view_modes.mjs)
+  bool ctl_keep_down(bool engine_dead, f32 now);  // the pilot stays down (single player), 3 s respawn (multiplayer)
+  bool ctl_reset_wait();                            // a RESET right after the death waits for the engine's 0.5 s
+  void ctl_revive();
+  f32 ctl_respawn_in() const;
   controls::AimAssist ctl_assist(f32 in_yaw, f32 in_pitch, f32 input);
 
   // simulation pieces

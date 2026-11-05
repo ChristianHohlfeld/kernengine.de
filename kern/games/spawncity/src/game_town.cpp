@@ -776,7 +776,7 @@ void Game::update_town(f32 dt) {
   if (!world_placed_) return;
   const f32 now = world_->sim_time();
   // Death: the wanted level is cleared, the police calls it off (SpawnCity game_reset.mjs).
-  const bool dead = world_->hud().respawn_in > 0 || (world_->hud().health >= 0 && world_->hud().health <= 0);
+  const bool dead = ctl_keep_down(world_->hud().respawn_in > 0 || (world_->hud().health >= 0 && world_->hud().health <= 0), now);  // game_controls.cpp
   if (dead && !player_dead_) {
     wanted_.clear();
     toast_ = "Erwischt. Neuer Versuch.";

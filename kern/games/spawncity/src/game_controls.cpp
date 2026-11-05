@@ -158,9 +158,11 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   if (view == 2) command("bigmap toggle");
   bool camera = in.pressed(Key::c) || view == 1 || pad_touch_.take_pressed("cam");
 
-  // ---- dead: R / Enter / Space and A / Y respawn; nothing else plays (desktop_controls.mjs:165) ----
+  // ---- dead: R / Enter / Space and A / Y call the RESET (desktop_controls.mjs:165 __arondightRequestReset,
+  // pad_actions.mjs); in multiplayer the respawn comes by itself after 3 s (vs_combat_presentation.mjs)
   if (!alive) {
     C.aiming = false;
+    if (!net_.active() && (in.pressed(Key::r) || in.pressed(Key::enter) || in.pressed(Key::space) || ph(kPadA) || ph(kPadY))) command("reset");
     return;
   }
 
@@ -1079,6 +1081,13 @@ std::string Game::ctl_hud_json() {
 bool Game::ctl_command(const std::string& cmd, std::string& out) {
   ControlsState& C = ctl_;
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
+  if (cmd == "die") {
+    // tests: the pilot falls (on foot), as from a lethal hit
+    if (mode_ != Mode::foot || player_dead_) { out = "no"; return true; }
+    world_->damage(soldier_, 100000, 0, false, matrix_of(soldier_).translation());
+    out = "ok";
+    return true;
+  }
   if (starts("device ")) {
     // the page: "device touch|mouse|mousemove|key|pad", "device platform <fine> <coarse> <touchPoints>"
     const std::string a = cmd.substr(7);
@@ -1202,6 +1211,68 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------------------------
+// the pilot down (player_vitals_runtime.mjs): in single player he stays down where he fell, no
+// regeneration, until a RESET (R / Enter / Space, pad A / Y, touch RESET); in multiplayer he comes
+// back after 3 s at his spawn (vs_combat_presentation.mjs RESPAWN_COOLDOWN_MS). The engine respawns
+// a pawn by itself after its respawn_delay (0.5 s, game.cpp); the game puts it down again then.
+
+namespace {
+constexpr f32 kMpRespawnS = 3.0f;  // vs_combat_presentation.mjs RESPAWN_COOLDOWN_MS 3000
+}
+
+bool Game::ctl_keep_down(bool engine_dead, f32 now) {
+  ControlsState::Down& D = ctl_.down;
+  if (engine_dead && !D.on) {
+    D = {};
+    D.on = true;
+    D.at = now;
+    D.where = matrix_of(soldier_).translation();
+  }
+  if (!D.on) return false;
+  if (!engine_dead) {
+    // the engine's respawn: keep him down where he fell (it moved him to the spawn point)
+    if (!D.respawned) { D.spawn = matrix_of(soldier_).translation(); D.respawned = true; }
+    world_->set_health(soldier_, 0, 0, true);
+    world_->teleport(soldier_, D.where);
+  }
+  if (D.respawned && D.reset_queued) {
+    D.reset_queued = false;
+    ui_reset();
+    return false;
+  }
+  if (net_.active() && D.respawned && now - D.at >= kMpRespawnS) {
+    const Vec3 spawn = D.spawn;
+    ctl_revive();
+    world_->teleport(soldier_, spawn);
+    return false;
+  }
+  return true;
+}
+
+bool Game::ctl_reset_wait() {
+  ControlsState::Down& D = ctl_.down;
+  if (!D.on || D.respawned) return false;
+  D.reset_queued = true;  // the engine's pawn respawn is still pending (0.5 s): RESET right after it
+  return true;
+}
+
+void Game::ctl_revive() {
+  ControlsState::Down& D = ctl_.down;
+  if (!D.on) return;
+  const kern::game::Actor* a = world_->level().find(soldier_);
+  world_->set_health(soldier_, a && a->health ? a->health->max_health : 100, 0, false);
+  D = {};
+  player_dead_ = false;
+}
+
+f32 Game::ctl_respawn_in() const {
+  const ControlsState::Down& D = ctl_.down;
+  if (!D.on) return -1;
+  if (!net_.active()) return 0;  // waits for the RESET
+  return std::fmax(0.0f, kMpRespawnS - (world_->sim_time() - D.at));
 }
 
 }  // namespace sc

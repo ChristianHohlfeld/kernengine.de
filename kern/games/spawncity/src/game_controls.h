@@ -11,6 +11,14 @@ namespace sc {
 
 struct ControlsState {
   controls::Devices dev;
+  // the pilot down in single player (player_vitals_runtime.mjs): no respawn of its own, only a RESET
+  struct Down {
+    bool on = false;          // down (the game's own flag over the engine's 0.5 s pawn respawn)
+    bool respawned = false;   // the engine brought the pawn back and the game put it down again
+    bool reset_queued = false;
+    f32 at = -1;              // sim time of the death
+    Vec3 where, spawn;        // where he fell, where the engine respawned him (multiplayer respawn)
+  } down;
   bool near_car = false, near_jet = false;  // on foot within reach (the page's EINSTEIGEN buttons, web/view.mjs)
   // mouse + keyboard (desktop_controls.mjs)
   bool locked = false;          // the page reports document.pointerLockElement

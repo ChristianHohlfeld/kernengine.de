@@ -442,6 +442,8 @@ void Game::ui_mix_cues() {
 
 void Game::ui_reset() {
   if (!world_placed_) return;
+  if (ctl_reset_wait()) return;  // game_controls.cpp
+  ctl_revive();
   gaps_lamps_reset();  // street_lamps.mjs onReset: every lamp stands and burns again (game_lamps.cpp)
   if (mode_ == Mode::parachute) {
     world_->set_alive(chute_actor_, false);

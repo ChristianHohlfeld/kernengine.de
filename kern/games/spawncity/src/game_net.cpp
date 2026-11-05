@@ -711,7 +711,7 @@ std::string Game::mp_hud_json() {
       first = false;
     }
     s += "]";
-    if (player_dead_) add(",\"respawnIn\":%.1f", std::fmax(0.0f, world_->hud().respawn_in));
+    if (player_dead_) add(",\"respawnIn\":%.1f", std::fmax(0.0f, ctl_respawn_in()));
   }
   return s + "}";
 }

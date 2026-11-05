@@ -250,6 +250,12 @@ async function run({name, url, context, mapped}) {
       await page.evaluate(() => { navigator.getGamepads = () => []; });
       await page.keyboard.press("KeyZ"); await gameWait(0.2);
       check(!(await ctl()).pad, `[${name}] a key ends pad-input`);
+      // single player: the pilot stays down, R calls the RESET (player_vitals_runtime.mjs, desktop_controls.mjs:165)
+      check(await cmd("die") === "ok", `[${name}] die`);
+      await gameWait(4);
+      check((await ctl()).dead && (await hud()).health <= 0, `[${name}] single player: still down after 4 s (health ${(await hud()).health})`);
+      await page.keyboard.press("KeyR"); await gameWait(1.2);
+      check(!(await ctl()).dead && (await hud()).health > 0, `[${name}] R: the RESET brings the pilot back (health ${(await hud()).health})`);
     } else {
       cdp ||= await ctx.newCDPSession(page);
       const touchTap = async (x, y) => {
