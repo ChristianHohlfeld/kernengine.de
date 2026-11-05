@@ -175,7 +175,8 @@ async function run({name, url, context, mapped}) {
   let h = await hud();
   check(h.mode === "foot", `[${name}] starts on foot`);
   check(mapped ? h.realData && !h.offline : h.offline, `[${name}] ${mapped ? "map tiles loaded through the MVT path" : "offline stand-in town"} (tiles ${JSON.stringify(h.tiles)})`);
-  check(h.tiles.buildings > 50 && h.tiles.colliders > 50, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
+  // world_building_collisions.mjs: the collision is the working set around the player (<= 480 within 340 m)
+  check(h.tiles.buildings > 50 && h.tiles.colliders > 20 && h.tiles.colliders <= 480, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
   if (mapped) check(tileRequests >= 1, `[${name}] tiles fetched by the page (${tileRequests})`);
   // The ground (terrain.h): real elevation through the Terrarium path, water basins, the player on it.
   if (mapped) check(h.terrain?.dem && h.terrain.max - h.terrain.min > 5, `[${name}] terrain elevation loaded (${JSON.stringify(h.terrain)})`);

@@ -121,6 +121,11 @@ struct CityStream::Tile {
   kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false;
+  // the drawn subset (indices into features.buildings) and its centres; a re-sync swaps the meshes
+  std::vector<u32> vis, vis_built;
+  std::vector<Vec2> cent;
+  std::vector<u32> old_meshes;
+  bool rebuilding = false, vis_dirty = false, prepared = false;
   // interiors (M3 life): one building left out, the collision rebuilt beside the old body
   i32 skip = -1;
   kern::physics::Body old_body;
@@ -149,15 +154,22 @@ void CityStream::clear() {
   stats_ = {};
   terrain_.clear();
   terrain_changes_.clear();
+  if (world_) for (kern::physics::Body b : {near_.body, near_.old_body}) if (b.valid() && world_->body_valid(b)) world_->destroy_body(b);
+  near_ = {};
+  vis_at_ = {1e9f, 1e9f};
+  vis_ms_ = -1e9;
 }
 
 void CityStream::remove(Tile& t) {
   if (r_)
     for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
       for (u32 id : *list) r_->remove(id);
+  if (r_) for (u32 id : t.old_meshes) r_->remove(id);
+  t.old_meshes.clear();
   t.meshes.clear();
   t.lay_meshes.clear();
   t.old_lay.clear();
+  near_.dirty = true;  // the collision set may hold this tile's buildings
   if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = {};
   if (world_ && t.old_body.valid() && world_->body_valid(t.old_body)) world_->destroy_body(t.old_body);  // M3 life
@@ -263,16 +275,20 @@ void CityStream::go_offline() {
 
 bool CityStream::ready_at(Vec3 p) const {
   if (!terrain_.ready_at(p)) return false;
+  const bool solid = near_.built && !near_.building && !near_.dirty && std::hypot(near_.at.x - p.x, near_.at.y - p.y) < 140;
   if (offline_) {
     for (const auto& [k, t] : tiles_)
-      if (t->procedural) return t->state == Tile::State::ready;
+      if (t->procedural) return t->state == Tile::State::ready && solid;
     return false;
   }
   f64 lon, lat;
   unproject(proj_, p.x, p.y, lon, lat);
   const TileKey c = tile_at(lon, lat);
   auto it = tiles_.find(c.hash());
-  return it != tiles_.end() && (it->second->state == Tile::State::ready || it->second->state == Tile::State::failed);
+  if (it == tiles_.end()) return false;
+  if (it->second->state == Tile::State::failed) return true;
+  // the drawn city and the collision under the player are there (not the whole tile)
+  return it->second->state == Tile::State::ready && solid;
 }
 
 void CityStream::feed_terrain(Tile& t) {
@@ -289,6 +305,7 @@ void CityStream::feed_terrain(Tile& t) {
 
 void CityStream::finish_features(Tile& t) {
   // Footprint and road streams for the engine's builders, lanes for the traffic.
+  t.cent.clear();
   for (MapFeatures::Building& b : t.features.buildings) {
     // terrain_craters.mjs buildingGroundBase: a house stands on the lowest ground of its outline.
     if (!b.rings.empty()) {
@@ -296,9 +313,11 @@ void CityStream::finish_features(Tile& t) {
       b.base += g;
       b.top += g;
     }
-    t.footprints.begin(b.seed, b.base, b.top);
-    for (const auto& ring : b.rings) t.footprints.ring(ring.data(), static_cast<u32>(ring.size()));
+    Vec2 c{};
+    if (!b.rings.empty() && !b.rings[0].empty()) { for (Vec2 q : b.rings[0]) c = c + q; c = c * (1.0f / static_cast<f32>(b.rings[0].size())); }
+    t.cent.push_back(c);
   }
+  t.prepared = true;
   for (const MapFeatures::Road& r : t.features.roads) {
     const f32 w = road_width(r.cls);
     const bool water = road_is_water(r.cls);
@@ -310,12 +329,60 @@ void CityStream::finish_features(Tile& t) {
     t.roads.road(r.points.data(), static_cast<u32>(r.points.size()), w, !water && road_drivable(r.cls), color, major && !water ? static_cast<i32>(kLine) : -1);
     if (road_drivable(r.cls)) lanes_.push_back(Lane{r.points, w, t.key.hash(), true});
   }
+  select_visual(focus_);
+  begin_visual(t);
+}
+
+void CityStream::begin_visual(Tile& t) {
+  // world_city_buildings.mjs: the selected footprints, at most MAX_VERTICES 96 per ring
+  t.footprints = kern::FootprintStream{};
+  std::vector<Vec2> thin;
+  for (u32 i : t.vis) {
+    const MapFeatures::Building& b = t.features.buildings[i];
+    t.footprints.begin(b.seed, b.base, b.top);
+    for (const auto& ring : b.rings) {
+      if (ring.size() <= 96) { t.footprints.ring(ring.data(), static_cast<u32>(ring.size())); continue; }
+      const std::size_t step = (ring.size() + 95) / 96;
+      thin.clear();
+      for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]);
+      t.footprints.ring(thin.data(), static_cast<u32>(thin.size()));
+    }
+  }
+  t.vis_built = t.vis;
+  t.vis_dirty = false;
   kern::BuildingOptions bo;
   bo.chunk_size = 320;
   bo.max_buildings = 12000;
   bo.style = konstanz_style();
   t.buildings.begin(t.footprints.data(), t.footprints.size(), bo);
+  t.upload_next = 0;
   t.state = Tile::State::building;
+}
+
+void CityStream::select_visual(Vec3 focus) {
+  // The nearest MAX_FOOTPRINTS buildings within VISUAL_RADIUS_M of all decoded tiles.
+  struct Pick { f32 d2; Tile* t; u32 i; };
+  std::vector<Pick> all;
+  constexpr f32 kR = 900;
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *tp;
+    if (!t.prepared) continue;
+    for (u32 i = 0; i < t.cent.size(); ++i) {
+      const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y, d2 = dx * dx + dy * dy;
+      if (d2 <= kR * kR) all.push_back({d2, &t, i});
+    }
+  }
+  constexpr std::size_t kMax = 2600;
+  if (all.size() > kMax) { std::nth_element(all.begin(), all.begin() + kMax, all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; }); all.resize(kMax); }
+  for (auto& [k, tp] : tiles_) tp->vis.clear();
+  for (const Pick& p : all) p.t->vis.push_back(p.i);
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *tp;
+    std::sort(t.vis.begin(), t.vis.end());
+    if (t.state == Tile::State::ready && t.vis != t.vis_built) t.vis_dirty = true;
+  }
+  vis_at_ = {focus.x, focus.y};
+  vis_ms_ = kern::now_ms();
 }
 
 void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls) {
@@ -380,9 +447,9 @@ void CityStream::build_areas(Tile& t) {
 
 void CityStream::begin_roads(Tile& t) {
   kern::RoadOptions ro;
-  ro.center_x = t.center.x;
-  ro.center_y = t.center.y;
-  ro.radius = 4000;
+  ro.center_x = focus_.x;  // world_city_roads.mjs RADIUS_M 720 around the player
+  ro.center_y = focus_.y;
+  ro.radius = 720;
   ro.segment_length = 4;  // follows the 5 m terrain nodes
   ro.palette = road_palette();
   t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
@@ -402,21 +469,66 @@ void CityStream::relay(const kern::Vec4& rect) {
   }
 }
 
-bool CityStream::build_collision(Tile& t, f64 deadline) {
-  if (!t.body.valid()) {
+void CityStream::update_collision(Vec3 focus, f64 deadline) {
+  NearCollision& n = near_;
+  const f64 now = kern::now_ms();
+  const bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140;
+  if (!n.building && (moved || (n.dirty && now - n.at_ms >= 250))) {
+    // world_building_collisions.mjs: the nearest MAX_FOOTPRINTS 480 within RADIUS_M 340
+    struct Pick { f32 d2; u64 tile; u32 i; };
+    std::vector<Pick> all;
+    for (auto& [k, tp] : tiles_) {
+      const Tile& t = *tp;
+      if (t.state != Tile::State::ready && t.state != Tile::State::building && t.state != Tile::State::roads && t.state != Tile::State::areas) continue;
+      if (!t.prepared) continue;
+      for (u32 i = 0; i < t.cent.size(); ++i) {
+        if (k == excl_tile_ && static_cast<i32>(i) == excl_index_) continue;  // an entered interior (M3 life)
+        const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y, d2 = dx * dx + dy * dy;
+        if (d2 <= 340.0f * 340.0f) all.push_back({d2, k, i});
+      }
+    }
+    std::sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
+    if (all.size() > 480) all.resize(480);
+    n.list.clear();
+    for (const Pick& p : all) n.list.push_back({p.tile, p.i});
+    n.old_body = n.body;
+    n.body = {};
+    n.next = 0;
+    n.colliders = 0;
+    n.building = true;
+    n.dirty = false;
+    n.at = {focus.x, focus.y};
+    n.at_ms = now;
+  }
+  if (n.building && build_near(deadline)) {
+    if (n.old_body.valid() && world_->body_valid(n.old_body)) world_->destroy_body(n.old_body);
+    n.old_body = {};
+    n.building = false;
+    n.built = true;
+  }
+}
+
+bool CityStream::build_near(f64 deadline) {
+  NearCollision& n = near_;
+  if (!n.body.valid()) {
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::fixed;
-    t.body = world_->create_body(bs);
+    n.body = world_->create_body(bs);
   }
   kern::Earcut earcut;
   std::vector<f64> xy;
   std::vector<u32> holes, tris, idx;
   std::vector<Vec3> pts;
-  while (t.collide_next < t.features.buildings.size()) {
-    if (static_cast<i32>(t.collide_next) == t.skip) { ++t.collide_next; continue; }  // an entered interior (M3 life)
-    const MapFeatures::Building& b = t.features.buildings[t.collide_next++];
+  while (n.next < n.list.size()) {
+    const auto [tile_key, bi] = n.list[n.next++];
+    auto it = tiles_.find(tile_key);
+    if (it == tiles_.end() || bi >= it->second->features.buildings.size()) continue;
+    const MapFeatures::Building& b = it->second->features.buildings[bi];
     xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
     std::vector<std::vector<Vec2>> rings = b.rings;
+    // MAX_VERTICES 64 per ring
+    for (auto& ring : rings)
+      if (ring.size() > 64) { const std::size_t step = (ring.size() + 63) / 64; std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]); ring = std::move(thin); }
     for (std::size_t r = 0; r < rings.size(); ++r) {
       auto& ring = rings[r];
       if (ring.size() < 3) continue;
@@ -453,7 +565,7 @@ bool CityStream::build_collision(Tile& t, f64 deadline) {
       ss.indices = kern::Span<const u32>(idx.data(), idx.size());
       ss.material.friction = 0.7f;
       ss.material.category_bits = kCatWorld;
-      if (world_->create_shape(t.body, ss).valid()) ++t.colliders;
+      if (world_->create_shape(n.body, ss).valid()) ++n.colliders;
     }
     if (kern::now_ms() > deadline) return false;
   }
@@ -463,8 +575,17 @@ bool CityStream::build_collision(Tile& t, f64 deadline) {
 bool CityStream::work(Tile& t, f64 deadline) {
   using S = Tile::State;
   switch (t.state) {
-    case S::requested:
     case S::ready:
+      if (t.vis_dirty && !t.relay) {
+        t.old_meshes = std::move(t.meshes);
+        t.meshes.clear();
+        t.triangles = 0;
+        t.rebuilding = true;
+        begin_visual(t);
+        return kern::now_ms() > deadline ? false : work(t, deadline);
+      }
+      return true;
+    case S::requested:
     case S::failed: return true;
     case S::decoding:
       if (!t.decoder.step(std::max(0.5, deadline - kern::now_ms()))) return false;
@@ -496,6 +617,16 @@ bool CityStream::work(Tile& t, f64 deadline) {
       chunks.clear();
       chunks.shrink_to_fit();
       t.upload_next = 0;
+      if (t.rebuilding) {
+        // the re-synced set is complete: the old meshes go in the same frame (nothing pops out)
+        for (u32 id : t.old_meshes) r_->remove(id);
+        t.old_meshes.clear();
+        t.rebuilding = false;
+        // the streets follow the player too (world_city_roads.mjs): re-laid beside the old ones
+        t.relay = true;
+        t.old_lay = std::move(t.lay_meshes);
+        t.lay_meshes.clear();
+      }
       begin_roads(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
@@ -531,12 +662,11 @@ bool CityStream::work(Tile& t, f64 deadline) {
         t.state = S::ready;
         return true;
       }
-      t.state = S::collision;
-      return kern::now_ms() > deadline ? false : work(t, deadline);
+      t.state = S::ready;  // collision: the working set around the player (update_collision)
+      near_.dirty = true;
+      return true;
     case S::collision:
-      if (!build_collision(t, deadline)) return false;
       t.state = S::ready;
-      t.features.roads.clear();  // areas stay for re-laying them on a changed ground
       return true;
   }
   return true;
@@ -545,6 +675,9 @@ bool CityStream::work(Tile& t, f64 deadline) {
 void CityStream::update(Vec3 focus, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 start = kern::now_ms(), deadline = start + budget_ms;
+  focus_ = focus;
+  // RESYNC_MOVE_M 140 / RESYNC_MS 2500 (world_city_buildings.mjs)
+  if (std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) >= 140 || start - vis_ms_ >= 2500) select_visual(focus);
   request_around(focus);
   unload_far(focus);
   terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
@@ -563,25 +696,20 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     if (kern::now_ms() > deadline) break;
     if (!work(*t, deadline)) break;
   }
-  // Interiors (M3 life): a tile whose collision leaves a building out is rebuilt beside the old
-  // body (at least 1.5 ms a frame), then the old body goes.
-  for (auto& [k, t] : tiles_) {
-    if (!t->recollide || t->state != Tile::State::ready) continue;
-    if (!build_collision(*t, std::fmax(deadline, kern::now_ms() + 1.5))) break;
-    if (t->old_body.valid() && world_->body_valid(t->old_body)) world_->destroy_body(t->old_body);
-    t->old_body = {};
-    t->recollide = false;
-  }
+  // The collision around the player: at least 1.5 ms a frame while a set is built (the player must
+  // never stand where no wall is).
+  update_collision(focus, std::fmax(deadline, kern::now_ms() + 1.5));
   stats_ = {};
   for (auto& [k, t] : tiles_) {
     if (t->state == Tile::State::ready) ++stats_.tiles_ready;
     else if (t->state == Tile::State::failed) ++stats_.tiles_failed;
     else ++stats_.tiles_loading;
     stats_.buildings += static_cast<u32>(t->features.buildings.size());
-    stats_.colliders += t->colliders;
+
     stats_.triangles += t->triangles;
     stats_.meshes += static_cast<u32>(t->meshes.size() + t->lay_meshes.size());
   }
+  stats_.colliders = near_.colliders;
   stats_.last_slice_ms = kern::now_ms() - start;
 }
 
@@ -697,18 +825,10 @@ void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaR
   }
 }
 
-void CityStream::recollide(Tile& t) {
-  if (t.state != Tile::State::ready) return;  // not built yet: the skip applies as it is built
-  if (t.recollide) {
-    // A rebuild in progress: drop the partial body, keep the complete old one.
-    if (t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
-  } else {
-    t.old_body = t.body;
-  }
-  t.body = {};
-  t.collide_next = 0;
-  t.colliders = 0;
-  t.recollide = true;
+void CityStream::recollide(Tile&) {
+  // the collision is the working set around the player: a new set without the entered building
+  near_.dirty = true;
+  near_.at_ms = -1e9;
 }
 
 void CityStream::exclude_building(u64 tile, i32 index) {
@@ -725,10 +845,6 @@ void CityStream::exclude_building(u64 tile, i32 index) {
   }
 }
 
-bool CityStream::exclusion_done() const {
-  for (const auto& [k, t] : tiles_)
-    if (t->recollide) return false;
-  return true;
-}
+bool CityStream::exclusion_done() const { return !near_.building && !near_.dirty; }
 
 }  // namespace sc

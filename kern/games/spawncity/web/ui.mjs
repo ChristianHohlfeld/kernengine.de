@@ -548,6 +548,9 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     return true;
   }
   function startPlace() {
+    // the original's start place (web/view/start_location.mjs) when the original view runs
+    const orig = globalThis.__arondightStartPlace;
+    if (orig) { const p = orig.get(); if (p) { moveTo(p.lat, p.lon, p.name); return; } if (!explicitStart) gpsStart(); return; }
     if (place) { moveTo(place.lat, place.lon, place.name); return; }
     if (!explicitStart) gpsStart();
   }

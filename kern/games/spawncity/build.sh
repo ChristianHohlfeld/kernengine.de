@@ -73,11 +73,13 @@ css = (view_dir / "original.css").read_text()
 for font in ("InterVariable.woff2", "InterVariable-Italic.woff2"):
     css = css.replace(f'url("fonts/{font}")', 'url("data:font/woff2;base64,' + base64.b64encode((view_dir / "fonts" / font).read_bytes()).decode() + '")')
 import json
-layouts = "\n".join("{\n" + strip((view_dir / f).read_text()) + "\n}" for f in ("edge_hud_layout.mjs", "thumb_layout.mjs"))
+layouts = "\n".join("{\n" + strip((view_dir / f).read_text()) + "\n}" for f in ("edge_hud_layout.mjs", "thumb_layout.mjs", "start_location.mjs"))
+# world_options_menu.mjs imports world_options.mjs: one block for both (its names stay visible to it)
+layouts += "\n{\n" + strip((view_dir / "world_options.mjs").read_text()) + "\n" + strip((view_dir / "world_options_menu.mjs").read_text()) + "\n}\n{\n" + strip((view_dir / "changelog_menu.mjs").read_text()) + "\n}"
 view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.html").read_text()) + ";\n" +
                "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
                "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
-               "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n};\n").replace("</script", "<\\/script")
+               "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n" + (view_dir / "install_app.js").read_text() + "\n};\n").replace("</script", "<\\/script")
 bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "view", "view_modes", "view_menu", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
