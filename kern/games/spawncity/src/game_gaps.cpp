@@ -482,6 +482,7 @@ void Game::gaps_update(f32 dt) {
     }
   }
   g.smoke.update(now, dt);
+  if (!combat_.zombies.active) g.zombie_doors.clear();  // dawn: the dead are gone
   gaps_lamps_update(dt);  // street lamps: shots, cars (game_lamps.cpp)
   gaps_seats_update(dt);  // jet seats (game_seats.cpp)
   gaps_guided(dt);  // GUIDED smoke trail and motor (game_gaps.cpp)
@@ -717,6 +718,7 @@ kern::Mat4 Game::gaps_drone_matrix() {
 
 void Game::gaps_draw() {
   if (!gaps_ || !gaps_->renderer) return;
+  gaps_barricades_draw();  // zombie barricades (game_barricades.cpp)
   GapsState& g = *gaps_;
   const f32 now = world_ ? world_->sim_time() : 0;
   const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
@@ -758,8 +760,8 @@ void Game::gaps_hud(std::string& s) {
     for (u32 i = 0; i < 5; ++i)
       if (g.pd_due[i] > now && !pdrones_[i].active) { ++inbound; next = std::fmin(next, g.pd_due[i] - now); }
   std::snprintf(b, sizeof b, ",\"gaps\":{\"inbound\":%u,\"inboundS\":%.1f,\"sirenCar\":%.4f,\"sirenDrone\":%.4f,\"smoke\":%zu,\"puffs\":%u,\"organic\":%u,"
-                "\"spawnAllowed\":%u,\"spawnDenied\":%u,\"overlapDenied\":%u,\"camLifted\":%s,\"jetBurning\":%s,\"lamps\":%zu,\"lampsBroken\":%zu,\"lampsFallen\":%zu,\"bursts\":[",
-                inbound, inbound ? next : 0.0f, g.car_level, g.drone_level, g.smoke.effects(), g.smoke.live_puffs(), g.organic_plays, g.spawn_allowed, g.spawn_denied,
+                "\"repair\":%s,\"spawnAllowed\":%u,\"spawnDenied\":%u,\"overlapDenied\":%u,\"camLifted\":%s,\"jetBurning\":%s,\"lamps\":%zu,\"lampsBroken\":%zu,\"lampsFallen\":%zu,\"bursts\":[",
+                inbound, inbound ? next : 0.0f, g.car_level, g.drone_level, g.smoke.effects(), g.smoke.live_puffs(), g.organic_plays, gaps_repair_offer() ? "true" : "false", g.spawn_allowed, g.spawn_denied,
                 g.overlap_denied, g.camera_lifted ? "true" : "false", g.jet_burning ? "true" : "false", g.lamps.all().size(), g.lamps.broken(), g.fallen.size());
   s += b;
   bool first = true;
@@ -814,6 +816,15 @@ bool Game::gaps_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "board") { out = gaps_seat_press() ? "asked" : "nothing to board"; return true; }
+  if (cmd == "repair") { out = gaps_repair_barricade() ? "repaired" : "nothing to repair"; return true; }
+  if (cmd == "barricades") {
+    std::vector<GapsState::DoorView> doors;
+    std::string s = "{\"doors\":[";
+    if (gaps_barricade_doors(doors))
+      for (std::size_t i = 0; i < doors.size(); ++i) s += (i ? "," : "") + std::to_string(doors[i].planks);
+    out = s + "],\"broken\":" + std::to_string(gaps_->planks_broken) + ",\"offer\":" + (gaps_repair_offer() ? "true" : "false") + "}";
+    return true;
+  }
   if (starts("lampbreak ")) {
     // Tests: lampbreak STATE -> break the lamp nearest the player (1 dark, 2 down)
     const u8 st = static_cast<u8>(std::atoi(cmd.c_str() + 10));

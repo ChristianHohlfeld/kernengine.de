@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gaps_rules.h"
@@ -61,6 +62,14 @@ struct GapsState {
   f32 last_heat = 0;
   i32 last_stars = 0;
   bool star_tones = false;
+  // zombie barricades (game_barricades.cpp): planks per door per building, each zombie's way in
+  struct DoorView { i32 i = 0; Vec2 c, d, n; i32 planks = 6; f32 floor = 0; i64 key = 0; };
+  struct ZombieDoor { bool inside = false, entering = false; Vec2 enter_at; f32 next_plank = 0; };
+  std::unordered_map<i64, std::vector<u8>> planks;
+  std::unordered_map<i64, f32> door_next_break;
+  std::unordered_map<i32, ZombieDoor> zombie_doors;
+  u32 planks_broken = 0;
+  Part plank_part;
   // jet_mode.mjs passenger (game_seats.cpp)
   bool riding = false, pilot_held = false;
   u8 ride_owner = 0, pending_owner = 0;

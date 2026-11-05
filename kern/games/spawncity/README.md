@@ -585,6 +585,13 @@ geschlossen (Quellen in Klammern, Werte im Code):
   des einen Knalls); Luftschlag und Überflug gehen an die Mitspieler (Bomben eines Mitspielers sind
   keine eigene Tat). Militär-Leuchtspuren und Panzergranaten sehen die Mitspieler auch.
 * **GUIDED** (`guided_missile.mjs`): Lock-Ton, Zündknall, Motorstimme und Rauchspur.
+* **Zombie-Barrikaden** (`zombie_nights.mjs`, `building_interiors.mjs`): nachts trägt jede Tür des
+  begehbaren Hauses sechs Bretter; Zombies schlagen sich an der Tür (1,15 m davor) Brett für Brett
+  durch (je Tür ein Brett alle 3,4 s), steigen 1,8 m hinein und jagen den Spieler im Haus; durch
+  intakte Bretter beißt keiner. REPARIEREN · 10 (Knopf oder F, 3,2 m an der Tür) nagelt ein Brett für
+  10 Zombie-Punkte wieder an. Testbefehle `barricades`, `repair`.
+* **Fahndung** (`wanted_police_drones.mjs reportCrime`): jede Tat bei Fahndung zeigt der Polizei den
+  Spieler (letzte Sichtung, Ort), ein neuer Stern spielt den kurzen Rechteck-Chirp.
 * **Mitfliegen im Jet** (`jet_mode.mjs`, `jet_seat_table.mjs`, `jet_seat_coordinator.mjs`): F am
   gelandeten Jet eines Mitspielers (9 m, Pilot drin) fragt beim Host den Beifahrersitz an; der Host
   führt die Sitztabelle (nur der Besitzer fliegt, ein Beifahrer, Pilot raus = Beifahrer raus, wer
@@ -679,56 +686,29 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Offen / nächste Meilensteine
 
-* Fahrer, die beim Carjacking sichtbar aussteigen.
-* Innenräume: die offene Tür und die Dachluke sind von außen kein echter Ausschnitt im Fassadennetz
-  (Kerns Gebäudenetz ist ein Netz je Kachel, SpawnCity schneidet per Shader-Uniform `facadeCutouts`) –
-  ein dunkles Türblatt steht davor; braucht Engine-Punkt 15. Das „Halten“ aus `player_push.mjs` gehört
-  zur Gravity-Gun (eigener Bereich); der Netzweg dafür (Fx `push`) ist da. Autotreffer an Passanten
-  werden nicht verschickt, weil Passanten auf Kern lokal sind (siehe Mehrspieler).
-* **Nuke: bewusst nicht gebaut.** Auf spawncity.de ist sie nicht erreichbar: `drone_weapon_modes.mjs`
-  sperrt die Drohnen-Nuke (nur GUN/ROCKETS/GUIDED), der Kommentar „LAUNCHER NUKE“ in
-  `gameplay_final_runtime_v2.mjs` hat keinen Code-Zweig mehr (`footShotAt` feuert normale Raketen),
-  `world_options.mjs` hat keinen Nuke-Schalter, und niemand löst `arondight:nuke-impact` oder eine
-  Explosion `kind:"nuke"` aus. `nuke_destruction.mjs`/`nuke_shock_field.mjs` sind dort toter Code.
-  Ebenso ist der Pilotenschild (`player_shield.mjs`) „retired“ (immer aus) – nicht nachgebaut.
-* Zombie-Barrikaden (Türen mit Brettern, REPARIEREN): die Innenräume (M3 life) gibt es jetzt, die
-  Barrikaden selbst fehlen noch; die Zombies laufen deshalb nur draußen.
-* Der Panzer ist ein leichter Agent auf dem Straßengraph (Strahl gegen Wände), kein Box3D-Fahrzeug wie
-  in SpawnCity (`physics.upsertBody kind:"bus"`); Box3D-Körper zur Laufzeit wären ein Level-Actor mehr.
-* Militär, Zombies, Gegner und Flak sind lokal (SpawnCity schickt Schnappschüsse an die Mitspieler).
-  Die Abstimmung über Spielregeln läuft über das Netz (`Session::propose_rule/vote`, mp::Ballot); im
-  Original ist Friendly Fire die einzige Regel (`world_options.mjs GAME_RULE_KEYS`). `combat_detail.h`
-  `create_ballot`/`cast_vote` ist dieselbe Logik für den lokalen Testbefehl `ballot`.
-* Trainingslevel (`training_test_level_v2.mjs`, `training_showcase.mjs`) ersetzen in SpawnCity die
-  Welt ohne Geodaten; auf Kern übernimmt das die prozedurale Ersatzstadt (`city_stream`) – nicht
-  nachgebaut, um die Stadt-Streaming-Arbeit nicht zu kreuzen. Die Rennstrecke (L) gibt es überall.
-* Kampfton: Kerns eingebaute Klänge (`builtin:smg/pistol/explosion/boost/...`) statt der eigenen
-  Synth-Patches aus `combat_audio_bank.mjs`, kein Retarded-Time-Doppler-Loop für die Jets (nur der
-  verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`) für MP/Sniper:
-  Kerns Soldatenwaffen sind Hitscan. `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
-* Glassprünge in Fenstern (siehe „Krater und Spuren“).
-* Kampfton: die Bank aus `combat_audio_bank.mjs` ist nachgebaut; Sniper, Werfer, Nachladen und Jets
-  nutzen weiter Kerns eingebaute Klänge (SpawnCitys Bank hat dafür keine), kein Retarded-Time-Doppler-Loop
-  für die Jets (nur der verspätete Überflug-Knall). Geschossflug mit Fallen (`projectile_ballistics.mjs`)
-  für MP/Sniper: Kerns Soldatenwaffen sind Hitscan (das wäre eine Engine-Änderung an `WeaponComponent`).
-  Die GUIDED zieht keinen Rauchschweif und hat keinen eigenen Motorton (Kerns Partikel/Klänge). `combat_visual_polish.mjs` betrifft nur three.js-Materialien.
-* Zerstörung an Gebäuden (Krater, Fassadenspuren).
-* Mehrspieler: Sprachchat; Polizei und Passanten nur lokal (wie in SpawnCity).
+Der genaue Stand je SpawnCity-Modul steht in `PARITY.md` (Status, Kern-Dateien, Begründung). Offen sind
+dort (Stand sc-m3-gaps):
 
-* Zerstörung an Gebäuden (Krater, Fassadenspuren).
-* Mehrspieler: Autoritätswechsel, wenn der Host geht (heute endet die Runde); Nostr als zweiter
-  öffentlicher Weg; synchronisierte Gebäudezerstörung und Atombombe (`world_sync.mjs`) – Kern-SpawnCity
-  hat beides noch nicht, der Fx-Kanal ist dafür vorbereitet; Mikrofon im Headless-Test nicht prüfbar
-  (der Test spricht mit `voice tone N`). Polizei und Passanten bleiben lokal (wie in SpawnCity).
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader; GPS-Start.
-* Verkehr: mehr Fahrzeugtypen; Fahrer, die beim Carjacking zurückschlagen.
-* Nach einem Mehrspieler-Ursprungswechsel bleiben Spuren/Abschleppwagen der alten Stadt bis zum Ablauf.
-* Wasser: Wellen-Normalen, Tiefenfarbe und Schaum im Shader. GPS-Start.
-* 3D nebeneinander (Kreuzblick) – braucht Engine-Punkt 9. Bloom-Stärke/Schwelle von `neon_bloom.mjs`
-  (0,13/0,08, Schwelle 0,88) lassen sich in Kern nicht einstellen; Kerns Bloom bleibt wie er ist.
-* Messer-Schnittspur (Band hinter der Klinge) und Waffen-Skins anderer Seltenheit.
-* Verkehr: Vorfahrt und Ampeln (heute bremsen die Fahrer vor jedem Straßenende und vor Hindernissen),
-  mehr Fahrzeugtypen.
+* **Mehrspieler:** Autoritätswechsel zum Nächstältesten, wenn der Host geht (`lan_vs.mjs`; heute endet
+  die Runde); Nostr-Relays als zweiter öffentlicher Signalweg (`nostr_data_relay.mjs`; die Signatur
+  BIP-340 gibt es schon in `nostr.cpp`); Schnappschüsse von Militär (`mil-snap`/`mil-hit`) und Zombies
+  (`zombie-sync`/`zombie-hit`) an die Mitspieler; dieselben Passanten auf allen Rechnern (im Original
+  deterministische Agenten, deren Tod per `npc-death` geht).
+* **Panzer** als Box3D-Fahrzeug (`military_response.mjs upsertBody kind bus, 9200 kg`), heute ein
+  leichter Agent auf dem Straßengraph.
+* **Trainingslevel** (`training_test_level_v2.mjs`, `training_showcase.mjs`): die Welt ohne Geodaten ist
+  im Original ein fester Hafen mit Straßen, Teich, Brücke, Steg und neun Häusern; auf Kern die
+  prozedurale Ersatzstadt.
+* **Bodenfarbe aus Luftbildern** (`world_ground.mjs`, Esri World Imagery): Nutzungsbedingungen der
+  Quelle klären, bevor sie übernommen wird.
+* **Darstellung, die Kerns Renderer nicht einstellbar macht:** Wasser mit Wellen-Normalen, Tiefenfarbe
+  und Ufer-Schaum (`world_water.mjs`), Glassprünge in den Fensterrastern (`facade_marks.mjs`),
+  Bloom-Stärke/-Schwelle (`neon_bloom.mjs` 0,13/0,08, Schwelle 0,88), 3D nebeneinander (`stereo_sbs.mjs`,
+  Engine-Punkt 9), echte Tür-/Lukenausschnitte im Fassadennetz (Engine-Punkt 15).
+* Innenräume: bei Nacht verdecken die Bretter der Barrikade die Türöffnung; die Türflügel selbst
+  zeichnet die Innenraum-Darstellung weiter (im Original sind sie nachts weg).
+* `fpv_optical_stabilizer.mjs` und `world_liveliness.mjs` sind im Original nicht geladen, auf Kern aber
+  gebaut (FPV-Stabilisator, Vögel/Bäume) – mit dem Nutzer klären, ob sie bleiben.
 
 ## Später in die Engine (gebaut im Spielordner)
 

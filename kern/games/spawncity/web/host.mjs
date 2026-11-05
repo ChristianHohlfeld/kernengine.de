@@ -265,7 +265,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     canvas.width = w; canvas.height = hh;
     e.kern_app_resize(w, hh);
   };
-  const gapsHud = new GapsHud(hudEl);  // impact bursts, police dispatch (gaps_hud.mjs)
+  const gapsHud = new GapsHud(hudEl, command);  // impact bursts, police dispatch (gaps_hud.mjs)
   const tick = () => {
     frames++;
     pollPad();

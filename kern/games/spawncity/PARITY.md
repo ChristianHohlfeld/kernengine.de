@@ -228,7 +228,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `walk_ui_layout_hotfix` | Handy-HUD zu Fuß im Bild halten | gebaut | `web/ui.mjs` |  |
 | `walk_world_experience_hotfix` | Panik, Ziel-HP, Schrei | gebaut | `people.cpp`, `game_town.cpp` |  |
 | `wanted_dispatch_guard` | Polizeidrohnen erst nach Anfahrzeit sichtbar, „DISPATCH“-HUD | gebaut | `game_gaps.cpp`, `game_town.cpp` | Drohne wartet unsichtbar am Spawnpunkt bis Spawn + Anfahrzeit (16 s − 1,3 s·Stufe, ≥ 9 s), dann Gnadenfrist 720 − 45·Sterne (≥ 450 ms) + 120 ms je Index bis zum ersten Schuss; HUD „POLICE DISPATCH · n DRONES INBOUND · x s“. Neu in sc-m3-gaps. |
-| `wanted_police_drones` | Polizeidrohnen | gebaut | `game_town.cpp`, `game_details.cpp` |  |
+| `wanted_police_drones` | Polizeidrohnen | gebaut | `game_town.cpp`, `game_details.cpp`, `game_gaps.cpp` | Dazu `reportCrime`: jede Tat bei Fahndung setzt letzte Sichtung und Ort auf den Spieler, ein neuer Stern spielt den Rechteck-Chirp 520 + 90·s → 760 + 100·s Hz (0,16 s) – neu in sc-m3-gaps. |
 | `wanted_police_fairness_v5` | Fairness-Regeln Polizei | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): toter Code. |
 | `wanted_police_pre_guard` | Polizeidrohnen sehen nur in Feuerreichweite | gebaut | `game_gaps.cpp`, `game_town.cpp` | Sicht nur bis min(35, 28 + 1,4·Stufe) m und nur, wenn die Drohne schon da ist. Neu in sc-m3-gaps. |
 | `wanted_system_logic` | Fahndungsregeln | gebaut | `wanted.cpp` | Stichprobe: 4/9/15/22/30, EMP 30 m / 18 s, Anfahrzeit, Trefferchance |
@@ -268,4 +268,4 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `world_water` | Wasser | teilweise | `terrain.cpp`, `city_stream.cpp`, `game_world.cpp` | Physik und Fläche gebaut; Wellen-Normalen, Tiefenfarbe und Ufer-Schaum im Shader fehlen. |
 | `xbox_control_mode` | Xbox-Modus | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `xbox_gamepad` | Gamepad | gebaut | `game.cpp` | Totzone 0,14 |
-| `zombie_nights` | Zombie-Nächte | teilweise | `combat_rules.cpp`, `game_events.cpp` | Runden gebaut; Barrikaden (brauchen Innenräume von sc-m3-life) und Sync an Mitspieler (`sendFx zombie-*`) fehlen. |
+| `zombie_nights` | Zombie-Nächte | teilweise | `combat_rules.cpp`, `game_events.cpp`, `game_barricades.cpp` | Runden; Barrikaden (6 Bretter je Tür des begehbaren Hauses bei Nacht, ein Brett je Tür alle 3,4 s, danach rein und durchs Haus, kein Biss durch intakte Bretter, REPARIEREN/F für 10 Punkte in 3,2 m) neu in sc-m3-gaps. Fehlt: Schnappschüsse an Mitspieler (`zombie-sync`/`zombie-hit`). |

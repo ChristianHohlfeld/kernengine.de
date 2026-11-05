@@ -454,6 +454,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
 
 void Game::try_enter() {
   if (gaps_seat_press()) return;  // a mate's jet as passenger, or out of it (game_seats.cpp)
+  if (gaps_repair_barricade()) return;  // zombie night: F boards a door up again (game_barricades.cpp)
   const Vec3 me = matrix_of(soldier_).translation();
   i32 best = -1;
   f32 best_d = kEnterCar;

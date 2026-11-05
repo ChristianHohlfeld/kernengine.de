@@ -371,6 +371,12 @@ class Game {
   void gaps_drone_revealed(u32 slot, i32 stars);
   void gaps_jet_damage(f32 amount);
   kern::Mat4 gaps_drone_matrix();
+  // zombie barricades (game_barricades.cpp, zombie_nights.mjs)
+  bool gaps_barricade_doors(std::vector<GapsState::DoorView>& out);
+  Vec3 gaps_zombie_goal(i32 person, Vec3 pos, Vec3 player, f32 now, bool& walled, bool& hold);
+  bool gaps_repair_barricade();
+  bool gaps_repair_offer() const;
+  void gaps_barricades_draw();
   // street lamps (game_lamps.cpp, street_lamps.mjs)
   void gaps_lamps_init(kern::Renderer& r);
   void gaps_lamps_sounds();

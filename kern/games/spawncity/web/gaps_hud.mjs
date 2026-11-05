@@ -15,12 +15,14 @@ const GAPS_STYLE = `
 @keyframes scBurstCore{0%{transform:scale(.35);opacity:1}38%{transform:scale(1.8);opacity:1}100%{transform:scale(3.6);opacity:0}}
 @keyframes scBurstRing{0%{transform:scale(.25);opacity:1}100%{transform:scale(5.2);opacity:0}}
 @keyframes scBurstSpark{0%{transform:rotate(var(--a)) translateX(1px) scale(1.2);opacity:1}100%{transform:rotate(var(--a)) translateX(var(--r)) scale(.35);opacity:0}}
+.sc-repair{position:absolute;right:calc(max(14px,env(safe-area-inset-right)) + 120px);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 150px);pointer-events:auto;font:900 15px system-ui,sans-serif;letter-spacing:.06em;color:#111;background:#ffb84a;border:0;border-radius:10px;padding:10px 16px;box-shadow:0 3px 12px #0007}
 .sc-dispatch{position:absolute;left:50%;top:calc(max(12px,env(safe-area-inset-top)) + 34px);transform:translateX(-50%);font:800 12px system-ui,sans-serif;letter-spacing:.06em;color:#fff;background:rgba(40,60,160,.72);border:1px solid #6f8cff;padding:4px 10px;border-radius:6px;white-space:nowrap;pointer-events:none}
 `;
 
 export class GapsHud {
-  constructor(root) {
+  constructor(root, command = () => "") {
     this.root = root;
+    this.command = command;
     const style = document.createElement("style");
     style.textContent = GAPS_STYLE;
     document.head.appendChild(style);
@@ -44,6 +46,10 @@ export class GapsHud {
     this.bursts = 0;
     this.dispatch = Object.assign(document.createElement("div"), {className: "sc-dispatch", hidden: true});
     root.appendChild(this.dispatch);
+    // zombie_nights.mjs #zombieRepair: REPAIR · 10 near a door with a plank missing (F does the same)
+    this.repair = Object.assign(document.createElement("button"), {className: "sc-repair", type: "button", hidden: true, textContent: "REPARIEREN · 10"});
+    this.repair.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); this.command("repair"); });
+    root.appendChild(this.repair);
   }
   update(h) {
     const g = h?.gaps;
@@ -62,6 +68,7 @@ export class GapsHud {
       item.timer = setTimeout(() => item.el.classList.remove("active"), 360);
       this.bursts++;
     }
+    this.repair.hidden = !g.repair;
     this.dispatch.hidden = !(g.inbound > 0);
     if (g.inbound > 0) this.dispatch.textContent = `POLIZEI-EINSATZ · ${g.inbound} ${g.inbound === 1 ? "DROHNE" : "DROHNEN"} IM ANFLUG · ${g.inboundS.toFixed(1)} s`;
   }
