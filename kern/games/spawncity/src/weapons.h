@@ -23,8 +23,8 @@ struct Spec {
 /// SpawnCity's numbers. Damage of the hitscan guns is SpawnCity's multiplayer damage
 /// (VS_WEAPON_DAMAGE smg 13, glock 26, sniper 95) times the zone (head 3, torso 1, legs .65).
 constexpr Spec kTable[] = {
-    {"MP", 55, 240, 13, 0, 240, 1},
-    {"Glock", 110, 120, 26, 0, 0, 2},
+    {"MP", 55, 180, 13, 0, 240, 1},     // footShotAt: nearestGrenadeHit(ray, 180)
+    {"Glock", 110, 240, 26, 0, 0, 2},   // glockShotAt: remaining = 240
     {"Sniper .50", 1150, 1500, 95, 0, 850, 3},
     {"Granatwerfer 40 mm", 760, 300, 125, 8.5f, 40, 5},
     {"Raketenwerfer", 900, 420, 160, 9.5f, 40, 6},

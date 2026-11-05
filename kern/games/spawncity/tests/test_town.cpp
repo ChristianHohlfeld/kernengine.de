@@ -49,6 +49,33 @@ SC_TEST(town_people_hits_and_crimes) {
   SC_CHECK(people.count(People::Kind::officer) == 0 && people.count(People::Kind::officer, false) == 1, "the body stays");
 }
 
+SC_TEST(town_passerby_hit_model) {
+  // world_procedural_population.mjs: 100 hp, a round 55 knocks down, lying there no target, the
+  // next round after getting up kills; headshot 165; fists stagger, at 35 down
+  People people;
+  const i32 a = people.add_citizen({10, 0, 0}, 0, 3);
+  Vec3 to{30, 0, 1.2f};
+  SC_CHECK(people.shot({0, 0, 1.2f}, to, 13, true, 1) == a, "the MP round hits the passer-by");
+  SC_CHECK(people.at(a).hp == 45 && people.at(a).state != People::State::down && people.at(a).knocked_until > 1, "55 off 100: knocked down, alive (%.0f)", people.at(a).hp);
+  to = {30, 0, 1.2f};
+  SC_CHECK(people.shot({0, 0, 1.2f}, to, 13, true, 2) < 0, "lying there: no target");
+  people.stand_up(a, {10, 0, 0}, 0);
+  to = {30, 0, 1.2f};
+  people.shot({0, 0, 1.2f}, to, 13, true, 10);
+  SC_CHECK(people.at(a).state == People::State::down, "the second round kills");
+  const i32 b = people.add_citizen({10, 5, 0}, 0, 4);
+  to = {30, 5, 1.62f};
+  people.shot({0, 5, 1.62f}, to, 13, true, 11);
+  SC_CHECK(people.at(b).state == People::State::down, "an MP headshot (165) kills");
+  const i32 c = people.add_citizen({1.5f, -5, 0}, 0, 5);
+  to = {3, -5, 1.2f};
+  people.shot({0, -5, 1.2f}, to, 24, true, 12, 40);
+  SC_CHECK(people.at(c).hp == 76 && people.at(c).knocked_until <= 12 && people.at(c).pos.x > 1.6f, "a fist staggers (%.0f hp, x %.2f)", people.at(c).hp, people.at(c).pos.x);
+  to = {3, -5, 1.2f};
+  people.shot({0, -5, 1.2f}, to, 45, true, 13, 12);
+  SC_CHECK(people.at(c).hp == 31 && people.at(c).knocked_until > 13, "at 35 or less: down");
+}
+
 SC_TEST(town_people_flee_and_walls) {
   kern::physics::World w;
   make_flat_world(w);

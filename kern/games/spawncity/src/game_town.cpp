@@ -77,8 +77,16 @@ PeopleView Game::people_view() const {
 void Game::handle_shots() {
   const f32 now = world_->sim_time();
   std::vector<kern::game::ShotEvent>& shots = world_->shots();
-  for (kern::game::ShotEvent& s : shots) {
-    if (s.shooter != soldier_) continue;
+  // gameplay_final_runtime_v2.mjs sniperShotAt atArrival: what the .50 round does at the far end lands
+  // when the bullet gets there (distance / SNIPER_TRACER_MPS 850 m/s); the rest acts at once
+  std::vector<kern::game::ShotEvent*> work;
+  std::vector<kern::game::ShotEvent> arrived;
+  gaps_sniper_rounds(shots, arrived, now);
+  for (kern::game::ShotEvent& s : shots)
+    if (s.shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) work.push_back(&s);
+  for (kern::game::ShotEvent& s : arrived) work.push_back(&s);
+  for (kern::game::ShotEvent* sp : work) {
+    kern::game::ShotEvent& s = *sp;
     // Shots are heard: people close by run (pedestrian_agents.mjs: 10 m all, to 22 m some).
     people_.frighten(s.from, 22, now, 1);
     Vec3 to = s.to;
@@ -108,6 +116,17 @@ void Game::handle_shots() {
     if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
     if (hit_remotes(s.from, to, damage) || people_.shot(s.from, to, damage, true, now) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
+      // Glock and sniper go through bodies: up to three, 0.6 m on past each, walls stop them
+      // (glockShotAt / sniperShotAt pierced < 3); the end point stays where the round really ends
+      if (damage >= 26) {
+        const Vec3 dir = kern::normalize(s.to - s.from, {1, 0, 0});
+        Vec3 from = to + dir * 0.6f;
+        for (int pierced = 1; pierced < 3 && kern::dot(s.to - from, dir) > 0.5f; ++pierced) {
+          Vec3 next = s.to;
+          if (!(hit_remotes(from, next, damage) || people_.shot(from, next, damage, true, now) >= 0 || life_shot(from, next, damage))) break;
+          from = next + dir * 0.6f;
+        }
+      }
       s.to = to;
       s.surface = 3;  // flesh: no decal
       s.impact = true;

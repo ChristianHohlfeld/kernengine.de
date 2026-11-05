@@ -249,7 +249,7 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   frighten(at, 22, now, 1.2f);
 }
 
-i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now) {
+i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns) {
   i32 best = -1;
   f32 best_s = 2;
   bool head = false;
@@ -258,6 +258,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now) {
     const Person& p = people_[i];
     if (p.state == State::down || p.state == State::gone) continue;
     if (dist2d(p.pos, from) < 0.5f) continue;  // the shooter himself
+    if (p.kind == Kind::citizen && now < p.knocked_until) continue;  // down as a ragdoll: the body is hidden
     f32 s;
     Vec3 on;
     const f32 d2 = segment_distance2(from, to, p.pos + Vec3{0, 0, 0.3f}, p.pos + Vec3{0, 0, kTopZ - kCapsuleR}, s, on);
@@ -277,8 +278,32 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now) {
   to = hit_point;
   last_head_ = head;
   if (by_player && p.kind == Kind::citizen) { p.provoked_at = now; p.provoked_hit = true; }
-  p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
   const Vec3 dir = to - from;
+  if (p.kind == Kind::citizen && damage > 0) {
+    const f32 hd = std::fmax(1e-3f, std::hypot(dir.x, dir.y));
+    const Vec3 flat{dir.x / hd, dir.y / hd, 0};
+    if (melee_ns >= 0) {
+      // world_procedural_population.mjs punch(): hp - damage; dead at 0, down at 35, else a stagger
+      const f32 k = std::fmax(0.5f, melee_ns / 30);
+      p.hp -= damage;
+      if (p.hp <= 0) kill(p, dir, by_player, now, false);
+      else if (p.hp <= 35) knock(p, flat * (2 * k) + Vec3{0, 0, 0.9f}, now);
+      else { const f32 step = std::fmin(0.6f, 0.22f * k); p.pos = p.pos + flat * step; p.v = 0; }
+    } else {
+      // gameplay_final_runtime_v2.mjs: weaponDamage 55 (default), sniper 200; headshots SMG 165,
+      // Glock / sniper 999 (Kern's damage 13 / 26 / 95 tells the gun)
+      const f32 dmg = head ? (damage >= 26 ? 999.0f : 165.0f) : (damage >= 90 ? 200.0f : 55.0f);
+      p.hp -= dmg;
+      if (p.hp <= 0) kill(p, dir, by_player, now, false);
+      else knock(p, flat * 2.5f + Vec3{0, 0, 1.4f}, now);
+    }
+    if (p.state != State::down) {
+      if (by_player) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
+      frighten(p.pos, 3, now, 1.6f);
+    }
+    return best;
+  }
+  p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
   if (p.hp <= 0) kill(p, dir, by_player, now, false);
   else {
     if (by_player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
@@ -293,6 +318,15 @@ void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
     const f32 d = kern::length(p.pos + Vec3{0, 0, 0.9f} - at);
     if (d >= radius) continue;
     const f32 t = clampf(1 - d / radius, 0, 1);
+    if (p.kind == Kind::citizen) {
+      // gameplay_final_runtime_v2.mjs dispatchExplosion: a person within the falloff > .22 takes one
+      // hit (55): the first knocks down, the next kills; lying there it takes nothing
+      if (t * t * (3 - 2 * t) <= 0.22f || now < p.knocked_until) continue;
+      p.hp -= 55;
+      if (p.hp <= 0) kill(p, p.pos - at, by_player, now, false);
+      else knock(p, p.pos - at, now);
+      continue;
+    }
     p.hp -= damage * t * t * (3 - 2 * t);
     if (p.hp <= 0) kill(p, p.pos - at, by_player, now, false);
   }
@@ -434,10 +468,10 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
         continue;
       }
       const f32 speed = std::hypot(v.velocity.x, v.velocity.y);
-      if (speed < 2.5f || dist2d(v.position, p.pos) > 8) continue;
+      if (speed < 2.2f || dist2d(v.position, p.pos) > 8) continue;  // people_impacts.mjs MIN_SPEED
       const Vec3 local = to_local(v.rotation, p.pos - v.position);
-      if (std::fabs(local.x) > v.half.x + 0.35f || std::fabs(local.y) > v.half.y + 0.35f) continue;
-      const f32 damage = (speed - 2) * 14;
+      if (std::fabs(local.x) > v.half.x + 0.32f || std::fabs(local.y) > v.half.y + 0.32f) continue;  // people_impacts.mjs PAD
+      const f32 damage = std::fmin(260.0f, std::fmax(6.0f, (speed - 1.5f) * 8.5f));  // people_impacts.mjs
       p.hp -= damage;
       if (p.hp <= 0) kill(p, v.velocity, v.player, now, true);
       else {

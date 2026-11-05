@@ -595,7 +595,13 @@ geschlossen (Quellen in Klammern, Werte im Code):
   Händen (rechts 300 ms / 24, links 250 ms / 16, Kombo binnen 430 ms ×1,35), Messer trifft 130 ms
   nach dem Druck; trifft der Strahl niemanden, trifft es den Nächsten im 40°-Kegel. Handgranate
   4 s Zünder, explodiert in der Hand mit 8,5 m / 125. Keine Magazine, kein Nachladen (das Original
-  hat keine Munition).
+  hat keine Munition). MP trifft bis 180 m, Glock bis 240 m; Glock und Sniper gehen durch bis zu drei
+  Körper, der Sniper wirkt erst, wenn die Kugel ankommt (850 m/s).
+* **Passanten** (`world_procedural_population.mjs`, `people_impacts.mjs`): 100 HP; ein Treffer zieht
+  55 ab (Sniper 200) und wirft den Menschen als Ragdoll um, der zweite nach dem Aufstehen tötet; ein
+  Kopftreffer tötet (MP 165, Glock/Sniper 999); wer liegt, ist kein Ziel. Explosionen treffen einmal
+  (Abfall > 0,22). Fäuste/Messer: Taumeln, bei ≤ 35 HP zu Boden. Autos: min(260, max(6, (v − 1,5)·8,5))
+  ab 2,2 m/s.
 * **Zombie-Barrikaden** (`zombie_nights.mjs`, `building_interiors.mjs`): nachts trägt jede Tür des
   begehbaren Hauses sechs Bretter; Zombies schlagen sich an der Tür (1,15 m davor) Brett für Brett
   durch (je Tür ein Brett alle 3,4 s), steigen 1,8 m hinein und jagen den Spieler im Haus; durch

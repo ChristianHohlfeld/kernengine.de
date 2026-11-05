@@ -56,7 +56,7 @@ class People {
     State state = State::walk;
     Vec3 pos;
     f32 yaw = 0, speed = 0, v = 0;  // heading (rad), walking pace, current speed
-    f32 hp = 40;
+    f32 hp = 100;                   // world_procedural_population.mjs: a person has 100
     f32 phase = 0;                  // gait phase (drawing)
     Vec3 shirt, pants, skin;
     // pavement route
@@ -87,7 +87,11 @@ class People {
   void update(f32 dt, f32 now, const PeopleView& view, Rng& rng);
   /// A bullet from `from` to `to`: the first person on that line takes `damage` (x3 on the head).
   /// Returns the index hit (-1: nobody) and shortens `to` to the hit point.
-  i32 shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now);
+  /// Passers-by take hits as world_procedural_population.mjs handleProceduralHit: a round does 55
+  /// (sniper 200, head 165 / Glock and sniper 999), a hit that is not fatal knocks the person down
+  /// (ragdoll, gets up again); someone lying there is no target. `melee_ns` >= 0: a fist or knife
+  /// (punch: damage, at hp <= 35 down, else a stagger of .22 x max(.5, ns / 30) m).
+  i32 shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns = -1);
   /// An explosion: damage falling off over `radius`, everyone in 2.5 x radius runs.
   void blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now);
   /// Everyone within `radius` runs away from `at` (shots, low flights, crashes).
@@ -123,6 +127,12 @@ class People {
   void spawn(const PeopleView& view, Rng& rng, f32 now);
   void walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng);
   void kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
+  /// Down as a ragdoll that gets up again (world_procedural_population.mjs knockPerson).
+  void knock(Person& p, Vec3 push, f32 now) {
+    falls_.push_back({static_cast<i32>(&p - people_.data()), push, false, true});
+    p.knocked_until = now + 6;
+    p.v = 0;
+  }
   bool route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& out, f32& heading) const;
   std::vector<Person> people_;
   std::vector<CrimeReport> reports_;

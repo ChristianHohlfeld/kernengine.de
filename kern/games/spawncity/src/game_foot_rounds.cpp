@@ -235,16 +235,31 @@ void Game::foot_rounds_update(f32 dt) {
   // knifeAt: the blade connects at the strike frame, 130 ms after the press, along the ray then
   if (g.knife_due >= 0 && now >= g.knife_due) {
     g.knife_due = -1;
-    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife) melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true);
+    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife) melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true, 12);  // knifeStrike momentumNs 12
   }
 }
 
-bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife) {
+void Game::gaps_sniper_rounds(const std::vector<kern::game::ShotEvent>& shots, std::vector<kern::game::ShotEvent>& arrived, f32 now) {
+  // sniperShotAt atArrival: the round's effects at distance / 850 m/s (handle_shots, game_town.cpp)
+  if (!gaps_) {
+    for (const kern::game::ShotEvent& s : shots)
+      if (s.shooter == soldier_ && mode_ == Mode::foot && foot_weapon_ == Id::sniper) arrived.push_back(s);
+    return;
+  }
+  GapsState& g = *gaps_;
+  for (const kern::game::ShotEvent& s : shots)
+    if (s.shooter == soldier_ && mode_ == Mode::foot && foot_weapon_ == Id::sniper) g.sniper_rounds.push_back({s, now + kern::length(s.to - s.from) / 850.0f});
+  for (const GapsState::SniperRound& r : g.sniper_rounds)
+    if (now >= r.due) arrived.push_back(r.s);
+  std::erase_if(g.sniper_rounds, [&](const GapsState::SniperRound& r) { return now >= r.due; });
+}
+
+bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_ns) {
   const f32 now = world_->sim_time();
   Vec3 dir;
   const Vec3 eye = aim_ray(dir);
   Vec3 to = eye + dir * reach;
-  i32 hit = people_.shot(eye, to, damage, true, now);
+  i32 hit = people_.shot(eye, to, damage, true, now, momentum_ns);
   if (hit < 0 && life_punch(eye, to)) hit = 0;  // animals (M3 life)
   if (hit < 0) {
     // meleeFallback: nobody on the line - whoever stands in front within reach (+.35 for a person),
@@ -267,7 +282,7 @@ bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife) {
         const Vec3 chest = all[static_cast<std::size_t>(best)].pos + Vec3{0, 0, 1.1f};
         Vec3 aim = kern::normalize(chest - eye, dir);
         Vec3 end = chest + aim * 0.6f;
-        hit = people_.shot(eye, end, damage, true, now);
+        hit = people_.shot(eye, end, damage, true, now, momentum_ns);
       }
     }
   }
@@ -298,7 +313,8 @@ void Game::melee_attack() {
     if (now - g.fist_last[h] < kFistRecover[h]) continue;
     const bool combo = now - g.fist_last[1 - h] < kCombo;
     g.fist_last[h] = now;
-    melee_hit(kPunchReach + 0.4f, 1.25f, std::round(kFistDmg[h] * (combo ? 1.35f : 1.0f)), false);
+    // PUNCH_NS [40, 26] x 1.2 on a combo
+    melee_hit(kPunchReach + 0.4f, 1.25f, std::round(kFistDmg[h] * (combo ? 1.35f : 1.0f)), false, (h ? 26.0f : 40.0f) * (combo ? 1.2f : 1.0f));
   }
 }
 

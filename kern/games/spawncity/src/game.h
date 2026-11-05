@@ -361,13 +361,14 @@ class Game {
   // sound, impact bursts, spawn gates, camera guard, jet damage
   // on-foot projectiles and melee (game_foot_rounds.cpp, gameplay_final_runtime_v2.mjs)
   bool foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at);
+  void gaps_sniper_rounds(const std::vector<kern::game::ShotEvent>& shots, std::vector<kern::game::ShotEvent>& arrived, f32 now);
   void grenade_bounce(Projectile& p, Vec3 point, Vec3 n, f32 now);
   bool car_near_point(Vec3 point) const;
   bool foot_remote_detonate(f32 now);
   void foot_rocket_launched();
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
-  bool melee_hit(f32 reach, f32 sweep, f32 damage, bool knife);
+  bool melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_ns);
   void melee_attack();
   void gaps_init(kern::Engine& e);
   void gaps_update(f32 dt);
