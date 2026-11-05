@@ -31,7 +31,7 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
     await p.waitForTimeout(6000);
     await shot("started");
     // where the player stands right after the start (the original: on the ground)
-    for (let i = 0; i < 6; i++) { console.log(dev, "after start", i, await p.evaluate(() => { const h = window.SpawnCity.hud(); let m = {}; try { m = JSON.parse(window.SpawnCity.command("minimap")).me; } catch {} return JSON.stringify({agl: h.agl, alt: h.alt, me: m, toast: h.toast, placed: h.placed}); })); await p.waitForTimeout(2000); }
+    for (let i = 0; i < 6; i++) { console.log(dev, "after start", i, await p.evaluate(() => { const h = window.SpawnCity.hud(); let m = {}; try { m = JSON.parse(window.SpawnCity.command("minimap")).me; } catch {} return JSON.stringify({agl: h.agl, alt: h.alt, me: m, toast: h.toast, placed: h.placed, cam: window.SpawnCity.command("camera")}); })); await p.waitForTimeout(2000); }
     for (const m of ["foot", "drone", "car"]) { console.log(dev, m, await p.evaluate(m => window.SpawnCity.command(`mode ${m}`), m)); await p.waitForTimeout(3000); await shot(m); }
   } catch (e) { fails++; console.log("FAIL", dev, e.message.split("\n")[0]); await shot("fail"); }
   console.log(dev, "errors:", JSON.stringify(errs, null, 1));
