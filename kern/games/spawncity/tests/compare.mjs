@@ -128,7 +128,7 @@ try {
       const escape = () => page.keyboard.press("Escape").catch(() => {});
       await step("title-changelog", () => clickIf("#gameMenuChangelog"), 1500); await escape(); await pause(600);
       await step("title-world", () => clickIf("#gameMenuWorld"), 1500); await escape(); await pause(600);
-      await step("title-place", () => clickIf("#startPlaceButton"), 1500); await escape(); await pause(600);
+      await step("title-place", () => clickIf("#startPlaceButton"), 1500); await escape(); await clickIf("#startPlacePanel .sp-x"); await pause(600);
       await step("start-drone", () => g.start(page), 6000);
       await step("foot", () => g.mode(page, "foot"), 3000);
       await step("car", () => g.mode(page, "car"), 3000);

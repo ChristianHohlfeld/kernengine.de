@@ -212,7 +212,8 @@ void Game::look_apply_tier() {
     kern::Renderer& r = engine_->renderer;
     r.set_shadow_filter(q.shadow_filter);
     kern::AoOptions ao;
-    ao.enabled = q.ao > 0;
+    // The original has no ambient occlusion (three.js without an AO pass): off on every level.
+    ao.enabled = false && q.ao > 0;
     ao.quality = q.ao >= 2 ? kern::AoQuality::medium : kern::AoQuality::low;
     ao.half_resolution = q.ao < 3;
     r.set_ambient_occlusion(ao);
@@ -270,7 +271,8 @@ void Game::look_lighting(f32 dt) {
   // The game's day clock instead of GameWorld's (same sun path and colours; "time" can set it).
   night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, r.lighting, r.sky);
   windows_.night = night_;
-  r.set_shadow_distance(kTier[L.gov.tier()].shadow_m);
+  // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
+  r.set_shadow_distance(L.software ? 0.0f : kTier[L.gov.tier()].shadow_m);
   const f32 now = static_cast<f32>(time_);
   const Vec3 eye = cam_.eye;
   auto req = [&](Vec3 p, u32 hex, f32 three_intensity, f32 range, f32 d_ref) {
@@ -563,6 +565,12 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
     const f32 hours = L.tod * 24;
     std::snprintf(b, sizeof b, "%.4f %02d:%02d", L.tod, static_cast<int>(hours) % 24, static_cast<int>((hours - std::floor(hours)) * 60));
     out = b;
+    return true;
+  }
+  if (cmd == "render software") {
+    // render_stability.mjs / simulator.mjs: SwiftShader, llvmpipe: no shadow map, the lowest level
+    L.software = true;
+    out = "software";
     return true;
   }
   if (cmd == "quality" || starts("quality ")) {

@@ -105,6 +105,7 @@ export function installOriginalMenus({command, ui, mp}) {
       for (const [sel, key, fmt] of MAP)
         if (input.matches?.(sel)) {
           const v = set(key, input.type === "checkbox" ? (input.checked ? 1 : 0) : input.tagName === "SELECT" ? (input.selectedIndex > 0 ? 1 : 0) : input.value);
+          if (key.startsWith("world.")) globalThis.__arondightWorldOptions?.set?.(key.slice(6), v > 0.5);
           const out = outFor(input);
           if (out && fmt) out.textContent = fmt(v);
           // the same setting shown twice (profile copies) follows
@@ -135,6 +136,12 @@ export function installOriginalMenus({command, ui, mp}) {
       else if (a.dataset.mode) { closeAll(); command(a.dataset.mode === "vehicle" ? "mode car" : `mode ${a.dataset.mode}`); }
       else if (a.hasAttribute("data-reset")) { for (const s of ["drohne", "fuss", "auto", "kamera", "ton", "maus"]) command(`settings reset ${s}`); save({}); fill(); }
     });
+  }
+  // world_options.mjs: the original's WORLD switches are the game's world.* settings
+  const wo = globalThis.__arondightWorldOptions;
+  if (wo) {
+    for (const o of wo.list) set(`world.${o.key}`, wo.get(o.key) ? 1 : 0);
+    addEventListener(wo.event, ev => { const k = ev.detail?.key; if (k && k !== "hostRules") set(`world.${k}`, ev.detail.value ? 1 : 0); });
   }
   const kernPanels = () => ["scPause", "scSettings"].map(id => document.getElementById(id)).filter(Boolean);
   const closeAll = () => {

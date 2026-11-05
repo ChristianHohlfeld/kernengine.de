@@ -49,19 +49,25 @@ export async function mountOriginalView(base = "./view/") {
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
     html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;outline:none;touch-action:none}
-    html.sc-original-view .scui-corner{display:none!important}`;
+    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
   const walk = {mode: "drone"};
   globalThis.__arondightWalkMode = walk;
+  // start_location.mjs builds its own button and panel (it mounts only when they are not there)
+  // (and so do world_options_menu.mjs / changelog_menu.mjs: their title buttons and panels)
+  for (const id of ["startPlaceButton", "startPlacePanel", "gameMenuWorld", "worldOptionsPanel", "gameMenuChangelog", "changelogPanel"]) $(id)?.remove();
+  globalThis.__arondightRealWorld = {active: false, originLat: NaN, originLon: NaN};
   if (globalThis.__scViewLayouts) globalThis.__scViewLayouts();  // single file (build.sh)
   else {
+    for (const m of ["start_location.mjs", "world_options.mjs", "world_options_menu.mjs", "changelog_menu.mjs"])
+      await import(base + m).catch(e => console.warn("[spawncity] " + m, e));
     await import(base + "edge_hud_layout.mjs").catch(e => console.warn("[spawncity] edge layout", e));
     await import(base + "thumb_layout.mjs").catch(e => console.warn("[spawncity] thumb layout", e));
   }
   // The title screen's flyover city (drone_simulator.html inline script, unchanged).
   if (globalThis.__scViewFlyover) globalThis.__scViewFlyover();
-  else { const sc = document.createElement("script"); sc.src = base + "menu_flyover.js"; document.body.appendChild(sc); }
+  else for (const f of ["menu_flyover.js", "install_app.js"]) { const sc = document.createElement("script"); sc.src = base + f; document.body.appendChild(sc); }
   return true;
 }
 
@@ -106,10 +112,7 @@ export class OriginalView {
     const kernAct = act => document.querySelector(`#scMenu [data-act="${act}"]`)?.click();
     // title menu (drone_simulator.html #gameMenu; auto_flight_start.mjs START)
     click("gameMenuStart", () => $("scStart")?.click());
-    click("gameMenuWorld", () => kernAct("world"));
-    click("gameMenuChangelog", () => kernAct("changelog"));
     click("gameMenuShare", () => kernAct("share"));
-    click("startPlaceButton", () => $("scPlace")?.click());
     // the game view's top bar and dock (mobile_gameplay_ui.mjs, game_exit_button.mjs)
     click("gameExitButton", () => this.ui?.open?.("exit"));
     click("mobileGameplaySettings", () => this.ui?.open?.("settings"));
@@ -185,6 +188,8 @@ export class OriginalView {
       const b = $(id);
       if (b && on !== undefined) { setData(b, "on", on ? "1" : "0"); b.setAttribute("aria-pressed", on ? "true" : "false"); }
     }
+    // what start_location.mjs reads of the running world (search bias, "far from here")
+    { const o = h.ui?.origin, w = globalThis.__arondightRealWorld; if (w) { w.active = !!h.placed; if (o) { w.originLat = o[0]; w.originLon = o[1]; } } }
     // ---- vitals (player_vitals_runtime.mjs)
     const vit = $("playerVitalsHud");
     if (vit) {

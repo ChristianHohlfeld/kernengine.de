@@ -292,10 +292,25 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // Drawing-buffer density from the game's quality level (perf.h render_scale, game_look.cpp): the
   // browser owns the canvas size, so the page applies it; app.mjs re-sizes on layout changes and the
   // next frame applies the scale again.
-  const baseRatio = () => Math.min(globalThis.devicePixelRatio || 1, mobile ? 1.5 : 2);
+  // render_stability.mjs renderPlatformProfile: the pixel-ratio ceiling of the original -
+  // software rasterizer 0.30 (?hq=1: 1), Android 1.15, iPhone / iPad 1.5, desktop 1.5
+  // (PRESENTATION / WORLD_FLIGHT_PIXEL_RATIO 1.5); software also without shadows (simulator.mjs).
+  const platform = (() => {
+    let name = "";
+    try { const gl = document.createElement("canvas").getContext("webgl2") || document.createElement("canvas").getContext("webgl"); const ext = gl?.getExtension("WEBGL_debug_renderer_info"); name = String(gl?.getParameter(ext?.UNMASKED_RENDERER_WEBGL || gl.RENDERER) || ""); gl?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* none */ }
+    const ua = navigator.userAgent, dpr = Math.max(.25, Number(globalThis.devicePixelRatio) || 1);
+    const software = /(swiftshader|llvmpipe|software raster|software renderer)/i.test(name), android = /android/i.test(ua);
+    const apple = /(?:iphone|ipad|ipod)|(?:macintosh.*mobile)/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+    const ceiling = software ? Math.min(dpr, params.get("hq") === "1" ? 1 : 0.30) : android ? Math.min(dpr, 1.15) : apple ? Math.min(dpr, 1.5) : Math.min(dpr, 1.5);
+    return {software, ceiling: Math.min(ceiling, 1.5), name};
+  })();
+  if (platform.software) command("render software");
+  const baseRatio = () => platform.ceiling;
   const applyRenderScale = h => {
-    const s = h?.renderScale;
+    let s = h?.renderScale;
     if (!(s > 0) || !canvas.clientWidth) return;
+    // the title covers the game view (the original draws only its 2D flyover there): no 3D pixels
+    if (originalView && !ui.playing) s = 2 / Math.max(canvas.clientWidth, 1);
     const r = baseRatio() * s, w = Math.max(1, Math.round(canvas.clientWidth * r)), hh = Math.max(1, Math.round(canvas.clientHeight * r));
     if (canvas.width === w && canvas.height === hh) return;
     canvas.width = w; canvas.height = hh;
