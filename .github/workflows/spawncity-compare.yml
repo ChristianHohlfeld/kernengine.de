@@ -8,6 +8,13 @@ on:
       kern_url:
         description: URL of SpawnCity on Kern
         default: https://kernengine.de/kern/games/spawncity/web/index.html
+      part:
+        description: "all, ui (screens) or controls (real inputs measured, compare_controls.mjs)"
+        default: all
+      build:
+        description: "build SpawnCity from this branch and compare that (kern_url then only gives the query, e.g. ?view=original)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -15,19 +22,58 @@ permissions:
 jobs:
   compare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: wasi-sdk 25 (cached)
+        if: inputs.build
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/wasi-sdk
+          key: wasi-sdk-25.0-v2
+      - name: Install wasi-sdk 25
+        if: inputs.build && steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /home/runner/wasi-sdk
+          curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
+          tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
+      - name: Object cache
+        if: inputs.build
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/kern-obj
+          key: sc-cmp-obj-${{ github.sha }}
+          restore-keys: |
+            sc-obj-
+            kern-obj-
+      - name: Build SpawnCity from this branch and serve it
+        if: inputs.build
+        env:
+          KERN_OBJ_CACHE: /home/runner/kern-obj
+        run: |
+          set -euo pipefail
+          export WASI_SDK=/home/runner/wasi-sdk
+          kern/games/spawncity/build.sh
+          (python3 -m http.server 8123 --bind 127.0.0.1 >/dev/null 2>&1 &)
+          sleep 1
       - name: Playwright + Chromium
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund playwright@1.56.0
           npx playwright install --with-deps chromium
       - name: Compare
-        run: node kern/games/spawncity/tests/compare.mjs generated/spawncity-compare https://spawncity.de/drone_simulator.html "${{ inputs.kern_url }}"
+        env:
+          COMPARE_PART: ${{ inputs.part }}
+        run: |
+          set -euo pipefail
+          KERN_URL="${{ inputs.kern_url }}"
+          if [ "${{ inputs.build }}" = "true" ]; then KERN_URL="http://127.0.0.1:8123/kern/games/spawncity/web/index.html?${KERN_URL#*\?}"; fi
+          node kern/games/spawncity/tests/compare.mjs generated/spawncity-compare https://spawncity.de/drone_simulator.html "$KERN_URL"
       - name: Results to branch vergleich-ergebnis
         if: always()
         run: |

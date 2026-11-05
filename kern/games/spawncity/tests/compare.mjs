@@ -7,11 +7,14 @@
 import {createRequire} from "node:module";
 import fs from "node:fs";
 import path from "node:path";
+import {measureControls} from "./compare_controls.mjs";
 
 const {chromium} = await import("playwright").catch(() => createRequire(import.meta.url)("playwright"));
 const out = path.resolve(process.argv[2] || "generated/spawncity-compare");
 const ORIGINAL = process.argv[3] || "https://spawncity.de/drone_simulator.html";
 const KERN = process.argv[4] || "https://kernengine.de/kern/games/spawncity/web/index.html";
+// COMPARE_PART: "all" (default), "ui" (the screens) or "controls" (compare_controls.mjs: real inputs, measured)
+const PART = process.env.COMPARE_PART || "all";
 const GPS = {latitude: 52.5208, longitude: 13.4094, accuracy: 5};  // Berlin, Alexanderplatz
 fs.mkdirSync(out, {recursive: true});
 const pause = ms => new Promise(r => setTimeout(r, ms));
@@ -80,7 +83,7 @@ const GAMES = {
 
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
 try {
-  for (const [dev, profile] of Object.entries(DEVICES)) {
+  for (const [dev, profile] of Object.entries(PART === "controls" ? {} : DEVICES)) {
     for (const [name, g] of Object.entries(GAMES)) {
       const ctx = await browser.newContext({...profile, geolocation: GPS, permissions: ["geolocation"], locale: "de-DE"});
       const page = await ctx.newPage();
@@ -140,6 +143,7 @@ try {
       await ctx.close();
     }
   }
+  if (PART !== "ui") await measureControls({browser, out, games: GAMES, devices: DEVICES, gps: GPS});
 } finally {
   fs.writeFileSync(path.join(out, "compare.json"), JSON.stringify(report, null, 1));
   // A quick overview: which visible texts exist in one game but not in the other, per step.

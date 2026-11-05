@@ -550,6 +550,14 @@ std::string Game::ctl_view_json() {
   };
   // ---- the camera (speed_lines.mjs measures its speed itself)
   add("\"eye\":[%.2f,%.2f,%.2f]", cam_.eye.x, cam_.eye.y, cam_.eye.z);
+  // ---- measuring point for tests/compare_controls.mjs (the same quantities the original's hooks give:
+  // position of what is steered, camera yaw/pitch in degrees counter-clockwise from +x, ground below)
+  {
+    const Vec3 d = cam_.target - cam_.eye, p = focus_position();
+    const f32 hz = std::sqrt(d.x * d.x + d.y * d.y);
+    add(",\"probe\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"ground\":%.3f,\"yaw\":%.3f,\"pitch\":%.3f}", p.x, p.y, p.z, city_.ground_height(p.x, p.y),
+        std::atan2(d.y, d.x) / kDeg, std::atan2(d.z, hz) / kDeg);
+  }
   // ---- damage taken (flight_fire_fx.mjs arondight:combat-damage -> .combat-damage-vignette)
   {
     const f32 hp = world_->hud().health, dhp = drone_hp_, jhp = jet_hp_, chp = car_index_ >= 0 ? cars_[car_index_].hp : -1;
