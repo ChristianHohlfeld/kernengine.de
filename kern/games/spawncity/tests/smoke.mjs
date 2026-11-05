@@ -487,6 +487,12 @@ async function run({name, url, context, mapped}) {
   }
 
   // Drone: wait for the firmware's calibration, then climb and fly forward for 3 s.
+  // The fights above leave burning cars and a damaged jet behind: RESET first (game_reset.mjs), so
+  // the vehicle checks start from a clean world as a player would after a restart.
+  await cmd("military off");
+  await cmd("zombies day");
+  await cmd("reset");
+  { const t = (await hud()).t; await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, t, {timeout: 300000}).catch(() => {}); }
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
   // touch: the altitude pad right of the move stick (simulator.mjs #soloClearance) pushed up
@@ -529,7 +535,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);  // LENKEN / GAS: the left stick up
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h`);
+    check(h.speed > 1.0, `[${name}] the car drives: ${(h.speed * 3.6).toFixed(0)} km/h (mode ${h.mode}, hp ${h.carHp}, toast ${h.toast})`);
     await shot("3-car");
     check(await cmd("radio next") !== "off" && (await hud()).radio?.on, `[${name}] car radio: next station (${JSON.stringify((await hud()).radio)})`);
     check(await cmd("cam") === "cockpit", `[${name}] car cockpit view`);
@@ -563,7 +569,7 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await touchHold(110, vh - 110);
     else await hold(["KeyW"]);
     h = await hud();
-    check(h.agl > 2, `[${name}] the jet lifts off: ${h.agl} m AGL`);
+    check(h.agl > 2, `[${name}] the jet lifts off: ${h.agl} m AGL (mode ${h.mode}, hp ${h.jetHp}, jet ${JSON.stringify(h.jet)}, toast ${h.toast})`);
     await shot("4-jet");
     check(await cmd("eject") === "ok", `[${name}] ejection seat`);
     const t0 = (await hud()).t;
