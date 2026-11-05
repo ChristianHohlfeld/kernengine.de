@@ -32,6 +32,10 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
     await shot("started");
     // where the player stands right after the start (the original: on the ground)
     for (let i = 0; i < 6; i++) { console.log(dev, "after start", i, await p.evaluate(() => { const h = window.SpawnCity.hud(); let m = {}; try { m = JSON.parse(window.SpawnCity.command("minimap")).me; } catch {} return JSON.stringify({agl: h.agl, alt: h.alt, me: m, toast: h.toast, placed: h.placed, cam: window.SpawnCity.command("camera")}); })); await p.waitForTimeout(2000); }
+    // the minimap (#worldLookHud): its box, and the big map after M
+    const mini = () => p.evaluate(() => { const e = document.getElementById("worldLookHud"); if (!e) return "none"; const r = e.getBoundingClientRect(); return JSON.stringify({x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), cls: e.className, display: getComputedStyle(e).display, vw: innerWidth, vh: innerHeight}); });
+    console.log(dev, "minimap", await mini());
+    console.log(dev, "city", await p.evaluate(() => JSON.stringify(window.SpawnCity.hud().tiles)));
     for (const m of ["foot", "drone", "car"]) { console.log(dev, m, await p.evaluate(m => window.SpawnCity.command(`mode ${m}`), m)); await p.waitForTimeout(3000); await shot(m); }
   } catch (e) { fails++; console.log("FAIL", dev, e.message.split("\n")[0]); await shot("fail"); }
   console.log(dev, "errors:", JSON.stringify(errs, null, 1));
