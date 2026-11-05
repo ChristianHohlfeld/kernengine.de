@@ -1,0 +1,45 @@
+name: SpawnCity Vergleich
+
+# The original (spawncity.de) and SpawnCity on Kern (kernengine.de) side by side in the same
+# browser, same GPS position and devices: screenshots and UI dumps of every step as an artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      kern_url:
+        description: URL of SpawnCity on Kern
+        default: https://kernengine.de/kern/games/spawncity/web/index.html
+
+permissions:
+  contents: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright + Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Compare
+        run: node kern/games/spawncity/tests/compare.mjs generated/spawncity-compare https://spawncity.de/drone_simulator.html "${{ inputs.kern_url }}"
+      - name: Results to branch vergleich-ergebnis
+        if: always()
+        run: |
+          set -euo pipefail
+          cd generated/spawncity-compare
+          git init -q -b vergleich-ergebnis
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Vergleich ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" vergleich-ergebnis
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spawncity-compare
+          path: generated/spawncity-compare
+          retention-days: 14
