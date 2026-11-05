@@ -177,7 +177,14 @@ async function run({name, url, context, mapped}) {
   let h = await hud();
   check(h.mode === "foot", `[${name}] starts on foot`);
   check(mapped ? h.realData && !h.offline : h.offline, `[${name}] ${mapped ? "map tiles loaded through the MVT path" : "offline stand-in town"} (tiles ${JSON.stringify(h.tiles)})`);
-  // world_building_collisions.mjs: the collision is the working set around the player (<= 480 within 340 m)
+  // world_building_collisions.mjs: the collision is the working set around the player (<= 480 within 340 m).
+  // The game starts before the city is there (like the original), so the houses stream in after the start.
+  {
+    const t1 = Date.now();
+    await page.waitForFunction(() => { const t = window.SpawnCity?.hud()?.tiles; return t && t.colliders > 20 && t.t?.built >= 0; }, null, {timeout: 120000}).catch(() => {});
+    h = await hud();
+    console.log(`[${name}] city built ${((Date.now() - t1) / 1000).toFixed(1)} s after the start (tiles ${JSON.stringify(h.tiles)})`);
+  }
   check(h.tiles.buildings > 50 && h.tiles.colliders > 20 && h.tiles.colliders <= 480, `[${name}] buildings with collision (${h.tiles.buildings} / ${h.tiles.colliders})`);
   if (mapped) check(tileRequests >= 1, `[${name}] tiles fetched by the page (${tileRequests})`);
   // The ground (terrain.h): real elevation through the Terrarium path, water basins, the player on it.
