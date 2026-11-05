@@ -49,14 +49,17 @@ SC_TEST(stream_tile_pipeline) {
   city.provide(key, bytes.data(), bytes.size());
   int frames = 0;
   f64 worst = 0;
-  while (!city.ready_at({0, 0, 0}) && frames < 2000) {
+  // ready_at is true at once (the game starts like the original); the tile builds in jobs
+  auto built = [&] { return city.stats().t_built >= 0 && city.stats().t_collision >= 0; };
+  const f64 give_up = kern::now_ms() + 60000;
+  while (!built() && kern::now_ms() < give_up) {
     const f64 t0 = kern::now_ms();
     city.update({0, 0, 0}, 3);
     const f64 took = kern::now_ms() - t0;
     if (took > worst) { worst = took; if (std::getenv("SC_VERBOSE")) std::printf("  frame %d took %.1f ms\n", frames, took); }
     ++frames;
   }
-  SC_CHECK(city.ready_at({0, 0, 0}), "tile built after %d frames", frames);
+  SC_CHECK(city.ready_at({0, 0, 0}) && built(), "tile built after %d frames", frames);
   SC_CHECK(frames > 1, "built over several frames (%d)", frames);
   SC_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on)", worst);
   // world_building_collisions.mjs: one collider for each of the nearest 480 buildings within 340 m

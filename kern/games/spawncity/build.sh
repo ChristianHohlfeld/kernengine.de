@@ -52,6 +52,7 @@ sources = {
     "ui": (here / "web/ui.mjs").read_text(),
     "gaps_hud": (here / "web/gaps_hud.mjs").read_text(),
     "life": (here / "web/life.mjs").read_text(),
+    "jobs": (web / "jobs.mjs").read_text(),
     "view": (here / "web/view.mjs").read_text(),
     "view_modes": (here / "web/view_modes.mjs").read_text(),
     "view_menu": (here / "web/view_menu.mjs").read_text(),
@@ -80,7 +81,9 @@ view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.h
                "globalThis.__scViewCss = " + json.dumps(css) + ";\n" +
                "globalThis.__scViewLayouts = () => {\n" + layouts + "\n};\n" +
                "globalThis.__scViewFlyover = () => {\n" + (view_dir / "menu_flyover.js").read_text() + "\n" + (view_dir / "install_app.js").read_text() + "\n};\n").replace("</script", "<\\/script")
-bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "view", "view_modes", "view_menu", "host"))
+# the job workers load kern.mjs from this text (no module URL in a single file)
+view_inline += "globalThis.__kernSource = " + json.dumps(sources["kern"]).replace("</script", "<\\/script") + ";\n"
+bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "jobs", "view", "view_modes", "view_menu", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')

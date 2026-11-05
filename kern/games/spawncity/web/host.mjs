@@ -14,6 +14,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {startKernJobs} from "../../../web/jobs.mjs";
 import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
 import {GapsHud} from "./gaps_hud.mjs";
@@ -33,7 +34,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const params = new URLSearchParams(location.search);
   // The original's view layer (view.mjs): its DOM, CSS and layout; Kern's canvas takes the place of
   // the original's three.js canvas.
-  const originalView = params.get("view") === "original" && await mountOriginalView();
+  // The original spawncity.de view is the default; ?view=kern shows Kern's own HUD (tests, debugging).
+  const originalView = params.get("view") !== "kern" && await mountOriginalView();
   const canvas = document.getElementById("game");
   const statusEl = document.getElementById("status");
   const hudEl = document.getElementById("hud");
@@ -57,6 +59,17 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     throw error;
   }
   const kern = app.kern, e = kern.exports;
+  // Kern jobs (kern/web/jobs.mjs): the city's tile decoding and building extrusion run in Web
+  // Workers on the same module, like MapLibre's tile workers for the original.
+  let jobs = null;
+  (async () => {
+    try {
+      let mod = null;
+      if (url) mod = await WebAssembly.compileStreaming(fetch(url)).catch(async () => WebAssembly.compile(await (await fetch(url)).arrayBuffer()));
+      else if (base64) { const bin = atob(base64), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); mod = await WebAssembly.compile(b); }
+      if (mod) jobs = await startKernJobs(kern, mod, {kernSource: globalThis.__kernSource || null});
+    } catch (error) { console.warn("[spawncity] no job workers, the city builds in the frame:", error?.message || error); }
+  })();
   // Fresh views each time: the module's memory may have grown (and detached older views).
   const decoder = new TextDecoder();
   const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, e.sc_result_length()));
@@ -322,6 +335,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pollPad();
     pumpTiles();
     pumpDem();
+    jobs?.pump();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
     if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }

@@ -195,7 +195,9 @@ void Game::look_begin(kern::Engine& e, const kern::Frame& f) {
 
 void Game::look_lap(perf::Slot s) { look_.meter.lap(s, clock_ms()); }
 
-i32 Game::look_people_budget() const { return ui_.settings.on(Opt::world_people) ? kTier[look_.gov.tier()].people : 0; }
+// world_procedural_population.mjs PERSON_SLOTS 100 (phone 68): the original does not scale the crowd
+// with the quality level
+i32 Game::look_people_budget() const { return ui_.settings.on(Opt::world_people) ? (mobile_ ? 68 : 100) : 0; }
 
 void Game::look_apply_tier() {
   LookState& L = look_;

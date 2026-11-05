@@ -66,6 +66,7 @@ struct MeshInput {
   u32 texture = 0;                       // GPU texture handle (0 = none)
   bool visible = true;
   u32 layers = 1;                        // view layers this mesh belongs to (RenderParams::layers)
+  bool pick_bvh = true;                  // false: no picking BVH (saves its build at upload; picking stays exact, brute force)
 };
 
 struct MeshGpu {
@@ -83,6 +84,7 @@ struct Mesh {
   u32 id = 0;
   bool visible = true;
   u32 layers = 1;
+  bool pick_bvh = true;  // MeshInput::pick_bvh
   bool linear_colors = false;
   Material material;
   u32 texture = 0;

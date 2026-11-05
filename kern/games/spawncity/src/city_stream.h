@@ -29,6 +29,11 @@ struct Lane {
 struct StreamStats {
   u32 tiles_ready = 0, tiles_loading = 0, tiles_failed = 0, buildings = 0, colliders = 0, triangles = 0, meshes = 0;
   f64 last_slice_ms = 0;
+  // the start's milestones in ms since start() (-1: not yet): requested / data arrived / decoded /
+  // ground settled / built / collision around the player - where a slow start spends its time
+  f64 t_request = -1, t_data = -1, t_decoded = -1, t_terrain = -1, t_built = -1, t_collision = -1;
+  f64 work_ms = 0;  // streaming time spent so far (all slices)
+  f64 worst_ms = 0; // longest slice of the last 2 s (a hitch shows here)
 };
 
 class CityStream {
@@ -122,6 +127,9 @@ class CityStream {
     u32 colliders = 0;
   };
   NearCollision near_;
+  StreamStats ms_;          // the milestones (copied into stats_ every update)
+  f64 start_ms_ = 0;
+  f64 worst_ = 0, worst_at_ = 0;
   Vec3 focus_{};
   Vec2 vis_at_{1e9f, 1e9f};
   f64 vis_ms_ = -1e9;

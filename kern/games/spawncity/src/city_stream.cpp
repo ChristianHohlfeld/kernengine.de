@@ -4,7 +4,9 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "city_jobs.h"
 #include "kern/core/base.h"
+#include "kern/core/jobs.h"
 #include "kern/geo/earcut.h"
 
 namespace sc {
@@ -126,6 +128,9 @@ struct CityStream::Tile {
   std::vector<u32> vis, vis_built;
   std::vector<Vec2> cent;
   std::vector<u32> old_meshes;
+  // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
+  u32 tile_job = 0, build_job = 0;
+  std::vector<kern::GeoChunk> built;
   bool rebuilding = false, vis_dirty = false, prepared = false;
   // interiors (M3 life): one building left out, the collision rebuilt beside the old body
   i32 skip = -1;
@@ -140,6 +145,7 @@ void CityStream::start(kern::Renderer& renderer, kern::physics::World& world, f6
   clear();
   r_ = &renderer;
   world_ = &world;
+  start_ms_ = kern::now_ms();
   proj_.init(lon, lat);
   terrain_.start(&renderer, &world, proj_, dem);
   origin_tile_ = tile_at(lon, lat);
@@ -153,6 +159,7 @@ void CityStream::clear() {
   requests_.clear();
   lanes_.clear();
   stats_ = {};
+  ms_ = {};
   terrain_.clear();
   terrain_changes_.clear();
   if (world_) for (kern::physics::Body b : {near_.body, near_.old_body}) if (b.valid() && world_->body_valid(b)) world_->destroy_body(b);
@@ -165,6 +172,7 @@ void CityStream::remove(Tile& t) {
   if (r_)
     for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
       for (u32 id : *list) r_->remove(id);
+  for (u32* j : {&t.tile_job, &t.build_job}) if (*j) { kern::jobs::cancel(*j); *j = 0; }
   if (r_) for (u32 id : t.old_meshes) r_->remove(id);
   t.old_meshes.clear();
   t.meshes.clear();
@@ -235,6 +243,7 @@ std::string CityStream::take_requests() {
     std::snprintf(b, sizeof b, "%s[%d,%d,%d]", i ? "," : "", requests_[i].z, requests_[i].x, requests_[i].y);
     s += b;
   }
+  if (!requests_.empty() && ms_.t_request < 0) ms_.t_request = kern::now_ms() - start_ms_;
   requests_.clear();
   return s + "]";
 }
@@ -242,9 +251,9 @@ std::string CityStream::take_requests() {
 void CityStream::provide(const TileKey& key, const u8* bytes, std::size_t length) {
   Tile* t = tile(key);
   if (!t || t->state != Tile::State::requested) return;
-  t->bytes.assign(bytes, bytes + length);
-  static const std::vector<std::string> wanted = {"building", "transportation", "water", "waterway", "park", "landcover", "landuse"};
-  t->decoder.begin(t->bytes.data(), t->bytes.size(), wanted);
+  if (key == origin_tile_ && ms_.t_data < 0) ms_.t_data = kern::now_ms() - start_ms_;
+  // decoded off the frame (a Web Worker / thread): the frame only takes the finished features
+  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes, length));
   t->state = Tile::State::decoding;
 }
 
@@ -286,10 +295,11 @@ bool CityStream::ready_at(Vec3 p) const {
   unproject(proj_, p.x, p.y, lon, lat);
   const TileKey c = tile_at(lon, lat);
   auto it = tiles_.find(c.hash());
-  if (it == tiles_.end()) return false;
-  if (it->second->state == Tile::State::failed) return true;
-  // the drawn city and the collision under the player are there (not the whole tile)
-  return it->second->state == Tile::State::ready && solid;
+  (void)it;
+  (void)solid;
+  // As the original: the game starts as soon as the ground under the player is there; the city
+  // (drawn set, collision set) streams in around him (world_spawn_guard: see Game::spawn_guard).
+  return true;
 }
 
 void CityStream::feed_terrain(Tile& t) {
@@ -352,10 +362,13 @@ void CityStream::begin_visual(Tile& t) {
   t.vis_built = t.vis;
   t.vis_dirty = false;
   kern::BuildingOptions bo;
-  bo.chunk_size = 320;
+  bo.chunk_size = 160;  // smaller uploads per frame (the original: 360 m; it only copies buffers)
   bo.max_buildings = 12000;
   bo.style = konstanz_style();
-  t.buildings.begin(t.footprints.data(), t.footprints.size(), bo);
+  // extruded and welded off the frame (city_jobs.h); the frame only uploads the finished chunks
+  if (t.build_job) kern::jobs::cancel(t.build_job);
+  t.build_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(t.footprints, bo));
+  t.built.clear();
   t.upload_next = 0;
   t.state = Tile::State::building;
 }
@@ -388,10 +401,11 @@ void CityStream::select_visual(Vec3 focus) {
 
 void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls) {
   if (chunk.mesh.vertex_count() == 0) return;
-  kern::weld(chunk.mesh);
+  if (!chunk.welded) kern::weld(chunk.mesh);
   const u32 id = r_->allocate_id();
   kern::MeshInput in = chunk.mesh.as_input(walls ? 0 : kern::kMaxExtensionAttributes);
   in.material = material;
+  in.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
   if (!r_->upsert(id, in)) { r_->release_id(id); return; }
   t.meshes.push_back(id);
   t.triangles += chunk.mesh.triangle_count();
@@ -506,6 +520,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
     n.old_body = {};
     n.building = false;
     n.built = true;
+    if (ms_.t_collision < 0 && !n.list.empty()) ms_.t_collision = kern::now_ms() - start_ms_;
   }
 }
 
@@ -588,28 +603,35 @@ bool CityStream::work(Tile& t, f64 deadline) {
       return true;
     case S::requested:
     case S::failed: return true;
-    case S::decoding:
-      if (!t.decoder.step(std::max(0.5, deadline - kern::now_ms()))) return false;
-      if (t.decoder.failed()) { t.state = S::failed; return true; }
-      extract(t.decoder.tile(), t.key, proj_, t.features);
-      t.decoder = mvt::Decoder{};
-      t.bytes.clear();
-      t.bytes.shrink_to_fit();
+    case S::decoding: {
+      std::vector<u8> out;
+      if (!kern::jobs::take(t.tile_job, out)) return true;  // still decoding off the frame: next tile
+      t.tile_job = 0;
+      if (!cityjobs::read_features(out, t.features)) { t.state = S::failed; return true; }
       ++real_tiles_;
+      if (t.key == origin_tile_ && ms_.t_decoded < 0) ms_.t_decoded = kern::now_ms() - start_ms_;
       feed_terrain(t);
       t.state = S::terrain_wait;
       return kern::now_ms() > deadline ? false : work(t, deadline);
+    }
     case S::terrain_wait:
       // Buildings and streets stand on the terrain: wait until its shape is decided.
       if (!terrain_.settled()) return true;
+      if (ms_.t_terrain < 0) ms_.t_terrain = kern::now_ms() - start_ms_;
       finish_features(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
     case S::building: {
-      if (!t.buildings.step(std::max(0.5, deadline - kern::now_ms()))) return false;
-      // One chunk mesh at a time (welding and the picking BVH take a few milliseconds each).
+      if (t.build_job) {
+        std::vector<u8> out;
+        if (!kern::jobs::take(t.build_job, out)) return true;  // still extruding off the frame
+        t.build_job = 0;
+        if (!cityjobs::read_chunks(out, t.built)) t.built.clear();
+        t.upload_next = 0;
+      }
+      // One finished chunk mesh at a time (the upload; the picking BVH is skipped for buildings).
       kern::Material m;
       m.roughness = 0.82f;
-      auto& chunks = t.buildings.chunks();
+      auto& chunks = t.built;
       while (t.upload_next < chunks.size()) {
         upload(t, chunks[t.upload_next], m, true);
         chunks[t.upload_next++].mesh = kern::MeshData{};
@@ -678,6 +700,8 @@ bool CityStream::work(Tile& t, f64 deadline) {
 void CityStream::update(Vec3 focus, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 start = kern::now_ms(), deadline = start + budget_ms;
+  // without workers / threads the jobs run here, inside the frame's budget
+  kern::jobs::pump(budget_ms * 0.5);
   focus_ = focus;
   // RESYNC_MOVE_M 140 / RESYNC_MS 2500 (world_city_buildings.mjs)
   if (std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) >= 140 || start - vis_ms_ >= 2500) select_visual(focus);
@@ -715,7 +739,14 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     stats_.meshes += static_cast<u32>(t->meshes.size() + t->lay_meshes.size());
   }
   stats_.colliders = near_.colliders;
+  ms_.work_ms += kern::now_ms() - start;
+  if (ms_.t_built < 0) { auto it = tiles_.find(origin_tile_.hash()); if (it != tiles_.end() && it->second->state == Tile::State::ready) ms_.t_built = kern::now_ms() - start_ms_; }
+  stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
+  stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
   stats_.last_slice_ms = kern::now_ms() - start;
+  if (kern::now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = kern::now_ms(); }
+  worst_ = std::fmax(worst_, stats_.last_slice_ms);
+  stats_.worst_ms = worst_;
 }
 
 void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {

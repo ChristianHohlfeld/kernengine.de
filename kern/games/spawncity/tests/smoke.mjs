@@ -18,6 +18,8 @@ import {fileURLToPath} from "node:url";
 const {chromium} = await import("playwright").catch(() => createRequire(import.meta.url)("playwright"));
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../../..");
+// The smoke test checks Kern's own HUD (?view=kern); the original view has view_check / compare.
+const kernView = q => (q && q.startsWith("?") ? `${q}&view=kern` : `?view=kern${q || ""}`);
 const shots = path.resolve(process.argv[2] || process.env.SC_SHOTS || path.join(root, "generated/spawncity-shots"));
 fs.mkdirSync(shots, {recursive: true});
 const port = 8700 + Math.floor(Math.random() * 200);
@@ -140,7 +142,7 @@ async function run({name, url, context, mapped}) {
     });
   }
   const t0 = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${url}`);
+  await page.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${kernView(url)}`);
   await page.waitForFunction(() => window.SpawnCity?.hud()?.placed, null, {timeout: 300000});
   console.log(`[${name}] world placed after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   const hud = () => page.evaluate(() => window.SpawnCity.hud());
@@ -607,7 +609,7 @@ async function runMultiplayer() {
   const open = async q => {
     const p = await ctx.newPage();
     p.on("pageerror", e => errors.push(e.message));
-    await p.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${q}`);
+    await p.goto(`http://127.0.0.1:${port}/kern/games/spawncity/web/index.html${kernView(q)}`);
     return p;
   };
   const room = "smoke" + Math.floor(Math.random() * 1e6);

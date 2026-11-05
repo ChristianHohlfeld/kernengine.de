@@ -67,6 +67,8 @@ struct TrafficCar {
   bool placed = false, driver = true;
   i32 lane = -1, index = 0, dir = 1;
   f32 target_speed = 10, stuck = 0;
+  bool far = false;   // beyond 180 m: a kinematic lane follower (game_traffic_far.cpp)
+  f32 far_speed = 0;
   CarInput input;  // what the driver (AI or player) does this step
   // police cruisers and damage (police_ground_units.mjs: 300 HP, burning below 25 %)
   bool police = false;
@@ -372,6 +374,10 @@ class Game {
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);
+  // far traffic (game_traffic_far.cpp, PHYS_NEAR_M / PHYS_FAR_M)
+  void traffic_far_switch();
+  void traffic_far_step(TrafficCar& c, f32 h);
+  void traffic_advance(TrafficCar& c);
   // cars and buses as the original (game_vehicle_damage.cpp)
   f32 car_max_hp(const TrafficCar& c) const;
   void car_bullet(i32 car, bool by_player);
@@ -524,6 +530,8 @@ class Game {
   f32 fps_ = 60;
   u64 steps_ = 0;
   Rng rng_{20261029};
+  bool spawn_checked_ = false;  // world_spawn_guard (Game::spawn_guard)
+  void spawn_guard();
   // audio
   kern::audio::Mixer mixer_;
   std::unique_ptr<kern::game::SoundBank> bank_;
