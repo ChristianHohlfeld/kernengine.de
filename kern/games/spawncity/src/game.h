@@ -524,6 +524,8 @@ class Game {
   f32 fps_ = 60;
   u64 steps_ = 0;
   Rng rng_{20261029};
+  bool spawn_checked_ = false;  // world_spawn_guard (Game::spawn_guard)
+  void spawn_guard();
   // audio
   kern::audio::Mixer mixer_;
   std::unique_ptr<kern::game::SoundBank> bank_;

@@ -336,7 +336,25 @@ bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const {
   return false;
 }
 
+void Game::spawn_guard() {
+  // world_spawn_guard.mjs: once the buildings around the start are solid, a player who stands
+  // inside one goes out to the nearest street (the start was chosen before the houses were there).
+  if (spawn_checked_ || mode_ != Mode::foot || city_.stats().t_collision < 0) return;
+  spawn_checked_ = true;
+  const Vec3 me = matrix_of(soldier_).translation();
+  if (!city_.building_at({me.x, me.y})) return;
+  Vec3 p;
+  f32 heading = 0;
+  for (f32 r : {40.0f, 80.0f, 160.0f})
+    for (int i = 0; i < 6; ++i)
+      if (city_.street_point(rng_, me, r, p, heading) && !city_.building_at({p.x, p.y})) {
+        world_->teleport(soldier_, p + Vec3{0, 0, 0.73f});
+        return;
+      }
+}
+
 void Game::place_world() {
+  spawn_checked_ = false;
   // Player at the start (a free spot near the requested place), the jet on the nearest square big
   // enough for it (SpawnCity: the VTOL stands next to the player at the start).
   Spot p{};
@@ -737,7 +755,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     else {
       const StreamStats& s = city_.stats();
       char buf[128];
-      std::snprintf(buf, sizeof buf, "SpawnCity: %s ... %u Gebaeude", city_.offline() ? "Ersatzstadt wird gebaut" : "Konstanz wird geladen", s.buildings);
+      std::snprintf(buf, sizeof buf, "SpawnCity: %s ... %u Gebaeude", city_.offline() ? "Ersatzstadt wird gebaut" : "die Stadt wird geladen", s.buildings);
       e.set_status(buf);
     }
   }
@@ -753,6 +771,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
+    spawn_guard();
     look_lap(perf::Slot::stream);
     update_town(dt);
     update_projectiles(dt);
@@ -1030,8 +1049,10 @@ std::string Game::hud_json() {
   add("\"mode\":\"%s\",\"placed\":%s,\"offline\":%s,\"realData\":%s", mode_name(mode_), world_placed_ ? "true" : "false", city_.offline() ? "true" : "false",
       city_.has_real_data() ? "true" : "false");
   const StreamStats& st = city_.stats();
-  add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u}", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
+  add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
+  add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f}}", st.t_request, st.t_data,
+      st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms);
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());

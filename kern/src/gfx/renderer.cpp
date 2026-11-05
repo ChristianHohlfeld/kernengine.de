@@ -272,7 +272,8 @@ bool Renderer::upsert(u32 id, const MeshInput& in) {
   m.world_bounds = instanced_bounds(m.local_bounds, m.transforms.data(), m.instance_count);
   if (!m.world_bounds.valid()) return fail("invalid world bounds");
   // Static world-space meshes get a BVH for picking; moving ones use the exact brute-force path.
-  if (!m.material.lines && m.instance_count == 1 && !skinned && m.triangle_count() >= kBvhMinTriangles &&
+  m.pick_bvh = in.pick_bvh;
+  if (in.pick_bvh && !m.material.lines && m.instance_count == 1 && !skinned && m.triangle_count() >= kBvhMinTriangles &&
       Mat4::load(m.transforms.data()).is_identity()) {
     m.bvh = std::make_unique<Bvh>();
     m.bvh->build(m.positions.data(), vertices, m.indices.empty() ? nullptr : m.indices.data(), static_cast<u32>(m.indices.size()));
@@ -435,7 +436,7 @@ bool Renderer::update_instances(u32 id, Span<const f32> transforms, Span<const f
   const bool static_world = n == 1 && !m->skinned() && !m->material.lines && Mat4::load(m->transforms.data()).is_identity();
   if (!static_world) {
     m->bvh.reset();
-  } else if (!m->bvh && m->triangle_count() >= kBvhMinTriangles) {
+  } else if (m->pick_bvh && !m->bvh && m->triangle_count() >= kBvhMinTriangles) {
     m->bvh = std::make_unique<Bvh>();
     m->bvh->build(m->positions.data(), m->vertex_count(), m->indices.empty() ? nullptr : m->indices.data(), static_cast<u32>(m->indices.size()));
   }
