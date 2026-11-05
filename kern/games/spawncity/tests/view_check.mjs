@@ -15,7 +15,7 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
   const p = await ctx.newPage(), errs = [];
   p.on("pageerror", e => errs.push(String(e.stack || e).slice(0, 500)));
   p.on("console", m => { if (m.type() === "error") errs.push("console: " + m.text().slice(0, 300)); });
-  const state = () => p.evaluate(() => { const h = window.SpawnCity?.hud?.(); return JSON.stringify({mode: h?.mode, placed: h?.placed, tiles: h?.tiles, playing: window.SpawnCity?.ui?.playing,
+  const state = () => p.evaluate(() => { const h = window.SpawnCity?.hud?.(); return JSON.stringify({mode: h?.mode, placed: h?.placed, agl: h?.agl, alt: h?.alt, fps: h?.fps, tiles: h?.tiles, playing: window.SpawnCity?.ui?.playing,
     scStart: document.getElementById("scStart")?.disabled, menu: document.getElementById("gameMenu")?.hidden, body: document.body.className}); }).catch(e => "state error " + e.message);
   const shot = async n => { await p.screenshot({path: path.join(out, `${dev}-${n}.png`)}).catch(() => {}); console.log(dev, n, await state()); };
   try {
