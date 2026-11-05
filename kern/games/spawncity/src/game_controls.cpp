@@ -832,6 +832,8 @@ void Game::update_touch_layout() {
     l.weapon = drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "RAKETEN" : "GUIDED";
     l.armed = drone_.telemetry().armed;
   }
+  ctl_.near_car = l.near_car;
+  ctl_.near_jet = l.near_jet;
   l.emp = wanted_.stars() > 0 && (mode_ == Mode::foot || mode_ == Mode::drone);
   l.strike_ready = world_->sim_time() - combat_.last_strike >= kStrikeCooldownS;
   l.cockpit = car_cockpit_;
@@ -875,6 +877,8 @@ std::string Game::ctl_hud_json() {
   s += "\"lastExit\":\"" + g_last_exit + "\",";
   s += "\"hint\":\"" + C.hint + "\",\"hintFaded\":";
   s += fade ? "true" : "false";
+  s += C.near_car ? ",\"nearCar\":true" : ",\"nearCar\":false";
+  s += C.near_jet ? ",\"nearJet\":true" : ",\"nearJet\":false";
   std::snprintf(b, sizeof b, ",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"head\":[%.3f,%.3f]", sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, head_yaw_, head_pitch_);
   s += b;
   return s + "}";
@@ -931,6 +935,28 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     // xbox_control_mode.mjs: CLASSIC / AIM (the setting pad.aimScheme)
     ui_.settings.set(Opt::pad_aim_scheme, cmd == "scheme aim" ? 1.0f : 0.0f);
     out = cmd == "scheme aim" ? "aim" : "classic";
+    return true;
+  }
+  if (starts("press ")) {
+    // web/view.mjs: a click on the original's button (ARM, STOP, weapon, mode, EINSTEIGEN, ...)
+    pad_touch_.inject(cmd.substr(6));
+    out = "ok";
+    return true;
+  }
+  if (starts("touch rects")) {
+    // web/view.mjs: "touch rects id x y w h;id x y w h;..." - where the page drew each button
+    std::vector<TouchPlay::DomRect> rects;
+    std::size_t i = 11;
+    while (i < cmd.size()) {
+      std::size_t j = cmd.find(';', i);
+      if (j == std::string::npos) j = cmd.size();
+      char id[32] = {};
+      TouchPlay::DomRect d;
+      if (std::sscanf(cmd.substr(i, j - i).c_str(), " %31s %f %f %f %f", id, &d.x, &d.y, &d.w, &d.h) == 5) { d.id = id; rects.push_back(d); }
+      i = j + 1;
+    }
+    pad_touch_.set_dom_rects(std::move(rects));
+    out = "ok";
     return true;
   }
   if (cmd == "touch release") {

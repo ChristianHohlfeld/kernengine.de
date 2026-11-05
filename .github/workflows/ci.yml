@@ -138,7 +138,7 @@ jobs:
           # SpawnCity on Kern (kern/games/spawncity): the page, its modules and the module; /spawncity/
           # leads there, and the single-file build is at /spawncity.html.
           mkdir -p _site/kern/games/spawncity/web _site/spawncity
-          cp kern/games/spawncity/web/* _site/kern/games/spawncity/web/
+          cp -r kern/games/spawncity/web/. _site/kern/games/spawncity/web/
           cp generated/spawncity.html _site/spawncity.html
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
           touch _site/.nojekyll

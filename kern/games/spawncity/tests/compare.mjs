@@ -64,10 +64,10 @@ const GAMES = {
   kern: {
     url: KERN,
     async boot(page) {
-      await page.waitForFunction(() => { const b = document.getElementById("scStart"); return b && !b.disabled; }, null, {timeout: 120000});
+      await page.waitForFunction(() => { const b = document.querySelector("html.sc-original-view #gameMenuStart") || document.getElementById("scStart"); return b && !b.disabled; }, null, {timeout: 120000});
     },
     async start(page) {
-      await page.click("#scStart");
+      await page.click(await page.$("html.sc-original-view #gameMenuStart") ? "#gameMenuStart" : "#scStart");
       await page.waitForFunction(() => document.getElementById("scMenu")?.hidden === true || getComputedStyle(document.getElementById("scMenu")).display === "none", null, {timeout: 60000}).catch(() => {});
     },
     mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(`mode ${m}`), m),

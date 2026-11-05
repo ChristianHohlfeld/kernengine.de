@@ -11,6 +11,7 @@ namespace sc {
 
 struct ControlsState {
   controls::Devices dev;
+  bool near_car = false, near_jet = false;  // on foot within reach (the page's EINSTEIGEN buttons, web/view.mjs)
   // mouse + keyboard (desktop_controls.mjs)
   bool locked = false;          // the page reports document.pointerLockElement
   bool swallow_lmb = false;     // the click that captured the mouse never fires

@@ -181,6 +181,25 @@ void TouchPlay::layout() {
   }
   for (TouchBtn& b : buttons_)
     if (std::find(down.begin(), down.end(), b.id) != down.end()) b.pressed = true;
+  apply_dom_rects();
+}
+
+void TouchPlay::set_dom_rects(std::vector<DomRect> rects) {
+  dom_ = std::move(rects);
+  layout();
+}
+
+void TouchPlay::apply_dom_rects() {
+  // The page draws the original's buttons (web/view.mjs, the original's DOM and CSS laid out by its
+  // own edge_hud_layout.mjs / thumb_layout.mjs); a finger counts where the player sees the button.
+  for (const DomRect& d : dom_) {
+    if (d.id == "clearance") {
+      if (pad_w_ > 0) { pad_x_ = d.x; pad_y_ = d.y; pad_w_ = d.w; pad_h_ = d.h; }
+      continue;
+    }
+    for (TouchBtn& b : buttons_)
+      if (b.id == d.id) { b.x = d.x; b.y = d.y; b.w = d.w; b.h = d.h; }
+  }
 }
 
 bool TouchPlay::in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const { return std::hypot(x - cx, y - cy) <= r; }

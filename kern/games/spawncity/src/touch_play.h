@@ -87,10 +87,17 @@ class TouchPlay {
   f32 take_zoom();
   bool held(const std::string& id) const;
   bool take_pressed(const std::string& id);
+  /// A click on the page's copy of a button (mouse, keyboard focus): the same press as a finger.
+  void inject(const std::string& id) { pressed_.push_back(id); }
   bool take_released(const std::string& id);
   /// A tap on the free screen while aiming the air strike (fighter_jets.mjs overlay).
   bool take_strike_tap(f32& x, f32& y);
   bool any() const { return !fingers_.empty(); }
+
+  /// The rectangles of the buttons as the page drew them (CSS px in the canvas frame): fingers hit
+  /// what the player sees. Ids as in view_json ("clearance" = the drone's altitude pad).
+  struct DomRect { std::string id; f32 x = 0, y = 0, w = 0, h = 0; };
+  void set_dom_rects(std::vector<DomRect> rects);
 
   std::string view_json() const;
   const std::vector<TouchBtn>& buttons() const { return buttons_; }
@@ -106,6 +113,7 @@ class TouchPlay {
     Vec2 base;
   };
   void layout();
+  void apply_dom_rects();
   bool no_sticks() const { return lay_.aiming || (lay_.mode == TouchMode::drone && lay_.pad_drone); }
   TouchBtn* button_at(f32 x, f32 y);
   bool in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const;
@@ -123,6 +131,7 @@ class TouchPlay {
   f32 clearance_ = 0, nade_up_ = 0;
   f32 zoom_ = 1, pinch_d_ = 0;
   bool strike_tap_ = false;
+  std::vector<DomRect> dom_;
   f32 strike_x_ = 0, strike_y_ = 0;
   // the altitude pad's rectangle (drone)
   f32 pad_x_ = 0, pad_y_ = 0, pad_w_ = 0, pad_h_ = 0;
