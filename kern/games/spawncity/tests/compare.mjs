@@ -112,6 +112,12 @@ try {
       };
       const url = new URL(g.url); url.searchParams.set("menu", "1");
       await step("title", async () => { await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000}); await g.boot(page); }, 1500);
+      // the title's panels (both games: the original's ids; Kern shows them with ?view=original)
+      const clickIf = sel => page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return "no " + sel; b.click(); return "ok"; }, sel);
+      const escape = () => page.keyboard.press("Escape").catch(() => {});
+      await step("title-changelog", () => clickIf("#gameMenuChangelog"), 1500); await escape(); await pause(600);
+      await step("title-world", () => clickIf("#gameMenuWorld"), 1500); await escape(); await pause(600);
+      await step("title-place", () => clickIf("#startPlaceButton"), 1500); await escape(); await pause(600);
       await step("start-drone", () => g.start(page), 6000);
       await step("foot", () => g.mode(page, "foot"), 3000);
       await step("car", () => g.mode(page, "car"), 3000);
@@ -119,6 +125,10 @@ try {
       await step("minimap", () => g.minimap(page), 1200);
       await g.minimap(page).catch(() => {});
       await step("pause-menu", () => g.pauseMenu(page), 1200);
+      await escape(); await pause(800);
+      await step("settings-menu", () => clickIf("#mobileGameplaySettings"), 1500);
+      await page.evaluate(() => { for (const h of document.querySelectorAll("dialog[open] .sec-head")) h.click(); }).catch(() => {});
+      await step("settings-open-all", null, 1000);
       await ctx.close();
     }
   }
