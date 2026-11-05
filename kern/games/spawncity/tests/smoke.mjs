@@ -181,7 +181,7 @@ async function run({name, url, context, mapped}) {
   // The game starts before the city is there (like the original), so the houses stream in after the start.
   {
     const t1 = Date.now();
-    await page.waitForFunction(() => { const t = window.SpawnCity?.hud()?.tiles; return t && t.colliders > 20 && t.t?.built >= 0; }, null, {timeout: 120000}).catch(() => {});
+    await page.waitForFunction(() => { const t = window.SpawnCity?.hud()?.tiles; return t && t.colliders > 20 && (t.t?.built >= 0 || t.t?.request < 0); }  /* offline town: no tile milestones */, null, {timeout: 120000}).catch(() => {});
     h = await hud();
     console.log(`[${name}] city built ${((Date.now() - t1) / 1000).toFixed(1)} s after the start (tiles ${JSON.stringify(h.tiles)})`);
   }
