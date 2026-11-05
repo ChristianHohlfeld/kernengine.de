@@ -108,7 +108,18 @@ export class OriginalView {
   }
 
   wire() {
-    const click = (id, fn) => $(id)?.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(ev); });
+    // A clicked HUD button must not keep the keyboard focus: SPACE / ENTER would press it again
+    // (SPACE = jump became WEAPON). The game's buttons are pointer targets; the keys belong to the
+    // game (desktop_controls.mjs). Dialogs and the title menu keep normal focus for their keys.
+    const hudButton = t => t instanceof Element && t.closest("button,[role=button]") && !t.closest("dialog,#gameMenu,#worldOptionsPanel,#changelogPanel,#startPlacePanel,input,select,textarea");
+    document.addEventListener("mousedown", ev => { if (hudButton(ev.target)) ev.preventDefault(); }, {capture: true});
+    const release = ev => {
+      const a = document.activeElement;
+      if ((ev.code === "Space" || ev.code === "Enter" || ev.code === "NumpadEnter") && hudButton(a)) { a.blur(); ev.preventDefault(); }
+    };
+    document.addEventListener("keydown", release, {capture: true});
+    document.addEventListener("keyup", release, {capture: true});
+    const click = (id, fn) => $(id)?.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(ev); ev.currentTarget?.blur?.(); });
     const kernAct = act => document.querySelector(`#scMenu [data-act="${act}"]`)?.click();
     // title menu (drone_simulator.html #gameMenu; auto_flight_start.mjs START)
     click("gameMenuStart", () => $("scStart")?.click());
