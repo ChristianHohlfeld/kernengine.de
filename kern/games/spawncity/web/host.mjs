@@ -287,6 +287,15 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (rate && e.sc_audio_init(rate)) setInterval(() => audio.pump(), 20);
     else audio = null;
   }
+  // A hidden page is silent (music_player.mjs wanted(): !document.hidden; the original's effects
+  // stop with the frame loop): minimised on a phone, no birds, no engine in the background.
+  document.addEventListener("visibilitychange", () => {
+    const c = audio?.context;
+    if (!c) return;
+    if (document.hidden) c.suspend?.().catch(() => {});
+    else if (c.state !== "running") c.resume?.().catch(() => {});
+  });
+  addEventListener("pagehide", () => audio?.context?.suspend?.().catch(() => {}));
 
   // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
   const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
