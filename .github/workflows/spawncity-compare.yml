@@ -10,7 +10,7 @@ on:
         default: https://kernengine.de/kern/games/spawncity/web/index.html
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compare:
@@ -28,6 +28,15 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Compare
         run: node kern/games/spawncity/tests/compare.mjs generated/spawncity-compare https://spawncity.de/drone_simulator.html "${{ inputs.kern_url }}"
+      - name: Results to branch vergleich-ergebnis
+        if: always()
+        run: |
+          set -euo pipefail
+          cd generated/spawncity-compare
+          git init -q -b vergleich-ergebnis
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Vergleich ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" vergleich-ergebnis
       - uses: actions/upload-artifact@v4
         if: always()
         with:
