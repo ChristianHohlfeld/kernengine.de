@@ -356,8 +356,33 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     e.kern_app_resize(w, hh);
   };
   const gapsHud = new GapsHud(hudEl, command);  // impact bursts, police dispatch (gaps_hud.mjs)
+  // ?perf=1: where a frame's time goes, on the player's own device (screenshot it). Frame time from
+  // rAF (p50 / p95 / max of the last 2 s, frames over 50 ms), the game's own CPU slots, the GPU
+  // time of the frame (timer query, when the browser has it), the city's slowest streaming step,
+  // the render scale and the drawing-buffer size.
+  const perfView = params.get("perf") === "1" ? (() => {
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;left:6px;bottom:6px;z-index:2147483647;max-width:96vw;padding:5px 7px;border-radius:6px;background:rgba(0,0,0,.72);color:#9ff;font:600 10px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none";
+    document.body.appendChild(el);
+    command("perf 1");
+    const ft = [];
+    let prev = 0, shownAt = 0, longs = 0;
+    return now => {
+      if (prev) { const d = now - prev; ft.push([now, d]); if (d > 50) longs++; }
+      prev = now;
+      while (ft.length && now - ft[0][0] > 2000) ft.shift();
+      if (now - shownAt < 250 || !last) return;
+      shownAt = now;
+      const s = ft.map(f => f[1]).sort((a, b) => a - b), q = x => s.length ? s[Math.min(s.length - 1, Math.floor(x * s.length))].toFixed(1) : "-";
+      const p = last.perf || {}, m = p.ms || {}, t = last.tiles?.t || {};
+      el.textContent = `frame ms p50 ${q(.5)} p95 ${q(.95)} max ${q(1)} · >50ms ${longs} · ${p.fps?.toFixed?.(0) ?? "-"} fps · tier ${p.tierName || "-"} · scale ${last.renderScale ?? "-"} · ${canvas.width}x${canvas.height}\n`
+        + `cpu logic ${m.logic?.toFixed(1)} physics ${m.physics?.toFixed(1)} stream ${m.stream?.toFixed(1)} draw ${m.draw?.toFixed(1)} render ${m.render?.toFixed(1)} · gpu ${m.gpu >= 0 ? m.gpu.toFixed(1) : "n/a"}\n`
+        + `stream worst ${t.worst ?? "-"} ms (${t.worstStep || "-"} ${t.worstStepMs ?? ""}) · mode ${last.mode}`;
+    };
+  })() : null;
   const tick = () => {
     frames++;
+    perfView?.(performance.now());
     pollPad();
     pumpTiles();
     pumpDem();
