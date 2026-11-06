@@ -18,6 +18,7 @@ struct Heli {
   f32 yaw = 0, hp = combat::kHeliHp, orbit = 0, rotor = 0, next_burst = 0, next_shot = 0;
   i32 burst = 0;
   bool dead = false;
+  u16 id = 0;  // in the snapshots to the mates (game_swarm.cpp)
 };
 
 struct Tank {
@@ -28,6 +29,7 @@ struct Tank {
   i32 fails = 0;
   std::vector<Vec2> path;
   bool leaving = false, wreck = false, dead = false, has_exit = false;
+  u16 id = 0;
   kern::physics::Body body;  // military_response.mjs upsertBody: the hull as a body cars and people hit
 };
 
@@ -39,6 +41,7 @@ struct SoldierAi {
   i32 burst = 0;
   bool los = false;
   std::vector<Vec2> path;
+  u16 id = 0;
 };
 
 struct FlakGun {
@@ -58,7 +61,7 @@ struct Flare { Vec3 p; f32 born = 0, until = 0; };
 
 struct Tracer { Vec3 a, b; f32 until = 0; Vec3 color{3, 2.4f, 1.2f}; };
 
-struct ZombieAi { i32 person = -1; f32 next_hit = 0, swing = -99, speed = 1, last_hp = 0; };
+struct ZombieAi { i32 person = -1; f32 next_hit = 0, swing = -99, speed = 1, last_hp = 0; u16 id = 0; };
 
 struct EnemyAi {
   i32 person = -1;

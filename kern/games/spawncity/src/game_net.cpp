@@ -291,6 +291,8 @@ void Game::update_net(f32 dt) {
         ++explosions_;
         gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)
         if (f.dir.y > 0.5f) destruction_.blast(f.p, f.a, f.dir.x, f.dir.y > 1.5f, city_, rng_);  // and buildings
+        // a mate's blast in our world hurts our people, zombies and military too (their own are his)
+        if (f.dir.x > 0) { people_.blast(f.p, f.a, f.dir.x, false, world_->sim_time()); combat_blast(f.p, f.a, f.dir.x, false); }
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;

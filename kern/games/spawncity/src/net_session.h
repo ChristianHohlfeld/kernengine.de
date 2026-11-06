@@ -101,6 +101,20 @@ struct Remote {
   f64 speaking_until = 0;
 };
 
+/// Units a player simulates himself and the others see and shoot (zombie_nights.mjs zombie-sync,
+/// military_response.mjs mil-snap): his zombies, helicopters, tanks and soldiers, every 120 ms.
+enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3 };
+struct SwarmUnit {
+  u16 id = 0;
+  SwarmKind kind = SwarmKind::zombie;
+  u8 flags = 0;     // zombie: attacking; heli: going down; soldier: 0 idle 1 aim 2 run 3 walk
+  Vec3 p;
+  f32 yaw = 0, aux = 0;  // aux: zombie speed, tank turret
+};
+struct Swarm { u8 owner = 0; std::vector<SwarmUnit> units; };
+/// A hit on another player's unit (zombie-hit / mil-hit): the owner applies it.
+struct SwarmHit { u8 from = 0, to = 0; u16 id = 0; SwarmKind kind = SwarmKind::zombie; f32 damage = 0; };
+
 class Session {
  public:
   Session();
@@ -123,6 +137,9 @@ class Session {
 
   // ---- outgoing ----
   void send_fx(Fx f);
+  /// Our units (all kinds in one snapshot, at most 64); the others draw and shoot them.
+  void send_swarm(const std::vector<SwarmUnit>& units);
+  void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
   /// A shot / blast of ours that reached player `target` (the authority judges it).
   void request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from);
   /// We went down (by kNobody: an accident).
@@ -144,6 +161,8 @@ class Session {
   std::vector<Hit> take_confirms() { return std::move(confirms_); }
   std::vector<Kill> take_kills() { return std::move(kills_); }
   std::vector<Fx> take_fx() { return std::move(fx_); }
+  std::vector<Swarm> take_swarms() { return std::move(swarms_); }
+  std::vector<SwarmHit> take_swarm_hits() { return std::move(swarm_hits_); }
   std::vector<PingEvent> take_pings() { return std::move(pings_); }
   std::vector<VoiceFrame> take_voice() { return std::move(voice_); }
   /// A spawn anchor from the host for this (joining) player.
@@ -196,6 +215,8 @@ class Session {
   std::vector<Hit> hits_, confirms_;
   std::vector<Kill> kills_;
   std::vector<Fx> fx_;
+  std::vector<Swarm> swarms_;
+  std::vector<SwarmHit> swarm_hits_;
   std::vector<PingEvent> pings_;
   std::vector<VoiceFrame> voice_;
   std::vector<u8> pending_anchor_;  // host: clients waiting for their anchor (first pose)

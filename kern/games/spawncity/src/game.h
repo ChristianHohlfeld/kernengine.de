@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "car.h"
@@ -232,6 +233,17 @@ class Game {
   void draw_projectiles();
   // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
   MpLocal& mp_local();
+  // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap)
+  struct RemoteUnit { u16 id = 0; net::SwarmKind kind = net::SwarmKind::zombie; u8 flags = 0; Vec3 p, tp; f32 yaw = 0, tyaw = 0, aux = 0, rotor = 0; i32 person = -1; };
+  struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
+  std::unordered_map<u8, RemoteSwarm> swarms_;
+  f64 swarm_clock_ = 0;
+  u16 swarm_serial_ = 0;
+  void swarm_update(f32 dt);
+  void swarm_clear();
+  bool swarm_shot(kern::game::ShotEvent& s);   // a mate's helicopter or tank on the line
+  bool swarm_person_hit(i32 person, f32 damage);  // a mate's zombie / soldier: the hit goes to him
+  void swarm_draw();
   void mp_input(kern::Engine& e, f32 dt);
   std::string mp_hud_json();
   std::string net_command(const std::string& cmd);

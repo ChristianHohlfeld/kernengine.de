@@ -98,7 +98,7 @@ bool Game::combat_shot(kern::game::ShotEvent& s) {
       if (g.hp <= 0) { g.dead = true; ++combat_.flak_destroyed; }
       return true;
     }
-  return false;
+  return swarm_shot(s);  // a mate's helicopter or tank (game_swarm.cpp)
 }
 
 void Game::combat_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
@@ -732,6 +732,7 @@ void Game::draw_military() {
     A.heli(Mat4::translate(h.p) * Mat4::trs({}, Quat::axis_angle({0, 0, 1}, h.yaw) * Quat::axis_angle({1, 0, 0}, clampf(-kern::length(h.v) * 0.004f, -0.25f, 0)), {1, 1, 1}),
            h.rotor, h.state == Heli::State::down);
   for (const Tank& k : combat_.tanks) A.tank(Mat4::translate(k.p) * Mat4::trs({}, yaw_quat(k.yaw), {1, 1, 1}), k.turret, k.wreck);
+  swarm_draw();  // the mates' helicopters and tanks
   for (const Tank& k : combat_.tanks)
     if (k.wreck && now - k.wreck_at < 40) people_art_.fire(k.p + Vec3{0, 0, 1.6f}, 0.9f, now);
   for (const FlakGun& g : combat_.flak)

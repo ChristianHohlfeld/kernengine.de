@@ -114,6 +114,13 @@ class People {
   u32 count(Kind k, bool alive_only = true) const;
   /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
   i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
+  /// Damage to person `i` from somewhere else (a mate's round on our zombie): down at 0.
+  void hurt(i32 i, f32 damage, Vec3 from_dir, bool by_player, f32 now) {
+    Person& p = at(i);
+    if (p.state == State::down || p.state == State::gone) return;
+    p.hp -= damage;
+    if (p.hp <= 0) kill(p, from_dir, by_player, now, false);
+  }
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
   /// A fall since the last take_falls() (ragdolls, M3 life): `push` is the car's throw (m/s,
   /// people_impacts.mjs) for `car`, else the direction of the shot or blast; `alive`: knocked down

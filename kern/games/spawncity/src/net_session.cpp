@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -61,6 +61,48 @@ struct R {
 };
 
 bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6f && std::fabs(v.y) < 1e6f && std::fabs(v.z) < 1e5f; }
+
+std::vector<u8> pack_swarm(u8 owner, const std::vector<SwarmUnit>& units) {
+  W w;
+  w.put(owner).put(static_cast<u8>(std::min<std::size_t>(units.size(), 64)));
+  for (std::size_t i = 0; i < units.size() && i < 64; ++i) {
+    const SwarmUnit& u = units[i];
+    // 18 bytes a unit (64 fit in one unreliable message of 1200): z in dm, yaw and aux in 1/100
+    const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
+    w.put(u.id).put(static_cast<u8>(u.kind)).put(u.flags).put(u.p.x).put(u.p.y).put(q16(u.p.z, 10)).put(q16(u.yaw, 100)).put(q16(u.aux, 100));
+  }
+  return w.b;
+}
+bool unpack_swarm(const std::vector<u8>& b, Swarm& s) {
+  R r{b};
+  s.owner = r.get<u8>();
+  const u8 n = r.get<u8>();
+  s.units.clear();
+  for (u8 i = 0; i < n && r.ok; ++i) {
+    SwarmUnit u;
+    u.id = r.get<u16>();
+    const u8 k = r.get<u8>();
+    u.flags = r.get<u8>();
+    u.p.x = r.get<f32>();
+    u.p.y = r.get<f32>();
+    u.p.z = r.get<std::int16_t>() / 10.0f;
+    u.yaw = r.get<std::int16_t>() / 100.0f;
+    u.aux = r.get<std::int16_t>() / 100.0f;
+    if (!r.ok || k > 3 || !sane(u.p) || !std::isfinite(u.yaw) || !std::isfinite(u.aux)) return false;
+    u.kind = static_cast<SwarmKind>(k);
+    s.units.push_back(u);
+  }
+  return r.ok;
+}
+std::vector<u8> pack_swarm_hit(const SwarmHit& h) { return W().put(h.from).put(h.to).put(h.id).put(static_cast<u8>(h.kind)).put(h.damage).b; }
+bool unpack_swarm_hit(const std::vector<u8>& b, SwarmHit& h) {
+  R r{b};
+  h.from = r.get<u8>(); h.to = r.get<u8>(); h.id = r.get<u16>();
+  const u8 k = r.get<u8>();
+  h.damage = r.get<f32>();
+  h.kind = static_cast<SwarmKind>(k);
+  return r.ok && k <= 3 && std::isfinite(h.damage) && h.damage > 0 && h.damage < 1e4f;
+}
 
 std::vector<u8> pack_hit(const Hit& h) { return W().put(h.target).put(h.by).put(h.weapon).put(h.zone).put(h.damage).put(h.from).b; }
 bool unpack_hit(const std::vector<u8>& b, Hit& h) {
@@ -223,6 +265,15 @@ void Session::send_fx(Fx f) {
   f.owner = self_slot_;
   to_host(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f));
 }
+void Session::send_swarm(const std::vector<SwarmUnit>& units) {
+  if (role_ == Role::none) return;
+  to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, units));
+}
+void Session::send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage) {
+  if (role_ == Role::none) return;
+  SwarmHit h{self_slot_, to, id, kind, damage};
+  to_host(kReliable, kSwarmHitMsg, pack_swarm_hit(h));
+}
 void Session::request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from) {
   if (role_ == Role::none || damage < 1) return;
   Hit h{target, self_slot_, weapon, zone, clampf(std::round(damage), 1, 100), from};
@@ -344,6 +395,23 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
       to_all(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f), from);
       return;
     }
+    case kSwarmMsg: {
+      // the host passes a player's units on to everybody else (the owner is who sent them)
+      Swarm sw;
+      if (!unpack_swarm(d, sw)) return;
+      sw.owner = from;
+      if (from != self_slot_) swarms_.push_back(sw);
+      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, sw.units), from);
+      return;
+    }
+    case kSwarmHitMsg: {
+      SwarmHit h;
+      if (!unpack_swarm_hit(d, h)) return;
+      h.from = from;
+      if (h.to == self_slot_) swarm_hits_.push_back(h);
+      else if (h.to != kHost) to_client(h.to, kReliable, kSwarmHitMsg, pack_swarm_hit(h));
+      return;
+    }
     case kHitReq: {
       Hit h;
       if (unpack_hit(d, h)) judge(from, h);
@@ -435,6 +503,8 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       return;
     }
     case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
+    case kSwarmMsg: { Swarm sw; if (unpack_swarm(d, sw) && sw.owner != self_slot_) swarms_.push_back(sw); return; }
+    case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
     case kSeatState: {
       const u32 rev = r.get<u32>();
       const u8 n = r.get<u8>();

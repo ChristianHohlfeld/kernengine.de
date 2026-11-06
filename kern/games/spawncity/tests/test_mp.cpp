@@ -184,6 +184,32 @@ SC_TEST(mp_sessions_host_two_clients) {
   SC_CHECK(fb.size() == 1 && fb[0].owner == a.self_slot() && fb[0].a == 7, "explosion reached b");
   SC_CHECK(b.take_pings().size() == 1 && host.take_pings().size() == 1, "ping");
   SC_CHECK(host.take_voice().size() == 1 && b.take_voice().empty(), "voice in range only");
+  // Units (zombie_nights.mjs zombie-sync, military_response.mjs mil-snap): a's swarm reaches host and b,
+  // b's hit on a's zombie goes to a alone.
+  {
+    std::vector<net::SwarmUnit> units;
+    for (u16 i = 1; i <= 64; ++i) units.push_back({i, i % 2 ? net::SwarmKind::zombie : net::SwarmKind::soldier, 1, {i * 1.5f, -3.25f, 12.3f}, 3.1f, 1.7f});
+    units[5].kind = net::SwarmKind::tank;
+    a.send_swarm(units);
+    run(0.3, {0, 0, 1}, {5, 0, 1}, {200, 0, 1});
+    const std::vector<net::Swarm> sb = b.take_swarms(), sh = host.take_swarms();
+    SC_CHECK(sb.size() == 1 && sh.size() == 1 && sb[0].owner == a.self_slot() && sb[0].units.size() == 64, "64 units in one message to b and the host");
+    if (!sb.empty() && sb[0].units.size() == 64) {
+      const net::SwarmUnit& u = sb[0].units[9];
+      SC_CHECK(u.id == 10 && u.kind == net::SwarmKind::soldier && std::fabs(u.p.x - 15) < 1e-4f && std::fabs(u.p.z - 12.3f) < 0.06f && std::fabs(u.yaw - 3.1f) < 0.006f &&
+                   std::fabs(u.aux - 1.7f) < 0.006f && u.flags == 1, "a unit arrives as it left");
+      SC_CHECK(sb[0].units[5].kind == net::SwarmKind::tank, "kinds kept");
+    }
+    SC_CHECK(a.take_swarms().empty(), "nobody gets his own back");
+    b.send_swarm_hit(a.self_slot(), 7, net::SwarmKind::zombie, 34);
+    run(0.3, {0, 0, 1}, {5, 0, 1}, {200, 0, 1});
+    const std::vector<net::SwarmHit> ha = a.take_swarm_hits();
+    SC_CHECK(ha.size() == 1 && ha[0].id == 7 && ha[0].from == b.self_slot() && ha[0].damage == 34, "the hit reached the owner");
+    SC_CHECK(host.take_swarm_hits().empty() && b.take_swarm_hits().empty(), "and only him");
+    host.send_swarm_hit(b.self_slot(), 3, net::SwarmKind::heli, 25);
+    run(0.3, {0, 0, 1}, {5, 0, 1}, {200, 0, 1});
+    SC_CHECK(b.take_swarm_hits().size() == 1, "the host's hit on a client's helicopter");
+  }
   // The pose timeline shows a mate where he is.
   const net::Remote* ra = b.remote(a.self_slot());
   SC_CHECK(ra && std::fabs(ra->body.sample(b.now_ms()).p.x - 5) < 0.2f, "a seen at x=5");

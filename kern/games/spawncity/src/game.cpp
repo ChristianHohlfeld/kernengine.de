@@ -798,6 +798,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_details(dt);  // critical damage, ballots (game_details.cpp)
     gaps_update(dt);  // dispatch, critical smoke, organic hits, impact bursts (game_gaps.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
+    swarm_update(dt);  // the mates' zombies and military (game_swarm.cpp)
     destruction_.update(dt, city_, rng_);  // broken buildings: torn pieces, debris (destruction.h)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }

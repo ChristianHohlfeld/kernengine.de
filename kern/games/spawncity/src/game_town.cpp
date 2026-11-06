@@ -119,6 +119,7 @@ void Game::handle_shots() {
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
     i32 person = -1;
     if (hit_remotes(s.from, to, damage) || (person = people_.shot(s.from, to, damage, true, now)) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
+      if (person >= 0) swarm_person_hit(person, damage);  // a mate's zombie or soldier: the hit goes to him
       if (person >= 0) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
       // Glock and sniper go through bodies: up to three, 0.6 m on past each, walls stop them
       // (glockShotAt / sniperShotAt pierced < 3); the end point stays where the round really ends
