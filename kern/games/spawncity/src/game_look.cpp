@@ -315,6 +315,24 @@ void Game::look_lighting(f32 dt) {
         if (mode_ == Mode::foot) world_->shake_camera(heavy ? 0.1f : 0.06f);
         L.flash_until = now + 0.055f;
       }
+    // The blue and red lights first: they colour the street around the cruiser and the drones;
+    // the street lamps then take what slots are left (one at least).
+    u32 police_n = 0;
+    // Police light bars (police_ground_units.mjs flashLights: 14, 18 m, 2 m above the car).
+    for (const TrafficCar& c : cars_) {
+      if (!c.police || !c.placed || c.wreck || c.unit < 0 || c.unit >= static_cast<i32>(units_.size()) || !world_->actor_alive(c.actor)) continue;
+      const PoliceUnit::State st = units_[c.unit].state;
+      if (st == PoliceUnit::State::abandoned || st == PoliceUnit::State::wreck || st == PoliceUnit::State::leave) continue;
+      const int fl = look::police_flash(now);
+      if (fl) { req(matrix_of(c.actor).translation() + Vec3{0, 0, 2}, fl == 1 ? 0xff2030 : 0x2a6bff, 14, 18, 3); ++police_n; }
+    }
+    // Police drones (wanted_police_drones.mjs: 24, 28 m).
+    for (u32 i = 0; i < 5; ++i) {
+      const PoliceDrone& d = pdrones_[i];
+      if (!d.active || d.emp) continue;
+      const int fl = look::drone_flash(now, static_cast<int>(i));
+      if (fl) { req(d.pos, fl == 1 ? 0xff1834 : 0x1688ff, 24, 28, 4); ++police_n; }
+    }
     const f32 glow = look::lamp_glow(night_);
     // Street lamps: the nearest three within 70 m, re-picked every 350 ms (scene_lighting.mjs).
     if (glow > 0.01f && show_lamps_) {
@@ -332,7 +350,8 @@ void Game::look_lighting(f32 dt) {
         L.near_lamps.clear();
         for (std::size_t i = 0; i < near.size() && i < 3; ++i) L.near_lamps.push_back(near[i].second);
       }
-      for (const Vec3& h : L.near_lamps) req(h, 0xffb35a, 46 * glow, 26, 5.75f);
+      const u32 lamp_slots = police_n ? std::max<u32>(1, L.pool_size > police_n ? L.pool_size - police_n : 1) : 3;
+      for (std::size_t li = 0; li < L.near_lamps.size() && li < lamp_slots; ++li) req(L.near_lamps[li], 0xffb35a, 46 * glow, 26, 5.75f);
     }
     // Headlights: a pool of light ~7 m ahead of the car the player drives.
     if (glow > 0.05f && mode_ == Mode::car && car_index_ >= 0) {
@@ -371,21 +390,6 @@ void Game::look_lighting(f32 dt) {
     }
     // Jetpack flame under the player.
     if (ui_.jetpack.thrusting && mode_ == Mode::foot) req(player_position() - Vec3{0, 0, 1.6f}, 0xff8a2a, 14, 9, 2);
-    // Police light bars (police_ground_units.mjs flashLights: 14, 18 m, 2 m above the car).
-    for (const TrafficCar& c : cars_) {
-      if (!c.police || !c.placed || c.wreck || c.unit < 0 || c.unit >= static_cast<i32>(units_.size()) || !world_->actor_alive(c.actor)) continue;
-      const PoliceUnit::State st = units_[c.unit].state;
-      if (st == PoliceUnit::State::abandoned || st == PoliceUnit::State::wreck || st == PoliceUnit::State::leave) continue;
-      const int fl = look::police_flash(now);
-      if (fl) req(matrix_of(c.actor).translation() + Vec3{0, 0, 2}, fl == 1 ? 0xff2030 : 0x2a6bff, 14, 18, 3);
-    }
-    // Police drones (wanted_police_drones.mjs: 24, 28 m).
-    for (u32 i = 0; i < 5; ++i) {
-      const PoliceDrone& d = pdrones_[i];
-      if (!d.active || d.emp) continue;
-      const int fl = look::drone_flash(now, static_cast<int>(i));
-      if (fl) req(d.pos, fl == 1 ? 0xff1834 : 0x1688ff, 24, 28, 4);
-    }
   }
   const kern::PointLights& out = L.lights.resolve(eye);
   L.lights_used = out.count;
