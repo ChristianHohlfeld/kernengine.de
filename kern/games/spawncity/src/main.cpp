@@ -94,6 +94,13 @@ KERN_EXPORT(sc_dem_data) void sc_dem_data(kern::i32 z, kern::i32 x, kern::i32 y,
 }
 KERN_EXPORT(sc_dem_failed) void sc_dem_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().terrain().fail(sc::TileKey{z, x, y}); }
 
+// ---- aerial imagery for the ground colour (world_ground.mjs): the page decodes, the game averages ----
+KERN_EXPORT(sc_image_requests) const char* sc_image_requests() { return result(sc::game().city().terrain().take_image_requests()); }
+KERN_EXPORT(sc_image_data) void sc_image_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 width, kern::u32 height) {
+  sc::game().city().terrain().provide_image(sc::TileKey{z, x, y}, rgba, width, height);
+}
+KERN_EXPORT(sc_image_failed) void sc_image_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().terrain().fail_image(sc::TileKey{z, x, y}); }
+
 // ---- input the App host does not forward ----
 KERN_EXPORT(sc_gamepad) void sc_gamepad(kern::i32 connected, kern::f32 lx, kern::f32 ly, kern::f32 rx, kern::f32 ry, kern::f32 lt, kern::f32 rt, kern::u32 buttons,
                                         kern::i32 active) {

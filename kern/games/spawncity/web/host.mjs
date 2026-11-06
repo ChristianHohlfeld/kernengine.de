@@ -30,6 +30,8 @@ import {installOriginalAudio, exemptVoice} from "./audio.mjs";
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
 // Elevation: Terrain Tiles (Terrarium) on AWS Open Data, as on spawncity.de (terrain_elevation.mjs).
 const SC_DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+// Aerial imagery for the ground's colour (world_ground.mjs TILE_URL, Esri World Imagery, z 15).
+const SC_IMAGERY = "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SC_MAX_FETCHES = 4;
 
 /** Starts the game in the page (index.html). Module: url (dev) or base64 (single file). */
@@ -157,6 +159,35 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     } finally {
       dem.active--;
     }
+  }
+  // ---- aerial imagery (world_ground.mjs): the ground's colour, never shown as a texture ----------
+  const img = {template: params.get("imagery") || SC_IMAGERY, queue: [], active: 0};
+  async function fetchImage([z, x, y]) {
+    img.active++;
+    try {
+      const res = await fetchWithTimeout(img.template.replace("{z}", z).replace("{x}", x).replace("{y}", y), 9000);
+      if (!res.ok) throw Error("imagery " + res.status);
+      const bitmap = await createImageBitmap(await res.blob());
+      // a small mosaic: 64 px per tile is enough for 10 m cells (the original draws it so)
+      const c = new OffscreenCanvas(64, 64), g = c.getContext("2d", {willReadFrequently: true});
+      g.imageSmoothingQuality = "high";
+      g.drawImage(bitmap, 0, 0, 64, 64);
+      const px = g.getImageData(0, 0, 64, 64).data;
+      const ptr = e.kern_alloc(px.length);
+      new Uint8Array(kern.memory.buffer, ptr, px.length).set(px);
+      e.sc_image_data(z, x, y, ptr, 64, 64);
+      e.kern_free(ptr);
+    } catch (error) {
+      e.sc_image_failed?.(z, x, y);  // the ground keeps its fallback colour
+    } finally {
+      img.active--;
+    }
+  }
+  function pumpImages() {
+    if (!e.sc_image_requests) return;
+    const list = JSON.parse(str(e.sc_image_requests()));
+    if (list.length) img.queue.push(...list);
+    while (img.active < SC_MAX_FETCHES && img.queue.length) fetchImage(img.queue.shift());
   }
   function pumpDem() {
     const list = JSON.parse(str(e.sc_dem_requests()));
@@ -391,6 +422,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     pollPad();
     pumpTiles();
     pumpDem();
+    if (!offline) pumpImages();
     jobs?.pump();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }

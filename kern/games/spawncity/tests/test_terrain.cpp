@@ -125,3 +125,37 @@ SC_TEST(terrain_water) {
   const RayResult h = cast(world, {20, 20, 50}, {0, 0, -1}, 100, {});
   SC_CHECK(h.hit && std::fabs(h.point.z + Terrain::kWaterBed) < 0.1f, "the lake bed is solid (%.2f)", h.point.z);
 }
+
+// world_ground.mjs: the aerial tiles of the 1600 m around the player are asked for once (z 15),
+// averaged to an albedo per node; the ground is rebuilt with them and nothing else is fetched.
+SC_TEST(terrain_ground_imagery) {
+  kern::Renderer r;
+  r.init(kern::RendererOptions{});
+  kern::physics::World world;
+  world.create(kern::physics::WorldSettings{});
+  kern::GeoProjector proj;
+  proj.init(kKonstanzLon, kKonstanzLat);
+  Terrain t;
+  t.start(&r, &world, proj, false);
+  t.update({0, 0, 0}, {0, 0, 0}, 50);
+  const std::string req = t.take_image_requests();
+  u32 n = 0;
+  for (char c : req) n += c == '[';
+  n -= 1;  // the outer bracket
+  SC_CHECK(n >= 4 && n <= 9 && req.find("[15,") != std::string::npos, "the z15 tiles around the player: %s", req.c_str());
+  // a green field everywhere
+  std::vector<u8> px(256 * 256 * 4);
+  for (std::size_t i = 0; i < px.size(); i += 4) { px[i] = 60; px[i + 1] = 110; px[i + 2] = 40; px[i + 3] = 255; }
+  std::size_t at = 1;
+  while ((at = req.find('[', at)) != std::string::npos) {
+    int z, x, y;
+    if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) == 3) t.provide_image(TileKey{z, x, y}, px.data(), 256, 256);
+    ++at;
+  }
+  for (int i = 0; i < 50; ++i) t.update({0, 0, 0}, {0, 0, 0}, 20);
+  SC_CHECK(t.take_image_requests() == "[]", "nothing more to fetch while the player stays");
+  t.update({200, 0, 0}, {200, 0, 0}, 20);
+  SC_CHECK(t.take_image_requests() == "[]", "200 m is not 350 m: no new window");
+  t.update({2000, 0, 0}, {2000, 0, 0}, 20);
+  SC_CHECK(t.take_image_requests() != "[]", "a new window after 350 m");
+}

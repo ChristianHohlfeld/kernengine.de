@@ -65,6 +65,13 @@ class Terrain {
 
   // ---- host side ----
   std::string take_requests();
+  // ---- ground colour (world_ground.mjs): aerial imagery of the 1600 m around the player, one
+  // albedo per 5 m node (never shown as a texture); rebuilt after 350 m of travel ----
+  static constexpr i32 kImageZoom = 15, kImagePixels = 64;
+  std::string take_image_requests();
+  /// RGBA of a requested imagery tile (any size; averaged down to 64 x 64 as the original's mosaic).
+  void provide_image(const TileKey& key, const u8* rgba, u32 width, u32 height);
+  void fail_image(const TileKey& key);
   void provide(const TileKey& key, const u8* rgba, u32 width, u32 height);
   void fail(const TileKey& key);
 
@@ -123,6 +130,13 @@ class Terrain {
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
   struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
+  struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
+  std::unordered_map<u64, Image> images_;
+  std::vector<TileKey> image_requests_;
+  Vec2 image_at_{1e9f, 1e9f};
+  void plan_images(Vec3 focus);
+  bool ground_albedo(f32 x, f32 y, Vec3& lin) const;
+  kern::Vec4 image_bounds(const TileKey& k) const;
 
   void plan_dem(Vec3 focus);
   bool run_job(f64 deadline);

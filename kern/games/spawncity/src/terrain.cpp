@@ -85,7 +85,7 @@ void filter_pass(std::vector<f32>& h, std::vector<f32>& t, u32 n, i32 pass, i32 
   }
 }
 
-const Vec3 kGround{0.36f, 0.40f, 0.31f};  // the level's ground colour so far
+const Vec3 kGround{0.437f, 0.485f, 0.349f};  // world_ground.mjs fallbackColors (.16, .2, .1 linear) in sRGB
 const Vec3 kBed{0.30f, 0.29f, 0.22f};
 const Vec3 kSoil = kern::hex_color(0x6b5a44);  // world_impacts.mjs ground chip colour
 
@@ -197,6 +197,9 @@ void Terrain::clear() {
   bridges_.clear();
   craters_.clear();
   tints_.clear();
+  images_.clear();
+  image_requests_.clear();
+  image_at_ = {1e9f, 1e9f};
   dem_tiles_.clear();
   requests_.clear();
   if (job_ && job_->id) kern::jobs::cancel(job_->id);
@@ -545,6 +548,125 @@ void Terrain::add_bridge(Vec2 a, Vec2 b, f32 width) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// ground colour (world_ground.mjs)
+
+namespace {
+// Satellite RGB -> albedo (world_ground.mjs albedo): lift shadows, remove haze, plausible ranges
+Vec3 albedo(Vec3 c) {
+  const f32 l = 0.2126f * c.x + 0.7152f * c.y + 0.0722f * c.z;
+  const f32 target = std::fmin(0.24f, std::fmax(0.07f, l * 0.8f + 0.03f)), k = target / std::fmax(0.02f, l);
+  f32 R = c.x * k, G = c.y * k, B = c.z * k;
+  const f32 m = (R + G + B) / 3, sat = std::fmax(R, std::fmax(G, B)) - std::fmin(R, std::fmin(G, B));
+  if (sat < 0.05f) { R = R * 0.85f + m * 0.15f; G = G * 0.85f + m * 0.15f; B = B * 0.85f + m * 0.15f; }
+  if (B > G && B > R && sat > 0.04f) B *= 0.85f;  // haze / water-ish blue cast -> calmer
+  return {std::fmin(0.45f, R), std::fmin(0.45f, G), std::fmin(0.45f, B)};
+}
+f32 srgb_lin8(u8 v) { const f32 x = v / 255.0f; return x <= 0.04045f ? x / 12.92f : std::pow((x + 0.055f) / 1.055f, 2.4f); }
+}  // namespace
+
+std::string Terrain::take_image_requests() {
+  std::string s = "[";
+  for (std::size_t i = 0; i < image_requests_.size(); ++i) {
+    char b[64];
+    std::snprintf(b, sizeof b, "%s[%d,%d,%d]", i ? "," : "", image_requests_[i].z, image_requests_[i].x, image_requests_[i].y);
+    s += b;
+  }
+  image_requests_.clear();
+  return s + "]";
+}
+
+kern::Vec4 Terrain::image_bounds(const TileKey& k) const {
+  f64 lon0, lat0, lon1, lat1;
+  tile_lonlat(k, 0, 0, lon0, lat0);
+  tile_lonlat(k, 1, 1, lon1, lat1);
+  f64 ax, ay, bx, by;
+  proj_.project(lon0, lat0, ax, ay);
+  proj_.project(lon1, lat1, bx, by);
+  return {static_cast<f32>(std::fmin(ax, bx)), static_cast<f32>(std::fmin(ay, by)), static_cast<f32>(std::fmax(ax, bx)), static_cast<f32>(std::fmax(ay, by))};
+}
+
+void Terrain::plan_images(Vec3 focus) {
+  // SIZE_M 1600 around the focus (10 m grid of it), REBUILD_MOVE_M 350
+  if (std::hypot(focus.x - image_at_.x, focus.y - image_at_.y) < 350) return;
+  image_at_ = {std::round(focus.x / 10) * 10, std::round(focus.y / 10) * 10};
+  constexpr f32 half = 800;
+  f64 lon_a, lat_a, lon_b, lat_b;
+  unproject(proj_, image_at_.x - half, image_at_.y + half, lon_a, lat_a);
+  unproject(proj_, image_at_.x + half, image_at_.y - half, lon_b, lat_b);
+  const i32 ix0 = static_cast<i32>(std::floor(merc_x(lon_a, kImageZoom))), iy0 = static_cast<i32>(std::floor(merc_y(lat_a, kImageZoom)));
+  const i32 ix1 = static_cast<i32>(std::floor(merc_x(lon_b, kImageZoom))), iy1 = static_cast<i32>(std::floor(merc_y(lat_b, kImageZoom)));
+  if ((ix1 - ix0 + 1) * (iy1 - iy0 + 1) > 25) return;
+  for (i32 y = iy0; y <= iy1; ++y)
+    for (i32 x = ix0; x <= ix1; ++x) {
+      const TileKey k{kImageZoom, x, y};
+      Image& im = images_[k.hash()];
+      if (!im.requested) { im.requested = true; im.key = k; image_requests_.push_back(k); }
+    }
+  // the cache keeps what is near (tileCache: 64 tiles)
+  for (auto it = images_.begin(); it != images_.end();) {
+    const TileKey& k = it->second.key;
+    if (k.x < ix0 - 2 || k.x > ix1 + 2 || k.y < iy0 - 2 || k.y > iy1 + 2) { if (!it->second.albedo.empty()) repaint(image_bounds(k)); it = images_.erase(it); }
+    else ++it;
+  }
+}
+
+void Terrain::provide_image(const TileKey& key, const u8* rgba, u32 width, u32 height) {
+  auto it = images_.find(key.hash());
+  if (it == images_.end() || width == 0 || height == 0) return;
+  // the mosaic: 64 px per tile (an area average in the image's own sRGB, as the canvas draws it)
+  constexpr u32 P = kImagePixels;
+  std::vector<u8> small(P * P * 4);
+  for (u32 j = 0; j < P; ++j)
+    for (u32 i = 0; i < P; ++i) {
+      const u32 x0 = i * width / P, x1 = std::max(x0 + 1, (i + 1) * width / P), y0 = j * height / P, y1 = std::max(y0 + 1, (j + 1) * height / P);
+      u32 sum[4] = {}, n = 0;
+      for (u32 y = y0; y < y1; ++y)
+        for (u32 x = x0; x < x1; ++x) { const u8* p = rgba + (static_cast<std::size_t>(y) * width + x) * 4; for (int c = 0; c < 4; ++c) sum[c] += p[c]; ++n; }
+      for (int c = 0; c < 4; ++c) small[(j * P + i) * 4 + c] = static_cast<u8>(sum[c] / std::max(1u, n));
+    }
+  // per pixel: the 3 x 3 around it in linear light (transparent ones skipped), then the albedo
+  Image& im = it->second;
+  im.albedo.assign(P * P * 3, 0);
+  for (u32 j = 0; j < P; ++j)
+    for (u32 i = 0; i < P; ++i) {
+      Vec3 s{};
+      u32 n = 0;
+      for (i32 dy = -1; dy <= 1; ++dy)
+        for (i32 dx = -1; dx <= 1; ++dx) {
+          const u32 qx = static_cast<u32>(std::clamp<i32>(static_cast<i32>(i) + dx, 0, P - 1)), qy = static_cast<u32>(std::clamp<i32>(static_cast<i32>(j) + dy, 0, P - 1));
+          const u8* p = &small[(qy * P + qx) * 4];
+          if (p[3] < 10) continue;
+          s = s + Vec3{srgb_lin8(p[0]), srgb_lin8(p[1]), srgb_lin8(p[2])};
+          ++n;
+        }
+      const Vec3 a = albedo(n ? s * (1.0f / static_cast<f32>(n)) : Vec3{0.12f, 0.16f, 0.08f});
+      im.albedo[(j * P + i) * 3] = a.x;
+      im.albedo[(j * P + i) * 3 + 1] = a.y;
+      im.albedo[(j * P + i) * 3 + 2] = a.z;
+    }
+  repaint(image_bounds(key));
+}
+
+void Terrain::fail_image(const TileKey& key) {
+  auto it = images_.find(key.hash());
+  if (it != images_.end()) it->second.failed = true;  // the ground keeps its fallback colour
+}
+
+bool Terrain::ground_albedo(f32 x, f32 y, Vec3& lin) const {
+  if (images_.empty()) return false;
+  f64 lon, lat;
+  unproject(proj_, x, y, lon, lat);
+  const f64 fx = merc_x(lon, kImageZoom), fy = merc_y(lat, kImageZoom);
+  const i32 tx = static_cast<i32>(std::floor(fx)), ty = static_cast<i32>(std::floor(fy));
+  auto it = images_.find(TileKey{kImageZoom, tx, ty}.hash());
+  if (it == images_.end() || it->second.albedo.empty()) return false;
+  const i32 px = std::clamp(static_cast<i32>((fx - tx) * kImagePixels), 0, kImagePixels - 1), py = std::clamp(static_cast<i32>((fy - ty) * kImagePixels), 0, kImagePixels - 1);
+  const f32* a = &it->second.albedo[(static_cast<std::size_t>(py) * kImagePixels + px) * 3];
+  lin = {a[0], a[1], a[2]};
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------
 // map areas
 
 namespace {
@@ -697,13 +819,19 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
   auto H = [&](i32 i, i32 j) { return h[static_cast<std::size_t>(j + 1) * (n + 2) + (i + 1)]; };
   // world_ground.mjs paintAreas: every node inside a map area (outer ring, not in a hole) takes
   // node * .45 + area * .55 (linear), area after area.
-  std::vector<Vec3> tint;
+  // world_ground.mjs: the aerial albedo per node (the fallback grass/soil where none loaded), then
+  // the map areas tint it
+  std::vector<Vec3> tint(static_cast<std::size_t>(n) * n);
+  for (i32 j = 0; j < n; ++j)
+    for (i32 i = 0; i < n; ++i) {
+      Vec3& c = tint[static_cast<std::size_t>(j) * n + i];
+      if (!ground_albedo(x0 + i * step, y0 + j * step, c)) c = {0.16f, 0.2f, 0.1f};
+    }
   {
     std::vector<f32> xs;
     const f32 x1 = x0 + size, y1 = y0 + size;
     for (const Tint& a : tints_) {
       if (a.box.x > x1 || a.box.z < x0 || a.box.y > y1 || a.box.w < y0) continue;
-      if (tint.empty()) tint.assign(static_cast<std::size_t>(n) * n, Vec3{-1, 0, 0});
       for (i32 j = 0; j < n; ++j) {
         const f32 y = y0 + j * step;
         if (y < a.box.y || y > a.box.w) continue;
@@ -719,8 +847,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
           const i32 i1 = std::min(n - 1, static_cast<i32>(std::floor((xs[q + 1] - x0) / step)));
           for (i32 i = i0; i <= i1; ++i) {
             Vec3& c = tint[static_cast<std::size_t>(j) * n + i];
-            const Vec3 base = c.x < 0 ? to_linear(kGround) : c;
-            c = base * 0.45f + a.lin * 0.55f;
+            c = c * 0.45f + a.lin * 0.55f;
           }
         }
       }
@@ -731,10 +858,9 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
       const f32 x = x0 + i * step, y = y0 + j * step, z = H(i, j);
       const f32 dx = H(i + 1, j) - H(i - 1, j), dy = H(i, j + 1) - H(i, j - 1);
       const Vec3 nn = kern::normalize(Vec3{-dx, -dy, 2 * step});
-      Vec3 c = kGround;
+      Vec3 c = to_srgb(tint[static_cast<std::size_t>(j) * n + i]);
       if (z < elevation(x, y) - 0.6f) c = water_at(x, y) ? kBed : kSoil;
       else if (surface_at(x, y) == 2) c = kSoil;
-      else if (!tint.empty() && tint[static_cast<std::size_t>(j) * n + i].x >= 0) c = to_srgb(tint[static_cast<std::size_t>(j) * n + i]);
       m.push({x, y, z}, nn, c, {x * 0.1f, y * 0.1f});
     }
   for (i32 j = 0; j < cells; ++j)
@@ -872,6 +998,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 deadline = kern::now_ms() + budget_ms;
   plan_dem(focus);
+  plan_images(focus);
   if (job_) run_job(deadline);
   if (!settled_) return;
   if (replan_ || std::hypot(focus.x - planned_focus_.x, focus.y - planned_focus_.y) > 40 ||
