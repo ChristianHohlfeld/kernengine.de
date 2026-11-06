@@ -105,10 +105,7 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       Vec3 dir = p.vel * (1.0f / std::fmax(0.001f, sp));
       if (p.guided) {
         // steerRocket: toward the dot (the crosshair ray's hit within 420 m, else its end), at most 2.8 rad/s
-        Vec3 ad;
-        const Vec3 from = aim_ray(ad);
-        const RayResult r = cast(world_->physics(), from, ad, kLaserRange, body(soldier_));
-        const Vec3 dot_at = r.hit ? r.point : from + ad * kLaserRange;
+        const Vec3 dot_at = rocket_laser_dot();
         const Vec3 to = dot_at - p.pos;
         const f32 d = kern::length(to);
         if (d >= 0.5f) {
@@ -216,7 +213,24 @@ void Game::blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player) 
   }
 }
 
+Vec3 Game::rocket_laser_dot() {
+  // updateRocketLaser: pinned point > the finger's ray > the crosshair ray; hit within 420 m, else its end
+  bool flying = false;
+  for (const Projectile& pr : projectiles_) flying = flying || (pr.alive && pr.by_player && pr.id == Id::rocket && pr.guided);
+  if (!flying) laser_pinned_ = false;
+  if (laser_pinned_) { laser_valid_ = true; laser_dot_ = laser_pin_; return laser_dot_; }
+  Vec3 from, ad;
+  if (laser_finger_) ctl_screen_ray(laser_fx_, laser_fy_, from, ad);
+  else { ad = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}); from = cam_.eye; }
+  const RayResult r = cast(world_->physics(), from, ad, kLaserRange, body(soldier_));
+  laser_valid_ = r.hit;
+  laser_dot_ = r.hit ? r.point : from + ad * kLaserRange;
+  return laser_dot_;
+}
+
 void Game::foot_rocket_launched() {
+  // a new rocket takes the laser over (never blocked): the pinned point goes
+  laser_pinned_ = false;
   // launchFootRocket: a new rocket takes the laser over, the one still in the air flies on unguided
   for (std::size_t i = 0; i + 1 < projectiles_.size(); ++i)
     if (projectiles_[i].id == Id::rocket && projectiles_[i].by_player) projectiles_[i].guided = false;
