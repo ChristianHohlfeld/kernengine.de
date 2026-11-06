@@ -68,9 +68,15 @@ export function installOriginalAudio() {
   let pose = {position: [0, 0, 0], direction: [0, 1, 0]};
   O.K.pose = () => pose;
 
-  // the menu music (drone_simulator.html's inline script), unchanged
-  if (globalThis.__scMenuMusic) globalThis.__scMenuMusic();
-  else { const sc = document.createElement("script"); sc.src = new URL("audio/menu_music.js", import.meta.url).href; document.body.appendChild(sc); }
+  // the menu music and the menu buttons' click blip (drone_simulator.html's inline scripts), unchanged
+  for (const [fn, file] of [["__scMenuMusic", "menu_music.js"], ["__scMenuBlip", "menu_blip.js"]]) {
+    if (globalThis[fn]) globalThis[fn]();
+    else { const sc = document.createElement("script"); sc.src = new URL(`audio/${file}`, import.meta.url).href; document.body.appendChild(sc); }
+  }
+  // a switch the page flips (view.mjs) is in the original's settings at once, as its inline script
+  // writes it (the blip after EFFECTS reads it in the same click)
+  const KEY_OF = Object.fromEntries(Object.entries(KERN_TO_ORIGINAL));
+  globalThis.__scAudioSetting = (kernKey, value) => { const o = KEY_OF[kernKey]; if (o) saveAudioSettings({...loadAudioSettings(), [o]: o.endsWith("Enabled") ? Number(value) > 0.5 : Number(value)}); };
   installImmersiveSoundscape();  // (already installed by its import: footsteps, the car's engine, its knocks)
 
   // simulator.mjs: the drone's motors (one HybridMotorSound on #viewport, unlocked by a tap)
@@ -150,6 +156,7 @@ export function installOriginalAudio() {
     "street_lamps.clang": (p, k) => O.street_lamps.clang(p, k),
     "people_impacts.thump": (p, gain) => O.people_impacts.thump(gain),
     "gameplay_polish_lite.playPersonGroan": () => O.gameplay_polish_lite.playPersonGroan(),
+    "ping_marker.set": () => globalThis.__oppUiBlip?.(false),  // ping_marker.mjs ping("set")
     "fighter_jets.beep": (p, kind) => kind === 0 ? O.fighter_jets.beep([740, 990], .06, .11) : kind === 1 ? O.fighter_jets.beep([220], .16, .1) : kind === 2 ? O.fighter_jets.beep([220], .18, .1) : O.fighter_jets.beep([330], .08, .1),
     "street_voices.honk": (p, bus, style) => O.street_voices.honk(p, {kind: bus ? "bus" : "car", style: ["toot", "double", "long"][style] || "toot", source: ""}),
     // world_procedural_population.mjs: arms flung up = a scream (seed: the person)

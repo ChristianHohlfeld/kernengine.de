@@ -298,7 +298,7 @@ void Game::update_net(f32 dt) {
     }
   }
   for (const net::PingEvent& p : net_.take_pings()) {
-    if (p.on) m.pings.set(p.owner, p.p, p.color, now);
+    if (p.on) { m.pings.set(p.owner, p.p, p.color, now); osfx("ping_marker.set", p.p); }  // ping("set"): __oppUiBlip(false)
     else m.pings.clear(p.owner);
   }
   // Incoming voice: the gain from the distance between the two players, here.
@@ -895,6 +895,7 @@ std::string Game::net_command(const std::string& cmd) {
     const u8 owner = net_.active() ? net_.self_slot() : net::kHost;
     const u32 color = net_.active() ? net_.color_of(owner) : 0xe8f4ff;
     const bool on = m.pings.toggle(owner, at, color, now);
+    if (on) osfx("ping_marker.set", at);  // ping("set"): __oppUiBlip(false)
     net_.send_ping(on, at, color);
     return on ? "set" : "cleared";
   }

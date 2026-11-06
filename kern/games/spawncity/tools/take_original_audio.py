@@ -11,6 +11,7 @@ Writes into <web dir> (default: kern/games/spawncity/web):
   audio/<module>.mjs          the original's audio modules, unchanged except for an import of a
                               module that is not here (named in the file's header)
   audio/menu_music.js         drone_simulator.html's inline script that starts the menu music
+  audio/menu_blip.js          drone_simulator.html's inline script of the menu buttons' click blip
   audio/original_sfx.mjs      the sound functions of the gameplay modules, one block per module
                               with the few names each block reads (its settings, its camera)
 The page (web/audio.mjs) feeds all of it from the game's state and events.
@@ -70,6 +71,14 @@ script_start = html.rindex("<script>", 0, start) + len("<script>\n")
 script_end = html.index("</script>", start)
 (web / "audio/menu_music.js").write_text(
     f"// Unchanged from the original SpawnCity (spawncity.de, drone_simulator.html inline script, commit\n// {commit}): the title music starts right away (or on the first tap) and the shared AudioContext with it.\n"
+    + html[script_start:script_end])
+
+# ---- drone_simulator.html: the menu's UI blip (START, HOME SCREEN, the switches, EXIT; pings) ------
+start = html.index("// Menu UI click:")
+script_start = html.rindex("<script>", 0, start) + len("<script>\n")
+script_end = html.index("</script>", start)
+(web / "audio/menu_blip.js").write_text(
+    f"// Unchanged from the original SpawnCity (spawncity.de, drone_simulator.html inline script, commit\n// {commit}): the menu's click blip (window.__oppUiBlip).\n"
     + html[script_start:script_end])
 
 # ---- the sound functions of the gameplay modules -------------------------------------------------------

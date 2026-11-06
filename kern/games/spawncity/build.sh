@@ -103,6 +103,7 @@ for name in AUDIO_MODULES:
     text = re.sub(r"\bexport (?=(?:const|let|class|function|async function) )", "", text)
     audio_inline += f'__scAudio["{name}"] = (() => {{\n{text}\nreturn {{{", ".join(exports)}}};\n}})();\n'
 audio_inline += "globalThis.__scMenuMusic = () => {\n" + (audio_dir / "menu_music.js").read_text() + "\n};\n"
+audio_inline += "globalThis.__scMenuBlip = () => {\n" + (audio_dir / "menu_blip.js").read_text() + "\n};\n"
 if "</script" in audio_inline.lower(): sys.exit("audio sources contain '</script'")
 sources["audio"] = audio_imports(sources["audio"])
 view_inline += audio_inline
