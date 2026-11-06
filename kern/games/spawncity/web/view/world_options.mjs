@@ -17,16 +17,20 @@ export const WORLD_OPTIONS=Object.freeze([
   {key:"zombies",label:"ZOMBIES",help:"Zombie nights after dark."},
   {key:"police",label:"POLICE",help:"Police drones and officers when you are wanted."},
   {key:"military",label:"MILITARY",help:"Soldiers, tanks and helicopters at high wanted levels."},
-  {key:"flak",label:"FLAK",help:"Now and then a stationary anti-aircraft gun that fires on your drone and jet."},
+  {key:"flak",label:"FLAK",help:"Now and then a stationary anti-aircraft gun that fires on your drone and jet.",def:false},
   {key:"jetpack",label:"JETPACK",help:"Jump twice to fire a short jetpack burst over houses. Recharges."},
-  {key:"destructibleTerrain",label:"DESTRUCTIBLE TERRAIN",help:"Big explosions tear craters into the ground. Off: the ground stays whole."},
-  {key:"friendlyFire",label:"FRIENDLY FIRE",help:"Player weapons can damage other players. The first player in the session sets this rule.",def:false,rule:true},
+  {key:"destructibleTerrain",label:"DESTRUCTIBLE TERRAIN",help:"Big explosions tear craters into the ground. Off: the ground stays whole.",def:false},
+  {key:"guided",label:"GUIDED MISSILES",help:"The drone's guided missile (GUIDED). Off: the weapon switch goes GUN -> ROCKETS -> GUN."},
+  {key:"friendlyFire",label:"FRIENDLY FIRE",help:"Player weapons can damage other players. The first player in the session sets this rule.",def:true,rule:true},
 ]);
 export const DEFAULT_WORLD_OPTIONS=Object.freeze(Object.fromEntries(WORLD_OPTIONS.map(o=>[o.key,o.def??true])));
 // Game rules: in a multiplayer session the first joiner (host)'s switches apply to
 // everybody (game_rules_sync.mjs sends them); alone, your own. worldRule() is the one to ask.
 export const GAME_RULE_KEYS=Object.freeze(WORLD_OPTIONS.filter(o=>o.rule).map(o=>o.key));
 let hostRules=null;
+// 2026-11: new defaults (friendly fire on, destructible terrain off, flak off) also for a device
+// that stored the old ones - once
+try{if(!localStorage.getItem("spawnCityWorldDefaultsV2")){const raw=JSON.parse(localStorage.getItem(WORLD_OPTIONS_KEY)||"{}");Object.assign(raw,{friendlyFire:true,destructibleTerrain:false,flak:false});localStorage.setItem(WORLD_OPTIONS_KEY,JSON.stringify(raw));localStorage.setItem("spawnCityWorldDefaultsV2","1");}}catch{}
 let current=load();
 function load(){try{const raw=JSON.parse(localStorage.getItem(WORLD_OPTIONS_KEY)||"{}");return{...DEFAULT_WORLD_OPTIONS,...Object.fromEntries(Object.entries(raw).filter(([k,v])=>k in DEFAULT_WORLD_OPTIONS&&typeof v==="boolean"))};}catch{return{...DEFAULT_WORLD_OPTIONS};}}
 export function worldOption(key){return key in current?current[key]===true:false;} // unknown/retired powers fail closed

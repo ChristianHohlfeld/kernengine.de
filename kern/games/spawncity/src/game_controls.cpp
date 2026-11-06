@@ -221,7 +221,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
     if (C.wheel != 0) step = C.wheel > 0 ? 1 : -1;
     if (step != 0) {
       if (on_foot) { cycle_foot_weapon(step); C.scope_on = false; }
-      else drone_weapon_ = (drone_weapon_ + 1) % 3;  // drone_weapon_modes.mjs toggle: GUN -> ROCKETS -> GUIDED
+      else drone_weapon_ = (drone_weapon_ + 1) % (ui_.settings.on(Opt::world_guided) ? 3 : 2);  // drone_weapon_modes.mjs toggle: GUN -> ROCKETS -> GUIDED (WORLD: GUIDED MISSILES off: no GUIDED)
     }
   }
 }
@@ -843,6 +843,7 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   // weapons: 1 gun, 2 rockets (3 selects nothing: desktop_controls.mjs order gun, missile)
   if (in.pressed(Key::digit1)) drone_weapon_ = 0;
   if (in.pressed(Key::digit2)) drone_weapon_ = 1;
+  if (drone_weapon_ == 2 && !ui_.settings.on(Opt::world_guided)) drone_weapon_ = 0;  // switched off while in hand
   // fire: LMB, RB, a finger on the screen (at the finger: flight_fire_fx.mjs, MG every 92 ms)
   const bool locked = C.aim_lock_until > now;
   bool trigger = C.lmb || (pad_on && pad.down(kPadRB));

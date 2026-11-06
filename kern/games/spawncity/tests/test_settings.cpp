@@ -13,7 +13,7 @@ SC_TEST(settings_defaults_and_ranges) {
   SC_CHECK(s.get(Opt::car_max_kmh) == 115 && s.get(Opt::car_reverse_kmh) == 32, "car 115 / 32 km/h");
   SC_CHECK(s.get(Opt::cam_fpv_tilt) == -15 && s.get(Opt::cam_fov) == 105, "camera -15 deg, 105 deg");
   SC_CHECK(s.get(Opt::audio_drone) == 50 && s.get(Opt::audio_vehicle) == 58 && s.get(Opt::music_volume) == 32, "audio mix v5");
-  SC_CHECK(s.on(Opt::world_jetpack) && !s.on(Opt::world_friendly_fire), "world options: jetpack on, friendly fire off");
+  SC_CHECK(s.on(Opt::world_jetpack) && s.on(Opt::world_friendly_fire) && !s.on(Opt::world_terrain) && !s.on(Opt::world_flak) && s.on(Opt::world_guided), "world options: jetpack, friendly fire, guided on; terrain, flak off");
   const u32 v = s.version();
   SC_CHECK(s.set("mouse.sensitivity", "999") && s.get(Opt::mouse_sensitivity) == 300, "clamped to 300");
   SC_CHECK(s.set("mouse.sensitivity", "47") && s.get(Opt::mouse_sensitivity) == 45, "snapped to the 5 %% step (%g)", s.get(Opt::mouse_sensitivity));
