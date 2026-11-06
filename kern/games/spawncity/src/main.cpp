@@ -27,8 +27,9 @@ class SpawnCityApp final : public kern::App {
     return o;
   }
   kern::Span<kern::ShaderExtension* const> extensions() override {
-    static kern::ShaderExtension* ext[1] = {&sc::game().windows()};
-    return {ext, 1};
+    // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk)
+    static kern::ShaderExtension* ext[2] = {&sc::game().windows(), &sc::game().water_look()};
+    return {ext, 2};
   }
   bool start(kern::Engine& e) override {
     // The streamed city lives in 150 - 300 MB of heap. Grown piece by piece while playing, every

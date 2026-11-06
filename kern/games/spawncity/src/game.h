@@ -15,6 +15,7 @@
 #include "car.h"
 #include "city_stream.h"
 #include "facades.h"
+#include "water_look.h"
 #include "combat_art.h"
 #include "destruction.h"
 #include "guided.h"
@@ -147,6 +148,7 @@ class Game {
   void voice_capture(const f32* samples, u32 count, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
   Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
+  WaterLook& water_look() { return water_look_; }  // the original's water shader (water_look.h)
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
@@ -448,6 +450,7 @@ class Game {
 
   kern::Engine* engine_ = nullptr;
   Facades windows_;
+  WaterLook water_look_;
   std::unique_ptr<kern::game::GameWorld> world_;
   CityStream city_;
   VehicleArt art_;

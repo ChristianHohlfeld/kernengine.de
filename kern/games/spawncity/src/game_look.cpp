@@ -273,6 +273,7 @@ void Game::look_lighting(f32 dt) {
   // The game's day clock instead of GameWorld's (same sun path and colours; "time" can set it).
   night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, r.lighting, r.sky);
   windows_.night = night_;
+  water_look_.time = static_cast<f32>(world_->sim_time());  // world_water.mjs uTime
   // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
   r.set_shadow_distance(L.software ? 0.0f : kTier[L.gov.tier()].shadow_m);
   const f32 now = static_cast<f32>(time_);

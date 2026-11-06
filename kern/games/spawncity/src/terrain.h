@@ -150,7 +150,7 @@ class Terrain {
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1);
   void build_render_tile(i32 level, i32 i, i32 j);
   void build_collision_tile(i32 i, i32 j);
-  void build_water_chunk(i32 i, i32 j);
+  void build_water_chunk(i32 i, i32 j, bool detail);
   void want_tiles(Vec3 focus, Vec3 anchor);
 
   kern::Renderer* r_ = nullptr;
@@ -175,6 +175,7 @@ class Terrain {
   std::unordered_map<u64, RenderTile> render_;
   std::unordered_map<u64, CollisionTile> collision_;
   std::unordered_map<u64, u32> water_meshes_;
+  std::unordered_map<u64, bool> water_detail_;  // the chunk is drawn cell by cell (world_water.mjs, 1000 m)
   std::unordered_set<u64> dirty_render_, dirty_collision_, dirty_water_;
   std::vector<u64> want_render_, want_collision_, want_water_;
   Vec3 planned_focus_{1e9f, 1e9f, 0}, planned_anchor_{1e9f, 1e9f, 0};

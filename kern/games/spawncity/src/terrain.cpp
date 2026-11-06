@@ -186,6 +186,7 @@ void Terrain::clear() {
   render_.clear();
   collision_.clear();
   water_meshes_.clear();
+  water_detail_.clear();
   dirty_render_.clear();
   dirty_collision_.clear();
   dirty_water_.clear();
@@ -934,47 +935,117 @@ void Terrain::build_collision_tile(i32 ti, i32 tj) {
   t.body = body;
 }
 
-void Terrain::build_water_chunk(i32 ci, i32 cj) {
+void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
+  // world_water.mjs: within RADIUS_M 1000 one quad per 4 m water cell, the corners carrying the
+  // shore distance (two-pass chamfer, cells) and the flow - what the water shader reads (aWater:
+  // shore + 1, flow x, flow y; water_look.h). Farther out the cells merge into rows (deep water,
+  // still: the same look without the per-cell mesh).
   kern::MeshData m;
+  m.extra_size = 3;
   const Vec3 color = kern::hex_color(0x176b98);  // world_water.mjs material colour
-  auto quad = [&](f32 xa, f32 ya, f32 xb, f32 yb) {
-    const u32 base = m.vertex_count();
-    for (const Vec2 p : {Vec2{xa, ya}, Vec2{xb, ya}, Vec2{xb, yb}, Vec2{xa, yb}})
-      m.push({p.x, p.y, water_level(p.x, p.y) + kWaterRenderZ}, {0, 0, 1}, color, {p.x * 0.05f, p.y * 0.05f});
-    m.indices.insert(m.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+  const i32 per = static_cast<i32>(kWaterChunk / kWaterCell);  // 80 cells
+  const i32 cx0 = ci * per, cy0 = cj * per;
+  auto wet = [&](i32 cx, i32 cy) {
+    if (!water_cell(cx, cy)) return false;
+    return bridges_.empty() || !on_bridge((cx + 0.5f) * kWaterCell, (cy + 0.5f) * kWaterCell);
   };
-  const i32 per = static_cast<i32>(kWaterChunk / kWaterBlock);
-  for (i32 bj = cj * per; bj < (cj + 1) * per; ++bj)
-    for (i32 bi = ci * per; bi < (ci + 1) * per; ++bi) {
-      auto it = water_.find(key2(bi, bj));
-      if (it == water_.end()) continue;
-      const WaterBlock& b = it->second;
-      const bool full = (b.bits[0] & b.bits[1] & b.bits[2] & b.bits[3]) == ~0ull && bridges_.empty();
-      if (full) { quad(bi * kWaterBlock, bj * kWaterBlock, (bi + 1) * kWaterBlock, (bj + 1) * kWaterBlock); continue; }
-      // Runs of water cells along each row become one quad (cells under a bridge stay out).
-      for (i32 y = 0; y < 16; ++y) {
-        i32 x = 0;
-        while (x < 16) {
-          auto wet = [&](i32 cx) {
-            const u32 idx = static_cast<u32>(y * 16 + cx);
-            if (!((b.bits[idx >> 6] >> (idx & 63)) & 1u)) return false;
-            const f32 px = (bi * 16 + cx + 0.5f) * kWaterCell, py = (bj * 16 + y + 0.5f) * kWaterCell;
-            return bridges_.empty() || !on_bridge(px, py);
-          };
-          if (!wet(x)) { ++x; continue; }
-          i32 e = x;
-          while (e < 16 && wet(e)) ++e;
-          quad((bi * 16 + x) * kWaterCell, (bj * 16 + y) * kWaterCell, (bi * 16 + e) * kWaterCell, (bj * 16 + y + 1) * kWaterCell);
-          x = e;
-        }
+  if (!detail) {
+    const f32 deep[3] = {13, 0, 0};
+    auto quad = [&](f32 xa, f32 ya, f32 xb, f32 yb) {
+      const u32 base = m.vertex_count();
+      for (const Vec2 p : {Vec2{xa, ya}, Vec2{xb, ya}, Vec2{xb, yb}, Vec2{xa, yb}}) {
+        m.push({p.x, p.y, water_level(p.x, p.y) + kWaterRenderZ}, {0, 0, 1}, color, {p.x * 0.05f, p.y * 0.05f});
+        m.push_extra(deep);
+      }
+      m.indices.insert(m.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    };
+    for (i32 y = cy0; y < cy0 + per; ++y) {
+      i32 x = cx0;
+      while (x < cx0 + per) {
+        if (!wet(x, y)) { ++x; continue; }
+        i32 e = x;
+        while (e < cx0 + per && wet(e, y)) ++e;
+        quad(x * kWaterCell, y * kWaterCell, e * kWaterCell, (y + 1) * kWaterCell);
+        x = e;
       }
     }
-  u32& slot = water_meshes_[key2(ci, cj)];
+  } else {
+    // the cells of the chunk and a 3-cell margin (the shore distance across the chunk's edge)
+    constexpr i32 B = 3;
+    const i32 W = per + 2 * B;
+    std::vector<u8> water(static_cast<std::size_t>(W) * W);
+    std::vector<f32> dist(water.size());
+    bool any = false;
+    for (i32 j = 0; j < W; ++j)
+      for (i32 i = 0; i < W; ++i) {
+        const bool w = wet(cx0 - B + i, cy0 - B + j);
+        water[static_cast<std::size_t>(j) * W + i] = w;
+        dist[static_cast<std::size_t>(j) * W + i] = w ? 1e6f : 0;
+        any = any || (w && i >= B && j >= B && i < W - B && j < W - B);
+      }
+    if (any) {
+      auto at = [&](i32 i, i32 j) -> f32& { return dist[static_cast<std::size_t>(j) * W + i]; };
+      for (i32 j = 0; j < W; ++j)
+        for (i32 i = 0; i < W; ++i) {
+          if (!water[static_cast<std::size_t>(j) * W + i]) continue;
+          f32 d = at(i, j);
+          if (i > 0) d = std::fmin(d, at(i - 1, j) + 1);
+          if (j > 0) d = std::fmin(d, at(i, j - 1) + 1);
+          if (i > 0 && j > 0) d = std::fmin(d, at(i - 1, j - 1) + 1.414f);
+          if (i < W - 1 && j > 0) d = std::fmin(d, at(i + 1, j - 1) + 1.414f);
+          at(i, j) = d;
+        }
+      for (i32 j = W - 1; j >= 0; --j)
+        for (i32 i = W - 1; i >= 0; --i) {
+          if (!water[static_cast<std::size_t>(j) * W + i]) continue;
+          f32 d = at(i, j);
+          if (i < W - 1) d = std::fmin(d, at(i + 1, j) + 1);
+          if (j < W - 1) d = std::fmin(d, at(i, j + 1) + 1);
+          if (i < W - 1 && j < W - 1) d = std::fmin(d, at(i + 1, j + 1) + 1.414f);
+          if (i > 0 && j < W - 1) d = std::fmin(d, at(i - 1, j + 1) + 1.414f);
+          at(i, j) = d;
+        }
+      // corners shared by their cells (vtx in world_water.mjs)
+      std::vector<i32> corner(static_cast<std::size_t>(per + 1) * (per + 1), -1);
+      auto vtx = [&](i32 a, i32 b) -> u32 {
+        i32& v = corner[static_cast<std::size_t>(b) * (per + 1) + a];
+        if (v >= 0) return static_cast<u32>(v);
+        f32 d = 0;
+        Vec2 fl{};
+        i32 n = 0;
+        for (const auto [di, dj] : {std::pair<i32, i32>{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}) {
+          const i32 i = a + di + B, j = b + dj + B;
+          if (!water[static_cast<std::size_t>(j) * W + i]) continue;
+          d += at(i, j);
+          const f32 px = (cx0 + a + di + 0.5f) * kWaterCell, py = (cy0 + b + dj + 0.5f) * kWaterCell;
+          fl = fl + flow_at(px, py);
+          ++n;
+        }
+        const f32 x = (cx0 + a) * kWaterCell, y = (cy0 + b) * kWaterCell;
+        const f32 shore = n == 4 ? std::fmin(d / 4 * kWaterCell, 40.0f) : 0;
+        const f32 rec[3] = {shore + 1, n ? fl.x / static_cast<f32>(n) : 0, n ? fl.y / static_cast<f32>(n) : 0};
+        v = static_cast<i32>(m.vertex_count());
+        m.push({x, y, water_level(x, y) + kWaterRenderZ}, {0, 0, 1}, color, {x * 0.05f, y * 0.05f});
+        m.push_extra(rec);
+        return static_cast<u32>(v);
+      };
+      for (i32 b = 0; b < per; ++b)
+        for (i32 a = 0; a < per; ++a) {
+          if (!water[static_cast<std::size_t>(b + B) * W + (a + B)]) continue;
+          const u32 p = vtx(a, b), q = vtx(a + 1, b), r = vtx(a + 1, b + 1), s = vtx(a, b + 1);
+          m.indices.insert(m.indices.end(), {p, q, r, p, r, s});
+        }
+    }
+  }
+  const u64 key = key2(ci, cj);
+  u32& slot = water_meshes_[key];
+  water_detail_[key] = detail;
   if (m.vertex_count() == 0) { if (slot) r_->remove(slot); slot = 0; return; }
-  kern::MeshInput in = m.as_input();
-  in.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0
+  kern::MeshInput in = m.as_input(1);  // the second extension's stream (main.cpp: facades, water)
+  in.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0, transparent .94
   in.material.metalness = 0;
   in.material.cast_shadow = false;
+  in.material.alpha = kern::AlphaMode::blend;
   const u32 id = r_->allocate_id();
   if (!r_->upsert(id, in)) { r_->release_id(id); return; }
   if (slot) r_->remove(slot);
@@ -1023,9 +1094,11 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
     ++stats_.rebuilds;
   }
   for (u64 k : want_water_) {
-    if (water_meshes_.count(k) && !dirty_water_.count(k)) continue;
+    const i32 wi = static_cast<i32>(k >> 32), wj = static_cast<i32>(k & 0xffffffffu);
+    const bool detail = rect_distance(focus.x, focus.y, wi * kWaterChunk, wj * kWaterChunk, (wi + 1) * kWaterChunk, (wj + 1) * kWaterChunk) < 1000;
+    if (water_meshes_.count(k) && !dirty_water_.count(k) && water_detail_[k] == detail) continue;
     if (kern::now_ms() > deadline) { missing = true; break; }
-    build_water_chunk(static_cast<i32>(k >> 32), static_cast<i32>(k & 0xffffffffu));
+    build_water_chunk(wi, wj, detail);
     dirty_water_.erase(k);
   }
   if (!missing) {
@@ -1045,7 +1118,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
     }
     keep = std::unordered_set<u64>(want_water_.begin(), want_water_.end());
     for (auto it = water_meshes_.begin(); it != water_meshes_.end();) {
-      if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); it = water_meshes_.erase(it); }
+      if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); water_detail_.erase(it->first); it = water_meshes_.erase(it); }
       else ++it;
     }
   }

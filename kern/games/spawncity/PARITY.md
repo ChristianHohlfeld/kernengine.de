@@ -266,7 +266,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `world_traffic_routes` | Routen aus Kacheln | gebaut | `city_stream.cpp` |  |
 | `world_transform_numeric` | Numerische Posen ohne three.js | entfällt |  | (b) Hilfe für den nativen Renderer. |
 | `world_vehicle_dynamics` | Fahrzeugmodell | gebaut | `car.cpp`, `car.h` |  |
-| `world_water` | Wasser | teilweise | `terrain.cpp`, `city_stream.cpp`, `game_world.cpp` | Physik und Fläche gebaut; Wellen-Normalen, Tiefenfarbe und Ufer-Schaum im Shader fehlen. |
+| `world_water` | Wasser | gebaut | `terrain.cpp`, `water_look.cpp`, `city_stream.cpp`, `game_world.cpp` | Physik, Becken und Fläche; der Shader des Originals (Wellen-Normalen entlang der Strömung, Tiefenfarbe nach Uferabstand, Schaum an Ufern und in schnellem Wasser, flacher Rand durchsichtiger): bis 1000 m eine Zelle je 4 m mit Uferabstand (Chamfer) und Strömung je Ecke, weiter draußen zusammengefasste Reihen. |
 | `xbox_control_mode` | Xbox-Modus | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `xbox_gamepad` | Gamepad | gebaut | `game.cpp` | Totzone 0,14 |
 | `zombie_nights` | Zombie-Nächte | teilweise | `combat_rules.cpp`, `game_events.cpp`, `game_barricades.cpp` | Runden; Barrikaden (6 Bretter je Tür des begehbaren Hauses bei Nacht, ein Brett je Tür alle 3,4 s, danach rein und durchs Haus, kein Biss durch intakte Bretter, REPARIEREN/F für 10 Punkte in 3,2 m) neu in sc-m3-gaps. Fehlt: Schnappschüsse an Mitspieler (`zombie-sync`/`zombie-hit`). |
