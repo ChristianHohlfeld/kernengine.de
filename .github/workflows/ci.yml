@@ -143,6 +143,10 @@ jobs:
           # its music (the original's track, loaded next to the page: sim/audio/, as on spawncity.de)
           mkdir -p _site/sim/audio && cp kern/games/spawncity/web/sim/audio/8_bits_only.m4a _site/sim/audio/
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
+          # The drop-in for spawncity.de (tools/dropin.sh): the game at the original's address; here
+          # at /spawncity-de/drone_simulator.html to try, and as the branch spawncity-de-dropin.
+          kern/games/spawncity/tools/dropin.sh _site/spawncity-de
+          cp kern/games/spawncity/tools/drone_simulator.webmanifest _site/spawncity-de/
           touch _site/.nojekyll
           du -sh _site
       - uses: actions/upload-artifact@v4
@@ -177,6 +181,14 @@ jobs:
           git add -A
           git commit -q -m "Pages: ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          # the spawncity.de drop-in as its own branch (lay it over the spawncity-de site)
+          cd spawncity-de
+          git init -q -b spawncity-de-dropin
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "SpawnCity on Kern, drop-in for spawncity.de: ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" spawncity-de-dropin
 
   e2e:
     needs: build
