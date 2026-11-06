@@ -100,6 +100,31 @@ struct Projector {
   }
 };
 
+// A polygon ring clipped to the tile's own square [0, ext]^2 (Sutherland-Hodgman, tile units).
+// Vector tiles repeat a building that crosses a tile edge in both tiles (clipped at the buffer):
+// drawn twice, the copies' walls lie in one plane and flicker (z-fighting). Clipped to the square,
+// the two halves meet at the edge, their cut walls inside the house facing away from each other.
+std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
+  std::vector<Vec2> a = ring, b;
+  auto pass = [&](auto inside, auto cut) {
+    b.clear();
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      const Vec2 p = a[i], q = a[(i + 1) % a.size()];
+      const bool pi = inside(p), qi = inside(q);
+      if (pi) b.push_back(p);
+      if (pi != qi) b.push_back(cut(p, q));
+    }
+    a.swap(b);
+  };
+  auto lerp_x = [](Vec2 p, Vec2 q, f32 x) { const f32 t = (x - p.x) / (q.x - p.x); return Vec2{x, p.y + (q.y - p.y) * t}; };
+  auto lerp_y = [](Vec2 p, Vec2 q, f32 y) { const f32 t = (y - p.y) / (q.y - p.y); return Vec2{p.x + (q.x - p.x) * t, y}; };
+  if (a.size() >= 3) pass([](Vec2 p) { return p.x >= 0; }, [&](Vec2 p, Vec2 q) { return lerp_x(p, q, 0); });
+  if (a.size() >= 3) pass([&](Vec2 p) { return p.x <= ext; }, [&](Vec2 p, Vec2 q) { return lerp_x(p, q, ext); });
+  if (a.size() >= 3) pass([](Vec2 p) { return p.y >= 0; }, [&](Vec2 p, Vec2 q) { return lerp_y(p, q, 0); });
+  if (a.size() >= 3) pass([&](Vec2 p) { return p.y <= ext; }, [&](Vec2 p, Vec2 q) { return lerp_y(p, q, ext); });
+  return a;
+}
+
 u32 hash_u32(u64 v) {
   v ^= v >> 33; v *= 0xff51afd7ed558ccdull; v ^= v >> 33; v *= 0xc4ceb9fe1a85ec53ull; v ^= v >> 33;
   return static_cast<u32>(v);
@@ -125,13 +150,16 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         b.base = base;
         b.top = std::fmax(top, base + 1.0f);
         b.seed = hash_u32(f.id * 31 + (n++) + static_cast<u64>(key.x) * 7919 + static_cast<u64>(key.y) * 104729);
+        const f32 ext = static_cast<f32>(l->extent);
         for (auto& ring : poly) {
+          const std::vector<Vec2> clipped = clip_to_tile(ring, ext);
+          if (clipped.size() < 3) { if (b.rings.empty()) break; continue; }  // the outline outside: the house is the other tile's
           std::vector<Vec2> m;
-          m.reserve(ring.size());
-          for (Vec2 p : ring) m.push_back(P(p));
+          m.reserve(clipped.size());
+          for (Vec2 p : clipped) m.push_back(P(p));
           b.rings.push_back(std::move(m));
         }
-        out.buildings.push_back(std::move(b));
+        if (!b.rings.empty()) out.buildings.push_back(std::move(b));
       }
     }
   }
