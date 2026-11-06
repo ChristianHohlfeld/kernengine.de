@@ -34,6 +34,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   kern.statusSink = text => onStatus?.(text);
   kern.pointerLockSink = lock => {
     try {
+      if (globalThis.__kernNoPointerLock) return;  // a VR headset's browser: no pointer lock
       if (lock && document.pointerLockElement !== canvas) canvas.requestPointerLock?.();
       if (!lock && document.pointerLockElement === canvas) document.exitPointerLock?.();
     } catch {}

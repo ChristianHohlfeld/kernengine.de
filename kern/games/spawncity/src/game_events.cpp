@@ -568,6 +568,15 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   const f32 now = world_->sim_time();
   if (!world_placed_ && (starts("military") || starts("strike") || starts("zombies") || starts("race") || starts("enemy") || starts("provoke"))) { out = "not placed"; return true; }
+  if (cmd == "person show" && world_placed_) {
+    // Tests: a citizen 3 m ahead, facing the camera, standing (the look of the people)
+    const Vec3 me = player_position();
+    const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    const Vec3 p{me.x + fwd.x * 3.0f, me.y + fwd.y * 3.0f, city_.ground_height(me.x + fwd.x * 3.0f, me.y + fwd.y * 3.0f)};
+    people_.add_scripted(People::Kind::zombie, p, std::atan2(-fwd.y, -fwd.x), 100, rng_.next(), {0.7f, 0.2f, 0.18f}, {0.15f, 0.18f, 0.3f}, {0.86f, 0.66f, 0.5f}, 0);
+    out = "ok";
+    return true;
+  }
   if (starts("heat ")) {
     // Tests: heat to N (witnessed police kills, severity 3 each)
     const f32 n = static_cast<f32>(std::atof(cmd.c_str() + 5));

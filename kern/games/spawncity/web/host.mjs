@@ -37,6 +37,12 @@ const SC_MAX_FETCHES = 4;
 /** Starts the game in the page (index.html). Module: url (dev) or base64 (single file). */
 export async function startSpawnCity({url = null, base64 = null} = {}) {
   const params = new URLSearchParams(location.search);
+  // A VR headset's browser (Meta Quest, Pico, Wolvic): no pointer lock - it only says "your cursor
+  // is confined to this window" and losing it threw you to the menu; the controllers are the pad
+  const headset = /OculusBrowser|Quest|Pico|Wolvic|MetaQuest/i.test(navigator.userAgent || "");
+  globalThis.__kernNoPointerLock = headset;
+  globalThis.__scHeadset = headset;
+  if (headset) document.documentElement.classList.add("sc-headset");
   // The original's view layer (view.mjs): its DOM, CSS and layout; Kern's canvas takes the place of
   // the original's three.js canvas.
   // The original spawncity.de view is the default; ?view=kern shows Kern's own HUD (tests, debugging).
@@ -529,10 +535,21 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (!yes) return;
     // a VR button on the title and in the game (top right), and ?vr=1 enters at the first gesture
     const b = document.createElement("button");
-    b.id = "scVrButton"; b.type = "button"; b.textContent = "VR";
+    b.id = "scVrButton"; b.type = "button"; b.textContent = headset ? "▶ IN VR SPIELEN" : "VR";
     b.title = "In die VR-Brille (WebXR)";
-    b.style.cssText = "position:fixed;z-index:2147481000;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 52px);min-width:58px;height:40px;border-radius:10px;border:2px solid #7ff0c5;background:#0d1118e0;color:#eafff7;font:900 14px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer";
-    b.addEventListener("click", ev => { ev.stopPropagation(); enterVR(); });
+    // in a headset the way in is the first thing you see: big, in the middle at the bottom
+    b.style.cssText = headset
+      ? "position:fixed;z-index:2147481000;left:50%;transform:translateX(-50%);bottom:12%;min-width:320px;height:72px;padding:0 28px;border-radius:16px;border:3px solid #7ff0c5;background:#0d1118f0;color:#eafff7;font:900 26px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer;box-shadow:0 0 0 6px #7ff0c533,0 10px 30px #000a"
+      : "position:fixed;z-index:2147481000;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 52px);min-width:58px;height:40px;border-radius:10px;border:2px solid #7ff0c5;background:#0d1118e0;color:#eafff7;font:900 14px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer";
+    // VR from the title: start the game first (the world loads behind the headset's view)
+    b.addEventListener("click", ev => {
+      ev.stopPropagation(); ev.preventDefault();
+      const st = document.getElementById("scStart");
+      if (st && !document.body.classList.contains("solo-flight") && !st.disabled) st.click();
+      enterVR();
+    });
+    // while in VR the button is not needed (and in a headset: only on the title and in the game's 2D view)
+    setInterval(() => { b.style.display = app.inXR ? "none" : ""; }, 500);
     b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
     document.body.appendChild(b);
     if (params.get("vr") === "1") addEventListener("pointerdown", () => enterVR(), {once: true, capture: true});

@@ -1,5 +1,6 @@
 // The town's people (see people.h).
 #include "people.h"
+#include "person_hit.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,7 @@ namespace {
 constexpr f32 kPavement = 1.6f;               // pavement centre beyond the carriageway edge
 constexpr f32 kWitness = 45;                  // wanted_system_logic: a witness within sight
 constexpr f32 kBodySeconds = 25;              // a body stays this long
-constexpr f32 kCapsuleR = 0.32f, kHeadZ = 1.5f, kTopZ = 1.8f;
+constexpr f32 kCapsuleR = 0.32f;
 
 const Vec3 kShirts[] = {{0.62f, 0.12f, 0.1f}, {0.16f, 0.28f, 0.55f}, {0.85f, 0.82f, 0.74f}, {0.2f, 0.42f, 0.25f}, {0.9f, 0.62f, 0.15f},
                         {0.35f, 0.35f, 0.38f}, {0.55f, 0.3f, 0.55f}, {0.1f, 0.1f, 0.12f}, {0.75f, 0.45f, 0.4f}, {0.3f, 0.6f, 0.7f}};
@@ -22,26 +23,6 @@ const Vec3 kSkins[] = {{0.94f, 0.76f, 0.62f}, {0.78f, 0.58f, 0.43f}, {0.66f, 0.4
 
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }
-
-/// Closest approach of segment p0-p1 to segment q0-q1: returns the squared distance, `s` along p.
-f32 segment_distance2(Vec3 p0, Vec3 p1, Vec3 q0, Vec3 q1, f32& s, Vec3& on_q) {
-  const Vec3 d1 = p1 - p0, d2 = q1 - q0, r = p0 - q0;
-  const f32 a = kern::dot(d1, d1), e = kern::dot(d2, d2), f = kern::dot(d2, r);
-  f32 t;
-  if (a <= 1e-9f) { s = 0; t = clampf(f / e, 0, 1); }
-  else {
-    const f32 c = kern::dot(d1, r);
-    const f32 b = kern::dot(d1, d2), den = a * e - b * b;
-    s = den > 1e-9f ? clampf((b * f - c * e) / den, 0, 1) : 0;
-    t = (b * s + f) / e;
-    if (t < 0) { t = 0; s = clampf(-c / a, 0, 1); }
-    else if (t > 1) { t = 1; s = clampf((b - c) / a, 0, 1); }
-  }
-  const Vec3 cp = p0 + d1 * s;
-  on_q = q0 + d2 * t;
-  const Vec3 dd = cp - on_q;
-  return kern::dot(dd, dd);
-}
 
 bool inside_building(const kern::physics::World& w, Vec3 p, f32 ground) {
   // A roof above the ground here (the terrain itself answers at ground height).
@@ -271,17 +252,14 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     if (p.state == State::down || p.state == State::gone) continue;
     if (dist2d(p.pos, from) < 0.5f) continue;  // the shooter himself
     if (p.kind == Kind::citizen && now < p.knocked_until) continue;  // down as a ragdoll: the body is hidden
-    f32 s;
-    Vec3 on;
-    const f32 d2 = segment_distance2(from, to, p.pos + Vec3{0, 0, 0.3f}, p.pos + Vec3{0, 0, kTopZ - kCapsuleR}, s, on);
-    if (d2 < kCapsuleR * kCapsuleR && s < best_s) {
+    // the body as it is drawn (person_hit.h): legs, the leaning torso with the arms, the head
+    f32 s = 2;
+    const BodyPart part = person_hit::hit(p.pos, p.yaw, p.v, from, to - from, s, 1.08f);
+    if (part != BodyPart::none && s < best_s) {
       best_s = s;
       best = static_cast<i32>(i);
-      head = on.z - p.pos.z > kHeadZ - 0.05f;
-      // Where the line enters the capsule, not its closest approach.
-      const f32 len = std::fmax(1e-4f, kern::length(to - from));
-      const f32 back = std::sqrt(std::fmax(0.0f, kCapsuleR * kCapsuleR - d2)) / len;
-      hit_point = from + (to - from) * std::fmax(0.0f, s - back);
+      head = part == BodyPart::head;
+      hit_point = from + (to - from) * s;
     }
   }
   last_head_ = false;

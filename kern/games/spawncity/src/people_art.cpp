@@ -37,18 +37,47 @@ bool PeopleArt::make(kern::Renderer& r, Part& p, const MeshData& mesh, const ker
 bool PeopleArt::init(kern::Renderer& r) {
   r_ = &r;
   const Vec3 white{1, 1, 1};
-  // Pivots: a leg hangs from the hip (its top at the origin), an arm from the shoulder.
+  // Pivots: a leg hangs from the hip (its top at the origin), an arm from the shoulder. The same
+  // proportions as before (person_hit.h hits this pose), now rounded: thigh and shin, a shoe with a
+  // toe cap, half the pelvis with every leg; belly and chest with the shoulders; upper and lower arm
+  // with a hand; a head with neck, nose, eyes, ears and hair.
+  const Vec3 shoe{0.12f, 0.1f, 0.09f}, sole{0.05f, 0.05f, 0.05f};
+  auto scl = [](Vec3 s) { return Mat4::scale(s); };
   MeshData leg;
-  prim::append(leg, prim::box({0.15f, 0.15f, 0.86f}, white), at({0, 0, -0.43f}));
-  prim::append(leg, prim::box({0.24f, 0.13f, 0.08f}, {0.12f, 0.1f, 0.09f}), at({0.05f, 0, -0.86f}));  // shoe
+  prim::append(leg, prim::box({0.25f, 0.21f, 0.2f}, white), at({0, 0, -0.04f}));                       // half the pelvis
+  prim::append(leg, prim::capsule(0.088f, 0.34f, 12, 6, white), at({0, 0, -0.23f}));                   // thigh
+  prim::append(leg, prim::capsule(0.07f, 0.36f, 12, 6, white), at({0.005f, 0, -0.62f}));               // shin
+  prim::append(leg, prim::box({0.22f, 0.12f, 0.075f}, shoe), at({0.035f, 0, -0.875f}));                  // shoe
+  prim::append(leg, prim::sphere(0.062f, 10, 6, shoe), at({0.14f, 0, -0.88f}) * scl({1.1f, 0.95f, 0.62f}));  // toe cap
+  prim::append(leg, prim::box({0.27f, 0.13f, 0.02f}, sole), at({0.05f, 0, -0.915f}));                    // sole
   if (!make(r, leg_, leg, mat(0.85f), true)) return false;
   MeshData torso;
-  prim::append(torso, prim::box({0.24f, 0.42f, 0.6f}, white), at({0, 0, 0.3f}));
+  prim::append(torso, prim::capsule(0.12f, 0.16f, 14, 6, white), at({0, 0, 0.2f}) * scl({0.95f, 1.6f, 1.0f}));   // belly
+  prim::append(torso, prim::capsule(0.13f, 0.14f, 14, 6, white), at({0.005f, 0, 0.42f}) * scl({0.98f, 1.62f, 1.0f}));  // chest
+  for (f32 y : {0.225f, -0.225f}) prim::append(torso, prim::sphere(0.066f, 10, 6, white), at({0, y, 0.535f}) * scl({1.0f, 1.0f, 0.85f}));     // shoulders
+  prim::append(torso, prim::box({0.2f, 0.36f, 0.05f}, {0.55f, 0.55f, 0.55f}), at({0, 0, 0.03f}));                 // the belt (darker)
   if (!make(r, torso_, torso, mat(0.8f), true)) return false;
   MeshData arm;
-  prim::append(arm, prim::box({0.11f, 0.11f, 0.62f}, white), at({0, 0, -0.31f}));
+  prim::append(arm, prim::capsule(0.056f, 0.24f, 10, 6, white), at({0, 0, -0.15f}));   // upper arm
+  prim::append(arm, prim::capsule(0.047f, 0.22f, 10, 6, white), at({0, 0, -0.42f}));   // forearm
   if (!make(r, arm_, arm, mat(0.8f), true)) return false;
-  if (!make(r, head_, prim::sphere(0.115f, 12, 8, white), mat(0.6f), true)) return false;
+  MeshData hand;
+  prim::append(hand, prim::sphere(0.052f, 10, 6, white), at({0, 0, -0.6f}) * scl({0.75f, 0.55f, 1.15f}));
+  if (!make(r, hand_, hand, mat(0.6f), true)) return false;
+  MeshData head_mesh;
+  prim::append(head_mesh, prim::sphere(0.115f, 16, 10, white), scl({0.94f, 0.88f, 1.05f}));
+  prim::append(head_mesh, prim::cylinder(0.052f, 0.13f, 10, white), at({-0.01f, 0, -0.205f}));                   // neck
+  prim::append(head_mesh, prim::box({0.045f, 0.03f, 0.05f}, white), at({0.11f, 0, -0.015f}));                    // nose
+  for (f32 y : {0.038f, -0.038f}) {
+    prim::append(head_mesh, prim::box({0.012f, 0.026f, 0.02f}, {0.06f, 0.05f, 0.05f}), at({0.104f, y, 0.012f}));  // eyes
+    prim::append(head_mesh, prim::sphere(0.026f, 6, 4, white), at({-0.005f, y * 2.65f, 0.0f}) * scl({0.6f, 0.5f, 1.0f}));  // ears
+  }
+  prim::append(head_mesh, prim::box({0.012f, 0.05f, 0.012f}, {0.45f, 0.28f, 0.26f}), at({0.104f, 0, -0.06f}));     // mouth
+  if (!make(r, head_, head_mesh, mat(0.6f), true)) return false;
+  MeshData hair;
+  prim::append(hair, prim::sphere(0.123f, 14, 8, white), at({-0.018f, 0, 0.088f}) * scl({1.0f, 0.95f, 0.5f}));  // the top
+  prim::append(hair, prim::sphere(0.118f, 14, 8, white), at({-0.04f, 0, 0.0f}) * scl({0.82f, 0.93f, 1.0f}));      // the back
+  if (!make(r, hair_, hair, mat(0.9f), true)) return false;
   MeshData cap;
   prim::append(cap, prim::cylinder(0.125f, 0.07f, 12, {0.08f, 0.1f, 0.16f}), Mat4{});
   prim::append(cap, prim::box({0.12f, 0.2f, 0.015f}, {0.05f, 0.05f, 0.06f}), at({0.12f, 0, 0.005f}));
@@ -97,7 +126,7 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
 }
 
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -128,19 +157,31 @@ void PeopleArt::person(const People::Person& p, f32 now) {
   put(torso_, body, p.shirt);
   const Mat4 shoulder = body * at({0, 0, 0.56f});
   const bool hands_up = !down && p.kind == People::Kind::citizen && now < p.hands_up_until;
+  Mat4 arm_l, arm_r;
   if (hands_up) {
-    put(arm_, shoulder * at({0, 0.27f, 0}) * rot({1, 0, 0}, 2.8f), p.shirt);
-    put(arm_, shoulder * at({0, -0.27f, 0}) * rot({1, 0, 0}, -2.8f), p.shirt);
+    arm_l = shoulder * at({0, 0.27f, 0}) * rot({1, 0, 0}, 2.8f);
+    arm_r = shoulder * at({0, -0.27f, 0}) * rot({1, 0, 0}, -2.8f);
   } else if (p.aiming && !down) {
     // Both arms forward, the pistol at eye height.
-    put(arm_, shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, -0.25f), p.shirt);
-    put(arm_, shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, 0.25f), p.shirt);
+    arm_l = shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, -0.25f);
+    arm_r = shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, 0.25f);
   } else {
-    put(arm_, shoulder * at({0, 0.27f, 0}) * rot({0, 1, 0}, -swing * 0.9f), p.shirt);
-    put(arm_, shoulder * at({0, -0.27f, 0}) * rot({0, 1, 0}, swing * 0.9f), p.shirt);
+    arm_l = shoulder * at({0, 0.27f, 0}) * rot({0, 1, 0}, -swing * 0.9f) * rot({1, 0, 0}, 0.06f);
+    arm_r = shoulder * at({0, -0.27f, 0}) * rot({0, 1, 0}, swing * 0.9f) * rot({1, 0, 0}, -0.06f);
   }
+  put(arm_, arm_l, p.shirt);
+  put(arm_, arm_r, p.shirt);
+  put(hand_, arm_l, p.skin);
+  put(hand_, arm_r, p.skin);
   const Mat4 head = body * at({0, 0, 0.73f});
   put(head_, head, p.skin);
+  {
+    // hair by the person: black, dark and light brown, blond, auburn, grey; the dead's hair dull
+    static const Vec3 kHair[6] = {{0.05f, 0.045f, 0.04f}, {0.18f, 0.11f, 0.06f}, {0.36f, 0.24f, 0.13f}, {0.72f, 0.58f, 0.32f}, {0.45f, 0.17f, 0.08f}, {0.55f, 0.55f, 0.56f}};
+    Vec3 hc = kHair[(p.seed >> 5) % 6];
+    if (p.kind == People::Kind::zombie) hc = {0.2f, 0.22f, 0.18f};
+    put(hair_, head, hc);
+  }
   if (p.kind == People::Kind::officer || p.kind == People::Kind::soldier || p.kind == People::Kind::enemy) put(cap_, head * at({0, 0, 0.06f}));
 }
 
@@ -189,7 +230,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

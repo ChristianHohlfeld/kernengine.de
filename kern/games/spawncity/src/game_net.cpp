@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "game.h"
+#include "person_hit.h"
 #include "mp_art.h"
 #include "mp_rules.h"
 #include "qr_code.h"
@@ -418,35 +419,14 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
   i32 best = -1;
   f32 best_t = 2;
   std::vector<net::Remote>& rs = net_.remotes();
-  // player_vehicle_runtime_v2.mjs vs hit proxies: on foot three boxes turned with the player - head
-  // .3 x .3 x .32 at 1.64 m, torso .6 x .38 x .68 at 1.14 m, legs .44 x .32 x .8 at .4 m (here x 1.16,
-  // vs_multiplayer.mjs HITBOX_PADDING); the round's entry decides the zone (a steep shot through the
-  // head is a head shot - the closest approach to the chest missed it or called it torso)
+  // player_vehicle_runtime_v2.mjs vs hit proxies: head, torso and legs turned with the player, here
+  // the pose as it is drawn (person_hit.h: the running lean, x 1.16 vs_multiplayer.mjs
+  // HITBOX_PADDING); the round's entry decides the zone (a steep shot through the head is a head shot)
   mp::Zone best_zone = mp::Zone::torso;
-  auto zones = [&](const net::Remote& r, f32& t_hit, mp::Zone& z) {
-    struct Box { mp::Zone z; f32 depth, width, height, mid; };
-    constexpr f32 k = 1.16f;
-    const Box boxes[3] = {{mp::Zone::head, 0.3f, 0.3f, 0.32f, 1.64f}, {mp::Zone::torso, 0.38f, 0.6f, 0.68f, 1.14f}, {mp::Zone::legs, 0.32f, 0.44f, 0.8f, 0.4f}};
-    const f32 cy = std::cos(r.state.avatar_yaw), sy = std::sin(r.state.avatar_yaw);
-    bool any = false;
-    for (const Box& b : boxes) {
-      // the segment in the box's frame: x forward, y left, z up from its middle
-      const Vec3 o = from - (r.person_shown + Vec3{0, 0, b.mid});
-      const Vec3 lo{o.x * cy + o.y * sy, -o.x * sy + o.y * cy, o.z}, ld{seg.x * cy + seg.y * sy, -seg.x * sy + seg.y * cy, seg.z};
-      const f32 h[3] = {b.depth * k / 2, b.width * k / 2, b.height * k / 2}, po[3] = {lo.x, lo.y, lo.z}, pd[3] = {ld.x, ld.y, ld.z};
-      f32 t0 = 0, t1 = 1;
-      bool hit = true;
-      for (int a = 0; a < 3 && hit; ++a) {
-        if (std::fabs(pd[a]) < 1e-7f) { hit = std::fabs(po[a]) <= h[a]; continue; }
-        f32 ta = (-h[a] - po[a]) / pd[a], tb = (h[a] - po[a]) / pd[a];
-        if (ta > tb) std::swap(ta, tb);
-        t0 = std::fmax(t0, ta);
-        t1 = std::fmin(t1, tb);
-        hit = t0 <= t1;
-      }
-      if (hit && (!any || t0 < t_hit)) { any = true; t_hit = t0; z = b.z; }
-    }
-    return any;
+  auto zones = [&](Vec3 feet, f32 yaw, f32 speed, f32& t_hit, mp::Zone& z) {
+    const BodyPart part = person_hit::hit(feet, yaw, speed, from, seg, t_hit, 1.16f);
+    z = part == BodyPart::head ? mp::Zone::head : part == BodyPart::legs ? mp::Zone::legs : mp::Zone::torso;
+    return part != BodyPart::none;
   };
   for (std::size_t i = 0; i < rs.size(); ++i) {
     const net::Remote& r = rs[i];
@@ -454,8 +434,20 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
     if (r.state.mode == net::PlayerMode::foot) {
       f32 t = 2;
       mp::Zone z = mp::Zone::torso;
-      if (zones(r, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
+      if (zones(r.person_shown, r.state.avatar_yaw, r.state.speed, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
       continue;
+    }
+    // the drone's pilot stands where he is drawn (the remote in his hands) - he can be shot too
+    if (r.state.mode == net::PlayerMode::drone) {
+      f32 t = 2;
+      mp::Zone z = mp::Zone::torso;
+      if (zones(r.person_shown, r.state.avatar_yaw, 0, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
+    }
+    // the parachutist hangs under his canopy (draw_remote_people: harness .85 m below, feet .9 m below that)
+    if (r.state.mode == net::PlayerMode::parachute) {
+      f32 t = 2;
+      mp::Zone z = mp::Zone::torso;
+      if (zones(r.shown - Vec3{0, 0, 1.75f}, r.state.yaw, 0, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
     }
     // A capsule on foot (and the drone pilot), a sphere around a vehicle.
     const bool person = r.state.mode == net::PlayerMode::foot;
@@ -475,7 +467,7 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
       const Vec3 q{c.x, c.y, clampf(p.z, c.z - 0.93f, c.z + 0.9f)};
       d = kern::length(p - q);
     }
-    if (d < radius && t < best_t) { best_t = t; best = static_cast<i32>(i); }
+    if (d < radius && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = mp::Zone::torso; }
   }
   // Everybody sees the round fly (a tracer in our colour up to where it ends).
   net::Fx shot;
@@ -487,7 +479,8 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
   if (best < 0) return false;
   to = from + seg * best_t;
   const net::Remote& r = rs[static_cast<std::size_t>(best)];
-  const mp::Zone zone = r.state.mode == net::PlayerMode::foot ? best_zone : mp::Zone::torso;
+  const bool body_zone = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone || r.state.mode == net::PlayerMode::parachute;
+  const mp::Zone zone = body_zone ? best_zone : mp::Zone::torso;
   mp_local().shot_zone = static_cast<u8>(zone);
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);

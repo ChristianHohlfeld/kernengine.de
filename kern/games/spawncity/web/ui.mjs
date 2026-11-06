@@ -262,7 +262,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     sync();
     if (!visible()) relock();
   }
-  function relock() { if (!coarse && ui.lockWanted) try { canvas.requestPointerLock?.(); } catch { /* no lock */ } canvas.focus?.(); }
+  function relock() { if (!coarse && !globalThis.__kernNoPointerLock && ui.lockWanted) try { canvas.requestPointerLock?.(); } catch { /* no lock */ } canvas.focus?.(); }
   function focusables(root) {
     return Array.from(root.querySelectorAll("button:not([disabled]),input,textarea,[tabindex='0']")).filter(n => n.offsetParent !== null);
   }

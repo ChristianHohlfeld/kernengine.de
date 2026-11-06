@@ -524,7 +524,7 @@ PartMeshes character_mesh(const Outfit& o, bool gun) {
   const auto rest = rest_positions();
   auto at = [&](u32 j) { b.set_bone(j); b.set_transform(Mat4::translate(rest[j])); };
   // limb(r, len): a capsule hanging from the joint down to -len.
-  auto limb = [&](f32 r, f32 len, Vec3 pos = {}) { b.capsule(r, max_of(.01f, len - 2 * r), 7, pos + Vec3{0, 0, -len / 2}, {kPi / 2, 0, 0}); };
+  auto limb = [&](f32 r, f32 len, Vec3 pos = {}) { b.capsule(r, max_of(.01f, len - 2 * r), 12, pos + Vec3{0, 0, -len / 2}, {kPi / 2, 0, 0}); };
   at(kPelvis);
   b.material(o.pants, 0);
   b.box({.34f, .2f, .18f}, {0, 0, .02f});
@@ -532,7 +532,7 @@ PartMeshes character_mesh(const Outfit& o, bool gun) {
   b.material(o.shirt, 0);
   // torso: capsule .17 / .26 rotated to Z, then scaled (1.12, .72, 1) in that frame
   b.set_transform(Mat4::translate(rest[kSpine] + Vec3{0, 0, .25f}) * Mat4::scale({1.12f, .72f, 1}));
-  b.capsule(.17f, .26f, 8, {}, {kPi / 2, 0, 0});
+  b.capsule(.17f, .26f, 14, {}, {kPi / 2, 0, 0});
   at(kSpine);
   b.material(o.vest, 0);
   b.box({.38f, .28f, .34f}, {0, .004f, .27f});
@@ -541,9 +541,15 @@ PartMeshes character_mesh(const Outfit& o, bool gun) {
   b.material(o.skin, 0);
   limb(.055f, .10f, {0, 0, .08f});
   at(kHead);
-  b.sphere(.115f, 10, 8, {0, .01f, .10f}, {}, {.92f, 1, 1.12f});
+  b.sphere(.115f, 16, 12, {0, .01f, .10f}, {}, {.92f, 1, 1.12f});
+  // the face (Kern): nose, eyes, mouth - seen in third person and by the mates
+  b.box({.035f, .045f, .045f}, {0, .118f, .068f});
+  b.material(0x141210, 0);
+  b.box({.026f, .012f, .018f}, {-.036f, .112f, .097f});
+  b.box({.026f, .012f, .018f}, {.036f, .112f, .097f});
+  b.box({.05f, .01f, .01f}, {0, .112f, .03f});
   b.material(o.helmet, 0.1f);
-  b.sphere(.13f, 10, 5, {0, 0, .13f}, {kPi / 2, 0, 0}, {1, 1, 1}, kPi * .55f);
+  b.sphere(.13f, 16, 8, {0, 0, .13f}, {kPi / 2, 0, 0}, {1, 1, 1}, kPi * .55f);
   for (u32 side = 0; side < 2; ++side) {
     const u32 sh = side ? kShoulderR : kShoulderL, el = side ? kElbowR : kElbowL, wr = side ? kWristR : kWristL;
     at(sh);
