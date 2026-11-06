@@ -308,9 +308,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // (audio.mjs): a long frame only delays a parameter change. Kern's own output stream (rendered in
   // wasm on the main thread, a short queue that underruns on every long frame) is then not used for
   // the game at all - it is only connected for the other players' voices in a multiplayer round.
+  let netActive = false;
   if (originalAudio && audio) {
     const kernConnect = audio.connect.bind(audio);
-    audio.connect = async () => { if (last?.net) return kernConnect(); };
+    audio.connect = async () => { if (netActive) return kernConnect(); };
   }
 
   // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
@@ -378,7 +379,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     applyRenderScale(last);
     ui.update(last);
     originalAudio?.update(last, ui);
-    if (originalAudio && audio && last?.net && !audio.node) audio.connect();
+    netActive = !!last?.net;
+    if (originalAudio && audio && netActive && !audio.node) audio.connect();
     if (!voiceExempt && audio) voiceExempt = exemptVoice(audio);
     life.update(last);
     const touchView = JSON.parse(str(e.sc_touch_view()));
