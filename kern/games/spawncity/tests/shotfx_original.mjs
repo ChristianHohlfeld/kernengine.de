@@ -81,7 +81,12 @@ for (const s of steps) {
       log(s, await page.evaluate(() => globalThis.__arondightWalkMode?.setMode?.("drone", {persist: false, reason: "shotfx"})));
       await frames(30);
       // armed (R): an unarmed drone does not fire
-      if (await page.evaluate(() => document.getElementById("viewport")?.dataset.fireArmed !== "1")) { await page.keyboard.press("KeyR"); await frames(10); }
+      if (await page.evaluate(() => document.getElementById("viewport")?.dataset.fireArmed !== "1")) {
+        // the ARM button of the flight HUD (else R)
+        const armed = await page.evaluate(() => { const b = [...document.querySelectorAll("button")].find(e => e.offsetParent && e.textContent.trim() === "ARM"); b?.click(); return Boolean(b); });
+        if (!armed) await page.keyboard.press("KeyR");
+        await frames(20);
+      }
       log("armed", await page.evaluate(() => document.getElementById("viewport")?.dataset.fireArmed));
       if (s === "drone") {
         await page.evaluate(() => globalThis.__arondightDroneWeapons?.setMode?.("gun"));
