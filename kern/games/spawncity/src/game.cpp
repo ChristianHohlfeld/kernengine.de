@@ -321,8 +321,26 @@ Vec3 Game::focus_position() const {
   return player_position();
 }
 
-bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const {
-  // A place where rays from above reach the ground (no roof, no wall) across the footprint.
+bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out, bool off_road) const {
+  // A place where rays from above reach the ground (no roof, no wall) across the footprint;
+  // `off_road`: and no street under it (the jet stands beside the streets, never on one where it
+  // would block the traffic and the people).
+  const std::vector<Lane>& lanes = city_.lanes();
+  auto on_road = [&](Vec2 c) {
+    if (!off_road) return false;
+    const f32 reach = std::hypot(half.x, half.y) + 2;
+    for (const Lane& L : lanes) {
+      if (!L.alive || L.points.size() < 2) continue;
+      for (std::size_t k = 0; k + 1 < L.points.size(); ++k) {
+        const Vec2 a = L.points[k], b = L.points[k + 1], ab = b - a;
+        const f32 l2 = ab.x * ab.x + ab.y * ab.y;
+        const f32 t = l2 > 1e-6f ? clampf(((c.x - a.x) * ab.x + (c.y - a.y) * ab.y) / l2, 0, 1) : 0;
+        const Vec2 q = a + ab * t;
+        if (std::hypot(c.x - q.x, c.y - q.y) < reach + L.width * 0.5f) return true;
+      }
+    }
+    return false;
+  };
   const kern::physics::World& w = world_->physics();
   for (f32 r = 0; r <= search; r += 6) {
     const int steps = r == 0 ? 1 : static_cast<int>(2 * kPi * r / 8);
@@ -337,7 +355,7 @@ bool Game::clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const {
           const RayResult h = cast(w, o, {0, 0, -1}, 90, {});
           ok = h.hit && h.point.z < city_.ground_height(o.x, o.y) + 0.3f && !city_.terrain().water_at(o.x, o.y);
         }
-      if (ok) { out = {c, 0}; return true; }
+      if (ok && !on_road({c.x, c.y})) { out = {c, 0}; return true; }
     }
   }
   return false;
@@ -348,6 +366,16 @@ void Game::spawn_guard() {
   // inside one goes out to the nearest street (the start was chosen before the houses were there).
   if (spawn_checked_ || mode_ != Mode::foot || city_.stats().t_collision < 0) return;
   spawn_checked_ = true;
+  // the jet was placed before the streets were there: on a street now, it moves beside it
+  if (jet_placed_ && mode_ != Mode::jet && !jet_.pilot) {
+    const Vec3 jp = matrix_of(jet_actor_).translation();
+    Spot here{}, there{};
+    if (!clear_spot(jp, {16, 20}, 0, here, true) && clear_spot(jp, {16, 20}, 260, there, true)) {
+      const Vec3 me0 = matrix_of(soldier_).translation();
+      const Vec3 rot{0, 0, std::atan2(me0.y - there.p.y, me0.x - there.p.x) / kDeg - 90};
+      world_->teleport(jet_actor_, there.p + Vec3{0, 0, 2.1f}, &rot);
+    }
+  }
   const Vec3 me = matrix_of(soldier_).translation();
   if (!city_.building_at({me.x, me.y})) return;
   Vec3 p;
@@ -369,7 +397,7 @@ void Game::place_world() {
   spawn_ = p;
   world_->teleport(soldier_, p.p + Vec3{0, 0, 0.73f});
   Spot j{};
-  if (clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j)) {
+  if (clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j, true) || clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j)) {
     world_->set_alive(jet_actor_, true);
     const Vec3 rot{0, 0, std::atan2(p.p.y - j.p.y, p.p.x - j.p.x) / kDeg - 90};  // nose (+Y) towards the player
     world_->teleport(jet_actor_, j.p + Vec3{0, 0, 2.1f}, &rot);

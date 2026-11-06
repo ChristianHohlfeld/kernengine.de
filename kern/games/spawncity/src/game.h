@@ -155,7 +155,7 @@ class Game {
   struct Spot { Vec3 p; f32 yaw; };
   kern::game::Level build_level() const;
   void place_world();
-  bool clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out) const;
+  bool clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out, bool off_road = false) const;
   kern::physics::Body body(kern::game::ActorId a) const { return world_->actor_body(a); }
   BodyState state_of(kern::game::ActorId a) const { return read_body(world_->physics(), body(a)); }
   kern::Mat4 matrix_of(kern::game::ActorId a) const;
