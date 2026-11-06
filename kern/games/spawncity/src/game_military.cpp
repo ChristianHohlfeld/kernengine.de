@@ -192,6 +192,21 @@ bool Game::spawn_tank(Vec3 target) {
     t.progress_t = now;
     roads_.path({p.x, p.y}, {target.x, target.y}, t.path);
     if (t.path.size() > 1) t.yaw = std::atan2(t.path[1].y - p.y, t.path[1].x - p.x);
+    // the hull as a Box3D body where it stands (created in place, never teleported): kinematic,
+    // driven by the tank's own path (set_target_pose each step), a vehicle to the world's rays
+    kern::physics::BodySettings bs;
+    bs.type = kern::physics::BodyType::kinematic;
+    bs.position = p + Vec3{0, 0, 0.85f};
+    bs.rotation = yaw_quat(t.yaw);
+    t.body = world_->physics().create_body(bs);
+    if (t.body.valid()) {
+      kern::physics::ShapeSettings ss;
+      ss.kind = kern::physics::ShapeKind::box;
+      ss.size = {6.9f, 3.1f, 1.6f};
+      ss.material.friction = 0.8f;
+      ss.material.category_bits = kCatVehicle;
+      world_->physics().create_shape(t.body, ss);
+    }
     combat_.tanks.push_back(t);
     return true;
   }
@@ -488,10 +503,17 @@ void Game::update_military(f32 dt) {
     }
   }
   for (Heli& h : C.helis) step_heli(h, dt);
-  for (Tank& k : C.tanks) step_tank(k, dt);
+  for (Tank& k : C.tanks) {
+    step_tank(k, dt);
+    if (k.body.valid() && world_->physics().body_valid(k.body))
+      world_->physics().set_target_pose(k.body, {k.p + Vec3{0, 0, 0.85f}, yaw_quat(k.yaw)}, dt);
+  }
   for (SoldierAi& s : C.soldiers) if (s.person >= 0) step_soldier(s, dt);
   std::erase_if(C.helis, [](const Heli& h) { return h.dead; });
-  std::erase_if(C.tanks, [](const Tank& k) { return k.dead; });
+  std::erase_if(C.tanks, [&](Tank& k) {
+    if (k.dead && k.body.valid() && world_->physics().body_valid(k.body)) world_->physics().destroy_body(k.body);
+    return k.dead;
+  });
   // withdrawn soldiers leave where nobody sees them go
   if (!C.military.active)
     for (SoldierAi& s : C.soldiers)

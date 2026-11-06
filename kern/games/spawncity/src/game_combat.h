@@ -28,6 +28,7 @@ struct Tank {
   i32 fails = 0;
   std::vector<Vec2> path;
   bool leaving = false, wreck = false, dead = false, has_exit = false;
+  kern::physics::Body body;  // military_response.mjs upsertBody: the hull as a body cars and people hit
 };
 
 struct Shell { Vec3 p, v; f32 life = 3; bool remote = false; };  // remote: a mate's tank (seen, no damage here)

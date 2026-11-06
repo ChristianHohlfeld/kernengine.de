@@ -548,7 +548,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   }
   if (cmd == "military off" || cmd == "military on") {
     C.military_enabled = cmd == "military on";
-    if (!C.military_enabled) { C.military.active = false; C.helis.clear(); C.tanks.clear(); C.shells.clear(); for (SoldierAi& s : C.soldiers) if (s.person >= 0) people_.at(s.person).state = People::State::gone; C.soldiers.clear(); }
+    if (!C.military_enabled) { C.military.active = false; C.helis.clear(); for (Tank& k : C.tanks) if (k.body.valid() && world_->physics().body_valid(k.body)) world_->physics().destroy_body(k.body); C.tanks.clear(); C.shells.clear(); for (SoldierAi& s : C.soldiers) if (s.person >= 0) people_.at(s.person).state = People::State::gone; C.soldiers.clear(); }
     out = C.military_enabled ? "on" : "off";
     return true;
   }
