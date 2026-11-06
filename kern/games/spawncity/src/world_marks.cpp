@@ -155,11 +155,12 @@ void Marks::spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rn
     Chunk c{b, half, now + kRubbleSeconds};
     if (rubble_.size() < kRubble) rubble_.push_back(c);
     else {
-      Chunk& old = rubble_[rubble_cursor_ % kRubble];
-      if (old.body.valid() && w.body_valid(old.body)) w.destroy_body(old.body);
-      old = c;
+      // full: the oldest chunk (the soonest to expire) makes room
+      Chunk* old = &rubble_[0];
+      for (Chunk& x : rubble_) if (x.until < old->until) old = &x;
+      if (old->body.valid() && w.body_valid(old->body)) w.destroy_body(old->body);
+      *old = c;
     }
-    ++rubble_cursor_;
   }
 }
 
@@ -168,7 +169,6 @@ void Marks::update(f32 now, kern::physics::World& w) {
     if (now > it->until) {
       if (it->body.valid() && w.body_valid(it->body)) w.destroy_body(it->body);
       it = rubble_.erase(it);
-      rubble_cursor_ = static_cast<u32>(rubble_.size());
     } else ++it;
   }
   stats_.scorches = static_cast<u32>(scorches_.size());

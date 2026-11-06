@@ -981,6 +981,39 @@ TEST(physics_scale_is_a_unit_system) {
   }
 }
 
+// Box3D keeps a reference to a mesh shape's triangle data (b3CreateMeshShape): it must live as
+// long as the shape and go with it - a streamed city that rebuilds its static colliders must not
+// keep every mesh it ever made.
+TEST(physics_mesh_data_freed_with_its_shape) {
+  using namespace physics;
+  World w;
+  CHECK(w.create(WorldSettings{}));
+  const Vec3 pts[4] = {{0, 0, 0}, {10, 0, 0}, {10, 10, 0}, {0, 10, 0}};
+  const u32 idx[6] = {0, 1, 2, 0, 2, 3};
+  ShapeSettings ss;
+  ss.kind = ShapeKind::mesh;
+  ss.points = Span<const Vec3>(pts, 4);
+  ss.indices = Span<const u32>(idx, 6);
+  BodySettings bs;
+  bs.type = BodyType::fixed;
+  for (int round = 0; round < 20; ++round) {
+    const Body b = w.create_body(bs);
+    Shape keep;
+    for (int k = 0; k < 10; ++k) keep = w.create_shape(b, ss);
+    CHECK(w.mesh_count() == 10);
+    w.destroy_shape(keep);
+    CHECK(w.mesh_count() == 9);
+    w.destroy_body(b);
+    CHECK(w.mesh_count() == 0);
+  }
+  // a ray still hits a mesh created after all that churn
+  const Body b = w.create_body(bs);
+  CHECK(w.create_shape(b, ss).valid());
+  CHECK(w.cast_ray({5, 5, 5}, {0, 0, -10}).hit);
+  w.destroy();
+  CHECK(w.mesh_count() == 0);
+}
+
 TEST(physics_hull_mesh) {
   const Vec3 cube[8] = {{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1}};
   MeshData m;

@@ -187,6 +187,11 @@ class World {
   bool body_valid(Body body) const;
   /// Adds a shape; on failure returns an invalid handle and sets last_error().
   Shape create_shape(Body body, const ShapeSettings& settings);
+  /// Removes one shape from its body (a static body's other shapes stay; a dynamic body's mass
+  /// follows). A mesh shape's triangle data is freed with it.
+  void destroy_shape(Shape shape);
+  /// Triangle meshes alive (one per mesh shape).
+  std::size_t mesh_count() const { return shape_meshes_.size(); }
   Joint create_joint(const JointSettings& settings);
   void destroy_joint(Joint joint, bool wake_bodies = true);
   bool joint_valid(Joint joint) const;
@@ -282,7 +287,9 @@ class World {
   u32 world_ = 0;  // packed b3WorldId, 0 = none
   WorldSettings settings_;
   std::unordered_map<u64, u64> body_users_, shape_users_;
-  std::vector<void*> meshes_;  // b3MeshData of mesh shapes (freed after the world)
+  // b3MeshData of each mesh shape (b3CreateMeshShape keeps a reference: the data lives exactly as
+  // long as its shape and is freed after the shape is gone - destroy_shape / destroy_body / destroy)
+  std::unordered_map<u64, void*> shape_meshes_;
   std::vector<TouchEvent> contact_begin_, contact_end_, sensor_begin_, sensor_end_;
   std::vector<HitEvent> hits_;
   std::vector<Joint> joint_events_;

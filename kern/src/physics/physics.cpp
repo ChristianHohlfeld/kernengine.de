@@ -167,8 +167,8 @@ void World::destroy() {
     if (b3World_IsValid(id)) b3DestroyWorld(id);
   }
   world_ = 0;
-  for (void* m : meshes_) b3DestroyMesh(static_cast<b3MeshData*>(m));
-  meshes_.clear();
+  for (auto& [k, m] : shape_meshes_) b3DestroyMesh(static_cast<b3MeshData*>(m));
+  shape_meshes_.clear();
   body_users_.clear();
   shape_users_.clear();
   contact_begin_.clear();
@@ -212,13 +212,32 @@ void World::destroy_body(Body body) {
   const b3BodyId id = body_id(body);
   // Forget the shapes of this body.
   const int count = b3Body_GetShapeCount(id);
+  std::vector<b3MeshData*> free_after;
   if (count > 0) {
     std::vector<b3ShapeId> shapes(static_cast<std::size_t>(count));
     b3Body_GetShapes(id, shapes.data(), count);
-    for (b3ShapeId s : shapes) shape_users_.erase(b3StoreShapeId(s));
+    for (b3ShapeId s : shapes) {
+      const u64 k = b3StoreShapeId(s);
+      shape_users_.erase(k);
+      auto it = shape_meshes_.find(k);
+      if (it != shape_meshes_.end()) { free_after.push_back(static_cast<b3MeshData*>(it->second)); shape_meshes_.erase(it); }
+    }
   }
   b3DestroyBody(id);
   body_users_.erase(body.id);
+  // the shapes are gone: their triangle data can go (it was referenced, not copied)
+  for (b3MeshData* m : free_after) b3DestroyMesh(m);
+}
+
+void World::destroy_shape(Shape shape) {
+  if (!valid() || !shape.valid()) return;
+  const b3ShapeId id = shape_id(shape);
+  if (!b3Shape_IsValid(id)) return;
+  const bool dynamic = b3Body_GetType(b3Shape_GetBody(id)) == b3_dynamicBody;
+  b3DestroyShape(id, dynamic);
+  shape_users_.erase(shape.id);
+  auto it = shape_meshes_.find(shape.id);
+  if (it != shape_meshes_.end()) { b3DestroyMesh(static_cast<b3MeshData*>(it->second)); shape_meshes_.erase(it); }
 }
 
 bool World::body_valid(Body body) const { return valid() && body.valid() && b3Body_IsValid(body_id(body)); }
@@ -307,7 +326,7 @@ Shape World::create_shape(Body body, const ShapeSettings& s) {
       if (!mesh) { fail("Box3D rejected the mesh (degenerate triangles?)"); return {}; }
       id = b3CreateMeshShape(bid, &def, mesh, b3Vec3{1, 1, 1});
       if (B3_IS_NULL(id)) { b3DestroyMesh(mesh); break; }
-      meshes_.push_back(mesh);
+      shape_meshes_[b3StoreShapeId(id)] = mesh;
       break;
     }
   }
