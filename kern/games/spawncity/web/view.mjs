@@ -187,6 +187,13 @@ export class OriginalView {
     cls("pad-input", !!ctl.pad);
     cls("mobile-gameplay-compact", true);
     cls("player-dead", !!ctl.dead);
+    // real_world_bootstrap.mjs: #viewport[data-world-mode="real"] once the real world is mounted
+    // ("training" without it). The real-world HUD (minimap, topbar, contract) hangs on it in the CSS.
+    const vp = document.getElementById("viewport");
+    if (vp) {
+      const world = h.offline ? "training" : "real";
+      if (vp.dataset.worldMode !== world) vp.dataset.worldMode = world;
+    }
     globalThis.__arondightWalkMode.mode = mode === "drone" ? "drone" : "foot";
     // ---- title menu (drone_simulator.html, auto_flight_start.mjs, start_location.mjs)
     const menu = $("gameMenu");
