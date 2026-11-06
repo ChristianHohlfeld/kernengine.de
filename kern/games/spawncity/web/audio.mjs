@@ -181,6 +181,9 @@ export function installOriginalAudio() {
     if (!command) return;
     let a;
     try { a = JSON.parse(command("audio frame")); } catch { return; }
+    // no sound before the page's first gesture: an AudioContext made then starts suspended and the
+    // browser warns ("not allowed to start"); the frame is still taken so the queue never grows
+    if (globalThis.navigator?.userActivation && !navigator.userActivation.hasBeenActive) return;
     Object.assign(state, a);
     const now = performance.now();
     // ---- settings: the game's (Kern's settings) under the original's key, every module follows

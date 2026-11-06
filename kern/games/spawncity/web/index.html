@@ -83,6 +83,13 @@
   /* simulator.mjs syncSoloPresentationOrientation: a portrait phone plays a landscape turned by 90 deg
      (logical x = screen y, logical y = screen width - screen x); menus turn with it */
   html.sc-css-landscape body { position: fixed; left: 100vw; top: 0; width: 100vh; width: 100dvh; height: 100vw; transform: rotate(90deg); transform-origin: 0 0; overflow: hidden; }
+  /* the original turns #viewport (and open dialogs) itself in portrait (original.css); the page is
+     already turned here, so that turn would come on top (upside down, the view off the screen):
+     the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
+     original's quarter-turned mapping */
+  html.sc-css-landscape body.solo-flight { position: fixed !important; left: 100vw !important; top: 0 !important; width: 100dvh !important; height: 100vw !important; min-height: 0 !important; max-height: none !important; transform: rotate(90deg) !important; transform-origin: 0 0 !important; overflow: hidden !important; }
+  html.sc-css-landscape body.solo-flight #viewport { inset: 0 !important; width: 100% !important; height: 100% !important; transform: none !important; }
+  html.sc-css-landscape body.solo-flight dialog[open] { transform: none; }
   .sc-attrib { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 10.5px; color: rgba(255, 255, 255, .78);
     pointer-events: auto; background: rgba(0, 0, 0, .35); padding: 2px 6px; border-radius: 4px; }
   .sc-attrib a { color: inherit; text-decoration: none; }
