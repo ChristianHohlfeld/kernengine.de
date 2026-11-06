@@ -1,4 +1,5 @@
 // Map features from vector tiles and the procedural stand-in city (see tiles.h).
+#include <array>
 #include "tiles.h"
 
 #include <cstring>
@@ -235,6 +236,64 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     else return false;
     return true;
   });
+}
+
+void training_level(MapFeatures& out) {
+  out.procedural = true;
+  auto road = [&](f32 x, f32 y, f32 w, f32 h, RoadClass c) {
+    // the plane's long side is the centreline (these match trainingRoutes())
+    MapFeatures::Road r;
+    r.cls = c;
+    if (w >= h) r.points = {{x - w / 2, y}, {x + w / 2, y}};
+    else r.points = {{x, y - h / 2}, {x, y + h / 2}};
+    out.roads.push_back(std::move(r));
+  };
+  road(0, -38, 124, 8, RoadClass::secondary);
+  road(0, 38, 124, 8, RoadClass::secondary);
+  road(-62, 0, 8, 76, RoadClass::secondary);
+  road(62, 0, 8, 76, RoadClass::secondary);
+  road(0, 0, 168, 11, RoadClass::primary);
+  road(0, 0, 10, 152, RoadClass::primary);
+  road(0, 54, 140, 8, RoadClass::tertiary);
+  {
+    // the pedestrian bridge over the pond (5 x 42 m)
+    MapFeatures::Road b;
+    b.cls = RoadClass::pedestrian;
+    b.bridge = true;
+    b.points = {{34, 31 - 21}, {34, 31 + 21}};
+    out.roads.push_back(std::move(b));
+  }
+  auto rect = [](f32 x, f32 y, f32 w, f32 h) { return std::vector<Vec2>{{x - w / 2, y - h / 2}, {x + w / 2, y - h / 2}, {x + w / 2, y + h / 2}, {x - w / 2, y + h / 2}}; };
+  for (const auto& [x, y, w, h] : std::initializer_list<std::array<f32, 4>>{{-38, 28, 42, 30}, {48, -25, 32, 22}}) {
+    MapFeatures::Area a;
+    a.kind = AreaKind::park;
+    a.rings.push_back(rect(x, y, w, h));
+    out.areas.push_back(std::move(a));
+  }
+  {
+    // the saturated harbour pond: a circle of 20 m stretched 1.55 x .92 at (34, 31)
+    MapFeatures::Area pond;
+    pond.kind = AreaKind::water;
+    std::vector<Vec2> ring;
+    for (int i = 0; i < 48; ++i) {
+      const f32 a = 2 * kPi * static_cast<f32>(i) / 48;
+      ring.push_back({34 + std::cos(a) * 20 * 1.55f, 31 + std::sin(a) * 20 * 0.92f});
+    }
+    pond.rings.push_back(std::move(ring));
+    out.areas.push_back(std::move(pond));
+  }
+  // the compact skyline: x, y, width, depth, height
+  const std::array<f32, 5> houses[] = {{-47, -22, 15, 13, 10}, {-27, -23, 13, 12, 15}, {31, -23, 15, 13, 12}, {50, -22, 12, 12, 18}, {-51, 18, 13, 12, 14},
+                                       {-18, 24, 14, 11, 20},  {54, 15, 13, 12, 11},   {-55, 61, 16, 11, 9},  {55, 64, 18, 12, 13}};
+  u32 n = 0;
+  for (const auto& [x, y, w, d, h] : houses) {
+    MapFeatures::Building b;
+    b.rings.push_back(rect(x, y, w, d));
+    b.base = 0;
+    b.top = h;
+    b.seed = 0x7a1e0u + n++ * 2654435761u;
+    out.buildings.push_back(std::move(b));
+  }
 }
 
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {

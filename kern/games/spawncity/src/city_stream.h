@@ -87,6 +87,7 @@ class CityStream {
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
   bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
+  bool training_offline = false;  // offline: the original's training level instead of the stand-in town
 
   // ---- street life and interiors (M3 life: life.h, interiors.h) ----
   /// A building or area of a built tile: tile hash + index (stable while the tile is loaded).

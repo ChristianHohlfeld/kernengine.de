@@ -259,7 +259,8 @@ void CityStream::go_offline() {
   auto t = std::make_unique<Tile>();
   t->procedural = true;
   t->key = TileKey{0, -1, -1};
-  procedural_city(0, 0, 760, 20261029, t->features);
+  if (training_offline) training_level(t->features);  // training_test_level_v2.mjs
+  else procedural_city(0, 0, 760, 20261029, t->features);
   feed_terrain(*t);
   t->state = Tile::State::building;
   finish_features(*t);

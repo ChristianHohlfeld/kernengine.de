@@ -207,7 +207,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `thumb_layout` | Daumen-Layout | gebaut | `touch_pad.h` |  |
 | `tow_service` | Abschleppdienst | gebaut | `game_traffic.cpp`, `world_traffic.cpp`, `game_gaps.cpp` | Stichprobe: 2 Wagen, 2,5/9/7 s, 9 m, 170–320 m, Haken 7,5 m / 1,8 s, 9/14 m/s, 70 s, 110 HP. Neu in sc-m3-gaps: Kugeln des Spielers zu Fuß treffen den Abschleppwagen (MP 5, Glock 9, Sniper 70, sonst 8; `onTracer`). |
 | `training_showcase` | Trainingswelt-Deko | fehlt |  | Welt ohne Geodaten: im Original das Trainingslevel, auf Kern die prozedurale Ersatzstadt. |
-| `training_test_level_v2` | Trainingslevel (Welt ohne Geodaten) | fehlt |  | wie training_showcase. |
+| `training_test_level_v2` | Trainingslevel (Welt ohne Geodaten) | gebaut | src/tiles.cpp training_level | Straßenring, Kreuzung, Teich, Brücke, Parks, 9 Häuser; startet offline (?world=training). |
 | `vehicle_control_settings` | Fahrzeug-Einstellungen | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
 | `vehicle_models` | Fahrzeugmodelle | gebaut | `vehicle_art.h`, `vehicle_art.cpp` |  |
 | `vehicle_spawn_clearance` | Keine überlappenden Fahrzeug-Spawns (SAT, 0,35 m) | gebaut | `spawn_guard.h`, game.cpp (`manage_traffic`) | Neu in sc-m3-gaps. |

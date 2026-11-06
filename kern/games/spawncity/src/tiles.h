@@ -64,6 +64,10 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
 /// The offline stand-in: a procedural European-style town filling a square of `size` metres
 /// centred on (cx, cy). Deterministic per seed.
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out);
+/// training_test_level_v2.mjs (fixed-grounded-harbour-v2): the original's world without map data -
+/// a road rectangle with its cross streets, nine houses, two parks and the harbour pond with its
+/// bridge, at the world origin.
+void training_level(MapFeatures& out);
 
 /// Default start: Konstanz, Marktstaette (old town by the harbour).
 constexpr f64 kKonstanzLon = 9.1766, kKonstanzLat = 47.6600;

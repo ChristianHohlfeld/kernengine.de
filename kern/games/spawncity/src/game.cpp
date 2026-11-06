@@ -281,6 +281,12 @@ bool Game::start(kern::Engine& e) {
   world_->set_paused(true);  // until the ground under the player is built
 
   // Elevation from the Terrarium tiles unless offline or ?dem=0 (terrain.h).
+  // without map data the original plays its training level; ?offline=1 (the tests) keeps the
+  // bigger stand-in town, ?world=training / ?world=town choose
+  {
+    const std::string wsel = e.arg("world", "");
+    city_.training_offline = wsel == "training" || (wsel != "town" && e.arg_number("offline", 0) <= 0);
+  }
   city_.start(e.renderer, world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
   if (!art_.init(e.renderer)) return false;

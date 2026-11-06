@@ -24,7 +24,11 @@ export const CHANGELOG=Object.freeze([
     "Bäume stehen auf dem Boden und kippen bei Explosionen um; Tauben lassen sich abschießen.",
     "Menschen schreien bei Treffern, Raketen zischen im Flug.",
     "Schüsse kommen beim Seitwärtslaufen genau aus der Waffe; der Jet steht nicht mehr auf der Straße.",
-    "Kein Flackern mehr an Fassaden; das Zielfernrohr zeigt alles, auch weit weg."]},
+    "Kein Flackern mehr an Fassaden; das Zielfernrohr zeigt alles, auch weit weg.",
+    "Handy-Steuerung wie CoD Mobile: rechte Bildschirmhälfte frei zum Umsehen, FIRE-Knopf, kurzer Tipp schießt.",
+    "Messer mit Ausfallschritt, Treffer-Ruck und Blut; Fäuste mit linker und rechter Maustaste.",
+    "Ohne Netz startet das Trainingsgelände mit Straßen, Teich, Brücke und Häusern.",
+    "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",
