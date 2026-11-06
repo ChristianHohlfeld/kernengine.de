@@ -95,6 +95,10 @@ class Engine {
   const RenderStats& stats() const { return renderer.last_stats(); }
   /// Clear colour for the frame (behind the sky only where no sky is drawn).
   Vec4 clear_color{0.045f, 0.07f, 0.12f, 1};
+  /// WebXR (kern_app_frame_xr): the headset's eye in the world and where it looks, as drawn last
+  /// frame (the first eye); `xr` false outside a session.
+  bool xr = false;
+  Vec3 xr_eye, xr_forward{1, 0, 0};
 
  private:
   std::vector<std::pair<std::string, std::string>> args_;

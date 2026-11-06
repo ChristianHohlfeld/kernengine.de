@@ -97,6 +97,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     if (!e.kern_context_restored()) onError?.(kern.fail("context restore"));
   });
   const observer = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+    if (xr) return;  // the XR layer sets the size while a session runs
     const [w, h] = size();
     if (w === width && h === height) return;
     width = w; height = h;
@@ -117,10 +118,60 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     handle = requestAnimationFrame(frame);
   };
   handle = requestAnimationFrame(frame);
+  // ---- WebXR (Meta Quest and the like): an immersive session draws every eye into the XR layer;
+  // the app updates once per XR frame (kern_app_frame_xr). `onFrame(frame, session, space)` runs
+  // first each frame (the page's own per-frame work and its controllers: window rAF sleeps in XR).
+  let xr = null;
+  const enterXR = async ({onFrame = null, onEnd = null, mode = "immersive-vr"} = {}) => {
+    if (xr || !navigator.xr || !e.kern_app_frame_xr) return false;
+    const session = await navigator.xr.requestSession(mode, {optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"]});
+    await gl.makeXRCompatible?.();
+    const layer = new XRWebGLLayer(session, gl, {antialias: false, depth: true, alpha: false, framebufferScaleFactor: 1});
+    session.updateRenderState({baseLayer: layer, depthNear: 0.05, depthFar: 1800});
+    const space = await session.requestReferenceSpace("local").catch(() => session.requestReferenceSpace("viewer"));
+    const ptr = e.kern_alloc(4 * 27 * 4);
+    xr = {session, layer, space, ptr};
+    cancelAnimationFrame(handle);
+    kern.framebufferOverride = layer.framebuffer;
+    e.kern_app_resize(layer.framebufferWidth, layer.framebufferHeight);
+    const step = (now, frame) => {
+      if (!xr || xr.session !== session) return;
+      session.requestAnimationFrame(step);
+      try { onFrame?.(frame, session, space); } catch (err) { console.error(err); }
+      const pose = frame.getViewerPose(space);
+      if (!pose) return;
+      const views = pose.views.slice(0, 4), f = new Float32Array(kern.memory.buffer, ptr, views.length * 27);
+      views.forEach((v, i) => {
+        const vp = layer.getViewport(v), o = i * 27, p = v.transform.position, q = v.transform.orientation;
+        f.set(v.projectionMatrix, o);
+        f[o + 16] = p.x; f[o + 17] = p.y; f[o + 18] = p.z;
+        f[o + 19] = q.x; f[o + 20] = q.y; f[o + 21] = q.z; f[o + 22] = q.w;
+        f[o + 23] = vp.x; f[o + 24] = vp.y; f[o + 25] = vp.width; f[o + 26] = vp.height;
+      });
+      gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+      if (!e.kern_app_frame_xr(now, views.length, ptr)) console.warn(kern.fail("xr frame"));
+    };
+    session.requestAnimationFrame(step);
+    session.addEventListener("end", () => {
+      if (!xr || xr.session !== session) return;
+      e.kern_free(ptr);
+      xr = null;
+      kern.framebufferOverride = null;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      e.kern_app_resize(width, height);
+      if (running) handle = requestAnimationFrame(frame);
+      onEnd?.();
+    });
+    return true;
+  };
   return {
     kern,
+    enterXR,
+    exitXR() { xr?.session.end().catch(() => {}); },
+    get inXR() { return !!xr; },
     stop() {
       running = false;
+      xr?.session.end().catch(() => {});
       cancelAnimationFrame(handle);
       observer?.disconnect();
       for (const off of listeners) off();

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "kern/api/c_api.h"
 
@@ -173,6 +174,7 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
 /// One display frame: update + render. Returns 0 when rendering failed.
 KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
   if (!g_running) return 0;
+  g_engine->xr = false;
   if (g_start_ms < 0) g_start_ms = g_last_ms = now_ms;
   Frame frame;
   frame.time = (now_ms - g_start_ms) / 1000.0;
@@ -187,6 +189,57 @@ KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
   params.page_hidden = page_hidden != 0;
   RenderStats stats;
   return g_engine->renderer.render(params, stats) ? 1 : 0;
+}
+
+/// One WebXR frame: update once, then every eye. `views` holds `count` x 27 floats: the eye's
+/// projection (16, column-major), its position (3) and orientation (quaternion x y z w) in the
+/// reference space (WebXR: y up, -z forward, metres; "local": the origin where the head started),
+/// and its viewport in the layer's framebuffer (x y w h). The app's camera after the update is
+/// the anchor: the reference space's origin sits at the camera's eye, its forward along the
+/// camera's heading (the app turns the player, the head looks around); Kern is z up.
+KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, const f32* views) {
+  if (!g_running || count < 1 || count > 4 || !views) return 0;
+  if (g_start_ms < 0) g_start_ms = g_last_ms = now_ms;
+  Frame frame;
+  frame.time = (now_ms - g_start_ms) / 1000.0;
+  frame.dt = static_cast<f32>(clamp((now_ms - g_last_ms) / 1000.0, 0.0, 0.1));
+  frame.index = g_frame++;
+  g_last_ms = now_ms;
+  g_app->update(*g_engine, frame);
+  g_engine->input.end_frame();
+  if (g_engine->renderer.lost()) return 1;
+  Camera& cam = g_engine->renderer.camera;
+  const Camera anchor = cam;
+  Vec3 f = anchor.target - anchor.eye;
+  f.z = 0;
+  f = normalize(f, {0, 1, 0});
+  const Vec3 r{f.y, -f.x, 0}, up{0, 0, 1};
+  // a WebXR vector (x right, y up, -z forward) in the world
+  auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
+  bool ok = true;
+  for (i32 i = 0; i < count; ++i) {
+    const f32* v = views + i * 27;
+    Quat q{v[19], v[20], v[21], v[22]};
+    const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    if (!(ql > 1e-6f)) continue;
+    q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
+    const Vec3 eye = anchor.eye + world({v[16], v[17], v[18]});
+    cam = anchor;
+    cam.eye = eye;
+    cam.target = eye + world(q.rotate({0, 0, -1}));
+    cam.up = world(q.rotate({0, 1, 0}));
+    cam.has_projection = true;
+    std::memcpy(cam.projection.m, v, 16 * sizeof(f32));
+    RenderParams params;
+    params.clear_color = g_engine->clear_color;
+    params.has_viewport = true;
+    params.viewport = {static_cast<i32>(v[23]), static_cast<i32>(v[24]), static_cast<i32>(v[25]), static_cast<i32>(v[26])};
+    RenderStats stats;
+    ok = g_engine->renderer.render(params, stats) && ok;
+    if (i == 0) { g_engine->xr = true; g_engine->xr_eye = cam.eye; g_engine->xr_forward = normalize(cam.target - cam.eye, {1, 0, 0}); }
+  }
+  cam = anchor;
+  return ok ? 1 : 0;
 }
 
 KERN_EXPORT(kern_app_resize) i32 kern_app_resize(i32 width, i32 height) {

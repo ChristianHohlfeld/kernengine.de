@@ -417,7 +417,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
         + `stream worst ${t.worst ?? "-"} ms (${t.worstStep || "-"} ${t.worstStepMs ?? ""}) · city re-syncs ${t.rebuilds ?? "-"} · street layings ${t.relays ?? "-"} · uploads ${t.uploads ?? "-"} (${t.uploadKVerts ?? "-"}k verts) · mode ${last.mode}`;
     };
   })() : null;
-  const tick = () => {
+  const work = () => {
     frames++;
     perfView?.(performance.now());
     pollPad();
@@ -449,8 +449,54 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     const touchView = JSON.parse(str(e.sc_touch_view()));
     if (view) view.update(last, touchView);
     else overlay.update(touchView);
-    requestAnimationFrame(tick);
   };
+  // in VR the XR session drives the frame (and this page's work with it, xrFrame below)
+  const tick = () => { if (!app.inXR) work(); requestAnimationFrame(tick); };
+
+  // ---- VR (WebXR: Meta Quest browser, the installed app): the game in the headset, the
+  // controllers as the pad - left stick move, right stick turn, triggers fire / aim, A B X Y,
+  // grips LB / RB, stick clicks L3 / R3 (the Xbox scheme the game already has)
+  const xrPad = frame => {
+    let L = null, R = null;
+    for (const src of frame.session.inputSources) {
+      if (!src.gamepad) continue;
+      if (src.handedness === "left") L = src.gamepad; else if (src.handedness === "right") R = src.gamepad;
+    }
+    if (!L && !R) return false;
+    const b = (g, i) => !!g?.buttons[i]?.pressed, v = (g, i) => g?.buttons[i]?.value ?? 0, ax = (g, i) => g?.axes[i] ?? 0;
+    let bits = 0;
+    const set = (bit, on) => { if (on) bits |= 1 << bit; };
+    set(0, b(R, 4)); set(1, b(R, 5)); set(2, b(L, 4)); set(3, b(L, 5));   // A B X Y
+    set(4, b(L, 1)); set(5, b(R, 1));                                     // LB RB (grips)
+    set(10, b(L, 3)); set(11, b(R, 3));                                   // L3 R3
+    set(9, b(L, 5) && b(R, 5));                                           // START (both upper buttons)
+    const lx = ax(L, 2), ly = ax(L, 3), rx = ax(R, 2), ry = ax(R, 3);
+    const active = bits !== 0 || [lx, ly, rx, ry].some(a => Math.abs(a) > 0.22) || v(L, 0) > 0.1 || v(R, 0) > 0.1;
+    e.sc_gamepad(1, lx, -ly, rx, -ry, v(L, 0), v(R, 0), bits >>> 0, active ? 1 : 0);
+    return true;
+  };
+  const xrFrame = frame => { work(); xrPad(frame); };
+  const vrSupported = navigator.xr?.isSessionSupported ? navigator.xr.isSessionSupported("immersive-vr").catch(() => false) : Promise.resolve(false);
+  const enterVR = async () => {
+    if (!(await vrSupported) || app.inXR) return false;
+    command("vr 1");
+    const ok = await app.enterXR({onFrame: xrFrame, onEnd: () => command("vr 0")}).catch(err => { console.warn("[spawncity] VR", err); return false; });
+    if (!ok) command("vr 0");
+    return ok;
+  };
+  vrSupported.then(yes => {
+    if (!yes) return;
+    // a VR button on the title and in the game (top right), and ?vr=1 enters at the first gesture
+    const b = document.createElement("button");
+    b.id = "scVrButton"; b.type = "button"; b.textContent = "VR";
+    b.title = "In die VR-Brille (WebXR)";
+    b.style.cssText = "position:fixed;z-index:2147481000;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 52px);min-width:58px;height:40px;border-radius:10px;border:2px solid #7ff0c5;background:#0d1118e0;color:#eafff7;font:900 14px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer";
+    b.addEventListener("click", ev => { ev.stopPropagation(); enterVR(); });
+    b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
+    document.body.appendChild(b);
+    if (params.get("vr") === "1") addEventListener("pointerdown", () => enterVR(), {once: true, capture: true});
+  });
+  window.SpawnCityVR = {enter: enterVR, exit: () => app.exitXR(), get active() { return app.inXR; }};
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = (originalView && document.querySelector("#worldLookHud .world-mini-canvas")) || hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");

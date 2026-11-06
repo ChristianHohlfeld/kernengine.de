@@ -289,6 +289,8 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
 }
 
 bool Game::ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const {
+  // VR: every screen point is where the head looks (WebXR, kern_app_frame_xr)
+  if (engine_ && engine_->xr) { from = engine_->xr_eye; dir = engine_->xr_forward; return true; }
   // The inverse of project_screen (game_net.cpp): a ray through a CSS px point of the view.
   const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   Vec3 r{f.y * cam_.up.z - f.z * cam_.up.y, f.z * cam_.up.x - f.x * cam_.up.z, f.x * cam_.up.y - f.y * cam_.up.x};
@@ -496,6 +498,8 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
       }
     }
   }
+  // VR: the head pitches, the stick only turns (no tilted horizon: a level body under the head)
+  if (engine_ && engine_->xr) p.look_y = 0;
   p.move_x = clampf(strafe, -1, 1);
   p.move_y = clampf(forward, -1, 1);
   const f32 mm = std::hypot(p.move_x, p.move_y);
@@ -516,6 +520,11 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     // Kern fires the guns (keyboard / mouse / pad); an empty magazine on touch pulls Kern's trigger
     // once so that the soldier reloads (touch_fire)
     p.fire = fire || touch_fire;
+    if (engine_ && engine_->xr && fire && !locked) {
+      // VR: the round goes where the head looks (the game fires it, Kern's soldier only reloads)
+      const bool empty = ctl_touch_shot(frame_w_ / 2, frame_h_ / 2);
+      p.fire = empty;
+    }
   }
   C.aim_point = false;
   trigger_was_ = p.fire;

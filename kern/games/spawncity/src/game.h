@@ -468,6 +468,7 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
+  bool vr_ = false;  // the page runs a WebXR session ("vr 1")
   Facades windows_;
   WaterLook water_look_;
   std::unique_ptr<kern::game::GameWorld> world_;

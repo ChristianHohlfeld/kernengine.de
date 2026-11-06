@@ -256,6 +256,10 @@ struct Camera {
   f32 fov = kPi / 3, near = 0.05f, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
   f32 ortho_height = 20;      // orthographic: visible height in metres
+  // An explicit projection (a WebXR eye: asymmetric frustum) instead of fov / aspect; the view
+  // still comes from eye / target / up.
+  bool has_projection = false;
+  Mat4 projection;
 };
 
 /// True when the camera's projection parameters are usable.
@@ -266,6 +270,7 @@ inline bool camera_valid(const Camera& c) {
 }
 /// Projection matrix of the camera for a viewport aspect ratio (width / height).
 inline Mat4 projection_matrix(const Camera& c, f32 aspect) {
+  if (c.has_projection) return c.projection;
   if (!c.orthographic) return Mat4::perspective(c.fov, aspect, c.near, c.far);
   const f32 h = c.ortho_height * 0.5f, w = h * aspect;
   return Mat4::ortho(-w, w, -h, h, c.near, c.far);

@@ -1292,6 +1292,12 @@ std::string Game::command(const std::string& cmd) {
     }
     return r;
   }
+  if (cmd == "vr 1" || cmd == "vr 0") {
+    // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera
+    vr_ = cmd == "vr 1";
+    if (vr_) { drone_cam_ = 0; car_cockpit_ = true; jet_cockpit_ = true; rig_init_ = false; }
+    return vr_ ? "vr" : "flat";
+  }
   if (starts("weapon ")) {
     const int n = std::atoi(cmd.c_str() + 7);
     if (n >= 0 && n < 8) select_foot_weapon(static_cast<weapons::Id>(n));

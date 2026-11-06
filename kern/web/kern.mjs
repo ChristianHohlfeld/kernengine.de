@@ -245,7 +245,8 @@ export class KernModule {
 
       createFramebuffer: () => self.addObject(gl().createFramebuffer()),
       deleteFramebuffer: f => { gl().deleteFramebuffer(obj(f)); self.releaseObject(f); },
-      bindFramebuffer: (target, f) => gl().bindFramebuffer(target, obj(f)),
+      // WebXR: the default framebuffer is the XR layer's while a session runs (app.mjs enterXR)
+      bindFramebuffer: (target, f) => gl().bindFramebuffer(target, f === 0 && self.framebufferOverride ? self.framebufferOverride : obj(f)),
       framebufferTexture2D: (target, attachment, textarget, t, level) => gl().framebufferTexture2D(target, attachment, textarget, obj(t), level),
       checkFramebufferStatus: target => gl().checkFramebufferStatus(target),
       drawBuffers: (ptr, count) => {
