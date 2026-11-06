@@ -127,7 +127,7 @@ void Game::ctl_enter(bool jet_first) {
   i32 best = -1;
   f32 best_d = kEnterCarM;
   for (std::size_t i = 0; i < cars_.size(); ++i) {
-    if (!cars_[i].placed) continue;
+    if (!cars_[i].placed || cars_[i].wreck) continue;
     const Vec3 p = matrix_of(cars_[i].actor).translation();
     const f32 d = std::hypot(p.x - me.x, p.y - me.y) - (cars_[i].car->spec().half.x - 1.78f);
     if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
@@ -1088,7 +1088,7 @@ void Game::update_touch_layout() {
     const Vec3 me = matrix_of(soldier_).translation();
     l.near_jet = jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJetM;
     for (const TrafficCar& c : cars_)
-      if (c.placed) { const Vec3 p = matrix_of(c.actor).translation(); l.near_car |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCarM; }
+      if (c.placed && !c.wreck) { const Vec3 p = matrix_of(c.actor).translation(); l.near_car |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCarM; }  // a wreck takes nobody
     l.weapon = weapons::spec(foot_weapon_).name;
     l.sniper = foot_weapon_ == weapons::Id::sniper;
     l.scope_on = ctl_.scope_on;

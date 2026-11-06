@@ -705,6 +705,9 @@ void Game::manage_traffic() {
       // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
       // VEHICLE_RELOCATE_M 330 (world_procedural_population.mjs)
       replace = d > 330 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
+      // A burnt-out wreck no tow truck came for is cleared after 45 s (the street is free again);
+      // it comes back as a whole car somewhere else.
+      if (c.wreck && world_->sim_time() - c.wreck_at > 45 && !car_towed(static_cast<i32>(i))) replace = true;
       // An abandoned car stays where it was left (SpawnCity: 180 s).
     }
     if (!replace) continue;
@@ -978,7 +981,8 @@ void Game::draw_vehicles() {
       const TrafficCar& c = cars_[i];
       if (!c.placed || !world_->actor_alive(c.actor)) continue;
       const bool mine = static_cast<i32>(i) == car_index_ && mode_ == Mode::car;
-      art_.car(matrix_of(c.actor), *c.car, c.color, mine && car_cockpit_, c.input.pedal < -0.05f);
+      // a wreck is burnt out: charred, no lights - nobody takes it for a car still to be shot
+      art_.car(matrix_of(c.actor), *c.car, c.wreck ? Vec3{0.055f, 0.05f, 0.045f} : c.color, mine && car_cockpit_, !c.wreck && c.input.pedal < -0.05f);
     }
     if (jet_placed_) {
       art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && jet_cockpit_);

@@ -428,6 +428,7 @@ class Game {
   void gaps_camera(kern::Camera& c);
   bool gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const;
   bool gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const;
+  bool car_towed(i32 car) const;  // a tow truck has it as its job (game_traffic.cpp)
   bool gaps_drone_due(u32 slot, i32 stars);
   void gaps_drone_revealed(u32 slot, i32 stars);
   void gaps_jet_damage(f32 amount);

@@ -460,6 +460,21 @@ void Game::draw_events() {
         const f32 t = now * (3.1f + static_cast<f32>(i)) + static_cast<f32>(i) * 2.1f, s = 1.4f * (0.55f + 0.25f * std::sin(t));
         A.put(CombatArt::glow_sphere, Mat4::translate(k.p + Vec3{0.3f * std::sin(t), 0.3f * std::cos(t), 2 + s * 0.6f + static_cast<f32>(i) * 0.5f}) * Mat4::scale({s, s, s * 1.4f}), {2.8f, 1.1f, 0.25f});
       }
+  // a burnt-out car or bus: flames for 9 s, then a dark smoke column until it is cleared
+  for (const TrafficCar& c : cars_) {
+    if (!c.placed || !c.wreck) continue;
+    const f32 age = now - c.wreck_at;
+    const Vec3 at = matrix_of(c.actor).translation();
+    for (int i = 0; i < 3; ++i) {
+      const f32 t = now * (2.7f + static_cast<f32>(i)) + static_cast<f32>(i) * 2.3f;
+      if (age < 9) {
+        const f32 s = 1.1f * (0.55f + 0.25f * std::sin(t)) * clampf(1.4f - age / 9, 0.3f, 1);
+        A.put(CombatArt::glow_sphere, Mat4::translate(at + Vec3{0.35f * std::sin(t), 0.35f * std::cos(t), 1.1f + s * 0.5f + static_cast<f32>(i) * 0.4f}) * Mat4::scale({s, s, s * 1.5f}), {2.8f, 1.05f, 0.22f});
+      }
+      const f32 rise = std::fmod(now * 0.9f + static_cast<f32>(i) * 1.3f, 4.0f), s = 0.7f + rise * 0.45f;
+      A.put(CombatArt::fade_sphere, Mat4::translate(at + Vec3{0.4f * std::sin(t * 0.3f), 0.4f * std::cos(t * 0.3f), 1.6f + rise * 1.6f}) * Mat4::scale({s, s, s}), {0.05f, 0.05f, 0.055f}, 0.55f * (1 - rise / 4));
+    }
+  }
   // race gates (race_track.mjs: start yellow, next green, passed blue, others white)
   if (combat_.race_on)
     for (i32 i = 0; i < kGates; ++i) {

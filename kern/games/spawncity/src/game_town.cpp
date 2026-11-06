@@ -260,6 +260,12 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy ki
     if (amount > 2) world_->damage(soldier_, amount, 0, false, at);
   }
   blast_cars(at, radius, damage, by_player);  // hits per car / bus, cruisers linear (game_vehicle_damage.cpp)
+  // the parked jet (player_vehicle_runtime_v2 airframes): grenades and rockets wreck it too, linear
+  // over the radius + 5 m (its size); in the cockpit the flight's own damage applies
+  if (jet_placed_ && mode_ != Mode::jet && gaps_) {
+    const f32 dj = kern::length(matrix_of(jet_actor_).translation() - at), rj = radius + 5;
+    if (dj < rj) gaps_jet_damage(std::fmax(20.0f, damage) * 2.5f * (1 - dj / rj));
+  }
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
   if (kind != BlastBy::other) destruction_.blast(at, radius, damage, kind == BlastBy::missile, city_, rng_);  // weapons break buildings
   life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)

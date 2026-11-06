@@ -401,4 +401,11 @@ std::string Game::traffic_json() {
   return b + trucks + "]}";
 }
 
+bool Game::car_towed(i32 car) const {
+  if (!life_) return false;
+  for (const WorldLife::TowTruck& t : life_->trucks)
+    if (t.job == car) return true;
+  return false;
+}
+
 }  // namespace sc
