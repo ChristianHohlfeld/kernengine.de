@@ -259,7 +259,7 @@ struct Camera {
   // An explicit projection (a WebXR eye: asymmetric frustum) instead of fov / aspect; the view
   // still comes from eye / target / up.
   bool has_projection = false;
-  Mat4 projection;
+  Mat4 projection = Mat4{};
 };
 
 /// True when the camera's projection parameters are usable.
