@@ -188,6 +188,27 @@ KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
   params.clear_color = g_engine->clear_color;
   params.page_hidden = page_hidden != 0;
   RenderStats stats;
+  if (g_engine->stereo && g_engine->renderer.width() >= 4) {
+    // side by side: each half the camera's own view, the eye shifted half the eye distance along
+    // the camera's right (parallel eyes, the same fov over half the width)
+    Camera& cam = g_engine->renderer.camera;
+    const Camera anchor = cam;
+    const Vec3 f = normalize(anchor.target - anchor.eye, {0, 1, 0});
+    const Vec3 r = normalize(cross(f, anchor.up), {1, 0, 0});
+    const i32 w = g_engine->renderer.width(), h = g_engine->renderer.height(), half = w / 2;
+    bool ok = true;
+    for (int e = 0; e < 2; ++e) {
+      const f32 side = (e == 0) != g_engine->stereo_cross ? -0.5f : 0.5f;
+      cam = anchor;
+      cam.eye = anchor.eye + r * (side * g_engine->stereo_ipd);
+      cam.target = anchor.target + r * (side * g_engine->stereo_ipd);
+      params.has_viewport = true;
+      params.viewport = {e == 0 ? 0 : half, 0, e == 0 ? half : w - half, h};
+      ok = g_engine->renderer.render(params, stats) && ok;
+    }
+    cam = anchor;
+    return ok ? 1 : 0;
+  }
   return g_engine->renderer.render(params, stats) ? 1 : 0;
 }
 

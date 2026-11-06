@@ -455,6 +455,16 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
   }
   look_view_models(dt);
   look_vr_hud();
+  // stereo_sbs.mjs: side-by-side cross-eye 3D (KAMERA: 3D NEBENEINANDER, ?sbs=1); the eye base by
+  // the view (stereoRig: on foot 6.4 cm, else .013 x focus x the view's width at 1 m, focus car 8,
+  // drone 6, jet 40 m, at most 2 m)
+  engine_->stereo = !vr_ && (ui_.settings.on(Opt::cam_stereo) || engine_->arg_number("sbs", 0) > 0);
+  if (engine_->stereo) {
+    const f32 aspect = std::fmax(0.3f, frame_w_ * 0.5f / std::fmax(1.0f, frame_h_)), k = 2 * std::tan(cam_.fov * 0.5f) * aspect;
+    const f32 F = mode_ == Mode::jet ? 40.0f : mode_ == Mode::car ? 8.0f : mode_ == Mode::foot ? 4.0f : 6.0f;
+    engine_->stereo_ipd = mode_ == Mode::foot ? 0.064f : std::fmax(0.064f, std::fmin(2.0f, 0.013f * F * k));
+    engine_->stereo_cross = true;
+  }
   look_lap(perf::Slot::draw);
   const kern::RenderStats& rs = e.stats();
   L.meter.end_frame(clock_ms(), static_cast<f32>(rs.cpu_ms), static_cast<f32>(rs.gpu_ms));

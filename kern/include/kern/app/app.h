@@ -99,6 +99,11 @@ class Engine {
   /// frame (the first eye); `xr` false outside a session.
   bool xr = false;
   Vec3 xr_eye, xr_forward{1, 0, 0};
+  /// Side-by-side stereo (a phone in a cardboard viewer, 3D TVs): the frame is drawn twice, the
+  /// left and the right half, the eyes `stereo_ipd` metres apart.
+  bool stereo = false;
+  f32 stereo_ipd = 0.064f;
+  bool stereo_cross = true;  // cross-eye viewing: the right eye's image on the left half
 
  private:
   std::vector<std::pair<std::string, std::string>> args_;
