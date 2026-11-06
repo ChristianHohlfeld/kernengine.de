@@ -369,6 +369,11 @@ void Game::update_net(f32 dt) {
     if (p.valid) r.person_shown = p.p;
     // his feet on our ground: his height field may be refined differently - walking he neither
     // floats nor wades (a jump, a roof, the jetpack stay as he sent them)
+    // his car on our ground: never sunk into it (his ground may lie lower than ours)
+    if (b.valid && r.state.mode == net::PlayerMode::car) {
+      const f32 g = city_.ground_height(r.shown.x, r.shown.y);
+      if (std::isfinite(g) && r.shown.z < g + 0.45f && r.shown.z > g - 4) r.shown.z = g + 0.45f;
+    }
     if (p.valid && (r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone)) {
       const f32 g = city_.ground_height(r.person_shown.x, r.person_shown.y);
       if (std::isfinite(g) && r.person_shown.z < g + 0.9f && r.person_shown.z > g - 4) r.person_shown.z = g;
