@@ -117,9 +117,9 @@ body.scui-playing .sc-top{top:calc(max(12px,env(safe-area-inset-top)) + 38px)}
 body.scui-playing .scui-switches{right:auto;left:calc(max(10px,env(safe-area-inset-left)) + 196px)}
 .scui-switches button{width:40px;height:32px;display:flex;align-items:center;justify-content:center;padding:0;background:rgba(10,13,18,.56);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;cursor:pointer}
 .scui-switches svg{width:20px;height:20px}.scui-switches [data-on="0"] .ss-wave,.scui-switches [data-on="1"] .ss-x,.scui-switches [data-on="1"] .ms-x{display:none}.scui-switches [data-sw="music"][data-on="0"]{color:rgba(255,255,255,.55)}
-#scInstall{position:fixed;z-index:101;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));height:32px;display:flex;align-items:center;gap:7px;padding:0 11px;background:rgba(10,13,18,.56);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;font:600 11px Inter,system-ui,sans-serif;letter-spacing:.12em;cursor:pointer}
+#scInstall{position:fixed;z-index:2147480500;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));height:32px;display:flex;align-items:center;gap:7px;padding:0 11px;background:rgba(10,13,18,.56);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;font:600 11px Inter,system-ui,sans-serif;letter-spacing:.12em;cursor:pointer}
 #scInstall svg{width:14px;height:14px}#scInstall[hidden],#scInstallHint[hidden]{display:none!important}
-#scInstallHint{position:fixed;z-index:102;top:calc(max(10px,env(safe-area-inset-top)) + 40px);left:max(10px,env(safe-area-inset-left));max-width:min(80vw,320px);padding:12px 14px;background:#12161cf5;border:1px solid rgba(255,255,255,.16);border-radius:14px;color:#fff;font:600 13px/1.4 system-ui,sans-serif}
+#scInstallHint{position:fixed;z-index:2147480501;top:calc(max(10px,env(safe-area-inset-top)) + 40px);left:max(10px,env(safe-area-inset-left));max-width:min(80vw,320px);padding:12px 14px;background:#12161cf5;border:1px solid rgba(255,255,255,.16);border-radius:14px;color:#fff;font:600 13px/1.4 system-ui,sans-serif}
 #scInstallHint b{color:#f5b301}
 #scShareToast{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:#0d1117e0;border:1px solid #ffffff30;font:800 12px system-ui;letter-spacing:.12em;opacity:0;transition:opacity .3s}#scShareToast[data-on="1"]{opacity:1}
 /* suggestion_box.mjs: the card bottom right of the title */
@@ -705,14 +705,26 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
     // An offline copy of the page (sw.js), like SpawnCity's service worker; not from file://.
     if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register("./sw.js", {scope: "./", updateViaCache: "none"}).catch(() => {});
-    const syncInstall = () => { install.hidden = standalone || menu.hidden || !(deferred || ios); if (install.hidden) installHint.hidden = true; };
+    // shown whenever this page is not the installed app (the prompt caught early in index.html;
+    // without one the browser's own menu entry is named)
+    const syncInstall = () => {
+      deferred = deferred || window.__scInstallPrompt || null;
+      if (window.__scInstalled) standalone = true;
+      install.hidden = standalone || menu.hidden;
+      if (install.hidden) installHint.hidden = true;
+    };
     setInterval(syncInstall, 500);
-    addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferred = e; });
-    addEventListener("appinstalled", () => { standalone = true; deferred = null; });
+    syncInstall();
+    addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferred = e; window.__scInstallPrompt = e; });
+    addEventListener("appinstalled", () => { standalone = true; deferred = null; window.__scInstallPrompt = null; });
+    matchMedia("(display-mode: standalone)").addEventListener?.("change", ev => { if (ev.matches) standalone = true; });
     install.addEventListener("click", e => {
       e.preventDefault(); e.stopPropagation();
-      if (deferred) { deferred.prompt(); deferred.userChoice.finally(() => { deferred = null; }); return; }
-      if (ios) { installHint.innerHTML = "Tippe unten in Safari auf <b>Teilen</b> &#x2191; und dann auf <b>Zum Home-Bildschirm</b>. SpawnCity startet danach im Vollbild wie eine App."; installHint.hidden = !installHint.hidden; }
+      if (deferred) { const d = deferred; deferred = null; window.__scInstallPrompt = null; d.prompt(); d.userChoice.then(c => { if (c?.outcome === "accepted") standalone = true; }).catch(() => {}); return; }
+      installHint.innerHTML = ios
+        ? "Tippe unten in Safari auf <b>Teilen</b> &#x2191; und dann auf <b>Zum Home-Bildschirm</b>. SpawnCity startet danach im Vollbild wie eine App."
+        : "Im Browsermenü <b>&#8942;</b> auf <b>App installieren</b> (oder <b>Zum Startbildschirm hinzufügen</b>) tippen. Ist SpawnCity schon installiert, öffnest du es dort mit <b>In App öffnen</b>.";
+      installHint.hidden = !installHint.hidden;
     });
     document.addEventListener("click", e => { if (!installHint.hidden && e.target !== install && !install.contains(e.target)) installHint.hidden = true; }, true);
   }

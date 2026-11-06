@@ -211,15 +211,29 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const probe = document.createElement("div");
   probe.style.cssText = "position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
   document.body.appendChild(probe);
-  // Portrait phones: the CSS-rotated landscape (index.html .sc-css-landscape); fingers map back.
-  const rotated = () => document.documentElement.classList.contains("sc-css-landscape");
+  // Landscape only (as the installed app: manifest "orientation": "landscape"). A phone or tablet
+  // held upright gets the real lock where the browser has one (fullscreen + screen.orientation.lock
+  // on the first tap, Android), else a "hold it sideways" screen until it is turned (iOS); nothing
+  // is rotated by CSS any more, so turning the device never tears the layout.
+  const rotated = () => false;
+  const lockLandscape = () => {
+    if (!coarse) return;
+    const el = document.documentElement;
+    const lock = () => screen.orientation?.lock?.("landscape").catch(() => {});
+    if (!document.fullscreenElement && el.requestFullscreen && !matchMedia("(display-mode: fullscreen)").matches)
+      el.requestFullscreen({navigationUI: "hide"}).then(lock, lock);
+    else lock();
+  };
   const orient = () => {
-    const turn = (coarse || params.get("rotate") === "1") && matchMedia("(orientation: portrait)").matches && params.get("rotate") !== "0";
-    document.documentElement.classList.toggle("sc-css-landscape", turn);
+    const upright = (coarse || params.get("rotate") === "1") && params.get("rotate") !== "0" && innerHeight > innerWidth * 1.05;
+    document.documentElement.classList.toggle("sc-portrait", upright);
   };
   orient();
+  addEventListener("pointerdown", lockLandscape, {capture: true, passive: true});
+  document.getElementById("scRotateGo")?.addEventListener("click", ev => { ev.stopPropagation(); lockLandscape(); setTimeout(orient, 400); });
   matchMedia("(orientation: portrait)").addEventListener?.("change", () => { orient(); frame(); });
   visualViewport?.addEventListener("resize", () => { orient(); frame(); });
+  screen.orientation?.addEventListener?.("change", () => { orient(); frame(); });
   const frame = () => {
     const c = getComputedStyle(probe), px = v => parseFloat(v) || 0;
     e.sc_touch_frame(canvas.clientWidth, canvas.clientHeight, px(c.paddingLeft), px(c.paddingTop), px(c.paddingRight), px(c.paddingBottom),

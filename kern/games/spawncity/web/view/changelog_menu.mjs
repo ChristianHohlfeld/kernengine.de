@@ -39,7 +39,12 @@ export const CHANGELOG=Object.freeze([
     "Die Titelmusik läuft nie mehr doppelt.",
     "MULTI-Knopf zeigt klar SOLO ▸ MULTI, die Suche, das Warten und die Spielerzahl.",
     "Auto: der linke Stick bewegt sich sichtbar mit.",
-    "Installierte App (PWA) startet immer mit der neuesten Version."]},
+    "Installierte App (PWA) startet immer mit der neuesten Version.",
+    "Nur Querformat: Handys sperren auf quer (Vollbild), sonst zeigt SpawnCity „Bitte quer halten“ – Drehen macht nichts mehr kaputt.",
+    "HOME SCREEN ist immer da, solange SpawnCity nicht installiert ist.",
+    "Treffer sitzen genau auf der Figur: Kopf, Oberkörper mit Armen, Beine – auch bei Mitspielern, Drohnenpiloten und am Fallschirm.",
+    "Schönere Menschen: runde Glieder, Schuhe, Hände, Gesicht und Haare; die Spielfigur mit Gesicht.",
+    "Meta Quest: großer Knopf IN VR SPIELEN, keine Maus-Sperre mehr, die zurück ins Menü warf."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",
