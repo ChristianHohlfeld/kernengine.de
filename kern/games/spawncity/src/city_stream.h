@@ -112,7 +112,6 @@ class CityStream {
   bool work(Tile& t, f64 deadline);
   void finish_features(Tile& t);
   void upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls);
-  void build_areas(Tile& t);
   void remove(Tile& t);
   void feed_terrain(Tile& t);
   void begin_roads(Tile& t);

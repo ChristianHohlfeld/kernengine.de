@@ -42,64 +42,10 @@ Vec3 area_color(AreaKind k) {
   }
   return {0.5f, 0.5f, 0.5f};
 }
-f32 area_z(AreaKind k) {
-  switch (k) {
-    case AreaKind::water: return 0.06f;
-    case AreaKind::sand: return 0.045f;
-    case AreaKind::pitch: return 0.04f;
-    case AreaKind::wood: return 0.035f;
-    default: return 0.03f;
-  }
-}
-
 f64 signed_area(const std::vector<Vec2>& r) {
   f64 a = 0;
   for (std::size_t i = 0, j = r.size() - 1; i < r.size(); j = i++) a += static_cast<f64>(r[j].x) * r[i].y - static_cast<f64>(r[i].x) * r[j].y;
   return a * 0.5;
-}
-
-// Convex polygon clip against a half plane (distance >= 0 kept).
-template <class F>
-void clip_poly(const std::vector<Vec2>& in, std::vector<Vec2>& out, F distance) {
-  out.clear();
-  if (in.empty()) return;
-  Vec2 a = in.back();
-  f32 da = distance(a);
-  for (Vec2 b : in) {
-    const f32 db = distance(b);
-    if ((da >= 0) != (db >= 0)) {
-      const f32 t = da / (da - db);
-      out.push_back({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t});
-    }
-    if (db >= 0) out.push_back(b);
-    a = b;
-    da = db;
-  }
-}
-
-/// terrain_surface.mjs drapeTerrainTriangle: the triangle cut along grid lines and diagonals.
-template <class Emit>
-void drape_triangle(Vec2 a, Vec2 b, Vec2 c, f32 step, std::vector<Vec2>& p, std::vector<Vec2>& q, Emit emit) {
-  const i32 lo_x = static_cast<i32>(std::floor(std::fmin(a.x, std::fmin(b.x, c.x)) / step)), hi_x = static_cast<i32>(std::floor(std::fmax(a.x, std::fmax(b.x, c.x)) / step));
-  const i32 lo_y = static_cast<i32>(std::floor(std::fmin(a.y, std::fmin(b.y, c.y)) / step)), hi_y = static_cast<i32>(std::floor(std::fmax(a.y, std::fmax(b.y, c.y)) / step));
-  for (i32 iy = lo_y; iy <= hi_y; ++iy)
-    for (i32 ix = lo_x; ix <= hi_x; ++ix) {
-      const f32 x = ix * step, y = iy * step;
-      p = {a, b, c};
-      clip_poly(p, q, [&](Vec2 v) { return v.x - x; });
-      clip_poly(q, p, [&](Vec2 v) { return x + step - v.x; });
-      clip_poly(p, q, [&](Vec2 v) { return v.y - y; });
-      clip_poly(q, p, [&](Vec2 v) { return y + step - v.y; });
-      const std::vector<Vec2> cell = p;
-      for (f32 sign : {1.0f, -1.0f}) {
-        clip_poly(cell, q, [&](Vec2 v) { return sign * ((v.x - x) - (v.y - y)); });
-        for (std::size_t i = 1; i + 1 < q.size(); ++i) {
-          const Vec2 A = q[0], B = q[i], C = q[i + 1];
-          if (std::fabs((B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x)) < 1e-6f) continue;
-          emit(A, B, C);
-        }
-      }
-    }
 }
 
 }  // namespace
@@ -181,6 +127,7 @@ void CityStream::remove(Tile& t) {
   t.lay_meshes.clear();
   t.old_lay.clear();
   near_.dirty = true;  // the collision set may hold this tile's buildings
+  terrain_.remove_tints(t.key.hash());
   if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = {};
   if (world_ && t.old_body.valid() && world_->body_valid(t.old_body)) world_->destroy_body(t.old_body);  // M3 life
@@ -309,6 +256,7 @@ void CityStream::feed_terrain(Tile& t) {
   // become basins in the terrain; bridges keep a solid road over them.
   for (const MapFeatures::Area& a : t.features.areas)
     if (a.kind == AreaKind::water) terrain_.add_water_polygon(a.rings);
+    else terrain_.add_tint(t.key.hash(), a.rings, area_color(a.kind));  // world_ground.mjs setAreas
   for (const MapFeatures::Road& r : t.features.roads) {
     if (road_is_water(r.cls)) terrain_.add_waterway(r.points, road_width(r.cls), r.cls == RoadClass::river ? 1.6f : r.cls == RoadClass::canal ? 0.5f : 1.1f);
     else if (r.bridge)
@@ -415,54 +363,6 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
   t.triangles += chunk.mesh.triangle_count();
 }
 
-void CityStream::build_areas(Tile& t) {
-  kern::MeshData mesh;
-  kern::Earcut earcut;
-  std::vector<f64> xy;
-  std::vector<u32> holes, tris;
-  const bool drape = terrain_.has_dem() || terrain_.crater_count() > 0;
-  std::vector<Vec2> poly, clipped;
-  for (const MapFeatures::Area& a : t.features.areas) {
-    if (a.kind == AreaKind::water) continue;  // the terrain's water surface
-    xy.clear();
-    holes.clear();
-    tris.clear();
-    for (std::size_t r = 0; r < a.rings.size(); ++r) {
-      if (a.rings[r].size() < 3) continue;
-      if (r) holes.push_back(static_cast<u32>(xy.size() / 2));
-      for (Vec2 p : a.rings[r]) xy.insert(xy.end(), {p.x, p.y});
-    }
-    if (xy.size() < 6) continue;
-    earcut.triangulate(xy.data(), static_cast<u32>(xy.size() / 2), holes.data(), static_cast<u32>(holes.size()), tris);
-    const Vec3 c = area_color(a.kind);
-    const f32 z = area_z(a.kind);
-    for (std::size_t i = 0; i + 2 < tris.size(); i += 3) {
-      Vec3 p[3];
-      for (int k = 0; k < 3; ++k) p[k] = {static_cast<f32>(xy[tris[i + k] * 2]), static_cast<f32>(xy[tris[i + k] * 2 + 1]), z};
-      // Faces up: counter-clockwise seen from above.
-      if (kern::cross(p[1] - p[0], p[2] - p[0]).z < 0) std::swap(p[1], p[2]);
-      if (!drape) {
-        for (int k = 0; k < 3; ++k) mesh.push(p[k], {0, 0, 1}, c, {p[k].x * 0.1f, p[k].y * 0.1f});
-        continue;
-      }
-      // terrain_surface.mjs drapeTerrainTriangle: split along the 5 m grid and the cells'
-      // SW-NE diagonal, so the patch lies on the ground instead of cutting through it.
-      drape_triangle({p[0].x, p[0].y}, {p[1].x, p[1].y}, {p[2].x, p[2].y}, Terrain::kStep, poly, clipped, [&](Vec2 q0, Vec2 q1, Vec2 q2) {
-        for (Vec2 q : {q0, q1, q2}) mesh.push({q.x, q.y, terrain_.height(q.x, q.y) + z}, terrain_.normal(q.x, q.y), c, {q.x * 0.1f, q.y * 0.1f});
-      });
-    }
-  }
-  if (mesh.vertex_count() == 0) return;
-  kern::weld(mesh);
-  kern::Material m;
-  m.roughness = 0.9f;
-  m.cast_shadow = false;
-  const u32 id = r_->allocate_id();
-  kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-  in.material = m;
-  if (r_->upsert(id, in)) t.lay_meshes.push_back(id);
-  else r_->release_id(id);
-}
 
 void CityStream::begin_roads(Tile& t) {
   kern::RoadOptions ro;
@@ -706,11 +606,8 @@ bool CityStream::work(Tile& t, f64 deadline) {
       t.state = S::areas;
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
-    case S::areas: {
-      const f64 t1 = kern::now_ms();
-      build_areas(t);
-      step_time("areas.build", t1);
-    }
+    case S::areas:
+      // the map areas are painted into the ground (Terrain::add_tint), as in world_ground.mjs
       if (t.relay) {
         // New layer in place: the old one goes now (no frame without roads).
         for (u32 id : t.old_lay) r_->remove(id);

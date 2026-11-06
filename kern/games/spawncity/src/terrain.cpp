@@ -196,6 +196,7 @@ void Terrain::clear() {
   wc_key_ = ~0ull;
   bridges_.clear();
   craters_.clear();
+  tints_.clear();
   dem_tiles_.clear();
   requests_.clear();
   if (job_ && job_->id) kern::jobs::cancel(job_->id);
@@ -544,6 +545,46 @@ void Terrain::add_bridge(Vec2 a, Vec2 b, f32 width) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// map areas
+
+namespace {
+f32 srgb_to_linear(f32 v) { return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); }
+f32 linear_to_srgb(f32 v) { return v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1 / 2.4f) - 0.055f; }
+Vec3 to_linear(Vec3 c) { return {srgb_to_linear(c.x), srgb_to_linear(c.y), srgb_to_linear(c.z)}; }
+Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_to_srgb(c.z)}; }
+}  // namespace
+
+void Terrain::add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, Vec3 srgb) {
+  if (rings.empty() || rings[0].size() < 3) return;
+  Tint t{owner, {1e30f, 1e30f, -1e30f, -1e30f}, to_linear(srgb), rings};
+  for (Vec2 p : rings[0]) {
+    t.box.x = std::fmin(t.box.x, p.x); t.box.y = std::fmin(t.box.y, p.y);
+    t.box.z = std::fmax(t.box.z, p.x); t.box.w = std::fmax(t.box.w, p.y);
+  }
+  repaint(t.box);
+  tints_.push_back(std::move(t));
+}
+
+void Terrain::remove_tints(u64 owner) {
+  for (auto it = tints_.begin(); it != tints_.end();) {
+    if (it->owner != owner) { ++it; continue; }
+    repaint(it->box);
+    it = tints_.erase(it);
+  }
+}
+
+void Terrain::repaint(const kern::Vec4& b) {
+  // only the render tiles: the shape (collision, roads on it) does not change
+  for (auto& [k, t] : render_) {
+    (void)t;
+    i32 level, i, j;
+    unkey3(k, level, i, j);
+    const f32 size = level == 2 ? kBlock : kTile;
+    if (i * size <= b.z && (i + 1) * size >= b.x && j * size <= b.w && (j + 1) * size >= b.y) dirty_render_.insert(k);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // craters
 
 void Terrain::add_crater(Vec2 at, f32 radius, f32 depth) {
@@ -654,6 +695,37 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
   for (i32 j = -1; j <= n; ++j)
     for (i32 i = -1; i <= n; ++i) h[static_cast<std::size_t>(j + 1) * (n + 2) + (i + 1)] = node_height(x0 + i * step, y0 + j * step);
   auto H = [&](i32 i, i32 j) { return h[static_cast<std::size_t>(j + 1) * (n + 2) + (i + 1)]; };
+  // world_ground.mjs paintAreas: every node inside a map area (outer ring, not in a hole) takes
+  // node * .45 + area * .55 (linear), area after area.
+  std::vector<Vec3> tint;
+  {
+    std::vector<f32> xs;
+    const f32 x1 = x0 + size, y1 = y0 + size;
+    for (const Tint& a : tints_) {
+      if (a.box.x > x1 || a.box.z < x0 || a.box.y > y1 || a.box.w < y0) continue;
+      if (tint.empty()) tint.assign(static_cast<std::size_t>(n) * n, Vec3{-1, 0, 0});
+      for (i32 j = 0; j < n; ++j) {
+        const f32 y = y0 + j * step;
+        if (y < a.box.y || y > a.box.w) continue;
+        xs.clear();
+        for (const auto& ring : a.rings)
+          for (std::size_t q = 0, r = ring.size() - 1; q < ring.size(); r = q++) {
+            const Vec2 p = ring[q], o = ring[r];
+            if ((p.y > y) != (o.y > y)) xs.push_back(p.x + (y - p.y) * (o.x - p.x) / (o.y - p.y));
+          }
+        std::sort(xs.begin(), xs.end());
+        for (std::size_t q = 0; q + 1 < xs.size(); q += 2) {
+          const i32 i0 = std::max(0, static_cast<i32>(std::ceil((xs[q] - x0) / step)));
+          const i32 i1 = std::min(n - 1, static_cast<i32>(std::floor((xs[q + 1] - x0) / step)));
+          for (i32 i = i0; i <= i1; ++i) {
+            Vec3& c = tint[static_cast<std::size_t>(j) * n + i];
+            const Vec3 base = c.x < 0 ? to_linear(kGround) : c;
+            c = base * 0.45f + a.lin * 0.55f;
+          }
+        }
+      }
+    }
+  }
   for (i32 j = 0; j < n; ++j)
     for (i32 i = 0; i < n; ++i) {
       const f32 x = x0 + i * step, y = y0 + j * step, z = H(i, j);
@@ -662,6 +734,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
       Vec3 c = kGround;
       if (z < elevation(x, y) - 0.6f) c = water_at(x, y) ? kBed : kSoil;
       else if (surface_at(x, y) == 2) c = kSoil;
+      else if (!tint.empty() && tint[static_cast<std::size_t>(j) * n + i].x >= 0) c = to_srgb(tint[static_cast<std::size_t>(j) * n + i]);
       m.push({x, y, z}, nn, c, {x * 0.1f, y * 0.1f});
     }
   for (i32 j = 0; j < cells; ++j)

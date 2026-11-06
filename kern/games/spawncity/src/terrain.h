@@ -96,6 +96,12 @@ class Terrain {
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
   i32 surface_at(f32 x, f32 y) const;
 
+  // ---- map areas (world_ground.mjs paintAreas) ----
+  /// Parks, woods, pitches, sand tint the ground's vertex colours (node * .45 + colour * .55,
+  /// linear): the ground already is the surface, so they cost no triangles. `owner`: the map tile.
+  void add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, Vec3 srgb);
+  void remove_tints(u64 owner);
+
   // ---- craters ----
   /// A bowl of `radius` (rim included) and `depth` (terrain_craters.mjs craterProfile, scaled).
   void add_crater(Vec2 at, f32 radius, f32 depth);
@@ -116,6 +122,7 @@ class Terrain {
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
+  struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
 
   void plan_dem(Vec3 focus);
   bool run_job(f64 deadline);
@@ -148,6 +155,8 @@ class Terrain {
   std::unordered_map<u64, WaterBlock> water_;
   std::vector<Bridge> bridges_;
   std::vector<Crater> craters_;
+  std::vector<Tint> tints_;
+  void repaint(const kern::Vec4& box);
   // tiles: render keyed by (level, i, j), collision by (i, j)
   std::unordered_map<u64, RenderTile> render_;
   std::unordered_map<u64, CollisionTile> collision_;
