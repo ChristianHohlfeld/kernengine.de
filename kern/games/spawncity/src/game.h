@@ -371,6 +371,12 @@ class Game {
   bool soft_target_near(Vec3 p) const;
   bool foot_remote_detonate(f32 now);
   void foot_rocket_launched();
+  // updateRocketLaser: the dot's source - a finger on the picture > the point it was lifted at
+  // (while a guided rocket flies) > the crosshair
+  bool laser_finger_ = false, laser_pinned_ = false, laser_valid_ = false;
+  f32 laser_fx_ = 0, laser_fy_ = 0;
+  Vec3 laser_pin_{}, laser_dot_{};
+  Vec3 rocket_laser_dot();
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);

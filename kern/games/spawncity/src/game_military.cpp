@@ -743,6 +743,18 @@ void Game::draw_military() {
     A.put(CombatArt::glow_box, Mat4::translate(f.p + Vec3{0, 0, 420 - len * 0.5f}) * Mat4::scale({0.44f, 0.44f, len}), Vec3{3.0f, 0.3f, 0.2f} * pulse);
     A.put(CombatArt::glow_sphere, Mat4::translate(f.p + Vec3{0, 0, 0.3f}) * Mat4::scale({0.7f, 0.7f, 0.7f}), {4.0f, 0.4f, 0.2f});
   }
+  // updateRocketLaser / placeDot: the launcher's red dot while it is in hand on foot - big, pulsing a
+  // little, pulled a hair toward the viewer so it never sinks into the wall
+  if (world_placed_ && mode_ == Mode::foot && foot_weapon_ == weapons::Id::rocket && !player_dead_) {
+    const Vec3 dot = rocket_laser_dot();
+    if (laser_valid_) {
+      const Vec3 to_eye = cam_.eye - dot;
+      const f32 dist = std::fmax(1e-3f, kern::length(to_eye));
+      const Vec3 at = dot + to_eye * (std::fmin(0.15f, 0.03f + dist * 0.002f) / dist);
+      const f32 size = std::fmax(0.14f, dist * 0.016f) * (0.9f + 0.1f * std::sin(now * 45.0f)) * 0.5f;
+      A.put(CombatArt::glow_sphere, Mat4::translate(at) * Mat4::scale({size, size, size}), {4.0f, 0.12f, 0.08f});
+    }
+  }
   for (const Tracer& t : combat_.tracers)
     if (now <= t.until) A.beam(t.a, t.b, 0.06f, t.color);
   std::erase_if(combat_.tracers, [&](const Tracer& t) { return now > t.until; });

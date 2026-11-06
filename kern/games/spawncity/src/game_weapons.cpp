@@ -267,7 +267,12 @@ void Game::foot_attack(bool trigger, bool pressed) {
       // gameplay_final_runtime_v2.mjs has no magazines: only the cooldown (760 / 900 ms) gates a shot
       (void)slot;
       next_attack_ = now + s.interval_ms / 1000;
-      const Vec3 muzzle = eye + dir * 0.8f + Vec3{0, 0, -0.15f};
+      // footMuzzle: the launcher's muzzle (its view model held right of the view, game_look.cpp:
+      // .245 / -.2 / -.47 + the barrel's mouth .03 up, .81 forward), then .10 (grenade) / .25 (rocket)
+      // along the shot's ray - the ray itself goes through the finger / the crosshair (footRay)
+      (void)eye;
+      const Vec3 cf = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), cr = kern::normalize(kern::cross(cf, cam_.up), {0, -1, 0}), cu = kern::cross(cr, cf);
+      const Vec3 muzzle = cam_.eye + cr * 0.245f - cu * 0.17f + cf * 1.28f + dir * (foot_weapon_ == Id::rocket ? 0.25f : 0.10f);
       // GRENADE_SPEED_MPS 40 straight along the aim; the rocket leaves at ROCKET_FOOT_LAUNCH_MPS 22
       const Vec3 v = dir * (foot_weapon_ == Id::rocket ? 22.0f : s.speed_mps);
       fire_projectile(foot_weapon_, muzzle, v, true, body(soldier_));

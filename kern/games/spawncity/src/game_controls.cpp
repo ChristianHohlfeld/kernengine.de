@@ -406,6 +406,20 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     // caught up, at most 4 per frame), Glock every 170 ms, every other weapon once per touch. The
     // shot is a ray through the finger: the game fires it (Kern's soldier shoots through the centre).
     const bool kern_gun = !game_weapon_in_hand();
+    {
+      // gameplay_final_runtime_v2.mjs fingerAt: the rocket's laser follows a fire finger; lifted
+      // while a guided rocket flies, the dot stays where it was (pinned)
+      const bool rocket = w == weapons::Id::rocket;
+      const auto& fs = pad_touch_.fires();
+      if (rocket && !fs.empty() && !locked) { laser_finger_ = true; laser_pinned_ = false; laser_fx_ = fs.back().x; laser_fy_ = fs.back().y; }
+      else if (laser_finger_) {
+        bool flying = false;
+        for (const Projectile& pr : projectiles_) flying = flying || (pr.alive && pr.by_player && pr.id == weapons::Id::rocket && pr.guided);
+        if (rocket && flying && laser_valid_) { laser_pinned_ = true; laser_pin_ = laser_dot_; }
+        laser_finger_ = false;
+      }
+      if (!rocket) laser_finger_ = laser_pinned_ = false;
+    }
     for (TouchFire& f : pad_touch_.fires()) {
       // first_person_controller_v5.mjs: the gun's sights follow the finger - the depth is resolved
       // where the finger went down (resolveDistance: 1.2 .. 180 m), the point moves with a drag, and
