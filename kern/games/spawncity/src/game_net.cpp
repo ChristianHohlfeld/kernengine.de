@@ -366,6 +366,12 @@ void Game::update_net(f32 dt) {
     const mp::PoseSample b = r.body.sample(now), p = r.person.sample(now);
     if (b.valid) { r.shown = b.p; r.shown_rotation = b.q; }
     if (p.valid) r.person_shown = p.p;
+    // his feet on our ground: his height field may be refined differently - walking he neither
+    // floats nor wades (a jump, a roof, the jetpack stay as he sent them)
+    if (p.valid && (r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone)) {
+      const f32 g = city_.ground_height(r.person_shown.x, r.person_shown.y);
+      if (std::isfinite(g) && r.person_shown.z < g + 0.9f && r.person_shown.z > g - 4) r.person_shown.z = g;
+    }
     r.phase += r.state.speed * dt * 3.4f;
     r.shown_hp += (r.state.health - r.shown_hp) * damp_alpha(10, dt);
   }

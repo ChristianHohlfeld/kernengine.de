@@ -394,6 +394,30 @@ void Game::spawn_guard() {
       }
 }
 
+void Game::ground_rescue() {
+  // world_ground_rescue: the ground can rise under a body after the start (the refined elevation
+  // arrives, a collision tile is rebuilt) - who is then under it is lifted back on top, falling
+  // stops; nobody drops through the world.
+  const auto lift = [&](kern::game::ActorId a, f32 rest) {
+    if (!a || !world_->actor_alive(a)) return;
+    const Vec3 c = matrix_of(a).translation();
+    const f32 g = city_.ground_height(c.x, c.y);
+    if (!std::isfinite(g) || c.z > g + rest - 0.45f) return;
+    if (!city_.terrain().ready_at(c)) {  // no ground there yet: hold on, do not fall
+      world_->teleport(a, {c.x, c.y, std::fmax(c.z, g + rest)});
+      world_->set_actor_velocity(a, {});
+      return;
+    }
+    Vec3 v = world_->actor_velocity(a);
+    world_->teleport(a, {c.x, c.y, g + rest + 0.08f});
+    world_->set_actor_velocity(a, {v.x, v.y, std::fmax(v.z, 0.0f)});
+  };
+  if (mode_ == Mode::foot) lift(soldier_, 0.73f);
+  if (mode_ == Mode::car && car_index_ >= 0 && cars_[car_index_].car)
+    lift(cars_[car_index_].actor, Car::ground_offset(cars_[car_index_].car->spec()));
+  if (jet_placed_ && !jet_.pilot) lift(jet_actor_, 2.1f);
+}
+
 void Game::place_world() {
   spawn_checked_ = false;
   // Player at the start (a free spot near the requested place), the jet on the nearest square big
@@ -826,6 +850,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     city_.anchor = player_position();  // ground collision stays under the pilot too
     city_.update(focus_position(), mobile_ ? 3 : 4);
     spawn_guard();
+    ground_rescue();
     look_lap(perf::Slot::stream);
     update_town(dt);
     update_projectiles(dt);

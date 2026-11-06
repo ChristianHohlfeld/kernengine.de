@@ -582,6 +582,7 @@ class Game {
   Rng rng_{20261029};
   bool spawn_checked_ = false;  // world_spawn_guard (Game::spawn_guard)
   void spawn_guard();
+  void ground_rescue();  // nothing ends up under the ground (the refined height field rose under it, a hole in collision)
   // audio
   kern::audio::Mixer mixer_;
   std::unique_ptr<kern::game::SoundBank> bank_;

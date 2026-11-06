@@ -144,7 +144,9 @@ void Game::swarm_update(f32 dt) {
       if (u.person < 0) continue;
       People::Person& p = people_.at(u.person);
       if (p.state == People::State::gone) { u.person = -1; continue; }
-      p.pos = u.p;
+      // on our ground, not his: his height field can differ (refined later, a crater) - no zombie
+      // floats above the street or wades in it
+      p.pos = {u.p.x, u.p.y, city_.ground_height(u.p.x, u.p.y)};
       p.yaw = u.yaw;
       p.v = u.kind == net::SwarmKind::zombie ? std::fmax(0.4f, u.aux) * (kern::length(u.tp - u.p) > 0.05f ? 1.0f : 0.0f) : u.aux;
       p.phase += p.v * dt * 3.4f;
@@ -194,7 +196,7 @@ void Game::swarm_draw() {
   for (auto& [owner, sw] : swarms_)
     for (const RemoteUnit& u : sw.units) {
       if (u.kind == net::SwarmKind::heli) A.heli(kern::Mat4::translate(u.p) * kern::Mat4::trs({}, yaw_quat(u.yaw), {1, 1, 1}), u.rotor, u.flags != 0);
-      else if (u.kind == net::SwarmKind::tank) A.tank(kern::Mat4::translate(u.p) * kern::Mat4::trs({}, yaw_quat(u.yaw), {1, 1, 1}), u.aux, u.flags != 0);
+      else if (u.kind == net::SwarmKind::tank) A.tank(kern::Mat4::translate({u.p.x, u.p.y, city_.ground_height(u.p.x, u.p.y)}) * kern::Mat4::trs({}, yaw_quat(u.yaw), {1, 1, 1}), u.aux, u.flags != 0);
     }
 }
 

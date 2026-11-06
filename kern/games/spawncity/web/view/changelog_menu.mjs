@@ -28,7 +28,9 @@ export const CHANGELOG=Object.freeze([
     "Handy-Steuerung wie CoD Mobile: rechte Bildschirmhälfte frei zum Umsehen, FIRE-Knopf, kurzer Tipp schießt.",
     "Messer mit Ausfallschritt, Treffer-Ruck und Blut; Fäuste mit linker und rechter Maustaste.",
     "Ohne Netz startet das Trainingsgelände mit Straßen, Teich, Brücke und Häusern.",
-    "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht."]},
+    "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht.",
+    "Niemand fällt mehr durch den Boden: wer unter das Gelände gerät, wird sofort wieder daraufgesetzt (zu Fuß, im Auto, der Jet).",
+    "Multiplayer: Mitspieler und ihre Zombies, Soldaten und Panzer stehen auf deinem Boden – kein Schweben, kein Waten mehr."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",
