@@ -547,7 +547,8 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
       const f32 rl = kern::dm::sin(clamp(hud_.reload, 0.0f, 1.0f) * kPi);
       g = Mat4::translate({0, -.12f * rl, .04f * rl}) * g * models::euler({-.5f * rl, 0, .35f * rl});
     }
-    const Mat4 world = cam * g;
+    // VR: the gun in the controller's hand - its grip where the hand is, the barrel along the ray
+    const Mat4 world = view_hand_valid_ ? view_hand_ * models::euler({.075f * kick, 0, 0}) * Mat4::translate(art.weapon.grip * -1.0f - mount) : cam * g;
     art.view_matrix = world;
     art.view_valid = true;
     const Mat4 body = world * Mat4::translate(mount);

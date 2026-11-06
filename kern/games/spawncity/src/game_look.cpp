@@ -480,6 +480,7 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
       r.set_visible(L.streak_mesh, true);
     }
   }
+  vr_update_view();  // the gun in the right hand, the body with the head (game_vr.cpp)
   look_view_models(dt);
   look_vr_hud();
   // stereo_sbs.mjs: side-by-side cross-eye 3D (KAMERA: 3D NEBENEINANDER, ?sbs=1); the eye base by
@@ -620,7 +621,11 @@ void Game::look_view_models(f32 dt) {
         const f32 ang = std::acos(clampf(kern::dot(axis, to), -1, 1));
         if (ang > 1e-4f) g = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle(kern::normalize(kern::cross(axis, to), {1, 0, 0}), ang), {1, 1, 1}) * Mat4::translate(grip * -1.0f) * g;
       }
-      put(cam * g * Mat4::translate({0, 0, kick * 0.08f}) * euler(kick * 0.12f, 0, 0));
+      {
+        Mat4 hand;
+        if (vr_hand_matrix(1, hand)) put(hand * Mat4::translate({0, 0, kick * 0.08f}) * euler(kick * 0.12f, 0, 0));  // VR: in the right hand
+        else put(cam * g * Mat4::translate({0, 0, kick * 0.08f}) * euler(kick * 0.12f, 0, 0));
+      }
       break;
     }
     case 2: {
@@ -628,7 +633,9 @@ void Game::look_view_models(f32 dt) {
       const f32 jab = age >= 0 && age < 0.3f ? std::sin(age / 0.3f * kPi) : 0;
       for (int side = -1; side <= 1; side += 2) {
         const f32 j = (side > 0) == (L.vm_punch == 1) ? jab : 0;
-        const Mat4 hand = cam * Mat4::translate({side * 0.17f + bx * 0.4f, -0.22f + bz * 0.2f - drop + j * 0.05f, -0.42f - j * 0.24f}) * euler(0.1f, -side * 0.12f * j, 0);
+        Mat4 hand = cam * Mat4::translate({side * 0.17f + bx * 0.4f, -0.22f + bz * 0.2f - drop + j * 0.05f, -0.42f - j * 0.24f}) * euler(0.1f, -side * 0.12f * j, 0);
+        Mat4 ctl;
+        if (vr_hand_matrix(side > 0 ? 1 : 0, ctl)) hand = ctl * euler(0.25f, 0, 0);  // VR: each fist at its controller
         put(side < 0 ? hand * Mat4::scale({-1, 1, 1}) : hand);
       }
       break;
@@ -645,7 +652,11 @@ void Game::look_view_models(f32 dt) {
         else if (u < 0.53f) { const f32 k = ease((u - 0.18f) / 0.35f); px = 0.06f - 0.42f * k; py = 0.09f - 0.17f * k; pz = 0.05f - 0.2f * k; rz = -0.5f + 1.4f * k; ry = -0.25f + 1.2f * k; rx = -0.35f * k; }
         else { const f32 k = ease((u - 0.53f) / 0.47f); px = -0.36f * (1 - k); py = -0.08f * (1 - k); pz = -0.15f * (1 - k); rz = 0.9f * (1 - k); ry = 0.95f * (1 - k); rx = -0.35f * (1 - k); }
       }
-      put(cam * Mat4::translate({0.2f + px + bx * 0.4f, -0.21f + py + bz * 0.2f - drop, -0.4f + pz}) * euler(rx, ry, rz));
+      {
+        Mat4 ctl;
+        if (vr_hand_matrix(1, ctl)) put(ctl * euler(0.25f, 0, 0));  // VR: the knife is where the hand is (the hand swings it)
+        else put(cam * Mat4::translate({0.2f + px + bx * 0.4f, -0.21f + py + bz * 0.2f - drop, -0.4f + pz}) * euler(rx, ry, rz));
+      }
       break;
     }
   }

@@ -50,7 +50,9 @@ export const CHANGELOG=Object.freeze([
     "Polizei wie im Original: schwarze Streifenwagen mit weißen Türen und rot-blau blitzendem Balken, Polizisten in schwarzer Weste.",
     "Neuer Raketenwerfer: kompaktes olivgrünes Rohr mit Optik und Lasermodul, tiefer und weiter rechts gehalten – er verdeckt die Sicht nicht mehr.",
     "Mehr Licht in der Nacht: bis zu 16 Lichtquellen statt 6 – zehn Straßenlaternen, Scheinwerfer der Autos ringsum, Blaulicht – und alle glänzen auf Lack, Glas und Straße.",
-    "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge."]},
+    "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge.",
+    "VR: dein Körper dreht sich mit, wenn du dich im Raum drehst; die Waffen liegen in der rechten Hand und schießen aus ihr, die Fäuste in beiden.",
+    "VR, zwei Steuerungen (Einstellungen → VR, in der Brille: beide Sticks drücken): Sticks – links gehen, rechts in 30°-Schritten drehen; oder Laufen mit den Armen – links joggen = gehen, beide = rennen, ohne Stick."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

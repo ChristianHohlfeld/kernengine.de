@@ -99,6 +99,13 @@ class Engine {
   /// frame (the first eye); `xr` false outside a session.
   bool xr = false;
   Vec3 xr_eye, xr_forward{1, 0, 0};
+  /// The room (WebXR "local" space) in the world: its forward (where the headset's -z points at
+  /// zero head yaw) and the head's yaw in it this frame (degrees, counter-clockwise from above; set
+  /// before the app's update). With `xr_follow_head` the app turns its body with the head: the room
+  /// is the body's heading minus that yaw, so turning in the real room turns the player.
+  Vec3 xr_room_forward{1, 0, 0};
+  f32 xr_head_yaw = 0;
+  bool xr_follow_head = false;
   /// Side-by-side stereo (a phone in a cardboard viewer, 3D TVs): the frame is drawn twice, the
   /// left and the right half, the eyes `stereo_ipd` metres apart.
   bool stereo = false;

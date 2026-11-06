@@ -33,6 +33,8 @@ enum class Opt : u8 {
   world_friendly_fire, world_terrain, world_guided,
   // view and helpers (settings_help.mjs: worldGrid, worldKeepLook, worldMinimapAxisLock, box3dColliderDebug; aim assist)
   foot_aim_assist, pad_aim_scheme, view_grid, view_keep_look, view_minimap_north, debug_colliders,
+  // VR (game_vr.cpp): the locomotion - 0 the sticks, 1 the arms
+  vr_arms,
   count
 };
 

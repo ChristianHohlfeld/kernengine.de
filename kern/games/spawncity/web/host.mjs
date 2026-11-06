@@ -396,6 +396,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   })();
   if (platform.software) command("render software");
   const baseRatio = () => platform.ceiling;
+  let xrDomSkip = 0;
   const applyRenderScale = h => {
     let s = h?.renderScale;
     // in VR the headset's layer sets the size (app.mjs): the page's canvas must not resize the renderer
@@ -467,6 +468,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (originalAudio && audio && netActive && !audio.node) audio.connect();
     if (!voiceExempt && audio) voiceExempt = exemptVoice(audio);
     life.update(last);
+    // in the headset the page is not seen: its DOM only every 8th frame (style and layout work
+    // must not cost the headset frames)
+    if (app.inXR && (++xrDomSkip % 8) !== 0) return;
     const touchView = JSON.parse(str(e.sc_touch_view()));
     if (view) view.update(last, touchView);
     else overlay.update(touchView);
@@ -537,7 +541,22 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.bindTexture(gl.TEXTURE_2D, null);
   };
-  const xrFrame = frame => { work(); xrPad(frame); try { vrHudDraw(); } catch (err) { console.warn("[spawncity] VR HUD", err); } };
+  // the controllers' pointing rays in the room (game_vr.cpp): the gun in the right hand
+  const xrHands = frame => {
+    const space = app.xrSpace;
+    const seen = [false, false];
+    if (space) for (const src of frame.session.inputSources) {
+      const side = src.handedness === "left" ? 0 : src.handedness === "right" ? 1 : -1;
+      if (side < 0 || !src.targetRaySpace) continue;
+      const pose = frame.getPose(src.targetRaySpace, space);
+      if (!pose) continue;
+      const p = pose.transform.position, q = pose.transform.orientation;
+      e.sc_vr_hand(side, 1, p.x, p.y, p.z, q.x, q.y, q.z, q.w);
+      seen[side] = true;
+    }
+    for (let i = 0; i < 2; ++i) if (!seen[i]) e.sc_vr_hand(i, 0, 0, 0, 0, 0, 0, 0, 1);
+  };
+  const xrFrame = frame => { try { xrHands(frame); } catch (err) { console.warn("[spawncity] VR hands", err); } work(); xrPad(frame); try { vrHudDraw(); } catch (err) { console.warn("[spawncity] VR HUD", err); } };
   const vrSupported = navigator.xr?.isSessionSupported ? navigator.xr.isSessionSupported("immersive-vr").catch(() => false) : Promise.resolve(false);
   const enterVR = async () => {
     if (!(await vrSupported) || app.inXR) return false;

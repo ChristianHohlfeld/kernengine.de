@@ -1356,6 +1356,13 @@ std::string Game::command(const std::string& cmd) {
     return r;
   }
   if (starts("vr hud ")) { vr_hud_tex_ = static_cast<u32>(std::atoi(cmd.c_str() + 7)); vr_hud_mesh_ = 0; return "hud"; }
+  if (cmd == "vr state") {
+    char b[200];
+    const Vec3 rf = engine_ ? engine_->xr_room_forward : Vec3{};
+    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
+                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0);
+    return b;
+  }
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera
     vr_ = cmd == "vr 1";

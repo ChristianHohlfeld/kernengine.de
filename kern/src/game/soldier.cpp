@@ -542,6 +542,7 @@ void GameWorld::soldier_camera(Camera& cam, f32 dt, const PlayInput& in, const C
   const f32 sens = c.look_sensitivity / max_of(1.0f, zoom);
   // Mouse / touch deltas arrive in degrees.
   camera_yaw_ -= in.look_x * sens;
+  camera_yaw_ += in.turn_deg;
   camera_pitch_ += in.look_y * sens;
   // Gamepad right stick: radial deadzone, outer saturation, a dynamic response curve and rate ramping.
   {

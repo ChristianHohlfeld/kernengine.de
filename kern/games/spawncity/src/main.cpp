@@ -112,6 +112,10 @@ KERN_EXPORT(sc_gamepad) void sc_gamepad(kern::i32 connected, kern::f32 lx, kern:
   p.buttons = buttons;
   p.active = active != 0;
 }
+/// VR: a controller's pointing ray in the room (WebXR local space: x right, y up, -z forward).
+KERN_EXPORT(sc_vr_hand) void sc_vr_hand(kern::i32 side, kern::i32 valid, kern::f32 px, kern::f32 py, kern::f32 pz, kern::f32 qx, kern::f32 qy, kern::f32 qz, kern::f32 qw) {
+  sc::game().vr_set_hand(side, valid != 0, {px, py, pz}, kern::Quat{qx, qy, qz, qw});
+}
 /// Mouse movement under the pointer lock (movementX/Y of mousemove, CSS px, clamped +-420 per event
 /// by the page: desktop_controls.mjs MAX_EVENT_PX) and the lock state (game_controls.cpp).
 KERN_EXPORT(sc_mouse) void sc_mouse(kern::f32 dx, kern::f32 dy) { sc::game().mouse_move(dx, dy); }

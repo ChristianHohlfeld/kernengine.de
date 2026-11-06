@@ -290,7 +290,11 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
 
 bool Game::ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const {
   // VR: every screen point is where the head looks (WebXR, kern_app_frame_xr)
-  if (engine_ && engine_->xr) { from = engine_->xr_eye; dir = engine_->xr_forward; return true; }
+  if (engine_ && engine_->xr) {
+    // the right controller's ray on foot (the gun is in that hand), else where the head looks
+    if (mode_ == Mode::foot && vr_hand_ray(from, dir)) return true;
+    from = engine_->xr_eye; dir = engine_->xr_forward; return true;
+  }
   // The inverse of project_screen (game_net.cpp): a ray through a CSS px point of the view.
   const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   Vec3 r{f.y * cam_.up.z - f.z * cam_.up.y, f.z * cam_.up.x - f.x * cam_.up.z, f.x * cam_.up.y - f.y * cam_.up.x};
@@ -503,8 +507,8 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     if (pad_touch_.take_pressed("fire")) { fire = true; fire_edge = true; }
     if (pad_touch_.held("fire")) fire = true;
   }
-  // VR: the head pitches, the stick only turns (no tilted horizon: a level body under the head)
-  if (engine_ && engine_->xr) p.look_y = 0;
+  // VR: the head looks, the body follows it; snap turn, the stick or the arms walk (game_vr.cpp)
+  if (engine_ && engine_->xr) vr_foot(p, forward, strafe, dt);
   p.move_x = clampf(strafe, -1, 1);
   p.move_y = clampf(forward, -1, 1);
   const f32 mm = std::hypot(p.move_x, p.move_y);

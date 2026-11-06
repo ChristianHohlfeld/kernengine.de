@@ -226,6 +226,16 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
   frame.dt = static_cast<f32>(clamp((now_ms - g_last_ms) / 1000.0, 0.0, 0.1));
   frame.index = g_frame++;
   g_last_ms = now_ms;
+  // the head's yaw in the room, before the update (the app may turn its body with it)
+  {
+    Quat q{views[19], views[20], views[21], views[22]};
+    const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    if (ql > 1e-6f) {
+      q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
+      const Vec3 hf = q.rotate({0, 0, -1});
+      if (hf.x * hf.x + hf.z * hf.z > 1e-6f) g_engine->xr_head_yaw = std::atan2(-hf.x, -hf.z) * (180.0f / kPi);
+    }
+  }
   g_app->update(*g_engine, frame);
   g_engine->input.end_frame();
   if (g_engine->renderer.lost()) return 1;
@@ -234,6 +244,12 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
   Vec3 f = anchor.target - anchor.eye;
   f.z = 0;
   f = normalize(f, {0, 1, 0});
+  if (g_engine->xr_follow_head) {
+    // the body faces where the head does: the room is the body's heading less the head's yaw
+    const f32 a = -g_engine->xr_head_yaw * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
+    f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
+  }
+  g_engine->xr_room_forward = f;
   const Vec3 r{f.y, -f.x, 0}, up{0, 0, 1};
   // a WebXR vector (x right, y up, -z forward) in the world
   auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };

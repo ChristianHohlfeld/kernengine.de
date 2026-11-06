@@ -81,6 +81,7 @@ struct PlayInput {
   bool handbrake = false;              // vehicles: rear handbrake (drift)
   u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
   f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
+  f32 turn_deg = 0;                    // heading change as it is (no sensitivity, no zoom): VR room turn, snap turn (CCW +)
   f32 zoom = 0;                        // camera distance change (wheel)
   // Remote players: the direction their camera looks (degrees) for camera-relative movement.
   f32 view_yaw = 0;
@@ -291,6 +292,9 @@ class GameWorld {
   void apply_soldier_state(const SoldierState& s);
   /// The camera the frame is drawn with (view model of a first-person player).
   void set_view(const Camera& camera) { view_camera_ = camera; view_valid_ = true; }
+  /// VR: the first-person weapon in the hand - `hand` (x right, y up, z back, the controller's
+  /// pointing ray along -z) places the gun's grip there; nullptr: back in front of the camera.
+  void set_view_hand(const Mat4* hand) { view_hand_valid_ = hand != nullptr; if (hand) view_hand_ = *hand; }
   /// False for collected pickups and used triggers (and their children).
   bool actor_alive(ActorId id) const;
   const PlayInput& last_input() const { return last_input_; }
@@ -644,6 +648,8 @@ class GameWorld {
   std::unordered_map<ActorId, HealthState> health_;
   std::vector<ShotEvent> shots_;
   Camera view_camera_;
+  Mat4 view_hand_;
+  bool view_hand_valid_ = false;
   bool view_valid_ = false;
   // camera feel (local player)
   f32 bob_phase_ = 0, bob_weight_ = 0, recoil_pitch_ = 0, recoil_yaw_ = 0, recoil_roll_ = 0, shake_energy_ = 0, land_dip_ = 0;

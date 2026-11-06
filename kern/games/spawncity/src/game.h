@@ -470,6 +470,18 @@ class Game {
 
   kern::Engine* engine_ = nullptr;
   bool vr_ = false;  // the page runs a WebXR session ("vr 1")
+  // VR rig (game_vr.cpp): the controllers' pointing rays in the room (WebXR local space)
+  struct VrHand { bool valid = false, had = false; Vec3 p, prev; Quat q; f32 swing = 0; };
+  VrHand vr_hands_[2];
+  bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false;
+ public:
+  void vr_set_hand(i32 side, bool valid, Vec3 p, Quat q);
+ private:
+  Vec3 vr_room_forward() const;
+  bool vr_hand_matrix(i32 side, kern::Mat4& out) const;
+  bool vr_hand_ray(Vec3& from, Vec3& dir) const;
+  void vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt);
+  void vr_update_view();
   u32 vr_hud_tex_ = 0, vr_hud_mesh_ = 0;  // the headset HUD panel (the page's texture, "vr hud <id>")
   void look_vr_hud();
   /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
