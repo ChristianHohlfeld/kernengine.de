@@ -88,6 +88,8 @@
      the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
      original's quarter-turned mapping */
   /* jet: EJECT / AUSSTEIGEN under the score and the FLOW bar, not over the vitals */
+  /* no GPS button (title and game): the live-GPS walk is gone */
+  #gpsLiveButton, #gpsLiveHud, #scGps { display: none !important; }
   /* jet_mode.mjs: KANONE left of the stick (on-foot-mode hides the foot fire button) */
   html body.jet-mode.on-foot-mode #viewport #footHud #footFire { visibility: visible !important; }
   body.jet-mode #jetHud [data-a="exit"] { top: calc(max(8px, var(--solo-safe-top, env(safe-area-inset-top))) + 140px) !important; font-size: 13px !important; }

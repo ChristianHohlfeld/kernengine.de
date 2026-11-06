@@ -300,7 +300,9 @@ export class OriginalView {
       if (b && on !== undefined) { setData(b, "on", on ? "1" : "0"); b.setAttribute("aria-pressed", on ? "true" : "false"); }
     }
     // what start_location.mjs reads of the running world (search bias, "far from here")
-    { const o = h.ui?.origin, w = globalThis.__arondightRealWorld; if (w) { w.active = !!h.placed; if (o) { w.originLat = o[0]; w.originLon = o[1]; } } }
+    // (only while playing: on the title the original has no world yet - a search for "New York" from
+    // the title must find New York, not a street of that name near the last place)
+    { const o = h.ui?.origin, w = globalThis.__arondightRealWorld; if (w) { w.active = !!h.placed && playing; if (o && playing) { w.originLat = o[0]; w.originLon = o[1]; } else { w.originLat = NaN; w.originLon = NaN; } } }
     // ---- what is there while you play: simulator.mjs enterSolo (soloHud), game_exit_button.mjs
     // sync (EXIT, MULTI right after it), proximity_voice.mjs updateLayout (the voice bar)
     setHidden($("soloHud"), !playing);
