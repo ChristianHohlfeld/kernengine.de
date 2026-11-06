@@ -172,7 +172,7 @@ export function installOriginalAudio() {
 
   // continuous voices the gameplay modules keep: the fighter jets (fighter_jets.mjs), the player's
   // jet (jet_mode.mjs), the GUIDED missiles' motors (guided_missile.mjs)
-  const jets = new Map(), missiles = new Map(), mates = new Map();
+  const jets = new Map(), missiles = new Map(), rockets = new Map(), mates = new Map();
   let jetVoice = false, settingsKey = "", was = {mode: "", playing: false, car: false, stars: 0, resets: 0, dmg: -1, hits: -1, me: null, peers: new Map(), flight: null};
   const SPEED = 255;
   const state = {}, events = [];  // the last events (tests)
@@ -291,6 +291,21 @@ export function installOriginalAudio() {
       if (pan?.positionX) { pan.positionX.value = x; pan.positionY.value = y; pan.positionZ.value = z; }
     }
     for (const [born, m] of missiles) if (!burning.has(born)) { O.guided_missile.stopVoice(m.voice); missiles.delete(born); }
+    // ---- rockets in flight: the same motor voice, panned at the rocket (a drone rocket a touch
+    // quieter, the launcher's rocket and the jet's missile full)
+    const flying = new Set();
+    for (const [born, x, y, z, kind] of a.rk || []) {
+      flying.add(born);
+      let r = rockets.get(born);
+      if (!r) {
+        r = {voice: O.guided_missile.motorVoice()};
+        if (kind === 2 && r.voice?.g?.gain) try { r.voice.g.gain.value *= 0.7; } catch { /* fixed */ }
+        rockets.set(born, r);
+      }
+      const pan = r.voice?.pan;
+      if (pan?.positionX) { pan.positionX.value = x; pan.positionY.value = y; pan.positionZ.value = z; }
+    }
+    for (const [born, r] of rockets) if (!flying.has(born)) { O.guided_missile.stopVoice(r.voice); rockets.delete(born); }
   }
 
   globalThis.__scPlayReward = (kind, gain) => O.gameplay_fun_runtime.playReward(kind, gain);

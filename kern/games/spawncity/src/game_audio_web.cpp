@@ -158,6 +158,19 @@ std::string Game::web_audio_state() {
       first = false;
     }
   }
+  // rockets in flight (the launcher's, the drone's, the jet's): their motor hisses on the way
+  // (the guided missile's voice, guided_missile.mjs motorVoice) - kind 1 foot, 2 drone, 3 jet
+  s += "],\"rk\":[";
+  {
+    bool first = true;
+    for (const Projectile& p : projectiles_) {
+      if (!p.alive || p.guided) continue;
+      const int kind = p.id == weapons::Id::rocket ? 1 : p.id == weapons::Id::drone_rockets ? 2 : p.id == weapons::Id::jet_missile ? 3 : 0;
+      if (!kind) continue;
+      add("%s[%.3f,%.2f,%.2f,%.2f,%d]", first ? "" : ",", p.born + 0.0001f * static_cast<f32>(kind), p.pos.x, p.pos.y, p.pos.z, kind);
+      first = false;
+    }
+  }
   add("],\"gps\":%d", ui_.gps.active() ? 1 : 0);
   return s;
 }
