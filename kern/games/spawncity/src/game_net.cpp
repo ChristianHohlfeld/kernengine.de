@@ -76,6 +76,7 @@ struct MpLocal {
   std::vector<Feed> feed;
   f64 hit_at = -1e12, hurt_at = -1e12, last_hurt = -1e12, regen_clock = 0, last_by_at = -1e12;
   bool hit_kill = false, hit_head = false;
+  u8 shot_zone = 0;  // the zone of our last round on a mate (tests)
   Vec3 hurt_from;
   u8 last_by = net::kNobody, last_weapon = 0, last_zone = 0;
   f32 last_hp = -1;
@@ -481,6 +482,7 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
   to = from + seg * best_t;
   const net::Remote& r = rs[static_cast<std::size_t>(best)];
   const mp::Zone zone = r.state.mode == net::PlayerMode::foot ? best_zone : mp::Zone::torso;
+  mp_local().shot_zone = static_cast<u8>(zone);
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);
   return true;
@@ -895,10 +897,13 @@ std::string Game::net_command(const std::string& cmd) {
       // Tests: a shot from 3 m beside the first remote player straight at his chest.
       if (net_.remotes().empty()) return "nobody";
       const net::Remote& r = net_.remotes()[0];
-      const Vec3 c = r.state.mode == net::PlayerMode::foot ? r.person_shown + Vec3{0, 0, 1.1f} : r.shown;
-      Vec3 to = c + Vec3{-3, 0, 0};
-      const Vec3 from = c + Vec3{3, 0, 0};
-      return hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4))) ? "hit" : "miss";
+      // "net hit <dmg> [head|steep]": at the chest, at the head, or steeply down through the head
+      const bool head = rest.find("head") != std::string::npos, steep = rest.find("steep") != std::string::npos;
+      const Vec3 c = r.state.mode == net::PlayerMode::foot ? r.person_shown + Vec3{0, 0, head || steep ? 1.66f : 1.1f} : r.shown;
+      Vec3 to = steep ? c + Vec3{-2, 0, -4} : c + Vec3{-3, 0, 0};
+      const Vec3 from = steep ? c + Vec3{2, 0, 4} : c + Vec3{3, 0, 0};
+      const bool hit = hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4)));
+      return hit ? std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_local().shot_zone)) : "miss";
     }
     if (rest.rfind("blast", 0) == 0) {
       if (net_.remotes().empty()) return "nobody";
