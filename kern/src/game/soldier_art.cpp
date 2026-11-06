@@ -88,7 +88,7 @@ struct SoldierArt {
   bool view_valid = false;
   // World effects.
   u32 tracer_core = 0, tracer_halo = 0, tracer_remote = 0, balls = 0, flashes = 0, decals = 0, chips = 0;
-  struct Tracer { Vec3 from, to; f64 born; f32 speed; bool remote; };
+  struct Tracer { Vec3 from, to; f64 born; f32 speed; bool remote; ActorId shooter = 0; Vec3 local; };  // shooter: the start rides on it
   std::vector<Tracer> tracers;
   struct Ball { Vec3 at; f64 born; };
   std::vector<Ball> ball_list;
@@ -382,6 +382,18 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
     t.born = now_ms;
     t.speed = kind == WeaponKind::sniper ? 850.0f : 240.0f;
     t.remote = !mine;
+    // a round from a moving shooter (a drone, a car, a mate) keeps its start on the shooter as drawn:
+    // the start in the shooter's frame, put back on it every frame
+    if (!mine && s.shooter) {
+      Mat4 sm;
+      f64 inv[16];
+      if (actor_matrix(s.shooter, sm) && invert(sm, inv)) {
+        const Vec3 p = from;
+        t.local = {static_cast<f32>(inv[0] * p.x + inv[4] * p.y + inv[8] * p.z + inv[12]), static_cast<f32>(inv[1] * p.x + inv[5] * p.y + inv[9] * p.z + inv[13]),
+                   static_cast<f32>(inv[2] * p.x + inv[6] * p.y + inv[10] * p.z + inv[14])};
+        t.shooter = s.shooter;
+      }
+    }
     if (length(t.to - t.from) > 0.5f) {
       if (art.tracers.size() >= kTracers + kRemoteTracers) art.tracers.erase(art.tracers.begin());
       art.tracers.push_back(t);
@@ -593,6 +605,10 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
     for (std::size_t i = 0; i < art.tracers.size();) {
       SoldierArt::Tracer& t = art.tracers[i];
       const f32 age = static_cast<f32>(now_ms - t.born);
+      // the player's own round leaves the muzzle where the gun is drawn now: strafing (or the
+      // view's interpolation) would otherwise leave the tracer's start beside the weapon
+      if (!t.remote && art.view_valid) t.from = art.view_matrix.transform_point(art.weapon.muzzle + art.weapon.mount);
+      if (t.remote && t.shooter) { Mat4 sm; if (actor_matrix(t.shooter, sm)) t.from = sm.transform_point(t.local); }
       const Vec3 d = t.to - t.from;
       const f32 dist = length(d);
       const Vec3 dir = d / max_of(dist, 1e-4f);

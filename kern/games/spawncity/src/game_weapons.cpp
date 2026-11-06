@@ -313,8 +313,9 @@ void Game::drone_attack(bool trigger, bool pressed) {
   const BodyState s = state_of(drone_actor_);
   Vec3 dir;
   aim_ray(dir);
-  // From the nose (-X of the airframe), along the camera's aim.
-  const Vec3 nose = s.position + s.rotation.rotate({-0.16f, 0, -0.02f});
+  // From the nose (-X of the airframe) of the drone as it is drawn (not its physics step: strafing,
+  // the round would leave beside the drone), along the camera's aim.
+  const Vec3 nose = matrix_of(drone_actor_).transform_point({-0.16f, 0, -0.02f});
   if (drone_weapon_ == 0) {
     const weapons::Spec& g = weapons::spec(Id::drone_gun);
     if (now < next_drone_fire_) return;
