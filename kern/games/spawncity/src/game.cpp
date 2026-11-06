@@ -832,6 +832,8 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   }
   if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
+    vr_menu_input();  // the headset's wrist menu (game_vr.cpp): while open the pad is the menu's
+    if (vr_menu_open_) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; }
     read_input(e, dt);
     update_touch_layout();
     look_lap(perf::Slot::logic);
@@ -1146,6 +1148,7 @@ std::string Game::hud_json() {
       st.colliders);
   add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
       st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
+  if (vr_) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());

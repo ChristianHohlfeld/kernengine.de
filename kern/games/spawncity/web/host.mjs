@@ -501,39 +501,60 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     e.sc_gamepad(1, lx, -ly, rx, -ry, v(L, 0), v(R, 0), bits >>> 0, active ? 1 : 0);
     return true;
   };
-  // the HUD in the headset (the page's HUD is not visible in an immersive session): a 512 x 192
-  // panel drawn here every 100 ms, a texture the game shows below the gaze ("vr hud <id>")
+  // the HUD in the headset (the page's HUD is not visible in an immersive session): a 512 x 384
+  // panel on the left wrist (game_look.cpp look_vr_hud), drawn here every 100 ms - health, weapon,
+  // stars; Y opens the menu there (game_vr.cpp): MULTI, drone / on foot, the locomotion, RESET, out
   let vrHud = null;
   const vrHudDraw = () => {
     const gl = app.kern.gl;
     if (!vrHud) {
-      const c = document.createElement("canvas"); c.width = 512; c.height = 192;
+      const c = document.createElement("canvas"); c.width = 512; c.height = 384;
       const tex = gl.createTexture();
       const slot = app.kern.reserveObject(tex);
       const id = e.kern_texture_external(slot);
-      vrHud = {c, g: c.getContext("2d"), tex, id, at: 0};
+      vrHud = {c, g: c.getContext("2d"), tex, id, at: 0, key: ""};
       command(`vr hud ${id}`);
     }
+    const h = last || {}, vr = h.vr || {};
+    // the page's actions the menu asked for
+    if (vr.action === "multi") { try { mpPage?.toggleMulti ? mpPage.toggleMulti(h) : mpPage?.goMulti?.(); } catch (err) { console.warn("[spawncity] VR multi", err); } }
+    else if (vr.action === "exit") app.exitXR();
+    else if (vr.action === "radio") { try { const r = globalThis.__arondightCarRadio; r?.next?.(); } catch { /* no radio */ } }
     const now = performance.now();
-    if (now - vrHud.at < 100) return;
-    vrHud.at = now;
-    const g = vrHud.g, h = last || {};
-    g.clearRect(0, 0, 512, 192);
-    g.fillStyle = "rgba(8,12,18,0.72)"; g.beginPath(); g.roundRect?.(4, 4, 504, 184, 22); g.fill();
-    g.strokeStyle = "rgba(127,240,197,0.8)"; g.lineWidth = 3; g.stroke();
-    g.font = "900 34px Inter, system-ui, sans-serif"; g.textBaseline = "top";
-    const hp = Math.max(0, Math.round(h.health >= 0 ? h.health : 100));
-    g.fillStyle = hp > 35 ? "#7ff0c5" : "#ff6b5a"; g.fillText(`♥ ${hp}`, 24, 20);
-    g.fillStyle = "#eef0f2";
-    const wpn = h.weapon || h.mode || "";
-    g.fillText(String(wpn).toUpperCase().slice(0, 14), 170, 20);
-    if (h.ammo >= 0) { g.fillStyle = "#ffd76a"; g.fillText(`${h.ammo}/${h.reserve ?? ""}`, 390, 20); }
-    const stars = h.wanted?.stars ?? h.stars ?? 0;
-    g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
-    g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 78);
-    g.font = "700 24px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2cc";
-    const line = h.combat?.banner || h.combat?.pop || h.toast || h.hint || (h.mode ? `MODE ${String(h.mode).toUpperCase()}` : "");
-    g.fillText(String(line).slice(0, 34), 24, 130);
+    const key = `${vr.menu}|${vr.hover}|${vr.arms}|${h.mp?.players?.length || 0}`;
+    if (now - vrHud.at < 100 && key === vrHud.key) return;
+    vrHud.at = now; vrHud.key = key;
+    const g = vrHud.g;
+    g.clearRect(0, 0, 512, 384);
+    const panel = (y0, y1) => { g.fillStyle = "rgba(8,12,18,0.82)"; g.beginPath(); g.roundRect?.(4, y0, 504, y1 - y0, 22); g.fill(); g.strokeStyle = "rgba(127,240,197,0.85)"; g.lineWidth = 3; g.stroke(); };
+    g.textBaseline = "middle";
+    if (vr.menu) {
+      panel(4, 380);
+      g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#7ff0c5"; g.fillText("MENÜ", 24, 40);
+      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("zeigen + Abzug · Y schließt", 150, 42);
+      const players = Array.isArray(h.mp?.players) ? h.mp.players.length : 0;
+      // the rows (game_vr.cpp kMenuTop 72, kMenuRow 44 - the same order)
+      const radio = globalThis.__arondightCarRadio?.station?.name;
+      const items = [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE", "LUFTSCHLAG (wohin du schaust)",
+        `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}`, `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}`, "RESET", "VR BEENDEN"];
+      items.forEach((t, i) => {
+        const y = 72 + i * 44;
+        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 3, 484, 38); }
+        g.font = "800 25px Inter, system-ui, sans-serif"; g.fillStyle = i === 6 ? "#ff9a8a" : "#eef0f2"; g.fillText(t, 28, y + 22);
+      });
+    } else {
+      // the watch: health, weapon, stars - nothing else in the way
+      panel(4, 140);
+      g.font = "900 40px Inter, system-ui, sans-serif";
+      const hp = Math.max(0, Math.round(h.health >= 0 ? h.health : 100));
+      g.fillStyle = hp > 35 ? "#7ff0c5" : "#ff6b5a"; g.fillText(`♥ ${hp}`, 24, 50);
+      g.fillStyle = "#eef0f2"; g.font = "800 30px Inter, system-ui, sans-serif";
+      g.fillText(String(h.weapon || h.mode || "").toUpperCase().slice(0, 16), 190, 50);
+      const stars = h.wanted?.stars ?? h.stars ?? 0;
+      g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
+      g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 106);
+      g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("Y = Menü", 380, 108);
+    }
     gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);

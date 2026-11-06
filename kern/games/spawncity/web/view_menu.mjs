@@ -17,7 +17,7 @@ const pct = v => `${Math.round(v)}%`, km = v => `${Math.round(v)} km/h`, m1 = v 
 const MAP = [
   ["[data-stereo-sbs]", "cam.stereo"],
   ["[data-vr-arms]", "vr.arms"],
-  ...["people", "traffic", "dogs", "cats", "birds", "zombies", "police", "military", "flak", "jetpack", "friendlyFire", "destructibleTerrain", "guided"].map(k => [`[data-world-option="${k}"]`, `world.${k}`]),
+  ...["people", "traffic", "dogs", "cats", "birds", "zombies", "police", "military", "flak", "jetpack", "friendlyFire", "destructibleTerrain", "guided", "alwaysDay"].map(k => [`[data-world-option="${k}"]`, `world.${k}`]),
   // player_settings_sections.mjs: drone, first person and vehicle profiles
   ['[data-setting="leftFineness"],[data-slider="left"]', "drone.leftFineness", of10],
   ['[data-setting="rightFineness"],[data-slider="right"]', "drone.rightFineness", of10],

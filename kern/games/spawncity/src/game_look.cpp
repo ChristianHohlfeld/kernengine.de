@@ -191,6 +191,7 @@ void Game::look_begin(kern::Engine& e, const kern::Frame& f) {
     // The day: SpawnCity's 480 s cycle on the game's own clock.
     L.tod += f.dt / look::kDayLength;
     L.tod -= std::floor(L.tod);
+    if (ui_.settings.on(Opt::world_always_day)) L.tod = 0.42f;  // WORLD: ALWAYS DAY - late morning
     if (L.gov.update(f.dt)) look_apply_tier();
   }
   // day_night_sync.mjs: a client follows the host's phase (the host sends it with its pose).
@@ -375,7 +376,7 @@ void Game::look_lighting(f32 dt) {
         for (std::size_t i = 0; i < near.size() && i < keep; ++i) L.near_lamps.push_back(near[i].second);
       }
       const u32 lamp_slots = police_n ? std::max<u32>(1, L.pool_size > police_n ? L.pool_size - police_n : 1) : 3 + (L.pool_size >= 10 ? 5 : 0);
-      for (std::size_t li = 0; li < L.near_lamps.size() && li < lamp_slots; ++li) req(L.near_lamps[li], 0xffb35a, 46 * glow, 26, 5.75f);
+      for (std::size_t li = 0; li < L.near_lamps.size() && li < lamp_slots; ++li) req(L.near_lamps[li], 0xffb35a, 64 * glow, 30, 5.75f);  // Kern: brighter than the original's 46 / 26 m
     }
     // Headlights: a pool of light ~7 m ahead of the car the player drives, and (Kern) of the three
     // nearest driven cars within 60 m - the street at night is lit by its traffic.
@@ -525,14 +526,34 @@ void Game::look_vr_hud() {
     in.texture = vr_hud_tex_;
     if (!r.upsert(vr_hud_mesh_, in)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
   }
-  Vec3 f = engine_->xr_forward;
-  f.z = 0;
-  f = kern::normalize(f, {1, 0, 0});
-  const Vec3 rt{f.y, -f.x, 0};
-  const Vec3 c = engine_->xr_eye + f * 1.3f - Vec3{0, 0, 0.5f};
-  const Vec3 to_eye = kern::normalize(engine_->xr_eye - c, f * -1.0f);
-  const Vec3 up = kern::normalize(kern::cross(rt, to_eye * -1.0f), {0, 0, 1});
-  constexpr f32 w = 0.72f, h = 0.27f;  // 512 x 192
+  // On the left wrist, like a watch (out of the view - raise the arm to read it, Y opens the menu
+  // there); without the left controller low in front, where you look down to.
+  Vec3 c, rt, up, to_eye;
+  f32 w = 0.2f, h = 0.15f;  // 512 x 384
+  kern::Mat4 lh;
+  if (vr_hand_matrix(0, lh)) {
+    const Vec3 hx = kern::normalize(Vec3{lh.m[0], lh.m[1], lh.m[2]}, {1, 0, 0}), hy = kern::normalize(Vec3{lh.m[4], lh.m[5], lh.m[6]}, {0, 0, 1}),
+               hz = kern::normalize(Vec3{lh.m[8], lh.m[9], lh.m[10]}, {0, 1, 0});
+    c = lh.translation() + hy * 0.06f + hz * 0.09f;  // over the back of the wrist
+    if (vr_menu_open_) { w = 0.32f; h = 0.24f; c = c + hy * 0.06f; }
+    (void)hx;
+    to_eye = kern::normalize(engine_->xr_eye - c, hy);
+    // turned to the eye, upright: the viewer's right is up x the normal towards him
+    rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), {1, 0, 0});
+    up = kern::cross(to_eye, rt);
+  } else {
+    Vec3 f = engine_->xr_forward;
+    f.z = 0;
+    f = kern::normalize(f, {1, 0, 0});
+    rt = {f.y, -f.x, 0};
+    c = engine_->xr_eye + f * 1.1f - Vec3{0, 0, 0.85f};
+    to_eye = kern::normalize(engine_->xr_eye - c, f * -1.0f);
+    rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), rt);
+    up = kern::cross(to_eye, rt);
+    w = 0.48f; h = 0.36f;
+  }
+  vr_menu_valid_ = true;
+  vr_menu_c_ = c; vr_menu_r_ = rt; vr_menu_u_ = up; vr_menu_n_ = to_eye; vr_menu_w_ = w; vr_menu_h_ = h;
   const f32 m[16] = {rt.x * w, rt.y * w, rt.z * w, 0, -to_eye.x, -to_eye.y, -to_eye.z, 0, up.x * h, up.y * h, up.z * h, 0, c.x, c.y, c.z, 1};
   r.update_instances(vr_hud_mesh_, {m, 16}, {});
   r.set_visible(vr_hud_mesh_, true);
@@ -677,6 +698,15 @@ void Game::look_view_models(f32 dt) {
     if (!id) continue;
     r.update_instances(id, {t.data(), t.size()}, {});
     r.set_visible(id, true);
+  }
+  // VR, knife in the right hand: the left is a fist (no forearm - the controller is the arm)
+  if (vr_hand && want == 3 && L.vm_body_vr[2]) {
+    Mat4 lh;
+    if (vr_hand_matrix(0, lh)) {
+      const Mat4 fm = lh * euler(0.25f, 0, 0) * Mat4::scale({-1, 1, 1});
+      r.update_instances(L.vm_body_vr[2], {fm.m, 16}, {});
+      r.set_visible(L.vm_body_vr[2], true);
+    }
   }
 }
 

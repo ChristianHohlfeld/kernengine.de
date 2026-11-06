@@ -244,7 +244,8 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
   Vec3 f = anchor.target - anchor.eye;
   f.z = 0;
   f = normalize(f, {0, 1, 0});
-  if (g_engine->xr_follow_head) {
+  if (g_engine->xr_hold_room) f = normalize(Vec3{g_engine->xr_room_forward.x, g_engine->xr_room_forward.y, 0}, f);
+  else if (g_engine->xr_follow_head) {
     // the body faces where the head does: the room is the body's heading less the head's yaw
     const f32 a = -g_engine->xr_head_yaw * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
     f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});

@@ -106,6 +106,7 @@ class Engine {
   Vec3 xr_room_forward{1, 0, 0};
   f32 xr_head_yaw = 0;
   bool xr_follow_head = false;
+  bool xr_hold_room = false;  // keep the room where it is (the app's camera spins or falls: death, a ragdoll)
   /// Side-by-side stereo (a phone in a cardboard viewer, 3D TVs): the frame is drawn twice, the
   /// left and the right half, the eyes `stereo_ipd` metres apart.
   bool stereo = false;

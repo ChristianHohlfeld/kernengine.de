@@ -508,7 +508,11 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     if (pad_touch_.held("fire")) fire = true;
   }
   // VR: the head looks, the body follows it; snap turn, the stick or the arms walk (game_vr.cpp)
-  if (engine_ && engine_->xr) vr_foot(p, forward, strafe, dt);
+  if (engine_ && engine_->xr) {
+    vr_foot(p, forward, strafe, dt);
+    // VR boxing and the knife: the blow is the controller's speed (vr_melee), never a trigger
+    if (w == weapons::Id::fists || w == weapons::Id::knife) { fire = fire_edge = false; touch_fresh = touch_fire = false; }
+  }
   p.move_x = clampf(strafe, -1, 1);
   p.move_y = clampf(forward, -1, 1);
   const f32 mm = std::hypot(p.move_x, p.move_y);

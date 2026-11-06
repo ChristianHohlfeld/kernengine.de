@@ -20,7 +20,104 @@ constexpr f32 kSnapDeg = 30;          // snap turn
 constexpr f32 kSwingWalk = 0.55f;     // m/s of hand speed (smoothed) that counts as a jogging arm
 constexpr f32 kSwingFull = 1.4f;      // ... and the full pace
 constexpr f32 kSwingTau = 0.22f;      // s: smoothing of the arm speed
+constexpr f32 kStrikeSpeed = 2.3f;    // m/s of a controller that is a punch / a slash (a boxing game, not a trigger)
+constexpr f32 kStrikeRecover = 0.28f; // s between two blows of one hand
+constexpr i32 kMenuRows = 7;  // MULTI, drone / on foot, air strike, radio, locomotion, RESET, out of VR (host.mjs draws them)
+constexpr f32 kMenuTop = 72, kMenuRow = 44;
 }  // namespace
+
+void Game::vr_melee(i32 side, f32 dt) {
+  // a blow is the controller's own speed: the fist (or the knife in the right hand) sweeps from
+  // where it was to where it is, a little past; whoever it crosses takes it - harder the faster
+  VrHand& h = vr_hands_[side];
+  kern::Mat4 m;
+  if (!vr_hand_matrix(side, m)) { h.world_ok = false; return; }
+  const Vec3 at = m.translation();
+  const Vec3 prev = h.world_ok ? h.world_prev : at;
+  h.world_prev = at;
+  h.world_ok = true;
+  const f32 now = world_->sim_time();
+  const bool knife = foot_weapon_ == weapons::Id::knife && side == 1;
+  const bool fists = foot_weapon_ == weapons::Id::fists || (foot_weapon_ == weapons::Id::knife && side == 0);
+  if (!(knife || fists) || player_dead_ || dt <= 1e-4f) return;
+  const f32 speed = h.had ? kern::length(h.p - h.prev_strike) / dt : 0;
+  h.prev_strike = h.p;
+  if (speed < kStrikeSpeed || now - h.strike_at < kStrikeRecover) return;
+  const Vec3 d = at - prev;
+  const f32 dl = kern::length(d);
+  if (dl < 1e-3f) return;
+  const Vec3 dir = d * (1.0f / dl);
+  const Vec3 from = prev - dir * 0.05f, to = at + dir * (knife ? 0.32f : 0.14f);  // the blade reaches further
+  const f32 k = clampf(speed / 4.0f, 0.6f, 1.6f);
+  const f32 dmg = knife ? 100.0f : (side == 1 ? 24.0f : 16.0f) * k;  // KNIFE_DMG, PUNCH_DMG right / left
+  const f32 ns = (knife ? 12.0f : 34.0f) * k;
+  Vec3 end = to;
+  i32 hit = people_.shot(from, end, dmg, true, now, ns);
+  if (hit < 0) { end = to; if (life_punch(from, end)) hit = 0; }
+  if (hit < 0) {
+    const kern::physics::RayHit rh = world_->physics().cast_ray(from, to - from, ~0ull, body(soldier_));
+    if (rh.hit && rh.body.valid()) { world_->physics().apply_linear_impulse(rh.body, dir * ns, rh.point); hit = 0; }
+  }
+  h.strike_at = now;
+  look_.vm_fire_at = now;
+  osfx(knife ? "gameplay_final_runtime_v2.knifeSwish" : "gameplay_final_runtime_v2.punchWhoosh", at, side == 1 ? 0 : 1, 0);
+  if (hit >= 0) {
+    osfx(knife ? "gameplay_final_runtime_v2.knifeHit" : "gameplay_final_runtime_v2.punchThud", at, side == 1 ? 0 : 1, 0);
+    world_->play_sound(combat_sfx(combat_audio::Kind::hit), at, 0.7f, knife ? 1.3f : 0.8f, true);
+  }
+}
+
+void Game::vr_menu_input() {
+  // Y (the left hand's upper button) opens the menu on the wrist; the right hand points, its trigger
+  // (or A) picks: MULTI, the drone or on foot, the locomotion, RESET, leaving VR
+  if (!vr_ || !engine_ || !engine_->xr) { vr_menu_open_ = false; return; }
+  if (pad.connected && (pad.pressed & (1u << kPadY))) vr_menu_open_ = !vr_menu_open_;
+  if (!vr_menu_open_) { vr_menu_hover_ = -1; return; }
+  vr_menu_hover_ = -1;
+  Vec3 from, dir;
+  if (vr_menu_valid_ && vr_hand_ray(from, dir)) {
+    const f32 dn = kern::dot(dir, vr_menu_n_);
+    if (std::fabs(dn) > 1e-4f) {
+      const f32 t = kern::dot(vr_menu_c_ - from, vr_menu_n_) / dn;
+      if (t > 0 && t < 3) {
+        const Vec3 p = from + dir * t - vr_menu_c_;
+        const f32 u = kern::dot(p, vr_menu_r_) / vr_menu_w_ + 0.5f, v = 0.5f - kern::dot(p, vr_menu_u_) / vr_menu_h_;
+        // the canvas (host.mjs vrHudDraw): the title to 72 px of 384, then the rows of 44 px
+        const f32 py = v * 384;
+        if (u >= 0 && u <= 1 && py >= kMenuTop && py < kMenuTop + kMenuRows * kMenuRow) vr_menu_hover_ = static_cast<i32>((py - kMenuTop) / kMenuRow);
+      }
+    }
+  }
+  const bool pick = pad.connected && ((pad.rt > 0.6f && !vr_menu_trigger_) || (pad.pressed & (1u << kPadA)));
+  vr_menu_trigger_ = pad.connected && pad.rt > 0.6f;
+  if (!pick || vr_menu_hover_ < 0) return;
+  switch (vr_menu_hover_) {
+    case 0: vr_action_ = "multi"; break;
+    case 1: toggle_drone(); vr_menu_open_ = false; break;
+    case 2: {
+      // the air strike on what you look at (the first hit along the head's ray, else 180 m out)
+      const Vec3 eye = engine_->xr_eye, f = engine_->xr_forward;
+      const RayResult rr = cast(world_->physics(), eye, f, 1500, body(soldier_));
+      Vec3 at = rr.hit ? rr.point : eye + f * 180.0f;
+      at.z = city_.ground_height(at.x, at.y);
+      if (!air_strike(at)) { toast_ = "LUFTSCHLAG LAEDT NOCH"; toast_age_ = 0; }
+      vr_menu_open_ = false;
+      break;
+    }
+    case 3: vr_action_ = "radio"; break;
+    case 4: command(std::string("set vr.arms ") + (ui_.settings.on(Opt::vr_arms) ? "0" : "1")); break;
+    case 5: ui_reset(); vr_menu_open_ = false; break;
+    default: vr_action_ = "exit"; vr_menu_open_ = false; break;
+  }
+}
+
+std::string Game::vr_menu_json() {
+  char b[200];
+  std::snprintf(b, sizeof b, ",\"vr\":{\"menu\":%d,\"hover\":%d,\"arms\":%d,\"action\":\"%s\"}", vr_menu_open_ ? 1 : 0, vr_menu_hover_,
+                ui_.settings.on(Opt::vr_arms) ? 1 : 0, vr_action_.c_str());
+  vr_action_.clear();
+  return b;
+}
 
 void Game::vr_set_hand(i32 side, bool valid, Vec3 p, Quat q) {
   if (side < 0 || side > 1) return;
@@ -100,6 +197,8 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
     h.had = true;
     h.swing += (std::fmin(v, 4.0f) - h.swing) * k;
   }
+  vr_melee(0, dt);
+  vr_melee(1, dt);
   if (vr_arms_) {
     // no stick walking, no stick strafing, no stick sprint: only the arms (and the real body)
     const VrHand &L = vr_hands_[0], &R = vr_hands_[1];
@@ -121,7 +220,10 @@ void Game::vr_update_view() {
   // gun stays a hidden view model)
   if (vr_ && mode_ == Mode::foot && !game_weapon_in_hand() && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
   else world_->set_view_hand(nullptr);
-  if (engine_) engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
+  if (engine_) {
+    engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
+    engine_->xr_hold_room = vr_ && player_dead_;  // dying the camera falls and turns: the room stays (no spin)
+  }
 }
 
 }  // namespace sc

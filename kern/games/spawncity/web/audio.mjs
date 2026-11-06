@@ -94,7 +94,7 @@ export function installOriginalAudio() {
     (p, k) => O.cows.moo(p, k, {pain: true}),                    // moo_pain
     p => O.pigeons.coo(p[0], p[1], Math.hypot(p[0] - walk.position.x, p[1] - walk.position.y)),  // coo
     p => O.pigeons.flapSound(p[0], p[1]),                        // flap
-    () => playAnimal("bird"),                                    // squawk
+    (p, k, pitch) => playAnimal("bird", pitch ?? 1),             // squawk (a hit bird: its own pitch, game life.cpp)
     p => O.cows.thud(p, false),                                  // thud
     p => O.jogger_chain.stomp(p[0], p[1], false),                // stomp
     p => O.jogger_chain.stomp(p[0], p[1], true),                 // stomp_accent
@@ -163,7 +163,7 @@ export function installOriginalAudio() {
     "street_voices.scream": (p, seed) => O.street_voices.scream(p, {seed: `p${seed}`}),
     "jet_mode.knock": () => O.jet_mode.sfx("bounce", {gain: .3, playbackRate: .6, minIntervalMs: 60}),
     "wanted_police_drones.escaped": () => O.wanted_police_drones.playTone({frequency: 660, endFrequency: 1040, duration: .22, gain: .023, type: "sine"}),
-    "life": (p, sound, volume) => LIFE[sound]?.(p, volume),
+    "life": (p, sound, volume, pitch) => LIFE[sound]?.(p, volume, pitch),
     // the original's own events, for its unchanged modules
     "world-kill": () => fire("arondight:world-kill", {kind: "person"}),                       // world_organic_hit_audio.mjs
     "world-physics-impact": (p, dv) => fire("arondight:world-physics-impact", {id: drive.vehicleId, deltaVelocityMps: dv}),  // immersive_soundscape.mjs

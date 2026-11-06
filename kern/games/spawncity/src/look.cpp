@@ -131,21 +131,22 @@ f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, ke
   const f32 az = sun_azimuth_deg * kDeg;
   const Vec3 across{std::cos(az + kPi * 0.5f), std::sin(az + kPi * 0.5f), 0};
   const Vec3 toward{std::cos(az), std::sin(az), 0};
-  const Vec3 sun = kern::normalize(across * (-std::cos(angle) * 0.62f) + toward * 0.38f + Vec3{0, 0, std::sin(angle)}, {0, 0, 1});
+  // Kern: a summer sun - higher, so the night is short (about a third of the cycle, not half)
+  const Vec3 sun = kern::normalize(across * (-std::cos(angle) * 0.62f) + toward * 0.38f + Vec3{0, 0, std::sin(angle) + 0.3f}, {0, 0, 1});
   const Vec3 moon = kern::normalize(Vec3{-sun.x, -sun.y, std::fmax(0.35f, -sun.z)}, {0, 0, 1});
   const f32 night = smooth(0.06f, -0.16f, sun.z);
   const f32 dusk = clampf(1 - std::fabs(sun.z) * 4, 0, 1) * (1 - night * 0.6f);
-  const Vec3 day_sun{4.6f, 4.05f, 3.46f}, dusk_sun{3.75f, 2.05f, 1.02f}, moon_light{0.16f, 0.2f, 0.32f};
+  const Vec3 day_sun{4.6f, 4.05f, 3.46f}, dusk_sun{3.75f, 2.05f, 1.02f}, moon_light{0.36f, 0.42f, 0.62f};  // Kern: a brighter moon (was .16 .2 .32)
   l.sun_direction = sun.z > -0.04f ? sun : moon;
   l.sun_color = mix3(mix3(day_sun, dusk_sun, dusk), moon_light, night);
-  l.sky_color = Vec3{0.035f, 0.05f, 0.1f} * night;
-  l.ground_color = Vec3{0.012f, 0.012f, 0.02f} * night;
+  l.sky_color = Vec3{0.07f, 0.09f, 0.16f} * night;
+  l.ground_color = Vec3{0.025f, 0.026f, 0.04f} * night;
   l.fog_color = mix3(mix3({0.474f, 0.584f, 0.716f}, {0.62f, 0.45f, 0.36f}, dusk * 0.6f), {0.03f, 0.04f, 0.07f}, night);
   l.fog_density = fog_density;
   l.fog_height_falloff = 0.012f;
   l.fog_sun_scatter = 0.55f * (1 - night * 0.7f);
   l.fog_horizon = 0.85f;
-  l.env_intensity = 0.53f - 0.41f * night;
+  l.env_intensity = 0.53f - 0.33f * night;
   l.env_zenith = mix3({0.05f, 0.2f, 0.62f}, {0.012f, 0.022f, 0.06f}, night);
   l.env_horizon = mix3({0.52f, 0.66f, 0.86f}, {0.05f, 0.075f, 0.13f}, night);
   {

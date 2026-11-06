@@ -68,6 +68,7 @@ constexpr OptSpec kSpecs[] = {
     {"world.friendlyFire", "welt", "Friendly Fire", "Spielerwaffen treffen andere Spieler.", 0, 1, 1, 1, true, true},
     {"world.destructibleTerrain", "welt", "Zerstoerbares Gelaende", "Explosionen reissen Krater in den Boden.", 0, 1, 1, 0, true, true},
     {"world.guided", "welt", "Lenkraketen", "Die Lenkrakete der Drohne (GUIDED). Aus: die Waffenwahl springt von ROCKETS zurueck zu GUN.", 0, 1, 1, 1, true, true},
+    {"world.alwaysDay", "welt", "Immer Tag", "Keine Nacht: die Sonne bleibt am spaeten Vormittag stehen (keine Zombie-Naechte).", 0, 1, 1, 0, true, true},
     // first_person_control_settings.mjs aimAssistStrengthPercent 0..100 (55); settings_help.mjs view rows
     {"foot.aimAssist", "fuss", "Zielhilfe", "Sanfter Zug zu Zielen nahe am Fadenkreuz mit Xbox-Pad und Touch. 0 schaltet sie aus.", 0, 100, 1, 55, false, true},
     {"pad.aimScheme", "drohne", "Xbox-Schema AIM", "Drohne mit dem Xbox-Pad: LB halten = rechter Stick schaut (Fadenkreuz) statt zu drehen. Aus = CLASSIC.", 0, 1, 1, 0, true, true},

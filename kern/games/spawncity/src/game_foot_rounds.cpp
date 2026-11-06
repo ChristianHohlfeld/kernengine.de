@@ -31,7 +31,7 @@ constexpr f32 kFistRecover[2] = {0.30f, 0.25f};  // FIST_RECOVER_MS
 constexpr f32 kFistDmg[2] = {24, 16};            // PUNCH_DMG
 constexpr f32 kCombo = 0.43f;                    // COMBO_MS
 constexpr f32 kPunchReach = 1.8f;                // PUNCH_REACH_M
-constexpr f32 kKnifeRecover = 0.38f, kKnifeReach = 1.6f, kKnifeDmg = 45, kKnifeStrike = 0.13f;  // KNIFE_*
+constexpr f32 kKnifeRecover = 0.38f, kKnifeReach = 1.6f, kKnifeDmg = 100, kKnifeStrike = 0.13f;  // KNIFE_* (Kern: a stab kills, as Call of Duty - 45 left them standing up again)
 
 bool foot_round(Id id) { return id == Id::grenade_launcher || id == Id::rocket || id == Id::hand_grenade; }
 }  // namespace
@@ -221,7 +221,8 @@ Vec3 Game::rocket_laser_dot() {
   if (!flying) laser_pinned_ = false;
   if (laser_pinned_) { laser_valid_ = true; laser_dot_ = laser_pin_; return laser_dot_; }
   Vec3 from, ad;
-  if (laser_finger_) ctl_screen_ray(laser_fx_, laser_fy_, from, ad);
+  if (engine_ && engine_->xr) { from = engine_->xr_eye; ad = engine_->xr_forward; }  // VR: where you look steers the rocket
+  else if (laser_finger_) ctl_screen_ray(laser_fx_, laser_fy_, from, ad);
   else { ad = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}); from = cam_.eye; }
   const RayResult r = cast(world_->physics(), from, ad, kLaserRange, body(soldier_));
   laser_valid_ = r.hit;

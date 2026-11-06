@@ -55,7 +55,12 @@ export const CHANGELOG=Object.freeze([
     "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel.",
     "Rechter Stick deutlich weiter vom Rand weg (Platz zum schnellen Drehen nach rechts), schnelle Wischer drehen weiter (Beschleunigung wie CoD Mobile).",
     "MULTI ruckelt nicht mehr: die Nostr-Signatur (über 100 ms je Paket) lief jede Sekunde mehrfach – jetzt aus; Daten ohne Direktverbindung gebündelt.",
-    "VR: nur die Waffe in der Hand, keine Arme; die Pistole in echter Größe und hinter Wänden verdeckt wie ein echtes Objekt."]},
+    "VR: nur die Waffe in der Hand, keine Arme; die Pistole in echter Größe und hinter Wänden verdeckt wie ein echtes Objekt.",
+    "VR: Boxen und Messer per Schlag mit dem Controller (nicht per Abzug), beim Messer die linke Hand als Faust; Messer tötet mit einem Stich.",
+    "VR: Uhr-HUD am linken Handgelenk statt im Blickfeld; Y öffnet dort das Menü – MULTI, Drohne/zu Fuß, Luftschlag wohin du schaust, Radio, Laufen, Reset, VR beenden.",
+    "VR: Raketen folgen deinem Blick, Granatwerfer und Raketen fliegen aus der Waffe in der Hand; beim Tod dreht sich die Welt nicht mehr.",
+    "Neu unter WELT: Immer Tag. Sommer-Sonne mit kürzeren Nächten, hellerer Mond und hellere Straßenlaternen.",
+    "Getroffene Vögel krächzen jedes Mal anders."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

@@ -21,6 +21,7 @@ export const WORLD_OPTIONS=Object.freeze([
   {key:"jetpack",label:"JETPACK",help:"Jump twice to fire a short jetpack burst over houses. Recharges."},
   {key:"destructibleTerrain",label:"DESTRUCTIBLE TERRAIN",help:"Big explosions tear craters into the ground. Off: the ground stays whole.",def:false},
   {key:"guided",label:"GUIDED MISSILES",help:"The drone's guided missile (GUIDED). Off: the weapon switch goes GUN -> ROCKETS -> GUN."},
+  {key:"alwaysDay",label:"ALWAYS DAY",help:"No night: the sun stays at late morning (no zombie nights).",def:false},
   {key:"friendlyFire",label:"FRIENDLY FIRE",help:"Player weapons can damage other players. The first player in the session sets this rule.",def:true,rule:true},
 ]);
 export const DEFAULT_WORLD_OPTIONS=Object.freeze(Object.fromEntries(WORLD_OPTIONS.map(o=>[o.key,o.def??true])));

@@ -280,7 +280,10 @@ void Game::foot_attack(bool trigger, bool pressed) {
       // along the shot's ray - the ray itself goes through the finger / the crosshair (footRay)
       (void)eye;
       const Vec3 cf = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), cr = kern::normalize(kern::cross(cf, cam_.up), {0, -1, 0}), cu = kern::cross(cr, cf);
-      const Vec3 muzzle = foot_weapon_ == Id::rocket ? cam_.eye + cr * 0.285f - cu * 0.215f + cf * 1.14f + dir * 0.25f  // the new tube's mouth (game_look.cpp)
+      kern::Mat4 vrh;
+      const bool vrm = vr_hand_matrix(1, vrh);
+      const Vec3 muzzle = vrm ? vrh.translation() + kern::normalize(Vec3{-vrh.m[8], -vrh.m[9], -vrh.m[10]}, dir) * (foot_weapon_ == Id::rocket ? 0.75f : 0.85f)  // VR: the launcher's mouth in the hand, along its ray
+                        : foot_weapon_ == Id::rocket ? cam_.eye + cr * 0.285f - cu * 0.215f + cf * 1.14f + dir * 0.25f  // the new tube's mouth (game_look.cpp)
                                                      : cam_.eye + cr * 0.245f - cu * 0.17f + cf * 1.28f + dir * 0.10f;
       // GRENADE_SPEED_MPS 40 straight along the aim; the rocket leaves at ROCKET_FOOT_LAUNCH_MPS 22
       const Vec3 v = dir * (foot_weapon_ == Id::rocket ? 22.0f : s.speed_mps);
