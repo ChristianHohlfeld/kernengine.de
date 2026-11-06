@@ -1006,8 +1006,13 @@ std::string Game::minimap_json() {
       const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
       if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
     }
-    for (const auto& b : f->buildings)
-      if (!b.rings.empty() && b.rings[0].size() >= 3) feats.push_back({'b', true, &b.rings[0], dist(b.rings[0])});
+    // buildings: a house is under 300 m across - one far corner rules it out before the outline
+    for (const auto& b : f->buildings) {
+      if (b.rings.empty() || b.rings[0].size() < 3) continue;
+      const Vec2 q = b.rings[0][0];
+      if (std::fabs(q.x - me.x) > range + 300 || std::fabs(q.y - me.y) > range + 300) continue;
+      feats.push_back({'b', true, &b.rings[0], dist(b.rings[0])});
+    }
   }
   std::erase_if(feats, [&](const Feat& f) { return f.d > range; });
   std::sort(feats.begin(), feats.end(), [](const Feat& a, const Feat& b) { return a.d < b.d; });
