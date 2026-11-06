@@ -382,7 +382,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       el.textContent = `frame ms p50 ${q(.5)} p95 ${q(.95)} max ${q(1)} · >50ms ${longs} · ${p.fps?.toFixed?.(0) ?? "-"} fps · tier ${p.tierName || "-"} · scale ${last.renderScale ?? "-"} · ${canvas.width}x${canvas.height}\n`
         + `cpu logic ${m.logic?.toFixed(1)} physics ${m.physics?.toFixed(1)} stream ${m.stream?.toFixed(1)} draw ${m.draw?.toFixed(1)} render ${m.render?.toFixed(1)} · gpu ${m.gpu >= 0 ? m.gpu.toFixed(1) : "n/a"}\n`
         + `wasm memory ${(memBytes / 1048576).toFixed(0)} MB · grew ${grows}x · longest frame with a grow ${growMax.toFixed(0)} ms\n`
-        + `stream worst ${t.worst ?? "-"} ms (${t.worstStep || "-"} ${t.worstStepMs ?? ""}) · city re-syncs ${t.rebuilds ?? "-"} · street layings ${t.relays ?? "-"} · mode ${last.mode}`;
+        + `stream worst ${t.worst ?? "-"} ms (${t.worstStep || "-"} ${t.worstStepMs ?? ""}) · city re-syncs ${t.rebuilds ?? "-"} · street layings ${t.relays ?? "-"} · uploads ${t.uploads ?? "-"} (${t.uploadKVerts ?? "-"}k verts) · mode ${last.mode}`;
     };
   })() : null;
   const tick = () => {

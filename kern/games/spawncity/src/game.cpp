@@ -1073,8 +1073,8 @@ std::string Game::hud_json() {
   const StreamStats& st = city_.stats();
   add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
       st.colliders);
-  add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u}}", st.t_request, st.t_data,
-      st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays);
+  add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
+      st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());

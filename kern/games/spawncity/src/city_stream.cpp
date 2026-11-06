@@ -405,6 +405,8 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
   if (chunk.mesh.vertex_count() == 0) return;
   if (!chunk.welded) kern::weld(chunk.mesh);
   const u32 id = r_->allocate_id();
+  ++upload_count_;
+  upload_vertices_ += chunk.mesh.vertex_count();
   kern::MeshInput in = chunk.mesh.as_input(walls ? 0 : kern::kMaxExtensionAttributes);
   in.material = material;
   in.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
@@ -626,7 +628,10 @@ bool CityStream::work(Tile& t, f64 deadline) {
       return kern::now_ms() > deadline ? false : work(t, deadline);
     case S::building: {
       if (t.build_job) {
-        if (!kern::jobs::take(t.build_job, t.built_bytes)) return true;  // still extruding off the frame
+        const f64 t1 = kern::now_ms();
+        const bool got = kern::jobs::take(t.build_job, t.built_bytes);
+        step_time("building.take", t1);
+        if (!got) return true;  // still extruding off the frame
         t.build_job = 0;
         t.built_at = 4;
         t.upload_next = cityjobs::chunk_count(t.built_bytes);  // chunks left
@@ -638,9 +643,13 @@ bool CityStream::work(Tile& t, f64 deadline) {
       m.roughness = 0.82f;
       while (t.upload_next > 0) {
         kern::GeoChunk chunk;
+        f64 t1 = kern::now_ms();
         if (!cityjobs::read_chunk(t.built_bytes, t.built_at, chunk)) { t.upload_next = 0; break; }
+        step_time("building.read", t1);
         --t.upload_next;
+        t1 = kern::now_ms();
         upload(t, chunk, m, true);
+        step_time("building.upload", t1);
         if (kern::now_ms() > deadline) return false;
       }
       t.built_bytes.clear();
@@ -772,6 +781,8 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
   stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
   stats_.rebuilds = rebuilds_;
+  stats_.uploads = upload_count_;
+  stats_.upload_vertices = static_cast<u32>(upload_vertices_ / 1000);
   stats_.relays = relays_;
   stats_.last_slice_ms = kern::now_ms() - start;
   if (kern::now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = kern::now_ms(); worst_step_ = ""; worst_step_ms_ = 0; }
