@@ -5,6 +5,9 @@
 #include <cstdio>
 
 #include "kern/core/base.h"
+#include "kern/core/jobs.h"
+#include <cstring>
+#include <unordered_map>
 
 namespace sc {
 
@@ -105,11 +108,60 @@ void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m) {
 
 struct Terrain::Job {
   Grid g;
-  std::vector<f32> tmp;
-  std::vector<i32> q;
-  u32 row = 0;
-  i32 pass = -1;  // -1 sampling rows, 0..7 filter passes
+  u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
 };
+
+namespace {
+// kDemJob: Terrarium tiles -> the bare-earth grid (sample_dem + bare_earth, without engine state).
+void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
+  const u8* p = in.data;
+  const u8* end = in.data + in.size;
+  bool ok = true;
+  auto get = [&](void* v, std::size_t n) { if (end - p < static_cast<std::ptrdiff_t>(n)) { ok = false; return; } std::memcpy(v, p, n); p += n; };
+  f64 lon0 = 0, lat0 = 0;
+  f32 x0 = 0, y0 = 0, step = 10, open = 160, blur = 30;
+  u32 n = 0, count = 0;
+  get(&lon0, 8); get(&lat0, 8); get(&x0, 4); get(&y0, 4); get(&step, 4); get(&n, 4); get(&open, 4); get(&blur, 4); get(&count, 4);
+  if (!ok || n < 2 || n > 4096) return;
+  struct T { u32 w, h; const f32* v; };
+  std::unordered_map<u64, T> tiles;
+  for (u32 k = 0; k < count && ok; ++k) {
+    u32 x = 0, y = 0, w = 0, h = 0;
+    get(&x, 4); get(&y, 4); get(&w, 4); get(&h, 4);
+    const std::size_t bytes = static_cast<std::size_t>(w) * h * 4;
+    if (!ok || w < 2 || h < 2 || static_cast<std::size_t>(end - p) < bytes) return;
+    tiles[TileKey{Terrain::kDemZoom, static_cast<i32>(x), static_cast<i32>(y)}.hash()] = {w, h, reinterpret_cast<const f32*>(p)};
+    p += bytes;
+  }
+  kern::GeoProjector proj;
+  if (!proj.init(lon0, lat0)) return;
+  std::vector<f32> grid(static_cast<std::size_t>(n) * n);
+  for (u32 row = 0; row < n; ++row) {
+    const f32 y = y0 + static_cast<f32>(row) * step;
+    for (u32 i = 0; i < n; ++i) {
+      f64 lon, lat;
+      unproject(proj, x0 + static_cast<f32>(i) * step, y, lon, lat);
+      const f64 fx = merc_x(lon, Terrain::kDemZoom), fy = merc_y(lat, Terrain::kDemZoom);
+      const i32 tx = static_cast<i32>(std::floor(fx)), ty = static_cast<i32>(std::floor(fy));
+      auto it = tiles.find(TileKey{Terrain::kDemZoom, tx, ty}.hash());
+      if (it == tiles.end()) return;  // a hole: no grid (retried)
+      const T& t = it->second;
+      // terrain_elevation.mjs: bilinear in the tile's pixels, clamped inside the tile
+      const f64 px = std::min(t.w - 1.001, (fx - tx) * t.w), py = std::min(t.h - 1.001, (fy - ty) * t.h);
+      const u32 a = static_cast<u32>(px), b = static_cast<u32>(py);
+      const f32 ax = static_cast<f32>(px - a), ay = static_cast<f32>(py - b);
+      f32 v0, v1, v2, v3;
+      const f32* h = t.v + static_cast<std::size_t>(b) * t.w + a;
+      std::memcpy(&v0, h, 4); std::memcpy(&v1, h + 1, 4); std::memcpy(&v2, h + t.w, 4); std::memcpy(&v3, h + t.w + 1, 4);
+      grid[static_cast<std::size_t>(row) * n + i] = (v0 * (1 - ax) + v1 * ax) * (1 - ay) + (v2 * (1 - ax) + v3 * ax) * ay;
+    }
+  }
+  bare_earth(grid, n, step, open, blur);
+  out.resize(grid.size() * 4);
+  std::memcpy(out.data(), grid.data(), out.size());
+}
+KERN_JOB(Terrain::kDemJob, dem_grid_job);
+}  // namespace
 
 Terrain::Terrain() = default;
 Terrain::~Terrain() = default;
@@ -145,6 +197,7 @@ void Terrain::clear() {
   craters_.clear();
   dem_tiles_.clear();
   requests_.clear();
+  if (job_ && job_->id) kern::jobs::cancel(job_->id);
   job_.reset();
   grid_ = Grid{};
   grid_ready_ = false;
@@ -161,6 +214,7 @@ void Terrain::clear() {
 
 void Terrain::disable_dem() {
   dem_ = false;
+  if (job_ && job_->id) kern::jobs::cancel(job_->id);
   job_.reset();
   requests_.clear();
   settled_ = true;
@@ -258,33 +312,37 @@ void Terrain::plan_dem(Vec3 focus) {
   g.cx = cx;
   g.cy = cy;
   g.h.resize(static_cast<std::size_t>(g.n) * g.n);
-  job_->tmp.resize(g.h.size());
 }
 
 bool Terrain::run_job(f64 deadline) {
+  (void)deadline;
   Job& j = *job_;
   Grid& g = j.g;
-  if (j.pass < 0) {
-    while (j.row < g.n) {
-      const f32 y = g.y0 + static_cast<f32>(j.row) * g.step;
-      for (u32 i = 0; i < g.n; ++i) {
-        f64 lon, lat;
-        unproject(proj_, g.x0 + static_cast<f32>(i) * g.step, y, lon, lat);
-        bool ok = true;
-        const f32 v = sample_dem(lon, lat, ok);
-        if (!ok) { job_.reset(); retry_at_ = kern::now_ms() + 1500; return true; }
-        g.h[static_cast<std::size_t>(j.row) * g.n + i] = v;
-      }
-      ++j.row;
-      if ((j.row & 15) == 0 && kern::now_ms() > deadline) return false;
+  if (!j.id) {
+    // Sampling the window (641k points) and the bare-earth filter run off the frame (a Web
+    // Worker / thread), like MapLibre's raster-dem workers do it for the original.
+    std::vector<u8> in;
+    auto put = [&](const void* p, std::size_t n) { const std::size_t at = in.size(); in.resize(at + n); std::memcpy(in.data() + at, p, n); };
+    auto put32 = [&](u32 v) { put(&v, 4); };
+    auto putf = [&](f32 v) { put(&v, 4); };
+    put(&proj_.lon0, 8); put(&proj_.lat0, 8);
+    putf(g.x0); putf(g.y0); putf(g.step); put32(g.n); putf(kOpen); putf(kBlur);
+    u32 count = 0;
+    for (const auto& [k, t] : dem_tiles_) count += t.h.empty() ? 0 : 1;
+    put32(count);
+    for (const auto& [k, t] : dem_tiles_) {
+      if (t.h.empty()) continue;
+      put32(static_cast<u32>(t.key.x)); put32(static_cast<u32>(t.key.y)); put32(t.w); put32(t.hgt);
+      put(t.h.data(), t.h.size() * 4);
     }
-    j.pass = 0;
+    j.id = kern::jobs::submit(kDemJob, std::move(in));
+    return false;
   }
-  const i32 ro = std::max(1, static_cast<i32>(std::lround(kOpen / g.step / 2))), rb = std::max(1, static_cast<i32>(std::lround(kBlur / g.step / 2)));
-  while (j.pass < 8) {
-    filter_pass(g.h, j.tmp, g.n, j.pass++, ro, rb, j.q);
-    if (kern::now_ms() > deadline) return false;
-  }
+  std::vector<u8> out;
+  if (!kern::jobs::take(j.id, out)) return false;
+  j.id = 0;
+  if (out.size() != static_cast<std::size_t>(g.n) * g.n * 4) { job_.reset(); retry_at_ = kern::now_ms() + 1500; return true; }
+  std::memcpy(g.h.data(), out.data(), out.size());
   // Commit. The reference (z = 0) is the bare earth at the world origin, fixed for this origin.
   if (!ref_ready_) {
     ref_height_ = grid_at(g, 0, 0);

@@ -81,7 +81,9 @@ SC_TEST(terrain_dem_tiles) {
     t.provide(k, tile.data(), 256, 256);
   }
   int frames = 0;
-  while (!t.ready_at({0, 0, 0}) && frames < 4000) { t.update({0, 0, 0}, {0, 0, 0}, 3); ++frames; }
+  // the elevation grid is built in a job (another thread here): wait for it by the clock
+  const f64 give_up = kern::now_ms() + 60000;
+  while (!t.ready_at({0, 0, 0}) && kern::now_ms() < give_up) { t.update({0, 0, 0}, {0, 0, 0}, 3); ++frames; }
   SC_CHECK(t.settled() && t.has_dem(), "elevation loaded after %d frames", frames);
   SC_CHECK(std::fabs(t.elevation(0, 0)) < 0.05f, "origin at z = 0 (%.3f)", t.elevation(0, 0));
   // z13 pixel at 47.66 N: 40075017 * cos(47.66) / 2^21 = 12.88 m -> 0.5 / 12.88 per metre
