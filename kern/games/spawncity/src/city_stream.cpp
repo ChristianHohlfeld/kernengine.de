@@ -124,6 +124,7 @@ struct CityStream::Tile {
   kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false;
+  Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
   // the drawn subset (indices into features.buildings) and its centres; a re-sync swaps the meshes
   std::vector<u32> vis, vis_built;
   std::vector<Vec2> cent;
@@ -469,6 +470,8 @@ void CityStream::begin_roads(Tile& t) {
   ro.segment_length = 4;  // follows the 5 m terrain nodes
   ro.palette = road_palette();
   t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
+  t.roads_at = {focus_.x, focus_.y};
+  ++relays_;
   t.upload_next = 0;
   t.state = Tile::State::roads;
 }
@@ -648,7 +651,10 @@ bool CityStream::work(Tile& t, f64 deadline) {
         for (u32 id : t.old_meshes) r_->remove(id);
         t.old_meshes.clear();
         t.rebuilding = false;
-        // the streets follow the player too (world_city_roads.mjs): re-laid beside the old ones
+        ++rebuilds_;
+        // The streets are their own layer with their own rule (world_city_roads.mjs: RADIUS_M 720,
+        // REBUILD_MOVE_M 260): a new building set does not re-lay them - only 260 m of travel does.
+        if (std::hypot(focus_.x - t.roads_at.x, focus_.y - t.roads_at.y) < 260) { t.state = S::ready; return true; }
         t.relay = true;
         t.old_lay = std::move(t.lay_meshes);
         t.lay_meshes.clear();
@@ -765,6 +771,8 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   if (ms_.t_built < 0) { auto it = tiles_.find(origin_tile_.hash()); if (it != tiles_.end() && it->second->state == Tile::State::ready) ms_.t_built = kern::now_ms() - start_ms_; }
   stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
   stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
+  stats_.rebuilds = rebuilds_;
+  stats_.relays = relays_;
   stats_.last_slice_ms = kern::now_ms() - start;
   if (kern::now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = kern::now_ms(); worst_step_ = ""; worst_step_ms_ = 0; }
   worst_ = std::fmax(worst_, stats_.last_slice_ms);
@@ -873,7 +881,9 @@ void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& ou
 
 void CityStream::ready_features(std::vector<const MapFeatures*>& out) const {
   for (const auto& [k, t] : tiles_)
-    if (t->state == Tile::State::ready || t->state == Tile::State::collision) out.push_back(&t->features);
+    // a tile being re-synced keeps its features (the map and the town must not lose its houses
+    // while the meshes are rebuilt: they flickered on the minimap)
+    if (t->prepared) out.push_back(&t->features);
 }
 
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {

@@ -36,6 +36,7 @@ struct StreamStats {
   f64 worst_ms = 0; // longest slice of the last 2 s (a hitch shows here)
   const char* worst_step = "";  // the step that took longest in that slice (where a hitch comes from)
   f64 worst_step_ms = 0;
+  u32 rebuilds = 0, relays = 0;  // building re-syncs and street layings so far
 };
 
 class CityStream {
@@ -134,6 +135,7 @@ class CityStream {
   f64 worst_ = 0, worst_at_ = 0;
   const char* worst_step_ = "";
   f64 worst_step_ms_ = 0;
+  u32 rebuilds_ = 0, relays_ = 0;
   void step_time(const char* name, f64 t0);
   Vec3 focus_{};
   Vec2 vis_at_{1e9f, 1e9f};
