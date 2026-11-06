@@ -61,7 +61,7 @@ SC_TEST(stream_tile_pipeline) {
   }
   SC_CHECK(city.ready_at({0, 0, 0}) && built(), "tile built after %d frames", frames);
   SC_CHECK(frames > 1, "built over several frames (%d)", frames);
-  SC_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on)", worst);
+  SC_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on; slowest step %s %.1f ms)", worst, city.stats().worst_step, city.stats().worst_step_ms);
   // world_building_collisions.mjs: one collider for each of the nearest 480 buildings within 340 m
   // (the sample tile's 401 houses; the ones whose centre is within 340 m of the player)
   {

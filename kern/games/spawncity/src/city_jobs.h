@@ -22,5 +22,9 @@ bool read_features(const std::vector<u8>& output, MapFeatures& out);
 std::vector<u8> buildings_input(const kern::FootprintStream& footprints, const kern::BuildingOptions& options);
 /// kBuildings output -> welded chunk meshes.
 bool read_chunks(const std::vector<u8>& output, std::vector<kern::GeoChunk>& out);
+/// The same, one chunk at a time (the frame uploads one per step): the count at offset 0, then
+/// read_chunk advances `at` (start with at = 4). False at the end or on a broken buffer.
+u32 chunk_count(const std::vector<u8>& output);
+bool read_chunk(const std::vector<u8>& output, std::size_t& at, kern::GeoChunk& out);
 
 }  // namespace sc::cityjobs

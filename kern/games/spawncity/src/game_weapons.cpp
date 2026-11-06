@@ -308,6 +308,7 @@ void Game::drone_attack(bool trigger, bool pressed) {
     next_drone_fire_ = now + g.interval_ms / 1000;
     kern::game::ShotEvent e;
     hit_scan(nose, dir, g.range_m, g.damage, true, body(drone_actor_), e);
+    e.shooter = drone_actor_;
     world_->shots().push_back(e);
     // the original's HUD (flight_fire_fx.mjs): an impact mark, the crosshair's hit confirm on a target
     if (e.impact) ctl_.impacts[ctl_.impact_serial++ % 8] = e.to;
@@ -346,6 +347,7 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     d = kern::normalize(d, fwd);
     kern::game::ShotEvent e;
     const bool hit = hit_scan(o, d, g.range_m, g.damage, true, body(jet_actor_), e);
+    e.shooter = jet_actor_;
     if (kern::length(e.to - o) > 600) e.to = o + d * 600.0f;
     world_->shots().push_back(e);
     // A third of the rounds burst (jet_mode.mjs: 34 %, 3.2 m, 70).
