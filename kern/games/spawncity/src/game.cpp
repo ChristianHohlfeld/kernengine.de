@@ -271,7 +271,7 @@ bool Game::start(kern::Engine& e) {
     TrafficCar c;
     c.actor = world_->find_actor(name);
     c.car = std::make_unique<Car>(CarSpec::car());
-    c.color = {0.93f, 0.94f, 0.96f};
+    c.color = {0.067f, 0.078f, 0.098f};  // buildCruiser: the black body 0x111419, white doors (people_art light_bar)
     c.police = true;
     c.driver = false;
     cars_.push_back(std::move(c));
@@ -392,30 +392,6 @@ void Game::spawn_guard() {
         world_->teleport(soldier_, p + Vec3{0, 0, 0.73f});
         return;
       }
-}
-
-void Game::ground_rescue() {
-  // world_ground_rescue: the ground can rise under a body after the start (the refined elevation
-  // arrives, a collision tile is rebuilt) - who is then under it is lifted back on top, falling
-  // stops; nobody drops through the world.
-  const auto lift = [&](kern::game::ActorId a, f32 rest) {
-    if (!a || !world_->actor_alive(a)) return;
-    const Vec3 c = matrix_of(a).translation();
-    const f32 g = city_.ground_height(c.x, c.y);
-    if (!std::isfinite(g) || c.z > g + rest - 0.45f) return;
-    if (!city_.terrain().ready_at(c)) {  // no ground there yet: hold on, do not fall
-      world_->teleport(a, {c.x, c.y, std::fmax(c.z, g + rest)});
-      world_->set_actor_velocity(a, {});
-      return;
-    }
-    Vec3 v = world_->actor_velocity(a);
-    world_->teleport(a, {c.x, c.y, g + rest + 0.08f});
-    world_->set_actor_velocity(a, {v.x, v.y, std::fmax(v.z, 0.0f)});
-  };
-  if (mode_ == Mode::foot) lift(soldier_, 0.73f);
-  if (mode_ == Mode::car && car_index_ >= 0 && cars_[car_index_].car)
-    lift(cars_[car_index_].actor, Car::ground_offset(cars_[car_index_].car->spec()));
-  if (jet_placed_ && !jet_.pilot) lift(jet_actor_, 2.1f);
 }
 
 void Game::place_world() {
@@ -865,9 +841,20 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     traffic_clock += dt;
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     city_.anchor = player_position();  // ground collision stays under the pilot too
+    {
+      // the elevation ahead of a fast flight (terrain.h lead)
+      const Vec3 f = focus_position();
+      if (dt > 0 && focus_prev_valid_) {
+        Vec3 v = (f - focus_prev_) * (1.0f / dt);
+        v.z = 0;
+        const f32 l = kern::length(v);
+        city_.terrain().lead = l > 15 ? v * (std::fmin(l * 12, 2500.0f) / l) : Vec3{};
+      }
+      focus_prev_ = f;
+      focus_prev_valid_ = true;
+    }
     city_.update(focus_position(), mobile_ ? 3 : 4);
     spawn_guard();
-    ground_rescue();
     look_lap(perf::Slot::stream);
     update_town(dt);
     update_projectiles(dt);

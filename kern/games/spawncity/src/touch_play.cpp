@@ -409,8 +409,7 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
           if (!still) b.pressed = false;
           const bool inside = x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4;
           if (!b.on_down && type == 2 && inside) {
-            // jet EJECT: only after a 650 ms hold
-            if (b.id != "eject" || (t_ms - f.t0) / 1000.0 >= kEjectHold) pressed_.push_back(b.id);
+            pressed_.push_back(b.id);  // jet EJECT too: a tap fires the seat
           }
         }
       released_.push_back(f.button);

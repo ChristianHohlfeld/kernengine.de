@@ -451,6 +451,12 @@ void Game::ui_reset() {
     show_soldier(matrix_of(chute_actor_).translation(), world_->camera_yaw());
     mode_ = Mode::foot;
   }
+  // RESET from the cockpit: back to the start on foot - no ejection, no parachute (that is EJECT)
+  if (mode_ == Mode::jet) {
+    jet_.pilot = false;
+    show_soldier(spawn_.p, 0);
+    mode_ = Mode::foot;
+  }
   if (mode_ != Mode::foot) command("mode foot");
   wanted_.clear();
   ui_clear_police();

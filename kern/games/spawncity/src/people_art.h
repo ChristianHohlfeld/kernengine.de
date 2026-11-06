@@ -36,7 +36,7 @@ class PeopleArt {
   bool make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m, bool tinted);
   void put(Part& p, const kern::Mat4& m, Vec3 tint = {1, 1, 1});
   kern::Renderer* r_ = nullptr;
-  Part leg_, torso_, arm_, head_, hand_, hair_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
+  Part leg_, torso_, arm_, head_, hand_, hair_, vest_, door_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
 };
 
 }  // namespace sc

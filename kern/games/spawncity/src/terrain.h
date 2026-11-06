@@ -118,6 +118,9 @@ class Terrain {
 
   /// Builds elevation, collision tiles around focus and anchor, render tiles, water meshes.
   void update(Vec3 focus, Vec3 anchor, f64 budget_ms);
+  /// Where the focus will be in a while (its velocity x 12 s): the elevation window is loaded
+  /// around there, so a fast jet never flies past the edge of the known ground.
+  Vec3 lead;
   const TerrainStats& stats() const { return stats_; }
 
  private:

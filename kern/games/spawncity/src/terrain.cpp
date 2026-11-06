@@ -1068,7 +1068,7 @@ bool Terrain::ready_at(Vec3 p) const {
 void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 deadline = kern::now_ms() + budget_ms;
-  plan_dem(focus);
+  plan_dem(focus + lead);
   plan_images(focus);
   if (job_) run_job(deadline);
   if (!settled_) return;
@@ -1076,6 +1076,19 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
       std::hypot(anchor.x - planned_anchor_.x, anchor.y - planned_anchor_.y) > 40)
     want_tiles(focus, anchor);
   bool missing = false;
+  // 0. the ground right under the focus and the anchor (and their neighbours) at once, whatever
+  // the budget: a jet at 250 m/s or a reload of the elevation never leaves a hole under anybody
+  for (const Vec3& at : {focus, anchor}) {
+    const i32 ci = static_cast<i32>(std::floor(at.x / kTile)), cj = static_cast<i32>(std::floor(at.y / kTile));
+    for (i32 j = cj - 1; j <= cj + 1; ++j)
+      for (i32 i = ci - 1; i <= ci + 1; ++i) {
+        const u64 k = key2(i, j);
+        if (collision_.count(k) && !dirty_collision_.count(k)) continue;
+        build_collision_tile(i, j);
+        dirty_collision_.erase(k);
+        ++stats_.rebuilds;
+      }
+  }
   // 1. collision (what stands on it must not fall), 2. render, 3. water
   for (u64 k : want_collision_) {
     if (collision_.count(k) && !dirty_collision_.count(k)) continue;

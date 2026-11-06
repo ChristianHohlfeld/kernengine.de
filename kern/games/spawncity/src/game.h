@@ -486,6 +486,8 @@ class Game {
   std::vector<TrafficCar> cars_;
   Mode mode_ = Mode::foot;
   i32 car_index_ = -1;       // the car the player drives
+  Vec3 focus_prev_;
+  bool focus_prev_valid_ = false;
   bool jet_flown_ = false, jet_v_valid_ = false;  // crash damage (game.cpp fixed_step)
   Vec3 jet_v_ctrl_;
   bool drone_out_ = false, jet_placed_ = false, world_placed_ = false, chute_open_ = false;
@@ -589,7 +591,6 @@ class Game {
   Rng rng_{20261029};
   bool spawn_checked_ = false;  // world_spawn_guard (Game::spawn_guard)
   void spawn_guard();
-  void ground_rescue();  // nothing ends up under the ground (the refined height field rose under it, a hole in collision)
   // audio
   kern::audio::Mixer mixer_;
   std::unique_ptr<kern::game::SoundBank> bank_;

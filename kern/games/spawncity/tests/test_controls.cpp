@@ -222,7 +222,7 @@ SC_TEST(controls_touch_vehicles) {
     t.pointer(2, 1, x, c, 20);
     SC_CHECK(t.clearance() == 0, "pad springs back");
   }
-  // jet: EJECT only after a 650 ms hold
+  // jet: EJECT on a tap (the ejection seat as you press it)
   l.mode = TouchMode::jet;
   t.set_layout(l);
   const TouchBtn* ej = nullptr;
@@ -232,11 +232,8 @@ SC_TEST(controls_touch_vehicles) {
   if (ej) {
     const f32 x = ej->x + 10, y = ej->y + 10;
     t.pointer(0, 2, x, y, 1000);
-    t.pointer(2, 2, x, y, 1300);
-    SC_CHECK(!t.take_pressed("eject"), "short tap: no eject");
-    t.pointer(0, 2, x, y, 2000);
-    t.pointer(2, 2, x, y, 2700);
-    SC_CHECK(t.take_pressed("eject"), "650 ms hold ejects");
+    t.pointer(2, 2, x, y, 1150);
+    SC_CHECK(t.take_pressed("eject"), "a tap ejects");
   }
   // car: two free fingers pinch the chase camera
   l.mode = TouchMode::car;

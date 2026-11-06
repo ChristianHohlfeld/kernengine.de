@@ -78,6 +78,15 @@ bool PeopleArt::init(kern::Renderer& r) {
   prim::append(hair, prim::sphere(0.123f, 14, 8, white), at({-0.018f, 0, 0.088f}) * scl({1.0f, 0.95f, 0.5f}));  // the top
   prim::append(hair, prim::sphere(0.118f, 14, 8, white), at({-0.04f, 0, 0.0f}) * scl({0.82f, 0.93f, 1.0f}));      // the back
   if (!make(r, hair_, hair, mat(0.9f), true)) return false;
+  // police_ground_units.mjs POLICE_COLORS: the cops' black vest over the dark blue shirt
+  MeshData vest;
+  prim::append(vest, prim::box({0.29f, 0.45f, 0.36f}, {0.082f, 0.094f, 0.118f}), at({0.005f, 0, 0.36f}));
+  prim::append(vest, prim::box({0.02f, 0.3f, 0.07f}, {0.85f, 0.86f, 0.88f}), at({0.15f, 0, 0.44f}));  // the light POLIZEI patch on the chest
+  if (!make(r, vest_, vest, mat(0.7f), false)) return false;
+  // buildCruiser: the white door panels (1.7 x .02 x .42) on the black body
+  MeshData door;
+  for (f32 y : {0.835f, -0.835f}) prim::append(door, prim::box({1.7f, 0.02f, 0.42f}, {0.933f, 0.941f, 0.949f}), at({-0.05f, y, 0.02f}));
+  if (!make(r, door_, door, mat(0.4f, 0.2f), false)) return false;
   MeshData cap;
   prim::append(cap, prim::cylinder(0.125f, 0.07f, 12, {0.08f, 0.1f, 0.16f}), Mat4{});
   prim::append(cap, prim::box({0.12f, 0.2f, 0.015f}, {0.05f, 0.05f, 0.06f}), at({0.12f, 0, 0.005f}));
@@ -126,7 +135,7 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
 }
 
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -182,17 +191,19 @@ void PeopleArt::person(const People::Person& p, f32 now) {
     if (p.kind == People::Kind::zombie) hc = {0.2f, 0.22f, 0.18f};
     put(hair_, head, hc);
   }
+  if (p.kind == People::Kind::officer && !down) put(vest_, body);
   if (p.kind == People::Kind::officer || p.kind == People::Kind::soldier || p.kind == People::Kind::enemy) put(cap_, head * at({0, 0, 0.06f}));
 }
 
 void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {
   const Mat4 m = chassis * at({-0.2f, 0, 0.86f});
   put(bar_, m);
-  // Alternating blue / red at 2.5 Hz (police_ground_units.mjs light bar).
-  const bool phase = std::fmod(now * 2.5f, 1.0f) < 0.5f;
-  const Vec3 dim{0.12f, 0.12f, 0.14f};
-  put(lamp_, m * at({0, 0.3f, 0.03f}), on ? (phase ? Vec3{0.1f, 0.25f, 2.6f} : Vec3{0.05f, 0.08f, 0.5f}) : dim);
-  put(lamp_, m * at({0, -0.3f, 0.03f}), on ? (!phase ? Vec3{2.6f, 0.08f, 0.06f} : Vec3{0.5f, 0.04f, 0.03f}) : dim);
+  put(door_, chassis);
+  // flashLights: 110 ms slots in sixes - red in 0 and 2, blue in 3 and 5 (police_ground_units.mjs)
+  const i32 slot = static_cast<i32>(std::floor(now * 1000 / 110)) % 6;
+  const bool red = on && (slot == 0 || slot == 2), blue = on && (slot == 3 || slot == 5);
+  put(lamp_, m * at({0, 0.25f, 0.05f}), blue ? Vec3{0.16f, 0.42f, 3.0f} : Vec3{0.024f, 0.063f, 0.18f});
+  put(lamp_, m * at({0, -0.25f, 0.05f}), red ? Vec3{3.0f, 0.1f, 0.16f} : Vec3{0.2f, 0.024f, 0.03f});
 }
 
 void PeopleArt::fire(Vec3 p, f32 size, f32 now) {
@@ -230,7 +241,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

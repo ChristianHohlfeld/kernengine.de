@@ -42,9 +42,18 @@ void Game::blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player) {
     }
     // dispatchExplosion: radius 2..18; f = smoothstep falloff x exposure (buildings .18); a car takes
     // ceil(3 f) hits, a bus ceil(4 f), at most 5 (each TARGET_DAMAGE)
-    const f32 r = clampf(radius, 2, 18), d = kern::length(p - at);
+    // the distance to the body itself, not to its middle: a rocket on a 12 m bus's flank is a
+    // direct hit (to the middle it was 5 m and more - the bus took nothing)
+    const kern::Mat4 m = matrix_of(c.actor);
+    const Vec3 ax = kern::normalize(m.transform_vector({1, 0, 0}), {1, 0, 0}), ay = kern::normalize(m.transform_vector({0, 1, 0}), {0, 1, 0}),
+               az = kern::normalize(m.transform_vector({0, 0, 1}), {0, 0, 1});
+    const Vec3 h = c.car->spec().half + Vec3{0, 0, 0.6f}, o = at - p;
+    const Vec3 lo{kern::dot(o, ax), kern::dot(o, ay), kern::dot(o, az)};
+    const Vec3 cl{clampf(lo.x, -h.x, h.x), clampf(lo.y, -h.y, h.y), clampf(lo.z, -h.z, h.z + 0.6f)};
+    const Vec3 near = p + ax * cl.x + ay * cl.y + az * cl.z;
+    const f32 r = clampf(radius, 2, 18), d = kern::length(at - near);
     if (d >= r) continue;
-    const f32 f = weapons::blast_factor(d, r, !line_of_sight(at, p + Vec3{0, 0, 0.8f}));
+    const f32 f = weapons::blast_factor(d, r, d > 0.8f && !line_of_sight(at, near));
     const f32 hits = std::fmin(5.0f, std::ceil(f * (is_bus(c) ? 4.0f : 3.0f)));
     for (i32 k = 0; k < static_cast<i32>(hits); ++k) damage_car(static_cast<i32>(i), is_bus(c) ? 26.0f : 30.0f, by_player);  // hit by hit (a critical car speeds up)
   }
