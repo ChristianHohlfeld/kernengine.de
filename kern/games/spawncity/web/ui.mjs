@@ -387,6 +387,21 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     // then the landscape lock (simulator.mjs:903); iOS ignores it and plays the CSS-rotated landscape
     document.documentElement.requestFullscreen({navigationUI: "hide"}).then(() => screen.orientation?.lock?.("landscape")).catch(() => {});
   }
+  // Phones and tablets play landscape, always: the lock from the very first touch (the title too),
+  // not only from START - turning the phone no longer flips the page between the real landscape and
+  // the CSS-turned one. An installed app may lock without fullscreen; iOS ignores the lock and keeps
+  // the CSS-rotated landscape (index.html .sc-css-landscape).
+  if (coarse && !navigator.webdriver) {
+    const lockNow = () => {
+      const installed = matchMedia("(display-mode: fullscreen)").matches || matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+      if (installed) { screen.orientation?.lock?.("landscape")?.catch?.(() => {}); return; }
+      fullscreenForGame();
+    };
+    const first = () => { removeEventListener("pointerdown", first, true); lockNow(); };
+    addEventListener("pointerdown", first, true);
+    document.addEventListener("fullscreenchange", () => { if (document.fullscreenElement) screen.orientation?.lock?.("landscape")?.catch?.(() => {}); });
+    lockNow();
+  }
   // Automated browsers and ?autostart=1 skip the title (auto_flight_start.mjs); ?menu=1 forces it.
   const skipTitle = params.get("menu") !== "1" && (navigator.webdriver || params.get("autostart") === "1");
   if (skipTitle) { menu.hidden = true; ui.started = ui.playing = true; }
