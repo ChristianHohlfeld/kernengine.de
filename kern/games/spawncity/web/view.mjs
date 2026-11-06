@@ -42,14 +42,17 @@ export async function mountOriginalView(base = "./view/") {
   // The Kern HUD root (speech bubbles, banners, perf line from life.mjs / gaps_hud.mjs) lives in
   // the game view, above the picture like the original's overlays.
   if (kernHud) { kernHud.classList.add("sc-kern-extra"); $("viewport").appendChild(kernHud); }
-  document.documentElement.classList.add("sc-original-view");
+  // the original's html classes: neon_ui_theme.mjs's skin hook (most of original.css hangs on it) and
+  // stylized_world_style.mjs's marker
+  document.documentElement.classList.add("sc-original-view", "neon-line-style", "stylized-world");
   const extra = document.createElement("style");
   extra.textContent = `
     html.sc-original-view #hud{position:absolute;inset:0;pointer-events:none;z-index:20}
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
     html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;outline:none;touch-action:none}
-    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}`;
+    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}
+    html.sc-original-view :is(.scui-switches,#mpBar){display:none!important}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
   const walk = {mode: "drone"};
@@ -62,6 +65,7 @@ export async function mountOriginalView(base = "./view/") {
   else {
     for (const m of ["start_location.mjs", "world_options.mjs", "world_options_menu.mjs", "changelog_menu.mjs"])
       await import(base + m).catch(e => console.warn("[spawncity] " + m, e));
+    await import(base + "neon_ui_theme.mjs").catch(e => console.warn("[spawncity] neon ui theme", e));
     await import(base + "edge_hud_layout.mjs").catch(e => console.warn("[spawncity] edge layout", e));
     await import(base + "thumb_layout.mjs").catch(e => console.warn("[spawncity] thumb layout", e));
   }
