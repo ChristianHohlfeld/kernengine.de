@@ -626,6 +626,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     C.race.last_pass = now - 1;
     return true;
   }
+  if (cmd == "damaged") { out = std::to_string(city_.damaged_buildings()); return true; }  // tests: buildings broken so far
   if (cmd == "rounds") {
     // tests: rounds in flight, launcher bounces so far
     char b[64];
