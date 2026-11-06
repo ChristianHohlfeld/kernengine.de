@@ -50,12 +50,12 @@ SC_TEST(controls_look_rates) {
   SC_CHECK(near(a.velocity, 1 - std::exp(-26 * dt), 1e-6f), "velocity");
   a.step(-1, dt);  // reversing: 40 /s
   SC_CHECK(a.velocity < 0, "reverses fast");
-  // fpsTouchLookDelta: 0.0068 / 0.0059 rad per px, up to 1.35x for flicks
+  // fpsTouchLookDelta: 0.0068 / 0.0059 rad per px; Kern: up to 1.6x for flicks (CoD Mobile acceleration)
   f32 y = 0, p = 0;
   touch_look_delta(10, 10, 100, y, p);
   SC_CHECK(near(y, 0.068f) && near(p, -0.059f), "slow drag 1:1");
   touch_look_delta(10, 0, 5000, y, p);
-  SC_CHECK(near(y, 0.068f * 1.35f), "flick gain");
+  SC_CHECK(near(y, 0.068f * 1.6f), "flick gain");
 }
 
 SC_TEST(controls_drone_sticks) {

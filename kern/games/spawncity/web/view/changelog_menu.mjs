@@ -52,7 +52,8 @@ export const CHANGELOG=Object.freeze([
     "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge.",
     "VR: dein Körper dreht sich mit, wenn du dich im Raum drehst; die Waffen liegen in der rechten Hand und schießen aus ihr, die Fäuste in beiden.",
     "VR, zwei Steuerungen (Einstellungen → VR, in der Brille: beide Sticks drücken): Sticks – links gehen, rechts in 30°-Schritten drehen; oder Laufen mit den Armen – links joggen = gehen, beide = rennen, ohne Stick.",
-    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel."]},
+    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel.",
+    "Rechter Stick weiter vom Rand weg (mehr Platz zum Drehen), schnelle Wischer drehen weiter (Beschleunigung wie CoD Mobile)."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

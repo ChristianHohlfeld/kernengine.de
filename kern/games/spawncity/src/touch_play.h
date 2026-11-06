@@ -59,6 +59,8 @@ struct TouchFire {
 class TouchPlay {
  public:
   static constexpr f32 kStick = 168;          // thumb_layout.mjs STICK
+  static constexpr f32 kRightInset = 36;      // Kern: the right stick off the edge (room for the thumb to turn, as CoD Mobile); not the drone's
+  f32 right_inset() const { return lay_.mode == TouchMode::drone ? 0.0f : kRightInset; }
   static constexpr f32 kRadiusK = 0.42f;      // control_semantics.mjs normalizedPointer
   static constexpr f32 kEdgeStart = 0.92f, kEdgeRampPx = 42;  // foot_touch_controller.mjs edge turn
   static constexpr f32 kEjectHold = 0.65f;    // jet_mode.mjs: EJECT after 650 ms

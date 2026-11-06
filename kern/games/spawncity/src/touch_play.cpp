@@ -70,7 +70,7 @@ void TouchPlay::layout() {
   if (lay_.mode == TouchMode::off) return;
   const TouchMode m = lay_.mode;
   // The sticks: 168 px flush in the safe corners (thumb_layout.mjs).
-  const f32 Lx = sl_, Ly = h_ - sb_ - kStick, Rx = w_ - sr_ - kStick, Ry = h_ - sb_ - kStick;
+  const f32 Lx = sl_, Ly = h_ - sb_ - kStick, Rx = w_ - sr_ - right_inset() - kStick, Ry = h_ - sb_ - kStick;
   constexpr u32 dark = 0x0d1118, amber = 0x2a1d0c, blue = 0x0e2a3e, red = 0x8b2436, green = 0x2f9e5a, yellow = 0xffc93c;
   if (lay_.aiming) {
     // fighter_jets.mjs targeting overlay: tap the ground, or ABBRECHEN.
@@ -226,7 +226,7 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
     f.y0 = f.y = f.last_y = y;
     f.t0 = f.last_t = t_ms;
     const f32 r = kStick / 2;
-    const f32 Lcx = sl_ + r, Lcy = h_ - sb_ - r, Rcx = w_ - sr_ - r, Rcy = h_ - sb_ - r;
+    const f32 Lcx = sl_ + r, Lcy = h_ - sb_ - r, Rcx = w_ - sr_ - right_inset() - r, Rcy = h_ - sb_ - r;
     if (TouchBtn* b = button_at(x, y)) {
       f.kind = Finger::press;
       f.button = b->id;
@@ -457,7 +457,7 @@ std::string TouchPlay::view_json() const {
     return std::string(buf);
   };
   std::string s = "{\"move\":" + stick(sl_, move_, move_id_ >= 0, sprint() && lay_.mode == TouchMode::foot, ml);
-  s += ",\"look\":" + stick(w_ - sr_ - kStick, look_, look_id_ >= 0, false, rl);
+  s += ",\"look\":" + stick(w_ - sr_ - right_inset() - kStick, look_, look_id_ >= 0, false, rl);
   s += ",\"buttons\":[";
   bool first = true;
   for (const TouchBtn& b : buttons_) {

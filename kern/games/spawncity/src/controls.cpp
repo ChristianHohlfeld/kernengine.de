@@ -67,7 +67,8 @@ f32 LookAxis::step(f32 target, f32 dt) {
 }
 
 void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch) {
-  const f32 gain = 1 + 0.35f * smoothstep01((speed_px_s - 700) / 2200);
+  // a slow drag is fine aim, a flick turns far (CoD Mobile's acceleration): up to x 1.6
+  const f32 gain = 1 + 0.6f * smoothstep01((speed_px_s - 500) / 1800);
   yaw = dx * 0.0068f * gain;
   pitch = -dy * 0.0059f * gain;
 }
