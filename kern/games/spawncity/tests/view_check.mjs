@@ -14,7 +14,7 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
   const ctx = await b.newContext({...opts, geolocation: {latitude: 52.5208, longitude: 13.4094}, permissions: ["geolocation"]});
   const p = await ctx.newPage(), errs = [];
   p.on("pageerror", e => errs.push(String(e.stack || e).slice(0, 500)));
-  p.on("console", m => { if (m.type() === "error") errs.push("console: " + m.text().slice(0, 300)); });
+  p.on("console", m => { if (m.type() === "error" || m.type() === "warning") errs.push(`console ${m.type()}: ` + m.text().slice(0, 300)); });
   const state = () => p.evaluate(() => { const h = window.SpawnCity?.hud?.(); return JSON.stringify({mode: h?.mode, placed: h?.placed, agl: h?.agl, alt: h?.alt, fps: h?.fps, tiles: h?.tiles, playing: window.SpawnCity?.ui?.playing,
     scStart: document.getElementById("scStart")?.disabled, menu: document.getElementById("gameMenu")?.hidden, body: document.body.className}); }).catch(e => "state error " + e.message);
   const shot = async n => { await p.screenshot({path: path.join(out, `${dev}-${n}.png`)}).catch(() => {}); console.log(dev, n, await state()); };
@@ -23,6 +23,7 @@ for (const [dev, opts] of [["desktop", {viewport: {width: 1280, height: 720}}], 
     const t0 = Date.now();
     await p.waitForFunction(() => window.SpawnCity?.hud?.()?.placed, null, {timeout: 180000, polling: 1000}).catch(async e => {
       console.log(dev, "never placed:", await p.evaluate(() => JSON.stringify(window.SpawnCity?.hud?.()?.tiles)).catch(() => "?"));
+      console.log(dev, "terrain / jobs:", await p.evaluate(() => { const h = window.SpawnCity?.hud?.() || {}; return JSON.stringify({terrain: h.terrain, offline: h.offline, realData: h.realData, mode: h.mode, toast: h.toast, status: document.getElementById("status")?.textContent, mem: window.SpawnCity?.kern?.memory?.buffer?.byteLength}); }).catch(e => e.message));
       throw e;
     });
     console.log(dev, "placed after", Date.now() - t0, "ms", await p.evaluate(() => JSON.stringify(window.SpawnCity.hud().tiles)));
