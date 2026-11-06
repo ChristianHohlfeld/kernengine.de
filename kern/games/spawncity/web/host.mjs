@@ -366,9 +366,13 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     document.body.appendChild(el);
     command("perf 1");
     const ft = [];
-    let prev = 0, shownAt = 0, longs = 0;
+    let prev = 0, shownAt = 0, longs = 0, memBytes = kern.memory.buffer.byteLength, grows = 0, growFrames = 0, growMax = 0;
     return now => {
-      if (prev) { const d = now - prev; ft.push([now, d]); if (d > 50) longs++; }
+      // wasm memory growth: how often, and how long the frames were in which it grew
+      const mb = kern.memory.buffer.byteLength;
+      const grew = mb !== memBytes;
+      if (grew) { grows++; memBytes = mb; }
+      if (prev) { const d = now - prev; ft.push([now, d]); if (d > 50) longs++; if (grew) { growFrames++; growMax = Math.max(growMax, d); } }
       prev = now;
       while (ft.length && now - ft[0][0] > 2000) ft.shift();
       if (now - shownAt < 250 || !last) return;
@@ -377,6 +381,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const p = last.perf || {}, m = p.ms || {}, t = last.tiles?.t || {};
       el.textContent = `frame ms p50 ${q(.5)} p95 ${q(.95)} max ${q(1)} · >50ms ${longs} · ${p.fps?.toFixed?.(0) ?? "-"} fps · tier ${p.tierName || "-"} · scale ${last.renderScale ?? "-"} · ${canvas.width}x${canvas.height}\n`
         + `cpu logic ${m.logic?.toFixed(1)} physics ${m.physics?.toFixed(1)} stream ${m.stream?.toFixed(1)} draw ${m.draw?.toFixed(1)} render ${m.render?.toFixed(1)} · gpu ${m.gpu >= 0 ? m.gpu.toFixed(1) : "n/a"}\n`
+        + `wasm memory ${(memBytes / 1048576).toFixed(0)} MB · grew ${grows}x · longest frame with a grow ${growMax.toFixed(0)} ms\n`
         + `stream worst ${t.worst ?? "-"} ms (${t.worstStep || "-"} ${t.worstStepMs ?? ""}) · city re-syncs ${t.rebuilds ?? "-"} · street layings ${t.relays ?? "-"} · mode ${last.mode}`;
     };
   })() : null;
