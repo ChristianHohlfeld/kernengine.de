@@ -176,6 +176,10 @@ void Game::draw_world() {
   L.art.end();
 }
 
+void Game::world_bullet(Vec3 at) {
+  if (life_) life_->marks.bullet(at, city_, rng_);  // world_impacts.mjs bullet: glassAt -> addGlassCrack
+}
+
 void Game::world_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
   (void)by_player;
   if (!life_) return;

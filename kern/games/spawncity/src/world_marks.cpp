@@ -6,7 +6,7 @@
 namespace sc {
 
 namespace {
-constexpr u32 kScorches = 40, kSoots = 48, kBreaches = 64, kRubble = 36;  // world_impacts.mjs / facade_marks.mjs
+constexpr u32 kScorches = 40, kSoots = 48, kBreaches = 64, kRubble = 36, kCracks = 160;  // world_impacts.mjs / facade_marks.mjs
 constexpr f32 kRubbleSeconds = 25;
 const Vec3 kRubbleColor = kern::hex_color(0x8a857c);
 
@@ -29,6 +29,8 @@ void Marks::clear(kern::physics::World* w) {
   scorches_.clear();
   soots_.clear();
   breaches_.clear();
+  cracks_.clear();
+  crack_cursor_ = 0;
   scorch_cursor_ = soot_cursor_ = breach_cursor_ = rubble_cursor_ = 0;
   dirty_ = true;
   stats_ = {};
@@ -164,6 +166,60 @@ void Marks::spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rn
   }
 }
 
+namespace {
+f32 fh(f32 n) { const f32 v = std::sin(n * 127.1f) * 43758.5453f; return v - std::floor(v); }
+// facades.cpp FACADE_GLSL's window mask on the CPU (world_city_buildings.mjs facadeGlassAt): is
+// this point of a wall glass? u along the wall, z above the base, H the wall's height.
+bool facade_glass(f32 u, f32 len, f32 z, f32 H, u32 seed) {
+  if (len <= 0 || z < 0 || z > H) return false;
+  const f32 sdq = static_cast<f32>(seed % 997) / 997.0f;
+  const f32 floor_h = 3.1f + 0.5f * (static_cast<f32>((seed >> 12) % 1000) / 1000.0f);
+  const bool pil = !(u >= 0.38f && u <= len - 0.38f);
+  if (z < 4 && len > 3) {
+    const f32 sp = 4.4f, ns = std::fmax(1.0f, std::floor(len / sp)), sm = (len - ns * sp) * 0.5f;
+    const f32 su = (u - sm) / sp - std::floor((u - sm) / sp);
+    const bool in_s = u - sm >= 0 && u - sm <= ns * sp;
+    return in_s && su >= 0.08f && su <= 0.92f && z >= 0.35f && z <= 3.0f;
+  }
+  if (H >= 26) {
+    const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+    const f32 mu = u / 1.6f - std::floor(u / 1.6f);
+    return fz < 0.8f && mu < 0.95f && !pil;
+  }
+  const f32 pitch = 2.7f + (3.7f - 2.7f) * fh(sdq * 7.0f);
+  const f32 n_win = std::fmax(1.0f, std::floor((len - 0.8f) / pitch)), margin = (len - n_win * pitch) * 0.5f;
+  const f32 lu = (u - margin) / pitch, fu = lu - std::floor(lu);
+  if (lu < 0 || lu > n_win || z > H - 1.2f) return false;
+  const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+  const f32 ww = 0.38f + (0.6f - 0.38f) * fh(sdq * 5.0f), wh = 0.42f + (0.6f - 0.42f) * fh(sdq * 9.0f);
+  return fu >= 0.5f - ww * 0.5f && fu <= 0.5f + ww * 0.5f && fz >= 0.3f && fz <= 0.3f + wh;
+}
+}  // namespace
+
+bool Marks::bullet(Vec3 p, const CityStream& city, Rng& rng) {
+  city_ = &city;
+  city.walls_near({p.x, p.y}, 0.6f, near_);
+  for (const CityStream::Wall& w : near_) {
+    const Vec2 rel{p.x - w.a.x, p.y - w.a.y};
+    const f32 u = rel.x * w.dir.x + rel.y * w.dir.y, off = rel.x * w.normal.x + rel.y * w.normal.y;
+    if (u < 0 || u > w.len || std::fabs(off) > 0.3f || p.z < w.base || p.z > w.top) continue;
+    if (!facade_glass(u, w.len, p.z - w.base, w.top - w.base, w.seed)) return false;
+    // addGlassCrack: on the pane (the outer wall plane), size .16 .. .26 m
+    WallMark m;
+    m.c = Vec3{w.a.x + w.dir.x * u + w.normal.x * 0.03f, w.a.y + w.dir.y * u + w.normal.y * 0.03f, p.z};
+    m.n = w.normal;
+    m.d = w.dir;
+    m.size = 0.16f + rng.unit() * 0.1f;
+    m.seed = rng.next();
+    if (cracks_.size() < kCracks) cracks_.push_back(m);
+    else cracks_[crack_cursor_ % kCracks] = m;
+    ++crack_cursor_;
+    dirty_ = true;
+    return true;
+  }
+  return false;
+}
+
 void Marks::update(f32 now, kern::physics::World& w) {
   for (auto it = rubble_.begin(); it != rubble_.end();) {
     if (now > it->until) {
@@ -246,6 +302,36 @@ void Marks::rebuild(const CityStream& city) {
         wall_data_.push(m.c + Vec3{m.d.x * q.x, m.d.y * q.x, q.y} + n * 0.002f, n, {0.03f, 0.028f, 0.026f}, {});
       wall_data_.indices.insert(wall_data_.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
     }
+  }
+  // facade_marks.mjs CRACK_FS: radial spokes, two broken rings, a tiny pit - light on the pane
+  for (const WallMark& m : cracks_) {
+    const Vec3 n{m.n.x, m.n.y, 0};
+    Rng cr(m.seed | 1);
+    auto line = [&](Vec2 a, Vec2 b, f32 w, Vec3 col) {
+      const Vec2 d = b - a;
+      const f32 l = std::fmax(1e-4f, std::hypot(d.x, d.y));
+      const Vec2 s{-d.y / l * w, d.x / l * w};
+      const u32 base = wall_data_.vertex_count();
+      for (const Vec2 q : {a + s, a - s, b - s, b + s}) wall_data_.push(m.c + Vec3{m.d.x * q.x, m.d.y * q.x, q.y}, n, col, {});
+      wall_data_.indices.insert(wall_data_.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    };
+    const Vec3 c{0.82f, 0.86f, 0.9f};
+    const i32 spokes = 7 + static_cast<i32>(cr.next() % 4);
+    std::vector<Vec2> ends;
+    for (i32 i = 0; i < spokes; ++i) {
+      const f32 a = 2 * kPi * (static_cast<f32>(i) + (cr.unit() - 0.5f) * 0.6f) / static_cast<f32>(spokes);
+      const f32 r = m.size * (0.6f + 0.4f * cr.unit());
+      const Vec2 e{std::cos(a) * r, std::sin(a) * r};
+      line(e * 0.08f, e * 0.55f, 0.004f, c);
+      line(e * 0.55f, e, 0.003f, c);
+      ends.push_back(e);
+    }
+    for (std::size_t i = 0; i < ends.size(); ++i) {
+      const Vec2 a = ends[i], b = ends[(i + 1) % ends.size()];
+      line(a * 0.35f, b * 0.35f, 0.003f, c);
+      if (cr.unit() < 0.7f) line(a * 0.7f, b * 0.7f, 0.0025f, c);
+    }
+    line({-0.01f, 0}, {0.01f, 0}, 0.01f, {0.95f, 0.97f, 1.0f});  // the pit
   }
 }
 

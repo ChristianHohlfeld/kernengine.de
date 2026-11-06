@@ -6,6 +6,7 @@
 //  * soot on the walls within reach, clipped to the wall (addWallSoot: 48, two walls a blast)
 //  * a breach in the wall that opens further with every blast on the same 2 m patch, and concrete
 //    chunks flying out as Box3D bodies for 25 s (addWallBreach / spawnRubble: 64 breaches, 36 chunks)
+//  * a spider-web crack on a window pane a bullet hit (addGlassCrack: 160; the glass never breaks)
 #pragma once
 
 #include <vector>
@@ -21,6 +22,8 @@ class Marks {
   void clear(kern::physics::World* w);
   /// A blast at `at`, radius `r`; `strength` ~ damage / 110 (facade_marks.mjs).
   void blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now, bool craters = true);
+  /// A bullet that hit `p` (world): on a window pane of a building it cracks the glass.
+  bool bullet(Vec3 p, const CityStream& city, Rng& rng);
   void update(f32 now, kern::physics::World& w);
   void draw(WorldArt& art, kern::physics::World& w, f32 now);
   const Stats& stats() const { return stats_; }
@@ -35,7 +38,8 @@ class Marks {
   void spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rng& rng, f32 now);
 
   std::vector<Scorch> scorches_;
-  std::vector<WallMark> soots_, breaches_;
+  std::vector<WallMark> soots_, breaches_, cracks_;
+  u32 crack_cursor_ = 0;
   std::vector<Chunk> rubble_;
   u32 scorch_cursor_ = 0, soot_cursor_ = 0, breach_cursor_ = 0, rubble_cursor_ = 0;
   std::vector<CityStream::Wall> near_;

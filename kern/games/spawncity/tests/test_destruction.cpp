@@ -2,6 +2,7 @@
 // the collider follows at once, the drawn chunk is swapped after its job, the debris lands, more
 // blasts level it to its stump, the damage outlives nothing but RESET; and nothing leaks.
 #include "../src/destruction.h"
+#include "../src/world_marks.h"
 
 #include "kern/core/base.h"
 #include "test_util.h"
@@ -44,6 +45,24 @@ SC_TEST(destruction_floors_collapse_and_reset) {
   const f64 give_up = kern::now_ms() + 60000;
   while ((city.stats().t_built < 0 || city.stats().t_collision < 0) && kern::now_ms() < give_up) city.update({0, 0, 0}, 3);
   SC_CHECK(std::fabs(roof(world) - 21) < 0.05f, "the house stands 21 m (%.2f)", roof(world));
+  // facade_marks.mjs glassAt / addGlassCrack: rounds on a wall crack its panes, not its piers
+  {
+    Marks marks;
+    Rng mr(9);
+    std::vector<CityStream::Wall> walls;
+    city.walls_near({0, 0}, 20, walls);
+    SC_CHECK(!walls.empty(), "the house has walls");
+    u32 glass = 0, tries = 0;
+    if (!walls.empty()) {
+      const CityStream::Wall& w = walls[0];
+      for (f32 z = w.base + 4.5f; z < w.top - 1.5f; z += 0.4f)
+        for (f32 u = 0.2f; u < w.len - 0.2f; u += 0.3f) {
+          ++tries;
+          glass += marks.bullet({w.a.x + w.dir.x * u, w.a.y + w.dir.y * u, z}, city, mr) ? 1 : 0;
+        }
+    }
+    SC_CHECK(glass > tries / 20 && glass < tries * 3 / 4, "some hits are panes (%u of %u)", glass, tries);
+  }
   const u32 meshes0 = city.stats().meshes;
   const std::size_t phys0 = world.mesh_count();
 

@@ -304,6 +304,7 @@ class Game {
   void draw_world();
   bool world_command(const std::string& cmd, std::string& out);
   void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
+  void world_bullet(Vec3 at);  // a round that hit the world: a window pane cracks (world_marks.h)
   std::unique_ptr<WorldLife> life_;
   // street life, animals, ragdolls, walkable buildings (game_life.cpp, M3 life; state in
   // GameLife, game_life.h, declared last so it goes before the world it has bodies in)

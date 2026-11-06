@@ -136,6 +136,7 @@ void Game::handle_shots() {
       s.impact = true;
       continue;
     }
+    if (s.impact && s.surface != 2) world_bullet(s.to);  // the world: a window pane may crack
     if (s.surface == 2 && s.impact) {
       // A moving body: which car was it?
       for (std::size_t i = 0; i < cars_.size(); ++i) {
