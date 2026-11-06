@@ -37,10 +37,14 @@ await ctx.addInitScript(slowmo);
 const page = await ctx.newPage();
 page.on("pageerror", e => log("pageerror", e.message));
 await page.goto(URL);
-await page.waitForFunction(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START", null, {timeout: 240000})
+// the page may start the game by itself (the menu hides, START stays "LOADING"); else press START
+await page.waitForFunction(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START" || (document.getElementById("gameMenu")?.hidden && globalThis.__arondightFootWeapons), null, {timeout: 240000})
   .catch(async e => { await page.screenshot({path: path.join(out, "orig-boot-failed.png")}); log("boot", await page.evaluate(() => document.getElementById("gameMenuStart")?.outerHTML || document.title)); throw e; });
-await page.click("#gameMenuStart");
-await page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000});
+if (await page.evaluate(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START" && !document.getElementById("gameMenu")?.hidden)) {
+  await page.click("#gameMenuStart");
+  await page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000});
+}
+await page.waitForFunction(() => globalThis.__arondightFootWeapons && globalThis.__arondightWalkMode, null, {timeout: 120000});
 await page.waitForFunction(() => Number(document.querySelector("#viewport")?.dataset.worldCityBuildings) > 20, null, {timeout: 90000}).catch(() => {});
 const frames = async n => { for (let i = 0; i < n; i++) await page.evaluate(() => new Promise(r => requestAnimationFrame(() => r()))); };
 const shot = async name => { await page.screenshot({path: path.join(out, `${name}.png`), timeout: 600000}); log("shot", name); };
