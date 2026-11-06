@@ -417,7 +417,7 @@ void Game::update_combat(f32 dt) {
   CombatState& C = combat_;
   // The air strike is aimed and called in game_controls.cpp (4 / J / D-pad up / STRIKE, fighter_jets.mjs);
   // the race ("race") and the next contract ("contract") are commands: spawncity.de has no keys for them.
-  C.scope = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper && world_->hud().aiming && !player_dead_;
+  C.scope = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper && world_->aim_blend() > 0.85f && !player_dead_;  // stepAds scoped
   // player rockets / grenades that fly into the helicopter, the tank or a flak gun go off there
   for (Projectile& p : projectiles_) {
     if (!p.alive || !p.by_player || p.id == weapons::Id::hand_grenade) continue;

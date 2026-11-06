@@ -164,6 +164,7 @@ kern::game::Level Game::build_level() const {
   ControllerComponent c = soldier_controller_;
   s.controller = c;
   s.weapon = weapon_preset(WeaponKind::pistol);
+  s.weapon->spread = s.weapon->aim_spread = s.weapon->recoil = 0;  // the original's rounds: no cone (select_foot_weapon)
   HealthComponent h;
   h.max_health = kPlayerHealth;
   h.regen_delay = 0;  // player_vitals_runtime.mjs: no regeneration (only a RESET or a respawn heals)
@@ -1105,8 +1106,8 @@ std::string Game::hud_json() {
   (void)h.ammo;
   // player_vitals_runtime.mjs: PLAYER_MAX_HP 100, every hit divided by PLAYER_DAMAGE_TOLERANCE 1.18. Kern's
   // soldier holds 118 (the same thing for every source of damage, falls included): shown as 0..100
-  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"respawn\":%.1f",
-      h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", h.respawn_in);
+  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"ads\":%.2f,\"respawn\":%.1f",
+      h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", world_->aim_blend(), h.respawn_in);
   Vec3 pos = focus_position(), vel;
   f32 agl = pos.z - city_.ground_height(pos.x, pos.y);
   switch (mode_) {

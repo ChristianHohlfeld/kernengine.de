@@ -240,7 +240,7 @@ function installViewModes() {
   // ---------------------------------------------------------------------------------------------
   // sniper_scope.mjs sync / readout; first_person_controller_v5.mjs body.ads-active / scope-active
   function sniper(h) {
-    const scoped = !!h.combat?.scope, ads = !!h.aiming && h.mode === "foot";
+    const scoped = !!h.combat?.scope, ads = (h.ads ?? (h.aiming ? 1 : 0)) > 0.6 && h.mode === "foot";  // adsT > .6
     body().classList.toggle("scope-active", scoped);
     body().classList.toggle("ads-active", ads);
     if (scoped) text(q("#sniperScope .ss-range"), `${Math.round(h.ctl?.zoom || 8)}×`);

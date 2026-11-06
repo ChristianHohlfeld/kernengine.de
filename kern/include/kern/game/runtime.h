@@ -255,6 +255,8 @@ class GameWorld {
   /// Advances the replica's clock (`time` = the server time being shown).
   void step_replica(f32 dt, f32 time, const PlayInput& input);
   const Hud& hud() const { return hud_; }
+  /// The local soldier's aim-down-sights blend (0 hip .. 1 at the sights; a scope is on above .85).
+  f32 aim_blend() const { return aim_blend_; }
   SimStats stats() const;
   const Level& level() const { return level_; }  // the level being presented or simulated
   physics::World& physics() { return physics_; }

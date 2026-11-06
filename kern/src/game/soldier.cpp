@@ -521,7 +521,18 @@ void GameWorld::soldier_camera(Camera& cam, f32 dt, const PlayInput& in, const C
   const Actor* a = level_.find(p->actor);
   const WeaponComponent* w = a && a->weapon ? &*a->weapon : nullptr;
   const bool aiming = hud_.aiming && w;
-  const f32 zoom = aiming ? kern::dm::tan(c.camera_fov * 0.5f * kDegree) / kern::dm::tan(w->aim_fov * 0.5f * kDegree) : 1.0f;
+  // Aim down sights (first_person_controller_v5.mjs stepAds): the blend eases to the goal with a
+  // 75 ms time constant (a scope 1.6x slower); a gun zooms with it, a scope (sniper) only shows its
+  // full magnification once the eye is at the glass (blend > .85) and x 1.45 at most before that.
+  // The look speed divides by the zoom of this frame (applyMouseLook adsZ).
+  const bool scope = w && w->kind == WeaponKind::sniper;
+  {
+    const f32 goal = aiming ? 1.0f : 0.0f;
+    aim_blend_ += (goal - aim_blend_) * (1 - kern::dm::exp(-dt / (scope ? 0.075f * 1.6f : 0.075f)));
+    if (std::fabs(aim_blend_ - goal) < 0.002f) aim_blend_ = goal;
+  }
+  const f32 full_zoom = w ? max_of(1.0f, kern::dm::tan(c.camera_fov * 0.5f * kDegree) / kern::dm::tan(w->aim_fov * 0.5f * kDegree)) : 1.0f;
+  const f32 zoom = scope ? (aim_blend_ > 0.85f ? full_zoom : 1 + (min_of(full_zoom, 1.45f) - 1) * aim_blend_) : 1 + (full_zoom - 1) * aim_blend_;
   const f32 sens = c.look_sensitivity / max_of(1.0f, zoom);
   // Mouse / touch deltas arrive in degrees.
   camera_yaw_ -= in.look_x * sens;
@@ -602,12 +613,13 @@ void GameWorld::soldier_camera(Camera& cam, f32 dt, const PlayInput& in, const C
   cam.near = 0.03f;
   cam.far = 4000;
   cam.orthographic = false;
-  // Field of view: aim zooms in (75 ms), sprint widens a little.
-  const f32 fov_target = aiming ? w->aim_fov : c.camera_fov + (sprinting ? 5.0f : 0.0f);
+  // Field of view: sprint widens a little (75 ms); the sights' zoom through tan (true magnification).
+  const f32 fov_target = c.camera_fov + (sprinting ? 5.0f : 0.0f);
   if (fov_now_ <= 0) fov_now_ = fov_target;
   fov_now_ = rt::damp(fov_now_, fov_target, 1 / 0.075f, dt);
-  cam.fov = fov_now_ * kDegree;
-  hud_.fov = fov_now_;
+  const f32 fov = 2 * std::atan(kern::dm::tan(fov_now_ * 0.5f * kDegree) / max_of(1.0f, zoom));
+  cam.fov = fov;
+  hud_.fov = fov / kDegree;
   camera_eye_ = eye;
   hud_.hit_age += dt;
   hud_.damage_age += dt;

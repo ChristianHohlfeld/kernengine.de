@@ -517,6 +517,15 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
       const Quat q = rotation_between(normalize(front - rear), normalize(art.aim_smooth - rear));
       g = Mat4::translate(grip) * quat_matrix(q) * Mat4::translate(grip * -1.0f) * g;
     }
+    // Aim down sights (adsPose, before the kick as in beforeRender): the rear sight .46 m in front of the eye, the sight line on the view axis.
+    if (aim_blend_ > 0.001f) {
+      const f32 t = aim_blend_;
+      const Vec3 rear = g.transform_point(art.weapon.rear_sight + mount), front = g.transform_point(art.weapon.front_sight + mount);
+      const Quat q = rotation_between(normalize(front - rear), {0, 0, -1}, t);
+      g = Mat4::translate(rear) * quat_matrix(q) * Mat4::translate(rear * -1.0f) * g;
+      const Vec3 rear2 = g.transform_point(art.weapon.rear_sight + mount);
+      g = Mat4::translate((Vec3{0, 0, -.46f} - rear2) * t) * g;
+    }
     // Kick: 16 ms after the shot, 130 ms, muzzle up and back toward the eye.
     const f64 ka = age - 16;
     const f32 kick = ka >= 0 && ka < 130 ? kern::dm::sin(kPi * static_cast<f32>(ka) / 130) : 0;
@@ -525,15 +534,6 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
     if (hud_.reload >= 0) {
       const f32 rl = kern::dm::sin(clamp(hud_.reload, 0.0f, 1.0f) * kPi);
       g = Mat4::translate({0, -.12f * rl, .04f * rl}) * g * models::euler({-.5f * rl, 0, .35f * rl});
-    }
-    // Aim down sights: the rear sight .46 m in front of the eye, the sight line on the view axis.
-    if (aim_blend_ > 0.001f) {
-      const f32 t = aim_blend_;
-      const Vec3 rear = g.transform_point(art.weapon.rear_sight + mount), front = g.transform_point(art.weapon.front_sight + mount);
-      const Quat q = rotation_between(normalize(front - rear), {0, 0, -1}, t);
-      g = Mat4::translate(rear) * quat_matrix(q) * Mat4::translate(rear * -1.0f) * g;
-      const Vec3 rear2 = g.transform_point(art.weapon.rear_sight + mount);
-      g = Mat4::translate((Vec3{0, 0, -.46f} - rear2) * t) * g;
     }
     const Mat4 world = cam * g;
     art.view_matrix = world;

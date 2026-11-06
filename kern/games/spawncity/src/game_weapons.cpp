@@ -60,6 +60,11 @@ void Game::select_foot_weapon(Id id) {
     // first_person_controller_v5.mjs ADS: x 1.45 for the guns, the sniper's scope x 8 (true
     // magnification through tan; Kern zooms by tan(fov / 2) / tan(aimFov / 2) from the 59 deg view)
     set("aimFov", Value(id == Id::sniper ? 8.09 : 42.6));
+    // the original's rounds go exactly through the crosshair / the finger: no cone, no bloom, no
+    // view kick beyond the camera's own shot impulse (fps_control_math.mjs addFpsShotImpulse)
+    set("spread", Value(0.0));
+    set("aimSpread", Value(0.0));
+    set("recoil", Value(0.0));
     if (world_->soldier_state(soldier_, st)) {
       st.ammo = ammo_mag_[static_cast<u8>(id)];
       st.reserve = ammo_reserve_[static_cast<u8>(id)];

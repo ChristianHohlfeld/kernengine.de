@@ -448,7 +448,9 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
       f.fresh = false;
       if (shots == 0 || locked) continue;
       if (kern_gun) {
-        for (int i = 0; i < shots; ++i) touch_fire |= ctl_touch_shot(f.x, f.y);
+        // sniper_scope.mjs: a tap on the screen while scoped fires through the crosshair
+        const bool scoped = C.scope_on && w == weapons::Id::sniper;
+        for (int i = 0; i < shots; ++i) touch_fire |= scoped ? ctl_touch_shot(frame_w_ / 2, frame_h_ / 2) : ctl_touch_shot(f.x, f.y);
       } else {
         touch_fresh = true;
         C.aim_point = true;
