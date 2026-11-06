@@ -77,6 +77,7 @@ struct RenderParams {
   bool page_hidden = false;
   u32 layers = ~0u;           // only meshes with (mesh.layers & layers) != 0 are drawn (and cast shadows)
   bool sky = true;            // false: the clear colour stays behind the scene
+  bool reuse_shadow = false;  // keep the sun's shadow map as it is (the second eye of a stereo / XR frame)
 };
 
 struct RenderStats {

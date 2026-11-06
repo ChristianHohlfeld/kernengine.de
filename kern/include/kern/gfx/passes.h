@@ -91,7 +91,7 @@ class SkyPass {
  private:
   Program program_;
   u32 vao_ = 0;
-  u32 u_forward_ = 0, u_right_ = 0, u_up_ = 0, u_tan_half_ = 0, u_night_ = 0, u_sun_up_ = 0, u_time_ = 0;
+  u32 u_forward_ = 0, u_right_ = 0, u_up_ = 0, u_tan_half_ = 0, u_skew_ = 0, u_night_ = 0, u_sun_up_ = 0, u_time_ = 0;
   u32 u_clouds_ = 0, u_exposure_ = 0, u_blast_age_ = 0, u_sun_ = 0, u_moon_ = 0, u_blast_dir_ = 0, u_wind_ = 0;
   u32 u_fog_color_ = 0, u_sun_color_ = 0, u_sun_light_ = 0, u_fog_sun_scatter_ = 0, u_fog_horizon_ = 0;
   UniformCache cache_;

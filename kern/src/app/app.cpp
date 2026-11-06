@@ -254,6 +254,7 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     RenderParams params;
     params.clear_color = g_engine->clear_color;
     params.has_viewport = true;
+    params.reuse_shadow = i > 0;  // one sun shadow map per XR frame, not per eye
     params.viewport = {static_cast<i32>(v[23]), static_cast<i32>(v[24]), static_cast<i32>(v[25]), static_cast<i32>(v[26])};
     RenderStats stats;
     ok = g_engine->renderer.render(params, stats) && ok;

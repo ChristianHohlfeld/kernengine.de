@@ -11,12 +11,13 @@ namespace {
 constexpr const char* kSkyVertex = R"GLSL(#version 300 es
 precision highp float;
 uniform vec3 uForward, uRight, uUp;
-uniform vec2 uTanHalf;
+uniform vec2 uTanHalf, uSkew;
 out vec3 vDir;
 void main() {
   vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
   vec2 ndc = p * 2.0 - 1.0;
-  vDir = uForward + ndc.x * uTanHalf.x * uRight + ndc.y * uTanHalf.y * uUp;
+  // the eye's own frustum (an XR eye's is asymmetric): x / -z = (ndc.x + P[2][0]) / P[0][0]
+  vDir = uForward + (ndc.x + uSkew.x) * uTanHalf.x * uRight + (ndc.y + uSkew.y) * uTanHalf.y * uUp;
   gl_Position = vec4(ndc, 1.0, 1.0);   // far plane: only uncovered pixels pass LEQUAL
 }
 )GLSL";
@@ -115,6 +116,7 @@ bool SkyPass::init() {
   u_right_ = program_.location("uRight");
   u_up_ = program_.location("uUp");
   u_tan_half_ = program_.location("uTanHalf");
+  u_skew_ = program_.location("uSkew");
   u_night_ = program_.location("uNight");
   u_sun_up_ = program_.location("uSunUp");
   u_time_ = program_.location("uTime");
@@ -162,7 +164,15 @@ void SkyPass::draw(const Camera& camera, f32 aspect, const SkyState& state, f32 
   cache_.set_vec3(u_forward_, forward);
   cache_.set_vec3(u_right_, right);
   cache_.set_vec3(u_up_, up);
-  cache_.set_vec2(u_tan_half_, t * (aspect > 0 ? aspect : 1), t);
+  if (camera.has_projection && std::fabs(camera.projection.m[0]) > 1e-6f && std::fabs(camera.projection.m[5]) > 1e-6f) {
+    // a given projection (WebXR eye): its half-angles and its off-centre
+    const f32* m = camera.projection.m;
+    cache_.set_vec2(u_tan_half_, 1.0f / m[0], 1.0f / m[5]);
+    cache_.set_vec2(u_skew_, m[8], m[9]);
+  } else {
+    cache_.set_vec2(u_tan_half_, t * (aspect > 0 ? aspect : 1), t);
+    cache_.set_vec2(u_skew_, 0, 0);
+  }
   cache_.set_float(u_night_, clamp(state.night, 0.0f, 1.0f));
   cache_.set_float(u_sun_up_, sun.z > -0.05f ? 1.0f : 0.0f);
   cache_.set_float(u_time_, static_cast<f32>(std::fmod(time_seconds, 3600.0)));

@@ -123,15 +123,18 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   // the app updates once per XR frame (kern_app_frame_xr). `onFrame(frame, session, space)` runs
   // first each frame (the page's own per-frame work and its controllers: window rAF sleeps in XR).
   let xr = null;
-  const enterXR = async ({onFrame = null, onEnd = null, mode = "immersive-vr"} = {}) => {
+  const enterXR = async ({onFrame = null, onEnd = null, mode = "immersive-vr", scale = 0.8} = {}) => {
     if (xr || !navigator.xr || !e.kern_app_frame_xr) return false;
     const session = await navigator.xr.requestSession(mode, {optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"]});
     await gl.makeXRCompatible?.();
-    const layer = new XRWebGLLayer(session, gl, {antialias: false, depth: true, alpha: false, framebufferScaleFactor: 1});
+    // a lighter layer than the panel's native size (Quest: 0.8 of ~1.8k x 1.9k per eye) with fixed
+    // foveation - a frame that misses the headset's 72 / 90 Hz too often is a frozen headset
+    const layer = new XRWebGLLayer(session, gl, {antialias: false, depth: true, alpha: false, framebufferScaleFactor: scale});
+    try { if ("fixedFoveation" in layer) layer.fixedFoveation = 1; } catch { /* not offered */ }
     session.updateRenderState({baseLayer: layer, depthNear: 0.05, depthFar: 1800});
     const space = await session.requestReferenceSpace("local").catch(() => session.requestReferenceSpace("viewer"));
     const ptr = e.kern_alloc(4 * 27 * 4);
-    xr = {session, layer, space, ptr};
+    xr = {session, layer, space, ptr, w: layer.framebufferWidth, h: layer.framebufferHeight, fails: 0};
     cancelAnimationFrame(handle);
     kern.framebufferOverride = layer.framebuffer;
     e.kern_app_resize(layer.framebufferWidth, layer.framebufferHeight);
@@ -150,7 +153,15 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
         f[o + 23] = vp.x; f[o + 24] = vp.y; f[o + 25] = vp.width; f[o + 26] = vp.height;
       });
       gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
-      if (!e.kern_app_frame_xr(now, views.length, ptr)) console.warn(kern.fail("xr frame"));
+      if (xr.w !== layer.framebufferWidth || xr.h !== layer.framebufferHeight) {
+        xr.w = layer.framebufferWidth; xr.h = layer.framebufferHeight;
+        e.kern_app_resize(xr.w, xr.h);
+      }
+      if (!e.kern_app_frame_xr(now, views.length, ptr)) {
+        // a failed frame is never a black headset for long: the size is put right and it goes on
+        if (++xr.fails % 30 === 1) console.warn(kern.fail("xr frame"));
+        xr.w = 0;
+      } else xr.fails = 0;
     };
     session.requestAnimationFrame(step);
     session.addEventListener("end", () => {
@@ -170,6 +181,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     enterXR,
     exitXR() { xr?.session.end().catch(() => {}); },
     get inXR() { return !!xr; },
+    get xrSpace() { return xr?.space || null; },
     stop() {
       running = false;
       xr?.session.end().catch(() => {});

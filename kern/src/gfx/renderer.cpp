@@ -713,7 +713,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     }
     const u64 key = shadow_->focus_key(focus, lighting.sun_direction, extent) ^ (shadow_revision_ * 0x9e3779b97f4a7c15ull) ^
                     (static_cast<u64>(params.layers) * 0xc2b2ae3d27d4eb4full);
-    if (shadow_key_valid_ && key == shadow_key_) {
+    if (shadow_key_valid_ && (key == shadow_key_ || params.reuse_shadow)) {
       stats.shadow_reused = true;
     } else {
       stats.shadow_draw_calls = shadow_->draw(meshes(), focus, lighting.sun_direction, params.layers, extent);

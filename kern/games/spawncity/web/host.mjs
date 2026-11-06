@@ -398,7 +398,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const baseRatio = () => platform.ceiling;
   const applyRenderScale = h => {
     let s = h?.renderScale;
-    if (!(s > 0) || !canvas.clientWidth) return;
+    // in VR the headset's layer sets the size (app.mjs): the page's canvas must not resize the renderer
+    if (app.inXR || !(s > 0) || !canvas.clientWidth) return;
     // the title covers the game view (the original draws only its 2D flyover there): no 3D pixels
     if (originalView && !ui.playing) s = 2 / Math.max(canvas.clientWidth, 1);
     // simulator.mjs adaptive pixel ratio: slow frames take it down to 0.8 at the least, never below
