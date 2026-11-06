@@ -43,7 +43,7 @@ Scroll kommt als `wheel` (Waffe/Zoom wie das Mausrad), Tippen ist ein Klick (LMB
 | überall | H / K | Mikrofon an/aus / stumm | `voice_control_bindings.mjs:3-4` |
 | überall | L | GPS LIVE | `gps_live_mode.mjs` |
 | Fuß | F | Jet zuerst, sonst wie E; nicht bei Zombie-Reparatur | `pad_actions.mjs:93-103` |
-| tot | R / Enter / Leertaste | Respawn | `desktop_controls.mjs:165` |
+| tot | R / Enter / Leertaste | RESET (Einzelspiel; im Mehrspieler Respawn nach 3 s) | `desktop_controls.mjs:165`, `player_vitals_runtime.mjs` |
 | Fuß | WASD | laufen 5,5 m/s (Diagonale normiert) | `player_walk_mode_v4.mjs:300-304` |
 | Fuß | Shift | sprinten 8,1 m/s | `player_walk_mode_v4.mjs:16,300` |
 | Fuß | Leertaste | springen 3,6 m/s; in der Luft nochmal = Jetpack, halten = Schub | `player_walk_mode_v4.mjs:22,30-36,69` |
@@ -97,7 +97,7 @@ Gemeinsame Aktionen (`pad_actions.mjs:7-18,54-89`):
 | VIEW | antippen (< 400 ms, beim Loslassen) Kamera; halten > 0,42 s große Karte; 1,5 s nach dem Öffnen kein Tipp |
 | MENU | Einstellungen auf/zu; Titel: START |
 | R3 | Mikro an/aus beim Loslassen; R3 + Y stumm (`voice_control_bindings.mjs:7-13`) |
-| A / Y tot | Respawn |
+| A / Y tot | RESET (Einzelspiel) |
 
 | Modus | Achse/Knopf | Wirkung | Quelle |
 |---|---|---|---|
@@ -224,5 +224,10 @@ Touch:
 45. Touch-Schüsse halten die Kadenz der Waffe (Glock 110 ms, Sniper 1150 ms; MP holt nach). **behoben**
 
 Bleibt (nur mit Engine-Änderung, siehe README „Später in die Engine“): Sprint nur bei Vorwärts-
-Anteil > 0,3 (Kerns Soldat; SpawnCity sprintet in jede Richtung); Respawn automatisch nach 3 s statt
-per Taste/Knopf (die Tasten werden dafür verschluckt); Kopfblick zu Fuß über die Minikarte (Kerns Soldatenkamera hat keinen Zusatzblick).
+Anteil > 0,3 (Kerns Soldat; SpawnCity sprintet in jede Richtung); Kopfblick zu Fuß über die Minikarte (Kerns Soldatenkamera hat keinen Zusatzblick).
+
+Tod im Einzelspiel (behoben): der Pilot bleibt liegen, wo er fiel, bis R / Enter / Leertaste, Pad A / Y
+oder Touch RESET den vollen RESET auslösen (`player_vitals_runtime.mjs`, `desktop_controls.mjs:165`);
+im Mehrspieler kommt er nach 3 s zurück. Kerns Spieler-Respawn lässt sich ohne Engine-Änderung nicht
+abschalten: die Engine belebt nach 0,5 s (kleinster `respawn_delay`), das Spiel legt ihn sofort wieder
+hin (`ctl_keep_down`). Rest: Kerns „Respawned“-Ton und -Meldung erscheinen dabei einmal.

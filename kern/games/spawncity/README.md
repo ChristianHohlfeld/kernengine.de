@@ -780,5 +780,5 @@ dort (Stand sc-m3-gaps):
     Soldaten-Layouts; `InputArbiter` mit Pad-Eingabe-Zustand und Plattformmeldung; im App-Host ein
     `mousemove`-Strom unter Pointer-Lock (begrenzt je Ereignis) und ein Lock-Status; `Key` um `+ - /`
     erweitern; im Soldaten: Schuss durch einen Bildschirmpunkt (Touch-Feuer am Finger für die
-    Kern-Waffen MP/Glock/Sniper), Sprint in jede Richtung, Respawn per Aufruf statt nach Zeit,
+    Kern-Waffen MP/Glock/Sniper), Sprint in jede Richtung, Spieler-Respawn abschaltbar (das Spiel legt den Piloten heute nach Kerns 0,5-s-Respawn wieder hin),
     Blickkurve/Raten der Pad-Sticks als Parameter (heute rechnet das Spiel sie und gibt Grad weiter).

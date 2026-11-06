@@ -162,7 +162,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   // pad_actions.mjs); in multiplayer the respawn comes by itself after 3 s (vs_combat_presentation.mjs)
   if (!alive) {
     C.aiming = false;
-    if (!net_.active() && (in.pressed(Key::r) || in.pressed(Key::enter) || in.pressed(Key::space) || ph(kPadA) || ph(kPadY))) command("reset");
+    if (!(net_.active() && net_.connected()) && (in.pressed(Key::r) || in.pressed(Key::enter) || in.pressed(Key::space) || ph(kPadA) || ph(kPadY))) command("reset");
     return;
   }
 
@@ -1243,7 +1243,7 @@ bool Game::ctl_keep_down(bool engine_dead, f32 now) {
     ui_reset();
     return false;
   }
-  if (net_.active() && D.respawned && now - D.at >= kMpRespawnS) {
+  if (net_.active() && net_.connected() && D.respawned && now - D.at >= kMpRespawnS) {
     const Vec3 spawn = D.spawn;
     ctl_revive();
     world_->teleport(soldier_, spawn);
@@ -1271,7 +1271,7 @@ void Game::ctl_revive() {
 f32 Game::ctl_respawn_in() const {
   const ControlsState::Down& D = ctl_.down;
   if (!D.on) return -1;
-  if (!net_.active()) return 0;  // waits for the RESET
+  if (!(net_.active() && net_.connected())) return 0;  // waits for the RESET
   return std::fmax(0.0f, kMpRespawnS - (world_->sim_time() - D.at));
 }
 
