@@ -98,6 +98,16 @@
     bottom: calc(max(12px, var(--solo-safe-bottom, env(safe-area-inset-bottom))) + 112px) !important;
     width: 84px !important; height: 84px !important; border-radius: 50% !important;
     font: 900 13px/1 Inter, system-ui, sans-serif !important; letter-spacing: .12em !important; }
+  /* sound and music switches: what they are and whether they are on, at a glance */
+  html body #soundSwitch, html body #musicSwitch { flex-direction: column !important; gap: 2px !important; height: auto !important; min-height: 40px !important; padding: 4px 6px !important; border-radius: 10px !important; transition: background .15s, border-color .15s; }
+  html body #soundSwitch::after, html body #musicSwitch::after { font: 800 8px/1 Inter, system-ui, sans-serif; letter-spacing: .1em; white-space: nowrap; }
+  html body #soundSwitch[data-on="1"]::after { content: "TON AN"; color: #7ff0c5; }
+  html body #soundSwitch[data-on="0"]::after { content: "TON AUS"; color: #ff9a8a; }
+  html body #musicSwitch[data-on="1"]::after { content: "MUSIK AN"; color: #7ff0c5; }
+  html body #musicSwitch[data-on="0"]::after { content: "MUSIK AUS"; color: #ff9a8a; }
+  html body #soundSwitch[data-on="0"], html body #musicSwitch[data-on="0"] { background: #4a1a1ae0 !important; border-color: #ff6b5a !important; }
+  html body #soundSwitch[data-on="0"] svg, html body #musicSwitch[data-on="0"] svg { opacity: .7; }
+  html body #soundSwitch:active, html body #musicSwitch:active { transform: scale(.94); }
   /* no GPS button (title and game): the live-GPS walk is gone */
   #gpsLiveButton, #gpsLiveHud, #scGps { display: none !important; }
   /* jet_mode.mjs: KANONE left of the stick (on-foot-mode hides the foot fire button) */
