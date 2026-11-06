@@ -83,6 +83,7 @@ void Game::grenade_bounce(Projectile& p, Vec3 point, Vec3 n, f32 now) {
   if (sp > 0.05f) p.pos = p.pos + p.vel * (0.020f / sp);
   // audioGrenadeBounce: gain .16 + v * .018 (.16 .. .44), rate .92 + n * .035 + .02 min(v, 10) (.88 .. 1.32)
   osfx("gameplay_final_runtime_v2.audioGrenadeBounce", point, impact, static_cast<f32>(p.bounces));
+  if (p.id == Id::grenade_launcher) bounce_fx_[bounce_fx_next_++ % 8] = {point + n * 0.008f, n, now, clampf(impact / 12, 0.55f, 1.35f)};
   world_->play_sound(combat_sfx(combat_audio::Kind::bounce), point, clampf(0.16f + impact * 0.018f, 0.16f, 0.44f) / 0.44f * 0.5f,
                      clampf(0.92f + p.bounces * 0.035f + 0.02f * std::fmin(impact, 10.0f), 0.88f, 1.32f), true);
   if (p.bounces >= kMaxBounces && kern::length(p.vel) < 2.8f) p.vel = p.vel * 0.38f;
@@ -291,8 +292,16 @@ void Game::foot_rounds_update(f32 dt) {
   // knifeAt: the blade connects at the strike frame, 130 ms after the press, along the ray then
   if (g.knife_due >= 0 && now >= g.knife_due) {
     g.knife_due = -1;
+    const bool was = ctl_.aim_point;
+    const f32 wx = ctl_.aim_x, wy = ctl_.aim_y;
+    ctl_.aim_point = g.knife_at_point;
+    ctl_.aim_x = g.knife_x;
+    ctl_.aim_y = g.knife_y;
     if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife && melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true, 12))  // knifeStrike momentumNs 12
       osfx("gameplay_final_runtime_v2.knifeHit", cam_.eye, 1);
+    ctl_.aim_point = was;
+    ctl_.aim_x = wx;
+    ctl_.aim_y = wy;
   }
 }
 
@@ -362,6 +371,10 @@ void Game::melee_attack() {
     if (now - g.knife_last < kKnifeRecover) return;
     g.knife_last = now;
     g.knife_due = now + kKnifeStrike;
+    g.knife_at_point = ctl_.aim_point;
+    g.knife_x = ctl_.aim_x;
+    g.knife_y = ctl_.aim_y;
+    look_.vm_fire_at = now;  // weaponFired("knife"): the slash across the view (game_look.cpp)
     osfx("gameplay_final_runtime_v2.knifeSwish", cam_.eye);
     return;
   }
@@ -377,6 +390,8 @@ void Game::melee_attack() {
     if (now - g.fist_last[h] < kFistRecover[h]) continue;
     const bool combo = now - g.fist_last[1 - h] < kCombo;
     g.fist_last[h] = now;
+    look_.vm_fire_at = now;  // weaponFired("fists", {hand}): that hand jabs (game_look.cpp)
+    look_.vm_punch = h == 0 ? 1 : 0;
     // PUNCH_NS [40, 26] x 1.2 on a combo
     osfx("gameplay_final_runtime_v2.punchWhoosh", cam_.eye, h, combo ? 1 : 0);
     if (melee_hit(kPunchReach + 0.4f, 1.25f, std::round(kFistDmg[h] * (combo ? 1.35f : 1.0f)), false, (h ? 26.0f : 40.0f) * (combo ? 1.2f : 1.0f)))

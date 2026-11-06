@@ -43,10 +43,10 @@ class Marks {
   std::vector<Chunk> rubble_;
   u32 scorch_cursor_ = 0, soot_cursor_ = 0, breach_cursor_ = 0, rubble_cursor_ = 0;
   std::vector<CityStream::Wall> near_;
-  u32 ground_mesh_ = 0, wall_mesh_ = 0;
+  u32 ground_mesh_[3] = {}, wall_mesh_ = 0;
   bool dirty_ = false;
   Stats stats_;
-  kern::MeshData ground_data_, wall_data_;
+  kern::MeshData ground_data_[3], wall_data_;  // scorches: the char, then two fading rims
   const CityStream* city_ = nullptr;
 };
 

@@ -787,6 +787,20 @@ void Game::draw_military() {
     A.put(CombatArt::fade_ring, m * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, 1.5708f), {1, 1, 1}) * Mat4::scale({band, band, tube * 0.2f}), Vec3{1.0f, 0.42f, 0.06f} * 3.0f, 1);
     A.put(CombatArt::fade_sphere, m * Mat4::scale({2 * r * 1.28f, 2 * r * 1.28f, 2 * r * 1.28f}), Vec3{0.0f, 1.0f, 0.13f} * 2.0f, 0.24f);
   }
+  // updateGrenadeBounceFx: e = 1 - (1-t)^3; the ring (r .040 .. .058, 0xffb347) x strength (.75 + 3.1 e),
+  // opacity .72 (1-t)^1.35; the flash (r .020, 0xf4fff8) x strength (1 + .7 e), opacity .95 (1-t)^2.2
+  for (const BounceFx& b : bounce_fx_) {
+    const f32 t = (now - b.born) / 0.18f;
+    if (t < 0 || t >= 1) continue;
+    const f32 e = 1 - (1 - t) * (1 - t) * (1 - t);
+    const Vec3 n = kern::normalize(b.n, {0, 0, 1});
+    const Vec3 ax = kern::cross({0, 0, 1}, n);
+    const f32 al = kern::length(ax);
+    const Quat q = al > 1e-4f ? Quat::axis_angle(ax * (1 / al), std::acos(clampf(n.z, -1, 1))) : n.z < 0 ? Quat::axis_angle({1, 0, 0}, kPi) : Quat{};
+    const f32 ring = b.strength * (0.75f + 3.1f * e) * 0.049f / 0.8f, flash = b.strength * (1 + 0.7f * e) * 0.04f;
+    A.put(CombatArt::fade_ring, Mat4::translate(b.p) * Mat4::trs({}, q, {1, 1, 1}) * Mat4::scale({ring, ring, 0.009f / 0.2f * 0.25f}), Vec3{1.0f, 0.7f, 0.28f} * 3.0f, 0.72f * std::pow(1 - t, 1.35f));
+    A.put(CombatArt::fade_sphere, Mat4::translate(b.p) * Mat4::scale({flash, flash, flash}), Vec3{0.96f, 1.0f, 0.97f} * 3.0f, 0.95f * std::pow(1 - t, 2.2f));
+  }
   // updateRocketLaser / placeDot: the launcher's red dot while it is in hand on foot - big, pulsing a
   // little, pulled a hair toward the viewer so it never sinks into the wall
   if (world_placed_ && mode_ == Mode::foot && foot_weapon_ == weapons::Id::rocket && !player_dead_) {

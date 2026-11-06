@@ -36,7 +36,7 @@ constexpr i32 kTiers = 5;
 constexpr Tier kTier[kTiers] = {
     {"minimal", 16, 35, 1, 0, 70, 90, 2, 0.6f},
     {"niedrig", 30, 50, 4, 0, 110, 140, 3, 0.75f},
-    {"mittel", 44, 70, 4, 1, 140, 180, 4, 0.85f},
+    {"mittel", 44, 70, 4, 1, 140, 180, 4, 1.0f},  // the original draws at its full ceiling until frames are slow
     {"hoch", 64, 90, 9, 2, 170, 220, 6, 1.0f},
     {"maximal", 80, 110, 9, 3, 170, 220, 6, 1.0f},
 };

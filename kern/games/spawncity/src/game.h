@@ -398,6 +398,11 @@ class Game {
   // gameplay_final_runtime_v2.mjs visualBlast: every explosion's orange core and flat shock ring (540 ms)
   struct VisualBlast { Vec3 p; f32 born = 0, scale = 1; };
   std::vector<VisualBlast> visual_blasts_;
+  // spawnGrenadeBounceFx: a launcher round's bounce - an orange ring on the surface and a white
+  // flash, 180 ms (a pool of 8, the oldest reused)
+  struct BounceFx { Vec3 p, n{0, 0, 1}; f32 born = -99, strength = 1; };
+  BounceFx bounce_fx_[8];
+  u32 bounce_fx_next_ = 0;
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);

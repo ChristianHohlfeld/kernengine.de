@@ -223,8 +223,9 @@ void VehicleArt::drone(const Mat4& body, const Vec3* motors, const f32* rotor_an
 }
 
 void VehicleArt::parachute(Vec3 pilot, f32 heading, bool open) {
+  // the pilot himself is the player's character (jet_mode.mjs makeChute buildCharacter, arms up to
+  // the risers): Game::draw_remote_people draws him with the people
   const Mat4 base = at(pilot) * rot({0, 0, 1}, heading);
-  put(pilot_, base * at({0, 0, 0}));
   if (!open) return;
   // Canopy 4.6 m above the harness, risers from the shoulders to its rim.
   const Vec3 top{0, 0, 4.6f};

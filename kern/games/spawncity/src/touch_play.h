@@ -7,6 +7,7 @@
 // edge_hud_layout.mjs. No GameWorld: the game reads sticks, fingers and button edges each frame,
 // the page draws view_json() with Kern's TouchOverlay. Coordinates: CSS px of the viewport.
 #pragma once
+#include <algorithm>
 
 #include <string>
 #include <vector>
@@ -52,6 +53,7 @@ struct TouchFire {
   bool fresh = true;               // went down since the game last looked
   i32 hand = 0;                    // fists: 0 right half, 1 left half (foot_touch_controller.mjs)
   f32 depth = -1;                  // the aim depth along its screen ray, resolved when it went down (m)
+  bool lifted = false;             // let go before the game saw it: kept for one read (a quick tap)
 };
 
 class TouchPlay {
@@ -80,6 +82,8 @@ class TouchPlay {
   /// Sprint (pushed to the rim forwards: m >= .90 and y < -.35).
   bool sprint() const;
   std::vector<TouchFire>& fires() { return fires_; }
+  /// After the game's frame read the fingers: the taps let go in between are gone now.
+  void drop_lifted() { fires_.erase(std::remove_if(fires_.begin(), fires_.end(), [](const TouchFire& f) { return f.lifted; }), fires_.end()); }
   /// Drone altitude pad axis (-1..1, up positive), 0 when released.
   f32 clearance() const { return clearance_; }
   /// Grenade button held: drag up in px since it went down.

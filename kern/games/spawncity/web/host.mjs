@@ -381,7 +381,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (!(s > 0) || !canvas.clientWidth) return;
     // the title covers the game view (the original draws only its 2D flyover there): no 3D pixels
     if (originalView && !ui.playing) s = 2 / Math.max(canvas.clientWidth, 1);
-    const r = baseRatio() * s, w = Math.max(1, Math.round(canvas.clientWidth * r)), hh = Math.max(1, Math.round(canvas.clientHeight * r));
+    // simulator.mjs adaptive pixel ratio: slow frames take it down to 0.8 at the least, never below
+    const r = Math.max(Math.min(baseRatio(), 0.8), baseRatio() * s), w = Math.max(1, Math.round(canvas.clientWidth * r)), hh = Math.max(1, Math.round(canvas.clientHeight * r));
     if (canvas.width === w && canvas.height === hh) return;
     canvas.width = w; canvas.height = hh;
     e.kern_app_resize(w, hh);

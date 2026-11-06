@@ -236,7 +236,7 @@ void Game::update_enemies(f32 dt) {
     const EnemySpec& s = enemy_spec(e.type);
     if (p.hp < e.last_hp) { e.hits += 1; p.hp = e.last_hp; e.next_shot = std::fmin(e.next_shot, now + 0.35f); }  // every hit costs 1
     if (e.hits >= s.hp) { people_.blast(p.pos + Vec3{0, 0, 0.9f}, 0.25f, 1e5f, true, now); continue; }
-    if (!have) continue;
+    if (!have || e.hold) continue;
     const f32 dx = tp.x - p.pos.x, dy = tp.y - p.pos.y, d = std::hypot(dx, dy);
     if (d > 300 || (e.retreat && d > 120 && spawn_unseen(p.pos, 2))) { p.state = People::State::gone; e.person = -1; continue; }
     const f32 want = std::atan2(dy, dx);
@@ -591,18 +591,46 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     C.race.last_pass = now - 1;
     return true;
   }
+  if (cmd == "melee probe") {
+    // tests: one knife blow straight through the view, now
+    char b[96];
+    const bool hit = melee_hit(1.9f, 1.2f, 45, true, 12);
+    Vec3 dir;
+    const Vec3 eye = aim_ray(dir);
+    std::snprintf(b, sizeof b, "%s eye %.1f %.1f %.1f dir %.2f %.2f %.2f", hit ? "hit" : "miss", eye.x, eye.y, eye.z, dir.x, dir.y, dir.z);
+    out = b;
+    return true;
+  }
+  if (cmd == "enemy hp") {
+    // tests: the last enemy's health
+    if (C.enemies.empty() || C.enemies.back().person < 0) { out = "none"; return true; }
+    const People::Person& q = people_.at(C.enemies.back().person);
+    char b[64];
+    std::snprintf(b, sizeof b, "%d hits at %.1f m", static_cast<int>(C.enemies.back().hits), dist2d(q.pos, player_position()));
+    out = b;
+    return true;
+  }
   if (starts("enemy ")) {
-    const std::string t = cmd.substr(6);
+    std::string t = cmd.substr(6);
+    // "enemy near": tests - a cop at arm's length (1.3 m) in front, for the fists and the knife
+    const bool near = t == "near";
+    if (near) {
+      t = "cop";
+      for (EnemyAi& o : C.enemies)
+        if (o.hold && o.person >= 0) { people_.at(o.person).state = People::State::gone; o.person = -1; }
+    }
     const EnemyType type = t == "heavy" ? EnemyType::heavy : t == "swat" ? EnemyType::swat : EnemyType::cop;
     const Vec3 me = player_position();
     const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
-    const Vec3 p{me.x + fwd.x * 20, me.y + fwd.y * 20, 0};
+    const f32 dist = near ? 1.3f : 20.0f;
+    const Vec3 p{me.x + fwd.x * dist, me.y + fwd.y * dist, near ? me.z : 0};
     const EnemySpec& s = enemy_spec(type);
     EnemyAi e;
     e.type = type;
     e.person = people_.add_scripted(People::Kind::enemy, p, 0, 1e4f, rng_.next(), s.color, {0.08f, 0.07f, 0.12f}, {0.88f, 0.7f, 0.58f}, static_cast<u8>(type));
     e.last_hp = 1e4f;
     e.next_shot = now + 1;
+    e.hold = near;
     C.enemies.push_back(e);
     out = s.name;
     return true;

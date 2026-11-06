@@ -106,6 +106,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
     case Mode::jet: jet_input(e, dt); break;
     case Mode::parachute: parachute_input(e, dt); break;
   }
+  pad_touch_.drop_lifted();
   C.look.step(dt, C.keep_look);
   // hand grenade (hand_grenade.mjs): T held / LB held / the button held = cooking, let go = throw;
   // regeneration in every mode, a cooking grenade drops when the pilot leaves the foot mode
@@ -246,7 +247,41 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
     from = cam_.eye;
     dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   }
-  const RayResult r = cast(world_->physics(), from, dir, 1500, {}, kCatWorld);
+  // fighter_jets.mjs screenGround / aimPoint: the city and the ground along the ray, not the
+  // player's own body (the eye sits inside it in FPV: a ray from there met it first and put the
+  // laser at his feet) - so the player's body is skipped and anything within 2 m of the eye too.
+  const kern::physics::Body self = mode_ == Mode::drone ? body(drone_actor_) : mode_ == Mode::jet ? body(jet_actor_) : body(soldier_);
+  RayResult r;
+  f32 skipped = 0;
+  for (int k = 0; k < 4; ++k) {
+    r = cast(world_->physics(), from + dir * skipped, dir, 2500 - skipped, self, kCatWorld);
+    if (!r.hit || kern::length(r.point - from) > 2.0f) break;
+    skipped = kern::length(r.point - from) + 0.05f;
+    r.hit = false;
+  }
+  if (!r.hit && dir.z < 0) {
+    // terrainRayDistance: the ground past the colliders (the height field, marched and halved)
+    f32 lo = 0, hi = -1;
+    for (f32 t = 4; t <= 2500; t += 4) {
+      const Vec3 q = from + dir * t;
+      if (q.z <= city_.ground_height(q.x, q.y)) { hi = t; break; }
+      lo = t;
+    }
+    if (hi > 0) {
+      for (int k = 0; k < 12; ++k) {
+        const f32 m = (lo + hi) / 2;
+        const Vec3 q = from + dir * m;
+        (q.z <= city_.ground_height(q.x, q.y) ? hi : lo) = m;
+      }
+      r.hit = true;
+      r.point = from + dir * hi;
+    }
+  }
+  if (!r.hit && at_point) {
+    // screenGround: a tap on the sky places nothing
+    osfx("fighter_jets.beep", cam_.eye, 2);  // beep([220], .12, .08)
+    return;
+  }
   const Vec3 at = r.hit ? r.point : from + dir * 180.0f;
   C.aim_lock_until = C.clock + 0.6f;
   osfx("fighter_jets.beep", at, 0);  // place(): beep([740, 990], .06, .11)
@@ -1164,6 +1199,15 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     } else if (cmd == "strike aim") ctl_strike_start();
     else if (cmd == "strike go") ctl_strike_confirm(false, 0, 0);
     else if (cmd == "strike cancel") C.aiming = false;
+    else if (cmd == "strike where") {
+      // tests: the last laser mark and the player, x y each
+      const Vec3 me = player_position();
+      const Vec3 f = combat_.flares.empty() ? Vec3{} : combat_.flares.back().p;
+      char b[96];
+      std::snprintf(b, sizeof b, "%.1f %.1f %.1f %.1f %d", f.x, f.y, me.x, me.y, static_cast<int>(combat_.flares.size()));
+      out = b;
+      return true;
+    }
     else return false;
     out = C.aiming ? "aiming" : "idle";
     return true;

@@ -351,7 +351,13 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
   switch (f.kind) {
     case Finger::move: move_ = {}; move_id_ = -1; break;
     case Finger::look: look_ = look_edge_ = {}; look_id_ = -1; break;
-    case Finger::fire: fires_.erase(std::remove_if(fires_.begin(), fires_.end(), [&](const TouchFire& fi) { return fi.id == id; }), fires_.end()); break;
+    case Finger::fire:
+      // a tap that came and went inside one frame still fires once (pointerdown fires in the
+      // original: knifeAt / punchAt / fireAt): kept, marked lifted, dropped after the frame read it
+      for (TouchFire& fi : fires_)
+        if (fi.id == id && fi.fresh) fi.lifted = true;
+      fires_.erase(std::remove_if(fires_.begin(), fires_.end(), [&](const TouchFire& fi) { return fi.id == id && !fi.lifted; }), fires_.end());
+      break;
     case Finger::clearance: clearance_ = 0; break;
     case Finger::strike:
       if (type == 2) { strike_tap_ = true; strike_x_ = x; strike_y_ = y; }
@@ -382,7 +388,10 @@ void TouchPlay::release_all() {
   for (const Finger& f : fingers_)
     if (f.kind == Finger::press) released_.push_back(f.button);
   fingers_.clear();
-  fires_.clear();
+  // a tap not yet seen by the game still fires once (the touchend that lets every finger go comes
+  // right after a quick tap's pointerup - before the frame)
+  for (TouchFire& f : fires_) f.lifted = f.lifted || f.fresh;
+  fires_.erase(std::remove_if(fires_.begin(), fires_.end(), [](const TouchFire& f) { return !f.lifted; }), fires_.end());
   move_ = look_ = look_edge_ = drag_ = {};
   move_id_ = look_id_ = -1;
   clearance_ = 0;

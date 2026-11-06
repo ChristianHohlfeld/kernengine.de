@@ -235,30 +235,41 @@ void Marks::update(f32 now, kern::physics::World& w) {
 
 void Marks::rebuild(const CityStream& city) {
   const Terrain& t = city.terrain();
-  ground_data_.clear();
+  for (kern::MeshData& g : ground_data_) g.clear();
   wall_data_.clear();
   constexpr i32 kSeg = 18;
-  // Ground scorches: a ragged disc draped on the terrain (above the street surface).
+  // Ground scorches (world_impacts.mjs SCORCH_FS): a ragged disc draped on the terrain, charred dark
+  // in the middle (.012) to soot at the rim (.05), alpha .6 that fades out over the outer 30 % -
+  // "softer than a painted disc: the ground still shows through at the rim". Kern has no per-vertex
+  // alpha: the char and the two outer bands are three blended meshes (alpha .6 / .4 / .15).
   for (const Scorch& s : scorches_) {
     const f32 sd = static_cast<f32>(s.seed % 1000) / 100;
-    const u32 base = ground_data_.vertex_count();
     auto at = [&](f32 x, f32 y) { return Vec3{x, y, t.height(x, y) + 0.16f}; };
-    ground_data_.push(at(s.c.x, s.c.y), {0, 0, 1}, {0.015f, 0.012f, 0.01f}, {});
-    const f32 rings[3] = {0.35f, 0.7f, 1.0f};
-    const Vec3 cols[3] = {{0.02f, 0.017f, 0.014f}, {0.04f, 0.034f, 0.028f}, {0.1f, 0.085f, 0.065f}};
-    for (i32 k = 0; k < 3; ++k)
+    auto ring_at = [&](f32 k, i32 i) {
+      const f32 a = 2 * kPi * static_cast<f32>(i) / kSeg, rr = s.r * k * ragged(a, sd);
+      return at(s.c.x + std::cos(a) * rr, s.c.y + std::sin(a) * rr);
+    };
+    auto char_col = [](f32 k) {  // mix(.05, .012, smoothstep(1, .35, k))
+      const f32 u = clampf((1 - k) / 0.65f, 0, 1), c = u * u * (3 - 2 * u);
+      return Vec3{0.05f, 0.045f, 0.04f} * (1 - c) + Vec3{0.012f, 0.01f, 0.01f} * c;
+    };
+    auto band = [&](kern::MeshData& g, f32 k0, f32 k1) {
+      const u32 base = g.vertex_count();
+      for (i32 i = 0; i < kSeg; ++i) g.push(ring_at(k0, i), {0, 0, 1}, char_col(k0), {});
+      for (i32 i = 0; i < kSeg; ++i) g.push(ring_at(k1, i), {0, 0, 1}, char_col(k1), {});
       for (i32 i = 0; i < kSeg; ++i) {
-        const f32 a = 2 * kPi * static_cast<f32>(i) / kSeg, rr = s.r * rings[k] * ragged(a, sd);
-        ground_data_.push(at(s.c.x + std::cos(a) * rr, s.c.y + std::sin(a) * rr), {0, 0, 1}, cols[k], {});
+        const u32 j = (i + 1) % kSeg, a0 = base + i, a1 = base + j, b0 = a0 + kSeg, b1 = a1 + kSeg;
+        g.indices.insert(g.indices.end(), {a0, b0, b1, a0, b1, a1});
       }
-    for (i32 i = 0; i < kSeg; ++i) {
-      const u32 j = (i + 1) % kSeg;
-      ground_data_.indices.insert(ground_data_.indices.end(), {base, base + 1 + i, base + 1 + j});
-      for (u32 k = 0; k < 2; ++k) {
-        const u32 a0 = base + 1 + k * kSeg + i, a1 = base + 1 + k * kSeg + j, b0 = a0 + kSeg, b1 = a1 + kSeg;
-        ground_data_.indices.insert(ground_data_.indices.end(), {a0, b0, b1, a0, b1, a1});
-      }
-    }
+    };
+    kern::MeshData& c = ground_data_[0];
+    const u32 base = c.vertex_count();
+    c.push(at(s.c.x, s.c.y), {0, 0, 1}, char_col(0), {});
+    for (i32 i = 0; i < kSeg; ++i) c.push(ring_at(0.35f, i), {0, 0, 1}, char_col(0.35f), {});
+    for (i32 i = 0; i < kSeg; ++i) c.indices.insert(c.indices.end(), {base, base + 1 + i, base + 1 + static_cast<u32>((i + 1) % kSeg)});
+    band(c, 0.35f, 0.7f);
+    band(ground_data_[1], 0.7f, 0.86f);
+    band(ground_data_[2], 0.86f, 1.0f);
   }
   // Wall marks in the wall's plane (dir along the wall, z up).
   auto wall_disc = [&](const WallMark& m, f32 inner, Vec3 c_in, f32 outer_k, Vec3 c_out, f32 seed) {
@@ -344,8 +355,13 @@ void Marks::draw(WorldArt& art, kern::physics::World& w, f32 now) {
     m.roughness = 1;
     m.cast_shadow = false;
     m.double_sided = true;
-    art.set_mesh(ground_mesh_, ground_data_, m);
     art.set_mesh(wall_mesh_, wall_data_, m);
+    const f32 alphas[3] = {0.6f, 0.4f, 0.15f};
+    for (int k = 0; k < 3; ++k) {
+      kern::Material g = m;
+      g.color = {1, 1, 1, alphas[k]};
+      art.set_mesh(ground_mesh_[k], ground_data_[k], g);
+    }
     dirty_ = false;
   }
   for (const Chunk& c : rubble_) {

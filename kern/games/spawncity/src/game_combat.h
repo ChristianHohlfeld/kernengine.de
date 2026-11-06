@@ -69,6 +69,7 @@ struct EnemyAi {
   f32 next_shot = 0, hits = 0, strafe = 1, last_hp = 0;
   i32 burst_left = 0;
   bool retreat = false;
+  bool hold = false;  // tests: a dummy that stands and never shoots
 };
 struct EnemyRocket { Vec3 p, v; f32 life = 0; };
 
