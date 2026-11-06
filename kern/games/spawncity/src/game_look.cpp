@@ -67,25 +67,35 @@ void boomstick(MeshData& m, MeshData& g) {
   arm(m, {0, -0.15f, -0.095f}, 1);
 }
 
-/// ROCKET LAUNCHER (buildRocketLauncher): gunmetal tube, open bore, guidance box with a red lens.
+/// ROCKET LAUNCHER (Kern, after buildRocketLauncher): a compact olive shoulder tube - flared
+/// venturi behind, a shroud and the dark bore in front, two bands, an optic on top with its lens,
+/// the laser module with the red lens beside the tube, pistol and fore grip. Shorter than before
+/// (0.95 m instead of 1.13 m) and held lower and further right: it frames the view, not fills it.
 void rocket_launcher(MeshData& m, MeshData& g) {
-  cyl(m, 0.068f, 0.96f, 0x2b3038, {0, 0.03f, -0.35f}, 18);          // main tube
-  cyl(m, 0.084f, 0.11f, 0x121418, {0, 0.03f, -0.81f}, 18);          // muzzle shroud
-  cyl(m, 0.058f, 0.012f, 0x030303, {0, 0.03f, -0.867f}, 16);        // open bore
-  for (f32 z : {-0.05f, -0.3f, -0.62f}) cyl(m, 0.072f, 0.022f, 0x8a9199, {0, 0.03f, z}, 18);  // rings
-  cyl(m, 0.098f, 0.15f, 0x121418, {0, 0.03f, 0.18f}, 18);           // rear venturi
-  cyl(m, 0.086f, 0.012f, 0x030303, {0, 0.03f, 0.258f}, 16);         // rear bore
-  box(m, {0.05f, 0.03f, 0.5f}, 0x121418, {0, 0.105f, -0.36f});      // top rail
-  box(m, {0.06f, 0.17f, 0.08f}, 0x1b1d20, {0, -0.115f, -0.14f});    // pistol grip
-  box(m, {0.055f, 0.12f, 0.07f}, 0x1b1d20, {0, -0.09f, -0.475f});   // fore grip
-  box(m, {0.012f, 0.05f, 0.11f}, 0x121418, {0, -0.025f, -0.17f});   // trigger guard
-  box(m, {0.06f, 0.075f, 0.24f}, 0x2b3038, {-0.095f, 0.06f, -0.46f});  // guidance unit
-  box(m, {0.07f, 0.012f, 0.25f}, 0x121418, {-0.095f, 0.104f, -0.46f});
-  cyl(m, 0.022f, 0.02f, 0x8a9199, {-0.095f, 0.06f, -0.585f});
-  glow_cyl(g, 0.015f, 0.012f, kGlowRed, {-0.095f, 0.06f, -0.597f});  // laser lens
-  glow_box(g, {0.014f, 0.014f, 0.014f}, kGlowAmber, {-0.128f, 0.08f, -0.38f});
-  glow_box(g, {0.014f, 0.014f, 0.014f}, kGlowRed, {-0.128f, 0.08f, -0.355f});
-  arm(m, {0, -0.14f, -0.145f}, 1);
+  constexpr u32 olive = 0x3e4a30, dark = 0x15181b, band = 0x262d1e, steel = 0x7d848b;
+  cyl(m, 0.058f, 0.76f, olive, {0, 0.03f, -0.27f}, 20);              // main tube (+.11 .. -.65)
+  cyl(m, 0.071f, 0.08f, dark, {0, 0.03f, -0.67f}, 20);               // muzzle shroud
+  cyl(m, 0.05f, 0.012f, 0x030303, {0, 0.03f, -0.712f}, 16);          // open bore
+  for (f32 z : {-0.12f, -0.52f}) cyl(m, 0.061f, 0.035f, band, {0, 0.03f, z}, 20);  // bands
+  cyl(m, 0.066f, 0.07f, dark, {0, 0.03f, 0.13f}, 20);                // rear cap
+  cyl(m, 0.08f, 0.05f, dark, {0, 0.03f, 0.19f}, 20);                 // venturi flare
+  cyl(m, 0.068f, 0.012f, 0x030303, {0, 0.03f, 0.216f}, 16);          // rear bore
+  // the optic: a body on a mount, the eyepiece behind, the objective in front
+  box(m, {0.03f, 0.03f, 0.08f}, dark, {0, 0.098f, -0.22f});          // mount
+  cyl(m, 0.026f, 0.17f, dark, {0, 0.135f, -0.23f}, 14);              // optic body
+  cyl(m, 0.03f, 0.03f, 0x23282d, {0, 0.135f, -0.33f}, 14);           // objective bell
+  cyl(m, 0.022f, 0.006f, 0x1c3a52, {0, 0.135f, -0.348f}, 14);        // objective glass
+  // the laser module on the left of the tube
+  box(m, {0.05f, 0.055f, 0.15f}, 0x2b3038, {-0.085f, 0.03f, -0.47f});
+  cyl(m, 0.018f, 0.02f, steel, {-0.085f, 0.03f, -0.555f}, 12);
+  glow_cyl(g, 0.012f, 0.01f, kGlowRed, {-0.085f, 0.03f, -0.566f});   // laser lens
+  glow_box(g, {0.012f, 0.012f, 0.012f}, kGlowRed, {-0.112f, 0.045f, -0.43f});
+  glow_box(g, {0.012f, 0.012f, 0.012f}, kGlowAmber, {-0.112f, 0.045f, -0.455f});
+  // grips
+  box(m, {0.05f, 0.15f, 0.07f}, dark, {0, -0.1f, -0.1f});            // pistol grip
+  box(m, {0.012f, 0.045f, 0.09f}, dark, {0, -0.035f, -0.135f});      // trigger guard
+  box(m, {0.048f, 0.11f, 0.06f}, dark, {0, -0.075f, -0.4f});         // fore grip
+  arm(m, {0, -0.13f, -0.105f}, 1);
 }
 
 /// FISTS (buildFists): one taped fist with forearm and sleeve; the left one is its mirror.
@@ -568,7 +578,9 @@ void Game::look_view_models(f32 dt) {
     case 1: {
       // Launchers: held right of the view (Kern's rest pose .245 / -.225 / -.445), kick back and up.
       const f32 kick = age >= 0 && age < 0.22f ? std::sin(age / 0.22f * kPi) : 0;
-      Mat4 g = Mat4::translate({0.245f + bx * 0.45f, -0.2f + bz * 0.2f - drop, -0.47f}) * euler(-0.03f, -0.06f, -0.018f);
+      // the rocket launcher sits lower and further right than the 40 mm (it frames the view)
+      const bool rkt = want == 1;
+      Mat4 g = Mat4::translate({(rkt ? 0.285f : 0.245f) + bx * 0.45f, (rkt ? -0.245f : -0.2f) + bz * 0.2f - drop, rkt ? -0.43f : -0.47f}) * euler(-0.03f, -0.06f, -0.018f);
       // alignSights: rotate about the grip (the model's origin) so the barrel (-z) points at the aim
       // point - the finger's, or the crosshair's rest point - smoothed at 22 Hz (TARGET_SMOOTH_HZ)
       {

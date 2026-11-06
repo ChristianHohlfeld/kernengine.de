@@ -47,7 +47,8 @@ export const CHANGELOG=Object.freeze([
     "Kein Durchfallen mehr bei weiten Flügen: der Boden unter dir wird immer sofort gebaut, die Höhendaten werden vorausschauend in Flugrichtung geladen.",
     "EJECT löst den Schleudersitz per Tipp aus; RESET setzt aus dem Cockpit zurück an den Start – ohne Schleudersitz.",
     "Raketen und Granaten treffen Busse an ihrer ganzen Länge.",
-    "Polizei wie im Original: schwarze Streifenwagen mit weißen Türen und rot-blau blitzendem Balken, Polizisten in schwarzer Weste."]},
+    "Polizei wie im Original: schwarze Streifenwagen mit weißen Türen und rot-blau blitzendem Balken, Polizisten in schwarzer Weste.",
+    "Neuer Raketenwerfer: kompaktes olivgrünes Rohr mit Optik und Lasermodul, tiefer und weiter rechts gehalten – er verdeckt die Sicht nicht mehr."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",
