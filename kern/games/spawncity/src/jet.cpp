@@ -275,7 +275,8 @@ void Jet::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     want.x += w_flight * (clampf(inp.pitch, -1, 1) * 1.6f - wb.x);
     want.y += w_flight * (clampf(inp.roll, -1, 1) * 3.4f - wb.y);
     // the yaw everywhere: the hover turns on the spot at 1.5 rad/s
-    const f32 yaw_rate = (1 - w_flight) * clampf(inp.yaw, -1, 1) * 1.5f + w_flight * (clampf(inp.yaw, -1, 1) * 0.7f + turn);
+    // in the hover the right stick's sideways turns it too (one thumb aims, as in arcade games)
+    const f32 yaw_rate = (1 - w_flight) * clampf(inp.yaw + inp.roll * 0.7f, -1, 1) * 1.5f + w_flight * (clampf(inp.yaw, -1, 1) * 0.7f + turn);
     want.z += (-yaw_rate - wb.z);
     world.set_angular_velocity(body, q.rotate(wb + (want - wb) * k));
     if (V > 20 && w_flight > 0) {
