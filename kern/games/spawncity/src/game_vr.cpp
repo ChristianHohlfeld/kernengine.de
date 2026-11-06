@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include "game.h"
+#include "game_life.h"
 
 namespace sc {
 
@@ -65,6 +66,77 @@ void Game::vr_melee(i32 side, f32 dt) {
     osfx(knife ? "gameplay_final_runtime_v2.knifeHit" : "gameplay_final_runtime_v2.punchThud", at, side == 1 ? 0 : 1, 0);
     world_->play_sound(combat_sfx(combat_audio::Kind::hit), at, 0.7f, knife ? 1.3f : 0.8f, true);
   }
+}
+
+void Game::vr_grab(i32 side, bool want, f32 dt) {
+  // Physics grabbing: the hand closes on what is in reach - a loose body (a crate, an animal, a
+  // ragdoll), a person (who goes down as a ragdoll and is held by the chest), a car (only pushed:
+  // the hand's force is a person's) - and drags it with a spring towards itself; letting go throws
+  // it with the hand's speed.
+  VrHand& h = vr_hands_[side];
+  kern::Mat4 m;
+  const bool hand = vr_hand_matrix(side, m);
+  const Vec3 at = hand ? m.translation() : Vec3{};
+  const f32 now = world_->sim_time();
+  kern::physics::World& w = world_->physics();
+  auto valid = [&](kern::physics::Body b) { return b.valid() && w.body_valid(b) && w.body_type(b) == kern::physics::BodyType::dynamic; };
+  if (!want || !hand || player_dead_) {
+    if (h.grab.valid() && valid(h.grab)) {
+      // the throw: whatever the hand's speed was (a little more - a swing reads short in the room)
+      w.set_linear_velocity(h.grab, w.linear_velocity(h.grab) * 1.15f);
+      w.set_awake(h.grab, true);
+    }
+    h.grab = {};
+    h.grab_person = -1;
+    h.grab_was = false;
+    return;
+  }
+  const bool fresh = !h.grab_was;
+  h.grab_was = true;
+  // a person grabbed a moment ago: his doll appears next frame - take its chest then
+  if (h.grab_person >= 0 && !h.grab.valid() && glife_) {
+    const kern::physics::Body b = glife_->life.ragdolls().bone_body(static_cast<u64>(h.grab_person) + 1, Ragdolls::chest);
+    if (valid(b)) { h.grab = b; h.grab_local = {}; }
+    else if (now - h.grab_t > 0.4f) h.grab_person = -1;
+  }
+  if (fresh && !h.grab.valid() && h.grab_person < 0) {
+    h.grab_t = now;
+    // 1. a loose body within a hand's reach (a small sphere swept a little through the hand)
+    const kern::physics::RayHit rh = w.cast_sphere(at + Vec3{0, 0, 0.06f}, 0.13f, {0, 0, -0.12f}, ~0ull, body(soldier_));
+    if (rh.hit && valid(rh.body)) { h.grab = rh.body; h.grab_local = w.local_point(rh.body, rh.point); }
+    else {
+      // 2. a person within 0.7 m of the hand (chest or head height)
+      i32 best = -1;
+      f32 bd = 0.7f;
+      const auto& all = people_.all();
+      for (std::size_t i = 0; i < all.size(); ++i) {
+        const People::Person& p = all[i];
+        if (p.state == People::State::down || p.state == People::State::gone || now < p.knocked_until) continue;
+        const f32 d = kern::length(p.pos + Vec3{0, 0, 1.25f} - at);
+        if (d < bd) { bd = d; best = static_cast<i32>(i); }
+      }
+      if (best >= 0) {
+        people_.grab_knock(best, (at - people_.all()[static_cast<std::size_t>(best)].pos) * 0.5f + Vec3{0, 0, 0.6f}, now);
+        h.grab_person = best;
+      }
+    }
+  }
+  if (!h.grab.valid()) return;
+  if (!valid(h.grab)) { h.grab = {}; return; }
+  // the spring: the grabbed point to the hand, the velocity change capped by a strong person's
+  // force (2.5 kN) - a dog flies, a ragdoll swings, a car only rocks
+  const Vec3 p = w.world_point(h.grab, h.grab_local);
+  const Vec3 v = w.linear_velocity(h.grab);
+  const Vec3 hv = h.world_ok && dt > 1e-4f ? (at - h.world_prev) * (1.0f / dt) : Vec3{};
+  const f32 mass = std::fmax(0.5f, w.mass(h.grab));
+  const Vec3 want_v = (at - p) * 12.0f + hv;
+  Vec3 dv = want_v - v;
+  const f32 cap = 2500.0f * std::fmax(dt, 1e-3f) / mass;
+  const f32 l = kern::length(dv);
+  if (l > cap) dv = dv * (cap / l);
+  w.set_linear_velocity(h.grab, v + dv);
+  w.set_angular_velocity(h.grab, w.angular_velocity(h.grab) * 0.9f);
+  w.set_awake(h.grab, true);
 }
 
 void Game::vr_menu_input() {
@@ -196,6 +268,13 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
     h.prev = h.p;
     h.had = true;
     h.swing += (std::fmin(v, 4.0f) - h.swing) * k;
+  }
+  // grabbing: the grip, or the trigger of a free hand (the left always; the right with the fists)
+  {
+    const bool fists = foot_weapon_ == weapons::Id::fists;
+    const bool lg = pad.connected && (pad.down(kPadLB) || pad.lt > 0.5f), rg = pad.connected && (pad.down(kPadRB) || (fists && pad.rt > 0.5f));
+    vr_grab(0, lg, dt);
+    vr_grab(1, rg && (fists || foot_weapon_ == weapons::Id::knife ? true : pad.down(kPadRB)), dt);
   }
   vr_melee(0, dt);
   vr_melee(1, dt);

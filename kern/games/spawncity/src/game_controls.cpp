@@ -110,7 +110,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   C.look.step(dt, C.keep_look);
   // hand grenade (hand_grenade.mjs): T held / LB held / the button held = cooking, let go = throw;
   // regeneration in every mode, a cooking grenade drops when the pilot leaves the foot mode
-  ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB), dt);
+  ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB) && !(engine_ && engine_->xr), dt);  // VR: the left grip grabs (game_vr.cpp)
   C.keep_look = ui_.settings.on(Opt::view_keep_look);
   C.aim_scheme = ui_.settings.on(Opt::pad_aim_scheme);  // xbox_control_mode.mjs CLASSIC / AIM  // WORLD: KEEP 360 LOOK (the head look stays)
   ui_after_input(dt);  // vehicle settings, the jetpack (game_ui.cpp, game_equipment.cpp)

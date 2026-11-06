@@ -40,6 +40,8 @@ class Ragdolls {
   u32 active() const;
   u32 spawned() const { return spawned_; }
   bool physical(u64 key) const;  // still Box3D bodies (not getting up)
+  /// A bone's body (VR grab: the hand takes the doll by its chest), invalid when there is none.
+  kern::physics::Body bone_body(u64 key, Bone b) const { const i32 i = find(key); return i >= 0 && dolls_[i].active && !dolls_[i].getting_up ? dolls_[i].bodies[b] : kern::physics::Body{}; }
 
   /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint.
   struct Draw { kern::Mat4 m; Vec3 tint; bool sphere; };

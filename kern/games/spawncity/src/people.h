@@ -133,6 +133,10 @@ class People {
   /// Whether the last hit of shot() was on the head (headshot_feedback.mjs).
   bool last_head() const { return last_head_; }
 
+ public:
+  /// VR grab: the person goes down as a ragdoll (gets up again later), pushed by `push`.
+  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(people_[static_cast<std::size_t>(index)], push, now); }
+
  private:
   void spawn(const PeopleView& view, Rng& rng, f32 now);
   void walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng);
