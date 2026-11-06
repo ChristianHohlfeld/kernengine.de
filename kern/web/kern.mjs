@@ -61,7 +61,7 @@ function decodeBase64(text) {
 export async function loadKern({ bytes = null, base64 = null, url = null, module = null, log = null } = {}) {
   if (!module) {
     if (base64) bytes = decodeBase64(base64);
-    if (!bytes && url) bytes = await (await fetch(url)).arrayBuffer();
+    if (!bytes && url) bytes = await (await fetch(url, {cache: "no-cache"})).arrayBuffer();  // revalidated: a new build is never an old cached one
     if (!bytes) throw Error("loadKern needs bytes, base64, url or module");
     module = await WebAssembly.compile(bytes);
   }

@@ -71,7 +71,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   (async () => {
     try {
       let mod = null;
-      if (url) mod = await WebAssembly.compileStreaming(fetch(url)).catch(async () => WebAssembly.compile(await (await fetch(url)).arrayBuffer()));
+      if (url) mod = await WebAssembly.compileStreaming(fetch(url, {cache: "no-cache"})).catch(async () => WebAssembly.compile(await (await fetch(url, {cache: "no-cache"})).arrayBuffer()));
       else if (base64) { const bin = atob(base64), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); mod = await WebAssembly.compile(b); }
       if (mod) jobs = await startKernJobs(kern, mod, {kernSource: globalThis.__kernSource || null});
     } catch (error) { console.warn("[spawncity] no job workers, the city builds in the frame:", error?.message || error); }

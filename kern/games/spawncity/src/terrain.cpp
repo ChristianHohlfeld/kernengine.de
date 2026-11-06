@@ -193,6 +193,7 @@ void Terrain::clear() {
   want_collision_.clear();
   want_water_.clear();
   water_.clear();
+  wc_key_ = ~0ull;
   bridges_.clear();
   craters_.clear();
   dem_tiles_.clear();
@@ -424,13 +425,22 @@ kern::HeightSampler Terrain::sampler(f32 offset) const {
 // water
 
 bool Terrain::water_cell(i32 cx, i32 cy) const {
-  auto it = water_.find(key2(cx >> 4, cy >> 4));
-  if (it == water_.end()) return false;
+  // The hottest lookup of the city's streets (every draped road point asks it, ?perf=1 / the CPU
+  // profile): consecutive points almost always fall in the same 64 m block, so the last block is
+  // remembered (unordered_map nodes never move; set_water_cell / clear forget it).
+  const u64 k = key2(cx >> 4, cy >> 4);
+  if (k != wc_key_) {
+    auto it = water_.find(k);
+    wc_key_ = k;
+    wc_bits_ = it == water_.end() ? nullptr : it->second.bits;
+  }
+  if (!wc_bits_) return false;
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
-  return (it->second.bits[idx >> 6] >> (idx & 63)) & 1u;
+  return (wc_bits_[idx >> 6] >> (idx & 63)) & 1u;
 }
 
 void Terrain::set_water_cell(i32 cx, i32 cy) {
+  wc_key_ = ~0ull;  // the remembered block (water_cell) may be new now
   WaterBlock& b = water_[key2(cx >> 4, cy >> 4)];
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
   if (!((b.bits[idx >> 6] >> (idx & 63)) & 1u)) ++stats_.water_cells;

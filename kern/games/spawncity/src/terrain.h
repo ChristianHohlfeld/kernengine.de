@@ -122,6 +122,8 @@ class Terrain {
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
   bool water_cell(i32 cx, i32 cy) const;
+  mutable u64 wc_key_ = ~0ull;            // water_cell's last block (its key, its bits or none)
+  mutable const u64* wc_bits_ = nullptr;
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1);

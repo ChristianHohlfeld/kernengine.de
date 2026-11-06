@@ -672,7 +672,12 @@ bool CityStream::work(Tile& t, f64 deadline) {
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
     case S::roads: {
-      if (!t.road_builder.step(std::max(0.5, deadline - kern::now_ms()))) return false;
+      {
+        const f64 t1 = kern::now_ms();
+        const bool built = t.road_builder.step(std::max(0.5, deadline - kern::now_ms()));
+        step_time("roads.build", t1);
+        if (!built) return false;
+      }
       kern::Material m;
       m.roughness = 0.95f;
       m.cast_shadow = false;
@@ -680,7 +685,9 @@ bool CityStream::work(Tile& t, f64 deadline) {
       auto& chunks = t.road_builder.chunks();
       while (t.upload_next < chunks.size()) {
         const std::size_t before = t.meshes.size();
+        const f64 t1 = kern::now_ms();
         upload(t, chunks[t.upload_next], m, false);
+        step_time("roads.upload", t1);
         // road meshes are the re-layable ones
         t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
         t.meshes.resize(before);
