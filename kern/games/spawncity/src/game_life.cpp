@@ -225,6 +225,7 @@ void Game::life_update(f32 dt) {
         pp.max_distance = 60;
         mixer_.play(G.clips[static_cast<u32>(Sound::thud)], pp);
       }
+      osfx("people_impacts.thump", p.pos, std::fmin(0.9f, 0.25f + sp * 0.04f));
     } else {
       Vec3 d = f.push;
       d.z = 0;
@@ -323,7 +324,9 @@ void Game::life_update(f32 dt) {
         if (all[i].kind == People::Kind::citizen && all[i].state != People::State::down && all[i].state != People::State::gone && blocks(all[i].pos)) who = static_cast<i32>(i);
       if (who == -2) continue;
       const bool bus = c.half.x > 3;
-      if (G.life.honk(c.position, bus, static_cast<u32>(c.car), now, kern::length(c.position - cam_.eye), out) && who >= 0)
+      const bool honked = G.life.honk(c.position, bus, static_cast<u32>(c.car), now, kern::length(c.position - cam_.eye), out);
+      if (honked) osfx("street_voices.honk", c.position + Vec3{0, 0, 0.4f}, bus ? 1 : 0, who == -1 ? 1 : 0);
+      if (honked && who >= 0)
         G.life.shout(all[who].pos, "honked", static_cast<u32>(who) * 2654435761u, now, kern::length(all[who].pos - cam_.eye), out);
     }
   }
@@ -341,6 +344,7 @@ void Game::life_update(f32 dt) {
     pp.max_distance = s.sound == Sound::horn || s.sound == Sound::horn_bus ? 160 : s.sound == Sound::jingle ? 400 : 60;
     if (s.sound == Sound::jingle) pp.spatial = false;
     mixer_.play(G.clips[static_cast<u32>(s.sound)], pp);
+    osfx("life", s.at, static_cast<f32>(static_cast<u32>(s.sound)), s.volume, s.pitch);  // audio.mjs LIFE: cows / pigeons / joggers / animals / voices
   }
   for (const LifeOut::Burst& b : out.bursts) world_->particle_burst(b.at, b.color);
   // the black cat got the player (damage 100000, "black-cat")

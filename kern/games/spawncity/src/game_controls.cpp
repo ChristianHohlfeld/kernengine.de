@@ -175,7 +175,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
     const bool cancel = C.rmb_hit || ph(kPadB) || pad_touch_.take_pressed("strike_cancel");
     if (tap) ctl_strike_confirm(true, tx, ty);
     else if (confirm) ctl_strike_confirm(false, 0, 0);
-    else if (cancel) { C.aiming = false; C.aim_lock_until = now + 0.5f; }
+    else if (cancel) { C.aiming = false; C.aim_lock_until = now + 0.5f; osfx("fighter_jets.beep", cam_.eye, 3); }  // beep([330], .08, .1)
     C.pad_rt = pad.rt > 0.5f;
     if (C.aiming) C.aim_lock_until = now + 0.4f;
     // the pad belongs to the aiming (pad_actions.mjs returns here)
@@ -232,6 +232,7 @@ void Game::ctl_strike_start() {
   if (world_->sim_time() - combat_.last_strike < kStrikeCooldownS) {
     toast_ = "Luftschlag laedt (" + std::to_string(static_cast<int>(kStrikeCooldownS - (world_->sim_time() - combat_.last_strike))) + " s)";
     toast_age_ = 0;
+    osfx("fighter_jets.beep", cam_.eye, 2);  // beep([220], .18, .1)
     return;
   }
   C.aiming = true;
@@ -249,6 +250,7 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
   const RayResult r = cast(world_->physics(), from, dir, 1500, {}, kCatWorld);
   const Vec3 at = r.hit ? r.point : from + dir * 180.0f;
   C.aim_lock_until = C.clock + 0.6f;
+  osfx("fighter_jets.beep", at, 0);  // place(): beep([740, 990], .06, .11)
   if (air_strike(at)) C.aiming = false;
 }
 
@@ -273,10 +275,19 @@ void Game::ctl_grenade(bool hold_key, bool hold_pad, f32 dt) {
   const bool can = mode_ == Mode::foot && !player_dead_;
   static bool key_was = false, pad_was = false;
   const bool touch_down = pad_touch_.take_pressed("nade"), touch_up = pad_touch_.take_released("nade");
+  static int last_tick = 0;  // hand_grenade.mjs lastTick
   if (can) {
-    if (hold_key && !key_was) g.pull(now, 0);
-    else if (hold_pad && !pad_was) g.pull(now, 1);
-    else if (touch_down) g.pull(now, 2);
+    bool pulled = false;
+    if (hold_key && !key_was) pulled = g.pull(now, 0);
+    else if (hold_pad && !pad_was) pulled = g.pull(now, 1);
+    else if (touch_down) pulled = g.pull(now, 2);
+    if (pulled) { last_tick = 0; osfx("hand_grenade.pinSound", cam_.eye); }
+  }
+  // every second of the fuse a tick, the last ones (under 1.2 s left) urgent
+  if (g.cooking) {
+    const f32 held = (now - g.at) * 1000;
+    const int sec = static_cast<int>(std::floor(held / 1000));
+    if (sec > last_tick - 1 && held - static_cast<f32>(last_tick) * 1000 >= 0) { last_tick = sec + 1; osfx("hand_grenade.tickSound", cam_.eye, controls::GrenadeCook::kFuse * 1000 - held < 1200 ? 1 : 0); }
   }
   key_was = hold_key;
   pad_was = hold_pad;
@@ -715,6 +726,7 @@ bool Game::ctl_touch_shot(f32 x, f32 y) {
   world_->shots().push_back(e);
   const char* snd = foot_weapon_ == weapons::Id::smg ? "sc:shot0" : foot_weapon_ == weapons::Id::sniper ? "builtin:sniper" : "sc:pistol0";
   world_->play_sound(snd, from, 0.9f, 1, true);
+  osfx("foot.shot", from, static_cast<f32>(static_cast<i32>(foot_weapon_)));
   world_->shake_camera(foot_weapon_ == weapons::Id::sniper ? 0.25f : 0.08f);
   return false;
 }

@@ -78,7 +78,7 @@ bool Game::combat_shot(kern::game::ShotEvent& s) {
       s.to = s.from + seg * t;
       s.surface = 2;
       h.hp -= kMilHit;  // military_response.mjs hit(): HIT 25
-      if (h.hp <= 0) { h.state = Heli::State::down; h.v.z = std::fmin(h.v.z, 2.0f); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), h.p, 0.8f, 0.8f, true); }
+      if (h.hp <= 0) { h.state = Heli::State::down; h.v.z = std::fmin(h.v.z, 2.0f); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), h.p, 0.8f, 0.8f, true); osfx("military_response.sound", h.p, 1, 0.8f, 0.8f); }
       return true;
     }
   for (Tank& k : combat_.tanks)
@@ -167,6 +167,7 @@ void Game::spawn_heli(Vec3 target) {
     h.yaw = std::atan2(target.y - p.y, target.x - p.x) - kPi / 2;
     h.next_burst = world_->sim_time() + 5;
     combat_.helis.push_back(h);
+    osfx("military_response.sound", h.p, 1, 0.2f, 0.3f);  // spawnHeli: sound("explosion", .2, .3)
     --combat_.pending_heli;
     return;
   }
@@ -289,6 +290,7 @@ void Game::step_heli(Heli& h, f32 dt) {
     combat_tracer(from, s.to);
     gaps_send_military(false, from, s.to);  // military_response.mjs sendFx tracer (game_gaps.cpp)
     world_->play_sound("builtin:smg", from, 0.6f, 0.55f, true);
+    osfx("military_response.sound", from, 0, 0.6f, 0.55f);  // sound("shot", .6, .55)
   }
 }
 
@@ -364,6 +366,7 @@ void Game::step_tank(Tank& k, f32 dt) {
     gaps_send_military(true, muzzle, aim);  // sendFx shell (game_gaps.cpp)
     world_->particle_burst(muzzle, {1.6f, 1.2f, 0.7f});
     world_->play_sound(combat_sfx(combat_audio::Kind::explosion), muzzle, 0.9f, 1.35f, true);
+    osfx("military_response.sound", muzzle, 1, 0.9f, 1.35f);  // sound("explosion", .9, 1.35)
   }
   if (k.leaving && d > 300 && spawn_unseen(k.p, 2)) k.dead = true;
 }
@@ -437,6 +440,7 @@ void Game::step_soldier(SoldierAi& s, f32 dt) {
   combat_tracer(from, e.to);
   gaps_send_military(false, from, e.to);  // military_response.mjs sendFx tracer (game_gaps.cpp)
   world_->play_sound("builtin:smg", from, 0.45f, 0.9f, true);
+  osfx("military_response.sound", from, 0, 0.45f, 0.9f);  // sound("shot", .45, .9)
 }
 
 void Game::update_military(f32 dt) {
@@ -507,7 +511,7 @@ void Game::update_military(f32 dt) {
     bool hit = r.hit || s.p.z <= city_.ground_height(s.p.x, s.p.y) + 0.2f;
     Vec3 at = r.hit ? r.point : s.p;
     if (!hit && have && kern::length(s.p - tp) < 2.2f) hit = true;
-    if (hit && s.remote) { world_->particle_burst(at, {3.0f, 1.2f, 0.3f}); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 0.8f, 1, true); s.life = -1; }
+    if (hit && s.remote) { world_->particle_burst(at, {3.0f, 1.2f, 0.3f}); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 0.8f, 1, true); osfx("military_response.sound", at, 1, 0.8f, 1); s.life = -1; }
     else if (hit) { explosion(at, 6, kShellDmg, false); s.life = -1; }
     else if (s.life > 0) combat_tracer(prev, s.p, {3.0f, 1.6f, 0.6f});
   }
@@ -590,6 +594,7 @@ void Game::update_flak(f32 dt) {
             g.flash_at = now;
             ++g.barrel;
             if (g.barrel % 3 == 0) world_->play_sound("builtin:launcher", mz, clampf(1.4f / (1 + kern::length(mz - cam_.eye) / 90), 0, 1.2f) * 0.55f, 1.6f, true);
+            osfx("flak_battery.audioShot", g.p);
             g.next_shot = std::fmax(g.next_shot + 1.0f / kFlakRps, now - 0.05f);
           }
         }
@@ -602,6 +607,7 @@ void Game::update_flak(f32 dt) {
     if (now >= r.until) {
       if (C.puffs.size() > 60) C.puffs.erase(C.puffs.begin());
       C.puffs.push_back({r.p, now});
+      osfx("flak_battery.audioBurst", r.p);
       if (have) {
         const f32 dmg = flak_burst_damage(kern::length(tp - r.p));
         if (dmg > 0) { damage_player_vehicle(dmg); ++C.flak_hits; }
@@ -682,6 +688,7 @@ void Game::update_jets(f32 dt) {
   std::erase_if(C.jets, [&](const FighterJet& j) { return j.y0 + kJetSpeed * (now - j.t0) > j.y0 + 2 * kJetSpan; });
   for (Bomb& b : C.bombs) {
     if (now - b.t0 >= b.dur) {
+      osfx("fighter_jets.blastSound", b.to);
       explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, !b.remote);  // a mate's strike is not our crime
       C.blasts.push_back({b.to, now, 1});
       b.dur = -1;

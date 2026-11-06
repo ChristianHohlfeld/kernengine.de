@@ -103,7 +103,7 @@ body.scui-playing .sc-top{top:calc(max(12px,env(safe-area-inset-top)) + 38px)}
 #scRadio[hidden],#scJet[hidden]{display:none}
 #scJet{position:fixed;z-index:19;left:50%;bottom:calc(max(34px,env(safe-area-inset-bottom) + 24px) + 12px);transform:translateX(-50%);width:min(160px,30vw);height:4px;border-radius:2px;background:#ffffff26;overflow:hidden}
 #scJet i{display:block;height:100%;background:linear-gradient(90deg,#ff8a2a,#ffd36a)}#scJet.burn i{background:#ff5a2a}
-/* jetpack_audio.mjs: a warm orange flash at the screen edges at the ignition */
+/* jetpack_audio.mjs: a warm orange flash at the screen edges at the ignition (with the original's sound, audio.mjs, jetpack_audio.mjs shows its own) */
 #scJetFlash{position:fixed;inset:0;z-index:18;pointer-events:none;box-shadow:inset 0 0 90px 30px #ff8a2acc;opacity:0;transition:opacity .45s ease-out}#scJetFlash.on{opacity:1;transition:none}
 /* player_settings_sections.mjs: what you control right now */
 .scui-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}.scui-modes button{min-height:34px;border:1px solid #ffffff38;border-radius:8px;background:#162437;color:#fff;font:850 10px/1 system-ui;letter-spacing:.08em;cursor:pointer}
@@ -784,7 +784,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       if (ms && modeBtn.textContent !== ms[0]) { modeBtn.textContent = ms[0]; modeBtn.dataset.cmd = ms[1]; }
       for (const b of settings.querySelectorAll("[data-mode]")) b.dataset.active = b.dataset.mode === h.mode ? "1" : "0";
       const jp = h.jetpack;
-      if (jp && jp.ignitions > (ui.jetIgnitions ?? jp.ignitions)) { jetFlash.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => jetFlash.classList.remove("on"))); }
+      if (jp && jp.ignitions > (ui.jetIgnitions ?? jp.ignitions) && !globalThis.__scOriginalAudio) { jetFlash.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => jetFlash.classList.remove("on"))); }
       if (jp) ui.jetIgnitions = jp.ignitions;
       jetBar.hidden = !jp || (jp.fuel > 0.995 && !jp.thrusting) || !!h.ui?.paused;
       if (!jetBar.hidden) { jetBar.querySelector("i").style.width = `${Math.round(jp.fuel * 100)}%`; jetBar.classList.toggle("burn", jp.thrusting); }

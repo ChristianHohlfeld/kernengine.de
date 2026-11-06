@@ -159,7 +159,7 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
 
 void Drone::reset() {
   fw_->runtime.reset();
-  for (int i = 0; i < 4; ++i) { omega_[i] = current_[i] = 0; pulses_[i] = 1000; }
+  for (int i = 0; i < 4; ++i) { omega_[i] = current_[i] = motor_torque_[i] = prop_torque_[i] = 0; pulses_[i] = 1000; }
   soc_ = 1;
   vbatt_ = battery_ocv(1, p_.cells);
   ibatt_ = 0;
@@ -231,6 +231,8 @@ void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 thrust_out[
     const f32 rev = omega_[i] / (2 * kPi);
     const f32 prop_torque = p_.Cq * p_.rho * rev * rev * d5_;
     const f32 motor_torque = back_emf_ * current_[i];  // Kt = Ke in SI units
+    motor_torque_[i] = motor_torque;
+    prop_torque_[i] = prop_torque;
     omega_[i] = std::fmax(0.0f, omega_[i] + (motor_torque - prop_torque - kBearingDrag * omega_[i]) * dt / p_.J);
     const f32 n = omega_[i] / (2 * kPi);
     f32 thrust = p_.Ct * p_.rho * n * n * d4_;
@@ -349,7 +351,7 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
   tele_.fault = (out.state & fc::kStateFault) != 0;
   tele_.game = (out.state & fc::kStateGameMode) != 0;
   tele_.nav_valid = (out.state & fc::kStateNavigationValid) != 0;
-  for (int i = 0; i < 4; ++i) { tele_.pulses[i] = pulses_[i]; tele_.omega[i] = omega_[i]; }
+  for (int i = 0; i < 4; ++i) { tele_.pulses[i] = pulses_[i]; tele_.omega[i] = omega_[i]; tele_.motor_torque[i] = motor_torque_[i]; tele_.prop_torque[i] = prop_torque_[i]; }
   tele_.battery_v = vbatt_;
   tele_.battery_soc = soc_;
   tele_.current_a = ibatt_;

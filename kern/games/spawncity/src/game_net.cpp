@@ -277,6 +277,7 @@ void Game::update_net(f32 dt) {
       case net::Fx::shot: {
         // The tracer starts where it would be by now (vs_multiplayer.mjs spawnRemoteShot).
         if (m.tracers.size() < 40) m.tracers.push_back({f.p, f.dir, std::fmax(1.0f, f.a), net_.color_of(f.owner)});
+        osfx("player_vehicle_runtime_v2.playPistol", f.p);  // a mate's round: playPistol(p, true)
         break;
       }
       case net::Fx::explosion: {
@@ -284,6 +285,7 @@ void Game::update_net(f32 dt) {
         world_->particle_burst(f.p, {3.0f, 1.2f, 0.3f});
         world_->particle_burst(f.p + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
         world_->play_sound("builtin:explosion", f.p, 1, 1, true);
+        osfx("player_vehicle_runtime_v2.playExplosion", f.p);
         world_->shake_camera(clampf(1.4f - kern::length(cam_.eye - f.p) / (std::fmax(2.0f, f.a) * 3), 0, 1.2f));
         ++explosions_;
         gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)

@@ -85,7 +85,7 @@ jobs:
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
             kern/build.sh --lehrer generated/kern_lehrer.wasm
             kern/games/spawncity/build.sh
-            for f in kern/games/spawncity/web/*.mjs; do node --check "$f"; done
+            for f in kern/games/spawncity/web/*.mjs kern/games/spawncity/web/audio/*.mjs; do node --check "$f"; done
             for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
@@ -140,6 +140,8 @@ jobs:
           mkdir -p _site/kern/games/spawncity/web _site/spawncity
           cp -r kern/games/spawncity/web/. _site/kern/games/spawncity/web/
           cp generated/spawncity.html _site/spawncity.html
+          # its music (the original's track, loaded next to the page: sim/audio/, as on spawncity.de)
+          mkdir -p _site/sim/audio && cp kern/games/spawncity/web/sim/audio/8_bits_only.m4a _site/sim/audio/
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
           touch _site/.nojekyll
           du -sh _site

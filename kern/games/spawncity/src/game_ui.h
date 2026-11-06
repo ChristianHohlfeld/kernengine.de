@@ -38,7 +38,8 @@ struct UiState {
   bool gps_cam_init = false;
   // equipment (game_equipment.cpp)
   Jetpack jetpack;
-  bool jump_was = false, jet_pending = false;  // jet_pending: tests ignite at the next airborne frame
+  bool jump_was = false, jet_pending = false;
+  f32 jet_acc = 0;  // the jetpack's thrust (m/s^2) this frame (jetpack_audio.mjs reads jet.acc)  // jet_pending: tests ignite at the next airborne frame
   kern::audio::VoiceId remote_jet_voice[8] = {};  // other players' jetpacks (by remote index)
   kern::audio::VoiceId jet_voice = 0, city_voice = 0, birds_voice = 0, crickets_voice = 0;
   kern::audio::ClipId jet_clip = 0, whoomp_clip = 0, thump_clip = 0, city_clip = 0, birds_clip = 0, crickets_clip = 0;

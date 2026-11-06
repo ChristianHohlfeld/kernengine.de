@@ -52,6 +52,7 @@ struct DroneTelemetry {
   u32 state = 0;
   std::array<u16, 4> pulses{};
   std::array<f32, 4> omega{};         // rad/s per motor
+  std::array<f32, 4> motor_torque{}, prop_torque{};  // N m per motor (motor_sound.mjs reads both)
   f32 battery_v = 0, battery_soc = 1, current_a = 0;
   f32 agl = 0;                        // rangefinder AGL (m), < 0 = no return
   f32 speed = 0, vz = 0;
@@ -90,7 +91,7 @@ class Drone {
   DroneParams p_;
   DroneFirmware* fw_ = nullptr;
   Vec3 motor_pos_[4];
-  f32 omega_[4] = {}, current_[4] = {}, rotor_angle_[4] = {};
+  f32 omega_[4] = {}, current_[4] = {}, rotor_angle_[4] = {}, motor_torque_[4] = {}, prop_torque_[4] = {};
   f32 soc_ = 1, vbatt_ = 16.8f, ibatt_ = 0;
   f32 back_emf_ = 0, d4_ = 0, d5_ = 0;
   Vec3 cdA_;

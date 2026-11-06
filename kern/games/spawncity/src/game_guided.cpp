@@ -59,6 +59,7 @@ bool Game::guided_press() {
     toast_ = b;
     toast_age_ = 0;
     world_->play_sound("builtin:click", cam_.eye, 0.4f, 0.7f, false);
+    osfx("guided_missile.denied", cam_.eye);
     return false;
   }
   Vec3 fwd;
@@ -94,6 +95,7 @@ bool Game::guided_press() {
   } else {
     gaps_guided_sounds();
     world_->play_sound("sc:locktone", eye, 1, 1, false);  // lockTone: two 1760 Hz beeps (game_gaps.cpp)
+    osfx("guided_missile.lockTone", eye);
   }
   const BodyState s = state_of(drone_actor_);
   bool pedestrian = best.kind == guided::TargetKind::person;

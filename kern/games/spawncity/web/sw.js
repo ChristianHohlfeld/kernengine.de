@@ -19,7 +19,8 @@ self.addEventListener("fetch", event => {
   event.respondWith((async () => {
     try {
       const res = await fetch(req);
-      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }
+      // a whole answer only (the music file is streamed in ranges: 206 cannot be cached)
+      if (res.status === 200) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }
       return res;
     } catch (error) {
       const hit = await caches.match(req, {ignoreSearch: true});
