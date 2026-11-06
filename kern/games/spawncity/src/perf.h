@@ -34,11 +34,11 @@ struct Tier {
 };
 constexpr i32 kTiers = 5;
 constexpr Tier kTier[kTiers] = {
-    {"minimal", 16, 35, 1, 0, 70, 90, 3, 0.6f},
-    {"niedrig", 30, 50, 4, 0, 110, 140, 6, 0.75f},
-    {"mittel", 44, 70, 4, 1, 140, 180, 8, 1.0f},  // the original draws at its full ceiling until frames are slow
-    {"hoch", 64, 90, 9, 2, 170, 220, 12, 1.0f},   // Kern: more point lights than the original's 6 (street lamps, headlights)
-    {"maximal", 80, 110, 9, 3, 170, 220, 16, 1.0f},
+    {"minimal", 16, 35, 1, 0, 70, 90, 2, 0.6f},
+    {"niedrig", 30, 50, 4, 0, 110, 140, 3, 0.75f},
+    {"mittel", 44, 70, 4, 1, 140, 180, 4, 1.0f},  // the original draws at its full ceiling until frames are slow (phones: dynamic_lights.mjs 4)
+    {"hoch", 64, 90, 9, 2, 170, 220, 6, 1.0f},    // the original's desktop pool: 6
+    {"maximal", 80, 110, 9, 3, 170, 220, 10, 1.0f},  // Kern: more on the strongest machines (lamps, headlights)
 };
 constexpr i32 kDesktopStart = 4, kMobileStart = 2, kMobileMax = 3;
 

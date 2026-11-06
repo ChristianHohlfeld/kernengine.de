@@ -229,7 +229,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     document.documentElement.classList.toggle("sc-portrait", upright);
   };
   orient();
-  addEventListener("pointerdown", lockLandscape, {capture: true, passive: true});
+  // (no fullscreen request on every tap: START asks once, ui.mjs fullscreenForGame - asking again on
+  // each touch threw the page in and out of fullscreen, a resize and a stutter every time)
   document.getElementById("scRotateGo")?.addEventListener("click", ev => { ev.stopPropagation(); lockLandscape(); setTimeout(orient, 400); });
   matchMedia("(orientation: portrait)").addEventListener?.("change", () => { orient(); frame(); });
   visualViewport?.addEventListener("resize", () => { orient(); frame(); });
@@ -582,8 +583,10 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       if (st && !document.body.classList.contains("solo-flight") && !st.disabled) st.click();
       enterVR();
     });
-    // while in VR the button is not needed (and in a headset: only on the title and in the game's 2D view)
-    setInterval(() => { b.style.display = app.inXR ? "none" : ""; }, 500);
+    // only on the title (never as an overlay in the game, never in the headset)
+    const syncVr = () => { const want = app.inXR || document.body.classList.contains("solo-flight") ? "none" : ""; if (b.style.display !== want) b.style.display = want; };
+    syncVr();
+    setInterval(syncVr, 500);
     b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
     document.body.appendChild(b);
     if (params.get("vr") === "1") addEventListener("pointerdown", () => enterVR(), {once: true, capture: true});

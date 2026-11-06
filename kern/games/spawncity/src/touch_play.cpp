@@ -251,17 +251,17 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       f.base = {};
       move_id_ = id;
       move_ = {};
-    } else if (lay_.alive && !no_sticks() && lay_.mode == TouchMode::foot && x > w_ * 0.42f) {
-      // Call of Duty Mobile: the whole right side looks - drag anywhere, as far as the thumb goes
-      // (no ring, no edge: lift and put it down again); a quick tap there fires at the finger
-      fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
-      f.kind = Finger::look;
-      f.free = true;
-      look_id_ = id;
-      look_ = look_edge_ = {};
     } else if (lay_.alive && !no_sticks() && in_circle(Rcx, Rcy, r, x, y)) {
       fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
       f.kind = Finger::look;
+      look_id_ = id;
+      look_ = look_edge_ = {};
+    } else if (lay_.alive && !no_sticks() && lay_.mode == TouchMode::foot && x > w_ * 0.42f) {
+      // the rest of the right side looks too (Call of Duty Mobile): drag anywhere, a quick tap fires
+      // at the finger; the visible right stick keeps its own ring and edge turn (above)
+      fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
+      f.kind = Finger::look;
+      f.free = true;
       look_id_ = id;
       look_ = look_edge_ = {};
     } else if (lay_.alive && (lay_.mode == TouchMode::foot || lay_.mode == TouchMode::drone || lay_.mode == TouchMode::jet)) {
