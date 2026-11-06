@@ -141,7 +141,20 @@ export class OriginalView {
     });
     const kernAct = act => document.querySelector(`#scMenu [data-act="${act}"]`)?.click();
     // title menu (drone_simulator.html #gameMenu; auto_flight_start.mjs START)
-    click("gameMenuStart", () => $("scStart")?.click());
+    click("gameMenuStart", () => {
+      // START is felt at once: the button answers (pressed, "STARTE …") and a short loading screen
+      // covers the world until the ground and the city around the start point stand
+      const b = $("gameMenuStart");
+      if (b) { b.dataset.pressed = "1"; b.textContent = "STARTE …"; }
+      this.loadingSince = performance.now();
+      $("scStart")?.click();
+    });
+    // the title's own START (ui.mjs #scStart) answers the same way
+    $("scStart")?.addEventListener("click", () => {
+      const b = $("scStart");
+      if (b) { b.dataset.pressed = "1"; b.textContent = "STARTE …"; }
+      if (!(this.loadingSince > 0)) this.loadingSince = performance.now();
+    }, true);
     click("gameMenuShare", () => kernAct("share"));
     // the game view's top bar and dock (mobile_gameplay_ui.mjs, game_exit_button.mjs)
     click("gameExitButton", () => this.ui?.open?.("exit"));
@@ -207,6 +220,44 @@ export class OriginalView {
     for (const b of document.querySelectorAll("#worldLookHud [data-map-expand]")) b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); this.command("bigmap toggle"); });
   }
 
+  /** The loading screen after START: until the start tile is built and collides and the ring around
+   *  it has (nearly) arrived - at most 15 s; the bar follows the tiles. */
+  loading(h, playing) {
+    if (!(this.loadingSince > 0)) return;
+    let el = $("scLoading");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "scLoading";
+      el.innerHTML = '<div class="scl-box"><b>SPAWNCITY</b><span class="scl-text">Lade die Stadt …</span><i class="scl-bar"><i></i></i><small class="scl-sub"></small></div>';
+      const st = document.createElement("style");
+      st.textContent = `#scLoading{position:fixed;inset:0;z-index:2147480000;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,#141a22,#07090c);color:#eef0f2;font-family:Inter,system-ui,sans-serif;transition:opacity .35s ease;touch-action:none}
+#scLoading.done{opacity:0;pointer-events:none}
+#scLoading .scl-box{display:flex;flex-direction:column;align-items:center;gap:14px;min-width:min(70vw,340px)}
+#scLoading b{font:900 italic clamp(28px,7vmin,54px)/1 Inter,system-ui,sans-serif;letter-spacing:.04em;text-shadow:0 3px 0 #0008}
+#scLoading .scl-text{font:700 13px/1 Inter,system-ui,sans-serif;letter-spacing:.3em;text-transform:uppercase;color:#eef0f2cc}
+#scLoading .scl-bar{display:block;width:100%;height:6px;border-radius:3px;background:#ffffff1c;overflow:hidden}
+#scLoading .scl-bar i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,#ff7a1a,#ffb02e);box-shadow:0 0 12px #ff7a1a88;transition:width .25s ease}
+#scLoading .scl-sub{font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;color:#eef0f288}
+#gameMenuStart[data-pressed="1"],#scStart[data-pressed="1"]{filter:brightness(1.15);transform:scale(.97);box-shadow:0 0 0 3px #ffd76a,0 0 26px #ff7a1a99!important}`;
+      document.head.appendChild(st);
+      (document.body).appendChild(el);
+    }
+    const t = h.tiles || {}, tt = t.t || {}, age = (performance.now() - this.loadingSince) / 1000;
+    const ground = !!h.placed && (h.offline || (tt.built >= 0 && tt.collision >= 0));
+    const total = Math.max(1, (t.ready || 0) + (t.loading || 0)), frac = Math.min(1, ((h.placed ? 0.2 : 0) + (ground ? 0.3 : 0) + 0.5 * (t.ready || 0) / total));
+    const bar = el.querySelector(".scl-bar i");
+    if (bar) bar.style.width = `${Math.round(Math.max(frac, Math.min(0.9, age / 15)) * 100)}%`;
+    setText(el.querySelector(".scl-text"), !h.placed ? "Lade die Stadt …" : !ground ? "Boden und Gebäude …" : "Fast fertig …");
+    setText(el.querySelector(".scl-sub"), `${t.ready || 0} / ${total} Kacheln`);
+    const ready = playing && ground && age > 0.6 && ((t.loading || 0) <= 1 || age > 8);
+    if (ready || age > 15) {
+      if (bar) bar.style.width = "100%";
+      el.classList.add("done");
+      this.loadingSince = 0;
+      setTimeout(() => el.remove(), 400);
+    }
+  }
+
   update(h, touch) {
     if (!h) return;
     this.last = h;
@@ -238,7 +289,10 @@ export class OriginalView {
     setHidden(menu, playing);
     const start = $("gameMenuStart");
     // the original's title: START and READY from the first frame (the city streams in after START)
-    if (start) { start.disabled = false; setText(start, "START"); }
+    if (start && !(this.loadingSince > 0)) { start.disabled = false; setText(start, "START"); delete start.dataset.pressed; }
+    const sc = $("scStart");
+    if (sc && !(this.loadingSince > 0) && sc.dataset.pressed) { delete sc.dataset.pressed; sc.textContent = "START"; }
+    this.loading(h, playing);
     setText($("gameMenuStatus"), h.placed && h.offline ? "OFFLINE" : "READY");
     // ---- the toggles' state (drone_simulator.html inline script render / renderMusic)
     for (const [id, on] of [["soundSwitch", h.ui?.audioOn], ["musicSwitch", h.ui?.musicOn]]) {
