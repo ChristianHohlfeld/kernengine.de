@@ -188,4 +188,22 @@ bool read_chunks(const std::vector<u8>& output, std::vector<kern::GeoChunk>& out
   return r.ok;
 }
 
+u32 chunk_count(const std::vector<u8>& output) {
+  u32 n = 0;
+  if (output.size() >= 4) std::memcpy(&n, output.data(), 4);
+  return n;
+}
+
+bool read_chunk(const std::vector<u8>& output, std::size_t& at, kern::GeoChunk& c) {
+  if (at >= output.size()) return false;
+  Reader r{output.data() + at, output.data() + output.size()};
+  c.x = r.get<i32>(); c.y = r.get<i32>(); c.items = r.get<u32>(); c.triangles = r.get<u32>();
+  c.mesh.extra_size = r.get<u32>();
+  r.array(c.mesh.positions); r.array(c.mesh.normals); r.array(c.mesh.colors); r.array(c.mesh.uvs); r.array(c.mesh.extra); r.array(c.mesh.indices);
+  c.welded = true;
+  if (!r.ok) return false;
+  at = static_cast<std::size_t>(r.p - output.data());
+  return true;
+}
+
 }  // namespace sc::cityjobs

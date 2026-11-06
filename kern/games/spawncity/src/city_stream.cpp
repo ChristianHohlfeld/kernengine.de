@@ -130,7 +130,8 @@ struct CityStream::Tile {
   std::vector<u32> old_meshes;
   // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
   u32 tile_job = 0, build_job = 0;
-  std::vector<kern::GeoChunk> built;
+  std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
+  std::size_t built_at = 0;
   bool rebuilding = false, vis_dirty = false, prepared = false;
   // interiors (M3 life): one building left out, the collision rebuilt beside the old body
   i32 skip = -1;
@@ -368,7 +369,7 @@ void CityStream::begin_visual(Tile& t) {
   // extruded and welded off the frame (city_jobs.h); the frame only uploads the finished chunks
   if (t.build_job) kern::jobs::cancel(t.build_job);
   t.build_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(t.footprints, bo));
-  t.built.clear();
+  t.built_bytes.clear();
   t.upload_next = 0;
   t.state = Tile::State::building;
 }
@@ -622,23 +623,25 @@ bool CityStream::work(Tile& t, f64 deadline) {
       return kern::now_ms() > deadline ? false : work(t, deadline);
     case S::building: {
       if (t.build_job) {
-        std::vector<u8> out;
-        if (!kern::jobs::take(t.build_job, out)) return true;  // still extruding off the frame
+        if (!kern::jobs::take(t.build_job, t.built_bytes)) return true;  // still extruding off the frame
         t.build_job = 0;
-        if (!cityjobs::read_chunks(out, t.built)) t.built.clear();
-        t.upload_next = 0;
+        t.built_at = 4;
+        t.upload_next = cityjobs::chunk_count(t.built_bytes);  // chunks left
+        return true;  // the uploads start next frame
       }
-      // One finished chunk mesh at a time (the upload; the picking BVH is skipped for buildings).
+      // One finished chunk mesh at a time, read straight from the job's output and uploaded (the
+      // picking BVH is skipped for buildings): no step longer than one chunk.
       kern::Material m;
       m.roughness = 0.82f;
-      auto& chunks = t.built;
-      while (t.upload_next < chunks.size()) {
-        upload(t, chunks[t.upload_next], m, true);
-        chunks[t.upload_next++].mesh = kern::MeshData{};
+      while (t.upload_next > 0) {
+        kern::GeoChunk chunk;
+        if (!cityjobs::read_chunk(t.built_bytes, t.built_at, chunk)) { t.upload_next = 0; break; }
+        --t.upload_next;
+        upload(t, chunk, m, true);
         if (kern::now_ms() > deadline) return false;
       }
-      chunks.clear();
-      chunks.shrink_to_fit();
+      t.built_bytes.clear();
+      t.built_bytes.shrink_to_fit();
       t.upload_next = 0;
       if (t.rebuilding) {
         // the re-synced set is complete: the old meshes go in the same frame (nothing pops out)
