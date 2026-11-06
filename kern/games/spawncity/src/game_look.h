@@ -49,6 +49,11 @@ struct LookState {
   bool vm_built = false;
   i32 vm_shown = -1;
   f32 vm_fire_at = -99, vm_prev_next_attack = 0, vm_bob = 0, vm_bob_w = 0, vm_switch_at = -99;
+  // first_person_controller_v5.mjs alignSights for the game's own launchers: the barrel follows the
+  // finger's point (held 420 ms after it lifts), else the crosshair's rest point (resolved / 160 ms)
+  Vec3 vm_aim_point{}, vm_aim_smooth{0, 0, -30};
+  f32 vm_aim_until = -99, vm_rest_depth = 30, vm_rest_at = -99;
+  bool vm_aim_snap = false;
   i32 vm_prev_weapon = -1, vm_punch = 0;
   std::vector<u32> kern_vm_hidden;  // Kern's view-model meshes hidden while ours is shown
 };

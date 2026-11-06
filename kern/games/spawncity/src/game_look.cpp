@@ -507,7 +507,30 @@ void Game::look_view_models(f32 dt) {
     case 1: {
       // Launchers: held right of the view (Kern's rest pose .245 / -.225 / -.445), kick back and up.
       const f32 kick = age >= 0 && age < 0.22f ? std::sin(age / 0.22f * kPi) : 0;
-      put(cam * Mat4::translate({0.245f + bx * 0.45f, -0.2f + bz * 0.2f - drop, -0.47f + kick * 0.08f}) * euler(-0.03f + kick * 0.12f, -0.06f, -0.018f));
+      Mat4 g = Mat4::translate({0.245f + bx * 0.45f, -0.2f + bz * 0.2f - drop, -0.47f}) * euler(-0.03f, -0.06f, -0.018f);
+      // alignSights: rotate about the grip (the model's origin) so the barrel (-z) points at the aim
+      // point - the finger's, or the crosshair's rest point - smoothed at 22 Hz (TARGET_SMOOTH_HZ)
+      {
+        const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), rr = kern::normalize(kern::cross(f, cam_.up), {0, -1, 0}), uu = kern::cross(rr, f);
+        if (now - L.vm_rest_at > 0.16f || now < L.vm_rest_at) {
+          L.vm_rest_at = now;
+          const RayResult h = cast(world_->physics(), cam_.eye, f, 180, body(soldier_));
+          L.vm_rest_depth = h.hit ? clampf(kern::length(h.point - cam_.eye), 1.2f, 180) : 30;
+        }
+        Vec3 want{0, 0, -L.vm_rest_depth};
+        if (now < L.vm_aim_until) {
+          const Vec3 d = L.vm_aim_point - cam_.eye;
+          want = {kern::dot(d, rr), kern::dot(d, uu), -kern::dot(d, f)};
+          if (L.vm_aim_snap) L.vm_aim_smooth = want;
+        }
+        L.vm_aim_snap = false;
+        L.vm_aim_smooth = L.vm_aim_smooth + (want - L.vm_aim_smooth) * damp_alpha(22, dt);
+        const Vec3 grip = g.transform_point({0, 0, 0}), axis = kern::normalize(g.transform_point({0, 0, -1}) - grip, {0, 0, -1});
+        const Vec3 to = kern::normalize(L.vm_aim_smooth - grip, {0, 0, -1});
+        const f32 ang = std::acos(clampf(kern::dot(axis, to), -1, 1));
+        if (ang > 1e-4f) g = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle(kern::normalize(kern::cross(axis, to), {1, 0, 0}), ang), {1, 1, 1}) * Mat4::translate(grip * -1.0f) * g;
+      }
+      put(cam * g * Mat4::translate({0, 0, kick * 0.08f}) * euler(kick * 0.12f, 0, 0));
       break;
     }
     case 2: {

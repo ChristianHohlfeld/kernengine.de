@@ -743,6 +743,27 @@ void Game::draw_military() {
     A.put(CombatArt::glow_box, Mat4::translate(f.p + Vec3{0, 0, 420 - len * 0.5f}) * Mat4::scale({0.44f, 0.44f, len}), Vec3{3.0f, 0.3f, 0.2f} * pulse);
     A.put(CombatArt::glow_sphere, Mat4::translate(f.p + Vec3{0, 0, 0.3f}) * Mat4::scale({0.7f, 0.7f, 0.7f}), {4.0f, 0.4f, 0.2f});
   }
+  // updateBlasts: hot core (sphere r .45, x .5 .. 5, opacity .9 (1-t)) and flat ring (inner .6 outer 1,
+  // x .7 .. 7.7, opacity .78 (1-t)^1.6), e = 1 - (1-t)^3 over 540 ms, additive orange / gold
+  std::erase_if(visual_blasts_, [&](const VisualBlast& b) { return now - b.born >= 0.54f || now < b.born; });
+  for (const VisualBlast& b : visual_blasts_) {
+    const f32 t = clampf((now - b.born) / 0.54f, 0, 1), e = 1 - (1 - t) * (1 - t) * (1 - t);
+    const f32 hot = b.scale * (0.5f + 4.5f * e) * 0.9f, ring = b.scale * (0.7f + 7.0f * e);
+    A.put(CombatArt::fade_sphere, Mat4::translate(b.p) * Mat4::scale({hot, hot, hot}), Vec3{1.0f, 0.33f, 0.056f} * 3.0f, 0.9f * (1 - t));
+    A.put(CombatArt::fade_ring, Mat4::translate(b.p) * Mat4::scale({ring, ring, ring}), Vec3{1.0f, 0.64f, 0.19f} * 3.0f, 0.78f * std::pow(1 - t, 1.6f));
+  }
+  // makeGrenade: the 40 mm round - dark shell, two glowing orange bands, a green phosphor halo (x1.35)
+  for (const Projectile& p : projectiles_) {
+    if (p.id != weapons::Id::grenade_launcher) continue;
+    constexpr f32 r = 0.039f * 1.35f;
+    const Mat4 m = Mat4::translate(p.pos) * Mat4::trs({}, Quat::axis_angle(kern::normalize(kern::cross({0, 0, 1}, kern::normalize(p.vel, {1, 0, 0})), {1, 0, 0}),
+                                                                        std::acos(clampf(kern::normalize(p.vel, {1, 0, 0}).z, -1, 1))), {1, 1, 1});
+    A.put(CombatArt::sphere, m * Mat4::scale({2 * r, 2 * r, 2 * r}), {0.006f, 0.014f, 0.009f});
+    const f32 band = r * 1.02f / 0.8f, tube = 0.0048f * 1.35f / 0.2f;
+    A.put(CombatArt::fade_ring, m * Mat4::scale({band, band, tube * 0.25f}), Vec3{1.0f, 0.42f, 0.06f} * 3.0f, 1);
+    A.put(CombatArt::fade_ring, m * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, 1.5708f), {1, 1, 1}) * Mat4::scale({band, band, tube * 0.2f}), Vec3{1.0f, 0.42f, 0.06f} * 3.0f, 1);
+    A.put(CombatArt::fade_sphere, m * Mat4::scale({2 * r * 1.28f, 2 * r * 1.28f, 2 * r * 1.28f}), Vec3{0.0f, 1.0f, 0.13f} * 2.0f, 0.24f);
+  }
   // updateRocketLaser / placeDot: the launcher's red dot while it is in hand on foot - big, pulsing a
   // little, pulled a hair toward the viewer so it never sinks into the wall
   if (world_placed_ && mode_ == Mode::foot && foot_weapon_ == weapons::Id::rocket && !player_dead_) {

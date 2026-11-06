@@ -377,6 +377,9 @@ class Game {
   f32 laser_fx_ = 0, laser_fy_ = 0;
   Vec3 laser_pin_{}, laser_dot_{};
   Vec3 rocket_laser_dot();
+  // gameplay_final_runtime_v2.mjs visualBlast: every explosion's orange core and flat shock ring (540 ms)
+  struct VisualBlast { Vec3 p; f32 born = 0, scale = 1; };
+  std::vector<VisualBlast> visual_blasts_;
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);

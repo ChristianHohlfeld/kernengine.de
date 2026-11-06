@@ -388,7 +388,7 @@ void Game::draw_projectiles() {
   for (const Projectile& p : projectiles_) {
     switch (p.id) {
       case Id::hand_grenade: people_art_.projectile(p.pos, p.vel, 0.05f, 0.14f, false); break;
-      case Id::grenade_launcher: people_art_.projectile(p.pos, p.vel, 0.03f, 0.12f, false); break;
+      case Id::grenade_launcher: break;  // the glowing 40 mm round: draw_military (makeGrenade)
       case Id::jet_bomb: people_art_.projectile(p.pos, p.vel, 0.25f, 1.9f, false); break;
       case Id::jet_missile: people_art_.projectile(p.pos, p.vel, 0.12f, 2.8f, true); break;
       default: people_art_.projectile(p.pos, p.vel, 0.06f, 0.7f, true); break;

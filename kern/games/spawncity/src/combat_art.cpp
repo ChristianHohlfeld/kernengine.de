@@ -22,7 +22,8 @@ bool CombatArt::init(kern::Renderer& r) {
   const Vec3 white{1, 1, 1};
   kern::MeshData meshes[kShapes] = {prim::box({1, 1, 1}, white),  prim::sphere(0.5f, 14, 10, white), prim::cylinder(0.5f, 1, 14, white),
                                     prim::cone(0.5f, 1, 14, white), prim::box({1, 1, 1}, white),      prim::sphere(0.5f, 12, 8, white),
-                                    prim::sphere(0.5f, 10, 7, white)};
+                                    prim::sphere(0.5f, 10, 7, white),  prim::sphere(0.5f, 12, 8, white),
+                                    prim::torus(0.8f, 0.2f, 24, 6, white)};
   for (int i = 0; i < kShapes; ++i) {
     kern::Material m;
     m.roughness = 0.7f;
@@ -31,6 +32,13 @@ bool CombatArt::init(kern::Renderer& r) {
       m.emissive = {1, 1, 1};
       m.unlit = true;
       m.cast_shadow = false;
+    }
+    if (i == fade_sphere || i == fade_ring) {
+      m.emissive = {1, 1, 1};
+      m.unlit = true;
+      m.cast_shadow = false;
+      m.double_sided = true;
+      m.alpha = kern::AlphaMode::blend;
     }
     if (i == smoke) {
       m.roughness = 1;
@@ -57,6 +65,12 @@ void CombatArt::put(Shape s, const Mat4& m, Vec3 tint) {
   Part& p = parts_[s];
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
+}
+
+void CombatArt::put(Shape s, const Mat4& m, Vec3 tint, f32 alpha) {
+  Part& p = parts_[s];
+  p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
+  p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, clampf(alpha, 0, 1)});
 }
 
 void CombatArt::beam(Vec3 a, Vec3 b, f32 width, Vec3 tint) {

@@ -424,14 +424,19 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
       // first_person_controller_v5.mjs: the gun's sights follow the finger - the depth is resolved
       // where the finger went down (resolveDistance: 1.2 .. 180 m), the point moves with a drag, and
       // the shot leaves the aligned muzzle; after the finger lifts it holds 420 ms (RELEASE_HOLD_MS).
-      if (kern_gun && !locked) {
+      if (!locked) {
         Vec3 ro, rd;
         ctl_screen_ray(f.x, f.y, ro, rd);
         if (f.depth < 0) {
           const RayResult h = cast(world_->physics(), ro, rd, 180, body(soldier_));
           f.depth = h.hit ? clampf(kern::length(h.point - ro), 1.2f, 180) : 180;
         }
-        world_->aim_view_model(ro + rd * f.depth, 0.42f, f.fresh);
+        if (kern_gun) world_->aim_view_model(ro + rd * f.depth, 0.42f, f.fresh);
+        else {  // the game's own launchers (game_look.cpp look_view_models)
+          look_.vm_aim_point = ro + rd * f.depth;
+          look_.vm_aim_until = world_->sim_time() + 0.42f;
+          look_.vm_aim_snap = look_.vm_aim_snap || f.fresh;
+        }
       }
       const f32 repeat = w == weapons::Id::smg ? 0.055f : w == weapons::Id::glock ? 0.17f : -1;
       int shots = 0;

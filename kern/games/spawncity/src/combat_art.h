@@ -14,12 +14,15 @@ namespace sc {
 
 class CombatArt {
  public:
-  enum Shape : u8 { box, sphere, cylinder, cone, glow_box, glow_sphere, smoke, kShapes };
+  enum Shape : u8 { box, sphere, cylinder, cone, glow_box, glow_sphere, smoke, fade_sphere, fade_ring, kShapes };
   bool init(kern::Renderer& r);
   void begin();
   /// One primitive: unit box (1 m, centred), sphere (diameter 1), cylinder / cone (diameter 1,
   /// height 1 from z = 0 up), scaled by `m`; glow shapes are unlit (tint = HDR colour).
   void put(Shape s, const kern::Mat4& m, Vec3 tint);
+  /// fade_sphere / fade_ring: unlit, see-through (alpha), no depth writes - blasts, halos, rings.
+  /// fade_ring: a flat ring in the XY plane, mid radius .8, tube .2 (inner .6, outer 1 at scale 1).
+  void put(Shape s, const kern::Mat4& m, Vec3 tint, f32 alpha);
   /// A glowing bar from `a` to `b` (tracers).
   void beam(Vec3 a, Vec3 b, f32 width, Vec3 tint);
   void end();

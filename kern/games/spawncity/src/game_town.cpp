@@ -233,6 +233,9 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player) {
   const f32 now = world_->sim_time();
   ++explosions_;
   look_blast(at, radius);  // light, camera shake (game_look.cpp)
+  // dispatchExplosion -> visualBlast(position, 1): a pool of 8 in the original
+  if (visual_blasts_.size() >= 8) visual_blasts_.erase(visual_blasts_.begin());
+  visual_blasts_.push_back({at, now, 1});
   world_->physics().explode(at, radius, radius * 0.5f, 6.0f);
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
