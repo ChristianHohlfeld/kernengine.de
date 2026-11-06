@@ -112,7 +112,7 @@ uniform vec3 uSunShadowTexel;    // map size, 1 / size, one texel in metres
 uniform vec4 uSunShadowFade;     // eye, shadow distance (fades out over its last tenth)
 uniform int uSunShadowEnabled, uHasTexture, uUnlit, uLinearColor, uGrade, uPointLightCount;
 uniform vec2 uPbr;
-uniform vec4 uPointPosRange[6], uPointColorIntensity[6];
+uniform vec4 uPointPosRange[16], uPointColorIntensity[16];
 layout(location=0) out vec4 outColor;
 layout(location=1) out vec4 outHdr;
 // Ambient occlusion record (scene target only): share of indirect light per channel x (1 - fog), albedo luminance.
@@ -204,16 +204,26 @@ constexpr const char* kFragmentLighting = R"GLSL(
       shadow = mix(shadow, 1.0, smoothstep(uSunShadowFade.w * 0.9, uSunShadowFade.w, d));
     }
   }
-  vec3 point = vec3(0.0);
+  vec3 point = vec3(0.0), pointSpec = vec3(0.0);
   if (uUnlit != 1) {
-    for (int i = 0; i < 6; i++) {
+    // Point lights: windowed falloff (Karis 2013) for the diffuse, and their highlight (GGX, the
+    // material's roughness) - a lamp, a light bar or a blast glints on paint, glass and wet streets.
+    vec3 Vp = normalize(uEye - vWorld);
+    float rp = clamp(uPbr.x, 0.08, 1.0), a2p = rp * rp * rp * rp;
+    for (int i = 0; i < 16; i++) {
       if (i >= uPointLightCount) break;
       vec3 delta = uPointPosRange[i].xyz - vWorld;
       float d2 = max(dot(delta, delta), 0.04);
       float radius = max(0.1, uPointPosRange[i].w);
       float attenuation = pow(max(0.0, 1.0 - d2 / (radius * radius)), 2.0) / (1.0 + d2 / (radius * radius));
-      float diffuse = max(dot(n, delta * inversesqrt(d2)), 0.0);
-      point += uPointColorIntensity[i].rgb * (uPointColorIntensity[i].a * 0.12) * attenuation * diffuse;
+      vec3 L = delta * inversesqrt(d2);
+      float diffuse = max(dot(n, L), 0.0);
+      vec3 c = uPointColorIntensity[i].rgb * (uPointColorIntensity[i].a * 0.12) * attenuation;
+      point += c * diffuse;
+      vec3 H = normalize(L + Vp);
+      float NdH = clamp(dot(n, H), 0.0, 1.0);
+      float D = a2p / (3.14159265 * pow(NdH * NdH * (a2p - 1.0) + 1.0, 2.0));
+      pointSpec += c * diffuse * min(D, 24.0) * 0.25;
     }
   }
   const float PI = 3.141592653589793;
@@ -222,6 +232,13 @@ constexpr const char* kFragmentLighting = R"GLSL(
   // sun and point lights keep their own shadowing.
   vec3 indirect = uUnlit == 1 ? vec3(0.0) : base * (1.0 - metal) * (hemis / PI + envIrradiance(n) * uEnvIntensity);
   vec3 rgb = uUnlit == 1 ? base : base * (1.0 - metal) * (uSunColor * ndl * shadow + point * PI) / PI + indirect;
+  if (uUnlit != 1) {
+    // the highlight's colour: white on dielectrics (F0 .04 at normal, more at grazing), the base on metals
+    vec3 Vh = normalize(uEye - vWorld);
+    vec3 F0p = mix(vec3(0.04), base, metal);
+    vec3 Fp = F0p + (1.0 - F0p) * pow(1.0 - clamp(dot(n, Vh), 0.0, 1.0), 5.0);
+    rgb += Fp * pointSpec * (1.0 - 0.6 * clamp(uPbr.x, 0.0, 1.0));
+  }
   if (uUnlit != 1 && (metal > 0.0 || rough < 0.95)) {
     vec3 V = normalize(uEye - vWorld), R = reflect(-V, n);
     float NdV = clamp(dot(n, V), 0.0, 1.0);

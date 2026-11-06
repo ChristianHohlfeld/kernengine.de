@@ -12,7 +12,7 @@ namespace kern {
 class Bvh;
 
 constexpr u32 kMaxBones = 32;
-constexpr u32 kMaxPointLights = 6;
+constexpr u32 kMaxPointLights = 16;
 constexpr u32 kMaxExtensionAttributes = 2;   // vertex locations 14 and 15
 constexpr u32 kMaxMaterialParams = 8;        // integer parameters for shader extensions
 

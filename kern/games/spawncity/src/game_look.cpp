@@ -363,20 +363,37 @@ void Game::look_lighting(f32 dt) {
           if (l.state || l.lane >= lanes.size() || !lanes[l.lane].alive) continue;  // a broken lamp gives no light
           const Vec3 head = l.foot + Vec3{std::cos(l.yaw) * 1.42f, std::sin(l.yaw) * 1.42f, 5.75f};  // [hx, hy, z + 5.75]
           const f32 d = std::hypot(head.x - eye.x, head.y - eye.y);
-          if (d <= 70) near.push_back({d, head});
+          if (d <= 110) near.push_back({d, head});
         }
         std::sort(near.begin(), near.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
         L.near_lamps.clear();
-        for (std::size_t i = 0; i < near.size() && i < 3; ++i) L.near_lamps.push_back(near[i].second);
+        for (std::size_t i = 0; i < near.size() && i < 10; ++i) L.near_lamps.push_back(near[i].second);
       }
-      const u32 lamp_slots = police_n ? std::max<u32>(1, L.pool_size > police_n ? L.pool_size - police_n : 1) : 3;
+      // every slot the police leave (Kern: up to ten lamps, not the original's three)
+      const u32 lamp_slots = std::max<u32>(1, L.pool_size > police_n + 1 ? L.pool_size - police_n - 1 : 1);
       for (std::size_t li = 0; li < L.near_lamps.size() && li < lamp_slots; ++li) req(L.near_lamps[li], 0xffb35a, 46 * glow, 26, 5.75f);
     }
-    // Headlights: a pool of light ~7 m ahead of the car the player drives.
+    // Headlights: a pool of light ~7 m ahead of the car the player drives, and (Kern) of the three
+    // nearest driven cars within 60 m - the street at night is lit by its traffic.
     if (glow > 0.05f && mode_ == Mode::car && car_index_ >= 0) {
       const kern::Mat4 m = matrix_of(cars_[car_index_].actor);
       const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});
       req(m.translation() + fwd * 7.0f + Vec3{0, 0, 0.9f}, 0xfff2d8, 60 * glow, 22, 2.5f);
+    }
+    if (glow > 0.05f && L.pool_size >= 8) {
+      std::vector<std::pair<f32, i32>> near;
+      for (std::size_t i = 0; i < cars_.size(); ++i) {
+        const TrafficCar& c = cars_[i];
+        if (!c.placed || c.wreck || !c.driver || (mode_ == Mode::car && static_cast<i32>(i) == car_index_) || !world_->actor_alive(c.actor)) continue;
+        const f32 d = kern::length(matrix_of(c.actor).translation() - eye);
+        if (d < 60) near.push_back({d, static_cast<i32>(i)});
+      }
+      std::sort(near.begin(), near.end());
+      for (std::size_t k = 0; k < near.size() && k < 3; ++k) {
+        const kern::Mat4 m = matrix_of(cars_[static_cast<std::size_t>(near[k].second)].actor);
+        const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});
+        req(m.translation() + fwd * 6.0f + Vec3{0, 0, 0.8f}, 0xfff2d8, 36 * glow, 16, 2.0f);
+      }
     }
     // Muzzle flash in front of the eye (55 ms per shot).
     if (now < L.flash_until) {
