@@ -274,6 +274,7 @@ export class MpPage {
 
   // ---- connection --------------------------------------------------------------------------------
   async connect(KernNet) {
+    this.KernNet = KernNet;
     const mp = this.params.get("mp");
     if (mp !== "host" && mp !== "join" && mp !== "auto") return;
     const e = this.e, kern = this.kern;
@@ -353,10 +354,15 @@ export class MpPage {
     return u.href;
   }
   goMulti() {
-    // MULTI (lan_vs.mjs): into the one public lobby - join it, or host it when nobody is there.
+    // MULTI (lan_vs.mjs): into the one public lobby - join it, or host it when nobody is there -
+    // right here, the game goes on (no reload: a reload threw the player back to the title)
+    if (this.net || this.connecting) return;
     const u = new URL(location.href);
     u.searchParams.set("mp", "auto"); u.searchParams.set("net", "public"); u.searchParams.set("room", MP_LOBBY);
-    location.href = u.href;
+    try { history.replaceState(history.state, "", u.href); } catch { /* the address stays */ }
+    this.params = u.searchParams;
+    this.connecting = true;
+    this.connect(this.KernNet).finally(() => { this.connecting = false; });
   }
   showShare() {
     // TEILEN (share_button.mjs) with a QR code to join (the game encodes it: sc QR encoder).
