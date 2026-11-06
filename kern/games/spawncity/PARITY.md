@@ -140,7 +140,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `nav_ar_route_math` | Routen-Hinweise | gebaut | `mp_rules.h` |  |
 | `nav_marker_timeline` | Glättung entfernter Fahrzeuge für die Navigation | gebaut | `mp_rules.h` |  |
 | `nav_route_request_gate` | Nur neueste Routenanfrage zählt | gebaut | `web/mp_host.mjs` |  |
-| `neon_bloom` | Bloom | teilweise | `game_look.cpp`, `perf.h` | Bloom an; Stärke 0,13/0,08 und Schwelle 0,88 lassen sich in Kern nicht einstellen (Engine-Punkt 11, mit dem Nutzer klären). |
+| `neon_bloom` | Bloom | gebaut | `game_look.cpp`, `kern/src/gfx/bloom.cpp` | Kerns Bloom-Pass hat die Werte des Originals fest eingebaut: Stärke 0,13 (nah) / 0,08 (weit), Schwelle 0,88. |
 | `neon_ui_theme` | UI-Skin | gebaut | `web/ui.mjs` |  |
 | `nostr_data_relay` | Zweiter öffentlicher Weg über Nostr-Relays | fehlt |  | braucht Schnorr-Signaturen auf secp256k1 (im Browser nicht eingebaut). |
 | `nuke_destruction` | Gebäude durch Waffen zerstören („everyday destructibles“); Atombombe | teilweise | `destruction.cpp`, `city_stream.cpp` | Waffen brechen Stockwerke ab, Einsturz zum Stumpf, Abriss-Stück und Bruchtrümmer: gebaut (eigene Umsetzung, destruction.h). Atombombe selbst: im Original nicht erreichbar (`drone_weapon_modes.mjs` entfernt `fireNuke`). Offen: Schwanken (sway) der getroffenen Häuser. |
