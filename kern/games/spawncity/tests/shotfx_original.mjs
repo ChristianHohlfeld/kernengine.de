@@ -26,8 +26,9 @@ const slowmo = () => {
   const st = window.setTimeout.bind(window);
   window.setTimeout = (f, d, ...a) => st(f, (Number(d) || 0) / k, ...a);
   // CSS animations started while slowed play slowed too
-  new MutationObserver(() => { if (k !== 1) for (const a of document.getAnimations?.() || []) a.playbackRate = k; })
+  const watch = () => new MutationObserver(() => { if (k !== 1) for (const a of document.getAnimations?.() || []) a.playbackRate = k; })
     .observe(document.documentElement, {subtree: true, attributes: true, attributeFilter: ["class"]});
+  if (document.documentElement) watch(); else addEventListener("DOMContentLoaded", watch, {once: true});
 };
 
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
@@ -36,7 +37,8 @@ await ctx.addInitScript(slowmo);
 const page = await ctx.newPage();
 page.on("pageerror", e => log("pageerror", e.message));
 await page.goto(URL);
-await page.waitForFunction(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START", null, {timeout: 120000});
+await page.waitForFunction(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START", null, {timeout: 240000})
+  .catch(async e => { await page.screenshot({path: path.join(out, "orig-boot-failed.png")}); log("boot", await page.evaluate(() => document.getElementById("gameMenuStart")?.outerHTML || document.title)); throw e; });
 await page.click("#gameMenuStart");
 await page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000});
 await page.waitForFunction(() => Number(document.querySelector("#viewport")?.dataset.worldCityBuildings) > 20, null, {timeout: 90000}).catch(() => {});
