@@ -808,9 +808,17 @@ void Game::draw_military() {
     if (laser_valid_) {
       const Vec3 to_eye = cam_.eye - dot;
       const f32 dist = std::fmax(1e-3f, kern::length(to_eye));
-      const Vec3 at = dot + to_eye * (std::fmin(0.15f, 0.03f + dist * 0.002f) / dist);
-      const f32 size = std::fmax(0.14f, dist * 0.016f) * (0.9f + 0.1f * std::sin(now * 45.0f)) * 0.5f;
-      A.put(CombatArt::glow_sphere, Mat4::translate(at) * Mat4::scale({size, size, size}), {4.0f, 0.12f, 0.08f});
+      // the sprite's width (placeDot: max(.14, d * .016), flicker .9 .. 1): a red core that full
+      // width, a soft halo round it - drawn flat towards the eye and pulled out of the wall by its
+      // own radius, so no wall swallows half of it (the HL2 dot, plainly seen)
+      const f32 size = std::fmax(0.14f, dist * 0.016f) * (0.9f + 0.1f * std::sin(now * 45.0f));
+      const Vec3 n = to_eye * (1 / dist);
+      const Vec3 at = dot + n * (std::fmin(0.15f, 0.03f + dist * 0.002f) + size * 0.3f);
+      const Vec3 ax = kern::cross({0, 0, 1}, n);
+      const f32 al = kern::length(ax);
+      const Quat q = al > 1e-4f ? Quat::axis_angle(ax * (1 / al), std::acos(clampf(n.z, -1, 1))) : Quat{};
+      A.put(CombatArt::glow_sphere, Mat4::translate(at) * Mat4::trs({}, q, {size, size, size * 0.25f}), {5.0f, 0.15f, 0.08f});
+      A.put(CombatArt::fade_sphere, Mat4::translate(at + n * 0.01f) * Mat4::trs({}, q, {size * 2.3f, size * 2.3f, size * 0.3f}), Vec3{1.0f, 0.05f, 0.03f} * 2.5f, 0.42f);
     }
   }
   for (const Tracer& t : combat_.tracers)
