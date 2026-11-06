@@ -542,6 +542,8 @@ class Game {
   bool web_audio_ = false;
   std::string osfx_;
   void osfx(const char* fn, Vec3 at, f32 a = 0, f32 b = 0, f32 c = 0);
+  bool shot_flesh_ = false;  // hit_scan's last round struck a person or a player
+  f32 hit_material(Vec3 at, u8 surface, bool flesh) const;
   std::string web_audio_state();
   bool web_audio_command(const std::string& cmd, std::string& out);
   // start parameters

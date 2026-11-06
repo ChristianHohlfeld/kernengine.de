@@ -288,6 +288,10 @@ void Game::life_update(f32 dt) {
     const People::Person& p = all[i];
     const u8 st = static_cast<u8>(p.state), was = G.prev_state[i];
     G.prev_state[i] = st;
+    if (G.prev_hands.size() < all.size()) G.prev_hands.resize(all.size(), 0);
+    if (p.hands_up_until > G.prev_hands[i] && p.hands_up_until > now && p.kind == People::Kind::citizen && p.state != People::State::down)
+      osfx("street_voices.scream", p.pos + Vec3{0, 0, 1.6f}, static_cast<f32>((static_cast<u32>(i) * 2654435761u + p.seed) & 0xffffff));
+    G.prev_hands[i] = p.hands_up_until;
     if (p.kind != People::Kind::citizen || p.state == People::State::down || p.state == People::State::gone) continue;
     const f32 hear = kern::length(p.pos + Vec3{0, 0, 1.6f} - cam_.eye);
     if (hear > 55) continue;
@@ -313,7 +317,8 @@ void Game::life_update(f32 dt) {
   if (now >= G.next_honk_check) {
     G.next_honk_check = now + 0.25f;
     for (const LifeCar& c : v.cars) {
-      if (c.player || !c.driver || cars_[c.car].police || std::hypot(c.velocity.x, c.velocity.y) > 1.0f) continue;
+      auto slot = [&](std::vector<std::pair<i32, f32>>& v) -> f32& { for (auto& [k, t] : v) if (k == c.car) return t; v.push_back({c.car, 0}); return v.back().second; };
+      if (c.player || !c.driver || cars_[c.car].police || std::hypot(c.velocity.x, c.velocity.y) > 1.0f) { if (c.car >= 0) slot(G.blocked) = 0; continue; }
       auto blocks = [&](Vec3 q) {
         const Vec3 l = to_local(c.rotation, q - c.position);
         return l.x > c.half.x && l.x < c.half.x + 7 && std::fabs(l.y) < 1.6f && std::fabs(l.z) < 3;
@@ -322,10 +327,15 @@ void Game::life_update(f32 dt) {
       if (mode_ == Mode::foot && blocks(me)) who = -1;
       for (std::size_t i = 0; i < all.size() && who == -2; ++i)
         if (all[i].kind == People::Kind::citizen && all[i].state != People::State::down && all[i].state != People::State::gone && blocks(all[i].pos)) who = static_cast<i32>(i);
-      if (who == -2) continue;
+      f32& since = slot(G.blocked);
+      if (who == -2) { since = 0; continue; }
+      if (since <= 0) since = now;
+      const f32 wait = now - since;
+      f32& next = slot(G.next_honk);
+      if (web_audio_ && (wait < (who == -1 ? 2.6f : 7.0f) || now < next)) continue;
       const bool bus = c.half.x > 3;
       const bool honked = G.life.honk(c.position, bus, static_cast<u32>(c.car), now, kern::length(c.position - cam_.eye), out);
-      if (honked) osfx("street_voices.honk", c.position + Vec3{0, 0, 0.4f}, bus ? 1 : 0, who == -1 ? 1 : 0);
+      if (honked) { next = now + 9 + rng_.unit() * 7; osfx("street_voices.honk", c.position + Vec3{0, 0, 0.4f}, bus ? 1 : 0, wait > 6 ? 2 : who == -1 ? 1 : 0); }
       if (honked && who >= 0)
         G.life.shout(all[who].pos, "honked", static_cast<u32>(who) * 2654435761u, now, kern::length(all[who].pos - cam_.eye), out);
     }

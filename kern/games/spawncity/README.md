@@ -538,7 +538,10 @@ kern/games/spawncity/
   Hupen, Schreie, Laternen …) sind aus deren Quelltext herausgeschnitten (`web/audio/original_sfx.mjs`,
   erzeugt von `tools/take_original_audio.py`). Das Spiel meldet nur, was passiert (`osfx`: das Ereignis
   nennt die Originalfunktion) und was läuft (Hörer, Motoren der Drohne, Auto, Jetpack, Sirenen, Jets,
-  Raketen; `audio frame`). Kerns Mixer läuft weiter, wird auf der Seite aber nicht gehört (`audio web 1`),
+  Raketen; `audio frame`). Einschläge klingen nach dem Material, das `materialKind` des Originals
+  bestimmt (Mensch/Spieler Fleisch, Auto/Polizeidrohne/Laterne Metall, Baum Holz, sonst Beton);
+  Hupen nach `honkCheck` (Spieler ab 2,6 s, Passant ab 7 s, „long“ ab 6 s Warten); Schreie, wenn
+  die Arme hochfliegen; `shoot` (Tests) feuert die Fußwaffe einmal durch die Bildmitte. Kerns Mixer läuft weiter, wird auf der Seite aber nicht gehört (`audio web 1`),
   außer den Stimmen der Mitspieler. `?audio=kern` oder `?view=kern`: Kerns eigener Ton (Synth-Patches,
   `MusicSynth`, wie in nativen Builds).
 * **Idee fürs nächste Update** (`suggestion_box.mjs`, `nostr.*`): nach 15 min Spielzeit dieser Version fragt

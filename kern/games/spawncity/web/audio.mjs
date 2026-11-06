@@ -42,11 +42,6 @@ function startSettings() {
 
 // LifeOut::Sound (life.h) -> the original's function (cows.mjs, pigeons.mjs, jogger_chain.mjs,
 // street_voices.mjs, animal_audio.mjs); the horns come as their own event (street_voices.honk).
-const hashSeed = s => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
-function screamSeed(female) {  // street_voices.mjs scream: female = hash(seed) > .45 (the game chose who screams)
-  for (let i = 0; i < 64; i++) { const s = `k${Math.floor(Math.random() * 1e9)}`; if ((hashSeed(s) > 0.45) === female) return s; }
-  return "";
-}
 
 /** Starts the original's sound on the page (the title music at once). attach(command) once the game
  *  runs, then update(hud, ui) every frame. */
@@ -87,7 +82,7 @@ export function installOriginalAudio() {
   const still = [0, 0, 0, 0];
 
   const fire = (type, detail) => { try { window.dispatchEvent(new CustomEvent(type, {detail})); } catch { /* none */ } };
-  const impactKind = surface => surface === 3 ? "flesh" : surface === 2 ? "metal" : "concrete";  // world_action_feedback.mjs materialKind
+  const MATERIAL = ["", "concrete", "metal", "flesh", "wood"];  // game_audio_web.cpp hit_material (world_action_feedback.mjs materialKind)
   const LIFE = [
     (p, k) => O.cows.moo(p, k),                                  // moo
     (p, k) => O.cows.moo(p, k, {pain: true}),                    // moo_pain
@@ -99,15 +94,14 @@ export function installOriginalAudio() {
     p => O.jogger_chain.stomp(p[0], p[1], true),                 // stomp_accent
     () => O.jogger_chain.jingle(),                               // jingle
     null, null,                                                  // horn, horn_bus: street_voices.honk
-    p => O.street_voices.scream(p, {seed: screamSeed(false)}),   // scream
-    p => O.street_voices.scream(p, {seed: screamSeed(true)}),    // scream_f
+    null, null,                                                  // scream, scream_f: the original screams when the arms fly up (street_voices.scream below)
     () => playAnimal("dog"), () => playAnimal("cat"), () => playAnimal("hiss"), () => playAnimal("yowl"), () => playAnimal("screech"),
   ];
   // the game's audio events: "<module>.<function>" with a place and three numbers (game_audio_web.cpp)
   const EVENTS = {
     // flight_fire_fx.mjs fire(): shotSound; world_action_feedback.mjs: playShotBody(1) for the new
     // round, playImpactSound(kind) where it struck (acknowledgeSceneHit)
-    "flight_fire_fx.fire": (p, surface) => { O.flight_fire_fx.shotSound(); O.world_action_feedback.playShotBody(1); if (surface > 0) O.world_action_feedback.playImpactSound(impactKind(surface)); },
+    "flight_fire_fx.fire": (p, material) => { O.flight_fire_fx.shotSound(); O.world_action_feedback.playShotBody(1); if (material > 0) O.world_action_feedback.playImpactSound(MATERIAL[material]); },
     // the weapons' own launch sound (weapons.h Id): grenade launcher audioShot(.34), rocket launcher
     // audioShot(.4) (gameplay_final_runtime_v2.mjs), hand grenade whoosh (hand_grenade.mjs), the
     // drone's missiles audioShot(.34), the jet's rocket sfx("explosion", .25, 1.8) and bomb
@@ -157,7 +151,11 @@ export function installOriginalAudio() {
     "people_impacts.thump": (p, gain) => O.people_impacts.thump(gain),
     "gameplay_polish_lite.playPersonGroan": () => O.gameplay_polish_lite.playPersonGroan(),
     "fighter_jets.beep": (p, kind) => kind === 0 ? O.fighter_jets.beep([740, 990], .06, .11) : kind === 1 ? O.fighter_jets.beep([220], .16, .1) : kind === 2 ? O.fighter_jets.beep([220], .18, .1) : O.fighter_jets.beep([330], .08, .1),
-    "street_voices.honk": (p, bus, player) => O.street_voices.honk(p, {kind: bus ? "bus" : "car", style: player ? "double" : "toot", source: ""}),
+    "street_voices.honk": (p, bus, style) => O.street_voices.honk(p, {kind: bus ? "bus" : "car", style: ["toot", "double", "long"][style] || "toot", source: ""}),
+    // world_procedural_population.mjs: arms flung up = a scream (seed: the person)
+    "street_voices.scream": (p, seed) => O.street_voices.scream(p, {seed: `p${seed}`}),
+    "jet_mode.knock": () => O.jet_mode.sfx("bounce", {gain: .3, playbackRate: .6, minIntervalMs: 60}),
+    "wanted_police_drones.escaped": () => O.wanted_police_drones.playTone({frequency: 660, endFrequency: 1040, duration: .22, gain: .023, type: "sine"}),
     "life": (p, sound, volume) => LIFE[sound]?.(p, volume),
     // the original's own events, for its unchanged modules
     "world-kill": () => fire("arondight:world-kill", {kind: "person"}),                       // world_organic_hit_audio.mjs
@@ -232,10 +230,6 @@ export function installOriginalAudio() {
     if (v.dmg !== undefined) was.dmg = v.dmg;
     if (was.hits >= 0 && v.droneHits > was.hits) O.flight_fire_fx.hitConfirmSound();
     if (v.droneHits !== undefined) was.hits = v.droneHits;
-    // ---- wanted_police_drones.mjs clearWanted: escaped (not a reset) -> playTone 660 -> 1040
-    const stars = h?.stars || 0, resets = h?.ui?.resets || 0;
-    if (was.stars > 0 && stars === 0 && resets === was.resets && playing) O.wanted_police_drones.playTone({frequency: 660, endFrequency: 1040, duration: .22, gain: .023, type: "sine"});
-    was.stars = stars; was.resets = resets;
     // ---- vs_combat_presentation.mjs playExplosion: you went down (local) / a mate did
     if (h?.net) {
       const me = !!h.ctl?.dead;

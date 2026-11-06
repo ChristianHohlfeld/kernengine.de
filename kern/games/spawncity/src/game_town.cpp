@@ -825,8 +825,10 @@ void Game::update_town(f32 dt) {
   // clock does not run (wanted_police_drones.mjs).
   const i32 st = wanted_.stars();
   const bool en_route = st > 0 && star_since_ >= 0 && now < star_since_ + wanted::arrival_delay_ms(st) / 1000 + 6;
+  const bool had = wanted_.stars() > 0;
   wanted_.update(dt, police_sees || en_route);
   const i32 stars = wanted_.stars();
+  if (had && stars == 0) osfx("wanted_police_drones.escaped", me);  // clearWanted("escaped"): playTone 660 -> 1040
   if (stars > last_stars_) {
     toast_ = "Fahndung: " + std::string(static_cast<std::size_t>(stars), '*');
     toast_age_ = 0;

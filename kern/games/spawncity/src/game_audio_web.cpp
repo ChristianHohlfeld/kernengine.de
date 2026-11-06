@@ -17,6 +17,7 @@
 #include "game.h"
 #include "game_combat.h"
 #include "game_gaps.h"
+#include "game_life.h"
 
 namespace sc {
 
@@ -25,6 +26,29 @@ void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
   char buf[192];
   std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, at.x, at.y, at.z, a, b, c);
   osfx_ += buf;
+}
+
+// world_action_feedback.mjs materialKind(hit): a person / player -> flesh; a car, bus, vehicle or
+// lamp (or a metal object, metalness > .32: the police drones) -> metal; a tree -> wood; else
+// concrete. Codes for audio.mjs: 1 concrete, 2 metal, 3 flesh, 4 wood.
+f32 Game::hit_material(Vec3 at, u8 surface, bool flesh) const {
+  if (flesh) return 3;
+  if (surface == 2) return 2;  // a car or a police drone (hit_scan)
+  if (gaps_)
+    for (i32 i : gaps_->lamps.near(at.x, at.y, 2.5f)) {
+      const lamps::Lamp& l = gaps_->lamps.all()[static_cast<std::size_t>(i)];
+      if (l.state < 2 && (std::hypot(at.x - l.foot.x, at.y - l.foot.y) < lamps::kPoleR + 0.25f || std::hypot(at.x - l.head.x, at.y - l.head.y) < 0.6f) && at.z < l.foot.z + lamps::kPoleH + 0.4f)
+        return 2;
+    }
+  if (glife_)
+    for (const Life::Tree& t : glife_->life.trees()) {
+      // the tree as life_art.cpp draws it: a trunk 2.3 m and a crown ball at 2.75 m (+ 15 cm)
+      const f32 s = t.scale, h = std::hypot(at.x - t.foot.x, at.y - t.foot.y);
+      if (h < 0.3f * s && at.z > t.foot.z - 0.2f && at.z < t.foot.z + 2.4f * s) return 4;
+      const f32 cx = h / (1.0f * s + 0.15f), cz = (at.z - t.foot.z - 2.75f * s) / (1.2f * s + 0.15f);
+      if (cx * cx + cz * cz < 1) return 4;
+    }
+  return 1;
 }
 
 std::string Game::web_audio_state() {
@@ -142,6 +166,11 @@ bool Game::web_audio_command(const std::string& cmd, std::string& out) {
   if (cmd == "audio frame") {
     out = "{\"e\":[" + osfx_ + "]," + web_audio_state() + "}";
     osfx_.clear();
+    return true;
+  }
+  if (cmd == "shoot") {
+    // tests: one round of the foot weapon in hand through the middle of the view (the touch path)
+    out = mode_ == Mode::foot && ctl_touch_shot(frame_w_ / 2, frame_h_ / 2) ? "reload" : "ok";
     return true;
   }
   if (cmd.rfind("audio web ", 0) == 0) {

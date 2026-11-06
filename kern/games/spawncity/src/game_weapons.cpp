@@ -123,7 +123,10 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
     }
   }
   i32 person = -1;
-  if ((by_player && hit_remotes(from, to, damage)) || (person = people_.shot(from, to, damage, by_player, now)) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
+  bool remote = false;
+  shot_flesh_ = false;
+  if ((by_player && (remote = hit_remotes(from, to, damage))) || (person = people_.shot(from, to, damage, by_player, now)) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
+    shot_flesh_ = remote || person >= 0;  // world_action_feedback.mjs materialKind: person / player -> flesh
     if (person >= 0 && by_player) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
     // a touch shot with the Glock or the sniper goes through bodies too (glockShotAt / sniperShotAt:
     // up to three, 0.6 m on past each), as handle_shots does for Kern's own rounds
@@ -314,7 +317,7 @@ void Game::drone_attack(bool trigger, bool pressed) {
     if (e.impact) ctl_.impacts[ctl_.impact_serial++ % 8] = e.to;
     if (e.surface >= 2) ++ctl_.drone_hits;
     world_->play_sound(combat_sfx(combat_audio::Kind::shot), nose, 0.55f, 1.35f, true);
-    osfx("flight_fire_fx.fire", e.to, e.impact ? e.surface : 0);  // shotSound + playShotBody(1) + playImpactSound(kind)
+    osfx("flight_fire_fx.fire", e.to, e.impact ? hit_material(e.to, e.surface, shot_flesh_) : 0);  // shotSound + playShotBody(1) + playImpactSound(materialKind)
   } else if (pressed && drone_weapon_ == 2) {
     guided_press();  // lock on what is nearest the crosshair and launch (game_guided.cpp)
   } else if (pressed) {

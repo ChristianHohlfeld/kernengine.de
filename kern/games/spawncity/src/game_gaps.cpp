@@ -534,6 +534,7 @@ void Game::gaps_jet_damage(f32 amount) {
   // jet_mode.mjs damageAirframe: HP 400; thrust .35 + hp / 200 * .65 (.35 .. 1); at 15 % it burns
   // for 12 s, at 0 it breaks up at once.
   if (!(amount > 0) || !jet_placed_) return;
+  if (amount > 8 && mode_ == Mode::jet) osfx("jet_mode.knock", matrix_of(jet_actor_).translation());  // damageAirframe: sfx("bounce", .3, .6)
   GapsState& g = *gaps_;
   const f32 now = world_->sim_time();
   jet_hp_ = std::fmax(0.0f, std::fmin(jet_hp_, kJetHpMax) - amount);
