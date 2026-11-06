@@ -59,6 +59,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "reset") { ui_reset(); out = "ok"; return true; }
+  if (cmd == "respawn") { out = request_respawn() ? "ok" : player_dead_ ? "wait" : "alive"; return true; }
   // ---- start place (start_location.mjs, auto_flight_start.mjs) ----
   if (starts("start ")) {
     double lat = 0, lon = 0;

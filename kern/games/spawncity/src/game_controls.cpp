@@ -161,6 +161,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   // ---- dead: R / Enter / Space and A / Y respawn; nothing else plays (desktop_controls.mjs:165) ----
   if (!alive) {
     C.aiming = false;
+    if (in.pressed(Key::r) || in.pressed(Key::enter) || in.pressed(Key::space) || ph(kPadA) || ph(kPadY)) request_respawn();
     return;
   }
 

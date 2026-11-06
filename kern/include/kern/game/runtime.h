@@ -284,6 +284,9 @@ class GameWorld {
   void set_health(ActorId id, f32 health, f32 armor, bool dead);
   /// Server: HUD state of a soldier pawn for its client. False if the pawn is no soldier.
   bool soldier_state(ActorId pawn, SoldierState& out) const;
+  /// A dead soldier comes back at the next step (a game whose player respawns on input sets a long
+  /// respawnDelay and calls this). False when it is not dead.
+  bool respawn_now(ActorId pawn);
   /// Client: applies the server's state of this machine's soldier to the HUD.
   void apply_soldier_state(const SoldierState& s);
   /// The camera the frame is drawn with (view model of a first-person player).

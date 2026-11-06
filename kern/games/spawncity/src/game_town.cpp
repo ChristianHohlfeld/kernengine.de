@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "game.h"
+#include "mp_rules.h"
 #include "weapons.h"
 
 namespace sc {
@@ -784,16 +785,39 @@ void Game::update_police(f32 dt) {
 // ---------------------------------------------------------------------------------------------
 // per frame
 
+bool Game::request_respawn() {
+  // a press right at the moment of death never skips the 3 s (__arondightRespawnReady)
+  if (!player_dead_ || respawn_wait() > 0) return false;
+  return world_->respawn_now(soldier_);
+}
+
 void Game::update_town(f32 dt) {
   if (!world_placed_) return;
   const f32 now = world_->sim_time();
   // Death: the wanted level is cleared, the police calls it off (SpawnCity game_reset.mjs).
+  // Alone the player comes back when he asks (request_respawn); with mates on the session's timer.
+  {
+    const i32 rule = net_.active() ? 1 : 0;
+    if (rule != respawn_rule_) {
+      respawn_rule_ = rule;
+      world_->set_property(soldier_, "components.health.respawnDelay", kern::json::Value(rule ? 3.0 : 1e5));
+    }
+  }
   const bool dead = world_->hud().respawn_in > 0 || (world_->hud().health >= 0 && world_->hud().health <= 0);
   if (dead && !player_dead_) {
     wanted_.clear();
     toast_ = "Erwischt. Neuer Versuch.";
     toast_age_ = 0;
+    died_at_ = now;
+    died_feet_ = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
+  } else if (!dead && player_dead_ && !net_.active() && died_at_ >= 0 && mode_ == Mode::foot) {
+    // back near where he went down (relocateRespawnOrigin: 3..5 m, never into a wall)
+    const Vec2 o = mp::respawn_offset(rng_);
+    Spot s{};
+    if (!clear_spot(died_feet_ + Vec3{o.x, o.y, 0}, {0.6f, 0.6f}, 24, s)) s = {died_feet_ + Vec3{o.x, o.y, 0}, 0};
+    world_->teleport(soldier_, Vec3{s.p.x, s.p.y, city_.ground_height(s.p.x, s.p.y)} + Vec3{0, 0, 0.75f});
   }
+  if (!dead) died_at_ = -1;
   player_dead_ = dead;
   handle_shots();
   const PeopleView view = people_view();

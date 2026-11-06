@@ -429,7 +429,10 @@ function installViewModes() {
         text(strong, "DESTROYED");
         text(small, wait > 0 ? `RESPAWN IN ${Math.ceil(wait / 1000)}` : body().classList.contains("pad-input") ? "PRESS Ⓐ TO RESPAWN" : body().classList.contains("desktop-input") ? "PRESS R TO RESPAWN" : "TAP TO RESPAWN");
       } else if (enemy) { text(strong, "ENEMY DESTROYED"); text(small, "WAITING FOR RESET"); }
-      if (button) { hide(button, !localDead); button.disabled = wait > 0; text(button, "RESPAWN"); }
+      if (button) {
+        hide(button, !localDead); button.disabled = wait > 0; text(button, "RESPAWN");
+        if (!button.dataset.kern) { button.dataset.kern = "1"; button.addEventListener("click", () => view.command("respawn")); }
+      }
     }
   }
 

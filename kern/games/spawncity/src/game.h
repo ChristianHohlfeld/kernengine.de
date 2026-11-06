@@ -535,6 +535,14 @@ class Game {
   f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400, town_clock_ = 0;  // jet: jet_mode.mjs HP_MAX 400
   i32 last_stars_ = 0;
   bool player_dead_ = false;
+  // vs_combat_presentation.mjs: down until the player asks (R / Enter / Space, pad A / Y, the
+  // RESPAWN button) - not before 3 s (RESPAWN_COOLDOWN_MS); back 3..5 m from where he went down
+  f32 died_at_ = -1;
+  Vec3 died_feet_{};
+  i32 respawn_rule_ = -1;  // the respawn delay set on Kern's soldier: 0 by input, 1 the mates' timer
+  static constexpr f32 kRespawnCooldown = 3;
+  bool request_respawn();
+  f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }
   // rules / feedback
   wanted::Tracker wanted_;
   std::string hint_, toast_;

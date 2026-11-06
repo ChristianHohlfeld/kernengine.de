@@ -86,6 +86,12 @@ void GameWorld::set_health(ActorId id, f32 health, f32 armor, bool dead) {
   h.dead = dead;
 }
 
+bool GameWorld::respawn_now(ActorId pawn) {
+  for (auto& q : pawns_)
+    if (q->actor == pawn && q->respawn_at >= 0) { q->respawn_at = sim_time_; return true; }
+  return false;
+}
+
 bool GameWorld::soldier_state(ActorId pawn, SoldierState& out) const {
   const Pawn* p = nullptr;
   for (const auto& q : pawns_) if (q->actor == pawn) p = q.get();
