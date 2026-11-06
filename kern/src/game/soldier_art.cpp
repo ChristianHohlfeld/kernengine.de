@@ -562,7 +562,15 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
     }
     // VR: the gun in the controller's hand - its grip where the hand is, the barrel along the ray
     const f32 vs = art.view_vr_scale;
-    const Mat4 world = view_hand_valid_ ? view_hand_ * models::euler({.075f * kick, 0, 0}) * Mat4::scale({vs, vs, vs}) * Mat4::translate(art.weapon.grip * -1.0f - mount) : cam * g;
+    // VR: Kimme und Korn on the ray - the sight line (rear to front sight) turned onto the hand's
+    // -z, about the grip: what you see over the sights is where the round goes (parallel, a few cm
+    // above the barrel's line)
+    Mat4 sight_fix;
+    if (view_hand_valid_) {
+      const Vec3 sl = normalize(art.weapon.front_sight - art.weapon.rear_sight, {0, 0, -1});
+      sight_fix = quat_matrix(rotation_between(sl, {0, 0, -1}));
+    }
+    const Mat4 world = view_hand_valid_ ? view_hand_ * models::euler({.075f * kick, 0, 0}) * Mat4::scale({vs, vs, vs}) * sight_fix * Mat4::translate(art.weapon.grip * -1.0f - mount) : cam * g;
     art.view_matrix = world;
     art.view_valid = true;
     const Mat4 body = world * Mat4::translate(mount);

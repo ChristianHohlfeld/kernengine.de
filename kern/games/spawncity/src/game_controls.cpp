@@ -211,12 +211,14 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   if (mode_ == Mode::jet && pad_touch_.take_pressed("vtol")) jet_.toggle_mode();
 
   // ---- EMP (G, pad B, the EMP button: foot and drone) ----
-  if ((on_foot || drone) && (in.pressed(Key::g) || ph(kPadB) || pad_touch_.take_pressed("emp"))) emp_pulse();
+  // (VR: B is the weapon switch - Y opens the wrist menu, EMP is there too)
+  const bool xr = engine_ && engine_->xr;
+  if ((on_foot || drone) && (in.pressed(Key::g) || (ph(kPadB) && !xr) || pad_touch_.take_pressed("emp"))) emp_pulse();
 
   // ---- weapons: Q / wheel / Y (not in the R3+Y chord) / D-pad left / the thumb button ----
   if (on_foot || drone) {
     i32 step = 0;
-    if (in.pressed(Key::q) || (ph(kPadY) && !v.suppress_weapon && !pad.down(kPadR3)) || pad_touch_.take_pressed("wpn")) step = 1;
+    if (in.pressed(Key::q) || (ph(kPadY) && !xr && !v.suppress_weapon && !pad.down(kPadR3)) || (xr && ph(kPadB)) || pad_touch_.take_pressed("wpn")) step = 1;
     else if (ph(kPadLeft)) step = -1;
     if (C.wheel != 0) step = C.wheel > 0 ? 1 : -1;
     if (step != 0) {

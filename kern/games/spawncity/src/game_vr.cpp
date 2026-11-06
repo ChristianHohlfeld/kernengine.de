@@ -229,7 +229,10 @@ void Game::vr_menu_input() {
       vr_menu_open_ = false;
       break;
     }
-    case 3: vr_action_ = "radio"; break;
+    case 3:
+      if (mode_ == Mode::car) vr_action_ = "radio";
+      else { emp_pulse(); vr_menu_open_ = false; }  // on foot and in the drone: the EMP
+      break;
     case 4: command(std::string("set vr.arms ") + (ui_.settings.on(Opt::vr_arms) ? "0" : "1")); break;
     case 5: ui_reset(); vr_menu_open_ = false; break;
     default: vr_action_ = "exit"; vr_menu_open_ = false; break;

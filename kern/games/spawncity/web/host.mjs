@@ -536,7 +536,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       // the rows (game_vr.cpp kMenuTop 72, kMenuRow 44 - the same order)
       const radio = globalThis.__arondightCarRadio?.station?.name;
       const items = [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE", "LUFTSCHLAG (wohin du schaust)",
-        `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}`, `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}`, "RESET", "VR BEENDEN"];
+        h.mode === "car" ? `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}` : "EMP", `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}`, "RESET", "VR BEENDEN"];
       items.forEach((t, i) => {
         const y = 72 + i * 44;
         if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 3, 484, 38); }
@@ -553,7 +553,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const stars = h.wanted?.stars ?? h.stars ?? 0;
       g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
       g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 106);
-      g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("Y = Menü", 380, 108);
+      g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("Y Menü · B Waffe", 300, 108);
     }
     gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);
