@@ -61,8 +61,8 @@ for (const s of steps) {
       await frames(10);
       if (s === "grenade" || s === "rocket") {
         await page.evaluate(a => globalThis.__arondightFootWeapons.fireAt({clientX: a.x, clientY: a.y, source: "shotfx"}), aim);
-        await slow(0.05); await frames(1); await shot(`orig-${s}-launch`); await slow(1);
-        for (let i = 0; i < 60; i++) { await frames(1); const n = await page.evaluate(() => globalThis.__arondightFootWeapons.projectiles().length); if (!n) break; }
+        await slow(0.05); await frames(1); await shot(`orig-${s}-launch`); await slow(0.25);  // the flight at a quarter: the blast is not missed
+        for (let i = 0; i < 200; i++) { await frames(1); const n = await page.evaluate(() => globalThis.__arondightFootWeapons.projectiles().length); if (!n) break; }
         await slow(0.05); await frames(1); await shot(`orig-${s}-a`); await frames(3); await shot(`orig-${s}-b`); await slow(1);
       } else {
         await slow(0.02);
@@ -74,11 +74,15 @@ for (const s of steps) {
       await page.evaluate(() => { globalThis.__arondightHandGrenade?.pull?.("shotfx"); });
       await frames(3);
       await page.evaluate(() => globalThis.__arondightHandGrenade?.release?.());
+      await slow(0.25);
       for (let i = 0; i < 400; i++) { await frames(1); const n = await page.evaluate(() => globalThis.__arondightFootWeapons.projectiles().length); if (!n) break; }
       await slow(0.05); await frames(1); await shot("orig-nade-a"); await frames(3); await shot("orig-nade-b"); await slow(1);
     } else if (s === "drone" || s === "dronerocket") {
       log(s, await page.evaluate(() => globalThis.__arondightWalkMode?.setMode?.("drone", {persist: false, reason: "shotfx"})));
       await frames(30);
+      // armed (R): an unarmed drone does not fire
+      if (await page.evaluate(() => document.getElementById("viewport")?.dataset.fireArmed !== "1")) { await page.keyboard.press("KeyR"); await frames(10); }
+      log("armed", await page.evaluate(() => document.getElementById("viewport")?.dataset.fireArmed));
       if (s === "drone") {
         await page.evaluate(() => globalThis.__arondightDroneWeapons?.setMode?.("gun"));
         await slow(0.02);
@@ -88,6 +92,7 @@ for (const s of steps) {
         await page.evaluate(() => globalThis.__arondightDroneWeapons?.setMode?.("missile"));
         await frames(3);
         log("missile", await page.evaluate(a => globalThis.__arondightDroneWeapons?.fireMissile?.({clientX: a.x, clientY: a.y, source: "shotfx"}), aim));
+        await slow(0.25);
         for (let i = 0; i < 200; i++) { await frames(1); const n = Number(await page.evaluate(() => document.getElementById("viewport").dataset.droneActiveMissiles || 0)); if (!n) break; }
         await slow(0.05); await frames(1); await shot("orig-dronerocket-a"); await frames(3); await shot("orig-dronerocket-b"); await slow(1);
       }
