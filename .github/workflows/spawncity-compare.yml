@@ -49,7 +49,7 @@ jobs:
           if [ -n "${{ inputs.kern_ref }}" ]; then KURL=http://localhost:8123/kern/games/spawncity/web/index.html; fi
           SCRIPT=kern/games/spawncity/tests/touch_compare.mjs
           if [ -n "${{ inputs.kern_ref }}" ]; then SCRIPT=/tmp/kernsite/$SCRIPT; fi
-          node "$SCRIPT" "$PWD/generated/spawncity-compare" https://spawncity.de/drone_simulator.html "$KURL"
+          NODE_PATH="$PWD/node_modules" node "$SCRIPT" "$PWD/generated/spawncity-compare" https://spawncity.de/drone_simulator.html "$KURL"
       - name: Compare
         if: inputs.touch != '1'
         run: node kern/games/spawncity/tests/compare.mjs generated/spawncity-compare https://spawncity.de/drone_simulator.html "${{ inputs.kern_url }}"
