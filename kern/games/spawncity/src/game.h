@@ -468,7 +468,9 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
-  bool vr_ = false;
+  bool vr_ = false;  // the page runs a WebXR session ("vr 1")
+  u32 vr_hud_tex_ = 0, vr_hud_mesh_ = 0;  // the headset HUD panel (the page's texture, "vr hud <id>")
+  void look_vr_hud();
   /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
   /// draw distances follow it, so a zoomed view shows what an unzoomed one shows nearer.
   f32 view_zoom() const;  // the page runs a WebXR session ("vr 1")

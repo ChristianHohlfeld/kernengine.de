@@ -454,9 +454,46 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
     }
   }
   look_view_models(dt);
+  look_vr_hud();
   look_lap(perf::Slot::draw);
   const kern::RenderStats& rs = e.stats();
   L.meter.end_frame(clock_ms(), static_cast<f32>(rs.cpu_ms), static_cast<f32>(rs.gpu_ms));
+}
+
+void Game::look_vr_hud() {
+  // A panel 1.3 m ahead of the head and 0.5 m below it, turned to the eye, levelled to the heading
+  // (it stays put under a nod): the page draws it, the game only carries it.
+  kern::Renderer& r = engine_->renderer;
+  const bool on = vr_ && engine_->xr && vr_hud_tex_;
+  if (!on) { if (vr_hud_mesh_) r.set_visible(vr_hud_mesh_, false); return; }
+  if (!vr_hud_mesh_) {
+    MeshData q;
+    q.push({-0.5f, 0, 0.5f}, {0, -1, 0}, {1, 1, 1}, {0, 0});
+    q.push({0.5f, 0, 0.5f}, {0, -1, 0}, {1, 1, 1}, {1, 0});
+    q.push({0.5f, 0, -0.5f}, {0, -1, 0}, {1, 1, 1}, {1, 1});
+    q.push({-0.5f, 0, -0.5f}, {0, -1, 0}, {1, 1, 1}, {0, 1});
+    q.indices = {0, 2, 1, 0, 3, 2};
+    vr_hud_mesh_ = r.allocate_id();
+    kern::MeshInput in = q.as_input(kern::kMaxExtensionAttributes);
+    in.material.unlit = true;
+    in.material.double_sided = true;
+    in.material.cast_shadow = false;
+    in.material.frustum_culled = false;
+    in.material.alpha = kern::AlphaMode::blend;
+    in.texture = vr_hud_tex_;
+    if (!r.upsert(vr_hud_mesh_, in)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
+  }
+  Vec3 f = engine_->xr_forward;
+  f.z = 0;
+  f = kern::normalize(f, {1, 0, 0});
+  const Vec3 rt{f.y, -f.x, 0};
+  const Vec3 c = engine_->xr_eye + f * 1.3f - Vec3{0, 0, 0.5f};
+  const Vec3 to_eye = kern::normalize(engine_->xr_eye - c, f * -1.0f);
+  const Vec3 up = kern::normalize(kern::cross(rt, to_eye * -1.0f), {0, 0, 1});
+  constexpr f32 w = 0.72f, h = 0.27f;  // 512 x 192
+  const f32 m[16] = {rt.x * w, rt.y * w, rt.z * w, 0, -to_eye.x, -to_eye.y, -to_eye.z, 0, up.x * h, up.y * h, up.z * h, 0, c.x, c.y, c.z, 1};
+  r.update_instances(vr_hud_mesh_, {m, 16}, {});
+  r.set_visible(vr_hud_mesh_, true);
 }
 
 void Game::look_view_models(f32 dt) {

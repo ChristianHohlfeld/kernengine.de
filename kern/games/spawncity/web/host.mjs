@@ -475,7 +475,48 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     e.sc_gamepad(1, lx, -ly, rx, -ry, v(L, 0), v(R, 0), bits >>> 0, active ? 1 : 0);
     return true;
   };
-  const xrFrame = frame => { work(); xrPad(frame); };
+  // the HUD in the headset (the page's HUD is not visible in an immersive session): a 512 x 192
+  // panel drawn here every 100 ms, a texture the game shows below the gaze ("vr hud <id>")
+  let vrHud = null;
+  const vrHudDraw = () => {
+    const gl = app.kern.gl;
+    if (!vrHud) {
+      const c = document.createElement("canvas"); c.width = 512; c.height = 192;
+      const tex = gl.createTexture();
+      const slot = app.kern.reserveObject(tex);
+      const id = e.kern_texture_external(slot);
+      vrHud = {c, g: c.getContext("2d"), tex, id, at: 0};
+      command(`vr hud ${id}`);
+    }
+    const now = performance.now();
+    if (now - vrHud.at < 100) return;
+    vrHud.at = now;
+    const g = vrHud.g, h = last || {};
+    g.clearRect(0, 0, 512, 192);
+    g.fillStyle = "rgba(8,12,18,0.72)"; g.beginPath(); g.roundRect?.(4, 4, 504, 184, 22); g.fill();
+    g.strokeStyle = "rgba(127,240,197,0.8)"; g.lineWidth = 3; g.stroke();
+    g.font = "900 34px Inter, system-ui, sans-serif"; g.textBaseline = "top";
+    const hp = Math.max(0, Math.round(h.health >= 0 ? h.health : 100));
+    g.fillStyle = hp > 35 ? "#7ff0c5" : "#ff6b5a"; g.fillText(`♥ ${hp}`, 24, 20);
+    g.fillStyle = "#eef0f2";
+    const wpn = h.weapon || h.mode || "";
+    g.fillText(String(wpn).toUpperCase().slice(0, 14), 170, 20);
+    if (h.ammo >= 0) { g.fillStyle = "#ffd76a"; g.fillText(`${h.ammo}/${h.reserve ?? ""}`, 390, 20); }
+    const stars = h.wanted?.stars ?? h.stars ?? 0;
+    g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
+    g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 78);
+    g.font = "700 24px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2cc";
+    const line = h.combat?.banner || h.combat?.pop || h.toast || h.hint || (h.mode ? `MODE ${String(h.mode).toUpperCase()}` : "");
+    g.fillText(String(line).slice(0, 34), 24, 130);
+    gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  };
+  const xrFrame = frame => { work(); xrPad(frame); try { vrHudDraw(); } catch (err) { console.warn("[spawncity] VR HUD", err); } };
   const vrSupported = navigator.xr?.isSessionSupported ? navigator.xr.isSessionSupported("immersive-vr").catch(() => false) : Promise.resolve(false);
   const enterVR = async () => {
     if (!(await vrSupported) || app.inXR) return false;
