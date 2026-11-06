@@ -28,4 +28,8 @@ grep -q 'drone_simulator.webmanifest' "$out/drone_simulator.html" || { echo "man
 rm -f "$out/manifest.webmanifest"
 # the original's worker file (registered for /drone_simulator.html) becomes Kern's worker
 cp "$here/web/sw.js" "$out/oppenheimer-sw.js"
+# the build tag (bottom right) names this Kern build, not the original's commit
+ver="${KERN_VERSION:-$(git -C "$kern" rev-parse --short HEAD 2>/dev/null || echo kern)}"
+sed -i "s#>v 9108537 · online 9108537<#>v ${ver} · Kern<#" "$out/view/original.html"
+grep -q "v ${ver} · Kern" "$out/view/original.html" || { echo "build tag not rewritten" >&2; exit 1; }
 echo "drop-in for spawncity.de in $out ($(du -sh "$out" | cut -f1))"
