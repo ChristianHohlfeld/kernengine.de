@@ -518,6 +518,9 @@ async function run({name, url, context, mapped}) {
   await cmd("zombies day");
   await cmd("reset");
   { const t = (await hud()).t; await page.waitForFunction(t => window.SpawnCity.hud().t > t + 1, t, {timeout: 300000}).catch(() => {}); }
+  // the army test left 5 stars: helicopters around a pilot standing still kill him (the player's
+  // touch rounds count as his since they carry their shooter) - the drone tests start unwanted
+  await cmd("wanted 0");
   check(await cmd("mode drone") === "drone", `[${name}] drone mode`);
   await page.waitForFunction(() => { const d = window.SpawnCity.hud()?.drone; return d && !d.calibrating; }, null, {timeout: 240000});
   // touch: the altitude pad right of the move stick (simulator.mjs #soloClearance) pushed up
@@ -531,7 +534,7 @@ async function run({name, url, context, mapped}) {
   await shot("2b-drone-fpv");
   // GUIDED (guided_missile.mjs): a press launches, a second one within 5 s is refused.
   const g1 = await cmd("guided");
-  check(g1.startsWith("launched"), `[${name}] GUIDED missile launched (${g1})`);
+  check(g1.startsWith("launched"), `[${name}] GUIDED missile launched (${g1}, pilot dead ${(await hud()).ctl?.dead}, health ${(await hud()).health})`);
   check(await cmd("guided") === "denied" && (await hud()).guided?.cd > 3, `[${name}] GUIDED reloads 5 s (${JSON.stringify((await hud()).guided)})`);
   {
     const tg = (await hud()).t, booms = (await hud()).explosions;
