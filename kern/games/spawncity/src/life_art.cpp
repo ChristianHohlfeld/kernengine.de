@@ -100,13 +100,14 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
       if (!near(b.pos)) continue;
       const bool moving = std::hypot(b.v.x, b.v.y) > 0.05f;
       const f32 nod = f.air ? -0.25f : moving ? std::sin(b.peck) * 0.12f : (std::sin(b.peck * 0.7f) > 0.85f ? 0.55f : 0.0f);
-      const Mat4 M = at(b.pos) * rot({0, 0, 1}, b.yaw) * rot({0, 1, 0}, nod);
+      // a dead pigeon lies on its side
+      const Mat4 M = b.dead_at >= 0 ? at(b.pos + Vec3{0, 0, 0.06f}) * rot({0, 0, 1}, b.yaw) * rot({1, 0, 0}, 1.45f) : at(b.pos) * rot({0, 0, 1}, b.yaw) * rot({0, 1, 0}, nod);
       ball(M * at({0, 0, 0.13f}) * sc3({0.3f, 0.19f, 0.18f}), grey);
       ball(M * at({0.07f, 0, 0.15f}) * sc3({0.14f, 0.14f, 0.14f}), breast);
       ball(M * at({0.15f, 0, 0.24f}) * sc3({0.1f, 0.1f, 0.1f}), head);
       box(M * at({0.205f, 0, 0.235f}) * sc3({0.04f, 0.015f, 0.015f}), rgb(0x3a3330));
       box(M * at({-0.17f, 0, 0.12f}) * sc3({0.13f, 0.09f, 0.018f}), rgb(0x4f5562));
-      if (f.air) {
+      if (f.air && b.dead_at < 0) {
         const f32 flap = std::sin(b.flap) * 0.9f;
         for (f32 s : {-1.0f, 1.0f}) box(M * at({0, s * 0.02f, 0.16f}) * rot({1, 0, 0}, s * flap) * at({0, s * 0.18f, 0}) * sc3({0.16f, 0.36f, 0.01f}), wing);
       }

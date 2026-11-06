@@ -32,7 +32,7 @@ struct GapsState {
   std::vector<f32> car_crit;   // per traffic car: burn_until seen
   bool jet_burning = false;
   // world_organic_hit_audio.mjs
-  f32 death_scan = -1, last_organic = -99;
+  f32 death_scan = -1, last_organic = -99, last_pain = -99;
   u32 organic_plays = 0;
   // impact_explosion_overlay.mjs: flight-fire impacts in the world (projected for the page)
   struct Burst { Vec3 p; f32 t = 0; u32 serial = 0; };

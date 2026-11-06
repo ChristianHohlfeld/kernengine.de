@@ -277,6 +277,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
   Person& p = people_[static_cast<std::size_t>(best)];
   to = hit_point;
   last_head_ = head;
+  if (damage > 0 || melee_ns >= 0) p.hurt_at = now;
   if (by_player && p.kind == Kind::citizen) { p.provoked_at = now; p.provoked_hit = true; }
   const Vec3 dir = to - from;
   if (p.kind == Kind::citizen && damage > 0) {

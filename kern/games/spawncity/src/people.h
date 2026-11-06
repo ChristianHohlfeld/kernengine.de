@@ -77,6 +77,7 @@ class People {
     bool provoked_hit = false;
     u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
     f32 knocked_until = 0;          // thrown by a car and getting up again (ragdoll.h, M3 life)
+    f32 hurt_at = -99;              // the last hit taken (the pain voice, game_gaps.cpp)
   };
   /// A death since the last take_deaths() (points, kill feed).
   struct Death { i32 index; Kind kind; bool by_player; bool head; };
@@ -119,6 +120,7 @@ class People {
     Person& p = at(i);
     if (p.state == State::down || p.state == State::gone) return;
     p.hp -= damage;
+    p.hurt_at = now;
     if (p.hp <= 0) kill(p, from_dir, by_player, now, false);
   }
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }

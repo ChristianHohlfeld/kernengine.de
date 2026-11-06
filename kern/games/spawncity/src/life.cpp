@@ -427,6 +427,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     if (spot_near(view, me, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
   }
   for (Flock& f : flocks_) {
+    f.birds.erase(std::remove_if(f.birds.begin(), f.birds.end(), [&](const Pigeon& b) { return b.dead_at >= 0 && now - b.dead_at > 12; }), f.birds.end());
     if (!f.air) {
       const f32 dp = dist2d(me, f.at);
       if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, out);
@@ -448,6 +449,15 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
       }
     }
     for (Pigeon& b : f.birds) {
+      if (b.dead_at >= 0) {
+        const f32 gz = ground(view, b.pos.x, b.pos.y);
+        if (b.pos.z > gz + 0.01f || b.fall_v.z > 0) {
+          b.fall_v.z -= 9.81f * dt;
+          b.pos = b.pos + b.fall_v * dt;
+          if (b.pos.z <= gz) { b.pos.z = gz; b.fall_v = {}; }
+        }
+        continue;
+      }
       if (!f.air) {
         // short walks, nodding, pecking; never into a wall
         if (now > b.walk_until) {
@@ -916,6 +926,14 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool mel
     const f32 t = seg_sphere(from, to, b.pos, 0.45f);
     if (t >= 0 && t < best) { best = t; kind = 1; which = static_cast<i32>(i); }
   }
+  // pigeons on the ground and in the air: a small sphere each (kind 4, which = flock * 64 + bird)
+  for (std::size_t fi = 0; fi < flocks_.size(); ++fi)
+    for (std::size_t bi = 0; bi < flocks_[fi].birds.size() && bi < 64; ++bi) {
+      const Pigeon& pg = flocks_[fi].birds[bi];
+      if (pg.dead_at >= 0) continue;
+      const f32 t = seg_sphere(from, to, pg.pos + Vec3{0, 0, 0.15f}, 0.2f);
+      if (t >= 0 && t < best) { best = t; kind = 4; which = static_cast<i32>(fi * 64 + bi); }
+    }
   if (chain_alive_)
     for (u32 i = 0; i < kRunners; ++i) {
       const Runner& r = chain_.runners[i];
@@ -964,6 +982,17 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool mel
     b.spin = 4 + hash01(mix(b.seed, static_cast<u64>(now * 100))) * 4;
     out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.8f, 1});
     out.bursts.push_back({b.pos, {0.8f, 0.75f, 0.66f}});
+  } else if (kind == 4) {
+    // a shot pigeon drops where it was, feathers fly, the rest of the flock takes off
+    Flock& f = flocks_[static_cast<std::size_t>(which / 64)];
+    Pigeon& pg = f.birds[static_cast<std::size_t>(which % 64)];
+    pg.dead_at = now;
+    pg.fall_v = {dir.x * 1.6f, dir.y * 1.6f, f.air ? -0.5f : 1.2f};
+    ++bird_hits_;
+    out.sounds.push_back({LifeOut::Sound::squawk, pg.pos, 0.7f, 1.25f});
+    out.sounds.push_back({LifeOut::Sound::flap, pg.pos, 0.8f, 1});
+    out.bursts.push_back({pg.pos + Vec3{0, 0, 0.15f}, {0.72f, 0.74f, 0.78f}});
+    spook_pigeons(now);
   } else if (kind == 2) {
     kill_runner(which, {dir.x * 2.5f, dir.y * 2.5f, 1.4f}, now, out);
   } else {

@@ -71,7 +71,7 @@ class Life {
     bool dead = false, walking = false;
     kern::physics::Body body;  // the dead cow: a 600 kg Box3D body
   };
-  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0; };
+  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; };
   struct Flock {
     bool air = false;
     Vec2 at;
