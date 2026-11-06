@@ -34,10 +34,14 @@ layout(location=0) out vec4 outColor;
 layout(location=1) out vec4 outHdr;
 layout(location=2) out vec4 outAo;  // scene target: no indirect share (WebGL needs every draw buffer written)
 float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+// the lattice wraps every 289 cells: the hash only ever sees small numbers (far out and late in the
+// day the clouds stay smooth - no blocky seams from lost float precision), and the noise is still continuous
+vec2 wrap289(vec2 i) { return i - floor(i / 289.0) * 289.0; }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y);
+  vec2 a = wrap289(i), b = wrap289(i + vec2(1.0));
+  return mix(mix(h21(a), h21(vec2(b.x, a.y)), f.x), mix(h21(vec2(a.x, b.y)), h21(b), f.x), f.y);
 }
 float fbm(vec2 p) {
   float a = 0.5, s = 0.0;

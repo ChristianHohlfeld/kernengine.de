@@ -159,7 +159,7 @@ void Game::update_zombies(f32 dt) {
     if (z.person < 0) continue;
     P& p = people_.at(z.person);
     if (p.kind != People::Kind::zombie || !alive(p)) { z.person = -1; continue; }
-    if (p.hp < z.last_hp) C.zombies.points += kZombieHitPts;  // every hit 10 points
+    if (p.hp < z.last_hp) { C.zombies.points += kZombieHitPts; osfx("zombie.shriek", p.pos + Vec3{0, 0, 1.6f}); }  // every hit 10 points (and a shriek)
     z.last_hp = p.hp;
     const Vec3 target = foot ? me : player_position();
     // a player in a boarded-up building: to the door, break the planks, in (game_barricades.cpp)
@@ -179,10 +179,9 @@ void Game::update_zombies(f32 dt) {
       z.swing = now;
       world_->damage(soldier_, kZombieMelee, 0, false, p.pos + Vec3{0, 0, 1.3f});
     }
-    if (d < 30 && now - C.last_groan > 0.9f && rng_.unit() < dt * 0.25f) {
+    if (d < 34 && now - C.last_groan > 0.7f && rng_.unit() < dt * 0.4f) {
       C.last_groan = now;
-      world_->play_sound(combat_sfx(combat_audio::Kind::scream), p.pos + Vec3{0, 0, 1.6f}, clampf(0.25f / (1 + d * 0.12f), 0.02f, 0.22f) * 2, 0.42f + rng_.unit() * 0.12f, true);
-      osfx("zombie_nights.groan", p.pos);
+      osfx("zombie_nights.groan", p.pos + Vec3{0, 0, 1.6f});  // a rasping groan, each its own (audio.mjs zombieVoice)
     }
     // far stragglers drop out where nobody sees them go (the round keeps its pressure)
     if (d > 140 && spawn_unseen(p.pos, 1.9f)) { p.state = People::State::gone; z.person = -1; ++C.zombies.to_spawn; }

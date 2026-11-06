@@ -22,6 +22,36 @@ import {installImmersiveSoundscape} from "./audio/immersive_soundscape.mjs";
 import {CAR_RADIO_VERSION} from "./audio/car_radio.mjs";
 import {ORGANIC_HIT_AUDIO_VERSION} from "./audio/world_organic_hit_audio.mjs";
 import {announceHeadshot} from "./audio/headshot_feedback.mjs";
+import {getSharedCombatAudioContext} from "./audio/combat_audio_bank.mjs";
+
+// Kern: a zombie's voice - a low rasping groan (a sawtooth throat through two vowel formants, a
+// tremolo rattle, a breath of noise), a different one every time; "shriek" when hit
+function zombieVoice(at, listener, kind) {
+  const ctx = getSharedCombatAudioContext?.();
+  if (!ctx || ctx.state !== "running" || !listener) return;
+  const set = loadAudioSettings();
+  if (!set.soundEnabled) return;
+  const d = Math.hypot(at[0] - listener.x, at[1] - listener.y, at[2] - listener.z);
+  if (d > 40) return;
+  const vol = Math.min(0.5, 0.42 / (1 + d * 0.1)) * Math.max(0, Math.min(1.4, (Number(set.fxVolume) || 0) / 72));
+  if (vol < 0.004) return;
+  const t = ctx.currentTime, shriek = kind === "shriek", dur = shriek ? 0.55 + Math.random() * 0.3 : 0.9 + Math.random() * 1.0;
+  const f0 = (shriek ? 210 : 72) * (0.85 + Math.random() * 0.35);
+  const out = ctx.createGain(); out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(vol, t + 0.08); out.gain.setValueAtTime(vol, t + dur * 0.6); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (pan) { pan.pan.value = Math.max(-0.8, Math.min(0.8, (at[0] - listener.x) / Math.max(4, d) * 0.6)); out.connect(pan).connect(ctx.destination); } else out.connect(ctx.destination);
+  const f1 = ctx.createBiquadFilter(); f1.type = "bandpass"; f1.frequency.value = (shriek ? 1100 : 520) * (0.9 + Math.random() * 0.25); f1.Q.value = 5;
+  const f2 = ctx.createBiquadFilter(); f2.type = "bandpass"; f2.frequency.value = (shriek ? 2300 : 1150) * (0.9 + Math.random() * 0.2); f2.Q.value = 6;
+  const trem = ctx.createGain(); trem.gain.value = 0.55;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 7 + Math.random() * 6; const lg = ctx.createGain(); lg.gain.value = 0.45; lfo.connect(lg).connect(trem.gain);
+  const o = ctx.createOscillator(); o.type = "sawtooth"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * (shriek ? 0.7 : 0.82), t + dur);
+  o.connect(trem); trem.connect(f1); trem.connect(f2); f1.connect(out); f2.connect(out);
+  // the breath: noise through the throat
+  const n = ctx.createBufferSource(), len = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * 0.35;
+  n.buffer = buf; const nf = ctx.createBiquadFilter(); nf.type = "bandpass"; nf.frequency.value = shriek ? 1800 : 800; nf.Q.value = 1.2; n.connect(nf).connect(out);
+  o.start(t); lfo.start(t); n.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05); n.stop(t + dur + 0.05);
+}
 import * as O from "./audio/original_sfx.mjs";
 import {V3} from "./audio/original_sfx.mjs";
 
@@ -134,7 +164,8 @@ export function installOriginalAudio() {
     "hand_grenade.tickSound": (p, urgent) => O.hand_grenade.tickSound(!!urgent),
     "gangsters.bang": p => O.gangsters.bang(p),
     "gangsters.stabSound": p => O.gangsters.stabSound(p),
-    "zombie_nights.groan": p => O.zombie_nights.groan({x: p[0], y: p[1]}, performance.now()),
+    "zombie_nights.groan": p => zombieVoice(p, camera.position, "groan"),
+    "zombie.shriek": p => zombieVoice(p, camera.position, "shriek"),
     "zombie_nights.repairKnock": () => O.zombie_nights.repairKnock(),
     "sandbox_game.sfx": (p, explosion, gain, rate) => O.sandbox_game.sfx(explosion ? "explosion" : "shot", {gain, rate, at: v3(p)}),
     "military_response.sound": (p, explosion, gain, rate) => O.military_response.sound(explosion ? "explosion" : "shot", p[0], p[1], p[2], gain, rate),

@@ -60,7 +60,10 @@ export const CHANGELOG=Object.freeze([
     "VR: Uhr-HUD am linken Handgelenk statt im Blickfeld; Y öffnet dort das Menü – MULTI, Drohne/zu Fuß, Luftschlag wohin du schaust, Radio, Laufen, Reset, VR beenden.",
     "VR: Raketen folgen deinem Blick, Granatwerfer und Raketen fliegen aus der Waffe in der Hand; beim Tod dreht sich die Welt nicht mehr.",
     "Neu unter WELT: Immer Tag. Sommer-Sonne mit kürzeren Nächten, hellerer Mond und hellere Straßenlaternen.",
-    "Getroffene Vögel krächzen jedes Mal anders."]},
+    "Getroffene Vögel krächzen jedes Mal anders.",
+    "Zombies stöhnen gruselig (jeder anders) und kreischen bei Treffern.",
+    "Polizeidrohnen weiß mit schwarzem Bauch, blauem Band und rot-blauem Blitzlicht; Martinshorn und Drohnen-Ton deutlich hörbar, klar verschieden.",
+    "Der Himmel ohne Kachel-Kanten in den Wolken."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

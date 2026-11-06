@@ -10,7 +10,7 @@ import {getSharedCombatAudioContext} from "./combat_audio_bank.mjs";
 
 export const POLICE_SIRENS_VERSION="police-sirens-v1";
 const HORN_LOW=466.16,HORN_HIGH=622.25,HORN_TONE_S=.66;
-const CAR_GAIN=.06,DRONE_GAIN=.032,AUDIBLE_M=260,SOUND_MPS=343;
+const CAR_GAIN=.1,DRONE_GAIN=.055,/* Kern: clearly audible (was .06 / .032) */ AUDIBLE_M=260,SOUND_MPS=343;
 let installed=false,settings=loadAudioSettings(),car=null,drone=null,last=performance.now();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const bridge=()=>globalThis.__arondightRealWorld||null;

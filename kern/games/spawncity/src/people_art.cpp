@@ -103,11 +103,18 @@ bool PeopleArt::init(kern::Renderer& r) {
   if (!make(r, flame_, prim::sphere(1.0f, 10, 6, white), flame, true)) return false;
   // Police drone: a 0.9 m quad (body, arms, guards) - not the player's airframe.
   MeshData pd;
-  prim::append(pd, prim::box({0.42f, 0.26f, 0.12f}, {0.08f, 0.1f, 0.16f}), Mat4{});
-  prim::append(pd, prim::box({0.9f, 0.05f, 0.04f}, {0.12f, 0.12f, 0.13f}), rot({0, 0, 1}, kPi / 4));
-  prim::append(pd, prim::box({0.9f, 0.05f, 0.04f}, {0.12f, 0.12f, 0.13f}), rot({0, 0, 1}, -kPi / 4));
-  prim::append(pd, prim::box({0.1f, 0.3f, 0.03f}, {0.85f, 0.86f, 0.9f}), at({0, 0, 0.075f}));  // white stripe
-  if (!make(r, pd_body_, pd, mat(0.45f, 0.3f), false)) return false;
+  // wanted_police_drones.mjs (white-black + red-blue light bar): a white shell, a black belly and
+  // arms, motor pods at the tips, a blue band with the light bar on top
+  prim::append(pd, prim::capsule(0.12f, 0.2f, 14, 6, {0.9f, 0.91f, 0.93f}), rot({0, 1, 0}, kPi / 2) * Mat4::scale({1, 1.15f, 0.62f}));
+  prim::append(pd, prim::box({0.36f, 0.22f, 0.05f}, {0.06f, 0.065f, 0.075f}), at({0, 0, -0.06f}));  // belly
+  prim::append(pd, prim::box({0.38f, 0.235f, 0.035f}, {0.12f, 0.3f, 0.85f}), at({0, 0, 0.02f}));   // blue band
+  for (f32 a : {kPi / 4, -kPi / 4}) prim::append(pd, prim::box({0.9f, 0.045f, 0.035f}, {0.07f, 0.07f, 0.08f}), rot({0, 0, 1}, a));
+  for (int i = 0; i < 4; ++i) {
+    const f32 a = kPi / 4 + static_cast<f32>(i) * kPi / 2;
+    prim::append(pd, prim::cylinder(0.045f, 0.06f, 10, {0.08f, 0.08f, 0.09f}), at({std::cos(a) * 0.32f, std::sin(a) * 0.32f, -0.02f}));
+  }
+  prim::append(pd, prim::sphere(0.04f, 10, 6, {0.05f, 0.06f, 0.08f}), at({-0.19f, 0, -0.03f}));  // the camera eye
+  if (!make(r, pd_body_, pd, mat(0.35f, 0.05f), false)) return false;
   kern::Material disc = mat(0.6f);
   disc.color = {1, 1, 1, 0.5f};
   disc.cast_shadow = false;
