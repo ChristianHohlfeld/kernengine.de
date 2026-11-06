@@ -36,7 +36,7 @@ SC_TEST(town_people_hits_and_crimes) {
   const i32 cop = people.add_officer({10, 0, 0}, 0, 0, 7);
   Vec3 to{30, 0, 1.2f};
   SC_CHECK(people.shot({0, 0, 1.2f}, to, 13, true, 1) == cop, "the bullet hits the officer");
-  SC_CHECK(std::fabs(to.x - (10 - 0.32f)) < 0.05f, "the shot ends at his body (%.2f)", to.x);
+  SC_CHECK(std::fabs(to.x - (10 - 0.15f * 1.08f)) < 0.05f, "the shot ends at his body - the torso front as drawn (%.2f)", to.x);
   SC_CHECK(people.at(cop).hp == 75 && people.at(cop).state != People::State::down, "an MP body hit takes 25 of 100");
   to = {30, 0, 1.62f};
   people.shot({0, 0, 1.62f}, to, 13, true, 2);
