@@ -701,19 +701,31 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 start = kern::now_ms(), deadline = start + budget_ms;
   // without workers / threads the jobs run here, inside the frame's budget
+  f64 t0 = kern::now_ms();
   kern::jobs::pump(budget_ms * 0.5);
+  step_time("jobs", t0);
   focus_ = focus;
   // RESYNC_MOVE_M 140 / RESYNC_MS 2500 (world_city_buildings.mjs)
+  t0 = kern::now_ms();
   if (std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) >= 140 || start - vis_ms_ >= 2500) select_visual(focus);
+  step_time("select_visual", t0);
+  t0 = kern::now_ms();
   request_around(focus);
   unload_far(focus);
+  step_time("request/unload", t0);
+  t0 = kern::now_ms();
   terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
+  step_time("terrain", t0);
+  t0 = kern::now_ms();
   terrain_.take_changes(terrain_changes_);
   for (const kern::Vec4& r : terrain_changes_) relay(r);
   terrain_changes_.clear();
+  step_time("relay", t0);
   // The collision around the player first (the player must never stand where no wall is): half
   // the budget while a set is built, at least 1.5 ms.
+  t0 = kern::now_ms();
   update_collision(focus, kern::now_ms() + std::fmax(1.5, budget_ms * 0.5));
+  step_time("collision", t0);
   // Nearest unfinished tile first.
   std::vector<Tile*> order;
   for (auto& [k, t] : tiles_) order.push_back(t.get());
@@ -722,12 +734,19 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     const f32 db = (b->center.x - focus.x) * (b->center.x - focus.x) + (b->center.y - focus.y) * (b->center.y - focus.y);
     return da < db;
   });
+  static const char* kStateName[] = {"requested", "decoding", "terrain_wait", "building", "roads", "areas", "collision", "ready", "failed"};
   for (Tile* t : order) {
     if (kern::now_ms() > deadline) break;
-    if (!work(*t, deadline)) break;
+    t0 = kern::now_ms();
+    const char* name = kStateName[static_cast<u32>(t->state)];
+    const bool more = work(*t, deadline);
+    step_time(name, t0);
+    if (!more) break;
   }
   // what is left of the budget goes on with the collision set
+  t0 = kern::now_ms();
   if (kern::now_ms() < deadline) update_collision(focus, deadline);
+  step_time("collision", t0);
   stats_ = {};
   for (auto& [k, t] : tiles_) {
     if (t->state == Tile::State::ready) ++stats_.tiles_ready;
@@ -744,9 +763,16 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
   stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
   stats_.last_slice_ms = kern::now_ms() - start;
-  if (kern::now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = kern::now_ms(); }
+  if (kern::now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = kern::now_ms(); worst_step_ = ""; worst_step_ms_ = 0; }
   worst_ = std::fmax(worst_, stats_.last_slice_ms);
   stats_.worst_ms = worst_;
+  stats_.worst_step = worst_step_;
+  stats_.worst_step_ms = worst_step_ms_;
+}
+
+void CityStream::step_time(const char* name, f64 t0) {
+  const f64 took = kern::now_ms() - t0;
+  if (took > worst_step_ms_) { worst_step_ms_ = took; worst_step_ = name; }
 }
 
 void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {
