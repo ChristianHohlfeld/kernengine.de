@@ -20,7 +20,7 @@ class Marks {
   struct Stats { u32 scorches = 0, soots = 0, breaches = 0, rubble = 0, craters = 0; };
   void clear(kern::physics::World* w);
   /// A blast at `at`, radius `r`; `strength` ~ damage / 110 (facade_marks.mjs).
-  void blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now);
+  void blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now, bool craters = true);
   void update(f32 now, kern::physics::World& w);
   void draw(WorldArt& art, kern::physics::World& w, f32 now);
   const Stats& stats() const { return stats_; }

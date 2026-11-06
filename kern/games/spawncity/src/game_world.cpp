@@ -192,7 +192,7 @@ void Game::world_blast(Vec3 at, f32 radius, f32 damage, bool by_player) {
     if (d < radius) tt.hp -= damage * 1.3f * std::pow(1 - d / radius, 1.2f);
   }
   // Craters, scorch, soot and breaches, rubble (world_marks.h); strength as facade_marks.mjs.
-  life_->marks.blast(at, radius, std::fmin(1.4f, damage / 110), city_, world_->physics(), rng_, world_->sim_time());
+  life_->marks.blast(at, radius, std::fmin(1.4f, damage / 110), city_, world_->physics(), rng_, world_->sim_time(), ui_.settings.on(Opt::world_terrain));
 }
 
 bool Game::world_command(const std::string& cmd, std::string& out) {

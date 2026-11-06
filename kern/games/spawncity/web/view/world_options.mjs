@@ -19,6 +19,7 @@ export const WORLD_OPTIONS=Object.freeze([
   {key:"military",label:"MILITARY",help:"Soldiers, tanks and helicopters at high wanted levels."},
   {key:"flak",label:"FLAK",help:"Now and then a stationary anti-aircraft gun that fires on your drone and jet."},
   {key:"jetpack",label:"JETPACK",help:"Jump twice to fire a short jetpack burst over houses. Recharges."},
+  {key:"destructibleTerrain",label:"DESTRUCTIBLE TERRAIN",help:"Big explosions tear craters into the ground. Off: the ground stays whole."},
   {key:"friendlyFire",label:"FRIENDLY FIRE",help:"Player weapons can damage other players. The first player in the session sets this rule.",def:false,rule:true},
 ]);
 export const DEFAULT_WORLD_OPTIONS=Object.freeze(Object.fromEntries(WORLD_OPTIONS.map(o=>[o.key,o.def??true])));

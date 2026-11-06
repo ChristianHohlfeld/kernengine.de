@@ -66,6 +66,7 @@ constexpr OptSpec kSpecs[] = {
     {"world.flak", "welt", "Flak", "Ab und zu ein Flakgeschuetz, das auf Drohne und Jet feuert.", 0, 1, 1, 1, true, true},
     {"world.jetpack", "welt", "Jetpack", "Zweimal springen fuer einen kurzen Jetpack-Schub ueber Haeuser. Laedt sich am Boden auf.", 0, 1, 1, 1, true, true},
     {"world.friendlyFire", "welt", "Friendly Fire", "Spielerwaffen treffen andere Spieler.", 0, 1, 1, 0, true, true},
+    {"world.destructibleTerrain", "welt", "Zerstoerbares Gelaende", "Explosionen reissen Krater in den Boden.", 0, 1, 1, 1, true, true},
     // first_person_control_settings.mjs aimAssistStrengthPercent 0..100 (55); settings_help.mjs view rows
     {"foot.aimAssist", "fuss", "Zielhilfe", "Sanfter Zug zu Zielen nahe am Fadenkreuz mit Xbox-Pad und Touch. 0 schaltet sie aus.", 0, 100, 1, 55, false, true},
     {"pad.aimScheme", "drohne", "Xbox-Schema AIM", "Drohne mit dem Xbox-Pad: LB halten = rechter Stick schaut (Fadenkreuz) statt zu drehen. Aus = CLASSIC.", 0, 1, 1, 0, true, true},

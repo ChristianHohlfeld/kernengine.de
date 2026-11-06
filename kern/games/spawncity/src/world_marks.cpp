@@ -34,13 +34,13 @@ void Marks::clear(kern::physics::World* w) {
   stats_ = {};
 }
 
-void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now) {
+void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now, bool craters) {
   city_ = &city;
   Terrain& t = city.terrain();
   r = clampf(r, 1.5f, 400);
   const f32 above = at.z - t.height(at.x, at.y);
   // The big ones dig into the ground (terrain_craters.mjs profile, scaled to the blast).
-  if (r >= 8 && above < 1.5f) {
+  if (craters && r >= 8 && above < 1.5f) {  // WORLD: DESTRUCTIBLE TERRAIN
     // The ground is a 5 m node grid (one height function for Box3D and the mesh): a bowl smaller
     // than a cell falls between the nodes and leaves no dent at all. So the crater sits on the node
     // nearest the blast and spans at least 5.5 m (its bowl then always reaches that node).

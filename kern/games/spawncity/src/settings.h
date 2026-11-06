@@ -30,7 +30,7 @@ enum class Opt : u8 {
   audio_on, audio_drone, audio_shots, audio_fx, audio_steps, audio_vehicle, audio_ambient, music_on, music_volume,
   // world options (world_options.mjs)
   world_people, world_traffic, world_dogs, world_cats, world_birds, world_zombies, world_police, world_military, world_flak, world_jetpack,
-  world_friendly_fire,
+  world_friendly_fire, world_terrain,
   // view and helpers (settings_help.mjs: worldGrid, worldKeepLook, worldMinimapAxisLock, box3dColliderDebug; aim assist)
   foot_aim_assist, pad_aim_scheme, view_grid, view_keep_look, view_minimap_north, debug_colliders,
   count
