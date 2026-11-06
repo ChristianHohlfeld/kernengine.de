@@ -286,6 +286,21 @@ void Game::gaps_remote_fx(const net::Fx& f) {
     if (ui_.settings.on(Opt::world_military)) combat_tracer(f.p, f.dir);
   } else if (f.kind == net::Fx::mil_shell) {
     if (ui_.settings.on(Opt::world_military)) combat_.shells.push_back({f.p, kern::normalize(f.dir - f.p) * 130.0f, 3, true});
+  } else if (f.kind == net::Fx::npc_death) {
+    // world_procedural_population.mjs handleRemoteFx: the mate killed this person - ours with the
+    // same id falls (where ours is); not here: the nearest citizen within 3 m of where it was
+    const u32 id = static_cast<u32>(f.dir.x) | (static_cast<u32>(f.dir.y) << 16);
+    i32 who = -1;
+    f32 bd = 3;
+    const auto& all = people_.all();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+      const People::Person& p = all[i];
+      if (p.kind != People::Kind::citizen || p.state == People::State::down || p.state == People::State::gone) continue;
+      if (p.seed == id) { who = static_cast<i32>(i); break; }
+      const f32 d = std::hypot(p.pos.x - f.p.x, p.pos.y - f.p.y);
+      if (d < bd) { bd = d; who = static_cast<i32>(i); }
+    }
+    if (who >= 0) people_.hurt(who, 1e4f, {std::cos(f.dir.z), std::sin(f.dir.z), 0}, false, now);
   }
 }
 

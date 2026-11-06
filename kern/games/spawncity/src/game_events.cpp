@@ -306,6 +306,15 @@ void Game::update_scores(f32 dt) {
   for (const People::Death& d : deaths) {
     if (d.head && d.by_player) { world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, 0.32f, 1.0f, false); osfx("headshot_feedback.announceHeadshot", cam_.eye); }  // headshot_feedback.mjs: a neutral short click
     if (!d.by_player) continue;
+    // "npc-death": the mates' copy of this person falls too (the same id on every machine)
+    if (net_.active() && d.kind == People::Kind::citizen && d.index >= 0) {
+      const People::Person& dp = people_.at(d.index);
+      net::Fx f;
+      f.kind = net::Fx::npc_death;
+      f.p = dp.pos;
+      f.dir = {static_cast<f32>(dp.seed & 0xffffu), static_cast<f32>(dp.seed >> 16), dp.yaw};
+      net_.send_fx(f);
+    }
     switch (d.kind) {
       case People::Kind::zombie: C.zombies.points += kZombieKillPts; break;
       case People::Kind::enemy: {

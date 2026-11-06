@@ -162,9 +162,21 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     const Vec2 a = L.points[p.seg], b = L.points[p.seg + 1];
     const f32 len = std::hypot(b.x - a.x, b.y - a.y);
     if (len < 3) continue;
-    p.along = rng.range(0, len);
-    p.dir = rng.unit() < 0.5f ? 1 : -1;
+    // world_procedural_population.mjs seedRouteAgents: the people of a street are the street's -
+    // one in every 9 m slot of a pavement, its id from the street's own geometry, the segment, the
+    // slot and the side: every machine in a round has the same person in the same place (and a
+    // death there is a death here, "npc-death")
+    const u32 slots = std::max(1u, static_cast<u32>(len / 9));
+    const u32 slot = static_cast<u32>(rng.next() % slots);
+    p.along = (static_cast<f32>(slot) + 0.5f) * len / static_cast<f32>(slots);
     p.side = rng.unit() < 0.5f ? 1.0f : -1.0f;
+    const u32 street = static_cast<u32>(std::lround(L.points.front().x)) * 73856093u ^ static_cast<u32>(std::lround(L.points.front().y)) * 19349663u ^
+                       static_cast<u32>(std::lround(L.points.back().x)) * 83492791u ^ static_cast<u32>(std::lround(L.points.back().y)) * 2971215073u;
+    const u32 id = (street ^ (static_cast<u32>(p.seg) * 2654435761u) ^ (slot * 40503u) ^ (p.side > 0 ? 0x9e3779b9u : 0u)) | 1u;
+    bool taken = false;
+    for (const Person& o : people_) taken = taken || (o.state != State::gone && o.seed == id);
+    if (taken) continue;
+    p.dir = (id >> 5) & 1 ? 1 : -1;
     p.off = L.width * 0.5f + kPavement;
     Vec3 at;
     f32 heading;
@@ -181,7 +193,7 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
       }
     }
     if (view.can_spawn && !view.can_spawn(at)) continue;  // nobody may see them appear
-    const u32 seed = serial_++ * 2654435761u;
+    const u32 seed = id;
     p.seed = seed;
     p.pos = at;
     p.yaw = heading;

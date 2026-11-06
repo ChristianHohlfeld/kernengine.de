@@ -71,7 +71,8 @@ struct Fx {
   // dir.x the target's slot, a damage (player_push.mjs) - M3 life
   // lamp: street_lamps.mjs sendBreak (p foot, dir x/y + state); strike / flyover: fighter_jets.mjs
   // (p mark, a alt, dir.x offset); mil_tracer / mil_shell: military_response.mjs (p from, dir to) - sc-m3-gaps
-  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, kLast = mil_shell };
+  // npc_death: world_procedural_population.mjs "npc-death" (p where, dir.x / dir.y the person's id, 16 bits each)
+  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, kLast = npc_death };
   u8 kind = shot, owner = 0;
   Vec3 p, dir;
   f32 a = 0;              // shot: speed; explosion: radius
