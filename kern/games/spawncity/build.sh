@@ -35,7 +35,10 @@ if [ "$skip_wasm" = 0 ]; then
     printf '// SpawnCity game headers %s, source %s\n#include "%s"\n' "$header_hash" "$(sha256sum "$f" | cut -c1-16)" "$f" > "$w"
     wrapped+=("$w")
   done
-  "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
+  # The streamed city lives in 150 - 300 MB of wasm memory. Grown at run time, every memory.grow on a
+  # phone copied the whole heap (frames of 0.5 - 1.1 s, measured with ?perf=1): reserve it up front
+  # (pages are only committed when touched).
+  KERN_INITIAL_MEMORY=$((384 * 1024 * 1024)) "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
 fi
 [ -s "$wasm" ] || { echo "missing $wasm (run without --skip-wasm)" >&2; exit 1; }
 
