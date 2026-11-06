@@ -43,6 +43,12 @@ for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) 
   if (w > 2 && h > 2) ov.push(`${keys[i]} x ${keys[j]} (${w}x${h})`);
 }
 log(`overlaps: ${ov.join(", ") || "none"}`);
+// every visible button / control on the screen (what the player sees, whatever its id)
+const all = await p.evaluate(() => [...document.querySelectorAll("button,[role=button],.k-audio,.scui-corner,svg")].filter(e => {
+  const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+  return r.width > 4 && r.height > 4 && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight && !e.closest("svg:not(:scope)") && e.checkVisibility?.({checkOpacity: true, checkVisibilityCSS: true}) !== false;
+}).map(e => { const r = e.getBoundingClientRect(); return `${e.tagName.toLowerCase()}#${e.id || "-"}.${String(e.className?.baseVal ?? e.className).split(" ")[0] || "-"} ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)} "${(e.textContent || e.getAttribute("aria-label") || "").trim().slice(0, 14)}"`; }));
+log("visible controls:\n```\n" + all.join("\n") + "\n```");
 await shot("foot");
 // one tap on WEAPON
 const w0 = await state();
