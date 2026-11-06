@@ -56,7 +56,9 @@ export async function mountOriginalView(base = "./view/") {
   globalThis.__arondightWalkMode = walk;
   // start_location.mjs builds its own button and panel (it mounts only when they are not there)
   // (and so do world_options_menu.mjs / changelog_menu.mjs: their title buttons and panels)
-  for (const id of ["startPlaceButton", "startPlacePanel", "gameMenuWorld", "worldOptionsPanel", "gameMenuChangelog", "changelogPanel"]) $(id)?.remove();
+  // (and thumb_layout.mjs its #thumbWeapon: a second one from the snapshot was the one the game and
+  // edge_hud_layout.mjs found - hidden - so JUMP took the weapon's place under the module's button)
+  for (const id of ["startPlaceButton", "startPlacePanel", "gameMenuWorld", "worldOptionsPanel", "gameMenuChangelog", "changelogPanel", "thumbWeapon"]) $(id)?.remove();
   globalThis.__arondightRealWorld = {active: false, originLat: NaN, originLon: NaN};
   if (globalThis.__scViewLayouts) globalThis.__scViewLayouts();  // single file (build.sh)
   else {
