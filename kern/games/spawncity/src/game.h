@@ -211,8 +211,8 @@ class Game {
   void wreck_car(i32 car);
   void damage_player_vehicle(f32 amount);
   /// What set a blast off: only weapons break buildings (destruction.h); the guided missile x 2.2.
-  enum class Blast : u8 { other, weapon, missile };
-  void explosion(Vec3 at, f32 radius, f32 damage, bool by_player, Blast kind = Blast::other);
+  enum class BlastBy : u8 { other, weapon, missile };
+  void explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy kind = BlastBy::other);
   void draw_town();
   // weapons (game_weapons.cpp)
   void init_weapons();

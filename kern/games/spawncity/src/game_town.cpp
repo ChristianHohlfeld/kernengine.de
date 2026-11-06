@@ -229,7 +229,7 @@ void Game::damage_player_vehicle(f32 amount) {
   }
 }
 
-void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, Blast kind) {
+void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy kind) {
   const f32 now = world_->sim_time();
   ++explosions_;
   look_blast(at, radius);  // light, camera shake (game_look.cpp)
@@ -245,7 +245,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, Blast kind
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
   combat_blast(at, radius, damage, by_player);  // army, flak, rockets (game_military.cpp)
-  if (by_player) blast_remotes(at, radius, damage, kind == Blast::missile ? 2 : kind == Blast::weapon ? 1 : 0);
+  if (by_player) blast_remotes(at, radius, damage, kind == BlastBy::missile ? 2 : kind == BlastBy::weapon ? 1 : 0);
   // The player on foot (weapons.h blast_factor: buildings in between shield most of it).
   if (mode_ == Mode::foot) {
     const Vec3 me = matrix_of(soldier_).translation();
@@ -258,7 +258,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, Blast kind
   }
   blast_cars(at, radius, damage, by_player);  // hits per car / bus, cruisers linear (game_vehicle_damage.cpp)
   world_blast(at, radius, damage, by_player);  // M3: craters, scorch, facade marks, animals, ragdolls
-  if (kind != Blast::other) destruction_.blast(at, radius, damage, kind == Blast::missile, city_, rng_);  // weapons break buildings
+  if (kind != BlastBy::other) destruction_.blast(at, radius, damage, kind == BlastBy::missile, city_, rng_);  // weapons break buildings
   life_blast(at, radius);  // M3 life: cows, pigeons, joggers, ragdolls (game_life.cpp)
   gaps_lamps_blast(at, radius);  // street_lamps.mjs onExplosion (game_lamps.cpp)
   blast_police_drones(at, radius, damage, by_player);  // every blast reaches them (game_foot_rounds.cpp)

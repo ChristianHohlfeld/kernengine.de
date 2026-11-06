@@ -235,7 +235,7 @@ bool Game::world_command(const std::string& cmd, std::string& out) {
     }
     const f32 before = t.height(at.x, at.y);  // "ground": the height before the blast (the crater test compares)
     at.z = city_.ground_height(at.x, at.y) + 0.5f;
-    explosion(at, 9.5f, 160, true, Blast::weapon);
+    explosion(at, 9.5f, 160, true, BlastBy::weapon);
     std::snprintf(b, sizeof b, "{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"ground\":%.2f}", at.x, at.y, at.z, before);
     out = b;
     return true;

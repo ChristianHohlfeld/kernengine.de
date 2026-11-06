@@ -512,7 +512,7 @@ void Game::update_military(f32 dt) {
     Vec3 at = r.hit ? r.point : s.p;
     if (!hit && have && kern::length(s.p - tp) < 2.2f) hit = true;
     if (hit && s.remote) { world_->particle_burst(at, {3.0f, 1.2f, 0.3f}); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 0.8f, 1, true); osfx("military_response.sound", at, 1, 0.8f, 1); s.life = -1; }
-    else if (hit) { explosion(at, 6, kShellDmg, false, Blast::weapon); s.life = -1; }  // the tank shell
+    else if (hit) { explosion(at, 6, kShellDmg, false, BlastBy::weapon); s.life = -1; }  // the tank shell
     else if (s.life > 0) combat_tracer(prev, s.p, {3.0f, 1.6f, 0.6f});
   }
   std::erase_if(C.shells, [](const Shell& s) { return s.life <= 0; });
@@ -689,7 +689,7 @@ void Game::update_jets(f32 dt) {
   for (Bomb& b : C.bombs) {
     if (now - b.t0 >= b.dur) {
       osfx("fighter_jets.blastSound", b.to);
-      explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, !b.remote, Blast::weapon);  // a mate's strike is not our crime
+      explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, !b.remote, BlastBy::weapon);  // a mate's strike is not our crime
       C.blasts.push_back({b.to, now, 1});
       b.dur = -1;
     }

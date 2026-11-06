@@ -242,7 +242,7 @@ void Game::update_projectiles(f32 dt) {
       const weapons::Spec& s = weapons::spec(p.id);
       // a jet rocket whose 5 s run out is gone without a blast (stepRockets: blast only on a hit)
       const bool spent = p.id == Id::jet_missile && now - p.born > p.fuse;
-      if (!spent && s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player, Blast::weapon);
+      if (!spent && s.radius_m > 0 && at.z > city_.ground_height(at.x, at.y) - 5) explosion(at, s.radius_m, s.damage, p.by_player, BlastBy::weapon);
       p.alive = false;
     }
   }
@@ -364,7 +364,7 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     if (kern::length(e.to - o) > 600) e.to = o + d * 600.0f;
     world_->shots().push_back(e);
     // A third of the rounds burst (jet_mode.mjs: 34 %, 3.2 m, 70).
-    if (hit && rng_.unit() < 0.34f) explosion(e.to, 3.2f, 70, true, Blast::weapon);  // the jet cannon
+    if (hit && rng_.unit() < 0.34f) explosion(e.to, 3.2f, 70, true, BlastBy::weapon);  // the jet cannon
     world_->play_sound("builtin:smg", o, 0.5f, 0.7f, true);
     osfx("jet_mode.gun", o);
   }

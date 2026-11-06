@@ -282,7 +282,7 @@ void Game::update_enemies(f32 dt) {
     const bool near = have && kern::length(r.p - tp) < 1.6f;
     if (r.life <= 0 || h.hit || near || r.p.z <= city_.ground_height(r.p.x, r.p.y) + 0.15f) {
       osfx("sandbox_game.sfx", h.hit ? h.point : r.p, 1, 1, 1);  // sfx("explosion", {gain: 1, at: p})
-      explosion(h.hit ? h.point : r.p, 6, 90, false, Blast::weapon);  // the enemy rocket
+      explosion(h.hit ? h.point : r.p, 6, 90, false, BlastBy::weapon);  // the enemy rocket
       r.life = -99;
     }
   }
@@ -424,7 +424,7 @@ void Game::update_combat(f32 dt) {
     bool boom = false;
     for (const Heli& h : C.helis) boom = boom || (h.state != Heli::State::down && kern::length(h.p - p.pos) < 3.2f);
     for (const Tank& k : C.tanks) boom = boom || (!k.wreck && kern::length(k.p + Vec3{0, 0, 1.2f} - p.pos) < 3.4f);
-    if (boom) { p.alive = false; const weapons::Spec& s = weapons::spec(p.id); explosion(p.pos, std::fmax(2.0f, s.radius_m), s.damage, true, Blast::weapon); }
+    if (boom) { p.alive = false; const weapons::Spec& s = weapons::spec(p.id); explosion(p.pos, std::fmax(2.0f, s.radius_m), s.damage, true, BlastBy::weapon); }
   }
   update_military(dt);
   update_flak(dt);
