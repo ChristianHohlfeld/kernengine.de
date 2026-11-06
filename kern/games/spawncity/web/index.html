@@ -87,6 +87,10 @@
      already turned here, so that turn would come on top (upside down, the view off the screen):
      the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
      original's quarter-turned mapping */
+  /* jet: EJECT / AUSSTEIGEN under the score and the FLOW bar, not over the vitals */
+  /* jet_mode.mjs: KANONE left of the stick (on-foot-mode hides the foot fire button) */
+  html body.jet-mode.on-foot-mode #viewport #footHud #footFire { visibility: visible !important; }
+  body.jet-mode #jetHud [data-a="exit"] { top: calc(max(8px, var(--solo-safe-top, env(safe-area-inset-top))) + 140px) !important; font-size: 13px !important; }
   html.sc-css-landscape body.solo-flight { position: fixed !important; left: 100vw !important; top: 0 !important; width: 100dvh !important; height: 100vw !important; min-height: 0 !important; max-height: none !important; transform: rotate(90deg) !important; transform-origin: 0 0 !important; overflow: hidden !important; }
   html.sc-css-landscape body.solo-flight #viewport { inset: 0 !important; width: 100% !important; height: 100% !important; transform: none !important; }
   html.sc-css-landscape body.solo-flight dialog[open] { transform: none; }

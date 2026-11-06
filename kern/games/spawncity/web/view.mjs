@@ -216,7 +216,9 @@ export class OriginalView {
     // player_car_mode.mjs player-driving, jet_mode.mjs jet-mode, desktop_controls.mjs desktop-input /
     // pad-input, mobile_gameplay_ui.mjs mobile-gameplay-compact, player_vitals_runtime.mjs player-dead)
     cls("solo-flight", playing);
-    cls("on-foot-mode", mode === "foot" || mode === "car");
+    // the walker stays the walker in the car and in the jet (and under the canopy): the original keeps
+    // on-foot-mode there (the foot sticks are claimed, the drone's ARM / STOP stay hidden)
+    cls("on-foot-mode", mode === "foot" || mode === "car" || mode === "jet" || mode === "parachute");
     cls("player-driving", mode === "car");
     cls("jet-mode", mode === "jet" || mode === "parachute");
     cls("desktop-input", desktop);

@@ -198,7 +198,9 @@ void VehicleArt::car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit
 }
 
 void VehicleArt::jet(const Mat4& body, bool gear_down, f32 nozzle, f32 thrust01, bool cockpit_view) {
-  if (!cockpit_view) put(jet_body_, body);
+  // the cockpit camera shows no airframe at all (glass, gear, flame neither): only the world ahead
+  if (cockpit_view) return;
+  put(jet_body_, body);
   put(jet_glass_, body * at({0, 3.2f, 0.75f}) * Mat4::scale({0.62f, 1.7f, 0.55f}));
   if (gear_down) {
     const JetSpec s;
