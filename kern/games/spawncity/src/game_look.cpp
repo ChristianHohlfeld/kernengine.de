@@ -197,6 +197,15 @@ void Game::look_lap(perf::Slot s) { look_.meter.lap(s, clock_ms()); }
 
 // world_procedural_population.mjs PERSON_SLOTS 100 (phone 68): the original does not scale the crowd
 // with the quality level
+f32 Game::view_zoom() const {
+  // on foot: the view's field (FOV setting) against the one drawn (ADS, the scope); the vehicles'
+  // cameras do not zoom
+  if (mode_ != Mode::foot) return 1;
+  const f32 base = std::fmax(cam_.fov, ui_.settings.get(Opt::cam_fov) * kDeg);
+  const f32 t = std::tan(std::fmax(0.05f, cam_.fov) * 0.5f);
+  return clampf(std::tan(std::fmin(base, 3.0f) * 0.5f) / std::fmax(1e-3f, t), 1, 12);
+}
+
 i32 Game::look_people_budget() const { return ui_.settings.on(Opt::world_people) ? (mobile_ ? 68 : 100) : 0; }
 
 void Game::look_apply_tier() {

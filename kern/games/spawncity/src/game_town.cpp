@@ -955,7 +955,7 @@ void Game::draw_town() {
     gaps_lamps_draw();  // street_lamps.mjs (game_lamps.cpp)
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
-      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
+      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m * std::fmin(view_zoom(), 4.0f) && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
     draw_projectiles();
     draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {

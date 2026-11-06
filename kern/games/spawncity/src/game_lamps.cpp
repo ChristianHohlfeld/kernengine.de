@@ -252,7 +252,7 @@ void Game::gaps_lamps_draw() {
     const std::vector<Lane>& lanes = city_.lanes();
     for (const lamps::Lamp& l : g.lamps.all()) {
       if (l.state == 2 || l.lane >= lanes.size() || !lanes[l.lane].alive) continue;
-      if (std::fabs(l.foot.x - cam_.eye.x) > look_.lamp_m || std::fabs(l.foot.y - cam_.eye.y) > look_.lamp_m) continue;
+      if (std::fabs(l.foot.x - cam_.eye.x) > look_.lamp_m * std::fmin(view_zoom(), 3.0f) || std::fabs(l.foot.y - cam_.eye.y) > look_.lamp_m * std::fmin(view_zoom(), 3.0f)) continue;
       const Mat4 m = yaw_at(l.foot, l.yaw);
       put(g.lamp_pole, m, {1, 1, 1, 1});
       if (l.state == 0 && glow > 0.01f) {

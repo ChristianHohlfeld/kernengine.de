@@ -468,7 +468,10 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
-  bool vr_ = false;  // the page runs a WebXR session ("vr 1")
+  bool vr_ = false;
+  /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
+  /// draw distances follow it, so a zoomed view shows what an unzoomed one shows nearer.
+  f32 view_zoom() const;  // the page runs a WebXR session ("vr 1")
   Facades windows_;
   WaterLook water_look_;
   std::unique_ptr<kern::game::GameWorld> world_;

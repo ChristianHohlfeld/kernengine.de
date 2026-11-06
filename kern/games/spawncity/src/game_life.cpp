@@ -380,7 +380,7 @@ void Game::life_draw() {
   const f32 now = world_ ? world_->sim_time() : 0;
   G.art.begin();
   if (world_placed_) {
-    G.art.life(G.life, now, cam_.eye, 170);
+    G.art.life(G.life, now, cam_.eye, 170 * std::fmin(view_zoom(), 3.0f));  // the scope sees farther
     G.interiors.draw(G.art, now, cam_.eye);
   }
   G.art.end();
