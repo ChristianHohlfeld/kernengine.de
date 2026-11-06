@@ -322,6 +322,15 @@ class GameWorld {
   void play_sound(const std::string& sound, Vec3 at, f32 volume, f32 pitch, bool spatial, ActorId actor = 0) { cue(sound, at, volume, pitch, spatial, spatial ? audio::Bus::sfx : audio::Bus::ui, actor); }
   void particle_burst(Vec3 at, Vec3 color) { burst(at, color); }
   void shake_camera(f32 amount) { shake_ = max_of(shake_, amount); shake_energy_ = min_of(1.35f, shake_energy_ + amount); }
+  /// Points the first-person weapon's sights at a world point (a touch shot / a dragged fire finger,
+  /// SpawnCity's first_person_controller: grip fixed, rotation only) for `hold_s` seconds; then it
+  /// returns to the crosshair. `snap`: on the target at once (a new shot leaves the aligned muzzle).
+  void aim_view_model(Vec3 world_point, f32 hold_s, bool snap) {
+    view_aim_point_ = world_point;
+    view_aim_hold_s_ = hold_s;
+    view_aim_set_ = true;
+    view_aim_snap_ = view_aim_snap_ || snap;
+  }
   void destroy_actor(ActorId id);
   void heal(ActorId id, f32 amount);
   void give_ammo(ActorId pawn, i32 rounds);
@@ -634,6 +643,10 @@ class GameWorld {
   // camera feel (local player)
   f32 bob_phase_ = 0, bob_weight_ = 0, recoil_pitch_ = 0, recoil_yaw_ = 0, recoil_roll_ = 0, shake_energy_ = 0, land_dip_ = 0;
   f32 fov_now_ = 0, look_rate_x_ = 0, look_rate_y_ = 0, aim_blend_ = 0;
+  Vec3 view_aim_point_{};
+  f32 view_aim_hold_s_ = 0;
+  bool view_aim_set_ = false, view_aim_snap_ = false;
+  f64 view_aim_until_ms_ = -1;
   u32 viewmodel_mesh_ = 0, flash_mesh_ = 0, tracer_mesh_ = 0;
   f64 flash_until_ = 0;
   Vec3 flash_at_;

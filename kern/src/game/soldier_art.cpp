@@ -499,7 +499,16 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
       const physics::RayHit h = physics_.cast_ray(c.eye, f * 180.0f, ~0ull, actor_body(local_->actor));
       art.rest_depth = h.hit ? clamp(h.fraction * 180.0f, 1.2f, 180.0f) : 30.0f;
     }
-    const Vec3 want{0, 0, -art.rest_depth};
+    Vec3 want{0, 0, -art.rest_depth};
+    // A touch shot / dragged fire finger: the sights go to that world point (camera space), held
+    // after the finger lifts (RELEASE_HOLD_MS), then back to the crosshair rest point.
+    if (view_aim_set_) { view_aim_set_ = false; view_aim_until_ms_ = now_ms + view_aim_hold_s_ * 1000.0; }
+    if (now_ms < view_aim_until_ms_) {
+      const Vec3 d = view_aim_point_ - c.eye;
+      want = {dot(d, r), dot(d, u), -dot(d, f)};
+      if (view_aim_snap_) art.aim_smooth = want;
+    }
+    view_aim_snap_ = false;
     art.aim_smooth = art.aim_smooth + (want - art.aim_smooth) * (1 - kern::dm::exp(-22 * dt));
     const Vec3 mount = art.weapon.mount;
     for (int it = 0; it < 2; ++it) {

@@ -407,6 +407,18 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     // shot is a ray through the finger: the game fires it (Kern's soldier shoots through the centre).
     const bool kern_gun = !game_weapon_in_hand();
     for (TouchFire& f : pad_touch_.fires()) {
+      // first_person_controller_v5.mjs: the gun's sights follow the finger - the depth is resolved
+      // where the finger went down (resolveDistance: 1.2 .. 180 m), the point moves with a drag, and
+      // the shot leaves the aligned muzzle; after the finger lifts it holds 420 ms (RELEASE_HOLD_MS).
+      if (kern_gun && !locked) {
+        Vec3 ro, rd;
+        ctl_screen_ray(f.x, f.y, ro, rd);
+        if (f.depth < 0) {
+          const RayResult h = cast(world_->physics(), ro, rd, 180, body(soldier_));
+          f.depth = h.hit ? clampf(kern::length(h.point - ro), 1.2f, 180) : 180;
+        }
+        world_->aim_view_model(ro + rd * f.depth, 0.42f, f.fresh);
+      }
       const f32 repeat = w == weapons::Id::smg ? 0.055f : w == weapons::Id::glock ? 0.17f : -1;
       int shots = 0;
       if (f.fresh) { shots = 1; f.last_shot = now; }
@@ -713,6 +725,9 @@ bool Game::ctl_touch_shot(f32 x, f32 y) {
   ctl_screen_ray(x, y, from, dir);
   kern::game::ShotEvent e;
   hit_scan(from, dir, s.range_m, s.damage, true, body(soldier_), e);
+  // the player's round: Kern draws its tracer and flash from the gun's muzzle (soldier_art.cpp,
+  // footMuzzle in the original), the lamps and the town know whose shot it was
+  e.shooter = soldier_;
   world_->shots().push_back(e);
   const char* snd = foot_weapon_ == weapons::Id::smg ? "sc:shot0" : foot_weapon_ == weapons::Id::sniper ? "builtin:sniper" : "sc:pistol0";
   world_->play_sound(snd, from, 0.9f, 1, true);
