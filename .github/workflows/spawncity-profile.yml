@@ -28,6 +28,8 @@ jobs:
           npx playwright install --with-deps chromium
       - run: node kern/games/spawncity/tests/profile.mjs "${{ inputs.kern_url }}" generated/profile kern ${{ inputs.modes }} || true
       - run: node kern/games/spawncity/tests/profile.mjs "${{ inputs.original_url }}" generated/profile original ${{ inputs.modes }} || true
+      - run: node kern/games/spawncity/tests/touch_check.mjs "${{ inputs.kern_url }}" generated/profile touch-kern || true
+      - run: node kern/games/spawncity/tests/touch_check.mjs "${{ inputs.original_url }}" generated/profile touch-original || true
       - name: Results to branch profil-ergebnis
         if: always()
         run: |
