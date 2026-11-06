@@ -169,20 +169,31 @@ SC_TEST(controls_touch_foot) {
   SC_CHECK(t.sprint(), "rim forwards sprints");
   t.pointer(2, 1, cx, cy - 200, 40);
   SC_CHECK(t.move().x == 0 && t.move().y == 0, "released");
-  // the screen fires at the finger, dragging moves the aim point (no look)
-  t.pointer(0, 2, 500, 150, 50);
-  SC_CHECK(t.fires().size() == 1 && t.fires()[0].hand == 0, "screen fire, right half");
-  t.pointer(1, 2, 510, 160, 66);
-  SC_CHECK(t.fires()[0].x == 510 && t.take_drag().x == 0, "fire drag aims, does not look");
-  t.pointer(2, 2, 430, 160, 80);
-  // the look stick: 1:1 drag
-  const f32 rx = 844 - 84;
-  t.pointer(0, 3, rx, cy, 100);
-  t.pointer(1, 3, rx + 10, cy, 200);
+  // the left side of the screen fires at the finger, dragging moves the aim point (no look)
+  t.pointer(0, 2, 250, 150, 50);
+  SC_CHECK(t.fires().size() == 1 && t.fires()[0].hand == 1, "screen fire, left half");
+  t.pointer(1, 2, 260, 160, 66);
+  SC_CHECK(t.fires()[0].x == 260 && t.take_drag().x == 0, "fire drag aims, does not look");
+  t.pointer(2, 2, 260, 160, 80);
+  t.drop_lifted();
+  // Call of Duty Mobile: the right side is a free look area - a quick tap fires at the finger ...
+  t.pointer(0, 3, 600, 150, 100);
+  t.pointer(2, 3, 600, 150, 160);
+  SC_CHECK(t.fires().size() == 1 && t.fires()[0].hand == 0 && t.fires()[0].x == 600, "a tap on the look side fires there");
+  t.drop_lifted();
+  // ... a drag looks 1:1, however far, with no edge turn
+  t.pointer(0, 5, 600, 150, 200);
+  t.pointer(1, 5, 610, 150, 300);
   SC_CHECK(near(t.take_drag().x, 0.068f), "look drag %g", 0.068f);
-  t.pointer(1, 3, rx + 200, cy, 300);
-  SC_CHECK(t.look_edge().x > 0.99f, "edge turn past the ring");
-  t.pointer(2, 3, rx + 200, cy, 310);
+  t.pointer(1, 5, 820, 150, 400);
+  SC_CHECK(t.look_edge().x == 0 && t.take_drag().x > 0.5f, "free drag, no edge turn");
+  t.pointer(2, 5, 820, 150, 420);
+  SC_CHECK(t.fires().empty(), "a drag is no shot");
+  // FIRE: held is the trigger
+  for (const TouchBtn& b : t.buttons())
+    if (b.id == "fire") t.pointer(0, 6, b.x + b.w / 2, b.y + b.h / 2, 430);
+  SC_CHECK(t.held("fire") && t.take_pressed("fire"), "FIRE held");
+  t.pointer(2, 6, 0, 0, 440);
   // JUMP is held
   for (const TouchBtn& b : t.buttons())
     if (b.id == "jump") t.pointer(0, 4, b.x + b.w / 2, b.y + b.h / 2, 400);

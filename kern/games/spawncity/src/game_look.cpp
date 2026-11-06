@@ -558,10 +558,18 @@ void Game::look_view_models(f32 dt) {
       break;
     }
     default: {
-      // Knife: low right, blade forward; a slash sweeps it across the view (380 ms).
+      // Knife (Call of Duty): low right, blade forward; a slash in three beats over 380 ms - a quick
+      // wind-up up and right (0 .. 70 ms), the cut down across to the left past the centre (70 ..
+      // 200 ms, the strike frame at 130 ms in the middle of it), the hand back low right
       const f32 u = age >= 0 && age < 0.38f ? age / 0.38f : 1;
-      const f32 sl = u < 1 ? std::sin(u * kPi) : 0;
-      put(cam * Mat4::translate({0.2f - sl * 0.26f + bx * 0.4f, -0.21f + bz * 0.2f - drop + sl * 0.06f, -0.4f - sl * 0.12f}) * euler(-0.2f * sl, 0.9f * sl, 0.5f * sl));
+      f32 px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0;
+      if (u < 1) {
+        auto ease = [](f32 t) { return t * t * (3 - 2 * t); };
+        if (u < 0.18f) { const f32 k = ease(u / 0.18f); px = 0.06f * k; py = 0.09f * k; pz = 0.05f * k; rz = -0.5f * k; ry = -0.25f * k; }
+        else if (u < 0.53f) { const f32 k = ease((u - 0.18f) / 0.35f); px = 0.06f - 0.42f * k; py = 0.09f - 0.17f * k; pz = 0.05f - 0.2f * k; rz = -0.5f + 1.4f * k; ry = -0.25f + 1.2f * k; rx = -0.35f * k; }
+        else { const f32 k = ease((u - 0.53f) / 0.47f); px = -0.36f * (1 - k); py = -0.08f * (1 - k); pz = -0.15f * (1 - k); rz = 0.9f * (1 - k); ry = 0.95f * (1 - k); rx = -0.35f * (1 - k); }
+      }
+      put(cam * Mat4::translate({0.2f + px + bx * 0.4f, -0.21f + py + bz * 0.2f - drop, -0.4f + pz}) * euler(rx, ry, rz));
       break;
     }
   }

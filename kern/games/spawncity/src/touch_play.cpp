@@ -377,7 +377,7 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
     case Finger::look:
       look_ = look_edge_ = {};
       look_id_ = -1;
-      if (f.free && type == 2 && t_ms - f.t0 < 220 && std::hypot(x - f.x0, y - f.y0) < 14) {
+      if (f.free && type == 2 && t_ms - f.t0 < 300 && std::hypot(x - f.x0, y - f.y0) < 14) {
         // a tap on the look side: one round at the finger (the original's screen fire)
         TouchFire fire;
         fire.id = id;

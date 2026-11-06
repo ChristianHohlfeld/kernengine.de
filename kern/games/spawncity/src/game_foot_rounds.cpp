@@ -297,8 +297,14 @@ void Game::foot_rounds_update(f32 dt) {
     ctl_.aim_point = g.knife_at_point;
     ctl_.aim_x = g.knife_x;
     ctl_.aim_y = g.knife_y;
-    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife && melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true, 12))  // knifeStrike momentumNs 12
+    if (mode_ == Mode::foot && !player_dead_ && foot_weapon_ == Id::knife && melee_hit(kKnifeReach + 0.3f, 1.2f, kKnifeDmg, true, 12)) {  // knifeStrike momentumNs 12
       osfx("gameplay_final_runtime_v2.knifeHit", cam_.eye, 1);
+      // the hit is felt: a red spray where the blade went in, a sharper jolt of the view
+      Vec3 dir;
+      const Vec3 eye = aim_ray(dir);
+      world_->particle_burst(eye + dir * 1.2f, {0.55f, 0.02f, 0.02f});
+      look_.shake.add(0.22f, 0.3f);
+    }
     ctl_.aim_point = was;
     ctl_.aim_x = wx;
     ctl_.aim_y = wy;
@@ -371,6 +377,30 @@ void Game::melee_attack() {
     if (now - g.knife_last < kKnifeRecover) return;
     g.knife_last = now;
     g.knife_due = now + kKnifeStrike;
+    // Call of Duty's knife: a target within 3 m ahead (a 35 degree cone) draws the player a short
+    // lunge onto it - the blade connects at the strike frame - and the view gives a little
+    {
+      Vec3 dir;
+      const Vec3 eye = aim_ray(dir);
+      const Vec3 me = state_of(soldier_).position;
+      const f32 fl = std::hypot(dir.x, dir.y);
+      f32 best = 3.0f;
+      Vec3 to{};
+      for (const People::Person& p : people_.all()) {
+        if (p.state == People::State::down || p.state == People::State::gone) continue;
+        const f32 dx = p.pos.x - me.x, dy = p.pos.y - me.y, d = std::hypot(dx, dy);
+        if (d < 0.6f || d > best || fl < 1e-4f || (dx * dir.x + dy * dir.y) / (d * fl) < 0.82f) continue;
+        best = d;
+        to = {dx / d, dy / d, 0};
+      }
+      if (best < 3.0f) {
+        const Vec3 v = world_->actor_velocity(soldier_);
+        const f32 sp = std::fmin(9.0f, (best - 0.9f) / kKnifeStrike);
+        world_->set_actor_velocity(soldier_, {to.x * sp, to.y * sp, v.z});
+      }
+      look_.shake.add(0.12f, 0.2f);
+      (void)eye;
+    }
     g.knife_at_point = ctl_.aim_point;
     g.knife_x = ctl_.aim_x;
     g.knife_y = ctl_.aim_y;
