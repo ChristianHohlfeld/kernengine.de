@@ -353,16 +353,43 @@ export class MpPage {
     if (this.params.get("offline")) u.searchParams.set("offline", this.params.get("offline"));
     return u.href;
   }
+  /** mobile_gameplay_ui.mjs multiplayerSnapshot: the MULTI button's state and its status line. */
+  uiState(h) {
+    const others = Array.isArray(h?.mp?.players) ? h.mp.players.filter(p => !p.me).length : 0;
+    if (this.connecting) return {state: "finding", label: "SUCHE …", status: "Suche Mitspieler in der Lobby …"};
+    if (!this.net) return {state: this.failed ? "error" : "offline", label: "MULTI", status: this.failed || ""};
+    const brokers = this.kind === "public" ? (this.net.clients?.filter(c => c.open).length || 0) : 1;
+    if (!brokers && performance.now() - (this.openedAt || 0) > 6000) return {state: "error", label: "MULTI ⚠", status: "Keine Verbindung · tippen = neu versuchen"};
+    if (others > 0) return {state: "connected", label: `MULTI · ${others + 1}`, status: `${others + 1} Spieler · ${this.hosting ? "du hostest" : "verbunden"}`};
+    return {state: "waiting", label: "MULTI · 1", status: this.hosting ? "Lobby offen · warte auf Mitspieler" : "verbunden · warte auf Mitspieler"};
+  }
+  /** MULTI again: a lobby that does not connect is tried anew; in a lobby it is left (lan_vs toggleVs). */
+  toggleMulti(h) {
+    const st = this.uiState(h).state;
+    if (this.connecting) return;
+    if (!this.net) { this.goMulti(); return; }
+    try { this.net.close?.(); } catch { /* closed */ }
+    this.net = null;
+    window.SpawnCityNet = null;
+    this.command("net stop");
+    const u = new URL(location.href);
+    for (const k of ["mp", "net", "room"]) u.searchParams.delete(k);
+    try { history.replaceState(history.state, "", u.href); } catch { /* the address stays */ }
+    this.params = u.searchParams;
+    if (st === "error") this.goMulti();
+  }
   goMulti() {
     // MULTI (lan_vs.mjs): into the one public lobby - join it, or host it when nobody is there -
     // right here, the game goes on (no reload: a reload threw the player back to the title)
     if (this.net || this.connecting) return;
+    this.failed = "";
     const u = new URL(location.href);
     u.searchParams.set("mp", "auto"); u.searchParams.set("net", "public"); u.searchParams.set("room", MP_LOBBY);
     try { history.replaceState(history.state, "", u.href); } catch { /* the address stays */ }
     this.params = u.searchParams;
     this.connecting = true;
-    this.connect(this.KernNet).finally(() => { this.connecting = false; });
+    this.connect(this.KernNet).then(() => { this.openedAt = performance.now(); if (!this.net) this.failed = "Mehrspieler nicht verfügbar · tippen = neu versuchen"; })
+      .catch(err => { this.failed = "Fehler: " + (err?.message || err); }).finally(() => { this.connecting = false; });
   }
   showShare() {
     // TEILEN (share_button.mjs) with a QR code to join (the game encodes it: sc QR encoder).

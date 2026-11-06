@@ -153,7 +153,7 @@ export class OriginalView {
     click("mobileGameplayReset", () => this.command("reset"));
     click("mobileGameplayWeapon", () => this.command("press wpn"));
     click("mobileGameplayMode", () => this.command("press mode"));
-    click("mobileGameplayMultiplayer", () => this.mp?.goMulti?.());
+    click("mobileGameplayMultiplayer", () => { if (this.mp?.toggleMulti) this.mp.toggleMulti(this.last); else this.mp?.goMulti?.(); });
     click("enterCarButton", () => this.command("press enter"));
     click("enterJetButton", () => this.command("press jet"));
     click("soloArm", () => this.command("press arm"));
@@ -256,6 +256,15 @@ export class OriginalView {
     if (multi) {
       multi.classList.remove("split-left");
       multi.classList.toggle("hud-after-exit", playing);
+      // mobile_gameplay_ui.mjs: the button tells what the multiplayer is doing (offline / finding /
+      // waiting / connected / error) and the line under it says it in words
+      const ms = this.mp?.uiState?.(h);
+      if (ms) {
+        if (multi.dataset.state !== ms.state) multi.dataset.state = ms.state;
+        setText(multi, ms.label);
+        const st = $("mobileGameplayMultiplayerStatus");
+        if (st) { setText(st, ms.status); if (st.dataset.state !== ms.state) st.dataset.state = ms.state; st.style.display = playing && ms.status ? "block" : "none"; }
+      }
       if (playing && exit?.offsetWidth) {
         const l = `${exit.offsetLeft + exit.offsetWidth + 6}px`;
         if (multi.style.getPropertyValue("left") !== l) multi.style.setProperty("left", l, "important");
