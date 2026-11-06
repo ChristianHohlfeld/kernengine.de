@@ -490,6 +490,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
       } else {
         touch_fresh = true;
         C.aim_point = true;
+        C.aim_hand = f.hand;
         C.aim_x = f.x;
         C.aim_y = f.y;
       }

@@ -384,6 +384,7 @@ void Game::melee_attack() {
   u32 n = 0;
   if (ctl_.lmb_hit) hands[n++] = 1;
   if (ctl_.rmb_hit) hands[n++] = 0;
+  if (n == 0 && ctl_.aim_point && ctl_.aim_hand >= 0) hands[n++] = static_cast<u8>(ctl_.aim_hand);  // touch: the left half the left hand
   if (n == 0) hands[n++] = ctl_.pad_lt_fire_was && !ctl_.pad_fire_was ? 1 : 0;
   for (u32 k = 0; k < n; ++k) {
     const u8 h = hands[k];

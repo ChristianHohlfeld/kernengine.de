@@ -7,6 +7,17 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
+    "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Luftschlag landet genau dort, wo du tippst.",
+    "Messer, Fäuste und Fingerschüsse reagieren auf jeden kurzen Tipp; Fäuste: linke Hälfte linke Hand, rechte Hälfte rechte Hand.",
+    "Hochkant gehaltene Handys zeigen das Spiel richtig im Querformat.",
+    "Jet: Steuer-Sticks und KANONE wieder da, kein Flugzeug mehr in der Innenkamera, aufgeräumte Knöpfe.",
+    "MULTI zeigt, was passiert: Suche, Lobby offen, Anzahl der Spieler.",
+    "Kopftreffer bei Mitspielern zählen zuverlässig; am Fallschirm hängt die echte Spielfigur.",
+    "Granaten blitzen beim Aufprall, Brandflecken laufen weich in den Boden aus, schärferes Bild.",
+    "Neu unter WELT: Lenkraketen abschaltbar. Standard jetzt: Friendly Fire an, zerstörbares Gelände und Flak aus.",
+    "UPDATE AVAILABLE: ist eine neue Version online, erscheint ein Knopf zum Aktualisieren."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

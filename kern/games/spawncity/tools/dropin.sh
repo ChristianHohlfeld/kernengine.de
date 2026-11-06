@@ -28,8 +28,14 @@ grep -q 'drone_simulator.webmanifest' "$out/drone_simulator.html" || { echo "man
 rm -f "$out/manifest.webmanifest"
 # the original's worker file (registered for /drone_simulator.html) becomes Kern's worker
 cp "$here/web/sw.js" "$out/oppenheimer-sw.js"
-# the build tag (bottom right) names this Kern build, not the original's commit
-ver="${KERN_VERSION:-$(git -C "$kern" rev-parse --short HEAD 2>/dev/null || echo kern)}"
-sed -i "s#>v 9108537 · online 9108537<#>v ${ver} · Kern<#" "$out/view/original.html"
-grep -q "v ${ver} · Kern" "$out/view/original.html" || { echo "build tag not rewritten" >&2; exit 1; }
+# the update check (update_check.js, the original's): the page carries its build SHA as its first
+# comment and ./build.json the same SHA - an open game sees a newer deploy ("UPDATE AVAILABLE",
+# RELOAD), the title reloads by itself. The tag bottom right is the check's own (the original's
+# static one goes).
+sha="${KERN_SHA:-$(git -C "$kern" rev-parse HEAD 2>/dev/null || echo 0000000)}"
+sed -i "1i <!-- BUILD_SHA:${sha} -->" "$out/drone_simulator.html"
+head -1 "$out/drone_simulator.html" | grep -q "BUILD_SHA:${sha}" || { echo "build sha not written" >&2; exit 1; }
+printf '{"sha":"%s","built":"%s"}\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$out/build.json"
+sed -i '/<div id="buildTag"/d' "$out/view/original.html"
+grep -q 'id="buildTag"' "$out/view/original.html" && { echo "static build tag left" >&2; exit 1; }
 echo "drop-in for spawncity.de in $out ($(du -sh "$out" | cut -f1))"

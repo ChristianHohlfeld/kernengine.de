@@ -46,6 +46,7 @@ struct ControlsState {
   // a ray through a screen point for the game's own weapons (touch fire at the finger)
   bool aim_point = false;
   f32 aim_x = 0, aim_y = 0;     // CSS px
+  i32 aim_hand = -1;            // fists on touch: the finger's half (foot_touch_controller.mjs akimbo halves: 1 left, 0 right)
   bool jet_aim = false;         // jet tap fire: aim through the finger within 35 deg of the nose
   // touch fire repeat (foot_touch_controller.mjs) and the drone's STOP
   f32 kill_until = -1;
