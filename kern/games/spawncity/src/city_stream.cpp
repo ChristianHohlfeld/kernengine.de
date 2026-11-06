@@ -657,7 +657,9 @@ bool CityStream::work(Tile& t, f64 deadline) {
       t.upload_next = 0;
       if (t.rebuilding) {
         // the re-synced set is complete: the old meshes go in the same frame (nothing pops out)
+        const f64 t1 = kern::now_ms();
         for (u32 id : t.old_meshes) r_->remove(id);
+        step_time("building.remove", t1);
         t.old_meshes.clear();
         t.rebuilding = false;
         ++rebuilds_;
@@ -668,7 +670,11 @@ bool CityStream::work(Tile& t, f64 deadline) {
         t.old_lay = std::move(t.lay_meshes);
         t.lay_meshes.clear();
       }
-      begin_roads(t);
+      {
+        const f64 t1 = kern::now_ms();
+        begin_roads(t);
+        step_time("roads.begin", t1);
+      }
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
     case S::roads: {
@@ -700,8 +706,11 @@ bool CityStream::work(Tile& t, f64 deadline) {
       t.state = S::areas;
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
-    case S::areas:
+    case S::areas: {
+      const f64 t1 = kern::now_ms();
       build_areas(t);
+      step_time("areas.build", t1);
+    }
       if (t.relay) {
         // New layer in place: the old one goes now (no frame without roads).
         for (u32 id : t.old_lay) r_->remove(id);
