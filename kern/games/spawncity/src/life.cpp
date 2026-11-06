@@ -130,7 +130,7 @@ void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out)
   update_cows(dt, now, view, out);
   update_pigeons(dt, now, view, rng, out);
   update_birds(dt, now, view);
-  update_trees(view);
+  update_trees(view, now);
   update_pets(dt, now, view, out);
   update_joggers(dt, now, view, rng, out);
   update_voices(dt, now, view, out);
@@ -533,7 +533,15 @@ void Life::update_birds(f32 dt, f32 now, const LifeView& view) {
   }
 }
 
-void Life::update_trees(const LifeView& view) {
+void Life::update_trees(const LifeView& view, f32 now) {
+  // the ground under a tree is the ground now: the height field refines after a tree was placed
+  // (a finer tile, a crater) - 64 trees a frame are put back on it (a sunk or floating trunk)
+  for (u32 k = 0; k < 64 && !trees_.empty(); ++k) {
+    Tree& t = trees_[tree_ground_cursor_++ % trees_.size()];
+    t.foot.z = ground(view, t.foot.x, t.foot.y);
+  }
+  // blown-over trees lie 40 s, then they are gone
+  if (!trees_.empty()) trees_.erase(std::remove_if(trees_.begin(), trees_.end(), [&](const Tree& t) { return t.fell_at >= 0 && now - t.fell_at > 40; }), trees_.end());
   // Trees beside the streets (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m, clear of buildings
   // by 2.4 m): placed once per lane as lanes arrive.
   const std::vector<Lane>& lanes = view.city->lanes();
@@ -1045,6 +1053,18 @@ void Life::blast(Vec3 at, f32 radius, f32 now, LifeOut& out) {
   }
   for (Flock& f : flocks_)
     if (!f.air && std::hypot(f.at.x - at.x, f.at.y - at.y) < 90) f.next_flight = std::fmin(f.next_flight, now);
+  // trees in the blast fall over, away from it, about their foot (nothing left in the air)
+  for (Tree& t : trees_) {
+    if (t.fell_at >= 0) continue;
+    const Vec2 d{t.foot.x - at.x, t.foot.y - at.y};
+    const f32 dist = std::hypot(d.x, d.y);
+    if (dist > r * 0.9f || std::fabs(t.foot.z - at.z) > r) continue;
+    t.fell_at = now;
+    t.fall_dir = dist > 0.1f ? d * (1 / dist) : Vec2{1, 0};
+    ++trees_down_;
+    out.sounds.push_back({LifeOut::Sound::thud, t.foot + Vec3{0, 0, 1}, 0.8f, 0.7f});
+    out.bursts.push_back({t.foot + Vec3{0, 0, 2.6f}, {0.31f, 0.52f, 0.34f}});
+  }
   if (chain_alive_) {
     const f32 R = std::fmax(3.0f, radius);
     for (u32 i = 0; i < kRunners; ++i) {

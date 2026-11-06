@@ -158,8 +158,14 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
     const f32 s = t.scale;
     // the unit cylinder stands on z = 0 (prim::cylinder): the trunk from the foot up 2.3 m, its foot
     // 0.4 m in the ground so a slope (or a crater since) never shows it standing on air
-    cylinder(at(t.foot - Vec3{0, 0, 0.4f}) * sc3({0.25f * s, 0.25f * s, 2.3f * s + 0.4f}), rgb(0x6a523d));
-    ball(at(t.foot + Vec3{0, 0, 2.75f * s}) * sc3({1.95f * s, 1.95f * s, 2.35f * s}), rgb(0x4f8658));
+    // a blown-over tree turns about its foot (accelerating, 1.1 s) and lies there
+    Mat4 base = at(t.foot);
+    if (t.fell_at >= 0) {
+      const f32 u = clampf((now - t.fell_at) / 1.1f, 0, 1), ang = 1.5f * u * u;
+      base = base * rot(kern::normalize(Vec3{-t.fall_dir.y, t.fall_dir.x, 0}, {1, 0, 0}), ang);
+    }
+    cylinder(base * at({0, 0, -0.4f}) * sc3({0.25f * s, 0.25f * s, 2.3f * s + 0.4f}), rgb(0x6a523d));
+    ball(base * at({0, 0, 2.75f * s}) * sc3({1.95f * s, 1.95f * s, 2.35f * s}), rgb(0x4f8658));
   }
   // ragdolls
   bones_.clear();

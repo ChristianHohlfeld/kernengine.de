@@ -91,7 +91,7 @@ class Life {
     i32 call = 0, beat = 0, side = 1;
     Runner runners[10];
   };
-  struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; };
+  struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; f32 fell_at = -1; Vec2 fall_dir{1, 0}; };  // fell_at: blown over (falls about its foot)
   // dogs and cats (world_procedural_population.mjs ambient animals; #1 is the black cat now and then)
   enum class Species : u8 { dog, cat, black_cat };
   struct Pet {
@@ -134,6 +134,7 @@ class Life {
   const Ragdolls& ragdolls() const { return ragdolls_; }
   const std::vector<Cow>& cows() const { return cows_; }
   const std::vector<Flock>& flocks() const { return flocks_; }
+  u32 trees_down() const { return trees_down_; }
   const std::vector<Bird>& birds() const { return birds_; }
   const std::vector<Tree>& trees() const { return trees_; }
   const std::vector<Pet>& pets() const { return pets_; }
@@ -165,7 +166,7 @@ class Life {
   bool blocked(const LifeView& view, Vec2 p) const;
   bool spot_near(const LifeView& view, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const;
   void update_birds(f32 dt, f32 now, const LifeView& view);
-  void update_trees(const LifeView& view);
+  void update_trees(const LifeView& view, f32 now);
   void update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out);
   void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);
   void update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
@@ -182,6 +183,7 @@ class Life {
   Vec2 herds_for_{1e9f, 1e9f};
   f32 last_herd_check_ = -99, last_moo_ = -99;
   std::vector<Flock> flocks_;
+  u32 trees_down_ = 0, tree_ground_cursor_ = 0;
   std::vector<Bird> birds_;
   std::vector<Tree> trees_;
   std::vector<Pet> pets_;
