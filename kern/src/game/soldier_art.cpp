@@ -73,6 +73,8 @@ struct SoldierArt {
   Meshes view, slide;
   WeaponKind view_kind = WeaponKind::rifle;
   bool view_built = false;
+  bool view_vr = false;    // built for the headset: the gun alone (no arms), in the world's depth, at real size
+  f32 view_vr_scale = 1;
   models::WeaponModel weapon;  // markers of the built weapon
   f64 local_shot = -1e9;
   f32 rest_depth = 30;
@@ -454,19 +456,30 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
   const Actor* me = fp_local ? level_.find(local_->actor) : nullptr;
   const bool dead = me && health_.count(me->id) && health_[me->id].dead;
   const bool has_gun = me && me->weapon && !dead;
-  if (has_gun && (!art.view_built || art.view_kind != me->weapon->kind)) {
+  if (has_gun && (!art.view_built || art.view_kind != me->weapon->kind || art.view_vr != view_hand_valid_)) {
     drop(r_, art.view);
     drop(r_, art.slide);
     art.weapon = models::weapon_model(me->weapon->kind);
     models::PartMeshes parts = art.weapon.parts;
-    // Gloves and sleeves hold the grip (in the group frame: grip + mount).
-    {
+    const bool vr = view_hand_valid_;
+    // Gloves and sleeves hold the grip (in the group frame: grip + mount) - not in VR: the real hand holds it
+    if (!vr) {
       models::Builder b(parts);
       b.set_transform(Mat4::translate(art.weapon.mount * -1.0f));
       models::view_arms(b, art.weapon.grip + art.weapon.mount);
     }
-    art.view = upsert_parts(r_, parts, true, layers_, false);
-    art.slide = upsert_parts(r_, art.weapon.slide, true, layers_, false);
+    // VR: the gun at its real length (the view models are sized for the screen)
+    art.view_vr_scale = 1;
+    if (vr) {
+      f32 lo = 1e9f, hi = -1e9f;
+      for (const MeshData* md : {&parts.matte, &parts.metal}) for (std::size_t i = 2; i < md->positions.size(); i += 3) { lo = min_of(lo, md->positions[i]); hi = max_of(hi, md->positions[i]); }
+      const WeaponKind k = me->weapon->kind;
+      const f32 real = k == WeaponKind::pistol ? .2f : k == WeaponKind::sniper ? 1.1f : k == WeaponKind::shotgun ? .9f : .62f;  // Glock, sniper, shotgun, SMG / rifle
+      if (hi > lo + .01f) art.view_vr_scale = clamp(real / (hi - lo), .3f, 3.0f);
+    }
+    art.view = upsert_parts(r_, parts, !vr, layers_, false);
+    art.slide = upsert_parts(r_, art.weapon.slide, !vr, layers_, false);
+    art.view_vr = vr;
     art.view_kind = me->weapon->kind;
     art.view_built = true;
     if (!art.flash_view) art.flash_view = upsert_mesh(r_, models::flash_mesh(), effect(true), layers_);
@@ -548,7 +561,8 @@ void GameWorld::present_soldier_art(f64 now_ms, f32 dt) {
       g = Mat4::translate({0, -.12f * rl, .04f * rl}) * g * models::euler({-.5f * rl, 0, .35f * rl});
     }
     // VR: the gun in the controller's hand - its grip where the hand is, the barrel along the ray
-    const Mat4 world = view_hand_valid_ ? view_hand_ * models::euler({.075f * kick, 0, 0}) * Mat4::translate(art.weapon.grip * -1.0f - mount) : cam * g;
+    const f32 vs = art.view_vr_scale;
+    const Mat4 world = view_hand_valid_ ? view_hand_ * models::euler({.075f * kick, 0, 0}) * Mat4::scale({vs, vs, vs}) * Mat4::translate(art.weapon.grip * -1.0f - mount) : cam * g;
     art.view_matrix = world;
     art.view_valid = true;
     const Mat4 body = world * Mat4::translate(mount);

@@ -46,6 +46,7 @@ struct LookState {
   std::vector<f32> streak_t, streak_tint;
   // first-person models for the game's own weapons (launchers, melee): body + glow per model
   u32 vm_body[4] = {}, vm_glow[4] = {};
+  u32 vm_body_vr[4] = {}, vm_glow_vr[4] = {};  // VR: the weapons alone, in the world's depth
   bool vm_built = false;
   i32 vm_shown = -1;
   f32 vm_fire_at = -99, vm_prev_next_attack = 0, vm_bob = 0, vm_bob_w = 0, vm_switch_at = -99;

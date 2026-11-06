@@ -117,7 +117,9 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
 void Game::vr_update_view() {
   // the first-person gun in the right hand (Kern's soldier), or back in front of the camera
   Mat4 m;
-  if (vr_ && mode_ == Mode::foot && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
+  // (the game's own weapons - launchers, knife, fists - are drawn by game_look.cpp; then Kern's
+  // gun stays a hidden view model)
+  if (vr_ && mode_ == Mode::foot && !game_weapon_in_hand() && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
   else world_->set_view_hand(nullptr);
   if (engine_) engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
 }

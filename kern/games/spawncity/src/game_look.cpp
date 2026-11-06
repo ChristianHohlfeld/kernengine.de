@@ -37,8 +37,10 @@ void glow_cyl(MeshData& m, f32 r, f32 len, Vec3 hdr, Vec3 at) { prim::append(m, 
 // Glow colours: linear HDR (above 1 the bloom picks them up), like the MeshBasicMaterial glows.
 constexpr Vec3 kGlowRed{3.2f, 0.12f, 0.12f}, kGlowAmber{3.0f, 1.25f, 0.1f}, kGlowOrange{3.0f, 0.9f, 0.18f};
 
+bool g_vm_arms = true;  // false: the VR set (the controller is the hand: no forearm, no sleeve)
 /// A gloved forearm and sleeve reaching back from a grip at `grip` (viewmodel_arms.mjs).
 void arm(MeshData& m, Vec3 grip, f32 side) {
+  if (!g_vm_arms) return;
   const Mat4 tilt = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   box(m, {0.075f, 0.08f, 0.1f}, 0x1d232c, {0, 0, 0.0f}, tilt);                 // glove
   cyl(m, 0.04f, 0.3f, 0xc58c66, {side * 0.012f, -0.03f, 0.2f}, 10, tilt);      // forearm
@@ -105,6 +107,7 @@ void fist(MeshData& m) {
   cyl(m, 0.0405f, 0.018f, 0xe9e4d8, {0, 0.002f, 0.016f}, 10);         // tape band
   box(m, {0.03f, 0.03f, 0.06f}, 0xa9714f, {-0.022f, -0.03f, -0.03f}); // thumb
   cyl(m, 0.038f, 0.05f, 0xe9e4d8, {0, -0.002f, 0.066f}, 10);          // wrist wrap
+  if (!g_vm_arms) return;
   const Mat4 back = Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   cyl(m, 0.043f, 0.3f, 0xc58c66, {0.012f, -0.03f, 0.24f}, 10, back);  // forearm
   cyl(m, 0.06f, 0.16f, 0x2c3440, {0.02f, -0.05f, 0.43f}, 10, back);   // sleeve
@@ -125,9 +128,9 @@ void knife(MeshData& m, MeshData& g) {
   (void)g;
 }
 
-kern::Material vm_material(bool glow) {
+kern::Material vm_material(bool glow, bool vr = false) {
   kern::Material mt;
-  mt.viewmodel = true;
+  mt.viewmodel = !vr;  // VR: in the world's depth (a wall in front hides it, as a real gun)
   mt.cast_shadow = false;
   mt.frustum_culled = false;
   mt.roughness = glow ? 1 : 0.55f;
@@ -540,26 +543,32 @@ void Game::look_view_models(f32 dt) {
   kern::Renderer& r = engine_->renderer;
   if (!L.vm_built) {
     L.vm_built = true;
-    for (int i = 0; i < 4; ++i) {
-      MeshData body, glow;
-      switch (i) {
-        case 0: boomstick(body, glow); break;
-        case 1: rocket_launcher(body, glow); break;
-        case 2: fist(body); break;
-        default: knife(body, glow); break;
+    for (int set = 0; set < 2; ++set) {
+      g_vm_arms = set == 0;  // set 1: VR - the weapon alone
+      for (int i = 0; i < 4; ++i) {
+        MeshData body, glow;
+        switch (i) {
+          case 0: boomstick(body, glow); break;
+          case 1: rocket_launcher(body, glow); break;
+          case 2: fist(body); break;
+          default: knife(body, glow); break;
+        }
+        auto make = [&](const MeshData& d, bool g, u32& id) {
+          if (d.positions.empty()) return;
+          id = r.allocate_id();
+          kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
+          in.material = vm_material(g, set == 1);
+          in.visible = false;
+          if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+        };
+        make(body, false, set ? L.vm_body_vr[i] : L.vm_body[i]);
+        make(glow, true, set ? L.vm_glow_vr[i] : L.vm_glow[i]);
       }
-      auto make = [&](const MeshData& d, bool g, u32& id) {
-        if (d.positions.empty()) return;
-        id = r.allocate_id();
-        kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
-        in.material = vm_material(g);
-        in.visible = false;
-        if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
-      };
-      make(body, false, L.vm_body[i]);
-      make(glow, true, L.vm_glow[i]);
     }
+    g_vm_arms = true;
   }
+  Mat4 vr_probe;
+  const bool vr_hand = vr_hand_matrix(1, vr_probe);
   const int want = world_placed_ && mode_ == Mode::foot && !player_dead_ && world_->hud().health > 0 ? vm_index(foot_weapon_) : -1;
   const f32 now = world_->sim_time();
   // Attacks: the game's weapons move next_attack_ forward when they fire / strike.
@@ -567,11 +576,14 @@ void Game::look_view_models(f32 dt) {
   if (wid != L.vm_prev_weapon) { L.vm_prev_weapon = wid; L.vm_switch_at = now; }
   else if (next_attack_ > L.vm_prev_next_attack + 1e-4f && now - L.vm_switch_at > 0.05f) { L.vm_fire_at = now; L.vm_punch ^= 1; }
   L.vm_prev_next_attack = next_attack_;
-  for (int i = 0; i < 4; ++i)
-    if (i != want) {
-      if (L.vm_body[i]) r.set_visible(L.vm_body[i], false);
-      if (L.vm_glow[i]) r.set_visible(L.vm_glow[i], false);
-    }
+  for (int i = 0; i < 4; ++i) {
+    // the set not in use (flat / VR) is hidden whole; of the other only the weapon in hand shows
+    for (u32 id : {vr_hand ? L.vm_body[i] : L.vm_body_vr[i], vr_hand ? L.vm_glow[i] : L.vm_glow_vr[i]})
+      if (id) r.set_visible(id, false);
+    if (i != want)
+      for (u32 id : {L.vm_body[i], L.vm_glow[i], L.vm_body_vr[i], L.vm_glow_vr[i]})
+        if (id) r.set_visible(id, false);
+  }
   L.vm_shown = want;
   if (want < 0) return;
   // Kern draws its own first-person weapon for the soldier's kind; while ours is in hand it hides.
@@ -661,7 +673,7 @@ void Game::look_view_models(f32 dt) {
       break;
     }
   }
-  for (u32 id : {L.vm_body[want], L.vm_glow[want]}) {
+  for (u32 id : {vr_hand ? L.vm_body_vr[want] : L.vm_body[want], vr_hand ? L.vm_glow_vr[want] : L.vm_glow[want]}) {
     if (!id) continue;
     r.update_instances(id, {t.data(), t.size()}, {});
     r.set_visible(id, true);

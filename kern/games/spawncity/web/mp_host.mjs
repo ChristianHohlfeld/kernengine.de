@@ -120,14 +120,13 @@ class MpNostr {
     };
     this.ws.onclose = this.ws.onerror = () => { this.open = false; };
   }
-  publish(topic, text) {
-    if (!this.open || text.length > 30000) return false;
+  signEvent(topic, text) {
+    if (!this.open || text.length > 30000) return null;
     const now = Math.floor(Date.now() / 1000);
-    const ev = this.sign(now, [["t", topic], ["expiration", String(now + 30)]], text);
-    if (!ev) return false;
-    try { this.ws.send(`["EVENT",${ev}]`); } catch { return false; }
-    return true;
+    return this.sign(now, [["t", topic], ["expiration", String(now + 30)]], text);
   }
+  sendSigned(ev) { if (!this.open) return false; try { this.ws.send(`["EVENT",${ev}]`); } catch { return false; } return true; }
+  publish(topic, text) { const ev = this.signEvent(topic, text); return ev ? this.sendSigned(ev) : false; }
   close() { try { this.ws?.send(JSON.stringify(["CLOSE", this.sub])); this.ws?.close(); } catch { /* closed */ } }
 }
 
@@ -141,9 +140,11 @@ export class MpPublicNet {
     this.pair = await crypto.subtle.generateKey({name: "ECDH", namedCurve: "P-256"}, true, ["deriveKey"]);
     this.jwk = await crypto.subtle.exportKey("jwk", this.pair.publicKey);
     this.clients = MP_BROKERS.map(cfg => new MpMqtt(cfg, [this.topic], (t, text) => this.onBroker(text)));
-    if (this.sign) for (const url of MP_NOSTR) this.clients.push(new MpNostr(url, [this.topic], (t, text) => this.onBroker(text), this.sign));
+    // Nostr only on request (?nostr=1): a BIP-340 signature costs ~140 ms on a desktop and several
+    // hundred on a phone - signed for every hello it froze the game every second
+    if (this.sign && this.nostr) for (const url of MP_NOSTR) this.clients.push(new MpNostr(url, [this.topic], (t, text) => this.onBroker(text), this.sign));
     this.hello = setInterval(() => this.announce(), MP_HELLO_MS);
-    this.timer = setInterval(() => this.flush(), 8);
+    this.timer = setInterval(() => this.flush(), 16);
     this.announce();
     if (!hosting) {
       this.host = await new Promise((resolve, reject) => {
@@ -157,7 +158,16 @@ export class MpPublicNet {
   publish(packet) {
     packet.v = 1; packet.id = this.self; packet.msg = packet.msg || Math.random().toString(36).slice(2, 12);
     const text = JSON.stringify(packet);
-    for (const c of this.clients) if (!(c.signalOnly && packet.bulk)) c.publish(this.topic, text);
+    // the Nostr relays: no data, the hello only every 10 s, one signature for all relays
+    const nostr = !packet.bulk && (packet.kind !== "hello" || Date.now() - (this.nostrHelloAt || 0) > 10000);
+    if (nostr && packet.kind === "hello") this.nostrHelloAt = Date.now();
+    let signed = null;
+    for (const c of this.clients) {
+      if (!c.signalOnly) { c.publish(this.topic, text); continue; }
+      if (!nostr) continue;
+      signed ??= c.signEvent(this.topic, text) || "";
+      if (signed) c.sendSigned(signed);
+    }
   }
   announce() { this.publish({kind: "hello", host: this.hosting, key: this.jwk}); }
   async peerFor(id, jwk) {
@@ -195,7 +205,11 @@ export class MpPublicNet {
     if (!p) return;
     let value;
     try { value = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name: "AES-GCM", iv: mpUnB64(m.iv)}, p.key, mpUnB64(m.box)))); } catch { return; }
-    if (value.t === "data") { this.deliver(p.id, mpUnB64(value.d)); return; }
+    if (value.t === "data") {
+      if (Array.isArray(value.ds)) for (const d of value.ds) this.deliver(p.id, mpUnB64(d));
+      else this.deliver(p.id, mpUnB64(value.d));
+      return;
+    }
     if (value.t === "offer" && this.hosting) { this.connect(p, false); await p.pc.setRemoteDescription(value.sdp); const a = await p.pc.createAnswer(); await p.pc.setLocalDescription(a); this.seal(p, {t: "answer", sdp: p.pc.localDescription}); return; }
     if (value.t === "answer" && p.pc) { await p.pc.setRemoteDescription(value.sdp).catch(() => {}); return; }
     if (value.t === "ice" && p.pc) { await p.pc.addIceCandidate(value.c).catch(() => {}); }
@@ -218,6 +232,9 @@ export class MpPublicNet {
   deliver(from, bytes) { this.received++; this.engine.netPush(from, bytes); }
   flush() {
     if (!this.clients) return;
+    // without a direct channel the packets of this flush go out as one sealed relay message per
+    // peer (one AES-GCM and one broker publish, not one per packet)
+    let relay = null;
     for (let guard = 0; guard < 256; guard++) {
       const d = this.engine.netTake();
       if (!d) break;
@@ -225,8 +242,11 @@ export class MpPublicNet {
       const p = this.peers.get(d.to);
       if (!p) continue;
       if (p.dc?.readyState === "open") { try { p.dc.send(d.bytes); continue; } catch { /* fall back */ } }
-      this.seal(p, {t: "data", d: mpB64(d.bytes)}, true);  // encrypted relay over the brokers (not the Nostr relays)
+      relay ??= new Map();
+      if (!relay.has(p)) relay.set(p, []);
+      relay.get(p).push(mpB64(d.bytes));
     }
+    if (relay) for (const [p, ds] of relay) this.seal(p, {t: "data", ds}, true);  // encrypted relay over the brokers (not the Nostr relays)
   }
   status() {
     const open = this.clients?.filter(c => c.open && !c.signalOnly).length || 0, nostr = this.clients?.filter(c => c.open && c.signalOnly).length || 0;
@@ -349,6 +369,7 @@ export class MpPage {
       const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, "0")).join("");
       const secret = this.nostrKey ||= hex(32);
       this.net.sign = (created, tags, content) => { const ev = this.command(`nostr event ${created} ${secret} ${hex(32)} ${JSON.stringify(tags)} ${content}`); return ev.startsWith("{") ? ev : null; };
+      this.net.nostr = this.params?.get?.("nostr") === "1";
       this.net.onstatus = this.setStatus;
       r = await this.net.open({room, hosting: mp === "host", auto: mp === "auto"});
     } else {
