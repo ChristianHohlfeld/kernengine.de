@@ -22,6 +22,7 @@ const pause = ms => new Promise(r => setTimeout(r, ms));
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1";
 const DEVICES = {
   landscape: {viewport: {width: 844, height: 390}, screen: {width: 844, height: 390}, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: UA},
+  small: {viewport: {width: 770, height: 353}, screen: {width: 770, height: 353}, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true, userAgent: UA},  // a real Android phone
   portrait: {viewport: {width: 390, height: 844}, screen: {width: 390, height: 844}, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: UA},
 };
 
@@ -67,7 +68,7 @@ const GAMES = {
     afterStart: page => page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000}),
     mode: (page, m) => page.evaluate(m => {
       const walk = globalThis.__arondightWalkMode;
-      if (m === "car") { walk?.setMode?.("foot", {persist: false, reason: "compare"}); return globalThis.__arondightVehicleDrive?.enterNearest?.() ?? globalThis.__arondightGtaRuntime?.setMode?.("vehicle") ?? "no car api"; }
+      if (m === "car") { walk?.setMode?.("foot", {persist: false, reason: "compare"}); const d = globalThis.__arondightVehicleDrive; let r = d?.enterNearest?.(); if (!d?.active) r = `nearest ${r}; gta ${globalThis.__arondightGtaRuntime?.setMode?.("vehicle")}`; return String(r); }
       if (m === "jet") { try { globalThis.__arondightVehicleDrive?.exit?.(); } catch {} walk?.setMode?.("foot", {persist: false, reason: "compare"}); return String(globalThis.__jetMode?.enter?.() ?? "no jet api"); }
       if (m === "unjet") { try { globalThis.__jetMode?.exit?.(); } catch {} return walk?.setMode?.("foot", {persist: false, reason: "compare"}); }
       return walk?.setMode?.(m, {persist: false, reason: "compare"}) ?? "no walk mode";
@@ -76,7 +77,8 @@ const GAMES = {
   },
   kern: {
     url: KERN,
-    boot: page => page.waitForFunction(() => { const b = document.querySelector("html.sc-original-view #gameMenuStart"); return b && !b.disabled && b.textContent.trim() === "START"; }, null, {timeout: 180000, polling: 500}),
+    // the snapshot's START is there before the game has loaded: wait for the game to say placed
+    boot: page => page.waitForFunction(() => { let placed = false; try { placed = !!window.SpawnCity?.hud?.()?.placed; } catch {} const b = document.querySelector("html.sc-original-view #gameMenuStart"); return placed && b && !b.disabled && b.textContent.trim() === "START"; }, null, {timeout: 180000, polling: 500}),
     afterStart: page => page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000}),
     mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(m === "unjet" ? "mode foot" : `mode ${m}`), m),
     state: page => page.evaluate(() => { try { const h = window.SpawnCity.hud(); return {mode: h.mode, device: h.ctl?.device, desktop: document.body.classList.contains("desktop-input"), coarse: matchMedia("(pointer: coarse)").matches, touch: navigator.maxTouchPoints}; } catch (e) { return {error: String(e)}; } }),
@@ -87,6 +89,7 @@ const report = {original: ORIGINAL, kern: KERN, runs: []};
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]});
 try {
   for (const [dev, profile] of Object.entries(DEVICES)) {
+    if (process.env.TOUCH_DEVICE && process.env.TOUCH_DEVICE !== dev) continue;
     for (const [name, g] of Object.entries(GAMES)) {
       if (ONLY && ONLY !== name) continue;
       const ctx = await browser.newContext({...profile, geolocation: GPS, permissions: ["geolocation"], locale: "de-DE"});
@@ -116,15 +119,17 @@ try {
       };
       const url = new URL(g.url); url.searchParams.set("menu", "1");
       await step("title", async () => { await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000}); await g.boot(page); }, 2500);
-      await step("drone", async () => { const n = await tap("#gameMenuStart"); await g.afterStart(page).catch(() => {}); return n; }, 7000);
-      await step("minimap-expanded", () => tap("#worldLookHud [data-map-expand]"), 2000);
-      await tap("#worldLookHud [data-map-expand]"); await pause(800);
-      await step("foot-tap", () => tap("#mobileGameplayMode"), 3500);
+      await step("start", async () => { const n = await tap("#gameMenuStart"); await g.afterStart(page).catch(() => {}); return n; }, 7000);
+      await step("minimap-expanded", () => tap("#worldLookHud [data-map-expand]"), 2500);
+      // close the big map: the original's ✕ (#worldMapFull .wm-close), else the expand button again
+      if ((await tap("#worldMapFull .wm-close")).startsWith("no ")) await tap("#worldLookHud [data-map-expand]");
+      await pause(1000);
+      await step("mode-tap", () => tap("#mobileGameplayMode"), 3500);
+      await step("drone", () => g.mode(page, "drone"), 2500);
       await step("foot", () => g.mode(page, "foot"), 2500);
       await step("car", () => g.mode(page, "car"), 3500);
       await step("jet", () => g.mode(page, "jet"), 4000);
       await g.mode(page, "unjet").catch(() => {}); await pause(1500);
-      await step("drone-again", () => g.mode(page, "drone"), 3000);
       await step("menu", () => tap("#mobileGameplaySettings"), 2000);
       await ctx.close();
     }
