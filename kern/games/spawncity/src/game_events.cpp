@@ -460,6 +460,26 @@ void Game::draw_events() {
         const f32 t = now * (3.1f + static_cast<f32>(i)) + static_cast<f32>(i) * 2.1f, s = 1.4f * (0.55f + 0.25f * std::sin(t));
         A.put(CombatArt::glow_sphere, Mat4::translate(k.p + Vec3{0.3f * std::sin(t), 0.3f * std::cos(t), 2 + s * 0.6f + static_cast<f32>(i) * 0.5f}) * Mat4::scale({s, s, s * 1.4f}), {2.8f, 1.1f, 0.25f});
       }
+  // headlights at night (traffic, buses, cruisers, the player's car): two warm glows at the front
+  // and a soft pool of light on the road ahead
+  if (night_ > 0.25f) {
+    const f32 k = clampf((night_ - 0.25f) / 0.5f, 0, 1);
+    for (std::size_t ci = 0; ci < cars_.size(); ++ci) {
+      const TrafficCar& c = cars_[ci];
+      if (!c.placed || c.wreck || !world_->actor_alive(c.actor)) continue;
+      if (!c.driver && !(mode_ == Mode::car && static_cast<i32>(ci) == car_index_)) continue;  // a parked, empty car is dark
+      const Mat4 m = matrix_of(c.actor);
+      const Vec3 pos = m.translation();
+      if (kern::length(pos - cam_.eye) > 160) continue;
+      const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0}), side{-fwd.y, fwd.x, 0};
+      const Vec3 h = c.car->spec().half;
+      for (f32 sd : {-1.0f, 1.0f})
+        A.put(CombatArt::glow_sphere, Mat4::translate(pos + fwd * (h.x + 0.02f) + side * (sd * h.y * 0.7f) + Vec3{0, 0, 0.05f}) * Mat4::scale({0.16f, 0.16f, 0.12f}), Vec3{3.2f, 3.0f, 2.6f} * k);
+      const Vec3 pool = pos + fwd * (h.x + 5.5f);
+      const Vec3 g{pool.x, pool.y, city_.ground_height(pool.x, pool.y) + 0.06f};
+      A.put(CombatArt::fade_sphere, Mat4::translate(g) * Mat4::trs({}, yaw_quat(std::atan2(fwd.y, fwd.x)), {9.0f, 4.2f, 0.05f}), Vec3{1.0f, 0.93f, 0.78f} * 1.6f, 0.2f * k);
+    }
+  }
   // a burnt-out car or bus: flames for 9 s, then a dark smoke column until it is cleared
   for (const TrafficCar& c : cars_) {
     if (!c.placed || !c.wreck) continue;
