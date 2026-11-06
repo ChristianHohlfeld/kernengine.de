@@ -1255,6 +1255,12 @@ std::string Game::command(const std::string& cmd) {
     return "unknown mode";
   }
   if (cmd == "eject" && mode_ == Mode::jet) { eject(); return "ok"; }
+  // simulator.mjs camFpv / camFollow / camThird: the drone's camera by name (any mode: the preference)
+  if (cmd == "cam fpv" || cmd == "cam follow" || cmd == "cam third") {
+    drone_cam_ = cmd == "cam fpv" ? 0 : cmd == "cam follow" ? 1 : 2;
+    rig_init_ = false;
+    return cmd.substr(4);
+  }
   if (cmd == "cam") {
     // Same as C / View: the mode's next camera.
     if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; return drone_cam_ == 0 ? "fpv" : drone_cam_ == 1 ? "follow" : "third"; }

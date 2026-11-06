@@ -215,6 +215,44 @@ SC_TEST(mp_sessions_host_two_clients) {
   SC_CHECK(ra && std::fabs(ra->body.sample(b.now_ms()).p.x - 5) < 0.2f, "a seen at x=5");
 }
 
+// lan_vs.mjs authority handover: the host goes, both clients see it, agree on the successor (the
+// lowest slot left), he hosts on, the other joins him.
+SC_TEST(mp_host_leaves_the_oldest_takes_over) {
+  net::Session host, a, b;
+  Wire w;
+  w.peers = {{11, &host}, {22, &a}, {33, &b}};
+  host.host(11, 9.1766, 47.66);
+  a.join(22, 11);
+  b.join(33, 11);
+  f64 t = 0;
+  auto step = [&](bool with_host) {
+    if (with_host) host.update(t, 1.0f / 60, pose_at({0, 0, 1}));
+    a.update(t, 1.0f / 60, pose_at({5, 0, 1}));
+    b.update(t, 1.0f / 60, pose_at({8, 0, 1}));
+    w.pump();
+    t += 1.0 / 60;
+  };
+  for (int i = 0; i < 120; ++i) step(true);
+  SC_CHECK(a.connected() && b.connected() && !a.host_lost() && !b.host_lost(), "both in, the host there");
+  host.stop();
+  w.peers.erase(11);
+  f64 until = t + 30;
+  while (t < until && !(a.host_lost() && b.host_lost())) step(false);
+  SC_CHECK(a.host_lost() && b.host_lost(), "both see the host gone (after %.1f s)", t - (until - 30));
+  SC_CHECK(a.successor() == b.successor(), "they agree on the successor (%u / %u)", a.successor(), b.successor());
+  net::Session& next = a.successor() == a.self_slot() ? a : b;
+  net::Session& other = &next == &a ? b : a;
+  const u64 next_id = &next == &a ? 22 : 33, other_id = &next == &a ? 33 : 22;
+  next.stop();
+  other.stop();
+  next.host(next_id, 9.1766, 47.66);
+  other.join(other_id, next_id);
+  for (int i = 0; i < 180; ++i) step(false);
+  f64 lon = 0, lat = 0;
+  SC_CHECK(next.hosting() && other.connected() && other.origin(lon, lat) && std::fabs(lon - 9.1766) < 1e-9, "the session goes on under the successor, same origin");
+  SC_CHECK(!other.host_lost(), "and the other is in again");
+}
+
 SC_TEST(mp_qr_code_structure) {
   // Decoded with OpenCV during development (versions 1, 5, 10, 11); here the structure.
   qr::Code c;

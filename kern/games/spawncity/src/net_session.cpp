@@ -170,6 +170,7 @@ bool Session::join(u64 self, u64 server) {
   connect_pending_ = true;
   role_ = Role::client;
   have_origin_ = false;
+  ever_in_ = false;
   scores_.clear();
   return true;
 }
@@ -183,11 +184,27 @@ void Session::stop() {
   protected_.clear();
   ballot_ = remote_ballot_ = mp::Ballot{};
   role_ = Role::none;
+  ever_in_ = false;
+  mates_.clear();
 }
 
 bool Session::connected() const {
   if (role_ == Role::host) return server_ && server_->running();
   return client_ && client_->connected() && have_origin_;
+}
+
+bool Session::host_lost() const {
+  if (role_ != Role::client || !ever_in_) return false;
+  if (!client_ || !client_->connected()) return true;
+  return now_ms() - in_since_ > kQuietS * 1000 + 2000 && !remote(kHost);
+}
+
+u8 Session::successor() const {
+  // from who was there while the host still was (by now the others may have gone quiet as well)
+  u8 best = self_slot_;
+  for (u8 s : mates_)
+    if (s != kHost && s < best) best = s;
+  return best;
 }
 
 bool Session::origin(f64& lon, f64& lat) const {
@@ -666,6 +683,11 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     client_->receive_packets();
     for (int ch : {kReliable, kUnreliable})
       while (auto m = client_->receive(ch)) deliver(m->type, m->data);
+    if (client_->connected() && have_origin_ && !ever_in_) { ever_in_ = true; in_since_ = now_ms(); }
+    if (client_->connected() && remote(kHost)) {
+      mates_.clear();
+      for (const Remote& r : remotes_) if (r.state.slot != kHost) mates_.push_back(r.state.slot);
+    }
     if (client_->connected() && have_origin_ && tick && send_pose) { client_->send(kUnreliable, kPose, pack(me_)); ++sent_poses_; }
     if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
     client_->send_packets();

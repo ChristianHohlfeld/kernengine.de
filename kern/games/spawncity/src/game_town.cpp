@@ -806,7 +806,11 @@ void Game::update_town(f32 dt) {
     }
   }
   const bool dead = world_->hud().respawn_in > 0 || (world_->hud().health >= 0 && world_->hud().health <= 0);
-  if (dead && !player_dead_) {
+  if (reset_revive_) {
+    // RESET raised him: the frame or two until Kern's step did it are no new death
+    if (!dead) { reset_revive_ = false; world_->heal(soldier_, 10000); place_world(); }
+    player_dead_ = false;
+  } else if (dead && !player_dead_) {
     wanted_.clear();
     toast_ = "Erwischt. Neuer Versuch.";
     toast_age_ = 0;

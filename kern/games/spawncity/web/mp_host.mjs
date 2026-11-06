@@ -294,27 +294,53 @@ export class MpPage {
     const relay = this.params.get("relay") || "", room = this.params.get("room") || (this.params.get("net") === "public" ? MP_LOBBY : "spawncity");
     this.kind = relay ? "relay" : this.params.get("net") === "public" ? "public" : "local";
     this.room = room;
-    const setStatus = text => { this.statusEl.textContent = text; this.statusEl.hidden = !text; };
+    this.adapter = adapter; this.KernNet = KernNet; this.relay = relay;
+    this.setStatus = text => { this.statusEl.textContent = text; this.statusEl.hidden = !text; };
     try {
-      let r;
-      if (this.kind === "public") {
-        this.net = new MpPublicNet(adapter);
-        this.net.onstatus = setStatus;
-        r = await this.net.open({room, hosting: mp === "host", auto: mp === "auto"});
-      } else {
-        this.net = new KernNet(adapter);
-        this.net.onstatus = setStatus;
-        const open = hosting => this.net.open({kind: this.kind === "relay" ? "relay" : "local", room, hosting, url: relay});
-        if (mp === "auto") r = await open(false).catch(() => open(true));  // nobody hosts: we do
-        else r = await open(mp === "host");
-      }
-      this.hosting = !r.host;
-      this.command(this.hosting ? `net host ${r.self}` : `net join ${r.self} ${r.host}`);
-      setInterval(() => this.net.flush(), 16);
-      window.SpawnCityNet = this.net;
+      await this.openTransport(mp);
+      setInterval(() => this.net?.flush(), 16);
     } catch (error) {
-      setStatus("Mehrspieler: " + (error?.message || error));
+      this.setStatus("Mehrspieler: " + (error?.message || error));
     }
+  }
+  async openTransport(mp) {
+    let r;
+    const room = this.room;
+    if (this.kind === "public") {
+      this.net = new MpPublicNet(this.adapter);
+      this.net.onstatus = this.setStatus;
+      r = await this.net.open({room, hosting: mp === "host", auto: mp === "auto"});
+    } else {
+      this.net = new this.KernNet(this.adapter);
+      this.net.onstatus = this.setStatus;
+      const open = hosting => this.net.open({kind: this.kind === "relay" ? "relay" : "local", room, hosting, url: this.relay});
+      if (mp === "auto") r = await open(false).catch(() => open(true));  // nobody hosts: we do
+      else r = await open(mp === "host");
+    }
+    this.hosting = !r.host;
+    this.command(this.hosting ? `net host ${r.self}` : `net join ${r.self} ${r.host}`);
+    window.SpawnCityNet = this.net;
+  }
+  /** lan_vs.mjs authority handover: the host left; the game says who takes over (1: we, 2: another). */
+  async migrate(we) {
+    if (this.migrating) return;
+    this.migrating = true;
+    this.setStatus?.(we ? "Host weg - du hostest jetzt" : "Host weg - verbinde neu ...");
+    try { this.net?.close?.(); } catch { /* closed */ }
+    try {
+      if (we) await this.openTransport("host");
+      else {
+        // the successor needs a moment to open his room: try a few times, then host ourselves
+        let ok = false;
+        for (let i = 0; i < 4 && !ok; i++) {
+          try { await new Promise(r => setTimeout(r, 600 + i * 900)); await this.openTransport("join"); ok = true; } catch { try { this.net?.close?.(); } catch { /* closed */ } }
+        }
+        if (!ok) await this.openTransport("host");
+      }
+      this.setStatus("");
+    } catch (error) {
+      this.setStatus("Mehrspieler: " + (error?.message || error));
+    } finally { this.migrating = false; }
   }
   joinUrl() {
     const u = new URL(location.href);
@@ -375,6 +401,10 @@ export class MpPage {
 
   // ---- per frame -----------------------------------------------------------------------------------
   update(h) {
+    if (this.net && !this.migrating && (this.migrateCheck = (this.migrateCheck || 0) + 1) % 15 === 0) {
+      const mg = this.command("net migrate");
+      if (mg === "1" || mg === "2") this.migrate(mg === "1");
+    }
     const m = h?.mp;
     if (!m) return;
     const net = m.self !== undefined;

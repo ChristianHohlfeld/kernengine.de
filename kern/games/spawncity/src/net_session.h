@@ -125,6 +125,12 @@ class Session {
   bool active() const { return role_ != Role::none; }
   bool hosting() const { return role_ == Role::host; }
   bool connected() const;
+  /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
+  /// silent for 6 s after we were in). The session then goes on under the successor.
+  bool host_lost() const;
+  /// Who takes over: the lowest slot left among the players we still hear (us included) - every
+  /// client computes the same.
+  u8 successor() const;
   bool origin(f64& lon, f64& lat) const;
   u8 self_slot() const { return self_slot_; }
 
@@ -221,7 +227,9 @@ class Session {
   std::vector<VoiceFrame> voice_;
   std::vector<u8> pending_anchor_;  // host: clients waiting for their anchor (first pose)
   f64 lon_ = 0, lat_ = 0, time_ = 0, send_clock_ = 0, scores_clock_ = 0, rules_clock_ = 0;
-  bool have_origin_ = false, connect_pending_ = false, anchor_ready_ = false;
+  bool have_origin_ = false, connect_pending_ = false, anchor_ready_ = false, ever_in_ = false;
+  f64 in_since_ = 0;
+  std::vector<u8> mates_;  // the clients we last heard while the host was there (successor())
   Vec3 anchor_;
   u8 self_slot_ = kHost;
   PlayerState me_;

@@ -481,7 +481,7 @@ class Game {
   bool landing_ = false;     // drone: ARM in the air lands it (simulator.mjs)
   f32 landing_still_ = 0;
   bool height_held_ = false;
-  i32 drone_cam_ = 1;        // 0 fpv, 1 follow, 2 third (SpawnCity default: follow)
+  i32 drone_cam_ = 0;        // 0 fpv, 1 follow, 2 third (the page restores the player's last choice; FPV first)
   bool car_cockpit_ = false, jet_cockpit_ = false;
   f32 fpv_tilt_deg_ = -15, fpv_fov_deg_ = 105;
   f32 jet_pitch_rate_ = 0, jet_roll_rate_ = 0;  // mouse rate commands (tau 25 ms)
@@ -555,7 +555,8 @@ class Game {
   // RESPAWN button) - not before 3 s (RESPAWN_COOLDOWN_MS); back 3..5 m from where he went down
   f32 died_at_ = -1;
   Vec3 died_feet_{};
-  i32 respawn_rule_ = -1;  // the respawn delay set on Kern's soldier: 0 by input, 1 the mates' timer
+  i32 respawn_rule_ = -1;
+  bool reset_revive_ = false;  // RESET while down: Kern revives the soldier next step, then the start point  // the respawn delay set on Kern's soldier: 0 by input, 1 the mates' timer
   static constexpr f32 kRespawnCooldown = 3;
   bool request_respawn();
   f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }

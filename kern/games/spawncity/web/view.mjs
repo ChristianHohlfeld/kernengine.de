@@ -82,7 +82,7 @@ const TOUCH_DOM = {
 };
 const JET_DOM = {vtol: "mode", rkt: "rocket", bomb: "bomb", cam: "cam", eject: "exit"};
 // Original elements a finger uses as page buttons (their own click), never as game input.
-const PAGE_BUTTONS = "#gameExitButton,#mobileGameplayDock,#mobileGameplayMultiplayer,#mobileGameplayReset,#proximityVoiceBar,#worldLookHud,#gpsLiveButton,#musicSwitch,#soundSwitch,#gameplayContractHud,#vsRespawnHud,#gpsLiveHud,#zombieRepair,dialog,#gameMenu,#scExitAsk";
+const PAGE_BUTTONS = "#soloCamera,#camFpv,#camFollow,#camThird,#gameExitButton,#mobileGameplayDock,#mobileGameplayMultiplayer,#mobileGameplayReset,#proximityVoiceBar,#worldLookHud,#gpsLiveButton,#musicSwitch,#soundSwitch,#gameplayContractHud,#vsRespawnHud,#gpsLiveHud,#zombieRepair,dialog,#gameMenu,#scExitAsk";
 
 /** A finger on the game view goes to the game unless it lands on a page button. */
 export function fingerForGame(ev) {
@@ -157,6 +157,15 @@ export class OriginalView {
     click("enterCarButton", () => this.command("press enter"));
     click("enterJetButton", () => this.command("press jet"));
     click("soloArm", () => this.command("press arm"));
+    // simulator.mjs: the drone camera (FPV / FOLLOW / THIRD), the button cycles, the three pick;
+    // the choice is kept (localStorage arondight45CameraMode, as the original)
+    const camStore = "arondight45CameraMode";
+    const setCam = m => { this.command(`cam ${m}`); try { localStorage.setItem(camStore, m); } catch { /* private */ } };
+    click("soloCamera", () => { const m = this.command("cam"); if (/^(fpv|follow|third)$/.test(m)) { try { localStorage.setItem(camStore, m); } catch { /* private */ } } });
+    click("camFpv", () => setCam("fpv"));
+    click("camFollow", () => setCam("follow"));
+    click("camThird", () => setCam("third"));
+    try { const saved = localStorage.getItem(camStore); if (/^(fpv|follow|third)$/.test(saved || "")) this.command(`cam ${saved}`); } catch { /* private */ }
     click("soloKill", () => this.command("press stop"));
     click("gpsLiveButton", () => kernAct("gps"));
     click("proximityVoicePtt", () => this.command("voice mic"));
@@ -304,6 +313,15 @@ export class OriginalView {
       const rs = $("soloRangeStatus");
       setText(rs, `AGL ${(h.agl ?? 0).toFixed(1)} m`);
       if (rs && rs.style.color !== "rgb(100, 224, 174)") rs.style.color = "#64e0ae";
+      const camName = ["FPV", "FOLLOW", "THIRD"][d.cam] || "FPV";
+      setText($("soloCamera"), camName);
+      for (const [id, k] of [["camFpv", 0], ["camFollow", 1], ["camThird", 2]]) {
+        const b = $(id);
+        if (!b || b.dataset.active === String(d.cam === k ? 1 : 0)) continue;
+        b.dataset.active = d.cam === k ? "1" : "0";
+        b.style.background = d.cam === k ? "#17694f" : "rgba(17,29,43,.82)";
+        b.style.borderColor = d.cam === k ? "#62d6aa" : "rgba(255,255,255,.3)";
+      }
       const arm = $("soloArm");
       if (arm) {
         const st = d.calibrating ? "CALIBRATING" : d.armed ? "ARMED" : "DISARMED";

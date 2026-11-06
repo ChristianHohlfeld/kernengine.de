@@ -89,6 +89,9 @@ struct MpLocal {
   // the joining player's spawn anchor
   bool anchor_pending = false;
   Vec3 anchor;
+  // the host left: 1 we take over, 2 we join the one who does (lan_vs.mjs authority handover)
+  i32 migrate = 0;
+  bool rejoined = false;  // back in after a handover: no spawn anchor (we stay where we are)
   // big map + navigation (world_map_full.mjs)
   bool map_open = false;
   bool has_dest = false;
@@ -228,6 +231,14 @@ void Game::update_net(f32 dt) {
     m.ff_setting = m.ff_rule;
   }
   net_.update(time_, dt, world_placed_ ? my_state() : net::PlayerState{}, world_placed_);  // no pose before the world stands
+  // The host is gone: the oldest of the rest takes over (lan_vs.mjs getAuthorityId), the others
+  // join him - same city, same origin, everybody stays where he is (the page reopens its transport).
+  if (net_.host_lost() && !m.migrate) {
+    m.migrate = net_.successor() == net_.self_slot() ? 1 : 2;
+    toast_ = m.migrate == 1 ? "Host weg - du uebernimmst die Sitzung" : "Host weg - die Sitzung zieht um";
+    toast_age_ = 0;
+    net_.stop();
+  }
   // The client takes the host's map origin once.
   f64 lon, lat;
   if (!net_.hosting() && !rebased_ && net_.origin(lon, lat)) {
@@ -236,7 +247,7 @@ void Game::update_net(f32 dt) {
   }
   // The joining player spawns at the host's anchor, in his own slot of a ring around it.
   Vec3 anchor;
-  if (net_.take_anchor(anchor)) { m.anchor = anchor; m.anchor_pending = true; }
+  if (net_.take_anchor(anchor) && !m.rejoined) { m.anchor = anchor; m.anchor_pending = true; }
   if (m.anchor_pending && world_placed_ && mode_ == Mode::foot) {
     m.anchor_pending = false;
     const Vec2 o = mp::spawn_ring_offset(std::max(1u, net_.index_of(net_.self_slot()) - 1));
@@ -802,13 +813,22 @@ std::string Game::net_command(const std::string& cmd) {
     const std::string rest = cmd.substr(4);
     unsigned long long self = 0, server = 0;
     if (rest.rfind("host ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu", &self) == 1) {
+      m.rejoined = m.migrate != 0;
+      m.migrate = 0;
       net_.host(self, lon_, lat_);
       // The first player sets the rule (world_options.mjs FRIENDLY FIRE, off by default).
       net_.set_friendly_fire_initial(ui_.settings.on(Opt::world_friendly_fire) || (engine_ && engine_->arg_number("ff", 0) > 0));
       m.ff_setting = ui_.settings.on(Opt::world_friendly_fire);
       return "hosting";
     }
-    if (rest.rfind("join ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu %llu", &self, &server) == 2) { net_.join(self, server); rebased_ = false; return "joining"; }
+    if (rest.rfind("join ", 0) == 0 && std::sscanf(rest.c_str() + 5, "%llu %llu", &self, &server) == 2) {
+      m.rejoined = m.migrate != 0;
+      m.migrate = 0;
+      net_.join(self, server);
+      rebased_ = false;  // the same origin after a handover: no new city (rebase only when it differs)
+      return "joining";
+    }
+    if (rest == "migrate") return std::to_string(m.migrate);
     if (rest == "stop") { net_.stop(); return "stopped"; }
     if (rest == "remotes") {
       std::string o = "[";

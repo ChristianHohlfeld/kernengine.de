@@ -471,6 +471,10 @@ void Game::ui_reset() {
   destruction_.reset(city_);  // every building whole again (world_destruction_state clearDestruction)
   foot_weapon_ = weapons::Id::knife;
   select_foot_weapon(weapons::Id::glock);
+  // down at RESET: Kern's soldier comes back at its next step (at its spawn), the start point follows
+  // then (update_town) - heal alone does not raise the dead (the player stayed lying)
+  if (world_->respawn_now(soldier_)) reset_revive_ = true;
+  died_at_ = -1;
   world_->heal(soldier_, 10000);
   place_world();
   ++ui_.resets;
