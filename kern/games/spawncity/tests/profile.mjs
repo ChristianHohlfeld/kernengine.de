@@ -17,17 +17,32 @@ const p = await ctx.newPage();
 p.on("pageerror", e => log(`pageerror ${e.message}`));
 p.on("crash", () => log("CRASH"));
 await p.addInitScript(() => {
-  const st = window.__gl = {draws: 0, calls: 0, frames: 0};
+  // every WebGL call: count and time per name, per frame; the long frames keep their slowest calls
+  const st = window.__gl = {draws: 0, calls: 0, frames: 0, time: {}, count: {}, cur: {}, long: []};
   const proto = WebGL2RenderingContext.prototype;
   for (const k of Object.getOwnPropertyNames(proto)) {
     const d = Object.getOwnPropertyDescriptor(proto, k);
     if (typeof d.value !== "function") continue;
     const o = d.value, draw = k.startsWith("draw");
-    proto[k] = function (...a) { if (draw) st.draws++; st.calls++; return o.apply(this, a); };
+    proto[k] = function (...a) {
+      if (draw) st.draws++;
+      st.calls++;
+      const t = performance.now(), r = o.apply(this, a), dt = performance.now() - t;
+      st.time[k] = (st.time[k] || 0) + dt; st.count[k] = (st.count[k] || 0) + 1; st.cur[k] = (st.cur[k] || 0) + dt;
+      return r;
+    };
   }
   const ft = window.__ft = [];
   let last = 0;
-  const loop = t => { if (last) ft.push(t - last); last = t; st.frames++; requestAnimationFrame(loop); };
+  const loop = t => {
+    if (last) {
+      const d = t - last;
+      ft.push(d);
+      if (d > 150) st.long.push({ms: Math.round(d), gl: Object.entries(st.cur).sort((a, c) => c[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(", ")});
+    }
+    st.cur = {};
+    last = t; st.frames++; requestAnimationFrame(loop);
+  };
   requestAnimationFrame(loop);
 });
 const t0 = Date.now();
@@ -48,7 +63,7 @@ for (const mode of modes.length ? modes : ["foot"]) {
   if (kern && mode !== "foot") await p.evaluate(m => window.SpawnCity.command?.(`mode ${m}`), mode);
   if (!kern && mode !== "foot") await p.keyboard.press(mode === "drone" ? "v" : "f").catch(() => {});
   await p.waitForTimeout(5000);
-  await p.evaluate(() => { window.__ft.length = 0; Object.assign(window.__gl, {draws: 0, calls: 0, frames: 0}); });
+  await p.evaluate(() => { window.__ft.length = 0; Object.assign(window.__gl, {draws: 0, calls: 0, frames: 0, time: {}, count: {}, long: []}); });
   await cdp.send("Profiler.start");
   await p.waitForTimeout(10000);
   const {profile} = await cdp.send("Profiler.stop");
@@ -56,6 +71,8 @@ for (const mode of modes.length ? modes : ["foot"]) {
   fs.writeFileSync(path.join(outDir, `${label}-${mode}.cpuprofile`), JSON.stringify(profile));
   const ft = r.ft.sort((a, c) => a - c), q = x => ft.length ? ft[Math.floor(x * (ft.length - 1))].toFixed(1) : "-";
   log(`\n## ${mode}\n\nframes ${ft.length} in 10 s · frame ms p50 ${q(.5)} · p95 ${q(.95)} · p99 ${q(.99)} · max ${q(1)} · draws/frame ${(r.gl.draws / Math.max(1, r.gl.frames)).toFixed(0)} · GL calls/frame ${(r.gl.calls / Math.max(1, r.gl.frames)).toFixed(0)}`);
+  log(`GL time per call name (ms in 10 s, calls): ${Object.entries(r.gl.time).sort((x, y) => y[1] - x[1]).slice(0, 12).map(([k, v]) => `${k} ${v.toFixed(0)} (${r.gl.count[k]})`).join(" · ")}`);
+  log(`long frames (> 150 ms) and their slowest GL calls: ${r.gl.long.slice(0, 12).map(l => `${l.ms} ms [${l.gl}]`).join(" | ") || "none"}`);
   if (r.hud) log(`hud mode ${r.hud.mode} fps ${r.hud.fps} tiles ${JSON.stringify(r.hud.tiles?.t || {})} perf ${JSON.stringify(r.hud.perf || r.hud.look?.perf || {})}`);
   // self time per function
   const nodes = new Map(profile.nodes.map(n => [n.id, n]));
