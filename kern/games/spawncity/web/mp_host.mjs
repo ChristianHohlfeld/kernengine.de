@@ -96,6 +96,41 @@ class MpMqtt {
   close() { clearInterval(this.ping); try { this.send(0xe0, []); this.ws?.close(); } catch { /* closed */ } }
 }
 
+// ---- Nostr relays (nostr_data_relay.mjs): a second public way to find each other - the same
+// hello / offer / answer / ice as over the brokers, as signed ephemeral events (kind 25045, tag the
+// room, expiring after 30 s; BIP-340 in the game: "nostr event", nostr.cpp). Signalling only: the
+// data itself goes over the WebRTC channel (or the brokers), never as one event a packet.
+const MP_NOSTR = ["wss://relay-rpi.edufeed.org", "wss://relay2.angor.io", "wss://top.testrelay.top", "wss://relay.primal.net"];
+const MP_NOSTR_KIND = 25045;
+class MpNostr {
+  constructor(url, topics, onMessage, sign) {
+    this.url = url; this.topics = topics; this.onMessage = onMessage; this.sign = sign; this.open = false; this.signalOnly = true;
+    this.sub = "sc" + Math.random().toString(36).slice(2, 10);
+    try { this.ws = new WebSocket(url); } catch { this.ws = null; return; }
+    this.ws.onopen = () => {
+      this.open = true;
+      this.ws.send(JSON.stringify(["REQ", this.sub, {kinds: [MP_NOSTR_KIND], "#t": this.topics, since: Math.floor(Date.now() / 1000) - 3}]));
+    };
+    this.ws.onmessage = ev => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch { return; }
+      if (m[0] !== "EVENT" || m[1] !== this.sub || !m[2]?.content) return;
+      const t = (m[2].tags || []).find(x => x[0] === "t")?.[1];
+      if (t && this.topics.includes(t)) this.onMessage(t, String(m[2].content));
+    };
+    this.ws.onclose = this.ws.onerror = () => { this.open = false; };
+  }
+  publish(topic, text) {
+    if (!this.open || text.length > 30000) return false;
+    const now = Math.floor(Date.now() / 1000);
+    const ev = this.sign(now, [["t", topic], ["expiration", String(now + 30)]], text);
+    if (!ev) return false;
+    try { this.ws.send(`["EVENT",${ev}]`); } catch { return false; }
+    return true;
+  }
+  close() { try { this.ws?.send(JSON.stringify(["CLOSE", this.sub])); this.ws?.close(); } catch { /* closed */ } }
+}
+
 // ---- public transport: WebRTC data channels, signalled (and relayed) over the brokers -------------
 export class MpPublicNet {
   constructor(engine) { this.engine = engine; this.peers = new Map(); this.seen = new Set(); this.onstatus = null; this.sent = 0; this.received = 0; this.mode = "Relay"; }
@@ -106,6 +141,7 @@ export class MpPublicNet {
     this.pair = await crypto.subtle.generateKey({name: "ECDH", namedCurve: "P-256"}, true, ["deriveKey"]);
     this.jwk = await crypto.subtle.exportKey("jwk", this.pair.publicKey);
     this.clients = MP_BROKERS.map(cfg => new MpMqtt(cfg, [this.topic], (t, text) => this.onBroker(text)));
+    if (this.sign) for (const url of MP_NOSTR) this.clients.push(new MpNostr(url, [this.topic], (t, text) => this.onBroker(text), this.sign));
     this.hello = setInterval(() => this.announce(), MP_HELLO_MS);
     this.timer = setInterval(() => this.flush(), 8);
     this.announce();
@@ -121,7 +157,7 @@ export class MpPublicNet {
   publish(packet) {
     packet.v = 1; packet.id = this.self; packet.msg = packet.msg || Math.random().toString(36).slice(2, 12);
     const text = JSON.stringify(packet);
-    for (const c of this.clients) c.publish(this.topic, text);
+    for (const c of this.clients) if (!(c.signalOnly && packet.bulk)) c.publish(this.topic, text);
   }
   announce() { this.publish({kind: "hello", host: this.hosting, key: this.jwk}); }
   async peerFor(id, jwk) {
@@ -135,10 +171,10 @@ export class MpPublicNet {
     this.peers.set(id, p);
     return p;
   }
-  async seal(p, value) {
+  async seal(p, value, bulk = false) {
     const iv = crypto.getRandomValues(new Uint8Array(12)), plain = new TextEncoder().encode(JSON.stringify(value));
     const box = new Uint8Array(await crypto.subtle.encrypt({name: "AES-GCM", iv}, p.key, plain));
-    this.publish({kind: "sealed", target: p.id, iv: mpB64(iv), box: mpB64(box)});
+    this.publish({kind: "sealed", target: p.id, iv: mpB64(iv), box: mpB64(box), bulk});
   }
   async onBroker(text) {
     const m = JSON.parse(text);
@@ -189,12 +225,12 @@ export class MpPublicNet {
       const p = this.peers.get(d.to);
       if (!p) continue;
       if (p.dc?.readyState === "open") { try { p.dc.send(d.bytes); continue; } catch { /* fall back */ } }
-      this.seal(p, {t: "data", d: mpB64(d.bytes)});  // encrypted relay over the brokers
+      this.seal(p, {t: "data", d: mpB64(d.bytes)}, true);  // encrypted relay over the brokers (not the Nostr relays)
     }
   }
   status() {
-    const open = this.clients?.filter(c => c.open).length || 0;
-    return `${this.mode} · ${open}/${MP_BROKERS.length} Broker`;
+    const open = this.clients?.filter(c => c.open && !c.signalOnly).length || 0, nostr = this.clients?.filter(c => c.open && c.signalOnly).length || 0;
+    return `${this.mode} · ${open}/${MP_BROKERS.length} Broker · ${nostr}/${MP_NOSTR.length} Nostr`;
   }
   close() { clearInterval(this.hello); clearInterval(this.timer); for (const p of this.peers.values()) p.pc?.close(); for (const c of this.clients || []) c.close(); this.clients = null; }
 }
@@ -309,6 +345,10 @@ export class MpPage {
     const room = this.room;
     if (this.kind === "public") {
       this.net = new MpPublicNet(this.adapter);
+      // the Nostr relays sign with a key for this session only (BIP-340 in the game)
+      const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, "0")).join("");
+      const secret = this.nostrKey ||= hex(32);
+      this.net.sign = (created, tags, content) => { const ev = this.command(`nostr event ${created} ${secret} ${hex(32)} ${JSON.stringify(tags)} ${content}`); return ev.startsWith("{") ? ev : null; };
       this.net.onstatus = this.setStatus;
       r = await this.net.open({room, hosting: mp === "host", auto: mp === "auto"});
     } else {
