@@ -1,0 +1,10 @@
+{
+ "original": "https://spawncity.de/drone_simulator.html",
+ "kern": "http://127.0.0.1:8123/kern/games/spawncity/web/index.html?view=original",
+ "gps": {
+  "latitude": 52.5208,
+  "longitude": 13.4094,
+  "accuracy": 5
+ },
+ "runs": []
+}

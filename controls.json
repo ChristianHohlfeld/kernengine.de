@@ -1,0 +1,2636 @@
+{
+ "runs": [
+  {
+   "device": "desktop",
+   "game": "original",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": 0,
+     "y": -2.9,
+     "z": 1.68,
+     "yaw": 90,
+     "pitch": -1.2722218725854067e-14,
+     "footYaw": 0,
+     "jumpZ": 0,
+     "kmh": null,
+     "carHeading": null,
+     "t": 0.9617999999999771,
+     "locked": true,
+     "lockEl": "viewport",
+     "weapon": "WEAPON · GLOCK",
+     "body": "desktop-input mobile-gameplay-compact solo-flight on-foot-mode",
+     "shot": "ctl-desktop-00-foot-original.png"
+    },
+    "lock": {
+     "locked": true
+    },
+    "W 1 s": {
+     "m": 6.05,
+     "mps": 4.84,
+     "shot": "ctl-desktop-01-W 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.25,
+     "wall": 16.58
+    },
+    "S 1 s": {
+     "m": 6.6,
+     "mps": 5.28,
+     "shot": "ctl-desktop-02-S 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.25,
+     "wall": 11.84
+    },
+    "D 1 s": {
+     "m": 4.62,
+     "mps": 4.4,
+     "shot": "ctl-desktop-03-D 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.05,
+     "wall": 9.64
+    },
+    "Shift+W 1 s": {
+     "m": 8.91,
+     "mps": 6.85,
+     "shot": "ctl-desktop-04-Shift+W 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.3,
+     "wall": 12.86
+    },
+    "Space (Sprung)": {
+     "m": 0.66,
+     "mps": 0,
+     "shot": "ctl-desktop-05-Space (Sprung)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.28,
+     "wall": 4.77
+    },
+    "Maus 200 px rechts": {
+     "deg": -29.8,
+     "pitch": 0,
+     "locked": true,
+     "shot": "ctl-desktop-06-Maus 200 px rechts-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 3.41
+    },
+    "Maus 100 px runter": {
+     "deg": -8.7,
+     "yaw": 0,
+     "locked": true,
+     "degps": -43.5,
+     "shot": "ctl-desktop-07-Maus 100 px runter-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 6.45
+    },
+    "Q (Waffe)": {
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "shot": "ctl-desktop-08-Q (Waffe)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 5
+    },
+    "RMB (zielen)": {
+     "body": "ads-active scope-active",
+     "lockEl": "viewport",
+     "shot": "ctl-desktop-09-RMB (zielen)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.32,
+     "wall": 4
+    },
+    "Drohne Space 1 s": {
+     "m": 0,
+     "mps": 0,
+     "shot": "ctl-desktop-10-Drohne Space 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.1,
+     "wall": 11.76
+    },
+    "Drohne W 1 s": {
+     "m": 0,
+     "dz": 0,
+     "mps": 0,
+     "dzps": 0,
+     "shot": "ctl-desktop-11-Drohne W 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.1,
+     "wall": 13.79
+    },
+    "Drohne Maus 200 px": {
+     "deg": 0,
+     "degps": 0,
+     "shot": "ctl-desktop-12-Drohne Maus 200 px-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 0.05,
+     "wall": 6.36
+    },
+    "Drohne A 1 s": {
+     "deg": 0,
+     "m": 0,
+     "mps": 0,
+     "degps": 0,
+     "shot": "ctl-desktop-13-Drohne A 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.28,
+     "wall": 14.99
+    },
+    "car": {
+     "mode": "foot"
+    },
+    "Auto W 2 s": {
+     "kmh": 0,
+     "m": 10.72,
+     "mps": 5.11,
+     "shot": "ctl-desktop-14-Auto W 2 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.1,
+     "wall": 44.86
+    },
+    "Auto W+A 1 s": {
+     "deg": 0,
+     "degps": 0,
+     "shot": "ctl-desktop-15-Auto W+A 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.3,
+     "wall": 48.1
+    },
+    "Auto S 2 s (Bremse)": {
+     "kmh": 0,
+     "shot": "ctl-desktop-16-Auto S 2 s (Bremse)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.1,
+     "wall": 26.62
+    },
+    "Auto F (aussteigen)": {
+     "mode": "foot -> foot",
+     "shot": "ctl-desktop-17-Auto F (aussteigen)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.1,
+     "wall": 7.21
+    },
+    "F (einsteigen)": {
+     "mode": "foot -> foot",
+     "shot": "ctl-desktop-18-F (einsteigen)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 4.38
+    },
+    "Wanted": {
+     "shot": "ctl-desktop-19-Wanted-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 4.53
+    },
+    "Esc (Pause)": {
+     "locked": "true -> true",
+     "shot": "ctl-desktop-20-Esc (Pause)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 4.53
+    }
+   },
+   "errors": [
+    "start: page.waitForFunction: Timeout 60000ms exceeded."
+   ],
+   "boot": 343
+  },
+  {
+   "device": "desktop",
+   "game": "kern",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": 6,
+     "y": 0,
+     "z": 0.47,
+     "ground": -0.247,
+     "yaw": 0,
+     "pitch": 0,
+     "kmh": null,
+     "agl": 0,
+     "fps": 26,
+     "t": 0.2,
+     "wall": 1636.0854000000002,
+     "locked": true,
+     "lockEl": "game",
+     "aiming": false,
+     "device": "desktop",
+     "weapon": "WEAPON · GLOCK",
+     "body": "on-foot-mode desktop-input mobile-gameplay-compact scui-playing solo-flight",
+     "shot": "ctl-desktop-00-foot-kern.png"
+    },
+    "lock": {
+     "locked": true
+    },
+    "W 1 s": {
+     "m": 7.26,
+     "mps": 4.94,
+     "shot": "ctl-desktop-01-W 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.4,
+     "wall": 15.36,
+     "fps": 14
+    },
+    "S 1 s": {
+     "m": 6.72,
+     "mps": 5.4,
+     "shot": "ctl-desktop-02-S 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.17,
+     "wall": 13.05,
+     "fps": 13
+    },
+    "D 1 s": {
+     "m": 8.11,
+     "mps": 4.99,
+     "shot": "ctl-desktop-03-D 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.55,
+     "wall": 14.89,
+     "fps": 12
+    },
+    "Shift+W 1 s": {
+     "m": 9.61,
+     "mps": 7.79,
+     "shot": "ctl-desktop-04-Shift+W 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.17,
+     "wall": 16.21,
+     "fps": 15
+    },
+    "Space (Sprung)": {
+     "m": 0,
+     "shot": "ctl-desktop-05-Space (Sprung)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 8.48,
+     "fps": 13
+    },
+    "Maus 200 px rechts": {
+     "deg": -29.8,
+     "pitch": 0,
+     "locked": true,
+     "degps": -298,
+     "shot": "ctl-desktop-06-Maus 200 px rechts-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.1,
+     "wall": 6.11,
+     "fps": 12
+    },
+    "Maus 100 px runter": {
+     "deg": -14.9,
+     "yaw": 0,
+     "locked": true,
+     "degps": -112,
+     "shot": "ctl-desktop-07-Maus 100 px runter-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.13,
+     "wall": 8.73,
+     "fps": 12
+    },
+    "Q (Waffe)": {
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "shot": "ctl-desktop-08-Q (Waffe)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.25,
+     "wall": 4.76,
+     "fps": 13
+    },
+    "RMB (zielen)": {
+     "body": "",
+     "lockEl": "game",
+     "aiming": false,
+     "shot": "ctl-desktop-09-RMB (zielen)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.24,
+     "wall": 9.78,
+     "fps": 13,
+     "controls": "{\"device\":\"desktop\",\"pad\":false,\"locked\":true,\"aiming\":false,\"dead\":false,\"rocket\":false,\"scope\":false,\"zoom\":1.000,\"look\":[0.00,0.00],\"nade\":{\"carry\":3,\"left\":-1.00},\"lastExit\":\"\",\"hint\":\"WASD move · SHIFT sprint · SPACE jump (2× jetpack) · LMB fire · RMB aim / scope · 1 MP 2 Glock 3 Sniper 5 Granatwerfer 6 Raketenwerfer 7 Fäuste (LMB links · RMB rechts) 8 Messer · Z / MMB ping · T halten Granate"
+    },
+    "Drohne Space 1 s": {
+     "m": 0,
+     "mps": 0,
+     "shot": "ctl-desktop-10-Drohne Space 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.56,
+     "wall": 35.02,
+     "fps": 11
+    },
+    "Drohne W 1 s": {
+     "m": 0,
+     "dz": 0,
+     "mps": 0,
+     "dzps": 0,
+     "shot": "ctl-desktop-11-Drohne W 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.67,
+     "wall": 34.42,
+     "fps": 11
+    },
+    "Drohne Maus 200 px": {
+     "deg": 0,
+     "degps": 0,
+     "shot": "ctl-desktop-12-Drohne Maus 200 px-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 0.3,
+     "wall": 8.64,
+     "fps": 11
+    },
+    "Drohne A 1 s": {
+     "deg": 0,
+     "m": 0,
+     "mps": 0,
+     "degps": 0,
+     "shot": "ctl-desktop-13-Drohne A 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1,
+     "wall": 25.51,
+     "fps": 10
+    },
+    "car": {
+     "mode": "car"
+    },
+    "Auto W 2 s": {
+     "kmh": 74,
+     "m": 34.52,
+     "mps": 15.81,
+     "kmhps": 16.5,
+     "shot": "ctl-desktop-14-Auto W 2 s-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 2.18,
+     "wall": 37.02,
+     "fps": 10
+    },
+    "Auto W+A 1 s": {
+     "deg": 24.7,
+     "degps": 14,
+     "shot": "ctl-desktop-15-Auto W+A 1 s-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 1.77,
+     "wall": 30.88,
+     "fps": 10
+    },
+    "Auto S 2 s (Bremse)": {
+     "kmh": 10,
+     "kmhps": -36.5,
+     "shot": "ctl-desktop-16-Auto S 2 s (Bremse)-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 2.08,
+     "wall": 37.57,
+     "fps": 11
+    },
+    "Auto F (aussteigen)": {
+     "mode": "car -> foot",
+     "shot": "ctl-desktop-17-Auto F (aussteigen)-kern.png",
+     "from": "car",
+     "to": "foot",
+     "held": 0.3,
+     "wall": 15.27,
+     "fps": 11
+    },
+    "F (einsteigen)": {
+     "mode": "foot -> car",
+     "shot": "ctl-desktop-18-F (einsteigen)-kern.png",
+     "from": "foot",
+     "to": "car",
+     "held": 0,
+     "wall": 14.37,
+     "fps": 10
+    },
+    "Wanted": {
+     "shot": "ctl-desktop-19-Wanted-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 9.31,
+     "fps": 10
+    },
+    "Esc (Pause)": {
+     "locked": "true -> false",
+     "shot": "ctl-desktop-20-Esc (Pause)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 7.08,
+     "fps": 13
+    }
+   },
+   "errors": [
+    "kern: not placed after 240 s",
+    "Failed to execute 'setPointerCapture' on 'Element': InvalidStateError",
+    "Failed to execute 'setPointerCapture' on 'Element': InvalidStateError"
+   ],
+   "boot": 0
+  },
+  {
+   "device": "pad",
+   "game": "original",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": 0,
+     "y": -2.9,
+     "z": 1.68,
+     "yaw": 90,
+     "pitch": -1.2722218725854067e-14,
+     "footYaw": 0,
+     "jumpZ": 0,
+     "kmh": null,
+     "carHeading": null,
+     "t": 0.998399999999721,
+     "locked": true,
+     "lockEl": "viewport",
+     "weapon": "WEAPON · GLOCK",
+     "body": "desktop-input mobile-gameplay-compact solo-flight on-foot-mode pad-connected",
+     "shot": "ctl-pad-00-foot-original.png"
+    },
+    "Pad links hoch 1 s": {
+     "m": 6.05,
+     "mps": 5.5,
+     "shot": "ctl-pad-01-Pad links hoch 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.1,
+     "wall": 12.12
+    },
+    "Pad links 50 % 1 s": {
+     "m": 2.14,
+     "mps": 1.79,
+     "shot": "ctl-pad-02-Pad links 50 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.2,
+     "wall": 14.19
+    },
+    "Pad rechts 50 % 1 s": {
+     "deg": -42.1,
+     "degps": -36.6,
+     "shot": "ctl-pad-03-Pad rechts 50 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.15,
+     "wall": 15.28
+    },
+    "Pad rechts 100 % 1 s": {
+     "deg": 158.2,
+     "degps": 137.6,
+     "shot": "ctl-pad-04-Pad rechts 100 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.15,
+     "wall": 17.61
+    },
+    "Pad rechts 20 % 1 s": {
+     "deg": -170.8,
+     "degps": -142.3,
+     "shot": "ctl-pad-05-Pad rechts 20 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.2,
+     "wall": 17.16
+    },
+    "Pad rechts hoch 50 % 1 s": {
+     "deg": 83.1,
+     "degps": 58,
+     "shot": "ctl-pad-06-Pad rechts hoch 50 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.43,
+     "wall": 20.63
+    },
+    "Pad A (Sprung)": {
+     "m": 0.66,
+     "mps": 0,
+     "shot": "ctl-pad-07-Pad A (Sprung)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.28,
+     "wall": 4.61
+    },
+    "Pad L3+links (Sprint) 1 s": {
+     "m": 8.1,
+     "mps": 8.1,
+     "shot": "ctl-pad-08-Pad L3+links (Sprint) 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1,
+     "wall": 10.59
+    },
+    "Pad Y (Waffe)": {
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "shot": "ctl-pad-09-Pad Y (Waffe)-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.35,
+     "wall": 5.02
+    },
+    "Drohne Pad links hoch 1 s": {
+     "m": 0,
+     "dz": 0,
+     "mps": 0,
+     "dzps": 0,
+     "shot": "ctl-pad-10-Drohne Pad links hoch 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.2,
+     "wall": 14.49
+    },
+    "Drohne Pad rechts 50 % 1 s": {
+     "deg": 0,
+     "m": 0,
+     "mps": 0,
+     "degps": 0,
+     "shot": "ctl-pad-11-Drohne Pad rechts 50 % 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.1,
+     "wall": 19.67
+    },
+    "Drohne Pad RT 1 s": {
+     "dz": 0,
+     "dzps": 0,
+     "shot": "ctl-pad-12-Drohne Pad RT 1 s-original.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.2,
+     "wall": 23.41
+    },
+    "Auto Pad RT 2 s": {
+     "kmh": 0,
+     "shot": "ctl-pad-13-Auto Pad RT 2 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.85,
+     "wall": 37.25
+    },
+    "Auto Pad links 50 % 1 s": {
+     "deg": 0,
+     "degps": 0,
+     "shot": "ctl-pad-14-Auto Pad links 50 % 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.15,
+     "wall": 17.41
+    },
+    "Auto Pad X (aussteigen)": {
+     "mode": "foot -> car",
+     "shot": "ctl-pad-15-Auto Pad X (aussteigen)-original.png",
+     "from": "foot",
+     "to": "car",
+     "held": 0.35,
+     "wall": 11.79
+    }
+   },
+   "errors": [
+    "start: page.waitForFunction: Timeout 60000ms exceeded."
+   ],
+   "boot": 3
+  },
+  {
+   "device": "pad",
+   "game": "kern",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": 6,
+     "y": 0,
+     "z": 0.47,
+     "ground": -0.247,
+     "yaw": 0,
+     "pitch": 0,
+     "kmh": null,
+     "agl": 0,
+     "fps": 20,
+     "t": 1,
+     "wall": 1663.2701000000002,
+     "locked": true,
+     "lockEl": "game",
+     "aiming": false,
+     "device": "desktop",
+     "weapon": "WEAPON · GLOCK",
+     "body": "on-foot-mode desktop-input mobile-gameplay-compact scui-playing solo-flight",
+     "shot": "ctl-pad-00-foot-kern.png"
+    },
+    "Pad links hoch 1 s": {
+     "m": 0.76,
+     "mps": 0.59,
+     "shot": "ctl-pad-01-Pad links hoch 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.32,
+     "wall": 13.84,
+     "fps": 15
+    },
+    "Pad links 50 % 1 s": {
+     "m": 0.01,
+     "mps": 0.06,
+     "shot": "ctl-pad-02-Pad links 50 % 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.12,
+     "wall": 16.17,
+     "fps": 22
+    },
+    "Pad rechts 50 % 1 s": {
+     "deg": -93.4,
+     "degps": -85,
+     "shot": "ctl-pad-03-Pad rechts 50 % 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.1,
+     "wall": 15.82,
+     "fps": 14
+    },
+    "Pad rechts 100 % 1 s": {
+     "deg": 105.2,
+     "degps": 80.9,
+     "shot": "ctl-pad-04-Pad rechts 100 % 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.3,
+     "wall": 22.92,
+     "fps": 11
+    },
+    "Pad rechts 20 % 1 s": {
+     "deg": -48.2,
+     "degps": -33.5,
+     "shot": "ctl-pad-05-Pad rechts 20 % 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.44,
+     "wall": 30.67,
+     "fps": 18
+    },
+    "Pad rechts hoch 50 % 1 s": {
+     "deg": 86,
+     "degps": 65.5,
+     "shot": "ctl-pad-06-Pad rechts hoch 50 % 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.31,
+     "wall": 31.35,
+     "fps": 15
+    },
+    "Pad A (Sprung)": {
+     "m": 0,
+     "mps": 0,
+     "shot": "ctl-pad-07-Pad A (Sprung)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.43,
+     "wall": 14.9,
+     "fps": 17
+    },
+    "Pad L3+links (Sprint) 1 s": {
+     "m": 1.36,
+     "mps": 1.29,
+     "shot": "ctl-pad-08-Pad L3+links (Sprint) 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.05,
+     "wall": 27.39,
+     "fps": 15
+    },
+    "Pad Y (Waffe)": {
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "shot": "ctl-pad-09-Pad Y (Waffe)-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.4,
+     "wall": 19.9,
+     "fps": 13
+    },
+    "Drohne Pad links hoch 1 s": {
+     "m": 0,
+     "dz": 0,
+     "mps": 0,
+     "dzps": 0,
+     "shot": "ctl-pad-10-Drohne Pad links hoch 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.2,
+     "wall": 24.93,
+     "fps": 14
+    },
+    "Drohne Pad rechts 50 % 1 s": {
+     "deg": 0,
+     "m": 0,
+     "mps": 0,
+     "degps": 0,
+     "shot": "ctl-pad-11-Drohne Pad rechts 50 % 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1.2,
+     "wall": 27.59,
+     "fps": 14
+    },
+    "Drohne Pad RT 1 s": {
+     "dz": 0,
+     "dzps": 0,
+     "shot": "ctl-pad-12-Drohne Pad RT 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 1,
+     "wall": 20.65,
+     "fps": 12
+    },
+    "Auto Pad RT 2 s": {
+     "kmh": 43,
+     "kmhps": 17,
+     "shot": "ctl-pad-13-Auto Pad RT 2 s-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 2,
+     "wall": 33.13,
+     "fps": 10
+    },
+    "Auto Pad links 50 % 1 s": {
+     "deg": 10.6,
+     "degps": 8.6,
+     "shot": "ctl-pad-14-Auto Pad links 50 % 1 s-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 1.23,
+     "wall": 26.74,
+     "fps": 12
+    },
+    "Auto Pad X (aussteigen)": {
+     "mode": "car -> foot",
+     "shot": "ctl-pad-15-Auto Pad X (aussteigen)-kern.png",
+     "from": "car",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 11.76,
+     "fps": 11
+    }
+   },
+   "errors": [
+    "kern: not placed after 240 s"
+   ],
+   "boot": 0
+  },
+  {
+   "device": "phone",
+   "game": "original",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": -6.5090155601501465,
+     "y": -11.15828800201416,
+     "z": 2.012972443204198,
+     "yaw": 90,
+     "pitch": -1.2722218725854067e-14,
+     "footYaw": 0,
+     "jumpZ": 0,
+     "kmh": null,
+     "carHeading": null,
+     "t": 4.133499999999989,
+     "locked": false,
+     "lockEl": "",
+     "weapon": "WEAPON · GLOCK",
+     "body": "mobile-gameplay-compact solo-flight on-foot-mode edge-hud thumb-weapon",
+     "shot": "ctl-phone-00-foot-original.png"
+    },
+    "Touch Blick 120 px": {
+     "deg": 161.7,
+     "pitch": 0,
+     "degps": 71.9,
+     "shot": "ctl-phone-01-Touch Blick 120 px-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.25,
+     "wall": 11.76
+    },
+    "Touch Blick 60 px hoch": {
+     "deg": 20.3,
+     "degps": 11,
+     "shot": "ctl-phone-02-Touch Blick 60 px hoch-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.85,
+     "wall": 10.11
+    },
+    "Touch Stick hoch 1 s": {
+     "m": 5.03,
+     "mps": 2.67,
+     "shot": "ctl-phone-03-Touch Stick hoch 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.88,
+     "wall": 10.66
+    },
+    "Touch Stick halb 1 s": {
+     "m": 2.44,
+     "mps": 1.3,
+     "shot": "ctl-phone-04-Touch Stick halb 1 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 1.87,
+     "wall": 13.29
+    },
+    "Tippen #footJump": {
+     "m": 0.52,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-05-Tippen #footJump-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 3.83
+    },
+    "Tippen #footWeaponToggle": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-06-Tippen #footWeaponToggle-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 4.19
+    },
+    "Tippen #mobileGameplayWeapon": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "shot": "ctl-phone-07-Tippen #mobileGameplayWeapon-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 3.22
+    },
+    "Tippen #handGrenadeBtn": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-08-Tippen #handGrenadeBtn-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.22,
+     "wall": 4.52
+    },
+    "Tippen #scopeButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "ads-active scope-active",
+     "mps": 0,
+     "shot": "ctl-phone-09-Tippen #scopeButton-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 4.74
+    },
+    "Tippen #airStrikeButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "ads-active scope-active air-strike-targeting",
+     "mps": 0,
+     "shot": "ctl-phone-10-Tippen #airStrikeButton-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.2,
+     "wall": 3.32
+    },
+    "Tippen #footFire": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "ads-active scope-active air-strike-targeting",
+     "shot": "ctl-phone-11-Tippen #footFire-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 3.06
+    },
+    "Tippen #enterCarButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "ads-active scope-active air-strike-targeting",
+     "shot": "ctl-phone-12-Tippen #enterCarButton-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 2.89
+    },
+    "Tippen #enterJetButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "ads-active scope-active air-strike-targeting",
+     "shot": "ctl-phone-13-Tippen #enterJetButton-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 2.57
+    },
+    "Tippen #mobileGameplayMode": {
+     "m": 0,
+     "mode": "foot -> drone",
+     "weapon": "WEAPON · SNIPER -> WEAPON · GUN",
+     "body": "",
+     "mps": 42.45,
+     "shot": "ctl-phone-14-Tippen #mobileGameplayMode-original.png",
+     "from": "foot",
+     "to": "drone",
+     "held": 0.2,
+     "wall": 3.56
+    },
+    "Drohne Touch links hoch 1 s": {
+     "error": "no #soloLeft"
+    },
+    "Drohne Touch rechts 1 s": {
+     "error": "no #soloRight"
+    },
+    "Auto Touch Gas 2 s": {
+     "kmh": 0,
+     "shot": "ctl-phone-15-Auto Touch Gas 2 s-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.98,
+     "wall": 18.86
+    },
+    "Auto Tippen Kamera": {
+     "shot": "ctl-phone-16-Auto Tippen Kamera-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 2.53
+    },
+    "Auto Tippen Aussteigen": {
+     "mode": "foot -> foot",
+     "shot": "ctl-phone-17-Auto Tippen Aussteigen-original.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 3.63
+    }
+   },
+   "errors": [
+    "Drohne Touch links hoch 1 s: no #soloLeft",
+    "Drohne Touch rechts 1 s: no #soloRight"
+   ],
+   "boot": 8
+  },
+  {
+   "device": "phone",
+   "game": "kern",
+   "results": {
+    "start": {
+     "mode": "foot",
+     "x": 6,
+     "y": 0,
+     "z": 0.47,
+     "ground": -0.247,
+     "yaw": 0,
+     "pitch": 0,
+     "kmh": null,
+     "agl": 0,
+     "fps": 16,
+     "t": 4.029,
+     "wall": 827.3614000000003,
+     "locked": false,
+     "lockEl": "",
+     "aiming": false,
+     "device": "touch",
+     "weapon": "WEAPON · GLOCK",
+     "body": "sc-touch-on on-foot-mode mobile-gameplay-compact scui-playing solo-flight edge-hud thumb-weapon",
+     "shot": "ctl-phone-00-foot-kern.png"
+    },
+    "Touch Blick 120 px": {
+     "deg": 148.2,
+     "pitch": 0,
+     "degps": 32.5,
+     "shot": "ctl-phone-01-Touch Blick 120 px-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 4.55,
+     "wall": 16.1,
+     "fps": 12
+    },
+    "Touch Blick 60 px hoch": {
+     "deg": 20.3,
+     "degps": 5.7,
+     "shot": "ctl-phone-02-Touch Blick 60 px hoch-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 3.57,
+     "wall": 28.45,
+     "fps": 12
+    },
+    "Touch Stick hoch 1 s": {
+     "m": 8.48,
+     "mps": 2.84,
+     "shot": "ctl-phone-03-Touch Stick hoch 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.9,
+     "wall": 27.91,
+     "fps": 11
+    },
+    "Touch Stick halb 1 s": {
+     "m": 4.57,
+     "mps": 1.6,
+     "shot": "ctl-phone-04-Touch Stick halb 1 s-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 2.87,
+     "wall": 27.2,
+     "fps": 12
+    },
+    "Tippen #footJump": {
+     "m": 0.65,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-05-Tippen #footJump-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.4,
+     "wall": 9.21,
+     "fps": 13
+    },
+    "Tippen #footWeaponToggle": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-06-Tippen #footWeaponToggle-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.32,
+     "wall": 10.2,
+     "fps": 19
+    },
+    "Tippen #mobileGameplayWeapon": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "shot": "ctl-phone-07-Tippen #mobileGameplayWeapon-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 8.07,
+     "fps": 18
+    },
+    "Tippen #handGrenadeBtn": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "mps": 0,
+     "shot": "ctl-phone-08-Tippen #handGrenadeBtn-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.23,
+     "wall": 9.06,
+     "fps": 22
+    },
+    "Tippen #scopeButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "",
+     "shot": "ctl-phone-09-Tippen #scopeButton-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 7.48,
+     "fps": 21
+    },
+    "Tippen #airStrikeButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "air-strike-targeting",
+     "mps": 0,
+     "shot": "ctl-phone-10-Tippen #airStrikeButton-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0.53,
+     "wall": 11.73,
+     "fps": 19
+    },
+    "Tippen #footFire": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "air-strike-targeting",
+     "shot": "ctl-phone-11-Tippen #footFire-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 6.79,
+     "fps": 19
+    },
+    "Tippen #enterCarButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "air-strike-targeting",
+     "shot": "ctl-phone-12-Tippen #enterCarButton-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 7.28,
+     "fps": 19
+    },
+    "Tippen #enterJetButton": {
+     "m": 0,
+     "mode": "foot -> foot",
+     "weapon": "",
+     "body": "air-strike-targeting",
+     "shot": "ctl-phone-13-Tippen #enterJetButton-kern.png",
+     "from": "foot",
+     "to": "foot",
+     "held": 0,
+     "wall": 6.75,
+     "fps": 19
+    },
+    "Tippen #mobileGameplayMode": {
+     "m": 1.94,
+     "mode": "foot -> drone",
+     "weapon": "WEAPON · SNIPER -> WEAPON · GUN",
+     "body": "",
+     "mps": 6.68,
+     "shot": "ctl-phone-14-Tippen #mobileGameplayMode-kern.png",
+     "from": "foot",
+     "to": "drone",
+     "held": 0.43,
+     "wall": 10.62,
+     "fps": 20
+    },
+    "Drohne Touch links hoch 1 s": {
+     "dz": 0,
+     "m": 0,
+     "mps": 0,
+     "dzps": 0,
+     "shot": "ctl-phone-15-Drohne Touch links hoch 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 2.58,
+     "wall": 25.06,
+     "fps": 16
+    },
+    "Drohne Touch rechts 1 s": {
+     "deg": -0.2,
+     "m": 0,
+     "mps": 0,
+     "degps": -0.1,
+     "shot": "ctl-phone-16-Drohne Touch rechts 1 s-kern.png",
+     "from": "drone",
+     "to": "drone",
+     "held": 2.88,
+     "wall": 26.38,
+     "fps": 13
+    },
+    "Auto Touch Gas 2 s": {
+     "kmh": 68,
+     "kmhps": 7.1,
+     "shot": "ctl-phone-17-Auto Touch Gas 2 s-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 3.78,
+     "wall": 30.12,
+     "fps": 11
+    },
+    "Auto Tippen Kamera": {
+     "shot": "ctl-phone-18-Auto Tippen Kamera-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 0.42,
+     "wall": 9.52,
+     "fps": 15
+    },
+    "Auto Tippen Aussteigen": {
+     "mode": "car -> car",
+     "shot": "ctl-phone-19-Auto Tippen Aussteigen-kern.png",
+     "from": "car",
+     "to": "car",
+     "held": 0.32,
+     "wall": 9.33,
+     "fps": 20
+    }
+   },
+   "errors": [
+    "kern: not placed after 240 s"
+   ],
+   "boot": 0
+  }
+ ],
+ "rows": [
+  {
+   "device": "desktop",
+   "input": "lock",
+   "original": {
+    "locked": true
+   },
+   "kern": {
+    "locked": true
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "W 1 s",
+   "original": {
+    "m": 6.05,
+    "mps": 4.84,
+    "shot": "ctl-desktop-01-W 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.25,
+    "wall": 16.58
+   },
+   "kern": {
+    "m": 7.26,
+    "mps": 4.94,
+    "shot": "ctl-desktop-01-W 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.4,
+    "wall": 15.36,
+    "fps": 14
+   },
+   "deviation": "2 %"
+  },
+  {
+   "device": "desktop",
+   "input": "S 1 s",
+   "original": {
+    "m": 6.6,
+    "mps": 5.28,
+    "shot": "ctl-desktop-02-S 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.25,
+    "wall": 11.84
+   },
+   "kern": {
+    "m": 6.72,
+    "mps": 5.4,
+    "shot": "ctl-desktop-02-S 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.17,
+    "wall": 13.05,
+    "fps": 13
+   },
+   "deviation": "2 %"
+  },
+  {
+   "device": "desktop",
+   "input": "D 1 s",
+   "original": {
+    "m": 4.62,
+    "mps": 4.4,
+    "shot": "ctl-desktop-03-D 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.05,
+    "wall": 9.64
+   },
+   "kern": {
+    "m": 8.11,
+    "mps": 4.99,
+    "shot": "ctl-desktop-03-D 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.55,
+    "wall": 14.89,
+    "fps": 12
+   },
+   "deviation": "13 %"
+  },
+  {
+   "device": "desktop",
+   "input": "Shift+W 1 s",
+   "original": {
+    "m": 8.91,
+    "mps": 6.85,
+    "shot": "ctl-desktop-04-Shift+W 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.3,
+    "wall": 12.86
+   },
+   "kern": {
+    "m": 9.61,
+    "mps": 7.79,
+    "shot": "ctl-desktop-04-Shift+W 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.17,
+    "wall": 16.21,
+    "fps": 15
+   },
+   "deviation": "14 %"
+  },
+  {
+   "device": "desktop",
+   "input": "Space (Sprung)",
+   "original": {
+    "m": 0.66,
+    "mps": 0,
+    "shot": "ctl-desktop-05-Space (Sprung)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.28,
+    "wall": 4.77
+   },
+   "kern": {
+    "m": 0,
+    "shot": "ctl-desktop-05-Space (Sprung)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 8.48,
+    "fps": 13
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "desktop",
+   "input": "Maus 200 px rechts",
+   "original": {
+    "deg": -29.8,
+    "pitch": 0,
+    "locked": true,
+    "shot": "ctl-desktop-06-Maus 200 px rechts-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 3.41
+   },
+   "kern": {
+    "deg": -29.8,
+    "pitch": 0,
+    "locked": true,
+    "degps": -298,
+    "shot": "ctl-desktop-06-Maus 200 px rechts-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.1,
+    "wall": 6.11,
+    "fps": 12
+   },
+   "deviation": "-900 %"
+  },
+  {
+   "device": "desktop",
+   "input": "Maus 100 px runter",
+   "original": {
+    "deg": -8.7,
+    "yaw": 0,
+    "locked": true,
+    "degps": -43.5,
+    "shot": "ctl-desktop-07-Maus 100 px runter-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 6.45
+   },
+   "kern": {
+    "deg": -14.9,
+    "yaw": 0,
+    "locked": true,
+    "degps": -112,
+    "shot": "ctl-desktop-07-Maus 100 px runter-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.13,
+    "wall": 8.73,
+    "fps": 12
+   },
+   "deviation": "-157 %"
+  },
+  {
+   "device": "desktop",
+   "input": "Q (Waffe)",
+   "original": {
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "shot": "ctl-desktop-08-Q (Waffe)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 5
+   },
+   "kern": {
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "shot": "ctl-desktop-08-Q (Waffe)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.25,
+    "wall": 4.76,
+    "fps": 13
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "RMB (zielen)",
+   "original": {
+    "body": "ads-active scope-active",
+    "lockEl": "viewport",
+    "shot": "ctl-desktop-09-RMB (zielen)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.32,
+    "wall": 4
+   },
+   "kern": {
+    "body": "",
+    "lockEl": "game",
+    "aiming": false,
+    "shot": "ctl-desktop-09-RMB (zielen)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.24,
+    "wall": 9.78,
+    "fps": 13,
+    "controls": "{\"device\":\"desktop\",\"pad\":false,\"locked\":true,\"aiming\":false,\"dead\":false,\"rocket\":false,\"scope\":false,\"zoom\":1.000,\"look\":[0.00,0.00],\"nade\":{\"carry\":3,\"left\":-1.00},\"lastExit\":\"\",\"hint\":\"WASD move · SHIFT sprint · SPACE jump (2× jetpack) · LMB fire · RMB aim / scope · 1 MP 2 Glock 3 Sniper 5 Granatwerfer 6 Raketenwerfer 7 Fäuste (LMB links · RMB rechts) 8 Messer · Z / MMB ping · T halten Granate"
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "Drohne Space 1 s",
+   "original": {
+    "m": 0,
+    "mps": 0,
+    "shot": "ctl-desktop-10-Drohne Space 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.1,
+    "wall": 11.76
+   },
+   "kern": {
+    "m": 0,
+    "mps": 0,
+    "shot": "ctl-desktop-10-Drohne Space 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.56,
+    "wall": 35.02,
+    "fps": 11
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "desktop",
+   "input": "Drohne W 1 s",
+   "original": {
+    "m": 0,
+    "dz": 0,
+    "mps": 0,
+    "dzps": 0,
+    "shot": "ctl-desktop-11-Drohne W 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.1,
+    "wall": 13.79
+   },
+   "kern": {
+    "m": 0,
+    "dz": 0,
+    "mps": 0,
+    "dzps": 0,
+    "shot": "ctl-desktop-11-Drohne W 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.67,
+    "wall": 34.42,
+    "fps": 11
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "desktop",
+   "input": "Drohne Maus 200 px",
+   "original": {
+    "deg": 0,
+    "degps": 0,
+    "shot": "ctl-desktop-12-Drohne Maus 200 px-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 0.05,
+    "wall": 6.36
+   },
+   "kern": {
+    "deg": 0,
+    "degps": 0,
+    "shot": "ctl-desktop-12-Drohne Maus 200 px-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 0.3,
+    "wall": 8.64,
+    "fps": 11
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "desktop",
+   "input": "Drohne A 1 s",
+   "original": {
+    "deg": 0,
+    "m": 0,
+    "mps": 0,
+    "degps": 0,
+    "shot": "ctl-desktop-13-Drohne A 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.28,
+    "wall": 14.99
+   },
+   "kern": {
+    "deg": 0,
+    "m": 0,
+    "mps": 0,
+    "degps": 0,
+    "shot": "ctl-desktop-13-Drohne A 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1,
+    "wall": 25.51,
+    "fps": 10
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "desktop",
+   "input": "car",
+   "original": {
+    "mode": "foot"
+   },
+   "kern": {
+    "mode": "car"
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "Auto W 2 s",
+   "original": {
+    "kmh": 0,
+    "m": 10.72,
+    "mps": 5.11,
+    "shot": "ctl-desktop-14-Auto W 2 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.1,
+    "wall": 44.86
+   },
+   "kern": {
+    "kmh": 74,
+    "m": 34.52,
+    "mps": 15.81,
+    "kmhps": 16.5,
+    "shot": "ctl-desktop-14-Auto W 2 s-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 2.18,
+    "wall": 37.02,
+    "fps": 10
+   },
+   "deviation": "209 %"
+  },
+  {
+   "device": "desktop",
+   "input": "Auto W+A 1 s",
+   "original": {
+    "deg": 0,
+    "degps": 0,
+    "shot": "ctl-desktop-15-Auto W+A 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.3,
+    "wall": 48.1
+   },
+   "kern": {
+    "deg": 24.7,
+    "degps": 14,
+    "shot": "ctl-desktop-15-Auto W+A 1 s-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 1.77,
+    "wall": 30.88,
+    "fps": 10
+   },
+   "deviation": "14"
+  },
+  {
+   "device": "desktop",
+   "input": "Auto S 2 s (Bremse)",
+   "original": {
+    "kmh": 0,
+    "shot": "ctl-desktop-16-Auto S 2 s (Bremse)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.1,
+    "wall": 26.62
+   },
+   "kern": {
+    "kmh": 10,
+    "kmhps": -36.5,
+    "shot": "ctl-desktop-16-Auto S 2 s (Bremse)-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 2.08,
+    "wall": 37.57,
+    "fps": 11
+   },
+   "deviation": "-36.5"
+  },
+  {
+   "device": "desktop",
+   "input": "Auto F (aussteigen)",
+   "original": {
+    "mode": "foot -> foot",
+    "shot": "ctl-desktop-17-Auto F (aussteigen)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.1,
+    "wall": 7.21
+   },
+   "kern": {
+    "mode": "car -> foot",
+    "shot": "ctl-desktop-17-Auto F (aussteigen)-kern.png",
+    "from": "car",
+    "to": "foot",
+    "held": 0.3,
+    "wall": 15.27,
+    "fps": 11
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "F (einsteigen)",
+   "original": {
+    "mode": "foot -> foot",
+    "shot": "ctl-desktop-18-F (einsteigen)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 4.38
+   },
+   "kern": {
+    "mode": "foot -> car",
+    "shot": "ctl-desktop-18-F (einsteigen)-kern.png",
+    "from": "foot",
+    "to": "car",
+    "held": 0,
+    "wall": 14.37,
+    "fps": 10
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "Wanted",
+   "original": {
+    "shot": "ctl-desktop-19-Wanted-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 4.53
+   },
+   "kern": {
+    "shot": "ctl-desktop-19-Wanted-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 9.31,
+    "fps": 10
+   },
+   "deviation": ""
+  },
+  {
+   "device": "desktop",
+   "input": "Esc (Pause)",
+   "original": {
+    "locked": "true -> true",
+    "shot": "ctl-desktop-20-Esc (Pause)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 4.53
+   },
+   "kern": {
+    "locked": "true -> false",
+    "shot": "ctl-desktop-20-Esc (Pause)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 7.08,
+    "fps": 13
+   },
+   "deviation": ""
+  },
+  {
+   "device": "pad",
+   "input": "Pad links hoch 1 s",
+   "original": {
+    "m": 6.05,
+    "mps": 5.5,
+    "shot": "ctl-pad-01-Pad links hoch 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.1,
+    "wall": 12.12
+   },
+   "kern": {
+    "m": 0.76,
+    "mps": 0.59,
+    "shot": "ctl-pad-01-Pad links hoch 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.32,
+    "wall": 13.84,
+    "fps": 15
+   },
+   "deviation": "-89 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad links 50 % 1 s",
+   "original": {
+    "m": 2.14,
+    "mps": 1.79,
+    "shot": "ctl-pad-02-Pad links 50 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.2,
+    "wall": 14.19
+   },
+   "kern": {
+    "m": 0.01,
+    "mps": 0.06,
+    "shot": "ctl-pad-02-Pad links 50 % 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.12,
+    "wall": 16.17,
+    "fps": 22
+   },
+   "deviation": "-97 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad rechts 50 % 1 s",
+   "original": {
+    "deg": -42.1,
+    "degps": -36.6,
+    "shot": "ctl-pad-03-Pad rechts 50 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.15,
+    "wall": 15.28
+   },
+   "kern": {
+    "deg": -93.4,
+    "degps": -85,
+    "shot": "ctl-pad-03-Pad rechts 50 % 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.1,
+    "wall": 15.82,
+    "fps": 14
+   },
+   "deviation": "-132 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad rechts 100 % 1 s",
+   "original": {
+    "deg": 158.2,
+    "degps": 137.6,
+    "shot": "ctl-pad-04-Pad rechts 100 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.15,
+    "wall": 17.61
+   },
+   "kern": {
+    "deg": 105.2,
+    "degps": 80.9,
+    "shot": "ctl-pad-04-Pad rechts 100 % 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.3,
+    "wall": 22.92,
+    "fps": 11
+   },
+   "deviation": "-41 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad rechts 20 % 1 s",
+   "original": {
+    "deg": -170.8,
+    "degps": -142.3,
+    "shot": "ctl-pad-05-Pad rechts 20 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.2,
+    "wall": 17.16
+   },
+   "kern": {
+    "deg": -48.2,
+    "degps": -33.5,
+    "shot": "ctl-pad-05-Pad rechts 20 % 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.44,
+    "wall": 30.67,
+    "fps": 18
+   },
+   "deviation": "76 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad rechts hoch 50 % 1 s",
+   "original": {
+    "deg": 83.1,
+    "degps": 58,
+    "shot": "ctl-pad-06-Pad rechts hoch 50 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.43,
+    "wall": 20.63
+   },
+   "kern": {
+    "deg": 86,
+    "degps": 65.5,
+    "shot": "ctl-pad-06-Pad rechts hoch 50 % 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.31,
+    "wall": 31.35,
+    "fps": 15
+   },
+   "deviation": "13 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad A (Sprung)",
+   "original": {
+    "m": 0.66,
+    "mps": 0,
+    "shot": "ctl-pad-07-Pad A (Sprung)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.28,
+    "wall": 4.61
+   },
+   "kern": {
+    "m": 0,
+    "mps": 0,
+    "shot": "ctl-pad-07-Pad A (Sprung)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.43,
+    "wall": 14.9,
+    "fps": 17
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "pad",
+   "input": "Pad L3+links (Sprint) 1 s",
+   "original": {
+    "m": 8.1,
+    "mps": 8.1,
+    "shot": "ctl-pad-08-Pad L3+links (Sprint) 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1,
+    "wall": 10.59
+   },
+   "kern": {
+    "m": 1.36,
+    "mps": 1.29,
+    "shot": "ctl-pad-08-Pad L3+links (Sprint) 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.05,
+    "wall": 27.39,
+    "fps": 15
+   },
+   "deviation": "-84 %"
+  },
+  {
+   "device": "pad",
+   "input": "Pad Y (Waffe)",
+   "original": {
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "shot": "ctl-pad-09-Pad Y (Waffe)-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.35,
+    "wall": 5.02
+   },
+   "kern": {
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "shot": "ctl-pad-09-Pad Y (Waffe)-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.4,
+    "wall": 19.9,
+    "fps": 13
+   },
+   "deviation": ""
+  },
+  {
+   "device": "pad",
+   "input": "Drohne Pad links hoch 1 s",
+   "original": {
+    "m": 0,
+    "dz": 0,
+    "mps": 0,
+    "dzps": 0,
+    "shot": "ctl-pad-10-Drohne Pad links hoch 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.2,
+    "wall": 14.49
+   },
+   "kern": {
+    "m": 0,
+    "dz": 0,
+    "mps": 0,
+    "dzps": 0,
+    "shot": "ctl-pad-10-Drohne Pad links hoch 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.2,
+    "wall": 24.93,
+    "fps": 14
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "pad",
+   "input": "Drohne Pad rechts 50 % 1 s",
+   "original": {
+    "deg": 0,
+    "m": 0,
+    "mps": 0,
+    "degps": 0,
+    "shot": "ctl-pad-11-Drohne Pad rechts 50 % 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.1,
+    "wall": 19.67
+   },
+   "kern": {
+    "deg": 0,
+    "m": 0,
+    "mps": 0,
+    "degps": 0,
+    "shot": "ctl-pad-11-Drohne Pad rechts 50 % 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.2,
+    "wall": 27.59,
+    "fps": 14
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "pad",
+   "input": "Drohne Pad RT 1 s",
+   "original": {
+    "dz": 0,
+    "dzps": 0,
+    "shot": "ctl-pad-12-Drohne Pad RT 1 s-original.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1.2,
+    "wall": 23.41
+   },
+   "kern": {
+    "dz": 0,
+    "dzps": 0,
+    "shot": "ctl-pad-12-Drohne Pad RT 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 1,
+    "wall": 20.65,
+    "fps": 12
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "pad",
+   "input": "Auto Pad RT 2 s",
+   "original": {
+    "kmh": 0,
+    "shot": "ctl-pad-13-Auto Pad RT 2 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.85,
+    "wall": 37.25
+   },
+   "kern": {
+    "kmh": 43,
+    "kmhps": 17,
+    "shot": "ctl-pad-13-Auto Pad RT 2 s-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 2,
+    "wall": 33.13,
+    "fps": 10
+   },
+   "deviation": "17"
+  },
+  {
+   "device": "pad",
+   "input": "Auto Pad links 50 % 1 s",
+   "original": {
+    "deg": 0,
+    "degps": 0,
+    "shot": "ctl-pad-14-Auto Pad links 50 % 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.15,
+    "wall": 17.41
+   },
+   "kern": {
+    "deg": 10.6,
+    "degps": 8.6,
+    "shot": "ctl-pad-14-Auto Pad links 50 % 1 s-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 1.23,
+    "wall": 26.74,
+    "fps": 12
+   },
+   "deviation": "8.6"
+  },
+  {
+   "device": "pad",
+   "input": "Auto Pad X (aussteigen)",
+   "original": {
+    "mode": "foot -> car",
+    "shot": "ctl-pad-15-Auto Pad X (aussteigen)-original.png",
+    "from": "foot",
+    "to": "car",
+    "held": 0.35,
+    "wall": 11.79
+   },
+   "kern": {
+    "mode": "car -> foot",
+    "shot": "ctl-pad-15-Auto Pad X (aussteigen)-kern.png",
+    "from": "car",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 11.76,
+    "fps": 11
+   },
+   "deviation": ""
+  },
+  {
+   "device": "phone",
+   "input": "Touch Blick 120 px",
+   "original": {
+    "deg": 161.7,
+    "pitch": 0,
+    "degps": 71.9,
+    "shot": "ctl-phone-01-Touch Blick 120 px-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.25,
+    "wall": 11.76
+   },
+   "kern": {
+    "deg": 148.2,
+    "pitch": 0,
+    "degps": 32.5,
+    "shot": "ctl-phone-01-Touch Blick 120 px-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 4.55,
+    "wall": 16.1,
+    "fps": 12
+   },
+   "deviation": "-55 %"
+  },
+  {
+   "device": "phone",
+   "input": "Touch Blick 60 px hoch",
+   "original": {
+    "deg": 20.3,
+    "degps": 11,
+    "shot": "ctl-phone-02-Touch Blick 60 px hoch-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.85,
+    "wall": 10.11
+   },
+   "kern": {
+    "deg": 20.3,
+    "degps": 5.7,
+    "shot": "ctl-phone-02-Touch Blick 60 px hoch-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 3.57,
+    "wall": 28.45,
+    "fps": 12
+   },
+   "deviation": "-48 %"
+  },
+  {
+   "device": "phone",
+   "input": "Touch Stick hoch 1 s",
+   "original": {
+    "m": 5.03,
+    "mps": 2.67,
+    "shot": "ctl-phone-03-Touch Stick hoch 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.88,
+    "wall": 10.66
+   },
+   "kern": {
+    "m": 8.48,
+    "mps": 2.84,
+    "shot": "ctl-phone-03-Touch Stick hoch 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.9,
+    "wall": 27.91,
+    "fps": 11
+   },
+   "deviation": "6 %"
+  },
+  {
+   "device": "phone",
+   "input": "Touch Stick halb 1 s",
+   "original": {
+    "m": 2.44,
+    "mps": 1.3,
+    "shot": "ctl-phone-04-Touch Stick halb 1 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 1.87,
+    "wall": 13.29
+   },
+   "kern": {
+    "m": 4.57,
+    "mps": 1.6,
+    "shot": "ctl-phone-04-Touch Stick halb 1 s-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.87,
+    "wall": 27.2,
+    "fps": 12
+   },
+   "deviation": "23 %"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #footJump",
+   "original": {
+    "m": 0.52,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-05-Tippen #footJump-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 3.83
+   },
+   "kern": {
+    "m": 0.65,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-05-Tippen #footJump-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.4,
+    "wall": 9.21,
+    "fps": 13
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #footWeaponToggle",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-06-Tippen #footWeaponToggle-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 4.19
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "WEAPON · GLOCK -> WEAPON · SNIPER",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-06-Tippen #footWeaponToggle-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.32,
+    "wall": 10.2,
+    "fps": 19
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #mobileGameplayWeapon",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "shot": "ctl-phone-07-Tippen #mobileGameplayWeapon-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 3.22
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "shot": "ctl-phone-07-Tippen #mobileGameplayWeapon-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 8.07,
+    "fps": 18
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #handGrenadeBtn",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-08-Tippen #handGrenadeBtn-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.22,
+    "wall": 4.52
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "mps": 0,
+    "shot": "ctl-phone-08-Tippen #handGrenadeBtn-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.23,
+    "wall": 9.06,
+    "fps": 22
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #scopeButton",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "ads-active scope-active",
+    "mps": 0,
+    "shot": "ctl-phone-09-Tippen #scopeButton-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 4.74
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "",
+    "shot": "ctl-phone-09-Tippen #scopeButton-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 7.48,
+    "fps": 21
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #airStrikeButton",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "ads-active scope-active air-strike-targeting",
+    "mps": 0,
+    "shot": "ctl-phone-10-Tippen #airStrikeButton-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.2,
+    "wall": 3.32
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "air-strike-targeting",
+    "mps": 0,
+    "shot": "ctl-phone-10-Tippen #airStrikeButton-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0.53,
+    "wall": 11.73,
+    "fps": 19
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #footFire",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "ads-active scope-active air-strike-targeting",
+    "shot": "ctl-phone-11-Tippen #footFire-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 3.06
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "air-strike-targeting",
+    "shot": "ctl-phone-11-Tippen #footFire-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 6.79,
+    "fps": 19
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #enterCarButton",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "ads-active scope-active air-strike-targeting",
+    "shot": "ctl-phone-12-Tippen #enterCarButton-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 2.89
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "air-strike-targeting",
+    "shot": "ctl-phone-12-Tippen #enterCarButton-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 7.28,
+    "fps": 19
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #enterJetButton",
+   "original": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "ads-active scope-active air-strike-targeting",
+    "shot": "ctl-phone-13-Tippen #enterJetButton-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 2.57
+   },
+   "kern": {
+    "m": 0,
+    "mode": "foot -> foot",
+    "weapon": "",
+    "body": "air-strike-targeting",
+    "shot": "ctl-phone-13-Tippen #enterJetButton-kern.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 6.75,
+    "fps": 19
+   },
+   "deviation": "0"
+  },
+  {
+   "device": "phone",
+   "input": "Tippen #mobileGameplayMode",
+   "original": {
+    "m": 0,
+    "mode": "foot -> drone",
+    "weapon": "WEAPON · SNIPER -> WEAPON · GUN",
+    "body": "",
+    "mps": 42.45,
+    "shot": "ctl-phone-14-Tippen #mobileGameplayMode-original.png",
+    "from": "foot",
+    "to": "drone",
+    "held": 0.2,
+    "wall": 3.56
+   },
+   "kern": {
+    "m": 1.94,
+    "mode": "foot -> drone",
+    "weapon": "WEAPON · SNIPER -> WEAPON · GUN",
+    "body": "",
+    "mps": 6.68,
+    "shot": "ctl-phone-14-Tippen #mobileGameplayMode-kern.png",
+    "from": "foot",
+    "to": "drone",
+    "held": 0.43,
+    "wall": 10.62,
+    "fps": 20
+   },
+   "deviation": "-84 %"
+  },
+  {
+   "device": "phone",
+   "input": "Drohne Touch links hoch 1 s",
+   "original": {
+    "error": "no #soloLeft"
+   },
+   "kern": {
+    "dz": 0,
+    "m": 0,
+    "mps": 0,
+    "dzps": 0,
+    "shot": "ctl-phone-15-Drohne Touch links hoch 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 2.58,
+    "wall": 25.06,
+    "fps": 16
+   },
+   "deviation": ""
+  },
+  {
+   "device": "phone",
+   "input": "Drohne Touch rechts 1 s",
+   "original": {
+    "error": "no #soloRight"
+   },
+   "kern": {
+    "deg": -0.2,
+    "m": 0,
+    "mps": 0,
+    "degps": -0.1,
+    "shot": "ctl-phone-16-Drohne Touch rechts 1 s-kern.png",
+    "from": "drone",
+    "to": "drone",
+    "held": 2.88,
+    "wall": 26.38,
+    "fps": 13
+   },
+   "deviation": ""
+  },
+  {
+   "device": "phone",
+   "input": "Auto Touch Gas 2 s",
+   "original": {
+    "kmh": 0,
+    "shot": "ctl-phone-15-Auto Touch Gas 2 s-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 2.98,
+    "wall": 18.86
+   },
+   "kern": {
+    "kmh": 68,
+    "kmhps": 7.1,
+    "shot": "ctl-phone-17-Auto Touch Gas 2 s-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 3.78,
+    "wall": 30.12,
+    "fps": 11
+   },
+   "deviation": "7.1"
+  },
+  {
+   "device": "phone",
+   "input": "Auto Tippen Kamera",
+   "original": {
+    "shot": "ctl-phone-16-Auto Tippen Kamera-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 2.53
+   },
+   "kern": {
+    "shot": "ctl-phone-18-Auto Tippen Kamera-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 0.42,
+    "wall": 9.52,
+    "fps": 15
+   },
+   "deviation": ""
+  },
+  {
+   "device": "phone",
+   "input": "Auto Tippen Aussteigen",
+   "original": {
+    "mode": "foot -> foot",
+    "shot": "ctl-phone-17-Auto Tippen Aussteigen-original.png",
+    "from": "foot",
+    "to": "foot",
+    "held": 0,
+    "wall": 3.63
+   },
+   "kern": {
+    "mode": "car -> car",
+    "shot": "ctl-phone-19-Auto Tippen Aussteigen-kern.png",
+    "from": "car",
+    "to": "car",
+    "held": 0.32,
+    "wall": 9.33,
+    "fps": 20
+   },
+   "deviation": ""
+  }
+ ]
+}
