@@ -247,8 +247,20 @@ function installViewModes() {
     const b = $("scopeButton");
     if (b) {
       const touchPlay = h.ctl?.device !== "desktop" && !h.ctl?.pad && h.mode === "foot";
-      const show = touchPlay && h.weapon === "Sniper" && !h.ctl?.dead;
-      b.classList.toggle("show", show);
+      // sniper_scope.mjs place(): straight above the thumb weapon switch (66 px up); shown only
+      // where it could be placed
+      const w = $("thumbWeapon");
+      let placed = false;
+      if (touchPlay && h.weapon === "Sniper" && !h.ctl?.dead && w?.classList.contains("show")) {
+        const l = parseFloat(w.style.left), t = parseFloat(w.style.top);
+        if (Number.isFinite(l) && Number.isFinite(t)) {
+          const L = `${Math.round(l)}px`, T = `${Math.round(t - 66)}px`;
+          if (b.style.left !== L) b.style.setProperty("left", L, "important");
+          if (b.style.top !== T) b.style.setProperty("top", T, "important");
+          placed = true;
+        }
+      }
+      b.classList.toggle("show", placed);
       const html = "<b>◎</b>SCOPE";
       if (b.dataset.html !== html) { b.dataset.html = html; b.innerHTML = html; }
       b.classList.toggle("on", !!h.ctl?.scope);
