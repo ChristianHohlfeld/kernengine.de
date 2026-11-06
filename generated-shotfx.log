@@ -1,0 +1,9 @@
+06:15:38 drone drone
+06:15:44 armed 0
+06:15:47 shot orig-drone-a
+06:15:54 shot orig-drone-b
+06:15:57 dronerocket drone
+06:17:35 armed 0
+06:17:41 missile false
+06:18:06 shot orig-dronerocket-a
+06:18:24 shot orig-dronerocket-b
