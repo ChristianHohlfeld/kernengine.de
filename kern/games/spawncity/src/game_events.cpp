@@ -520,7 +520,7 @@ void Game::draw_events() {
 
 void Game::draw_combat() {
   combat_art_.begin();
-  if (world_placed_) { draw_military(); draw_events(); destruction_.draw(combat_art_); }
+  if (world_placed_) { draw_military(); draw_events(); destruction_.draw(combat_art_); draw_guided_mark(); }
   combat_art_.end();
 }
 

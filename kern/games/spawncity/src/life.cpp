@@ -129,7 +129,7 @@ void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out)
   if (!world_ || !view.city || dt <= 0) return;
   update_cows(dt, now, view, out);
   update_pigeons(dt, now, view, rng, out);
-  update_birds(dt, now, view);
+  update_birds(dt, now, view, rng, out);
   update_trees(view, now);
   update_pets(dt, now, view, out);
   update_joggers(dt, now, view, rng, out);
@@ -504,7 +504,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
 // ---------------------------------------------------------------------------------------------
 // birds over the roofs and trees along the streets (world_liveliness.mjs)
 
-void Life::update_birds(f32 dt, f32 now, const LifeView& view) {
+void Life::update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
   if (!view.birds_on) {
     for (Bird& b : birds_) b.dead_until = std::fmax(b.dead_until, now + 0.5f);  // switched off: not drawn, not hit
     return;
@@ -518,9 +518,19 @@ void Life::update_birds(f32 dt, f32 now, const LifeView& view) {
     b.center = b.center + (target - b.center) * k;
     if (dist2d(b.center, target) > 400) b.center = target;
     if (now < b.dying_until) {
+      // it tumbles down out of the sky and lies where it hit the ground (a thud, a last flutter)
+      if (b.down) continue;
       b.fall_v.z -= 5.4f * dt;
       b.pos = b.pos + b.fall_v * dt;
       b.yaw += b.spin * dt;
+      const f32 gz = ground(view, b.pos.x, b.pos.y);
+      if (b.pos.z <= gz + 0.05f) {
+        b.pos.z = gz + 0.05f;
+        b.down = true;
+        b.dying_until = b.dead_until;
+        out.sounds.push_back({LifeOut::Sound::thud, b.pos, 0.55f, rng.range(1.3f, 1.6f)});
+        out.sounds.push_back({LifeOut::Sound::flap, b.pos, 0.35f, rng.range(1.1f, 1.4f)});
+      } else if (now + dt >= b.dying_until) b.dying_until = now + 0.2f;  // still falling
       continue;
     }
     if (now < b.dead_until) continue;
@@ -985,10 +995,17 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool mel
     Bird& b = birds_[which];
     ++bird_hits_;
     b.dying_until = now + 1.1f;
-    b.dead_until = now + 9;
+    b.dead_until = now + 14;
+    b.down = false;
     b.fall_v = {dir.x * 2.2f, dir.y * 2.2f, -0.4f};
     b.spin = 4 + hash01(mix(b.seed, static_cast<u64>(now * 100))) * 4;
-    out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.8f, 1});
+    {
+      // a shrill cry, its pitch the bird's own and a little random, and the wings beating wildly
+      const f32 h = hash01(mix(b.seed, static_cast<u64>(now * 1000)));
+      out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 1.0f, 0.8f + 0.5f * hash01(b.seed) + 0.1f * h});
+      out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.7f, 1.3f + 0.3f * h});
+      out.sounds.push_back({LifeOut::Sound::flap, b.pos, 0.9f, 1.2f});
+    }
     out.bursts.push_back({b.pos, {0.8f, 0.75f, 0.66f}});
   } else if (kind == 4) {
     // a shot pigeon drops where it was, feathers fly, the rest of the flock takes off
@@ -997,7 +1014,8 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool mel
     pg.dead_at = now;
     pg.fall_v = {dir.x * 1.6f, dir.y * 1.6f, f.air ? -0.5f : 1.2f};
     ++bird_hits_;
-    out.sounds.push_back({LifeOut::Sound::squawk, pg.pos, 0.7f, 1.25f});
+    out.sounds.push_back({LifeOut::Sound::squawk, pg.pos, 0.9f, 1.05f + 0.35f * hash01(static_cast<u32>(which) * 2654435761u + static_cast<u32>(now * 100))});
+    out.sounds.push_back({LifeOut::Sound::coo, pg.pos, 0.6f, 1.5f});
     out.sounds.push_back({LifeOut::Sound::flap, pg.pos, 0.8f, 1});
     out.bursts.push_back({pg.pos + Vec3{0, 0, 0.15f}, {0.72f, 0.74f, 0.78f}});
     spook_pigeons(now);
@@ -1081,9 +1099,11 @@ void Life::blast(Vec3 at, f32 radius, f32 now, LifeOut& out) {
   for (Bird& b : birds_) {
     if (now < b.dead_until || kern::length(b.pos - at) > r) continue;
     b.dying_until = now + 1.1f;
-    b.dead_until = now + 9;
+    b.dead_until = now + 14;
+    b.down = false;
     b.fall_v = (b.pos - at) * 0.5f;
     b.spin = 6;
+    out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.9f, 0.9f + 0.4f * hash01(b.seed)});
   }
   for (u32 i = 0; i < pets_.size(); ++i) {
     Pet& p = pets_[i];

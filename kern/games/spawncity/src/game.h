@@ -294,6 +294,7 @@ class Game {
   // GUIDED missile with target lock (game_guided.cpp, guided_missile.mjs)
   bool guided_press();
   void update_guided(f32 dt);
+  void draw_guided_mark();
   void draw_guided();
   void guided_hud(std::string& s);
   bool guided_target_at(const guided::Target& t, Vec3& at) const;
@@ -485,6 +486,8 @@ class Game {
   std::vector<TrafficCar> cars_;
   Mode mode_ = Mode::foot;
   i32 car_index_ = -1;       // the car the player drives
+  bool jet_flown_ = false, jet_v_valid_ = false;  // crash damage (game.cpp fixed_step)
+  Vec3 jet_v_ctrl_;
   bool drone_out_ = false, jet_placed_ = false, world_placed_ = false, chute_open_ = false;
   f32 chute_time_ = 0;
   Vec2 chute_steer_;
@@ -523,6 +526,10 @@ class Game {
   std::vector<guided::Flight> guided_;  // GUIDED missiles in flight (game_guided.cpp)
   f32 guided_last_ = -99;
   std::string guided_lock_;
+  guided::Target guided_mark_;  // the first press marks, the second launches (game_guided.cpp)
+  Vec3 guided_mark_at_;
+  f32 guided_mark_time_ = -99;
+  bool guided_marked_ = false;
   // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot
   std::vector<f32> car_last_hp_, car_burn_seen_;
   detail::CriticalClock pd_crit_[5], drone_crit_;

@@ -34,7 +34,7 @@ struct JetSpec {
   Gear gear[3] = {{{0, 5.2f, -0.6f}, 0.212f, true}, {{1.9f, -1.4f, -0.6f}, 0.394f, false}, {{-1.9f, -1.4f, -0.6f}, 0.394f, false}};
   f32 strut_rest = 1.6f, gear_height = 2.05f, strut_static = 0.15f, strut_max = 0.4f, strut_zeta = 0.6f, tyre_mu = 0.8f, roll_mu = 0.02f, brake_mu = 0.5f;
   f32 g_limit = 9, g_push = 3, alpha_limit = 0.38f, p_max = 3.4f, q_max = 1.7f;
-  f32 hover_speed = 14, hover_climb = 10, hover_sink = 6, hover_tilt = 0.35f;
+  f32 hover_speed = 22, hover_climb = 10, hover_sink = 6, hover_tilt = 0.35f;
   f32 wing_borne_v = 85, hover_law_v = 50, transition_nozzle = 1.05f, braking_nozzle = 1.71f;
 };
 
@@ -67,6 +67,7 @@ class Jet {
 
   bool engine_on = true;
   bool pilot = true;
+  bool arcade = true;             // dogfight handling: direct rates, the path follows the nose
   f32 thrust_scale = 1;           // damage reduces it (jet_mode.mjs)
   f32 fuel = 1;                   // 0..1 (HUD); the SpawnCity jet does not burn fuel
   const JetTelemetry& telemetry() const { return tele_; }

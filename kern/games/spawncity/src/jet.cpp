@@ -264,6 +264,28 @@ void Jet::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   world.apply_force_to_center(body, force);
   world.apply_torque(body, torque);
 
+  // ---------------- arcade handling (dogfights): the stick sets the rates directly and the flight
+  // path follows the nose - bank and it turns, pull and it comes round, the yaw in the hover is quick
+  if (arcade && pilot_ok && !on_ground) {
+    const f32 k = 1 - std::exp(-dt * 9);
+    const f32 Vs = std::fmax(V, 30.0f);
+    const f32 turn = w_flight * G * std::sin(att_roll) * std::cos(att_pitch) / Vs;  // coordinated
+    Vec3 want = wb;
+    // flight: pitch 1.6 rad/s, roll 3.4 rad/s, yaw .7 rad/s + the bank's turn
+    want.x += w_flight * (clampf(inp.pitch, -1, 1) * 1.6f - wb.x);
+    want.y += w_flight * (clampf(inp.roll, -1, 1) * 3.4f - wb.y);
+    // the yaw everywhere: the hover turns on the spot at 1.5 rad/s
+    const f32 yaw_rate = (1 - w_flight) * clampf(inp.yaw, -1, 1) * 1.5f + w_flight * (clampf(inp.yaw, -1, 1) * 0.7f + turn);
+    want.z += (-yaw_rate - wb.z);
+    world.set_angular_velocity(body, q.rotate(wb + (want - wb) * k));
+    if (V > 20 && w_flight > 0) {
+      const Vec3 vd = v * (1.0f / V);
+      const f32 kv = 1 - std::exp(-dt * 3.2f * w_flight);
+      const Vec3 nd = nrm(vd + (fwd - vd) * kv);
+      if (kern::dot(nd, nd) > 0.5f) world.set_linear_velocity(body, nd * V);
+    }
+  }
+
   landed_ = contacts >= 2 && V < 1.5f && mode_ == Mode::hover && inp.lift <= 0.15f;
   tele_.V = V;
   tele_.agl = agl;

@@ -9,7 +9,10 @@
 
 namespace sc {
 
+using kern::Mat4;
+
 namespace {
+constexpr f32 kGuidedMarkSeconds = 8;
 bool person_up(const People::Person& p) { return p.state != People::State::down && p.state != People::State::gone; }
 const char* person_label(const People::Person& p) {
   switch (p.kind) {
@@ -50,6 +53,8 @@ bool Game::guided_target_at(const guided::Target& t, Vec3& at) const {
 }
 
 bool Game::guided_press() {
+  // Two taps: the first marks what is nearest the crosshair (a ring sits on it, two beeps), the
+  // second launches at the mark. A mark lasts 8 s; a lost target (dead, gone) drops it.
   const f32 now = world_->sim_time();
   if (!drone_out_ || player_dead_) return false;
   if (now < guided_last_ + guided::kCooldown) {
@@ -64,39 +69,54 @@ bool Game::guided_press() {
   }
   Vec3 fwd;
   const Vec3 eye = aim_ray(fwd);
-  const f32 height = std::fmax(1.0f, frame_h_);
-  guided::Target best;
-  f32 best_score = guided::kPickPx;
-  Vec3 best_at;
-  auto consider = [&](const guided::Target& t, Vec3 at) {
-    const f32 dist = kern::length(at - eye);
-    if (dist > guided::kRange || dist < 3) return;
-    const f32 s = guided::pick_score(eye, fwd, cam_.fov, height, at);
-    if (s >= 0 && s < best_score) { best_score = s; best = t; best_at = at; }
-  };
-  for (std::size_t i = 0; i < people_.all().size(); ++i) {
-    const People::Person& p = people_.all()[i];
-    if (person_up(p)) consider({guided::TargetKind::person, static_cast<i32>(i), 0, person_label(p)}, p.pos + Vec3{0, 0, 1.1f});
-  }
-  for (std::size_t i = 0; i < cars_.size(); ++i) {
-    if (!cars_[i].placed || cars_[i].wreck) continue;
-    const bool bus = cars_[i].car->spec().radius > 0.4f;
-    consider({guided::TargetKind::car, static_cast<i32>(i), 0, bus ? "BUS" : "AUTO"}, matrix_of(cars_[i].actor).translation() + Vec3{0, 0, 0.8f});
-  }
-  for (i32 i = 0; i < 5; ++i)
-    if (pdrones_[i].active) consider({guided::TargetKind::police_drone, i, 0, "POLIZEIDROHNE"}, pdrones_[i].pos);
-  for (const net::Remote& r : net_.remotes())
-    consider({guided::TargetKind::player, -1, r.state.slot, r.state.mode == net::PlayerMode::drone ? "DROHNE" : "SPIELER"},
-             r.shown + Vec3{0, 0, r.state.mode == net::PlayerMode::foot ? 1.1f : 0.0f});
-  if (best.kind == guided::TargetKind::point) {
-    // Nothing to home on: the spot you aimed at.
-    const RayResult r = cast(world_->physics(), eye, fwd, guided::kRange, body(drone_actor_));
-    best_at = r.hit ? r.point : eye + fwd * guided::kRange;
-  } else {
+  Vec3 mark_now;
+  const bool marked = guided_marked_ && now - guided_mark_time_ < kGuidedMarkSeconds &&
+                      (guided_mark_.kind == guided::TargetKind::point || guided_target_at(guided_mark_, mark_now));
+  if (!marked) {
+    const f32 height = std::fmax(1.0f, frame_h_);
+    guided::Target best;
+    f32 best_score = guided::kPickPx;
+    Vec3 best_at;
+    auto consider = [&](const guided::Target& t, Vec3 at) {
+      const f32 dist = kern::length(at - eye);
+      if (dist > guided::kRange || dist < 3) return;
+      const f32 s = guided::pick_score(eye, fwd, cam_.fov, height, at);
+      if (s >= 0 && s < best_score) { best_score = s; best = t; best_at = at; }
+    };
+    for (std::size_t i = 0; i < people_.all().size(); ++i) {
+      const People::Person& p = people_.all()[i];
+      if (person_up(p)) consider({guided::TargetKind::person, static_cast<i32>(i), 0, person_label(p)}, p.pos + Vec3{0, 0, 1.1f});
+    }
+    for (std::size_t i = 0; i < cars_.size(); ++i) {
+      if (!cars_[i].placed || cars_[i].wreck) continue;
+      const bool bus = cars_[i].car->spec().radius > 0.4f;
+      consider({guided::TargetKind::car, static_cast<i32>(i), 0, bus ? "BUS" : "AUTO"}, matrix_of(cars_[i].actor).translation() + Vec3{0, 0, 0.8f});
+    }
+    for (i32 i = 0; i < 5; ++i)
+      if (pdrones_[i].active) consider({guided::TargetKind::police_drone, i, 0, "POLIZEIDROHNE"}, pdrones_[i].pos);
+    for (const net::Remote& r : net_.remotes())
+      consider({guided::TargetKind::player, -1, r.state.slot, r.state.mode == net::PlayerMode::drone ? "DROHNE" : "SPIELER"},
+               r.shown + Vec3{0, 0, r.state.mode == net::PlayerMode::foot ? 1.1f : 0.0f});
+    if (best.kind == guided::TargetKind::point) {
+      // Nothing to home on: the spot you aimed at.
+      const RayResult r = cast(world_->physics(), eye, fwd, guided::kRange, body(drone_actor_));
+      best_at = r.hit ? r.point : eye + fwd * guided::kRange;
+      best.label = "ZIELPUNKT";
+    }
     gaps_guided_sounds();
     world_->play_sound("sc:locktone", eye, 1, 1, false);  // lockTone: two 1760 Hz beeps (game_gaps.cpp)
     osfx("guided_missile.lockTone", eye);
+    guided_mark_ = best;
+    guided_mark_at_ = best_at;
+    guided_mark_time_ = now;
+    guided_marked_ = true;
+    toast_ = std::string("MARKIERT: ") + best.label + " - NOCHMAL TIPPEN = FEUER";
+    toast_age_ = 0;
+    return false;
   }
+  const guided::Target best = guided_mark_;
+  const Vec3 best_at = best.kind == guided::TargetKind::point ? guided_mark_at_ : mark_now;
+  guided_marked_ = false;
   const BodyState s = state_of(drone_actor_);
   bool pedestrian = best.kind == guided::TargetKind::person;
   if (best.kind == guided::TargetKind::player)
@@ -112,6 +132,9 @@ bool Game::guided_press() {
   guided_lock_ = best.label;
   if (best.kind != guided::TargetKind::point && pedestrian) {
     toast_ = std::string("GUIDED LOCK - ") + best.label + " - SPRINT ZUM AUSWEICHEN";
+    toast_age_ = 0;
+  } else {
+    toast_ = std::string("LENKRAKETE AUF ") + best.label;
     toast_age_ = 0;
   }
   // no launch sound: it drops off the rail; the ignition bang and the motor come when it lights (game_gaps.cpp)
@@ -156,6 +179,25 @@ void Game::draw_guided() {
   for (const guided::Flight& f : guided_) people_art_.projectile(f.m.p, f.m.v, 0.06f, 0.9f, f.m.motor);
 }
 
+void Game::draw_guided_mark() {
+  // the mark: a red ring on the ground under it and a pulsing halo on it, turned to the eye
+  const f32 now = world_->sim_time();
+  if (!guided_marked_ || now - guided_mark_time_ >= kGuidedMarkSeconds || !drone_out_) return;
+  Vec3 at = guided_mark_at_;
+  if (guided_mark_.kind != guided::TargetKind::point && !guided_target_at(guided_mark_, at)) return;
+  const f32 pulse = 0.85f + 0.15f * std::sin(now * 12);
+  const f32 d = std::fmax(1.0f, kern::length(at - cam_.eye));
+  const f32 r = std::fmax(1.2f, d * 0.025f) * pulse;
+  const Vec3 n = kern::normalize(cam_.eye - at, {0, 0, 1});
+  const Vec3 ax = kern::cross({0, 0, 1}, n);
+  const f32 al = kern::length(ax);
+  const Quat q = al > 1e-4f ? Quat::axis_angle(ax * (1 / al), std::acos(clampf(n.z, -1, 1))) : Quat{};
+  CombatArt& A = combat_art_;
+  A.put(CombatArt::fade_ring, Mat4::translate(at) * Mat4::trs({}, q, {1, 1, 1}) * Mat4::scale({r, r, 0.05f}), Vec3{1.0f, 0.12f, 0.08f} * 3.0f, 0.85f);
+  const f32 g = city_.ground_height(at.x, at.y) + 0.08f;
+  A.put(CombatArt::fade_ring, Mat4::translate({at.x, at.y, g}) * Mat4::scale({r * 1.4f, r * 1.4f, 0.05f}), Vec3{1.0f, 0.12f, 0.08f} * 2.5f, 0.6f);
+}
+
 void Game::guided_hud(std::string& s) {
   const f32 now = world_->sim_time();
   char b[160];
@@ -166,8 +208,9 @@ void Game::guided_hud(std::string& s) {
     dist = kern::length(f.m.goal - f.m.p);
     lock = f.m.tracking ? f.t.label : "VERLOREN";
   }
-  std::snprintf(b, sizeof b, ",\"guided\":{\"cd\":%.1f,\"flying\":%zu,\"lock\":\"%s\",\"dist\":%.0f,\"last\":\"%s\"}",
-                std::fmax(0.0f, guided_last_ + guided::kCooldown - now), guided_.size(), lock, dist, guided_lock_.c_str());
+  const bool marked = guided_marked_ && now - guided_mark_time_ < kGuidedMarkSeconds;
+  std::snprintf(b, sizeof b, ",\"guided\":{\"cd\":%.1f,\"flying\":%zu,\"lock\":\"%s\",\"dist\":%.0f,\"last\":\"%s\",\"marked\":\"%s\"}",
+                std::fmax(0.0f, guided_last_ + guided::kCooldown - now), guided_.size(), lock, dist, guided_lock_.c_str(), marked ? guided_mark_.label : "");
   s += b;
 }
 

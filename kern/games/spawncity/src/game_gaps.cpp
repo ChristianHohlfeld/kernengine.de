@@ -909,6 +909,22 @@ bool Game::gaps_command(const std::string& cmd, std::string& out) {
     out = b;
     return true;
   }
+  if (cmd == "jet dive") {
+    // Tests: the flown jet 40 m up, nose and speed straight down into the ground (crash damage)
+    if (!jet_placed_ || mode_ != Mode::jet) { out = "not in the jet"; return true; }
+    const Vec3 p = matrix_of(jet_actor_).translation();
+    const Vec3 rot{-80, 0, 0};
+    world_->teleport(jet_actor_, {p.x, p.y, city_.ground_height(p.x, p.y) + 40}, &rot);
+    world_->set_actor_velocity(jet_actor_, {0, 0, -70});
+    out = "diving";
+    return true;
+  }
+  if (cmd == "jet hp") {
+    char b[64];
+    std::snprintf(b, sizeof b, "jet %.0f placed %d mode %s", jet_hp_, jet_placed_ ? 1 : 0, mode_name(mode_));
+    out = b;
+    return true;
+  }
   if (cmd == "jetdamage" || starts("jetdamage ")) {
     gaps_jet_damage(cmd.size() > 10 ? static_cast<f32>(std::atof(cmd.c_str() + 10)) : 50);
     char b[64];

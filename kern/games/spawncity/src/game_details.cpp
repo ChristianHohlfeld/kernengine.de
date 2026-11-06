@@ -96,7 +96,7 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
     if (mode_ != Mode::drone) { out = "not drone"; return true; }
     drone_weapon_ = 2;
     const bool ok = guided_press();
-    out = ok ? std::string("launched ") + guided_lock_ : "denied";
+    out = ok ? std::string("launched ") + guided_lock_ : guided_marked_ ? std::string("marked ") + guided_mark_.label : "denied";
     return true;
   }
   if (starts("hurt ")) {

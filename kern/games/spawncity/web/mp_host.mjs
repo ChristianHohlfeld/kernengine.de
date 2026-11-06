@@ -397,11 +397,12 @@ export class MpPage {
   uiState(h) {
     const others = Array.isArray(h?.mp?.players) ? h.mp.players.filter(p => !p.me).length : 0;
     if (this.connecting) return {state: "finding", label: "SUCHE …", status: "Suche Mitspieler in der Lobby …"};
-    if (!this.net) return {state: this.failed ? "error" : "offline", label: "MULTI", status: this.failed || ""};
+    // solo is said plainly: the button names where a tap goes, the line under it what you are in
+    if (!this.net) return this.failed ? {state: "error", label: "MULTI ⚠", status: this.failed} : {state: "offline", label: "SOLO ▸ MULTI", status: ""};
     const brokers = this.kind === "public" ? (this.net.clients?.filter(c => c.open).length || 0) : 1;
     if (!brokers && performance.now() - (this.openedAt || 0) > 6000) return {state: "error", label: "MULTI ⚠", status: "Keine Verbindung · tippen = neu versuchen"};
-    if (others > 0) return {state: "connected", label: `MULTI · ${others + 1}`, status: `${others + 1} Spieler · ${this.hosting ? "du hostest" : "verbunden"}`};
-    return {state: "waiting", label: "MULTI · 1", status: this.hosting ? "Lobby offen · warte auf Mitspieler" : "verbunden · warte auf Mitspieler"};
+    if (others > 0) return {state: "connected", label: `MULTI · ${others + 1}P`, status: `${others + 1} Spieler · ${this.hosting ? "du hostest" : "verbunden"}`};
+    return {state: "waiting", label: "WARTE …", status: this.hosting ? "Lobby offen · warte auf Mitspieler" : "verbunden · warte auf Mitspieler"};
   }
   /** MULTI again: a lobby that does not connect is tried anew; in a lobby it is left (lan_vs toggleVs). */
   toggleMulti(h) {

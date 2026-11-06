@@ -81,7 +81,7 @@ class Life {
     f32 r = 12, h = 12, dir = 1, a0 = 0, dur = 10;
     std::vector<Pigeon> birds;
   };
-  struct Bird { u32 seed = 0; Vec3 pos; f32 yaw = 0, flap = 1, dead_until = -1, dying_until = -1, spin = 0; Vec3 fall_v; Vec2 center; };
+  struct Bird { u32 seed = 0; Vec3 pos; f32 yaw = 0, flap = 1, dead_until = -1, dying_until = -1, spin = 0; Vec3 fall_v; Vec2 center; bool down = false; };
   struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; };
   struct Chain {
     u32 id = 0;
@@ -165,7 +165,7 @@ class Life {
   void spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, LifeOut& out);
   bool blocked(const LifeView& view, Vec2 p) const;
   bool spot_near(const LifeView& view, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const;
-  void update_birds(f32 dt, f32 now, const LifeView& view);
+  void update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
   void update_trees(const LifeView& view, f32 now);
   void update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out);
   void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);

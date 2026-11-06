@@ -471,7 +471,8 @@ export class OriginalView {
 
   sticks(t, mode) {
     const pairs = mode === "drone" ? [["soloLeft", t.move, ".solo-knob"], ["soloRight", t.look, ".solo-knob"]]
-      : mode === "car" ? [["vehicleMove", t.move, ".knob"], ["vehicleLook", t.look, ".knob"]]
+      // the car drives with the foot sticks it claimed (shared_sticks.mjs): their knobs move
+      : mode === "car" ? [["footMove", t.move, ".knob"], ["footLook", t.look, ".knob"], ["vehicleMove", t.move, ".knob"], ["vehicleLook", t.look, ".knob"]]
       : [["footMove", t.move, ".knob"], ["footLook", t.look, ".knob"]];
     for (const [id, s, sel] of pairs) {
       const el = $(id), k = el?.querySelector(sel);

@@ -765,6 +765,23 @@ void Game::draw_military() {
     const f32 pulse = 0.75f + 0.25f * std::sin(now * 18);
     A.put(CombatArt::glow_box, Mat4::translate(f.p + Vec3{0, 0, 420 - len * 0.5f}) * Mat4::scale({0.44f, 0.44f, len}), Vec3{3.0f, 0.3f, 0.2f} * pulse);
     A.put(CombatArt::glow_sphere, Mat4::translate(f.p + Vec3{0, 0, 0.3f}) * Mat4::scale({0.7f, 0.7f, 0.7f}), {4.0f, 0.4f, 0.2f});
+    // runLine / poseRunLine: a pulsing blue line of 9 chevrons on the ground, pointing north (+y),
+    // where the stick of bombs will walk (170 m), wandering along it, 5.2 s
+    const f32 t = now - f.born, until = 5.2f;
+    if (t >= 0 && t < until) {
+      constexpr f32 kRunLen = 170;
+      const f32 pulse = 0.55f + 0.45f * std::sin(t * 9), fade = std::fmin(1.0f, t / 0.4f) * std::fmin(1.0f, (until - t) / 0.6f);
+      const Quat arm_l = Quat::axis_angle({0, 0, 1}, 0.785398f), arm_r = Quat::axis_angle({0, 0, 1}, -0.785398f);
+      for (int i = 0; i < 9; ++i) {
+        const f32 u = std::fmod(i / 9.0f + t * 0.35f, 1.0f), y = f.p.y - kRunLen / 2 + u * kRunLen;
+        const f32 a = 0.75f * pulse * fade * std::sin(u * kPi);
+        if (a <= 0.01f) continue;
+        const Vec3 c{f.p.x, y, city_.ground_height(f.p.x, y) + 0.35f};
+        // the two arms of the chevron (-2.2,-1.1) -> (0,1.1) <- (2.2,-1.1), scaled x2 for the view from above
+        A.put(CombatArt::fade_sphere, Mat4::translate(c + Vec3{-1.1f, 0, 0} * 2.0f) * Mat4::trs({}, arm_l, {1, 1, 1}) * Mat4::scale({6.2f, 1.3f, 0.05f}), Vec3{0.25f, 0.66f, 1.0f} * 3.0f, a);
+        A.put(CombatArt::fade_sphere, Mat4::translate(c + Vec3{1.1f, 0, 0} * 2.0f) * Mat4::trs({}, arm_r, {1, 1, 1}) * Mat4::scale({6.2f, 1.3f, 0.05f}), Vec3{0.25f, 0.66f, 1.0f} * 3.0f, a);
+      }
+    }
   }
   // updateBlasts: hot core (sphere r .45, x .5 .. 5, opacity .9 (1-t)) and flat ring (inner .6 outer 1,
   // x .7 .. 7.7, opacity .78 (1-t)^1.6), e = 1 - (1-t)^3 over 540 ms, additive orange / gold

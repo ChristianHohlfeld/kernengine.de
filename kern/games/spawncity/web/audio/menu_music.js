@@ -8,8 +8,10 @@
   var cfg={};try{cfg=JSON.parse(localStorage.getItem("arondight45AudioSettingsV1")||"{}");}catch(e){}
   if(cfg.musicEnabled===false)return;
   var vol=Math.max(0,Math.min(1,(cfg.musicVolume==null?32:cfg.musicVolume)/100))*0.45;
-  var a=new Audio("./sim/audio/8_bits_only.m4a");a.loop=true;a.preload="auto";a.volume=vol;a.setAttribute("playsinline","");
-  window.__oppMusicElement=a;
+  // Kern: one track only - a second call (or the game's player that came first) reuses the element
+  var a=window.__oppMusicElement;
+  if(!a){a=new Audio("./sim/audio/8_bits_only.m4a");a.loop=true;a.preload="auto";a.volume=vol;a.setAttribute("playsinline","");window.__oppMusicElement=a;}
+  if(window.__scMenuMusicArmed)return;window.__scMenuMusicArmed=true;
   // One audio session for the whole game: the Web Audio context for all
   // effects is created on the same first tap that starts the music, so iOS
   // never switches/interrupts the session later when the game is running.

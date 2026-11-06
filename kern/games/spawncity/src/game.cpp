@@ -432,6 +432,8 @@ void Game::place_world() {
     const Vec3 rot{0, 0, std::atan2(p.p.y - j.p.y, p.p.x - j.p.x) / kDeg - 90};  // nose (+Y) towards the player
     world_->teleport(jet_actor_, j.p + Vec3{0, 0, 2.1f}, &rot);
     jet_.reset();
+    jet_flown_ = false;
+    jet_v_valid_ = false;
     jet_.pilot = false;
     jet_placed_ = true;
   }
@@ -619,7 +621,22 @@ void Game::fixed_step(f32 h) {
     const kern::physics::Body b = body(jet_actor_);
     JetInput in = mode_ == Mode::jet ? jet_in_ : JetInput{};
     if (mode_ != Mode::jet && jet_.telemetry().contacts > 0) in.brake = 1;  // parked: brakes on
-    if (b.valid()) jet_.step(w, b, h, in);
+    if (b.valid()) {
+      // jet_mode.mjs onPhysicsImpact: what the step took off its speed beyond the flight forces
+      // (a wall, a roof, the ground nose first) - over 5 m/s it hurts, (dv - 5)^1.7 * 4; a hard
+      // landing (gear sink over 4 m/s) (gi - 4) * 80; a parked jet that never flew is spared
+      const Vec3 v_now = w.linear_velocity(b);
+      if (mode_ == Mode::jet) jet_flown_ = true;
+      if (jet_flown_ && jet_v_valid_) {
+        const f32 dv = kern::length(v_now - jet_v_ctrl_);
+        if (dv > 5) gaps_jet_damage(std::pow(dv - 5, 1.7f) * 4);
+        if (mode_ == Mode::jet && dv > 2) look_.shake.trauma = std::fmin(1.0f, look_.shake.trauma + dv / 15);
+      }
+      jet_.step(w, b, h, in);
+      if (jet_flown_ && jet_.gear_impact() > 4) gaps_jet_damage((jet_.gear_impact() - 4) * 80);
+      jet_v_ctrl_ = w.linear_velocity(b);
+      jet_v_valid_ = true;
+    }
   }
   drive_traffic(h);
   step_world(h);  // M3 world: buoyancy, water drag (game_world.cpp)

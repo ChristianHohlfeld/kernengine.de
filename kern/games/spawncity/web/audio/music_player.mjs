@@ -36,7 +36,7 @@ function ensureGraph(){
   context=getSharedCombatAudioContext({resume:true});
   // Adopt the menu's element (already playing since the page loaded).
   element=globalThis.__oppMusicElement||null;
-  if(!element){element=new Audio();element.src=DEFAULT_MUSIC_TRACK;element.loop=true;element.preload="auto";element.setAttribute("playsinline","");element.setAttribute("webkit-playsinline","");}
+  if(!element){element=new Audio();element.src=DEFAULT_MUSIC_TRACK;element.loop=true;element.preload="auto";element.setAttribute("playsinline","");element.setAttribute("webkit-playsinline","");globalThis.__oppMusicElement=element;/* Kern: the menu script (loaded later) adopts this one - never two tracks */}
   element.addEventListener("playing",()=>setStatus("playing"));element.addEventListener("pause",()=>setStatus(wanted()?"paused-unexpected":"paused"));
   // Route through a Web Audio gain (iOS ignores element.volume) — but only
   // once the context is running, otherwise rerouting would mute music that

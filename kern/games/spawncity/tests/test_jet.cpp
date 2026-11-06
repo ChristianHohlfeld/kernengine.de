@@ -68,8 +68,8 @@ SC_TEST(jet_transition_and_climb) {
   SC_CHECK(r.jet.telemetry().w_flight > 0.99f, "wing-borne law %.2f", r.jet.telemetry().w_flight);
   SC_CHECK(s.position.z > 10.0f, "did not sink into the ground: %.0f m", s.position.z);
   const f32 z0 = s.position.z;
-  in.pitch = 0.6f;
-  r.run(2.0f, in);
+  in.pitch = 0.4f;  // arcade: the stick is a rate (1.6 rad/s full) - a short pull, then level climb
+  r.run(1.0f, in);
   in.pitch = 0;
   r.run(2.0f, in);
   SC_CHECK(r.st().position.z > z0 + 40.0f, "pulls up: %.0f -> %.0f m", z0, r.st().position.z);
@@ -79,6 +79,36 @@ SC_TEST(jet_transition_and_climb) {
   in.roll = 0;
   r.run(3.0f, in);
   SC_CHECK(std::fabs(wrap_pi(r.jet.telemetry().heading - h0)) > 0.1f, "banks and turns: %.2f rad", wrap_pi(r.jet.telemetry().heading - h0));
+}
+
+SC_TEST(jet_arcade_dogfight_turns) {
+  // arcade handling: the hover turns on the spot, wing-borne a bank and a pull bring it round fast
+  JetRig r;
+  JetInput in;
+  in.lift = 1;
+  r.run(3.0f, in);
+  in.lift = 0;
+  r.run(1.0f, in);
+  f32 h0 = r.jet.telemetry().heading;
+  in.yaw = 1;
+  r.run(1.5f, in);
+  in.yaw = 0;
+  SC_CHECK(std::fabs(wrap_pi(r.jet.telemetry().heading - h0)) > 1.5f, "hover yaw: %.2f rad in 1.5 s", wrap_pi(r.jet.telemetry().heading - h0));
+  r.run(1.0f, in);
+  r.jet.set_mode(Jet::Mode::flight);
+  in.lift = 1;
+  r.run(10.0f, in);
+  in.lift = 0;
+  h0 = r.jet.telemetry().heading;
+  in.roll = 1;
+  r.run(0.45f, in);
+  in.roll = 0;
+  in.pitch = 1;
+  r.run(2.5f, in);
+  in.pitch = 0;
+  const f32 turned = std::fabs(wrap_pi(r.jet.telemetry().heading - h0));
+  SC_CHECK(turned > 2.0f, "a bank and a pull: %.2f rad in 3 s", turned);
+  SC_CHECK(r.st().position.z > 5.0f, "still in the air: %.0f m", r.st().position.z);
 }
 
 SC_TEST(jet_soft_landing) {
