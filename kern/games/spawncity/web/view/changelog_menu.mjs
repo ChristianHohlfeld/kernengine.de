@@ -25,7 +25,6 @@ export const CHANGELOG=Object.freeze([
     "Menschen schreien bei Treffern, Raketen zischen im Flug.",
     "Schüsse kommen beim Seitwärtslaufen genau aus der Waffe; der Jet steht nicht mehr auf der Straße.",
     "Kein Flackern mehr an Fassaden; das Zielfernrohr zeigt alles, auch weit weg.",
-    "Handy-Steuerung wie CoD Mobile: rechte Bildschirmhälfte frei zum Umsehen, FIRE-Knopf, kurzer Tipp schießt.",
     "Messer mit Ausfallschritt, Treffer-Ruck und Blut; Fäuste mit linker und rechter Maustaste.",
     "Ohne Netz startet das Trainingsgelände mit Straßen, Teich, Brücke und Häusern.",
     "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht.",
@@ -53,7 +52,7 @@ export const CHANGELOG=Object.freeze([
     "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge.",
     "VR: dein Körper dreht sich mit, wenn du dich im Raum drehst; die Waffen liegen in der rechten Hand und schießen aus ihr, die Fäuste in beiden.",
     "VR, zwei Steuerungen (Einstellungen → VR, in der Brille: beide Sticks drücken): Sticks – links gehen, rechts in 30°-Schritten drehen; oder Laufen mit den Armen – links joggen = gehen, beide = rennen, ohne Stick.",
-    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da, FIRE sitzt links daneben; der VR-Knopf erscheint nur noch im Titel."]},
+    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

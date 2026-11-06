@@ -116,7 +116,6 @@ class TouchPlay {
     f32 x0 = 0, y0 = 0, x = 0, y = 0, last_x = 0, last_y = 0;
     f64 t0 = 0, last_t = 0;
     Vec2 base;
-    bool free = false;  // the free look zone (the right side, Call of Duty Mobile): drag only, a quick tap fires
   };
   void layout();
   void apply_dom_rects();

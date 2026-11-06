@@ -119,14 +119,6 @@ void TouchPlay::layout() {
     low.push_back(btn("wpn", "⇄ " + lay_.weapon, 60, 60, amber, true));
     low.push_back(btn("jump", "JUMP", 64, 64, dark, true));
   }
-  if (m == TouchMode::foot && lay_.alive) {
-    // COD: a big FIRE where the thumb rests on the right, above JUMP (hold = fire through the
-    // crosshair, its drag aims); the look side is the free area around it
-    TouchBtn fire = btn("fire", "FIRE", 84, 84, 0x7a1a12, true);
-    fire.x = w_ - std::max(kSafe, sr_) - 40 - fire.w;
-    fire.y = h_ - std::max(kSafe, sb_) - 112 - fire.h;
-    add(fire);
-  }
   f32 x = Rx - 8;
   for (TouchBtn& b : low) {
     b.x = x - b.w;
@@ -256,14 +248,6 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       f.kind = Finger::look;
       look_id_ = id;
       look_ = look_edge_ = {};
-    } else if (lay_.alive && !no_sticks() && lay_.mode == TouchMode::foot && x > w_ * 0.42f) {
-      // the rest of the right side looks too (Call of Duty Mobile): drag anywhere, a quick tap fires
-      // at the finger; the visible right stick keeps its own ring and edge turn (above)
-      fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
-      f.kind = Finger::look;
-      f.free = true;
-      look_id_ = id;
-      look_ = look_edge_ = {};
     } else if (lay_.alive && (lay_.mode == TouchMode::foot || lay_.mode == TouchMode::drone || lay_.mode == TouchMode::jet)) {
       // The screen fires at the finger (foot / drone / jet); dragging moves the aim point.
       f.kind = Finger::fire;
@@ -315,7 +299,6 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
             drag_.x += yaw;
             drag_.y += pitch;
           }
-          if (f.free) { look_ = look_edge_ = {}; break; }
           const f32 cap = radius * kEdgeStart + kEdgeRampPx;
           f32 ox = x - f.x0, oy = y - f.y0, dist = std::hypot(ox, oy);
           if (dist > cap) {
@@ -345,13 +328,6 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       case Finger::clearance: clearance_ = controls::clearance_pad_axis(pad_y_ + pad_h_ / 2, y, pad_h_); break;
       case Finger::press:
         if (f.button == "nade") nade_up_ = f.y0 - y;  // drag "up" = stronger throw
-        if (f.button == "fire" && lay_.mode == TouchMode::foot && (dx != 0 || dy != 0)) {
-          // COD: the thumb on FIRE also aims - its drag turns the view like the look side
-          f32 yaw, pitch;
-          controls::touch_look_delta(dx, dy, static_cast<f32>(std::hypot(dx, dy) / dt_ms * 1000.0), yaw, pitch);
-          drag_.x += yaw;
-          drag_.y += pitch;
-        }
         break;
       case Finger::pinch: {
         const Finger* other = nullptr;
@@ -374,21 +350,7 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
   // up / cancel
   switch (f.kind) {
     case Finger::move: move_ = {}; move_id_ = -1; break;
-    case Finger::look:
-      look_ = look_edge_ = {};
-      look_id_ = -1;
-      if (f.free && type == 2 && t_ms - f.t0 < 300 && std::hypot(x - f.x0, y - f.y0) < 14) {
-        // a tap on the look side: one round at the finger (the original's screen fire)
-        TouchFire fire;
-        fire.id = id;
-        fire.x = x;
-        fire.y = y;
-        fire.down_t = static_cast<f32>(t_ms / 1000.0);
-        fire.hand = x < w_ / 2 ? 1 : 0;
-        fire.lifted = true;
-        fires_.push_back(fire);
-      }
-      break;
+    case Finger::look: look_ = look_edge_ = {}; look_id_ = -1; break;
     case Finger::fire:
       // a tap that came and went inside one frame still fires once (pointerdown fires in the
       // original: knifeAt / punchAt / fireAt): kept, marked lifted, dropped after the frame read it
