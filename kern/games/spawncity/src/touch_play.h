@@ -51,6 +51,7 @@ struct TouchFire {
   f32 last_shot = -1;              // set by the game (repeat fire)
   bool fresh = true;               // went down since the game last looked
   i32 hand = 0;                    // fists: 0 right half, 1 left half (foot_touch_controller.mjs)
+  f32 depth = -1;                  // the aim depth along its screen ray, resolved when it went down (m)
 };
 
 class TouchPlay {
