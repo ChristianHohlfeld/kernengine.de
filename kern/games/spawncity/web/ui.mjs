@@ -366,8 +366,12 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   // ---- title screen --------------------------------------------------------------------------
   function showTitle() { menu.hidden = false; ui.playing = false; try { document.exitPointerLock?.(); } catch { /* none */ } focusFirst(menu); sync(); }
   function start() {
-    // As the original: START is always START (the world streams in around the start).
-    startPlace();
+    // As the original: START is always START. The ground under the start point must be there before
+    // the title goes (no frame in the sky): a press before that waits for it (usually a second or
+    // two - the city itself streams in around the player afterwards).
+    if (!ui.placed) { if (!ui.startPending) { ui.startPending = true; startPlace(); fullscreenForGame(); } return; }
+    if (!ui.startPending) startPlace();  // (a waiting press already chose the place)
+    ui.startPending = false;
     menu.hidden = true;
     ui.started = ui.playing = true;
     ui.lockWanted = !coarse;
@@ -789,6 +793,8 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       jetBar.hidden = !jp || (jp.fuel > 0.995 && !jp.thrusting) || !!h.ui?.paused;
       if (!jetBar.hidden) { jetBar.querySelector("i").style.width = `${Math.round(jp.fuel * 100)}%`; jetBar.classList.toggle("burn", jp.thrusting); }
       const ready = !!h.placed;
+      ui.placed = ready;
+      if (ready && ui.startPending && !ui.playing) start();
       const status = ready && h.offline ? "OFFLINE · PROZEDURALE ERSATZSTADT" : "BEREIT";
       if (menuStatus.textContent !== status) menuStatus.textContent = status;
     },
