@@ -591,6 +591,13 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     C.race.last_pass = now - 1;
     return true;
   }
+  if (cmd == "rounds") {
+    // tests: rounds in flight, launcher bounces so far
+    char b[64];
+    std::snprintf(b, sizeof b, "%d in flight, %u bounces", static_cast<int>(projectiles_.size()), bounce_fx_next_);
+    out = b;
+    return true;
+  }
   if (cmd == "melee probe") {
     // tests: one knife blow straight through the view, now
     char b[96];
