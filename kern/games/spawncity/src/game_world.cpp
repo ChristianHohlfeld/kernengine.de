@@ -74,9 +74,9 @@ void Game::hud_world(std::string& s) {
   const Terrain& t = city_.terrain();
   const TerrainStats& ts = t.stats();
   char b[400];
-  std::snprintf(b, sizeof b, ",\"terrain\":{\"dem\":%s,\"settled\":%s,\"min\":%.1f,\"max\":%.1f,\"render\":%u,\"collision\":%u,\"water\":%u,\"craters\":%u}",
+  std::snprintf(b, sizeof b, ",\"terrain\":{\"dem\":%s,\"settled\":%s,\"min\":%.1f,\"max\":%.1f,\"render\":%u,\"collision\":%u,\"water\":%u,\"craters\":%u,\"demTiles\":%u,\"demFailed\":%u}",
                 ts.dem ? "true" : "false", t.settled() ? "true" : "false", ts.min_height, ts.max_height, ts.render_tiles, ts.collision_tiles, ts.water_cells,
-                ts.craters);
+                ts.craters, ts.dem_tiles, ts.dem_failed);
   s += b;
   if (!life_) return;
   std::snprintf(b, sizeof b, ",\"swimming\":%s,\"splashes\":%u", life_->swimming ? "true" : "false", life_->splashes);

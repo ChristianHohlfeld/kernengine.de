@@ -42,6 +42,7 @@ struct TerrainStats {
 
 class Terrain {
  public:
+  static constexpr u32 kDemJob = 3;            // the elevation grid job (kern/core/jobs.h; city jobs are 1, 2)
   static constexpr i32 kDemZoom = 13;          // see README: the city ring is ~5 km, bare earth is smooth below 160 m
   static constexpr f32 kDemStep = 10;          // grid spacing of the sampled elevation (m)
   static constexpr f32 kDemSize = 8000;        // grid window around the player (m)
