@@ -264,12 +264,6 @@ async function run({name, url, context, mapped}) {
       await page.evaluate(() => { navigator.getGamepads = () => []; });
       await page.keyboard.press("KeyZ"); await gameWait(0.2);
       check(!(await ctl()).pad, `[${name}] a key ends pad-input`);
-      // single player: the pilot stays down, R calls the RESET (player_vitals_runtime.mjs, desktop_controls.mjs:165)
-      check(await cmd("die") === "ok", `[${name}] die`);
-      await gameWait(4);
-      check((await ctl()).dead && (await hud()).health <= 0, `[${name}] single player: still down after 4 s (health ${(await hud()).health})`);
-      await page.keyboard.press("KeyR"); await gameWait(1.2);
-      check(!(await ctl()).dead && (await hud()).health > 0, `[${name}] R: the RESET brings the pilot back (health ${(await hud()).health})`);
     } else {
       cdp ||= await ctx.newCDPSession(page);
       const touchTap = async (x, y) => {
@@ -361,6 +355,16 @@ async function run({name, url, context, mapped}) {
     await shot("1c-night");
     await cmd("time 0.40");
     await revive();
+    if (!context.hasTouch) {
+      // single player: the pilot stays down, R calls the RESET (player_vitals_runtime.mjs, desktop_controls.mjs:165)
+      // (here, after the street checks: the RESET clears the people)
+      const gameWait = async s => { const t = (await hud()).t; await page.waitForFunction(([t, s]) => window.SpawnCity.hud().t > t + s, [t, s], {timeout: 300000}).catch(() => {}); };
+      check(await cmd("die") === "ok", `[${name}] die`);
+      await gameWait(4);
+      check((await hud()).ctl?.dead && (await hud()).health <= 0, `[${name}] single player: still down after 4 s (health ${(await hud()).health})`);
+      await page.keyboard.press("KeyR"); await gameWait(1.2);
+      check(!(await hud()).ctl?.dead && (await hud()).health > 0, `[${name}] R: the RESET brings the pilot back (health ${(await hud()).health})`);
+    }
     check(await cmd("weapon 6") === "Messer", `[${name}] knife in hand`);
     await frame(); await frame();
     await page.waitForFunction(() => window.SpawnCity.hud().look?.viewModel === "KNIFE", null, {timeout: 30000}).catch(() => {});

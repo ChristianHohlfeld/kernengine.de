@@ -91,6 +91,12 @@ export async function measureControls({browser, out, games, devices, gps}) {
       const page = await ctx.newPage();
       page.on("pageerror", e => run.errors.push(String(e.message || e).slice(0, 300)));
       const probe = () => page.evaluate(PROBE[name]).catch(e => ({error: String(e)}));
+      // holds last a span of the GAME's clock (the CI runner's slow frames stretch the wall clock:
+      // Kern's sim time runs at a fraction of it there, the original clamps its frames to 50 ms)
+      const gameWait = async sec => {
+        const t0 = (await probe()).t, w0 = Date.now();
+        while (Date.now() - w0 < 30000) { const t = (await probe()).t; if (typeof t === "number" && t - t0 >= sec) return; await pause(40); }
+      };
       const S = SETUP[name];
       let shotN = 0;
       const shot = async label => { const f = `ctl-${dev}-${String(shotN++).padStart(2, "0")}-${label}-${name}.png`; await page.screenshot({path: path.join(out, f)}).catch(() => {}); return f; };
@@ -123,7 +129,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
       const dyaw = (a, b) => +wrap(b.yaw - a.yaw).toFixed(1);
       const dpitch = (a, b) => +(b.pitch - a.pitch).toFixed(1);
       const peak = (a, s) => +Math.max(0, ...s.map(x => (x.jumpZ ?? x.z) - (a.jumpZ ?? a.z))).toFixed(2);
-      const hold = async (keys, ms) => { for (const k of keys) await page.keyboard.down(k); await pause(ms); for (const k of [...keys].reverse()) await page.keyboard.up(k); };
+      const hold = async (keys, ms) => { for (const k of keys) await page.keyboard.down(k); await gameWait(ms / 1000); for (const k of [...keys].reverse()) await page.keyboard.up(k); };
       const centre = async () => { const vp = page.viewportSize(); return {x: vp.width / 2, y: vp.height / 2}; };
       // Under the pointer lock a mouse only reports movementX/Y; headless Chromium's synthetic mouse
       // gives none, so the events carry it themselves, on the locked element like the browser does
@@ -143,7 +149,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
         await touch("touchStart", [{x: r.x, y: r.y, id: 7}]);
         const n = Math.max(2, Math.round(ms / 33));
         for (let i = 1; i <= n; i++) { await touch("touchMove", [{x: r.x + dx * i / n, y: r.y + dy * i / n, id: 7}]); await pause(ms / n); }
-        await pause(holdMs);
+        if (holdMs) await gameWait(holdMs / 1000);
         await touch("touchEnd", []);
         return r.sel;
       };
@@ -156,7 +162,11 @@ export async function measureControls({browser, out, games, devices, gps}) {
         const url = new URL(g.url); url.searchParams.set("menu", "1");
         await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000});
         // loading takes long on the CI runner (SwiftShader): wait up to 4 minutes for the title's START
-        await g.boot(page).catch(async e => { run.errors.push(`boot: ${e.message.slice(0, 120)}`); await g.boot(page); }).catch(async () => g.boot(page));
+        const w0 = Date.now();
+        for (;;) {
+          try { await g.boot(page); break; } catch (e) { if (Date.now() - w0 > 420000) throw e; }
+        }
+        run.boot = Math.round((Date.now() - w0) / 1000);
         if (name === "kern") await page.waitForFunction(() => window.SpawnCity?.hud?.()?.placed, null, {timeout: 240000, polling: 1000}).catch(() => run.errors.push("kern: not placed after 240 s"));
         await g.start(page).catch(e => run.errors.push(`start: ${String(e.message || e).slice(0, 120)}`));
         await pause(4000);
@@ -178,6 +188,7 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await measure("Maus 100 px runter", () => mouseMove(0, 100), (a, s, b) => ({deg: dpitch(a, b), yaw: dyaw(a, b), locked: a.locked}));
           await measure("Q (Waffe)", () => page.keyboard.press("KeyQ"), (a, s, b) => ({weapon: `${a.weapon} -> ${b.weapon}`}));
           await measure("RMB (zielen)", async () => { await page.mouse.down({button: "right"}); await pause(600); }, (a, s, b, c) => ({body: c.body.match(/ads-active|scope-active/g)?.join(" ") || "", lockEl: c.lockEl, aiming: c.aiming}), 100);
+          if (name === "kern") run.results["RMB (zielen)"].controls = await page.evaluate(() => String(window.SpawnCity?.command?.("controls") || "").slice(0, 400)).catch(() => "");
           await page.mouse.up({button: "right"}).catch(() => {});
           // drone
           await toMode("drone", 3500);
@@ -199,23 +210,23 @@ export async function measureControls({browser, out, games, devices, gps}) {
           await page.keyboard.press("Escape").catch(() => {});
         }
         if (dev === "pad") {
-          await measure("Pad links hoch 1 s", async () => { await pad({axes: [0, -1, 0, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
-          await measure("Pad links 50 % 1 s", async () => { await pad({axes: [0, -0.5, 0, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
-          await measure("Pad rechts 50 % 1 s", async () => { await pad({axes: [0, 0, 0.5, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
-          await measure("Pad rechts 100 % 1 s", async () => { await pad({axes: [0, 0, 1, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
-          await measure("Pad rechts 20 % 1 s", async () => { await pad({axes: [0, 0, 0.2, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
-          await measure("Pad rechts hoch 50 % 1 s", async () => { await pad({axes: [0, 0, 0, -0.5]}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: dpitch(a, b)}));
-          await measure("Pad A (Sprung)", async () => { await pad({buttons: {0: 1}}); await pause(150); await padIdle(); }, (a, s) => ({m: peak(a, s)}), 1300);
-          await measure("Pad L3+links (Sprint) 1 s", async () => { await pad({axes: [0, -1, 0, 0], buttons: {10: 1}}); await pause(1000); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
-          await measure("Pad Y (Waffe)", async () => { await pad({buttons: {3: 1}}); await pause(150); await padIdle(); }, (a, s, b) => ({weapon: `${a.weapon} -> ${b.weapon}`}), 600);
+          await measure("Pad links hoch 1 s", async () => { await pad({axes: [0, -1, 0, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
+          await measure("Pad links 50 % 1 s", async () => { await pad({axes: [0, -0.5, 0, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
+          await measure("Pad rechts 50 % 1 s", async () => { await pad({axes: [0, 0, 0.5, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
+          await measure("Pad rechts 100 % 1 s", async () => { await pad({axes: [0, 0, 1, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
+          await measure("Pad rechts 20 % 1 s", async () => { await pad({axes: [0, 0, 0.2, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b)}));
+          await measure("Pad rechts hoch 50 % 1 s", async () => { await pad({axes: [0, 0, 0, -0.5]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: dpitch(a, b)}));
+          await measure("Pad A (Sprung)", async () => { await pad({buttons: {0: 1}}); await gameWait(0.15); await padIdle(); }, (a, s) => ({m: peak(a, s)}), 1300);
+          await measure("Pad L3+links (Sprint) 1 s", async () => { await pad({axes: [0, -1, 0, 0], buttons: {10: 1}}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({m: dist(a, b)}));
+          await measure("Pad Y (Waffe)", async () => { await pad({buttons: {3: 1}}); await gameWait(0.15); await padIdle(); }, (a, s, b) => ({weapon: `${a.weapon} -> ${b.weapon}`}), 600);
           await toMode("drone", 3500);
-          await measure("Drohne Pad links hoch 1 s", async () => { await pad({axes: [0, -1, 0, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({m: dist(a, b), dz: +(b.z - a.z).toFixed(2)}), 300);
-          await measure("Drohne Pad rechts 50 % 1 s", async () => { await pad({axes: [0, 0, 0.5, 0]}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b), m: dist(a, b)}), 300);
-          await measure("Drohne Pad RT 1 s", async () => { await pad({buttons: {7: 1}}); await pause(1000); await padIdle(); }, (a, s, b) => ({dz: +(b.z - a.z).toFixed(2)}), 300);
+          await measure("Drohne Pad links hoch 1 s", async () => { await pad({axes: [0, -1, 0, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({m: dist(a, b), dz: +(b.z - a.z).toFixed(2)}), 300);
+          await measure("Drohne Pad rechts 50 % 1 s", async () => { await pad({axes: [0, 0, 0.5, 0]}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: dyaw(a, b), m: dist(a, b)}), 300);
+          await measure("Drohne Pad RT 1 s", async () => { await pad({buttons: {7: 1}}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({dz: +(b.z - a.z).toFixed(2)}), 300);
           await toMode("car", 3500);
-          await measure("Auto Pad RT 2 s", async () => { await pad({buttons: {7: 1}}); await pause(2000); await padIdle(); }, (a, s, b) => ({kmh: +(Math.max(0, ...s.map(x => x.kmh ?? 0), b.kmh ?? 0)).toFixed(1)}), 100);
-          await measure("Auto Pad links 50 % 1 s", async () => { await pad({axes: [-0.5, 0, 0, 0], buttons: {7: 1}}); await pause(1000); await padIdle(); }, (a, s, b) => ({deg: a.carHeading != null ? +wrap(b.carHeading - a.carHeading).toFixed(1) : dyaw(a, b)}), 100);
-          await measure("Auto Pad X (aussteigen)", async () => { await pad({buttons: {2: 1}}); await pause(150); await padIdle(); }, (a, s, b) => ({mode: `${a.mode} -> ${b.mode}`}), 1500);
+          await measure("Auto Pad RT 2 s", async () => { await pad({buttons: {7: 1}}); await gameWait(2.0); await padIdle(); }, (a, s, b) => ({kmh: +(Math.max(0, ...s.map(x => x.kmh ?? 0), b.kmh ?? 0)).toFixed(1)}), 100);
+          await measure("Auto Pad links 50 % 1 s", async () => { await pad({axes: [-0.5, 0, 0, 0], buttons: {7: 1}}); await gameWait(1.0); await padIdle(); }, (a, s, b) => ({deg: a.carHeading != null ? +wrap(b.carHeading - a.carHeading).toFixed(1) : dyaw(a, b)}), 100);
+          await measure("Auto Pad X (aussteigen)", async () => { await pad({buttons: {2: 1}}); await gameWait(0.15); await padIdle(); }, (a, s, b) => ({mode: `${a.mode} -> ${b.mode}`}), 1500);
         }
         if (dev === "phone") {
           await measure("Touch Blick 120 px", () => drag("#footLook", 120, 0, 500), (a, s, b) => ({deg: dyaw(a, b), pitch: dpitch(a, b)}));

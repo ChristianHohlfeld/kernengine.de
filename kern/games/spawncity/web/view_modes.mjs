@@ -539,16 +539,20 @@ function installViewModes() {
       b.style.setProperty("--cool", `${Math.round(k * 100)}%`);
     }
     const aiming = !!ctl.aiming;
-    body().classList.toggle("air-strike-targeting", aiming);
+    const shutRecent = !!S.strikeOverlay && performance.now() - Number(S.strikeOverlay.dataset.shutAt || -1e9) < 400;
+    body().classList.toggle("air-strike-targeting", aiming && !shutRecent);
     if (aiming && !S.strikeOverlay) {
       const o = document.createElement("dialog");
       o.id = "airStrikeTargeting";
       o.innerHTML = '<b>ZIEL MARKIEREN</b><small data-as-hint>Tippen = Laser auf das Ziel · die Jets kommen</small><div class="as-actions"><button type="button" data-a="cancel">✕ ABBRECHEN</button></div>';
       ($("viewport") || document.body).appendChild(o);
+      // fighter_jets.mjs setTargeting(false) closes the overlay at once, inside the pointerup: the
+      // click the browser makes of the same tap then lands on what lies below (e.g. the mode button)
+      const shut = () => { o.dataset.shutAt = String(performance.now()); o.close?.(); o.removeAttribute("open"); document.body.classList.remove("air-strike-targeting"); };
       const stop = e => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.(); };
       for (const btn of o.querySelectorAll(".as-actions button")) {
         btn.addEventListener("pointerdown", stop);
-        btn.addEventListener("pointerup", e => { stop(e); view.command("strike cancel"); });
+        btn.addEventListener("pointerup", e => { stop(e); view.command("strike cancel"); shut(); });
         btn.addEventListener("click", stop);
       }
       o.addEventListener("pointerdown", e => { if (e.target.closest?.(".as-actions")) return; stop(e); o.dataset.down = "1"; });
@@ -561,6 +565,7 @@ function installViewModes() {
         const c = $("game")?.getBoundingClientRect(), rot = document.documentElement.classList.contains("sc-css-landscape");
         const x = rot ? e.clientY : e.clientX - (c?.left || 0), y = rot ? innerWidth - e.clientX : e.clientY - (c?.top || 0);
         view.command(`strike at ${x.toFixed(0)} ${y.toFixed(0)}`);
+        shut();
       });
       o.addEventListener("click", stop);
       o.addEventListener("contextmenu", stop);
@@ -568,7 +573,7 @@ function installViewModes() {
     }
     const o = S.strikeOverlay;
     if (o) {
-      if (aiming && !o.open) {
+      if (aiming && !o.open && performance.now() - Number(o.dataset.shutAt || -1e9) > 400) {
         o.classList.remove("placed");
         const hint = o.querySelector("[data-as-hint]");
         if (hint) hint.textContent = document.pointerLockElement ? "Fadenkreuz aufs Ziel · KLICK / J = Laser + Jets · ESC abbrechen" : "Tippen = Laser auf das Ziel · die Jets kommen";

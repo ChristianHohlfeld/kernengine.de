@@ -124,7 +124,17 @@ export class OriginalView {
     };
     document.addEventListener("keydown", release, {capture: true});
     document.addEventListener("keyup", release, {capture: true});
-    const click = (id, fn) => $(id)?.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(ev); ev.currentTarget?.blur?.(); });
+    // A finger the game took (its touch buttons follow these elements, sendRects) already pressed the
+    // button in the game; the click the browser makes of the same tap - or thumb_layout.mjs's
+    // #mobileGameplayWeapon.click() from #thumbWeapon - must not press it a second time.
+    let gameTouchAt = -1e9;
+    addEventListener("pointerdown", ev => { if (ev.pointerType !== "mouse" && fingerForGame(ev)) gameTouchAt = performance.now(); }, {capture: true});
+    const GAME_TOUCH = new Set(["mobileGameplayWeapon", "mobileGameplayMode", "enterCarButton", "enterJetButton", "soloArm", "soloKill"]);
+    const click = (id, fn) => $(id)?.addEventListener("click", ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!(GAME_TOUCH.has(id) && performance.now() - gameTouchAt < 700)) fn(ev);
+      ev.currentTarget?.blur?.();
+    });
     const kernAct = act => document.querySelector(`#scMenu [data-act="${act}"]`)?.click();
     // title menu (drone_simulator.html #gameMenu; auto_flight_start.mjs START)
     click("gameMenuStart", () => $("scStart")?.click());
