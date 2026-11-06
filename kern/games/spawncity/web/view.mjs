@@ -85,7 +85,18 @@ const PAGE_BUTTONS = "#gameExitButton,#mobileGameplayDock,#mobileGameplayMultipl
 export function fingerForGame(ev) {
   const t = ev.target instanceof Element ? ev.target : null;
   if (!t || !t.closest("#viewport")) return false;
-  return !t.closest(PAGE_BUTTONS);
+  const game = !t.closest(PAGE_BUTTONS);
+  // the game presses this button itself (its touch rect): the click that follows the finger must not
+  // press it a second time (DRONE toggled there and straight back, the weapon switched twice)
+  if (game) { const b = t.closest("button,[role=button]"); if (b) { gameTouched.el = b; gameTouched.at = performance.now(); } }
+  return game;
+}
+const gameTouched = {el: null, at: -1e9};
+/** True when this element was just pressed by a game-owned finger (its click is a duplicate). */
+function pressedByGame(el) {
+  if (!gameTouched.el || performance.now() - gameTouched.at > 800) return false;
+  // thumb_layout.mjs: the thumb weapon button clicks the dock's WEAPON button on pointerdown
+  return gameTouched.el === el || (el?.id === "mobileGameplayWeapon" && gameTouched.el.id === "thumbWeapon");
 }
 
 const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", Granatwerfer: "WERFER", Raketenwerfer: "RAKETEN", "Fäuste": "FÄUSTE", Messer: "MESSER"};
@@ -119,7 +130,11 @@ export class OriginalView {
     };
     document.addEventListener("keydown", release, {capture: true});
     document.addEventListener("keyup", release, {capture: true});
-    const click = (id, fn) => $(id)?.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(ev); ev.currentTarget?.blur?.(); });
+    const click = (id, fn) => $(id)?.addEventListener("click", ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!pressedByGame(ev.currentTarget)) fn(ev);
+      ev.currentTarget?.blur?.();
+    });
     const kernAct = act => document.querySelector(`#scMenu [data-act="${act}"]`)?.click();
     // title menu (drone_simulator.html #gameMenu; auto_flight_start.mjs START)
     click("gameMenuStart", () => $("scStart")?.click());
