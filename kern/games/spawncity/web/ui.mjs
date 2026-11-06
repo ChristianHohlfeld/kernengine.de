@@ -164,7 +164,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     <div class="gm-center">
       <div class="gm-title" aria-label="SpawnCity"><span>SPAWN</span><span>CITY</span></div>
       <div class="gm-sub">DROHNE · AUTOS · JET</div>
-      <button id="scStart" type="button" disabled>LADEN</button>
+      <button id="scStart" type="button">START</button>
       <button id="scPlace" type="button" data-act="place"><span>📍</span><b>MEIN STANDORT (GPS)</b><i>ÄNDERN</i></button>
       <div id="scMenuStatus">STADT WIRD VORBEREITET</div>
       <button class="scui-btn gm-wide" data-act="world" type="button">WELT</button>
@@ -366,7 +366,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   // ---- title screen --------------------------------------------------------------------------
   function showTitle() { menu.hidden = false; ui.playing = false; try { document.exitPointerLock?.(); } catch { /* none */ } focusFirst(menu); sync(); }
   function start() {
-    if (startBtn.disabled) return;
+    // As the original: START is always START (the world streams in around the start).
     startPlace();
     menu.hidden = true;
     ui.started = ui.playing = true;
@@ -789,8 +789,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       jetBar.hidden = !jp || (jp.fuel > 0.995 && !jp.thrusting) || !!h.ui?.paused;
       if (!jetBar.hidden) { jetBar.querySelector("i").style.width = `${Math.round(jp.fuel * 100)}%`; jetBar.classList.toggle("burn", jp.thrusting); }
       const ready = !!h.placed;
-      if (startBtn.disabled === ready) { startBtn.disabled = !ready; startBtn.textContent = ready ? "START" : "LADEN"; }
-      const status = ready ? (h.offline ? "OFFLINE · PROZEDURALE ERSATZSTADT" : "BEREIT") : (statusEl?.textContent || "STADT WIRD VORBEREITET").toUpperCase();
+      const status = ready && h.offline ? "OFFLINE · PROZEDURALE ERSATZSTADT" : "BEREIT";
       if (menuStatus.textContent !== status) menuStatus.textContent = status;
     },
     get playing() { return ui.playing; },

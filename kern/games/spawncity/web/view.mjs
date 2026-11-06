@@ -127,6 +127,10 @@ export class OriginalView {
     // the game view's top bar and dock (mobile_gameplay_ui.mjs, game_exit_button.mjs)
     click("gameExitButton", () => this.ui?.open?.("exit"));
     click("mobileGameplaySettings", () => this.ui?.open?.("settings"));
+    // the real-world topbar's SETTINGS (#soloTopbar .phone-settings-button, phone_control_settings):
+    // the same MENU dialog
+    for (const b of document.querySelectorAll(".phone-settings-button"))
+      b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); this.ui?.open?.("settings"); b.blur(); });
     click("mobileGameplayReset", () => this.command("reset"));
     click("mobileGameplayWeapon", () => this.command("press wpn"));
     click("mobileGameplayMode", () => this.command("press mode"));
@@ -202,8 +206,9 @@ export class OriginalView {
     const menu = $("gameMenu");
     setHidden(menu, playing);
     const start = $("gameMenuStart");
-    if (start) { const ready = !!h.placed; start.disabled = !ready; setText(start, ready ? "START" : "LOADING"); }
-    setText($("gameMenuStatus"), h.placed ? (h.offline ? "OFFLINE" : "READY") : "");
+    // the original's title: START and READY from the first frame (the city streams in after START)
+    if (start) { start.disabled = false; setText(start, "START"); }
+    setText($("gameMenuStatus"), h.placed && h.offline ? "OFFLINE" : "READY");
     // ---- the toggles' state (drone_simulator.html inline script render / renderMusic)
     for (const [id, on] of [["soundSwitch", h.ui?.audioOn], ["musicSwitch", h.ui?.musicOn]]) {
       const b = $(id);
