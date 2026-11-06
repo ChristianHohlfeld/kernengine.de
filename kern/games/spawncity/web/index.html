@@ -88,6 +88,16 @@
      the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
      original's quarter-turned mapping */
   /* jet: EJECT / AUSSTEIGEN under the score and the FLOW bar, not over the vitals */
+  /* Call of Duty Mobile on foot (touch): the right side is a free look area - no stick ring there -
+     and a big FIRE where the thumb rests (hold = fire through the crosshair, drag = aim) */
+  html body.sc-touch-on.on-foot-mode:not(.player-driving):not(.jet-mode) #viewport #footHud #footLook { opacity: 0 !important; pointer-events: none !important; }
+  html body.sc-touch-on.on-foot-mode:not(.player-driving):not(.jet-mode):not(.player-dead) #viewport #footHud #footFire {
+    display: flex !important; visibility: visible !important; pointer-events: auto !important; align-items: center; justify-content: center;
+    position: absolute !important; left: auto !important; top: auto !important;
+    right: calc(max(12px, var(--solo-safe-right, env(safe-area-inset-right))) + 40px) !important;
+    bottom: calc(max(12px, var(--solo-safe-bottom, env(safe-area-inset-bottom))) + 112px) !important;
+    width: 84px !important; height: 84px !important; border-radius: 50% !important;
+    font: 900 13px/1 Inter, system-ui, sans-serif !important; letter-spacing: .12em !important; }
   /* no GPS button (title and game): the live-GPS walk is gone */
   #gpsLiveButton, #gpsLiveHud, #scGps { display: none !important; }
   /* jet_mode.mjs: KANONE left of the stick (on-foot-mode hides the foot fire button) */

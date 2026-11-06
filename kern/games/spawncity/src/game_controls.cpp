@@ -498,6 +498,11 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
       }
     }
   }
+  // COD Mobile FIRE (touch_play.cpp): held = the trigger through the crosshair
+  if (touch_mode_) {
+    if (pad_touch_.take_pressed("fire")) { fire = true; fire_edge = true; }
+    if (pad_touch_.held("fire")) fire = true;
+  }
   // VR: the head pitches, the stick only turns (no tilted horizon: a level body under the head)
   if (engine_ && engine_->xr) p.look_y = 0;
   p.move_x = clampf(strafe, -1, 1);
