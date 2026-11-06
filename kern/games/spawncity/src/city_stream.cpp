@@ -8,6 +8,7 @@
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
 #include "kern/geo/earcut.h"
+#include <unordered_set>
 
 namespace sc {
 
@@ -48,6 +49,30 @@ f64 signed_area(const std::vector<Vec2>& r) {
   return a * 0.5;
 }
 
+constexpr f32 kChunk = 160;  // the building mesh chunks (BuildingOptions::chunk_size)
+u64 cell_key(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
+u64 cell_of(Vec2 c) { return cell_key(static_cast<i32>(std::floor(c.x / kChunk)), static_cast<i32>(std::floor(c.y / kChunk))); }
+
+kern::BuildingOptions building_options() {
+  kern::BuildingOptions bo;
+  bo.chunk_size = kChunk;  // smaller uploads per frame (the original: 360 m; it only copies buffers)
+  bo.max_buildings = 12000;
+  bo.style = konstanz_style();
+  return bo;
+}
+
+// world_city_buildings.mjs: at most MAX_VERTICES 96 per ring; the centre picks the chunk
+void put_footprint(kern::FootprintStream& fs, const MapFeatures::Building& b, Vec2 c, std::vector<Vec2>& thin) {
+  fs.begin(b.seed, b.base, b.top, c.x, c.y);
+  for (const auto& ring : b.rings) {
+    if (ring.size() <= 96) { fs.ring(ring.data(), static_cast<u32>(ring.size())); continue; }
+    const std::size_t step = (ring.size() + 95) / 96;
+    thin.clear();
+    for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]);
+    fs.ring(thin.data(), static_cast<u32>(thin.size()));
+  }
+}
+
 }  // namespace
 
 struct CityStream::Tile {
@@ -77,6 +102,11 @@ struct CityStream::Tile {
   std::vector<u32> old_meshes;
   // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
   u32 tile_job = 0, build_job = 0;
+  // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
+  std::unordered_map<u64, std::vector<u32>> cell_ids;
+  std::unordered_set<u64> dirty_cells;
+  std::vector<u64> job_cells;
+  u32 cell_job = 0;
   std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
   std::size_t built_at = 0;
   bool rebuilding = false, vis_dirty = false, prepared = false;
@@ -112,6 +142,7 @@ void CityStream::clear() {
   terrain_changes_.clear();
   if (world_) for (kern::physics::Body b : {near_.body, near_.old_body}) if (b.valid() && world_->body_valid(b)) world_->destroy_body(b);
   near_ = {};
+  damage_.clear();  // a new start place: a new city
   vis_at_ = {1e9f, 1e9f};
   vis_ms_ = -1e9;
 }
@@ -120,7 +151,10 @@ void CityStream::remove(Tile& t) {
   if (r_)
     for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
       for (u32 id : *list) r_->remove(id);
-  for (u32* j : {&t.tile_job, &t.build_job}) if (*j) { kern::jobs::cancel(*j); *j = 0; }
+  for (u32* j : {&t.tile_job, &t.build_job, &t.cell_job}) if (*j) { kern::jobs::cancel(*j); *j = 0; }
+  t.cell_ids.clear();
+  t.dirty_cells.clear();
+  t.job_cells.clear();
   if (r_) for (u32 id : t.old_meshes) r_->remove(id);
   t.old_meshes.clear();
   t.meshes.clear();
@@ -274,6 +308,12 @@ void CityStream::finish_features(Tile& t) {
       b.base += g;
       b.top += g;
     }
+    b.full_top = b.top;
+    // destruction outlives the tile: a building that was hit stays as it was left
+    if (auto d = damage_.find(b.seed); d != damage_.end()) {
+      b.top = std::fmin(b.top, b.base + d->second.height);
+      b.leveled = d->second.leveled;
+    }
     Vec2 c{};
     if (!b.rings.empty() && !b.rings[0].empty()) { for (Vec2 q : b.rings[0]) c = c + q; c = c * (1.0f / static_cast<f32>(b.rings[0].size())); }
     t.cent.push_back(c);
@@ -298,26 +338,17 @@ void CityStream::begin_visual(Tile& t) {
   // world_city_buildings.mjs: the selected footprints, at most MAX_VERTICES 96 per ring
   t.footprints = kern::FootprintStream{};
   std::vector<Vec2> thin;
-  for (u32 i : t.vis) {
-    const MapFeatures::Building& b = t.features.buildings[i];
-    t.footprints.begin(b.seed, b.base, b.top);
-    for (const auto& ring : b.rings) {
-      if (ring.size() <= 96) { t.footprints.ring(ring.data(), static_cast<u32>(ring.size())); continue; }
-      const std::size_t step = (ring.size() + 95) / 96;
-      thin.clear();
-      for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]);
-      t.footprints.ring(thin.data(), static_cast<u32>(thin.size()));
-    }
-  }
+  for (u32 i : t.vis) put_footprint(t.footprints, t.features.buildings[i], t.cent[i], thin);
   t.vis_built = t.vis;
   t.vis_dirty = false;
-  kern::BuildingOptions bo;
-  bo.chunk_size = 160;  // smaller uploads per frame (the original: 360 m; it only copies buffers)
-  bo.max_buildings = 12000;
-  bo.style = konstanz_style();
+  // the whole set is rebuilt with every damage there is: no single chunk is pending any more
+  if (t.cell_job) { kern::jobs::cancel(t.cell_job); t.cell_job = 0; }
+  t.job_cells.clear();
+  t.dirty_cells.clear();
+  t.cell_ids.clear();
   // extruded and welded off the frame (city_jobs.h); the frame only uploads the finished chunks
   if (t.build_job) kern::jobs::cancel(t.build_job);
-  t.build_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(t.footprints, bo));
+  t.build_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(t.footprints, building_options()));
   t.built_bytes.clear();
   t.upload_next = 0;
   t.state = Tile::State::building;
@@ -360,6 +391,7 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
   in.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
   if (!r_->upsert(id, in)) { r_->release_id(id); return; }
   t.meshes.push_back(id);
+  if (walls) t.cell_ids[cell_key(chunk.x, chunk.y)].push_back(id);
   t.triangles += chunk.mesh.triangle_count();
 }
 
@@ -436,61 +468,156 @@ bool CityStream::build_near(f64 deadline) {
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::fixed;
     n.body = world_->create_body(bs);
+    n.shapes.assign(n.list.size(), {});
   }
+  while (n.next < n.list.size()) {
+    const std::size_t slot = n.next++;
+    const auto [tile_key, bi] = n.list[slot];
+    auto it = tiles_.find(tile_key);
+    if (it == tiles_.end() || bi >= it->second->features.buildings.size()) continue;
+    n.shapes[slot] = building_shape(n.body, it->second->features.buildings[bi]);
+    if (n.shapes[slot].valid()) ++n.colliders;
+    if (kern::now_ms() > deadline) return false;
+  }
+  return true;
+}
+
+kern::physics::Shape CityStream::building_shape(kern::physics::Body body, const MapFeatures::Building& b) {
   kern::Earcut earcut;
   std::vector<f64> xy;
   std::vector<u32> holes, tris, idx;
   std::vector<Vec3> pts;
-  while (n.next < n.list.size()) {
-    const auto [tile_key, bi] = n.list[n.next++];
-    auto it = tiles_.find(tile_key);
-    if (it == tiles_.end() || bi >= it->second->features.buildings.size()) continue;
-    const MapFeatures::Building& b = it->second->features.buildings[bi];
-    xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
-    std::vector<std::vector<Vec2>> rings = b.rings;
-    // MAX_VERTICES 64 per ring
-    for (auto& ring : rings)
-      if (ring.size() > 64) { const std::size_t step = (ring.size() + 63) / 64; std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]); ring = std::move(thin); }
-    for (std::size_t r = 0; r < rings.size(); ++r) {
-      auto& ring = rings[r];
-      if (ring.size() < 3) continue;
-      const f64 a = signed_area(ring);
-      if (std::fabs(a) < 0.5) continue;
-      if ((r == 0) != (a > 0)) std::reverse(ring.begin(), ring.end());  // outer CCW, courtyards CW
-      if (r) holes.push_back(static_cast<u32>(xy.size() / 2));
-      for (Vec2 p : ring) xy.insert(xy.end(), {p.x, p.y});
-      // Walls: quads per edge, outward = right of the edge for CCW outer / CW holes.
-      for (std::size_t i = 0; i < ring.size(); ++i) {
-        const Vec2 p0 = ring[i], p1 = ring[(i + 1) % ring.size()];
-        const u32 base = static_cast<u32>(pts.size());
-        pts.push_back({p0.x, p0.y, b.base});
-        pts.push_back({p1.x, p1.y, b.base});
-        pts.push_back({p1.x, p1.y, b.top});
-        pts.push_back({p0.x, p0.y, b.top});
-        idx.insert(idx.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
-      }
-    }
-    if (xy.size() >= 6) {
-      earcut.triangulate(xy.data(), static_cast<u32>(xy.size() / 2), holes.data(), static_cast<u32>(holes.size()), tris);
+  xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
+  std::vector<std::vector<Vec2>> rings = b.rings;
+  // MAX_VERTICES 64 per ring
+  for (auto& ring : rings)
+    if (ring.size() > 64) { const std::size_t step = (ring.size() + 63) / 64; std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); k += step) thin.push_back(ring[k]); ring = std::move(thin); }
+  for (std::size_t r = 0; r < rings.size(); ++r) {
+    auto& ring = rings[r];
+    if (ring.size() < 3) continue;
+    const f64 a = signed_area(ring);
+    if (std::fabs(a) < 0.5) continue;
+    if ((r == 0) != (a > 0)) std::reverse(ring.begin(), ring.end());  // outer CCW, courtyards CW
+    if (r) holes.push_back(static_cast<u32>(xy.size() / 2));
+    for (Vec2 p : ring) xy.insert(xy.end(), {p.x, p.y});
+    // Walls: quads per edge, outward = right of the edge for CCW outer / CW holes.
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+      const Vec2 p0 = ring[i], p1 = ring[(i + 1) % ring.size()];
       const u32 base = static_cast<u32>(pts.size());
-      for (std::size_t i = 0; i < xy.size() / 2; ++i) pts.push_back({static_cast<f32>(xy[i * 2]), static_cast<f32>(xy[i * 2 + 1]), b.top});
-      for (std::size_t i = 0; i + 2 < tris.size(); i += 3) {
-        u32 a = base + tris[i], c = base + tris[i + 1], d = base + tris[i + 2];
-        if (kern::cross(pts[c] - pts[a], pts[d] - pts[a]).z < 0) std::swap(c, d);
-        idx.insert(idx.end(), {a, c, d});
-      }
+      pts.push_back({p0.x, p0.y, b.base});
+      pts.push_back({p1.x, p1.y, b.base});
+      pts.push_back({p1.x, p1.y, b.top});
+      pts.push_back({p0.x, p0.y, b.top});
+      idx.insert(idx.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
     }
-    if (!idx.empty()) {
-      kern::physics::ShapeSettings ss;
-      ss.kind = kern::physics::ShapeKind::mesh;
-      ss.points = kern::Span<const Vec3>(pts.data(), pts.size());
-      ss.indices = kern::Span<const u32>(idx.data(), idx.size());
-      ss.material.friction = 0.7f;
-      ss.material.category_bits = kCatWorld;
-      if (world_->create_shape(n.body, ss).valid()) ++n.colliders;
-    }
-    if (kern::now_ms() > deadline) return false;
   }
+  if (xy.size() >= 6) {
+    earcut.triangulate(xy.data(), static_cast<u32>(xy.size() / 2), holes.data(), static_cast<u32>(holes.size()), tris);
+    const u32 base = static_cast<u32>(pts.size());
+    for (std::size_t i = 0; i < xy.size() / 2; ++i) pts.push_back({static_cast<f32>(xy[i * 2]), static_cast<f32>(xy[i * 2 + 1]), b.top});
+    for (std::size_t i = 0; i + 2 < tris.size(); i += 3) {
+      u32 a = base + tris[i], c = base + tris[i + 1], d = base + tris[i + 2];
+      if (kern::cross(pts[c] - pts[a], pts[d] - pts[a]).z < 0) std::swap(c, d);
+      idx.insert(idx.end(), {a, c, d});
+    }
+  }
+  if (!idx.empty()) {
+    kern::physics::ShapeSettings ss;
+    ss.kind = kern::physics::ShapeKind::mesh;
+    ss.points = kern::Span<const Vec3>(pts.data(), pts.size());
+    ss.indices = kern::Span<const u32>(idx.data(), idx.size());
+    ss.material.friction = 0.7f;
+    ss.material.category_bits = kCatWorld;
+    return world_->create_shape(body, ss);
+  }
+  return {};
+}
+
+// ---------------------------------------------------------------------------------------------
+// destruction
+
+bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled) {
+  auto it = tiles_.find(tile);
+  if (it == tiles_.end() || !it->second->prepared || index >= it->second->features.buildings.size()) return false;
+  Tile& t = *it->second;
+  MapFeatures::Building& b = t.features.buildings[index];
+  if (!(new_top < b.top - 0.01f)) return false;
+  b.top = std::fmax(b.base + 0.3f, new_top);
+  b.leveled = b.leveled || leveled;
+  Damage& d = damage_[b.seed];
+  d.height = b.top - b.base;
+  d.leveled = b.leveled;
+  // the drawing: its chunk alone (when the building is drawn at all)
+  if (index < t.cent.size() && std::find(t.vis_built.begin(), t.vis_built.end(), index) != t.vis_built.end()) t.dirty_cells.insert(cell_of(t.cent[index]));
+  // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
+  // destroyed and created on a static body; no teleport, no filter change, no rebuild of the set)
+  NearCollision& n = near_;
+  if (n.building) { n.dirty = true; return true; }  // the set being built: built again after it
+  for (std::size_t k = 0; k < n.list.size(); ++k) {
+    if (n.list[k].first != tile || n.list[k].second != index) continue;
+    if (k < n.shapes.size()) {
+      if (n.shapes[k].valid()) { world_->destroy_shape(n.shapes[k]); --n.colliders; }
+      n.shapes[k] = building_shape(n.body, b);
+      if (n.shapes[k].valid()) ++n.colliders;
+    }
+    break;
+  }
+  return true;
+}
+
+void CityStream::clear_damage() {
+  damage_.clear();
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *tp;
+    if (!t.prepared) continue;
+    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
+      MapFeatures::Building& b = t.features.buildings[i];
+      if (b.top >= b.full_top - 0.01f && !b.leveled) continue;
+      b.top = b.full_top;
+      b.leveled = false;
+      if (i < t.cent.size()) t.dirty_cells.insert(cell_of(t.cent[i]));
+    }
+  }
+  near_.dirty = true;
+}
+
+void CityStream::begin_cells(Tile& t) {
+  kern::FootprintStream fs;
+  std::vector<Vec2> thin;
+  for (u32 i : t.vis_built)
+    if (i < t.cent.size() && t.dirty_cells.count(cell_of(t.cent[i]))) put_footprint(fs, t.features.buildings[i], t.cent[i], thin);
+  t.job_cells.assign(t.dirty_cells.begin(), t.dirty_cells.end());
+  t.dirty_cells.clear();
+  t.cell_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(fs, building_options()));
+}
+
+bool CityStream::finish_cells(Tile& t) {
+  std::vector<u8> out;
+  if (!kern::jobs::take(t.cell_job, out)) return false;
+  t.cell_job = 0;
+  // new chunks first, then the old ones go: the same step, nothing pops out
+  std::unordered_map<u64, std::vector<u32>> old;
+  for (u64 c : t.job_cells) {
+    auto it = t.cell_ids.find(c);
+    if (it == t.cell_ids.end()) continue;
+    old[c] = std::move(it->second);
+    t.cell_ids.erase(it);
+  }
+  kern::Material m;
+  m.roughness = 0.82f;
+  std::size_t at = 4;
+  const u32 count = cityjobs::chunk_count(out);
+  for (u32 k = 0; k < count; ++k) {
+    kern::GeoChunk chunk;
+    if (!cityjobs::read_chunk(out, at, chunk)) break;
+    upload(t, chunk, m, true);
+  }
+  for (auto& [c, ids] : old)
+    for (u32 id : ids) {
+      r_->remove(id);
+      t.meshes.erase(std::remove(t.meshes.begin(), t.meshes.end(), id), t.meshes.end());
+    }
+  t.job_cells.clear();
   return true;
 }
 
@@ -506,7 +633,19 @@ bool CityStream::work(Tile& t, f64 deadline) {
         begin_visual(t);
         return kern::now_ms() > deadline ? false : work(t, deadline);
       }
-      return true;
+      // destruction: the damaged chunks alone, built off the frame and swapped in one step
+      if (t.cell_job) {
+        const f64 t1 = kern::now_ms();
+        const bool done = finish_cells(t);
+        step_time("cells.swap", t1);
+        if (!done) return true;
+      }
+      if (!t.dirty_cells.empty()) {
+        const f64 t1 = kern::now_ms();
+        begin_cells(t);
+        step_time("cells.begin", t1);
+      }
+      return kern::now_ms() <= deadline;
     case S::requested:
     case S::failed: return true;
     case S::decoding: {

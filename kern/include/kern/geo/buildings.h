@@ -95,6 +95,14 @@ class FootprintStream {
     data_.insert(data_.end(), {static_cast<f64>(seed_hash), base, top, 0, 0, 0, 0});
     rings_at_ = data_.size() - 1;
   }
+  /// The same with the building's centre given: it decides the chunk (floor(centre / chunk_size)),
+  /// so a game can rebuild one chunk alone and get exactly that chunk's buildings.
+  void begin(u32 seed_hash, f64 base, f64 top, f64 center_x, f64 center_y) {
+    data_[0] += 1;
+    data_.insert(data_.end(), {static_cast<f64>(seed_hash), base, top, 1, center_x, center_y, 0});
+    rings_at_ = data_.size() - 1;
+  }
+  bool empty() const { return data_[0] == 0; }
   void ring(const Vec2* points, u32 count) {
     data_[rings_at_] += 1;
     data_.push_back(count);

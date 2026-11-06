@@ -143,7 +143,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `neon_bloom` | Bloom | teilweise | `game_look.cpp`, `perf.h` | Bloom an; Stärke 0,13/0,08 und Schwelle 0,88 lassen sich in Kern nicht einstellen (Engine-Punkt 11, mit dem Nutzer klären). |
 | `neon_ui_theme` | UI-Skin | gebaut | `web/ui.mjs` |  |
 | `nostr_data_relay` | Zweiter öffentlicher Weg über Nostr-Relays | fehlt |  | braucht Schnorr-Signaturen auf secp256k1 (im Browser nicht eingebaut). |
-| `nuke_destruction` | Atombombe: Zerstörung | entfällt |  | (c) im Original nicht erreichbar (README „Nuke: bewusst nicht gebaut“). |
+| `nuke_destruction` | Gebäude durch Waffen zerstören („everyday destructibles“); Atombombe | teilweise | `destruction.cpp`, `city_stream.cpp` | Waffen brechen Stockwerke ab, Einsturz zum Stumpf, Abriss-Stück und Bruchtrümmer: gebaut (eigene Umsetzung, destruction.h). Atombombe selbst: im Original nicht erreichbar (`drone_weapon_modes.mjs` entfernt `fireNuke`). Offen: Schwanken (sway) der getroffenen Häuser. |
 | `nuke_shock_field` | Atombombe: Stoßfront | entfällt |  | (c) wie nuke_destruction. |
 | `p2p_link` | Kopplung Spiel ↔ Handy-Controller (QR, WebRTC) | entfällt |  | (b) Kopplung mit der Controller-Seite für die echte Drohne (`controller.mjs`, `drone_controller.html`), außerhalb des Spiels; im Spiel nur das Fallback-Panel der Werkbank (`.panel`, im Spiel ausgeblendet). |
 | `pad_actions` | Xbox-Aktionen | gebaut | `controls.cpp`, `game_controls.cpp`, `touch_play.cpp`, `web/host.mjs` | CONTROLS.md (sc-m3-controls): jede Eingabe mit Quelle `datei.mjs:Zeile`. |
@@ -246,7 +246,7 @@ Stand: gebaut: 177 · entfällt: 61 · teilweise: 7 · fehlt: 5
 | `world_city_roads` | Straßen, Parks, Wasser | gebaut | `city_stream.cpp`, `tiles.h` |  |
 | `world_critical_damage_fx` | Rauch (dunkle Scheiben) und Glut vor der Explosion | gebaut | `game_gaps.cpp`, `game_details.cpp` | Rauchwolken je Effekt: Takt 155 − 72·Fortschritt ms, Glut ab 67 % (jede 5.), Lebensdauer 1,25–1,77 s, Pool 78 (mobil 48). Neu in sc-m3-gaps. |
 | `world_crowd_density_v1` | Passanten-Dichte | gebaut | `people.cpp`, `game_town.cpp` | Passanten sind eigene Agenten, keine an Läufer geklebten Zusatzleute (das, was v1 im Original abschaltet). |
-| `world_destruction_state` | Gebäudeschaden (Dach tiefer, eingeebnet) | entfällt |  | (c) einzige Schreiber sind die Atombombe (`nuke_destruction.mjs`) und deren Sync – im Original nicht erreichbar. |
+| `world_destruction_state` | Gebäudeschaden (Dach tiefer, eingeebnet) | gebaut | `city_stream.cpp` | Der Schaden steht am Kartenmerkmal des Gebäudes (eine Wahrheit für Grafik, Kollision, Minimap) und überdauert neu geladene Kacheln bis RESET; im Mehrspieler bricht jede Waffenexplosion dieselben Häuser auf allen Rechnern. |
 | `world_ground` | Bodenfarbe aus Luftbildern (Albedo je 10-m-Zelle) | fehlt |  | Kern färbt den Boden aus den Flächen der Vektorkacheln. |
 | `world_impacts` | Spuren jeder Aktion | gebaut | `game_world.cpp`, `world_marks.cpp` |  |
 | `world_liveliness` | Lebendigkeit der Welt | entfällt |  | Im Original nicht geladen (von `drone_simulator.html` aus nicht importiert, Prüfung per Import-Graph): toter Code (in der Liste von sc-m3-life). |

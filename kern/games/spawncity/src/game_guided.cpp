@@ -142,7 +142,7 @@ void Game::update_guided(f32 dt) {
       }
     }
     if (boom) {
-      explosion(blast, guided::kBlastRadius, guided::kDamage, true);
+      explosion(blast, guided::kBlastRadius, guided::kDamage, true, Blast::missile);
       guided_[i] = guided_.back();
       guided_.pop_back();
       continue;

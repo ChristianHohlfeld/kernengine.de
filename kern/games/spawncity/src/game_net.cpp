@@ -174,6 +174,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   // A client plays in the host's city: the same streamed map from the same origin.
   lon_ = lon;
   lat_ = lat;
+  destruction_.reset(city_);
   city_.clear();
   city_.start(engine_->renderer, world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
   if (engine_->arg_number("offline", 0) > 0) city_.go_offline();
@@ -289,6 +290,7 @@ void Game::update_net(f32 dt) {
         world_->shake_camera(clampf(1.4f - kern::length(cam_.eye - f.p) / (std::fmax(2.0f, f.a) * 3), 0, 1.2f));
         ++explosions_;
         gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)
+        if (f.dir.y > 0.5f) destruction_.blast(f.p, f.a, f.dir.x, f.dir.y > 1.5f, city_, rng_);  // and buildings
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
@@ -439,12 +441,14 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
   return true;
 }
 
-void Game::blast_remotes(Vec3 at, f32 radius, f32 damage) {
+void Game::blast_remotes(Vec3 at, f32 radius, f32 damage, u8 breaks) {
   if (!net_.active()) return;
   net::Fx fx;
   fx.kind = net::Fx::explosion;
   fx.p = at;
   fx.a = radius;
+  // a weapon's blast breaks the same buildings on every machine (dir: damage, 1 weapon / 2 missile)
+  fx.dir = {damage, static_cast<f32>(breaks), 0};
   net_.send_fx(fx);
   for (const net::Remote& r : net_.remotes()) {
     if (r.state.flags & net::kDead) continue;

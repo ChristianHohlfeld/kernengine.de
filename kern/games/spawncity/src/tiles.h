@@ -40,6 +40,8 @@ struct MapFeatures {
     std::vector<std::vector<Vec2>> rings;  // outer first, then courtyards (metres)
     f32 base = 0, top = 8;
     u32 seed = 0;
+    f32 full_top = 0;      // the top before any damage (CityStream::damage_building)
+    bool leveled = false;  // collapsed to its rubble stump
   };
   struct Road {
     std::vector<Vec2> points;

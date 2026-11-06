@@ -467,6 +467,7 @@ void Game::ui_reset() {
   player_dead_ = false;
   // Fresh weapons, the pistol in hand (Kern's weapon component follows select_foot_weapon).
   init_weapons();
+  destruction_.reset(city_);  // every building whole again (world_destruction_state clearDestruction)
   foot_weapon_ = weapons::Id::knife;
   select_foot_weapon(weapons::Id::glock);
   world_->heal(soldier_, 10000);

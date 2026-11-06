@@ -104,6 +104,17 @@ class CityStream {
   /// True once the collision matches the last exclude_building() call.
   bool exclusion_done() const;
 
+  // ---- destruction (destruction.h) ----
+  /// Lowers a building to `new_top` (only ever lower; `leveled`: collapsed to its stump). One
+  /// truth for everything that reads the building (drawing, collision, minimap, walls, interiors):
+  /// its map feature. Its 160 m mesh chunk is rebuilt as a job and swapped in one step, its
+  /// collider replaced alone. The damage outlives the tile (a re-streamed tile keeps it) until
+  /// clear_damage().
+  bool damage_building(u64 tile, u32 index, f32 new_top, bool leveled);
+  /// Every building back to its full height (RESET).
+  void clear_damage();
+  u32 damaged_buildings() const { return static_cast<u32>(damage_.size()); }
+
  private:
   struct Tile;
   Tile* tile(const TileKey& k);
@@ -125,6 +136,7 @@ class CityStream {
     Vec2 at{1e9f, 1e9f};
     f64 at_ms = -1e9;
     std::vector<std::pair<u64, u32>> list;
+    std::vector<kern::physics::Shape> shapes;  // list[i]'s collider (destruction replaces one)
     std::size_t next = 0;
     bool building = false, dirty = true, built = false;
     u32 colliders = 0;
@@ -145,6 +157,12 @@ class CityStream {
   void begin_visual(Tile& t);
   void update_collision(Vec3 focus, f64 deadline);
   bool build_near(f64 deadline);
+  kern::physics::Shape building_shape(kern::physics::Body body, const MapFeatures::Building& b);
+  // damage by building seed: the height above its base that is left, and whether it collapsed
+  struct Damage { f32 height = 0; bool leveled = false; };
+  std::unordered_map<u32, Damage> damage_;
+  void begin_cells(Tile& t);
+  bool finish_cells(Tile& t);
 
   kern::Renderer* r_ = nullptr;
   kern::physics::World* world_ = nullptr;

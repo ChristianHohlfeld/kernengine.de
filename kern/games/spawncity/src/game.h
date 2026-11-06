@@ -16,6 +16,7 @@
 #include "city_stream.h"
 #include "facades.h"
 #include "combat_art.h"
+#include "destruction.h"
 #include "guided.h"
 #include "combat_detail.h"
 #include "combat_audio.h"
@@ -209,7 +210,9 @@ class Game {
   void damage_car(i32 car, f32 amount, bool by_player);
   void wreck_car(i32 car);
   void damage_player_vehicle(f32 amount);
-  void explosion(Vec3 at, f32 radius, f32 damage, bool by_player);
+  /// What set a blast off: only weapons break buildings (destruction.h); the guided missile x 2.2.
+  enum class Blast : u8 { other, weapon, missile };
+  void explosion(Vec3 at, f32 radius, f32 damage, bool by_player, Blast kind = Blast::other);
   void draw_town();
   // weapons (game_weapons.cpp)
   void init_weapons();
@@ -239,7 +242,7 @@ class Game {
   void rebase_origin(f64 lon, f64 lat);
   /// A shot or blast against the other players: their machines apply the damage.
   bool hit_remotes(Vec3 from, Vec3& to, f32 damage);
-  void blast_remotes(Vec3 at, f32 radius, f32 damage);
+  void blast_remotes(Vec3 at, f32 radius, f32 damage, u8 breaks = 0);
   void draw_remote_people();
   void draw_remote_vehicles();
   // combat and events (game_military.cpp, game_events.cpp) - hooked into update, draw, hud_json,
@@ -487,6 +490,7 @@ class Game {
   People people_;
   PeopleArt people_art_;
   CombatArt combat_art_;
+  Destruction destruction_;  // buildings broken by weapons (destruction.h)
   CombatState combat_;
   std::vector<guided::Flight> guided_;  // GUIDED missiles in flight (game_guided.cpp)
   f32 guided_last_ = -99;

@@ -286,6 +286,7 @@ bool Game::start(kern::Engine& e) {
   if (!art_.init(e.renderer)) return false;
   if (!people_art_.init(e.renderer)) return false;
   if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
+  destruction_.init(e.renderer);
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 68 : 100);  // PERSON_SLOTS (world_procedural_population.mjs)
   if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
@@ -797,6 +798,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_details(dt);  // critical damage, ballots (game_details.cpp)
     gaps_update(dt);  // dispatch, critical smoke, organic hits, impact bursts (game_gaps.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
+    destruction_.update(dt, city_, rng_);  // broken buildings: torn pieces, debris (destruction.h)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
   look_lap(perf::Slot::logic);
