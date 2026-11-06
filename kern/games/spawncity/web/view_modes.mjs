@@ -251,7 +251,7 @@ function installViewModes() {
       // where it could be placed
       const w = $("thumbWeapon");
       let placed = false;
-      if (touchPlay && h.weapon === "Sniper" && !h.ctl?.dead && w?.classList.contains("show")) {
+      if (touchPlay && /^Sniper/.test(h.weapon || "") && !h.ctl?.dead && w?.classList.contains("show")) {
         const l = parseFloat(w.style.left), t = parseFloat(w.style.top);
         if (Number.isFinite(l) && Number.isFinite(t)) {
           const L = `${Math.round(l)}px`, T = `${Math.round(t - 66)}px`;

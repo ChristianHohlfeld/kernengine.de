@@ -49,7 +49,8 @@ export async function mountOriginalView(base = "./view/") {
     html.sc-original-view #hud > :is(.sc-top,.sc-map,.sc-panel,.sc-health,.sc-ammo,.sc-attrib,.sc-help,.sc-toast,.sc-cross,.sc-offline){display:none!important}
     html.sc-original-view :is(#scMenu,#scPause,#scSettings,#scQuit),html.sc-original-view .k-touch{display:none!important}
     html.sc-original-view #game{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;outline:none;touch-action:none}
-    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}`;
+    html.sc-original-view :is(.scui-corner,#scInstall,#scInstallHint){display:none!important}
+    html.sc-original-view :is(.scui-switches,#mpBar){display:none!important}`;
   document.head.appendChild(extra);
   // The original's layout modules, unchanged (they read the walk mode through this name).
   const walk = {mode: "drone"};
@@ -101,7 +102,8 @@ function pressedByGame(el) {
   return gameTouched.el === el || (el?.id === "mobileGameplayWeapon" && gameTouched.el.id === "thumbWeapon");
 }
 
-const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", Granatwerfer: "WERFER", Raketenwerfer: "RAKETEN", "Fäuste": "FÄUSTE", Messer: "MESSER"};
+const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", "Sniper .50": "SNIPER", Granatwerfer: "WERFER", "Granatwerfer 40 mm": "WERFER", Raketenwerfer: "RAKETEN",
+  "Fäuste": "FÄUSTE", Faeuste: "FÄUSTE", Messer: "MESSER"};  // the game's names (weapons.h) -> the original's labels
 const FOOT_ORDER = ["MP", "GLOCK", "SNIPER", "WERFER", "RAKETEN", "FÄUSTE", "MESSER"];  // first_person_weapon_runtime_v3.mjs WEAPON_ORDER
 const DRONE_NAMES = {MG: "GUN", RAKETEN: "ROCKETS", GUIDED: "GUIDED"};                  // drone_weapon_modes.mjs
 
