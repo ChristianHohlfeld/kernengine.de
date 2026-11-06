@@ -1367,6 +1367,11 @@ std::string Game::command(const std::string& cmd) {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera
     vr_ = cmd == "vr 1";
     if (vr_) { drone_cam_ = 0; car_cockpit_ = true; jet_cockpit_ = true; rig_init_ = false; }
+    // a headset draws two eyes at 72-90 Hz: start low, never above the middle level (a missed
+    // frame there is a stutter you feel); back on the page the platform's own ladder
+    if (vr_) look_.gov.reset(1, 2);
+    else look_.gov.reset(mobile_ ? perf::kMobileStart : perf::kDesktopStart, mobile_ ? perf::kMobileMax : perf::kTiers - 1);
+    look_apply_tier();
     return vr_ ? "vr" : "flat";
   }
   if (starts("weapon ")) {
