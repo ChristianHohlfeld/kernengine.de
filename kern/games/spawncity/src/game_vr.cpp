@@ -53,7 +53,23 @@ void Game::vr_melee(i32 side, f32 dt) {
   const f32 dmg = knife ? 100.0f : (side == 1 ? 24.0f : 16.0f) * k;  // KNIFE_DMG, PUNCH_DMG right / left
   const f32 ns = (knife ? 12.0f : 34.0f) * k;
   Vec3 end = to;
-  i32 hit = people_.shot(from, end, dmg, true, now, ns);
+  i32 hit = -1;
+  {
+    // a mate in the way takes the blow (damage by the authority, and a shove on his machine)
+    Vec3 mt = to;
+    if (hit_remotes(from, mt, dmg)) {
+      hit = 0;
+      for (const net::Remote& rm : net_.remotes())
+        if (kern::length(rm.person_shown + Vec3{0, 0, 1.2f} - mt) < 1.2f) {
+          net::Fx f;
+          f.kind = net::Fx::push;
+          f.p = dir * (knife ? 1.5f : 3.5f * k) + Vec3{0, 0, 0.8f};
+          f.dir = {static_cast<f32>(rm.state.slot), 0, 0};
+          net_.send_fx(f);
+        }
+    }
+  }
+  if (hit < 0) hit = people_.shot(from, end, dmg, true, now, ns);
   if (hit < 0) { end = to; if (life_punch(from, end)) hit = 0; }
   if (hit < 0) {
     const kern::physics::RayHit rh = world_->physics().cast_ray(from, to - from, ~0ull, body(soldier_));
@@ -80,7 +96,19 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
   const f32 now = world_->sim_time();
   kern::physics::World& w = world_->physics();
   auto valid = [&](kern::physics::Body b) { return b.valid() && w.body_valid(b) && w.body_type(b) == kern::physics::BodyType::dynamic; };
+  auto push_mate = [&](u8 slot, Vec3 dv) {
+    // player_push.mjs: the mate's own machine applies the velocity change (it is replicated back)
+    net::Fx f;
+    f.kind = net::Fx::push;
+    f.p = {clampf(dv.x, -12, 12), clampf(dv.y, -12, 12), clampf(dv.z, -6, 9)};
+    f.dir = {static_cast<f32>(slot), 0, 0};
+    f.a = 0;
+    net_.send_fx(f);
+  };
+  const Vec3 hand_v = h.world_ok && dt > 1e-4f ? (at - h.world_prev) * (1.0f / dt) : Vec3{};
   if (!want || !hand || player_dead_) {
+    if (h.grab_slot >= 0) push_mate(static_cast<u8>(h.grab_slot), hand_v * 1.2f);  // the throw
+    h.grab_slot = -1;
     if (h.grab.valid() && valid(h.grab)) {
       // the throw: whatever the hand's speed was (a little more - a swing reads short in the room)
       w.set_linear_velocity(h.grab, w.linear_velocity(h.grab) * 1.15f);
@@ -118,8 +146,33 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
       if (best >= 0) {
         people_.grab_knock(best, (at - people_.all()[static_cast<std::size_t>(best)].pos) * 0.5f + Vec3{0, 0, 0.6f}, now);
         h.grab_person = best;
+      } else if (net_.active()) {
+        // 3. a mate on foot: held by the collar - pulled and shoved on his own machine
+        f32 md = 0.75f;
+        for (const net::Remote& rm : net_.remotes()) {
+          if (rm.state.mode != net::PlayerMode::foot || (rm.state.flags & net::kDead)) continue;
+          const f32 d = kern::length(rm.person_shown + Vec3{0, 0, 1.3f} - at);
+          if (d < md) { md = d; h.grab_slot = rm.state.slot; }
+        }
+        h.grab_mate_at = 0;
       }
     }
+  }
+  if (h.grab_slot >= 0) {
+    // the mate follows the hand: every 80 ms a small velocity change towards it
+    if (now - h.grab_mate_at > 0.08f) {
+      h.grab_mate_at = now;
+      for (const net::Remote& rm : net_.remotes())
+        if (rm.state.slot == h.grab_slot) {
+          const Vec3 chest = rm.person_shown + Vec3{0, 0, 1.3f};
+          Vec3 dv = (at - chest) * 2.0f + hand_v * 0.35f;
+          const f32 l = kern::length(dv);
+          if (l > 3) dv = dv * (3 / l);
+          if (kern::length(at - chest) > 1.6f) { h.grab_slot = -1; break; }  // torn loose
+          push_mate(rm.state.slot, dv);
+        }
+    }
+    return;
   }
   if (!h.grab.valid()) return;
   if (!valid(h.grab)) { h.grab = {}; return; }
@@ -127,7 +180,7 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
   // force (2.5 kN) - a dog flies, a ragdoll swings, a car only rocks
   const Vec3 p = w.world_point(h.grab, h.grab_local);
   const Vec3 v = w.linear_velocity(h.grab);
-  const Vec3 hv = h.world_ok && dt > 1e-4f ? (at - h.world_prev) * (1.0f / dt) : Vec3{};
+  const Vec3 hv = hand_v;
   const f32 mass = std::fmax(0.5f, w.mass(h.grab));
   const Vec3 want_v = (at - p) * 12.0f + hv;
   Vec3 dv = want_v - v;

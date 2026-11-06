@@ -471,7 +471,7 @@ class Game {
   kern::Engine* engine_ = nullptr;
   bool vr_ = false;  // the page runs a WebXR session ("vr 1")
   // VR rig (game_vr.cpp): the controllers' pointing rays in the room (WebXR local space)
-  struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false; Vec3 p, prev, prev_strike, world_prev, grab_local; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1; };
+  struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false; Vec3 p, prev, prev_strike, world_prev, grab_local; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1, grab_slot = -1; f32 grab_mate_at = 0; };
   VrHand vr_hands_[2];
   bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false;
   bool vr_menu_open_ = false, vr_menu_trigger_ = false, vr_menu_valid_ = false;
