@@ -292,7 +292,60 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
   }
 }
 
+void Game::vr_scope_update() {
+  // The sniper's scope in VR: a second camera looks out of the objective along the barrel (5 deg),
+  // its picture lies on the lens at the eyepiece - bring the rifle to the eye and look through it,
+  // take it down and you see the world again (no zoom of the whole view: no sickness)
+  kern::Renderer& r = engine_->renderer;
+  kern::Mat4 m;
+  const bool on = vr_ && engine_->xr && mode_ == Mode::foot && !player_dead_ && foot_weapon_ == weapons::Id::sniper && vr_hand_matrix(1, m);
+  engine_->xr_scope = false;
+  if (!on) { if (vr_scope_mesh_) r.set_visible(vr_scope_mesh_, false); return; }
+  if (!vr_scope_tex_) {
+    u32 fbo = 0;
+    vr_scope_tex_ = r.create_render_target(512, fbo);
+    engine_->xr_scope_fbo = fbo;
+    engine_->xr_scope_size = 512;
+    if (!vr_scope_tex_) return;
+  }
+  if (!vr_scope_mesh_) {
+    kern::MeshData d;  // the lens: a disc (a fan), the picture mapped across it
+    const Vec3 n{0, -1, 0};
+    d.push({0, 0, 0}, n, {1, 1, 1}, {0.5f, 0.5f});
+    constexpr int kSeg = 28;
+    for (int i = 0; i <= kSeg; ++i) {
+      const f32 a = static_cast<f32>(i) / kSeg * 2 * kPi;
+      d.push({std::cos(a) * 0.5f, 0, std::sin(a) * 0.5f}, n, {1, 1, 1}, {0.5f + std::cos(a) * 0.5f, 0.5f - std::sin(a) * 0.5f});
+      if (i > 0) d.indices.insert(d.indices.end(), {0u, static_cast<u32>(i), static_cast<u32>(i + 1)});
+    }
+    vr_scope_mesh_ = r.allocate_id();
+    kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
+    in.material.unlit = true;
+    in.material.double_sided = true;
+    in.material.cast_shadow = false;
+    in.material.frustum_culled = false;
+    in.texture = vr_scope_tex_;
+    if (!r.upsert(vr_scope_mesh_, in)) { r.release_id(vr_scope_mesh_); vr_scope_mesh_ = 0; return; }
+  }
+  const Vec3 x{m.m[0], m.m[1], m.m[2]}, y{m.m[4], m.m[5], m.m[6]}, z{m.m[8], m.m[9], m.m[10]}, at = m.translation();
+  // the scope sits on the rifle above the grip: the eyepiece 9 cm behind it, the objective 30 cm ahead
+  const Vec3 eyepiece = at + y * 0.075f + z * 0.09f, objective = at + y * 0.075f - z * 0.3f;
+  kern::Camera c = cam_;
+  c.eye = objective;
+  c.target = objective - z;
+  c.up = y;
+  c.fov = 5 * kDeg;
+  c.near = 0.05f;
+  engine_->xr_scope_camera = c;
+  engine_->xr_scope = true;
+  constexpr f32 kLens = 0.034f;  // m across
+  const f32 lm[16] = {x.x * kLens, x.y * kLens, x.z * kLens, 0, -z.x, -z.y, -z.z, 0, y.x * kLens, y.y * kLens, y.z * kLens, 0, eyepiece.x, eyepiece.y, eyepiece.z, 1};
+  r.update_instances(vr_scope_mesh_, {lm, 16}, {});
+  r.set_visible(vr_scope_mesh_, true);
+}
+
 void Game::vr_update_view() {
+  if (engine_) vr_scope_update();
   // the first-person gun in the right hand (Kern's soldier), or back in front of the camera
   Mat4 m;
   // (the game's own weapons - launchers, knife, fists - are drawn by game_look.cpp; then Kern's

@@ -542,6 +542,32 @@ u32 Renderer::register_external_texture(u32 gl_handle) {
   return static_cast<u32>(textures_.size() - 1);
 }
 
+u32 Renderer::create_render_target(i32 size, u32& framebuffer) {
+  framebuffer = 0;
+  if (!initialised_ || lost_ || size < 16 || size > 2048) return 0;
+  const u32 tex = gl::createTexture();
+  gl::bindTexture(gl::TEXTURE_2D, tex);
+  gl::texImage2D(gl::TEXTURE_2D, 0, static_cast<i32>(gl::RGBA8), size, size, gl::RGBA, gl::UNSIGNED_BYTE, nullptr, 0);
+  gl::texParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, static_cast<i32>(gl::LINEAR));
+  gl::texParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, static_cast<i32>(gl::LINEAR));
+  gl::texParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, static_cast<i32>(gl::CLAMP_TO_EDGE));
+  gl::texParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, static_cast<i32>(gl::CLAMP_TO_EDGE));
+  gl::bindTexture(gl::TEXTURE_2D, 0);
+  const u32 depth = gl::createRenderbuffer();
+  gl::bindRenderbuffer(gl::RENDERBUFFER, depth);
+  gl::renderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT24, size, size);
+  gl::bindRenderbuffer(gl::RENDERBUFFER, 0);
+  const u32 fbo = gl::createFramebuffer();
+  gl::bindFramebuffer(gl::FRAMEBUFFER, fbo);
+  gl::framebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tex, 0);
+  gl::framebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, depth);
+  const u32 status = gl::checkFramebufferStatus(gl::FRAMEBUFFER);
+  gl::bindFramebuffer(gl::FRAMEBUFFER, 0);
+  if (status != gl::FRAMEBUFFER_COMPLETE) { fail("render target incomplete 0x%x", status); return 0; }
+  framebuffer = fbo;
+  return register_external_texture(tex);
+}
+
 bool Renderer::delete_texture(u32 id) {
   if (!id || id >= textures_.size() || !textures_[id].alive) return false;
   Texture& t = textures_[id];
@@ -664,7 +690,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
   Viewport rect{0, 0, width_, height_};
   if (params.has_viewport) {
     rect = params.viewport;
-    if (rect.width < 1 || rect.height < 1 || rect.x < 0 || rect.y < 0 || rect.x + rect.width > width_ || rect.y + rect.height > height_)
+    if (rect.width < 1 || rect.height < 1 || rect.x < 0 || rect.y < 0 || (!params.framebuffer && (rect.x + rect.width > width_ || rect.y + rect.height > height_)))
       return fail("viewport must fit inside the drawing buffer");
   }
   if (!camera_valid(camera)) return fail("invalid camera projection");
@@ -723,9 +749,10 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     stats.shadow_resolution = static_cast<u32>(shadow_->options().resolution);
   }
 
+  if (params.framebuffer) gl::bindFramebuffer(gl::FRAMEBUFFER, params.framebuffer);  // a render target (the shadow pass left 0 bound)
   if (params.has_viewport) { gl::enable(gl::SCISSOR_TEST); gl::scissor(rect.x, rect.y, rect.width, rect.height); }
   else gl::disable(gl::SCISSOR_TEST);
-  const bool post = !params.has_viewport && bloom_.begin(width_, height_, start, params.page_hidden);
+  const bool post = !params.has_viewport && !params.framebuffer && bloom_.begin(width_, height_, start, params.page_hidden);
   gl::viewport(rect.x, rect.y, rect.width, rect.height);
   gl::clearColor(params.clear_color.x, params.clear_color.y, params.clear_color.z, params.clear_color.w);
   gl::clearDepth(1);
@@ -823,6 +850,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     bound_texture_ = ~0u;
   }
   if (params.has_viewport) gl::disable(gl::SCISSOR_TEST);
+  if (params.framebuffer) gl::bindFramebuffer(gl::FRAMEBUFFER, 0);
   if (timer_query) {
     gl::endQuery(gl::TIME_ELAPSED);
     pending_queries_.push_back(timer_query);

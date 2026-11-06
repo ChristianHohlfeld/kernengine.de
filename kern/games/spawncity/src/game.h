@@ -481,6 +481,8 @@ class Game {
   std::string vr_action_;
   void vr_melee(i32 side, f32 dt);
   void vr_grab(i32 side, bool want, f32 dt);
+  void vr_scope_update();
+  u32 vr_scope_tex_ = 0, vr_scope_mesh_ = 0;
   void vr_menu_input();
   std::string vr_menu_json();
  public:

@@ -78,6 +78,7 @@ struct RenderParams {
   u32 layers = ~0u;           // only meshes with (mesh.layers & layers) != 0 are drawn (and cast shadows)
   bool sky = true;            // false: the clear colour stays behind the scene
   bool reuse_shadow = false;  // keep the sun's shadow map as it is (the second eye of a stereo / XR frame)
+  u32 framebuffer = 0;        // a render target (create_render_target's framebuffer): drawn there instead of the bound one
 };
 
 struct RenderStats {
@@ -142,6 +143,9 @@ class Renderer {
   u32 create_texture(const TextureDesc& desc);
   /// Registers a texture whose GPU object the host owns (and restores in place).
   u32 register_external_texture(u32 gl_handle);
+  /// A colour + depth render target of `size` px square: returns the texture id for meshes and the
+  /// framebuffer for RenderParams::framebuffer (0 / 0 on failure). The scope of a VR sniper.
+  u32 create_render_target(i32 size, u32& framebuffer);
   bool delete_texture(u32 texture);
 
   // ---- scene state ----

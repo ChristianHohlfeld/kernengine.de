@@ -64,7 +64,8 @@ export const CHANGELOG=Object.freeze([
     "Zombies stöhnen gruselig (jeder anders) und kreischen bei Treffern.",
     "Polizeidrohnen weiß mit schwarzem Bauch, blauem Band und rot-blauem Blitzlicht; Martinshorn und Drohnen-Ton deutlich hörbar, klar verschieden.",
     "Der Himmel ohne Kachel-Kanten in den Wolken.",
-    "VR: Greifen mit Griff-Taste (oder Abzug der freien Hand) – Kisten, Tiere, Passanten (fallen als Ragdoll in deine Hand), Autos nur ein wenig schieben; loslassen wirft mit deinem Schwung."]},
+    "VR: Greifen mit Griff-Taste (oder Abzug der freien Hand) – Kisten, Tiere, Passanten (fallen als Ragdoll in deine Hand), Autos nur ein wenig schieben; loslassen wirft mit deinem Schwung.",
+    "VR: echtes Zielfernrohr beim Sniper – das Gewehr ans Auge, durch die Linse schauen (eigene Kamera, 5°); Gewehr runter, normale Sicht."]},
   {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",

@@ -251,6 +251,7 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
   }
   g_engine->xr_room_forward = f;
+
   const Vec3 r{f.y, -f.x, 0}, up{0, 0, 1};
   // a WebXR vector (x right, y up, -z forward) in the world
   auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
@@ -276,6 +277,19 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     RenderStats stats;
     ok = g_engine->renderer.render(params, stats) && ok;
     if (i == 0) { g_engine->xr = true; g_engine->xr_eye = cam.eye; g_engine->xr_forward = normalize(cam.target - cam.eye, {1, 0, 0}); }
+  }
+  if (g_engine->xr_scope && g_engine->xr_scope_fbo && g_engine->xr_scope_size > 0) {
+    // the scope's own picture after the eyes (their shadow map reused; the lens shows it next frame)
+    cam = g_engine->xr_scope_camera;
+    cam.has_projection = false;
+    RenderParams sp;
+    sp.clear_color = g_engine->clear_color;
+    sp.has_viewport = true;
+    sp.reuse_shadow = true;
+    sp.framebuffer = g_engine->xr_scope_fbo;
+    sp.viewport = {0, 0, g_engine->xr_scope_size, g_engine->xr_scope_size};
+    RenderStats ss;
+    if (!g_engine->renderer.render(sp, ss)) g_engine->xr_scope = false;
   }
   cam = anchor;
   return ok ? 1 : 0;

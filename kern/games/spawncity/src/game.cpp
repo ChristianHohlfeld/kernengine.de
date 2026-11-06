@@ -1362,8 +1362,8 @@ std::string Game::command(const std::string& cmd) {
   if (cmd == "vr state") {
     char b[200];
     const Vec3 rf = engine_ ? engine_->xr_room_forward : Vec3{};
-    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
-                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0);
+    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
+                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
     return b;
   }
   if (cmd == "vr 1" || cmd == "vr 0") {
