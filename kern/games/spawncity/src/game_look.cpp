@@ -416,8 +416,15 @@ void Game::look_lighting(f32 dt) {
     {
       int k = 0;
       for (const Projectile& p : projectiles_) {
-        if (k >= 2) break;
-        if (!p.alive || p.gravity || std::hypot(p.pos.x - eye.x, p.pos.y - eye.y) > 90) continue;
+        if (k >= 3) break;
+        if (!p.alive || std::hypot(p.pos.x - eye.x, p.pos.y - eye.y) > 90) continue;
+        if (p.id == weapons::Id::grenade_launcher) {
+          // the 40 mm round's phosphor glow lights the street green as it flies and bounces
+          req(p.pos, 0x6dff8e, 6, 6, 1.0f);
+          ++k;
+          continue;
+        }
+        if (p.gravity) continue;
         req(p.pos, 0xff9a40, 16, 10, 2.5f);
         ++k;
       }

@@ -19,6 +19,7 @@ import {POLICE_SIRENS_VERSION} from "./audio/police_sirens.mjs";
 import {JETPACK_AUDIO_VERSION} from "./audio/jetpack_audio.mjs";
 import {playAnimal} from "./audio/animal_audio.mjs";
 import {installImmersiveSoundscape} from "./audio/immersive_soundscape.mjs";
+import {createAmbience} from "./audio/ambience.mjs";
 import {CAR_RADIO_VERSION} from "./audio/car_radio.mjs";
 import {ORGANIC_HIT_AUDIO_VERSION} from "./audio/world_organic_hit_audio.mjs";
 import {announceHeadshot} from "./audio/headshot_feedback.mjs";
@@ -209,6 +210,7 @@ export function installOriginalAudio() {
   const SPEED = 255;
   const state = {}, events = [];  // the last events (tests)
 
+  const ambience = createAmbience();
   function update(h, ui) {
     if (!command) return;
     let a;
@@ -217,6 +219,7 @@ export function installOriginalAudio() {
     // browser warns ("not allowed to start"); the frame is still taken so the queue never grows
     if (globalThis.navigator?.userActivation && !navigator.userActivation.hasBeenActive) return;
     Object.assign(state, a);
+    try { ambience.step(h); } catch { /* no ambience */ }  // Kern: the town's quiet bed (ambience.mjs)
     const now = performance.now();
     // ---- settings: the game's (Kern's settings) under the original's key, every module follows
     const key = JSON.stringify(a.set);

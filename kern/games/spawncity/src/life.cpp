@@ -516,6 +516,37 @@ void Life::spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, L
   (void)now;
 }
 
+i32 Life::catch_pigeon(Vec3 hand, f32 hand_speed, f32 now, Rng& rng) {
+  for (Flock& f : flocks_) {
+    if (f.air) continue;
+    for (std::size_t i = 0; i < f.birds.size(); ++i) {
+      const Pigeon& b = f.birds[i];
+      if (b.dead_at >= 0 || kern::length(hand - (b.pos + Vec3{0, 0, 0.15f})) > 0.24f) continue;
+      // a quick hand, or bad luck (one in two): the flock is up and away
+      if (hand_speed > 1.0f || rng.unit() < 0.5f) { f.next_flight = now; return -1; }
+      LooseBird lb;
+      lb.id = ++loose_serial_;
+      lb.pos = b.pos + Vec3{0, 0, 0.15f};
+      lb.yaw = b.yaw;
+      loose_.push_back(lb);
+      f.birds.erase(f.birds.begin() + static_cast<std::ptrdiff_t>(i));
+      f.next_flight = now + 0.4f;  // the others take fright a moment later
+      return lb.id;
+    }
+  }
+  return -1;
+}
+
+void Life::hold_pigeon(i32 id, Vec3 at, f32 yaw) {
+  for (LooseBird& b : loose_)
+    if (b.id == id) { b.pos = at; b.yaw = yaw; b.held = true; b.flap += 0.9f; }  // it struggles
+}
+
+void Life::release_pigeon(i32 id, Vec3 velocity) {
+  for (LooseBird& b : loose_)
+    if (b.id == id) { b.held = false; b.t = 0; b.vel = velocity + Vec3{0, 0, 2.5f}; }
+}
+
 void Life::spook_pigeons(f32 now) {
   for (Flock& f : flocks_) { f.next_flight = now; }
 }
@@ -529,6 +560,19 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     Vec2 at;
     if (spot_near(view, me, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
   }
+  // a pigeon let go flies off: up and away (it beats its wings), gone after 6 s
+  for (LooseBird& b : loose_) {
+    if (b.held) continue;
+    b.t += dt;
+    b.flap += dt * 22;
+    b.vel.z += (4.0f - b.vel.z) * std::fmin(1.0f, dt * 1.5f);
+    const Vec2 h{b.vel.x, b.vel.y};
+    const f32 hs = std::hypot(h.x, h.y);
+    if (hs < 6) { const Vec2 d = hs > 0.1f ? h * (1 / hs) : Vec2{std::cos(b.yaw), std::sin(b.yaw)}; b.vel.x += d.x * dt * 6; b.vel.y += d.y * dt * 6; }
+    b.pos = b.pos + b.vel * dt;
+    if (hs > 0.1f) b.yaw = std::atan2(b.vel.y, b.vel.x);
+  }
+  loose_.erase(std::remove_if(loose_.begin(), loose_.end(), [](const LooseBird& b) { return !b.held && b.t > 6; }), loose_.end());
   for (Flock& f : flocks_) {
     f.birds.erase(std::remove_if(f.birds.begin(), f.birds.end(), [&](const Pigeon& b) { return b.dead_at >= 0 && now - b.dead_at > 12; }), f.birds.end());
     if (!f.air) {

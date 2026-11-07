@@ -140,6 +140,8 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
     const Vec3 tv = h.throw_v * 1.6f + Vec3{0, 0, kern::length(h.throw_v) > 2 ? 0.8f : 0.0f};
     if (h.grab_slot >= 0) push_mate(static_cast<u8>(h.grab_slot), tv);
     h.grab_slot = -1;
+    if (h.bird >= 0 && glife_) glife_->life.release_pigeon(h.bird, h.throw_v);  // off it flies
+    h.bird = -1;
     if (h.grab.valid() && valid(h.grab)) {
       const bool swung = kern::length(h.throw_v) > 1.2f;
       if (h.grab_person >= 0 && glife_) {
@@ -163,12 +165,15 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
     if (valid(b)) { h.grab = b; h.grab_local = {}; }
     else if (now - h.grab_t > 0.4f) h.grab_person = -1;
   }
-  if (fresh && !h.grab.valid() && h.grab_person < 0) {
+  if (fresh && !h.grab.valid() && h.grab_person < 0 && h.bird < 0) {
     h.grab_t = now;
     // 1. a loose body within a hand's reach (a small sphere swept a little through the hand)
     const kern::physics::RayHit rh = w.cast_sphere(at + Vec3{0, 0, 0.06f}, 0.13f, {0, 0, -0.12f}, ~0ull, body(soldier_));
     if (rh.hit && valid(rh.body)) { h.grab = rh.body; h.grab_local = w.local_point(rh.body, rh.point); }
-    else if (const kern::physics::Body ab = glife_ ? glife_->life.grab_animal(at, 0.45f) : kern::physics::Body{}; valid(ab)) {
+    else if (const i32 bird = glife_ ? glife_->life.catch_pigeon(at, kern::length(h.throw_v), now, rng_) : -1; bird >= 0) {
+      h.bird = bird;  // a pigeon, caught (it took patience)
+      vr_pulse_[side] = 0.5f;
+    } else if (const kern::physics::Body ab = glife_ ? glife_->life.grab_animal(at, 0.45f) : kern::physics::Body{}; valid(ab)) {
       // a live dog, cat or cow: picked up as a body (it gets up where it lands, life.cpp)
       h.grab = ab;
       h.grab_local = w.local_point(ab, at);
@@ -197,6 +202,11 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
         h.grab_mate_at = 0;
       }
     }
+  }
+  if (h.bird >= 0) {
+    if (glife_) glife_->life.hold_pigeon(h.bird, at, std::atan2(m.m[1], m.m[0]));
+    if (h.bird >= 0 && (now - h.grab_t) > 0 && (static_cast<i32>(now * 3) % 2) == 0) vr_pulse_[side] = std::fmax(vr_pulse_[side], 0.08f);  // it flutters
+    return;
   }
   if (h.grab_slot >= 0) {
     // the mate follows the hand: every 80 ms a small velocity change towards it

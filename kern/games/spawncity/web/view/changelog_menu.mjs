@@ -9,6 +9,9 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Leise Atmosphäre am Boden: ein fernes Stadtrauschen, Vogelgezwitscher am Tag, ab und zu ein Hund, nachts Grillen und manchmal ein Käuzchen, oben Wind (Lautstärke: Ton → Umgebung).",
+    "Die Werfer-Granate leuchtet wieder grün wie im Original und taucht die Straße im Flug in ihr Licht.",
+    "VR: Tauben fangen – ganz langsam anschleichen und vorsichtig zugreifen (klappt nicht immer, sonst fliegt der Schwarm auf); loslassen und sie fliegt davon.",
     "Multiplayer: auch die Jogger-Gruppe ist bei allen dieselbe; die Weltdaten sind jetzt sehr sparsam (rund 1 KB/s) – Mitspieler ruckeln und hängen nicht mehr, auch über die Relay-Verbindung.",
     "Multiplayer: als Beifahrer zu einem Mitspieler ins Auto steigen (E / X / Einsteigen neben seinem stehenden Auto) – auch in seinen Jet; nochmal drücken steigt aus.",
     "Straßen liegen nach Explosionen sauber im Krater statt darüber zu schweben (feines Netz über verformtem Boden, auch bei mehreren Kratern kurz hintereinander).",

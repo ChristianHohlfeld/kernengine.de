@@ -113,6 +113,17 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
       }
     }
   }
+  // a pigeon in a hand (VR) or flying off from it
+  for (const Life::LooseBird& b : life.loose_birds()) {
+    if (!near(b.pos)) continue;
+    const Mat4 M = at(b.pos - Vec3{0, 0, 0.15f}) * rot({0, 0, 1}, b.yaw);
+    ball(M * at({0, 0, 0.13f}) * sc3({0.3f, 0.19f, 0.18f}), grey);
+    ball(M * at({0.07f, 0, 0.15f}) * sc3({0.14f, 0.14f, 0.14f}), breast);
+    ball(M * at({0.15f, 0, 0.24f}) * sc3({0.1f, 0.1f, 0.1f}), head);
+    box(M * at({0.205f, 0, 0.235f}) * sc3({0.04f, 0.015f, 0.015f}), rgb(0x3a3330));
+    const f32 flap = std::sin(b.flap) * 0.9f;
+    for (f32 s : {-1.0f, 1.0f}) box(M * at({0, s * 0.02f, 0.16f}) * rot({1, 0, 0}, s * flap) * at({0, s * 0.18f, 0}) * sc3({0.16f, 0.36f, 0.01f}), wing);
+  }
   // birds over the roofs: a dark V that flaps
   for (const Life::Bird& b : life.birds()) {
     if (now < b.dead_until && now >= b.dying_until) continue;

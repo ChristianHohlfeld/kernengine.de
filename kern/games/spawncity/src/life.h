@@ -164,7 +164,17 @@ class Life {
   /// A hand grabs the nearest live animal within `reach` of `at` (a dog, a cat, a cow): it becomes a
   /// Box3D body for as long as it is held and flies; it gets up where it lands. The body, or none.
   kern::physics::Body grab_animal(Vec3 at, f32 reach);
+  /// A pigeon caught by hand (VR): crept up on, the hand slow and right on it - and even then
+  /// only every other try, a miss sends the flock up. Returns its id (-1: it got away).
+  i32 catch_pigeon(Vec3 hand, f32 hand_speed, f32 now, Rng& rng);
+  void hold_pigeon(i32 id, Vec3 at, f32 yaw);
+  /// Let go: it flies off from there, with the hand's throw.
+  void release_pigeon(i32 id, Vec3 velocity);
+  struct LooseBird { i32 id = 0; Vec3 pos, vel; f32 yaw = 0, flap = 0, t = 0; bool held = true; };
+  const std::vector<LooseBird>& loose_birds() const { return loose_; }
  private:
+  std::vector<LooseBird> loose_;
+  i32 loose_serial_ = 0;
   bool remote_joggers_ = false;
   f32 remote_joggers_at_ = -9;
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };

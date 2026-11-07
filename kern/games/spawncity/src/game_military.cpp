@@ -808,7 +808,7 @@ void Game::draw_military() {
     const f32 band = r * 1.02f / 0.8f, tube = 0.0048f * 1.35f / 0.2f;
     A.put(CombatArt::fade_ring, m * Mat4::scale({band, band, tube * 0.25f}), Vec3{1.0f, 0.42f, 0.06f} * 3.0f, 1);
     A.put(CombatArt::fade_ring, m * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, 1.5708f), {1, 1, 1}) * Mat4::scale({band, band, tube * 0.2f}), Vec3{1.0f, 0.42f, 0.06f} * 3.0f, 1);
-    A.put(CombatArt::fade_sphere, m * Mat4::scale({2 * r * 1.28f, 2 * r * 1.28f, 2 * r * 1.28f}), Vec3{0.0f, 1.0f, 0.13f} * 2.0f, 0.24f);
+    A.put(CombatArt::fade_sphere, m * Mat4::scale({2 * r * 1.28f, 2 * r * 1.28f, 2 * r * 1.28f}), Vec3{0.0f, 1.0f, 0.13f} * 3.2f, 0.42f);  // additive in the original: brighter here, Kern blends normally
   }
   // updateGrenadeBounceFx: e = 1 - (1-t)^3; the ring (r .040 .. .058, 0xffb347) x strength (.75 + 3.1 e),
   // opacity .72 (1-t)^1.35; the flash (r .020, 0xf4fff8) x strength (1 + .7 e), opacity .95 (1-t)^2.2
