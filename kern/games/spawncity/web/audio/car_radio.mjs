@@ -18,7 +18,7 @@ const viewport=()=>document.getElementById("viewport");
 const bridge=()=>globalThis.__arondightRealWorld||null;
 // the radio is not the menu music: it plays whenever you sit in a car and it is switched on (📻 hold /
 // "RADIO AUS" in the station list), at least at a level you can hear over the engine
-function wantedLevel(){return inCar&&on&&!document.hidden?Math.max(.55,Math.min(1,(Number(settings.musicVolume)||0)/100))*HEADROOM:0;}
+function wantedLevel(){return inCar&&on&&!document.hidden&&settings.musicEnabled!==false&&settings.soundEnabled!==false?Math.max(.55,Math.min(1,(Number(settings.musicVolume)||0)/100))*HEADROOM:0;}
 // Public broadcasters (ARD + Deutschlandradio): official HTTPS streams, chosen by the federal state the
 // map is in, plus the national programmes. Community-directory stations of the area follow.
 const PUBLIC={

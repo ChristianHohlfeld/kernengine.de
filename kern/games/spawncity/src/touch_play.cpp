@@ -194,7 +194,12 @@ void TouchPlay::apply_dom_rects() {
   // own edge_hud_layout.mjs / thumb_layout.mjs); a finger counts where the player sees the button.
   for (const DomRect& d : dom_) {
     if (d.id == "clearance") {
+      // the height pad as drawn (#soloHeightPad): its axis centre and span, and where a finger
+      // takes it - the button's own rectangle too (it kept the built-in one: a finger on the
+      // visible DESCEND half missed it or landed on the stick beside it)
       if (pad_w_ > 0) { pad_x_ = d.x; pad_y_ = d.y; pad_w_ = d.w; pad_h_ = d.h; }
+      for (TouchBtn& b : buttons_)
+        if (b.id == "clearance") { b.x = d.x; b.y = d.y; b.w = d.w; b.h = d.h; }
       continue;
     }
     for (TouchBtn& b : buttons_)

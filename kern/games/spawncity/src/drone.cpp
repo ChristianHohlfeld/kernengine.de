@@ -255,7 +255,25 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
   const Vec3 down = s.rotation.rotate({0, 0, -1});
   const f32 vertical = -down.z;
   RayResult range;
-  if (vertical > 0.55f) range = cast(world, s.position + s.rotation.rotate({0, 0, -0.018f}), down, kNavRayMax, body);
+  // Like the original's filter (maskBits = COLLISION_TERRAIN) it sees only the fixed world - terrain
+  // and buildings: cars, pedestrians, ragdolls, animals and pigeons passing below do not make the
+  // altitude hold jump (each moving hit is stepped past).
+  if (vertical > 0.55f) {
+    Vec3 o = s.position + s.rotation.rotate({0, 0, -0.018f});
+    f32 travelled = 0;
+    for (int k = 0; k < 6; ++k) {
+      const kern::physics::RayHit h = world.cast_ray(o, down * (kNavRayMax - travelled), kCatWorld, body);
+      if (!h.hit) break;
+      const f32 d = h.fraction * (kNavRayMax - travelled);
+      if (!h.body.valid() || world.body_type(h.body) == kern::physics::BodyType::fixed) {
+        range.hit = true; range.distance = travelled + d; range.point = h.point; range.normal = h.normal;
+        break;
+      }
+      travelled += d + 0.02f;
+      o = h.point + down * 0.02f;
+      if (travelled >= kNavRayMax) break;
+    }
+  }
   const bool agl_valid = range.hit && range.distance >= 0.001f;
   const f32 true_agl = agl_valid ? range.distance * vertical : 999.0f;
   // Truth altitude above whatever is straight below (ground effect).

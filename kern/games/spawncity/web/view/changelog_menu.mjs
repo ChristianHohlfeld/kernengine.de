@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Drohne: Höhenhaltung wie im Original – der Höhenmesser sieht nur Boden und Gebäude, Autos, Passanten und Tiere darunter lassen sie nicht mehr springen; auf dem Handy reagiert das Höhenfeld wieder genau.",
+    "Radio verstummt, sobald Musik oder Ton ausgeschaltet ist.",
     "Start, RESET, Respawn und Beitritt: du wirst mit Sicherheitsabstand über dem Boden abgesetzt und gehalten, bis der Boden unter dir fertig geladen ist – kein Durchrutschen mehr beim Start.",
     "Multiplayer: Boxen und Messer eines Mitspielers erzeugen keine Schuss-Töne und Schuss-Spuren mehr; man hört den Schlag, wenn er trifft. Man sieht seine Schläge (der Arm schnellt vor), bei VR-Spielern die echten Handbewegungen samt Waffe in der Hand. Boxen am Desktop/Handy trifft jetzt auch Mitspieler.",
     "Handy: kompakte Oberfläche – mehr Spiel, weniger Knöpfe im Bild: durchsichtige Sticks (nur ein dünner Ring, greifen weiter auf voller Fläche), kleinere, halbtransparente Aktionsknöpfe, schmale obere Leiste mit ⚙ statt SETTINGS, kleinere Minimap, Sprach-Knöpfe nur im MULTI.",
