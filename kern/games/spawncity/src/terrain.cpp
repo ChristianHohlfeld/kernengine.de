@@ -748,6 +748,16 @@ void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1) {
   replan_ = true;
 }
 
+bool Terrain::ground_ready(f32 x, f32 y) const {
+  if (!settled_ || job_) return false;
+  if (dem_) {
+    if (!grid_ready_) return false;
+    const f32 span = grid_.step * static_cast<f32>(grid_.n > 0 ? grid_.n - 1 : 0);
+    if (x < grid_.x0 + 20 || y < grid_.y0 + 20 || x > grid_.x0 + span - 20 || y > grid_.y0 + span - 20) return false;
+  }
+  return has_collision(x, y);
+}
+
 bool Terrain::has_collision(f32 x, f32 y) const {
   const u64 k = key2(static_cast<i32>(std::floor(x / kTile)), static_cast<i32>(std::floor(y / kTile)));
   return collision_.count(k) && !dirty_collision_.count(k);

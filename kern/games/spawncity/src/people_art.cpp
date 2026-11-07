@@ -257,6 +257,35 @@ void PeopleArt::person(const People::Person& p, f32 now) {
     const f32 ap = clampf(p.aim_pitch, -1.2f, 1.2f);
     arm_l = shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.45f + ap) * rot({1, 0, 0}, -0.25f);
     arm_r = shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, -1.45f + ap) * rot({1, 0, 0}, 0.25f);
+  } else if (p.hands && !down) {
+    // a VR mate: each arm from its shoulder to his real hand (the arm 0.6 m: stretched or bent
+    // within 0.5 .. 1.15 of it)
+    auto reach = [&](f32 side_y, Vec3 hand) {
+      const Vec3 s0 = (shoulder * at({0, side_y, 0})).translation();
+      const Vec3 d = hand - s0;
+      const f32 len = kern::length(d);
+      const Vec3 z = len > 1e-3f ? d * (-1.0f / len) : Vec3{0, 0, 1};          // the arm runs along -z
+      const Vec3 fwd{std::cos(p.yaw), std::sin(p.yaw), 0};
+      Vec3 x = kern::normalize(kern::cross(Vec3{0, 0, 1}, z), fwd);
+      if (kern::length(kern::cross(Vec3{0, 0, 1}, z)) < 1e-3f) x = fwd;
+      const Vec3 y = kern::cross(z, x);
+      const f32 k = clampf(len / 0.6f, 0.5f, 1.15f);
+      Mat4 m;
+      m.m[0] = x.x; m.m[1] = x.y; m.m[2] = x.z; m.m[3] = 0;
+      m.m[4] = y.x; m.m[5] = y.y; m.m[6] = y.z; m.m[7] = 0;
+      m.m[8] = z.x * k; m.m[9] = z.y * k; m.m[10] = z.z * k; m.m[11] = 0;
+      m.m[12] = s0.x; m.m[13] = s0.y; m.m[14] = s0.z; m.m[15] = 1;
+      return m;
+    };
+    arm_l = reach(0.2f, p.hand_l);
+    arm_r = reach(-0.2f, p.hand_r);
+  } else if (p.punch && !down) {
+    // a mate's blow: the striking arm straight out at the target, the other one guarding
+    const bool r = p.punch & 1, l = p.punch & 2, slash = p.punch & 4;
+    arm_r = r || slash ? shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, slash ? -1.2f : -1.62f) * rot({1, 0, 0}, slash ? 0.6f : 0.12f)
+                       : shoulder * at({0, -0.22f, 0}) * rot({0, 1, 0}, -0.9f) * rot({1, 0, 0}, 0.5f);
+    arm_l = l ? shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.62f) * rot({1, 0, 0}, -0.12f)
+              : shoulder * at({0, 0.22f, 0}) * rot({0, 1, 0}, -0.9f) * rot({1, 0, 0}, -0.5f);
   } else {
     arm_l = shoulder * at({0, 0.27f, 0}) * rot({0, 1, 0}, -swing * 0.9f) * rot({1, 0, 0}, 0.06f);
     arm_r = shoulder * at({0, -0.27f, 0}) * rot({0, 1, 0}, swing * 0.9f) * rot({1, 0, 0}, -0.06f);
@@ -271,8 +300,10 @@ void PeopleArt::person(const People::Person& p, f32 now) {
     // low and forward when not aiming (knife, fists, a launcher on the shoulder)
     using W = weapons::Id;
     const W w = static_cast<W>(p.held);
-    const f32 ap = p.aiming ? clampf(p.aim_pitch, -1.2f, 1.2f) : 0.5f;
-    const Mat4 g = shoulder * at({0, -0.06f, 0}) * rot({0, 1, 0}, ap) * at({w == W::rocket ? 0.05f : 0.5f, 0, w == W::rocket ? 0.12f : -0.02f});
+    const f32 ap = p.aiming || p.hands ? clampf(p.aim_pitch, -1.2f, 1.2f) : 0.5f;
+    // a VR mate: the weapon in his real right hand along his aim; else at the meeting hands
+    const Mat4 g = p.hands ? at(p.hand_r) * rot({0, 0, 1}, p.yaw) * rot({0, 1, 0}, ap) * at({w == W::rocket ? -0.35f : 0.0f, 0, w == W::rocket ? 0.1f : 0.0f})
+                           : shoulder * at({0, -0.06f, 0}) * rot({0, 1, 0}, ap) * at({w == W::rocket ? 0.05f : 0.5f, 0, w == W::rocket ? 0.12f : -0.02f});
     Part* part = w == W::glock ? &gun_pistol_ : w == W::smg ? &gun_smg_ : w == W::sniper ? &gun_sniper_ : w == W::grenade_launcher ? &gun_tube_
                  : w == W::rocket ? &gun_rocket_ : w == W::knife ? &gun_knife_ : nullptr;
     if (part) put(*part, g);

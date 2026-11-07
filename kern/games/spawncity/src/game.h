@@ -273,7 +273,8 @@ class Game {
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
   /// A shot or blast against the other players: their machines apply the damage.
-  bool hit_remotes(Vec3 from, Vec3& to, f32 damage);
+  /// melee: a blow (no round, no tracer, no shot sound): the others hear it land (Fx::melee).
+  bool hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee = false);
   void blast_remotes(Vec3 at, f32 radius, f32 damage, u8 breaks = 0);
   void draw_remote_people();
   void draw_remote_vehicles();
@@ -635,6 +636,11 @@ class Game {
   static constexpr f32 kRespawnCooldown = 3;
   bool request_respawn();
   Vec3 standing_feet(Vec3 feet) const;  // the ground under a spawn spot as it is now (game.cpp)
+  void spawn_guard_step();
+  void put_down(Vec3 feet, f32 yaw_deg);  // the soldier onto the ground at feet, with the spawn guard
+  static constexpr f32 kSpawnLift = 0.35f;  // m: the safe margin a player is put down over the ground
+  Vec3 spawn_guard_;  // x, y, yaw (deg)
+  f32 spawn_guard_until_ = -1, spawn_guard_ready_at_ = -1;
   f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }
   // rules / feedback
   wanted::Tracker wanted_;

@@ -125,6 +125,8 @@ std::vector<u8> pack(const PlayerState& s) {
   if (s.flags & kDroneOut) w.put(s.drone_pos).put(s.drone_rot);
   if (s.flags & kJetOut) w.put(s.jet_pos).put(s.jet_rot);
   w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon).put(s.day).put(s.car);
+  for (kern::i8 v : s.hand) w.put(v);
+  w.put(s.hands);
   return w.b;
 }
 
@@ -137,6 +139,8 @@ bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
   if (s.flags & kDroneOut) { s.drone_pos = r.get<Vec3>(); s.drone_rot = r.get<Quat>(); }
   if (s.flags & kJetOut) { s.jet_pos = r.get<Vec3>(); s.jet_rot = r.get<Quat>(); }
   s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>(); s.day = r.get<f32>(); s.car = r.get<u8>();
+  for (kern::i8& v : s.hand) v = r.get<kern::i8>();
+  s.hands = r.get<u8>();
   if (!r.ok || mode > static_cast<u8>(PlayerMode::parachute) || !sane(s.position) || !sane(s.velocity) || !sane(s.avatar) || !std::isfinite(s.health)) return false;
   s.mode = static_cast<PlayerMode>(mode);
   s.health = clampf(s.health, 0, 100);

@@ -131,6 +131,9 @@ class Terrain {
   std::vector<Vec3> extra;
   /// Whether ground collision stands at (x, y) (a car may run its physics there).
   bool has_collision(f32 x, f32 y) const;
+  /// Whether the ground at (x, y) is final: the elevation there is loaded (no reload running that
+  /// would move it) and its collision stands - a player may be put down there.
+  bool ground_ready(f32 x, f32 y) const;
   const TerrainStats& stats() const { return stats_; }
 
  private:

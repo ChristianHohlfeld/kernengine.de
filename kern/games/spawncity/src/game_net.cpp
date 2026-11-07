@@ -146,6 +146,31 @@ net::PlayerState Game::my_state() const {
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
   s.stars = static_cast<u8>(wanted_.stars());
   s.weapon = static_cast<u8>(foot_weapon_);
+  // the hands and the blows (the others draw his arms there: game_net.cpp draw)
+  s.hands = 0;
+  for (kern::i8& v : s.hand) v = 0;
+  if (mode_ == Mode::foot && !player_dead_) {
+    const f32 tnow = world_->sim_time();
+    const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
+    if (engine_ && engine_->xr && vr_) {
+      kern::Mat4 hm;
+      bool any = false;
+      for (i32 side = 0; side < 2; ++side)
+        if (vr_hand_matrix(side, hm)) {
+          const Vec3 d = hm.translation() - feet;
+          // (x, y within 1.27 m of the feet, z 0 .. 2.54 m over them)
+          s.hand[side * 3 + 0] = static_cast<kern::i8>(std::lround(clampf(d.x * 100, -127, 127)));
+          s.hand[side * 3 + 1] = static_cast<kern::i8>(std::lround(clampf(d.y * 100, -127, 127)));
+          s.hand[side * 3 + 2] = static_cast<kern::i8>(std::lround(clampf(d.z * 50 - 127, -127, 127)));
+          any = true;
+        }
+      if (any) s.hands |= 1;
+    } else if (gaps_) {
+      if (tnow - gaps_->fist_last[0] < 0.22f) s.hands |= 2;
+      if (tnow - gaps_->fist_last[1] < 0.22f) s.hands |= 4;
+      if (foot_weapon_ == weapons::Id::knife && tnow - look_.vm_fire_at < 0.3f) s.hands |= 8;
+    }
+  }
   // the traffic car we drive, by the host's index (his town's: game_worldsync.cpp); a car of our
   // own town (far from him) is none of his
   s.car = 255;
@@ -268,7 +293,7 @@ void Game::update_net(f32 dt) {
     const Vec2 o = mp::spawn_ring_offset(std::max(1u, net_.index_of(net_.self_slot()) - 1));
     Spot s{};
     if (!clear_spot(m.anchor + Vec3{o.x, o.y, 0}, {0.6f, 0.6f}, 30, s)) s = {m.anchor + Vec3{o.x, o.y, 0}, 0};
-    world_->teleport(soldier_, Vec3{s.p.x, s.p.y, 0} + Vec3{0, 0, 0.75f});
+    put_down(s.p, s.yaw / kDeg);  // on the ground there as it will be (game.cpp spawn guard)
   }
 
   // Hits other players landed on us (the authority approved them): the owner applies them.
@@ -322,6 +347,9 @@ void Game::update_net(f32 dt) {
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
+      case net::Fx::melee:  // a mate's blow landed there (a fist or a blade): its sound, no round
+        osfx(f.a > 0.5f ? "gameplay_final_runtime_v2.knifeHit" : "gameplay_final_runtime_v2.punchThud", f.p, 0, 0);
+        break;
       case net::Fx::cow_death:
       case net::Fx::push: life_net_fx(f); break;  // M3 life (game_life.cpp)
       default: gaps_remote_fx(f); break;  // sc-m3-gaps effects (game_gaps.cpp)
@@ -358,7 +386,7 @@ void Game::update_net(f32 dt) {
       const Vec2 o = mp::respawn_offset(rng_);
       Spot s{};
       if (!clear_spot(m.death_feet + Vec3{o.x, o.y, 0}, {0.6f, 0.6f}, 24, s)) s = {m.death_feet + Vec3{o.x, o.y, 0}, 0};
-      if (mode_ == Mode::foot) world_->teleport(soldier_, Vec3{s.p.x, s.p.y, 0} + Vec3{0, 0, 0.75f});
+      if (mode_ == Mode::foot) put_down(s.p, s.yaw / kDeg);
       net_.report_respawn();
       m.last_hp = -1;
     }
@@ -426,7 +454,7 @@ void Game::mix_voice(f32* out, u32 frames) {
 // ---------------------------------------------------------------------------------------------
 // shots and blasts against the other players
 
-bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
+bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   (void)damage;
   if (!net_.active()) return false;
   const weapons::Id wid = mode_ == Mode::drone ? (drone_weapon_ == 0 ? weapons::Id::drone_gun : weapons::Id::drone_rockets)
@@ -487,13 +515,23 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage) {
     }
     if (d < radius && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = mp::Zone::torso; }
   }
-  // Everybody sees the round fly (a tracer in our colour up to where it ends).
-  net::Fx shot;
-  shot.kind = net::Fx::shot;
-  shot.p = from;
-  shot.dir = kern::normalize(seg);
-  shot.a = std::sqrt(l2) * (best >= 0 ? best_t : 1);
-  net_.send_fx(shot);
+  // Everybody sees the round fly (a tracer in our colour up to where it ends) - a blow is no
+  // round: only when it lands they hear it there
+  if (!melee) {
+    net::Fx shot;
+    shot.kind = net::Fx::shot;
+    shot.p = from;
+    shot.dir = kern::normalize(seg);
+    shot.a = std::sqrt(l2) * (best >= 0 ? best_t : 1);
+    net_.send_fx(shot);
+  } else if (best >= 0) {
+    net::Fx blow;
+    blow.kind = net::Fx::melee;
+    blow.p = from + seg * best_t;
+    blow.dir = kern::normalize(seg);
+    blow.a = damage >= 99 ? 1.0f : 0.0f;  // the knife
+    net_.send_fx(blow);
+  }
   if (best < 0) return false;
   to = from + seg * best_t;
   const net::Remote& r = rs[static_cast<std::size_t>(best)];
@@ -580,6 +618,18 @@ void Game::draw_remote_people() {
       p.aiming = w != weapons::Id::fists && w != weapons::Id::knife;
       p.aim_pitch = r.state.pitch;
       p.yaw = r.state.yaw;
+      // his real hands (VR) - the arms reach them, the gun in the right one - or his blows
+      p.hands = (r.state.hands & 1) != 0;
+      if (p.hands) {
+        auto hp = [&](i32 side) {
+          return p.pos + Vec3{r.state.hand[side * 3] / 100.0f, r.state.hand[side * 3 + 1] / 100.0f, (r.state.hand[side * 3 + 2] + 127) / 50.0f};
+        };
+        p.hand_l = hp(0);
+        p.hand_r = hp(1);
+        p.aiming = false;
+      }
+      p.punch = static_cast<u8>((r.state.hands >> 1) & 7);
+      if (p.punch) p.aiming = false;
       people_art_.person(p, now);
     } else if (r.state.mode == net::PlayerMode::drone) {
       p.pos = r.person_shown;

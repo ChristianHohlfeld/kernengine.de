@@ -389,7 +389,7 @@ void Game::spawn_guard() {
   for (f32 r : {40.0f, 80.0f, 160.0f})
     for (int i = 0; i < 6; ++i)
       if (city_.street_point(rng_, me, r, p, heading) && !city_.building_at({p.x, p.y})) {
-        world_->teleport(soldier_, p + Vec3{0, 0, 0.73f});
+        put_down(p, heading / kDeg);
         return;
       }
 }
@@ -401,7 +401,7 @@ void Game::place_world() {
   Spot p{};
   if (!clear_spot({0, 0, 0}, {2, 2}, 200, p)) p = {{0, 0, 0}, 0};
   spawn_ = p;
-  world_->teleport(soldier_, p.p + Vec3{0, 0, 0.73f});
+  put_down(p.p, p.yaw / kDeg);  // on the ground as it will be (the spawn guard: the start)
   Spot j{};
   if (clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j, true) || clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j)) {
     world_->set_alive(jet_actor_, true);
@@ -436,7 +436,50 @@ void Game::show_soldier(Vec3 feet, f32 yaw_deg) {
   if (!world_->actor_alive(soldier_)) world_->set_alive(soldier_, true);
   world_->set_mode(kern::game::SimMode::play);
   const Vec3 rot{0, 0, yaw_deg};
-  world_->teleport(soldier_, standing_feet(feet) + Vec3{0, 0, 0.73f}, &rot);
+  // a safe margin over the ground as it is now, and the spawn guard (spawn_guard_step) until the
+  // ground there is final
+  (void)rot;
+  put_down(feet, yaw_deg);
+}
+
+void Game::put_down(Vec3 feet, f32 yaw_deg) {
+  const Vec3 rot{0, 0, yaw_deg};
+  world_->teleport(soldier_, standing_feet(feet) + Vec3{0, 0, 0.73f + kSpawnLift}, &rot);
+  world_->set_actor_velocity(soldier_, {});
+  spawn_guard_ = {feet.x, feet.y, yaw_deg};
+  spawn_guard_until_ = world_->sim_time() + 20;
+  spawn_guard_ready_at_ = -1;
+}
+
+void Game::spawn_guard_step() {
+  // A player put down (start, RESET, respawn, out of a vehicle) stands on the ground as it is
+  // once it is final there: while the elevation or the collision under him is still coming (the
+  // first seconds of a start, a reload), he is held over it - his feet a margin above the ground
+  // he will get - and set down on it when it is there; for 2 s after that a ground that moved
+  // under him (the elevation arriving late) lifts him back onto it. Then the guard is done.
+  if (spawn_guard_until_ < 0 || mode_ != Mode::foot || player_dead_) { spawn_guard_until_ = -1; return; }
+  const f32 now = world_->sim_time();
+  if (now > spawn_guard_until_) { spawn_guard_until_ = -1; return; }
+  const Vec3 c = matrix_of(soldier_).translation();
+  // he moved off on his own (walked, a vehicle): the guard follows him while it lasts
+  const Vec3 feet{c.x, c.y, c.z - 0.73f};
+  const bool ready = city_.terrain().ground_ready(feet.x, feet.y);
+  const Vec3 stand = standing_feet(feet);
+  if (!ready) {
+    // held: just over where the ground will be, no fall speed
+    const Vec3 hold = stand + Vec3{0, 0, kSpawnLift};
+    if (std::fabs(feet.z - hold.z) > 0.05f) { const Vec3 rot{0, 0, spawn_guard_.z}; world_->teleport(soldier_, hold + Vec3{0, 0, 0.73f}, &rot); }
+    world_->set_actor_velocity(soldier_, {});
+    spawn_guard_ready_at_ = -1;
+    return;
+  }
+  if (spawn_guard_ready_at_ < 0) spawn_guard_ready_at_ = now;
+  if (feet.z < stand.z - 0.25f) {
+    // the ground came up over his feet: back onto it
+    world_->teleport(soldier_, stand + Vec3{0, 0, 0.73f + 0.1f});
+    world_->set_actor_velocity(soldier_, {});
+  }
+  if (now - spawn_guard_ready_at_ > 2.0f) spawn_guard_until_ = -1;
 }
 
 Vec3 Game::standing_feet(Vec3 feet) const {
@@ -600,6 +643,7 @@ void Game::eject() {
 void Game::fixed_step(f32 h) {
   if (!world_ || !world_placed_) return;
   ++steps_;
+  spawn_guard_step();  // a player put down stands on the final ground (game.cpp)
   kern::physics::World& w = world_->physics();
   if (drone_out_) {
     const kern::physics::Body b = body(drone_actor_);

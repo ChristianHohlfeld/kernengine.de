@@ -74,6 +74,9 @@ class People {
     bool aiming = false;
     f32 aim_pitch = 0;  // rad, + down: where the aiming arms (and the head) point - a mate's view (game_net.cpp)
     i32 held = -1;      // a weapon in the right hand (weapons::Id; -1 none): a mate's, drawn by PeopleArt
+    bool hands = false; // a VR mate: his arms reach his real hands (world places)
+    Vec3 hand_l, hand_r;
+    u8 punch = 0;       // a mate's blow: bit 0 the right hand jabs, bit 1 the left, bit 2 a knife slash
     u32 seed = 0;
     // fighting back (pedestrian_agents.mjs) and the scripted kinds
     f32 provoked_at = -99, fight_until = 0, last_attack = -99;

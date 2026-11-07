@@ -63,6 +63,10 @@ struct PlayerState {
   f32 thrust = 0;         // jet 0..1
   u8 stars = 0, weapon = 0;
   f32 day = -1;           // time of day 0..1 (day_night_sync.mjs: clients follow the host's)
+  // his hands (body-relative to his feet, cm; VR: where the controllers are) and his blows:
+  // bit 0 the hands are real (VR), bit 1 the right hand jabs, bit 2 the left, bit 3 a knife slash
+  kern::i8 hand[6] = {0, 0, 0, 0, 0, 0};
+  u8 hands = 0;
   u8 car = 255;           // the traffic car he drives (its index on his machine; 255 none) - the host's world leaves it to him
 };
 
@@ -73,7 +77,7 @@ struct Fx {
   // lamp: street_lamps.mjs sendBreak (p foot, dir x/y + state); strike / flyover: fighter_jets.mjs
   // (p mark, a alt, dir.x offset); mil_tracer / mil_shell: military_response.mjs (p from, dir to) - sc-m3-gaps
   // npc_death: world_procedural_population.mjs "npc-death" (p where, dir.x / dir.y the person's id, 16 bits each)
-  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, kLast = npc_death };
+  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee };
   u8 kind = shot, owner = 0;
   Vec3 p, dir;
   f32 a = 0;              // shot: speed; explosion: radius

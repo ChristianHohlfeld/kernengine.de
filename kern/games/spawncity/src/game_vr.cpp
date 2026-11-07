@@ -74,7 +74,7 @@ void Game::vr_melee(i32 side, f32 dt) {
     const Vec3 from = prev + o - dir * 0.04f, to = at + o + dir * reach;
     // a mate in the way takes the blow (damage by the authority, and a shove on his machine)
     Vec3 mt = to;
-    if (hit_remotes(from, mt, dmg)) {
+    if (hit_remotes(from, mt, dmg, true)) {
       hit = 0;
       at_hit = mt;
       for (const net::Remote& rm : net_.remotes())

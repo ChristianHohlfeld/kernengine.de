@@ -336,6 +336,11 @@ bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_
   Vec3 dir;
   const Vec3 eye = aim_ray(dir);
   Vec3 to = eye + dir * reach;
+  // a mate in front takes the blow first (his machine applies it: the authority approves)
+  {
+    Vec3 mt = to;
+    if (hit_remotes(eye, mt, damage, true)) return true;
+  }
   i32 hit = people_.shot(eye, to, damage, true, now, momentum_ns);
   if (hit < 0 && life_punch(eye, to)) hit = 0;  // animals (M3 life)
   if (hit < 0) {

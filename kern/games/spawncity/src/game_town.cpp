@@ -833,7 +833,7 @@ void Game::update_town(f32 dt) {
     const Vec2 o = mp::respawn_offset(rng_);
     Spot s{};
     if (!clear_spot(died_feet_ + Vec3{o.x, o.y, 0}, {0.6f, 0.6f}, 24, s)) s = {died_feet_ + Vec3{o.x, o.y, 0}, 0};
-    world_->teleport(soldier_, standing_feet(Vec3{s.p.x, s.p.y, city_.ground_height(s.p.x, s.p.y)}) + Vec3{0, 0, 0.75f});
+    put_down(Vec3{s.p.x, s.p.y, city_.ground_height(s.p.x, s.p.y)}, s.yaw / kDeg);
   } else if (!dead && player_dead_ && net_.active() && mode_ == Mode::foot) {
     // with mates Kern brings him back at the spawn on its timer: put him on the ground as it is now
     // (a crater on the spawn sank it - he would start under the terrain and fall)
