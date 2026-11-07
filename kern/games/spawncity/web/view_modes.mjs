@@ -622,6 +622,7 @@ function installViewModes() {
   }
 
   registerViewBinder("modes", (h, touch, view) => {
+    document.body.classList.toggle("sc-mp-on", !!h.net);  // the voice buttons only in MULTI (index.html)
     radios(h);
     sticks(h);
     car(h, view);
