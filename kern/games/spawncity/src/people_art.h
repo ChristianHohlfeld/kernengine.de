@@ -30,6 +30,8 @@ class PeopleArt {
   void projectile(Vec3 at, Vec3 dir, f32 radius, f32 length, bool flame);
   /// A street lamp on the pavement (head lit by `night` 0..1).
   void street_lamp(Vec3 foot, f32 arm_yaw, f32 night);
+  /// A mate's beacon: a thin pillar of his colour rising over him (seen from afar, MP).
+  void beacon(Vec3 foot, Vec3 color, f32 alpha);
   void end();
 
  private:
@@ -43,6 +45,7 @@ class PeopleArt {
   kern::Renderer* r_ = nullptr;
   Part leg_, torso_, arm_, head_, hand_, hair_, vest_, door_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
   Part rd_pelvis_, rd_chest_, rd_upper_, rd_fore_, rd_thigh_, rd_shin_;  // a ragdoll's bones, rounded
+  Part beacon_;
   Part gun_pistol_, gun_smg_, gun_sniper_, gun_tube_, gun_rocket_, gun_knife_;  // a mate's weapon in his hand (barrel along +x)
 };
 

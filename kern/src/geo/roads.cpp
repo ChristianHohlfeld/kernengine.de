@@ -64,6 +64,25 @@ void RoadBuilder::band(f64 ax, f64 ay, f64 bx, f64 by, f64 width, f64 z, const R
     const f64 px = ax + dx * t, py = ay + dy * t, qx = ax + dx * u, qy = ay + dy * u;
     if (min_of(std::hypot(px - cx, py - cy), std::hypot(qx - cx, qy - cy)) > limit) continue;
     const f64 A[2] = {px + nx, py + ny}, B[2] = {px - nx, py - ny}, C[2] = {qx - nx, qy - ny}, D[2] = {qx + nx, qy + ny};
+    const f64 sl = len / segments;
+    if (options_.deformed && options_.fine_step > 0.05 && options_.deformed((px + qx) * 0.5, (py + qy) * 0.5, sl * 0.5 + width * 0.5)) {
+      // the bent ground: a grid of small quads, every vertex on the terrain
+      const u32 na = max_of<u32>(1, static_cast<u32>(std::ceil(sl / options_.fine_step))), nw = max_of<u32>(1, static_cast<u32>(std::ceil(width / options_.fine_step)));
+      auto P = [&](u32 a, u32 w, f64* out) {
+        const f64 fa = static_cast<f64>(a) / na, fw = static_cast<f64>(w) / nw;
+        const f64 lx = A[0] + (D[0] - A[0]) * fa, ly = A[1] + (D[1] - A[1]) * fa, rx = B[0] + (C[0] - B[0]) * fa, ry = B[1] + (C[1] - B[1]) * fa;
+        out[0] = lx + (rx - lx) * fw;
+        out[1] = ly + (ry - ly) * fw;
+      };
+      for (u32 a = 0; a < na; ++a)
+        for (u32 w = 0; w < nw; ++w) {
+          f64 p0[2], p1[2], p2[2], p3[2];
+          P(a, w, p0); P(a, w + 1, p1); P(a + 1, w + 1, p2); P(a + 1, w, p3);
+          tri(p0, p1, p2, z, col);
+          tri(p0, p2, p3, z, col);
+        }
+      continue;
+    }
     tri(A, B, C, z, col);
     tri(A, C, D, z, col);
   }

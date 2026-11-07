@@ -550,6 +550,13 @@ void Game::draw_remote_people() {
   for (const net::Remote& r : net_.remotes())
     if (r.state.mode == net::PlayerMode::parachute && !(r.state.flags & net::kDead) && !(r.state.flags & net::kPassenger))
       pilot(r.shown - Vec3{0, 0, 0.85f}, r.state.yaw, mp::rgb(net_.color_of(r.state.slot)));
+  // the mates' beacons: a pillar of light over each one farther than 40 m (find each other)
+  for (const net::Remote& r : net_.remotes()) {
+    if (r.state.flags & (net::kDead | net::kPassenger)) continue;
+    const Vec3 at = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone ? r.person_shown : r.shown;
+    const f32 d = kern::length(at - cam_.eye);
+    if (d > 40) people_art_.beacon(at, mp::rgb(net_.color_of(r.state.slot)), clampf((d - 40) / 200, 0, 1));
+  }
   for (const net::Remote& r : net_.remotes()) {
     People::Person p;
     p.kind = People::Kind::citizen;
@@ -691,7 +698,14 @@ bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
   const f32 t = std::tan(cam_.fov / 2), aspect = frame_w_ / std::fmax(1.0f, frame_h_);
   const f32 z = std::fabs(depth) < 1e-3f ? 1e-3f : std::fabs(depth);
   f32 nx = kern::dot(d, r) / (z * t * aspect), ny = kern::dot(d, u) / (z * t);
-  if (depth < 0) { nx = -nx; ny = -ny; if (std::fabs(nx) < 0.02f && std::fabs(ny) < 0.02f) ny = -1; }
+  if (depth < 0.05f) {
+    // behind the camera: the side he is on, unprojected (a perspective division would mirror it -
+    // a mate behind on the left showed on the right); straight behind is down
+    nx = kern::dot(d, r);
+    ny = kern::dot(d, u);
+    const f32 l = std::hypot(nx, ny);
+    if (l < 1e-3f) { nx = 0; ny = -1; } else { nx = nx / l * 4; ny = ny / l * 4; }
+  }
   x = nx;
   y = ny;
   return depth > 0 && std::fabs(nx) < 0.97f && std::fabs(ny) < 0.93f;

@@ -3,6 +3,7 @@
 // built incrementally under a time budget.
 #pragma once
 
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,11 @@ struct RoadOptions {
   f64 uv_scale = 0.2;
   Rgb curb_color{0.525, 0.514, 0.486};
   std::vector<Rgb> palette;  // surface / marking colours referenced by index
+  /// Where the ground is deformed (a crater): a segment whose circle (x, y, r) this says yes to is
+  /// draped finely - every `fine_step` metres along and across - so it lies on the bent ground
+  /// instead of spanning over it. Empty: never.
+  std::function<bool(f64 x, f64 y, f64 r)> deformed;
+  f64 fine_step = 0.9;
 };
 
 /// Road stream (f64 values): count, then per road

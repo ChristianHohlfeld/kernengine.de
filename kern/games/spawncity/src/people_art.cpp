@@ -111,6 +111,13 @@ bool PeopleArt::init(kern::Renderer& r) {
     prim::append(m, prim::box({0.27f, 0.13f, 0.02f}, sole), at({0.05f, 0, -0.245f}));
     if (!make(r, rd_shin_, m, mat(0.85f), true)) return false;
   }
+  {
+    // a mate's beacon (MP): a unit column, unlit and glowing in his colour
+    kern::Material bm = mat(0.3f, 0, {1.6f, 1.6f, 1.6f});
+    bm.unlit = true;
+    bm.cast_shadow = false;
+    if (!make(r, beacon_, prim::cylinder(1.0f, 1.0f, 10, white), bm, true)) return false;
+  }
   // the weapons a mate carries (seen in third person, MP): built along +x from the grip
   {
     const Vec3 gm{0.09f, 0.09f, 0.1f}, gd{0.2f, 0.21f, 0.23f}, ol{0.26f, 0.3f, 0.2f};
@@ -210,7 +217,7 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
 }
 
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &beacon_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -308,6 +315,11 @@ void PeopleArt::ragdolls(const std::vector<Ragdolls::Draw>& bones) {
   }
 }
 
+void PeopleArt::beacon(Vec3 foot, Vec3 color, f32 alpha) {
+  // from 2.6 m over him 90 m up, 0.18 m thick - thin near, a line far away (tinted, brighter with alpha)
+  put(beacon_, at(foot + Vec3{0, 0, 2.6f}) * Mat4::scale({0.18f, 0.18f, 90.0f}), color * (0.6f + 1.4f * alpha));
+}
+
 void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {
   const Mat4 m = chassis * at({-0.2f, 0, 0.86f});
   put(bar_, m);
@@ -354,7 +366,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &beacon_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

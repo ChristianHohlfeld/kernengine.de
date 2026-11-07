@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Straßen liegen nach Explosionen sauber im Krater statt darüber zu schweben (feines Netz über verformtem Boden, auch bei mehreren Kratern kurz hintereinander).",
+    "Multiplayer: über jedem Mitspieler, der weiter als 40 m weg ist, steht eine Lichtsäule in seiner Farbe; die Pfeile am Bildrand zeigen auch bei Mitspielern hinter dir in die richtige Richtung.",
     "Multiplayer: eine gemeinsame Welt – alle sehen dieselben Autos an derselben Stelle (gleiche Farbe, gleiche Fahrt) und dieselben Passanten; der Host führt Verkehr und Passanten, rund um jeden Spieler. Das Auto, das ein Mitspieler fährt, gehört ihm.",
     "Multiplayer: Mitspieler halten ihre echte Waffe (Pistole, MP, Sniper, Werfer, Raketenwerfer, Messer) und zielen sichtbar dorthin, wohin sie schauen – hoch, runter, links, rechts.",
     "Respawn und RESET stellen dich auf den Boden, wie er jetzt ist – auch in einem Krater, nie darunter.",

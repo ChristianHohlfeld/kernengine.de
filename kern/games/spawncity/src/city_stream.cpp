@@ -94,7 +94,7 @@ struct CityStream::Tile {
   // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
   kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
   std::vector<u32> lay_meshes, old_lay;
-  bool relay = false;
+  bool relay = false, relay_again = false;
   Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
   // the drawn subset (indices into features.buildings) and its centres; a re-sync swaps the meshes
   std::vector<u32> vis, vis_built;
@@ -404,6 +404,8 @@ void CityStream::begin_roads(Tile& t) {
   ro.radius = 720;
   ro.segment_length = 4;  // follows the 5 m terrain nodes
   ro.palette = road_palette();
+  // over a crater the ribbon is draped finely (0.9 m quads): it lies in the bowl, not over it
+  ro.deformed = [this](f64 x, f64 y, f64 r) { return terrain_.deformed(static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(r)); };
   t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
   t.roads_at = {focus_.x, focus_.y};
   ++relays_;
@@ -414,8 +416,10 @@ void CityStream::begin_roads(Tile& t) {
 void CityStream::relay(const kern::Vec4& rect) {
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
-    if (t.state != Tile::State::ready || t.relay) continue;
     if (rect.x > t.bounds.z || rect.z < t.bounds.x || rect.y > t.bounds.w || rect.w < t.bounds.y) continue;
+    // a new crater while this tile's roads are being re-laid: once more after that (the layer
+    // being built sampled the ground before it)
+    if (t.relay || t.state != Tile::State::ready) { if (t.relay) t.relay_again = true; continue; }
     t.relay = true;
     t.old_lay = std::move(t.lay_meshes);
     t.lay_meshes.clear();
@@ -755,6 +759,13 @@ bool CityStream::work(Tile& t, f64 deadline) {
         t.old_lay.clear();
         t.relay = false;
         t.state = S::ready;
+        if (t.relay_again) {
+          t.relay_again = false;
+          t.relay = true;
+          t.old_lay = std::move(t.lay_meshes);
+          t.lay_meshes.clear();
+          begin_roads(t);
+        }
         return true;
       }
       t.state = S::ready;  // collision: the working set around the player (update_collision)

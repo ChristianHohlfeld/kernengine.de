@@ -112,6 +112,11 @@ class Terrain {
   // ---- craters ----
   /// A bowl of `radius` (rim included) and `depth` (terrain_craters.mjs craterProfile, scaled).
   void add_crater(Vec2 at, f32 radius, f32 depth);
+  /// Whether a circle (x, y, r) touches a crater (the roads drape finely there: city_stream.cpp).
+  bool deformed(f32 x, f32 y, f32 r) const {
+    for (const Crater& c : craters_) if (std::hypot(x - c.c.x, y - c.c.y) < c.r + r + 2.5f) return true;
+    return false;
+  }
   u32 crater_count() const { return static_cast<u32>(craters_.size()); }
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
   void take_changes(std::vector<kern::Vec4>& out) { out.insert(out.end(), changes_.begin(), changes_.end()); changes_.clear(); }
