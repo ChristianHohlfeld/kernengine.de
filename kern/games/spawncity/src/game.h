@@ -272,6 +272,9 @@ class Game {
   void update_net(f32 dt);
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
+  void net_world_rules();
+  bool world_rule_locked(Opt o) const;
+  std::string world_rules_json() const;
   /// A shot or blast against the other players: their machines apply the damage.
   /// melee: a blow (no round, no tracer, no shot sound): the others hear it land (Fx::melee).
   bool hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee = false);

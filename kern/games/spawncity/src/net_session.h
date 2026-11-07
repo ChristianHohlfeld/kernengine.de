@@ -196,6 +196,11 @@ class Session {
   const mp::Scoreboard& scores() const { return scores_; }
   bool friendly_fire() const { return friendly_fire_; }
   void set_friendly_fire_initial(bool on) { if (role_ != Role::client) friendly_fire_ = on; }
+  /// The host's WORLD switches (who lives in the city, the player abilities): one bit per world.*
+  /// option, the host's apply to everybody (server authority). Host: set them (sent on a change and
+  /// with the rules every 4 s); client: whether they have arrived and what they are.
+  void set_world_rules(u16 mask);
+  bool world_rules(u16& mask) const { if (!have_world_rules_) return false; mask = world_rules_; return true; }
   bool protected_now(u8 slot, f64 now_ms) const;
   f64 now_ms() const { return time_ * 1000; }
   /// The vote everybody sees: text, and whether our answer is missing.
@@ -246,7 +251,9 @@ class Session {
   u8 self_slot_ = kHost;
   PlayerState me_;
   mp::Scoreboard scores_;
-  bool friendly_fire_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
+  bool friendly_fire_ = false;
+  u16 world_rules_ = 0;
+  bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
   std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)
   mp::Ballot ballot_, remote_ballot_;
   u32 ballot_serial_ = 0;

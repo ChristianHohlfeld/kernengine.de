@@ -146,6 +146,34 @@ export function installOriginalMenus({command, ui, mp}) {
     for (const o of wo.list) set(`world.${o.key}`, wo.get(o.key) ? 1 : 0);
     addEventListener(wo.event, ev => { const k = ev.detail?.key; if (k && k !== "hostRules") set(`world.${k}`, ev.detail.value ? 1 : 0); });
   }
+  // In a session the host's WORLD switches apply (the game holds them: worldLocked / worldRules):
+  // the WORLD panel shows his, locked - a click does not change them, nor this device's own.
+  let worldLocked = false;
+  document.addEventListener("click", ev => {
+    if (!worldLocked) return;
+    const row = ev.target.closest?.("#worldOptionsPanel .wo-row[data-wo]");
+    if (row && row.dataset.wo !== "friendlyFire") { ev.preventDefault(); ev.stopImmediatePropagation(); }
+  }, true);
+  registerViewBinder("worldRules", h => {
+    worldLocked = !!h.worldLocked;
+    const panel = document.getElementById("worldOptionsPanel");
+    if (!panel || panel.hidden) return;
+    for (const row of panel.querySelectorAll(".wo-row[data-wo]")) {
+      const k = row.dataset.wo;
+      if (k === "friendlyFire" || !(k in (h.worldRules || {}))) continue;
+      const lock = worldLocked ? "true" : "false";
+      if (row.getAttribute("aria-disabled") !== lock) { row.setAttribute("aria-disabled", lock); row.style.opacity = worldLocked ? ".55" : ""; row.style.cursor = worldLocked ? "not-allowed" : ""; }
+      if (worldLocked) { const v = String(!!h.worldRules[k]); if (row.getAttribute("aria-checked") !== v) row.setAttribute("aria-checked", v); }
+    }
+    let note = panel.querySelector(".wo-host-note");
+    if (worldLocked && !note) {
+      note = document.createElement("p");
+      note.className = "wo-sub wo-host-note";
+      note.style.color = "#ffd76a";
+      note.textContent = "MULTIPLAYER: DIE WELT-EINSTELLUNGEN DES HOSTS GELTEN FÜR ALLE.";
+      panel.querySelector(".wo-card h2")?.after(note);
+    } else if (!worldLocked && note) note.remove();
+  });
   const kernPanels = () => ["scPause", "scSettings"].map(id => document.getElementById(id)).filter(Boolean);
   const closeAll = () => {
     for (let i = 0; i < 8 && kernPanels().some(p => !p.hidden); i++) ui?.open?.("close");

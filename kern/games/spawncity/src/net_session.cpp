@@ -190,6 +190,7 @@ void Session::stop() {
   role_ = Role::none;
   ever_in_ = false;
   mates_.clear();
+  have_world_rules_ = false;  // a new session: the new host's switches
 }
 
 bool Session::connected() const {
@@ -357,7 +358,19 @@ void Session::send_scores() {
   to_all(kReliable, kScores, w.b, kNobody);
 }
 
-void Session::send_rules() { to_all(kReliable, kRules, W().put(static_cast<u8>(friendly_fire_)).b, kNobody); }
+void Session::send_rules() {
+  W w;
+  w.put(static_cast<u8>(friendly_fire_));
+  if (have_world_rules_) w.put(world_rules_);
+  to_all(kReliable, kRules, w.b, kNobody);
+}
+void Session::set_world_rules(u16 mask) {
+  if (role_ == Role::client) return;
+  const bool changed = !have_world_rules_ || mask != world_rules_;
+  world_rules_ = mask;
+  have_world_rules_ = true;
+  if (changed && role_ == Role::host) send_rules();
+}
 
 void Session::send_anchor(u8 slot) {
   // The largest fresh group in the shared frame; dead or quiet players do not pull.
@@ -581,7 +594,13 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       if (r.ok && v.from != self_slot_ && v.data.size() >= 4 && v.data.size() <= 800) voice_.push_back(v);
       return;
     }
-    case kRules: { const u8 ff = r.get<u8>(); if (r.ok) friendly_fire_ = ff != 0; return; }
+    case kRules: {
+      const u8 ff = r.get<u8>();
+      if (!r.ok) return;
+      friendly_fire_ = ff != 0;
+      if (role_ == Role::client) { const u16 m = r.get<u16>(); if (r.ok) { world_rules_ = m; have_world_rules_ = true; } }
+      return;
+    }
     case kBallotMsg: {
       mp::Ballot b;
       b.id = r.get<u32>(); b.key = r.get<u8>(); b.value = r.get<u8>() != 0;

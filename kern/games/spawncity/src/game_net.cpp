@@ -68,6 +68,8 @@ mp::Weapon mp_weapon(weapons::Id id) {
 /// Per-player multiplayer presentation state (owned by Game through mp_).
 struct MpLocal {
   MpArt art;
+  f32 world_own[16] = {};  // our own WORLD switches while the host's apply
+  bool world_saved = false;
   mp::PingBoard pings;
   struct Tracer { Vec3 p, v; f32 left; u32 color; };
   std::vector<Tracer> tracers;
@@ -115,6 +117,57 @@ MpLocal& Game::mp_local() {
   if (!mp_) mp_.reset(new MpLocal);
   if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer);
   return *mp_;
+}
+
+// ---------------------------------------------------------------------------------------------
+// the WORLD switches: the host's apply to everybody
+
+namespace {
+// world.* switches that make the world (friendly fire is the rule voted on: game_rules_sync)
+constexpr Opt kWorldRules[] = {Opt::world_people, Opt::world_traffic, Opt::world_dogs, Opt::world_cats, Opt::world_birds, Opt::world_zombies, Opt::world_police,
+                               Opt::world_military, Opt::world_flak, Opt::world_jetpack, Opt::world_terrain, Opt::world_guided, Opt::world_always_day};
+}  // namespace
+
+bool Game::world_rule_locked(Opt o) const {
+  if (!net_.active() || net_.hosting()) return false;
+  for (Opt w : kWorldRules) if (w == o) return true;
+  return false;
+}
+
+void Game::net_world_rules() {
+  Settings& st = ui_.settings;
+  MpLocal& m = mp_local();
+  if (!net_.active()) {
+    // out of the session: our own switches again
+    if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(kWorldRules[i], m.world_own[i]); m.world_saved = false; }
+    return;
+  }
+  if (net_.hosting()) {
+    u16 mask = 0;
+    for (u32 i = 0; i < std::size(kWorldRules); ++i) if (st.on(kWorldRules[i])) mask |= static_cast<u16>(1u << i);
+    net_.set_world_rules(mask);
+    return;
+  }
+  u16 mask = 0;
+  if (!net_.world_rules(mask)) return;
+  if (!m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) m.world_own[i] = st.get(kWorldRules[i]); m.world_saved = true; }
+  for (u32 i = 0; i < std::size(kWorldRules); ++i) {
+    const f32 v = (mask >> i) & 1u ? 1.0f : 0.0f;
+    if (st.get(kWorldRules[i]) != v) st.set(kWorldRules[i], v);
+  }
+}
+
+std::string Game::world_rules_json() const {
+  std::string o = net_.active() && !net_.hosting() ? ",\"worldLocked\":true,\"worldRules\":{" : ",\"worldLocked\":false,\"worldRules\":{";
+  bool first = true;
+  for (Opt w : kWorldRules) {
+    const char* key = opt_spec(w).key;  // "world.people"
+    o += first ? "\"" : ",\"";
+    o += key + 6;
+    o += ui_.settings.on(w) ? "\":true" : "\":false";
+    first = false;
+  }
+  return o + "}";
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -256,6 +309,7 @@ void Game::update_net(f32 dt) {
   m.tracers.erase(std::remove_if(m.tracers.begin(), m.tracers.end(), [](const MpLocal::Tracer& t) { return t.left <= 0; }), m.tracers.end());
   m.flashes.erase(std::remove_if(m.flashes.begin(), m.flashes.end(), [&](const MpLocal::Flash& f) { return now - f.born > f.life; }), m.flashes.end());
   if (world_placed_) update_nav();
+  net_world_rules();  // the host's WORLD switches are everybody's (server authority); out of a session our own
   if (!net_.active()) return;
 
   // Changing FRIENDLY FIRE in the settings during a session asks everybody (game_rules_sync.mjs);
@@ -988,6 +1042,7 @@ std::string Game::net_command(const std::string& cmd) {
       return "joining";
     }
     if (rest == "migrate") return std::to_string(m.migrate);
+    if (rest == "rules") { u16 w = 0; const bool have = net_.world_rules(w); return std::string(have ? "have " : "none ") + std::to_string(w) + (net_.hosting() ? " host" : " client"); }
     if (rest == "stop") { net_.stop(); return "stopped"; }
     if (rest == "remotes") {
       std::string o = "[";

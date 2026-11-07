@@ -1324,6 +1324,7 @@ std::string Game::hud_json() {
   details_hud(s);  // "details":{...} (game_details.cpp)
   gaps_hud(s);  // "gaps":{...} (game_gaps.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
+  s += world_rules_json();  // the WORLD switches in force (the host's in a session: game_net.cpp)
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)

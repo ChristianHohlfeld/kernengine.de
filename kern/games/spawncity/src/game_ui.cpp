@@ -30,18 +30,21 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   if (starts("set ")) {
     // "set <key> <value>" (several pairs separated by ';' are fine: the page replays its copy).
     std::string rest = cmd.substr(4);
-    u32 ok = 0, bad = 0;
+    u32 ok = 0, bad = 0, locked = 0;
     std::size_t at = 0;
     while (at < rest.size()) {
       std::size_t end = rest.find(';', at);
       if (end == std::string::npos) end = rest.size();
       const std::string pair = rest.substr(at, end - at);
       const std::size_t sp = pair.find(' ');
-      if (sp != std::string::npos && st.set(std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
+      Opt o;
+      // in a session the host's WORLD switches apply: a client cannot change them
+      if (sp != std::string::npos && find_opt(std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
+      else if (sp != std::string::npos && st.set(std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
       else if (!pair.empty()) ++bad;
       at = end + 1;
     }
-    out = bad ? (ok ? "partly" : "unknown setting") : "ok";
+    out = bad ? (ok ? "partly" : "unknown setting") : locked && !ok ? "vom Host festgelegt" : "ok";
     return true;
   }
   if (starts("get ")) {
