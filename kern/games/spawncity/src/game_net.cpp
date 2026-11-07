@@ -826,8 +826,10 @@ bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
   if (depth < 0.05f) {
     // behind the camera: the side he is on, unprojected (a perspective division would mirror it -
     // a mate behind on the left showed on the right); straight behind is down
+    // (the side from the horizontal: left / right by the camera's right, down by how far behind -
+    // straight behind is the bottom edge, behind on the left the bottom left)
     nx = kern::dot(d, r);
-    ny = kern::dot(d, u);
+    ny = depth;
     const f32 l = std::hypot(nx, ny);
     if (l < 1e-3f) { nx = 0; ny = -1; } else { nx = nx / l * 4; ny = ny / l * 4; }
   }
@@ -848,7 +850,7 @@ std::string Game::mp_hud_json() {
   auto marker = [&](Vec3 p, f32& sx, f32& sy, bool& on, f32& angle) {
     f32 nx, ny, depth;
     on = project_screen(p, nx, ny, depth);
-    const f32 margin = std::fmin(46.0f, w * 0.07f), hw = std::fmax(1.0f, w / 2 - margin), hh = std::fmax(1.0f, h / 2 - margin);
+    const f32 margin = std::fmin(86.0f, w * 0.1f), hw = std::fmax(1.0f, w / 2 - margin), hh = std::fmax(1.0f, h / 2 - margin);
     f32 x = nx * w / 2, y = -ny * h / 2;
     if (!on) { const f32 k = std::fmin(hw / std::fmax(1e-3f, std::fabs(x)), hh / std::fmax(1e-3f, std::fabs(y))); x *= k; y *= k; }
     const Vec2 q = mp::safe_mobile_marker_point({w / 2 + x, h / 2 + y}, w, h, touch_mode_);
@@ -911,6 +913,7 @@ std::string Game::mp_hud_json() {
     // Players: nameplates (P1.., distance, health), the board, who is talking.
     s += ",\"players\":[";
     first = true;
+    const Vec3 mine = mode_ == Mode::foot ? matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f} : focus_position();
     for (const net::Remote& r : net_.remotes()) {
       if (now - r.received_ms > mp::kStaleHoldMs) continue;
       // Over the head on foot, over the craft otherwise (the marker follows what the mate steers).
@@ -919,10 +922,17 @@ std::string Game::mp_hud_json() {
       bool on;
       marker(anchor, x, y, on, ang);
       const f32 d = kern::length(anchor - cam_.eye);
+      // where he is from us: higher or lower (his feet / craft against ours), and his bearing
+      // against the view (0 ahead, + to the right, +-180 behind) - the HUD says it in words
+      const Vec3 his = r.state.mode == net::PlayerMode::foot ? r.person_shown : r.shown;
+      const f32 dz = his.z - mine.z;
+      const Vec3 look = cam_.target - cam_.eye;
+      const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
       add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
+          "\"dz\":%.1f,\"rel\":%.0f,"
           "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f}",
           first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
-          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, now < r.speaking_until ? "true" : "false",
+          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
           r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y);
       first = false;
     }

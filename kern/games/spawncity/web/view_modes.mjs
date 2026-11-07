@@ -402,7 +402,9 @@ function installViewModes() {
     }
     S.localDead = localDead; S.peerDead = peerDead;
     if (marker) {
-      if (!peer || !vp) hide(marker, true);
+      // the mates are drawn by mp_host.mjs (every mate: in view over his head, out of view at the
+      // edge with the direction, distance, above / below) - the original's single marker stays off
+      if (true) hide(marker, true);
       else {
         hide(marker, false);
         marker.classList.toggle("offscreen", !peer.on);

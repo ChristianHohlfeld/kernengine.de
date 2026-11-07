@@ -258,12 +258,25 @@ export class MpPublicNet {
 // ---- the multiplayer page parts ------------------------------------------------------------------
 const MP_CSS = `
 #mpHud{position:fixed;inset:0;pointer-events:none;z-index:5;font-family:Inter,system-ui,sans-serif;color:#fff}
-.mp-plate{--c:#fff;position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:3px;filter:drop-shadow(0 1px 2px #000c);will-change:transform}
-.mp-plate .t{display:flex;gap:6px;align-items:baseline;padding:3px 8px;border-radius:8px;background:#060b10b8;border:1.5px solid var(--c);white-space:nowrap}
-.mp-plate strong{font:900 13px/1 system-ui;letter-spacing:.06em;color:var(--c)}.mp-plate small{font:800 11.5px/1 system-ui;opacity:.92}
-.mp-plate .hp{width:44px;height:3px;border-radius:2px;background:#ffffff30;overflow:hidden}.mp-plate .hp u{display:block;height:100%;background:var(--c)}
-.mp-plate .ar{order:3;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:12px solid var(--c)}
-.mp-plate.off .hp{display:none}.mp-plate.off .ar{position:absolute;left:50%;top:50%;margin:-6px 0 0 -9px;transform:rotate(var(--a)) translateY(30px)}
+/* the mates (vs_multiplayer.mjs renderMarker, redone): in view a plate over his head - name, distance,
+   above / below - with a caret on him; out of view a badge at the edge with a big arrow toward him,
+   the distance, how much higher or lower, and the side in words (LINKS / RECHTS / HINTER DIR) */
+.mp-plate{--c:#fff;--a:0deg;font-family:Inter,system-ui,sans-serif;color:#fff;position:absolute;left:0;top:0;pointer-events:none;will-change:transform;filter:drop-shadow(0 1px 2px #000d)}
+.mp-plate .on{display:flex;flex-direction:column;align-items:center;gap:2px}
+.mp-plate .t{display:flex;gap:6px;align-items:center;padding:3px 9px;border-radius:9px;background:#060b10cc;border:2px solid var(--c);white-space:nowrap}
+.mp-plate strong{font:900 14px/1 system-ui;letter-spacing:.06em;color:var(--c)}.mp-plate small{font:800 12px/1 system-ui;color:#fff}
+.mp-plate .el{font:900 12px/1 system-ui;color:#fff;padding:1px 5px;border-radius:6px;background:var(--c);color:#06090d}.mp-plate .el:empty{display:none}
+.mp-plate .hp{width:48px;height:4px;border-radius:2px;background:#ffffff30;overflow:hidden}.mp-plate .hp u{display:block;height:100%;background:var(--c)}
+.mp-plate .caret{width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:12px solid var(--c)}
+.mp-plate .edge{display:none;position:relative;width:54px;height:54px}
+.mp-plate .edge .ring{position:absolute;inset:0;border-radius:50%;background:#060b10d9;border:3px solid var(--c);box-shadow:0 0 0 3px #0008,0 0 14px var(--c);display:flex;align-items:center;justify-content:center;font:900 15px/1 system-ui;color:var(--c);letter-spacing:.04em}
+.mp-plate .edge .arrow{position:absolute;left:50%;top:50%;width:0;height:0;margin:-14px 0 0 -12px;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:20px solid var(--c);transform:rotate(var(--a)) translateY(-44px);transform-origin:12px 14px;filter:drop-shadow(0 0 4px var(--c))}
+.mp-plate .edge .lab{position:absolute;left:50%;top:60px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;white-space:nowrap}
+.mp-plate .edge .lab b{font:900 12px/1 system-ui;color:#fff;padding:2px 6px;border-radius:6px;background:#060b10cc;border:1.5px solid var(--c)}
+.mp-plate .edge .lab i{font:900 11px/1 system-ui;font-style:normal;letter-spacing:.08em;color:var(--c)}
+.mp-plate.low .edge .lab{top:auto;bottom:60px;flex-direction:column-reverse}
+.mp-plate.off .on{display:none}.mp-plate.off .edge{display:block}
+.mp-plate.off.near .edge .ring{animation:mpNear 1s ease-in-out infinite}@keyframes mpNear{50%{box-shadow:0 0 0 3px #0008,0 0 24px var(--c)}}
 .mp-plate.dead{filter:grayscale(1);opacity:.75}.mp-plate .mic{display:none}.mp-plate.talk .mic{display:inline}
 #mpFeed{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 160px);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 #mpFeed div{padding:4px 9px;border-radius:7px;background:#070b10c4;font:800 12px/1.2 Inter,system-ui;white-space:nowrap}#mpFeed div.me{box-shadow:0 0 0 1.5px #ffd76a}
@@ -556,16 +569,33 @@ export class MpPage {
       let el = this.plates.get(p.slot);
       if (!el) {
         el = document.createElement("div"); el.className = "mp-plate";
-        el.innerHTML = '<i class="ar"></i><span class="t"><strong></strong><small></small><span class="mic">🎙</span></span><b class="hp"><u></u></b>';
-        this.root.appendChild(el); this.plates.set(p.slot, el);
+        el.innerHTML = '<div class="on"><span class="t"><strong></strong><small></small><span class="el"></span><span class="mic">🎙</span></span><b class="hp"><u></u></b><i class="caret"></i></div>'
+          + '<div class="edge"><i class="arrow"></i><div class="ring"></div><div class="lab"><b></b><i></i></div></div>';
+        // the plates live with the game's own HUD (the original view's #viewport: above its canvas),
+        // else in Kern's layer
+        if (!this.plateRoot) {
+          const vp = document.getElementById("viewport");
+          this.plateRoot = document.createElement("div"); this.plateRoot.id = "mpPlates";
+          this.plateRoot.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:7;overflow:hidden";
+          (vp || this.root).appendChild(this.plateRoot);
+        }
+        this.plateRoot.appendChild(el); this.plates.set(p.slot, el);
       }
       el.style.setProperty("--c", p.color);
       el.classList.toggle("off", !p.on); el.classList.toggle("dead", p.dead); el.classList.toggle("talk", p.talk);
-      const sc = p.on ? Math.max(.82, Math.min(1.15, 1.25 - p.d / 160)) : 1;
+      el.classList.toggle("near", !p.on && p.d < 40);
+      const vh = (document.getElementById("viewport") || document.documentElement).clientHeight || innerHeight;
+      el.classList.toggle("low", !p.on && p.y > vh * 0.6);  // at the bottom edge the words go above the badge
+      const sc = p.on ? Math.max(.85, Math.min(1.2, 1.3 - p.d / 160)) : 1;
       el.style.transform = `translate3d(${p.x}px,${p.y}px,0) translate(-50%,${p.on ? "-100%" : "-50%"}) scale(${sc.toFixed(3)})`;
-      el.style.setProperty("--a", `${p.angle}deg`);
+      // the arrow points from the badge toward him (screen angle, 0 = up)
+      el.style.setProperty("--a", `${(p.angle + 180).toFixed(0)}deg`);
       const name = p.dead ? `P${p.index} DOWN` : `P${p.index}`, d = p.d < 10 ? `${p.d.toFixed(1)} m` : p.d < 1000 ? `${Math.round(p.d)} m` : `${(p.d / 1000).toFixed(1)} km`;
-      el.querySelector("strong").textContent = name; el.querySelector("small").textContent = d; el.querySelector(".hp u").style.width = `${p.hp}%`;
+      const dz = Number(p.dz) || 0, el3 = Math.abs(dz) >= 2.5 ? `${dz > 0 ? "▲" : "▼"} ${Math.round(Math.abs(dz))} m` : "";
+      const rel = Number(p.rel) || 0, side = Math.abs(rel) > 135 ? "HINTER DIR" : rel < -20 ? "◀ LINKS" : rel > 20 ? "RECHTS ▶" : dz > 2.5 ? "ÜBER DIR" : dz < -2.5 ? "UNTER DIR" : "VORN";
+      const put = (q, t) => { const n = el.querySelector(q); if (n.textContent !== t) n.textContent = t; };
+      put("strong", name); put("small", d); put(".on .el", el3); el.querySelector(".hp u").style.width = `${p.hp}%`;
+      put(".edge .ring", `P${p.index}`); put(".edge .lab b", el3 ? `${d} · ${el3}` : d); put(".edge .lab i", side);
     }
     for (const [slot, el] of this.plates) if (!seen.has(slot)) { el.remove(); this.plates.delete(slot); }
     // kill feed and board (mp_fun_hud.mjs)
