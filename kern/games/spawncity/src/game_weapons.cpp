@@ -247,6 +247,7 @@ void Game::update_projectiles(f32 dt) {
       // A person or a police drone in the way.
       Vec3 seg_to = p.pos + step;
       if (!boom && people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { boom = true; at = seg_to; }
+      if (!boom && p.by_player && round_meets_mate(p.pos, seg_to, at)) boom = true;  // a mate's body or vehicle
       if (!boom)
         for (const PoliceDrone& d : pdrones_)
           if (d.active && kern::length(d.pos - (p.pos + step * 0.5f)) < 1.2f + len * 0.5f) { boom = true; at = d.pos; }

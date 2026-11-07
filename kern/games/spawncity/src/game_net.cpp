@@ -454,17 +454,18 @@ void Game::mix_voice(f32* out, u32 frames) {
 // ---------------------------------------------------------------------------------------------
 // shots and blasts against the other players
 
-bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
-  (void)damage;
-  if (!net_.active()) return false;
-  const weapons::Id wid = mode_ == Mode::drone ? (drone_weapon_ == 0 ? weapons::Id::drone_gun : weapons::Id::drone_rockets)
-                          : mode_ == Mode::jet ? weapons::Id::jet_cannon
-                                               : foot_weapon_;
+// The mate closest along a segment (his body as it is drawn, a sphere around his vehicle): -1 for
+// none; `t_out` the share of the segment where it touches him. Rounds, blows, grenades and rockets
+// all ask this - a mate's body stops them on every machine as a passer-by's does.
+i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) {
+  t_out = 2;
+  zone_out = mp::Zone::torso;
+  if (!net_.active()) return -1;
   const Vec3 seg = to - from;
   const f32 l2 = std::fmax(1e-6f, kern::dot(seg, seg));
   i32 best = -1;
   f32 best_t = 2;
-  std::vector<net::Remote>& rs = net_.remotes();
+  const std::vector<net::Remote>& rs = net_.remotes();
   // player_vehicle_runtime_v2.mjs vs hit proxies: head, torso and legs turned with the player, here
   // the pose as it is drawn (person_hit.h: the running lean, x 1.16 vs_multiplayer.mjs
   // HITBOX_PADDING); the round's entry decides the zone (a steep shot through the head is a head shot)
@@ -476,7 +477,7 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   };
   for (std::size_t i = 0; i < rs.size(); ++i) {
     const net::Remote& r = rs[i];
-    if (r.state.flags & net::kDead) continue;
+    if (r.state.flags & (net::kDead | net::kPassenger)) continue;  // a passenger rides in the vehicle hit as one
     if (r.state.mode == net::PlayerMode::foot) {
       f32 t = 2;
       mp::Zone z = mp::Zone::torso;
@@ -515,6 +516,23 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
     }
     if (d < radius && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = mp::Zone::torso; }
   }
+  t_out = best_t;
+  zone_out = best_zone;
+  return best;
+}
+
+bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
+  (void)damage;
+  if (!net_.active()) return false;
+  const weapons::Id wid = mode_ == Mode::drone ? (drone_weapon_ == 0 ? weapons::Id::drone_gun : weapons::Id::drone_rockets)
+                          : mode_ == Mode::jet ? weapons::Id::jet_cannon
+                                               : foot_weapon_;
+  const Vec3 seg = to - from;
+  const f32 l2 = std::fmax(1e-6f, kern::dot(seg, seg));
+  std::vector<net::Remote>& rs = net_.remotes();
+  f32 best_t = 2;
+  mp::Zone best_zone = mp::Zone::torso;
+  const i32 best = remote_on_segment(from, to, best_t, best_zone);
   // Everybody sees the round fly (a tracer in our colour up to where it ends) - a blow is no
   // round: only when it lands they hear it there
   if (!melee) {

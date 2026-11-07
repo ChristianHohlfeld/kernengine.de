@@ -162,6 +162,11 @@ void Game::update_guided(f32 dt) {
       if (l > 1e-4f) {
         const RayResult r = cast(world_->physics(), f.prev, d * (1.0f / l), l, body(drone_actor_), kCatWorld);
         if (r.hit && now > f.m.born + 0.15f) { boom = true; blast = r.point - d * (0.1f / l); }
+        // a passer-by or a mate on the way: it goes off on him
+        if (!boom && now > f.m.born + 0.15f) {
+          if (people_.shot(f.prev, f.m.p, 0, false, now, -1, 0) >= 0) { boom = true; blast = f.m.p; }
+          else if (round_meets_mate(f.prev, f.m.p, blast)) boom = true;
+        }
       }
     }
     if (boom) {

@@ -67,6 +67,16 @@ bool Game::car_near_point(Vec3 point) const {
   return false;
 }
 
+// A round meets a mate: his body as drawn (or the sphere round his vehicle) on the segment sets it
+// off right there - grenades and rockets do not fly through other players.
+bool Game::round_meets_mate(Vec3 from, Vec3 to, Vec3& at) {
+  f32 t = 2;
+  mp::Zone z = mp::Zone::torso;
+  if (remote_on_segment(from, to, t, z) < 0 || t > 1) return false;
+  at = from + (to - from) * t;
+  return true;
+}
+
 void Game::grenade_bounce(Projectile& p, Vec3 point, Vec3 n, f32 now) {
   // bounceFootGrenade: v -= (1 + .58) vn n, x .88, nextCollisionAt +36 ms, lifted R + .014 off the
   // surface and .02 along the new flight; at the 7th bounce slower than 2.8 m/s x .38
@@ -127,6 +137,7 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       if (r.hit && r.distance <= trav + 0.2f) { at = r.point; return true; }
       Vec3 seg_to = p.pos + dir * trav;
       if (people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { at = seg_to; return true; }  // organic
+      if (round_meets_mate(p.pos, seg_to, at)) return true;  // a mate's body (his blast is replicated)
       if (soft_target_near(p.pos)) { at = p.pos; return true; }
       for (const PoliceDrone& d : pdrones_)
         if (d.active && kern::length(d.pos - p.pos) < 1.2f + trav) { at = d.pos; return true; }
@@ -163,6 +174,7 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       // through a body: hitting one it goes off there)
       Vec3 seg_to = p.pos + dir * (travel + kGrenadeR);
       if (people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { at = seg_to; return true; }
+      if (round_meets_mate(p.pos, seg_to, at)) return true;  // a mate's body as well
     }
     if (!hand) {
       // a police drone or a soft target on the way sets a launcher round off

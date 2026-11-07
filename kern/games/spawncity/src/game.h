@@ -275,6 +275,8 @@ class Game {
   /// A shot or blast against the other players: their machines apply the damage.
   /// melee: a blow (no round, no tracer, no shot sound): the others hear it land (Fx::melee).
   bool hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee = false);
+  i32 remote_on_segment(Vec3 from, Vec3 to, f32& t, mp::Zone& zone);
+  bool round_meets_mate(Vec3 from, Vec3 to, Vec3& at);
   void blast_remotes(Vec3 at, f32 radius, f32 damage, u8 breaks = 0);
   void draw_remote_people();
   void draw_remote_vehicles();
