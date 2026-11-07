@@ -748,6 +748,11 @@ void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1) {
   replan_ = true;
 }
 
+bool Terrain::has_collision(f32 x, f32 y) const {
+  const u64 k = key2(static_cast<i32>(std::floor(x / kTile)), static_cast<i32>(std::floor(y / kTile)));
+  return collision_.count(k) && !dirty_collision_.count(k);
+}
+
 void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
   struct W { f32 d; u64 k; };
   std::vector<W> render, coll, water;
@@ -771,7 +776,9 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
     }
   // Collision: 160 m tiles within 420 m of the focus (traffic lives there) and 200 m of the
   // anchor (the pilot on foot while his drone is away).
-  for (const auto& [p, reach] : {std::pair<Vec3, f32>{focus, 420.0f}, std::pair<Vec3, f32>{anchor, 200.0f}}) {
+  std::vector<std::pair<Vec3, f32>> around{{focus, 420.0f}, {anchor, 200.0f}};
+  for (const Vec3& m : extra) around.push_back({m, 300.0f});  // the mates (MP host): his traffic there
+  for (const auto& [p, reach] : around) {
     const i32 ci = static_cast<i32>(std::floor(p.x / kTile)), cj = static_cast<i32>(std::floor(p.y / kTile));
     const i32 rr = static_cast<i32>(std::ceil(reach / kTile));
     for (i32 j = cj - rr; j <= cj + rr; ++j)
@@ -804,6 +811,7 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
   finish(water, want_water_);
   planned_focus_ = focus;
   planned_anchor_ = anchor;
+  planned_extra_ = extra;
   replan_ = false;
 }
 
@@ -1072,13 +1080,17 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   plan_images(focus);
   if (job_) run_job(deadline);
   if (!settled_) return;
-  if (replan_ || std::hypot(focus.x - planned_focus_.x, focus.y - planned_focus_.y) > 40 ||
+  bool extra_moved = extra.size() != planned_extra_.size();
+  for (std::size_t i = 0; !extra_moved && i < extra.size(); ++i) extra_moved = std::hypot(extra[i].x - planned_extra_[i].x, extra[i].y - planned_extra_[i].y) > 40;
+  if (replan_ || extra_moved || std::hypot(focus.x - planned_focus_.x, focus.y - planned_focus_.y) > 40 ||
       std::hypot(anchor.x - planned_anchor_.x, anchor.y - planned_anchor_.y) > 40)
     want_tiles(focus, anchor);
   bool missing = false;
   // 0. the ground right under the focus and the anchor (and their neighbours) at once, whatever
   // the budget: a jet at 250 m/s or a reload of the elevation never leaves a hole under anybody
-  for (const Vec3& at : {focus, anchor}) {
+  std::vector<Vec3> under{focus, anchor};
+  under.insert(under.end(), extra.begin(), extra.end());
+  for (const Vec3& at : under) {
     const i32 ci = static_cast<i32>(std::floor(at.x / kTile)), cj = static_cast<i32>(std::floor(at.y / kTile));
     for (i32 j = cj - 1; j <= cj + 1; ++j)
       for (i32 i = ci - 1; i <= ci + 1; ++i) {

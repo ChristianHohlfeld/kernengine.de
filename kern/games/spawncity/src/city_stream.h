@@ -147,6 +147,7 @@ class CityStream {
     std::vector<kern::physics::Shape> shapes;  // list[i]'s collider (destruction replaces one)
     std::size_t next = 0;
     bool building = false, dirty = true, built = false;
+    std::vector<Vec3> mates_at;  // where the mates were at the last pick (MP host)
     u32 colliders = 0;
   };
   NearCollision near_;

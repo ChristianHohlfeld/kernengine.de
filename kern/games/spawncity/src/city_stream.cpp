@@ -434,7 +434,8 @@ void CityStream::relay(const kern::Vec4& rect) {
 void CityStream::update_collision(Vec3 focus, f64 deadline) {
   NearCollision& n = near_;
   const f64 now = kern::now_ms();
-  const bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140;
+  bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140 || extra_foci.size() != n.mates_at.size();
+  for (std::size_t i = 0; !moved && i < extra_foci.size(); ++i) moved = std::hypot(extra_foci[i].x - n.mates_at[i].x, extra_foci[i].y - n.mates_at[i].y) >= 140;
   if (!n.building && (moved || (n.dirty && now - n.at_ms >= 250))) {
     // world_building_collisions.mjs: the nearest MAX_FOOTPRINTS 480 within RADIUS_M 340
     struct Pick { f32 d2; u64 tile; u32 i; };
@@ -445,12 +446,16 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
       if (!t.prepared) continue;
       for (u32 i = 0; i < t.cent.size(); ++i) {
         if (k == excl_tile_ && static_cast<i32>(i) == excl_index_) continue;  // an entered interior (M3 life)
-        const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y, d2 = dx * dx + dy * dy;
+        const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y;
+        f32 d2 = dx * dx + dy * dy;
+        // (MP host: the buildings around the mates too - his traffic and people there collide)
+        for (const Vec3& m : extra_foci) { const f32 mx = t.cent[i].x - m.x, my = t.cent[i].y - m.y; d2 = std::fmin(d2, mx * mx + my * my); }
         if (d2 <= 340.0f * 340.0f) all.push_back({d2, k, i});
       }
     }
     std::sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
-    if (all.size() > 480) all.resize(480);
+    const std::size_t cap = 480 + 320 * extra_foci.size();
+    if (all.size() > cap) all.resize(cap);
     n.list.clear();
     for (const Pick& p : all) n.list.push_back({p.tile, p.i});
     n.old_body = n.body;
@@ -460,6 +465,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
     n.building = true;
     n.dirty = false;
     n.at = {focus.x, focus.y};
+    n.mates_at = extra_foci;
     n.at_ms = now;
   }
   if (n.building && build_near(deadline)) {
@@ -802,6 +808,7 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   unload_far(focus);
   step_time("request/unload", t0);
   t0 = kern::now_ms();
+  terrain_.extra = extra_foci;
   terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
   step_time("terrain", t0);
   t0 = kern::now_ms();

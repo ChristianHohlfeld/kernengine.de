@@ -126,6 +126,11 @@ class Terrain {
   /// Where the focus will be in a while (its velocity x 12 s): the elevation window is loaded
   /// around there, so a fast jet never flies past the edge of the known ground.
   Vec3 lead;
+  /// MP host: the other players - ground collision 300 m around each of them too (his traffic
+  /// drives there with real physics: game_worldsync.cpp).
+  std::vector<Vec3> extra;
+  /// Whether ground collision stands at (x, y) (a car may run its physics there).
+  bool has_collision(f32 x, f32 y) const;
   const TerrainStats& stats() const { return stats_; }
 
  private:
@@ -187,6 +192,7 @@ class Terrain {
   std::unordered_set<u64> dirty_render_, dirty_collision_, dirty_water_;
   std::vector<u64> want_render_, want_collision_, want_water_;
   Vec3 planned_focus_{1e9f, 1e9f, 0}, planned_anchor_{1e9f, 1e9f, 0};
+  std::vector<Vec3> planned_extra_;
   bool replan_ = true;
   std::vector<kern::Vec4> changes_;
   TerrainStats stats_;

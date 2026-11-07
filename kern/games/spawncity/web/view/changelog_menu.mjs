@@ -9,6 +9,7 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: auch rund um weit entfernte Mitspieler fahren die Autos des Hosts mit echter Physik – der Host lädt dort Boden- und Gebäudekollision mit.",
     "Multiplayer: der Host bestimmt die ganze Stadt – er lädt sie auch rund um jeden Mitspieler und führt dort Verkehr und Passanten; ein Mitspieler hat nur noch so lange eine eigene Stadt, bis die des Hosts bei ihm ankommt.",
     "Jet am Handy: KANONE sitzt jetzt über dem rechten Stick statt auf der Knopfleiste; Drohne: 📻 links neben der Minimap.",
     "VR: das Menü wählt nie aus Versehen die erste Zeile; Stick-Bewegungen im Menü drehen dich nicht und wechseln keine Waffe; gehaltene Tiere bleiben in der Hand; beim Laufen mit den Armen kein Wusch-Ton bei jedem Schwung.",

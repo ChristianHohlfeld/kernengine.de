@@ -18,15 +18,18 @@ void Game::traffic_far_switch() {
   // the hysteresis: physics on under 150 m, off beyond 180 m (driven cars, police, wrecks keep theirs)
   kern::physics::World& w = world_->physics();
   const Vec3 me = focus_position();
+  const std::vector<Vec3> mates = net_.hosting() ? mate_foci() : std::vector<Vec3>{};
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     const kern::physics::Body b = body(c.actor);
     if (!c.placed || !b.valid() || !w.body_valid(b)) { c.far = false; continue; }
     const bool keep = c.police || c.wreck || c.burn_until >= 0 || static_cast<i32>(i) == car_index_;
     const Vec3 p = matrix_of(c.actor).translation();
-    // (physics only where our own ground collision is: near us - around a mate the host's cars run
-    // as lane followers, the mate's machine puts them on his ground: game_worldsync.cpp)
-    const f32 d = std::hypot(p.x - me.x, p.y - me.y);
+    // near any player real physics (MP host: the ground and the buildings are loaded around the
+    // mates too - CityStream::extra_foci); never where no ground collision stands yet
+    f32 d = std::hypot(p.x - me.x, p.y - me.y);
+    for (const Vec3& m : mates) d = std::fmin(d, std::hypot(p.x - m.x, p.y - m.y));
+    if (d <= kPhysFar && !city_.terrain().has_collision(p.x, p.y)) d = kPhysFar + 1;
     if (!c.far && !keep && d > kPhysFar) {
       c.far_speed = c.driver ? std::fmax(0.0f, c.car->forward_speed()) : 0;
       w.set_body_type(b, kern::physics::BodyType::kinematic);
