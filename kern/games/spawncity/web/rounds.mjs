@@ -5,6 +5,7 @@
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {registerViewBinder} from "./view.mjs";
+import {sharePicture, shareClip, clipRunning} from "./share.mjs";
 
 const MODES = [
   [1, "🚓", "RÄUBER & POLIZEI", "Einer flieht, alle jagen"],
@@ -35,6 +36,10 @@ const CSS = `
 #scRound .mark{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font:900 12px/1 system-ui;color:#7ff0c5;text-shadow:0 1px 3px #000}
 #scRound .mark i{width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:14px solid #7ff0c5;filter:drop-shadow(0 0 4px #7ff0c5)}
 #scRound .blind{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font:900 22px/1.2 system-ui;letter-spacing:.12em}
+#scRound .share{display:flex;gap:6px;margin-top:10px}#scRound .share button{flex:1;padding:8px;border-radius:9px;border:1px solid #7ff0c588;background:#7ff0c51a;color:#dffcf1;font:900 12px system-ui;letter-spacing:.08em;cursor:pointer}
+#scRound .xp{margin-top:6px;font:900 12px system-ui;color:#7ff0c5;letter-spacing:.08em}
+#scRoundBtn b{margin-left:6px;color:#7ff0c5}
+#scToast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);z-index:42;padding:6px 12px;border-radius:999px;background:#0b1118e0;border:1.5px solid #7ff0c588;color:#dffcf1;font:900 12px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;pointer-events:none}#scToast[hidden]{display:none}
 #scRound .res ol{margin:6px 0 0;padding-left:22px;font:800 13px/1.6 system-ui}
 `;
 
@@ -70,20 +75,44 @@ export function installRounds({command}) {
   root.addEventListener("click", ev => {
     const b = ev.target.closest("[data-vote]");
     if (b) { ev.stopPropagation(); command(`round vote ${b.dataset.vote}`); }
+    const sh = ev.target.closest("[data-share]");
+    if (sh) { ev.stopPropagation(); if (sh.dataset.share === "clip") clip(); else picture(lastRes); }
   });
   addEventListener("keydown", ev => {
     if (ev.code !== "KeyO" || ev.repeat || ev.target?.closest?.("input,textarea")) return;
     command("round start");
   });
-  let key = "", best = null;
+  const toast = document.createElement("div"); toast.id = "scToast"; toast.hidden = true;
+  let toastUntil = 0;
+  const say = (t, ms = 2500) => { toast.textContent = t; toast.hidden = false; toastUntil = performance.now() + ms; };
+  // the player's experience: rounds played, points, wins - kept in this browser, nothing to buy
+  let xp = 0, xpRound = -1, xpGain = 0;  // xpRound: the round already counted (this visit)
+  try { xp = Math.max(0, Number(localStorage.getItem("spawnCityXP")) || 0); } catch { /* private mode */ }
+  const levelOf = v => 1 + Math.floor(Math.sqrt(v / 60));
+  const clip = () => {
+    if (clipRunning()) return;
+    shareClip(10, left => { if (left > 0) say(`🎬 CLIP ● ${Math.ceil(left)} s`, 600); }).then(r => say(`🎬 Clip ${r}`));
+  };
+  const picture = line => sharePicture(line).then(r => say(`📸 Bild ${r}`));
+  addEventListener("keydown", ev => {
+    if (ev.repeat || ev.target?.closest?.("input,textarea")) return;
+    if (ev.code === "F8") { ev.preventDefault(); clip(); }
+    else if (ev.code === "F9") { ev.preventDefault(); picture(""); }
+  });
+  let key = "", best = null, lastRes = "";
   try { best = JSON.parse(localStorage.getItem("spawnCityRaceBest") || "null"); } catch { best = null; }
   const mmss = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   registerViewBinder("rounds", h => {
-    anchor(mount());
+    const vp = mount();
+    if (toast.parentElement !== vp) vp.appendChild(toast);
+    if (!toast.hidden && performance.now() > toastUntil) toast.hidden = true;
+    anchor(vp);
     const R = h.round;
     const playing = !!document.body.classList.contains("solo-flight") || !!h.placed;
     btn.hidden = !R || R.phase !== 0 || !playing;
+    const lv = `🏁 RUNDE<b>LV ${levelOf(xp)}</b>`;
+    if (btn.innerHTML !== lv) btn.innerHTML = lv;
     if (!R) { if (root.innerHTML) root.innerHTML = ""; return; }
     // a personal best of the race (alone or not): kept here
     if (R.myTime > 0 && (!best || R.myTime < best)) { best = R.myTime; try { localStorage.setItem("spawnCityRaceBest", JSON.stringify(best)); } catch { /* private mode */ } }
@@ -104,9 +133,19 @@ export function installRounds({command}) {
       if (R.target) html += `<div class="mark" style="left:${R.tx}px;top:${R.ty}px"><span>${Math.round(R.td)} m</span><i></i></div>`;
       if (R.blind) html = `<div class="blind"><span>AUGEN ZU</span><span>${Math.ceil(R.left)}</span><small style="font:700 13px system-ui;opacity:.7">Die anderen verstecken sich …</small></div>` + html;
     } else if (R.phase === 4) {
+      // once per round: its experience (taking part, points, the win)
+      if (xpRound !== R.id && me) {
+        const top = Math.max(0, ...(R.players || []).map(p => p.score));
+        xpGain = 25 + Math.min(300, 10 * me.score) + (me.score > 0 && me.score === top ? 50 : 0);
+        const before = levelOf(xp);
+        xp += xpGain; xpRound = R.id;
+        try { localStorage.setItem("spawnCityXP", String(xp)); } catch { /* private mode */ }
+        if (levelOf(xp) > before) say(`⭐ LEVEL ${levelOf(xp)}!`, 4000);
+      }
+      lastRes = `${R.modeName}: ${me ? me.score : 0} Punkte`;
       const ranking = [...(R.players || [])].sort((a, b) => b.score - a.score)
         .map(p => `<li style="color:${p.color}">${p.me ? "DU" : "P" + p.index} – ${p.score} Punkte${p.role ? ` (${esc(p.role)})` : ""}</li>`).join("");
-      html = `<div class="card res"><h3><span>${esc(R.modeName)}</span><span>ENDE</span></h3><b>${esc(R.result)}</b>${R.myTime > 0 ? `<div>Deine Zeit: ${R.myTime.toFixed(1)} s${best ? ` · Bestzeit ${best.toFixed(1)} s` : ""}</div>` : ""}<ol>${ranking}</ol></div>`;
+      html = `<div class="card res"><h3><span>${esc(R.modeName)}</span><span>ENDE</span></h3><b>${esc(R.result)}</b>${R.myTime > 0 ? `<div>Deine Zeit: ${R.myTime.toFixed(1)} s${best ? ` · Bestzeit ${best.toFixed(1)} s` : ""}</div>` : ""}<ol>${ranking}</ol><div class="xp">+${xpGain} XP · LEVEL ${levelOf(xp)}</div><div class="share"><button data-share="pic">📸 BILD TEILEN</button><button data-share="clip">🎬 CLIP 10 s</button></div></div>`;
     }
     // the marker moves every frame: only it is updated in place when the rest is the same
     const k = html.replace(/style="left:[^"]*"/, "");

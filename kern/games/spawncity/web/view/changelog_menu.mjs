@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-07",time:"19:40",title:"Level, Bilder und Clips",items:[
+    "Jede Runde gibt Erfahrung (mitspielen, Punkte, Sieg) – dein Level steht am RUNDE-Knopf. Nichts zu kaufen.",
+    "Nach der Runde: BILD TEILEN oder CLIP 10 s – direkt ins Teilen-Menü des Handys, sonst als Datei.",
+    "Jederzeit: F8 nimmt einen 10-Sekunden-Clip auf, F9 macht ein Bild.",
+  ]},
   {date:"2026-11-07",time:"19:30",title:"Runden mit Freunden",items:[
     "Neu: 🏁 RUNDE (Taste O) – alle stimmen ab: Räuber & Polizei, Drohnenrennen, Zombienacht, King of the Hill oder Verstecken.",
     "Jede Runde mit Countdown, Ziel, Zeit, Punktestand und Siegerliste; der Host zählt die Punkte, für alle gleich.",
