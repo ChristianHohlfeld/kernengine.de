@@ -72,7 +72,7 @@ struct GapsState {
   u32 planks_broken = 0;
   Part plank_part;
   // jet_mode.mjs passenger (game_seats.cpp)
-  bool riding = false, pilot_held = false;
+  bool riding = false, pilot_held = false, ride_car = false;  // ride_car: a car's passenger (stands and shoots)
   f32 pilot_asked = -10;  // when the pilot seat was last asked for (game_seats.cpp)
   u8 ride_owner = 0, pending_owner = 0;
   f32 seat_pending_until = -1, ride_seen = 0;

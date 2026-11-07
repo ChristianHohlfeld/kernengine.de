@@ -498,6 +498,7 @@ class Game {
   void gaps_send_jets(bool strike, Vec3 p, f32 offset, f32 alt);
   void gaps_send_military(bool shell, Vec3 from, Vec3 to);
   // riding along in a mate's jet (game_seats.cpp, jet_mode.mjs passenger, jet_seats.h)
+  bool gaps_ride_car() const;
   bool gaps_riding() const;
   bool gaps_ride_pose(Vec3& p, Quat& q) const;
   bool gaps_seat_press();

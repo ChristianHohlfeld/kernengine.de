@@ -1196,6 +1196,9 @@ std::string Game::ctl_hud_json() {
   s += "\"hint\":\"" + C.hint + "\",\"hintFaded\":";
   s += fade ? "true" : "false";
   s += C.near_car ? ",\"nearCar\":true" : ",\"nearCar\":false";
+  // a mate's car / landed jet to ride along in, or the ride to leave (the EINSTEIGEN button says it: view.mjs)
+  s += gaps_ && gaps_->riding ? ",\"riding\":true" : ",\"riding\":false";
+  s += gaps_boardable() >= 0 ? ",\"board\":true" : ",\"board\":false";
   s += C.near_jet ? ",\"nearJet\":true" : ",\"nearJet\":false";
   s += C.pad_drone ? ",\"padDrone\":true" : ",\"padDrone\":false";
   std::snprintf(b, sizeof b, ",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"head\":[%.3f,%.3f]", sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, head_yaw_, head_pitch_);

@@ -394,9 +394,11 @@ export class OriginalView {
     const touchUi = !desktop, key = ctl.pad ? "Ⓧ  " : desktop ? "F · " : "";
     const car = $("enterCarButton");
     if (car) {
-      const show = (mode === "foot" && ctl.nearCar) || mode === "car";
+      // (riding in a mate's car or jet: the way out; next to his: MITFAHREN - game_seats.cpp)
+      const out = mode === "car" || !!ctl.riding;
+      const show = (mode === "foot" && ctl.nearCar) || out;
       setHidden(car, !show);
-      setText(car, touchUi ? (mode === "car" ? "↗" : "🚗") : mode === "car" ? `${key}AUSSTEIGEN` : `${key}🚗 EINSTEIGEN`);
+      setText(car, touchUi ? (out ? "↗" : "🚗") : out ? `${key}AUSSTEIGEN` : ctl.board ? `${key}🚗 MITFAHREN` : `${key}🚗 EINSTEIGEN`);
     }
     const jet = $("enterJetButton");
     if (jet) {

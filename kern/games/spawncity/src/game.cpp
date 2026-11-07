@@ -319,6 +319,13 @@ Vec3 Game::player_position() const {
   if (mode_ == Mode::car && car_index_ >= 0) return matrix_of(cars_[car_index_].actor).translation();
   if (mode_ == Mode::jet) return matrix_of(jet_actor_).translation();
   if (mode_ == Mode::parachute) return matrix_of(chute_actor_).translation();
+  // riding in a mate's jet (the walker is put away where he got in): where the jet is - the city
+  // streams, the traffic and the people live around it, not around the place he boarded
+  if (gaps_riding()) {
+    Vec3 p;
+    Quat q;
+    if (!gaps_ride_car() && gaps_ride_pose(p, q)) return p;
+  }
   return matrix_of(soldier_).translation();
 }
 
@@ -1312,12 +1319,7 @@ std::string Game::hud_json() {
         const Vec3 p = matrix_of(c.actor).translation();
         if (std::hypot(p.x - me.x, p.y - me.y) < kEnterCar) { hint_ = std::string(k) + "\U0001F697 EINSTEIGEN"; break; }
       }
-      // a mate's car / landed jet: ride along (game_seats.cpp); riding: the way out
-      if (gaps_ && gaps_->riding) hint_ = std::string(k) + "AUSSTEIGEN";
-      else if (const i32 m = gaps_boardable(); m >= 0) {
-        const net::Remote* r = net_.remote(static_cast<u8>(m));
-        hint_ = std::string(k) + (r && r->state.mode == net::PlayerMode::jet ? "\u2708 MITFLIEGEN" : "\U0001F697 MITFAHREN");
-      }
+      // (a mate's car / jet to ride along in, the ride to leave: the EINSTEIGEN button says it, view.mjs)
     }
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";

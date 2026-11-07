@@ -259,7 +259,7 @@ net::PlayerState Game::my_state() const {
   }
   if (mp_ && mp_->mic && !mp_->muted) f |= net::kTalking;
   if (ui_.jetpack.thrusting && mode_ == Mode::foot) f |= net::kJetpack;  // game_equipment.cpp
-  if (Vec3 rp; gaps_riding()) {
+  if (Vec3 rp; gaps_riding() && !(gaps_ && gaps_->ride_car)) {  // (a car's passenger: himself, standing in it)
     // riding in a mate's jet (game_seats.cpp): where we are is his jet, and nobody walks there
     Quat rq;
     if (gaps_ride_pose(rp, rq)) { s.position = rp; s.avatar = rp; s.rotation = rq; s.velocity = {}; s.speed = 0; }
@@ -539,6 +539,7 @@ i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) 
   for (std::size_t i = 0; i < rs.size(); ++i) {
     const net::Remote& r = rs[i];
     if (r.state.flags & (net::kDead | net::kPassenger)) continue;  // a passenger rides in the vehicle hit as one
+    if (gaps_riding() && r.state.slot == gaps_->ride_owner) continue;  // the car we ride in: our rounds leave it
     if (r.state.mode == net::PlayerMode::foot) {
       f32 t = 2;
       mp::Zone z = mp::Zone::torso;

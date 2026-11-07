@@ -17,6 +17,7 @@ constexpr f32 kChuteAgl = 10;                               // leavePassenger: a
 }  // namespace
 
 bool Game::gaps_riding() const { return gaps_ && gaps_->riding; }
+bool Game::gaps_ride_car() const { return gaps_ && gaps_->riding && gaps_->ride_car; }
 
 bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   if (!gaps_ || !gaps_->riding) return false;
@@ -74,6 +75,7 @@ void Game::gaps_leave_ride() {
   const bool have = gaps_ride_pose(p, q);
   if (g.riding) net_.seat_request(false, g.ride_owner, seats::Seat::passenger);
   g.riding = false;
+  g.ride_car = false;
   if (!have) { p = matrix_of(soldier_).translation(); q = Quat{}; }
   const net::Remote* rr = net_.remote(g.ride_owner);
   const bool in_car = rr && rr->state.mode == net::PlayerMode::car;
@@ -136,7 +138,11 @@ void Game::gaps_seats_update(f32 dt) {
       }
       g.riding = true;
       g.ride_seen = now;
-      hide_soldier();
+      // in a car the passenger stays himself: standing in the seat's place (his head and arms over
+      // the roof, as out of a sunroof) with his own weapons - he can shoot, the others see him; in
+      // a jet he sits under the canopy and only rides
+      g.ride_car = r->state.mode == net::PlayerMode::car;
+      if (!g.ride_car) hide_soldier();
       toast_ = r->state.mode == net::PlayerMode::car ? "Beifahrer" : "Mitflieger";
       toast_age_ = 0;
     } else if (now > g.seat_pending_until) {
@@ -148,13 +154,24 @@ void Game::gaps_seats_update(f32 dt) {
   if (g.riding) {
     Vec3 p;
     Quat q;
-    if (gaps_ride_pose(p, q)) g.ride_seen = now;
+    if (gaps_ride_pose(p, q)) {
+      g.ride_seen = now;
+      if (g.ride_car) {
+        // carried along: on the road in the passenger's place, at the car's speed (the car is the
+        // mate's - drawn here, no body of ours to stand in)
+        const Vec3 seat = p + q.rotate({0.04f, -0.36f, 0});
+        const net::Remote* rr = net_.remote(g.ride_owner);
+        world_->teleport(soldier_, {seat.x, seat.y, city_.ground_height(seat.x, seat.y) + 0.73f});
+        world_->set_actor_velocity(soldier_, rr ? rr->state.velocity : Vec3{});
+      }
+    }
     // the pilot got out (his seat row is gone) or his jet went quiet: out we go
     if (!(seated && row.owner == g.ride_owner) || now - g.ride_seen > kStaleS) gaps_leave_ride();
   }
 }
 
 bool Game::gaps_ride_camera(kern::Camera& c) {
+  if (gaps_ && gaps_->ride_car) return false;  // a car's passenger looks (and aims) as on foot
   Vec3 p;
   Quat q;
   if (!gaps_ride_pose(p, q)) return false;

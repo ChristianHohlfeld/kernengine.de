@@ -271,7 +271,7 @@ void Game::update_projectiles(f32 dt) {
 
 void Game::foot_attack(bool trigger, bool pressed) {
   const f32 now = world_->sim_time();
-  if (gaps_riding()) return;  // a passenger has nothing to fire (game_seats.cpp)
+  if (gaps_riding() && !(gaps_ && gaps_->ride_car)) return;  // a jet's passenger has nothing to fire; a car's does (game_seats.cpp)
   // launchFootGrenade: the clacker comes before the cooldown - a press while a round flies sets it off
   if (trigger && pressed && !player_dead_ && foot_weapon_ == Id::grenade_launcher && foot_remote_detonate(now)) return;
   if (!trigger || now < next_attack_ || player_dead_) return;
