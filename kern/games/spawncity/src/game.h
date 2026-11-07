@@ -487,7 +487,7 @@ class Game {
   i32 vr_menu_hover_ = -1, vr_menu_hover_was_ = -1, vr_menu_page_ = 0, vr_menu_sel_ = 0;
   bool vr_menu_stick_armed_ = true, vr_y_fired_ = false, vr_near_vehicle_ = false;
   f32 vr_y_held_ = 0;
-  bool vr_cam_request_ = false;  // the wrist menu's KAMERA (game_controls.cpp)
+  bool vr_cam_request_ = false, vr_scoped_ = false;  // the wrist menu's KAMERA (game_controls.cpp)
   Vec3 vr_menu_c_, vr_menu_r_, vr_menu_u_, vr_menu_n_;
   f32 vr_menu_w_ = 1, vr_menu_h_ = 1;
   std::string vr_action_;
@@ -616,6 +616,7 @@ class Game {
   bool reset_revive_ = false;  // RESET while down: Kern revives the soldier next step, then the start point  // the respawn delay set on Kern's soldier: 0 by input, 1 the mates' timer
   static constexpr f32 kRespawnCooldown = 3;
   bool request_respawn();
+  Vec3 standing_feet(Vec3 feet) const;  // the ground under a spawn spot as it is now (game.cpp)
   f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }
   // rules / feedback
   wanted::Tracker wanted_;

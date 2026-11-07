@@ -71,6 +71,8 @@ class People {
     // officer (driven by Police)
     i32 unit = -1;
     bool aiming = false;
+    f32 aim_pitch = 0;  // rad, + down: where the aiming arms (and the head) point - a mate's view (game_net.cpp)
+    i32 held = -1;      // a weapon in the right hand (weapons::Id; -1 none): a mate's, drawn by PeopleArt
     u32 seed = 0;
     // fighting back (pedestrian_agents.mjs) and the scripted kinds
     f32 provoked_at = -99, fight_until = 0, last_attack = -99;

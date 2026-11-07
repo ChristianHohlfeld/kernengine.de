@@ -436,7 +436,18 @@ void Game::show_soldier(Vec3 feet, f32 yaw_deg) {
   if (!world_->actor_alive(soldier_)) world_->set_alive(soldier_, true);
   world_->set_mode(kern::game::SimMode::play);
   const Vec3 rot{0, 0, yaw_deg};
-  world_->teleport(soldier_, feet + Vec3{0, 0, 0.73f}, &rot);
+  world_->teleport(soldier_, standing_feet(feet) + Vec3{0, 0, 0.73f}, &rot);
+}
+
+Vec3 Game::standing_feet(Vec3 feet) const {
+  // Where a player put down at `feet` stands, as the ground is now: the terrain's height there (a
+  // crater may have sunk it since the spot was taken - RESET, a respawn), or the first floor a ray
+  // from 3 m above meets (a deck, a roof the spot is on); never below the ground.
+  const f32 ground = city_.ground_height(feet.x, feet.y);
+  const RayResult r = cast(world_->physics(), {feet.x, feet.y, std::fmax(feet.z, ground) + 3.0f}, {0, 0, -1}, 3.0f + std::fabs(feet.z - ground) + 1.0f, body(soldier_), kCatWorld);
+  f32 z = ground;
+  if (r.hit && r.normal.z > 0.6f && r.point.z > ground - 0.05f) z = r.point.z;
+  return {feet.x, feet.y, z + 0.02f};
 }
 
 void Game::toggle_drone() {

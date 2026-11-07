@@ -473,7 +473,8 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
   // grabbing: the grip, or the trigger of a free hand (the left always; the right with the fists)
   {
     const bool fists = foot_weapon_ == weapons::Id::fists;
-    const bool lg = pad.connected && (pad.down(kPadLB) || pad.lt > 0.5f), rg = pad.connected && (pad.down(kPadRB) || (fists && pad.rt > 0.5f));
+    // (the sniper's left trigger is its scope: the grip still grabs)
+    const bool lg = pad.connected && (pad.down(kPadLB) || (pad.lt > 0.5f && foot_weapon_ != weapons::Id::sniper)), rg = pad.connected && (pad.down(kPadRB) || (fists && pad.rt > 0.5f));
     vr_grab(0, lg, dt);
     vr_grab(1, rg && (fists || foot_weapon_ == weapons::Id::knife ? true : pad.down(kPadRB)), dt);
   }
@@ -548,8 +549,16 @@ void Game::vr_scope_update() {
   c.near = 0.05f;
   engine_->xr_scope_camera = c;
   engine_->xr_scope = true;
-  constexpr f32 kLens = 0.034f;  // m across
-  const f32 lm[16] = {x.x * kLens, x.y * kLens, x.z * kLens, 0, -z.x, -z.y, -z.z, 0, y.x * kLens, y.y * kLens, y.z * kLens, 0, eyepiece.x, eyepiece.y, eyepiece.z, 1};
+  // Scoping the easy way (the left trigger held, or the eyepiece brought within 12 cm of the eye):
+  // the scope's picture comes up before the eye along the barrel, 16 cm across at 30 cm (about 30
+  // deg of the view) - aim with the rifle, the middle is where the round goes; let go and it sits
+  // on the rifle again
+  const Vec3 eye = engine_->xr_eye;
+  const bool ads = (pad.connected && pad.lt > 0.5f) || kern::length(eyepiece - eye) < 0.12f;
+  const f32 lens = ads ? 0.16f : 0.034f;  // m across
+  const Vec3 c0 = ads ? eye - z * 0.3f : eyepiece;
+  const f32 lm[16] = {x.x * lens, x.y * lens, x.z * lens, 0, -z.x, -z.y, -z.z, 0, y.x * lens, y.y * lens, y.z * lens, 0, c0.x, c0.y, c0.z, 1};
+  vr_scoped_ = ads;
   r.update_instances(vr_scope_mesh_, {lm, 16}, {});
   r.set_visible(vr_scope_mesh_, true);
 }

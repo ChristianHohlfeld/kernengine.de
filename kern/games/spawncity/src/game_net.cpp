@@ -135,6 +135,12 @@ net::PlayerState Game::my_state() const {
   s.avatar_yaw = world_->camera_yaw() * kDeg;
   s.yaw = world_->camera_yaw() * kDeg;
   s.pitch = world_->camera_pitch() * kDeg;
+  if (engine_ && engine_->xr) {
+    // VR: where the gun points (the right hand's ray) is the aim the others see - yaw and pitch
+    Vec3 from, dir;
+    if (mode_ == Mode::foot && vr_hand_ray(from, dir)) { s.yaw = std::atan2(dir.y, dir.x); s.pitch = -std::asin(clampf(dir.z, -1, 1)); }
+    else { const Vec3 f = engine_->xr_forward; s.pitch = -std::asin(clampf(f.z, -1, 1)); }
+  }
   s.speed = std::hypot(b.velocity.x, b.velocity.y);
   const kern::game::Hud& h = world_->hud();
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
@@ -553,7 +559,13 @@ void Game::draw_remote_people() {
     if (r.state.mode == net::PlayerMode::foot) {
       p.pos = r.person_shown;
       p.v = r.state.speed;
-      p.aiming = r.state.speed < 0.5f;
+      // his weapon in his hand, the arms along his aim (up / down) - a gun is always held up, the
+      // fists and the knife swing; the body faces where he looks
+      const weapons::Id w = static_cast<weapons::Id>(r.state.weapon);
+      p.held = static_cast<i32>(r.state.weapon);
+      p.aiming = w != weapons::Id::fists && w != weapons::Id::knife;
+      p.aim_pitch = r.state.pitch;
+      p.yaw = r.state.yaw;
       people_art_.person(p, now);
     } else if (r.state.mode == net::PlayerMode::drone) {
       p.pos = r.person_shown;

@@ -43,6 +43,7 @@ class PeopleArt {
   kern::Renderer* r_ = nullptr;
   Part leg_, torso_, arm_, head_, hand_, hair_, vest_, door_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
   Part rd_pelvis_, rd_chest_, rd_upper_, rd_fore_, rd_thigh_, rd_shin_;  // a ragdoll's bones, rounded
+  Part gun_pistol_, gun_smg_, gun_sniper_, gun_tube_, gun_rocket_, gun_knife_;  // a mate's weapon in his hand (barrel along +x)
 };
 
 }  // namespace sc

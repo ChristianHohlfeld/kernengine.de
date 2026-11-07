@@ -9,6 +9,9 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: Mitspieler halten ihre echte Waffe (Pistole, MP, Sniper, Werfer, Raketenwerfer, Messer) und zielen sichtbar dorthin, wohin sie schauen – hoch, runter, links, rechts.",
+    "Respawn und RESET stellen dich auf den Boden, wie er jetzt ist – auch in einem Krater, nie darunter.",
+    "VR: Zielfernrohr ganz einfach – linken Abzug halten (oder das Okular ans Auge), das Bild kommt vors Auge.",
     "Handy: der rechte Stick steht jetzt in jedem Modus etwas vom Rand weg – sichtbar genau dort, wo er auch greift (vorher sah man ihn am Rand, gegriffen wurde weiter links).",
     "Minimap in jeder Welt; ⛶ öffnet die große Karte.",
     "Radio auch im Jet und in der Drohne (📻 in der Leiste, in VR im Menü).",

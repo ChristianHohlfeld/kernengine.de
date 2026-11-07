@@ -1,6 +1,8 @@
 // Procedural people (see people_art.h).
 #include "people_art.h"
 
+#include "weapons.h"
+
 #include <cmath>
 
 #include "kern/geo/primitives.h"
@@ -109,6 +111,41 @@ bool PeopleArt::init(kern::Renderer& r) {
     prim::append(m, prim::box({0.27f, 0.13f, 0.02f}, sole), at({0.05f, 0, -0.245f}));
     if (!make(r, rd_shin_, m, mat(0.85f), true)) return false;
   }
+  // the weapons a mate carries (seen in third person, MP): built along +x from the grip
+  {
+    const Vec3 gm{0.09f, 0.09f, 0.1f}, gd{0.2f, 0.21f, 0.23f}, ol{0.26f, 0.3f, 0.2f};
+    MeshData m;
+    prim::append(m, prim::box({0.17f, 0.035f, 0.045f}, gm), at({0.06f, 0, 0.03f}));    // slide
+    prim::append(m, prim::box({0.04f, 0.032f, 0.1f}, gd), at({-0.005f, 0, -0.03f}) * rot({0, 1, 0}, -0.25f));  // grip
+    if (!make(r, gun_pistol_, m, mat(0.45f, 0.4f), false)) return false;
+    MeshData s2;
+    prim::append(s2, prim::box({0.42f, 0.05f, 0.08f}, gm), at({0.13f, 0, 0.03f}));      // body and barrel
+    prim::append(s2, prim::box({0.045f, 0.04f, 0.16f}, gd), at({0.12f, 0, -0.07f}));    // magazine
+    prim::append(s2, prim::box({0.04f, 0.035f, 0.1f}, gd), at({-0.01f, 0, -0.03f}) * rot({0, 1, 0}, -0.25f));
+    prim::append(s2, prim::box({0.16f, 0.04f, 0.06f}, gd), at({-0.14f, 0, 0.02f}));     // stock
+    if (!make(r, gun_smg_, s2, mat(0.45f, 0.4f), false)) return false;
+    MeshData sn;
+    prim::append(sn, prim::cylinder(0.012f, 0.75f, 8, gm), at({0.18f, 0, 0.04f}) * rot({0, 1, 0}, kPi / 2));  // barrel
+    prim::append(sn, prim::box({0.42f, 0.055f, 0.08f}, ol), at({0.0f, 0, 0.02f}));      // body
+    prim::append(sn, prim::cylinder(0.025f, 0.26f, 10, gd), at({-0.06f, 0, 0.1f}) * rot({0, 1, 0}, kPi / 2));  // scope
+    prim::append(sn, prim::box({0.04f, 0.035f, 0.1f}, gd), at({-0.03f, 0, -0.04f}) * rot({0, 1, 0}, -0.25f));
+    prim::append(sn, prim::box({0.22f, 0.045f, 0.09f}, ol), at({-0.3f, 0, 0.0f}));      // stock
+    if (!make(r, gun_sniper_, sn, mat(0.5f, 0.3f), false)) return false;
+    MeshData gl;
+    prim::append(gl, prim::cylinder(0.045f, 0.42f, 12, ol), at({-0.08f, 0, 0.05f}) * rot({0, 1, 0}, kPi / 2));  // the 40 mm tube
+    prim::append(gl, prim::box({0.04f, 0.035f, 0.1f}, gd), at({0.0f, 0, -0.03f}) * rot({0, 1, 0}, -0.25f));
+    prim::append(gl, prim::box({0.18f, 0.05f, 0.08f}, gd), at({-0.2f, 0, 0.02f}));
+    if (!make(r, gun_tube_, gl, mat(0.55f, 0.2f), false)) return false;
+    MeshData rk;
+    prim::append(rk, prim::cylinder(0.06f, 1.0f, 12, ol), at({-0.45f, 0, 0.09f}) * rot({0, 1, 0}, kPi / 2));   // over the shoulder
+    prim::append(rk, prim::cylinder(0.075f, 0.12f, 12, gd), at({0.43f, 0, 0.09f}) * rot({0, 1, 0}, kPi / 2));  // the muzzle ring
+    prim::append(rk, prim::box({0.04f, 0.035f, 0.1f}, gd), at({0.0f, 0, -0.01f}) * rot({0, 1, 0}, -0.25f));
+    if (!make(r, gun_rocket_, rk, mat(0.6f, 0.15f), false)) return false;
+    MeshData kn;
+    prim::append(kn, prim::box({0.17f, 0.006f, 0.032f}, {0.75f, 0.77f, 0.8f}), at({0.11f, 0, 0.0f}));
+    prim::append(kn, prim::box({0.1f, 0.025f, 0.035f}, gd), at({-0.02f, 0, 0.0f}));
+    if (!make(r, gun_knife_, kn, mat(0.3f, 0.7f), false)) return false;
+  }
   // police_ground_units.mjs POLICE_COLORS: the cops' black vest over the dark blue shirt
   MeshData vest;
   prim::append(vest, prim::box({0.29f, 0.45f, 0.36f}, {0.082f, 0.094f, 0.118f}), at({0.005f, 0, 0.36f}));
@@ -173,7 +210,7 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
 }
 
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -209,9 +246,10 @@ void PeopleArt::person(const People::Person& p, f32 now) {
     arm_l = shoulder * at({0, 0.27f, 0}) * rot({1, 0, 0}, 2.8f);
     arm_r = shoulder * at({0, -0.27f, 0}) * rot({1, 0, 0}, -2.8f);
   } else if (p.aiming && !down) {
-    // Both arms forward, the pistol at eye height.
-    arm_l = shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, -0.25f);
-    arm_r = shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, -1.45f) * rot({1, 0, 0}, 0.25f);
+    // Both arms forward along the aim (a mate's view pitch: up and down), the weapon at eye height.
+    const f32 ap = clampf(p.aim_pitch, -1.2f, 1.2f);
+    arm_l = shoulder * at({0, 0.2f, 0}) * rot({0, 1, 0}, -1.45f + ap) * rot({1, 0, 0}, -0.25f);
+    arm_r = shoulder * at({0, -0.2f, 0}) * rot({0, 1, 0}, -1.45f + ap) * rot({1, 0, 0}, 0.25f);
   } else {
     arm_l = shoulder * at({0, 0.27f, 0}) * rot({0, 1, 0}, -swing * 0.9f) * rot({1, 0, 0}, 0.06f);
     arm_r = shoulder * at({0, -0.27f, 0}) * rot({0, 1, 0}, swing * 0.9f) * rot({1, 0, 0}, -0.06f);
@@ -220,7 +258,18 @@ void PeopleArt::person(const People::Person& p, f32 now) {
   put(arm_, arm_r, p.shirt);
   put(hand_, arm_l, p.skin);
   put(hand_, arm_r, p.skin);
-  const Mat4 head = body * at({0, 0, 0.73f});
+  const Mat4 head = body * at({0, 0, 0.73f}) * rot({0, 1, 0}, down ? 0.0f : clampf(p.aim_pitch, -1.2f, 1.2f) * 0.6f);
+  if (p.held >= 0 && !down) {
+    // the weapon in the right hand: at the hands where the aiming arms meet, along the aim; held
+    // low and forward when not aiming (knife, fists, a launcher on the shoulder)
+    using W = weapons::Id;
+    const W w = static_cast<W>(p.held);
+    const f32 ap = p.aiming ? clampf(p.aim_pitch, -1.2f, 1.2f) : 0.5f;
+    const Mat4 g = shoulder * at({0, -0.06f, 0}) * rot({0, 1, 0}, ap) * at({w == W::rocket ? 0.05f : 0.5f, 0, w == W::rocket ? 0.12f : -0.02f});
+    Part* part = w == W::glock ? &gun_pistol_ : w == W::smg ? &gun_smg_ : w == W::sniper ? &gun_sniper_ : w == W::grenade_launcher ? &gun_tube_
+                 : w == W::rocket ? &gun_rocket_ : w == W::knife ? &gun_knife_ : nullptr;
+    if (part) put(*part, g);
+  }
   put(head_, head, p.skin);
   put(hair_, head, hair_color(p));
   if (p.kind == People::Kind::officer && !down) put(vest_, body);
@@ -305,7 +354,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

@@ -581,7 +581,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const stars = h.wanted?.stars ?? h.stars ?? 0;
       g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
       g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 106);
-      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(h.mode === "foot" ? "Y Menü · R-Stick ↕ / B Waffe · X einsteigen" : "Y Menü · L-Stick drücken = Kamera", 150, 108);
+      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(h.mode === "foot" ? (/sniper/i.test(String(h.weapon)) ? "L-Abzug = Zielfernrohr · R-Stick ↕ Waffe" : "Y Menü · R-Stick ↕ / B Waffe · X einsteigen") : "Y Menü · L-Stick drücken = Kamera", 150, 108);
     }
     gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);
