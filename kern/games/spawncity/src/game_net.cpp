@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "game.h"
+#include "game_world.h"
 #include "person_hit.h"
 #include "mp_art.h"
 #include "mp_rules.h"
@@ -399,6 +400,9 @@ void Game::update_net(f32 dt) {
         ++explosions_;
         gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)
         if (f.dir.y > 0.5f) destruction_.blast(f.p, f.a, f.dir.x, f.dir.y > 1.5f, city_, rng_);  // and buildings
+        // the scorch and the wall marks too (the crater, if any, comes with the host's state:
+        // game_destruction_sync.cpp - dug here it would be ours, not the city's)
+        if (life_ && f.a >= 1.5f) life_->marks.blast(f.p, f.a, std::fmin(1.4f, f.dir.x / 110), city_, world_->physics(), rng_, world_->sim_time(), false);
         // a mate's blast in our world hurts our people, zombies and military too (their own are his)
         if (f.dir.x > 0) { people_.blast(f.p, f.a, f.dir.x, false, world_->sim_time()); combat_blast(f.p, f.a, f.dir.x, false); }
         break;

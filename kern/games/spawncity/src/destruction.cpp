@@ -21,6 +21,18 @@ Vec2 norm2(Vec2 v, Vec2 fallback) {
 }
 }  // namespace
 
+bool Destruction::merge_points(const std::vector<std::pair<u32, f32>>& list, bool log) {
+  bool changed = false;
+  for (const auto& [seed, hp] : list) {
+    if (!std::isfinite(hp) || hp < 0) continue;
+    auto [it, fresh] = points_.try_emplace(seed, hp);
+    if (!fresh) { if (hp >= it->second - 0.01f) continue; it->second = hp; }
+    changed = true;
+    if (log) points_log_.emplace_back(seed, hp);
+  }
+  return changed;
+}
+
 u32 Destruction::blast(Vec3 at, f32 radius, f32 damage, bool missile, CityStream& city, Rng& rng) {
   const f32 r = std::clamp(radius, 2.0f, 40.0f);
   const f32 power = std::clamp(damage, 10.0f, 400.0f) * (missile ? 2.2f : 1.0f);
@@ -42,6 +54,7 @@ u32 Destruction::blast(Vec3 at, f32 radius, f32 damage, bool missile, CityStream
     (void)fresh;
     const f32 hp = std::fmax(0.0f, it->second - power * std::pow(1 - d / r, 1.5f) * 2.6f);
     it->second = hp;
+    points_log_.emplace_back(b.seed, hp);
     const f32 keep = hp / full;
     const f32 target = hp <= 0 ? b.base + std::fmin(kRubble, height) : b.base + std::fmax(kRubble, std::ceil(height * keep / kFloor) * kFloor);
     if (target >= b.top - 0.4f) continue;
@@ -254,6 +267,7 @@ void Destruction::reset(CityStream& city) {
   torn_.clear();
   pieces_.clear();
   points_.clear();
+  points_log_.clear();
   city.clear_damage();
   stats_ = {};
 }

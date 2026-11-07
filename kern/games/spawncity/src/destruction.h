@@ -26,6 +26,7 @@
 //  * torn pieces are a pool of at most 40 meshes, freed when they break; everything goes on RESET.
 #pragma once
 
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
 
@@ -51,6 +52,11 @@ class Destruction {
 
   struct Stats { u32 pieces = 0, torn = 0, hits = 0, collapsed = 0; };
   const Stats& stats() const { return stats_; }
+  /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
+  /// points a blast here took (since the last call), and those another machine reports.
+  std::vector<std::pair<u32, f32>> take_points_log() { return std::move(points_log_); }
+  void points_list(std::vector<std::pair<u32, f32>>& out) const { out.assign(points_.begin(), points_.end()); std::sort(out.begin(), out.end()); }
+  bool merge_points(const std::vector<std::pair<u32, f32>>& list, bool log);
 
  private:
   // what fracture needs of a broken building (a copy: the tile may go while a piece flies)
@@ -74,6 +80,7 @@ class Destruction {
 
   kern::Renderer* r_ = nullptr;
   std::unordered_map<u32, f32> points_;  // structural points left, by building seed
+  std::vector<std::pair<u32, f32>> points_log_;
   std::vector<Piece> pieces_;
   std::vector<Torn> torn_;
   Stats stats_;

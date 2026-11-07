@@ -121,6 +121,19 @@ class CityStream {
   u32 damaged_buildings() const { return static_cast<u32>(damage_.size()); }
   /// Counts every height a building lost (marks on the walls drop what hangs in the air: world_marks.cpp).
   u32 damage_serial() const { return damage_serial_; }
+  /// Destruction sync (game_destruction_sync.cpp): one building's damage as it goes over the
+  /// network - by its seed, the height above its base that is left, collapsed or not.
+  struct DamageRec { u32 seed = 0; f32 height = 0; bool leveled = false; };
+  /// Every damaged building (also those whose tile is not loaded here).
+  void damage_list(std::vector<DamageRec>& out) const;
+  /// The seeds whose damage changed since the last call (what this machine has to tell).
+  std::vector<u32> take_damage_log() { return std::move(damage_log_); }
+  bool damage_of(u32 seed, DamageRec& out) const;
+  /// Merge damage from another machine: only ever lower (the lowest height anybody saw wins, so
+  /// every machine ends at the same city whatever order the reports come in). A loaded building
+  /// is lowered at once (drawing, collider), an unloaded one when its tile streams in. Returns
+  /// whether anything changed. `log`: whether this change is ours to tell again (host relays).
+  bool merge_damage(const std::vector<DamageRec>& list, bool log);
 
  private:
   u32 damage_serial_ = 0;
@@ -170,6 +183,8 @@ class CityStream {
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
   std::unordered_map<u32, Damage> damage_;
+  std::vector<u32> damage_log_;
+  bool damage_quiet_ = false;  // merge_damage(.., false): not logged
   void begin_cells(Tile& t);
   bool finish_cells(Tile& t);
 

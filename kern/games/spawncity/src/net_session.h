@@ -180,6 +180,12 @@ class Session {
   std::vector<Swarm> take_swarms() { return std::move(swarms_); }
   std::vector<SwarmHit> take_swarm_hits() { return std::move(swarm_hits_); }
   std::vector<std::vector<u8>> take_world() { return std::move(world_); }
+  /// Destruction sync: client -> host, host -> all / one; incoming with the sender's slot.
+  struct Blob { u8 from = 0; std::vector<u8> data; };
+  void destroy_to_host(const std::vector<u8>& blob);
+  void destroy_to_all(const std::vector<u8>& blob, bool reliable);
+  void destroy_to(u8 slot, const std::vector<u8>& blob);
+  std::vector<Blob> take_destroy() { return std::move(destroy_); }
   std::vector<PingEvent> take_pings() { return std::move(pings_); }
   std::vector<VoiceFrame> take_voice() { return std::move(voice_); }
   /// A spawn anchor from the host for this (joining) player.
@@ -252,6 +258,7 @@ class Session {
   PlayerState me_;
   mp::Scoreboard scores_;
   bool friendly_fire_ = false;
+  std::vector<Blob> destroy_;
   u16 world_rules_ = 0;
   bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
   std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)

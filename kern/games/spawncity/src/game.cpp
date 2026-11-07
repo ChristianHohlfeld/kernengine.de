@@ -912,6 +912,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     traffic_clock += dt;
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     worldsync_update(dt);  // one world in multiplayer (game_worldsync.cpp)
+    dsync_update(dt);  // one destroyed city in multiplayer (game_destruction_sync.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
     {
       // the elevation ahead of a fast flight (terrain.h lead)
@@ -1451,6 +1452,7 @@ std::string Game::command(const std::string& cmd) {
                   std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
     return b;
   }
+  if (cmd == "destroy sync") return dsync_json();
   if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera

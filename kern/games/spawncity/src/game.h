@@ -47,6 +47,7 @@
 namespace sc {
 
 struct MpLocal;  // multiplayer presentation state (game_net.cpp)
+struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
 struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
@@ -199,6 +200,13 @@ class Game {
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
   struct CarPuppet { Vec3 p, v; Quat q; f32 at = -9; };
   void worldsync_update(f32 dt);
+  // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
+  void dsync_update(f32 dt);
+  void dsync_send_full(i32 to);
+  void dsync_reset_epoch();
+  std::string dsync_json();
+  DestroySync& dsync();
+  std::shared_ptr<DestroySync> dsync_;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;

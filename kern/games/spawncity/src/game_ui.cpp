@@ -480,6 +480,7 @@ void Game::ui_reset() {
   // Fresh weapons, the pistol in hand (Kern's weapon component follows select_foot_weapon).
   init_weapons();
   destruction_.reset(city_);  // every building whole again (world_destruction_state clearDestruction)
+  dsync_reset_epoch();  // in a session: every machine's city whole again with the host's (game_destruction_sync.cpp)
   foot_weapon_ = weapons::Id::knife;
   select_foot_weapon(weapons::Id::glock);
   // down at RESET: Kern's soldier comes back at its next step (at its spawn), the start point follows

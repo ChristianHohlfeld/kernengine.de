@@ -143,6 +143,7 @@ void CityStream::clear() {
   if (world_) for (kern::physics::Body b : {near_.body, near_.old_body}) if (b.valid() && world_->body_valid(b)) world_->destroy_body(b);
   near_ = {};
   damage_.clear();  // a new start place: a new city
+  damage_log_.clear();
   vis_at_ = {1e9f, 1e9f};
   vis_ms_ = -1e9;
 }
@@ -563,6 +564,7 @@ bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled)
   Damage& d = damage_[b.seed];
   d.height = b.top - b.base;
   d.leveled = b.leveled;
+  if (!damage_quiet_) damage_log_.push_back(b.seed);
   // the drawing: its chunk alone (when the building is drawn at all)
   if (index < t.cent.size() && std::find(t.vis_built.begin(), t.vis_built.end(), index) != t.vis_built.end()) t.dirty_cells.insert(cell_of(t.cent[index]));
   // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
@@ -581,8 +583,65 @@ bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled)
   return true;
 }
 
+void CityStream::damage_list(std::vector<DamageRec>& out) const {
+  out.clear();
+  out.reserve(damage_.size());
+  for (const auto& [seed, d] : damage_) out.push_back({seed, d.height, d.leveled});
+  std::sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
+}
+
+bool CityStream::damage_of(u32 seed, DamageRec& out) const {
+  auto it = damage_.find(seed);
+  if (it == damage_.end()) return false;
+  out = {seed, it->second.height, it->second.leveled};
+  return true;
+}
+
+bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
+  if (list.empty()) return false;
+  std::unordered_map<u32, const DamageRec*> want;
+  bool changed = false;
+  for (const DamageRec& r : list) {
+    if (!(r.height >= 0) || !std::isfinite(r.height)) continue;
+    auto it = damage_.find(r.seed);
+    if (it != damage_.end() && it->second.height <= r.height + 0.01f && (it->second.leveled || !r.leveled)) continue;  // ours is as low already
+    want[r.seed] = &r;
+  }
+  if (want.empty()) return false;
+  damage_quiet_ = !log;
+  // the loaded ones: lowered now (the same path as a blast: its chunk, its collider)
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *tp;
+    if (!t.prepared) continue;
+    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
+      auto w = want.find(t.features.buildings[i].seed);
+      if (w == want.end()) continue;
+      const MapFeatures::Building& b = t.features.buildings[i];
+      if (damage_building(k, i, b.base + w->second->height, w->second->leveled)) changed = true;
+    }
+  }
+  // the rest (not loaded here): kept for when the tile comes (prepare applies damage_)
+  for (auto& [seed, r] : want) {
+    auto it = damage_.find(seed);
+    if (it == damage_.end()) {
+      damage_[seed] = Damage{r->height, r->leveled};
+    } else if (r->height < it->second.height - 0.01f || (r->leveled && !it->second.leveled)) {
+      it->second.height = std::fmin(it->second.height, r->height);
+      it->second.leveled = it->second.leveled || r->leveled;
+    } else {
+      continue;
+    }
+    changed = true;
+    if (log) damage_log_.push_back(seed);
+  }
+  damage_quiet_ = false;
+  if (changed) ++damage_serial_;
+  return changed;
+}
+
 void CityStream::clear_damage() {
   damage_.clear();
+  damage_log_.clear();
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
     if (!t.prepared) continue;

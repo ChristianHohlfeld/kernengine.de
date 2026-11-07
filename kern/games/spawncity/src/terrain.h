@@ -118,6 +118,11 @@ class Terrain {
     return false;
   }
   u32 crater_count() const { return static_cast<u32>(craters_.size()); }
+  /// One crater as it goes over the network (destruction sync: game_destruction_sync.cpp).
+  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } };
+  void crater_list(std::vector<CraterRec>& out) const;
+  /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
+  void set_craters(const std::vector<CraterRec>& list);
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
   void take_changes(std::vector<kern::Vec4>& out) { out.insert(out.end(), changes_.begin(), changes_.end()); changes_.clear(); }
 

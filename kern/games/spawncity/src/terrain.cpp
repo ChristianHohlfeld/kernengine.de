@@ -723,6 +723,25 @@ void Terrain::add_crater(Vec2 at, f32 radius, f32 depth) {
   dirty(at.x - radius, at.y - radius, at.x + radius, at.y + radius);
 }
 
+void Terrain::crater_list(std::vector<CraterRec>& out) const {
+  out.clear();
+  for (const Crater& c : craters_) out.push_back({c.c.x, c.c.y, c.r, c.depth});
+}
+
+void Terrain::set_craters(const std::vector<CraterRec>& list) {
+  std::vector<CraterRec> mine;
+  crater_list(mine);
+  if (mine == list) return;
+  auto has = [](const std::vector<CraterRec>& v, const CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); };
+  // the ground changes only where a crater came or went (a reorder alone changes nothing: the
+  // height adds every bowl up)
+  for (const CraterRec& c : mine) if (!has(list, c)) dirty(c.x - c.r, c.y - c.r, c.x + c.r, c.y + c.r);
+  for (const CraterRec& c : list) if (!has(mine, c)) dirty(c.x - c.r, c.y - c.r, c.x + c.r, c.y + c.r);
+  craters_.clear();
+  for (const CraterRec& c : list) if (c.r > 0.5f && std::isfinite(c.x) && std::isfinite(c.y) && std::isfinite(c.depth)) craters_.push_back({{c.x, c.y}, c.r, c.depth, c.depth * 7.0f / 22.0f});
+  stats_.craters = static_cast<u32>(craters_.size());
+}
+
 // ---------------------------------------------------------------------------------------------
 // tiles
 

@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -302,6 +302,16 @@ void Session::send_swarm(const std::vector<SwarmUnit>& units) {
 void Session::send_world(const std::vector<u8>& blob) {
   if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
 }
+// Destruction sync (game_destruction_sync.cpp): reliable, the host is the authority.
+void Session::destroy_to_host(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && client_->connected()) client_->send(kReliable, kDestroyMsg, blob);
+}
+void Session::destroy_to_all(const std::vector<u8>& blob, bool reliable) {
+  if (role_ == Role::host) to_all(reliable ? kReliable : kUnreliable, kDestroyMsg, blob, kHost);
+}
+void Session::destroy_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kReliable, kDestroyMsg, blob);
+}
 void Session::send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage) {
   if (role_ == Role::none) return;
   SwarmHit h{self_slot_, to, id, kind, damage};
@@ -426,6 +436,7 @@ void Session::send_seats() {
 
 void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
   switch (type) {
+    case kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
     case kSeatReq: {
       R r{d};
       const u8 claim = r.get<u8>(), owner = r.get<u8>(), seat = r.get<u8>();
@@ -556,6 +567,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     case kSwarmMsg: { Swarm sw; if (unpack_swarm(d, sw) && sw.owner != self_slot_) swarms_.push_back(sw); return; }
     case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
     case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
+    case kDestroyMsg: { if (role_ == Role::client && destroy_.size() < 64) destroy_.push_back({kHost, d}); return; }
     case kSeatState: {
       const u32 rev = r.get<u32>();
       const u8 n = r.get<u8>();
