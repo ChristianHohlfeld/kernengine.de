@@ -1,0 +1,84 @@
+// Unchanged from the original SpawnCity (spawncity.de, sim/audio_settings.mjs, commit 9108537) except for the imports of impact_explosion_overlay.mjs (modules that are not on Kern):
+// the audio settings (EFFECTS / MUSIC / the mixer sliders) and the effects master bus, run on Kern by web/audio.mjs.
+
+export const AUDIO_SETTINGS_KEY="arondight45AudioSettingsV1";
+export const AUDIO_SETTINGS_EVENT="arondight45-audio-settings-change";
+export const AUDIO_MIX_VERSION=5;
+export const DEFAULT_AUDIO_SETTINGS=Object.freeze({soundEnabled:true,droneVolume:50,shotsVolume:82,fxVolume:72,footstepsVolume:30,vehicleVolume:58,ambientVolume:46,musicEnabled:true,musicVolume:32,mixVersion:AUDIO_MIX_VERSION});
+const clampPercent=value=>Math.max(0,Math.min(100,Math.round(Number(value)||0)));
+export function normalizeAudioSettings(value={}){
+  return{
+    soundEnabled:value.soundEnabled===undefined?DEFAULT_AUDIO_SETTINGS.soundEnabled:Boolean(value.soundEnabled),
+    droneVolume:clampPercent(value.droneVolume??DEFAULT_AUDIO_SETTINGS.droneVolume),
+    shotsVolume:clampPercent(value.shotsVolume??DEFAULT_AUDIO_SETTINGS.shotsVolume),
+    fxVolume:clampPercent(value.fxVolume??DEFAULT_AUDIO_SETTINGS.fxVolume),
+    footstepsVolume:clampPercent(value.footstepsVolume??DEFAULT_AUDIO_SETTINGS.footstepsVolume),
+    vehicleVolume:clampPercent(value.vehicleVolume??DEFAULT_AUDIO_SETTINGS.vehicleVolume),
+    ambientVolume:clampPercent(value.ambientVolume??DEFAULT_AUDIO_SETTINGS.ambientVolume),
+    musicEnabled:value.musicEnabled===undefined?DEFAULT_AUDIO_SETTINGS.musicEnabled:Boolean(value.musicEnabled),
+    musicVolume:clampPercent(value.musicVolume??DEFAULT_AUDIO_SETTINGS.musicVolume),
+    mixVersion:AUDIO_MIX_VERSION,
+  };
+}
+function migrateAudioSettings(value={}){
+  if(Number(value?.mixVersion)>=AUDIO_MIX_VERSION)return normalizeAudioSettings(value);
+  // v4 -> v5: on foot the drone was muted by broadcasting droneVolume:0, which the mixer then
+  // saved with the next slider move. A 0 % drone volume from v4 is that bug, not a choice.
+  if(Number(value?.mixVersion)===4)return normalizeAudioSettings({...value,droneVolume:Number(value.droneVolume)===0?DEFAULT_AUDIO_SETTINGS.droneVolume:value.droneVolume,mixVersion:AUDIO_MIX_VERSION});
+  // v3 -> v4 adds the separate music track; the effect mix is kept as-is.
+  if(Number(value?.mixVersion)===3)return normalizeAudioSettings({...value,mixVersion:AUDIO_MIX_VERSION});
+  return normalizeAudioSettings({...value,
+    droneVolume:value.droneVolume==null?DEFAULT_AUDIO_SETTINGS.droneVolume:Math.min(clampPercent(value.droneVolume),60),
+    footstepsVolume:value.footstepsVolume==null?DEFAULT_AUDIO_SETTINGS.footstepsVolume:Math.min(clampPercent(value.footstepsVolume),36),
+    vehicleVolume:value.vehicleVolume??DEFAULT_AUDIO_SETTINGS.vehicleVolume,
+    ambientVolume:value.ambientVolume??DEFAULT_AUDIO_SETTINGS.ambientVolume,
+    mixVersion:AUDIO_MIX_VERSION,
+  });
+}
+export function loadAudioSettings(){
+  try{
+    const raw=localStorage.getItem(AUDIO_SETTINGS_KEY);
+    if(raw){const parsed=JSON.parse(raw),next=migrateAudioSettings(parsed);if(Number(parsed?.mixVersion)!==AUDIO_MIX_VERSION)localStorage.setItem(AUDIO_SETTINGS_KEY,JSON.stringify(next));return next;}
+    const legacy=localStorage.getItem("arondight45MotorSound"),next=normalizeAudioSettings({...DEFAULT_AUDIO_SETTINGS,soundEnabled:legacy!=="off"});localStorage.setItem(AUDIO_SETTINGS_KEY,JSON.stringify(next));localStorage.removeItem("arondight45MotorSound");return next;
+  }catch{return normalizeAudioSettings(DEFAULT_AUDIO_SETTINGS);}
+}
+export function saveAudioSettings(settings,{notify=true}={}){
+  const next=normalizeAudioSettings(settings);try{localStorage.setItem(AUDIO_SETTINGS_KEY,JSON.stringify(next));localStorage.removeItem("arondight45MotorSound");}catch{}
+  if(notify&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent(AUDIO_SETTINGS_EVENT,{detail:{...next}}));
+  return next;
+}
+function slider(label,key){return `<div class="phone-settings-row"><label>${label}</label><output data-audio-out="${key}"></output><input data-audio-slider="${key}" type="range" min="0" max="100" step="1"><div class="phone-settings-scale"><span>MUTE</span><span>100%</span></div></div>`;}
+export function mountAudioSettings({dialog,onChange=()=>{}}={}){
+  if(!dialog)throw Error("audio settings dialog required");
+  let settings=loadAudioSettings();
+  const section=document.createElement("section");section.className="camera-settings-section audio-settings-section";section.dataset.audioSettings=String(AUDIO_MIX_VERSION);
+  section.innerHTML=`<h4>AUDIO MIXER</h4><label class="phone-settings-toggle"><span>EFFECTS</span><input data-audio-enabled type="checkbox"></label><h4>MUSIC</h4><label class="phone-settings-toggle"><span>MUSIC</span><input data-music-enabled type="checkbox"></label>${slider("MUSIC VOLUME","music")}<h4>SOUND EFFECTS</h4>${slider("DRONE","drone")}${slider("SHOTS","shots")}${slider("FX / EXPLOSIONS","fx")}${slider("FOOTSTEPS","footsteps")}${slider("VEHICLE","vehicle")}${slider("AMBIENT / OTHER","ambient")}<p class="phone-settings-note">Music and sound effects are separate tracks with independent volumes. SOUND mutes everything.</p>`;
+  const actions=dialog.querySelector(".phone-settings-actions");dialog.insertBefore(section,actions);
+  const enabled=section.querySelector("[data-audio-enabled]"),musicEnabled=section.querySelector("[data-music-enabled]"),inputs=Object.fromEntries(["music","drone","shots","fx","footsteps","vehicle","ambient"].map(key=>[key,section.querySelector(`[data-audio-slider="${key}"]`)]));
+  const render=()=>{enabled.checked=settings.soundEnabled;musicEnabled.checked=settings.musicEnabled;for(const[key,input]of Object.entries(inputs)){const prop=`${key}Volume`;input.value=String(settings[prop]);section.querySelector(`[data-audio-out="${key}"]`).value=`${settings[prop]}%`;}section.dataset.masterEnabled=settings.soundEnabled?"1":"0";section.dataset.mixVersion=String(AUDIO_MIX_VERSION);};
+  const apply=()=>{settings=saveAudioSettings({soundEnabled:enabled.checked,musicEnabled:musicEnabled.checked,musicVolume:+inputs.music.value,droneVolume:+inputs.drone.value,shotsVolume:+inputs.shots.value,fxVolume:+inputs.fx.value,footstepsVolume:+inputs.footsteps.value,vehicleVolume:+inputs.vehicle.value,ambientVolume:+inputs.ambient.value});render();onChange({...settings});};
+  enabled.addEventListener("change",apply);musicEnabled.addEventListener("change",apply);for(const input of Object.values(inputs))input.addEventListener("input",apply);
+  const external=event=>{settings=normalizeAudioSettings(event.detail||loadAudioSettings());render();onChange({...settings});};window.addEventListener(AUDIO_SETTINGS_EVENT,external);
+  dialog.addEventListener("close",()=>{settings=loadAudioSettings();render();});dialog.querySelector("[data-reset]")?.addEventListener("click",()=>{settings=saveAudioSettings(DEFAULT_AUDIO_SETTINGS);render();onChange({...settings});});
+  render();onChange({...settings});return{section,get settings(){return{...settings};},reload(){settings=loadAudioSettings();render();onChange({...settings});return{...settings};}};
+}
+
+// ---------------------------------------------------------------- effects master bus
+// "Effects off" must silence EVERY game sound, whichever module made it (jet engine, sirens, cars,
+// animals …): about 25 modules synthesize sound and not all of them read the settings. Every Web
+// Audio node that connects straight to the speakers is routed through one master gain per audio
+// context instead; music and voice chat mark their output as exempt (they have their own switches).
+export function exemptFromEffectsBus(node){if(node)node.__audioBusExempt=true;return node;}
+const fxBuses=new Set();
+function busGain(){const s=loadAudioSettings();return s.soundEnabled?1:0;}
+function fxBusFor(ctx,orig){let bus=ctx.__arondightFxBus;if(bus)return bus;try{bus=ctx.createGain();bus.__isFxBus=true;bus.gain.value=busGain();orig.call(bus,ctx.destination);ctx.__arondightFxBus=bus;fxBuses.add(bus);return bus;}catch{return null;}}
+function installEffectsBus(){
+  if(typeof window==="undefined"||typeof AudioNode==="undefined"||AudioNode.prototype.__arondightBusPatched)return;
+  const orig=AudioNode.prototype.connect;AudioNode.prototype.__arondightBusPatched=true;
+  AudioNode.prototype.connect=function(dest,...rest){
+    if(typeof AudioDestinationNode!=="undefined"&&dest instanceof AudioDestinationNode&&!this.__isFxBus&&!this.__audioBusExempt){const bus=fxBusFor(dest.context,orig);if(bus){orig.call(this,bus,...rest);return dest;}}
+    return orig.call(this,dest,...rest);};
+  window.addEventListener(AUDIO_SETTINGS_EVENT,()=>{const g=busGain();for(const bus of fxBuses){try{bus.gain.setTargetAtTime(g,bus.context.currentTime,.03);}catch{bus.gain.value=g;}}});
+  globalThis.__arondightEffectsBus={get enabled(){return busGain()>0;},exempt:exemptFromEffectsBus};
+}
+installEffectsBus();

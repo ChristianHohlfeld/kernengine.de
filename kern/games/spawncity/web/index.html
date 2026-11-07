@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="screen-orientation" content="landscape">
+<meta name="x5-orientation" content="landscape">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./sim/icons/spawncity-192.png">
+<link rel="apple-touch-icon" href="./sim/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="SpawnCity">
+<meta name="application-name" content="SpawnCity">
+<meta name="theme-color" content="#010806">
+<meta name="description" content="SpawnCity – das Spiel in deiner echten Stadt: Es startet genau dort, wo du stehst – flieg Drohne, lauf durch deine Straßen, fahr Auto, Bus oder Jet und spiel mit Freunden. Kostenlos im Browser, ohne Download.">
+<meta property="og:site_name" content="SpawnCity">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="SpawnCity – deine echte Stadt ist das Spielfeld">
+<meta property="og:description" content="Drohne, zu Fuß, Auto, Bus und Jet – in deiner echten Stadt, per GPS genau da, wo du stehst. Mit Freunden im Multiplayer. Kostenlos im Browser.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SpawnCity – deine echte Stadt ist das Spielfeld">
+<meta name="twitter:description" content="Drohne, zu Fuß, Auto, Bus und Jet – in deiner echten Stadt, per GPS genau da, wo du stehst. Kostenlos im Browser.">
+<title>SpawnCity – Drohne, Auto &amp; Jet in deiner echten Stadt</title>
+<style>
+  :root { color-scheme: dark; --glass: rgba(8, 12, 18, .58); --line: rgba(255, 255, 255, .14); --text: #eef3f8; --muted: #9fb0c2; --accent: #ffb547; --hot: #ff5a3c; --ok: #6be3a5; }
+  html:not(.sc-original-view), html:not(.sc-original-view) body { margin: 0; height: 100%; background: #0b0f14; color: var(--text); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+    font: 500 13px/1.3 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+  #stage { position: fixed; inset: 0; }
+  html:not(.sc-original-view) canvas { display: block; width: 100%; height: 100%; outline: none; }
+  #status { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); padding: 14px 20px; background: var(--glass); border: 1px solid var(--line);
+    border-radius: 12px; backdrop-filter: blur(8px); font-weight: 600; letter-spacing: .02em; pointer-events: none; max-width: 80vw; text-align: center; }
+  #hud { position: fixed; inset: 0; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+  .sc-top { position: absolute; left: max(14px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); display: flex; gap: 10px; align-items: center; }
+  .sc-badge { padding: 5px 10px; border-radius: 8px; background: var(--glass); border: 1px solid var(--line); font-weight: 800; letter-spacing: .08em; font-size: 12px; }
+  .sc-stars { color: var(--accent); font-size: 16px; letter-spacing: 2px; }
+  .sc-fps { color: var(--muted); font-size: 11px; }
+  .sc-map { position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); width: 150px; height: 150px;
+            border-radius: 50%; background: rgba(12, 16, 22, .55); border: 1px solid var(--line); }
+  body.sc-touch-on .sc-map { width: 104px; height: 104px; }
+  .sc-toast { position: absolute; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translateX(-50%); padding: 7px 14px; border-radius: 10px;
+    background: var(--glass); border: 1px solid var(--line); font-weight: 650; }
+  .sc-offline { position: absolute; left: 50%; top: calc(max(14px, env(safe-area-inset-top)) + 40px); transform: translateX(-50%); padding: 6px 12px; border-radius: 8px;
+    background: rgba(120, 60, 0, .72); border: 1px solid rgba(255, 181, 71, .6); color: #ffd9a0; font-weight: 700; font-size: 12px; letter-spacing: .03em; }
+  .sc-cross { --spread: 10px; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  .sc-cross::before, .sc-cross::after { content: ""; position: absolute; background: rgba(255, 255, 255, .9); box-shadow: 0 0 2px #000; }
+  .sc-cross::before { width: 2px; height: 10px; left: -1px; top: calc(-5px - var(--spread)); box-shadow: 0 calc(10px + 2 * var(--spread)) 0 rgba(255, 255, 255, .9); }
+  .sc-cross::after { height: 2px; width: 10px; top: -1px; left: calc(-5px - var(--spread)); box-shadow: calc(10px + 2 * var(--spread)) 0 0 rgba(255, 255, 255, .9); }
+  .sc-panel { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); min-width: 190px; padding: 10px 12px;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
+  .sc-speed b { font-size: 30px; font-weight: 800; } .sc-speed small { margin-left: 5px; color: var(--muted); }
+  .sc-rows div { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; } .sc-rows span { color: var(--muted); }
+  .sc-rows .hot b { color: var(--hot); } .sc-rows .warn b { color: var(--accent); }
+  body[data-mode="jet"] .sc-panel { color: #7dff9b; border-color: rgba(125, 255, 155, .35); } body[data-mode="jet"] .sc-rows span { color: #4fc070; }
+  .sc-health { position: absolute; left: 50%; bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); transform: translateX(-50%); width: min(260px, 40vw); height: 6px;
+    border-radius: 3px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+  .sc-health i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #6be3a5, #b8f06a); }
+  .sc-health.low i { background: var(--hot); }
+  .sc-ammo { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); padding: 8px 12px;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 10px; } .sc-ammo b { font-size: 24px; }
+  .sc-banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); z-index: 40; padding: 10px 18px; border-radius: 10px; background: #2c3320e8;
+    border: 2px solid #b8c27a; color: #e8f0b8; font: 900 16px/1.1 Inter, system-ui, sans-serif; letter-spacing: .12em; pointer-events: none; text-align: center; }
+  .sc-pop { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); font: 700 clamp(15px, 2.6vw, 24px) Inter, system-ui, sans-serif; letter-spacing: .16em;
+    color: #f5b301; text-shadow: 0 1px 4px #000b; pointer-events: none; white-space: nowrap; }
+  .sc-guided { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); padding: 3px 9px; border-radius: 10px; background: #0b1118d0; border: 1px solid #ffb24a; color: #ffe2b8; font: 800 11px/1.3 system-ui, sans-serif; letter-spacing: .06em; pointer-events: none; white-space: nowrap; }
+  .sc-scope { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 0 min(38vh, 38vw), #000 calc(min(38vh, 38vw) + 2px)); }
+  .sc-scope::before, .sc-scope::after { content: ""; position: absolute; left: 50%; top: 50%; background: #000c; }
+  .sc-scope::before { width: min(76vh, 76vw); height: 1px; transform: translate(-50%, -50%); }
+  .sc-scope::after { width: 1px; height: min(76vh, 76vw); transform: translate(-50%, -50%); }
+  .sc-scope i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #ff2a1a; }
+  .sc-hint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); padding: 6px 12px; border-radius: 8px; background: var(--glass); border: 1px solid var(--accent);
+    color: var(--accent); font-weight: 700; }
+  /* desktop_controls.mjs #desktopKeyHints: centred under the top bar, fades 12 s after a change */
+  .sc-help { position: absolute; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 102px); transform: translateX(-50%); max-width: min(70vw, 860px); padding: 4px 10px;
+    border-radius: 6px; background: #0b0f1680; color: #dfe7f2cc; font: 600 10px/1.35 Inter, system-ui, sans-serif; letter-spacing: .04em; text-align: center; transition: opacity .6s; }
+  .sc-help:empty { display: none; }
+  .sc-help.faded { opacity: 0; }
+  body.pad-input, body.pad-input canvas { cursor: none; }
+  /* touch play: the credits stay readable but never take a thumb's touch from the controls */
+  body.sc-touch-on .sc-attrib { pointer-events: none; font-size: 9px; }
+  /* simulator.mjs syncSoloPresentationOrientation: a portrait phone plays a landscape turned by 90 deg
+     (logical x = screen y, logical y = screen width - screen x); menus turn with it */
+  /* the original turns #viewport (and open dialogs) itself in portrait (original.css); the page is
+     already turned here, so that turn would come on top (upside down, the view off the screen):
+     the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
+     original's quarter-turned mapping */
+  /* jet: EJECT / AUSSTEIGEN under the score and the FLOW bar, not over the vitals */
+  /* the minimap in every world (the original showed it only in the real world: the training town too), and its big map */
+  body.solo-flight #viewport #worldLookHud { display: block; }
+  /* the right stick off the edge (touch_play.h kRightInset): room for the thumb to turn */
+  html body:not(.desktop-input) #viewport #footLook { right: calc(var(--solo-safe-right, env(safe-area-inset-right, 0px)) + 76px) !important; }
+  /* on foot (touch): no FIRE button - the screen fires where it is touched (the original) */
+  html body.sc-touch-on.on-foot-mode:not(.player-driving):not(.jet-mode) #viewport #footHud #footFire { display: none !important; }
+  /* sound and music switches: what they are and whether they are on, at a glance */
+  html body #soundSwitch, html body #musicSwitch { flex-direction: column !important; gap: 2px !important; height: auto !important; min-height: 40px !important; padding: 4px 6px !important; border-radius: 10px !important; transition: background .15s, border-color .15s; }
+  html body #soundSwitch::after, html body #musicSwitch::after { font: 800 8px/1 Inter, system-ui, sans-serif; letter-spacing: .1em; white-space: nowrap; }
+  html body #soundSwitch[data-on="1"]::after { content: "AN"; color: #7ff0c5; }
+  html body #soundSwitch[data-on="0"]::after { content: "AUS"; color: #ff9a8a; }
+  html body #musicSwitch[data-on="1"]::after { content: "AN"; color: #7ff0c5; }
+  html body #musicSwitch[data-on="0"]::after { content: "AUS"; color: #ff9a8a; }
+  html body #soundSwitch[data-on="0"], html body #musicSwitch[data-on="0"] { background: #4a1a1ae0 !important; border-color: #ff6b5a !important; }
+  html body #soundSwitch[data-on="0"] svg, html body #musicSwitch[data-on="0"] svg { opacity: .7; }
+  html body #soundSwitch:active, html body #musicSwitch:active { transform: scale(.94); }
+  /* no GPS button (title and game): the live-GPS walk is gone */
+  #gpsLiveButton, #gpsLiveHud, #scGps { display: none !important; }
+  /* jet_mode.mjs: KANONE left of the stick (on-foot-mode hides the foot fire button) */
+  html body.jet-mode.on-foot-mode #viewport #footHud #footFire { visibility: visible !important; }
+  body.jet-mode #jetHud [data-a="exit"] { top: calc(max(8px, var(--solo-safe-top, env(safe-area-inset-top))) + 140px) !important; font-size: 13px !important; }
+  .sc-attrib { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 10.5px; color: rgba(255, 255, 255, .78);
+    pointer-events: auto; background: rgba(0, 0, 0, .35); padding: 2px 6px; border-radius: 4px; }
+  .sc-attrib a { color: inherit; text-decoration: none; }
+  body.sc-touch-on .sc-panel { left: auto; right: max(14px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 40px); bottom: auto; min-width: 150px; }
+  body.sc-touch-on .sc-ammo { bottom: auto; top: calc(max(12px, env(safe-area-inset-top)) + 40px); right: auto; left: max(14px, env(safe-area-inset-left)); }
+  body.sc-touch-on .sc-fps { display: none; }
+  /* Touch: a compact panel that ends above the context buttons over the right stick. */
+  body.sc-touch-on .sc-panel { padding: 6px 10px; min-width: 130px; }
+  body.sc-touch-on .sc-speed b { font-size: 20px; }
+  body.sc-touch-on .sc-rows div:nth-child(n+3) { display: none; }
+  @media (max-width: 640px) { .sc-fps { display: none; } .sc-speed b { font-size: 24px; } }
+</style>
+<script src="./update_check.js"></script>
+<script>
+// The install prompt is caught before anything else loads (Chrome fires it once, early).
+window.__scInstallPrompt = null;
+addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__scInstallPrompt = e; });
+addEventListener("appinstalled", function () { window.__scInstallPrompt = null; window.__scInstalled = true; });
+</script>
+<style>
+  /* landscape only: a phone held upright shows how to hold it (the game waits behind) */
+  #scRotate { display: none; position: fixed; inset: 0; z-index: 2147483600; background: #0b0f15; color: #eef3f8; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; font: 800 18px/1.35 Inter, system-ui, sans-serif; letter-spacing: .06em; padding: 24px; }
+  html.sc-portrait #scRotate { display: flex; }
+  /* the original turned its #viewport a quarter in portrait; on Kern nothing is turned (a portrait
+     desktop window just shows the game upright, a phone asks to be turned) */
+  @media (orientation: portrait) {
+    html body.solo-flight #viewport, html.android-stable-webgl body.solo-flight #viewport { --solo-safe-top: env(safe-area-inset-top,0px); --solo-safe-right: env(safe-area-inset-right,0px); --solo-safe-bottom: env(safe-area-inset-bottom,0px); --solo-safe-left: env(safe-area-inset-left,0px); inset: 0 !important; width: 100% !important; height: 100% !important; transform: none !important; }
+    html body.solo-flight dialog[open] { transform: none; }
+  }
+  #scRotate .sc-phone { width: 64px; height: 110px; border: 5px solid #7ff0c5; border-radius: 14px; animation: scTurn 1.8s ease-in-out infinite; }
+  @keyframes scTurn { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+  #scRotate button { margin-top: 6px; padding: 14px 26px; border-radius: 12px; border: 0; background: linear-gradient(180deg, #ffb02e, #ff7a1a); color: #16120c; font: 900 16px/1 Inter, system-ui, sans-serif; letter-spacing: .14em; }
+  #scRotate small { font-weight: 600; opacity: .7; letter-spacing: .02em; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="game" tabindex="0" aria-label="SpawnCity"></canvas></div>
+<div id="hud"></div>
+<div id="status">SpawnCity wird gestartet ...</div>
+<div id="scRotate" role="dialog" aria-label="Quer halten"><div class="sc-phone"></div><div>BITTE QUER HALTEN</div><small>SpawnCity spielt im Querformat.</small><button type="button" id="scRotateGo">QUER SPIELEN</button></div>
+<script type="module">
+  import {startSpawnCity} from "./host.mjs";
+  startSpawnCity({url: "./spawncity.wasm"});
+</script>
+</body>
+</html>
