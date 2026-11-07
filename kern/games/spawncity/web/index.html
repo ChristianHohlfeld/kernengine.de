@@ -87,6 +87,8 @@
      the viewport fills the turned page, dialogs stay as they are; the safe-area insets keep the
      original's quarter-turned mapping */
   /* jet: EJECT / AUSSTEIGEN under the score and the FLOW bar, not over the vitals */
+  /* the minimap in every world (the original showed it only in the real world: the training town too), and its big map */
+  body.solo-flight #viewport #worldLookHud { display: block; }
   /* the right stick off the edge (touch_play.h kRightInset): room for the thumb to turn */
   html body:not(.desktop-input) #viewport #footLook { right: calc(var(--solo-safe-right, env(safe-area-inset-right, 0px)) + 76px) !important; }
   /* on foot (touch): no FIRE button - the screen fires where it is touched (the original) */

@@ -283,6 +283,82 @@ void Life::kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out) {
   (void)now;
 }
 
+kern::physics::Body Life::grab_animal(Vec3 at, f32 reach) {
+  if (!world_) return {};
+  f32 best = reach;
+  Cow* cow = nullptr;
+  i32 pet = -1;
+  for (Cow& c : cows_) {
+    if (c.dead) continue;
+    if (c.carried && c.body.valid() && world_->body_valid(c.body)) {
+      const f32 d = kern::length(world_->pose(c.body).position - at);
+      if (d < best + 0.6f) { best = d; cow = &c; pet = -1; }
+      continue;
+    }
+    // the hand on its back, its neck or its flank (the body 1.6 m long, 1.45 m high)
+    const Vec3 to_local = at - (c.pos + Vec3{0, 0, 1.1f});
+    const f32 d = std::fmax(0.0f, kern::length(to_local) - 0.75f);
+    if (d < best) { best = d; cow = &c; pet = -1; }
+  }
+  for (std::size_t i = 0; i < pets_.size(); ++i) {
+    Pet& p = pets_[i];
+    if (!p.shown || p.dead_at >= 0) continue;
+    const Vec3 c = p.carried && p.body.valid() && world_->body_valid(p.body) ? world_->pose(p.body).position : p.pos + Vec3{0, 0, 0.3f * p.scale};
+    const f32 d = std::fmax(0.0f, kern::length(at - c) - 0.25f * p.scale);
+    if (d < best) { best = d; pet = static_cast<i32>(i); cow = nullptr; }
+  }
+  if (pet >= 0) {
+    Pet& p = pets_[static_cast<std::size_t>(pet)];
+    if (p.carried && p.body.valid() && world_->body_valid(p.body)) { p.carried_still = 0; return p.body; }
+    const Species sp = species(static_cast<u32>(pet), epoch_);
+    const f32 sc = sp == Species::dog ? p.scale : p.scale * 0.62f;
+    const Vec3 half = Vec3{0.33f, 0.13f, 0.27f} * sc;
+    const f32 mass = (sp == Species::dog ? 22.0f : 4.0f) * sc * sc * sc;
+    ph::BodySettings bs;
+    bs.type = ph::BodyType::dynamic;
+    bs.position = {p.pos.x, p.pos.y, p.pos.z + half.z};
+    bs.rotation = yaw_quat(p.yaw);
+    bs.linear_damping = 0.1f;
+    bs.angular_damping = 1.5f;
+    p.body = world_->create_body(bs);
+    ph::ShapeSettings ss;
+    ss.kind = ph::ShapeKind::box;
+    ss.size = half * 2.0f;
+    ss.material.density = mass / (8 * half.x * half.y * half.z);
+    ss.material.friction = 0.7f;
+    ss.material.category_bits = kCatWorld;
+    world_->create_shape(p.body, ss);
+    p.rot = bs.rotation;
+    p.carried = true;
+    p.carried_still = 0;
+    return p.body;
+  }
+  if (cow) {
+    Cow& c = *cow;
+    if (c.carried && c.body.valid() && world_->body_valid(c.body)) { c.carried_still = 0; return c.body; }
+    ph::BodySettings bs;
+    bs.type = ph::BodyType::dynamic;
+    bs.position = c.pos + Vec3{0, 0, 1.12f};
+    bs.rotation = yaw_quat(c.yaw);
+    bs.linear_damping = 0.05f;
+    bs.angular_damping = 0.6f;
+    c.body = world_->create_body(bs);
+    ph::ShapeSettings ss;
+    ss.kind = ph::ShapeKind::box;
+    ss.size = {1.64f, 0.68f, 0.76f};
+    ss.material.density = kCowMass / (1.64f * 0.68f * 0.76f);
+    ss.material.friction = 0.7f;
+    ss.material.restitution = 0.05f;
+    ss.material.category_bits = kCatWorld;
+    world_->create_shape(c.body, ss);
+    c.rot = bs.rotation;
+    c.carried = true;
+    c.carried_still = 0;
+    return c.body;
+  }
+  return {};
+}
+
 void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
   // herds around the player (re-checked every 2 s when he moved 150 m)
   if (now - last_herd_check_ > 2) {
@@ -300,6 +376,33 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
         c.rot = p.rotation;
       }
       continue;
+    }
+    if (c.carried) {
+      // held or thrown: the body's pose; once it lies still for a second (upright enough) it stands
+      // up where it is and grazes back to its patch
+      if (!(c.body.valid() && world_->body_valid(c.body))) { c.carried = false; c.body = {}; }
+      else {
+        const ph::Pose p = world_->pose(c.body);
+        c.pos = p.position;
+        c.rot = p.rotation;
+        const f32 v = kern::length(world_->linear_velocity(c.body));
+        c.carried_still = v < 0.35f ? c.carried_still + dt : 0;
+        if (c.carried_still > 1.0f) {
+          world_->destroy_body(c.body);
+          c.body = {};
+          c.carried = false;
+          const Vec3 f = p.rotation.rotate({1, 0, 0});
+          c.yaw = std::atan2(f.y, f.x);
+          const f64 clock = view.epoch > 0 ? view.epoch : now;
+          const i64 k = static_cast<i64>(std::floor(clock / kPeriod));
+          const Vec2 A = graze_spot(c, k), B = graze_spot(c, k + 1), d = B - A;
+          const f32 len = std::hypot(d.x, d.y), walk = std::fmin(kPeriod * 0.75f, len / kWalk);
+          const f32 u = std::fmin(1.0f, static_cast<f32>(clock - static_cast<f64>(k) * kPeriod) / std::fmax(0.001f, walk));
+          c.off = Vec2{p.position.x, p.position.y} - (A + d * u);
+          c.pos = {p.position.x, p.position.y, ground(view, p.position.x, p.position.y)};
+        }
+        continue;
+      }
     }
     // the clock-driven grazing walk on the wall clock: the same on every machine (cows.mjs pathPose)
     const f64 clock = view.epoch > 0 ? view.epoch : now;
@@ -701,6 +804,26 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       if (p.body.valid() && world_->body_valid(p.body)) { const ph::Pose q = world_->pose(p.body); p.pos = q.position; p.rot = q.rotation; }
       continue;
     }
+    if (p.carried) {
+      // held or thrown alive: the body's pose; lying still for 0.8 s it gets up and trots back
+      if (!(p.body.valid() && world_->body_valid(p.body))) { p.carried = false; p.body = {}; }
+      else {
+        const ph::Pose q = world_->pose(p.body);
+        p.pos = q.position;
+        p.rot = q.rotation;
+        p.carried_still = kern::length(world_->linear_velocity(p.body)) < 0.3f ? p.carried_still + dt : 0;
+        if (p.carried_still > 0.8f) {
+          drop();
+          p.carried = false;
+          const f32 a0 = p.phase + p.omega * t;
+          const Vec2 q0 = pet_anchor_ + Vec2{std::cos(a0), std::sin(a0)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r;
+          p.off = Vec2{q.position.x, q.position.y} - q0;
+          p.has_pose = false;
+        }
+        continue;
+      }
+    }
+    p.off = p.off * std::exp(-dt / 5);
     if (cat_.on && i == 1) {
       const f32 cs = cat_.phase == 2 ? 1.3f : 11;
       p.pos = cat_.p;
@@ -711,7 +834,7 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       continue;
     }
     const f32 a = p.phase + p.omega * t;
-    const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r;
+    const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
     const Vec2 last{p.pos.x, p.pos.y};
     if (p.has_pose && dist2d(q, last) > 1e-4f) p.yaw = std::atan2(q.y - last.y, q.x - last.x);
     p.speed = p.has_pose && dt > 0 ? dist2d(q, last) / dt : 0;

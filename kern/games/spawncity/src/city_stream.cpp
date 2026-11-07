@@ -545,6 +545,7 @@ bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled)
   if (!(new_top < b.top - 0.01f)) return false;
   b.top = std::fmax(b.base + 0.3f, new_top);
   b.leveled = b.leveled || leveled;
+  ++damage_serial_;
   Damage& d = damage_[b.seed];
   d.height = b.top - b.base;
   d.leveled = b.leveled;

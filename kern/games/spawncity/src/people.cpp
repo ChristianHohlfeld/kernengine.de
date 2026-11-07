@@ -242,7 +242,7 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   frighten(at, 22, now, 1.2f);
 }
 
-i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns) {
+i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns, f32 self_r) {
   i32 best = -1;
   f32 best_s = 2;
   bool head = false;
@@ -250,7 +250,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
   for (std::size_t i = 0; i < people_.size(); ++i) {
     const Person& p = people_[i];
     if (p.state == State::down || p.state == State::gone) continue;
-    if (dist2d(p.pos, from) < 0.5f) continue;  // the shooter himself
+    if (dist2d(p.pos, from) < self_r) continue;  // the shooter himself
     if (p.kind == Kind::citizen && now < p.knocked_until) continue;  // down as a ragdoll: the body is hidden
     // the body as it is drawn (person_hit.h): legs, the leaning torso with the arms, the head
     f32 s = 2;

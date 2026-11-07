@@ -126,7 +126,7 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
       const RayResult r = cast(world_->physics(), p.pos, dir, trav + 0.2f, p.ignore);
       if (r.hit && r.distance <= trav + 0.2f) { at = r.point; return true; }
       Vec3 seg_to = p.pos + dir * trav;
-      if (people_.shot(p.pos, seg_to, 0, false, now) >= 0) { at = seg_to; return true; }  // organic
+      if (people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { at = seg_to; return true; }  // organic
       if (soft_target_near(p.pos)) { at = p.pos; return true; }
       for (const PoliceDrone& d : pdrones_)
         if (d.active && kern::length(d.pos - p.pos) < 1.2f + trav) { at = d.pos; return true; }
@@ -158,10 +158,14 @@ bool Game::foot_round_step(Projectile& p, f32 dt, f32 now, Vec3& at) {
         continue;
       }
     }
+    {
+      // organic: a person on the way sets the round off - a hand grenade too (it does not fly
+      // through a body: hitting one it goes off there)
+      Vec3 seg_to = p.pos + dir * (travel + kGrenadeR);
+      if (people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { at = seg_to; return true; }
+    }
     if (!hand) {
-      // organic: a person (or a police drone) on the way sets a launcher round off
-      Vec3 seg_to = p.pos + dir * travel;
-      if (people_.shot(p.pos, seg_to, 0, false, now) >= 0) { at = seg_to; return true; }
+      // a police drone or a soft target on the way sets a launcher round off
       if (soft_target_near(p.pos)) { at = p.pos; return true; }
       for (const PoliceDrone& d : pdrones_)
         if (d.active && kern::length(d.pos - p.pos) < 1.2f + travel) { at = d.pos; return true; }

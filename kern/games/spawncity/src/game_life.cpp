@@ -240,7 +240,9 @@ void Game::life_update(f32 dt) {
         }
       }
     }
-    Ragdolls::Colors col{p.shirt, p.pants, p.skin};
+    Ragdolls::Colors col{p.shirt, p.pants, p.skin, PeopleArt::hair_color(p)};
+    col.cap = p.kind == People::Kind::officer || p.kind == People::Kind::soldier || p.kind == People::Kind::enemy;
+    col.vest = p.kind == People::Kind::officer;
     const u64 key = static_cast<u64>(f.index) + 1;
     if (G.life.ragdolls().spawn(key, p.pos, p.yaw, vel, col, f.alive, now)) {
       ++G.falls;
@@ -678,6 +680,15 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     return true;
   });
   return false;
+}
+
+void Game::life_draw_ragdolls() {
+  // the fallen, drawn with the standing people's rounded parts (face, hair, shoes - no boxes)
+  if (!glife_) return;
+  static std::vector<Ragdolls::Draw> bones;
+  bones.clear();
+  glife_->life.ragdolls().draw(bones);
+  people_art_.ragdolls(bones);
 }
 
 }  // namespace sc

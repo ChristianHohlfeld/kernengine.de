@@ -82,6 +82,7 @@ struct PlayInput {
   u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
   f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
   f32 turn_deg = 0;                    // heading change as it is (no sensitivity, no zoom): VR room turn, snap turn (CCW +)
+  f32 speed_scale = 1;                 // soldier: the walk speed times this (VR arm-swing running: the arms' power; the gun stays usable)
   f32 zoom = 0;                        // camera distance change (wheel)
   // Remote players: the direction their camera looks (degrees) for camera-relative movement.
   f32 view_yaw = 0;

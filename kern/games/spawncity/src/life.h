@@ -68,8 +68,9 @@ class Life {
     Vec2 flee_v;
     Vec3 color;
     Quat rot;  // the dead body's orientation
-    bool dead = false, walking = false;
-    kern::physics::Body body;  // the dead cow: a 600 kg Box3D body
+    bool dead = false, walking = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
+    f32 carried_still = 0;
+    kern::physics::Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
   };
   struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; };
   struct Flock {
@@ -98,7 +99,9 @@ class Life {
     f32 radius = 20, omega = 0.05f, phase = 0, wobble_omega = 0.2f, wobble_r = 2, scale = 1;
     Vec3 pos;
     f32 yaw = 0, gait = 0, speed = 0, dead_at = -1;
-    bool shown = false, has_pose = false;
+    bool shown = false, has_pose = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
+    f32 carried_still = 0;
+    Vec2 off;  // where a throw left it, off its round (back to it over some seconds)
     i32 punches = 0;
     Vec3 color;
     kern::physics::Body body;  // the dead animal
@@ -154,6 +157,9 @@ class Life {
   static bool in_rings(const std::vector<std::vector<Vec2>>& rings, Vec2 p);
   static f32 ring_area(const std::vector<Vec2>& r);
 
+  /// A hand grabs the nearest live animal within `reach` of `at` (a dog, a cat, a cow): it becomes a
+  /// Box3D body for as long as it is held and flies; it gets up where it lands. The body, or none.
+  kern::physics::Body grab_animal(Vec3 at, f32 reach);
  private:
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
   void rebuild_herds(const LifeView& view, f32 now);

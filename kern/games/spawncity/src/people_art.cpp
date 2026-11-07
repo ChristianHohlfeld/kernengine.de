@@ -78,6 +78,37 @@ bool PeopleArt::init(kern::Renderer& r) {
   prim::append(hair, prim::sphere(0.123f, 14, 8, white), at({-0.018f, 0, 0.088f}) * scl({1.0f, 0.95f, 0.5f}));  // the top
   prim::append(hair, prim::sphere(0.118f, 14, 8, white), at({-0.04f, 0, 0.0f}) * scl({0.82f, 0.93f, 1.0f}));      // the back
   if (!make(r, hair_, hair, mat(0.9f), true)) return false;
+  // a ragdoll's bones (ragdoll.cpp kDefs, each about its own centre): the standing body's pieces cut
+  // at the joints - the belly and the pelvis round, a shoe on each shin, a hand on each forearm
+  {
+    MeshData m;
+    prim::append(m, prim::capsule(0.115f, 0.11f, 14, 6, white), rot({1, 0, 0}, kPi / 2));
+    prim::append(m, prim::box({0.2f, 0.34f, 0.05f}, {0.55f, 0.55f, 0.55f}), at({0, 0, 0.08f}));  // the belt
+    if (!make(r, rd_pelvis_, m, mat(0.85f), true)) return false;
+  }
+  {
+    MeshData m;
+    prim::append(m, prim::capsule(0.12f, 0.16f, 14, 6, white), at({0, 0, -0.1f}) * scl({0.95f, 1.6f, 1.0f}));   // belly
+    prim::append(m, prim::capsule(0.13f, 0.12f, 14, 6, white), at({0.005f, 0, 0.1f}) * scl({0.98f, 1.62f, 1.0f}));  // chest
+    for (f32 y : {0.225f, -0.225f}) prim::append(m, prim::sphere(0.066f, 10, 6, white), at({0, y, 0.2f}) * scl({1.0f, 1.0f, 0.85f}));
+    if (!make(r, rd_chest_, m, mat(0.8f), true)) return false;
+  }
+  if (!make(r, rd_upper_, prim::capsule(0.056f, 0.22f, 10, 6, white), mat(0.8f), true)) return false;
+  {
+    MeshData m;
+    prim::append(m, prim::capsule(0.047f, 0.22f, 10, 6, white), Mat4{});
+    prim::append(m, prim::sphere(0.052f, 10, 6, {0.82f, 0.66f, 0.53f}), at({0, 0, -0.2f}) * scl({0.75f, 0.55f, 1.15f}));  // the hand
+    if (!make(r, rd_fore_, m, mat(0.7f), true)) return false;
+  }
+  if (!make(r, rd_thigh_, prim::capsule(0.088f, 0.32f, 12, 6, white), mat(0.85f), true)) return false;
+  {
+    MeshData m;
+    prim::append(m, prim::capsule(0.07f, 0.34f, 12, 6, white), Mat4{});
+    prim::append(m, prim::box({0.22f, 0.12f, 0.075f}, shoe), at({0.035f, 0, -0.205f}));
+    prim::append(m, prim::sphere(0.062f, 10, 6, shoe), at({0.14f, 0, -0.21f}) * scl({1.1f, 0.95f, 0.62f}));
+    prim::append(m, prim::box({0.27f, 0.13f, 0.02f}, sole), at({0.05f, 0, -0.245f}));
+    if (!make(r, rd_shin_, m, mat(0.85f), true)) return false;
+  }
   // police_ground_units.mjs POLICE_COLORS: the cops' black vest over the dark blue shirt
   MeshData vest;
   prim::append(vest, prim::box({0.29f, 0.45f, 0.36f}, {0.082f, 0.094f, 0.118f}), at({0.005f, 0, 0.36f}));
@@ -142,7 +173,7 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
 }
 
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_}) {
     p->transforms.clear();
     p->tints.clear();
   }
@@ -191,15 +222,41 @@ void PeopleArt::person(const People::Person& p, f32 now) {
   put(hand_, arm_r, p.skin);
   const Mat4 head = body * at({0, 0, 0.73f});
   put(head_, head, p.skin);
-  {
-    // hair by the person: black, dark and light brown, blond, auburn, grey; the dead's hair dull
-    static const Vec3 kHair[6] = {{0.05f, 0.045f, 0.04f}, {0.18f, 0.11f, 0.06f}, {0.36f, 0.24f, 0.13f}, {0.72f, 0.58f, 0.32f}, {0.45f, 0.17f, 0.08f}, {0.55f, 0.55f, 0.56f}};
-    Vec3 hc = kHair[(p.seed >> 5) % 6];
-    if (p.kind == People::Kind::zombie) hc = {0.2f, 0.22f, 0.18f};
-    put(hair_, head, hc);
-  }
+  put(hair_, head, hair_color(p));
   if (p.kind == People::Kind::officer && !down) put(vest_, body);
   if (p.kind == People::Kind::officer || p.kind == People::Kind::soldier || p.kind == People::Kind::enemy) put(cap_, head * at({0, 0, 0.06f}));
+}
+
+Vec3 PeopleArt::hair_color(const People::Person& p) {
+  // hair by the person: black, dark and light brown, blond, auburn, grey
+  static const Vec3 kHair[6] = {{0.05f, 0.045f, 0.04f}, {0.18f, 0.11f, 0.06f}, {0.36f, 0.24f, 0.13f}, {0.72f, 0.58f, 0.32f}, {0.45f, 0.17f, 0.08f}, {0.55f, 0.55f, 0.56f}};
+  if (p.kind == People::Kind::zombie) return {0.2f, 0.22f, 0.18f};
+  return kHair[(p.seed >> 5) % 6];
+}
+
+void PeopleArt::ragdolls(const std::vector<Ragdolls::Draw>& bones) {
+  for (const Ragdolls::Draw& d : bones) {
+    if (!d.colors) continue;
+    const Ragdolls::Colors& c = *d.colors;
+    switch (d.bone) {
+      case Ragdolls::pelvis: put(rd_pelvis_, d.pose, c.pants); break;
+      case Ragdolls::chest:
+        put(rd_chest_, d.pose, c.shirt);
+        if (c.vest) put(vest_, d.pose * at({0, 0, -0.36f}));
+        break;
+      case Ragdolls::head: {
+        // the head bone sits where the standing head's centre is (the face along +x)
+        put(head_, d.pose, c.skin);
+        put(hair_, d.pose, c.hair);
+        if (c.cap) put(cap_, d.pose * at({0, 0, 0.06f}));
+        break;
+      }
+      case Ragdolls::upper_arm_l: case Ragdolls::upper_arm_r: put(rd_upper_, d.pose, c.shirt); break;
+      case Ragdolls::lower_arm_l: case Ragdolls::lower_arm_r: put(rd_fore_, d.pose, c.shirt); break;
+      case Ragdolls::thigh_l: case Ragdolls::thigh_r: put(rd_thigh_, d.pose, c.pants); break;
+      default: put(rd_shin_, d.pose, c.pants); break;
+    }
+  }
 }
 
 void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {
@@ -248,7 +305,7 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
 }
 
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_}) {
+  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_}) {
     if (!p->id) continue;
     if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
     r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),

@@ -249,8 +249,9 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy ki
   people_.blast(at, radius, damage, by_player, now);
   combat_blast(at, radius, damage, by_player);  // army, flak, rockets (game_military.cpp)
   if (by_player) blast_remotes(at, radius, damage, kind == BlastBy::missile ? 2 : kind == BlastBy::weapon ? 1 : 0);
-  // The player on foot (weapons.h blast_factor: buildings in between shield most of it).
-  if (mode_ == Mode::foot) {
+  // The player on foot - and the pilot standing below his drone (weapons.h blast_factor: buildings
+  // in between shield most of it).
+  if (mode_ == Mode::foot || (mode_ == Mode::drone && !player_dead_)) {
     const Vec3 me = matrix_of(soldier_).translation();
     const f32 d = kern::length(me - at);
     // dispatchExplosion: only an amount above 2 counts (gameplay_final_runtime_v2.mjs)
@@ -956,6 +957,7 @@ void Game::draw_town() {
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
       if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m * std::fmin(view_zoom(), 4.0f) && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
+    life_draw_ragdolls();  // game_life.cpp
     draw_projectiles();
     draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {

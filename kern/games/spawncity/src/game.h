@@ -471,10 +471,11 @@ class Game {
   kern::Engine* engine_ = nullptr;
   bool vr_ = false;  // the page runs a WebXR session ("vr 1")
   // VR rig (game_vr.cpp): the controllers' pointing rays in the room (WebXR local space)
-  struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false; Vec3 p, prev, prev_strike, world_prev, grab_local; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1, grab_slot = -1; f32 grab_mate_at = 0; };
+  struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false, swish = false; Vec3 p, prev, prev_strike, world_prev, grab_local, throw_v; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1, grab_slot = -1; f32 grab_mate_at = 0; };
   VrHand vr_hands_[2];
-  bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false;
+  bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false, vr_wpn_armed_ = true;
   bool vr_fire_was_ = false;  // the drone's trigger in VR (an edge)
+  f32 vr_pulse_[2] = {0, 0};  // a rumble the page plays on the controller (vr json, host.mjs)
   // the comfort tunnel (game_vr.cpp vr_comfort): its mesh, its strength, the last frame's room / eye
   u32 vr_tunnel_mesh_ = 0, vr_tunnel_tex_ = 0;
   f32 vr_tunnel_ = 0;
@@ -483,7 +484,10 @@ class Game {
   void vr_comfort(f32 dt);
   void vr_room(Vec3& f, Vec3& r, Vec3& up) const;
   bool vr_menu_open_ = false, vr_menu_trigger_ = false, vr_menu_valid_ = false;
-  i32 vr_menu_hover_ = -1;
+  i32 vr_menu_hover_ = -1, vr_menu_hover_was_ = -1, vr_menu_page_ = 0, vr_menu_sel_ = 0;
+  bool vr_menu_stick_armed_ = true, vr_y_fired_ = false, vr_near_vehicle_ = false;
+  f32 vr_y_held_ = 0;
+  bool vr_cam_request_ = false;  // the wrist menu's KAMERA (game_controls.cpp)
   Vec3 vr_menu_c_, vr_menu_r_, vr_menu_u_, vr_menu_n_;
   f32 vr_menu_w_ = 1, vr_menu_h_ = 1;
   std::string vr_action_;
@@ -491,7 +495,8 @@ class Game {
   void vr_grab(i32 side, bool want, f32 dt);
   void vr_scope_update();
   u32 vr_scope_tex_ = 0, vr_scope_mesh_ = 0;
-  void vr_menu_input();
+  void vr_menu_input(f32 dt);
+  void life_draw_ragdolls();
   std::string vr_menu_json();
  public:
   void vr_set_hand(i32 side, bool valid, Vec3 p, Quat q);

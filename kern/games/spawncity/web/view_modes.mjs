@@ -595,7 +595,29 @@ function installViewModes() {
     }
   }
 
+  // the radio in the jet and the drone too (car_radio.mjs plays in every vehicle, audio.mjs): a 📻
+  // button in the jet's button row and the drone's top bar - tap = next station, hold = off
+  // (page buttons: view.mjs PAGE_BUTTONS ".sc-radio-btn"); the car keeps the original's own
+  const radioBtn = where => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "sc-radio-btn"; b.textContent = "📻"; b.dataset.where = where;
+    b.title = "Radio: tippen = nächster Sender, halten = aus"; b.setAttribute("aria-label", "Radio");
+    let holdT = 0, held = false;
+    b.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); held = false; holdT = setTimeout(() => { held = true; globalThis.__arondightCarRadio?.toggleOff?.(); }, 550); });
+    b.addEventListener("pointerup", e => { e.preventDefault(); e.stopPropagation(); clearTimeout(holdT); if (held) return; if (!globalThis.__scRadioAny) { globalThis.__scRadioAny = true; return; } globalThis.__arondightCarRadio?.next?.(1); });
+    b.addEventListener("pointercancel", () => clearTimeout(holdT));
+    b.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); });
+    return b;
+  };
+  function radios(h) {
+    const jetRow = q("#jetHud .jet-btns"), droneBar = $("soloArmToolbar")?.parentElement;
+    if (jetRow && !jetRow.querySelector(".sc-radio-btn")) jetRow.appendChild(radioBtn("jet"));
+    if (droneBar && !droneBar.querySelector(".sc-radio-btn")) { const b = radioBtn("drone"); b.style.cssText = "min-width:44px"; droneBar.appendChild(b); }
+    for (const b of document.querySelectorAll(".sc-radio-btn")) hide(b, b.dataset.where !== h.mode);
+  }
+
   registerViewBinder("modes", (h, touch, view) => {
+    radios(h);
     sticks(h);
     car(h, view);
     jet(h, view);

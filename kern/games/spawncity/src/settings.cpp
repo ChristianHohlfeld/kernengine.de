@@ -79,6 +79,7 @@ constexpr OptSpec kSpecs[] = {
     {"vr.arms", "kamera", "VR: Laufen mit den Armen", "AUS: klassisch mit den Sticks (links gehen, rechts in Schritten drehen). AN: wie Gorilla Tag, nur ohne Boden - mit dem linken Arm joggen = gehen, mit beiden Armen = rennen; die rechte Hand zielt und schiesst weiter, die Sticks bewegen nicht.", 0, 1, 1, 0, true, true},
     {"vr.level", "kamera", "VR: Horizont halten", "AN (Komfort): in Jet und FPV-Drohne bleibt der Horizont gerade, nur die Richtung dreht mit. AUS: du sitzt fest im Cockpit und kippst mit der Maschine (Loopings, Rollen).", 0, 1, 1, 1, true, true},
     {"vr.tunnel", "kamera", "VR: Komfort-Tunnel", "Dunkelt den Rand des Blicks ab, waehrend du kuenstlich gedreht oder beschleunigt wirst (Sticks, Fahrzeuge) - gegen Uebelkeit.", 0, 1, 1, 1, true, true},
+    {"vr.smoothTurn", "kamera", "VR: Weich drehen", "AUS: der rechte Stick dreht in 30-Grad-Schritten (am angenehmsten). AN: er dreht stufenlos, bis 120 Grad pro Sekunde.", 0, 1, 1, 0, true, true},
 };
 static_assert(sizeof kSpecs / sizeof kSpecs[0] == static_cast<u32>(Opt::count), "one row per option");
 

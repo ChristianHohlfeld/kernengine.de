@@ -93,7 +93,9 @@ class People {
   /// (sniper 200, head 165 / Glock and sniper 999), a hit that is not fatal knocks the person down
   /// (ragdoll, gets up again); someone lying there is no target. `melee_ns` >= 0: a fist or knife
   /// (punch: damage, at hp <= 35 down, else a stagger of .22 x max(.5, ns / 30) m).
-  i32 shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns = -1);
+  /// `self_r`: a person this close (2-D) to `from` is the shooter and skipped - 0 for the player's
+  /// rounds, grenades and blows (a fist starts inside that radius of the one it hits).
+  i32 shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns = -1, f32 self_r = 0.5f);
   /// An explosion: damage falling off over `radius`, everyone in 2.5 x radius runs.
   void blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now);
   /// Everyone within `radius` runs away from `at` (shots, low flights, crashes).

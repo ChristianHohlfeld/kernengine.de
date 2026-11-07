@@ -712,6 +712,12 @@ void Game::update_jets(f32 dt) {
     if (now - b.t0 >= b.dur) {
       osfx("fighter_jets.blastSound", b.to);
       explosion(b.to + Vec3{0, 0, 0.4f}, kBombRadius, kBombDamage, !b.remote, BlastBy::weapon);  // a mate's strike is not our crime
+      // standing in the run (on foot, the pilot below his drone): a bomb within 9 m kills - the
+      // general blast's falloff left a player at the mark alive between two bombs of the stick
+      if ((mode_ == Mode::foot || mode_ == Mode::drone) && !player_dead_) {
+        const Vec3 me = matrix_of(soldier_).translation();
+        if (kern::length(me - b.to) < 9 && line_of_sight(b.to + Vec3{0, 0, 0.6f}, me)) world_->damage(soldier_, 999, 0, false, b.to);
+      }
       C.blasts.push_back({b.to, now, 1});
       b.dur = -1;
     }

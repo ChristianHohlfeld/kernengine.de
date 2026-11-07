@@ -158,6 +158,9 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   const int view = C.view.step(pad.down(kPadView), now);
   if (view == 2) command("bigmap toggle");
   bool camera = in.pressed(Key::c) || view == 1 || pad_touch_.take_pressed("cam");
+  // VR: the left stick's click switches the view in a vehicle (cockpit / outside; the drone's three)
+  if (engine_ && engine_->xr && mode_ != Mode::foot && ph(kPadL3)) camera = true;
+  if (vr_cam_request_) { camera = true; vr_cam_request_ = false; }
 
   // ---- dead: R / Enter / Space and A / Y respawn; nothing else plays (desktop_controls.mjs:165) ----
   if (!alive) {
@@ -205,8 +208,9 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   }
   if (camera) {
     if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; }
-    else if (mode_ == Mode::car && !(engine_ && engine_->xr)) car_cockpit_ = !car_cockpit_;  // VR: always the seat
-    else if (mode_ == Mode::jet && !(engine_ && engine_->xr)) jet_cockpit_ = !jet_cockpit_;
+    else if (mode_ == Mode::car) car_cockpit_ = !car_cockpit_;
+    else if (mode_ == Mode::jet) jet_cockpit_ = !jet_cockpit_;
+    rig_init_ = false;
   }
   if (mode_ == Mode::jet && pad_touch_.take_pressed("vtol")) jet_.toggle_mode();
 
@@ -239,6 +243,7 @@ void Game::ctl_strike_start() {
   }
   C.aiming = true;
   C.aim_lock_until = C.clock + 0.5f;
+  osfx("fighter_jets.beep", cam_.eye, 4);  // setTargeting(true): beep([660, 990], .07, .1)
 }
 
 void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
@@ -287,7 +292,8 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
   const Vec3 at = r.hit ? r.point : from + dir * 180.0f;
   C.aim_lock_until = C.clock + 0.6f;
   osfx("fighter_jets.beep", at, 0);  // place(): beep([740, 990], .06, .11)
-  if (air_strike(at)) C.aiming = false;
+  if (air_strike(at)) { C.aiming = false; osfx("fighter_jets.beep", at, 5); }  // confirmStrike: beep([880, 1175, 1568], .08, .12)
+  else osfx("fighter_jets.beep", at, 1);  // beep([220], .16, .1)
 }
 
 bool Game::ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const {

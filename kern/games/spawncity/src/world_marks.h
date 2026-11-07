@@ -36,6 +36,7 @@ class Marks {
   void add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls, const Terrain& t, Rng& rng);
   void add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStream::Wall>& walls, const Terrain& t, kern::physics::World& w, Rng& rng, f32 now);
   void spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rng& rng, f32 now);
+  void prune_walls();  // marks whose wall is gone (a floor blown off, a house down) go with it
 
   std::vector<Scorch> scorches_;
   std::vector<WallMark> soots_, breaches_, cracks_;
@@ -45,6 +46,7 @@ class Marks {
   std::vector<CityStream::Wall> near_;
   u32 ground_mesh_[3] = {}, wall_mesh_ = 0;
   bool dirty_ = false;
+  u32 damage_seen_ = 0;  // CityStream::damage_serial at the last prune
   Stats stats_;
   kern::MeshData ground_data_[3], wall_data_;  // scorches: the char, then two fading rims
   const CityStream* city_ = nullptr;

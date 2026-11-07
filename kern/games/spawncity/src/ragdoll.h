@@ -19,7 +19,7 @@ namespace sc {
 class Ragdolls {
  public:
   enum Bone : u8 { pelvis, chest, head, upper_arm_l, upper_arm_r, lower_arm_l, lower_arm_r, thigh_l, thigh_r, shin_l, shin_r, kBones };
-  struct Colors { Vec3 shirt{0.35f, 0.44f, 0.53f}, pants{0.17f, 0.19f, 0.22f}, skin{0.82f, 0.66f, 0.53f}; };
+  struct Colors { Vec3 shirt{0.35f, 0.44f, 0.53f}, pants{0.17f, 0.19f, 0.22f}, skin{0.82f, 0.66f, 0.53f}, hair{0.18f, 0.11f, 0.06f}; bool cap = false, vest = false; };
   /// A person who stood up again (reverse ragdoll): where and facing which way.
   struct Up { u64 key; Vec3 feet; f32 yaw; };
 
@@ -44,7 +44,7 @@ class Ragdolls {
   kern::physics::Body bone_body(u64 key, Bone b) const { const i32 i = find(key); return i >= 0 && dolls_[i].active && !dolls_[i].getting_up ? dolls_[i].bodies[b] : kern::physics::Body{}; }
 
   /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint.
-  struct Draw { kern::Mat4 m; Vec3 tint; bool sphere; };
+  struct Draw { kern::Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; const Colors* colors = nullptr; kern::Mat4 pose; };  // pose: the bone's frame (unscaled)
   void draw(std::vector<Draw>& out) const;
 
   /// Bone sizes (rest pose, standing at the origin facing +X): centre, half extents (capsule:

@@ -7,6 +7,7 @@
 
 #include "kern/gfx/renderer.h"
 #include "people.h"
+#include "ragdoll.h"
 
 namespace sc {
 
@@ -15,6 +16,10 @@ class PeopleArt {
   bool init(kern::Renderer& r);
   void begin();
   void person(const People::Person& p, f32 now);
+  /// The fallen as ragdolls (ragdoll.cpp bones): the same rounded body, face and hair as standing.
+  void ragdolls(const std::vector<Ragdolls::Draw>& bones);
+  /// A person's hair colour (the dead's dull, a zombie's grey-green).
+  static Vec3 hair_color(const People::Person& p);
   /// A light bar on a car roof (chassis frame), flashing when `on`.
   void light_bar(const kern::Mat4& chassis, bool on, f32 now);
   /// A muzzle flash / tracer stub is Kern's (ShotEvent); this is a burning wreck's glow.
@@ -37,6 +42,7 @@ class PeopleArt {
   void put(Part& p, const kern::Mat4& m, Vec3 tint = {1, 1, 1});
   kern::Renderer* r_ = nullptr;
   Part leg_, torso_, arm_, head_, hand_, hair_, vest_, door_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
+  Part rd_pelvis_, rd_chest_, rd_upper_, rd_fore_, rd_thigh_, rd_shin_;  // a ragdoll's bones, rounded
 };
 
 }  // namespace sc

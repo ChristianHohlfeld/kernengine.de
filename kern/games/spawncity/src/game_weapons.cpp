@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "game.h"
+#include "person_hit.h"
 
 namespace sc {
 
@@ -130,6 +131,21 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
   i32 person = -1;
   bool remote = false;
   shot_flesh_ = false;
+  // the pilot standing below his drone: your own rounds hurt him as anyone's (the original's
+  // self-hit; his body is the soldier's capsule, the hit is by the person's pose)
+  if (by_player && mode_ == Mode::drone && !player_dead_ && world_->actor_alive(soldier_)) {
+    const Vec3 c = matrix_of(soldier_).translation();
+    f32 t = 2;
+    const BodyPart part = person_hit::hit(c - Vec3{0, 0, 0.73f}, world_->camera_yaw() * kDeg, 0, from, to - from, t);
+    if (part != BodyPart::none) {
+      out.to = from + (to - from) * t;
+      out.surface = 3;
+      out.impact = true;
+      shot_flesh_ = true;
+      world_->damage(soldier_, damage * (part == BodyPart::head ? 2.0f : part == BodyPart::legs ? 0.7f : 1.0f), 0, false, from);
+      return true;
+    }
+  }
   if ((by_player && (remote = hit_remotes(from, to, damage))) || (person = people_.shot(from, to, damage, by_player, now)) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
     shot_flesh_ = remote || person >= 0;  // world_action_feedback.mjs materialKind: person / player -> flesh
     if (person >= 0 && by_player) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
@@ -230,7 +246,7 @@ void Game::update_projectiles(f32 dt) {
       }
       // A person or a police drone in the way.
       Vec3 seg_to = p.pos + step;
-      if (!boom && people_.shot(p.pos, seg_to, 0, false, now) >= 0) { boom = true; at = seg_to; }
+      if (!boom && people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { boom = true; at = seg_to; }
       if (!boom)
         for (const PoliceDrone& d : pdrones_)
           if (d.active && kern::length(d.pos - (p.pos + step * 0.5f)) < 1.2f + len * 0.5f) { boom = true; at = d.pos; }

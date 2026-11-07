@@ -55,7 +55,7 @@ void LifeArt::put(Part& p, const Mat4& m, Vec3 tint) {
 void LifeArt::cow(const Life::Cow& c, f32 now) {
   // x forward, origin between the feet; coat tint, dark spots, pink udder and muzzle
   Mat4 M;
-  if (c.dead) M = Mat4::trs(c.pos, c.rot, {1, 1, 1}) * at({0, 0, -1.12f});  // the Box3D body (centre 1.12 m over the feet)
+  if (c.dead || c.carried) M = Mat4::trs(c.pos, c.rot, {1, 1, 1}) * at({0, 0, -1.12f});  // the Box3D body (centre 1.12 m over the feet)
   else {
     const f32 bob = c.walking && now < c.flee_until ? std::fabs(std::sin(c.phase)) * 0.05f : 0;
     M = at(c.pos + Vec3{0, 0, bob}) * rot({0, 0, 1}, c.yaw);
@@ -132,7 +132,7 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
     if (dead && now - p.dead_at > 7) continue;
     const bool dog = life.species(static_cast<u32>(i), life.epoch()) == Life::Species::dog;
     const f32 sc = dog ? p.scale : p.scale * 0.62f;
-    Mat4 M = dead ? Mat4::trs(p.pos, p.rot, {sc, sc, sc}) * at({0, 0, -0.27f}) : at(p.pos) * rot({0, 0, 1}, p.yaw) * sc3({sc, sc, sc});
+    Mat4 M = dead || p.carried ? Mat4::trs(p.pos, p.rot, {sc, sc, sc}) * at({0, 0, -0.27f}) : at(p.pos) * rot({0, 0, 1}, p.yaw) * sc3({sc, sc, sc});
     const Life::CatAttack& cat = life.cat_attack();
     if (!dead && i == 1 && cat.on && cat.phase == 1) M = M * rot({0, 1, 0}, -0.5f);
     const f32 bob = dead ? 0 : std::fabs(std::sin(p.gait * kPi * 2)) * std::fmin(0.03f, p.speed * 0.01f);
@@ -168,12 +168,7 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
     ball(base * at({0, 0, 2.75f * s}) * sc3({1.95f * s, 1.95f * s, 2.35f * s}), rgb(0x4f8658));
   }
   // ragdolls
-  bones_.clear();
-  life.ragdolls().draw(bones_);
-  for (const Ragdolls::Draw& d : bones_) {
-    if (d.sphere) ball(d.m, d.tint);
-    else box(d.m, d.tint);
-  }
+  // (the ragdolls are PeopleArt's: Game::life_draw_ragdolls - the same body as standing)
 }
 
 void LifeArt::end() {

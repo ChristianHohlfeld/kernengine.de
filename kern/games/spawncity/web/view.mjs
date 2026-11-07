@@ -82,7 +82,7 @@ const TOUCH_DOM = {
 };
 const JET_DOM = {vtol: "mode", rkt: "rocket", bomb: "bomb", cam: "cam", eject: "exit"};
 // Original elements a finger uses as page buttons (their own click), never as game input.
-const PAGE_BUTTONS = "#soloCamera,#camFpv,#camFollow,#camThird,#gameExitButton,#mobileGameplayDock,#mobileGameplayMultiplayer,#mobileGameplayReset,#proximityVoiceBar,#worldLookHud,#gpsLiveButton,#musicSwitch,#soundSwitch,#gameplayContractHud,#vsRespawnHud,#gpsLiveHud,#zombieRepair,dialog,#gameMenu,#scExitAsk";
+const PAGE_BUTTONS = ".sc-radio-btn,#soloCamera,#camFpv,#camFollow,#camThird,#gameExitButton,#mobileGameplayDock,#mobileGameplayMultiplayer,#mobileGameplayReset,#proximityVoiceBar,#worldLookHud,#gpsLiveButton,#musicSwitch,#soundSwitch,#gameplayContractHud,#vsRespawnHud,#gpsLiveHud,#zombieRepair,dialog,#gameMenu,#scExitAsk";
 
 /** A finger on the game view goes to the game unless it lands on a page button. */
 export function fingerForGame(ev) {
@@ -481,6 +481,15 @@ export class OriginalView {
       // the car drives with the foot sticks it claimed (shared_sticks.mjs): their knobs move
       : mode === "car" ? [["footMove", t.move, ".knob"], ["footLook", t.look, ".knob"], ["vehicleMove", t.move, ".knob"], ["vehicleLook", t.look, ".knob"]]
       : [["footMove", t.move, ".knob"], ["footLook", t.look, ".knob"]];
+    // the right stick stands where the game has it (touch_play.cpp: 76 px off the edge, in every
+    // mode): the page's CSS layers (thumb_layout.mjs) pin it to the edge, the finger would miss it
+    const fw = $("game")?.clientWidth || 0;
+    for (const id of ["footLook", "soloRight", "vehicleLook"]) {
+      const el = $(id);
+      if (!el || !fw || !t.look) continue;
+      const right = `${Math.max(0, Math.round(fw - t.look.x - t.look.size))}px`;
+      if (el.style.getPropertyValue("right") !== right) { el.style.setProperty("right", right, "important"); el.style.setProperty("left", "auto", "important"); }
+    }
     for (const [id, s, sel] of pairs) {
       const el = $(id), k = el?.querySelector(sel);
       if (!el || !s) continue;

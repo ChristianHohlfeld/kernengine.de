@@ -188,7 +188,8 @@ export function installOriginalAudio() {
     "people_impacts.thump": (p, gain) => O.people_impacts.thump(gain),
     "gameplay_polish_lite.playPersonGroan": () => O.gameplay_polish_lite.playPersonGroan(),
     "ping_marker.set": () => globalThis.__oppUiBlip?.(false),  // ping_marker.mjs ping("set")
-    "fighter_jets.beep": (p, kind) => kind === 0 ? O.fighter_jets.beep([740, 990], .06, .11) : kind === 1 ? O.fighter_jets.beep([220], .16, .1) : kind === 2 ? O.fighter_jets.beep([220], .18, .1) : O.fighter_jets.beep([330], .08, .1),
+    "fighter_jets.beep": (p, kind) => kind === 0 ? O.fighter_jets.beep([740, 990], .06, .11) : kind === 1 ? O.fighter_jets.beep([220], .16, .1) : kind === 2 ? O.fighter_jets.beep([220], .18, .1) : kind === 3 ? O.fighter_jets.beep([330], .08, .1)
+      : kind === 4 ? O.fighter_jets.beep([660, 990], .07, .1) : O.fighter_jets.beep([880, 1175, 1568], .08, .12),
     "street_voices.honk": (p, bus, style) => O.street_voices.honk(p, {kind: bus ? "bus" : "car", style: ["toot", "double", "long"][style] || "toot", source: ""}),
     // world_procedural_population.mjs: arms flung up = a scream (seed: the person)
     "street_voices.scream": (p, seed) => O.street_voices.scream(p, {seed: `p${seed}`}),
@@ -246,7 +247,9 @@ export function installOriginalAudio() {
     const playing = !!ui?.playing;
     if (playing && !was.playing) fire("arondight:game-start", {});                                // auto_flight_start.mjs START
     was.playing = playing;
-    const inCar = a.mode === "car" && !a.paused;
+    // the radio: on by itself in the car (the original), in the jet and the drone once you switch it
+    // on there (its 📻, the VR menu: globalThis.__scRadioAny) - car_radio.mjs "vehicle-mode"
+    const inCar = (a.mode === "car" || ((a.mode === "jet" || a.mode === "drone") && globalThis.__scRadioAny)) && !a.paused;
     if (inCar !== was.car) fire("arondight:vehicle-mode", {active: inCar});                      // player_car_mode.mjs (car_radio.mjs)
     was.car = inCar;
     // ---- the drone's motors (simulator.mjs render: not while the menu covers the game)

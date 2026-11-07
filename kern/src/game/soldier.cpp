@@ -332,7 +332,7 @@ void GameWorld::drive_soldier(const PlayInput& in, f32 dt) {
   // Speeds: walk, sprint (forward only, not while aiming or crouched), crouch, aim.
   const bool sprint = in.boost && c.boost && in.move_y > 0.3f && !in.aim && pw_->crouch < 0.5f && !dead;
   const f32 walk = max_of(0.1f, c.max_speed);
-  mover.settings.max_speed = pw_->crouch > 0.5f ? min_of(walk, c.crouch_speed) : in.aim ? walk * 0.6f : walk;
+  mover.settings.max_speed = (pw_->crouch > 0.5f ? min_of(walk, c.crouch_speed) : in.aim ? walk * 0.6f : walk) * clamp(in.speed_scale, 0.1f, 2.5f);
   mover.settings.sprint = sprint ? max_of(1.0f, c.boost_speed / mover.settings.max_speed) : 1.0f;
 
   // Jump: buffered presses and coyote time.

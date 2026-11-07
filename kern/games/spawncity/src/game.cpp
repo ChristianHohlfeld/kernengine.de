@@ -832,7 +832,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   }
   if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
-    vr_menu_input();  // the headset's wrist menu (game_vr.cpp): while open the pad is the menu's
+    vr_menu_input(dt);  // the headset's wrist menu (game_vr.cpp): while open the pad is the menu's
     if (vr_menu_open_) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; }
     read_input(e, dt);
     update_touch_layout();

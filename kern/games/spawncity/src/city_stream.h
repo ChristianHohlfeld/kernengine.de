@@ -115,8 +115,11 @@ class CityStream {
   /// Every building back to its full height (RESET).
   void clear_damage();
   u32 damaged_buildings() const { return static_cast<u32>(damage_.size()); }
+  /// Counts every height a building lost (marks on the walls drop what hangs in the air: world_marks.cpp).
+  u32 damage_serial() const { return damage_serial_; }
 
  private:
+  u32 damage_serial_ = 0;
   struct Tile;
   Tile* tile(const TileKey& k);
   void request_around(Vec3 focus);

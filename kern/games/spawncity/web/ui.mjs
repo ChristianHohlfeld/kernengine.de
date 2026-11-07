@@ -829,5 +829,10 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
     open: name => act(name),
     title: showTitle,
     start,
+    get started() { return ui.started; },
+    /** The title screen is up. */
+    titleShown: () => !menu.hidden,
+    /** Every panel and the quit question shut (VR: no page menu where nobody sees it). */
+    closeAll() { while (ui.open.length) closeTop(); if (!quit.hidden) quit.hidden = true; sync(); },
   };
 }

@@ -495,10 +495,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     set(0, b(R, 4)); set(1, b(R, 5)); set(2, b(L, 4)); set(3, b(L, 5));   // A B X Y
     set(4, b(L, 1)); set(5, b(R, 1));                                     // LB RB (grips)
     set(10, b(L, 3)); set(11, b(R, 3));                                   // L3 R3
-    set(9, b(L, 5) && b(R, 5));                                           // START (both upper buttons)
+    // (no START chord in the headset: a page menu would open where nobody can see it)
     const lx = ax(L, 2), ly = ax(L, 3), rx = ax(R, 2), ry = ax(R, 3);
     const active = bits !== 0 || [lx, ly, rx, ry].some(a => Math.abs(a) > 0.22) || v(L, 0) > 0.1 || v(R, 0) > 0.1;
     e.sc_gamepad(1, lx, -ly, rx, -ry, v(L, 0), v(R, 0), bits >>> 0, active ? 1 : 0);
+    // the game's rumble (a landed blow, a pick in the menu, RESET): the controller's haptics
+    const pulse = last?.vr?.pulse;
+    if (pulse) for (const [g, k] of [[L, 0], [R, 1]]) {
+      const a = +pulse[k] || 0;
+      if (a > 0.01) try { g?.hapticActuators?.[0]?.pulse?.(Math.min(1, a), 30 + a * 60); } catch { /* no haptics */ }
+    }
     return true;
   };
   // the HUD in the headset (the page's HUD is not visible in an immersive session): a 512 x 384
@@ -519,9 +525,12 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     // the page's actions the menu asked for
     if (vr.action === "multi") { try { mpPage?.toggleMulti ? mpPage.toggleMulti(h) : mpPage?.goMulti?.(); } catch (err) { console.warn("[spawncity] VR multi", err); } }
     else if (vr.action === "exit") app.exitXR();
-    else if (vr.action === "radio") { try { const r = globalThis.__arondightCarRadio; r?.next?.(); } catch { /* no radio */ } }
+    else if (vr.action === "radio") { try { if (!globalThis.__scRadioAny && h.mode !== "car") globalThis.__scRadioAny = true; else globalThis.__arondightCarRadio?.next?.(1); } catch { /* no radio */ } }
+    else if (vr.action === "radio_off") { try { const r = globalThis.__arondightCarRadio; if (r?.on) r.toggleOff(); } catch { /* no radio */ } }
+    // a page menu is never open in the headset (nobody sees it there - the game would stand still)
+    if (h.ui?.paused && ui?.started && !ui?.titleShown?.()) { try { ui.closeAll?.(); } catch { /* none */ } }
     const now = performance.now();
-    const key = `${vr.menu}|${vr.hover}|${vr.arms}|${vr.level}|${vr.tunnel}|${vr.rocket}|${h.mode}|${h.mp?.players?.length || 0}`;
+    const key = `${vr.menu}|${vr.page}|${vr.hover}|${vr.arms}|${vr.smooth}|${vr.level}|${vr.tunnel}|${vr.day}|${vr.sound}|${vr.music}|${vr.rocket}|${vr.cam}|${vr.reset}|${h.mode}|${h.weapon}|${h.mp?.players?.length || 0}|${globalThis.__arondightCarRadio?.station?.name || ""}`;
     if (now - vrHud.at < 100 && key === vrHud.key) return;
     vrHud.at = now; vrHud.key = key;
     const g = vrHud.g;
@@ -530,28 +539,36 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     g.textBaseline = "middle";
     if (vr.menu) {
       panel(4, 380);
-      g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#7ff0c5"; g.fillText("MENÜ", 24, 40);
-      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("zeigen + Abzug · Y schließt", 150, 42);
+      const page = vr.page | 0;
+      g.font = "900 28px Inter, system-ui, sans-serif"; g.fillStyle = "#7ff0c5"; g.fillText(page ? "EINSTELLUNGEN" : "MENÜ", 24, 36);
+      g.font = "700 16px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(page ? "zeigen + Abzug · B zurück" : "zeigen + Abzug · Y / B schließt · Y halten = RESET", page ? 250 : 120, 38);
       const players = Array.isArray(h.mp?.players) ? h.mp.players.length : 0;
-      // the rows (game_vr.cpp kMenuTop 72, kMenuRow 44 - the same order)
-      const radio = globalThis.__arondightCarRadio?.station?.name;
-      const items = [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE", "LUFTSCHLAG (wohin du schaust)",
-        h.mode === "car" ? `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}` : "EMP",
-        h.mode === "foot" ? `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}` : h.mode === "car" ? `KOMFORT-TUNNEL: ${vr.tunnel ? "AN" : "AUS"}` : `HORIZONT: ${vr.level ? "HALTEN" : "FREI (Cockpit)"}`,
-        "RESET", "VR BEENDEN"];
+      const radio = globalThis.__arondightCarRadio, station = radio?.station?.name;
+      const onoff = v => (v ? "AN" : "AUS");
+      // the rows (game_vr.cpp kMenuTop 66, kMenuRow 35 - the same order)
+      const items = page ? ["‹ ZURÜCK", `LAUFEN: ${vr.arms ? "MIT DEN ARMEN" : "STICKS"}`, `DREHEN: ${vr.smooth ? "WEICH" : "30°-SCHRITTE"}`, `HORIZONT: ${vr.level ? "HALTEN" : "FREI (Cockpit)"}`,
+        `KOMFORT-TUNNEL: ${onoff(vr.tunnel)}`, `IMMER TAG: ${onoff(vr.day)}`, `TON: ${onoff(vr.sound)}`, `MUSIK: ${onoff(vr.music)}`, "RADIO AUS"]
+        : [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE",
+          h.mode === "car" || h.mode === "jet" ? "AUSSTEIGEN" : "EINSTEIGEN (nächstes Fahrzeug)", "LUFTSCHLAG (wohin du schaust)",
+          `📻 RADIO${station && (h.mode === "car" || globalThis.__scRadioAny) && radio?.on ? ` · ${String(station).slice(0, 16)}` : " · nächster Sender"}`,
+          h.mode === "foot" ? "EMP" : `KAMERA: ${vr.cam || ""}`, "EINSTELLUNGEN ›", "RESET", "VR BEENDEN"];
       items.forEach((t, i) => {
-        const y = 72 + i * 44;
-        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 3, 484, 38); }
-        g.font = "800 25px Inter, system-ui, sans-serif"; g.fillStyle = i === 6 ? "#ff9a8a" : "#eef0f2"; g.fillText(t, 28, y + 22);
+        const y = 66 + i * 35;
+        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 2, 484, 31); }
+        g.font = "800 22px Inter, system-ui, sans-serif"; g.fillStyle = !page && i === 8 ? "#ff9a8a" : !page && i === 7 ? "#ffcf3a" : "#eef0f2"; g.fillText(t, 28, y + 18);
       });
     } else {
       // the watch: health, weapon, stars - nothing else in the way; in a vehicle its controls below
       const hints = {
         drone: ["L: Gas ↕ · Drehen ↔   R: Neigen", "Abzug R: Feuer · B: Waffe · A: Start/Landen"],
-        car: ["L: Lenken · Abzug R: Gas · L: Bremse", "B: Handbremse · X: Aussteigen"],
+        car: ["L: Lenken · Abzug R: Gas · L: Bremse", "B: Handbremse · X: Aussteigen · Radio im Menü"],
         jet: ["L: Schub ↕ · Seite ↔   R: Nicken · Rollen", `Abzug R: ${vr.rocket ? "RAKETE" : "MG"} · L: Rakete · Griff L: VTOL · R: Bombe`],
       }[h.mode];
       panel(4, hints ? 214 : 140);
+      if (vr.reset > 0) {  // Y held: the RESET ring fills
+        g.strokeStyle = "#ffcf3a"; g.lineWidth = 8; g.beginPath(); g.arc(452, 58, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * vr.reset); g.stroke();
+        g.font = "800 14px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a"; g.fillText("RESET", 430, 106);
+      }
       if (hints) {
         g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2";
         hints.forEach((t, i) => g.fillText(t, 24, 158 + i * 32));
@@ -564,7 +581,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const stars = h.wanted?.stars ?? h.stars ?? 0;
       g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
       g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 106);
-      g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText("Y Menü · B Waffe", 300, 108);
+      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(h.mode === "foot" ? "Y Menü · R-Stick ↕ / B Waffe · X einsteigen" : "Y Menü · L-Stick drücken = Kamera", 150, 108);
     }
     gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);

@@ -227,10 +227,31 @@ void Marks::update(f32 now, kern::physics::World& w) {
       it = rubble_.erase(it);
     } else ++it;
   }
+  if (city_ && city_->damage_serial() != damage_seen_) { damage_seen_ = city_->damage_serial(); prune_walls(); }
   stats_.scorches = static_cast<u32>(scorches_.size());
   stats_.soots = static_cast<u32>(soots_.size());
   stats_.breaches = static_cast<u32>(breaches_.size());
   stats_.rubble = static_cast<u32>(rubble_.size());
+}
+
+void Marks::prune_walls() {
+  // soot, breaches and window cracks sit on a wall: when the building lost the floors they were on
+  // (or fell to its stump), they go - nothing stays hanging in the air where the facade was
+  std::vector<CityStream::Wall> walls;
+  auto gone = [&](const WallMark& m) {
+    city_->walls_near({m.c.x, m.c.y}, 0.8f, walls);
+    for (const CityStream::Wall& w : walls)
+      if (w.top >= m.c.z - 0.15f && w.base <= m.c.z + 0.5f) return false;
+    return true;
+  };
+  for (std::vector<WallMark>* v : {&soots_, &breaches_, &cracks_}) {
+    const std::size_t before = v->size();
+    v->erase(std::remove_if(v->begin(), v->end(), gone), v->end());
+    if (v->size() != before) dirty_ = true;
+  }
+  soot_cursor_ = std::min<u32>(soot_cursor_, static_cast<u32>(soots_.size()));
+  breach_cursor_ = std::min<u32>(breach_cursor_, static_cast<u32>(breaches_.size()));
+  crack_cursor_ = std::min<u32>(crack_cursor_, static_cast<u32>(cracks_.size()));
 }
 
 void Marks::rebuild(const CityStream& city) {
