@@ -562,6 +562,7 @@ std::string Game::rounds_command(const std::string& cmd) {
   // "round start" (the vote), "round vote N", "round state"
   if (cmd == "round start") { rounds_request(kAskVote, 0); return "asked"; }
   if (cmd == "round skip" && (!net_.active() || net_.hosting())) { rounds().left = 0; return "skipped"; }  // tests: the phase to its end
+  if (cmd == "round hill") { const RoundState& R = rounds(); return std::to_string(R.hill.x) + " " + std::to_string(R.hill.y); }  // tests: the ring
   if (cmd.rfind("round vote ", 0) == 0) { rounds_request(kCastVote, static_cast<u8>(std::atoi(cmd.c_str() + 11))); return "voted"; }
   std::string j = rounds_json();
   return "{" + j.substr(10);
