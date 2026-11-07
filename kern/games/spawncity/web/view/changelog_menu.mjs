@@ -7,15 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
-  {date:"2026-11-07",time:"19:59",title:"Spielrunden zurückgenommen",items:[
-    "Die neuen Spielrunden mit Abstimmung und fünf Spielmodi wurden wegen Problemen vorerst zurückgenommen.",
-    "Freies Spiel und Multiplayer bleiben wie vor dem Runden-Update erhalten.",
-    "Die danach ergänzten Runden-Level und die Bild-/Clip-Funktionen sind vorerst nicht erreichbar.",
-  ]},
-  {date:"2026-11-07",time:"19:40",title:"Level, Bilder und Clips",items:[
-    "Jede Runde gibt Erfahrung (mitspielen, Punkte, Sieg) – dein Level steht am RUNDE-Knopf. Nichts zu kaufen.",
-    "Nach der Runde: BILD TEILEN oder CLIP 10 s – direkt ins Teilen-Menü des Handys, sonst als Datei.",
-    "Jederzeit: F8 nimmt einen 10-Sekunden-Clip auf, F9 macht ein Bild.",
+  {date:"2026-11-07",time:"20:11",title:"Vollständiger Rollback vor die Spielrunden",items:[
+    "Die fünf neuen Spielrunden mit Abstimmung sind vollständig zurückgenommen; freies Spiel und Multiplayer bleiben wie zuvor.",
+    "Auch das spätere Runden-Testkommando, XP/Level und die Bild-/Clip-Teilen-Funktionen dieses Updates wurden entfernt.",
   ]},
   {date:"2026-11-07",time:"19:12",title:"Mit Freunden oder öffentlich",items:[
     "MULTI fragt jetzt: MIT FREUNDEN (eigener Raum an deinem Ort, der Link zum Verschicken kommt sofort) oder ÖFFENTLICH (mit allen).",
