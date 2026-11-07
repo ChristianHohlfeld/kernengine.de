@@ -50,6 +50,7 @@ struct MpLocal;  // multiplayer presentation state (game_net.cpp)
 struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
 struct TossState;    // thrown things in a session (game_toss.cpp)
 struct ProjSync;     // rounds in flight in a session (game_projsync.cpp)
+struct RoundState;   // the game rounds (game_rounds.cpp)
 struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
@@ -225,6 +226,22 @@ class Game {
   void projsync_blast(u8 owner, Vec3 at);
   ProjSync& projsync();
   std::shared_ptr<ProjSync> projsync_;
+  // rounds (game_rounds.cpp): short games with a goal, voted, host-authoritative
+  RoundState& rounds();
+  std::shared_ptr<RoundState> rounds_;
+  bool round_player_pos(u8 slot, Vec3& at, bool& on_foot, bool& alive) const;
+  void rounds_send();
+  void rounds_request(u8 what, u8 value);
+  void rounds_handle(u8 from, u8 what, u8 value);
+  void rounds_begin(u8 mode);
+  void rounds_finish();
+  void rounds_update(f32 dt);
+  void rounds_on_kill(u8 victim, u8 by);
+  void rounds_zombie_down();
+  void rounds_draw();
+  std::string rounds_json();
+  u8 rounds_role_of(u8 slot);
+  std::string rounds_command(const std::string& cmd);
   u32 proj_serial_ = 0;
   std::string worldsync_list() const;
   bool world_puppet() const;

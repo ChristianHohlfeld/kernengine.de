@@ -193,6 +193,10 @@ class Session {
   /// Rounds in flight (game_projsync.cpp): the shooter's machine streams them; the host relays.
   void send_proj(const std::vector<u8>& blob);
   std::vector<Blob> take_proj() { return std::move(proj_); }
+  /// Rounds (game_rounds.cpp): the host's round state to all, a client's vote / report to him.
+  void round_to_host(const std::vector<u8>& blob);
+  void round_to_all(const std::vector<u8>& blob);
+  std::vector<Blob> take_round() { return std::move(round_); }
   std::vector<PingEvent> take_pings() { return std::move(pings_); }
   std::vector<VoiceFrame> take_voice() { return std::move(voice_); }
   /// A spawn anchor from the host for this (joining) player.
@@ -265,7 +269,7 @@ class Session {
   PlayerState me_;
   mp::Scoreboard scores_;
   bool friendly_fire_ = false;
-  std::vector<Blob> destroy_, toss_, proj_;
+  std::vector<Blob> destroy_, toss_, proj_, round_;
   u16 world_rules_ = 0;
   bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
   std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)

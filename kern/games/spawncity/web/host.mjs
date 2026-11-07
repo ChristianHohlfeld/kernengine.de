@@ -25,6 +25,7 @@ import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
 // the mode binders register themselves (view_modes.mjs)
 import {VIEW_MODES} from "./view_modes.mjs";
 import {installOriginalMenus} from "./view_menu.mjs";
+import {installRounds} from "./rounds.mjs";
 import {installOriginalAudio, exemptVoice} from "./audio.mjs";
 
 const SC_TILEJSON = "https://tiles.openfreemap.org/planet";
@@ -368,6 +369,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
   const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
+  installRounds({command});  // the rounds: vote, goal, clock, results (rounds.mjs, game_rounds.cpp)
   mpPage.connect(KernNet);
 
   // ---- HUD ----------------------------------------------------------------------------------

@@ -380,6 +380,7 @@ void Game::update_net(f32 dt) {
     m.hit_kill = false;
   }
   for (const net::Kill& k : net_.take_kills()) {
+    rounds_on_kill(k.victim, k.by);  // a round's rules (game_rounds.cpp)
     m.feed.push_back({k, now});
     if (m.feed.size() > 5) m.feed.erase(m.feed.begin());
     if (k.by == net_.self_slot() && k.victim != net_.self_slot()) {
@@ -677,8 +678,10 @@ void Game::draw_remote_people() {
     if (r.state.mode == net::PlayerMode::parachute && !(r.state.flags & net::kDead) && !(r.state.flags & net::kPassenger))
       pilot(r.shown - Vec3{0, 0, 0.85f}, r.state.yaw, mp::rgb(net_.color_of(r.state.slot)));
   // the mates' beacons: a pillar of light over each one farther than 40 m (find each other)
+  const bool seeking = rounds_role_of(net_.self_slot()) == 3;  // the seeker of a hide round: no beacons over the hidden
   for (const net::Remote& r : net_.remotes()) {
     if (r.state.flags & (net::kDead | net::kPassenger)) continue;
+    if (seeking && rounds_role_of(r.state.slot) == 4) continue;
     const Vec3 at = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone ? r.person_shown : r.shown;
     const f32 d = kern::length(at - cam_.eye);
     if (d > 40) people_art_.beacon(at, mp::rgb(net_.color_of(r.state.slot)), clampf((d - 40) / 200, 0, 1));
@@ -930,8 +933,10 @@ std::string Game::mp_hud_json() {
     s += ",\"players\":[";
     first = true;
     const Vec3 mine = mode_ == Mode::foot ? matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f} : focus_position();
+    const bool seeking = rounds_role_of(self) == 3;
     for (const net::Remote& r : net_.remotes()) {
       if (now - r.received_ms > mp::kStaleHoldMs) continue;
+      if (seeking && rounds_role_of(r.state.slot) == 4) continue;  // a hide round: the seeker must find them himself
       // Over the head on foot, over the craft otherwise (the marker follows what the mate steers).
       const Vec3 anchor = r.state.mode == net::PlayerMode::foot ? r.person_shown + Vec3{0, 0, 2.05f} : r.shown + Vec3{0, 0, 0.45f};
       f32 x, y, ang;
@@ -945,10 +950,10 @@ std::string Game::mp_hud_json() {
       const Vec3 look = cam_.target - cam_.eye;
       const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
       add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
-          "\"dz\":%.1f,\"rel\":%.0f,"
+          "\"dz\":%.1f,\"rel\":%.0f,\"role\":%u,"
           "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f}",
           first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
-          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
+          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, rounds_role_of(r.state.slot), now < r.speaking_until ? "true" : "false",
           r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y);
       first = false;
     }

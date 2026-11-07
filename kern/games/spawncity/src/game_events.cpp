@@ -315,7 +315,7 @@ void Game::update_scores(f32 dt) {
       net_.send_fx(f);
     }
     switch (d.kind) {
-      case People::Kind::zombie: C.zombies.points += kZombieKillPts; break;
+      case People::Kind::zombie: C.zombies.points += kZombieKillPts; rounds_zombie_down(); break;
       case People::Kind::enemy: {
         const EnemyType t = static_cast<EnemyType>(people_.at(d.index).role);
         award(enemy_spec(t).score, t == EnemyType::cop ? "TAKEDOWN!" : t == EnemyType::swat ? "SWAT DOWN!" : "HEAVY DOWN!!");
@@ -519,7 +519,7 @@ void Game::draw_events() {
 
 void Game::draw_combat() {
   combat_art_.begin();
-  if (world_placed_) { draw_military(); draw_events(); destruction_.draw(combat_art_); draw_guided_mark(); }
+  if (world_placed_) { draw_military(); draw_events(); destruction_.draw(combat_art_); draw_guided_mark(); rounds_draw(); }
   combat_art_.end();
 }
 

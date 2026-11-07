@@ -936,6 +936,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     dsync_update(dt);  // one destroyed city in multiplayer (game_destruction_sync.cpp)
     toss_update(dt);   // thrown people and animals fly on every machine (game_toss.cpp)
     projsync_update(dt);  // every round in flight on every machine (game_projsync.cpp)
+    rounds_update(dt);    // rounds: vote, play, results (game_rounds.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
     {
       // the elevation ahead of a fast flight (terrain.h lead)
@@ -1344,6 +1345,7 @@ std::string Game::hud_json() {
   gaps_hud(s);  // "gaps":{...} (game_gaps.cpp)
   s += ",\"hint\":\"" + json_escape(hint_) + "\"";
   s += world_rules_json();  // the WORLD switches in force (the host's in a session: game_net.cpp)
+  s += rounds_json();  // the round (game_rounds.cpp)
   if (toast_age_ < 4) s += ",\"toast\":\"" + json_escape(toast_) + "\"";
   s += ui_hud_json();  // menus, settings, equipment (game_ui.cpp)
   s += look_hud_json();  // frame times, quality, time of day (game_look.cpp)
@@ -1472,6 +1474,7 @@ std::string Game::command(const std::string& cmd) {
   }
   if (cmd == "destroy sync") return dsync_json();
   if (cmd.rfind("toss", 0) == 0) return toss_command(cmd);
+  if (cmd.rfind("round", 0) == 0) return rounds_command(cmd);
   if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera

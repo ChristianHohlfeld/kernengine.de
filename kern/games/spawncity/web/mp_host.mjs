@@ -278,6 +278,7 @@ const MP_CSS = `
 .mp-plate.low .edge .lab{top:auto;bottom:60px;flex-direction:column-reverse}
 .mp-plate.off .on{display:none}.mp-plate.off .edge{display:block}
 .mp-plate.off.near .edge .ring{animation:mpNear 1s ease-in-out infinite}@keyframes mpNear{50%{box-shadow:0 0 0 3px #0008,0 0 24px var(--c)}}
+.mp-plate.robber{--c:#ff3b30!important}.mp-plate.robber .ring,.mp-plate.robber .t{animation:mpNear .6s ease-in-out infinite}
 .mp-plate.dead{filter:grayscale(1);opacity:.75}.mp-plate .mic{display:none}.mp-plate.talk .mic{display:inline}
 #mpFeed{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 160px);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 #mpFeed div{padding:4px 9px;border-radius:7px;background:#070b10c4;font:800 12px/1.2 Inter,system-ui;white-space:nowrap}#mpFeed div.me{box-shadow:0 0 0 1.5px #ffd76a}
@@ -614,6 +615,7 @@ export class MpPage {
       el.style.setProperty("--c", p.color);
       el.classList.toggle("off", !p.on); el.classList.toggle("dead", p.dead); el.classList.toggle("talk", p.talk);
       el.classList.toggle("near", !p.on && p.d < 40);
+      el.classList.toggle("robber", p.role === 1);  // a round of Räuber & Polizei: the robber marked red for all
       const vh = (document.getElementById("viewport") || document.documentElement).clientHeight || innerHeight;
       el.classList.toggle("low", !p.on && p.y > vh * 0.6);  // at the bottom edge the words go above the badge
       const sc = p.on ? Math.max(.85, Math.min(1.2, 1.3 - p.d / 160)) : 1;
@@ -624,7 +626,7 @@ export class MpPage {
       const dz = Number(p.dz) || 0, el3 = Math.abs(dz) >= 2.5 ? `${dz > 0 ? "▲" : "▼"} ${Math.round(Math.abs(dz))} m` : "";
       const rel = Number(p.rel) || 0, side = Math.abs(rel) > 135 ? "HINTER DIR" : rel < -20 ? "◀ LINKS" : rel > 20 ? "RECHTS ▶" : dz > 2.5 ? "ÜBER DIR" : dz < -2.5 ? "UNTER DIR" : "VORN";
       const put = (q, t) => { const n = el.querySelector(q); if (n.textContent !== t) n.textContent = t; };
-      put("strong", name); put("small", d); put(".on .el", el3); el.querySelector(".hp u").style.width = `${p.hp}%`;
+      put("strong", p.role === 1 ? `${name} · RÄUBER` : name); put("small", d); put(".on .el", el3); el.querySelector(".hp u").style.width = `${p.hp}%`;
       put(".edge .ring", `P${p.index}`); put(".edge .lab b", el3 ? `${d} · ${el3}` : d); put(".edge .lab i", side);
     }
     for (const [slot, el] of this.plates) if (!seen.has(slot)) { el.remove(); this.plates.delete(slot); }
