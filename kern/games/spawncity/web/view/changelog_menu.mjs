@@ -12,11 +12,6 @@ export const CHANGELOG=Object.freeze([
     "Nach der Runde: BILD TEILEN oder CLIP 10 s – direkt ins Teilen-Menü des Handys, sonst als Datei.",
     "Jederzeit: F8 nimmt einen 10-Sekunden-Clip auf, F9 macht ein Bild.",
   ]},
-  {date:"2026-11-07",time:"19:30",title:"Runden mit Freunden",items:[
-    "Neu: 🏁 RUNDE (Taste O) – alle stimmen ab: Räuber & Polizei, Drohnenrennen, Zombienacht, King of the Hill oder Verstecken.",
-    "Jede Runde mit Countdown, Ziel, Zeit, Punktestand und Siegerliste; der Host zählt die Punkte, für alle gleich.",
-    "Drohnenrennen: 8 Tore durch die Straßen, deine Bestzeit wird gespeichert.",
-  ]},
   {date:"2026-11-07",time:"19:12",title:"Mit Freunden oder öffentlich",items:[
     "MULTI fragt jetzt: MIT FREUNDEN (eigener Raum an deinem Ort, der Link zum Verschicken kommt sofort) oder ÖFFENTLICH (mit allen).",
     "Öffentliche Lobby: gespielt wird in einer bekannten Stadt (jeden Tag eine andere) – dein echter Standort bleibt privat, LIVE GPS ist dort aus, fremde Stimmen sind zu Beginn stumm.",
