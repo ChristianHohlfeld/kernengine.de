@@ -5,7 +5,6 @@
 // the game's audio), ping markers, the big map with destination, route and guidance, and the
 // HUD data the page draws (nameplates, feed, board, hit marker, damage direction, shield).
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 
@@ -71,7 +70,6 @@ mp::Weapon mp_weapon(weapons::Id id) {
 /// Per-player multiplayer presentation state (owned by Game through mp_).
 struct MpLocal {
   MpArt art;
-  bool public_lobby = false;  // in the public lobby: no real places, strangers muted at first
   f32 world_own[16] = {};  // our own WORLD switches while the host's apply
   bool world_saved = false;
   mp::PingBoard pings;
@@ -131,8 +129,6 @@ namespace {
 constexpr Opt kWorldRules[] = {Opt::world_people, Opt::world_traffic, Opt::world_dogs, Opt::world_cats, Opt::world_birds, Opt::world_zombies, Opt::world_police,
                                Opt::world_military, Opt::world_flak, Opt::world_jetpack, Opt::world_terrain, Opt::world_guided, Opt::world_always_day};
 }  // namespace
-
-bool Game::public_lobby() const { return mp_ && mp_->public_lobby && net_.active(); }
 
 bool Game::voice_mic_on() const { return mp_ && mp_->mic && !mp_->muted && net_.active(); }
 
@@ -1072,31 +1068,6 @@ std::string Game::net_command(const std::string& cmd) {
     if (rest == "migrate") return std::to_string(m.migrate);
     if (rest == "rules") { u16 w = 0; const bool have = net_.world_rules(w); return std::string(have ? "have " : "none ") + std::to_string(w) + (net_.hosting() ? " host" : " client"); }
     if (rest == "stop") { net_.stop(); return "stopped"; }
-    if (rest.rfind("public ", 0) == 0) {
-      // the public lobby (strangers): nobody learns where anybody really is - the host plays it in
-      // a well-known city centre (the day's one: the same for everybody who hosts it that day),
-      // never at his GPS place; a start / GPS move is refused while it lasts; strangers' voices
-      // start muted (unmute with the speaker button)
-      m.public_lobby = rest[7] == '1';
-      if (m.public_lobby) {
-        if (!m.muted) { m.muted = true; m.mic = false; m.capture.clear(); }
-        if (net_.hosting()) {
-          struct Place { const char* name; f64 lat, lon; };
-          static const Place kPlaces[] = {{"Berlin, Alexanderplatz", 52.521918, 13.413215}, {"Hamburg, Rathausmarkt", 53.550556, 9.993333},
-                                          {"München, Marienplatz", 48.137154, 11.576124}, {"Köln, Domplatte", 50.941278, 6.958281},
-                                          {"Frankfurt, Römerberg", 50.110556, 8.682222}, {"Zürich, Bahnhofstrasse", 47.372394, 8.538888},
-                                          {"Wien, Stephansplatz", 48.208493, 16.373118}};
-          const i64 day = static_cast<i64>(std::chrono::duration_cast<std::chrono::hours>(std::chrono::system_clock::now().time_since_epoch()).count() / 24);
-          const Place& pl = kPlaces[static_cast<std::size_t>(day % static_cast<i64>(std::size(kPlaces)))];
-          ui_.place = pl.name;
-          ui_move_world(pl.lon, pl.lat);
-          net_.set_origin(lon_, lat_);
-          toast_ = std::string("Öffentliche Lobby: ") + pl.name + " - dein Standort bleibt privat";
-          toast_age_ = 0;
-        }
-      }
-      return m.public_lobby ? "public" : "private";
-    }
     if (rest == "remotes") {
       std::string o = "[";
       for (const net::Remote& r : net_.remotes()) {

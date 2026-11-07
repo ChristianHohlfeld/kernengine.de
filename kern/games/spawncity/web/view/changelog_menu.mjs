@@ -7,13 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
-  {date:"2026-11-07",time:"20:11",title:"Vollständiger Rollback vor die Spielrunden",items:[
-    "Die fünf neuen Spielrunden mit Abstimmung sind vollständig zurückgenommen; freies Spiel und Multiplayer bleiben wie zuvor.",
-    "Auch das spätere Runden-Testkommando, XP/Level und die Bild-/Clip-Teilen-Funktionen dieses Updates wurden entfernt.",
-  ]},
-  {date:"2026-11-07",time:"19:12",title:"Mit Freunden oder öffentlich",items:[
-    "MULTI fragt jetzt: MIT FREUNDEN (eigener Raum an deinem Ort, der Link zum Verschicken kommt sofort) oder ÖFFENTLICH (mit allen).",
-    "Öffentliche Lobby: gespielt wird in einer bekannten Stadt (jeden Tag eine andere) – dein echter Standort bleibt privat, LIVE GPS ist dort aus, fremde Stimmen sind zu Beginn stumm.",
+  {date:"2026-11-07",time:"20:35",title:"Vollständiger Rollback auf den Stand vor Freunde/öffentlich und Spielrunden",items:[
+    "SpawnCity läuft wieder wie vor dem MULTI-Update mit MIT FREUNDEN / ÖFFENTLICH und der öffentlichen Tagesstadt.",
+    "Die fünf Spielrunden mit Abstimmung, das Runden-Testkommando, XP/Level und die Bild-/Clip-Teilen-Funktionen sind zurückgenommen.",
+    "Der Spielstand entspricht wieder der Version vor diesen Updates; das übrige Spiel bleibt unverändert.",
   ]},
   {date:"2026-11-07",time:"18:52",title:"Beifahrer sitzen, Hunde überall, Würfe ohne Haken",items:[
     "Multiplayer: Beifahrer sitzen jetzt sichtbar im Auto (Kopf und Arme im Fenster, ihre Waffe in der Hand) und schauen auf Sitzhöhe heraus – getroffen werden sie dort, wo sie sitzen.",

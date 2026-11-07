@@ -71,7 +71,6 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
     if (n < 2 || !std::isfinite(lat) || !std::isfinite(lon) || std::fabs(lat) > 85 || std::fabs(lon) > 180) { out = "usage: start <lat> <lon> [name]"; return true; }
     // the host's city is everybody's: a client cannot move it, the host takes them all along
     if (net_.active() && !net_.hosting()) { out = "im Mehrspieler nicht"; return true; }
-    if (public_lobby()) { out = "in der öffentlichen Lobby nicht (dein Standort bleibt privat)"; return true; }
     ui_.place = name;
     ui_move_world(lon, lat);
     if (net_.hosting()) net_.set_origin(lon_, lat_);
@@ -86,7 +85,6 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   }
   // ---- LIVE GPS (gps_live_mode.mjs) ----
   if (starts("gps ")) {
-    if (public_lobby() && cmd.find("off") == std::string::npos) { out = "LIVE GPS nicht in der öffentlichen Lobby (dein Standort bleibt privat)"; return true; }
     const std::string rest = cmd.substr(4);
     GpsLive& g = ui_.gps;
     if (rest == "on") { if (!g.active()) { g.start(time_); ui_.trail.clear(); ui_.trail_dirty = true; } out = "on"; return true; }
