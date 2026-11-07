@@ -87,6 +87,10 @@ class CityStream {
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
   bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
+  /// MP host: the other players - the town is loaded around them too (ring `mate_ring`), so the
+  /// host's traffic and people live there (the authority over the whole town: game_worldsync.cpp)
+  std::vector<Vec3> extra_foci;
+  i32 mate_ring = 1;
   bool training_offline = false;  // offline: the original's training level instead of the stand-in town
 
   // ---- street life and interiors (M3 life: life.h, interiors.h) ----
@@ -122,7 +126,7 @@ class CityStream {
   u32 damage_serial_ = 0;
   struct Tile;
   Tile* tile(const TileKey& k);
-  void request_around(Vec3 focus);
+  void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
   bool work(Tile& t, f64 deadline);
   void finish_features(Tile& t);

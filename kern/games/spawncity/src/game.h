@@ -206,6 +206,8 @@ class Game {
   bool puppet_world_ = false;
   f32 world_send_clock_ = 0, people_send_clock_ = 0;
   u32 world_sent_ = 0, world_got_ = 0;
+  f32 world_heard_at_ = -99;
+  bool cars_were_ = false;
   std::vector<bool> car_seen_;
   std::vector<People::NetPerson> people_acc_;
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
@@ -501,7 +503,7 @@ class Game {
   void vr_room(Vec3& f, Vec3& r, Vec3& up) const;
   bool vr_menu_open_ = false, vr_menu_trigger_ = false, vr_menu_valid_ = false;
   i32 vr_menu_hover_ = -1, vr_menu_hover_was_ = -1, vr_menu_page_ = 0, vr_menu_sel_ = 0;
-  bool vr_menu_stick_armed_ = true, vr_y_fired_ = false, vr_near_vehicle_ = false;
+  bool vr_menu_stick_used_ = false, vr_menu_stick_armed_ = true, vr_y_fired_ = false, vr_near_vehicle_ = false;
   f32 vr_y_held_ = 0;
   bool vr_cam_request_ = false, vr_scoped_ = false;  // the wrist menu's KAMERA (game_controls.cpp)
   Vec3 vr_menu_c_, vr_menu_r_, vr_menu_u_, vr_menu_n_;

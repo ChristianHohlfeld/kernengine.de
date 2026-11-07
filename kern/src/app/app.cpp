@@ -298,7 +298,9 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     if (i == 0) { g_engine->xr = true; g_engine->xr_eye = cam.eye; g_engine->xr_forward = normalize(cam.target - cam.eye, {1, 0, 0}); }
   }
   if (g_engine->xr_scope && g_engine->xr_scope_fbo && g_engine->xr_scope_size > 0) {
-    // the scope's own picture after the eyes (their shadow map reused; the lens shows it next frame)
+    // the scope's own picture after the eyes (their shadow map reused; the lens shows it next frame);
+    // the comfort tunnel is the eyes', not the scope's
+    if (vig_mesh) g_engine->renderer.set_visible(vig_mesh, false);
     cam = g_engine->xr_scope_camera;
     cam.has_projection = false;
     RenderParams sp;

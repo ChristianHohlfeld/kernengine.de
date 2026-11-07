@@ -442,9 +442,10 @@ void Game::show_soldier(Vec3 feet, f32 yaw_deg) {
 Vec3 Game::standing_feet(Vec3 feet) const {
   // Where a player put down at `feet` stands, as the ground is now: the terrain's height there (a
   // crater may have sunk it since the spot was taken - RESET, a respawn), or the first floor a ray
-  // from 3 m above meets (a deck, a roof the spot is on); never below the ground.
+  // from 1 m over the spot meets (a deck, a roof the spot is on - not a bridge above it); never
+  // below the ground.
   const f32 ground = city_.ground_height(feet.x, feet.y);
-  const RayResult r = cast(world_->physics(), {feet.x, feet.y, std::fmax(feet.z, ground) + 3.0f}, {0, 0, -1}, 3.0f + std::fabs(feet.z - ground) + 1.0f, body(soldier_), kCatWorld);
+  const RayResult r = cast(world_->physics(), {feet.x, feet.y, std::fmax(feet.z, ground) + 1.0f}, {0, 0, -1}, 1.0f + std::fabs(feet.z - ground) + 1.0f, body(soldier_), kCatWorld);
   f32 z = ground;
   if (r.hit && r.normal.z > 0.6f && r.point.z > ground - 0.05f) z = r.point.z;
   return {feet.x, feet.y, z + 0.02f};
@@ -857,7 +858,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
     vr_menu_input(dt);  // the headset's wrist menu (game_vr.cpp): while open the pad is the menu's
-    if (vr_menu_open_) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; }
+    if (vr_menu_open_) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; pad.rx = pad.ry = 0; }  // the menu's: no turn, no weapon step
     read_input(e, dt);
     update_touch_layout();
     look_lap(perf::Slot::logic);

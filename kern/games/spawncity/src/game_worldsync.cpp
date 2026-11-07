@@ -6,13 +6,15 @@
 //  * every 100 ms he sends the cars and the citizens within reach of any mate (unreliable, the
 //    newest wins): a car's index, kind, colour, pose and velocity; a citizen's index, seed (his
 //    looks), state, place, heading and pace
-//  * a client near the host (within 350 m: the host's streamed city reaches there) runs no
-//    traffic and no citizens of his own - his cars are puppets steered onto the host's poses
+//  * the host loads the town around every mate too (CityStream::extra_foci) and places his
+//    traffic and people around all of them; a client runs no traffic and no citizens of his own
+//    while the host's world comes - his cars are puppets steered onto the host's poses
 //    (dynamic bodies driven by velocity: they still push and get pushed), his citizens are eased
 //    to the host's places, a death or a fall there is one here (People::apply_snapshot)
 //  * the car a player drives is his (PlayerState.car): the host leaves it out and hides his copy,
 //    the others draw it as that player's car; let go, it is the host's again where it stopped
-//  * a client far from the host (his own end of the map) keeps a town of his own there
+//  * only until the host's world reaches a client (the first seconds there, the town loading on
+//    the host) the client's own town fills the gap; then it is the host's, everywhere
 // Police, the military and the zombies stay with the player they belong to (wanted, swarm).
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
@@ -34,7 +36,6 @@ inline f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 constexpr f32 kSendEvery = 0.2f;     // s between two snapshots of the host's cars
 constexpr f32 kPeopleEvery = 0.4f;   // ... of his citizens and joggers
 constexpr f32 kReach = 200;          // m around a mate: what he can see of the street life
-constexpr f32 kNearHost = 350;       // m: a client this close to the host lives in the host's town
 constexpr u8 kCars = 1, kPeople = 2, kJoggers = 3;
 
 struct Wr {
@@ -70,12 +71,12 @@ std::vector<Vec3> Game::mate_foci() const {
 }
 
 bool Game::world_puppet() const {
-  // a client in the host's town (near him): the host's street life, none of his own
+  // the host is the authority over the whole town - around every player (he loads it around his
+  // mates too: CityStream::extra_foci): a client lives in his world as soon as it comes and as
+  // long as it keeps coming (3 s); only before the host has the town around him (the first
+  // seconds after a long trip) or with a host that sends none, his own fills the gap
   if (!net_.active() || net_.hosting()) return false;
-  const net::Remote* h = net_.remote(net::kHost);
-  if (!h) return false;
-  const Vec3 hp = h->state.mode == net::PlayerMode::foot || h->state.mode == net::PlayerMode::drone ? h->person_shown : h->shown;
-  return dist2d(hp, focus_position()) < kNearHost;
+  return world_->sim_time() - world_heard_at_ < 3.0f;
 }
 
 void Game::worldsync_update(f32 dt) {
@@ -112,6 +113,9 @@ void Game::worldsync_update(f32 dt) {
     world_send_clock_ += dt;
     people_send_clock_ += dt;
     const std::vector<Vec3> mates = mate_foci();
+    // the town is loaded around them too (their tile and the ring; one tile on a phone)
+    city_.extra_foci = mates;
+    city_.mate_ring = mobile_ ? 0 : 1;
     // Small on the wire (a relay over the brokers carries it when no direct channel is open): the
     // cars 5 times a second, the citizens and the joggers 2.5 times, each in one message, places
     // relative to the message's anchor in 10 cm, headings in bytes - some 1 KB/s
@@ -159,7 +163,10 @@ void Game::worldsync_update(f32 dt) {
         ++n;
       }
       cw.b[1] = static_cast<u8>(n | 0x80);
-      net_.send_world(cw.b);
+      // nothing yet around the mates (the town loading there): his own town stays; one empty
+      // snapshot after cars clears them there
+      if (n > 0 || cars_were_) net_.send_world(cw.b);
+      cars_were_ = n > 0;
       ++world_sent_;
     }
     if (people_send_clock_ >= kPeopleEvery && !mates.empty()) {
@@ -182,7 +189,7 @@ void Game::worldsync_update(f32 dt) {
         ++m;
       }
       pw.b[1] = static_cast<u8>(m | 0x80);
-      net_.send_world(pw.b);
+      if (m > 0) net_.send_world(pw.b);
       // the running club (jogger_chain.mjs): its id and its runners, when it runs near a mate
       if (glife_) {
         const Life::Chain* ch = glife_->life.chain();
@@ -204,7 +211,8 @@ void Game::worldsync_update(f32 dt) {
       }
     }
   }
-  // ---- client: the host's town around us, or our own far from him ----
+  if (!net_.hosting()) city_.extra_foci.clear();
+  // ---- client: the host's town around us (or our own until his arrives) ----
   const bool puppet = world_puppet();
   if (puppet != puppet_world_) {
     puppet_world_ = puppet;
@@ -219,6 +227,7 @@ void Game::worldsync_update(f32 dt) {
   }
   std::vector<std::vector<u8>> blobs = net_.take_world();
   world_got_ += static_cast<u32>(blobs.size());
+  if (!blobs.empty()) world_heard_at_ = now;
   if (!puppet) return;
   if (car_net_.size() < cars_.size()) car_net_.resize(cars_.size(), -1);
   if (car_puppet_.size() < cars_.size()) car_puppet_.resize(cars_.size());

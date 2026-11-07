@@ -175,7 +175,7 @@ CityStream::Tile* CityStream::tile(const TileKey& k) {
   return it == tiles_.end() ? nullptr : it->second.get();
 }
 
-void CityStream::request_around(Vec3 focus) {
+void CityStream::request_around(Vec3 focus, i32 ring) {
   if (offline_) return;
   f64 lon, lat;
   unproject(proj_, focus.x, focus.y, lon, lat);
@@ -208,10 +208,14 @@ void CityStream::unload_far(Vec3 focus) {
   f64 lon, lat;
   unproject(proj_, focus.x, focus.y, lon, lat);
   const TileKey c = tile_at(lon, lat);
+  std::vector<TileKey> mates;
+  for (const Vec3& f : extra_foci) { f64 lo, la; unproject(proj_, f.x, f.y, lo, la); mates.push_back(tile_at(lo, la)); }
   for (auto it = tiles_.begin(); it != tiles_.end();) {
     Tile& t = *it->second;
     const i32 d = std::max(std::abs(t.key.x - c.x), std::abs(t.key.y - c.y));
-    if (!t.procedural && d > ring + 1) {
+    bool near_mate = false;
+    for (const TileKey& m : mates) near_mate = near_mate || std::max(std::abs(t.key.x - m.x), std::abs(t.key.y - m.y)) <= mate_ring + 1;
+    if (!t.procedural && d > ring + 1 && !near_mate) {
       remove(t);
       it = tiles_.erase(it);
     } else ++it;
@@ -793,7 +797,8 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   if (std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) >= 140 || start - vis_ms_ >= 2500) select_visual(focus);
   step_time("select_visual", t0);
   t0 = kern::now_ms();
-  request_around(focus);
+  request_around(focus, ring);
+  for (const Vec3& f : extra_foci) request_around(f, mate_ring);  // MP host: the town around the mates too
   unload_far(focus);
   step_time("request/unload", t0);
   t0 = kern::now_ms();

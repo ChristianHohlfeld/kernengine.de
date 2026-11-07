@@ -610,9 +610,14 @@ function installViewModes() {
     return b;
   };
   function radios(h) {
-    const jetRow = q("#jetHud .jet-btns"), droneBar = $("soloArmToolbar")?.parentElement;
+    const jetRow = q("#jetHud .jet-btns"), vp = $("viewport");
     if (jetRow && !jetRow.querySelector(".sc-radio-btn")) jetRow.appendChild(radioBtn("jet"));
-    if (droneBar && !droneBar.querySelector(".sc-radio-btn")) { const b = radioBtn("drone"); b.style.cssText = "min-width:44px"; droneBar.appendChild(b); }
+    // the drone: its own small button left of the minimap (the drone's top bar is hidden on phones)
+    if (vp && !vp.querySelector('.sc-radio-btn[data-where="drone"]')) {
+      const b = radioBtn("drone");
+      b.style.cssText = "position:absolute;z-index:12;top:calc(max(48px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 42px)) + 4px);right:calc(max(10px,var(--solo-safe-right,env(safe-area-inset-right))) + 128px);width:44px;height:44px;border-radius:12px;border:1px solid rgba(127,240,197,.55);background:rgba(7,21,34,.86);color:#fff;font-size:20px;padding:0";
+      vp.appendChild(b);
+    }
     for (const b of document.querySelectorAll(".sc-radio-btn")) hide(b, b.dataset.where !== h.mode);
   }
 

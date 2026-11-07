@@ -53,7 +53,8 @@ void Game::vr_melee(i32 side, f32 dt) {
   if (speed < kStrikeSpeed) { h.swish = false; return; }
   if (!h.swish) {
     h.swish = true;
-    osfx(knife ? "gameplay_final_runtime_v2.knifeSwish" : "gameplay_final_runtime_v2.punchWhoosh", at, side == 1 ? 0 : 1, 0);
+    // (running with the arms every swing would whoosh: there only a landed blow is heard)
+    if (!vr_arms_) osfx(knife ? "gameplay_final_runtime_v2.knifeSwish" : "gameplay_final_runtime_v2.punchWhoosh", at, side == 1 ? 0 : 1, 0);
   }
   if (now - h.strike_at < kStrikeRecover) return;
   const Vec3 d = at - prev;
@@ -240,6 +241,7 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
   w.set_linear_velocity(h.grab, v + dv);
   w.set_angular_velocity(h.grab, w.angular_velocity(h.grab) * 0.9f);
   w.set_awake(h.grab, true);
+  if (glife_) glife_->life.hold_animal(h.grab);  // a dog or a cow in the hand stays in it
   // a held person: the rest of the doll follows the chest (a limp body, not a chest alone)
   if (h.grab_person >= 0 && glife_)
     for (u8 b = 0; b < Ragdolls::kBones; ++b) {
@@ -269,7 +271,7 @@ void Game::vr_menu_input(f32 dt) {
       vr_pulse_[0] = 0.8f;
     }
   } else {
-    if (vr_y_held_ > 0 && !vr_y_fired_) { vr_menu_open_ = !vr_menu_open_; vr_menu_page_ = 0; }  // a tap
+    if (vr_y_held_ > 0 && !vr_y_fired_) { vr_menu_open_ = !vr_menu_open_; vr_menu_page_ = 0; vr_menu_stick_used_ = false; }  // a tap
     vr_y_held_ = 0;
     vr_y_fired_ = false;
   }
@@ -297,10 +299,13 @@ void Game::vr_menu_input(f32 dt) {
     if (std::fabs(ry) < 0.3f) vr_menu_stick_armed_ = true;
     if (vr_menu_stick_armed_ && std::fabs(ry) > 0.7f) {
       vr_menu_stick_armed_ = false;
-      vr_menu_sel_ = (vr_menu_sel_ + (ry > 0 ? kMenuRows - 1 : 1)) % kMenuRows;
+      vr_menu_sel_ = vr_menu_stick_used_ ? (vr_menu_sel_ + (ry > 0 ? kMenuRows - 1 : 1)) % kMenuRows : 0;
+      vr_menu_stick_used_ = true;
     }
-    if (vr_menu_hover_ >= 0) vr_menu_sel_ = vr_menu_hover_;
-    else vr_menu_hover_ = vr_menu_sel_;
+    // pointing wins; the stick's row only once the stick chose one (a trigger pulled while the ray
+    // is off the panel must not pick the first row)
+    if (vr_menu_hover_ >= 0) { vr_menu_sel_ = vr_menu_hover_; vr_menu_stick_used_ = false; }
+    else if (vr_menu_stick_used_) vr_menu_hover_ = vr_menu_sel_;
   }
   const bool pick = pad.connected && ((pad.rt > 0.6f && !vr_menu_trigger_) || (pad.pressed & (1u << kPadA)));
   vr_menu_trigger_ = pad.connected && pad.rt > 0.6f;

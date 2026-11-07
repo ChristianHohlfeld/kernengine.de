@@ -136,6 +136,7 @@ void Game::update_traffic_world(f32 dt) {
       explosion(world_->physics().pose(t.body).position + Vec3{0, 0, 0.3f}, 7, 110, false);
     }
   // ---- tow service: who needs help (every 0.5 s) ----
+  if (puppet_world_) return;  // MP client in the host's town: his cars, his tow trucks
   if (now - L.tow_scan_at < 0.5f) return;
   L.tow_scan_at = now;
   if (L.watch.size() < cars_.size()) L.watch.resize(cars_.size());

@@ -490,6 +490,15 @@ export class OriginalView {
       const right = `${Math.max(0, Math.round(fw - t.look.x - t.look.size))}px`;
       if (el.style.getPropertyValue("right") !== right) { el.style.setProperty("right", right, "important"); el.style.setProperty("left", "auto", "important"); }
     }
+    // the jet's KANONE right over that stick, where the thumb reaches it (the original's CSS put
+    // it left of a stick at the edge - now the jet's button row is there)
+    const fire = $("footFire");
+    if (fire && fw && t.look) {
+      const fh = $("game")?.clientHeight || 0;
+      const right = `${Math.max(0, Math.round(fw - t.look.x - t.look.size / 2 - (fire.offsetWidth || 64) / 2))}px`, bottom = `${Math.max(0, Math.round(fh - t.look.y + 8))}px`;
+      if (fire.style.getPropertyValue("right") !== right) fire.style.setProperty("right", right, "important");
+      if (fh && fire.style.getPropertyValue("bottom") !== bottom) fire.style.setProperty("bottom", bottom, "important");
+    }
     for (const [id, s, sel] of pairs) {
       const el = $(id), k = el?.querySelector(sel);
       if (!el || !s) continue;

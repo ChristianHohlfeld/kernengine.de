@@ -258,7 +258,11 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy ki
     // dispatchExplosion: only an amount above 2 counts (gameplay_final_runtime_v2.mjs)
     // dispatchExplosion clamps the blast to 2..18 m and 10..160 damage
     const f32 rr = clampf(radius, 2, 18), dmg = clampf(damage, 10, 160);
-    const f32 amount = d < rr ? dmg * weapons::blast_factor(d, rr, !line_of_sight(at, me)) : 0;
+    // (the line of sight past his own capsule - in the drone line_of_sight leaves out the drone)
+    const Vec3 dl = me - at;
+    const f32 dlen = kern::length(dl);
+    const bool shielded = dlen > 0.05f && cast(world_->physics(), at, dl * (1.0f / dlen), dlen, body(soldier_), kCatWorld).hit;
+    const f32 amount = d < rr ? dmg * weapons::blast_factor(d, rr, shielded) : 0;
     if (amount > 2) world_->damage(soldier_, amount, 0, false, at);
   }
   blast_cars(at, radius, damage, by_player);  // hits per car / bus, cruisers linear (game_vehicle_damage.cpp)

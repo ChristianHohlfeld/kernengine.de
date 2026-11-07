@@ -167,6 +167,11 @@ class Life {
   /// A pigeon caught by hand (VR): crept up on, the hand slow and right on it - and even then
   /// only every other try, a miss sends the flock up. Returns its id (-1: it got away).
   i32 catch_pigeon(Vec3 hand, f32 hand_speed, f32 now, Rng& rng);
+  /// The animal with this body is in a hand this frame: it does not stand up there (held still).
+  void hold_animal(kern::physics::Body b) {
+    for (Cow& c : cows_) if (c.carried && c.body == b) c.carried_still = 0;
+    for (Pet& p : pets_) if (p.carried && p.body == b) p.carried_still = 0;
+  }
   void hold_pigeon(i32 id, Vec3 at, f32 yaw);
   /// Let go: it flies off from there, with the hand's throw.
   void release_pigeon(i32 id, Vec3 velocity);
