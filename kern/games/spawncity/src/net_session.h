@@ -43,6 +43,7 @@ enum PlayerFlag : u16 {
   kCockpit = 512,
   kJetpack = 1024,    // the jetpack burns (jetpack_audio.mjs: the others hear it in 3-D; game_equipment.cpp)
   kPassenger = 2048,  // rides in a mate's jet (jet_mode.mjs passenger): not drawn on foot
+  kSeated = 4096,     // a car's passenger: seated in the mate's car (drawn and hit there, his weapon out)
 };
 
 /// One player's state as the others see it.

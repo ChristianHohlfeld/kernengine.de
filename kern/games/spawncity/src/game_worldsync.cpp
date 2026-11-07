@@ -211,14 +211,15 @@ void Game::worldsync_update(f32 dt) {
           if (fl & 5) quat(c->rot);
         }
         const auto& pets = L.pets();
-        aw.put(L.pet_anchor().x); aw.put(L.pet_anchor().y);
+        aw.put(static_cast<u8>(L.pet_anchors().size()));
+        for (const Vec2& a : L.pet_anchors()) { aw.put(a.x); aw.put(a.y); }
         aw.put(static_cast<u8>(std::min<std::size_t>(pets.size(), 255)));
         u8 np = 0;
         const std::size_t np_at = aw.b.size();
         aw.put<u8>(0);
         for (std::size_t i = 0; i < pets.size() && i < 255; ++i) {
           const Life::Pet& p = pets[i];
-          if (!p.shown && p.dead_at < 0) continue;
+          if ((!p.shown && p.dead_at < 0) || !near_mate(p.pos)) continue;  // (the rest are not where any mate is)
           aw.put(static_cast<u8>(i));
           aw.put(dm(p.pos.x, o.x)); aw.put(dm(p.pos.y, o.y)); aw.put(dm(p.pos.z, 0));
           aw.put(ang8(p.yaw));
@@ -380,8 +381,8 @@ void Game::worldsync_update(f32 dt) {
         c.rot = (fl & 5) ? quat() : Quat::axis_angle({0, 0, 1}, c.yaw);
         cows.push_back(c);
       }
-      Vec2 anchor;
-      anchor.x = r.get<f32>(); anchor.y = r.get<f32>();
+      std::vector<Vec2> anchors(r.get<u8>());
+      for (Vec2& a : anchors) { a.x = r.get<f32>(); a.y = r.get<f32>(); }
       const u8 pet_count = r.get<u8>(), npets = r.get<u8>();
       std::vector<Life::NetPet> pets;
       for (u8 k = 0; k < npets && r.ok; ++k) {
@@ -411,7 +412,7 @@ void Game::worldsync_update(f32 dt) {
         }
         flocks.push_back(std::move(f));
       }
-      if (r.ok && glife_) glife_->life.apply_animals(cows, pets, pet_count, anchor, flocks, now, snap_at);
+      if (r.ok && glife_) glife_->life.apply_animals(cows, pets, pet_count, anchors, flocks, now, snap_at);
     } else if (type == kJoggers) {
       const u32 id = r.get<u32>();
       Vec3 pos[10];

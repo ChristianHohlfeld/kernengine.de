@@ -159,7 +159,8 @@ class Terrain {
   bool ground_albedo(f32 x, f32 y, Vec3& lin) const;
   kern::Vec4 image_bounds(const TileKey& k) const;
 
-  void plan_dem(Vec3 focus, Vec3 player, bool mates);
+  void plan_dem(Vec3 focus, Vec3 player, bool mates, bool side = false);
+  void plan_side_dem();
   bool run_job(f64 deadline);
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
@@ -181,6 +182,7 @@ class Terrain {
   f32 ref_height_ = 0;
   bool ref_ready_ = false;
   Grid grid_;
+  std::vector<Grid> side_;  // host: windows round far mates (plan_side_dem)
   std::unique_ptr<Job> job_;
   std::unordered_map<u64, DemTile> dem_tiles_;
   std::vector<TileKey> requests_;

@@ -174,8 +174,11 @@ class Life {
   kern::physics::Body pet_body(u32 i) const { return i < pets_.size() ? pets_[i].body : kern::physics::Body{}; }
   void set_remote_animals(bool on);
   bool remote_animals() const { return remote_animals_; }
-  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now, f32 at);
-  Vec2 pet_anchor() const { return pet_anchor_; }
+  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, const std::vector<NetFlock>& flocks, f32 now, f32 at);
+  /// The neighbourhoods of the dogs and cats: the player's first, then (host) one round every mate
+  /// far from it; pet i belongs to anchor i / base.
+  const std::vector<Vec2>& pet_anchors() const { return pet_anchors_; }
+  Vec2 anchor_of(u32 i) const { const u32 k = pet_base_ ? i / pet_base_ : 0; return k > 0 && k < pet_anchors_.size() ? pet_anchors_[k] : pet_anchor_; }
   /// Thrown things (game_toss.cpp): the body of an animal another player throws, made here so
   /// it flies here too (the host's cow by key / pet by index); invalid when there is none.
   kern::physics::Body net_carry_cow(u64 key);
@@ -215,6 +218,8 @@ class Life {
   std::vector<LooseBird> loose_;
   i32 loose_serial_ = 0;
   bool remote_animals_ = false;
+  std::vector<Vec2> pet_anchors_;
+  u32 pet_base_ = 20;
   f32 remote_animals_at_ = -9;
   std::vector<Vec3> pet_net_to_;
   std::vector<f32> pet_net_yaw_;

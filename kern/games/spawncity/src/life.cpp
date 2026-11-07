@@ -93,7 +93,8 @@ void Life::init(kern::physics::World& w, bool mobile) {
   world_ = &w;
   mobile_ = mobile;
   // world_procedural_population.mjs AMBIENT_ANIMAL_COUNT, their circling paths and sizes
-  pets_.assign(mobile ? 12 : 20, {});
+  pet_base_ = mobile ? 12 : 20;
+  pets_.assign(pet_base_, {});
   for (u32 i = 0; i < pets_.size(); ++i) pet_params(pets_[i], i);
   ragdolls_.init(w, mobile);
   // world_liveliness.mjs BIRD_COUNT
@@ -828,7 +829,7 @@ constexpr f32 kPetTorso = 0.11f;
 
 Life::Species Life::species(u32 i, f64 epoch) const {
   if (i == 1 && (static_cast<i64>(std::floor(epoch / 120)) % 2 == 0 || cat_.on)) return Species::black_cat;
-  return i % 3 == 2 ? Species::cat : Species::dog;
+  return (pet_base_ ? i % pet_base_ : i) % 3 == 2 ? Species::cat : Species::dog;  // every neighbourhood the same mix
 }
 
 bool Life::provoke_cat(f32 now) {
@@ -876,9 +877,44 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
   epoch_ = view.epoch;
   // the anchor: the neighbourhood (re-anchored when the player is 2.5 km away, REANCHOR_M)
   const Vec2 me{view.focus.x, view.focus.y};
-  if (dist2d(pet_anchor_, me) > 2500) {
-    pet_anchor_ = {std::round(me.x / 100) * 100, std::round(me.y / 100) * 100};
-    for (Pet& p : pets_) { p.shown = false; p.has_pose = false; }
+  if (!remote_animals_) {
+    // (a client takes the host's neighbourhoods: apply_animals)
+    if (dist2d(pet_anchor_, me) > 2500) {
+      pet_anchor_ = {std::round(me.x / 100) * 100, std::round(me.y / 100) * 100};
+      for (u32 i = 0; i < pet_base_ && i < pets_.size(); ++i) { pets_[i].shown = false; pets_[i].has_pose = false; }
+    }
+    // host: a neighbourhood of dogs and cats round every mate far from the others too (as he would
+    // have alone) - the same rounds, its own group of the list; one nobody is near any more goes
+    const u32 base = pet_base_ ? pet_base_ : 20;
+    std::vector<Vec2> want{pet_anchor_};
+    for (std::size_t k = 1; k < pet_anchors_.size(); ++k) {
+      const Vec2 a = pet_anchors_[k];
+      bool near = false;
+      for (const Vec3& m : view.mates) near = near || dist2d(a, Vec2{m.x, m.y}) <= 2500;
+      want.push_back(near ? a : Vec2{1e9f, 1e9f});
+    }
+    for (const Vec3& m : view.mates) {
+      const Vec2 mp{m.x, m.y};
+      bool covered = false;
+      for (const Vec2& a : want) covered = covered || dist2d(a, mp) <= 2500;
+      if (covered) continue;
+      const Vec2 a{std::round(mp.x / 100) * 100, std::round(mp.y / 100) * 100};
+      bool placed = false;
+      for (std::size_t k = 1; k < want.size() && !placed; ++k) if (want[k].x > 1e8f) { want[k] = a; placed = true; }
+      if (!placed && want.size() < 8) want.push_back(a);
+    }
+    while (want.size() > 1 && want.back().x > 1e8f) want.pop_back();
+    if (pets_.size() != base * want.size()) {
+      const std::size_t had = pets_.size();
+      for (std::size_t i = base * want.size(); i < had; ++i)
+        if (pets_[i].body.valid() && world_->body_valid(pets_[i].body)) world_->destroy_body(pets_[i].body);
+      pets_.resize(base * want.size());
+      for (std::size_t i = had; i < pets_.size(); ++i) pet_params(pets_[i], static_cast<u32>(i % base));
+    }
+    for (std::size_t k = 1; k < want.size() && k < pet_anchors_.size(); ++k)
+      if (dist2d(want[k], pet_anchors_[k]) > 1)
+        for (u32 i = 0; i < base; ++i) { Pet& p = pets_[k * base + i]; p.shown = false; p.has_pose = false; p.off = {}; }
+    pet_anchors_ = want;
   }
   const f32 t = static_cast<f32>(std::fmod(view.epoch, 86400.0 * 4));
   // the black cat's charge (updateCatAttack)
@@ -938,7 +974,7 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
         if (round) {
           p.off = p.off * std::exp(-dt / 5);
           const f32 a = p.phase + p.omega * t;
-          const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
+          const Vec2 q = anchor_of(i) + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
           to = {q.x, q.y, ground(view, q.x, q.y)};
           if (p.has_pose && dist2d(Vec2{q.x, q.y}, Vec2{p.pos.x, p.pos.y}) > 1e-4f) pet_net_yaw_[i] = std::atan2(q.y - p.pos.y, q.x - p.pos.x);
         }
@@ -973,7 +1009,7 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
           drop();
           p.carried = false;
           const f32 a0 = p.phase + p.omega * t;
-          const Vec2 q0 = pet_anchor_ + Vec2{std::cos(a0), std::sin(a0)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r;
+          const Vec2 q0 = anchor_of(i) + Vec2{std::cos(a0), std::sin(a0)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r;
           p.off = Vec2{q.position.x, q.position.y} - q0;
           p.has_pose = false;
         }
@@ -991,7 +1027,7 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       continue;
     }
     const f32 a = p.phase + p.omega * t;
-    const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
+    const Vec2 q = anchor_of(i) + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
     const Vec2 last{p.pos.x, p.pos.y};
     if (p.has_pose && dist2d(q, last) > 1e-4f) p.yaw = std::atan2(q.y - last.y, q.x - last.x);
     p.speed = p.has_pose && dt > 0 ? dist2d(q, last) / dt : 0;
@@ -1182,10 +1218,15 @@ void Life::set_remote_animals(bool on) {
   pet_anchor_ = {1e9f, 1e9f};
 }
 
-void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now, f32 at) {
+void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, const std::vector<NetFlock>& flocks, f32 now, f32 at) {
   if (!remote_animals_) return;
   remote_animals_at_ = now;
-  pet_anchor_ = pet_anchor;  // the host's neighbourhood: the round of every dog and cat is then the same here
+  // the host's neighbourhoods: the round of every dog and cat is then the same here
+  if (!pet_anchors.empty()) {
+    pet_anchor_ = pet_anchors[0];
+    pet_anchors_ = pet_anchors;
+    pet_base_ = std::max<u32>(1, pet_count / static_cast<u32>(pet_anchors.size()));
+  }
   // cows by key: known ones go where he has them, new ones appear, the rest go
   std::vector<Cow> next;
   for (const NetCow& n : cows) {
@@ -1219,7 +1260,7 @@ void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetP
   if (pets_.size() != pet_count) {  // (a phone host has fewer: his count, each one's round by its index)
     const std::size_t had = pets_.size();
     pets_.resize(pet_count);
-    for (std::size_t i = had; i < pets_.size(); ++i) pet_params(pets_[i], static_cast<u32>(i));
+    for (std::size_t i = had; i < pets_.size(); ++i) pet_params(pets_[i], static_cast<u32>(i) % pet_base_);
   }
   pet_net_to_.resize(pet_count);
   pet_net_yaw_.resize(pet_count, 0);

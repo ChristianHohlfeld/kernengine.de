@@ -24,6 +24,7 @@
 
 #include "game.h"
 #include "game_life.h"
+#include "mp_rules.h"
 
 namespace sc {
 
@@ -55,7 +56,7 @@ kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100,
 
 struct TossState {
   struct Own { u8 kind = 0; u64 id = 0; i32 local = -1; f32 still = 0, born = 0; u8 done_sent = 0; };
-  struct Remote { u8 from = 0, kind = 0, flags = 0; u64 id = 0; Vec3 p, v; Quat q; f32 at = 0; i32 local = -1; bool released = false; };
+  struct Remote { u8 from = 0, kind = 0, flags = 0; u64 id = 0; Vec3 p, v; Quat q; f32 at = 0; i32 local = -1; bool released = false; std::shared_ptr<mp::PoseTimeline> line; };
   std::vector<Own> own;
   std::vector<Remote> remote;
   f32 clock = 0;
@@ -144,6 +145,7 @@ void Game::toss_update(f32 dt) {
   if (t.clock >= kSendEvery && !recs.empty()) {
     t.clock = 0;
     Out o;
+    o.put(static_cast<u32>(std::lround(static_cast<f64>(now) * 1000)));  // our clock: the others play the track on it
     o.put(static_cast<u8>(std::min<std::size_t>(recs.size(), 16)));
     for (std::size_t i = 0; i < recs.size() && i < 16; ++i) {
       const Rec& r = recs[i];
@@ -159,6 +161,7 @@ void Game::toss_update(f32 dt) {
   // ---- theirs: the newest record of every toss
   for (const net::Session::Blob& m : net_.take_toss()) {
     In in{m.data};
+    const u32 t_ms = in.get<u32>();
     const u8 n = in.get<u8>();
     for (u8 k = 0; k < n && in.ok; ++k) {
       TossState::Remote r;
@@ -176,15 +179,19 @@ void Game::toss_update(f32 dt) {
       r.at = now;
       ++t.got;
       auto it = std::find_if(t.remote.begin(), t.remote.end(), [&](const TossState::Remote& q2) { return q2.from == r.from && q2.kind == r.kind && q2.id == r.id; });
-      if (it == t.remote.end()) t.remote.push_back(r);
-      else { r.local = it->local; *it = r; }
+      // the track on his clock (mp::PoseTimeline: a jitter buffer behind it, interpolated) - the
+      // body here follows the throw as he threw it, not as the packets happened to arrive
+      if (it == t.remote.end()) { r.line = std::make_shared<mp::PoseTimeline>(); r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); t.remote.push_back(r); }
+      else { r.local = it->local; r.line = it->line; r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); *it = r; }
     }
   }
   // ---- theirs: our copy of each body steered onto their track
   for (TossState::Remote& r : t.remote) {
     const bool live = !(r.flags & kDone) && now - r.at < kQuiet;
     if (r.kind == kBird) {
-      L.net_bird(r.id, r.p, std::atan2(r.q.rotate({1, 0, 0}).y, r.q.rotate({1, 0, 0}).x), r.v, live && (r.flags & kHeld));
+      Vec3 bp = r.p;
+      if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) bp = smp.p; }
+      L.net_bird(r.id, bp, std::atan2(r.q.rotate({1, 0, 0}).y, r.q.rotate({1, 0, 0}).x), r.v, live && (r.flags & kHeld));
       continue;
     }
     if (!live) continue;
@@ -211,10 +218,13 @@ void Game::toss_update(f32 dt) {
     if (!body_ok(b)) continue;
     // steering: his velocity plus a pull onto his place (a spring of ~0.1 s), the turn likewise
     const kern::physics::Pose ps = w.pose(b);
-    const Vec3 off = r.p + r.v * (now - r.at) - ps.position;
-    if (kern::length(off) > 6) { w.set_pose(b, {r.p, r.q}); w.set_linear_velocity(b, r.v); continue; }  // too far apart (a hitch): there
+    Vec3 want_p = r.p + r.v * (now - r.at);
+    Quat want_q = r.q;
+    if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) { want_p = smp.p; want_q = smp.q; } }
+    const Vec3 off = want_p - ps.position;
+    if (kern::length(off) > 6) { w.set_pose(b, {want_p, want_q}); w.set_linear_velocity(b, r.v); continue; }  // too far apart (a hitch): there
     w.set_linear_velocity(b, r.v + off * 10.0f);
-    Quat e = r.q * Quat{-ps.rotation.x, -ps.rotation.y, -ps.rotation.z, ps.rotation.w};
+    Quat e = want_q * Quat{-ps.rotation.x, -ps.rotation.y, -ps.rotation.z, ps.rotation.w};
     if (e.w < 0) e = Quat{-e.x, -e.y, -e.z, -e.w};
     w.set_angular_velocity(b, Vec3{e.x, e.y, e.z} * 2.0f * 8.0f);
     w.set_awake(b, true);

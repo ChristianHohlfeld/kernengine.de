@@ -551,6 +551,12 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   }
   C.aim_point = false;
   trigger_was_ = p.fire;
+  if (gaps_ride_car()) {
+    // seated in a mate's car: no walking or jumping, the eye low as a sitter's (crouched)
+    p.move_x = p.move_y = 0;
+    p.jump = p.boost = false;
+    p.crouch = true;
+  }
   return p;
 }
 

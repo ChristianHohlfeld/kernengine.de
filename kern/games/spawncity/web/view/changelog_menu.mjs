@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-07",time:"18:52",title:"Beifahrer sitzen, Hunde überall, Würfe ohne Haken",items:[
+    "Multiplayer: Beifahrer sitzen jetzt sichtbar im Auto (Kopf und Arme im Fenster, ihre Waffe in der Hand) und schauen auf Sitzhöhe heraus – getroffen werden sie dort, wo sie sitzen.",
+    "Multiplayer: Hunde und Katzen gibt es auch rund um weit entfernte Mitspieler – jede Nachbarschaft mit denselben Runden für alle.",
+    "Multiplayer: Geworfene Passanten, Tiere und Tauben folgen bei allen exakt der Bahn des Werfers – auch bei schwankender Verbindung ohne Haken.",
+    "Multiplayer: Auch weit entfernte Mitspieler (über 4 km vom Host) haben beim Host das echte Gelände unter ihren Autos.",
+  ]},
   {date:"2026-11-07",time:"17:56",title:"Echtes Gelände bei Mitspielern",items:[
     "Multiplayer: Unter weiter entfernten Mitspielern liegt auch beim Host das echte Gelände – Autos fahren dort über dieselben Hügel wie bei ihnen.",
     "Neuigkeiten: jedes Update steht wieder mit Datum, Uhrzeit und eigenem Titel im NEU / CHANGELOG-Menü.",

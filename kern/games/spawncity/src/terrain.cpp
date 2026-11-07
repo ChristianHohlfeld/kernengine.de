@@ -109,6 +109,7 @@ void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m) {
 struct Terrain::Job {
   Grid g;
   u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
+  bool side = false;  // a window round a far mate (host), not the player's own
 };
 
 namespace {
@@ -206,6 +207,7 @@ void Terrain::clear() {
   if (job_ && job_->id) kern::jobs::cancel(job_->id);
   job_.reset();
   grid_ = Grid{};
+  side_.clear();
   grid_ready_ = false;
   ref_ready_ = false;
   ref_height_ = 0;
@@ -272,9 +274,32 @@ f32 Terrain::sample_dem(f64 lon, f64 lat, bool& ok) const {
   return (h[0] * (1 - ax) + h[1] * ax) * (1 - ay) + (h[t.w] * (1 - ax) + h[t.w + 1] * ax) * ay;
 }
 
-void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates) {
+// Host: the elevation round a mate too far for the player's own window (8 km) - a window of his own
+// (built the same way, after the player's), so the ground under his cars and people is the real
+// one here as on his machine. Windows nobody is near any more are dropped.
+void Terrain::plan_side_dem() {
+  if (!dem_ || job_ || !grid_ready_) return;
+  auto inside = [](const Grid& g, f32 x, f32 y, f32 margin) {
+    const f32 span = g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0);
+    return x > g.x0 + margin && y > g.y0 + margin && x < g.x0 + span - margin && y < g.y0 + span - margin;
+  };
+  side_.erase(std::remove_if(side_.begin(), side_.end(), [&](const Grid& g) {
+    for (const Vec3& e : extra) if (inside(g, e.x, e.y, 0)) return false;
+    return true;
+  }), side_.end());
+  for (const Vec3& e : extra) {
+    if (inside(grid_, e.x, e.y, 700)) continue;
+    bool covered = false;
+    for (const Grid& g : side_) covered = covered || inside(g, e.x, e.y, 700);
+    if (covered || side_.size() >= 3) continue;
+    plan_dem({e.x, e.y, 0}, {e.x, e.y, 0}, false, true);
+    return;
+  }
+}
+
+void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates, bool side) {
   if (!dem_ || job_) return;
-  if (grid_ready_) {
+  if (grid_ready_ && !side) {
     // a new window when the centre moved far, or someone it must hold is near its edge
     const f32 half = kDemSize / 2 - 700;
     bool edge = std::fabs(player.x - grid_.cx) > half || std::fabs(player.y - grid_.cy) > half;
@@ -310,12 +335,13 @@ void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates) {
   }
   if (!all) return;
   // Drop tiles far from this window (memory: a z13 tile is 256 KB of floats).
-  for (auto it = dem_tiles_.begin(); it != dem_tiles_.end();) {
+  if (!side) for (auto it = dem_tiles_.begin(); it != dem_tiles_.end();) {
     const i32 x = it->second.key.x, y = it->second.key.y;
     if (x < ix0 - 1 || x > ix1 + 1 || y < iy0 - 1 || y > iy1 + 1) it = dem_tiles_.erase(it);
     else ++it;
   }
   job_ = std::make_unique<Job>();
+  job_->side = side;
   Grid& g = job_->g;
   g.step = kDemStep;
   g.n = static_cast<u32>(std::lround(kDemSize / kDemStep)) + 1;
@@ -355,6 +381,15 @@ bool Terrain::run_job(f64 deadline) {
   j.id = 0;
   if (out.size() != static_cast<std::size_t>(g.n) * g.n * 4) { job_.reset(); retry_at_ = kern::now_ms() + 1500; return true; }
   std::memcpy(g.h.data(), out.data(), out.size());
+  if (j.side) {
+    // a far mate's window: kept beside the player's; the ground there is built again from it
+    const f32 span = g.step * static_cast<f32>(g.n - 1);
+    const f32 x0 = g.x0, y0 = g.y0;
+    side_.push_back(std::move(g));
+    job_.reset();
+    dirty(x0, y0, x0 + span, y0 + span);
+    return true;
+  }
   // Commit. The reference (z = 0) is the bare earth at the world origin, fixed for this origin.
   if (!ref_ready_) {
     ref_height_ = grid_at(g, 0, 0);
@@ -386,7 +421,19 @@ f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
 // ---------------------------------------------------------------------------------------------
 // heights
 
-f32 Terrain::elevation(f32 x, f32 y) const { return grid_ready_ ? grid_at(grid_, x, y) - ref_height_ : 0.0f; }
+f32 Terrain::elevation(f32 x, f32 y) const {
+  if (!grid_ready_) return 0.0f;
+  // the player's window; outside it, a far mate's (host) where there is one
+  if (!side_.empty()) {
+    const f32 span = grid_.step * static_cast<f32>(grid_.n > 0 ? grid_.n - 1 : 0);
+    if (x < grid_.x0 || y < grid_.y0 || x > grid_.x0 + span || y > grid_.y0 + span)
+      for (const Grid& g : side_) {
+        const f32 sp = g.step * static_cast<f32>(g.n - 1);
+        if (x >= g.x0 && y >= g.y0 && x <= g.x0 + sp && y <= g.y0 + sp) return grid_at(g, x, y) - ref_height_;
+      }
+  }
+  return grid_at(grid_, x, y) - ref_height_;
+}
 
 f32 Terrain::node_height(f32 x, f32 y) const {
   const f32 e = elevation(x, y);
@@ -774,11 +821,13 @@ void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1) {
 }
 
 bool Terrain::ground_ready(f32 x, f32 y) const {
-  if (!settled_ || job_) return false;
+  if (!settled_ || (job_ && !job_->side)) return false;
   if (dem_) {
     if (!grid_ready_) return false;
-    const f32 span = grid_.step * static_cast<f32>(grid_.n > 0 ? grid_.n - 1 : 0);
-    if (x < grid_.x0 + 20 || y < grid_.y0 + 20 || x > grid_.x0 + span - 20 || y > grid_.y0 + span - 20) return false;
+    auto in = [&](const Grid& g) { const f32 span = g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0); return !(x < g.x0 + 20 || y < g.y0 + 20 || x > g.x0 + span - 20 || y > g.y0 + span - 20); };
+    bool ok = in(grid_);
+    for (const Grid& g : side_) ok = ok || in(g);
+    if (!ok) return false;
   }
   return has_collision(x, y);
 }
@@ -1123,6 +1172,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
       if (hi.x - lo.x < kDemSize - 1600 && hi.y - lo.y < kDemSize - 1600) { c = {(lo.x + hi.x) / 2, (lo.y + hi.y) / 2, focus.z}; all = true; }
     }
     plan_dem(c, focus, all);
+    if (!all) plan_side_dem();  // (mates beyond the window: their own)
   }
   plan_images(focus);
   if (job_) run_job(deadline);

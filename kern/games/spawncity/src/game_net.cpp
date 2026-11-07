@@ -19,6 +19,7 @@
 namespace sc {
 
 namespace {
+constexpr f32 kSeatDrop = 0.42f;  // a seated passenger: hips 0.5 m over the road instead of 0.92 (game_seats.cpp)
 // Body colours of the cars the players drive (by the car's colour index).
 const Vec3 kCarColors[] = {{0.85f, 0.2f, 0.15f}, {0.15f, 0.45f, 0.85f}, {0.95f, 0.75f, 0.1f}, {0.2f, 0.7f, 0.3f}, {0.7f, 0.3f, 0.8f}, {0.95f, 0.5f, 0.15f},
                            {0.1f, 0.75f, 0.75f}, {0.9f, 0.9f, 0.9f}};
@@ -265,6 +266,7 @@ net::PlayerState Game::my_state() const {
     if (gaps_ride_pose(rp, rq)) { s.position = rp; s.avatar = rp; s.rotation = rq; s.velocity = {}; s.speed = 0; }
     f |= net::kPassenger;
   }
+  if (gaps_ride_car()) f |= net::kSeated;
   s.flags = f;
   return s;
 }
@@ -544,7 +546,8 @@ i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) 
     if (r.state.mode == net::PlayerMode::foot) {
       f32 t = 2;
       mp::Zone z = mp::Zone::torso;
-      if (zones(r.person_shown, r.state.avatar_yaw, r.state.speed, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
+      const Vec3 feet = (r.state.flags & net::kSeated) ? r.person_shown - Vec3{0, 0, kSeatDrop} : r.person_shown;
+      if (zones(feet, r.state.avatar_yaw, r.state.speed, t, z) && t < best_t) { best_t = t; best = static_cast<i32>(i); best_zone = z; }
       continue;
     }
     // the drone's pilot stands where he is drawn (the remote in his hands) - he can be shot too
@@ -561,7 +564,7 @@ i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) 
     }
     // A capsule on foot (and the drone pilot), a sphere around a vehicle.
     const bool person = r.state.mode == net::PlayerMode::foot;
-    Vec3 c = person ? r.person_shown + Vec3{0, 0, 0.73f} : r.shown;
+    Vec3 c = person ? r.person_shown + Vec3{0, 0, (r.state.flags & net::kSeated) ? 0.73f - kSeatDrop : 0.73f} : r.shown;
     f32 radius = 0.45f * 1.16f;  // vs_multiplayer.mjs HITBOX_PADDING
     switch (r.state.mode) {
       case net::PlayerMode::foot: c += Vec3{0, 0, 0.2f}; break;
@@ -692,6 +695,9 @@ void Game::draw_remote_people() {
     if (r.state.mode == net::PlayerMode::foot) {
       p.pos = r.person_shown;
       p.v = r.state.speed;
+      // a passenger: seated in the car he rides in - the hips on the seat, the legs in the
+      // footwell (out of sight under the doors), head and arms where he looks and aims
+      if (r.state.flags & net::kSeated) { p.pos.z -= kSeatDrop; p.v = 0; }
       // his weapon in his hand, the arms along his aim (up / down) - a gun is always held up, the
       // fists and the knife swing; the body faces where he looks
       const weapons::Id w = static_cast<weapons::Id>(r.state.weapon);
