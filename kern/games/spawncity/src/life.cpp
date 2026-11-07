@@ -78,21 +78,23 @@ f32 Life::ring_area(const std::vector<Vec2>& r) {
   return std::fabs(a) * 0.5f;
 }
 
+// a dog's / cat's round by its index (the same on every machine)
+void Life::pet_params(Pet& p, u32 i) {
+  const u64 h = mix(0xa11a, i);
+  p.radius = 13 + 45 * hash01(h + 1);
+  p.omega = (0.55f + 0.9f * hash01(h + 2)) / p.radius;
+  p.phase = hash01(h + 3) * 2 * kPi;
+  p.wobble_omega = 0.12f + 0.18f * hash01(h + 4);
+  p.wobble_r = 1.2f + 2.3f * hash01(h + 5);
+  p.scale = 0.72f + 0.46f * hash01(h + 6);
+}
+
 void Life::init(kern::physics::World& w, bool mobile) {
   world_ = &w;
   mobile_ = mobile;
   // world_procedural_population.mjs AMBIENT_ANIMAL_COUNT, their circling paths and sizes
   pets_.assign(mobile ? 12 : 20, {});
-  for (u32 i = 0; i < pets_.size(); ++i) {
-    Pet& p = pets_[i];
-    const u64 h = mix(0xa11a, i);
-    p.radius = 13 + 45 * hash01(h + 1);
-    p.omega = (0.55f + 0.9f * hash01(h + 2)) / p.radius;
-    p.phase = hash01(h + 3) * 2 * kPi;
-    p.wobble_omega = 0.12f + 0.18f * hash01(h + 4);
-    p.wobble_r = 1.2f + 2.3f * hash01(h + 5);
-    p.scale = 0.72f + 0.46f * hash01(h + 6);
-  }
+  for (u32 i = 0; i < pets_.size(); ++i) pet_params(pets_[i], i);
   ragdolls_.init(w, mobile);
   // world_liveliness.mjs BIRD_COUNT
   const u32 n = mobile ? 10 : 16;
@@ -142,7 +144,15 @@ void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out)
 
 void Life::rebuild_herds(const LifeView& view, f32 now) {
   std::vector<CityStream::AreaRef> areas;
-  view.city->areas_near({view.focus.x, view.focus.y}, kHerdRadius, AreaKind::grass, areas);
+  // around the player and (host) around every mate: the same herds for everybody
+  std::vector<Vec3> foci{view.focus};
+  foci.insert(foci.end(), view.mates.begin(), view.mates.end());
+  for (const Vec3& f : foci) {
+    std::vector<CityStream::AreaRef> more;
+    view.city->areas_near({f.x, f.y}, kHerdRadius, AreaKind::grass, more);
+    for (const CityStream::AreaRef& a : more)
+      if (std::none_of(areas.begin(), areas.end(), [&](const CityStream::AreaRef& q) { return q.key == a.key; })) areas.push_back(a);
+  }
   struct Cand { Meadow m; f32 d; };
   std::vector<Cand> cand;
   for (const CityStream::AreaRef& a : areas) {
@@ -157,7 +167,8 @@ void Life::rebuild_herds(const LifeView& view, f32 now) {
     Vec2 c{};
     for (Vec2 p : m.rings[0]) { m.lo = {std::fmin(m.lo.x, p.x), std::fmin(m.lo.y, p.y)}; m.hi = {std::fmax(m.hi.x, p.x), std::fmax(m.hi.y, p.y)}; c = c + p; }
     m.centre = c * (1.0f / static_cast<f32>(m.rings[0].size()));
-    const f32 d = dist2d(m.centre, Vec2{view.focus.x, view.focus.y});
+    f32 d = 1e9f;
+    for (const Vec3& f : foci) d = std::fmin(d, dist2d(m.centre, Vec2{f.x, f.y}));
     if (d > kHerdRadius + std::sqrt(area)) continue;
     cand.push_back({std::move(m), d});
   }
@@ -360,10 +371,36 @@ kern::physics::Body Life::grab_animal(Vec3 at, f32 reach) {
 }
 
 void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
+  if (remote_animals_) {
+    // the host's herds: eased to his snapshots; one that is a body here (ours: in our hand, thrown,
+    // killed here) follows its body until it stands or lies again
+    for (Cow& c : cows_) {
+      const bool body = c.body.valid() && world_->body_valid(c.body);
+      if (body) {
+        const ph::Pose p = world_->pose(c.body);
+        c.pos = p.position;
+        c.rot = p.rotation;
+        if (c.carried && !c.dead) {
+          c.carried_still = kern::length(world_->linear_velocity(c.body)) < 0.35f ? c.carried_still + dt : 0;
+          if (c.carried_still > 1.0f) { world_->destroy_body(c.body); c.body = {}; c.carried = false; c.pos.z = ground(view, c.pos.x, c.pos.y); }
+        }
+        continue;
+      }
+      const Vec3 d = c.net_to - c.pos;
+      if (kern::length(d) > 8) c.pos = c.net_to;
+      else c.pos = c.pos + d * std::fmin(1.0f, dt * 6);
+      if (!c.carried && !c.net_dead) c.pos.z = ground(view, c.pos.x, c.pos.y);
+      c.rot = c.net_rot;
+      c.dead = c.net_dead;
+      c.phase += dt * (c.walking ? 3.2f : 0.0f);
+    }
+    return;
+  }
   // herds around the player (re-checked every 2 s when he moved 150 m)
   if (now - last_herd_check_ > 2) {
     last_herd_check_ = now;
-    if (dist2d(herds_for_, Vec2{view.focus.x, view.focus.y}) > 150) {
+    if (dist2d(herds_for_, Vec2{view.focus.x, view.focus.y}) > 150 || (!view.mates.empty() && now - herds_at_ > 6)) {
+      herds_at_ = now;
       herds_for_ = {view.focus.x, view.focus.y};
       rebuild_herds(view, now);
     }
@@ -552,13 +589,58 @@ void Life::spook_pigeons(f32 now) {
 }
 
 void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
+  if (remote_animals_) {
+    // the host's flocks: every bird eased to where he has it (walking, pecking, flying)
+    if (!view.birds_on) { flocks_.clear(); }
+    for (Flock& f : flocks_)
+      for (Pigeon& b : f.birds) {
+        if (b.dead_at >= 0) {
+          const f32 gz = ground(view, b.pos.x, b.pos.y);
+          if (b.pos.z > gz + 0.01f || b.fall_v.z > 0) { b.fall_v.z -= 9.81f * dt; b.pos = b.pos + b.fall_v * dt; if (b.pos.z <= gz) { b.pos.z = gz; b.fall_v = {}; } }
+          continue;
+        }
+        const Vec3 d = b.net_to - b.pos;
+        const bool moving = kern::length(d) > 0.02f;
+        if (kern::length(d) > 15) b.pos = b.net_to;
+        else b.pos = b.pos + d * std::fmin(1.0f, dt * (f.air ? 8.0f : 6.0f));
+        if (!f.air) b.pos.z = ground(view, b.pos.x, b.pos.y);
+        b.yaw += wrap_pi(b.net_yaw - b.yaw) * std::fmin(1.0f, dt * 8);
+        b.flap += dt * (f.air ? 16.0f : 0.0f);
+        b.peck += dt * (f.air ? 0.0f : moving ? 9.0f : 3.0f);
+      }
+  }
+  if (remote_animals_) {
+    for (LooseBird& b : loose_) {
+      if (b.held) continue;
+      b.t += dt;
+      b.flap += dt * 22;
+      b.vel.z += (4.0f - b.vel.z) * std::fmin(1.0f, dt * 1.5f);
+      b.pos = b.pos + b.vel * dt;
+      const f32 hs = std::hypot(b.vel.x, b.vel.y);
+      if (hs > 0.1f) b.yaw = std::atan2(b.vel.y, b.vel.x);
+    }
+    loose_.erase(std::remove_if(loose_.begin(), loose_.end(), [](const LooseBird& b) { return !b.held && b.t > 6; }), loose_.end());
+    (void)rng;
+    (void)out;
+    return;
+  }
   const Vec2 me{view.focus.x, view.focus.y};
   const u32 want = mobile_ ? 3 : 5;  // FLOCKS
-  flocks_.erase(std::remove_if(flocks_.begin(), flocks_.end(), [&](const Flock& f) { return !f.air && dist2d(f.at, me) > kDespawn; }), flocks_.end());
+  auto far_from_all = [&](Vec2 at) {
+    if (dist2d(at, me) <= kDespawn) return false;
+    for (const Vec3& m : view.mates) if (dist2d(at, Vec2{m.x, m.y}) <= kDespawn) return false;
+    return true;
+  };
+  flocks_.erase(std::remove_if(flocks_.begin(), flocks_.end(), [&](const Flock& f) { return !f.air && far_from_all(f.at); }), flocks_.end());
   if (!view.birds_on) { flocks_.clear(); return; }
-  if (flocks_.size() < want && rng.unit() < 1 - std::exp(-3 * dt)) {
+  // (host: as many again around every mate, spawned round them in turn)
+  if (flocks_.size() < want * (1 + view.mates.size()) && rng.unit() < 1 - std::exp(-3 * dt * static_cast<f32>(1 + view.mates.size()))) {
+    const u32 pick = view.mates.empty() ? 0 : rng.next() % static_cast<u32>(1 + view.mates.size());
+    const Vec2 around = pick == 0 ? me : Vec2{view.mates[pick - 1].x, view.mates[pick - 1].y};
+    u32 there = 0;
+    for (const Flock& f : flocks_) there += dist2d(f.at, around) <= kDespawn;
     Vec2 at;
-    if (spot_near(view, me, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
+    if (there < want && spot_near(view, around, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
   }
   // a pigeon let go flies off: up and away (it beats its wings), gone after 6 s
   for (LooseBird& b : loose_) {
@@ -578,6 +660,8 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     if (!f.air) {
       const f32 dp = dist2d(me, f.at);
       if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, out);
+      else if (const Vec3* mate = [&]() -> const Vec3* { for (const Vec3& m : view.mates) if (dist2d(Vec2{m.x, m.y}, f.at) < kSpookPlayer + 1.4f) return &m; return nullptr; }())
+        spook(f, {mate->x, mate->y}, now, rng, view, out);  // a mate walking up to them (host: his flocks are everybody's)
       else
         for (const LifeCar& c : view.cars)
           if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, out); break; }
@@ -842,6 +926,33 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       p.body = {};
     };
     if (!allowed) { drop(); p.shown = false; p.dead_at = -1; continue; }
+    if (remote_animals_ && !(p.body.valid() && world_->body_valid(p.body))) {
+      // the host's dog / cat: eased to his snapshots (a body here is ours: below)
+      if (i < pet_net_to_.size()) {
+        Vec3 to = pet_net_to_[i];
+        // walking its round: the round is the wall clock's (the host's anchor, the same epoch) - so
+        // here exactly where it is there, not where his last snapshot had it
+        const bool round = p.shown && p.dead_at < 0 && !p.carried && !(cat_.on && i == 1);
+        if (round) {
+          p.off = p.off * std::exp(-dt / 5);
+          const f32 a = p.phase + p.omega * t;
+          const Vec2 q = pet_anchor_ + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
+          to = {q.x, q.y, ground(view, q.x, q.y)};
+          if (p.has_pose && dist2d(Vec2{q.x, q.y}, Vec2{p.pos.x, p.pos.y}) > 1e-4f) pet_net_yaw_[i] = std::atan2(q.y - p.pos.y, q.x - p.pos.x);
+        }
+        const Vec3 d = to - p.pos;
+        const Vec2 last{p.pos.x, p.pos.y};
+        if (!p.has_pose || kern::length(d) > 6 || round) p.pos = to;
+        else p.pos = p.pos + d * std::fmin(1.0f, dt * 7);
+        if (!p.carried && p.dead_at < 0) p.pos.z = ground(view, p.pos.x, p.pos.y);
+        p.yaw += wrap_pi(pet_net_yaw_[i] - p.yaw) * std::fmin(1.0f, dt * 8);
+        if (p.has_pose && dt > 0) p.speed = std::fmin(6.0f, dist2d(Vec2{p.pos.x, p.pos.y}, last) / dt);
+        p.gait += p.speed * dt / (0.55f * p.scale);
+        p.rot = p.net_rot;
+        p.has_pose = true;
+      }
+      continue;
+    }
     if (p.dead_at >= 0) {
       // a dead animal is gone after a while (25 s); another wanders in later
       if (now - p.dead_at > 25) { drop(); p.dead_at = -1; p.shown = false; p.has_pose = false; continue; }
@@ -1047,6 +1158,129 @@ void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* al
     r.yaw = yaw[i];
   }
   remote_joggers_at_ = now;
+}
+
+// ---------------------------------------------------------------------------------------------
+// the host's animals (MP client) and thrown ones (game_toss.cpp)
+
+void Life::set_remote_animals(bool on) {
+  if (on == remote_animals_) return;
+  remote_animals_ = on;
+  // the other world's animals go (bodies too); the next snapshot / our own spawning brings them
+  for (Cow& c : cows_) if (c.body.valid() && world_->body_valid(c.body)) world_->destroy_body(c.body);
+  for (Pet& p : pets_) if (p.body.valid() && world_->body_valid(p.body)) world_->destroy_body(p.body);
+  cows_.clear();
+  meadows_.clear();
+  flocks_.clear();
+  for (Pet& p : pets_) { p.body = {}; p.shown = false; p.has_pose = false; p.carried = false; p.dead_at = -1; }
+  herds_for_ = {1e9f, 1e9f};
+  pet_anchor_ = {1e9f, 1e9f};
+}
+
+void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now) {
+  if (!remote_animals_) return;
+  remote_animals_at_ = now;
+  pet_anchor_ = pet_anchor;  // the host's neighbourhood: the round of every dog and cat is then the same here
+  // cows by key: known ones go where he has them, new ones appear, the rest go
+  std::vector<Cow> next;
+  for (const NetCow& n : cows) {
+    auto old = std::find_if(cows_.begin(), cows_.end(), [&](const Cow& x) { return x.key == n.key; });
+    Cow c;
+    if (old != cows_.end()) { c = *old; old->body = {}; }
+    else {
+      c.key = n.key;
+      c.color = rgb(kCoats[static_cast<u32>(hash01(mix(n.key, 7)) * 5) % 5]);
+      c.phase = hash01(n.key) * 6;
+      c.pos = n.pos;
+      c.yaw = n.yaw;
+      c.next_moo = now + 8 + hash01(mix(n.key, 9)) * 30;
+    }
+    const bool mine = c.body.valid() && world_->body_valid(c.body);
+    if (!mine) {
+      c.net_to = n.pos;
+      c.net_rot = n.rot;
+      c.net_dead = n.dead;
+      c.walking = n.walking;
+      c.carried = n.carried;
+      c.yaw += wrap_pi(n.yaw - c.yaw);
+    }
+    next.push_back(c);
+  }
+  for (Cow& c : cows_) if (c.body.valid() && world_->body_valid(c.body)) world_->destroy_body(c.body);
+  cows_ = std::move(next);
+  // dogs and cats by his index (his count: the species of an index is the same everywhere)
+  if (pets_.size() != pet_count) {  // (a phone host has fewer: his count, each one's round by its index)
+    const std::size_t had = pets_.size();
+    pets_.resize(pet_count);
+    for (std::size_t i = had; i < pets_.size(); ++i) pet_params(pets_[i], static_cast<u32>(i));
+  }
+  pet_net_to_.resize(pet_count);
+  pet_net_yaw_.resize(pet_count, 0);
+  std::vector<bool> seen(pet_count, false);
+  for (const NetPet& n : pets) {
+    if (n.idx >= pet_count) continue;
+    seen[n.idx] = true;
+    Pet& p = pets_[n.idx];
+    if (p.body.valid() && world_->body_valid(p.body)) continue;  // ours right now
+    pet_net_to_[n.idx] = n.pos;
+    pet_net_yaw_[n.idx] = n.yaw;
+    p.off = n.off;
+    p.net_rot = n.rot;
+    p.shown = n.shown;
+    p.carried = n.carried;
+    if (n.dead && p.dead_at < 0) p.dead_at = now;
+    if (!n.dead) p.dead_at = -1;
+  }
+  for (u32 i = 0; i < pet_count; ++i)
+    if (!seen[i] && !(pets_[i].body.valid() && world_->body_valid(pets_[i].body))) { pets_[i].shown = false; pets_[i].has_pose = false; }
+  // pigeon flocks by his index, every bird
+  if (flocks_.size() != flocks.size()) flocks_.resize(flocks.size());
+  for (std::size_t i = 0; i < flocks.size(); ++i) {
+    const NetFlock& n = flocks[i];
+    Flock& f = flocks_[i];
+    f.air = n.air;
+    f.at = n.at;
+    if (f.birds.size() != n.birds.size()) {
+      f.birds.resize(n.birds.size());
+      for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].pos = n.birds[k]; f.birds[k].yaw = n.yaws[k]; f.birds[k].dead_at = -1; f.birds[k].peck = static_cast<f32>(k) * 1.7f; }
+    }
+    for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].net_to = n.birds[k]; f.birds[k].net_yaw = n.yaws[k]; }
+  }
+}
+
+kern::physics::Body Life::net_carry_cow(u64 key) {
+  for (Cow& c : cows_) {
+    if (c.key != key || c.dead) continue;
+    if (c.body.valid() && world_->body_valid(c.body)) return c.body;
+    return grab_animal(c.pos + Vec3{0, 0, 1.1f}, 0.05f);
+  }
+  return {};
+}
+
+kern::physics::Body Life::net_carry_pet(u32 index) {
+  if (index >= pets_.size()) return {};
+  Pet& p = pets_[index];
+  if (p.dead_at >= 0) return {};
+  if (p.body.valid() && world_->body_valid(p.body)) return p.body;
+  if (!p.shown) { p.shown = true; }
+  return grab_animal(p.pos + Vec3{0, 0, 0.3f * p.scale}, 0.05f);
+}
+
+void Life::net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held) {
+  for (LooseBird& b : loose_)
+    if (b.net == key) {
+      if (held) { b.pos = at; b.yaw = yaw; b.held = true; b.flap += 0.9f; }
+      else if (b.held) { b.held = false; b.t = 0; b.pos = at; b.vel = vel + Vec3{0, 0, 2.5f}; }
+      return;
+    }
+  LooseBird lb;
+  lb.id = -static_cast<i32>(++loose_serial_);
+  lb.net = key;
+  lb.pos = at;
+  lb.yaw = yaw;
+  lb.held = held;
+  if (!held) lb.vel = vel + Vec3{0, 0, 2.5f};
+  loose_.push_back(lb);
 }
 
 void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {

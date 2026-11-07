@@ -48,6 +48,7 @@ namespace sc {
 
 struct MpLocal;  // multiplayer presentation state (game_net.cpp)
 struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
+struct TossState;    // thrown things in a session (game_toss.cpp)
 struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
@@ -207,6 +208,15 @@ class Game {
   std::string dsync_json();
   DestroySync& dsync();
   std::shared_ptr<DestroySync> dsync_;
+  // thrown things (game_toss.cpp): what our hand takes flies on every machine
+  void toss_update(f32 dt);
+  void toss_own(u8 kind, i32 local, u64 id);
+  void toss_own_body(kern::physics::Body b);
+  std::string toss_json();
+  std::string toss_command(const std::string& cmd);
+  i32 toss_test_ = -1;
+  TossState& toss();
+  std::shared_ptr<TossState> toss_;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;

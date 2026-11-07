@@ -176,6 +176,7 @@ void Game::life_update(f32 dt) {
   v.epoch = static_cast<f64>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0;
   const Vec3 pv = mode_ == Mode::foot ? world_->actor_velocity(soldier_) : Vec3{};
   v.player_speed = std::hypot(pv.x, pv.y);
+  if (net_.hosting()) v.mates = mate_foci();  // his herds and flocks reach every mate (game_worldsync.cpp)
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
     if (!c.placed || !world_->actor_alive(c.actor)) continue;

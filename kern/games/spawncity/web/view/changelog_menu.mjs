@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: Tiere sind für alle dieselben – Kühe, Hunde, Katzen und jeder einzelne Tauben-Schwarm kommen vom Host (Hunde und Katzen laufen ihre Runde nach derselben Uhr, also exakt gleich), auch rund um weit entfernte Mitspieler.",
+    "Multiplayer: Was einer packt und wirft – Passanten, Hunde, Katzen, Kühe, Tauben –, fliegt auf allen Geräten mit Physik dieselbe Bahn: der Werfer besitzt den Körper, bis er still liegt, die anderen steuern ihre Kopie auf seine Spur.",
     "Multiplayer: Eine zerstörte Stadt für alle – Krater (Boden, Kollision und Straßen darauf) und Gebäudeschäden sind der Zustand des Hosts und auf jedem Gerät gleich, auch in gerade nicht geladenen Vierteln und für Spieler, die später dazukommen; eine Prüfsumme gleicht Abweichungen automatisch ab, RESET setzt die Stadt überall zurück.",
     "Multiplayer: Neue Mitspieler-Anzeige – im Blick ein Schild über dem Kopf (Name, Entfernung, ▲/▼ wie viel höher oder tiefer), außer Sicht ein großes Abzeichen am Rand mit Pfeil zu ihm, Entfernung und LINKS / RECHTS / HINTER DIR / ÜBER DIR / UNTER DIR – für jeden Mitspieler.",
     "Sprachchat: Mikrofon- und Lautsprecher-Knopf zeigen klar, ob sie an sind (grün leuchtend) oder aus (dunkel, durchgestrichen); die Mikrofon-Freigabe wird direkt beim Tippen gefragt – in VR schon beim Betreten der Brille, im VR-Menü gibt es MIKROFON AN/AUS; wird es verweigert, sagt das Spiel es.",

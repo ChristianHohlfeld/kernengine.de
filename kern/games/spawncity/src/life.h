@@ -35,6 +35,7 @@ struct LifeView {
   f32 player_speed = 0;
   bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
   std::vector<LifeCar> cars;
+  std::vector<Vec3> mates;  // MP host: where the other players are (herds and flocks there too: one world)
 };
 
 /// What the game should do for street life this frame.
@@ -71,8 +72,11 @@ class Life {
     bool dead = false, walking = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
     f32 carried_still = 0;
     kern::physics::Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
+    Vec3 net_to;               // MP client: where the host has it
+    Quat net_rot;
+    bool net_dead = false;
   };
-  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; };
+  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; Vec3 net_to; f32 net_yaw = 0; };
   struct Flock {
     bool air = false;
     Vec2 at;
@@ -106,6 +110,7 @@ class Life {
     Vec3 color;
     kern::physics::Body body;  // the dead animal
     Quat rot;
+    Quat net_rot;  // MP client: the host's carried / dead pose
   };
   struct CatAttack { bool on = false; i32 phase = 0; Vec3 p, from; f32 yaw = 0, start = 0, leap_at = 0, last_cry = -9, away_yaw = 0, leave_at = 0; i32 cries = 0; };
   struct Voice { Vec3 at; std::string text, mood; f32 until; };
@@ -150,6 +155,34 @@ class Life {
   /// eased to where his snapshots have them; none heard for 1.5 s: gone.
   void set_remote_joggers(bool on) { if (on != remote_joggers_) { remote_joggers_ = on; chain_alive_ = false; } }
   void apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now);
+  /// MP client: the animals are the host's too (game_worldsync.cpp): no herds, pets or flocks of
+  /// our own; his cows (by key - the same on every machine), dogs and cats (by his index) and
+  /// pigeon flocks (by his index) eased to where his snapshots have them. An animal that is a
+  /// body here (in our hand, thrown by us, killed here) is ours until it stands or lies again.
+  struct NetCow { u64 key = 0; Vec3 pos; Quat rot; f32 yaw = 0; bool dead = false, walking = false, carried = false; };
+  struct NetPet { u8 idx = 0; Vec3 pos; Quat rot; f32 yaw = 0, speed = 0; Vec2 off; bool shown = false, dead = false, carried = false; };
+  struct NetFlock { u8 idx = 0; bool air = false; Vec2 at; std::vector<Vec3> birds; std::vector<f32> yaws; };
+  /// Which animal a body is (a carried / thrown one): 1 a cow (id: its key), 2 a dog or cat (id:
+  /// its index); 0 none.
+  u8 animal_of(kern::physics::Body b, u64& id) const {
+    for (const Cow& c : cows_) if (c.body == b && b.valid()) { id = c.key; return 1; }
+    for (std::size_t i = 0; i < pets_.size(); ++i) if (pets_[i].body == b && b.valid()) { id = i; return 2; }
+    return 0;
+  }
+  kern::physics::Body cow_body(u64 key) const { for (const Cow& c : cows_) if (c.key == key) return c.body; return {}; }
+  kern::physics::Body pet_body(u32 i) const { return i < pets_.size() ? pets_[i].body : kern::physics::Body{}; }
+  void set_remote_animals(bool on);
+  bool remote_animals() const { return remote_animals_; }
+  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now);
+  Vec2 pet_anchor() const { return pet_anchor_; }
+  /// Thrown things (game_toss.cpp): the body of an animal another player throws, made here so
+  /// it flies here too (the host's cow by key / pet by index); invalid when there is none.
+  kern::physics::Body net_carry_cow(u64 key);
+  kern::physics::Body net_carry_pet(u32 index);
+  /// A pigeon in another player's hand / let go by him (`key` his and the bird's): drawn here.
+  void net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held);
+  /// A dog or cat killed on a client: the host's dies too (and every snapshot says so).
+  void net_kill_pet(u32 index, Vec3 dir, f32 now, LifeOut& out) { if (index < pets_.size() && pets_[index].dead_at < 0) kill_pet(index, dir, now, out); }
   const std::vector<Voice>& voices() const { return voices_; }
   u32 cow_hits() const { return cow_hits_; }
   u32 bird_hits() const { return bird_hits_; }
@@ -175,11 +208,16 @@ class Life {
   void hold_pigeon(i32 id, Vec3 at, f32 yaw);
   /// Let go: it flies off from there, with the hand's throw.
   void release_pigeon(i32 id, Vec3 velocity);
-  struct LooseBird { i32 id = 0; Vec3 pos, vel; f32 yaw = 0, flap = 0, t = 0; bool held = true; };
+  struct LooseBird { i32 id = 0; Vec3 pos, vel; f32 yaw = 0, flap = 0, t = 0; bool held = true; u64 net = 0; };
   const std::vector<LooseBird>& loose_birds() const { return loose_; }
  private:
   std::vector<LooseBird> loose_;
   i32 loose_serial_ = 0;
+  bool remote_animals_ = false;
+  f32 remote_animals_at_ = -9;
+  std::vector<Vec3> pet_net_to_;
+  std::vector<f32> pet_net_yaw_;
+  std::vector<u64> loose_keys_;  // net_bird: whose loose bird (0: ours)
   bool remote_joggers_ = false;
   f32 remote_joggers_at_ = -9;
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
@@ -196,6 +234,7 @@ class Life {
   void update_trees(const LifeView& view, f32 now);
   void update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out);
   void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);
+  static void pet_params(Pet& p, u32 i);
   void update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
   void kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out);
   Vec3 sample(f32 s, f32& yaw, Vec2& normal) const;
@@ -208,7 +247,7 @@ class Life {
   std::vector<Cow> cows_;
   std::vector<u64> dead_cows_;
   Vec2 herds_for_{1e9f, 1e9f};
-  f32 last_herd_check_ = -99, last_moo_ = -99;
+  f32 last_herd_check_ = -99, last_moo_ = -99, herds_at_ = -99;
   std::vector<Flock> flocks_;
   u32 trees_down_ = 0, tree_ground_cursor_ = 0;
   std::vector<Bird> birds_;

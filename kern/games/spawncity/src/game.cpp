@@ -913,6 +913,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     worldsync_update(dt);  // one world in multiplayer (game_worldsync.cpp)
     dsync_update(dt);  // one destroyed city in multiplayer (game_destruction_sync.cpp)
+    toss_update(dt);   // thrown people and animals fly on every machine (game_toss.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
     {
       // the elevation ahead of a fast flight (terrain.h lead)
@@ -1453,6 +1454,7 @@ std::string Game::command(const std::string& cmd) {
     return b;
   }
   if (cmd == "destroy sync") return dsync_json();
+  if (cmd.rfind("toss", 0) == 0) return toss_command(cmd);
   if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera

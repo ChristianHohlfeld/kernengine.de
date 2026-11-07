@@ -16,14 +16,16 @@
 //    lower (a merge takes the lowest anybody saw), so whatever order the reports come in, every
 //    machine ends at the same city; a building not loaded here keeps its damage for when its tile
 //    streams in (CityStream::merge_damage)
-//  * changes go as deltas (reliable), a joiner gets the whole state, and every 2 s a digest (a
-//    hash of the craters and the damage) lets a client that drifted ask for the whole again
+//  * changes go as deltas (reliable, ordered), a joiner gets the whole state; every 2 s the host
+//    sends a digest (a hash of the craters and the damage) - a check that the cities ARE equal
+//    (a differing one is a defect, reported), not a repair
 //  * RESET is an epoch: the host's next epoch clears the city on every machine
 // Debris, dust, soot and scorch stay effects (every machine draws them from the blast it hears).
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include "game.h"
@@ -112,6 +114,7 @@ struct DestroySync {
   Points pts_out;
   std::vector<u8> known;         // host: the slots that have the whole state
   u32 mismatches = 0;
+  f32 told_at = -99;              // client: when our last edit went (its echo may not be back yet)
   bool was_active = false, hosting = false;
   u32 sent_states = 0, got_states = 0, asks = 0;
 };
@@ -209,17 +212,12 @@ void Game::dsync_update(f32 dt) {
       terrain.crater_list(c);
       Damage dm;
       city_.damage_list(dm);
-      // a drift (or another epoch): twice in a row, then the whole state again
-      if (epoch != d.epoch || digest_of(c, dm) != theirs) {
-        if (++d.mismatches >= 2 && d.mine.empty() && d.dmg_out.empty()) {
-          Out o;
-          o.put(kAsk).put(d.epoch);
-          net_.destroy_to_host(o.b);
-          d.mismatches = 0;
-          ++d.asks;
-        }
-      } else {
-        d.mismatches = 0;
+      // the check, not a repair: the protocol keeps the cities equal by construction (one
+      // authority, reliable ordered deltas, merges that only ever lower, the whole state for a
+      // joiner and with every epoch) - a differing digest while nothing of ours is in flight is a
+      // defect, counted and logged so it is seen (`destroy sync`), never papered over
+      if (epoch == d.epoch && d.mine.empty() && d.dmg_out.empty() && d.pts_out.empty() && now - d.told_at > 1.0f && digest_of(c, dm) != theirs) {
+        if (++d.mismatches == 1 || d.mismatches % 30 == 0) std::fprintf(stderr, "[spawncity] destruction digest differs from the host's (%u)\n", d.mismatches);
       }
       continue;
     }
@@ -309,6 +307,7 @@ void Game::dsync_update(f32 dt) {
   put_damage(o, d.dmg_out, 0, nd);
   put_points(o, d.pts_out, 0, np);
   net_.destroy_to_host(o.b);
+  d.told_at = now;
   for (DestroySync::Mine& q : d.mine) q.told = true;
   d.dmg_out.erase(d.dmg_out.begin(), d.dmg_out.begin() + static_cast<std::ptrdiff_t>(nd));
   d.pts_out.erase(d.pts_out.begin(), d.pts_out.begin() + static_cast<std::ptrdiff_t>(np));
@@ -321,8 +320,8 @@ std::string Game::dsync_json() {
   Damage dm;
   city_.damage_list(dm);
   char b[256];
-  std::snprintf(b, sizeof b, "{\"epoch\":%u,\"craters\":%zu,\"damaged\":%zu,\"digest\":%u,\"sent\":%u,\"got\":%u,\"asks\":%u,\"pending\":%zu}", d.epoch, c.size(), dm.size(),
-                digest_of(c, dm), d.sent_states, d.got_states, d.asks, d.mine.size());
+  std::snprintf(b, sizeof b, "{\"epoch\":%u,\"craters\":%zu,\"damaged\":%zu,\"digest\":%u,\"sent\":%u,\"got\":%u,\"asks\":%u,\"pending\":%zu,\"mismatches\":%u}", d.epoch, c.size(), dm.size(),
+                digest_of(c, dm), d.sent_states, d.got_states, d.asks, d.mine.size(), d.mismatches);
   return b;
 }
 

@@ -36,7 +36,7 @@ inline f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 constexpr f32 kSendEvery = 0.2f;     // s between two snapshots of the host's cars
 constexpr f32 kPeopleEvery = 0.4f;   // ... of his citizens and joggers
 constexpr f32 kReach = 200;          // m around a mate: what he can see of the street life
-constexpr u8 kCars = 1, kPeople = 2, kJoggers = 3;
+constexpr u8 kCars = 1, kPeople = 2, kJoggers = 3, kAnimals = 4;
 
 struct Wr {
   std::vector<u8> b;
@@ -190,6 +190,64 @@ void Game::worldsync_update(f32 dt) {
       }
       pw.b[1] = static_cast<u8>(m | 0x80);
       if (m > 0) net_.send_world(pw.b);
+      // the animals: the cows near a mate (by key), every dog and cat (by index), every flock with
+      // its birds - the clients' are these (Life::apply_animals)
+      if (glife_) {
+        const Life& L = glife_->life;
+        Wr aw;
+        aw.put(kAnimals);
+        aw.put<u8>(0x80);
+        aw.put(o.x); aw.put(o.y);
+        auto quat = [&](const Quat& q) { aw.put(q16(q.x)); aw.put(q16(q.y)); aw.put(q16(q.z)); aw.put(q16(q.w)); };
+        std::vector<const Life::Cow*> cows;
+        for (const Life::Cow& c : L.cows()) if (near_mate(c.pos) && cows.size() < 40) cows.push_back(&c);
+        aw.put(static_cast<u8>(cows.size()));
+        for (const Life::Cow* c : cows) {
+          aw.put(c->key);
+          aw.put(dm(c->pos.x, o.x)); aw.put(dm(c->pos.y, o.y)); aw.put(dm(c->pos.z, 0));
+          aw.put(ang8(c->yaw));
+          const u8 fl = static_cast<u8>((c->dead ? 1 : 0) | (c->walking ? 2 : 0) | (c->carried ? 4 : 0));
+          aw.put(fl);
+          if (fl & 5) quat(c->rot);
+        }
+        const auto& pets = L.pets();
+        aw.put(L.pet_anchor().x); aw.put(L.pet_anchor().y);
+        aw.put(static_cast<u8>(std::min<std::size_t>(pets.size(), 255)));
+        u8 np = 0;
+        const std::size_t np_at = aw.b.size();
+        aw.put<u8>(0);
+        for (std::size_t i = 0; i < pets.size() && i < 255; ++i) {
+          const Life::Pet& p = pets[i];
+          if (!p.shown && p.dead_at < 0) continue;
+          aw.put(static_cast<u8>(i));
+          aw.put(dm(p.pos.x, o.x)); aw.put(dm(p.pos.y, o.y)); aw.put(dm(p.pos.z, 0));
+          aw.put(ang8(p.yaw));
+          aw.put(dm(p.off.x, 0)); aw.put(dm(p.off.y, 0));
+          const u8 fl = static_cast<u8>((p.shown ? 1 : 0) | (p.dead_at >= 0 ? 2 : 0) | (p.carried ? 4 : 0));
+          aw.put(fl);
+          if (fl & 6) quat(p.rot);
+          ++np;
+        }
+        aw.b[np_at] = np;
+        const auto& flocks = L.flocks();
+        aw.put(static_cast<u8>(std::min<std::size_t>(flocks.size(), 24)));
+        for (std::size_t i = 0; i < flocks.size() && i < 24; ++i) {
+          const Life::Flock& f = flocks[i];
+          aw.put(static_cast<u8>(f.air ? 1 : 0));
+          aw.put(dm(f.at.x, o.x)); aw.put(dm(f.at.y, o.y));
+          u8 nb = 0;
+          for (const Life::Pigeon& b : f.birds) nb += b.dead_at < 0 && nb < 20;
+          aw.put(nb);
+          u8 k = 0;
+          for (const Life::Pigeon& b : f.birds) {
+            if (b.dead_at >= 0 || k >= nb) continue;
+            aw.put(dm(b.pos.x, o.x)); aw.put(dm(b.pos.y, o.y)); aw.put(dm(b.pos.z, 0));
+            aw.put(ang8(b.yaw));
+            ++k;
+          }
+        }
+        net_.send_world(aw.b);
+      }
       // the running club (jogger_chain.mjs): its id and its runners, when it runs near a mate
       if (glife_) {
         const Life::Chain* ch = glife_->life.chain();
@@ -218,6 +276,7 @@ void Game::worldsync_update(f32 dt) {
     puppet_world_ = puppet;
     people_.set_puppets(puppet);
     if (glife_) glife_->life.set_remote_joggers(puppet);
+    if (glife_) glife_->life.set_remote_animals(puppet);
     car_net_.assign(cars_.size(), -1);
     for (std::size_t i = 0; i < cars_.size(); ++i) {
       TrafficCar& c = cars_[i];
@@ -298,6 +357,52 @@ void Game::worldsync_update(f32 dt) {
         }
         seen.assign(cars_.size(), false);
       }
+    } else if (type == kAnimals) {
+      auto quat = [&]() { Quat q; q.x = uq16(r.get<i16>()); q.y = uq16(r.get<i16>()); q.z = uq16(r.get<i16>()); q.w = uq16(r.get<i16>()); const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); if (l > 1e-6f) { q.x /= l; q.y /= l; q.z /= l; q.w /= l; } else q = Quat{}; return q; };
+      std::vector<Life::NetCow> cows;
+      const u8 nc = r.get<u8>();
+      for (u8 k = 0; k < nc && r.ok; ++k) {
+        Life::NetCow c;
+        c.key = r.get<u64>();
+        c.pos.x = ox + r.get<i16>() / 10.0f; c.pos.y = oy + r.get<i16>() / 10.0f; c.pos.z = r.get<i16>() / 10.0f;
+        c.yaw = un8(r.get<u8>());
+        const u8 fl = r.get<u8>();
+        c.dead = fl & 1; c.walking = fl & 2; c.carried = fl & 4;
+        c.rot = (fl & 5) ? quat() : Quat::axis_angle({0, 0, 1}, c.yaw);
+        cows.push_back(c);
+      }
+      Vec2 anchor;
+      anchor.x = r.get<f32>(); anchor.y = r.get<f32>();
+      const u8 pet_count = r.get<u8>(), npets = r.get<u8>();
+      std::vector<Life::NetPet> pets;
+      for (u8 k = 0; k < npets && r.ok; ++k) {
+        Life::NetPet p;
+        p.idx = r.get<u8>();
+        p.pos.x = ox + r.get<i16>() / 10.0f; p.pos.y = oy + r.get<i16>() / 10.0f; p.pos.z = r.get<i16>() / 10.0f;
+        p.yaw = un8(r.get<u8>());
+        p.off.x = r.get<i16>() / 10.0f; p.off.y = r.get<i16>() / 10.0f;
+        const u8 fl = r.get<u8>();
+        p.shown = fl & 1; p.dead = fl & 2; p.carried = fl & 4;
+        p.rot = (fl & 6) ? quat() : Quat::axis_angle({0, 0, 1}, p.yaw);
+        pets.push_back(p);
+      }
+      std::vector<Life::NetFlock> flocks;
+      const u8 nf = r.get<u8>();
+      for (u8 k = 0; k < nf && r.ok; ++k) {
+        Life::NetFlock f;
+        f.idx = k;
+        f.air = r.get<u8>() != 0;
+        f.at.x = ox + r.get<i16>() / 10.0f; f.at.y = oy + r.get<i16>() / 10.0f;
+        const u8 nb = r.get<u8>();
+        for (u8 j = 0; j < nb && r.ok; ++j) {
+          Vec3 b;
+          b.x = ox + r.get<i16>() / 10.0f; b.y = oy + r.get<i16>() / 10.0f; b.z = r.get<i16>() / 10.0f;
+          f.birds.push_back(b);
+          f.yaws.push_back(un8(r.get<u8>()));
+        }
+        flocks.push_back(std::move(f));
+      }
+      if (r.ok && glife_) glife_->life.apply_animals(cows, pets, pet_count, anchor, flocks, now);
     } else if (type == kJoggers) {
       const u32 id = r.get<u32>();
       Vec3 pos[10];
