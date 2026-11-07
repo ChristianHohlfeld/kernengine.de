@@ -257,6 +257,7 @@ export class MpPublicNet {
 
 // ---- the multiplayer page parts ------------------------------------------------------------------
 const MP_CSS = `
+#mpChoose{position:fixed;inset:0;z-index:2147480000;display:flex;align-items:center;justify-content:center;background:#05080ccc;font-family:Inter,system-ui,sans-serif}#mpChoose>div{display:flex;flex-direction:column;gap:10px;width:min(92vw,420px);padding:16px;border-radius:14px;background:#0f151d;border:1px solid #ffffff2e;color:#eaf4ff}#mpChoose b{letter-spacing:.14em;font-size:15px}#mpChoose button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px 14px;border-radius:11px;border:1px solid #7fd3ff66;background:#ffffff0d;color:#eaf4ff;text-align:left;cursor:pointer;font:inherit}#mpChoose button strong{font:900 15px/1.1 system-ui;letter-spacing:.06em}#mpChoose button small{opacity:.75;font:600 12px/1.3 system-ui}#mpChoose button.x{align-items:center;border-color:#ffffff33;font:800 12px system-ui;letter-spacing:.14em}
 #mpHud{position:fixed;inset:0;pointer-events:none;z-index:5;font-family:Inter,system-ui,sans-serif;color:#fff}
 /* the mates (vs_multiplayer.mjs renderMarker, redone): in view a plate over his head - name, distance,
    above / below - with a caret on him; out of view a badge at the edge with a big arrow toward him,
@@ -412,6 +413,7 @@ export class MpPage {
     }
     this.hosting = !r.host;
     this.command(this.hosting ? `net host ${r.self}` : `net join ${r.self} ${r.host}`);
+    this.command(`net public ${this.kind === "public" && room === MP_LOBBY ? 1 : 0}`);  // the public lobby: no real places
     window.SpawnCityNet = this.net;
   }
   /** lan_vs.mjs authority handover: the host left; the game says who takes over (1: we, 2: another). */
@@ -471,17 +473,45 @@ export class MpPage {
     this.params = u.searchParams;
     if (st === "error") this.goMulti();
   }
-  goMulti() {
-    // MULTI (lan_vs.mjs): into the one public lobby - join it, or host it when nobody is there -
-    // right here, the game goes on (no reload: a reload threw the player back to the title)
+  /** MULTI: with friends (a private room of your own, at your place, a link to send) or the public
+   *  lobby (strangers: in the day's city, never at your real place, their voices muted at first). */
+  chooseMulti() {
     if (this.net || this.connecting) return;
+    if (document.getElementById("mpChoose")) return;
+    const box = document.createElement("div"); box.id = "mpChoose";
+    box.innerHTML = `<div><b>MULTIPLAYER</b>
+      <button data-c="friends"><strong>👥 MIT FREUNDEN</strong><small>Eigener Raum an deinem Ort – du schickst den Link</small></button>
+      <button data-c="public"><strong>🌍 ÖFFENTLICH</strong><small>Mit allen – in einer bekannten Stadt, dein Standort bleibt privat</small></button>
+      <button data-c="close" class="x">ABBRECHEN</button></div>`;
+    box.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
+    box.addEventListener("click", ev => {
+      ev.stopPropagation();
+      const c = ev.target.closest("[data-c]")?.dataset.c;
+      if (!c) return;
+      box.remove();
+      if (c !== "close") this.goMulti(c);
+    });
+    document.body.appendChild(box);
+  }
+  goMulti(kind = "") {
+    // MULTI (lan_vs.mjs): right here, the game goes on (no reload: a reload threw the player back
+    // to the title). Without a choice yet: ask (friends or public); VR takes the public lobby.
+    if (this.net || this.connecting) return;
+    if (!kind) { this.chooseMulti(); return; }
     this.failed = "";
+    const friends = kind === "friends";
+    const roomId = friends ? "f-" + Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36).padStart(2, "0")).join("").slice(0, 8) : MP_LOBBY;
     const u = new URL(location.href);
-    u.searchParams.set("mp", "auto"); u.searchParams.set("net", "public"); u.searchParams.set("room", MP_LOBBY);
+    u.searchParams.set("mp", friends ? "host" : "auto"); u.searchParams.set("net", "public"); u.searchParams.set("room", roomId);
     try { history.replaceState(history.state, "", u.href); } catch { /* the address stays */ }
     this.params = u.searchParams;
     this.connecting = true;
-    this.connect(this.KernNet).then(() => { this.openedAt = performance.now(); if (!this.net) this.failed = "Mehrspieler nicht verfügbar · tippen = neu versuchen"; })
+    this.connect(this.KernNet).then(() => {
+      this.openedAt = performance.now();
+      if (!this.net) { this.failed = "Mehrspieler nicht verfügbar · tippen = neu versuchen"; return; }
+      this.command(`net public ${friends ? 0 : 1}`);
+      if (friends) this.showShare();  // the link for the friends right away
+    })
       .catch(err => { this.failed = "Fehler: " + (err?.message || err); }).finally(() => { this.connecting = false; });
   }
   showShare() {

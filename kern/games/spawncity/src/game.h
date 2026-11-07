@@ -304,6 +304,7 @@ class Game {
   void net_world_rules();
   bool world_rule_locked(Opt o) const;
   bool voice_mic_on() const;
+  bool public_lobby() const;
   std::string world_rules_json() const;
   /// A shot or blast against the other players: their machines apply the damage.
   /// melee: a blow (no round, no tracer, no shot sound): the others hear it land (Fx::melee).

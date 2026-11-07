@@ -523,7 +523,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     }
     const h = last || {}, vr = h.vr || {};
     // the page's actions the menu asked for
-    if (vr.action === "multi") { try { mpPage?.toggleMulti ? mpPage.toggleMulti(h) : mpPage?.goMulti?.(); } catch (err) { console.warn("[spawncity] VR multi", err); } }
+    if (vr.action === "multi") { try { if (mpPage?.net) mpPage.toggleMulti(h); else mpPage?.goMulti?.("public"); } catch (err) { console.warn("[spawncity] VR multi", err); } }
     else if (vr.action === "exit") app.exitXR();
     else if (vr.action === "radio") { try { if (!globalThis.__scRadioAny && h.mode !== "car") globalThis.__scRadioAny = true; else globalThis.__arondightCarRadio?.next?.(1); } catch { /* no radio */ } }
     else if (vr.action === "radio_off") { try { const r = globalThis.__arondightCarRadio; if (r?.on) r.toggleOff(); } catch { /* no radio */ } }

@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-07",time:"19:12",title:"Mit Freunden oder öffentlich",items:[
+    "MULTI fragt jetzt: MIT FREUNDEN (eigener Raum an deinem Ort, der Link zum Verschicken kommt sofort) oder ÖFFENTLICH (mit allen).",
+    "Öffentliche Lobby: gespielt wird in einer bekannten Stadt (jeden Tag eine andere) – dein echter Standort bleibt privat, LIVE GPS ist dort aus, fremde Stimmen sind zu Beginn stumm.",
+  ]},
   {date:"2026-11-07",time:"18:52",title:"Beifahrer sitzen, Hunde überall, Würfe ohne Haken",items:[
     "Multiplayer: Beifahrer sitzen jetzt sichtbar im Auto (Kopf und Arme im Fenster, ihre Waffe in der Hand) und schauen auf Sitzhöhe heraus – getroffen werden sie dort, wo sie sitzen.",
     "Multiplayer: Hunde und Katzen gibt es auch rund um weit entfernte Mitspieler – jede Nachbarschaft mit denselben Runden für alle.",
