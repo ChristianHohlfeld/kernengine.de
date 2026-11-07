@@ -204,7 +204,7 @@ class Game {
   std::vector<Vec3> mate_foci() const;
   bool puppet_car_step(TrafficCar& c, std::size_t i, f32 h);
   bool puppet_world_ = false;
-  f32 world_send_clock_ = 0;
+  f32 world_send_clock_ = 0, people_send_clock_ = 0;
   u32 world_sent_ = 0, world_got_ = 0;
   std::vector<bool> car_seen_;
   std::vector<People::NetPerson> people_acc_;

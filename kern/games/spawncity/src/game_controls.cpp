@@ -121,6 +121,8 @@ void Game::read_input(kern::Engine& e, f32 dt) {
 // actions shared by the modes
 
 void Game::ctl_enter(bool jet_first) {
+  // a mate's jet or car as passenger (or out of it) first: game_seats.cpp
+  if (gaps_seat_press()) return;
   // pad_actions.mjs: F boards a jet first, E (and X) a nearby car first.
   const Vec3 me = matrix_of(soldier_).translation();
   bool near_jet = jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJetM;

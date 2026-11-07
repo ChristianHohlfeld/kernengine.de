@@ -83,7 +83,7 @@ class Life {
     std::vector<Pigeon> birds;
   };
   struct Bird { u32 seed = 0; Vec3 pos; f32 yaw = 0, flap = 1, dead_until = -1, dying_until = -1, spin = 0; Vec3 fall_v; Vec2 center; bool down = false; };
-  struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; };
+  struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; Vec3 net_to; };
   struct Chain {
     u32 id = 0;
     std::vector<Vec2> path;  // the pavement line
@@ -146,6 +146,10 @@ class Life {
   f64 epoch() const { return epoch_; }
   bool provoke_cat(f32 now);  // tests: the black cat charges
   const Chain* chain() const { return chain_alive_ ? &chain_ : nullptr; }
+  /// MP client: the running club is the host's (game_worldsync.cpp) - no own chain, his runners
+  /// eased to where his snapshots have them; none heard for 1.5 s: gone.
+  void set_remote_joggers(bool on) { if (on != remote_joggers_) { remote_joggers_ = on; chain_alive_ = false; } }
+  void apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now);
   const std::vector<Voice>& voices() const { return voices_; }
   u32 cow_hits() const { return cow_hits_; }
   u32 bird_hits() const { return bird_hits_; }
@@ -161,6 +165,8 @@ class Life {
   /// Box3D body for as long as it is held and flies; it gets up where it lands. The body, or none.
   kern::physics::Body grab_animal(Vec3 at, f32 reach);
  private:
+  bool remote_joggers_ = false;
+  f32 remote_joggers_at_ = -9;
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
   void rebuild_herds(const LifeView& view, f32 now);
   Vec2 graze_spot(const Cow& c, i64 k) const;

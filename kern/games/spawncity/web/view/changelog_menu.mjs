@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: auch die Jogger-Gruppe ist bei allen dieselbe; die Weltdaten sind jetzt sehr sparsam (rund 1 KB/s) – Mitspieler ruckeln und hängen nicht mehr, auch über die Relay-Verbindung.",
+    "Multiplayer: als Beifahrer zu einem Mitspieler ins Auto steigen (E / X / Einsteigen neben seinem stehenden Auto) – auch in seinen Jet; nochmal drücken steigt aus.",
     "Straßen liegen nach Explosionen sauber im Krater statt darüber zu schweben (feines Netz über verformtem Boden, auch bei mehreren Kratern kurz hintereinander).",
     "Multiplayer: über jedem Mitspieler, der weiter als 40 m weg ist, steht eine Lichtsäule in seiner Farbe; die Pfeile am Bildrand zeigen auch bei Mitspielern hinter dir in die richtige Richtung.",
     "Multiplayer: eine gemeinsame Welt – alle sehen dieselben Autos an derselben Stelle (gleiche Farbe, gleiche Fahrt) und dieselben Passanten; der Host führt Verkehr und Passanten, rund um jeden Spieler. Das Auto, das ein Mitspieler fährt, gehört ihm.",

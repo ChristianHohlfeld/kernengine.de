@@ -23,16 +23,19 @@
 #include <cstring>
 
 #include "game.h"
+#include "game_life.h"
 
 namespace sc {
 
 namespace {
 using i16 = std::int16_t;
+using i8 = std::int8_t;
 inline f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
-constexpr f32 kSendEvery = 0.1f;     // s between two snapshots of the host's world
-constexpr f32 kReach = 320;          // m around a mate: what he can see of the street life
+constexpr f32 kSendEvery = 0.2f;     // s between two snapshots of the host's cars
+constexpr f32 kPeopleEvery = 0.4f;   // ... of his citizens and joggers
+constexpr f32 kReach = 200;          // m around a mate: what he can see of the street life
 constexpr f32 kNearHost = 350;       // m: a client this close to the host lives in the host's town
-constexpr u8 kCars = 1, kPeople = 2;
+constexpr u8 kCars = 1, kPeople = 2, kJoggers = 3;
 
 struct Wr {
   std::vector<u8> b;
@@ -107,63 +110,98 @@ void Game::worldsync_update(f32 dt) {
       }
     }
     world_send_clock_ += dt;
+    people_send_clock_ += dt;
     const std::vector<Vec3> mates = mate_foci();
+    // Small on the wire (a relay over the brokers carries it when no direct channel is open): the
+    // cars 5 times a second, the citizens and the joggers 2.5 times, each in one message, places
+    // relative to the message's anchor in 10 cm, headings in bytes - some 1 KB/s
+    auto near_mate = [&](Vec3 p) {
+      for (const Vec3& m : mates) if (dist2d(p, m) < kReach) return true;
+      return false;
+    };
+    const Vec2 o = mates.empty() ? Vec2{} : Vec2{std::round(mates[0].x), std::round(mates[0].y)};
+    auto dm = [&](f32 v, f32 base) { return static_cast<i16>(std::lround(clampf((v - base) * 10, -32000, 32000))); };
+    auto ang8 = [](f32 a) { return static_cast<u8>(static_cast<i32>(std::lround(wrap_pi(a) / (2 * kPi) * 256)) & 255); };
     if (world_send_clock_ >= kSendEvery && !mates.empty()) {
       world_send_clock_ = 0;
-      auto near_mate = [&](Vec3 p) {
-        for (const Vec3& m : mates) if (dist2d(p, m) < kReach) return true;
-        return false;
-      };
-      // (in messages of at most 20 cars / 24 people: one datagram each, never fragmented)
       Wr cw;
       cw.put(kCars);
       cw.put<u8>(0);
+      cw.put(o.x); cw.put(o.y);
       u8 n = 0;
-      std::vector<std::vector<u8>> car_msgs;
+      // the nearest to a mate first (at most 32: what he sees around him)
+      std::vector<std::pair<f32, std::size_t>> order;
       for (std::size_t i = 0; i < cars_.size() && i < 255; ++i) {
-        if (n == 20) { cw.b[1] = n; car_msgs.push_back(cw.b); cw.b.resize(2); n = 0; }
         const TrafficCar& c = cars_[i];
         if (!c.placed || c.police || !world_->actor_alive(c.actor) || (i < car_lent_.size() && car_lent_[i])) continue;
         if (mode_ == Mode::car && static_cast<i32>(i) == car_index_) continue;  // ours: drawn as our car
+        const Vec3 cpos = matrix_of(c.actor).translation();
+        f32 d = 1e9f;
+        for (const Vec3& mt : mates) d = std::fmin(d, dist2d(cpos, mt));
+        if (d < kReach) order.push_back({d, i});
+      }
+      std::sort(order.begin(), order.end());
+      for (const auto& [dist, i] : order) {
+        if (n >= 32) break;
+        const TrafficCar& c = cars_[i];
         const BodyState s = state_of(c.actor);
-        if (!near_mate(s.position)) continue;
         cw.put(static_cast<u8>(i));
         cw.put(static_cast<u8>((c.car->spec().radius > 0.4f ? 1 : 0) | (c.wreck ? 2 : 0) | (c.input.pedal < -0.05f ? 4 : 0) | (c.burn_until >= 0 ? 8 : 0)));
-        cw.put(col8(c.color.x)); cw.put(col8(c.color.y)); cw.put(col8(c.color.z));
-        cw.put(s.position.x); cw.put(s.position.y); cw.put(s.position.z);
-        cw.put(q16(s.rotation.x)); cw.put(q16(s.rotation.y)); cw.put(q16(s.rotation.z)); cw.put(q16(s.rotation.w));
-        cw.put(cms(s.velocity.x)); cw.put(cms(s.velocity.y)); cw.put(cms(s.velocity.z));
+        const u16 rgb565 = static_cast<u16>(((col8(c.color.x) >> 3) << 11) | ((col8(c.color.y) >> 2) << 5) | (col8(c.color.z) >> 3));
+        cw.put(rgb565);
+        cw.put(dm(s.position.x, o.x)); cw.put(dm(s.position.y, o.y)); cw.put(dm(s.position.z, 0));
+        // heading, pitch and roll of the body (x forward)
+        const Vec3 f = s.rotation.rotate({1, 0, 0}), l = s.rotation.rotate({0, 1, 0});
+        cw.put(ang8(std::atan2(f.y, f.x)));
+        cw.put(static_cast<i8>(std::lround(clampf(std::asin(clampf(f.z, -1, 1)) / kPi * 127, -127, 127))));
+        cw.put(static_cast<i8>(std::lround(clampf(std::asin(clampf(l.z, -1, 1)) / kPi * 127, -127, 127))));
+        cw.put(cms(s.velocity.x)); cw.put(cms(s.velocity.y));
         ++n;
       }
-      cw.b[1] = n;
-      car_msgs.push_back(cw.b);
-      // the last one of the cars says "that was all" (bit 7 of the count): the client drops the rest
-      car_msgs.back()[1] |= 0x80;
-      for (const auto& m : car_msgs) net_.send_world(m);
+      cw.b[1] = static_cast<u8>(n | 0x80);
+      net_.send_world(cw.b);
       ++world_sent_;
+    }
+    if (people_send_clock_ >= kPeopleEvery && !mates.empty()) {
+      people_send_clock_ = 0;
       Wr pw;
       pw.put(kPeople);
       pw.put<u8>(0);
+      pw.put(o.x); pw.put(o.y);
       u8 m = 0;
-      std::vector<std::vector<u8>> people_msgs;
       const auto& all = people_.all();
-      for (std::size_t i = 0; i < all.size() && i < 255; ++i) {
-        if (m == 24) { pw.b[1] = m; people_msgs.push_back(pw.b); pw.b.resize(2); m = 0; }
+      for (std::size_t i = 0; i < all.size() && i < 255 && m < 48; ++i) {
         const People::Person& p = all[i];
         if (p.kind != People::Kind::citizen || p.state == People::State::gone || !near_mate(p.pos)) continue;
         pw.put(static_cast<u8>(i));
-        pw.put(static_cast<u8>(p.state));
-        pw.put(static_cast<u8>(now < p.knocked_until ? 1 : 0));
+        pw.put(static_cast<u8>((static_cast<u8>(p.state) & 15) | (now < p.knocked_until ? 16 : 0)));
         pw.put(p.seed);
-        pw.put(p.pos.x); pw.put(p.pos.y); pw.put(p.pos.z);
-        pw.put(static_cast<i16>(std::lround(wrap_pi(p.yaw) * 10000)));
+        pw.put(dm(p.pos.x, o.x)); pw.put(dm(p.pos.y, o.y));
+        pw.put(ang8(p.yaw));
         pw.put(static_cast<u8>(std::lround(clampf(p.v * 20, 0, 255))));
         ++m;
       }
-      pw.b[1] = m;
-      people_msgs.push_back(pw.b);
-      people_msgs.back()[1] |= 0x80;
-      for (const auto& mm : people_msgs) net_.send_world(mm);
+      pw.b[1] = static_cast<u8>(m | 0x80);
+      net_.send_world(pw.b);
+      // the running club (jogger_chain.mjs): its id and its runners, when it runs near a mate
+      if (glife_) {
+        const Life::Chain* ch = glife_->life.chain();
+        bool near = false;
+        if (ch) for (const Life::Runner& rn : ch->runners) if (rn.alive && near_mate(rn.pos)) near = true;
+        if (ch && near) {
+          Wr jw;
+          jw.put(kJoggers);
+          jw.put<u8>(0x80 | 10);
+          jw.put(o.x); jw.put(o.y);
+          jw.put(ch->id);
+          for (const Life::Runner& rn : ch->runners) {
+            jw.put<u8>(rn.alive ? 1 : 0);
+            jw.put(dm(rn.pos.x, o.x)); jw.put(dm(rn.pos.y, o.y));
+            jw.put(ang8(rn.yaw));
+          }
+          net_.send_world(jw.b);
+        }
+      }
     }
   }
   // ---- client: the host's town around us, or our own far from him ----
@@ -171,6 +209,7 @@ void Game::worldsync_update(f32 dt) {
   if (puppet != puppet_world_) {
     puppet_world_ = puppet;
     people_.set_puppets(puppet);
+    if (glife_) glife_->life.set_remote_joggers(puppet);
     car_net_.assign(cars_.size(), -1);
     for (std::size_t i = 0; i < cars_.size(); ++i) {
       TrafficCar& c = cars_[i];
@@ -188,22 +227,25 @@ void Game::worldsync_update(f32 dt) {
     const u8 type = r.get<u8>(), count = r.get<u8>();
     const bool last = count & 0x80;
     const u8 n = count & 0x7f;
+    const f32 ox = r.get<f32>(), oy = r.get<f32>();
+    if (!r.ok) continue;
+    auto un8 = [](u8 a) { return static_cast<f32>(static_cast<i8>(a)) / 128 * kPi; };
     if (type == kCars) {
       std::vector<bool>& seen = car_seen_;
       if (seen.size() != cars_.size()) seen.assign(cars_.size(), false);
       for (u8 k = 0; k < n && r.ok; ++k) {
         const u8 idx = r.get<u8>(), flags = r.get<u8>();
-        const Vec3 col{r.get<u8>() / 255.0f, r.get<u8>() / 255.0f, r.get<u8>() / 255.0f};
+        const u16 c565 = r.get<u16>();
+        const Vec3 col{static_cast<f32>((c565 >> 11) & 31) / 31, static_cast<f32>((c565 >> 5) & 63) / 63, static_cast<f32>(c565 & 31) / 31};
         Vec3 p;
-        p.x = r.get<f32>(); p.y = r.get<f32>(); p.z = r.get<f32>();
-        Quat q;
-        q.x = uq16(r.get<i16>()); q.y = uq16(r.get<i16>()); q.z = uq16(r.get<i16>()); q.w = uq16(r.get<i16>());
+        p.x = ox + r.get<i16>() / 10.0f; p.y = oy + r.get<i16>() / 10.0f; p.z = r.get<i16>() / 10.0f;
+        const f32 yaw = un8(r.get<u8>());
+        const f32 pitch = static_cast<f32>(r.get<i8>()) / 127 * kPi, roll = static_cast<f32>(r.get<i8>()) / 127 * kPi;
         Vec3 v;
-        v.x = r.get<i16>() / 100.0f; v.y = r.get<i16>() / 100.0f; v.z = r.get<i16>() / 100.0f;
+        v.x = r.get<i16>() / 100.0f; v.y = r.get<i16>() / 100.0f; v.z = 0;
         if (!r.ok) break;
-        const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-        if (ql < 1e-3f) continue;
-        q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
+        // heading about z, then the nose up (about -y: x forward towards z), then the roll about x
+        const Quat q = Quat::axis_angle({0, 0, 1}, yaw) * Quat::axis_angle({0, 1, 0}, -pitch) * Quat::axis_angle({1, 0, 0}, roll);
         // which of our cars plays his: the one that did, else a free one of the kind (car / bus)
         i32 local = -1;
         for (std::size_t i = 0; i < cars_.size(); ++i) if (car_net_[i] == idx) { local = static_cast<i32>(i); break; }
@@ -222,9 +264,8 @@ void Game::worldsync_update(f32 dt) {
         if (car_net_[static_cast<std::size_t>(local)] != idx || !c.placed) {
           car_net_[static_cast<std::size_t>(local)] = idx;
           if (!world_->actor_alive(c.actor)) world_->set_alive(c.actor, true);
-          const Vec3 f = q.rotate({1, 0, 0});
-          const Vec3 rot{0, 0, std::atan2(f.y, f.x) / kDeg};
-          world_->teleport(c.actor, p, &rot);
+          const Vec3 rot{0, 0, yaw / kDeg};
+          world_->teleport(c.actor, p + Vec3{0, 0, 0.05f}, &rot);
           world_->set_actor_velocity(c.actor, v);
           c.car->reset();
           c.placed = true;
@@ -248,16 +289,30 @@ void Game::worldsync_update(f32 dt) {
         }
         seen.assign(cars_.size(), false);
       }
+    } else if (type == kJoggers) {
+      const u32 id = r.get<u32>();
+      Vec3 pos[10];
+      f32 yaw[10];
+      bool alive[10];
+      for (u32 k = 0; k < 10 && k < n; ++k) {
+        alive[k] = r.get<u8>() != 0;
+        pos[k].x = ox + r.get<i16>() / 10.0f; pos[k].y = oy + r.get<i16>() / 10.0f;
+        pos[k].z = city_.ground_height(pos[k].x, pos[k].y);
+        yaw[k] = un8(r.get<u8>());
+      }
+      if (r.ok && glife_) glife_->life.apply_joggers(id, pos, yaw, alive, std::min<u32>(n, 10), now);
     } else if (type == kPeople) {
       std::vector<People::NetPerson>& list = people_acc_;
       for (u8 k = 0; k < n && r.ok; ++k) {
         People::NetPerson np;
         np.idx = r.get<u8>();
-        np.state = r.get<u8>();
-        np.flags = r.get<u8>();
+        const u8 st = r.get<u8>();
+        np.state = st & 15;
+        np.flags = (st & 16) ? 1 : 0;
         np.seed = r.get<u32>();
-        np.pos.x = r.get<f32>(); np.pos.y = r.get<f32>(); np.pos.z = r.get<f32>();
-        np.yaw = r.get<i16>() / 10000.0f;
+        np.pos.x = ox + r.get<i16>() / 10.0f; np.pos.y = oy + r.get<i16>() / 10.0f;
+        np.pos.z = city_.ground_height(np.pos.x, np.pos.y);
+        np.yaw = un8(r.get<u8>());
         np.v = r.get<u8>() / 20.0f;
         if (r.ok) list.push_back(np);
       }
@@ -300,7 +355,7 @@ bool Game::puppet_car_step(TrafficCar& c, std::size_t i, f32 h) {
   if (!b.valid()) return true;
   kern::physics::World& w = world_->physics();
   const CarPuppet& cp = car_puppet_[i];
-  const f32 age = clampf(world_->sim_time() - cp.at, 0, 0.3f);
+  const f32 age = clampf(world_->sim_time() - cp.at, 0, 0.5f);
   const Vec3 want = cp.p + cp.v * age;
   const BodyState s = read_body(w, b);
   const Vec3 err = want - s.position;
@@ -311,15 +366,15 @@ bool Game::puppet_car_step(TrafficCar& c, std::size_t i, f32 h) {
     world_->set_actor_velocity(c.actor, cp.v);
     return true;
   }
-  w.set_linear_velocity(b, cp.v + err * 5.0f);
-  // the turn: the shortest rotation from ours to his, as an angular velocity
-  Quat d = cp.q * Quat{-s.rotation.x, -s.rotation.y, -s.rotation.z, s.rotation.w};
-  if (d.w < 0) d = {-d.x, -d.y, -d.z, -d.w};
-  const f32 sn = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
-  if (sn > 1e-5f) {
-    const f32 ang = 2 * std::atan2(sn, d.w);
-    w.set_angular_velocity(b, Vec3{d.x, d.y, d.z} * (ang / sn * 6.0f));
-  } else w.set_angular_velocity(b, {});
+  // (the height is the car's own: its wheels on our ground - only the plan view is steered)
+  const Vec3 lv = w.linear_velocity(b);
+  w.set_linear_velocity(b, Vec3{cp.v.x + err.x * 4.0f, cp.v.y + err.y * 4.0f, lv.z});
+  // the turn: the heading only (pitch and roll are the car's own on our ground; a wreck tumbling
+  // in his world is put as he has it by the jump above when it is far off)
+  const Vec3 fh = cp.q.rotate({1, 0, 0}), fo = s.rotation.rotate({1, 0, 0});
+  const f32 dyaw = wrap_pi(std::atan2(fh.y, fh.x) - std::atan2(fo.y, fo.x));
+  const Vec3 av = w.angular_velocity(b);
+  w.set_angular_velocity(b, Vec3{av.x, av.y, dyaw * 6.0f});
   w.set_awake(b, true);
   (void)h;
   return true;

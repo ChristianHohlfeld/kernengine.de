@@ -973,8 +973,55 @@ void Life::kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out) {
   }
 }
 
+void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now) {
+  Chain& c = chain_;
+  if (!chain_alive_ || c.id != id) {
+    c = Chain{};
+    c.id = id;
+    c.born = now;
+    for (u32 i = 0; i < kRunners; ++i) { c.runners[i].alive = false; }
+    for (u32 i = 0; i < n && i < kRunners; ++i) { c.runners[i].pos = c.runners[i].net_to = pos[i]; c.runners[i].yaw = c.runners[i].yaw_s = yaw[i]; c.runners[i].alive = alive[i]; }
+    chain_alive_ = true;
+  }
+  for (u32 i = 0; i < n && i < kRunners; ++i) {
+    Runner& r = c.runners[i];
+    if (!alive[i]) {
+      if (r.alive) {
+        // down on the host's side: down here too (the doll falls along his heading)
+        Ragdolls::Colors col;
+        col.shirt = rgb(0xd8ff3a);
+        col.pants = rgb(0x1c2a3a);
+        const u32 skins[5] = {0xe0b08c, 0xc48e6c, 0xa87052, 0x7b4a33, 0xd2a27e};
+        col.skin = rgb(skins[i % 5]);
+        ragdolls_.spawn((0x10000000ull + c.id) * 16 + static_cast<u64>(i), r.pos, r.yaw_s, Vec3{std::cos(r.yaw_s), std::sin(r.yaw_s), 0.4f} * 2.5f, col, false, now);
+      }
+      r.alive = false;
+      continue;
+    }
+    if (!r.alive) continue;  // down here (a hit of ours): stays down
+    r.net_to = pos[i];
+    r.yaw = yaw[i];
+  }
+  remote_joggers_at_ = now;
+}
+
 void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
   if (!view.people_on) { chain_alive_ = false; return; }
+  if (remote_joggers_) {
+    // the host's club: eased to his runners (100 ms snapshots), gone when he stops sending it
+    if (now - remote_joggers_at_ > 1.5f) { chain_alive_ = false; return; }
+    if (!chain_alive_) return;
+    for (Runner& r : chain_.runners) {
+      if (!r.alive) continue;
+      const Vec3 d = r.net_to - r.pos;
+      const f32 k = std::fmin(1.0f, dt * 9);
+      r.pos = r.pos + d * k;
+      r.pos.z = ground(view, r.pos.x, r.pos.y);
+      r.yaw_s += clampf(wrap_pi(r.yaw - r.yaw_s), -9 * dt, 9 * dt);
+      r.phase += kSpeed * dt * 2.4f;
+    }
+    return;
+  }
   if (!chain_alive_) {
     if (next_chain_ < 0) next_chain_ = now + kFirst;
     if (now >= next_chain_) {
