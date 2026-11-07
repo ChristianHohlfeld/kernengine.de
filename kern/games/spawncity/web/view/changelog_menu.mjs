@@ -7,43 +7,86 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
-  {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
-    "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+  {date:"2026-11-07",time:"17:56",title:"Echtes Gelände bei Mitspielern",items:[
+    "Multiplayer: Unter weiter entfernten Mitspielern liegt auch beim Host das echte Gelände – Autos fahren dort über dieselben Hügel wie bei ihnen.",
+    "Neuigkeiten: jedes Update steht wieder mit Datum, Uhrzeit und eigenem Titel im NEU / CHANGELOG-Menü.",
+  ]},
+  {date:"2026-11-07",time:"17:46",title:"Eigener Jet-Platz",items:[
     "Multiplayer: Jeder Spieler hat seinen Jet auf einem eigenen Platz – nie mehr zwei Jets übereinander; am bemannten Jet eines Mitspielers steigst du als Mitflieger ein, statt in deinen eigenen.",
+  ]},
+  {date:"2026-11-07",time:"17:28",title:"Alle Geschosse sichtbar, kein Ruckeln",items:[
     "Multiplayer: Jedes Geschoss fliegt bei allen sichtbar auf der Bahn des Schützen – Handgranaten, Granatwerfer, Raketen, Lenkraketen samt Kurven, Drohnenraketen, Jet-Raketen und Bomben – mit Leuchten, Licht und Rauch.",
     "Multiplayer: Kein Ruckeln mehr – Mitspieler laufen mit einem Puffer, der sich der Verbindung anpasst; Autos, Passanten, Jogger, Kühe und Tauben werden zwischen den Paketen in ihrem eigenen Tempo weiterbewegt statt stoßweise nachgezogen.",
+  ]},
+  {date:"2026-11-07",time:"17:11",title:"Beifahrer schießen",items:[
     "Multiplayer: Als Beifahrer im Auto kannst du schießen – du stehst mit deiner Waffe im Wagen (Kopf und Arme über dem Dach), deine Kugeln und Granaten verlassen das Auto, statt darin zu explodieren, und die anderen sehen dich; der Knopf heißt MITFAHREN bzw. AUSSTEIGEN.",
     "Multiplayer: Wer im Jet mitfliegt, hat die Stadt um sich – sie lädt dort, wo der Jet ist, nicht mehr dort, wo er eingestiegen ist (vorher: nur Ampeln und Wiese).",
+  ]},
+  {date:"2026-11-07",time:"16:55",title:"Tiere und Würfe für alle gleich",items:[
     "Multiplayer: Tiere sind für alle dieselben – Kühe, Hunde, Katzen und jeder einzelne Tauben-Schwarm kommen vom Host (Hunde und Katzen laufen ihre Runde nach derselben Uhr, also exakt gleich), auch rund um weit entfernte Mitspieler.",
     "Multiplayer: Was einer packt und wirft – Passanten, Hunde, Katzen, Kühe, Tauben –, fliegt auf allen Geräten mit Physik dieselbe Bahn: der Werfer besitzt den Körper, bis er still liegt, die anderen steuern ihre Kopie auf seine Spur.",
+  ]},
+  {date:"2026-11-07",time:"16:31",title:"Eine zerstörte Stadt für alle",items:[
     "Multiplayer: Eine zerstörte Stadt für alle – Krater (Boden, Kollision und Straßen darauf) und Gebäudeschäden sind der Zustand des Hosts und auf jedem Gerät gleich, auch in gerade nicht geladenen Vierteln und für Spieler, die später dazukommen; eine Prüfsumme gleicht Abweichungen automatisch ab, RESET setzt die Stadt überall zurück.",
+  ]},
+  {date:"2026-11-07",time:"16:20",title:"Neue Mitspieler-Anzeige",items:[
     "Multiplayer: Neue Mitspieler-Anzeige – im Blick ein Schild über dem Kopf (Name, Entfernung, ▲/▼ wie viel höher oder tiefer), außer Sicht ein großes Abzeichen am Rand mit Pfeil zu ihm, Entfernung und LINKS / RECHTS / HINTER DIR / ÜBER DIR / UNTER DIR – für jeden Mitspieler.",
+  ]},
+  {date:"2026-11-07",time:"16:12",title:"Sprachchat zeigt An/Aus",items:[
     "Sprachchat: Mikrofon- und Lautsprecher-Knopf zeigen klar, ob sie an sind (grün leuchtend) oder aus (dunkel, durchgestrichen); die Mikrofon-Freigabe wird direkt beim Tippen gefragt – in VR schon beim Betreten der Brille, im VR-Menü gibt es MIKROFON AN/AUS; wird es verweigert, sagt das Spiel es.",
+  ]},
+  {date:"2026-11-07",time:"16:05",title:"Die Einstellungen des Hosts gelten",items:[
     "Multiplayer: Die WELT-Einstellungen des Hosts gelten für alle (Leute, Verkehr, Tiere, Zombies, Polizei, Militär, Flak, Jetpack, zerstörbares Gelände, Lenkraketen, Immer Tag) – Mitspieler sehen sie gesperrt, danach gelten wieder ihre eigenen.",
+  ]},
+  {date:"2026-11-07",time:"15:57",title:"Mitfahren und GPS-Start",items:[
     "Multiplayer: Mitfahren und Mitfliegen funktioniert sichtbar – neben dem stehenden Auto oder gelandeten Jet eines Mitspielers erscheint MITFAHREN/MITFLIEGEN (auf Touch der Einsteigen-Knopf), drinnen AUSSTEIGEN.",
     "Multiplayer: Startet der Host per GPS oder an einem gewählten Ort, ziehen alle Mitspieler mit in seine Stadt – vorher blieb eine früh eröffnete Sitzung am Standardort hängen.",
+  ]},
+  {date:"2026-11-07",time:"15:42",title:"Granaten treffen Mitspieler",items:[
     "Multiplayer: Granaten, Raketen und Lenkraketen fliegen nicht mehr durch Mitspieler – sie explodieren an ihrem Körper oder Fahrzeug.",
+  ]},
+  {date:"2026-11-07",time:"15:36",title:"Drohnen-Höhe wie im Original",items:[
     "Drohne: Höhenhaltung wie im Original – der Höhenmesser sieht nur Boden und Gebäude, Autos, Passanten und Tiere darunter lassen sie nicht mehr springen; auf dem Handy reagiert das Höhenfeld wieder genau.",
     "Radio verstummt, sobald Musik oder Ton ausgeschaltet ist.",
+  ]},
+  {date:"2026-11-07",time:"15:27",title:"Sicherer Start, Boxen ohne Schussgeräusch",items:[
     "Start, RESET, Respawn und Beitritt: du wirst mit Sicherheitsabstand über dem Boden abgesetzt und gehalten, bis der Boden unter dir fertig geladen ist – kein Durchrutschen mehr beim Start.",
     "Multiplayer: Boxen und Messer eines Mitspielers erzeugen keine Schuss-Töne und Schuss-Spuren mehr; man hört den Schlag, wenn er trifft. Man sieht seine Schläge (der Arm schnellt vor), bei VR-Spielern die echten Handbewegungen samt Waffe in der Hand. Boxen am Desktop/Handy trifft jetzt auch Mitspieler.",
+  ]},
+  {date:"2026-11-07",time:"15:14",title:"Kompakte Handy-Oberfläche",items:[
     "Handy: kompakte Oberfläche – mehr Spiel, weniger Knöpfe im Bild: durchsichtige Sticks (nur ein dünner Ring, greifen weiter auf voller Fläche), kleinere, halbtransparente Aktionsknöpfe, schmale obere Leiste mit ⚙ statt SETTINGS, kleinere Minimap, Sprach-Knöpfe nur im MULTI.",
+  ]},
+  {date:"2026-11-07",time:"15:10",title:"Echte Physik bei fernen Mitspielern",items:[
     "Multiplayer: auch rund um weit entfernte Mitspieler fahren die Autos des Hosts mit echter Physik – der Host lädt dort Boden- und Gebäudekollision mit.",
+  ]},
+  {date:"2026-11-07",time:"13:08",title:"Der Host bestimmt die Stadt",items:[
     "Multiplayer: der Host bestimmt die ganze Stadt – er lädt sie auch rund um jeden Mitspieler und führt dort Verkehr und Passanten; ein Mitspieler hat nur noch so lange eine eigene Stadt, bis die des Hosts bei ihm ankommt.",
     "Jet am Handy: KANONE sitzt jetzt über dem rechten Stick statt auf der Knopfleiste; Drohne: 📻 links neben der Minimap.",
     "VR: das Menü wählt nie aus Versehen die erste Zeile; Stick-Bewegungen im Menü drehen dich nicht und wechseln keine Waffe; gehaltene Tiere bleiben in der Hand; beim Laufen mit den Armen kein Wusch-Ton bei jedem Schwung.",
     "Luftschlag und Explosionen treffen den Piloten unter seiner Drohne zuverlässig; Aussteigen unter einer Brücke landet nicht mehr oben auf ihr.",
+  ]},
+  {date:"2026-11-07",time:"12:36",title:"Leise Atmosphäre, grüne Werfer-Granate",items:[
     "Leise Atmosphäre am Boden: ein fernes Stadtrauschen, Vogelgezwitscher am Tag, ab und zu ein Hund, nachts Grillen und manchmal ein Käuzchen, oben Wind (Lautstärke: Ton → Umgebung).",
     "Die Werfer-Granate leuchtet wieder grün wie im Original und taucht die Straße im Flug in ihr Licht.",
     "VR: Tauben fangen – ganz langsam anschleichen und vorsichtig zugreifen (klappt nicht immer, sonst fliegt der Schwarm auf); loslassen und sie fliegt davon.",
+  ]},
+  {date:"2026-11-07",time:"12:29",title:"Jogger für alle gleich, Beifahrer",items:[
     "Multiplayer: auch die Jogger-Gruppe ist bei allen dieselbe; die Weltdaten sind jetzt sehr sparsam (rund 1 KB/s) – Mitspieler ruckeln und hängen nicht mehr, auch über die Relay-Verbindung.",
     "Multiplayer: als Beifahrer zu einem Mitspieler ins Auto steigen (E / X / Einsteigen neben seinem stehenden Auto) – auch in seinen Jet; nochmal drücken steigt aus.",
+  ]},
+  {date:"2026-11-07",time:"12:15",title:"Straßen im Krater, Lichtsäulen",items:[
     "Straßen liegen nach Explosionen sauber im Krater statt darüber zu schweben (feines Netz über verformtem Boden, auch bei mehreren Kratern kurz hintereinander).",
     "Multiplayer: über jedem Mitspieler, der weiter als 40 m weg ist, steht eine Lichtsäule in seiner Farbe; die Pfeile am Bildrand zeigen auch bei Mitspielern hinter dir in die richtige Richtung.",
+  ]},
+  {date:"2026-11-07",time:"12:06",title:"Eine gemeinsame Welt",items:[
     "Multiplayer: eine gemeinsame Welt – alle sehen dieselben Autos an derselben Stelle (gleiche Farbe, gleiche Fahrt) und dieselben Passanten; der Host führt Verkehr und Passanten, rund um jeden Spieler. Das Auto, das ein Mitspieler fährt, gehört ihm.",
+  ]},
+  {date:"2026-11-07",time:"11:47",title:"Mitspieler mit echter Waffe",items:[
     "Multiplayer: Mitspieler halten ihre echte Waffe (Pistole, MP, Sniper, Werfer, Raketenwerfer, Messer) und zielen sichtbar dorthin, wohin sie schauen – hoch, runter, links, rechts.",
     "Respawn und RESET stellen dich auf den Boden, wie er jetzt ist – auch in einem Krater, nie darunter.",
     "VR: Zielfernrohr ganz einfach – linken Abzug halten (oder das Okular ans Auge), das Bild kommt vors Auge.",
+  ]},
+  {date:"2026-11-07",time:"11:38",title:"Großes VR- und Touch-Update",items:[
     "Handy: der rechte Stick steht jetzt in jedem Modus etwas vom Rand weg – sichtbar genau dort, wo er auch greift (vorher sah man ihn am Rand, gegriffen wurde weiter links).",
     "Minimap in jeder Welt; ⛶ öffnet die große Karte.",
     "Radio auch im Jet und in der Drohne (📻 in der Leiste, in VR im Menü).",
@@ -57,30 +100,73 @@ export const CHANGELOG=Object.freeze([
     "VR: Laufen mit den Armen – je kräftiger, desto schneller (bis Sprint), und dabei zielen und schießen.",
     "VR: Waffenwechsel am rechten Stick (hoch/runter), weich oder in 30°-Schritten drehen.",
     "VR: Menü mit Einstellungsseite (Laufen, Drehen, Horizont, Tunnel, Immer Tag, Ton, Musik, Radio), Einsteigen/Aussteigen, Kamera innen/außen (auch: linken Stick drücken); Y halten = RESET von überall.",
+  ]},
+  {date:"2026-11-07",time:"10:41",title:"Handy-Knöpfe sicher, VR-Fahrzeuge",items:[
     "Handy: DRONE, ARM und die anderen Knöpfe schalten bei jedem Tipp sicher – auch nach längerem Drücken (vorher schalteten sie manchmal hin und sofort zurück, die Drohne blieb unscharf und die Sticks taten nichts).",
     "VR: Drohne wie eine echte Fernsteuerung (Mode 2) – links Gas und Drehen, rechts Neigen, rechter Abzug feuert, A startet und landet.",
     "VR: Auto und Jet immer im Cockpit; du schaust mit dem Kopf, der rechte Stick dreht die Sicht nicht mehr.",
     "VR: Komfort-Tunnel – der Rand des Blicks dunkelt ab, wenn das Spiel dich dreht oder beschleunigt; Horizont halten oder frei im Cockpit mitkippen (Einstellung und Brillen-Menü).",
     "VR: auf der Uhr am Handgelenk stehen in Drohne, Auto und Jet die Tasten.",
-    "Luftschlag landet genau dort, wo du tippst.",
-    "Messer, Fäuste und Fingerschüsse reagieren auf jeden kurzen Tipp; Fäuste: linke Hälfte linke Hand, rechte Hälfte rechte Hand.",
-    "Hochkant gehaltene Handys zeigen das Spiel richtig im Querformat.",
-    "Jet: Steuer-Sticks und KANONE wieder da, kein Flugzeug mehr in der Innenkamera, aufgeräumte Knöpfe.",
-    "MULTI zeigt, was passiert: Suche, Lobby offen, Anzahl der Spieler.",
-    "Kopftreffer bei Mitspielern zählen zuverlässig; am Fallschirm hängt die echte Spielfigur.",
-    "Granaten blitzen beim Aufprall, Brandflecken laufen weich in den Boden aus, schärferes Bild.",
-    "Neu unter WELT: Lenkraketen abschaltbar. Standard jetzt: Friendly Fire an, zerstörbares Gelände und Flak aus.",
-    "UPDATE AVAILABLE: ist eine neue Version online, erscheint ein Knopf zum Aktualisieren.",
-    "VR: auf der Meta Quest mit dem VR-Knopf in die Brille, die Controller steuern alles.",
-    "Wracks sind klar verkohlt, brennen aus und werden abgeräumt; Granaten zerstören auch den Jet.",
-    "Nachts Scheinwerfer an allen Autos; Blaulicht färbt die Straße.",
-    "Bäume stehen auf dem Boden und kippen bei Explosionen um; Tauben lassen sich abschießen.",
-    "Menschen schreien bei Treffern, Raketen zischen im Flug.",
-    "Schüsse kommen beim Seitwärtslaufen genau aus der Waffe; der Jet steht nicht mehr auf der Straße.",
-    "Kein Flackern mehr an Fassaden; das Zielfernrohr zeigt alles, auch weit weg.",
-    "Messer mit Ausfallschritt, Treffer-Ruck und Blut; Fäuste mit linker und rechter Maustaste.",
-    "Ohne Netz startet das Trainingsgelände mit Straßen, Teich, Brücke und Häusern.",
-    "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht.",
+  ]},
+  {date:"2026-11-06",time:"23:48",title:"VR: Kimme und Korn",items:[
+    "VR: Kimme und Korn liegen genau auf der Schusslinie; B wechselt die Waffe, EMP im Menü (im Auto dort das Radio).",
+  ]},
+  {date:"2026-11-06",time:"23:41",title:"VR-Multiplayer: packen und schubsen",items:[
+    "VR-Multiplayer: Mitspieler am Kragen packen, ziehen und schubsen, Schläge und Messer treffen sie – repliziert auf ihrer Seite.",
+  ]},
+  {date:"2026-11-06",time:"23:35",title:"VR: Greifen",items:[
+    "VR: Greifen mit Griff-Taste (oder Abzug der freien Hand) – Kisten, Tiere, Passanten (fallen als Ragdoll in deine Hand), Autos nur ein wenig schieben; loslassen wirft mit deinem Schwung.",
+  ]},
+  {date:"2026-11-06",time:"22:49",title:"Himmel ohne Kanten",items:[
+    "Der Himmel ohne Kachel-Kanten in den Wolken.",
+  ]},
+  {date:"2026-11-06",time:"22:43",title:"Zombies stöhnen, neue Polizeidrohnen",items:[
+    "Getroffene Vögel krächzen jedes Mal anders.",
+    "Zombies stöhnen gruselig (jeder anders) und kreischen bei Treffern.",
+    "Polizeidrohnen weiß mit schwarzem Bauch, blauem Band und rot-blauem Blitzlicht; Martinshorn und Drohnen-Ton deutlich hörbar, klar verschieden.",
+  ]},
+  {date:"2026-11-06",time:"22:40",title:"VR: Waffe in echter Größe, Uhr-HUD",items:[
+    "VR: nur die Waffe in der Hand, keine Arme; die Pistole in echter Größe und hinter Wänden verdeckt wie ein echtes Objekt.",
+    "VR: Boxen und Messer per Schlag mit dem Controller (nicht per Abzug), beim Messer die linke Hand als Faust; Messer tötet mit einem Stich.",
+    "VR: Uhr-HUD am linken Handgelenk statt im Blickfeld; Y öffnet dort das Menü – MULTI, Drohne/zu Fuß, Luftschlag wohin du schaust, Radio, Laufen, Reset, VR beenden.",
+    "VR: Raketen folgen deinem Blick, Granatwerfer und Raketen fliegen aus der Waffe in der Hand; beim Tod dreht sich die Welt nicht mehr.",
+    "Neu unter WELT: Immer Tag. Sommer-Sonne mit kürzeren Nächten, hellerer Mond und hellere Straßenlaternen.",
+  ]},
+  {date:"2026-11-06",time:"22:24",title:"Rechter Stick weiter vom Rand",items:[
+    "Rechter Stick deutlich weiter vom Rand weg (Platz zum schnellen Drehen nach rechts), schnelle Wischer drehen weiter (Beschleunigung wie CoD Mobile).",
+    "MULTI ruckelt nicht mehr: die Nostr-Signatur (über 100 ms je Paket) lief jede Sekunde mehrfach – jetzt aus; Daten ohne Direktverbindung gebündelt.",
+  ]},
+  {date:"2026-11-06",time:"22:14",title:"Handy ohne Flackern",items:[
+    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel.",
+  ]},
+  {date:"2026-11-06",time:"21:48",title:"Glänzendes Licht",items:[
+    "Licht glänzt jetzt auf Lack, Glas und Straße; auf starken Rechnern bis zu 10 Lichter (Laternen, Scheinwerfer ringsum), auf dem Handy wie im Original.",
+    "VR, zwei Steuerungen (Einstellungen → VR, in der Brille: beide Sticks drücken): Sticks – links gehen, rechts in 30°-Schritten drehen; oder Laufen mit den Armen – links joggen = gehen, beide = rennen, ohne Stick.",
+  ]},
+  {date:"2026-11-06",time:"21:22",title:"VR ohne schwarzes Bild",items:[
+    "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge.",
+    "VR: dein Körper dreht sich mit, wenn du dich im Raum drehst; die Waffen liegen in der rechten Hand und schießen aus ihr, die Fäuste in beiden.",
+  ]},
+  {date:"2026-11-06",time:"19:39",title:"Neuer Raketenwerfer",items:[
+    "Neuer Raketenwerfer: kompaktes olivgrünes Rohr mit Optik und Lasermodul, tiefer und weiter rechts gehalten – er verdeckt die Sicht nicht mehr.",
+  ]},
+  {date:"2026-11-06",time:"19:25",title:"Polizei wie im Original",items:[
+    "Polizei wie im Original: schwarze Streifenwagen mit weißen Türen und rot-blau blitzendem Balken, Polizisten in schwarzer Weste.",
+  ]},
+  {date:"2026-11-06",time:"19:23",title:"Meta Quest: IN VR SPIELEN",items:[
+    "Meta Quest: großer Knopf IN VR SPIELEN, keine Maus-Sperre mehr, die zurück ins Menü warf.",
+    "Kein Durchfallen mehr bei weiten Flügen: der Boden unter dir wird immer sofort gebaut, die Höhendaten werden vorausschauend in Flugrichtung geladen.",
+    "EJECT löst den Schleudersitz per Tipp aus; RESET setzt aus dem Cockpit zurück an den Start – ohne Schleudersitz.",
+    "Raketen und Granaten treffen Busse an ihrer ganzen Länge.",
+  ]},
+  {date:"2026-11-06",time:"18:41",title:"App immer aktuell, schönere Menschen",items:[
+    "Installierte App (PWA) startet immer mit der neuesten Version.",
+    "Nur Querformat: Handys sperren auf quer (Vollbild), sonst zeigt SpawnCity „Bitte quer halten“ – Drehen macht nichts mehr kaputt.",
+    "HOME SCREEN ist immer da, solange SpawnCity nicht installiert ist.",
+    "Treffer sitzen genau auf der Figur: Kopf, Oberkörper mit Armen, Beine – auch bei Mitspielern, Drohnenpiloten und am Fallschirm.",
+    "Schönere Menschen: runde Glieder, Schuhe, Hände, Gesicht und Haare; die Spielfigur mit Gesicht.",
+  ]},
+  {date:"2026-11-06",time:"18:17",title:"Jet für Dogfights, Lenkrakete, Luftschlag-Pfeile",items:[
     "Multiplayer: Mitspieler und ihre Zombies, Soldaten und Panzer stehen auf deinem Boden – kein Schweben, kein Waten mehr.",
     "Jet arcade-steuerbar für Dogfights: der Knüppel dreht direkt, die Flugbahn folgt der Nase, im Schwebeflug dreht er auf der Stelle.",
     "Jet-Crash in Wand oder Boden: er explodiert. Harte Landungen beschädigen ihn.",
@@ -90,62 +176,46 @@ export const CHANGELOG=Object.freeze([
     "Die Titelmusik läuft nie mehr doppelt.",
     "MULTI-Knopf zeigt klar SOLO ▸ MULTI, die Suche, das Warten und die Spielerzahl.",
     "Auto: der linke Stick bewegt sich sichtbar mit.",
-    "Installierte App (PWA) startet immer mit der neuesten Version.",
-    "Nur Querformat: Handys sperren auf quer (Vollbild), sonst zeigt SpawnCity „Bitte quer halten“ – Drehen macht nichts mehr kaputt.",
-    "HOME SCREEN ist immer da, solange SpawnCity nicht installiert ist.",
-    "Treffer sitzen genau auf der Figur: Kopf, Oberkörper mit Armen, Beine – auch bei Mitspielern, Drohnenpiloten und am Fallschirm.",
-    "Schönere Menschen: runde Glieder, Schuhe, Hände, Gesicht und Haare; die Spielfigur mit Gesicht.",
-    "Meta Quest: großer Knopf IN VR SPIELEN, keine Maus-Sperre mehr, die zurück ins Menü warf.",
-    "Kein Durchfallen mehr bei weiten Flügen: der Boden unter dir wird immer sofort gebaut, die Höhendaten werden vorausschauend in Flugrichtung geladen.",
-    "EJECT löst den Schleudersitz per Tipp aus; RESET setzt aus dem Cockpit zurück an den Start – ohne Schleudersitz.",
-    "Raketen und Granaten treffen Busse an ihrer ganzen Länge.",
-    "Polizei wie im Original: schwarze Streifenwagen mit weißen Türen und rot-blau blitzendem Balken, Polizisten in schwarzer Weste.",
-    "Neuer Raketenwerfer: kompaktes olivgrünes Rohr mit Optik und Lasermodul, tiefer und weiter rechts gehalten – er verdeckt die Sicht nicht mehr.",
-    "Licht glänzt jetzt auf Lack, Glas und Straße; auf starken Rechnern bis zu 10 Lichter (Laternen, Scheinwerfer ringsum), auf dem Handy wie im Original.",
-    "VR: kein schwarzes Bild mehr (die Seite verkleinerte das Bild der Brille), ein Schattenbild pro Frame statt pro Auge, Foveated Rendering und eine leichtere Auflösung gegen Ruckler, der Himmel sitzt richtig zu jedem Auge.",
-    "VR: dein Körper dreht sich mit, wenn du dich im Raum drehst; die Waffen liegen in der rechten Hand und schießen aus ihr, die Fäuste in beiden.",
-    "VR, zwei Steuerungen (Einstellungen → VR, in der Brille: beide Sticks drücken): Sticks – links gehen, rechts in 30°-Schritten drehen; oder Laufen mit den Armen – links joggen = gehen, beide = rennen, ohne Stick.",
-    "Handy: kein Flackern und Ruckeln mehr durch ständiges Vollbild-Umschalten bei jedem Tipp; der rechte Stick ist wieder da; Schießen per Touch wieder wie vorher (Tipp auf den Bildschirm, kein FIRE-Knopf); der VR-Knopf erscheint nur noch im Titel.",
-    "Rechter Stick deutlich weiter vom Rand weg (Platz zum schnellen Drehen nach rechts), schnelle Wischer drehen weiter (Beschleunigung wie CoD Mobile).",
-    "MULTI ruckelt nicht mehr: die Nostr-Signatur (über 100 ms je Paket) lief jede Sekunde mehrfach – jetzt aus; Daten ohne Direktverbindung gebündelt.",
-    "VR: nur die Waffe in der Hand, keine Arme; die Pistole in echter Größe und hinter Wänden verdeckt wie ein echtes Objekt.",
-    "VR: Boxen und Messer per Schlag mit dem Controller (nicht per Abzug), beim Messer die linke Hand als Faust; Messer tötet mit einem Stich.",
-    "VR: Uhr-HUD am linken Handgelenk statt im Blickfeld; Y öffnet dort das Menü – MULTI, Drohne/zu Fuß, Luftschlag wohin du schaust, Radio, Laufen, Reset, VR beenden.",
-    "VR: Raketen folgen deinem Blick, Granatwerfer und Raketen fliegen aus der Waffe in der Hand; beim Tod dreht sich die Welt nicht mehr.",
-    "Neu unter WELT: Immer Tag. Sommer-Sonne mit kürzeren Nächten, hellerer Mond und hellere Straßenlaternen.",
-    "Getroffene Vögel krächzen jedes Mal anders.",
-    "Zombies stöhnen gruselig (jeder anders) und kreischen bei Treffern.",
-    "Polizeidrohnen weiß mit schwarzem Bauch, blauem Band und rot-blauem Blitzlicht; Martinshorn und Drohnen-Ton deutlich hörbar, klar verschieden.",
-    "Der Himmel ohne Kachel-Kanten in den Wolken.",
-    "VR: Greifen mit Griff-Taste (oder Abzug der freien Hand) – Kisten, Tiere, Passanten (fallen als Ragdoll in deine Hand), Autos nur ein wenig schieben; loslassen wirft mit deinem Schwung.",
-    "VR-Multiplayer: Mitspieler am Kragen packen, ziehen und schubsen, Schläge und Messer treffen sie – repliziert auf ihrer Seite.",
-    "VR: Kimme und Korn liegen genau auf der Schusslinie; B wechselt die Waffe, EMP im Menü (im Auto dort das Radio).",
-    "VR: echtes Zielfernrohr beim Sniper – das Gewehr ans Auge, durch die Linse schauen (eigene Kamera, 5°); Gewehr runter, normale Sicht."]},
-  {date:"2026-10-17",time:"13:20",title:"Jet-HUD und Laufstil verbessert",items:[
+  ]},
+  {date:"2026-11-06",time:"17:54",title:"Ton-Knöpfe und Ladebildschirm",items:[
+    "Ton- und Musikknöpfe zeigen klar AN oder AUS; kurzer Ladebildschirm, bis die Welt steht.",
+  ]},
+  {date:"2026-11-06",time:"17:33",title:"Kein Flackern, klares Zielfernrohr",items:[
+    "Kein Flackern mehr an Fassaden; das Zielfernrohr zeigt alles, auch weit weg.",
+    "Messer mit Ausfallschritt, Treffer-Ruck und Blut; Fäuste mit linker und rechter Maustaste.",
+    "Ohne Netz startet das Trainingsgelände mit Straßen, Teich, Brücke und Häusern.",
+  ]},
+  {date:"2026-11-06",time:"16:40",title:"Update-Knopf, Scheinwerfer, Bäume",items:[
+    "UPDATE AVAILABLE: ist eine neue Version online, erscheint ein Knopf zum Aktualisieren.",
+    "VR: auf der Meta Quest mit dem VR-Knopf in die Brille, die Controller steuern alles.",
+    "Wracks sind klar verkohlt, brennen aus und werden abgeräumt; Granaten zerstören auch den Jet.",
+    "Nachts Scheinwerfer an allen Autos; Blaulicht färbt die Straße.",
+    "Bäume stehen auf dem Boden und kippen bei Explosionen um; Tauben lassen sich abschießen.",
+    "Menschen schreien bei Treffern, Raketen zischen im Flug.",
+    "Schüsse kommen beim Seitwärtslaufen genau aus der Waffe; der Jet steht nicht mehr auf der Straße.",
+  ]},
+  {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
+    "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Luftschlag landet genau dort, wo du tippst.",
+    "Messer, Fäuste und Fingerschüsse reagieren auf jeden kurzen Tipp; Fäuste: linke Hälfte linke Hand, rechte Hälfte rechte Hand.",
+    "Hochkant gehaltene Handys zeigen das Spiel richtig im Querformat.",
+    "Jet: Steuer-Sticks und KANONE wieder da, kein Flugzeug mehr in der Innenkamera, aufgeräumte Knöpfe.",
+    "MULTI zeigt, was passiert: Suche, Lobby offen, Anzahl der Spieler.",
+    "Kopftreffer bei Mitspielern zählen zuverlässig; am Fallschirm hängt die echte Spielfigur.",
+    "Granaten blitzen beim Aufprall, Brandflecken laufen weich in den Boden aus, schärferes Bild.",
+    "Neu unter WELT: Lenkraketen abschaltbar. Standard jetzt: Friendly Fire an, zerstörbares Gelände und Flak aus.",
     "EJECT sitzt jetzt links oben und verdeckt die Minimap nicht mehr.",
     "Bei Kopftreffern gibt es weder HEADSHOT-Schrift noch Ansager – nur ein kurzes neutrales Knacken.",
-    "Rennende Passanten und Jogger lehnen sich wieder deutlich zurück und strecken die Füße nach vorne."]},
-  {date:"2026-10-17",time:"11:44",title:"Vollbild und klassische Hände zurück",items:[
     "Vollbild startet wieder wie vor der App-Umstellung; die Steuerung bleibt in normaler Ansicht und Vollbild nutzbar.",
-    "In der Ego-Ansicht sind die Hände und Waffen wieder kompakt wie vor den neuen großen Handschuh-Armen."]},
-  {date:"2026-10-16",time:"14:42",title:"Neueste Spielversion und Changelog wieder live",items:[
     "Alle bisherigen Änderungen und Updates erscheinen wieder in der richtigen Reihenfolge im NEU / CHANGELOG-Menü.",
     "Die aktuelle Spielversion wird jetzt einheitlich unter spawncity.de veröffentlicht – einschließlich des verbesserten Touchpad-Mouselooks.",
-    "Das Spiel prüft beim Veröffentlichen, ob die richtige Version tatsächlich auf spawncity.de angekommen ist."]},
-  {date:"2026-10-16",time:"14:11",title:"Touchpad-Mouselook in Ego-Sicht",items:[
     "Notebook-Touchpads drehen die Kamera in der Ego-Perspektive wieder gleichmäßig, auch bei schnellen Fingerbewegungen.",
-    "Die Steuerung nutzt zuverlässige Mausbewegungen statt Raw-Input-Zwang; Schießen, Gamepad und Touch-Bedienung bleiben erhalten."]},
-  {date:"2026-10-16",time:"10:46",title:"Headshots, Sniper-Fixes, echte Jogger",items:[
     "HEADSHOT! Kopftreffer mit Sniper und Glock töten sofort, mit der MP dreifacher Schaden – mit Einblendung und Ansager.",
     "Sniper-Zielfernrohr hängt nicht mehr: Drohne, Auto, Jet, Drehen des Handys oder Tod beenden das Zielen sofort.",
     "Beim Zielen durchs Fernrohr tauchen keine Zombies oder Leute mehr plötzlich neben dir auf.",
     "Ein Sniper-Schuss sprengt kein Auto mehr: Karosserie braucht drei Treffer, der Motorraum zwei – erst raucht es, dann knallt es.",
     "Polizei, Militär und Zombies sind weniger tödlich: weniger Schaden, kurze Reaktionszeit, keine Salven mehr.",
     "Jogger joggen jetzt wirklich – mit Laufstil, Sportklamotten und ohne durch Häuser zu laufen.",
-    "Die losen Physik-Objekte (Kisten, Fässer, Hütchen) sind raus, auch aus dem Menü."]},
-  {date:"2026-10-16",time:"08:57",title:"Teilen",items:[
-    "Neuer Knopf TEILEN im Startmenü: schick SpawnCity direkt per WhatsApp, X, Instagram & Co. – oder der Link wird kopiert. Geteilte Links zeigen jetzt ein großes Vorschaubild."]},
-  {date:"2026-10-16",time:"07:10",title:"Polizei kommt, Busse fahren, neue Autos",items:[
     "Polizei, Polizeidrohnen und Militär kommen wieder: du entkommst erst, wenn sie da waren – nicht mehr, bevor das erste Auto eintrifft. Das Militär rückt bei fünf Sternen deutlich früher aus.",
     "Ein Haus wegzuschießen reißt keinen ganzen Block mehr mit: brennende Autos, Trümmer und Polizeiwagen beschädigen keine Häuser mehr, nur noch echte Waffen.",
     "Busse kannst du jetzt genauso fahren wie Autos – mit Außen- und Innenansicht.",
@@ -158,8 +228,6 @@ export const CHANGELOG=Object.freeze([
     "Spieler halten etwa 18 % mehr aus.",
     "Zombies brechen nicht mehr sofort durch: eine Barrikade hält, egal wie viele drauf einschlagen, und durch Bretter wird niemand gekratzt. Nachts sind die Eingänge nur noch verbarrikadiert, ohne Türen.",
     "Routenpfeile liegen jetzt als Pfeile auf der Straße statt als flache Symbole im Bild.",
-    "Die installierte App startet nicht mehr im erzwungenen Vollbild – kein „Zum Beenden nach oben wischen“ mehr, du kommst ganz normal raus."]},
-  {date:"2026-10-16",time:"06:38",title:"Feste Häuser, Tauben, Laserpunkt",items:[
     "Häuser sind überall fest: Autos fahren nicht mehr durch Gebäude (auch nicht in der Innenansicht), Passanten und Tiere laufen nicht mehr hindurch – egal wie weit du dich von deiner Drohne entfernst.",
     "Die Physik repariert sich selbst: ein einzelner kaputter Körper kann die Kollisionen nicht mehr lahmlegen, und sollte die Physik doch einmal abstürzen, wird sie sofort neu aufgebaut.",
     "Tauben! Kleine Trupps laufen in der Stadt herum, nicken, picken und gurren – kommst du ihnen zu nahe, fährt ein Auto vorbei oder knallt es, flattern alle zusammen auf und landen woanders.",
@@ -169,19 +237,13 @@ export const CHANGELOG=Object.freeze([
     "Die Ton- und Musik-Knöpfe oben wackeln nicht mehr.",
     "Sounds sind zurück: Motor, Umgebung und Explosionen setzen nach dem Zurückkehren in die App wieder ein (spätestens beim ersten Tippen).",
     "Straßen und Gehwege verschwinden nicht mehr kurz, wenn irgendwo etwas explodiert.",
-    "Innenansicht im Auto ganz ohne Lenkrad – freie Sicht auf die Straße."]},
-  {date:"2026-10-16",time:"03:30",title:"Neue Hände, Sniper-Timing, Fixes",items:[
     "Neue Hände in der Ego-Sicht und eine schnellere Messer-Animation.",
     "Sniper: Treffer und Einschlag kommen erst an, wenn die Kugel da ist.",
     "Granatwerfer-Explosionen sind wieder deutlich zu hören.",
     "Auf Dachaufbauten (Treppenhäuser) kann man jetzt stehen.",
     "Gebäude sind beim Start nicht mehr schon eingestürzt.",
-    "Startmenü passt auf das Handy quer, und EXIT ist immer erreichbar."]},
-  {date:"2026-10-16",time:"02:30",title:"Neuer Mehrspieler-Raum",items:[
     "SpawnCity hat jetzt einen eigenen Mehrspieler-Raum.",
     "Bitte die Seite einmal neu laden. Wer noch eine ältere Version offen hat, sieht die anderen erst nach dem Neuladen.",
-    "Die Fernsteuerung (Remote) wird einfach neu gekoppelt wie bisher."]},
-  {date:"2026-10-15",time:"23:59",title:"Flak!",items:[
     "Ab und zu steht irgendwo in der Stadt eine Vierlings-Flak hinter Sandsäcken. Fliegst du mit Drohne oder Jet in ihre Nähe (gut 1 km, Sichtlinie), feuert sie wie verrückt: vier Rohre, Leuchtspur bei jedem Schuss, Sprengwolken um dich herum, harter Sound. Nahe Detonationen beschädigen dich.",
     "Ausschalten: eine Explosion daneben oder ein paar Scharfschützen-Treffer. Alle Spieler finden die Flak an denselben Orten. Im Menü unter WORLD → FLAK abschaltbar.",
   ]},

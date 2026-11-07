@@ -159,7 +159,7 @@ class Terrain {
   bool ground_albedo(f32 x, f32 y, Vec3& lin) const;
   kern::Vec4 image_bounds(const TileKey& k) const;
 
-  void plan_dem(Vec3 focus);
+  void plan_dem(Vec3 focus, Vec3 player, bool mates);
   bool run_job(f64 deadline);
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;

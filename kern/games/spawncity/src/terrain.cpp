@@ -272,9 +272,15 @@ f32 Terrain::sample_dem(f64 lon, f64 lat, bool& ok) const {
   return (h[0] * (1 - ax) + h[1] * ax) * (1 - ay) + (h[t.w] * (1 - ax) + h[t.w + 1] * ax) * ay;
 }
 
-void Terrain::plan_dem(Vec3 focus) {
+void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates) {
   if (!dem_ || job_) return;
-  if (grid_ready_ && std::hypot(focus.x - grid_.cx, focus.y - grid_.cy) < kDemReload) return;
+  if (grid_ready_) {
+    // a new window when the centre moved far, or someone it must hold is near its edge
+    const f32 half = kDemSize / 2 - 700;
+    bool edge = std::fabs(player.x - grid_.cx) > half || std::fabs(player.y - grid_.cy) > half;
+    if (mates) for (const Vec3& e : extra) edge = edge || std::fabs(e.x - grid_.cx) > half || std::fabs(e.y - grid_.cy) > half;
+    if (!edge && std::hypot(focus.x - grid_.cx, focus.y - grid_.cy) < kDemReload) return;
+  }
   const f64 now = kern::now_ms();
   if (now < retry_at_) return;
   const f32 cx = std::round(focus.x / 50) * 50, cy = std::round(focus.y / 50) * 50, half = kDemSize / 2;
@@ -1105,7 +1111,19 @@ bool Terrain::ready_at(Vec3 p) const {
 void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 deadline = kern::now_ms() + budget_ms;
-  plan_dem(focus + lead);
+  // the elevation window (8 km): round the player - and in a session (host) round him and his
+  // mates together when they fit in it, so the ground under a mate is the real one here too (his
+  // cars drive on the same hills as on his machine); far apart, the player's own comes first
+  {
+    Vec3 c = focus + lead;
+    bool all = false;
+    if (!extra.empty()) {
+      Vec2 lo{focus.x, focus.y}, hi = lo;
+      for (const Vec3& e : extra) { lo = {std::fmin(lo.x, e.x), std::fmin(lo.y, e.y)}; hi = {std::fmax(hi.x, e.x), std::fmax(hi.y, e.y)}; }
+      if (hi.x - lo.x < kDemSize - 1600 && hi.y - lo.y < kDemSize - 1600) { c = {(lo.x + hi.x) / 2, (lo.y + hi.y) / 2, focus.z}; all = true; }
+    }
+    plan_dem(c, focus, all);
+  }
   plan_images(focus);
   if (job_) run_job(deadline);
   if (!settled_) return;
