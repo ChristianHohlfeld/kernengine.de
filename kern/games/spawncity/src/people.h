@@ -35,6 +35,7 @@ struct PeopleView {
   bool player_on_foot = true, player_alive = true;
   std::function<bool(Vec3)> can_spawn;  // spawn_visibility_guard.mjs: may someone appear here unseen?
   std::vector<VehicleView> vehicles;
+  std::vector<Vec3> foci;  // the other players (MP host): people live around everybody
 };
 
 /// What the people saw that the wanted tracker hears about.
@@ -80,7 +81,11 @@ class People {
     u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
     f32 knocked_until = 0;          // thrown by a car and getting up again (ragdoll.h, M3 life)
     f32 hurt_at = -99;              // the last hit taken (the pain voice, game_gaps.cpp)
+    i32 net = -1;                   // MP client: the host's index of this citizen (a puppet of his world)
+    Vec3 net_to;                    // ... where the host has him (eased towards)
   };
+  /// A citizen of the host's world as his snapshot has him (game_worldsync.cpp).
+  struct NetPerson { u8 idx = 0, state = 0, flags = 0; u32 seed = 0; Vec3 pos; f32 yaw = 0, v = 0; };
   /// A death since the last take_deaths() (points, kill feed).
   struct Death { i32 index; Kind kind; bool by_player; bool head; };
 
@@ -134,6 +139,14 @@ class People {
   struct Fall { i32 index; Vec3 push; bool car; bool alive; };
   void take_falls(std::vector<Fall>& out) { out.insert(out.end(), falls_.begin(), falls_.end()); falls_.clear(); }
   void stand_up(i32 i, Vec3 feet, f32 yaw) { Person& p = at(i); p.pos = feet; p.yaw = yaw; p.knocked_until = 0; }
+  /// MP client: the citizens are the host's (puppets eased to his snapshots, no own spawning).
+  void set_puppets(bool on) { if (on != puppets_) { puppets_ = on; for (Person& p : people_) if (p.kind == Kind::citizen) p.state = State::gone; } }
+  bool puppets() const { return puppets_; }
+  /// One snapshot of the host's citizens (all of them near any player): new ones appear, known
+  /// ones move there, a death or a fall there is one here, the ones not in it are gone.
+  void apply_snapshot(const std::vector<NetPerson>& list, f32 now);
+  /// The colours and pace a citizen's seed gives (the same on every machine).
+  static void dress(Person& p);
   /// Whether the last hit of shot() was on the head (headshot_feedback.mjs).
   bool last_head() const { return last_head_; }
 
@@ -156,7 +169,7 @@ class People {
   std::vector<CrimeReport> reports_;
   std::vector<Death> deaths_;
   std::vector<Fall> falls_;
-  bool last_head_ = false;
+  bool last_head_ = false, puppets_ = false;
   u32 budget_ = 60, serial_ = 1;
   f32 show_ = 170, hide_ = 190;
 };

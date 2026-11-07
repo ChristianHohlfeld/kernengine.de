@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -124,7 +124,7 @@ std::vector<u8> pack(const PlayerState& s) {
   w.put(s.slot).put(static_cast<u8>(s.mode)).put(s.color).put(s.flags).put(s.t_ms).put(s.position).put(s.velocity).put(s.rotation).put(s.avatar).put(s.avatar_yaw);
   if (s.flags & kDroneOut) w.put(s.drone_pos).put(s.drone_rot);
   if (s.flags & kJetOut) w.put(s.jet_pos).put(s.jet_rot);
-  w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon).put(s.day);
+  w.put(s.yaw).put(s.pitch).put(s.speed).put(s.health).put(s.thrust).put(s.stars).put(s.weapon).put(s.day).put(s.car);
   return w.b;
 }
 
@@ -136,7 +136,7 @@ bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
   s.position = r.get<Vec3>(); s.velocity = r.get<Vec3>(); s.rotation = r.get<Quat>(); s.avatar = r.get<Vec3>(); s.avatar_yaw = r.get<f32>();
   if (s.flags & kDroneOut) { s.drone_pos = r.get<Vec3>(); s.drone_rot = r.get<Quat>(); }
   if (s.flags & kJetOut) { s.jet_pos = r.get<Vec3>(); s.jet_rot = r.get<Quat>(); }
-  s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>(); s.day = r.get<f32>();
+  s.yaw = r.get<f32>(); s.pitch = r.get<f32>(); s.speed = r.get<f32>(); s.health = r.get<f32>(); s.thrust = r.get<f32>(); s.stars = r.get<u8>(); s.weapon = r.get<u8>(); s.day = r.get<f32>(); s.car = r.get<u8>();
   if (!r.ok || mode > static_cast<u8>(PlayerMode::parachute) || !sane(s.position) || !sane(s.velocity) || !sane(s.avatar) || !std::isfinite(s.health)) return false;
   s.mode = static_cast<PlayerMode>(mode);
   s.health = clampf(s.health, 0, 100);
@@ -285,6 +285,9 @@ void Session::send_fx(Fx f) {
 void Session::send_swarm(const std::vector<SwarmUnit>& units) {
   if (role_ == Role::none) return;
   to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, units));
+}
+void Session::send_world(const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
 }
 void Session::send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage) {
   if (role_ == Role::none) return;
@@ -522,6 +525,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
     case kSwarmMsg: { Swarm sw; if (unpack_swarm(d, sw) && sw.owner != self_slot_) swarms_.push_back(sw); return; }
     case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
+    case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
     case kSeatState: {
       const u32 rev = r.get<u32>();
       const u8 n = r.get<u8>();

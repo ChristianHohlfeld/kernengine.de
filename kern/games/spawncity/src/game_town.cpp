@@ -42,6 +42,7 @@ PeopleView Game::people_view() const {
   v.physics = &world_->physics();
   v.city = &city_;
   v.focus = focus_position();
+  if (net_.hosting()) v.foci = mate_foci();  // MP: the citizens live around every player (game_worldsync.cpp)
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.player_on_foot = mode_ == Mode::foot;

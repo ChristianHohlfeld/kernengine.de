@@ -63,6 +63,7 @@ struct PlayerState {
   f32 thrust = 0;         // jet 0..1
   u8 stars = 0, weapon = 0;
   f32 day = -1;           // time of day 0..1 (day_night_sync.mjs: clients follow the host's)
+  u8 car = 255;           // the traffic car he drives (its index on his machine; 255 none) - the host's world leaves it to him
 };
 
 /// An effect another player sees (vs_multiplayer.mjs fx: shot, explosion, impact).
@@ -147,6 +148,8 @@ class Session {
   /// Our units (all kinds in one snapshot, at most 64); the others draw and shoot them.
   void send_swarm(const std::vector<SwarmUnit>& units);
   void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
+  /// The host's world (traffic, people: game_worldsync.cpp) to every client, unreliable.
+  void send_world(const std::vector<u8>& blob);
   /// A shot / blast of ours that reached player `target` (the authority judges it).
   void request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from);
   /// We went down (by kNobody: an accident).
@@ -170,6 +173,7 @@ class Session {
   std::vector<Fx> take_fx() { return std::move(fx_); }
   std::vector<Swarm> take_swarms() { return std::move(swarms_); }
   std::vector<SwarmHit> take_swarm_hits() { return std::move(swarm_hits_); }
+  std::vector<std::vector<u8>> take_world() { return std::move(world_); }
   std::vector<PingEvent> take_pings() { return std::move(pings_); }
   std::vector<VoiceFrame> take_voice() { return std::move(voice_); }
   /// A spawn anchor from the host for this (joining) player.
@@ -224,6 +228,7 @@ class Session {
   std::vector<Fx> fx_;
   std::vector<Swarm> swarms_;
   std::vector<SwarmHit> swarm_hits_;
+  std::vector<std::vector<u8>> world_;
   std::vector<PingEvent> pings_;
   std::vector<VoiceFrame> voice_;
   std::vector<u8> pending_anchor_;  // host: clients waiting for their anchor (first pose)

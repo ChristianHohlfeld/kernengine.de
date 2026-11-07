@@ -196,6 +196,22 @@ class Game {
   // simulation pieces
   void drive_traffic(f32 h);
   void manage_traffic();
+  // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
+  struct CarPuppet { Vec3 p, v; Quat q; f32 at = -9; };
+  void worldsync_update(f32 dt);
+  std::string worldsync_list() const;
+  bool world_puppet() const;
+  std::vector<Vec3> mate_foci() const;
+  bool puppet_car_step(TrafficCar& c, std::size_t i, f32 h);
+  bool puppet_world_ = false;
+  f32 world_send_clock_ = 0;
+  u32 world_sent_ = 0, world_got_ = 0;
+  std::vector<bool> car_seen_;
+  std::vector<People::NetPerson> people_acc_;
+  std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
+  std::vector<CarPuppet> car_puppet_;
+  std::vector<bool> car_lent_;         // host: a mate drives this car of ours
+  std::vector<std::pair<Vec3, Quat>> car_lent_at_;
   void step_parachute(f32 h);
   // the town: people, police, damage (game_town.cpp)
   void update_town(f32 dt);

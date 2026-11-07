@@ -129,7 +129,71 @@ bool People::witnessed(Vec3 at) const {
   return false;
 }
 
+namespace {
+// the nearest player (MP: the host's people live around every player)
+f32 near_any(const PeopleView& v, Vec3 p) {
+  f32 d = dist2d(p, v.focus);
+  for (const Vec3& f : v.foci) d = std::fmin(d, dist2d(p, f));
+  return d;
+}
+}  // namespace
+
+void People::dress(Person& p) {
+  const u32 seed = p.seed;
+  p.speed = 1.0f + static_cast<f32>((seed >> 7) % 66) / 100;
+  p.fitness = 0.75f + static_cast<f32>((seed >> 11) % 51) / 100;
+  p.shirt = kShirts[(seed >> 3) % 10];
+  p.pants = kPants[(seed >> 9) % 6];
+  p.skin = kSkins[(seed >> 13) % 5];
+}
+
+void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
+  std::vector<bool> seen(people_.size(), false);
+  for (const NetPerson& n : list) {
+    i32 at = -1;
+    for (std::size_t i = 0; i < people_.size(); ++i)
+      if (people_[i].kind == Kind::citizen && people_[i].net == n.idx && people_[i].state != State::gone) { at = static_cast<i32>(i); break; }
+    const bool host_down = n.state == static_cast<u8>(State::down);
+    if (at < 0) {
+      if (host_down) continue;  // a body we never saw walk: not worth showing
+      Person p;
+      p.kind = Kind::citizen;
+      p.seed = n.seed;
+      dress(p);
+      p.net = n.idx;
+      p.pos = p.net_to = n.pos;
+      p.yaw = n.yaw;
+      p.state = static_cast<State>(n.state <= static_cast<u8>(State::fight) ? n.state : 0);
+      bool placed = false;
+      for (std::size_t i = 0; i < people_.size(); ++i)
+        if (people_[i].state == State::gone) { people_[i] = p; at = static_cast<i32>(i); placed = true; break; }
+      if (!placed) { people_.push_back(p); seen.push_back(false); at = static_cast<i32>(people_.size() - 1); }
+    }
+    seen[static_cast<std::size_t>(at)] = true;
+    Person& p = people_[static_cast<std::size_t>(at)];
+    if (p.seed != n.seed) { p.seed = n.seed; dress(p); p.pos = n.pos; }
+    if (p.state == State::down) continue;
+    if (host_down) { kill(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0}, false, now, false); continue; }
+    if ((n.flags & 1) && now >= p.knocked_until) { knock(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0.5f}, now); continue; }
+    p.net_to = n.pos;
+    p.v = n.v;
+    if (now >= p.knocked_until) {
+      p.state = static_cast<State>(n.state <= static_cast<u8>(State::fight) ? n.state : 0);
+      // far off (a respawn of his, a teleport): there at once
+      if (dist2d(p.pos, n.pos) > 6) p.pos = n.pos;
+      p.yaw = n.yaw;
+    }
+  }
+  for (std::size_t i = 0; i < seen.size() && i < people_.size(); ++i) {
+    Person& p = people_[i];
+    if (seen[i] || p.kind != Kind::citizen || p.net < 0) continue;
+    if (p.state == State::down || now < p.knocked_until) continue;  // a body / a ragdoll stays its time
+    p.state = State::gone;
+  }
+}
+
 void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
+  if (puppets_) return;  // MP client: the host's citizens
   const std::vector<Lane>& lanes = view.city->lanes();
   if (lanes.empty()) return;
   u32 alive = count(Kind::citizen, false);
@@ -162,8 +226,10 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     Vec3 at;
     f32 heading;
     route_point(p, lanes, at, heading);
-    const f32 d = dist2d(at, view.focus);
-    if (d < near || d > show_) continue;
+    // around a player: ours, or (MP host) one of the others - near none of them, far from none
+    const f32 d = near_any(view, at);
+    const Vec3 around = view.foci.empty() || (attempt % (view.foci.size() + 1)) == 0 ? view.focus : view.foci[attempt % (view.foci.size() + 1) - 1];
+    if (d < near || dist2d(at, around) > show_) continue;
     if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
       p.side = -p.side;  // the other pavement, else closer to the kerb
       route_point(p, lanes, at, heading);
@@ -451,12 +517,18 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
   for (Person& p : people_) {
     if (p.state == State::gone) continue;
     if (p.state == State::down) {
-      if (now - p.down_at > kBodySeconds || dist2d(p.pos, view.focus) > hide_) p.state = State::gone;
+      if (now - p.down_at > kBodySeconds || near_any(view, p.pos) > hide_) p.state = State::gone;
       continue;
     }
     if (now < p.knocked_until) continue;  // lying on the street as a ragdoll (M3 life)
-    if (p.kind == Kind::citizen) {
-      if (dist2d(p.pos, view.focus) > hide_) { p.state = State::gone; continue; }
+    if (p.kind == Kind::citizen && puppets_ && p.net >= 0) {
+      // the host's citizen: eased to where his snapshot has him (100 ms apart)
+      const Vec3 d = p.net_to - p.pos;
+      const f32 k = std::fmin(1.0f, dt * 9);
+      p.pos.x += d.x * k;
+      p.pos.y += d.y * k;
+    } else if (p.kind == Kind::citizen) {
+      if (near_any(view, p.pos) > hide_) { p.state = State::gone; continue; }
       if (p.state != State::fight) walk(p, dt, now, view, rng);
     }
     p.phase += p.v * dt * 3.4f;

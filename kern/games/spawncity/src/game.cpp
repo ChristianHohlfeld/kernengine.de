@@ -638,6 +638,8 @@ void Game::drive_traffic(f32 h) {
     if (!c.placed) continue;
     const kern::physics::Body b = body(c.actor);
     if (!b.valid()) continue;
+    if (i < car_lent_.size() && car_lent_[i]) continue;  // MP host: a mate drives it (game_worldsync.cpp)
+    if (puppet_car_step(c, i, h)) continue;             // MP client: the host's car (game_worldsync.cpp)
     if (c.far) { traffic_far_step(c, h); continue; }  // no physics far away (game_traffic_far.cpp)
     if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
       c.car->step(w, b, h, c.input);
@@ -741,8 +743,17 @@ void Game::step_parachute(f32 h) {
 // traffic placement (every half second)
 
 void Game::manage_traffic() {
+  if (puppet_world_) return;  // MP client in the host's town: his traffic (game_worldsync.cpp)
   const std::vector<Lane>& lanes = city_.lanes();
   const Vec3 me = focus_position();
+  // MP host: the traffic lives around every player - placed near one of them, taken away only
+  // when it is far from all (game_worldsync.cpp sends it)
+  const std::vector<Vec3> mates = net_.hosting() ? mate_foci() : std::vector<Vec3>{};
+  auto nearest = [&](Vec3 p) {
+    f32 d = std::hypot(p.x - me.x, p.y - me.y);
+    for (const Vec3& m : mates) d = std::fmin(d, std::hypot(p.x - m.x, p.y - m.y));
+    return d;
+  };
   i32 alive_lanes = 0;
   for (const Lane& l : lanes) alive_lanes += l.alive ? 1 : 0;
   if (alive_lanes == 0) return;
@@ -750,6 +761,7 @@ void Game::manage_traffic() {
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     if (static_cast<i32>(i) == car_index_) continue;
+    if (i < car_lent_.size() && car_lent_[i]) continue;  // a mate drives it
     if (c.police) {
       // An abandoned cruiser far away is put back into the pool.
       if (c.placed && c.unit < 0 && std::hypot(matrix_of(c.actor).translation().x - me.x, matrix_of(c.actor).translation().y - me.y) > 420) {
@@ -763,7 +775,7 @@ void Game::manage_traffic() {
     bool replace = !c.placed;
     if (c.placed) {
       const Vec3 p = matrix_of(c.actor).translation();
-      const f32 d = std::hypot(p.x - me.x, p.y - me.y);
+      const f32 d = nearest(p);
       // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
       // VEHICLE_RELOCATE_M 330 (world_procedural_population.mjs)
       replace = d > 330 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !lanes[c.lane].alive) && d > 120);
@@ -785,12 +797,13 @@ void Game::manage_traffic() {
       // itself runs right past the player: the synthetic test town, long OSM ways)
       f32 along = seg * 0.5f;
       if (seg > 16) {
-        const f32 t0 = clampf(((me.x - a.x) * (bpt.x - a.x) + (me.y - a.y) * (bpt.y - a.y)) / seg, 0, seg);  // nearest to the player
+        const Vec3 around = mates.empty() || attempt % (mates.size() + 1) == 0 ? me : mates[attempt % (mates.size() + 1) - 1];
+        const f32 t0 = clampf(((around.x - a.x) * (bpt.x - a.x) + (around.y - a.y) * (bpt.y - a.y)) / seg, 0, seg);  // nearest to the player
         along = clampf(t0 + (rng_.unit() < 0.5f ? -1.0f : 1.0f) * rng_.range(45, 240), 4, seg - 4);
       }
       const Vec2 mid = a + (bpt - a) * (along / seg);
-      const f32 d = std::hypot(mid.x - me.x, mid.y - me.y);
-      if (d < 45 || d > 240) continue;  // VEHICLE_PLACE_MIN_M / VEHICLE_PLACE_MAX_M
+      const f32 d = nearest({mid.x, mid.y, 0});
+      if (d < 45 || d > 240) continue;  // VEHICLE_PLACE_MIN_M / VEHICLE_PLACE_MAX_M (from the nearest player)
       const i32 dir = rng_.unit() < 0.5f ? 1 : -1;
       const Vec2 dv = (dir > 0 ? bpt - a : a - bpt) * (1.0f / seg);
       const f32 off = std::fmin(L.width * 0.25f, 1.8f);
@@ -853,6 +866,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     static f32 traffic_clock = 0;
     traffic_clock += dt;
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
+    worldsync_update(dt);  // one world in multiplayer (game_worldsync.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
     {
       // the elevation ahead of a fast flight (terrain.h lead)
@@ -1377,6 +1391,7 @@ std::string Game::command(const std::string& cmd) {
                   std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
     return b;
   }
+  if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera
     vr_ = cmd == "vr 1";

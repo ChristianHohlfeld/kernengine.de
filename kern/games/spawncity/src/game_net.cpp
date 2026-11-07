@@ -146,6 +146,13 @@ net::PlayerState Game::my_state() const {
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
   s.stars = static_cast<u8>(wanted_.stars());
   s.weapon = static_cast<u8>(foot_weapon_);
+  // the traffic car we drive, by the host's index (his town's: game_worldsync.cpp); a car of our
+  // own town (far from him) is none of his
+  s.car = 255;
+  if (mode_ == Mode::car && car_index_ >= 0) {
+    if (net_.hosting()) s.car = static_cast<u8>(std::min(car_index_, 254));
+    else if (puppet_world_ && static_cast<std::size_t>(car_index_) < car_net_.size() && car_net_[static_cast<std::size_t>(car_index_)] >= 0) s.car = static_cast<u8>(car_net_[static_cast<std::size_t>(car_index_)]);
+  }
   s.day = look_.tod;  // the host's phase is the session's (game_look.cpp)
   s.thrust = jet_.thrust() / std::fmax(1.0f, jet_.spec().thrust_max);
   u16 f = 0;
