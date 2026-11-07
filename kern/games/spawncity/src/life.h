@@ -72,11 +72,12 @@ class Life {
     bool dead = false, walking = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
     f32 carried_still = 0;
     kern::physics::Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
-    Vec3 net_to;               // MP client: where the host has it
+    Vec3 net_to, net_v;        // MP client: where the host has it, and its pace there
+    f32 net_at = 0;
     Quat net_rot;
     bool net_dead = false;
   };
-  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; Vec3 net_to; f32 net_yaw = 0; };
+  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; Vec3 net_to, net_v; f32 net_yaw = 0, net_at = 0; };
   struct Flock {
     bool air = false;
     Vec2 at;
@@ -87,7 +88,7 @@ class Life {
     std::vector<Pigeon> birds;
   };
   struct Bird { u32 seed = 0; Vec3 pos; f32 yaw = 0, flap = 1, dead_until = -1, dying_until = -1, spin = 0; Vec3 fall_v; Vec2 center; bool down = false; };
-  struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; Vec3 net_to; };
+  struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; Vec3 net_to, net_v; f32 net_at = 0; };
   struct Chain {
     u32 id = 0;
     std::vector<Vec2> path;  // the pavement line
@@ -154,7 +155,7 @@ class Life {
   /// MP client: the running club is the host's (game_worldsync.cpp) - no own chain, his runners
   /// eased to where his snapshots have them; none heard for 1.5 s: gone.
   void set_remote_joggers(bool on) { if (on != remote_joggers_) { remote_joggers_ = on; chain_alive_ = false; } }
-  void apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now);
+  void apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now, f32 at);
   /// MP client: the animals are the host's too (game_worldsync.cpp): no herds, pets or flocks of
   /// our own; his cows (by key - the same on every machine), dogs and cats (by his index) and
   /// pigeon flocks (by his index) eased to where his snapshots have them. An animal that is a
@@ -173,7 +174,7 @@ class Life {
   kern::physics::Body pet_body(u32 i) const { return i < pets_.size() ? pets_[i].body : kern::physics::Body{}; }
   void set_remote_animals(bool on);
   bool remote_animals() const { return remote_animals_; }
-  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now);
+  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now, f32 at);
   Vec2 pet_anchor() const { return pet_anchor_; }
   /// Thrown things (game_toss.cpp): the body of an animal another player throws, made here so
   /// it flies here too (the host's cow by key / pet by index); invalid when there is none.

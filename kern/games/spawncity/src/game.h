@@ -49,6 +49,7 @@ namespace sc {
 struct MpLocal;  // multiplayer presentation state (game_net.cpp)
 struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
 struct TossState;    // thrown things in a session (game_toss.cpp)
+struct ProjSync;     // rounds in flight in a session (game_projsync.cpp)
 struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
@@ -108,6 +109,8 @@ struct Projectile {
   bool resting = false;                  // a grenade lying still (gameplay_final_runtime_v2.mjs)
   f32 next_collision = 0, smoke_at = -1;  // bounce guard (36 / 60 ms), the rocket's last puff
   kern::physics::Body ignore;
+  u32 net = 0;          // MP: its id in the stream to the others (game_projsync.cpp)
+  bool ghost = false;   // MP: a mate's round as it flies on his machine - drawn here, no hits here
 };
 
 /// A police drone (wanted_police_drones.mjs): flies in a ring around the player at about his
@@ -217,6 +220,12 @@ class Game {
   i32 toss_test_ = -1;
   TossState& toss();
   std::shared_ptr<TossState> toss_;
+  // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
+  void projsync_update(f32 dt);
+  void projsync_blast(u8 owner, Vec3 at);
+  ProjSync& projsync();
+  std::shared_ptr<ProjSync> projsync_;
+  u32 proj_serial_ = 0;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;
@@ -230,6 +239,8 @@ class Game {
   std::vector<People::NetPerson> people_acc_;
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
   std::vector<CarPuppet> car_puppet_;
+  f64 world_clock_ = 0;              // client: his clock to ours (ms, game_worldsync.cpp)
+  bool world_clock_ok_ = false;
   std::vector<bool> car_lent_;         // host: a mate drives this car of ours
   std::vector<std::pair<Vec3, Quat>> car_lent_at_;
   void step_parachute(f32 h);

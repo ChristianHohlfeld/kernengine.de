@@ -131,7 +131,7 @@ void Game::worldsync_update(f32 dt) {
       Wr cw;
       cw.put(kCars);
       cw.put<u8>(0);
-      cw.put(o.x); cw.put(o.y);
+      cw.put(o.x); cw.put(o.y); cw.put(static_cast<u32>(std::lround(now * 1000)));  // his clock: the client dead-reckons from it
       u8 n = 0;
       // the nearest to a mate first (at most 32: what he sees around him)
       std::vector<std::pair<f32, std::size_t>> order;
@@ -174,7 +174,7 @@ void Game::worldsync_update(f32 dt) {
       Wr pw;
       pw.put(kPeople);
       pw.put<u8>(0);
-      pw.put(o.x); pw.put(o.y);
+      pw.put(o.x); pw.put(o.y); pw.put(static_cast<u32>(std::lround(now * 1000)));  // his clock: the client dead-reckons from it
       u8 m = 0;
       const auto& all = people_.all();
       for (std::size_t i = 0; i < all.size() && i < 255 && m < 48; ++i) {
@@ -197,7 +197,7 @@ void Game::worldsync_update(f32 dt) {
         Wr aw;
         aw.put(kAnimals);
         aw.put<u8>(0x80);
-        aw.put(o.x); aw.put(o.y);
+        aw.put(o.x); aw.put(o.y); aw.put(static_cast<u32>(std::lround(now * 1000)));  // his clock: the client dead-reckons from it
         auto quat = [&](const Quat& q) { aw.put(q16(q.x)); aw.put(q16(q.y)); aw.put(q16(q.z)); aw.put(q16(q.w)); };
         std::vector<const Life::Cow*> cows;
         for (const Life::Cow& c : L.cows()) if (near_mate(c.pos) && cows.size() < 40) cows.push_back(&c);
@@ -257,7 +257,7 @@ void Game::worldsync_update(f32 dt) {
           Wr jw;
           jw.put(kJoggers);
           jw.put<u8>(0x80 | 10);
-          jw.put(o.x); jw.put(o.y);
+          jw.put(o.x); jw.put(o.y); jw.put(static_cast<u32>(std::lround(now * 1000)));  // his clock: the client dead-reckons from it
           jw.put(ch->id);
           for (const Life::Runner& rn : ch->runners) {
             jw.put<u8>(rn.alive ? 1 : 0);
@@ -296,7 +296,16 @@ void Game::worldsync_update(f32 dt) {
     const bool last = count & 0x80;
     const u8 n = count & 0x7f;
     const f32 ox = r.get<f32>(), oy = r.get<f32>();
+    const u32 t_ms = r.get<u32>();
     if (!r.ok) continue;
+    // the host's clock on ours: the smallest (now - his time) seen, rising slowly - every snapshot is
+    // then placed at the moment it was taken, so the motion between snapshots is his, not a stepping
+    {
+      const f64 lag = static_cast<f64>(now) * 1000 - static_cast<f64>(t_ms);
+      if (!world_clock_ok_ || lag < world_clock_) { world_clock_ = lag; world_clock_ok_ = true; }
+      else world_clock_ += std::min(1.0, (lag - world_clock_) * 0.02);
+    }
+    const f32 snap_at = static_cast<f32>((static_cast<f64>(t_ms) + world_clock_) / 1000);
     auto un8 = [](u8 a) { return static_cast<f32>(static_cast<i8>(a)) / 128 * kPi; };
     if (type == kCars) {
       std::vector<bool>& seen = car_seen_;
@@ -346,7 +355,7 @@ void Game::worldsync_update(f32 dt) {
         cp.p = p;
         cp.q = q;
         cp.v = v;
-        cp.at = now;
+        cp.at = snap_at;
       }
       // the snapshot's last part: the host's cars we no longer hear of are gone here too
       if (last) {
@@ -402,7 +411,7 @@ void Game::worldsync_update(f32 dt) {
         }
         flocks.push_back(std::move(f));
       }
-      if (r.ok && glife_) glife_->life.apply_animals(cows, pets, pet_count, anchor, flocks, now);
+      if (r.ok && glife_) glife_->life.apply_animals(cows, pets, pet_count, anchor, flocks, now, snap_at);
     } else if (type == kJoggers) {
       const u32 id = r.get<u32>();
       Vec3 pos[10];
@@ -414,7 +423,7 @@ void Game::worldsync_update(f32 dt) {
         pos[k].z = city_.ground_height(pos[k].x, pos[k].y);
         yaw[k] = un8(r.get<u8>());
       }
-      if (r.ok && glife_) glife_->life.apply_joggers(id, pos, yaw, alive, std::min<u32>(n, 10), now);
+      if (r.ok && glife_) glife_->life.apply_joggers(id, pos, yaw, alive, std::min<u32>(n, 10), now, snap_at);
     } else if (type == kPeople) {
       std::vector<People::NetPerson>& list = people_acc_;
       for (u8 k = 0; k < n && r.ok; ++k) {
@@ -428,6 +437,7 @@ void Game::worldsync_update(f32 dt) {
         np.pos.z = city_.ground_height(np.pos.x, np.pos.y);
         np.yaw = un8(r.get<u8>());
         np.v = r.get<u8>() / 20.0f;
+        np.at = snap_at;
         if (r.ok) list.push_back(np);
       }
       if (last) { people_.apply_snapshot(list, now); list.clear(); }

@@ -271,6 +271,14 @@ std::string Game::toss_command(const std::string& cmd) {
       }
     return "{\"none\":true}";
   }
+  if (cmd.rfind("toss fire ", 0) == 0) {  // tests: a round of weapon N from the eye, up and ahead
+    const i32 id = std::atoi(cmd.c_str() + 10);
+    Vec3 dir;
+    const Vec3 eye = aim_ray(dir);
+    const Vec3 d = kern::normalize(dir + Vec3{0, 0, 0.35f}, dir);
+    fire_projectile(static_cast<weapons::Id>(id), eye + d * 1.2f, d * (id == 7 ? 14.0f : id == 4 ? 22.0f : 40.0f), true, body(soldier_));
+    return "fired";
+  }
   if (cmd == "toss animals") {
     // tests: the cows (key low bits, x, y), the dogs and cats shown, every pigeon (x, y)
     std::string o = "{\"epoch\":" + std::to_string(L.epoch()) + ",\"cows\":[";
@@ -290,8 +298,11 @@ std::string Game::toss_command(const std::string& cmd) {
 
 std::string Game::toss_json() {
   TossState& t = toss();
-  char b[160];
-  std::snprintf(b, sizeof b, "{\"own\":%zu,\"remote\":%zu,\"sent\":%u,\"got\":%u}", t.own.size(), t.remote.size(), t.sent, t.got);
+  char b[256];
+  u32 ghosts = 0, rounds = 0;
+  Vec3 gp;
+  for (const Projectile& p : projectiles_) { if (!p.alive) continue; if (p.ghost) { ++ghosts; gp = p.pos; } else ++rounds; }
+  std::snprintf(b, sizeof b, "{\"own\":%zu,\"remote\":%zu,\"sent\":%u,\"got\":%u,\"rounds\":%u,\"ghosts\":%u,\"ghost\":[%.2f,%.2f,%.2f]}", t.own.size(), t.remote.size(), t.sent, t.got, rounds, ghosts, gp.x, gp.y, gp.z);
   return b;
 }
 

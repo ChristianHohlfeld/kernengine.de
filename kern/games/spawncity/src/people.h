@@ -86,9 +86,10 @@ class People {
     f32 hurt_at = -99;              // the last hit taken (the pain voice, game_gaps.cpp)
     i32 net = -1;                   // MP client: the host's index of this citizen (a puppet of his world)
     Vec3 net_to;                    // ... where the host has him (eased towards)
+    f32 net_at = 0;                 // ... when (on our clock): he walks on from there at his pace
   };
   /// A citizen of the host's world as his snapshot has him (game_worldsync.cpp).
-  struct NetPerson { u8 idx = 0, state = 0, flags = 0; u32 seed = 0; Vec3 pos; f32 yaw = 0, v = 0; };
+  struct NetPerson { u8 idx = 0, state = 0, flags = 0; u32 seed = 0; Vec3 pos; f32 yaw = 0, v = 0, at = 0; };
   /// A death since the last take_deaths() (points, kill feed).
   struct Death { i32 index; Kind kind; bool by_player; bool head; };
 

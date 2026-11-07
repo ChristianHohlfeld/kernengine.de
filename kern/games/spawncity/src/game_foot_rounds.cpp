@@ -300,7 +300,7 @@ void Game::foot_rounds_update(f32 dt) {
     Projectile* best = nullptr;
     f32 bt = 2;
     for (Projectile& p : projectiles_) {
-      if (!p.alive || !foot_round(p.id)) continue;
+      if (!p.alive || p.ghost || !foot_round(p.id)) continue;
       const f32 t = clampf(kern::dot(p.pos - s.from, seg) / l2, 0, 1);
       if (kern::length(s.from + seg * t - p.pos) <= kShotHit && t < bt) { bt = t; best = &p; }
     }

@@ -37,6 +37,14 @@ bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 rece
   if (!have_offset_) { offset_ = floor; have_offset_ = true; }
   else if (floor < offset_) offset_ = floor;
   else offset_ += fmin2(1, (floor - offset_) * 0.08);
+  // the jitter buffer: the latest snapshots' lateness over the fastest (offset_), the gap between
+  // two snapshots; the delay covers the latest of them (no snapshot missing when it is due)
+  lags_.push_back(std::max(0.0, received - source - offset_));
+  while (lags_.size() > kMaxSnapshots) lags_.erase(lags_.begin());
+  const f64 late = *std::max_element(lags_.begin(), lags_.end());
+  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - snaps_.back().source);
+  const f64 want = clampd(late + gap + 15, kInterpolationDelayMs, 320);
+  delay_ += want > delay_ ? std::min(want - delay_, 40.0) : std::max(want - delay_, -3.0);
   snaps_.push_back({p, q, vel, received, source});
   while (snaps_.size() > kMaxSnapshots) snaps_.erase(snaps_.begin());
   return true;
@@ -49,7 +57,7 @@ PoseSample PoseTimeline::sample(f64 now) const {
   out.valid = true;
   out.age_ms = now > latest.received ? now - latest.received : 0;
   out.stale = out.age_ms > kStaleHoldMs;
-  const f64 target = now - offset_ - kInterpolationDelayMs;
+  const f64 target = now - offset_ - delay_;
   const Snap* left = &snaps_[0];
   const Snap* right = nullptr;
   for (std::size_t i = 1; i < snaps_.size(); ++i) {

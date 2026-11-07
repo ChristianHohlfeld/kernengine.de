@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -303,6 +303,10 @@ void Session::send_world(const std::vector<u8>& blob) {
   if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
 }
 // Destruction sync (game_destruction_sync.cpp): reliable, the host is the authority.
+void Session::send_proj(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && client_->connected()) client_->send(kUnreliable, kProjMsg, blob);
+  else if (role_ == Role::host) to_all(kUnreliable, kProjMsg, W().put(self_slot_).bytes(blob).b, kHost);
+}
 void Session::send_toss(const std::vector<u8>& blob) {
   if (role_ == Role::client && client_ && client_->connected()) client_->send(kUnreliable, kTossMsg, blob);
   else if (role_ == Role::host) to_all(kUnreliable, kTossMsg, W().put(self_slot_).bytes(blob).b, kHost);
@@ -441,6 +445,12 @@ void Session::send_seats() {
 void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
   switch (type) {
     case kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
+    case kProjMsg: {  // a client's rounds in flight: drawn here, and on to the others
+      if (role_ != Role::host) return;
+      if (proj_.size() < 64) proj_.push_back({from, d});
+      to_all(kUnreliable, kProjMsg, W().put(from).bytes(d).b, from);
+      return;
+    }
     case kTossMsg: {  // a client's thrown things: ours to drive, and on to the others
       if (role_ != Role::host) return;
       if (toss_.size() < 64) toss_.push_back({from, d});
@@ -578,6 +588,13 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
     case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
     case kDestroyMsg: { if (role_ == Role::client && destroy_.size() < 64) destroy_.push_back({kHost, d}); return; }
+    case kProjMsg: {  // (relayed: the shooter's slot first)
+      if (role_ != Role::client) return;
+      const u8 from = r.get<u8>();
+      std::vector<u8> body = r.bytes();
+      if (r.ok && from != self_slot_ && proj_.size() < 64) proj_.push_back({from, std::move(body)});
+      return;
+    }
     case kTossMsg: {  // (relayed: the thrower's slot first)
       if (role_ != Role::client) return;
       const u8 from = r.get<u8>();

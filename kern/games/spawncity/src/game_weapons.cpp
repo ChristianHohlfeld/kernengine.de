@@ -197,6 +197,7 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   p.fuse = id == Id::jet_missile ? 5.0f /* jet_mode.mjs life 5 s */ : id == Id::hand_grenade ? kGrenadeFuse : id == Id::drone_rockets ? 7.2f /* direct_fire_missiles.mjs TTL */ : id == Id::grenade_launcher ? 2.8f : id == Id::rocket ? 9.0f : 12;
   if (id == Id::hand_grenade) p.next_collision = p.born + 0.06f;  // throwHandGrenade nextCollisionAt +60 ms
   p.guided = id == Id::drone_guided;
+  p.net = ++proj_serial_ & 0x7fff;
   projectiles_.push_back(p);
   const char* snd = id == Id::hand_grenade || id == Id::jet_bomb ? "builtin:jump" : "builtin:launcher";
   world_->play_sound(snd, from, 0.9f, id == Id::jet_missile ? 0.8f : 1.0f, true);
@@ -210,7 +211,7 @@ void Game::update_projectiles(f32 dt) {
   Vec3 aim_dir;
   const Vec3 aim_from = aim_ray(aim_dir);
   for (Projectile& p : projectiles_) {
-    if (!p.alive) continue;
+    if (!p.alive || p.ghost) continue;  // (a mate's round: moved by its stream, game_projsync.cpp)
     bool boom = false;
     Vec3 at = p.pos;
     if (p.id == Id::grenade_launcher || p.id == Id::rocket || p.id == Id::hand_grenade) {

@@ -391,6 +391,7 @@ void Game::update_net(f32 dt) {
         break;
       }
       case net::Fx::explosion: {
+        projsync_blast(f.owner, f.p);  // his round ends in his blast (game_projsync.cpp)
         m.flashes.push_back({f.p, std::fmax(1.0f, f.a * 0.6f), now, kExplosionMs});
         world_->particle_burst(f.p, {3.0f, 1.2f, 0.3f});
         world_->particle_burst(f.p + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});

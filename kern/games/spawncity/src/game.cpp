@@ -921,6 +921,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     worldsync_update(dt);  // one world in multiplayer (game_worldsync.cpp)
     dsync_update(dt);  // one destroyed city in multiplayer (game_destruction_sync.cpp)
     toss_update(dt);   // thrown people and animals fly on every machine (game_toss.cpp)
+    projsync_update(dt);  // every round in flight on every machine (game_projsync.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
     {
       // the elevation ahead of a fast flight (terrain.h lead)

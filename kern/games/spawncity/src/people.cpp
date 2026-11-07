@@ -176,6 +176,7 @@ void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
     if (host_down) { kill(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0}, false, now, false); continue; }
     if ((n.flags & 1) && now >= p.knocked_until) { knock(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0.5f}, now); continue; }
     p.net_to = n.pos;
+    p.net_at = n.at;
     p.v = n.v;
     if (now >= p.knocked_until) {
       p.state = static_cast<State>(n.state <= static_cast<u8>(State::fight) ? n.state : 0);
@@ -522,9 +523,12 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
     }
     if (now < p.knocked_until) continue;  // lying on the street as a ragdoll (M3 life)
     if (p.kind == Kind::citizen && puppets_ && p.net >= 0) {
-      // the host's citizen: eased to where his snapshot has him (100 ms apart)
-      const Vec3 d = p.net_to - p.pos;
-      const f32 k = std::fmin(1.0f, dt * 9);
+      // the host's citizen: where he is by now - his snapshot's place walked on at his pace and
+      // heading for the time since it was taken (no stop-and-go between snapshots) - eased to
+      const f32 age = clampf(now - p.net_at, 0, 0.8f);
+      const Vec3 want = p.net_to + Vec3{std::cos(p.yaw), std::sin(p.yaw), 0} * (p.v * age);
+      const Vec3 d = want - p.pos;
+      const f32 k = std::fmin(1.0f, dt * 10);
       p.pos.x += d.x * k;
       p.pos.y += d.y * k;
     } else if (p.kind == Kind::citizen) {

@@ -386,9 +386,10 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
         }
         continue;
       }
-      const Vec3 d = c.net_to - c.pos;
-      if (kern::length(d) > 8) c.pos = c.net_to;
-      else c.pos = c.pos + d * std::fmin(1.0f, dt * 6);
+      const Vec3 want = c.net_to + c.net_v * clampf(now - c.net_at, 0, 0.8f);
+      const Vec3 d = want - c.pos;
+      if (kern::length(d) > 8) c.pos = want;
+      else c.pos = c.pos + d * std::fmin(1.0f, dt * 8);
       if (!c.carried && !c.net_dead) c.pos.z = ground(view, c.pos.x, c.pos.y);
       c.rot = c.net_rot;
       c.dead = c.net_dead;
@@ -599,10 +600,11 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
           if (b.pos.z > gz + 0.01f || b.fall_v.z > 0) { b.fall_v.z -= 9.81f * dt; b.pos = b.pos + b.fall_v * dt; if (b.pos.z <= gz) { b.pos.z = gz; b.fall_v = {}; } }
           continue;
         }
-        const Vec3 d = b.net_to - b.pos;
-        const bool moving = kern::length(d) > 0.02f;
-        if (kern::length(d) > 15) b.pos = b.net_to;
-        else b.pos = b.pos + d * std::fmin(1.0f, dt * (f.air ? 8.0f : 6.0f));
+        const Vec3 want = b.net_to + b.net_v * clampf(now - b.net_at, 0, 0.6f);
+        const Vec3 d = want - b.pos;
+        const bool moving = kern::length(b.net_v) > 0.05f;
+        if (kern::length(d) > 15) b.pos = want;
+        else b.pos = b.pos + d * std::fmin(1.0f, dt * 10);
         if (!f.air) b.pos.z = ground(view, b.pos.x, b.pos.y);
         b.yaw += wrap_pi(b.net_yaw - b.yaw) * std::fmin(1.0f, dt * 8);
         b.flap += dt * (f.air ? 16.0f : 0.0f);
@@ -1128,7 +1130,7 @@ void Life::kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out) {
   }
 }
 
-void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now) {
+void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now, f32 at) {
   Chain& c = chain_;
   if (!chain_alive_ || c.id != id) {
     c = Chain{};
@@ -1154,7 +1156,10 @@ void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* al
       continue;
     }
     if (!r.alive) continue;  // down here (a hit of ours): stays down
+    // his pace from his last two snapshots (on his clock): the runner goes on between them
+    if (at > r.net_at + 0.02f && r.net_at > 0) { const Vec3 v = (pos[i] - r.net_to) * (1.0f / (at - r.net_at)); if (kern::length(v) < 12) r.net_v = v; }
     r.net_to = pos[i];
+    r.net_at = at;
     r.yaw = yaw[i];
   }
   remote_joggers_at_ = now;
@@ -1177,7 +1182,7 @@ void Life::set_remote_animals(bool on) {
   pet_anchor_ = {1e9f, 1e9f};
 }
 
-void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now) {
+void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, Vec2 pet_anchor, const std::vector<NetFlock>& flocks, f32 now, f32 at) {
   if (!remote_animals_) return;
   remote_animals_at_ = now;
   pet_anchor_ = pet_anchor;  // the host's neighbourhood: the round of every dog and cat is then the same here
@@ -1197,6 +1202,8 @@ void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetP
     }
     const bool mine = c.body.valid() && world_->body_valid(c.body);
     if (!mine) {
+      if (at > c.net_at + 0.02f && c.net_at > 0) { const Vec3 v = (n.pos - c.net_to) * (1.0f / (at - c.net_at)); c.net_v = kern::length(v) < 15 ? v : Vec3{}; }
+      c.net_at = at;
       c.net_to = n.pos;
       c.net_rot = n.rot;
       c.net_dead = n.dead;
@@ -1244,7 +1251,14 @@ void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetP
       f.birds.resize(n.birds.size());
       for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].pos = n.birds[k]; f.birds[k].yaw = n.yaws[k]; f.birds[k].dead_at = -1; f.birds[k].peck = static_cast<f32>(k) * 1.7f; }
     }
-    for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].net_to = n.birds[k]; f.birds[k].net_yaw = n.yaws[k]; }
+    for (std::size_t k = 0; k < n.birds.size(); ++k) {
+      Pigeon& b = f.birds[k];
+      // its flight between his snapshots: the pace of his last two (on his clock)
+      if (at > b.net_at + 0.02f && b.net_at > 0) { const Vec3 v = (n.birds[k] - b.net_to) * (1.0f / (at - b.net_at)); b.net_v = kern::length(v) < 25 ? v : Vec3{}; }
+      b.net_to = n.birds[k];
+      b.net_at = at;
+      b.net_yaw = n.yaws[k];
+    }
   }
 }
 
@@ -1291,8 +1305,8 @@ void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     if (!chain_alive_) return;
     for (Runner& r : chain_.runners) {
       if (!r.alive) continue;
-      const Vec3 d = r.net_to - r.pos;
-      const f32 k = std::fmin(1.0f, dt * 9);
+      const Vec3 d = r.net_to + r.net_v * clampf(now - r.net_at, 0, 0.6f) - r.pos;
+      const f32 k = std::fmin(1.0f, dt * 10);
       r.pos = r.pos + d * k;
       r.pos.z = ground(view, r.pos.x, r.pos.y);
       r.yaw_s += clampf(wrap_pi(r.yaw - r.yaw_s), -9 * dt, 9 * dt);

@@ -35,23 +35,28 @@ struct PoseSample {
   bool stale = false, extrapolated = false, valid = false;
 };
 
-/// Snapshots of one remote body on the sender's clock; sampled 90 ms behind the estimated remote
-/// "now" (interpolation between snapshots, at most 100 ms of extrapolation, then hold).
+/// Snapshots of one remote body on the sender's clock; sampled a jitter buffer behind the estimated
+/// remote "now" (interpolation between snapshots, at most 100 ms of extrapolation, then hold). The
+/// buffer adapts: 90 ms on a steady link, up to 320 ms as late as the snapshots really come (the
+/// relay's jitter) - so the motion is smooth, never stepping between an extrapolation and the
+/// late snapshot that corrects it; it grows at once and shrinks slowly (no visible time warp).
 class PoseTimeline {
  public:
-  void reset() { snaps_.clear(); offsets_.clear(); have_offset_ = false; }
+  void reset() { snaps_.clear(); offsets_.clear(); lags_.clear(); have_offset_ = false; delay_ = kInterpolationDelayMs; }
   /// `has_v`: the sender's velocity is known (it is blended 70/30 with the measured one).
   bool push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source_ms, f64 received_ms);
   PoseSample sample(f64 now_ms) const;
   bool empty() const { return snaps_.empty(); }
   Vec3 last_position() const { return snaps_.empty() ? Vec3{} : snaps_.back().p; }
   f64 clock_offset_ms() const { return offset_; }
+  f64 delay_ms() const { return delay_; }
 
  private:
   struct Snap { Vec3 p; Quat q; Vec3 v; f64 received, source; };
   std::vector<Snap> snaps_;
   std::vector<f64> offsets_;
-  f64 offset_ = 0;
+  f64 offset_ = 0, delay_ = kInterpolationDelayMs;
+  std::vector<f64> lags_;  // how late each snapshot came over the fastest one (the jitter)
   bool have_offset_ = false;
 };
 

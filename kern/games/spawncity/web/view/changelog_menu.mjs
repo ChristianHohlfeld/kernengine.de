@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: Jedes Geschoss fliegt bei allen sichtbar auf der Bahn des Schützen – Handgranaten, Granatwerfer, Raketen, Lenkraketen samt Kurven, Drohnenraketen, Jet-Raketen und Bomben – mit Leuchten, Licht und Rauch.",
+    "Multiplayer: Kein Ruckeln mehr – Mitspieler laufen mit einem Puffer, der sich der Verbindung anpasst; Autos, Passanten, Jogger, Kühe und Tauben werden zwischen den Paketen in ihrem eigenen Tempo weiterbewegt statt stoßweise nachgezogen.",
     "Multiplayer: Als Beifahrer im Auto kannst du schießen – du stehst mit deiner Waffe im Wagen (Kopf und Arme über dem Dach), deine Kugeln und Granaten verlassen das Auto, statt darin zu explodieren, und die anderen sehen dich; der Knopf heißt MITFAHREN bzw. AUSSTEIGEN.",
     "Multiplayer: Wer im Jet mitfliegt, hat die Stadt um sich – sie lädt dort, wo der Jet ist, nicht mehr dort, wo er eingestiegen ist (vorher: nur Ampeln und Wiese).",
     "Multiplayer: Tiere sind für alle dieselben – Kühe, Hunde, Katzen und jeder einzelne Tauben-Schwarm kommen vom Host (Hunde und Katzen laufen ihre Runde nach derselben Uhr, also exakt gleich), auch rund um weit entfernte Mitspieler.",
