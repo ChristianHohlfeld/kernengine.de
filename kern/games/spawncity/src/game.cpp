@@ -410,7 +410,21 @@ void Game::place_world() {
   spawn_ = p;
   put_down(p.p, p.yaw / kDeg);  // on the ground as it will be (the spawn guard: the start)
   Spot j{};
-  if (clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j, true) || clear_spot(p.p + Vec3{18, 6, 0}, {16, 20}, 260, j)) {
+  // in a session every player has his own jet: each on its own square (the others' jets stand
+  // where they stand - never two on one spot), looked for round the start by the player's place
+  const u32 idx = net_.active() ? net_.index_of(net_.self_slot()) : 1;
+  auto taken = [&](Vec3 at) {
+    for (const net::Remote& r : net_.remotes())
+      if ((r.state.flags & net::kJetOut) && std::hypot(r.state.jet_pos.x - at.x, r.state.jet_pos.y - at.y) < 24) return true;
+    return false;
+  };
+  bool found = false;
+  for (u32 k = 0; k < 8 && !found; ++k) {
+    const f32 a = static_cast<f32>((idx > 0 ? idx - 1 : 0) + k) * 0.785398f;
+    const Vec3 c = idx <= 1 && k == 0 ? p.p + Vec3{18, 6, 0} : p.p + Vec3{std::cos(a) * 45, std::sin(a) * 45, 0};
+    found = (clear_spot(c, {16, 20}, 260, j, true) || clear_spot(c, {16, 20}, 260, j)) && !taken(j.p);
+  }
+  if (found) {
     world_->set_alive(jet_actor_, true);
     const Vec3 rot{0, 0, std::atan2(p.p.y - j.p.y, p.p.x - j.p.x) / kDeg - 90};  // nose (+Y) towards the player
     world_->teleport(jet_actor_, j.p + Vec3{0, 0, 2.1f}, &rot);

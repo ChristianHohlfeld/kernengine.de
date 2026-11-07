@@ -58,9 +58,10 @@ bool Game::gaps_seat_press() {
   f32 bd = kBoardM;
   const i32 best = gaps_boardable(&bd);
   if (best < 0) return false;
-  if (jet_placed_) {
+  if (jet_placed_ && mode_ == Mode::foot) {
+    // our own (empty) jet clearly nearer: that one; a manned one of his right there: ride along
     const Vec3 j = matrix_of(jet_actor_).translation();
-    if (std::hypot(j.x - me.x, j.y - me.y) <= bd) return false;  // our own jet is nearer
+    if (std::hypot(j.x - me.x, j.y - me.y) + 2 < bd) return false;
   }
   g.seat_pending_until = world_->sim_time() + kPendingS;
   g.pending_owner = static_cast<u8>(best);
