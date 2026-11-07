@@ -188,7 +188,11 @@ export class OriginalView {
     try { const saved = localStorage.getItem(camStore); if (/^(fpv|follow|third)$/.test(saved || "")) this.command(`cam ${saved}`); } catch { /* private */ }
     click("soloKill", () => this.command("press stop"));
     click("gpsLiveButton", () => kernAct("gps"));
-    click("proximityVoicePtt", () => this.command("voice mic"));
+    click("proximityVoicePtt", () => {
+      // turning it on: the microphone is asked for inside this tap (mp_host.mjs __scMicPrime)
+      try { const v = JSON.parse(this.command("voice state")); if (!v.mic || v.muted) globalThis.__scMicPrime?.(); } catch { /* older game */ }
+      this.command("voice mic");
+    });
     click("proximityVoiceMute", () => this.command("voice mute"));
     // EFFECTS / MUSIC toggles (drone_simulator.html inline script): the game's audio.on / music.on
     const toggle = (id, key) => {
@@ -314,6 +318,25 @@ export class OriginalView {
     // sync (EXIT, MULTI right after it), proximity_voice.mjs updateLayout (the voice bar)
     setHidden($("soloHud"), !playing);
     setHidden($("proximityVoiceBar"), !playing);
+    // the voice bar shows its state (proximity_voice.mjs updateLayout): the mic on / off, the
+    // speaker on / muted - lit when on, struck through when off, the status says it in words
+    { const v = h.mp?.voice;
+      if (v) {
+        const mic = !!v.mic && !v.muted, mute = !!v.muted;
+        const ptt = $("proximityVoicePtt"), spk = $("proximityVoiceMute"), st = $("proximityVoiceStatus");
+        if (ptt && ptt.dataset.on !== (mic ? "1" : "0")) {
+          ptt.dataset.on = mic ? "1" : "0"; ptt.setAttribute("aria-pressed", String(mic));
+          ptt.textContent = mic ? "🎙" : "🎤"; ptt.title = mic ? "MIC AN · ausschalten" : "MIC AUS · einschalten";
+          ptt.setAttribute("aria-label", mic ? "Mikrofon ausschalten" : "Mikrofon einschalten");
+        }
+        if (spk && spk.dataset.on !== (mute ? "0" : "1")) {
+          spk.dataset.on = mute ? "0" : "1"; spk.setAttribute("aria-pressed", String(mute));
+          spk.textContent = mute ? "🔇" : "🔊"; spk.title = mute ? "Sprachchat stumm · einschalten" : "Sprachchat an · stumm schalten";
+        }
+        const t = mute ? "STUMM" : mic ? "MIC AN" : "MIC AUS";
+        if (st && st.textContent !== t) st.textContent = t;
+      }
+    }
     const exit = $("gameExitButton"), multi = $("mobileGameplayMultiplayer");
     setHidden(exit, !playing);
     if (multi) {

@@ -24,8 +24,8 @@ constexpr f32 kSwingSprint = 2.6f;    // ... and the hardest sprint (1.6 x the w
 constexpr f32 kSwingTau = 0.22f;      // s: smoothing of the arm speed
 constexpr f32 kStrikeSpeed = 1.8f;    // m/s of a controller that is a punch / a slash (a boxing game, not a trigger)
 constexpr f32 kStrikeRecover = 0.28f; // s between two blows of one hand
-constexpr i32 kMenuRows = 9;  // the rows of a page (host.mjs vrHudDraw draws them, the same order)
-constexpr f32 kMenuTop = 66, kMenuRow = 35;
+constexpr i32 kMenuRows = 10;  // the rows of a page (host.mjs vrHudDraw draws them, the same order)
+constexpr f32 kMenuTop = 66, kMenuRow = 31;
 constexpr f32 kResetHold = 1.0f;  // s of Y held = RESET
 }  // namespace
 
@@ -327,10 +327,15 @@ void Game::vr_menu_input(f32 dt) {
       case 5: flip("world.alwaysDay", Opt::world_always_day); break;
       case 6: flip("audio.on", Opt::audio_on); break;
       case 7: flip("music.on", Opt::music_on); break;
-      default: vr_action_ = "radio_off"; break;
+      case 8: vr_action_ = "radio_off"; break;
+      default:  // the microphone of the voice chat (the page opens it: mp_host.mjs)
+        if (net_.active()) command("voice mic");
+        else { toast_ = "MIKROFON: NUR IM MULTIPLAYER"; toast_age_ = 0; }
+        break;
     }
     return;
   }
+  if (vr_menu_hover_ >= 9) return;  // the main page has nine rows
   switch (vr_menu_hover_) {
     case 0: vr_action_ = "multi"; break;
     case 1: toggle_drone(); vr_menu_open_ = false; break;
@@ -363,14 +368,14 @@ void Game::vr_menu_input(f32 dt) {
 }
 
 std::string Game::vr_menu_json() {
-  char b[400];
+  char b[480];
   const Settings& st = ui_.settings;
   std::snprintf(b, sizeof b,
                 ",\"vr\":{\"menu\":%d,\"page\":%d,\"hover\":%d,\"arms\":%d,\"smooth\":%d,\"level\":%d,\"tunnel\":%d,\"day\":%d,\"sound\":%d,\"music\":%d,\"rocket\":%d,"
-                "\"reset\":%.2f,\"pulse\":[%.2f,%.2f],\"near\":%d,\"cam\":\"%s\",\"action\":\"%s\"}",
+                "\"reset\":%.2f,\"pulse\":[%.2f,%.2f],\"near\":%d,\"mic\":%d,\"cam\":\"%s\",\"action\":\"%s\"}",
                 vr_menu_open_ ? 1 : 0, vr_menu_page_, vr_menu_hover_, st.on(Opt::vr_arms) ? 1 : 0, st.on(Opt::vr_smooth_turn) ? 1 : 0, st.on(Opt::vr_level) ? 1 : 0,
                 st.on(Opt::vr_tunnel) ? 1 : 0, st.on(Opt::world_always_day) ? 1 : 0, st.on(Opt::audio_on) ? 1 : 0, st.on(Opt::music_on) ? 1 : 0, ctl_.rocket ? 1 : 0,
-                vr_y_fired_ ? 1.0f : clampf(vr_y_held_ / kResetHold, 0, 1), vr_pulse_[0], vr_pulse_[1], vr_near_vehicle_ ? 1 : 0,
+                vr_y_fired_ ? 1.0f : clampf(vr_y_held_ / kResetHold, 0, 1), vr_pulse_[0], vr_pulse_[1], vr_near_vehicle_ ? 1 : 0, voice_mic_on() ? 1 : 0,
                 mode_ == Mode::drone ? (drone_cam_ == 0 ? "FPV" : drone_cam_ == 1 ? "FOLGEN" : "AUSSEN") : mode_ == Mode::car ? (car_cockpit_ ? "INNEN" : "AUSSEN")
                 : mode_ == Mode::jet ? (jet_cockpit_ ? "COCKPIT" : "AUSSEN") : "", vr_action_.c_str());
   vr_action_.clear();

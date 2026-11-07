@@ -9,6 +9,7 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Sprachchat: Mikrofon- und Lautsprecher-Knopf zeigen klar, ob sie an sind (grün leuchtend) oder aus (dunkel, durchgestrichen); die Mikrofon-Freigabe wird direkt beim Tippen gefragt – in VR schon beim Betreten der Brille, im VR-Menü gibt es MIKROFON AN/AUS; wird es verweigert, sagt das Spiel es.",
     "Multiplayer: Die WELT-Einstellungen des Hosts gelten für alle (Leute, Verkehr, Tiere, Zombies, Polizei, Militär, Flak, Jetpack, zerstörbares Gelände, Lenkraketen, Immer Tag) – Mitspieler sehen sie gesperrt, danach gelten wieder ihre eigenen.",
     "Multiplayer: Mitfahren und Mitfliegen funktioniert sichtbar – neben dem stehenden Auto oder gelandeten Jet eines Mitspielers erscheint MITFAHREN/MITFLIEGEN (auf Touch der Einsteigen-Knopf), drinnen AUSSTEIGEN.",
     "Multiplayer: Startet der Host per GPS oder an einem gewählten Ort, ziehen alle Mitspieler mit in seine Stadt – vorher blieb eine früh eröffnete Sitzung am Standardort hängen.",

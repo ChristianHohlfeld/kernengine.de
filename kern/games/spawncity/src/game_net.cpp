@@ -128,6 +128,8 @@ constexpr Opt kWorldRules[] = {Opt::world_people, Opt::world_traffic, Opt::world
                                Opt::world_military, Opt::world_flak, Opt::world_jetpack, Opt::world_terrain, Opt::world_guided, Opt::world_always_day};
 }  // namespace
 
+bool Game::voice_mic_on() const { return mp_ && mp_->mic && !mp_->muted && net_.active(); }
+
 bool Game::world_rule_locked(Opt o) const {
   if (!net_.active() || net_.hosting()) return false;
   for (Opt w : kWorldRules) if (w == o) return true;
@@ -1101,6 +1103,13 @@ std::string Game::net_command(const std::string& cmd) {
     }
     if (rest == "all") { m.everywhere = !m.everywhere; return m.everywhere ? "everywhere" : "near"; }
     if (rest == "off") { m.mic = false; m.capture.clear(); return "off"; }
+    if (rest == "denied") {  // the browser / the headset did not give the microphone
+      m.mic = false;
+      m.capture.clear();
+      toast_ = "MIKROFON NICHT FREIGEGEBEN - in den Browser-Einstellungen erlauben";
+      toast_age_ = 0;
+      return "off";
+    }
     if (starts("voice tone ")) {
       // Tests (no microphone in a headless browser): 100 ms of a 440 Hz tone as if spoken.
       std::vector<f32> tone(4800);

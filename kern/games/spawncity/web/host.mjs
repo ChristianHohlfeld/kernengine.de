@@ -545,17 +545,17 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const players = Array.isArray(h.mp?.players) ? h.mp.players.length : 0;
       const radio = globalThis.__arondightCarRadio, station = radio?.station?.name;
       const onoff = v => (v ? "AN" : "AUS");
-      // the rows (game_vr.cpp kMenuTop 66, kMenuRow 35 - the same order)
+      // the rows (game_vr.cpp kMenuTop 66, kMenuRow 31 - the same order)
       const items = page ? ["‹ ZURÜCK", `LAUFEN: ${vr.arms ? "MIT DEN ARMEN" : "STICKS"}`, `DREHEN: ${vr.smooth ? "WEICH" : "30°-SCHRITTE"}`, `HORIZONT: ${vr.level ? "HALTEN" : "FREI (Cockpit)"}`,
-        `KOMFORT-TUNNEL: ${onoff(vr.tunnel)}`, `IMMER TAG: ${onoff(vr.day)}`, `TON: ${onoff(vr.sound)}`, `MUSIK: ${onoff(vr.music)}`, "RADIO AUS"]
+        `KOMFORT-TUNNEL: ${onoff(vr.tunnel)}`, `IMMER TAG: ${onoff(vr.day)}`, `TON: ${onoff(vr.sound)}`, `MUSIK: ${onoff(vr.music)}`, "RADIO AUS", h.net ? `🎤 MIKROFON: ${onoff(vr.mic)}` : "🎤 MIKROFON (nur Multiplayer)"]
         : [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE",
           h.mode === "car" || h.mode === "jet" ? "AUSSTEIGEN" : "EINSTEIGEN (nächstes Fahrzeug)", "LUFTSCHLAG (wohin du schaust)",
           `📻 RADIO${station && (h.mode === "car" || globalThis.__scRadioAny) && radio?.on ? ` · ${String(station).slice(0, 16)}` : " · nächster Sender"}`,
           h.mode === "foot" ? "EMP" : `KAMERA: ${vr.cam || ""}`, "EINSTELLUNGEN ›", "RESET", "VR BEENDEN"];
       items.forEach((t, i) => {
-        const y = 66 + i * 35;
-        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 2, 484, 31); }
-        g.font = "800 22px Inter, system-ui, sans-serif"; g.fillStyle = !page && i === 8 ? "#ff9a8a" : !page && i === 7 ? "#ffcf3a" : "#eef0f2"; g.fillText(t, 28, y + 18);
+        const y = 66 + i * 31;  // game_vr.cpp kMenuRow
+        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 2, 484, 28); }
+        g.font = "800 21px Inter, system-ui, sans-serif"; g.fillStyle = !page && i === 8 ? "#ff9a8a" : !page && i === 7 ? "#ffcf3a" : "#eef0f2"; g.fillText(t, 28, y + 16);
       });
     } else {
       // the watch: health, weapon, stars - nothing else in the way; in a vehicle its controls below
@@ -630,6 +630,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       ev.stopPropagation(); ev.preventDefault();
       const st = document.getElementById("scStart");
       if (st && !document.body.classList.contains("solo-flight") && !st.disabled) st.click();
+      // in a session the microphone is asked for now, on the page (a headset cannot show the
+      // browser's question once inside): later the voice chat opens it without a question
+      if (document.body.classList.contains("sc-mp-on")) globalThis.__scMicPrime?.();
       enterVR();
     });
     // only on the title (never as an overlay in the game, never in the headset)

@@ -111,6 +111,13 @@
   html body:not(.desktop-input) #viewport :is(#soundSwitch, #musicSwitch) svg { width: 16px !important; height: 16px !important; }
   html body:not(.desktop-input) #viewport :is(#soundSwitch, #musicSwitch)::after { font-size: 9px !important; }
   html body:not(.desktop-input):not(.sc-mp-on) #viewport #proximityVoiceBar { display: none !important; }
+  /* the voice bar's state at a glance: on = lit green, off = dark and struck through */
+  html body #viewport #proximityVoiceBar #proximityVoicePtt, html body #viewport #proximityVoiceBar #proximityVoiceMute { position: relative; transition: background .15s, border-color .15s, opacity .15s; }
+  html body #viewport #proximityVoiceBar #proximityVoicePtt[data-on="1"], html body #viewport #proximityVoiceBar #proximityVoiceMute[data-on="1"] { background: #17694fe6 !important; border-color: #62d6aa !important; box-shadow: 0 0 0 2px #62d6aa55, 0 0 12px #62d6aa88 !important; opacity: 1 !important; }
+  html body #viewport #proximityVoiceBar #proximityVoicePtt[data-on="0"], html body #viewport #proximityVoiceBar #proximityVoiceMute[data-on="0"] { background: #1b1f26d9 !important; border-color: #ffffff40 !important; box-shadow: none !important; opacity: .8; }
+  html body #viewport #proximityVoiceBar #proximityVoicePtt[data-on="0"]::after, html body #viewport #proximityVoiceBar #proximityVoiceMute[data-on="0"]::after { content: ""; position: absolute; left: 18%; right: 18%; top: 50%; height: 2px; background: #ff6b5a; transform: rotate(-35deg); pointer-events: none; }
+  html body #viewport #proximityVoiceBar #proximityVoicePtt[data-on="1"] { animation: scMicLive 1.6s ease-in-out infinite; }
+  @keyframes scMicLive { 50% { box-shadow: 0 0 0 4px #62d6aa33, 0 0 18px #62d6aaaa; } }
   html body:not(.desktop-input) #viewport #playerVitalsHud { transform: scale(.85); transform-origin: left top; opacity: .9; }
   html body:not(.desktop-input) #viewport #worldLookHud { transform: scale(.8); transform-origin: right top; opacity: .88; }
   /* the minimap in every world (the original showed it only in the real world: the training town too), and its big map */

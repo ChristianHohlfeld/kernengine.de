@@ -300,6 +300,24 @@ const MP_CSS = `
 #mpMap .info{position:absolute;left:12px;bottom:max(10px,env(safe-area-inset-bottom));padding:6px 10px;border-radius:8px;background:#070b10c4;font:700 12px system-ui;color:#dde6ef}
 `;
 
+// The microphone: asked for on a tap (a browser asks only inside a user gesture, a headset not at
+// all once in VR) - __scMicPrime() on the mic button and the VR button takes the stream then; the
+// voice chat uses that one (or asks itself when it opens without a primed one).
+let primed = null;
+const MIC = {audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}, video: false};
+function micStream() {
+  if (primed) { const p = primed; primed = null; return p; }
+  return navigator.mediaDevices?.getUserMedia ? navigator.mediaDevices.getUserMedia(MIC) : Promise.reject(new Error("no microphone"));
+}
+globalThis.__scMicPrime = () => {
+  if (primed || !navigator.mediaDevices?.getUserMedia) return;
+  primed = navigator.mediaDevices.getUserMedia(MIC);
+  primed.catch(() => {});
+  // a primed stream nobody takes within a minute is closed again (no open microphone for nothing)
+  const mine = primed;
+  setTimeout(() => { if (primed === mine) { primed = null; mine.then(st => st.getTracks().forEach(t => t.stop())).catch(() => {}); } }, 60000);
+};
+
 export class MpPage {
   constructor({e, kern, command, params, canvas, statusEl}) {
     this.e = e; this.kern = kern; this.command = command; this.params = params; this.canvas = canvas; this.statusEl = statusEl;
@@ -316,7 +334,7 @@ export class MpPage {
       respawn: $("#mpRespawn"), vote: $("#mpVote"), bar: $("#mpBar")};
     this.el.bar.addEventListener("click", ev => {
       const a = ev.target.closest("button")?.dataset.a;
-      if (a === "mic") this.command("voice mic");
+      if (a === "mic") { try { const v = JSON.parse(this.command("voice state")); if (!v.mic || v.muted) globalThis.__scMicPrime?.(); } catch { /* older game */ } this.command("voice mic"); }
       else if (a === "mute") this.command("voice mute");
       else if (a === "all") this.command("voice all");
       else if (a === "map") this.command("bigmap toggle");
@@ -578,7 +596,7 @@ export class MpPage {
     if (on && !this.voice) {
       this.voice = {stopped: false};
       const v = this.voice;
-      navigator.mediaDevices?.getUserMedia?.({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}, video: false}).then(stream => {
+      micStream().then(stream => {
         if (v.stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(2048, 1, 1), silent = ctx.createGain();
@@ -592,7 +610,7 @@ export class MpPage {
           e.kern_free(ptr);
         };
         Object.assign(v, {stream, ctx, src, proc});
-      }).catch(() => { this.command("voice off"); this.statusEl.textContent = "Mikrofon nicht freigegeben"; this.statusEl.hidden = false; setTimeout(() => { this.statusEl.hidden = true; }, 2500); });
+      }).catch(() => { this.command("voice denied"); this.statusEl.textContent = "Mikrofon nicht freigegeben"; this.statusEl.hidden = false; setTimeout(() => { this.statusEl.hidden = true; }, 2500); });
     } else if (!on && this.voice) {
       const v = this.voice; this.voice = null; v.stopped = true;
       v.stream?.getTracks().forEach(t => t.stop()); v.proc?.disconnect(); v.src?.disconnect(); v.ctx?.close();
