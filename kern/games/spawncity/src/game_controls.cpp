@@ -1137,6 +1137,8 @@ void Game::update_touch_layout() {
     l.near_jet = jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJetM;
     for (const TrafficCar& c : cars_)
       if (c.placed && !c.wreck) { const Vec3 p = matrix_of(c.actor).translation(); l.near_car |= std::hypot(p.x - me.x, p.y - me.y) < kEnterCarM; }  // a wreck takes nobody
+    // a mate's car or landed jet to ride along in - or out of it while riding (game_seats.cpp)
+    l.near_car |= gaps_boardable() >= 0 || (gaps_ && gaps_->riding);
     l.weapon = weapons::spec(foot_weapon_).name;
     l.sniper = foot_weapon_ == weapons::Id::sniper;
     l.scope_on = ctl_.scope_on;

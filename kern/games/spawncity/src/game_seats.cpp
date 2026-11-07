@@ -27,24 +27,35 @@ bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   return false;
 }
 
+// nearestRemoteBoardable: a mate's landed jet or his car standing (nearly) still, he at the wheel
+// (his pilot seat in the table), within reach - -1 for none. The hint, the touch button and the
+// press all ask this one.
+i32 Game::gaps_boardable(f32* dist) const {
+  if (!gaps_ || !net_.active() || mode_ != Mode::foot || player_dead_ || gaps_->riding) return -1;
+  const Vec3 me = matrix_of(soldier_).translation();
+  i32 best = -1;
+  f32 bd = kBoardM;
+  for (const net::Remote& r : net_.remotes()) {
+    if (r.state.flags & (net::kDead | net::kPassenger)) continue;
+    const bool jet = r.state.mode == net::PlayerMode::jet && (r.state.flags & net::kGearDown) && r.state.speed <= 4;
+    const bool car = r.state.mode == net::PlayerMode::car && r.state.speed <= 3;
+    if (!jet && !car) continue;
+    if (net_.seats().get(r.state.slot).pilot != r.state.slot) continue;
+    const f32 d = std::hypot(r.shown.x - me.x, r.shown.y - me.y);
+    if (d < (car ? 5.5f : kBoardM) && d < bd) { bd = d; best = r.state.slot; }
+  }
+  if (dist) *dist = bd;
+  return best;
+}
+
 bool Game::gaps_seat_press() {
   if (!gaps_ || !net_.active()) return false;
   GapsState& g = *gaps_;
   if (g.riding) { gaps_leave_ride(); return true; }
   if (mode_ != Mode::foot || player_dead_ || g.seat_pending_until > world_->sim_time()) return false;
   const Vec3 me = matrix_of(soldier_).translation();
-  // nearestRemoteBoardable: landed, its pilot in his seat, within 9 m
-  i32 best = -1;
   f32 bd = kBoardM;
-  for (const net::Remote& r : net_.remotes()) {
-    // a landed jet, or a car standing (nearly) still - its driver at the wheel - within reach
-    const bool jet = r.state.mode == net::PlayerMode::jet && (r.state.flags & net::kGearDown) && r.state.speed <= 4;
-    const bool car = r.state.mode == net::PlayerMode::car && r.state.speed <= 3;
-    if (!jet && !car) continue;
-    if (net_.seats().get(r.state.slot).pilot != r.state.slot) continue;
-    const f32 d = std::hypot(r.shown.x - me.x, r.shown.y - me.y);
-    if (d < (car ? 5.5f : bd) && d < bd) { bd = d; best = r.state.slot; }
-  }
+  const i32 best = gaps_boardable(&bd);
   if (best < 0) return false;
   if (jet_placed_) {
     const Vec3 j = matrix_of(jet_actor_).translation();
@@ -100,9 +111,15 @@ void Game::gaps_seats_update(f32 dt) {
   const u8 self = net_.self_slot();
   // the pilot seat of our own jet (or the driver's of our car) while we fly / drive it
   const bool at_wheel = mode_ == Mode::jet || mode_ == Mode::car;
-  if (at_wheel && !g.pilot_held) { net_.seat_request(true, self, seats::Seat::pilot); g.pilot_held = true; }
+  // (asked again until the table shows it: a request before the session stood, a lost one or a
+  // new authority after a handover would otherwise leave the mates unable to board)
+  if (!net_.active()) { g.riding = false; g.pilot_held = false; return; }
+  if (at_wheel && (!g.pilot_held || (net_.seats().get(self).pilot != self && now > g.pilot_asked + 1.5f))) {
+    net_.seat_request(true, self, seats::Seat::pilot);
+    g.pilot_held = true;
+    g.pilot_asked = now;
+  }
   if (!at_wheel && g.pilot_held) { net_.seat_request(false, self, seats::Seat::pilot); g.pilot_held = false; }
-  if (!net_.active()) { g.riding = false; return; }
   seats::Row row;
   seats::Seat seat;
   const bool seated = net_.seats().seat_of(self, row, seat) && seat == seats::Seat::passenger;

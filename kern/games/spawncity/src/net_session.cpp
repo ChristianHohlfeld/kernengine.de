@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -211,6 +211,14 @@ u8 Session::successor() const {
   return best;
 }
 
+// The host moves the city (a new start place, his GPS position): every client rebases to it.
+void Session::set_origin(f64 lon, f64 lat) {
+  if (role_ != Role::host) return;
+  lon_ = lon;
+  lat_ = lat;
+  have_origin_ = true;
+  to_all(kReliable, kOriginMsg, W().put(lon_).put(lat_).b, kHost);
+}
 bool Session::origin(f64& lon, f64& lat) const {
   if (!have_origin_) return false;
   lon = lon_;
@@ -512,6 +520,11 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
 void Session::deliver(u16 type, const std::vector<u8>& d) {
   R r{d};
   switch (type) {
+    case kOriginMsg: {
+      const f64 lon = r.get<f64>(), lat = r.get<f64>();
+      if (r.ok && role_ == Role::client && std::isfinite(lon) && std::isfinite(lat) && std::fabs(lat) <= 85 && std::fabs(lon) <= 180) { lon_ = lon; lat_ = lat; have_origin_ = true; }
+      return;
+    }
     case kWelcome: {
       self_slot_ = r.get<u8>();
       lon_ = r.get<f64>();

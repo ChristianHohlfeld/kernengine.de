@@ -66,9 +66,11 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
     char name[96] = {};
     const int n = std::sscanf(cmd.c_str() + 6, "%lf %lf %95[^\n]", &lat, &lon, name);
     if (n < 2 || !std::isfinite(lat) || !std::isfinite(lon) || std::fabs(lat) > 85 || std::fabs(lon) > 180) { out = "usage: start <lat> <lon> [name]"; return true; }
-    if (net_.active()) { out = "im Mehrspieler nicht"; return true; }  // the host's city is everybody's
+    // the host's city is everybody's: a client cannot move it, the host takes them all along
+    if (net_.active() && !net_.hosting()) { out = "im Mehrspieler nicht"; return true; }
     ui_.place = name;
     ui_move_world(lon, lat);
+    if (net_.hosting()) net_.set_origin(lon_, lat_);
     out = "moving";
     return true;
   }

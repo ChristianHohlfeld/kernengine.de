@@ -882,6 +882,17 @@ bool Game::gaps_command(const std::string& cmd, std::string& out) {
     out = s + "]}";
     return true;
   }
+  if (cmd == "board?") {
+    const Vec3 me = matrix_of(soldier_).translation();
+    char b[400];
+    std::string s = "[";
+    for (const net::Remote& r : net_.remotes()) {
+      std::snprintf(b, sizeof b, "{\"slot\":%u,\"mode\":%u,\"shown\":[%.1f,%.1f],\"me\":[%.1f,%.1f],\"speed\":%.2f,\"flags\":%u,\"pilot\":%d}", r.state.slot, static_cast<u32>(r.state.mode), r.shown.x, r.shown.y, me.x, me.y, r.state.speed, r.state.flags, net_.seats().get(r.state.slot).pilot);
+      s += b;
+    }
+    out = s + "]";
+    return true;
+  }
   if (cmd == "board") { out = gaps_seat_press() ? "asked" : "nothing to board"; return true; }
   if (cmd == "repair") { out = gaps_repair_barricade() ? "repaired" : "nothing to repair"; return true; }
   if (cmd == "barricades") {

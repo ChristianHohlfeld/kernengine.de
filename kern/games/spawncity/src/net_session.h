@@ -138,6 +138,8 @@ class Session {
   /// client computes the same.
   u8 successor() const;
   bool origin(f64& lon, f64& lat) const;
+  /// Host: the city moves (a new start place) - every client rebases to it.
+  void set_origin(f64 lon, f64 lat);
   u8 self_slot() const { return self_slot_; }
 
   // ---- host page ----

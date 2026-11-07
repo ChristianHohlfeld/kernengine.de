@@ -9,6 +9,8 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Multiplayer: Mitfahren und Mitfliegen funktioniert sichtbar – neben dem stehenden Auto oder gelandeten Jet eines Mitspielers erscheint MITFAHREN/MITFLIEGEN (auf Touch der Einsteigen-Knopf), drinnen AUSSTEIGEN.",
+    "Multiplayer: Startet der Host per GPS oder an einem gewählten Ort, ziehen alle Mitspieler mit in seine Stadt – vorher blieb eine früh eröffnete Sitzung am Standardort hängen.",
     "Multiplayer: Granaten, Raketen und Lenkraketen fliegen nicht mehr durch Mitspieler – sie explodieren an ihrem Körper oder Fahrzeug.",
     "Drohne: Höhenhaltung wie im Original – der Höhenmesser sieht nur Boden und Gebäude, Autos, Passanten und Tiere darunter lassen sie nicht mehr springen; auf dem Handy reagiert das Höhenfeld wieder genau.",
     "Radio verstummt, sobald Musik oder Ton ausgeschaltet ist.",

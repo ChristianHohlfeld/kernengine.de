@@ -1310,6 +1310,12 @@ std::string Game::hud_json() {
         const Vec3 p = matrix_of(c.actor).translation();
         if (std::hypot(p.x - me.x, p.y - me.y) < kEnterCar) { hint_ = std::string(k) + "\U0001F697 EINSTEIGEN"; break; }
       }
+      // a mate's car / landed jet: ride along (game_seats.cpp); riding: the way out
+      if (gaps_ && gaps_->riding) hint_ = std::string(k) + "AUSSTEIGEN";
+      else if (const i32 m = gaps_boardable(); m >= 0) {
+        const net::Remote* r = net_.remote(static_cast<u8>(m));
+        hint_ = std::string(k) + (r && r->state.mode == net::PlayerMode::jet ? "\u2708 MITFLIEGEN" : "\U0001F697 MITFAHREN");
+      }
     }
   }
   if (mode_ == Mode::drone && drone_.telemetry().calibrating) hint_ = "Flugregler kalibriert - stillhalten";
@@ -1395,6 +1401,14 @@ std::string Game::command(const std::string& cmd) {
     return "unknown mode";
   }
   if (cmd == "eject" && mode_ == Mode::jet) { eject(); return "ok"; }
+  // tests: "tp X Y" puts the walker on the ground there
+  if (cmd.rfind("tp ", 0) == 0 && mode_ == Mode::foot) {
+    f32 x = 0, y = 0;
+    if (std::sscanf(cmd.c_str() + 3, "%f %f", &x, &y) != 2) return "usage: tp X Y";
+    world_->teleport(soldier_, standing_feet({x, y, city_.ground_height(x, y)}) + Vec3{0, 0, 0.73f});
+    world_->set_actor_velocity(soldier_, {});
+    return "ok";
+  }
   // simulator.mjs camFpv / camFollow / camThird: the drone's camera by name (any mode: the preference)
   if (cmd == "cam fpv" || cmd == "cam follow" || cmd == "cam third") {
     drone_cam_ = cmd == "cam fpv" ? 0 : cmd == "cam follow" ? 1 : 2;

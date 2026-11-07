@@ -479,6 +479,7 @@ class Game {
   bool gaps_riding() const;
   bool gaps_ride_pose(Vec3& p, Quat& q) const;
   bool gaps_seat_press();
+  i32 gaps_boardable(f32* dist = nullptr) const;
   void gaps_leave_ride();
   void gaps_seats_update(f32 dt);
   bool gaps_ride_camera(kern::Camera& c);

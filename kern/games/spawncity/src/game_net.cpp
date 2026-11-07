@@ -281,9 +281,10 @@ void Game::update_net(f32 dt) {
   }
   // The client takes the host's map origin once.
   f64 lon, lat;
-  if (!net_.hosting() && !rebased_ && net_.origin(lon, lat)) {
+  // The client plays in the host's city: his origin on joining, and again whenever he moves it.
+  if (!net_.hosting() && net_.origin(lon, lat) && (std::fabs(lon - lon_) > 1e-7 || std::fabs(lat - lat_) > 1e-7)) {
     rebased_ = true;
-    if (std::fabs(lon - lon_) > 1e-7 || std::fabs(lat - lat_) > 1e-7) rebase_origin(lon, lat);
+    rebase_origin(lon, lat);
   }
   // The joining player spawns at the host's anchor, in his own slot of a ring around it.
   Vec3 anchor;
