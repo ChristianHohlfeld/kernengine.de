@@ -244,15 +244,26 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
   Vec3 f = anchor.target - anchor.eye;
   f.z = 0;
   f = normalize(f, {0, 1, 0});
+  Vec3 up{0, 0, 1};
   if (g_engine->xr_hold_room) f = normalize(Vec3{g_engine->xr_room_forward.x, g_engine->xr_room_forward.y, 0}, f);
   else if (g_engine->xr_follow_head) {
     // the body faces where the head does: the room is the body's heading less the head's yaw
     const f32 a = -g_engine->xr_head_yaw * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
     f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
+  } else if (g_engine->xr_full_room) {
+    // the craft is the rest frame: the room pitches and rolls with the camera
+    const Vec3 ff = normalize(anchor.target - anchor.eye, f);
+    const Vec3 rr = normalize(cross(ff, anchor.up), Vec3{f.y, -f.x, 0});
+    f = ff;
+    up = cross(rr, ff);
   }
   g_engine->xr_room_forward = f;
+  g_engine->xr_room_up = up;
 
-  const Vec3 r{f.y, -f.x, 0}, up{0, 0, 1};
+  const Vec3 r = normalize(cross(f, up), Vec3{f.y, -f.x, 0});
+  const f32 vig = g_engine->xr_vignette;
+  const u32 vig_mesh = g_engine->xr_vignette_mesh;
+  if (vig_mesh) g_engine->renderer.set_visible(vig_mesh, vig > 0.01f);
   // a WebXR vector (x right, y up, -z forward) in the world
   auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
   bool ok = true;
@@ -273,6 +284,14 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     params.clear_color = g_engine->clear_color;
     params.has_viewport = true;
     params.reuse_shadow = i > 0;  // one sun shadow map per XR frame, not per eye
+    if (vig_mesh && vig > 0.01f) {
+      // the comfort tunnel before this eye: the hole's half-angle 60 deg .. 26 deg
+      const Vec3 er = world(q.rotate({1, 0, 0})), eu = world(q.rotate({0, 1, 0})), ef = world(q.rotate({0, 0, -1}));
+      const f32 d = std::fmax(0.3f, cam.near * 1.5f), half = (60.0f - 34.0f * std::fmin(vig, 1.0f)) * (kPi / 180.0f), sc = d * std::tan(half);
+      const Vec3 c = eye + ef * d;
+      const f32 m[16] = {er.x * sc, er.y * sc, er.z * sc, 0, ef.x, ef.y, ef.z, 0, eu.x * sc, eu.y * sc, eu.z * sc, 0, c.x, c.y, c.z, 1};
+      g_engine->renderer.update_instances(vig_mesh, {m, 16}, {});
+    }
     params.viewport = {static_cast<i32>(v[23]), static_cast<i32>(v[24]), static_cast<i32>(v[25]), static_cast<i32>(v[26])};
     RenderStats stats;
     ok = g_engine->renderer.render(params, stats) && ok;

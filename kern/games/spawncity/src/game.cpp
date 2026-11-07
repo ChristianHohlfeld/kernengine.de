@@ -501,7 +501,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       // a parked car may be asleep in Box3D: the throttle must reach it at once
       if (world_->physics().body_valid(body(c.actor))) world_->physics().set_awake(body(c.actor), true);
       hide_soldier();
-      car_cockpit_ = false;
+      car_cockpit_ = vr_;  // VR: the driver's seat (a chase camera swinging round the car sickens)
       break;
     }
     case Mode::jet:

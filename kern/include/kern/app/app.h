@@ -106,13 +106,22 @@ class Engine {
   Vec3 xr_room_forward{1, 0, 0};
   f32 xr_head_yaw = 0;
   bool xr_follow_head = false;
-  bool xr_hold_room = false;
+  bool xr_hold_room = false;  // keep the room where it is (the app's camera spins or falls: death, a ragdoll)
+  /// The room turns with the camera fully (pitch and roll too: a cockpit, an FPV drone - the craft
+  /// is the rest frame); `xr_room_up` is then its up (else the world's).
+  bool xr_full_room = false;
+  Vec3 xr_room_up{0, 0, 1};
+  /// The comfort tunnel (0 off .. 1 narrow): `xr_vignette_mesh` (the app's mesh: a black ring in
+  /// its x-z plane facing +y, see-through inside radius 1, opaque from 2 out) is put before each
+  /// eye, the hole's half-angle 60 deg at 0 down to 26 deg at 1; hidden at 0.
+  f32 xr_vignette = 0;
+  u32 xr_vignette_mesh = 0;
   /// A second view drawn first in an XR frame (a sniper's scope): into `xr_scope_fbo` (a render
   /// target of xr_scope_size px, Renderer::create_render_target) through `xr_scope_camera`.
   bool xr_scope = false;
   Camera xr_scope_camera;
   u32 xr_scope_fbo = 0;
-  i32 xr_scope_size = 0;  // keep the room where it is (the app's camera spins or falls: death, a ragdoll)
+  i32 xr_scope_size = 0;
   /// Side-by-side stereo (a phone in a cardboard viewer, 3D TVs): the frame is drawn twice, the
   /// left and the right half, the eyes `stereo_ipd` metres apart.
   bool stereo = false;

@@ -205,8 +205,8 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   }
   if (camera) {
     if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; }
-    else if (mode_ == Mode::car) car_cockpit_ = !car_cockpit_;
-    else if (mode_ == Mode::jet) jet_cockpit_ = !jet_cockpit_;
+    else if (mode_ == Mode::car && !(engine_ && engine_->xr)) car_cockpit_ = !car_cockpit_;  // VR: always the seat
+    else if (mode_ == Mode::jet && !(engine_ && engine_->xr)) jet_cockpit_ = !jet_cockpit_;
   }
   if (mode_ == Mode::jet && pad_touch_.take_pressed("vtol")) jet_.toggle_mode();
 
@@ -831,11 +831,15 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   const f32 latch_vals[9] = {pad.down(kPadA) ? 1.0f : 0.0f, pad.down(kPadB) ? 1.0f : 0.0f, pad.down(kPadX) ? 1.0f : 0.0f, pad.down(kPadY) ? 1.0f : 0.0f,
                              pad.down(kPadRB) ? 1.0f : 0.0f, pad.lt, pad.rt, pad.down(kPadView) ? 1.0f : 0.0f, pad.down(kPadMenu) ? 1.0f : 0.0f};
   const bool pad_on = pad.connected && !C.latch.step(latch_vals, 9);
-  const bool aim = pad_on && C.aim_scheme && pad.down(kPadLB);
+  // VR (Quest controllers): mode 2 like a real drone's remote - left stick throttle (up / down) and
+  // yaw, right stick pitch and roll, the right trigger fires, A arms, B the weapon
+  const bool vr_pad = pad_on && engine_ && engine_->xr;
+  const bool aim = pad_on && !vr_pad && C.aim_scheme && pad.down(kPadLB);
   // left stick: WASD (x = D - A, y = S - W), the touch stick, LS
   Vec2 left{key(in, Key::d) - key(in, Key::a), key(in, Key::s) - key(in, Key::w)};
   if (touch_mode_) left += pad_touch_.move();
-  if (pad_on) left += Vec2{controls::gamepad_axis(pad.lx), controls::gamepad_axis(-pad.ly)};
+  if (vr_pad) left += Vec2{controls::gamepad_axis(pad.rx), controls::gamepad_axis(-pad.ry)};
+  else if (pad_on) left += Vec2{controls::gamepad_axis(pad.lx), controls::gamepad_axis(-pad.ly)};
   // right stick: arrows, the mouse rate (1500 px/s, 50 ms) unless RMB looks, the touch stick, RS
   Vec2 right{key(in, Key::right) - key(in, Key::left), key(in, Key::down) - key(in, Key::up)};
   if (C.rmb) {
@@ -847,7 +851,8 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
     right += C.drone_mouse.rate;
   }
   if (touch_mode_) right += pad_touch_.look();
-  if (pad_on) {
+  if (vr_pad) right.x += controls::gamepad_axis(pad.lx);
+  else if (pad_on) {
     const Vec2 rs{controls::gamepad_axis(pad.rx), controls::gamepad_axis(-pad.ry)};
     if (aim) C.look.set(C.look.yaw_deg + rs.x * 105 * dt, C.look.pitch_deg - rs.y * 82 * dt);  // AIM: LB looks (real_world_bootstrap.mjs)
     else right += rs;
@@ -862,7 +867,8 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   sticks_.body_pitch = a.body_pitch;
   // height axis: Space / Shift, RT - LT, the touch altitude pad
   f32 axis = key(in, Key::space) - ((in.down(Key::shift_left) || in.down(Key::shift_right)) ? 1.0f : 0.0f);
-  if (pad_on) axis += controls::height_axis(pad.rt, pad.lt);
+  if (vr_pad) axis += controls::gamepad_axis(pad.ly);  // up-positive: push = climb
+  else if (pad_on) axis += controls::height_axis(pad.rt, pad.lt);
   if (touch_mode_) axis += pad_touch_.clearance();
   axis = clampf(axis, -1, 1);
   // weapons: 1 gun, 2 rockets (3 selects nothing: desktop_controls.mjs order gun, missile)
@@ -873,6 +879,12 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   const bool locked = C.aim_lock_until > now;
   bool trigger = C.lmb || (pad_on && pad.down(kPadRB));
   bool pressed = C.lmb_hit || (pad_on && (C.pad_hit & (1u << kPadRB)));
+  if (vr_pad) {
+    const bool rt = pad.rt > 0.5f;
+    trigger |= rt;
+    pressed |= rt && !vr_fire_was_;
+    vr_fire_was_ = rt;
+  }
   for (TouchFire& f : pad_touch_.fires()) {
     const bool due = f.fresh || (drone_weapon_ == 0 && now - f.last_shot >= 0.092f);
     if (due) {
@@ -947,11 +959,14 @@ void Game::car_input(kern::Engine& e, f32 dt) {
     look_y += -pad_touch_.look().y;
   }
   bool brake = in.down(Key::space) || pad_touch_.held("hb");
+  const bool xr = engine_ && engine_->xr;
   if (pad.connected) {
     steer += controls::gamepad_axis(pad.lx, 0.08f);
     pedal += pad.rt - pad.lt;
-    look_x += controls::gamepad_axis(pad.rx, 0.08f);
-    look_y += controls::gamepad_axis(pad.ry, 0.08f);  // pad.ry is up-positive: -axis(axes[3])
+    if (!xr) {  // VR: the head looks around the cabin, the right stick does nothing
+      look_x += controls::gamepad_axis(pad.rx, 0.08f);
+      look_y += controls::gamepad_axis(pad.ry, 0.08f);  // pad.ry is up-positive: -axis(axes[3])
+    }
     brake = brake || pad.down(kPadB);
   }
   ci.steer = -clampf(steer, -1, 1);  // Kern's car: + steers left
@@ -961,8 +976,8 @@ void Game::car_input(kern::Engine& e, f32 dt) {
   // head look: the stick spring plus the desktop mouse (0.12 deg/px, back after 1.4 s idle)
   C.car_head.step(clampf(look_x, -1, 1), clampf(look_y, -1, 1), dt);
   if (C.md.x != 0 || C.md.y != 0) C.look.add(C.md.x, C.md.y, kLookDegPx, kLookDegPx * 0.85f);
-  head_yaw_ = -(C.car_head.yaw + C.look.yaw_deg / kRad);
-  head_pitch_ = C.car_head.pitch + C.look.pitch_deg / kRad;
+  head_yaw_ = xr ? 0 : -(C.car_head.yaw + C.look.yaw_deg / kRad);
+  head_pitch_ = xr ? 0 : C.car_head.pitch + C.look.pitch_deg / kRad;
   // chase zoom: wheel x 1.1 (+ - in ctl_command), two fingers (pinch)
   if (C.wheel != 0) C.car_zoom *= C.wheel > 0 ? 1.1f : 1 / 1.1f;
   if (touch_mode_) C.car_zoom *= pad_touch_.take_zoom();
@@ -1065,6 +1080,7 @@ void Game::parachute_input(kern::Engine& e, f32 dt) {
 void Game::ctl_camera(kern::Camera& c) {
   const ControlsState& C = ctl_;
   if (mode_ == Mode::foot || mode_ == Mode::car) return;
+  if (engine_ && engine_->xr) return;  // VR: the head looks
   if (C.look.yaw_deg == 0 && C.look.pitch_deg == 0) return;
   const Vec3 d = c.target - c.eye;
   const f32 len = kern::length(d);

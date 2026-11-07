@@ -233,16 +233,21 @@ void Game::vr_menu_input() {
       if (mode_ == Mode::car) vr_action_ = "radio";
       else { emp_pulse(); vr_menu_open_ = false; }  // on foot and in the drone: the EMP
       break;
-    case 4: command(std::string("set vr.arms ") + (ui_.settings.on(Opt::vr_arms) ? "0" : "1")); break;
+    case 4:  // on foot the locomotion, in the jet / drone the horizon, in the car the tunnel
+      if (mode_ == Mode::foot) command(std::string("set vr.arms ") + (ui_.settings.on(Opt::vr_arms) ? "0" : "1"));
+      else if (mode_ == Mode::car) command(std::string("set vr.tunnel ") + (ui_.settings.on(Opt::vr_tunnel) ? "0" : "1"));
+      else command(std::string("set vr.level ") + (ui_.settings.on(Opt::vr_level) ? "0" : "1"));
+      break;
     case 5: ui_reset(); vr_menu_open_ = false; break;
     default: vr_action_ = "exit"; vr_menu_open_ = false; break;
   }
 }
 
 std::string Game::vr_menu_json() {
-  char b[200];
-  std::snprintf(b, sizeof b, ",\"vr\":{\"menu\":%d,\"hover\":%d,\"arms\":%d,\"action\":\"%s\"}", vr_menu_open_ ? 1 : 0, vr_menu_hover_,
-                ui_.settings.on(Opt::vr_arms) ? 1 : 0, vr_action_.c_str());
+  char b[240];
+  std::snprintf(b, sizeof b, ",\"vr\":{\"menu\":%d,\"hover\":%d,\"arms\":%d,\"level\":%d,\"tunnel\":%d,\"rocket\":%d,\"action\":\"%s\"}", vr_menu_open_ ? 1 : 0,
+                vr_menu_hover_, ui_.settings.on(Opt::vr_arms) ? 1 : 0, ui_.settings.on(Opt::vr_level) ? 1 : 0, ui_.settings.on(Opt::vr_tunnel) ? 1 : 0,
+                ctl_.rocket ? 1 : 0, vr_action_.c_str());
   vr_action_.clear();
   return b;
 }
@@ -256,22 +261,36 @@ void Game::vr_set_hand(i32 side, bool valid, Vec3 p, Quat q) {
   h.q = q;
 }
 
-Vec3 Game::vr_room_forward() const {
-  // what kern_app_frame_xr will use this frame: the body's heading (less the head's yaw on foot)
-  Vec3 f = cam_.target - cam_.eye;
+void Game::vr_room(Vec3& f, Vec3& r, Vec3& up) const {
+  // what kern_app_frame_xr will use this frame: the body's heading (less the head's yaw on foot),
+  // or - in a cockpit with the horizon free - the craft's whole attitude
+  f = cam_.target - cam_.eye;
   f.z = 0;
   f = kern::normalize(f, {0, 1, 0});
+  up = {0, 0, 1};
   if (engine_ && engine_->xr_follow_head) {
     const f32 a = -engine_->xr_head_yaw * kDeg, c = std::cos(a), s = std::sin(a);
     f = kern::normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
+  } else if (engine_ && engine_->xr_full_room) {
+    const Vec3 ff = kern::normalize(cam_.target - cam_.eye, f);
+    const Vec3 rr = kern::normalize(kern::cross(ff, cam_.up), Vec3{f.y, -f.x, 0});
+    f = ff;
+    up = kern::cross(rr, ff);
   }
+  r = kern::normalize(kern::cross(f, up), Vec3{f.y, -f.x, 0});
+}
+
+Vec3 Game::vr_room_forward() const {
+  Vec3 f, r, up;
+  vr_room(f, r, up);
   return f;
 }
 
 bool Game::vr_hand_matrix(i32 side, Mat4& out) const {
   if (!vr_ || !engine_ || !engine_->xr || side < 0 || side > 1 || !vr_hands_[side].valid) return false;
   const VrHand& h = vr_hands_[side];
-  const Vec3 f = vr_room_forward(), r{f.y, -f.x, 0}, up{0, 0, 1};
+  Vec3 f, r, up;
+  vr_room(f, r, up);
   auto W = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
   const Vec3 x = W(h.q.rotate({1, 0, 0})), y = W(h.q.rotate({0, 1, 0})), z = W(h.q.rotate({0, 0, 1})), p = cam_.eye + W(h.p);
   out = Mat4{};
@@ -411,7 +430,97 @@ void Game::vr_update_view() {
   if (engine_) {
     engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
     engine_->xr_hold_room = vr_ && player_dead_;  // dying the camera falls and turns: the room stays (no spin)
+    // the jet's cockpit and the FPV drone with the horizon free (VR: Horizont halten off): you sit
+    // in the craft, it is the rest frame - the world turns round it, loops and rolls included
+    engine_->xr_full_room = vr_ && !player_dead_ && !ui_.settings.on(Opt::vr_level) &&
+                            ((mode_ == Mode::jet && jet_cockpit_) || (mode_ == Mode::drone && drone_cam_ == 0));
   }
+}
+
+void Game::vr_comfort(f32 dt) {
+  // The comfort tunnel (Meta's locomotion guidance): the view's rim darkens while the game - not
+  // the player's own head - turns or speeds the view: a stick turn, a snap, a car taking a corner,
+  // a drone braking. Turning your head, walking in the room, cruising straight leave it open.
+  if (!engine_) return;
+  kern::Renderer& r = engine_->renderer;
+  const bool on = vr_ && engine_->xr && ui_.settings.on(Opt::vr_tunnel) && !player_dead_;
+  if (!on) {
+    vr_tunnel_ = 0;
+    vr_prev_ok_ = false;
+    engine_->xr_vignette = 0;
+    return;
+  }
+  if (!vr_tunnel_mesh_) {
+    // a black ring: see-through inside radius 1, opaque from 2 to 8 (the texture's u is the radius)
+    if (!vr_tunnel_tex_) {
+      u8 px[64 * 2 * 4];
+      for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 64; ++x) {
+          const f32 t = static_cast<f32>(x) / 63, a = t * t * (3 - 2 * t);
+          u8* p = px + (y * 64 + x) * 4;
+          p[0] = p[1] = p[2] = 0;
+          p[3] = static_cast<u8>(a * 255 + 0.5f);
+        }
+      kern::TextureDesc td;
+      td.rgba = px;
+      td.width = 64;
+      td.height = 2;
+      td.mipmaps = false;
+      vr_tunnel_tex_ = r.create_texture(td);
+      if (!vr_tunnel_tex_) return;
+    }
+    kern::MeshData d;
+    const Vec3 n{0, -1, 0};
+    constexpr int kSeg = 40;
+    const f32 radii[3] = {1, 2, 8}, us[3] = {0.5f / 64, 1 - 0.5f / 64, 1 - 0.5f / 64};
+    for (int i = 0; i <= kSeg; ++i) {
+      const f32 a = static_cast<f32>(i) / kSeg * 2 * kPi, c = std::cos(a), sn = std::sin(a);
+      for (int k = 0; k < 3; ++k) d.push({c * radii[k], 0, sn * radii[k]}, n, {0, 0, 0}, {us[k], 0.5f});
+      if (i > 0) {
+        const u32 b = static_cast<u32>((i - 1) * 3), e = static_cast<u32>(i * 3);
+        for (u32 k = 0; k < 2; ++k) d.indices.insert(d.indices.end(), {b + k, e + k, e + k + 1, b + k, e + k + 1, b + k + 1});
+      }
+    }
+    vr_tunnel_mesh_ = r.allocate_id();
+    kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
+    in.material.unlit = true;
+    in.material.double_sided = true;
+    in.material.cast_shadow = false;
+    in.material.frustum_culled = false;
+    in.material.alpha = kern::AlphaMode::blend;
+    in.texture = vr_tunnel_tex_;
+    if (!r.upsert(vr_tunnel_mesh_, in)) { r.release_id(vr_tunnel_mesh_); vr_tunnel_mesh_ = 0; return; }
+    r.set_visible(vr_tunnel_mesh_, false);
+    engine_->xr_vignette_mesh = vr_tunnel_mesh_;
+  }
+  // this frame's room and the camera (the room's anchor) against the last
+  Vec3 f, rt, up;
+  vr_room(f, rt, up);
+  const Vec3 eye = cam_.eye;
+  f32 want = 0;
+  if (vr_prev_ok_ && dt > 1e-4f) {
+    const f32 turn = std::acos(clampf(kern::dot(f, vr_prev_f_), -1, 1)) + std::acos(clampf(kern::dot(up, vr_prev_up_), -1, 1));
+    const f32 rate = turn / dt / kDeg;  // deg/s the game turns the room
+    const Vec3 v = (eye - vr_prev_eye_) * (1 / dt);
+    const f32 jump = kern::length(eye - vr_prev_eye_);
+    if (jump < 4) {  // not a respawn, a seat change, a teleport
+      const f32 acc = kern::length(v - vr_prev_v_) / dt;
+      const f32 speed = kern::length(Vec3{v.x, v.y, 0});
+      want = std::fmax(want, clampf((rate - 25) / 110, 0, 1));
+      want = std::fmax(want, clampf((acc - 4) / 18, 0, 1) * 0.8f);
+      // on foot the stick walk itself (a constant artificial motion): a light rim while moving
+      if (mode_ == Mode::foot) want = std::fmax(want, clampf((speed - 0.8f) / 6, 0, 1) * 0.55f);
+    }
+    vr_prev_v_ = v;
+  }
+  vr_prev_f_ = f;
+  vr_prev_up_ = up;
+  vr_prev_eye_ = eye;
+  vr_prev_ok_ = true;
+  // in fast (80 ms), out slow (350 ms): no pumping
+  const f32 tau = want > vr_tunnel_ ? 0.08f : 0.35f;
+  vr_tunnel_ += (want - vr_tunnel_) * (1 - std::exp(-dt / tau));
+  engine_->xr_vignette = vr_tunnel_ < 0.02f ? 0 : vr_tunnel_;
 }
 
 }  // namespace sc

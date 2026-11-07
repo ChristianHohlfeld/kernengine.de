@@ -486,6 +486,7 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
     }
   }
   vr_update_view();  // the gun in the right hand, the body with the head (game_vr.cpp)
+  vr_comfort(dt);  // the comfort tunnel (game_vr.cpp)
   look_view_models(dt);
   look_vr_hud();
   // stereo_sbs.mjs: side-by-side cross-eye 3D (KAMERA: 3D NEBENEINANDER, ?sbs=1); the eye base by

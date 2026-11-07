@@ -521,7 +521,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else if (vr.action === "exit") app.exitXR();
     else if (vr.action === "radio") { try { const r = globalThis.__arondightCarRadio; r?.next?.(); } catch { /* no radio */ } }
     const now = performance.now();
-    const key = `${vr.menu}|${vr.hover}|${vr.arms}|${h.mp?.players?.length || 0}`;
+    const key = `${vr.menu}|${vr.hover}|${vr.arms}|${vr.level}|${vr.tunnel}|${vr.rocket}|${h.mode}|${h.mp?.players?.length || 0}`;
     if (now - vrHud.at < 100 && key === vrHud.key) return;
     vrHud.at = now; vrHud.key = key;
     const g = vrHud.g;
@@ -536,15 +536,26 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       // the rows (game_vr.cpp kMenuTop 72, kMenuRow 44 - the same order)
       const radio = globalThis.__arondightCarRadio?.station?.name;
       const items = [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE", "LUFTSCHLAG (wohin du schaust)",
-        h.mode === "car" ? `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}` : "EMP", `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}`, "RESET", "VR BEENDEN"];
+        h.mode === "car" ? `RADIO${radio ? ` · ${String(radio).slice(0, 14)}` : " · nächster Sender"}` : "EMP",
+        h.mode === "foot" ? `LAUFEN: ${vr.arms ? "ARME" : "STICKS"}` : h.mode === "car" ? `KOMFORT-TUNNEL: ${vr.tunnel ? "AN" : "AUS"}` : `HORIZONT: ${vr.level ? "HALTEN" : "FREI (Cockpit)"}`,
+        "RESET", "VR BEENDEN"];
       items.forEach((t, i) => {
         const y = 72 + i * 44;
         if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 3, 484, 38); }
         g.font = "800 25px Inter, system-ui, sans-serif"; g.fillStyle = i === 6 ? "#ff9a8a" : "#eef0f2"; g.fillText(t, 28, y + 22);
       });
     } else {
-      // the watch: health, weapon, stars - nothing else in the way
-      panel(4, 140);
+      // the watch: health, weapon, stars - nothing else in the way; in a vehicle its controls below
+      const hints = {
+        drone: ["L: Gas ↕ · Drehen ↔   R: Neigen", "Abzug R: Feuer · B: Waffe · A: Start/Landen"],
+        car: ["L: Lenken · Abzug R: Gas · L: Bremse", "B: Handbremse · X: Aussteigen"],
+        jet: ["L: Schub ↕ · Seite ↔   R: Nicken · Rollen", `Abzug R: ${vr.rocket ? "RAKETE" : "MG"} · L: Rakete · Griff L: VTOL · R: Bombe`],
+      }[h.mode];
+      panel(4, hints ? 214 : 140);
+      if (hints) {
+        g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2";
+        hints.forEach((t, i) => g.fillText(t, 24, 158 + i * 32));
+      }
       g.font = "900 40px Inter, system-ui, sans-serif";
       const hp = Math.max(0, Math.round(h.health >= 0 ? h.health : 100));
       g.fillStyle = hp > 35 ? "#7ff0c5" : "#ff6b5a"; g.fillText(`♥ ${hp}`, 24, 50);

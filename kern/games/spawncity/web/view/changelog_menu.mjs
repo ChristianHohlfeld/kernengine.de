@@ -9,6 +9,11 @@ export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-06",time:"16:00",title:"SpawnCity läuft jetzt auf Kern",items:[
     "Schneller und flüssiger: die ganze Welt läuft auf der neuen Kern-Engine.",
+    "Handy: DRONE, ARM und die anderen Knöpfe schalten bei jedem Tipp sicher – auch nach längerem Drücken (vorher schalteten sie manchmal hin und sofort zurück, die Drohne blieb unscharf und die Sticks taten nichts).",
+    "VR: Drohne wie eine echte Fernsteuerung (Mode 2) – links Gas und Drehen, rechts Neigen, rechter Abzug feuert, A startet und landet.",
+    "VR: Auto und Jet immer im Cockpit; du schaust mit dem Kopf, der rechte Stick dreht die Sicht nicht mehr.",
+    "VR: Komfort-Tunnel – der Rand des Blicks dunkelt ab, wenn das Spiel dich dreht oder beschleunigt; Horizont halten oder frei im Cockpit mitkippen (Einstellung und Brillen-Menü).",
+    "VR: auf der Uhr am Handgelenk stehen in Drohne, Auto und Jet die Tasten.",
     "Luftschlag landet genau dort, wo du tippst.",
     "Messer, Fäuste und Fingerschüsse reagieren auf jeden kurzen Tipp; Fäuste: linke Hälfte linke Hand, rechte Hälfte rechte Hand.",
     "Hochkant gehaltene Handys zeigen das Spiel richtig im Querformat.",

@@ -474,6 +474,14 @@ class Game {
   struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false; Vec3 p, prev, prev_strike, world_prev, grab_local; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1, grab_slot = -1; f32 grab_mate_at = 0; };
   VrHand vr_hands_[2];
   bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false;
+  bool vr_fire_was_ = false;  // the drone's trigger in VR (an edge)
+  // the comfort tunnel (game_vr.cpp vr_comfort): its mesh, its strength, the last frame's room / eye
+  u32 vr_tunnel_mesh_ = 0, vr_tunnel_tex_ = 0;
+  f32 vr_tunnel_ = 0;
+  Vec3 vr_prev_f_{1, 0, 0}, vr_prev_up_{0, 0, 1}, vr_prev_eye_, vr_prev_v_;
+  bool vr_prev_ok_ = false;
+  void vr_comfort(f32 dt);
+  void vr_room(Vec3& f, Vec3& r, Vec3& up) const;
   bool vr_menu_open_ = false, vr_menu_trigger_ = false, vr_menu_valid_ = false;
   i32 vr_menu_hover_ = -1;
   Vec3 vr_menu_c_, vr_menu_r_, vr_menu_u_, vr_menu_n_;

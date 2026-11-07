@@ -95,11 +95,18 @@ export function fingerForGame(ev) {
   return game;
 }
 const gameTouched = {el: null, at: -1e9};
-/** True when this element was just pressed by a game-owned finger (its click is a duplicate). */
+// a finger anywhere else (or the mouse) ends the claim; the game's own finger sets it again
+addEventListener("pointerdown", () => { gameTouched.el = null; }, {capture: true});
+/** True when this element was pressed by the game-owned finger that went down on it last (its
+ *  click is a duplicate): once, however long the finger stayed (a slow frame, a held button - a
+ *  time window let the click through after a long press: DRONE toggled there and straight back,
+ *  ARM armed and disarmed, the sticks then did nothing). */
 function pressedByGame(el) {
-  if (!gameTouched.el || performance.now() - gameTouched.at > 800) return false;
+  if (!gameTouched.el || performance.now() - gameTouched.at > 20000) return false;
   // thumb_layout.mjs: the thumb weapon button clicks the dock's WEAPON button on pointerdown
-  return gameTouched.el === el || (el?.id === "mobileGameplayWeapon" && gameTouched.el.id === "thumbWeapon");
+  const hit = gameTouched.el === el || (el?.id === "mobileGameplayWeapon" && gameTouched.el.id === "thumbWeapon");
+  if (hit) gameTouched.el = null;
+  return hit;
 }
 
 const FOOT_NAMES = {MP: "MP", Glock: "GLOCK", Sniper: "SNIPER", "Sniper .50": "SNIPER", Granatwerfer: "WERFER", "Granatwerfer 40 mm": "WERFER", Raketenwerfer: "RAKETEN",
