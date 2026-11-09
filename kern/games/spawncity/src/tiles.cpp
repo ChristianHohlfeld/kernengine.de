@@ -2,7 +2,10 @@
 #include <array>
 #include "tiles.h"
 
+#include <cmath>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 #include <string_view>
 
 namespace sc {
@@ -135,6 +138,7 @@ u32 hash_u32(u64 v) {
 
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
   std::vector<std::vector<std::vector<Vec2>>> polys;
+  std::vector<std::vector<Vec2>> apron;
   if (const mvt::Layer* l = tile.layer("building")) {
     const Projector P(key, proj, static_cast<f64>(l->extent));
     for (const mvt::Feature& f : l->features) {
@@ -152,6 +156,12 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         b.top = std::fmax(top, base + 1.0f);
         b.seed = hash_u32(f.id * 31 + (n++) + static_cast<u64>(key.x) * 7919 + static_cast<u64>(key.y) * 104729);
         const f32 ext = static_cast<f32>(l->extent);
+        if (!poly.empty()) {
+          // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
+          bool over = false;
+          for (Vec2 q : poly[0]) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
+          if (over) { std::vector<Vec2> m; for (Vec2 q : poly[0]) m.push_back(P(q)); apron.push_back(std::move(m)); }
+        }
         for (auto& ring : poly) {
           const std::vector<Vec2> clipped = clip_to_tile(ring, ext);
           if (clipped.size() < 3) { if (b.rings.empty()) break; continue; }  // the outline outside: the house is the other tile's
@@ -236,6 +246,137 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     else return false;
     return true;
   });
+  {
+    const Projector P(key, proj, 1.0);
+    const Vec2 a = P({0, 0}), b = P({1, 1});
+    furnish(out, {std::fmin(a.x, b.x), std::fmin(a.y, b.y), std::fmax(a.x, b.x), std::fmax(a.y, b.y)}, apron);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// street furniture
+
+namespace {
+struct FurnishIndex {
+  static constexpr f32 kCell = 20;
+  struct Seg { Vec2 a, b; f32 half; u32 road; bool paved; };
+  struct Ring { const std::vector<Vec2>* r; kern::Vec4 box; };
+  std::vector<Seg> segs;
+  std::vector<Ring> rings;
+  std::unordered_map<u64, std::vector<u32>> seg_cells, ring_cells;
+  static u64 key(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
+  static i32 cell(f32 v) { return static_cast<i32>(std::floor(v / kCell)); }
+  void add_seg(Vec2 a, Vec2 b, f32 half, u32 road, bool paved) {
+    const u32 id = static_cast<u32>(segs.size());
+    segs.push_back({a, b, half, road, paved});
+    const f32 m = half + 3;
+    for (i32 x = cell(std::fmin(a.x, b.x) - m); x <= cell(std::fmax(a.x, b.x) + m); ++x)
+      for (i32 y = cell(std::fmin(a.y, b.y) - m); y <= cell(std::fmax(a.y, b.y) + m); ++y) seg_cells[key(x, y)].push_back(id);
+  }
+  void add_ring(const std::vector<Vec2>& r) {
+    if (r.size() < 3) return;
+    kern::Vec4 box{1e30f, 1e30f, -1e30f, -1e30f};
+    for (Vec2 p : r) box = {std::fmin(box.x, p.x), std::fmin(box.y, p.y), std::fmax(box.z, p.x), std::fmax(box.w, p.y)};
+    if (box.z - box.x > 4000 || box.w - box.y > 4000) return;
+    const u32 id = static_cast<u32>(rings.size());
+    rings.push_back({&r, box});
+    for (i32 x = cell(box.x); x <= cell(box.z); ++x)
+      for (i32 y = cell(box.y); y <= cell(box.w); ++y) ring_cells[key(x, y)].push_back(id);
+  }
+  /// Inside a house.
+  bool built(Vec2 p) const {
+    const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
+    if (it == ring_cells.end()) return false;
+    for (u32 id : it->second) {
+      const Ring& g = rings[id];
+      if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
+      const std::vector<Vec2>& r = *g.r;
+      bool c = false;
+      for (std::size_t i = 0, j = r.size() - 1; i < r.size(); j = i++)
+        if ((r[i].y > p.y) != (r[j].y > p.y) && p.x < (r[j].x - r[i].x) * (p.y - r[i].y) / (r[j].y - r[i].y + 1e-12f) + r[i].x) c = !c;
+      if (c) return true;
+    }
+    return false;
+  }
+  /// Clear of every street by `paved` beyond its carriageway and of every path by `unpaved`.
+  bool off_roads(Vec2 p, f32 paved, f32 unpaved) const {
+    const auto it = seg_cells.find(key(cell(p.x), cell(p.y)));
+    if (it == seg_cells.end()) return true;
+    for (u32 id : it->second) {
+      const Seg& s = segs[id];
+      const Vec2 d = s.b - s.a;
+      const f32 l2 = d.x * d.x + d.y * d.y;
+      const f32 t = l2 > 1e-6f ? clampf(((p.x - s.a.x) * d.x + (p.y - s.a.y) * d.y) / l2, 0, 1) : 0;
+      if (std::hypot(p.x - s.a.x - d.x * t, p.y - s.a.y - d.y * t) < s.half + (s.paved ? paved : unpaved)) return false;
+    }
+    return true;
+  }
+};
+}  // namespace
+
+void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vector<Vec2>>& apron) {
+  out.trees.clear();
+  out.lamps.clear();
+  FurnishIndex ix;
+  for (u32 ri = 0; ri < out.roads.size(); ++ri) {
+    const MapFeatures::Road& r = out.roads[ri];
+    if (road_is_water(r.cls)) continue;
+    const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
+    for (std::size_t k = 0; k + 1 < r.points.size(); ++k) ix.add_seg(r.points[k], r.points[k + 1], road_width(r.cls) / 2, ri, paved);
+  }
+  for (const MapFeatures::Building& b : out.buildings)
+    if (!b.rings.empty()) ix.add_ring(b.rings[0]);
+  for (const std::vector<Vec2>& r : apron) ix.add_ring(r);
+  auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
+  constexpr f32 kPi2 = 6.2831853f;
+  std::unordered_set<u64> lamp_cells;
+  for (u32 ri = 0; ri < out.roads.size(); ++ri) {
+    const MapFeatures::Road& r = out.roads[ri];
+    if (road_is_water(r.cls) || r.points.size() < 2) continue;
+    const f32 w = road_width(r.cls);
+    // ---- trees beside the streets cars drive (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m,
+    // 2.4 m clear of houses): every 37 m, alternating sides, beyond the pavement
+    if (road_drivable(r.cls) && !r.bridge && w <= 14) {
+      f32 carry = 17;
+      u32 i = ri * 7;
+      for (std::size_t k = 0; k + 1 < r.points.size(); ++k) {
+        const Vec2 a = r.points[k], d = r.points[k + 1] - a;
+        const f32 len = std::hypot(d.x, d.y);
+        if (len < 1) continue;
+        const Vec2 u = d * (1 / len), right{u.y, -u.x};
+        for (f32 t = carry; t < len; t += 37, ++i) {
+          const f32 side = (i & 1) ? 1.0f : -1.0f, off = w * 0.5f + 2.2f + static_cast<f32>(i % 4) * 0.4f;
+          const Vec2 c = a + u * t + right * (side * off);
+          if (!inside(c) || !ix.off_roads(c, 1.9f, 0.6f) || ix.built(c)) continue;
+          bool free = true;
+          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{std::cos(static_cast<f32>(j) * kPi2 / 6), std::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4f);
+          if (free) out.trees.push_back({c, 0.82f + static_cast<f32>(i % 5) * 0.045f});
+        }
+        carry = std::fmod(carry + 37 - std::fmod(len, 37.0f), 37.0f);
+      }
+    }
+    // ---- street lamps (street_lamps.mjs setLampRoads): every street but paths and tracks
+    if (r.cls != RoadClass::path && r.cls != RoadClass::track) {
+      f32 carry = 34 * 0.5f, side = 1;
+      for (std::size_t k = 0; k + 1 < r.points.size(); ++k) {
+        const Vec2 a = r.points[k], d = r.points[k + 1] - a;
+        const f32 len = std::hypot(d.x, d.y);
+        if (len < 0.5f) continue;
+        const Vec2 u = d * (1 / len), n{-u.y, u.x};
+        for (f32 t = carry; t < len; t += 34) {
+          side = -side;
+          const Vec2 c = a + u * t + n * ((w / 2 + 1.15f) * side);
+          if (!inside(c)) continue;
+          const u64 cell = (static_cast<u64>(static_cast<u32>(std::lround(c.x / 8))) << 32) | static_cast<u32>(std::lround(c.y / 8));
+          // on its kerb: off every other street's carriageway, not in a house (nor its arm's foot)
+          if (!ix.off_roads(c, 0.35f, 0.3f) || ix.built(c)) continue;
+          if (!lamp_cells.insert(cell).second) continue;
+          out.lamps.push_back({c, std::atan2(-n.y * side, -n.x * side)});
+        }
+        carry = std::fmod(std::fmod(carry - len, 34.0f) + 34.0f, 34.0f);
+      }
+    }
+  }
 }
 
 void training_level(MapFeatures& out) {

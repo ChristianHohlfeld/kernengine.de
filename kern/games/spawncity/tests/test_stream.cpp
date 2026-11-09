@@ -102,7 +102,10 @@ SC_TEST(stream_offline_town) {
   city.start(r, world, kKonstanzLon, kKonstanzLat);
   city.update({0, 0, 0}, 1);
   const TileKey key = tile_at(kKonstanzLon, kKonstanzLat);
-  city.fail(key);  // no map service
+  city.fail(key);  // one lost request: asked again, the real world is not given up
+  SC_CHECK(!city.offline(), "one failed request does not cost the real world");
+  city.fail(key);
+  city.fail(key);  // no map service: three times nothing
   SC_CHECK(city.offline(), "falls back to the stand-in town");
   int frames = 0;
   while (!city.ready_at({0, 0, 0}) && frames++ < 3000) city.update({0, 0, 0}, 4);

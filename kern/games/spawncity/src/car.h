@@ -1,18 +1,26 @@
-// Cars and buses: SpawnCity's vehicle dynamics (sim/world_vehicle_dynamics.mjs v4.1) as a
-// ray-cast vehicle on one Box3D chassis.
+// Cars and buses: SpawnCity's vehicle dynamics (sim/world_vehicle_dynamics.mjs v4.1) - real wheeled
+// vehicles on Box3D joints, after Box3D's own driving setup (its manual: "The wheel joint is
+// designed specifically for vehicles", a sphere per wheel).
 //
-// SpawnCity hung four wheel bodies on Box3D wheel joints with a steering motor. Kern's physics
-// layer exposes the wheel joint without its steering (later in the engine, see README), so the
-// suspension here is the same spring and damper per corner acting along a ray from the chassis
-// mount: stiffness q*g/sag (q = a quarter of the mass), body damping ratio 0.45, travel limits
-// with bump stops. Everything above the suspension is SpawnCity's model unchanged: per-wheel spin
-// degree of freedom (I*dw/dt = T_engine - T_brake - Fx*r, integrated implicitly in 5 substeps),
-// the combined-slip tyre curve (kappa_peak 0.1, alpha_peak 6.5 deg, sliding grip 0.78, load
-// sensitivity 0.15), traction control and ABS at 11 % slip, power-limited low gear, automatic
-// D/R that only changes below 0.65 m/s, electric power steering solved as the equilibrium of
-// hand torque + assist against the tyres' aligning torque, rack rate limit, aero drag and rolling
-// resistance. The tyre forces act on the chassis at the contact patches, so load transfer, pitch,
-// roll and yaw come out of Box3D.
+// A dynamic chassis and four dynamic wheels (spheres) on Box3D wheel joints: the joint guides the
+// wheel along the suspension axis, its spring carries the car, its limits are the bump stops, its
+// steering servo turns the front wheels; a damper strut (a soft distance joint from a chassis
+// mount over the wheel to the hub) carries the damping. Springs, dampers and stops are Box3D's
+// soft constraints - solved implicitly inside the solver, stable for any stiffness and any step -
+// and the wheels meet the ground through Box3D's contacts. (An earlier version pushed the chassis
+// with spring forces computed outside the solver from one ray per wheel; held over several steps
+// and 20 times stiffer on the bump stop, such a spring feeds energy in instead of taking it out -
+// a heavy bus that touched its stops was thrown into the air.)
+//
+// Everything above the suspension is SpawnCity's model unchanged: per-wheel spin degree of freedom
+// (I*dw/dt = T_engine - T_brake - Fx*r, integrated implicitly in 5 substeps; the wheel bodies
+// themselves do not spin and do not rub on the ground), the combined-slip tyre curve (kappa_peak
+// 0.1, alpha_peak 6.5 deg, sliding grip 0.78, load sensitivity 0.15), traction control and ABS at
+// 11 % slip, power-limited low gear, automatic D/R that only changes below 0.65 m/s, electric
+// power steering solved as the equilibrium of hand torque + assist against the tyres' aligning
+// torque, rack rate limit, aero drag and rolling resistance. The tyre forces act on the wheels at
+// the contact patches and reach the chassis through the joints, so load transfer, pitch, roll and
+// yaw come out of Box3D.
 //
 // Chassis frame: +X forward, +Y left, +Z up.
 #pragma once
@@ -34,6 +42,7 @@ struct CarSpec {
   f32 steer_lag = 0.15f, steer_damp_speed = 15, drag_area = 0.68f, rolling_resistance = 0.013f, wheel_inertia = 1.3f;
   f32 brake = 2400, handbrake = 3200, coast = 30, steer_lock = 0.58f, steer_hand = 430, steer_assist = 600, steer_assist_speed = 6, friction = 1.1f;
   f32 rack_rate = 2.8f;
+  f32 steer_servo = 3000;  // the steering servo's torque limit (world_vehicle_dynamics.mjs steerTorque)
   f32 upper_mass = 95;  // the greenhouse (glass, pillars, roof) as its own hull
   std::vector<Vec2> upper_profile{{-1.02f, 0.8f}, {-0.64f, 1.37f}, {0.3f, 1.37f}, {0.86f, 0.8f}};
   f32 upper_half_width = 0.71f, upper_dz = 0.54f;
@@ -59,6 +68,18 @@ struct WheelState {
 class Car {
  public:
   explicit Car(const CarSpec& s = {}) : s_(s) {}
+  ~Car() { detach(); }
+  Car(const Car&) = delete;
+  Car& operator=(const Car&) = delete;
+  /// Takes the wheels (bodies, joints) off: the chassis is no longer driven (parked far away
+  /// without physics, moved by somebody else, removed). step() puts them on again.
+  void detach();
+  bool rigged() const { return rig_world_ != nullptr; }
+  /// What a hit on a wheel reports as the shape's user (the game: the car's actor, so a round
+  /// into a tyre is a hit on the car).
+  u64 hit_user = 0;
+  /// One wheel body of the rig (valid while rigged): for whoever must know it (a ray's ignore).
+  kern::physics::Body wheel_body(int i) const { return rig_[i].body; }
   static RigidSpec rigid_spec(const CarSpec& s);
   /// Height of the chassis centre above flat ground at rest.
   static f32 ground_offset(const CarSpec& s) { return s.radius - s.attach_z - s.sag; }
@@ -83,10 +104,20 @@ class Car {
   WheelState w_[4];
   f32 steer_ = 0, steer_eq_f_ = 0, vf_ = 0, throttle_ = 0;
   i32 gear_ = 1;
-  struct Applied { Vec3 p, f; bool center; };  // chassis-local point and force
-  Applied applied_[10];
+  struct Applied { Vec3 p, f; i32 on; };  // chassis-local point and force; on: wheel 0..3, or -1 the chassis' centre
+  Applied applied_[6];
   i32 n_applied_ = 0;
-  void push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, bool center);
+  void push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on);
+  // the wheels on their joints
+  struct Rig { kern::physics::Body body; kern::physics::Joint joint, strut; };
+  Rig rig_[4];
+  kern::physics::World* rig_world_ = nullptr;
+  kern::physics::Body rig_chassis_;
+  Vec3 last_pos_;
+  bool has_last_ = false;
+  void attach(kern::physics::World& world, kern::physics::Body chassis);
+  void place(kern::physics::World& world, const BodyState& st);
+  bool ensure_rig(kern::physics::World& world, kern::physics::Body chassis, f32 dt);
 };
 
 /// SpawnCity's AI driver (world_vehicle_dynamics.mjs aiInput): steer to the target, slow for bends.

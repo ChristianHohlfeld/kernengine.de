@@ -86,6 +86,20 @@ class CityStream {
   void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
   bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
+  /// The street furniture (tiles.h furnish) of every tile whose ground is final, in a fixed
+  /// order; `furniture_serial` changes whenever that set does.
+  struct Furniture { u64 tile; const std::vector<MapFeatures::Spot>* trees; const std::vector<MapFeatures::Spot>* lamps; };
+  void furniture(std::vector<Furniture>& out) const;
+  u32 furniture_serial() const { return furniture_serial_; }
+  /// Where the ground changed since the last call (a crater, a new elevation window): what stands
+  /// on it is put on it again.
+  void take_ground_changes(std::vector<kern::Vec4>& out) { out.insert(out.end(), ground_changes_.begin(), ground_changes_.end()); ground_changes_.clear(); }
+  /// Where the player will be in a few seconds, relative to the focus (his velocity x 4 s, the
+  /// game sets it): the drawn city and its streets are built along the way there, so nothing is
+  /// missing where a fast car arrives.
+  Vec3 view_lead;
+  /// How many buildings are drawn at most (world_city_buildings.mjs MAX_FOOTPRINTS 2600).
+  u32 building_budget = 2600;
   i32 ring = 1;  // tiles requested around the player's tile (1 = 3 x 3)
   /// MP host: the other players - the town is loaded around them too (ring `mate_ring`), so the
   /// host's traffic and people live there (the authority over the whole town: game_worldsync.cpp)
@@ -137,10 +151,13 @@ class CityStream {
 
  private:
   u32 damage_serial_ = 0;
+  u32 furniture_serial_ = 0;
+  std::vector<kern::Vec4> ground_changes_;
   struct Tile;
   Tile* tile(const TileKey& k);
   void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
+  kern::Vec4 ring_bounds(Vec3 focus, i32 r) const;
   bool work(Tile& t, f64 deadline);
   void finish_features(Tile& t);
   void upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls);
@@ -154,7 +171,7 @@ class CityStream {
   // MAX_FOOTPRINTS 480, MAX_VERTICES 64), the streets (world_city_roads.mjs: RADIUS_M 720).
   struct NearCollision {
     kern::physics::Body body, old_body;
-    Vec2 at{1e9f, 1e9f};
+    Vec2 at{1e9f, 1e9f}, ahead{1e9f, 1e9f};
     f64 at_ms = -1e9;
     std::vector<std::pair<u64, u32>> list;
     std::vector<kern::physics::Shape> shapes;  // list[i]'s collider (destruction replaces one)
@@ -173,10 +190,10 @@ class CityStream {
   u64 upload_vertices_ = 0;
   void step_time(const char* name, f64 t0);
   Vec3 focus_{};
-  Vec2 vis_at_{1e9f, 1e9f};
+  Vec2 vis_at_{1e9f, 1e9f}, vis_ahead_{1e9f, 1e9f};
   f64 vis_ms_ = -1e9;
-  void select_visual(Vec3 focus);
-  void begin_visual(Tile& t);
+  void select_cells(Vec3 focus, bool force);
+  void drop_cell(Tile& t, u64 cell);
   void update_collision(Vec3 focus, f64 deadline);
   bool build_near(f64 deadline);
   kern::physics::Shape building_shape(kern::physics::Body body, const MapFeatures::Building& b);
@@ -186,7 +203,7 @@ class CityStream {
   std::vector<u32> damage_log_;
   bool damage_quiet_ = false;  // merge_damage(.., false): not logged
   void begin_cells(Tile& t);
-  bool finish_cells(Tile& t);
+  bool finish_cells(Tile& t, f64 deadline);
 
   kern::Renderer* r_ = nullptr;
   kern::physics::World* world_ = nullptr;

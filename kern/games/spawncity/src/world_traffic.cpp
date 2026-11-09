@@ -110,6 +110,32 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     // The axis: the widest arm (the main road)
     for (const Arm& a : n.arms)
       if (a.width >= wmax) { j.axis = a.dir; break; }
+    // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
+    // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
+    // street: not on its own arm, not on the one crossing it).
+    for (Arm& a : j.arms) {
+      const f32 aa = std::atan2(a.dir.y, a.dir.x);
+      f32 best = 6.2831853f;
+      const Arm* next = nullptr;
+      for (const Arm& b : j.arms) {
+        if (&b == &a) continue;
+        f32 d = std::atan2(b.dir.y, b.dir.x) - aa;
+        while (d <= 1e-4f) d += 6.2831853f;
+        if (d < best) { best = d; next = &b; }
+      }
+      const f32 half = best / 2;
+      if (!next || best >= 3.1415927f) {
+        // no arm on that side: abeam of the junction, beside the arm's own kerb
+        a.pole = Vec2{-a.dir.y, a.dir.x} * (a.width * 0.5f + 1.2f);
+        a.has_pole = true;
+        continue;
+      }
+      const f32 s = std::sin(half);
+      const f32 r = (std::fmax(a.width, next->width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
+      if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
+      a.pole = Vec2{std::cos(aa + half), std::sin(aa + half)} * r;
+      a.has_pole = true;
+    }
     const u32 h = static_cast<u32>(static_cast<i32>(n.p.x * 7.0f)) * 73856093u ^ static_cast<u32>(static_cast<i32>(n.p.y * 7.0f)) * 19349663u;
     j.offset = static_cast<f32>(h % 3800) / 100.0f;
     junctions_.push_back(j);

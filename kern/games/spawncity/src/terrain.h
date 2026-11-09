@@ -35,7 +35,7 @@
 namespace sc {
 
 struct TerrainStats {
-  u32 dem_tiles = 0, dem_failed = 0, render_tiles = 0, collision_tiles = 0, water_cells = 0, craters = 0, rebuilds = 0;
+  u32 windows = 0, dem_tiles = 0, dem_failed = 0, render_tiles = 0, collision_tiles = 0, water_cells = 0, craters = 0, rebuilds = 0;
   f32 min_height = 0, max_height = 0;
   bool dem = false, settled = false;
 };
@@ -45,8 +45,9 @@ class Terrain {
   static constexpr u32 kDemJob = 3;            // the elevation grid job (kern/core/jobs.h; city jobs are 1, 2)
   static constexpr i32 kDemZoom = 13;          // see README: the city ring is ~5 km, bare earth is smooth below 160 m
   static constexpr f32 kDemStep = 10;          // grid spacing of the sampled elevation (m)
-  static constexpr f32 kDemSize = 8000;        // grid window around the player (m)
-  static constexpr f32 kDemReload = 2000;      // reload after this much travel (terrain_elevation.mjs RELOAD_MOVE_M analogue)
+  static constexpr f32 kDemSize = 8000;        // the smallest elevation window (m); it grows with the map tiles it must hold
+  static constexpr f32 kDemMaxSize = 24000;    // and the largest (low latitudes: a map tile is 2.4 km wide there)
+  static constexpr f32 kDemMargin = 300;       // the bare-earth filter's reach from a window's edge (open 160 m + blur): inside it two windows agree
   static constexpr f32 kOpen = 160, kBlur = 30;  // terrain_elevation.mjs OPEN_M, BLUR_M
   static constexpr f32 kStep = 5;              // terrain_craters.mjs TERRAIN_FIELD_STEP_M
   static constexpr f32 kWaterLevel = -0.18f;   // terrain_craters.mjs WATER_LEVEL_M
@@ -80,6 +81,12 @@ class Terrain {
   bool has_dem() const { return grid_ready_; }
   /// Collision under p is built.
   bool ready_at(Vec3 p) const;
+  /// The ground of the whole rect (x0, y0, x1, y1) is known for good: it lies in an elevation
+  /// window's interior, where no later window gives another height (or there is no elevation).
+  bool covers(const kern::Vec4& rect) const;
+  /// What must be known (the city sets it every frame): the square of the map tiles round the
+  /// player first, then one per far mate (host). The windows are planned to hold them.
+  std::vector<kern::Vec4> needs;
 
   // ---- heights (one truth for physics, rendering, walkers, cars) ----
   f32 elevation(f32 x, f32 y) const;
@@ -108,6 +115,22 @@ class Terrain {
   /// linear): the ground already is the surface, so they cost no triangles. `owner`: the map tile.
   void add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, Vec3 srgb);
   void remove_tints(u64 owner);
+
+  // ---- road corridors (terrain_craters.mjs setRoadCorridors) ----
+  /// A street's corridor: its centre line and its width with the pavements (road width + 3.4 m).
+  struct RoadLine { const std::vector<Vec2>* points; f32 width; };
+  /// The streets of one map tile (`owner`, its square `bounds`): inside that square the ground is
+  /// level across every street and smooth along it (the height of the street's smoothed centre
+  /// line, blending back to the natural ground over 4.5 m) - physics, the ground mesh, the roads
+  /// and the walkers all read this one height. Only the tile's own streets shape its square (a
+  /// tile's data holds every street within reach of it), so the ground there does not depend on
+  /// which neighbours are loaded. The elevation under the streets must be known (covers).
+  void set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<RoadLine>& roads);
+  void remove_corridors(u64 owner);
+  /// Whether the streets of the map tile at (x, y) have shaped the ground there (or no city runs).
+  bool corridors_at(f32 x, f32 y) const;
+  /// The city streams map tiles: a place's ground is final only once its tile's streets are in.
+  bool corridors_expected = false;
 
   // ---- craters ----
   /// A bowl of `radius` (rim included) and `depth` (terrain_craters.mjs craterProfile, scaled).
@@ -150,6 +173,13 @@ class Terrain {
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
+  struct CorridorSeg { f32 ax, ay, dx, dy, l2, ha, hb, half; };
+  struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; std::unordered_map<u64, std::vector<CorridorSeg>> grid; };
+  std::vector<std::unique_ptr<CorridorSet>> corridors_;
+  mutable const CorridorSet* corridor_hit_ = nullptr;  // the set of the last query (queries come in runs)
+  const CorridorSet* corridor_set(f32 x, f32 y) const;
+  f32 road_field(f32 x, f32 y) const;
+  f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
   std::unordered_map<u64, Image> images_;
@@ -159,8 +189,9 @@ class Terrain {
   bool ground_albedo(f32 x, f32 y, Vec3& lin) const;
   kern::Vec4 image_bounds(const TileKey& k) const;
 
-  void plan_dem(Vec3 focus, Vec3 player, bool mates, bool side = false);
-  void plan_side_dem();
+  void plan_windows(Vec3 focus);
+  bool plan_dem(Vec2 centre, f32 half, bool side);
+  kern::Vec4 interior(const Grid& g) const;
   bool run_job(f64 deadline);
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
@@ -169,7 +200,7 @@ class Terrain {
   mutable const u64* wc_bits_ = nullptr;
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
-  void dirty(f32 x0, f32 y0, f32 x1, f32 y1);
+  void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);
   void build_render_tile(i32 level, i32 i, i32 j);
   void build_collision_tile(i32 i, i32 j);
   void build_water_chunk(i32 i, i32 j, bool detail);

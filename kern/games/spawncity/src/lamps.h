@@ -33,6 +33,12 @@ class Field {
  public:
   /// Places the lamps of one street (centre line, width). `ground` gives the height.
   void place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const std::function<f32(f32, f32)>& ground);
+  /// The lamps of the loaded map tiles (tiles.h furnish), all at once: the field is laid anew
+  /// (what was broken stays broken, by cell key). `ground` gives the height.
+  struct Spot { f32 x, y, yaw; };
+  void rebuild(const std::vector<Spot>& spots, const std::function<f32(f32, f32)>& ground);
+  /// Lamps whose foot lies in the rect stand on the ground as it is now.
+  void reground(f32 x0, f32 y0, f32 x1, f32 y1, const std::function<f32(f32, f32)>& ground);
   void clear() { lamps_.clear(); seen_.clear(); grid_.clear(); }
   std::vector<Lamp>& all() { return lamps_; }
   const std::vector<Lamp>& all() const { return lamps_; }

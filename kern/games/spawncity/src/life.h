@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "city_stream.h"
@@ -36,6 +37,7 @@ struct LifeView {
   bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
   std::vector<LifeCar> cars;
   std::vector<Vec3> mates;  // MP host: where the other players are (herds and flocks there too: one world)
+  const std::vector<kern::Vec4>* ground_changes = nullptr;  // where the ground changed this frame (what stands there is put on it again)
 };
 
 /// What the game should do for street life this frame.
@@ -97,7 +99,7 @@ class Life {
     i32 call = 0, beat = 0, side = 1;
     Runner runners[10];
   };
-  struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; f32 fell_at = -1; Vec2 fall_dir{1, 0}; };  // fell_at: blown over (falls about its foot)
+  struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; f32 fell_at = -1; Vec2 fall_dir{1, 0}; u64 tile = 0; u32 index = 0; };  // fell_at: blown over (falls about its foot); tile / index: which of the map tile's trees
   // dogs and cats (world_procedural_population.mjs ambient animals; #1 is the black cat now and then)
   enum class Species : u8 { dog, cat, black_cat };
   struct Pet {
@@ -262,7 +264,8 @@ class Life {
   CatAttack cat_;
   Vec2 pet_anchor_{1e9f, 1e9f};
   f64 epoch_ = 0;
-  std::size_t tree_lanes_ = 0;
+  u32 tree_serial_ = ~0u;                       // the city's furniture set the trees were taken from
+  std::unordered_set<u64> trees_gone_;          // blown over and cleared away (stays so while its tile is loaded)
   Chain chain_;
   bool chain_alive_ = false;
   f32 next_chain_ = -1, streak_at_ = -99;

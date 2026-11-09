@@ -106,18 +106,24 @@ void Game::gaps_lamps_sounds() {
 }
 
 void Game::gaps_lamps_place() {
-  // setLampRoads: as the streets stream in (a few lanes per frame); lanes that are paths are left out
+  // The lamps are the map tiles' (tiles.h furnish; street_lamps.mjs setLampRoads lays them anew
+  // with every road set): taken whenever the set of tiles changes - a tile that goes takes its
+  // lamps along, what was broken stays broken (by cell). Not in open water.
   GapsState& g = *gaps_;
-  const std::vector<Lane>& lanes = city_.lanes();
-  if (g.lamp_lanes > lanes.size()) { g.lamps.clear(); g.lamp_lanes = 0; }  // the city was restarted
-  bool changed = false;
-  for (int budget = 0; g.lamp_lanes < lanes.size() && budget < 24; ++budget, ++g.lamp_lanes) {
-    const Lane& L = lanes[g.lamp_lanes];
-    if (!L.alive || L.points.size() < 2 || L.width < 4.5f) continue;  // path / track: narrower than a street
-    g.lamps.place_road(L.points, L.width, static_cast<u32>(g.lamp_lanes), [this](f32 x, f32 y) { return city_.ground_height(x, y); });
-    changed = true;
+  auto ground = [this](f32 x, f32 y) { return city_.ground_height(x, y); };
+  if (g.lamp_serial != city_.furniture_serial()) {
+    g.lamp_serial = city_.furniture_serial();
+    std::vector<CityStream::Furniture> tiles;
+    city_.furniture(tiles);
+    std::vector<lamps::Field::Spot> spots;
+    for (const CityStream::Furniture& f : tiles)
+      for (const MapFeatures::Spot& sp : *f.lamps)
+        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a});
+    g.lamps.rebuild(spots, ground);
+    g.lamps_dirty = true;
   }
-  if (changed || g.lamps_dirty) gaps_lamps_mirror();
+  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, ground); g.lamps_dirty = true; }
+  if (g.lamps_dirty) gaps_lamps_mirror();
 }
 
 void Game::gaps_lamps_mirror() {
@@ -249,9 +255,8 @@ void Game::gaps_lamps_draw() {
   };
   if (world_placed_ && show_lamps_) {
     const f32 glow = look::lamp_glow(night_);
-    const std::vector<Lane>& lanes = city_.lanes();
     for (const lamps::Lamp& l : g.lamps.all()) {
-      if (l.state == 2 || l.lane >= lanes.size() || !lanes[l.lane].alive) continue;
+      if (l.state == 2) continue;
       if (std::fabs(l.foot.x - cam_.eye.x) > look_.lamp_m * std::fmin(view_zoom(), 3.0f) || std::fabs(l.foot.y - cam_.eye.y) > look_.lamp_m * std::fmin(view_zoom(), 3.0f)) continue;
       const Mat4 m = yaw_at(l.foot, l.yaw);
       put(g.lamp_pole, m, {1, 1, 1, 1});

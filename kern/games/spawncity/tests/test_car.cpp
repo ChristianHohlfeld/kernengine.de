@@ -95,3 +95,71 @@ SC_TEST(bus_drives) {
   r.run(8.0f, in);
   SC_CHECK(r.car.forward_speed() > 8.0f, "bus accelerates: %.1f m/s", r.car.forward_speed());
 }
+
+// The suspension is Box3D's own (wheel joints, soft constraints): a bus that hits its bump stops -
+// dropped, or driven over a kerb - loses energy there and stays on the road; it is never thrown up.
+SC_TEST(bus_dropped_does_not_bounce_higher) {
+  CarRig r(CarSpec::bus());
+  r.run(1.5f, {});
+  const f32 rest = r.st().position.z;
+  r.world.set_pose(r.body, {{0, 0, rest + 0.8f}, Quat{}});
+  r.world.set_linear_velocity(r.body, {});
+  f32 top_after = -1e9f, low = 1e9f;
+  bool landed = false;
+  for (int i = 0; i < 240 * 5; ++i) {
+    r.car.step(r.world, r.body, kH, {});
+    r.world.step(kH, 4);
+    const BodyState s = r.st();
+    low = std::fmin(low, s.position.z);
+    if (!landed && s.velocity.z > 0.05f && s.position.z < rest + 0.3f) landed = true;
+    if (landed) top_after = std::fmax(top_after, s.position.z);
+  }
+  SC_CHECK(landed, "the bus lands");
+  SC_CHECK(top_after < rest + 0.35f, "rebound stays low: %.2f m over its ride height (dropped from 0.80)", top_after - rest);
+  SC_CHECK(std::fabs(r.st().position.z - rest) < 0.05f && std::fabs(r.st().velocity.z) < 0.05f, "settles at its ride height: %.3f (rest %.3f)", r.st().position.z, rest);
+}
+
+SC_TEST(bus_takes_kerbs_without_flying) {
+  CarRig r(CarSpec::bus());
+  // kerbs across the road, 12 cm high, every 15 m
+  for (int k = 0; k < 6; ++k) make_static_box(r.world, {25.0f + 15.0f * k, 0, 0.06f}, {0.6f, 30, 0.12f});
+  r.run(1.5f, {});
+  const f32 rest = r.st().position.z;
+  CarInput in;
+  in.pedal = 1;
+  in.max_speed = 14;
+  f32 top = -1e9f, up = 0;
+  for (int i = 0; i < 240 * 14; ++i) {
+    r.car.step(r.world, r.body, kH, in);
+    r.world.step(kH, 4);
+    const BodyState s = r.st();
+    top = std::fmax(top, s.position.z);
+    up = std::fmax(up, s.velocity.z);
+  }
+  SC_CHECK(r.st().position.x > 80, "the bus drove over the kerbs: x %.1f", r.st().position.x);
+  SC_CHECK(top < rest + 0.45f, "never thrown up: at most %.2f m over its ride height", top - rest);
+  SC_CHECK(up < 2.0f, "no upward kick: at most %.2f m/s", up);
+}
+
+// Traffic runs its tyres at 60 Hz and holds the forces over the 240 Hz steps in between (game.cpp
+// drive_traffic): the same bus, driven that way.
+SC_TEST(bus_at_traffic_rate_takes_kerbs) {
+  CarRig r(CarSpec::bus());
+  for (int k = 0; k < 6; ++k) make_static_box(r.world, {25.0f + 15.0f * k, 0, 0.06f}, {0.6f, 30, 0.12f});
+  CarInput in;
+  in.pedal = 0.7f;
+  in.max_speed = 9;
+  f32 top = -1e9f, up = 0, rest = Car::ground_offset(r.car.spec());
+  for (int i = 0; i < 240 * 20; ++i) {
+    if (i % 4 == 0) r.car.step(r.world, r.body, kH * 4, in);
+    else r.car.reapply(r.world, r.body);
+    r.world.step(kH, 4);
+    if (i < 360) continue;
+    const BodyState s = r.st();
+    top = std::fmax(top, s.position.z);
+    up = std::fmax(up, s.velocity.z);
+  }
+  SC_CHECK(r.st().position.x > 100, "the bus drove over the kerbs: x %.1f", r.st().position.x);
+  SC_CHECK(top < rest + 0.3f, "never thrown up: at most %.2f m over its ride height", top - rest);
+  SC_CHECK(up < 2.0f, "no upward kick: at most %.2f m/s", up);
+}

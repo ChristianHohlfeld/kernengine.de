@@ -49,6 +49,11 @@ f64 signed_area(const std::vector<Vec2>& r) {
   return a * 0.5;
 }
 
+f32 rect_distance_to(const kern::Vec4& r, f32 x, f32 y) {
+  const f32 dx = std::fmax(std::fmax(r.x - x, x - r.z), 0.0f), dy = std::fmax(std::fmax(r.y - y, y - r.w), 0.0f);
+  return std::hypot(dx, dy);
+}
+
 constexpr f32 kChunk = 160;  // the building mesh chunks (BuildingOptions::chunk_size)
 u64 cell_key(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
 u64 cell_of(Vec2 c) { return cell_key(static_cast<i32>(std::floor(c.x / kChunk)), static_cast<i32>(std::floor(c.y / kChunk))); }
@@ -78,6 +83,8 @@ void put_footprint(kern::FootprintStream& fs, const MapFeatures::Building& b, Ve
 struct CityStream::Tile {
   enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed } state = State::requested;
   TileKey key;
+  u32 tries = 0;       // failed requests so far
+  f64 retry_ms = 0;    // when a failed tile is asked for again
   bool procedural = false;
   std::vector<u8> bytes;
   mvt::Decoder decoder;
@@ -96,10 +103,13 @@ struct CityStream::Tile {
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false, relay_again = false;
   Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
-  // the drawn subset (indices into features.buildings) and its centres; a re-sync swaps the meshes
-  std::vector<u32> vis, vis_built;
+  // the buildings' centres, and the buildings by chunk cell (160 m): the drawn city is made of
+  // cells - each wanted cell is extruded once, off the frame, and stays until it is far behind
   std::vector<Vec2> cent;
-  std::vector<u32> old_meshes;
+  std::unordered_map<u64, std::vector<u32>> cell_items;
+  std::unordered_set<u64> want_cells;                     // the cells to be drawn now (select_cells)
+  std::unordered_map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
+  bool cell_uploading = false;
   // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
   u32 tile_job = 0, build_job = 0;
   // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
@@ -109,7 +119,7 @@ struct CityStream::Tile {
   u32 cell_job = 0;
   std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
   std::size_t built_at = 0;
-  bool rebuilding = false, vis_dirty = false, prepared = false;
+  bool prepared = false;
   // interiors (M3 life): one building left out, the collision rebuilt beside the old body
   i32 skip = -1;
   kern::physics::Body old_body;
@@ -129,6 +139,7 @@ void CityStream::start(kern::Renderer& renderer, kern::physics::World& world, f6
   origin_tile_ = tile_at(lon, lat);
   offline_ = false;
   real_tiles_ = 0;
+  terrain_.corridors_expected = true;
 }
 
 void CityStream::clear() {
@@ -156,13 +167,17 @@ void CityStream::remove(Tile& t) {
   t.cell_ids.clear();
   t.dirty_cells.clear();
   t.job_cells.clear();
-  if (r_) for (u32 id : t.old_meshes) r_->remove(id);
-  t.old_meshes.clear();
+  if (r_) for (auto& [c, ids] : t.cell_old) for (u32 id : ids) r_->remove(id);
+  t.cell_old.clear();
+  t.want_cells.clear();
+  t.cell_uploading = false;
   t.meshes.clear();
   t.lay_meshes.clear();
   t.old_lay.clear();
   near_.dirty = true;  // the collision set may hold this tile's buildings
+  if (t.prepared) ++furniture_serial_;
   terrain_.remove_tints(t.key.hash());
+  terrain_.remove_corridors(t.key.hash());
   if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = {};
   if (world_ && t.old_body.valid() && world_->body_valid(t.old_body)) world_->destroy_body(t.old_body);  // M3 life
@@ -203,6 +218,17 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
     tiles_[k.hash()] = std::move(t);
     requests_.push_back(k);
   }
+}
+
+kern::Vec4 CityStream::ring_bounds(Vec3 focus, i32 r) const {
+  f64 lon, lat, x0, y0, x1, y1;
+  unproject(proj_, focus.x, focus.y, lon, lat);
+  const TileKey c = tile_at(lon, lat);
+  tile_lonlat(TileKey{c.z, c.x - r, c.y + r}, 0, 1, lon, lat);
+  proj_.project(lon, lat, x0, y0);
+  tile_lonlat(TileKey{c.z, c.x + r, c.y - r}, 1, 0, lon, lat);
+  proj_.project(lon, lat, x1, y1);
+  return {static_cast<f32>(x0), static_cast<f32>(y0), static_cast<f32>(x1), static_cast<f32>(y1)};
 }
 
 void CityStream::unload_far(Vec3 focus) {
@@ -246,9 +272,14 @@ void CityStream::provide(const TileKey& key, const u8* bytes, std::size_t length
 }
 
 void CityStream::fail(const TileKey& key) {
-  if (Tile* t = tile(key)) t->state = Tile::State::failed;
-  // Nothing came for the player's own start tile: build the stand-in town instead.
-  if (key == origin_tile_ && real_tiles_ == 0) go_offline();
+  Tile* t = tile(key);
+  if (!t) return;
+  // asked again (a lost request is no hole in the city): after 2 s, 4 s, ... 20 s
+  t->state = Tile::State::failed;
+  ++t->tries;
+  t->retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t->tries);
+  // Nothing came for the player's own start tile, three times: build the stand-in town instead.
+  if (key == origin_tile_ && real_tiles_ == 0 && t->tries >= 3) go_offline();
 }
 
 void CityStream::go_offline() {
@@ -266,10 +297,18 @@ void CityStream::go_offline() {
   t->key = TileKey{0, -1, -1};
   if (training_offline) training_level(t->features);  // training_test_level_v2.mjs
   else procedural_city(0, 0, 760, 20261029, t->features);
+  furnish(t->features, t->bounds, {});
   feed_terrain(*t);
   t->state = Tile::State::building;
   finish_features(*t);
   tiles_[t->key.hash()] = std::move(t);
+}
+
+void CityStream::furniture(std::vector<Furniture>& out) const {
+  out.clear();
+  for (const auto& [k, t] : tiles_)
+    if (t->prepared) out.push_back({k, &t->features.trees, &t->features.lamps});
+  std::sort(out.begin(), out.end(), [](const Furniture& a, const Furniture& b) { return a.tile < b.tile; });
 }
 
 bool CityStream::ready_at(Vec3 p) const {
@@ -280,15 +319,11 @@ bool CityStream::ready_at(Vec3 p) const {
       if (t->procedural) return t->state == Tile::State::ready && solid;
     return false;
   }
-  f64 lon, lat;
-  unproject(proj_, p.x, p.y, lon, lat);
-  const TileKey c = tile_at(lon, lat);
-  auto it = tiles_.find(c.hash());
-  (void)it;
   (void)solid;
-  // As the original: the game starts as soon as the ground under the player is there; the city
-  // (drawn set, collision set) streams in around him (world_spawn_guard: see Game::spawn_guard).
-  return true;
+  // As the original: the game starts as soon as the ground under the player is there - its
+  // elevation and the streets that level it (terrain.h set_corridors); the city (drawn set,
+  // collision set) streams in around him (world_spawn_guard: see Game::spawn_guard).
+  return terrain_.corridors_at(p.x, p.y);
 }
 
 void CityStream::feed_terrain(Tile& t) {
@@ -305,6 +340,15 @@ void CityStream::feed_terrain(Tile& t) {
 }
 
 void CityStream::finish_features(Tile& t) {
+  // The streets' corridors first (terrain_craters.mjs setRoadCorridors: every street but paths
+  // and tracks, its width + 3.4 m of pavements): the ground of this tile is final with them, and
+  // the houses, the streets and everything else are put on it.
+  {
+    std::vector<Terrain::RoadLine> lines;
+    for (const MapFeatures::Road& r : t.features.roads)
+      if (!road_is_water(r.cls) && r.cls != RoadClass::path && r.cls != RoadClass::track) lines.push_back({&r.points, road_width(r.cls) + 3.4f});
+    terrain_.set_corridors(t.key.hash(), t.bounds, lines);
+  }
   // Footprint and road streams for the engine's builders, lanes for the traffic.
   t.cent.clear();
   for (MapFeatures::Building& b : t.features.buildings) {
@@ -325,6 +369,7 @@ void CityStream::finish_features(Tile& t) {
     t.cent.push_back(c);
   }
   t.prepared = true;
+  ++furniture_serial_;
   for (const MapFeatures::Road& r : t.features.roads) {
     const f32 w = road_width(r.cls);
     const bool water = road_is_water(r.cls);
@@ -336,54 +381,86 @@ void CityStream::finish_features(Tile& t) {
     t.roads.road(r.points.data(), static_cast<u32>(r.points.size()), w, !water && road_drivable(r.cls), color, major && !water ? static_cast<i32>(kLine) : -1);
     if (road_drivable(r.cls)) lanes_.push_back(Lane{r.points, w, t.key.hash(), true});
   }
-  select_visual(focus_);
-  begin_visual(t);
+  // the buildings by cell; the cells round the view are extruded from now on (select_cells), the
+  // streets are laid at once
+  t.cell_items.clear();
+  for (u32 i = 0; i < t.cent.size(); ++i) t.cell_items[cell_of(t.cent[i])].push_back(i);
+  select_cells(focus_, true);
+  begin_roads(t);
 }
 
-void CityStream::begin_visual(Tile& t) {
-  // world_city_buildings.mjs: the selected footprints, at most MAX_VERTICES 96 per ring
-  t.footprints = kern::FootprintStream{};
-  std::vector<Vec2> thin;
-  for (u32 i : t.vis) put_footprint(t.footprints, t.features.buildings[i], t.cent[i], thin);
-  t.vis_built = t.vis;
-  t.vis_dirty = false;
-  // the whole set is rebuilt with every damage there is: no single chunk is pending any more
-  if (t.cell_job) { kern::jobs::cancel(t.cell_job); t.cell_job = 0; }
-  t.job_cells.clear();
-  t.dirty_cells.clear();
-  t.cell_ids.clear();
-  // extruded and welded off the frame (city_jobs.h); the frame only uploads the finished chunks
-  if (t.build_job) kern::jobs::cancel(t.build_job);
-  t.build_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(t.footprints, building_options()));
-  t.built_bytes.clear();
-  t.upload_next = 0;
-  t.state = Tile::State::building;
-}
-
-void CityStream::select_visual(Vec3 focus) {
-  // The nearest MAX_FOOTPRINTS buildings within VISUAL_RADIUS_M of all decoded tiles.
-  struct Pick { f32 d2; Tile* t; u32 i; };
-  std::vector<Pick> all;
-  constexpr f32 kR = 900;
+void CityStream::select_cells(Vec3 focus, bool force) {
+  // The drawn city (world_city_buildings.mjs: the nearest MAX_FOOTPRINTS buildings within
+  // VISUAL_RADIUS_M 900 m), by cell: the cells within the radius of the way ahead - from the
+  // player to where he will be in a few seconds (`view_lead`) - nearest first, up to the budget of
+  // buildings. A cell that is wanted is built once and kept; it goes when it lies well outside
+  // the radius. So driving on only adds the cells that come into view ahead - the houses already
+  // standing are never built again, and nothing is missing where the player arrives.
+  const f64 now = kern::now_ms();
+  const Vec2 ahead{focus.x + view_lead.x, focus.y + view_lead.y};
+  if (!force && std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) < 40 && std::hypot(ahead.x - vis_ahead_.x, ahead.y - vis_ahead_.y) < 60 && now - vis_ms_ < 1000) return;
+  vis_at_ = {focus.x, focus.y};
+  vis_ahead_ = ahead;
+  vis_ms_ = now;
+  constexpr f32 kR = 900, kKeep = 220;
+  const Vec2 a{focus.x, focus.y}, ab = ahead - a;
+  const f32 ab2 = ab.x * ab.x + ab.y * ab.y;
+  auto way_distance = [&](Vec2 p) {
+    const f32 t = ab2 > 1 ? clampf(((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2, 0, 1) : 0;
+    return std::hypot(p.x - a.x - ab.x * t, p.y - a.y - ab.y * t);
+  };
+  struct Pick { f32 d; Tile* t; u64 cell; u32 n; };
+  std::vector<Pick> picks;
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
     if (!t.prepared) continue;
-    for (u32 i = 0; i < t.cent.size(); ++i) {
-      const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y, d2 = dx * dx + dy * dy;
-      if (d2 <= kR * kR) all.push_back({d2, &t, i});
+    for (const auto& [cell, items] : t.cell_items) {
+      const i32 cx = static_cast<i32>(static_cast<u32>(cell >> 32)), cy = static_cast<i32>(static_cast<u32>(cell));
+      const f32 d = way_distance({(static_cast<f32>(cx) + 0.5f) * kChunk, (static_cast<f32>(cy) + 0.5f) * kChunk});
+      if (d <= kR + kKeep) picks.push_back({d, &t, cell, static_cast<u32>(items.size())});
     }
   }
-  constexpr std::size_t kMax = 2600;
-  if (all.size() > kMax) { std::nth_element(all.begin(), all.begin() + kMax, all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; }); all.resize(kMax); }
-  for (auto& [k, tp] : tiles_) tp->vis.clear();
-  for (const Pick& p : all) p.t->vis.push_back(p.i);
+  std::sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
+  for (auto& [k, tp] : tiles_) tp->want_cells.clear();
+  u32 total = 0;
+  f32 reach = kR;
+  for (const Pick& p : picks) {
+    if (p.d > kR) break;
+    if (total >= building_budget && p.d > 240) { reach = p.d; break; }  // (what is next to the player is always drawn)
+    p.t->want_cells.insert(p.cell);
+    total += p.n;
+  }
+  for (const Pick& p : picks) {
+    Tile& t = *p.t;
+    const bool want = t.want_cells.count(p.cell) != 0, built = t.cell_ids.count(p.cell) != 0;
+    if (want && !built) t.dirty_cells.insert(p.cell);
+    if (!want && !built) t.dirty_cells.erase(p.cell);
+    // a built cell stays while it is near the drawn radius (no flicker at its edge)
+    if (!want && built && p.d > reach + kKeep * 0.5f && !t.cell_job && !t.cell_uploading) drop_cell(t, p.cell);
+  }
+  // cells beyond every radius (the player was put somewhere else): gone
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
-    std::sort(t.vis.begin(), t.vis.end());
-    if (t.state == Tile::State::ready && t.vis != t.vis_built) t.vis_dirty = true;
+    if (t.cell_job || t.cell_uploading) continue;
+    std::vector<u64> far;
+    for (const auto& [cell, ids] : t.cell_ids) {
+      if (t.want_cells.count(cell)) continue;
+      const i32 cx = static_cast<i32>(static_cast<u32>(cell >> 32)), cy = static_cast<i32>(static_cast<u32>(cell));
+      if (way_distance({(static_cast<f32>(cx) + 0.5f) * kChunk, (static_cast<f32>(cy) + 0.5f) * kChunk}) > kR + kKeep) far.push_back(cell);
+    }
+    for (u64 c : far) drop_cell(t, c);
   }
-  vis_at_ = {focus.x, focus.y};
-  vis_ms_ = kern::now_ms();
+}
+
+void CityStream::drop_cell(Tile& t, u64 cell) {
+  auto it = t.cell_ids.find(cell);
+  if (it == t.cell_ids.end()) return;
+  for (u32 id : it->second) {
+    r_->remove(id);
+    t.meshes.erase(std::remove(t.meshes.begin(), t.meshes.end(), id), t.meshes.end());
+  }
+  t.cell_ids.erase(it);
+  t.dirty_cells.erase(cell);
 }
 
 void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& material, bool walls) {
@@ -404,15 +481,17 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
 
 void CityStream::begin_roads(Tile& t) {
   kern::RoadOptions ro;
-  ro.center_x = focus_.x;  // world_city_roads.mjs RADIUS_M 720 around the player
-  ro.center_y = focus_.y;
-  ro.radius = 720;
+  // world_city_roads.mjs RADIUS_M 720 around the player - and along his way ahead (view_lead)
+  const Vec2 mid{focus_.x + view_lead.x * 0.5f, focus_.y + view_lead.y * 0.5f};
+  ro.center_x = mid.x;
+  ro.center_y = mid.y;
+  ro.radius = 720 + std::hypot(view_lead.x, view_lead.y) * 0.5f;
   ro.segment_length = 4;  // follows the 5 m terrain nodes
   ro.palette = road_palette();
   // over a crater the ribbon is draped finely (0.9 m quads): it lies in the bowl, not over it
   ro.deformed = [this](f64 x, f64 y, f64 r) { return terrain_.deformed(static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(r)); };
   t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
-  t.roads_at = {focus_.x, focus_.y};
+  t.roads_at = mid;
   ++relays_;
   t.upload_next = 0;
   t.state = Tile::State::roads;
@@ -435,7 +514,16 @@ void CityStream::relay(const kern::Vec4& rect) {
 void CityStream::update_collision(Vec3 focus, f64 deadline) {
   NearCollision& n = near_;
   const f64 now = kern::now_ms();
-  bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140 || extra_foci.size() != n.mates_at.size();
+  // (along the way ahead - view_lead: a fast car has its walls before it gets there)
+  const Vec2 way_a{focus.x, focus.y}, way_ab{view_lead.x, view_lead.y};
+  const f32 way_l2 = way_ab.x * way_ab.x + way_ab.y * way_ab.y;
+  auto way_d2 = [&](Vec2 p) {
+    const f32 t = way_l2 > 1 ? clampf(((p.x - way_a.x) * way_ab.x + (p.y - way_a.y) * way_ab.y) / way_l2, 0, 1) : 0;
+    const f32 dx = p.x - way_a.x - way_ab.x * t, dy = p.y - way_a.y - way_ab.y * t;
+    return dx * dx + dy * dy;
+  };
+  bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140 || std::hypot(focus.x + view_lead.x - n.ahead.x, focus.y + view_lead.y - n.ahead.y) >= 140 ||
+               extra_foci.size() != n.mates_at.size();
   for (std::size_t i = 0; !moved && i < extra_foci.size(); ++i) moved = std::hypot(extra_foci[i].x - n.mates_at[i].x, extra_foci[i].y - n.mates_at[i].y) >= 140;
   if (!n.building && (moved || (n.dirty && now - n.at_ms >= 250))) {
     // world_building_collisions.mjs: the nearest MAX_FOOTPRINTS 480 within RADIUS_M 340
@@ -447,8 +535,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
       if (!t.prepared) continue;
       for (u32 i = 0; i < t.cent.size(); ++i) {
         if (k == excl_tile_ && static_cast<i32>(i) == excl_index_) continue;  // an entered interior (M3 life)
-        const f32 dx = t.cent[i].x - focus.x, dy = t.cent[i].y - focus.y;
-        f32 d2 = dx * dx + dy * dy;
+        f32 d2 = way_d2(t.cent[i]);
         // (MP host: the buildings around the mates too - his traffic and people there collide)
         for (const Vec3& m : extra_foci) { const f32 mx = t.cent[i].x - m.x, my = t.cent[i].y - m.y; d2 = std::fmin(d2, mx * mx + my * my); }
         if (d2 <= 340.0f * 340.0f) all.push_back({d2, k, i});
@@ -466,6 +553,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
     n.building = true;
     n.dirty = false;
     n.at = {focus.x, focus.y};
+    n.ahead = {focus.x + view_lead.x, focus.y + view_lead.y};
     n.mates_at = extra_foci;
     n.at_ms = now;
   }
@@ -566,7 +654,7 @@ bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled)
   d.leveled = b.leveled;
   if (!damage_quiet_) damage_log_.push_back(b.seed);
   // the drawing: its chunk alone (when the building is drawn at all)
-  if (index < t.cent.size() && std::find(t.vis_built.begin(), t.vis_built.end(), index) != t.vis_built.end()) t.dirty_cells.insert(cell_of(t.cent[index]));
+  if (index < t.cent.size() && t.cell_ids.count(cell_of(t.cent[index]))) t.dirty_cells.insert(cell_of(t.cent[index]));
   // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
   // destroyed and created on a static body; no teleport, no filter change, no rebuild of the set)
   NearCollision& n = near_;
@@ -650,49 +738,77 @@ void CityStream::clear_damage() {
       if (b.top >= b.full_top - 0.01f && !b.leveled) continue;
       b.top = b.full_top;
       b.leveled = false;
-      if (i < t.cent.size()) t.dirty_cells.insert(cell_of(t.cent[i]));
+      if (i < t.cent.size() && t.cell_ids.count(cell_of(t.cent[i]))) t.dirty_cells.insert(cell_of(t.cent[i]));
     }
   }
   near_.dirty = true;
 }
 
 void CityStream::begin_cells(Tile& t) {
+  // the cells to build (wanted and not there yet, or damaged), the nearest first - a few per job,
+  // so the first ones stand soon and no upload step is long
+  std::vector<std::pair<f32, u64>> order;
+  for (u64 c : t.dirty_cells) {
+    const i32 cx = static_cast<i32>(static_cast<u32>(c >> 32)), cy = static_cast<i32>(static_cast<u32>(c));
+    order.push_back({std::hypot((static_cast<f32>(cx) + 0.5f) * kChunk - focus_.x, (static_cast<f32>(cy) + 0.5f) * kChunk - focus_.y), c});
+  }
+  std::sort(order.begin(), order.end());
+  if (order.size() > 6) order.resize(6);
   kern::FootprintStream fs;
   std::vector<Vec2> thin;
-  for (u32 i : t.vis_built)
-    if (i < t.cent.size() && t.dirty_cells.count(cell_of(t.cent[i]))) put_footprint(fs, t.features.buildings[i], t.cent[i], thin);
-  t.job_cells.assign(t.dirty_cells.begin(), t.dirty_cells.end());
-  t.dirty_cells.clear();
+  t.job_cells.clear();
+  for (const auto& [d, c] : order) {
+    t.job_cells.push_back(c);
+    t.dirty_cells.erase(c);
+    const auto it = t.cell_items.find(c);
+    if (it == t.cell_items.end()) continue;
+    for (u32 i : it->second) put_footprint(fs, t.features.buildings[i], t.cent[i], thin);
+  }
   t.cell_job = kern::jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(fs, building_options()));
 }
 
-bool CityStream::finish_cells(Tile& t) {
-  std::vector<u8> out;
-  if (!kern::jobs::take(t.cell_job, out)) return false;
-  t.cell_job = 0;
-  // new chunks first, then the old ones go: the same step, nothing pops out
-  std::unordered_map<u64, std::vector<u32>> old;
-  for (u64 c : t.job_cells) {
-    auto it = t.cell_ids.find(c);
-    if (it == t.cell_ids.end()) continue;
-    old[c] = std::move(it->second);
-    t.cell_ids.erase(it);
+bool CityStream::finish_cells(Tile& t, f64 deadline) {
+  if (!t.cell_uploading) {
+    if (!kern::jobs::take(t.cell_job, t.built_bytes)) return false;
+    t.cell_job = 0;
+    // what the job replaces is kept until its meshes are all there: nothing pops out
+    for (u64 c : t.job_cells) {
+      auto it = t.cell_ids.find(c);
+      if (it != t.cell_ids.end()) { t.cell_old[c] = std::move(it->second); t.cell_ids.erase(it); }
+    }
+    t.built_at = 4;
+    t.upload_next = cityjobs::chunk_count(t.built_bytes);
+    t.cell_uploading = true;
   }
+  // one finished chunk mesh at a time, read straight from the job's output: no step longer than
+  // one chunk
   kern::Material m;
   m.roughness = 0.82f;
-  std::size_t at = 4;
-  const u32 count = cityjobs::chunk_count(out);
-  for (u32 k = 0; k < count; ++k) {
+  while (t.upload_next > 0) {
     kern::GeoChunk chunk;
-    if (!cityjobs::read_chunk(out, at, chunk)) break;
+    if (!cityjobs::read_chunk(t.built_bytes, t.built_at, chunk)) { t.upload_next = 0; break; }
+    --t.upload_next;
+    const f64 t1 = kern::now_ms();
     upload(t, chunk, m, true);
+    step_time("building.upload", t1);
+    if (t.upload_next > 0 && kern::now_ms() > deadline) return false;
   }
-  for (auto& [c, ids] : old)
+  t.built_bytes.clear();
+  t.built_bytes.shrink_to_fit();
+  for (auto& [c, ids] : t.cell_old)
     for (u32 id : ids) {
       r_->remove(id);
       t.meshes.erase(std::remove(t.meshes.begin(), t.meshes.end(), id), t.meshes.end());
     }
+  t.cell_old.clear();
+  for (u64 c : t.job_cells) {
+    t.cell_ids[c];  // built (a cell without a mesh too)
+    // not wanted any more by now (the player went on): it goes with the next selection
+  }
   t.job_cells.clear();
+  t.cell_uploading = false;
+  ++rebuilds_;
+  if (ms_.t_built < 0 && t.key == origin_tile_) ms_.t_built = kern::now_ms() - start_ms_;
   return true;
 }
 
@@ -700,25 +816,27 @@ bool CityStream::work(Tile& t, f64 deadline) {
   using S = Tile::State;
   switch (t.state) {
     case S::ready:
-      if (t.vis_dirty && !t.relay) {
-        t.old_meshes = std::move(t.meshes);
-        t.meshes.clear();
-        t.triangles = 0;
-        t.rebuilding = true;
-        begin_visual(t);
-        return kern::now_ms() > deadline ? false : work(t, deadline);
-      }
-      // destruction: the damaged chunks alone, built off the frame and swapped in one step
-      if (t.cell_job) {
+      // the drawn cells: built off the frame, uploaded a chunk a step, swapped when complete
+      if (t.cell_job || t.cell_uploading) {
         const f64 t1 = kern::now_ms();
-        const bool done = finish_cells(t);
+        const bool done = finish_cells(t, deadline);
         step_time("cells.swap", t1);
-        if (!done) return true;
+        if (!done) return kern::now_ms() <= deadline;
       }
-      if (!t.dirty_cells.empty()) {
+      if (!t.dirty_cells.empty() && !t.cell_job && !t.cell_uploading) {
         const f64 t1 = kern::now_ms();
         begin_cells(t);
         step_time("cells.begin", t1);
+      }
+      // the streets round the player (world_city_roads.mjs RADIUS_M 720): laid again after
+      // REBUILD_MOVE_M 260 m of travel
+      if (const Vec2 mid{focus_.x + view_lead.x * 0.5f, focus_.y + view_lead.y * 0.5f};
+          !t.relay && std::hypot(mid.x - t.roads_at.x, mid.y - t.roads_at.y) >= 260 && rect_distance_to(t.bounds, mid.x, mid.y) < 720 + 260 + std::hypot(view_lead.x, view_lead.y) * 0.5f) {
+        t.relay = true;
+        t.old_lay = std::move(t.lay_meshes);
+        t.lay_meshes.clear();
+        begin_roads(t);
+        return kern::now_ms() <= deadline;
       }
       return kern::now_ms() <= deadline;
     case S::requested:
@@ -735,62 +853,18 @@ bool CityStream::work(Tile& t, f64 deadline) {
       return kern::now_ms() > deadline ? false : work(t, deadline);
     }
     case S::terrain_wait:
-      // Buildings and streets stand on the terrain: wait until its shape is decided.
-      if (!terrain_.settled()) return true;
+      // Buildings and streets stand on the terrain: wait until the ground of the whole tile is
+      // known for good (terrain.h covers) - a house is never based on a height that changes later.
+      // (the tile's data reaches a little over its square - its buffer - and the streets' profile
+      // is smoothed over the ground beside them: 80 m more must be known)
+      if (!terrain_.settled() || !terrain_.covers({t.bounds.x - 80, t.bounds.y - 80, t.bounds.z + 80, t.bounds.w + 80})) return true;
       if (ms_.t_terrain < 0) ms_.t_terrain = kern::now_ms() - start_ms_;
       finish_features(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
-    case S::building: {
-      if (t.build_job) {
-        const f64 t1 = kern::now_ms();
-        const bool got = kern::jobs::take(t.build_job, t.built_bytes);
-        step_time("building.take", t1);
-        if (!got) return true;  // still extruding off the frame
-        t.build_job = 0;
-        t.built_at = 4;
-        t.upload_next = cityjobs::chunk_count(t.built_bytes);  // chunks left
-        return true;  // the uploads start next frame
-      }
-      // One finished chunk mesh at a time, read straight from the job's output and uploaded (the
-      // picking BVH is skipped for buildings): no step longer than one chunk.
-      kern::Material m;
-      m.roughness = 0.82f;
-      while (t.upload_next > 0) {
-        kern::GeoChunk chunk;
-        f64 t1 = kern::now_ms();
-        if (!cityjobs::read_chunk(t.built_bytes, t.built_at, chunk)) { t.upload_next = 0; break; }
-        step_time("building.read", t1);
-        --t.upload_next;
-        t1 = kern::now_ms();
-        upload(t, chunk, m, true);
-        step_time("building.upload", t1);
-        if (kern::now_ms() > deadline) return false;
-      }
-      t.built_bytes.clear();
-      t.built_bytes.shrink_to_fit();
-      t.upload_next = 0;
-      if (t.rebuilding) {
-        // the re-synced set is complete: the old meshes go in the same frame (nothing pops out)
-        const f64 t1 = kern::now_ms();
-        for (u32 id : t.old_meshes) r_->remove(id);
-        step_time("building.remove", t1);
-        t.old_meshes.clear();
-        t.rebuilding = false;
-        ++rebuilds_;
-        // The streets are their own layer with their own rule (world_city_roads.mjs: RADIUS_M 720,
-        // REBUILD_MOVE_M 260): a new building set does not re-lay them - only 260 m of travel does.
-        if (std::hypot(focus_.x - t.roads_at.x, focus_.y - t.roads_at.y) < 260) { t.state = S::ready; return true; }
-        t.relay = true;
-        t.old_lay = std::move(t.lay_meshes);
-        t.lay_meshes.clear();
-      }
-      {
-        const f64 t1 = kern::now_ms();
-        begin_roads(t);
-        step_time("roads.begin", t1);
-      }
+    case S::building:
+      // (the drawn buildings are cells now - see S::ready; a tile goes from its features to its streets)
+      begin_roads(t);
       return kern::now_ms() > deadline ? false : work(t, deadline);
-    }
     case S::roads: {
       {
         const f64 t1 = kern::now_ms();
@@ -857,22 +931,30 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   kern::jobs::pump(budget_ms * 0.5);
   step_time("jobs", t0);
   focus_ = focus;
-  // RESYNC_MOVE_M 140 / RESYNC_MS 2500 (world_city_buildings.mjs)
   t0 = kern::now_ms();
-  if (std::hypot(focus.x - vis_at_.x, focus.y - vis_at_.y) >= 140 || start - vis_ms_ >= 2500) select_visual(focus);
-  step_time("select_visual", t0);
+  select_cells(focus, false);
+  step_time("select_cells", t0);
   t0 = kern::now_ms();
   request_around(focus, ring);
   for (const Vec3& f : extra_foci) request_around(f, mate_ring);  // MP host: the town around the mates too
+  for (auto& [k, tp] : tiles_)
+    if (tp->state == Tile::State::failed && start >= tp->retry_ms) { tp->state = Tile::State::requested; requests_.push_back(tp->key); }
   unload_far(focus);
   step_time("request/unload", t0);
   t0 = kern::now_ms();
   terrain_.extra = extra_foci;
+  // the ground the city needs: the squares of the tiles round the player and round each mate
+  terrain_.needs.clear();
+  if (!offline_) {
+    auto grown = [](kern::Vec4 r) { return kern::Vec4{r.x - 80, r.y - 80, r.z + 80, r.w + 80}; };
+    terrain_.needs.push_back(grown(ring_bounds(focus, ring)));
+    for (const Vec3& f : extra_foci) terrain_.needs.push_back(grown(ring_bounds(f, mate_ring)));
+  }
   terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
   step_time("terrain", t0);
   t0 = kern::now_ms();
   terrain_.take_changes(terrain_changes_);
-  for (const kern::Vec4& r : terrain_changes_) relay(r);
+  for (const kern::Vec4& r : terrain_changes_) { relay(r); ground_changes_.push_back(r); }
   terrain_changes_.clear();
   step_time("relay", t0);
   // The collision around the player first (the player must never stand where no wall is): half
@@ -913,7 +995,6 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   }
   stats_.colliders = near_.colliders;
   ms_.work_ms += kern::now_ms() - start;
-  if (ms_.t_built < 0) { auto it = tiles_.find(origin_tile_.hash()); if (it != tiles_.end() && it->second->state == Tile::State::ready) ms_.t_built = kern::now_ms() - start_ms_; }
   stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
   stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
   stats_.rebuilds = rebuilds_;

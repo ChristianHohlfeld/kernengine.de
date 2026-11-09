@@ -400,6 +400,14 @@ Joint World::create_joint(const JointSettings& s) {
       d.enableSpinMotor = s.enable_motor;
       d.spinSpeed = s.motor_speed;
       d.maxSpinTorque = max_of(0.0f, s.max_motor_torque);
+      d.enableSteering = s.enable_steering;
+      d.steeringHertz = max_of(0.0f, s.steering_hertz);
+      d.steeringDampingRatio = max_of(0.0f, s.steering_damping_ratio);
+      d.targetSteeringAngle = s.target_steering;
+      d.maxSteeringTorque = max_of(0.0f, s.max_steering_torque);
+      d.enableSteeringLimit = s.enable_steering_limit;
+      d.lowerSteeringLimit = min_of(s.steering_lower, s.steering_upper);
+      d.upperSteeringLimit = max_of(s.steering_lower, s.steering_upper);
       id = b3CreateWheelJoint(w, &d);
       break;
     }
@@ -470,6 +478,18 @@ void World::destroy_joint(Joint joint, bool wake_bodies) {
 }
 
 bool World::joint_valid(Joint joint) const { return valid() && joint.valid() && b3Joint_IsValid(joint_id(joint)); }
+
+void World::set_wheel_steering(Joint joint, f32 target) {
+  if (!joint_valid(joint)) return;
+  const b3JointId id = joint_id(joint);
+  if (b3Joint_GetType(id) == b3_wheelJoint) b3WheelJoint_SetTargetSteeringAngle(id, target);
+}
+
+f32 World::wheel_steering(Joint joint) const {
+  if (!joint_valid(joint)) return 0;
+  const b3JointId id = joint_id(joint);
+  return b3Joint_GetType(id) == b3_wheelJoint ? b3WheelJoint_GetSteeringAngle(id) : 0.0f;
+}
 
 f32 World::joint_angle(Joint joint) const {
   if (!joint_valid(joint)) return 0;

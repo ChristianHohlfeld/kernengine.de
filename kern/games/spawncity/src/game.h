@@ -73,6 +73,7 @@ struct TrafficCar {
   bool placed = false, driver = true;
   i32 lane = -1, index = 0, dir = 1;
   f32 target_speed = 10, stuck = 0;
+  f32 peak_up = 0, peak_lift = 0;  // tests: the highest upward speed and height over its ride height while driven here
   bool far = false;   // beyond 180 m: a kinematic lane follower (game_traffic_far.cpp)
   f32 far_speed = 0;
   CarInput input;  // what the driver (AI or player) does this step
@@ -658,7 +659,7 @@ class Game {
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
-  std::size_t lamp_lanes_ = 0;  // lanes already given their lamps (the lane list only grows)
+  std::vector<kern::Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;
   f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400, town_clock_ = 0;  // jet: jet_mode.mjs HP_MAX 400

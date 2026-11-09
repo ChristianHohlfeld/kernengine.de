@@ -201,11 +201,21 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     while (dem.active < SC_MAX_FETCHES && dem.queue.length) fetchDem(dem.queue.shift());
   }
   if (offline) e.sc_offline();
-  else loadTemplate().catch(error => {
-    console.warn("[spawncity] no map service, building the stand-in town:", error?.message || error);
-    tiles.failed = true;
-    e.sc_offline();
-  });
+  else (async () => {
+    // the map service's address: asked three times before the stand-in town is built (one lost
+    // request must not cost the real world)
+    for (let attempt = 1; ; attempt++) {
+      try { await loadTemplate(); return; } catch (error) {
+        if (attempt >= 3) {
+          console.warn("[spawncity] no map service, building the stand-in town:", error?.message || error);
+          tiles.failed = true;
+          e.sc_offline();
+          return;
+        }
+        await new Promise(r => setTimeout(r, 1200 * attempt));
+      }
+    }
+  })();
 
   // ---- touch frame and fingers --------------------------------------------------------------
   const probe = document.createElement("div");

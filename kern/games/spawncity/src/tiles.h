@@ -52,11 +52,22 @@ struct MapFeatures {
     std::vector<std::vector<Vec2>> rings;
     AreaKind kind = AreaKind::park;
   };
+  /// A tree or a street lamp: where it stands and its size (tree) / the way its arm points (lamp).
+  struct Spot { Vec2 p; f32 a = 0; };
   std::vector<Building> buildings;
   std::vector<Road> roads;
   std::vector<Area> areas;
+  std::vector<Spot> trees, lamps;  // furnish(): the tile's own, inside its square
   bool procedural = false;  // the stand-in city, not real map data
 };
+
+/// The street furniture of a tile, from its own data alone (so every machine and every load gives
+/// the same): trees beside the streets and street lamps (street_lamps.mjs: every 34 m, alternating
+/// kerbs, 1.15 m beyond the road edge, one per 8 m cell) - each inside the tile's `square`
+/// (x0, y0, x1, y1), clear of every street's carriageway and pavement, of every path and of every
+/// house. `apron`: outlines of houses that reach over the square's edge (the neighbours' parts).
+/// Open water is the terrain's to know: the game leaves those out when it puts them up.
+void furnish(MapFeatures& out, const kern::Vec4& square, const std::vector<std::vector<Vec2>>& apron);
 
 /// OpenMapTiles layers (building, transportation, water, waterway, park, landcover) -> features.
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out);

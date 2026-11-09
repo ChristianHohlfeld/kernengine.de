@@ -21,7 +21,7 @@ namespace sc {
 
 class TrafficRules {
  public:
-  struct Arm { Vec2 dir; f32 width = 6; };
+  struct Arm { Vec2 dir; f32 width = 6; Vec2 pole; bool has_pole = false; };  // pole: the signal's post, on the kerb corner right of the incoming traffic (relative to the junction)
   struct Junction {
     Vec2 p;
     std::vector<Arm> arms;

@@ -162,6 +162,7 @@ void Game::life_update(f32 dt) {
   LifeView v;
   v.physics = &w;
   v.city = &city_;
+  v.ground_changes = &ground_changes_;
   v.focus = focus_position();
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;

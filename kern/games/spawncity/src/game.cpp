@@ -227,6 +227,7 @@ kern::game::Level Game::build_level() const {
 bool Game::start(kern::Engine& e) {
   engine_ = &e;
   mobile_ = e.arg_number("mobile", 0) > 0;
+  city_.building_budget = mobile_ ? 2600 : 4000;  // world_city_buildings.mjs MAX_FOOTPRINTS 2600 (a desktop draws more of the city)
   lat_ = e.arg_number("lat", kKonstanzLat);
   lon_ = e.arg_number("lon", kKonstanzLon);
   fpv_tilt_deg_ = static_cast<f32>(kern::clamp(e.arg_number("fpvtilt", -15), -15.0, 50.0));
@@ -480,7 +481,11 @@ void Game::spawn_guard_step() {
   // under him (the elevation arriving late) lifts him back onto it. Then the guard is done.
   if (spawn_guard_until_ < 0 || mode_ != Mode::foot || player_dead_) { spawn_guard_until_ = -1; return; }
   const f32 now = world_->sim_time();
-  if (now > spawn_guard_until_) { spawn_guard_until_ = -1; return; }
+  // (no end while the ground under him is not there yet: he is never dropped onto nothing)
+  {
+    const Vec3 at = matrix_of(soldier_).translation();
+    if (now > spawn_guard_until_ && (spawn_guard_ready_at_ >= 0 || city_.terrain().ground_ready(at.x, at.y))) { spawn_guard_until_ = -1; return; }
+  }
   const Vec3 c = matrix_of(soldier_).translation();
   // he moved off on his own (walked, a vehicle): the guard follows him while it lasts
   const Vec3 feet{c.x, c.y, c.z - 0.73f};
@@ -701,12 +706,21 @@ void Game::drive_traffic(f32 h) {
   const std::vector<Lane>& lanes = city_.lanes();
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
-    if (!c.placed) continue;
+    // (a car nobody drives here - not placed, removed, moved by a mate or by the host, without
+    // physics far away - has no wheels on joints: car.h detach; Car::step puts them on)
+    if (!c.placed || !world_->actor_alive(c.actor)) { c.car->detach(); continue; }
     const kern::physics::Body b = body(c.actor);
-    if (!b.valid()) continue;
-    if (i < car_lent_.size() && car_lent_[i]) continue;  // MP host: a mate drives it (game_worldsync.cpp)
-    if (puppet_car_step(c, i, h)) continue;             // MP client: the host's car (game_worldsync.cpp)
-    if (c.far) { traffic_far_step(c, h); continue; }  // no physics far away (game_traffic_far.cpp)
+    if (!b.valid() || !w.body_valid(b)) { c.car->detach(); continue; }
+    c.car->hit_user = static_cast<u64>(c.actor);
+    if (i < car_lent_.size() && car_lent_[i]) { c.car->detach(); continue; }  // MP host: a mate drives it (game_worldsync.cpp)
+    if (puppet_car_step(c, i, h)) { c.car->detach(); continue; }             // MP client: the host's car (game_worldsync.cpp)
+    if (c.far) { c.car->detach(); traffic_far_step(c, h); continue; }  // no physics far away (game_traffic_far.cpp)
+    if (life_) {
+      // hanging on a tow truck's boom (game_traffic.cpp puts it there every step): not driven
+      bool towed = false;
+      for (const WorldLife::TowTruck& t : life_->trucks) towed = towed || (t.towing && t.job == static_cast<i32>(i));
+      if (towed) { c.car->detach(); continue; }
+    }
     if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
       c.car->step(w, b, h, c.input);
       continue;
@@ -754,6 +768,11 @@ void Game::drive_traffic(f32 h) {
     if (c.stuck > 3) { in.pedal = -0.6f; in.steer = -in.steer; if (c.stuck > 5) c.stuck = 0; }
     c.input = in;
     c.car->step(w, b, h * 4, in);
+    {
+      const f32 lift = s.position.z - city_.ground_height(s.position.x, s.position.y) - Car::ground_offset(c.car->spec());
+      c.peak_up = std::fmax(c.peak_up, s.velocity.z);
+      c.peak_lift = std::fmax(c.peak_lift, lift);
+    }
   }
 }
 
@@ -912,6 +931,8 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   ui_update(dt);  // settings, WORLD options, menus (game_ui.cpp)
   if (!world_placed_) {
     city_.update({0, 0, 0}, 24);  // loading behind the title: nothing to keep smooth (the title draws no 3D)
+    ground_changes_.clear();
+    city_.take_ground_changes(ground_changes_);
     if (city_.ready_at({0, 0, 0})) place_world();
     else {
       const StreamStats& s = city_.stats();
@@ -945,11 +966,15 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
         v.z = 0;
         const f32 l = kern::length(v);
         city_.terrain().lead = l > 15 ? v * (std::fmin(l * 12, 2500.0f) / l) : Vec3{};
+        // the city ahead of a fast car: built along the next 4 s of the way (at most 420 m ahead)
+        city_.view_lead = l > 6 ? v * (std::fmin(l * 4, 420.0f) / l) : Vec3{};
       }
       focus_prev_ = f;
       focus_prev_valid_ = true;
     }
     city_.update(focus_position(), mobile_ ? 3 : 4);
+    ground_changes_.clear();
+    city_.take_ground_changes(ground_changes_);
     spawn_guard();
     look_lap(perf::Slot::stream);
     update_town(dt);
@@ -1502,6 +1527,20 @@ std::string Game::command(const std::string& cmd) {
     if (look_command(cmd, out)) return out;
   }
   if (cmd == "offline") { city_.go_offline(); return "ok"; }
+  if (cmd == "traffic bodies") {
+    // tests: every placed car - where it rides (over its design ride height), its peaks, its wheels
+    std::string out = "[";
+    for (const TrafficCar& c : cars_) {
+      if (!c.placed) continue;
+      const Vec3 p = matrix_of(c.actor).translation();
+      char b[160];
+      std::snprintf(b, sizeof b, "%s{\"bus\":%d,\"far\":%d,\"rig\":%d,\"lift\":%.2f,\"peakUp\":%.2f,\"peakLift\":%.2f,\"x\":%.0f,\"y\":%.0f}", out.size() > 1 ? "," : "",
+                    c.car->spec().radius > 0.4f ? 1 : 0, c.far ? 1 : 0, c.car->rigged() ? 1 : 0,
+                    p.z - city_.ground_height(p.x, p.y) - Car::ground_offset(c.car->spec()), c.peak_up, c.peak_lift, p.x, p.y);
+      out += b;
+    }
+    return out + "]";
+  }
   if (cmd == "camera") {
     // tests: where the view is (the overview while loading, else the mode's camera)
     char b[256];

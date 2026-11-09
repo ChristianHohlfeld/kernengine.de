@@ -2,6 +2,7 @@
 #include "life.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <cmath>
 #include <cstdio>
 
@@ -120,7 +121,8 @@ void Life::clear() {
   herds_for_ = {1e9f, 1e9f};
   flocks_.clear();
   trees_.clear();
-  tree_lanes_ = 0;
+  trees_gone_.clear();
+  tree_serial_ = ~0u;
   chain_alive_ = false;
   next_chain_ = -1;
   streak_n_ = 0;
@@ -778,40 +780,38 @@ void Life::update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut
 }
 
 void Life::update_trees(const LifeView& view, f32 now) {
-  // the ground under a tree is the ground now: the height field refines after a tree was placed
-  // (a finer tile, a crater) - 64 trees a frame are put back on it (a sunk or floating trunk)
-  for (u32 k = 0; k < 64 && !trees_.empty(); ++k) {
-    Tree& t = trees_[tree_ground_cursor_++ % trees_.size()];
-    t.foot.z = ground(view, t.foot.x, t.foot.y);
-  }
-  // blown-over trees lie 40 s, then they are gone
+  auto key_of = [](u64 tile, u32 index) { return tile * 0x9e3779b97f4a7c15ull + index; };
+  // blown-over trees lie 40 s, then they are gone (and stay gone while their tile is loaded)
+  for (const Tree& t : trees_) if (t.fell_at >= 0 && now - t.fell_at > 40) trees_gone_.insert(key_of(t.tile, t.index));
   if (!trees_.empty()) trees_.erase(std::remove_if(trees_.begin(), trees_.end(), [&](const Tree& t) { return t.fell_at >= 0 && now - t.fell_at > 40; }), trees_.end());
-  // Trees beside the streets (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m, clear of buildings
-  // by 2.4 m): placed once per lane as lanes arrive.
-  const std::vector<Lane>& lanes = view.city->lanes();
-  if (tree_lanes_ > lanes.size()) { trees_.clear(); tree_lanes_ = 0; }
-  for (int budget = 0; tree_lanes_ < lanes.size() && budget < 16; ++budget, ++tree_lanes_) {
-    const Lane& L = lanes[tree_lanes_];
-    if (!L.alive || L.points.size() < 2 || L.width > 14) continue;
-    f32 carry = 17;
-    u32 i = static_cast<u32>(tree_lanes_ * 7);
-    for (std::size_t k = 0; k + 1 < L.points.size(); ++k) {
-      const Vec2 a = L.points[k], b = L.points[k + 1], d = b - a;
-      const f32 len = std::hypot(d.x, d.y);
-      if (len < 1) continue;
-      const Vec2 u = d * (1 / len), right{u.y, -u.x};
-      for (f32 t = carry; t < len; t += 37, ++i) {
-        const f32 side = (i & 1) ? 1.0f : -1.0f, off = L.width * 0.5f + 2.2f + static_cast<f32>(i % 4) * 0.4f;
-        const Vec2 c = a + u * t + right * (side * off);
-        if (view.city->terrain().water_at(c.x, c.y)) continue;
-        bool free = !blocked(view, c);
-        for (int j = 0; j < 6 && free; ++j) free = !blocked(view, c + Vec2{std::cos(j * kPi / 3), std::sin(j * kPi / 3)} * 2.4f);
-        if (!free) continue;
-        trees_.push_back({{c.x, c.y, ground(view, c.x, c.y)}, 0.82f + static_cast<f32>(i % 5) * 0.045f, static_cast<u32>(tree_lanes_)});
+  // The trees are the map tiles' (tiles.h furnish: beside the streets, clear of every street,
+  // path and house - from the tile's data alone, so every machine has the same trees): taken
+  // whenever the set of tiles changes; a tile that goes takes its trees along.
+  if (tree_serial_ != view.city->furniture_serial()) {
+    tree_serial_ = view.city->furniture_serial();
+    std::vector<CityStream::Furniture> tiles;
+    view.city->furniture(tiles);
+    std::unordered_map<u64, Tree> fallen;
+    for (const Tree& t : trees_) if (t.fell_at >= 0) fallen[key_of(t.tile, t.index)] = t;
+    std::unordered_set<u64> gone;
+    trees_.clear();
+    for (const CityStream::Furniture& f : tiles)
+      for (u32 i = 0; i < f.trees->size(); ++i) {
+        const MapFeatures::Spot& sp = (*f.trees)[i];
+        const u64 k = key_of(f.tile, i);
+        if (trees_gone_.count(k)) { gone.insert(k); continue; }
+        if (view.city->terrain().water_at(sp.p.x, sp.p.y)) continue;
+        Tree t{{sp.p.x, sp.p.y, ground(view, sp.p.x, sp.p.y)}, sp.a, 0, -1, {1, 0}, f.tile, i};
+        if (const auto it = fallen.find(k); it != fallen.end()) { t.fell_at = it->second.fell_at; t.fall_dir = it->second.fall_dir; }
+        trees_.push_back(t);
       }
-      carry = std::fmod(carry + 37 - std::fmod(len, 37.0f), 37.0f);
-    }
+    trees_gone_ = std::move(gone);
   }
+  // the ground changed somewhere (a crater, a new elevation window): the trees there stand on it
+  if (view.ground_changes)
+    for (const kern::Vec4& r : *view.ground_changes)
+      for (Tree& t : trees_)
+        if (t.foot.x >= r.x && t.foot.x <= r.z && t.foot.y >= r.y && t.foot.y <= r.w) t.foot.z = ground(view, t.foot.x, t.foot.y);
 }
 
 

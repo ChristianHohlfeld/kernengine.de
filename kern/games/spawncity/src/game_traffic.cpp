@@ -363,9 +363,10 @@ void Game::draw_traffic_lights() {
     const TrafficRules::Junction& j = L.rules.junctions()[ji];
     if (!j.lights) continue;
     for (const TrafficRules::Arm& a : j.arms) {
-      // a pole on the right of the incoming traffic (heading -a), at the junction's edge
-      const Vec2 right{-a.dir.y, a.dir.x};
-      const Vec2 p = j.p + a.dir * (j.radius - 0.5f) + right * (a.width * 0.5f + 1.2f);
+      // a post on the kerb corner right of the incoming traffic (world_traffic.cpp)
+      if (!a.has_pole) continue;
+      const Vec2 p = j.p + a.pole;
+      if (city_.terrain().water_at(p.x, p.y)) continue;
       const f32 g = city_.ground_height(p.x, p.y);
       L.art.put(L.art.cylinder, kern::Mat4::translate({p.x, p.y, g}) * kern::Mat4::scale({0.07f, 0.07f, 3.1f}), {0.22f, 0.23f, 0.24f});
       const f32 face = std::atan2(a.dir.y, a.dir.x);

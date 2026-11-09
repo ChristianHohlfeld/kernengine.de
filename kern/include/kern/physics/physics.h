@@ -112,6 +112,12 @@ struct JointSettings {
   // motor joint: velocity drive and spring towards frame alignment
   Vec3 linear_velocity, angular_velocity;
   f32 max_velocity_force = 0, max_velocity_torque = 0, max_spring_force = 0, max_spring_torque = 0;
+  // wheel joint steering (Box3D b3WheelJointDef): the wheel turns about the suspension axis towards
+  // `target_steering` (radians) with a spring-damper servo of at most `max_steering_torque`;
+  // without it the wheel is fixed forward
+  bool enable_steering = false, enable_steering_limit = false;
+  f32 steering_hertz = 0, steering_damping_ratio = 0, target_steering = 0, max_steering_torque = 0;
+  f32 steering_lower = 0, steering_upper = 0;
   // parallel joint
   f32 max_torque = 0;
   // Joint softness of the solver (0 = Box3D defaults); keep below half the sub-step rate.
@@ -237,6 +243,9 @@ class World {
   Vec3 joint_force(Joint joint) const;
   /// Motor of a revolute (rad/s, N*m), prismatic (m/s, N), distance (m/s, N) or spherical joint (torque only).
   void set_joint_motor(Joint joint, bool enable, f32 speed, f32 max_force);
+  /// Wheel joints: the steering servo's target angle (radians), and the angle it has now.
+  void set_wheel_steering(Joint joint, f32 target);
+  f32 wheel_steering(Joint joint) const;
   /// Revolute joints: angle of B relative to A (radians, from the reference angle); 0 for others.
   f32 joint_angle(Joint joint) const;
   /// Revolute joints: angular speed of B relative to A about the hinge axis (rad/s); 0 for others.

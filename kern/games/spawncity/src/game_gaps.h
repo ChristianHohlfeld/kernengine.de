@@ -78,7 +78,7 @@ struct GapsState {
   f32 seat_pending_until = -1, ride_seen = 0;
   // street_lamps.mjs (game_lamps.cpp)
   lamps::Field lamps;
-  std::size_t lamp_lanes = 0;
+  u32 lamp_serial = ~0u;  // the city's furniture set the lamps were taken from
   bool lamps_dirty = false, lamp_sounds = false;
   f32 lamp_car_check = -1;
   u32 lamps_broken_events = 0;

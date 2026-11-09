@@ -39,6 +39,29 @@ void Field::place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const 
   }
 }
 
+void Field::rebuild(const std::vector<Spot>& spots, const std::function<f32(f32, f32)>& ground) {
+  clear();
+  lamps_.reserve(spots.size());
+  for (const Spot& s : spots) {
+    Lamp lp;
+    lp.foot = {s.x, s.y, ground ? ground(s.x, s.y) : 0};
+    lp.yaw = s.yaw;
+    lp.head = {s.x + std::cos(s.yaw) * kArm, s.y + std::sin(s.yaw) * kArm};
+    lp.key = cell_key(s.x, s.y);
+    if (!seen_.insert(lp.key).second) continue;
+    const auto br = broken_.find(lp.key);
+    if (br != broken_.end()) lp.state = br->second;
+    grid_[grid_key(s.x, s.y)].push_back(static_cast<i32>(lamps_.size()));
+    lamps_.push_back(lp);
+  }
+}
+
+void Field::reground(f32 x0, f32 y0, f32 x1, f32 y1, const std::function<f32(f32, f32)>& ground) {
+  if (!ground) return;
+  for (Lamp& l : lamps_)
+    if (l.foot.x >= x0 && l.foot.x <= x1 && l.foot.y >= y0 && l.foot.y <= y1) l.foot.z = ground(l.foot.x, l.foot.y);
+}
+
 std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
   std::vector<i32> out;
   const i64 g0 = static_cast<i64>(std::floor((x - r) / kGridM)), g1 = static_cast<i64>(std::floor((x + r) / kGridM));

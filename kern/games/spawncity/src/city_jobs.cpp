@@ -87,6 +87,10 @@ void run_tile(kern::Span<const u8> in, std::vector<u8>& out) {
     w.put<u32>(static_cast<u32>(a.rings.size()));
     for (const auto& ring : a.rings) w.points(ring);
   }
+  for (const auto* list : {&f.trees, &f.lamps}) {
+    w.put<u32>(static_cast<u32>(list->size()));
+    for (const auto& sp : *list) { w.put<f32>(sp.p.x); w.put<f32>(sp.p.y); w.put<f32>(sp.a); }
+  }
 }
 
 // ---- kBuildings: footprints -> welded chunk meshes (kern::BuildingBuilder + kern::weld) ----
@@ -155,6 +159,12 @@ bool read_features(const std::vector<u8>& output, MapFeatures& f) {
     a.rings.resize(r.get<u32>());
     for (auto& ring : a.rings) r.points(ring);
     if (!r.ok) return false;
+  }
+  for (auto* list : {&f.trees, &f.lamps}) {
+    const u32 n = r.get<u32>();
+    if (!r.ok || n > 200000) return false;
+    list->resize(n);
+    for (auto& sp : *list) { sp.p.x = r.get<f32>(); sp.p.y = r.get<f32>(); sp.a = r.get<f32>(); }
   }
   return r.ok;
 }

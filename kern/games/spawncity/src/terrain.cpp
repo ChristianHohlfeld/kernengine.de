@@ -110,6 +110,7 @@ struct Terrain::Job {
   Grid g;
   u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
   bool side = false;  // a window round a far mate (host), not the player's own
+  i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
 };
 
 namespace {
@@ -208,6 +209,8 @@ void Terrain::clear() {
   job_.reset();
   grid_ = Grid{};
   side_.clear();
+  corridors_.clear();
+  corridor_hit_ = nullptr;
   grid_ready_ = false;
   ref_ready_ = false;
   ref_height_ = 0;
@@ -277,44 +280,85 @@ f32 Terrain::sample_dem(f64 lon, f64 lat, bool& ok) const {
 // Host: the elevation round a mate too far for the player's own window (8 km) - a window of his own
 // (built the same way, after the player's), so the ground under his cars and people is the real
 // one here as on his machine. Windows nobody is near any more are dropped.
-void Terrain::plan_side_dem() {
-  if (!dem_ || job_ || !grid_ready_) return;
-  auto inside = [](const Grid& g, f32 x, f32 y, f32 margin) {
-    const f32 span = g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0);
-    return x > g.x0 + margin && y > g.y0 + margin && x < g.x0 + span - margin && y < g.y0 + span - margin;
-  };
+// ---- the elevation windows ----------------------------------------------------------------------
+// The ground's height is a function of the place alone: every window samples the same 10 m
+// lattice (its corner is a multiple of 50 m) through the same filter, so two windows agree
+// wherever both are further than the filter's reach (kDemMargin) from their edges - their
+// "interior". Only the interior counts as known ground: the city builds a map tile once its whole
+// square lies in an interior (covers), and a player is put down only there (ground_ready). So
+// nothing ever stands on a height that a later window would change, and nothing has to be moved
+// when one arrives.
+namespace {
+kern::Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; }
+bool rect_in(const kern::Vec4& in, const kern::Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; }
+}  // namespace
+
+kern::Vec4 Terrain::interior(const Grid& g) const {
+  return interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
+}
+
+bool Terrain::covers(const kern::Vec4& rect) const {
+  if (!settled_) return false;
+  if (!dem_) return true;  // flat ground: known everywhere
+  if (!grid_ready_) return false;
+  if (rect_in(rect, interior(grid_))) return true;
+  for (const Grid& g : side_) if (rect_in(rect, interior(g))) return true;
+  return false;
+}
+
+void Terrain::plan_windows(Vec3 focus) {
+  if (!dem_ || job_) return;
+  // what must be known: the city's tiles round the player (needs[0]) and round each far mate
+  // (host); without a city (tests) a square round the focus
+  kern::Vec4 own{focus.x - 1500, focus.y - 1500, focus.x + 1500, focus.y + 1500};
+  if (!needs.empty()) own = needs[0];
+  // one window for everybody when they fit in it, else the player's own and one per far mate
+  kern::Vec4 all = own;
+  for (std::size_t i = 1; i < needs.size(); ++i) all = {std::fmin(all.x, needs[i].x), std::fmin(all.y, needs[i].y), std::fmax(all.z, needs[i].z), std::fmax(all.w, needs[i].w)};
+  const bool together = needs.size() > 1 && all.z - all.x < kDemMaxSize - 2 * kDemMargin - 800 && all.w - all.y < kDemMaxSize - 2 * kDemMargin - 800;
+  const kern::Vec4 want = together ? all : own;
+  // the player's window: a new one when what is needed comes within the slack of its interior's
+  // edge (a tile's width ahead is loaded with it, so the next row of tiles is known before the
+  // player reaches it)
+  const f32 tile = std::fmax(400.0f, (own.z - own.x) / 3), slack = std::fmin(400.0f, tile * 0.25f);
+  bool planned = false;
+  if (!grid_ready_ || !rect_in({want.x - slack, want.y - slack, want.z + slack, want.w + slack}, interior(grid_))) {
+    // (a window that already holds what is needed is only replaced by one that holds more of it)
+    Vec2 c{(want.x + want.z) / 2, (want.y + want.w) / 2};
+    // a fast craft: the window leads it, as far as what is needed now stays inside
+    const f32 lead_max = tile;
+    c.x += clampf(lead.x, -lead_max, lead_max);
+    c.y += clampf(lead.y, -lead_max, lead_max);
+    const f32 half_need = std::fmax(want.z - want.x, want.w - want.y) / 2 + lead_max + kDemMargin + tile;
+    const f32 half = clampf(std::ceil(std::fmax(kDemSize / 2, half_need) / 50) * 50, kDemSize / 2, kDemMaxSize / 2);
+    planned = plan_dem(c, half, false);
+    if (planned || job_) return;
+  }
+  if (together || !grid_ready_) { side_.clear(); return; }
+  // far mates: their own windows (the ground there is the real one for the host's traffic too)
   side_.erase(std::remove_if(side_.begin(), side_.end(), [&](const Grid& g) {
-    for (const Vec3& e : extra) if (inside(g, e.x, e.y, 0)) return false;
+    for (std::size_t i = 1; i < needs.size(); ++i) if (rect_in(needs[i], interior(g))) return false;
     return true;
   }), side_.end());
-  for (const Vec3& e : extra) {
-    if (inside(grid_, e.x, e.y, 700)) continue;
-    bool covered = false;
-    for (const Grid& g : side_) covered = covered || inside(g, e.x, e.y, 700);
-    if (covered || side_.size() >= 3) continue;
-    plan_dem({e.x, e.y, 0}, {e.x, e.y, 0}, false, true);
-    return;
+  for (std::size_t i = 1; i < needs.size(); ++i) {
+    const kern::Vec4& n = needs[i];
+    if (covers(n) || side_.size() >= 3) continue;
+    const f32 half = clampf(std::ceil((std::fmax(n.z - n.x, n.w - n.y) / 2 + kDemMargin + 400) / 50) * 50, 1500.0f, kDemMaxSize / 2);
+    if (plan_dem({(n.x + n.z) / 2, (n.y + n.w) / 2}, half, true) || job_) return;
   }
 }
 
-void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates, bool side) {
-  if (!dem_ || job_) return;
-  if (grid_ready_ && !side) {
-    // a new window when the centre moved far, or someone it must hold is near its edge
-    const f32 half = kDemSize / 2 - 700;
-    bool edge = std::fabs(player.x - grid_.cx) > half || std::fabs(player.y - grid_.cy) > half;
-    if (mates) for (const Vec3& e : extra) edge = edge || std::fabs(e.x - grid_.cx) > half || std::fabs(e.y - grid_.cy) > half;
-    if (!edge && std::hypot(focus.x - grid_.cx, focus.y - grid_.cy) < kDemReload) return;
-  }
+bool Terrain::plan_dem(Vec2 centre, f32 half, bool side) {
+  if (!dem_ || job_) return false;
   const f64 now = kern::now_ms();
-  if (now < retry_at_) return;
-  const f32 cx = std::round(focus.x / 50) * 50, cy = std::round(focus.y / 50) * 50, half = kDemSize / 2;
+  if (now < retry_at_) return false;
+  const f32 cx = std::round(centre.x / 50) * 50, cy = std::round(centre.y / 50) * 50;
   f64 lon_a, lat_a, lon_b, lat_b;
   unproject(proj_, cx - half, cy + half, lon_a, lat_a);
   unproject(proj_, cx + half, cy - half, lon_b, lat_b);
   const i32 ix0 = static_cast<i32>(std::floor(merc_x(lon_a, kDemZoom))), iy0 = static_cast<i32>(std::floor(merc_y(lat_a, kDemZoom)));
   const i32 ix1 = static_cast<i32>(std::floor(merc_x(lon_b, kDemZoom))), iy1 = static_cast<i32>(std::floor(merc_y(lat_b, kDemZoom)));
-  if ((ix1 - ix0 + 1) * (iy1 - iy0 + 1) > 25) return;
+  if ((ix1 - ix0 + 1) * (iy1 - iy0 + 1) > 100) return false;
   bool all = true, failed = false;
   for (i32 y = iy0; y <= iy1; ++y)
     for (i32 x = ix0; x <= ix1; ++x) {
@@ -326,14 +370,16 @@ void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates, bool side) {
     }
   if (failed) {
     // Never invent heights: without its first elevation the world stays flat for good (the
-    // buildings already stand on it); a failed reload keeps the last surface and retries.
+    // buildings already stand on it); a failed reload keeps the last surface and is asked again
+    // (what lies outside the known ground waits for it: covers).
     ++dem_failures_;
-    if (!grid_ready_) { disable_dem(); return; }
+    if (!grid_ready_) { disable_dem(); return false; }
     for (auto& [k, t] : dem_tiles_) if (t.failed) { t.failed = false; t.requested = false; }
-    retry_at_ = now + std::min(60000.0, 1500.0 * dem_failures_);
-    return;
+    retry_at_ = now + std::min(15000.0, 1500.0 * dem_failures_);
+    return false;
   }
-  if (!all) return;
+  if (!all) return false;
+  dem_failures_ = 0;
   // Drop tiles far from this window (memory: a z13 tile is 256 KB of floats).
   if (!side) for (auto it = dem_tiles_.begin(); it != dem_tiles_.end();) {
     const i32 x = it->second.key.x, y = it->second.key.y;
@@ -342,14 +388,16 @@ void Terrain::plan_dem(Vec3 focus, Vec3 player, bool mates, bool side) {
   }
   job_ = std::make_unique<Job>();
   job_->side = side;
+  job_->x0 = ix0; job_->y0 = iy0; job_->x1 = ix1; job_->y1 = iy1;
   Grid& g = job_->g;
   g.step = kDemStep;
-  g.n = static_cast<u32>(std::lround(kDemSize / kDemStep)) + 1;
+  g.n = static_cast<u32>(std::lround(half * 2 / kDemStep)) + 1;
   g.x0 = cx - half;
   g.y0 = cy - half;
   g.cx = cx;
   g.cy = cy;
   g.h.resize(static_cast<std::size_t>(g.n) * g.n);
+  return true;
 }
 
 bool Terrain::run_job(f64 deadline) {
@@ -366,10 +414,11 @@ bool Terrain::run_job(f64 deadline) {
     put(&proj_.lon0, 8); put(&proj_.lat0, 8);
     putf(g.x0); putf(g.y0); putf(g.step); put32(g.n); putf(kOpen); putf(kBlur);
     u32 count = 0;
-    for (const auto& [k, t] : dem_tiles_) count += t.h.empty() ? 0 : 1;
+    auto mine = [&](const DemTile& t) { return !t.h.empty() && t.key.x >= j.x0 && t.key.x <= j.x1 && t.key.y >= j.y0 && t.key.y <= j.y1; };
+    for (const auto& [k, t] : dem_tiles_) count += mine(t) ? 1 : 0;
     put32(count);
     for (const auto& [k, t] : dem_tiles_) {
-      if (t.h.empty()) continue;
+      if (!mine(t)) continue;
       put32(static_cast<u32>(t.key.x)); put32(static_cast<u32>(t.key.y)); put32(t.w); put32(t.hgt);
       put(t.h.data(), t.h.size() * 4);
     }
@@ -396,6 +445,7 @@ bool Terrain::run_job(f64 deadline) {
     ref_ready_ = true;
   }
   const bool reload = grid_ready_;
+  const kern::Vec4 known = reload ? interior(grid_) : kern::Vec4{0, 0, 0, 0};
   grid_ = std::move(g);
   grid_ready_ = true;
   settled_ = true;
@@ -404,7 +454,16 @@ bool Terrain::run_job(f64 deadline) {
   for (f32 v : grid_.h) { lo = std::fmin(lo, v - ref_height_); hi = std::fmax(hi, v - ref_height_); }
   stats_.min_height = lo;
   stats_.max_height = hi;
-  if (reload) dirty(-1e9f, -1e9f, 1e9f, 1e9f);
+  ++stats_.windows;
+  if (reload) {
+    // Inside the old window's interior the ground is the same as before (see plan_windows):
+    // only what lay outside it is built again.
+    const f32 big = 1e9f;
+    dirty(-big, -big, known.x, big);
+    dirty(known.z, -big, big, big);
+    dirty(known.x, -big, known.z, known.y);
+    dirty(known.x, known.w, known.z, big);
+  }
   return true;
 }
 
@@ -423,21 +482,129 @@ f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
 
 f32 Terrain::elevation(f32 x, f32 y) const {
   if (!grid_ready_) return 0.0f;
-  // the player's window; outside it, a far mate's (host) where there is one
-  if (!side_.empty()) {
-    const f32 span = grid_.step * static_cast<f32>(grid_.n > 0 ? grid_.n - 1 : 0);
-    if (x < grid_.x0 || y < grid_.y0 || x > grid_.x0 + span || y > grid_.y0 + span)
-      for (const Grid& g : side_) {
-        const f32 sp = g.step * static_cast<f32>(g.n - 1);
-        if (x >= g.x0 && y >= g.y0 && x <= g.x0 + sp && y <= g.y0 + sp) return grid_at(g, x, y) - ref_height_;
-      }
-  }
+  // the window that knows the place (its interior); else any that holds it; else the player's,
+  // held at its edge (far ground nobody stands on: the horizon)
+  auto in = [&](const kern::Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
+  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
+  if (in(interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
   return grid_at(grid_, x, y) - ref_height_;
+}
+
+// ---- road corridors -----------------------------------------------------------------------------
+namespace {
+constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5f;  // terrain_craters.mjs RG, ROAD_BLEND_M
+u64 road_key(i32 ix, i32 iy) { return (static_cast<u64>(static_cast<u32>(ix)) << 32) | static_cast<u32>(iy); }
+}  // namespace
+
+f32 Terrain::road_field(f32 x, f32 y) const {
+  // terrain_craters.mjs roadField: the ground smoothed over ~36 m (tent kernel) - a street's
+  // profile along its length; one field for all streets, so crossing streets agree at a junction
+  f32 sum = 0, wsum = 0;
+  for (int j = -2; j <= 2; ++j)
+    for (int i = -2; i <= 2; ++i) {
+      const f32 w = static_cast<f32>((3 - std::abs(i)) * (3 - std::abs(j)));
+      sum += elevation(x + static_cast<f32>(i) * 9, y + static_cast<f32>(j) * 9) * w;
+      wsum += w;
+    }
+  return sum / wsum;
+}
+
+void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<RoadLine>& roads) {
+  remove_corridors(owner);
+  auto set = std::make_unique<CorridorSet>();
+  set->owner = owner;
+  set->bounds = bounds;
+  set->box = {1e30f, 1e30f, -1e30f, -1e30f};
+  std::vector<Vec2> pts;
+  std::vector<f32> hs;
+  for (const RoadLine& r : roads) {
+    if (!r.points || r.points->size() < 2 || !(r.width > 0)) continue;
+    // the centre line every 5 m, its heights from the smooth field
+    pts.clear();
+    for (std::size_t i = 0; i + 1 < r.points->size(); ++i) {
+      const Vec2 a = (*r.points)[i], b = (*r.points)[i + 1];
+      const i32 k = std::max(1, static_cast<i32>(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / 5)));
+      for (i32 q = 0; q < k; ++q) pts.push_back(a + (b - a) * (static_cast<f32>(q) / static_cast<f32>(k)));
+    }
+    pts.push_back(r.points->back());
+    hs.resize(pts.size());
+    const f32 half = r.width / 2, reach = half + kRoadBlend;
+    // (only what can reach into the tile's own square)
+    auto near = [&](Vec2 p) { return p.x > bounds.x - reach - 6 && p.x < bounds.z + reach + 6 && p.y > bounds.y - reach - 6 && p.y < bounds.w + reach + 6; };
+    for (std::size_t i = 0; i < pts.size(); ++i) hs[i] = near(pts[i]) ? road_field(pts[i].x, pts[i].y) : 0;
+    for (std::size_t i = 0; i + 1 < pts.size(); ++i) {
+      const Vec2 a = pts[i], b = pts[i + 1];
+      if (!near(a) || !near(b)) continue;
+      const f32 dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      if (l2 < 1e-4f) continue;
+      const CorridorSeg seg{a.x, a.y, dx, dy, l2, hs[i], hs[i + 1], half};
+      const f32 x0 = std::fmin(a.x, b.x) - reach, x1 = std::fmax(a.x, b.x) + reach, y0 = std::fmin(a.y, b.y) - reach, y1 = std::fmax(a.y, b.y) + reach;
+      set->box = {std::fmin(set->box.x, x0), std::fmin(set->box.y, y0), std::fmax(set->box.z, x1), std::fmax(set->box.w, y1)};
+      for (i32 gx = static_cast<i32>(std::floor(x0 / kRoadGrid)); gx <= static_cast<i32>(std::floor(x1 / kRoadGrid)); ++gx)
+        for (i32 gy = static_cast<i32>(std::floor(y0 / kRoadGrid)); gy <= static_cast<i32>(std::floor(y1 / kRoadGrid)); ++gy) set->grid[road_key(gx, gy)].push_back(seg);
+    }
+  }
+  const kern::Vec4 box = set->box;
+  corridor_hit_ = nullptr;
+  corridors_.push_back(std::move(set));
+  // the ground of the tile's square changed where its streets run (nobody else's ground did)
+  if (box.z > box.x) {
+    const kern::Vec4 c{std::fmax(box.x, bounds.x), std::fmax(box.y, bounds.y), std::fmin(box.z, bounds.z), std::fmin(box.w, bounds.w)};
+    if (c.z > c.x && c.w > c.y) dirty(c.x, c.y, c.z, c.w, false);
+  }
+}
+
+void Terrain::remove_corridors(u64 owner) {
+  for (auto it = corridors_.begin(); it != corridors_.end(); ++it) {
+    if ((*it)->owner != owner) continue;
+    const kern::Vec4 box = (*it)->box, bounds = (*it)->bounds;
+    corridor_hit_ = nullptr;
+    corridors_.erase(it);
+    if (box.z > box.x) {
+      const kern::Vec4 c{std::fmax(box.x, bounds.x), std::fmax(box.y, bounds.y), std::fmin(box.z, bounds.z), std::fmin(box.w, bounds.w)};
+      if (c.z > c.x && c.w > c.y) dirty(c.x, c.y, c.z, c.w, false);
+    }
+    return;
+  }
+}
+
+const Terrain::CorridorSet* Terrain::corridor_set(f32 x, f32 y) const {
+  // the map tile whose square holds the point (the squares tile the plane: west / south edge in)
+  auto in = [&](const CorridorSet& s) { return x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w; };
+  if (corridor_hit_ && in(*corridor_hit_)) return corridor_hit_;
+  for (const auto& s : corridors_) if (in(*s)) return corridor_hit_ = s.get();
+  return nullptr;
+}
+
+bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) != nullptr; }
+
+f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
+  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
+  // junctions blend smoothly, no steps
+  const CorridorSet* set = corridors_.empty() ? nullptr : corridor_set(x, y);
+  if (!set) return h;
+  const auto it = set->grid.find(road_key(static_cast<i32>(std::floor(x / kRoadGrid)), static_cast<i32>(std::floor(y / kRoadGrid))));
+  if (it == set->grid.end()) return h;
+  f32 best = 0, sw = 0, sh = 0;
+  for (const CorridorSeg& s : it->second) {
+    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
+    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = std::hypot(x - px, y - py);
+    const f32 w = d <= s.half ? 1 : d >= s.half + kRoadBlend ? 0 : 1 - (d - s.half) / kRoadBlend;
+    if (w <= 0) continue;
+    const f32 ws = w * w * (3 - 2 * w);
+    sw += ws;
+    sh += ws * (s.ha + (s.hb - s.ha) * t);
+    best = std::fmax(best, w);
+  }
+  if (sw <= 0) return h;
+  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
 }
 
 f32 Terrain::node_height(f32 x, f32 y) const {
   const f32 e = elevation(x, y);
-  f32 h = e;
+  f32 h = road_level(x, y, e);
   for (const Crater& c : craters_) {
     const f32 dx = x - c.c.x, dy = y - c.c.y;
     if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
@@ -466,7 +633,10 @@ f32 Terrain::footprint_base(const std::vector<Vec2>& ring) const {
   f32 m = 1e9f;
   for (std::size_t i = 0; i < ring.size(); ++i) {
     const Vec2 a = ring[i], b = ring[(i + 1) % ring.size()];
-    m = std::fmin(m, std::fmin(elevation(a.x, a.y), elevation((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f)));
+    // (the natural ground, or the street's corridor where it cuts lower: never floating)
+    const Vec2 c = (a + b) * 0.5f;
+    const f32 ea = elevation(a.x, a.y), ec = elevation(c.x, c.y);
+    m = std::fmin(m, std::fmin(std::fmin(ea, road_level(a.x, a.y, ea)), std::fmin(ec, road_level(c.x, c.y, ec))));
   }
   return m < 1e8f ? m : 0.0f;
 }
@@ -798,7 +968,7 @@ void Terrain::set_craters(const std::vector<CraterRec>& list) {
 // ---------------------------------------------------------------------------------------------
 // tiles
 
-void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1) {
+void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify) {
   const f32 m = kStep * 2;
   x0 -= m; y0 -= m; x1 += m; y1 += m;
   for (auto& [k, t] : render_) {
@@ -816,19 +986,13 @@ void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1) {
     const i32 i = static_cast<i32>(k >> 32), j = static_cast<i32>(k & 0xffffffffu);
     if (i * kWaterChunk <= x1 && (i + 1) * kWaterChunk >= x0 && j * kWaterChunk <= y1 && (j + 1) * kWaterChunk >= y0) dirty_water_.insert(k);
   }
-  changes_.push_back({x0, y0, x1, y1});
+  if (notify) changes_.push_back({x0, y0, x1, y1});
   replan_ = true;
 }
 
 bool Terrain::ground_ready(f32 x, f32 y) const {
-  if (!settled_ || (job_ && !job_->side)) return false;
-  if (dem_) {
-    if (!grid_ready_) return false;
-    auto in = [&](const Grid& g) { const f32 span = g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0); return !(x < g.x0 + 20 || y < g.y0 + 20 || x > g.x0 + span - 20 || y > g.y0 + span - 20); };
-    bool ok = in(grid_);
-    for (const Grid& g : side_) ok = ok || in(g);
-    if (!ok) return false;
-  }
+  // known ground (an interior: no later window changes it) with its collision standing
+  if (!covers({x, y, x, y}) || !corridors_at(x, y)) return false;
   return has_collision(x, y);
 }
 
@@ -1160,20 +1324,7 @@ bool Terrain::ready_at(Vec3 p) const {
 void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   if (!r_ || !world_) return;
   const f64 deadline = kern::now_ms() + budget_ms;
-  // the elevation window (8 km): round the player - and in a session (host) round him and his
-  // mates together when they fit in it, so the ground under a mate is the real one here too (his
-  // cars drive on the same hills as on his machine); far apart, the player's own comes first
-  {
-    Vec3 c = focus + lead;
-    bool all = false;
-    if (!extra.empty()) {
-      Vec2 lo{focus.x, focus.y}, hi = lo;
-      for (const Vec3& e : extra) { lo = {std::fmin(lo.x, e.x), std::fmin(lo.y, e.y)}; hi = {std::fmax(hi.x, e.x), std::fmax(hi.y, e.y)}; }
-      if (hi.x - lo.x < kDemSize - 1600 && hi.y - lo.y < kDemSize - 1600) { c = {(lo.x + hi.x) / 2, (lo.y + hi.y) / 2, focus.z}; all = true; }
-    }
-    plan_dem(c, focus, all);
-    if (!all) plan_side_dem();  // (mates beyond the window: their own)
-  }
+  plan_windows(focus);
   plan_images(focus);
   if (job_) run_job(deadline);
   if (!settled_) return;
