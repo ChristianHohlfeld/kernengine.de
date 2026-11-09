@@ -777,6 +777,13 @@ bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
     };
     for (const SimJoint* sj : w->joint) release(sj);
     release(w->mouth);
+    // Returning from a motorised preview must not send the puppet coasting.
+    // This is an instantaneous velocity reset, not a continuous pose controller.
+    for (const physics::Body& body : w->bodies) {
+      if (!body.valid() || physics_.body_type(body) != physics::BodyType::dynamic) continue;
+      physics_.set_linear_velocity(body, {});
+      physics_.set_angular_velocity(body, {});
+    }
     w->driving = "pose";
   } else {
     physics_.set_body_type(w->trunk, physics::BodyType::dynamic);
