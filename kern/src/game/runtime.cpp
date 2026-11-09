@@ -2639,9 +2639,16 @@ bool GameWorld::begin_grab(ActorId actor, Vec3 point) {
   auto it = body_of_actor_.find(owner);
   if (it == body_of_actor_.end() || !it->second->body.valid()) return false;
   // A walker held by its trunk is held like a hand holds the robot: upright, not swinging on a point.
-  bool trunk = false;
-  for (const auto& w : walkers_) trunk = trunk || w->trunk.id == it->second->body.id;
-  return grab_.begin(physics_, it->second->body, point, 7.5f, trunk);
+  bool trunk = false, posing = false;
+  for (const auto& w : walkers_) {
+    trunk = trunk || w->trunk.id == it->second->body.id;
+    if (w->pose_edit)
+      for (const physics::Body& b : w->bodies)
+        posing = posing || (b.valid() && b.id == it->second->body.id);
+  }
+  // A puppet is not being lifted against gravity: the stronger mouse joint
+  // follows the hand, while the physical revolute limits remain enabled.
+  return grab_.begin(physics_, it->second->body, point, posing ? 15.0f : 7.5f, trunk && !posing);
 }
 void GameWorld::move_grab(Vec3 target) { grab_.set_target(target); }
 void GameWorld::end_grab() { grab_.end(); }
