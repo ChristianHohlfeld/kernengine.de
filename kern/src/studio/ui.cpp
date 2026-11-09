@@ -1262,8 +1262,16 @@ json::Value Studio::run(const json::Value& c) {
     l.name = "Micro Duck · Posen";
     l.world.title = "Micro Duck · Keyframes";
     l.world.gravity = {0, 0, 0};
+    l.world.ground = false;
     l.world.time_of_day = 0.42f;
     const ActorId duck = game::add_micro_duck(l, {0, 0, 0});
+    // The keyframe puppet is constrained by its 15 physical hinges, not by
+    // floor or shell-to-shell contacts. Keep body mass, inertia and all Box3D
+    // limit joints; the rendered duck meshes remain fully pickable.
+    for (game::Actor& a : l.actors) {
+      a.colliders.clear();
+      if (a.mesh) a.mesh->collision = false;
+    }
     if (auto* actor = l.find(duck); actor && actor->controller)
       actor->controller->autonomous = false;
     l.world.player = 0;
