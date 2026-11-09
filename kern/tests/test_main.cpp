@@ -3441,6 +3441,47 @@ TEST(studio_observer_camera_grabs_bodies) {
   CHECK(!f.s->state()["play"]["observing"].as_bool());
 }
 
+TEST(studio_motion_mouse_joint_holds_pose_after_release) {
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"motionBegin"})")["ok"].as_bool());
+  CHECK(f.s->level().world.gravity.z == 0);
+  CHECK(!f.s->level().world.ground);
+  game::ActorId duck = 0;
+  for (const game::Actor& a : f.s->level().actors) {
+    if (a.controller && a.controller->mode == game::ControlMode::walker) duck = a.id;
+    CHECK(a.colliders.empty());  // only hinge travel limits, not shell/floor contacts
+  }
+  CHECK(duck != 0);
+  if (!duck) return;
+  f.frames(10);
+  game::GameWorld& w = f.s->world();
+  const auto initial = w.walker_joints(duck);
+  CHECK(initial.size() == 15);
+  const physics::Body head = w.actor_body(duck + 9);
+  CHECK(w.physics().body_type(head) == physics::BodyType::dynamic);
+  const Vec3 p = w.physics().pose(head).position;
+  CHECK(w.begin_grab(duck + 9, p));
+  w.move_grab(p + Vec3{0, 0.7f, 0.7f});
+  f.frames(40);
+  w.end_grab();
+  const auto held = w.walker_joints(duck);
+  f32 moved = 0;
+  for (std::size_t j = 0; j < 14 && j < held.size(); ++j) {
+    moved += std::fabs(held[j].angle - initial[j].angle);
+    CHECK(held[j].angle >= held[j].lower - 0.10f);
+    CHECK(held[j].angle <= held[j].upper + 0.10f);
+  }
+  CHECK(moved > 0.005f);  // physical MouseGrab moved an actual servo joint
+  f.frames(50);
+  const auto retained = w.walker_joints(duck);
+  f32 worst_drift = 0;
+  for (std::size_t j = 0; j < 14 && j < retained.size(); ++j)
+    worst_drift = max_of(worst_drift, std::fabs(retained[j].angle - held[j].angle));
+  CHECK(worst_drift < 0.15f);  // no zero-g coast or spring back to home
+  const json::Value pose = f.cmd(R"({"cmd":"motionPose"})");
+  CHECK(pose["ok"].as_bool() && pose["joints"].size() == 14);
+}
+
 TEST(studio_simulate_drags_bodies_without_ctrl) {
   StudioFixture f;
   game::Level l = game::basic_level();
