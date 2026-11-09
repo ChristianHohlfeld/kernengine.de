@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -140,10 +140,87 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   const engine = new StudioEngine(kern);
   const page = new StudioPage(kern, engine, () => base64 ?? toBase64(bytes));
   page.start();
+  // Embedded real-time Box3D puppet for Kern Lehrer. All posing happens inside
+  // the actual Studio renderer / GameWorld; the parent only records encoder data.
+  if (new URLSearchParams(location.search).has("motion")) {
+    const style = document.createElement("style");
+    style.textContent = `
+      #titlebar,#toolbar,#side,#sideSplit,#drawer,#statusbar,#touchExit,#touchPause{display:none!important}
+      html,body,#app{width:100%;height:100%;overflow:hidden}
+      #app{display:flex!important;flex-direction:column}
+      #main{display:flex!important;flex:1;min-height:0;overflow:hidden}
+      #viewArea{flex:1!important;width:100%;height:100%;min-height:0}
+      #gl,#viewports{width:100%;height:100%}
+    `;
+    document.head.append(style);
+    const ready = engine.command({cmd: "motionBegin"});
+    let previewId = 0;
+    window.addEventListener("message", e => {
+      if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type?.startsWith("kern-motion-")) return;
+      const m = e.data, send = value => e.source.postMessage({type: "kern-motion-reply", id: m.id, result: value}, e.origin);
+      if (m.type === "kern-motion-capture") send(engine.command({cmd: "motionPose"}));
+      if (m.type === "kern-motion-edit") { ++previewId; send(engine.command({cmd: "motionEdit"})); }
+      if (m.type === "kern-motion-preview") {
+        const result = engine.command({cmd: "motionPreview", joints: m.joints});
+        const ticket = ++previewId;
+        setTimeout(() => { if (ticket === previewId) engine.command({cmd: "motionEdit"}); }, 850);
+        send(result);
+      }
+      if (m.type === "kern-motion-run") {
+        // The BroadcastChannel is asynchronous; explicitly load these exact
+        // bytes before registering the skill or starting the simulation.
+        trainedPolicies(m.file).then(records => {
+          if (!records.length || !engine.registerPolicy(m.file, records[0][1]))
+            return send({ok:false,error:"Trainiertes ONNX fehlt oder ist inkompatibel"});
+          const register = engine.command({cmd: "motionRegister", name: m.name, file: m.file, duration: m.duration});
+          send(register.ok ? engine.command({cmd: "motionRun", name: m.name}) : register);
+        }).catch(error => send({ok:false,error:String(error)}));
+      }
+      if (m.type === "kern-motion-restart") send(engine.command({cmd: "motionBegin"}));
+    });
+    window.parent.postMessage({type:"kern-motion-ready", ok:!!ready.ok, error:ready.error}, location.origin);
+  }
   applyAudioPrefs(engine);  // music / effects switches remembered on this device
   window.KernStudio = page.api();
-  engine.loadPolicies().catch(() => {});  // the robot's moves (sit, pick, kicks, roll, rollers)
+  engine.loadPolicies().then(() => mountLearnedMotions(engine, page)).catch(() => {});  // including dynamic Lehrer skills
   return page;
+}
+
+/** Learned ONNX skills are callable on any Micro Duck in the current level.
+ * No manifest edit, C++ rebuild or fixed UI button is required for each one. */
+function mountLearnedMotions(engine, page) {
+  if (new URLSearchParams(location.search).has("motion")) return;  // the embedded puppet has its own controls
+  const el = document.createElement("aside");
+  el.id = "learnedMotions";
+  el.style.cssText = "position:absolute;left:14px;bottom:14px;z-index:5;background:#1c1c1ee8;color:#eee;border:1px solid #444;border-radius:9px;padding:9px;max-width:270px;font:12px system-ui;display:none;box-shadow:0 4px 16px #0006";
+  $("#viewArea").append(el);
+  function refresh() {
+    let skills = {};
+    try { skills = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}"); } catch { return; }
+    el.replaceChildren();
+    const records = Object.values(skills).filter(s=>s && typeof s.name==="string" && typeof s.file==="string" && Number.isFinite(s.duration));
+    el.style.display = records.length ? "block" : "none";
+    if (!records.length) return;
+    const title = document.createElement("div");
+    title.textContent = "Gelernte Bewegungen";
+    title.style.cssText = "font-weight:650;margin-bottom:6px";
+    el.append(title);
+    for (const skill of records) {
+      const btn = document.createElement("button");
+      btn.textContent = skill.name.replace(/^motion_/, "").replace(/_/g," ");
+      btn.type = "button";
+      btn.style.cssText = "margin:2px 4px 3px 0;padding:5px 8px;color:#eee;border:1px solid #555;border-radius:6px;background:#303034;cursor:pointer";
+      btn.onclick = () => {
+        const reg = engine.command({cmd:"motionRegister",name:skill.name,file:skill.file,duration:skill.duration});
+        const r = reg.ok ? engine.command({cmd:"motionPlay",name:skill.name}) : reg;
+        if (!r.ok) page.toast("Bewegung: " + (r.error || "Netz noch nicht geladen"));
+      };
+      el.append(btn);
+    }
+  }
+  refresh();
+  addEventListener("storage", e => {if(e.key==="kern-lehrer.motion-skills.v1")refresh();});
+  try { new BroadcastChannel("kern-lehrer").onmessage = refresh; } catch { /* unsupported */ }
 }
 
 class StudioPage {

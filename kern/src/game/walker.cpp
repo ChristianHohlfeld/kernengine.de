@@ -532,8 +532,8 @@ struct PolicySet {
   f32 ramp_s = 2, rise_s = 1;     // DEFAULT_SITSTAND_RAMP_S / RISE_S, or the set's
 };
 
-const PolicySet& policy_set() {
-  static const PolicySet set = [] {
+PolicySet& policy_set() {
+  static PolicySet set = [] {
     PolicySet out;
     out.pick = {"alpha_ground_pick.onnx", 4, 0.7f, 1.0f};
     out.crouch = {"roller_crouch.onnx", 3, 0.7f, 0.8f};
@@ -601,6 +601,39 @@ const char* move_blocked(const W& w) {
 }
 
 }  // namespace
+
+bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds) {
+  if (name.empty() || name.size() > 48 || file.size() < 6 || file.size() > 80 ||
+      file.substr(file.size() - 5) != ".onnx" || !std::isfinite(seconds) ||
+      seconds < 0.3f || seconds > 15.0f) return false;
+  for (char c : name) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') || c == '_' || c == '-')) return false;
+  for (char c : file) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) return false;
+  const auto policy = walker_policy(file);
+  if (!policy || policy->dims.empty() || policy->dims.front() != 61 || policy->dims.back() != 14)
+    return false;
+  PolicySet& set = policy_set();
+  for (SkillDef& skill : set.skills) {
+    if (skill.name != name) continue;
+    // Do not silently replace a shipped / built-in skill (especially jump).
+    if (skill.file.find("motion_") != 0) return false;
+    skill.file = std::string(file);
+    skill.duration = seconds;
+    skill.period = seconds;
+    return true;
+  }
+  if (set.skills.size() >= 96) return false;
+  SkillDef skill;
+  skill.name = std::string(name);
+  skill.file = std::string(file);
+  skill.duration = seconds;
+  skill.period = seconds;
+  skill.action_scale = 1.0f;
+  skill.phase_slot = kJumpPhaseSlot;
+  set.skills.push_back(std::move(skill));
+  return true;
+}
 
 std::string GameWorld::walker_skill(ActorId id, std::string_view name) {
   WalkerBrain* w = walker_brain(id);
@@ -721,6 +754,16 @@ bool GameWorld::set_walker_external(ActorId id, bool on) {
   WalkerBrain* w = walker_brain(id);
   if (!w) return false;
   w->external = on;
+  return true;
+}
+
+bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
+  WalkerBrain* w = walker_brain(id);
+  if (!w) return false;
+  if (w->pose_edit != on) {
+    w->pose_edit = on;
+    physics_.set_body_type(w->trunk, on ? physics::BodyType::fixed : physics::BodyType::dynamic);
+  }
   return true;
 }
 
@@ -1453,6 +1496,14 @@ void GameWorld::drive_servos(f32 h) {
   // The servos' device model (servo.h): one law for the Studio, the Lehrer and the calibration rig.
   for (auto& sj : joints_) {
     if (!sj->servo || sj->broken || !sj->joint.valid()) continue;
+    bool posing = false;
+    for (const auto& w : walkers_) {
+      if (!w->pose_edit) continue;
+      if (w->mouth == sj.get()) { posing = true; break; }
+      for (const SimJoint* j : w->joint) if (j == sj.get()) { posing = true; break; }
+      if (posing) break;
+    }
+    if (posing) continue;
     servo_step(physics_, sj->joint, sj->servo_target, sj->servo_stiffness, sj->servo_damping, sj->servo_friction, sj->servo_torque);
   }
 }

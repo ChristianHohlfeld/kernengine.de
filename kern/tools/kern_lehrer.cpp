@@ -36,7 +36,7 @@ using namespace kern::lehrer;
 namespace {
 
 struct Options {
-  std::string task = "jump", out, eval, log, checkpoint, resume, warm, trace;
+  std::string task = "jump", scenario, out, eval, log, checkpoint, resume, warm, trace;
   std::string calibrate, holdout, profile, compare, examples, demo, demo_search, demo_check, play_eval;
   i32 play = 0;
   std::string policies;
@@ -509,6 +509,7 @@ int main(int argc, char** argv) {
     const std::string a = argv[i];
     auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
     if (a == "--task") o.task = next();
+    else if (a == "--scenario") o.scenario = next();
     else if (a == "--envs") o.envs = std::atoi(next());
     else if (a == "--threads") o.threads = std::atoi(next());
     else if (a == "--iterations") o.iterations = std::atoi(next());
@@ -561,7 +562,7 @@ int main(int argc, char** argv) {
     else if (a == "--nachahmungs-lohn") o.imitate_reward = static_cast<f32>(std::atof(next()));
     else {
       std::fprintf(stderr,
-                   "usage: kern_lehrer [--task jump|stand] [--envs N] [--threads N] [--iterations 600] [--steps 24] [--seed 1]\n"
+                   "usage: kern_lehrer [--task jump|stand] [--scenario file.json] [--envs N] [--threads N] [--iterations 600] [--steps 24] [--seed 1]\n"
                    "                  [--out task.onnx] [--log log.csv] [--checkpoint run.ckpt] [--resume run.ckpt] [--save-every 25]\n"
                    "                  [--warm-start velstand|none] [--init-std 0.3] [--lr 1e-3] [--entropy 0.005]\n"
                    "                  [--critic 256,128] [--actor 512,256,128] [--epochs 5] [--minibatches 4] [--adaptive-lr 1] [--kl 0.01]\n"
@@ -581,6 +582,18 @@ int main(int argc, char** argv) {
                    "       kern_lehrer --spielen-ueben play.onnx [--iterations 300] [--envs 32] [--out play_geuebt.onnx]   then practise (PPO, the rewards only)\n"
                    "       kern_lehrer --spielen-spur [--seed N] [--randomized] [--netz play.onnx]   one play episode, decision by decision\n"
                    "       kern_lehrer --biss-fenster | --halt-messen   where the beak gets a sock / how far the duck goes after stop\n");
+      return 2;
+    }
+  }
+  if (!o.scenario.empty()) {
+    const std::vector<u8> bytes = read_file(o.scenario);
+    if (bytes.empty() || bytes.size() > 16384) {
+      std::fprintf(stderr, "invalid or oversized scenario file: %s\n", o.scenario.c_str());
+      return 2;
+    }
+    o.task = "scenario:" + std::string(bytes.begin(), bytes.end());
+    if (!make_task(o.task)) {
+      std::fprintf(stderr, "invalid scenario JSON: %s\n", o.scenario.c_str());
       return 2;
     }
   }
@@ -605,7 +618,7 @@ int main(int argc, char** argv) {
   if (o.play == 4) { measure_stop(); return 0; }
   if (o.play == 6) return demo_trace(o);
   if (o.play) return play_train(o);
-  if (o.out.empty()) o.out = o.task + ".onnx";
+  if (o.out.empty()) o.out = o.scenario.empty() ? o.task + ".onnx" : "scenario.onnx";
   const i32 threads = o.threads > 0 ? o.threads : max_of(1, static_cast<i32>(std::thread::hardware_concurrency()));
   if (o.envs <= 0) o.envs = 16 * threads;
   // The task's recipe (recipe.h; the browser trains with the same), then what the command line says.

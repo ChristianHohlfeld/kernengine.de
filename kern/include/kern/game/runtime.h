@@ -405,6 +405,9 @@ class GameWorld {
   /// of its networks (when no skill, pick or sit runs). The servos take it as trained: home + action,
   /// scale 1, no low-pass, through the actuator delay.
   bool set_walker_external(ActorId id, bool on);
+  /// Zero-g keyframe posing: lock the trunk and suspend joint servos while the Box3D
+  /// MouseGrab moves articulated links. Re-enable servos to preview targets.
+  bool set_walker_pose_edit(ActorId id, bool on);
   bool set_walker_action(ActorId id, const f32 action[14]);
   /// The observation walker `id`'s controller builds at its next control tick (robotd's 61, the
   /// command slots 48..60 as last smoothed); no side effects. Exact between ticks: the world is at a

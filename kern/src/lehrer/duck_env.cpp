@@ -48,6 +48,7 @@ i32 DuckEnv::push_interval() {
 void DuckEnv::reset() {
   const Task::Start s = task_->reset(rng_);
   game::Level l = impl_->base;
+  task_->scene(l, rng_);  // fresh deterministic obstacles / objects for each episode
   game::Actor* trunk = l.find(duck_);
   trunk->transform.rotation = {s.roll, s.pitch, s.yaw};
   trunk->transform.position.z += s.dz * game::kWalkerScale;
@@ -94,6 +95,7 @@ void DuckEnv::observe() {
   game::GameWorld& w = *impl_->world;
   w.walker_observation(duck_, obs_.data());
   task_->command(obs_.data(), step_);
+  task_->augment_observation(obs_.data(), probe_);
   // The critic sees the clean state; the actor what the robot's sensors give (noise, bias).
   std::memcpy(critic_.data(), obs_.data(), sizeof(f32) * kObs);
   if (task_->privileged()) task_->privileged(probe_, critic_.data() + kObs);

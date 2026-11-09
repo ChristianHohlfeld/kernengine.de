@@ -58,6 +58,7 @@ struct GameWorld::WalkerBrain {
   u64 step = 0;                    // physics steps since start (the control clock)
   f32 action[14] = {};             // the last action (raw network output)
   bool external = false;           // set_walker_external: the Lehrer's action drives
+  bool pose_edit = false;          // zero-g puppet: mouse joint moves free articulated links
   f32 external_action[14] = {};
   f32 last_obs[61] = {};           // what the controller saw at the last tick
   f32 target[14] = {};             // joint targets of the last control tick (radians)

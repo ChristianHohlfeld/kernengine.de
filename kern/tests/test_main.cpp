@@ -4618,6 +4618,37 @@ class ReachEnv : public lehrer::Env {
 };
 }  // namespace
 
+TEST(lehrer_motion_keyframes_are_valid_and_match_the_50hz_controller) {
+  // A motion is 14 measured servo offsets, with a timed phase (not text/LLM).
+  const std::string spec =
+      R"({"name":"motion_nod","duration":1,"frames":[{"time":0,"joints":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"time":0.5,"joints":[0,0,0,0,0,0,0.4,0,0,0,0,0,0,0]},{"time":1,"joints":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]})";
+  auto task = lehrer::make_motion_task(spec);
+  CHECK(task != nullptr);
+  if (!task) return;
+  CHECK(task->episode_seconds() == 1.0f);
+  f32 a[14] = {}, obs[lehrer::kObs] = {};
+  CHECK(task->reference_action(0, a));
+  CHECK_NEAR(a[6], 0.0f, 1e-5f);
+  CHECK(task->reference_action(25, a));
+  CHECK_NEAR(a[6], 0.4f, 1e-5f);
+  CHECK(task->reference_action(50, a));
+  CHECK_NEAR(a[6], 0.0f, 1e-5f);
+  task->command(obs, 0);
+  CHECK_NEAR(obs[game::kJumpPhaseSlot], 1.0f, 1e-5f);
+  task->command(obs, 25);
+  CHECK_NEAR(obs[game::kJumpPhaseSlot], -1.0f, 1e-4f);
+  CHECK(lehrer::make_motion_task(R"({"duration":1,"frames":[]})") == nullptr);
+  CHECK(lehrer::make_motion_task(R"({"duration":1,"frames":[{"time":0,"joints":[0]},{"time":1,"joints":[0]}]})") == nullptr);
+
+  lehrer::DuckEnv env(lehrer::make_motion_task(spec), 17, game::kWalkerSubsteps);
+  env.task().randomize = false;
+  env.reset();
+  CHECK(env.world().set_walker_pose_edit(env.duck(), true));   // disable motors, fix trunk for mouse joint
+  CHECK(env.world().set_walker_pose_edit(env.duck(), false));  // re-enable real servo law
+  const auto step = env.step(a);
+  CHECK(std::isfinite(step.reward));
+}
+
 TEST(lehrer_ppo_learns_to_reach) {
   lehrer::PpoConfig cfg;
   cfg.actor_hidden = cfg.critic_hidden = {32, 32};
@@ -4960,6 +4991,39 @@ TEST(micro_duck_observation_between_ticks_is_what_its_controller_sees) {
   }
   CHECK(ticks == 100);
   CHECK(worst == 0);
+}
+
+TEST(lehrer_free_scenario_defines_physics_goals_and_rewards) {
+  // No C++ changes per new scenario: the same JSON is supplied to native and WASM workers.
+  const std::string spec = R"({
+    "name":"Obstacle route","duration":3,
+    "start":{"yaw":0,"yawSpread":0},
+    "waypoints":[{"x":0.4,"y":0,"radius":0.12},{"x":0.9,"y":0.2,"radius":0.15}],
+    "objects":[{"kind":"box","x":0.6,"y":0.3,"width":0.15,"depth":0.2,"height":0.2},
+               {"kind":"sphere","x":1.0,"y":0.1,"radius":0.07,"dynamic":true}],
+    "rewards":{"progress":10,"waypoint":8,"finish":20,"upright":2,"fall":-12}
+  })";
+  CHECK(!lehrer::make_scenario_task(R"({"duration":-1})"));
+  CHECK(!lehrer::make_scenario_task(R"({"objects":[{"kind":"script","x":0,"y":0}]})"));
+  CHECK(!lehrer::make_scenario_task(R"({"waypoints":[{"x":1e100,"y":0}]})"));
+  auto scenario = lehrer::make_scenario_task(spec);
+  CHECK(scenario != nullptr);
+  if (!scenario) return;
+  lehrer::DuckEnv standard(lehrer::make_stand_task(), 42);
+  standard.task().randomize = false;
+  standard.reset();
+  lehrer::DuckEnv custom(std::move(scenario), 42);
+  custom.task().randomize = false;
+  custom.reset();
+  CHECK(custom.world().level().actors.size() == standard.world().level().actors.size() + 2);
+  CHECK(std::fabs(custom.observation()[55] - 0.4f) < 0.15f);
+  const f32 actions[lehrer::kActions] = {};
+  for (int i = 0; i < 4; ++i) {
+    const lehrer::Env::Step result = custom.step(actions);
+    CHECK(std::isfinite(result.reward));
+    CHECK(!custom.task().terms.empty());
+    if (result.terminal || result.timeout) break;
+  }
 }
 
 TEST(lehrer_duck_env_runs_episodes_headless) {

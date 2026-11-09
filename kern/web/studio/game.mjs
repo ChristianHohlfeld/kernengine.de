@@ -656,8 +656,16 @@ export class StudioEngine {
    *  the Lehrer saves a newer one (docs/lehrer.md). */
   watchTrainedPolicies() {
     const load = async only => {
-      for (const [file, bytes] of await trainedPolicies(only))
-        if (this.registerPolicy(file, bytes)) console.info("Kern: trained network " + file + " loaded");
+      let learned = {};
+      try { learned = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}"); } catch { /* unavailable */ }
+      for (const [file, bytes] of await trainedPolicies(only)) {
+        if (!this.registerPolicy(file, bytes)) continue;
+        if (learned[file]) {
+          const s = learned[file];
+          this.command({cmd:"motionRegister",name:s.name,file,duration:s.duration});
+        }
+        console.info("Kern: trained network " + file + " loaded");
+      }
     };
     load().catch(() => {});
     try { new BroadcastChannel("kern-lehrer").onmessage = e => load(e.data?.file).catch(() => {}); } catch { /* no channel */ }
