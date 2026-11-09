@@ -1256,13 +1256,28 @@ json::Value Studio::run(const json::Value& c) {
   // Kern Lehrer motion authoring uses this exact Studio/Box3D simulation.
   // MouseGrab, joint limits and the 14 encoder angles are not approximated in JS.
   if (name == "motionBegin") {
-    game::Level l = game::micro_duck_level();
+    // A dedicated puppet scene. No room, furniture, ball, floor or other
+    // pickable objects can get between the finger and the actual Micro Duck.
+    game::Level l = game::empty_level();
+    l.name = "Micro Duck · Posen";
+    l.world.title = "Micro Duck · Keyframes";
     l.world.gravity = {0, 0, 0};
-    for (game::Actor& a : l.actors) if (a.controller) a.controller->autonomous = false;
+    l.world.time_of_day = 0.42f;
+    const ActorId duck = game::add_micro_duck(l, {0, 0, 0});
+    if (auto* actor = l.find(duck); actor && actor->controller)
+      actor->controller->autonomous = false;
+    l.world.player = 0;
+    l.camera.position = {-3.5f, -3.5f, 2.5f};
+    l.camera.yaw = 45.0f;
+    l.camera.pitch = -18.0f;
     load_level(std::move(l));
-    if (!play(game::SimMode::simulate)) return error("Could not start the Micro Duck simulation");
-    for (const game::Actor& a : level_.actors)
-      if (world_->set_walker_external(a.id, true)) world_->set_walker_pose_edit(a.id, true);
+    tool_ = Tool::select;  // don't let transform gizmos intercept mouse/touch drags
+    deselect();
+    if (!play(game::SimMode::simulate))
+      return error("Could not start the Micro Duck simulation");
+    if (!world_->set_walker_external(duck, true) ||
+        !world_->set_walker_pose_edit(duck, true))
+      return error("Could not initialise zero-gravity Box3D pose mode");
     return ok();
   }
   if (name == "motionPose" || name == "motionEdit" || name == "motionPreview") {
