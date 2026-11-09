@@ -685,7 +685,10 @@ std::vector<GameWorld::WalkerJoint> GameWorld::walker_joints(ActorId id) const {
     const SimJoint* sj = j < kJoints ? w->joint[j] : w->mouth;
     if (!sj) continue;
     const DuckLinkDef& l = kDuckLinks[j + 1];
-    out.push_back({l.joint, physics_.joint_angle(sj->joint), l.lower, l.upper});
+    out.push_back({l.joint, physics_.joint_angle(sj->joint), l.lower, l.upper,
+                   physics_.joint_spring_enabled(sj->joint),
+                   physics_.joint_motor_enabled(sj->joint),
+                   physics_.joint_limit_enabled(sj->joint)});
   }
   return out;
 }
