@@ -583,6 +583,25 @@ PolicySet& policy_set() {
   return set;
 }
 
+i32 skill_index(std::string_view name) {
+  const PolicySet& set = policy_set();
+  for (std::size_t i = 0; i < set.skills.size(); ++i)
+    if (set.skills[i].name == name) return static_cast<i32>(i);
+  return -1;
+}
+
+template <class W>
+const char* move_blocked(const W& w) {
+  using Sit = decltype(w.sit);
+  if (w.pick_phase >= 0) return "a ground pick is running";
+  if (w.skill >= 0) return "a scripted move is already running";
+  if (w.sit == Sit::sitting) return "the robot is sitting - stand it up first";
+  if (w.sit == Sit::rising) return "the robot is standing up";
+  return nullptr;
+}
+
+}  // namespace
+
 bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds) {
   if (name.empty() || name.size() > 48 || file.size() < 6 || file.size() > 80 ||
       file.substr(file.size() - 5) != ".onnx" || !std::isfinite(seconds) ||
@@ -615,25 +634,6 @@ bool register_learned_walker_skill(std::string_view name, std::string_view file,
   set.skills.push_back(std::move(skill));
   return true;
 }
-
-i32 skill_index(std::string_view name) {
-  const PolicySet& set = policy_set();
-  for (std::size_t i = 0; i < set.skills.size(); ++i)
-    if (set.skills[i].name == name) return static_cast<i32>(i);
-  return -1;
-}
-
-template <class W>
-const char* move_blocked(const W& w) {
-  using Sit = decltype(w.sit);
-  if (w.pick_phase >= 0) return "a ground pick is running";
-  if (w.skill >= 0) return "a scripted move is already running";
-  if (w.sit == Sit::sitting) return "the robot is sitting - stand it up first";
-  if (w.sit == Sit::rising) return "the robot is standing up";
-  return nullptr;
-}
-
-}  // namespace
 
 std::string GameWorld::walker_skill(ActorId id, std::string_view name) {
   WalkerBrain* w = walker_brain(id);
