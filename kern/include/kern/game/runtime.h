@@ -408,6 +408,9 @@ class GameWorld {
   /// Zero-g keyframe posing: lock the trunk and suspend joint servos while the Box3D
   /// MouseGrab moves articulated links. Re-enable servos to preview targets.
   bool set_walker_pose_edit(ActorId id, bool on);
+  /// While posing, choose a fixed torso (articulate limbs) or a floating torso
+  /// (move the whole duck with the mouse, still at zero gravity).
+  bool set_walker_pose_anchor(ActorId id, bool anchored);
   bool set_walker_action(ActorId id, const f32 action[14]);
   /// The observation walker `id`'s controller builds at its next control tick (robotd's 61, the
   /// command slots 48..60 as last smoothed); no side effects. Exact between ticks: the world is at a
