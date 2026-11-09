@@ -151,6 +151,8 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
       #main{display:flex!important;flex:1;min-height:0;overflow:hidden}
       #viewArea{flex:1!important;width:100%;height:100%;min-height:0}
       #gl,#viewports{width:100%;height:100%}
+      #viewArea .vp{cursor:grab!important;touch-action:none}
+      #viewArea .vp:active{cursor:grabbing!important}
     `;
     document.head.append(style);
     const ready = engine.command({cmd: "motionBegin"});
@@ -158,6 +160,10 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
     window.addEventListener("message", e => {
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type?.startsWith("kern-motion-")) return;
       const m = e.data, send = value => e.source.postMessage({type: "kern-motion-reply", id: m.id, result: value}, e.origin);
+      if (m.type === "kern-motion-ping") {
+        e.source.postMessage({type:"kern-motion-ready",ok:!!ready.ok,error:ready.error},e.origin);
+        return;
+      }
       if (m.type === "kern-motion-capture") send(engine.command({cmd: "motionPose"}));
       if (m.type === "kern-motion-edit") { ++previewId; send(engine.command({cmd: "motionEdit"})); }
       if (m.type === "kern-motion-preview") {
