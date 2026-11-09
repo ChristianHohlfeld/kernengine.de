@@ -4618,6 +4618,37 @@ class ReachEnv : public lehrer::Env {
 };
 }  // namespace
 
+TEST(lehrer_motion_keyframes_are_valid_and_match_the_50hz_controller) {
+  // A motion is 14 measured servo offsets, with a timed phase (not text/LLM).
+  const std::string spec =
+      R"({"name":"motion_nod","duration":1,"frames":[{"time":0,"joints":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"time":0.5,"joints":[0,0,0,0,0,0,0.4,0,0,0,0,0,0,0]},{"time":1,"joints":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]})";
+  auto task = lehrer::make_motion_task(spec);
+  CHECK(task != nullptr);
+  if (!task) return;
+  CHECK(task->episode_seconds() == 1.0f);
+  f32 a[14] = {}, obs[lehrer::kObs] = {};
+  CHECK(task->reference_action(0, a));
+  CHECK_NEAR(a[6], 0.0f, 1e-5f);
+  CHECK(task->reference_action(25, a));
+  CHECK_NEAR(a[6], 0.4f, 1e-5f);
+  CHECK(task->reference_action(50, a));
+  CHECK_NEAR(a[6], 0.0f, 1e-5f);
+  task->command(obs, 0);
+  CHECK_NEAR(obs[game::kJumpPhaseSlot], 1.0f, 1e-5f);
+  task->command(obs, 25);
+  CHECK_NEAR(obs[game::kJumpPhaseSlot], -1.0f, 1e-4f);
+  CHECK(lehrer::make_motion_task(R"({"duration":1,"frames":[]})") == nullptr);
+  CHECK(lehrer::make_motion_task(R"({"duration":1,"frames":[{"time":0,"joints":[0]},{"time":1,"joints":[0]}]})") == nullptr);
+
+  lehrer::DuckEnv env(lehrer::make_motion_task(spec), 17, game::kWalkerSubsteps);
+  env.task().randomize = false;
+  env.reset();
+  CHECK(env.world().set_walker_pose_edit(env.duck(), true));   // disable motors, fix trunk for mouse joint
+  CHECK(env.world().set_walker_pose_edit(env.duck(), false));  // re-enable real servo law
+  const auto step = env.step(a);
+  CHECK(std::isfinite(step.reward));
+}
+
 TEST(lehrer_ppo_learns_to_reach) {
   lehrer::PpoConfig cfg;
   cfg.actor_hidden = cfg.critic_hidden = {32, 32};
