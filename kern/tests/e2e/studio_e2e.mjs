@@ -784,6 +784,38 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await ctx.close();
 }
 
+// ---- Lehrer: the real embedded zero-gravity puppet must be visible and poseable ----------------
+{
+  const ctx = await browser.newContext({viewport:{width:1100,height:900}});
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(base + "/_site/lehrer/");
+  check(await page.locator("#task").inputValue() === "motion", "Lehrer opens on keyframe authoring");
+  check(await page.locator("#motionPanel").isVisible() &&
+        await page.locator("#scenarioPanel").isHidden(), "Lehrer shows its 3D puppet instead of the scenario editor");
+  check(await page.locator("#motionTrain").isDisabled(), "training is disabled before the keyframes exist");
+  await page.locator("#motionStudio").scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => {
+    const win = document.getElementById("motionStudio")?.contentWindow;
+    return win?.KernStudio && win.KernStudio.command({cmd:"motionPose"}).joints?.length === 14;
+  }, null, {timeout:120000});
+  const pose = await page.evaluate(() =>
+    document.getElementById("motionStudio").contentWindow.KernStudio.command({cmd:"motionPose"}));
+  check(pose.ok && pose.joints.length === 14, "embedded Studio captures fourteen physically measured joints");
+  check(!errors.length, "no JS errors while the free-pose rig starts: " + errors.join(" | "));
+  await page.locator("#motionCapture").click();
+  check(await page.locator("#motionTrain").isDisabled(), "one keyframe is insufficient for training");
+  await page.locator("#motionTime").fill("1.2");
+  await page.locator("#motionCapture").click();
+  check(await page.locator("#motionTrain").isEnabled(), "complete keyframe sequence unlocks training");
+  await page.locator("#motionAnchor").uncheck();
+  const floating = await page.evaluate(() =>
+    document.getElementById("motionStudio").contentWindow.KernStudio.command({cmd:"motionPose"}));
+  check(floating.ok, "floating torso remains poseable in zero gravity");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`${checks} checks, ${failures} failures (screenshots: ${shots})`);
 process.exit(failures ? 1 : 0);

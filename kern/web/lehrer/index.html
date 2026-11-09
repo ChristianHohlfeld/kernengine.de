@@ -52,6 +52,12 @@ details p { margin: 6px 0; }
 .motion-preview{width:100%;height:440px;min-height:300px;border:1px solid var(--line2);border-radius:8px;background:#151516}
 .motion-frame{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .motion-frame button{font-weight:500;text-align:left}
+.motion-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:10px 0}
+.motion-controls label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--text-hi)}
+.motion-controls input[type="checkbox"]{width:18px;height:18px;min-height:18px;accent-color:var(--accent)}
+#motionFrameList:empty::after{content:"Noch keine Keyframes. Pose modellieren und speichern.";color:var(--dim);font-size:12px}
+#motionTrain{min-width:240px}
+
 @media(max-width:640px){.motion-preview{height:340px}.motion-frame{grid-template-columns:1fr}}
 
 </style>
@@ -94,13 +100,14 @@ details p { margin: 6px 0; }
   </section>
   <section class="panel" id="motionPanel">
     <h2 style="font-size:17px;margin:0 0 6px;color:var(--text-hi)">Bewegung vormachen</h2>
-    <p style="color:var(--dim);margin:0 0 12px">Echte Micro Duck in Box3D, ohne Schwerkraft. Ziehe den Kopf oder Körper mit der Maus an den Gelenken. Speichere die Posen zu verschiedenen Zeitpunkten. Das Training läuft anschließend mit Erdschwerkraft.</p>
+    <p style="color:var(--dim);margin:0 0 12px">1. Ente ohne Gravitation bewegen. 2. Gelenkpose am gewünschten Zeitpunkt speichern. 3. Alle Posen festlegen. 4. Erst dann das Netz trainieren. Keine aktiven Servomotoren beim Modellieren – die echten Box3D-Gelenkgrenzen bleiben.</p>
     <div class="controls" style="grid-template-columns:minmax(170px,2fr) repeat(2,minmax(120px,1fr));margin-bottom:12px">
       <label>Bewegungsname <input id="motionName" maxlength="48" value="Kopfnicken" placeholder="z. B. Kopfnicken"></label>
       <label>Dauer (Sekunden) <input id="motionDuration" type="number" min=".3" max="15" step=".1" value="1.2"></label>
       <label>Keyframe bei Sekunde <input id="motionTime" type="number" min="0" max="15" step=".1" value="0"></label>
     </div>
-    <iframe id="motionStudio" title="Kern Studio · physikalische Micro Duck" class="motion-preview" src="../editor/?motion=1" loading="lazy"></iframe>
+    <div class="motion-controls"><label><input type="checkbox" id="motionAnchor" checked> Rumpf fixieren (Gelenke bewegen)</label><span style="font-size:12px;color:var(--dim)">Ausschalten: ganze Ente frei bewegen. Alt + Ziehen: Kamera drehen.</span></div>
+    <iframe id="motionStudio" title="Kern Studio · frei bewegliche Box3D Micro Duck" class="motion-preview" src="../editor/?motion=1" loading="eager"></iframe>
     <div class="buttons">
       <button id="motionCapture" type="button">Aktuelle Pose als Keyframe speichern</button>
       <button id="motionReset" type="button">Ente zurücksetzen</button>
@@ -108,8 +115,10 @@ details p { margin: 6px 0; }
       <button id="motionTest" type="button" disabled>Netz an der Ente testen</button>
     </div>
     <p id="motionStatus" style="color:var(--dim);margin:10px 0">3D-Ente wird geladen …</p>
+    <h3 style="font-size:14px;color:var(--text-hi);margin:14px 0 4px">Keyframes – zeitliche Sollposen fürs Training</h3>
     <div id="motionFrames" class="motion-frame"></div>
-    <p style="font-size:12px;color:var(--dim);margin:12px 0 0">Erster Keyframe: 0 s. Letzter Keyframe: Ende der Bewegung. Dazwischen beliebige Posen. Das Netz erhält die Bewegungsphase als Kommando (Eingänge 55/56), nicht als erfundenen Sensor. Die reale Roboter-Hardware muss denselben Phasenbefehl und die Servogrenzen unterstützen.</p>
+    <div class="buttons"><button id="motionTrain" class="go" type="button" disabled>Alle Keyframes trainieren → ONNX</button></div>
+    <p style="font-size:12px;color:var(--dim);margin:12px 0 0">Der erste Keyframe muss bei 0 s liegen, der letzte am Bewegungsende. Zwischenposen sind frei. Aufgezeichnet werden die 14 Policy-Gelenke samt echten Winkeln; das Maul ist ein separater 15. Servo. Die Bewegung wird später mit Erdschwerkraft in Box3D trainiert. Die Phase läuft über Eingänge 55/56.</p>
   </section>
   <section class="panel" id="scenarioPanel" hidden>
     <h2 style="font-size:17px;margin:0 0 12px;color:var(--text-hi)">Freies Trainingsszenario</h2>

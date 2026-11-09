@@ -685,7 +685,10 @@ std::vector<GameWorld::WalkerJoint> GameWorld::walker_joints(ActorId id) const {
     const SimJoint* sj = j < kJoints ? w->joint[j] : w->mouth;
     if (!sj) continue;
     const DuckLinkDef& l = kDuckLinks[j + 1];
-    out.push_back({l.joint, physics_.joint_angle(sj->joint), l.lower, l.upper});
+    out.push_back({l.joint, physics_.joint_angle(sj->joint), l.lower, l.upper,
+                   physics_.joint_spring_enabled(sj->joint),
+                   physics_.joint_motor_enabled(sj->joint),
+                   physics_.joint_limit_enabled(sj->joint)});
   }
   return out;
 }
@@ -760,10 +763,49 @@ bool GameWorld::set_walker_external(ActorId id, bool on) {
 bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
   WalkerBrain* w = walker_brain(id);
   if (!w) return false;
-  if (w->pose_edit != on) {
-    w->pose_edit = on;
-    physics_.set_body_type(w->trunk, on ? physics::BodyType::fixed : physics::BodyType::dynamic);
+  if (w->pose_edit == on) return true;
+  // The real servo_step has already installed a spring AND a friction motor in Box3D.
+  // Merely skipping servo_step in pose mode leaves both constraints alive forever.
+  grab_.end();
+  w->pose_edit = on;
+  if (on) {
+    physics_.set_body_type(w->trunk, physics::BodyType::fixed);
+    auto release = [&](const SimJoint* sj) {
+      if (!sj || !sj->joint.valid()) return;
+      physics_.set_joint_spring(sj->joint, 0, 0, 0);
+      physics_.set_joint_motor(sj->joint, false, 0, 0);
+    };
+    for (const SimJoint* sj : w->joint) release(sj);
+    release(w->mouth);
+    // Returning from a motorised preview must not send the puppet coasting.
+    // This is an instantaneous velocity reset, not a continuous pose controller.
+    for (const physics::Body& body : w->bodies) {
+      if (!body.valid() || physics_.body_type(body) != physics::BodyType::dynamic) continue;
+      physics_.set_linear_velocity(body, {});
+      physics_.set_angular_velocity(body, {});
+    }
+    w->driving = "pose";
+  } else {
+    physics_.set_body_type(w->trunk, physics::BodyType::dynamic);
+    // Resume at the user's actual measured pose, not at the old home-pose
+    // command from before free editing. Preview may replace the target next tick.
+    for (i32 j = 0; j < kJoints; ++j) {
+      w->target[j] = physics_.joint_angle(w->joint[j]->joint);
+      w->previous_target[j] = w->target[j];
+      w->joint[j]->servo_target = w->target[j];
+    }
+    for (auto& pending : w->pending)
+      for (i32 j = 0; j < kJoints; ++j) pending[static_cast<std::size_t>(j)] = w->target[j];
+    w->has_previous = false;
   }
+  return true;
+}
+
+bool GameWorld::set_walker_pose_anchor(ActorId id, bool anchored) {
+  WalkerBrain* w = walker_brain(id);
+  if (!w || !w->pose_edit) return false;
+  grab_.end();
+  physics_.set_body_type(w->trunk, anchored ? physics::BodyType::fixed : physics::BodyType::dynamic);
   return true;
 }
 
@@ -1292,6 +1334,9 @@ void GameWorld::drive_walkers(f32 h) {
   const f32 slow = std::sqrt(kDuckScale);  // simulated time runs this much slower than real time
   for (auto& wp : walkers_) {
     WalkerBrain& w = *wp;
+    // Posing is passive: no policy, no controller, no servo commands, no idle pose.
+    // The hard Box3D revolute limits are still solved at every physics step.
+    if (w.pose_edit) { ++w.step; continue; }
     if (w.step % w.decimation == 0) {
       // ---- one control tick (50 Hz real): observation -> policy -> joint targets ----------------
       // Who drives: the player's stick, then a Logic command, then the autonomous brain.

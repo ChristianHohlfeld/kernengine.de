@@ -1256,17 +1256,46 @@ json::Value Studio::run(const json::Value& c) {
   // Kern Lehrer motion authoring uses this exact Studio/Box3D simulation.
   // MouseGrab, joint limits and the 14 encoder angles are not approximated in JS.
   if (name == "motionBegin") {
-    game::Level l = game::micro_duck_level();
+    // The example level is a cluttered room with floor, toys, self-collision,
+    // autonomous behaviour and a logic graph. It is NOT a pose rig.
+    // Use an isolated floating puppet with zero gravity and no surrounding colliders.
+    game::Level l = game::empty_level();
+    l.name = "Micro Duck - Freies Posieren";
+    l.world.title = l.name;
     l.world.gravity = {0, 0, 0};
-    for (game::Actor& a : l.actors) if (a.controller) a.controller->autonomous = false;
+    l.world.ground = false;
+    l.world.time_of_day = 0.42f;
+    l.camera.position = {-3.0f, -3.8f, 2.8f};
+    l.camera.yaw = 51.0f;
+    l.camera.pitch = -23.0f;
+    const game::ActorId duck = game::add_micro_duck(l, {0, 0, 0.45f});
+    if (!duck) return error("Could not create Micro Duck");
+    for (game::Actor& a : l.actors) {
+      // A pose rig is limited by its hinges, NOT by the floor or by shell-to-shell
+      // collisions. All inertial rigid bodies and their revolute joints remain.
+      a.colliders.clear();
+      if (a.mesh) a.mesh->collision = false;
+      if (a.controller) { a.controller->autonomous = false; a.controller->kern_extras = false; }
+    }
     load_level(std::move(l));
     if (!play(game::SimMode::simulate)) return error("Could not start the Micro Duck simulation");
-    for (const game::Actor& a : level_.actors)
-      if (world_->set_walker_external(a.id, true)) world_->set_walker_pose_edit(a.id, true);
+    if (!world_->set_walker_external(duck, true) || !world_->set_walker_pose_edit(duck, true))
+      return error("Micro Duck puppet joints could not be released");
     return ok();
+  }
+  if (name == "motionAnchor") {
+    if (play_ != PlayState::simulating || !c["anchored"].is_bool())
+      return error("Start posing and select a valid torso anchor");
+    for (const game::Actor& a : level_.actors) {
+      game::GameWorld::WalkerProbe p;
+      if (world_->walker_probe(a.id, p))
+        return ok(world_->set_walker_pose_anchor(a.id, c["anchored"].as_bool()));
+    }
+    return error("No Micro Duck to anchor");
   }
   if (name == "motionPose" || name == "motionEdit" || name == "motionPreview") {
     if (play_ != PlayState::simulating) return error("Start motion posing first");
+    if (name == "motionPose") world_->end_grab();  // stop drift before capturing the timed target
     for (const game::Actor& a : level_.actors) {
       game::GameWorld::WalkerProbe p;
       if (!world_->walker_probe(a.id, p)) continue;

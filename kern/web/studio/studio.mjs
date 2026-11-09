@@ -159,6 +159,7 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
       if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type?.startsWith("kern-motion-")) return;
       const m = e.data, send = value => e.source.postMessage({type: "kern-motion-reply", id: m.id, result: value}, e.origin);
       if (m.type === "kern-motion-capture") send(engine.command({cmd: "motionPose"}));
+      if (m.type === "kern-motion-anchor") send(engine.command({cmd: "motionAnchor", anchored: !!m.anchored}));
       if (m.type === "kern-motion-edit") { ++previewId; send(engine.command({cmd: "motionEdit"})); }
       if (m.type === "kern-motion-preview") {
         const result = engine.command({cmd: "motionPreview", joints: m.joints});
