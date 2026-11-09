@@ -2651,7 +2651,26 @@ bool GameWorld::begin_grab(ActorId actor, Vec3 point) {
   return grab_.begin(physics_, it->second->body, point, posing ? 15.0f : 7.5f, trunk && !posing);
 }
 void GameWorld::move_grab(Vec3 target) { grab_.set_target(target); }
-void GameWorld::end_grab() { grab_.end(); }
+void GameWorld::end_grab() {
+  const physics::Body grabbed = grab_.body();
+  grab_.end();
+  // A gesture editor must preserve the pose after releasing the mouse.
+  // Remove inertial drift once, not by reintroducing a motor or a spring.
+  if (!grabbed.valid()) return;
+  for (const auto& w : walkers_) {
+    if (!w->pose_edit) continue;
+    bool part = false;
+    for (const physics::Body& b : w->bodies)
+      if (b.valid() && b.id == grabbed.id) { part = true; break; }
+    if (!part) continue;
+    for (const physics::Body& b : w->bodies) {
+      if (!b.valid() || physics_.body_type(b) != physics::BodyType::dynamic) continue;
+      physics_.set_linear_velocity(b, {});
+      physics_.set_angular_velocity(b, {});
+    }
+    break;
+  }
+}
 
 void GameWorld::debug_lines(bool colliders, bool contacts, bool joints, std::vector<f32>& p, std::vector<f32>& c) const {
   const Vec3 kStatic{0.45f, 0.85f, 0.45f}, kKinematic{0.45f, 0.65f, 1.0f}, kDynamic{1.0f, 0.62f, 0.25f}, kSensor{0.85f, 0.4f, 1.0f}, kSleep{0.55f, 0.55f, 0.55f};
