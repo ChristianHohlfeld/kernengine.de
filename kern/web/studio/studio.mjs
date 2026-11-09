@@ -182,8 +182,45 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   }
   applyAudioPrefs(engine);  // music / effects switches remembered on this device
   window.KernStudio = page.api();
-  engine.loadPolicies().catch(() => {});  // the robot's moves (sit, pick, kicks, roll, rollers)
+  engine.loadPolicies().then(() => mountLearnedMotions(engine, page)).catch(() => {});  // including dynamic Lehrer skills
   return page;
+}
+
+/** Learned ONNX skills are callable on any Micro Duck in the current level.
+ * No manifest edit, C++ rebuild or fixed UI button is required for each one. */
+function mountLearnedMotions(engine, page) {
+  if (new URLSearchParams(location.search).has("motion")) return;  // the embedded puppet has its own controls
+  const el = document.createElement("aside");
+  el.id = "learnedMotions";
+  el.style.cssText = "position:absolute;left:14px;bottom:14px;z-index:5;background:#1c1c1ee8;color:#eee;border:1px solid #444;border-radius:9px;padding:9px;max-width:270px;font:12px system-ui;display:none;box-shadow:0 4px 16px #0006";
+  $("#viewArea").append(el);
+  function refresh() {
+    let skills = {};
+    try { skills = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}"); } catch { return; }
+    el.replaceChildren();
+    const records = Object.values(skills).filter(s=>s && typeof s.name==="string" && typeof s.file==="string" && Number.isFinite(s.duration));
+    el.style.display = records.length ? "block" : "none";
+    if (!records.length) return;
+    const title = document.createElement("div");
+    title.textContent = "Gelernte Bewegungen";
+    title.style.cssText = "font-weight:650;margin-bottom:6px";
+    el.append(title);
+    for (const skill of records) {
+      const btn = document.createElement("button");
+      btn.textContent = skill.name.replace(/^motion_/, "").replace(/_/g," ");
+      btn.type = "button";
+      btn.style.cssText = "margin:2px 4px 3px 0;padding:5px 8px;color:#eee;border:1px solid #555;border-radius:6px;background:#303034;cursor:pointer";
+      btn.onclick = () => {
+        const reg = engine.command({cmd:"motionRegister",name:skill.name,file:skill.file,duration:skill.duration});
+        const r = reg.ok ? engine.command({cmd:"motionPlay",name:skill.name}) : reg;
+        if (!r.ok) page.toast("Bewegung: " + (r.error || "Netz noch nicht geladen"));
+      };
+      el.append(btn);
+    }
+  }
+  refresh();
+  addEventListener("storage", e => {if(e.key==="kern-lehrer.motion-skills.v1")refresh();});
+  try { new BroadcastChannel("kern-lehrer").onmessage = refresh; } catch { /* unsupported */ }
 }
 
 class StudioPage {
