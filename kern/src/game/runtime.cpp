@@ -2638,13 +2638,44 @@ bool GameWorld::begin_grab(ActorId actor, Vec3 point) {
   const ActorId owner = level_.body_owner(actor) ? level_.body_owner(actor) : actor;
   auto it = body_of_actor_.find(owner);
   if (it == body_of_actor_.end() || !it->second->body.valid()) return false;
-  // A walker held by its trunk is held like a hand holds the robot: upright, not swinging on a point.
-  bool trunk = false;
-  for (const auto& w : walkers_) trunk = trunk || w->trunk.id == it->second->body.id;
-  return grab_.begin(physics_, it->second->body, point, 7.5f, trunk);
+  bool trunk = false, posing = false;
+  for (const auto& w : walkers_) {
+    if (w->trunk != it->second->body) continue;
+    trunk = true;
+    if (w->pose_edit) return false;  // the puppet's trunk is pinned by design
+  }
+  for (const auto& w : walkers_) {
+    if (!w->pose_edit) continue;
+    for (const physics::Body b : w->bodies)
+      if (b == it->second->body) { posing = true; break; }
+  }
+  // Damped, responsive Box3D mouse motor during keyframe authoring. It never
+  // teleports the link: the solver and physical hinge limits do all movement.
+  return grab_.begin(physics_, it->second->body, point, posing ? 16.0f : 7.5f, trunk);
 }
 void GameWorld::move_grab(Vec3 target) { grab_.set_target(target); }
-void GameWorld::end_grab() { grab_.end(); }
+void GameWorld::end_grab() {
+  if (!grab_.active()) return;
+  const physics::Body released = grab_.body();
+  grab_.end();
+  for (auto& w : walkers_) {
+    if (!w->pose_edit) continue;
+    bool ours = false;
+    for (const physics::Body b : w->bodies) if (b == released) { ours = true; break; }
+    if (!ours) continue;
+    // Latch the *measured* Box3D angles at release, never the mouse target
+    // (which could be unreachable because of hard physical joint limits).
+    for (i32 j = 0; j < 14; ++j)
+      w->pose_hold[j] = physics_.joint_angle(w->joint[j]->joint);
+    if (w->mouth) w->pose_mouth_hold = physics_.joint_angle(w->mouth->joint);
+    for (const physics::Body b : w->bodies) {
+      if (!b.valid()) continue;
+      physics_.set_linear_velocity(b, {});
+      physics_.set_angular_velocity(b, {});
+    }
+    break;
+  }
+}
 
 void GameWorld::debug_lines(bool colliders, bool contacts, bool joints, std::vector<f32>& p, std::vector<f32>& c) const {
   const Vec3 kStatic{0.45f, 0.85f, 0.45f}, kKinematic{0.45f, 0.65f, 1.0f}, kDynamic{1.0f, 0.62f, 0.25f}, kSensor{0.85f, 0.4f, 1.0f}, kSleep{0.55f, 0.55f, 0.55f};
