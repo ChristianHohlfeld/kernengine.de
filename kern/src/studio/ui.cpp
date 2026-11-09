@@ -1226,6 +1226,17 @@ json::Value Studio::run(const json::Value& c) {
 
   if (name == "motionRegister")
     return ok(game::register_learned_walker_skill(str("name"), str("file"), static_cast<f32>(num("duration"))));
+  if (name == "motionPlay") {
+    if (play_ == PlayState::editing && !play(game::SimMode::simulate))
+      return error("Could not start simulation");
+    for (const game::Actor& a : level_.actors) {
+      game::GameWorld::WalkerProbe p;
+      if (!world_->walker_probe(a.id, p)) continue;
+      const std::string failure = world_->walker_skill(a.id, str("name"));
+      return failure.empty() ? ok() : error(failure);
+    }
+    return error("This level has no Micro Duck");
+  }
   if (name == "motionRun") {
     if (str("name").empty()) return error("Missing learned skill name");
     game::Level l = game::micro_duck_level();  // restore Earth gravity for genuine execution
