@@ -140,6 +140,40 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   const engine = new StudioEngine(kern);
   const page = new StudioPage(kern, engine, () => base64 ?? toBase64(bytes));
   page.start();
+  // Embedded real-time Box3D puppet for Kern Lehrer. All posing happens inside
+  // the actual Studio renderer / GameWorld; the parent only records encoder data.
+  if (new URLSearchParams(location.search).has("motion")) {
+    const style = document.createElement("style");
+    style.textContent = \`
+      #titlebar,#toolbar,#side,#sideSplit,#drawer,#statusbar,#touchExit,#touchPause{display:none!important}
+      html,body,#app{width:100%;height:100%;overflow:hidden}
+      #app{display:flex!important;flex-direction:column}
+      #main{display:flex!important;flex:1;min-height:0;overflow:hidden}
+      #viewArea{flex:1!important;width:100%;height:100%;min-height:0}
+      #gl,#viewports{width:100%;height:100%}
+    \`;
+    document.head.append(style);
+    const ready = engine.command({cmd: "motionBegin"});
+    let previewId = 0;
+    window.addEventListener("message", e => {
+      if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type?.startsWith("kern-motion-")) return;
+      const m = e.data, send = value => e.source.postMessage({type: "kern-motion-reply", id: m.id, result: value}, e.origin);
+      if (m.type === "kern-motion-capture") send(engine.command({cmd: "motionPose"}));
+      if (m.type === "kern-motion-edit") { ++previewId; send(engine.command({cmd: "motionEdit"})); }
+      if (m.type === "kern-motion-preview") {
+        const result = engine.command({cmd: "motionPreview", joints: m.joints});
+        const ticket = ++previewId;
+        setTimeout(() => { if (ticket === previewId) engine.command({cmd: "motionEdit"}); }, 850);
+        send(result);
+      }
+      if (m.type === "kern-motion-run") {
+        const register = engine.command({cmd: "motionRegister", name: m.name, file: m.file, duration: m.duration});
+        send(register.ok ? engine.command({cmd: "motionRun", name: m.name}) : register);
+      }
+      if (m.type === "kern-motion-restart") send(engine.command({cmd: "motionBegin"}));
+    });
+    window.parent.postMessage({type:"kern-motion-ready", ok:!!ready.ok, error:ready.error}, location.origin);
+  }
   applyAudioPrefs(engine);  // music / effects switches remembered on this device
   window.KernStudio = page.api();
   engine.loadPolicies().catch(() => {});  // the robot's moves (sit, pick, kicks, roll, rollers)
