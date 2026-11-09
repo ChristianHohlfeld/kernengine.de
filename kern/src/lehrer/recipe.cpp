@@ -11,6 +11,7 @@ f32 Recipe::push_scale(i32 iteration) const { return iteration < 300 ? 0.0f : it
 std::unique_ptr<Task> make_task(const std::string& name) {
   if (name == "jump") return make_jump_task();
   if (name == "stand") return make_stand_task();
+  if (name.compare(0, 9, "scenario:") == 0) return make_scenario_task(name.substr(9));
   return nullptr;
 }
 
@@ -24,6 +25,14 @@ Recipe recipe_for(const std::string& task) {
   r.task = task;
   r.substeps = game::kWalkerSubsteps;
   r.ppo.critic_hidden = {256, 128};
+  if (task.compare(0, 9, "scenario:") == 0) {
+    // Pollen-style: begin with standing balance; two goal-vector command inputs are fresh.
+    r.warm_start = "velstand";
+    r.ppo.init_std = 0.25f;
+    r.ppo.learning_rate = 1e-4f;
+    r.ppo.steps_per_env = 48;
+    r.ppo.entropy_coef = 0.005f;
+  }
   if (task == "jump") {
     // From velstand's balance (warm start); imitation of the built-in demonstration (vorbild.h),
     // then practice: small action noise, a careful learning rate, the demonstration's reward.
