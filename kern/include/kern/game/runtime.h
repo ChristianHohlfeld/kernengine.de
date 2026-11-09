@@ -441,7 +441,11 @@ class GameWorld {
   /// The last call its voice made ("greet", "chirp", "wheee", ...), "" before the first.
   std::string walker_said(ActorId id) const;
   /// Its servo joints now (radians, the MJCF angle) with their ranges: the policy's 14, the mouth.
-  struct WalkerJoint { std::string name; f32 angle = 0, lower = 0, upper = 0; };
+  struct WalkerJoint {
+    std::string name;
+    f32 angle = 0, lower = 0, upper = 0;
+    bool spring = false, motor = false, limit = false;
+  };
   std::vector<WalkerJoint> walker_joints(ActorId id) const;
   // ---- Kern's play layer (walker_play.cpp): ball and sock, a learned network (docs/lehrer.md) ------
   static constexpr i32 kPlayObs = 23, kPlayActions = 9;
