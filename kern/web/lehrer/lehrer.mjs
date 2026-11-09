@@ -146,6 +146,17 @@ const motionPending = new Map();
 let motionFrames = [];
 let latestMotion = null;
 const motionFrame = $("motionStudio");
+let motionHandshakeAttempts = 0;
+function pingMotion() {
+  if (motionReady || ++motionHandshakeAttempts > 20) {
+    if (!motionReady) motionStatus("Die 3D-Ente ist nicht erreichbar. Studio bitte neu laden.");
+    return;
+  }
+  motionFrame.contentWindow?.postMessage({type:"kern-motion-ping"}, location.origin);
+  setTimeout(pingMotion, 650);
+}
+setTimeout(pingMotion, 200); // survives both fast cached and slow WASM iframe startup
+
 function motionTell(type, data = {}) {
   if (!motionReady) return Promise.reject(Error("3D-Ente ist noch nicht bereit"));
   return new Promise((resolve, reject) => {
@@ -193,8 +204,20 @@ window.addEventListener("message", event => {
   if (event.origin !== location.origin || event.source !== motionFrame.contentWindow) return;
   if (event.data?.type === "kern-motion-ready") {
     motionReady = !!event.data.ok;
-    motionStatus(motionReady ? "Ente bereit: Kopf oder Gliedmaß mit der Maus ziehen, dann Pose speichern." :
-      "Studio-Fehler: " + (event.data.error || "unbekannt"));
+    if (!motionReady) {
+      motionStatus("Studio-Fehler: " + (event.data.error || "unbekannt"));
+    } else {
+      motionStatus("Bereit: Ente ziehen, loslassen, Keyframe speichern.");
+      if (!motionFrames.some(f => f.time === 0)) {
+        motionTell("capture").then(result => {
+          if (!motionFrames.some(f => f.time === 0)) {
+            motionFrames.unshift({time:0, joints:result.joints});
+            $("motionTime").value = $("motionDuration").value;
+            renderMotionFrames();
+          }
+        }).catch(error => motionStatus(error.message));
+      }
+    }
   } else if (event.data?.type === "kern-motion-reply") {
     const done = motionPending.get(event.data.id);
     if (done) { motionPending.delete(event.data.id); done(event.data.result); }
@@ -213,7 +236,7 @@ $("motionCapture").onclick = async () => {
     motionFrames.push({time,joints});
     motionFrames.sort((a,b)=>a.time-b.time);
     renderMotionFrames();
-    $("motionTime").value = String(Math.min(duration, Math.round((time + .2)*100)/100));
+    $("motionTime").value = String(duration);  // default to end, intermediates remain editable
   } catch (error) { motionStatus(error.message); }
 };
 $("motionReset").onclick = () => motionTell("restart").then(()=>motionStatus("Ente zurückgesetzt. Keyframes bleiben erhalten.")).catch(e=>motionStatus(e.message));
@@ -334,6 +357,9 @@ $("task").addEventListener("change", () => {
   $("s-jump").textContent = "–";
 });
 setScenario(DEFAULT_SCENARIO);
+// Do not restore a prior scenario selection over the visible keyframe editor.
+// Users can still choose every other task explicitly afterwards.
+$("task").value = "motion";
 $("task").dispatchEvent(new Event("change"));
 $("scExample").onclick = () => setScenario(DEFAULT_SCENARIO);
 $("scApply").onclick = () => {
