@@ -88,6 +88,8 @@ class Task {
   }
   /// Whether the last episode ended by meeting the task goal, not by a fall.
   virtual bool succeeded() const { return false; }
+  /// Optional 50 Hz pose reference; angles are servo actions relative to home.
+  virtual bool reference_action(i32 step, f32 action[kActions]) const { (void)step; (void)action; return false; }
   /// Writes the command slots 48..60 of the observation (the unified layout: twist, head, body) for
   /// control tick `step` of the episode (0 = its first).
   virtual void command(f32 observation[kObs], i32 step) { (void)step; for (i32 i = 48; i < kObs; ++i) observation[i] = 0; }
@@ -113,6 +115,8 @@ std::unique_ptr<Task> make_jump_task(const JumpDemo* demo = nullptr, f32 imitate
 std::unique_ptr<Task> make_stand_task();
 /// Runtime-defined scenario JSON; rejected unless the schema and numeric limits are valid.
 std::unique_ptr<Task> make_scenario_task(const std::string& spec);
+/// Physically tracked keyframe motion, authored using the Studio MouseGrab.
+std::unique_ptr<Task> make_motion_task(const std::string& spec);
 
 /// An environment the Lehrer learns in: reset, then observation / step. The actor sees
 /// observation() (obs_size), the critic critic() (critic_size, the actor's first).
