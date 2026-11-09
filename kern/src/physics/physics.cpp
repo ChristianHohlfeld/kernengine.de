@@ -477,6 +477,22 @@ f32 World::joint_angle(Joint joint) const {
   return b3Joint_GetType(id) == b3_revoluteJoint ? b3RevoluteJoint_GetAngle(id) : 0.0f;
 }
 
+bool World::joint_spring_enabled(Joint joint) const {
+  if (!joint_valid(joint)) return false;
+  const b3JointId id = joint_id(joint);
+  return b3Joint_GetType(id) == b3_revoluteJoint && b3RevoluteJoint_IsSpringEnabled(id);
+}
+bool World::joint_motor_enabled(Joint joint) const {
+  if (!joint_valid(joint)) return false;
+  const b3JointId id = joint_id(joint);
+  return b3Joint_GetType(id) == b3_revoluteJoint && b3RevoluteJoint_IsMotorEnabled(id);
+}
+bool World::joint_limit_enabled(Joint joint) const {
+  if (!joint_valid(joint)) return false;
+  const b3JointId id = joint_id(joint);
+  return b3Joint_GetType(id) == b3_revoluteJoint && b3RevoluteJoint_IsLimitEnabled(id);
+}
+
 void World::set_joint_motor(Joint joint, bool enable, f32 speed, f32 max_force) {
   if (!joint_valid(joint)) return;
   const b3JointId id = joint_id(joint);
