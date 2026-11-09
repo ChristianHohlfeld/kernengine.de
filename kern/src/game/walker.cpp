@@ -761,8 +761,24 @@ bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
   WalkerBrain* w = walker_brain(id);
   if (!w) return false;
   if (w->pose_edit != on) {
+    // Authoring is not an idle policy: stop all velocities and hold the physical
+    // hinge angles where the user left them. Normal play and the PPO servo model
+    // are untouched. Box3D's revolute joint limits stay enabled throughout.
+    if (on) {
+      for (i32 j = 0; j < kJoints; ++j) {
+        const SimJoint* sj = w->joint[j];
+        w->pose_hold[j] = clamp(physics_.joint_angle(sj->joint),
+                                kDuckLinks[j + 1].lower, kDuckLinks[j + 1].upper);
+      }
+      if (w->mouth) w->pose_mouth_hold = physics_.joint_angle(w->mouth->joint);
+    }
     w->pose_edit = on;
     physics_.set_body_type(w->trunk, on ? physics::BodyType::fixed : physics::BodyType::dynamic);
+    if (on) for (const physics::Body b : w->bodies) {
+      if (!b.valid()) continue;
+      physics_.set_linear_velocity(b, {});
+      physics_.set_angular_velocity(b, {});
+    }
   }
   return true;
 }
@@ -1292,6 +1308,12 @@ void GameWorld::drive_walkers(f32 h) {
   const f32 slow = std::sqrt(kDuckScale);  // simulated time runs this much slower than real time
   for (auto& wp : walkers_) {
     WalkerBrain& w = *wp;
+    if (w.pose_edit) {
+      // No inference, delayed servo targets or autoplay while posing. Only the
+      // Box3D MouseGrab and the deliberately held joint angles drive the model.
+      ++w.step;
+      continue;
+    }
     if (w.step % w.decimation == 0) {
       // ---- one control tick (50 Hz real): observation -> policy -> joint targets ----------------
       // Who drives: the player's stick, then a Logic command, then the autonomous brain.
@@ -1493,18 +1515,36 @@ void GameWorld::drive_walkers(f32 h) {
 
 void GameWorld::drive_servos(f32 h) {
   (void)h;
-  // The servos' device model (servo.h): one law for the Studio, the Lehrer and the calibration rig.
+  // All non-authoring robots keep the identical physical XL330 servo law.
   for (auto& sj : joints_) {
     if (!sj->servo || sj->broken || !sj->joint.valid()) continue;
     bool posing = false;
     for (const auto& w : walkers_) {
       if (!w->pose_edit) continue;
-      if (w->mouth == sj.get()) { posing = true; break; }
-      for (const SimJoint* j : w->joint) if (j == sj.get()) { posing = true; break; }
-      if (posing) break;
+      i32 joint = -1;
+      if (w->mouth == sj.get()) joint = kJoints;
+      else for (i32 j = 0; j < kJoints; ++j)
+        if (w->joint[j] == sj.get()) { joint = j; break; }
+      if (joint < 0) continue;
+      posing = true;
+      if (grab_.active() && grab_.body() == sj->b) {
+        // One limb is free *only while it is being dragged* by the real
+        // Box3D motor mouse joint. Joint limits continue to constrain it.
+        physics_.set_joint_spring(sj->joint, 0, 0, 0);
+        physics_.set_joint_motor(sj->joint, false, 0, 0);
+      } else {
+        // The other joints, and the released limb, stay put instead of
+        // floating/gliding away in zero gravity. This is editor-only.
+        const f32 target = joint == kJoints ? w->pose_mouth_hold : w->pose_hold[joint];
+        servo_step(physics_, sj->joint, target, sj->servo_stiffness * 5.0f,
+                   sj->servo_damping * 4.0f, sj->servo_friction * 4.0f,
+                   sj->servo_torque * 12.0f);
+      }
+      break;
     }
-    if (posing) continue;
-    servo_step(physics_, sj->joint, sj->servo_target, sj->servo_stiffness, sj->servo_damping, sj->servo_friction, sj->servo_torque);
+    if (!posing)
+      servo_step(physics_, sj->joint, sj->servo_target, sj->servo_stiffness,
+                 sj->servo_damping, sj->servo_friction, sj->servo_torque);
   }
 }
 
