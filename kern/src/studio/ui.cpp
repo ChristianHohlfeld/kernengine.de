@@ -1223,6 +1223,50 @@ json::Value Studio::run(const json::Value& c) {
   auto view_index = [&]() { return c["viewport"].is_number() ? clamp(static_cast<u32>(num("viewport")), 0u, 3u) : active_view_; };
   if (name.rfind("logic", 0) == 0) return logic_command(name, c);
 
+  // Kern Lehrer motion authoring uses this exact Studio/Box3D simulation.
+  // MouseGrab, joint limits and the 14 encoder angles are not approximated in JS.
+  if (name == "motionBegin") {
+    game::Level l = game::micro_duck_level();
+    l.world.gravity = {0, 0, 0};
+    for (game::Actor& a : l.actors) if (a.controller) a.controller->autonomous = false;
+    load_level(std::move(l));
+    if (!play(game::SimMode::simulate)) return error("Could not start the Micro Duck simulation");
+    for (const game::Actor& a : level_.actors)
+      if (world_->set_walker_external(a.id, true)) world_->set_walker_pose_edit(a.id, true);
+    return ok();
+  }
+  if (name == "motionPose" || name == "motionEdit" || name == "motionPreview") {
+    if (play_ != PlayState::simulating) return error("Start motion posing first");
+    for (const game::Actor& a : level_.actors) {
+      game::GameWorld::WalkerProbe p;
+      if (!world_->walker_probe(a.id, p)) continue;
+      if (name == "motionEdit") return ok(world_->set_walker_pose_edit(a.id, true));
+      if (name == "motionPreview") {
+        const json::Value& q = c["joints"];
+        if (!q.is_array() || q.items().size() != 14) return error("Expected 14 joint targets");
+        f32 target[14];
+        for (i32 i = 0; i < 14; ++i) {
+          const auto& v = q.items()[static_cast<std::size_t>(i)];
+          if (!v.is_number() || !std::isfinite(v.as_number()) || std::fabs(v.as_number()) > 2.5)
+            return error("Joint target is outside the safe input range");
+          target[i] = static_cast<f32>(v.as_number());
+        }
+        world_->set_walker_external(a.id, true);
+        world_->set_walker_pose_edit(a.id, false);
+        return ok(world_->set_walker_action(a.id, target));
+      }
+      json::Value r = ok();
+      json::Value angles = json::Value::array(), names = json::Value::array();
+      for (i32 i = 0; i < 14; ++i) angles.push(static_cast<f64>(p.joint[i]));
+      for (const auto& joint : world_->walker_joints(a.id))
+        if (names.size() < 14) names.push(joint.name);
+      r.set("joints", std::move(angles));
+      r.set("names", std::move(names));
+      return r;
+    }
+    return error("No articulated Micro Duck in the running level");
+  }
+
   // ---- selection ----
   if (name == "select") {
     select(ids_of(c["ids"].is_null() ? c["id"] : c["ids"]), c["add"].as_bool(), c["toggle"].as_bool());
