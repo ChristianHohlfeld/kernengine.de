@@ -784,6 +784,40 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await ctx.close();
 }
 
+// ---- Lehrer: the deployed HTML contains a *working* embedded Box3D puppet, not
+// merely a select with an invisible/keyframe panel. Exercise the real Studio C
+// ABI and the two-click home-pose + goal-pose workflow end to end. -----------
+{
+  const ctx = await browser.newContext({viewport:{width:1060,height:850}});
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", e=>errors.push(e.message));
+  await page.goto(base + "/_site/lehrer/");
+  check(await page.locator("#motionPanel").isVisible(), "Lehrer: keyframe mode is visible on first load");
+  check((await page.locator("#task").inputValue()) === "motion", "Lehrer: new motion is the default task");
+  await page.waitForFunction(() => {
+    try {
+      const w = document.querySelector("#motionStudio")?.contentWindow;
+      return w?.KernStudio?.state?.play?.state === "simulating";
+    } catch { return false; }
+  },null,{timeout:120000});
+  const duck = await page.evaluate(() => {
+    const w = document.querySelector("#motionStudio").contentWindow;
+    return w.KernStudio.command({cmd:"motionPose"});
+  });
+  check(duck.ok && duck.joints?.length === 14 &&
+        duck.joints.every(Number.isFinite), "Lehrer: real 14-joint Box3D Micro Duck is poseable");
+  check(await until(async () => (await page.locator("#motionFrames button").count()) === 2,15000),
+        "Lehrer: home pose automatically captured at t=0");
+  await page.locator("#motionCapture").click();
+  check(await until(async () => (await page.locator("#motionFrames button").count()) === 4,15000),
+        "Lehrer: one click captures the final pose at the chosen time");
+  check((await page.locator("#motionStatus").textContent()).includes("2 Keyframes"),
+        "Lehrer: both frames are ready for training");
+  check(errors.length === 0, "Lehrer: no browser JS errors" + (errors.length ? " " + errors.join(" | "):""));
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`${checks} checks, ${failures} failures (screenshots: ${shots})`);
 process.exit(failures ? 1 : 0);
