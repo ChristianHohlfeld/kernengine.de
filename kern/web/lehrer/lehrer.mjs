@@ -186,8 +186,13 @@ function renderMotionFrames() {
     row.append(preview, remove);
     el.append(row);
   }
+  let valid = false, why = "";
+  try { motionSpec(); valid = true; }
+  catch (error) { why = error.message; }
+  $("motionTrain").disabled = running || !valid;
   motionStatus(motionFrames.length + " Keyframes gespeichert. " +
-    (motionFrames.length >= 2 ? "Training möglich, wenn Start und Ende enthalten sind." : "Jetzt weitere Posen setzen."));
+    (valid ? "Fertig zum Trainieren – oder weitere Posen hinzufügen." :
+      (why || "Weitere Posen hinzufügen.")));
 }
 window.addEventListener("message", event => {
   if (event.origin !== location.origin || event.source !== motionFrame.contentWindow) return;
@@ -218,6 +223,16 @@ $("motionCapture").onclick = async () => {
 };
 $("motionReset").onclick = () => motionTell("restart").then(()=>motionStatus("Ente zurückgesetzt. Keyframes bleiben erhalten.")).catch(e=>motionStatus(e.message));
 $("motionClear").onclick = () => { motionFrames = []; renderMotionFrames(); };
+$("motionDuration").addEventListener("input", renderMotionFrames);
+$("motionAnchor").onchange = () => {
+  motionTell("anchor", {anchored: $("motionAnchor").checked})
+    .then(() => motionStatus($("motionAnchor").checked ?
+      "Rumpf fixiert: Kopf und Beine lassen sich ohne Servo-Gegenkraft ziehen." :
+      "Ente frei schwebend: auch der Rumpf kann mit der Maus verschoben werden."))
+    .catch(error => motionStatus(error.message));
+};
+$("motionTrain").onclick = () => start();
+renderMotionFrames();
 $("motionTest").onclick = () => {
   if (!latestMotion) return;
   motionTell("run", latestMotion).then(()=>motionStatus("Neues ONNX-Netz steuert die Ente mit Erdschwerkraft."))
@@ -328,6 +343,7 @@ $("task").addEventListener("change", () => {
   const motion = $("task").value === "motion";
   $("motionPanel").hidden = !motion;
   $("scenarioPanel").hidden = !scenario;
+  $("start").hidden = motion;  // the motion's Train button is after the keyframe timeline
   $("s-jump").nextElementSibling.textContent = motion ? "Bewegungsfehler (Grad)" : scenario ? t("Ziele erreicht (Prüfläufe)", "Goals reached (evaluation)") :
     t("echte Sprünge (sauberer Roboter)", "Real jumps (clean robot)");
   for (const id of ["s-height", "s-flight"]) $(id).parentElement.hidden = scenario || motion;
@@ -378,6 +394,7 @@ async function start() {
   onnx = null;
   latestMotion = null;
   $("motionTest").disabled = true;
+  $("motionTrain").disabled = true;
   $("start").disabled = true;
   $("pause").disabled = false;
   $("download").disabled = true;
@@ -572,6 +589,7 @@ function stop(done = false) {
   wakeLock?.release?.().catch(() => {});
   wakeLock = null;
   $("start").disabled = false;
+  if ($("task").value === "motion") renderMotionFrames();
   $("pause").disabled = true;
   $("pause").textContent = "Pause";
   if (!done && !$("status").classList.contains("err")) status(t("Angehalten.", "Stopped."));
