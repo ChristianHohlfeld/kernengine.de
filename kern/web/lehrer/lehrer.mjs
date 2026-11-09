@@ -140,6 +140,94 @@ async function spawn() {
 }
 
 
+// The Studio iframe uses Kern's real Box3D MouseGrab, not a JS mock-up.
+let motionReady = false, motionNextId = 0;
+const motionPending = new Map();
+let motionFrames = [];
+let latestMotion = null;
+const motionFrame = $("motionStudio");
+function motionTell(type, data = {}) {
+  if (!motionReady) return Promise.reject(Error("3D-Ente ist noch nicht bereit"));
+  return new Promise((resolve, reject) => {
+    const id = ++motionNextId;
+    const timer = setTimeout(() => { motionPending.delete(id); reject(Error("Studio antwortet nicht")); }, 8000);
+    motionPending.set(id, result => { clearTimeout(timer); result?.ok ? resolve(result) : reject(Error(result?.error || "Studio Fehler")); });
+    motionFrame.contentWindow.postMessage({type: "kern-motion-" + type, id, ...data}, location.origin);
+  });
+}
+function motionStatus(message) { $("motionStatus").textContent = message; }
+function motionSlug() {
+  const s = $("motionName").value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase().slice(0, 38);
+  return "motion_" + (s || "bewegung");
+}
+function motionSpec() {
+  const duration = Number($("motionDuration").value);
+  if (!Number.isFinite(duration) || duration < .3 || duration > 15) throw Error("Dauer: 0,3 bis 15 Sekunden");
+  const frames = [...motionFrames].sort((a,b)=>a.time-b.time);
+  if (frames.length < 2 || Math.abs(frames[0].time) > .0001 ||
+      Math.abs(frames.at(-1).time - duration) > .001)
+    throw Error("Mindestens zwei Keyframes nötig: bei 0 und bei " + duration + " Sekunden");
+  if (frames.length > 32) throw Error("Maximal 32 Keyframes");
+  return {name: motionSlug(), duration, frames};
+}
+function renderMotionFrames() {
+  const el = $("motionFrames");
+  el.replaceChildren();
+  for (const frame of motionFrames) {
+    const row = document.createElement("div");
+    const preview = document.createElement("button");
+    preview.textContent = frame.time.toFixed(2) + " s · Pose ansehen";
+    preview.onclick = () => motionTell("preview", {joints: frame.joints}).catch(e => motionStatus(e.message));
+    const remove = document.createElement("button");
+    remove.textContent = "Entfernen";
+    remove.style.marginLeft = "6px";
+    remove.onclick = () => { motionFrames = motionFrames.filter(f=>f!==frame); renderMotionFrames(); };
+    row.append(preview, remove);
+    el.append(row);
+  }
+  motionStatus(motionFrames.length + " Keyframes gespeichert. " +
+    (motionFrames.length >= 2 ? "Training möglich, wenn Start und Ende enthalten sind." : "Jetzt weitere Posen setzen."));
+}
+window.addEventListener("message", event => {
+  if (event.origin !== location.origin || event.source !== motionFrame.contentWindow) return;
+  if (event.data?.type === "kern-motion-ready") {
+    motionReady = !!event.data.ok;
+    motionStatus(motionReady ? "Ente bereit: Kopf oder Gliedmaß mit der Maus ziehen, dann Pose speichern." :
+      "Studio-Fehler: " + (event.data.error || "unbekannt"));
+  } else if (event.data?.type === "kern-motion-reply") {
+    const done = motionPending.get(event.data.id);
+    if (done) { motionPending.delete(event.data.id); done(event.data.result); }
+  }
+});
+$("motionCapture").onclick = async () => {
+  try {
+    const time = Number($("motionTime").value);
+    const duration = Number($("motionDuration").value);
+    if (!Number.isFinite(time) || time < 0 || time > duration) throw Error("Zeit muss zwischen 0 und Dauer liegen");
+    const result = await motionTell("capture");
+    const joints = result.joints;
+    if (!Array.isArray(joints) || joints.length !== 14 || joints.some(x=>!Number.isFinite(x)))
+      throw Error("Studio liefert keine gültigen 14 Gelenkwinkel");
+    motionFrames = motionFrames.filter(f=>Math.abs(f.time-time)>.001);
+    motionFrames.push({time,joints});
+    motionFrames.sort((a,b)=>a.time-b.time);
+    renderMotionFrames();
+    $("motionTime").value = String(Math.min(duration, Math.round((time + .2)*100)/100));
+  } catch (error) { motionStatus(error.message); }
+};
+$("motionReset").onclick = () => motionTell("restart").then(()=>motionStatus("Ente zurückgesetzt. Keyframes bleiben erhalten.")).catch(e=>motionStatus(e.message));
+$("motionClear").onclick = () => { motionFrames = []; renderMotionFrames(); };
+$("motionTest").onclick = () => {
+  if (!latestMotion) return;
+  motionTell("run", latestMotion).then(()=>motionStatus("Neues ONNX-Netz steuert die Ente mit Erdschwerkraft."))
+    .catch(e=>motionStatus("Test fehlgeschlagen: "+e.message));
+};
+function motionMeta() {
+  const spec = motionSpec();
+  return {name: spec.name, file: spec.name + ".onnx", duration: spec.duration};
+}
+
 // A scenario is data, not a generated C++ task. Both the Web Worker collector and the PPO learner
 // receive the exact same canonical JSON; the native trainer accepts the same schema with --scenario.
 const DEFAULT_SCENARIO = {
@@ -237,13 +325,16 @@ function scenarioConfig() {
 
 $("task").addEventListener("change", () => {
   const scenario = $("task").value === "scenario";
+  const motion = $("task").value === "motion";
+  $("motionPanel").hidden = !motion;
   $("scenarioPanel").hidden = !scenario;
-  $("s-jump").nextElementSibling.textContent = scenario ? t("Ziele erreicht (Prüfläufe)", "Goals reached (evaluation)") :
+  $("s-jump").nextElementSibling.textContent = motion ? "Bewegungsfehler (Grad)" : scenario ? t("Ziele erreicht (Prüfläufe)", "Goals reached (evaluation)") :
     t("echte Sprünge (sauberer Roboter)", "Real jumps (clean robot)");
-  for (const id of ["s-height", "s-flight"]) $(id).parentElement.hidden = scenario;
+  for (const id of ["s-height", "s-flight"]) $(id).parentElement.hidden = scenario || motion;
   $("s-jump").textContent = "–";
 });
 setScenario(DEFAULT_SCENARIO);
+$("task").dispatchEvent(new Event("change"));
 $("scExample").onclick = () => setScenario(DEFAULT_SCENARIO);
 $("scApply").onclick = () => {
   try { setScenario(JSON.parse($("scJson").value)); status(t("Szenario geladen.", "Scenario loaded.")); }
@@ -274,9 +365,10 @@ async function start() {
   if (running) return;
   const task = $("task").value;
   let scenario = null;
-  try { if (task === "scenario") scenario = scenarioConfig(); }
+  try { if (task === "scenario") scenario = scenarioConfig();
+    if (task === "motion") scenario = motionSpec(); }
   catch (error) { status(error.message, true); return; }
-  const taskName = scenario ? "scenario:" + JSON.stringify(scenario) : task;
+  const taskName = scenario ? (task === "motion" ? "motion:" : "scenario:") + JSON.stringify(scenario) : task;
   const workers = Math.max(1, Math.min(64, Number($("workers").value) || 1));
   const envs = Math.max(1, Math.min(256, Number($("envs").value) || 8));
   running = true;
@@ -284,6 +376,8 @@ async function start() {
   iteration = 0;
   history = [];
   onnx = null;
+  latestMotion = null;
+  $("motionTest").disabled = true;
   $("start").disabled = true;
   $("pause").disabled = false;
   $("download").disabled = true;
@@ -342,9 +436,10 @@ async function loop(task) {
     const seconds = (performance.now() - t0) / 1000;
     show(learned.stats, seconds, collectors.length * Number($("envs").value) * steps);
     if (iteration % 25 === 0 || iteration === total) {
-      if (task === "jump" || task === "scenario") {
+      if (task === "jump" || task === "scenario" || task === "motion") {
         const result = (await call(learner, { type: "evaluate", episodes: 5 }, "evaluated")).report;
         if (task === "jump") showJump(result);
+        else if (task === "motion") showMotion(result);
         else showScenario(result);
       }
       await exportOnnx(task);
@@ -361,9 +456,19 @@ async function loop(task) {
 async function exportOnnx(task) {
   const d = await call(learner, { type: "export" }, "onnx");
   onnx = new Blob([d.onnx], { type: "application/octet-stream" });
-  onnx.task = task === "scenario" ? "scenario_" + $("scName").value.replace(/[^a-z0-9_-]/gi, "_").slice(0, 48) : task;
+  onnx.task = task === "motion" ? motionSlug() : task === "scenario" ? "scenario_" + $("scName").value.replace(/[^a-z0-9_-]/gi, "_").slice(0, 48) : task;
   $("download").disabled = false;
-  if (task === "scenario") {
+  if (task === "motion") {
+    const meta = motionMeta();
+    try {
+      const skills = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}");
+      skills[meta.file] = meta;
+      localStorage.setItem("kern-lehrer.motion-skills.v1", JSON.stringify(skills));
+    } catch (error) { status("Die Fähigkeiten-Metadaten konnten nicht gespeichert werden: " + error.message, true); return; }
+    await saveForStudio(meta.file, d.onnx);
+    latestMotion = meta;
+    $("motionTest").disabled = false;
+  } else if (task === "scenario") {
     $("saved").textContent = t("Szenario-Modell als ONNX bereit. Für die Nutzung im Studio ist eine passende Kommando-Integration nötig.",
       "Scenario ONNX ready. Studio use needs matching command integration.");
   } else {
@@ -414,6 +519,10 @@ function showJump(r) {
   $("s-flight").textContent = Math.round(r.flightS * 1000);
 }
 
+function showMotion(r) {
+  if (!r) return;
+  $("s-jump").textContent = Number.isFinite(r.meanErrorDeg) ? r.meanErrorDeg.toFixed(1) + "°" : "–";
+}
 function showScenario(r) {
   if (!r) return;
   $("s-jump").textContent = `${r.successes}/${r.episodes}`;
