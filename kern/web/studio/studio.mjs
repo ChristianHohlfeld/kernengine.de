@@ -8,7 +8,7 @@
 // packaging standalone games.
 import {loadKern} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -167,8 +167,14 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
         send(result);
       }
       if (m.type === "kern-motion-run") {
-        const register = engine.command({cmd: "motionRegister", name: m.name, file: m.file, duration: m.duration});
-        send(register.ok ? engine.command({cmd: "motionRun", name: m.name}) : register);
+        // The BroadcastChannel is asynchronous; explicitly load these exact
+        // bytes before registering the skill or starting the simulation.
+        trainedPolicies(m.file).then(records => {
+          if (!records.length || !engine.registerPolicy(m.file, records[0][1]))
+            return send({ok:false,error:"Trainiertes ONNX fehlt oder ist inkompatibel"});
+          const register = engine.command({cmd: "motionRegister", name: m.name, file: m.file, duration: m.duration});
+          send(register.ok ? engine.command({cmd: "motionRun", name: m.name}) : register);
+        }).catch(error => send({ok:false,error:String(error)}));
       }
       if (m.type === "kern-motion-restart") send(engine.command({cmd: "motionBegin"}));
     });
