@@ -724,6 +724,16 @@ bool GameWorld::set_walker_external(ActorId id, bool on) {
   return true;
 }
 
+bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
+  WalkerBrain* w = walker_brain(id);
+  if (!w) return false;
+  if (w->pose_edit != on) {
+    w->pose_edit = on;
+    physics_.set_body_type(w->trunk, on ? physics::BodyType::fixed : physics::BodyType::dynamic);
+  }
+  return true;
+}
+
 bool GameWorld::set_walker_action(ActorId id, const f32 action[14]) {
   WalkerBrain* w = walker_brain(id);
   if (!w) return false;
@@ -1453,6 +1463,14 @@ void GameWorld::drive_servos(f32 h) {
   // The servos' device model (servo.h): one law for the Studio, the Lehrer and the calibration rig.
   for (auto& sj : joints_) {
     if (!sj->servo || sj->broken || !sj->joint.valid()) continue;
+    bool posing = false;
+    for (const auto& w : walkers_) {
+      if (!w->pose_edit) continue;
+      if (w->mouth == sj.get()) { posing = true; break; }
+      for (const SimJoint* j : w->joint) if (j == sj.get()) { posing = true; break; }
+      if (posing) break;
+    }
+    if (posing) continue;
     servo_step(physics_, sj->joint, sj->servo_target, sj->servo_stiffness, sj->servo_damping, sj->servo_friction, sj->servo_torque);
   }
 }
