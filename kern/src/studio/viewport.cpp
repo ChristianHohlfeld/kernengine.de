@@ -126,7 +126,10 @@ ActorId Studio::pick(u32 index, f32 x, f32 y, Vec3* hit_point) {
     q.ignore_id = hit.mesh;  // the ground or a locked actor: look behind it
     r.origin = hit.point + r.direction * 0.001f;
   }
-  if (icon) {
+  // In Simulate, an icon for the duck controller must not mask the
+  // articulated limb mesh directly under the cursor/finger. Otherwise the
+  // first click grabs the static trunk, and posing feels unresponsive.
+  if (icon && (play_ != PlayState::simulating || !mesh_actor)) {
     if (hit_point && !mesh_actor) { Mat4 m; world_->actor_matrix(icon, m); *hit_point = m.translation(); }
     return icon;
   }
