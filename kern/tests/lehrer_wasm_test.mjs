@@ -56,4 +56,28 @@ check(onnx.length > 50000 && new TextDecoder().decode(onnx).includes("actions"),
   const first = want.findIndex((w, i) => w !== got[i]);
   check(first < 0, "deterministic: differs from tick " + first);
 }
+// A new browser scenario must use the SAME C ABI and PPO rollout as built-in tasks.
+{
+  const manifest = JSON.stringify({
+    name: "WASM scenario", duration: 2, commands: { forward: 0.1 },
+    waypoints: [{ x: 0.4, y: 0.0, radius: 0.15 }],
+    objects: [{ kind: "box", x: 0.5, y: 0.2, width: 0.15, depth: 0.15, height: 0.15 }],
+    rewards: { progress: 12, waypoint: 8, finish: 20, upright: 2 }
+  });
+  const sc = enc.encode("scenario:" + manifest), sp = put(sc);
+  const config = enc.encode('{"steps":4}'), cp = put(config);
+  check(e.kern_lehrer_create(sp, sc.length, 1, 9, 0) === 1, "scenario collector");
+  check(e.kern_lehrer_learner(sp, sc.length, cp, config.length, 9) === 1, "scenario learner");
+  const current = take(e.kern_lehrer_policy());
+  check(e.kern_lehrer_set_policy(put(current), current.length >> 2) === 1, "scenario policy");
+  const steps = take(e.kern_lehrer_collect(4));
+  check(steps.length > 0, "scenario rollout");
+  const evaluation = e.kern_lehrer_evaluate(2);
+  check(evaluation !== 0, "scenario evaluation");
+  const metrics = JSON.parse(kern.string(evaluation, e.kern_lehrer_result_length()));
+  check(metrics.episodes === 2 && metrics.successes >= 0, "scenario metrics " + JSON.stringify(metrics));
+  const model = take(e.kern_lehrer_export_onnx());
+  check(model.length > 50000, "scenario ONNX");
+}
+
 console.log(`Lehrer wasm ok (bit-identical with native): imitation round of ${ticks} ticks, 16 duck steps in ${ms.toFixed(0)} ms, learn ${stats.learnSeconds.toFixed(2)} s, onnx ${onnx.length} bytes`);
