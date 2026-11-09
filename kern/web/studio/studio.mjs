@@ -13,6 +13,8 @@ import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hu
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
 const AUTOSAVE_KEY = "kern-studio.autosave.v1", LAYOUT_KEY = "kern-studio.layout.v1", LAST_KEY = "kern-studio.last.v1";
+// The embedded Lehrer puppet is a tool, NOT a second normal Studio session.
+const POSE_EMBED = new URLSearchParams(location.search).has("motion");
 // User settings (docs/studio.md, "Einstellungen"): only the user's own choices, as the engine reports
 // them (settings.cpp). A setting never changed is not stored and follows the defaults of the build.
 const SETTINGS_KEY = "kern-studio.settings.v1", SETTINGS_VERSION = 1;
@@ -142,7 +144,7 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   page.start();
   // Embedded real-time Box3D puppet for Kern Lehrer. All posing happens inside
   // the actual Studio renderer / GameWorld; the parent only records encoder data.
-  if (new URLSearchParams(location.search).has("motion")) {
+  if (POSE_EMBED) {
     const style = document.createElement("style");
     style.textContent = `
       #titlebar,#toolbar,#side,#sideSplit,#drawer,#statusbar,#touchExit,#touchPause{display:none!important}
@@ -317,8 +319,9 @@ class StudioPage {
     this.initSplitters();
     this.catalog = this.engine.command({cmd: "catalog"}).groups;
     this.renderCatalog();
-    this.reopenLast();
-    this.offerRestore();
+    // Do not open the previous Studio game or show "Start fresh" / "Neu anfangen"
+    // inside the Lehrer iframe. Those controls refer to the ordinary editor.
+    if (!POSE_EMBED) { this.reopenLast(); this.offerRestore(); }
     requestAnimationFrame(t => this.frame(t));
     // Hosting or playing online in a background tab: keep the simulation and the network going.
     backgroundTicker(time => {
@@ -385,6 +388,7 @@ class StudioPage {
   }
 
   rememberLast(time) {
+    if (POSE_EMBED) return;  // never replace the user's normal Studio last project
     const st = this.state;
     if (!st?.level || st.level.dirty || st.play?.state !== "editing") return;
     if (this.revision === this.lastRememberedRevision || time - (this.lastRemembered || 0) < 3000) return;
@@ -463,6 +467,7 @@ class StudioPage {
   }
 
   autosave(time) {
+    if (POSE_EMBED) return;  // poser is ephemeral; saved keyframes belong to Lehrer
     const text = this.engine.takeAutosave(time);
     if (this.engine.takeAutosaveDiscard()) this.dropAutosave();
     if (!text) return;
@@ -479,6 +484,7 @@ class StudioPage {
 
   /** Stores the user's choices when the engine reports a change (nothing at all while none was made). */
   saveSettings() {
+    if (POSE_EMBED) return;  // avoid changing normal Studio settings from an iframe
     const values = this.engine.command({cmd: "takeSettings"})?.values;
     if (!values) return;
     try {
