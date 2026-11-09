@@ -139,9 +139,144 @@ async function spawn() {
   return w;
 }
 
+
+// A scenario is data, not a generated C++ task. Both the Web Worker collector and the PPO learner
+// receive the exact same canonical JSON; the native trainer accepts the same schema with --scenario.
+const DEFAULT_SCENARIO = {
+  name: "Mein Parcours", duration: 8,
+  commands: { forward: 0.15, lateral: 0, turn: 0 },
+  start: { yaw: 0, yawSpread: 0 },
+  waypoints: [{ x: 0.4, y: 0, radius: 0.15 }, { x: 0.85, y: 0, radius: 0.15 }],
+  objects: [{ kind: "box", x: 0.62, y: 0.25, width: 0.15, depth: 0.15, height: 0.20 }],
+  rewards: { progress: 12, waypoint: 8, finish: 20, upright: 2, fall: -12,
+    actionRate: -0.1, contact: -2, height: 0, speed: 0, pose: 0 }
+};
+
+function numField(id, lo, hi) {
+  const raw = $(id).value.trim();
+  const n = Number(raw);
+  if (!raw || !Number.isFinite(n) || n < lo || n > hi) throw Error("Ungültiger Wert: " + id);
+  return n;
+}
+
+function parseRows(id, type) {
+  const result = [];
+  const lines = $(id).value.split(/\r?\n/);
+  for (let i = 0; i < lines.length; ++i) {
+    const line = lines[i].replace(/#.*/, "").trim();
+    if (!line) continue;
+    const bits = line.split(/[\s;]+/);
+    if (type === "waypoint") {
+      if (bits.length !== 3 || bits.some(v => !Number.isFinite(Number(v))))
+        throw Error("Zielpunkt Zeile " + (i + 1) + ": erwartet x y Radius");
+      const [x, y, radius] = bits.map(Number);
+      if (Math.abs(x) > 5 || Math.abs(y) > 5 || radius < 0.03 || radius > 1)
+        throw Error("Zielpunkt Zeile " + (i + 1) + " liegt außerhalb der erlaubten Grenzen");
+      result.push({ x, y, radius });
+    } else {
+      const kind = bits[0];
+      if ((kind !== "box" && kind !== "sphere") ||
+          bits.length !== (kind === "box" ? 6 : 4) ||
+          bits.slice(1).some(v => !Number.isFinite(Number(v))))
+        throw Error("Objekt Zeile " + (i + 1) + ": box x y Breite Tiefe Höhe / sphere x y Radius");
+      const n = bits.slice(1).map(Number);
+      const obj = kind === "box" ?
+        { kind, x: n[0], y: n[1], width: n[2], depth: n[3], height: n[4] } :
+        { kind, x: n[0], y: n[1], radius: n[2] };
+      if (Math.abs(obj.x) > 5 || Math.abs(obj.y) > 5 ||
+          n.slice(2).some(v => v < 0.01 || v > 2))
+        throw Error("Objekt Zeile " + (i + 1) + " liegt außerhalb der erlaubten Grenzen");
+      result.push(obj);
+    }
+  }
+  if (result.length > (type === "waypoint" ? 16 : 32))
+    throw Error("Zu viele " + (type === "waypoint" ? "Zielpunkte" : "Objekte"));
+  return result;
+}
+
+function setScenario(cfg) {
+  if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) throw Error("Ein JSON-Objekt wird erwartet");
+  $("scName").value = cfg.name ?? "Szenario";
+  $("scDuration").value = cfg.duration ?? 6;
+  $("scForward").value = cfg.commands?.forward ?? 0;
+  for (const [id, key, fallback] of [
+    ["scProgress", "progress", 12], ["scWaypoint", "waypoint", 8],
+    ["scFinish", "finish", 20], ["scUpright", "upright", 2], ["scFall", "fall", -12]
+  ]) $(id).value = cfg.rewards?.[key] ?? fallback;
+  $("scWaypoints").value = (cfg.waypoints || []).map(p => [p.x, p.y, p.radius ?? 0.15].join(" ")).join("\n");
+  $("scObjects").value = (cfg.objects || []).map(o =>
+    o.kind === "sphere" ? ["sphere", o.x, o.y, o.radius ?? 0.08].join(" ") :
+    ["box", o.x, o.y, o.width ?? 0.15, o.depth ?? 0.15, o.height ?? 0.15].join(" ")
+  ).join("\n");
+  $("scJson").value = JSON.stringify(cfg, null, 2);
+}
+
+function scenarioConfig() {
+  // The advanced JSON is the source for options without a visual field (14 joint angles,
+  // actuation/speed terms, randomisation, dynamic objects). Fields overwrite only their own keys.
+  const cfg = JSON.parse($("scJson").value);
+  if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) throw Error("Szenario muss ein JSON-Objekt sein");
+  cfg.name = $("scName").value.trim().slice(0, 80) || "Szenario";
+  cfg.duration = numField("scDuration", 0.5, 60);
+  cfg.commands = { ...(cfg.commands || {}), forward: numField("scForward", -0.4, 0.4) };
+  const points = parseRows("scWaypoints", "waypoint");
+  cfg.waypoints = points.map((p, i) => ({ ...(cfg.waypoints?.[i] || {}), ...p }));
+  const objs = parseRows("scObjects", "object");
+  cfg.objects = objs.map((o, i) => ({ ...(cfg.objects?.[i] || {}), ...o }));
+  cfg.rewards = { ...(cfg.rewards || {}),
+    progress: numField("scProgress", -100, 100),
+    waypoint: numField("scWaypoint", -100, 100),
+    finish: numField("scFinish", -100, 100),
+    upright: numField("scUpright", -100, 100),
+    fall: numField("scFall", -100, 100) };
+  if (cfg.waypoints.length === 0 && !cfg.rewards.pose && !cfg.rewards.height && !cfg.rewards.speed &&
+      !cfg.rewards.upright) throw Error("Mindestens ein Zielpunkt oder ein Haltungs-/Geschwindigkeitsziel ist nötig");
+  if (JSON.stringify(cfg).length > 16384) throw Error("Szenario zu groß (maximal 16 KiB)");
+  return cfg;
+}
+
+$("task").addEventListener("change", () => {
+  const scenario = $("task").value === "scenario";
+  $("scenarioPanel").hidden = !scenario;
+  $("s-jump").nextElementSibling.textContent = scenario ? t("Ziele erreicht (Prüfläufe)", "Goals reached (evaluation)") :
+    t("echte Sprünge (sauberer Roboter)", "Real jumps (clean robot)");
+  for (const id of ["s-height", "s-flight"]) $(id).parentElement.hidden = scenario;
+  $("s-jump").textContent = "–";
+});
+setScenario(DEFAULT_SCENARIO);
+$("scExample").onclick = () => setScenario(DEFAULT_SCENARIO);
+$("scApply").onclick = () => {
+  try { setScenario(JSON.parse($("scJson").value)); status(t("Szenario geladen.", "Scenario loaded.")); }
+  catch (error) { status(error.message, true); }
+};
+$("scSave").onclick = () => {
+  try {
+    const cfg = scenarioConfig();
+    $("scJson").value = JSON.stringify(cfg, null, 2);
+    const blob = new Blob([$("scJson").value], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "kern-szenario.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) { status(error.message, true); }
+};
+$("scFile").onchange = async () => {
+  const file = $("scFile").files?.[0];
+  if (!file) return;
+  try {
+    if (file.size > 16384) throw Error("Datei zu groß (maximal 16 KiB)");
+    setScenario(JSON.parse(await file.text()));
+    status(t("Szenario importiert.", "Scenario imported."));
+  } catch (error) { status(error.message, true); }
+  $("scFile").value = "";
+};
+
 async function start() {
   if (running) return;
   const task = $("task").value;
+  let scenario = null;
+  try { if (task === "scenario") scenario = scenarioConfig(); }
+  catch (error) { status(error.message, true); return; }
+  const taskName = scenario ? "scenario:" + JSON.stringify(scenario) : task;
   const workers = Math.max(1, Math.min(64, Number($("workers").value) || 1));
   const envs = Math.max(1, Math.min(256, Number($("envs").value) || 8));
   running = true;
@@ -160,11 +295,11 @@ async function start() {
     collectors = await Promise.all(Array.from({ length: workers }, () => spawn()));
     // Worker i steps ducks i*envs .. (i+1)*envs-1 of one run: the same run as natively with as many
     // ducks in all (bit for bit, docs/lehrer.md).
-    await Promise.all(collectors.map((w, i) => call(w, { type: "collector", task, envs, seed, first: i * envs }, "ready")));
+    await Promise.all(collectors.map((w, i) => call(w, { type: "collector", task: taskName, envs, seed, first: i * envs }, "ready").then(d => { if (!d.ok) throw Error("Szenario-Validierung fehlgeschlagen"); return d; })));
     const config = {};
     if (Number($("initstd").value) > 0) config.initStd = Number($("initstd").value);
     if (Number($("lr").value) > 0) config.learningRate = Number($("lr").value);
-    const made = await call(learner, { type: "learner", task, seed, config }, "policy");
+    const made = await call(learner, { type: "learner", task: taskName, seed, config }, "policy");
     policy = made.policy;
     steps = made.steps || 24;
     // First imitation of the demonstration (the jump's recipe), round by round, then practice.
@@ -207,7 +342,11 @@ async function loop(task) {
     const seconds = (performance.now() - t0) / 1000;
     show(learned.stats, seconds, collectors.length * Number($("envs").value) * steps);
     if (iteration % 25 === 0 || iteration === total) {
-      if (task === "jump") showJump((await call(learner, { type: "evaluate", episodes: 5 }, "evaluated")).report);
+      if (task === "jump" || task === "scenario") {
+        const result = (await call(learner, { type: "evaluate", episodes: 5 }, "evaluated")).report;
+        if (task === "jump") showJump(result);
+        else showScenario(result);
+      }
       await exportOnnx(task);
     }
   }
@@ -222,9 +361,14 @@ async function loop(task) {
 async function exportOnnx(task) {
   const d = await call(learner, { type: "export" }, "onnx");
   onnx = new Blob([d.onnx], { type: "application/octet-stream" });
-  onnx.task = task;
+  onnx.task = task === "scenario" ? "scenario_" + $("scName").value.replace(/[^a-z0-9_-]/gi, "_").slice(0, 48) : task;
   $("download").disabled = false;
-  await saveForStudio(`${task}.onnx`, d.onnx).catch(() => {});
+  if (task === "scenario") {
+    $("saved").textContent = t("Szenario-Modell als ONNX bereit. Für die Nutzung im Studio ist eine passende Kommando-Integration nötig.",
+      "Scenario ONNX ready. Studio use needs matching command integration.");
+  } else {
+    await saveForStudio(`${task}.onnx`, d.onnx).catch(() => {});
+  }
 }
 
 /** Kern Studio on this device picks the network up (IndexedDB "kern-lehrer", key = file name), at
@@ -270,6 +414,10 @@ function showJump(r) {
   $("s-flight").textContent = Math.round(r.flightS * 1000);
 }
 
+function showScenario(r) {
+  if (!r) return;
+  $("s-jump").textContent = `${r.successes}/${r.episodes}`;
+}
 function draw() {
   const c = $("chart"), dpr = devicePixelRatio || 1;
   const w = c.clientWidth, h = c.clientHeight;
