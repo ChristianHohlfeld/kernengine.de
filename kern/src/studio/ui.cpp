@@ -12,6 +12,7 @@
 
 #include "internal.h"
 #include "kern/game/walker.h"
+#include "kern/game/walker_policy.h"
 #include "kern/game/demos.h"
 #include "kern/studio/studio.h"
 
@@ -1223,6 +1224,24 @@ json::Value Studio::run(const json::Value& c) {
   auto view_index = [&]() { return c["viewport"].is_number() ? clamp(static_cast<u32>(num("viewport")), 0u, 3u) : active_view_; };
   if (name.rfind("logic", 0) == 0) return logic_command(name, c);
 
+  if (name == "motionRegister")
+    return ok(game::register_learned_walker_skill(str("name"), str("file"), static_cast<f32>(num("duration"))));
+  if (name == "motionRun") {
+    if (str("name").empty()) return error("Missing learned skill name");
+    game::Level l = game::micro_duck_level();  // restore Earth gravity for genuine execution
+    for (game::Actor& a : l.actors) if (a.controller) a.controller->autonomous = false;
+    load_level(std::move(l));
+    if (!play(game::SimMode::simulate)) return error("Unable to start the simulation");
+    for (const game::Actor& a : level_.actors) {
+      game::GameWorld::WalkerProbe p;
+      if (world_->walker_probe(a.id, p)) {
+        const std::string failure = world_->walker_skill(a.id, str("name"));
+        if (!failure.empty()) return error(failure);
+        return ok();
+      }
+    }
+    return error("No Micro Duck");
+  }
   // Kern Lehrer motion authoring uses this exact Studio/Box3D simulation.
   // MouseGrab, joint limits and the 14 encoder angles are not approximated in JS.
   if (name == "motionBegin") {
