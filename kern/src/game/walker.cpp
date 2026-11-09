@@ -532,8 +532,8 @@ struct PolicySet {
   f32 ramp_s = 2, rise_s = 1;     // DEFAULT_SITSTAND_RAMP_S / RISE_S, or the set's
 };
 
-const PolicySet& policy_set() {
-  static const PolicySet set = [] {
+PolicySet& policy_set() {
+  static PolicySet set = [] {
     PolicySet out;
     out.pick = {"alpha_ground_pick.onnx", 4, 0.7f, 1.0f};
     out.crouch = {"roller_crouch.onnx", 3, 0.7f, 0.8f};
@@ -581,6 +581,39 @@ const PolicySet& policy_set() {
     return out;
   }();
   return set;
+}
+
+bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds) {
+  if (name.empty() || name.size() > 48 || file.size() < 6 || file.size() > 80 ||
+      file.substr(file.size() - 5) != ".onnx" || !std::isfinite(seconds) ||
+      seconds < 0.3f || seconds > 15.0f) return false;
+  for (char c : name) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') || c == '_' || c == '-')) return false;
+  for (char c : file) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) return false;
+  const auto policy = walker_policy(file);
+  if (!policy || policy->dims.empty() || policy->dims.front() != 61 || policy->dims.back() != 14)
+    return false;
+  PolicySet& set = policy_set();
+  for (SkillDef& skill : set.skills) {
+    if (skill.name != name) continue;
+    // Do not silently replace a shipped / built-in skill (especially jump).
+    if (skill.file.find("motion_") != 0) return false;
+    skill.file = std::string(file);
+    skill.duration = seconds;
+    skill.period = seconds;
+    return true;
+  }
+  if (set.skills.size() >= 96) return false;
+  SkillDef skill;
+  skill.name = std::string(name);
+  skill.file = std::string(file);
+  skill.duration = seconds;
+  skill.period = seconds;
+  skill.action_scale = 1.0f;
+  skill.phase_slot = kJumpPhaseSlot;
+  set.skills.push_back(std::move(skill));
+  return true;
 }
 
 i32 skill_index(std::string_view name) {
