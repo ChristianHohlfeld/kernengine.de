@@ -144,14 +144,14 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   // the actual Studio renderer / GameWorld; the parent only records encoder data.
   if (new URLSearchParams(location.search).has("motion")) {
     const style = document.createElement("style");
-    style.textContent = \`
+    style.textContent = `
       #titlebar,#toolbar,#side,#sideSplit,#drawer,#statusbar,#touchExit,#touchPause{display:none!important}
       html,body,#app{width:100%;height:100%;overflow:hidden}
       #app{display:flex!important;flex-direction:column}
       #main{display:flex!important;flex:1;min-height:0;overflow:hidden}
       #viewArea{flex:1!important;width:100%;height:100%;min-height:0}
       #gl,#viewports{width:100%;height:100%}
-    \`;
+    `;
     document.head.append(style);
     const ready = engine.command({cmd: "motionBegin"});
     let previewId = 0;
