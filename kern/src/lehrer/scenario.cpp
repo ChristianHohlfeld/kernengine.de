@@ -131,7 +131,7 @@ class ScenarioTask final : public Task {
     add("upright", weights_.upright, kern::dm::exp(-inclination / 0.05f));
     const f32 dz = p.position.z - desired_height_;
     add("height", weights_.height, kern::dm::exp(-dz * dz / (0.035f * 0.035f)));
-    const f32 speed = kern::dm::sqrt(p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y);
+    const f32 speed = std::sqrt(p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y);
     const f32 vs = speed - desired_speed_;
     add("speed", weights_.speed, kern::dm::exp(-vs * vs / (0.15f * 0.15f)));
     f32 pose_error = 0, action_change = 0;
@@ -148,7 +148,7 @@ class ScenarioTask final : public Task {
     if (stage_ < points_.size()) {
       const Waypoint& w = points_[stage_];
       const f32 dx = p.position.x - w.x, dy = p.position.y - w.y;
-      const f32 distance = kern::dm::sqrt(dx * dx + dy * dy);
+      const f32 distance = std::sqrt(dx * dx + dy * dy);
       if (!measured_) { last_distance_ = distance; measured_ = true; }
       add("progress", weights_.progress, clamp(last_distance_ - distance, -0.05f, 0.05f), false);
       last_distance_ = distance;
