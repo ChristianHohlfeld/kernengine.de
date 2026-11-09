@@ -792,7 +792,20 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", e=>errors.push(e.message));
+  // Reproduce a device where ordinary Studio has a saved previous game.
+  // The embedded puppet must NOT restore it or show the "Start fresh" toast.
+  await page.addInitScript(() => {
+    if (location.pathname.endsWith("/kern/web/studio/index.html") &&
+        new URLSearchParams(location.search).has("motion")) {
+      localStorage.setItem("kern-studio.autosave.v1", JSON.stringify({
+        name:"Orb Run", text:"saved-normal-Studio-session", time:Date.now()
+      }));
+    }
+  });
   await page.goto(base + "/_site/lehrer/");
+  check((await page.locator("#motionStudio").getAttribute("src")) ===
+        "../kern/web/studio/index.html?motion=1",
+        "Lehrer: poser uses the module page outside the /editor/ service-worker scope");
   check(await page.locator("#motionPanel").isVisible(), "Lehrer: keyframe mode is visible on first load");
   check((await page.locator("#task").inputValue()) === "motion", "Lehrer: new motion is the default task");
   await page.waitForFunction(() => {
@@ -801,6 +814,19 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
       return w?.KernStudio?.state?.play?.state === "simulating";
     } catch { return false; }
   },null,{timeout:120000});
+  const state = await page.evaluate(() =>
+    document.querySelector("#motionStudio").contentWindow.KernStudio.state);
+  check(state.level.name === "Micro Duck · Posen" &&
+        state.play.state === "simulating",
+        "Lehrer: loads the zero-gravity Micro Duck instead of Orb Run");
+  const isolated = await page.evaluate(() => {
+    const w = document.querySelector("#motionStudio").contentWindow;
+    const toast = w.document.getElementById("toast");
+    return {toastHidden: !toast || toast.hidden,
+            preserved: !!w.localStorage.getItem("kern-studio.autosave.v1")};
+  });
+  check(isolated.toastHidden && isolated.preserved,
+        "Lehrer: no 'Start fresh' / 'Neu anfangen' overlay; saved Studio project untouched");
   const duck = await page.evaluate(() => {
     const w = document.querySelector("#motionStudio").contentWindow;
     return w.KernStudio.command({cmd:"motionPose"});
