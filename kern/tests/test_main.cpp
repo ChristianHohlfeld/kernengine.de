@@ -4962,6 +4962,39 @@ TEST(micro_duck_observation_between_ticks_is_what_its_controller_sees) {
   CHECK(worst == 0);
 }
 
+TEST(lehrer_free_scenario_defines_physics_goals_and_rewards) {
+  // No C++ changes per new scenario: the same JSON is supplied to native and WASM workers.
+  const std::string spec = R"({
+    "name":"Obstacle route","duration":3,
+    "start":{"yaw":0,"yawSpread":0},
+    "waypoints":[{"x":0.4,"y":0,"radius":0.12},{"x":0.9,"y":0.2,"radius":0.15}],
+    "objects":[{"kind":"box","x":0.6,"y":0.3,"width":0.15,"depth":0.2,"height":0.2},
+               {"kind":"sphere","x":1.0,"y":0.1,"radius":0.07,"dynamic":true}],
+    "rewards":{"progress":10,"waypoint":8,"finish":20,"upright":2,"fall":-12}
+  })";
+  CHECK(!lehrer::make_scenario_task(R"({"duration":-1})"));
+  CHECK(!lehrer::make_scenario_task(R"({"objects":[{"kind":"script","x":0,"y":0}]})"));
+  CHECK(!lehrer::make_scenario_task(R"({"waypoints":[{"x":1e100,"y":0}]})"));
+  auto scenario = lehrer::make_scenario_task(spec);
+  CHECK(scenario != nullptr);
+  if (!scenario) return;
+  lehrer::DuckEnv standard(lehrer::make_stand_task(), 42);
+  standard.task().randomize = false;
+  standard.reset();
+  lehrer::DuckEnv custom(std::move(scenario), 42);
+  custom.task().randomize = false;
+  custom.reset();
+  CHECK(custom.world().level().actors.size() == standard.world().level().actors.size() + 2);
+  CHECK(std::fabs(custom.observation()[55] - 0.4f) < 0.15f);
+  const f32 actions[lehrer::kActions] = {};
+  for (int i = 0; i < 4; ++i) {
+    const lehrer::Env::Step result = custom.step(actions);
+    CHECK(std::isfinite(result.reward));
+    CHECK(!custom.task().terms.empty());
+    if (result.terminal || result.timeout) break;
+  }
+}
+
 TEST(lehrer_duck_env_runs_episodes_headless) {
   lehrer::DuckEnv env(lehrer::make_stand_task(), 7);
   env.task().randomize = false;  // the clean robot: the check is that the external path is exact
