@@ -1270,8 +1270,13 @@ json::Value Studio::run(const json::Value& c) {
     l.camera.pitch = -23.0f;
     const game::ActorId duck = game::add_micro_duck(l, {0, 0, 0.45f});
     if (!duck) return error("Could not create Micro Duck");
-    for (game::Actor& a : l.actors)
+    for (game::Actor& a : l.actors) {
+      // A pose rig is limited by its hinges, NOT by the floor or by shell-to-shell
+      // collisions. All inertial rigid bodies and their revolute joints remain.
+      a.colliders.clear();
+      if (a.mesh) a.mesh->collision = false;
       if (a.controller) { a.controller->autonomous = false; a.controller->kern_extras = false; }
+    }
     load_level(std::move(l));
     if (!play(game::SimMode::simulate)) return error("Could not start the Micro Duck simulation");
     if (!world_->set_walker_external(duck, true) || !world_->set_walker_pose_edit(duck, true))
