@@ -1279,6 +1279,8 @@ json::Value Studio::run(const json::Value& c) {
     l.camera.yaw = 45.0f;
     l.camera.pitch = -18.0f;
     load_level(std::move(l));
+    set_layout(Layout::single);  // saved Studio quad layouts must not split the puppet
+    set_view_type(0, ViewType::perspective);
     tool_ = Tool::select;  // don't let transform gizmos intercept mouse/touch drags
     deselect();
     if (!play(game::SimMode::simulate))
