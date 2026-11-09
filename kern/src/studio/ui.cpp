@@ -1295,6 +1295,7 @@ json::Value Studio::run(const json::Value& c) {
   }
   if (name == "motionPose" || name == "motionEdit" || name == "motionPreview") {
     if (play_ != PlayState::simulating) return error("Start motion posing first");
+    if (name == "motionPose") world_->end_grab();  // stop drift before capturing the timed target
     for (const game::Actor& a : level_.actors) {
       game::GameWorld::WalkerProbe p;
       if (!world_->walker_probe(a.id, p)) continue;
