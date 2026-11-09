@@ -3441,6 +3441,49 @@ TEST(studio_observer_camera_grabs_bodies) {
   CHECK(!f.s->state()["play"]["observing"].as_bool());
 }
 
+TEST(studio_motion_puppet_has_no_servo_force_and_keeps_hard_limits) {
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"motionBegin"})")["ok"].as_bool());
+  CHECK(f.s->level().world.gravity.x == 0 && f.s->level().world.gravity.z == 0);
+  CHECK(!f.s->level().world.ground);  // no floor/furniture to obstruct free posing
+  CHECK(f.s->level().actors.size() == 16);  // trunk, 14 controlled links, mouth
+  game::ActorId duck = 0;
+  for (const game::Actor& a : f.s->level().actors) if (a.controller) duck = a.id;
+  CHECK(duck != 0);
+  if (!duck) return;
+  const auto trunk = f.s->world().actor_body(duck);
+  CHECK(f.s->world().physics().body_type(trunk) == physics::BodyType::fixed);
+  f.frames(10);
+  const auto before = f.s->world().walker_joints(duck);
+  CHECK(before.size() == 15);
+  for (const auto& j : before) {
+    CHECK(j.limit);        // physical travel stops remain on
+    CHECK(!j.spring);     // no implicit position servo spring
+    CHECK(!j.motor);      // no friction / holding motor
+  }
+  json::Value pose = f.cmd(R"({"cmd":"motionPose"})");
+  CHECK(pose["ok"].as_bool());
+  CHECK(pose["joints"].size() == 14);  // policy outputs; mouth separate
+  const auto head = f.s->world().actor_body(duck + 9);
+  CHECK(f.s->world().physics().body_type(head) == physics::BodyType::dynamic);
+  const auto start = f.s->world().physics().pose(head).position;
+  CHECK(f.s->world().begin_grab(duck + 9, start));
+  f.s->world().move_grab(start + Vec3{0, 0.7f, 0.7f});
+  f.frames(30);
+  f.s->world().end_grab();
+  const auto after = f.s->world().walker_joints(duck);
+  f32 moved = 0;
+  for (std::size_t i = 0; i < 14 && i < after.size(); ++i)
+    moved += std::fabs(after[i].angle - before[i].angle);
+  CHECK(moved > 0.005f);  // mouse can actually articulate the duck, not fight a home-pose motor
+  for (const auto& j : after) CHECK(j.limit && !j.spring && !j.motor);
+  CHECK(f.cmd(R"({"cmd":"motionAnchor","anchored":false})")["ok"].as_bool());
+  CHECK(f.s->world().physics().body_type(trunk) == physics::BodyType::dynamic);
+  CHECK(f.cmd(R"({"cmd":"motionAnchor","anchored":true})")["ok"].as_bool());
+  CHECK(f.s->world().physics().body_type(trunk) == physics::BodyType::fixed);
+  CHECK(f.cmd(R"({"cmd":"motionEdit"})")["ok"].as_bool());
+}
+
 TEST(studio_simulate_drags_bodies_without_ctrl) {
   StudioFixture f;
   game::Level l = game::basic_level();
