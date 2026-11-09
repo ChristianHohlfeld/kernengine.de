@@ -52,6 +52,9 @@ const PickupDetector* pickup_detector();
 /// The policies this program has: velstand.onnx is built in; the page (or a test) loads the
 /// others of the robot's set (kern_studio_load_policy / register_walker_policy).
 void register_walker_policy(std::shared_ptr<const WalkerPolicy> policy);
+/// Register a keyframed motion policy as a one-shot skill without recompiling the manifest.
+/// Requires a loaded 61->14 ONNX policy. The phase occupies observation slots 55/56.
+bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds);
 std::shared_ptr<const WalkerPolicy> walker_policy(std::string_view file);
 std::vector<std::string> walker_policy_files();
 
