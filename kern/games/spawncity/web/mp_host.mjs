@@ -17,6 +17,7 @@
 //     (routing.openstreetmap.de, FOSSGIS) when the streamed streets do not reach the goal
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
+import {WorldBasemap, mercX, mercY, lonOf, latOf} from "./world_map.mjs";
 
 // mqtt_data_relay.mjs BROKER_CONFIGS, direct_udp_peer.mjs DEFAULT_ICE_SERVERS
 const MP_BROKERS = [
@@ -304,13 +305,13 @@ const MP_CSS = `
 #mpShare>div{padding:18px 20px;border-radius:14px;background:#0d141c;border:1px solid #ffffff30;text-align:center;max-width:min(92vw,420px)}
 #mpShare canvas{background:#fff;border-radius:8px;image-rendering:pixelated;width:220px;height:220px}#mpShare p{font:600 12px/1.4 system-ui;color:#c8d4e0;word-break:break-all}
 #mpShare button{margin:4px;border-radius:9px;border:1px solid #fff4;background:#1b2b3a;color:#fff;font:800 12px system-ui;padding:8px 14px}
-#mpMap{position:fixed;inset:0;z-index:20;background:#0b1016;pointer-events:auto;touch-action:none}#mpMap canvas{width:100%;height:100%;display:block}
-#mpMap .bar{position:absolute;left:12px;right:12px;top:max(10px,env(safe-area-inset-top));display:flex;gap:8px}
+#mpMap{position:fixed;inset:0;z-index:80;background:#0b1016;pointer-events:auto;touch-action:none}#mpMap canvas{width:100%;height:100%;display:block}
+#mpMap .bar{position:absolute;left:12px;right:190px;top:max(10px,env(safe-area-inset-top));display:flex;gap:8px}
 #mpMap input{flex:1;min-width:0;padding:9px 12px;border-radius:10px;border:1px solid #ffffff30;background:#101820e8;color:#fff;font:600 14px system-ui}
 #mpMap button{border-radius:10px;border:1px solid #ffffff30;background:#16222ee8;color:#fff;font:800 13px system-ui;padding:0 14px}
 #mpMap ul{position:absolute;left:12px;right:12px;top:calc(max(10px,env(safe-area-inset-top)) + 46px);margin:0;padding:0;list-style:none;max-height:40vh;overflow:auto}
 #mpMap li{padding:8px 12px;background:#101820f0;border-bottom:1px solid #ffffff14;font:600 13px system-ui;cursor:pointer}#mpMap li small{display:block;color:#9fb0c2}
-#mpMap .info{position:absolute;left:12px;bottom:max(10px,env(safe-area-inset-bottom));padding:6px 10px;border-radius:8px;background:#070b10c4;font:700 12px system-ui;color:#dde6ef}
+#mpMap .info{position:absolute;left:12px;bottom:max(10px,env(safe-area-inset-bottom));max-width:calc(100% - 190px);padding:6px 10px;border-radius:8px;background:#070b10c4;font:700 12px system-ui;color:#dde6ef}#mpMap .info a{color:#9fd0ff}
 `;
 
 // The microphone: asked for on a tap (a browser asks only inside a user gesture, a headset not at
@@ -665,11 +666,16 @@ export class MpPage {
 
 // ---- the big map (world_map_full.mjs: GTA pause-map style; the game sends what it knows) -----------
 class MpBigMap {
+  // The view is the world's: longitude / latitude at the centre and a zoom (MapLibre's numbers, 3 the
+  // continents .. 19.5 the kerb - world_map_full.mjs). The ground is the real map of the whole
+  // world (world_map.mjs); what the game knows - me, the mates, the jet, pings, the destination and
+  // its route - is drawn on it.
   constructor(page) {
-    this.page = page; this.zoom = 1.2; this.follow = true; this.cx = 0; this.cy = 0; this.data = null; this.last = 0; this.pointers = new Map();
+    this.page = page; this.view = null; this.follow = true; this.data = null; this.last = 0; this.pointers = new Map();
+    this.base = new WorldBasemap(() => globalThis.SpawnCity?.tiles?.template || null);
     const el = document.createElement("div"); el.id = "mpMap";
     el.innerHTML = `<canvas></canvas><div class="bar"><input type="search" placeholder="Adresse oder Ort suchen" enterkeyhint="search"><button data-b="me">◎</button><button data-b="clear">ZIEL ✕</button><button data-b="close">✕</button></div><ul></ul>
-      <div class="info">Tippen: Wegpunkt · Ziehen: verschieben · Rad / Pinch: Zoom · M / Esc: schließen · © OpenStreetMap-Mitwirkende · Suche: Photon · Routen: FOSSGIS</div>`;
+      <div class="info">Tippen: Wegpunkt · Ziehen: verschieben · Rad / Pinch: Zoom · M / Esc: schließen · © <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://openmaptiles.org" target="_blank" rel="noopener">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende · Suche: Photon · Routen: FOSSGIS</div>`;
     document.body.appendChild(el);
     document.exitPointerLock?.();
     this.el = el; this.cv = el.querySelector("canvas"); this.g = this.cv.getContext("2d"); this.list = el.querySelector("ul"); this.input = el.querySelector("input");
@@ -677,35 +683,61 @@ class MpBigMap {
       const b = ev.target.closest("button")?.dataset.b;
       if (b === "close") page.command("bigmap close");
       if (b === "clear") page.command("nav clear");
-      if (b === "me") this.follow = true;
+      if (b === "me") { this.follow = true; this.last = 0; }
     });
     this.input.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Escape") page.command("bigmap close"); });
     this.onSlash = ev => { if (ev.code === "Slash" && document.activeElement !== this.input) { ev.preventDefault(); this.input.focus(); } };
     addEventListener("keydown", this.onSlash, true);
     this.input.addEventListener("input", () => { clearTimeout(this.searchTimer); this.searchTimer = setTimeout(() => this.search(), 350); });
-    this.cv.addEventListener("wheel", ev => { this.zoom = Math.max(0.05, Math.min(12, this.zoom * Math.exp(-ev.deltaY * 0.0015))); ev.preventDefault(); }, {passive: false});
-    this.cv.addEventListener("pointerdown", ev => { this.pointers.set(ev.pointerId, {x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY}); this.cv.setPointerCapture(ev.pointerId); });
+    this.cv.addEventListener("wheel", ev => { this.zoomBy(-ev.deltaY * 0.0022, ev.clientX, ev.clientY); ev.preventDefault(); }, {passive: false});
+    this.cv.addEventListener("pointerdown", ev => { this.pointers.set(ev.pointerId, {x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY, moved: false}); this.cv.setPointerCapture(ev.pointerId); });
     this.cv.addEventListener("pointermove", ev => {
       const p = this.pointers.get(ev.pointerId); if (!p) return;
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()], d0 = Math.hypot(a.x - b.x, a.y - b.y);
         p.x = ev.clientX; p.y = ev.clientY;
-        const d1 = Math.hypot(a.x - b.x, a.y - b.y); if (d0 > 1) this.zoom = Math.max(0.05, Math.min(12, this.zoom * d1 / d0));
+        const d1 = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d0 > 1 && d1 > 1) this.zoomBy(Math.log2(d1 / d0), (a.x + b.x) / 2, (a.y + b.y) / 2);
+        for (const q of this.pointers.values()) q.moved = true;
         return;
       }
-      this.cx -= (ev.clientX - p.x) / this.zoom; this.cy += (ev.clientY - p.y) / this.zoom; p.x = ev.clientX; p.y = ev.clientY;
-      if (Math.hypot(p.x - p.sx, p.y - p.sy) > 8) this.follow = false;
+      this.panPx(p.x - ev.clientX, p.y - ev.clientY); p.x = ev.clientX; p.y = ev.clientY;
+      if (Math.hypot(p.x - p.sx, p.y - p.sy) > 8) { this.follow = false; p.moved = true; }
     });
-    this.cv.addEventListener("pointerup", ev => {
+    const up = ev => {
       const p = this.pointers.get(ev.pointerId); this.pointers.delete(ev.pointerId);
-      if (p && Math.hypot(ev.clientX - p.sx, ev.clientY - p.sy) < 8 && this.pointers.size === 0) {
-        const [x, y] = this.toWorld(ev.clientX, ev.clientY);
-        page.command(`nav set ${x.toFixed(1)} ${y.toFixed(1)} Wegpunkt`);
+      if (ev.type === "pointerup" && p && !p.moved && this.pointers.size === 0 && this.view) {
+        const [lon, lat] = this.unproject(ev.clientX, ev.clientY);
+        page.command(`nav geo ${lon.toFixed(7)} ${lat.toFixed(7)} Wegpunkt`);
         this.last = 0;
       }
-    });
+    };
+    this.cv.addEventListener("pointerup", up);
+    this.cv.addEventListener("pointercancel", up);
   }
-  toWorld(px, py) { const w = this.cv.clientWidth, h = this.cv.clientHeight; return [this.cx + (px - w / 2) / this.zoom, this.cy - (py - h / 2) / this.zoom]; }
+  // ---- the view
+  scale() { return 512 * 2 ** this.view.zoom; }
+  project(lon, lat) { const s = this.scale(); return [this.cv.clientWidth / 2 + (mercX(lon) - mercX(this.view.lon)) * s, this.cv.clientHeight / 2 + (mercY(lat) - mercY(this.view.lat)) * s]; }
+  unproject(px, py) { const s = this.scale(); return [lonOf(mercX(this.view.lon) + (px - this.cv.clientWidth / 2) / s), latOf(mercY(this.view.lat) + (py - this.cv.clientHeight / 2) / s)]; }
+  panPx(dx, dy) {
+    if (!this.view) return;
+    const s = this.scale();
+    this.view.lon = lonOf(((mercX(this.view.lon) + dx / s) % 1 + 1) % 1);
+    this.view.lat = Math.max(-84, Math.min(84, latOf(mercY(this.view.lat) + dy / s)));
+  }
+  zoomBy(dz, px, py) {
+    if (!this.view) return;
+    const w = this.cv.clientWidth, h = this.cv.clientHeight, at = px === undefined ? [w / 2, h / 2] : [px, py];
+    const before = this.unproject(at[0], at[1]);
+    this.view.zoom = Math.max(3, Math.min(19.5, this.view.zoom + dz));
+    // the place under the finger / the cursor stays under it
+    const after = this.project(before[0], before[1]);
+    this.panPx(after[0] - at[0], after[1] - at[1]);
+    if (px !== undefined && Math.abs(dz) > 1e-4 && Math.hypot(at[0] - w / 2, at[1] - h / 2) > 40) this.follow = false;
+  }
+  // the game's metres <-> the world (kern::GeoProjector: equirectangular round the city's origin)
+  toLonLat(x, y) { const d = this.data, R = 6378137, k = Math.PI / 180; return [d.lon0 + x / (R * k * Math.max(0.01, Math.cos(d.lat0 * k))), d.lat0 + y / (R * k)]; }
+  P(x, y) { const [lon, lat] = this.toLonLat(x, y); return this.project(lon, lat); }
   async search() {
     const q = this.input.value.trim(), d = this.data;
     if (q.length < 3) { this.list.innerHTML = ""; return; }
@@ -721,19 +753,29 @@ class MpBigMap {
         const it = items[+ev.target.closest("li")?.dataset.i];
         if (!it) return;
         this.page.command(`nav geo ${it.lon} ${it.lat} ${it.name.replace(/\s+/g, " ").slice(0, 80)}`);
-        this.list.innerHTML = ""; this.input.value = ""; this.follow = true; this.last = 0;
+        this.list.innerHTML = ""; this.input.value = ""; this.last = 0;
+        // the place found, in view
+        if (this.view) { this.follow = false; this.view.lon = it.lon; this.view.lat = it.lat; this.view.zoom = Math.max(this.view.zoom, 14); }
       };
     } catch { this.list.innerHTML = "<li>Suche nicht erreichbar</li>"; }
   }
   frame() {
     const now = performance.now();
-    this.padInput();
     if (now - this.last > 250) {
       this.last = now;
-      const range = Math.max(this.cv.clientWidth, this.cv.clientHeight) / this.zoom * 0.6 + 50;
-      try { this.data = JSON.parse(this.page.command(this.follow ? `bigmap follow ${Math.min(3000, range).toFixed(0)}` : `bigmap ${this.cx.toFixed(0)} ${this.cy.toFixed(0)} ${Math.min(3000, range).toFixed(0)}`)); } catch { /* keep */ }
-      if (this.follow && this.data?.me) { this.cx = this.data.me[0]; this.cy = this.data.me[1]; }
+      // (the game's own streets are only drawn where there is no map of the world: the stand-in town)
+      let range = 60;
+      if (this.view && this.data && !this.data.real) range = Math.min(3000, Math.max(this.cv.clientWidth, this.cv.clientHeight) * 40075016.686 * Math.cos(this.view.lat * Math.PI / 180) / this.scale() * 0.6 + 50);
+      try { this.data = JSON.parse(this.page.command(`bigmap follow ${range.toFixed(0)}`)); } catch { /* keep */ }
     }
+    const d = this.data;
+    if (d?.me && d.lon0 !== undefined) {
+      const [lon, lat] = this.toLonLat(d.me[0], d.me[1]);
+      // opened: on me, as close as the craft is fast (world_map_full.mjs: jet 12.5, a high drone 14.5, else 16)
+      if (!this.view) this.view = {lon, lat, zoom: d.mode === "jet" ? 12.5 : d.mode === "drone" && d.agl > 120 ? 14.5 : 16};
+      else if (this.follow) { this.view.lon = lon; this.view.lat = lat; }
+    }
+    this.padInput();
     this.draw();
   }
   padInput() {
@@ -743,60 +785,78 @@ class MpBigMap {
     const p = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g?.connected) : null;
     const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - (this.padAt || now)) / 1000));
     this.padAt = now;
-    if (!p) return;
+    if (!p || !this.view) return;
     const ax = i => { const v = +p.axes[i] || 0, a = Math.abs(v); return a <= 0.15 ? 0 : Math.sign(v) * (a - 0.15) / 0.85; }, b = i => !!p.buttons[i]?.pressed;
     const sx = ax(0), sy = ax(1);
-    if (sx || sy) { this.cx += sx * Math.abs(sx) * 900 * dt / this.zoom; this.cy -= sy * Math.abs(sy) * 900 * dt / this.zoom; this.follow = false; }
+    if (sx || sy) { this.panPx(sx * Math.abs(sx) * 900 * dt, sy * Math.abs(sy) * 900 * dt); this.follow = false; }
     const tz = (p.buttons[7]?.value || 0) - (p.buttons[6]?.value || 0);
-    if (tz) this.zoom = Math.max(0.05, Math.min(12, this.zoom * Math.exp(tz * 2.2 * dt)));
+    if (tz) this.zoomBy(tz * 2.2 * dt);
     if (!this.padWas) this.padWas = p.buttons.map(x => x.pressed);  // buttons held as the map opened
     const pressed = i => b(i) && !this.padWas[i];
-    if (pressed(0)) this.page.command(`nav set ${this.cx.toFixed(1)} ${this.cy.toFixed(1)} Wegpunkt`);
+    if (pressed(0)) this.page.command(`nav geo ${this.view.lon.toFixed(7)} ${this.view.lat.toFixed(7)} Wegpunkt`);
     if (pressed(2)) this.page.command("nav clear");
     if (pressed(3)) this.input.focus();
-    if (pressed(14)) this.zoom = Math.max(0.05, this.zoom / 2);
-    if (pressed(15)) this.zoom = Math.min(12, this.zoom * 2);
+    if (pressed(14)) this.zoomBy(-1);
+    if (pressed(15)) this.zoomBy(1);
     if (pressed(11)) this.follow = true;
     if (pressed(1) || pressed(8)) this.page.command("bigmap close");
     this.padWas = p.buttons.map(x => x.pressed);
   }
   draw() {
     const cv = this.cv, g = this.g, dpr = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
-    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = "#0b1016"; g.fillRect(0, 0, w, h);
-    const d = this.data; if (!d?.me) return;
-    const X = x => w / 2 + (x - this.cx) * this.zoom, Y = y => h / 2 - (y - this.cy) * this.zoom;
-    g.strokeStyle = "#cfd7e0"; g.lineCap = g.lineJoin = "round"; g.lineWidth = Math.max(1.2, 7 * this.zoom); g.globalAlpha = .75;
-    for (const l of d.lanes) { g.beginPath(); for (let i = 0; i < l.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(l[i]), Y(l[i + 1])); g.stroke(); }
-    g.globalAlpha = 1;
-    if (d.route?.length >= 4) {
-      g.strokeStyle = "#ffd76a"; g.lineWidth = Math.max(3, 4 * this.zoom); g.setLineDash([10, 6]); g.beginPath();
-      for (let i = 0; i < d.route.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(d.route[i]), Y(d.route[i + 1]));
-      g.stroke(); g.setLineDash([]);
-    }
-    const dot = (x, y, c, r) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
-    if (d.dest) { dot(X(d.dest.x), Y(d.dest.y), "#ffd76a", 8); g.fillStyle = "#fff"; g.font = "700 12px system-ui"; g.fillText(d.dest.name, X(d.dest.x) + 11, Y(d.dest.y) + 4); }
-    if (d.jet) dot(X(d.jet[0]), Y(d.jet[1]), "#7fd3ff", 6);
-    for (const p of d.pings) { g.fillStyle = p.color; g.save(); g.translate(X(p.x), Y(p.y)); g.rotate(Math.PI / 4); g.fillRect(-6, -6, 12, 12); g.restore(); }
-    // Players; one off the map sits at its edge with an arrow toward him (map_peer_edge.mjs).
-    for (const p of d.players) {
-      let x = X(p.x), y = Y(p.y), off = false;
-      const ix = 16, it = 60, ib = 40;
-      if (x < ix || x > w - ix || y < it || y > h - ib) {
-        const cx = w / 2, cy = (it + h - ib) / 2, dx = x - cx, dy = y - cy;
-        const t = Math.min(dx ? ((dx > 0 ? w - ix : ix) - cx) / dx : Infinity, dy ? ((dy > 0 ? h - ib : it) - cy) / dy : Infinity);
-        x = cx + dx * t; y = cy + dy * t; off = true;
+    const d = this.data;
+    if (!d?.me || !this.view) { g.fillStyle = "#0b1016"; g.fillRect(0, 0, w, h); return; }
+    const mpp = 40075016.686 * Math.cos(this.view.lat * Math.PI / 180) / this.scale();  // metres per pixel here
+    g.lineCap = g.lineJoin = "round";
+    if (d.real) this.base.draw(g, w, h, this.view);
+    else {
+      // the stand-in town (no map service): the game's own streets
+      g.fillStyle = "#f8f4f0"; g.fillRect(0, 0, w, h);
+      for (const pass of [["#cfcdca", 2], ["#ffffff", 0]]) {
+        g.strokeStyle = pass[0]; g.lineWidth = Math.max(1.2, 7 / mpp) + pass[1];
+        for (const l of d.lanes) { g.beginPath(); for (let i = 0; i < l.length; i += 2) { const [x, y] = this.P(l[i], l[i + 1]); (i ? g.lineTo : g.moveTo).call(g, x, y); } g.stroke(); }
       }
-      dot(x, y, p.dead ? "#777" : p.color, off ? 6 : 7);
-      g.fillStyle = "#fff"; g.font = "800 11px system-ui"; g.fillText(`P${p.index}${off ? " ›" : ""}`, x + 9, y + 4);
     }
-    // Me: an arrow along the view.
-    g.save(); g.translate(X(d.me[0]), Y(d.me[1])); g.rotate(d.me[2]);
-    g.fillStyle = "#ffd23e"; g.beginPath(); g.moveTo(0, -13); g.lineTo(9, 10); g.lineTo(0, 5); g.lineTo(-9, 10); g.closePath(); g.fill(); g.restore();
+    if (d.route?.length >= 4) {
+      for (const pass of [["#0b2235", 7, .85], ["#4ab3ff", 4, 1]]) {
+        g.strokeStyle = pass[0]; g.lineWidth = pass[1]; g.globalAlpha = pass[2]; g.beginPath();
+        for (let i = 0; i < d.route.length; i += 2) { const [x, y] = this.P(d.route[i], d.route[i + 1]); (i ? g.lineTo : g.moveTo).call(g, x, y); }
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+    if (d.real) this.base.drawLabels(g, w, h, this.view);
+    const dot = (x, y, c, r) => { g.fillStyle = "#0b1118"; g.beginPath(); g.arc(x, y, r + 2, 0, Math.PI * 2); g.fill(); g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    const tag = (t, x, y) => { g.font = "800 12px Inter, system-ui, sans-serif"; g.lineWidth = 3.5; g.strokeStyle = "#0b1118"; g.strokeText(t, x, y); g.fillStyle = "#fff"; g.fillText(t, x, y); };
+    if (d.dest) { const [x, y] = this.P(d.dest.x, d.dest.y); dot(x, y, "#ffd76a", 8); tag(d.dest.name, x + 12, y + 4); }
+    if (d.jet) { const [x, y] = this.P(d.jet[0], d.jet[1]); dot(x, y, "#7fd3ff", 6); }
+    for (const p of d.pings) { const [x, y] = this.P(p.x, p.y); g.fillStyle = p.color; g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillRect(-6, -6, 12, 12); g.restore(); }
+    // Players; one off the map sits at its edge with an arrow toward him (map_peer_edge.mjs).
+    const edge = (x, y) => {
+      const ix = 16, it = 60, ib = 40;
+      if (!(x < ix || x > w - ix || y < it || y > h - ib)) return [x, y, false];
+      const cx = w / 2, cy = (it + h - ib) / 2, dx = x - cx, dy = y - cy;
+      const t = Math.min(dx ? ((dx > 0 ? w - ix : ix) - cx) / dx : Infinity, dy ? ((dy > 0 ? h - ib : it) - cy) / dy : Infinity);
+      return [cx + dx * t, cy + dy * t, true];
+    };
+    for (const p of d.players) {
+      const [x, y, off] = edge(...this.P(p.x, p.y));
+      dot(x, y, p.dead ? "#777" : p.color, off ? 6 : 7);
+      tag(`P${p.index}${off ? " ›" : ""}`, x + 10, y + 4);
+    }
+    // Me: an arrow along the view (at the map's edge when I am off it).
+    {
+      const [x, y, off] = edge(...this.P(d.me[0], d.me[1]));
+      g.save(); g.translate(x, y); g.rotate(d.me[2]); if (off) g.scale(0.8, 0.8);
+      g.fillStyle = "#0b1118"; g.beginPath(); g.moveTo(0, -16); g.lineTo(12, 13); g.lineTo(0, 7); g.lineTo(-12, 13); g.closePath(); g.fill();
+      g.fillStyle = "#ffd23e"; g.beginPath(); g.moveTo(0, -13); g.lineTo(9, 10); g.lineTo(0, 5); g.lineTo(-9, 10); g.closePath(); g.fill(); g.restore();
+    }
     // scale bar
-    const m = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find(v => v * this.zoom > 70) || 5000;
-    g.fillStyle = "#fff"; g.fillRect(w - 20 - m * this.zoom, h - 30, m * this.zoom, 3); g.font = "700 11px system-ui"; g.fillText(m >= 1000 ? `${m / 1000} km` : `${m} m`, w - 20 - m * this.zoom, h - 36);
+    const m = [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000].find(v => v / mpp > 70) || 2000000, bw = m / mpp;
+    g.fillStyle = "#0b1118"; g.fillRect(w - 21 - bw, h - 31, bw + 2, 5); g.fillStyle = "#fff"; g.fillRect(w - 20 - bw, h - 30, bw, 3);
+    tag(m >= 1000 ? `${m / 1000} km` : `${m} m`, w - 20 - bw, h - 36);
   }
-  close() { removeEventListener("keydown", this.onSlash, true); this.el.remove(); }
+  close() { removeEventListener("keydown", this.onSlash, true); this.base.dispose(); this.el.remove(); }
 }

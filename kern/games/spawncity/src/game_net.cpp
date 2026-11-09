@@ -982,7 +982,10 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
   const Vec3 look = cam_.target - cam_.eye;
   f64 lon = 0, lat = 0;
   unproject(city_.projector(), me.x, me.y, lon, lat);
-  std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.3f],\"lon\":%.6f,\"lat\":%.6f,\"real\":%s,\"lanes\":[", me.x, me.y, std::atan2(look.x, look.y), lon, lat,
+  static const char* kModes[] = {"foot", "drone", "car", "jet", "parachute"};
+  const u32 mi = static_cast<u32>(mode_);
+  std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.3f],\"lon\":%.6f,\"lat\":%.6f,\"lon0\":%.8f,\"lat0\":%.8f,\"mode\":\"%s\",\"agl\":%.0f,\"real\":%s,\"lanes\":[", me.x, me.y,
+                std::atan2(look.x, look.y), lon, lat, city_.projector().lon0, city_.projector().lat0, mi < 5 ? kModes[mi] : "foot", me.z - city_.ground_height(me.x, me.y),
                 city_.has_real_data() ? "true" : "false");
   o += b;
   bool first = true;

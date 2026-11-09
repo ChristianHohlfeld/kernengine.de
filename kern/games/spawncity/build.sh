@@ -115,6 +115,11 @@ import shutil
 shutil.copyfile(music, out.parent / "sim/audio/8_bits_only.m4a")
 # the job workers load kern.mjs from this text (no module URL in a single file)
 view_inline += "globalThis.__kernSource = " + json.dumps(sources["kern"]).replace("</script", "<\\/script") + ";\n"
+# the big map's ground (world_map.mjs with its tile reader / painter): two scopes of their own
+map_tiles = strip((here / "web/world_map_tiles.mjs").read_text())
+map_base = strip((here / "web/world_map.mjs").read_text())
+view_inline += ("globalThis.__scMapTiles = (() => {\n" + map_tiles + "\nreturn {parseTile, renderTile, labelsOf};\n})();\n" +
+                "const {WorldBasemap, mercX, mercY, lonOf, latOf} = (() => {\n" + map_base + "\nreturn {WorldBasemap, mercX, mercY, lonOf, latOf};\n})();\n").replace("</script", "<\\/script")
 bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "jobs", "view", "view_modes", "view_menu", "audio", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
