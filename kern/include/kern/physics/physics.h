@@ -239,6 +239,10 @@ class World {
   void set_joint_motor(Joint joint, bool enable, f32 speed, f32 max_force);
   /// Revolute joints: angle of B relative to A (radians, from the reference angle); 0 for others.
   f32 joint_angle(Joint joint) const;
+  /// Inspect physical hinge constraints (useful for checking free puppets vs motorised robots).
+  bool joint_spring_enabled(Joint joint) const;
+  bool joint_motor_enabled(Joint joint) const;
+  bool joint_limit_enabled(Joint joint) const;
   /// Revolute joints: angular speed of B relative to A about the hinge axis (rad/s); 0 for others.
   f32 joint_speed(Joint joint) const;
   /// Revolute joints: a spring-damper toward `target` (radians) in physical units, stiffness N*m/rad
