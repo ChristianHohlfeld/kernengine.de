@@ -1569,6 +1569,47 @@ std::string Game::command(const std::string& cmd) {
             out += b;
           }
           out += "]";
+          // a car that stands wrong: what it touches - per part (0 the chassis, 1-4 the wheels)
+          // the other body [part, its type (0 fixed, 1 kinematic, 2 dynamic), the car it belongs to
+          // or -1, impulse] and the contact points [part, normal x y z, separation, impulse,
+          // height over the ground]
+          bool odd = p.z - city_.ground_height(p.x, p.y) - Car::ground_offset(c.car->spec()) < -0.08f;
+          for (int k = 0; k < 4; ++k) {
+            const kern::physics::Body wb = c.car->wheel_body(k);
+            if (!wb.valid() || !w.body_valid(wb)) continue;
+            const Vec3 hub = w.pose(wb).position;
+            odd = odd || hub.z - c.car->spec().radius - city_.ground_height(hub.x, hub.y) < -0.08f || c.car->wheel(k).travel > c.car->spec().susp_upper + 0.05f;
+          }
+          if (odd) {
+            auto owner = [&](kern::physics::Body o) {
+              for (std::size_t j = 0; j < cars_.size(); ++j) {
+                if (body(cars_[j].actor) == o) return static_cast<i32>(j);
+                for (int k = 0; k < 4; ++k) if (cars_[j].car->rigged() && cars_[j].car->wheel_body(k) == o) return static_cast<i32>(j);
+              }
+              return -1;
+            };
+            std::string touch = ",\"touch\":[", cps = ",\"cp\":[";
+            for (int part = 0; part < 5; ++part) {
+              const kern::physics::Body pb = part == 0 ? cb : c.car->wheel_body(part - 1);
+              if (!pb.valid() || !w.body_valid(pb)) continue;
+              std::vector<std::pair<kern::physics::Body, f32>> ts;
+              w.touching(pb, ts);
+              for (const auto& [o, imp] : ts) {
+                const kern::physics::BodyType bt = w.body_valid(o) ? w.body_type(o) : kern::physics::BodyType::fixed;
+                std::snprintf(b, sizeof b, "%s[%d,%d,%d,%.0f]", touch.back() == '[' ? "" : ",", part, bt == kern::physics::BodyType::fixed ? 0 : bt == kern::physics::BodyType::kinematic ? 1 : 2, owner(o), imp);
+                touch += b;
+              }
+              std::vector<kern::physics::ContactPoint> pts;
+              w.contact_points(pb, pts);
+              for (const kern::physics::ContactPoint& q : pts) {
+                if (cps.size() > 1500) break;
+                std::snprintf(b, sizeof b, "%s[%d,%.2f,%.2f,%.2f,%.2f,%.0f,%.2f]", cps.back() == '[' ? "" : ",", part, q.normal.x, q.normal.y, q.normal.z, q.separation, q.impulse,
+                              q.point.z - city_.ground_height(q.point.x, q.point.y));
+                cps += b;
+              }
+            }
+            out += touch + "]" + cps + "]";
+          }
         }
       }
       out += "}";
