@@ -6,9 +6,9 @@
 // and does what only a browser can do: menus and dialogs as DOM, file pickers,
 // downloads, the clipboard, pointer lock, decoding images, local storage and
 // packaging standalone games.
-import {loadKern} from "../kern.mjs";
+import {loadKern, chordedButton} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, trainedPolicies, POINTER, chordedButton, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
@@ -656,7 +656,7 @@ class StudioPage {
       // a second mouse button while one is held (right-button fly + left, aim + fire) comes as a
       // move: chordedButton
       const chord = chordedButton(e);
-      if (chord !== null) { send(chord, e); this.flushUi(); e.preventDefault(); return; }
+      if (chord !== null) { send(chord ? POINTER.down : POINTER.up, e); this.flushUi(); e.preventDefault(); return; }
       send(POINTER.move, e);
     });
     el.addEventListener("pointerup", e => { if (!routeTouch(this.engine, POINTER.up, e, pos)) send(POINTER.up, e); this.flushUi(); });
@@ -2022,7 +2022,7 @@ class StudioPage {
     this.canvas.addEventListener("pointerdown", e => lockedButton(POINTER.down, e));
     this.canvas.addEventListener("pointerup", e => lockedButton(POINTER.up, e));
     // (a second button while one is held - aim, then fire - comes as a move: chordedButton)
-    this.canvas.addEventListener("pointermove", e => { const chord = chordedButton(e); if (chord !== null) lockedButton(chord, e); });
+    this.canvas.addEventListener("pointermove", e => { const chord = chordedButton(e); if (chord !== null) lockedButton(chord ? POINTER.down : POINTER.up, e); });
     this.canvas.addEventListener("mousedown", e => { if (document.pointerLockElement === this.canvas) e.preventDefault(); });
   }
 

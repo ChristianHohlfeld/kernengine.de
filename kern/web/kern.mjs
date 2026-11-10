@@ -37,6 +37,21 @@ const MAX_POINT_LIGHTS = 6;
 // Linear colour tagging (vertex colours baked from linear sources skip the
 // sRGB decode). Kept as a WeakSet so callers can tag shared arrays once.
 const LINEAR_COLOR_ARRAYS = new WeakSet();
+/**
+ * Chorded mouse buttons - the one place that knows how the browser reports them, for every host
+ * (app.mjs, studio/game.mjs, the Studio). Pointer Events report a mouse button that is pressed or
+ * let go while another one is held as a `pointermove` whose `button` names it - never as
+ * pointerdown / pointerup (W3C Pointer Events, "chorded button interactions"). So aiming with the
+ * right button and then firing with the left arrives as a move.
+ * Returns true when the event says that button is now held, false when it was let go (its new
+ * state is in `buttons`), and null for anything else (a plain move, a finger, a pen).
+ */
+export function chordedButton(e) {
+  if (e.pointerType !== "mouse" || !(e.button >= 0)) return null;
+  const bit = e.button === 1 ? 4 : e.button === 2 ? 2 : 1 << e.button;  // button 1 = middle (bit 4), 2 = right (bit 2)
+  return (e.buttons & bit) !== 0;
+}
+
 export function markLinearColors(...arrays) {
   for (const a of arrays) if (a && typeof a === "object") LINEAR_COLOR_ARRAYS.add(a);
   return arrays[0];

@@ -6,7 +6,7 @@
 // full screen: rendering, Box3D physics, controllers and game rules all run in
 // C++ (kern::game::GameWorld). This file sizes the canvas, forwards input and
 // draws the HUD text - nothing else.
-import {loadKern, KERN_NOTICES} from "../kern.mjs";
+import {loadKern, KERN_NOTICES, chordedButton} from "../kern.mjs";
 
 /**
  * German interface for Kern Studio and the games, purely visual: the engine, its commands, the
@@ -495,19 +495,6 @@ export function localizePage() {
 
 
 export const POINTER = {down: 0, move: 1, up: 2, cancel: 3, wheel: 4, leave: 5};
-
-/**
- * Chorded mouse buttons. Pointer Events report a mouse button that is pressed or released while
- * another one is held as a `pointermove` whose `button` names it - never as pointerdown /
- * pointerup (W3C Pointer Events: "chorded button interactions"). So aiming with the right button
- * and then firing with the left arrives as a move. Returns POINTER.down / POINTER.up for such an
- * event (the button's new state is in `buttons`), null for a plain move.
- */
-export function chordedButton(e) {
-  if (e.pointerType !== "mouse" || !(e.button >= 0)) return null;
-  const bit = e.button === 1 ? 4 : e.button === 2 ? 2 : 1 << e.button;  // button 1 = middle (bit 4), 2 = right (bit 2)
-  return (e.buttons & bit) ? POINTER.down : POINTER.up;
-}
 
 /** Thin wrapper over kern/src/studio/api.cpp. */
 const AO_QUALITIES = ["low", "medium", "high", "ultra"];
@@ -1538,7 +1525,7 @@ export async function startGame({levelText = null, template = null, bytes = null
     if (routeTouch(engine, POINTER.move, e, at)) return;
     // a second mouse button while one is held (aim, then fire) comes as a move: chordedButton
     const chord = chordedButton(e);
-    if (chord !== null) { e.preventDefault(); send(chord, e); return; }
+    if (chord !== null) { e.preventDefault(); send(chord ? POINTER.down : POINTER.up, e); return; }
     if (document.pointerLockElement !== canvas) send(POINTER.move, e);
   });
   canvas.addEventListener("pointerup", e => { if (!routeTouch(engine, POINTER.up, e, at)) send(POINTER.up, e); });

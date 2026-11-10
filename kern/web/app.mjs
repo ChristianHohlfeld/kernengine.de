@@ -2,7 +2,7 @@
 // (kern/include/kern/app/app.h) in a canvas. Owns only what the browser
 // forces into JavaScript: the WebGL2 context, the frame callback, the
 // drawing-buffer size and input events, all forwarded to the module.
-import {loadKern} from "./kern.mjs";
+import {loadKern, chordedButton} from "./kern.mjs";
 
 export const KERN_APP_VERSION = "kern-app-host-1";
 
@@ -71,10 +71,9 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   on(window, "keyup", event => { const k = KEY_INDEX.get(event.code); if (k !== undefined) e.kern_app_key(k, 0); });
   // The mouse buttons held, taken from the button events alone: pointerdown, pointerup and - for a
   // second button while one is already held (aim with the right, then fire with the left) - the
-  // pointermove that names it in `button` (Pointer Events: chorded buttons come as moves, never as
-  // pointerdown / pointerup). A plain move's `buttons` is not read: the browser's own synthetic
-  // moves (it tests again what lies under the cursor whenever the page changes) do not carry the
-  // buttons that are held, and would let go of them.
+  // pointermove that names it (kern.mjs chordedButton). A plain move's `buttons` is not read: the
+  // browser's own synthetic moves (it tests again what lies under the cursor whenever the page
+  // changes) do not carry the buttons that are held, and would let go of them.
   let held = 0;
   on(window, "blur", () => { held = 0; e.kern_app_focus(0); });
   on(window, "focus", () => e.kern_app_focus(1));
@@ -89,7 +88,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   on(canvas, "pointermove", event => {
     const [x, y] = local(event), r = ratio();
     if (event.pointerType === "touch") { e.kern_app_touch(event.pointerId, 1, x, y); return; }
-    if (event.button >= 0) held = event.buttons;  // a chorded button changed
+    if (chordedButton(event) !== null) held = event.buttons;  // a second button was pressed or let go
     e.kern_app_pointer(x, y, (event.movementX || 0) * r, (event.movementY || 0) * r, held);
   });
   const up = event => {
