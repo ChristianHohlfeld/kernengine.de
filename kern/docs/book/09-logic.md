@@ -197,7 +197,7 @@ level).
 | `call(name, target, args)` | custom event on all instances (or the target's) and event transitions with this name |
 | `find(self)`, `instances()` | access |
 | `trace()`, `tracing` | which nodes ran (for the editor) |
-| `budget` | 200,000 node executions per step |
+| `budget` | 200,000 loop passes per step (the loop guard) |
 | `jit` | enable the JIT (default: on, where the host can) |
 
 An `Instance` offers `get`/`set` for variables, `state`/`set_state` for state machines,
@@ -237,8 +237,13 @@ Data is **pulled**: an input connected to a pure node executes that node's `run`
 
 ### Protection against infinite loops
 
-- More than `budget` (200,000) nodes in one step: the instance is disabled ("infinite loop? The graph
-  is stopped.").
+- The loop guard: more than `budget` (200,000) loop passes in one step. Loops are the one thing in
+  a graph without a fixed end – a path that leads back into itself without a wait, a function that
+  calls itself and a tween played from its own Update are compile errors. Over the limit the loops
+  of the chain end at once, the rest of the chain runs to its end, and then the instance is
+  disabled ("infinite loop? The Blueprint is stopped."). Every tier counts the same passes
+  (`Runtime::pass`) and stops at the same one – also a Blueprint compiled as its C++ class, which
+  cannot abort a chain in its middle.
 - Events that trigger events may nest at most 64 deep; beyond that, the chain is stopped.
 - In compiled code: more than 512 nested loops/sequences stop the instance.
 
@@ -412,7 +417,7 @@ The shared state lives in the instance, at fixed addresses that never change aft
 | `slots()` | f64 slots: first the numeric variables (bool, int, float), then **8 per node** – 4 for state (loop index, gate open, flip-flop …) and 4 for data outputs of inline-generated exec nodes |
 | `stack()` | i32 continuation stack: `[0]` = depth, then pairs (pc, entry); 512 entries |
 | `exec_table()` | per node and exec output: (target, input) |
-| `counters()` | `[0]` nodes in this step, `[1]` limit (the budget), `[2]` tracing on |
+| `counters()` | `[0]` nodes run (a count), `[1]` the limit of loop passes per step (the budget), `[2]` tracing on, `[3]` loop passes in this step, `[4]` a loop of the running chain was refused a pass |
 
 Non-numeric variables (vector, text, actor) live in a map in the instance and are read via node
 functions.
@@ -421,8 +426,9 @@ functions.
 
 The generated program is a **loop over a program counter** – one case per node. This keeps every exec
 wiring valid, including merges and cycles. Continuations of Sequence and loops go onto the
-instance's stack, exactly as in the interpreter. Every iteration increments `counters[0]`; above the
-limit the function returns 1 (infinite loop), with a full stack 2.
+instance's stack, exactly as in the interpreter. Every iteration increments `counters[0]`. A loop
+node counts its pass in `counters[3]`; at the limit it takes Completed instead and sets
+`counters[4]` (the loop guard). With a full stack the function returns 2.
 
 The WebAssembly module:
 
@@ -500,8 +506,8 @@ The three tiers are **interchangeable**, even in the middle of a game:
   matter in which tier – with the same semantics.
 - Kern is deterministic ([Chapter 6](06-physics.md), Section 6.14). A graph that computed differently
   when compiled in the browser than natively in the interpreter would devalue replays, training and
-  debugging. The budget against infinite loops also counts identically in both tiers (node
-  executions per step) and disables the same graphs.
+  debugging. The guard against infinite loops also counts identically in every tier (loop passes
+  per step) and stops the same graphs at the same pass.
 - The editor debugs with the same semantics: breakpoints and the live display of running nodes also
   work in compiled code (`trace`).
 

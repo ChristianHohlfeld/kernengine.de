@@ -440,6 +440,7 @@ struct BlueprintWorld {
   class Runtime* runtime = nullptr;
   class Instance* instance = nullptr;
   ActorRef self = 0;
+  i32* counters = nullptr;  // the runtime's shared counters ([3] loop passes this step, [1] their limit)
 };
 class NativeBlueprint {
  public:
@@ -598,6 +599,8 @@ class Instance {
   bool jit_pending_ = false;
   NativeGraphFn native_ = nullptr;
   std::unique_ptr<NativeBlueprint> blueprint_;  // the Blueprint as its compiled C++ class (register_native_blueprint)
+  int active_ = 0;                    // chains of this instance that are running (nested: events, calls)
+  bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
   bool begun_ = false;
 };
@@ -643,8 +646,14 @@ class Runtime {
   const std::vector<Trace>& trace() const { return trace_; }
   void clear_trace() { trace_.clear(); }
   bool tracing = false;
-  /// Node executions in one tick before the runtime assumes an infinite loop.
+  /// The loop guard: loop passes in one step before the runtime assumes an endless loop. Loops are
+  /// the one thing in a Blueprint without a fixed end (paths back, functions calling themselves
+  /// and a tween played from its own Update are errors of the graph). Over the limit the loops of
+  /// the chain end at once, the rest of the chain runs to its end, and then the Blueprint is
+  /// stopped (disabled) and it is said - the same in every tier.
   u32 budget = 200000;
+  /// May a loop of `inst` make another pass? (Counts it. False: the guard - the loop ends.)
+  bool pass(Instance& inst);
   u64 executed() const { return executed_; }
   /// The host linked the native code of instance `id` (`function` = table index, < 0 failed).
   static void jit_ready(i32 id, i32 function);
@@ -668,7 +677,8 @@ class Runtime {
   void run_from(Instance& inst, int node, int entry);
   void enter_state(Instance& inst, std::size_t machine, u32 state);
   void check_transitions(Instance& inst, const std::string* event);
-  bool over_budget(Instance& inst);
+  void step_starts();              // a new step: the guard counts from zero
+  void chain_ends(Instance& inst); // the outermost chain of a stopped Blueprint is over: it is disabled
   Host& host_;
   const Library& lib_;
   std::vector<std::unique_ptr<Instance>> instances_;
@@ -676,7 +686,9 @@ class Runtime {
   std::vector<Trace> trace_;
   u64 executed_ = 0, tick_start_ = 0, serial_ = 0;
   int depth_ = 0;
-  i32 counters_[4] = {0, 200000, 0, 0};  // generated code: nodes run, limit, tracing
+  i32 counters_[5] = {0, 200000, 0, 0, 0};     // shared with generated code: [0] nodes run, [1] the limit of loop
+                                               // passes per step, [2] tracing, [3] loop passes this step, [4] a loop
+                                               // of the running compiled chain was refused a pass
   bool run_compiled(Instance& inst, int node, int entry);
 };
 
@@ -718,8 +730,10 @@ class Context {
   void cancel_waits();
   /// After the current chain ends, continue at this node's exec output (Sequence, loops).
   void then(int exec_output);
-  /// Re-enter this node with `entry` once the chain started by the return value finishes (loops).
-  void loop_back(int entry);
+  /// A loop's next pass: re-enter this node with `entry` once the chain started by the return
+  /// value (the body) finishes. False: the loop guard refuses the pass (Runtime::budget) - the
+  /// loop ends, the node goes on at Completed.
+  bool loop_back(int entry);
   static constexpr int kResume = 1000;
 
  private:

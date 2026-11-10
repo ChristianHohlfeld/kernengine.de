@@ -119,21 +119,18 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Funktionen von `blueprint.h`, was folgt, ein Lambda; die Wartezeiten führt die Laufzeit für alle
   Stufen an einer Stelle. Every N Seconds und die State Machines (Timer, Bedingungen, Events)
   bleiben ebenfalls bei der Laufzeit – ein Code für jede Stufe –, die Klasse hat die Handler und
-  `state_set` / `state_get` / `state_is`. Damit laufen alle Tier-Fälle außer `infinite_loop` als
-  Klassen mit dem Ergebnis von Interpreter und JIT.
+  `state_set` / `state_get` / `state_is`.
+- [x] **Der Schleifenwächter, für jede Stufe derselbe:** Gezählt werden Schleifendurchläufe je
+  Schritt, an einer Stelle (`Runtime::pass`); über der Grenze enden die Schleifen der Kette, der
+  Rest läuft zu Ende, dann ist der Blueprint gestoppt. Interpreter, JIT und Klasse hören beim
+  selben Durchlauf auf. Damit laufen alle 14 Tier-Fälle als Klassen mit dem Ergebnis von
+  Interpreter und JIT.
 - [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
   - Die Gameplay-Knoten.
   - Random: jeder Random-Knoten hat seine eigene Folge (`kern::Node<id>`), damit die Reihenfolge,
     in der C++ Argumente auswertet, nichts ändert.
   - Eingänge werden vor dem Knoten ausgewertet, alle, genau einmal – auch im Interpreter (heute
     liest Select nur den gewählten Eingang; solange Werte nur rechnen, ist das dasselbe).
-  - Der Schleifenwächter: Interpreter, JIT und Text zählen dasselbe und hören an derselben Stelle
-    auf (heute bricht der Interpreter nach 200 000 Knoten je Schritt ab, der Text gar nicht).
-    Geplant: gezählt werden Schleifendurchläufe je Schritt (in gültigen Blueprints sind Schleifen
-    das Einzige ohne festes Ende – Wege zurück, Selbstaufrufe und ein Tween aus seinem eigenen
-    Update sind Regelverstöße); ist die Grenze überschritten, enden alle Schleifen der Kette, der
-    Rest läuft zu Ende, dann ist der Blueprint gestoppt. Das kann C++ ohne Ausnahmen genauso
-    tun wie der Interpreter; der JIT zählt dann an seinen Schleifen statt an jedem Knoten.
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
     mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).

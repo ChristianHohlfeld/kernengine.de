@@ -159,23 +159,36 @@ struct Blueprint : logic::PureNodes {
   }
 
   // ---- loops ----
+  /// The loop guard (Runtime::budget): may a loop make another pass? The runtime counts the passes
+  /// of every tier in one place; over the limit the loops of the chain end at once - an endless
+  /// loop ends, the rest of the chain runs to its end, then the Blueprint is stopped.
+  bool kern_pass() {
+    i32* count = kern_world.counters;
+    if (!count) return true;  // (no world: a class somebody just made)
+    if (count[3] < count[1]) {
+      ++count[3];
+      return true;
+    }
+    return kern_world.runtime->pass(*kern_world.instance);
+  }
   /// while (loop(condition)): a While Loop.
-  bool loop(Bool condition) { return condition; }
+  bool loop(Bool condition) { return condition && kern_pass(); }
   /// for (auto it = flow_for(n, first, last); it.next();): a For Loop; n.index is the index.
   template <class N> struct ForLoop {
+    Blueprint& self;
     N& n;
     bool first = true;
     bool next() {
       if (!first) logic::flow::for_step(n.memory);
       first = false;
-      if (!logic::flow::for_runs(n.memory)) return false;
+      if (!logic::flow::for_runs(n.memory) || !self.kern_pass()) return false;
       n.index = logic::flow::for_index(n.memory);
       return true;
     }
   };
   template <class N> ForLoop<N> flow_for(N& n, Int first, Int last) {
     logic::flow::for_start(n.memory, first, last);
-    return {n};
+    return {*this, n};
   }
 
   // ---- steps ----

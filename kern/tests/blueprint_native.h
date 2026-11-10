@@ -507,7 +507,6 @@ inline std::vector<Case> cases() {
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
   for (const logic_cases::Case& t : logic_cases::cases()) {
-    if (std::string(t.name) == "infinite_loop") continue;  // (the class has no loop guard yet: BLUEPRINTS.md)
     Case c;
     c.name = std::string("Tier_") + t.name;
     c.graph = logic_cases::parse(t);

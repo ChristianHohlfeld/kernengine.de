@@ -331,6 +331,21 @@ class WasmGen {
     if (target >= 0) push(target, entry);
   }
   void slot_cond_set(int slot, f64 v) { f64c(v); lset(kF0); store_slot_from_f0(slot); }
+  // The loop guard (Runtime::budget): the runtime's counters - [3] loop passes this step, [1]
+  // their limit, [4] a loop of this chain was refused a pass. may_pass leaves 1 on the stack when
+  // the loop may make another pass.
+  void may_pass() {
+    const u32 ct = static_cast<u32>(counters_);
+    i32c(ct + 12); mem(kI32Load, 2, 0); i32c(ct + 4); mem(kI32Load, 2, 0); op(kI32LtS);
+  }
+  void count_pass() {
+    const u32 ct = static_cast<u32>(counters_);
+    i32c(ct + 12); i32c(ct + 12); mem(kI32Load, 2, 0); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);
+  }
+  void pass_refused() {
+    const u32 ct = static_cast<u32>(counters_);
+    i32c(ct + 16); i32c(1); mem(kI32Store, 2, 0);
+  }
 
   void node_code(int i) {
     const NodeDef* d = in_.def_at(i);
@@ -373,15 +388,25 @@ class WasmGen {
       if_void();
       next(i, 1);  // Completed (exec outputs: body, completed)
       op(kElse);
+      may_pass();
+      if_void();
+      count_pass();
       load_slot(base + 0); lset(kF0); store_slot_from_f0(in_.out_slot(i, 1));
       push(i, kResume);
       next(i, 0);
+      op(kElse);
+      pass_refused();  // (the loop guard: the loop ends)
+      next(i, 1);
+      op(kEnd);
       op(kEnd);
       return;
     }
     if (t == "flow.while") {
       value(i, "condition", 0); bool_of_f64();
-      if_void(); push(i, kResume); next(i, 0); op(kElse); next(i, 1); op(kEnd);
+      if_void();
+      may_pass();
+      if_void(); count_pass(); push(i, kResume); next(i, 0); op(kElse); pass_refused(); next(i, 1); op(kEnd);
+      op(kElse); next(i, 1); op(kEnd);
       return;
     }
     if (t == "flow.do_once") {
@@ -462,9 +487,8 @@ class WasmGen {
     i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 0); lset(kPc);
     i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 4); lset(kEntry);
     op(kEnd);
-    // Step budget (infinite loop guard) and tracing for the editor.
-    i32c(ct); i32c(ct); mem(kI32Load, 2, 0); i32c(1); op(kI32Add); ltee(kR); mem(kI32Store, 2, 0);
-    lget(kR); i32c(ct + 4); mem(kI32Load, 2, 0); op(kI32GtS); if_void(); ret_i32(1); op(kEnd);
+    // Nodes run (a count for the runtime) and tracing for the editor. (The loop guard is at the loops.)
+    i32c(ct); i32c(ct); mem(kI32Load, 2, 0); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);
     i32c(ct + 8); mem(kI32Load, 2, 0); if_void(); i32c(in_.id()); lget(kPc); call(kFnTrace); op(kEnd);
     // Dispatch: block per node, br_table on pc.
     op(kBlock); op(kVoid);  // exit
@@ -511,7 +535,7 @@ class CppGen {
     s += "  (void)et; (void)push; (void)entry;\n";
     s += "  for (;;) {\n";
     s += "    if (pc < 0) {\n      if (st[0] <= base) return 0;\n      --st[0];\n      pc = st[1 + 2 * st[0]];\n      entry = st[2 + 2 * st[0]];\n    }\n";
-    s += "    if (++ct[0] > ct[1]) return 1;\n";
+    s += "    ++ct[0];\n";
     s += "    switch (pc) {\n";
     for (int i = 0; i < static_cast<int>(in_.node_count()); ++i) {
       const NodeDef* d = in_.def_at(i);
@@ -622,12 +646,14 @@ class CppGen {
     }
     if (t == "flow.for") {
       line("if (entry != " + std::to_string(kResume) + ") { " + S(0) + " = " + value(i, "first") + "; " + S(1) + " = " + value(i, "last") + "; } else " + S(0) + " += 1.0;");
-      line("if (" + S(0) + " > " + S(1) + ") { " + next(i, 1) + " } else { s[" + std::to_string(in_.out_slot(i, 1)) + "] = " + S(0) + "; if (!push(" + std::to_string(i) + ", " +
-           std::to_string(kResume) + ")) return 2; " + next(i, 0) + " }");
+      // (the loop guard: ct[3] loop passes this step, ct[1] their limit, ct[4] a pass was refused)
+      line("if (" + S(0) + " > " + S(1) + ") { " + next(i, 1) + " } else if (ct[3] >= ct[1]) { ct[4] = 1; " + next(i, 1) + " } else { ++ct[3]; s[" + std::to_string(in_.out_slot(i, 1)) + "] = " +
+           S(0) + "; if (!push(" + std::to_string(i) + ", " + std::to_string(kResume) + ")) return 2; " + next(i, 0) + " }");
       return;
     }
     if (t == "flow.while") {
-      line("if (" + value(i, "condition") + " != 0.0) { if (!push(" + std::to_string(i) + ", " + std::to_string(kResume) + ")) return 2; " + next(i, 0) + " } else { " + next(i, 1) + " }");
+      line("if (" + value(i, "condition") + " == 0.0) { " + next(i, 1) + " } else if (ct[3] >= ct[1]) { ct[4] = 1; " + next(i, 1) + " } else { ++ct[3]; if (!push(" + std::to_string(i) + ", " +
+           std::to_string(kResume) + ")) return 2; " + next(i, 0) + " }");
       return;
     }
     if (t == "flow.do_once") {

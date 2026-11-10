@@ -2073,17 +2073,42 @@ TEST(logic_checks_and_infinite_loops) {
   int errors = 0;
   for (const auto& i : issues) errors += i.error ? 1 : 0;
   CHECK(errors >= 3);
-  // While(true) is stopped by the step budget and reported.
+  // While(true) is stopped by the loop guard and reported: the loop gets its budget of passes
+  // and ends, the rest of the chain runs to its end (the loops in it end at once), and then the
+  // Blueprint is stopped. (That is what a compiled class can do too, without an exception.)
   logic::Runtime rt(host);
   rt.budget = 5000;
-  const logic::Graph loop = logic_graph(R"({"variables":[{"name":"N","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},
-    {"id":2,"type":"flow.while","values":{"condition":true}},{"id":3,"type":"var.add","params":{"variable":"N"}}],
-    "links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})");
+  const logic::Graph loop = logic_graph(R"({"variables":[{"name":"N","type":"float","value":0},{"name":"After","type":"float","value":0},{"name":"More","type":"float","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.while","values":{"condition":true}},{"id":3,"type":"var.add","params":{"variable":"N"}},
+      {"id":4,"type":"var.add","params":{"variable":"After"}},{"id":5,"type":"flow.for","values":{"first":1,"last":10}},{"id":6,"type":"var.add","params":{"variable":"More"}},
+      {"id":7,"type":"var.add","params":{"variable":"After"}},{"id":8,"type":"event.tick"},{"id":9,"type":"var.add","params":{"variable":"After"},"values":{"amount":100}}],
+    "links":[[1,"then",2,"exec"],[2,"body",3,"exec"],[2,"completed",4,"exec"],[4,"then",5,"exec"],[5,"body",6,"exec"],[5,"completed",7,"exec"],[8,"then",9,"exec"]]})");
   logic::Instance* inst = rt.add(loop, 0, "Loop");
   rt.begin();
   CHECK(inst->disabled());
-  CHECK(!host.errors.empty() && host.errors.back().find("infinite loop") != std::string::npos);
-  CHECK(inst->get("N").as_number() > 100);
+  CHECK(host.errors.size() == 1 && host.errors.back().find("infinite loop") != std::string::npos && host.errors.back().find("5000 passes") != std::string::npos);
+  CHECK(inst->get("N").as_number() == 5000);    // exactly the budget
+  CHECK(inst->get("After").as_number() == 2);   // the chain ran to its end ...
+  CHECK(inst->get("More").as_number() == 0);    // ... and the loop in it ended at once
+  host.t += 1.0 / 60;
+  rt.tick(1.0f / 60);
+  CHECK(inst->get("After").as_number() == 2 && host.errors.size() == 1);  // stopped: no more events
+  // Loops that end stay under the guard however many chains run in a step, and a new step counts anew.
+  logic::Runtime calm(host);
+  calm.budget = 50;
+  logic::Instance* fine = calm.add(logic_graph(R"({"variables":[{"name":"N","type":"float","value":0}],"nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"flow.for","values":{"first":1,"last":40}},
+    {"id":3,"type":"var.add","params":{"variable":"N"}}],"links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})"), 0, "Fine");
+  calm.begin();
+  for (int i = 0; i < 5; ++i) calm.tick(1.0f / 60);
+  CHECK(!fine->disabled() && fine->get("N").as_number() == 200 && host.errors.size() == 1);
+  // The limit is the budget as it is now - also for an event raised between two steps.
+  logic::Runtime wide(host);
+  logic::Instance* big = wide.add(logic_graph(R"({"variables":[{"name":"N","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+    {"id":2,"type":"flow.for","values":{"first":1,"last":300000}},{"id":3,"type":"var.add","params":{"variable":"N"}}],"links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})"), 0, "Big");
+  wide.begin();
+  wide.budget = 1000000;
+  wide.call("Go");
+  CHECK(!big->disabled() && big->get("N").as_number() == 300000 && host.errors.size() == 1);
 }
 
 TEST(logic_tween_and_every) {

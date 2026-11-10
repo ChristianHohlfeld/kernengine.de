@@ -910,7 +910,17 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
 
 bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) {
   results.clear();
-  if (blueprint_) return !disabled_ && blueprint_->call(function, args, results);
+  if (blueprint_) {
+    if (disabled_) return false;
+    if (rt_.depth_ == 0) rt_.step_starts();  // (a call from outside any chain is a step of its own for the loop guard)
+    rt_.counters_[1] = static_cast<i32>(min_of<u64>(rt_.budget, 0x7fffffff));
+    ++rt_.depth_;
+    ++active_;
+    const bool known = blueprint_->call(function, args, results);
+    rt_.chain_ends(*this);
+    --rt_.depth_;
+    return known;
+  }
   auto it = fn_index_.find(std::string(function));
   if (it == fn_index_.end()) return false;
   const int f = it->second;
@@ -935,7 +945,7 @@ bool Instance::call(std::string_view function, const std::vector<Value>& args, s
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
   // loop guard: the budget counts what one step runs, and a paused world has no ticks to start
   // a new count while its systems keep asking.
-  if (rt_.depth_ == 0) rt_.tick_start_ = rt_.executed_;
+  if (rt_.depth_ == 0) rt_.step_starts();
   Frame frame;
   frame.function = f;
   frame.depth = rt_.depth_ + 1;
@@ -1047,7 +1057,7 @@ Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
     auto loop = native_registry().find(hash);
     if (native && own != blueprint_registry().end()) {
       added->blueprint_ = own->second();
-      added->blueprint_->attach({&host_, this, added, self});
+      added->blueprint_->attach({&host_, this, added, self, counters_});
     }
     else if (loop != native_registry().end()) added->native_ = loop->second;
     else if (jit) added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
@@ -1076,17 +1086,31 @@ Instance* Runtime::find(ActorRef self) {
   return nullptr;
 }
 
-bool Runtime::over_budget(Instance& inst) {
-  if (++executed_ - tick_start_ <= budget) return false;
-  if (!inst.disabled_) {
-    host_.error(inst.name() + ": more than " + std::to_string(budget) + " nodes ran in one step - infinite loop? The graph is stopped.");
-    inst.disabled_ = true;
+void Runtime::step_starts() {
+  tick_start_ = executed_;
+  counters_[1] = static_cast<i32>(min_of<u64>(budget, 0x7fffffff));
+  counters_[3] = 0;
+}
+
+bool Runtime::pass(Instance& inst) {
+  counters_[1] = static_cast<i32>(min_of<u64>(budget, 0x7fffffff));  // (the limit as it is now: compiled code reads it there)
+  if (!inst.stopping_ && counters_[3] < counters_[1]) {
+    ++counters_[3];
+    return true;
   }
-  return true;
+  if (!inst.stopping_) {
+    inst.stopping_ = true;
+    host_.error(inst.name() + ": a loop made more than " + std::to_string(counters_[1]) + " passes in one step - infinite loop? The Blueprint is stopped.");
+  }
+  return false;
+}
+
+void Runtime::chain_ends(Instance& inst) {
+  if (--inst.active_ == 0 && inst.stopping_) inst.disabled_ = true;
 }
 
 void Runtime::begin() {
-  tick_start_ = executed_;
+  step_starts();
   for (std::size_t k = 0; k < instances_.size(); ++k) {
     Instance& inst = *instances_[k];
     if (inst.begun_ || inst.disabled_) continue;
@@ -1105,7 +1129,7 @@ void Runtime::begin() {
 }
 
 void Runtime::tick(f32 dt) {
-  tick_start_ = executed_;
+  step_starts();
   const f64 now = host_.time();
   // Latent actions that are due (in order of their time).
   std::stable_sort(pending_.begin(), pending_.end(), [](const Pending& a, const Pending& b) { return a.at < b.at; });
@@ -1217,7 +1241,9 @@ void Runtime::check_transitions(Instance& inst, const std::string* event) {
 bool Runtime::run_compiled(Instance& inst, int node, int entry) {
   counters_[1] = static_cast<i32>(min_of<u64>(budget, 0x7fffffff));
   counters_[2] = tracing ? 1 : 0;
-  if (executed_ - tick_start_ > budget) counters_[0] = counters_[1] + 1;
+  // (a loop of this chain that is refused a pass sets [4]; a chain that runs inside this one has its own)
+  const i32 outer_refused = counters_[4];
+  counters_[4] = 0;
   int r;
   if (inst.native_) r = inst.native_(&inst, node, entry);
   else {
@@ -1231,10 +1257,12 @@ bool Runtime::run_compiled(Instance& inst, int node, int entry) {
   }
   executed_ += static_cast<u64>(counters_[0] > 0 ? counters_[0] : 0);
   counters_[0] = 0;
-  if (r == 1) {
-    if (!inst.disabled_) host_.error(inst.name() + ": more than " + std::to_string(budget) + " nodes ran in one step - infinite loop? The graph is stopped.");
-    inst.disabled_ = true;
-  } else if (r == 2) {
+  if (counters_[4] && !inst.stopping_) {
+    inst.stopping_ = true;
+    host_.error(inst.name() + ": a loop made more than " + std::to_string(counters_[1]) + " passes in one step - infinite loop? The Blueprint is stopped.");
+  }
+  counters_[4] = outer_refused;
+  if (r == 2) {
     host_.error(inst.name() + ": the graph nests deeper than " + std::to_string(CodeLayout::kStack) + " loops / sequences - stopped.");
     inst.disabled_ = true;
   }
@@ -1276,7 +1304,10 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
       Context ctx(*this, inst, start, entry);
       due = c.def->run(ctx) == 0;
     }
+    counters_[1] = static_cast<i32>(min_of<u64>(budget, 0x7fffffff));  // (the class reads the limit there)
+    ++inst.active_;
     if (due) inst.blueprint_->run(start, entry);
+    chain_ends(inst);
     --depth_;
     return;
   }
@@ -1286,7 +1317,9 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
       host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
       return;
     }
+    ++inst.active_;
     run_compiled(inst, start, entry);
+    chain_ends(inst);
     --depth_;
     return;
   }
@@ -1298,11 +1331,12 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
   // A Return node ended the function call this chain is (Instance::return_values).
   auto returned = [&] { return !inst.frames_.empty() && inst.frames_.back().returned && inst.frames_.back().depth == depth_; };
   std::vector<std::pair<int, int>> stack{{start, entry}};
+  ++inst.active_;
   while (!stack.empty() && !inst.disabled_ && !returned()) {
     auto [n, e] = stack.back();
     stack.pop_back();
     while (n >= 0 && !inst.disabled_) {
-      if (over_budget(inst)) break;
+      ++executed_;
       Instance::CNode& c = inst.nodes_[static_cast<std::size_t>(n)];
       if (!c.def) break;
       Context ctx(*this, inst, n, e);
@@ -1315,6 +1349,7 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
       n = c.exec_out[static_cast<std::size_t>(r)];
     }
   }
+  chain_ends(inst);
   --depth_;
 }
 
@@ -1337,7 +1372,8 @@ Value Context::pull(int node, int pin) {
   if (const int s = inst_.out_slot(node, pin); s >= 0 && src.def->kind != NodeKind::pure)
     return from_slot(inst_.slots_[static_cast<std::size_t>(s)], src.out[static_cast<std::size_t>(pin)].type).converted(src.out[static_cast<std::size_t>(pin)].type);
   if (src.def && src.def->kind == NodeKind::pure && src.def->run) {
-    if (eval_depth_ > 48 || rt_.over_budget(inst_)) return src.outputs[static_cast<std::size_t>(pin)];
+    if (eval_depth_ > 48) return src.outputs[static_cast<std::size_t>(pin)];
+    ++rt_.executed_;
     Context c(rt_, inst_, node, 0);
     c.eval_depth_ = eval_depth_ + 1;
     src.def->run(c);
@@ -1407,6 +1443,10 @@ void Context::then(int exec_output) {
   if (target >= 0) continuations_.push_back({target, c.exec_out_entry[static_cast<std::size_t>(exec_output)]});
 }
 
-void Context::loop_back(int entry) { continuations_.push_back({node_, entry}); }
+bool Context::loop_back(int entry) {
+  if (!rt_.pass(inst_)) return false;
+  continuations_.push_back({node_, entry});
+  return true;
+}
 
 }  // namespace kern::logic

@@ -215,9 +215,8 @@ void add_flow(Library& lib) {
       } else {
         flow::for_step(m);
       }
-      if (!flow::for_runs(m)) return c.exec("completed");
+      if (!flow::for_runs(m) || !c.loop_back(Context::kResume)) return c.exec("completed");
       c.out("index", Value::integer(flow::for_index(m)));
-      c.loop_back(Context::kResume);
       return c.exec("body");
     };
     lib.add(std::move(d));
@@ -227,8 +226,7 @@ void add_flow(Library& lib) {
     d.inputs = {exec_in(), data("condition", "Condition", PinType::boolean, false)};
     d.outputs = {exec_out("body", "Loop Body"), exec_out("completed", "Completed")};
     d.run = [](Context& c) {
-      if (!c.in_bool("condition")) return c.exec("completed");
-      c.loop_back(Context::kResume);
+      if (!c.in_bool("condition") || !c.loop_back(Context::kResume)) return c.exec("completed");
       return c.exec("body");
     };
     lib.add(std::move(d));

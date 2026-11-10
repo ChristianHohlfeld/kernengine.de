@@ -198,7 +198,7 @@ Besitzer (Actor oder Level).
 | `call(name, target, args)` | Custom Event auf allen Instanzen (oder der des Ziels) und Event-Übergänge mit diesem Namen |
 | `find(self)`, `instances()` | Zugriff |
 | `trace()`, `tracing` | welche Knoten liefen (für den Editor) |
-| `budget` | 200 000 Knotenausführungen pro Schritt |
+| `budget` | 200 000 Schleifendurchläufe pro Schritt (der Schleifenwächter) |
 | `jit` | JIT einschalten (Standard: an, wo der Host kann) |
 
 Eine `Instance` bietet `get`/`set` von Variablen, `state`/`set_state` von State Machines,
@@ -239,8 +239,14 @@ gespeicherten Ausgang.
 
 ### Schutz vor Endlosschleifen
 
-- Mehr als `budget` (200 000) Knoten in einem Schritt: Die Instanz wird abgeschaltet („infinite
-  loop? The graph is stopped.“).
+- Der Schleifenwächter: mehr als `budget` (200 000) Schleifendurchläufe in einem Schritt.
+  Schleifen sind das Einzige in einem Graphen ohne festes Ende – ein Weg, der ohne Warten in sich
+  selbst zurückführt, eine Funktion, die sich selbst aufruft, und ein Tween, der aus seinem
+  eigenen Update neu gestartet wird, sind Compile-Fehler. Über der Grenze enden die Schleifen der
+  Kette sofort, der Rest der Kette läuft zu Ende, und dann wird die Instanz abgeschaltet
+  („infinite loop? The Blueprint is stopped.“). Jede Stufe zählt dieselben Durchläufe
+  (`Runtime::pass`) und hört beim selben auf – auch ein Blueprint, der als seine C++-Klasse
+  kompiliert ist und eine Kette nicht mittendrin abbrechen kann.
 - Events, die Events auslösen, dürfen höchstens 64 tief verschachteln; darüber wird die Kette
   gestoppt.
 - Im kompilierten Code: mehr als 512 verschachtelte Schleifen/Sequences stoppen die Instanz.
@@ -418,7 +424,7 @@ Der gemeinsame Zustand liegt in der Instanz, an festen Adressen, die sich nach d
 | `slots()` | f64-Slots: zuerst die numerischen Variablen (bool, int, float), dann **8 pro Knoten** – 4 für Zustand (Schleifenindex, Gate offen, Flip-Flop …) und 4 für Datenausgänge inline erzeugter Exec-Knoten |
 | `stack()` | i32-Fortsetzungsstapel: `[0]` = Tiefe, dann Paare (pc, entry); 512 Einträge |
 | `exec_table()` | je Knoten und Exec-Ausgang: (Ziel, Eingang) |
-| `counters()` | `[0]` Knoten in diesem Schritt, `[1]` Grenze (das Budget), `[2]` Tracing an |
+| `counters()` | `[0]` gelaufene Knoten (eine Zählung), `[1]` Grenze der Schleifendurchläufe pro Schritt (das Budget), `[2]` Tracing an, `[3]` Schleifendurchläufe in diesem Schritt, `[4]` einer Schleife der laufenden Kette wurde ein Durchlauf verweigert |
 
 Nicht numerische Variablen (Vektor, Text, Actor) liegen in einer Map der Instanz und werden über
 Knotenfunktionen gelesen.
@@ -428,7 +434,9 @@ Knotenfunktionen gelesen.
 Das erzeugte Programm ist eine **Schleife über einen Programmzähler** – ein Fall je Knoten. So bleibt
 jede Exec-Verdrahtung gültig, auch Zusammenführungen und Zyklen. Fortsetzungen von Sequence und
 Schleifen gehen auf den Stapel der Instanz, genau wie im Interpreter. Jeder Durchlauf zählt
-`counters[0]` hoch; über der Grenze liefert die Funktion 1 (Endlosschleife), bei vollem Stapel 2.
+`counters[0]` hoch. Ein Schleifen-Knoten zählt seinen Durchlauf in `counters[3]`; an der Grenze
+nimmt er stattdessen Completed und setzt `counters[4]` (der Schleifenwächter). Bei vollem Stapel
+liefert die Funktion 2.
 
 Das WebAssembly-Modul:
 
@@ -505,8 +513,8 @@ Die drei Stufen sind **austauschbar**, und zwar mitten im Spiel:
   welcher Stufe – mit derselben Semantik fort.
 - Kern ist deterministisch ([Kapitel 6](06-physik.md), Abschnitt 6.14). Ein Graph, der im Browser
   kompiliert anders rechnete als nativ im Interpreter, würde Replays, das Training und
-  Fehlersuche entwerten. Auch das Budget gegen Endlosschleifen zählt in beiden Stufen gleich
-  (Knotenausführungen pro Schritt) und schaltet dieselben Graphen ab.
+  Fehlersuche entwerten. Auch der Wächter gegen Endlosschleifen zählt in jeder Stufe gleich
+  (Schleifendurchläufe pro Schritt) und stoppt dieselben Graphen beim selben Durchlauf.
 - Der Editor debuggt mit derselben Semantik: Breakpoints und die Live-Anzeige laufender Knoten
   funktionieren auch im kompilierten Code (`trace`).
 

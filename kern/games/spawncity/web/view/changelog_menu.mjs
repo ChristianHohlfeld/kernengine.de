@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"18:53",title:"Endlosschleifen: derselbe Schutz für Blueprint und C++",items:[
+    "Kern-Blueprints: Der Schutz vor Endlosschleifen zählt jetzt Schleifendurchläufe (200 000 je Schritt) statt Knoten. Läuft eine Schleife darüber, enden die Schleifen dieser Kette, der Rest läuft noch zu Ende, dann ist der Blueprint gestoppt und es wird gemeldet. Bisher brach die Kette mittendrin ab.",
+    "So verhält sich ein Blueprint in jeder Form gleich – als Graph, im Browser beschleunigt und als kompiliertes C++ hören alle beim selben Durchlauf auf. Damit laufen alle Prüf-Blueprints der Engine auch als C++-Klassen mit demselben Ergebnis.",
+    "Nebenbei rechnen beschleunigte Blueprints schneller, weil nicht mehr jeder Knoten mitgezählt wird.",
+  ]},
   {date:"2026-11-10",time:"18:31",title:"Tween: Finished kommt nie schon mit Play",items:[
     "Kern-Blueprints: Ein Tween meldet Finished jetzt immer erst mit seinem letzten Update in einem späteren Schritt – auch bei Dauer 0 (bisher im selben Augenblick wie Play). Ein Tween, der sich aus Finished selbst wieder startet, wiederholt sich damit sauber, als Blueprint wie als kompiliertes C++.",
     "Wer denselben Tween aus dessen eigenem Update neu startet, bekommt im Kern-Editor jetzt einen Hinweis am Knoten: Das wäre eine Endlosschleife.",

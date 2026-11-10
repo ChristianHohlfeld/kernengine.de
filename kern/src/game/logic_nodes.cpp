@@ -540,11 +540,10 @@ void add_game_nodes(logic::Library& lib) {
       i64 k = 0;
       std::size_t pos = 0;
       while (k < s.index && pos < s.value.s.size()) { pos = s.value.s.find(',', pos) + 1; ++k; }
-      if (pos >= s.value.s.size()) return c.exec("completed");
+      if (pos >= s.value.s.size() || !c.loop_back(Context::kResume)) return c.exec("completed");
       const ActorId id = static_cast<ActorId>(std::strtoul(s.value.s.c_str() + pos, nullptr, 10));
       c.out("actor", Value::actor(id));
       c.out("index", Value::integer(s.index));
-      c.loop_back(Context::kResume);
       return c.exec("body");
     };
     lib.add(std::move(d));

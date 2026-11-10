@@ -38,7 +38,7 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Fertig für alle Knoten der Kernbibliothek außer Random:** Der Text wird von einem
+- **Fertig für alle Knoten der Kernbibliothek außer Random, samt Schleifenwächter:** Der Text wird von einem
   C++-Compiler ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen,
   Funktionen, Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip
   Flop, die Switches; alle Events, Call Event, Print, Game Time; Delay, Retriggerable Delay,
@@ -48,8 +48,8 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** der Schleifenwächter für alle Stufen gleich, Zufall und die Gameplay-Knoten
-  als Funktionen von `blueprint.h`. `native_ready` sagt für jeden Blueprint, was ihm noch fehlt;
+- **Als Nächstes:** Zufall und die Gameplay-Knoten als Funktionen von `blueprint.h`.
+  `native_ready` sagt für jeden Blueprint, was ihm noch fehlt;
   bis dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
   `kern/games/spawncity/BLUEPRINTS.md`.
 
@@ -371,9 +371,13 @@ Blueprint, der seit dem Build geändert wurde, läuft im Interpreter, bis der Bu
 schreibt – nie als veralteter Code. `Runtime::native = false` lässt den Interpreter laufen, auch
 wenn es die Klasse gibt (so vergleichen die Tests beide).
 
-**Noch offen** (steht im Fahrplan, `kern/games/spawncity/BLUEPRINTS.md`): Der Interpreter bricht
-eine Endlosschleife nach 200 000 Knoten je Schritt ab – der kompilierte Text hat diesen Wächter
-noch nicht.
+**Endlosschleifen.** Schleifen sind das Einzige in einem Blueprint ohne festes Ende (Wege zurück,
+Selbstaufrufe und ein Tween aus seinem eigenen Update sind Regelverstöße). Die Laufzeit zählt die
+Schleifendurchläufe eines Schritts für alle Stufen an einer Stelle (`Runtime::pass`,
+`Runtime::budget` = 200 000); `while (loop(...))` und `it.next()` fragen dort nach. Ist die Grenze
+überschritten, enden die Schleifen der Kette sofort, der Rest der Kette läuft zu Ende, dann ist
+der Blueprint gestoppt und es wird gemeldet. Das ist für Graph und Text dasselbe – der Text kann
+eine Kette nicht mittendrin abbrechen, also tut es auch der Interpreter nicht mehr.
 
 ## Der Beweis (Tests)
 
@@ -400,8 +404,9 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle bis auf `infinite_loop` (der Schleifenwächter), auch ein Handler, der
-sein eigenes Event auslöst (`event_reentry`), Tweens und Timer (`waits`) und Zustände (`states`).
+demselben Ergebnis: alle 14, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
+(`event_reentry`), Tweens und Timer (`waits`) und Zustände (`states`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

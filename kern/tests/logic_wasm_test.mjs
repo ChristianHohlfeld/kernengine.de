@@ -32,6 +32,8 @@ x.logic_test_bench_prepare(1);
 await settle();
 const tj = x.logic_test_bench_run(), vj = x.logic_test_bench_value();
 if (vi !== vj) { console.log(`FAIL benchmark results differ: ${vi} vs ${vj}`); failures++; }
+// (all of the million passes ran - the loop guard's limit is the budget the test set, not its default)
+if (vi !== 1499999) { console.log(`FAIL the benchmark loop did not run to its end: ${vi}`); failures++; }
 console.log(`1,000,000 loop iterations: interpreter ${ti.toFixed(1)} ms, compiled ${tj.toFixed(1)} ms (${(ti / tj).toFixed(1)}x faster)`);
 console.log(failures ? `${failures} failures` : "logic JIT: all cases match");
 process.exit(failures ? 1 : 0);
