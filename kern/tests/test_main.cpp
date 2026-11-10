@@ -2320,7 +2320,7 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
       CHECK(inst->get("Edge").as_int() == 9007199254740992);                                              // 2^53 + 1 is 2^53, as a number adds
       CHECK(inst->get("Top").as_int() == top && inst->get("TopAsFloat").as_number() == 9223372036854775808.0);
-      CHECK(inst->get("Low").as_int() == std::numeric_limits<i64>::min());
+      CHECK(inst->get("Low").as_int() == -top && inst->get("Least").as_int() == -top);  // Int's lower end: the same distance from 0
       CHECK(inst->get("FromFloor").as_number() == 0 && inst->get("FromRound").as_number() == 0);          // endless and no number: 0
     }
     if (std::string(c.name) == "infinite_loop") CHECK(inst->disabled());

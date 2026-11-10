@@ -55,11 +55,12 @@ bool convertible(PinType from, PinType to);
 
 /// A number as a whole number (Float to Int, on a wire or in a node): toward zero. Not a number
 /// or endless: 0. Beyond what Int holds: its nearest end. Defined for every number - the same in
-/// the interpreter and in a Blueprint's C++.
+/// the interpreter and in a Blueprint's C++. Int's ends are 2^63 - 1 and its negative: the same
+/// distance from 0, so every Int can be written down in C++ (-2^63 is no literal there).
 inline i64 whole(f64 v) {
   if (!std::isfinite(v)) return 0;
   if (v >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  if (v < -9223372036854775808.0) return std::numeric_limits<i64>::min();
+  if (v <= -9223372036854775808.0) return -std::numeric_limits<i64>::max();
   return static_cast<i64>(v);
 }
 
@@ -72,7 +73,8 @@ constexpr i64 normal(i64 v) {
   if (v >= -exact && v <= exact) return v;
   const f64 held = static_cast<f64>(v);  // (the nearest a double holds)
   if (held >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  return static_cast<i64>(held);  // (Int's lower end is a double itself)
+  if (held <= -9223372036854775808.0) return -std::numeric_limits<i64>::max();
+  return static_cast<i64>(held);
 }
 /// Int + Int (Add to Variable): added as numbers - defined for every value, where the
 /// arithmetic of i64 overflows.

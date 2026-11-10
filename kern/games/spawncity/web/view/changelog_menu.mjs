@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"22:29",title:"Ganze Zahlen: beide Enden gleich weit von null",items:[
+    "Kern-Blueprints: Die kleinste ganze Zahl ist jetzt −(2^63 − 1), genauso weit von null wie die größte. So lässt sich jede ganze Zahl eines Blueprints auch in seinem C++ hinschreiben – der bisherige unterste Wert war dort keine gültige Zahl, ein Blueprint mit genau diesem Wert hätte sich nicht kompilieren lassen.",
+  ]},
   {date:"2026-11-10",time:"22:15",title:"Nativer Export: ein Level als Spiel mit kompilierten Blueprints",items:[
     "Kern-Engine: Ein Level lässt sich jetzt mit einem Befehl als eigenständiges Spiel exportieren, dessen Blueprints fest als C++ einkompiliert sind (tools/export_game.sh). Das Spiel ist dieselbe einzelne HTML-Datei, die „Package Game“ im Editor schreibt – nur muss beim Start nichts mehr übersetzt werden, und der Compiler optimiert Blueprints und Engine zusammen.",
     "Der Editor im Browser kann kein C++ kompilieren; sein „Package Game“ bleibt wie es ist (die Blueprints übersetzt dort der Browser beim Start). Ein automatischer Browser-Test spielt ein nativ exportiertes Level und prüft, dass seine Blueprints wirklich als kompilierte Klassen laufen.",

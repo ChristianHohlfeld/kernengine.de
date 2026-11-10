@@ -428,7 +428,8 @@ nicht mehr hineinpasst, das nächste Ende. Round und Floor benutzen dieselbe Reg
 `Int` ist eine ganze Zahl, **wie ein Blueprint sie hält** (`kern::logic::Whole`, `logic::normal`):
 Unter jeder Zahl eines Blueprints liegt ein `double` (die Variablen des Interpreters, der JIT).
 Ganze Zahlen sind deshalb bis 2^53 exakt; eine größere ist die nächste, die ein `double` hält,
-und keine geht über die Enden von 64 Bit hinaus. Das gilt für jeden `Int`, den es gibt – einen
+und keine geht über die Enden hinaus: 2^63 − 1 und dasselbe negativ (gleich weit von 0, damit
+sich jeder `Int` in C++ hinschreiben lässt). Das gilt für jeden `Int`, den es gibt – einen
 Wert an einem Pin, eine Variable der Klasse –, also in jeder Stufe gleich. `Count += 1` addiert,
 wie der Graph addiert: als Zahl, für jeden Wert definiert (eine Variable, die sich 70-mal
 verdoppelt, bleibt am oberen Ende stehen; die Arithmetik von `i64` wäre dort undefiniert). Für

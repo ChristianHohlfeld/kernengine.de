@@ -154,9 +154,10 @@ inline const std::vector<Case>& cases() {
           [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
       // Whole numbers at their ends: a variable doubled 70 times stays at Int's end, one past 2^53
       // adds as a number does, Float to Int of what does not fit, Floor and Round of endless and
-      // of what is no number - every tier holds a whole number the same way (logic::normal).
+      // of what is no number - every tier holds a whole number the same way (logic::normal). Int's
+      // lower end is -(2^63 - 1): what is typed in as -2^63 (Least) is that, and C++ can write it.
       {"whole_numbers",
-       R"({"variables":[{"name":"Big","type":"int","value":1},{"name":"Edge","type":"int","value":9007199254740992},{"name":"Top","type":"int","value":0},
+       R"({"variables":[{"name":"Big","type":"int","value":1},{"name":"Edge","type":"int","value":9007199254740992},{"name":"Least","type":"int","value":-9223372036854775808},{"name":"Top","type":"int","value":0},
           {"name":"Low","type":"int","value":0},{"name":"FromFloor","type":"float","value":-1},{"name":"FromRound","type":"float","value":-1},
           {"name":"TopAsFloat","type":"float","value":0},{"name":"Shown","type":"text","value":""}],"nodes":[{"id":1,"type":"event.begin"},
           {"id":2,"type":"flow.for","values":{"first":0,"last":69}},{"id":20,"type":"math.mul","values":{"a":1e+300,"b":1e+300}},
