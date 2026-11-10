@@ -157,6 +157,8 @@ class Session {
   void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
   /// The host's world (traffic, people: game_worldsync.cpp) to every client, unreliable.
   void send_world(const std::vector<u8>& blob);
+  /// The host's world as one client must see it (what is around him: game_worldsync.cpp).
+  void send_world_to(u8 slot, const std::vector<u8>& blob);
   /// A shot / blast of ours that reached player `target` (the authority judges it).
   void request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from);
   /// We went down (by kNobody: an accident).
@@ -221,6 +223,8 @@ class Session {
   bool vote_pending() const { return remote_ballot_.id != 0; }
   std::string status() const;
   u32 sent_poses() const { return sent_poses_; }
+  /// Messages the transport did not take (too large, queue full): must stay 0.
+  u32 send_refused() const { return send_refused_; }
 
  private:
   enum class Role : u8 { none, host, client };
@@ -273,6 +277,8 @@ class Session {
   u32 ballot_serial_ = 0;
   std::string vote_text_ = "Aenderungen nur einstimmig";
   u32 sent_poses_ = 0;
+  u32 send_refused_ = 0, refused_said_ = 0;
+  void refused(u16 type, std::size_t bytes);
   seats::Table seats_;
   f64 seats_clock_ = 0;
 };

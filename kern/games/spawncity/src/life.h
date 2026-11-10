@@ -81,6 +81,7 @@ class Life {
   };
   struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; Vec3 net_to, net_v; f32 net_yaw = 0, net_at = 0; };
   struct Flock {
+    u32 id = 0;  // its own for good (the host's: a client knows a flock by it)
     bool air = false;
     Vec2 at;
     f32 next_flight = 0, t = 0, coo_at = 0;
@@ -164,7 +165,7 @@ class Life {
   /// body here (in our hand, thrown by us, killed here) is ours until it stands or lies again.
   struct NetCow { u64 key = 0; Vec3 pos; Quat rot; f32 yaw = 0; bool dead = false, walking = false, carried = false; };
   struct NetPet { u8 idx = 0; Vec3 pos; Quat rot; f32 yaw = 0, speed = 0; Vec2 off; bool shown = false, dead = false, carried = false; };
-  struct NetFlock { u8 idx = 0; bool air = false; Vec2 at; std::vector<Vec3> birds; std::vector<f32> yaws; };
+  struct NetFlock { u32 id = 0; bool air = false; Vec2 at; std::vector<Vec3> birds; std::vector<f32> yaws; std::vector<u8> dead; };
   /// Which animal a body is (a carried / thrown one): 1 a cow (id: its key), 2 a dog or cat (id:
   /// its index); 0 none.
   u8 animal_of(kern::physics::Body b, u64& id) const {
@@ -176,7 +177,11 @@ class Life {
   kern::physics::Body pet_body(u32 i) const { return i < pets_.size() ? pets_[i].body : kern::physics::Body{}; }
   void set_remote_animals(bool on);
   bool remote_animals() const { return remote_animals_; }
-  void apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, const std::vector<NetFlock>& flocks, f32 now, f32 at);
+  /// The host's animals as he has them around us (game_worldsync.cpp), each list whole: what a
+  /// list does not name is not there. `at`: when the list was taken, on our clock.
+  void apply_cows(const std::vector<NetCow>& cows, f32 now, f32 at);
+  void apply_pets(const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, f32 now);
+  void apply_flocks(const std::vector<NetFlock>& flocks, f32 now, f32 at);
   /// The neighbourhoods of the dogs and cats: the player's first, then (host) one round every mate
   /// far from it; pet i belongs to anchor i / base.
   const std::vector<Vec2>& pet_anchors() const { return pet_anchors_; }
@@ -257,6 +262,7 @@ class Life {
   Vec2 herds_for_{1e9f, 1e9f};
   f32 last_herd_check_ = -99, last_moo_ = -99, herds_at_ = -99;
   std::vector<Flock> flocks_;
+  u32 flock_serial_ = 0;
   u32 trees_down_ = 0, tree_ground_cursor_ = 0;
   std::vector<Bird> birds_;
   std::vector<Tree> trees_;

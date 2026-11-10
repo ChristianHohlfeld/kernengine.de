@@ -40,6 +40,9 @@ class TrafficRules {
 
   void rebuild(const std::vector<Lane>& lanes);
   u64 built_from = ~0ull;
+  /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
+  /// the host's): the lights are a function of it and of the junction's place alone.
+  f32 lights_time = -1;  // (-1: not set - the caller's time)
   const std::vector<Junction>& junctions() const { return junctions_; }
   /// 0 green, 1 amber, 2 red for traffic moving along `heading` into junction j at `now`.
   i32 light(const Junction& j, Vec2 heading, f32 now) const;

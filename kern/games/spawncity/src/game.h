@@ -8,6 +8,7 @@
 // jet (F at the jet; F in the air = ejection seat and parachute). Switching never loads anything.
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -34,6 +35,8 @@
 #include "kern/game/sound.h"
 #include "kern/game/touch.h"
 #include "net_session.h"
+#include "life.h"
+#include "mp_rules.h"
 #include "people.h"
 #include "people_art.h"
 #include "road_graph.h"
@@ -204,6 +207,9 @@ class Game {
   void manage_traffic();
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
   struct CarPuppet { Vec3 p, v; Quat q; f32 at = -9; };
+  struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
+  f64 life_epoch() const;
+  void car_body_dynamic(TrafficCar& c);
   void worldsync_update(f32 dt);
   // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
   void dsync_update(f32 dt);
@@ -233,6 +239,8 @@ class Game {
   bool puppet_car_step(TrafficCar& c, std::size_t i, f32 h);
   bool puppet_world_ = false;
   f32 world_send_clock_ = 0, people_send_clock_ = 0;
+  f64 world_send_real_ = 0;
+  u32 world_tick_ = 0;  // the host's car snapshots so far (a car at rest sends its whole entry every 20th)
   u32 world_sent_ = 0, world_got_ = 0;
   f32 world_heard_at_ = -99;
   bool cars_were_ = false;
@@ -240,6 +248,14 @@ class Game {
   std::vector<People::NetPerson> people_acc_;
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
   std::vector<CarPuppet> car_puppet_;
+  std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
+  std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
+  std::map<u8, WorldParts> world_parts_;
+  std::vector<Life::NetCow> cows_acc_;
+  std::vector<Life::NetPet> pets_acc_;
+  std::vector<Life::NetFlock> flocks_acc_;
+  f64 host_epoch_off_ = 0;                   // client: the host's wall clock minus our real clock (kern::now_ms)
+  bool host_epoch_ok_ = false;
   f64 world_clock_ = 0;              // client: his clock to ours (ms, game_worldsync.cpp)
   bool world_clock_ok_ = false;
   std::vector<bool> car_lent_;         // host: a mate drives this car of ours

@@ -533,6 +533,7 @@ bool Life::spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view) {
   }
   f.next_flight = now + rng.range(25, 70);
   f.coo_at = now + rng.range(2, 9);
+  f.id = ++flock_serial_;
   flocks_.push_back(std::move(f));
   return true;
 }
@@ -1218,15 +1219,9 @@ void Life::set_remote_animals(bool on) {
   pet_anchor_ = {1e9f, 1e9f};
 }
 
-void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, const std::vector<NetFlock>& flocks, f32 now, f32 at) {
+void Life::apply_cows(const std::vector<NetCow>& cows, f32 now, f32 at) {
   if (!remote_animals_) return;
   remote_animals_at_ = now;
-  // the host's neighbourhoods: the round of every dog and cat is then the same here
-  if (!pet_anchors.empty()) {
-    pet_anchor_ = pet_anchors[0];
-    pet_anchors_ = pet_anchors;
-    pet_base_ = std::max<u32>(1, pet_count / static_cast<u32>(pet_anchors.size()));
-  }
   // cows by key: known ones go where he has them, new ones appear, the rest go
   std::vector<Cow> next;
   for (const NetCow& n : cows) {
@@ -1256,6 +1251,17 @@ void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetP
   }
   for (Cow& c : cows_) if (c.body.valid() && world_->body_valid(c.body)) world_->destroy_body(c.body);
   cows_ = std::move(next);
+}
+
+void Life::apply_pets(const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, f32 now) {
+  if (!remote_animals_) return;
+  remote_animals_at_ = now;
+  // the host's neighbourhoods: the round of every dog and cat is then the same here
+  if (!pet_anchors.empty()) {
+    pet_anchor_ = pet_anchors[0];
+    pet_anchors_ = pet_anchors;
+    pet_base_ = std::max<u32>(1, pet_count / static_cast<u32>(pet_anchors.size()));
+  }
   // dogs and cats by his index (his count: the species of an index is the same everywhere)
   if (pets_.size() != pet_count) {  // (a phone host has fewer: his count, each one's round by its index)
     const std::size_t had = pets_.size();
@@ -1281,26 +1287,40 @@ void Life::apply_animals(const std::vector<NetCow>& cows, const std::vector<NetP
   }
   for (u32 i = 0; i < pet_count; ++i)
     if (!seen[i] && !(pets_[i].body.valid() && world_->body_valid(pets_[i].body))) { pets_[i].shown = false; pets_[i].has_pose = false; }
-  // pigeon flocks by his index, every bird
-  if (flocks_.size() != flocks.size()) flocks_.resize(flocks.size());
-  for (std::size_t i = 0; i < flocks.size(); ++i) {
-    const NetFlock& n = flocks[i];
-    Flock& f = flocks_[i];
+}
+
+void Life::apply_flocks(const std::vector<NetFlock>& flocks, f32 now, f32 at) {
+  if (!remote_animals_) return;
+  remote_animals_at_ = now;
+  // pigeon flocks by his id, every bird by its place in the flock (a dead one stays in its place)
+  std::vector<Flock> next;
+  next.reserve(flocks.size());
+  for (const NetFlock& n : flocks) {
+    auto old = std::find_if(flocks_.begin(), flocks_.end(), [&](const Flock& x) { return x.id == n.id; });
+    Flock f;
+    if (old != flocks_.end()) f = std::move(*old);
+    f.id = n.id;
     f.air = n.air;
     f.at = n.at;
     if (f.birds.size() != n.birds.size()) {
       f.birds.resize(n.birds.size());
-      for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].pos = n.birds[k]; f.birds[k].yaw = n.yaws[k]; f.birds[k].dead_at = -1; f.birds[k].peck = static_cast<f32>(k) * 1.7f; }
+      for (std::size_t k = 0; k < n.birds.size(); ++k) { f.birds[k].pos = n.birds[k]; f.birds[k].yaw = n.yaws[k]; f.birds[k].dead_at = -1; f.birds[k].peck = static_cast<f32>(k) * 1.7f; f.birds[k].net_at = 0; }
     }
     for (std::size_t k = 0; k < n.birds.size(); ++k) {
       Pigeon& b = f.birds[k];
+      // shot there: it drops here (where it lies is his)
+      if (n.dead[k] && b.dead_at < 0) { b.dead_at = now; b.fall_v = {}; }
+      if (!n.dead[k]) b.dead_at = -1;
+      if (n.dead[k]) { if (kern::length(b.pos - n.birds[k]) > 1.5f) b.pos = n.birds[k]; continue; }
       // its flight between his snapshots: the pace of his last two (on his clock)
       if (at > b.net_at + 0.02f && b.net_at > 0) { const Vec3 v = (n.birds[k] - b.net_to) * (1.0f / (at - b.net_at)); b.net_v = kern::length(v) < 25 ? v : Vec3{}; }
       b.net_to = n.birds[k];
       b.net_at = at;
       b.net_yaw = n.yaws[k];
     }
+    next.push_back(std::move(f));
   }
+  flocks_ = std::move(next);
 }
 
 kern::physics::Body Life::net_carry_cow(u64 key) {

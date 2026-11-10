@@ -721,6 +721,7 @@ void Game::drive_traffic(f32 h) {
       for (const WorldLife::TowTruck& t : life_->trucks) towed = towed || (t.towing && t.job == static_cast<i32>(i));
       if (towed) { c.car->detach(); continue; }
     }
+    car_body_dynamic(c);  // (it was the host's puppet a moment ago: driven here now)
     if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
       c.car->step(w, b, h, c.input);
       continue;

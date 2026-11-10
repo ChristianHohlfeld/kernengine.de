@@ -277,13 +277,21 @@ f32 Session::hp_of(u8 slot) const {
 
 // ---- routing ------------------------------------------------------------------------------------
 
+// A message that was not taken (too large for its channel, the send queue full) is counted and
+// said once per kind: a list that silently never arrives is a world that silently differs.
+void Session::refused(u16 type, std::size_t bytes) {
+  ++send_refused_;
+  if (refused_said_ < 8) { ++refused_said_; std::fprintf(stderr, "[spawncity net] message type %u (%zu bytes) was not sent\n", static_cast<unsigned>(type), bytes); }
+}
 void Session::to_client(u8 slot, int ch, u16 type, const std::vector<u8>& data) {
-  if (role_ == Role::host && server_ && slot < server_->max_clients() && server_->client_connected(slot)) server_->send(slot, ch, type, data);
+  if (role_ == Role::host && server_ && slot < server_->max_clients() && server_->client_connected(slot))
+    if (!server_->send(slot, ch, type, data)) refused(type, data.size());
 }
 void Session::to_all(int ch, u16 type, const std::vector<u8>& data, u8 except) {
   if (role_ != Role::host || !server_) return;
   for (int c = 0; c < server_->max_clients(); ++c)
-    if (c != except && server_->client_connected(c)) server_->send(c, ch, type, data);
+    if (c != except && server_->client_connected(c))
+      if (!server_->send(c, ch, type, data)) refused(type, data.size());
 }
 void Session::to_host(int ch, u16 type, const std::vector<u8>& data) {
   if (role_ == Role::host) dispatch(kHost, type, data);
@@ -301,6 +309,9 @@ void Session::send_swarm(const std::vector<SwarmUnit>& units) {
 }
 void Session::send_world(const std::vector<u8>& blob) {
   if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
+}
+void Session::send_world_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kUnreliable, kWorldMsg, blob);
 }
 // Destruction sync (game_destruction_sync.cpp): reliable, the host is the authority.
 void Session::send_proj(const std::vector<u8>& blob) {

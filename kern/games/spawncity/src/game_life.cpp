@@ -174,7 +174,7 @@ void Game::life_update(f32 dt) {
   v.cats_on = ui_.settings.on(Opt::world_cats);
   v.head = mode_ == Mode::foot ? player_position() + Vec3{0, 0, 0.95f} : player_position();
   // the wall clock (SpawnCity's Date.now()): herds and pets walk the same on every machine
-  v.epoch = static_cast<f64>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0;
+  v.epoch = life_epoch();  // the wall clock - in a session the host's (game_worldsync.cpp)
   const Vec3 pv = mode_ == Mode::foot ? world_->actor_velocity(soldier_) : Vec3{};
   v.player_speed = std::hypot(pv.x, pv.y);
   if (net_.hosting()) v.mates = mate_foci();  // his herds and flocks reach every mate (game_worldsync.cpp)

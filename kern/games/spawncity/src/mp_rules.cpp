@@ -67,7 +67,18 @@ PoseSample PoseTimeline::sample(f64 now) const {
   if (right) {
     const f64 span = std::max(0.001, right->source - left->source);
     const f32 a = static_cast<f32>(clampd((target - left->source) / span, 0, 1));
-    out.p = left->p + (right->p - left->p) * a;
+    // Hermite through both snapshots with their velocities (Glenn Fiedler, "Snapshot
+    // Interpolation": the curve passes through both points and matches their velocities - no
+    // kink at the samples); a jump between them (a teleport) is not a flight: straight then
+    const f32 T = static_cast<f32>(span / 1000);
+    const Vec3 d = right->p - left->p;
+    const f32 flown = (kern::length(left->v) + kern::length(right->v)) * 0.5f * T;
+    if (T < 0.6f && kern::length(d) <= flown * 2.5f + 0.5f) {
+      const f32 a2 = a * a, a3 = a2 * a;
+      out.p = left->p * (2 * a3 - 3 * a2 + 1) + left->v * ((a3 - 2 * a2 + a) * T) + right->p * (-2 * a3 + 3 * a2) + right->v * ((a3 - a2) * T);
+    } else {
+      out.p = left->p + d * a;
+    }
     out.q = nlerp_slerp(left->q, right->q, a);
     return out;
   }

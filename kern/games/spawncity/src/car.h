@@ -75,6 +75,9 @@ class Car {
   /// without physics, moved by somebody else, removed). step() puts them on again.
   void detach();
   bool rigged() const { return rig_world_ != nullptr; }
+  /// A car somebody else drives (shown only): its steering angle, and its wheels rolling at `v`.
+  void show(f32 steer) { steer_ = steer; }
+  void roll(f32 v, f32 dt) { for (WheelState& w : w_) { w.omega = v / s_.radius; w.angle = std::fmod(w.angle + w.omega * dt, 2 * kPi); } }
   /// What a hit on a wheel reports as the shape's user (the game: the car's actor, so a round
   /// into a tyre is a hit on the car).
   u64 hit_user = 0;

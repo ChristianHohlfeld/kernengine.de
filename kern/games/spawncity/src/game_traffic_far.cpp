@@ -23,6 +23,7 @@ void Game::traffic_far_switch() {
     TrafficCar& c = cars_[i];
     const kern::physics::Body b = body(c.actor);
     if (!c.placed || !b.valid() || !w.body_valid(b)) { c.far = false; continue; }
+    if (puppet_world_ && i < car_net_.size() && car_net_[i] >= 0) { c.far = false; continue; }  // the host's car here: on his poses (game_worldsync.cpp)
     const bool keep = c.police || c.wreck || c.burn_until >= 0 || static_cast<i32>(i) == car_index_;
     const Vec3 p = matrix_of(c.actor).translation();
     // near any player real physics (MP host: the ground and the buildings are loaded around the

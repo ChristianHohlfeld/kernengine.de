@@ -107,9 +107,18 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     for (const Arm& a : n.arms) wmax = std::fmax(wmax, a.width);
     j.lights = wmax >= 9;
     j.radius = std::fmax(6.0f, wmax * 0.5f + 3.5f);
-    // The axis: the widest arm (the main road)
-    for (const Arm& a : n.arms)
-      if (a.width >= wmax) { j.axis = a.dir; break; }
+    // The axis: the widest arm (the main road); of several as wide, the one with the smallest
+    // bearing - the same on every machine, whatever order its streets came in
+    {
+      f32 best = 1e9f;
+      for (const Arm& a : n.arms) {
+        if (a.width < wmax) continue;
+        f32 bearing = std::atan2(a.dir.y, a.dir.x);
+        if (bearing < 0) bearing += 3.14159265f;
+        if (bearing >= 3.14159265f - 1e-3f) bearing = 0;
+        if (bearing < best) { best = bearing; j.axis = a.dir; }
+      }
+    }
     // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
     // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
     // street: not on its own arm, not on the one crossing it).
@@ -136,7 +145,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
       a.pole = Vec2{std::cos(aa + half), std::sin(aa + half)} * r;
       a.has_pole = true;
     }
-    const u32 h = static_cast<u32>(static_cast<i32>(n.p.x * 7.0f)) * 73856093u ^ static_cast<u32>(static_cast<i32>(n.p.y * 7.0f)) * 19349663u;
+    const u32 h = static_cast<u32>(static_cast<i32>(std::lround(n.p.x / 3))) * 73856093u ^ static_cast<u32>(static_cast<i32>(std::lround(n.p.y / 3))) * 19349663u;
     j.offset = static_cast<f32>(h % 3800) / 100.0f;
     junctions_.push_back(j);
     const i32 id = static_cast<i32>(junctions_.size() - 1);
@@ -160,7 +169,8 @@ void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
   const bool along = std::fabs(heading.x * j.axis.x + heading.y * j.axis.y) > 0.7071f;
-  f32 t = std::fmod(now + j.offset, kCycle);
+  // (the shared wall clock when the game has set it: every machine shows the same phase)
+  f32 t = std::fmod((lights_time >= 0 ? lights_time : now) + j.offset, kCycle);
   if (!along) t = std::fmod(t + kCycle - (kGreen + kAmber + kAllRed), kCycle);
   if (t < kGreen) return 0;
   if (t < kGreen + kAmber) return 1;

@@ -42,6 +42,7 @@ f32 Game::traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed) {
   WorldLife& L = *life_;
   if (static_cast<i32>(L.car_limit.size()) <= car) { L.car_limit.resize(car + 1, 1e9f); L.car_limit_at.resize(car + 1, -99); L.car_view.resize(car + 1); }
   const f32 now = world_->sim_time();
+  L.rules.lights_time = static_cast<f32>(std::fmod(life_epoch(), 38.0 * 1000));
   if (now - L.car_limit_at[car] < kCacheS) return L.car_limit[car];
   L.car_limit_at[car] = now;
   if (L.rules.built_from != lane_signature(city_.lanes())) {
@@ -342,6 +343,7 @@ void Game::draw_traffic_lights() {
   if (!life_ || !life_->art_ready) return;
   WorldLife& L = *life_;
   const f32 now = world_->sim_time();
+  L.rules.lights_time = static_cast<f32>(std::fmod(life_epoch(), 38.0 * 1000));  // (the host's wall clock in a session)
   // the tow trucks' bed, boom, hook and amber bar (tow_service.mjs buildTruck)
   for (const WorldLife::TowTruck& t : L.trucks) {
     if (!t.body.valid() || !world_->physics().body_valid(t.body)) continue;

@@ -111,7 +111,6 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
     bs.linear_velocity = st.velocity;
     bs.angular_damping = 0.05f;
     bs.linear_damping = 0.02f;
-    bs.enable_sleep = false;
     Rig& g = rig_[i];
     g.body = world.create_body(bs);
     // Two shapes, one sphere: the tyre on the ground has no solver friction (its grip is the tyre
