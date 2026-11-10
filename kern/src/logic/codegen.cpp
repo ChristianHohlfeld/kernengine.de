@@ -85,7 +85,7 @@ enum Op : u8 {
 constexpr u8 kVoid = 0x40, kTypeI32 = 0x7f, kTypeF64 = 0x7c;
 
 // Locals of run(pc, entry).
-constexpr u32 kPc = 0, kEntry = 1, kBase = 2, kR = 3, kSp = 4, kF0 = 5, kF1 = 6, kF2 = 7;
+constexpr u32 kPc = 0, kEntry = 1, kBase = 2, kR = 3, kSp = 4, kF0 = 5, kF1 = 6, kF2 = 7, kF3 = 8;
 // Imported functions.
 constexpr u32 kFnCallNode = 0, kFnReadPin = 1, kFnTrace = 2;
 
@@ -159,8 +159,8 @@ class WasmGen {
       fn.uleb(3);  // local groups
       fn.uleb(3);
       fn.byte(kTypeI32);  // base, r, sp
-      fn.uleb(3);
-      fn.byte(kTypeF64);  // f0..f2
+      fn.uleb(4);
+      fn.byte(kTypeF64);  // f0..f3
       fn.uleb(0);
       fn.byte(kTypeI32);
       fn.append(code);
@@ -195,7 +195,17 @@ class WasmGen {
   void bool_of_f64() { f64c(0); op(kF64Ne); }  // f64 -> i32 0/1
   void to_f64_from_bool() { op(kF64ConvertI32U); }
   void convert(PinType t) {
-    if (t == PinType::integer) op(kF64Trunc);
+    if (t == PinType::integer) {
+      // A whole number as Int holds it (logic::whole): toward zero; not a number or endless: 0;
+      // beyond Int: its nearest end. (kF3 is this conversion's own.)
+      op(kF64Trunc);
+      lset(kF3);
+      lget(kF3); f64c(0);
+      lget(kF3); lget(kF3); op(kF64Sub); f64c(0); op(kF64Eq);  // finite: x - x is 0
+      op(kSelect);
+      f64c(-9223372036854775808.0); op(kF64Max);
+      f64c(9223372036854775808.0); op(kF64Min);
+    }
     else if (t == PinType::boolean) { bool_of_f64(); to_f64_from_bool(); }
   }
 
@@ -209,8 +219,11 @@ class WasmGen {
       return;
     }
     if (depth < 24 && in_.inline_pure(s.node)) {
+      // (a value that is an Int - Round, Floor - is one as the node gives it, whatever reads it)
+      const PinType gives = in_.outputs_at(s.node)[static_cast<std::size_t>(s.pin)].type;
       pure(s.node, s.pin, depth + 1);
-      convert(pin.type);
+      if (gives == PinType::integer) convert(gives);
+      if (pin.type != gives) convert(pin.type);
       return;
     }
     if (const int slot = in_.out_slot(s.node, s.pin); slot >= 0 && in_.def_at(s.node)->kind != NodeKind::pure) {
@@ -321,7 +334,7 @@ class WasmGen {
   void push(int pc, int entry) {
     const u32 st = static_cast<u32>(stack_);
     i32c(st); mem(kI32Load, 2, 0); lset(kSp);
-    lget(kSp); i32c(CodeLayout::kStack); op(kI32GeS); if_void(); ret_i32(2); op(kEnd);
+    lget(kSp); i32c(in_.stack_capacity()); op(kI32GeS); if_void(); ret_i32(2); op(kEnd);
     i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); i32c(pc); mem(kI32Store, 2, 0);
     i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); i32c(entry); mem(kI32Store, 2, 4);
     i32c(st); lget(kSp); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);

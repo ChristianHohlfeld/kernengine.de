@@ -63,6 +63,25 @@ inline i64 whole(f64 v) {
   return static_cast<i64>(v);
 }
 
+/// A whole number as a Blueprint holds it. Every number of a Blueprint is a double underneath
+/// (the interpreter's variables, the JIT): whole numbers are exact up to 2^53, a larger one is
+/// the nearest a double holds, and none is past Int's ends. Every Int there is - a value on a
+/// pin, a variable of a Blueprint's class - is such a number, so every tier has the same.
+constexpr i64 normal(i64 v) {
+  constexpr i64 exact = i64{1} << 53;
+  if (v >= -exact && v <= exact) return v;
+  const f64 held = static_cast<f64>(v);  // (the nearest a double holds)
+  if (held >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
+  return static_cast<i64>(held);  // (Int's lower end is a double itself)
+}
+/// Int + Int (Add to Variable): added as numbers - defined for every value, where the
+/// arithmetic of i64 overflows.
+inline i64 whole_add(i64 a, i64 b) {
+  constexpr i64 half = i64{1} << 52;
+  if (a > -half && a < half && b > -half && b < half) return a + b;  // (the same, without the detour)
+  return whole(static_cast<f64>(a) + static_cast<f64>(b));
+}
+
 /// A value on a data pin.
 struct Value {
   PinType type = PinType::number;
@@ -74,7 +93,7 @@ struct Value {
   ActorRef a = 0;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
-  static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = x; return r; }
+  static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
   static Value number(f64 x) { Value r; r.type = PinType::number; r.n = x; return r; }
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
@@ -421,7 +440,9 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
 /// and per node a table of exec targets. Everything else calls back into the C++ nodes.
 struct CodeLayout {
   static constexpr int kNodeSlots = 8;   // per node: 4 state + 4 data outputs
-  static constexpr int kStack = 512;     // continuation entries (pc, entry)
+  static constexpr int kStack = 512;     // continuation entries (pc, entry): at least; an instance has as
+                                         // many as its graph can ever need (Instance::stack_capacity)
+  static constexpr int kStackMost = 1 << 15;  // a graph that could need more is not compiled by the JIT
 };
 
 /// Compiles an instance's graph to a WebAssembly module (the JIT's input).
@@ -533,6 +554,10 @@ class Instance {
   bool inline_pure(int node) const;
   f64* slots() { return slots_.data(); }
   i32* stack() { return stack_.data(); }
+  /// How many continuations the stack holds: as many as this graph can ever leave open (a node
+  /// leaves some at most once in each running chain, and chains nest 64 events deep at most) -
+  /// generated code never runs out of it where the interpreter and the Blueprint's class go on.
+  int stack_capacity() const { return stack_capacity_; }
   i32* exec_table() { return exec_table_.data(); }
   int var_slot(std::string_view name) const;
   int node_slot(int node) const { return node_slot_base_ + node * CodeLayout::kNodeSlots; }
@@ -605,6 +630,8 @@ class Instance {
   std::vector<Frame> frames_;
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
   std::vector<i32> stack_;            // [0] = depth, then (pc, entry) pairs
+  int stack_capacity_ = CodeLayout::kStack;
+  bool jit_fits_ = true;              // (false: the graph could need more than kStackMost - it stays in the interpreter)
   std::vector<i32> exec_table_;       // per node: (target, entry) per exec output
   std::vector<int> exec_table_offset_;
   int node_slot_base_ = 0;

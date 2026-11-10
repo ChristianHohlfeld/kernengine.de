@@ -2313,6 +2313,15 @@ TEST(logic_tier_cases_interpreter) {
       // 70 events deep is asked for: 63 Deep handlers run under Open, the next level is refused -
       // the functions between them (Outer, Inner) are calls, not levels
       CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
+      CHECK(inst->get("Tail").as_int() == 630);  // every handler's ten open steps ran when the levels below were over
+    }
+    if (std::string(c.name) == "whole_numbers") {
+      const i64 top = std::numeric_limits<i64>::max();
+      CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
+      CHECK(inst->get("Edge").as_int() == 9007199254740992);                                              // 2^53 + 1 is 2^53, as a number adds
+      CHECK(inst->get("Top").as_int() == top && inst->get("TopAsFloat").as_number() == 9223372036854775808.0);
+      CHECK(inst->get("Low").as_int() == std::numeric_limits<i64>::min());
+      CHECK(inst->get("FromFloor").as_number() == 0 && inst->get("FromRound").as_number() == 0);          // endless and no number: 0
     }
     if (std::string(c.name) == "infinite_loop") CHECK(inst->disabled());
     if (std::string(c.name) == "reroutes") {

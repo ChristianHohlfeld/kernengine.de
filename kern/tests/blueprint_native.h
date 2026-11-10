@@ -324,7 +324,10 @@ inline std::vector<Value> samples(PinType t) {
   switch (t) {
     case PinType::boolean: r = {Value::boolean(false), Value::boolean(true)}; break;
     case PinType::integer:
-      for (i64 v : {0, 1, -1, 2, 7, -13, 100, 1000000007}) r.push_back(Value::integer(v));
+      // (and whole numbers at their ends: 2^53, 2^62, Int's upper end)
+      for (i64 v : {i64{0}, i64{1}, i64{-1}, i64{2}, i64{7}, i64{-13}, i64{100}, i64{1000000007}, i64{9007199254740992}, i64{-9007199254740992}, i64{4611686018427387904},
+                    std::numeric_limits<i64>::max()})
+        r.push_back(Value::integer(v));
       break;
     case PinType::number:
       for (f64 v : {0.0, 1.0, -1.0, 0.5, -2.5, 3.75, 90.0, 1e-9, 123456.789, -0.0, 2.0, 45.0, -180.0, 7.0, 0.3, 1e19, -1e300, inf, -inf, std::numeric_limits<f64>::quiet_NaN()})

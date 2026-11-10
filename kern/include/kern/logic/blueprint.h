@@ -75,6 +75,9 @@ struct Layout {
 /// The nodes of the core library (src/logic/core_nodes.cpp). kern::Blueprint, below, is these and
 /// the gameplay nodes.
 struct BlueprintCore : logic::PureNodes {
+  /// A whole number as a Blueprint holds it (the functions of nodes.h take and give i64).
+  using Int = logic::Whole;
+
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;
 
@@ -210,7 +213,12 @@ struct BlueprintCore : logic::PureNodes {
   template <Setting Function, class... V> static void func_return(const V&...) {}
   /// if (flow_do_once(n, "exec", closed)): the call goes through once ("reset": again).
   template <class N> bool flow_do_once(N& n, std::string_view entry, Bool closed) { return logic::flow::do_once(n.memory, entry == "reset" ? 1 : 0, closed); }
-  template <class N> bool flow_do_n(N& n, std::string_view entry, Int count) { return logic::flow::do_n(n.memory, entry == "reset" ? 1 : 0, count, n.counter); }
+  template <class N> bool flow_do_n(N& n, std::string_view entry, Int count) {
+    i64 counter = n.counter;
+    const bool through = logic::flow::do_n(n.memory, entry == "reset" ? 1 : 0, count, counter);
+    n.counter = counter;
+    return through;
+  }
   template <class N> bool flow_gate(N& n, std::string_view entry, Bool closed) {
     return logic::flow::gate(n.memory, entry == "open" ? 1 : entry == "close" ? 2 : entry == "toggle" ? 3 : 0, closed);
   }

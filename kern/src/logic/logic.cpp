@@ -147,7 +147,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
   Value v = zero(t);
   switch (t) {
     case PinType::boolean: v.b = j.is_bool() ? j.as_bool() : j.truthy(); break;
-    case PinType::integer: v.i = j.is_number() ? static_cast<i64>(std::llround(j.as_number())) : j.is_string() ? std::strtoll(j.as_string().c_str(), nullptr, 10) : 0; break;
+    case PinType::integer: v.i = normal(j.is_number() ? whole(std::round(j.as_number())) : j.is_string() ? std::strtoll(j.as_string().c_str(), nullptr, 10) : 0); break;
     case PinType::number: v.n = j.is_number() ? j.as_number() : j.is_string() ? std::strtod(j.as_string().c_str(), nullptr) : 0; break;
     case PinType::vector:
       if (j.is_array() && j.size() >= 3) v.v = {static_cast<f32>(j[0].as_number()), static_cast<f32>(j[1].as_number()), static_cast<f32>(j[2].as_number())};
@@ -676,7 +676,7 @@ std::vector<Instance*>& instance_registry() {
 bool numeric(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number; }
 f64 to_type(f64 v, PinType t) {
   if (t == PinType::boolean) return v != 0 ? 1.0 : 0.0;
-  if (t == PinType::integer) return std::isfinite(v) ? std::trunc(v) : 0.0;
+  if (t == PinType::integer) return static_cast<f64>(whole(v));  // (a whole number as Int holds it: logic::normal)
   return v;
 }
 Value from_slot(f64 v, PinType t) {
@@ -800,7 +800,7 @@ int Instance::call_node(int node, int entry) {
   if (rt_.tracing && rt_.trace_.size() < 4096) rt_.trace_.push_back({name_, c.node->id, rt_.host().time()});
   // Continuations (Sequence-like C++ nodes, loops) go onto the generated code's stack, last first.
   for (auto it = ctx.continuations_.rbegin(); it != ctx.continuations_.rend(); ++it) {
-    if (stack_[0] >= CodeLayout::kStack) break;
+    if (stack_[0] >= stack_capacity_) break;
     stack_[static_cast<std::size_t>(1 + 2 * stack_[0])] = it->first;
     stack_[static_cast<std::size_t>(2 + 2 * stack_[0])] = it->second;
     ++stack_[0];
@@ -926,6 +926,19 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
       for (const CNode::Source& s : nodes_[i].data_in)
         if (s.node >= 0 && is_fresh(s.node)) nodes_[i].fed_fresh = true;
     }
+  }
+  // The generated code's continuation stack, as large as this graph can ever need: a node that
+  // leaves something to go on with (a Sequence its further outputs, a loop its next pass) does so
+  // at most once in each chain that is running, and chains nest 64 events deep at most (with the
+  // outermost and a call from outside: 66).
+  {
+    i64 open = 0;
+    for (const CNode& c : nodes_)
+      if (c.def && (c.def->kind == NodeKind::flow || c.def->loop)) open += static_cast<i64>(max_of<std::size_t>(c.exec_out.size(), 1));
+    const i64 needed = 66 * open;
+    jit_fits_ = needed <= CodeLayout::kStackMost;
+    stack_capacity_ = static_cast<int>(clamp<i64>(needed, CodeLayout::kStack, CodeLayout::kStackMost));
+    stack_.assign(static_cast<std::size_t>(1 + 2 * stack_capacity_), 0);
   }
   fn_entry_.assign(graph_.functions.size(), -1);
   for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
@@ -1082,7 +1095,7 @@ Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
     if (native && own != blueprint_registry().end()) {
       added->blueprint_ = own->second();
       added->blueprint_->attach({&host_, this, added, self, counters_});
-    } else if (jit) {
+    } else if (jit && added->jit_fits_) {
       added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
     }
   }
@@ -1296,7 +1309,7 @@ bool Runtime::run_compiled(Instance& inst, int node, int entry) {
   }
   counters_[4] = outer_refused;
   if (r == 2) {
-    host_.error(inst.name() + ": the graph nests deeper than " + std::to_string(CodeLayout::kStack) + " loops / sequences - stopped.");
+    host_.error(inst.name() + ": the graph nests deeper than " + std::to_string(inst.stack_capacity_) + " loops / sequences - stopped.");
     inst.disabled_ = true;
   }
   return true;

@@ -59,6 +59,20 @@ inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
 
 namespace logic {
 
+/// `Int` in a Blueprint's C++: a whole number as a Blueprint holds it (logic::normal). It is an
+/// i64 to every function that takes one. Adding to it - Add to Variable, `Count += 1` - adds as
+/// the interpreter and the JIT add: as numbers, defined for every value.
+struct Whole {
+  i64 v = 0;
+  constexpr Whole() = default;
+  constexpr Whole(i64 x) : v(normal(x)) {}       // NOLINT (implicit: an i64 is one)
+  constexpr operator i64() const { return v; }   // NOLINT
+  Whole& operator+=(Whole amount) {
+    v = whole_add(v, amount.v);
+    return *this;
+  }
+};
+
 /// An actor on a pin (`Actor` in a Blueprint's C++): its id, 0 = none.
 struct ActorHandle {
   ActorRef id = 0;
@@ -75,6 +89,7 @@ template <> inline std::string from_value<std::string>(const Value& v) { return 
 template <> inline ActorHandle from_value<ActorHandle>(const Value& v) { return {v.as_actor()}; }
 inline Value to_value(bool v) { return Value::boolean(v); }
 inline Value to_value(i64 v) { return Value::integer(v); }
+inline Value to_value(Whole v) { return Value::integer(v); }
 inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
@@ -134,6 +149,7 @@ template <class T> T native_out(const Instance& instance, int node, int out) { r
 /// interpreter's variables make.
 inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }
 inline void native_set(i64& variable, const Value& v) { variable = whole(v.as_number()); }
+inline void native_set(Whole& variable, const Value& v) { variable = whole(v.as_number()); }
 inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
@@ -367,6 +383,7 @@ template <> struct To<i64> {
   static i64 from(i64 v) { return v; }
   static i64 from(f64 v) { return whole(v); }
 };
+template <> struct To<Whole> : To<i64> {};
 template <> struct To<f64> {
   static f64 from(bool v) { return v ? 1 : 0; }
   static f64 from(i64 v) { return static_cast<f64>(v); }

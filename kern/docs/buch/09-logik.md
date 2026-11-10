@@ -72,6 +72,14 @@ Ein Level hat einen **Level-Graphen** (Self = keiner); jeder Actor kann einen ei
 `integer`, `string`). Ein `Value` trägt einen Typ und den passenden Inhalt (`b`, `i`, `n`, `v`, `s`,
 `a`; `ActorRef` ist die Actor-ID).
 
+Eine ganze Zahl (`integer`) ist überall dieselbe: so, wie ein Blueprint sie hält (`logic::normal`).
+Unter jeder Zahl liegt ein `double` – in den Variablen des Interpreters, im JIT –, also sind
+ganze Zahlen bis 2^53 exakt, eine größere ist die nächste, die ein `double` hält, und keine geht
+über die Enden von 64 Bit hinaus. `Value::integer` und der Typ `Int` der C++-Klasse
+(`logic::Whole`) sorgen dafür; aus einer Kommazahl wird eine ganze mit `logic::whole` (zur Null
+hin; „keine Zahl“ und unendlich: 0; was nicht passt: das nächste Ende). Add to Variable addiert
+als Zahl und ist für jeden Wert definiert.
+
 Welche Drähte erlaubt sind, sagt `convertible(from, to)`:
 
 - gleicher Typ immer; Exec nur mit Exec;
@@ -272,7 +280,10 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
   C++-Klasse sind sie gewöhnliche Aufrufe, und sich selbst aufrufen kann eine Funktion nicht).
   Löst eine Funktion ein Event aus, dessen Handler sie noch einmal aufruft, ist das ein Aufruf
   wie jeder andere; ist der Handler zu Ende, hat der unterbrochene Aufruf seine Parameter wieder.
-- Im kompilierten Code: mehr als 512 verschachtelte Schleifen/Sequences stoppen die Instanz.
+- Der Stapel des JIT für offene Sequences und Schleifen ist so groß, wie der Graph ihn je brauchen
+  kann (`Instance::stack_capacity`: 66 × die Exec-Ausgänge seiner Flow- und Schleifen-Knoten,
+  mindestens 512). Er läuft deshalb nie voll, wo Interpreter und C++-Klasse weiterlaufen; ein
+  Graph, der mehr als 32 768 Einträge bräuchte, wird nicht JIT-kompiliert.
 
 ### State Machines
 
@@ -451,7 +462,7 @@ Der gemeinsame Zustand liegt in der Instanz, an festen Adressen, die sich nach d
 | Bereich | Inhalt |
 |---|---|
 | `slots()` | f64-Slots: zuerst die numerischen Variablen (bool, int, float), dann **8 pro Knoten** – 4 für Zustand (Schleifenindex, Gate offen, Flip-Flop …) und 4 für Datenausgänge inline erzeugter Exec-Knoten |
-| `stack()` | i32-Fortsetzungsstapel: `[0]` = Tiefe, dann Paare (pc, entry); 512 Einträge |
+| `stack()` | i32-Fortsetzungsstapel: `[0]` = Tiefe, dann Paare (pc, entry); `stack_capacity()` Einträge (so viele, wie der Graph je brauchen kann) |
 | `exec_table()` | je Knoten und Exec-Ausgang: (Ziel, Eingang) |
 | `counters()` | `[0]` gelaufene Knoten (eine Zählung), `[1]` Grenze der Schleifendurchläufe pro Schritt (das Budget), `[2]` Tracing an, `[3]` Schleifendurchläufe in diesem Schritt, `[4]` einer Schleife der laufenden Kette wurde ein Durchlauf verweigert |
 

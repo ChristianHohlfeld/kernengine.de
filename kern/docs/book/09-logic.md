@@ -71,6 +71,14 @@ A level has a **level graph** (Self = none); every actor can carry a graph of it
 `integer`, `string`). A `Value` carries a type and the matching content (`b`, `i`, `n`, `v`, `s`,
 `a`; `ActorRef` is the actor ID).
 
+A whole number (`integer`) is the same everywhere: as a Blueprint holds it (`logic::normal`).
+Every number is a `double` underneath – in the interpreter's variables, in the JIT – so whole
+numbers are exact up to 2^53, a larger one is the nearest a `double` holds, and none is past the
+ends of 64 bits. `Value::integer` and the type `Int` of the C++ class (`logic::Whole`) see to
+that; a fractional number becomes a whole one with `logic::whole` (toward zero; not a number and
+endless: 0; what does not fit: the nearest end). Add to Variable adds as a number and is defined
+for every value.
+
 Which wires are allowed is determined by `convertible(from, to)`:
 
 - the same type always; exec only with exec;
@@ -270,7 +278,10 @@ on an action node reads that node's last stored output.
   calls, and a function cannot call itself). If a function raises an event whose handler calls it
   again, that is a call like any other; when the handler is over, the interrupted call has its
   parameters again.
-- In compiled code: more than 512 nested loops/sequences stop the instance.
+- The JIT's stack for open sequences and loops is as large as the graph can ever need
+  (`Instance::stack_capacity`: 66 × the exec outputs of its flow and loop nodes, at least 512).
+  So it never runs full where the interpreter and the C++ class go on; a graph that would need
+  more than 32,768 entries is not JIT-compiled.
 
 ### State machines
 
@@ -447,7 +458,7 @@ The shared state lives in the instance, at fixed addresses that never change aft
 | Area | Content |
 |---|---|
 | `slots()` | f64 slots: first the numeric variables (bool, int, float), then **8 per node** – 4 for state (loop index, gate open, flip-flop …) and 4 for data outputs of inline-generated exec nodes |
-| `stack()` | i32 continuation stack: `[0]` = depth, then pairs (pc, entry); 512 entries |
+| `stack()` | i32 continuation stack: `[0]` = depth, then pairs (pc, entry); `stack_capacity()` entries (as many as the graph can ever need) |
 | `exec_table()` | per node and exec output: (target, input) |
 | `counters()` | `[0]` nodes run (a count), `[1]` the limit of loop passes per step (the budget), `[2]` tracing on, `[3]` loop passes in this step, `[4]` a loop of the running chain was refused a pass |
 

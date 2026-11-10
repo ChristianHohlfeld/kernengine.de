@@ -149,12 +149,17 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   außen liest. Wie tief Events ineinander liegen dürfen (64), zählt Funktionsaufrufe nicht mehr
   mit; Werte lesen einander ohne Grenze (der Interpreter hörte nach 48 auf). Tier-Fall
   `function_reentry`.
-- [ ] **Native Ausführung, Teil 2 – die Randfälle zwischen den Stufen:**
-  - Verschachtelung: Der JIT stoppt bei mehr als 64 ineinander liegenden Schleifen / Sequences,
-    die anderen Stufen nicht.
-  - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text
-    als 64-Bit-Zahl; der JIT schneidet „keine Zahl“ und unendlich beim Umwandeln nicht auf 0.
-    Beides wird gleichgezogen.
+- [x] **Ganze Zahlen in jeder Stufe gleich:** `Int` ist eine ganze Zahl, wie ein Blueprint sie
+  hält (`logic::normal`, in der Klasse der Typ `kern::logic::Whole`): bis 2^53 exakt, darüber
+  die nächste Zahl eines `double`, nie über die Enden von 64 Bit. `Count += 1` addiert als Zahl
+  und ist für jeden Wert definiert (vorher lief die Klasse dort in undefinierte
+  `i64`-Arithmetik, der JIT ließ „keine Zahl“ und unendlich stehen, der Interpreter rundete nur
+  in Variablen). Tier-Fall `whole_numbers`.
+- [x] **Der JIT geht so tief wie die anderen Stufen:** Sein Stapel für offene Sequences und
+  Schleifen ist so groß, wie der Graph ihn je brauchen kann (je laufender Kette lässt ein Knoten
+  höchstens einmal etwas offen, und Ketten liegen höchstens 64 Events tief). Vorher stoppte er
+  bei 512 offenen Schritten, wo Interpreter und Klasse weiterliefen. Ein Graph, der mehr als
+  32 768 bräuchte, bleibt im Interpreter.
 - [ ] **Nativer Export:** Der Editor exportiert das Spiel mit diesen Klassen, voll optimiert.
 - [ ] Der JIT erzeugt Formeln und Funktionsaufrufe ebenfalls direkt (heute Rückruf).
 

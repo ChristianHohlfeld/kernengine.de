@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"22:09",title:"Ganze Zahlen: überall dieselbe Zahl",items:[
+    "Kern-Blueprints: Eine ganze Zahl (Integer) ist jetzt in jeder Form dieselbe – als Graph, im Browser beschleunigt und als kompiliertes C++. Bis 2^53 ist sie exakt; größer geht es bis zu den Enden von 64 Bit, nie darüber hinaus. Eine Variable, die sich immer wieder verdoppelt, bleibt am oberen Ende stehen (das kompilierte C++ lief dort bisher ins Undefinierte), und aus „keine Zahl“ oder unendlich wird beim Runden überall 0.",
+    "Beschleunigte Blueprints gehen jetzt so tief wie die anderen Formen: Ihr Speicher für offene Sequences und Schleifen ist so groß, wie der Blueprint ihn je brauchen kann (bisher war bei 512 Schluss).",
+    "Damit sind die bekannten Unterschiede zwischen Blueprint und C++ ausgeräumt; 17 Prüf-Blueprints liefern in allen drei Formen dasselbe.",
+  ]},
   {date:"2026-11-10",time:"21:43",title:"Funktionen und Events: in jeder Form gleich tief",items:[
     "Kern-Blueprints: Löst eine Funktion ein Event aus und dessen Handler ruft dieselbe Funktion noch einmal auf, ist das jetzt ein Aufruf wie jeder andere – bisher wurde der innere Aufruf als Graph übersprungen, als kompiliertes C++ aber ausgeführt. Jeder Aufruf hat seine eigenen Werte; ist der Handler fertig, rechnet der unterbrochene Aufruf mit seinen weiter.",
     "Wie tief Events ineinander liegen dürfen (64), zählt Funktionsaufrufe nicht mehr mit, und lange Rechenketten werden vollständig ausgewertet (bisher endete der Graph nach 48 Werten hintereinander). Blueprint und C++ hören damit an derselben Stelle auf.",

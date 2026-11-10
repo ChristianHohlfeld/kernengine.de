@@ -416,11 +416,18 @@ die Maschine hin; geführt wird sie von der Laufzeit (Timer, Bedingungen, Events
 für jede Stufe) für den Graphen, aus dem die Klasse geschrieben wurde. Die Klasse fragt und setzt
 Zustände darüber (`state_set`, `state_get`, `state_is`) und hat die State-Events als Handler.
 
-**Zahlen.** `Float` ist `double`, `Int` eine ganze Zahl mit 64 Bit. Aus einer Kommazahl wird eine
-ganze Zahl überall gleich (`kern::logic::whole`): zur Null hin abgeschnitten; „keine Zahl“ und
-unendlich ergeben 0; was nicht mehr hineinpasst, das nächste Ende. Round und Floor benutzen
-dieselbe Regel. Ganze Zahlen sind in allen Stufen bis 2^53 exakt (der Interpreter hält
-Zahlen-Variablen als `double`).
+**Zahlen.** `Float` ist `double`. Aus einer Kommazahl wird eine ganze Zahl überall gleich
+(`kern::logic::whole`): zur Null hin abgeschnitten; „keine Zahl“ und unendlich ergeben 0; was
+nicht mehr hineinpasst, das nächste Ende. Round und Floor benutzen dieselbe Regel.
+
+`Int` ist eine ganze Zahl, **wie ein Blueprint sie hält** (`kern::logic::Whole`, `logic::normal`):
+Unter jeder Zahl eines Blueprints liegt ein `double` (die Variablen des Interpreters, der JIT).
+Ganze Zahlen sind deshalb bis 2^53 exakt; eine größere ist die nächste, die ein `double` hält,
+und keine geht über die Enden von 64 Bit hinaus. Das gilt für jeden `Int`, den es gibt – einen
+Wert an einem Pin, eine Variable der Klasse –, also in jeder Stufe gleich. `Count += 1` addiert,
+wie der Graph addiert: als Zahl, für jeden Wert definiert (eine Variable, die sich 70-mal
+verdoppelt, bleibt am oberen Ende stehen; die Arithmetik von `i64` wäre dort undefiniert). Für
+jede Funktion, die ein `i64` nimmt, ist ein `Int` eins.
 
 **Im Spiel.** `tools/blueprint_cpp.sh level.klevel out.cpp` schreibt für jeden Blueprint des
 Levels, der so laufen kann, seinen Text und dahinter den Kleber (`logic::native_glue`): eine
@@ -469,11 +476,11 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 16, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+demselben Ergebnis: alle 17, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
-tiefer als 64 ineinander liegen (`function_reentry`), Tweens und Timer (`waits`), Zustände
-(`states`) und Zufall (`random`).
+tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
+(`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

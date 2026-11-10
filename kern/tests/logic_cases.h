@@ -125,9 +125,11 @@ inline const std::vector<Case>& cases() {
       // any other. Each call has its parameters, also for the step two paths lead to (it reads
       // them from outside the body's own path) and after the inner call is over. Functions called
       // by nodes do not count for how deep events nest (Outer, Inner between the Deep events: 63
-      // handlers run before the 65th level is refused, in every tier).
+      // handlers run before the 65th level is refused, in every tier). Every Deep handler leaves
+      // ten steps of a Sequence open while the next level runs - more than 600 at the deepest: the
+      // JIT's stack is as large as the graph can need (Tail).
       {"function_reentry",
-       R"({"variables":[{"name":"Log","type":"float","value":0},{"name":"Calls","type":"int","value":0},{"name":"DeepCount","type":"int","value":0}],
+       R"({"variables":[{"name":"Log","type":"float","value":0},{"name":"Calls","type":"int","value":0},{"name":"DeepCount","type":"int","value":0},{"name":"Tail","type":"int","value":0}],
         "functions":[{"name":"Step","inputs":[{"name":"x","type":"float","value":0}],"outputs":[]},{"name":"Outer","inputs":[{"name":"v","type":"float","value":0}],"outputs":[]},
           {"name":"Inner","inputs":[{"name":"v","type":"float","value":0}],"outputs":[]}],
         "nodes":[{"id":20,"type":"func.entry","params":{"function":"Step"}},{"id":21,"type":"var.add","params":{"variable":"Calls"},"values":{"amount":1}},
@@ -138,15 +140,38 @@ inline const std::vector<Case>& cases() {
           {"id":32,"type":"event.custom","params":{"name":"Go"}},{"id":33,"type":"func.call","params":{"function":"Step"}},
           {"id":40,"type":"event.custom","params":{"name":"Open"}},{"id":41,"type":"flow.call","params":{"name":"Deep"},"values":{"value":70}},
           {"id":42,"type":"event.custom","params":{"name":"Deep"}},{"id":43,"type":"var.add","params":{"variable":"DeepCount"},"values":{"amount":1}},
-          {"id":44,"type":"func.call","params":{"function":"Outer"}},
+          {"id":44,"type":"func.call","params":{"function":"Outer"}},{"id":45,"type":"flow.sequence","params":{"count":"11"}},
+          {"id":46,"type":"var.add","params":{"variable":"Tail"},"values":{"amount":1}},
           {"id":50,"type":"func.entry","params":{"function":"Outer"}},{"id":51,"type":"func.call","params":{"function":"Inner"}},
           {"id":60,"type":"func.entry","params":{"function":"Inner"}},{"id":61,"type":"flow.branch"},{"id":62,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
           {"id":63,"type":"flow.call","params":{"name":"Deep"}},{"id":64,"type":"math.sub","values":{"b":1}}],
         "links":[[20,"then",21,"exec"],[21,"then",22,"exec"],[22,"then0",23,"exec"],[20,"x",24,"a"],[24,"result",23,"condition"],[23,"true",25,"exec"],[20,"x",27,"a"],[27,"result",25,"value"],
           [25,"then",26,"exec"],[22,"then1",26,"exec"],[29,"value",28,"acc"],[20,"x",28,"x"],[28,"result",26,"value"],
           [30,"then",31,"exec"],[30,"value",31,"x"],[32,"then",33,"exec"],[32,"value",33,"x"],
-          [40,"then",41,"exec"],[42,"then",43,"exec"],[43,"then",44,"exec"],[42,"value",44,"v"],
+          [40,"then",41,"exec"],[42,"then",43,"exec"],[43,"then",45,"exec"],[45,"then0",44,"exec"],[42,"value",44,"v"],
+          [45,"then1",46,"exec"],[45,"then2",46,"exec"],[45,"then3",46,"exec"],[45,"then4",46,"exec"],[45,"then5",46,"exec"],[45,"then6",46,"exec"],[45,"then7",46,"exec"],
+          [45,"then8",46,"exec"],[45,"then9",46,"exec"],[45,"then10",46,"exec"],
           [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
+      // Whole numbers at their ends: a variable doubled 70 times stays at Int's end, one past 2^53
+      // adds as a number does, Float to Int of what does not fit, Floor and Round of endless and
+      // of what is no number - every tier holds a whole number the same way (logic::normal).
+      {"whole_numbers",
+       R"({"variables":[{"name":"Big","type":"int","value":1},{"name":"Edge","type":"int","value":9007199254740992},{"name":"Top","type":"int","value":0},
+          {"name":"Low","type":"int","value":0},{"name":"FromFloor","type":"float","value":-1},{"name":"FromRound","type":"float","value":-1},
+          {"name":"TopAsFloat","type":"float","value":0},{"name":"Shown","type":"text","value":""}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"flow.for","values":{"first":0,"last":69}},{"id":20,"type":"math.mul","values":{"a":1e+300,"b":1e+300}},
+          {"id":21,"type":"flow.sequence","params":{"count":"4"}},{"id":22,"type":"var.add","params":{"variable":"Big"}},{"id":23,"type":"var.get","params":{"variable":"Big"}},
+          {"id":24,"type":"var.set","params":{"variable":"Shown"}},{"id":25,"type":"var.get","params":{"variable":"Big"}},
+          {"id":26,"type":"var.add","params":{"variable":"Edge"},"values":{"amount":1}},{"id":27,"type":"var.add","params":{"variable":"Edge"},"values":{"amount":1}},
+          {"id":28,"type":"var.add","params":{"variable":"Edge"},"values":{"amount":1}},{"id":29,"type":"var.set","params":{"variable":"Top"}},
+          {"id":30,"type":"value.float","values":{"value":1e+300}},{"id":31,"type":"var.add","params":{"variable":"Top"},"values":{"amount":5}},
+          {"id":32,"type":"var.set","params":{"variable":"TopAsFloat"}},{"id":33,"type":"var.get","params":{"variable":"Top"}},{"id":34,"type":"var.set","params":{"variable":"Low"}},
+          {"id":35,"type":"value.float","values":{"value":-1e+300}},{"id":36,"type":"var.add","params":{"variable":"Low"},"values":{"amount":-1}},
+          {"id":37,"type":"var.set","params":{"variable":"FromFloor"}},{"id":38,"type":"math.floor"},{"id":39,"type":"var.set","params":{"variable":"FromRound"}},
+          {"id":40,"type":"math.round"},{"id":41,"type":"math.sub"}],"links":[[1,"then",21,"exec"],[2,"body",22,"exec"],[2,"completed",24,"exec"],[20,"result",38,"a"],
+          [20,"result",41,"a"],[20,"result",41,"b"],[21,"then0",2,"exec"],[21,"then1",26,"exec"],[21,"then2",29,"exec"],[21,"then3",37,"exec"],[23,"value",22,"amount"],
+          [25,"value",24,"value"],[26,"then",27,"exec"],[27,"then",28,"exec"],[29,"then",31,"exec"],[30,"result",29,"value"],[31,"then",32,"exec"],[32,"then",34,"exec"],
+          [33,"value",32,"value"],[34,"then",36,"exec"],[35,"result",34,"value"],[37,"then",39,"exec"],[38,"result",37,"value"],[40,"result",39,"value"],[41,"result",40,"a"]]})"},
       // Every N Seconds, a Retriggerable Delay, three Tweens (one runs to its end, one is stopped,
       // one plays itself again from Finished).
       {"waits",
