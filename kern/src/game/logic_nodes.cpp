@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "kern/game/runtime.h"
+#include "kern/logic/nodes.h"
 #include "kern/logic/logic.h"
 
 namespace kern::game {
@@ -210,7 +211,7 @@ void add_actor_nodes(logic::Library& lib) {
                  [](Context& c, GameWorld& w) {
                    std::vector<ActorId> v;
                    w.actors_with_tag(c.in_text("tag"), v);
-                   c.out("actor", Value::actor(v.empty() ? 0 : v[c.host().random() % v.size()]));
+                   c.out("actor", Value::actor(v.empty() ? 0 : v[logic::random::next(&c.slot(0), c.instance().seed(), c.node().id) % v.size()]));
                  },
                  "One living actor with the tag, chosen at random.", "pick");
     d.memory = true;  // new on every read

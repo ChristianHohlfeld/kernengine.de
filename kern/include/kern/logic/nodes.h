@@ -129,6 +129,40 @@ inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
 
+/// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
+/// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a
+/// sequence: in which order they are asked makes no difference to what each gives - in C++ the
+/// order in which arguments are worked out is the compiler's.
+namespace random {
+inline u32 next(f64* m, u32 seed, u32 node) {
+  u32 state = static_cast<u32>(m[0]);
+  if (m[1] == 0) {
+    m[1] = 1;
+    state = seed ^ (node * 0x9e3779b9u);
+  }
+  state += 0x9e3779b9u;
+  m[0] = static_cast<f64>(state);
+  u32 z = state;
+  z ^= z >> 16;
+  z *= 0x85ebca6bu;
+  z ^= z >> 13;
+  z *= 0xc2b2ae35u;
+  z ^= z >> 16;
+  return z;
+}
+/// 0 <= x < 1
+inline f64 unit(u32 r) { return static_cast<f64>(r >> 8) / static_cast<f64>(1u << 24); }
+inline f64 number(f64* m, u32 seed, u32 node, f64 min, f64 max) { return min + (max - min) * unit(next(m, seed, node)); }
+/// A whole number from min to max, both included (max below min: min).
+inline i64 whole_number(f64* m, u32 seed, u32 node, i64 min, i64 max) {
+  if (max < min) max = min;
+  const u64 span = static_cast<u64>(max) - static_cast<u64>(min) + 1;  // (0: every Int there is)
+  const u32 choices = span == 0 || span > 0x7fffffffull ? 0x7fffffffu : static_cast<u32>(span);
+  return min + static_cast<i64>(next(m, seed, node) % choices);
+}
+inline bool chance(f64* m, u32 seed, u32 node, f64 chance) { return unit(next(m, seed, node)) < chance; }
+}  // namespace random
+
 /// The value nodes of the core library. Static, typed, without side effects: the interpreter
 /// wraps each as a node, a Blueprint's C++ calls it by this name.
 struct PureNodes {

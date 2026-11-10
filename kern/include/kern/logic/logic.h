@@ -498,6 +498,10 @@ class Instance {
   /// The same for functions of numbers: the first output (`fallback` when the call fails).
   f64 call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback = 0);
   bool has_function(std::string_view function) const { return fn_index_.count(std::string(function)) != 0; }
+  /// Where this Blueprint's Random nodes start from: drawn from the host's random numbers once,
+  /// when a Random node first asks (deterministic per world; a Blueprint without Random draws
+  /// nothing). Each node has a sequence of its own from it (logic::random).
+  u32 seed();
   /// What output `out` of node `node` holds (both by their place: in the graph's list, among the
   /// node's outputs) - an event's values when its handler starts.
   const Value& output(int node, int out) const { return nodes_[static_cast<std::size_t>(node)].outputs[static_cast<std::size_t>(out)]; }
@@ -563,6 +567,8 @@ class Instance {
     std::vector<Value> outputs;      // last output values
     NodeState state;
     int running = 0;                 // events: handlers of this node that are running (a handler that raises its own event)
+    bool fresh = false;              // a value that is new on every read (Random), or one that passes such a value on
+    bool fed_fresh = false;          // one of its inputs reads such a value
   };
   struct Machine {
     const StateMachine* def = nullptr;
@@ -599,6 +605,8 @@ class Instance {
   bool jit_pending_ = false;
   NativeGraphFn native_ = nullptr;
   std::unique_ptr<NativeBlueprint> blueprint_;  // the Blueprint as its compiled C++ class (register_native_blueprint)
+  u32 seed_ = 0;                      // seed()
+  bool seeded_ = false;
   int active_ = 0;                    // chains of this instance that are running (nested: events, calls)
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;

@@ -3167,7 +3167,7 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   static const std::set<std::string_view> have{
       "event.begin",   "event.tick",    "event.custom",    "flow.call",       "debug.print",     "time.now",
       "event.every",   "event.state_enter", "event.state_exit", "state.set",   "state.get",       "state.is",
-      "flow.delay",    "flow.retrigger_delay", "flow.tween",
+      "flow.delay",    "flow.retrigger_delay", "flow.tween",    "math.random",   "math.random_int", "math.random_bool",
       "func.entry",    "func.return",   "func.call",       "func.pure",       "var.get",         "var.set",       "var.add",        "flow.reroute",
       "value.reroute", "flow.branch",   "flow.sequence",   "flow.for",        "flow.while",      "flow.do_once",  "flow.do_n",      "flow.gate",
       "flow.flip_flop", "flow.switch_int", "flow.switch_text", "math.add",     "math.sub",        "math.mul",      "math.div",       "math.mod",

@@ -123,14 +123,15 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 - [x] **Der Schleifenwächter, für jede Stufe derselbe:** Gezählt werden Schleifendurchläufe je
   Schritt, an einer Stelle (`Runtime::pass`); über der Grenze enden die Schleifen der Kette, der
   Rest läuft zu Ende, dann ist der Blueprint gestoppt. Interpreter, JIT und Klasse hören beim
-  selben Durchlauf auf. Damit laufen alle 14 Tier-Fälle als Klassen mit dem Ergebnis von
-  Interpreter und JIT.
+  selben Durchlauf auf.
+- [x] **Random, und Eingänge genau einmal:** Jeder Random-Knoten hat seine eigene Folge (vom
+  Seed des Blueprints und seiner Id; `logic::random`), also ist gleich, in welcher Reihenfolge C++
+  Argumente auswertet. Jeder Eingang eines Knotens wird genau einmal gelesen (Select liest beide
+  Seiten, Tween die Dauer auch bei Stop); der JIT überlässt Knoten, die Zufall lesen, ihrer
+  Knotenfunktion. Damit läuft die ganze Kernbibliothek als Klasse; alle 15 Tier-Fälle stimmen in
+  jeder Stufe überein.
 - [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
-  - Die Gameplay-Knoten.
-  - Random: jeder Random-Knoten hat seine eigene Folge (`kern::Node<id>`), damit die Reihenfolge,
-    in der C++ Argumente auswertet, nichts ändert.
-  - Eingänge werden vor dem Knoten ausgewertet, alle, genau einmal – auch im Interpreter (heute
-    liest Select nur den gewählten Eingang; solange Werte nur rechnen, ist das dasselbe).
+  - Die Gameplay-Knoten (jeder liest dabei jeden Eingang genau einmal).
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
     mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).

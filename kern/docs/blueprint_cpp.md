@@ -38,17 +38,17 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Fertig für alle Knoten der Kernbibliothek außer Random, samt Schleifenwächter:** Der Text wird von einem
+- **Fertig für die ganze Kernbibliothek, samt Schleifenwächter:** Der Text wird von einem
   C++-Compiler ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen,
   Funktionen, Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip
   Flop, die Switches; alle Events, Call Event, Print, Game Time; Delay, Retriggerable Delay,
-  Tween; State Machines. Jeder Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit
-  nachgeschlagen.
+  Tween; State Machines; Random. Jeder Knoten ist eine typisierte Funktion; nichts wird zur
+  Laufzeit nachgeschlagen.
 - **Fertig: Das Spiel führt diesen Text aus.** Der Build schreibt die Blueprints eines Levels als
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** Zufall und die Gameplay-Knoten als Funktionen von `blueprint.h`.
+- **Als Nächstes:** die Gameplay-Knoten als Funktionen von `blueprint.h`.
   `native_ready` sagt für jeden Blueprint, was ihm noch fehlt;
   bis dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
   `kern/games/spawncity/BLUEPRINTS.md`.
@@ -326,9 +326,19 @@ Every N Seconds, Custom Event, On State Entered / Left, Call Event, Print, Game 
 Retriggerable Delay, Tween; State Machines mit Set State, Current State, Is In State; Function
 Entry, Return, Call Function, Function Value; Get, Set, Add; alle Mathe-, Logik-, Vektor- und
 Text-Werte, Compare, Select, Formel, die Reroutes; Branch, Sequence, For, While, Do Once, Do N,
-Gate, Flip Flop, Switch on Int, Switch on Text. `logic::native_ready(graph, &warum)` sagt es für
-jeden Blueprint (er muss dazu fehlerfrei kompilieren); für alles andere nennt es den Knoten, der
-noch fehlt (Random und die Gameplay-Knoten – der nächste Schritt).
+Gate, Flip Flop, Switch on Int, Switch on Text; Random Float, Random Integer, Random Bool.
+`logic::native_ready(graph, &warum)` sagt es für jeden Blueprint (er muss dazu fehlerfrei
+kompilieren); für alles andere nennt es den Knoten, der noch fehlt (die Gameplay-Knoten – der
+nächste Schritt).
+
+**Eingänge und Zufall.** Jeder Eingang eines Knotens wird genau einmal ausgewertet, ob der Knoten
+ihn dann benutzt oder nicht – wie die Argumente eines Aufrufs (Select liest beide Seiten). In
+welcher Reihenfolge C++ die Argumente auswertet, legt der Compiler fest; damit das nichts ändert,
+rechnen Werte nur (Regel für Pure-Funktionen), und **jeder Random-Knoten hat seine eigene
+Folge** (`logic::random`, in seinem Member `kern::Node<id>`): Sie beginnt beim Seed des
+Blueprints (einmal aus den Zufallszahlen der Welt gezogen, sobald ein Random-Knoten zum ersten
+Mal fragt – deterministisch je Welt) und der Id des Knotens. Was ein Random-Knoten liefert, hängt
+also nicht davon ab, welcher andere vor ihm dran war.
 
 **Events.** Welches Event welchen Handler erreicht, entscheidet die Laufzeit (`Runtime::fire`:
 Typ, Name, Ziel, die Reihenfolge nach Knoten-Id) – für Interpreter, JIT und Klasse dieselbe
@@ -404,9 +414,9 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 14, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+demselben Ergebnis: alle 15, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
-(`event_reentry`), Tweens und Timer (`waits`) und Zustände (`states`).
+(`event_reentry`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

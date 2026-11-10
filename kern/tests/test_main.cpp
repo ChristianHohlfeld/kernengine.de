@@ -29,6 +29,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/logic.h"
 #include "blueprint_native.h"
+#include "kern/logic/nodes.h"
 #include "logic_cases.h"
 #include "../src/game/soldier_models.h"
 
@@ -2111,6 +2112,64 @@ TEST(logic_checks_and_infinite_loops) {
   CHECK(!big->disabled() && big->get("N").as_number() == 300000 && host.errors.size() == 1);
 }
 
+TEST(logic_random_nodes_have_their_own_sequences) {
+  // Every Random node draws from a sequence of its own (from the Blueprint's seed and its id):
+  // what a node gives does not depend on which node was asked first - in C++ the order in which
+  // the arguments of a call are worked out is the compiler's. And every input of a node is read
+  // once, whether the node uses it or not (Select): how many numbers a node has drawn does not
+  // depend on a choice either.
+  auto run = [](const char* links, int rounds) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    const std::string graph = std::string(R"({"variables":[{"name":"X","type":"float","value":0},{"name":"Y","type":"float","value":0},{"name":"Z","type":"float","value":0}],
+      "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"X"}},{"id":3,"type":"var.set","params":{"variable":"Y"}},
+        {"id":4,"type":"math.random"},{"id":5,"type":"math.random"},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
+        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"op":">"},"values":{"b":0}}],
+      "links":[[4,"result",2,"value"],[5,"result",3,"value"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"],)") + links + "]}";
+    logic::Instance* inst = rt.add(logic_graph(graph.c_str()), 0, "R");
+    rt.begin();
+    std::vector<f64> out;
+    for (int k = 0; k < rounds; ++k) {
+      rt.call("Go", 0, {{"value", logic::Value::number(k % 2)}});
+      for (const char* v : {"X", "Y", "Z"}) out.push_back(inst->get(v).as_number());
+    }
+    return out;
+  };
+  // X first, then Y - or Y first, then X: the same X and the same Y
+  const auto a = run(R"([1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",6,"exec"])", 6);
+  const auto b = run(R"([1,"then",3,"exec"],[3,"then",2,"exec"],[2,"then",6,"exec"])", 6);
+  CHECK(a.size() == 18 && a == b);
+  CHECK(a[0] != a[1] && a[0] != a[3] && a[0] >= 0 && a[0] < 1);  // two nodes: two sequences; a sequence moves on
+  // Z picks B (node 9) in round 0 and A (node 8) in round 1 - and both have drawn in both rounds:
+  // round 1 gets node 8's second number
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    logic::Instance* inst = rt.add(logic_graph(R"({"variables":[{"name":"Z","type":"float","value":0}],
+      "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
+        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"op":">"},"values":{"b":0}}],
+      "links":[[1,"then",6,"exec"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"]]})"), 0, "S");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(0)}});
+    const f64 z0 = inst->get("Z").as_number();
+    rt.call("Go", 0, {{"value", logic::Value::number(1)}});
+    const f64 z1 = inst->get("Z").as_number();
+    f64 m8[4] = {0, 0, 0, 0}, m9[4] = {0, 0, 0, 0};
+    const u32 seed = inst->seed();
+    const f64 a1 = logic::random::number(m8, seed, 8, 0, 1), a2 = logic::random::number(m8, seed, 8, 0, 1), b1 = logic::random::number(m9, seed, 9, 0, 1);
+    CHECK(z0 == b1 && z1 == a2 && a1 != a2);
+  }
+  // another Blueprint (another seed from the world): other numbers
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  const logic::Graph one = logic_graph(R"({"variables":[{"name":"X","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"X"}},
+    {"id":4,"type":"math.random"}],"links":[[1,"then",2,"exec"],[4,"result",2,"value"]]})");
+  logic::Instance* first = rt.add(one, 1, "One");
+  logic::Instance* second = rt.add(one, 2, "Two");
+  rt.begin();
+  CHECK(first->get("X").as_number() != second->get("X").as_number());
+}
+
 TEST(logic_tween_and_every) {
   FakeLogicHost host;
   logic::Runtime rt(host);
@@ -2784,8 +2843,7 @@ TEST(logic_native_blueprints) {
     CHECK(said.find(why) != std::string::npos);
   };
   not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message"}],"links":[[1,"then",2,"exec"]]})", "(node 2) is not yet a function of blueprint.h");
-  not_yet(R"({"variables":[{"name":"A","type":"float","value":0}],"nodes":[{"id":4,"type":"math.random"},{"id":5,"type":"var.set","params":{"variable":"A"}}],"links":[[4,"result",5,"value"]]})",
-          "Random Float in Range (node 4) is not yet a function of blueprint.h");
+  not_yet(R"({"nodes":[{"id":4,"type":"actor.self"},{"id":5,"type":"game.message"}],"links":[]})", "is not yet a function of blueprint.h");
   CHECK(logic::native_ready(logic_graph(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})")));
   not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
 
@@ -2844,7 +2902,7 @@ TEST(logic_native_blueprints) {
   for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
-  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"math.random"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"game.message"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
   // a node that waits is run again by the runtime when the wait is over: <node>_resume, with its settings
   CHECK(logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.tween","params":{"ease":"out"}}],"links":[[1,"then",4,"play"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.flow_tween_resume<\"out\">(self.n4); break;  // Tween") != std::string::npos);

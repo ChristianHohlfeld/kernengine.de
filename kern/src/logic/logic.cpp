@@ -757,9 +757,17 @@ std::pair<int, int> Instance::exec_target(int node, int ordinal) const {
   return {c.exec_out[static_cast<std::size_t>(ordinal)], c.exec_out_entry[static_cast<std::size_t>(ordinal)]};
 }
 
+u32 Instance::seed() {
+  if (!seeded_) {
+    seeded_ = true;
+    seed_ = rt_.host().random();
+  }
+  return seed_;
+}
+
 bool Instance::inline_pure(int node) const {
   const CNode& c = nodes_[static_cast<std::size_t>(node)];
-  if (!c.def || c.def->kind != NodeKind::pure) return false;
+  if (!c.def || c.def->kind != NodeKind::pure || c.fresh) return false;
   static const char* kInline[] = {"math.add", "math.sub", "math.mul", "math.div", "math.mod", "math.min", "math.max", "math.clamp", "math.abs", "math.negate",
                                   "math.lerp", "math.sqrt", "math.floor", "math.round", "math.compare", "logic.and", "logic.or", "logic.xor", "logic.not",
                                   "value.float", "value.int", "value.bool"};
@@ -774,6 +782,7 @@ bool Instance::inline_node(int node) const {
   if (!c.def) return false;
   if (c.def->kind == NodeKind::pure) return inline_pure(node);
   if (c.def->kind == NodeKind::event) return !c.def->run;  // plain events just continue
+  if (c.fed_fresh) return false;  // (its node function reads every input exactly once)
   const std::string& t = c.def->type;
   if (t == "flow.branch" || t == "flow.sequence" || t == "flow.for" || t == "flow.while" || t == "flow.do_once" || t == "flow.do_n" || t == "flow.gate" ||
       t == "flow.flip_flop")
@@ -900,6 +909,26 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     if (nodes_[i].def && nodes_[i].def->kind == NodeKind::event) events_.push_back(static_cast<int>(i));
   std::sort(events_.begin(), events_.end(), [&](int a, int b) { return nodes_[static_cast<std::size_t>(a)].node->id < nodes_[static_cast<std::size_t>(b)].node->id; });
   // Functions: where each one's body starts.
+  // Values that are new on every read (Random) and what reads them: generated code leaves these
+  // nodes to their node functions, which read every input exactly once.
+  {
+    std::vector<u8> known(nodes_.size(), 0);
+    std::function<bool(int)> is_fresh = [&](int i) -> bool {
+      CNode& c = nodes_[static_cast<std::size_t>(i)];
+      if (known[static_cast<std::size_t>(i)]) return c.fresh;
+      known[static_cast<std::size_t>(i)] = 1;  // (a cycle of values is an error of the graph: it ends here)
+      if (!c.def || c.def->kind != NodeKind::pure) return false;
+      bool fresh = c.def->memory;
+      for (const CNode::Source& s : c.data_in)
+        if (s.node >= 0 && is_fresh(s.node)) fresh = true;
+      return c.fresh = fresh;
+    };
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+      is_fresh(static_cast<int>(i));
+      for (const CNode::Source& s : nodes_[i].data_in)
+        if (s.node >= 0 && is_fresh(s.node)) nodes_[i].fed_fresh = true;
+    }
+  }
   fn_entry_.assign(graph_.functions.size(), -1);
   for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
     fn_index_[graph_.functions[f].name] = static_cast<int>(f);

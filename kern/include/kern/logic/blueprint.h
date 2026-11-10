@@ -8,7 +8,7 @@
 // So far this covers: variables, functions, formulas, the value nodes, Branch / Sequence / While /
 // For, Do Once, Do N, Gate, Flip Flop, the switches; the events (Begin Play, Tick, Every N
 // Seconds, Custom Event, the state events), Call Event, Print, Game Time; Delay, Retriggerable
-// Delay, Tween; state machines. Random and the gameplay nodes follow (logic::native_ready tells).
+// Delay, Tween; state machines; Random. The gameplay nodes follow (logic::native_ready tells).
 #pragma once
 
 #include <cstddef>
@@ -91,6 +91,22 @@ struct Blueprint : logic::PureNodes {
     if (kern_world.runtime)
       kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(text)}});
   }
+
+  // ---- random ----
+  /// Where the Random nodes start from: the instance's seed (a class without a world: its host's
+  /// first number, or 0).
+  u32 kern_seed() {
+    if (!kern_seeded) {
+      kern_seeded = true;
+      kern_seed_value = kern_world.instance ? kern_world.instance->seed() : kern_world.host ? kern_world.host->random() : 0;
+    }
+    return kern_seed_value;
+  }
+  u32 kern_seed_value = 0;
+  bool kern_seeded = false;
+  template <class N> Float math_random(N& n, Float min, Float max) { return logic::random::number(n.memory, kern_seed(), N::id, min, max); }
+  template <class N> Int math_random_int(N& n, Int min, Int max) { return logic::random::whole_number(n.memory, kern_seed(), N::id, min, max); }
+  template <class N> Bool math_random_bool(N& n, Float chance) { return logic::random::chance(n.memory, kern_seed(), N::id, chance); }
 
   // ---- state machines ----
   static Machine machine(std::string_view) { return {}; }

@@ -661,7 +661,9 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       runs += body;
       continue;
     }
-    body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n  " + c.name + " b;\n  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
+    body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n  " + c.name + " b;\n"
+            "  NativeTestHost alone;  // (the class by itself: a host of its own - its Random nodes start from that host's number)\n  b.kern_world.host = &alone;\n"
+            "  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
     for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + show(b." + v.name + ")";
     body += ";\n  };\n"
             "  // the same Blueprint behind a logic::Instance: the engine's way to it, by name\n"

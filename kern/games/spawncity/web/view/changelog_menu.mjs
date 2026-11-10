@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"20:02",title:"Zufall in Blueprints: jeder Knoten mit eigener Folge",items:[
+    "Kern-Blueprints: Jeder Random-Knoten zieht jetzt aus seiner eigenen Zufallsfolge. Was er liefert, hängt nicht mehr davon ab, welcher andere Random-Knoten vor ihm dran war – und ist als Blueprint und als kompiliertes C++ dasselbe. Die Zahlen selbst sind andere als bisher, weiterhin je Welt wiederholbar.",
+    "Jeder Eingang eines Knotens wird genau einmal ausgewertet, auch wenn der Knoten ihn dann nicht braucht (Select liest beide Seiten).",
+    "Damit läuft die gesamte Grundausstattung der Blueprints als kompiliertes C++. Es fehlen noch die Spielknoten.",
+  ]},
   {date:"2026-11-10",time:"18:53",title:"Endlosschleifen: derselbe Schutz für Blueprint und C++",items:[
     "Kern-Blueprints: Der Schutz vor Endlosschleifen zählt jetzt Schleifendurchläufe (200 000 je Schritt) statt Knoten. Läuft eine Schleife darüber, enden die Schleifen dieser Kette, der Rest läuft noch zu Ende, dann ist der Blueprint gestoppt und es wird gemeldet. Bisher brach die Kette mittendrin ab.",
     "So verhält sich ein Blueprint in jeder Form gleich – als Graph, im Browser beschleunigt und als kompiliertes C++ hören alle beim selben Durchlauf auf. Damit laufen alle Prüf-Blueprints der Engine auch als C++-Klassen mit demselben Ergebnis.",

@@ -70,8 +70,6 @@ NodeDef fresh(NodeDef d) {
   return d;
 }
 
-f64 random01(Context& c) { return static_cast<f64>(c.host().random() >> 8) / static_cast<f64>(1u << 24); }
-
 int clamp_count(const Node& n, std::string_view key, int def, int lo, int hi) { return setting_count(n.param(key), def, lo, hi); }
 
 void add_events(Library& lib) {
@@ -320,6 +318,7 @@ void add_flow(Library& lib) {
     d.keywords = "timeline lerp interpolate animate over time";
     d.run = [](Context& c) {
       f64* m = &c.slot(0);
+      const f64 duration = c.entry() == Context::kResume ? 0.0 : c.in_number("duration");  // (read with every call, Stop too)
       if (c.entry() == 1) {
         c.cancel_waits();
         flow::tween_stop(m);
@@ -328,7 +327,7 @@ void add_flow(Library& lib) {
       const f64 now = c.host().time();
       if (c.entry() == 0) {
         c.cancel_waits();
-        flow::tween_play(m, now, c.in_number("duration"));
+        flow::tween_play(m, now, duration);
       }
       if (!flow::tween_runs(m)) return kStop;
       bool finished = false;
@@ -507,14 +506,19 @@ void add_math(Library& lib) {
   lib.add(pure("math.pow", "Power", "Math", {data("a", "Base", K::number, 2.0), data("b", "Exponent", K::number, 2.0)}, number, of(&P::math_pow)));
   lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_round)));
   lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_floor)));
-  lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number),
-               [](Context& c) { const f64 lo = c.in_number("min"); return Value::number(lo + (c.in_number("max") - lo) * random01(c)); }, "Deterministic per world", "rand")));
+  // Random: every node has a sequence of its own (logic::random), from the Blueprint's seed.
+  lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number), [](Context& c) {
+    const f64 lo = c.in_number("min"), hi = c.in_number("max");
+    return Value::number(random::number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
+  }, "Deterministic per world", "rand")));
   lib.add(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
-    const i64 lo = c.in_int("min"), hi = max_of(lo, c.in_int("max"));
-    return Value::integer(lo + static_cast<i64>(c.host().random() % static_cast<u32>(min_of<i64>(hi - lo + 1, 0x7fffffff))));
+    const i64 lo = c.in_int("min"), hi = c.in_int("max");
+    return Value::integer(random::whole_number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
   }, "Min to Max inclusive", "rand")));
-  lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean),
-               [](Context& c) { return Value::boolean(random01(c) < c.in_number("chance")); }, "True with the given chance (0..1)", "rand coin")));
+  lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean), [](Context& c) {
+    const f64 chance = c.in_number("chance");
+    return Value::boolean(random::chance(&c.slot(0), c.instance().seed(), c.node().id, chance));
+  }, "True with the given chance (0..1)", "rand coin")));
   {
     NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, boolean, [](Context& c) {
       const f64 a = c.in_number("a"), b = c.in_number("b");
@@ -530,7 +534,13 @@ void add_math(Library& lib) {
   lib.add(pure("logic.not", "NOT", "Logic", {data("a", "A", K::boolean, false)}, boolean, of(&P::logic_not), "", "! invert"));
   {
     NodeDef d = pure("logic.select", "Select", "Logic", {data("pick", "Pick A", K::boolean, true), data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, data("result", "", K::number),
-                     [](Context& c) { return c.in_bool("pick") ? c.in("a") : c.in("b"); }, "A when Pick A is true, otherwise B", "ternary choose if");
+                     [](Context& c) {
+                       // (both are read, whichever is picked: every input of a node is worked out once, as the arguments of a call)
+                       const bool pick = c.in_bool("pick");
+                       const Value a = c.in("a"), b = c.in("b");
+                       return pick ? a : b;
+                     },
+                     "A when Pick A is true, otherwise B", "ternary choose if");
     d.params = {param("type", "Type", ParamDef::Kind::choice, "float", {"float", "Number", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor"})};
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       PinType t = PinType::number;

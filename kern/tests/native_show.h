@@ -29,11 +29,16 @@ inline std::string native_show(const kern::logic::Value& v) {
   }
 }
 
-/// The host of the native Blueprint test: time stands still, nothing is random, errors are kept.
+/// The host of the native Blueprint test: time stands still, errors are kept; its random numbers
+/// are one fixed sequence (a Blueprint draws its seed from it).
 struct NativeTestHost : kern::logic::Host {
   std::vector<std::string> errors;
   kern::f64 time() const override { return 0; }
   void print(const std::string&, bool) override {}
   void error(const std::string& text) override { errors.push_back(text); }
-  kern::u32 random() override { return 0; }
+  kern::u32 state = 2463534242u;
+  kern::u32 random() override {
+    state = state * 1664525u + 1013904223u;
+    return state;
+  }
 };
