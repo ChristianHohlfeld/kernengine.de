@@ -10,10 +10,13 @@ Gespeichert wird der Blueprint (im Level, `.klevel`). Das C++ ist die zweite Ans
 Sache: Man kann sie lesen und ändern, und was man ändert, ist der Blueprint.
 
 ```
-kern/include/kern/logic/logic.h   to_cpp, from_cpp, apply_cpp, canonical, same_blueprint, cpp_name_ok, cpp_problem, cpp_names
-kern/src/logic/notation.cpp       Shape (was steht wo), Writer (Graph → Text), Reader (Text → Graph)
-kern/src/studio/logic_edit.cpp    logicCpp, logicCppApply (die C++-Ansicht des Editors)
-kern/tests/test_main.cpp          logic_notation_*, studio_logic_cpp_view (der Beweis, siehe unten)
+kern/include/kern/logic/logic.h      to_cpp, from_cpp, apply_cpp, canonical, same_blueprint, cpp_name_ok, cpp_problem, cpp_names, native_ready
+kern/include/kern/logic/blueprint.h  wogegen der Text kompiliert: kern::Blueprint, kern::Node, kern::formula, kern::to, KERN_PURE, KERN_LAYOUT
+kern/include/kern/logic/nodes.h      was die Knoten rechnen, als typisierte Funktionen – für den Interpreter und für den Text dieselben
+kern/src/logic/notation.cpp          Shape (was steht wo), Writer (Graph → Text), Reader (Text → Graph)
+kern/src/studio/logic_edit.cpp       logicCpp, logicCppApply (die C++-Ansicht des Editors)
+kern/tests/test_main.cpp             logic_notation_*, studio_logic_cpp_view, logic_native_blueprints (der Beweis, siehe unten)
+kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, Aufrufe, der erzeugte Treiber
 ```
 
 | Funktion | Bedeutung |
@@ -25,16 +28,23 @@ kern/tests/test_main.cpp          logic_notation_*, studio_logic_cpp_view (der B
 | `same_blueprint(a, b)` | Derselbe Blueprint – Knoten für Knoten, Draht für Draht, Wert für Wert –, egal in welcher Reihenfolge gespeichert. |
 | `cpp_problem(graph)` | Warum ein Graph nicht als C++ geschrieben werden kann (leer: er kann). `check()` meldet dasselbe als Fehler. |
 | `cpp_names(graph)` | Für Levels von früher: benennt um, was kein C++-Name ist („Ball Seen“ → `BallSeen`), samt allen Verwendungen. Läuft beim Laden eines Levels. |
+| `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Wenn nicht: welcher Knoten noch keine Funktion in `blueprint.h` hat. |
 
 ## Stand
 
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Als Nächstes:** die native Ausführung genau dieses Textes (`kern/logic/blueprint.h`,
-  typisierte Knotenfunktionen, kein Rückruf) und der native Export. Der Fahrplan steht in
-  `kern/games/spawncity/BLUEPRINTS.md`. Bis dahin führen Interpreter, JIT und der bisherige Export
-  die Blueprints aus; der Text ist noch nicht das, was der Compiler bekommt.
+- **Fertig für Blueprints aus Funktionen:** Der Text wird von einem C++-Compiler ausgeführt, so
+  wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen, Funktionen, Formeln, alle
+  Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip Flop, die Switches. Jeder
+  Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit nachgeschlagen. SpawnCitys
+  Regel-Blueprint „Wanted“ läuft so.
+- **Als Nächstes:** Events, wartende Knoten, State Machines, Zufall und die Gameplay-Knoten als
+  Funktionen von `blueprint.h`; dann führt das Spiel den Text aus, und der Export baut ihn ein.
+  `native_ready` sagt für jeden Blueprint, was ihm noch fehlt. Der Fahrplan steht in
+  `kern/games/spawncity/BLUEPRINTS.md`. Bis dahin führen im Spiel Interpreter, JIT und der
+  bisherige Export die Blueprints aus.
 
 ## Im Editor
 
@@ -78,9 +88,9 @@ struct Demo : kern::Blueprint {
     }
     Heat = math_sub(Heat, by);
     if (Open) {
-      Count += 1.0;
+      Count += 1;
     } else if (math_compare<">">(Heat, 5.0)) {
-      Count += 2.0;
+      Count += 2;
     }
     debug_print(kern::to<Text>(Count), false);
   }
@@ -125,7 +135,7 @@ KERN_LAYOUT(Demo) {
 | unverdrahteter Eingang | der eingetippte Wert als Literal |
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
 | Get Variable | der Name der Variablen |
-| Set / Add to Variable | `Heat = wert;` / `Heat += wert;` |
+| Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -184,9 +194,9 @@ steht der hinter dem `if` – wie man es in C++ schreibt:
 
 ```cpp
 if (Open) {
-  Count += 1.0;
+  Count += 1;
 } else {
-  Count += 2.0;
+  Count += 2;
 }
 debug_print("done", false);
 ```
@@ -226,6 +236,19 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   und alles, was ihn weiterreicht, ebenfalls. Zwei Leser bekämen zwei verschiedene Zahlen; wer
   dieselbe Zahl zweimal braucht, legt sie in eine Variable.
 - Die Eingänge einer Formel sind C++-Namen.
+- **Kein Weg führt ohne Warten in sich selbst zurück.** Schritte wiederholt ein Schleifen-Knoten
+  (While, For). Mit einem Delay dazwischen ist es ein Timer – das geht. Ein Gate, das sich selbst
+  schließt, oder ein Do Once, das sich zurücksetzt, ist kein Weg zurück: In Reset, Open, Close
+  und Toggle endet der Weg (`NodeDef::first_entry_only`).
+- **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
+  auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
+  geht.)
+- **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add, kein
+  Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
+  rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
+  wie oft und in welcher Reihenfolge ein Wert gelesen wird.
+- **Add to Variable** zählt Zahlen: Integer oder Float. Menge und Ergebnis haben den Typ der
+  Variablen – eine ganze Zahl wird ganzzahlig erhöht (`Count += 1;`).
 
 Außerdem gilt, unabhängig von der Speicherreihenfolge: Die Handler eines Events laufen in der
 Reihenfolge ihrer Knoten-Ids.
@@ -237,7 +260,7 @@ Form:
 
 - `if (c) { return {1.0}; } return {2.0};` (frühes Return), `else if`, Anweisungen nach einem
   `if` (sie hängen an allen offenen Enden seiner Zweige).
-- `var_set<"Heat">(wert);` statt `Heat = wert;`; ganze Zahlen, wo ein Float steht (`Heat = 1;`).
+- ganze Zahlen, wo ein Float steht (`Heat = 1;`).
 - Anweisungen nach den Blöcken einer Sequence sind ihr letzter Block.
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
 
@@ -245,6 +268,8 @@ Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen 
 
 - alles außerhalb der Schreibweise (`int x = 3;`, `break`, Operatoren wie `a + b` außerhalb einer
   Formel, eigene Klassen),
+- die Knoten, die ihre eigene Form haben, als Aufruf (`var_set<"Heat">(wert);` – es heißt
+  `Heat = wert;`),
 - unbekannte Namen, falsche Anzahl von Werten, falscher Typ ohne `kern::to`,
 - ein Parameter in einem Lambda nach einem Warten,
 - fehlende oder falsche Deklarationen (`n12 is not declared: struct { Float value = 0.0; } n12;`),
@@ -257,6 +282,37 @@ Drähte in fester Reihenfolge, jede Einstellung und jeder eingetippte Wert ausge
 in ihrer einen Schreibweise. Es ist derselbe Blueprint (`same_blueprint`) und läuft genau gleich.
 Nicht erhalten bleibt nur, was keine Wirkung hat: ein eingetippter Wert unter einem Draht, Felder
 einer Transition, die ihre Art nicht benutzt.
+
+## Vom Compiler ausgeführt
+
+Der Text ist gültiges C++20. Er beginnt mit `#include "kern/logic/blueprint.h"` und braucht sonst
+nichts: Der Blueprint ist ein `struct`, seine Variablen sind Member, seine Funktionen Methoden,
+jeder Knoten ein Funktionsaufruf, jede Formel ein Lambda. Kein Rückruf in eine Knoten-Bibliothek,
+kein Nachschlagen eines Pins oder einer Variablen beim Namen – der Compiler sieht alles und
+optimiert es wie handgeschriebenen Code.
+
+**Eine Bedeutung je Knoten.** Was ein Knoten rechnet, steht genau einmal: als typisierte Funktion
+in `kern/logic/nodes.h` (`math_clamp`, `text_append`, `kern::math::…` für Formeln, die
+Umwandlungen `kern::to`, die Knoten mit Gedächtnis wie Do Once und Gate auf ihren vier Zahlen).
+Der Interpreter ruft für seinen Knoten dieselbe Funktion auf wie der Text. Graph und Text können
+deshalb nicht verschieden rechnen – es gibt nur eine Stelle, an der gerechnet wird.
+
+**Was heute so läuft.** Blueprints aus Variablen und Funktionen mit diesen Knoten: Function Entry,
+Return, Call Function, Function Value, Get, Set, Add, alle Mathe-, Logik-, Vektor- und Text-Werte,
+Compare, Select, Formel, die Reroutes, Branch, Sequence, For, While, Do Once, Do N, Gate, Flip
+Flop, Switch on Int, Switch on Text. `logic::native_ready(graph, &warum)` sagt es für jeden
+Blueprint; für alles andere nennt es den Knoten, der noch fehlt (Events, Delay, Tween, State
+Machines, Random, Zeit, Print, die Gameplay-Knoten – der nächste Schritt).
+
+**Zahlen.** `Float` ist `double`, `Int` eine ganze Zahl mit 64 Bit. Aus einer Kommazahl wird eine
+ganze Zahl überall gleich (`kern::logic::whole`): zur Null hin abgeschnitten; „keine Zahl“ und
+unendlich ergeben 0; was nicht mehr hineinpasst, das nächste Ende. Round und Floor benutzen
+dieselbe Regel. Ganze Zahlen sind in allen Stufen bis 2^53 exakt (der Interpreter hält
+Zahlen-Variablen als `double`).
+
+**Noch offen** (steht im Fahrplan, `kern/games/spawncity/BLUEPRINTS.md`): Der Interpreter bricht
+eine Endlosschleife nach 200 000 Knoten je Schritt ab – der kompilierte Text hat diesen Wächter
+noch nicht. Er kommt mit dem Schritt, in dem das Spiel den Text ausführt.
 
 ## Der Beweis (Tests)
 
@@ -274,6 +330,18 @@ Bibliothek** (jeder Eingang mit einem Wert, der nicht die Vorgabe ist; einmal al
 verdrahtet, einmal keiner), von Hand geschriebene Texte mit allen Formen, die Ablehnungen mit
 ihren Stellen und die Regeln. In SpawnCity prüft `rules_wanted_blueprint_is_its_cpp` dasselbe
 für den Blueprint „Wanted“ des Levels.
+
+Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von fünf Blueprints genau so,
+wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Compiler des
+Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
+Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
+(`blueprint_native_test`, über 2000 Aufrufe).
+Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
+Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
+Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
+vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
+sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen nicht vorkommt.
+SpawnCitys Tests machen dasselbe mit dem Blueprint „Wanted“ des Levels (`wanted_native_test`).
 
 Für die Ansicht: `logic_notation_apply_keeps_ids_and_places` (der Code ohne Layout, auf seinen
 Blueprint angewendet, ändert nichts; eine eingefügte, geänderte oder gelöschte Zeile lässt alle

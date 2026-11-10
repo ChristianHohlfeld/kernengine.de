@@ -53,4 +53,11 @@ if [ $# -eq 0 ]; then
   for f in "${cpp_objects[@]}"; do case "$f" in *_src_logic_*|*_src_core_*) core+=("$f") ;; esac; done
   "$cxx" "${flags[@]}" "$here/logic_native_test.cpp" "$gen"/logic_*.cpp "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/logic_native_test"
   "$out/logic_native_test" "$gen/logic_expected.txt"
+  # A Blueprint's C++ text (docs/blueprint_cpp.md), compiled as it is, computes what the
+  # interpreter computes: every call of every case, value for value.
+  nat="$out/native_gen"
+  rm -rf "$nat" && mkdir -p "$nat"
+  "$out/kern_tests" --emit-native "$nat"
+  "$cxx" "${flags[@]}" -I"$nat" "$nat/blueprint_native_main.cpp" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_native_test"
+  "$out/blueprint_native_test" "$nat/blueprint_native_expected.txt"
 fi

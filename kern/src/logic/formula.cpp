@@ -7,6 +7,7 @@
 
 #include "kern/core/dmath.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 
 namespace kern::logic {
 
@@ -25,7 +26,7 @@ constexpr Fn kFunctions[] = {
     {"cos", kCos, 1},     {"tan", kTan, 1},     {"asin", kAsin, 1},   {"acos", kAcos, 1},   {"atan", kAtan, 1},   {"atan2", kAtan2, 2}, {"rad", kRad, 1},
     {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},
 };
-constexpr f64 kPi = 3.14159265358979323846;
+constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
 
 bool letter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
@@ -303,7 +304,14 @@ std::string Formula::print(int t, int outer, bool cpp) const {
     case kOr: case kAnd: case kLt: case kLe: case kGt: case kGe: case kEq: case kNe: case kAdd: case kSub: case kMul:
       // left-associative: the right operand needs brackets at the same binding. A comparison of a
       // comparison is bracketed on both sides (C++ binds == looser than <; here they are equal).
-      s = print(n.a, mine == 3 ? mine + 1 : mine, cpp) + " " + op_text(n.code) + " " + print(n.b, mine + 1, cpp);
+      // In C++ an && inside an || is bracketed as well (compilers ask for it).
+      {
+        auto operand = [&](int child, int outer_binding) {
+          const bool and_in_or = cpp && n.code == kOr && child >= 0 && tree_[static_cast<std::size_t>(child)].code == kAnd;
+          return and_in_or ? "(" + print(child, 0, true) + ")" : print(child, outer_binding, cpp);
+        };
+        s = operand(n.a, mine == 3 ? mine + 1 : mine) + " " + op_text(n.code) + " " + operand(n.b, mine + 1);
+      }
       break;
     default: {
       const char* name = "?";
@@ -353,9 +361,9 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kAdd: r = a + b; break;
       case kSub: r = a - b; break;
       case kMul: r = a * b; break;
-      case kDiv: r = b != 0 ? a / b : 0; break;
-      case kMod: r = b != 0 ? std::fmod(a, b) : 0; break;
-      case kPow: r = dm::pow(a, b); break;
+      case kDiv: r = math::div(a, b); break;
+      case kMod: r = math::mod(a, b); break;
+      case kPow: r = math::pow(a, b); break;
       case kNeg: r = -a; break;
       case kNot: r = a == 0 ? 1 : 0; break;
       case kLt: r = a < b ? 1 : 0; break;
@@ -367,28 +375,29 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kAnd: r = a != 0 && b != 0 ? 1 : 0; break;
       case kOr: r = a != 0 || b != 0 ? 1 : 0; break;
       case kSelect: r = a != 0 ? b : c; break;
-      case kMin: r = min_of(a, b); break;
-      case kMax: r = max_of(a, b); break;
-      case kClamp: r = clamp(a, min_of(b, c), max_of(b, c)); break;
-      case kAbs: r = std::fabs(a); break;
-      case kSign: r = a > 0 ? 1 : a < 0 ? -1 : 0; break;
-      case kFloor: r = std::floor(a); break;
-      case kCeil: r = std::ceil(a); break;
-      case kRound: r = std::round(a); break;
-      case kTrunc: r = std::trunc(a); break;
-      case kSqrt: r = std::sqrt(max_of(0.0, a)); break;
-      case kExp: r = dm::exp(a); break;
-      case kLog: r = a > 0 ? dm::log(a) : 0; break;
-      case kSin: r = dm::sin(a); break;
-      case kCos: r = dm::cos(a); break;
-      case kTan: r = dm::tan(a); break;
-      case kAsin: r = dm::asin(clamp(a, -1.0, 1.0)); break;
-      case kAcos: r = dm::acos(clamp(a, -1.0, 1.0)); break;
-      case kAtan: r = dm::atan(a); break;
-      case kAtan2: r = dm::atan2(a, b); break;
-      case kRad: r = a * (kPi / 180); break;
-      case kDeg: r = a * (180 / kPi); break;
-      case kLerp: r = a + (b - a) * c; break;
+      // the functions: the ones a formula's C++ calls (kern::math, nodes.h)
+      case kMin: r = math::min(a, b); break;
+      case kMax: r = math::max(a, b); break;
+      case kClamp: r = math::clamp(a, b, c); break;
+      case kAbs: r = math::abs(a); break;
+      case kSign: r = math::sign(a); break;
+      case kFloor: r = math::floor(a); break;
+      case kCeil: r = math::ceil(a); break;
+      case kRound: r = math::round(a); break;
+      case kTrunc: r = math::trunc(a); break;
+      case kSqrt: r = math::sqrt(a); break;
+      case kExp: r = math::exp(a); break;
+      case kLog: r = math::log(a); break;
+      case kSin: r = math::sin(a); break;
+      case kCos: r = math::cos(a); break;
+      case kTan: r = math::tan(a); break;
+      case kAsin: r = math::asin(a); break;
+      case kAcos: r = math::acos(a); break;
+      case kAtan: r = math::atan(a); break;
+      case kAtan2: r = math::atan2(a, b); break;
+      case kRad: r = math::rad(a); break;
+      case kDeg: r = math::deg(a); break;
+      case kLerp: r = math::lerp(a, b, c); break;
     }
     st[n++] = r;
   }

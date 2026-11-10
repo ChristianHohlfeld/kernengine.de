@@ -7,6 +7,13 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"16:46",title:"Blueprint-Code läuft direkt als C++",items:[
+    "Unter der Haube (für alle Kern-Spiele): Den C++-Text eines Blueprints führt jetzt ein C++-Compiler aus, so wie er dasteht – jeder Knoten ist eine Funktion, nichts wird beim Laufen in einer Knotenliste nachgeschlagen. Das gilt zuerst für Blueprints aus Funktionen, Formeln und Variablen; Events, Warten und die Spielknoten folgen.",
+    "Was ein Knoten rechnet, steht dafür nur noch an einer Stelle: Graph und C++ benutzen dieselbe Funktion. Bei jedem Update laufen über 2000 Aufrufe einmal als kompiliertes C++ und einmal als Blueprint und werden Zeichen für Zeichen verglichen – auch mit Extremwerten wie unendlich.",
+    "Die Fahndungsregeln von SpawnCity bestehen diese Prüfung vollständig. Im Spiel selbst laufen sie weiter als Blueprint, bis auch Events und Warten als C++ laufen – dort ändert sich nichts.",
+    "Neue Regeln im Kern-Editor, damit Graph und C++ immer dasselbe bedeuten: Eine Funktion ruft sich nicht selbst auf, eine Funktion, die als Wert gelesen wird, rechnet nur, und Wiederholen ist Sache der Schleifen-Knoten (ein Draht zurück braucht ein Warten). Verstöße zeigt der Editor am Knoten.",
+    "Add to Variable zählt ganze Zahlen jetzt ganzzahlig.",
+  ]},
   {date:"2026-11-10",time:"15:48",title:"Blueprints sind jetzt auch C++ – in beide Richtungen",items:[
     "Unter der Haube (für alle Kern-Spiele): Jeder Blueprint hat jetzt genau einen C++-Text, und jeder solche Text ist genau ein Blueprint. Variablen sind Member, Funktionen sind Funktionen, eine Verzweigung ist ein if, eine Formel ist der Ausdruck selbst. Hin und zurück geht nichts verloren – das wird bei jedem Update für jeden Knotentyp der Engine geprüft.",
     "Im Kern-Editor zeigt der Knopf C++ im Blueprint-Editor diesen Text. Er lässt sich dort ändern und anwenden: Der Blueprint ist dann, was im C++ steht, und alle Knoten bleiben, wo sie waren. Was sich nicht lesen lässt, wird mit Zeile und Grund abgelehnt.",

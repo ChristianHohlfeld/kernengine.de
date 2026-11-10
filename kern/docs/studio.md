@@ -344,8 +344,13 @@ ein Undo-Schritt; Knoten, die es noch gibt, bleiben, wo sie sind. Deshalb sind d
 Funktions-Pins C++-Namen: Buchstaben, Ziffern und `_`, keine Leerzeichen, kein Wort von C++ und
 keins der Schreibweise (`Float`, `Text`, `loop` …). Der Editor nimmt andere Namen nicht an und
 sagt, warum; `check()` meldet einen Graphen, den C++ nicht sagen kann, als Fehler – auch einen
-Exec-Ausgang mit zwei Drähten, ein Return außerhalb des Wegs seiner Funktion oder einen
-Zufallswert, den zwei Eingänge lesen.
+Exec-Ausgang mit zwei Drähten, ein Return außerhalb des Wegs seiner Funktion, einen Zufallswert,
+den zwei Eingänge lesen, oder einen Weg, der ohne Warten in sich selbst zurückführt (dafür gibt
+es die Schleifen-Knoten).
+
+Blueprints aus Funktionen, Formeln und Variablen führt ein C++-Compiler als genau diesen Text aus
+(`kern/logic/blueprint.h`; `logic::native_ready` sagt, ob ein Blueprint schon so läuft). Graph
+und Text rechnen mit denselben Funktionen (`kern/logic/nodes.h`).
 
 ### Funktionen
 
@@ -358,11 +363,15 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   die Ausgänge an den Aufrufer gibt. Return beendet die Funktion sofort, auch mitten in einer
   Schleife oder Sequence. Ausgänge, die kein Return gesetzt hat, behalten ihren Default.
 - Aufgerufen wird sie mit einem Knoten, der ihren Namen trägt: mit Exec-Pins (**Call**), oder – ist
-  sie *Pure* – als Wert-Knoten ohne Exec-Pins, der rechnet, sobald ein Ausgang gelesen wird. Pure
-  ist für Funktionen gedacht, die nur rechnen.
+  sie *Pure* – als Wert-Knoten ohne Exec-Pins, der rechnet, sobald ein Ausgang gelesen wird. Eine
+  Pure-Funktion rechnet nur: Sie verzweigt, läuft in Schleifen und liest Werte, aber sie setzt
+  keine Variable, wartet nicht und löst nichts aus – und was sie als Schritt aufruft, ebenfalls
+  nicht. Sonst ist es ein Compile-Fehler am betroffenen Knoten (Abhilfe: *Pure* abwählen und die
+  Funktion als Schritt aufrufen).
 - Ein Aufruf läuft sofort bis zum Ende. Nach einem Delay ist der Aufrufer schon weiter; ein Return
-  dahinter erreicht ihn nicht mehr. Eine Funktion kann sich nicht selbst aufrufen (der innere
-  Aufruf wird übersprungen und gemeldet).
+  dahinter erreicht ihn nicht mehr. Eine Funktion ruft sich nicht selbst auf, auch nicht über
+  andere Funktionen: Das ist ein Compile-Fehler am aufrufenden Knoten (Wiederholen ist Sache der
+  Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
 - Aus C++ ruft `logic::Instance::call("Name", args, results)` eine Funktion; `call_number` ist die
   Kurzform für Zahlen. So rufen Engine-Systeme Regeln auf, die im Blueprint stehen.
 - Kopierte Knoten nehmen die Funktionen mit, die sie nennen.

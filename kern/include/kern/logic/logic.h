@@ -31,7 +31,9 @@
 // A level has one level graph; any actor can carry its own graph (its Self).
 #pragma once
 
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -50,6 +52,16 @@ const char* pin_type_name(PinType t);
 bool pin_type_from_name(std::string_view name, PinType& out);
 /// Data that can flow from `from` into an input of type `to` (autocasts).
 bool convertible(PinType from, PinType to);
+
+/// A number as a whole number (Float to Int, on a wire or in a node): toward zero. Not a number
+/// or endless: 0. Beyond what Int holds: its nearest end. Defined for every number - the same in
+/// the interpreter and in a Blueprint's C++.
+inline i64 whole(f64 v) {
+  if (!std::isfinite(v)) return 0;
+  if (v >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
+  if (v < -9223372036854775808.0) return std::numeric_limits<i64>::min();
+  return static_cast<i64>(v);
+}
 
 /// A value on a data pin.
 struct Value {
@@ -273,6 +285,8 @@ struct NodeDef {
   bool loop = false;     // a loop: exec output 0 is its body (run again and again), output 1 follows it
   bool memory = false;   // keeps something between runs (a loop's index, Do Once, a Delay's wait, Random's
                          // sequence): in C++ the node has a member. A value with memory is new on every read.
+  bool first_entry_only = false;  // only its first exec input can lead on to an exec output; the others
+                         // (Reset, Open, Close, Stop) change what the node keeps, and the path ends there
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;
@@ -383,6 +397,9 @@ bool cpp_name_ok(std::string_view name);
 /// Why a graph cannot be written as C++ (empty: it can), and the node that is about (0: the
 /// graph itself). check() reports the same as an error.
 std::string cpp_problem(const Graph& g, u32* node = nullptr, const Library& lib = library());
+/// Can a C++ compiler run this Blueprint's text as it stands (kern/logic/blueprint.h has a typed
+/// function for each of its nodes, nothing is looked up at run time)? `why`: what is missing.
+bool native_ready(const Graph& g, std::string* why = nullptr, const Library& lib = library());
 /// Documents from before names had to be C++ names: renames the variables, functions and function
 /// pins C++ cannot write ("Ball Seen" becomes BallSeen, "Text" TextValue), and every use with
 /// them. Returns what was renamed (old, new); nothing for a graph whose names are fine.

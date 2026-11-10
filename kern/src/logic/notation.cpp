@@ -473,6 +473,147 @@ struct Shape {
 
   const Function* function_of(int i) const { return g.function(at(i).node->param("function")); }
 
+  /// The steps a step leads to that run before it is over (not what follows a wait), and whether
+  /// the path goes on through them: through Reset, Open or Close of a node it does not.
+  std::vector<std::pair<int, bool>> next_steps(int x) const {
+    std::vector<std::pair<int, bool>> r;
+    if (at(x).def->latent) return r;
+    for (const auto& d : at(x).dst) {
+      if (d.first < 0) continue;
+      const Info& t = at(d.first);
+      r.push_back({d.first, !(t.def->first_entry_only && d.second != t.exec_in.front())});
+    }
+    return r;
+  }
+
+  /// No path leads back into itself without a wait: steps are repeated by a loop node (in C++ a
+  /// loop is a loop - a path back would be a method calling itself, deeper with every round).
+  bool paths_ok() {
+    std::vector<u8> mark(n.size(), 0);
+    for (int start : by_id) {
+      if (at(start).pure || mark[static_cast<std::size_t>(start)]) continue;
+      std::vector<std::pair<int, std::size_t>> stack{{start, 0}};  // depth first: (step, next exec output)
+      mark[static_cast<std::size_t>(start)] = 1;
+      while (!stack.empty()) {
+        const int x = stack.back().first;
+        const std::vector<std::pair<int, bool>> next = next_steps(x);
+        if (stack.back().second < next.size()) {
+          const auto [t, on] = next[stack.back().second++];
+          if (!on) continue;  // (the path ends in that node: a Gate closing itself is no way back)
+          if (mark[static_cast<std::size_t>(t)] == 1)
+            return fail("the path from " + title(x) + " leads back to " + title(t) + " without a wait: a While Loop or For Loop repeats steps", x);
+          if (mark[static_cast<std::size_t>(t)] == 0) {
+            mark[static_cast<std::size_t>(t)] = 1;
+            stack.push_back({t, 0});
+          }
+          continue;
+        }
+        mark[static_cast<std::size_t>(x)] = 2;
+        stack.pop_back();
+      }
+    }
+    return true;
+  }
+
+  /// Functions: none runs again while it runs (it has one set of values, not one per call), and
+  /// one that is read as a value only computes - how often and in which order values are read
+  /// then makes no difference.
+  bool functions_ok() {
+    const std::size_t count = g.functions.size();
+    auto index_of = [&](const std::string& name) {
+      for (std::size_t f = 0; f < count; ++f) if (g.functions[f].name == name) return static_cast<int>(f);
+      return -1;
+    };
+    std::vector<std::vector<int>> steps(count);                   // per function: its steps before any wait
+    std::vector<std::vector<std::pair<int, int>>> calls(count);   // per function: (the function called, the node that calls)
+    std::vector<u8> value(count, 0);
+    for (std::size_t f = 0; f < count; ++f) value[f] = g.functions[f].pure ? 1 : 0;
+    for (int i : by_id) {
+      if (at(i).def->type == "func.pure")
+        if (const int f = index_of(at(i).node->param("function")); f >= 0) value[static_cast<std::size_t>(f)] = 1;
+      if (at(i).def->type != "func.entry") continue;
+      const int f = index_of(at(i).node->param("function"));
+      if (f < 0) continue;
+      std::vector<u8> seen(n.size(), 0);  // 1: it runs in the function (its values are read), 2: and the path goes on through it
+      std::vector<std::pair<int, bool>> todo{{i, true}};
+      while (!todo.empty()) {
+        const auto [x, on] = todo.back();
+        todo.pop_back();
+        u8& state = seen[static_cast<std::size_t>(x)];
+        const u8 want = on ? 3 : 1;
+        if ((state & want) == want) continue;
+        const bool first = state == 0;
+        state |= want;
+        if (first) {
+          const std::string& t = at(x).def->type;
+          if (t == "func.call" || t == "func.pure")
+            if (const int callee = index_of(at(x).node->param("function")); callee >= 0) calls[static_cast<std::size_t>(f)].push_back({callee, x});
+          for (const auto& src : at(x).src)  // the values it reads
+            if (src.first >= 0 && at(src.first).pure) todo.push_back({src.first, true});
+          if (!at(x).pure && x != i) steps[static_cast<std::size_t>(f)].push_back(x);
+        }
+        if (at(x).pure || !on) continue;  // (closing a Gate is something the function does - but nothing after it)
+        for (const auto& next : next_steps(x)) todo.push_back(next);
+      }
+    }
+    // a function that calls itself, directly or through others
+    std::vector<u8> mark(count, 0);
+    for (std::size_t start = 0; start < count; ++start) {
+      if (mark[start]) continue;
+      std::vector<std::pair<int, std::size_t>> stack{{static_cast<int>(start), 0}};
+      mark[start] = 1;
+      while (!stack.empty()) {
+        const std::size_t f = static_cast<std::size_t>(stack.back().first);
+        if (stack.back().second < calls[f].size()) {
+          const auto [callee, node] = calls[f][stack.back().second++];
+          if (mark[static_cast<std::size_t>(callee)] == 1) {
+            const std::string& a = g.functions[f].name;
+            const std::string& b = g.functions[static_cast<std::size_t>(callee)].name;
+            return fail("function \"" + b + "\" calls itself" + (a == b ? std::string() : " (through \"" + a + "\")") +
+                            ": a function does not run again while it runs - repeat steps with a loop",
+                        node);
+          }
+          if (mark[static_cast<std::size_t>(callee)] == 0) {
+            mark[static_cast<std::size_t>(callee)] = 1;
+            stack.push_back({callee, 0});
+          }
+          continue;
+        }
+        mark[f] = 2;
+        stack.pop_back();
+      }
+    }
+    // a function read as a value only computes; so does every function it calls
+    std::vector<int> todo;
+    std::vector<std::string> because(count);
+    for (std::size_t f = 0; f < count; ++f)
+      if (value[f]) {
+        todo.push_back(static_cast<int>(f));
+        because[f] = "function \"" + g.functions[f].name + "\" is read as a value, so it only computes";
+      }
+    while (!todo.empty()) {
+      const std::size_t f = static_cast<std::size_t>(todo.back());
+      todo.pop_back();
+      for (int x : steps[f]) {
+        const NodeDef& d = *at(x).def;
+        if (d.type == "func.call") {
+          const int callee = index_of(at(x).node->param("function"));
+          if (callee >= 0 && !value[static_cast<std::size_t>(callee)]) {
+            value[static_cast<std::size_t>(callee)] = 1;
+            because[static_cast<std::size_t>(callee)] =
+                "function \"" + g.functions[static_cast<std::size_t>(callee)].name + "\" runs inside \"" + g.functions[f].name + "\", which is read as a value, so it only computes";
+            todo.push_back(callee);
+          }
+          continue;
+        }
+        const bool computes = d.type == "flow.reroute" || d.type == "func.return" || (d.kind == NodeKind::flow && !d.latent && (!d.memory || d.loop));
+        if (!computes)
+          return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
+      }
+    }
+    return true;
+  }
+
   /// What the notation cannot write, and so no Blueprint may be.
   bool rules() {
     std::set<std::string> names, node_names;
@@ -512,10 +653,11 @@ struct Shape {
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
       if (t == "var.get" || t == "var.set" || t == "var.add")
         if (!g.variable(x.node->param("variable"))) return fail(title(i) + " names a variable that is not there", i);
+      if (x.def->problem)
+        if (const std::string why = x.def->problem(*x.node, g); !why.empty()) return fail(title(i) + ": " + why, i);
       if (t == "math.formula") {
         const std::string text = x.node->param("formula", "a + b");
         const Formula& f = Formula::cached(text);
-        if (!f.ok()) return fail(title(i) + ": " + f.error(), i);
         for (const std::string& input : f.inputs())
           if (!cpp_name_ok(input)) return fail(title(i) + ": \"" + input + "\" cannot be an input's name (a word of C++ or of the notation)", i);
       }
@@ -540,7 +682,7 @@ struct Shape {
           return fail(title(i) + ": the output \"" + id + "\" has no name C++ can write", i);
       }
     }
-    return true;
+    return paths_ok() && functions_ok();
   }
 };
 
@@ -815,8 +957,10 @@ struct Writer {
       default: break;
     }
     // a plain step
-    if ((t == "var.set" || t == "var.add") && !X.member) {
-      line(ind, X.node->param("variable") + (t == "var.set" ? " = " : " += ") + value(x, X.data_in.front(), c) + ";");
+    if (t == "var.set" || t == "var.add") {
+      // Heat = value;   or, when what the node gives is read: n5.value = (Heat = value);
+      const std::string set = X.node->param("variable") + (t == "var.set" ? " = " : " += ") + value(x, X.data_in.front(), c);
+      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
     if (t == "func.call") {
@@ -1857,6 +2001,9 @@ struct Reader {
     auto fn = node_fns.find(t.s);
     if (fn != node_fns.end()) {
       if (fn->second->kind != NodeKind::pure) { fail(s.tok, t.s + " is a step, not a value: it stands on a line of its own"); return s; }
+      if (fn->second->type == "var.get") { fail(s.tok, "a variable is read by its name"); return s; }
+      if (fn->second->type == "func.pure") { fail(s.tok, "a function's value is Function(values).result"); return s; }
+      if (fn->second->type == "math.formula") { fail(s.tok, "a formula is kern::formula([](Float a) -> Float { return ...; }, value)"); return s; }
       s = pure_call(fn->second, s.tok);
       if (failed()) return s;
       if (accept(".")) {
@@ -2216,6 +2363,28 @@ struct Reader {
       scope.first = false;
       return gone();
     }
+    // n<id>.value = (Variable = value);   a Set / Add whose result is read
+    if (numbered(t.s, "n") && is(".", 1) && is("=", 3) && is("(", 4)) {
+      const u32 id = numbered(t.s, "n");
+      const std::string pin = peek(2).s;
+      p += 5;
+      const std::size_t name = p;
+      std::string var;
+      if (!word(var, "a variable")) return {};
+      if (!g.variable(var)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
+      const bool add = is("+=");
+      if (!add && !is("=")) { fail(p, var + " = value or " + var + " += value expected, not " + shown(peek())); return {}; }
+      ++p;
+      const int node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+      if (node < 0 || !declare(id, node, at)) return {};
+      enter(in, node, "", at);
+      const Src s = value();
+      if (failed() || !bind(node, data_inputs(node).front(), s) || !expect(")") || !expect(";")) return {};
+      bool has = false;
+      for (const PinDef& pd : made[static_cast<std::size_t>(node)].out) has = has || (pd.type != PinType::exec && pd.id == pin);
+      if (!has) { fail(at + 2, "a Set gives \"value\": n" + std::to_string(id) + ".value = (" + var + " ...);"); return {}; }
+      return {out(node, 0)};
+    }
     // n<id> = Function(...);
     if (numbered(t.s, "n") && is("=", 1)) {
       const u32 id = numbered(t.s, "n");
@@ -2254,6 +2423,8 @@ struct Reader {
     const NodeDef* def = fn->second;
     const std::string fname = node_name(def->type);
     p += 1;
+    if (def->type == "var.set" || def->type == "var.add") { fail(at, "a variable is set by its name: Heat = value; or Heat += value;"); return {}; }
+    if (def->type == "func.call") { fail(at, "a function is called by its name: Function(values);"); return {}; }
     if (def->kind == NodeKind::pure) { fail(at, fname + " is a value: alone on a line it does nothing"); return {}; }
     if (def->kind == NodeKind::event) { fail(at, fname + " is an event: KERN_EVENT(on<id>, " + fname + ")"); return {}; }
     if (def->loop) { fail(at, fname + " is a loop: for (auto it<id> = " + fname + "(...); it<id>.next();) { }"); return {}; }
@@ -2967,6 +3138,29 @@ std::string cpp_problem(const Graph& g, u32* node, const Library& lib) {
   if (shape.build()) return {};
   if (node) *node = shape.error_node;
   return shape.error;
+}
+
+bool native_ready(const Graph& g, std::string* why, const Library& lib) {
+  // The nodes blueprint.h has a function for. (A test compiles a Blueprint of all of them.)
+  static const std::set<std::string_view> have{
+      "func.entry",    "func.return",   "func.call",       "func.pure",       "var.get",         "var.set",       "var.add",        "flow.reroute",
+      "value.reroute", "flow.branch",   "flow.sequence",   "flow.for",        "flow.while",      "flow.do_once",  "flow.do_n",      "flow.gate",
+      "flow.flip_flop", "flow.switch_int", "flow.switch_text", "math.add",     "math.sub",        "math.mul",      "math.div",       "math.mod",
+      "math.min",      "math.max",      "math.clamp",      "math.abs",        "math.negate",     "math.lerp",     "math.sin",       "math.cos",
+      "math.atan2",    "math.sqrt",     "math.pow",        "math.round",      "math.floor",      "math.compare",  "math.formula",   "logic.and",
+      "logic.or",      "logic.xor",     "logic.not",       "logic.select",    "value.float",     "value.int",     "value.bool",     "value.text",
+      "vector.make",   "vector.break",  "vector.add",      "vector.sub",      "vector.cross",    "vector.scale",  "vector.length",  "vector.normalize",
+      "vector.distance", "vector.dot",  "vector.lerp",     "text.append",     "text.equal",      "text.contains", "text.length",
+  };
+  auto no = [&](std::string text) {
+    if (why) *why = std::move(text);
+    return false;
+  };
+  if (const std::string problem = cpp_problem(g, nullptr, lib); !problem.empty()) return no(problem);
+  if (!g.machines.empty()) return no("state machines (\"" + g.machines.front().name + "\") are not yet part of blueprint.h");
+  for (const Node& node : g.nodes)
+    if (!have.count(node.type)) return no(lib.title(node) + " (node " + std::to_string(node.id) + ") is not yet a function of blueprint.h");
+  return true;
 }
 
 bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, bool layout) {

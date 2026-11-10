@@ -1,0 +1,675 @@
+// A Blueprint's C++ compiled by a C++ compiler computes what the interpreter computes
+// (docs/blueprint_cpp.md). The cases: Blueprints written in the notation, and one made of every
+// value node blueprint.h has; each with calls. kern_tests --emit-native <dir> writes each
+// Blueprint's text exactly as logic::to_cpp gives it, a main() that makes the calls, and what the
+// interpreter answers; run.sh compiles the texts into blueprint_native_test and compares.
+#pragma once
+
+#include <cstdio>
+#include <limits>
+#include <set>
+#include <string>
+#include <vector>
+
+#include "kern/logic/logic.h"
+#include "native_show.h"
+
+namespace blueprint_native {
+using namespace kern;
+using logic::PinType;
+using logic::Value;
+
+struct Call {
+  std::string function;
+  std::vector<Value> args;
+};
+struct Case {
+  std::string name;
+  logic::Graph graph;
+  std::vector<Call> calls;
+};
+
+// Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
+inline const char* kFlow = R"kn(
+struct Flow : kern::Blueprint {
+  Float Heat = 0.0;
+  Int Count = 0;
+  Bool Open = false;
+  Text Log = "";
+  Vector Home = Vector{1.0, 2.0, 3.0};
+
+  struct GradeResult { Int grade = 0; Text name = "none"; };
+  /// Branches that return, an else-if chain, a path that ends without a Return.
+  KERN_PURE GradeResult Grade(Float points = 0.0) {
+    if (math_compare<">=">(points, 90.0)) {
+      return {1, "top"};
+    } else if (math_compare<">=">(points, 50.0)) {
+      return {2, "pass"};
+    } else if (math_compare<"<">(points, 0.0)) {
+      return {};
+    }
+    return {3, text_append("fail ", kern::to<Text>(points), "")};
+  }
+
+  struct FirstAboveResult { Int sum = 0; Int last = -1; };
+  /// A loop that returns from its middle, an index read after the loop.
+  KERN_PURE FirstAboveResult FirstAbove(Int from = 0, Int to = 9, Float limit = 4.5) {
+    for (auto it12 = flow_for(n12, from, to); it12.next();) {
+      if (math_compare<">">(kern::to<Float>(n12.index), limit)) {
+        return {n12.index, n12.index};
+      }
+    }
+    return {-1, n12.index};
+  }
+
+  /// Nested loops, Add with whole numbers and with fractions, a While that counts down.
+  void Fill(Int rows = 2, Int columns = 3) {
+    Count = 0;
+    for (auto it20 = flow_for(n20, 1, rows); it20.next();) {
+      for (auto it21 = flow_for(n21, 1, columns); it21.next();) {
+        Count += math_round(math_mul(kern::to<Float>(n20.index), kern::to<Float>(n21.index)));
+        Heat += 0.25;
+      }
+    }
+    while (loop(math_compare<">">(Heat, 1.0))) {
+      Heat += -1.0;
+      Log = text_append(Log, "-", "");
+    }
+  }
+
+  /// Do Once, Do N, Gate and Flip Flop keep what they are between calls.
+  void Step(Text what = "go") {
+    switch (flow_switch_text<"go, reset, open, close, toggle, flip">(what)) {
+      case 0: {
+        {
+          go30("exec");
+        }
+        {
+          go31("exec");
+        }
+        {
+          go32("enter");
+        }
+      } break;
+      case 1: {
+        {
+          go30("reset");
+        }
+        {
+          go31("reset");
+        }
+      } break;
+      case 2: { go32("open"); } break;
+      case 3: { go32("close"); } break;
+      case 4: { go32("toggle"); } break;
+      case 5: {
+        switch (flow_flip_flop(n33)) {
+          case 0: { Log = text_append(Log, "A", kern::to<Text>(n33.is_a)); } break;
+          case 1: { Log = text_append(Log, "B", kern::to<Text>(n33.is_a)); } break;
+        }
+      } break;
+      case 6: { Log = "?"; } break;
+    }
+  }
+
+  /// Switch on Int with its default, an exec knot, paths that meet again.
+  void Choose(Int which = 0) {
+    flow_reroute();
+    switch (flow_switch_int<"3">(which)) {
+      case 0: { Log = "zero"; } break;
+      case 1: { Log = "one"; } break;
+      case 2: { Log = "two"; } break;
+      case 3: { Log = "other"; } break;
+    }
+    Count += which;
+  }
+
+  void go30(Text entry) {
+    if (flow_do_once(n30, entry, false)) {
+      Log = text_append(Log, "once ", "");
+    }
+  }
+
+  void go31(Text entry) {
+    if (flow_do_n(n31, entry, 2)) {
+      Log = text_append(Log, "n", kern::to<Text>(n31.counter));
+    }
+  }
+
+  void go32(Text entry) {
+    if (flow_gate(n32, entry, true)) {
+      Open = logic_not(Open);
+    }
+  }
+
+  struct : kern::Node<12> { Int index = 0; } n12;
+  struct : kern::Node<20> { Int index = 0; } n20;
+  struct : kern::Node<21> { Int index = 0; } n21;
+  kern::Node<30> n30;
+  struct : kern::Node<31> { Int counter = 0; } n31;
+  kern::Node<32> n32;
+  struct : kern::Node<33> { Bool is_a = false; } n33;
+};
+)kn";
+
+// Values with names, functions as values and as steps, results that are kept, an entry's values
+// read from another body.
+inline const char* kCalls = R"kn(
+struct Calls : kern::Blueprint {
+  Float Total = 0.0;
+  Int Steps = 0;
+  Text Trace = "";
+  Bool Flag = false;
+
+  struct ScaleResult { Float out = 0.0; Float twice = 0.0; };
+  /// A value two inputs read (it has a name), a formula.
+  KERN_PURE ScaleResult Scale(Float x = 1.0, Float by = 2.0) {
+    const auto n40 = [&] { return math_mul(x, by); };
+    return {n40(), kern::formula([](Float a, Float b) -> Float { return a + b; }, n40(), n40())};
+  }
+
+  struct AddUpResult { Float total = 0.0; Int steps = 0; };
+  /// A function's value in a loop, an Add whose result is read, a Set whose result is read.
+  AddUpResult AddUp(Float amount = 1.0, Int times = 1) {
+    for (auto it42 = flow_for(n42, 1, times); it42.next();) {
+      n43.value = (Total += Scale(amount, 1.5).out);
+      n44.value = (Steps = math_floor(n43.value));
+      Trace = text_append(Trace, kern::to<Text>(n44.value), ",");
+    }
+    return {Total, Steps};
+  }
+
+  /// A step two wires lead to reads what the function was given: the entry's values are kept.
+  void Mark(Float amount = 1.0, Bool twice = false) {
+    n50 = {amount, twice};
+    {
+      go52();
+    }
+    {
+      if (twice) {
+        go52();
+      }
+    }
+  }
+
+  struct BothResult { Float sum = 0.0; Text text = ""; };
+  /// Functions called as steps: each call keeps its results.
+  BothResult Both(Float a = 1.0, Float b = 2.0) {
+    n61 = AddUp(a, 2);
+    n62 = AddUp(b, 1);
+    Flag = math_compare<">">(n61.total, n62.total);
+    Mark(n62.total, Flag);
+    return {math_add(n61.total, n62.total), text_append(kern::to<Text>(n61.steps), "/", kern::to<Text>(n62.steps))};
+  }
+
+  void go52() {
+    n52.value = (Total += n50.amount);
+    Trace = text_append(Trace, kern::to<Text>(n52.value), kern::to<Text>(n50.twice));
+  }
+
+  struct : kern::Node<42> { Int index = 0; } n42;
+  struct { Float value = 0.0; } n43;
+  struct { Int value = 0; } n44;
+  struct { Float amount = 0.0; Bool twice = false; } n50;
+  struct { Float value = 0.0; } n52;
+  AddUpResult n61;
+  AddUpResult n62;
+};
+)kn";
+
+// Every wire between different types, Select and Reroute in every type, typed-in values.
+inline const char* kCasts = R"kn(
+struct Casts : kern::Blueprint {
+  Bool B = false;
+  Int I = 0;
+  Float F = 0.0;
+  Vector V = Vector{0.0, 0.0, 0.0};
+  Text T = "";
+  Actor A = Actor{0};
+
+  /// Every wire between pins of different types.
+  void FromFloat(Float x = 0.0) {
+    B = kern::to<Bool>(x);
+    I = kern::to<Int>(x);
+    F = x;
+    V = kern::to<Vector>(x);
+    T = kern::to<Text>(x);
+  }
+
+  void FromInt(Int x = 0) {
+    B = kern::to<Bool>(x);
+    I = x;
+    F = kern::to<Float>(x);
+    V = kern::to<Vector>(x);
+    T = kern::to<Text>(x);
+  }
+
+  void FromBool(Bool x = false) {
+    B = x;
+    I = kern::to<Int>(x);
+    F = kern::to<Float>(x);
+    T = kern::to<Text>(x);
+  }
+
+  void FromVector(Vector x = Vector{0.0, 0.0, 0.0}) {
+    V = x;
+    T = kern::to<Text>(x);
+  }
+
+  void FromActor(Actor x = Actor{0}) {
+    A = x;
+    B = kern::to<Bool>(x);
+    T = kern::to<Text>(x);
+  }
+
+  struct PickResult { Float number = 0.0; Int whole = 0; Bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{0}; };
+  /// Select and Reroute in every type; the typed-in values of a node.
+  KERN_PURE PickResult Pick(Bool first = true, Actor who = Actor{0}) {
+    return {logic_select<"float">(first, 1.5, -2.5), logic_select<"int">(first, 7, -7), logic_select<"bool">(first, true, false),
+            value_reroute<"vector">(logic_select<"vector">(first, Vector{1.0, 2.0, 3.0}, Vector{-1.0, 0.5, 0.25})), value_reroute<"text">(logic_select<"text">(first, "a \"word\"", "tab\tand\\slash")),
+            value_reroute<"actor">(logic_select<"actor">(first, who, Actor{7}))};
+  }
+};
+)kn";
+
+// A Sequence whose first part returns: the function has ended, the second part does not run.
+inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"int","value":0}],
+  "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
+    {"name":"Clamp01","inputs":[{"name":"v","type":"float","value":0.5}],"outputs":[{"name":"out","type":"float","value":-1},{"name":"low","type":"bool","value":false}]},
+    {"name":"Label","inputs":[{"name":"who","type":"text","value":"nobody"}],"outputs":[{"name":"text","type":"text","value":""}]}],
+  "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
+    {"id":10,"type":"func.entry","params":{"function":"Clamp01"}},{"id":11,"type":"var.add","params":{"variable":"Calls"}},{"id":12,"type":"flow.sequence","params":{"count":"2"}},
+    {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"op":"<"},"values":{"b":0}},
+    {"id":15,"type":"func.return","params":{"function":"Clamp01"},"values":{"out":0,"low":true}},
+    {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","values":{"b":1}},
+    {"id":30,"type":"func.entry","params":{"function":"Label"}},{"id":31,"type":"text.append","values":{"a":"hello "}},{"id":32,"type":"func.return","params":{"function":"Label"}}],
+  "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"result"],
+    [10,"then",11,"exec"],[11,"then",12,"exec"],[12,"then0",13,"exec"],[10,"v",14,"a"],[14,"result",13,"condition"],[13,"true",15,"exec"],
+    [12,"then1",16,"exec"],[10,"v",17,"a"],[17,"result",16,"out"],
+    [30,"then",32,"exec"],[30,"who",31,"b"],[31,"result",32,"text"]]})";
+
+inline const char* kFormulas[] = {
+    "a + b * c - a / b",
+    "a % b + b % c",
+    "a ^ b",
+    "-a + !b",
+    "(a < b) + (a <= b) * 2 + (a > b) * 4 + (a >= b) * 8 + (a == b) * 16 + (a != b) * 32",
+    "a && b || !c",
+    "a ? b : c",
+    "min(a, b) + max(b, c) + clamp(a, b, c)",
+    "abs(a) + sign(b)",
+    "floor(a) + ceil(b) * 10 + round(c) * 100 + trunc(a) * 1000",
+    "sqrt(a) + pow(b, 2) + exp(c / 1000) + log(b)",
+    "sin(a) + cos(b) + tan(c)",
+    "asin(a) + acos(b) + atan(c) + atan2(a, b)",
+    "rad(a) + deg(b)",
+    "lerp(a, b, c)",
+    "pi * a",
+    "1e3 + .5 * a - 2.5e-1",
+    "a / 0 + b % 0",
+    "max(9000, 16000 - level * 1300)",
+    "pi",
+};
+
+/// The values a pin of a type is tried with.
+inline std::vector<Value> samples(PinType t) {
+  std::vector<Value> r;
+  const f64 inf = std::numeric_limits<f64>::infinity();
+  switch (t) {
+    case PinType::boolean: r = {Value::boolean(false), Value::boolean(true)}; break;
+    case PinType::integer:
+      for (i64 v : {0, 1, -1, 2, 7, -13, 100, 1000000007}) r.push_back(Value::integer(v));
+      break;
+    case PinType::number:
+      for (f64 v : {0.0, 1.0, -1.0, 0.5, -2.5, 3.75, 90.0, 1e-9, 123456.789, -0.0, 2.0, 45.0, -180.0, 7.0, 0.3, 1e19, -1e300, inf, -inf, std::numeric_limits<f64>::quiet_NaN()})
+        r.push_back(Value::number(v));
+      break;
+    case PinType::vector:
+      for (Vec3 v : {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, -2, 0}, Vec3{1.5f, 2.5f, -3.5f}, Vec3{1000, 0.001f, 7}}) r.push_back(Value::vector(v));
+      break;
+    case PinType::text:
+      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC"}) r.push_back(Value::text(v));
+      break;
+    case PinType::actor:
+      for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
+      break;
+    default: break;
+  }
+  return r;
+}
+
+/// Adds the function P<k> to `g`: the value node `def` with `params` between a Function Entry
+/// and a Return - its inputs are the function's, its outputs the function's results.
+inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const std::vector<std::pair<std::string, std::string>>& params, int k, const logic::Library& lib) {
+  logic::Function f;
+  f.name = "P" + std::to_string(k);
+  f.pure = true;
+  f.help = def.type;
+  for (const auto& [key, value] : params) f.help += " " + value;
+  logic::Node entry, node, give;
+  entry.id = g.next_id++;
+  node.id = g.next_id++;
+  give.id = g.next_id++;
+  entry.type = "func.entry";
+  give.type = "func.return";
+  node.type = def.type;
+  entry.set_param("function", f.name);
+  give.set_param("function", f.name);
+  for (const auto& [key, value] : params) node.set_param(key, value);
+  entry.y = node.y = give.y = 160.0f * static_cast<f32>(k);
+  node.x = 280;
+  node.y += 110;
+  give.x = 560;
+  std::vector<logic::PinDef> in, out;
+  lib.pins(node, g, in, out);
+  g.links.push_back({entry.id, "then", give.id, "exec"});
+  for (const logic::PinDef& p : in) {
+    if (p.type == PinType::exec) continue;
+    const std::string name = "i" + std::to_string(f.inputs.size());
+    f.inputs.push_back({name, p.type, p.def.is_null() ? Value::zero(p.type).to_json() : p.def});
+    g.links.push_back({entry.id, name, node.id, p.id});
+  }
+  for (const logic::PinDef& p : out) {
+    if (p.type == PinType::exec) continue;
+    const std::string name = "o" + std::to_string(f.outputs.size());
+    f.outputs.push_back({name, p.type, Value::zero(p.type).to_json()});
+    g.links.push_back({node.id, p.id, give.id, name});
+  }
+  g.functions.push_back(f);
+  g.nodes.push_back(std::move(entry));
+  g.nodes.push_back(std::move(node));
+  g.nodes.push_back(std::move(give));
+  return f.name;
+}
+
+/// Every value node blueprint.h has a function for, in every setting, each as a function of its
+/// own - and called with many values.
+inline Case nodes_case(const logic::Library& lib = logic::library()) {
+  Case c;
+  c.name = "Nodes";
+  int k = 0;
+  for (const auto& d : lib.all()) {
+    if (d->kind != logic::NodeKind::pure) continue;
+    std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
+    if (d->type == "math.formula") {
+      variants.clear();
+      for (const char* formula : kFormulas) variants.push_back({{"formula", formula}});
+    } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::choice) {
+      variants.clear();
+      for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
+    }
+    for (const auto& params : variants) {
+      logic::Graph alone;
+      add_probe(alone, *d, params, 0, lib);
+      if (!logic::native_ready(alone, nullptr, lib)) continue;
+      const std::string name = add_probe(c.graph, *d, params, k, lib);
+      const logic::Function& f = *c.graph.function(name);
+      std::vector<std::vector<Value>> pool;
+      std::size_t most = 1;
+      for (const logic::FunctionPin& p : f.inputs) {
+        pool.push_back(samples(p.type));
+        most = max_of(most, pool.back().size());
+      }
+      u32 seed = 2463534242u + static_cast<u32>(k) * 7919u;
+      const std::size_t rounds = f.inputs.empty() ? 1 : most + 14;
+      for (std::size_t r = 0; r < rounds; ++r) {
+        Call call{name, {}};
+        for (std::size_t i = 0; i < pool.size(); ++i) {
+          std::size_t pick = r % pool[i].size();  // first every value on every input at once (equal inputs), then mixed
+          if (r >= most) {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            pick = seed % pool[i].size();
+          }
+          call.args.push_back(pool[i][pick]);
+        }
+        c.calls.push_back(std::move(call));
+      }
+      ++k;
+    }
+  }
+  return c;
+}
+
+inline std::vector<Value> numbers(std::initializer_list<f64> v) {
+  std::vector<Value> r;
+  for (f64 x : v) r.push_back(Value::number(x));
+  return r;
+}
+
+inline std::vector<Case> cases() {
+  std::vector<Case> all;
+  auto read = [&](const char* name, const char* text) -> Case& {
+    all.push_back({name, {}, {}});
+    std::string error;
+    if (!logic::from_cpp(text, all.back().graph, nullptr, &error)) std::printf("blueprint_native %s: %s\n", name, error.c_str());
+    return all.back();
+  };
+  const Value yes = Value::boolean(true), no = Value::boolean(false);
+  auto N = [](f64 v) { return Value::number(v); };
+  auto I = [](i64 v) { return Value::integer(v); };
+  auto T = [](const char* v) { return Value::text(v); };
+  {
+    Case& c = read("Flow", kFlow);
+    for (f64 v : {95.0, 90.0, 89.999, 50.0, 12.5, -3.0, 0.0, std::numeric_limits<f64>::quiet_NaN()}) c.calls.push_back({"Grade", {N(v)}});
+    c.calls.push_back({"FirstAbove", {I(0), I(9), N(4.5)}});
+    c.calls.push_back({"FirstAbove", {I(3), I(3), N(0)}});
+    c.calls.push_back({"FirstAbove", {I(5), I(2), N(1)}});  // no pass: the index of the run before stays
+    c.calls.push_back({"FirstAbove", {I(0), I(5), N(100)}});
+    c.calls.push_back({"FirstAbove", {I(-3), I(3), N(-1.5)}});
+    c.calls.push_back({"Fill", {I(2), I(3)}});
+    c.calls.push_back({"Fill", {I(0), I(3)}});
+    c.calls.push_back({"Fill", {I(4), I(4)}});
+    for (const char* what : {"go", "go", "go", "open", "go", "reset", "go", "flip", "flip", "toggle", "go", "close", "go", "x", "flip"}) c.calls.push_back({"Step", {T(what)}});
+    for (i64 which : {-1, 0, 1, 2, 3, 100}) c.calls.push_back({"Choose", {I(which)}});
+    c.calls.push_back({"Grade", {N(51)}});
+  }
+  {
+    Case& c = read("Calls", kCalls);
+    c.calls.push_back({"Scale", {N(1), N(2)}});
+    c.calls.push_back({"Scale", {N(2.5), N(-1.5)}});
+    c.calls.push_back({"AddUp", {N(1), I(1)}});
+    c.calls.push_back({"AddUp", {N(2.5), I(3)}});
+    c.calls.push_back({"AddUp", {N(0.1), I(0)}});
+    c.calls.push_back({"AddUp", {N(-4), I(2)}});
+    c.calls.push_back({"Mark", {N(1), no}});
+    c.calls.push_back({"Mark", {N(2), yes}});
+    c.calls.push_back({"Both", {N(1), N(2)}});
+    c.calls.push_back({"Both", {N(5), N(0.5)}});
+    c.calls.push_back({"Both", {N(-1), N(-1)}});
+    c.calls.push_back({"Scale", {N(0), N(0)}});
+  }
+  {
+    Case& c = read("Casts", kCasts);
+    for (const Value& v : samples(PinType::number)) c.calls.push_back({"FromFloat", {v}});
+    for (const Value& v : samples(PinType::integer)) c.calls.push_back({"FromInt", {v}});
+    for (const Value& v : samples(PinType::boolean)) c.calls.push_back({"FromBool", {v}});
+    for (const Value& v : samples(PinType::vector)) c.calls.push_back({"FromVector", {v}});
+    for (const Value& v : samples(PinType::actor)) c.calls.push_back({"FromActor", {v}});
+    c.calls.push_back({"Pick", {yes, Value::actor(3)}});
+    c.calls.push_back({"Pick", {no, Value::actor(3)}});
+  }
+  {
+    all.push_back({"Functions", {}, {}});
+    Case& c = all.back();
+    json::Value j;
+    if (!json::parse(kFunctions, j) || !logic::graph_from_json(j, c.graph)) std::printf("blueprint_native Functions: not read\n");
+    c.calls.push_back({"Double", {N(21)}});
+    for (f64 v : {0.25, 3.0, -2.0, 0.0, 1.0}) c.calls.push_back({"Clamp01", {N(v)}});
+    c.calls.push_back({"Label", {T("Kern")}});
+  }
+  all.push_back(nodes_case());
+  return all;
+}
+
+struct Host : logic::Host {
+  std::vector<std::string> errors;
+  f64 time() const override { return 0; }
+  void print(const std::string&, bool) override {}
+  void error(const std::string& text) override { errors.push_back(text); }
+  u32 random() override { return 0; }
+};
+
+/// One line per call: Function(values) -> results | variables.
+inline std::string line(const std::string& function, const std::vector<std::string>& args, const std::vector<std::pair<std::string, std::string>>& results,
+                        const std::vector<std::pair<std::string, std::string>>& variables) {
+  std::string s = function + "(";
+  for (std::size_t i = 0; i < args.size(); ++i) s += (i ? ", " : "") + args[i];
+  s += ") ->";
+  for (const auto& [name, value] : results) s += " " + name + "=" + value;
+  s += " |";
+  for (const auto& [name, value] : variables) s += " " + name + "=" + value;
+  return s + "\n";
+}
+
+/// What the interpreter answers.
+inline std::string play(const Case& c, std::vector<std::string>* errors = nullptr) {
+  Host host;
+  logic::Runtime rt(host);
+  rt.jit = false;
+  logic::Instance* inst = rt.add(c.graph, 0, c.name);
+  rt.begin();
+  std::string text = "== " + c.name + "\n";
+  for (const Call& call : c.calls) {
+    const logic::Function* f = c.graph.function(call.function);
+    std::vector<Value> out;
+    if (!f || !inst->call(call.function, call.args, out)) host.errors.push_back(c.name + ": " + call.function + " could not be called");
+    std::vector<std::string> args;
+    std::vector<std::pair<std::string, std::string>> results, variables;
+    for (const Value& a : call.args) args.push_back(native_show(a));
+    for (std::size_t k = 0; f && k < f->outputs.size() && k < out.size(); ++k) results.push_back({f->outputs[k].name, native_show(out[k])});
+    for (const logic::Variable& v : c.graph.variables) variables.push_back({v.name, native_show(inst->get(v.name))});
+    text += line(call.function, args, results, variables);
+  }
+  if (errors) *errors = host.errors;
+  return text;
+}
+
+inline std::string c_string(const std::string& s) {
+  std::string r = "\"";
+  char b[8];
+  for (unsigned char ch : s) {
+    if (ch == '"' || ch == '\\') { r += '\\'; r += static_cast<char>(ch); }
+    else if (ch < 32 || ch > 126) { std::snprintf(b, sizeof b, "\\%03o", ch); r += b; }
+    else r += static_cast<char>(ch);
+  }
+  return r + "\"";
+}
+
+inline const char* cpp_type(PinType t) {
+  switch (t) {
+    case PinType::boolean: return "bool";
+    case PinType::integer: return "kern::i64";
+    case PinType::number: return "kern::f64";
+    case PinType::vector: return "kern::Vec3";
+    case PinType::text: return "std::string";
+    case PinType::actor: return "kern::logic::ActorHandle";
+    default: return "void";
+  }
+}
+
+/// A value as C++ source, bit for bit.
+inline std::string cpp_value(const Value& v) {
+  char b[160];
+  auto number = [&](f64 x, const char* suffix) -> std::string {
+    if (std::isnan(x)) return std::string("std::numeric_limits<") + (*suffix ? "float" : "double") + ">::quiet_NaN()";
+    if (std::isinf(x)) return std::string(x < 0 ? "-" : "") + "std::numeric_limits<" + (*suffix ? "float" : "double") + ">::infinity()";
+    std::snprintf(b, sizeof b, "%a%s", x, suffix);
+    return b;
+  };
+  switch (v.type) {
+    case PinType::boolean: return v.b ? "true" : "false";
+    case PinType::integer: std::snprintf(b, sizeof b, "%lldLL", static_cast<long long>(v.i)); return b;
+    case PinType::number: return number(v.n, "");
+    case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
+    case PinType::text: return "std::string(" + c_string(v.s) + ")";
+    case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
+    default: return "0";
+  }
+}
+
+inline bool write_file(const std::string& path, const std::string& text) {
+  FILE* f = std::fopen(path.c_str(), "wb");
+  if (!f) return false;
+  const bool ok = std::fwrite(text.data(), 1, text.size(), f) == text.size();
+  return std::fclose(f) == 0 && ok;
+}
+
+/// Writes <dir>/bp_<Name>.h (the Blueprint's text, as it is), blueprint_native_main.cpp (the
+/// calls) and blueprint_native_expected.txt (the interpreter's answers).
+inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
+  std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
+                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"native_show.h\"\n";
+  std::string runs, expected;
+  for (const Case& c : all) {
+    std::string text, why;
+    if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why)) {
+      if (error) *error = c.name + ": " + why;
+      return false;
+    }
+    if (!write_file(dir + "/bp_" + c.name + ".h", text)) {
+      if (error) *error = "cannot write into " + dir;
+      return false;
+    }
+    std::vector<std::string> errors;
+    expected += play(c, &errors);
+    if (!errors.empty()) {
+      if (error) *error = c.name + ": " + errors[0];
+      return false;
+    }
+    main += "#include \"bp_" + c.name + ".h\"\n";
+    std::string body = "static void run_" + c.name + "(std::string& got) {\n  " + c.name + " b;\n  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
+    for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + show(b." + v.name + ")";
+    body += ";\n  };\n";
+    for (std::size_t at = 0; at < c.calls.size();) {
+      std::size_t end = at;
+      while (end < c.calls.size() && c.calls[end].function == c.calls[at].function) ++end;  // calls of one function in a row: one table
+      const logic::Function& f = *c.graph.function(c.calls[at].function);
+      body += "  {\n    const struct {";
+      for (std::size_t i = 0; i < f.inputs.size(); ++i) body += std::string(" ") + cpp_type(f.inputs[i].type) + " a" + std::to_string(i) + ";";
+      body += " int row; } rows[] = {\n";
+      for (std::size_t r = at; r < end; ++r) {
+        body += "        {";
+        for (const Value& a : c.calls[r].args) body += cpp_value(a) + ", ";
+        body += std::to_string(r) + "},\n";
+      }
+      body += "    };\n    for (const auto& r : rows) {\n      (void)r;\n      ";
+      std::string call = "b." + f.name + "(";
+      std::string shown = "std::string(\"" + f.name + "(\")";
+      for (std::size_t i = 0; i < f.inputs.size(); ++i) {
+        call += (i ? ", r.a" : "r.a") + std::to_string(i);
+        shown += std::string(i ? " + \", \"" : "") + " + show(r.a" + std::to_string(i) + ")";
+      }
+      call += ")";
+      body += (f.outputs.empty() ? "" : "const auto out = ") + call + ";\n      got += " + shown + " + \") ->\"";
+      for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
+      body += " + variables() + \"\\n\";\n    }\n  }\n";
+      at = end;
+    }
+    runs += body + "}\n\n";
+  }
+  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n" + runs;
+  main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt>\\n\"); return 2; }\n"
+          "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got;\n";
+  std::size_t count = 0, calls = 0;
+  for (const Case& c : all) {
+    main += "  run_" + c.name + "(got);\n";
+    ++count;
+    calls += c.calls.size();
+  }
+  main += "  const std::string expected = want.str();\n  int failures = 0;\n  if (got != expected) {\n    ++failures;\n"
+          "    std::size_t a = 0, b = 0, shown = 0;\n    while ((a < got.size() || b < expected.size()) && shown < 12) {\n"
+          "      const std::size_t ae = got.find('\\n', a), be = expected.find('\\n', b);\n"
+          "      const std::string x = a < got.size() ? got.substr(a, ae == std::string::npos ? ae : ae - a) : \"(nothing)\", y = b < expected.size() ? expected.substr(b, be == std::string::npos ? be : be - b) : \"(nothing)\";\n"
+          "      if (x != y) { std::printf(\"FAIL the compiled Blueprint: %s\\n     the interpreter:        %s\\n\", x.c_str(), y.c_str()); ++shown; }\n"
+          "      a = ae == std::string::npos ? got.size() : ae + 1;\n      b = be == std::string::npos ? expected.size() : be + 1;\n    }\n  }\n";
+  main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) + " calls)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
+  if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected)) {
+    if (error) *error = "cannot write into " + dir;
+    return false;
+  }
+  return true;
+}
+
+}  // namespace blueprint_native

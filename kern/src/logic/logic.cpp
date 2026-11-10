@@ -68,7 +68,7 @@ i64 Value::as_int() const {
   switch (type) {
     case PinType::boolean: return b ? 1 : 0;
     case PinType::integer: return i;
-    case PinType::number: return std::isfinite(n) ? static_cast<i64>(std::llround(std::trunc(n))) : 0;
+    case PinType::number: return whole(n);
     case PinType::text: return std::strtoll(s.c_str(), nullptr, 10);
     case PinType::actor: return a;
     default: return 0;
@@ -677,7 +677,7 @@ f64 to_type(f64 v, PinType t) {
 }
 Value from_slot(f64 v, PinType t) {
   if (t == PinType::boolean) return Value::boolean(v != 0);
-  if (t == PinType::integer) return Value::integer(static_cast<i64>(v));
+  if (t == PinType::integer) return Value::integer(whole(v));
   return Value::number(v);
 }
 std::unordered_map<u64, NativeGraphFn>& native_registry() {

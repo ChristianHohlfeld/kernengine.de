@@ -83,7 +83,9 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   und der zurückgelesene Blueprint läuft genau gleich (`kern/tests/run.sh logic_notation`; für
   „Wanted“: `rules_wanted_blueprint_is_its_cpp`).
 - [x] **Die Regeln dazu:** Namen sind C++-Namen, ein Exec-Ausgang hat einen Draht, Return liegt
-  auf einem Weg seiner Funktion, ein Zufallswert hat einen Leser. `check()` meldet Verstöße, der
+  auf einem Weg seiner Funktion, ein Zufallswert hat einen Leser; kein Weg führt ohne Warten in
+  sich selbst zurück, keine Funktion ruft sich selbst auf, eine Funktion, die als Wert gelesen
+  wird, rechnet nur, Add to Variable zählt im Typ der Variablen. `check()` meldet Verstöße, der
   Editor nimmt solche Namen nicht an.
 - [x] **Die C++-Ansicht im Editor:** **C++** in der Toolbar des Blueprint-Editors zeigt den Text
   des Blueprints; ändern und **Apply** (ein Undo-Schritt) macht ihn zum Blueprint. Bestehende
@@ -91,13 +93,33 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   und Grund (`logic::apply_cpp`, Befehle `logicCpp` / `logicCppApply`).
 - [ ] Die Ansicht komfortabler: Syntaxfarben, Vervollständigung der Knotennamen, neue Knoten
   ohne Überlappung einsortieren.
-- [ ] **Native Ausführung genau dieses Textes:** `kern/logic/blueprint.h` und typisierte
-  Knotenfunktionen (jeder Knoten eine C++-Funktion, die Interpreter und Text gemeinsam benutzen);
-  der bisherige Export (Schleife über Knotennummern mit `call_node` / `read_pin`) entfällt. Dazu
-  gehört, die Bedeutung an den Stellen festzulegen, an denen C++ sie vorgibt: Eingänge werden vor
-  dem Knoten ausgewertet, Parameter gelten je Aufruf, jeder Random-Knoten hat seine eigene Folge.
-  Test: Das kompilierte C++ liefert dasselbe wie Interpreter und JIT, und im erzeugten Code gibt
-  es keinen Rückruf.
+- [x] **Native Ausführung, Teil 1 – Blueprints aus Funktionen:** Der Text kompiliert gegen
+  `kern/logic/blueprint.h`, so wie er dasteht. Was ein Knoten rechnet, steht einmal, als
+  typisierte Funktion in `kern/logic/nodes.h`; der Interpreter ruft dieselbe Funktion auf wie der
+  Text. Es läuft: Variablen, Funktionen, Formeln, alle Wert-Knoten, Branch, Sequence, For, While,
+  Do Once, Do N, Gate, Flip Flop, die Switches – also „Wanted“ ganz. `logic::native_ready` sagt
+  für jeden Blueprint, ob sein Text so läuft, und sonst, welcher Knoten fehlt. Beweis:
+  `blueprint_native_test` (in `kern/tests/run.sh`) kompiliert die Texte von fünf Blueprints und
+  vergleicht über 2000 Aufrufe Zeichen für Zeichen mit dem Interpreter; `wanted_native_test` (in
+  SpawnCitys Tests) dasselbe für „Wanted“.
+- [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
+  - Events (`KERN_EVENT`), wartende Knoten (Delay, Retriggerable Delay, Tween), State Machines
+    (`kern::Machine`), Call Event, Set State, Print, Game Time, die Gameplay-Knoten.
+  - Random: jeder Random-Knoten hat seine eigene Folge (`kern::Node<id>`), damit die Reihenfolge,
+    in der C++ Argumente auswertet, nichts ändert.
+  - Eingänge werden vor dem Knoten ausgewertet, alle, genau einmal – auch im Interpreter (heute
+    liest Select nur den gewählten Eingang; solange Werte nur rechnen, ist das dasselbe).
+  - Der Schleifenwächter: Interpreter, JIT und Text zählen dasselbe und hören an derselben Stelle
+    auf (heute bricht der Interpreter nach 200 000 Knoten je Schritt ab, der Text gar nicht).
+  - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
+    (heute überspringt der Interpreter den inneren Aufruf und meldet es).
+  - Tween mit Dauer 0 läuft sofort durch: als Rücksprung im Text darf das nicht tiefer werden.
+  - Das Spiel führt den Text aus: Die Klasse hängt an `logic::Instance` (Variablen und Funktionen
+    beim Namen nur an der Grenze zur Engine); der bisherige Export (Schleife über Knotennummern
+    mit `call_node` / `read_pin`) entfällt.
+  - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text
+    als 64-Bit-Zahl; der JIT schneidet „keine Zahl“ und unendlich beim Umwandeln nicht auf 0.
+    Beides wird gleichgezogen.
 - [ ] **Nativer Export:** Der Editor exportiert das Spiel mit diesen Klassen, voll optimiert.
 - [ ] Der JIT erzeugt Formeln und Funktionsaufrufe ebenfalls direkt (heute Rückruf).
 

@@ -28,6 +28,7 @@
 #include "kern/net/client_server.h"
 #include "kern/game/net_game.h"
 #include "kern/logic/logic.h"
+#include "blueprint_native.h"
 #include "logic_cases.h"
 #include "../src/game/soldier_models.h"
 
@@ -1952,7 +1953,7 @@ TEST(logic_formulas) {
            Spelled{"-a^2 + --b + !!c", "-a ^ 2 + -(-b) + !(!c)", "-kern::math::pow(a, 2.0) + -(-b) + !(!c)"},
            Spelled{"(a ^ b) ^ c", "(a ^ b) ^ c", "kern::math::pow(kern::math::pow(a, b), c)"},
            Spelled{"a<b==c", "(a < b) == c", "(a < b) == c"},
-           Spelled{"a==(b<c) || !d && e", "a == (b < c) || !d && e", "a == (b < c) || !d && e"},
+           Spelled{"a==(b<c) || !d && e", "a == (b < c) || !d && e", "a == (b < c) || (!d && e)"},  // (C++: && inside || in brackets)
            Spelled{"(a||b)&&c ? (d?1:2) : e?3:4", "(a || b) && c ? (d ? 1 : 2) : e ? 3 : 4", "(a || b) && c ? (d ? 1.0 : 2.0) : e ? 3.0 : 4.0"},
            Spelled{"pow(x,2)+div(x,3)+mod(x,4)", "x ^ 2 + x / 3 + x % 4", "kern::math::pow(x, 2.0) + kern::math::div(x, 3.0) + kern::math::mod(x, 4.0)"},
            Spelled{"clamp(0.28+level*.02,1e-1,3.8E-1)*2*pi", "clamp(0.28 + level * 0.02, 0.1, 0.38) * 2 * pi", "kern::math::clamp(0.28 + level * 0.02, 0.1, 0.38) * 2.0 * kern::math::pi"},
@@ -2000,23 +2001,20 @@ TEST(logic_formulas) {
 TEST(logic_functions) {
   FakeLogicHost host;
   logic::Runtime rt(host);
-  // Double(x) -> result (pure); Clamp01(v) -> out, low: returns early below zero; Fact(n) calls itself.
+  // Double(x) -> result (pure); Clamp01(v) -> out, low: returns early below zero.
   const logic::Graph g = logic_graph(R"({"variables":[{"name":"Calls","type":"int","value":0}],
     "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
       {"name":"Clamp01","inputs":[{"name":"v","type":"float","value":0.5}],"outputs":[{"name":"out","type":"float","value":-1},{"name":"low","type":"bool","value":false}]},
-      {"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]},
       {"name":"Label","inputs":[{"name":"who","type":"text","value":"nobody"}],"outputs":[{"name":"text","type":"text","value":""}]}],
     "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
       {"id":10,"type":"func.entry","params":{"function":"Clamp01"}},{"id":11,"type":"var.add","params":{"variable":"Calls"}},{"id":12,"type":"flow.sequence","params":{"count":"2"}},
       {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"op":"<"},"values":{"b":0}},
       {"id":15,"type":"func.return","params":{"function":"Clamp01"},"values":{"out":0,"low":true}},
       {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","values":{"b":1}},
-      {"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}},
       {"id":30,"type":"func.entry","params":{"function":"Label"}},{"id":31,"type":"text.append","values":{"a":"hello "}},{"id":32,"type":"func.return","params":{"function":"Label"}}],
     "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"result"],
       [10,"then",11,"exec"],[11,"then",12,"exec"],[12,"then0",13,"exec"],[10,"v",14,"a"],[14,"result",13,"condition"],[13,"true",15,"exec"],
       [12,"then1",16,"exec"],[10,"v",17,"a"],[17,"result",16,"out"],
-      [20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"],
       [30,"then",32,"exec"],[30,"who",31,"b"],[31,"result",32,"text"]]})");
   CHECK(no_errors(logic::check(g)));
   logic::Instance* inst = rt.add(g, 0, "Level");
@@ -2041,21 +2039,17 @@ TEST(logic_functions) {
   CHECK(inst->get("Calls").as_int() == 4);
   // text in, text out
   CHECK(inst->call("Label", {logic::Value::text("Kern")}, out) && out[0].as_text() == "hello Kern");
-  // a function cannot call itself: the inner call is skipped (its outputs' defaults) and said
-  CHECK(host.errors.empty());
-  CHECK_NEAR(inst->call_number("Fact", {3}), 7, 1e-12);
-  CHECK(host.errors.size() == 1 && host.errors[0].find("calls itself") != std::string::npos);
-  CHECK(!inst->disabled());
+  CHECK(host.errors.empty() && !inst->disabled());
   // calls from C++ are steps of their own for the loop guard: any number of them without a tick
   // in between (a paused world whose systems keep asking) never stops the graph
   rt.budget = 1000;
   for (int i = 0; i < 2000; ++i) CHECK_NEAR(inst->call_number("Double", {static_cast<f64>(i)}), 2.0 * i, 1e-12);
-  CHECK(!inst->disabled() && host.errors.size() == 1);
+  CHECK(!inst->disabled() && host.errors.empty());
   rt.budget = 200000;
   // the functions survive JSON, and a graph without functions writes none
   logic::Graph back;
   CHECK(logic::graph_from_json(logic::graph_to_json(g), back));
-  CHECK(back == g && back.functions.size() == 4 && back.functions[1].outputs[0].name == "out");
+  CHECK(back == g && back.functions.size() == 3 && back.functions[1].outputs[0].name == "out");
   CHECK(!logic::graph_to_json(logic::Graph{}).has("functions"));
   // checks: an unknown function, a function without or with two entries
   const logic::Graph bad = logic_graph(R"({"functions":[{"name":"F","inputs":[],"outputs":[]},{"name":"G","inputs":[],"outputs":[]}],
@@ -2529,9 +2523,9 @@ struct Demo : kern::Blueprint {
     }
     Heat = math_sub(Heat, by);
     if (Open) {
-      Count += 1.0;
+      Count += 1;
     } else if (math_compare<">">(Heat, 5.0)) {
-      Count += 2.0;
+      Count += 2;
     }
     debug_print(kern::to<Text>(Count), false);
   }
@@ -2581,7 +2575,7 @@ struct Demo : kern::Blueprint {
   CHECK(inst->get("Count").as_int() == 1);
 
   // Every form at once: gates entered from two events, a tween with two ways on, a switch whose
-  // paths meet again, loops, a circle of steps nothing leads into, a Return nothing leads to,
+  // paths meet again, loops, a circle of steps nothing leads into (a timer: it waits), a Return nothing leads to,
   // values nothing reads.
   const char* door = R"kn(
 struct Door : kern::Blueprint {
@@ -2623,7 +2617,7 @@ struct Door : kern::Blueprint {
     {
       if (flow_do_once(n41, "exec", false)) {
         for (auto it42 = flow_for(n42, 0, 3); it42.next();) {
-          Hits += kern::to<Float>(n42.index);
+          Hits += n42.index;
         }
         Angle = kern::to<Float>(n42.index);
       }
@@ -2654,7 +2648,9 @@ struct Door : kern::Blueprint {
 
   void go50() {
     Hits += 5;
-    go50();
+    flow_delay(n51, 1.0, [this] {
+      go50();
+    });
   }
 
   void go60() {
@@ -2674,6 +2670,7 @@ struct Door : kern::Blueprint {
   kern::Node<41> n41;
   struct : kern::Node<42> { Int index = 0; } n42;
   struct : kern::Node<43> { Float alpha = 0.0; } n43;
+  kern::Node<51> n51;
   kern::Node<70> n70;
 };
 )kn";
@@ -2698,6 +2695,58 @@ struct Door : kern::Blueprint {
   errors = 0;
   for (const logic::Issue& i : logic::check(d)) errors += i.error ? 1 : 0;
   CHECK(errors == 0);
+}
+
+TEST(logic_native_blueprints) {
+  // What a C++ compiler runs as it stands (logic::native_ready): Blueprints of functions. run.sh
+  // compiles the texts of these cases and compares every call with the interpreter
+  // (blueprint_native_test). Here: the cases are sound, and every node native_ready lets through
+  // is in one of them - it cannot promise a function blueprint.h does not have.
+  std::set<std::string> used;
+  std::size_t calls = 0;
+  for (const blueprint_native::Case& c : blueprint_native::cases()) {
+    CHECK(no_errors(logic::check(c.graph)));
+    std::string why, text;
+    const bool ready = logic::native_ready(c.graph, &why);
+    if (!ready) std::printf("%s: %s\n", c.name.c_str(), why.c_str());
+    CHECK(ready && logic::to_cpp(c.graph, c.name, text, &why));
+    std::vector<std::string> errors;
+    const std::string played = blueprint_native::play(c, &errors);
+    for (const std::string& e : errors) std::printf("%s: %s\n", c.name.c_str(), e.c_str());
+    CHECK(errors.empty() && !c.calls.empty());
+    calls += c.calls.size();
+    for (const logic::Node& n : c.graph.nodes) used.insert(n.type);
+  }
+  CHECK(calls > 1500);
+  for (const auto& d : logic::library().all()) {
+    // the node next to a variable and a function it can name
+    logic::Graph g = logic_graph(R"({"variables":[{"name":"V","type":"float","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
+      "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})");
+    logic::Node n;
+    n.id = 2;
+    n.type = d->type;
+    n.set_param("variable", "V");
+    n.set_param("function", "F");
+    g.nodes.push_back(n);
+    g.next_id = 3;
+    if (!logic::native_ready(g)) continue;
+    if (!used.count(d->type)) std::printf("native_ready lets %s through, and no native case has it\n", d->type.c_str());
+    CHECK(used.count(d->type));
+  }
+  CHECK(used.size() >= 60);
+  // what is not there yet is said, with the node
+  auto not_yet = [](const char* graph, const char* why) {
+    const logic::Graph g = logic_graph(graph);
+    std::string said;
+    CHECK(!logic::native_ready(g, &said));
+    if (said.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, said.c_str());
+    CHECK(said.find(why) != std::string::npos);
+  };
+  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})", "(node 1) is not yet a function of blueprint.h");
+  not_yet(R"({"variables":[{"name":"A","type":"float","value":0}],"nodes":[{"id":4,"type":"math.random"},{"id":5,"type":"var.set","params":{"variable":"A"}}],"links":[[4,"result",5,"value"]]})",
+          "Random Float in Range (node 4) is not yet a function of blueprint.h");
+  not_yet(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})", "state machines (\"Door\") are not yet part of blueprint.h");
+  not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
 }
 
 TEST(logic_notation_refuses_with_place_and_reason) {
@@ -2822,6 +2871,71 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"var.add","params":{"variable":"A"}}],
             "links":[[1,"then",2,"exec"],[1,"then",3,"exec"]]})",
           "has more than one wire", 1);
+  auto fine = [](const char* graph) {
+    json::Value j;
+    logic::Graph g;
+    CHECK(json::parse(graph, j) && logic::graph_from_json(j, g));
+    for (const logic::Issue& i : logic::check(g)) {
+      if (i.error) std::printf("unexpected: %s\n", i.text.c_str());
+      CHECK(!i.error);
+    }
+  };
+  // a function does not run again while it runs: not by calling itself, not through another one
+  problem(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+            "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
+            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})",
+          "function \"Fact\" calls itself:", 21);
+  problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
+              {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],
+            "links":[[1,"then",3,"exec"],[2,"r",3,"r"],[4,"then",5,"exec"],[5,"then",6,"exec"],[5,"r",6,"r"]]})",
+          "calls itself (through", 0);
+  // ... but after a wait it has ended: calling itself then is a timer
+  fine(R"({"functions":[{"name":"Again","inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"Again"}},{"id":2,"type":"flow.delay"},{"id":3,"type":"func.call","params":{"function":"Again"}}],
+            "links":[[1,"then",2,"exec"],[2,"completed",3,"exec"]]})");
+  // a function read as a value only computes - and so does what it calls
+  problem(R"({"variables":[{"name":"Calls","type":"int","value":0}],"functions":[{"name":"F","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"var.add","params":{"variable":"Calls"}},{"id":3,"type":"func.return","params":{"function":"F"}}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"]]})",
+          "function \"F\" is read as a value, so it only computes: Add to Calls (node 2) changes something", 2);
+  problem(R"({"variables":[{"name":"Calls","type":"int","value":0}],
+            "functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"Count","inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.call","params":{"function":"Count"}},{"id":3,"type":"func.return","params":{"function":"F"}},
+              {"id":4,"type":"func.entry","params":{"function":"Count"}},{"id":5,"type":"flow.do_once"},{"id":6,"type":"event.begin"},{"id":7,"type":"debug.print"},{"id":8,"type":"func.pure","params":{"function":"F"}},
+              {"id":9,"type":"text.append"}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[8,"r",9,"a"],[9,"result",7,"text"]]})",
+          "function \"Count\" runs inside \"F\", which is read as a value, so it only computes: Do Once (node 5) changes something", 5);
+  problem(R"({"functions":[{"name":"F","pure":true,"inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})",
+          "Delay (node 2) waits", 2);
+  // (branches, loops and other values are computing)
+  fine(R"({"functions":[{"name":"Sum","pure":true,"inputs":[{"name":"to","type":"int","value":3}],"outputs":[{"name":"r","type":"float","value":0}]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"Sum"}},{"id":2,"type":"flow.for"},{"id":3,"type":"flow.branch"},{"id":4,"type":"func.return","params":{"function":"Sum"}},
+              {"id":5,"type":"math.compare","params":{"op":">"},"values":{"b":1}},{"id":6,"type":"func.return","params":{"function":"Sum"},"values":{"r":-1}}],
+            "links":[[1,"then",2,"exec"],[1,"to",2,"last"],[2,"body",3,"exec"],[2,"index",5,"a"],[5,"result",3,"condition"],[3,"true",4,"exec"],[2,"index",4,"r"],[2,"completed",6,"exec"]]})");
+  // no path leads back into itself without a wait: a loop node repeats steps
+  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.branch"},{"id":4,"type":"math.compare","params":{"op":"<"},"values":{"b":5}},
+              {"id":5,"type":"var.get","params":{"variable":"A"}}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[5,"value",4,"a"],[4,"result",3,"condition"],[3,"true",2,"exec"]]})",
+          "leads back to Add to A (node 2) without a wait", 3);
+  fine(R"({"variables":[{"name":"A","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.delay"}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"completed",2,"exec"]]})");
+  // (a Gate that closes itself, a Do Once that resets itself: the path ends in that input)
+  fine(R"({"variables":[{"name":"A","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.gate"},{"id":3,"type":"var.add","params":{"variable":"A"}},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
+            "links":[[1,"then",2,"enter"],[2,"exit",3,"exec"],[3,"then",4,"exec"],[4,"completed",5,"exec"],[5,"exit",2,"close"]]})");
+  fine(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
+            "links":[[1,"then",4,"exec"],[4,"completed",5,"exec"],[5,"exit",4,"reset"]]})");
+  problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
+            "links":[[1,"then",4,"exec"],[4,"completed",5,"exec"],[5,"exit",4,"exec"]]})",
+          "leads back to Do Once (node 4) without a wait", 5);
+  // Add to Variable counts: numbers only
+  problem(R"({"variables":[{"name":"Name","type":"text","value":""}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Name"}}],"links":[[1,"then",2,"exec"]]})",
+          "needs a number variable (Integer or Float): \"Name\" is", 2);
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
@@ -2970,7 +3084,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
   }
   // A change in the text: what is still there keeps its id and place, what is new gets new ones.
   const char* before_text = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
-                            "    Heat = math_add(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1.0;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
+                            "    Heat = math_add(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
   logic::Graph g0, g1, g2, g3;
   std::string error;
   CHECK(logic::from_cpp(before_text, g0, nullptr, &error));
@@ -2992,7 +3106,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
     CHECK(missing == gone);
   };
   // one more line in the middle
-  CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += math_mul(value, 2.0);\n    if (math_compare"), g0, g1, &error));
+  CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += kern::to<Int>(math_mul(value, 2.0));\n    if (math_compare"), g0, g1, &error));
   kept(g1, 0);
   CHECK(g1.nodes.size() == g0.nodes.size() + 2 && g1.next_id == g0.next_id + 2);
   int fresh = 0;
@@ -8264,6 +8378,16 @@ int main(int argc, char** argv) {
       expected += std::string("== ") + c.name + "\n" + logic_cases::play(rt, host, inst);
     }
     if (FILE* f = std::fopen((std::string(argv[2]) + "/logic_expected.txt").c_str(), "wb")) { std::fwrite(expected.data(), 1, expected.size(), f); std::fclose(f); }
+    return 0;
+  }
+  // kern_tests --emit-native <dir>: Blueprints as their C++ text, calls to them and the
+  // interpreter's answers (run.sh compiles them into blueprint_native_test).
+  if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
+    std::string error;
+    if (!blueprint_native::emit(argv[2], blueprint_native::cases(), &error)) {
+      std::printf("FAIL --emit-native: %s\n", error.c_str());
+      return 1;
+    }
     return 0;
   }
   // kern_tests --emit-notation <dir>: the logic cases in the C++ notation (to read them).

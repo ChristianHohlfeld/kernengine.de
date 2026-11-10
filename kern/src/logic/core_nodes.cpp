@@ -2,15 +2,16 @@
 // machines, functions, math, logic, vectors, text, debugging). Gameplay nodes live in
 // the game module (src/game/logic_nodes.cpp).
 #include <cmath>
-#include "kern/core/dmath.h"
+#include <type_traits>
+#include <utility>
 
+#include "kern/core/dmath.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 
 namespace kern::logic {
 
 namespace {
-
-constexpr f64 kDeg = 3.14159265358979323846 / 180.0;
 
 PinDef exec_in(std::string id = "exec", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef exec_out(std::string id = "then", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
@@ -40,6 +41,19 @@ NodeDef pure(std::string type, std::string label, std::string category, std::vec
   return d;
 }
 
+/// A function of nodes.h as a value node: its arguments are the node's inputs in their order, its
+/// result the output. What the node computes is that function - a Blueprint's C++ calls the same one.
+template <class R, class... A, std::size_t... I> Value call_typed(R (*f)(A...), const Value* v, std::index_sequence<I...>) {
+  return to_value(f(from_value<std::decay_t<A>>(v[I])...));
+}
+template <class R, class... A> std::function<Value(Context&)> of(R (*f)(A...)) {
+  return [f](Context& c) {
+    Value v[sizeof...(A)];
+    for (std::size_t i = 0; i < sizeof...(A); ++i) v[i] = c.in(i);  // (the inputs one after the other, in their order)
+    return call_typed(f, v, std::index_sequence_for<A...>{});
+  };
+}
+
 ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::string def = {}, std::vector<std::string> choices = {}) {
   ParamDef p;
   p.key = std::move(key);
@@ -58,25 +72,7 @@ NodeDef fresh(NodeDef d) {
 
 f64 random01(Context& c) { return static_cast<f64>(c.host().random() >> 8) / static_cast<f64>(1u << 24); }
 
-int clamp_count(const Node& n, std::string_view key, int def, int lo, int hi) {
-  const std::string s = n.param(key);
-  const int v = s.empty() ? def : std::atoi(s.c_str());
-  return clamp(v, lo, hi);
-}
-
-std::vector<std::string> split_cases(const std::string& s) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char ch : s + ",") {
-    if (ch == ',') {
-      while (!cur.empty() && cur.front() == ' ') cur.erase(cur.begin());
-      while (!cur.empty() && cur.back() == ' ') cur.pop_back();
-      if (!cur.empty()) out.push_back(cur);
-      cur.clear();
-    } else cur += ch;
-  }
-  return out;
-}
+int clamp_count(const Node& n, std::string_view key, int def, int lo, int hi) { return setting_count(n.param(key), def, lo, hi); }
 
 void add_events(Library& lib) {
   {
@@ -212,16 +208,15 @@ void add_flow(Library& lib) {
     d.loop = true;
     d.memory = true;
     d.run = [](Context& c) {
-      f64& index = c.slot(0);
-      f64& last = c.slot(1);
+      f64* m = &c.slot(0);
       if (c.entry() != Context::kResume) {
-        index = static_cast<f64>(c.in_int("first"));
-        last = static_cast<f64>(c.in_int("last"));
+        const i64 first = c.in_int("first");
+        flow::for_start(m, first, c.in_int("last"));
       } else {
-        index += 1;
+        flow::for_step(m);
       }
-      if (index > last) return c.exec("completed");
-      c.out("index", Value::integer(static_cast<i64>(index)));
+      if (!flow::for_runs(m)) return c.exec("completed");
+      c.out("index", Value::integer(flow::for_index(m)));
       c.loop_back(Context::kResume);
       return c.exec("body");
     };
@@ -243,15 +238,8 @@ void add_flow(Library& lib) {
     d.inputs = {exec_in(), exec_in("reset", "Reset"), data("closed", "Start Closed", PinType::boolean, false)};
     d.outputs = {exec_out("completed", "Completed")};
     d.memory = true;
-    d.run = [](Context& c) {
-      f64& closed = c.slot(0);
-      f64& started = c.slot(1);
-      if (c.entry() == 1) { closed = 0; started = 1; return kStop; }
-      if (started == 0) { started = 1; closed = c.in_bool("closed") ? 1 : 0; }
-      if (closed != 0) return kStop;
-      closed = 1;
-      return 0;
-    };
+    d.first_entry_only = true;
+    d.run = [](Context& c) { return flow::do_once(&c.slot(0), c.entry(), c.in_bool("closed")) ? 0 : kStop; };
     lib.add(std::move(d));
   }
   {
@@ -259,12 +247,11 @@ void add_flow(Library& lib) {
     d.inputs = {exec_in(), data("n", "N", PinType::integer, 3), exec_in("reset", "Reset")};
     d.outputs = {exec_out("exit", "Exit"), data("counter", "Counter", PinType::integer)};
     d.memory = true;
+    d.first_entry_only = true;
     d.run = [](Context& c) {
-      f64& counter = c.slot(0);
-      if (c.entry() == 1) { counter = 0; return kStop; }
-      if (counter >= static_cast<f64>(c.in_int("n"))) return kStop;
-      counter += 1;
-      c.out("counter", Value::integer(static_cast<i64>(counter)));
+      i64 counter = 0;
+      if (!flow::do_n(&c.slot(0), c.entry(), c.in_int("n"), counter)) return kStop;
+      c.out("counter", Value::integer(counter));
       return 0;
     };
     lib.add(std::move(d));
@@ -274,18 +261,8 @@ void add_flow(Library& lib) {
     d.inputs = {exec_in("enter", "Enter"), exec_in("open", "Open"), exec_in("close", "Close"), exec_in("toggle", "Toggle"), data("closed", "Start Closed", PinType::boolean, false)};
     d.outputs = {exec_out("exit", "Exit")};
     d.memory = true;
-    d.run = [](Context& c) {
-      f64& open = c.slot(0);
-      f64& started = c.slot(1);
-      if (started == 0) { started = 1; open = c.in_bool("closed") ? 0 : 1; }
-      switch (c.entry()) {
-        case 0: return open != 0 ? 0 : kStop;
-        case 1: open = 1; return kStop;
-        case 2: open = 0; return kStop;
-        case 3: open = open != 0 ? 0 : 1; return kStop;
-        default: return kStop;
-      }
-    };
+    d.first_entry_only = true;
+    d.run = [](Context& c) { return flow::gate(&c.slot(0), c.entry(), c.in_bool("closed")) ? 0 : kStop; };
     lib.add(std::move(d));
   }
   {
@@ -294,10 +271,10 @@ void add_flow(Library& lib) {
     d.outputs = {exec_out("a", "A"), exec_out("b", "B"), data("is_a", "Is A", PinType::boolean)};
     d.memory = true;
     d.run = [](Context& c) {
-      f64& a = c.slot(0);
-      a = a != 0 ? 0 : 1;
-      c.out("is_a", Value::boolean(a != 0));
-      return a != 0 ? 0 : 1;
+      bool is_a = false;
+      const int out = flow::flip_flop(&c.slot(0), is_a);
+      c.out("is_a", Value::boolean(is_a));
+      return out;
     };
     lib.add(std::move(d));
   }
@@ -378,11 +355,7 @@ void add_flow(Library& lib) {
       for (int i = 0; i < k; ++i) out.push_back(exec_out("case" + std::to_string(i), std::to_string(i)));
       out.push_back(exec_out("default", "Default"));
     };
-    d.run = [](Context& c) {
-      const int k = clamp_count(c.node(), "count", 3, 1, 32);
-      const i64 v = c.in_int("selection");
-      return v >= 0 && v < k ? static_cast<int>(v) : k;
-    };
+    d.run = [](Context& c) { return flow::switch_int(clamp_count(c.node(), "count", 3, 1, 32), c.in_int("selection")); };
     lib.add(std::move(d));
   }
   {
@@ -392,15 +365,10 @@ void add_flow(Library& lib) {
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>&, std::vector<PinDef>& out) {
       out.clear();
       int i = 0;
-      for (const std::string& s : split_cases(n.param("cases", "A, B"))) out.push_back(exec_out("case" + std::to_string(i++), s));
+      for (const std::string& s : setting_cases(n.param("cases", "A, B"))) out.push_back(exec_out("case" + std::to_string(i++), s));
       out.push_back(exec_out("default", "Default"));
     };
-    d.run = [](Context& c) {
-      const auto cases = split_cases(c.param("cases", "A, B"));
-      const std::string v = c.in_text("selection");
-      for (std::size_t i = 0; i < cases.size(); ++i) if (cases[i] == v) return static_cast<int>(i);
-      return static_cast<int>(cases.size());
-    };
+    d.run = [](Context& c) { return flow::switch_text(c.param("cases", "A, B"), c.in_text("selection")); };
     lib.add(std::move(d));
   }
   {
@@ -458,12 +426,25 @@ void add_variables(Library& lib) {
     lib.add(std::move(d));
   }
   {
-    NodeDef d = make("var.add", "Add to Variable", "Variables", NodeKind::action, "Adds Amount to a number variable (use -1 to count down).");
+    NodeDef d = make("var.add", "Add to Variable", "Variables", NodeKind::action, "Adds Amount to a number variable, Integer or Float (use -1 to count down).");
     d.params = {param("variable", "Variable", ParamDef::Kind::variable)};
-    d.inputs = {exec_in(), data("amount", "Amount", PinType::number, 1)};
+    d.inputs = {exec_in(), data("amount", "Amount", PinType::number, 1.0)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.keywords = "increment decrement counter plus";
     d.title = [](const NodeDef&, const Node& n) { return "Add to " + n.param("variable", "?"); };
+    // The amount and the result have the variable's type: whole numbers add as whole numbers.
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const Variable* v = g.variable(n.param("variable"));
+      if (!v || v->type != PinType::integer) return;
+      for (PinDef& p : in) if (p.id == "amount") { p.type = PinType::integer; p.def = json::Value(1); }
+      for (PinDef& p : out) if (p.id == "value") p.type = PinType::integer;
+    };
+    d.problem = [](const Node& n, const Graph& g) {
+      const Variable* v = g.variable(n.param("variable"));
+      return v && v->type != PinType::integer && v->type != PinType::number
+                 ? "needs a number variable (Integer or Float): \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) + " - use Set"
+                 : std::string();
+    };
     d.run = [](Context& c) {
       const std::string name = c.param("variable");
       const Value cur = c.instance().get(name);
@@ -510,38 +491,28 @@ void add_variables(Library& lib) {
 
 void add_math(Library& lib) {
   using K = PinType;
+  using P = PureNodes;
   auto ab = [](K t, json::Value a = 0.0, json::Value b = 0.0) { return std::vector<PinDef>{data("a", "A", t, a), data("b", "B", t, b)}; };
-  lib.add(pure("math.add", "Add", "Math", ab(K::number), data("result", "", K::number), [](Context& c) { return Value::number(c.in_number("a") + c.in_number("b")); }, "A + B", "+ plus sum"));
-  lib.add(pure("math.sub", "Subtract", "Math", ab(K::number), data("result", "", K::number), [](Context& c) { return Value::number(c.in_number("a") - c.in_number("b")); }, "A - B", "- minus"));
-  lib.add(pure("math.mul", "Multiply", "Math", ab(K::number, 1.0, 1.0), data("result", "", K::number), [](Context& c) { return Value::number(c.in_number("a") * c.in_number("b")); }, "A × B", "* times"));
-  lib.add(pure("math.div", "Divide", "Math", ab(K::number, 1.0, 1.0), data("result", "", K::number), [](Context& c) {
-    const f64 b = c.in_number("b");
-    return Value::number(b != 0 ? c.in_number("a") / b : 0.0);
-  }, "A ÷ B (0 when B is 0)", "/"));
-  lib.add(pure("math.mod", "Modulo", "Math", ab(K::number, 0.0, 2.0), data("result", "", K::number), [](Context& c) {
-    const f64 b = c.in_number("b");
-    return Value::number(b != 0 ? std::fmod(c.in_number("a"), b) : 0.0);
-  }, "Remainder of A ÷ B", "% remainder"));
-  lib.add(pure("math.min", "Min", "Math", ab(K::number), data("result", "", K::number), [](Context& c) { return Value::number(min_of(c.in_number("a"), c.in_number("b"))); }));
-  lib.add(pure("math.max", "Max", "Math", ab(K::number), data("result", "", K::number), [](Context& c) { return Value::number(max_of(c.in_number("a"), c.in_number("b"))); }));
-  lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)},
-               data("result", "", K::number), [](Context& c) {
-                 const f64 lo = c.in_number("min"), hi = c.in_number("max");
-                 return Value::number(clamp(c.in_number("value"), min_of(lo, hi), max_of(lo, hi)));
-               }));
-  lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return Value::number(std::fabs(c.in_number("a"))); }));
-  lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return Value::number(-c.in_number("a")); }));
-  lib.add(pure("math.lerp", "Lerp", "Math", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 1.0), data("alpha", "Alpha", K::number, 0.5)}, data("result", "", K::number),
-               [](Context& c) { const f64 a = c.in_number("a"); return Value::number(a + (c.in_number("b") - a) * c.in_number("alpha")); }, "A + (B - A) × Alpha", "interpolate mix blend"));
-  lib.add(pure("math.sin", "Sin (degrees)", "Math", {data("a", "Degrees", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return Value::number(kern::dm::sin(c.in_number("a") * kDeg)); }));
-  lib.add(pure("math.cos", "Cos (degrees)", "Math", {data("a", "Degrees", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return Value::number(kern::dm::cos(c.in_number("a") * kDeg)); }));
-  lib.add(pure("math.atan2", "Atan2 (degrees)", "Math", {data("y", "Y", K::number, 0.0), data("x", "X", K::number, 1.0)}, data("result", "", K::number),
-               [](Context& c) { return Value::number(kern::dm::atan2(c.in_number("y"), c.in_number("x")) / kDeg); }, "Angle of (X, Y) in degrees", "angle"));
-  lib.add(pure("math.sqrt", "Square Root", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return Value::number(std::sqrt(max_of(0.0, c.in_number("a")))); }));
-  lib.add(pure("math.pow", "Power", "Math", {data("a", "Base", K::number, 2.0), data("b", "Exponent", K::number, 2.0)}, data("result", "", K::number),
-               [](Context& c) { const f64 r = kern::dm::pow(c.in_number("a"), c.in_number("b")); return Value::number(std::isfinite(r) ? r : 0.0); }));
-  lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::integer), [](Context& c) { return Value::integer(static_cast<i64>(std::llround(c.in_number("a")))); }));
-  lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::integer), [](Context& c) { return Value::integer(static_cast<i64>(std::floor(c.in_number("a")))); }));
+  const PinDef number = data("result", "", K::number), integer = data("result", "", K::integer), boolean = data("result", "", K::boolean);
+  lib.add(pure("math.add", "Add", "Math", ab(K::number), number, of(&P::math_add), "A + B", "+ plus sum"));
+  lib.add(pure("math.sub", "Subtract", "Math", ab(K::number), number, of(&P::math_sub), "A - B", "- minus"));
+  lib.add(pure("math.mul", "Multiply", "Math", ab(K::number, 1.0, 1.0), number, of(&P::math_mul), "A × B", "* times"));
+  lib.add(pure("math.div", "Divide", "Math", ab(K::number, 1.0, 1.0), number, of(&P::math_div), "A ÷ B (0 when B is 0)", "/"));
+  lib.add(pure("math.mod", "Modulo", "Math", ab(K::number, 0.0, 2.0), number, of(&P::math_mod), "Remainder of A ÷ B", "% remainder"));
+  lib.add(pure("math.min", "Min", "Math", ab(K::number), number, of(&P::math_min)));
+  lib.add(pure("math.max", "Max", "Math", ab(K::number), number, of(&P::math_max)));
+  lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
+  lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
+  lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_negate)));
+  lib.add(pure("math.lerp", "Lerp", "Math", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 1.0), data("alpha", "Alpha", K::number, 0.5)}, number, of(&P::math_lerp),
+               "A + (B - A) × Alpha", "interpolate mix blend"));
+  lib.add(pure("math.sin", "Sin (degrees)", "Math", {data("a", "Degrees", K::number, 0.0)}, number, of(&P::math_sin)));
+  lib.add(pure("math.cos", "Cos (degrees)", "Math", {data("a", "Degrees", K::number, 0.0)}, number, of(&P::math_cos)));
+  lib.add(pure("math.atan2", "Atan2 (degrees)", "Math", {data("y", "Y", K::number, 0.0), data("x", "X", K::number, 1.0)}, number, of(&P::math_atan2), "Angle of (X, Y) in degrees", "angle"));
+  lib.add(pure("math.sqrt", "Square Root", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_sqrt)));
+  lib.add(pure("math.pow", "Power", "Math", {data("a", "Base", K::number, 2.0), data("b", "Exponent", K::number, 2.0)}, number, of(&P::math_pow)));
+  lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_round)));
+  lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_floor)));
   lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number),
                [](Context& c) { const f64 lo = c.in_number("min"); return Value::number(lo + (c.in_number("max") - lo) * random01(c)); }, "Deterministic per world", "rand")));
   lib.add(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
@@ -551,25 +522,18 @@ void add_math(Library& lib) {
   lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean),
                [](Context& c) { return Value::boolean(random01(c) < c.in_number("chance")); }, "True with the given chance (0..1)", "rand coin")));
   {
-    NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, data("result", "", K::boolean), [](Context& c) {
-      const std::string op = c.param("op", "==");
-      const Value a = c.in("a"), b = c.in("b");
-      const f64 x = a.as_number(), y = b.as_number();
-      if (op == "==") return Value::boolean(std::fabs(x - y) <= 1e-9);
-      if (op == "!=") return Value::boolean(std::fabs(x - y) > 1e-9);
-      if (op == "<") return Value::boolean(x < y);
-      if (op == "<=") return Value::boolean(x <= y);
-      if (op == ">") return Value::boolean(x > y);
-      return Value::boolean(x >= y);
+    NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, boolean, [](Context& c) {
+      const f64 a = c.in_number("a"), b = c.in_number("b");
+      return Value::boolean(P::compare(c.param("op", "=="), a, b));
     }, "Compares two numbers", "equal less greater == != < > <= >=");
     d.params = {param("op", "Operator", ParamDef::Kind::choice, "==", {"==", "=", "!=", "≠", "<", "<", "<=", "≤", ">", ">", ">=", "≥"})};
     d.title = [](const NodeDef&, const Node& n) { return "A " + n.param("op", "==") + " B"; };
     lib.add(std::move(d));
   }
-  lib.add(pure("logic.and", "AND", "Logic", ab(K::boolean, false, false), data("result", "", K::boolean), [](Context& c) { return Value::boolean(c.in_bool("a") && c.in_bool("b")); }, "", "&& both"));
-  lib.add(pure("logic.or", "OR", "Logic", ab(K::boolean, false, false), data("result", "", K::boolean), [](Context& c) { return Value::boolean(c.in_bool("a") || c.in_bool("b")); }, "", "|| either"));
-  lib.add(pure("logic.xor", "XOR", "Logic", ab(K::boolean, false, false), data("result", "", K::boolean), [](Context& c) { return Value::boolean(c.in_bool("a") != c.in_bool("b")); }));
-  lib.add(pure("logic.not", "NOT", "Logic", {data("a", "A", K::boolean, false)}, data("result", "", K::boolean), [](Context& c) { return Value::boolean(!c.in_bool("a")); }, "", "! invert"));
+  lib.add(pure("logic.and", "AND", "Logic", ab(K::boolean, false, false), boolean, of(&P::logic_and), "", "&& both"));
+  lib.add(pure("logic.or", "OR", "Logic", ab(K::boolean, false, false), boolean, of(&P::logic_or), "", "|| either"));
+  lib.add(pure("logic.xor", "XOR", "Logic", ab(K::boolean, false, false), boolean, of(&P::logic_xor)));
+  lib.add(pure("logic.not", "NOT", "Logic", {data("a", "A", K::boolean, false)}, boolean, of(&P::logic_not), "", "! invert"));
   {
     NodeDef d = pure("logic.select", "Select", "Logic", {data("pick", "Pick A", K::boolean, true), data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, data("result", "", K::number),
                      [](Context& c) { return c.in_bool("pick") ? c.in("a") : c.in("b"); }, "A when Pick A is true, otherwise B", "ternary choose if");
@@ -584,52 +548,44 @@ void add_math(Library& lib) {
     lib.add(std::move(d));
   }
   // Literals.
-  lib.add(pure("value.float", "Number", "Values", {data("value", "", K::number, 0.0)}, data("result", "", K::number), [](Context& c) { return c.in("value"); }, "A constant number", "float literal constant"));
-  lib.add(pure("value.int", "Integer", "Values", {data("value", "", K::integer, 0)}, data("result", "", K::integer), [](Context& c) { return c.in("value"); }, "A constant integer", "int literal"));
-  lib.add(pure("value.bool", "Boolean", "Values", {data("value", "", K::boolean, false)}, data("result", "", K::boolean), [](Context& c) { return c.in("value"); }, "true / false", "literal"));
-  lib.add(pure("value.text", "Text", "Values", {data("value", "", K::text, "")}, data("result", "", K::text), [](Context& c) { return c.in("value"); }, "A constant text", "string literal"));
+  lib.add(pure("value.float", "Number", "Values", {data("value", "", K::number, 0.0)}, number, of(&P::value_float), "A constant number", "float literal constant"));
+  lib.add(pure("value.int", "Integer", "Values", {data("value", "", K::integer, 0)}, integer, of(&P::value_int), "A constant integer", "int literal"));
+  lib.add(pure("value.bool", "Boolean", "Values", {data("value", "", K::boolean, false)}, boolean, of(&P::value_bool), "true / false", "literal"));
+  lib.add(pure("value.text", "Text", "Values", {data("value", "", K::text, "")}, data("result", "", K::text), of(&P::value_text), "A constant text", "string literal"));
   // Vectors.
   const json::Value zero3 = [] { json::Value a = json::Value::array(); a.push(0.0); a.push(0.0); a.push(0.0); return a; }();
-  lib.add(pure("vector.make", "Make Vector", "Vector", {data("x", "X", K::number, 0.0), data("y", "Y", K::number, 0.0), data("z", "Z", K::number, 0.0)}, data("result", "", K::vector),
-               [](Context& c) { return Value::vector({static_cast<f32>(c.in_number("x")), static_cast<f32>(c.in_number("y")), static_cast<f32>(c.in_number("z"))}); }));
+  const PinDef vector = data("result", "", K::vector);
+  lib.add(pure("vector.make", "Make Vector", "Vector", {data("x", "X", K::number, 0.0), data("y", "Y", K::number, 0.0), data("z", "Z", K::number, 0.0)}, vector, of(&P::vector_make)));
   {
     NodeDef d = make("vector.break", "Break Vector", "Vector", NodeKind::pure, "X, Y and Z of a vector.");
     d.inputs = {data("v", "Vector", K::vector, zero3)};
     d.outputs = {data("x", "X", K::number), data("y", "Y", K::number), data("z", "Z", K::number)};
     d.run = [](Context& c) {
-      const Vec3 v = c.in_vector("v");
-      c.out("x", Value::number(v.x));
-      c.out("y", Value::number(v.y));
-      c.out("z", Value::number(v.z));
+      const P::Broken b = P::vector_break(c.in_vector("v"));
+      c.out("x", Value::number(b.x));
+      c.out("y", Value::number(b.y));
+      c.out("z", Value::number(b.z));
       return kStop;
     };
     lib.add(std::move(d));
   }
-  auto vv = [&](const char* type, const char* label, std::function<Vec3(Vec3, Vec3)> f, const char* kw = "") {
-    lib.add(pure(type, label, "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3)}, data("result", "", K::vector),
-                 [f](Context& c) { return Value::vector(f(c.in_vector("a"), c.in_vector("b"))); }, "", kw));
-  };
-  vv("vector.add", "Vector + Vector", [](Vec3 a, Vec3 b) { return a + b; }, "add plus");
-  vv("vector.sub", "Vector - Vector", [](Vec3 a, Vec3 b) { return a - b; }, "subtract minus");
-  vv("vector.cross", "Cross Product", [](Vec3 a, Vec3 b) { return cross(a, b); });
-  lib.add(pure("vector.scale", "Vector × Float", "Vector", {data("a", "Vector", K::vector, zero3), data("b", "Scale", K::number, 1.0)}, data("result", "", K::vector),
-               [](Context& c) { return Value::vector(c.in_vector("a") * static_cast<f32>(c.in_number("b"))); }, "", "multiply scale"));
-  lib.add(pure("vector.length", "Vector Length", "Vector", {data("a", "Vector", K::vector, zero3)}, data("result", "", K::number), [](Context& c) { return Value::number(length(c.in_vector("a"))); }, "", "magnitude size"));
-  lib.add(pure("vector.normalize", "Normalize", "Vector", {data("a", "Vector", K::vector, zero3)}, data("result", "", K::vector), [](Context& c) { return Value::vector(normalize(c.in_vector("a"), {0, 0, 0})); }, "", "unit direction"));
-  lib.add(pure("vector.distance", "Distance", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3)}, data("result", "", K::number),
-               [](Context& c) { return Value::number(distance(c.in_vector("a"), c.in_vector("b"))); }));
-  lib.add(pure("vector.dot", "Dot Product", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3)}, data("result", "", K::number),
-               [](Context& c) { return Value::number(dot(c.in_vector("a"), c.in_vector("b"))); }));
-  lib.add(pure("vector.lerp", "Lerp Vector", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3), data("alpha", "Alpha", K::number, 0.5)}, data("result", "", K::vector),
-               [](Context& c) { return Value::vector(lerp(c.in_vector("a"), c.in_vector("b"), static_cast<f32>(c.in_number("alpha")))); }, "", "interpolate"));
+  const std::vector<PinDef> vab{data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3)};
+  lib.add(pure("vector.add", "Vector + Vector", "Vector", vab, vector, of(&P::vector_add), "", "add plus"));
+  lib.add(pure("vector.sub", "Vector - Vector", "Vector", vab, vector, of(&P::vector_sub), "", "subtract minus"));
+  lib.add(pure("vector.cross", "Cross Product", "Vector", vab, vector, of(&P::vector_cross)));
+  lib.add(pure("vector.scale", "Vector × Float", "Vector", {data("a", "Vector", K::vector, zero3), data("b", "Scale", K::number, 1.0)}, vector, of(&P::vector_scale), "", "multiply scale"));
+  lib.add(pure("vector.length", "Vector Length", "Vector", {data("a", "Vector", K::vector, zero3)}, number, of(&P::vector_length), "", "magnitude size"));
+  lib.add(pure("vector.normalize", "Normalize", "Vector", {data("a", "Vector", K::vector, zero3)}, vector, of(&P::vector_normalize), "", "unit direction"));
+  lib.add(pure("vector.distance", "Distance", "Vector", vab, number, of(&P::vector_distance)));
+  lib.add(pure("vector.dot", "Dot Product", "Vector", vab, number, of(&P::vector_dot)));
+  lib.add(pure("vector.lerp", "Lerp Vector", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3), data("alpha", "Alpha", K::number, 0.5)}, vector, of(&P::vector_lerp), "",
+               "interpolate"));
   // Text.
-  lib.add(pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text),
-               [](Context& c) { return Value::text(c.in_text("a") + c.in_text("b") + c.in_text("c")); }, "Joins texts (numbers and vectors convert)", "concat string join format"));
-  lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, data("result", "", K::boolean),
-               [](Context& c) { return Value::boolean(c.in_text("a") == c.in_text("b")); }));
-  lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, data("result", "", K::boolean),
-               [](Context& c) { return Value::boolean(c.in_text("a").find(c.in_text("b")) != std::string::npos); }));
-  lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, data("result", "", K::integer), [](Context& c) { return Value::integer(static_cast<i64>(c.in_text("a").size())); }));
+  lib.add(pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text), of(&P::text_append),
+               "Joins texts (numbers and vectors convert)", "concat string join format"));
+  lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
+  lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
+  lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
   // Time.
   lib.add(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed"));
   {

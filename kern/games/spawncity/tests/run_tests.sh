@@ -47,3 +47,14 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$out/obj/$(echo "$f" | sed "s|/|_|g")-$key-$(sha256sum "$f" | cut -c1-12).o"); done
 "$cxx" -fsanitize=address,undefined "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 "$out/spawncity_tests" "$@"
+# The rules' Blueprint as its C++ text, compiled as it is by the host compiler (nothing looked up
+# at run time), gives what the interpreter gives: every call, value for value.
+if [ $# -eq 0 ]; then
+  nat="$out/native"
+  rm -rf "$nat" && mkdir -p "$nat"
+  "$out/spawncity_tests" --emit-native "$nat"
+  logic_objects=()
+  for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_logic_*|*_kern_src_core_*) logic_objects+=("$f") ;; esac; done
+  "$cxx" "${flags[@]}" -Werror -I"$nat" "$nat/blueprint_native_main.cpp" "${logic_objects[@]}" "$out"/musl/*.o -lm -o "$out/wanted_native_test"
+  "$out/wanted_native_test" "$nat/blueprint_native_expected.txt"
+fi
