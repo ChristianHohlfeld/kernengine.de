@@ -63,9 +63,13 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   document.head.appendChild(style);
 
   let app;
+  // The page's share of the keyboard and the locked mouse comes through Kern's one input reader
+  // (kern.mjs BrowserInput, by way of the App host); what it does with them is set further down.
+  const pageInput = {key: null, look: null, lock: null};
   try {
     app = await runKernApp({canvas, url, base64, args, maxPixelRatio: mobile ? 1.5 : 2,
-      onStatus: text => { statusEl.textContent = text; statusEl.hidden = !text; }});
+      onStatus: text => { statusEl.textContent = text; statusEl.hidden = !text; },
+      onKey: (ev, down) => pageInput.key?.(ev, down), onLook: (dx, dy) => pageInput.look?.(dx, dy), onLock: locked => pageInput.lock?.(locked)});
   } catch (error) {
     statusEl.hidden = false;
     statusEl.textContent = "SpawnCity konnte nicht starten: " + (error?.message || error);
@@ -313,15 +317,13 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (t - mouseSeen > 200) { mouseSeen = t; command("device mousemove"); }
   }, {capture: true});
   // One movement stream: mousemove under the lock (precision touchpads keep sending it while
-  // pointermove stalls), each event clamped to +-420 px (MAX_EVENT_PX), never dropped.
-  addEventListener("mousemove", ev => {
-    if (document.pointerLockElement !== canvas) return;
-    const c = v => Math.max(-420, Math.min(420, Number(v) || 0));
-    e.sc_mouse(c(ev.movementX), c(ev.movementY));
-  }, {capture: true});
-  document.addEventListener("pointerlockchange", () => e.sc_pointer_lock(document.pointerLockElement === canvas ? 1 : 0));
+  // pointermove stalls), each event held to +-420 px (MAX_EVENT_PX), never dropped - as Kern's
+  // input reader gives it to every host.
+  pageInput.look = (dx, dy) => e.sc_mouse(dx, dy);
+  pageInput.lock = locked => e.sc_pointer_lock(locked ? 1 : 0);
   // Keys Kern's input does not carry, and page buttons: + / - car zoom, P multiplayer, L GPS LIVE
-  addEventListener("keydown", ev => {
+  pageInput.key = (ev, down) => {
+    if (!down) return;
     if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.target instanceof Element && ev.target.closest("input,textarea,select,[contenteditable]")) return;
     if (ui?.playing === false) return;
@@ -330,7 +332,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     else if (ev.code === "KeyP" && !last?.ctl?.dead) { ev.preventDefault(); mpPage?.goMulti(); }  // pad_actions.mjs
     else if (ev.code === "KeyL") ui?.open("gps");  // gps_live_mode.mjs
     else if (ev.code === "NumpadEnter" && last?.ctl?.aiming) command("strike go");
-  });
+  };
 
   // ---- gamepad (Xbox standard mapping) ------------------------------------------------------
   function pollPad() {

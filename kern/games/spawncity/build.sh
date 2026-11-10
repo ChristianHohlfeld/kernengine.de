@@ -88,7 +88,7 @@ view_inline = ("globalThis.__scViewHtml = " + json.dumps((view_dir / "original.h
 # exports land in __scAudio[name]; its imports read them from there. The music file stays a file
 # (sim/audio/8_bits_only.m4a, 4.4 MB): the page loads it next to itself (copied there below).
 AUDIO_MODULES = ["audio_settings", "combat_audio_bank", "site_config", "music_player", "motor_sound", "police_sirens", "jetpack_audio", "animal_audio",
-                 "immersive_soundscape", "car_radio", "world_organic_hit_audio", "headshot_feedback", "original_sfx"]
+                 "immersive_soundscape", "ambience", "car_radio", "world_organic_hit_audio", "headshot_feedback", "original_sfx"]
 def audio_imports(text):
     def named(m):
         names = ", ".join(n.strip().replace(" as ", ": ") for n in m.group(1).split(",") if n.strip())

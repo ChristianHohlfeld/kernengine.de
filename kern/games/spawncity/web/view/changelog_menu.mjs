@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"09:13",title:"Eine Eingabeschicht für alle Kern-Spiele",items:[
+    "Unter der Haube: Tastatur, Maus, Zeigersperre und Fokus liest jetzt eine einzige Schicht der Kern Engine – für SpawnCity genauso wie für jedes andere Kern-Spiel. An der Bedienung ändert sich nichts; Eingabefehler können so nicht mehr nur in einem der Spiele stecken.",
+  ]},
   {date:"2026-11-10",time:"03:59",title:"Verkehr fährt über Kartengrenzen weiter",items:[
     "Autos und Busse fahren an den Grenzen der Kartenkacheln einfach weiter, statt dort zu wenden – der Verkehr fließt durchgehend durch die Stadt.",
     "Straßen liegen an diesen Grenzen nicht mehr doppelt übereinander: keine Geister-Kreuzungen und keine doppelten Fahrspuren mehr.",

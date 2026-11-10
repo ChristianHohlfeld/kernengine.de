@@ -6,7 +6,7 @@
 // and does what only a browser can do: menus and dialogs as DOM, file pickers,
 // downloads, the clipboard, pointer lock, decoding images, local storage and
 // packaging standalone games.
-import {loadKern, chordedButton} from "../kern.mjs";
+import {loadKern, BrowserInput} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
 import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
@@ -516,9 +516,7 @@ class StudioPage {
   uiAction(a) {
     switch (a.action) {
       case "capturePointer":
-        if (document.pointerLockElement !== this.canvas) {
-          try { const p = this.canvas.requestPointerLock?.(); p?.catch?.(() => {}); } catch { /* needs a user gesture */ }
-        }
+        this.input.lock();
         break;
       case "releasePointer":
         if (document.pointerLockElement) { this.releasingLock = true; document.exitPointerLock(); }
@@ -635,39 +633,47 @@ class StudioPage {
       const [x, y] = pos(e);
       return this.engine.pointer(i, type, x, y, {button: e.pointerType !== "mouse" && this.state?.play?.state === "playing" ? -1 : e.button, buttons: e.buttons, mods: modifiers(e), ...extra});
     };
-    el.addEventListener("pointerdown", e => {
-      if (e.target.closest(".vp-bar, .k-hud-banner")) return;
-      this.closeMenus();
-      if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
-      try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-      // Fingers on the playing viewport drive the engine's touch controls (sticks, look, buttons).
-      // Outside Play a finger first makes its viewport the active one: the engine's touch navigation
-      // (orbit, pinch zoom and pan, tap, hold) works on the active viewport.
-      let active = !!this.state?.viewports?.[i]?.active;
-      if (!active && e.pointerType !== "mouse" && this.state?.play?.state !== "playing") { this.engine.command({cmd: "activeViewport", viewport: i}); active = true; }
-      if (active && routeTouch(this.engine, POINTER.down, e, pos)) { this.flushUi(); e.preventDefault(); return; }
-      send(POINTER.down, e);
-      this.flushUi();
-      e.preventDefault();
+    // (The events are read by kern.mjs' BrowserInput, as in every Kern host. While the mouse is
+    // locked the browser sends them to the locked canvas instead: initInput.)
+    const TOUCH_PHASE = [POINTER.down, POINTER.move, POINTER.up, POINTER.cancel];
+    const mouse = (type, m, e, extra = {}) => this.engine.pointer(i, type, m.x, m.y, {button: e.button, buttons: m.buttons, mods: modifiers(e), ...extra});
+    new BrowserInput({
+      surface: el,
+      lockTarget: this.canvas,
+      position: pos,
+      onDown: e => {
+        if (e.target.closest(".vp-bar, .k-hud-banner")) return false;
+        this.closeMenus();
+        if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
+        return true;
+      },
+      onTouch: (phase, e) => {
+        const type = TOUCH_PHASE[phase];
+        if (type === POINTER.down) {
+          // Fingers on the playing viewport drive the engine's touch controls (sticks, look, buttons).
+          // Outside Play a finger first makes its viewport the active one: the engine's touch navigation
+          // (orbit, pinch zoom and pan, tap, hold) works on the active viewport.
+          let active = !!this.state?.viewports?.[i]?.active;
+          if (!active && this.state?.play?.state !== "playing") { this.engine.command({cmd: "activeViewport", viewport: i}); active = true; }
+          if (!(active && routeTouch(this.engine, POINTER.down, e, pos))) send(POINTER.down, e);
+          this.flushUi();
+          e.preventDefault();
+          return;
+        }
+        if (type === POINTER.move && document.pointerLockElement === this.canvas) return;
+        if (!routeTouch(this.engine, type, e, pos)) send(type, e);
+        if (type === POINTER.up) this.flushUi();
+      },
+      onMouseButton: (button, down, m, e) => {
+        mouse(down ? POINTER.down : POINTER.up, m, e);
+        this.flushUi();
+        if (e.type !== "pointerup") e.preventDefault();
+      },
+      onMouseMove: (m, e) => { if (!m.locked) mouse(POINTER.move, m, e); },
+      onMouseCancel: (m, e) => mouse(POINTER.cancel, m, e),
+      onWheel: (pixels, m, e) => mouse(POINTER.wheel, m, e, {button: this.state?.play?.state === "playing" ? -1 : e.button, wheel: pixels}),
     });
-    el.addEventListener("pointermove", e => {
-      if (document.pointerLockElement === this.canvas) return;
-      if (routeTouch(this.engine, POINTER.move, e, pos)) return;
-      // a second mouse button while one is held (right-button fly + left, aim + fire) comes as a
-      // move: chordedButton
-      const chord = chordedButton(e);
-      if (chord !== null) { send(chord ? POINTER.down : POINTER.up, e); this.flushUi(); e.preventDefault(); return; }
-      send(POINTER.move, e);
-    });
-    el.addEventListener("pointerup", e => { if (!routeTouch(this.engine, POINTER.up, e, pos)) send(POINTER.up, e); this.flushUi(); });
-    el.addEventListener("pointercancel", e => { if (!routeTouch(this.engine, POINTER.cancel, e, pos)) send(POINTER.cancel, e); });
     el.addEventListener("pointerleave", e => { if (!e.buttons) send(POINTER.leave, e); });
-    el.addEventListener("wheel", e => {
-      e.preventDefault();
-      const scale = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1;
-      send(POINTER.wheel, e, {wheel: e.deltaY * scale});
-    }, {passive: false});
-    el.addEventListener("contextmenu", e => e.preventDefault());
     el.addEventListener("gesturestart", e => e.preventDefault());  // iOS: pinching the viewport never zooms the page
     el.addEventListener("dblclick", e => {
       if (e.target.closest(".vp-bar")) return;
@@ -1977,10 +1983,40 @@ class StudioPage {
       if (r?.handled) e.preventDefault();
       this.flushUi();
     };
-    addEventListener("keydown", e => onKey(e, true));
-    addEventListener("keyup", e => onKey(e, false));
-    addEventListener("blur", () => this.engine.blur());
-    document.addEventListener("visibilitychange", () => { if (document.hidden) this.engine.blur(); });
+    // The keyboard, the focus and the locked pointer (kern.mjs' BrowserInput, as in every Kern host).
+    // While the mouse is locked the browser sends every click to the locked canvas, not to the
+    // viewport under the (hidden) cursor: its buttons go to the active viewport (fire, aim...).
+    const lockedButton = (type, e) => {
+      if (document.pointerLockElement !== this.canvas) return;
+      const vp = this.state?.viewports?.findIndex?.(v => v.active) ?? 0;
+      const v = this.views[Math.max(0, vp)];
+      const r = v.el.getBoundingClientRect();
+      this.engine.pointer(v.index, type, r.width / 2, r.height / 2, {button: e.button, buttons: this.input.buttons, mods: modifiers(e)});
+      this.flushUi();
+      e.preventDefault();
+    };
+    this.input = new BrowserInput({
+      surface: this.canvas,
+      capture: false,
+      onKey: onKey,
+      onFocus: focused => { if (!focused) this.engine.blur(); },
+      onVisibility: hidden => { if (hidden) this.engine.blur(); },
+      onMouseButton: (button, down, m, e) => lockedButton(down ? POINTER.down : POINTER.up, e),
+      // Pointer lock while playing: mouse movement looks around.
+      onLook: (dx, dy) => this.engine.look(dx, dy),
+      // The browser takes the first Escape to end pointer lock (the page never sees that key).
+      // Losing the lock while this tab keeps the focus therefore *is* that Escape: stop playing
+      // right away, so one press is enough (switching windows only frees the mouse).
+      onLock: (locked, {focused}) => {
+        if (this.locked && !locked) {
+          this.engine.command({cmd: "pointerCaptured", value: false});
+          const play = this.state?.play?.state;
+          if (!this.releasingLock && focused && (play === "playing" || play === "simulating")) this.engine.command({cmd: "stop"});
+        }
+        this.releasingLock = false;
+        this.locked = locked;
+      },
+    });
     addEventListener("pointerdown", e => {
       if (!e.target.closest(".menu, #menubar")) this.closeMenus();
     }, true);
@@ -1993,36 +2029,6 @@ class StudioPage {
       const entries = this.fallbackMenu(e.target);
       if (entries.length) this.openMenu(entries, e.clientX, e.clientY);
     });
-    // Pointer lock while playing: mouse movement looks around.
-    // The browser takes the first Escape to end pointer lock (the page never sees that key).
-    // Losing the lock while this tab keeps the focus therefore *is* that Escape: stop playing
-    // right away, so one press is enough (switching windows only frees the mouse).
-    document.addEventListener("pointerlockchange", () => {
-      const locked = document.pointerLockElement === this.canvas;
-      if (this.locked && !locked) {
-        this.engine.command({cmd: "pointerCaptured", value: false});
-        const play = this.state?.play?.state;
-        if (!this.releasingLock && document.hasFocus() && (play === "playing" || play === "simulating")) this.engine.command({cmd: "stop"});
-      }
-      this.releasingLock = false;
-      this.locked = locked;
-    });
-    document.addEventListener("mousemove", e => { if (this.locked) this.engine.look(e.movementX, e.movementY); });
-    // While the mouse is locked the browser sends every click to the locked canvas, not to the
-    // viewport under the (hidden) cursor: route the buttons to the active viewport (fire, aim...).
-    const lockedButton = (type, e) => {
-      if (document.pointerLockElement !== this.canvas) return;
-      const vp = this.state?.viewports?.findIndex?.(v => v.active) ?? 0;
-      const v = this.views[Math.max(0, vp)];
-      const r = v.el.getBoundingClientRect();
-      this.engine.pointer(v.index, type, r.width / 2, r.height / 2, {button: e.button, buttons: e.buttons, mods: modifiers(e)});
-      this.flushUi();
-      e.preventDefault();
-    };
-    this.canvas.addEventListener("pointerdown", e => lockedButton(POINTER.down, e));
-    this.canvas.addEventListener("pointerup", e => lockedButton(POINTER.up, e));
-    // (a second button while one is held - aim, then fire - comes as a move: chordedButton)
-    this.canvas.addEventListener("pointermove", e => { const chord = chordedButton(e); if (chord !== null) lockedButton(chord ? POINTER.down : POINTER.up, e); });
     this.canvas.addEventListener("mousedown", e => { if (document.pointerLockElement === this.canvas) e.preventDefault(); });
   }
 

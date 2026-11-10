@@ -2,12 +2,15 @@
 //
 // The engine is C++ compiled to WebAssembly (kern/build.sh). The browser only
 // offers WebGL2, canvas events and timing to JavaScript, so this file does
-// exactly three things and contains no engine logic:
+// exactly four things and contains no engine logic:
 //   1. instantiate the module with the `kern_gl` (WebGL2) and `kern_env`
 //      imports plus a minimal WASI shim,
 //   2. own the GPU object handle tables and context-loss plumbing,
 //   3. expose `KernRenderer`, a thin typed-array marshalling facade over the
-//      engine's C ABI (kern/include/kern/api/c_api.h).
+//      engine's C ABI (kern/include/kern/api/c_api.h),
+//   4. read the browser's keyboard, mouse, pointer lock and focus once, for
+//      every host (`BrowserInput`): the App host (app.mjs), the game page and
+//      the Studio (studio/) only say what an event means to their engine.
 //
 // Usage:
 //   const kern = await loadKern({ bytes });      // once per page
@@ -50,6 +53,125 @@ export function chordedButton(e) {
   if (e.pointerType !== "mouse" || !(e.button >= 0)) return null;
   const bit = e.button === 1 ? 4 : e.button === 2 ? 2 : 1 << e.button;  // button 1 = middle (bit 4), 2 = right (bit 2)
   return (e.buttons & bit) !== 0;
+}
+
+/**
+ * The browser's keyboard, mouse, pointer lock and focus for one surface - the one place that
+ * listens to them, for every Kern host. What the browser does on its own account is settled here:
+ *
+ *  - mouse buttons come from the button events alone - pointerdown, pointerup and the pointermove
+ *    that names a second button (chordedButton). A plain move's `buttons` is not trusted: the
+ *    browser's own synthetic moves (it tests again what lies under the cursor whenever the page
+ *    changes) do not carry the buttons that are held. The pointer is captured while a button is
+ *    down, so its release always arrives; losing the window's focus lets go of every button;
+ *  - a locked pointer already sends everything to its element and cannot be captured; its
+ *    movement comes as `mousemove` on the document (precision touchpads keep sending that while
+ *    pointermove stalls), every event held to +-420 px (a locked pointer now and then reports one
+ *    huge jump);
+ *  - the wheel comes in pixels whatever unit the browser used (a line 40 px, a page 400 px);
+ *  - the surface's context menu never opens.
+ *
+ * Options (all callbacks optional; `m` is {x, y, dx, dy, buttons, locked} - the position as
+ * `position(event)` gives it (default: client px), the movement in css px, the held buttons as a
+ * MouseEvent.buttons mask):
+ *   surface      element the pointer acts on (null: keyboard, lock and focus only)
+ *   lockTarget   element that holds the pointer lock (default: the surface)
+ *   capture      capture the pointer on pointerdown (default true)
+ *   onDown(event)                     first, for every pointerdown on the surface; false: not ours
+ *   onMouseButton(button, down, m, event)   a mouse button (MouseEvent.button) was pressed / let go
+ *   onMouseMove(m, event)             the mouse moved (a plain move, locked or not)
+ *   onMouseCancel(m, event)           the browser took the mouse away (pointercancel)
+ *   onTouch(phase, event)             a finger or pen: 0 down, 1 move, 2 up, 3 cancel
+ *   onWheel(pixels, m, event)         the wheel (the default action is prevented)
+ *   onLook(dx, dy, event)             the locked pointer moved (css px)
+ *   onLock(locked, {focused})         the lock was taken or lost; lost with `focused`: by Escape
+ *   onKey(event, down)                keydown / keyup on the window (repeats included)
+ *   onFocus(focused)                  the window got or lost the focus
+ *   onVisibility(hidden)              the page was hidden or shown
+ */
+export class BrowserInput {
+  constructor({surface = null, lockTarget = surface, position = null, capture = true, ...on} = {}) {
+    this.surface = surface;
+    this.lockTarget = lockTarget;
+    this.buttons = 0;
+    this.off = [];
+    const listen = (target, type, fn, options) => { target.addEventListener(type, fn, options); this.off.push(() => target.removeEventListener(type, fn, options)); };
+    const at = position || (event => [event.clientX, event.clientY]);
+    const state = event => {
+      const [x, y] = at(event);
+      return {x, y, dx: event.movementX || 0, dy: event.movementY || 0, buttons: this.buttons, locked: this.locked};
+    };
+    const mouse = event => event.pointerType === "mouse";
+    if (surface) {
+      listen(surface, "pointerdown", event => {
+        if (on.onDown?.(event) === false) return;
+        // (a locked pointer already sends everything to its element, and cannot be captured)
+        if (capture && !this.locked) try { surface.setPointerCapture?.(event.pointerId); } catch { /* the pointer is gone */ }
+        if (!mouse(event)) { on.onTouch?.(0, event); return; }
+        this.buttons = event.buttons;
+        on.onMouseButton?.(event.button, true, state(event), event);
+      });
+      listen(surface, "pointermove", event => {
+        if (!mouse(event)) { on.onTouch?.(1, event); return; }
+        const chord = chordedButton(event);
+        if (chord !== null) {
+          this.buttons = event.buttons;
+          on.onMouseButton?.(event.button, chord, state(event), event);
+          return;
+        }
+        on.onMouseMove?.(state(event), event);
+      });
+      listen(surface, "pointerup", event => {
+        if (!mouse(event)) { on.onTouch?.(2, event); return; }
+        this.buttons = event.buttons;
+        on.onMouseButton?.(event.button, false, state(event), event);
+      });
+      listen(surface, "pointercancel", event => {
+        if (!mouse(event)) { on.onTouch?.(3, event); return; }
+        this.buttons = 0;
+        on.onMouseCancel?.(state(event), event);
+      });
+      listen(surface, "wheel", event => {
+        event.preventDefault();
+        on.onWheel?.(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 400 : 1), state(event), event);
+      }, {passive: false});
+      listen(surface, "contextmenu", event => event.preventDefault());
+    }
+    if (lockTarget && (on.onLook || on.onLock)) {
+      const hold = v => Math.max(-420, Math.min(420, Number(v) || 0));
+      listen(document, "mousemove", event => { if (this.locked) on.onLook?.(hold(event.movementX), hold(event.movementY), event); });
+      listen(document, "pointerlockchange", () => on.onLock?.(this.locked, {focused: document.hasFocus()}));
+    }
+    if (on.onKey) {
+      listen(window, "keydown", event => on.onKey(event, true));
+      listen(window, "keyup", event => on.onKey(event, false));
+    }
+    listen(window, "blur", () => { this.buttons = 0; on.onFocus?.(false); });
+    listen(window, "focus", () => on.onFocus?.(true));
+    if (on.onVisibility) listen(document, "visibilitychange", () => on.onVisibility(document.hidden));
+  }
+
+  /** The pointer is locked to this input's lock target. */
+  get locked() { return !!this.lockTarget && document.pointerLockElement === this.lockTarget; }
+
+  /** Asks for the pointer lock (needs a user gesture; a refusal is no error). */
+  lock() {
+    try {
+      if (globalThis.__kernNoPointerLock || !this.lockTarget || this.locked) return;  // (a VR headset's browser has no pointer lock)
+      this.lockTarget.requestPointerLock?.()?.catch?.(() => {});
+    } catch { /* needs a user gesture */ }
+  }
+
+  /** Gives the pointer lock back. */
+  unlock() {
+    try { if (this.locked) document.exitPointerLock?.(); } catch { /* nothing to give back */ }
+  }
+
+  /** Takes every listener off again. */
+  dispose() {
+    for (const off of this.off) off();
+    this.off = [];
+  }
 }
 
 export function markLinearColors(...arrays) {

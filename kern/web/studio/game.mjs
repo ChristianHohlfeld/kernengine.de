@@ -6,7 +6,7 @@
 // full screen: rendering, Box3D physics, controllers and game rules all run in
 // C++ (kern::game::GameWorld). This file sizes the canvas, forwards input and
 // draws the HUD text - nothing else.
-import {loadKern, KERN_NOTICES, chordedButton} from "../kern.mjs";
+import {loadKern, KERN_NOTICES, BrowserInput} from "../kern.mjs";
 
 /**
  * German interface for Kern Studio and the games, purely visual: the engine, its commands, the
@@ -1510,49 +1510,46 @@ export async function startGame({levelText = null, template = null, bytes = null
   // Mouse: click captures the pointer for mouse look; touch drags orbit the camera.
   // Touch drags look around; only mouse buttons fire and aim (touch has its own buttons).
   // Touch and pen fingers go to the engine's touch controls; the mouse looks (pointer lock) and fires.
-  const send = (type, e) => engine.pointer(0, type, e.clientX, e.clientY, {button: e.pointerType === "mouse" ? e.button : -1, buttons: e.buttons, mods: modifiers(e), wheel: e.deltaY ?? 0});
+  // (The events are read by kern.mjs' BrowserInput, as in every Kern host.)
   const at = e => [e.clientX, e.clientY];
-  canvas.addEventListener("pointerdown", e => {
-    canvas.focus();
-    try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-    e.preventDefault();
-    if (routeTouch(engine, POINTER.down, e, at)) return;
-    // The mouse looks through pointer lock - not while watching (observer camera: it drags bodies).
-    if (e.pointerType === "mouse" && document.pointerLockElement !== canvas && !engine.state()?.play?.observing) canvas.requestPointerLock?.()?.catch?.(() => {});
-    send(POINTER.down, e);
+  const sendTouch = (type, e) => engine.pointer(0, type, e.clientX, e.clientY, {button: -1, buttons: e.buttons, mods: modifiers(e), wheel: 0});
+  const sendMouse = (type, m, e, extra = {}) => engine.pointer(0, type, m.x, m.y, {button: e.button, buttons: m.buttons, mods: modifiers(e), wheel: 0, ...extra});
+  const TOUCH_PHASE = [POINTER.down, POINTER.move, POINTER.up, POINTER.cancel];
+  let wasLocked = false;
+  const input = new BrowserInput({
+    surface: canvas,
+    onDown(e) { canvas.focus(); e.preventDefault(); },
+    onTouch(phase, e) {
+      const type = TOUCH_PHASE[phase];
+      if (routeTouch(engine, type, e, at)) return;
+      if (type !== POINTER.move || !input.locked) sendTouch(type, e);
+    },
+    onMouseButton(button, down, m, e) {
+      // The mouse looks through pointer lock - not while watching (observer camera: it drags bodies).
+      if (e.type === "pointerdown" && !m.locked && !engine.state()?.play?.observing) input.lock();
+      if (e.type === "pointermove") e.preventDefault();  // (a second button while one is held)
+      sendMouse(down ? POINTER.down : POINTER.up, m, e);
+    },
+    onMouseMove(m, e) { if (!m.locked) sendMouse(POINTER.move, m, e); },
+    onMouseCancel(m, e) { sendMouse(POINTER.cancel, m, e); },
+    onWheel(pixels, m, e) { sendMouse(POINTER.wheel, m, e, {button: -1, wheel: pixels}); },
+    onLook(dx, dy) { engine.look(dx, dy); },
+    // The browser's Escape ends pointer lock without telling the page: pause right away (one press),
+    // and the next click into the game resumes and captures the mouse again.
+    onLock(locked, {focused}) {
+      if (wasLocked && !locked && focused && engine.status()?.hud?.status === "playing") engine.command({cmd: "pause", value: true});
+      if (locked) engine.command({cmd: "pause", value: false});
+      wasLocked = locked;
+    },
+    onKey(e, down) {
+      const r = engine.key(e.key, e.code, down, modifiers(e), e.repeat);
+      if (r?.handled && !(e.code === "Escape")) e.preventDefault();
+    },
+    onFocus(focused) { if (!focused) engine.blur(); },
+    onVisibility(hidden) { if (hidden) engine.command({cmd: "touchRelease"}); },
   });
-  canvas.addEventListener("pointermove", e => {
-    if (routeTouch(engine, POINTER.move, e, at)) return;
-    // a second mouse button while one is held (aim, then fire) comes as a move: chordedButton
-    const chord = chordedButton(e);
-    if (chord !== null) { e.preventDefault(); send(chord ? POINTER.down : POINTER.up, e); return; }
-    if (document.pointerLockElement !== canvas) send(POINTER.move, e);
-  });
-  canvas.addEventListener("pointerup", e => { if (!routeTouch(engine, POINTER.up, e, at)) send(POINTER.up, e); });
-  canvas.addEventListener("pointercancel", e => { if (!routeTouch(engine, POINTER.cancel, e, at)) send(POINTER.cancel, e); });
   // No finger left on the screen: nothing can still be held (SpawnCity's ground truth).
   addEventListener("touchend", e => { if (!e.touches.length) engine.command({cmd: "touchRelease"}); });
-  addEventListener("visibilitychange", () => { if (document.hidden) engine.command({cmd: "touchRelease"}); });
-  canvas.addEventListener("wheel", e => { e.preventDefault(); send(POINTER.wheel, e); }, {passive: false});
-  canvas.addEventListener("contextmenu", e => e.preventDefault());
-  document.addEventListener("mousemove", e => { if (document.pointerLockElement === canvas) engine.look(e.movementX, e.movementY); });
-  // The browser's Escape ends pointer lock without telling the page: pause right away (one press),
-  // and the next click into the game resumes and captures the mouse again.
-  let wasLocked = false;
-  document.addEventListener("pointerlockchange", () => {
-    const locked = document.pointerLockElement === canvas;
-    if (wasLocked && !locked && document.hasFocus() && engine.status()?.hud?.status === "playing") engine.command({cmd: "pause", value: true});
-    if (locked) engine.command({cmd: "pause", value: false});
-    wasLocked = locked;
-  });
-
-  const key = (e, down) => {
-    const r = engine.key(e.key, e.code, down, modifiers(e), e.repeat);
-    if (r?.handled && !(e.code === "Escape")) e.preventDefault();
-  };
-  addEventListener("keydown", e => key(e, true));
-  addEventListener("keyup", e => key(e, false));
-  addEventListener("blur", () => engine.blur());
 
   const gamepad = new GamepadInput(engine);
   let touchShown = false;
