@@ -23,10 +23,13 @@ for c in "$kern"/third_party/musl_math/src/*.c; do
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ]; then "$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o" & pids+=($!); fi
 done
 for p in "${pids[@]}"; do wait "$p"; done
+# The level file (the project: world settings, actors, their Blueprints) as a source the game links.
+python3 "$game/tools/embed_level.py" "$game/level/spawncity.klevel" "$game/src/level_data.cpp"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
-# Kern's GL stub), then the game's simulation sources (no GameWorld) and the tests.
+# Kern's GL stub, Kern Logic for the rules that are Blueprints), then the game's simulation sources
+# (no GameWorld) and the tests.
 sources=()
-for d in core physics geo gfx scene audio net; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
+for d in core physics geo gfx scene audio net logic; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
 sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done

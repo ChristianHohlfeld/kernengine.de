@@ -242,6 +242,22 @@ const StateMachine* Graph::machine(std::string_view name) const {
   for (const StateMachine& m : machines) if (m.name == name) return &m;
   return nullptr;
 }
+const Function* Graph::function(std::string_view name) const {
+  for (const Function& f : functions) if (f.name == name) return &f;
+  return nullptr;
+}
+Function* Graph::function(std::string_view name) {
+  for (Function& f : functions) if (f.name == name) return &f;
+  return nullptr;
+}
+const FunctionPin* Function::input(std::string_view n) const {
+  for (const FunctionPin& p : inputs) if (p.name == n) return &p;
+  return nullptr;
+}
+const FunctionPin* Function::output(std::string_view n) const {
+  for (const FunctionPin& p : outputs) if (p.name == n) return &p;
+  return nullptr;
+}
 bool Graph::operator==(const Graph& o) const { return graph_to_json(*this) == graph_to_json(o); }
 
 json::Value graph_to_json(const Graph& g) {
@@ -323,6 +339,30 @@ json::Value graph_to_json(const Graph& g) {
     machines.push(std::move(o));
   }
   root.set("machines", std::move(machines));
+  if (!g.functions.empty()) {  // (only then: graphs without functions keep their content hash)
+    json::Value functions = json::Value::array();
+    auto pins = [](const std::vector<FunctionPin>& list) {
+      json::Value a = json::Value::array();
+      for (const FunctionPin& p : list) {
+        json::Value x = json::Value::object();
+        x.set("name", p.name);
+        x.set("type", pin_type_name(p.type));
+        x.set("value", p.value);
+        a.push(std::move(x));
+      }
+      return a;
+    };
+    for (const Function& f : g.functions) {
+      json::Value o = json::Value::object();
+      o.set("name", f.name);
+      if (f.pure) o.set("pure", true);
+      if (!f.help.empty()) o.set("help", f.help);
+      o.set("inputs", pins(f.inputs));
+      o.set("outputs", pins(f.outputs));
+      functions.push(std::move(o));
+    }
+    root.set("functions", std::move(functions));
+  }
   if (!g.comments.empty()) {
     json::Value comments = json::Value::array();
     for (const CommentBox& c : g.comments) {
@@ -430,6 +470,28 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     }
     g.machines.push_back(std::move(m));
   }
+  for (const json::Value& v : j["functions"].items()) {
+    Function f;
+    f.name = v["name"].as_string();
+    if (f.name.empty() || f.name.size() > 64) return bad("a function needs a name (1-64 characters)");
+    if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
+    f.pure = v["pure"].as_bool();
+    f.help = v["help"].as_string();
+    auto pins = [&](const json::Value& list, std::vector<FunctionPin>& out, const char* what) {
+      for (const json::Value& x : list.items()) {
+        FunctionPin p;
+        p.name = x["name"].as_string();
+        if (p.name.empty() || p.name.size() > 64 || p.name == "exec" || p.name == "then") return bad(std::string("function \"") + f.name + "\": " + what + " needs a name (not exec / then)");
+        for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
+        if (!pin_type_from_name(x["type"].as_string(), p.type) || p.type == PinType::exec) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
+        p.value = Value::from_json(x["value"], p.type).to_json();
+        out.push_back(std::move(p));
+      }
+      return true;
+    };
+    if (!pins(v["inputs"], f.inputs, "an input") || !pins(v["outputs"], f.outputs, "an output")) return false;
+    g.functions.push_back(std::move(f));
+  }
   for (const json::Value& v : j["comments"].items()) {
     CommentBox c;
     c.id = id_of(v["id"]);
@@ -506,7 +568,22 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (m && !v.empty() && v != "any" && !m->find(v)) err(n.id, lib.title(n) + ": \"" + m->name + "\" has no state \"" + v + "\"");
       }
       if (pd.kind == ParamDef::Kind::event && v.empty()) err(n.id, lib.title(n) + ": the event needs a name");
+      if (pd.kind == ParamDef::Kind::function && !g.function(v)) err(n.id, d->label + ": no function \"" + v + "\"");
     }
+    if (d->problem)
+      if (const std::string why = d->problem(n, g); !why.empty()) err(n.id, d->label + ": " + why);
+  }
+  // A function's body starts at its one entry node.
+  for (const Function& f : g.functions) {
+    int entries = 0, returns = 0;
+    for (const Node& n : g.nodes) {
+      if (n.param("function") != f.name) continue;
+      entries += n.type == "func.entry" ? 1 : 0;
+      returns += n.type == "func.return" ? 1 : 0;
+    }
+    if (entries == 0) err(0, "function \"" + f.name + "\" has no Function Entry node");
+    if (entries > 1) err(0, "function \"" + f.name + "\" has " + std::to_string(entries) + " Function Entry nodes (one is its start)");
+    if (entries == 1 && returns == 0 && !f.outputs.empty()) warn(0, "function \"" + f.name + "\" has no Return node: it gives its outputs' defaults");
   }
   auto find_pin = [&](u32 node, const std::string& id, bool input) -> const PinDef* {
     auto it = pins.find(node);
@@ -805,6 +882,77 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     }
   }
   exec_table_.push_back(-1);  // never empty (a stable address)
+  // Functions: where each one's body starts.
+  fn_entry_.assign(graph_.functions.size(), -1);
+  for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
+    fn_index_[graph_.functions[f].name] = static_cast<int>(f);
+    for (std::size_t i = 0; i < nodes_.size(); ++i)
+      if (nodes_[i].def && nodes_[i].def->type == "func.entry" && nodes_[i].node->param("function") == graph_.functions[f].name) { fn_entry_[f] = static_cast<int>(i); break; }
+  }
+}
+
+bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) {
+  results.clear();
+  auto it = fn_index_.find(std::string(function));
+  if (it == fn_index_.end()) return false;
+  const int f = it->second;
+  const Function& fn = graph_.functions[static_cast<std::size_t>(f)];
+  results.reserve(fn.outputs.size());
+  for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, p.type));
+  const int entry = fn_entry_[static_cast<std::size_t>(f)];
+  if (entry < 0 || disabled_) return false;
+  // One frame per function: a node's values are the instance's, not the call's.
+  for (const Frame& fr : frames_)
+    if (fr.function == f) {
+      rt_.host().error(name_ + ": function \"" + fn.name + "\" calls itself - the inner call is skipped");
+      return false;
+    }
+  CNode& e = nodes_[static_cast<std::size_t>(entry)];
+  std::size_t k = 0;
+  for (std::size_t o = 0; o < e.out.size() && k < fn.inputs.size(); ++o) {
+    if (e.out[o].type == PinType::exec) continue;
+    e.outputs[o] = (k < args.size() ? args[k] : Value::from_json(fn.inputs[k].value, fn.inputs[k].type)).converted(e.out[o].type);
+    ++k;
+  }
+  // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
+  // loop guard: the budget counts what one step runs, and a paused world has no ticks to start
+  // a new count while its systems keep asking.
+  if (rt_.depth_ == 0) rt_.tick_start_ = rt_.executed_;
+  Frame frame;
+  frame.function = f;
+  frame.depth = rt_.depth_ + 1;
+  frame.stack_base = stack_[0];
+  frame.results = std::move(results);
+  frames_.push_back(std::move(frame));
+  rt_.run_from(*this, entry, 0);
+  results = std::move(frames_.back().results);
+  frames_.pop_back();
+  return true;
+}
+
+f64 Instance::call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback) {
+  std::vector<Value> in, out;
+  in.reserve(args.size());
+  for (f64 a : args) in.push_back(Value::number(a));
+  return call(function, in, out) && !out.empty() ? out[0].as_number() : fallback;
+}
+
+bool Instance::return_values(std::string_view function, const std::vector<std::pair<std::string, Value>>& values) {
+  // Only inside the function's own chain: a Return reached from an event the function raised,
+  // or after a latent node, ends that chain and nothing else.
+  if (frames_.empty() || frames_.back().depth != rt_.depth_) return false;
+  Frame& fr = frames_.back();
+  const Function& fn = graph_.functions[static_cast<std::size_t>(fr.function)];
+  if (fn.name != function) {
+    rt_.host().error(name_ + ": a Return of \"" + std::string(function) + "\" was reached inside \"" + fn.name + "\" - its values are ignored");
+  } else {
+    for (std::size_t o = 0; o < fn.outputs.size() && o < fr.results.size(); ++o)
+      for (const auto& [name, v] : values)
+        if (name == fn.outputs[o].name) { fr.results[o] = v.converted(fn.outputs[o].type); break; }
+  }
+  fr.returned = true;
+  stack_[0] = fr.stack_base;  // generated code: nothing of the call is left to continue
+  return true;
 }
 
 Value Instance::get(std::string_view variable) const {
@@ -1066,8 +1214,10 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
     host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
     return;
   }
+  // A Return node ended the function call this chain is (Instance::return_values).
+  auto returned = [&] { return !inst.frames_.empty() && inst.frames_.back().returned && inst.frames_.back().depth == depth_; };
   std::vector<std::pair<int, int>> stack{{start, entry}};
-  while (!stack.empty() && !inst.disabled_) {
+  while (!stack.empty() && !inst.disabled_ && !returned()) {
     auto [n, e] = stack.back();
     stack.pop_back();
     while (n >= 0 && !inst.disabled_) {
@@ -1077,6 +1227,7 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
       Context ctx(*this, inst, n, e);
       const int r = c.def->run ? c.def->run(ctx) : 0;
       if (tracing && trace_.size() < 4096) trace_.push_back({inst.name(), c.node->id, host_.time()});
+      if (returned()) break;
       for (auto it = ctx.continuations_.rbegin(); it != ctx.continuations_.rend(); ++it) stack.push_back(*it);
       if (r < 0 || static_cast<std::size_t>(r) >= c.exec_out.size()) break;
       e = c.exec_out_entry[static_cast<std::size_t>(r)];

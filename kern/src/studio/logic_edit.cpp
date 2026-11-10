@@ -52,6 +52,7 @@ const char* param_kind_name(logic::ParamDef::Kind k) {
     case K::sound: return "sound";
     case K::tag: return "tag";
     case K::integer: return "integer";
+    case K::function: return "function";
   }
   return "text";
 }
@@ -262,6 +263,8 @@ json::Value Studio::logic_json() const {
           for (const logic::Variable& v : g->variables) choice(v.name, v.name + " (" + logic::pin_type_name(v.type) + ")");
         if (pd.kind == K::machine)
           for (const logic::StateMachine& m : g->machines) choice(m.name, m.name);
+        if (pd.kind == K::function)
+          for (const logic::Function& f : g->functions) choice(f.name, f.name);
         if (pd.kind == K::state) {
           if (n.type == "event.state_enter" || n.type == "event.state_exit") choice("any", "Any state");
           if (const logic::StateMachine* m = g->machine(n.param("machine", "State Machine")))
@@ -308,6 +311,7 @@ json::Value Studio::logic_json() const {
   }
   o.set("variables", std::move(vars));
   json::Value graph = logic::graph_to_json(*g);
+  o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
   o.set("machines", graph["machines"]);
   o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
   json::Value iss = json::Value::array();
@@ -425,7 +429,9 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   for (const auto& d : lib.all()) {
     if (d->type == "var.get" || d->type == "var.set" || d->type == "var.add") continue;  // per variable below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
+    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
+    if (d->type == "func.entry") { e.label = "New Function"; e.help = "Adds a function to this Blueprint: its entry and a Return node. Inputs and outputs are set in Details."; }
     if (d->type == "event.state_enter" || d->type == "event.state_exit" || d->type == "state.set" || d->type == "state.is" || d->type == "state.get") {
       if (g->machines.empty()) continue;
       e.params.push_back({"machine", g->machines.front().name});
@@ -442,6 +448,10 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
       consider({"Add to " + v.name, "Variables", "Adds to " + v.name, "var.add", {{"variable", v.name}}});
   }
+  for (const logic::Function& f : g->functions) {
+    consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
+    consider({"Return (" + f.name + ")", "Functions", "Ends " + f.name + " and gives its outputs to the caller", "func.return", {{"function", f.name}}});
+  }
   for (const std::string& ev : event_names(level_)) {
     consider({"Call " + ev, "Events", "Raises the custom event " + ev, "flow.call", {{"name", ev}}});
     consider({"Event " + ev, "Events", "Runs when " + ev + " is called", "event.custom", {{"name", ev}}});
@@ -452,7 +462,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       consider({"On " + s.name + " Entered", "State Machines", m.name + " entered " + s.name, "event.state_enter", {{"machine", m.name}, {"state", s.name}}});
     }
   // Categories in the order people reach for them.
-  static const char* order[] = {"Events", "Flow", "Variables", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
+  static const char* order[] = {"Events", "Flow", "Variables", "Functions", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
                                 "Math", "Logic", "Vector", "Text", "Values", "Utilities"};
   auto cat_rank = [](const std::string& c) {
     for (int i = 0; i < static_cast<int>(std::size(order)); ++i) if (c == order[i]) return i;
@@ -539,6 +549,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     for (const logic::CommentBox& cb : g->comments) if (std::find(ids.begin(), ids.end(), cb.id) != ids.end()) part.comments.push_back(cb);
     for (const logic::Link& l : g->links)
       if (std::find(ids.begin(), ids.end(), l.from) != ids.end() && std::find(ids.begin(), ids.end(), l.to) != ids.end()) part.links.push_back(l);
+    // The functions the copied nodes name travel with them (pasted into another Blueprint).
+    for (const logic::Node& n : part.nodes)
+      if (const logic::Function* f = g->function(n.param("function")); f && n.type.rfind("func.", 0) == 0 && !part.function(f->name)) part.functions.push_back(*f);
     json::Value r = ok_result();
     r.set("text", json::stringify(logic::graph_to_json(part)));
     return r;
@@ -612,6 +625,35 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       n.x = static_cast<f32>(std::round(num("x") / 8) * 8);
       n.y = static_cast<f32>(std::round(num("y") / 8) * 8);
       for (const auto& [k, v] : c["params"].members()) n.set_param(k, v.is_string() ? v.as_string() : json::stringify(v));
+      // Function nodes name their function. A new entry is a new function (with a Return next to
+      // it); a call or a Return without a function takes the first one.
+      if (type == "func.entry") {
+        const std::string wanted = n.param("function");
+        if (!wanted.empty() && g.function(wanted)) {
+          for (const logic::Node& o : g.nodes)
+            if (o.type == "func.entry" && o.param("function") == wanted) { error = "the function " + wanted + " has its entry node already"; return false; }
+        } else {
+          std::string base = wanted.empty() ? "NewFunction" : wanted, fname = base;
+          for (int i = 2; g.function(fname); ++i) fname = base + std::to_string(i);
+          logic::Function f;
+          f.name = fname;
+          g.functions.push_back(std::move(f));
+          n.set_param("function", fname);
+          logic::Node ret;
+          ret.id = g.next_id++;
+          ret.type = "func.return";
+          ret.x = n.x + 320;
+          ret.y = n.y;
+          ret.set_param("function", fname);
+          g.links.push_back({n.id, "then", ret.id, "exec"});
+          g.nodes.push_back(std::move(ret));
+          result.set("function", fname);
+        }
+      }
+      if ((type == "func.return" || type == "func.call" || type == "func.pure") && !g.function(n.param("function"))) {
+        if (g.functions.empty()) { error = "this Blueprint has no function yet: add one in My Blueprint"; return false; }
+        n.set_param("function", g.functions.front().name);
+      }
       // New variables nodes on a graph without variables: offer one (Get / Set need a name).
       if ((type == "var.get" || type == "var.set" || type == "var.add") && n.param("variable").empty()) {
         if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::number, json::Value(0.0), {}});
@@ -656,9 +698,17 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       f32 minx = 1e9f, miny = 1e9f;
       for (const logic::Node& n : part.nodes) { minx = min_of(minx, n.x); miny = min_of(miny, n.y); }
       for (const logic::CommentBox& cb : part.comments) { minx = min_of(minx, cb.x); miny = min_of(miny, cb.y); }
+      // Functions the nodes name come along where this Blueprint has none of that name; a function
+      // has one entry, so an entry of a function that is here already is not pasted again.
+      for (const logic::Function& f : part.functions) if (!g.function(f.name)) g.functions.push_back(f);
+      auto has_entry = [&](const std::string& fn) {
+        for (const logic::Node& o : g.nodes) if (o.type == "func.entry" && o.param("function") == fn) return true;
+        return false;
+      };
       std::unordered_map<u32, u32> remap;
       json::Value ids = json::Value::array();
       for (logic::Node n : part.nodes) {
+        if (n.type == "func.entry" && has_entry(n.param("function"))) continue;
         remap[n.id] = g.next_id;
         n.id = g.next_id++;
         n.x = n.x - minx + static_cast<f32>(num("x"));
@@ -730,7 +780,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   if (name == "logicDelete") {
     return graph_edit("Delete Nodes", [&](logic::Graph& g, game::Level&) {
       std::vector<u32> ids;
-      for (const json::Value& v : c["ids"].items()) ids.push_back(static_cast<u32>(v.as_number()));
+      for (const json::Value& v : c["ids"].items()) {
+        // A function's entry stays as long as the function does (it goes with it in My Blueprint).
+        const logic::Node* n = g.find(static_cast<u32>(v.as_number()));
+        if (n && n->type == "func.entry" && g.function(n->param("function"))) { error = "a function's entry goes with the function: delete the function in My Blueprint"; continue; }
+        ids.push_back(static_cast<u32>(v.as_number()));
+      }
       auto gone = [&](u32 id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); };
       const std::size_t before = g.nodes.size() + g.comments.size();
       g.comments.erase(std::remove_if(g.comments.begin(), g.comments.end(), [&](const logic::CommentBox& cb) { return gone(cb.id); }), g.comments.end());
@@ -772,6 +827,126 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!n) return false;
       n->comment = str("text");
       return true;
+    });
+  }
+  if (name == "logicFunction") {
+    // A function of the graph: its name, whether it is offered as a pure node, its help and its
+    // pins. The function's nodes (entry, Return, calls) follow every change.
+    const std::string op = str("op");
+    return graph_edit("Edit Function", [&](logic::Graph& g, game::Level&) {
+      const std::string fname = str("name");
+      logic::Function* f = g.function(fname);
+      if (!f) { error = "no function " + fname; return false; }
+      auto uses = [&](const logic::Node& n) {
+        return (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure") && n.param("function") == fname;
+      };
+      // a pin's side on a node: the function's inputs leave the entry and enter the calls; the
+      // outputs enter the Returns and leave the calls
+      auto is_input_pin_of = [&](const logic::Node& n, bool input_side) { return input_side ? n.type != "func.entry" : n.type == "func.return"; };
+      auto drop_links = [&](auto&& gone) {
+        g.links.erase(std::remove_if(g.links.begin(), g.links.end(), gone), g.links.end());
+      };
+      if (op == "remove") {
+        std::vector<u32> ids;
+        for (const logic::Node& n : g.nodes) if (uses(n)) ids.push_back(n.id);
+        auto has = [&](u32 id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); };
+        drop_links([&](const logic::Link& l) { return has(l.from) || has(l.to); });
+        g.nodes.erase(std::remove_if(g.nodes.begin(), g.nodes.end(), [&](const logic::Node& n) { return has(n.id); }), g.nodes.end());
+        g.functions.erase(std::remove_if(g.functions.begin(), g.functions.end(), [&](const logic::Function& x) { return x.name == fname; }), g.functions.end());
+        return true;
+      }
+      if (op == "rename") {
+        const std::string to = str("to");
+        if (to.empty() || to.size() > 64 || g.function(to)) { error = "that name is empty or taken"; return false; }
+        for (logic::Node& n : g.nodes) if (uses(n)) n.set_param("function", to);
+        f->name = to;
+        return true;
+      }
+      if (op == "pure") {
+        // The calls change their kind: a pure node has no exec pins.
+        f->pure = c["value"].as_bool();
+        for (logic::Node& n : g.nodes) {
+          if (!uses(n) || (n.type != "func.call" && n.type != "func.pure")) continue;
+          n.type = f->pure ? "func.pure" : "func.call";
+          if (f->pure) {
+            const u32 id = n.id;
+            drop_links([&](const logic::Link& l) { return (l.to == id && l.in == "exec") || (l.from == id && l.out == "then"); });
+          }
+        }
+        return true;
+      }
+      if (op == "help") { f->help = str("text"); return true; }
+      const bool input_side = str("side") != "out";
+      std::vector<logic::FunctionPin>& pins = input_side ? f->inputs : f->outputs;
+      auto valid_name = [&](const std::string& n) {
+        if (n.empty() || n.size() > 64 || n == "exec" || n == "then") return false;
+        for (const logic::FunctionPin& p : pins) if (p.name == n) return false;
+        return true;
+      };
+      if (op == "pinAdd") {
+        if (pins.size() >= 16) { error = "a function has at most 16 inputs and 16 outputs"; return false; }
+        std::string base = str("pin").empty() ? (input_side ? "value" : "result") : str("pin"), pname = base;
+        for (int i = 2; !valid_name(pname) && i < 100; ++i) pname = base + std::to_string(i);
+        logic::PinType t = logic::PinType::number;
+        logic::pin_type_from_name(str("type").empty() ? "float" : str("type"), t);
+        if (t == logic::PinType::exec) t = logic::PinType::number;
+        pins.push_back({pname, t, logic::Value::zero(t).to_json()});
+        result.set("pin", pname);
+        return true;
+      }
+      const std::string pin = str("pin");
+      auto it = std::find_if(pins.begin(), pins.end(), [&](const logic::FunctionPin& x) { return x.name == pin; });
+      if (it == pins.end()) { error = "no pin " + pin; return false; }
+      // the wires and the typed-in values of this pin on the function's nodes
+      auto on_pin = [&](const logic::Link& l, bool& as_input) {
+        const logic::Node* to = g.find(l.to);
+        const logic::Node* from = g.find(l.from);
+        if (to && uses(*to) && l.in == pin && is_input_pin_of(*to, input_side)) { as_input = true; return true; }
+        if (from && uses(*from) && l.out == pin && !is_input_pin_of(*from, input_side)) { as_input = false; return true; }
+        return false;
+      };
+      if (op == "pinRemove") {
+        drop_links([&](const logic::Link& l) { bool in; return on_pin(l, in); });
+        for (logic::Node& n : g.nodes)
+          if (uses(n) && is_input_pin_of(n, input_side))
+            n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
+        pins.erase(it);
+        return true;
+      }
+      if (op == "pinRename") {
+        const std::string to = str("to");
+        if (!valid_name(to)) { error = "that name is empty or taken"; return false; }
+        for (logic::Link& l : g.links) {
+          bool as_input = false;
+          if (!on_pin(l, as_input)) continue;
+          (as_input ? l.in : l.out) = to;
+        }
+        for (logic::Node& n : g.nodes)
+          if (uses(n) && is_input_pin_of(n, input_side))
+            for (auto& v : n.values) if (v.first == pin) v.first = to;
+        it->name = to;
+        return true;
+      }
+      if (op == "pinType") {
+        logic::PinType t;
+        if (!logic::pin_type_from_name(str("type"), t) || t == logic::PinType::exec) { error = "unknown type"; return false; }
+        it->value = logic::Value::from_json(it->value, it->type).converted(t).to_json();
+        it->type = t;
+        // values typed into the nodes were of the old type
+        for (logic::Node& n : g.nodes)
+          if (uses(n) && is_input_pin_of(n, input_side))
+            n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
+        return true;
+      }
+      if (op == "pinValue") { it->value = logic::Value::from_json(c["value"], it->type).to_json(); return true; }
+      if (op == "pinMove") {
+        const std::ptrdiff_t at = it - pins.begin(), to = at + (num("by") < 0 ? -1 : 1);
+        if (to < 0 || to >= static_cast<std::ptrdiff_t>(pins.size())) return false;
+        std::swap(pins[static_cast<std::size_t>(at)], pins[static_cast<std::size_t>(to)]);
+        return true;
+      }
+      error = "unknown function edit " + op;
+      return false;
     });
   }
   if (name == "logicVariable") {

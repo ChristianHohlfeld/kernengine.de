@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"12:45",title:"SpawnCity wird ein Editor-Projekt: die ersten Regeln sind Blueprints",items:[
+    "Die Fahndung (Sterne, Polizei-Anzahl, Ankunft, Trefferchance, EMP, Entkommen) steht nicht mehr im Programmcode, sondern als Blueprint im Level von SpawnCity – 19 Funktionen, die sich im Kern-Editor öffnen und ändern lassen. Am Spiel ändert sich nichts: Alle Werte sind die des Originals und werden bei jedem Update gegen dessen Tabelle geprüft.",
+    "Das Level von SpawnCity ist jetzt eine Datei, die der Kern-Editor lesen kann. Schritt für Schritt wandern Regeln und Systeme dorthin, bis SpawnCity ganz ohne eigenen Programmcode auskommt.",
+    "Neu in der Engine (für alle Kern-Spiele): Blueprint-Funktionen mit Ein- und Ausgängen und ein Formel-Knoten, der eine ganze Formel wie max(9000, 16000 - level * 1300) als einen Knoten rechnet.",
+  ]},
   {date:"2026-11-10",time:"10:12",title:"Controller, Finger und Gerät: überall gleich gelesen",items:[
     "Controller: Die große Karte hört jetzt auf denselben Controller wie das Spiel und die Menüs. War neben dem Xbox-Controller ein zweites Gerät angeschlossen (Lenkrad, Funkempfänger), reagierte die Karte bisher unter Umständen gar nicht.",
     "Unter der Haube: Auch Controller, Geräteerkennung (Maus, Finger, Controller) und das Loslassen aller Finger liest jetzt die eine Eingabeschicht der Kern Engine – für SpawnCity, die Beispielspiele, den Editor und jedes exportierte Spiel gleich.",

@@ -7,7 +7,8 @@
 //
 // It follows Unreal Engine's Blueprint editor:
 //   * layout      toolbar (Compile, Save, Find), My Blueprint (graphs, variables,
-//                 events), the graph with tabs, Details, Compiler Results / Find.
+//                 functions, events), the graph with tabs, Details, Compiler
+//                 Results / Find.
 //   * graph       grey grid, nodes with coloured title bars by kind, compact
 //                 operator and variable nodes, spline wires coloured by type,
 //                 reroute knots, comment boxes, live execution while playing.
@@ -83,6 +84,7 @@ export class LogicEditor {
     this.selection = new Set();      // node / comment / state ids
     this.selLink = null;             // selected wire [from, out, to, in]
     this.selVar = null;              // variable shown in Details
+    this.selFn = null;               // function shown in Details
     this.selTransition = null;
     this.drag = null;
     this.palette = null;
@@ -355,7 +357,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -370,15 +372,23 @@ export class LogicEditor {
           ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name]))}</span>` : `<span class="lg-vt">${LG_TYPE_NAMES[v.type] || v.type}</span>`}
           <span class="lg-acts"><button data-get title="Add a Get node">Get</button><button data-set title="Add a Set node">Set</button></span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
+    // a function's signature in short: (x, y) -> result
+    const sig = f => `(${f.inputs.map(p => p.name).join(", ")})${f.outputs.length ? " → " + f.outputs.map(p => p.name).join(", ") : ""}`;
+    const fns = (data.functions || []).filter(f => match(f.name)).map(f => `
+        <div class="lg-item lg-fn${this.selFn === f.name ? " on" : ""}" draggable="true" data-fn="${lgEsc(f.name)}" title="${lgEsc(f.help || "Drag into the graph: a call of the function")}">
+          <i class="lg-fni">ƒ</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
+          <span class="lg-acts"><button data-call title="Add a call of the function">Call</button><button data-ret title="Add a Return node">Return</button></span>
+        </div>`).join("") || `<div class="lg-none">No functions${q ? " match" : " yet: + adds one"}</div>`;
     const events = (data.events || []).filter(match).map(e => `
         <div class="lg-item lg-ev" draggable="true" data-ev="${lgEsc(e)}" title="Drag into the graph: the event; Ctrl = Call">${lgIco("event", "red")}<span class="lg-vn">${lgEsc(e)}</span>
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
-    this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) + section("events", "Events", "Add a custom event", events);
+    this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
+      section("fns", "Functions", "Add a function", fns) + section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
       s.querySelector(".lg-sec-t").onclick = () => { const id = s.dataset.sec; if (this.collapsed.has(id)) this.collapsed.delete(id); else this.collapsed.add(id); this.myKey = ""; this.renderMy(this.data); };
       const add = s.querySelector("[data-add]");
-      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : this.addCustomEvent();
+      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : s.dataset.sec === "fns" ? this.addFunction() : this.addCustomEvent();
     }
     for (const it of this.el.mylist.querySelectorAll("[data-graph]")) {
       it.onclick = () => { this.openView(it.dataset.graph); if (this.phone) this.togglePanel(""); };
@@ -392,6 +402,15 @@ export class LogicEditor {
       row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-var", name); e.dataTransfer.effectAllowed = "copy"; };
       row.oncontextmenu = e => { e.preventDefault(); this.variableMenu(name, e.clientX, e.clientY); };
     }
+    for (const row of this.el.mylist.querySelectorAll(".lg-fn")) {
+      const name = row.dataset.fn;
+      row.onclick = e => { if (e.target.closest("button")) return; this.selectFunction(name); };
+      row.ondblclick = () => this.focusFunction(name);
+      row.querySelector("[data-call]").onclick = () => this.addCall(name);
+      row.querySelector("[data-ret]").onclick = () => this.addAtCenter("func.return", {function: name});
+      row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-function", name); e.dataTransfer.effectAllowed = "copy"; };
+      row.oncontextmenu = e => { e.preventDefault(); this.functionMenu(name, e.clientX, e.clientY); };
+    }
     for (const row of this.el.mylist.querySelectorAll(".lg-ev")) {
       const name = row.dataset.ev;
       row.querySelector("[data-on]").onclick = () => this.addAtCenter("event.custom", {name});
@@ -401,8 +420,55 @@ export class LogicEditor {
     }
   }
 
+  // ---- functions ---------------------------------------------------------------
+  fn(name) { return (this.data?.functions || []).find(f => f.name === name) || null; }
+
+  selectFunction(name) {
+    this.selFn = name;
+    this.selVar = null;
+    this.selection.clear();
+    this.selLink = null;
+    this.markSelection();
+    this.myKey = "";
+    this.renderMy(this.data);
+    this.renderDetails();
+    if (this.phone) this.togglePanel("details");
+  }
+
+  /** A call of the function: a pure function as a value node, any other with exec pins. */
+  addCall(name) { this.addAtCenter(this.fn(name)?.pure ? "func.pure" : "func.call", {function: name}); }
+
+  /** Shows where the function starts. */
+  focusFunction(name) {
+    const entry = (this.data?.nodes || []).find(n => n.type === "func.entry" && (n.params || []).some(p => p.key === "function" && p.value === name));
+    if (entry) this.focusNode(entry.id);
+  }
+
+  functionMenu(name, x, y) {
+    this.studio.openMenu([
+      {header: name},
+      {label: "Call " + name, run: () => this.addCall(name)},
+      {label: "Add Return Node", run: () => this.addAtCenter("func.return", {function: name})},
+      {label: "Go to Entry", run: () => this.focusFunction(name)},
+      {label: "Find References", run: () => this.findText(name)},
+      {label: "Rename / Edit...", run: () => this.selectFunction(name)},
+      {separator: true},
+      {label: "Delete Function", run: () => { if (this.selFn === name) this.selFn = null; this.cmd({cmd: "logicFunction", op: "remove", name}); }},
+    ], x, y);
+  }
+
+  /** A new function: its entry and a Return node at the middle of the view; Details names it. */
+  addFunction() {
+    const r = this.addAtCenter("func.entry", {});
+    if (r?.function) {
+      this.selectFunction(r.function);
+      this.afterRender = () => { const f = this.el.dbody.querySelector("[data-fk='name']"); f?.focus(); f?.select(); };
+    }
+  }
+
   selectVariable(name) {
     this.selVar = name;
+    this.selFn = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -523,7 +589,7 @@ export class LogicEditor {
   paramHtml(n, p) {
     const attr = `data-param="${lgEsc(p.key)}" data-node="${n.id}"`;
     const choices = p.choices || [];
-    if (["choice", "variable", "machine", "state", "sound"].includes(p.kind)) {
+    if (["choice", "variable", "machine", "state", "sound", "function"].includes(p.kind)) {
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
     }
@@ -709,7 +775,7 @@ export class LogicEditor {
     for (const id of ids) this.selection.add(id);
     this.selLink = null;
     this.selTransition = null;
-    if (ids.length) this.selVar = null;
+    if (ids.length) this.selVar = this.selFn = null;
     this.markSelection();
     if (this.data?.view === "graph") this.drawWires();
     else if (this.machine) this.drawTransitions(this.machine);
@@ -727,22 +793,25 @@ export class LogicEditor {
     const state = ids.length === 1 && m ? m.states.find(s => s.id === ids[0]) : null;
     const trans = this.selTransition && m ? m.transitions.find(t => t.id === this.selTransition) : null;
     const variable = this.selVar ? d.variables?.find(v => v.name === this.selVar) : null;
-    const k = JSON.stringify([node, box, state, trans, variable, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
+    const fn = this.selFn ? this.fn(this.selFn) : null;
+    const k = JSON.stringify([node, box, state, trans, variable, fn, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
     if (k === this.detKey) return;
     // Do not rebuild under the user's typing.
-    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable)) return;
+    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable, fn)) return;
     this.detKey = k;
-    this.detSame = (n2, b2, s2, t2, v2) => (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "");
+    this.detSame = (n2, b2, s2, t2, v2, f2) => (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "") &&
+      (f2?.name ?? "") === (fn?.name ?? "") && (f2 ? f2.inputs.length + ":" + f2.outputs.length : "") === (fn ? fn.inputs.length + ":" + fn.outputs.length : "");
     const b = this.el.dbody;
     if (node) b.innerHTML = this.nodeDetails(node);
     else if (box) b.innerHTML = this.commentDetails(box);
     else if (trans) b.innerHTML = this.transitionDetails(m, trans);
     else if (state) b.innerHTML = this.stateDetails(m, state);
     else if (variable) b.innerHTML = this.variableDetails(variable);
+    else if (fn) b.innerHTML = this.functionDetails(fn);
     else if (ids.length > 1) b.innerHTML = `<div class="lg-dh">${ids.length} selected</div><div class="lg-dsec"><div class="lg-dtxt">Drag one to move them all. C puts a comment around them; Q straightens their wires; the context menu aligns them.</div>
       <div class="lg-dacts"><button data-act="comment">Comment</button><button data-act="straighten">Straighten</button><button data-act="delete" class="danger">Delete</button></div></div>`;
     else b.innerHTML = this.graphDetails();
-    this.bindDetails(node, box, m, state, trans, variable);
+    this.bindDetails(node, box, m, state, trans, variable, fn);
   }
 
   nodeDetails(n) {
@@ -788,6 +857,29 @@ export class LogicEditor {
       <div class="lg-dacts"><button data-act="get">Add Get</button><button data-act="set">Add Set</button><button data-act="refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
 
+  functionDetails(f) {
+    const types = ["bool", "int", "float", "vector", "text", "actor"];
+    const value = p => p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
+      : p.type === "actor" ? `<span class="lg-dim">none</span>`
+      : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
+    const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
+        <i class="lg-pill" style="--c:${LG_TYPE_COLORS[p.type]}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
+        <select data-pf="type" title="Type">${types.map(t => `<option value="${t}"${t === p.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select>${value(p)}
+        <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>`).join("") ||
+      `<div class="lg-none">${side === "in" ? "No inputs" : "No outputs"}</div>`;
+    const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
+    return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
+      <div class="lg-dsec"><div class="lg-dst">Function</div>
+        <div class="lg-drow"><label>Name</label><div><input data-fk="name" value="${lgEsc(f.name)}" spellcheck="false"></div></div>
+        <div class="lg-drow"><label title="A pure function only computes: it has no exec pins where it is called and runs whenever its outputs are read">Pure</label><div><input type="checkbox" data-fk="pure"${f.pure ? " checked" : ""}></div></div>
+        <div class="lg-drow"><label>Description</label><div><input data-fk="help" value="${lgEsc(f.help || "")}"></div></div>
+      </div>
+      <div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows(f.inputs, "in")}<div class="lg-dacts"><button data-act="fn-in">+ Input</button></div></div>
+      <div class="lg-dsec"><div class="lg-dst">Outputs</div>${rows(f.outputs, "out")}<div class="lg-dacts"><button data-act="fn-out">+ Output</button></div></div>
+      <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} call${refs === 1 ? "" : "s"} of ${lgEsc(f.name)} in this Blueprint. The function starts at its Function Entry node and ends at a Return node.</div></div>
+      <div class="lg-dacts"><button data-act="fn-call">Add Call</button><button data-act="fn-return">Add Return</button><button data-act="fn-entry">Go to Entry</button><button data-act="delete" class="danger">Delete</button></div>`;
+  }
+
   transitionDetails(m, t) {
     const vars = (this.data.variables || []).filter(v => v.type === "bool");
     return `<div class="lg-dh">Transition</div><div class="lg-dsub">${lgEsc(m.states.find(s => s.id === t.from)?.name || "Any State")} → ${lgEsc(m.states.find(s => s.id === t.to)?.name || "?")}</div>
@@ -825,7 +917,7 @@ export class LogicEditor {
         <tr><td>F / Home</td><td>Frame selection / all</td></tr><tr><td>Ctrl+F</td><td>Find</td></tr><tr><td>F7</td><td>Compile</td></tr></table></div>`;
   }
 
-  bindDetails(node, box, m, state, trans, variable) {
+  bindDetails(node, box, m, state, trans, variable, fn) {
     const b = this.el.dbody;
     this.bindInputs(b);
     for (const f of b.querySelectorAll("input, select, textarea")) f.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter" && f.tagName !== "TEXTAREA") f.blur(); });
@@ -833,6 +925,7 @@ export class LogicEditor {
     const ids = [...this.selection];
     act("delete", () => {
       if (variable && !node && !box) { this.selVar = null; this.cmd({cmd: "logicVariable", op: "remove", name: variable.name}); return; }
+      if (fn && !node && !box) { this.selFn = null; this.cmd({cmd: "logicFunction", op: "remove", name: fn.name}); return; }
       if (trans) { this.selTransition = null; this.cmd({cmd: "logicMachine", op: "removeTransition", machine: m.id, transition: trans.id}); return; }
       this.deleteSelection();
     });
@@ -843,6 +936,36 @@ export class LogicEditor {
     act("get", () => this.addAtCenter("var.get", {variable: variable.name}));
     act("set", () => this.addAtCenter("var.set", {variable: variable.name}));
     act("refs", () => this.findText(variable.name));
+    if (fn) {
+      const edit = c => this.cmd({cmd: "logicFunction", name: fn.name, ...c});
+      act("fn-in", () => edit({op: "pinAdd", side: "in"}));
+      act("fn-out", () => edit({op: "pinAdd", side: "out"}));
+      act("fn-call", () => this.addCall(fn.name));
+      act("fn-return", () => this.addAtCenter("func.return", {function: fn.name}));
+      act("fn-entry", () => this.focusFunction(fn.name));
+      for (const f of b.querySelectorAll("[data-fk]")) {
+        f.onchange = () => {
+          const k = f.dataset.fk;
+          if (k === "name") { const to = f.value.trim(); if (edit({op: "rename", to})?.ok !== false) this.selFn = to; }
+          else if (k === "pure") edit({op: "pure", value: f.checked});
+          else edit({op: "help", text: f.value});
+        };
+      }
+      for (const row of b.querySelectorAll(".lg-frow")) {
+        const side = row.dataset.side, pin = row.dataset.pin;
+        const def = (side === "in" ? fn.inputs : fn.outputs).find(p => p.name === pin);
+        for (const f of row.querySelectorAll("[data-pf]")) {
+          const k = f.dataset.pf;
+          if (k === "remove") f.onclick = () => edit({op: "pinRemove", side, pin});
+          else if (k === "up") f.onclick = () => edit({op: "pinMove", side, pin, by: -1});
+          else f.onchange = () => {
+            if (k === "name") edit({op: "pinRename", side, pin, to: f.value.trim()});
+            else if (k === "type") edit({op: "pinType", side, pin, type: f.value});
+            else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : def.type === "text" ? f.value : (+f.value || 0)});
+          };
+        }
+      }
+    }
     act("anyto", () => this.cmd({cmd: "logicMachine", op: "addTransition", machine: m.id, from: 0, to: state.id}));
     act("rename-m", () => this.renameMachine(m.id));
     act("delete-m", () => this.cmd({cmd: "logicMachine", op: "remove", machine: m.id}));
@@ -992,7 +1115,7 @@ export class LogicEditor {
 
   addAt(type, p, params, from) {
     const r = this.cmd({cmd: "logicAdd", type, x: lgSnap(p.x), y: lgSnap(p.y), params, from: from || undefined});
-    if (r?.id) { this.selection = new Set([r.id]); this.selVar = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
+    if (r?.id) { this.selection = new Set([r.id]); this.selVar = this.selFn = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
     return r;
   }
 
@@ -1000,7 +1123,7 @@ export class LogicEditor {
     const p = this.centerWorld();
     // Do not stack new nodes on top of each other.
     this.stagger = ((this.stagger || 0) + 32) % 160;
-    this.addAt(type, {x: p.x + this.stagger, y: p.y + this.stagger}, params);
+    return this.addAt(type, {x: p.x + this.stagger, y: p.y + this.stagger}, params);
   }
 
   // ===========================================================================
@@ -1021,12 +1144,13 @@ export class LogicEditor {
     c.addEventListener("pointermove", e => this.onMove(e));
     c.addEventListener("pointerup", e => this.onUp(e));
     c.addEventListener("pointercancel", e => this.onUp(e, true));
-    c.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("text/x-kern-var") || e.dataTransfer.types.includes("text/x-kern-event")) e.preventDefault(); });
+    c.addEventListener("dragover", e => { if (["text/x-kern-var", "text/x-kern-event", "text/x-kern-function"].some(t => e.dataTransfer.types.includes(t))) e.preventDefault(); });
     c.addEventListener("drop", e => {
-      const v = e.dataTransfer.getData("text/x-kern-var"), ev = e.dataTransfer.getData("text/x-kern-event");
-      if (!v && !ev) return;
+      const v = e.dataTransfer.getData("text/x-kern-var"), ev = e.dataTransfer.getData("text/x-kern-event"), fn = e.dataTransfer.getData("text/x-kern-function");
+      if (!v && !ev && !fn) return;
       e.preventDefault();
       const p = this.toWorld(e.clientX, e.clientY);
+      if (fn) { this.addAt(this.fn(fn)?.pure ? "func.pure" : "func.call", p, {function: fn}); return; }
       if (ev) { this.addAt(e.ctrlKey || e.metaKey ? "flow.call" : "event.custom", p, {name: ev}); return; }
       if (e.ctrlKey || e.metaKey) this.addAt("var.get", p, {variable: v});
       else if (e.altKey) this.addAt("var.set", p, {variable: v});
@@ -1989,6 +2113,16 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-dim{color:#808080}
 .lg-dissue{display:flex;gap:6px;align-items:flex-start;padding:5px 7px;border-radius:4px;margin:4px 0;line-height:1.4}
 .lg-dissue.err{background:rgba(210,59,59,.15);color:#ffb3ae}.lg-dissue.warn{background:rgba(201,146,30,.14);color:#f5d27f}
+.lg-fni{width:14px;text-align:center;font:italic 600 13px Georgia,serif;color:#b79cff;flex:none}
+.lg-frow{display:flex;align-items:center;gap:4px;min-height:28px}
+.lg-frow input:not([type=checkbox]),.lg-frow select{height:24px;min-width:0;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 5px;font:inherit}
+.lg-frow .lg-fname{flex:1 1 0}
+.lg-frow select{flex:0 0 74px}
+.lg-frow .lg-fval{flex:0 0 56px}
+.lg-frow input[type=checkbox]{flex:0 0 56px;margin:0}
+.lg-frow .lg-dim{flex:0 0 56px}
+.lg-frow button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
+.lg-frow button:disabled{opacity:.3}
 .lg-dacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .lg-dacts button{height:28px;padding:0 12px;border:1px solid #444;border-radius:4px;background:#262626}
 .lg-dacts button:hover{border-color:var(--lg-acc)}

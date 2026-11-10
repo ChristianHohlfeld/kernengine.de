@@ -1,5 +1,5 @@
 // Kern Logic: the built-in nodes (events, flow control, variables, state
-// machines, math, logic, vectors, text, debugging). Gameplay nodes live in
+// machines, functions, math, logic, vectors, text, debugging). Gameplay nodes live in
 // the game module (src/game/logic_nodes.cpp).
 #include <cmath>
 #include "kern/core/dmath.h"
@@ -630,6 +630,126 @@ void add_math(Library& lib) {
   }
 }
 
+// A formula as one node: every name in it is an input pin (logic.h, Formula).
+void add_formula(Library& lib) {
+  NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
+                   "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
+                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; pi.");
+  d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
+  d.outputs = {data("result", "", PinType::number)};
+  d.keywords = "math expression formula equation calculate compute";
+  d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) {
+    const std::string text = n.param("formula", "a + b");
+    for (const std::string& name : Formula::cached(text).inputs()) in.push_back(data(name, name, PinType::number, 0.0));
+  };
+  d.title = [](const NodeDef&, const Node& n) {
+    const std::string f = n.param("formula", "a + b");
+    return f.size() > 44 ? f.substr(0, 43) + "..." : f;
+  };
+  d.problem = [](const Node& n, const Graph&) {
+    const std::string text = n.param("formula", "a + b");
+    return Formula::cached(text).error();
+  };
+  d.run = [](Context& c) {
+    const std::string text = c.param("formula", "a + b");
+    const Formula& f = Formula::cached(text);
+    f64 values[Formula::kMaxInputs] = {};
+    const std::size_t count = min_of(f.inputs().size(), c.input_count());
+    for (std::size_t i = 0; i < count; ++i) values[i] = c.in(i).as_number();
+    c.out(std::size_t{0}, Value::number(f.evaluate(values, count)));
+    return kStop;
+  };
+  lib.add(std::move(d));
+}
+
+// Functions: named, with typed inputs and outputs (Graph::functions). The four nodes take their
+// data pins from the function they name; a pin's id is its name.
+void add_functions(Library& lib) {
+  // which == 0: the inputs as outputs (entry); 1: the outputs as inputs (return); 2: both (calls)
+  auto shape = [](int which) {
+    return [which](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const Function* f = g.function(n.param("function"));
+      if (!f) return;
+      if (which == 0 || which == 2)
+        for (const FunctionPin& p : f->inputs) (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value});
+      if (which == 1 || which == 2)
+        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value});
+    };
+  };
+  auto named = [](const char* prefix) {
+    return [prefix](const NodeDef&, const Node& n) { return std::string(prefix) + n.param("function", "?"); };
+  };
+  // Runs the function with the node's inputs and puts its results on the node's outputs.
+  auto call = [](Context& c) {
+    const Function* f = c.instance().graph().function(c.param("function"));
+    if (!f) return;
+    std::vector<Value> args, results;
+    args.reserve(f->inputs.size());
+    for (const FunctionPin& p : f->inputs) args.push_back(c.in(p.name));
+    c.instance().call(f->name, args, results);
+    for (std::size_t k = 0; k < f->outputs.size() && k < results.size(); ++k) c.out(f->outputs[k].name, results[k]);
+  };
+  {
+    NodeDef d = make("func.entry", "Function Entry", "Functions", NodeKind::event,
+                     "Where a function starts: its inputs come out here. Every function has exactly one. Functions are made in My Blueprint.");
+    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.outputs = {exec_out()};
+    d.shape = shape(0);
+    d.title = named("Function ");
+    d.color = 0x6d3fc4;
+    d.event = "logic.function";  // (never raised: a function starts when it is called)
+    d.keywords = "function begin start input parameter argument";
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("func.return", "Return", "Functions", NodeKind::action,
+                     "Ends the function and gives its outputs to the caller. Loops and sequences of the function stop here too. Outputs no Return set keep their defaults.");
+    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.inputs = {exec_in()};
+    d.shape = shape(1);
+    d.color = 0x6d3fc4;
+    d.keywords = "return result output end exit function";
+    d.run = [](Context& c) {
+      const Function* f = c.instance().graph().function(c.param("function"));
+      std::vector<std::pair<std::string, Value>> values;
+      if (f)
+        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, c.in(p.name));
+      c.instance().return_values(c.param("function"), values);
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("func.call", "Call Function", "Functions", NodeKind::action,
+                     "Runs a function of this Blueprint to its end, then continues. Its results stay on the outputs until the next call.");
+    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.inputs = {exec_in()};
+    d.outputs = {exec_out()};
+    d.shape = shape(2);
+    d.title = named("");
+    d.color = 0x2f6fd0;
+    d.keywords = "call run invoke function";
+    d.run = [call](Context& c) {
+      call(c);
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
+                     "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
+    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.shape = shape(2);
+    d.title = named("");
+    d.keywords = "call pure function value compute";
+    d.run = [call](Context& c) {
+      call(c);
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+}
+
 }  // namespace
 
 Library& Library::core() {
@@ -641,6 +761,8 @@ Library& Library::core() {
     add_flow(lib);
     add_variables(lib);
     add_math(lib);
+    add_formula(lib);
+    add_functions(lib);
   }
   return lib;
 }

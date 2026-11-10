@@ -276,7 +276,7 @@ das.
 ## Logic: Blueprints, die C++ sind
 
 Jeder Actor und das Level können einen Logic-Graphen tragen: Events, Flow, Variablen,
-State Machines, Mathe und rund 70 Gameplay-Knoten. Geöffnet wird er über **Logic** in der Toolbar
+Funktionen, State Machines, Mathe (auch als Formel) und rund 70 Gameplay-Knoten. Geöffnet wird er über **Logic** in der Toolbar
 oder in Details.
 
 Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und deckt das ganze Fenster ab:
@@ -284,9 +284,9 @@ Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und
 | Bereich | Inhalt |
 |---|---|
 | Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, C++-Export |
-| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Events (Custom Events: Event / Call) |
+| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call) |
 | Graph | Tabs, Breadcrumb, Zoom-Stufen wie Unreal („Zoom 1:1“, „Zoom −2“), Wasserzeichen EVENT GRAPH |
-| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ, Default, Referenzen), Kommentar (Text, Farbe), State, Transition |
+| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
 | Compiler Results / Find Results | Probleme und Suchtreffer, ein Klick springt zum Knoten |
 
 Im Graphen:
@@ -333,6 +333,43 @@ Im Graphen:
   - Der +-Knopf öffnet das Aktionsmenü als Sheet.
   - My Blueprint und Details sind Schubladen, ein Kasten-Knopf schaltet die Rechteckauswahl ein.
 - **Vorlagen:** Tür, Punktezone, Spawner, Ampel.
+
+### Funktionen
+
+Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. Angelegt wird sie mit
+**+** bei *Functions* in My Blueprint (oder „New Function“ im Aktionsmenü); Details zeigt dann Name,
+*Pure*, Beschreibung und die Pins.
+
+- Der Rumpf beginnt am Knoten **Function Entry** (die Eingänge kommen dort heraus; jede Funktion
+  hat genau einen, er verschwindet nur mit der Funktion) und endet an einem **Return**-Knoten, der
+  die Ausgänge an den Aufrufer gibt. Return beendet die Funktion sofort, auch mitten in einer
+  Schleife oder Sequence. Ausgänge, die kein Return gesetzt hat, behalten ihren Default.
+- Aufgerufen wird sie mit einem Knoten, der ihren Namen trägt: mit Exec-Pins (**Call**), oder – ist
+  sie *Pure* – als Wert-Knoten ohne Exec-Pins, der rechnet, sobald ein Ausgang gelesen wird. Pure
+  ist für Funktionen gedacht, die nur rechnen.
+- Ein Aufruf läuft sofort bis zum Ende. Nach einem Delay ist der Aufrufer schon weiter; ein Return
+  dahinter erreicht ihn nicht mehr. Eine Funktion kann sich nicht selbst aufrufen (der innere
+  Aufruf wird übersprungen und gemeldet).
+- Aus C++ ruft `logic::Instance::call("Name", args, results)` eine Funktion; `call_number` ist die
+  Kurzform für Zahlen. So rufen Engine-Systeme Regeln auf, die im Blueprint stehen.
+- Kopierte Knoten nehmen die Funktionen mit, die sie nennen.
+
+### Formel-Knoten
+
+**Formula** (Kategorie Math) ist eine Formel als ein Knoten: Jeder Name darin wird ein Eingang,
+`max(9000, 16000 - level * 1300)` hat also den Eingang `level`. Die Formel steht in Details unter
+Settings und ist der Titel des Knotens; eine Formel, die sich nicht lesen lässt, ist ein
+Compile-Fehler mit Stelle und Grund.
+
+| | |
+|---|---|
+| Operatoren | `+ - * / %`, `^` (Potenz), Vorzeichen `-`, `!` |
+| Vergleiche | `< <= > >= == !=` ergeben 1 oder 0; `&&`, `||`; `a ? b : c` |
+| Funktionen | `min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log lerp(a, b, t)` |
+| Winkel | `sin cos tan asin acos atan atan2(y, x)` in Radiant; `rad(grad)`, `deg(radiant)`; `pi` |
+
+Gerechnet wird wie in den Mathe-Knoten (f64, dieselben Funktionen auf jeder Plattform); eine
+Division durch 0 ergibt 0.
 
 Ausgeführt wird in drei Stufen, die dasselbe Ergebnis liefern (`kern/tests/logic_cases.h`):
 1. **Interpreter**, zum Bearbeiten.

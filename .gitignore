@@ -4,3 +4,5 @@ node_modules/
 __pycache__/
 kern/build/
 .claude/
+# SpawnCity's level file as a source (tools/embed_level.py writes it at build time)
+kern/games/spawncity/src/level_data.cpp

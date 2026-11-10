@@ -224,6 +224,8 @@ jobs:
           sleep 1
           mkdir -p artifacts/e2e
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771
+          # functions and formulas in the Blueprint editor; SpawnCity's level file opens in the editor
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@v4

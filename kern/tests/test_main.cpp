@@ -1909,6 +1909,133 @@ TEST(logic_state_machine_timers_events_conditions) {
   CHECK(inst->get("Entered").as_number() == 5);
 }
 
+TEST(logic_formulas) {
+  auto value = [](const char* text, std::initializer_list<f64> in = {}) {
+    const logic::Formula f(text);
+    if (!f.ok()) std::printf("formula \"%s\": %s\n", text, f.error().c_str());
+    return f.ok() ? f.evaluate(in.begin(), in.size()) : -12345.0;
+  };
+  // precedence and associativity as in C (and ^ as the power, binding tighter than the sign in front)
+  CHECK(value("1 + 2 * 3") == 7 && value("(1 + 2) * 3") == 9 && value("10 - 4 - 3") == 3 && value("2 * 3 % 4") == 2);
+  CHECK(value("2 ^ 3 ^ 2") == 512 && value("-2 ^ 2") == -4 && value("2 ^ -1") == 0.5);
+  CHECK(value("10 / 4") == 2.5 && value("1 / 0") == 0 && value("7 % 0") == 0 && value("7 % 3") == 1);
+  CHECK(value("3 > 2 && 2 >= 2") == 1 && value("1 < 1 || 0 != 0") == 0 && value("!0 + !5") == 1 && value("1 == 1 ? 5 : 6") == 5 && value("0 ? 5 : 1 ? 7 : 8") == 7);
+  CHECK(value("min(3, 4) + max(3, 4) + clamp(9, 0, 5) + abs(-2) + sign(-3)") == 13);
+  CHECK(value("floor(2.7) + ceil(2.1) + round(2.5) + trunc(-2.7)") == 6 && value("sqrt(16) + sqrt(-4) + log(-1)") == 4);
+  CHECK(value("lerp(10, 20, 0.25)") == 12.5);
+  CHECK_NEAR(value("sin(rad(90)) + cos(0) + deg(pi) + atan2(1, 1) * 4 / pi + exp(0) + pow(2, 10)"), 1 + 1 + 180 + 1 + 1 + 1024, 1e-12);
+  // numbers are read as a compiler reads them
+  CHECK(value("0.7 * 5") == 0.7 * 5 && value("1e3 + .5") == 1000.5 && value("2.5E-1") == 0.25 && value("16000 - 5 * 1300") == 9500);
+  // names are the inputs, in the order they first appear; a missing one is 0
+  const logic::Formula f("b * a + b - c");
+  CHECK(f.ok() && f.inputs().size() == 3 && f.inputs()[0] == "b" && f.inputs()[1] == "a" && f.inputs()[2] == "c");
+  const f64 in[2] = {2, 3};
+  CHECK(f.evaluate(in, 2) == 8);
+  // what cannot be read says why and where
+  for (const char* bad : {"", "  ", "1 +", "foo(1)", "min(1)", "(1", "1 2", "a $ b", "sin", "a ? b", "min(1, 2", "exec + 1"}) {
+    const logic::Formula e(bad);
+    CHECK(!e.ok() && !e.error().empty() && e.evaluate(nullptr, 0) == 0);
+  }
+  CHECK(logic::Formula("no function").error().find("unexpected") != std::string::npos);
+  CHECK(logic::Formula("nope(1)").error().find("no function \"nope\"") != std::string::npos);
+  CHECK(logic::Formula("min(1)").error().find("min takes 2 values") != std::string::npos);
+  CHECK(!logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q").ok() && logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p").ok());
+  // the node: its pins are the formula's names; a formula that cannot be read is an error of the graph
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Out","type":"float","value":0}],
+    "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Out"}},
+      {"id":3,"type":"math.formula","params":{"formula":"max(9000, 16000 - level * 1300) + bonus"},"values":{"bonus":0.5}}],
+    "links":[[1,"then",2,"exec"],[1,"value",3,"level"],[3,"result",2,"value"]]})");
+  CHECK(no_errors(logic::check(g)));
+  std::vector<logic::PinDef> pins_in, pins_out;
+  logic::library().pins(g.nodes[2], g, pins_in, pins_out);
+  CHECK(pins_in.size() == 2 && pins_in[0].id == "level" && pins_in[1].id == "bonus" && pins_out.size() == 1);
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  rt.call("Go", 0, {{"value", logic::Value::number(5)}});
+  CHECK(inst->get("Out").as_number() == 9500.5);
+  rt.call("Go", 0, {{"value", logic::Value::number(1)}});
+  CHECK(inst->get("Out").as_number() == 14700.5);
+  const logic::Graph bad = logic_graph(R"({"nodes":[{"id":1,"type":"math.formula","params":{"formula":"1 +"}}]})");
+  bool said = false;
+  for (const logic::Issue& i : logic::check(bad)) said |= i.error && i.node == 1 && i.text.find("ends too early") != std::string::npos;
+  CHECK(said);
+}
+
+TEST(logic_functions) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  // Double(x) -> result (pure); Clamp01(v) -> out, low: returns early below zero; Fact(n) calls itself.
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Calls","type":"int","value":0}],
+    "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
+      {"name":"Clamp01","inputs":[{"name":"v","type":"float","value":0.5}],"outputs":[{"name":"out","type":"float","value":-1},{"name":"low","type":"bool","value":false}]},
+      {"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]},
+      {"name":"Label","inputs":[{"name":"who","type":"text","value":"nobody"}],"outputs":[{"name":"text","type":"text","value":""}]}],
+    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
+      {"id":10,"type":"func.entry","params":{"function":"Clamp01"}},{"id":11,"type":"var.add","params":{"variable":"Calls"}},{"id":12,"type":"flow.sequence","params":{"count":"2"}},
+      {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"op":"<"},"values":{"b":0}},
+      {"id":15,"type":"func.return","params":{"function":"Clamp01"},"values":{"out":0,"low":true}},
+      {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","values":{"b":1}},
+      {"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}},
+      {"id":30,"type":"func.entry","params":{"function":"Label"}},{"id":31,"type":"text.append","values":{"a":"hello "}},{"id":32,"type":"func.return","params":{"function":"Label"}}],
+    "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"result"],
+      [10,"then",11,"exec"],[11,"then",12,"exec"],[12,"then0",13,"exec"],[10,"v",14,"a"],[14,"result",13,"condition"],[13,"true",15,"exec"],
+      [12,"then1",16,"exec"],[10,"v",17,"a"],[17,"result",16,"out"],
+      [20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"],
+      [30,"then",32,"exec"],[30,"who",31,"b"],[31,"result",32,"text"]]})");
+  CHECK(no_errors(logic::check(g)));
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  CHECK(inst->has_function("Double") && !inst->has_function("Triple"));
+  CHECK_NEAR(inst->call_number("Double", {21}), 42, 1e-12);
+  CHECK_NEAR(inst->call_number("Triple", {21}, -5), -5, 1e-12);  // no such function: the fallback
+  std::vector<logic::Value> out;
+  // inside 0..1: the sequence's second branch returns (the first Return did not run)
+  CHECK(inst->call("Clamp01", {logic::Value::number(0.25)}, out) && out.size() == 2);
+  CHECK_NEAR(out[0].as_number(), 0.25, 1e-12);
+  CHECK(!out[1].as_bool());
+  CHECK(inst->call("Clamp01", {logic::Value::number(3)}, out));
+  CHECK_NEAR(out[0].as_number(), 1, 1e-12);
+  // below zero: the first Return ends the function - the sequence's second branch does not run
+  CHECK(inst->call("Clamp01", {logic::Value::number(-2)}, out));
+  CHECK_NEAR(out[0].as_number(), 0, 1e-12);
+  CHECK(out[1].as_bool());
+  // a missing argument takes the input's default
+  CHECK(inst->call("Clamp01", {}, out));
+  CHECK_NEAR(out[0].as_number(), 0.5, 1e-12);
+  CHECK(inst->get("Calls").as_int() == 4);
+  // text in, text out
+  CHECK(inst->call("Label", {logic::Value::text("Kern")}, out) && out[0].as_text() == "hello Kern");
+  // a function cannot call itself: the inner call is skipped (its outputs' defaults) and said
+  CHECK(host.errors.empty());
+  CHECK_NEAR(inst->call_number("Fact", {3}), 7, 1e-12);
+  CHECK(host.errors.size() == 1 && host.errors[0].find("calls itself") != std::string::npos);
+  CHECK(!inst->disabled());
+  // calls from C++ are steps of their own for the loop guard: any number of them without a tick
+  // in between (a paused world whose systems keep asking) never stops the graph
+  rt.budget = 1000;
+  for (int i = 0; i < 2000; ++i) CHECK_NEAR(inst->call_number("Double", {static_cast<f64>(i)}), 2.0 * i, 1e-12);
+  CHECK(!inst->disabled() && host.errors.size() == 1);
+  rt.budget = 200000;
+  // the functions survive JSON, and a graph without functions writes none
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back));
+  CHECK(back == g && back.functions.size() == 4 && back.functions[1].outputs[0].name == "out");
+  CHECK(!logic::graph_to_json(logic::Graph{}).has("functions"));
+  // checks: an unknown function, a function without or with two entries
+  const logic::Graph bad = logic_graph(R"({"functions":[{"name":"F","inputs":[],"outputs":[]},{"name":"G","inputs":[],"outputs":[]}],
+    "nodes":[{"id":1,"type":"func.entry","params":{"function":"G"}},{"id":2,"type":"func.entry","params":{"function":"G"}},{"id":3,"type":"func.call","params":{"function":"H"}},{"id":4,"type":"event.begin"}],
+    "links":[[4,"then",3,"exec"]]})");
+  int no_entry = 0, two = 0, unknown = 0;
+  for (const logic::Issue& i : logic::check(bad)) {
+    no_entry += i.text.find("\"F\" has no Function Entry") != std::string::npos;
+    two += i.text.find("\"G\" has 2 Function Entry") != std::string::npos;
+    unknown += i.text.find("no function \"H\"") != std::string::npos;
+  }
+  CHECK(no_entry == 1 && two == 1 && unknown == 1);
+}
+
 TEST(logic_checks_and_infinite_loops) {
   FakeLogicHost host;
   // Errors: unknown type, missing variable, wrong wire types.
@@ -6131,6 +6258,105 @@ TEST(studio_shortcuts_follow_the_keyboard_layout) {
   f.s->key("e", "KeyE", true, 0, false);
   f.s->key("e", "KeyE", false, 0, false);
   CHECK(f.s->state()["tool"].as_string() == "rotate");
+}
+
+TEST(studio_logic_functions) {
+  // A function made, shaped and used with the editor's commands: Twice(x) -> result = x * 2.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  // a call without any function is refused with a reason
+  CHECK(!f.cmd(R"({"cmd":"logicAdd","type":"func.call","x":0,"y":0})")["ok"].as_bool());
+  // New Function: the function, its entry and a Return wired to it
+  json::Value made = f.cmd(R"({"cmd":"logicAdd","type":"func.entry","x":0,"y":0})");
+  CHECK(made["ok"].as_bool() && made["function"].as_string() == "NewFunction");
+  const u32 entry = static_cast<u32>(made["id"].as_number());
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["functions"].size() == 1 && st["logic"]["nodes"].size() == 2 && st["logic"]["links"].size() == 1);
+  u32 ret = 0;
+  for (const json::Value& n : st["logic"]["nodes"].items()) if (n["type"].as_string() == "func.return") ret = static_cast<u32>(n["id"].as_number());
+  CHECK(ret != 0);
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"NewFunction","to":"Twice"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"float"})")["pin"].as_string() == "x");
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"out","pin":"result","type":"float"})")["pin"].as_string() == "result");
+  CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"exec"})")["ok"].as_bool());  // a reserved name
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"help","name":"Twice","text":"Two times x"})")["ok"].as_bool());
+  const u32 mul = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.mul","x":160,"y":80})")["id"].as_number());
+  auto connect = [&](u32 from, const char* out, u32 to, const char* in) {
+    json::Value c = json::Value::object();
+    c.set("cmd", "logicConnect");
+    c.set("from", from);
+    c.set("out", out);
+    c.set("to", to);
+    c.set("in", in);
+    return f.s->command(c)["ok"].as_bool();
+  };
+  CHECK(connect(entry, "x", mul, "a"));
+  CHECK(connect(mul, "result", ret, "result"));
+  json::Value val = json::Value::object();
+  val.set("cmd", "logicValue");
+  val.set("node", mul);
+  val.set("pin", "b");
+  val.set("value", 2);
+  CHECK(f.s->command(val)["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["functions"][0]["name"].as_string() == "Twice" && st["logic"]["functions"][0]["inputs"][0]["name"].as_string() == "x");
+  int errors = 0;
+  for (const json::Value& i : st["logic"]["issues"].items()) errors += i["error"].as_bool() ? 1 : 0;
+  CHECK(errors == 0);
+  // the entry shows the input as an output pin, the Return the output as an input
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    if (n["type"].as_string() == "func.entry") CHECK(n["outputs"].size() == 2 && n["outputs"][1]["id"].as_string() == "x" && n["title"].as_string() == "Function Twice");
+    if (n["type"].as_string() == "func.return") CHECK(n["inputs"].size() == 2 && n["inputs"][1]["id"].as_string() == "result");
+  }
+  // the palette offers the function by its name (with exec pins) and its Return
+  json::Value pal = f.cmd(R"({"cmd":"logicPalette","query":"twice"})");
+  bool call = false, ret_item = false;
+  for (const json::Value& it : pal["items"].items()) {
+    call |= it["type"].as_string() == "func.call" && it["label"].as_string() == "Twice";
+    ret_item |= it["type"].as_string() == "func.return";
+  }
+  CHECK(call && ret_item);
+  // a call, then pure: the call node becomes a value node and loses its exec wires
+  const u32 begin = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"event.begin","x":0,"y":300})")["id"].as_number());
+  const u32 use = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"func.call","x":240,"y":300,"params":{"function":"Twice"}})")["id"].as_number());
+  CHECK(connect(begin, "then", use, "exec"));
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pure","name":"Twice","value":true})")["ok"].as_bool());
+  st = f.s->state();
+  for (const json::Value& n : st["logic"]["nodes"].items())
+    if (static_cast<u32>(n["id"].as_number()) == use) CHECK(n["type"].as_string() == "func.pure" && n["inputs"].size() == 1 && n["outputs"].size() == 1);
+  CHECK(st["logic"]["links"].size() == 3);  // entry -> Return, x -> a, result -> result; the exec wire into the call is gone
+  // renaming a pin keeps its wires; removing it drops them
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"value"})")["ok"].as_bool());
+  st = f.s->state();
+  bool rewired = false;
+  for (const json::Value& l : st["logic"]["links"].items()) rewired |= l[1].as_string() == "value" && static_cast<u32>(l[2].as_number()) == mul;
+  CHECK(rewired);
+  // the entry cannot be deleted on its own
+  json::Value del = json::Value::object();
+  del.set("cmd", "logicDelete");
+  json::Value ids = json::Value::array();
+  ids.push(entry);
+  del.set("ids", ids);
+  CHECK(!f.s->command(del)["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinRemove","name":"Twice","side":"in","pin":"value"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["links"].size() == 2);
+  // the level with its function survives saving and loading, and the function runs when playing
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"float"})")["ok"].as_bool());
+  CHECK(connect(entry, "x", mul, "a"));
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(0) : nullptr;
+  CHECK(inst != nullptr);
+  if (inst) CHECK_NEAR(inst->call_number("Twice", {21}), 42, 1e-9);
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+  // deleting the function takes its nodes with it
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"remove","name":"Twice"})")["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["functions"].size() == 0);
+  for (const json::Value& n : st["logic"]["nodes"].items()) CHECK(n["type"].as_string().rfind("func.", 0) != 0);
+  // undo brings it back
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["functions"].size() == 1);
 }
 
 TEST(studio_logic_editor_commands) {

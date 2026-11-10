@@ -707,10 +707,11 @@ std::string Game::ctl_view_json() {
     i32 active = 0, in_range = 0;
     f32 inbound = 1e9f;
     const Vec3 me = player_position();
+    const f32 emp_range = wanted::emp_range();
     for (const PoliceDrone& d : pdrones_) {
       if (!d.active) continue;
       ++active;
-      if (!d.emp && kern::length(d.pos - me) <= wanted::kEmpRange) ++in_range;
+      if (!d.emp && kern::length(d.pos - me) <= emp_range) ++in_range;
       if (d.shots == 0) inbound = std::fmin(inbound, d.next_shot - now);
     }
     const bool searching = stars > 0 && wanted_.hidden_ms() > 0;

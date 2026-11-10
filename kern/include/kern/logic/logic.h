@@ -22,6 +22,11 @@
 //                 entering / leaving a state raises events the graph handles.
 //   latent nodes  Delay, Tween, Retriggerable Delay suspend the chain and
 //                 resume it from the tick, like Blueprint latent actions.
+//   functions     named, with typed inputs and outputs. The body starts at the
+//                 function's Function Entry node and ends at a Return node; it
+//                 is called from a graph (Call Function, or as a pure node)
+//                 and from C++ (Instance::call). A call runs to its end at
+//                 once: after a latent node the caller is already gone.
 //
 // A level has one level graph; any actor can carry its own graph (its Self).
 #pragma once
@@ -137,6 +142,24 @@ struct StateMachine {
   const State* find(std::string_view name) const;
 };
 
+/// A function of a graph (Blueprint function). Pins are named; a name is the pin's id on the
+/// function's nodes (Function Entry: the inputs as outputs; Return: the outputs as inputs; the
+/// call nodes: both).
+struct FunctionPin {
+  std::string name;
+  PinType type = PinType::number;
+  json::Value value;     // default: an input nobody wired, an output no Return node set
+};
+
+struct Function {
+  std::string name;
+  std::vector<FunctionPin> inputs, outputs;
+  bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  std::string help;
+  const FunctionPin* input(std::string_view name) const;
+  const FunctionPin* output(std::string_view name) const;
+};
+
 /// A comment box (Blueprint "C"): a titled frame behind a group of nodes; moving it moves them.
 struct CommentBox {
   u32 id = 0;
@@ -150,20 +173,62 @@ struct Graph {
   std::vector<Link> links;
   std::vector<Variable> variables;
   std::vector<StateMachine> machines;
+  std::vector<Function> functions;
   std::vector<CommentBox> comments;    // editor only: no effect on what runs
   u32 next_id = 1;
-  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && comments.empty(); }
+  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && comments.empty(); }
   Node* find(u32 id);
   const Node* find(u32 id) const;
   const Variable* variable(std::string_view name) const;
   Variable* variable(std::string_view name);
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
+  const Function* function(std::string_view name) const;
+  Function* function(std::string_view name);
   bool operator==(const Graph& o) const;  // via JSON
 };
 
 json::Value graph_to_json(const Graph& g);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
+
+// ---------------------------------------------------------------------------
+// formulas
+
+/// A formula over named numbers, e.g. "max(9000, 16000 - level * 1300)" - what the Formula node
+/// computes. Parsed once, evaluated on f64 exactly like the maths nodes (the same functions, the
+/// same results in every tier and on every platform).
+///
+///   numbers      1, 2.5, .5, 1e3            names   letters, digits and _ (each is an input)
+///   operators    + - * / %  ^ (power)       unary - and !
+///                < <= > >= == !=            1 when true, else 0
+///                && ||                      a ? b : c
+///   functions    min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log
+///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
+///                lerp(a, b, t)
+///   constants    pi
+/// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
+/// are those of 0 and of nothing (0).
+class Formula {
+ public:
+  static constexpr std::size_t kMaxInputs = 16;
+  explicit Formula(std::string_view text);
+  bool ok() const { return error_.empty(); }
+  /// Why it could not be parsed (empty when it could).
+  const std::string& error() const { return error_; }
+  /// The names the formula reads, in the order they first appear.
+  const std::vector<std::string>& inputs() const { return inputs_; }
+  /// Its value for these inputs, in the order of inputs() (missing ones are 0); 0 when !ok().
+  f64 evaluate(const f64* values, std::size_t count) const;
+  /// The parsed formula for a text (parsed once, kept).
+  static const Formula& cached(const std::string& text);
+
+ private:
+  friend struct FormulaParser;
+  struct Op { u8 code = 0; u8 args = 0; u16 index = 0; f64 number = 0; };
+  std::vector<Op> code_;
+  std::vector<std::string> inputs_;
+  std::string error_;
+};
 
 // ---------------------------------------------------------------------------
 // node library
@@ -177,7 +242,7 @@ struct PinDef {
 
 struct ParamDef {
   std::string key, label;
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer } kind = Kind::text;
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function } kind = Kind::text;
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
 };
@@ -199,6 +264,8 @@ struct NodeDef {
   std::function<void(const NodeDef& def, const Node& node, const Graph& graph, std::vector<PinDef>& in, std::vector<PinDef>& out)> shape;
   /// Title that depends on params ("Set Score", "On Key F").
   std::function<std::string(const NodeDef& def, const Node& node)> title;
+  /// What is wrong with this node's settings (a formula that does not parse...), or empty: check() reports it.
+  std::function<std::string(const Node& node, const Graph& graph)> problem;
   /// Events: does this node handle `e`? (default: e.key is empty, or equals the node's first param / is "any").
   std::function<bool(const Node& node, const struct Event& e)> accepts;
   /// Runs the node. Returns the index of the exec output to continue with
@@ -235,7 +302,8 @@ struct Issue {
   std::string text;
 };
 /// Unknown node types, links between missing pins or incompatible types,
-/// unknown variables / events / states, unlinked required inputs, cycles of pure nodes.
+/// unknown variables / events / states / functions, functions without exactly one entry,
+/// unlinked required inputs, cycles of pure nodes.
 std::vector<Issue> check(const Graph& g, const Library& lib = library());
 
 // ---------------------------------------------------------------------------
@@ -308,6 +376,17 @@ class Instance {
   std::string state(std::string_view machine) const;
   bool set_state(std::string_view machine, std::string_view state);
   bool disabled() const { return disabled_; }
+  /// Calls a function of this graph and runs it to its end: `results` gets its outputs in the
+  /// function's order (the defaults where no Return node set them). Missing arguments take the
+  /// inputs' defaults. False: no such function, no entry node, or the function is running
+  /// already (a function cannot call itself) - `results` then holds the defaults.
+  bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// The same for functions of numbers: the first output (`fallback` when the call fails).
+  f64 call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback = 0);
+  bool has_function(std::string_view function) const { return fn_index_.count(std::string(function)) != 0; }
+  /// A Return node: the running call of `function` ends with these outputs (by output name).
+  /// False outside that function's own chain (the chain then just ends).
+  bool return_values(std::string_view function, const std::vector<std::pair<std::string, Value>>& values);
   /// Runs as machine code (JIT-compiled WebAssembly or generated C++) instead of the interpreter.
   bool compiled() const { return jit_fn_ >= 0 || native_ != nullptr; }
   const char* tier() const { return native_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
@@ -369,6 +448,13 @@ class Instance {
     u32 state = 0;
     f64 entered = 0;
   };
+  struct Frame {                     // a function call that is running
+    int function = -1;               // index in graph_.functions
+    int depth = 0;                   // Runtime::depth_ of the call's own chain
+    i32 stack_base = 0;              // generated code: continuation depth when the call began
+    bool returned = false;
+    std::vector<Value> results;
+  };
   Runtime& rt_;
   Graph graph_;
   ActorRef self_ = 0;
@@ -378,6 +464,9 @@ class Instance {
   std::unordered_map<std::string, Value> vars_;   // non-numeric variables
   std::unordered_map<std::string, int> var_slots_; // numeric variables live in slots
   std::vector<Machine> machines_;
+  std::unordered_map<std::string, int> fn_index_;  // function name -> index in graph_.functions
+  std::vector<int> fn_entry_;         // per function: compiled index of its entry node (-1 none)
+  std::vector<Frame> frames_;
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
   std::vector<i32> stack_;            // [0] = depth, then (pc, entry) pairs
   std::vector<i32> exec_table_;       // per node: (target, entry) per exec output

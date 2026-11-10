@@ -1,0 +1,1797 @@
+{
+ "format": "kern-level",
+ "version": 1,
+ "name": "SpawnCity",
+ "world": {
+  "title": "SpawnCity",
+  "timeOfDay": 0.4,
+  "dayLength": 480,
+  "fogDensity": 0.00085,
+  "aoRadius": 1.6,
+  "ground": false,
+  "groundFriction": 0.8,
+  "killZ": -3000,
+  "ambience": "builtin:city",
+  "ambienceVolume": 0.35,
+  "reverb": 0.2
+ },
+ "nextId": 2,
+ "actors": [
+  {
+   "id": 1,
+   "name": "Wanted",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 88,
+     "variables": [
+      {
+       "name": "Heat",
+       "type": "float",
+       "value": 0,
+       "help": "What the police know of: every crime seen adds its severity"
+      },
+      {
+       "name": "HiddenMs",
+       "type": "float",
+       "value": 0,
+       "help": "How long no police unit or witness has seen the player (the escape clock)"
+      },
+      {
+       "name": "MaxStars",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "name": "EmpRange",
+       "type": "float",
+       "value": 30,
+       "help": "Metres the EMP reaches"
+      },
+      {
+       "name": "EmpCooldownMs",
+       "type": "float",
+       "value": 18000
+      },
+      {
+       "name": "MaxFireRange",
+       "type": "float",
+       "value": 35
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Severity"
+       }
+      },
+      {
+       "id": 2,
+       "type": "math.formula",
+       "x": 600,
+       "y": 0,
+       "params": {
+        "formula": "crime >= 5 && crime <= 7 ? 3 : crime == 0 || crime == 2 || crime == 4 ? 2 : crime == 1 || crime == 3 || crime == 8 ? 1 : 0"
+       }
+      },
+      {
+       "id": 3,
+       "type": "func.return",
+       "x": 1088,
+       "y": 0,
+       "params": {
+        "function": "Severity"
+       }
+      },
+      {
+       "id": 4,
+       "type": "func.entry",
+       "x": 0,
+       "y": 192,
+       "params": {
+        "function": "StarsForHeat"
+       }
+      },
+      {
+       "id": 5,
+       "type": "math.formula",
+       "x": 600,
+       "y": 192,
+       "params": {
+        "formula": "(floor(heat) >= 4) + (floor(heat) >= 9) + (floor(heat) >= 15) + (floor(heat) >= 22) + (floor(heat) >= 30)"
+       }
+      },
+      {
+       "id": 6,
+       "type": "func.return",
+       "x": 1088,
+       "y": 192,
+       "params": {
+        "function": "StarsForHeat"
+       }
+      },
+      {
+       "id": 7,
+       "type": "func.entry",
+       "x": 0,
+       "y": 384,
+       "params": {
+        "function": "Level"
+       }
+      },
+      {
+       "id": 8,
+       "type": "math.formula",
+       "x": 600,
+       "y": 384,
+       "params": {
+        "formula": "clamp(stars, lowest, maxStars)"
+       }
+      },
+      {
+       "id": 9,
+       "type": "func.return",
+       "x": 984,
+       "y": 384,
+       "params": {
+        "function": "Level"
+       }
+      },
+      {
+       "id": 10,
+       "type": "var.get",
+       "x": 300,
+       "y": 384,
+       "params": {
+        "variable": "MaxStars"
+       }
+      },
+      {
+       "id": 12,
+       "type": "func.entry",
+       "x": 0,
+       "y": 696,
+       "params": {
+        "function": "PoliceCount"
+       }
+      },
+      {
+       "id": 13,
+       "type": "math.formula",
+       "x": 600,
+       "y": 696,
+       "params": {
+        "formula": "min(3, ceil(level * 0.7))"
+       }
+      },
+      {
+       "id": 14,
+       "type": "func.return",
+       "x": 944,
+       "y": 696,
+       "params": {
+        "function": "PoliceCount"
+       }
+      },
+      {
+       "id": 15,
+       "type": "func.pure",
+       "x": 300,
+       "y": 696,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 0
+       }
+      },
+      {
+       "id": 16,
+       "type": "func.entry",
+       "x": 0,
+       "y": 912,
+       "params": {
+        "function": "DetectionRadius"
+       }
+      },
+      {
+       "id": 17,
+       "type": "math.formula",
+       "x": 600,
+       "y": 912,
+       "params": {
+        "formula": "level > 0 ? 52 + level * 7 : 0"
+       }
+      },
+      {
+       "id": 18,
+       "type": "func.return",
+       "x": 984,
+       "y": 912,
+       "params": {
+        "function": "DetectionRadius"
+       }
+      },
+      {
+       "id": 19,
+       "type": "func.pure",
+       "x": 300,
+       "y": 912,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 0
+       }
+      },
+      {
+       "id": 20,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1120,
+       "params": {
+        "function": "EscapeMs"
+       }
+      },
+      {
+       "id": 21,
+       "type": "math.formula",
+       "x": 600,
+       "y": 1120,
+       "params": {
+        "formula": "level > 0 ? 4200 + level * 900 : 0"
+       }
+      },
+      {
+       "id": 22,
+       "type": "func.return",
+       "x": 1008,
+       "y": 1120,
+       "params": {
+        "function": "EscapeMs"
+       }
+      },
+      {
+       "id": 23,
+       "type": "func.pure",
+       "x": 300,
+       "y": 1120,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 0
+       }
+      },
+      {
+       "id": 24,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1328,
+       "params": {
+        "function": "SpawnRadius"
+       }
+      },
+      {
+       "id": 25,
+       "type": "math.formula",
+       "x": 600,
+       "y": 1328,
+       "params": {
+        "formula": "58 + max(index, 0) % 3 * 8"
+       }
+      },
+      {
+       "id": 26,
+       "type": "func.return",
+       "x": 952,
+       "y": 1328,
+       "params": {
+        "function": "SpawnRadius"
+       }
+      },
+      {
+       "id": 27,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1520,
+       "params": {
+        "function": "ArrivalDelayMs"
+       }
+      },
+      {
+       "id": 28,
+       "type": "math.formula",
+       "x": 600,
+       "y": 1520,
+       "params": {
+        "formula": "max(9000, 16000 - level * 1300)"
+       }
+      },
+      {
+       "id": 29,
+       "type": "func.return",
+       "x": 992,
+       "y": 1520,
+       "params": {
+        "function": "ArrivalDelayMs"
+       }
+      },
+      {
+       "id": 30,
+       "type": "func.pure",
+       "x": 300,
+       "y": 1520,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 31,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1728,
+       "params": {
+        "function": "EngageDelayMs"
+       }
+      },
+      {
+       "id": 32,
+       "type": "math.formula",
+       "x": 600,
+       "y": 1728,
+       "params": {
+        "formula": "max(4200, 6800 - level * 450)"
+       }
+      },
+      {
+       "id": 33,
+       "type": "func.return",
+       "x": 976,
+       "y": 1728,
+       "params": {
+        "function": "EngageDelayMs"
+       }
+      },
+      {
+       "id": 34,
+       "type": "func.pure",
+       "x": 300,
+       "y": 1728,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 35,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1936,
+       "params": {
+        "function": "WaveBreakMs"
+       }
+      },
+      {
+       "id": 36,
+       "type": "math.formula",
+       "x": 600,
+       "y": 1936,
+       "params": {
+        "formula": "9500 - level * 450"
+       }
+      },
+      {
+       "id": 37,
+       "type": "func.return",
+       "x": 920,
+       "y": 1936,
+       "params": {
+        "function": "WaveBreakMs"
+       }
+      },
+      {
+       "id": 38,
+       "type": "func.pure",
+       "x": 300,
+       "y": 1936,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 40,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2232,
+       "params": {
+        "function": "PoliceDamage"
+       }
+      },
+      {
+       "id": 41,
+       "type": "math.formula",
+       "x": 600,
+       "y": 2232,
+       "params": {
+        "formula": "min(4, 2 + floor((level - 1) / 2))"
+       }
+      },
+      {
+       "id": 42,
+       "type": "func.return",
+       "x": 1008,
+       "y": 2232,
+       "params": {
+        "function": "PoliceDamage"
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.pure",
+       "x": 300,
+       "y": 2232,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 44,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2448,
+       "params": {
+        "function": "FireRange"
+       }
+      },
+      {
+       "id": 45,
+       "type": "math.formula",
+       "x": 600,
+       "y": 2448,
+       "params": {
+        "formula": "min(maxFireRange, 28 + level * 1.4)"
+       }
+      },
+      {
+       "id": 46,
+       "type": "func.return",
+       "x": 1016,
+       "y": 2448,
+       "params": {
+        "function": "FireRange"
+       }
+      },
+      {
+       "id": 47,
+       "type": "func.pure",
+       "x": 300,
+       "y": 2448,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 48,
+       "type": "var.get",
+       "x": 300,
+       "y": 2590,
+       "params": {
+        "variable": "MaxFireRange"
+       }
+      },
+      {
+       "id": 49,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2704,
+       "params": {
+        "function": "FireIntervalMs"
+       }
+      },
+      {
+       "id": 50,
+       "type": "math.formula",
+       "x": 600,
+       "y": 2704,
+       "params": {
+        "formula": "max(3900, 5100 - level * 230)"
+       }
+      },
+      {
+       "id": 51,
+       "type": "func.return",
+       "x": 976,
+       "y": 2704,
+       "params": {
+        "function": "FireIntervalMs"
+       }
+      },
+      {
+       "id": 52,
+       "type": "func.pure",
+       "x": 300,
+       "y": 2704,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 53,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2912,
+       "params": {
+        "function": "HitChance"
+       }
+      },
+      {
+       "id": 54,
+       "type": "math.formula",
+       "x": 600,
+       "y": 2912,
+       "params": {
+        "formula": "clamp(0.28 + level * 0.02 - clamp((distance - 6) / 32, 0, 1) * 0.26 - min(1, max(0, speed) / 7.2) * 0.24, 0.1, 0.38)"
+       }
+      },
+      {
+       "id": 55,
+       "type": "func.return",
+       "x": 1088,
+       "y": 2912,
+       "params": {
+        "function": "HitChance"
+       }
+      },
+      {
+       "id": 56,
+       "type": "func.pure",
+       "x": 300,
+       "y": 2912,
+       "params": {
+        "function": "Level"
+       },
+       "values": {
+        "lowest": 1
+       }
+      },
+      {
+       "id": 58,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3240,
+       "params": {
+        "function": "EmpImpulse"
+       }
+      },
+      {
+       "id": 59,
+       "type": "math.formula",
+       "x": 300,
+       "y": 3390,
+       "params": {
+        "formula": "min(1, distance / range)"
+       }
+      },
+      {
+       "id": 60,
+       "type": "var.get",
+       "x": 40,
+       "y": 3490,
+       "params": {
+        "variable": "EmpRange"
+       }
+      },
+      {
+       "id": 61,
+       "type": "math.formula",
+       "x": 640,
+       "y": 3240,
+       "params": {
+        "formula": "distance >= 0 && distance <= range ? 54 + 72 * (1 - t * t * (3 - 2 * t)) : 0"
+       }
+      },
+      {
+       "id": 62,
+       "type": "func.return",
+       "x": 1128,
+       "y": 3240,
+       "params": {
+        "function": "EmpImpulse"
+       }
+      },
+      {
+       "id": 64,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3672,
+       "params": {
+        "function": "Stars"
+       }
+      },
+      {
+       "id": 65,
+       "type": "var.get",
+       "x": 300,
+       "y": 3782,
+       "params": {
+        "variable": "Heat"
+       }
+      },
+      {
+       "id": 66,
+       "type": "func.pure",
+       "x": 600,
+       "y": 3742,
+       "params": {
+        "function": "StarsForHeat"
+       }
+      },
+      {
+       "id": 67,
+       "type": "func.return",
+       "x": 940,
+       "y": 3672,
+       "params": {
+        "function": "Stars"
+       }
+      },
+      {
+       "id": 68,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3912,
+       "params": {
+        "function": "Report"
+       }
+      },
+      {
+       "id": 69,
+       "type": "flow.branch",
+       "x": 300,
+       "y": 3912,
+       "comment": "Nobody saw it: nothing happens"
+      },
+      {
+       "id": 70,
+       "type": "func.pure",
+       "x": 300,
+       "y": 4062,
+       "params": {
+        "function": "Severity"
+       }
+      },
+      {
+       "id": 71,
+       "type": "var.add",
+       "x": 600,
+       "y": 3912,
+       "params": {
+        "variable": "Heat"
+       }
+      },
+      {
+       "id": 72,
+       "type": "var.set",
+       "x": 900,
+       "y": 3912,
+       "params": {
+        "variable": "HiddenMs"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 73,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4232,
+       "params": {
+        "function": "Update"
+       }
+      },
+      {
+       "id": 74,
+       "type": "func.pure",
+       "x": 0,
+       "y": 4432,
+       "params": {
+        "function": "Stars"
+       }
+      },
+      {
+       "id": 75,
+       "type": "math.formula",
+       "x": 300,
+       "y": 4382,
+       "params": {
+        "formula": "stars <= 0 || seen"
+       }
+      },
+      {
+       "id": 76,
+       "type": "flow.branch",
+       "x": 600,
+       "y": 4232,
+       "comment": "No stars, or seen: the escape clock stands at 0"
+      },
+      {
+       "id": 77,
+       "type": "var.set",
+       "x": 900,
+       "y": 4212,
+       "params": {
+        "variable": "HiddenMs"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 78,
+       "type": "math.formula",
+       "x": 600,
+       "y": 4562,
+       "params": {
+        "formula": "dt * 1000"
+       }
+      },
+      {
+       "id": 79,
+       "type": "var.add",
+       "x": 900,
+       "y": 4382,
+       "params": {
+        "variable": "HiddenMs"
+       }
+      },
+      {
+       "id": 80,
+       "type": "func.pure",
+       "x": 900,
+       "y": 4562,
+       "params": {
+        "function": "EscapeMs"
+       }
+      },
+      {
+       "id": 81,
+       "type": "math.formula",
+       "x": 1200,
+       "y": 4532,
+       "params": {
+        "formula": "hidden >= escape"
+       }
+      },
+      {
+       "id": 82,
+       "type": "flow.branch",
+       "x": 1200,
+       "y": 4382,
+       "comment": "Out of sight long enough: escaped"
+      },
+      {
+       "id": 83,
+       "type": "func.call",
+       "x": 1480,
+       "y": 4382,
+       "params": {
+        "function": "Clear"
+       }
+      },
+      {
+       "id": 84,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4760,
+       "params": {
+        "function": "Clear"
+       }
+      },
+      {
+       "id": 85,
+       "type": "var.set",
+       "x": 300,
+       "y": 4760,
+       "params": {
+        "variable": "Heat"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.set",
+       "x": 600,
+       "y": 4760,
+       "params": {
+        "variable": "HiddenMs"
+       },
+       "values": {
+        "value": 0
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "then",
+       3,
+       "exec"
+      ],
+      [
+       2,
+       "result",
+       3,
+       "severity"
+      ],
+      [
+       1,
+       "crime",
+       2,
+       "crime"
+      ],
+      [
+       4,
+       "then",
+       6,
+       "exec"
+      ],
+      [
+       5,
+       "result",
+       6,
+       "stars"
+      ],
+      [
+       4,
+       "heat",
+       5,
+       "heat"
+      ],
+      [
+       7,
+       "then",
+       9,
+       "exec"
+      ],
+      [
+       8,
+       "result",
+       9,
+       "level"
+      ],
+      [
+       7,
+       "stars",
+       8,
+       "stars"
+      ],
+      [
+       7,
+       "lowest",
+       8,
+       "lowest"
+      ],
+      [
+       10,
+       "value",
+       8,
+       "maxStars"
+      ],
+      [
+       12,
+       "then",
+       14,
+       "exec"
+      ],
+      [
+       13,
+       "result",
+       14,
+       "count"
+      ],
+      [
+       12,
+       "stars",
+       15,
+       "stars"
+      ],
+      [
+       15,
+       "level",
+       13,
+       "level"
+      ],
+      [
+       16,
+       "then",
+       18,
+       "exec"
+      ],
+      [
+       17,
+       "result",
+       18,
+       "meters"
+      ],
+      [
+       16,
+       "stars",
+       19,
+       "stars"
+      ],
+      [
+       19,
+       "level",
+       17,
+       "level"
+      ],
+      [
+       20,
+       "then",
+       22,
+       "exec"
+      ],
+      [
+       21,
+       "result",
+       22,
+       "ms"
+      ],
+      [
+       20,
+       "stars",
+       23,
+       "stars"
+      ],
+      [
+       23,
+       "level",
+       21,
+       "level"
+      ],
+      [
+       24,
+       "then",
+       26,
+       "exec"
+      ],
+      [
+       25,
+       "result",
+       26,
+       "meters"
+      ],
+      [
+       24,
+       "index",
+       25,
+       "index"
+      ],
+      [
+       27,
+       "then",
+       29,
+       "exec"
+      ],
+      [
+       28,
+       "result",
+       29,
+       "ms"
+      ],
+      [
+       27,
+       "stars",
+       30,
+       "stars"
+      ],
+      [
+       30,
+       "level",
+       28,
+       "level"
+      ],
+      [
+       31,
+       "then",
+       33,
+       "exec"
+      ],
+      [
+       32,
+       "result",
+       33,
+       "ms"
+      ],
+      [
+       31,
+       "stars",
+       34,
+       "stars"
+      ],
+      [
+       34,
+       "level",
+       32,
+       "level"
+      ],
+      [
+       35,
+       "then",
+       37,
+       "exec"
+      ],
+      [
+       36,
+       "result",
+       37,
+       "ms"
+      ],
+      [
+       35,
+       "stars",
+       38,
+       "stars"
+      ],
+      [
+       38,
+       "level",
+       36,
+       "level"
+      ],
+      [
+       40,
+       "then",
+       42,
+       "exec"
+      ],
+      [
+       41,
+       "result",
+       42,
+       "damage"
+      ],
+      [
+       40,
+       "stars",
+       43,
+       "stars"
+      ],
+      [
+       43,
+       "level",
+       41,
+       "level"
+      ],
+      [
+       44,
+       "then",
+       46,
+       "exec"
+      ],
+      [
+       45,
+       "result",
+       46,
+       "meters"
+      ],
+      [
+       44,
+       "stars",
+       47,
+       "stars"
+      ],
+      [
+       47,
+       "level",
+       45,
+       "level"
+      ],
+      [
+       48,
+       "value",
+       45,
+       "maxFireRange"
+      ],
+      [
+       49,
+       "then",
+       51,
+       "exec"
+      ],
+      [
+       50,
+       "result",
+       51,
+       "ms"
+      ],
+      [
+       49,
+       "stars",
+       52,
+       "stars"
+      ],
+      [
+       52,
+       "level",
+       50,
+       "level"
+      ],
+      [
+       53,
+       "then",
+       55,
+       "exec"
+      ],
+      [
+       54,
+       "result",
+       55,
+       "chance"
+      ],
+      [
+       53,
+       "stars",
+       56,
+       "stars"
+      ],
+      [
+       56,
+       "level",
+       54,
+       "level"
+      ],
+      [
+       53,
+       "distance",
+       54,
+       "distance"
+      ],
+      [
+       53,
+       "speed",
+       54,
+       "speed"
+      ],
+      [
+       58,
+       "then",
+       62,
+       "exec"
+      ],
+      [
+       58,
+       "distance",
+       59,
+       "distance"
+      ],
+      [
+       60,
+       "value",
+       59,
+       "range"
+      ],
+      [
+       58,
+       "distance",
+       61,
+       "distance"
+      ],
+      [
+       60,
+       "value",
+       61,
+       "range"
+      ],
+      [
+       59,
+       "result",
+       61,
+       "t"
+      ],
+      [
+       61,
+       "result",
+       62,
+       "impulse"
+      ],
+      [
+       64,
+       "then",
+       67,
+       "exec"
+      ],
+      [
+       65,
+       "value",
+       66,
+       "heat"
+      ],
+      [
+       66,
+       "stars",
+       67,
+       "stars"
+      ],
+      [
+       68,
+       "then",
+       69,
+       "exec"
+      ],
+      [
+       68,
+       "witnessed",
+       69,
+       "condition"
+      ],
+      [
+       69,
+       "true",
+       71,
+       "exec"
+      ],
+      [
+       68,
+       "crime",
+       70,
+       "crime"
+      ],
+      [
+       70,
+       "severity",
+       71,
+       "amount"
+      ],
+      [
+       71,
+       "then",
+       72,
+       "exec"
+      ],
+      [
+       73,
+       "then",
+       76,
+       "exec"
+      ],
+      [
+       74,
+       "stars",
+       75,
+       "stars"
+      ],
+      [
+       73,
+       "seen",
+       75,
+       "seen"
+      ],
+      [
+       75,
+       "result",
+       76,
+       "condition"
+      ],
+      [
+       76,
+       "true",
+       77,
+       "exec"
+      ],
+      [
+       76,
+       "false",
+       79,
+       "exec"
+      ],
+      [
+       73,
+       "dt",
+       78,
+       "dt"
+      ],
+      [
+       78,
+       "result",
+       79,
+       "amount"
+      ],
+      [
+       79,
+       "then",
+       82,
+       "exec"
+      ],
+      [
+       79,
+       "value",
+       81,
+       "hidden"
+      ],
+      [
+       74,
+       "stars",
+       80,
+       "stars"
+      ],
+      [
+       80,
+       "ms",
+       81,
+       "escape"
+      ],
+      [
+       81,
+       "result",
+       82,
+       "condition"
+      ],
+      [
+       82,
+       "true",
+       83,
+       "exec"
+      ],
+      [
+       84,
+       "then",
+       85,
+       "exec"
+      ],
+      [
+       85,
+       "then",
+       86,
+       "exec"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Severity",
+       "inputs": [
+        {
+         "name": "crime",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "severity",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "How much heat a crime adds. Crimes: 0 person, 1 person hit, 2 player, 3 car, 4 bus, 5 police drone, 6 police officer, 7 police car, 8 carjacking, 9 bird"
+      },
+      {
+       "name": "StarsForHeat",
+       "inputs": [
+        {
+         "name": "heat",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Wanted stars for a heat: one more at 4, 9, 15, 22 and 30"
+      },
+      {
+       "name": "Level",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "lowest",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "level",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "The stars as a level between Lowest and the most there are"
+      },
+      {
+       "name": "PoliceCount",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "count",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Police units on the way: min(3, ceil(0.7 x stars))"
+      },
+      {
+       "name": "DetectionRadius",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "meters",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "How far the police see the player (m)"
+      },
+      {
+       "name": "EscapeMs",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Out of sight for this long (ms): the heat is gone"
+      },
+      {
+       "name": "SpawnRadius",
+       "inputs": [
+        {
+         "name": "index",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "meters",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Where unit number Index arrives: 58, 66 or 74 m away"
+      },
+      {
+       "name": "ArrivalDelayMs",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "From the first star until the units arrive (ms)"
+      },
+      {
+       "name": "EngageDelayMs",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "From arriving until the units open fire (ms)"
+      },
+      {
+       "name": "WaveBreakMs",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Between two waves of units (ms)"
+      },
+      {
+       "name": "PoliceDamage",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "damage",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "What a police hit takes: 2 2 3 3 4"
+      },
+      {
+       "name": "FireRange",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "meters",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "How far the police fire (m)"
+      },
+      {
+       "name": "FireIntervalMs",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Between two police shots (ms)"
+      },
+      {
+       "name": "HitChance",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "distance",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "chance",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "Chance that a police shot hits: distance (m) and the player's speed (m/s) make it harder"
+      },
+      {
+       "name": "EmpImpulse",
+       "inputs": [
+        {
+         "name": "distance",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "impulse",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "The EMP's push (N s) on a police drone at a distance: 126 at the player, 54 at the edge of its range, nothing beyond"
+      },
+      {
+       "name": "Stars",
+       "inputs": [],
+       "outputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "pure": true,
+       "help": "The wanted stars right now"
+      },
+      {
+       "name": "Report",
+       "inputs": [
+        {
+         "name": "crime",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "witnessed",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "outputs": [],
+       "help": "A crime happened. Only a crime somebody saw adds heat; it also restarts the escape clock"
+      },
+      {
+       "name": "Update",
+       "inputs": [
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "seen",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [],
+       "help": "Every step: Dt in seconds, Seen = a police unit or a witness sees the player right now. Out of sight for EscapeMs, the heat is gone"
+      },
+      {
+       "name": "Clear",
+       "inputs": [],
+       "outputs": [],
+       "help": "No heat, no stars"
+      }
+     ],
+     "comments": [
+      {
+       "id": 11,
+       "x": -48,
+       "y": -80,
+       "w": 1760,
+       "h": 658,
+       "text": "Stars: what a crime costs, and how many stars the heat is"
+      },
+      {
+       "id": 39,
+       "x": -48,
+       "y": 616,
+       "w": 1760,
+       "h": 1498,
+       "text": "The police response: how many units, how far they see, when they come"
+      },
+      {
+       "id": 57,
+       "x": -48,
+       "y": 2152,
+       "w": 1760,
+       "h": 970,
+       "text": "Police fire"
+      },
+      {
+       "id": 63,
+       "x": -48,
+       "y": 3160,
+       "w": 1760,
+       "h": 394,
+       "text": "EMP"
+      },
+      {
+       "id": 87,
+       "x": -48,
+       "y": 3592,
+       "w": 1760,
+       "h": 1338,
+       "text": "The heat: what the police know of, and how the player gets rid of it"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "textures": [],
+ "sounds": []
+}

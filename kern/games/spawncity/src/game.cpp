@@ -10,7 +10,9 @@
 #include <cstring>
 
 #include "kern/core/base.h"
+#include "kern/core/json.h"
 #include "kern/logic/logic.h"
+#include "rules.h"
 
 namespace sc {
 
@@ -127,23 +129,24 @@ Game::~Game() = default;
 
 kern::game::Level Game::build_level() const {
   using namespace kern::game;
+  // The level file is the project (level/spawncity.klevel, rules.h): the world's settings - the
+  // 480 s day, the fog of stylized_world_style.mjs, no ground plane (the terrain's tiles are the
+  // ground), a kill plane far below (real terrain lies under the origin in places), the city's
+  // ambience - and the actors that carry the rules as Blueprints. What follows adds what the
+  // device decides and what is still built in code.
   Level l;
-  l.name = "SpawnCity";
-  l.world.title = "SpawnCity";
+  {
+    kern::json::Value doc;
+    std::string error;
+    if (!kern::json::parse(rules::level_text(), doc, &error) || !from_json(doc, l, &error)) {
+      kern::log(kern::LogLevel::error, "SpawnCity: the level file is broken: %s", error.c_str());
+      l = Level{};
+    }
+  }
   l.world.step_hz = kStepHz;
   l.world.substeps = substeps_;
-  l.world.time_of_day = 0.40f;
-  l.world.day_length = 480;          // SpawnCity: a day-night cycle of 480 s
-  l.world.fog_density = 0.00085f;     // stylized_world_style.mjs
   l.world.shadow_distance = mobile_ ? 70 : 110;
-  l.world.ao_radius = 1.6f;
-  l.world.ground = false;  // the terrain's ground tiles (terrain.h) are the ground
   l.world.ground_color = {0.36f, 0.40f, 0.31f};
-  l.world.ground_friction = 0.8f;
-  l.world.kill_z = -3000;  // real terrain lies below the origin in places (heights are relative to it)
-  l.world.ambience = "builtin:city";
-  l.world.ambience_volume = 0.35f;
-  l.world.reverb = 0.2f;
 
   // The player: Kern's soldier with SpawnCity's on-foot values (walk 5.5, sprint 8.1, jump 3.6 m/s,
   // eye 1.68 m, 90 degrees horizontal field of view), starting with the pistol.
@@ -218,10 +221,9 @@ kern::game::Level Game::build_level() const {
 
   // The fixed-step hook: one node of the game's own type in the level graph.
   kern::logic::Node node;
-  node.id = 1;
+  node.id = l.logic.next_id++;
   node.type = kNodeType;
   l.logic.nodes.push_back(node);
-  l.logic.next_id = 2;
   return l;
 }
 
@@ -256,6 +258,13 @@ bool Game::start(kern::Engine& e) {
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer);  // the night of the facades: game_look.cpp (windows_.night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
+  // The rules that are Blueprints of the level's actors: bound to the C++ that still calls them.
+  {
+    kern::logic::Runtime* logic = world_->logic_runtime();
+    kern::logic::Instance* wanted = logic ? logic->find(world_->find_actor("Wanted")) : nullptr;
+    if (!wanted || wanted->disabled()) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
+    wanted::bind(wanted);
+  }
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");
   jet_actor_ = world_->find_actor("Jet");
@@ -1542,6 +1551,19 @@ std::string Game::command(const std::string& cmd) {
     const int n = std::atoi(cmd.c_str() + 7);
     if (n >= 0 && n < 8) select_foot_weapon(static_cast<weapons::Id>(n));
     return weapons::spec(foot_weapon_).name;
+  }
+  if (cmd == "blueprints") {
+    // Tests / debugging: the level's Blueprints as they run - name, how they are executed
+    // (interpreter, compiled WebAssembly, native C++), functions and nodes.
+    std::string s = "[";
+    if (kern::logic::Runtime* rt = world_->logic_runtime())
+      for (const auto& inst : rt->instances()) {
+        char b[256];
+        std::snprintf(b, sizeof b, "%s{\"name\":\"%s\",\"tier\":\"%s\",\"functions\":%zu,\"nodes\":%zu,\"disabled\":%s}", s.size() > 1 ? "," : "", inst->name().c_str(), inst->tier(),
+                      inst->graph().functions.size(), inst->graph().nodes.size(), inst->disabled() ? "true" : "false");
+        s += b;
+      }
+    return s + "]";
   }
   if (starts("wanted ")) {
     // Tests / debugging: raise the wanted level to N stars (0 clears it).
