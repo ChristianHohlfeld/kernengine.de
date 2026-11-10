@@ -650,6 +650,14 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       }
     }
   }
+  // A Blueprint is its C++ as well: what that cannot say (names C++ cannot write, a Return off its
+  // function's path, a random value read twice ...) is an error of the graph.
+  bool errors = false;
+  for (const Issue& i : out) errors = errors || i.error;
+  if (!errors) {
+    u32 node = 0;
+    if (const std::string why = cpp_problem(g, &node, lib); !why.empty()) err(node, why);
+  }
   return out;
 }
 
@@ -882,6 +890,9 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     }
   }
   exec_table_.push_back(-1);  // never empty (a stable address)
+  for (std::size_t i = 0; i < nodes_.size(); ++i)
+    if (nodes_[i].def && nodes_[i].def->kind == NodeKind::event) events_.push_back(static_cast<int>(i));
+  std::sort(events_.begin(), events_.end(), [&](int a, int b) { return nodes_[static_cast<std::size_t>(a)].node->id < nodes_[static_cast<std::size_t>(b)].node->id; });
   // Functions: where each one's body starts.
   fn_entry_.assign(graph_.functions.size(), -1);
   for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
@@ -1067,8 +1078,10 @@ void Runtime::begin() {
     Event e;
     e.type = "logic.begin";
     e.target = inst.self();
-    for (std::size_t i = 0; i < inst.nodes_.size(); ++i)
-      if (inst.nodes_[i].def && inst.nodes_[i].def->type == "event.begin") run_from(inst, static_cast<int>(i), 0);
+    for (std::size_t at = 0; at < inst.events_.size() && !inst.disabled_; ++at) {
+      const int i = inst.events_[at];
+      if (inst.nodes_[static_cast<std::size_t>(i)].def->type == "event.begin") run_from(inst, i, 0);
+    }
   }
 }
 
@@ -1098,9 +1111,11 @@ void Runtime::fire(const Event& e) {
   for (std::size_t k = 0; k < instances_.size(); ++k) {
     Instance& inst = *instances_[k];
     if (inst.disabled_ || (e.target && inst.self() != e.target && !(e.level && inst.self() == 0))) continue;
-    for (std::size_t i = 0; i < inst.nodes_.size(); ++i) {
+    // (the handlers of one event run in the order of their node ids, whatever order the graph is stored in)
+    for (std::size_t at = 0; at < inst.events_.size(); ++at) {
+      const std::size_t i = static_cast<std::size_t>(inst.events_[at]);
       Instance::CNode& c = inst.nodes_[i];
-      if (!c.def || c.def->kind != NodeKind::event || c.def->event != e.type) continue;
+      if (c.def->event != e.type) continue;
       bool ok;
       if (c.def->accepts) ok = c.def->accepts(*c.node, e);
       else {
@@ -1241,6 +1256,14 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
 // context
 
 Context::Context(Runtime& rt, Instance& inst, int node, int entry) : rt_(rt), inst_(inst), node_(node), entry_(entry) {}
+
+std::string Context::param(std::string_view key, std::string_view fallback) const {
+  const Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
+  for (const auto& [k, v] : c.node->params) if (k == key) return v;
+  if (c.def)
+    for (const ParamDef& p : c.def->params) if (p.key == key) return p.def;
+  return std::string(fallback);
+}
 
 Value Context::pull(int node, int pin) {
   Instance::CNode& src = inst_.nodes_[static_cast<std::size_t>(node)];

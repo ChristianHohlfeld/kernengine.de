@@ -86,6 +86,41 @@ SC_TEST(rules_wanted_unbound) {
   SC_CHECK(t.stars() == 0 && t.heat() == 0, "unbound: no heat");
 }
 
+SC_TEST(rules_wanted_blueprint_is_its_cpp) {
+  // The Blueprint and its C++ are one thing in two notations: written as C++ and read back it is
+  // the same Blueprint, the text is the same again, and the rules give the same numbers.
+  kern::logic::Graph g, back, twice;
+  std::string error, text, again, difference, name;
+  SC_CHECK(rules::actor_graph("Wanted", g, &error), "the level has the Wanted Blueprint (%s)", error.c_str());
+  SC_CHECK(kern::logic::to_cpp(g, "Wanted", text, &error), "it is written as C++ (%s)", error.c_str());
+  SC_CHECK(kern::logic::from_cpp(text, back, &name, &error) && name == "Wanted", "the C++ is read back (%s)", error.c_str());
+  SC_CHECK(kern::logic::same_blueprint(g, back, &difference), "it is the same Blueprint (%s)", difference.c_str());
+  SC_CHECK(kern::logic::to_cpp(back, name, again, &error) && again == text, "what was read writes the same text again");
+  SC_CHECK(kern::logic::from_cpp(again, twice, nullptr, &error) && twice == back, "and reads as the same graph again");
+  // every rule is a function of the struct, every formula an expression of it
+  for (const char* line : {"struct Wanted : kern::Blueprint {", "Float Heat = 0.0;", "KERN_PURE ArrivalDelayMsResult ArrivalDelayMs(Int stars = 0) {",
+                           "kern::math::max(9000.0, 16000.0 - level * 1300.0)", "Heat += kern::to<Float>(Severity(crime).severity);", "void Clear() {"})
+    SC_CHECK(text.find(line) != std::string::npos, "the text has \"%s\"", line);
+  SC_CHECK(text.find("call_node") == std::string::npos && text.find("read_pin") == std::string::npos, "nothing in it calls back into a node registry");
+  // the Blueprint read from the C++ runs the rules exactly like the level's
+  WantedBlueprint::Host host;
+  kern::logic::Runtime rt(host);
+  kern::logic::Instance* from_text = rt.add(back, 1, "Wanted");
+  rt.begin();
+  WantedBlueprint bp;
+  SC_CHECK(bp.inst && from_text && !from_text->disabled(), "both run");
+  if (!bp.inst || !from_text) return;
+  for (const kern::logic::Function& f : g.functions) {
+    if (!f.pure) continue;
+    for (f64 a = 0; a <= 6; a += 0.5) {
+      std::vector<kern::logic::Value> args, one, two;
+      for (std::size_t k = 0; k < f.inputs.size(); ++k) args.push_back(kern::logic::Value::number(a + 7.5 * static_cast<f64>(k)));
+      const bool ran = bp.inst->call(f.name, args, one) && from_text->call(f.name, args, two);
+      SC_CHECK(ran && one.size() == two.size() && (one.empty() || one[0].as_number() == two[0].as_number()), "%s(%g) is the same", f.name.c_str(), a);
+    }
+  }
+}
+
 SC_TEST(rules_wanted_levels) {
   WantedBlueprint bp;
   SC_CHECK(wanted::stars_for_heat(3.9f) == 0 && wanted::stars_for_heat(4) == 1 && wanted::stars_for_heat(30) == 5, "thresholds 4 9 15 22 30");

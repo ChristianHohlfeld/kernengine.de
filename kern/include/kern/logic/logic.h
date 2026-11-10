@@ -221,10 +221,21 @@ class Formula {
   f64 evaluate(const f64* values, std::size_t count) const;
   /// The parsed formula for a text (parsed once, kept).
   static const Formula& cached(const std::string& text);
+  /// The formula written the one canonical way (single spaces, no brackets that change nothing,
+  /// / % ^ as operators): what the C++ notation reads a formula back as. Empty when !ok().
+  std::string text() const;
+  /// The formula as a C++ expression over its inputs as doubles, with the same value: functions
+  /// and pi are those of kern::math, / % ^ are its calls div, mod and pow, numbers are double
+  /// literals. Read back by from_cpp (the text without "kern::math::" is a formula again).
+  std::string cpp() const;
 
  private:
   friend struct FormulaParser;
   struct Op { u8 code = 0; u8 args = 0; u16 index = 0; f64 number = 0; };
+  struct Term { u8 code = 0; u16 index = 0; int a = -1, b = -1, c = -1; f64 number = 0; };  // the formula as a tree
+  std::string print(int term, int outer, bool cpp) const;
+  std::vector<Term> tree_;
+  int root_ = -1;
   std::vector<Op> code_;
   std::vector<std::string> inputs_;
   std::string error_;
@@ -249,6 +260,9 @@ struct ParamDef {
 
 class Context;
 
+/// event: starts a chain. action: one step that always goes on (one exec output) or ends the
+/// chain (none). pure: a value, no exec pins. flow: decides where the chain goes on - several exec
+/// outputs, or one it may not take (Do Once, Gate).
 enum class NodeKind : u8 { event, action, pure, flow };
 
 struct NodeDef {
@@ -256,6 +270,9 @@ struct NodeDef {
   NodeKind kind = NodeKind::action;
   std::string event;     // events: the Event::type it handles (e.g. "logic.tick", "game.overlap")
   bool latent = false;
+  bool loop = false;     // a loop: exec output 0 is its body (run again and again), output 1 follows it
+  bool memory = false;   // keeps something between runs (a loop's index, Do Once, a Delay's wait, Random's
+                         // sequence): in C++ the node has a member. A value with memory is new on every read.
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;
@@ -331,6 +348,45 @@ class Host {
 /// C++ compiled into the binary.
 bool platform_jit_compile(const std::vector<u8>& module, i32 id);
 void platform_jit_release(i32 function);
+
+// ---------------------------------------------------------------------------
+// The C++ notation (docs/blueprint_cpp.md)
+//
+// A Blueprint and its C++ text are one thing in two notations. The text is a fixed subset of
+// C++: one struct, the variables as members, the functions and events as methods, every node one
+// statement or one expression. to_cpp writes it the one canonical way; from_cpp reads it back as
+// the same Blueprint and refuses, with the place and the reason, whatever is not in the subset.
+
+/// The Blueprint as C++. False: the graph cannot be written (unknown node types, names that are
+/// no C++ names - check() reports the same) and `error` says why.
+/// `layout` false: the code alone, without the KERN_LAYOUT block that says where the nodes are in
+/// the graph view (what Studio shows; apply_cpp reads it back).
+bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), bool layout = true);
+/// The Blueprint a C++ text is. False: `error` says what is not a Blueprint, with line and column.
+bool from_cpp(std::string_view text, Graph& out, std::string* name = nullptr, std::string* error = nullptr, const Library& lib = library());
+/// The Blueprint a C++ text is, as a change to `before`. A text without its KERN_LAYOUT block
+/// keeps, for every node it still has, the id, the place and the comment the node has in
+/// `before`; a new node gets a new id and a place next to the node before it; the comment boxes
+/// stay. (With a KERN_LAYOUT block the text says all of that itself, as for from_cpp.)
+bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error = nullptr, const Library& lib = library());
+/// The one canonical form of a graph - what reading its own C++ gives: the nodes in the order
+/// the text names them, only the values and settings that differ from their defaults, formulas
+/// in their one spelling. It is the same Blueprint (same_blueprint) and runs exactly as `g`.
+bool canonical(const Graph& g, Graph& out, std::string* error = nullptr, const Library& lib = library());
+/// The same Blueprint whatever the order its nodes and wires are stored in: variables,
+/// functions, state machines, comment boxes, and node by node (by id) type, place, comment,
+/// settings and typed-in values as they take effect, and the same wires.
+bool same_blueprint(const Graph& a, const Graph& b, std::string* difference = nullptr, const Library& lib = library());
+/// A name the notation can write as a C++ name: letters, digits and _, not starting with a
+/// digit, no C++ keyword and none of the notation's own names (Float, loop, n12, go12, on12 ...).
+bool cpp_name_ok(std::string_view name);
+/// Why a graph cannot be written as C++ (empty: it can), and the node that is about (0: the
+/// graph itself). check() reports the same as an error.
+std::string cpp_problem(const Graph& g, u32* node = nullptr, const Library& lib = library());
+/// Documents from before names had to be C++ names: renames the variables, functions and function
+/// pins C++ cannot write ("Ball Seen" becomes BallSeen, "Text" TextValue), and every use with
+/// them. Returns what was renamed (old, new); nothing for a graph whose names are fine.
+std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Library& lib = library());
 
 /// Generated code (WebAssembly from the JIT, or C++ exported from Studio) works on this
 /// layout: f64 slots for numeric variables and node state, an i32 continuation stack,
@@ -466,6 +522,7 @@ class Instance {
   std::vector<Machine> machines_;
   std::unordered_map<std::string, int> fn_index_;  // function name -> index in graph_.functions
   std::vector<int> fn_entry_;         // per function: compiled index of its entry node (-1 none)
+  std::vector<int> events_;           // the event nodes, by node id: the order handlers of one event run in
   std::vector<Frame> frames_;
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
   std::vector<i32> stack_;            // [0] = depth, then (pc, entry) pairs
@@ -559,7 +616,9 @@ class Context {
   Instance& instance() { return inst_; }
   ActorRef self() const { return inst_.self_; }
   const Node& node() const { return *inst_.nodes_[node_].node; }
-  std::string param(std::string_view key, std::string_view fallback = {}) const { return node().param(key, fallback); }
+  /// A setting of the node. One it does not store is its definition's default (ParamDef::def):
+  /// `fallback` is for settings the definition does not declare.
+  std::string param(std::string_view key, std::string_view fallback = {}) const;
   /// Which exec input started the node (0 for the first, kResume after a latent wait).
   int entry() const { return entry_; }
   /// Data input by index among *all* inputs (exec inputs included) or by pin id.

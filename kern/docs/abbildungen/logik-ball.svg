@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 174">
-  <!-- Level-Graph des Beispiel-Levels Micro Duck (micro_duck_level in src/game/demos.cpp): alle 0,25 s; ist der Ball sichtbar und Ball Seen noch falsch, zwitschert die Ente (Chirp); Ball Seen bekommt in beiden Zweigen den Wert Visible. -->
+  <!-- Level-Graph des Beispiel-Levels Micro Duck (micro_duck_level in src/game/demos.cpp): alle 0,25 s; ist der Ball sichtbar und BallSeen noch falsch, zwitschert die Ente (Chirp); BallSeen bekommt in beiden Zweigen den Wert Visible. -->
   <rect class="fw" x="2" y="8" width="84" height="30" rx="3"/>
   <path class="fa" d="M2,21 L2,11 Q2,8 5,8 L83,8 Q86,8 86,11 L86,21 Z"/>
   <text x="7" y="17.6" class="k t">Every N Seconds</text>
@@ -15,11 +15,11 @@
   <rect class="fw" x="278" y="36" width="100" height="30" rx="3"/>
   <path class="fa" d="M278,49 L278,39 Q278,36 281,36 L375,36 Q378,36 378,39 L378,49 Z"/>
   <text x="283" y="45.6" class="k t">Set Variable</text>
-  <text x="283" y="60" class="k">Ball Seen = Value</text>
+  <text x="283" y="60" class="k">BallSeen = Value</text>
   <rect class="fw" x="278" y="96" width="100" height="30" rx="3"/>
   <path class="fa" d="M278,109 L278,99 Q278,96 281,96 L375,96 Q378,96 378,99 L378,109 Z"/>
   <text x="283" y="105.6" class="k t">Set Variable</text>
-  <text x="283" y="120" class="k">Ball Seen = Value</text>
+  <text x="283" y="120" class="k">BallSeen = Value</text>
   <rect class="fw" x="2" y="66" width="104" height="30" rx="3"/>
   <path class="fa" d="M2,79 L2,69 Q2,66 5,66 L103,66 Q106,66 106,69 L106,79 Z"/>
   <text x="7" y="75.6" class="k t">Robot Camera Sees</text>
@@ -27,7 +27,7 @@
   <rect class="fw" x="2" y="118" width="72" height="30" rx="3"/>
   <path class="fa" d="M2,131 L2,121 Q2,118 5,118 L71,118 Q74,118 74,121 L74,131 Z"/>
   <text x="7" y="127.6" class="k t">Get Variable</text>
-  <text x="7" y="142" class="k">Ball Seen</text>
+  <text x="7" y="142" class="k">BallSeen</text>
   <rect class="fw" x="92" y="122" width="40" height="18" rx="3"/>
   <path class="fa" d="M92,135 L92,125 Q92,122 95,122 L129,122 Q132,122 132,125 L132,135 Z"/>
   <text x="97" y="131.6" class="k t">NOT</text>

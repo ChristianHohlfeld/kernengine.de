@@ -577,7 +577,8 @@ On Begin Overlap → Add Score (10) → Show Message („+10“) → Play Sound 
 ![Der Graph der Vorlage door: Flip Flop wechselt zwischen zwei Tweens, die die Tür hoch und runter schieben](../abbildungen/logik-tuer.svg)
 
 Interact wechselt zwischen Öffnen und Schließen; jeder Tween läuft 0,8 s und schiebt die Tür jeden
-Schritt ein Stück.
+Schritt ein Stück. Eine Sequence lässt Interact beides tun – die Tür schalten und den Ton spielen:
+Ein Exec-Ausgang hat genau einen Draht.
 
 ### Spawner (Vorlage `spawner`)
 
@@ -598,9 +599,9 @@ dreht er auf der Stelle (45 °/s für 0,6 s), sonst geht er geradeaus (0,3 m/s).
 
 Der Level-Graph des Beispiel-Levels Micro Duck (`micro_duck_level` in `demos.cpp`):
 
-![Alle 0,25 s: zwitschern, wenn der Ball sichtbar ist und Ball Seen noch falsch ist; danach merkt sich Ball Seen die Sichtbarkeit](../abbildungen/logik-ball.svg)
+![Alle 0,25 s: zwitschern, wenn der Ball sichtbar ist und BallSeen noch falsch ist; danach merkt sich BallSeen die Sichtbarkeit](../abbildungen/logik-ball.svg)
 
-Die boolesche Variable „Ball Seen“ sorgt dafür, dass die Ente nur einmal zwitschert, wenn der Ball
+Die boolesche Variable „BallSeen“ sorgt dafür, dass die Ente nur einmal zwitschert, wenn der Ball
 ins Bild kommt – nicht alle 0,25 s, solange er sichtbar ist. Ein Kommentarrahmen im Graphen sagt
 ausdrücklich, dass das eine Demo der Roboter-Knoten ist und nichts, was der Roboter von selbst tut.
 

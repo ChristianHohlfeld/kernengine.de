@@ -1,10 +1,11 @@
-// Browser test of the Blueprint editor's functions and formulas, and of SpawnCity's level file in
-// the editor (Playwright + Chromium):
+// Browser test of the Blueprint editor's functions, formulas and C++ view, and of SpawnCity's
+// level file in the editor (Playwright + Chromium):
 //   node blueprint_e2e.mjs <base url of the repository root>
 //
 //  1. a function made with the mouse and the keyboard in My Blueprint and Details: its name, an
 //     input and an output, a Formula node between the entry and the Return, a call from Begin
-//     Play - compiled, played, and the result on the screen;
+//     Play - compiled, played, and the result on the screen; the same Blueprint in the C++ view,
+//     changed there and applied;
 //  2. kern/games/spawncity/level/spawncity.klevel opens as a level: its actors are there, their
 //     Blueprints compile without errors with the editor's own node library, and Play runs them
 //     as machine code. (The game's project file must stay a file the editor reads.)
@@ -82,6 +83,36 @@ await cmd({cmd: "logicConnect", from: call.id, out: "then", to: msg, in: "exec"}
 await cmd({cmd: "logicConnect", from: call.id, out: "result", to: msg, in: "text"});
 await cmd({cmd: "logicValue", node: call.id, pin: "x", value: 20});
 check(errorsOf(await logic()).length === 0, "the graph compiles");
+
+// ---- 1b. the same Blueprint as C++: read it, change it, apply it ----------------------------------
+await page.click(".lg-cpp");
+const cppText = page.locator(".lg-cpptext");
+check(await until(async () => (await cppText.inputValue()).includes("TwiceResult Twice(Float x = 0.0) {")), "the C++ button shows the Blueprint as C++");
+let code = await cppText.inputValue();
+check(code.includes("return {kern::formula([](Float x, Float bonus) -> Float { return x * 2.0 + bonus; }, x, 0.5)};"), "the Formula node is the expression itself");
+check(/n\d+ = Twice\(20\.0\);/.test(code) && code.includes("KERN_EVENT(on") && !code.includes("KERN_LAYOUT") && !/call_node|read_pin/.test(code), "the call is a call, the event a method; no layout, no callbacks");
+// a change typed into the text becomes the graph (Ctrl+Enter), and the nodes stay where they are
+const places = async () => JSON.stringify((await logic()).nodes.map(n => [n.id, n.x, n.y]).sort((a, b) => a[0] - b[0]));
+const placesBefore = await places();
+await cppText.fill(code.replace("x, 0.5)};", "x, 1.5)};"));
+check(await page.locator(".lg-cppstate.dirty").count() === 1, "a changed text says so");
+await cppText.press("Control+Enter");
+check(await until(async () => (await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 1.5), "Apply changes the Blueprint: the Formula's bonus is 1.5");
+check(await places() === placesBefore, "every node kept its id and its place");
+check(await page.locator(".lg-cppstate.dirty").count() === 0 && (await cppText.inputValue()).includes("x, 1.5)};"), "the view shows the Blueprint as it now is");
+// what is not a Blueprint is refused with its line, and nothing changes
+await cppText.fill((await cppText.inputValue()).replace("Twice(20.0);", "Twice(20.0, 1.0);"));
+await cppText.press("Control+Enter");
+check(await until(async () => /^line \d+, column \d+: /.test(await page.locator(".lg-cpperr").innerText().catch(() => ""))), `a text that is no Blueprint is refused with line and reason (${await page.locator(".lg-cpperr").innerText().catch(() => "")})`);
+check((await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 1.5, "and the Blueprint is untouched");
+await page.click(".lg-cppreset");
+check(await page.locator(".lg-cpperr").isHidden() && (await cppText.inputValue()).includes("Twice(20.0);"), "Reset shows the Blueprint's text again");
+// back to 0.5 through the text, then back to the graph
+await cppText.fill((await cppText.inputValue()).replace("x, 1.5)};", "x, 0.5)};"));
+await page.click(".lg-cppapply");
+check(await until(async () => (await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 0.5), "the Apply button does the same");
+await page.click(".lg-cppclose");
+check(await page.locator(".lg-cppview").isHidden() && errorsOf(await logic()).length === 0, "Graph closes the view; the Blueprint compiles");
 await cmd({cmd: "logicClose"});
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "40.5", 60000), `Play calls the function: 20 * 2 + 0.5 on the screen (${(await status()).hud?.message})`);

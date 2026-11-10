@@ -444,7 +444,7 @@ straight ahead.
 
 **The duck chirps at the ball.** In the Micro Duck example level, the level graph asks every 0.25 s:
 does the head camera see the ball **and** did it not see it before? Then it chirps. The variable
-"Ball Seen" remembers whether the ball was already in view – so the duck chirps once when the ball
+"BallSeen" remembers whether the ball was already in view – so the duck chirps once when the ball
 appears, not every 0.25 s.
 
 > **Try it!** In a level, open the logic editor, choose **Templates…** and insert the traffic
@@ -473,7 +473,7 @@ appears, not every 0.25 s.
 1. After the C++ export, you move a node. Do you have to export again? And if you change a number
    in the node?
 2. Why does logic run only on the server in a network game?
-3. What would happen without the variable "Ball Seen" while the ball is in view?
+3. What would happen without the variable "BallSeen" while the ball is in view?
 4. Why are the loop counters in shared compartments instead of with the interpreter?
 
 ### Solutions

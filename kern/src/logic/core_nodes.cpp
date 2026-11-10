@@ -50,6 +50,12 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
   return p;
 }
 
+/// A value that is new on every read (Random): the node keeps its sequence.
+NodeDef fresh(NodeDef d) {
+  d.memory = true;
+  return d;
+}
+
 f64 random01(Context& c) { return static_cast<f64>(c.host().random() >> 8) / static_cast<f64>(1u << 24); }
 
 int clamp_count(const Node& n, std::string_view key, int def, int lo, int hi) {
@@ -149,7 +155,7 @@ void add_events(Library& lib) {
 void add_flow(Library& lib) {
   {
     // Reroute nodes (Blueprint knots): a wire bends through them; they change nothing.
-    NodeDef d = make("flow.reroute", "Reroute (exec)", "Flow", NodeKind::flow, "A knot an exec wire passes through, to route wires tidily.");
+    NodeDef d = make("flow.reroute", "Reroute (exec)", "Flow", NodeKind::action, "A knot an exec wire passes through, to route wires tidily.");
     d.inputs = {exec_in()};
     d.outputs = {exec_out()};
     d.keywords = "knot reroute wire";
@@ -203,6 +209,8 @@ void add_flow(Library& lib) {
     d.outputs = {exec_out("body", "Loop Body"), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
     d.keywords = "repeat for each count";
     // State in slots (index, last): the same in the interpreter and in generated code.
+    d.loop = true;
+    d.memory = true;
     d.run = [](Context& c) {
       f64& index = c.slot(0);
       f64& last = c.slot(1);
@@ -234,6 +242,7 @@ void add_flow(Library& lib) {
     NodeDef d = make("flow.do_once", "Do Once", "Flow", NodeKind::flow, "Lets the first call through; later calls are ignored until Reset.");
     d.inputs = {exec_in(), exec_in("reset", "Reset"), data("closed", "Start Closed", PinType::boolean, false)};
     d.outputs = {exec_out("completed", "Completed")};
+    d.memory = true;
     d.run = [](Context& c) {
       f64& closed = c.slot(0);
       f64& started = c.slot(1);
@@ -249,6 +258,7 @@ void add_flow(Library& lib) {
     NodeDef d = make("flow.do_n", "Do N", "Flow", NodeKind::flow, "Lets N calls through, then blocks until Reset.");
     d.inputs = {exec_in(), data("n", "N", PinType::integer, 3), exec_in("reset", "Reset")};
     d.outputs = {exec_out("exit", "Exit"), data("counter", "Counter", PinType::integer)};
+    d.memory = true;
     d.run = [](Context& c) {
       f64& counter = c.slot(0);
       if (c.entry() == 1) { counter = 0; return kStop; }
@@ -263,6 +273,7 @@ void add_flow(Library& lib) {
     NodeDef d = make("flow.gate", "Gate", "Flow", NodeKind::flow, "Enter passes through while the gate is open. Open, Close and Toggle change it.");
     d.inputs = {exec_in("enter", "Enter"), exec_in("open", "Open"), exec_in("close", "Close"), exec_in("toggle", "Toggle"), data("closed", "Start Closed", PinType::boolean, false)};
     d.outputs = {exec_out("exit", "Exit")};
+    d.memory = true;
     d.run = [](Context& c) {
       f64& open = c.slot(0);
       f64& started = c.slot(1);
@@ -281,6 +292,7 @@ void add_flow(Library& lib) {
     NodeDef d = make("flow.flip_flop", "Flip Flop", "Flow", NodeKind::flow, "Alternates between A and B on every call.");
     d.inputs = {exec_in()};
     d.outputs = {exec_out("a", "A"), exec_out("b", "B"), data("is_a", "Is A", PinType::boolean)};
+    d.memory = true;
     d.run = [](Context& c) {
       f64& a = c.slot(0);
       a = a != 0 ? 0 : 1;
@@ -292,6 +304,7 @@ void add_flow(Library& lib) {
   {
     NodeDef d = make("flow.delay", "Delay", "Flow", NodeKind::flow, "Waits, then continues. Calls while waiting are ignored.");
     d.latent = true;
+    d.memory = true;
     d.inputs = {exec_in(), data("duration", "Duration", PinType::number, 1)};
     d.outputs = {exec_out("completed", "Completed")};
     d.keywords = "wait timer sleep";
@@ -307,6 +320,7 @@ void add_flow(Library& lib) {
   {
     NodeDef d = make("flow.retrigger_delay", "Retriggerable Delay", "Flow", NodeKind::flow, "Waits; every new call restarts the wait.");
     d.latent = true;
+    d.memory = true;
     d.inputs = {exec_in(), data("duration", "Duration", PinType::number, 1)};
     d.outputs = {exec_out("completed", "Completed")};
     d.run = [](Context& c) {
@@ -320,6 +334,7 @@ void add_flow(Library& lib) {
     NodeDef d = make("flow.tween", "Tween", "Flow", NodeKind::flow,
                      "Runs Update every step for Duration seconds with Alpha going 0 to 1 (eased), then Finished. Use it to move, fade or scale over time (a timeline).");
     d.latent = true;
+    d.memory = true;
     d.inputs = {exec_in("play", "Play"), exec_in("stop", "Stop"), data("duration", "Duration", PinType::number, 1)};
     d.params = {param("ease", "Easing", ParamDef::Kind::choice, "smooth", {"linear", "Linear", "smooth", "Smooth", "in", "Ease in", "out", "Ease out"})};
     d.outputs = {exec_out("update", "Update"), exec_out("finished", "Finished"), data("alpha", "Alpha", PinType::number)};
@@ -527,14 +542,14 @@ void add_math(Library& lib) {
                [](Context& c) { const f64 r = kern::dm::pow(c.in_number("a"), c.in_number("b")); return Value::number(std::isfinite(r) ? r : 0.0); }));
   lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::integer), [](Context& c) { return Value::integer(static_cast<i64>(std::llround(c.in_number("a")))); }));
   lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, data("result", "", K::integer), [](Context& c) { return Value::integer(static_cast<i64>(std::floor(c.in_number("a")))); }));
-  lib.add(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number),
-               [](Context& c) { const f64 lo = c.in_number("min"); return Value::number(lo + (c.in_number("max") - lo) * random01(c)); }, "Deterministic per world", "rand"));
-  lib.add(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
+  lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number),
+               [](Context& c) { const f64 lo = c.in_number("min"); return Value::number(lo + (c.in_number("max") - lo) * random01(c)); }, "Deterministic per world", "rand")));
+  lib.add(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
     const i64 lo = c.in_int("min"), hi = max_of(lo, c.in_int("max"));
     return Value::integer(lo + static_cast<i64>(c.host().random() % static_cast<u32>(min_of<i64>(hi - lo + 1, 0x7fffffff))));
-  }, "Min to Max inclusive", "rand"));
-  lib.add(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean),
-               [](Context& c) { return Value::boolean(random01(c) < c.in_number("chance")); }, "True with the given chance (0..1)", "rand coin"));
+  }, "Min to Max inclusive", "rand")));
+  lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean),
+               [](Context& c) { return Value::boolean(random01(c) < c.in_number("chance")); }, "True with the given chance (0..1)", "rand coin")));
   {
     NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, data("result", "", K::boolean), [](Context& c) {
       const std::string op = c.param("op", "==");

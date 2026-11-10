@@ -438,11 +438,11 @@ näher als 1,6 m, dreht sie 0,6 s auf der Stelle, sonst geht sie geradeaus.
 
 **Die Ente zwitschert beim Ball:** Im Level Micro Duck fragt ein Graph alle 0,25 s: Sieht die
 Kopfkamera den Ball, und hat sie ihn vorher **nicht** gesehen? Dann zwitschert sie. Eine Bool-Variable
-„Ball Seen“ merkt sich den letzten Stand, sonst ginge das Zwitschern alle 0,25 s los, solange der Ball
+„BallSeen“ merkt sich den letzten Stand, sonst ginge das Zwitschern alle 0,25 s los, solange der Ball
 im Bild ist. Ein Kommentar im Graphen sagt: Das ist eine Demo, kein Verhalten des echten Roboters.
 
 > **Mission:** Öffne **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck)
-> und dort den Level-Graphen mit dem Knopf **Logik** (Logic). Finde die Variable „Ball Seen“ und den
+> und dort den Level-Graphen mit dem Knopf **Logik** (Logic). Finde die Variable „BallSeen“ und den
 > Branch. Starte **Spielen** (Play). Das Spiel beginnt hier mit der freien Kamera: Greif den Ball mit der linken Maustaste und zieh ihn vor den Kopf der Ente. Sie zwitschert
 > einmal, und erst wieder, wenn der Ball weg war und neu auftaucht.
 

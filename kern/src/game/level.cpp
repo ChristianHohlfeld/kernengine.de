@@ -920,6 +920,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     if (const json::Value* x = c.find("logic")) {
       logic::Graph g;
       if (!logic::graph_from_json(*x, g, error)) return false;
+      logic::cpp_names(g);  // (levels from before a Blueprint's names had to be C++ names)
       a.logic = std::move(g);
     }
   }
@@ -1070,8 +1071,10 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   }
   r.uinteger("nextId", l.next_id);
   if (!r.ok) return false;
-  if (const json::Value* g = doc.find("logic"); g && !g->is_null())
+  if (const json::Value* g = doc.find("logic"); g && !g->is_null()) {
     if (!logic::graph_from_json(*g, l.logic, error)) return false;
+    logic::cpp_names(l.logic);  // (levels from before a Blueprint's names had to be C++ names)
+  }
   const json::Value& actors = doc["actors"];
   if (!actors.is_null() && !actors.is_array()) { if (error) *error = "actors must be an array"; return false; }
   if (actors.size() > 100000) { if (error) *error = "too many actors"; return false; }

@@ -570,7 +570,8 @@ On Begin Overlap → Add Score (10) → Show Message ("+10") → Play Sound (`bu
 ![The graph of the door template: Flip Flop alternates between two tweens that push the door up and down](../abbildungen/logik-tuer.svg)
 
 Interact alternates between opening and closing; each tween runs for 0.8 s and pushes the door a
-little every step.
+little every step. A Sequence lets Interact do both - switch the door and play the sound: an exec
+output has exactly one wire.
 
 ### Spawner (template `spawner`)
 
@@ -591,9 +592,9 @@ Begin Play turns off the robot's autonomy. Every 0.25 s: if the ToF sees somethi
 
 The level graph of the Micro Duck sample level (`micro_duck_level` in `demos.cpp`):
 
-![Every 0.25 s: chirp if the ball is visible and Ball Seen is still false; then Ball Seen stores the visibility](../abbildungen/logik-ball.svg)
+![Every 0.25 s: chirp if the ball is visible and BallSeen is still false; then BallSeen stores the visibility](../abbildungen/logik-ball.svg)
 
-The boolean variable "Ball Seen" ensures that the duck chirps only once when the ball comes into
+The boolean variable "BallSeen" ensures that the duck chirps only once when the ball comes into
 view – not every 0.25 s for as long as it is visible. A comment box in the graph states explicitly
 that this is a demo of the robot nodes and not something the robot does on its own.
 

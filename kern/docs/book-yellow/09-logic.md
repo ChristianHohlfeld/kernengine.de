@@ -428,12 +428,12 @@ height of 6 m and increase "Spawned" by 1. All players see the copies.
 something closer than 1.6 m, it turns on the spot for 0.6 s; otherwise it walks straight ahead.
 
 **The duck chirps at the ball:** In the level Micro Duck, a graph asks every 0.25 s: does the head
-camera see the ball, and did it **not** see it before? Then it chirps. A Bool variable "Ball Seen"
+camera see the ball, and did it **not** see it before? Then it chirps. A Bool variable "BallSeen"
 remembers the last state; otherwise the chirping would go off every 0.25 s as long as the ball is in
 the picture. A comment in the graph says: this is a demo, not a behavior of the real robot.
 
 > **Mission:** Open **File › Example Levels › Micro Duck** and there the level graph with the
-> **Logic** button. Find the variable "Ball Seen" and the Branch. Start **Play**. Here the game
+> **Logic** button. Find the variable "BallSeen" and the Branch. Start **Play**. Here the game
 > begins with the free camera: grab the ball with the left mouse button and drag it in front of the
 > duck's head. It chirps once, and only again once the ball was gone and shows up again.
 

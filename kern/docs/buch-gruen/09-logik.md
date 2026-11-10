@@ -461,7 +461,7 @@ geradeaus.
 
 **Die Ente zwitschert beim Ball.** Im Beispiel-Level Micro Duck fragt der Level-Graph alle 0,25 s:
 Sieht die Kopfkamera den Ball **und** hat sie ihn vorher nicht gesehen? Dann zwitschert sie. Die
-Variable „Ball Seen“ merkt sich, ob der Ball schon im Bild war – so zwitschert die Ente einmal,
+Variable „BallSeen“ merkt sich, ob der Ball schon im Bild war – so zwitschert die Ente einmal,
 wenn der Ball auftaucht, und nicht alle 0,25 s.
 
 > **Probier's aus!** Öffne in einem Level den Logik-Editor, wähle **Templates…** und füge die
@@ -490,7 +490,7 @@ wenn der Ball auftaucht, und nicht alle 0,25 s.
 1. Du verschiebst nach dem C++-Export einen Knoten. Musst du neu exportieren? Und wenn du eine Zahl
    im Knoten änderst?
 2. Warum läuft Logik im Netzwerkspiel nur auf dem Server?
-3. Was würde ohne die Variable „Ball Seen“ passieren, solange der Ball im Bild ist?
+3. Was würde ohne die Variable „BallSeen“ passieren, solange der Ball im Bild ist?
 4. Warum liegen die Schleifenzähler in gemeinsamen Fächern statt beim Dolmetscher?
 
 ### Lösungen

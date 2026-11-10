@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"15:48",title:"Blueprints sind jetzt auch C++ – in beide Richtungen",items:[
+    "Unter der Haube (für alle Kern-Spiele): Jeder Blueprint hat jetzt genau einen C++-Text, und jeder solche Text ist genau ein Blueprint. Variablen sind Member, Funktionen sind Funktionen, eine Verzweigung ist ein if, eine Formel ist der Ausdruck selbst. Hin und zurück geht nichts verloren – das wird bei jedem Update für jeden Knotentyp der Engine geprüft.",
+    "Im Kern-Editor zeigt der Knopf C++ im Blueprint-Editor diesen Text. Er lässt sich dort ändern und anwenden: Der Blueprint ist dann, was im C++ steht, und alle Knoten bleiben, wo sie waren. Was sich nicht lesen lässt, wird mit Zeile und Grund abgelehnt.",
+    "Die Fahndungsregeln von SpawnCity lassen sich so als C++ lesen und ändern – es bleibt ein und dieselbe Quelle. Am Spiel ändert sich nichts.",
+    "Dafür heißen Variablen, Funktionen und Pins in Blueprints jetzt wie in C++ (ohne Leerzeichen); ältere Levels werden beim Öffnen von selbst umbenannt.",
+  ]},
   {date:"2026-11-10",time:"12:45",title:"SpawnCity wird ein Editor-Projekt: die ersten Regeln sind Blueprints",items:[
     "Die Fahndung (Sterne, Polizei-Anzahl, Ankunft, Trefferchance, EMP, Entkommen) steht nicht mehr im Programmcode, sondern als Blueprint im Level von SpawnCity – 19 Funktionen, die sich im Kern-Editor öffnen und ändern lassen. Am Spiel ändert sich nichts: Alle Werte sind die des Originals und werden bei jedem Update gegen dessen Tabelle geprüft.",
     "Das Level von SpawnCity ist jetzt eine Datei, die der Kern-Editor lesen kann. Schritt für Schritt wandern Regeln und Systeme dorthin, bis SpawnCity ganz ohne eigenen Programmcode auskommt.",

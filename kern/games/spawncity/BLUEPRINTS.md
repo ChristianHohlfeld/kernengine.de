@@ -67,19 +67,38 @@ auch dieser Code in einen Blueprint, entfällt der Aufruf.
 
 ### 1 – Blueprint ⇄ C++, exakt und umkehrbar
 
-Vor allen weiteren Regeln. Heute ist der C++-Export eine Schleife über Knotennummern, die für
-alles außer Ablauf, Zahlen-Variablen und einfacher Mathematik zur Laufzeit in die Knoten-Registry
-zurückruft (`call_node`, `read_pin`) – auch für Funktionsaufrufe und Formeln. Einen Weg von C++
-zurück zum Blueprint gibt es nicht. Ziel:
+Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schreibweisen
+(`kern/docs/blueprint_cpp.md`): gespeichert wird der Blueprint, das C++ ist die zweite, ebenfalls
+änderbare Ansicht – eine Quelle, kein Auseinanderlaufen.
 
-- [ ] **Exakter Export:** Ein Blueprint ist eine C++-Klasse. Variablen sind Member, Funktionen
-  sind Funktionen, Events sind Methoden, Branch ist `if`, Schleifen sind Schleifen, eine Formel
-  ist der Ausdruck selbst, jeder Gameplay-Knoten ist ein direkter Aufruf der Engine. Kein Rückruf
-  in den Interpreter; ein Test verbietet `call_node` / `read_pin` im erzeugten Code.
-- [ ] **Rückweg:** Dieses C++ wird wieder zum selben Blueprint eingelesen. Jede Form im C++
-  entspricht genau einem Knoten; was nicht eindeutig ist, wird mit Stelle und Grund abgelehnt.
-- [ ] **Beweis:** Für jeden Knotentyp und jeden Test-Graphen ergibt Blueprint → C++ → Blueprint
-  denselben Graphen, und das kompilierte C++ liefert dasselbe wie Interpreter und JIT.
+- [x] **Die Schreibweise, hin:** Ein Blueprint ist eine C++-Klasse (`logic::to_cpp`). Variablen
+  sind Member, Funktionen sind Funktionen, Events sind Methoden, Branch ist `if`, Schleifen sind
+  Schleifen, eine Formel ist der Ausdruck selbst, jeder Knoten ist ein Aufruf seiner Funktion. Im
+  Text steht kein Rückruf in eine Knoten-Registry.
+- [x] **Der Rückweg:** Dieses C++ wird wieder zum selben Blueprint eingelesen (`logic::from_cpp`),
+  auch von Hand geschriebenes (frühes `return`, `else if`, Anweisungen nach einem `if`). Was nicht
+  zur Schreibweise gehört, wird mit Zeile, Spalte und Grund abgelehnt.
+- [x] **Der Beweis für die Schreibweise:** Für jeden Knotentyp der Bibliothek und jeden
+  Test-Graphen ergibt Blueprint → C++ → Blueprint denselben Blueprint, der Text ist ein Fixpunkt,
+  und der zurückgelesene Blueprint läuft genau gleich (`kern/tests/run.sh logic_notation`; für
+  „Wanted“: `rules_wanted_blueprint_is_its_cpp`).
+- [x] **Die Regeln dazu:** Namen sind C++-Namen, ein Exec-Ausgang hat einen Draht, Return liegt
+  auf einem Weg seiner Funktion, ein Zufallswert hat einen Leser. `check()` meldet Verstöße, der
+  Editor nimmt solche Namen nicht an.
+- [x] **Die C++-Ansicht im Editor:** **C++** in der Toolbar des Blueprint-Editors zeigt den Text
+  des Blueprints; ändern und **Apply** (ein Undo-Schritt) macht ihn zum Blueprint. Bestehende
+  Knoten behalten Id, Platz und Kommentar, neue stehen neben ihrem Vorgänger; Fehler nennen Zeile
+  und Grund (`logic::apply_cpp`, Befehle `logicCpp` / `logicCppApply`).
+- [ ] Die Ansicht komfortabler: Syntaxfarben, Vervollständigung der Knotennamen, neue Knoten
+  ohne Überlappung einsortieren.
+- [ ] **Native Ausführung genau dieses Textes:** `kern/logic/blueprint.h` und typisierte
+  Knotenfunktionen (jeder Knoten eine C++-Funktion, die Interpreter und Text gemeinsam benutzen);
+  der bisherige Export (Schleife über Knotennummern mit `call_node` / `read_pin`) entfällt. Dazu
+  gehört, die Bedeutung an den Stellen festzulegen, an denen C++ sie vorgibt: Eingänge werden vor
+  dem Knoten ausgewertet, Parameter gelten je Aufruf, jeder Random-Knoten hat seine eigene Folge.
+  Test: Das kompilierte C++ liefert dasselbe wie Interpreter und JIT, und im erzeugten Code gibt
+  es keinen Rückruf.
+- [ ] **Nativer Export:** Der Editor exportiert das Spiel mit diesen Klassen, voll optimiert.
 - [ ] Der JIT erzeugt Formeln und Funktionsaufrufe ebenfalls direkt (heute Rückruf).
 
 ### 2 – Die Sprache vervollständigen

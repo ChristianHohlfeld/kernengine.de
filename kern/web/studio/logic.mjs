@@ -131,7 +131,7 @@ export class LogicEditor {
         <label class="lg-ownerbox" title="Whose Blueprint: the level's or an actor's">${lgIco("graph")}<select class="lg-owner"></select></label>
         <div class="lg-spacer"></div>
         <button class="lg-tb lg-templates" title="Ready-made graphs">${lgIco("tpl")}<span>Templates</span>${lgIco("chevron", "lg-dd")}</button>
-        <button class="lg-tb lg-cpp" title="Download the graph as C++ source: built into a game it runs as native code">${lgIco("code")}<span>C++</span></button>
+        <button class="lg-tb lg-cpp" title="The Blueprint as C++: the same thing in its second notation - read it, change it, apply it">${lgIco("code")}<span>C++</span></button>
         <button class="lg-tb lg-boxbtn" title="Box select (touch)">${lgIco("box")}</button>
         <button class="lg-tb lg-help" title="Shortcuts and how it works">${lgIco("help")}</button>
         <button class="lg-tb lg-panelbtn lg-detbtn" title="Details">${lgIco("info")}</button>
@@ -168,6 +168,18 @@ export class LogicEditor {
               <div class="lg-rlist"></div>
             </div>
           </div>
+          <div class="lg-cppview" hidden>
+            <div class="lg-cpphead">
+              <b>C++</b><span class="lg-cppname"></span><span class="lg-cppstate"></span>
+              <div class="lg-spacer"></div>
+              <button class="lg-tb lg-cppapply" title="The Blueprint becomes what this text says (Ctrl+Enter). One undo step.">Apply</button>
+              <button class="lg-tb lg-cppreset" title="Drop the changes: the text of the Blueprint as it is">Reset</button>
+              <button class="lg-tb lg-cppdl" title="Download the source today's game build compiles for this graph">Download</button>
+              <button class="lg-tb lg-cppclose" title="Back to the graph (Esc)">Graph</button>
+            </div>
+            <textarea class="lg-cpptext" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
+            <button class="lg-cpperr" hidden></button>
+          </div>
         </section>
         <aside class="lg-details">
           <div class="lg-ph"><span>Details</span><button class="lg-x" data-close-panel>${lgIco("close")}</button></div>
@@ -188,7 +200,30 @@ export class LogicEditor {
     $(".lg-save").onclick = () => this.studio.uiAction?.({action: "save"});
     $(".lg-findbtn").onclick = () => this.openFind();
     $(".lg-templates").onclick = e => this.templatesMenu(e.currentTarget);
-    $(".lg-cpp").onclick = () => this.exportCpp();
+    $(".lg-cpp").onclick = () => (this.cppOpen ? this.closeCpp(true) : this.openCpp());
+    this.el.cpp = $(".lg-cppview");
+    this.el.cppText = $(".lg-cpptext");
+    this.el.cppErr = $(".lg-cpperr");
+    $(".lg-cppapply").onclick = () => this.applyCpp();
+    $(".lg-cppreset").onclick = () => this.loadCpp();
+    $(".lg-cppdl").onclick = () => this.exportCpp();
+    $(".lg-cppclose").onclick = () => this.closeCpp(true);
+    this.el.cppErr.onclick = () => this.cppJump();
+    this.el.cppText.oninput = () => this.cppState();
+    this.el.cppText.onkeydown = e => {
+      e.stopPropagation();  // (the graph's shortcuts are not for the text)
+      if (e.key === "Tab") {
+        e.preventDefault();
+        this.el.cppText.setRangeText("  ", this.el.cppText.selectionStart, this.el.cppText.selectionEnd, "end");
+        this.cppState();
+      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.applyCpp();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeCpp(false);
+      }
+    };
     $(".lg-help").onclick = () => this.showHelp();
     $(".lg-mybtn").onclick = () => this.togglePanel("my");
     $(".lg-detbtn").onclick = () => this.togglePanel("details");
@@ -233,6 +268,86 @@ export class LogicEditor {
       t("Traffic light (state machine)", "traffic_light"),
       t("Robot: walk and turn away with its ToF", "robot_avoid"),
     ], r.left, r.bottom + 2);
+  }
+
+  // ---- the Blueprint as C++ (kern/docs/blueprint_cpp.md) ------------------------
+  // The graph and this text are one thing in two notations: the engine writes the text from the
+  // graph (logicCpp) and reads a changed text back as the graph (logicCppApply).
+  openCpp() {
+    this.cppOpen = true;
+    this.el.cpp.hidden = false;
+    this.host.classList.add("show-cpp");
+    this.loadCpp();
+    this.el.cppText.focus();
+  }
+
+  /// The text of the Blueprint as it is now (drops what was typed).
+  loadCpp() {
+    const r = this.engine.command({cmd: "logicCpp"});
+    this.cppBase = r?.ok ? r.text : "";
+    this.el.cppText.value = this.cppBase;
+    this.el.cppText.readOnly = !r?.ok;
+    this.el.cpp.querySelector(".lg-cppname").textContent = r?.name ? " · " + r.name : "";
+    this.cppProblem(r?.ok ? "" : (r?.error || "This Blueprint cannot be written as C++ yet.") + " Fix it in the graph (Compiler Results).");
+    this.cppState();
+  }
+
+  cppDirty() { return this.cppOpen && this.el.cppText.value !== this.cppBase; }
+
+  cppState() {
+    const dirty = this.cppDirty();
+    const st = this.el.cpp.querySelector(".lg-cppstate");
+    st.textContent = dirty ? "changed - Apply makes it the Blueprint" : "the Blueprint as it is";
+    st.classList.toggle("dirty", dirty);
+    this.el.cpp.querySelector(".lg-cppapply").disabled = !dirty;
+    this.el.cpp.querySelector(".lg-cppreset").disabled = !dirty;
+  }
+
+  cppProblem(text) {
+    this.el.cppErr.hidden = !text;
+    this.el.cppErr.textContent = text || "";
+  }
+
+  /// Puts the cursor where the error is ("line 12, column 5: ...").
+  cppJump() {
+    const m = /^line (\d+), column (\d+)/.exec(this.el.cppErr.textContent || "");
+    if (!m) return;
+    const lines = this.el.cppText.value.split("\n");
+    const line = Math.min(+m[1], lines.length);
+    let at = 0;
+    for (let i = 0; i < line - 1; i++) at += lines[i].length + 1;
+    at += Math.max(0, Math.min(+m[2] - 1, lines[line - 1].length));
+    this.el.cppText.focus();
+    this.el.cppText.setSelectionRange(at, Math.min(at + 1, this.el.cppText.value.length));
+    const lh = parseFloat(getComputedStyle(this.el.cppText).lineHeight) || 18;
+    this.el.cppText.scrollTop = Math.max(0, (line - 4) * lh);
+  }
+
+  applyCpp() {
+    if (!this.cppDirty()) return;
+    const r = this.engine.command({cmd: "logicCppApply", text: this.el.cppText.value});
+    this.studio.flushUi();
+    if (!r?.ok) {
+      this.cppProblem(r?.error || "The text could not be read.");
+      this.cppJump();
+      return;
+    }
+    this.loadCpp();  // (as the engine writes it: the one canonical form)
+    this.studio.toast("Applied: the Blueprint is what the C++ says.");
+  }
+
+  /// Back to the graph. With changes not applied, Esc asks once; the Graph button drops them.
+  closeCpp(force) {
+    if (!force && this.cppDirty() && !this.cppAsked) {
+      this.cppAsked = true;
+      this.studio.toast("The C++ has changes that are not applied. Ctrl+Enter applies them; Esc again drops them.");
+      return;
+    }
+    this.cppAsked = false;
+    this.cppOpen = false;
+    this.el.cpp.hidden = true;
+    this.host.classList.remove("show-cpp");
+    this.el.canvas.focus();
   }
 
   exportCpp() {
@@ -291,6 +406,12 @@ export class LogicEditor {
       if (this.selLink && !(data.links || []).some(l => l.join() === this.selLink.join())) this.selLink = null;
       if (data.view === "graph") this.renderGraph(data);
       else this.renderMachine(data, this.machine);
+    }
+    // The C++ view shows this Blueprint: it follows (undo, a renamed variable, another Blueprint)
+    // unless its text is being changed.
+    if (this.cppOpen && !this.cppDirty()) {
+      const r = this.engine.command({cmd: "logicCpp"});
+      if ((r?.ok ? r.text : "") !== this.cppBase) this.loadCpp();
     }
     this.applyView();
     this.renderStatus(data);
@@ -1956,7 +2077,18 @@ export const LOGIC_STYLE = `
 .lg-acts button{height:20px;padding:0 6px;border:1px solid #444;border-radius:3px;background:#161616;font-size:11px!important}
 .lg-acts button:hover{border-color:var(--lg-acc)}
 .lg-none{padding:4px 14px;color:#808080;font-size:11.5px}
-.lg-center{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.lg-center{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.lg-cppview{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;background:#181818}
+.lg-cppview[hidden]{display:none}
+.lg-cpphead{display:flex;align-items:center;gap:6px;height:34px;padding:0 8px 0 12px;background:#1a1a1a;border-bottom:1px solid var(--lg-line);flex:none;color:#eee}
+.lg-cppname{color:#9aa0a6}.lg-cppstate{margin-left:10px;color:#7f8790}.lg-cppstate.dirty{color:var(--lg-sel)}
+.lg-cpphead .lg-tb:disabled{opacity:.4;pointer-events:none}
+.lg-cpptext{flex:1;min-height:0;width:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;background:#161616;color:#d8dade;
+  font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;tab-size:2;white-space:pre;overflow:auto}
+.lg-cpptext[readonly]{color:#8a8f96}
+.lg-cpperr{flex:none;display:block;width:100%;text-align:left;border:0;border-top:1px solid #5a1d1d;background:#3a1717;color:#ffb4a8;padding:8px 14px;font:12px/1.4 inherit;cursor:pointer;white-space:pre-wrap}
+.lg-cpperr[hidden]{display:none}
+.show-cpp .lg-cpp{background:var(--lg-hi)}
 .lg-tabs{display:flex;align-items:flex-end;gap:2px;height:32px;padding:0 6px;background:#1a1a1a;border-bottom:1px solid var(--lg-line);flex:none;overflow-x:auto;scrollbar-width:none}
 .lg-tab{display:flex;align-items:center;gap:6px;height:27px;padding:0 12px;border:1px solid transparent;border-bottom:0;border-radius:5px 5px 0 0;background:transparent;color:#a8a8a8;white-space:nowrap}
 .lg-tab .lg-i{width:13px;height:13px}

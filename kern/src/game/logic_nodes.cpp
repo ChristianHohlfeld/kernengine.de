@@ -205,13 +205,17 @@ void add_actor_nodes(logic::Library& lib) {
                    c.out("count", Value::integer(static_cast<i64>(v.size())));
                  },
                  "The first living actor with the tag, and how many have it.", "get tagged"));
-  lib.add(getter("actor.random_tag", "Random Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "spawn")}, {data("actor", "Actor", PinType::actor)},
+  {
+    NodeDef d = getter("actor.random_tag", "Random Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "spawn")}, {data("actor", "Actor", PinType::actor)},
                  [](Context& c, GameWorld& w) {
                    std::vector<ActorId> v;
                    w.actors_with_tag(c.in_text("tag"), v);
                    c.out("actor", Value::actor(v.empty() ? 0 : v[c.host().random() % v.size()]));
                  },
-                 "One living actor with the tag, chosen at random.", "pick"));
+                 "One living actor with the tag, chosen at random.", "pick");
+    d.memory = true;  // new on every read
+    lib.add(std::move(d));
+  }
   lib.add(getter("actor.has_tag", "Has Tag", "Actors", {data("target", "Actor", PinType::actor, 0), data("tag", "Tag", PinType::text, "enemy")}, {data("result", "Result", PinType::boolean)},
                  [](Context& c, GameWorld& w) { c.out("result", Value::boolean(w.has_tag(target(c), c.in_text("tag")))); }, "Does the actor carry the tag?", "is"));
   lib.add(getter("actor.name", "Get Name", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("name", "Name", PinType::text)},
@@ -516,6 +520,8 @@ void add_game_nodes(logic::Library& lib) {
     NodeDef d = make("flow.for_each_tag", "For Each Actor with Tag", "Flow", NodeKind::flow, "Runs Loop Body for every living actor with the tag, then Completed.", "loop all every");
     d.inputs = {exec_in(), data("tag", "Tag", PinType::text, "target")};
     d.outputs = {exec_out("body", "Loop Body"), data("actor", "Actor", PinType::actor), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
+    d.loop = true;
+    d.memory = true;
     d.run = [](Context& c) {
       GameWorld* w = world(c);
       if (!w) return c.exec("completed");

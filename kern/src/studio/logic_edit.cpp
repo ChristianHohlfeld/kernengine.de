@@ -24,6 +24,21 @@ json::Value fail_result(const std::string& text) {
   return r;
 }
 
+/// Why `name` cannot name a variable, a function or a function's pin (empty: it can). A Blueprint
+/// is its C++ as well (logic::to_cpp), and there these are names of the language.
+std::string name_problem(const logic::Graph& g, const std::string& name) {
+  if (!logic::cpp_name_ok(name))
+    return "\"" + name + "\" cannot be a name: letters, digits and _ (no spaces), not a word of C++ (int, class ...) or of Blueprints in C++ (Float, Text, loop ...)";
+  for (const auto& d : logic::library().all()) {
+    std::string fn = d->type;
+    for (char& ch : fn) if (ch == '.') ch = '_';
+    if (fn == name) return "\"" + name + "\" is the name of a node (" + d->label + ")";
+  }
+  for (const logic::Function& f : g.functions)
+    if (f.name + "Result" == name) return "\"" + name + "\" is taken by the function " + f.name + " (the type of its results in C++)";
+  return {};
+}
+
 std::string lower(std::string s) {
   for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   return s;
@@ -556,6 +571,19 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     r.set("text", json::stringify(logic::graph_to_json(part)));
     return r;
   }
+  if (name == "logicCpp") {
+    // The Blueprint in its second notation (docs/blueprint_cpp.md): the code alone - where the
+    // nodes are stays with the graph.
+    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const game::Actor* a = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+    const std::string owner_name = a ? a->name : std::string("Level");
+    std::string text, why;
+    if (!logic::to_cpp(g ? *g : logic::Graph(), owner_name, text, &why, logic::library(), false)) return fail_result(why);
+    json::Value r = ok_result();
+    r.set("text", text);
+    r.set("name", owner_name);
+    return r;
+  }
   if (name == "logicExportCpp") {
     // The graph as C++ source (compiled into a game it replaces the interpreter / JIT for this graph).
     const logic::Graph* g = graph_of(level_, logic_owner_);
@@ -615,6 +643,21 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     result.set("ok", done || error.empty());
     return result;
   };
+  if (name == "logicCppApply") {
+    // The Blueprint becomes what the C++ says: one undo step. The nodes the text still has keep
+    // their ids and places; what cannot be read is refused with its line and the reason.
+    const logic::Graph* g = graph_of(level_, owner);
+    logic::Graph now;
+    if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error)) return fail_result(error);
+    bool applied = false;
+    graph_edit("Edit C++", [&](logic::Graph& graph, game::Level&) {
+      graph = std::move(now);
+      applied = true;
+      return true;
+    });
+    if (!applied) return fail_result(error.empty() ? "Stop playing to change the Blueprint" : error);
+    return result;
+  }
   if (name == "logicAdd") {
     const std::string type = str("type");
     if (!logic::library().find(type)) return fail_result("unknown node type " + type);
@@ -634,7 +677,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
             if (o.type == "func.entry" && o.param("function") == wanted) { error = "the function " + wanted + " has its entry node already"; return false; }
         } else {
           std::string base = wanted.empty() ? "NewFunction" : wanted, fname = base;
-          for (int i = 2; g.function(fname); ++i) fname = base + std::to_string(i);
+          if (const std::string why = name_problem(g, base); !why.empty()) { error = why; return false; }
+          for (int i = 2; g.function(fname) || g.variable(fname); ++i) fname = base + std::to_string(i);
           logic::Function f;
           f.name = fname;
           g.functions.push_back(std::move(f));
@@ -693,6 +737,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     json::Value j;
     logic::Graph part;
     if (!json::parse(str("text"), j) || !logic::graph_from_json(j, part, &error)) return fail_result(error.empty() ? "not logic nodes" : error);
+    logic::cpp_names(part);  // (copied before names had to be C++ names)
     return graph_edit("Paste Nodes", [&](logic::Graph& g, game::Level&) {
       if (part.nodes.empty() && part.comments.empty()) return false;
       f32 minx = 1e9f, miny = 1e9f;
@@ -857,7 +902,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "rename") {
         const std::string to = str("to");
-        if (to.empty() || to.size() > 64 || g.function(to)) { error = "that name is empty or taken"; return false; }
+        if (to.empty() || to.size() > 64 || g.function(to) || g.variable(to)) { error = "that name is empty or taken"; return false; }
+        if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         for (logic::Node& n : g.nodes) if (uses(n)) n.set_param("function", to);
         f->name = to;
         return true;
@@ -881,7 +927,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       auto valid_name = [&](const std::string& n) {
         if (n.empty() || n.size() > 64 || n == "exec" || n == "then") return false;
         for (const logic::FunctionPin& p : pins) if (p.name == n) return false;
-        return true;
+        // (an input is a parameter in the function's C++: it cannot hide a variable or a function)
+        if (input_side && (g.variable(n) || g.function(n))) return false;
+        return name_problem(g, n).empty();
       };
       if (op == "pinAdd") {
         if (pins.size() >= 16) { error = "a function has at most 16 inputs and 16 outputs"; return false; }
@@ -915,7 +963,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "pinRename") {
         const std::string to = str("to");
-        if (!valid_name(to)) { error = "that name is empty or taken"; return false; }
+        if (!valid_name(to)) { error = name_problem(g, to).empty() ? "that name is empty or taken" : name_problem(g, to); return false; }
         for (logic::Link& l : g.links) {
           bool as_input = false;
           if (!on_pin(l, as_input)) continue;
@@ -955,7 +1003,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       const std::string var = str("name");
       if (op == "add") {
         std::string base = var.empty() ? "NewVar" : var, n = base;
-        for (int i = 2; g.variable(n); ++i) n = base + std::to_string(i);
+        if (const std::string why = name_problem(g, base); !why.empty() && !var.empty()) { error = why; return false; }
+        for (int i = 2; g.variable(n) || g.function(n); ++i) n = base + std::to_string(i);
         logic::PinType t = logic::PinType::number;
         logic::pin_type_from_name(str("type").empty() ? "float" : str("type"), t);
         if (t == logic::PinType::exec) t = logic::PinType::number;
@@ -971,7 +1020,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "rename") {
         const std::string to = str("to");
-        if (to.empty() || to.size() > 64 || g.variable(to)) { error = "that name is empty or taken"; return false; }
+        if (to.empty() || to.size() > 64 || g.variable(to) || g.function(to)) { error = "that name is empty or taken"; return false; }
+        if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         for (logic::Node& n : g.nodes)
           if (n.param("variable") == var) n.set_param("variable", to);
         for (logic::StateMachine& m : g.machines)
@@ -1144,9 +1194,11 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!n || !pin_of(g, node, str("pin"), output, p) || p.type == logic::PinType::exec) { error = "only data pins can become variables"; return false; }
       std::string base;
       for (char ch : p.label.empty() ? p.id : p.label) if (std::isalnum(static_cast<unsigned char>(ch))) base += ch;
-      if (base.empty()) base = "NewVar";
+      // (a name C++ can write: "Text" or "Actor" alone would be the type's)
+      if (base.empty() || std::isdigit(static_cast<unsigned char>(base[0]))) base = "NewVar" + base;
+      if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
-      for (int i = 2; g.variable(vname); ++i) vname = base + std::to_string(i);
+      for (int i = 2; g.variable(vname) || g.function(vname); ++i) vname = base + std::to_string(i);
       logic::Variable v{vname, p.type, logic::Value::zero(p.type).to_json(), {}};
       if (!output)
         if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, p.type).to_json();
@@ -1207,12 +1259,13 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const std::string which = str("template");
     std::string text;
     if (which == "door")
-      text = R"({"nodes":[{"id":1,"type":"game.interact","x":0,"y":0},{"id":2,"type":"flow.flip_flop","x":320,"y":0},
-        {"id":3,"type":"flow.tween","x":576,"y":-128,"params":{"ease":"smooth"},"values":{"duration":0.8}},
-        {"id":4,"type":"flow.tween","x":576,"y":112,"params":{"ease":"smooth"},"values":{"duration":0.8}},
-        {"id":5,"type":"actor.move_by","x":896,"y":-128,"values":{"offset":[0,0,0.05]}},{"id":6,"type":"actor.move_by","x":896,"y":112,"values":{"offset":[0,0,-0.05]}},
-        {"id":7,"type":"game.sound","x":576,"y":352,"params":{"sound":"builtin:confirm"}}],
-        "links":[[1,"then",2,"exec"],[2,"a",3,"play"],[2,"b",4,"play"],[3,"update",5,"exec"],[4,"update",6,"exec"],[1,"then",7,"exec"]]})";
+      text = R"({"nodes":[{"id":1,"type":"game.interact","x":0,"y":0},{"id":8,"type":"flow.sequence","x":288,"y":0,"params":{"count":"2"}},
+        {"id":2,"type":"flow.flip_flop","x":544,"y":0},
+        {"id":3,"type":"flow.tween","x":800,"y":-128,"params":{"ease":"smooth"},"values":{"duration":0.8}},
+        {"id":4,"type":"flow.tween","x":800,"y":112,"params":{"ease":"smooth"},"values":{"duration":0.8}},
+        {"id":5,"type":"actor.move_by","x":1120,"y":-128,"values":{"offset":[0,0,0.05]}},{"id":6,"type":"actor.move_by","x":1120,"y":112,"values":{"offset":[0,0,-0.05]}},
+        {"id":7,"type":"game.sound","x":544,"y":352,"params":{"sound":"builtin:confirm"}}],
+        "links":[[1,"then",8,"exec"],[8,"then0",2,"exec"],[8,"then1",7,"exec"],[2,"a",3,"play"],[2,"b",4,"play"],[3,"update",5,"exec"],[4,"update",6,"exec"]]})";
     else if (which == "score_zone")
       text = R"({"nodes":[{"id":1,"type":"game.overlap_begin","x":0,"y":0},{"id":2,"type":"game.add_score","x":320,"y":0,"values":{"points":10}},
         {"id":3,"type":"game.message","x":640,"y":0,"values":{"text":"+10"}},{"id":4,"type":"game.sound","x":960,"y":0,"params":{"sound":"builtin:pickup"}}],
@@ -1242,6 +1295,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     json::Value j;
     logic::Graph part;
     if (!json::parse(text, j) || !logic::graph_from_json(j, part, &error)) return fail_result(error);
+    logic::cpp_names(part);
     return graph_edit("Add Logic Template", [&](logic::Graph& g, game::Level&) {
       // Below what is there.
       f32 y0 = 0;

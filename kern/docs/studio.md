@@ -283,7 +283,7 @@ Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und
 
 | Bereich | Inhalt |
 |---|---|
-| Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, C++-Export |
+| Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, **C++** (der Blueprint als C++: ansehen, ändern, anwenden) |
 | My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call) |
 | Graph | Tabs, Breadcrumb, Zoom-Stufen wie Unreal („Zoom 1:1“, „Zoom −2“), Wasserzeichen EVENT GRAPH |
 | Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
@@ -333,6 +333,19 @@ Im Graphen:
   - Der +-Knopf öffnet das Aktionsmenü als Sheet.
   - My Blueprint und Details sind Schubladen, ein Kasten-Knopf schaltet die Rechteckauswahl ein.
 - **Vorlagen:** Tür, Punktezone, Spawner, Ampel.
+
+### Blueprints als C++
+
+Jeder Blueprint hat genau einen C++-Text und jeder solche Text ist genau ein Blueprint
+(`logic::to_cpp`, `logic::from_cpp`; die Schreibweise, ihre Regeln und der Beweis stehen in
+[blueprint_cpp.md](blueprint_cpp.md)). **C++** in der Toolbar öffnet diese zweite Ansicht: Der
+Text folgt dem Graphen, und ein geänderter Text wird mit **Apply** (Ctrl+Enter) zum Blueprint –
+ein Undo-Schritt; Knoten, die es noch gibt, bleiben, wo sie sind. Deshalb sind die Namen von Variablen, Funktionen und
+Funktions-Pins C++-Namen: Buchstaben, Ziffern und `_`, keine Leerzeichen, kein Wort von C++ und
+keins der Schreibweise (`Float`, `Text`, `loop` …). Der Editor nimmt andere Namen nicht an und
+sagt, warum; `check()` meldet einen Graphen, den C++ nicht sagen kann, als Fehler – auch einen
+Exec-Ausgang mit zwei Drähten, ein Return außerhalb des Wegs seiner Funktion oder einen
+Zufallswert, den zwei Eingänge lesen.
 
 ### Funktionen
 

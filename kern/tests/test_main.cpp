@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <set>
 #include <tuple>
 #include <vector>
@@ -1940,6 +1941,39 @@ TEST(logic_formulas) {
   CHECK(logic::Formula("nope(1)").error().find("no function \"nope\"") != std::string::npos);
   CHECK(logic::Formula("min(1)").error().find("min takes 2 values") != std::string::npos);
   CHECK(!logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q").ok() && logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p").ok());
+  // one canonical spelling, and the same formula as a C++ expression: both read back as the same
+  // formula with the same values
+  struct Spelled { const char* typed; const char* canonical; const char* cpp; };
+  for (const Spelled& c : {
+           Spelled{"max( 9000,16000-level*1300 )", "max(9000, 16000 - level * 1300)", "kern::math::max(9000.0, 16000.0 - level * 1300.0)"},
+           Spelled{"(a+b)*c - (d)", "(a + b) * c - d", "(a + b) * c - d"},
+           Spelled{"a-(b-c)-(d+e)", "a - (b - c) - (d + e)", "a - (b - c) - (d + e)"},
+           Spelled{"a/b%c^d^e", "a / b % c ^ d ^ e", "kern::math::mod(kern::math::div(a, b), kern::math::pow(c, kern::math::pow(d, e)))"},
+           Spelled{"-a^2 + --b + !!c", "-a ^ 2 + -(-b) + !(!c)", "-kern::math::pow(a, 2.0) + -(-b) + !(!c)"},
+           Spelled{"(a ^ b) ^ c", "(a ^ b) ^ c", "kern::math::pow(kern::math::pow(a, b), c)"},
+           Spelled{"a<b==c", "(a < b) == c", "(a < b) == c"},
+           Spelled{"a==(b<c) || !d && e", "a == (b < c) || !d && e", "a == (b < c) || !d && e"},
+           Spelled{"(a||b)&&c ? (d?1:2) : e?3:4", "(a || b) && c ? (d ? 1 : 2) : e ? 3 : 4", "(a || b) && c ? (d ? 1.0 : 2.0) : e ? 3.0 : 4.0"},
+           Spelled{"pow(x,2)+div(x,3)+mod(x,4)", "x ^ 2 + x / 3 + x % 4", "kern::math::pow(x, 2.0) + kern::math::div(x, 3.0) + kern::math::mod(x, 4.0)"},
+           Spelled{"clamp(0.28+level*.02,1e-1,3.8E-1)*2*pi", "clamp(0.28 + level * 0.02, 0.1, 0.38) * 2 * pi", "kern::math::clamp(0.28 + level * 0.02, 0.1, 0.38) * 2.0 * kern::math::pi"},
+           Spelled{"-(a+b)*-c", "-(a + b) * -c", "-(a + b) * -c"},
+           Spelled{"1e21+1e-7+123456789012", "1e+21 + 1e-07 + 123456789012", "1e+21 + 1e-07 + 123456789012.0"},
+       }) {
+    const logic::Formula typed(c.typed);
+    CHECK(typed.ok());
+    if (typed.text() != c.canonical) std::printf("formula \"%s\": canonical \"%s\"\n", c.typed, typed.text().c_str());
+    if (typed.cpp() != c.cpp) std::printf("formula \"%s\": C++ \"%s\"\n", c.typed, typed.cpp().c_str());
+    CHECK(typed.text() == c.canonical && typed.cpp() == c.cpp);
+    std::string plain = typed.cpp();  // (as from_cpp reads it: the names without their namespace)
+    for (std::size_t at = plain.find("kern::math::"); at != std::string::npos; at = plain.find("kern::math::")) plain.erase(at, 12);
+    const logic::Formula again(typed.text()), from_cpp(plain);
+    CHECK(again.ok() && again.text() == c.canonical && from_cpp.ok() && from_cpp.text() == c.canonical);
+    CHECK(again.inputs() == typed.inputs() && from_cpp.inputs() == typed.inputs());
+    const f64 at[5] = {1.5, -2.25, 3, 0.5, 7};
+    const f64 want = typed.evaluate(at, 5);
+    CHECK(again.evaluate(at, 5) == want && from_cpp.evaluate(at, 5) == want);
+  }
+  CHECK(!logic::Formula("1e999").ok());
   // the node: its pins are the formula's names; a formula that cannot be read is an error of the graph
   FakeLogicHost host;
   logic::Runtime rt(host);
@@ -2174,7 +2208,7 @@ TEST(logic_tier_cases_interpreter) {
     }
     if (std::string(c.name) == "mixed_cpp_nodes") {
       CHECK(inst->get("Count").as_int() == 6);
-      CHECK(inst->get("Text").as_text() == "n=6");
+      CHECK(inst->get("Label").as_text() == "n=6");
       CHECK(inst->get("Done").as_bool());
     }
     if (std::string(c.name) == "state_machine") CHECK(inst->state("M") == "A" || inst->state("M") == "B");
@@ -2194,6 +2228,790 @@ TEST(logic_tier_cases_interpreter) {
   CHECK(wasm.size() > 64 && wasm[0] == 0 && wasm[1] == 'a' && wasm[2] == 's' && wasm[3] == 'm');
   const std::string cpp = logic::generate_cpp(*inst, "m");
   CHECK(cpp.find("register_native_graph") != std::string::npos && cpp.find("switch (pc)") != std::string::npos);
+}
+
+/// A graph through its C++ and back: the same Blueprint, the same text again, and nothing left
+/// to change after one pass. Returns the canonical graph (what the text reads as).
+static logic::Graph notation_round_trip(const logic::Graph& g, const char* name) {
+  std::string text, error, again, difference, read_name;
+  logic::Graph back, twice;
+  const bool written = logic::to_cpp(g, name, text, &error);
+  if (!written) std::printf("%s: cannot be written: %s\n", name, error.c_str());
+  CHECK(written);
+  if (!written) return g;
+  const bool read = logic::from_cpp(text, back, &read_name, &error);
+  if (!read) std::printf("%s: cannot be read: %s\n%s\n", name, error.c_str(), text.c_str());
+  CHECK(read);
+  if (!read) return g;
+  // the same Blueprint (node by node, wire by wire, value by value)
+  const bool same = logic::same_blueprint(g, back, &difference);
+  if (!same) std::printf("%s: %s\n%s\n", name, difference.c_str(), text.c_str());
+  CHECK(same);
+  // the text is a fixed point: what was read writes the same text again
+  const bool rewritten = logic::to_cpp(back, read_name, again, &error);
+  if (!rewritten) std::printf("%s: %s\n", name, error.c_str());
+  CHECK(rewritten && again == text);
+  if (rewritten && again != text) std::printf("%s: the text changes when it is read and written again\n---- first\n%s---- second\n%s", name, text.c_str(), again.c_str());
+  // and so is the graph: reading that text gives the very same graph (canonical is idempotent)
+  CHECK(logic::from_cpp(again, twice, nullptr, &error) && twice == back);
+  logic::Graph canon;
+  CHECK(logic::canonical(back, canon, &error) && canon == back);
+  CHECK(logic::check(back).size() == logic::check(g).size());
+  return back;
+}
+
+TEST(logic_notation_tier_cases) {
+  // Every tier case as C++ and back: the same Blueprint, and it plays exactly as before.
+  for (const logic_cases::Case& c : logic_cases::cases()) {
+    const logic::Graph g = logic_cases::parse(c);
+    const logic::Graph back = notation_round_trip(g, c.name);
+    logic_cases::Host host_a, host_b;
+    logic::Runtime rt_a(host_a), rt_b(host_b);
+    const std::string a = logic_cases::play(rt_a, host_a, rt_a.add(g, 0, c.name));
+    const std::string b = logic_cases::play(rt_b, host_b, rt_b.add(back, 0, c.name));
+    if (a != b) std::printf("%s plays differently after the round trip:\n%s----\n%s", c.name, a.c_str(), b.c_str());
+    CHECK(a == b);
+  }
+}
+
+/// A graph that uses every node type of the library: each step entered from an event of its own,
+/// every input given a value that is not its default, and (wired) every exec output going on to
+/// a step and every data output read.
+static logic::Graph every_node_graph(bool wired) {
+  using logic::PinType;
+  const logic::Library& lib = logic::library();
+  logic::Graph g;
+  u32 next = 1;
+  const std::pair<const char*, PinType> vars[] = {{"VB", PinType::boolean}, {"VI", PinType::integer}, {"VF", PinType::number},
+                                                  {"VV", PinType::vector},  {"VT", PinType::text},    {"VA", PinType::actor}};
+  for (const auto& [name, type] : vars) g.variables.push_back({name, type, logic::Value::zero(type).to_json(), {}});
+  g.variables[2].help = "A number.\n\nIts second paragraph.";
+  auto var_of = [&](PinType t) {
+    for (const auto& [name, type] : vars) if (type == t) return std::string(name);
+    return std::string("VF");
+  };
+  auto other_than_default = [](PinType t) {
+    switch (t) {
+      case PinType::boolean: return logic::Value::boolean(true);
+      case PinType::integer: return logic::Value::integer(-7);
+      case PinType::number: return logic::Value::number(2.625);
+      case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
+      case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
+      default: return logic::Value::actor(3);
+    }
+  };
+  logic::Function fn;
+  fn.name = "Fn";
+  fn.help = "Twice x.";
+  fn.inputs = {{"x", PinType::number, json::Value(1.5)}};
+  fn.outputs = {{"y", PinType::number, json::Value(0.25)}, {"ok", PinType::boolean, json::Value(true)}};
+  logic::Function proc;
+  proc.name = "Proc";
+  logic::Function calc;
+  calc.name = "Calc";
+  calc.pure = true;
+  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}};
+  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}};
+  g.functions = {fn, proc, calc};
+  logic::StateMachine m;
+  m.id = next++;
+  m.name = "State Machine";
+  m.states = {{next, "Idle", 10, 20.5f, true}, {next + 1, "Run", 200, 20, false}};
+  next += 2;
+  m.transitions.push_back({next++, m.states[0].id, m.states[1].id, logic::TriggerKind::event, "Start", 1, "", "go"});
+  m.transitions.push_back({next++, m.states[1].id, m.states[0].id, logic::TriggerKind::timer, "", 2.5f, "", ""});
+  m.transitions.push_back({next++, 0, m.states[0].id, logic::TriggerKind::condition, "", 1, "VB", "stop"});
+  m.transitions.push_back({next++, m.states[1].id, m.states[1].id, logic::TriggerKind::automatic, "", 1, "", ""});
+  g.machines.push_back(m);
+  auto add = [&](const std::string& type, std::vector<std::pair<std::string, std::string>> params = {}) {
+    logic::Node n;
+    n.id = next++;
+    n.type = type;
+    n.x = 16.0f * static_cast<f32>(n.id % 40);
+    n.y = 0.5f * static_cast<f32>(n.id);
+    n.params = std::move(params);
+    if (n.id % 5 == 0) n.comment = "node " + std::to_string(n.id) + "\nnoted";
+    g.nodes.push_back(n);
+    return n.id;
+  };
+  auto pins = [&](u32 id, std::vector<logic::PinDef>& in, std::vector<logic::PinDef>& out) { lib.pins(*g.find(id), g, in, out); };
+  auto wire = [&](u32 from, const std::string& out, u32 to, const std::string& in) { g.links.push_back({from, out, to, in}); };
+  auto first_exec = [&](u32 id, bool input) {
+    std::vector<logic::PinDef> in, out;
+    pins(id, in, out);
+    for (const logic::PinDef& p : input ? in : out) if (p.type == PinType::exec) return p.id;
+    return std::string();
+  };
+  /// A Set node of the output's type that reads it, appended to the chain at (tail, pin).
+  auto read = [&](u32 from, const logic::PinDef& out, u32& tail, std::string& tail_pin) {
+    const u32 set = add("var.set", {{"variable", var_of(out.type)}});
+    wire(from, out.id, set, "value");
+    if (tail) wire(tail, tail_pin, set, "exec");
+    tail = set;
+    tail_pin = "then";
+  };
+  // the functions' bodies
+  {
+    const u32 e = add("func.entry", {{"function", "Fn"}}), mul = add("math.mul"), r = add("func.return", {{"function", "Fn"}});
+    wire(e, "then", r, "exec");
+    wire(e, "x", mul, "a");
+    wire(mul, "result", r, "y");
+    add("func.entry", {{"function", "Proc"}});
+    const u32 ce = add("func.entry", {{"function", "Calc"}}), cr = add("func.return", {{"function", "Calc"}});
+    wire(ce, "then", cr, "exec");
+    add("func.return", {{"function", "Proc"}});  // (a Return nothing leads to)
+  }
+  std::vector<std::string> types;
+  for (const auto& d : lib.all()) types.push_back(d->type);
+  for (const std::string& type : types) {
+    const logic::NodeDef* def = lib.find(type);
+    if (type == "func.entry" || type == "func.return") continue;
+    std::vector<std::pair<std::string, std::string>> params;
+    for (const logic::ParamDef& pd : def->params) {
+      using K = logic::ParamDef::Kind;
+      params.push_back({pd.key, pd.kind == K::variable ? "VF" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+                                    pd.kind == K::state ? "Idle" : pd.def});
+    }
+    const u32 id = add(type, params);
+    std::vector<logic::PinDef> in, out;
+    pins(id, in, out);
+    for (const logic::PinDef& p : in)
+      if (p.type != PinType::exec) g.find(id)->set_value(p.id, other_than_default(p.type).to_json());
+    u32 tail = 0;
+    std::string tail_pin;
+    if (def->kind == logic::NodeKind::event) {
+      tail = id;
+      tail_pin = first_exec(id, false);
+    } else if (def->kind == logic::NodeKind::pure) {
+      if (wired) {
+        tail = add("event.custom", {{"name", "P" + std::to_string(id)}});
+        tail_pin = "then";
+      }
+    } else {
+      const u32 e = add("event.custom", {{"name", "E" + std::to_string(id)}});
+      wire(e, "then", id, first_exec(id, true));
+      // (its other exec inputs too, each from an event of its own)
+      for (const logic::PinDef& p : in)
+        if (p.type == PinType::exec && p.id != first_exec(id, true) && wired) wire(add("event.custom", {{"name", "E" + std::to_string(id) + p.id}}), "then", id, p.id);
+      bool first = true;
+      for (const logic::PinDef& p : out) {
+        if (p.type != PinType::exec || !wired) continue;
+        if (first) { tail = id; tail_pin = p.id; first = false; continue; }
+        wire(id, p.id, add("var.add", {{"variable", "VI"}}), "exec");
+      }
+    }
+    if (!wired) continue;
+    if (!tail) {
+      // (a step without exec output: what it gave is read from an event of its own)
+      bool any = false;
+      for (const logic::PinDef& p : out) any = any || p.type != PinType::exec;
+      if (!any) continue;
+      tail = add("event.custom", {{"name", "R" + std::to_string(id)}});
+      tail_pin = "then";
+    }
+    for (const logic::PinDef& p : out)
+      if (p.type != PinType::exec) read(id, p, tail, tail_pin);
+  }
+  g.comments.push_back({next++, -40.5f, 12, 640, 320.25f, "Everything \"there is\"", 0x336699});
+  g.comments.push_back({next++, 0, 0, 100, 100, "", 0});
+  g.next_id = next + 3;
+  return g;
+}
+
+TEST(logic_notation_every_node_type) {
+  // Every node type of the library, written as C++ and read back: nothing of it may be lost.
+  for (bool wired : {false, true}) {
+    const logic::Graph g = every_node_graph(wired);
+    int errors = 0;
+    for (const logic::Issue& i : logic::check(g)) {
+      if (!i.error) continue;
+      ++errors;
+      std::printf("every node (%s): node %u: %s\n", wired ? "wired" : "loose", i.node, i.text.c_str());
+    }
+    CHECK(errors == 0);
+    const logic::Graph back = notation_round_trip(g, wired ? "Every" : "EveryLoose");
+    CHECK(back.nodes.size() == g.nodes.size() && back.links.size() == g.links.size());
+    // the nodes come back in the order of their ids, whatever order they were stored in
+    logic::Graph shuffled = g;
+    std::reverse(shuffled.nodes.begin(), shuffled.nodes.end());
+    std::reverse(shuffled.links.begin(), shuffled.links.end());
+    logic::Graph again;
+    CHECK(logic::canonical(shuffled, again) && again == back);
+  }
+  // The library itself: every node has one C++ name, every output a name C++ can write.
+  std::set<std::string> names;
+  for (const auto& d : logic::library().all()) {
+    std::string name = d->type;
+    for (char& ch : name) if (ch == '.') ch = '_';
+    CHECK(names.insert(name).second);
+    CHECK(logic::cpp_name_ok(name));
+    // a node without its settings is the node with their defaults (what the text writes out)
+    logic::Graph g;
+    g.variables.push_back({"V", logic::PinType::text, json::Value(""), {}});
+    logic::Node bare, full;
+    bare.type = full.type = d->type;
+    for (const logic::ParamDef& pd : d->params) full.set_param(pd.key, pd.def);
+    std::vector<logic::PinDef> in_a, out_a, in_b, out_b;
+    logic::library().pins(bare, g, in_a, out_a);
+    logic::library().pins(full, g, in_b, out_b);
+    CHECK(in_a.size() == in_b.size() && out_a.size() == out_b.size());
+    for (std::size_t k = 0; k < in_a.size() && k < in_b.size(); ++k) CHECK(in_a[k].id == in_b[k].id && in_a[k].type == in_b[k].type);
+    for (std::size_t k = 0; k < out_a.size() && k < out_b.size(); ++k) CHECK(out_a[k].id == out_b[k].id && out_a[k].type == out_b[k].type);
+  }
+  for (const char* ok : {"Heat", "max_stars", "a1", "Go", "n", "on", "it", "x_y"}) CHECK(logic::cpp_name_ok(ok));
+  for (const char* no : {"", "1a", "my var", "class", "float", "Float", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
+    CHECK(!logic::cpp_name_ok(no));
+}
+
+TEST(logic_notation_reads_what_a_person_writes) {
+  // C++ as one writes it by hand - early returns, else if, statements after an if, no layout -
+  // read as a Blueprint and written back the one canonical way.
+  const char* typed = R"kn(
+// my rules
+struct Demo : kern::Blueprint {
+  /// How hot it is.
+  /// Second line.
+  Float Heat = 1;
+  Int Count = 0;
+  Bool Open = false;
+
+  struct LevelResult { Float Result = 0.0; Bool Hot = false; };
+  /// The level for a heat.
+  KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
+    if (math_compare<">">(heat, 10.0)) {
+      return {kern::formula([](Float h, Float s) -> Float { return h*s; }, heat, scale), true};
+    } else {
+      return {0.0, false};
+    }
+  }
+
+  void Cool(Float by = 1.0) {
+    if (math_compare<"<=">(Heat, 0.0)) { return; }
+    else {
+      Heat = math_sub(Heat, by);
+      if (Open) { Count += 1; }
+      else { if (math_compare<">">(Heat, 5.0)) { Count += 2; } }
+      debug_print(kern::to<Text>(Count), false);
+    }
+  }
+
+  KERN_EVENT(on1, event_tick)
+  void on1(Float delta) {
+    n1 = {delta};
+    Cool(delta);
+    flow_delay(n9, 0.5, [this] { Heat += n1.delta; });
+  }
+  struct { Float delta = 0.0; } n1;
+  kern::Node<9> n9;
+};
+)kn";
+  const char* canonical = R"kn(struct Demo : kern::Blueprint {
+  // ---- variables ----
+  /// How hot it is.
+  /// Second line.
+  Float Heat = 1.0;
+  Int Count = 0;
+  Bool Open = false;
+
+  // ---- functions ----
+  struct LevelResult { Float Result = 0.0; Bool Hot = false; };
+  /// The level for a heat.
+  KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
+    if (math_compare<">">(heat, 10.0)) {
+      return {kern::formula([](Float h, Float s) -> Float { return h * s; }, heat, scale), true};
+    }
+    return {0.0, false};
+  }
+
+  void Cool(Float by = 1.0) {
+    if (math_compare<"<=">(Heat, 0.0)) {
+      return;
+    }
+    Heat = math_sub(Heat, by);
+    if (Open) {
+      Count += 1.0;
+    } else if (math_compare<">">(Heat, 5.0)) {
+      Count += 2.0;
+    }
+    debug_print(kern::to<Text>(Count), false);
+  }
+
+  // ---- events ----
+  KERN_EVENT(on1, event_tick)
+  void on1(Float delta) {
+    n1 = {delta};
+    Cool(delta);
+    flow_delay(n9, 0.5, [this] {
+      Heat += n1.delta;
+    });
+  }
+
+  // ---- what nodes give and keep ----
+  struct { Float delta = 0.0; } n1;
+  kern::Node<9> n9;
+};
+)kn";
+  logic::Graph g;
+  std::string name, error, text;
+  const bool read = logic::from_cpp(typed, g, &name, &error);
+  if (!read) std::printf("%s\n", error.c_str());
+  CHECK(read && name == "Demo");
+  CHECK(logic::to_cpp(g, name, text, &error));
+  const std::size_t from = text.find("struct Demo"), to = text.find("KERN_LAYOUT");
+  CHECK(from != std::string::npos && to != std::string::npos);
+  const std::string body = from != std::string::npos && to != std::string::npos ? text.substr(from, to - from - 1) : std::string();
+  if (body != canonical) std::printf("---- written\n%s---- expected\n%s", body.c_str(), canonical);
+  CHECK(body == canonical);
+  notation_round_trip(g, "Demo");
+  int errors = 0;
+  for (const logic::Issue& i : logic::check(g)) errors += i.error ? 1 : 0;
+  CHECK(errors == 0);
+  // it runs: Cool is called every step, and half a second later the step's time comes back
+  logic_cases::Host host;
+  logic::Runtime rt(host);
+  logic::Instance* inst = rt.add(g, 0, "demo");
+  rt.begin();
+  host.t += 0.25;
+  rt.tick(0.25f);
+  CHECK(std::fabs(inst->get("Heat").as_number() - 0.75) < 1e-9 && inst->get("Count").as_int() == 0);
+  CHECK(std::fabs(inst->call_number("Level", {20, 3}) - 60) < 1e-9 && inst->call_number("Level", {5, 3}) == 0);
+  inst->set("Open", logic::Value::boolean(true));
+  host.t += 0.25;
+  rt.tick(0.25f);
+  CHECK(inst->get("Count").as_int() == 1);
+
+  // Every form at once: gates entered from two events, a tween with two ways on, a switch whose
+  // paths meet again, loops, a circle of steps nothing leads into, a Return nothing leads to,
+  // values nothing reads.
+  const char* door = R"kn(
+struct Door : kern::Blueprint {
+  Float Angle = 0.0;
+  Int Hits = 0;
+  Text Note = "a \"door\"\n\ttab \\ end \101";
+  Vector Home = Vector{1.0, -2.5, 3.0};
+  Actor Other = Actor{7};
+
+  kern::Machine machine3 = machine("Door")
+      .state(4, "closed", 100, 80.5, true)
+      .state(5, "open", 300, 80)
+      .on_event(6, 4, 5, "Open", "push")
+      .after(7, 5, 4, 2.5)
+      .when(8, 0, 4, "Angle")
+      .automatic(9, 5, 5);
+
+  auto n20() { return math_mul(Angle, 2.0); }
+
+  KERN_EVENT(on1, event_custom<"Open">)
+  void on1(Actor actor, Float value, Text text) {
+    go30("open");
+  }
+
+  KERN_EVENT(on2, event_custom<"Push">)
+  void on2(Actor actor, Float value, Text text) {
+    n2 = {actor, value, text};
+    const auto n21 = [&] { return math_add(value, n20()); };
+    switch (flow_switch_int<"2">(kern::to<Int>(n21()))) {
+      case 0: { Hits += 1; } break;
+      case 1: { Hits += 2; } break;
+    }
+    Angle = n21();
+    go30("enter");
+  }
+
+  KERN_EVENT(on40, event_begin)
+  void on40() {
+    {
+      if (flow_do_once(n41, "exec", false)) {
+        for (auto it42 = flow_for(n42, 0, 3); it42.next();) {
+          Hits += kern::to<Float>(n42.index);
+        }
+        Angle = kern::to<Float>(n42.index);
+      }
+    }
+    {
+      flow_tween<"smooth">(n43, "play", 1.5, {
+        {"update", [this] {
+          const auto n44 = [&] { return math_mul(n43.alpha, 90.0); };
+          Angle = math_add(n44(), n44());
+        }},
+        {"finished", [this] {
+          flow_call<"Open">(Actor{0}, Other, n20(), Note);
+        }},
+      });
+    }
+    while (loop(math_compare<"<">(Angle, 10.0))) {
+      Angle += 1;
+    }
+    Hits = 0;
+  }
+
+  void go30(Text entry) {
+    if (flow_gate(n30, entry, true)) {
+      state_set<"Door", "open">();
+      debug_print(text_append("pushed by ", kern::to<Text>(n2.actor), ""), true);
+    }
+  }
+
+  void go50() {
+    Hits += 5;
+    go50();
+  }
+
+  void go60() {
+    func_return<"Nothing">();
+  }
+
+  void Nothing() {
+  }
+
+  void detached() {
+    (void)math_random(n70, 0.0, 1.0);
+    (void)Home;
+  }
+
+  struct { Actor actor = Actor{0}; Float value = 0.0; Text text = ""; } n2;
+  kern::Node<30> n30;
+  kern::Node<41> n41;
+  struct : kern::Node<42> { Int index = 0; } n42;
+  struct : kern::Node<43> { Float alpha = 0.0; } n43;
+  kern::Node<70> n70;
+};
+)kn";
+  logic::Graph d;
+  const bool door_read = logic::from_cpp(door, d, &name, &error);
+  if (!door_read) std::printf("%s\n", error.c_str());
+  CHECK(door_read && name == "Door");
+  CHECK(d.variables.size() == 5 && d.variables[2].value.as_string() == "a \"door\"\n\ttab \\ end A");
+  CHECK(d.machines.size() == 1 && d.machines[0].states.size() == 2 && d.machines[0].transitions.size() == 4 && d.machines[0].states[0].y == 80.5f);
+  CHECK(d.machines[0].transitions[1].seconds == 2.5f && d.machines[0].transitions[0].label == "push" && d.machines[0].transitions[2].from == 0);
+  // the Sequence took the statements after its two blocks as a third one
+  for (const logic::Node& n : d.nodes) if (n.type == "flow.sequence") CHECK(n.param("count") == "3");
+  // the Gate is entered through two of its exec inputs, the switch's two paths meet at one Set
+  int gate_wires = 0, met = 0;
+  for (const logic::Link& l : d.links) {
+    gate_wires += l.to == 30 && (l.in == "enter" || l.in == "open") ? 1 : 0;
+    const logic::Node* to = d.find(l.to);
+    met += to && to->type == "var.set" && to->param("variable") == "Angle" && l.in == "exec" && d.find(l.from)->type == "var.add" && d.find(l.from)->param("variable") == "Hits" ? 1 : 0;
+  }
+  CHECK(gate_wires == 2 && met == 2);
+  notation_round_trip(d, "Door");
+  errors = 0;
+  for (const logic::Issue& i : logic::check(d)) errors += i.error ? 1 : 0;
+  CHECK(errors == 0);
+}
+
+TEST(logic_notation_refuses_with_place_and_reason) {
+  // What is not in the subset is refused: where, and why.
+  auto refused = [](const std::string& body, const char* why, const char* where = nullptr) {
+    const std::string text = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n  Text Name = \"\";\n" + body + "\n};\n";
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text, g, nullptr, &error);
+    const bool right = !read && error.find(why) != std::string::npos && (!where || error.rfind(where, 0) == 0);
+    if (!right) std::printf("expected \"%s\"%s%s, got: %s\n", why, where ? " at " : "", where ? where : "", read ? "(it was read)" : error.c_str());
+    CHECK(right);
+  };
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }"; };
+  refused(in_event("    Heat = nope;"), "\"nope\" is not known here", "line 7, column 12:");
+  refused(in_event("    Count = 1.5;"), "is Int, this is Float", "line 7, column 13:");
+  refused(in_event("    Count = Heat;"), "write kern::to<Int>(...)");
+  refused(in_event("    Heat = kern::to<Float>(Heat);"), "no kern::to");
+  refused(in_event("    Name = kern::to<Float>(Count);"), "this input is Text");
+  refused(in_event("    Heat = math_add(1.0);"), "math_add takes 2 value(s): a, b");
+  refused(in_event("    Heat = math_add(1.0, 2.0, 3.0);"), "\")\" expected");
+  refused(in_event("    Heat = math_nope(1.0);"), "\"math_nope\" is not known here");
+  refused(in_event("    Heat = math_add(1.0, 2.0).result;"), "gives one value: no .result");
+  refused(in_event("    Heat = 1.0 + 2.0;"), "\";\" expected");
+  refused(in_event("    int x = 3;"), "\"int\" starts no statement");
+  refused(in_event("    break;"), "\"break\" is not part of the notation");
+  refused(in_event("    return 3;"), "only a function's own body returns values");
+  refused(in_event("    return;\n    Heat = 1.0;"), "nothing leads here", "line 8, column 5:");
+  refused(in_event("    if (math_compare<\"<\">(Heat, 1.0)) {\n      flow_delay(n2, 1.0, [this] {\n      });\n    }\n    Heat = 1.0;\n  }\n  kern::Node<2> n2;\n  void Unused() {"),
+          "C++ would go on with this line", "line 11, column 5:");
+  refused(in_event("    flow_delay(n2, 1.0, [this] {\n      Heat = value;\n    });\n  }\n  kern::Node<2> n2;\n  void Unused() {"), "after a wait", "line 8, column 14:");
+  refused(in_event("    flow_delay(1.0, [this] {\n    });"), "is not declared: kern::Node<");  // (the Delay keeps its wait)
+  refused(in_event("    flow_delay<\"x\">(n2, 1.0, [this] {\n    });"), "flow_delay has no settings");
+  refused(in_event("    flow_tween(n2, \"play\", 1.0, {});"), "flow_tween has 1 setting(s): flow_tween<\"smooth\">");
+  refused(in_event("    flow_do_once(n2, \"exec\", false);"), "decides whether the path goes on: if (flow_do_once(...)) { }");
+  refused(in_event("    flow_flip_flop(n2);"), "switch (flow_flip_flop(...)) { case 0: { } break; }");
+  refused(in_event("    math_add(1.0, 2.0);"), "math_add is a value");
+  refused(in_event("    Heat = n9.value;"), "n9 names no node");
+  refused(in_event("    go9();"), "go9 names no step");
+  refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
+  refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
+  refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
+  refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
+  refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
+  refused("  Float Heat = 1.0;", "the variable Heat is declared twice");
+  refused("  double Heat2 = 1.0;", "\"double\" is no type here");
+  refused("  Float Other = \"text\";", "this is Text, but Float is needed");
+  refused("  void Fn() {\n  }\n  void Fn() {\n  }", "the function Fn is declared twice");
+  refused("  FnResult Fn() {\n  }", "struct FnResult { ... }; must be declared above");
+  refused("  void on3() {\n  }", "on3 needs its KERN_EVENT");
+  refused("  KERN_EVENT(on3, event_nope)\n  void on3() {\n  }", "\"event_nope\" is no event");
+  refused("  KERN_EVENT(on3, event_tick)\n  void on3() {\n  }", "the method of event_tick is void on3(Float delta)");
+  refused("  void Text() {\n  }", "the function \"Text\" is no name C++ can write");
+  refused("  void loop() {\n  }", "no name C++ can write");
+  refused("  Float my_value = 0.0;\n  Float value = 0.0;\n" + in_event("    Heat = 1.0;"), "\"value\" is an output of");
+  // the layout: one line per node, in the text's order
+  logic::Graph g;
+  std::string error;
+  const std::string one = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n" + in_event("    Heat = 1.0;") + "\n};\nKERN_LAYOUT(B) {\n";
+  CHECK(logic::from_cpp(one + "  node(1, 8, 16.5, \"start\");\n  node(2, 300, 16);\n  box(3, 0, 0, 400, 200, \"all of it\", 0x102030);\n  next_id(9);\n}\n", g, nullptr, &error));
+  CHECK(g.nodes.size() == 2 && g.nodes[0].id == 1 && g.nodes[0].y == 16.5f && g.nodes[0].comment == "start" && g.nodes[1].x == 300 && g.next_id == 9);
+  CHECK(g.comments.size() == 1 && g.comments[0].color == 0x102030 && g.comments[0].w == 400);
+  CHECK(!logic::from_cpp(one + "  node(1, 0, 0);\n  next_id(9);\n}\n", g, nullptr, &error) && error.find("the layout places 1 node(s), the text names 2") != std::string::npos);
+  CHECK(!logic::from_cpp(one + "  node(5, 0, 0);\n  node(2, 0, 0);\n  next_id(9);\n}\n", g, nullptr, &error) && error.find("line 9, column 3: the layout places node 5 here, but the text names n1") == 0);
+  CHECK(!logic::from_cpp(one + "  node(1, 0, 0);\n  node(1, 0, 0);\n  next_id(9);\n}\n", g, nullptr, &error) && error.find("node 1 is placed twice") != std::string::npos);
+  CHECK(!logic::from_cpp(one + "  node(1, 0, 0);\n  node(2, 0, 0);\n  next_id(2);\n}\n", g, nullptr, &error) && error.find("is not above every id in use") != std::string::npos);
+  CHECK(!logic::from_cpp(one + "  node(1, 0, 0);\n  node(2, 0, 0);\n  knot(3);\n}\n", g, nullptr, &error) && error.find("a layout has node(id, x, y)") != std::string::npos);
+  // not a Blueprint at all
+  CHECK(!logic::from_cpp("int main() { return 0; }", g, nullptr, &error) && error.find("line 1, column 1: \"struct\" expected") == 0);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  Float x = 0.0;\n", g, nullptr, &error) && error.find("\"};\" is missing") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n};\nint more;", g, nullptr, &error) && error.find("is too much") != std::string::npos);
+  CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
+}
+
+TEST(logic_notation_rules_are_errors_of_the_graph) {
+  // What C++ cannot say, no Blueprint may be: check() reports it, on the node it is about.
+  auto problem = [](const char* graph, const char* why, u32 node = 0) {
+    json::Value j;
+    logic::Graph g;
+    CHECK(json::parse(graph, j) && logic::graph_from_json(j, g));
+    bool found = false;
+    std::string all;
+    for (const logic::Issue& i : logic::check(g)) {
+      all += i.text + " | ";
+      found = found || (i.error && i.text.find(why) != std::string::npos && (!node || i.node == node));
+    }
+    if (!found) std::printf("expected \"%s\", got: %s\n", why, all.c_str());
+    CHECK(found);
+    std::string text, error;
+    CHECK(!logic::to_cpp(g, "G", text, &error) && !error.empty());
+  };
+  problem(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "\"my var\" is no name C++ can write");
+  problem(R"({"variables":[{"name":"Float","type":"float","value":0}],"nodes":[],"links":[]})", "\"Float\" is no name C++ can write");
+  problem(R"({"variables":[{"name":"math_add","type":"float","value":0}],"nodes":[],"links":[]})", "is the name of a node");
+  problem(R"({"variables":[{"name":"value","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}}],"links":[]})", "\"value\" is an output of", 1);
+  problem(R"({"variables":[{"name":"A","type":"float","value":0}],"functions":[{"name":"F","inputs":[{"name":"A","type":"float","value":0}],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})",
+          "the input \"A\" of F has the name of a variable");
+  problem(R"({"variables":[{"name":"FResult","type":"float","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})",
+          "\"FResult\" is taken by the function F");
+  // a random number read by two inputs: each read would be another one
+  problem(R"({"variables":[{"name":"A","type":"float","value":0},{"name":"B","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"B"}},{"id":4,"type":"math.random"}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"result",2,"value"],[4,"result",3,"value"]]})",
+          "is new on every read, and 2 inputs read it", 4);
+  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"A"}},{"id":4,"type":"math.random"},{"id":5,"type":"math.negate"},{"id":6,"type":"math.add"}],
+            "links":[[1,"then",2,"exec"],[4,"result",5,"a"],[5,"result",6,"a"],[5,"result",6,"b"],[6,"result",2,"value"]]})",
+          "passes on a value that is new on every read", 5);
+  // a Return off its function's path
+  problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.delay"},{"id":3,"type":"func.return","params":{"function":"F"}}],
+            "links":[[1,"then",2,"exec"],[2,"completed",3,"exec"]]})",
+          "is not on a path of its own function", 3);
+  problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"event.begin"},{"id":3,"type":"func.return","params":{"function":"F"}}],
+            "links":[[2,"then",3,"exec"]]})",
+          "is not on a path of its own function", 3);
+  // one exec output, two wires
+  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"var.add","params":{"variable":"A"}}],
+            "links":[[1,"then",2,"exec"],[1,"then",3,"exec"]]})",
+          "has more than one wire", 1);
+  // Levels from before these rules: their names are made C++ names when they are loaded, and
+  // everything that uses them follows.
+  {
+    json::Value old;
+    logic::Graph g;
+    CHECK(json::parse(R"({"variables":[{"name":"Ball Seen","type":"bool","value":false},{"name":"Text","type":"text","value":""},{"name":"value","type":"float","value":0},
+              {"name":"2nd","type":"float","value":0},{"name":"BallSeen","type":"float","value":0}],
+            "functions":[{"name":"my fn","inputs":[{"name":"in put","type":"float","value":0},{"name":"value","type":"float","value":0}],"outputs":[{"name":"class","type":"float","value":0}]}],
+            "machines":[{"id":40,"name":"M","states":[{"id":41,"name":"A","initial":true},{"id":42,"name":"B"}],"transitions":[{"id":43,"from":41,"to":42,"trigger":"condition","variable":"Ball Seen"}]}],
+            "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Ball Seen"},"values":{"value":true}},
+              {"id":3,"type":"var.set","params":{"variable":"value"}},{"id":4,"type":"func.pure","params":{"function":"my fn"},"values":{"in put":3}},
+              {"id":5,"type":"func.entry","params":{"function":"my fn"}},{"id":6,"type":"func.return","params":{"function":"my fn"}},
+              {"id":7,"type":"var.set","params":{"variable":"Text"},"values":{"value":"hi"}},{"id":8,"type":"var.add","params":{"variable":"2nd"}}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"class",3,"value"],[1,"value",4,"value"],[5,"then",6,"exec"],[5,"in put",6,"class"],[3,"then",7,"exec"],[7,"then",8,"exec"]]})", old) &&
+          logic::graph_from_json(old, g));
+    int before = 0;
+    for (const logic::Issue& i : logic::check(g)) before += i.error ? 1 : 0;
+    CHECK(before > 0);
+    const auto renamed = logic::cpp_names(g);
+    CHECK(renamed.size() == 7);
+    CHECK(g.variables[0].name == "BallSeen2" && g.variables[1].name == "TextValue" && g.variables[2].name == "Value" && g.variables[3].name == "Var2nd" && g.variables[4].name == "BallSeen");
+    CHECK(g.functions[0].name == "myFn" && g.functions[0].inputs[0].name == "inPut" && g.functions[0].inputs[1].name == "value" && g.functions[0].outputs[0].name == "Class");
+    CHECK(g.find(2)->param("variable") == "BallSeen2" && g.find(3)->param("variable") == "Value" && g.find(4)->param("function") == "myFn" && g.machines[0].transitions[0].variable == "BallSeen2");
+    CHECK(g.find(4)->value("inPut") && !g.find(4)->value("in put"));
+    for (const logic::Issue& i : logic::check(g)) {
+      if (i.error) std::printf("after the renames: %s\n", i.text.c_str());
+      CHECK(!i.error);
+    }
+    CHECK(logic::cpp_names(g).empty());
+    // it runs as before: Go sets BallSeen2, which switches the machine, and my fn gives its first input
+    logic_cases::Host host;
+    logic::Runtime rt(host);
+    logic::Instance* inst = rt.add(g, 0, "old");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(9)}});
+    host.t += 0.1;
+    rt.tick(0.1f);
+    CHECK(inst->get("BallSeen2").as_bool() && inst->get("Value").as_number() == 3 && inst->get("TextValue").as_text() == "hi" && inst->state("M") == "B");
+    notation_round_trip(g, "Old");
+  }
+  // (paths that meet before a Return are fine when they come from one Branch)
+  json::Value j;
+  logic::Graph ok;
+  CHECK(json::parse(R"({"variables":[{"name":"A","type":"float","value":0}],"functions":[{"name":"F","inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"y","type":"float","value":0}]}],
+            "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.branch"},{"id":3,"type":"var.add","params":{"variable":"A"}},
+                     {"id":4,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"func.return","params":{"function":"F"}}],
+            "links":[[1,"then",2,"exec"],[2,"true",3,"exec"],[2,"false",4,"exec"],[3,"then",5,"exec"],[4,"then",5,"exec"],[1,"x",5,"y"]]})", j) && logic::graph_from_json(j, ok));
+  std::string text, error;
+  CHECK(logic::to_cpp(ok, "Ok", text, &error));
+  CHECK(text.find("    if (true) {\n      A += 1.0;\n    } else {\n      A = 0.0;\n    }\n    return {x};\n") != std::string::npos);
+  notation_round_trip(ok, "Ok");
+}
+
+TEST(logic_notation_survives_any_text) {
+  // Texts that are almost Blueprints - canonical ones with characters dropped, lines doubled,
+  // swapped or gone: each is either refused with its place, or it is a Blueprint that writes and
+  // reads as itself. Nothing in between, and never a crash.
+  std::vector<std::string> texts;
+  for (const logic_cases::Case& c : logic_cases::cases()) {
+    std::string text;
+    if (logic::to_cpp(logic_cases::parse(c), c.name, text)) texts.push_back(text);
+  }
+  {
+    std::string text;
+    CHECK(logic::to_cpp(every_node_graph(true), "Every", text));
+    texts.push_back(text);
+    // (the code alone as well: without a layout every node is new)
+    CHECK(logic::to_cpp(logic_cases::parse(logic_cases::cases()[1]), "Gates", text, nullptr, logic::library(), false));
+    texts.push_back(text);
+  }
+  u32 seed = 20261110;
+  auto rnd = [&](std::size_t below) {
+    seed = seed * 1664525u + 1013904223u;
+    return below ? static_cast<std::size_t>(seed >> 8) % below : 0;
+  };
+  int read = 0, refused = 0;
+  for (int round = 0; round < 1500; ++round) {
+    std::string text = texts[rnd(texts.size())];
+    std::vector<std::size_t> starts{0};
+    for (std::size_t i = 0; i + 1 < text.size(); ++i) if (text[i] == '\n') starts.push_back(i + 1);
+    auto line = [&](std::size_t k) { return text.substr(starts[k], (k + 1 < starts.size() ? starts[k + 1] : text.size()) - starts[k]); };
+    const std::size_t k = rnd(starts.size()), other = rnd(starts.size());
+    switch (rnd(6)) {
+      case 0: text.erase(rnd(text.size()), 1 + rnd(6)); break;                                  // characters gone
+      case 1: text.erase(starts[k], line(k).size()); break;                                     // a line gone
+      case 2: text.insert(starts[k], line(other)); break;                                       // a line twice / moved
+      case 3: {                                                                                 // two lines swapped
+        const std::size_t lo = std::min(k, other), hi = std::max(k, other);
+        if (lo == hi) break;
+        const std::string a = line(lo), b = line(hi);
+        text.replace(starts[hi], b.size(), a);
+        text.replace(starts[lo], a.size(), b);
+        break;
+      }
+      case 4: text.insert(rnd(text.size()), std::string(1, "(){};,<>\".=+-n1"[rnd(15)])); break;  // a character too many
+      default: {                                                                                // a number changed
+        const std::size_t at = text.find_first_of("0123456789", rnd(text.size()));
+        if (at != std::string::npos) text[at] = static_cast<char>('0' + rnd(10));
+        break;
+      }
+    }
+    logic::Graph g, again;
+    std::string error, written;
+    if (!logic::from_cpp(text, g, nullptr, &error)) {
+      ++refused;
+      CHECK(error.rfind("line ", 0) == 0);
+      continue;
+    }
+    ++read;
+    const bool writes = logic::to_cpp(g, "Again", written, &error);
+    if (!writes) std::printf("read but not written: %s\n", error.c_str());
+    CHECK(writes);
+    const bool same = writes && logic::from_cpp(written, again, nullptr, &error) && again == g;
+    if (writes && !same) std::printf("read, written, read: not the same (%s)\n", error.c_str());
+    CHECK(same);
+  }
+  CHECK(read > 50 && refused > 300);
+}
+
+TEST(logic_notation_apply_keeps_ids_and_places) {
+  // The code alone (as Studio shows it, without the layout), applied to the Blueprint it came
+  // from: nothing changes - every node keeps its id, its place and its comment.
+  auto placed = [](logic::Graph g) {
+    for (logic::Node& n : g.nodes) {
+      n.x = 56.0f * static_cast<f32>(n.id);
+      n.y = 16.0f * static_cast<f32>(n.id % 9) + 0.5f;
+      if (n.id % 4 == 0) n.comment = "note " + std::to_string(n.id);
+    }
+    g.comments.push_back({g.next_id++, 1, 2, 300, 200, "a box", 0x123456});
+    return g;
+  };
+  std::vector<std::pair<std::string, logic::Graph>> graphs;
+  for (const logic_cases::Case& c : logic_cases::cases()) graphs.push_back({c.name, placed(logic_cases::parse(c))});
+  graphs.push_back({"Every", every_node_graph(true)});
+  for (const auto& [name, g] : graphs) {
+    logic::Graph canon, back, onto;
+    std::string code, error, difference;
+    CHECK(logic::canonical(g, canon, &error));
+    CHECK(logic::to_cpp(canon, name, code, &error, logic::library(), false) && code.find("KERN_LAYOUT") == std::string::npos);
+    const bool applied = logic::apply_cpp(code, canon, back, &error);
+    if (!applied) std::printf("%s: %s\n", name.c_str(), error.c_str());
+    CHECK(applied && back == canon);
+    // (onto the graph as it was stored, in whatever order: the same Blueprint)
+    CHECK(logic::apply_cpp(code, g, onto, &error) && logic::same_blueprint(g, onto, &difference));
+    if (!difference.empty()) std::printf("%s: %s\n", name.c_str(), difference.c_str());
+  }
+  // A change in the text: what is still there keeps its id and place, what is new gets new ones.
+  const char* before_text = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+                            "    Heat = math_add(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1.0;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
+  logic::Graph g0, g1, g2, g3;
+  std::string error;
+  CHECK(logic::from_cpp(before_text, g0, nullptr, &error));
+  for (logic::Node& n : g0.nodes) { n.x += 1000; n.comment = "kept " + std::to_string(n.id); }
+  auto changed = [&](const char* from, const char* to) {
+    std::string t = before_text;
+    const std::size_t at = t.find(from);
+    CHECK(at != std::string::npos);
+    if (at != std::string::npos) t.replace(at, std::strlen(from), to);
+    return t;
+  };
+  auto kept = [&](const logic::Graph& now, std::size_t gone) {
+    std::size_t missing = 0;
+    for (const logic::Node& o : g0.nodes) {
+      const logic::Node* n = now.find(o.id);
+      if (!n) { ++missing; continue; }
+      CHECK(n->type == o.type && n->x == o.x && n->y == o.y && n->comment == o.comment);
+    }
+    CHECK(missing == gone);
+  };
+  // one more line in the middle
+  CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += math_mul(value, 2.0);\n    if (math_compare"), g0, g1, &error));
+  kept(g1, 0);
+  CHECK(g1.nodes.size() == g0.nodes.size() + 2 && g1.next_id == g0.next_id + 2);
+  int fresh = 0;
+  for (const logic::Node& n : g1.nodes)
+    if (!g0.find(n.id)) {
+      ++fresh;
+      CHECK(n.id >= g0.next_id && (n.type == "var.add" || n.type == "math.mul") && n.comment.empty() && n.x > 1000);
+    }
+  CHECK(fresh == 2);
+  // a value changed, a line gone
+  CHECK(logic::apply_cpp(changed("10.0", "12.5"), g0, g2, &error));
+  kept(g2, 0);
+  CHECK(g2.nodes.size() == g0.nodes.size() && g2.next_id == g0.next_id && !(g2 == g0));
+  CHECK(logic::apply_cpp(changed("    debug_print(kern::to<Text>(Count), false);\n", ""), g0, g3, &error));
+  kept(g3, 2);  // the Print and the Get it read
+  CHECK(g3.nodes.size() == g0.nodes.size() - 2);
+  // what cannot be read changes nothing and says where
+  logic::Graph untouched = g0;
+  CHECK(!logic::apply_cpp(changed("Heat = math_add(Heat, value);", "Heat = Heat + value;"), g0, untouched, &error) && error.rfind("line 7, column 17:", 0) == 0 && untouched == g0);
 }
 
 TEST(game_character_mover) {
@@ -6280,6 +7098,17 @@ TEST(studio_logic_functions) {
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"float"})")["pin"].as_string() == "x");
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"out","pin":"result","type":"float"})")["pin"].as_string() == "result");
   CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"exec"})")["ok"].as_bool());  // a reserved name
+  // names are names of the Blueprint's C++ too: no spaces, no words of the language
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"my value"})")["error"].as_string().find("cannot be a name") != std::string::npos);
+  CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"Twice","to":"class"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"Twice","to":"math_add"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Speed","type":"float"})")["name"].as_string() == "Speed");
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Top Speed"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Float"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Twice"})")["ok"].as_bool());  // (a function has that name)
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"my var","type":"float"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"TopSpeed"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"TopSpeed"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"help","name":"Twice","text":"Two times x"})")["ok"].as_bool());
   const u32 mul = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.mul","x":160,"y":80})")["id"].as_number());
   auto connect = [&](u32 from, const char* out, u32 to, const char* in) {
@@ -6357,6 +7186,91 @@ TEST(studio_logic_functions) {
   // undo brings it back
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["functions"].size() == 1);
+}
+
+TEST(studio_logic_cpp_view) {
+  // The editor's C++ view: a Blueprint written as C++ from nothing, played, changed in the text.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
+  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("struct Level : kern::Blueprint {") != std::string::npos && cpp["text"].as_string().find("KERN_LAYOUT") == std::string::npos);
+  auto apply = [&](const std::string& text) {
+    json::Value c = json::Value::object();
+    c.set("cmd", "logicCppApply");
+    c.set("text", text);
+    return f.s->command(c);
+  };
+  const std::string typed = "struct Level : kern::Blueprint {\n  Float Score = 0.0;\n\n  struct TwiceResult { Float result = 0.0; };\n  KERN_PURE TwiceResult Twice(Float x = 0.0) {\n"
+                            "    return {math_mul(x, 2.0)};\n  }\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Score = Twice(21.0).result;\n  }\n};\n";
+  json::Value r = apply(typed);
+  if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+  CHECK(r["ok"].as_bool());
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["functions"].size() == 1 && st["logic"]["variables"].size() == 1 && st["logic"]["nodes"].size() == 6);
+  int errors = 0;
+  for (const json::Value& i : st["logic"]["issues"].items()) errors += i["error"].as_bool() ? 1 : 0;
+  CHECK(errors == 0);
+  // it plays
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(0) : nullptr;
+  CHECK(inst && inst->get("Score").as_number() == 42);
+  CHECK(!apply(typed)["ok"].as_bool());  // (not while playing)
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+  // the view shows the text the one canonical way; a change in it changes the graph and keeps ids and places
+  std::string shown = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
+  CHECK(shown.find("    return {math_mul(x, 2.0)};\n") != std::string::npos && shown.find("  // ---- functions ----\n") != std::string::npos);
+  std::map<u32, std::pair<f64, f64>> places;
+  for (const json::Value& n : st["logic"]["nodes"].items()) places[static_cast<u32>(n["id"].as_number())] = {n["x"].as_number(), n["y"].as_number()};
+  const std::size_t at = shown.find("math_mul(x, 2.0)");
+  CHECK(at != std::string::npos);
+  if (at != std::string::npos) shown.replace(at, 16, "math_mul(x, 3.0)");
+  CHECK(apply(shown)["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["nodes"].size() == 6);
+  bool three = false;
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    const auto it = places.find(static_cast<u32>(n["id"].as_number()));
+    CHECK(it != places.end() && it->second.first == n["x"].as_number() && it->second.second == n["y"].as_number());
+    if (n["type"].as_string() == "math.mul")
+      for (const json::Value& p : n["inputs"].items()) three |= p["id"].as_string() == "b" && p["value"].as_number() == 3;
+  }
+  CHECK(three);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string() == shown);
+  // one undo step
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul(x, 2.0)") != std::string::npos);
+  // every ready-made graph of the editor is a Blueprint C++ can say, and says it
+  for (const char* tpl : {"door", "score_zone", "spawner", "traffic_light", "robot_avoid"}) {
+    StudioFixture t;
+    CHECK(t.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+    CHECK(t.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+    json::Value add = json::Value::object();
+    add.set("cmd", "logicTemplate");
+    add.set("template", tpl);
+    CHECK(t.s->command(add)["ok"].as_bool());
+    int bad = 0;
+    const json::Value shown_state = t.s->state();
+    for (const json::Value& i : shown_state["logic"]["issues"].items()) {
+      if (i["error"].as_bool()) std::printf("template %s: %s\n", tpl, i["text"].as_string().c_str());
+      bad += i["error"].as_bool() ? 1 : 0;
+    }
+    CHECK(bad == 0);
+    const json::Value text = t.cmd(R"({"cmd":"logicCpp"})");
+    CHECK(text["ok"].as_bool() && text["text"].as_string().find("struct Level : kern::Blueprint {") != std::string::npos);
+    // (its own text, applied: nothing changes)
+    const std::string before = json::stringify(t.s->state()["logic"]["nodes"]);
+    json::Value again = json::Value::object();
+    again.set("cmd", "logicCppApply");
+    again.set("text", text["text"].as_string());
+    CHECK(t.s->command(again)["ok"].as_bool() && json::stringify(t.s->state()["logic"]["nodes"]) == before);
+  }
+  // what cannot be read is refused with its line, and nothing changes
+  std::string broken = shown;
+  broken.replace(broken.find("Twice(21.0).result"), 18, "Twice(21.0)");
+  r = apply(broken);
+  CHECK(!r["ok"].as_bool() && r["error"].as_string().rfind("line ", 0) == 0 && r["error"].as_string().find("which result: Twice(...).result") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul(x, 2.0)") != std::string::npos);
 }
 
 TEST(studio_logic_editor_commands) {
@@ -7350,6 +8264,20 @@ int main(int argc, char** argv) {
       expected += std::string("== ") + c.name + "\n" + logic_cases::play(rt, host, inst);
     }
     if (FILE* f = std::fopen((std::string(argv[2]) + "/logic_expected.txt").c_str(), "wb")) { std::fwrite(expected.data(), 1, expected.size(), f); std::fclose(f); }
+    return 0;
+  }
+  // kern_tests --emit-notation <dir>: the logic cases in the C++ notation (to read them).
+  if (argc > 2 && std::strcmp(argv[1], "--emit-notation") == 0) {
+    for (const logic_cases::Case& c : logic_cases::cases()) {
+      std::string text, error;
+      if (!logic::to_cpp(logic_cases::parse(c), c.name, text, &error)) text = "// " + error + "\n";
+      if (FILE* f = std::fopen((std::string(argv[2]) + "/" + c.name + ".cpp").c_str(), "wb")) { std::fwrite(text.data(), 1, text.size(), f); std::fclose(f); }
+    }
+    for (bool wired : {false, true}) {
+      std::string text, error;
+      if (!logic::to_cpp(every_node_graph(wired), wired ? "Every" : "EveryLoose", text, &error)) text = "// " + error + "\n";
+      if (FILE* f = std::fopen((std::string(argv[2]) + (wired ? "/every.cpp" : "/every_loose.cpp")).c_str(), "wb")) { std::fwrite(text.data(), 1, text.size(), f); std::fclose(f); }
+    }
     return 0;
   }
   // kern_tests [name-substring] runs a subset.
