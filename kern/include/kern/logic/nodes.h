@@ -269,6 +269,33 @@ inline int flip_flop(f64* m, bool& is_a) {
   is_a = m[0] != 0;
   return is_a ? 0 : 1;
 }
+/// Delay. start: true when the wait begins (a call while it waits is ignored); done: it is over.
+inline bool delay_start(f64* m) {
+  if (m[0] != 0) return false;
+  m[0] = 1;
+  return true;
+}
+inline void delay_done(f64* m) { m[0] = 0; }
+/// Tween. m: [0] it runs, [1] when it began, [2] how long it takes.
+inline void tween_play(f64* m, f64 now, f64 duration) {
+  m[0] = 1;
+  m[1] = now;
+  m[2] = max_of(0.0, duration);
+}
+inline void tween_stop(f64* m) { m[0] = 0; }
+inline bool tween_runs(const f64* m) { return m[0] != 0; }
+/// One step of a running tween at time `now`: its alpha (0..1, eased), and whether that was the
+/// last one (the tween then no longer runs).
+inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool& finished) {
+  const f64 t = kern::clamp(m[2] > 0 ? (now - m[1]) / m[2] : 1.0, 0.0, 1.0);
+  f64 e = t;
+  if (ease == "smooth") e = t * t * (3 - 2 * t);
+  else if (ease == "in") e = t * t;
+  else if (ease == "out") e = 1 - (1 - t) * (1 - t);
+  finished = t >= 1;
+  if (finished) m[0] = 0;
+  return e;
+}
 /// Switch on Int with `cases` cases: the exec output (the case, or `cases` for Default).
 inline int switch_int(int cases, i64 selection) { return selection >= 0 && selection < cases ? static_cast<int>(selection) : cases; }
 /// Switch on Text: the exec output (the case that equals the selection, or the count for Default).

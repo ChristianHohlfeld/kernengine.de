@@ -2742,10 +2742,10 @@ TEST(logic_native_blueprints) {
     if (said.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, said.c_str());
     CHECK(said.find(why) != std::string::npos);
   };
-  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})", "Delay (node 2) is not yet a function of blueprint.h");
+  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message"}],"links":[[1,"then",2,"exec"]]})", "(node 2) is not yet a function of blueprint.h");
   not_yet(R"({"variables":[{"name":"A","type":"float","value":0}],"nodes":[{"id":4,"type":"math.random"},{"id":5,"type":"var.set","params":{"variable":"A"}}],"links":[[4,"result",5,"value"]]})",
           "Random Float in Range (node 4) is not yet a function of blueprint.h");
-  not_yet(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})", "state machines (\"Door\") are not yet part of blueprint.h");
+  CHECK(logic::native_ready(logic_graph(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})")));
   not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
 
   // A graph whose class the binary has runs as that class: the instance reaches it by name
@@ -2803,7 +2803,10 @@ TEST(logic_native_blueprints) {
   for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
-  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"flow.delay"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"math.random"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  // a node that waits is run again by the runtime when the wait is over: <node>_resume, with its settings
+  CHECK(logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.tween","params":{"ease":"out"}}],"links":[[1,"then",4,"play"]]})"), "X", glue, &why));
+  CHECK(glue.find("case 1: self.flow_tween_resume<\"out\">(self.n4); break;  // Tween") != std::string::npos);
   // an event's handler is reached through the glue: the node's place in the graph, its values from its outputs
   CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"float","value":0}],
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));

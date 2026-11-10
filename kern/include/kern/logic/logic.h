@@ -629,6 +629,11 @@ class Runtime {
   void fire(const Event& e);
   /// Custom event by name on every instance (or on `target`'s).
   void call(std::string_view name, ActorRef target = 0, std::vector<std::pair<std::string, Value>> args = {});
+  /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
+  /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
+  /// kept and served in one place. cancel_waits: the node's waits are off.
+  void wait(Instance& inst, u32 node, f64 seconds, int entry);
+  void cancel_waits(Instance& inst, u32 node);
   Instance* find(ActorRef self);
   const std::vector<std::unique_ptr<Instance>>& instances() const { return instances_; }
   /// Node ids that ran recently (Studio flashes them while playing): instance name -> ids.

@@ -3164,6 +3164,8 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   // The nodes blueprint.h has a function for. (A test compiles a Blueprint of all of them.)
   static const std::set<std::string_view> have{
       "event.begin",   "event.tick",    "event.custom",    "flow.call",       "debug.print",     "time.now",
+      "event.every",   "event.state_enter", "event.state_exit", "state.set",   "state.get",       "state.is",
+      "flow.delay",    "flow.retrigger_delay", "flow.tween",
       "func.entry",    "func.return",   "func.call",       "func.pure",       "var.get",         "var.set",       "var.add",        "flow.reroute",
       "value.reroute", "flow.branch",   "flow.sequence",   "flow.for",        "flow.while",      "flow.do_once",  "flow.do_n",      "flow.gate",
       "flow.flip_flop", "flow.switch_int", "flow.switch_text", "math.add",     "math.sub",        "math.mul",      "math.div",       "math.mod",
@@ -3177,8 +3179,8 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
     if (why) *why = std::move(text);
     return false;
   };
-  if (const std::string problem = cpp_problem(g, nullptr, lib); !problem.empty()) return no(problem);
-  if (!g.machines.empty()) return no("state machines (\"" + g.machines.front().name + "\") are not yet part of blueprint.h");
+  for (const Issue& i : check(g, lib))  // (a Blueprint that compiles: its rules as C++ are part of that)
+    if (i.error) return no(i.text);
   for (const Node& node : g.nodes)
     if (!have.count(node.type)) return no(lib.title(node) + " (node " + std::to_string(node.id) + ") is not yet a function of blueprint.h");
   return true;
@@ -3217,6 +3219,17 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   for (std::size_t i = 0; i < g.nodes.size(); ++i) {
     const Node& n = g.nodes[i];
     const NodeDef* def = lib.find(n.type);
+    if (def && def->latent) {
+      // A node that waits: when the wait is over the runtime runs it again - <node>_resume.
+      std::string fn = node_name(def->type) + "_resume";
+      if (!def->params.empty()) {
+        fn += "<";
+        for (std::size_t k = 0; k < def->params.size(); ++k) fn += (k ? ", " : "") + text_literal(n.param(def->params[k].key, def->params[k].def));
+        fn += ">";
+      }
+      events += "      case " + std::to_string(i) + ": self." + fn + "(self.n" + std::to_string(n.id) + "); break;  // " + lib.title(n) + "\n";
+      continue;
+    }
     if (!def || def->kind != NodeKind::event || def->type == "func.entry") continue;
     std::vector<PinDef> in, outs;
     lib.pins(n, g, in, outs);

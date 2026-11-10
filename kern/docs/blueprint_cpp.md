@@ -38,18 +38,19 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Fertig für Blueprints aus Funktionen und Events:** Der Text wird von einem C++-Compiler
-  ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen, Funktionen,
-  Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip Flop, die
-  Switches; die Events Begin Play, Tick und Custom Event, Call Event, Print, Game Time. Jeder
-  Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit nachgeschlagen.
+- **Fertig für alle Knoten der Kernbibliothek außer Random:** Der Text wird von einem
+  C++-Compiler ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen,
+  Funktionen, Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip
+  Flop, die Switches; alle Events, Call Event, Print, Game Time; Delay, Retriggerable Delay,
+  Tween; State Machines. Jeder Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit
+  nachgeschlagen.
 - **Fertig: Das Spiel führt diesen Text aus.** Der Build schreibt die Blueprints eines Levels als
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** wartende Knoten, State Machines, Zufall und die Gameplay-Knoten als
-  Funktionen von `blueprint.h`. `native_ready` sagt für jeden Blueprint, was ihm noch fehlt; bis
-  dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
+- **Als Nächstes:** der Schleifenwächter für alle Stufen gleich, Zufall und die Gameplay-Knoten
+  als Funktionen von `blueprint.h`. `native_ready` sagt für jeden Blueprint, was ihm noch fehlt;
+  bis dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
   `kern/games/spawncity/BLUEPRINTS.md`.
 
 ## Im Editor
@@ -316,20 +317,35 @@ Umwandlungen `kern::to`, die Knoten mit Gedächtnis wie Do Once und Gate auf ihr
 Der Interpreter ruft für seinen Knoten dieselbe Funktion auf wie der Text. Graph und Text können
 deshalb nicht verschieden rechnen – es gibt nur eine Stelle, an der gerechnet wird.
 
-**Was heute so läuft.** Blueprints mit diesen Knoten: Begin Play, Event Tick, Custom Event, Call
-Event, Print, Game Time; Function Entry, Return, Call Function, Function Value; Get, Set, Add;
-alle Mathe-, Logik-, Vektor- und Text-Werte, Compare, Select, Formel, die Reroutes; Branch,
-Sequence, For, While, Do Once, Do N, Gate, Flip Flop, Switch on Int, Switch on Text.
-`logic::native_ready(graph, &warum)` sagt es für jeden Blueprint; für alles andere nennt es den
-Knoten, der noch fehlt (Delay, Tween, Every N Seconds, State Machines, Random, die
-Gameplay-Knoten – der nächste Schritt).
+**Was heute so läuft.** Blueprints mit den Knoten der Kernbibliothek: Begin Play, Event Tick,
+Every N Seconds, Custom Event, On State Entered / Left, Call Event, Print, Game Time; Delay,
+Retriggerable Delay, Tween; State Machines mit Set State, Current State, Is In State; Function
+Entry, Return, Call Function, Function Value; Get, Set, Add; alle Mathe-, Logik-, Vektor- und
+Text-Werte, Compare, Select, Formel, die Reroutes; Branch, Sequence, For, While, Do Once, Do N,
+Gate, Flip Flop, Switch on Int, Switch on Text. `logic::native_ready(graph, &warum)` sagt es für
+jeden Blueprint (er muss dazu fehlerfrei kompilieren); für alles andere nennt es den Knoten, der
+noch fehlt (Random und die Gameplay-Knoten – der nächste Schritt).
 
 **Events.** Welches Event welchen Handler erreicht, entscheidet die Laufzeit (`Runtime::fire`:
 Typ, Name, Ziel, die Reihenfolge nach Knoten-Id) – für Interpreter, JIT und Klasse dieselbe
 Stelle. Die Klasse hat den Handler als Methode `on<id>`; der Kleber ruft sie mit den Werten des
 Events. `KERN_EVENT(on5, event_custom<"Hit">)` sagt dem Leser und dem Editor, welcher Knoten die
 Methode ist. Die Welt der Klasse (`kern_world`: Host, Laufzeit, Instanz) setzt die Engine; Print,
-Game Time und Call Event gehen darüber.
+Game Time und Call Event gehen darüber. Ein Event, das selbst entscheidet, ob es fällig ist
+(Every N Seconds zählt seine Zeit), tut das auf der Seite der Laufzeit – derselbe Code für jede
+Stufe –, dann läuft der Handler.
+
+**Warten.** `flow_delay(n8, 0.5, [this] { ... });` – was folgt, ist ein Lambda, das der Knoten in
+seinem Member behält (`kern::Node::later`). Die Wartezeiten aller Stufen führt die Laufzeit an
+einer Stelle (`Runtime::wait`); ist eine um, läuft der Knoten über den Kleber weiter
+(`flow_delay_resume`). Was Delay, Retriggerable Delay und Tween dabei rechnen (läuft schon?
+welches Alpha?), sind dieselben Funktionen wie im Interpreter (`logic::flow::delay_start`,
+`tween_step` …) auf den vier Zahlen des Knotens.
+
+**State Machines.** `kern::Machine machine3 = machine("Door").state(...).on_event(...)` schreibt
+die Maschine hin; geführt wird sie von der Laufzeit (Timer, Bedingungen, Events – derselbe Code
+für jede Stufe) für den Graphen, aus dem die Klasse geschrieben wurde. Die Klasse fragt und setzt
+Zustände darüber (`state_set`, `state_get`, `state_is`) und hat die State-Events als Handler.
 
 **Zahlen.** `Float` ist `double`, `Int` eine ganze Zahl mit 64 Bit. Aus einer Kommazahl wird eine
 ganze Zahl überall gleich (`kern::logic::whole`): zur Null hin abgeschnitten; „keine Zahl“ und
@@ -379,8 +395,9 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 (`blueprint_native_test`, über 2000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
-Szenario wie Interpreter und JIT – Begin Play, Events, Ticks – mit demselben Ergebnis, auch ein
-Handler, der sein eigenes Event auslöst (`event_reentry`).
+Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
+demselben Ergebnis: alle bis auf `infinite_loop` (der Schleifenwächter), auch ein Handler, der
+sein eigenes Event auslöst (`event_reentry`), Tweens und Timer (`waits`) und Zustände (`states`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

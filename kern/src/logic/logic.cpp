@@ -1241,6 +1241,25 @@ bool Runtime::run_compiled(Instance& inst, int node, int entry) {
   return true;
 }
 
+void Runtime::wait(Instance& inst, u32 node, f64 seconds, int entry) {
+  const auto it = inst.index_.find(node);
+  if (it == inst.index_.end()) return;
+  Pending p;
+  p.inst = &inst;
+  p.node = it->second;
+  p.at = host_.time() + max_of(0.0, seconds);
+  p.entry = entry;
+  p.serial = ++serial_;
+  pending_.push_back(p);
+}
+
+void Runtime::cancel_waits(Instance& inst, u32 node) {
+  const auto it = inst.index_.find(node);
+  if (it == inst.index_.end()) return;
+  const int index = it->second;
+  pending_.erase(std::remove_if(pending_.begin(), pending_.end(), [&](const Pending& p) { return p.inst == &inst && p.node == index; }), pending_.end());
+}
+
 void Runtime::run_from(Instance& inst, int start, int entry) {
   if (inst.blueprint_) {
     // The Blueprint's own class: the chain is a method of it.
@@ -1249,7 +1268,15 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
       host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
       return;
     }
-    inst.blueprint_->run(start, entry);
+    // An event that decides itself whether it is due (Every N Seconds counts its time): that is
+    // the event's side, the same code for every tier - then the handler.
+    const Instance::CNode& c = inst.nodes_[static_cast<std::size_t>(start)];
+    bool due = true;
+    if (entry != Context::kResume && c.def && c.def->kind == NodeKind::event && c.def->run) {
+      Context ctx(*this, inst, start, entry);
+      due = c.def->run(ctx) == 0;
+    }
+    if (due) inst.blueprint_->run(start, entry);
     --depth_;
     return;
   }

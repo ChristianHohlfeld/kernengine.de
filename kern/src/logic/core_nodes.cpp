@@ -286,11 +286,13 @@ void add_flow(Library& lib) {
     d.outputs = {exec_out("completed", "Completed")};
     d.keywords = "wait timer sleep";
     d.run = [](Context& c) {
-      NodeState& s = c.state();
-      if (c.entry() == Context::kResume) { s.flag = false; return 0; }
-      if (s.flag) return kStop;
-      s.flag = true;
-      return c.wait(c.in_number("duration"));
+      f64* m = &c.slot(0);
+      if (c.entry() == Context::kResume) {
+        flow::delay_done(m);
+        return 0;
+      }
+      const f64 duration = c.in_number("duration");
+      return flow::delay_start(m) ? c.wait(duration) : kStop;
     };
     lib.add(std::move(d));
   }
@@ -317,30 +319,22 @@ void add_flow(Library& lib) {
     d.outputs = {exec_out("update", "Update"), exec_out("finished", "Finished"), data("alpha", "Alpha", PinType::number)};
     d.keywords = "timeline lerp interpolate animate over time";
     d.run = [](Context& c) {
-      NodeState& s = c.state();
-      if (c.entry() == 1) { c.cancel_waits(); s.flag = false; return kStop; }
+      f64* m = &c.slot(0);
+      if (c.entry() == 1) {
+        c.cancel_waits();
+        flow::tween_stop(m);
+        return kStop;
+      }
       const f64 now = c.host().time();
       if (c.entry() == 0) {
         c.cancel_waits();
-        s.time = now;
-        s.a = max_of(0.0, c.in_number("duration"));
-        s.flag = true;
+        flow::tween_play(m, now, c.in_number("duration"));
       }
-      if (!s.flag) return kStop;
-      f64 t = s.a > 0 ? (now - s.time) / s.a : 1.0;
-      t = clamp(t, 0.0, 1.0);
-      const std::string ease = c.param("ease", "smooth");
-      f64 e = t;
-      if (ease == "smooth") e = t * t * (3 - 2 * t);
-      else if (ease == "in") e = t * t;
-      else if (ease == "out") e = 1 - (1 - t) * (1 - t);
-      c.out("alpha", Value::number(e));
-      if (t >= 1) {
-        s.flag = false;
-        c.then(c.exec("finished"));
-        return c.exec("update");
-      }
-      c.wait(0, Context::kResume);  // again next step
+      if (!flow::tween_runs(m)) return kStop;
+      bool finished = false;
+      c.out("alpha", Value::number(flow::tween_step(m, now, c.param("ease", "smooth"), finished)));
+      if (finished) c.then(c.exec("finished"));  // (after Update)
+      else c.wait(0, Context::kResume);          // again next step
       return c.exec("update");
     };
     lib.add(std::move(d));
