@@ -112,6 +112,20 @@ inline std::vector<std::string> setting_cases(std::string_view s) {
   return out;
 }
 
+/// What the engine passes by position to a function of a Blueprint's class, as the C++ type of
+/// that input (the conversion of Instance::call); a missing one is the input's default.
+template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
+  return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
+}
+/// Instance::set for a variable that is a member of a Blueprint's class: the conversions the
+/// interpreter's variables make.
+inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }
+inline void native_set(i64& variable, const Value& v) { variable = whole(v.as_number()); }
+inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
+inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
+inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
+inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
+
 /// The value nodes of the core library. Static, typed, without side effects: the interpreter
 /// wraps each as a node, a Blueprint's C++ calls it by this name.
 struct PureNodes {

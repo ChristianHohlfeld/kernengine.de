@@ -147,6 +147,11 @@ async function run({name, url, context, mapped}) {
   console.log(`[${name}] world placed after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   const hud = () => page.evaluate(() => window.SpawnCity.hud());
   const cmd = c => page.evaluate(c => window.SpawnCity.command(c), c);
+  // The level's rules run as their compiled C++ class (src/level_blueprints.cpp, written from the
+  // level by the build): not in the interpreter, not in the JIT.
+  const blueprints = JSON.parse(await cmd("blueprints"));
+  const rules = blueprints.find(b => b.name === "Wanted");
+  check(rules && rules.tier === "native C++" && !rules.disabled, `[${name}] the rules' Blueprint runs as its C++ class (${JSON.stringify(blueprints)})`);
   const shot = async file => {
     await page.waitForTimeout(400);
     const p = path.join(shots, `${name}-${file}.png`);

@@ -17,6 +17,7 @@ kern/src/logic/notation.cpp          Shape (was steht wo), Writer (Graph → Tex
 kern/src/studio/logic_edit.cpp       logicCpp, logicCppApply (die C++-Ansicht des Editors)
 kern/tests/test_main.cpp             logic_notation_*, studio_logic_cpp_view, logic_native_blueprints (der Beweis, siehe unten)
 kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, Aufrufe, der erzeugte Treiber
+tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen, die ein Spiel einbindet
 ```
 
 | Funktion | Bedeutung |
@@ -29,6 +30,7 @@ kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, A
 | `cpp_problem(graph)` | Warum ein Graph nicht als C++ geschrieben werden kann (leer: er kann). `check()` meldet dasselbe als Fehler. |
 | `cpp_names(graph)` | Für Levels von früher: benennt um, was kein C++-Name ist („Ball Seen“ → `BallSeen`), samt allen Verwendungen. Läuft beim Laden eines Levels. |
 | `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Wenn nicht: welcher Knoten noch keine Funktion in `blueprint.h` hat. |
+| `native_glue(graph, name, text)` | Der Kleber hinter dem Text: macht die Klasse für die Engine beim Namen erreichbar (`logic::NativeBlueprint`) und meldet sie unter dem Hash des Graphen an. Kein Teil der Schreibweise. |
 
 ## Stand
 
@@ -38,13 +40,15 @@ kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, A
 - **Fertig für Blueprints aus Funktionen:** Der Text wird von einem C++-Compiler ausgeführt, so
   wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen, Funktionen, Formeln, alle
   Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip Flop, die Switches. Jeder
-  Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit nachgeschlagen. SpawnCitys
-  Regel-Blueprint „Wanted“ läuft so.
+  Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit nachgeschlagen.
+- **Fertig: Das Spiel führt diesen Text aus.** Der Build schreibt die Blueprints eines Levels als
+  C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
+  Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
+  SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
 - **Als Nächstes:** Events, wartende Knoten, State Machines, Zufall und die Gameplay-Knoten als
-  Funktionen von `blueprint.h`; dann führt das Spiel den Text aus, und der Export baut ihn ein.
-  `native_ready` sagt für jeden Blueprint, was ihm noch fehlt. Der Fahrplan steht in
-  `kern/games/spawncity/BLUEPRINTS.md`. Bis dahin führen im Spiel Interpreter, JIT und der
-  bisherige Export die Blueprints aus.
+  Funktionen von `blueprint.h`. `native_ready` sagt für jeden Blueprint, was ihm noch fehlt; bis
+  dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
+  `kern/games/spawncity/BLUEPRINTS.md`.
 
 ## Im Editor
 
@@ -310,9 +314,23 @@ unendlich ergeben 0; was nicht mehr hineinpasst, das nächste Ende. Round und Fl
 dieselbe Regel. Ganze Zahlen sind in allen Stufen bis 2^53 exakt (der Interpreter hält
 Zahlen-Variablen als `double`).
 
+**Im Spiel.** `tools/blueprint_cpp.sh level.klevel out.cpp` schreibt für jeden Blueprint des
+Levels, der so laufen kann, seinen Text und dahinter den Kleber (`logic::native_glue`): eine
+Klasse `Name_Native`, über die die Engine Funktionen und Variablen beim Namen erreicht
+(`Instance::call`, `get`, `set`), angemeldet unter dem Hash des Graphen
+(`register_native_blueprint`). Ein Spiel, das `out.cpp` einbindet, führt diese Blueprints als
+kompilierten Code aus; `Instance::tier()` sagt dann „native C++“. Beim Namen wird nur an dieser
+Grenze nachgesehen – in der Klasse ist jeder Aufruf ein direkter Aufruf.
+
+Das Level bleibt die eine Quelle. Die Klasse führt nur genau den Graphen aus, aus dem sie
+geschrieben wurde: Der Hash lässt Positionen und Kommentare aus, alles andere ändert ihn. Ein
+Blueprint, der seit dem Build geändert wurde, läuft im Interpreter, bis der Build die Datei neu
+schreibt – nie als veralteter Code. `Runtime::native = false` lässt den Interpreter laufen, auch
+wenn es die Klasse gibt (so vergleichen die Tests beide).
+
 **Noch offen** (steht im Fahrplan, `kern/games/spawncity/BLUEPRINTS.md`): Der Interpreter bricht
 eine Endlosschleife nach 200 000 Knoten je Schritt ab – der kompilierte Text hat diesen Wächter
-noch nicht. Er kommt mit dem Schritt, in dem das Spiel den Text ausführt.
+noch nicht.
 
 ## Der Beweis (Tests)
 
@@ -335,13 +353,16 @@ Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von fünf Bl
 wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Compiler des
 Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
 Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
-(`blueprint_native_test`, über 2000 Aufrufe).
+(`blueprint_native_test`, über 2000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
+und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt.
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
 vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
 sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen nicht vorkommt.
-SpawnCitys Tests machen dasselbe mit dem Blueprint „Wanted“ des Levels (`wanted_native_test`).
+SpawnCitys Tests machen dasselbe mit dem Blueprint „Wanted“ des Levels (`wanted_native_test`);
+dort laufen außerdem alle Regel-Tests auf der Klasse, wie im Spiel, und ein Level, dessen
+Blueprint ohne neuen Build geändert wurde, fiele auf (`rules_wanted_blueprint` prüft die Stufe).
 
 Für die Ansicht: `logic_notation_apply_keeps_ids_and_places` (der Code ohne Layout, auf seinen
 Blueprint angewendet, ändert nichts; eine eingefügte, geänderte oder gelöschte Zeile lässt alle

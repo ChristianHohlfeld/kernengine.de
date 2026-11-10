@@ -102,6 +102,14 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   `blueprint_native_test` (in `kern/tests/run.sh`) kompiliert die Texte von fünf Blueprints und
   vergleicht über 2000 Aufrufe Zeichen für Zeichen mit dem Interpreter; `wanted_native_test` (in
   SpawnCitys Tests) dasselbe für „Wanted“.
+- [x] **Das Spiel führt den Text aus:** Der Build schreibt die Blueprints des Levels als
+  C++-Klassen in `src/level_blueprints.cpp` (`tools/blueprint_cpp.sh`: der Text jedes Blueprints,
+  der so laufen kann, und der Kleber `logic::native_glue`). `logic::Runtime` führt einen Graphen,
+  dessen Klasse im Programm steckt, als diese Klasse aus (Stufe „native C++“); die Engine
+  erreicht Funktionen und Variablen beim Namen nur an dieser Grenze. Die Klasse läuft nur für
+  genau den Graphen, aus dem sie geschrieben wurde (Hash) – ein geändertes Level fällt auf den
+  Interpreter zurück, bis neu gebaut ist. „Wanted“ läuft so im ausgelieferten SpawnCity; die
+  Regel-Tests laufen auf der Klasse und vergleichen sie mit dem Interpreter.
 - [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
   - Events (`KERN_EVENT`), wartende Knoten (Delay, Retriggerable Delay, Tween), State Machines
     (`kern::Machine`), Call Event, Set State, Print, Game Time, die Gameplay-Knoten.
@@ -114,9 +122,9 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es).
   - Tween mit Dauer 0 läuft sofort durch: als Rücksprung im Text darf das nicht tiefer werden.
-  - Das Spiel führt den Text aus: Die Klasse hängt an `logic::Instance` (Variablen und Funktionen
-    beim Namen nur an der Grenze zur Engine); der bisherige Export (Schleife über Knotennummern
-    mit `call_node` / `read_pin`) entfällt.
+  - Events, Warten und State Machines kommen über dieselbe Grenze (`logic::NativeBlueprint`);
+    danach entfällt der bisherige Export (Schleife über Knotennummern mit `call_node` /
+    `read_pin`, heute die Stufe „native C++ (node loop)“).
   - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text
     als 64-Bit-Zahl; der JIT schneidet „keine Zahl“ und unendlich beim Umwandeln nicht auf 0.
     Beides wird gleichgezogen.

@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"17:15",title:"Die Fahndungsregeln laufen im Spiel als kompiliertes C++",items:[
+    "Die Fahndung von SpawnCity (Sterne, Polizei, Entkommen, EMP) läuft jetzt im Spiel selbst als kompilierter C++-Code ihres Blueprints – nicht mehr über den Blueprint-Interpreter. Die Werte sind dieselben; das wird bei jedem Update mit über 500 Aufrufen gegen den Blueprint geprüft.",
+    "Unter der Haube (für alle Kern-Spiele): Beim Bauen eines Spiels werden die Blueprints seines Levels als C++-Klassen mitkompiliert. Das Level bleibt die eine Quelle – wird ein Blueprint geändert, läuft er bis zum nächsten Bau wieder als Blueprint, nie als veralteter Code.",
+  ]},
   {date:"2026-11-10",time:"16:46",title:"Blueprint-Code läuft direkt als C++",items:[
     "Unter der Haube (für alle Kern-Spiele): Den C++-Text eines Blueprints führt jetzt ein C++-Compiler aus, so wie er dasteht – jeder Knoten ist eine Funktion, nichts wird beim Laufen in einer Knotenliste nachgeschlagen. Das gilt zuerst für Blueprints aus Funktionen, Formeln und Variablen; Events, Warten und die Spielknoten folgen.",
     "Was ein Knoten rechnet, steht dafür nur noch an einer Stelle: Graph und C++ benutzen dieselbe Funktion. Bei jedem Update laufen über 2000 Aufrufe einmal als kompiliertes C++ und einmal als Blueprint und werden Zeichen für Zeichen verglichen – auch mit Extremwerten wie unendlich.",

@@ -39,6 +39,10 @@ SC_TEST(rules_wanted_blueprint) {
   SC_CHECK(bp.inst && bp.problems.empty(), "the level's Wanted Blueprint compiles without errors or warnings: %s", bp.problems.c_str());
   if (!bp.inst) return;
   SC_CHECK(!bp.inst->disabled() && bp.host.errors.empty(), "it runs (%s)", bp.host.errors.c_str());
+  // it runs as its compiled C++ class (src/level_blueprints.cpp, written from the level by the
+  // build): as in the game. A level whose Blueprint changed without a rebuild would run it in the
+  // interpreter instead - here that is a failure.
+  SC_CHECK(std::string(bp.inst->tier()) == "native C++", "the Wanted Blueprint runs as its C++ class (it runs: %s)", bp.inst->tier());
   // every rule the game calls is a function of the Blueprint
   for (const char* f : {"Severity", "StarsForHeat", "PoliceCount", "DetectionRadius", "EscapeMs", "PoliceDamage", "SpawnRadius", "ArrivalDelayMs", "EngageDelayMs",
                         "WaveBreakMs", "FireRange", "FireIntervalMs", "HitChance", "EmpImpulse", "Report", "Update", "Clear", "Stars"})
@@ -103,12 +107,15 @@ SC_TEST(rules_wanted_blueprint_is_its_cpp) {
     SC_CHECK(text.find(line) != std::string::npos, "the text has \"%s\"", line);
   SC_CHECK(text.find("call_node") == std::string::npos && text.find("read_pin") == std::string::npos, "nothing in it calls back into a node registry");
   // the Blueprint read from the C++ runs the rules exactly like the level's
+  // (the level's runs as its compiled class, the one read from the text in the interpreter)
   WantedBlueprint::Host host;
   kern::logic::Runtime rt(host);
+  rt.native = false;
   kern::logic::Instance* from_text = rt.add(back, 1, "Wanted");
   rt.begin();
   WantedBlueprint bp;
   SC_CHECK(bp.inst && from_text && !from_text->disabled(), "both run");
+  SC_CHECK(bp.inst && from_text && std::string(bp.inst->tier()) == "native C++" && std::string(from_text->tier()) == "interpreter", "one as the class, one in the interpreter");
   if (!bp.inst || !from_text) return;
   for (const kern::logic::Function& f : g.functions) {
     if (!f.pure) continue;

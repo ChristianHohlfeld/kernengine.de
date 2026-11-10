@@ -3163,6 +3163,67 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   return true;
 }
 
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib) {
+  std::string why;
+  if (!native_ready(g, &why, lib)) {
+    if (error) *error = why;
+    return false;
+  }
+  auto type = [](PinType t) -> const char* {
+    switch (t) {
+      case PinType::boolean: return "bool";
+      case PinType::integer: return "kern::i64";
+      case PinType::number: return "kern::f64";
+      case PinType::vector: return "kern::Vec3";
+      case PinType::text: return "std::string";
+      default: return "kern::logic::ActorHandle";
+    }
+  };
+  // (the notation's literal, outside the class: with the types' own names)
+  auto value = [](const json::Value& j, PinType t) {
+    const std::string text = literal(Value::from_json(j, t));
+    if (t == PinType::vector) return "kern::Vec3" + text.substr(6);
+    if (t == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
+    return text;
+  };
+  char hash[40];
+  std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
+  std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
+                  "// text): glue, not part of the notation - nothing to edit here.\n"
+                  "namespace {\n"
+                  "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
+                  "  " + name + " self;\n"
+                  "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
+                  "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
+  for (const Function& f : g.functions) {
+    std::string call = "self." + f.name + "(";
+    for (std::size_t k = 0; k < f.inputs.size(); ++k)
+      call += std::string(k ? ", " : "") + "native_arg<" + type(f.inputs[k].type) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type) + ")";
+    call += ")";
+    s += "    if (function == \"" + f.name + "\") {\n";
+    if (f.outputs.empty()) {
+      s += "      " + call + ";\n";
+    } else {
+      s += "      const auto out = " + call + ";\n      results = {";
+      for (std::size_t k = 0; k < f.outputs.size(); ++k) s += std::string(k ? ", " : "") + "to_value(out." + f.outputs[k].name + ")";
+      s += "};\n";
+    }
+    s += "      return true;\n    }\n";
+  }
+  s += "    return false;\n  }\n"
+       "  bool get(std::string_view variable, kern::logic::Value& out) const override {\n    (void)out;\n";
+  for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { out = kern::logic::to_value(self." + v.name + "); return true; }\n";
+  s += "    return false;\n  }\n"
+       "  bool set(std::string_view variable, const kern::logic::Value& value) override {\n    (void)value;\n";
+  for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { kern::logic::native_set(self." + v.name + ", value); return true; }\n";
+  s += "    return false;\n  }\n};\n"
+       "[[maybe_unused]] const bool " + name + "_registered =\n"
+       "    (kern::logic::register_native_blueprint(" + hash + ", [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new " + name + "_Native()); }), true);\n"
+       "}  // namespace\n";
+  out = std::move(s);
+  return true;
+}
+
 bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, bool layout) {
   Shape shape(g, lib);
   if (!shape.build()) {

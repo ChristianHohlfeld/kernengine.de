@@ -1,7 +1,9 @@
 // A Blueprint's C++ compiled by a C++ compiler computes what the interpreter computes
 // (docs/blueprint_cpp.md). The cases: Blueprints written in the notation, and one made of every
 // value node blueprint.h has; each with calls. kern_tests --emit-native <dir> writes each
-// Blueprint's text exactly as logic::to_cpp gives it, a main() that makes the calls, and what the
+// Blueprint's text exactly as logic::to_cpp gives it (and after it the glue the engine reaches
+// the class through, logic::native_glue), a main() that makes the calls - on the class itself
+// and, by name, through a logic::Instance that runs the graph as that class - and what the
 // interpreter answers; run.sh compiles the texts into blueprint_native_test and compares.
 #pragma once
 
@@ -503,13 +505,7 @@ inline std::vector<Case> cases() {
   return all;
 }
 
-struct Host : logic::Host {
-  std::vector<std::string> errors;
-  f64 time() const override { return 0; }
-  void print(const std::string&, bool) override {}
-  void error(const std::string& text) override { errors.push_back(text); }
-  u32 random() override { return 0; }
-};
+using Host = NativeTestHost;
 
 /// One line per call: Function(values) -> results | variables.
 inline std::string line(const std::string& function, const std::vector<std::string>& args, const std::vector<std::pair<std::string, std::string>>& results,
@@ -528,6 +524,7 @@ inline std::string play(const Case& c, std::vector<std::string>* errors = nullpt
   Host host;
   logic::Runtime rt(host);
   rt.jit = false;
+  rt.native = false;  // (the interpreter, also in a binary that has the Blueprint as a class)
   logic::Instance* inst = rt.add(c.graph, 0, c.name);
   rt.begin();
   std::string text = "== " + c.name + "\n";
@@ -596,19 +593,31 @@ inline bool write_file(const std::string& path, const std::string& text) {
   return std::fclose(f) == 0 && ok;
 }
 
-/// Writes <dir>/bp_<Name>.h (the Blueprint's text, as it is), blueprint_native_main.cpp (the
-/// calls) and blueprint_native_expected.txt (the interpreter's answers).
+/// Writes <dir>/bp_<Name>.h (the Blueprint's text, as it is, and its glue), blueprint_native_main.cpp
+/// (the calls) and blueprint_native_expected.txt (the interpreter's answers).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
                      "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"native_show.h\"\n";
   std::string runs, expected;
   for (const Case& c : all) {
-    std::string text, why;
-    if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why)) {
+    std::string text, glue, why;
+    if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why)) {
       if (error) *error = c.name + ": " + why;
       return false;
     }
-    if (!write_file(dir + "/bp_" + c.name + ".h", text)) {
+    // the graph as the compiled test gets it (as a level file would hold it): the same Blueprint, the same hash
+    const std::string stored = json::stringify(logic::graph_to_json(c.graph));
+    logic::Graph again;
+    json::Value parsed;
+    if (!json::parse(stored, parsed) || !logic::graph_from_json(parsed, again) || logic::graph_hash(again) != logic::graph_hash(c.graph)) {
+      if (error) *error = c.name + ": the graph is not the same after it was stored";
+      return false;
+    }
+    if (stored.find(")KGRAPH\"") != std::string::npos) {
+      if (error) *error = c.name + ": the graph contains the embedding's end mark";
+      return false;
+    }
+    if (!write_file(dir + "/bp_" + c.name + ".h", text + "\n" + glue)) {
       if (error) *error = "cannot write into " + dir;
       return false;
     }
@@ -619,8 +628,18 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       return false;
     }
     main += "#include \"bp_" + c.name + ".h\"\n";
-    std::string body = "static void run_" + c.name + "(std::string& got) {\n  " + c.name + " b;\n  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
+    std::string body = "static const char kGraph_" + c.name + "[] =";
+    for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
+    body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n  " + c.name + " b;\n  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
     for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + show(b." + v.name + ")";
+    body += ";\n  };\n"
+            "  // the same Blueprint behind a logic::Instance: the engine's way to it, by name\n"
+            "  NativeTestHost host;\n  kern::logic::Runtime rt(host);\n  rt.jit = false;\n  kern::logic::Graph graph;\n"
+            "  {\n    kern::json::Value stored;\n    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) hosted += \"(the graph was not read)\\n\";\n  }\n"
+            "  kern::logic::Instance* inst = rt.add(graph, 0, \"" + c.name + "\");\n  rt.begin();\n  hosted += \"== " + c.name + "\\n\";\n"
+            "  if (std::string(inst->tier()) != \"native C++\") hosted += std::string(\"(it runs in the \") + inst->tier() + \", not as its class)\\n\";\n"
+            "  const auto hosted_variables = [&] {\n    return std::string(\" |\")";
+    for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + native_show(inst->get(\"" + v.name + "\"))";
     body += ";\n  };\n";
     for (std::size_t at = 0; at < c.calls.size();) {
       std::size_t end = at;
@@ -644,27 +663,40 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       call += ")";
       body += (f.outputs.empty() ? "" : "const auto out = ") + call + ";\n      got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
-      body += " + variables() + \"\\n\";\n    }\n  }\n";
+      body += " + variables() + \"\\n\";\n";
+      // ... and the same call by name
+      body += "      std::vector<kern::logic::Value> results;\n      if (!inst->call(\"" + f.name + "\", {";
+      for (std::size_t i = 0; i < f.inputs.size(); ++i) body += std::string(i ? ", " : "") + "kern::logic::to_value(r.a" + std::to_string(i) + ")";
+      body += "}, results)) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
+      for (std::size_t k = 0; k < f.outputs.size(); ++k)
+        body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
+      body += " + hosted_variables() + \"\\n\";\n    }\n  }\n";
       at = end;
     }
     runs += body + "}\n\n";
   }
-  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n" + runs;
+  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
+          "// The lines that are not the interpreter's (0: none).\n"
+          "static int differs(const std::string& got, const std::string& expected, const char* what) {\n"
+          "  if (got == expected) return 0;\n  std::size_t a = 0, b = 0, shown = 0;\n"
+          "  while ((a < got.size() || b < expected.size()) && shown < 12) {\n"
+          "    const std::size_t ae = got.find('\\n', a), be = expected.find('\\n', b);\n"
+          "    const std::string x = a < got.size() ? got.substr(a, ae == std::string::npos ? ae : ae - a) : \"(nothing)\", y = b < expected.size() ? expected.substr(b, be == std::string::npos ? be : be - b) : \"(nothing)\";\n"
+          "    if (x != y) { std::printf(\"FAIL %s: %s\\n     the interpreter: %s\\n\", what, x.c_str(), y.c_str()); ++shown; }\n"
+          "    a = ae == std::string::npos ? got.size() : ae + 1;\n    b = be == std::string::npos ? expected.size() : be + 1;\n  }\n  return 1;\n}\n\n" + runs;
   main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt>\\n\"); return 2; }\n"
-          "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got;\n";
+          "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got, hosted;\n";
   std::size_t count = 0, calls = 0;
   for (const Case& c : all) {
-    main += "  run_" + c.name + "(got);\n";
+    main += "  run_" + c.name + "(got, hosted);\n";
     ++count;
     calls += c.calls.size();
   }
-  main += "  const std::string expected = want.str();\n  int failures = 0;\n  if (got != expected) {\n    ++failures;\n"
-          "    std::size_t a = 0, b = 0, shown = 0;\n    while ((a < got.size() || b < expected.size()) && shown < 12) {\n"
-          "      const std::size_t ae = got.find('\\n', a), be = expected.find('\\n', b);\n"
-          "      const std::string x = a < got.size() ? got.substr(a, ae == std::string::npos ? ae : ae - a) : \"(nothing)\", y = b < expected.size() ? expected.substr(b, be == std::string::npos ? be : be - b) : \"(nothing)\";\n"
-          "      if (x != y) { std::printf(\"FAIL the compiled Blueprint: %s\\n     the interpreter:        %s\\n\", x.c_str(), y.c_str()); ++shown; }\n"
-          "      a = ae == std::string::npos ? got.size() : ae + 1;\n      b = be == std::string::npos ? expected.size() : be + 1;\n    }\n  }\n";
-  main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) + " calls)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
+  main += "  const std::string expected = want.str();\n  int failures = 0;\n"
+          "  failures += differs(got, expected, \"the compiled Blueprint\");\n"
+          "  failures += differs(hosted, expected, \"its class behind logic::Instance\");\n";
+  main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) +
+          " calls on the class and by name through logic::Instance)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
   if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected)) {
     if (error) *error = "cannot write into " + dir;
     return false;

@@ -688,6 +688,12 @@ std::unordered_map<u64, NativeGraphFn>& native_registry() {
 
 void register_native_graph(u64 hash, NativeGraphFn fn) { native_registry()[hash] = fn; }
 
+std::unordered_map<u64, NativeBlueprintFactory>& blueprint_registry() {
+  static std::unordered_map<u64, NativeBlueprintFactory> r;
+  return r;
+}
+void register_native_blueprint(u64 hash, NativeBlueprintFactory make) { blueprint_registry()[hash] = make; }
+
 u64 graph_hash(const Graph& g) {
   // FNV-1a of the graph without positions and comments (moving a node keeps the code valid).
   Graph copy = g;
@@ -904,6 +910,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
 
 bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) {
   results.clear();
+  if (blueprint_) return !disabled_ && blueprint_->call(function, args, results);
   auto it = fn_index_.find(std::string(function));
   if (it == fn_index_.end()) return false;
   const int f = it->second;
@@ -967,6 +974,10 @@ bool Instance::return_values(std::string_view function, const std::vector<std::p
 }
 
 Value Instance::get(std::string_view variable) const {
+  if (blueprint_) {
+    Value v;
+    return blueprint_->get(variable, v) ? v : Value();
+  }
   if (const int k = var_slot(variable); k >= 0) {
     const Variable* v = graph_.variable(variable);
     return from_slot(slots_[static_cast<std::size_t>(k)], v ? v->type : PinType::number);
@@ -976,6 +987,7 @@ Value Instance::get(std::string_view variable) const {
 }
 
 bool Instance::set(std::string_view variable, const Value& v) {
+  if (blueprint_) return blueprint_->set(variable, v);
   if (const int k = var_slot(variable); k >= 0) {
     const Variable* var = graph_.variable(variable);
     slots_[static_cast<std::size_t>(k)] = to_type(v.as_number(), var ? var->type : PinType::number);
@@ -1028,9 +1040,13 @@ Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
   Instance* added = inst.get();
   instances_.push_back(std::move(inst));
   if (!added->disabled_) {
-    // Code compiled into the binary (exported from Studio) wins; else the host's JIT.
-    auto native = native_registry().find(graph_hash(graph));
-    if (native != native_registry().end()) added->native_ = native->second;
+    // Code compiled into the binary wins - the Blueprint's own C++ class first, then the node
+    // loop exported from Studio; else the host's JIT.
+    const u64 hash = graph_hash(graph);
+    auto own = blueprint_registry().find(hash);
+    auto loop = native_registry().find(hash);
+    if (native && own != blueprint_registry().end()) added->blueprint_ = own->second();
+    else if (loop != native_registry().end()) added->native_ = loop->second;
     else if (jit) added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
   }
   return added;

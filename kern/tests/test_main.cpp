@@ -2747,6 +2747,61 @@ TEST(logic_native_blueprints) {
           "Random Float in Range (node 4) is not yet a function of blueprint.h");
   not_yet(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})", "state machines (\"Door\") are not yet part of blueprint.h");
   not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
+
+  // A graph whose class the binary has runs as that class: the instance reaches it by name
+  // (logic::NativeBlueprint - written for a Blueprint by logic::native_glue; here one by hand,
+  // whose answers differ from the graph's so it shows who answers).
+  struct Fake final : logic::NativeBlueprint {
+    f64 heat = 1;
+    bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+      results.clear();
+      if (function != "Twice") return false;
+      results = {logic::Value::number(2 * (args.empty() ? 0.0 : args[0].as_number()) + heat)};
+      return true;
+    }
+    bool get(std::string_view variable, logic::Value& out) const override {
+      if (variable != "Heat") return false;
+      out = logic::Value::number(heat);
+      return true;
+    }
+    bool set(std::string_view variable, const logic::Value& value) override {
+      if (variable != "Heat") return false;
+      heat = value.as_number();
+      return true;
+    }
+  };
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"float","value":5}],
+    "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"r","type":"float","value":0}]}],
+    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Twice"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Twice"}}],
+    "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"r"]]})");
+  logic::register_native_blueprint(logic::graph_hash(g), [] { return std::unique_ptr<logic::NativeBlueprint>(new Fake()); });
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Instance* inst = rt.add(g, 0, "Hosted");
+  CHECK(std::string(inst->tier()) == "native C++" && inst->compiled());
+  CHECK(inst->call_number("Twice", {4}) == 9);
+  CHECK(inst->get("Heat").as_number() == 1 && inst->set("Heat", logic::Value::number(3)) && inst->call_number("Twice", {4}) == 11);
+  CHECK(!inst->set("Nope", logic::Value::number(1)) && inst->call_number("Nope", {1}, -7) == -7 && inst->has_function("Twice"));
+  // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
+  // the class never runs a graph it was not written from
+  logic::Graph moved = g, changed = g;
+  moved.nodes[1].x += 100;
+  changed.nodes[1].set_value("b", json::Value(3.0));
+  CHECK(std::string(rt.add(moved, 0, "Moved")->tier()) == "native C++");
+  logic::Instance* other = rt.add(changed, 0, "Changed");
+  CHECK(std::string(other->tier()) != "native C++" && other->call_number("Twice", {4}) == 12);
+  // Runtime::native off: the interpreter, whatever the binary has
+  logic::Runtime plain(host);
+  plain.native = false;
+  logic::Instance* interpreted = plain.add(g, 0, "Plain");
+  CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
+  // the glue for it: every function and variable by name, registered under the graph's hash
+  std::string glue, why;
+  CHECK(logic::native_glue(g, "Hosted", glue, &why));
+  for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
+                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
+    CHECK(glue.find(line) != std::string::npos);
+  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
 }
 
 TEST(logic_notation_refuses_with_place_and_reason) {

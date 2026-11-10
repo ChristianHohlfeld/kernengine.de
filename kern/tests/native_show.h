@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "kern/logic/logic.h"
 
@@ -27,3 +28,12 @@ inline std::string native_show(const kern::logic::Value& v) {
     default: return "?";
   }
 }
+
+/// The host of the native Blueprint test: time stands still, nothing is random, errors are kept.
+struct NativeTestHost : kern::logic::Host {
+  std::vector<std::string> errors;
+  kern::f64 time() const override { return 0; }
+  void print(const std::string&, bool) override {}
+  void error(const std::string& text) override { errors.push_back(text); }
+  kern::u32 random() override { return 0; }
+};

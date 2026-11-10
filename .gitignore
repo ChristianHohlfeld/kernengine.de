@@ -6,3 +6,5 @@ kern/build/
 .claude/
 # SpawnCity's level file as a source (tools/embed_level.py writes it at build time)
 kern/games/spawncity/src/level_data.cpp
+# ... and its Blueprints as C++ classes (tools/blueprint_cpp.sh writes them at build time)
+kern/games/spawncity/src/level_blueprints.cpp

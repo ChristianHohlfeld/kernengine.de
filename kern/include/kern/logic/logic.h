@@ -424,6 +424,26 @@ u64 graph_hash(const Graph& g);
 using NativeGraphFn = int (*)(void* inst, int pc, int entry);
 void register_native_graph(u64 hash, NativeGraphFn fn);
 
+/// A Blueprint compiled from its C++ text (kern/logic/blueprint.h, docs/blueprint_cpp.md), as the
+/// engine reaches it: by name, at the boundary. Inside, the class calls its own functions and
+/// reads its own members directly. logic::native_glue writes the class that implements this.
+class NativeBlueprint {
+ public:
+  virtual ~NativeBlueprint() = default;
+  /// As Instance::call (false: no such function, `results` empty).
+  virtual bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) = 0;
+  virtual bool get(std::string_view variable, Value& out) const = 0;
+  virtual bool set(std::string_view variable, const Value& value) = 0;
+};
+using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
+/// Code compiled into the binary: the class of the Blueprint with this content hash. A graph with
+/// that hash then runs as this class (Runtime::native), not in the interpreter or the JIT.
+void register_native_blueprint(u64 hash, NativeBlueprintFactory make);
+/// The C++ that makes a Blueprint's class reachable by name and registers it under the graph's
+/// hash: compiled after the Blueprint's text (to_cpp(g, name)) in the same source. For graphs that
+/// are native_ready. It is glue for the engine, not part of the notation: nothing to edit there.
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library());
+
 struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loops, latent waits
   f64 time = 0, a = 0, b = 0;
   i64 counter = 0, index = 0, last = 0;
@@ -460,9 +480,12 @@ class Instance {
   /// A Return node: the running call of `function` ends with these outputs (by output name).
   /// False outside that function's own chain (the chain then just ends).
   bool return_values(std::string_view function, const std::vector<std::pair<std::string, Value>>& values);
-  /// Runs as machine code (JIT-compiled WebAssembly or generated C++) instead of the interpreter.
-  bool compiled() const { return jit_fn_ >= 0 || native_ != nullptr; }
-  const char* tier() const { return native_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
+  /// Runs as machine code (its own C++ class, JIT-compiled WebAssembly or the node loop exported
+  /// as C++) instead of the interpreter.
+  bool compiled() const { return blueprint_ || jit_fn_ >= 0 || native_ != nullptr; }
+  const char* tier() const {
+    return blueprint_ ? "native C++" : native_ ? "native C++ (node loop)" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter";
+  }
   i32 id() const { return id_; }
 
   // ---- generated code support (compiled modules and exported C++ call these) ----
@@ -550,6 +573,7 @@ class Instance {
   i32 jit_fn_ = -1;                   // table index of the compiled run function
   bool jit_pending_ = false;
   NativeGraphFn native_ = nullptr;
+  std::unique_ptr<NativeBlueprint> blueprint_;  // the Blueprint as its compiled C++ class (register_native_blueprint)
   bool disabled_ = false;
   bool begun_ = false;
 };
@@ -598,6 +622,9 @@ class Runtime {
   static Instance* instance_by_id(i32 id);
   /// Compile graphs to native code (on by default where the host can).
   bool jit = true;
+  /// Run a Blueprint as its compiled C++ class where the binary has one (register_native_blueprint).
+  /// Off: the interpreter (or the JIT) runs it - what the class is compared with.
+  bool native = true;
 
  private:
   friend class Context;

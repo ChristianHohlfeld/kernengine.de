@@ -19,8 +19,8 @@ int main(int argc, char** argv) {
     logic_cases::Host host;
     kern::logic::Runtime rt(host);
     kern::logic::Instance* inst = rt.add(logic_cases::parse(c), 0, c.name);
-    if (std::strcmp(inst->tier(), "native C++") != 0) {
-      std::printf("FAIL %s runs in the %s, not as native C++\n", c.name, inst->tier());
+    if (std::strcmp(inst->tier(), "native C++ (node loop)") != 0) {
+      std::printf("FAIL %s runs in the %s, not as the exported node loop\n", c.name, inst->tier());
       ++failures;
     }
     got += std::string("== ") + c.name + "\n" + logic_cases::play(rt, host, inst);
