@@ -18,7 +18,9 @@ src/logic/logic.cpp            values, graph JSON, Library, check, interpreter
 src/logic/core_nodes.cpp       core nodes (events, flow, variables, state machines, math, text …)
 src/logic/codegen.cpp          compile_wasm (JIT) and generate_cpp (export)
 src/logic/logic_api.cpp        C ABI between engine and JIT modules
-src/game/logic_nodes.cpp       game nodes (actors, physics, combat, robots …)
+src/game/logic_node_shapes.cpp game nodes as the library knows them: names, pins, settings
+src/game/logic_nodes.cpp       what the game nodes do (actors, physics, combat, robots …), as functions
+include/kern/game/blueprint_nodes.h  those functions (kern::game::nodes) and their calls in a Blueprint's C++
 src/game/logic_world.cpp       graphs in the GameWorld: host, events, replication
 src/studio/logic_edit.cpp      editing in Studio
 web/studio/logic.mjs           Blueprint editor (user interface)
@@ -143,20 +145,35 @@ A node function sees the world through `Context`:
 | `self()`, `host()`, `runtime()`, `instance()` | context |
 
 `Library::core()` contains the built-in nodes; `logic::library()` is core plus whatever the game has
-registered. The game nodes register themselves at program start (`logic_nodes.cpp`;
-`game::logic_nodes_registered()` ensures that this file gets linked).
+registered. The game nodes register themselves at program start
+(`game::logic_nodes_registered()` ensures that they get linked).
 
-A minimal example from `logic_nodes.cpp`, an action:
+A game node is written in two places. **What it looks like** – name, pins, settings – is in
+`logic_node_shapes.cpp`; that file needs nothing of the game, so tools that only read and write
+Blueprints know the nodes too (`tools/blueprint_cpp`):
 
 ```cpp
-lib.add(action("game.add_score", "Add Score", "Game",
-               {data("points", "Points", PinType::number, 10.0)}, {},
-               [](Context& c, GameWorld& w) { w.add_score(static_cast<f32>(c.in_number("points"))); },
-               "Adds points (wins at the target score when the goal is Score).", "points reward"));
+lib.add(step("game.add_score", "Add Score", "Game", {data("points", "Points", PinType::number, 10.0)}, {},
+             "Adds points (wins at the target score when the goal is Score).", "points reward"));
 ```
 
-`action(...)` builds a `NodeDef` from this with one exec input and one exec output `then`, whose
-`run` calls the function with the GameWorld and returns 0.
+**What it does** is a typed function in `kern::game::nodes` (declared in
+`kern/game/blueprint_nodes.h`, defined in `logic_nodes.cpp`): the game, Self, then the node's data
+inputs in their order. `bind` attaches it to the node:
+
+```cpp
+void game_add_score(GameWorld& w, Self, Float points) { w.add_score(static_cast<f32>(points)); }
+...
+bind(lib, "game.add_score", &nodes::game_add_score);
+```
+
+The interpreter calls it through the node, a Blueprint's C++ calls it directly
+(`game_add_score(5.0);`, [blueprint_cpp.md](../blueprint_cpp.md)) – both the same function. A node
+with several outputs gives a `struct` whose fields are named like the pins; an actor input without
+a value means Self inside the function. So a new game node needs: its line in
+`logic_node_shapes.cpp`, its function and `bind`, its call in `BlueprintNodesOf`
+(`blueprint_nodes.h`) and a place in a Blueprint of the test levels (`tests/game_cases.h`) – the
+test `game_blueprints_as_classes` tells which of these is missing.
 
 ---
 
@@ -287,7 +304,7 @@ the network agree.
 
 ## 9.6 Game nodes
 
-`src/game/logic_nodes.cpp` registers 71 nodes. They call functions of the GameWorld
+The library has 71 game nodes (`logic_node_shapes.cpp`, `logic_nodes.cpp`). They call functions of the GameWorld
 ([Chapter 8](08-game-runtime.md)); an actor input without a wire (0) means **Self**.
 
 ### Events

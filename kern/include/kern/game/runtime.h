@@ -18,6 +18,7 @@
 
 #include "kern/game/geometry.h"
 #include "kern/game/level.h"
+#include "kern/game/logic_nodes.h"
 #include "kern/gfx/particles.h"
 #include "kern/gfx/renderer.h"
 #include "kern/physics/physics.h"
@@ -168,9 +169,6 @@ struct SimStats {
   u64 steps = 0;
 };
 
-/// The gameplay nodes of Kern Logic are registered (always true; links logic_nodes.cpp).
-bool logic_nodes_registered();
-
 class GameWorld {
  public:
   explicit GameWorld(Renderer& renderer, NightWindows* windows = nullptr);
@@ -303,6 +301,9 @@ class GameWorld {
   // ---- logic (Kern Logic graphs: the level's and the actors') ----
   /// The running graphs (Play and Simulate on the authority; null otherwise).
   logic::Runtime* logic_runtime() { return logic_.get(); }
+  /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
+  /// Off: the interpreter or the JIT, whatever the program has - read when the game starts.
+  bool logic_native = true;
   /// A key of this machine's keyboard while playing ("KeyF", "Digit1"...): On Key events.
   void key_event(const std::string& code, bool down);
   /// Replicated changes made by logic (the network server sends them; clients apply them).

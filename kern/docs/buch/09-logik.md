@@ -18,7 +18,9 @@ src/logic/logic.cpp            Werte, Graph-JSON, Library, check, Interpreter
 src/logic/core_nodes.cpp       Kern-Knoten (Events, Flow, Variablen, State Machines, Mathe, Text …)
 src/logic/codegen.cpp          compile_wasm (JIT) und generate_cpp (Export)
 src/logic/logic_api.cpp        C-ABI zwischen Engine und JIT-Modulen
-src/game/logic_nodes.cpp       Spiel-Knoten (Actors, Physik, Kampf, Roboter …)
+src/game/logic_node_shapes.cpp Spiel-Knoten, wie die Bibliothek sie kennt: Namen, Pins, Einstellungen
+src/game/logic_nodes.cpp       was die Spiel-Knoten tun (Actors, Physik, Kampf, Roboter …), als Funktionen
+include/kern/game/blueprint_nodes.h  diese Funktionen (kern::game::nodes) und ihre Aufrufe im C++ eines Blueprints
 src/game/logic_world.cpp       Graphen in der GameWorld: Host, Events, Replikation
 src/studio/logic_edit.cpp      Bearbeitung im Studio
 web/studio/logic.mjs           Blueprint-Editor (Oberfläche)
@@ -145,19 +147,34 @@ Eine Knotenfunktion sieht die Welt über `Context`:
 
 `Library::core()` enthält die eingebauten Knoten; `logic::library()` ist core plus das, was das Spiel
 registriert hat. Die Spiel-Knoten registrieren sich beim Start des Programms selbst
-(`logic_nodes.cpp`; `game::logic_nodes_registered()` sorgt dafür, dass diese Datei gelinkt wird).
+(`game::logic_nodes_registered()` sorgt dafür, dass sie gelinkt werden).
 
-Ein minimales Beispiel aus `logic_nodes.cpp`, eine Aktion:
+Ein Spiel-Knoten steht an zwei Stellen. **Wie er aussieht** – Name, Pins, Einstellungen – steht
+in `logic_node_shapes.cpp`; diese Datei braucht nichts vom Spiel, deshalb kennen auch Werkzeuge
+die Knoten, die nur Blueprints lesen und schreiben (`tools/blueprint_cpp`):
 
 ```cpp
-lib.add(action("game.add_score", "Add Score", "Game",
-               {data("points", "Points", PinType::number, 10.0)}, {},
-               [](Context& c, GameWorld& w) { w.add_score(static_cast<f32>(c.in_number("points"))); },
-               "Adds points (wins at the target score when the goal is Score).", "points reward"));
+lib.add(step("game.add_score", "Add Score", "Game", {data("points", "Points", PinType::number, 10.0)}, {},
+             "Adds points (wins at the target score when the goal is Score).", "points reward"));
 ```
 
-`action(...)` baut daraus eine `NodeDef` mit einem Exec-Eingang und einem Exec-Ausgang `then`, deren
-`run` die Funktion mit der GameWorld aufruft und 0 liefert.
+**Was er tut**, ist eine typisierte Funktion in `kern::game::nodes` (deklariert in
+`kern/game/blueprint_nodes.h`, definiert in `logic_nodes.cpp`): das Spiel, Self, dann die
+Dateneingänge des Knotens in ihrer Reihenfolge. `bind` hängt sie an den Knoten:
+
+```cpp
+void game_add_score(GameWorld& w, Self, Float points) { w.add_score(static_cast<f32>(points)); }
+...
+bind(lib, "game.add_score", &nodes::game_add_score);
+```
+
+Der Interpreter ruft sie über den Knoten auf, das C++ eines Blueprints direkt
+(`game_add_score(5.0);`, [blueprint_cpp.md](../blueprint_cpp.md)) – beide dieselbe Funktion. Ein
+Knoten mit mehreren Ausgängen gibt ein `struct`, dessen Felder wie die Pins heißen; ein
+Actor-Eingang ohne Wert meint in der Funktion Self. Ein neuer Spiel-Knoten braucht also: seine
+Zeile in `logic_node_shapes.cpp`, seine Funktion samt `bind`, seinen Aufruf in
+`BlueprintNodesOf` (`blueprint_nodes.h`) und einen Platz in einem Blueprint der Test-Levels
+(`tests/game_cases.h`) – der Test `game_blueprints_as_classes` meldet, was davon fehlt.
 
 ---
 
@@ -291,7 +308,7 @@ das Netz stimmen überein.
 
 ## 9.6 Spiel-Knoten
 
-`src/game/logic_nodes.cpp` registriert 71 Knoten. Sie rufen Funktionen der GameWorld
+Die Bibliothek hat 71 Spiel-Knoten (`logic_node_shapes.cpp`, `logic_nodes.cpp`). Sie rufen Funktionen der GameWorld
 ([Kapitel 8](08-spiel-laufzeit.md)); ein Actor-Eingang ohne Draht (0) bedeutet **Self**.
 
 ### Events

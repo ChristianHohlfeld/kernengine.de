@@ -91,9 +91,9 @@ check(await until(async () => (await cppText.inputValue()).includes("TwiceResult
 let code = await cppText.inputValue();
 check(code.includes("return {kern::formula([](Float x, Float bonus) -> Float { return x * 2.0 + bonus; }, x, 0.5)};"), "the Formula node is the expression itself");
 check(/n\d+ = Twice\(20\.0\);/.test(code) && code.includes("KERN_EVENT(on") && !code.includes("KERN_LAYOUT") && !/call_node|read_pin/.test(code), "the call is a call, the event a method; no layout, no callbacks");
-// (this Blueprint has an event: a compiler does not run its text yet, and the view says what is missing)
+// (an event, a call, Show Message - a gameplay node: a compiler runs this text as it stands, and the view says so)
 const nativeNote = page.locator(".lg-cppnative");
-check((await nativeNote.textContent()) === "runs in the interpreter for now" && /is not yet a function of blueprint\.h/.test(await nativeNote.getAttribute("title")), "the view says whether a compiler runs the text as it stands");
+check((await nativeNote.textContent()) === "runs as compiled C++" && /every node is a function/.test(await nativeNote.getAttribute("title")), "the view says that a compiler runs the text as it stands");
 // a change typed into the text becomes the graph (Ctrl+Enter), and the nodes stay where they are
 const places = async () => JSON.stringify((await logic()).nodes.map(n => [n.id, n.x, n.y]).sort((a, b) => a[0] - b[0]));
 const placesBefore = await places();

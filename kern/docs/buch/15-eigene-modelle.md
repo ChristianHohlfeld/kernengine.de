@@ -499,7 +499,7 @@ nach der Dauer zurück. Nötig sind:
 | `PlayInput::robot` und `drive_walkers` | ein freies Bit und `walker_skill(w.actor, "bow")` beim Drücken |
 | `src/studio/viewport.cpp` | eine Taste (wie `Digit7` → 256) |
 | `src/game/touch.cpp` | ein Touch-Knopf (wie „HOP“); seine deutsche Beschriftung (hier „HÜPFEN“) kommt in `I18N_DE` in `web/studio/game.mjs` |
-| `src/game/logic_nodes.cpp` | die Beschreibung von **Robot Move** um den Namen ergänzen; der Knoten ruft `walker_skill` mit dem Namen |
+| `src/game/logic_node_shapes.cpp` | die Beschreibung von **Robot Move** um den Namen ergänzen; der Knoten ruft `walker_skill` mit dem Namen |
 | `web/studio/game.mjs` | den Dateinamen in `KERN_POLICIES`, damit das Studio ihn aus `policies/` lädt |
 | `kern/policies/` | die Datei selbst, dazu eine Zeile in `policies/README.md` |
 

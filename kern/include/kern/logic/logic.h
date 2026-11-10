@@ -289,6 +289,8 @@ struct NodeDef {
                          // (Reset, Open, Close, Stop) change what the node keeps, and the path ends there
   int now_outputs = 0;   // latent: its first exec outputs that run with the call itself, not after a wait
                          // (Tween's Update runs with Play); the others always run later
+  bool native = false;   // a Blueprint's C++ has it as a function (blueprint.h): a C++ compiler runs a
+                         // Blueprint whose nodes all have one (native_ready)
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;
@@ -313,6 +315,9 @@ class Library {
  public:
   void add(NodeDef def);
   const NodeDef* find(std::string_view type) const;
+  /// A node of the library, to complete it: a module that knows what the node does binds that
+  /// (NodeDef::run) to a node another one has described (the gameplay nodes). Null: no such node.
+  NodeDef* edit(std::string_view type);
   const std::vector<std::unique_ptr<NodeDef>>& all() const { return defs_; }
   /// Resolved pins of a node (static or shaped).
   void pins(const Node& node, const Graph& graph, std::vector<PinDef>& in, std::vector<PinDef>& out) const;
@@ -470,6 +475,7 @@ struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loo
   i64 counter = 0, index = 0, last = 0;
   bool flag = false, flag2 = false;
   Value value;
+  std::vector<ActorRef> list;  // a loop over things: what it goes through (For Each Actor with Tag)
 };
 
 class Runtime;

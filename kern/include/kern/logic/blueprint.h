@@ -5,10 +5,10 @@
 // typed, inline, the very function the interpreter's node calls (nodes.h). Nothing is looked up
 // at run time.
 //
-// So far this covers: variables, functions, formulas, the value nodes, Branch / Sequence / While /
-// For, Do Once, Do N, Gate, Flip Flop, the switches; the events (Begin Play, Tick, Every N
-// Seconds, Custom Event, the state events), Call Event, Print, Game Time; Delay, Retriggerable
-// Delay, Tween; state machines; Random. The gameplay nodes follow (logic::native_ready tells).
+// This covers the core library - variables, functions, formulas, the value nodes, Branch /
+// Sequence / While / For, Do Once, Do N, Gate, Flip Flop, the switches; the events, Call Event,
+// Print, Game Time; Delay, Retriggerable Delay, Tween; state machines; Random - and the gameplay
+// nodes (kern/game/blueprint_nodes.h). logic::native_ready tells what a Blueprint still lacks.
 #pragma once
 
 #include <cstddef>
@@ -17,19 +17,11 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "kern/logic/nodes.h"
 
 namespace kern {
-
-/// A node's setting as a template argument: flow_switch_int<"3">, math_compare<"<=">.
-template <std::size_t N> struct Setting {
-  char text[N]{};
-  constexpr Setting(const char (&s)[N]) {  // NOLINT (implicit: that is the point)
-    for (std::size_t i = 0; i < N; ++i) text[i] = s[i];
-  }
-  constexpr std::string_view view() const { return {text, N - 1}; }
-};
 
 /// The C++ type of a pin type named in a setting ("float", "int", "bool", "vector", "text", "actor").
 template <Setting Type>
@@ -46,6 +38,9 @@ template <u32 Id> struct Node {
   f64 memory[4] = {0, 0, 0, 0};
   /// A node that waits: what follows it (by exec output), kept until the wait is over.
   std::function<void(int)> later;
+  /// A loop over things: what it goes through, as it was when the loop started (For Each Actor
+  /// with Tag).
+  std::vector<logic::ActorRef> list;
 };
 
 /// One way on of a node that waits and has several: {"update", [this] { ... }}.
@@ -77,7 +72,9 @@ struct Layout {
   void next_id(u32) {}
 };
 
-struct Blueprint : logic::PureNodes {
+/// The nodes of the core library (src/logic/core_nodes.cpp). kern::Blueprint, below, is these and
+/// the gameplay nodes.
+struct BlueprintCore : logic::PureNodes {
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;
 
@@ -191,7 +188,7 @@ struct Blueprint : logic::PureNodes {
   bool loop(Bool condition) { return condition && kern_pass(); }
   /// for (auto it = flow_for(n, first, last); it.next();): a For Loop; n.index is the index.
   template <class N> struct ForLoop {
-    Blueprint& self;
+    BlueprintCore& self;
     N& n;
     bool first = true;
     bool next() {
@@ -227,6 +224,17 @@ struct Blueprint : logic::PureNodes {
   template <Setting Type> static pin_t<Type> logic_select(Bool pick, pin_t<Type> a, pin_t<Type> b) { return pick ? a : b; }
   template <Setting Type> static pin_t<Type> value_reroute(pin_t<Type> in) { return in; }
 };
+
+}  // namespace kern
+
+#include "kern/game/blueprint_nodes.h"
+
+namespace kern {
+
+/// What a Blueprint's C++ derives from: every node of the library as a function - the core's
+/// (BlueprintCore) and the game's (game::BlueprintNodesOf; they need the game only where a
+/// Blueprint uses them).
+struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
 
 }  // namespace kern
 

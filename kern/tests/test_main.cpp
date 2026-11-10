@@ -29,6 +29,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/logic.h"
 #include "blueprint_native.h"
+#include "game_cases.h"
 #include "kern/logic/nodes.h"
 #include "logic_cases.h"
 #include "../src/game/soldier_models.h"
@@ -2818,6 +2819,13 @@ TEST(logic_native_blueprints) {
     for (const logic::Node& n : c.graph.nodes) used.insert(n.type);
   }
   CHECK(calls > 1500);
+  // (the gameplay nodes are in the Blueprints of the game cases: game_cases.h, the game_native_test stage)
+  for (const game_cases::Case& c : game_cases::cases()) {
+    for (const logic::Node& n : c.level.logic.nodes) used.insert(n.type);
+    for (const game::Actor& a : c.level.actors)
+      if (a.logic)
+        for (const logic::Node& n : a.logic->nodes) used.insert(n.type);
+  }
   for (const auto& d : logic::library().all()) {
     // the node next to a variable and a function it can name
     logic::Graph g = logic_graph(R"({"variables":[{"name":"V","type":"float","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
@@ -2833,7 +2841,10 @@ TEST(logic_native_blueprints) {
     if (!used.count(d->type)) std::printf("native_ready lets %s through, and no native case has it\n", d->type.c_str());
     CHECK(used.count(d->type));
   }
-  CHECK(used.size() >= 60);
+  // ... which is every node of the library: there is none a compiler does not run
+  for (const auto& d : logic::library().all()) CHECK(d->native);
+  if (used.size() != logic::library().all().size()) std::printf("%zu node types in the native cases, %zu in the library\n", used.size(), logic::library().all().size());
+  CHECK(used.size() == logic::library().all().size() && used.size() >= 150);
   // what is not there yet is said, with the node
   auto not_yet = [](const char* graph, const char* why) {
     const logic::Graph g = logic_graph(graph);
@@ -2842,8 +2853,8 @@ TEST(logic_native_blueprints) {
     if (said.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, said.c_str());
     CHECK(said.find(why) != std::string::npos);
   };
-  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message"}],"links":[[1,"then",2,"exec"]]})", "(node 2) is not yet a function of blueprint.h");
-  not_yet(R"({"nodes":[{"id":4,"type":"actor.self"},{"id":5,"type":"game.message"}],"links":[]})", "is not yet a function of blueprint.h");
+  CHECK(logic::native_ready(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message"}],"links":[[1,"then",2,"exec"]]})")));
+  CHECK(logic::native_ready(logic_graph(R"({"nodes":[{"id":4,"type":"actor.self"},{"id":5,"type":"walker.quack"}],"links":[[4,"actor",5,"target"]]})")));
   CHECK(logic::native_ready(logic_graph(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})")));
   not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
 
@@ -2902,7 +2913,28 @@ TEST(logic_native_blueprints) {
   for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
-  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"game.message"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  {
+    // a node that is not a function of blueprint.h (NodeDef::native: a library decides for its own
+    // nodes): said with the node, and no glue for a class that would not compile
+    logic::Library lib;
+    logic::NodeDef later;
+    later.type = "test.later";
+    later.label = "Later";
+    later.inputs = {{"exec", "", logic::PinType::exec, {}}};
+    later.outputs = {{"then", "", logic::PinType::exec, {}}};
+    lib.add(later);
+    logic::Graph g;
+    logic::Node n;
+    n.id = 2;
+    n.type = "test.later";
+    g.nodes.push_back(n);
+    g.next_id = 3;
+    std::string said;
+    CHECK(!logic::native_ready(g, &said, lib) && said == "Later (node 2) is not yet a function of blueprint.h");
+    CHECK(!logic::native_glue(g, "X", glue, &why, lib) && why.find("not yet a function of blueprint.h") != std::string::npos);
+    lib.edit("test.later")->native = true;
+    CHECK(logic::native_ready(g, &said, lib) && lib.edit("nothing") == nullptr);
+  }
   // a node that waits is run again by the runtime when the wait is over: <node>_resume, with its settings
   CHECK(logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.tween","params":{"ease":"out"}}],"links":[[1,"then",4,"play"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.flow_tween_resume<\"out\">(self.n4); break;  // Tween") != std::string::npos);
@@ -2911,6 +2943,77 @@ TEST(logic_native_blueprints) {
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
                   "native_out<std::string>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
+}
+
+TEST(game_blueprints_as_classes) {
+  // The gameplay nodes are functions of a Blueprint's class too (kern/game/blueprint_nodes.h). The
+  // Blueprints of two levels use every one of them (game_cases.h); run.sh writes them as classes
+  // with the tool a game's build uses and plays the scenarios in the interpreter and as those
+  // classes (game_native_test). Here: the levels are sound, every Blueprint of them is one a
+  // compiler runs, and the scenarios make happen what they are meant to - in the interpreter.
+  std::string error;
+  const std::vector<game_cases::Case> cases = game_cases::cases(&error);
+  if (!error.empty()) std::printf("the game cases: %s\n", error.c_str());
+  CHECK(error.empty() && cases.size() == 2);
+  std::set<std::string> used;
+  int blueprints = 0;
+  auto ready = [&](const logic::Graph& g, const std::string& owner) {
+    std::string why, text, glue;
+    const bool ok = no_errors(logic::check(g)) && logic::native_ready(g, &why) && logic::to_cpp(g, logic::cpp_class_name(owner, g), text, &why) &&
+                    logic::native_glue(g, logic::cpp_class_name(owner, g), glue, &why);
+    if (!ok) std::printf("%s: %s\n", owner.c_str(), why.c_str());
+    CHECK(ok);
+    for (const logic::Node& n : g.nodes) used.insert(n.type);
+    ++blueprints;
+  };
+  for (const game_cases::Case& c : cases) {
+    CHECK(no_errors(game::validate(c.level)));
+    ready(c.level.logic, "Level");
+    for (const game::Actor& a : c.level.actors)
+      if (a.logic) ready(*a.logic, a.name);
+  }
+  CHECK(blueprints == 8);
+  // every node of the library does something: the gameplay nodes are described in one file
+  // (logic_node_shapes.cpp) and bound to the game in another (logic_nodes.cpp)
+  for (const auto& d : logic::library().all()) {
+    if (d->kind != logic::NodeKind::event && !d->run) std::printf("%s does nothing\n", d->type.c_str());
+    CHECK(d->kind == logic::NodeKind::event || d->run);
+  }
+  // every gameplay node is in one of the cases
+  for (const std::string& type : game::logic_node_types()) {
+    const logic::NodeDef* d = logic::library().find(type);
+    if (!used.count(type)) std::printf("no game case has %s\n", type.c_str());
+    CHECK(d && d->native && used.count(type));
+  }
+  CHECK(game::logic_node_types().size() == 71 && game::logic_node_shapes_registered());
+  // the Arena, as the file the classes are written from: the same Blueprints
+  game::Level stored;
+  CHECK(game::from_text(game::to_text(cases[0].level), stored, &error) && logic::graph_hash(stored.logic) == logic::graph_hash(cases[0].level.logic));
+  const game_cases::Played played = game_cases::play(stored, cases[0].scenario, false);
+  CHECK(played.tiers.size() == 7);
+  for (const std::string& t : played.tiers) CHECK(t.find("native C++") == std::string::npos);
+  for (const char* happened :
+       {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "each;each;", "jump;", "key:truekey:false",
+        "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
+        "event: Logic error: Spawn Actor: no template \"Nothing\"", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
+    if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
+    CHECK(played.text.find(happened) != std::string::npos);
+  }
+  // the door went up, the crates were hit, the scenario is the same when it is played again
+  const std::size_t end = played.text.find("-- the end\n");
+  CHECK(played.text.find("Door: alive at (10, 0, 4.5)") != std::string::npos && played.text.find("Hits=0 Moved=0 Sum=0") != std::string::npos && end != std::string::npos &&
+        played.text.find(" Hits=0 ", end) == std::string::npos && played.text.find(" Bumps=0 ", end) == std::string::npos);
+  CHECK(game_cases::play(stored, cases[0].scenario, false).text == played.text);
+  // the robot's room: its Blueprint reads the sensors (every quarter of a second) and drives the robot
+  const game_cases::Played robot = game_cases::play(cases[1].level, cases[1].scenario, false);
+  CHECK(robot.tiers.size() == 1 && robot.text.find("-- free again\n") != std::string::npos);
+  const std::size_t driven = robot.text.find("-- driven\n"), sat = robot.text.find("-- sit, pet, hear, chirp\n");
+  CHECK(driven != std::string::npos && sat != std::string::npos);
+  if (driven != std::string::npos && sat != std::string::npos) {
+    const std::string then = robot.text.substr(driven, sat - driven);
+    if (then.find("State=\"Logic\"") == std::string::npos || then.find(" Looks=0") != std::string::npos) std::printf("%s", then.substr(0, 400).c_str());
+    CHECK(then.find("State=\"Logic\"") != std::string::npos && then.find(" Looks=0") == std::string::npos && then.find("Fallen=false") != std::string::npos);
+  }
 }
 
 TEST(logic_notation_refuses_with_place_and_reason) {
@@ -7530,14 +7633,16 @@ TEST(studio_logic_cpp_view) {
     CHECK(with_event["native"].as_bool() && !with_event.has("nativeWhy"));
     const std::string handler = f.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string();
     CHECK(handler.find("KERN_EVENT(on") != std::string::npos && handler.find(": self.on") != std::string::npos && handler.find("register_native_blueprint(0x") != std::string::npos);
-    // (a door waits and moves an actor: not yet - the view says which node is missing, Download is still the node loop)
+    // (a door waits and moves an actor - gameplay nodes: a compiler runs that too, Download is its class)
     StudioFixture door;
     CHECK(door.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
     CHECK(door.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
     CHECK(door.cmd(R"({"cmd":"logicTemplate","template":"door"})")["ok"].as_bool());
     json::Value waits = door.cmd(R"({"cmd":"logicCpp"})");
-    CHECK(waits["ok"].as_bool() && !waits["native"].as_bool() && waits["nativeWhy"].as_string().find("is not yet a function of blueprint.h") != std::string::npos);
-    CHECK(door.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string().find("register_native_graph") != std::string::npos);
+    CHECK(waits["ok"].as_bool() && waits["native"].as_bool() && !waits.has("nativeWhy"));
+    const std::string door_class = door.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string();
+    CHECK(door_class.find("struct Level : kern::Blueprint {") != std::string::npos && door_class.find("register_native_blueprint(0x") != std::string::npos &&
+          door_class.find("register_native_graph") == std::string::npos);
     StudioFixture own;
     CHECK(own.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
     own.cmd(R"({"cmd":"spawn","item":"cube"})");
@@ -8602,6 +8707,20 @@ int main(int argc, char** argv) {
     if (!blueprint_native::emit(argv[2], blueprint_native::cases(), &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
+    }
+    return 0;
+  }
+  // kern_tests --emit-game-native <dir>: the levels of game_cases.h as files (run.sh has
+  // tools/blueprint_cpp write their Blueprints as C++ classes and compiles them into game_native_test).
+  if (argc > 2 && std::strcmp(argv[1], "--emit-game-native") == 0) {
+    std::string error;
+    for (const game_cases::Case& c : game_cases::cases(&error)) {
+      const std::string text = game::to_text(c.level);
+      FILE* f = error.empty() ? std::fopen((std::string(argv[2]) + "/" + c.name + ".klevel").c_str(), "wb") : nullptr;
+      if (!f || std::fwrite(text.data(), 1, text.size(), f) != text.size() || std::fclose(f) != 0) {
+        std::printf("FAIL --emit-game-native: %s\n", error.empty() ? "cannot write the level" : error.c_str());
+        return 1;
+      }
     }
     return 0;
   }

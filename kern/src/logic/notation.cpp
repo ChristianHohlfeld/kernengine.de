@@ -3163,28 +3163,18 @@ std::string cpp_problem(const Graph& g, u32* node, const Library& lib) {
 }
 
 bool native_ready(const Graph& g, std::string* why, const Library& lib) {
-  // The nodes blueprint.h has a function for. (A test compiles a Blueprint of all of them.)
-  static const std::set<std::string_view> have{
-      "event.begin",   "event.tick",    "event.custom",    "flow.call",       "debug.print",     "time.now",
-      "event.every",   "event.state_enter", "event.state_exit", "state.set",   "state.get",       "state.is",
-      "flow.delay",    "flow.retrigger_delay", "flow.tween",    "math.random",   "math.random_int", "math.random_bool",
-      "func.entry",    "func.return",   "func.call",       "func.pure",       "var.get",         "var.set",       "var.add",        "flow.reroute",
-      "value.reroute", "flow.branch",   "flow.sequence",   "flow.for",        "flow.while",      "flow.do_once",  "flow.do_n",      "flow.gate",
-      "flow.flip_flop", "flow.switch_int", "flow.switch_text", "math.add",     "math.sub",        "math.mul",      "math.div",       "math.mod",
-      "math.min",      "math.max",      "math.clamp",      "math.abs",        "math.negate",     "math.lerp",     "math.sin",       "math.cos",
-      "math.atan2",    "math.sqrt",     "math.pow",        "math.round",      "math.floor",      "math.compare",  "math.formula",   "logic.and",
-      "logic.or",      "logic.xor",     "logic.not",       "logic.select",    "value.float",     "value.int",     "value.bool",     "value.text",
-      "vector.make",   "vector.break",  "vector.add",      "vector.sub",      "vector.cross",    "vector.scale",  "vector.length",  "vector.normalize",
-      "vector.distance", "vector.dot",  "vector.lerp",     "text.append",     "text.equal",      "text.contains", "text.length",
-  };
   auto no = [&](std::string text) {
     if (why) *why = std::move(text);
     return false;
   };
   for (const Issue& i : check(g, lib))  // (a Blueprint that compiles: its rules as C++ are part of that)
     if (i.error) return no(i.text);
-  for (const Node& node : g.nodes)
-    if (!have.count(node.type)) return no(lib.title(node) + " (node " + std::to_string(node.id) + ") is not yet a function of blueprint.h");
+  // The nodes blueprint.h has a function for say so (NodeDef::native; the native tests compile a
+  // Blueprint with each of them).
+  for (const Node& node : g.nodes) {
+    const NodeDef* def = lib.find(node.type);
+    if (!def || !def->native) return no(lib.title(node) + " (node " + std::to_string(node.id) + ") is not yet a function of blueprint.h");
+  }
   return true;
 }
 

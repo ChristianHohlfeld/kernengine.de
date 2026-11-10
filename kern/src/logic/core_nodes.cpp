@@ -738,6 +738,9 @@ Library& Library::core() {
     add_math(lib);
     add_formula(lib);
     add_functions(lib);
+    // Every node of the core library is a function of blueprint.h (BlueprintCore) or a form of the
+    // notation; the native Blueprint test compiles each of them.
+    for (const auto& d : lib.defs_) d->native = true;
   }
   return lib;
 }

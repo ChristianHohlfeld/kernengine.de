@@ -1,568 +1,417 @@
-// Kern Logic: gameplay nodes. Every node is a C++ function on the GameWorld;
-// they register themselves into the logic library at start-up.
+// Kern Logic: what the gameplay nodes do. Each is a typed function on the GameWorld
+// (kern::game::nodes, declared in kern/game/blueprint_nodes.h): bound here to its node of the
+// library for the interpreter (the node's names and pins are in logic_node_shapes.cpp); a
+// Blueprint's C++ calls the function directly. Bound at start-up.
 #include <cmath>
 #include <cstdlib>
+#include <type_traits>
+#include <utility>
 
+#include <functional>
+
+#include "kern/game/blueprint_nodes.h"
+#include "kern/game/logic_nodes.h"
 #include "kern/game/runtime.h"
 #include "kern/logic/nodes.h"
 #include "kern/logic/logic.h"
 
 namespace kern::game {
 
+// ---------------------------------------------------------------------------
+// What the nodes do
+// ---------------------------------------------------------------------------
+namespace nodes {
+
+namespace {
+/// An Actor input: the actor given, or Self when it is left empty.
+ActorId or_self(Actor target, Self self) { return target.id ? target.id : self; }
+Vec3 position(GameWorld& w, ActorId id) {
+  Mat4 m;
+  return w.actor_matrix(id, m) ? m.translation() : Vec3{};
+}
+}  // namespace
+
+Actor actor_player(GameWorld& w, Self, Int index) {
+  const std::vector<ActorId> p = w.pawns();
+  ActorId a = index == 0 ? w.player() : 0;
+  if (!a && index >= 0 && static_cast<std::size_t>(index) < p.size()) a = p[static_cast<std::size_t>(index)];
+  return {a};
+}
+Int actor_player_count(GameWorld& w, Self) { return static_cast<Int>(w.pawns().size()); }
+Actor actor_find(GameWorld& w, Self, const Text& name) { return {w.find_actor(name)}; }
+Found actor_find_tag(GameWorld& w, Self, const Text& tag) {
+  std::vector<ActorId> v;
+  w.actors_with_tag(tag, v);
+  return {{v.empty() ? 0 : v.front()}, static_cast<Int>(v.size())};
+}
+Actor actor_random_tag(GameWorld& w, Self, f64* memory, u32 seed, u32 node, const Text& tag) {
+  std::vector<ActorId> v;
+  w.actors_with_tag(tag, v);
+  return {v.empty() ? 0 : v[logic::random::next(memory, seed, node) % v.size()]};
+}
+Bool actor_has_tag(GameWorld& w, Self self, Actor target, const Text& tag) { return w.has_tag(or_self(target, self), tag); }
+Text actor_name(GameWorld& w, Self self, Actor target) {
+  const game::Actor* a = w.level().find(or_self(target, self));
+  return a ? a->name : Text();
+}
+Bool actor_valid(GameWorld& w, Self, Actor target) { return target.id && w.level().find(target.id) && w.actor_alive(target.id); }
+Vector actor_location(GameWorld& w, Self self, Actor target) { return position(w, or_self(target, self)); }
+Vector actor_rotation(GameWorld& w, Self self, Actor target) {
+  Mat4 m;
+  return w.actor_matrix(or_self(target, self), m) ? matrix_transform(m).rotation : Vec3{};
+}
+Vector actor_forward(GameWorld& w, Self self, Actor target) {
+  Mat4 m;
+  return w.actor_matrix(or_self(target, self), m) ? normalize(m.transform_vector({1, 0, 0}), {1, 0, 0}) : Vec3{1, 0, 0};
+}
+Velocity actor_velocity(GameWorld& w, Self self, Actor target) {
+  const Vec3 v = w.actor_velocity(or_self(target, self));
+  return {v, length(v)};
+}
+Float actor_distance(GameWorld& w, Self self, Actor a, Actor b) { return distance(position(w, or_self(a, self)), position(w, b.id)); }
+Health actor_health(GameWorld& w, Self self, Actor target) {
+  const f32 h = w.health_of(or_self(target, self));
+  return {h, h == 0};
+}
+Score game_score(GameWorld& w, Self) { return {w.hud().score, static_cast<Int>(w.hud().pickups)}; }
+
+void actor_set_location(GameWorld& w, Self self, Actor target, Vector location) { w.teleport(or_self(target, self), location); }
+void actor_set_rotation(GameWorld& w, Self self, Actor target, Vector rotation) {
+  const ActorId t = or_self(target, self);
+  w.teleport(t, position(w, t), &rotation);
+}
+void actor_move_by(GameWorld& w, Self self, Actor target, Vector offset) {
+  const ActorId t = or_self(target, self);
+  w.teleport(t, position(w, t) + offset);
+}
+void actor_set_velocity(GameWorld& w, Self self, Actor target, Vector velocity) { w.set_actor_velocity(or_self(target, self), velocity); }
+void actor_impulse(GameWorld& w, Self self, Actor target, Vector impulse) { w.push_actor(or_self(target, self), impulse, true); }
+void actor_force(GameWorld& w, Self self, Actor target, Vector force) { w.push_actor(or_self(target, self), force, false); }
+void actor_launch(GameWorld& w, Self self, Actor target, Vector velocity) {
+  const ActorId t = or_self(target, self);
+  w.set_actor_velocity(t, w.actor_velocity(t) * Vec3{1, 1, 0} + velocity);
+}
+void actor_simulate(GameWorld& w, Self self, Actor target, Bool simulate) { w.set_simulate_physics(or_self(target, self), simulate); }
+void actor_joint_motor(GameWorld& w, Self self, Actor target, Int joint, Bool enable, Float speed, Float force) {
+  w.set_joint_motor(or_self(target, self), static_cast<i32>(joint), enable, static_cast<f32>(speed), static_cast<f32>(force));
+}
+void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float impulse, Float damage) {
+  const f32 r = static_cast<f32>(max_of(0.1, radius));
+  w.physics().explode(location, r, r * 0.5f, static_cast<f32>(impulse));
+  w.particle_burst(location, {3.0f, 1.2f, 0.3f});
+  w.play_sound("builtin:explosion", location, 1, 1, true);
+  w.shake_camera(0.6f);
+  const f32 dmg = static_cast<f32>(damage);
+  if (dmg > 0)
+    for (const game::Actor& a : w.level().actors) {
+      if (w.health_of(a.id) <= 0) continue;
+      const f32 d = distance(position(w, a.id), location);
+      if (d < r) w.damage(a.id, dmg * (1 - d / r), self, false, location);
+    }
+}
+Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view named, Actor tpl, Vector location, Vector rotation) {
+  ActorId source = tpl.id;
+  if (!source) source = w.find_actor(named);
+  const ActorId id = source ? w.spawn_copy(source, location, rotation) : 0;
+  if (!id) host.error("Spawn Actor: no template \"" + std::string(named) + "\"");
+  return {id};
+}
+void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(target, self)); }
+void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled) { w.set_alive(or_self(target, self), enabled); }
+void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, const Text& path, const Text& value) {
+  json::Value v;
+  if (!json::parse(value, v)) v = json::Value(value);
+  if (!w.set_property(or_self(target, self), path, v)) host.error(std::string("Set Property: ") + last_error());
+}
+void actor_set_light(GameWorld& w, Self self, Actor target, Vector color, Float intensity, Float range) {
+  const ActorId t = or_self(target, self);
+  json::Value rgb = json::Value::array();
+  rgb.push(static_cast<f64>(color.x));
+  rgb.push(static_cast<f64>(color.y));
+  rgb.push(static_cast<f64>(color.z));
+  w.set_property(t, "components.light.color", rgb);
+  w.set_property(t, "components.light.intensity", json::Value(intensity));
+  w.set_property(t, "components.light.range", json::Value(range));
+}
+void actor_set_color(GameWorld& w, Self self, Actor target, Vector color) {
+  char hex[8];
+  auto b = [](f32 v) { return static_cast<int>(std::lround(clamp(v, 0.0f, 1.0f) * 255)); };
+  std::snprintf(hex, sizeof hex, "#%02x%02x%02x", b(color.x), b(color.y), b(color.z));
+  w.set_property(or_self(target, self), "components.mesh.material.color", json::Value(hex));
+}
+
+void game_message(GameWorld& w, Self, const Text& text) { w.show_message(text); }
+void game_add_score(GameWorld& w, Self, Float points) { w.add_score(static_cast<f32>(points)); }
+void game_win(GameWorld& w, Self, const Text& message) { w.end_game(true, message); }
+void game_lose(GameWorld& w, Self, const Text& message) { w.end_game(false, message); }
+void game_sound(GameWorld& w, Self self, std::string_view sound, Vector location, Float volume, Float pitch, Bool spatial) {
+  Vec3 at = location;
+  if (length_sq(at) == 0 && self) at = position(w, self);
+  w.play_sound(std::string(sound), at, static_cast<f32>(volume), static_cast<f32>(pitch), spatial, self);
+}
+void game_particles(GameWorld& w, Self, Vector location, Vector color) { w.particle_burst(location, color * 1.6f); }
+void game_shake(GameWorld& w, Self, Float amount) { w.shake_camera(static_cast<f32>(amount)); }
+void combat_damage(GameWorld& w, Self self, Actor target, Float amount, Actor instigator) {
+  const ActorId t = or_self(target, self);
+  w.damage(t, static_cast<f32>(amount), instigator.id, false, position(w, self ? self : t));
+}
+void combat_heal(GameWorld& w, Self self, Actor target, Float amount) { w.heal(or_self(target, self), static_cast<f32>(amount)); }
+void combat_kill(GameWorld& w, Self self, Actor target) { w.damage(or_self(target, self), 1e9f, 0, false, {}); }
+void combat_ammo(GameWorld& w, Self self, Actor target, Int rounds) { w.give_ammo(or_self(target, self), static_cast<i32>(rounds)); }
+Trace physics_trace(GameWorld& w, Self, Vector start, Vector end, Actor ignore) {
+  ActorId a = 0;
+  Vec3 p, n;
+  const bool hit = w.line_trace(start, end, ignore.id, a, p, n);
+  return {hit, {a}, p, n};
+}
+std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, const Text& tag) {
+  std::vector<ActorId> v;
+  w.actors_with_tag(tag, v);
+  return v;
+}
+
+void walker_move(GameWorld& w, Self self, Actor target, Float forward, Float strafe, Float turn, Float duration) {
+  w.walker_command(or_self(target, self), static_cast<f32>(forward), static_cast<f32>(strafe), static_cast<f32>(turn * 3.14159265358979 / 180), static_cast<f32>(duration));
+}
+void walker_look(GameWorld& w, Self self, Actor target, Float yaw, Float pitch, Float duration) {
+  constexpr f64 k = 3.14159265358979 / 180;
+  w.walker_look(or_self(target, self), static_cast<f32>(yaw * k), static_cast<f32>(pitch * k), static_cast<f32>(duration));
+}
+void walker_autonomous(GameWorld& w, Self self, Actor target, Bool enable) { w.walker_set_autonomous(or_self(target, self), enable); }
+void walker_skill(GameWorld& w, Self self, Actor target, const Text& move) { w.walker_skill(or_self(target, self), move); }
+void walker_beak(GameWorld& w, Self self, Actor target, Float open) { w.walker_mouth(or_self(target, self), static_cast<f32>(open)); }
+void walker_pet(GameWorld& w, Self self, Actor target, Float seconds) { w.walker_pet(or_self(target, self), static_cast<f32>(seconds)); }
+void walker_hear(GameWorld& w, Self self, Actor target, Bool voice) { w.walker_hear(or_self(target, self), voice); }
+Bool walker_holding(GameWorld& w, Self self, Actor target) { return w.walker_holding(or_self(target, self)); }
+void walker_quack(GameWorld& w, Self self, Actor target) { w.walker_quack(or_self(target, self)); }
+Tof walker_tof(GameWorld& w, Self self, Actor target) {
+  GameWorld::WalkerSensors s;
+  const bool ok = w.walker_sensors(or_self(target, self), s);
+  return {ok && s.nearest >= 0, ok ? s.nearest : -1.0, ok ? s.nearest_bearing * 180 / 3.14159265358979 : 0.0, ok ? s.free_left : 0.0, ok ? s.free_right : 0.0};
+}
+Sees walker_sees(GameWorld& w, Self self, Actor target, Actor other) {
+  bool visible = false;
+  f32 bearing = 0, distance = -1;
+  w.walker_sees(or_self(target, self), other.id, visible, bearing, distance);
+  return {visible, bearing * 180 / 3.14159265358979, distance};
+}
+Robot walker_state(GameWorld& w, Self self, Actor target) {
+  const ActorId robot = or_self(target, self);
+  GameWorld::WalkerSensors s;
+  const bool ok = w.walker_sensors(robot, s);
+  return {w.walker_state(robot), ok && s.fallen, ok ? s.speed : 0.0};
+}
+
+}  // namespace nodes
+
+// ---------------------------------------------------------------------------
+// The functions as the nodes of the library
+// ---------------------------------------------------------------------------
 namespace {
 
 using logic::Context;
 using logic::NodeDef;
 using logic::NodeKind;
-using logic::ParamDef;
-using logic::PinDef;
-using logic::PinType;
 using logic::Value;
 using logic::kStop;
 
-constexpr u32 kEventColor = 0xb4232f;
-
 GameWorld* world(Context& c) { return static_cast<GameWorld*>(c.host().game()); }
 
-PinDef exec_in(std::string id = "exec", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
-PinDef exec_out(std::string id = "then", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
-PinDef data(std::string id, std::string label, PinType t, json::Value def = {}) { return {std::move(id), std::move(label), t, std::move(def)}; }
-json::Value vec3(f32 x, f32 y, f32 z) {
-  json::Value a = json::Value::array();
-  a.push(static_cast<f64>(x));
-  a.push(static_cast<f64>(y));
-  a.push(static_cast<f64>(z));
-  return a;
+// What a function gives are the node's data outputs: one value, or a struct with a field per output.
+template <class T> void give(Context& c, std::size_t first, const T& r) { c.out(first, logic::to_value(r)); }
+void give(Context& c, std::size_t first, const nodes::Found& r) {
+  c.out(first, Value::actor(r.actor.id));
+  c.out(first + 1, Value::integer(r.count));
 }
-ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::string def = {}, std::vector<std::string> choices = {}) {
-  ParamDef p;
-  p.key = std::move(key);
-  p.label = std::move(label);
-  p.kind = kind;
-  p.def = std::move(def);
-  p.choices = std::move(choices);
-  return p;
+void give(Context& c, std::size_t first, const nodes::Velocity& r) {
+  c.out(first, Value::vector(r.velocity));
+  c.out(first + 1, Value::number(r.speed));
 }
-NodeDef make(std::string type, std::string label, std::string category, NodeKind kind, std::string help, std::string keywords = {}) {
-  NodeDef d;
-  d.type = std::move(type);
-  d.label = std::move(label);
-  d.category = std::move(category);
-  d.kind = kind;
-  d.help = std::move(help);
-  d.keywords = std::move(keywords);
-  return d;
+void give(Context& c, std::size_t first, const nodes::Health& r) {
+  c.out(first, Value::number(r.health));
+  c.out(first + 1, Value::boolean(r.dead));
 }
-/// An action node: exec in -> run -> exec out.
-NodeDef action(std::string type, std::string label, std::string category, std::vector<PinDef> in, std::vector<PinDef> out, std::function<void(Context&, GameWorld&)> fn,
-               std::string help, std::string keywords = {}) {
-  NodeDef d = make(std::move(type), std::move(label), std::move(category), NodeKind::action, std::move(help), std::move(keywords));
-  d.inputs = {exec_in()};
-  for (PinDef& p : in) d.inputs.push_back(std::move(p));
-  d.outputs = {exec_out()};
-  for (PinDef& p : out) d.outputs.push_back(std::move(p));
-  d.run = [fn = std::move(fn)](Context& c) {
-    if (GameWorld* w = world(c)) fn(c, *w);
-    return 0;
+void give(Context& c, std::size_t first, const nodes::Score& r) {
+  c.out(first, Value::number(r.score));
+  c.out(first + 1, Value::integer(r.pickups));
+}
+void give(Context& c, std::size_t first, const nodes::Trace& r) {
+  c.out(first, Value::boolean(r.hit));
+  c.out(first + 1, Value::actor(r.actor.id));
+  c.out(first + 2, Value::vector(r.location));
+  c.out(first + 3, Value::vector(r.normal));
+}
+void give(Context& c, std::size_t first, const nodes::Tof& r) {
+  c.out(first, Value::boolean(r.blocked));
+  c.out(first + 1, Value::number(r.distance));
+  c.out(first + 2, Value::number(r.bearing));
+  c.out(first + 3, Value::number(r.left));
+  c.out(first + 4, Value::number(r.right));
+}
+void give(Context& c, std::size_t first, const nodes::Sees& r) {
+  c.out(first, Value::boolean(r.visible));
+  c.out(first + 1, Value::number(r.bearing));
+  c.out(first + 2, Value::number(r.distance));
+}
+void give(Context& c, std::size_t first, const nodes::Robot& r) {
+  c.out(first, Value::text(r.state));
+  c.out(first + 1, Value::boolean(r.fallen));
+  c.out(first + 2, Value::number(r.speed));
+}
+/// Runs `f` for the node: every input is read once, in its order - with a game or without (the
+/// arguments of a call); without a game the node does nothing and gives nothing.
+template <class R, class... A, std::size_t... I>
+void run_typed(R (*f)(GameWorld&, logic::ActorRef, A...), Context& c, std::size_t first, std::index_sequence<I...>) {
+  Value v[sizeof...(A) + 1];
+  for (std::size_t i = 0; i < sizeof...(A); ++i) v[i] = c.in(first + i);
+  GameWorld* w = world(c);
+  if (!w) return;
+  if constexpr (std::is_void_v<R>) f(*w, c.self(), logic::from_value<std::decay_t<A>>(v[I])...);
+  else give(c, first, f(*w, c.self(), logic::from_value<std::decay_t<A>>(v[I])...));
+}
+
+/// The node to bind: described in logic_node_shapes.cpp, not bound yet. (A node that stays
+/// unbound - a wrong name here, or a function that does not fit its pins - is found by the test
+/// game_blueprints_as_classes: every node of the library does something.)
+NodeDef* node(logic::Library& lib, const char* type) {
+  NodeDef* d = lib.edit(type);
+  return d && !d->run ? d : nullptr;
+}
+/// Binds a function of kern::game::nodes to its node: its arguments after the game and Self are
+/// the node's data inputs in their order (a step's first pin is its exec pin).
+template <class R, class... A> void bind(logic::Library& lib, const char* type, R (*f)(GameWorld&, logic::ActorRef, A...)) {
+  NodeDef* d = node(lib, type);
+  if (!d) return;
+  const bool value = d->kind == NodeKind::pure;
+  if (d->inputs.size() != sizeof...(A) + (value ? 0 : 1)) return;
+  d->run = [f, value](Context& c) {
+    run_typed(f, c, value ? 0 : 1, std::index_sequence_for<A...>{});
+    return value ? kStop : 0;
   };
-  return d;
 }
-/// A pure node reading the world.
-NodeDef getter(std::string type, std::string label, std::string category, std::vector<PinDef> in, std::vector<PinDef> out, std::function<void(Context&, GameWorld&)> fn,
-               std::string help, std::string keywords = {}) {
-  NodeDef d = make(std::move(type), std::move(label), std::move(category), NodeKind::pure, std::move(help), std::move(keywords));
-  d.inputs = std::move(in);
-  d.outputs = std::move(out);
-  d.run = [fn = std::move(fn)](Context& c) {
-    if (GameWorld* w = world(c)) fn(c, *w);
+/// Binds what a node does that is written for the interpreter alone.
+void bind(logic::Library& lib, const char* type, std::function<int(Context&)> run) {
+  if (NodeDef* d = node(lib, type)) d->run = std::move(run);
+}
+void bind_actor_nodes(logic::Library& lib) {
+  bind(lib, "actor.self", [](Context& c) {
+    if (world(c)) c.out("actor", Value::actor(c.self()));
     return kStop;
-  };
-  return d;
-}
-/// An event node: `event` is the GameWorld event type; outputs are filled from its arguments.
-NodeDef event(std::string type, std::string label, std::string channel, std::vector<PinDef> out, std::string help, std::string keywords = {}) {
-  NodeDef d = make(std::move(type), std::move(label), "Events", NodeKind::event, std::move(help), std::move(keywords));
-  d.event = std::move(channel);
-  d.outputs = {exec_out()};
-  for (PinDef& p : out) d.outputs.push_back(std::move(p));
-  d.color = kEventColor;
-  d.accepts = [](const logic::Node&, const logic::Event&) { return true; };
-  return d;
-}
+  });
+  bind(lib, "actor.player", &nodes::actor_player);
+  bind(lib, "actor.player_count", &nodes::actor_player_count);
+  bind(lib, "actor.find", &nodes::actor_find);
+  bind(lib, "actor.find_tag", &nodes::actor_find_tag);
+  bind(lib, "actor.random_tag", [](Context& c) {
+    const std::string tag = c.in_text("tag");
+    if (GameWorld* w = world(c)) c.out("actor", logic::to_value(nodes::actor_random_tag(*w, c.self(), &c.slot(0), c.instance().seed(), c.node().id, tag)));
+    return kStop;
+  });
+  bind(lib, "actor.has_tag", &nodes::actor_has_tag);
+  bind(lib, "actor.name", &nodes::actor_name);
+  bind(lib, "actor.valid", &nodes::actor_valid);
+  bind(lib, "actor.location", &nodes::actor_location);
+  bind(lib, "actor.rotation", &nodes::actor_rotation);
+  bind(lib, "actor.forward", &nodes::actor_forward);
+  bind(lib, "actor.velocity", &nodes::actor_velocity);
+  bind(lib, "actor.distance", &nodes::actor_distance);
+  bind(lib, "actor.health", &nodes::actor_health);
+  bind(lib, "game.score", &nodes::game_score);
 
-/// The actor input, defaulting to Self when unlinked and 0.
-ActorId target(Context& c, std::string_view pin = "target") {
-  const logic::ActorRef a = c.in_actor(pin);
-  return a ? a : c.self();
-}
-
-Vec3 actor_position(GameWorld& w, ActorId id) {
-  Mat4 m;
-  return w.actor_matrix(id, m) ? m.translation() : Vec3{};
-}
-
-std::string key_label(const std::string& code) {
-  if (code.rfind("Key", 0) == 0 && code.size() == 4) return code.substr(3);
-  if (code.rfind("Digit", 0) == 0 && code.size() == 6) return code.substr(5);
-  return code;
-}
-
-/// "F" -> "KeyF", "1" -> "Digit1", "Space" stays.
-std::string key_code(std::string k) {
-  if (k.size() == 1 && std::isalpha(static_cast<unsigned char>(k[0]))) return std::string("Key") + static_cast<char>(std::toupper(static_cast<unsigned char>(k[0])));
-  if (k.size() == 1 && std::isdigit(static_cast<unsigned char>(k[0]))) return "Digit" + k;
-  return k;
-}
-
-const std::vector<std::string> kActions = {"jump", "Jump", "fire", "Fire", "aim", "Aim", "reload", "Reload", "crouch", "Crouch", "interact", "Interact", "boost", "Sprint / boost"};
-
-void add_events(logic::Library& lib) {
-  const PinDef actor_out = data("actor", "Actor", PinType::actor), other_out = data("other", "Other Actor", PinType::actor);
-  lib.add(event("game.overlap_begin", "On Begin Overlap", "game.overlap_begin", {actor_out, other_out},
-                "Something entered this actor's sensor collider (a trigger volume). Other Actor is who came in.", "trigger enter touch volume"));
-  lib.add(event("game.overlap_end", "On End Overlap", "game.overlap_end", {actor_out, other_out}, "Something left this actor's sensor collider.", "trigger leave exit"));
-  lib.add(event("game.touched_sensor", "On Entered Sensor", "game.overlapped_begin", {actor_out, data("other", "Sensor Actor", PinType::actor)},
-                "This actor (e.g. a player) walked into someone else's sensor.", "overlap volume"));
-  lib.add(event("game.hit", "On Hit", "game.hit",
-                {actor_out, other_out, data("speed", "Impact Speed", PinType::number), data("point", "Point", PinType::vector), data("normal", "Normal", PinType::vector)},
-                "This actor's body hit something hard enough (Box3D hit event).", "collide collision bump impact"));
-  lib.add(event("game.pickup", "On Collected", "game.pickup", {actor_out, data("other", "Collector", PinType::actor), data("points", "Points", PinType::number)},
-                "A pickup was collected.", "pickup orb"));
-  lib.add(event("game.trigger", "On Trigger", "game.trigger", {actor_out, data("other", "Player", PinType::actor)}, "A player touched this trigger.", "goal checkpoint"));
-  lib.add(event("game.damaged", "On Damaged", "game.damaged",
-                {actor_out, data("other", "Attacker", PinType::actor), data("amount", "Damage", PinType::number), data("head", "Headshot", PinType::boolean)},
-                "This actor took damage (needs a Health component).", "hurt shot"));
-  lib.add(event("game.death", "On Death", "game.death", {actor_out, data("other", "Killer", PinType::actor), data("head", "Headshot", PinType::boolean)},
-                "This actor's health reached 0.", "die killed destroyed"));
-  lib.add(event("game.respawn", "On Respawn", "game.respawn", {actor_out}, "This actor came back after dying.", "revive"));
-  lib.add(event("game.interact", "On Interact", "game.interact", {actor_out, data("other", "Player", PinType::actor), data("point", "Point", PinType::vector)},
-                "A player pressed Interact (F / Y on the gamepad) looking at this actor or standing next to it.", "use button press open"));
-  lib.add(event("game.pawn_added", "On Player Joined", "game.pawn_added", {data("actor", "Player", PinType::actor)}, "A player joined (multiplayer).", "connect spawn"));
-  {
-    NodeDef d = event("game.over", "On Game Over", "game.over", {data("won", "Won", PinType::boolean), data("message", "Message", PinType::text)}, "The game was won or lost.", "end win lose");
-    lib.add(std::move(d));
-  }
-  {
-    NodeDef d = event("game.input", "On Input Action", "game.input", {data("actor", "Player", PinType::actor), data("pressed", "Pressed", PinType::boolean)},
-                      "A player pressed or released an action (works for every player, on every device: keyboard, gamepad, touch).", "button control press");
-    d.params = {param("action", "Action", ParamDef::Kind::choice, "interact", kActions),
-                param("edge", "When", ParamDef::Kind::choice, "pressed", {"pressed", "Pressed", "released", "Released", "both", "Both"})};
-    d.title = [](const NodeDef&, const logic::Node& n) {
-      std::string a = n.param("action", "interact");
-      if (!a.empty()) a[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(a[0])));
-      const std::string e = n.param("edge", "pressed");
-      return "On " + a + (e == "released" ? " Released" : e == "both" ? "" : " Pressed");
-    };
-    d.accepts = [](const logic::Node& n, const logic::Event& e) {
-      if (e.key != n.param("action", "interact")) return false;
-      const std::string edge = n.param("edge", "pressed");
-      const logic::Value* p = e.arg("pressed");
-      const bool pressed = p && p->as_bool();
-      return edge == "both" || (edge == "pressed") == pressed;
-    };
-    lib.add(std::move(d));
-  }
-  {
-    NodeDef d = event("game.key", "On Key", "game.key", {data("pressed", "Pressed", PinType::boolean), data("actor", "Player", PinType::actor)},
-                      "A key of this computer's keyboard (only the local player; use On Input Action for gamepads and multiplayer).", "keyboard");
-    d.params = {param("key", "Key", ParamDef::Kind::key, "F"), param("edge", "When", ParamDef::Kind::choice, "pressed", {"pressed", "Pressed", "released", "Released", "both", "Both"})};
-    d.title = [](const NodeDef&, const logic::Node& n) { return "On Key " + key_label(key_code(n.param("key", "F"))); };
-    d.accepts = [](const logic::Node& n, const logic::Event& e) {
-      if (e.key != key_code(n.param("key", "F"))) return false;
-      const std::string edge = n.param("edge", "pressed");
-      const logic::Value* p = e.arg("pressed");
-      const bool pressed = p && p->as_bool();
-      return edge == "both" || (edge == "pressed") == pressed;
-    };
-    lib.add(std::move(d));
-  }
+  bind(lib, "actor.set_location", &nodes::actor_set_location);
+  bind(lib, "actor.set_rotation", &nodes::actor_set_rotation);
+  bind(lib, "actor.move_by", &nodes::actor_move_by);
+  bind(lib, "actor.set_velocity", &nodes::actor_set_velocity);
+  bind(lib, "actor.impulse", &nodes::actor_impulse);
+  bind(lib, "actor.force", &nodes::actor_force);
+  bind(lib, "actor.launch", &nodes::actor_launch);
+  bind(lib, "actor.simulate", &nodes::actor_simulate);
+  bind(lib, "actor.joint_motor", &nodes::actor_joint_motor);
+  bind(lib, "actor.explode", &nodes::actor_explode);
+  // (its setting names the template; errors go to the host)
+  bind(lib, "actor.spawn", [](Context& c) {
+    const logic::ActorHandle tpl{c.in_actor("template")};
+    const Vec3 location = c.in_vector("location"), rotation = c.in_vector("rotation");
+    if (GameWorld* w = world(c)) c.out("spawned", logic::to_value(nodes::actor_spawn(*w, c.self(), c.host(), c.param("template"), tpl, location, rotation)));
+    return 0;
+  });
+  bind(lib, "actor.destroy", &nodes::actor_destroy);
+  bind(lib, "actor.enable", &nodes::actor_enable);
+  bind(lib, "actor.set_property", [](Context& c) {
+    const logic::ActorHandle to{c.in_actor("target")};
+    const std::string path = c.in_text("path"), text = c.in_text("value");
+    if (GameWorld* w = world(c)) nodes::actor_set_property(*w, c.self(), c.host(), to, path, text);
+    return 0;
+  });
+  bind(lib, "actor.set_light", &nodes::actor_set_light);
+  bind(lib, "actor.set_color", &nodes::actor_set_color);
 }
 
-void add_actor_nodes(logic::Library& lib) {
-  const json::Value zero3 = vec3(0, 0, 0);
-  lib.add(getter("actor.self", "Self", "Actors", {}, {data("actor", "Self", PinType::actor)}, [](Context& c, GameWorld&) { c.out("actor", Value::actor(c.self())); },
-                 "The actor this graph belongs to (none in the level graph).", "this me owner"));
-  {
-    NodeDef d = getter("actor.player", "Get Player", "Actors", {data("index", "Player Index", PinType::integer, 0)}, {data("actor", "Player", PinType::actor)},
-                       [](Context& c, GameWorld& w) {
-                         const i64 i = c.in_int("index");
-                         const std::vector<ActorId> p = w.pawns();
-                         ActorId a = i == 0 ? w.player() : 0;
-                         if (!a && i >= 0 && static_cast<std::size_t>(i) < p.size()) a = p[static_cast<std::size_t>(i)];
-                         c.out("actor", Value::actor(a));
-                       },
-                       "The player's actor (0 = this machine's player; 1, 2... other players).", "pawn character me");
-    lib.add(std::move(d));
-  }
-  lib.add(getter("actor.player_count", "Player Count", "Actors", {}, {data("count", "Count", PinType::integer)},
-                 [](Context& c, GameWorld& w) { c.out("count", Value::integer(static_cast<i64>(w.pawns().size()))); }, "How many players are in the game.", "players number"));
-  lib.add(getter("actor.find", "Find Actor by Name", "Actors", {data("name", "Name", PinType::text, "Cube")}, {data("actor", "Actor", PinType::actor)},
-                 [](Context& c, GameWorld& w) { c.out("actor", Value::actor(w.find_actor(c.in_text("name")))); }, "The actor with this name (as in the Outliner).", "get lookup named"));
-  lib.add(getter("actor.find_tag", "Find Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actor", "Actor", PinType::actor), data("count", "Count", PinType::integer)},
-                 [](Context& c, GameWorld& w) {
-                   std::vector<ActorId> v;
-                   w.actors_with_tag(c.in_text("tag"), v);
-                   c.out("actor", Value::actor(v.empty() ? 0 : v.front()));
-                   c.out("count", Value::integer(static_cast<i64>(v.size())));
-                 },
-                 "The first living actor with the tag, and how many have it.", "get tagged"));
-  {
-    NodeDef d = getter("actor.random_tag", "Random Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "spawn")}, {data("actor", "Actor", PinType::actor)},
-                 [](Context& c, GameWorld& w) {
-                   std::vector<ActorId> v;
-                   w.actors_with_tag(c.in_text("tag"), v);
-                   c.out("actor", Value::actor(v.empty() ? 0 : v[logic::random::next(&c.slot(0), c.instance().seed(), c.node().id) % v.size()]));
-                 },
-                 "One living actor with the tag, chosen at random.", "pick");
-    d.memory = true;  // new on every read
-    lib.add(std::move(d));
-  }
-  lib.add(getter("actor.has_tag", "Has Tag", "Actors", {data("target", "Actor", PinType::actor, 0), data("tag", "Tag", PinType::text, "enemy")}, {data("result", "Result", PinType::boolean)},
-                 [](Context& c, GameWorld& w) { c.out("result", Value::boolean(w.has_tag(target(c), c.in_text("tag")))); }, "Does the actor carry the tag?", "is"));
-  lib.add(getter("actor.name", "Get Name", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("name", "Name", PinType::text)},
-                 [](Context& c, GameWorld& w) {
-                   const Actor* a = w.level().find(target(c));
-                   c.out("name", Value::text(a ? a->name : std::string()));
-                 },
-                 "The actor's name.", "display"));
-  lib.add(getter("actor.valid", "Is Valid", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("result", "Valid", PinType::boolean)},
-                 [](Context& c, GameWorld& w) {
-                   const ActorId id = c.in_actor("target");
-                   c.out("result", Value::boolean(id && w.level().find(id) && w.actor_alive(id)));
-                 },
-                 "True for an existing, living actor.", "exists alive none null"));
-  lib.add(getter("actor.location", "Get Location", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("location", "Location", PinType::vector)},
-                 [](Context& c, GameWorld& w) { c.out("location", Value::vector(actor_position(w, target(c)))); }, "World position of the actor.", "position where"));
-  lib.add(getter("actor.rotation", "Get Rotation", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("rotation", "Rotation", PinType::vector)},
-                 [](Context& c, GameWorld& w) {
-                   Mat4 m;
-                   c.out("rotation", Value::vector(w.actor_matrix(target(c), m) ? matrix_transform(m).rotation : Vec3{}));
-                 },
-                 "World rotation in degrees (X roll, Y pitch, Z yaw).", "orientation angle"));
-  lib.add(getter("actor.forward", "Get Forward Vector", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("forward", "Forward", PinType::vector)},
-                 [](Context& c, GameWorld& w) {
-                   Mat4 m;
-                   c.out("forward", Value::vector(w.actor_matrix(target(c), m) ? normalize(m.transform_vector({1, 0, 0}), {1, 0, 0}) : Vec3{1, 0, 0}));
-                 },
-                 "The direction the actor faces (its X axis).", "direction facing"));
-  lib.add(getter("actor.velocity", "Get Velocity", "Actors", {data("target", "Actor", PinType::actor, 0)}, {data("velocity", "Velocity", PinType::vector), data("speed", "Speed", PinType::number)},
-                 [](Context& c, GameWorld& w) {
-                   const Vec3 v = w.actor_velocity(target(c));
-                   c.out("velocity", Value::vector(v));
-                   c.out("speed", Value::number(length(v)));
-                 },
-                 "Linear velocity (m/s) and speed.", "speed motion"));
-  lib.add(getter("actor.distance", "Distance Between", "Actors", {data("a", "A", PinType::actor, 0), data("b", "B", PinType::actor, 0)}, {data("distance", "Distance", PinType::number)},
-                 [](Context& c, GameWorld& w) { c.out("distance", Value::number(distance(actor_position(w, target(c, "a")), actor_position(w, c.in_actor("b"))))); },
-                 "Metres between two actors (A defaults to Self).", "near far range"));
-  lib.add(getter("actor.health", "Get Health", "Combat", {data("target", "Actor", PinType::actor, 0)}, {data("health", "Health", PinType::number), data("dead", "Is Dead", PinType::boolean)},
-                 [](Context& c, GameWorld& w) {
-                   const f32 h = w.health_of(target(c));
-                   c.out("health", Value::number(h));
-                   c.out("dead", Value::boolean(h == 0));
-                 },
-                 "Hit points (-1 without a Health component).", "hp life"));
-  lib.add(getter("game.score", "Get Score", "Game", {}, {data("score", "Score", PinType::number), data("pickups", "Collected", PinType::integer)},
-                 [](Context& c, GameWorld& w) {
-                   c.out("score", Value::number(w.hud().score));
-                   c.out("pickups", Value::integer(w.hud().pickups));
-                 },
-                 "Score and collected pickups.", "points"));
-
-  // ---- actions ----
-  lib.add(action("actor.set_location", "Set Location", "Actors", {data("target", "Actor", PinType::actor, 0), data("location", "Location", PinType::vector, zero3)}, {},
-                 [](Context& c, GameWorld& w) { w.teleport(target(c), c.in_vector("location")); }, "Teleports the actor (bodies included).", "move teleport position"));
-  lib.add(action("actor.set_rotation", "Set Rotation", "Actors", {data("target", "Actor", PinType::actor, 0), data("rotation", "Rotation", PinType::vector, zero3)}, {},
-                 [](Context& c, GameWorld& w) {
-                   const Vec3 r = c.in_vector("rotation");
-                   w.teleport(target(c), actor_position(w, target(c)), &r);
-                 },
-                 "Turns the actor (degrees).", "rotate turn orient"));
-  lib.add(action("actor.move_by", "Move By", "Actors", {data("target", "Actor", PinType::actor, 0), data("offset", "Offset", PinType::vector, vec3(0, 0, 1))}, {},
-                 [](Context& c, GameWorld& w) { w.teleport(target(c), actor_position(w, target(c)) + c.in_vector("offset")); }, "Moves the actor by an offset.", "translate add offset"));
-  lib.add(action("actor.set_velocity", "Set Velocity", "Physics", {data("target", "Actor", PinType::actor, 0), data("velocity", "Velocity", PinType::vector, zero3)}, {},
-                 [](Context& c, GameWorld& w) { w.set_actor_velocity(target(c), c.in_vector("velocity")); }, "Sets the linear velocity (players too).", "speed launch"));
-  lib.add(action("actor.impulse", "Add Impulse", "Physics", {data("target", "Actor", PinType::actor, 0), data("impulse", "Impulse", PinType::vector, vec3(0, 0, 500))}, {},
-                 [](Context& c, GameWorld& w) { w.push_actor(target(c), c.in_vector("impulse"), true); }, "A kick (N·s) to a dynamic body or a player.", "push kick throw"));
-  lib.add(action("actor.force", "Add Force", "Physics", {data("target", "Actor", PinType::actor, 0), data("force", "Force", PinType::vector, vec3(0, 0, 1000))}, {},
-                 [](Context& c, GameWorld& w) { w.push_actor(target(c), c.in_vector("force"), false); }, "A force (N) for this step; call it every Tick for a steady push.", "thrust wind"));
-  lib.add(action("actor.launch", "Launch", "Physics", {data("target", "Actor", PinType::actor, 0), data("velocity", "Velocity", PinType::vector, vec3(0, 0, 10))}, {},
-                 [](Context& c, GameWorld& w) {
-                   const ActorId t = target(c);
-                   w.set_actor_velocity(t, w.actor_velocity(t) * Vec3{1, 1, 0} + c.in_vector("velocity"));
-                 },
-                 "Throws a player or body (keeps its horizontal speed, adds this).", "jump bounce"));
-  lib.add(action("actor.simulate", "Set Simulate Physics", "Physics", {data("target", "Actor", PinType::actor, 0), data("simulate", "Simulate", PinType::boolean, true)}, {},
-                 [](Context& c, GameWorld& w) { w.set_simulate_physics(target(c), c.in_bool("simulate")); }, "Lets the body fall (on) or holds it (off).", "dynamic kinematic freeze"));
-  lib.add(action("actor.joint_motor", "Set Joint Motor", "Physics",
-                 {data("target", "Actor", PinType::actor, 0), data("joint", "Joint Index", PinType::integer, 0), data("enable", "Enable", PinType::boolean, true),
-                  data("speed", "Speed (°/s or m/s)", PinType::number, 90.0), data("force", "Max Force", PinType::number, 1000.0)},
-                 {}, [](Context& c, GameWorld& w) {
-                   w.set_joint_motor(target(c), static_cast<i32>(c.in_int("joint")), c.in_bool("enable"), static_cast<f32>(c.in_number("speed")), static_cast<f32>(c.in_number("force")));
-                 },
-                 "Drives a hinge, slider or rope of the actor (doors, lifts, winches).", "constraint hinge slider drive"));
-  lib.add(action("actor.explode", "Explosion", "Physics",
-                 {data("location", "Location", PinType::vector, zero3), data("radius", "Radius", PinType::number, 6.0), data("impulse", "Strength", PinType::number, 6.0),
-                  data("damage", "Damage", PinType::number, 50.0)},
-                 {}, [](Context& c, GameWorld& w) {
-                   const Vec3 at = c.in_vector("location");
-                   const f32 r = static_cast<f32>(max_of(0.1, c.in_number("radius")));
-                   w.physics().explode(at, r, r * 0.5f, static_cast<f32>(c.in_number("impulse")));
-                   w.particle_burst(at, {3.0f, 1.2f, 0.3f});
-                   w.play_sound("builtin:explosion", at, 1, 1, true);
-                   w.shake_camera(0.6f);
-                   const f32 dmg = static_cast<f32>(c.in_number("damage"));
-                   if (dmg > 0)
-                     for (const Actor& a : w.level().actors) {
-                       if (w.health_of(a.id) <= 0) continue;
-                       const f32 d = distance(actor_position(w, a.id), at);
-                       if (d < r) w.damage(a.id, dmg * (1 - d / r), c.self(), false, at);
-                     }
-                 },
-                 "Box3D radial impulse with flash, sound and damage falling off with distance.", "blast bomb radial"));
-  {
-    NodeDef d = action("actor.spawn", "Spawn Actor", "Actors",
-                       {data("template", "Template", PinType::actor, 0), data("location", "Location", PinType::vector, vec3(0, 0, 1)), data("rotation", "Rotation", PinType::vector, zero3)},
-                       {data("spawned", "Spawned", PinType::actor)},
-                       [](Context& c, GameWorld& w) {
-                         ActorId tpl = c.in_actor("template");
-                         if (!tpl) tpl = w.find_actor(c.param("template"));
-                         const ActorId id = tpl ? w.spawn_copy(tpl, c.in_vector("location"), c.in_vector("rotation")) : 0;
-                         if (!id) c.host().error("Spawn Actor: no template \"" + c.param("template") + "\"");
-                         c.out("spawned", Value::actor(id));
-                       },
-                       "A copy of a template actor (with its children and logic) - replicated to every player.", "create instantiate clone copy");
-    d.params = {param("template", "Template name", ParamDef::Kind::text, "")};
-    lib.add(std::move(d));
-  }
-  lib.add(action("actor.destroy", "Destroy Actor", "Actors", {data("target", "Actor", PinType::actor, 0)}, {}, [](Context& c, GameWorld& w) { w.destroy_actor(target(c)); },
-                 "Removes the actor for the rest of the game.", "delete remove kill"));
-  lib.add(action("actor.enable", "Set Enabled", "Actors", {data("target", "Actor", PinType::actor, 0), data("enabled", "Enabled", PinType::boolean, false)}, {},
-                 [](Context& c, GameWorld& w) { w.set_alive(target(c), c.in_bool("enabled")); }, "Hides and disables (or brings back) the actor and its body.", "visible hide show active"));
-  lib.add(action("actor.set_property", "Set Property", "Actors",
-                 {data("target", "Actor", PinType::actor, 0), data("path", "Property", PinType::text, "components.light.intensity"), data("value", "Value", PinType::text, "20")}, {},
-                 [](Context& c, GameWorld& w) {
-                   const std::string text = c.in_text("value");
-                   json::Value v;
-                   if (!json::parse(text, v)) v = json::Value(text);
-                   if (!w.set_property(target(c), c.in_text("path"), v)) c.host().error(std::string("Set Property: ") + last_error());
-                 },
-                 "Changes any component value (the path as in the level file, e.g. components.mesh.material.color) - replicated.", "component field details"));
-  lib.add(action("actor.set_light", "Set Light", "Effects",
-                 {data("target", "Actor", PinType::actor, 0), data("color", "Color", PinType::vector, vec3(1, 0.9f, 0.7f)), data("intensity", "Intensity", PinType::number, 10.0),
-                  data("range", "Range", PinType::number, 10.0)},
-                 {}, [](Context& c, GameWorld& w) {
-                   const Vec3 col = c.in_vector("color");
-                   const ActorId t = target(c);
-                   w.set_property(t, "components.light.color", vec3(col.x, col.y, col.z));
-                   w.set_property(t, "components.light.intensity", json::Value(c.in_number("intensity")));
-                   w.set_property(t, "components.light.range", json::Value(c.in_number("range")));
-                 },
-                 "Colour (0..1 each), brightness and reach of the actor's point light.", "lamp brightness"));
-  lib.add(action("actor.set_color", "Set Color", "Effects", {data("target", "Actor", PinType::actor, 0), data("color", "Color", PinType::vector, vec3(1, 0.2f, 0.2f))}, {},
-                 [](Context& c, GameWorld& w) {
-                   const Vec3 col = c.in_vector("color");
-                   char hex[8];
-                   auto b = [](f32 v) { return static_cast<int>(std::lround(clamp(v, 0.0f, 1.0f) * 255)); };
-                   std::snprintf(hex, sizeof hex, "#%02x%02x%02x", b(col.x), b(col.y), b(col.z));
-                   w.set_property(target(c), "components.mesh.material.color", json::Value(hex));
-                 },
-                 "Mesh colour (0..1 each).", "material paint tint"));
-}
-
-/// Robots (walkers, the Micro Duck): drive them, look, read their ToF and camera. Commands are in
-/// the robot's own units (the real duck's m/s and degrees); distances are world metres.
-void add_walker_nodes(logic::Library& lib) {
-  const json::Value none = json::Value(0.0);
-  lib.add(action("walker.move", "Walk", "Robots",
-                 {data("target", "Robot", PinType::actor, 0), data("forward", "Forward (m/s)", PinType::number, 0.3), data("strafe", "Sideways (m/s)", PinType::number, 0.0),
-                  data("turn", "Turn (°/s)", PinType::number, 0.0), data("duration", "Duration (s, 0 = keep)", PinType::number, 0.0)},
-                 {}, [](Context& c, GameWorld& w) {
-                   w.walker_command(target(c), static_cast<f32>(c.in_number("forward")), static_cast<f32>(c.in_number("strafe")),
-                                    static_cast<f32>(c.in_number("turn") * 3.14159265358979 / 180), static_cast<f32>(c.in_number("duration")));
-                 },
-                 "Walks the robot like its gamepad: forward up to 0.4 m/s, sideways 0.3, turning 57 °/s (its trained ranges). Overrides its own behaviour "
-                 "for the duration (0: until the next Walk; Set Autonomous gives it back).",
-                 "drive move go duck robot walker twist"));
-  lib.add(action("walker.look", "Look", "Robots",
-                 {data("target", "Robot", PinType::actor, 0), data("yaw", "Yaw (°, + left)", PinType::number, 0.0), data("pitch", "Pitch (°, + down)", PinType::number, 0.0),
-                  data("duration", "Duration (s, 0 = keep)", PinType::number, 0.0)},
-                 {}, [](Context& c, GameWorld& w) {
-                   constexpr f64 k = 3.14159265358979 / 180;
-                   w.walker_look(target(c), static_cast<f32>(c.in_number("yaw") * k), static_cast<f32>(c.in_number("pitch") * k), static_cast<f32>(c.in_number("duration")));
-                 },
-                 "Turns the robot's head (its camera and ToF look there): yaw up to 80°, pitch up to 63°.", "head camera gaze duck robot"));
-  lib.add(action("walker.autonomous", "Set Autonomous", "Robots", {data("target", "Robot", PinType::actor, 0), data("enable", "Autonomous", PinType::boolean, true)}, {},
-                 [](Context& c, GameWorld& w) { w.walker_set_autonomous(target(c), c.in_bool("enable")); },
-                 "On: the robot roams on its own (camera, ToF, exploration memory) whenever nobody drives it. Off: it stands until driven.",
-                 "brain behaviour wander ai duck robot"));
-  lib.add(action("walker.skill", "Robot Move", "Robots", {data("target", "Robot", PinType::actor, 0), data("move", "Move", PinType::text, "pick")}, {},
-                 [](Context& c, GameWorld& w) { w.walker_skill(target(c), c.in_text("move")); },
-                 "One of the robot's moves, as its daemon runs them: sit (toggles), pick (ground pick; the crouch on rollers), kick_left, kick_right, roulade; and jump, Kern's own (trained in Kern Lehrer).",
-                 "skill sit kick roll pick duck robot"));
-  lib.add(action("walker.beak", "Robot Beak", "Robots", {data("target", "Robot", PinType::actor, 0), data("open", "Open (0-1)", PinType::number, 1.0)}, {},
-                 [](Context& c, GameWorld& w) { w.walker_mouth(target(c), static_cast<f32>(c.in_number("open"))); },
-                 "Opens (1) or closes (0) the beak.", "mouth jaw duck robot"));
-  lib.add(action("walker.pet", "Pet Robot", "Robots", {data("target", "Robot", PinType::actor, 0), data("seconds", "Seconds", PinType::number, 3.0)}, {},
-                 [](Context& c, GameWorld& w) { w.walker_pet(target(c), static_cast<f32>(c.in_number("seconds"))); },
-                 "A hand on the duck for a while: it melts, wiggles or falls asleep, as Pollen's brain does it.", "petting stroke touch duck robot"));
-  lib.add(action("walker.hear", "Robot Hears", "Robots", {data("target", "Robot", PinType::actor, 0), data("voice", "Voice (else a noise)", PinType::boolean, true)}, {},
-                 [](Context& c, GameWorld& w) { w.walker_hear(target(c), c.in_bool("voice")); },
-                 "The duck hears someone talk (it perks up and answers) or a noise (it stirs from a doze).", "sound voice listen duck robot"));
-  lib.add(getter("walker.holding", "Robot Holds Something", "Robots", {data("target", "Robot", PinType::actor, 0)}, {data("holding", "Holding", PinType::boolean)},
-                 [](Context& c, GameWorld& w) { c.out("holding", Value::boolean(w.walker_holding(target(c)))); },
-                 "The beak is told to shut and its servo reads it open: something is in it (a sock).", "sock beak carry duck robot"));
-  lib.add(action("walker.quack", "Chirp", "Robots", {data("target", "Robot", PinType::actor, 0)}, {},
-                 [](Context& c, GameWorld& w) { w.walker_quack(target(c)); }, "The duck chirps (its own voice, the robot's synth) and opens its beak.", "sound duck robot"));
-  lib.add(getter("walker.tof", "Robot ToF", "Robots", {data("target", "Robot", PinType::actor, 0)},
-                 {data("blocked", "Obstacle Seen", PinType::boolean), data("distance", "Nearest (m)", PinType::number), data("bearing", "Bearing (°, + left)", PinType::number),
-                  data("left", "Free Left (0-1)", PinType::number), data("right", "Free Right (0-1)", PinType::number)},
-                 [](Context& c, GameWorld& w) {
-                   GameWorld::WalkerSensors s;
-                   const bool ok = w.walker_sensors(target(c), s);
-                   c.out("blocked", Value::boolean(ok && s.nearest >= 0));
-                   c.out("distance", Value::number(ok ? s.nearest : -1.0));
-                   c.out("bearing", Value::number(ok ? s.nearest_bearing * 180 / 3.14159265358979 : 0.0));
-                   c.out("left", Value::number(ok ? s.free_left : 0.0));
-                   c.out("right", Value::number(ok ? s.free_right : 0.0));
-                 },
-                 "The head time-of-flight sensor (8 x 8 zones, 45°): the nearest obstacle with the robot's own floor filter. -1 = nothing in range (4 m real).",
-                 "distance sensor depth obstacle duck robot"));
-  lib.add(getter("walker.sees", "Robot Camera Sees", "Robots", {data("target", "Robot", PinType::actor, 0), data("other", "Actor", PinType::actor, 0)},
-                 {data("visible", "Visible", PinType::boolean), data("bearing", "Bearing (°, + left)", PinType::number), data("distance", "Distance (m)", PinType::number)},
-                 [](Context& c, GameWorld& w) {
-                   bool visible = false;
-                   f32 bearing = 0, distance = -1;
-                   w.walker_sees(target(c), c.in_actor("other"), visible, bearing, distance);
-                   c.out("visible", Value::boolean(visible));
-                   c.out("bearing", Value::number(bearing * 180 / 3.14159265358979));
-                   c.out("distance", Value::number(distance));
-                 },
-                 "Whether the actor is in the head camera's picture (62° x 37°) with nothing in between.", "vision see detect camera duck robot"));
-  lib.add(getter("walker.state", "Robot State", "Robots", {data("target", "Robot", PinType::actor, 0)},
-                 {data("state", "Behaviour", PinType::text), data("fallen", "Fallen", PinType::boolean), data("speed", "Speed (m/s)", PinType::number)},
-                 [](Context& c, GameWorld& w) {
-                   GameWorld::WalkerSensors s;
-                   const bool ok = w.walker_sensors(target(c), s);
-                   c.out("state", Value::text(w.walker_state(target(c))));
-                   c.out("fallen", Value::boolean(ok && s.fallen));
-                   c.out("speed", Value::number(ok ? s.speed : 0.0));
-                 },
-                 "What the robot is doing (Chill, LookAround, Wander, TurnInPlace, BackOff, Zoomies, GetUp; Driven / Logic when someone drives it).",
-                 "behaviour status fallen duck robot"));
-  (void)none;
-}
-
-void add_game_nodes(logic::Library& lib) {
-  const json::Value zero3 = vec3(0, 0, 0);
-  lib.add(action("game.message", "Show Message", "Game", {data("text", "Text", PinType::text, "Hello!")}, {}, [](Context& c, GameWorld& w) { w.show_message(c.in_text("text")); },
-                 "A message in the middle of the screen (every player sees it).", "say hud print notify"));
-  lib.add(action("game.add_score", "Add Score", "Game", {data("points", "Points", PinType::number, 10.0)}, {}, [](Context& c, GameWorld& w) { w.add_score(static_cast<f32>(c.in_number("points"))); },
-                 "Adds points (wins at the target score when the goal is Score).", "points reward"));
-  lib.add(action("game.win", "Win Game", "Game", {data("message", "Message", PinType::text, "You win!")}, {}, [](Context& c, GameWorld& w) { w.end_game(true, c.in_text("message")); },
-                 "Ends the game as won.", "victory finish complete"));
-  lib.add(action("game.lose", "Lose Game", "Game", {data("message", "Message", PinType::text, "Game over")}, {}, [](Context& c, GameWorld& w) { w.end_game(false, c.in_text("message")); },
-                 "Ends the game as lost.", "fail defeat"));
-  {
-    NodeDef d = action("game.sound", "Play Sound", "Audio",
-                       {data("location", "Location", PinType::vector, zero3), data("volume", "Volume", PinType::number, 1.0), data("pitch", "Pitch", PinType::number, 1.0),
-                        data("spatial", "3D", PinType::boolean, true)},
-                       {}, [](Context& c, GameWorld& w) {
-                         Vec3 at = c.in_vector("location");
-                         if (length_sq(at) == 0 && c.self()) at = actor_position(w, c.self());
-                         w.play_sound(c.param("sound", "builtin:confirm"), at, static_cast<f32>(c.in_number("volume")), static_cast<f32>(c.in_number("pitch")), c.in_bool("spatial"),
-                                      c.self());
-                       },
-                       "Plays a sound once (3D at the location, or Self's position; or flat when 3D is off).", "audio sfx noise");
-    d.params = {param("sound", "Sound", ParamDef::Kind::sound, "builtin:confirm")};
-    d.title = [](const NodeDef&, const logic::Node& n) {
-      std::string s = n.param("sound", "builtin:confirm");
-      if (s.rfind("builtin:", 0) == 0) s = s.substr(8);
-      return "Play " + s;
-    };
-    lib.add(std::move(d));
-  }
-  lib.add(action("game.particles", "Spawn Sparks", "Effects", {data("location", "Location", PinType::vector, zero3), data("color", "Color", PinType::vector, vec3(1, 0.8f, 0.3f))}, {},
-                 [](Context& c, GameWorld& w) { w.particle_burst(c.in_vector("location"), c.in_vector("color") * 1.6f); }, "A burst of glowing particles.", "fx effect burst confetti"));
-  lib.add(action("game.shake", "Camera Shake", "Effects", {data("amount", "Amount", PinType::number, 0.5)}, {}, [](Context& c, GameWorld& w) { w.shake_camera(static_cast<f32>(c.in_number("amount"))); },
-                 "Shakes this machine's camera (0..1).", "rumble"));
-  lib.add(action("combat.damage", "Apply Damage", "Combat",
-                 {data("target", "Actor", PinType::actor, 0), data("amount", "Damage", PinType::number, 25.0), data("instigator", "Instigator", PinType::actor, 0)}, {},
-                 [](Context& c, GameWorld& w) {
-                   const ActorId t = target(c);
-                   w.damage(t, static_cast<f32>(c.in_number("amount")), c.in_actor("instigator"), false, actor_position(w, c.self() ? c.self() : t));
-                 },
-                 "Hurts an actor with a Health component (armor first, death, score).", "hurt hit attack"));
-  lib.add(action("combat.heal", "Heal", "Combat", {data("target", "Actor", PinType::actor, 0), data("amount", "Amount", PinType::number, 25.0)}, {},
-                 [](Context& c, GameWorld& w) { w.heal(target(c), static_cast<f32>(c.in_number("amount"))); }, "Gives health back (up to the maximum).", "health restore medkit"));
-  lib.add(action("combat.kill", "Kill", "Combat", {data("target", "Actor", PinType::actor, 0)}, {}, [](Context& c, GameWorld& w) { w.damage(target(c), 1e9f, 0, false, {}); },
-                 "Takes all health (respawns like any death).", "die"));
-  lib.add(action("combat.ammo", "Give Ammo", "Combat", {data("target", "Player", PinType::actor, 0), data("rounds", "Rounds", PinType::integer, 30)}, {},
-                 [](Context& c, GameWorld& w) { w.give_ammo(target(c), static_cast<i32>(c.in_int("rounds"))); }, "Adds rounds to a soldier's reserve.", "bullets reload"));
-  // Line trace (exec node like Unreal's, so the hit is taken once).
-  {
-    NodeDef d = action("physics.trace", "Line Trace", "Physics",
-                       {data("start", "Start", PinType::vector, zero3), data("end", "End", PinType::vector, vec3(10, 0, 0)), data("ignore", "Ignore", PinType::actor, 0)},
-                       {data("hit", "Hit", PinType::boolean), data("actor", "Hit Actor", PinType::actor), data("location", "Location", PinType::vector), data("normal", "Normal", PinType::vector)},
-                       [](Context& c, GameWorld& w) {
-                         ActorId a = 0;
-                         Vec3 p, n;
-                         const bool hit = w.line_trace(c.in_vector("start"), c.in_vector("end"), c.in_actor("ignore"), a, p, n);
-                         c.out("hit", Value::boolean(hit));
-                         c.out("actor", Value::actor(a));
-                         c.out("location", Value::vector(p));
-                         c.out("normal", Value::vector(n));
-                       },
-                       "First thing between Start and End (a Box3D ray).", "raycast ray line of sight");
-    lib.add(std::move(d));
-  }
-  // For each actor with a tag.
-  {
-    NodeDef d = make("flow.for_each_tag", "For Each Actor with Tag", "Flow", NodeKind::flow, "Runs Loop Body for every living actor with the tag, then Completed.", "loop all every");
-    d.inputs = {exec_in(), data("tag", "Tag", PinType::text, "target")};
-    d.outputs = {exec_out("body", "Loop Body"), data("actor", "Actor", PinType::actor), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
-    d.loop = true;
-    d.memory = true;
-    d.run = [](Context& c) {
+void bind_game_nodes(logic::Library& lib) {
+  bind(lib, "game.message", &nodes::game_message);
+  bind(lib, "game.add_score", &nodes::game_add_score);
+  bind(lib, "game.win", &nodes::game_win);
+  bind(lib, "game.lose", &nodes::game_lose);
+  bind(lib, "game.sound", [](Context& c) {
+    const Vec3 location = c.in_vector("location");
+    const f64 volume = c.in_number("volume"), pitch = c.in_number("pitch");
+    const bool spatial = c.in_bool("spatial");
+    if (GameWorld* w = world(c)) nodes::game_sound(*w, c.self(), c.param("sound", "builtin:confirm"), location, volume, pitch, spatial);
+    return 0;
+  });
+  bind(lib, "game.particles", &nodes::game_particles);
+  bind(lib, "game.shake", &nodes::game_shake);
+  bind(lib, "combat.damage", &nodes::combat_damage);
+  bind(lib, "combat.heal", &nodes::combat_heal);
+  bind(lib, "combat.kill", &nodes::combat_kill);
+  bind(lib, "combat.ammo", &nodes::combat_ammo);
+  bind(lib, "physics.trace", &nodes::physics_trace);
+  bind(lib, "flow.for_each_tag", [](Context& c) {
+    // Where the loop is, is the node's: the actors as the loop started, and the pass.
+    logic::NodeState& s = c.state();
+    if (c.entry() != Context::kResume) {
+      const std::string tag = c.in_text("tag");
       GameWorld* w = world(c);
-      if (!w) return c.exec("completed");
-      logic::NodeState& s = c.state();
-      if (c.entry() != Context::kResume) {
-        std::vector<ActorId> v;
-        w->actors_with_tag(c.in_text("tag"), v);
-        // Remember the list in the node state's text (ids joined), so the loop sees a stable set.
-        s.value = Value::text("");
-        for (ActorId id : v) s.value.s += std::to_string(id) + ",";
-        s.index = 0;
-      } else {
-        ++s.index;
-      }
-      // Find entry `index` in the list.
-      i64 k = 0;
-      std::size_t pos = 0;
-      while (k < s.index && pos < s.value.s.size()) { pos = s.value.s.find(',', pos) + 1; ++k; }
-      if (pos >= s.value.s.size() || !c.loop_back(Context::kResume)) return c.exec("completed");
-      const ActorId id = static_cast<ActorId>(std::strtoul(s.value.s.c_str() + pos, nullptr, 10));
-      c.out("actor", Value::actor(id));
-      c.out("index", Value::integer(s.index));
-      return c.exec("body");
-    };
-    lib.add(std::move(d));
-  }
+      s.list = w ? nodes::actors_with_tag(*w, tag) : std::vector<logic::ActorRef>();
+      s.index = 0;
+    } else {
+      ++s.index;
+    }
+    if (s.index >= static_cast<i64>(s.list.size()) || !c.loop_back(Context::kResume)) return c.exec("completed");
+    c.out("actor", Value::actor(s.list[static_cast<std::size_t>(s.index)]));
+    c.out("index", Value::integer(s.index));
+    return c.exec("body");
+  });
+}
+
+/// Robots (walkers, the Micro Duck).
+void bind_walker_nodes(logic::Library& lib) {
+  bind(lib, "walker.move", &nodes::walker_move);
+  bind(lib, "walker.look", &nodes::walker_look);
+  bind(lib, "walker.autonomous", &nodes::walker_autonomous);
+  bind(lib, "walker.skill", &nodes::walker_skill);
+  bind(lib, "walker.beak", &nodes::walker_beak);
+  bind(lib, "walker.pet", &nodes::walker_pet);
+  bind(lib, "walker.hear", &nodes::walker_hear);
+  bind(lib, "walker.holding", &nodes::walker_holding);
+  bind(lib, "walker.quack", &nodes::walker_quack);
+  bind(lib, "walker.tof", &nodes::walker_tof);
+  bind(lib, "walker.sees", &nodes::walker_sees);
+  bind(lib, "walker.state", &nodes::walker_state);
 }
 
 const bool kRegistered = [] {
+  (void)logic_node_shapes_registered();  // (the nodes themselves: names, pins, settings)
   logic::Library& lib = logic::library();
-  add_events(lib);
-  add_actor_nodes(lib);
-  add_game_nodes(lib);
-  add_walker_nodes(lib);
+  bind_actor_nodes(lib);
+  bind_game_nodes(lib);
+  bind_walker_nodes(lib);
   return true;
 }();
 
 }  // namespace
 
-/// Referenced from GameWorld so the registration above is always linked.
+/// Referenced from GameWorld so the binding above is always linked.
 bool logic_nodes_registered() { return kRegistered; }
 
 }  // namespace kern::game

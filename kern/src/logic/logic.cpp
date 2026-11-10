@@ -527,6 +527,10 @@ const NodeDef* Library::find(std::string_view type) const {
   auto it = index_.find(std::string(type));
   return it == index_.end() ? nullptr : defs_[it->second].get();
 }
+NodeDef* Library::edit(std::string_view type) {
+  auto it = index_.find(std::string(type));
+  return it == index_.end() ? nullptr : defs_[it->second].get();
+}
 
 void Library::pins(const Node& node, const Graph& graph, std::vector<PinDef>& in, std::vector<PinDef>& out) const {
   in.clear();

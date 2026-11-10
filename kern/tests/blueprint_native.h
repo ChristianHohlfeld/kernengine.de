@@ -7,12 +7,14 @@
 // interpreter answers; run.sh compiles the texts into blueprint_native_test and compares.
 #pragma once
 
+#include <algorithm>
 #include <cstdio>
 #include <limits>
 #include <set>
 #include <string>
 #include <vector>
 
+#include "kern/game/logic_nodes.h"
 #include "kern/logic/logic.h"
 #include "logic_cases.h"
 #include "native_show.h"
@@ -386,14 +388,16 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   return f.name;
 }
 
-/// Every value node blueprint.h has a function for, in every setting, each as a function of its
-/// own - and called with many values.
+/// Every value node of the core library, in every setting, each as a function of its own - and
+/// called with many values. (What the gameplay nodes give needs a game: they are in the
+/// Blueprints of game_cases.h, played by game_native_test; this test links Kern Logic alone.)
 inline Case nodes_case(const logic::Library& lib = logic::library()) {
   Case c;
   c.name = "Nodes";
   int k = 0;
+  const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
-    if (d->kind != logic::NodeKind::pure) continue;
+    if (d->kind != logic::NodeKind::pure || std::find(of_the_game.begin(), of_the_game.end(), d->type) != of_the_game.end()) continue;
     std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
     if (d->type == "math.formula") {
       variants.clear();

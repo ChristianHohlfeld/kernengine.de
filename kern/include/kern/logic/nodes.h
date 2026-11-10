@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,6 +17,15 @@
 #include "kern/math/math.h"
 
 namespace kern {
+
+/// A node's setting as a template argument: flow_switch_int<"3">, math_compare<"<=">.
+template <std::size_t N> struct Setting {
+  char text[N]{};
+  constexpr Setting(const char (&s)[N]) {  // NOLINT (implicit: that is the point)
+    for (std::size_t i = 0; i < N; ++i) text[i] = s[i];
+  }
+  constexpr std::string_view view() const { return {text, N - 1}; }
+};
 
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {

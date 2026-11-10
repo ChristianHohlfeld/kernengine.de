@@ -60,4 +60,30 @@ if [ $# -eq 0 ]; then
   "$out/kern_tests" --emit-native "$nat"
   "$cxx" "${flags[@]}" -I"$nat" "$nat/blueprint_native_main.cpp" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_native_test"
   "$out/blueprint_native_test" "$nat/blueprint_native_expected.txt"
+  # The Blueprints of a game as classes: the levels of game_cases.h, written as level files; their
+  # Blueprints as C++ by the tool a game's build uses (tools/blueprint_cpp), compiled and linked
+  # with the engine. Every scenario, played in the interpreter and as those classes, is the same.
+  gam="$out/game_native_gen"
+  rm -rf "$gam" && mkdir -p "$gam"
+  "$out/kern_tests" --emit-game-native "$gam"
+  shapes="$out/obj/$(echo "$root/src/game/logic_node_shapes.cpp" | sed "s|/|_|g").o"
+  "$cxx" "${flags[@]}" -w "$root/../tools/blueprint_cpp.cpp" "$shapes" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_cpp"
+  for level in "$gam"/*.klevel; do "$out/blueprint_cpp" "$level" "${level%.klevel}_blueprints.cpp"; done
+  engine=()
+  for f in "${cpp_objects[@]}"; do case "$f" in *test_main.cpp.o) ;; *) engine+=("$f") ;; esac; done
+  "$cxx" "${flags[@]}" "$here/game_native_test.cpp" "$gam"/*_blueprints.cpp "${engine[@]}" "${objects[@]}" -lm -o "$out/game_native_test"
+  "$out/game_native_test" "$gam"
+file; its
+  # Blueprints as C++ by the tool a game's build uses (tools/blueprint_cpp), compiled and linked
+  # with the engine. The scenario, played in the interpreter and as those classes, is the same.
+  gam="$out/game_native_gen"
+  rm -rf "$gam" && mkdir -p "$gam"
+  "$out/kern_tests" --emit-game-native "$gam"
+  shapes="$out/obj/$(echo "$root/src/game/logic_node_shapes.cpp" | sed "s|/|_|g").o"
+  "$cxx" "${flags[@]}" -w "$root/../tools/blueprint_cpp.cpp" "$shapes" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_cpp"
+  "$out/blueprint_cpp" "$gam/arena.klevel" "$gam/arena_blueprints.cpp"
+  engine=()
+  for f in "${cpp_objects[@]}"; do case "$f" in *test_main.cpp.o) ;; *) engine+=("$f") ;; esac; done
+  "$cxx" "${flags[@]}" "$here/game_native_test.cpp" "$gam/arena_blueprints.cpp" "${engine[@]}" "${objects[@]}" -lm -o "$out/game_native_test"
+  "$out/game_native_test" "$gam/arena.klevel"
 fi

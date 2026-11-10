@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"20:55",title:"Jeder Blueprint läuft als kompiliertes C++ – auch die Spielknoten",items:[
+    "Unter der Haube (für alle Kern-Spiele): Auch die Spielknoten sind jetzt C++-Funktionen – Actors bewegen und erzeugen, Physik, Schaden und Heilung, Sounds und Effekte, die Events des Spiels (Überlappung, Treffer, Eingabe, Tod und Respawn …), die Schleife über alle Actors mit einem Tag und die Roboter-Knoten. Damit gibt es keinen Knoten mehr, den ein C++-Compiler nicht ausführt: Jeder Blueprint, der fehlerfrei kompiliert, läuft im gebauten Spiel als seine eigene C++-Klasse.",
+    "Blueprint und C++ rufen für jeden Knoten dieselbe Funktion auf. Geprüft wird das mit zwei Test-Levels, deren Blueprints jeden Spielknoten benutzen: einmal als Graph gespielt, einmal als kompilierte Klassen – jede Variable, jeder Actor und jede Meldung müssen übereinstimmen.",
+    "Im Kern-Editor steht in der C++-Ansicht jetzt bei jedem Blueprint „runs as compiled C++“, und Download liefert seine Klasse.",
+  ]},
   {date:"2026-11-10",time:"20:02",title:"Zufall in Blueprints: jeder Knoten mit eigener Folge",items:[
     "Kern-Blueprints: Jeder Random-Knoten zieht jetzt aus seiner eigenen Zufallsfolge. Was er liefert, hängt nicht mehr davon ab, welcher andere Random-Knoten vor ihm dran war – und ist als Blueprint und als kompiliertes C++ dasselbe. Die Zahlen selbst sind andere als bisher, weiterhin je Welt wiederholbar.",
     "Jeder Eingang eines Knotens wird genau einmal ausgewertet, auch wenn der Knoten ihn dann nicht braucht (Select liest beide Seiten).",

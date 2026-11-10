@@ -32,6 +32,7 @@ void GameWorld::start_logic() {
   if (!any) return;
   logic_host_ = std::make_unique<LogicHost>(*this);
   logic_ = std::make_unique<logic::Runtime>(*logic_host_);
+  logic_->native = logic_native;
   if (!level_.logic.empty()) logic_->add(level_.logic, 0, "Level");
   for (const Actor& a : level_.actors)
     if (a.logic && !a.logic->empty()) logic_->add(*a.logic, static_cast<logic::ActorRef>(a.id), a.name);

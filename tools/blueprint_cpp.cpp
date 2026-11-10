@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "kern/core/json.h"
+#include "kern/game/logic_nodes.h"
 #include "kern/logic/logic.h"
 
 using namespace kern;
@@ -44,6 +45,7 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n");
     return 2;
   }
+  (void)game::logic_node_shapes_registered();  // the gameplay nodes, as the library knows them
   std::string text, why;
   json::Value doc;
   if (!read_file(argv[1], text) || !json::parse(text, doc, &why)) {

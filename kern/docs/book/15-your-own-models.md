@@ -490,7 +490,7 @@ back after its duration. What is needed:
 | `PlayInput::robot` and `drive_walkers` | a free bit and `walker_skill(w.actor, "bow")` on press |
 | `src/studio/viewport.cpp` | a key (like `Digit7` → 256) |
 | `src/game/touch.cpp` | a touch button (like "HOP") |
-| `src/game/logic_nodes.cpp` | add the name to the description of **Robot Move**; the node calls `walker_skill` with the name |
+| `src/game/logic_node_shapes.cpp` | add the name to the description of **Robot Move**; the node calls `walker_skill` with the name |
 | `web/studio/game.mjs` | the file name in `KERN_POLICIES`, so that the Studio loads it from `policies/` |
 | `kern/policies/` | the file itself, plus a line in `policies/README.md` |
 

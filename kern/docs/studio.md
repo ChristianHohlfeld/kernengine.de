@@ -348,10 +348,10 @@ Exec-Ausgang mit zwei Drähten, ein Return außerhalb des Wegs seiner Funktion, 
 den zwei Eingänge lesen, oder einen Weg, der ohne Warten in sich selbst zurückführt (dafür gibt
 es die Schleifen-Knoten).
 
-Blueprints aus Funktionen, Formeln und Variablen führt ein C++-Compiler als genau diesen Text aus
-(`kern/logic/blueprint.h`; `logic::native_ready` sagt, ob ein Blueprint schon so läuft). Graph
-und Text rechnen mit denselben Funktionen (`kern/logic/nodes.h`). Die Ansicht zeigt das neben
-dem Namen an („runs as compiled C++“, sonst im Tooltip der Knoten, der noch fehlt). **Download**
+Jeden Blueprint führt ein C++-Compiler als genau diesen Text aus (`kern/logic/blueprint.h`) –
+auch seine Gameplay-Knoten: Actors, Physik, Kampf, Effekte, Roboter. Graph und Text rufen
+dieselben Funktionen auf (`kern/logic/nodes.h`, `kern/game/blueprint_nodes.h`). Die Ansicht zeigt
+das neben dem Namen an („runs as compiled C++“). **Download**
 gibt die Quelle, die ein Spiel-Build dafür kompiliert – die Klasse des Blueprints samt dem
 Kleber, über den die Engine sie beim Namen erreicht; `tools/blueprint_cpp.sh level.klevel out.cpp`
 schreibt dasselbe für alle Blueprints eines Levels, und ein Spiel, das `out.cpp` einbindet, führt

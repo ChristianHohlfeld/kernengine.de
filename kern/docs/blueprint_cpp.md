@@ -13,10 +13,15 @@ Sache: Man kann sie lesen und ändern, und was man ändert, ist der Blueprint.
 kern/include/kern/logic/logic.h      to_cpp, from_cpp, apply_cpp, canonical, same_blueprint, cpp_name_ok, cpp_problem, cpp_names, native_ready
 kern/include/kern/logic/blueprint.h  wogegen der Text kompiliert: kern::Blueprint, kern::Node, kern::formula, kern::to, KERN_PURE, KERN_LAYOUT
 kern/include/kern/logic/nodes.h      was die Knoten rechnen, als typisierte Funktionen – für den Interpreter und für den Text dieselben
+kern/include/kern/game/blueprint_nodes.h  dasselbe für die Gameplay-Knoten (kern::game::nodes) und ihre Aufrufe in der Klasse
 kern/src/logic/notation.cpp          Shape (was steht wo), Writer (Graph → Text), Reader (Text → Graph)
+kern/src/game/logic_node_shapes.cpp  die Gameplay-Knoten, wie die Bibliothek sie kennt: Namen, Pins, Einstellungen (braucht nichts vom Spiel)
+kern/src/game/logic_nodes.cpp        was die Gameplay-Knoten tun (kern::game::nodes), an ihre Knoten gebunden
 kern/src/studio/logic_edit.cpp       logicCpp, logicCppApply (die C++-Ansicht des Editors)
-kern/tests/test_main.cpp             logic_notation_*, studio_logic_cpp_view, logic_native_blueprints (der Beweis, siehe unten)
+kern/tests/test_main.cpp             logic_notation_*, studio_logic_cpp_view, logic_native_blueprints, game_blueprints_as_classes (der Beweis, siehe unten)
 kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, Aufrufe, der erzeugte Treiber
+kern/tests/game_cases.h              zwei Levels, deren Blueprints jeden Gameplay-Knoten benutzen, mit ihren Szenarien
+kern/tests/game_native_test.cpp      spielt sie im Interpreter und als Klassen und vergleicht
 tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen, die ein Spiel einbindet
 ```
 
@@ -29,7 +34,7 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 | `same_blueprint(a, b)` | Derselbe Blueprint – Knoten für Knoten, Draht für Draht, Wert für Wert –, egal in welcher Reihenfolge gespeichert. |
 | `cpp_problem(graph)` | Warum ein Graph nicht als C++ geschrieben werden kann (leer: er kann). `check()` meldet dasselbe als Fehler. |
 | `cpp_names(graph)` | Für Levels von früher: benennt um, was kein C++-Name ist („Ball Seen“ → `BallSeen`), samt allen Verwendungen. Läuft beim Laden eines Levels. |
-| `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Wenn nicht: welcher Knoten noch keine Funktion in `blueprint.h` hat. |
+| `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Ja, wenn er fehlerfrei kompiliert und jeder seiner Knoten eine Funktion von `blueprint.h` ist (`NodeDef::native` – in Kerns Bibliothek jeder). |
 | `cpp_class_name(owner, graph)` | Der Klassenname für den Blueprint eines Actors: sein Name als C++-Name, den nichts in der Klasse trägt. |
 | `native_glue(graph, name, text)` | Der Kleber hinter dem Text: macht die Klasse für die Engine beim Namen erreichbar (`logic::NativeBlueprint`) und meldet sie unter dem Hash des Graphen an. Kein Teil der Schreibweise. |
 
@@ -38,20 +43,20 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Fertig für die ganze Kernbibliothek, samt Schleifenwächter:** Der Text wird von einem
+- **Fertig für die ganze Knotenbibliothek, samt Schleifenwächter:** Der Text wird von einem
   C++-Compiler ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen,
   Funktionen, Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip
   Flop, die Switches; alle Events, Call Event, Print, Game Time; Delay, Retriggerable Delay,
-  Tween; State Machines; Random. Jeder Knoten ist eine typisierte Funktion; nichts wird zur
-  Laufzeit nachgeschlagen.
+  Tween; State Machines; Random; **und alle Gameplay-Knoten** – Actors, Physik, Kampf, Effekte,
+  die Events des Spiels, die Roboter. Jeder Knoten ist eine typisierte Funktion; nichts wird zur
+  Laufzeit nachgeschlagen. Es gibt keinen Knoten mehr, den ein Compiler nicht ausführt.
 - **Fertig: Das Spiel führt diesen Text aus.** Der Build schreibt die Blueprints eines Levels als
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** die Gameplay-Knoten als Funktionen von `blueprint.h`.
-  `native_ready` sagt für jeden Blueprint, was ihm noch fehlt;
-  bis dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
-  `kern/games/spawncity/BLUEPRINTS.md`.
+- **Als Nächstes:** Der bisherige Export (eine Schleife über Knotennummern) entfällt; die letzten
+  Randfälle zwischen den Stufen (siehe `kern/games/spawncity/BLUEPRINTS.md`); der native Export
+  eines ganzen Spiels aus dem Editor.
 
 ## Im Editor
 
@@ -65,8 +70,8 @@ Code, ohne den Layout-Block (wo die Knoten stehen, bleibt beim Graphen).
   Ansicht den Text in der kanonischen Form.
 - Was sich nicht lesen lässt, wird nicht angewendet: Die Fehlerzeile nennt Zeile, Spalte und
   Grund, ein Klick setzt den Cursor dorthin. **Reset** verwirft die Änderungen.
-- Neben dem Namen steht, ob ein C++-Compiler diesen Text schon ausführt, so wie er dasteht
-  („runs as compiled C++“) – oder welcher Knoten dafür noch fehlt (als Tooltip).
+- Neben dem Namen steht, dass ein C++-Compiler diesen Text ausführt, so wie er dasteht („runs as
+  compiled C++“) – das gilt für jeden Blueprint, der fehlerfrei kompiliert.
 - **Download** lädt die Quelle, die ein Spiel-Build für diesen Blueprint kompiliert: für einen
   Blueprint, den der Compiler so ausführt, seine eigene Klasse – der Text und dahinter der Kleber
   (`blueprint_<name>.cpp`, dasselbe, was `tools/blueprint_cpp.sh` für ein ganzes Level schreibt);
@@ -321,15 +326,50 @@ Umwandlungen `kern::to`, die Knoten mit Gedächtnis wie Do Once und Gate auf ihr
 Der Interpreter ruft für seinen Knoten dieselbe Funktion auf wie der Text. Graph und Text können
 deshalb nicht verschieden rechnen – es gibt nur eine Stelle, an der gerechnet wird.
 
-**Was heute so läuft.** Blueprints mit den Knoten der Kernbibliothek: Begin Play, Event Tick,
-Every N Seconds, Custom Event, On State Entered / Left, Call Event, Print, Game Time; Delay,
-Retriggerable Delay, Tween; State Machines mit Set State, Current State, Is In State; Function
-Entry, Return, Call Function, Function Value; Get, Set, Add; alle Mathe-, Logik-, Vektor- und
-Text-Werte, Compare, Select, Formel, die Reroutes; Branch, Sequence, For, While, Do Once, Do N,
-Gate, Flip Flop, Switch on Int, Switch on Text; Random Float, Random Integer, Random Bool.
-`logic::native_ready(graph, &warum)` sagt es für jeden Blueprint (er muss dazu fehlerfrei
-kompilieren); für alles andere nennt es den Knoten, der noch fehlt (die Gameplay-Knoten – der
-nächste Schritt).
+**Was so läuft: alles.** Jeder Knoten der Bibliothek ist eine Funktion von `blueprint.h` oder
+eine Form der Schreibweise (`NodeDef::native`; die Tests kompilieren einen Blueprint mit jedem
+einzelnen). `logic::native_ready(graph, &warum)` sagt es für einen Blueprint: Er muss fehlerfrei
+kompilieren (`check()`), mehr nicht. Bringt ein Spiel eigene Knoten mit, die noch keine Funktion
+sind, nennt `native_ready` den Knoten; so ein Blueprint läuft im Interpreter oder im JIT.
+
+**Gameplay-Knoten.** Was ein Gameplay-Knoten tut, steht genau einmal: als typisierte Funktion in
+`kern::game::nodes` (`kern/game/blueprint_nodes.h`, definiert in `src/game/logic_nodes.cpp`) –
+`actor_location(spiel, self, actor)`, `combat_damage(spiel, self, ziel, schaden, verursacher)`.
+Der Knoten der Bibliothek ruft sie auf, und die Klasse ruft sie auf:
+
+```cpp
+KERN_EVENT(on1, game_overlap_begin)
+void on1(Actor actor, Actor other) {
+  Visits += 1;
+  game_add_score(5.0);
+  if (actor_has_tag(other, "player")) {
+    actor_spawn<"Crate">(n7, Actor{0}, actor_location(other), Vector{0.0, 0.0, 0.0});
+    actor_impulse(n7.spawned, Vector{0.0, 0.0, 300.0});
+  }
+}
+```
+
+- Das Spiel und der eigene Actor kommen aus der Welt der Klasse (`kern_world`); ein leer
+  gelassener Actor-Eingang (`Actor{0}`) meint Self – in der Funktion, also für Graph und Text
+  gleich.
+- Ein Wert-Knoten mit mehreren Ausgängen gibt ein `struct`, dessen Felder wie die Pins heißen:
+  `actor_velocity(a).speed`, `walker_tof(Actor{0}).distance`.
+- Ein Schritt, dessen Ausgänge gelesen werden, bekommt seinen Member als erstes Argument und
+  füllt ihn: `physics_trace(n40, start, end, Actor{0});`, danach `n40.hit`, `n40.location`.
+- Einstellungen sind Template-Argumente: `actor_spawn<"Crate">`, `game_sound<"builtin:confirm">`,
+  `game_input<"jump", "pressed">`.
+- For Each Actor with Tag ist eine Schleife wie jede: `for (auto it9 = flow_for_each_tag(n9,
+  "crate"); it9.next();) { ... n9.actor ... }`. Die Liste gilt, wie sie beim Start der Schleife
+  war, und gehört dem Knoten (wie der Index eines For Loop).
+- Die Events des Spiels (On Begin Overlap, On Hit, On Damaged, On Input Action …) sind Handler
+  wie alle Events; wer welches bekommt, entscheidet die Laufzeit.
+- Ohne Spiel (eine Klasse, die jemand einfach anlegt; ein Test ohne Welt) tun diese Knoten
+  nichts und geben nichts – ihre Eingänge werden trotzdem gelesen, wie Argumente eben.
+
+Wie ein Gameplay-Knoten *aussieht* (Name, Pins, Einstellungen), steht getrennt von dem, was er
+tut: `src/game/logic_node_shapes.cpp` braucht nichts vom Spiel. Deshalb kennt
+`tools/blueprint_cpp` die Knoten, ohne die Engine zu bauen; `logic_nodes.cpp` bindet die
+Funktionen an (`Library::edit`).
 
 **Eingänge und Zufall.** Jeder Eingang eines Knotens wird genau einmal ausgewertet, ob der Knoten
 ihn dann benutzt oder nicht – wie die Argumente eines Aufrufs (Select liest beide Seiten). In
@@ -421,7 +461,19 @@ Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt 
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
 vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
-sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen nicht vorkommt.
+sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen (und denen des Spiels,
+siehe unten) nicht vorkommt – und dass das inzwischen jeder Knoten der Bibliothek ist.
+Für die Gameplay-Knoten: zwei Levels (`game_cases.h`) – die **Arena**, deren sieben Blueprints
+jeden Actor-, Physik-, Kampf- und Effekt-Knoten und jedes Event des Spiels benutzen, und der
+Raum des **Roboters** mit allen Robots-Knoten. `kern_tests --emit-game-native` schreibt sie als
+Level-Dateien, `tools/blueprint_cpp` – das Werkzeug, das auch der Build eines Spiels benutzt –
+ihre Blueprints als Klassen; `game_native_test` bindet sie mit der ganzen Engine und spielt jedes
+Szenario zweimal, im Interpreter und als Klassen (`GameWorld::logic_native`): Überlappungen,
+Treffer, Pickup, Trigger, Schaden, Tod und Respawn, Eingaben, ein zweiter Spieler, Spielende; der
+Roboter liest Kamera und ToF und wird gefahren. Verglichen wird alles, was man sehen kann – jede
+Variable jedes Blueprints, Ort und Gesundheit jedes Actors, das HUD, die Meldungen des Spiels –,
+Zeile für Zeile, an vielen Stellen des Szenarios. `game_blueprints_as_classes` stellt sicher,
+dass die Szenarien wirklich auslösen, was sie sollen, und dass kein Gameplay-Knoten fehlt.
 SpawnCitys Tests machen dasselbe mit dem Blueprint „Wanted“ des Levels (`wanted_native_test`);
 dort laufen außerdem alle Regel-Tests auf der Klasse, wie im Spiel, und ein Level, dessen
 Blueprint ohne neuen Build geändert wurde, fiele auf (`rules_wanted_blueprint` prüft die Stufe).

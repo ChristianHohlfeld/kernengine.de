@@ -130,8 +130,17 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Seiten, Tween die Dauer auch bei Stop); der JIT überlässt Knoten, die Zufall lesen, ihrer
   Knotenfunktion. Damit läuft die ganze Kernbibliothek als Klasse; alle 15 Tier-Fälle stimmen in
   jeder Stufe überein.
-- [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
-  - Die Gameplay-Knoten (jeder liest dabei jeden Eingang genau einmal).
+- [x] **Die Gameplay-Knoten als Funktionen:** Was ein Gameplay-Knoten tut, ist eine typisierte
+  Funktion (`kern::game::nodes`, `kern/game/blueprint_nodes.h`) – Actors, Physik, Kampf, Effekte,
+  die Events des Spiels, For Each Actor with Tag, die Roboter. Der Knoten der Bibliothek und die
+  Klasse rufen dieselbe auf; jeder Eingang wird genau einmal gelesen. Wie ein Knoten aussieht
+  (Name, Pins), steht getrennt davon (`logic_node_shapes.cpp`), deshalb kennt
+  `tools/blueprint_cpp` die Knoten, ohne die Engine zu bauen. Damit ist **jeder Knoten der
+  Bibliothek** eine Funktion: Jeder Blueprint, der fehlerfrei kompiliert, läuft als seine Klasse.
+  Beweis: `game_native_test` (in `kern/tests/run.sh`) – zwei Levels, acht Blueprints mit jedem
+  Gameplay-Knoten, vom Werkzeug des Spiel-Builds als Klassen geschrieben, im Interpreter und als
+  Klassen gespielt und Zeile für Zeile verglichen.
+- [ ] **Native Ausführung, Teil 2 – die Randfälle zwischen den Stufen:**
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
     mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).
