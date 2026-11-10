@@ -68,6 +68,9 @@ struct MapFeatures {
 /// house. `apron`: outlines of houses that reach over the square's edge (the neighbours' parts).
 /// Open water is the terrain's to know: the game leaves those out when it puts them up.
 void furnish(MapFeatures& out, const kern::Vec4& square, const std::vector<std::vector<Vec2>>& apron);
+/// The parts of a line inside a rectangle (x0, y0, x1, y1), in the line's order: a street as far
+/// as it lies in its map tile's own square (vector tiles repeat it 26 m into the neighbours).
+std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const kern::Vec4& rect);
 
 /// OpenMapTiles layers (building, transportation, water, waterway, park, landcover) -> features.
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out);

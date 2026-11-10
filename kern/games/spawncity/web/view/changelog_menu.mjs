@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"03:59",title:"Verkehr fährt über Kartengrenzen weiter",items:[
+    "Autos und Busse fahren an den Grenzen der Kartenkacheln einfach weiter, statt dort zu wenden – der Verkehr fließt durchgehend durch die Stadt.",
+    "Straßen liegen an diesen Grenzen nicht mehr doppelt übereinander: keine Geister-Kreuzungen und keine doppelten Fahrspuren mehr.",
+  ]},
   {date:"2026-11-10",time:"03:36",title:"Verkehr ohne Auffahrunfälle",items:[
     "Autos und Busse springen nicht mehr aus Staus in die Luft: Fahrer hielten Abstand, indem sie mit Vollgas zurücksetzten – dabei schoben sie sich aufeinander und wurden hochgeschleudert. Jetzt bremsen sie wie im Original hinter dem Vordermann bis zum Stand.",
     "Fahrer folgen ihrer Spur genauer (Zielpunkt ein Stück voraus auf der Fahrbahn) und bremsen vor Kurven – weniger Ausflüge auf den Gehweg.",

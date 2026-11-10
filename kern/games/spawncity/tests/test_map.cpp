@@ -90,3 +90,21 @@ SC_TEST(map_procedural_city) {
     if (!(b.top >= 8 && b.top < 25)) { SC_CHECK(false, "storey heights %.1f", b.top); break; }
   }
 }
+
+
+SC_TEST(map_line_clipped_to_square) {
+  // a street as far as it lies in its tile's square: in order, a part per stay inside
+  const kern::Vec4 sq{0, 0, 100, 100};
+  auto parts = clip_line({{-20, 50}, {50, 50}, {50, 130}, {80, 130}, {80, 90}, {120, 90}}, sq);
+  SC_CHECK(parts.size() == 2, "two stays inside (%zu)", parts.size());
+  if (parts.size() == 2) {
+    SC_CHECK(parts[0].size() == 3 && parts[0][0].x == 0 && parts[0][0].y == 50 && parts[0][2].x == 50 && parts[0][2].y == 100, "in at the west edge, out at the north (%zu points)", parts[0].size());
+    SC_CHECK(parts[1].size() == 3 && parts[1][0].y == 100 && parts[1][2].x == 100 && parts[1][2].y == 90, "back in from the north, out at the east (%zu points)", parts[1].size());
+  }
+  SC_CHECK(clip_line({{-5, -5}, {-1, 200}}, sq).empty(), "outside: nothing");
+  parts = clip_line({{10, 10}, {20, 20}, {30, 10}}, sq);
+  SC_CHECK(parts.size() == 1 && parts[0].size() == 3, "inside: the whole line");
+  // two tiles side by side cut the same street at the same point of their common edge
+  const auto left = clip_line({{60, 40}, {140, 60}}, sq), right = clip_line({{60, 40}, {140, 60}}, {100, 0, 200, 100});
+  SC_CHECK(left.size() == 1 && right.size() == 1 && std::fabs(left[0].back().x - right[0].front().x) < 1e-3f && std::fabs(left[0].back().y - right[0].front().y) < 1e-3f, "the parts meet on the edge");
+}

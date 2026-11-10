@@ -502,4 +502,32 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
   out.areas.push_back(lake);
 }
 
+std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const kern::Vec4& rect) {
+  // Liang-Barsky per stretch; stretches that follow each other inside stay one part
+  std::vector<std::vector<Vec2>> out;
+  std::vector<Vec2> cur;
+  auto close = [&] { if (cur.size() >= 2) out.push_back(std::move(cur)); cur.clear(); };
+  for (std::size_t i = 0; i + 1 < line.size(); ++i) {
+    const Vec2 a = line[i], b = line[i + 1];
+    const f32 dx = b.x - a.x, dy = b.y - a.y;
+    f32 t0 = 0, t1 = 1;
+    bool in = true;
+    const f32 p[4] = {-dx, dx, -dy, dy}, q[4] = {a.x - rect.x, rect.z - a.x, a.y - rect.y, rect.w - a.y};
+    for (int k = 0; k < 4 && in; ++k) {
+      if (p[k] == 0) { in = q[k] >= 0; continue; }
+      const f32 r = q[k] / p[k];
+      if (p[k] < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
+      else { if (r < t0) in = false; else if (r < t1) t1 = r; }
+    }
+    if (!in || t1 <= t0) { close(); continue; }
+    const Vec2 ca{a.x + dx * t0, a.y + dy * t0}, cb{a.x + dx * t1, a.y + dy * t1};
+    if (cur.empty()) cur.push_back(ca);
+    else if (t0 > 0) { close(); cur.push_back(ca); }  // (it came back in: a new part)
+    cur.push_back(cb);
+    if (t1 < 1) close();
+  }
+  close();
+  return out;
+}
+
 }  // namespace sc

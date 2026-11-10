@@ -379,7 +379,17 @@ void CityStream::finish_features(Tile& t) {
                       : (r.cls == RoadClass::path || r.cls == RoadClass::track) ? kPath
                       : major ? kAsphaltMajor : kAsphalt;
     t.roads.road(r.points.data(), static_cast<u32>(r.points.size()), w, !water && road_drivable(r.cls), color, major && !water ? static_cast<i32>(kLine) : -1);
-    if (road_drivable(r.cls)) lanes_.push_back(Lane{r.points, w, t.key.hash(), true});
+    if (!road_drivable(r.cls)) continue;
+    // The lane: the street as far as it lies in this tile's own square. (A vector tile repeats
+    // its streets 26 m into the neighbours: there the ground is the neighbour's - final only with
+    // its own streets' corridors - and so is the lane. Clipped, the lanes of two tiles meet end to
+    // end on the edge: traffic drives on across it, and nobody drives where the ground may yet change.)
+    if (t.procedural) { lanes_.push_back(Lane{r.points, w, t.key.hash(), true}); continue; }
+    for (std::vector<Vec2>& part : clip_line(r.points, t.bounds)) {
+      f32 len = 0;
+      for (std::size_t k = 0; k + 1 < part.size(); ++k) len += std::hypot(part[k + 1].x - part[k].x, part[k + 1].y - part[k].y);
+      if (len > 0.5f) lanes_.push_back(Lane{std::move(part), w, t.key.hash(), true});
+    }
   }
   // the buildings by cell; the cells round the view are extruded from now on (select_cells), the
   // streets are laid at once
