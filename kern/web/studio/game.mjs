@@ -6,7 +6,7 @@
 // full screen: rendering, Box3D physics, controllers and game rules all run in
 // C++ (kern::game::GameWorld). This file sizes the canvas, forwards input and
 // draws the HUD text - nothing else.
-import {loadKern, KERN_NOTICES, BrowserInput} from "../kern.mjs";
+import {loadKern, KERN_NOTICES, BrowserInput, readGamepad} from "../kern.mjs";
 
 /**
  * German interface for Kern Studio and the games, purely visual: the engine, its commands, the
@@ -1106,22 +1106,20 @@ export const escHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&am
 export class GamepadInput {
   constructor(engine) { this.engine = engine; this.connected = false; this.last = ""; }
   poll() {
-    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(p => p && p.connected) : [];
-    const p = pads.find(g => g.mapping === "standard") || pads[0];
-    if (!p) {
+    const g = readGamepad();  // (the pad in use, read as for every Kern host)
+    if (!g) {
       if (this.connected) { this.connected = false; this.last = ""; this.engine.command({cmd: "gamepad", connected: false}); }
       return null;
     }
-    const b = i => !!p.buttons[i]?.pressed, v = i => p.buttons[i]?.value ?? 0, ax = i => p.axes[i] ?? 0;
-    const s = {cmd: "gamepad", connected: true, lx: ax(0), ly: -ax(1), rx: ax(2), ry: ax(3), lt: v(6), rt: v(7),
-      a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), l3: b(10), start: b(9), view: b(8)};
-    // Any pressed button or a stick past .22 marks the pad as the device in use (SpawnCity pad-input).
-    s.active = p.buttons.slice(0, 17).some(x => x?.pressed) || p.axes.slice(0, 4).some(a => Math.abs(a) > 0.22);
+    const b = i => (g.bits >> i & 1) === 1;
+    // (the engine's right stick takes the browser's y axis: down is positive)
+    const s = {cmd: "gamepad", connected: true, lx: g.lx, ly: g.ly, rx: g.rx, ry: -g.ry, lt: g.lt, rt: g.rt,
+      a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), l3: b(10), start: b(9), view: b(8), active: g.active};
     const key = JSON.stringify(s);
     // Sticks at rest and nothing pressed: send once, then stay quiet.
     if (key !== this.last || Math.abs(s.rx) > 0.05 || Math.abs(s.ry) > 0.05) { this.last = key; this.engine.command(s); }
     this.connected = true;
-    return p;
+    return g.pad;
   }
 }
 
@@ -1181,6 +1179,7 @@ export class TouchOverlay {
  * Tells the engine what device this is and which one the player uses right now
  * (SpawnCity's rules, decided in C++: touch switches to the touch layout, a mouse
  * only on fine-pointer devices, any key to desktop), plus the safe-area insets.
+ * Returns {onDevice, onKey} for the host's BrowserInput (which sees the devices).
  */
 export function watchInputDevice(engine) {
   const mq = q => matchMedia(q).matches;
@@ -1193,18 +1192,21 @@ export function watchInputDevice(engine) {
   platform();
   addEventListener("resize", platform);
   addEventListener("orientationchange", platform);
+  // (a moving mouse only matters while the touch layout is up: the engine is asked then)
   let touch = mq("(pointer: coarse)");
-  addEventListener("pointerdown", e => {
-    touch = e.pointerType !== "mouse";
-    engine.command({cmd: "device", event: touch ? "touch" : "mouse"});
-  }, true);
-  addEventListener("pointermove", e => {
-    if (touch && e.pointerType === "mouse" && !document.pointerLockElement && (e.movementX || e.movementY)) {
-      engine.command({cmd: "device", event: "mousemove"});
-      touch = engine.status()?.input?.device === "touch";
-    }
-  }, true);
-  addEventListener("keydown", () => { touch = false; }, true);
+  return {
+    onDevice(kind) {
+      if (kind === "mousemove") {
+        if (!touch) return;
+        engine.command({cmd: "device", event: "mousemove"});
+        touch = engine.status()?.input?.device === "touch";
+        return;
+      }
+      touch = kind === "touch";
+      engine.command({cmd: "device", event: kind});
+    },
+    onKey() { touch = false; },
+  };
 }
 
 /**
@@ -1503,7 +1505,7 @@ export async function startGame({levelText = null, template = null, bytes = null
   $("loading").hidden = true;
   const hud = $("hud");
   const overlay = new TouchOverlay(document.body);
-  watchInputDevice(engine);
+  const device = watchInputDevice(engine);
   canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); engine.contextLost(); kern.resetTables(); });
   canvas.addEventListener("webglcontextrestored", () => { kern.attachContext(canvas, gl); engine.contextRestored(); });
 
@@ -1542,14 +1544,16 @@ export async function startGame({levelText = null, template = null, bytes = null
       wasLocked = locked;
     },
     onKey(e, down) {
+      if (down) device.onKey();
       const r = engine.key(e.key, e.code, down, modifiers(e), e.repeat);
       if (r?.handled && !(e.code === "Escape")) e.preventDefault();
     },
     onFocus(focused) { if (!focused) engine.blur(); },
     onVisibility(hidden) { if (hidden) engine.command({cmd: "touchRelease"}); },
+    onDevice: device.onDevice,
+    // No finger left on the screen: nothing can still be held (SpawnCity's ground truth).
+    onFingersGone() { engine.command({cmd: "touchRelease"}); },
   });
-  // No finger left on the screen: nothing can still be held (SpawnCity's ground truth).
-  addEventListener("touchend", e => { if (!e.touches.length) engine.command({cmd: "touchRelease"}); });
 
   const gamepad = new GamepadInput(engine);
   let touchShown = false;

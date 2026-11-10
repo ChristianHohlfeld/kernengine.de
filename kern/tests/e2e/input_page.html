@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kern BrowserInput - contract page</title>
+<style>html, body { margin: 0; height: 100%; } #surface { position: absolute; left: 40px; top: 30px; width: 600px; height: 400px; background: #223; touch-action: none; }</style>
+<canvas id="surface" tabindex="0"></canvas>
+<button id="beside" style="position: absolute; left: 660px; top: 30px;">beside</button>
+<script type="module">
+// What kern.mjs' BrowserInput tells a host, written down event by event (window.log): the browser
+// test input_e2e.mjs drives a real mouse and keyboard and reads it. Positions are surface px.
+import {BrowserInput, readGamepad, wheelPixels} from "../../web/kern.mjs";
+window.readGamepad = readGamepad;
+window.wheelPixels = wheelPixels;
+const surface = document.getElementById("surface");
+const log = window.log = [], seen = window.seen = [];  // (seen: the device in use and the fingers' ground truth)
+const position = e => { const r = surface.getBoundingClientRect(); return [Math.round(e.clientX - r.left), Math.round(e.clientY - r.top)]; };
+const input = window.input = new BrowserInput({
+  surface,
+  position,
+  onDown(e) { log.push(["down", e.pointerType]); },
+  onMouseButton(button, down, m, e) { log.push(["button", button, down, m.buttons, m.x, m.y, m.locked, e.type]); if (window.lockOnClick && down && e.type === "pointerdown") input.lock(); },
+  onMouseMove(m) { log.push(["move", m.x, m.y, m.buttons, m.locked]); },
+  onMouseCancel(m) { log.push(["cancel", m.buttons]); },
+  onTouch(phase, e) { log.push(["touch", phase, e.pointerId]); },
+  onWheel(pixels, m) { log.push(["wheel", pixels, m.x, m.y]); },
+  onLook(dx, dy) { log.push(["look", dx, dy]); },
+  onLock(locked, {focused}) { log.push(["lock", locked, focused]); },
+  onKey(e, down) { log.push(["key", e.code, down, e.repeat]); },
+  onFocus(focused) { log.push(["focus", focused]); },
+  onVisibility(hidden) { log.push(["visibility", hidden]); },
+  onDevice(kind, e) { seen.push(["device", kind, e.target?.id || e.target?.nodeName || ""]); },
+  onFingersGone() { seen.push(["fingers gone"]); },
+});
+window.ready = true;
+</script>

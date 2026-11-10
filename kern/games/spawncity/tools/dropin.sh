@@ -17,11 +17,11 @@ mkdir -p "$out/kern/web/studio"
 cp -r "$here/web/." "$out/"
 rm -f "$out/index.html"
 [ -f "$out/spawncity.wasm" ] || { echo "spawncity.wasm missing (run build.sh first)" >&2; exit 1; }
-# Kern's web modules next to it (host.mjs imports them from the repository layout)
+# Kern's web modules next to it (the page's modules import them from the repository layout)
 cp "$kern/web/app.mjs" "$kern/web/kern.mjs" "$kern/web/jobs.mjs" "$out/kern/web/"
 cp "$kern/web/studio/game.mjs" "$out/kern/web/studio/"
-sed -i 's#"\.\./\.\./\.\./web/#"./kern/web/#g' "$out/host.mjs"
-grep -q '\.\./\.\./\.\./' "$out/host.mjs" && { echo "host.mjs: a repository path is left" >&2; exit 1; }
+sed -i 's#"\.\./\.\./\.\./web/#"./kern/web/#g' "$out"/*.mjs
+grep -l '\.\./\.\./\.\./' "$out"/*.mjs && { echo "a repository path is left in the modules above" >&2; exit 1; }
 # the game at the original's address, with the original's manifest
 sed -e 's#href="\./manifest\.webmanifest"#href="./drone_simulator.webmanifest"#' "$here/web/index.html" > "$out/drone_simulator.html"
 grep -q 'drone_simulator.webmanifest' "$out/drone_simulator.html" || { echo "manifest link not rewritten" >&2; exit 1; }

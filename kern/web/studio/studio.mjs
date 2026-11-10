@@ -279,7 +279,7 @@ class StudioPage {
     const style = document.createElement("style");
     style.textContent = HUD_STYLE + "\n" + TOUCH_STYLE;
     document.head.append(style);
-    watchInputDevice(this.engine);
+    this.device = watchInputDevice(this.engine);
     // Language: Deutsch / English (the other one is offered; the page reloads, the level is autosaved).
     {
       const b = $("#langBtn"), de = I18N_LANG === "de";
@@ -1959,6 +1959,7 @@ class StudioPage {
   initInput() {
     const editable = el => el && (el.isContentEditable || (el.matches?.("input, textarea, select") && !el.matches("input[type=checkbox], input[type=range], input[type=color]")));
     const onKey = (e, down) => {
+      if (down) this.device.onKey();
       if (this.dialog && !$("#dialogLayer").firstElementChild) this.dialog = null;  // a dialog that is gone takes no keys
       if (this.dialog) {
         if (down && e.key === "Escape") { this.dialog.close(); e.preventDefault(); }
@@ -2001,6 +2002,9 @@ class StudioPage {
       onKey: onKey,
       onFocus: focused => { if (!focused) this.engine.blur(); },
       onVisibility: hidden => { if (hidden) this.engine.blur(); },
+      onDevice: (kind, e) => this.device.onDevice(kind, e),
+      // No finger left on the screen: nothing can still be held (as in the packaged game).
+      onFingersGone: () => this.engine.command({cmd: "touchRelease"}),
       onMouseButton: (button, down, m, e) => lockedButton(down ? POINTER.down : POINTER.up, e),
       // Pointer lock while playing: mouse movement looks around.
       onLook: (dx, dy) => this.engine.look(dx, dy),

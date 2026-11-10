@@ -15,6 +15,7 @@
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
+import {readGamepad} from "../../../web/kern.mjs";
 import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 import {startKernJobs} from "../../../web/jobs.mjs";
 import {MpPage} from "./mp_host.mjs";
@@ -65,11 +66,12 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   let app;
   // The page's share of the keyboard and the locked mouse comes through Kern's one input reader
   // (kern.mjs BrowserInput, by way of the App host); what it does with them is set further down.
-  const pageInput = {key: null, look: null, lock: null};
+  const pageInput = {key: null, look: null, lock: null, device: null, fingersGone: null, visibility: null};
   try {
     app = await runKernApp({canvas, url, base64, args, maxPixelRatio: mobile ? 1.5 : 2,
       onStatus: text => { statusEl.textContent = text; statusEl.hidden = !text; },
-      onKey: (ev, down) => pageInput.key?.(ev, down), onLook: (dx, dy) => pageInput.look?.(dx, dy), onLock: locked => pageInput.lock?.(locked)});
+      onKey: (ev, down) => pageInput.key?.(ev, down), onLook: (dx, dy) => pageInput.look?.(dx, dy), onLock: locked => pageInput.lock?.(locked),
+      onDevice: (kind, ev) => pageInput.device?.(kind, ev), onFingersGone: () => pageInput.fingersGone?.(), onVisibility: hidden => pageInput.visibility?.(hidden)});
   } catch (error) {
     statusEl.hidden = false;
     statusEl.textContent = "SpawnCity konnte nicht starten: " + (error?.message || error);
@@ -298,9 +300,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // foot_touch_controller.mjs: every finger is let go when the page hides, on pagehide, and when a
   // touchend / touchcancel leaves no touch on the glass (the ground truth); blur keeps them.
   const releaseFingers = () => command("touch release");
-  document.addEventListener("visibilitychange", () => { if (document.hidden) releaseFingers(); });
-  addEventListener("pagehide", releaseFingers);
-  for (const t of ["touchend", "touchcancel"]) addEventListener(t, ev => { if (ev.touches.length === 0) releaseFingers(); }, {capture: true, passive: true});
+  pageInput.visibility = hidden => { if (hidden) releaseFingers(); };
+  pageInput.fingersGone = releaseFingers;
   const overlay = new TouchOverlay(document.getElementById("stage"));
 
   // ---- devices and the mouse (desktop_controls.mjs; the game decides, game_controls.cpp) ------------
@@ -308,14 +309,14 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   if (!params.has("coarse"))
     command(`device platform ${matchMedia("(hover: hover) and (pointer: fine)").matches ? 1 : 0} ${coarse ? 1 : 0} ${navigator.maxTouchPoints || 0}`);
   const UI_SELECTOR = "button,input,select,textarea,a,label,dialog,[role=button],.sc-map";
-  addEventListener("pointerdown", ev => command(ev.pointerType === "mouse" ? "device mouse" : "device touch"), {capture: true});
+  // (a mouse moving over the page's own controls says nothing; the game hears of it every 200 ms)
   let mouseSeen = 0;
-  addEventListener("pointermove", ev => {
-    if (ev.pointerType !== "mouse" || document.pointerLockElement || !(ev.movementX || ev.movementY)) return;
+  pageInput.device = (kind, ev) => {
+    if (kind !== "mousemove") { command("device " + kind); return; }
     if (ev.target instanceof Element && ev.target.closest(UI_SELECTOR)) return;
     const t = performance.now();
     if (t - mouseSeen > 200) { mouseSeen = t; command("device mousemove"); }
-  }, {capture: true});
+  };
   // One movement stream: mousemove under the lock (precision touchpads keep sending it while
   // pointermove stalls), each event held to +-420 px (MAX_EVENT_PX), never dropped - as Kern's
   // input reader gives it to every host.
@@ -336,14 +337,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
 
   // ---- gamepad (Xbox standard mapping) ------------------------------------------------------
   function pollPad() {
-    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(p => p && p.connected) : [];
-    const p = pads.find(g => g.mapping === "standard") || pads[0];
-    if (!p) { e.sc_gamepad(0, 0, 0, 0, 0, 0, 0, 0, 0); return; }
-    let bits = 0;
-    for (let i = 0; i < 16; i++) if (p.buttons[i]?.pressed) bits |= 1 << i;
-    const ax = i => p.axes[i] ?? 0, v = i => p.buttons[i]?.value ?? 0;
-    const active = bits !== 0 || p.axes.slice(0, 4).some(a => Math.abs(a) > 0.22);
-    e.sc_gamepad(1, ax(0), -ax(1), ax(2), -ax(3), v(6), v(7), bits >>> 0, active ? 1 : 0);
+    const g = readGamepad();
+    if (!g) { e.sc_gamepad(0, 0, 0, 0, 0, 0, 0, 0, 0); return; }
+    e.sc_gamepad(1, g.lx, g.ly, g.rx, g.ry, g.lt, g.rt, g.bits >>> 0, g.active ? 1 : 0);
   }
 
   // ---- audio --------------------------------------------------------------------------------

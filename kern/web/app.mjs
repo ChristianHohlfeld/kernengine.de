@@ -25,10 +25,11 @@ const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "S
  * `maxPixelRatio` caps the drawing-buffer density (default: full device ratio).
  * The page's own share of the input (all optional, after the app had the event; BrowserInput):
  * `onKey(event, down)`, `onLook(dx, dy)` - the locked pointer's movement in css px -,
- * `onLock(locked)`.
+ * `onLock(locked)`, `onDevice(kind, event)`, `onFingersGone()`, `onVisibility(hidden)`.
  */
 export async function runKernApp({canvas, bytes = null, base64 = null, url = null, module = null, onStatus = null, onError = null,
-  maxPixelRatio = Infinity, contextAttributes = {}, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null} = {}) {
+  maxPixelRatio = Infinity, contextAttributes = {}, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null, onDevice = null, onFingersGone = null,
+  onVisibility = null} = {}) {
   if (!canvas?.getContext) throw Error("canvas required");
   const kern = await loadKern({bytes, base64, url, module});
   const e = kern.exports;
@@ -82,6 +83,9 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     onFocus(focused) { e.kern_app_focus(focused ? 1 : 0); },
     onLook: onLook ? (dx, dy) => onLook(dx, dy) : null,
     onLock: locked => onLock?.(locked),
+    onDevice,
+    onFingersGone,
+    onVisibility,
   });
   listeners.push(() => input.dispose());
   on(canvas, "webglcontextlost", event => { event.preventDefault(); e.kern_context_lost(); kern.resetTables(); });

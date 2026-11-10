@@ -8,9 +8,10 @@
 //   2. own the GPU object handle tables and context-loss plumbing,
 //   3. expose `KernRenderer`, a thin typed-array marshalling facade over the
 //      engine's C ABI (kern/include/kern/api/c_api.h),
-//   4. read the browser's keyboard, mouse, pointer lock and focus once, for
-//      every host (`BrowserInput`): the App host (app.mjs), the game page and
-//      the Studio (studio/) only say what an event means to their engine.
+//   4. read the browser's keyboard, mouse, fingers, pointer lock, focus and
+//      gamepad once, for every host (`BrowserInput`, `readGamepad`,
+//      `wheelPixels`): the App host (app.mjs), the game page and the Studio
+//      (studio/) only say what an event means to their engine.
 //
 // Usage:
 //   const kern = await loadKern({ bytes });      // once per page
@@ -55,9 +56,36 @@ export function chordedButton(e) {
   return (e.buttons & bit) !== 0;
 }
 
+/** The wheel in pixels whatever unit the browser used: a line is 40 px, a page 400 px. */
+export function wheelPixels(e) {
+  return e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1);
+}
+
 /**
- * The browser's keyboard, mouse, pointer lock and focus for one surface - the one place that
- * listens to them, for every Kern host. What the browser does on its own account is settled here:
+ * The gamepad in use - the one place that picks and reads it, for every host and every page
+ * widget: of the connected pads the first with the browser's "standard" mapping (Xbox layout),
+ * else the first connected. Returns null without one, else
+ *   {pad, lx, ly, rx, ry, lt, rt, bits, active}
+ * - the sticks with right and up positive (the browser's y axes point down), the triggers 0..1,
+ * the pressed buttons 0..16 as a mask (bit = the standard mapping's button index), and `active`:
+ * a button is pressed or a stick is past .22, which marks the pad as the device in use. Dead
+ * zones and response curves are the engine's.
+ */
+export function readGamepad() {
+  const pads = globalThis.navigator?.getGamepads ? Array.from(navigator.getGamepads()).filter(p => p && p.connected) : [];
+  const pad = pads.find(g => g.mapping === "standard") || pads[0];
+  if (!pad) return null;
+  let bits = 0;
+  for (let i = 0; i < 17; i++) if (pad.buttons[i]?.pressed) bits |= 1 << i;
+  const ax = i => pad.axes[i] ?? 0, v = i => pad.buttons[i]?.value ?? 0;
+  const active = bits !== 0 || Array.from(pad.axes).slice(0, 4).some(a => Math.abs(a) > 0.22);
+  return {pad, lx: ax(0), ly: -ax(1), rx: ax(2), ry: -ax(3), lt: v(6), rt: v(7), bits, active};
+}
+
+/**
+ * The browser's keyboard, mouse, fingers, pointer lock and focus for one surface - the one place
+ * that listens to them, for every Kern host. What the browser does on its own account is settled
+ * here:
  *
  *  - mouse buttons come from the button events alone - pointerdown, pointerup and the pointermove
  *    that names a second button (chordedButton). A plain move's `buttons` is not trusted: the
@@ -68,8 +96,11 @@ export function chordedButton(e) {
  *    movement comes as `mousemove` on the document (precision touchpads keep sending that while
  *    pointermove stalls), every event held to +-420 px (a locked pointer now and then reports one
  *    huge jump);
- *  - the wheel comes in pixels whatever unit the browser used (a line 40 px, a page 400 px);
- *  - the surface's context menu never opens.
+ *  - the wheel comes in pixels whatever unit the browser used (wheelPixels);
+ *  - the surface's context menu never opens;
+ *  - a finger's release can get lost (the page scrolls away under it, a system gesture takes it):
+ *    the browser's own list of touches is the ground truth - when a touchend / touchcancel leaves
+ *    it empty, or the page is being left, nothing is held any more (onFingersGone).
  *
  * Options (all callbacks optional; `m` is {x, y, dx, dy, buttons, locked} - the position as
  * `position(event)` gives it (default: client px), the movement in css px, the held buttons as a
@@ -88,6 +119,10 @@ export function chordedButton(e) {
  *   onKey(event, down)                keydown / keyup on the window (repeats included)
  *   onFocus(focused)                  the window got or lost the focus
  *   onVisibility(hidden)              the page was hidden or shown
+ *   onDevice(kind, event)             what the player uses, seen anywhere in the window: "touch" or
+ *                                     "mouse" - a pointer went down (a pen is a touch) -, and
+ *                                     "mousemove" - a mouse really moved while not locked
+ *   onFingersGone()                   no finger is left on the glass, or the page is being left
  */
 export class BrowserInput {
   constructor({surface = null, lockTarget = surface, position = null, capture = true, ...on} = {}) {
@@ -133,7 +168,7 @@ export class BrowserInput {
       });
       listen(surface, "wheel", event => {
         event.preventDefault();
-        on.onWheel?.(event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 400 : 1), state(event), event);
+        on.onWheel?.(wheelPixels(event), state(event), event);
       }, {passive: false});
       listen(surface, "contextmenu", event => event.preventDefault());
     }
@@ -149,6 +184,17 @@ export class BrowserInput {
     listen(window, "blur", () => { this.buttons = 0; on.onFocus?.(false); });
     listen(window, "focus", () => on.onFocus?.(true));
     if (on.onVisibility) listen(document, "visibilitychange", () => on.onVisibility(document.hidden));
+    if (on.onDevice) {
+      listen(window, "pointerdown", event => on.onDevice(mouse(event) ? "mouse" : "touch", event), {capture: true});
+      listen(window, "pointermove", event => {
+        if (mouse(event) && !document.pointerLockElement && (event.movementX || event.movementY)) on.onDevice("mousemove", event);
+      }, {capture: true});
+    }
+    if (on.onFingersGone) {
+      for (const type of ["touchend", "touchcancel"])
+        listen(window, type, event => { if (event.touches.length === 0) on.onFingersGone(); }, {capture: true, passive: true});
+      listen(window, "pagehide", () => on.onFingersGone());
+    }
   }
 
   /** The pointer is locked to this input's lock target. */

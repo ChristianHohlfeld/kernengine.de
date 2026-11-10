@@ -32,8 +32,9 @@ kern/
     studio/studio.h      Kern Studio (komplette Editorlogik, ohne Browser testbar)
   src/                   Implementierung (gleiche Gliederung; src/studio/api.cpp = kern_studio_* C-ABI)
   third_party/box3d/     Box3D (Erin Catto, MIT), als C17 mitkompiliert
-  web/kern.mjs           Browser-Plattformschicht + KernRenderer (JS-Fassade der C-ABI) + BrowserInput:
-                         Tastatur, Maus, Zeigersperre und Fokus werden hier einmal gelesen - für jeden Host
+  web/kern.mjs           Browser-Plattformschicht + KernRenderer (JS-Fassade der C-ABI) + BrowserInput /
+                         readGamepad: Tastatur, Maus, Finger, Zeigersperre, Fokus, Gerät und Controller
+                         werden hier einmal gelesen - für jeden Host (Test: tests/e2e/input_e2e.mjs)
   web/app.mjs            Host für C++-Spiele (Frame-Loop, Größe, Kontextverlust; Eingabe über BrowserInput)
   web/studio/            Studio-Seite (index.html, studio.css, studio.mjs), Spiel-Host (game.mjs, play.html)
   docs/studio.md         Dokumentation von Studio, Komponenten, Format und Protokoll

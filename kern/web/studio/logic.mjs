@@ -20,6 +20,8 @@
 //                 right click, tapping a pin offers the nodes that fit it; panels
 //                 become sheets on a phone.
 
+import {wheelPixels} from "../kern.mjs";
+
 const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", int: "#1fe0b0", float: "#9be36b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5"};
 const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Float", vector: "Vector", text: "Text", actor: "Actor"};
 const LG_KIND_COLORS = {event: "#8f1d1d", action: "#1f4e8c", pure: "#3c7a3c", flow: "#5c5c5c"};
@@ -1007,10 +1009,11 @@ export class LogicEditor {
     const c = this.el.canvas;
     c.addEventListener("wheel", e => {
       e.preventDefault();
-      if (e.ctrlKey && Math.abs(e.deltaY) < 50) { this.setZoom(this.view.zoom * Math.pow(1.01, -e.deltaY), e.clientX, e.clientY); return; }  // pinch on a trackpad
+      const px = wheelPixels(e);  // (the wheel in pixels, as every Kern page reads it)
+      if (e.ctrlKey && Math.abs(px) < 50) { this.setZoom(this.view.zoom * Math.pow(1.01, -px), e.clientX, e.clientY); return; }  // pinch on a trackpad
       const v = this.view;
       let i = LG_ZOOMS.reduce((best, z, k) => Math.abs(z - v.zoom) < Math.abs(LG_ZOOMS[best] - v.zoom) ? k : best, 0);
-      i = Math.max(0, Math.min(LG_ZOOMS.length - 1, i + (e.deltaY < 0 ? 1 : -1)));
+      i = Math.max(0, Math.min(LG_ZOOMS.length - 1, i + (px < 0 ? 1 : -1)));
       this.setZoom(LG_ZOOMS[i], e.clientX, e.clientY);
     }, {passive: false});
     c.addEventListener("contextmenu", e => e.preventDefault());

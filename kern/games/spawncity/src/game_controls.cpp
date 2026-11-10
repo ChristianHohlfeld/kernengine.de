@@ -1197,8 +1197,10 @@ std::string Game::ctl_hud_json() {
                 C.dev.pad ? "true" : "false", C.locked ? "true" : "false", C.aiming ? "true" : "false", player_dead_ ? "true" : "false", C.rocket ? "true" : "false",
                 C.scope_on ? "true" : "false", C.car_zoom, C.look.yaw_deg, C.look.pitch_deg, C.nade.carry, C.nade.cooking ? C.nade.left(C.clock) : -1.0f);
   s += b;
-  // tests: the mouse buttons as the game holds them, and Kern's trigger (fire while aiming)
-  std::snprintf(b, sizeof b, "\"lmb\":%s,\"rmb\":%s,\"trigger\":%s,", C.lmb ? "true" : "false", C.rmb ? "true" : "false", trigger_was_ ? "true" : "false");
+  // tests: the mouse buttons as the game holds them, Kern's trigger (fire while aiming), and
+  // whether the touch controls hold a finger
+  std::snprintf(b, sizeof b, "\"lmb\":%s,\"rmb\":%s,\"trigger\":%s,\"fingers\":%s,", C.lmb ? "true" : "false", C.rmb ? "true" : "false",
+                trigger_was_ ? "true" : "false", pad_touch_.any() ? "true" : "false");
   s += b;
   const bool fade = C.clock - C.hint_at > 12 && !player_dead_;
   s += "\"lastExit\":\"" + g_last_exit + "\",";

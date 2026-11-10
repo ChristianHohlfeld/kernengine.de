@@ -17,6 +17,7 @@
 //     (routing.openstreetmap.de, FOSSGIS) when the streamed streets do not reach the goal
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
+import {readGamepad, wheelPixels} from "../../../web/kern.mjs";
 import {WorldBasemap, mercX, mercY, lonOf, latOf} from "./world_map.mjs";
 
 // mqtt_data_relay.mjs BROKER_CONFIGS, direct_udp_peer.mjs DEFAULT_ICE_SERVERS
@@ -689,7 +690,7 @@ class MpBigMap {
     this.onSlash = ev => { if (ev.code === "Slash" && document.activeElement !== this.input) { ev.preventDefault(); this.input.focus(); } };
     addEventListener("keydown", this.onSlash, true);
     this.input.addEventListener("input", () => { clearTimeout(this.searchTimer); this.searchTimer = setTimeout(() => this.search(), 350); });
-    this.cv.addEventListener("wheel", ev => { this.zoomBy(-ev.deltaY * 0.0022, ev.clientX, ev.clientY); ev.preventDefault(); }, {passive: false});
+    this.cv.addEventListener("wheel", ev => { this.zoomBy(-wheelPixels(ev) * 0.0022, ev.clientX, ev.clientY); ev.preventDefault(); }, {passive: false});
     this.cv.addEventListener("pointerdown", ev => { this.pointers.set(ev.pointerId, {x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY, moved: false}); this.cv.setPointerCapture(ev.pointerId); });
     this.cv.addEventListener("pointermove", ev => {
       const p = this.pointers.get(ev.pointerId); if (!p) return;
@@ -782,7 +783,7 @@ class MpBigMap {
     // world_map_full.mjs:355-362: LS pans -s|s| 900 px/s (dead zone .15, rescaled), RT/LT zoom
     // (rt - lt) 2.2 /s, A waypoint at the centre, X clears it, Y search, D-pad left/right zoom -1/+1,
     // R3 follows me, B or VIEW closes (VIEW held when the map opened does not close it).
-    const p = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g?.connected) : null;
+    const p = readGamepad()?.pad;  // (the pad the game reads)
     const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - (this.padAt || now)) / 1000));
     this.padAt = now;
     if (!p || !this.view) return;

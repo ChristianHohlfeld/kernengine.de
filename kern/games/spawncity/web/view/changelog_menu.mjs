@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"10:12",title:"Controller, Finger und Gerät: überall gleich gelesen",items:[
+    "Controller: Die große Karte hört jetzt auf denselben Controller wie das Spiel und die Menüs. War neben dem Xbox-Controller ein zweites Gerät angeschlossen (Lenkrad, Funkempfänger), reagierte die Karte bisher unter Umständen gar nicht.",
+    "Unter der Haube: Auch Controller, Geräteerkennung (Maus, Finger, Controller) und das Loslassen aller Finger liest jetzt die eine Eingabeschicht der Kern Engine – für SpawnCity, die Beispielspiele, den Editor und jedes exportierte Spiel gleich.",
+    "Jede dieser Seiten wird ab jetzt bei jedem Update automatisch mit echter Maus und Tastatur gegen dieselben Regeln geprüft.",
+  ]},
   {date:"2026-11-10",time:"09:13",title:"Eine Eingabeschicht für alle Kern-Spiele",items:[
     "Unter der Haube: Tastatur, Maus, Zeigersperre und Fokus liest jetzt eine einzige Schicht der Kern Engine – für SpawnCity genauso wie für jedes andere Kern-Spiel. An der Bedienung ändert sich nichts; Eingabefehler können so nicht mehr nur in einem der Spiele stecken.",
   ]},

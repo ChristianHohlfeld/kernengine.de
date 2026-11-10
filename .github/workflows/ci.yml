@@ -4,7 +4,8 @@ name: CI
 # native and browser tests run in parallel and do not hold the deployment up.
 #   native  unit tests with ASan / UBSan
 #   build   Kern Studio + example games (parallel ThinLTO, object cache kept between runs)
-#   e2e     the browser test against the built Studio
+#   e2e     the browser tests: the built Studio; the input of every host (the reader's contract,
+#           the example games, SpawnCity)
 #   deploy  main only: publishes the site to the gh-pages branch
 #           https://kernengine.de/ (custom domain via the CNAME file)
 on:
@@ -222,6 +223,14 @@ jobs:
           sleep 1
           mkdir -p artifacts/e2e
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771
+      - name: Input test (one reader for every host)
+        run: |
+          set -euo pipefail
+          # the example games as built, next to their pages; SpawnCity as the drop-in for spawncity.de
+          for g in hello orbrun; do cp _site/kern/examples/$g/$g.wasm kern/examples/$g/; done
+          python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
+          sleep 1
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772 "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1"
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -10,6 +10,7 @@
 // suggestion_box.mjs, neon_ui_theme.mjs, edge_hud_layout.mjs, mobile_gameplay_ui.mjs, pwa_fullscreen_policy.mjs.
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
+import {readGamepad} from "../../../web/kern.mjs";
 
 const SCUI_STORE = "spawnCityKernSettingsV1";
 const SCUI_SUGGEST = "spawnCityKernSuggestV1";
@@ -461,8 +462,7 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   const padPrev = new Set();
   let stickY = 0, stickX = 0;
   function pollPad() {
-    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(p => p && p.connected) : [];
-    const p = pads.find(g => g.mapping === "standard") || pads[0];
+    const p = readGamepad()?.pad;  // (the pad the game reads)
     if (!p) { stickX = stickY = 0; return; }
     const hit = i => { const on = !!p.buttons[i]?.pressed, was = padPrev.has(i); if (on) padPrev.add(i); else padPrev.delete(i); return on && !was; };
     const a = hit(0), b = hit(1), y = hit(3), lb = hit(4), rb = hit(5), view = hit(8), menuBtn = hit(9), up = hit(12), down = hit(13), left = hit(14), right = hit(15);
