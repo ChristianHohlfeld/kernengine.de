@@ -1540,11 +1540,38 @@ std::string Game::command(const std::string& cmd) {
     for (const TrafficCar& c : cars_) {
       if (!c.placed) continue;
       const Vec3 p = matrix_of(c.actor).translation();
-      char b[160];
-      std::snprintf(b, sizeof b, "%s{\"bus\":%d,\"far\":%d,\"rig\":%d,\"lift\":%.2f,\"peakUp\":%.2f,\"peakLift\":%.2f,\"x\":%.0f,\"y\":%.0f}", out.size() > 1 ? "," : "",
+      char b[420];
+      std::snprintf(b, sizeof b, "%s{\"bus\":%d,\"far\":%d,\"rig\":%d,\"lift\":%.2f,\"peakUp\":%.2f,\"peakLift\":%.2f,\"x\":%.0f,\"y\":%.0f", out.size() > 1 ? "," : "",
                     c.car->spec().radius > 0.4f ? 1 : 0, c.far ? 1 : 0, c.car->rigged() ? 1 : 0,
                     p.z - city_.ground_height(p.x, p.y) - Car::ground_offset(c.car->spec()), c.peak_up, c.peak_lift, p.x, p.y);
       out += b;
+      // how it stands: upright (up.z), its speed, body type and sleep, the ground the physics has
+      // under it against the ground's height there (gap > 0: the collision lies lower), and every
+      // wheel - its travel and how far its tread is over (+) or in (-) the ground
+      const kern::physics::Body cb = body(c.actor);
+      kern::physics::World& w = world_->physics();
+      if (cb.valid() && w.body_valid(cb)) {
+        const BodyState st = read_body(w, cb);
+        std::vector<kern::physics::Body> own{cb};
+        for (int k = 0; k < 4; ++k) if (c.car->rigged()) own.push_back(c.car->wheel_body(k));
+        const kern::physics::RayHit hit = w.cast_ray_ignoring(p + Vec3{0, 0, 4}, {0, 0, -12}, kern::Span<const kern::physics::Body>(own.data(), own.size()), kCatWorld);
+        std::snprintf(b, sizeof b, ",\"up\":%.2f,\"v\":%.1f,\"vz\":%.2f,\"dyn\":%d,\"awake\":%d,\"gap\":%.2f,\"driver\":%d,\"wreck\":%d,\"pedal\":%.2f,\"hb\":%d", st.rotation.rotate({0, 0, 1}).z,
+                      std::hypot(st.velocity.x, st.velocity.y), st.velocity.z, w.body_type(cb) == kern::physics::BodyType::dynamic ? 1 : 0, w.awake(cb) ? 1 : 0,
+                      hit.hit ? city_.ground_height(p.x, p.y) - hit.point.z : 99.0f, c.driver ? 1 : 0, c.wreck ? 1 : 0, c.input.pedal, c.input.handbrake ? 1 : 0);
+        out += b;
+        if (c.car->rigged()) {
+          out += ",\"wheels\":[";
+          for (int k = 0; k < 4; ++k) {
+            const kern::physics::Body wb = c.car->wheel_body(k);
+            const Vec3 hub = wb.valid() && w.body_valid(wb) ? w.pose(wb).position : Vec3{};
+            std::snprintf(b, sizeof b, "%s[%.2f,%.2f,%d]", k ? "," : "", c.car->wheel(k).travel, hub.z - c.car->spec().radius - city_.ground_height(hub.x, hub.y),
+                          wb.valid() && w.body_valid(wb) && w.awake(wb) ? 1 : 0);
+            out += b;
+          }
+          out += "]";
+        }
+      }
+      out += "}";
     }
     return out + "]";
   }
