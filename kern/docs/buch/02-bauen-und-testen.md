@@ -299,21 +299,29 @@ Derselbe Stub wird in den nativen Lehrer gelinkt.
 ## 2.7 Logik-Tests: drei Stufen, ein Ergebnis
 
 Ein Logik-Graph kann in drei Stufen laufen ([Kapitel 9](09-logik.md)): im **Interpreter**, als
-**JIT** (zur Laufzeit erzeugtes WebAssembly-Modul) und als **exportiertes C++**. Alle drei müssen
-Bit für Bit dieselben Ergebnisse liefern. Die gemeinsamen Testfälle stehen in
-`kern/tests/logic_cases.h` (Graphen als JSON, z. B. `math_loops`, `gates_and_sequences`).
+**JIT** (zur Laufzeit erzeugtes WebAssembly-Modul) und als **seine eigene C++-Klasse** (im Build
+eines Spiels kompiliert). Alle drei müssen Bit für Bit dieselben Ergebnisse liefern. Die
+gemeinsamen Testfälle stehen in `kern/tests/logic_cases.h` (Graphen als JSON, z. B. `math_loops`,
+`gates_and_sequences`).
 
 | Stufe | Test | Wo |
 |---|---|---|
 | Interpreter | `logic_tier_cases_interpreter` in `test_main.cpp` | `run.sh` |
-| Exportiertes C++ | `logic_native_test.cpp` | `run.sh` (zweite Phase, nur ohne Argumente) |
+| C++-Klasse | `blueprint_native_test` (aus `blueprint_native.h` erzeugt) | `run.sh` (zweite Phase, nur ohne Argumente) |
+| C++-Klassen in einem Spiel | `game_native_test.cpp` mit `game_cases.h` | `run.sh` (danach) |
 | JIT (WebAssembly) | `logic_wasm_test.cpp` + `logic_wasm_test.mjs` | CI-Job `build` |
 
-**Exportiertes C++.** `kern_tests --emit-logic <dir>` schreibt für jeden Fall den generierten
-C++-Quelltext (`logic_<name>.cpp`) und die Ergebnisse des Interpreters (`logic_expected.txt`).
-`run.sh` übersetzt die generierten Quellen zusammen mit den Objekten von `src/logic` und `src/core`
-und musl in `logic_native_test` und vergleicht. Jeder Graph muss dabei in der Stufe `native C++`
-laufen.
+**C++-Klasse.** `kern_tests --emit-native <dir>` schreibt für jeden Fall den C++-Text des Blueprints
+genau so, wie `logic::to_cpp` ihn liefert (`bp_<Name>.h`), einen Treiber mit allen Aufrufen und die
+Ergebnisse des Interpreters. `run.sh` übersetzt das zusammen mit den Objekten von `src/logic` und
+`src/core` und musl in `blueprint_native_test` und vergleicht Zeichen für Zeichen. Jeder Graph muss
+dabei in der Stufe `native C++` laufen.
+
+**C++-Klassen in einem Spiel.** `kern_tests --emit-game-native <dir>` schreibt zwei Levels als
+Dateien; `tools/blueprint_cpp` – das Werkzeug, das auch der Build eines Spiels benutzt – schreibt
+ihre Blueprints als Klassen; `game_native_test` bindet sie mit der ganzen Engine und spielt jedes
+Szenario im Interpreter und als Klassen. Alles, was man sehen kann, muss übereinstimmen
+([blueprint_cpp.md](../blueprint_cpp.md), „Der Beweis“).
 
 **JIT.** Die CI baut `logic_wasm_test.cpp` als eigenes Modul und lässt es unter Node laufen:
 

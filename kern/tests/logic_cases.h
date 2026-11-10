@@ -1,6 +1,6 @@
 // Logic graphs whose results must be identical in every tier: the interpreter,
-// the JIT (WebAssembly, tests/logic_wasm_test.*) and exported C++ (run.sh builds
-// the generated sources into tests/logic_native_test.cpp).
+// the JIT (WebAssembly, tests/logic_wasm_test.*) and the Blueprint's own C++ class
+// (run.sh compiles their texts into blueprint_native_test: tests/blueprint_native.h).
 #pragma once
 
 #include <cmath>

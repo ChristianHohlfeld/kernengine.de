@@ -38,7 +38,7 @@ Kern besteht aus diesen Teilen:
 | Physik | `kern::physics` | C++-Schicht über Box3D: Welt, Körper, Shapes, Gelenke, Raycast, `MouseGrab` |
 | Audio | `kern::audio` | Software-Mixer, 3D-Klang, Busse, Hall, Limiter, Synthesizer, Stimme der Ente |
 | Spiel-Laufzeit | `kern::game` | `Level` (`.klevel`), `GameWorld`, Controller, Regeln, Sound, Touch, Walker (Micro Duck), Mehrspieler |
-| Logik | `kern::logic` | Blueprint-artige Graphen; Interpreter, JIT nach WebAssembly, Export als C++ |
+| Logik | `kern::logic` | Blueprint-artige Graphen; Interpreter, JIT nach WebAssembly, jeder Blueprint auch als C++-Klasse |
 | Netzwerk | `kern::net` | Serialisierung, Zuverlässigkeit, Kanäle, Client/Server, Transporte |
 | Studio | `kern::studio` | der Editor nach dem Vorbild verbreiteter Game-Engine-Editoren, komplett in C++ und ohne Browser testbar |
 | Lehrer | `kern::lehrer` | Umgebungen, MLP, PPO, DAgger, CMA-ES, ONNX-Export, Kalibrierung |
@@ -374,7 +374,7 @@ dann Spiel, Editor und Roboter, zum Schluss die Referenz.
 | [06 Physik](06-physik.md) | die Box3D-Schicht und die Regeln für ihren Gebrauch |
 | [07 Audio](07-audio.md) | Mixer, 3D-Klang, Synthesizer, Sound in Spielen |
 | [08 Spiel-Laufzeit](08-spiel-laufzeit.md) | Levels, Actors, Komponenten, `.klevel`, `GameWorld`, Controller, Regeln |
-| [09 Logik](09-logik.md) | Logik-Graphen, Interpreter, JIT, Export als C++ |
+| [09 Logik](09-logik.md) | Logik-Graphen, Interpreter, JIT, Blueprints als C++ |
 | [10 Netzwerk](10-netzwerk.md) | Kern Net und Mehrspieler |
 | [11 Studio](11-studio.md) | Kern Studio: Oberfläche, Steuerung, Protokoll, Export |
 | [12 Eigene Spiele](12-eigene-spiele.md) | Spiele in C++ und im Studio bauen |

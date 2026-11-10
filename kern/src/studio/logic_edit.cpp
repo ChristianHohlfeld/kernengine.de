@@ -589,41 +589,22 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     return r;
   }
   if (name == "logicExportCpp") {
-    // The graph as C++ source (compiled into a game it replaces the interpreter / JIT for this graph).
+    // The Blueprint as the source a game's build compiles: its own class - the Blueprint's text
+    // as it is - and the glue the engine reaches it through (what tools/blueprint_cpp.sh writes
+    // for a whole level). A game that links it runs the Blueprint as that compiled code.
     const logic::Graph* g = graph_of(level_, logic_owner_);
     if (!g) return fail_result("this actor has no logic yet");
-    if (logic::native_ready(*g)) {
-      // Its own class: the Blueprint's text as it is, and the glue the engine reaches it through
-      // (what tools/blueprint_cpp.sh writes for a whole level).
-      const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
-      const std::string cls = logic::cpp_class_name(owner ? owner->name : std::string("Level"), *g);
-      std::string text, glue, why;
-      if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why)) return fail_result(why);
-      json::Value r = ok_result();
-      r.set("text", text + "\n" + glue);
-      std::string file;
-      for (char ch : cls) file += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-      r.set("file", "blueprint_" + file + ".cpp");
-      r.set("native", true);
-      return r;
-    }
-    struct Quiet : logic::Host {
-      f64 time() const override { return 0; }
-      void print(const std::string&, bool) override {}
-      void error(const std::string&) override {}
-      u32 random() override { return 4; }
-      bool jit_compile(const std::vector<u8>&, i32) override { return false; }
-    } host;
-    logic::Runtime rt(host);
-    rt.jit = false;
-    const game::Actor* a = logic_owner_ ? level_.find(logic_owner_) : nullptr;
-    const std::string name = (level_.name.empty() ? std::string("Level") : level_.name) + "_" + (a ? a->name : std::string("Level"));
-    logic::Instance* inst = rt.add(*g, static_cast<logic::ActorRef>(logic_owner_), name);
+    std::string text, glue, why;
+    if (!logic::native_ready(*g, &why)) return fail_result(why);  // (it does not compile: Compile says where)
+    const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+    const std::string cls = logic::cpp_class_name(owner ? owner->name : std::string("Level"), *g);
+    if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why)) return fail_result(why);
     json::Value r = ok_result();
-    r.set("text", logic::generate_cpp(*inst, name));
+    r.set("text", text + "\n" + glue);
     std::string file;
-    for (char ch : name) file += std::isalnum(static_cast<unsigned char>(ch)) ? static_cast<char>(std::tolower(static_cast<unsigned char>(ch))) : '_';
-    r.set("file", "logic_" + file + ".cpp");
+    for (char ch : cls) file += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    r.set("file", "blueprint_" + file + ".cpp");
+    r.set("native", true);
     return r;
   }
   if (name == "logicCompile") {

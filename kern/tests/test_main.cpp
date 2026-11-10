@@ -2315,14 +2315,12 @@ TEST(logic_tier_cases_interpreter) {
     }
     CHECK(!r.empty());
   }
-  // The generated programs exist and the WebAssembly module is well-formed (magic, version, sections).
+  // The JIT's program exists and the WebAssembly module is well-formed (magic, version, sections).
   logic_cases::Host host;
   logic::Runtime rt(host);
   logic::Instance* inst = rt.add(logic_cases::parse(logic_cases::cases()[0]), 0, "m");
   const std::vector<u8> wasm = logic::compile_wasm(*inst);
   CHECK(wasm.size() > 64 && wasm[0] == 0 && wasm[1] == 'a' && wasm[2] == 's' && wasm[3] == 'm');
-  const std::string cpp = logic::generate_cpp(*inst, "m");
-  CHECK(cpp.find("register_native_graph") != std::string::npos && cpp.find("switch (pc)") != std::string::npos);
 }
 
 /// A graph through its C++ and back: the same Blueprint, the same text again, and nothing left
@@ -7641,8 +7639,19 @@ TEST(studio_logic_cpp_view) {
     json::Value waits = door.cmd(R"({"cmd":"logicCpp"})");
     CHECK(waits["ok"].as_bool() && waits["native"].as_bool() && !waits.has("nativeWhy"));
     const std::string door_class = door.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string();
-    CHECK(door_class.find("struct Level : kern::Blueprint {") != std::string::npos && door_class.find("register_native_blueprint(0x") != std::string::npos &&
-          door_class.find("register_native_graph") == std::string::npos);
+    CHECK(door_class.find("struct Level : kern::Blueprint {") != std::string::npos && door_class.find("register_native_blueprint(0x") != std::string::npos);
+    // a Blueprint that does not compile has no C++: Download says why, there is nothing else to give
+    const json::Value formula = door.cmd(R"({"cmd":"logicAdd","type":"math.formula","x":0,"y":900})");
+    CHECK(formula["ok"].as_bool());
+    json::Value broken = json::Value::object();
+    broken.set("cmd", "logicParam");
+    broken.set("node", formula["id"].as_number());
+    broken.set("key", "formula");
+    broken.set("value", "x * 2 +");
+    door.cmd(json::stringify(broken).c_str());
+    const json::Value refused = door.cmd(R"({"cmd":"logicExportCpp"})");
+    if (refused["ok"].as_bool()) std::printf("exported although it does not compile\n");
+    CHECK(!refused["ok"].as_bool() && !refused.has("text") && refused["error"].as_string().find("ends too early") != std::string::npos);
     StudioFixture own;
     CHECK(own.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
     own.cmd(R"({"cmd":"spawn","item":"cube"})");
@@ -8685,21 +8694,6 @@ TEST(app_input_and_args) {
 App* kern_create_app() { return nullptr; }
 
 int main(int argc, char** argv) {
-  // kern_tests --emit-logic <dir>: writes the logic cases as generated C++ (run.sh compiles them
-  // into logic_native_test) and the interpreter's results as the expectation.
-  if (argc > 2 && std::strcmp(argv[1], "--emit-logic") == 0) {
-    std::string expected;
-    for (const logic_cases::Case& c : logic_cases::cases()) {
-      logic_cases::Host host;
-      logic::Runtime rt(host);
-      logic::Instance* inst = rt.add(logic_cases::parse(c), 0, c.name);
-      const std::string src = logic::generate_cpp(*inst, c.name);
-      if (FILE* f = std::fopen((std::string(argv[2]) + "/logic_" + c.name + ".cpp").c_str(), "wb")) { std::fwrite(src.data(), 1, src.size(), f); std::fclose(f); }
-      expected += std::string("== ") + c.name + "\n" + logic_cases::play(rt, host, inst);
-    }
-    if (FILE* f = std::fopen((std::string(argv[2]) + "/logic_expected.txt").c_str(), "wb")) { std::fwrite(expected.data(), 1, expected.size(), f); std::fclose(f); }
-    return 0;
-  }
   // kern_tests --emit-native <dir>: Blueprints as their C++ text, calls to them and the
   // interpreter's answers (run.sh compiles them into blueprint_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {

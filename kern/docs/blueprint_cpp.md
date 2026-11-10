@@ -54,9 +54,10 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** Der bisherige Export (eine Schleife über Knotennummern) entfällt; die letzten
-  Randfälle zwischen den Stufen (siehe `kern/games/spawncity/BLUEPRINTS.md`); der native Export
-  eines ganzen Spiels aus dem Editor.
+- **Fertig: ein C++ je Blueprint.** Den früheren Export (eine Schleife über Knotennummern, die in
+  die Knoten-Bibliothek zurückrief) gibt es nicht mehr.
+- **Als Nächstes:** die letzten Randfälle zwischen den Stufen (siehe
+  `kern/games/spawncity/BLUEPRINTS.md`); der native Export eines ganzen Spiels aus dem Editor.
 
 ## Im Editor
 
@@ -72,10 +73,10 @@ Code, ohne den Layout-Block (wo die Knoten stehen, bleibt beim Graphen).
   Grund, ein Klick setzt den Cursor dorthin. **Reset** verwirft die Änderungen.
 - Neben dem Namen steht, dass ein C++-Compiler diesen Text ausführt, so wie er dasteht („runs as
   compiled C++“) – das gilt für jeden Blueprint, der fehlerfrei kompiliert.
-- **Download** lädt die Quelle, die ein Spiel-Build für diesen Blueprint kompiliert: für einen
-  Blueprint, den der Compiler so ausführt, seine eigene Klasse – der Text und dahinter der Kleber
-  (`blueprint_<name>.cpp`, dasselbe, was `tools/blueprint_cpp.sh` für ein ganzes Level schreibt);
-  sonst noch der bisherige Export.
+- **Download** lädt die Quelle, die ein Spiel-Build für diesen Blueprint kompiliert: seine eigene
+  Klasse – der Text und dahinter der Kleber (`blueprint_<name>.cpp`, dasselbe, was
+  `tools/blueprint_cpp.sh` für ein ganzes Level schreibt). Ein Blueprint, der nicht kompiliert,
+  hat kein C++; Download sagt dann, warum.
 - Die Klasse heißt wie der Actor, als C++-Name (`cpp_class_name`): „Door 1“ ist `Door1`; heißt
   schon eine Funktion oder Variable darin so, `Door1Blueprint`.
 - Kann der Blueprint gerade nicht als C++ geschrieben werden (ein Regelverstoß, siehe unten),

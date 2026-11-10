@@ -657,7 +657,7 @@ Einzelheiten in [Kapitel 16](16-kalibrierung.md) und `docs/kalibrierung.md`.
 | **Lehrer** | Kerns Trainingssystem für Micro-Duck-Netze ([Kapitel 14](14-lehrer.md)) |
 | **Läufer** (Walker) | Controller-Art (Modus `walker`) für gelenkige Roboter, die eine Policy fährt |
 | **Lerner / Learner** | der PPO-Teil, der aus Rollouts lernt |
-| **Logik-Graph** | Blueprint-artiges Programm aus Knoten und Verbindungen; läuft im Interpreter, als JIT oder als exportiertes C++ |
+| **Logik-Graph** | Blueprint-artiges Programm aus Knoten und Verbindungen; läuft im Interpreter, als JIT oder als seine eigene kompilierte C++-Klasse |
 | **LoopbackNetwork** | In-Process-Netz für Tests und Mehrspieler im Editor |
 | **Micro Duck** | zweibeiniger Roboter von Pollen Robotics; in Kern mit seinen echten Netzen simuliert |
 | **NetGame** | Mehrspieler über Kern Net: autoritativer Server, Snapshots, Interpolation |

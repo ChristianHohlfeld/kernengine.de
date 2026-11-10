@@ -403,9 +403,11 @@ Ausgeführt wird in drei Stufen, die dasselbe Ergebnis liefern (`kern/tests/logi
 2. **JIT**: Beim Start von Play/Simulate kompiliert Kern jeden Graphen zu WebAssembly-Maschinencode
    (`src/logic/codegen.cpp`). Das ist etwa 55-mal schneller als der Interpreter. Die Statuszeile zeigt
    „compiled“.
-3. **Export als C++**: **Export C++** schreibt einen lesbaren Quelltext, der sich über einen Hash am
-   Graphen registriert. Mit `kern/build.sh --studio out.wasm datei.cpp` läuft der Graph dann als
-   nativer Code.
+3. **Als C++-Klasse**: Jeder Blueprint ist auch ein C++-Text (siehe „Blueprints als C++“).
+   **Download** in der C++-Ansicht gibt die Quelle dafür; in ein Spiel eingebunden
+   (`kern/build.sh --studio out.wasm blueprint_<name>.cpp`, oder für ein ganzes Level
+   `tools/blueprint_cpp.sh`), läuft der Blueprint als diese kompilierte Klasse – gefunden über den
+   Hash des Graphen, also nie als veralteter Code.
 
 Logic läuft nur auf der Autorität (Standalone oder Server). Geänderte Eigenschaften und erzeugte
 Actors werden repliziert, auch an Spieler, die später dazukommen.

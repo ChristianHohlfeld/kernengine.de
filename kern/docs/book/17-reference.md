@@ -657,7 +657,7 @@ Details in [Chapter 16](16-calibration.md) and `docs/kalibrierung.md`.
 | **`.klevel`** | file format of a level (JSON, `"format": "kern-level"`) |
 | **Lehrer** | Kern's training system for Micro Duck networks; German for "teacher" ([Chapter 14](14-lehrer.md)) |
 | **Learner** | the part of PPO that learns from rollouts (German: *Lerner*) |
-| **Logic graph** | blueprint-style program of nodes and connections; runs in the interpreter, as JIT or as exported C++ |
+| **Logic graph** | blueprint-style program of nodes and connections; runs in the interpreter, as JIT or as its own compiled C++ class |
 | **LoopbackNetwork** | in-process network for tests and multiplayer in the editor |
 | **Micro Duck** | bipedal robot by Pollen Robotics; simulated in Kern with its real networks |
 | **NetGame** | multiplayer over Kern Net: authoritative server, snapshots, interpolation |

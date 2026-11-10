@@ -416,7 +416,7 @@ bool native_ready(const Graph& g, std::string* why = nullptr, const Library& lib
 /// them. Returns what was renamed (old, new); nothing for a graph whose names are fine.
 std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Library& lib = library());
 
-/// Generated code (WebAssembly from the JIT, or C++ exported from Studio) works on this
+/// Generated code (WebAssembly from the JIT) works on this
 /// layout: f64 slots for numeric variables and node state, an i32 continuation stack,
 /// and per node a table of exec targets. Everything else calls back into the C++ nodes.
 struct CodeLayout {
@@ -426,14 +426,9 @@ struct CodeLayout {
 
 /// Compiles an instance's graph to a WebAssembly module (the JIT's input).
 std::vector<u8> compile_wasm(const class Instance& inst);
-/// The graph as C++ source: compiled into a game (build.sh) it replaces the interpreter
-/// for graphs with the same content (matched by hash). `name` becomes the function name.
-std::string generate_cpp(const class Instance& inst, const std::string& name);
-/// Content hash of a graph (what generated C++ registers under).
+/// Content hash of a graph (what a Blueprint's C++ class registers under: places and comments
+/// are left out, everything else changes it).
 u64 graph_hash(const Graph& g);
-/// Code compiled into the binary: a generated function for a graph hash.
-using NativeGraphFn = int (*)(void* inst, int pc, int entry);
-void register_native_graph(u64 hash, NativeGraphFn fn);
 
 /// A Blueprint compiled from its C++ text (kern/logic/blueprint.h, docs/blueprint_cpp.md), as the
 /// engine reaches it: by name, at the boundary. Inside, the class calls its own functions and
@@ -514,15 +509,13 @@ class Instance {
   /// A Return node: the running call of `function` ends with these outputs (by output name).
   /// False outside that function's own chain (the chain then just ends).
   bool return_values(std::string_view function, const std::vector<std::pair<std::string, Value>>& values);
-  /// Runs as machine code (its own C++ class, JIT-compiled WebAssembly or the node loop exported
-  /// as C++) instead of the interpreter.
-  bool compiled() const { return blueprint_ || jit_fn_ >= 0 || native_ != nullptr; }
-  const char* tier() const {
-    return blueprint_ ? "native C++" : native_ ? "native C++ (node loop)" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter";
-  }
+  /// Runs as machine code (its own C++ class, or JIT-compiled WebAssembly) instead of the
+  /// interpreter.
+  bool compiled() const { return blueprint_ || jit_fn_ >= 0; }
+  const char* tier() const { return blueprint_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
   i32 id() const { return id_; }
 
-  // ---- generated code support (compiled modules and exported C++ call these) ----
+  // ---- generated code support (the JIT's modules call these) ----
   /// Runs the C++ function of node `node` (returns the exec output ordinal, kStop or kSuspend).
   int call_node(int node, int entry);
   /// Input `pin` (index) of node `node`, as a number.
@@ -609,7 +602,6 @@ class Instance {
   i32 id_ = 0;
   i32 jit_fn_ = -1;                   // table index of the compiled run function
   bool jit_pending_ = false;
-  NativeGraphFn native_ = nullptr;
   std::unique_ptr<NativeBlueprint> blueprint_;  // the Blueprint as its compiled C++ class (register_native_blueprint)
   u32 seed_ = 0;                      // seed()
   bool seeded_ = false;

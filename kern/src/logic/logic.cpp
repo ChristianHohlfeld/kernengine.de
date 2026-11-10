@@ -684,13 +684,7 @@ Value from_slot(f64 v, PinType t) {
   if (t == PinType::integer) return Value::integer(whole(v));
   return Value::number(v);
 }
-std::unordered_map<u64, NativeGraphFn>& native_registry() {
-  static std::unordered_map<u64, NativeGraphFn> r;
-  return r;
-}
 }  // namespace
-
-void register_native_graph(u64 hash, NativeGraphFn fn) { native_registry()[hash] = fn; }
 
 std::unordered_map<u64, NativeBlueprintFactory>& blueprint_registry() {
   static std::unordered_map<u64, NativeBlueprintFactory> r;
@@ -1083,17 +1077,14 @@ Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
   Instance* added = inst.get();
   instances_.push_back(std::move(inst));
   if (!added->disabled_) {
-    // Code compiled into the binary wins - the Blueprint's own C++ class first, then the node
-    // loop exported from Studio; else the host's JIT.
-    const u64 hash = graph_hash(graph);
-    auto own = blueprint_registry().find(hash);
-    auto loop = native_registry().find(hash);
+    // Code compiled into the binary wins - the Blueprint's own C++ class; else the host's JIT.
+    auto own = blueprint_registry().find(graph_hash(graph));
     if (native && own != blueprint_registry().end()) {
       added->blueprint_ = own->second();
       added->blueprint_->attach({&host_, this, added, self, counters_});
+    } else if (jit) {
+      added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
     }
-    else if (loop != native_registry().end()) added->native_ = loop->second;
-    else if (jit) added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
   }
   return added;
 }
@@ -1278,16 +1269,15 @@ bool Runtime::run_compiled(Instance& inst, int node, int entry) {
   const i32 outer_refused = counters_[4];
   counters_[4] = 0;
   int r;
-  if (inst.native_) r = inst.native_(&inst, node, entry);
-  else {
 #if defined(__wasm__)
-    // The JIT put the module's run function into the indirect function table: a direct call.
-    using RunFn = int (*)(int, int);
-    r = reinterpret_cast<RunFn>(static_cast<uintptr_t>(inst.jit_fn_))(node, entry);
+  // The JIT put the module's run function into the indirect function table: a direct call.
+  using RunFn = int (*)(int, int);
+  r = reinterpret_cast<RunFn>(static_cast<uintptr_t>(inst.jit_fn_))(node, entry);
 #else
-    r = 0;
+  r = 0;
+  (void)node;
+  (void)entry;
 #endif
-  }
   executed_ += static_cast<u64>(counters_[0] > 0 ? counters_[0] : 0);
   counters_[0] = 0;
   if (counters_[4] && !inst.stopping_) {

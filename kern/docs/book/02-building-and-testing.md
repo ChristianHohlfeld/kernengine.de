@@ -300,20 +300,28 @@ same stub is linked into the native Lehrer.
 ## 2.7 Logic Tests: Three Tiers, One Result
 
 A logic graph can run in three tiers ([Chapter 9](09-logic.md)): in the **interpreter**, as a **JIT**
-(a WebAssembly module generated at runtime) and as **exported C++**. All three must produce
-bit-identical results. The shared test cases live in `kern/tests/logic_cases.h` (graphs as JSON,
-e.g. `math_loops`, `gates_and_sequences`).
+(a WebAssembly module generated at runtime) and as **its own C++ class** (compiled in a game's
+build). All three must produce bit-identical results. The shared test cases live in
+`kern/tests/logic_cases.h` (graphs as JSON, e.g. `math_loops`, `gates_and_sequences`).
 
 | Tier | Test | Where |
 |---|---|---|
 | Interpreter | `logic_tier_cases_interpreter` in `test_main.cpp` | `run.sh` |
-| Exported C++ | `logic_native_test.cpp` | `run.sh` (second phase, only without arguments) |
+| C++ class | `blueprint_native_test` (generated from `blueprint_native.h`) | `run.sh` (second phase, only without arguments) |
+| C++ classes in a game | `game_native_test.cpp` with `game_cases.h` | `run.sh` (after that) |
 | JIT (WebAssembly) | `logic_wasm_test.cpp` + `logic_wasm_test.mjs` | CI job `build` |
 
-**Exported C++.** `kern_tests --emit-logic <dir>` writes, for each case, the generated C++ source
-(`logic_<name>.cpp`) and the interpreter's results (`logic_expected.txt`). `run.sh` compiles the
-generated sources together with the objects of `src/logic` and `src/core` and musl into
-`logic_native_test` and compares. Every graph must run in the `native C++` tier.
+**C++ class.** `kern_tests --emit-native <dir>` writes, for each case, the Blueprint's C++ text
+exactly as `logic::to_cpp` gives it (`bp_<Name>.h`), a driver with all calls and the interpreter's
+results. `run.sh` compiles this together with the objects of `src/logic` and `src/core` and musl
+into `blueprint_native_test` and compares character by character. Every graph must run in the
+`native C++` tier.
+
+**C++ classes in a game.** `kern_tests --emit-game-native <dir>` writes two levels as files;
+`tools/blueprint_cpp` – the tool a game's build uses – writes their Blueprints as classes;
+`game_native_test` links them with the whole engine and plays every scenario in the interpreter
+and as the classes. Everything that can be seen must agree
+([blueprint_cpp.md](../blueprint_cpp.md), "Der Beweis").
 
 **JIT.** CI builds `logic_wasm_test.cpp` as a separate module and runs it under Node:
 

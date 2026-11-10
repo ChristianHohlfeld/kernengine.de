@@ -45,7 +45,7 @@ Projekts: Der Export des Editors nimmt es mit.
 ## Stufen
 
 Jede Stufe endet live. „Fertig“ heißt: die Tests der Stufe sind grün, die drei Ausführungsarten
-der Blueprints (Interpreter, JIT, exportiertes C++) liefern dasselbe, und der Eingabe- und der
+der Blueprints (Interpreter, JIT, die eigene C++-Klasse) liefern dasselbe, und der Eingabe- und der
 Editor-Test der CI laufen durch.
 
 ### 0 – Fundament
@@ -140,14 +140,15 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Beweis: `game_native_test` (in `kern/tests/run.sh`) – zwei Levels, acht Blueprints mit jedem
   Gameplay-Knoten, vom Werkzeug des Spiel-Builds als Klassen geschrieben, im Interpreter und als
   Klassen gespielt und Zeile für Zeile verglichen.
+- [x] **Der bisherige Export ist entfernt:** Die Schleife über Knotennummern (`generate_cpp`,
+  die Stufe „native C++ (node loop)“) gibt es nicht mehr. Ein Blueprint hat genau ein C++ – seine
+  Klasse; Download im Editor gibt sie, und ein Blueprint, der nicht kompiliert, hat keins.
 - [ ] **Native Ausführung, Teil 2 – die Randfälle zwischen den Stufen:**
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
     mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).
   - Verschachtelung: Der JIT stoppt bei mehr als 64 ineinander liegenden Schleifen / Sequences,
     die anderen Stufen nicht.
-  - Danach entfällt der bisherige Export (Schleife über Knotennummern mit `call_node` /
-    `read_pin`, heute die Stufe „native C++ (node loop)“).
   - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text
     als 64-Bit-Zahl; der JIT schneidet „keine Zahl“ und unendlich beim Umwandeln nicht auf 0.
     Beides wird gleichgezogen.

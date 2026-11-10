@@ -38,7 +38,7 @@ Kern consists of these parts:
 | Physics | `kern::physics` | C++ layer over Box3D: world, bodies, shapes, joints, raycasts, `MouseGrab` |
 | Audio | `kern::audio` | software mixer, 3D sound, buses, reverb, limiter, synthesizer, the duck's voice |
 | Game runtime | `kern::game` | `Level` (`.klevel`), `GameWorld`, controllers, rules, sound, touch, Walker (Micro Duck), multiplayer |
-| Logic | `kern::logic` | node-based visual scripting graphs; interpreter, JIT to WebAssembly, export as C++ |
+| Logic | `kern::logic` | node-based visual scripting graphs; interpreter, JIT to WebAssembly, each Blueprint also a C++ class |
 | Networking | `kern::net` | serialization, reliability, channels, client/server, transports |
 | Studio | `kern::studio` | an editor in the style of common game-engine editors, written entirely in C++ and testable without a browser |
 | Lehrer | `kern::lehrer` | environments, MLP, PPO, DAgger, CMA-ES, ONNX export, calibration |
@@ -371,7 +371,7 @@ game, editor and robot, and finally the reference.
 | [06 Physics](06-physics.md) | the Box3D layer and the rules for using it |
 | [07 Audio](07-audio.md) | mixer, 3D sound, synthesizer, sound in games |
 | [08 Game Runtime](08-game-runtime.md) | levels, actors, components, `.klevel`, `GameWorld`, controllers, rules |
-| [09 Logic](09-logic.md) | logic graphs, interpreter, JIT, export as C++ |
+| [09 Logic](09-logic.md) | logic graphs, interpreter, JIT, Blueprints as C++ |
 | [10 Networking](10-networking.md) | Kern Net and multiplayer |
 | [11 Studio](11-studio.md) | Kern Studio: interface, controls, protocol, export |
 | [12 Your Own Games](12-your-own-games.md) | building games in C++ and in the Studio |

@@ -357,13 +357,13 @@ export class LogicEditor {
 
   exportCpp() {
     const r = this.cmd({cmd: "logicExportCpp"});
-    if (!r?.text) return;
+    if (!r?.text) return;  // (a Blueprint that does not compile has no C++: cmd has said why)
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([r.text], {type: "text/x-c++src"}));
     a.download = r.file || "logic.cpp";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    this.studio.toast("C++ source downloaded: add it to your game's build (kern/build.sh ... " + (r.file || "logic.cpp") + ") and the graph runs as native code.");
+    this.studio.toast("C++ source downloaded: add it to your game's build (kern/build.sh ... " + (r.file || "logic.cpp") + ") and the Blueprint runs as this compiled class.");
   }
 
   compile() {

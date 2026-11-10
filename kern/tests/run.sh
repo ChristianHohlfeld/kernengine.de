@@ -44,17 +44,13 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$out/obj/$(echo "$f" | sed "s|/|_|g").o"); done
 "$cxx" -fsanitize=address,undefined "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/kern_tests"
 (cd "$here" && "$out/kern_tests" "$@")
-# Logic graphs exported as C++ must behave exactly like the interpreter.
+# Blueprints compiled as C++ must behave exactly like the interpreter.
 if [ $# -eq 0 ]; then
-  gen="$out/logic_gen"
-  rm -rf "$gen" && mkdir -p "$gen"
-  "$out/kern_tests" --emit-logic "$gen"
   core=()
   for f in "${cpp_objects[@]}"; do case "$f" in *_src_logic_*|*_src_core_*) core+=("$f") ;; esac; done
-  "$cxx" "${flags[@]}" "$here/logic_native_test.cpp" "$gen"/logic_*.cpp "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/logic_native_test"
-  "$out/logic_native_test" "$gen/logic_expected.txt"
   # A Blueprint's C++ text (docs/blueprint_cpp.md), compiled as it is, computes what the
-  # interpreter computes: every call of every case, value for value.
+  # interpreter computes: every call of every case, value for value - and the tier cases
+  # (logic_cases.h) play their scenarios as classes.
   nat="$out/native_gen"
   rm -rf "$nat" && mkdir -p "$nat"
   "$out/kern_tests" --emit-native "$nat"

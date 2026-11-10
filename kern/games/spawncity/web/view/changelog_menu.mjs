@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"21:11",title:"Ein C++ je Blueprint: der alte Export ist weg",items:[
+    "Unter der Haube (für alle Kern-Spiele): Den früheren C++-Export von Blueprints – eine Schleife über Knotennummern, die zur Laufzeit in die Knoten-Bibliothek zurückrief – gibt es nicht mehr. Jeder Blueprint hat jetzt genau ein C++: seine eigene Klasse, in der jeder Knoten ein direkter Funktionsaufruf ist.",
+    "Im Kern-Editor liefert Download in der C++-Ansicht immer diese Klasse. Kompiliert ein Blueprint nicht, sagt der Editor, warum – statt etwas anderes zu exportieren.",
+  ]},
   {date:"2026-11-10",time:"20:55",title:"Jeder Blueprint läuft als kompiliertes C++ – auch die Spielknoten",items:[
     "Unter der Haube (für alle Kern-Spiele): Auch die Spielknoten sind jetzt C++-Funktionen – Actors bewegen und erzeugen, Physik, Schaden und Heilung, Sounds und Effekte, die Events des Spiels (Überlappung, Treffer, Eingabe, Tod und Respawn …), die Schleife über alle Actors mit einem Tag und die Roboter-Knoten. Damit gibt es keinen Knoten mehr, den ein C++-Compiler nicht ausführt: Jeder Blueprint, der fehlerfrei kompiliert, läuft im gebauten Spiel als seine eigene C++-Klasse.",
     "Blueprint und C++ rufen für jeden Knoten dieselbe Funktion auf. Geprüft wird das mit zwei Test-Levels, deren Blueprints jeden Spielknoten benutzen: einmal als Graph gespielt, einmal als kompilierte Klassen – jede Variable, jeder Actor und jede Meldung müssen übereinstimmen.",
