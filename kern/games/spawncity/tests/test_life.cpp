@@ -12,7 +12,7 @@ using namespace sc;
 namespace {
 void step(kern::physics::World& w, Ragdolls* r, f32& now, f32 seconds) {
   for (int i = 0; i < static_cast<int>(seconds * 240); ++i) {
-    w.step(1.0f / 240, 4);
+    w.step(1.0f / 240, 1);
     now += 1.0f / 240;
     if (r && i % 4 == 0) r->update(4.0f / 240, now);
   }
@@ -100,7 +100,7 @@ SC_TEST(life_interior_plan_and_stairs) {
   mover.reset({start.x, start.y, P.levels[0] + 0.05f});
   for (int i = 0; i < 240 * 3; ++i) {
     mover.step(w, 1.0f / 240, {c.v.x * 0.5f, c.v.y * 0.5f, 0}, false, false, {});
-    w.step(1.0f / 240, 4);
+    w.step(1.0f / 240, 1);
   }
   const f32 half = (P.levels[1] - P.levels[0]) / 2;
   SC_CHECK(std::fabs(mover.position().z - (P.levels[0] + half)) < 0.35f, "up the stairs onto the half landing (z %.2f, want %.2f)", mover.position().z, P.levels[0] + half);
@@ -135,7 +135,7 @@ SC_TEST(life_cows_birds_shots) {
   SC_CHECK(life.cows()[0].dead && life.cows()[0].body.valid(), "killed, a Box3D body");
   const f32 m = w.mass(life.cows()[0].body);
   SC_CHECK(std::fabs(m - 600) < 5, "600 kg (%.0f)", m);
-  for (int i = 0; i < 240; ++i) w.step(1.0f / 240, 4);
+  for (int i = 0; i < 240; ++i) w.step(1.0f / 240, 1);
   life.update(1.0f / 60, now + 1, v, rng, out);
   SC_CHECK(kern::length(life.cows()[0].pos - (cow + Vec3{0, 0, 1.12f})) > 0.3f, "the body was thrown");
   // birds circle over the roofs and fall when hit

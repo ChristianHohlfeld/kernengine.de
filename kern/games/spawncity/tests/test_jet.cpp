@@ -20,7 +20,7 @@ struct JetRig {
     const int n = static_cast<int>(seconds / kH + 0.5f);
     for (int i = 0; i < n; ++i) {
       jet.step(world, body, kH, in);
-      world.step(kH, 4);
+      world.step(kH, 1);
     }
   }
   BodyState st() const { return read_body(world, body); }
@@ -120,7 +120,7 @@ SC_TEST(jet_soft_landing) {
   f32 worst = 0;
   for (int i = 0; i < 240 * 10; ++i) {
     r.jet.step(r.world, r.body, kH, in);
-    r.world.step(kH, 4);
+    r.world.step(kH, 1);
     worst = std::fmax(worst, r.jet.gear_impact());
   }
   SC_CHECK(r.jet.telemetry().contacts >= 2, "on the ground");

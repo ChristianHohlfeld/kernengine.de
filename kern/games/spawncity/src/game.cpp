@@ -130,7 +130,7 @@ kern::game::Level Game::build_level() const {
   l.name = "SpawnCity";
   l.world.title = "SpawnCity";
   l.world.step_hz = kStepHz;
-  l.world.substeps = 4;
+  l.world.substeps = substeps_;
   l.world.time_of_day = 0.40f;
   l.world.day_length = 480;          // SpawnCity: a day-night cycle of 480 s
   l.world.fog_density = 0.00085f;     // stylized_world_style.mjs
@@ -227,6 +227,12 @@ kern::game::Level Game::build_level() const {
 bool Game::start(kern::Engine& e) {
   engine_ = &e;
   mobile_ = e.arg_number("mobile", 0) > 0;
+  // Box3D's solver runs 240 times a second: its manual's "60 Hz with 4 sub-steps" (and the
+  // original's world_rigid_body_runtime.mjs: FIXED_DT 1/60, SOLVER_SUBSTEPS 4) - here as one
+  // sub-step per 240 Hz step (the game's own step, so collisions are found 240 times a second
+  // too). Four sub-steps on top of 240 Hz were 960 solver passes a second: four times the work
+  // for nothing, the largest cost of a street full of cars.
+  substeps_ = static_cast<i32>(kern::clamp(e.arg_number("substeps", 1), 1.0, 8.0));
   city_.building_budget = mobile_ ? 2600 : 4000;  // world_city_buildings.mjs MAX_FOOTPRINTS 2600 (a desktop draws more of the city)
   lat_ = e.arg_number("lat", kKonstanzLat);
   lon_ = e.arg_number("lon", kKonstanzLon);

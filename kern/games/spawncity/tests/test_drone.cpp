@@ -21,7 +21,7 @@ struct Rig {
     const int n = static_cast<int>(seconds / kH + 0.5f);
     for (int i = 0; i < n; ++i) {
       drone.step(world, body, kH, s);
-      world.step(kH, 4);
+      world.step(kH, 1);
     }
   }
   BodyState state() const { return read_body(world, body); }
