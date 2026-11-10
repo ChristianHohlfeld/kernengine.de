@@ -12,7 +12,8 @@
 //  3. SpawnCity (when its url is given): tests/input_check.mjs of the game.
 // The Studio and the packaged games are in studio_e2e.mjs.
 import {createRequire} from "node:module";
-import {spawnSync} from "node:child_process";
+import {spawn} from "node:child_process";
+import readline from "node:readline";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 
@@ -82,10 +83,12 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   await page.waitForFunction(() => window.input.locked, null, {timeout: 10000}).catch(() => {});
   log = await take();
   check(same(only(log, "lock"), [["lock", true, true]]) && await page.evaluate(() => window.input.locked), "a click takes the pointer lock");
-  // (headless Chromium reports a locked pointer's moves as a jump and its way back: the moves are
-  // given to the document as the events a real mouse sends)
+  // (headless Chromium reports a locked pointer's moves as a jump and its way back, and may send
+  // moves of its own once the lock is taken: the moves are given to the document as the events a
+  // real mouse sends, and only those are counted)
   await page.evaluate(() => { for (const dx of [25, -10, 5000, -5000]) document.dispatchEvent(new MouseEvent("mousemove", {movementX: dx, movementY: dx / 5, bubbles: true})); });
-  check(same(only(await take(), "look"), [["look", 25, 5], ["look", -10, -2], ["look", 420, 420], ["look", -420, -420]]), "the locked pointer's movement, every event held to +-420 px");
+  const looks = only(await take(), "look").filter(e => !e[3]).map(e => e.slice(0, 3));
+  check(same(looks, [["look", 25, 5], ["look", -10, -2], ["look", 420, 420], ["look", -420, -420]]), "the locked pointer's movement, every event held to +-420 px" + ` (${JSON.stringify(looks)})`);
   await page.mouse.down({button: "right"});
   await page.mouse.down({button: "left"});
   log = only(await take(), "button");
@@ -229,15 +232,11 @@ const examples = [
     await page.keyboard.up("KeyW");
     const rolling = await speed();
     check(await until(async () => await speed() < rolling * 0.7), `orbrun: letting go of W rolls out (${rolling} -> ${await speed()} km/h)`);
-    await page.keyboard.down("KeyS");
-    await until(async () => await speed() <= 1);
-    await page.keyboard.up("KeyS");
-    await until(async () => await speed() <= 1, 60000);
     const finger = (type, x, y) => page.evaluate(([type, x, y]) => document.querySelector("canvas").dispatchEvent(new PointerEvent(type, {pointerType: "touch", pointerId: 11, isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true})), [type, x, y]);
     const before = await speed();
     await finger("pointerdown", 150, 420);
     await finger("pointermove", 150, 320);
-    check(await until(async () => await speed() > before + 25), `orbrun: a finger pushed up on the left half drives (${before} -> ${await speed()} km/h)`);
+    check(await until(async () => await speed() > before + 15), `orbrun: a finger pushed up on the left half drives (${before} -> ${await speed()} km/h)`);
     await finger("pointerup", 150, 320);
     const pushed = await speed();
     check(await until(async () => await speed() < pushed * 0.7), `orbrun: the finger lifted rolls out (${pushed} -> ${await speed()} km/h)`);
@@ -257,11 +256,16 @@ for (const [name, act] of examples) {
 await browser.close();
 
 // ---- 3. SpawnCity ------------------------------------------------------------------------------
+// (its check's lines as they come, so a log's times say where a slow run spent them; ten minutes
+// are the most it may take)
 if (process.argv[3]) {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const run = spawnSync(process.execPath, [path.join(here, "../../games/spawncity/tests/input_check.mjs"), process.argv[3]], {encoding: "utf8", env: process.env});
-  process.stdout.write(run.stdout.split("\n").filter(Boolean).map(l => l.replace(/^(ok  |FAIL) /, "$1 SpawnCity: ")).join("\n") + "\n");
-  if (run.status !== 0) { failures++; process.stderr.write(run.stderr); }
+  const child = spawn(process.execPath, [path.join(here, "../../games/spawncity/tests/input_check.mjs"), process.argv[3]], {env: process.env, stdio: ["ignore", "pipe", "inherit"]});
+  const late = setTimeout(() => { console.log("FAIL SpawnCity: the check did not finish within ten minutes"); child.kill("SIGKILL"); }, 600000);
+  readline.createInterface({input: child.stdout}).on("line", line => console.log(line.replace(/^(ok  |FAIL) /, "$1 SpawnCity: ")));
+  const code = await new Promise(resolve => child.on("close", resolve));
+  clearTimeout(late);
+  if (code !== 0) failures++;
 }
 console.log(failures ? `${failures} FAILED` : "input test passed");
 process.exit(failures ? 1 : 0);

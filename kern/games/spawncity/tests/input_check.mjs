@@ -18,7 +18,9 @@ const url = process.argv[2];
 if (!url) { console.error("usage: node input_check.mjs <url>"); process.exit(2); }
 let failures = 0;
 const check = (ok, what) => { if (!ok) failures++; console.log(ok ? "ok  " : "FAIL", what); };
-const b = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]});
+// WebGL in software, the page itself composited by the CPU (with --use-angle=swiftshader the whole
+// page is composited through the software GPU, and this page's HUD takes minutes a frame).
+const b = await chromium.launch({args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]});
 const p = await (await b.newContext({viewport: {width: 900, height: 420}})).newPage();
 const errors = [];
 p.on("pageerror", e => errors.push(e.message));
@@ -34,7 +36,10 @@ const until = async (fn, ms = 60000) => {
     await p.waitForTimeout(700);
   }
 };
-check(await until(h => h.placed, 180000), "the world is placed");
+const began = Date.now();
+const placed = await until(h => h.placed, 180000);
+check(placed, `the world is placed (after ${((Date.now() - began) / 1000).toFixed(0)} s)`);
+if (!placed) { await b.close(); console.log("1 FAILED"); process.exit(1); }  // nothing to drive
 await p.mouse.move(450, 260);
 await p.mouse.down();  // the capture click: never fires
 await p.mouse.up();

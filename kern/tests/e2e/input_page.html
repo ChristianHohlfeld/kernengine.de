@@ -22,7 +22,7 @@ const input = window.input = new BrowserInput({
   onMouseCancel(m) { log.push(["cancel", m.buttons]); },
   onTouch(phase, e) { log.push(["touch", phase, e.pointerId]); },
   onWheel(pixels, m) { log.push(["wheel", pixels, m.x, m.y]); },
-  onLook(dx, dy) { log.push(["look", dx, dy]); },
+  onLook(dx, dy, e) { log.push(["look", dx, dy, e.isTrusted]); },
   onLock(locked, {focused}) { log.push(["lock", locked, focused]); },
   onKey(e, down) { log.push(["key", e.code, down, e.repeat]); },
   onFocus(focused) { log.push(["focus", focused]); },
