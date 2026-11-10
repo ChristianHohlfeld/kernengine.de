@@ -314,6 +314,8 @@ void add_flow(Library& lib) {
                      "Runs Update every step for Duration seconds with Alpha going 0 to 1 (eased), then Finished. Use it to move, fade or scale over time (a timeline).");
     d.latent = true;
     d.memory = true;
+    d.first_entry_only = true;  // (Stop ends the path)
+    d.now_outputs = 1;          // (Update runs with Play; Finished never does)
     d.inputs = {exec_in("play", "Play"), exec_in("stop", "Stop"), data("duration", "Duration", PinType::number, 1)};
     d.params = {param("ease", "Easing", ParamDef::Kind::choice, "smooth", {"linear", "Linear", "smooth", "Smooth", "in", "Ease in", "out", "Ease out"})};
     d.outputs = {exec_out("update", "Update"), exec_out("finished", "Finished"), data("alpha", "Alpha", PinType::number)};
@@ -332,7 +334,7 @@ void add_flow(Library& lib) {
       }
       if (!flow::tween_runs(m)) return kStop;
       bool finished = false;
-      c.out("alpha", Value::number(flow::tween_step(m, now, c.param("ease", "smooth"), finished)));
+      c.out("alpha", Value::number(flow::tween_step(m, now, c.param("ease", "smooth"), c.entry() == 0, finished)));
       if (finished) c.then(c.exec("finished"));  // (after Update)
       else c.wait(0, Context::kResume);          // again next step
       return c.exec("update");

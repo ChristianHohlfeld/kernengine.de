@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"18:31",title:"Tween: Finished kommt nie schon mit Play",items:[
+    "Kern-Blueprints: Ein Tween meldet Finished jetzt immer erst mit seinem letzten Update in einem späteren Schritt – auch bei Dauer 0 (bisher im selben Augenblick wie Play). Ein Tween, der sich aus Finished selbst wieder startet, wiederholt sich damit sauber, als Blueprint wie als kompiliertes C++.",
+    "Wer denselben Tween aus dessen eigenem Update neu startet, bekommt im Kern-Editor jetzt einen Hinweis am Knoten: Das wäre eine Endlosschleife.",
+  ]},
   {date:"2026-11-10",time:"18:12",title:"Warten und State Machines laufen als kompiliertes C++",items:[
     "Unter der Haube (für alle Kern-Spiele): Auch Blueprints, die warten (Delay, Tween, Timer) oder State Machines benutzen, laufen jetzt als kompilierter C++-Code. Wartezeiten und Zustandswechsel führt dabei für Blueprint und C++ dieselbe Stelle der Engine – beide tun zur selben Zeit dasselbe.",
     "Damit läuft die ganze Grundausstattung der Blueprints als C++, mit Ausnahme von Zufallszahlen. Als Nächstes kommen der Schutz vor Endlosschleifen und die Spielknoten (Actors bewegen, Sounds, Eingabe).",

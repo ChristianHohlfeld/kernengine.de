@@ -145,12 +145,12 @@ struct Blueprint : logic::PureNodes {
       const std::function<void()>& run = output == 0 ? update : finished;
       if (run) run();
     };
-    flow_tween_resume<Ease>(n);
+    flow_tween_resume<Ease>(n, true);
   }
-  template <Setting Ease, class N> void flow_tween_resume(N& n) {
+  template <Setting Ease, class N> void flow_tween_resume(N& n, bool first = false) {
     if (!logic::flow::tween_runs(n.memory)) return;
     bool finished = false;
-    n.alpha = logic::flow::tween_step(n.memory, time_now(), Ease.view(), finished);
+    n.alpha = logic::flow::tween_step(n.memory, time_now(), Ease.view(), first, finished);
     const auto later = n.later;
     if (!finished) kern_wait(N::id, 0);  // again next step
     if (!later) return;

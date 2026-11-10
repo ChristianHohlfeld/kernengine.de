@@ -477,8 +477,10 @@ struct Shape {
   /// the path goes on through them: through Reset, Open or Close of a node it does not.
   std::vector<std::pair<int, bool>> next_steps(int x) const {
     std::vector<std::pair<int, bool>> r;
-    if (at(x).def->latent) return r;
-    for (const auto& d : at(x).dst) {
+    for (std::size_t k = 0; k < at(x).dst.size(); ++k) {
+      const auto& d = at(x).dst[k];
+      // (after a wait: later - except what a waiting node runs with the call itself, a Tween's Update)
+      if (at(x).def->latent && static_cast<int>(k) >= at(x).def->now_outputs) continue;
       if (d.first < 0) continue;
       const Info& t = at(d.first);
       r.push_back({d.first, !(t.def->first_entry_only && d.second != t.exec_in.front())});

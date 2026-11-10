@@ -285,14 +285,15 @@ inline void tween_play(f64* m, f64 now, f64 duration) {
 inline void tween_stop(f64* m) { m[0] = 0; }
 inline bool tween_runs(const f64* m) { return m[0] != 0; }
 /// One step of a running tween at time `now`: its alpha (0..1, eased), and whether that was the
-/// last one (the tween then no longer runs).
-inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool& finished) {
+/// last one (the tween then no longer runs). `first`: the step that comes with Play - never the
+/// last one: Finished comes with the last Update on a later step, also for a tween of no duration.
+inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool first, bool& finished) {
   const f64 t = kern::clamp(m[2] > 0 ? (now - m[1]) / m[2] : 1.0, 0.0, 1.0);
   f64 e = t;
   if (ease == "smooth") e = t * t * (3 - 2 * t);
   else if (ease == "in") e = t * t;
   else if (ease == "out") e = 1 - (1 - t) * (1 - t);
-  finished = t >= 1;
+  finished = t >= 1 && !first;
   if (finished) m[0] = 0;
   return e;
 }

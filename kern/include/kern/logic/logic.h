@@ -287,6 +287,8 @@ struct NodeDef {
                          // sequence): in C++ the node has a member. A value with memory is new on every read.
   bool first_entry_only = false;  // only its first exec input can lead on to an exec output; the others
                          // (Reset, Open, Close, Stop) change what the node keeps, and the path ends there
+  int now_outputs = 0;   // latent: its first exec outputs that run with the call itself, not after a wait
+                         // (Tween's Update runs with Play); the others always run later
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;

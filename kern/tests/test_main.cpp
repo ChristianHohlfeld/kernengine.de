@@ -2103,6 +2103,22 @@ TEST(logic_tween_and_every) {
   CHECK(inst->get("A").as_number() == 1);
   CHECK(inst->get("Done").as_bool());
   CHECK(std::fabs(inst->get("Ticks").as_number() - 4) <= 1);
+  // A tween of no duration: Update runs with Play (alpha 1); Finished comes with the last Update
+  // on the next step - never with Play itself (a tween played from its own Finished repeats, it
+  // does not run away).
+  FakeLogicHost host0;
+  logic::Runtime rt0(host0);
+  const logic::Graph zero = logic_graph(R"({"variables":[{"name":"A","type":"float","value":0},{"name":"Updates","type":"int","value":0},{"name":"Done","type":"int","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.tween","values":{"duration":0}},{"id":3,"type":"var.set","params":{"variable":"A"}},
+      {"id":4,"type":"var.add","params":{"variable":"Done"}},{"id":5,"type":"var.add","params":{"variable":"Updates"}}],
+    "links":[[1,"then",2,"play"],[2,"update",3,"exec"],[2,"alpha",3,"value"],[3,"then",5,"exec"],[2,"finished",4,"exec"],[4,"then",2,"play"]]})");
+  CHECK(no_errors(logic::check(zero)));
+  logic::Instance* again = rt0.add(zero, 0, "Zero");
+  rt0.begin();
+  CHECK(again->get("A").as_number() == 1 && again->get("Updates").as_int() == 1 && again->get("Done").as_int() == 0);
+  for (int i = 0; i < 3; ++i) { host0.t += 1.0 / 60; rt0.tick(1.0f / 60); }
+  // (every step: the last Update, Finished, and Play again with its first Update)
+  CHECK(again->get("Done").as_int() == 3 && again->get("Updates").as_int() == 7 && !again->disabled() && host0.errors.empty());
 }
 
 TEST(game_logic_graphs_drive_the_world) {
@@ -2997,6 +3013,10 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
             "links":[[1,"then",4,"exec"],[4,"completed",5,"exec"],[5,"exit",4,"exec"]]})",
           "leads back to Do Once (node 4) without a wait", 5);
+  // (a Tween's Update runs with Play: playing the same tween from its own Update never ends. From
+  // Finished it is a tween that repeats, and Stop from Update ends it.)
+  problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.tween"}],"links":[[1,"then",2,"play"],[2,"update",2,"play"]]})", "leads back to Tween (node 2) without a wait", 2);
+  fine(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.tween"}],"links":[[1,"then",2,"play"],[2,"finished",2,"play"],[2,"update",2,"stop"]]})");
   // Add to Variable counts: numbers only
   problem(R"({"variables":[{"name":"Name","type":"text","value":""}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Name"}}],"links":[[1,"then",2,"exec"]]})",

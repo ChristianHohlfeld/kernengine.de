@@ -258,8 +258,12 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
 - Die Eingänge einer Formel sind C++-Namen.
 - **Kein Weg führt ohne Warten in sich selbst zurück.** Schritte wiederholt ein Schleifen-Knoten
   (While, For). Mit einem Delay dazwischen ist es ein Timer – das geht. Ein Gate, das sich selbst
-  schließt, oder ein Do Once, das sich zurücksetzt, ist kein Weg zurück: In Reset, Open, Close
-  und Toggle endet der Weg (`NodeDef::first_entry_only`).
+  schließt, oder ein Do Once, das sich zurücksetzt, ist kein Weg zurück: In Reset, Open, Close,
+  Toggle und Stop endet der Weg (`NodeDef::first_entry_only`). Das Update eines Tweens läuft
+  schon mit Play (`NodeDef::now_outputs`): denselben Tween aus seinem eigenen Update neu zu
+  starten, ist ein Weg zurück. Aus Finished ist es ein Tween, der sich wiederholt – Finished
+  kommt immer erst mit dem letzten Update in einem späteren Schritt, nie mit Play selbst (auch
+  bei Dauer 0).
 - **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
   auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
   geht.)

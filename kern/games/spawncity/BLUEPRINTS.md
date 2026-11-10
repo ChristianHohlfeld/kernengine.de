@@ -129,11 +129,16 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
     liest Select nur den gewählten Eingang; solange Werte nur rechnen, ist das dasselbe).
   - Der Schleifenwächter: Interpreter, JIT und Text zählen dasselbe und hören an derselben Stelle
     auf (heute bricht der Interpreter nach 200 000 Knoten je Schritt ab, der Text gar nicht).
+    Geplant: gezählt werden Schleifendurchläufe je Schritt (in gültigen Blueprints sind Schleifen
+    das Einzige ohne festes Ende – Wege zurück, Selbstaufrufe und ein Tween aus seinem eigenen
+    Update sind Regelverstöße); ist die Grenze überschritten, enden alle Schleifen der Kette, der
+    Rest läuft zu Ende, dann ist der Blueprint gestoppt. Das kann C++ ohne Ausnahmen genauso
+    tun wie der Interpreter; der JIT zählt dann an seinen Schleifen statt an jedem Knoten.
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
     (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
     mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).
-  - Ein Tween, dessen Update ihn selbst mit Dauer 0 neu startet, wird im Text mit jedem Mal
-    tiefer (der Interpreter stoppt dort über den Wächter): mit dem Wächter zusammen lösen.
+  - Verschachtelung: Der JIT stoppt bei mehr als 64 ineinander liegenden Schleifen / Sequences,
+    die anderen Stufen nicht.
   - Danach entfällt der bisherige Export (Schleife über Knotennummern mit `call_node` /
     `read_pin`, heute die Stufe „native C++ (node loop)“).
   - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text
