@@ -77,10 +77,12 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(same(await take(), [["down", "touch"], ["touch", 0, 7], ["touch", 1, 7], ["touch", 2, 7], ["touch", 3, 8]]), "a finger: down, move, up, cancel");
 
   // the pointer lock: asked for on a click, told when taken; the locked pointer's movement
+  // (the browser tells of the lock after it changed it: wait for the telling, not for the state)
+  const told = (kind, value) => page.waitForFunction(([kind, value]) => window.log.some(e => e[0] === kind && e[1] === value), [kind, value], {timeout: 15000}).catch(() => {});
   await page.evaluate(() => { window.lockOnClick = true; });
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForFunction(() => window.input.locked, null, {timeout: 10000}).catch(() => {});
+  await told("lock", true);
   log = await take();
   check(same(only(log, "lock"), [["lock", true, true]]) && await page.evaluate(() => window.input.locked), "a click takes the pointer lock");
   // (headless Chromium reports a locked pointer's moves as a jump and its way back, and may send
@@ -97,8 +99,8 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   await page.mouse.up({button: "right"});
   await take();
   await page.evaluate(() => window.input.unlock());
-  await page.waitForFunction(() => !window.input.locked, null, {timeout: 10000}).catch(() => {});
-  check(same(only(await take(), "lock").map(e => e[1]), [false]), "giving the lock back is told");
+  await told("lock", false);
+  check(same(only(await take(), "lock").map(e => e[1]), [false]) && !(await page.evaluate(() => window.input.locked)), "giving the lock back is told");
 
   // the device in use, seen anywhere in the window (the surface or not); a locked mouse says nothing
   const taken = () => page.evaluate(() => window.seen.splice(0));
