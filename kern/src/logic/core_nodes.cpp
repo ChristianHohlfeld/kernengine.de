@@ -661,7 +661,7 @@ void add_functions(Library& lib) {
     std::vector<Value> args, results;
     args.reserve(f->inputs.size());
     for (const FunctionPin& p : f->inputs) args.push_back(c.in(p.name));
-    c.instance().call(f->name, args, results);
+    c.instance().call_inside(f->name, args, results);
     for (std::size_t k = 0; k < f->outputs.size() && k < results.size(); ++k) c.out(f->outputs[k].name, results[k]);
   };
   {

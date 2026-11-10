@@ -215,6 +215,20 @@ aus (Call Event), hat der innere Lauf seine Werte, und wenn er zu Ende ist, hat 
 die eigenen: im Rumpf ohnehin (Parameter), und auch für den, der sie von außen liest (`n1.value`).
 Graph und Text halten das gleich (`Runtime::fire`, der Kleber).
 
+**Eine Funktion, die wieder aufgerufen wird, während sie läuft.** Sich selbst aufrufen darf eine
+Funktion nicht (Regel). Löst sie aber ein Event aus, kann dessen Handler sie noch einmal aufrufen
+– das ist ein Aufruf wie jeder andere, in C++ wie im Graphen. Jeder Aufruf hat seine Parameter;
+ist der Handler zu Ende, hat der unterbrochene Aufruf die eigenen wieder, auch für den, der sie
+von außen liest (`n20.x` aus einer `go`-Methode). Für den Graphen macht das `Runtime::fire`, für
+die Klasse ihr Kleber – beide an derselben Stelle: um den Handler, der in einem laufenden
+Blueprint startet.
+
+**Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
+64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
+Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
+sie gewöhnliche Aufrufe. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
+C++ hat auch keine Grenze).
+
 **Wege, die sich wieder treffen.** Führen alle Wege eines Branch (oder Switch) in denselben Knoten,
 steht der hinter dem `if` – wie man es in C++ schreibt:
 
@@ -455,9 +469,11 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 15, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+demselben Ergebnis: alle 16, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
-(`event_reentry`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
+(`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
+tiefer als 64 ineinander liegen (`function_reentry`), Tweens und Timer (`waits`), Zustände
+(`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

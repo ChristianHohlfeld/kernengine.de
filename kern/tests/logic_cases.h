@@ -121,6 +121,32 @@ inline const std::vector<Case>& cases() {
           {"id":9,"type":"event.custom","params":{"name":"Open"}},{"id":10,"type":"var.set","params":{"variable":"Seen"}}],
         "links":[[1,"then",2,"exec"],[2,"then",8,"exec"],[8,"then0",3,"exec"],[1,"value",4,"a"],[4,"result",3,"condition"],[3,"true",5,"exec"],[1,"value",6,"a"],[6,"result",5,"value"],
           [8,"then1",7,"exec"],[1,"value",7,"amount"],[9,"then",10,"exec"],[1,"value",10,"value"]]})"},
+      // A function that is called again while it runs - by an event it raised (Step): a call like
+      // any other. Each call has its parameters, also for the step two paths lead to (it reads
+      // them from outside the body's own path) and after the inner call is over. Functions called
+      // by nodes do not count for how deep events nest (Outer, Inner between the Deep events: 63
+      // handlers run before the 65th level is refused, in every tier).
+      {"function_reentry",
+       R"({"variables":[{"name":"Log","type":"float","value":0},{"name":"Calls","type":"int","value":0},{"name":"DeepCount","type":"int","value":0}],
+        "functions":[{"name":"Step","inputs":[{"name":"x","type":"float","value":0}],"outputs":[]},{"name":"Outer","inputs":[{"name":"v","type":"float","value":0}],"outputs":[]},
+          {"name":"Inner","inputs":[{"name":"v","type":"float","value":0}],"outputs":[]}],
+        "nodes":[{"id":20,"type":"func.entry","params":{"function":"Step"}},{"id":21,"type":"var.add","params":{"variable":"Calls"},"values":{"amount":1}},
+          {"id":22,"type":"flow.sequence","params":{"count":"2"}},{"id":23,"type":"flow.branch"},{"id":24,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
+          {"id":25,"type":"flow.call","params":{"name":"Again"}},{"id":27,"type":"math.sub","values":{"b":1}},{"id":26,"type":"var.set","params":{"variable":"Log"}},
+          {"id":28,"type":"math.formula","params":{"formula":"(acc * 7 + x) % 1000003"}},{"id":29,"type":"var.get","params":{"variable":"Log"}},
+          {"id":30,"type":"event.custom","params":{"name":"Again"}},{"id":31,"type":"func.call","params":{"function":"Step"}},
+          {"id":32,"type":"event.custom","params":{"name":"Go"}},{"id":33,"type":"func.call","params":{"function":"Step"}},
+          {"id":40,"type":"event.custom","params":{"name":"Open"}},{"id":41,"type":"flow.call","params":{"name":"Deep"},"values":{"value":70}},
+          {"id":42,"type":"event.custom","params":{"name":"Deep"}},{"id":43,"type":"var.add","params":{"variable":"DeepCount"},"values":{"amount":1}},
+          {"id":44,"type":"func.call","params":{"function":"Outer"}},
+          {"id":50,"type":"func.entry","params":{"function":"Outer"}},{"id":51,"type":"func.call","params":{"function":"Inner"}},
+          {"id":60,"type":"func.entry","params":{"function":"Inner"}},{"id":61,"type":"flow.branch"},{"id":62,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
+          {"id":63,"type":"flow.call","params":{"name":"Deep"}},{"id":64,"type":"math.sub","values":{"b":1}}],
+        "links":[[20,"then",21,"exec"],[21,"then",22,"exec"],[22,"then0",23,"exec"],[20,"x",24,"a"],[24,"result",23,"condition"],[23,"true",25,"exec"],[20,"x",27,"a"],[27,"result",25,"value"],
+          [25,"then",26,"exec"],[22,"then1",26,"exec"],[29,"value",28,"acc"],[20,"x",28,"x"],[28,"result",26,"value"],
+          [30,"then",31,"exec"],[30,"value",31,"x"],[32,"then",33,"exec"],[32,"value",33,"x"],
+          [40,"then",41,"exec"],[42,"then",43,"exec"],[43,"then",44,"exec"],[42,"value",44,"v"],
+          [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
       // Every N Seconds, a Retriggerable Delay, three Tweens (one runs to its end, one is stopped,
       // one plays itself again from Finished).
       {"waits",

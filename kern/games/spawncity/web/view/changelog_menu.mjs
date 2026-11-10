@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"21:43",title:"Funktionen und Events: in jeder Form gleich tief",items:[
+    "Kern-Blueprints: Löst eine Funktion ein Event aus und dessen Handler ruft dieselbe Funktion noch einmal auf, ist das jetzt ein Aufruf wie jeder andere – bisher wurde der innere Aufruf als Graph übersprungen, als kompiliertes C++ aber ausgeführt. Jeder Aufruf hat seine eigenen Werte; ist der Handler fertig, rechnet der unterbrochene Aufruf mit seinen weiter.",
+    "Wie tief Events ineinander liegen dürfen (64), zählt Funktionsaufrufe nicht mehr mit, und lange Rechenketten werden vollständig ausgewertet (bisher endete der Graph nach 48 Werten hintereinander). Blueprint und C++ hören damit an derselben Stelle auf.",
+  ]},
   {date:"2026-11-10",time:"21:11",title:"Ein C++ je Blueprint: der alte Export ist weg",items:[
     "Unter der Haube (für alle Kern-Spiele): Den früheren C++-Export von Blueprints – eine Schleife über Knotennummern, die zur Laufzeit in die Knoten-Bibliothek zurückrief – gibt es nicht mehr. Jeder Blueprint hat jetzt genau ein C++: seine eigene Klasse, in der jeder Knoten ein direkter Funktionsaufruf ist.",
     "Im Kern-Editor liefert Download in der C++-Ansicht immer diese Klasse. Kompiliert ein Blueprint nicht, sagt der Editor, warum – statt etwas anderes zu exportieren.",

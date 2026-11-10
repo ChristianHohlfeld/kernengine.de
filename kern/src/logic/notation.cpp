@@ -3243,6 +3243,19 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
   }
   events = events.empty() ? std::string("    (void)node;\n") : "    switch (node) {\n" + events + "      default: break;\n    }\n";
+  // What the functions hold of their parameters outside their own bodies (the members n<id> of
+  // their entries): a handler that runs while the Blueprint is at work - a function raised the
+  // event and is in the middle of its call - leaves them as they were (as Runtime::fire does it
+  // with the entries' outputs for the other tiers).
+  std::string keep, give_back;
+  for (std::size_t i = 0; i < g.nodes.size(); ++i) {
+    if (g.nodes[i].type != "func.entry" || !shape.at(static_cast<int>(i)).member) continue;
+    const std::string id = std::to_string(g.nodes[i].id);
+    keep += "    const auto outer" + id + " = self.n" + id + ";\n";
+    give_back += " self.n" + id + " = outer" + id + ";";
+  }
+  if (!keep.empty())
+    events = "    const bool at_work = self.kern_world.instance && self.kern_world.instance->chains() > 1;\n" + keep + events + "    if (at_work) {" + give_back + " }\n";
   std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
                   "// text): glue, not part of the notation - nothing to edit here.\n"
                   "namespace {\n"

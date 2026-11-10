@@ -143,10 +143,13 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 - [x] **Der bisherige Export ist entfernt:** Die Schleife über Knotennummern (`generate_cpp`,
   die Stufe „native C++ (node loop)“) gibt es nicht mehr. Ein Blueprint hat genau ein C++ – seine
   Klasse; Download im Editor gibt sie, und ein Blueprint, der nicht kompiliert, hat keins.
+- [x] **Funktionen, Events und Tiefe in jeder Stufe gleich:** Eine Funktion, die über ein Event
+  wieder aufgerufen wird, während sie läuft, ist ein Aufruf wie jeder andere (der Interpreter
+  übersprang den inneren Aufruf); jeder Aufruf hat seine Parameter, auch für den, der sie von
+  außen liest. Wie tief Events ineinander liegen dürfen (64), zählt Funktionsaufrufe nicht mehr
+  mit; Werte lesen einander ohne Grenze (der Interpreter hörte nach 48 auf). Tier-Fall
+  `function_reentry`.
 - [ ] **Native Ausführung, Teil 2 – die Randfälle zwischen den Stufen:**
-  - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
-    (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
-    mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).
   - Verschachtelung: Der JIT stoppt bei mehr als 64 ineinander liegenden Schleifen / Sequences,
     die anderen Stufen nicht.
   - Ganze Zahlen: Der Interpreter hält Zahlen-Variablen als `double` (exakt bis 2^53), der Text

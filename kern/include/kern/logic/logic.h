@@ -493,9 +493,17 @@ class Instance {
   bool disabled() const { return disabled_; }
   /// Calls a function of this graph and runs it to its end: `results` gets its outputs in the
   /// function's order (the defaults where no Return node set them). Missing arguments take the
-  /// inputs' defaults. False: no such function, no entry node, or the function is running
-  /// already (a function cannot call itself) - `results` then holds the defaults.
+  /// inputs' defaults. False: no such function or no entry node - `results` then holds the
+  /// defaults. (A function cannot call itself - a rule, check() - but an event it raises may
+  /// call it again while it runs: that is a call like any other, as in the Blueprint's C++.)
   bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// The same from a call node of this graph (Call Function, Function Value). The call belongs to
+  /// the chain it is made in: it is no chain of its own for how deep events may nest - in the
+  /// Blueprint's C++ it is a call like any other.
+  bool call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// How many chains of this Blueprint are running, one inside the other (more than one: an event
+  /// a running chain raised has reached a handler of the same Blueprint).
+  int chains() const { return active_; }
   /// The same for functions of numbers: the first output (`fallback` when the call fails).
   f64 call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback = 0);
   bool has_function(std::string_view function) const { return fn_index_.count(std::string(function)) != 0; }
@@ -574,6 +582,7 @@ class Instance {
     u32 state = 0;
     f64 entered = 0;
   };
+  bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside);
   struct Frame {                     // a function call that is running
     int function = -1;               // index in graph_.functions
     int depth = 0;                   // Runtime::depth_ of the call's own chain
@@ -680,7 +689,8 @@ class Runtime {
     int entry = 0;                 // entry passed back to the node
     u64 serial = 0;                // retriggering cancels older waits
   };
-  void run_from(Instance& inst, int node, int entry);
+  enum class Chain : u8 { event, call, call_inside };  // what starts it (run_from)
+  void run_from(Instance& inst, int node, int entry, Chain chain = Chain::event);
   void enter_state(Instance& inst, std::size_t machine, u32 state);
   void check_transitions(Instance& inst, const std::string* event);
   void step_starts();              // a new step: the guard counts from zero
@@ -751,7 +761,6 @@ class Context {
   int entry_;
   std::vector<std::pair<int, int>> continuations_;  // (node, entry) to run after the chain, LIFO
   bool compiled_ = false;                           // continuations go to the instance's stack
-  int eval_depth_ = 0;
   Value pull(int node, int pin);
 };
 

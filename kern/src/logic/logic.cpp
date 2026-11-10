@@ -935,7 +935,10 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
   }
 }
 
-bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) {
+bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) { return call_function(function, args, results, false); }
+bool Instance::call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) { return call_function(function, args, results, true); }
+
+bool Instance::call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside) {
   results.clear();
   if (blueprint_) {
     if (disabled_) return false;
@@ -956,12 +959,9 @@ bool Instance::call(std::string_view function, const std::vector<Value>& args, s
   for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, p.type));
   const int entry = fn_entry_[static_cast<std::size_t>(f)];
   if (entry < 0 || disabled_) return false;
-  // One frame per function: a node's values are the instance's, not the call's.
-  for (const Frame& fr : frames_)
-    if (fr.function == f) {
-      rt_.host().error(name_ + ": function \"" + fn.name + "\" calls itself - the inner call is skipped");
-      return false;
-    }
+  // (A function does not call itself - check() refuses that. An event it raises may reach a
+  // handler that calls it again while it runs: a call like any other, as in the Blueprint's C++.
+  // Its parameters are the inner call's then; Runtime::fire gives the outer call its own back.)
   CNode& e = nodes_[static_cast<std::size_t>(entry)];
   std::size_t k = 0;
   for (std::size_t o = 0; o < e.out.size() && k < fn.inputs.size(); ++o) {
@@ -975,11 +975,11 @@ bool Instance::call(std::string_view function, const std::vector<Value>& args, s
   if (rt_.depth_ == 0) rt_.step_starts();
   Frame frame;
   frame.function = f;
-  frame.depth = rt_.depth_ + 1;
+  frame.depth = rt_.depth_ + (inside ? 0 : 1);  // (the depth its own chain runs at)
   frame.stack_base = stack_[0];
   frame.results = std::move(results);
   frames_.push_back(std::move(frame));
-  rt_.run_from(*this, entry, 0);
+  rt_.run_from(*this, entry, 0, inside ? Runtime::Chain::call_inside : Runtime::Chain::call);
   results = std::move(frames_.back().results);
   frames_.pop_back();
   return true;
@@ -1196,12 +1196,22 @@ void Runtime::fire(const Event& e) {
       std::vector<Value> outer;
       const bool nested = c.running > 0;
       if (nested) outer = c.outputs;
+      // The same for the functions of a Blueprint that is at work (one of them raised this event
+      // and is in the middle of its call): what they hold of their parameters is the running
+      // calls' again when this handler is over - whatever it called. (A Blueprint's class does
+      // that in its glue.)
+      std::vector<std::vector<Value>> parameters;
+      const bool at_work = !inst.blueprint_ && inst.active_ > 0;
+      if (at_work)
+        for (int entry : inst.fn_entry_) parameters.push_back(entry >= 0 ? inst.nodes_[static_cast<std::size_t>(entry)].outputs : std::vector<Value>());
       for (std::size_t o = 0; o < c.out.size(); ++o)
         if (const Value* v = e.arg(c.out[o].id)) c.outputs[o] = v->converted(c.out[o].type);
       ++c.running;
       run_from(inst, static_cast<int>(i), 0);
       --c.running;
       if (nested) c.outputs = std::move(outer);
+      for (std::size_t f = 0; f < parameters.size(); ++f)
+        if (inst.fn_entry_[f] >= 0) inst.nodes_[static_cast<std::size_t>(inst.fn_entry_[f])].outputs = std::move(parameters[f]);
       if (inst.disabled_) break;
     }
   }
@@ -1311,7 +1321,7 @@ void Runtime::cancel_waits(Instance& inst, u32 node) {
   pending_.erase(std::remove_if(pending_.begin(), pending_.end(), [&](const Pending& p) { return p.inst == &inst && p.node == index; }), pending_.end());
 }
 
-void Runtime::run_from(Instance& inst, int start, int entry) {
+void Runtime::run_from(Instance& inst, int start, int entry, Chain chain) {
   if (inst.blueprint_) {
     // The Blueprint's own class: the chain is a method of it.
     if (++depth_ > 64) {
@@ -1334,21 +1344,21 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
     --depth_;
     return;
   }
+  // How deep chains nest: handlers of events that handlers raise (at most 64), and a function
+  // the engine calls from outside. A function called by a node of the graph belongs to the chain
+  // it is called in - in the Blueprint's C++ it is a call like any other, and functions cannot
+  // call themselves.
+  const bool counts = chain != Chain::call_inside;
+  if (counts && ++depth_ > 64 && chain == Chain::event) {
+    --depth_;
+    host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
+    return;
+  }
   if (inst.compiled()) {
-    if (++depth_ > 64) {
-      --depth_;
-      host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
-      return;
-    }
     ++inst.active_;
     run_compiled(inst, start, entry);
     chain_ends(inst);
-    --depth_;
-    return;
-  }
-  if (++depth_ > 64) {  // events raised from handlers raising events...
-    --depth_;
-    host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
+    if (counts) --depth_;
     return;
   }
   // A Return node ended the function call this chain is (Instance::return_values).
@@ -1373,7 +1383,7 @@ void Runtime::run_from(Instance& inst, int start, int entry) {
     }
   }
   chain_ends(inst);
-  --depth_;
+  if (counts) --depth_;
 }
 
 // ---------------------------------------------------------------------------
@@ -1395,10 +1405,10 @@ Value Context::pull(int node, int pin) {
   if (const int s = inst_.out_slot(node, pin); s >= 0 && src.def->kind != NodeKind::pure)
     return from_slot(inst_.slots_[static_cast<std::size_t>(s)], src.out[static_cast<std::size_t>(pin)].type).converted(src.out[static_cast<std::size_t>(pin)].type);
   if (src.def && src.def->kind == NodeKind::pure && src.def->run) {
-    if (eval_depth_ > 48) return src.outputs[static_cast<std::size_t>(pin)];
+    // (as deep as the values read each other: a value that reads itself is an error of the
+    // graph - check() - and an expression in C++ has no limit either)
     ++rt_.executed_;
     Context c(rt_, inst_, node, 0);
-    c.eval_depth_ = eval_depth_ + 1;
     src.def->run(c);
   }
   return src.outputs[static_cast<std::size_t>(pin)];

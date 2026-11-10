@@ -253,7 +253,8 @@ This is how Sequence (output 0 immediately, the others scheduled) and loops (exe
 re-enter the node itself via `loop_back` with `kResume`) work.
 
 Data is **pulled**: an input connected to a pure node executes that node's `run` on every read
-(depth at most 48). An input on an action node reads that node's last stored output.
+– as deep as the values read each other (a value that reads itself is a compile error). An input
+on an action node reads that node's last stored output.
 
 ### Protection against infinite loops
 
@@ -264,7 +265,11 @@ Data is **pulled**: an input connected to a pure node executes that node's `run`
   disabled ("infinite loop? The Blueprint is stopped."). Every tier counts the same passes
   (`Runtime::pass`) and stops at the same one – also a Blueprint compiled as its C++ class, which
   cannot abort a chain in its middle.
-- Events that trigger events may nest at most 64 deep; beyond that, the chain is stopped.
+- Events that trigger events may nest at most 64 deep; beyond that, the chain is stopped – in
+  every tier at the same event. Function calls do not count (in the C++ class they are ordinary
+  calls, and a function cannot call itself). If a function raises an event whose handler calls it
+  again, that is a call like any other; when the handler is over, the interrupted call has its
+  parameters again.
 - In compiled code: more than 512 nested loops/sequences stop the instance.
 
 ### State machines

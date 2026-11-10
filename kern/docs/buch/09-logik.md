@@ -254,8 +254,8 @@ So arbeiten Sequence (Ausgang 0 sofort, die übrigen vorgemerkt) und Schleifen (
 danach den Knoten selbst per `loop_back` mit `kResume` erneut betreten).
 
 Daten werden **gezogen**: Ein Eingang, der mit einem Pure-Knoten verbunden ist, führt dessen `run`
-bei jedem Lesen aus (Tiefe höchstens 48). Ein Eingang an einem Aktionsknoten liest dessen zuletzt
-gespeicherten Ausgang.
+bei jedem Lesen aus – so tief, wie die Werte einander lesen (ein Wert, der sich selbst liest, ist
+ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt gespeicherten Ausgang.
 
 ### Schutz vor Endlosschleifen
 
@@ -268,7 +268,10 @@ gespeicherten Ausgang.
   (`Runtime::pass`) und hört beim selben auf – auch ein Blueprint, der als seine C++-Klasse
   kompiliert ist und eine Kette nicht mittendrin abbrechen kann.
 - Events, die Events auslösen, dürfen höchstens 64 tief verschachteln; darüber wird die Kette
-  gestoppt.
+  gestoppt – in jeder Stufe beim selben Event. Funktionsaufrufe zählen dabei nicht mit (in der
+  C++-Klasse sind sie gewöhnliche Aufrufe, und sich selbst aufrufen kann eine Funktion nicht).
+  Löst eine Funktion ein Event aus, dessen Handler sie noch einmal aufruft, ist das ein Aufruf
+  wie jeder andere; ist der Handler zu Ende, hat der unterbrochene Aufruf seine Parameter wieder.
 - Im kompilierten Code: mehr als 512 verschachtelte Schleifen/Sequences stoppen die Instanz.
 
 ### State Machines

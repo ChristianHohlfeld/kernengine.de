@@ -2307,6 +2307,13 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Done").as_bool());
     }
     if (std::string(c.name) == "state_machine") CHECK(inst->state("M") == "A" || inst->state("M") == "B");
+    if (std::string(c.name) == "function_reentry") {
+      // every call of Step made its two steps with its own x - also the calls an inner call interrupted
+      CHECK(inst->get("Calls").as_int() == 23 && inst->get("Log").as_number() == 808629);
+      // 70 events deep is asked for: 63 Deep handlers run under Open, the next level is refused -
+      // the functions between them (Outer, Inner) are calls, not levels
+      CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
+    }
     if (std::string(c.name) == "infinite_loop") CHECK(inst->disabled());
     if (std::string(c.name) == "reroutes") {
       CHECK(inst->get("Hits").as_int() == 6);  // 6 x Go through two exec knots
