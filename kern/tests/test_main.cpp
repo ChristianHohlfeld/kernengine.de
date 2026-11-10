@@ -2713,7 +2713,7 @@ TEST(logic_native_blueprints) {
     std::vector<std::string> errors;
     const std::string played = blueprint_native::play(c, &errors);
     for (const std::string& e : errors) std::printf("%s: %s\n", c.name.c_str(), e.c_str());
-    CHECK(errors.empty() && !c.calls.empty());
+    CHECK(errors.empty() && (c.scenario || !c.calls.empty()) && played.size() > c.name.size() + 4);
     calls += c.calls.size();
     for (const logic::Node& n : c.graph.nodes) used.insert(n.type);
   }
@@ -2742,7 +2742,7 @@ TEST(logic_native_blueprints) {
     if (said.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, said.c_str());
     CHECK(said.find(why) != std::string::npos);
   };
-  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})", "(node 1) is not yet a function of blueprint.h");
+  not_yet(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})", "Delay (node 2) is not yet a function of blueprint.h");
   not_yet(R"({"variables":[{"name":"A","type":"float","value":0}],"nodes":[{"id":4,"type":"math.random"},{"id":5,"type":"var.set","params":{"variable":"A"}}],"links":[[4,"result",5,"value"]]})",
           "Random Float in Range (node 4) is not yet a function of blueprint.h");
   not_yet(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})", "state machines (\"Door\") are not yet part of blueprint.h");
@@ -2753,6 +2753,8 @@ TEST(logic_native_blueprints) {
   // whose answers differ from the graph's so it shows who answers).
   struct Fake final : logic::NativeBlueprint {
     f64 heat = 1;
+    void attach(const logic::BlueprintWorld&) override {}
+    void run(int, int) override {}
     bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
       results.clear();
       if (function != "Twice") return false;
@@ -2801,7 +2803,12 @@ TEST(logic_native_blueprints) {
   for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
-  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  CHECK(!logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"flow.delay"}],"links":[]})"), "X", glue, &why) && why.find("not yet a function of blueprint.h") != std::string::npos);
+  // an event's handler is reached through the glue: the node's place in the graph, its values from its outputs
+  CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"float","value":0}],
+      "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
+  CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
+                  "native_out<std::string>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
 }
 
 TEST(logic_notation_refuses_with_place_and_reason) {
@@ -7412,9 +7419,19 @@ TEST(studio_logic_cpp_view) {
   // The view says whether a compiler runs the text as it stands; Download gives what a game build
   // compiles: for a Blueprint of functions its own class (the text and the glue), named as C++.
   {
+    // (Begin Play and a function: a compiler runs that; the event's handler is reached through the glue)
     json::Value with_event = f.cmd(R"({"cmd":"logicCpp"})");
-    CHECK(!with_event["native"].as_bool() && with_event["nativeWhy"].as_string().find("is not yet a function of blueprint.h") != std::string::npos);
-    CHECK(f.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string().find("register_native_graph") != std::string::npos);  // (the node loop, until events are functions too)
+    CHECK(with_event["native"].as_bool() && !with_event.has("nativeWhy"));
+    const std::string handler = f.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string();
+    CHECK(handler.find("KERN_EVENT(on") != std::string::npos && handler.find(": self.on") != std::string::npos && handler.find("register_native_blueprint(0x") != std::string::npos);
+    // (a door waits and moves an actor: not yet - the view says which node is missing, Download is still the node loop)
+    StudioFixture door;
+    CHECK(door.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+    CHECK(door.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+    CHECK(door.cmd(R"({"cmd":"logicTemplate","template":"door"})")["ok"].as_bool());
+    json::Value waits = door.cmd(R"({"cmd":"logicCpp"})");
+    CHECK(waits["ok"].as_bool() && !waits["native"].as_bool() && waits["nativeWhy"].as_string().find("is not yet a function of blueprint.h") != std::string::npos);
+    CHECK(door.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string().find("register_native_graph") != std::string::npos);
     StudioFixture own;
     CHECK(own.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
     own.cmd(R"({"cmd":"spawn","item":"cube"})");

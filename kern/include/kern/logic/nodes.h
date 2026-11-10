@@ -117,6 +117,9 @@ inline std::vector<std::string> setting_cases(std::string_view s) {
 template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
   return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
 }
+/// A value an event brought, as the C++ type of its handler's parameter: output `out` of the
+/// event's node `node` (Runtime::fire puts the event's values there, for every tier).
+template <class T> T native_out(const Instance& instance, int node, int out) { return from_value<T>(instance.output(node, out).converted(pin_type_of<T>())); }
 /// Instance::set for a variable that is a member of a Blueprint's class: the conversions the
 /// interpreter's variables make.
 inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }

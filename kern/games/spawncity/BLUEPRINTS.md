@@ -110,9 +110,14 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   genau den Graphen, aus dem sie geschrieben wurde (Hash) – ein geändertes Level fällt auf den
   Interpreter zurück, bis neu gebaut ist. „Wanted“ läuft so im ausgelieferten SpawnCity; die
   Regel-Tests laufen auf der Klasse und vergleichen sie mit dem Interpreter.
+- [x] **Events als Methoden der Klasse:** Begin Play, Tick und Custom Event sind Handler
+  `on<id>`, die die Laufzeit über den Kleber aufruft – wer welches Event bekommt, entscheidet
+  `Runtime::fire` für alle Stufen gleich. Dazu Call Event, Print und Game Time. Ein Handler, der
+  sein eigenes Event auslöst, hat je Lauf seine eigenen Werte (im Interpreter wie im Text). Sieben
+  der Tier-Fälle laufen so als Klassen und liefern dasselbe wie Interpreter und JIT.
 - [ ] **Native Ausführung, Teil 2 – alles Übrige als Funktionen von `blueprint.h`:**
-  - Events (`KERN_EVENT`), wartende Knoten (Delay, Retriggerable Delay, Tween), State Machines
-    (`kern::Machine`), Call Event, Set State, Print, Game Time, die Gameplay-Knoten.
+  - Wartende Knoten (Delay, Retriggerable Delay, Tween), Every N Seconds, State Machines
+    (`kern::Machine`, Set State, die State-Events), die Gameplay-Knoten.
   - Random: jeder Random-Knoten hat seine eigene Folge (`kern::Node<id>`), damit die Reihenfolge,
     in der C++ Argumente auswertet, nichts ändert.
   - Eingänge werden vor dem Knoten ausgewertet, alle, genau einmal – auch im Interpreter (heute
@@ -120,7 +125,8 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   - Der Schleifenwächter: Interpreter, JIT und Text zählen dasselbe und hören an derselben Stelle
     auf (heute bricht der Interpreter nach 200 000 Knoten je Schritt ab, der Text gar nicht).
   - Eine Funktion, die über ein Event wieder bei sich selbst ankommt: in allen Stufen gleich
-    (heute überspringt der Interpreter den inneren Aufruf und meldet es).
+    (heute überspringt der Interpreter den inneren Aufruf und meldet es); ebenso Funktionen, die
+    mehr als 64 tief ineinander aufrufen (der Interpreter bricht dort ab).
   - Tween mit Dauer 0 läuft sofort durch: als Rücksprung im Text darf das nicht tiefer werden.
   - Events, Warten und State Machines kommen über dieselbe Grenze (`logic::NativeBlueprint`);
     danach entfällt der bisherige Export (Schleife über Knotennummern mit `call_node` /

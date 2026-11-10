@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"17:51",title:"Blueprint-Events laufen als kompiliertes C++",items:[
+    "Unter der Haube (für alle Kern-Spiele): Auch Blueprints mit Events laufen jetzt als kompilierter C++-Code – Begin Play, Tick und eigene Events sind Methoden der Klasse, dazu Call Event, Print und Game Time. Wer welches Event bekommt, entscheidet für Blueprint und C++ dieselbe Stelle der Engine.",
+    "Ein Event, das sich selbst wieder auslöst, hat jetzt in jedem Lauf seine eigenen Werte – wie die Parameter eines Funktionsaufrufs. Bisher sah der äußere Lauf danach die Werte des inneren.",
+    "Warten (Delay), State Machines und die Spielknoten folgen als Nächstes.",
+  ]},
   {date:"2026-11-10",time:"17:25",title:"Kern-Editor: die C++-Ansicht sagt, was schon kompiliert läuft",items:[
     "Im Kern-Editor zeigt die C++-Ansicht eines Blueprints jetzt, ob sein Code schon direkt als C++ läuft – oder welcher Knoten dafür noch fehlt. Download liefert genau die Datei, die ein Spiel dafür mitkompiliert.",
     "Die Klasse eines Blueprints heißt wie sein Actor, als gültiger C++-Name (aus „Door 1“ wird Door1).",

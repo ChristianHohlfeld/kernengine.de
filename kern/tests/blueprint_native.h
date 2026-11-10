@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "kern/logic/logic.h"
+#include "logic_cases.h"
 #include "native_show.h"
 
 namespace blueprint_native {
@@ -29,6 +30,7 @@ struct Case {
   std::string name;
   logic::Graph graph;
   std::vector<Call> calls;
+  bool scenario = false;  // no calls: the scenario of the tier cases (logic_cases::play) - events, ticks
 };
 
 // Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
@@ -502,6 +504,16 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Label", {T("Kern")}});
   }
   all.push_back(nodes_case());
+  // The tier cases a compiler runs as they stand: their events are handlers of the class, the
+  // runtime is the same for every tier.
+  for (const logic_cases::Case& t : logic_cases::cases()) {
+    if (std::string(t.name) == "infinite_loop") continue;  // (the class has no loop guard yet: BLUEPRINTS.md)
+    Case c;
+    c.name = std::string("Tier_") + t.name;
+    c.graph = logic_cases::parse(t);
+    c.scenario = true;
+    if (logic::native_ready(c.graph)) all.push_back(std::move(c));
+  }
   return all;
 }
 
@@ -521,6 +533,14 @@ inline std::string line(const std::string& function, const std::vector<std::stri
 
 /// What the interpreter answers.
 inline std::string play(const Case& c, std::vector<std::string>* errors = nullptr) {
+  if (c.scenario) {
+    logic_cases::Host host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    rt.native = false;
+    logic::Instance* inst = rt.add(c.graph, 0, c.name);
+    return "== " + c.name + "\n" + logic_cases::play(rt, host, inst);
+  }
   Host host;
   logic::Runtime rt(host);
   rt.jit = false;
@@ -597,7 +617,7 @@ inline bool write_file(const std::string& path, const std::string& text) {
 /// (the calls) and blueprint_native_expected.txt (the interpreter's answers).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
-                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"native_show.h\"\n";
+                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
   std::string runs, expected;
   for (const Case& c : all) {
     std::string text, glue, why;
@@ -630,6 +650,18 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     main += "#include \"bp_" + c.name + ".h\"\n";
     std::string body = "static const char kGraph_" + c.name + "[] =";
     for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
+    if (c.scenario) {
+      // events and ticks need the runtime: the class behind a logic::Instance plays the scenario
+      body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n"
+              "  logic_cases::Host host;\n  kern::logic::Runtime rt(host);\n  rt.jit = false;\n  kern::logic::Graph graph;\n"
+              "  std::string text = \"== " + c.name + "\\n\";\n"
+              "  {\n    kern::json::Value stored;\n    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) text += \"(the graph was not read)\\n\";\n  }\n"
+              "  kern::logic::Instance* inst = rt.add(graph, 0, \"" + c.name + "\");\n"
+              "  if (std::string(inst->tier()) != \"native C++\") text += std::string(\"(it runs in the \") + inst->tier() + \", not as its class)\\n\";\n"
+              "  text += logic_cases::play(rt, host, inst);\n  got += text;\n  hosted += text;\n}\n\n";
+      runs += body;
+      continue;
+    }
     body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n  " + c.name + " b;\n  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
     for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + show(b." + v.name + ")";
     body += ";\n  };\n"

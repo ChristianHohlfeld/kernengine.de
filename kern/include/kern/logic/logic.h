@@ -431,9 +431,23 @@ void register_native_graph(u64 hash, NativeGraphFn fn);
 /// A Blueprint compiled from its C++ text (kern/logic/blueprint.h, docs/blueprint_cpp.md), as the
 /// engine reaches it: by name, at the boundary. Inside, the class calls its own functions and
 /// reads its own members directly. logic::native_glue writes the class that implements this.
+/// What a Blueprint's class has of the world it runs in. The engine sets it (NativeBlueprint::
+/// attach); a class somebody just makes has none - nothing is printed, time stands still.
+struct BlueprintWorld {
+  class Host* host = nullptr;
+  class Runtime* runtime = nullptr;
+  class Instance* instance = nullptr;
+  ActorRef self = 0;
+};
 class NativeBlueprint {
  public:
   virtual ~NativeBlueprint() = default;
+  /// The world the class runs in: set once, before anything runs.
+  virtual void attach(const BlueprintWorld& world) = 0;
+  /// A chain starts at node `node` (its place in the graph's list): the handler of an event. The
+  /// runtime has decided that it runs (Runtime::fire, the same for every tier) and has put the
+  /// event's values on the node's outputs (Instance::output).
+  virtual void run(int node, int entry) = 0;
   /// As Instance::call (false: no such function, `results` empty).
   virtual bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) = 0;
   virtual bool get(std::string_view variable, Value& out) const = 0;
@@ -481,6 +495,9 @@ class Instance {
   /// The same for functions of numbers: the first output (`fallback` when the call fails).
   f64 call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback = 0);
   bool has_function(std::string_view function) const { return fn_index_.count(std::string(function)) != 0; }
+  /// What output `out` of node `node` holds (both by their place: in the graph's list, among the
+  /// node's outputs) - an event's values when its handler starts.
+  const Value& output(int node, int out) const { return nodes_[static_cast<std::size_t>(node)].outputs[static_cast<std::size_t>(out)]; }
   /// A Return node: the running call of `function` ends with these outputs (by output name).
   /// False outside that function's own chain (the chain then just ends).
   bool return_values(std::string_view function, const std::vector<std::pair<std::string, Value>>& values);
@@ -542,6 +559,7 @@ class Instance {
     std::vector<int> exec_in_index;  // input index -> exec input ordinal (-1 data)
     std::vector<Value> outputs;      // last output values
     NodeState state;
+    int running = 0;                 // events: handlers of this node that are running (a handler that raises its own event)
   };
   struct Machine {
     const StateMachine* def = nullptr;

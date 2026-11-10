@@ -38,15 +38,16 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 - **Fertig:** die Schreibweise in beide Richtungen, für jeden Knotentyp der Bibliothek, mit den
   Regeln, die sie braucht, und dem Beweis als Test.
 - **Fertig:** die C++-Ansicht im Editor (siehe unten): ansehen, ändern, anwenden.
-- **Fertig für Blueprints aus Funktionen:** Der Text wird von einem C++-Compiler ausgeführt, so
-  wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen, Funktionen, Formeln, alle
-  Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip Flop, die Switches. Jeder
+- **Fertig für Blueprints aus Funktionen und Events:** Der Text wird von einem C++-Compiler
+  ausgeführt, so wie er dasteht (siehe „Vom Compiler ausgeführt“) – Variablen, Funktionen,
+  Formeln, alle Wert-Knoten, Branch, Sequence, Schleifen, Do Once, Do N, Gate, Flip Flop, die
+  Switches; die Events Begin Play, Tick und Custom Event, Call Event, Print, Game Time. Jeder
   Knoten ist eine typisierte Funktion; nichts wird zur Laufzeit nachgeschlagen.
 - **Fertig: Das Spiel führt diesen Text aus.** Der Build schreibt die Blueprints eines Levels als
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
-- **Als Nächstes:** Events, wartende Knoten, State Machines, Zufall und die Gameplay-Knoten als
+- **Als Nächstes:** wartende Knoten, State Machines, Zufall und die Gameplay-Knoten als
   Funktionen von `blueprint.h`. `native_ready` sagt für jeden Blueprint, was ihm noch fehlt; bis
   dahin laufen solche Blueprints im Interpreter oder im JIT. Der Fahrplan steht in
   `kern/games/spawncity/BLUEPRINTS.md`.
@@ -201,6 +202,12 @@ aus einem anderen Event –, liest den Member `n1.delta`; dafür beginnt der Rum
 **Nach einem Warten.** Was auf einen wartenden Knoten folgt, läuft später und ist ein Lambda, das
 nur `this` behält. Darin gibt es keine Parameter mehr, nur Member und Variablen.
 
+**Ein Event, das sich selbst wieder auslöst.** Die Werte eines Events gehören dem einen Lauf
+seines Handlers – wie die Parameter eines Methodenaufrufs. Löst ein Handler sein eigenes Event
+aus (Call Event), hat der innere Lauf seine Werte, und wenn er zu Ende ist, hat der äußere wieder
+die eigenen: im Rumpf ohnehin (Parameter), und auch für den, der sie von außen liest (`n1.value`).
+Graph und Text halten das gleich (`Runtime::fire`, der Kleber).
+
 **Wege, die sich wieder treffen.** Führen alle Wege eines Branch (oder Switch) in denselben Knoten,
 steht der hinter dem `if` – wie man es in C++ schreibt:
 
@@ -309,12 +316,20 @@ Umwandlungen `kern::to`, die Knoten mit Gedächtnis wie Do Once und Gate auf ihr
 Der Interpreter ruft für seinen Knoten dieselbe Funktion auf wie der Text. Graph und Text können
 deshalb nicht verschieden rechnen – es gibt nur eine Stelle, an der gerechnet wird.
 
-**Was heute so läuft.** Blueprints aus Variablen und Funktionen mit diesen Knoten: Function Entry,
-Return, Call Function, Function Value, Get, Set, Add, alle Mathe-, Logik-, Vektor- und Text-Werte,
-Compare, Select, Formel, die Reroutes, Branch, Sequence, For, While, Do Once, Do N, Gate, Flip
-Flop, Switch on Int, Switch on Text. `logic::native_ready(graph, &warum)` sagt es für jeden
-Blueprint; für alles andere nennt es den Knoten, der noch fehlt (Events, Delay, Tween, State
-Machines, Random, Zeit, Print, die Gameplay-Knoten – der nächste Schritt).
+**Was heute so läuft.** Blueprints mit diesen Knoten: Begin Play, Event Tick, Custom Event, Call
+Event, Print, Game Time; Function Entry, Return, Call Function, Function Value; Get, Set, Add;
+alle Mathe-, Logik-, Vektor- und Text-Werte, Compare, Select, Formel, die Reroutes; Branch,
+Sequence, For, While, Do Once, Do N, Gate, Flip Flop, Switch on Int, Switch on Text.
+`logic::native_ready(graph, &warum)` sagt es für jeden Blueprint; für alles andere nennt es den
+Knoten, der noch fehlt (Delay, Tween, Every N Seconds, State Machines, Random, die
+Gameplay-Knoten – der nächste Schritt).
+
+**Events.** Welches Event welchen Handler erreicht, entscheidet die Laufzeit (`Runtime::fire`:
+Typ, Name, Ziel, die Reihenfolge nach Knoten-Id) – für Interpreter, JIT und Klasse dieselbe
+Stelle. Die Klasse hat den Handler als Methode `on<id>`; der Kleber ruft sie mit den Werten des
+Events. `KERN_EVENT(on5, event_custom<"Hit">)` sagt dem Leser und dem Editor, welcher Knoten die
+Methode ist. Die Welt der Klasse (`kern_world`: Host, Laufzeit, Instanz) setzt die Engine; Print,
+Game Time und Call Event gehen darüber.
 
 **Zahlen.** `Float` ist `double`, `Int` eine ganze Zahl mit 64 Bit. Aus einer Kommazahl wird eine
 ganze Zahl überall gleich (`kern::logic::whole`): zur Null hin abgeschnitten; „keine Zahl“ und
@@ -362,7 +377,10 @@ wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Co
 Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
 Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
 (`blueprint_native_test`, über 2000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
-und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt.
+und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
+spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
+Szenario wie Interpreter und JIT – Begin Play, Events, Ticks – mit demselben Ergebnis, auch ein
+Handler, der sein eigenes Event auslöst (`event_reentry`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit

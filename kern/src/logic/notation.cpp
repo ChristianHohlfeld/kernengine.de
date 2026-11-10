@@ -3163,6 +3163,7 @@ std::string cpp_problem(const Graph& g, u32* node, const Library& lib) {
 bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   // The nodes blueprint.h has a function for. (A test compiles a Blueprint of all of them.)
   static const std::set<std::string_view> have{
+      "event.begin",   "event.tick",    "event.custom",    "flow.call",       "debug.print",     "time.now",
       "func.entry",    "func.return",   "func.call",       "func.pure",       "var.get",         "var.set",       "var.add",        "flow.reroute",
       "value.reroute", "flow.branch",   "flow.sequence",   "flow.for",        "flow.while",      "flow.do_once",  "flow.do_n",      "flow.gate",
       "flow.flip_flop", "flow.switch_int", "flow.switch_text", "math.add",     "math.sub",        "math.mul",      "math.div",       "math.mod",
@@ -3208,11 +3209,46 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   };
   char hash[40];
   std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
+  // The handlers of events: the runtime starts a chain at an event's node, the class has it as
+  // the method on<id>; the event's values are the node's outputs.
+  std::string events, running;
+  Shape shape(g, lib);
+  shape.build();
+  for (std::size_t i = 0; i < g.nodes.size(); ++i) {
+    const Node& n = g.nodes[i];
+    const NodeDef* def = lib.find(n.type);
+    if (!def || def->kind != NodeKind::event || def->type == "func.entry") continue;
+    std::vector<PinDef> in, outs;
+    lib.pins(n, g, in, outs);
+    std::string args;
+    for (std::size_t o = 0; o < outs.size(); ++o) {
+      if (outs[o].type == PinType::exec) continue;
+      args += std::string(args.empty() ? "" : ", ") + "native_out<" + type(outs[o].type) + ">(*self.kern_world.instance, " + std::to_string(i) + ", " + std::to_string(o) + ")";
+    }
+    const std::string id = std::to_string(n.id), call = "self.on" + id + "(" + args + ");";
+    if (shape.at(static_cast<int>(i)).member) {
+      // Its values are read outside its own body, from the member n<id>. A handler that raises
+      // its own event: the inner run's values are the inner run's - the outer run has its own
+      // again when that is over (as Runtime::fire does it with the node's outputs).
+      running += "  int running" + id + " = 0;\n";
+      events += "      case " + std::to_string(i) + ": {  // " + lib.title(n) + "\n        const auto outer = self.n" + id + ";\n        ++running" + id + ";\n        " + call +
+                "\n        if (--running" + id + " > 0) self.n" + id + " = outer;\n      } break;\n";
+    } else {
+      events += "      case " + std::to_string(i) + ": " + call + " break;  // " + lib.title(n) + "\n";
+    }
+  }
+  events = events.empty() ? std::string("    (void)node;\n") : "    switch (node) {\n" + events + "      default: break;\n    }\n";
   std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
                   "// text): glue, not part of the notation - nothing to edit here.\n"
                   "namespace {\n"
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
-                  "  " + name + " self;\n"
+                  "  " + name + " self;\n" +
+                  running +
+                  "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n"
+                  "  void run(int node, int entry) override {\n"
+                  "    using kern::logic::native_out;\n    (void)entry;\n" +
+                  events +
+                  "  }\n"
                   "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {

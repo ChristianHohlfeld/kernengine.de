@@ -1045,7 +1045,10 @@ Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
     const u64 hash = graph_hash(graph);
     auto own = blueprint_registry().find(hash);
     auto loop = native_registry().find(hash);
-    if (native && own != blueprint_registry().end()) added->blueprint_ = own->second();
+    if (native && own != blueprint_registry().end()) {
+      added->blueprint_ = own->second();
+      added->blueprint_->attach({&host_, this, added, self});
+    }
     else if (loop != native_registry().end()) added->native_ = loop->second;
     else if (jit) added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
   }
@@ -1139,9 +1142,18 @@ void Runtime::fire(const Event& e) {
         ok = e.key.empty() || want.empty() || want == "any" || want == e.key;
       }
       if (!ok) continue;
+      // The event's values are the handler's, as the parameters of a method are a call's: when the
+      // event reaches this handler again while it runs (it raised its own event), the inner run
+      // has its values - and the outer one has its own again when that is over.
+      std::vector<Value> outer;
+      const bool nested = c.running > 0;
+      if (nested) outer = c.outputs;
       for (std::size_t o = 0; o < c.out.size(); ++o)
         if (const Value* v = e.arg(c.out[o].id)) c.outputs[o] = v->converted(c.out[o].type);
+      ++c.running;
       run_from(inst, static_cast<int>(i), 0);
+      --c.running;
+      if (nested) c.outputs = std::move(outer);
       if (inst.disabled_) break;
     }
   }
@@ -1230,6 +1242,17 @@ bool Runtime::run_compiled(Instance& inst, int node, int entry) {
 }
 
 void Runtime::run_from(Instance& inst, int start, int entry) {
+  if (inst.blueprint_) {
+    // The Blueprint's own class: the chain is a method of it.
+    if (++depth_ > 64) {
+      --depth_;
+      host_.error(inst.name() + ": events nest more than 64 deep - the chain is stopped");
+      return;
+    }
+    inst.blueprint_->run(start, entry);
+    --depth_;
+    return;
+  }
   if (inst.compiled()) {
     if (++depth_ > 64) {
       --depth_;

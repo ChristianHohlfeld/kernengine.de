@@ -5,9 +5,10 @@
 // typed, inline, the very function the interpreter's node calls (nodes.h). Nothing is looked up
 // at run time.
 //
-// So far this covers what a Blueprint of functions needs: variables, functions, formulas, the
-// value nodes, Branch / Sequence / While / For, Do Once, Do N, Gate, Flip Flop, the switches.
-// Events, waits, state machines and the gameplay nodes follow (logic::native_ready tells).
+// So far this covers: variables, functions, formulas, the value nodes, Branch / Sequence / While /
+// For, Do Once, Do N, Gate, Flip Flop, the switches; the events Begin Play, Tick and Custom Event,
+// Call Event, Print, Game Time. Waits, state machines, Random and the gameplay nodes follow
+// (logic::native_ready tells).
 #pragma once
 
 #include <cstddef>
@@ -54,6 +55,20 @@ struct Layout {
 };
 
 struct Blueprint : logic::PureNodes {
+  /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
+  logic::BlueprintWorld kern_world;
+
+  // ---- the world ----
+  void debug_print(const Text& text, Bool screen) {
+    if (kern_world.host) kern_world.host->print(text, screen);
+  }
+  Float time_now() const { return kern_world.host ? kern_world.host->time() : 0.0; }
+  /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{0}).
+  template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
+    if (kern_world.runtime)
+      kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(text)}});
+  }
+
   // ---- loops ----
   /// while (loop(condition)): a While Loop.
   bool loop(Bool condition) { return condition; }
@@ -99,6 +114,10 @@ struct Blueprint : logic::PureNodes {
 
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
+/// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event
+/// node (for the reader and the editor). Which events reach it decides the runtime, for every
+/// tier the same; the engine calls the method through the Blueprint's glue (logic::native_glue).
+#define KERN_EVENT(method, ...)
 /// KERN_LAYOUT(Name) { node(id, x, y); ... }: the layout of the Blueprint Name.
 #define KERN_LAYOUT(Name)                \
   struct Name##_Layout : ::kern::Layout { \
