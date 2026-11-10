@@ -30,6 +30,7 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
 | `cpp_problem(graph)` | Warum ein Graph nicht als C++ geschrieben werden kann (leer: er kann). `check()` meldet dasselbe als Fehler. |
 | `cpp_names(graph)` | Für Levels von früher: benennt um, was kein C++-Name ist („Ball Seen“ → `BallSeen`), samt allen Verwendungen. Läuft beim Laden eines Levels. |
 | `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Wenn nicht: welcher Knoten noch keine Funktion in `blueprint.h` hat. |
+| `cpp_class_name(owner, graph)` | Der Klassenname für den Blueprint eines Actors: sein Name als C++-Name, den nichts in der Klasse trägt. |
 | `native_glue(graph, name, text)` | Der Kleber hinter dem Text: macht die Klasse für die Engine beim Namen erreichbar (`logic::NativeBlueprint`) und meldet sie unter dem Hash des Graphen an. Kein Teil der Schreibweise. |
 
 ## Stand
@@ -62,7 +63,14 @@ Code, ohne den Layout-Block (wo die Knoten stehen, bleibt beim Graphen).
   Ansicht den Text in der kanonischen Form.
 - Was sich nicht lesen lässt, wird nicht angewendet: Die Fehlerzeile nennt Zeile, Spalte und
   Grund, ein Klick setzt den Cursor dorthin. **Reset** verwirft die Änderungen.
-- **Download** lädt die Quelle, die der heutige Spiel-Build für diesen Graphen kompiliert.
+- Neben dem Namen steht, ob ein C++-Compiler diesen Text schon ausführt, so wie er dasteht
+  („runs as compiled C++“) – oder welcher Knoten dafür noch fehlt (als Tooltip).
+- **Download** lädt die Quelle, die ein Spiel-Build für diesen Blueprint kompiliert: für einen
+  Blueprint, den der Compiler so ausführt, seine eigene Klasse – der Text und dahinter der Kleber
+  (`blueprint_<name>.cpp`, dasselbe, was `tools/blueprint_cpp.sh` für ein ganzes Level schreibt);
+  sonst noch der bisherige Export.
+- Die Klasse heißt wie der Actor, als C++-Name (`cpp_class_name`): „Door 1“ ist `Door1`; heißt
+  schon eine Funktion oder Variable darin so, `Door1Blueprint`.
 - Kann der Blueprint gerade nicht als C++ geschrieben werden (ein Regelverstoß, siehe unten),
   steht dort der Grund; behoben wird er im Graphen.
 

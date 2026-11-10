@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"17:25",title:"Kern-Editor: die C++-Ansicht sagt, was schon kompiliert läuft",items:[
+    "Im Kern-Editor zeigt die C++-Ansicht eines Blueprints jetzt, ob sein Code schon direkt als C++ läuft – oder welcher Knoten dafür noch fehlt. Download liefert genau die Datei, die ein Spiel dafür mitkompiliert.",
+    "Die Klasse eines Blueprints heißt wie sein Actor, als gültiger C++-Name (aus „Door 1“ wird Door1).",
+  ]},
   {date:"2026-11-10",time:"17:15",title:"Die Fahndungsregeln laufen im Spiel als kompiliertes C++",items:[
     "Die Fahndung von SpawnCity (Sterne, Polizei, Entkommen, EMP) läuft jetzt im Spiel selbst als kompilierter C++-Code ihres Blueprints – nicht mehr über den Blueprint-Interpreter. Die Werte sind dieselben; das wird bei jedem Update mit über 500 Aufrufen gegen den Blueprint geprüft.",
     "Unter der Haube (für alle Kern-Spiele): Beim Bauen eines Spiels werden die Blueprints seines Levels als C++-Klassen mitkompiliert. Das Level bleibt die eine Quelle – wird ein Blueprint geändert, läuft er bis zum nächsten Bau wieder als Blueprint, nie als veralteter Code.",

@@ -7409,6 +7409,43 @@ TEST(studio_logic_cpp_view) {
   // one undo step
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul(x, 2.0)") != std::string::npos);
+  // The view says whether a compiler runs the text as it stands; Download gives what a game build
+  // compiles: for a Blueprint of functions its own class (the text and the glue), named as C++.
+  {
+    json::Value with_event = f.cmd(R"({"cmd":"logicCpp"})");
+    CHECK(!with_event["native"].as_bool() && with_event["nativeWhy"].as_string().find("is not yet a function of blueprint.h") != std::string::npos);
+    CHECK(f.cmd(R"({"cmd":"logicExportCpp"})")["text"].as_string().find("register_native_graph") != std::string::npos);  // (the node loop, until events are functions too)
+    StudioFixture own;
+    CHECK(own.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+    own.cmd(R"({"cmd":"spawn","item":"cube"})");
+    const u32 owner = static_cast<u32>(own.s->level().actors.back().id);
+    json::Value rename = json::Value::object();
+    rename.set("cmd", "rename");
+    rename.set("id", static_cast<f64>(owner));
+    rename.set("name", "Score board 2");
+    CHECK(own.s->command(rename)["ok"].as_bool());
+    json::Value open = json::Value::object();
+    open.set("cmd", "logicOpen");
+    open.set("owner", static_cast<f64>(owner));
+    CHECK(own.s->command(open)["ok"].as_bool());
+    json::Value text = json::Value::object();
+    text.set("cmd", "logicCppApply");
+    text.set("text", "struct Anything : kern::Blueprint {\n  Float Score = 0.0;\n\n  struct ScoreBoard2Result { Float result = 0.0; };\n"
+                     "  KERN_PURE ScoreBoard2Result ScoreBoard2(Float x = 0.0) {\n    return {math_mul(x, 2.0)};\n  }\n};\n");
+    json::Value applied = own.s->command(text);
+    if (!applied["ok"].as_bool()) std::printf("%s\n", applied["error"].as_string().c_str());
+    CHECK(applied["ok"].as_bool());
+    // (the actor's name as a C++ name; a function has that name already: the class is called something else)
+    json::Value view = own.cmd(R"({"cmd":"logicCpp"})");
+    CHECK(view["ok"].as_bool() && view["native"].as_bool() && view["name"].as_string() == "ScoreBoard2Blueprint");
+    CHECK(view["text"].as_string().find("struct ScoreBoard2Blueprint : kern::Blueprint {") != std::string::npos);
+    json::Value file = own.cmd(R"({"cmd":"logicExportCpp"})");
+    CHECK(file["ok"].as_bool() && file["native"].as_bool() && file["file"].as_string() == "blueprint_scoreboard2blueprint.cpp");
+    const std::string source = file["text"].as_string();
+    CHECK(source.find("#include \"kern/logic/blueprint.h\"") != std::string::npos && source.find("struct ScoreBoard2Blueprint : kern::Blueprint {") != std::string::npos);
+    CHECK(source.find("struct ScoreBoard2Blueprint_Native final : kern::logic::NativeBlueprint {") != std::string::npos && source.find("register_native_blueprint(0x") != std::string::npos);
+    CHECK(source.find("call_node") == std::string::npos && source.find("read_pin") == std::string::npos);
+  }
   // every ready-made graph of the editor is a Blueprint C++ can say, and says it
   for (const char* tpl : {"door", "score_zone", "spawner", "traffic_light", "robot_avoid"}) {
     StudioFixture t;

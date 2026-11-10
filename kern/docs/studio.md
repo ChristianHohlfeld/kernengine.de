@@ -350,7 +350,12 @@ es die Schleifen-Knoten).
 
 Blueprints aus Funktionen, Formeln und Variablen führt ein C++-Compiler als genau diesen Text aus
 (`kern/logic/blueprint.h`; `logic::native_ready` sagt, ob ein Blueprint schon so läuft). Graph
-und Text rechnen mit denselben Funktionen (`kern/logic/nodes.h`).
+und Text rechnen mit denselben Funktionen (`kern/logic/nodes.h`). Die Ansicht zeigt das neben
+dem Namen an („runs as compiled C++“, sonst im Tooltip der Knoten, der noch fehlt). **Download**
+gibt die Quelle, die ein Spiel-Build dafür kompiliert – die Klasse des Blueprints samt dem
+Kleber, über den die Engine sie beim Namen erreicht; `tools/blueprint_cpp.sh level.klevel out.cpp`
+schreibt dasselbe für alle Blueprints eines Levels, und ein Spiel, das `out.cpp` einbindet, führt
+sie als kompilierten Code aus (Stufe „native C++“).
 
 ### Funktionen
 

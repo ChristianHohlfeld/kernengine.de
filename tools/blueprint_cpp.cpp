@@ -37,24 +37,6 @@ bool read_file(const char* path, std::string& out) {
   return true;
 }
 
-/// A class name for a Blueprint: its owner's name as a C++ name that no other class has and
-/// nothing inside the class is called (a function named like its class would be a constructor).
-std::string class_name(const std::string& owner, const logic::Graph& g, std::set<std::string>& taken) {
-  std::string base;
-  for (char ch : owner)
-    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') base += ch;
-  if (base.empty() || (base[0] >= '0' && base[0] <= '9')) base = "Blueprint" + base;
-  auto inside = [&](const std::string& name) {
-    for (const logic::Variable& v : g.variables) if (v.name == name) return true;
-    for (const logic::Function& f : g.functions) if (f.name == name || f.name + "Result" == name) return true;
-    return false;
-  };
-  std::string name = base;
-  for (int k = 2; !logic::cpp_name_ok(name) || inside(name) || taken.count(name); ++k) name = base + (k == 2 ? "Blueprint" : "Blueprint" + std::to_string(k));
-  taken.insert(name);
-  return name;
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -80,7 +62,6 @@ int main(int argc, char** argv) {
                     "// as C++ classes (kern/docs/blueprint_cpp.md). Change the Blueprint in the level; the build writes\n"
                     "// this file again.\n"
                     "#include \"kern/logic/blueprint.h\"\n";
-  std::set<std::string> taken;
   std::set<u64> written;
   int classes = 0;
   for (const auto& [owner, json] : found) {
@@ -102,7 +83,7 @@ int main(int argc, char** argv) {
       continue;
     }
     std::string label = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
-    const std::string cls = class_name(label, g, taken);
+    const std::string cls = logic::cpp_class_name(label, g);  // (each class has a namespace of its own, below)
     std::string code, glue;
     if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());

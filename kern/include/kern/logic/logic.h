@@ -394,6 +394,10 @@ bool same_blueprint(const Graph& a, const Graph& b, std::string* difference = nu
 /// A name the notation can write as a C++ name: letters, digits and _, not starting with a
 /// digit, no C++ keyword and none of the notation's own names (Float, loop, n12, go12, on12 ...).
 bool cpp_name_ok(std::string_view name);
+/// The class name for the Blueprint of `owner` (an actor's name, "Level"): the name as a C++
+/// name ("Door 1" is Door1) that nothing in the class has - a function called like its class
+/// would be its constructor.
+std::string cpp_class_name(std::string_view owner, const Graph& g);
 /// Why a graph cannot be written as C++ (empty: it can), and the node that is about (0: the
 /// graph itself). check() reports the same as an error.
 std::string cpp_problem(const Graph& g, u32* node = nullptr, const Library& lib = library());

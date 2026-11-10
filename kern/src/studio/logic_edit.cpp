@@ -576,18 +576,37 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // nodes are stays with the graph.
     const logic::Graph* g = graph_of(level_, logic_owner_);
     const game::Actor* a = logic_owner_ ? level_.find(logic_owner_) : nullptr;
-    const std::string owner_name = a ? a->name : std::string("Level");
+    const logic::Graph none;
+    const std::string owner_name = logic::cpp_class_name(a ? a->name : std::string("Level"), g ? *g : none);
     std::string text, why;
-    if (!logic::to_cpp(g ? *g : logic::Graph(), owner_name, text, &why, logic::library(), false)) return fail_result(why);
+    if (!logic::to_cpp(g ? *g : none, owner_name, text, &why, logic::library(), false)) return fail_result(why);
     json::Value r = ok_result();
     r.set("text", text);
     r.set("name", owner_name);
+    // Does a C++ compiler run this text as it stands? (If not: what is missing.)
+    r.set("native", logic::native_ready(g ? *g : none, &why));
+    if (!r["native"].as_bool()) r.set("nativeWhy", why);
     return r;
   }
   if (name == "logicExportCpp") {
     // The graph as C++ source (compiled into a game it replaces the interpreter / JIT for this graph).
     const logic::Graph* g = graph_of(level_, logic_owner_);
     if (!g) return fail_result("this actor has no logic yet");
+    if (logic::native_ready(*g)) {
+      // Its own class: the Blueprint's text as it is, and the glue the engine reaches it through
+      // (what tools/blueprint_cpp.sh writes for a whole level).
+      const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+      const std::string cls = logic::cpp_class_name(owner ? owner->name : std::string("Level"), *g);
+      std::string text, glue, why;
+      if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why)) return fail_result(why);
+      json::Value r = ok_result();
+      r.set("text", text + "\n" + glue);
+      std::string file;
+      for (char ch : cls) file += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+      r.set("file", "blueprint_" + file + ".cpp");
+      r.set("native", true);
+      return r;
+    }
     struct Quiet : logic::Host {
       f64 time() const override { return 0; }
       void print(const std::string&, bool) override {}

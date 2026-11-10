@@ -170,11 +170,11 @@ export class LogicEditor {
           </div>
           <div class="lg-cppview" hidden>
             <div class="lg-cpphead">
-              <b>C++</b><span class="lg-cppname"></span><span class="lg-cppstate"></span>
+              <b>C++</b><span class="lg-cppname"></span><span class="lg-cppstate"></span><span class="lg-cppnative"></span>
               <div class="lg-spacer"></div>
               <button class="lg-tb lg-cppapply" title="The Blueprint becomes what this text says (Ctrl+Enter). One undo step.">Apply</button>
               <button class="lg-tb lg-cppreset" title="Drop the changes: the text of the Blueprint as it is">Reset</button>
-              <button class="lg-tb lg-cppdl" title="Download the source today's game build compiles for this graph">Download</button>
+              <button class="lg-tb lg-cppdl" title="Download the source a game build compiles for this Blueprint">Download</button>
               <button class="lg-tb lg-cppclose" title="Back to the graph (Esc)">Graph</button>
             </div>
             <textarea class="lg-cpptext" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
@@ -288,6 +288,11 @@ export class LogicEditor {
     this.el.cppText.value = this.cppBase;
     this.el.cppText.readOnly = !r?.ok;
     this.el.cpp.querySelector(".lg-cppname").textContent = r?.name ? " · " + r.name : "";
+    // Does a C++ compiler run this text as it stands, or is a node not yet a function there?
+    const native = this.el.cpp.querySelector(".lg-cppnative");
+    native.textContent = !r?.ok ? "" : r.native ? "runs as compiled C++" : "runs in the interpreter for now";
+    native.title = !r?.ok ? "" : r.native ? "A game build compiles this text as it stands: every node is a function, nothing is looked up at run time." : (r.nativeWhy || "");
+    native.classList.toggle("ready", !!(r?.ok && r.native));
     this.cppProblem(r?.ok ? "" : (r?.error || "This Blueprint cannot be written as C++ yet.") + " Fix it in the graph (Compiler Results).");
     this.cppState();
   }
@@ -2082,6 +2087,7 @@ export const LOGIC_STYLE = `
 .lg-cppview[hidden]{display:none}
 .lg-cpphead{display:flex;align-items:center;gap:6px;height:34px;padding:0 8px 0 12px;background:#1a1a1a;border-bottom:1px solid var(--lg-line);flex:none;color:#eee}
 .lg-cppname{color:#9aa0a6}.lg-cppstate{margin-left:10px;color:#7f8790}.lg-cppstate.dirty{color:var(--lg-sel)}
+.lg-cppnative{margin-left:10px;color:#7f8790;cursor:help}.lg-cppnative.ready{color:#6fbf73}
 .lg-cpphead .lg-tb:disabled{opacity:.4;pointer-events:none}
 .lg-cpptext{flex:1;min-height:0;width:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;background:#161616;color:#d8dade;
   font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;tab-size:2;white-space:pre;overflow:auto}

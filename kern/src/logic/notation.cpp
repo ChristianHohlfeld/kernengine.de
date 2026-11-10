@@ -3018,6 +3018,26 @@ bool cpp_name_ok(std::string_view name) {
   return true;
 }
 
+std::string cpp_class_name(std::string_view owner, const Graph& g) {
+  std::string base;
+  bool upper = false;
+  for (char ch : owner) {
+    if (!is_part(ch)) { upper = !base.empty(); continue; }
+    base += upper ? static_cast<char>(std::toupper(static_cast<unsigned char>(ch))) : ch;
+    upper = false;
+  }
+  while (base.find("__") != std::string::npos) base.erase(base.find("__"), 1);
+  if (base.empty() || is_digit(base[0])) base = "Blueprint" + base;
+  auto inside = [&](const std::string& name) {
+    for (const Variable& v : g.variables) if (v.name == name) return true;
+    for (const Function& f : g.functions) if (f.name == name || f.name + "Result" == name) return true;
+    return false;
+  };
+  std::string name = base;
+  for (int k = 1; !cpp_name_ok(name) || inside(name); ++k) name = base + "Blueprint" + (k == 1 ? std::string() : std::to_string(k));
+  return name;
+}
+
 std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Library& lib) {
   std::vector<std::pair<std::string, std::string>> renamed;
   std::set<std::string> node_names, event_outs, taken;
