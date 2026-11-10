@@ -7,6 +7,31 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"02:22",title:"Zielen und Schießen gleichzeitig",items:[
+    "Maus: Mit gehaltener rechter Taste anvisieren und dabei mit der linken schießen funktioniert jetzt zuverlässig – in beliebiger Reihenfolge der Tasten.",
+    "Maus: Das Anvisieren bleibt stabil, solange du die rechte Taste hältst.",
+  ]},
+  {date:"2026-11-10",time:"01:31",title:"Flüssiger bei viel Verkehr",items:[
+    "Deutlich flüssiger in vollen Straßen: Die Fahrzeug-Physik kostet nur noch einen Bruchteil der Rechenzeit.",
+  ]},
+  {date:"2026-11-10",time:"01:15",title:"Multiplayer: eine Welt für alle",items:[
+    "Multiplayer: Passanten, Jogger, Autos, Kühe, Hunde, Katzen und Tauben sind bei allen exakt dieselben – der Host bestimmt die Straße, Mitspieler zeigen genau seine Welt und erfinden nichts mehr selbst dazu.",
+    "Multiplayer: Was der eine sieht, fehlt beim anderen nicht mehr – auch volle Straßen und große Schwärme kommen vollständig bei jedem Mitspieler an.",
+    "Multiplayer: Die Autos des Hosts fahren bei Mitspielern flüssig auf seiner Spur.",
+    "Multiplayer: Ampeln schalten bei allen gleichzeitig; erlegte Tauben eines Schwarms sind bei allen dieselben.",
+  ]},
+  {date:"2026-11-10",time:"00:30",title:"Die Weltkarte zeigt wieder die ganze Welt",items:[
+    "Große Karte: Sie zeigt wieder die ganze Welt – von den Kontinenten bis zur Bordsteinkante zoombar, mit Straßen, Wasser, Parks, Häusern und Ortsnamen.",
+    "Große Karte: Wegpunkte lassen sich überall auf der Welt setzen.",
+  ]},
+  {date:"2026-11-10",time:"00:21",title:"Die Welt außerhalb deiner Stadt stimmt wieder",items:[
+    "Überall auf der Welt steht die Stadt wieder richtig auf dem Gelände – keine versunkenen oder schwebenden Viertel mehr, wenn du deine Startstadt verlässt.",
+    "Straßen liegen wie im Original eben im Gelände, Häuser stehen passend daran.",
+    "Beim schnellen Fahren stehen die Häuser schon dort, wo du hinkommst: Die Stadt baut sich entlang deines Wegs voraus auf.",
+    "Bäume und Laternen stehen neben der Straße – nicht mehr auf der Fahrbahn, in Häusern oder in der Luft; Ampeln stehen an der Ecke der Kreuzung.",
+    "Fehlt ein Kartenstück wegen schlechter Verbindung, wird es von selbst erneut geladen.",
+    "Autos und Busse fahren auf echten Rädern mit Federung – die alte Federung konnte Busse in die Luft schleudern.",
+  ]},
   {date:"2026-11-07",time:"20:35",title:"Vollständiger Rollback auf den Stand vor Freunde/öffentlich und Spielrunden",items:[
     "SpawnCity läuft wieder wie vor dem MULTI-Update mit MIT FREUNDEN / ÖFFENTLICH und der öffentlichen Tagesstadt.",
     "Die fünf Spielrunden mit Abstimmung, das Runden-Testkommando, XP/Level und die Bild-/Clip-Teilen-Funktionen sind zurückgenommen.",

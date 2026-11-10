@@ -496,6 +496,19 @@ export function localizePage() {
 
 export const POINTER = {down: 0, move: 1, up: 2, cancel: 3, wheel: 4, leave: 5};
 
+/**
+ * Chorded mouse buttons. Pointer Events report a mouse button that is pressed or released while
+ * another one is held as a `pointermove` whose `button` names it - never as pointerdown /
+ * pointerup (W3C Pointer Events: "chorded button interactions"). So aiming with the right button
+ * and then firing with the left arrives as a move. Returns POINTER.down / POINTER.up for such an
+ * event (the button's new state is in `buttons`), null for a plain move.
+ */
+export function chordedButton(e) {
+  if (e.pointerType !== "mouse" || !(e.button >= 0)) return null;
+  const bit = e.button === 1 ? 4 : e.button === 2 ? 2 : 1 << e.button;  // button 1 = middle (bit 4), 2 = right (bit 2)
+  return (e.buttons & bit) ? POINTER.down : POINTER.up;
+}
+
 /** Thin wrapper over kern/src/studio/api.cpp. */
 const AO_QUALITIES = ["low", "medium", "high", "ultra"];
 /** PCF taps for the sun's shadow: phones 4 (3x3 kernel), desktop 9 (5x5). ?shadowFilter=1|4|9 overrides. */
@@ -1521,7 +1534,13 @@ export async function startGame({levelText = null, template = null, bytes = null
     if (e.pointerType === "mouse" && document.pointerLockElement !== canvas && !engine.state()?.play?.observing) canvas.requestPointerLock?.()?.catch?.(() => {});
     send(POINTER.down, e);
   });
-  canvas.addEventListener("pointermove", e => { if (!routeTouch(engine, POINTER.move, e, at) && document.pointerLockElement !== canvas) send(POINTER.move, e); });
+  canvas.addEventListener("pointermove", e => {
+    if (routeTouch(engine, POINTER.move, e, at)) return;
+    // a second mouse button while one is held (aim, then fire) comes as a move: chordedButton
+    const chord = chordedButton(e);
+    if (chord !== null) { e.preventDefault(); send(chord, e); return; }
+    if (document.pointerLockElement !== canvas) send(POINTER.move, e);
+  });
   canvas.addEventListener("pointerup", e => { if (!routeTouch(engine, POINTER.up, e, at)) send(POINTER.up, e); });
   canvas.addEventListener("pointercancel", e => { if (!routeTouch(engine, POINTER.cancel, e, at)) send(POINTER.cancel, e); });
   // No finger left on the screen: nothing can still be held (SpawnCity's ground truth).

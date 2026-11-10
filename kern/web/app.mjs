@@ -69,24 +69,33 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     if (!event.repeat) e.kern_app_key(k, 1);
   });
   on(window, "keyup", event => { const k = KEY_INDEX.get(event.code); if (k !== undefined) e.kern_app_key(k, 0); });
-  on(window, "blur", () => e.kern_app_focus(0));
+  // The mouse buttons held, taken from the button events alone: pointerdown, pointerup and - for a
+  // second button while one is already held (aim with the right, then fire with the left) - the
+  // pointermove that names it in `button` (Pointer Events: chorded buttons come as moves, never as
+  // pointerdown / pointerup). A plain move's `buttons` is not read: the browser's own synthetic
+  // moves (it tests again what lies under the cursor whenever the page changes) do not carry the
+  // buttons that are held, and would let go of them.
+  let held = 0;
+  on(window, "blur", () => { held = 0; e.kern_app_focus(0); });
   on(window, "focus", () => e.kern_app_focus(1));
   canvas.style.touchAction = "none";
   on(canvas, "pointerdown", event => {
     const [x, y] = local(event);
     if (event.pointerType === "touch") e.kern_app_touch(event.pointerId, 0, x, y);
-    else e.kern_app_pointer(x, y, 0, 0, event.buttons);
-    canvas.setPointerCapture?.(event.pointerId);
+    else e.kern_app_pointer(x, y, 0, 0, held = event.buttons);
+    // (a locked pointer already sends everything here, and cannot be captured)
+    if (document.pointerLockElement !== canvas) try { canvas.setPointerCapture?.(event.pointerId); } catch { /* the pointer is gone */ }
   });
   on(canvas, "pointermove", event => {
     const [x, y] = local(event), r = ratio();
-    if (event.pointerType === "touch") e.kern_app_touch(event.pointerId, 1, x, y);
-    else e.kern_app_pointer(x, y, (event.movementX || 0) * r, (event.movementY || 0) * r, event.buttons);
+    if (event.pointerType === "touch") { e.kern_app_touch(event.pointerId, 1, x, y); return; }
+    if (event.button >= 0) held = event.buttons;  // a chorded button changed
+    e.kern_app_pointer(x, y, (event.movementX || 0) * r, (event.movementY || 0) * r, held);
   });
   const up = event => {
     const [x, y] = local(event);
     if (event.pointerType === "touch") e.kern_app_touch(event.pointerId, 2, x, y);
-    else e.kern_app_pointer(x, y, 0, 0, event.buttons);
+    else e.kern_app_pointer(x, y, 0, 0, held = event.type === "pointercancel" ? 0 : event.buttons);
   };
   on(canvas, "pointerup", up);
   on(canvas, "pointercancel", up);

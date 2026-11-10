@@ -345,10 +345,24 @@ const vpCenter = async (page, i = 0) => {
     await page.mouse.down();
     check(await until(async () => (await status(page)).hud?.soldier?.ammo < 30, 120000), "holding the left mouse button fires");
     await page.mouse.up();
+    // Aim with the right button, then fire with the left. The browser reports a second button
+    // pressed while one is held as a pointermove (chorded buttons), not as a pointerdown.
+    await page.mouse.down({button: "right"});
+    check(await until(async () => (await status(page)).hud?.soldier?.aiming === true, 60000), "holding the right mouse button aims");
+    const aimed = (await status(page)).hud.soldier.ammo;
+    await page.mouse.down();
+    check(await until(async () => { const so = (await status(page)).hud?.soldier; return so?.aiming && so.ammo < aimed; }, 120000), "the left button fires while the right one aims");
+    await page.mouse.up();
+    check((await status(page)).hud?.soldier?.aiming === true, "letting go of the left button keeps aiming");
+    await page.mouse.up({button: "right"});
+    check(await until(async () => (await status(page)).hud?.soldier?.aiming === false, 60000), "letting go of the right button stops aiming");
     await page.keyboard.press("Escape");
   }
   await page.waitForTimeout(300);
   if ((await state(page)).play?.state !== "editing") await cmd(page, {cmd: "stop"});
+  // (the same level as a packaged game: played further down)
+  const rangeFile = path.join(shots, "shooting-range-game.html");
+  fs.writeFileSync(rangeFile, await page.evaluate(() => window.KernStudio.packageHtml("Shooting Range")));
 
   // Logic (Blueprint-style graph): start node, drag a wire into empty space, search, type a value, play.
   {
@@ -467,6 +481,32 @@ const vpCenter = async (page, i = 0) => {
   await shot(game, "game.png");
   check(gerrors.length === 0, "no page errors in the game" + (gerrors.length ? ": " + gerrors.join(" | ") : ""));
   await gctx.close();
+
+  // The packaged first-person game: aim with the right mouse button, fire with the left.
+  {
+    const rctx = await browser.newContext({viewport: {width: 1100, height: 680}});
+    const range = await rctx.newPage();
+    const rerrors = [];
+    range.on("pageerror", e => rerrors.push(e.message));
+    await range.goto(pathToFileURL(rangeFile).href);
+    await range.waitForFunction(() => window.KernGame, null, {timeout: 90000});
+    const soldier = () => range.evaluate(() => window.KernGame.status.hud?.soldier);
+    check(await until(async () => (await soldier())?.ammo === 30, 60000), "the packaged Shooting Range plays a Soldier");
+    await range.mouse.move(550, 340);
+    await range.mouse.down();  // the capture click
+    await range.mouse.up();
+    check(await until(() => range.evaluate(() => !!document.pointerLockElement), 20000), "the packaged game captures the mouse");
+    const before = (await soldier()).ammo;
+    await range.mouse.down({button: "right"});
+    check(await until(async () => (await soldier())?.aiming === true, 60000), "the packaged game aims with the right mouse button");
+    await range.mouse.down();
+    check(await until(async () => { const so = await soldier(); return so?.aiming && so.ammo < before; }, 120000), "the packaged game fires with the left button while the right one aims");
+    await range.mouse.up();
+    await range.mouse.up({button: "right"});
+    check(await until(async () => (await soldier())?.aiming === false, 60000), "the packaged game stops aiming when the right button is let go");
+    check(rerrors.length === 0, "no page errors in the packaged Shooting Range" + (rerrors.length ? ": " + rerrors.join(" | ") : ""));
+    await rctx.close();
+  }
 
   // The same game on a phone: the engine detects touch, draws its sticks and never locks the pointer.
   const tctx = await browser.newContext({viewport: {width: 844, height: 390}, hasTouch: true, isMobile: true, deviceScaleFactor: 1});
