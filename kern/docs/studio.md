@@ -138,6 +138,8 @@ Vorlagen unter File → New Level: Orb Run, Physics Lab (alle Gelenktypen: Stape
 
 ## Spiele exportieren
 
+**Nativer Export:** `tools/export_game.sh level.klevel spiel.html` schreibt dieselbe Seite wie Package Game, aber mit einem Engine-Modul, das für dieses Level gebaut ist – jeder Blueprint als seine C++-Klasse einkompiliert, voll optimiert (Stufe „native C++“ statt JIT; siehe [blueprint_cpp.md](blueprint_cpp.md)). Braucht wasi-sdk, einen C++-Compiler und Node.
+
 File → Package Game schreibt eine eigenständige HTML-Datei. Sie enthält das Engine-Modul (base64), `kern.mjs`, `game.mjs` und das Level. Das Spiel läuft im Vollbild mit HUD, Maus-Look per Pointer-Lock und Touch-Steuerung (Joystick, Sprung, Boost). Es braucht keinen Server und kein Netz.
 
 ## Protokoll

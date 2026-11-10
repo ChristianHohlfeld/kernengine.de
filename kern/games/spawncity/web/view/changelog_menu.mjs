@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"22:15",title:"Nativer Export: ein Level als Spiel mit kompilierten Blueprints",items:[
+    "Kern-Engine: Ein Level lässt sich jetzt mit einem Befehl als eigenständiges Spiel exportieren, dessen Blueprints fest als C++ einkompiliert sind (tools/export_game.sh). Das Spiel ist dieselbe einzelne HTML-Datei, die „Package Game“ im Editor schreibt – nur muss beim Start nichts mehr übersetzt werden, und der Compiler optimiert Blueprints und Engine zusammen.",
+    "Der Editor im Browser kann kein C++ kompilieren; sein „Package Game“ bleibt wie es ist (die Blueprints übersetzt dort der Browser beim Start). Ein automatischer Browser-Test spielt ein nativ exportiertes Level und prüft, dass seine Blueprints wirklich als kompilierte Klassen laufen.",
+  ]},
   {date:"2026-11-10",time:"22:09",title:"Ganze Zahlen: überall dieselbe Zahl",items:[
     "Kern-Blueprints: Eine ganze Zahl (Integer) ist jetzt in jeder Form dieselbe – als Graph, im Browser beschleunigt und als kompiliertes C++. Bis 2^53 ist sie exakt; größer geht es bis zu den Enden von 64 Bit, nie darüber hinaus. Eine Variable, die sich immer wieder verdoppelt, bleibt am oberen Ende stehen (das kompilierte C++ lief dort bisher ins Undefinierte), und aus „keine Zahl“ oder unendlich wird beim Runden überall 0.",
     "Beschleunigte Blueprints gehen jetzt so tief wie die anderen Formen: Ihr Speicher für offene Sequences und Schleifen ist so groß, wie der Blueprint ihn je brauchen kann (bisher war bei 512 Schluss).",

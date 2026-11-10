@@ -160,7 +160,11 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   höchstens einmal etwas offen, und Ketten liegen höchstens 64 Events tief). Vorher stoppte er
   bei 512 offenen Schritten, wo Interpreter und Klasse weiterliefen. Ein Graph, der mehr als
   32 768 bräuchte, bleibt im Interpreter.
-- [ ] **Nativer Export:** Der Editor exportiert das Spiel mit diesen Klassen, voll optimiert.
+- [x] **Nativer Export:** `tools/export_game.sh level.klevel spiel.html` schreibt ein Level als
+  eigenständiges Spiel mit diesen Klassen, voll optimiert (dieselbe Seite wie „Package Game“ im
+  Editor, das Engine-Modul für das Level gebaut). Der Editor selbst läuft im Browser und kann
+  kein C++ kompilieren – der Export ist deshalb ein Werkzeug des Repositorys. Browser-Test
+  `export_e2e.mjs`: Die Blueprints des exportierten Spiels laufen als Klassen.
 - [ ] Der JIT erzeugt Formeln und Funktionsaufrufe ebenfalls direkt (heute Rückruf).
 
 ### 2 – Die Sprache vervollständigen

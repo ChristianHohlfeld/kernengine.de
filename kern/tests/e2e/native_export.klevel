@@ -1,0 +1,275 @@
+{
+  "format": "kern-level",
+  "version": 1,
+  "name": "Native Export",
+  "world": {
+    "gravity": [
+      0,
+      0,
+      -9.80665
+    ],
+    "substeps": 4,
+    "stepHz": 60,
+    "timeOfDay": 0.42,
+    "dayLength": 0,
+    "sunAzimuth": 210,
+    "fogDensity": 0.0009,
+    "exposure": 1,
+    "aoRadius": 1.6,
+    "shadowDistance": 80,
+    "clouds": true,
+    "ground": true,
+    "groundColor": "#304526",
+    "groundFriction": 0.7,
+    "groundRestitution": 0,
+    "contactHertz": 30,
+    "contactDamping": 10,
+    "contactSpeed": 3,
+    "killZ": -50,
+    "title": "Native Export",
+    "goal": "none",
+    "timeLimit": 0,
+    "scoreTarget": 0,
+    "player": 0,
+    "masterVolume": 1,
+    "music": "",
+    "musicVolume": 0.6,
+    "ambience": "",
+    "ambienceVolume": 0.6,
+    "reverb": 0.25,
+    "doppler": 1
+  },
+  "camera": {
+    "position": [
+      -8,
+      -10,
+      6
+    ],
+    "yaw": 51,
+    "pitch": -22
+  },
+  "nextId": 3,
+  "actors": [
+    {
+      "id": 1,
+      "name": "Floor",
+      "transform": {
+        "position": [
+          0,
+          0,
+          -0.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "mesh": {
+          "shape": "box",
+          "size": [
+            40,
+            40,
+            0.2
+          ],
+          "radius": 0.5,
+          "height": 1,
+          "segments": 24,
+          "collision": true,
+          "friction": 0.6,
+          "restitution": 0,
+          "rollingResistance": 0,
+          "material": {
+            "color": "#8c9199",
+            "roughness": 0.9,
+            "metalness": 0,
+            "emissive": "#000000",
+            "emissiveStrength": 0,
+            "opacity": 1,
+            "unlit": false,
+            "castShadow": true,
+            "doubleSided": false,
+            "texture": "",
+            "tiling": 1
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "Cube",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "mesh": {
+          "shape": "box",
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "radius": 0.5,
+          "height": 1,
+          "segments": 24,
+          "collision": true,
+          "friction": 0.6,
+          "restitution": 0,
+          "rollingResistance": 0,
+          "material": {
+            "color": "#d98c4d",
+            "roughness": 0.6,
+            "metalness": 0,
+            "emissive": "#000000",
+            "emissiveStrength": 0,
+            "opacity": 1,
+            "unlit": false,
+            "castShadow": true,
+            "doubleSided": false,
+            "texture": "",
+            "tiling": 1
+          }
+        },
+        "logic": {
+          "kind": "kern-logic",
+          "version": 1,
+          "nextId": 4,
+          "variables": [],
+          "nodes": [
+            {
+              "id": 1,
+              "type": "event.every",
+              "x": 0,
+              "y": 0,
+              "params": {
+                "seconds": "0.5"
+              }
+            },
+            {
+              "id": 2,
+              "type": "actor.move_by",
+              "x": 280,
+              "y": 0,
+              "values": {
+                "target": 0,
+                "offset": [
+                  0,
+                  0,
+                  0.10000000149011612
+                ]
+              }
+            },
+            {
+              "id": 3,
+              "type": "game.add_score",
+              "x": 560,
+              "y": 0,
+              "values": {
+                "points": 1
+              }
+            }
+          ],
+          "links": [
+            [
+              1,
+              "then",
+              2,
+              "exec"
+            ],
+            [
+              2,
+              "then",
+              3,
+              "exec"
+            ]
+          ],
+          "machines": []
+        }
+      }
+    }
+  ],
+  "textures": [],
+  "sounds": [],
+  "logic": {
+    "kind": "kern-logic",
+    "version": 1,
+    "nextId": 5,
+    "variables": [
+      {
+        "name": "Ticks",
+        "type": "int",
+        "value": 0
+      }
+    ],
+    "nodes": [
+      {
+        "id": 1,
+        "type": "event.begin",
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": 2,
+        "type": "event.tick",
+        "x": 0,
+        "y": 200
+      },
+      {
+        "id": 3,
+        "type": "game.message",
+        "x": 280,
+        "y": 0,
+        "values": {
+          "text": "Native export"
+        }
+      },
+      {
+        "id": 4,
+        "type": "var.add",
+        "x": 280,
+        "y": 200,
+        "params": {
+          "variable": "Ticks"
+        },
+        "values": {
+          "amount": 1
+        }
+      }
+    ],
+    "links": [
+      [
+        1,
+        "then",
+        3,
+        "exec"
+      ],
+      [
+        2,
+        "then",
+        4,
+        "exec"
+      ]
+    ],
+    "machines": []
+  }
+}

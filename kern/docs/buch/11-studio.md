@@ -1221,6 +1221,15 @@ Editor, nur das Level, sofort im Spiel. Das Modul enthält Pollens 3D-Modelle de
 (CC BY-NC-SA 4.0, nicht kommerziell), außer es wurde kommerziell gebaut (`KERN_COMMERCIAL=1
 tools/build_studio.sh`); siehe Abschnitt 12.6 in [Kapitel 12](12-eigene-spiele.md).
 
+**Der native Export.** Im verpackten Spiel übersetzt der Browser die Blueprints beim Start (der JIT,
+[Kapitel 9](09-logik.md)). `tools/export_game.sh level.klevel spiel.html` schreibt dieselbe Seite mit
+einem Engine-Modul, das **für dieses Level gebaut** ist: Jeder Blueprint des Levels wird als seine
+C++-Klasse geschrieben ([blueprint_cpp.md](../blueprint_cpp.md)) und mit der Engine kompiliert, voll
+optimiert. Im Spiel laufen die Blueprints dann als diese Klassen (Stufe „native C++“) – nichts wird
+beim Start übersetzt oder nachgeschlagen. Das braucht die Werkzeuge von `kern/build.sh` (wasi-sdk),
+einen C++-Compiler und Node, also einen Rechner mit dem Repository statt des Editors im Browser. Das
+Level bleibt die Quelle: nach einer Änderung neu exportieren.
+
 ![Das exportierte Orb Run als eigenständige HTML-Datei](bilder/game.png)
 
 **Bedienung im exportierten Spiel:**

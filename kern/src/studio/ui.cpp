@@ -1101,10 +1101,14 @@ json::Value Studio::status() {
   }
   if (logic::Runtime* rt = world_->running() ? world_->logic_runtime() : nullptr) {
     json::Value lg = json::Value::object();
-    u32 compiled = 0;
-    for (const auto& i : rt->instances()) compiled += i->compiled() ? 1 : 0;
+    u32 compiled = 0, native = 0;
+    for (const auto& i : rt->instances()) {
+      compiled += i->compiled() ? 1 : 0;
+      native += std::string_view(i->tier()) == "native C++" ? 1 : 0;  // (its own C++ class, compiled into this program)
+    }
     lg.set("graphs", static_cast<u32>(rt->instances().size()));
     lg.set("compiled", compiled);
+    lg.set("native", native);
     s.set("logic", std::move(lg));
   }
   if (play_ != PlayState::editing) {

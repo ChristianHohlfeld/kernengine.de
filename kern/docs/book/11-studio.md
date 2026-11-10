@@ -1170,6 +1170,15 @@ level, straight into Play. The module contains Pollen's 3D models of the Micro D
 non-commercial) unless it was built commercially (`KERN_COMMERCIAL=1 tools/build_studio.sh`); see
 Section 12.6 in [Chapter 12](12-your-own-games.md).
 
+**The native export.** In the packaged game the browser compiles the Blueprints at startup (the JIT,
+[Chapter 9](09-logic.md)). `tools/export_game.sh level.klevel game.html` writes the same page with an
+engine module that is **built for this level**: every Blueprint of the level is written as its C++
+class ([blueprint_cpp.md](../blueprint_cpp.md)) and compiled with the engine, fully optimised. In the
+game the Blueprints then run as those classes (the tier "native C++") – nothing is compiled or looked
+up at startup. This needs the tools of `kern/build.sh` (wasi-sdk), a C++ compiler and Node, that is a
+machine with the repository instead of the editor in the browser. The level stays the source: export
+again after changing it.
+
 ![The exported Orb Run as a standalone HTML file](../buch/bilder/game.png)
 
 **Controls in the exported game:**

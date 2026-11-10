@@ -23,6 +23,7 @@ kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, A
 kern/tests/game_cases.h              zwei Levels, deren Blueprints jeden Gameplay-Knoten benutzen, mit ihren Szenarien
 kern/tests/game_native_test.cpp      spielt sie im Interpreter und als Klassen und vergleicht
 tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen, die ein Spiel einbindet
+tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die Klassen einkompiliert
 ```
 
 | Funktion | Bedeutung |
@@ -56,8 +57,12 @@ tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
 - **Fertig: ein C++ je Blueprint.** Den früheren Export (eine Schleife über Knotennummern, die in
   die Knoten-Bibliothek zurückrief) gibt es nicht mehr.
-- **Als Nächstes:** die letzten Randfälle zwischen den Stufen (siehe
-  `kern/games/spawncity/BLUEPRINTS.md`); der native Export eines ganzen Spiels aus dem Editor.
+- **Fertig: der native Export.** `tools/export_game.sh level.klevel spiel.html` schreibt ein Level
+  als eigenständiges Spiel, dessen Engine-Modul für dieses Level gebaut ist: alle Blueprints als
+  ihre C++-Klassen, voll optimiert. Die Seite ist die, die „Package Game“ im Editor schreibt.
+- **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
+  die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (17 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -436,6 +441,14 @@ Klasse `Name_Native`, über die die Engine Funktionen und Variablen beim Namen e
 (`register_native_blueprint`). Ein Spiel, das `out.cpp` einbindet, führt diese Blueprints als
 kompilierten Code aus; `Instance::tier()` sagt dann „native C++“. Beim Namen wird nur an dieser
 Grenze nachgesehen – in der Klasse ist jeder Aufruf ein direkter Aufruf.
+
+**Als fertiges Spiel.** `tools/export_game.sh level.klevel spiel.html` macht beides in einem
+Zug: die Klassen schreiben, die Engine mit ihnen bauen (`kern/build.sh --studio`, ThinLTO – der
+Compiler sieht Blueprint und Engine zusammen), die Seite schreiben. Der Editor im Browser kann
+kein C++ kompilieren; sein „Package Game“ legt das Level neben das Modul des Editors, und der
+Browser übersetzt die Blueprints beim Start (JIT). Der native Export ist derselbe Inhalt,
+vorab kompiliert. Der Browser-Test `kern/tests/e2e/export_e2e.mjs` spielt ein so exportiertes
+Level und prüft, dass seine Blueprints als Klassen laufen.
 
 Das Level bleibt die eine Quelle. Die Klasse führt nur genau den Graphen aus, aus dem sie
 geschrieben wurde: Der Hash lässt Positionen und Kommentare aus, alles andere ändert ihn. Ein

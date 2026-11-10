@@ -87,8 +87,11 @@ jobs:
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
             kern/build.sh --lehrer generated/kern_lehrer.wasm
             kern/games/spawncity/build.sh
+            # The native export: a level as a game with its Blueprints compiled in as C++ classes
+            # (the browser test plays it: kern/tests/e2e/export_e2e.mjs).
+            tools/export_game.sh kern/tests/e2e/native_export.klevel generated/native_export.html
             for f in kern/games/spawncity/web/*.mjs kern/games/spawncity/web/audio/*.mjs; do node --check "$f"; done
-            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs tools/export_game.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
           set -o pipefail
@@ -157,6 +160,11 @@ jobs:
           path: _site
           include-hidden-files: true
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-export
+          path: generated/native_export.html
+          retention-days: 7
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -205,6 +213,10 @@ jobs:
         with:
           name: site
           path: _site
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-export
+          path: generated
       - name: Playwright (cached)
         uses: actions/cache@v4
         with:
@@ -226,6 +238,8 @@ jobs:
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771
           # functions and formulas in the Blueprint editor; SpawnCity's level file opens in the editor
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771
+          # the native export: a game whose Blueprints run as their compiled C++ classes
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/export_e2e.mjs http://127.0.0.1:8771/generated/native_export.html
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@v4
