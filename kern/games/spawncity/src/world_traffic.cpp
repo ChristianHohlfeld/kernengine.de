@@ -177,6 +177,59 @@ i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   return 2;
 }
 
+TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
+  Pursuit out;
+  const i32 n = static_cast<i32>(lane.points.size());
+  if (n < 2) { out.target = n ? lane.points[0] : pos; out.passed = true; return out; }
+  dir = dir < 0 ? -1 : 1;
+  i32 i = std::clamp(index, 0, n - 1);
+  if (i - dir < 0 || i - dir >= n) i += dir;  // (the lane's first point in this direction: the stretch after it)
+  Vec2 a = lane.points[i - dir], b = lane.points[i];
+  auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = std::hypot(d.x, d.y); if (l > 1e-3f) t = d * (1.0f / l); return l; };
+  Vec2 t{1, 0};
+  f32 len = along(a, b, t);
+  // where the car is along the stretch that leads to lane point `index`
+  const f32 at = (pos.x - a.x) * t.x + (pos.y - a.y) * t.y;
+  out.passed = i != std::clamp(index, 0, n - 1) ? false : at >= len - 0.5f;
+  const f32 s = clampf(at, 0, len);
+  Vec2 cur = a + t * s;
+  f32 left = len - s, want = std::fmax(0.0f, look);
+  out.end = left;
+  for (i32 k = i; k + dir >= 0 && k + dir < n; k += dir) out.end += std::hypot(lane.points[k + dir].x - lane.points[k].x, lane.points[k + dir].y - lane.points[k].y);
+  while (want > left) {
+    if (i + dir < 0 || i + dir >= n) { want = left; break; }  // the lane ends here
+    want -= left;
+    cur = b;
+    a = b;
+    i += dir;
+    b = lane.points[i];
+    left = along(a, b, t);
+  }
+  out.tangent = t;
+  out.target = cur + t * want + Vec2{t.y, -t.x} * off;
+  return out;
+}
+
+f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32* limiter) {
+  const f32 half = bus ? 1.6f : 1.25f, own = bus ? 4.0f : 1.9f;
+  f32 gap = 1e9f;
+  i32 who = -1;
+  for (std::size_t i = 0; i < all.size(); ++i) {
+    const Vehicle& o = all[i];
+    if (!o.there || static_cast<i32>(i) == self) continue;
+    const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
+    if (std::fabs(dx) > 40 || std::fabs(dy) > 40) continue;
+    const f32 along = dx * fwd.x + dy * fwd.y;
+    if (along < 1 || along > 40) continue;
+    if (std::fabs(-dx * fwd.y + dy * fwd.x) > half + 0.6f) continue;
+    const f32 g = along - ((o.bus ? 4.0f : 1.9f) + own);
+    if (g < gap) { gap = g; who = static_cast<i32>(i); }
+  }
+  if (limiter) *limiter = who;
+  if (who < 0) return 1e9f;
+  return std::fmax(0.0f, gap - 2.5f) / 1.6f;
+}
+
 f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
                         bool player_on_foot, View& view) {
   view = View{};

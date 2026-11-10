@@ -75,10 +75,13 @@ struct TrafficCar {
   Vec3 color{0.7f, 0.1f, 0.1f};
   bool placed = false, driver = true;
   i32 lane = -1, index = 0, dir = 1;
-  f32 target_speed = 10, stuck = 0;
+  f32 target_speed = 10;
+  f32 want = 0;       // the speed its driver aims for now (lights, people, the vehicle ahead)
+  i32 ahead = -1;     // the car it stands behind (its way is taken by it), or -1
   f32 peak_up = 0, peak_lift = 0;  // tests: the highest upward speed and height over its ride height while driven here
-  bool far = false;   // beyond 180 m: a kinematic lane follower (game_traffic_far.cpp)
+  bool far = false;   // beyond 180 m: a lane follower without physics (game_traffic_far.cpp)
   f32 far_speed = 0;
+  std::vector<u64> solid_masks;  // what its shapes collide with while it has physics (far: nothing)
   CarInput input;  // what the driver (AI or player) does this step
   // police cruisers and damage (police_ground_units.mjs: 300 HP, burning below 25 %)
   bool police = false;
@@ -404,6 +407,10 @@ class Game {
   void life_net_fx(const net::Fx& f);     // cow deaths and pushes from the other players
   // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
   f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
+  /// The speed the vehicle ahead leaves car `car` (world_traffic.h gap_speed); `limiter`: the car
+  /// it is (an index into cars_), or -1.
+  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter = nullptr);
+  f32 traffic_lane_distance(const TrafficCar& c) const;  // how far it is off its lane's line (tests)
   void eject_driver(i32 car);
   void update_traffic_world(f32 dt);
   void step_tow(f32 h);
@@ -480,7 +487,13 @@ class Game {
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);
   // far traffic (game_traffic_far.cpp, PHYS_NEAR_M / PHYS_FAR_M)
   void traffic_far_switch();
-  void traffic_far_step(TrafficCar& c, f32 h);
+  void traffic_far_step(TrafficCar& c, std::size_t i, f32 h);
+  void traffic_make_far(TrafficCar& c);
+  bool traffic_make_near(TrafficCar& c, std::size_t i);
+  void traffic_solid(TrafficCar& c);
+  /// Where a car stands at rest on the ground at (x, y) heading `yaw`: every wheel on the ground at
+  /// its ride height - the chassis pitched and rolled with the ground under its wheels.
+  kern::physics::Pose car_rest_pose(const CarSpec& s, f32 x, f32 y, f32 yaw) const;
   void traffic_advance(TrafficCar& c);
   // cars and buses as the original (game_vehicle_damage.cpp)
   f32 car_max_hp(const TrafficCar& c) const;

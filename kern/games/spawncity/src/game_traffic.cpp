@@ -64,6 +64,43 @@ f32 Game::traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed) {
   return lim;
 }
 
+f32 Game::traffic_lane_distance(const TrafficCar& c) const {
+  const std::vector<Lane>& lanes = city_.lanes();
+  if (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size())) return -1;
+  const Vec3 p = matrix_of(c.actor).translation();
+  return lane_distance(lanes[static_cast<std::size_t>(c.lane)], {p.x, p.y});
+}
+
+f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter) {
+  if (limiter) *limiter = -1;
+  if (!life_ || car < 0) return 1e9f;
+  WorldLife& L = *life_;
+  // every vehicle on the road, once a step: the cars (by index; with or without physics), then
+  // the tow trucks
+  if (L.vehicles_step != steps_) {
+    L.vehicles_step = steps_;
+    L.vehicles.assign(cars_.size() + L.trucks.size(), TrafficRules::Vehicle{});
+    for (std::size_t i = 0; i < cars_.size(); ++i) {
+      const TrafficCar& c = cars_[i];
+      if (!c.placed || !world_->actor_alive(c.actor)) continue;
+      const Vec3 p = matrix_of(c.actor).translation();
+      L.vehicles[i] = {{p.x, p.y}, c.car->spec().radius > 0.4f, true};
+    }
+    for (std::size_t k = 0; k < L.trucks.size(); ++k) {
+      const WorldLife::TowTruck& t = L.trucks[k];
+      if (!t.body.valid() || !world_->physics().body_valid(t.body)) continue;
+      const Vec3 p = world_->physics().pose(t.body).position;
+      L.vehicles[cars_.size() + k] = {{p.x, p.y}, false, true};
+    }
+  }
+  const f32 fl = std::hypot(fwd.x, fwd.y);
+  const Vec2 f2 = fl > 1e-4f ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
+  i32 who = -1;
+  const f32 v = TrafficRules::gap_speed(car, {pos.x, pos.y}, f2, cars_[static_cast<std::size_t>(car)].car->spec().radius > 0.4f, L.vehicles, &who);
+  if (limiter) *limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
+  return v;
+}
+
 void Game::eject_driver(i32 ci) {
   if (!life_ || ci < 0 || ci >= static_cast<i32>(cars_.size())) return;
   const BodyState s = state_of(cars_[ci].actor);
@@ -146,11 +183,20 @@ void Game::update_traffic_world(f32 dt) {
     TrafficCar& c = cars_[i];
     WorldLife::Watch& w = L.watch[i];
     const bool busy = std::any_of(L.trucks.begin(), L.trucks.end(), [&](const WorldLife::TowTruck& t) { return t.job == static_cast<i32>(i); });
-    if (!c.placed || c.police || static_cast<i32>(i) == car_index_ || busy || now < w.cooldown) { w = {w.cooldown}; continue; }
+    // (a car without physics far away is nobody's job: tow_service.mjs watches the physical ones)
+    if (!c.placed || c.far || c.police || static_cast<i32>(i) == car_index_ || busy || now < w.cooldown) { w = {w.cooldown}; continue; }
     const BodyState s = state_of(c.actor);
     const f32 up = s.rotation.rotate({0, 0, 1}).z, speed = std::hypot(s.velocity.x, s.velocity.y);
-    const TrafficRules::View* v = i < L.car_view.size() ? &L.car_view[i] : nullptr;
-    const bool waiting = v && (v->wait || v->yielding);
+    // waiting: at a red light, for the junction or for somebody in the way - or in the queue
+    // behind one who does (the car ahead that takes its way, and the one ahead of that ...). A
+    // queue nobody at its head is waiting in - two cars nose to nose, a car behind a wreck -
+    // stands for good: that is stuck.
+    bool waiting = false;
+    for (i32 k = static_cast<i32>(i), hop = 0; k >= 0 && k < static_cast<i32>(cars_.size()) && hop < 16; ++hop) {
+      if (k < static_cast<i32>(L.car_view.size()) && (L.car_view[static_cast<std::size_t>(k)].wait || L.car_view[static_cast<std::size_t>(k)].yielding)) { waiting = true; break; }
+      k = cars_[static_cast<std::size_t>(k)].ahead;
+      if (k == static_cast<i32>(i)) break;
+    }
     const bool on_lane = c.lane >= 0 && c.lane < static_cast<i32>(city_.lanes().size()) && city_.lanes()[c.lane].alive;
     const char* reason = nullptr;
     if (c.wreck) { if (now - c.wreck_at > kWreckWaitS) reason = "wreck"; }
@@ -170,12 +216,14 @@ void Game::update_traffic_world(f32 dt) {
     for (int k = 0; k < 40 && !found; ++k) {
       if (!city_.street_point(rng_, s.position, kSpawnMax, spot, heading)) break;
       const f32 dj = std::hypot(spot.x - s.position.x, spot.y - s.position.y), dp = std::hypot(spot.x - me.x, spot.y - me.y);
-      found = dj > kSpawnMin && dp > 140 && !cast(world_->physics(), spot + Vec3{0, 0, 3}, {0, 0, -1}, 2.6f, {}).hit;
+      // (on ground that stands - the truck is a physical car from its first step - and free)
+      found = dj > kSpawnMin && dp > 140 && city_.terrain().ground_ready(spot.x, spot.y) && !cast(world_->physics(), spot + Vec3{0, 0, 3}, {0, 0, -1}, 2.6f, {}).hit;
     }
     if (!found) continue;
     WorldLife::TowTruck t;
     t.car = std::make_unique<Car>(CarSpec::car());
-    t.body = create_body(world_->physics(), Car::rigid_spec(t.car->spec()), spot + Vec3{0, 0, Car::ground_offset(t.car->spec()) + 0.05f}, yaw_quat(heading), kCatVehicle);
+    const kern::physics::Pose rest = car_rest_pose(t.car->spec(), spot.x, spot.y, heading);
+    t.body = create_body(world_->physics(), Car::rigid_spec(t.car->spec()), rest.position, rest.rotation, kCatVehicle);
     t.job = static_cast<i32>(i);
     t.depot = {spot.x, spot.y};
     t.born = now;
@@ -275,10 +323,11 @@ void Game::step_tow(f32 h) {
             t.towing = false;
             const Vec3 back{s.position.x - std::cos(yaw) * 5.1f, s.position.y - std::sin(yaw) * 5.1f, 0};
             const Vec3 rot{0, 0, yaw / kDeg};
-            world_->teleport(job->actor, {back.x, back.y, city_.ground_height(back.x, back.y) + Car::ground_offset(job->car->spec()) + 0.1f}, &rot);
+            const kern::physics::Pose rest = car_rest_pose(job->car->spec(), back.x, back.y, yaw);
+            world_->teleport(job->actor, rest.position, &rot);
+            if (const kern::physics::Body jb = body(job->actor); jb.valid()) w.set_pose(jb, rest);
             world_->set_actor_velocity(job->actor, {});
             job->car->reset();
-            job->stuck = 0;
             t.state = WorldLife::TowTruck::State::depot;
             t.state_at = now;
             t.path.clear();

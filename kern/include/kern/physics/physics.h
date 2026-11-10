@@ -224,6 +224,11 @@ class World {
   f32 mass(Body body) const;
   BodyType body_type(Body body) const;
   void set_body_type(Body body, BodyType type);
+  /// What the body's shapes collide with (their mask bits, in shape order) - and setting it: one
+  /// mask per shape (the last one repeats for the shapes beyond). The shapes' own categories stay,
+  /// so queries still find them; contacts the new masks rule out end, others begin.
+  void body_masks(Body body, std::vector<u64>& out) const;
+  void set_body_masks(Body body, Span<const u64> masks);
   Vec3 local_point(Body body, Vec3 world_point) const;
   Vec3 world_point(Body body, Vec3 local_point) const;
   Vec3 world_vector(Body body, Vec3 local_vector) const;

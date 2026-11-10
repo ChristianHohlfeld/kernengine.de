@@ -38,6 +38,8 @@ struct WorldLife {
   std::vector<f32> car_limit, car_limit_at;
   std::vector<TrafficRules::View> car_view;
   std::vector<Vec3> car_positions, honks;
+  std::vector<TrafficRules::Vehicle> vehicles;  // every vehicle on the road this step (the cars by index, then the tow trucks)
+  u64 vehicles_step = ~0ull;
   std::vector<Vec2> walkers;
   u32 honk_count = 0, ejected = 0;
   struct Fright { i32 person; f32 at; Vec3 from; };

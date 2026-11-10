@@ -106,7 +106,9 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
     const Vec3 local{s.wheels[i].x, s.wheels[i].y, s.attach_z};
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::dynamic;
-    bs.position = st.position + st.rotation.rotate(local);
+    // (the hub where the spring holds it under the standing car - `sag` up its travel -, or where
+    // it was: a car put down at its ride height has its tyres on the ground, not in it)
+    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(w_[i].has_travel ? w_[i].travel : s.sag, s.susp_lower, s.susp_upper)});
     bs.rotation = st.rotation;
     bs.linear_velocity = st.velocity;
     bs.angular_damping = 0.05f;
@@ -206,7 +208,7 @@ void Car::place(kern::physics::World& world, const BodyState& st) {
   for (int i = 0; i < 4; ++i) {
     const Rig& g = rig_[i];
     if (!g.body.valid() || !world.body_valid(g.body)) continue;
-    const Vec3 local{s_.wheels[i].x, s_.wheels[i].y, s_.attach_z + clampf(w_[i].has_travel ? w_[i].travel : 0, s_.susp_lower, s_.susp_upper)};
+    const Vec3 local{s_.wheels[i].x, s_.wheels[i].y, s_.attach_z + clampf(w_[i].has_travel ? w_[i].travel : s_.sag, s_.susp_lower, s_.susp_upper)};
     const Vec3 arm = st.rotation.rotate(local);
     world.set_pose(g.body, {st.position + arm, st.rotation});
     world.set_linear_velocity(g.body, st.velocity + kern::cross(st.angular, arm));

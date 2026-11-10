@@ -603,6 +603,25 @@ BodyType World::body_type(Body body) const {
   const b3BodyType t = b3Body_GetType(body_id(body));
   return t == b3_staticBody ? BodyType::fixed : t == b3_kinematicBody ? BodyType::kinematic : BodyType::dynamic;
 }
+void World::body_masks(Body body, std::vector<u64>& out) const {
+  out.clear();
+  if (!body_valid(body)) return;
+  const b3BodyId id = body_id(body);
+  std::vector<b3ShapeId> shapes(static_cast<std::size_t>(std::max(0, b3Body_GetShapeCount(id))));
+  const int n = shapes.empty() ? 0 : b3Body_GetShapes(id, shapes.data(), static_cast<int>(shapes.size()));
+  for (int i = 0; i < n; ++i) out.push_back(b3Shape_GetFilter(shapes[static_cast<std::size_t>(i)]).maskBits);
+}
+void World::set_body_masks(Body body, Span<const u64> masks) {
+  if (!body_valid(body) || masks.size == 0) return;
+  const b3BodyId id = body_id(body);
+  std::vector<b3ShapeId> shapes(static_cast<std::size_t>(std::max(0, b3Body_GetShapeCount(id))));
+  const int n = shapes.empty() ? 0 : b3Body_GetShapes(id, shapes.data(), static_cast<int>(shapes.size()));
+  for (int i = 0; i < n; ++i) {
+    b3Filter f = b3Shape_GetFilter(shapes[static_cast<std::size_t>(i)]);
+    f.maskBits = masks[std::min(static_cast<std::size_t>(i), masks.size - 1)];
+    b3Shape_SetFilter(shapes[static_cast<std::size_t>(i)], f, true);
+  }
+}
 Vec3 World::local_point(Body body, Vec3 p) const { return body_valid(body) ? kv(b3Body_GetLocalPoint(body_id(body), bv(p))) : p; }
 Vec3 World::world_point(Body body, Vec3 p) const { return body_valid(body) ? kv(b3Body_GetWorldPoint(body_id(body), bv(p))) : p; }
 Vec3 World::world_vector(Body body, Vec3 v) const { return body_valid(body) ? kv(b3Body_GetWorldVector(body_id(body), bv(v))) : v; }

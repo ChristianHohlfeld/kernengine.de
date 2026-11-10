@@ -432,7 +432,8 @@ void Game::worldsync_update(f32 dt) {
         if (car_net_[static_cast<std::size_t>(local)] != idx || !c.placed) {
           car_net_[static_cast<std::size_t>(local)] = idx;
           car_line_[static_cast<std::size_t>(local)].reset();
-          if (!world_->actor_alive(c.actor)) world_->set_alive(c.actor, true);
+          if (!world_->actor_alive(c.actor)) { world_->set_alive(c.actor, true); c.solid_masks.clear(); }
+          traffic_solid(c);  // (it had no physics far away here: his car is a body that pushes)
           // his car here: a kinematic body on his poses (it pushes what it meets; what happens
           // to it happens on his machine and comes back from there)
           kern::physics::World& w = world_->physics();
@@ -446,7 +447,6 @@ void Game::worldsync_update(f32 dt) {
             w.set_angular_velocity(b, {});
           }
           c.placed = true;
-          c.far = false;
         }
         c.driver = false;
         c.color = col;

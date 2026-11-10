@@ -7,6 +7,13 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-10",time:"03:36",title:"Verkehr ohne Auffahrunfälle",items:[
+    "Autos und Busse springen nicht mehr aus Staus in die Luft: Fahrer hielten Abstand, indem sie mit Vollgas zurücksetzten – dabei schoben sie sich aufeinander und wurden hochgeschleudert. Jetzt bremsen sie wie im Original hinter dem Vordermann bis zum Stand.",
+    "Fahrer folgen ihrer Spur genauer (Zielpunkt ein Stück voraus auf der Fahrbahn) und bremsen vor Kurven – weniger Ausflüge auf den Gehweg.",
+    "Verkehr in der Ferne hält sich an Ampeln, Fußgänger und Abstände und fährt nicht mehr durch wartende Autos; er wird erst dort wieder zum echten Fahrzeug, wo Platz und fester Boden ist.",
+    "Autos stehen am Hang so, wie die Straße liegt, und setzen ohne Ruck auf ihren Rädern auf.",
+    "Der Abschleppdienst kommt nur noch für Autos, die wirklich festsitzen – nicht für die Schlange vor einer roten Ampel.",
+  ]},
   {date:"2026-11-10",time:"02:22",title:"Zielen und Schießen gleichzeitig",items:[
     "Maus: Mit gehaltener rechter Taste anvisieren und dabei mit der linken schießen funktioniert jetzt zuverlässig – in beliebiger Reihenfolge der Tasten.",
     "Maus: Das Anvisieren bleibt stabil, solange du die rechte Taste hältst.",

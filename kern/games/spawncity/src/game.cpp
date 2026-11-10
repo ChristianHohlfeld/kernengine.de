@@ -1,5 +1,6 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
 #include "game.h"
+#include "world_traffic.h"
 #include "game_world.h"  // WorldLife (M3 world state)
 #include "game_life.h"   // GameLife (M3 life)
 
@@ -720,7 +721,7 @@ void Game::drive_traffic(f32 h) {
     c.car->hit_user = static_cast<u64>(c.actor);
     if (i < car_lent_.size() && car_lent_[i]) { c.car->detach(); continue; }  // MP host: a mate drives it (game_worldsync.cpp)
     if (puppet_car_step(c, i, h)) { c.car->detach(); continue; }             // MP client: the host's car (game_worldsync.cpp)
-    if (c.far) { c.car->detach(); traffic_far_step(c, h); continue; }  // no physics far away (game_traffic_far.cpp)
+    if (c.far) { c.car->detach(); traffic_far_step(c, i, h); continue; }  // no physics far away (game_traffic_far.cpp)
     if (life_) {
       // hanging on a tow truck's boom (game_traffic.cpp puts it there every step): not driven
       bool towed = false;
@@ -742,37 +743,48 @@ void Game::drive_traffic(f32 h) {
     // AI traffic at 60 Hz (world_rigid_body_runtime.mjs FIXED_DT 1/60): its tyres are solved every 4th
     // 240 Hz step (staggered over the cars), the forces held in between
     if ((steps_ + i) % 4 != 0) { c.car->reapply(w, b); continue; }
-    // AI driver: follow the lane on its right-hand side (SpawnCity aiInput), keep 1.6 s + 6 m.
+    // AI driver: follow the lane on its right-hand side (SpawnCity aiInput) at the speed the
+    // lights, the people and the vehicle ahead leave him.
     const Lane& L = lanes[c.lane];
     const BodyState s = read_body(w, b);
     const Vec3 fwd = s.rotation.rotate({1, 0, 0});
     const i32 n = static_cast<i32>(L.points.size());
     c.index = std::clamp(c.index, 0, n - 1);
-    const Vec2 p = L.points[c.index];
-    const i32 prev = std::clamp(c.index - c.dir, 0, n - 1);
-    Vec2 d = p - L.points[prev];
-    const f32 dl = std::sqrt(d.x * d.x + d.y * d.y);
-    d = dl > 1e-3f ? d * (1.0f / dl) : Vec2{fwd.x, fwd.y};
     const f32 off = std::fmin(L.width * 0.25f, 1.8f);
-    const Vec3 target{p.x + d.y * off, p.y - d.x * off, 0};
-    if (std::hypot(target.x - s.position.x, target.y - s.position.y) < 7) traffic_advance(c);
+    // his target (world_procedural_population.mjs): the point a lookahead on along his lane from
+    // where he is - max(7 m, 1.3 s at his speed) -, on its right-hand side
+    const TrafficRules::Pursuit pu = TrafficRules::pursuit(L, c.index, c.dir, {s.position.x, s.position.y}, std::fmax(7.0f, c.target_speed * 1.3f), off);
+    const Vec3 target{pu.target.x, pu.target.y, 0};
+    // the lane point ahead is reached: the next one; within 2.5 m of the lane's end on to a street
+    // that starts there, else round (traffic_advance)
+    if (c.index + c.dir < 0 || c.index + c.dir >= n ? pu.end < 2.5f : pu.passed) traffic_advance(c);
     // Approaching the end of the street (a junction): slow down to turn (SpawnCity aiInput).
     f32 want_speed = c.target_speed;
+    if (pu.end < 18) want_speed = std::fmin(want_speed, 4.5f + pu.end * 0.3f);
     {
-      const Vec2 end = c.dir > 0 ? L.points.back() : L.points.front();
-      const f32 to_end = std::hypot(end.x - s.position.x, end.y - s.position.y);
-      if (to_end < 18) want_speed = std::fmin(want_speed, 4.5f + to_end * 0.3f);
+      // the bend ahead (driveSpeed): the lane's direction at the target against his own
+      f32 turn = std::atan2(pu.tangent.y, pu.tangent.x) - std::atan2(fwd.y, fwd.x);
+      while (turn > kPi) turn -= 2 * kPi;
+      while (turn < -kPi) turn += 2 * kPi;
+      turn = std::fabs(turn);
+      if (turn > 0.12f) {
+        const f32 look = std::fmax(6.0f, std::hypot(target.x - s.position.x, target.y - s.position.y));
+        const f32 R = look / (2 * std::sin(std::fmin(turn, 1.5f) / 2) + 1e-3f);
+        want_speed = std::fmin(want_speed, std::fmax(3.2f, std::sqrt(3.5f * R)));
+      }
     }
     want_speed = std::fmin(want_speed, traffic_rules(static_cast<i32>(i), s.position, fwd, c.car->forward_speed()));  // M3 lights / right of way
-    CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, want_speed);
-    const f32 v = std::fmax(0.0f, c.car->forward_speed());
-    const f32 gap = 1.6f * v + 6;
-    const Vec3 nose = s.position + fwd * (c.car->spec().half.x + 0.2f) + Vec3{0, 0, 0.1f};
-    const RayResult ahead = cast(w, nose, fwd, gap, b);
-    if (ahead.hit) in.pedal = std::fmin(in.pedal, ahead.distance < 6 ? -1.0f : -0.3f);
-    // Stuck against something: back off a little, then try again.
-    c.stuck = (in.pedal > 0.2f && v < 0.3f) ? c.stuck + h * 4 : 0;  // a 60 Hz step
-    if (c.stuck > 3) { in.pedal = -0.6f; in.steer = -in.steer; if (c.stuck > 5) c.stuck = 0; }
+    // the vehicle ahead (world_procedural_population.mjs driveSpeed): a speed to aim for - the
+    // driver brakes down to a stop behind it and never backs off (what stands for good is the tow
+    // service's: game_traffic.cpp)
+    {
+      i32 limiter = -1;
+      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, &limiter);
+      c.ahead = free_way < 0.6f ? limiter : -1;
+      want_speed = std::fmin(want_speed, free_way);
+    }
+    c.want = want_speed;
+    const CarInput in = ai_drive(s.position, fwd, c.car->forward_speed(), target, want_speed);
     c.input = in;
     c.car->step(w, b, h * 4, in);
     {
@@ -903,8 +915,9 @@ void Game::manage_traffic() {
       // Nothing in the way (another car, a building corner).
       if (cast(world_->physics(), pos + Vec3{0, 0, 3}, {0, 0, -1}, 3.2f, {}).hit) continue;
       if (!gaps_vehicle_spawn_ok(static_cast<i32>(i), pos, std::atan2(dv.y, dv.x))) continue;  // no overlap, unseen (game_gaps.cpp)
-      if (!world_->actor_alive(c.actor)) world_->set_alive(c.actor, true);
-      const Vec3 rot{0, 0, std::atan2(dv.y, dv.x) / kDeg};
+      if (!world_->actor_alive(c.actor)) { world_->set_alive(c.actor, true); c.far = false; c.solid_masks.clear(); }  // (a new body: solid)
+      const f32 yaw = std::atan2(dv.y, dv.x);
+      const Vec3 rot{0, 0, yaw / kDeg};
       world_->teleport(c.actor, pos, &rot);
       world_->set_actor_velocity(c.actor, {});
       c.car->reset();
@@ -917,7 +930,16 @@ void Game::manage_traffic() {
       c.lane = li;
       c.dir = dir;
       c.index = dir > 0 ? k + 1 : k;
-      c.stuck = 0;
+      c.want = 0;
+      c.ahead = -1;
+      c.far_speed = 0;
+      // with physics only near a player and on ground that stands (game_traffic_far.cpp); there
+      // it rests on its wheels as the ground lies
+      if (d < 150 && city_.terrain().ground_ready(pos.x, pos.y)) {
+        traffic_solid(c);
+        car_body_dynamic(c);  // (it was without physics where it stood before)
+        if (const kern::physics::Body cb = body(c.actor); cb.valid()) world_->physics().set_pose(cb, car_rest_pose(c.car->spec(), pos.x, pos.y, yaw));
+      } else traffic_make_far(c);
       break;
     }
   }
@@ -1559,6 +1581,15 @@ std::string Game::command(const std::string& cmd) {
                       std::hypot(st.velocity.x, st.velocity.y), st.velocity.z, w.body_type(cb) == kern::physics::BodyType::dynamic ? 1 : 0, w.awake(cb) ? 1 : 0,
                       hit.hit ? city_.ground_height(p.x, p.y) - hit.point.z : 99.0f, c.driver ? 1 : 0, c.wreck ? 1 : 0, c.input.pedal, c.input.handbrake ? 1 : 0);
         out += b;
+        // its driver: the speed he aims for, the car he stands behind, how far he is off his lane
+        const bool on_lane = c.lane >= 0 && c.lane < static_cast<i32>(city_.lanes().size()) && city_.lanes()[c.lane].alive;
+        std::snprintf(b, sizeof b, ",\"want\":%.1f,\"ahead\":%d,\"off\":%.1f,\"farV\":%.1f", c.want > 1e8f ? -1.0f : c.want, c.ahead, on_lane ? traffic_lane_distance(c) : -1.0f, c.far_speed);
+        out += b;
+        if (on_lane) {
+          const Lane& ln = city_.lanes()[c.lane];
+          std::snprintf(b, sizeof b, ",\"lane\":[%d,%zu,%d,%d,%.0f,%.0f,%.0f,%.0f]", c.lane, ln.points.size(), c.index, c.dir, ln.points.front().x, ln.points.front().y, ln.points.back().x, ln.points.back().y);
+          out += b;
+        }
         if (c.car->rigged()) {
           out += ",\"wheels\":[";
           for (int k = 0; k < 4; ++k) {

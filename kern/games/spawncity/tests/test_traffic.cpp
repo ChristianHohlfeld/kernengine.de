@@ -79,3 +79,51 @@ SC_TEST(traffic_first_come_and_people) {
   }
   SC_CHECK(honked, "honks at the player standing in the road");
 }
+
+SC_TEST(traffic_keeps_its_distance) {
+  // driveSpeed: the nearest vehicle in the own corridor ahead - the centres' distance less both
+  // half lengths less 2.5 m, at 1.6 s headway; a speed to aim for (0 = stop), never a reverse
+  using V = TrafficRules::Vehicle;
+  std::vector<V> all{{{0, 0}, false, true}, {{20, 0.5f}, false, true}, {{30, 0}, true, true}, {{10, 4}, false, true}, {{-8, 0}, false, true}, {{12, 0}, false, false}};
+  i32 who = -2;
+  // car 0 heading +x: car 1 is 20 m ahead (gap 20 - 3.8 = 16.2, free 13.7 -> 8.56 m/s); the car
+  // beside (4 m to the left), the one behind and the one that is not there do not count
+  f32 v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, &who);
+  SC_CHECK(std::fabs(v - (20 - 3.8f - 2.5f) / 1.6f) < 1e-3f && who == 1, "behind a car 20 m ahead (%.2f m/s, limiter %d)", v, who);
+  // the bus one further: behind it car 1 has 10 - (1.9 + 4) = 4.1 m -> 1 m/s
+  v = TrafficRules::gap_speed(1, {20, 0.5f}, {1, 0}, false, all, &who);
+  SC_CHECK(std::fabs(v - (10 - 5.9f - 2.5f) / 1.6f) < 1e-3f && who == 2, "behind the bus (%.2f m/s, limiter %d)", v, who);
+  // closer than 2.5 m bumper to bumper: stop
+  all[1].p = {6, 0};
+  v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, &who);
+  SC_CHECK(v == 0 && who == 1, "bumper to bumper: stop (%.2f)", v);
+  // nobody ahead: free
+  v = TrafficRules::gap_speed(2, {30, 0}, {1, 0}, true, all, &who);
+  SC_CHECK(v > 1e8f && who == -1, "nobody ahead: free (%.0f, %d)", v, who);
+  // a car looks 1.25 + 0.6 m to each side, a bus 1.6 + 0.6 m
+  all[1].p = {20, 2.0f};
+  all[2].there = false;
+  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all) > 1e8f, "2 m to the side: not in a car's way");
+  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, true, all) < 10, "2 m to the side: in a bus' way");
+}
+
+SC_TEST(traffic_pursuit_point) {
+  // the driver's target: `look` metres on along the lane from where the car is, on its right
+  Lane l{{{0, 0}, {100, 0}, {100, 50}}, 8, 1, true};
+  // on the first stretch, 30 m along, 3 m beside the line: 10 m on, 2 m to the right (-y)
+  TrafficRules::Pursuit p = TrafficRules::pursuit(l, 1, 1, {30, 3}, 10, 2);
+  SC_CHECK(std::fabs(p.target.x - 40) < 1e-3f && std::fabs(p.target.y + 2) < 1e-3f && !p.passed, "ahead on the stretch (%.1f, %.1f)", p.target.x, p.target.y);
+  SC_CHECK(std::fabs(p.end - 120) < 1e-3f, "the lane's end is 120 m on (%.1f)", p.end);
+  // 4 m before the bend: 6 m of the 10 are round it (on the second stretch, right of it is +x)
+  p = TrafficRules::pursuit(l, 1, 1, {96, 0}, 10, 2);
+  SC_CHECK(std::fabs(p.target.x - 102) < 1e-3f && std::fabs(p.target.y - 6) < 1e-3f && !p.passed, "round the bend (%.1f, %.1f)", p.target.x, p.target.y);
+  // at the bend: the lane point ahead is reached
+  p = TrafficRules::pursuit(l, 1, 1, {99.8f, 0.5f}, 10, 2);
+  SC_CHECK(p.passed, "at the lane point");
+  // never beyond the lane's end
+  p = TrafficRules::pursuit(l, 2, 1, {100, 45}, 10, 0);
+  SC_CHECK(std::fabs(p.target.x - 100) < 1e-3f && std::fabs(p.target.y - 50) < 1e-3f && std::fabs(p.end - 5) < 1e-3f, "the end holds the target (%.1f, %.1f)", p.target.x, p.target.y);
+  // the other way: from the end back, the right side is the other one
+  p = TrafficRules::pursuit(l, 1, -1, {100, 20}, 10, 2);
+  SC_CHECK(std::fabs(p.target.x - 98) < 1e-3f && std::fabs(p.target.y - 10) < 1e-3f, "driving back (%.1f, %.1f)", p.target.x, p.target.y);
+}
