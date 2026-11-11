@@ -226,7 +226,7 @@ trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in ei
 
 ## 9.5 Kern-Knoten
 
-Kern bringt **103** eingebaute Knoten mit:
+Kern bringt **104** eingebaute Knoten mit:
 
 | Kategorie | Beispiele |
 |---|---|

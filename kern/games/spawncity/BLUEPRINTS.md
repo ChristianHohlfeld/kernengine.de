@@ -180,7 +180,7 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Im Editor: Listen-Pins, Listentypen für Variablen und Funktions-Pins, ein Eintrags-Editor;
   generische Knoten nehmen den Typ des ersten Drahts an.
 - [x] Strukturen (benannte Felder) als Pin-Typ: `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`, Variablen, Listen und Funktions-Pins des Typs, Felder aus Wert-Typen, Aufzählungen, Strukturen und Listen, Make (`struct_make<Weapon>(...)`), Break (`struct_break<Weapon>(w).Damage`) und Set Field (`Held.Damage = x;`); im Editor mit Feld-Editor in Details.
-- [ ] Datentabellen im Level (im Editor als Tabelle).
+- [x] Datentabellen: Eine Tabelle ist eine Variable, die eine Liste einer Struktur ist – eine Zeile je Eintrag, eine Spalte je Feld; der Editor zeigt und bearbeitet sie als Tabelle. **Find Row** holt die Zeile, deren Feld ein Wert ist (`list_find_row<&Item::Key>(Shop, key)` gibt `.found`, `.row`, `.index`). Kein eigener Begriff neben Listen und Strukturen; die Daten stehen im Blueprint des Levels und werden mit ihm kompiliert.
 - [x] Aufzählungen (Enum) als Pin-Typ mit Auswahl: `KERN_ENUM(Mode, Closed, Open)`, Variablen, Listen und Funktions-Pins des Typs, „Switch on Enum“ (`case Mode::Open:`), Namen und Plätze der Werte als Knoten.
 - [ ] Lokale Variablen in Funktionen; Funktionen, die sich selbst aufrufen dürfen.
 - [ ] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen.

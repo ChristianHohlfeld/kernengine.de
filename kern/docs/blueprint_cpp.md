@@ -437,6 +437,7 @@ Die Knoten einer Struktur (`S` ist die Struktur):
 |---|---|---|
 | Make S | `struct_make<S>(feld, feld, …)` | ein Wert der Struktur aus einem Wert je Feld |
 | Break S | `struct_break<S>(wert).Feld` | das Feld des Werts |
+| Find Row (Find S by Feld) | `list_find_row<&S::Feld>(liste, wert)` | `.found`, `.row`, `.index`: der erste Eintrag einer Liste von S, dessen Feld der Wert ist |
 | Set Feld of Variable | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
 
 ### Formeln

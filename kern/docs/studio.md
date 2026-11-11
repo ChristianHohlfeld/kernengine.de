@@ -563,6 +563,23 @@ derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
   `struct_break<Weapon>(Held).Damage`, `Held.Damage = 30.0;` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Strukturen“.
 
+### Datentabellen
+
+Eine Tabelle ist kein eigener Begriff: Sie ist eine Variable, die eine **Liste einer Struktur** ist.
+Jeder Eintrag ist eine Zeile, jedes Feld eine Spalte.
+
+- **Als Tabelle bearbeiten:** Die Details einer solchen Variablen zeigen ihren Standardwert als
+  Tabelle – eine Zeile je Eintrag, eine Spalte je Feld, **+ Row** hängt eine Zeile an, × nimmt
+  eine heraus. Ein Feld, das selbst eine Struktur oder Liste ist, hat keine Spalte; es steht unter
+  seiner Zeile.
+- **Find Row** (Lists; im Menü je Struktur als „Find Item by Key“) holt die erste Zeile, deren
+  Feld der gesuchte Wert ist – der Schlüssel kann jedes Feld sein, das man in der Einstellung
+  **Field** wählt. Ausgänge: **Found**, **Row** (ohne Treffer die Standardwerte der Struktur),
+  **Index** (ohne Treffer −1).
+- Die Daten stehen im Blueprint (für Daten des ganzen Spiels: im Blueprint des Levels) und werden
+  mit ihm gespeichert, als C++ geschrieben und kompiliert. Weil es eine Variable ist, lässt sich
+  die Tabelle im Spiel auch ändern (Add, Set Item, Set Field …).
+
 ### Formel-Knoten
 
 **Formula** (Kategorie Math) ist eine Formel als ein Knoten: Jeder Name darin wird ein Eingang,

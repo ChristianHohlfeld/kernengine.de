@@ -648,6 +648,14 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       logic::Node named;
       named.type = d->type;
       named.set_param("struct", s.name);
+      // (Find Row: by the struct's first field, until another is chosen)
+      bool by_field = false;
+      for (const logic::ParamDef& pd : d->params) by_field = by_field || pd.kind == logic::ParamDef::Kind::field;
+      if (by_field && !s.fields.empty()) {
+        named.set_param("field", s.fields.front().name);
+        consider({lib.title(named), d->category, d->help, d->type, {{"struct", s.name}, {"field", s.fields.front().name}}});
+        continue;
+      }
       consider({lib.title(named), d->category, d->help, d->type, {{"struct", s.name}}});
     }
   for (const logic::Function& f : g->functions) {
@@ -1659,6 +1667,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       auto is_node = [&](const logic::Node& n, const char* type) { return n.type == type && n.param("struct") == old; };
       auto sets_field = [&](const logic::Node& n) {
         const logic::Variable* v = g.variable(n.param("variable"));
+        if (n.type == "list.find_row") return n.param("struct") == old && n.param("field") == field;  // (Find Row names its struct itself)
         return n.type == "struct.set_field" && v && v->type == logic::PinType::structure && v->of == old && n.param("field") == field;
       };
       if (op == "renameField") {

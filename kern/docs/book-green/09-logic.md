@@ -210,7 +210,7 @@ state.
 
 ## 9.5 The basic nodes
 
-Kern comes with **103 basic nodes**: for events, flow, memory, lists, enums, structs and
+Kern comes with **104 basic nodes**: for events, flow, memory, lists, enums, structs and
 calculating. You
 don't have to know them by heart – the menu in the editor suggests matching ones. A few examples
 show what's in the building set:
@@ -237,7 +237,7 @@ same enum – and **Switch on Mode** is a railroad switch with one track for eac
 **struct** is a type of your own too, but it bundles several values under names, like an index
 card: a "Weapon" with a "Name", a "Type" and a "Damage". **Make Weapon** fills in a card, **Break
 Weapon** reads its fields, and **Set Field** changes one field and leaves the others alone. All
-103 nodes with their fine points are in the blue book, Chapter 9.
+104 nodes with their fine points are in the blue book, Chapter 9.
 
 > **Did you know?** Even randomness isn't quite random in Kern. It comes from a generator whose
 > starting value is fixed – **deterministic** per world. That's why replays and network games match.
