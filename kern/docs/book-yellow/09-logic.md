@@ -225,7 +225,7 @@ red, it would still stay on yellow for one step. With **Set State** you jump dir
 
 ## 9.5 Core Nodes
 
-Kern brings **100** built-in nodes:
+Kern brings **103** built-in nodes:
 
 | Category | Examples |
 |---|---|
@@ -235,6 +235,7 @@ Kern brings **100** built-in nodes:
 | variables | Get, Set, Add |
 | lists | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
 | enums | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
+| structures | Make, Break, Set Field |
 | functions | Function Entry, Return, Call Function |
 | math | plus, minus, times, divided by, remainder, square root, random, calculating with angles |
 | logic | Compare, AND, OR, XOR, NOT, Select |
@@ -254,6 +255,13 @@ What you know from Scratch:
   its exception, and a wire only connects pins of the same enum. Nodes say what you mean instead,
   and in the menu they carry your enum's name: **Mode to Text** gives the value's name,
   **Mode to Index** its place (the first is 0).
+- A **struct** = a type you make yourself, with named fields: "Weapon" with the fields "Name,"
+  "Type" and "Damage." Each field has a type of its own and a default. A value holds one value
+  for every field – several variables bundled into one, which also fits into a list. Like an
+  enum's value it converts to nothing, and a wire only connects pins of the same struct. In the
+  menu its nodes carry your struct's name: **Make Weapon** builds a value from its fields,
+  **Break Weapon** gives the fields, and **Set Field** changes one field of a variable and
+  leaves the others as they are. Two values are equal if all their fields are equal.
 - **Switch** = one of several outputs depending on a number, a text or an enum's value, like a
   railroad switch with many tracks. **Switch on Mode** has one output for each value.
 - **AND, OR, NOT** = "and," "or," "not." **XOR** = "either – or, but not both."

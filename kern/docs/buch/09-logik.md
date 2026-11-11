@@ -53,6 +53,11 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   noch Text: Er wandelt sich in nichts um, und ein Draht verbindet nur Pins derselben Aufzählung.
   Wo eine Zahl oder ein Text gebraucht wird, sagt ein Knoten, was gemeint ist (Enum to Index,
   Enum to Text).
+- **Strukturen** (Structs): Ein Blueprint kann eigene Typen mit benannten Feldern deklarieren,
+  etwa `Weapon` mit den Feldern `Name`, `Type`, `Damage`. Jedes Feld hat einen Typ und einen
+  Standardwert. Ein Wert einer Struktur hält einen Wert für jedes ihrer Felder. Er wandelt sich
+  in nichts um, und ein Draht verbindet nur Pins derselben Struktur. Make baut einen Wert aus
+  seinen Feldern, Break gibt die Felder, Set Field ändert ein Feld einer Variablen.
 - **State Machines**: Zustände und Übergänge im Stil des Zustandseditors von
   digitalisierungsplanung.de. Ein Übergang feuert auf ein Event, einen Timer, eine Bedingungsvariable
   oder automatisch; Betreten und Verlassen eines Zustands lösen Events aus.
@@ -115,6 +120,44 @@ einer Instanz setzt oder eine ihrer Funktionen aufruft (`Instance::set`, `Instan
 was kein Wert der Aufzählung ist, ihr erster Wert. Im C++ eines Blueprints ist eine Aufzählung
 `KERN_ENUM(Mode, Closed, Opening, Open);` ([blueprint_cpp.md](../blueprint_cpp.md)).
 
+Ein achter Werttyp und ein achter Listentyp gehören den **Strukturen** des Blueprints
+(`Graph::structs`; ein `StructType` hat `name`, `fields` und `help`, ein `StructField` hat `name`,
+`type` und `value`, seinen Standardwert). `structure`, der Wert einer Struktur, steht nach
+`enumeration`, `structure_list` nach `enumeration_list` (im JSON `struct` und `struct_list`).
+Welche Struktur gemeint ist, steht als ihr Name neben dem Typ, in `of`, wie bei einer Aufzählung.
+Ein Feld ist von einem Wert-Typ, einer Aufzählung, einer Struktur, die über dieser deklariert
+ist, oder eine Liste von einem davon; so enthält keine Struktur sich selbst. Eine Struktur hat
+mindestens ein Feld und höchstens 32. Der `Value` hält einen Wert je Feld, in der Reihenfolge der
+Felder (`Value::structure(fields)`, `field(i)`; eine Liste: `Value::structures`); Kopien teilen
+sich die Felder, bis eine von ihnen sich ändert. Die Datei hält einen Wert als Objekt seiner
+Felder bei ihren Namen:
+
+```json
+"structs": [
+  {"name": "Weapon", "fields": [
+    {"name": "Name", "type": "text", "value": ""},
+    {"name": "Type", "type": "enum", "of": "Kind", "value": 0},
+    {"name": "Damage", "type": "float", "value": 10}
+  ], "help": "What a weapon does."}
+],
+"variables": [
+  {"name": "Held", "type": "struct", "of": "Weapon", "value": {"Name": "Knife", "Type": 0, "Damage": 25}},
+  {"name": "Rack", "type": "struct_list", "of": "Weapon", "value": []}
+]
+```
+
+`structs` steht nur da, wenn der Blueprint welche deklariert. Ein Feld, das in einem Wert fehlt,
+hat seinen Standardwert. Weil das JSON eines Werts sich nach der Deklaration richtet, wird der
+Wert einer Struktur mit ihr geschrieben und gelesen: `to_json(graph, of)` und
+`Value::from_json(json, type, graph, of)`; `default_of` gibt den Standardwert einer Struktur,
+`zero_of` den leeren Wert jedes Typs. Zwei Werte sind gleich, wenn alle ihre Felder gleich sind.
+Eine Typ-Einstellung nennt die Struktur als `"type": "Weapon"`, eine Liste als `"Weapon_list"`.
+Von außerhalb des Blueprints (`Instance::set`, `Instance::call`) ist, was kein Wert der Struktur
+ist – kein Struktur-Wert, einer mit anderen Feldern, einer, in dem ein Feld nicht von seinem Typ
+ist –, der Standardwert der Struktur; in einer Liste gilt das Eintrag für Eintrag. Im C++ eines
+Blueprints ist eine Struktur `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`
+([blueprint_cpp.md](../blueprint_cpp.md)).
+
 Eine ganze Zahl (`integer`) ist überall dieselbe: so, wie ein Blueprint sie hält (`logic::normal`).
 Unter jeder Zahl liegt ein `double` – in den Variablen des Interpreters, im JIT –, also sind
 ganze Zahlen bis 2^53 exakt, eine größere ist die nächste, die ein `double` hält, und keine geht
@@ -126,7 +169,7 @@ als Zahl und ist für jeden Wert definiert.
 Welche Drähte erlaubt sind, sagt `convertible(from, to)`:
 
 - gleicher Typ immer; Exec nur mit Exec;
-- **alles nach `text`** („everything prints“) – außer den Werten einer Aufzählung, die zu nichts werden;
+- **alles nach `text`** („everything prints“) – außer den Werten einer Aufzählung und einer Struktur, die zu nichts werden;
 - Zahlen untereinander (`bool`, `int`, `float`);
 - `actor` → `bool` („ist gültig“);
 - `float`/`int` → `vector` (in alle drei Komponenten);
@@ -135,6 +178,8 @@ Welche Drähte erlaubt sind, sagt `convertible(from, to)`:
 - der **Wert einer Aufzählung** wandelt sich in nichts um, und nichts wird zu einem – keine Zahl
   und auch kein `text`; dasselbe gilt für eine Liste davon. Ein Draht verbindet nur Pins
   derselben Aufzählung (`fits(from, to)`: `convertible`, und zwei Aufzählungen sind dieselbe).
+- der **Wert einer Struktur** wandelt sich in nichts um, und nichts wird zu einem; dasselbe gilt
+  für eine Liste davon. Ein Draht verbindet nur Pins derselben Struktur.
 
 Die Umrechnungen (`as_bool`, `as_int`, `as_number`, `as_vector`, `as_text`, `as_actor`) sind
 festgelegt, z. B. Text „0“ oder „false“ ist falsch, ein Vektor als Zahl ist seine Länge, eine Zahl
@@ -351,7 +396,7 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 
 ## 9.5 Kern-Knoten
 
-`src/logic/core_nodes.cpp` registriert 100 Knoten:
+`src/logic/core_nodes.cpp` registriert 103 Knoten:
 
 | Kategorie | Knoten |
 |---|---|
@@ -361,6 +406,7 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 | **Variablen** | `var.get` · `var.set` · `var.add` (Amount, −1 zählt herunter) |
 | **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find` Find Item (Index oder −1) – Schritte auf einer Listen-Variablen (Einstellung List): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
 | **Aufzählungen** | auf den Werten einer Aufzählung des Blueprints (Einstellung Enum; im Editor trägt der Knoten ihren Namen, „Mode to Text“): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (der Name des Werts) · `enum.from_name` Text to Enum (der Wert mit diesem Namen; Found – heißt kein Wert so: der erste Wert, und Found ist falsch) · `enum.index` Enum to Index (die Stelle des Werts unter den Werten der Aufzählung, die erste ist 0) · `enum.from_index` Index to Enum (der Wert an dieser Stelle; Valid – gibt es die Stelle nicht: der erste Wert, und Valid ist falsch) · `enum.values` All Values (eine Liste aller Werte in ihrer Reihenfolge, für ein For Each) – die Knoten für jeden Typ arbeiten auch im Typ einer Aufzählung: Get und Set einer Variablen, Select, Reroute, die Listen-Knoten und For Each |
+| **Strukturen** | auf einer Struktur des Blueprints (Einstellung Struct; im Editor trägt der Knoten ihren Namen, „Make Weapon“): `struct.make` Make Struct (ein Eingang je Feld – ohne Draht: der Standardwert des Felds; Value) · `struct.break` Break Struct (Value; ein Ausgang je Feld) · `struct.set_field` Set Field (ein Schritt auf einer Struktur-Variablen, Einstellungen Variable und Field: ändert dieses Feld und lässt die anderen; Value – das Feld, wie es jetzt ist) |
 | **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) |
 | **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` · `math.formula` Formula (jeder Name darin ist ein Eingang) |
 | **Logik** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; Gleichheit mit 10⁻⁹ Toleranz) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
@@ -619,12 +665,13 @@ Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zu
 | Befehl | Wirkung |
 |---|---|
 | `logicOpen {owner}`, `logicClose`, `logicView {view}` | Graph eines Actors (oder des Levels) öffnen, schließen, Ansicht |
-| `logicPalette {query, from}` | Aktionsmenü: Suche über Titel, Kategorie, Hilfe, Suchwörter; beim Ziehen von einem Pin nur Knoten, die den Draht annehmen; dazu „Get/Set/Add to <Variable>“, „Call/Event <Name>“, „Go to <Zustand>“, „On <Zustand> Entered“, „Add Reroute Node“ und die Knoten jeder Aufzählung bei ihrem Namen (für eine Aufzählung `Mode`: „Switch on Mode“, „Mode to Text“ …); nach Kategorien geordnet, höchstens 120 |
+| `logicPalette {query, from}` | Aktionsmenü: Suche über Titel, Kategorie, Hilfe, Suchwörter; beim Ziehen von einem Pin nur Knoten, die den Draht annehmen; dazu „Get/Set/Add to <Variable>“, „Call/Event <Name>“, „Go to <Zustand>“, „On <Zustand> Entered“, „Add Reroute Node“, die Knoten jeder Aufzählung bei ihrem Namen (für eine Aufzählung `Mode`: „Switch on Mode“, „Mode to Text“ …) und die jeder Struktur („Make Weapon“, „Break Weapon“ und „Set Damage of Held“ für jedes Feld jeder Struktur-Variablen); nach Kategorien geordnet, höchstens 120 |
 | `logicAdd {type, x, y, params, from}` | Knoten auf das 8-px-Raster setzen; ohne Variable/State Machine wird eine angelegt; von einem Pin fallen gelassen wird er gleich verbunden |
-| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände); ein generischer Knoten (Select, Reroute, die Listen-Knoten), dessen typisierte Pins noch frei sind, nimmt den Typ des Drahts an, auch den einer Aufzählung |
+| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände); ein generischer Knoten (Select, Reroute, die Listen-Knoten), dessen typisierte Pins noch frei sind, nimmt den Typ des Drahts an, auch den einer Aufzählung oder Struktur |
 | `logicValue`, `logicParam`, `logicComment` | Literal, Einstellung (Drähte zu weggefallenen Pins werden entfernt), Knotenkommentar |
 | `logicVariable {op}` | `add`, `remove`, `rename` (auch in Knoten und Übergängen), `type` (Wert wird umgewandelt), `value` |
 | `logicEnum {op}` | die Aufzählungen des Blueprints: `add` (sie beginnt als `NewEnum` mit den Werten `First` und `Second`), `remove`, `rename`, `help` (ihre Beschreibung); ihre Werte: `addValue`, `renameValue`, `moveValue` (nach oben oder unten), `removeValue` |
+| `logicStruct {op}` | die Strukturen des Blueprints: `add` (sie beginnt als `NewStruct` mit dem Feld `Field`, einem Float), `remove`, `rename`, `help` (ihre Beschreibung); ihre Felder: `addField`, `renameField`, `moveField` (nach oben oder unten), `removeField`, `fieldType`, `fieldValue` (sein Standardwert) |
 | `logicMachine {op}` | State Machines und Zustände anlegen, umbenennen, entfernen, Anfangszustand, Übergänge (`addTransition`, `editTransition`, `removeTransition`; Bedingung ohne Variable legt eine boolesche „Ready“ an) |
 | `logicCommentBox {op}` | Kommentarrahmen |
 | `logicPromote` | „Promote to Variable“: neue Variable vom Typ des Pins, über Get (Eingang) oder Set (Ausgang) angeschlossen |
@@ -657,9 +704,36 @@ keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise (`Float` �
 Aufzählung endet nicht auf `_list`, keine zwei Werte einer Aufzählung heißen gleich, und eine
 Aufzählung hat mindestens einen Wert (höchstens 256).
 
+**Strukturen im Editor.** My Blueprint hat einen Abschnitt **Structures**; **+** legt eine an,
+und die Knöpfe Make und Break an ihrer Zeile setzen ihre Knoten. Ist sie ausgewählt, zeigt
+**Details** ihren Namen, eine Beschreibung und ihre Felder, jedes mit Namen, Typ und
+Standardwert; ein Feld kann man umbenennen, nach oben oder unten schieben oder entfernen, und
+**+ Field** fügt eins an. Die Auswahlliste **Type** eines Felds führt die Wert-Typen, die
+Aufzählungen und die Strukturen, die diese nicht enthalten, und eine Liste von jedem. Die
+Auswahlliste **Type** einer Variablen und der Ein- und Ausgänge einer Funktion führt die
+Strukturen des Blueprints und eine Liste von jeder (`Weapon`, `Weapon List`). Der Standardwert
+einer Struktur-Variablen hat eine Zeile je Feld mit dem Editor des Feld-Typs, eine Liste von
+Strukturen hat diese Zeilen je Eintrag. Ein Pin vom Typ einer Struktur, an dem kein Draht
+hängt, beginnt beim Standardwert der Struktur und zeigt am Knoten in Kurzform, was er hält;
+eingetragen wird sein Wert in Details, Feld für Feld. Strukturen haben ein eigenes Blau
+(`#3f6fd6`).
+
+Eine Struktur, die benutzt wird, lässt sich weiter bearbeiten. Die Struktur oder ein Feld
+umzubenennen, ändert nichts außer dem Namen: Die Werte und die Drähte an Make und Break bleiben.
+Ein Feld zu verschieben, ändert nur seinen Platz. Ein neues Feld hat überall seinen
+Standardwert. Wird ein Feld entfernt, fällt sein Wert überall weg, ebenso die Drähte an seinen
+Pins; ein Set Field, das es nennt, meldet einen Fehler. Bekommt ein Feld einen anderen Typ,
+bleibt sein Wert, wo die Typen sich umwandeln, und Drähte, die nicht mehr passen, fallen weg.
+Nimmt ein Feld den Typ einer Struktur an, die unter dieser steht, rückt diese Struktur unter
+sie. Eine Struktur, von deren Typ noch etwas ist (eine Variable, ein Pin einer Funktion, ein
+Feld, ein Knoten), lässt sich nicht entfernen; der Editor sagt, was sie benutzt. Der Name einer
+Struktur und die Namen ihrer Felder sind C++-Namen wie bei Aufzählungen; der Name einer Struktur
+endet nicht auf `_list`, keine zwei Felder einer Struktur heißen gleich, und kein Feld heißt wie
+eine Aufzählung oder Struktur des Blueprints.
+
 Mehrere Befehle mit derselben `transaction` werden ein Undo-Schritt (Drähte aufnehmen und
 woanders ablegen), aufeinanderfolgende Werteingaben in denselben Pin ebenfalls. Test:
-`studio_logic_editor_commands`, `studio_logic_lists`, `studio_logic_enums`,
+`studio_logic_editor_commands`, `studio_logic_lists`, `studio_logic_enums`, `studio_logic_structs`,
 `studio_blueprint_breakpoints_pause_the_game`, `studio_blueprint_comments_reroutes_promote`.
 
 ---

@@ -216,8 +216,8 @@ einen Zustand.
 
 ## 9.5 Die Grundknoten
 
-Kern bringt **100 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen, Aufzählungen und
-Rechnen. Du musst sie nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar
+Kern bringt **103 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen, Aufzählungen,
+Strukturen und Rechnen. Du musst sie nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar
 Beispiele zeigen, was in dem Baukasten steckt:
 
 - **Branch – die Weiche.** Ein Ja/Nein-Wert kommt herein, und der Ablauf fährt entweder auf das
@@ -240,8 +240,11 @@ Text ins Protokoll oder auf den Bildschirm schreibt. Du kannst auch eine eigene 
 **Aufzählung** (im Editor: Enum), indem du ihren Werten Namen gibst: Der „Mode“ einer Tür könnte
 „Closed“, „Opening“ oder „Open“ sein. So ein Wert ist immer genau einer davon. Er ist weder Zahl
 noch Text, sein Draht passt also nur an Pins derselben Aufzählung – und **Switch on Mode** ist eine
-Weiche mit einem Gleis für jeden Wert. Alle 100 Knoten mit ihren Feinheiten stehen im blauen Buch,
-Kapitel 9.
+Weiche mit einem Gleis für jeden Wert. Auch eine **Struktur** (im Editor: Struct) ist eine eigene
+Sorte, aber sie bündelt mehrere Werte unter Namen, wie eine Karteikarte: eine „Weapon“ mit
+„Name“, „Type“ und „Damage“. **Make Weapon** füllt eine Karte aus, **Break Weapon** liest ihre
+Felder, und **Set Field** ändert ein Feld und lässt die anderen, wie sie sind. Alle 103 Knoten
+mit ihren Feinheiten stehen im blauen Buch, Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
 > dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Wiederholungen und
