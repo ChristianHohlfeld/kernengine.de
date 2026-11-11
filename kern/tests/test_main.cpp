@@ -2649,6 +2649,268 @@ static logic::Graph notation_round_trip(const logic::Graph& g, const char* name)
   return back;
 }
 
+TEST(logic_structs) {
+  using logic::PinType;
+  using logic::TypeRef;
+  using logic::Value;
+  // A value of a struct holds a value for each of its fields, in the order its declaration has
+  // them; which struct it is of is the pin's or the variable's to say.
+  const Value knife = Value::structure({Value::text("Knife"), Value::number(25)});
+  CHECK(knife.type == PinType::structure && knife.fields() == 2 && knife.field(0)->s == "Knife" && knife.field(1)->n == 25 && !knife.field(2));
+  CHECK(Value::zero(PinType::structure).fields() == 0 && !Value::zero(PinType::structure).field(0) && Value::number(1).fields() == 0);
+  // two of them are equal when all their fields are - and a struct is equal to a struct only
+  CHECK(knife == Value::structure({Value::text("Knife"), Value::number(25)}) && !(knife == Value::structure({Value::text("Knife"), Value::number(26)})));
+  CHECK(!(knife == Value::structure({Value::text("Knife")})) && !(knife == Value::number(25)) && !(knife == Value::text("Knife")) && !(Value::text("") == Value::zero(PinType::structure)));
+  const Value rack = Value::structures({knife, Value::structure({Value::text("Bow"), Value::number(12)})});
+  CHECK(rack.type == PinType::structure_list && rack.size() == 2 && rack.item(0) == knife && rack.item(1).field(0)->s == "Bow" && rack.item(5).type == PinType::structure && rack.item(5).fields() == 0);
+  CHECK(rack == Value::of(std::vector<Value>{knife, rack.item(1)}) && !(rack == Value::structures({knife})) && Value::structures({}).size() == 0 && Value::zero(PinType::structure_list) == Value::structures({}));
+  // (a list on a wire is shared; whoever changes one changes its own)
+  Value changed = rack;
+  changed.edit<Value>()[0] = rack.item(1);
+  logic::structs::set_field(changed.edit<Value>()[1], 1, Value::number(13));
+  CHECK(rack.item(0) == knife && rack.item(1).field(1)->n == 12 && changed.item(0) == rack.item(1) && changed.item(1).field(1)->n == 13 && !(changed == rack));
+  PinType named = PinType::exec;
+  CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
+  CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
+  CHECK(logic::kValueTypes == 8 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
+  // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
+  for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::number_list, PinType::enumeration_list}) {
+    CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
+    CHECK(!logic::convertible(PinType::structure_list, other) && !logic::convertible(other, PinType::structure_list));
+  }
+  CHECK(logic::convertible(PinType::structure, PinType::structure) && logic::convertible(PinType::structure_list, PinType::structure_list) && !logic::convertible(PinType::structure, PinType::structure_list));
+  // ... and a value of one struct is none of another.
+  const TypeRef weapon{PinType::structure, "Weapon"}, slot{PinType::structure, "Slot"}, weapons{PinType::structure_list, "Weapon"}, slots{PinType::structure_list, "Slot"};
+  CHECK(logic::fits(weapon, weapon) && !logic::fits(weapon, slot) && logic::fits(weapons, weapons) && !logic::fits(weapons, slots) && !logic::fits(weapon, weapons));
+  CHECK(!logic::fits(weapon, {PinType::text, ""}) && !logic::fits({PinType::number, ""}, weapon) && !logic::fits({PinType::enumeration, "Weapon"}, weapon));
+
+  // A Blueprint with structs: a variable and a list of a struct's type, a struct inside a
+  // struct, an enum's value and a list as fields; Make, Break, Set Field; a function that takes
+  // and gives them.
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(R"kn(
+struct Arena : kern::Blueprint {
+  KERN_ENUM(Kind, Melee, Ranged);
+  /// What a weapon does.
+  KERN_STRUCT(Weapon) {
+    Text Name = "";
+    Kind Type = Kind::Melee;
+    Float Damage = 10.0;
+    List<Float> Falloff = List<Float>{};
+  };
+  KERN_STRUCT(Slot) {
+    Weapon In = Weapon{"Fist", Kind::Melee, 1.0, List<Float>{}};
+    Int Count = 1;
+  };
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}};
+  List<Weapon> Rack = List<Weapon>{};
+  Slot Belt = Slot{Weapon{"Fist", Kind::Melee, 1.0, List<Float>{}}, 1};
+  Float Seen = 0.0;
+  Bool Has = false;
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    Held.Damage = math_mul(struct_break<Weapon>(Held).Damage, 2.0);
+    list_add(Rack, struct_make<Weapon>("Bow", Kind::Ranged, 12.0, List<Float>{1.0, 0.5}));
+  }
+  KERN_EVENT(on5, event_custom<"Go">)
+  void on5(Actor actor, Float value, Text text) {
+    Held.Name = text;
+    Belt.In = Held;
+    Belt.Count = list_length<Weapon>(Rack);
+    Seen = struct_break<Weapon>(list_get<Weapon>(Rack, kern::to<Int>(value))).Damage;
+    Has = list_contains<Weapon>(Rack, Held);
+  }
+  struct SwapResult { Weapon was = Weapon{"", Kind::Melee, 10.0, List<Float>{}}; Int count = 0; };
+  SwapResult Swap(Weapon to = Weapon{"Club", Kind::Ranged, 7.0, List<Float>{2.0}}, List<Weapon> more = List<Weapon>{}) {
+    Rack = more;
+    list_add(Rack, Held);
+    Held = to;
+    return {list_get<Weapon>(Rack, list_length<Weapon>(more)), list_length<Weapon>(Rack)};
+  }
+};
+)kn", g, nullptr, &error));
+  if (!error.empty()) std::printf("structs: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  CHECK(g.structs.size() == 2 && g.structs[0].name == "Weapon" && g.structs[0].fields.size() == 4 && g.structs[0].help == "What a weapon does." && g.structure("Slot") == &g.structs[1]);
+  CHECK(g.structs[0].field("Damage") == 2 && g.structs[0].field("Nope") == -1 && g.structs[0].fields[1].type == (TypeRef{PinType::enumeration, "Kind"}) && g.structs[1].fields[0].type == weapon);
+  CHECK(g.structs[0].fields[2].value.as_number() == 10 && g.structs[1].fields[0].value["Name"].as_string() == "Fist" && g.structs[1].fields[0].value["Falloff"].is_array());
+  CHECK(logic::structs_in(g.structs[1], g) == std::vector<std::string>{"Weapon"} && logic::structs_in(g.structs[0], g).empty());
+  const logic::Variable* held = g.variable("Held");
+  CHECK(held && held->type == PinType::structure && held->of == "Weapon" && held->value["Name"].as_string() == "Knife" && held->value["Damage"].as_number() == 25 && held->value["Type"].as_number() == 0);
+  CHECK(g.variable("Rack")->type == PinType::structure_list && g.variable("Rack")->of == "Weapon" && g.variable("Belt")->value["In"]["Damage"].as_number() == 1);
+  // the names of its types, as a setting holds them
+  TypeRef t;
+  CHECK(logic::type_from_text("Weapon", g, t) && t == weapon && logic::type_text(t) == "Weapon" && logic::type_label(t) == "Weapon");
+  CHECK(logic::type_from_text("Weapon_list", g, t) && t == weapons && logic::type_text(t) == "Weapon_list" && logic::type_label(t) == "Weapon List");
+  CHECK(logic::type_from_text("Kind", g, t) && t.type == PinType::enumeration && !logic::type_from_text("struct", g, t) && !logic::type_from_text("struct_list", g, t) && !logic::type_from_text("Nope", g, t));
+  // A value as the graph's file holds it: an object of its fields by their names, every one of
+  // them; read, a field that is missing has its default.
+  const logic::StructType& declared = *g.structure("Weapon");
+  const Value plain = logic::default_of(declared, g);
+  const Value fist = Value::structure({Value::text("Fist"), Value::enumeration(0), Value::number(1), Value::of(std::vector<f64>{})});
+  CHECK(plain == Value::structure({Value::text(""), Value::enumeration(0), Value::number(10), Value::of(std::vector<f64>{})}) && logic::zero_of(weapon, g) == plain);
+  CHECK(logic::zero_of(slot, g) == Value::structure({fist, Value::integer(1)}) && logic::zero_of(weapons, g).size() == 0 && logic::zero_of({PinType::number, ""}, g) == Value::number(0));
+  CHECK(logic::field_of(Value::zero(PinType::structure), declared, 2, g) == Value::number(10) && logic::field_of(fist, declared, 2, g) == Value::number(1) && logic::field_of(fist, declared, 0, g).s == "Fist");
+  json::Value partly;
+  CHECK(json::parse(R"({"Damage":3,"Falloff":[0.5],"Other":true})", partly));
+  const Value read = Value::from_json(partly, PinType::structure, g, "Weapon");
+  CHECK(read == Value::structure({Value::text(""), Value::enumeration(0), Value::number(3), Value::of(std::vector<f64>{0.5})}));
+  CHECK(json::stringify(read.to_json(g, "Weapon")) == R"({"Name":"","Type":0,"Damage":3,"Falloff":[0.5]})" && Value::from_json(read.to_json(g, "Weapon"), PinType::structure, g, "Weapon") == read);
+  CHECK(json::stringify(Value::structures({read, plain}).to_json(g, "Weapon")) == R"([{"Name":"","Type":0,"Damage":3,"Falloff":[0.5]},{"Name":"","Type":0,"Damage":10,"Falloff":[]}])");
+  CHECK(json::stringify(Value::zero(PinType::structure).to_json(g, "Slot")) == R"({"In":{"Name":"Fist","Type":0,"Damage":1,"Falloff":[]},"Count":1})");
+  CHECK(Value::from_json(json::Value(7.0), PinType::structure, g, "Weapon") == plain && Value::from_json(json::Value(7.0), PinType::structure_list, g, "Weapon").size() == 0);
+  // what a value of a type is
+  CHECK(logic::is_value_of(read, weapon, g) && logic::is_value_of(Value::structures({read}), weapons, g) && !logic::is_value_of(read, slot, g) && !logic::is_value_of(Value::zero(PinType::structure), weapon, g));
+  CHECK(!logic::is_value_of(Value::structure({Value::text(""), Value::enumeration(2), Value::number(3), Value::of(std::vector<f64>{})}), weapon, g));  // (Kind has two values)
+  CHECK(!logic::is_value_of(Value::structure({Value::text(""), Value::enumeration(0), Value::integer(3), Value::of(std::vector<f64>{})}), weapon, g) && !logic::is_value_of(Value::number(1), weapon, g));
+
+  const Value bow = Value::structure({Value::text("Bow"), Value::enumeration(1), Value::number(12), Value::of(std::vector<f64>{1.0, 0.5})});
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Arena");
+    CHECK(inst->get("Held") == Value::structure({Value::text("Knife"), Value::enumeration(0), Value::number(25), Value::of(std::vector<f64>{})}) && inst->get("Rack").size() == 0);
+    rt.begin();
+    // Set Field changes one field and leaves the others; Make gives a struct, Add puts it into the list
+    CHECK(inst->get("Held") == Value::structure({Value::text("Knife"), Value::enumeration(0), Value::number(50), Value::of(std::vector<f64>{})}) && inst->get("Rack") == Value::structures({bow}));
+    rt.call("Go", 0, {{"value", Value::number(0)}, {"text", Value::text("Axe")}});
+    const Value axe = Value::structure({Value::text("Axe"), Value::enumeration(0), Value::number(50), Value::of(std::vector<f64>{})});
+    CHECK(inst->get("Held") == axe && inst->get("Belt") == Value::structure({axe, Value::integer(1)}) && inst->get("Seen").as_number() == 12 && !inst->get("Has").as_bool());
+    // (an item from beyond the list is the struct's default: Damage 10)
+    rt.call("Go", 0, {{"value", Value::number(7)}, {"text", Value::text("Axe")}});
+    CHECK(inst->get("Seen").as_number() == 10);
+    // From outside a struct's variable takes a struct of its type: anything else is its default.
+    CHECK(inst->set("Held", bow) && inst->get("Held") == bow && inst->set("Held", Value::number(3)) && inst->get("Held") == plain);
+    CHECK(inst->set("Held", bow) && inst->set("Held", inst->get("Belt")) && inst->get("Held") == plain && inst->set("Held", bow) && inst->set("Held", Value::zero(PinType::structure)) && inst->get("Held") == plain);
+    CHECK(inst->set("Held", Value::structure({Value::text("x"), Value::enumeration(5), Value::number(1), Value::of(std::vector<f64>{})})) && inst->get("Held") == plain);
+    CHECK(inst->set("Rack", Value::structures({bow, Value::number(2), axe, Value::structure({})})) && inst->get("Rack") == Value::structures({bow, plain, axe, plain}));
+    CHECK(inst->set("Rack", Value::number(4)) && inst->get("Rack").size() == 0 && inst->get("Rack").type == PinType::structure_list && inst->set("Rack", bow) && inst->get("Rack").size() == 0);
+    CHECK(inst->set("Belt", Value::structure({bow, Value::integer(4)})) && inst->get("Belt").field(0)->field(0)->s == "Bow" && inst->set("Belt", Value::structure({Value::number(1), Value::integer(4)})) &&
+          inst->get("Belt") == logic::zero_of(slot, g));
+    rt.call("Go", 0, {{"value", Value::number(0)}, {"text", Value::text("")}});
+    CHECK(inst->get("Has").as_bool() == false && inst->get("Seen").as_number() == 10);
+    // A function takes a struct and a list of them, and gives a struct back.
+    std::vector<Value> out;
+    CHECK(inst->set("Held", bow) && inst->call("Swap", {axe, Value::structures({axe, axe})}, out) && out.size() == 2 && out[0] == bow && out[1].as_int() == 3);
+    CHECK(inst->get("Held") == axe && inst->get("Rack") == Value::structures({axe, axe, bow}));
+    rt.call("Go", 0, {{"value", Value::number(2)}, {"text", Value::text("Axe")}});
+    CHECK(inst->get("Has").as_bool() && inst->get("Seen").as_number() == 12);  // (Contains: a struct equal in every field)
+    // (its defaults; and what is no struct of the input's type is the struct's default)
+    const Value club = Value::structure({Value::text("Club"), Value::enumeration(1), Value::number(7), Value::of(std::vector<f64>{2.0})});
+    CHECK(inst->call("Swap", {}, out) && out[0] == axe && out[1].as_int() == 1 && inst->get("Held") == club);
+    CHECK(inst->call("Swap", {Value::text("Weapon"), Value::structures({bow, Value::integer(1)})}, out) && out[0] == club && out[1].as_int() == 3 && inst->get("Held") == plain);
+    CHECK(inst->get("Rack") == Value::structures({bow, plain, club}));
+    CHECK(host.errors.empty());
+  }
+  // The graph's file: the structs, and of which struct a variable or a function's pin is. A
+  // graph without structs is the file it was.
+  const json::Value file = logic::graph_to_json(g);
+  logic::Graph back;
+  CHECK(logic::graph_from_json(file, back) && back == g && logic::graph_hash(back) == logic::graph_hash(g) && back.structs.size() == 2);
+  CHECK(file["structs"].size() == 2 && file["structs"][0]["name"].as_string() == "Weapon" && file["structs"][0]["fields"].size() == 4 && file["structs"][0]["help"].as_string() == "What a weapon does.");
+  CHECK(file["structs"][0]["fields"][1]["type"].as_string() == "enum" && file["structs"][0]["fields"][1]["of"].as_string() == "Kind" && file["structs"][1]["fields"][0]["type"].as_string() == "struct");
+  CHECK(file["structs"][1]["fields"][0]["of"].as_string() == "Weapon" && file["structs"][1]["fields"][0]["value"]["Name"].as_string() == "Fist" && !file["structs"][0]["fields"][0]["of"].is_string());
+  CHECK(file["variables"][0]["type"].as_string() == "struct" && file["variables"][0]["of"].as_string() == "Weapon" && file["variables"][0]["value"]["Damage"].as_number() == 25);
+  CHECK(file["variables"][1]["type"].as_string() == "struct_list" && file["functions"][0]["inputs"][0]["of"].as_string() == "Weapon" && file["functions"][0]["inputs"][0]["value"]["Name"].as_string() == "Club");
+  CHECK(!logic::graph_to_json(logic::Graph{})["structs"].is_array());
+  logic::Graph other = g;
+  other.structs[0].fields[2].value = json::Value(11.0);
+  CHECK(!(other == g) && logic::graph_hash(other) != logic::graph_hash(g));
+  // as C++ and back: the same Blueprint, the same text
+  notation_round_trip(g, "Arena");
+  std::string text;
+  CHECK(logic::to_cpp(g, "Arena", text, &error, logic::library(), false));
+  CHECK(text.find("  // ---- types ----\n  KERN_ENUM(Kind, Melee, Ranged);\n  /// What a weapon does.\n  KERN_STRUCT(Weapon) {\n    Text Name = \"\";\n    Kind Type = Kind::Melee;\n    Float Damage = 10.0;\n"
+                  "    List<Float> Falloff = List<Float>{};\n  };\n  KERN_STRUCT(Slot) {\n    Weapon In = Weapon{\"Fist\", Kind::Melee, 1.0, List<Float>{}};\n    Int Count = 1;\n  };\n\n  // ---- variables ----\n"
+                  "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0, List<Float>{}};\n  List<Weapon> Rack = List<Weapon>{};\n") != std::string::npos);
+  CHECK(text.find("    Held.Damage = math_mul(struct_break<Weapon>(Held).Damage, 2.0);\n    list_add(Rack, struct_make<Weapon>(\"Bow\", Kind::Ranged, 12.0, List<Float>{1.0, 0.5}));\n") != std::string::npos);
+  // (the glue of its class: a struct is held field by field)
+  std::string glue;
+  CHECK(logic::native_glue(g, "Arena", glue, &error) && glue.find("template <> struct Held<::Arena::Weapon> {") != std::string::npos && glue.find("template <> struct Held<::Arena::Slot> {") != std::string::npos);
+  CHECK(glue.find("return v.type == type && v.fields() == 2 && is_value<::Arena::Weapon>(*v.field(0)) && is_value<kern::i64>(*v.field(1));") != std::string::npos);
+  CHECK(glue.find("return Value::structure({to_value(s.Name), to_value(s.Type), to_value(s.Damage), to_value(s.Falloff)});") != std::string::npos);
+
+  // What does not fit is said by the check.
+  auto problem = [](const logic::Graph& bad, const char* why) {
+    bool said = false;
+    for (const logic::Issue& i : logic::check(bad)) said = said || (i.error && i.text.find(why) != std::string::npos);
+    if (!said)
+      for (const logic::Issue& i : logic::check(bad)) std::printf("structs: expected \"%s\", got: %s\n", why, i.text.c_str());
+    CHECK(said);
+  };
+  const char* types = R"("enums":[{"name":"E","values":["A","B"]}],"structs":[{"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":1},{"name":"N","type":"float","value":2}]},
+                                                                            {"name":"T","fields":[{"name":"In","type":"struct","of":"S","value":{}}]}],)";
+  auto with_types = [&](const std::string& rest) { return logic_graph(("{" + std::string(types) + rest + "}").c_str()); };
+  problem(with_types(R"("nodes":[{"id":1,"type":"struct.make","params":{"struct":"Nope"}}],"links":[])"), "\"Nope\" is no struct of this Blueprint");
+  problem(with_types(R"("nodes":[{"id":1,"type":"struct.break","params":{"struct":"E"}}],"links":[])"), "\"E\" is no struct of this Blueprint");
+  problem(with_types(R"("nodes":[{"id":1,"type":"enum.name","params":{"enum":"S"}}],"links":[])"), "\"S\" is no enum of this Blueprint");
+  problem(with_types(R"("nodes":[{"id":1,"type":"logic.select","params":{"type":"U"}}],"links":[])"), "\"U\" is no type it can have (Type: float, int, bool, vector, text, actor, an enum or a struct of this Blueprint, or a list of one");
+  problem(with_types(R"("variables":[{"name":"V","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"N"}}],"links":[[1,"then",2,"exec"]])"),
+          "needs a struct variable: \"V\" is float");
+  problem(with_types(R"("variables":[{"name":"V","type":"struct","of":"S","value":{}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"Gone"}}],"links":[[1,"then",2,"exec"]])"),
+          "S has no field \"Gone\" (K, N)");
+  problem(with_types(R"("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"Gone","field":"N"}}],"links":[[1,"then",2,"exec"]])"), "no variable \"Gone\"");
+  problem(with_types(R"("variables":[{"name":"V","type":"struct","of":"S","value":{"K":7}}],"nodes":[],"links":[])"), "variable \"V\", field K: 7 is no value of E (it has 2)");
+  problem(with_types(R"("variables":[{"name":"L","type":"struct_list","of":"T","value":[{},{"In":{"K":3}}]}],"nodes":[],"links":[])"), "variable \"L\", field In, field K: 3 is no value of E (it has 2)");
+  problem(with_types(R"("nodes":[{"id":1,"type":"struct.make","params":{"struct":"T"},"values":{"In":{"K":2}}}],"links":[])"), "\"In\", field K: 2 is no value of E (it has 2)");
+  problem(logic_graph(R"({"enums":[{"name":"E","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":4}]}],"nodes":[],"links":[]})"),
+          "struct \"S\": the field \"K\": 4 is no value of E (it has 1)");
+  problem(logic_graph(R"({"structs":[{"name":"S","fields":[]}],"nodes":[],"links":[]})"), "struct \"S\" has no fields");
+  // a struct does not go into another's pin, into a number or into a text - and it comes out of Break field by field
+  const char* two = R"("variables":[{"name":"A","type":"struct","of":"S","value":{}},{"name":"B","type":"struct","of":"T","value":{}},{"name":"N","type":"float","value":0},{"name":"C","type":"struct","of":"S","value":{}},
+    {"name":"L","type":"struct_list","of":"S","value":[]}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"%s"}},{"id":4,"type":"debug.print"},
+             {"id":5,"type":"struct.break","params":{"struct":"S"}},{"id":6,"type":"struct.break","params":{"struct":"T"}}],
+    "links":[[1,"then",3,"exec"],[%s]])";
+  auto wired = [&](const char* into, const char* link) {
+    char rest[1600];
+    std::snprintf(rest, sizeof rest, two, into, link);
+    return no_errors(logic::check(with_types(rest)));
+  };
+  CHECK(wired("C", "2,\"value\",3,\"value\"") && !wired("B", "2,\"value\",3,\"value\"") && !wired("N", "2,\"value\",3,\"value\"") && !wired("C", "2,\"value\",4,\"text\"") && !wired("L", "2,\"value\",3,\"value\""));
+  CHECK(wired("N", "2,\"value\",5,\"value\"],[5,\"N\",3,\"value\"") && !wired("N", "2,\"value\",6,\"value\"") && wired("C", "6,\"In\",3,\"value\"") && !wired("N", "5,\"K\",3,\"value\""));
+  // A file that names a struct the Blueprint does not have, declares a type twice, or has a
+  // struct with a field of a struct that is not declared above it (itself too), is no graph.
+  json::Value j;
+  logic::Graph none;
+  CHECK(json::parse(R"({"variables":[{"name":"V","type":"struct","of":"Gone","value":{}}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]},{"name":"S","fields":[{"name":"B","type":"float","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"enums":[{"name":"S","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"B","type":"float","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0},{"name":"A","type":"int","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none, &error) &&
+        error.find("the field \"A\" exists twice") != std::string::npos);
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"Me","type":"struct","of":"S","value":{}}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none, &error) &&
+        error.find("a struct holds structs declared above it") != std::string::npos);
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"In","type":"struct_list","of":"T","value":[]}]},{"name":"T","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", j) &&
+        !logic::graph_from_json(j, none));
+  // (a graph an editor's mistake built wrong: the check says what is wrong with it, and nothing reads without end)
+  logic::Graph wrong = g;
+  wrong.structs[0].fields.push_back({"Me", weapon, json::Value::object()});
+  problem(wrong, "struct \"Weapon\" contains itself (the field \"Me\")");
+  CHECK(logic::zero_of(weapon, wrong).fields() == 5 && !logic::to_cpp(wrong, "Arena", text, &error));
+  wrong = g;
+  wrong.structs[0].fields[2].type = slot;
+  problem(wrong, "struct \"Weapon\": the field \"Damage\" is of the struct \"Slot\", which is declared below it");
+  CHECK(logic::default_of(wrong.structs[0], wrong).fields() == 4 && logic::zero_of(slot, wrong).fields() == 2);
+  wrong = g;
+  wrong.structs[0].fields[1].type.of = "Gone";
+  problem(wrong, "struct \"Weapon\": the field \"Type\" is of the enum \"Gone\", which this Blueprint does not have");
+  wrong = g;
+  wrong.structs[1].fields.push_back(wrong.structs[1].fields[1]);
+  problem(wrong, "struct \"Slot\" has two fields called \"Count\"");
+  wrong = g;
+  for (int k = 0; k < 30; ++k) wrong.structs[1].fields.push_back({"F" + std::to_string(k), {PinType::number, ""}, json::Value(0.0)});
+  CHECK(no_errors(logic::check(wrong)) && wrong.structs[1].fields.size() == logic::StructType::kMaxFields);
+  notation_round_trip(wrong, "Arena");
+  wrong.structs[1].fields.push_back({"OneMore", {PinType::number, ""}, json::Value(0.0)});
+  problem(wrong, "struct \"Slot\" has 33 fields (a struct has 32 at most)");
+  wrong = g;
+  wrong.structs.clear();
+  problem(wrong, "variable \"Held\" is of the struct \"Weapon\", which this Blueprint does not have");
+}
+
 TEST(logic_notation_tier_cases) {
   // Every tier case as C++ and back: the same Blueprint, and it plays exactly as before.
   for (const logic_cases::Case& c : logic_cases::cases()) {
@@ -2671,19 +2933,44 @@ static logic::Graph every_node_graph(bool wired) {
   const logic::Library& lib = logic::library();
   logic::Graph g;
   u32 next = 1;
-  const std::pair<const char*, PinType> vars[] = {{"VB", PinType::boolean},       {"VI", PinType::integer},       {"VF", PinType::number},       {"VV", PinType::vector},
-                                                  {"VT", PinType::text},          {"VA", PinType::actor},         {"LB", PinType::boolean_list}, {"LI", PinType::integer_list},
-                                                  {"LF", PinType::number_list},   {"LV", PinType::vector_list},   {"LT", PinType::text_list},    {"LA", PinType::actor_list},
-                                                  {"VE", PinType::enumeration},   {"LE", PinType::enumeration_list}};
+  struct Var { const char* name; PinType type; const char* of; };
+  const Var vars[] = {{"VB", PinType::boolean, ""},        {"VI", PinType::integer, ""},          {"VF", PinType::number, ""},         {"VV", PinType::vector, ""},
+                      {"VT", PinType::text, ""},           {"VA", PinType::actor, ""},            {"LB", PinType::boolean_list, ""},   {"LI", PinType::integer_list, ""},
+                      {"LF", PinType::number_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
+                      {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
+                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
-  for (const auto& [name, type] : vars)
-    g.variables.push_back({name, type, logic::Value::zero(type).to_json(), {}, logic::element_of(type) == PinType::enumeration ? std::string("EM") : std::string()});
+  // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
+  g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
+  g.structs.push_back({"SM", {}, "A struct that holds one.\n\nIts second paragraph."});
+  {
+    json::Value in = json::Value::object(), numbers = json::Value::array(), places = json::Value::array(), at = json::Value::array();
+    in.set("N", 5);
+    in.set("Tag", "in");
+    numbers.push(1.5);
+    numbers.push(-2.0);
+    places.push(1);
+    for (f64 x : {0.0, 0.5, -1.0}) at.push(x);
+    g.structs[1].fields = {{"F", {PinType::number, ""}, json::Value(1.5)},   {"E", {PinType::enumeration, "EM"}, json::Value(1)}, {"In", {PinType::structure, "SI"}, in},
+                           {"L", {PinType::number_list, ""}, numbers},      {"Ins", {PinType::structure_list, "SI"}, json::Value::array()},
+                           {"B", {PinType::boolean, ""}, json::Value(true)}, {"V", {PinType::vector, ""}, at},                    {"A", {PinType::actor, ""}, json::Value(0)},
+                           {"Es", {PinType::enumeration_list, "EM"}, places}};
+  }
+  for (const Var& v : vars) g.variables.push_back({v.name, v.type, logic::zero_of({v.type, v.of}, g).to_json(g, v.of), {}, v.of});
   g.variables[2].help = "A number.\n\nIts second paragraph.";
-  auto var_of = [&](PinType t) {
-    for (const auto& [name, type] : vars) if (type == t) return std::string(name);
+  auto var_of = [&](const logic::PinDef& pin) {
+    for (const Var& v : vars) if (v.type == pin.type && pin.of == v.of) return std::string(v.name);
     return std::string("VF");
   };
-  auto other_than_default = [](PinType t) {
+  std::function<logic::Value(PinType, const std::string&)> other_than_default = [&](PinType t, const std::string& of) {
+    const logic::Value inner = logic::Value::structure({logic::Value::integer(-7), logic::Value::text("x \"y\"\n")});
+    if (logic::element_of(t) == PinType::structure) {
+      const logic::Value one = of == "SI" ? inner
+                                          : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
+                                                                     logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
+                                                                     logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
+      return t == PinType::structure ? one : logic::Value::structures({one, logic::zero_of({PinType::structure, of}, g)});
+    }
     switch (t) {
       case PinType::boolean: return logic::Value::boolean(true);
       case PinType::integer: return logic::Value::integer(-7);
@@ -2703,8 +2990,9 @@ static logic::Graph every_node_graph(bool wired) {
   };
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
-    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration)
-      v.value = other_than_default(v.type).to_json();
+    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration ||
+        logic::element_of(v.type) == PinType::structure)
+      v.value = other_than_default(v.type, v.of).to_json(g, v.of);
   logic::Function fn;
   fn.name = "Fn";
   fn.help = "Twice x.";
@@ -2715,10 +3003,12 @@ static logic::Graph every_node_graph(bool wired) {
   logic::Function calc;
   calc.name = "Calc";
   calc.pure = true;
-  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list).to_json()},
-                 {"none", PinType::actor_list, json::Value::array()}, {"e", PinType::enumeration, json::Value(1), "EM"}};
-  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list).to_json()},
-                  {"all", PinType::enumeration_list, other_than_default(PinType::enumeration_list).to_json(), "EM"}};
+  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list, "").to_json()},
+                 {"none", PinType::actor_list, json::Value::array()}, {"e", PinType::enumeration, json::Value(1), "EM"},
+                 {"s", PinType::structure, other_than_default(PinType::structure, "SM").to_json(g, "SM"), "SM"}};
+  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list, "").to_json()},
+                  {"all", PinType::enumeration_list, other_than_default(PinType::enumeration_list, "").to_json(), "EM"},
+                  {"structs", PinType::structure_list, other_than_default(PinType::structure_list, "SI").to_json(g, "SI"), "SI"}};
   g.functions = {fn, proc, calc};
   logic::StateMachine m;
   m.id = next++;
@@ -2751,7 +3041,7 @@ static logic::Graph every_node_graph(bool wired) {
   };
   /// A Set node of the output's type that reads it, appended to the chain at (tail, pin).
   auto read = [&](u32 from, const logic::PinDef& out, u32& tail, std::string& tail_pin) {
-    const u32 set = add("var.set", {{"variable", var_of(out.type)}});
+    const u32 set = add("var.set", {{"variable", var_of(out)}});
     wire(from, out.id, set, "value");
     if (tail) wire(tail, tail_pin, set, "exec");
     tail = set;
@@ -2776,14 +3066,15 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type == "struct.set_field" ? "VS" : type.rfind("list.", 0) == 0 ? "LT" : "VF") :
+                                    pd.kind == K::field ? "In" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
     const u32 id = add(type, params);
     std::vector<logic::PinDef> in, out;
     pins(id, in, out);
     for (const logic::PinDef& p : in)
-      if (p.type != PinType::exec) g.find(id)->set_value(p.id, other_than_default(p.type).to_json());
+      if (p.type != PinType::exec) g.find(id)->set_value(p.id, other_than_default(p.type, p.of).to_json(g, p.of));
     u32 tail = 0;
     std::string tail_pin;
     if (def->kind == logic::NodeKind::event) {
@@ -3377,7 +3668,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
   refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
   refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor> or List<an enum of the Blueprint>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
   refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
   refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
@@ -3398,7 +3689,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  KERN_ENUM(Mode, A, 2);", "a value's name expected");
   refused("  KERN_ENUM(Items_list, A);", "a name that ends in _list reads as a list");
   refused("  KERN_ENUM(Mode, A, Float);", "the value \"Float\" of Mode is no name C++ can write");
-  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum declared above it, or a List of one of them", "line 5, column 3:");
+  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them", "line 5, column 3:");
   refused(mode + "  Mode Other = Mode::Ajar;", "Mode has no value \"Ajar\" (Closed, Open)", "line 7, column 22:");
   refused(mode + "  Mode Other = 1;", "this is Int, but Mode is needed (like Mode::Closed)");
   refused(mode + "  KERN_ENUM(Light, Red);\n  Mode Other = Light::Red;", "this is Light, but Mode is needed");
@@ -3416,6 +3707,67 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case 0: {\n      } break;\n    }"), "a case of flow_switch_enum<Mode> is one of the enum's values: case Mode::Closed:", "line 10, column 12:");
   refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Ajar: {\n      } break;\n    }"), "Mode has no value \"Ajar\"");
   refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Open: {\n      } break;\n      case Mode::Open: {\n      } break;\n    }"), "case Mode::Open is there twice");
+  // structs
+  const std::string weapon = "  KERN_ENUM(Kind, Melee, Ranged);\n  KERN_STRUCT(Weapon) {\n    Text Label = \"\";\n    Kind Type = Kind::Melee;\n    Float Damage = 10.0;\n  };\n"
+                             "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0};\n";
+  const std::string solo = "  KERN_STRUCT(Solo) {\n    Float A = 0.0;\n  };\n  Solo One = Solo{1.0};\n";
+  refused("  KERN_STRUCT(Weapon) {\n  };", "a struct has fields: KERN_STRUCT(Weapon) { Float Field = 0.0; };", "line 6, column 3:");
+  refused("  KERN_STRUCT(Heat) {\n    Float A = 0.0;\n  };", "the name Heat is declared twice");
+  refused("  KERN_ENUM(Weapon, A);\n  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n  };", "the name Weapon is declared twice");
+  refused(solo + "  KERN_ENUM(Solo, A);", "the name Solo is declared twice");
+  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n    Int A = 1;\n  };", "Weapon has the field A twice", "line 7, column 9:");
+  refused("  KERN_STRUCT(Weapon) {\n    Double A = 0.0;\n  };", "the struct Weapon: \"Double\" is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
+  refused("  KERN_STRUCT(Weapon) {\n    Float A = \"a\";\n  };", "Weapon.A: this is Text, but Float is needed (like 0.0)");
+  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0\n  };", "\";\" expected");
+  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n  }", "\";\" expected");
+  refused("  KERN_STRUCT(Items_list) {\n    Float A = 0.0;\n  };", "a name that ends in _list reads as a list");
+  refused("  KERN_STRUCT(Weapon) {\n    Float Float = 0.0;\n  };", "the field \"Float\" of Weapon is no name C++ can write");
+  refused("  KERN_ENUM(Kind, A);\n  KERN_STRUCT(Weapon) {\n    Kind Kind = Kind::A;\n  };", "the field \"Kind\" of Weapon has the name of a type of this Blueprint");
+  // a struct does not contain itself, and holds only what is declared above it
+  refused("  KERN_STRUCT(Chain) {\n    Float A = 0.0;\n    Chain Next = Chain{0.0};\n  };", "the struct Chain cannot contain itself: a field is of a type declared above the struct", "line 7, column 5:");
+  refused("  KERN_STRUCT(Chain) {\n    List<Chain> More = List<Chain>{};\n  };", "the struct Chain cannot contain itself", "line 6, column 5:");
+  refused("  KERN_STRUCT(Outer) {\n    Inner In = Inner{0.0};\n  };\n  KERN_STRUCT(Inner) {\n    Float A = 0.0;\n  };", "the struct Outer: \"Inner\" is no type here: a field is", "line 6, column 5:");
+  refused("  Solo One = Solo{1.0};\n  KERN_STRUCT(Solo) {\n    Float A = 0.0;\n  };", "\"Solo\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them",
+          "line 5, column 3:");
+  // a struct written out gives a value for every field, in their order, each of its type
+  refused(weapon + "  Weapon Other = Weapon{\"a\", Kind::Melee};", "Weapon has 3 field(s) (Label, Type, Damage): Weapon{...} gives a value for each, in that order", "line 12, column 41:");
+  refused(weapon + "  Weapon Other = Weapon{\"a\", Kind::Melee, 1.0, 2.0};", "Weapon has 3 field(s) (Label, Type, Damage)", "line 12, column 46:");
+  refused(weapon + "  Weapon Other = Weapon{};", "Weapon has 3 field(s) (Label, Type, Damage)");
+  refused(weapon + "  Weapon Other = Weapon{\"a\", 1, 2.0};", "Weapon.Type: this is Int, but Kind is needed (like Kind::Melee)", "line 12, column 30:");
+  refused(weapon + "  Weapon Other = Weapon{1.5, Kind::Melee, 2.0};", "Weapon.Label: this is Float, but Text is needed");
+  refused(weapon + "  Weapon Other = 1.0;", "this is Float, but Weapon is needed (like Weapon{\"\", Kind::Melee, 10.0})");
+  refused(weapon + solo + "  Weapon Other = Solo{1.0};", "this is Solo, but Weapon is needed");
+  refused(weapon + "  List<Weapon> Rack = List<Weapon>{Weapon{\"a\", Kind::Melee, 1.0}, 2.0};", "a list's item: this is Float, but Weapon is needed");
+  refused(weapon + "  List<Weapon> Rack = List<Kind>{};", "this is List<Kind>, but List<Weapon> is needed (like List<Weapon>{})");
+  // a field is set by its name, and read through Break
+  refused(weapon + in_event("    Held.Range = 1.0;"), "Weapon has no field \"Range\" (Label, Type, Damage)", "line 14, column 10:");
+  refused(weapon + in_event("    Held.Damage += 1.0;"), "Held.Damage = value; expected, not \"+=\"");
+  refused(weapon + in_event("    Held.Damage = \"a\";"), "is Float, this is Text");
+  refused(weapon + in_event("    Held.Type = Count;"), "this is Int, the input is Kind: the two do not convert");
+  refused(in_event("    Heat.X = 1.0;"), "Heat is Float: only a struct has fields to set (Variable.Field = value;)");
+  refused(weapon + in_event("    n9.value = (Held.Range = 1.0);"), "Weapon has no field \"Range\"");
+  refused(weapon + in_event("    n9.total = (Held.Damage = 1.0);"), "a Set gives \"value\"");
+  refused(weapon + in_event("    struct_set_field<\"Damage\">(Held, 1.0);"), "a struct's field is set by its name: Variable.Field = value;");
+  refused(weapon + in_event("    Heat = Held.Damage;"), "a struct's field is read through Break: struct_break<Weapon>(Held).Damage");
+  refused(in_event("    Heat = Count.Damage;"), "Count is Int: it has no fields");
+  refused(weapon + in_event("    Heat = struct_break<Weapon>(Held);"), "struct_break gives several values: say which one (.Label, Type, Damage)");
+  refused(solo + in_event("    Heat = struct_break<Solo>(One);"), "which field: struct_break<Solo>(...).A");
+  refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Range;"), "struct_break has no output \"Range\" (Label, Type, Damage)");
+  refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Label;"), "this is Text, the input is Float: the two do not convert");
+  refused(weapon + solo + in_event("    Heat = struct_break<Solo>(Held).A;"), "this is Weapon, the input is Solo: the two do not convert");
+  refused(weapon + in_event("    Held = struct_make(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
+  refused(weapon + in_event("    Held = struct_make<Kind>(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
+  refused(weapon + in_event("    Held = struct_make<\"Weapon\">(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
+  refused(weapon + in_event("    Held = struct_make<Weapon>(\"a\", Kind::Melee);"), "struct_make takes 3 value(s): Label, Type, Damage");
+  refused(weapon + in_event("    Held = struct_make<Weapon>(\"a\", 1, 1.0);"), "\"Type\" of struct_make is Kind, this is Int");
+  refused(weapon + in_event("    struct_make<Weapon>(\"a\", Kind::Melee, 1.0);"), "struct_make is a value: alone on a line it does nothing");
+  // a struct is no number and no text, and no other struct
+  refused(weapon + in_event("    Name = Held;"), "this is Weapon, the input is Text: the two do not convert");
+  refused(weapon + in_event("    Name = kern::to<Text>(Held);"), "a Weapon cannot become a Text");
+  refused(weapon + in_event("    Held = 1.0;"), "is Weapon, this is Float");
+  refused(weapon + solo + in_event("    Held = One;"), "this is Solo, the input is Weapon: the two do not convert");
+  refused(weapon + in_event("    Held = logic_select<Weapon>(true, Held, 1.0);"), "\"b\" of logic_select is Weapon, this is Float");
+  refused(weapon + in_event("    Count = list_length<Weapon>(Held);"), "this is Weapon, the input is List<Weapon>: the two do not convert");
   // the setting "Type" of a generic node is the type itself
   refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
   refused(in_event("    Heat = logic_select<Double>(true, 1.0, 2.0);"), "a setting is a text (\"...\") or a type");
@@ -3584,6 +3936,26 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
           "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.switch_enum","params":{"enum":"E"}},{"id":3,"type":"func.return","params":{"function":"F"}},
                    {"id":4,"type":"enum.values","params":{"enum":"E"}}],
           "links":[[1,"then",2,"exec"],[1,"e",2,"value"],[2,"case1",3,"exec"],[4,"values",3,"all"]]})");
+  // a struct is a type of the Blueprint's C++ too: its name and its fields' names are names there
+  problem(R"({"structs":[{"name":"my struct","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "the struct \"my struct\" is no name C++ can write");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"b c","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"b c\" of S is no name C++ can write");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"Text","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"Text\" of S is no name C++ can write");
+  problem(R"({"structs":[{"name":"Items_list","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]}],"variables":[{"name":"S","type":"float","value":0}],"nodes":[],"links":[]})", "the name \"S\" is used twice");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]}],"functions":[{"name":"S","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"S"}}],"links":[]})",
+          "the name \"S\" is used twice");
+  problem(R"({"structs":[{"name":"math_add","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "is the name of a node");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"E","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"E\" of S has the name of a type of this Blueprint");
+  fine(R"({"enums":[{"name":"E","values":["A","B"]}],
+          "structs":[{"name":"In","fields":[{"name":"A","type":"float","value":1}]},
+                     {"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":1},{"name":"I","type":"struct","of":"In","value":{"A":2}},{"name":"L","type":"struct_list","of":"In","value":[{}]},
+                                           {"name":"value","type":"float","value":0}]}],
+          "variables":[{"name":"V","type":"struct","of":"S","value":{"K":1}},{"name":"L","type":"struct_list","of":"S","value":[{"K":0},{}]},{"name":"A","type":"float","value":0}],
+          "functions":[{"name":"F","inputs":[{"name":"s","type":"struct","of":"S","value":{}}],"outputs":[{"name":"all","type":"struct_list","of":"In","value":[]},{"name":"one","type":"struct","of":"In","value":{}}]}],
+          "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"I"}},{"id":3,"type":"func.return","params":{"function":"F"}},
+                   {"id":4,"type":"struct.break","params":{"struct":"S"}},{"id":5,"type":"struct.make","params":{"struct":"In"},"values":{"A":3}},
+                   {"id":6,"type":"struct.set_field","params":{"variable":"V","field":"value"}}],
+          "links":[[1,"then",2,"exec"],[1,"s",4,"value"],[5,"value",2,"value"],[2,"then",6,"exec"],[4,"value",6,"value"],[6,"then",3,"exec"],[4,"L",3,"all"],[2,"value",3,"one"]]})");
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
@@ -8973,6 +9345,338 @@ TEST(studio_logic_enums) {
   r = cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Light"}});
   if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
   CHECK(r["ok"].as_bool() && values("Light").empty() && f.s->state()["logic"]["enums"].size() == 1);
+}
+
+TEST(studio_logic_structs) {
+  // Structs in the editor: a struct and its fields; variables, pins and nodes of its type; and
+  // what follows when a field is renamed, moved, retyped or removed - a value is held by its
+  // fields' names, so what is typed in and wired stays with its field.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> kv) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : kv) c.set(k, v);
+    return f.s->command(c);
+  };
+  auto parsed = [](const char* text) {
+    json::Value j;
+    CHECK(json::parse(text, j));
+    return j;
+  };
+  auto structure = [&](const char* name) {
+    const json::Value st = f.s->state();
+    for (const json::Value& s : st["logic"]["structs"].items()) if (s["name"].as_string() == name) return s;
+    return json::Value();
+  };
+  /// The fields of a struct as text: "Name:text,Damage:float".
+  auto fields = [&](const char* name) {
+    std::string all;
+    const json::Value declared = structure(name);
+    for (const json::Value& x : declared["fields"].items())
+      all += (all.empty() ? "" : ",") + x["name"].as_string() + ":" + (x["of"].is_string() ? x["of"].as_string() + (x["type"].as_string().find("_list") != std::string::npos ? "[]" : "") : x["type"].as_string());
+    return all;
+  };
+  auto order = [&] {
+    std::string all;
+    const json::Value st = f.s->state();
+    for (const json::Value& s : st["logic"]["structs"].items()) all += (all.empty() ? "" : ",") + s["name"].as_string();
+    return all;
+  };
+  auto edit = [&](const char* op, const char* name, std::initializer_list<std::pair<const char*, json::Value>> more = {}) {
+    json::Value c = json::Value::object();
+    c.set("cmd", "logicStruct");
+    c.set("op", op);
+    c.set("name", name);
+    for (const auto& [k, v] : more) c.set(k, v);
+    return f.s->command(c);
+  };
+  const json::Value made = cmd({{"cmd", "logicStruct"}, {"op", "add"}, {"name", "Weapon"}});
+  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Weapon" && fields("Weapon") == "Field:float" && structure("Weapon")["fields"][0]["value"].as_number() == 0);
+  // its name is a type's name in C++: not a word of the notation, not a list's name, not taken twice
+  CHECK(!edit("add", "Float")["ok"].as_bool() && !edit("add", "Items_list")["ok"].as_bool() && !edit("add", "Weapon")["ok"].as_bool() && !edit("add", "math_add")["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "add"}})["name"].as_string() == "NewStruct" && order() == "Weapon,NewStruct");
+  CHECK(edit("rename", "NewStruct", {{"to", "Aim"}})["ok"].as_bool() && !edit("rename", "Aim", {{"to", "Weapon"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Aim"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Kind"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Weapon"}})["ok"].as_bool() && !edit("add", "Kind")["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Kind"}, {"index", 0}, {"to", "Melee"}})["ok"].as_bool() && cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Kind"}, {"index", 1}, {"to", "Ranged"}})["ok"].as_bool());
+  // the fields: renamed, added (of a value type, an enum's, another struct's, a list), given a default
+  CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Damage"}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Damage"}, {"value", 10}})["ok"].as_bool());
+  CHECK(edit("addField", "Weapon", {{"field", "Label"}, {"type", "text"}})["ok"].as_bool() && edit("addField", "Weapon", {{"field", "Type"}, {"type", "Kind"}})["ok"].as_bool());
+  CHECK(edit("addField", "Weapon", {{"type", "float_list"}})["field"].as_string() == "Field" && edit("addField", "Weapon")["field"].as_string() == "Field2");
+  CHECK(fields("Weapon") == "Damage:float,Label:text,Type:Kind,Field:float_list,Field2:float" && structure("Weapon")["fields"][0]["value"].as_number() == 10);
+  json::Value r = edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "Label"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon has a field Label already");
+  CHECK(!edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "my field"}})["ok"].as_bool() && !edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "class"}})["ok"].as_bool());
+  r = edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "Kind"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "\"Kind\" is a type of this Blueprint" && !edit("addField", "Weapon", {{"field", "Aim"}})["ok"].as_bool());
+  CHECK(!edit("renameField", "Weapon", {{"field", "Nope"}, {"to", "X"}})["ok"].as_bool() && !edit("addField", "Weapon", {{"field", "Other"}, {"type", "Nope"}})["ok"].as_bool());
+  // (a type's name is no field's name anywhere: an enum or a struct cannot take a field's)
+  r = cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Label"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "\"Label\" is a field of the struct Weapon" && !edit("rename", "Aim", {{"to", "Damage"}})["ok"].as_bool());
+  CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Falloff"}})["ok"].as_bool() && edit("removeField", "Weapon", {{"field", "Field2"}})["ok"].as_bool());
+  CHECK(edit("fieldValue", "Weapon", {{"field", "Type"}, {"value", 1}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Falloff"}, {"value", parsed("[1, 0.5]")}})["ok"].as_bool());
+  CHECK(edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}})["ok"].as_bool() && fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list");
+  // (the first one does not move up, the last one not down)
+  edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}});
+  edit("moveField", "Weapon", {{"field", "Falloff"}, {"by", 1}});
+  CHECK(fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list" && edit("help", "Weapon", {{"text", "What a weapon does."}})["ok"].as_bool());
+  // A field of another struct: the struct it is of stands above (Aim moves up) - and no struct
+  // holds itself, directly or through another one.
+  CHECK(edit("renameField", "Aim", {{"field", "Field"}, {"to", "Tries"}})["ok"].as_bool() && edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(edit("fieldValue", "Aim", {{"field", "Tries"}, {"value", 3}})["ok"].as_bool() && order() == "Weapon,Aim");
+  CHECK(edit("addField", "Weapon", {{"field", "Sight"}, {"type", "Aim"}})["ok"].as_bool() && order() == "Aim,Weapon" && fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list,Sight:Aim");
+  CHECK(structure("Weapon")["fields"][4]["value"]["Tries"].as_number() == 3 && edit("addField", "Weapon", {{"field", "Marks"}, {"type", "Aim_list"}})["ok"].as_bool() && fields("Weapon").find("Marks:Aim[]") != std::string::npos);
+  r = edit("addField", "Aim", {{"field", "Of"}, {"type", "Weapon"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon holds Aim: a struct cannot contain itself" && !edit("addField", "Aim", {{"field", "Me"}, {"type", "Aim_list"}})["ok"].as_bool());
+  r = edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "Aim"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "a struct cannot contain itself" && fields("Aim") == "Tries:int" && no_errors(logic::check(f.s->level().logic)));
+
+  // A variable of the struct's type, a list of them, and their defaults - by the fields' names.
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Held"}, {"type", "Weapon"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Rack"}, {"type", "float"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Rack"}, {"type", "Weapon_list"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Other"}, {"type", "Nope"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Weapon"}})["ok"].as_bool());
+  auto variable = [&](const char* name) {
+    const json::Value st = f.s->state();
+    for (const json::Value& v : st["logic"]["variables"].items()) if (v["name"].as_string() == name) return v;
+    return json::Value();
+  };
+  CHECK(variable("Held")["type"].as_string() == "struct" && variable("Held")["of"].as_string() == "Weapon" && variable("Held")["value"]["Damage"].as_number() == 10 && variable("Held")["value"]["Type"].as_number() == 1);
+  CHECK(variable("Held")["value"]["Sight"]["Tries"].as_number() == 3 && variable("Held")["value"]["Falloff"].size() == 2 && variable("Rack")["type"].as_string() == "struct_list" && variable("Rack")["value"].size() == 0);
+  // (what is given of a value is taken, the rest is the fields' defaults; what the struct does not have is not kept)
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "Held"}, {"value", parsed(R"({"Label":"Knife","Damage":25,"Nope":1,"Sight":{"Tries":7}})")}})["ok"].as_bool());
+  CHECK(variable("Held")["value"]["Label"].as_string() == "Knife" && variable("Held")["value"]["Damage"].as_number() == 25 && variable("Held")["value"]["Type"].as_number() == 1 && !variable("Held")["value"].has("Nope"));
+  CHECK(variable("Held")["value"]["Sight"]["Tries"].as_number() == 7 && cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "Rack"}, {"value", parsed(R"([{"Label":"Bow"},{}])")}})["ok"].as_bool());
+  CHECK(variable("Rack")["value"].size() == 2 && variable("Rack")["value"][0]["Label"].as_string() == "Bow" && variable("Rack")["value"][1]["Damage"].as_number() == 10);
+  // (a variable that becomes another struct's starts at that struct's default)
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Last"}, {"type", "Weapon"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Last"}, {"type", "Aim"}})["ok"].as_bool());
+  CHECK(variable("Last")["of"].as_string() == "Aim" && variable("Last")["value"]["Tries"].as_number() == 3 && !variable("Last")["value"].has("Damage"));
+
+  // The nodes of a struct are offered per struct, by its name; Set Field per struct variable and field.
+  auto offered = [&](const json::Value& pal, const char* type, const char* param = nullptr, const char* value = nullptr, const char* label = nullptr) {
+    for (const json::Value& it : pal["items"].items())
+      if (it["type"].as_string() == type && (!param || it["params"][param].as_string() == value) && (!label || it["label"].as_string() == label)) return true;
+    return false;
+  };
+  json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "weapon"}});
+  CHECK(offered(pal, "struct.make", "struct", "Weapon", "Make Weapon") && offered(pal, "struct.break", "struct", "Weapon", "Break Weapon") && !offered(pal, "struct.make", "struct", "Aim"));
+  pal = cmd({{"cmd", "logicPalette"}, {"query", "held"}});
+  CHECK(offered(pal, "struct.set_field", "field", "Damage", "Set Damage of Held") && offered(pal, "struct.set_field", "field", "Sight", "Set Sight of Held") && offered(pal, "var.set", "variable", "Held"));
+  pal = cmd({{"cmd", "logicPalette"}, {"query", "struct"}});
+  bool bare = false;
+  std::size_t per_struct = 0;
+  for (const json::Value& it : pal["items"].items()) {
+    if (it["type"].as_string() != "struct.make" && it["type"].as_string() != "struct.break") continue;
+    ++per_struct;
+    bare |= !it["params"]["struct"].is_string() || it["params"]["struct"].as_string().empty();
+    CHECK(it["category"].as_string() == "Structures");
+  }
+  CHECK(!bare && per_struct == 4);  // (Make and Break for each of the two structs)
+  auto added = [&](const char* type, const char* params = "{}") {
+    json::Value add = json::Value::object(), p;
+    add.set("cmd", "logicAdd");
+    add.set("type", type);
+    add.set("x", 0);
+    add.set("y", 0);
+    CHECK(json::parse(params, p));
+    add.set("params", p);
+    return static_cast<u32>(f.s->command(add)["id"].as_number());
+  };
+  // From the pin of Get Held: what takes a Weapon - Break Weapon, Select and Reroute in its type, Set Held; nothing of another struct, no number, no text.
+  const u32 get = added("var.get", R"({"variable":"Held"})");
+  json::Value from = json::Value::object();
+  from.set("node", get);
+  from.set("pin", "value");
+  from.set("output", true);
+  pal = cmd({{"cmd", "logicPalette"}, {"query", ""}, {"from", from}});
+  CHECK(offered(pal, "struct.break", "struct", "Weapon") && offered(pal, "logic.select", "type", "Weapon") && offered(pal, "value.reroute", "type", "Weapon") && offered(pal, "var.set", "variable", "Held"));
+  CHECK(offered(pal, "list.contains", "type", "Weapon") && offered(pal, "list.add", "variable", "Rack") && !offered(pal, "struct.break", "struct", "Aim") && !offered(pal, "struct.make") && !offered(pal, "var.set", "variable", "Last"));
+  CHECK(!offered(pal, "math.add") && !offered(pal, "debug.print"));
+
+  auto pin = [&](u32 node, const char* id, bool output) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items())
+      if (static_cast<u32>(n["id"].as_number()) == node)
+        for (const json::Value& p : n[output ? "outputs" : "inputs"].items()) if (p["id"].as_string() == id) return p;
+    return json::Value();
+  };
+  auto node = [&](u32 id) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items()) if (static_cast<u32>(n["id"].as_number()) == id) return n;
+    return json::Value();
+  };
+  auto wire = [&](u32 a, const char* out, u32 b, const char* in) { return cmd({{"cmd", "logicConnect"}, {"from", a}, {"out", out}, {"to", b}, {"in", in}}); };
+  auto wired = [&](u32 a, const char* out, u32 b, const char* in) {
+    for (const logic::Link& l : f.s->level().logic.links) if (l.from == a && l.out == out && l.to == b && l.in == in) return true;
+    return false;
+  };
+  // Make has an input for each field - of the field's type, with its default -, Break an output; Set Field names a variable and a field.
+  const u32 begin = added("event.begin"), make = added("struct.make", R"({"struct":"Weapon"})"), brk = added("struct.break", R"({"struct":"Weapon"})"), set = added("var.set", R"({"variable":"Held"})");
+  const u32 tune = added("struct.set_field", R"({"variable":"Held","field":"Damage"})"), number = added("math.add"), text = added("text.append"), print = added("debug.print");
+  CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "float");
+  CHECK(pin(make, "Damage", false)["value"].as_number() == 10 && pin(make, "Type", false)["type"].as_string() == "enum" && pin(make, "Type", false)["of"].as_string() == "Kind" && pin(make, "Type", false)["value"].as_number() == 1);
+  CHECK(pin(make, "Sight", false)["type"].as_string() == "struct" && pin(make, "Sight", false)["of"].as_string() == "Aim" && pin(make, "Sight", false)["value"]["Tries"].as_number() == 3);
+  CHECK(pin(make, "Marks", false)["type"].as_string() == "struct_list" && pin(make, "value", true)["type"].as_string() == "struct" && pin(make, "value", true)["of"].as_string() == "Weapon");
+  CHECK(node(brk)["title"].as_string() == "Break Weapon" && node(brk)["outputs"].size() == 6 && pin(brk, "Label", true)["type"].as_string() == "text" && pin(brk, "value", false)["value"]["Damage"].as_number() == 10);
+  CHECK(node(tune)["title"].as_string() == "Set Damage of Held" && pin(tune, "value", false)["type"].as_string() == "float" && pin(tune, "value", false)["value"].as_number() == 10);
+  // (its settings: the struct variables, and the fields of the one it names)
+  std::string variables, field_choices;
+  const json::Value tuned = node(tune);
+  for (const json::Value& p : tuned["params"].items())
+    for (const json::Value& ch : p["choices"].items()) (p["key"].as_string() == "variable" ? variables : field_choices) += ch[0].as_string() + " ";
+  CHECK(variables == "Held Last " && field_choices == "Label Damage Type Falloff Sight Marks " && node(tune)["params"][1]["kind"].as_string() == "field");
+  // (a Set Field without settings names the first struct variable and its first field; of another variable: a field that one has)
+  const u32 loose = added("struct.set_field");
+  CHECK(f.s->level().logic.find(loose)->param("variable") == "Held" && f.s->level().logic.find(loose)->param("field") == "Label");
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Last"}})["ok"].as_bool() && f.s->level().logic.find(loose)->param("field") == "Tries" && node(loose)["title"].as_string() == "Set Tries of Last");
+  json::Value gone = json::Value::array();
+  gone.push(loose);
+  CHECK(cmd({{"cmd", "logicDelete"}, {"ids", gone}})["ok"].as_bool());
+  CHECK(wire(begin, "then", set, "exec")["ok"].as_bool() && wire(make, "value", set, "value")["ok"].as_bool() && wire(set, "then", tune, "exec")["ok"].as_bool() && wire(get, "value", brk, "value")["ok"].as_bool());
+  CHECK(wire(number, "result", make, "Damage")["ok"].as_bool() && wire(brk, "Damage", tune, "value")["ok"].as_bool() && wire(brk, "Label", print, "text")["ok"].as_bool() && wire(text, "result", make, "Label")["ok"].as_bool());
+  // (a struct goes into its own type only; a field's pin takes what its type takes)
+  r = wire(get, "value", print, "text");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "a Weapon cannot go into a text pin" && !wire(get, "value", make, "Sight")["ok"].as_bool() && !wire(number, "result", set, "value")["ok"].as_bool());
+  CHECK(!wire(text, "result", make, "Type")["ok"].as_bool() && !wire(brk, "Sight", tune, "value")["ok"].as_bool());
+  // a value typed into a struct's pin and into a field's pin
+  CHECK(cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Sight"}, {"value", parsed(R"({"Tries":9,"Gone":1})")}})["ok"].as_bool() && pin(make, "Sight", false)["value"]["Tries"].as_number() == 9);
+  CHECK(!pin(make, "Sight", false)["value"].has("Gone") && cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Type"}, {"value", 0}})["ok"].as_bool() && pin(make, "Type", false)["value"].as_number() == 0);
+  // a generic node takes the struct's type from its first wire
+  const u32 select = added("logic.select"), rack = added("var.get", R"({"variable":"Rack"})"), length = added("list.length");
+  CHECK(pin(select, "a", false)["generic"].as_string().find("Weapon") != std::string::npos && wire(get, "value", select, "a")["ok"].as_bool() && f.s->level().logic.find(select)->param("type") == "Weapon");
+  CHECK(pin(select, "result", true)["type"].as_string() == "struct" && pin(select, "result", true)["of"].as_string() == "Weapon" && wire(rack, "value", length, "list")["ok"].as_bool());
+  CHECK(f.s->level().logic.find(length)->param("type") == "Weapon" && pin(length, "list", false)["type"].as_string() == "struct_list" && no_errors(logic::check(f.s->level().logic)));
+
+  // A field's new name: its values and its wires stay with it - on Make, on Break, in Set Field, in every default.
+  CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:float") != std::string::npos);
+  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && !wired(number, "result", make, "Damage") && node(tune)["title"].as_string() == "Set Power of Held");
+  CHECK(variable("Held")["value"]["Power"].as_number() == 25 && !variable("Held")["value"].has("Damage") && variable("Rack")["value"][1]["Power"].as_number() == 10 && no_errors(logic::check(f.s->level().logic)));
+  CHECK(cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Label"}, {"value", "typed"}})["ok"].as_bool() && edit("renameField", "Weapon", {{"field", "Label"}, {"to", "Title"}})["ok"].as_bool());
+  CHECK(f.s->level().logic.find(make)->value("Title") && f.s->level().logic.find(make)->value("Title")->as_string() == "typed" && wired(text, "result", make, "Title") && wired(brk, "Title", print, "text"));
+  CHECK(variable("Held")["value"]["Title"].as_string() == "Knife" && variable("Rack")["value"][0]["Title"].as_string() == "Bow");
+  // (a field of a struct inside: the structs that hold it follow)
+  CHECK(edit("renameField", "Aim", {{"field", "Tries"}, {"to", "Shots"}})["ok"].as_bool() && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7 && pin(make, "Sight", false)["value"]["Shots"].as_number() == 9);
+  CHECK(structure("Weapon")["fields"][4]["value"]["Shots"].as_number() == 3 && variable("Last")["value"]["Shots"].as_number() == 3 && no_errors(logic::check(f.s->level().logic)));
+  // A field moves: nothing but its place changes.
+  CHECK(edit("moveField", "Weapon", {{"field", "Power"}, {"by", 1}})["ok"].as_bool() && fields("Weapon") == "Title:text,Type:Kind,Power:float,Falloff:float_list,Sight:Aim,Marks:Aim[]");
+  CHECK(variable("Held")["value"]["Power"].as_number() == 25 && variable("Held")["value"]["Type"].as_number() == 1 && wired(number, "result", make, "Power") && node(make)["inputs"][2]["id"].as_string() == "Power");
+  // An enum's values move: what a struct holds of them follows.
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Kind"}, {"index", 1}, {"by", -1}})["ok"].as_bool() && variable("Held")["value"]["Type"].as_number() == 0 && structure("Weapon")["fields"][1]["value"].as_number() == 0);
+  CHECK(variable("Rack")["value"][0]["Type"].as_number() == 0 && pin(make, "Type", false)["value"].as_number() == 1 && no_errors(logic::check(f.s->level().logic)));
+  r = cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Kind"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Kind is in use: the field Type of the struct Weapon");
+  // A field's new type: what it holds is kept where the types convert; wires that no longer fit go.
+  CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "int"}})["ok"].as_bool() && fields("Weapon").find("Power:int") != std::string::npos && variable("Held")["value"]["Power"].as_number() == 25);
+  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && pin(tune, "value", false)["type"].as_string() == "int" && no_errors(logic::check(f.s->level().logic)));
+  CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "Kind"}})["ok"].as_bool() && variable("Held")["value"]["Power"].as_number() == 0 && !wired(number, "result", make, "Power"));
+  CHECK(wired(brk, "Power", tune, "value") && pin(tune, "value", false)["of"].as_string() == "Kind" && no_errors(logic::check(f.s->level().logic)));
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && fields("Weapon").find("Power:int") != std::string::npos && wired(number, "result", make, "Power") && variable("Held")["value"]["Power"].as_number() == 25);
+  // A field goes: its values and its wires go with it.
+  CHECK(edit("removeField", "Weapon", {{"field", "Title"}})["ok"].as_bool() && fields("Weapon") == "Type:Kind,Power:int,Falloff:float_list,Sight:Aim,Marks:Aim[]");
+  CHECK(!variable("Held")["value"].has("Title") && !variable("Rack")["value"][0].has("Title") && !f.s->level().logic.find(make)->value("Title") && node(make)["inputs"].size() == 5 && node(brk)["outputs"].size() == 5);
+  bool hangs = false;
+  for (const logic::Link& l : f.s->level().logic.links) hangs |= l.in == "Title" || l.out == "Title";
+  CHECK(!hangs && wired(number, "result", make, "Power") && no_errors(logic::check(f.s->level().logic)));
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && wired(text, "result", make, "Title") && variable("Held")["value"]["Title"].as_string() == "Knife" && f.cmd(R"({"cmd":"redo"})")["ok"].as_bool() && !variable("Held")["value"].has("Title"));
+  // (a struct keeps one field at least)
+  CHECK(!edit("removeField", "Aim", {{"field", "Shots"}})["ok"].as_bool());
+
+  // The struct's new name: everything of its type follows - variables, fields, settings (also of a list), titles.
+  CHECK(edit("rename", "Weapon", {{"to", "Gun"}})["ok"].as_bool() && variable("Held")["of"].as_string() == "Gun" && variable("Rack")["of"].as_string() == "Gun" && node(make)["title"].as_string() == "Make Gun");
+  CHECK(f.s->level().logic.find(select)->param("type") == "Gun" && f.s->level().logic.find(length)->param("type") == "Gun" && pin(length, "list", false)["of"].as_string() == "Gun" && node(brk)["title"].as_string() == "Break Gun");
+  CHECK(edit("rename", "Aim", {{"to", "Scope"}})["ok"].as_bool() && fields("Gun").find("Sight:Scope,Marks:Scope[]") != std::string::npos && variable("Last")["of"].as_string() == "Scope" && no_errors(logic::check(f.s->level().logic)));
+  // A function takes and gives a struct.
+  const u32 entry = added("func.entry");
+  const std::string fn = f.s->level().logic.find(entry)->param("function");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "in"}, {"pin", "gun"}, {"type", "Gun"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "Scope_list"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", fn}, {"side", "in"}, {"pin", "gun"}, {"value", parsed(R"({"Power":7})")}})["ok"].as_bool());
+  CHECK(pin(entry, "gun", true)["type"].as_string() == "struct" && pin(entry, "gun", true)["of"].as_string() == "Gun");
+  const logic::Function* fun = f.s->level().logic.function(fn);
+  CHECK(fun && fun->inputs[0].of == "Gun" && fun->inputs[0].value["Power"].as_number() == 7 && fun->inputs[0].value["Sight"]["Shots"].as_number() == 3 && fun->outputs[0].type == logic::PinType::structure_list && fun->outputs[0].of == "Scope");
+  // Copied nodes take their structs along - with the structs and the enums the fields are of.
+  json::Value ids = json::Value::array();
+  ids.push(make);
+  ids.push(number);
+  const json::Value copied = cmd({{"cmd", "logicCopy"}, {"ids", ids}});
+  const std::string clip = copied["text"].as_string();
+  CHECK(copied["ok"].as_bool() && clip.find("\"structs\":[{\"name\":\"Scope\"") != std::string::npos && clip.find("{\"name\":\"Gun\"") != std::string::npos && clip.find("\"enums\":[{\"name\":\"Kind\"") != std::string::npos);
+  // A wire's knot and a promoted pin take the struct's type.
+  json::Value link = json::Value::array();
+  link.push(make);
+  link.push("value");
+  link.push(set);
+  link.push("value");
+  r = cmd({{"cmd", "logicInsertReroute"}, {"link", link}, {"x", 0}, {"y", 0}});
+  CHECK(r["ok"].as_bool() && f.s->level().logic.find(static_cast<u32>(r["id"].as_number()))->param("type") == "Gun" && no_errors(logic::check(f.s->level().logic)));
+  r = cmd({{"cmd", "logicPromote"}, {"node", make}, {"pin", "Sight"}, {"output", false}});
+  CHECK(r["ok"].as_bool() && variable(r["variable"].as_string().c_str())["of"].as_string() == "Scope" && variable(r["variable"].as_string().c_str())["value"]["Shots"].as_number() == 9);
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+  // The whole of it as C++, and from the C++ back.
+  json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
+  const std::string code = cpp["text"].as_string();
+  if (!cpp["ok"].as_bool()) std::printf("%s\n", cpp["error"].as_string().c_str());
+  CHECK(cpp["ok"].as_bool() && cpp["native"].as_bool());
+  CHECK(code.find("  KERN_ENUM(Kind, Ranged, Melee);\n  KERN_STRUCT(Scope) {\n    Int Shots = 3;\n  };\n  /// What a weapon does.\n  KERN_STRUCT(Gun) {\n    Kind Type = Kind::Ranged;\n    Int Power = 10;\n"
+                  "    List<Float> Falloff = List<Float>{1.0, 0.5};\n    Scope Sight = Scope{3};\n    List<Scope> Marks = List<Scope>{};\n  };\n") != std::string::npos);
+  CHECK(code.find("  Gun Held = Gun{Kind::Ranged, 25, List<Float>{1.0, 0.5}, Scope{7}, List<Scope>{}};\n  List<Gun> Rack = List<Gun>{Gun{Kind::Ranged, 10, List<Float>{1.0, 0.5}, Scope{3}, List<Scope>{}}, "
+                  "Gun{Kind::Ranged, 10, List<Float>{1.0, 0.5}, Scope{3}, List<Scope>{}}};\n  Scope Last = Scope{3};\n") != std::string::npos);
+  CHECK(code.find("Held.Power = struct_break<Gun>(n") != std::string::npos && code.find("struct_make<Gun>(Kind::Melee, kern::to<Int>(") != std::string::npos);
+  json::Value apply = json::Value::object();
+  apply.set("cmd", "logicCppApply");
+  std::string changed = code;
+  const std::size_t at = changed.find("    Int Shots = 3;\n");
+  CHECK(at != std::string::npos);
+  if (at != std::string::npos) changed.replace(at, 19, "    Float Zoom = 2.5;\n    Int Shots = 3;\n");
+  // (the text names every field of a struct that is written out: the new field too)
+  for (const char* scope : {"Scope{3}", "Scope{7}", "Scope{9}"})
+    for (std::size_t k = changed.find(scope); k != std::string::npos; k = changed.find(scope, k + 1)) changed.insert(k + 6, "2.5, ");
+  apply.set("text", changed);
+  r = f.s->command(apply);
+  if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+  CHECK(r["ok"].as_bool() && fields("Scope") == "Zoom:float,Shots:int" && variable("Held")["value"]["Sight"]["Zoom"].as_number() == 2.5 && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7);
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+  // (a struct written out with a field missing is refused, with its place)
+  apply.set("text", code.substr(0, at) + "    Float Zoom = 2.5;\n" + code.substr(at));
+  r = f.s->command(apply);
+  CHECK(!r["ok"].as_bool() && r["error"].as_string().find("Scope has 2 field(s) (Zoom, Shots): Scope{...} gives a value for each, in that order") != std::string::npos && r["error"].as_string().rfind("line ", 0) == 0);
+
+  // The copied nodes pasted into a Blueprint without their structs: the structs come too. Pasted
+  // where the struct has other fields, the nodes mean its fields by their names, and a wire of a
+  // field that is not there goes.
+  CHECK(!f.s->level().actors.empty());
+  if (!f.s->level().actors.empty()) {
+    const game::ActorId other = f.s->level().actors.front().id;
+    CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(other)}})["ok"].as_bool());
+    auto here = [&]() -> const logic::Graph* {
+      const game::Actor* owner = f.s->level().find(other);
+      return owner && owner->logic ? &*owner->logic : nullptr;
+    };
+    json::Value pasted = cmd({{"cmd", "logicPaste"}, {"text", copied["text"]}, {"x", 0}, {"y", 0}});
+    CHECK(pasted["ok"].as_bool() && here() && here()->structs.size() == 2 && here()->structs[0].name == "Scope" && here()->structs[1].name == "Gun" && here()->enums.size() == 1);
+    CHECK(here() && here()->links.size() == 1 && here()->links[0].in == "Power" && no_errors(logic::check(*here())) && fields("Gun").find("Sight:Scope") != std::string::npos);
+    // (here the struct loses the field the pasted wire goes into, and gets another one)
+    CHECK(edit("removeField", "Gun", {{"field", "Power"}})["ok"].as_bool() && edit("addField", "Gun", {{"field", "Weight"}, {"type", "float"}})["ok"].as_bool() && here()->links.empty());
+    pasted = cmd({{"cmd", "logicPaste"}, {"text", copied["text"]}, {"x", 0}, {"y", 400}});
+    CHECK(pasted["ok"].as_bool() && here() && here()->structs.size() == 2 && here()->links.empty() && no_errors(logic::check(*here())));
+    u32 pasted_make = 0;
+    for (const json::Value& id : pasted["ids"].items())
+      if (const logic::Node* n = here()->find(static_cast<u32>(id.as_number())); n && n->type == "struct.make") pasted_make = n->id;
+    // (what was typed into Sight is held by the field's name: it is there; Weight is at its default)
+    CHECK(pasted_make && pin(pasted_make, "Sight", false)["value"]["Shots"].as_number() == 9 && pin(pasted_make, "Weight", false)["value"].as_number() == 0 && node(pasted_make)["inputs"].size() == 5);
+    CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool() && fields("Gun").find("Power:int") != std::string::npos);
+  }
+
+  // A struct in use stays; one nothing is of goes.
+  r = edit("remove", "Gun");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Gun is in use: the variable Held");
+  r = edit("remove", "Scope");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Scope is in use: the variable Last");
+  CHECK(edit("add", "Spare")["ok"].as_bool() && edit("addField", "Spare", {{"field", "In"}, {"type", "Scope"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "remove"}, {"name", "Last"}})["ok"].as_bool());
+  r = edit("remove", "Spare");
+  if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+  CHECK(r["ok"].as_bool() && structure("Spare").is_null() && f.s->state()["logic"]["structs"].size() == 2 && !edit("remove", "Spare")["ok"].as_bool());
+  CHECK(!edit("nope", "Gun")["ok"].as_bool() && no_errors(logic::check(f.s->level().logic)));
 }
 
 TEST(studio_blueprint_breakpoints_pause_the_game) {

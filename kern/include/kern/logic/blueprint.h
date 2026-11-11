@@ -284,6 +284,14 @@ struct BlueprintCore : logic::PureNodes {
   /// the value's - a case for every value of the enum, as C++ wants a switch over an enum to be.
   template <class E> static constexpr E flow_switch_enum(std::type_identity_t<E> value) { return value; }
 
+  // ---- structs ----
+  // A struct the Blueprint declares with KERN_STRUCT; the nodes' setting "Struct" is the type.
+  // Make is the struct from a value for each field, in their order; Break is the struct, read
+  // field by field: struct_break<Weapon>(Held).Damage. (Set Field is the assignment
+  // Held.Damage = 2.0; - no function.)
+  template <class S, class... V> static S struct_make(const V&... fields) { return S{fields...}; }
+  template <class S> static S struct_break(std::type_identity_t<S> value) { return value; }
+
   // ---- steps ----
   void flow_reroute() {}
   /// A Return nothing leads to (a method of its own that nothing calls).
@@ -331,6 +339,14 @@ struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
   enum class Name : ::kern::i64 { __VA_ARGS__ };                                              \
   friend constexpr ::std::string_view kern_enum_names(Name) { return #__VA_ARGS__; }         \
   static_assert(true)
+/// KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; }; declares a struct of the
+/// Blueprint: the type Weapon with these fields, each with its default. It is a plain aggregate -
+/// Weapon{"Knife", 25.0} gives every field in their order - and two of them are equal when all
+/// their fields are (logic::structs::equal, nodes.h).
+#define KERN_STRUCT(Name)                                                                              \
+  struct Name;                                                                                         \
+  friend bool operator==(const Name& a, const Name& b) { return ::kern::logic::structs::equal(a, b); } \
+  struct Name
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
 /// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event

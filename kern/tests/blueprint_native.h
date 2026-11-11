@@ -16,6 +16,7 @@
 
 #include "kern/game/logic_nodes.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 #include "logic_cases.h"
 #include "native_show.h"
 
@@ -33,6 +34,10 @@ struct Case {
   logic::Graph graph;
   std::vector<Call> calls;
   bool scenario = false;  // no calls: the scenario of the tier cases (logic_cases::play) - events, ticks
+  /// Calls made after the others with values as they come from outside (Instance::call): of any
+  /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
+  /// them as the engine gives them (logic::native_arg).
+  std::vector<Call> outside = {};
 };
 
 // Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
@@ -453,6 +458,117 @@ struct Enums : kern::Blueprint {
 };
 )kn";
 
+// Structs: a type of the Blueprint's own with named fields - an enum's, another struct's, lists
+// of them. Make, Break and Set Field; variables and lists of a struct; functions that take and
+// give them; the list nodes compare structs field by field.
+inline const char* kStructs = R"kn(
+struct Structs : kern::Blueprint {
+  KERN_ENUM(Kind, Melee, Ranged, Magic);
+  /// Where something is aimed.
+  KERN_STRUCT(Aim) {
+    Vector At = Vector{0.0, 0.0, 1.0};
+    Int Tries = 3;
+  };
+  /// What a weapon does.
+  KERN_STRUCT(Weapon) {
+    Text Name = "Fist";
+    Kind Type = Kind::Melee;
+    Float Damage = 10.0;
+    List<Float> Falloff = List<Float>{1.0, 0.5};
+    Aim Sight = Aim{Vector{0.0, 0.0, 1.0}, 3};
+    List<Aim> Marks = List<Aim>{};
+    Bool Ready = true;
+    Actor Owner = Actor{0};
+    List<Kind> Also = List<Kind>{Kind::Magic};
+  };
+  KERN_STRUCT(Solo) {
+    Float Only = 0.5;
+  };
+
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}, Aim{Vector{1.0, 0.0, 0.0}, 1}, List<Aim>{}, true, Actor{0}, List<Kind>{}};
+  List<Weapon> Rack = List<Weapon>{};
+  Aim Last = Aim{Vector{0.0, 0.0, 1.0}, 3};
+  Solo One = Solo{0.5};
+  List<Aim> Seen = List<Aim>{Aim{Vector{0.0, 2.0, 0.0}, 7}};
+  Int Count = 0;
+  Text Log = "";
+
+  struct ForgeResult { Weapon made = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}; Solo one = Solo{0.5}; };
+  /// Make: a struct from a value for each field - a struct and lists inside it.
+  KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{0}) {
+    return {struct_make<Weapon>(name, kind, damage, list_make<Float, "2">(damage, math_div(damage, 2.0)), struct_make<Aim>(at, kern::to<Int>(damage)), list_make<Aim, "2">(struct_make<Aim>(at, 1), Last), false, who,
+                                list_make<Kind, "1">(kind)),
+            struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
+  }
+
+  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; };
+  /// A function takes a struct and a list of them (with defaults); Break; the list nodes of a
+  /// struct's type - an item from beyond the list is the struct's default.
+  TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
+    Held = w;
+    Rack = more;
+    One = one;
+    return {struct_break<Weapon>(w).Name, struct_break<Weapon>(w).Type, list_length<Weapon>(more), list_contains<Weapon>(more, w), list_find<Weapon>(more, w), list_get<Weapon>(more, 0),
+            struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only};
+  }
+
+  struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Float was = 0.0; Int rack = 0; Int tries = 0; };
+  /// Set Field: one field of a struct variable changes, the others stay - a number, a text, an
+  /// enum's value, a struct, a list; what the step gives is read.
+  TuneResult Tune(Float damage = 1.0, Text name = "x", Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}, Kind kind = Kind::Magic) {
+    n30.value = (Held.Damage = math_add(struct_break<Weapon>(Held).Damage, damage));
+    Held.Name = name;
+    Held.Sight = sight;
+    Held.Type = kind;
+    Held.Falloff = list_make<Float, "1">(n30.value);
+    Held.Marks = Seen;
+    Held.Also = list_make<Kind, "2">(kind, struct_break<Weapon>(Held).Type);
+    One.Only = n30.value;
+    n38.value = (Last.Tries = kern::to<Int>(damage));
+    list_add(Rack, Held);
+    return {Held, n30.value, list_length<Weapon>(Rack), n38.value};
+  }
+
+  struct EditResult { Int count = 0; Bool removed = false; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Int index = 0; };
+  /// The steps that change a list variable, on a list of structs; Remove Item takes out what
+  /// equals the struct - every field of it.
+  EditResult Edit(Text what = "insert", Int at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}) {
+    switch (flow_switch_text<"insert, set, remove_at, remove, clear, add">(what)) {
+      case 0: { list_insert(Rack, at, w); } break;
+      case 1: { list_set(Rack, at, w); } break;
+      case 2: { list_remove_at(Rack, at); } break;
+      case 3: { list_remove(n44, Rack, w); } break;
+      case 4: { list_clear(Rack); } break;
+      case 5: { list_add(n46, Rack, w); } break;
+    }
+    return {list_length<Weapon>(Rack), n44.removed, list_get<Weapon>(Rack, 0), n46.index};
+  }
+
+  struct WalkResult { Float total = 0.0; Text names = ""; Aim last = Aim{Vector{0.0, 0.0, 1.0}, 3}; Weapon picked = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; };
+  /// For Each over a list of structs; Select and Reroute of a struct's type.
+  WalkResult Walk(Bool pick = true) {
+    Log = "";
+    Count = 0;
+    for (auto it60 = flow_for_each<Weapon>(n60, Rack); it60.next();) {
+      Log = text_append(Log, struct_break<Weapon>(n60.item).Name, "/");
+      Count += struct_break<Aim>(struct_break<Weapon>(n60.item).Sight).Tries;
+      Last = struct_break<Weapon>(n60.item).Sight;
+      for (auto it64 = flow_for_each<Aim>(n64, struct_break<Weapon>(n60.item).Marks); it64.next();) {
+        Count += struct_break<Aim>(n64.item).Tries;
+      }
+    }
+    return {kern::to<Float>(Count), Log, Last, logic_select<Weapon>(pick, Held, value_reroute<Weapon>(list_get<Weapon>(Rack, 1)))};
+  }
+
+  struct { Float value = 0.0; } n30;
+  struct { Int value = 0; } n38;
+  struct { Bool removed = false; } n44;
+  struct { Int index = 0; } n46;
+  struct : kern::Node<60> { Weapon item = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Int index = 0; } n60;
+  struct : kern::Node<64> { Aim item = Aim{Vector{0.0, 0.0, 1.0}, 3}; Int index = 0; } n64;
+};
+)kn";
+
 // A Sequence whose first part returns: the function has ended, the second part does not run.
 inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"int","value":0}],
   "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
@@ -537,6 +653,37 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
   return r;
 }
 
+/// The values a pin of a type of the Blueprint `g` is tried with. A struct: its default, and for
+/// each field two more with that field at other values.
+inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g) {
+  if (logic::element_of(t.type) != PinType::structure) {
+    const logic::EnumType* e = g.enumeration(t.of);
+    return samples(t.type, e ? e->values.size() : 0);
+  }
+  std::vector<Value> items;
+  if (const logic::StructType* s = g.structure(t.of)) {
+    const Value plain = logic::default_of(*s, g);
+    items.push_back(plain);
+    for (std::size_t k = 0; k < s->fields.size(); ++k) {
+      const std::vector<Value> of_field = samples(s->fields[k].type, g);
+      for (std::size_t pick : {std::size_t{1}, of_field.size() - 1}) {
+        Value changed = plain;
+        if (!of_field.empty()) logic::structs::set_field(changed, k, of_field[pick % of_field.size()]);
+        items.push_back(std::move(changed));
+      }
+    }
+  }
+  if (t.type == PinType::structure) return items;
+  auto list = [&](std::vector<std::size_t> picks) {
+    std::vector<Value> rows;
+    for (std::size_t k : picks) rows.push_back(items[k % items.size()]);
+    return Value::structures(std::move(rows));
+  };
+  std::vector<std::size_t> all;
+  for (std::size_t k = 0; k < items.size(); ++k) all.push_back(k);
+  return {list({}), list({1}), list(all), list({1, 0, 1, 2, 1}), list({2, 3, 4, 5, 3, 2})};
+}
+
 /// Adds the function P<k> to `g`: the value node `def` with `params` between a Function Entry
 /// and a Return - its inputs are the function's, its outputs the function's results.
 inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const std::vector<std::pair<std::string, std::string>>& params, int k, const logic::Library& lib) {
@@ -565,13 +712,13 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? Value::zero(p.type).to_json() : p.def, p.of});
+    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of({p.type, p.of}, g).to_json(g, p.of) : p.def, p.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, Value::zero(p.type).to_json(), p.of});
+    f.outputs.push_back({name, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), p.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
@@ -587,8 +734,20 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
 inline Case nodes_case(const logic::Library& lib = logic::library()) {
   Case c;
   c.name = "Nodes";
-  // (an enum of its own: the generic nodes in its type, and the enum nodes)
-  c.graph.enums.push_back({"Season", {"Spring", "Summer", "Autumn", "Winter"}, "The four seasons."});
+  // (an enum and structs of its own: the generic nodes in their types, the enum nodes, Make and Break)
+  {
+    json::Value types;
+    if (!json::parse(R"({"enums":[{"name":"Season","values":["Spring","Summer","Autumn","Winter"],"help":"The four seasons."}],
+      "structs":[{"name":"Spot","fields":[{"name":"At","type":"vector","value":[0,0.5,-1]},{"name":"Label","type":"text","value":"here"}],"help":"A place."},
+                 {"name":"Day","fields":[{"name":"When","type":"enum","of":"Season","value":1},{"name":"Warmth","type":"float","value":20.5},
+                                         {"name":"Where","type":"struct","of":"Spot","value":{"Label":"home"}},{"name":"Hours","type":"int_list","value":[6,22]},
+                                         {"name":"Stops","type":"struct_list","of":"Spot","value":[{"At":[1,2,3]}]},{"name":"Dry","type":"bool","value":true},
+                                         {"name":"Guide","type":"actor","value":0},{"name":"Around","type":"enum_list","of":"Season","value":[0,3]}],"help":"A day of a season."},
+                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]}],"nodes":[],"links":[]})",
+                     types) ||
+        !logic::graph_from_json(types, c.graph))
+      std::printf("blueprint_native Nodes: its types were not read\n");
+  }
   int k = 0;
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
@@ -601,7 +760,7 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::type) {
-      // (a generic node in every type it can have; an enum node for the enum)
+      // (a generic node in every type it can have; an enum node for the enum, Make and Break for every struct)
       variants.clear();
       for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
     } else if (d->type == "list.make") {
@@ -613,6 +772,7 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     for (const auto& params : variants) {
       logic::Graph alone;
       alone.enums = c.graph.enums;
+      alone.structs = c.graph.structs;
       add_probe(alone, *d, params, 0, lib);
       if (!logic::native_ready(alone, nullptr, lib)) continue;
       const std::string name = add_probe(c.graph, *d, params, k, lib);
@@ -620,8 +780,7 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       std::vector<std::vector<Value>> pool;
       std::size_t most = 1;
       for (const logic::FunctionPin& p : f.inputs) {
-        const logic::EnumType* e = c.graph.enumeration(p.of);
-        pool.push_back(samples(p.type, e ? e->values.size() : 0));
+        pool.push_back(samples({p.type, p.of}, c.graph));
         most = max_of(most, pool.back().size());
       }
       u32 seed = 2463534242u + static_cast<u32>(k) * 7919u;
@@ -746,6 +905,39 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Next", {}});
   }
   {
+    Case& c = read("Structs", kStructs);
+    const logic::Graph& g = c.graph;
+    auto E = [](i64 place) { return Value::enumeration(place); };
+    const std::vector<Value> weapons = samples({PinType::structure, "Weapon"}, g), racks = samples({PinType::structure_list, "Weapon"}, g), aims = samples({PinType::structure, "Aim"}, g),
+                             solos = samples({PinType::structure, "Solo"}, g);
+    c.calls.push_back({"Walk", {yes}});
+    for (f64 damage : {12.0, 0.0, -3.5, std::numeric_limits<f64>::infinity()})
+      for (i64 kind = 0; kind < 3; ++kind) c.calls.push_back({"Forge", {T(kind ? "Bow" : ""), E(kind), N(damage), Value::vector({1, static_cast<f32>(kind), -2.5f}), Value::actor(static_cast<logic::ActorRef>(kind * 21))}});
+    for (std::size_t k = 0; k < weapons.size(); ++k) {
+      c.calls.push_back({"Take", {weapons[k], racks[k % racks.size()], solos[k % solos.size()]}});
+      c.calls.push_back({"Edit", {T("add"), I(0), weapons[(k * 7 + 3) % weapons.size()]}});
+      c.calls.push_back({"Tune", {N(static_cast<f64>(k) * 1.25), T(k % 2 ? "tuned" : ""), aims[k % aims.size()], E(static_cast<i64>(k % 3))}});
+      c.calls.push_back({"Walk", {k % 2 ? yes : no}});
+    }
+    for (const Value& rack : racks) {
+      c.calls.push_back({"Take", {weapons[2], rack, solos[0]}});
+      for (const char* what : {"insert", "set", "remove", "remove_at", "add", "remove", "nothing"})
+        for (i64 at : {i64{0}, i64{1}, i64{-1}, i64{99}}) c.calls.push_back({"Edit", {T(what), I(at), weapons[static_cast<std::size_t>(at + 1) % weapons.size()]}});
+      c.calls.push_back({"Walk", {no}});
+      c.calls.push_back({"Edit", {T("clear"), I(0), weapons[0]}});
+      c.calls.push_back({"Walk", {yes}});
+    }
+    // From outside a struct's input takes a struct of its type: anything else is the struct's
+    // default - no struct at all, one of another type, one with a field that is none of its
+    // type's; a list, item by item.
+    const Value other = aims[1], broken = Value::structure({T("x"), E(7), N(1), Value::of(std::vector<f64>{}), aims[0], Value::structures({}), yes, Value::actor(0), Value::enumerations({})});
+    for (const Value& odd : {N(4), T("Weapon"), other, broken, Value::structure({}), Value::zero(PinType::structure), racks[2]})
+      c.outside.push_back({"Take", {odd, Value::structures({weapons[1], odd, weapons[3]}), odd}});
+    c.outside.push_back({"Take", {weapons[4], N(1), solos[1]}});
+    c.outside.push_back({"Tune", {N(2), T("y"), weapons[1], E(1)}});
+    c.outside.push_back({"Take", {}});
+  }
+  {
     all.push_back({"Functions", {}, {}});
     Case& c = all.back();
     json::Value j;
@@ -798,7 +990,9 @@ inline std::string play(const Case& c, std::vector<std::string>* errors = nullpt
   logic::Instance* inst = rt.add(c.graph, 0, c.name);
   rt.begin();
   std::string text = "== " + c.name + "\n";
-  for (const Call& call : c.calls) {
+  std::vector<Call> calls = c.calls;
+  calls.insert(calls.end(), c.outside.begin(), c.outside.end());
+  for (const Call& call : calls) {
     const logic::Function* f = c.graph.function(call.function);
     std::vector<Value> out;
     if (!f || !inst->call(call.function, call.args, out)) host.errors.push_back(c.name + ": " + call.function + " could not be called");
@@ -841,14 +1035,15 @@ inline const char* builtin_cpp_type(PinType t) {
     default: return "void";
   }
 }
-/// A pin's type in C++, outside the class `owner` (an enum is the class's own: Owner::Mode).
+/// A pin's type in C++, outside the class `owner` (an enum and a struct are the class's own: Owner::Mode).
 inline std::string cpp_type(PinType t, const std::string& of = {}, const std::string& owner = {}) {
-  if (logic::element_of(t) != PinType::enumeration) return builtin_cpp_type(t);
+  if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
 
-/// A value as C++ source, bit for bit. (An enum's value: by its place - static_cast<Owner::Mode>(2).)
-inline std::string cpp_value(const Value& v, const std::string& of = {}, const std::string& owner = {}) {
+/// A value as C++ source, bit for bit. (An enum's value: by its place - static_cast<Owner::Mode>(2);
+/// a struct's: every field - `g` has its declaration.)
+inline std::string cpp_value(const Value& v, const std::string& of = {}, const std::string& owner = {}, const logic::Graph* g = nullptr) {
   char b[160];
   auto number = [&](f64 x, const char* suffix) -> std::string {
     if (std::isnan(x)) return std::string("std::numeric_limits<") + (*suffix ? "float" : "double") + ">::quiet_NaN()";
@@ -864,12 +1059,45 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
     case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
+    case PinType::structure: {
+      const logic::StructType* s = g ? g->structure(of) : nullptr;
+      std::string r = owner + "::" + of + "{";
+      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + cpp_value(logic::field_of(v, *s, k, *g), s->fields[k].type.of, owner, g);
+      return r + "}";
+    }
     default: break;
   }
   if (!logic::is_list(v.type)) return "0";
   std::string r = cpp_type(v.type, of, owner) + "{";
-  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + cpp_value(v.item(k), of, owner);
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + cpp_value(v.item(k), of, owner, g);
   return r + "}";
+}
+
+/// A value as the C++ that makes it as the engine holds it (kern::logic::Value), whatever it is.
+inline std::string value_source(const Value& v) {
+  const std::string L = "kern::logic::Value::";
+  auto rows = [&](const char* make) {
+    std::string r = L + make + "({";
+    for (std::size_t k = 0, n = v.rows ? v.rows->size() : 0; k < n; ++k) r += (k ? ", " : "") + value_source((*v.rows)[k]);
+    return r + "})";
+  };
+  switch (v.type) {
+    case PinType::boolean: return L + "boolean(" + cpp_value(v) + ")";
+    case PinType::integer: return L + "integer(" + cpp_value(v) + ")";
+    case PinType::number: return L + "number(" + cpp_value(v) + ")";
+    case PinType::vector: return L + "vector(" + cpp_value(v) + ")";
+    case PinType::text: return L + "text(" + cpp_value(v) + ")";
+    case PinType::actor: return L + "actor(" + std::to_string(v.a) + "u)";
+    case PinType::enumeration: return L + "enumeration(" + std::to_string(v.i) + ")";
+    case PinType::structure: return v.rows ? rows("structure") : L + "zero(kern::logic::PinType::structure)";
+    case PinType::structure_list: return rows("structures");
+    case PinType::enumeration_list: {
+      std::string r = L + "enumerations({";
+      for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + std::to_string(v.item(k).i);
+      return r + "})";
+    }
+    default: return "kern::logic::to_value(" + cpp_value(v) + ")";  // (a list of a value type)
+  }
 }
 
 inline bool write_file(const std::string& path, const std::string& text) {
@@ -950,7 +1178,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       body += " int row; } rows[] = {\n";
       for (std::size_t r = at; r < end; ++r) {
         body += "        {";
-        for (std::size_t i = 0; i < c.calls[r].args.size(); ++i) body += cpp_value(c.calls[r].args[i], i < f.inputs.size() ? f.inputs[i].of : std::string(), c.name) + ", ";
+        for (std::size_t i = 0; i < c.calls[r].args.size(); ++i) body += cpp_value(c.calls[r].args[i], i < f.inputs.size() ? f.inputs[i].of : std::string(), c.name, &c.graph) + ", ";
         body += std::to_string(r) + "},\n";
       }
       body += "    };\n    for (const auto& r : rows) {\n      (void)r;\n      ";
@@ -973,6 +1201,27 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       body += " + hosted_variables() + \"\\n\";\n    }\n  }\n";
       at = end;
     }
+    // The calls with values from outside: the class takes them as the engine gives them - each
+    // input through logic::native_arg, a missing one its default.
+    for (const Call& call : c.outside) {
+      const logic::Function& f = *c.graph.function(call.function);
+      std::string given, direct = "b." + f.name + "(", shown = "std::string(\"" + f.name + "(\")";
+      for (std::size_t i = 0; i < call.args.size(); ++i) {
+        given += (i ? ", " : "") + value_source(call.args[i]);
+        shown += std::string(i ? " + \", \"" : "") + " + native_show(given[" + std::to_string(i) + "])";
+      }
+      for (std::size_t i = 0; i < f.inputs.size(); ++i) {
+        const logic::FunctionPin& in = f.inputs[i];
+        direct += std::string(i ? ", " : "") + "kern::logic::native_arg<" + cpp_type(in.type, in.of, c.name) + ">(given, " + std::to_string(i) + ", " +
+                  cpp_value(Value::from_json(in.value, in.type, c.graph, in.of), in.of, c.name, &c.graph) + ")";
+      }
+      body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
+      for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
+      body += " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!inst->call(\"" + f.name + "\", given, results)) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
+      for (std::size_t k = 0; k < f.outputs.size(); ++k)
+        body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
+      body += " + hosted_variables() + \"\\n\";\n  }\n";
+    }
     runs += body + "}\n\n";
   }
   main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
@@ -990,7 +1239,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
   for (const Case& c : all) {
     main += "  run_" + c.name + "(got, hosted);\n";
     ++count;
-    calls += c.calls.size();
+    calls += c.calls.size() + c.outside.size();
   }
   main += "  const std::string expected = want.str();\n  int failures = 0;\n"
           "  failures += differs(got, expected, \"the compiled Blueprint\");\n"
