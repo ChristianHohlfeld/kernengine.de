@@ -52,6 +52,11 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
   values, held as its place among them (the first is 0). It is neither a number nor a text: it
   converts to nothing, and a wire only connects pins of the same enum. Where a number or a text
   is wanted, a node says what is meant (Enum to Index, Enum to Text).
+- **Structs**: a Blueprint may declare structs – a type of its own with named fields, for example
+  `Weapon` with the fields `Name`, `Type`, `Damage`. Each field has a type and a default. A value
+  of a struct holds a value for each of its fields. It converts to nothing, and a wire only
+  connects pins of the same struct. Make builds a value from its fields, Break gives the fields,
+  Set Field changes one field of a variable.
 - **State machines**: states and transitions in the style of the state editor of
   digitalisierungsplanung.de. A transition fires on an event, a timer, a condition variable or
   automatically; entering and leaving a state trigger events.
@@ -113,6 +118,42 @@ function of an instance (`Instance::set`, `Instance::call`) – what is no value
 first value. In a Blueprint's C++ an enum is `KERN_ENUM(Mode, Closed, Opening, Open);`
 ([blueprint_cpp.md](../blueprint_cpp.md)).
 
+An eighth value type and an eighth list type are for the Blueprint's **structs**
+(`Graph::structs`; a `StructType` has `name`, `fields` and `help`, a `StructField` has `name`,
+`type` and `value`, its default): `structure`, a value of a struct, comes after `enumeration`,
+and `structure_list` after `enumeration_list` (in JSON `struct` and `struct_list`). Which struct
+is meant stands beside the type as the struct's name, in `of`, as with an enum. A field is of a
+value type, an enum, a struct declared above this one, or a list of one of these; so no struct
+contains itself. A struct has at least one field and at most 32. The `Value` holds one value per
+field, in the order of the fields (`Value::structure(fields)`, `field(i)`; a list:
+`Value::structures`); copies share the fields until one of them changes. The file holds a value
+as an object of its fields by their names:
+
+```json
+"structs": [
+  {"name": "Weapon", "fields": [
+    {"name": "Name", "type": "text", "value": ""},
+    {"name": "Type", "type": "enum", "of": "Kind", "value": 0},
+    {"name": "Damage", "type": "float", "value": 10}
+  ], "help": "What a weapon does."}
+],
+"variables": [
+  {"name": "Held", "type": "struct", "of": "Weapon", "value": {"Name": "Knife", "Type": 0, "Damage": 25}},
+  {"name": "Rack", "type": "struct_list", "of": "Weapon", "value": []}
+]
+```
+
+`structs` only appears if the Blueprint declares any. A field missing in a value has its
+default. Because a value's JSON goes by the declaration, a struct's value is written and read
+with it: `to_json(graph, of)` and `Value::from_json(json, type, graph, of)`; `default_of` gives
+a struct's default, `zero_of` the empty value of any type. Two values are equal if all their
+fields are. A type setting names the struct as `"type": "Weapon"`, a list as `"Weapon_list"`.
+From outside the Blueprint (`Instance::set`, `Instance::call`), what is no value of the struct –
+no struct value, one with other fields, one with a field that is not of its type – is the
+struct's default; in a list that holds item by item. In a Blueprint's C++ a struct is
+`KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`
+([blueprint_cpp.md](../blueprint_cpp.md)).
+
 A whole number (`integer`) is the same everywhere: as a Blueprint holds it (`logic::normal`).
 Every number is a `double` underneath – in the interpreter's variables, in the JIT – so whole
 numbers are exact up to 2^53, a larger one is the nearest a `double` holds, and none is past the
@@ -124,7 +165,7 @@ for every value.
 Which wires are allowed is determined by `convertible(from, to)`:
 
 - the same type always; exec only with exec;
-- **everything to `text`** ("everything prints") - except an enum's values, which convert to nothing;
+- **everything to `text`** ("everything prints") - except an enum's and a struct's values, which convert to nothing;
 - numbers among themselves (`bool`, `int`, `float`);
 - `actor` → `bool` ("is valid");
 - `float`/`int` → `vector` (into all three components);
@@ -133,6 +174,8 @@ Which wires are allowed is determined by `convertible(from, to)`:
 - an **enum's value** converts to nothing and nothing becomes one – not a number and not `text`
   either, and the same holds for a list of them. A wire connects pins of the same enum only
   (`fits(from, to)`: `convertible`, and two enums are the same enum).
+- a **struct's value** converts to nothing and nothing becomes one, and the same holds for a
+  list of them. A wire connects pins of the same struct only.
 
 The conversions (`as_bool`, `as_int`, `as_number`, `as_vector`, `as_text`, `as_actor`) are fixed,
 e.g. the text "0" or "false" is false, a vector as a number is its length, a number converted to
@@ -348,7 +391,7 @@ on an action node reads that node's last stored output.
 
 ## 9.5 Core nodes
 
-`src/logic/core_nodes.cpp` registers 100 nodes:
+`src/logic/core_nodes.cpp` registers 103 nodes:
 
 | Category | Nodes |
 |---|---|
@@ -358,6 +401,7 @@ on an action node reads that node's last stored output.
 | **Variables** | `var.get` · `var.set` · `var.add` (Amount, −1 counts down) |
 | **Lists** | values, generic over the items' type (setting Type): `list.make` Make List (0..16 items) · `list.length` · `list.get` Get Item (beyond the list: the type's zero) · `list.contains` · `list.find` Find Item (index or −1) – steps on a list variable (setting List): `list.add` Add to List (gives the index) · `list.insert` (in front of the index; past the end: at the end) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (every equal item; Removed) · `list.clear` |
 | **Enums** | on the values of one enum of the Blueprint (setting Enum; in the editor a node carries the enum's name, "Mode to Text"): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (the value's name) · `enum.from_name` Text to Enum (the value with that name; Found – no value has that name: the first value, and Found is false) · `enum.index` Enum to Index (the place of the value among the enum's values, the first is 0) · `enum.from_index` Index to Enum (the value at that place; Valid – no such place: the first value, and Valid is false) · `enum.values` All Values (a list of every value in their order, for a For Each) – the nodes that take any type work in an enum's type too: Get and Set of a variable, Select, Reroute, the list nodes and For Each |
+| **Structures** | on one struct of the Blueprint (setting Struct; in the editor a node carries the struct's name, "Make Weapon"): `struct.make` Make Struct (an input per field – without a wire: the field's default; Value) · `struct.break` Break Struct (Value; an output per field) · `struct.set_field` Set Field (a step on a struct variable, settings Variable and Field: changes that field and leaves the others; Value – the field as it is now) |
 | **Functions** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (a function marked Pure, as a value) |
 | **Math** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (degrees), `sqrt`, `pow`, `round`, `floor`, `random` (float in range), `random_int`, `random_bool` · `math.formula` Formula (every name in it is an input) |
 | **Logic** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; equality with 10⁻⁹ tolerance) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
@@ -611,12 +655,13 @@ playing the nodes that ran, live values of variables, states, tier).
 | Command | Effect |
 |---|---|
 | `logicOpen {owner}`, `logicClose`, `logicView {view}` | open or close the graph of an actor (or of the level), view |
-| `logicPalette {query, from}` | action menu: search over title, category, help, search words; when dragging from a pin, only nodes that accept the wire; plus "Get/Set/Add to <Variable>", "Call/Event <Name>", "Go to <State>", "On <State> Entered", "Add Reroute Node", and the nodes of every enum by its name (for an enum `Mode`: "Switch on Mode", "Mode to Text" …); ordered by category, at most 120 |
+| `logicPalette {query, from}` | action menu: search over title, category, help, search words; when dragging from a pin, only nodes that accept the wire; plus "Get/Set/Add to <Variable>", "Call/Event <Name>", "Go to <State>", "On <State> Entered", "Add Reroute Node", the nodes of every enum by its name (for an enum `Mode`: "Switch on Mode", "Mode to Text" …), and those of every struct ("Make Weapon", "Break Weapon", and "Set Damage of Held" for every field of every struct variable); ordered by category, at most 120 |
 | `logicAdd {type, x, y, params, from}` | place a node on the 8 px grid; without a variable/state machine one is created; when dropped from a pin it is connected right away |
-| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | wires, deleting, moving (comments including size, states); a generic node (Select, Reroute, the list nodes) whose typed pins are still free takes the type of the wire, an enum's type too |
+| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | wires, deleting, moving (comments including size, states); a generic node (Select, Reroute, the list nodes) whose typed pins are still free takes the type of the wire, an enum's or a struct's type too |
 | `logicValue`, `logicParam`, `logicComment` | literal, setting (wires to pins that no longer exist are removed), node comment |
 | `logicVariable {op}` | `add`, `remove`, `rename` (also in nodes and transitions), `type` (value is converted), `value` |
 | `logicEnum {op}` | the Blueprint's enums: `add` (it starts as `NewEnum` with the values `First` and `Second`), `remove`, `rename`, `help` (its description); its values: `addValue`, `renameValue`, `moveValue` (up or down), `removeValue` |
+| `logicStruct {op}` | the Blueprint's structs: `add` (it starts as `NewStruct` with the field `Field`, a Float), `remove`, `rename`, `help` (its description); its fields: `addField`, `renameField`, `moveField` (up or down), `removeField`, `fieldType`, `fieldValue` (its default) |
 | `logicMachine {op}` | create, rename and remove state machines and states, initial state, transitions (`addTransition`, `editTransition`, `removeTransition`; a condition without a variable creates a boolean "Ready") |
 | `logicCommentBox {op}` | comment boxes |
 | `logicPromote` | "Promote to Variable": a new variable of the pin's type, connected via Get (input) or Set (output) |
@@ -646,9 +691,32 @@ values' names are names of C++: letters, digits and `_`, not starting with a dig
 C++ or of the notation such as `Float`. The enum's name does not end in `_list`, no two values of
 an enum have the same name, and an enum has at least one value (at most 256).
 
+**Structs in the editor.** My Blueprint has a section **Structures**; `+` adds one, and the
+buttons Make and Break on its row place its nodes. Selecting it shows it in **Details**: its
+name, a description and its fields, each with a name, a type and a default; a field can be
+renamed, moved up or down, or removed, and **+ Field** adds one. A field's **Type** dropdown
+lists the value types, the enums and the structs that do not hold this one, and a list of each.
+The **Type** dropdown of a variable, and of a function's inputs and outputs, lists the
+Blueprint's structs and a list of each (`Weapon`, `Weapon List`). The default of a struct
+variable has a row per field with the editor of the field's type, and a list of structs has
+these rows per item. A pin of a struct's type that has no wire starts at the struct's default
+and shows on the node, in short, what it holds; its value is entered in Details, field by
+field. Structs are a blue of their own (`#3f6fd6`).
+
+A struct that is in use can still be edited. Renaming the struct or a field changes nothing but
+the name: values, and the wires on Make and Break, stay. Moving a field changes its place only.
+A new field has its default everywhere. When a field is removed, its value goes everywhere, and
+so do the wires on its pins; a Set Field that names it reports an error. When a field's type
+changes, its value stays where the types convert, and wires that no longer fit go. A field that
+takes the type of a struct listed below this one moves this struct below it. A struct that
+something is of (a variable, a function's pin, a field, a node) cannot be removed; the editor
+says what uses it. A struct's name and its fields' names are names of C++, as with enums; the
+struct's name does not end in `_list`, no two fields of a struct have the same name, and no
+field has the name of an enum or a struct of the Blueprint.
+
 Several commands with the same `transaction` become one undo step (picking up wires and dropping them
 elsewhere), as do consecutive value entries into the same pin. Tests:
-`studio_logic_editor_commands`, `studio_logic_lists`, `studio_logic_enums`,
+`studio_logic_editor_commands`, `studio_logic_lists`, `studio_logic_enums`, `studio_logic_structs`,
 `studio_blueprint_breakpoints_pause_the_game`, `studio_blueprint_comments_reroutes_promote`.
 
 ---

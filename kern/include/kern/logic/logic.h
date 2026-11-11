@@ -25,6 +25,9 @@
 //   enums         a Blueprint may declare enumerations: a type of its own with named values
 //                 (Mode: Closed, Opening, Open). A value of it is one of them - held as
 //                 its place in the declaration, the first being 0.
+//   structs       a Blueprint may declare structures: a type of its own with named, typed fields
+//                 (Weapon: Name, Damage). A value of it holds a value for each field; a field
+//                 is a value type, an enum, a struct declared above it, or a list of one.
 //   state machines  states and transitions in the style of the
 //                 digitalisierungsplanung.de state editor: a transition fires
 //                 on an event, a timer, a condition variable or automatically;
@@ -59,20 +62,20 @@ namespace kern::logic {
 using ActorRef = u32;  // game actor id (0 = none)
 
 /// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
-/// their order). `enumeration`: a value of an enum the Blueprint declares - which one says the
-/// name beside the type (PinDef::of, Variable::of ...).
+/// their order). `enumeration`: a value of an enum the Blueprint declares, `structure`: a value of
+/// one of its structs - which one says the name beside the type (PinDef::of, Variable::of ...).
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, count
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
-constexpr u8 kValueTypes = 7;  // boolean ... enumeration
+constexpr u8 kValueTypes = 8;  // boolean ... structure
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
 constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t < PinType::count; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::enumeration ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::structure ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list"};
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -163,6 +166,10 @@ struct Value {
   /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
   /// whoever changes one (edit) changes its own.
   std::shared_ptr<const ListItems> list;
+  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
+  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
+  /// declared default - what a field is, is read through the declaration (logic::field_of).
+  std::shared_ptr<const std::vector<Value>> rows;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
   static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
@@ -179,38 +186,80 @@ struct Value {
     r.type = PinType::enumeration_list;
     return r;
   }
-  static Value zero(PinType t);
-  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle). Whole numbers
-  /// are held as every Int is (logic::normal).
-  template <class T> static Value of(std::vector<T> items) {
+  /// A value of a struct: its fields' values, in the order of the declaration.
+  static Value structure(std::vector<Value> fields) {
     Value r;
-    r.type = list_type_of<T>();
-    if constexpr (std::is_same_v<T, i64>)
-      for (std::size_t k = 0; k < items.size(); ++k) items[k] = normal(items[k]);
-    if (!items.empty()) {
-      auto held = std::make_shared<ListItems>();
-      std::get<std::vector<T>>(*held) = std::move(items);
-      r.list = std::move(held);
-    }
+    r.type = PinType::structure;
+    r.rows = std::make_shared<std::vector<Value>>(std::move(fields));
     return r;
+  }
+  /// A list of structs.
+  static Value structures(std::vector<Value> items) {
+    Value r;
+    r.type = PinType::structure_list;
+    if (!items.empty()) r.rows = std::make_shared<std::vector<Value>>(std::move(items));
+    return r;
+  }
+  static Value zero(PinType t);
+  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
+  /// Whole numbers are held as every Int is (logic::normal).
+  template <class T> static Value of(std::vector<T> items) {
+    if constexpr (std::is_same_v<T, Value>) {
+      return structures(std::move(items));
+    } else {
+      Value r;
+      r.type = list_type_of<T>();
+      if constexpr (std::is_same_v<T, i64>)
+        for (std::size_t k = 0; k < items.size(); ++k) items[k] = normal(items[k]);
+      if (!items.empty()) {
+        auto held = std::make_shared<ListItems>();
+        std::get<std::vector<T>>(*held) = std::move(items);
+        r.list = std::move(held);
+      }
+      return r;
+    }
   }
   /// The items of a list of T - none if this is no such list.
   template <class T> const std::vector<T>& items() const {
     static const std::vector<T> none;
-    return list && holds<T>() ? std::get<std::vector<T>>(*list) : none;
+    if constexpr (std::is_same_v<T, Value>) return rows && type == PinType::structure_list ? *rows : none;
+    else return list && holds<T>() ? std::get<std::vector<T>>(*list) : none;
   }
-  /// Is this a list whose items are held as T? (A list of enum values holds them as i64.)
-  template <class T> bool holds() const { return type == list_type_of<T>() || (std::is_same_v<T, i64> && type == PinType::enumeration_list); }
+  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
+  /// of structs as Value.)
+  template <class T> bool holds() const {
+    if constexpr (std::is_same_v<T, Value>) return type == PinType::structure_list;
+    else return type == list_type_of<T>() || (std::is_same_v<T, i64> && type == PinType::enumeration_list);
+  }
   /// The items of a list of T, to change them: this value's own (it becomes that list if it is
   /// none).
   template <class T> std::vector<T>& edit() {
-    if (!holds<T>()) {
-      type = list_type_of<T>();
-      list.reset();
+    if constexpr (std::is_same_v<T, Value>) {
+      if (type != PinType::structure_list) {
+        type = PinType::structure_list;
+        rows.reset();
+      }
+      return own_rows();
+    } else {
+      if (!holds<T>()) {
+        type = list_type_of<T>();
+        list.reset();
+      }
+      if (!list) list = std::make_shared<ListItems>();
+      else if (list.use_count() > 1) list = std::make_shared<ListItems>(*list);  // (someone else reads these)
+      return std::get<std::vector<T>>(const_cast<ListItems&>(*list));  // (made as ListItems, above and in of())
     }
-    if (!list) list = std::make_shared<ListItems>();
-    else if (list.use_count() > 1) list = std::make_shared<ListItems>(*list);  // (someone else reads these)
-    return std::get<std::vector<T>>(const_cast<ListItems&>(*list));  // (made as ListItems, above and in of())
+  }
+  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
+  /// field is at its declared default).
+  const Value* field(std::size_t index) const { return type == PinType::structure && rows && index < rows->size() ? &(*rows)[index] : nullptr; }
+  /// How many fields a struct's value holds.
+  std::size_t fields() const { return type == PinType::structure && rows ? rows->size() : 0; }
+  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
+  std::vector<Value>& own_rows() {
+    if (!rows) rows = std::make_shared<std::vector<Value>>();
+    else if (rows.use_count() > 1) rows = std::make_shared<std::vector<Value>>(*rows);  // (someone else reads these)
+    return const_cast<std::vector<Value>&>(*rows);  // (made as a vector, here and in structure())
   }
   /// How many items a list has (no list: 0).
   std::size_t size() const;
@@ -226,6 +275,11 @@ struct Value {
   Value converted(PinType to) const;
   json::Value to_json() const;
   static Value from_json(const json::Value& j, PinType type);
+  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
+  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
+  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
+  json::Value to_json(const struct Graph& g, std::string_view of) const;
+  static Value from_json(const json::Value& j, PinType type, const struct Graph& g, std::string_view of);
   bool operator==(const Value& o) const;
 };
 
@@ -258,7 +312,7 @@ struct Variable {
   PinType type = PinType::number;
   json::Value value;     // default
   std::string help;
-  std::string of = {};   // an enum value (or a list of them): the enum's name
+  std::string of = {};   // a value of an enum or a struct (or a list of them): its name
 };
 
 /// An enumeration a Blueprint declares: a type with named values. A value of it is held as its
@@ -269,15 +323,34 @@ struct EnumType {
   std::string help;
 };
 
-/// A type as pins, variables and settings name it: the pin type, and for an enum which one.
+/// A type as pins, variables and settings name it: the pin type, and for an enum or a struct
+/// which one.
 struct TypeRef {
   PinType type = PinType::number;
   std::string of;
   bool operator==(const TypeRef&) const = default;
 };
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
-/// enums are the same enum.)
+/// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
+
+/// A structure a Blueprint declares: a type with named fields, each of a type and with a default.
+/// A field is a value type, an enum of the Blueprint, a struct declared above this one, or a list
+/// of one of these - no struct contains itself. In a Blueprint's C++ it is
+/// KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };
+struct StructField {
+  std::string name;
+  TypeRef type;
+  json::Value value;     // default
+};
+struct StructType {
+  static constexpr std::size_t kMaxFields = 32;
+  std::string name;
+  std::vector<StructField> fields;
+  std::string help;
+  /// The place of the field called `name`, or -1.
+  int field(std::string_view name) const;
+};
 
 /// A state machine in the style of the digitalisierungsplanung.de editor.
 enum class TriggerKind : u8 { event, timer, condition, automatic };
@@ -316,7 +389,7 @@ struct FunctionPin {
   std::string name;
   PinType type = PinType::number;
   json::Value value;     // default: an input nobody wired, an output no Return node set
-  std::string of = {};   // an enum value (or a list of them): the enum's name
+  std::string of = {};   // a value of an enum or a struct (or a list of them): its name
 };
 
 struct Function {
@@ -343,11 +416,14 @@ struct Graph {
   std::vector<StateMachine> machines;
   std::vector<Function> functions;
   std::vector<EnumType> enums;         // the types it declares
+  std::vector<StructType> structs;     // (a struct after the structs its fields are of)
   std::vector<CommentBox> comments;    // editor only: no effect on what runs
   u32 next_id = 1;
-  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && comments.empty(); }
+  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
   const EnumType* enumeration(std::string_view name) const;
   EnumType* enumeration(std::string_view name);
+  const StructType* structure(std::string_view name) const;
+  StructType* structure(std::string_view name);
   Node* find(u32 id);
   const Node* find(u32 id) const;
   const Variable* variable(std::string_view name) const;
@@ -361,6 +437,24 @@ struct Graph {
 
 json::Value graph_to_json(const Graph& g);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
+
+/// The value something of type `t` has when nothing else is said: the zero of a value type, the
+/// empty list - and of a struct every field at its declared default.
+Value zero_of(const TypeRef& t, const Graph& g);
+/// A struct's value with every field at its declared default.
+Value default_of(const StructType& s, const Graph& g);
+/// The field at `index` of a value of the struct `s`: what the value holds there, or the field's
+/// declared default.
+Value field_of(const Value& v, const StructType& s, std::size_t index, const Graph& g);
+/// Is `v` a value of type `t` as a Blueprint holds it: of that pin type; an enum's value one of
+/// its values; a struct with a value of its type for every field; a list of such items?
+bool is_value_of(const Value& v, const TypeRef& t, const Graph& g);
+/// What comes from outside (Instance::set, the arguments of Instance::call) as a value of type
+/// `t`: converted as a wire converts; an enum's value that is none of the enum's is the first; and
+/// what is no struct of that type is the struct's default.
+Value from_outside(const Value& v, const TypeRef& t, const Graph& g);
+/// The structs `s` holds, directly or in its fields' structs (their names) - itself not among them.
+std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 
 // ---------------------------------------------------------------------------
 // formulas
@@ -420,24 +514,27 @@ struct PinDef {
   PinType type = PinType::exec;
   json::Value def;       // default literal (data inputs)
   bool hidden = false;   // not drawn (advanced)
-  std::string of = {};   // an enum value (or a list of them): the enum's name
+  std::string of = {};   // a value of an enum or a struct (or a list of them): its name
 };
 
 struct ParamDef {
   std::string key, label;
   /// type: the setting names a type ("float", "text_list" ...) - the "Type" of a generic node
   /// (Select, Reroute, the list nodes). In a Blueprint's C++ it is that type: logic_select<Float>.
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type } kind = Kind::text;
+  /// field: the setting names a field of the struct variable the node's setting "variable" names
+  /// (Set Field). In a Blueprint's C++ it is that member: Held.Damage = 2.0.
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field } kind = Kind::text;
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
+  bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
 };
-/// The types a Kind::type setting can name in the Blueprint `g` - its enums among them -, in the
-/// order they are offered.
+/// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
+/// them -, in the order they are offered.
 std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g);
-/// The text that names a type in a setting: "float", "text_list"; an enum by its own name
-/// ("Mode"), a list of its values as "Mode_list".
+/// The text that names a type in a setting: "float", "text_list"; an enum or a struct by its own
+/// name ("Mode"), a list of its values as "Mode_list".
 std::string type_text(const TypeRef& t);
 /// The type a text names in the Blueprint `g` (false: none).
 bool type_from_text(std::string_view text, const Graph& g, TypeRef& out);

@@ -77,6 +77,12 @@ ParamDef enum_param() {
   p.enums_only = true;
   return p;
 }
+/// The setting "Struct" of a struct node: which struct of the Blueprint.
+ParamDef struct_param() {
+  ParamDef p = param("struct", "Struct", ParamDef::Kind::type);
+  p.structs_only = true;
+  return p;
+}
 /// The type a node's setting "Type" names in its Blueprint - Float when it names none (the
 /// check says so). `lists`: a list type may be meant.
 TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
@@ -84,16 +90,18 @@ TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
   if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type))) t = {PinType::number, {}};
   return t;
 }
-/// A data pin of a type a Blueprint names (an enum's with the enum).
+/// A data pin of a type a Blueprint names (an enum's with the enum, a struct's with the struct).
 PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Value def = {}) {
   PinDef p = data(std::move(id), std::move(label), t.type, std::move(def));
   p.of = t.of;
   return p;
 }
-void retype(PinDef& p, const TypeRef& t) {
+/// What a pin of type `t` holds when nothing is typed in (a struct: its fields' defaults).
+json::Value zero_json(const TypeRef& t, const Graph& g) { return zero_of(t, g).to_json(g, t.of); }
+void retype(PinDef& p, const TypeRef& t, const Graph& g) {
   p.type = t.type;
   p.of = t.of;
-  p.def = Value::zero(t.type).to_json();
+  p.def = zero_json(t, g);
 }
 
 /// A value that is new on every read (Random): the node keeps its sequence.
@@ -194,7 +202,7 @@ void add_flow(Library& lib) {
     d.keywords = "knot reroute wire";
     d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const TypeRef t = setting_type(n, g, true);
-      in = {typed_pin("in", "", t, Value::zero(t.type).to_json())};
+      in = {typed_pin("in", "", t, zero_json(t, g))};
       out = {typed_pin("out", "", t)};
     };
     d.run = [](Context& c) {
@@ -531,6 +539,7 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
     case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
+    case PinType::structure: f(std::type_identity<Value>{}); break;  // (a struct is the value that holds its fields)
     default: break;
   }
 }
@@ -541,8 +550,8 @@ void add_lists(Library& lib) {
     const TypeRef e = item_type(n, g);
     for (std::vector<PinDef>* pins : {&in, &out})
       for (PinDef& p : *pins) {
-        if (p.id == "list") { retype(p, {list_of(e.type), e.of}); p.def = json::Value::array(); }
-        if (p.id == "item") retype(p, e);
+        if (p.id == "list") { retype(p, {list_of(e.type), e.of}, g); p.def = json::Value::array(); }
+        if (p.id == "item") retype(p, e, g);
       }
   };
   {
@@ -553,8 +562,8 @@ void add_lists(Library& lib) {
       const TypeRef e = item_type(n, g);
       in.clear();
       const int k = clamp_count(n, "count", 2, 0, 16);
-      for (int i = 0; i < k; ++i) in.push_back(typed_pin("item" + std::to_string(i), std::to_string(i), e, Value::zero(e.type).to_json()));
-      retype(out[0], {list_of(e.type), e.of});
+      for (int i = 0; i < k; ++i) in.push_back(typed_pin("item" + std::to_string(i), std::to_string(i), e, zero_json(e, g)));
+      retype(out[0], {list_of(e.type), e.of}, g);
     };
     d.run = [](Context& c) {
       const std::size_t count = c.input_count();
@@ -635,7 +644,7 @@ void add_lists(Library& lib) {
     const Variable* v = g.variable(n.param("variable"));
     const TypeRef e = v && is_list(v->type) ? TypeRef{element_of(v->type), v->of} : TypeRef{};
     for (PinDef& p : in)
-      if (p.id == "item") retype(p, e);
+      if (p.id == "item") retype(p, e, g);
     (void)out;
   };
   auto needs_list = [](const Node& n, const Graph& g) {
@@ -788,11 +797,10 @@ void add_enums(Library& lib) {
   // Every pin called value, a, b is of the node's enum; "values" is the list of them.
   auto typed = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
     const TypeRef e{PinType::enumeration, n.param("enum")};
-    (void)g;
     for (std::vector<PinDef>* pins : {&in, &out})
       for (PinDef& p : *pins) {
-        if (p.id == "value" || p.id == "a" || p.id == "b") retype(p, e);
-        if (p.id == "values") retype(p, {PinType::enumeration_list, e.of});
+        if (p.id == "value" || p.id == "a" || p.id == "b") retype(p, e, g);
+        if (p.id == "values") retype(p, {PinType::enumeration_list, e.of}, g);
       }
   };
   auto titled = [](const char* before, const char* after) {
@@ -891,7 +899,7 @@ void add_enums(Library& lib) {
     d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const EnumType* e = g.enumeration(n.param("enum"));
       for (PinDef& p : in)
-        if (p.id == "value") retype(p, {PinType::enumeration, n.param("enum")});
+        if (p.id == "value") retype(p, {PinType::enumeration, n.param("enum")}, g);
       out.clear();
       for (std::size_t k = 0; e && k < e->values.size(); ++k) out.push_back(exec_out("case" + std::to_string(k), e->values[k]));
     };
@@ -901,6 +909,102 @@ void add_enums(Library& lib) {
       int outs = 0;
       for (std::size_t k = 0; k < c.node_outputs(); ++k) outs += c.output(k).type == PinType::exec ? 1 : 0;
       return value >= 0 && value < outs ? static_cast<int>(value) : kStop;
+    };
+    lib.add(std::move(d));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// structs
+// ---------------------------------------------------------------------------
+// A Blueprint declares structs (Graph::structs). Make gives a struct's value from a value for
+// each field, Break gives the fields of one, Set Field changes one field of a struct variable.
+// What they do is logic::structs (nodes.h); the generic nodes (Select, Reroute, the list nodes,
+// For Each) take a struct's type as they take any other.
+
+void add_structs(Library& lib) {
+  auto of = [](const Node& n, const Graph& g) { return g.structure(n.param("struct")); };
+  {
+    NodeDef d = make("struct.make", "Make Struct", "Structures", NodeKind::pure, "A value of the struct, from a value for each of its fields.", "create new construct record fields");
+    d.params = {struct_param()};
+    d.outputs = {data("value", "Value", PinType::structure)};
+    d.title = [](const NodeDef&, const Node& n) { return "Make " + n.param("struct", "?"); };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      in.clear();
+      if (const StructType* s = of(n, g))
+        for (const StructField& f : s->fields) in.push_back(typed_pin(f.name, f.name, f.type, f.value));
+      retype(out[0], {PinType::structure, n.param("struct")}, g);
+    };
+    d.run = [](Context& c) {
+      std::vector<Value> fields;
+      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(c.in(k));  // (the fields one after the other, in their order)
+      c.out(std::size_t{0}, structs::make(std::move(fields)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("struct.break", "Break Struct", "Structures", NodeKind::pure, "The fields of a struct's value, each on a pin of its own.", "split fields members get read");
+    d.params = {struct_param()};
+    d.inputs = {data("value", "Value", PinType::structure)};
+    d.title = [](const NodeDef&, const Node& n) { return "Break " + n.param("struct", "?"); };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      retype(in[0], {PinType::structure, n.param("struct")}, g);
+      out.clear();
+      if (const StructType* s = of(n, g))
+        for (const StructField& f : s->fields) out.push_back(typed_pin(f.name, f.name, f.type));
+    };
+    d.run = [of](Context& c) {
+      const Value value = c.in(std::size_t{0});
+      const Graph& g = c.instance().graph();
+      if (const StructType* s = of(c.node(), g))
+        for (std::size_t k = 0; k < s->fields.size(); ++k) c.out(k, field_of(value, *s, k, g));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // The struct of the node's variable, and the place of the node's field in it (-1: none).
+    auto field = [](const Node& n, const Graph& g, const StructType*& s) {
+      const Variable* v = g.variable(n.param("variable"));
+      s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
+      return s ? s->field(n.param("field")) : -1;
+    };
+    NodeDef d = make("struct.set_field", "Set Field", "Structures", NodeKind::action, "Changes one field of a struct variable; the others stay as they are. Value: what the field is now.",
+                     "member assign change write");
+    d.params = {param("variable", "Struct", ParamDef::Kind::variable), param("field", "Field", ParamDef::Kind::field)};
+    d.inputs = {exec_in(), data("value", "Value", PinType::number)};
+    d.outputs = {exec_out(), data("value", "Value", PinType::number)};
+    d.title = [](const NodeDef&, const Node& n) { return "Set " + n.param("field", "?") + " of " + n.param("variable", "?"); };
+    d.shape = [field](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const StructType* s = nullptr;
+      const int k = field(n, g, s);
+      if (k < 0) return;
+      const StructField& f = s->fields[static_cast<std::size_t>(k)];
+      for (PinDef& p : in)
+        if (p.id == "value") { retype(p, f.type, g); p.def = f.value; }
+      for (PinDef& p : out)
+        if (p.id == "value") retype(p, f.type, g);
+    };
+    d.problem = [field](const Node& n, const Graph& g) {
+      const Variable* v = g.variable(n.param("variable"));
+      if (!v) return std::string();  // (the check says that there is no such variable)
+      if (v->type != PinType::structure) return "needs a struct variable: \"" + v->name + "\" is " + type_text({v->type, v->of});
+      const StructType* s = nullptr;
+      if (field(n, g, s) >= 0 || !s) return std::string();
+      std::string all;
+      for (const StructField& f : s->fields) all += (all.empty() ? "" : ", ") + f.name;
+      return s->name + " has no field \"" + n.param("field") + "\" (" + all + ")";
+    };
+    d.run = [field](Context& c) {
+      const Value value = c.in("value");
+      const StructType* s = nullptr;
+      const int k = field(c.node(), c.instance().graph(), s);
+      Value* v = c.instance().variable(c.param("variable"));
+      if (k < 0 || !v || v->type != PinType::structure) return 0;
+      structs::set_field(*v, static_cast<std::size_t>(k), value);
+      c.out("value", value);
+      return 0;
     };
     lib.add(std::move(d));
   }
@@ -968,8 +1072,8 @@ void add_math(Library& lib) {
     d.params = {type_param(true)};
     d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const TypeRef t = setting_type(n, g, true);
-      for (PinDef& p : in) if (p.id != "pick") retype(p, t);
-      retype(out[0], t);
+      for (PinDef& p : in) if (p.id != "pick") retype(p, t, g);
+      retype(out[0], t, g);
     };
     lib.add(std::move(d));
   }
@@ -1159,6 +1263,7 @@ Library& Library::core() {
     add_variables(lib);
     add_lists(lib);
     add_enums(lib);
+    add_structs(lib);
     add_math(lib);
     add_formula(lib);
     add_functions(lib);

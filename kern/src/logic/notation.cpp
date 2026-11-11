@@ -79,9 +79,10 @@ const char* cpp_type(PinType t) {
     default: return "void";
   }
 }
-/// A type as the notation writes it: Float, List<Text>; an enum by its name - Mode, List<Mode>.
+/// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
+/// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
-  if (element_of(t.type) != PinType::enumeration) return cpp_type(t.type);
+  if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
   return is_list(t.type) ? "List<" + t.of + ">" : t.of;
 }
 /// A value type by its name (a list is List<that>).
@@ -166,9 +167,22 @@ std::string literal(const Value& v) {
   for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
   return r + "}";
 }
-/// A value as the notation writes it, where it may be an enum's: `of` says which enum, `g` has
-/// its values' names - Mode::Open, List<Mode>{Mode::Closed, Mode::Open}.
-std::string literal(const Value& v, const std::string& of, const Graph& g) {
+/// A value as the notation writes it, where it may be an enum's or a struct's: `of` says which,
+/// `g` has its declaration - Mode::Open, List<Mode>{Mode::Closed, Mode::Open}; a struct with
+/// every field, in their order: Weapon{"Knife", Kind::Melee, 25.0}.
+std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0) {
+  if (element_of(v.type) == PinType::structure) {
+    const StructType* s = depth < g.structs.size() ? g.structure(of) : nullptr;  // (a struct holds structs declared above it: no deeper than there are structs)
+    auto one = [&](const Value& x) {
+      std::string r = of + "{";
+      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + literal(field_of(x, *s, k, g), s->fields[k].type.of, g, depth + 1);
+      return r + "}";
+    };
+    if (v.type == PinType::structure) return one(v);
+    std::string r = "List<" + of + ">{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + one(v.item(k));
+    return r + "}";
+  }
   if (element_of(v.type) != PinType::enumeration) return literal(v);
   const EnumType* e = g.enumeration(of);
   auto one = [&](i64 index) { return of + "::" + (e && enums::is_value(e->values.size(), index) ? e->values[static_cast<std::size_t>(index)] : std::string("_") + std::to_string(index)); };
@@ -689,6 +703,11 @@ struct Shape {
       }
     }
     auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
+      if (element_of(type) == PinType::structure) {
+        if (!g.structure(of)) return fail(what + " is of the struct \"" + of + "\", which is not declared");
+        if (!is_value_of(Value::from_json(value, type, g, of), {type, of}, g)) return fail(what + " holds what is no value of " + of);
+        return true;
+      }
       if (element_of(type) != PinType::enumeration) return true;
       const EnumType* e = g.enumeration(of);
       if (!e) return fail(what + " is of the enum \"" + of + "\", which is not declared");
@@ -697,6 +716,30 @@ struct Shape {
         if (!enums::is_value(e->values.size(), type == PinType::enumeration ? v.i : v.item(k).i)) return fail(what + " holds what is no value of " + e->name);
       return true;
     };
+    // A struct is a type of the Blueprint's C++ too: its name and its fields' names are C++ names,
+    // and a field is of a type declared above the struct - no struct contains itself.
+    for (std::size_t at = 0; at < g.structs.size(); ++at) {
+      const StructType& st = g.structs[at];
+      if (!name_ok(st.name, "the struct")) return false;
+      if (!names.insert(st.name).second) return fail("the name \"" + st.name + "\" is used twice");
+      if (st.name.size() > 5 && st.name.substr(st.name.size() - 5) == "_list") return fail("the struct \"" + st.name + "\": a name that ends in _list reads as a list");
+      if (st.fields.empty()) return fail("the struct " + st.name + " has no fields");
+      if (st.fields.size() > StructType::kMaxFields) return fail("the struct " + st.name + " has " + std::to_string(st.fields.size()) + " fields: " + std::to_string(StructType::kMaxFields) + " at most");
+      std::set<std::string> seen;
+      for (const StructField& f : st.fields) {
+        if (!cpp_name_ok(f.name)) return fail("the field \"" + f.name + "\" of " + st.name + " is no name C++ can write: letters, digits and _, not a word of C++ or of the notation");
+        if (!seen.insert(f.name).second) return fail("the struct " + st.name + " has two fields called \"" + f.name + "\"");
+        if (g.enumeration(f.name) || g.structure(f.name)) return fail("the field \"" + f.name + "\" of " + st.name + " has the name of a type of this Blueprint");
+        if (f.type.type == PinType::exec || f.type.type >= PinType::count) return fail("the field " + f.name + " of " + st.name + " has no type");
+        if (element_of(f.type.type) == PinType::structure) {
+          std::size_t inner = 0;
+          while (inner < g.structs.size() && g.structs[inner].name != f.type.of) ++inner;
+          if (inner == at) return fail("the struct " + st.name + " contains itself (the field " + f.name + ")");
+          if (inner >= at) return fail("the field " + f.name + " of " + st.name + " is of the struct \"" + f.type.of + "\", which is not declared above it");
+        }
+        if (!typed_ok("the field " + f.name + " of " + st.name, f.type.type, f.type.of, f.value)) return false;
+      }
+    }
     for (const Variable& v : g.variables) {
       if (!name_ok(v.name, "the variable")) return false;
       if (!names.insert(v.name).second) return fail("the name \"" + v.name + "\" is used twice");
@@ -735,7 +778,7 @@ struct Shape {
         const std::string value = x.node->param(pd.key, pd.def);
         bool known = false;
         for (const TypeRef& choice : type_choices(pd, g)) known = known || value == type_text(choice);
-        if (!known) return fail(title(i) + ": \"" + value + "\" is no " + (pd.enums_only ? "enum of this Blueprint" : "type it can have"), i);
+        if (!known) return fail(title(i) + ": \"" + value + "\" is no " + (pd.enums_only ? "enum of this Blueprint" : pd.structs_only ? "struct of this Blueprint" : "type it can have"), i);
       }
       for (int k : x.data_in) {
         // (an enum's value typed into a pin is one of its values)
@@ -796,7 +839,7 @@ struct Writer {
     const Info& X = at(x);
     const PinDef& p = X.in[static_cast<std::size_t>(k)];
     const json::Value* typed = X.node->value(p.id);
-    return literal(Value::from_json(typed ? *typed : p.def, p.type), p.of, s.g);
+    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), p.of, s.g);
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
@@ -806,7 +849,9 @@ struct Writer {
     const PinDef pin = at(from).out[static_cast<std::size_t>(o)];
     std::string e;
     if (at(from).pure) {
-      const std::string suffix = at(from).def->type == "func.pure" || at(from).data_out.size() > 1 ? "." + pin.id : std::string();
+      // (a function's value and a Break name what is read, whatever they give: Calc(x).r, struct_break<Weapon>(Held).Damage)
+      const std::string& kind = at(from).def->type;
+      const std::string suffix = kind == "func.pure" || kind == "struct.break" || at(from).data_out.size() > 1 ? "." + pin.id : std::string();
       e = (at(from).named ? "n" + id(from) + "()" : pure(from, c)) + suffix;
     } else if (at(from).event && at(from).place == c) {
       e = pin.id;  // an event's or a function's own value, inside its own body: the parameter
@@ -1052,6 +1097,12 @@ struct Writer {
       line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
+    if (t == "struct.set_field") {
+      // Held.Damage = value;   or, when what the node gives is read: n5.value = (Held.Damage = value);
+      const std::string set = X.node->param("variable") + "." + X.node->param("field") + " = " + value(x, X.data_in.front(), c);
+      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
+      return 0;
+    }
     if (t == "func.call") {
       const std::string args = inputs(x, c);
       line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
@@ -1065,7 +1116,7 @@ struct Writer {
     std::string r;
     for (int k : which) {
       const PinDef& p = pins[static_cast<std::size_t>(k)];
-      r += cpp_type(TypeRef{p.type, p.of}) + " " + p.id + " = " + literal(Value::zero(p.type), p.of, g) + "; ";
+      r += cpp_type(TypeRef{p.type, p.of}) + " " + p.id + " = " + literal(zero_of({p.type, p.of}, g), p.of, g) + "; ";
     }
     return r;
   }
@@ -1107,7 +1158,7 @@ struct Writer {
     std::string type;
     for (char ch : name) type += is_part(ch) ? ch : '_';
     if (type.empty() || is_digit(type[0])) type = "Blueprint_" + type;
-    bool taken = !cpp_name_ok(type) || g.variable(type) || g.function(type);
+    bool taken = !cpp_name_ok(type) || g.variable(type) || g.function(type) || g.enumeration(type) || g.structure(type);
     for (const Function& f : g.functions) taken = taken || f.name + "Result" == type;
     return taken ? type + "_Blueprint" : type;
   }
@@ -1125,7 +1176,7 @@ struct Writer {
       any = true;
       line(1, std::string("// ---- ") + title + " ----");
     };
-    if (!g.enums.empty()) {
+    if (!g.enums.empty() || !g.structs.empty()) {
       section("types");
       for (const EnumType& e : g.enums) {
         doc(1, e.help);
@@ -1133,12 +1184,19 @@ struct Writer {
         for (const std::string& v : e.values) values += ", " + v;
         line(1, "KERN_ENUM(" + e.name + values + ");");
       }
+      // (the structs after the enums: a field is of a type declared above it)
+      for (const StructType& st : g.structs) {
+        doc(1, st.help);
+        line(1, "KERN_STRUCT(" + st.name + ") {");
+        for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + ";");
+        line(1, "};");
+      }
     }
     if (!g.variables.empty()) {
       section("variables");
       for (const Variable& v : g.variables) {
         doc(1, v.help);
-        line(1, cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type), v.of, g) + ";");
+        line(1, cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g) + ";");
       }
     }
     if (!g.machines.empty()) {
@@ -1176,12 +1234,12 @@ struct Writer {
         first = false;
         if (!f.outputs.empty()) {
           std::string members;
-          for (const FunctionPin& p : f.outputs) members += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
+          for (const FunctionPin& p : f.outputs) members += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
           line(1, "struct " + f.name + "Result { " + members + "};");
         }
         doc(1, f.help);
         std::string args;
-        for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g);
+        for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g);
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (a path that ends without a Return gives the outputs' defaults)
         if (!body(e, 2) && !f.outputs.empty()) line(2, "return {};");
@@ -1258,8 +1316,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum of the Blueprint, or List<one of them>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor> or List<an enum of the Blueprint>";
+const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum or a struct of the Blueprint, or List<one of them>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -1549,11 +1607,36 @@ struct Reader {
   }
 
   // ---- literals ----
+  /// The fields of a struct by their names: "Name, Type, Damage".
+  static std::string field_names(const StructType& s) {
+    std::string all;
+    for (const StructField& f : s.fields) all += (all.empty() ? "" : ", ") + f.name;
+    return all;
+  }
   /// A literal: true, 12, -0.5, "text", Vector{x, y, z}, Actor{n}. False (nothing read): none here.
-  /// A value written out. `of`: which enum it is of, when it is an enum's value (or a list of them).
+  /// A value written out. `of`: which enum or struct it is of, when it is one's value (or a list
+  /// of them).
   bool literal_here(Value& v, std::string* of = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
+    if (t.kind == Tok::id && is("{", 1) && g.structure(t.s)) {
+      // Weapon{"Knife", Kind::Melee, 25.0}: a value for every field, in their order
+      const StructType s = *g.structure(t.s);
+      const std::string all = s.name + " has " + std::to_string(s.fields.size()) + " field(s) (" + field_names(s) + "): " + s.name + "{...} gives a value for each, in that order";
+      p += 2;
+      std::vector<Value> held;
+      for (const StructField& f : s.fields) {
+        if (is("}") || (!held.empty() && !accept(","))) { fail(p, all); return true; }
+        Value item;
+        if (!typed_literal(f.type, item, s.name + "." + f.name)) return true;
+        held.push_back(std::move(item));
+      }
+      if (!is("}")) { fail(p, all); return true; }
+      ++p;
+      v = Value::structure(std::move(held));
+      if (of) *of = s.name;
+      return true;
+    }
     if (t.kind == Tok::id && is("::", 1) && g.enumeration(t.s)) {
       // Mode::Open
       const EnumType& e = *g.enumeration(t.s);
@@ -1608,14 +1691,16 @@ struct Reader {
       if (!type_here(list)) return true;
       if (!expect("{", "(a list written out is " + cpp_type(list) + "{...})")) return true;
       json::Value items = json::Value::array();
+      std::vector<Value> structs;
       while (!is("}")) {
         Value item;
         if (!typed_literal({element_of(list.type), list.of}, item, "a list's item")) return true;
-        items.push(item.to_json());
+        if (list.type == PinType::structure_list) structs.push_back(std::move(item));
+        else items.push(item.to_json());
         if (!accept(",")) break;
       }
       if (!expect("}")) return true;
-      v = Value::from_json(items, list.type);
+      v = list.type == PinType::structure_list ? Value::structures(std::move(structs)) : Value::from_json(items, list.type);
       if (of) *of = list.of;
       return true;
     }
@@ -1630,19 +1715,20 @@ struct Reader {
     if (failed()) return false;
     if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
     if (v.type != want.type || of != want.of)
-      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of}) + ", but " + cpp_type(want) + " is needed (like " + literal(Value::zero(want.type), want.of, g) + ")");
+      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want.of, g) + ")");
     out = v;
     return true;
   }
 
   // ---- the first pass: what the struct declares ----
-  /// A type: Float, an enum the Blueprint has declared, List<one of them>.
+  /// A type: Float, an enum or a struct the Blueprint has declared, List<one of them>.
   bool type_here(TypeRef& t) {
     t = {};
     if (peek().kind != Tok::id) return false;
     if (type_of_cpp(peek().s, t.type)) { ++p; return true; }
-    if (g.enumeration(peek().s)) {
-      t = {PinType::enumeration, toks[p++].s};
+    if (g.enumeration(peek().s) || g.structure(peek().s)) {
+      t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
+      t.of = toks[p++].s;
       return true;
     }
     if (is("List") && is("<", 1)) {
@@ -1650,10 +1736,10 @@ struct Reader {
       const Tok inner = peek(2);
       PinType item = PinType::number;
       const bool value = inner.kind == Tok::id && type_of_cpp(inner.s, item);
-      const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s);
-      if ((!value && !of_enum) || !is(">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
+      const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s), of_struct = inner.kind == Tok::id && g.structure(inner.s);
+      if ((!value && !of_enum && !of_struct) || !is(">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
       p += 4;
-      t = value ? TypeRef{list_of(item), {}} : TypeRef{PinType::enumeration_list, inner.s};
+      t = value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
       return true;
     }
     return false;
@@ -1665,11 +1751,11 @@ struct Reader {
       std::string field;
       if (!type_here(t)) return fail(p, what + ": " + kTypes + shown(peek()));
       if (!word(field, "the name")) return false;
-      Value v = Value::zero(t.type);
+      Value v = zero_of(t, g);
       const std::size_t at = p;
       if (accept("=") && !typed_literal(t, v, field)) return false;
       if (!expect(";")) return false;
-      if (!defaults && !(v == Value::zero(t.type))) return fail(at, "what a node gives starts empty: " + field + " = " + literal(Value::zero(t.type), t.of, g));
+      if (!defaults && !(v == zero_of(t, g))) return fail(at, "what a node gives starts empty: " + field + " = " + literal(zero_of(t, g), t.of, g));
       out.push_back({field, t});
       if (defaults) defaults->push_back(v);
     }
@@ -1801,7 +1887,7 @@ struct Reader {
         // KERN_ENUM(Mode, Closed, Opening, Open);   an enum of the Blueprint
         EnumType e;
         if (!expect("(") || !word(e.name, "the enum's name")) return false;
-        if (g.enumeration(e.name) || g.variable(e.name) || g.function(e.name)) return fail(at + 2, "the name " + e.name + " is declared twice");
+        if (g.enumeration(e.name) || g.structure(e.name) || g.variable(e.name) || g.function(e.name)) return fail(at + 2, "the name " + e.name + " is declared twice");
         while (accept(",")) {
           std::string value;
           const std::size_t where = p;
@@ -1815,6 +1901,35 @@ struct Reader {
         g.enums.push_back(std::move(e));
         continue;
       }
+      if (accept("KERN_STRUCT")) {
+        // KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };   a struct of the Blueprint
+        StructType s;
+        if (!expect("(") || !word(s.name, "the struct's name")) return false;
+        if (g.enumeration(s.name) || g.structure(s.name) || g.variable(s.name) || g.function(s.name)) return fail(at + 2, "the name " + s.name + " is declared twice");
+        if (!expect(")") || !expect("{")) return false;
+        while (!is("}")) {
+          StructField f;
+          // (a field is of a type declared above the struct: the struct itself is none of them)
+          const Tok named = is("List") && is("<", 1) ? peek(2) : peek();
+          if (named.kind == Tok::id && named.s == s.name) return fail(p, "the struct " + s.name + " cannot contain itself: a field is of a type declared above the struct");
+          if (!type_here(f.type))
+            return fail(p, "the struct " + s.name + ": " + shown(peek()) + " is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
+          const std::size_t where = p;
+          if (!word(f.name, "the field's name")) return false;
+          if (s.field(f.name) >= 0) return fail(where, s.name + " has the field " + f.name + " twice");
+          Value init = zero_of(f.type, g);
+          if (accept("=") && !typed_literal(f.type, init, s.name + "." + f.name)) return false;
+          if (!expect(";")) return false;
+          f.value = init.to_json(g, f.type.of);
+          s.fields.push_back(std::move(f));
+        }
+        if (s.fields.empty()) return fail(p, "a struct has fields: KERN_STRUCT(" + s.name + ") { Float Field = 0.0; };");
+        if (s.fields.size() > StructType::kMaxFields) return fail(at + 2, s.name + " has " + std::to_string(s.fields.size()) + " fields: a struct has " + std::to_string(StructType::kMaxFields) + " at most");
+        if (!expect("}") || !expect(";")) return false;
+        s.help = take_docs();
+        g.structs.push_back(std::move(s));
+        continue;
+      }
       TypeRef type;
       if (type_here(type)) {
         // a variable
@@ -1822,11 +1937,11 @@ struct Reader {
         v.type = type.type;
         v.of = type.of;
         if (!word(v.name, "the variable's name")) return false;
-        Value init = Value::zero(type.type);
+        Value init = zero_of(type, g);
         if (accept("=") && !typed_literal(type, init, v.name)) return false;
         if (!expect(";")) return false;
         if (g.variable(v.name)) return fail(at + 1, "the variable " + v.name + " is declared twice");
-        v.value = init.to_json();
+        v.value = init.to_json(g, type.of);
         v.help = take_docs();
         g.variables.push_back(std::move(v));
         continue;
@@ -1911,7 +2026,7 @@ struct Reader {
         continue;
       }
       if (ret != "void" && (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result"))
-        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum declared above it, or a List of one of them; a function gives void or <Function>Result");
+        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them; a function gives void or <Function>Result");
       if (!expect("(")) return false;
       Item it;
       if (ret == "void" && numbered(fn, "on")) {
@@ -1949,7 +2064,7 @@ struct Reader {
           auto r = results.find(fn);
           if (r == results.end()) return fail(at, "struct " + ret + " { ... }; must be declared above the function");
           for (std::size_t k = 0; k < r->second.first.size(); ++k)
-            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(), r->second.first[k].second.of});
+            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second.of), r->second.first[k].second.of});
         }
         while (!is(")")) {
           FunctionPin in;
@@ -1958,9 +2073,9 @@ struct Reader {
           in.type = in_type.type;
           in.of = in_type.of;
           if (!word(in.name, "the input's name")) return false;
-          Value v = Value::zero(in.type);
+          Value v = zero_of(in_type, g);
           if (accept("=") && !typed_literal(in_type, v, in.name)) return false;
-          in.value = v.to_json();
+          in.value = v.to_json(g, in.of);
           f.inputs.push_back(std::move(in));
           if (!accept(",")) break;
         }
@@ -2011,7 +2126,8 @@ struct Reader {
       if (pd.kind == ParamDef::Kind::variable) continue;
       PinType type = PinType::number;
       want += (want.empty() ? "" : ", ") +
-              (pd.kind == ParamDef::Kind::type ? (pd.enums_only ? std::string("AnEnum") : pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : std::string("Type")) : "\"" + pd.def + "\"");
+              (pd.kind == ParamDef::Kind::type ? (pd.enums_only ? std::string("AnEnum") : pd.structs_only ? std::string("AStruct") : pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : std::string("Type"))
+                                               : "\"" + pd.def + "\"");
       ++count;
     }
     return count == 0 ? " has no settings (no <...>)" : " has " + std::to_string(count) + " setting(s): " + node_name(def->type) + "<" + want + ">";
@@ -2100,8 +2216,8 @@ struct Reader {
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
     if (v.type != pin.type || src.of != pin.of)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
-                               literal(Value::zero(pin.type), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json());
+                               literal(zero_of(want, g), pin.of, g) + ")");
+    m.node.set_value(pin.id, v.to_json(g, pin.of));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.
@@ -2238,7 +2354,13 @@ struct Reader {
       else s.root = true;
       return s;
     }
-    if (g.variable(t.s)) {
+    if (const Variable* v = g.variable(t.s)) {
+      if (is(".")) {
+        const std::string field = peek(1).kind == Tok::id ? peek(1).s : std::string("Field");
+        if (v->type == PinType::structure) fail(p, "a struct's field is read through Break: struct_break<" + v->of + ">(" + v->name + ")." + field);
+        else fail(p, v->name + " is " + cpp_type(TypeRef{v->type, v->of}) + ": it has no fields");
+        return s;
+      }
       s.node = make("var.get", s.tok, {{"variable", t.s}});
       s.root = true;
       return s;
@@ -2337,6 +2459,21 @@ struct Reader {
     if (!string(entry, "the exec input (" + list + ")")) return false;
     if (std::find(ins.begin(), ins.end(), entry) == ins.end()) return fail(at, node_name(m.def->type) + " has no exec input \"" + entry + "\" (" + list + ")");
     return true;
+  }
+  /// Variable.Field = value   ("Variable" has been read, "." is next): the Set Field it is, up to
+  /// and including the "=" (-1: refused).
+  int field_step(const std::string& var, std::size_t at) {
+    const Variable* v = g.variable(var);
+    const StructType* s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
+    if (!s) { fail(p, var + " is " + (v ? cpp_type(TypeRef{v->type, v->of}) : std::string("no variable")) + ": only a struct has fields to set (Variable.Field = value;)"); return -1; }
+    ++p;
+    std::string field;
+    const std::size_t where = p;
+    if (!word(field, "a field of " + s->name + " (" + field_names(*s) + ")")) return -1;
+    if (s->field(field) < 0) { fail(where, s->name + " has no field \"" + field + "\" (" + field_names(*s) + ")"); return -1; }
+    if (!is("=")) { fail(p, var + "." + field + " = value; expected, not " + shown(peek())); return -1; }
+    ++p;
+    return step(make("struct.set_field", at, {{"variable", var}, {"field", field}}), at);
   }
   /// A body in braces: "{" has been read; reads up to and including "}".
   Ends block(Ends open, bool keep_scope = true) {
@@ -2636,10 +2773,15 @@ struct Reader {
       std::string var;
       if (!word(var, "a variable")) return {};
       if (!g.variable(var)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
-      const bool add = is("+=");
-      if (!add && !is("=")) { fail(p, var + " = value or " + var + " += value expected, not " + shown(peek())); return {}; }
-      ++p;
-      const int node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+      int node = -1;
+      if (is(".")) {
+        node = field_step(var, at);  // n<id>.value = (Variable.Field = value);
+      } else {
+        const bool add = is("+=");
+        if (!add && !is("=")) { fail(p, var + " = value or " + var + " += value expected, not " + shown(peek())); return {}; }
+        ++p;
+        node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+      }
       if (node < 0 || !declare(id, node, at)) return {};
       enter(in, node, "", at);
       const Src s = value();
@@ -2661,13 +2803,18 @@ struct Reader {
       return call_function(std::move(in), f->name, id, at);
     }
     if (const Variable* v = g.variable(t.s)) {
-      // Variable = value;   Variable += value;
+      // Variable = value;   Variable += value;   Variable.Field = value;
       const std::string var = v->name;
       p += 1;
-      const bool add = is("+=");
-      if (!add && !is("=")) { fail(p, var + " = value; or " + var + " += value; expected, not " + shown(peek())); return {}; }
-      ++p;
-      const int node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+      int node = -1;
+      if (is(".")) {
+        node = field_step(var, at);
+      } else {
+        const bool add = is("+=");
+        if (!add && !is("=")) { fail(p, var + " = value; or " + var + " += value; expected, not " + shown(peek())); return {}; }
+        ++p;
+        node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+      }
       if (node < 0) return {};
       enter(in, node, "", at);
       const Src s = value();
@@ -2689,6 +2836,7 @@ struct Reader {
     p += 1;
     if (def->type == "var.set" || def->type == "var.add") { fail(at, "a variable is set by its name: Heat = value; or Heat += value;"); return {}; }
     if (def->type == "func.call") { fail(at, "a function is called by its name: Function(values);"); return {}; }
+    if (def->type == "struct.set_field") { fail(at, "a struct's field is set by its name: Variable.Field = value;"); return {}; }
     if (def->kind == NodeKind::pure) { fail(at, fname + " is a value: alone on a line it does nothing"); return {}; }
     if (def->kind == NodeKind::event) { fail(at, fname + " is an event: KERN_EVENT(on<id>, " + fname + ")"); return {}; }
     if (def->loop) { fail(at, fname + " is a loop: for (auto it<id> = " + fname + "(...); it<id>.next();) { }"); return {}; }
@@ -3084,9 +3232,10 @@ struct Reader {
       if (!out_pin) return fail(w.from.tok, fname + " has no output \"" + w.from.pin + "\" (" + outs + ")");
       if (f.pure) {
         // (one way to write each read: a function's value names its result, a value with one output does not)
-        const bool fn_value = f.def->type == "func.pure";
+        const bool fn_value = f.def->type == "func.pure", fields = f.def->type == "struct.break";
         if (fn_value && w.from.pin.empty()) return fail(w.from.tok, "which result: " + f.node.param("function") + "(...)." + out_pin->id);
-        if (!fn_value && count == 1 && !w.from.pin.empty()) return fail(w.from.tok, fname + " gives one value: no ." + w.from.pin);
+        if (fields && w.from.pin.empty()) return fail(w.from.tok, "which field: struct_break<" + f.node.param("struct") + ">(...)." + out_pin->id);
+        if (!fn_value && !fields && count == 1 && !w.from.pin.empty()) return fail(w.from.tok, fname + " gives one value: no ." + w.from.pin);
       }
       const PinDef* in = nullptr;
       for (const PinDef& pd : to.in) if (pd.id == w.in) in = &pd;
@@ -3185,19 +3334,26 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
     add("enum " + std::to_string(i + 1), g.enums[i].name + " { " + values + " }");
     add("the description of enum " + std::to_string(i + 1), g.enums[i].help);
   }
+  add("the number of structs", std::to_string(g.structs.size()));
+  for (std::size_t i = 0; i < g.structs.size(); ++i) {
+    std::string fields;
+    for (const StructField& f : g.structs[i].fields) fields += cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + "; ";
+    add("struct " + std::to_string(i + 1), g.structs[i].name + " { " + fields + "}");
+    add("the description of struct " + std::to_string(i + 1), g.structs[i].help);
+  }
   add("the number of variables", std::to_string(g.variables.size()));
   for (std::size_t i = 0; i < g.variables.size(); ++i) {
     const Variable& v = g.variables[i];
-    add("variable " + std::to_string(i + 1), cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type), v.of, g));
+    add("variable " + std::to_string(i + 1), cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g));
     add("the description of variable " + std::to_string(i + 1), v.help);
   }
   add("the number of functions", std::to_string(g.functions.size()));
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const Function& f = g.functions[i];
     std::string sig = f.name + (f.pure ? " (pure)" : "") + " (";
-    for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
+    for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
     sig += ") -> (";
-    for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
+    for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
     add("function " + std::to_string(i + 1), sig + ")");
     add("the description of function " + std::to_string(i + 1), f.help);
   }
@@ -3263,7 +3419,7 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
       if (wire != into.end()) add("the input \"" + p.id + "\" of " + key, "from " + wire->second);
       else {
         const json::Value* typed = n->value(p.id);
-        add("the input \"" + p.id + "\" of " + key, literal(Value::from_json(typed ? *typed : p.def, p.type), p.of, g));
+        add("the input \"" + p.id + "\" of " + key, literal(Value::from_json(typed ? *typed : p.def, p.type, g, p.of), p.of, g));
       }
     }
     for (const PinDef& p : out) {
@@ -3304,7 +3460,7 @@ std::string cpp_class_name(std::string_view owner, const Graph& g) {
   auto inside = [&](const std::string& name) {
     for (const Variable& v : g.variables) if (v.name == name) return true;
     for (const Function& f : g.functions) if (f.name == name || f.name + "Result" == name) return true;
-    return false;
+    return g.enumeration(name) || g.structure(name);
   };
   std::string name = base;
   for (int k = 1; !cpp_name_ok(name) || inside(name); ++k) name = base + "Blueprint" + (k == 1 ? std::string() : std::to_string(k));
@@ -3471,14 +3627,20 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       default: return "kern::logic::ActorHandle";
     }
   };
-  // (an enum is the class's own: <Class>::Mode)
+  // (an enum and a struct are the class's own: <Class>::Mode)
   auto type = [&](PinType t, const std::string& of) -> std::string {
-    if (element_of(t) != PinType::enumeration) return builtin(t);
+    if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
   };
   // (the notation's literal, outside the class: with the types' own names)
   std::function<std::string(const Value&, const std::string&)> spelled = [&](const Value& v, const std::string& of) -> std::string {
     if (v.type == PinType::enumeration) return name + "::" + literal(v, of, g);
+    if (v.type == PinType::structure) {
+      const StructType* s = g.structure(of);
+      std::string r = name + "::" + of + "{";
+      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + spelled(field_of(v, *s, k, g), s->fields[k].type.of);
+      return r + "}";
+    }
     const std::string text = literal(v);
     if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
     if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
@@ -3487,7 +3649,35 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k), of);
     return r + "}";
   };
-  auto value = [&](const json::Value& j, PinType t, const std::string& of) { return spelled(Value::from_json(j, t), of); };
+  auto value = [&](const json::Value& j, PinType t, const std::string& of) { return spelled(Value::from_json(j, t, g, of), of); };
+  // How a struct of the class is held as a value of the engine (kern::logic::Value), field by
+  // field: what native_arg, to_value and native_set go through for it (nodes.h, detail::Held).
+  // A value from outside that is no struct of this type is the struct's default.
+  std::string structs;
+  for (const StructType& st : g.structs) {
+    const std::string full = "::" + name + "::" + st.name;
+    auto held = [&](const StructField& f) -> std::string {
+      if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
+      return is_list(f.type.type) ? "kern::List<::" + name + "::" + f.type.of + ">" : "::" + name + "::" + f.type.of;
+    };
+    std::string is, from, to;
+    for (std::size_t k = 0; k < st.fields.size(); ++k) {
+      const std::string at = "*v.field(" + std::to_string(k) + ")";
+      is += " && is_value<" + held(st.fields[k]) + ">(" + at + ")";
+      from += std::string(k ? ", " : "") + "from_value<" + held(st.fields[k]) + ">(" + at + ")";
+      to += std::string(k ? ", " : "") + "to_value(s." + st.fields[k].name + ")";
+    }
+    structs += "template <> struct Held<" + full + "> {\n"
+               "  static constexpr PinType type = PinType::structure;\n"
+               "  static bool is(const Value& v) { return v.type == type && v.fields() == " + std::to_string(st.fields.size()) + is + "; }\n"
+               "  static " + full + " from(const Value& v) {\n"
+               "    if (!is(v)) return {};\n"
+               "    return {" + from + "};\n"
+               "  }\n"
+               "  static Value to(const " + full + "& s) { return Value::structure({" + to + "}); }\n"
+               "};\n";
+  }
+  if (!structs.empty()) structs = "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n";
   char hash[40];
   std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
   // The handlers of events: the runtime starts a chain at an event's node, the class has it as
@@ -3539,7 +3729,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   if (!keep.empty())
     events = "    const bool at_work = self.kern_world.instance && self.kern_world.instance->chains() > 1;\n" + keep + events + "    if (at_work) {" + give_back + " }\n";
   std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
-                  "// text): glue, not part of the notation - nothing to edit here.\n"
+                  "// text): glue, not part of the notation - nothing to edit here.\n" +
+                  structs +
                   "namespace {\n"
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
                   "  " + name + " self;\n" +

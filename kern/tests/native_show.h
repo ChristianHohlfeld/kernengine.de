@@ -26,6 +26,11 @@ inline std::string native_show(const kern::logic::Value& v) {
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "#%llu", static_cast<unsigned long long>(v.a)); return b;
     case PinType::enumeration: std::snprintf(b, sizeof b, "~%lld", static_cast<long long>(v.i)); return b;  // (its place among its enum's values)
+    case PinType::structure: {  // its fields, each as above
+      std::string r = "{";
+      for (std::size_t k = 0, n = v.fields(); k < n; ++k) r += (k ? ", " : "") + native_show(*v.field(k));
+      return r + "}";
+    }
     default: break;
   }
   if (!kern::logic::is_list(v.type)) return "?";

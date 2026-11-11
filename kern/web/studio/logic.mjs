@@ -36,16 +36,25 @@ const lgItemType = t => t.slice(0, -5);
 // type is that one name, as a node's Type setting holds it. A value of an enum is its place among
 // the enum's values.
 const LG_ENUM_COLOR = "#a58bff";
+// A struct of the Blueprint is a type by its name too - "Weapon", a list of them "Weapon_list".
+// The engine sends {type: "struct" | "struct_list", of: "Weapon"}. A value of a struct is an
+// object of its fields by their names: {Name: "Knife", Damage: 25}.
+const LG_STRUCT_COLOR = "#3f6fd6";
+let lgStructNames = new Set();  // the structs of the Blueprint that is shown (lgNormalize)
 const lgBuiltin = t => t in LG_TYPE_NAMES;
-const lgColor = t => LG_TYPE_COLORS[t] || (t ? LG_ENUM_COLOR : "#aaa");
+const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
+const lgColor = t => LG_TYPE_COLORS[t] || (lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
 const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
-const lgTyped = x => { if (x?.of && (x.type === "enum" || x.type === "enum_list")) x.type = x.type === "enum" ? x.of : x.of + "_list"; };
+const lgTyped = x => { if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of; };
 const lgEnumOf = (enums, type) => lgBuiltin(type) ? null : (enums || []).find(e => e.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
-/** Every pin, variable and function pin of the editor's data with its type as one name. */
+const lgStructOf = (structs, type) => lgBuiltin(type) ? null : (structs || []).find(s => s.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
+/** Every pin, variable, function pin and struct field of the editor's data with its type as one name. */
 function lgNormalize(data) {
   for (const n of data.nodes || []) { (n.inputs || []).forEach(lgTyped); (n.outputs || []).forEach(lgTyped); }
   (data.variables || []).forEach(lgTyped);
   for (const f of data.functions || []) { (f.inputs || []).forEach(lgTyped); (f.outputs || []).forEach(lgTyped); }
+  for (const s of data.structs || []) (s.fields || []).forEach(lgTyped);
+  lgStructNames = new Set((data.structs || []).map(s => s.name));
 }
 const LG_KIND_COLORS = {event: "#8f1d1d", action: "#1f4e8c", pure: "#3c7a3c", flow: "#5c5c5c"};
 const LG_GRID = 16;
@@ -58,21 +67,34 @@ const lgEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<":
 const lgHex = n => "#" + (n >>> 0).toString(16).padStart(6, "0");
 const lgNum = v => (typeof v === "number" ? (Math.abs(v) >= 1e4 || Number.isInteger(v) ? String(v) : String(+v.toFixed(4))) : String(v ?? ""));
 const lgSnap = v => Math.round(v / LG_SNAP) * LG_SNAP;
-const lgValueText = (v, type, enums) => {
-  const e = lgEnumOf(enums, type);
+/** A value as text. `data`: the editor's data - its enums and structs say what a value of theirs is. */
+const lgValueText = (v, type, data) => {
+  const e = lgEnumOf(data?.enums, type), s = lgStructOf(data?.structs, type);
   if (e) return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => e.values[x] ?? "?").join(", ") + "]" : e.values[v] ?? "?";  // (an enum's value by its name)
+  if (s) {
+    // a struct: its fields by their names
+    const one = x => "{" + s.fields.map(f => f.name + ": " + (f.type === "text" ? JSON.stringify(x?.[f.name] ?? "") : lgValueText(x?.[f.name], f.type, data))).join(", ") + "}";
+    return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(one).join(", ") + "]" : one(v);
+  }
   return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x) + ")" : lgValueText(x)).join(", ") + "]"
     : Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
 };
-const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : 0;
+/** A struct's value in short, as a node shows it: its first fields, the rest in the tooltip. */
+const lgStructSummary = (v, type, data) => {
+  const s = lgStructOf(data?.structs, type);
+  if (!s) return "";
+  const parts = s.fields.slice(0, 2).map(f => lgStructOf(data?.structs, f.type) || lgIsList(f.type) ? f.name : lgValueText(v?.[f.name], f.type, data));
+  return "{" + parts.join(", ") + (s.fields.length > 2 ? ", …" : "") + "}";
+};
+const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : lgStructNames.has(item) ? {} : 0;
 const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
 
 /** The editor of a list's items (the default of a variable or a function input, a list typed
  *  into a node): one row per item with the field of its type, × takes it out, + adds one. */
-function lgListEditor(type, value, enums) {
+function lgListEditor(type, value, data) {
   const item = lgItemType(type), items = Array.isArray(value) ? value : [];
   if (item === "actor") return `<span class="lg-dim">${items.length ? items.length + " actors" : "empty (filled while playing)"}</span>`;
-  const of = lgEnumOf(enums, type);
+  const of = lgEnumOf(data?.enums, type);
   const field = (v, i) => of ? `<select data-li="${i}">${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
     : item === "bool" ? `<input type="checkbox" data-li="${i}"${v ? " checked" : ""}>`
     : `<input data-li="${i}" value="${lgEsc(item === "vector" ? (Array.isArray(v) ? v : [0, 0, 0]).map(lgNum).join(", ") : item === "text" ? (v ?? "") : lgNum(v))}" spellcheck="false"${item === "text" ? "" : ' inputmode="decimal"'}>`;
@@ -92,6 +114,52 @@ function lgListBind(box, send) {
   for (const x of box.querySelectorAll("[data-lx]")) x.onclick = () => send(lgListValue(box).filter((_, i) => i !== +x.dataset.lx));
   const add = box.querySelector("[data-ladd]");
   if (add) add.onclick = () => send([...lgListValue(box), lgItemZero(item)]);
+}
+
+/** The editor of a value by its parts: a struct field by field - a struct inside it too -, a list
+ *  item by item. Every field carries the path to its part (data-vp: the fields' names and the
+ *  items' places from the value down); lgValueBind gives the whole value with that part changed. */
+function lgValueEditor(type, value, data, path = []) {
+  const at = p => lgEsc(JSON.stringify(p));
+  const st = lgStructOf(data?.structs, type), en = lgEnumOf(data?.enums, type);
+  if (lgIsList(type)) {
+    const item = lgItemType(type), items = Array.isArray(value) ? value : [];
+    if (item === "actor") return `<span class="lg-dim">${items.length ? items.length + " actors" : "empty (filled while playing)"}</span>`;
+    return `<div class="lg-list">${items.map((v, i) => `<div class="lg-li${st ? " lg-lis" : ""}"><em>${i}</em>${lgValueEditor(item, v, data, [...path, i])}<button data-vx="${at([...path, i])}" title="Remove this item">×</button></div>`).join("")}
+      <button class="lg-ladd" data-vadd="${at(path)}" data-vt="${lgEsc(item)}" title="Add an item at the end">+ Item</button></div>`;
+  }
+  if (st) return `<div class="lg-struct">${st.fields.map(f => `<div class="lg-sf${lgStructOf(data?.structs, f.type) || lgIsList(f.type) ? " wide" : ""}"><label title="${lgEsc(lgTypeName(f.type))}"><i class="lg-pill" style="--c:${lgColor(f.type)}"></i>${lgEsc(f.name)}</label>${lgValueEditor(f.type, value?.[f.name], data, [...path, f.name])}</div>`).join("")}</div>`;
+  if (en) return `<select data-vp="${at(path)}" data-vt="enum">${en.values.map((name, k) => `<option value="${k}"${k === value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
+  if (type === "bool") return `<input type="checkbox" data-vp="${at(path)}" data-vt="bool"${value ? " checked" : ""}>`;
+  if (type === "actor") return `<span class="lg-dim">none (set it while playing)</span>`;
+  return `<input data-vp="${at(path)}" data-vt="${lgEsc(type)}" value="${lgEsc(type === "vector" ? (Array.isArray(value) ? value : [0, 0, 0]).map(lgNum).join(", ") : type === "text" ? (value ?? "") : lgNum(value))}" spellcheck="false"${type === "text" ? "" : ' inputmode="decimal"'}>`;
+}
+/** Every change in a value editor gives `send` the whole value (`value`: what the editor shows). */
+function lgValueBind(box, current, send) {
+  if (!box) return;
+  // the value with the part at `path` being `part` (the value as it is now: the editor stays as
+  // it is while one types in it, and an earlier entry must not be undone by a later one)
+  const put = (path, part) => {
+    if (!path.length) return part;
+    const whole = JSON.parse(JSON.stringify(current() ?? (typeof path[0] === "number" ? [] : {})));
+    let o = whole;
+    for (const k of path.slice(0, -1)) o = o[k] ??= {};
+    o[path[path.length - 1]] = part;
+    return whole;
+  };
+  const part = path => path.reduce((o, k) => o?.[k], current());
+  for (const f of box.querySelectorAll("[data-vp]")) {
+    const t = f.dataset.vt;
+    f.onchange = () => send(put(JSON.parse(f.dataset.vp), t === "bool" ? f.checked : t === "enum" ? +f.value : t === "vector" ? lgVector(f.value) : t === "text" ? f.value : (+f.value || 0)));
+  }
+  for (const x of box.querySelectorAll("[data-vx]")) {
+    const path = JSON.parse(x.dataset.vx), list = path.slice(0, -1);
+    x.onclick = () => send(put(list, (part(list) || []).filter((_, i) => i !== path[path.length - 1])));
+  }
+  for (const add of box.querySelectorAll("[data-vadd]")) {
+    const path = JSON.parse(add.dataset.vadd);
+    add.onclick = () => send(put(path, [...(part(path) || []), lgItemZero(add.dataset.vt)]));
+  }
 }
 
 function lgPinIcon(type, linked) {
@@ -148,6 +216,7 @@ export class LogicEditor {
     this.selVar = null;              // variable shown in Details
     this.selFn = null;               // function shown in Details
     this.selEnum = null;             // enum shown in Details
+    this.selStruct = null;           // struct shown in Details
     this.selTransition = null;
     this.drag = null;
     this.palette = null;
@@ -547,7 +616,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.enums, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -559,7 +628,7 @@ export class LogicEditor {
     const vars = (data.variables || []).filter(v => match(v.name)).map(v => `
         <div class="lg-item lg-var${this.selVar === v.name ? " on" : ""}" draggable="true" data-var="${lgEsc(v.name)}" title="Drag into the graph: Ctrl = Get, Alt = Set">
           <i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
-          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data.enums))}</span>` : `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
+          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data))}</span>` : `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
           <span class="lg-acts"><button data-get title="Add a Get node">Get</button><button data-set title="Add a Set node">Set</button></span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
     // a function's signature in short: (x, y) -> result
@@ -575,16 +644,24 @@ export class LogicEditor {
           <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span><span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
           <span class="lg-acts"><button data-switch title="Add a Switch on the enum">Switch</button></span>
         </div>`).join("") || `<div class="lg-none">No enums${q ? " match" : " yet: + adds one"}</div>`;
+    // a struct: a type of this Blueprint with named fields
+    const structs = (data.structs || []).filter(s => match(s.name)).map(s => `
+        <div class="lg-item lg-st${this.selStruct === s.name ? " on" : ""}" data-struct="${lgEsc(s.name)}" title="${lgEsc(s.help || "A struct: a type of this Blueprint with named fields")}">
+          <i class="lg-pill" style="--c:${LG_STRUCT_COLOR}"></i><span class="lg-vn">${lgEsc(s.name)}</span><span class="lg-vt">${lgEsc(s.fields.map(f => f.name).join(", "))}</span>
+          <span class="lg-acts"><button data-make title="Add a Make node of the struct">Make</button><button data-break title="Add a Break node of the struct">Break</button></span>
+        </div>`).join("") || `<div class="lg-none">No structs${q ? " match" : " yet: + adds one"}</div>`;
     const events = (data.events || []).filter(match).map(e => `
         <div class="lg-item lg-ev" draggable="true" data-ev="${lgEsc(e)}" title="Drag into the graph: the event; Ctrl = Call">${lgIco("event", "red")}<span class="lg-vn">${lgEsc(e)}</span>
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
-      section("fns", "Functions", "Add a function", fns) + section("enums", "Enums", "Add an enum", enums) + section("events", "Events", "Add a custom event", events);
+      section("fns", "Functions", "Add a function", fns) + section("enums", "Enums", "Add an enum", enums) + section("structs", "Structures", "Add a struct", structs) +
+      section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
       s.querySelector(".lg-sec-t").onclick = () => { const id = s.dataset.sec; if (this.collapsed.has(id)) this.collapsed.delete(id); else this.collapsed.add(id); this.myKey = ""; this.renderMy(this.data); };
       const add = s.querySelector("[data-add]");
-      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : s.dataset.sec === "fns" ? this.addFunction() : s.dataset.sec === "enums" ? this.addEnum() : this.addCustomEvent();
+      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : s.dataset.sec === "fns" ? this.addFunction() : s.dataset.sec === "enums" ? this.addEnum()
+        : s.dataset.sec === "structs" ? this.addStruct() : this.addCustomEvent();
     }
     for (const it of this.el.mylist.querySelectorAll("[data-graph]")) {
       it.onclick = () => { this.openView(it.dataset.graph); if (this.phone) this.togglePanel(""); };
@@ -613,6 +690,13 @@ export class LogicEditor {
       row.querySelector("[data-switch]").onclick = () => this.addAtCenter("flow.switch_enum", {enum: name});
       row.oncontextmenu = e => { e.preventDefault(); this.enumMenu(name, e.clientX, e.clientY); };
     }
+    for (const row of this.el.mylist.querySelectorAll(".lg-st")) {
+      const name = row.dataset.struct;
+      row.onclick = e => { if (e.target.closest("button")) return; this.selectStruct(name); };
+      row.querySelector("[data-make]").onclick = () => this.addAtCenter("struct.make", {struct: name});
+      row.querySelector("[data-break]").onclick = () => this.addAtCenter("struct.break", {struct: name});
+      row.oncontextmenu = e => { e.preventDefault(); this.structMenu(name, e.clientX, e.clientY); };
+    }
     for (const row of this.el.mylist.querySelectorAll(".lg-ev")) {
       const name = row.dataset.ev;
       row.querySelector("[data-on]").onclick = () => this.addAtCenter("event.custom", {name});
@@ -627,7 +711,7 @@ export class LogicEditor {
 
   selectFunction(name) {
     this.selFn = name;
-    this.selVar = this.selEnum = null;
+    this.selVar = this.selEnum = this.selStruct = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -670,7 +754,7 @@ export class LogicEditor {
 
   selectVariable(name) {
     this.selVar = name;
-    this.selFn = this.selEnum = null;
+    this.selFn = this.selEnum = this.selStruct = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -704,15 +788,16 @@ export class LogicEditor {
   enumNamed(name) { return (this.data?.enums || []).find(e => e.name === name) || null; }
   /** The enum a type is of ("Mode", "Mode_list"), or null. */
   enumOf(type) { return lgEnumOf(this.data?.enums, type); }
-  /** The types a variable or a function's pin can have: the value types, this Blueprint's enums, and a list of each. */
-  typeOptions(current) {
-    const values = [...LG_VALUE_TYPES, ...(this.data?.enums || []).map(e => e.name)];
+  /** The types a variable, a function's pin or a struct's field can have: the value types, this
+   *  Blueprint's enums and structs (`without`: the structs that are none of them), and a list of each. */
+  typeOptions(current, without = []) {
+    const values = [...LG_VALUE_TYPES, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
     return [...values, ...values.map(t => t + "_list")].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeName(t))}</option>`).join("");
   }
 
   selectEnum(name) {
     this.selEnum = name;
-    this.selVar = this.selFn = null;
+    this.selVar = this.selFn = this.selStruct = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -740,6 +825,56 @@ export class LogicEditor {
     if (r?.name) {
       this.selectEnum(r.name);
       this.afterRender = () => { const f = this.el.dbody.querySelector("[data-ek='name']"); f?.focus(); f?.select(); };
+    }
+  }
+
+  // ---- structs ----------------------------------------------------------------------
+  structNamed(name) { return (this.data?.structs || []).find(s => s.name === name) || null; }
+  /** The struct a type is of ("Weapon", "Weapon_list"), or null. */
+  structOf(type) { return lgStructOf(this.data?.structs, type); }
+  /** The structs that hold the struct `name` in a field, directly or through others (a struct does not contain itself: none of them can be a field's type in it). */
+  structsHolding(name) {
+    const holds = (s, seen = new Set()) => s.fields.some(f => {
+      const of = this.structOf(f.type);
+      if (!of || seen.has(of.name)) return false;
+      seen.add(of.name);
+      return of.name === name || holds(of, seen);
+    });
+    return (this.data?.structs || []).filter(s => s.name !== name && holds(s)).map(s => s.name);
+  }
+  /** The editor of a struct's value or of a list of structs, field by field ("": the type is neither). */
+  partsEditor(type, value) { return this.structOf(type) ? lgValueEditor(type, value, this.data) : ""; }
+
+  selectStruct(name) {
+    this.selStruct = name;
+    this.selVar = this.selFn = this.selEnum = null;
+    this.selection.clear();
+    this.selLink = null;
+    this.markSelection();
+    this.myKey = "";
+    this.renderMy(this.data);
+    this.renderDetails();
+    if (this.phone) this.togglePanel("details");
+  }
+
+  structMenu(name, x, y) {
+    this.studio.openMenu([
+      {header: name},
+      {label: "Make " + name, run: () => this.addAtCenter("struct.make", {struct: name})},
+      {label: "Break " + name, run: () => this.addAtCenter("struct.break", {struct: name})},
+      {label: "New Variable of " + name, run: () => this.addVariable(name)},
+      {label: "Find References", run: () => this.findText(name)},
+      {label: "Rename / Edit...", run: () => this.selectStruct(name)},
+      {separator: true},
+      {label: "Delete Struct", run: () => { if (this.cmd({cmd: "logicStruct", op: "remove", name})?.ok !== false && this.selStruct === name) this.selStruct = null; }},
+    ], x, y);
+  }
+
+  addStruct() {
+    const r = this.cmd({cmd: "logicStruct", op: "add"});
+    if (r?.name) {
+      this.selectStruct(r.name);
+      this.afterRender = () => { const f = this.el.dbody.querySelector("[data-stk='name']"); f?.focus(); f?.select(); };
     }
   }
 
@@ -831,15 +966,16 @@ export class LogicEditor {
       case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
       case "actor": return `<select class="lg-lit act" ${attr}><option value="0">${p.id === "target" || p.id === "a" ? "Self" : "None"}</option>${actors.map(([id, name]) => `<option value="${id}"${id === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
       default:
-        // a list that is not wired: how many items are typed in (they are edited in Details)
-        return lgIsList(p.type) ? `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type, this.data?.enums))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>` : "";
+        // a list that is not wired: how many items are typed in (they are edited in Details); a struct: its first fields
+        if (lgIsList(p.type)) return `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type, this.data))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>`;
+        return this.structOf(p.type) ? `<span class="lg-lcount lg-scount" title="${lgEsc(lgValueText(v, p.type, this.data))}">${lgEsc(lgStructSummary(v, p.type, this.data))}</span>` : "";
     }
   }
 
   paramHtml(n, p) {
     const attr = `data-param="${lgEsc(p.key)}" data-node="${n.id}"`;
     const choices = p.choices || [];
-    if (["choice", "type", "variable", "machine", "state", "sound", "function"].includes(p.kind)) {
+    if (["choice", "type", "variable", "field", "machine", "state", "sound", "function"].includes(p.kind)) {
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
     }
@@ -1025,7 +1161,7 @@ export class LogicEditor {
     for (const id of ids) this.selection.add(id);
     this.selLink = null;
     this.selTransition = null;
-    if (ids.length) this.selVar = this.selFn = this.selEnum = null;
+    if (ids.length) this.selVar = this.selFn = this.selEnum = this.selStruct = null;
     this.markSelection();
     if (this.data?.view === "graph") this.drawWires();
     else if (this.machine) this.drawTransitions(this.machine);
@@ -1045,12 +1181,13 @@ export class LogicEditor {
     const variable = this.selVar ? d.variables?.find(v => v.name === this.selVar) : null;
     const fn = this.selFn ? this.fn(this.selFn) : null;
     const en = this.selEnum ? this.enumNamed(this.selEnum) : null;
-    const k = JSON.stringify([node, box, state, trans, variable, fn, en, d.enums, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
+    const st = this.selStruct ? this.structNamed(this.selStruct) : null;
+    const k = JSON.stringify([node, box, state, trans, variable, fn, en, st, d.enums, d.structs, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
     if (k === this.detKey) return;
     // Do not rebuild under the user's typing.
-    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable, fn, en)) return;
+    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable, fn, en, st)) return;
     this.detKey = k;
-    this.detSame = (n2, b2, s2, t2, v2, f2, e2) => (e2?.name ?? "") === (en?.name ?? "") && (e2?.values.length ?? 0) === (en?.values.length ?? 0) && (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "") &&
+    this.detSame = (n2, b2, s2, t2, v2, f2, e2, st2) => (st2?.name ?? "") === (st?.name ?? "") && (st2?.fields.length ?? 0) === (st?.fields.length ?? 0) && (e2?.name ?? "") === (en?.name ?? "") && (e2?.values.length ?? 0) === (en?.values.length ?? 0) && (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "") &&
       (f2?.name ?? "") === (fn?.name ?? "") && (f2 ? f2.inputs.length + ":" + f2.outputs.length : "") === (fn ? fn.inputs.length + ":" + fn.outputs.length : "");
     const b = this.el.dbody;
     if (node) b.innerHTML = this.nodeDetails(node);
@@ -1060,10 +1197,11 @@ export class LogicEditor {
     else if (variable) b.innerHTML = this.variableDetails(variable);
     else if (fn) b.innerHTML = this.functionDetails(fn);
     else if (en) b.innerHTML = this.enumDetails(en);
+    else if (st) b.innerHTML = this.structDetails(st);
     else if (ids.length > 1) b.innerHTML = `<div class="lg-dh">${ids.length} selected</div><div class="lg-dsec"><div class="lg-dtxt">Drag one to move them all. C puts a comment around them; Q straightens their wires; the context menu aligns them.</div>
       <div class="lg-dacts"><button data-act="comment">Comment</button><button data-act="straighten">Straighten</button><button data-act="delete" class="danger">Delete</button></div></div>`;
     else b.innerHTML = this.graphDetails();
-    this.bindDetails(node, box, m, state, trans, variable, fn, en);
+    this.bindDetails(node, box, m, state, trans, variable, fn, en, st);
   }
 
   nodeDetails(n) {
@@ -1071,7 +1209,8 @@ export class LogicEditor {
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
     const inputs = n.inputs.filter(p => p.type !== "exec");
     const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
-      (lgIsList(p.type) && !p.linked ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value, this.data.enums)}</div>` : "")).join("");
+      (p.linked ? "" : this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${this.partsEditor(p.type, p.value)}</div>`
+        : lgIsList(p.type) ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("");
     const params = (n.params || []).map(p => `<div class="lg-drow"><label>${lgEsc(p.label)}</label><div>${this.paramHtml(n, p)}</div></div>`).join("");
     const issues = (n.issues || []).map(t => `<div class="lg-dissue ${n.error ? "err" : "warn"}">${lgIco(n.error ? "error" : "warn")}${lgEsc(t)}</div>`).join("");
     return `<div class="lg-dh"><i class="lg-dhc" style="background:${head}"></i>${lgEsc(n.title)}</div>
@@ -1094,8 +1233,9 @@ export class LogicEditor {
 
   variableDetails(v) {
     const live = this.trace?.variables?.[v.name];
-    const list = lgIsList(v.type), of = this.enumOf(v.type);
+    const list = lgIsList(v.type), of = this.enumOf(v.type), parts = this.partsEditor(v.type, v.value);
     const val = list ? `<span class="lg-dim">${Array.isArray(v.value) && v.value.length ? v.value.length + (v.value.length === 1 ? " item" : " items") : "empty"}</span>`
+      : parts ? `<span class="lg-dim">${lgEsc(lgTypeName(v.type))}: its fields</span>`
       : of ? `<select data-vk="value">${of.values.map((name, k) => `<option value="${k}"${k === v.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
       : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
@@ -1108,8 +1248,8 @@ export class LogicEditor {
         <div class="lg-drow"><label>Type</label><div><select data-vk="type">${this.typeOptions(v.type)}</select></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Default Value</div><div class="lg-drow"><label>${lgEsc(v.name)}</label><div>${val}</div></div>
-        ${list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value, this.data.enums)}</div>` : ""}
-        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live, v.type, this.data.enums))}</div></div>` : ""}</div>
+        ${parts ? `<div class="lg-lsub lg-vsub" data-var="${lgEsc(v.name)}">${parts}</div>` : list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value, this.data)}</div>` : ""}
+        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live, v.type, this.data))}</div></div>` : ""}</div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} node${refs === 1 ? "" : "s"} use${refs === 1 ? "s" : ""} ${lgEsc(v.name)}.</div></div>
       <div class="lg-dacts"><button data-act="get">Add Get</button><button data-act="set">Add Set</button><button data-act="refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
@@ -1117,6 +1257,7 @@ export class LogicEditor {
   functionDetails(f) {
     const value = p => this.enumOf(p.type) && !lgIsList(p.type) ? `<select data-pf="value" class="lg-fval" title="Default">${this.enumOf(p.type).values.map((name, k) => `<option value="${k}"${k === p.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
       : lgIsList(p.type) ? `<span class="lg-dim lg-fval" title="Default">${Array.isArray(p.value) && p.value.length ? p.value.length + " it." : "empty"}</span>`
+      : this.structOf(p.type) ? `<span class="lg-dim lg-fval" title="Default: ${lgEsc(lgValueText(p.value, p.type, this.data))}">fields</span>`
       : p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
       : p.type === "actor" ? `<span class="lg-dim">none</span>`
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
@@ -1124,7 +1265,8 @@ export class LogicEditor {
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
         <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${value(p)}
         <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
-        (lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data.enums)}</div>` : "")).join("") ||
+        (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
+          : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : "No outputs"}</div>`;
     const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
     return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
@@ -1156,6 +1298,36 @@ export class LogicEditor {
         <div class="lg-dtxt">A variable or a pin of this enum holds one of these values. Moving a value keeps what is set and wired with it; removing one turns what was that value into the first.</div></div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${vars} variable${vars === 1 ? "" : "s"} and ${nodes} node${nodes === 1 ? "" : "s"} are of ${lgEsc(e.name)}.</div></div>
       <div class="lg-dacts"><button data-act="enum-switch">Add Switch</button><button data-act="enum-var">New Variable</button><button data-act="enum-refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
+  }
+
+  structDetails(s) {
+    const of = t => t === s.name || t === s.name + "_list";
+    const vars = (this.data.variables || []).filter(v => of(v.type)).length;
+    const nodes = (this.data.nodes || []).filter(n => (n.params || []).some(p => (p.kind === "type") && of(p.value))).length;
+    const without = [s.name, ...this.structsHolding(s.name)];
+    // a field's default: in the row for a plain value, below it for a list or a struct
+    const value = f => this.enumOf(f.type) && !lgIsList(f.type) ? `<select data-sf="value" class="lg-fval" title="Default">${this.enumOf(f.type).values.map((name, k) => `<option value="${k}"${k === f.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
+      : lgIsList(f.type) ? `<span class="lg-dim lg-fval" title="Default">${Array.isArray(f.value) && f.value.length ? f.value.length + " it." : "empty"}</span>`
+      : this.structOf(f.type) ? `<span class="lg-dim lg-fval" title="Default: ${lgEsc(lgValueText(f.value, f.type, this.data))}">fields</span>`
+      : f.type === "bool" ? `<input type="checkbox" data-sf="value"${f.value ? " checked" : ""} title="Default">`
+      : f.type === "actor" ? `<span class="lg-dim">none</span>`
+      : `<input data-sf="value" class="lg-fval" value="${lgEsc(f.type === "vector" ? (f.value || [0, 0, 0]).join(", ") : f.type === "text" ? (f.value ?? "") : lgNum(f.value))}" title="Default" spellcheck="false">`;
+    const rows = s.fields.map((f, i) => `<div class="lg-frow lg-srow" data-field="${lgEsc(f.name)}">
+        <i class="lg-pill" style="--c:${lgColor(f.type)}"></i><input data-sf="name" class="lg-fname" value="${lgEsc(f.name)}" spellcheck="false" title="The field's name">
+        <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${value(f)}
+        <button data-sf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-sf="down" title="Move down"${i === s.fields.length - 1 ? " disabled" : ""}>↓</button>
+        <button data-sf="remove" title="Remove this field"${s.fields.length === 1 ? " disabled" : ""}>×</button></div>` +
+        (this.structOf(f.type) ? `<div class="lg-lsub lg-vsub" data-sfield="${lgEsc(f.name)}">${this.partsEditor(f.type, f.value)}</div>`
+          : lgIsList(f.type) ? `<div class="lg-lsub" data-sfield="${lgEsc(f.name)}">${lgListEditor(f.type, f.value, this.data)}</div>` : "")).join("");
+    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_STRUCT_COLOR}"></i>${lgEsc(s.name)}</div><div class="lg-dsub">Struct</div>
+      <div class="lg-dsec"><div class="lg-dst">Struct</div>
+        <div class="lg-drow"><label>Name</label><div><input data-stk="name" value="${lgEsc(s.name)}" spellcheck="false"></div></div>
+        <div class="lg-drow"><label>Description</label><div><input data-stk="help" value="${lgEsc(s.help || "")}"></div></div>
+      </div>
+      <div class="lg-dsec"><div class="lg-dst">Fields</div>${rows}<div class="lg-dacts"><button data-act="struct-field">+ Field</button></div>
+        <div class="lg-dtxt">A variable or a pin of this struct holds a value for each field. Make gives one from its fields, Break gives its fields, Set Field changes one of a variable. A renamed field keeps its values and wires; a removed one takes them along.</div></div>
+      <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${vars} variable${vars === 1 ? "" : "s"} and ${nodes} node${nodes === 1 ? "" : "s"} are of ${lgEsc(s.name)}.</div></div>
+      <div class="lg-dacts"><button data-act="struct-make">Add Make</button><button data-act="struct-break">Add Break</button><button data-act="struct-var">New Variable</button><button data-act="struct-refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
 
   transitionDetails(m, t) {
@@ -1195,7 +1367,7 @@ export class LogicEditor {
         <tr><td>F / Home</td><td>Frame selection / all</td></tr><tr><td>Ctrl+F</td><td>Find</td></tr><tr><td>F7</td><td>Compile</td></tr></table></div>`;
   }
 
-  bindDetails(node, box, m, state, trans, variable, fn, en) {
+  bindDetails(node, box, m, state, trans, variable, fn, en, st) {
     const b = this.el.dbody;
     this.bindInputs(b);
     for (const f of b.querySelectorAll("input, select, textarea")) f.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter" && f.tagName !== "TEXTAREA") f.blur(); });
@@ -1205,6 +1377,7 @@ export class LogicEditor {
       if (variable && !node && !box) { this.selVar = null; this.cmd({cmd: "logicVariable", op: "remove", name: variable.name}); return; }
       if (fn && !node && !box) { this.selFn = null; this.cmd({cmd: "logicFunction", op: "remove", name: fn.name}); return; }
       if (en && !node && !box) { if (this.cmd({cmd: "logicEnum", op: "remove", name: en.name})?.ok !== false) this.selEnum = null; return; }
+      if (st && !node && !box) { if (this.cmd({cmd: "logicStruct", op: "remove", name: st.name})?.ok !== false) this.selStruct = null; return; }
       if (trans) { this.selTransition = null; this.cmd({cmd: "logicMachine", op: "removeTransition", machine: m.id, transition: trans.id}); return; }
       this.deleteSelection();
     });
@@ -1215,12 +1388,21 @@ export class LogicEditor {
     act("get", () => this.addAtCenter("var.get", {variable: variable.name}));
     act("set", () => this.addAtCenter("var.set", {variable: variable.name}));
     act("refs", () => this.findText(variable.name));
-    // The items of lists: a variable's default, a function pin's default, a list typed into a node.
+    // The items of lists and the fields of structs: a variable's default, a function pin's
+    // default, a struct field's default, a value typed into a node. (`shown`: the value there is now.)
     for (const sub of b.querySelectorAll(".lg-lsub")) {
-      const box = sub.querySelector(".lg-list");
-      if (sub.dataset.var) lgListBind(box, value => this.cmd({cmd: "logicVariable", op: "value", name: sub.dataset.var, value}));
-      else if (sub.dataset.fpin && fn) lgListBind(box, value => this.cmd({cmd: "logicFunction", name: fn.name, op: "pinValue", side: sub.dataset.side, pin: sub.dataset.fpin, value}));
-      else if (sub.dataset.node) lgListBind(box, value => this.cmd({cmd: "logicValue", node: +sub.dataset.node, pin: sub.dataset.pin, value}));
+      const d = sub.dataset;
+      const send = d.var ? value => this.cmd({cmd: "logicVariable", op: "value", name: d.var, value})
+        : d.fpin && fn ? value => this.cmd({cmd: "logicFunction", name: fn.name, op: "pinValue", side: d.side, pin: d.fpin, value})
+        : d.sfield && st ? value => this.cmd({cmd: "logicStruct", name: st.name, op: "fieldValue", field: d.sfield, value})
+        : d.node ? value => this.cmd({cmd: "logicValue", node: +d.node, pin: d.pin, value}) : null;
+      if (!send) continue;
+      if (!sub.classList.contains("lg-vsub")) { lgListBind(sub.querySelector(".lg-list"), send); continue; }
+      const shown = () => d.var ? this.data.variables?.find(v => v.name === d.var)?.value
+        : d.fpin ? (d.side === "in" ? this.fn(fn.name)?.inputs : this.fn(fn.name)?.outputs)?.find(p => p.name === d.fpin)?.value
+        : d.sfield ? this.structNamed(st.name)?.fields.find(f => f.name === d.sfield)?.value
+        : this.data.nodes?.find(n => n.id === +d.node)?.inputs.find(p => p.id === d.pin)?.value;
+      lgValueBind(sub, shown, send);
     }
     if (fn) {
       const edit = c => this.cmd({cmd: "logicFunction", name: fn.name, ...c});
@@ -1272,6 +1454,35 @@ export class LogicEditor {
           const k = f.dataset.ev;
           if (k === "name") f.onchange = () => { if (edit({op: "renameValue", index, to: f.value.trim()})?.ok === false) f.value = en.values[index]; };
           else f.onclick = () => edit(k === "remove" ? {op: "removeValue", index} : {op: "moveValue", index, by: k === "up" ? -1 : 1});
+        }
+      }
+    }
+    if (st) {
+      const edit = c => this.cmd({cmd: "logicStruct", name: st.name, ...c});
+      act("struct-field", () => edit({op: "addField"}));
+      act("struct-make", () => this.addAtCenter("struct.make", {struct: st.name}));
+      act("struct-break", () => this.addAtCenter("struct.break", {struct: st.name}));
+      act("struct-var", () => this.addVariable(st.name));
+      act("struct-refs", () => this.findText(st.name));
+      for (const f of b.querySelectorAll("[data-stk]")) {
+        f.onchange = () => {
+          if (f.dataset.stk === "help") { edit({op: "help", text: f.value}); return; }
+          const to = f.value.trim();
+          if (edit({op: "rename", to})?.ok !== false) this.selStruct = to;
+          else f.value = st.name;
+        };
+      }
+      for (const row of b.querySelectorAll(".lg-srow")) {
+        const field = row.dataset.field, def = st.fields.find(x => x.name === field);
+        for (const f of row.querySelectorAll("[data-sf]")) {
+          const k = f.dataset.sf;
+          if (k === "remove") f.onclick = () => edit({op: "removeField", field});
+          else if (k === "up" || k === "down") f.onclick = () => edit({op: "moveField", field, by: k === "up" ? -1 : 1});
+          else f.onchange = () => {
+            if (k === "name") { if (edit({op: "renameField", field, to: f.value.trim()})?.ok === false) f.value = field; }
+            else if (k === "type") { if (edit({op: "fieldType", field, type: f.value})?.ok === false) f.value = def.type; }
+            else edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : def.type === "text" ? f.value : (+f.value || 0)});
+          };
         }
       }
     }
@@ -1424,7 +1635,7 @@ export class LogicEditor {
 
   addAt(type, p, params, from) {
     const r = this.cmd({cmd: "logicAdd", type, x: lgSnap(p.x), y: lgSnap(p.y), params, from: from || undefined});
-    if (r?.id) { this.selection = new Set([r.id]); this.selVar = this.selFn = this.selEnum = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
+    if (r?.id) { this.selection = new Set([r.id]); this.selVar = this.selFn = this.selEnum = this.selStruct = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
     return r;
   }
 
@@ -2458,6 +2669,16 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-li input[type=checkbox]{margin:0 auto 0 0}
 .lg-li select{flex:1 1 0;min-width:0;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 4px;font:inherit}
 .lg-erow em{flex:0 0 16px;text-align:right;color:#808080;font-style:normal;font-size:11px}
+.lg-struct{display:flex;flex-direction:column;gap:3px;flex:1 1 0;min-width:0}
+.lg-sf{display:flex;align-items:center;gap:6px;min-width:0}
+.lg-sf.wide{flex-direction:column;align-items:stretch;gap:2px}
+.lg-sf.wide>.lg-struct,.lg-sf.wide>.lg-list{margin-left:10px;padding-left:8px;border-left:2px solid #3a3a3a}
+.lg-sf>label{flex:0 0 84px;display:flex;align-items:center;gap:5px;color:#b8b8b8;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-sf.wide>label{flex:none}
+.lg-sf>input:not([type=checkbox]),.lg-sf>select{flex:1 1 0;min-width:0;width:auto;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 6px;font:inherit}
+.lg-sf>input[type=checkbox]{margin:0 auto 0 0}
+.lg-li.lg-lis{align-items:flex-start}
+.lg-scount{max-width:150px;overflow:hidden;text-overflow:ellipsis}
 .lg-li button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-ladd{align-self:flex-start;height:24px;padding:0 10px;margin-left:23px;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-lcount{color:#9a9a9a;font-size:11px;padding:0 4px;white-space:nowrap}

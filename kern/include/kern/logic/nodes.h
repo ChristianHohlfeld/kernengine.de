@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "kern/core/base.h"
@@ -79,6 +80,15 @@ struct Whole {
 /// Blueprint's class.
 namespace detail {
 template <class T> struct Held;  // (no such pin type)
+/// A struct of a Blueprint's class (KERN_STRUCT). How its value is held says the class's glue,
+/// field by field (logic::native_glue writes Held<Class::Struct>: is, from, to).
+template <class S>
+concept NativeStruct = !std::is_same_v<S, Value> && requires { requires Held<S>::type == PinType::structure; };
+// A struct in the interpreter: its value as it is (Value::rows are its fields).
+template <> struct Held<Value> {
+  static constexpr PinType type = PinType::structure;
+  static Value from(const Value& v) { return v; }
+};
 template <> struct Held<bool> {
   static constexpr PinType type = PinType::boolean;
   static bool from(const Value& v) { return v.as_bool(); }
@@ -131,6 +141,7 @@ template <class E>
   requires std::is_enum_v<E>
 struct Held<E> {
   static constexpr PinType type = PinType::enumeration;
+  static bool is(const Value& v) { return v.type == type && v.i >= 0 && static_cast<u64>(v.i) < enum_count<E>(); }
   static E from(const Value& v) {
     const i64 index = v.as_int();
     return static_cast<E>(index >= 0 && static_cast<u64>(index) < enum_count<E>() ? index : 0);
@@ -140,15 +151,43 @@ template <class E>
   requires std::is_enum_v<E>
 struct Held<std::vector<E>> {
   static constexpr PinType type = PinType::enumeration_list;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (i64 index : v.items<i64>())
+      if (index < 0 || static_cast<u64>(index) >= enum_count<E>()) return false;
+    return true;
+  }
   static std::vector<E> from(const Value& v) {
     std::vector<E> r;
     for (i64 index : v.items<i64>()) r.push_back(static_cast<E>(index >= 0 && static_cast<u64>(index) < enum_count<E>() ? index : 0));
     return r;
   }
 };
+// A list of structs of a Blueprint's class. What comes in from outside and is no struct of that
+// type is the struct's default, item by item (as Instance::set and Instance::call hold it).
+template <NativeStruct S> struct Held<std::vector<S>> {
+  static constexpr PinType type = PinType::structure_list;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (const Value& item : v.items<Value>())
+      if (!Held<S>::is(item)) return false;
+    return true;
+  }
+  static std::vector<S> from(const Value& v) {
+    std::vector<S> r;
+    for (const Value& item : v.items<Value>()) r.push_back(Held<S>::from(item));
+    return r;
+  }
+};
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
 template <class T> constexpr PinType pin_type_of() { return detail::Held<T>::type; }
+/// Is `v` a value of the C++ type T as a Blueprint holds it (logic::is_value_of: of that pin
+/// type, an enum's value one of its values, a struct with a value of its type for every field)?
+template <class T> bool is_value(const Value& v) {
+  if constexpr (requires { detail::Held<T>::is(v); }) return detail::Held<T>::is(v);
+  else return v.type == pin_type_of<T>();
+}
 inline Value to_value(bool v) { return Value::boolean(v); }
 inline Value to_value(i64 v) { return Value::integer(v); }
 inline Value to_value(Whole v) { return Value::integer(v); }
@@ -156,7 +195,14 @@ inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
+inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
+template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }
+template <detail::NativeStruct S> Value to_value(std::vector<S> v) {
+  std::vector<Value> items;
+  for (const S& item : v) items.push_back(detail::Held<S>::to(item));
+  return Value::structures(std::move(items));
+}
 template <class E>
   requires std::is_enum_v<E>
 Value to_value(E v) {
@@ -253,6 +299,76 @@ inline std::vector<std::string> names(std::string_view list) {
 }
 }  // namespace enums
 
+/// What the struct nodes do. A struct's value holds a value for each of its fields, in the order
+/// its declaration has them. In the interpreter that is a Value (its rows); in a Blueprint's C++
+/// it is the aggregate KERN_STRUCT declares - Make is its initializer, Break its members, Set
+/// Field the assignment to one of them.
+namespace structs {
+/// Make: the struct with these fields.
+inline Value make(std::vector<Value> fields) { return Value::structure(std::move(fields)); }
+/// Set Field: the field at `index` of the struct `s` becomes `value` (a field it does not have:
+/// nothing).
+inline void set_field(Value& s, std::size_t index, Value value) {
+  if (index < s.fields()) s.own_rows()[index] = std::move(value);
+}
+
+/// Stands for a value of any type where a field of an aggregate is initialized (never called).
+struct AnyField {
+  template <class T> operator T() const;  // NOLINT (implicit: that is the point)
+};
+template <class S, std::size_t... I> constexpr bool takes_fields(std::index_sequence<I...>) {
+  return requires { S{(static_cast<void>(I), AnyField{})...}; };
+}
+/// How many fields the aggregate S has (a struct of a Blueprint: StructType::kMaxFields at most).
+template <class S, std::size_t N = StructType::kMaxFields> constexpr std::size_t field_count() {
+  if constexpr (N == 0) return 0;
+  else if constexpr (takes_fields<S>(std::make_index_sequence<N>{})) return N;
+  else return field_count<S, N - 1>();
+}
+/// Calls f(fields...) with the fields of the aggregate `s`, in their order.
+template <class S, class F> constexpr decltype(auto) fields(S& s, F&& f) {
+  constexpr std::size_t N = field_count<std::remove_const_t<S>>();
+  if constexpr (N == 1) { auto& [f0] = s; return f(f0); }
+  else if constexpr (N == 2) { auto& [f0, f1] = s; return f(f0, f1); }
+  else if constexpr (N == 3) { auto& [f0, f1, f2] = s; return f(f0, f1, f2); }
+  else if constexpr (N == 4) { auto& [f0, f1, f2, f3] = s; return f(f0, f1, f2, f3); }
+  else if constexpr (N == 5) { auto& [f0, f1, f2, f3, f4] = s; return f(f0, f1, f2, f3, f4); }
+  else if constexpr (N == 6) { auto& [f0, f1, f2, f3, f4, f5] = s; return f(f0, f1, f2, f3, f4, f5); }
+  else if constexpr (N == 7) { auto& [f0, f1, f2, f3, f4, f5, f6] = s; return f(f0, f1, f2, f3, f4, f5, f6); }
+  else if constexpr (N == 8) { auto& [f0, f1, f2, f3, f4, f5, f6, f7] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7); }
+  else if constexpr (N == 9) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8); }
+  else if constexpr (N == 10) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9); }
+  else if constexpr (N == 11) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10); }
+  else if constexpr (N == 12) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11); }
+  else if constexpr (N == 13) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12); }
+  else if constexpr (N == 14) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13); }
+  else if constexpr (N == 15) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14); }
+  else if constexpr (N == 16) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15); }
+  else if constexpr (N == 17) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16); }
+  else if constexpr (N == 18) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17); }
+  else if constexpr (N == 19) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18); }
+  else if constexpr (N == 20) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19); }
+  else if constexpr (N == 21) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20); }
+  else if constexpr (N == 22) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21); }
+  else if constexpr (N == 23) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22); }
+  else if constexpr (N == 24) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23); }
+  else if constexpr (N == 25) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24); }
+  else if constexpr (N == 26) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25); }
+  else if constexpr (N == 27) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26); }
+  else if constexpr (N == 28) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27); }
+  else if constexpr (N == 29) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28); }
+  else if constexpr (N == 30) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29); }
+  else if constexpr (N == 31) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30); }
+  else if constexpr (N == 32) { auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31] = s; return f(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31); }
+  else return f();
+}
+/// Are two structs equal: every field of one equal to that field of the other (the operator ==
+/// of a KERN_STRUCT).
+template <class S> constexpr bool equal(const S& a, const S& b) {
+  return fields(a, [&b](const auto&... x) { return fields(b, [&x...](const auto&... y) { return (static_cast<bool>(x == y) && ...); }); });
+}
+}  // namespace structs
+
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,
 /// digits; anything else ends it. Empty or no digits: `fallback`.
 constexpr int setting_int(std::string_view s, int fallback) {
@@ -311,6 +427,7 @@ template <class E>
 void native_set(E& variable, const Value& v) {
   variable = from_value<E>(v.converted(PinType::enumeration));
 }
+template <detail::NativeStruct S> void native_set(S& variable, const Value& v) { variable = from_value<S>(v); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a

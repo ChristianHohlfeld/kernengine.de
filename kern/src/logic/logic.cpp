@@ -22,33 +22,43 @@ std::string number_text(f64 n) {
 
 const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinTypeNames[static_cast<u32>(t)].data() : "?"; }
 
+namespace {
+/// Is a type one the Blueprint declares (an enum's or a struct's, or a list of them)?
+bool declared_type(PinType t) { return element_of(t) == PinType::enumeration || element_of(t) == PinType::structure; }
+}  // namespace
+
 std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
   std::vector<TypeRef> r;
-  if (!pd.enums_only)
+  if (!pd.enums_only && !pd.structs_only)
     for (PinType t : {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor}) r.push_back({t, {}});
-  for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
+  if (!pd.structs_only)
+    for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
+  if (!pd.enums_only)
+    for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
   if (pd.with_lists)
     for (std::size_t k = 0, n = r.size(); k < n; ++k) r.push_back({list_of(r[k].type), r[k].of});
   return r;
 }
 std::string type_text(const TypeRef& t) {
-  if (element_of(t.type) != PinType::enumeration) return pin_type_name(t.type);
+  if (!declared_type(t.type)) return pin_type_name(t.type);
   return is_list(t.type) ? t.of + "_list" : t.of;
 }
 bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
   PinType builtin;
-  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && element_of(builtin) != PinType::enumeration) {
+  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && !declared_type(builtin)) {
     // (the types' own names only: a setting holds the one name of its type)
     if (text != pin_type_name(builtin)) return false;
     out = {builtin, {}};
     return true;
   }
-  if (g.enumeration(text)) {
-    out = {PinType::enumeration, std::string(text)};
+  const bool listed = text.size() > 5 && text.substr(text.size() - 5) == "_list";
+  const std::string_view item = listed ? text.substr(0, text.size() - 5) : text;
+  if (g.enumeration(text) || g.structure(text)) {
+    out = {g.enumeration(text) ? PinType::enumeration : PinType::structure, std::string(text)};
     return true;
   }
-  if (text.size() > 5 && text.substr(text.size() - 5) == "_list" && g.enumeration(text.substr(0, text.size() - 5))) {
-    out = {PinType::enumeration_list, std::string(text.substr(0, text.size() - 5))};
+  if (listed && (g.enumeration(item) || g.structure(item))) {
+    out = {g.enumeration(item) ? PinType::enumeration_list : PinType::structure_list, std::string(item)};
     return true;
   }
   return false;
@@ -56,21 +66,22 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
 std::string type_label(const TypeRef& t) {
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor"};
   const PinType e = element_of(t.type);
-  const std::string name = e == PinType::enumeration ? (t.of.empty() ? std::string("Enum") : t.of) : static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
+  const std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
   return is_list(t.type) ? name + " List" : name;
 }
 
 bool fits(const TypeRef& from, const TypeRef& to) {
   if (!convertible(from.type, to.type)) return false;
-  return element_of(from.type) != PinType::enumeration || element_of(to.type) != PinType::enumeration || from.of == to.of;
+  return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
 bool convertible(PinType from, PinType to) {
   if (from == to) return true;
   if (from == PinType::exec || to == PinType::exec) return false;
   // (a value of an enum is one of its names, a place among them: it is no number and no text
-  // by itself - Enum to Text, Enum to Index say which is meant)
-  if (element_of(from) == PinType::enumeration || element_of(to) == PinType::enumeration) return false;
+  // by itself - Enum to Text, Enum to Index say which is meant. A struct is its fields: Break
+  // gives each of them)
+  if (declared_type(from) || declared_type(to)) return false;
   if (to == PinType::text) return true;  // everything prints
   if (is_list(from) || is_list(to)) return false;  // (a list is a list of its type and nothing else)
   const bool from_num = from == PinType::integer || from == PinType::number || from == PinType::boolean;
@@ -140,6 +151,12 @@ std::string Value::as_text() const {
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
+    case PinType::structure: {
+      // (what it holds, in the order of its fields; their names are the struct's to say - Break)
+      std::string r = "{";
+      for (std::size_t k = 0, n = fields(); k < n; ++k) r += (k ? ", " : "") + (*rows)[k].as_text();
+      return r + "}";
+    }
     default: break;
   }
   if (!is_list(type)) return "";
@@ -150,6 +167,7 @@ std::string Value::as_text() const {
 }
 
 std::size_t Value::size() const {
+  if (type == PinType::structure_list) return rows ? rows->size() : 0;
   if (!list) return 0;
   switch (type) {
     case PinType::boolean_list: return std::get<std::vector<bool>>(*list).size();
@@ -165,6 +183,7 @@ std::size_t Value::size() const {
 
 Value Value::item(std::size_t index) const {
   if (index >= size()) return zero(element_of(type));
+  if (type == PinType::structure_list) return (*rows)[index];
   switch (type) {
     case PinType::boolean_list: return boolean(std::get<std::vector<bool>>(*list)[index]);
     case PinType::integer_list: return integer(std::get<std::vector<i64>>(*list)[index]);
@@ -194,6 +213,7 @@ Value Value::converted(PinType to) const {
     case PinType::text: return text(as_text());
     case PinType::actor: return actor(as_actor());
     case PinType::enumeration: return enumeration(as_int());
+    case PinType::structure: return zero(to);  // (nothing but a struct is one: its default - zero_of)
     case PinType::enumeration_list:
       if (type == PinType::integer_list) {  // (what a node computed on the places of an enum's values: those values)
         Value r = *this;
@@ -222,10 +242,147 @@ json::Value Value::to_json() const {
     case PinType::enumeration: return json::Value(static_cast<f64>(i));
     default: break;
   }
+  // (a struct's fields have their names in its declaration: to_json(g, of) writes them)
+  if (type == PinType::structure) return json::Value::object();
   if (!is_list(type)) return json::Value();
   json::Value arr = json::Value::array();  // a list: its items
   for (std::size_t k = 0, n = size(); k < n; ++k) arr.push(item(k).to_json());
   return arr;
+}
+
+namespace {
+/// How deep structs can be inside structs in `g`: a struct holds structs declared above it, so
+/// no deeper than there are structs. (A graph somebody built wrong - a struct that contains
+/// itself - ends there too; the check says what is wrong with it.)
+int struct_depth(const Graph& g) { return static_cast<int>(g.structs.size()); }
+
+Value read_value(const json::Value& j, const TypeRef& t, const Graph& g, int depth);
+Value default_value(const StructType& s, const Graph& g, int depth) {
+  std::vector<Value> fields;
+  fields.reserve(s.fields.size());
+  for (const StructField& f : s.fields) fields.push_back(read_value(f.value, f.type, g, depth - 1));
+  return Value::structure(std::move(fields));
+}
+Value read_struct(const json::Value& j, const StructType& s, const Graph& g, int depth) {
+  std::vector<Value> fields;
+  fields.reserve(s.fields.size());
+  for (const StructField& f : s.fields) {
+    const json::Value* held = j.is_object() ? j.find(f.name) : nullptr;
+    fields.push_back(read_value(held ? *held : f.value, f.type, g, depth - 1));
+  }
+  return Value::structure(std::move(fields));
+}
+Value read_value(const json::Value& j, const TypeRef& t, const Graph& g, int depth) {
+  const StructType* s = element_of(t.type) == PinType::structure && depth > 0 ? g.structure(t.of) : nullptr;
+  if (!s) return Value::from_json(j, t.type);
+  if (t.type == PinType::structure) return read_struct(j, *s, g, depth);
+  std::vector<Value> items;
+  for (const json::Value& x : j.items()) items.push_back(read_struct(x, *s, g, depth));
+  return Value::structures(std::move(items));
+}
+json::Value written(const Value& v, std::string_view of, const Graph& g, int depth) {
+  const StructType* s = element_of(v.type) == PinType::structure && depth > 0 ? g.structure(of) : nullptr;
+  if (!s) return v.to_json();
+  auto one = [&](const Value& x) {
+    json::Value o = json::Value::object();
+    for (std::size_t k = 0; k < s->fields.size(); ++k) {
+      const StructField& f = s->fields[k];
+      const Value* held = x.field(k);
+      o.set(f.name, written(held ? *held : read_value(f.value, f.type, g, depth - 1), f.type.of, g, depth - 1));
+    }
+    return o;
+  };
+  if (v.type == PinType::structure) return one(v);
+  json::Value arr = json::Value::array();
+  for (const Value& x : v.items<Value>()) arr.push(one(x));
+  return arr;
+}
+bool value_of(const Value& v, const TypeRef& t, const Graph& g, int depth) {
+  if (v.type != t.type) return false;
+  if (element_of(t.type) == PinType::enumeration) {
+    const EnumType* e = g.enumeration(t.of);
+    const i64 count = e ? static_cast<i64>(e->values.size()) : 0;
+    if (t.type == PinType::enumeration) return v.i >= 0 && v.i < count;
+    for (i64 x : v.items<i64>())
+      if (x < 0 || x >= count) return false;
+    return true;
+  }
+  if (element_of(t.type) != PinType::structure) return true;
+  const StructType* s = depth > 0 ? g.structure(t.of) : nullptr;
+  if (!s) return false;
+  auto one = [&](const Value& x) {
+    if (x.type != PinType::structure || x.fields() != s->fields.size()) return false;
+    for (std::size_t k = 0; k < s->fields.size(); ++k)
+      if (!value_of(*x.field(k), s->fields[k].type, g, depth - 1)) return false;
+    return true;
+  };
+  if (t.type == PinType::structure) return one(v);
+  for (const Value& x : v.items<Value>())
+    if (!one(x)) return false;
+  return true;
+}
+}  // namespace
+
+json::Value Value::to_json(const Graph& g, std::string_view of) const { return written(*this, of, g, struct_depth(g)); }
+Value Value::from_json(const json::Value& j, PinType t, const Graph& g, std::string_view of) { return read_value(j, {t, std::string(of)}, g, struct_depth(g)); }
+
+Value zero_of(const TypeRef& t, const Graph& g) {
+  const StructType* s = t.type == PinType::structure ? g.structure(t.of) : nullptr;
+  return s ? default_of(*s, g) : Value::zero(t.type);
+}
+Value default_of(const StructType& s, const Graph& g) { return default_value(s, g, struct_depth(g)); }
+Value field_of(const Value& v, const StructType& s, std::size_t index, const Graph& g) {
+  if (const Value* held = v.field(index)) return *held;
+  if (index >= s.fields.size()) return Value();
+  return read_value(s.fields[index].value, s.fields[index].type, g, struct_depth(g) - 1);
+}
+bool is_value_of(const Value& v, const TypeRef& t, const Graph& g) { return value_of(v, t, g, struct_depth(g)); }
+
+Value from_outside(const Value& v, const TypeRef& t, const Graph& g) {
+  Value r = v.converted(t.type);
+  if (element_of(t.type) == PinType::enumeration) {
+    // one of the enum's values: what is none of them is the first (inside a Blueprint every enum
+    // value is one - the check and the enum nodes see to that)
+    const EnumType* e = g.enumeration(t.of);
+    const i64 count = e ? static_cast<i64>(e->values.size()) : 0;
+    if (t.type == PinType::enumeration) {
+      if (r.i < 0 || r.i >= count) r.i = 0;
+      return r;
+    }
+    bool all = true;
+    for (i64 x : r.items<i64>()) all = all && x >= 0 && x < count;
+    if (!all)
+      for (i64& x : r.edit<i64>())
+        if (x < 0 || x >= count) x = 0;
+    return r;
+  }
+  if (element_of(t.type) != PinType::structure) return r;
+  // a struct of that type, with a value for every field: anything else is the struct's default
+  // (in a list: item by item)
+  const TypeRef one{PinType::structure, t.of};
+  if (t.type == PinType::structure) return is_value_of(r, one, g) ? r : zero_of(one, g);
+  bool all = true;
+  for (const Value& x : r.items<Value>()) all = all && is_value_of(x, one, g);
+  if (!all)
+    for (Value& x : r.edit<Value>())
+      if (!is_value_of(x, one, g)) x = zero_of(one, g);
+  return r;
+}
+
+std::vector<std::string> structs_in(const StructType& s, const Graph& g) {
+  std::vector<std::string> names;
+  std::vector<const StructType*> todo{&s};
+  while (!todo.empty()) {
+    const StructType* at = todo.back();
+    todo.pop_back();
+    for (const StructField& f : at->fields) {
+      if (element_of(f.type.type) != PinType::structure || f.type.of == s.name) continue;
+      if (std::find(names.begin(), names.end(), f.type.of) != names.end()) continue;
+      names.push_back(f.type.of);
+      if (const StructType* inner = g.structure(f.type.of)) todo.push_back(inner);
+    }
+  }
+  return names;
 }
 
 Value Value::from_json(const json::Value& j, PinType t) {
@@ -243,7 +400,8 @@ Value Value::from_json(const json::Value& j, PinType t) {
     case PinType::enumeration: v.i = j.is_number() ? max_of(i64{0}, whole(j.as_number())) : 0; break;
     default: break;
   }
-  if (is_list(t) && j.is_array() && j.size() > 0) {
+  // (a list of structs: from_json(j, t, g, of) reads them - their fields are the declaration's)
+  if (is_list(t) && t != PinType::structure_list && j.is_array() && j.size() > 0) {
     // a list: an array of its items (anything else: the empty list)
     const PinType e = element_of(t);
     auto held = std::make_shared<ListItems>();
@@ -267,8 +425,9 @@ Value Value::from_json(const json::Value& j, PinType t) {
 
 bool Value::operator==(const Value& o) const {
   if (type != o.type) {
-    // (an enum's value is no number and no text: it is equal to an enum's value only)
-    if (type == PinType::enumeration || o.type == PinType::enumeration) return false;
+    // (an enum's value is no number and no text: it is equal to an enum's value only - and a
+    // struct to a struct)
+    if (type == PinType::enumeration || o.type == PinType::enumeration || type == PinType::structure || o.type == PinType::structure) return false;
     if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
     if (is_list(type) || is_list(o.type)) return false;
     return as_number() == o.as_number();
@@ -282,6 +441,12 @@ bool Value::operator==(const Value& o) const {
     case PinType::actor: return a == o.a;
     case PinType::enumeration: return i == o.i;
     default: break;
+  }
+  if (element_of(type) == PinType::structure) {
+    // structs: every field equal; lists of them: the same structs in the same order
+    const std::size_t count = rows ? rows->size() : 0;
+    if (count != (o.rows ? o.rows->size() : 0)) return false;
+    return count == 0 || rows == o.rows || *rows == *o.rows;
   }
   if (!is_list(type)) return true;
   if (size() != o.size()) return false;  // lists: the same items in the same order
@@ -354,6 +519,18 @@ const StateMachine* Graph::machine(std::string_view name) const {
   for (const StateMachine& m : machines) if (m.name == name) return &m;
   return nullptr;
 }
+int StructType::field(std::string_view n) const {
+  for (std::size_t k = 0; k < fields.size(); ++k) if (fields[k].name == n) return static_cast<int>(k);
+  return -1;
+}
+const StructType* Graph::structure(std::string_view name) const {
+  for (const StructType& s : structs) if (s.name == name) return &s;
+  return nullptr;
+}
+StructType* Graph::structure(std::string_view name) {
+  for (StructType& s : structs) if (s.name == name) return &s;
+  return nullptr;
+}
 const EnumType* Graph::enumeration(std::string_view name) const {
   for (const EnumType& e : enums) if (e.name == name) return &e;
   return nullptr;
@@ -408,6 +585,26 @@ json::Value graph_to_json(const Graph& g) {
       enums.push(std::move(o));
     }
     root.set("enums", std::move(enums));
+  }
+  if (!g.structs.empty()) {
+    json::Value structs = json::Value::array();
+    for (const StructType& s : g.structs) {
+      json::Value o = json::Value::object();
+      o.set("name", s.name);
+      json::Value fields = json::Value::array();
+      for (const StructField& f : s.fields) {
+        json::Value x = json::Value::object();
+        x.set("name", f.name);
+        x.set("type", pin_type_name(f.type.type));
+        if (!f.type.of.empty()) x.set("of", f.type.of);
+        x.set("value", f.value);
+        fields.push(std::move(x));
+      }
+      o.set("fields", std::move(fields));
+      if (!s.help.empty()) o.set("help", s.help);
+      structs.push(std::move(o));
+    }
+    root.set("structs", std::move(structs));
   }
   json::Value nodes = json::Value::array();
   for (const Node& n : g.nodes) {
@@ -540,20 +737,38 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     e.help = v["help"].as_string();
     g.enums.push_back(std::move(e));
   }
-  // A type in the file: its name, and for an enum's values which enum ("of").
+  // A type in the file: its name, and for an enum's or a struct's values which one ("of").
   auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
     if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
-    if (element_of(type) != PinType::enumeration) return true;
+    if (!declared_type(type)) return true;
     of = v["of"].as_string();
-    return g.enumeration(of) != nullptr;
+    return element_of(type) == PinType::enumeration ? g.enumeration(of) != nullptr : g.structure(of) != nullptr;
   };
+  // (a struct after the structs its fields are of: no struct contains itself)
+  for (const json::Value& v : j["structs"].items()) {
+    StructType s;
+    s.name = v["name"].as_string();
+    if (s.name.empty() || s.name.size() > 64) return bad("a struct needs a name (1-64 characters)");
+    if (g.structure(s.name) || g.enumeration(s.name)) return bad("the type \"" + s.name + "\" is declared twice");
+    for (const json::Value& x : v["fields"].items()) {
+      StructField f;
+      f.name = x["name"].as_string();
+      if (f.name.empty() || f.name.size() > 64) return bad("struct \"" + s.name + "\": a field needs a name (1-64 characters)");
+      if (s.field(f.name) >= 0) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" exists twice");
+      if (!type_of(x, f.type.type, f.type.of)) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" has an unknown type (a struct holds structs declared above it)");
+      f.value = Value::from_json(x["value"], f.type.type, g, f.type.of).to_json(g, f.type.of);
+      s.fields.push_back(std::move(f));
+    }
+    s.help = v["help"].as_string();
+    g.structs.push_back(std::move(s));
+  }
   for (const json::Value& v : j["variables"].items()) {
     Variable var;
     var.name = v["name"].as_string();
     if (var.name.empty() || var.name.size() > 64) return bad("a variable needs a name (1-64 characters)");
     if (g.variable(var.name)) return bad("variable \"" + var.name + "\" is declared twice");
     if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type");
-    var.value = Value::from_json(v["value"], var.type).to_json();
+    var.value = Value::from_json(v["value"], var.type, g, var.of).to_json(g, var.of);
     var.help = v["help"].as_string();
     g.variables.push_back(std::move(var));
   }
@@ -635,7 +850,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
         if (p.name.empty() || p.name.size() > 64 || p.name == "exec" || p.name == "then") return bad(std::string("function \"") + f.name + "\": " + what + " needs a name (not exec / then)");
         for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
         if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
-        p.value = Value::from_json(x["value"], p.type).to_json();
+        p.value = Value::from_json(x["value"], p.type, g, p.of).to_json(g, p.of);
         out.push_back(std::move(p));
       }
       return true;
@@ -709,6 +924,26 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   auto err = [&](u32 node, std::string text) { out.push_back({node, true, std::move(text)}); };
   auto warn = [&](u32 node, std::string text) { out.push_back({node, false, std::move(text)}); };
   std::unordered_map<u32, std::pair<std::vector<PinDef>, std::vector<PinDef>>> pins;
+  // A value that is held somewhere (a default, a typed-in value): where it is an enum's - itself,
+  // in a list, in a struct's field - it is one of the enum's values.
+  std::function<void(u32, const std::string&, const Value&, const TypeRef&, std::size_t)> held_ok = [&](u32 node, const std::string& what, const Value& v, const TypeRef& t, std::size_t depth) {
+    if (element_of(t.type) == PinType::enumeration) {
+      const EnumType* e = g.enumeration(t.of);
+      if (!e) return;
+      for (std::size_t k = 0, n = t.type == PinType::enumeration ? 1 : v.size(); k < n; ++k) {
+        const i64 index = t.type == PinType::enumeration ? v.i : v.item(k).i;
+        if (index >= static_cast<i64>(e->values.size())) err(node, what + ": " + std::to_string(index) + " is no value of " + e->name + " (it has " + std::to_string(e->values.size()) + ")");
+      }
+      return;
+    }
+    const StructType* s = element_of(t.type) == PinType::structure && depth < g.structs.size() ? g.structure(t.of) : nullptr;
+    if (!s) return;
+    for (std::size_t item = 0, items = t.type == PinType::structure ? 1 : v.size(); item < items; ++item) {
+      const Value one = t.type == PinType::structure ? v : v.item(item);
+      for (std::size_t k = 0; k < s->fields.size(); ++k)
+        if (const Value* held = one.field(k)) held_ok(node, what + ", field " + s->fields[k].name, *held, s->fields[k].type, depth + 1);
+    }
+  };
   for (const Node& n : g.nodes) {
     const NodeDef* d = lib.find(n.type);
     if (!d) { err(n.id, "unknown node type \"" + n.type + "\""); continue; }
@@ -729,18 +964,23 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         bool known = false;
         for (const TypeRef& t : type_choices(pd, g)) known = known || v == type_text(t);
         if (!known && pd.enums_only) err(n.id, lib.title(n) + ": \"" + v + "\" is no enum of this Blueprint");
+        else if (!known && pd.structs_only) err(n.id, lib.title(n) + ": \"" + v + "\" is no struct of this Blueprint");
         else if (!known)
-          err(n.id, lib.title(n) + ": \"" + v + "\" is no type it can have (" + pd.label + ": float, int, bool, vector, text, actor, an enum of this Blueprint" +
+          err(n.id, lib.title(n) + ": \"" + v + "\" is no type it can have (" + pd.label + ": float, int, bool, vector, text, actor, an enum or a struct of this Blueprint" +
                         (pd.with_lists ? ", or a list of one - float_list ...)" : ")"));
       }
     }
-    // a value of an enum typed into a pin is one of the enum's values
+    // a value of an enum typed into a pin is one of the enum's values - also where a struct holds it
     for (const PinDef& in : p.first) {
-      if (in.type != PinType::enumeration) continue;
-      const EnumType* e = g.enumeration(in.of);
       const json::Value* typed = n.value(in.id);
-      if (e && typed && typed->is_number() && typed->as_number() >= static_cast<f64>(e->values.size()))
-        err(n.id, lib.title(n) + ": \"" + in.id + "\" is value " + std::to_string(whole(typed->as_number())) + " of " + e->name + ", which has " + std::to_string(e->values.size()));
+      if (!typed) continue;
+      if (in.type == PinType::enumeration) {
+        const EnumType* e = g.enumeration(in.of);
+        if (e && typed->is_number() && typed->as_number() >= static_cast<f64>(e->values.size()))
+          err(n.id, lib.title(n) + ": \"" + in.id + "\" is value " + std::to_string(whole(typed->as_number())) + " of " + e->name + ", which has " + std::to_string(e->values.size()));
+      } else if (element_of(in.type) == PinType::structure && g.structure(in.of)) {
+        held_ok(n.id, lib.title(n) + ": \"" + in.id + "\"", Value::from_json(*typed, in.type, g, in.of), {in.type, in.of}, 0);
+      }
     }
     if (d->problem)
       if (const std::string why = d->problem(n, g); !why.empty()) err(n.id, d->label + ": " + why);
@@ -754,16 +994,43 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (e.values[a] == e.values[b]) err(0, "enum \"" + e.name + "\" has two values called \"" + e.values[a] + "\"");
     }
   }
-  // What is of an enum's type names an enum, and its default is one of the values.
-  auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
-    if (element_of(type) != PinType::enumeration) return;
-    const EnumType* e = g.enumeration(of);
-    if (!e) { err(0, what + " is of the enum \"" + of + "\", which this Blueprint does not have"); return; }
-    const Value v = Value::from_json(value, type);
-    for (std::size_t k = 0, n = type == PinType::enumeration ? 1 : v.size(); k < n; ++k) {
-      const i64 index = type == PinType::enumeration ? v.i : v.item(k).i;
-      if (index >= static_cast<i64>(e->values.size())) err(0, what + ": " + std::to_string(index) + " is no value of " + e->name + " (it has " + std::to_string(e->values.size()) + ")");
+  // The structs: each has fields (32 at most), no two of them the same name; a field is of a
+  // type there is - an enum, or a struct declared above its own (no struct contains itself).
+  for (std::size_t at = 0; at < g.structs.size(); ++at) {
+    const StructType& s = g.structs[at];
+    if (s.fields.empty()) err(0, "struct \"" + s.name + "\" has no fields");
+    if (s.fields.size() > StructType::kMaxFields) err(0, "struct \"" + s.name + "\" has " + std::to_string(s.fields.size()) + " fields (a struct has " + std::to_string(StructType::kMaxFields) + " at most)");
+    bool sound = true;
+    for (std::size_t a = 0; a < s.fields.size(); ++a) {
+      const StructField& f = s.fields[a];
+      const std::string what = "struct \"" + s.name + "\": the field \"" + f.name + "\"";
+      if (f.name.empty()) err(0, "struct \"" + s.name + "\": field " + std::to_string(a) + " has no name");
+      for (std::size_t b = 0; b < a; ++b)
+        if (f.name == s.fields[b].name) err(0, "struct \"" + s.name + "\" has two fields called \"" + f.name + "\"");
+      if (f.type.type == PinType::exec || f.type.type >= PinType::count) { err(0, what + " has no type"); sound = false; }
+      if (element_of(f.type.type) == PinType::enumeration && !g.enumeration(f.type.of)) { err(0, what + " is of the enum \"" + f.type.of + "\", which this Blueprint does not have"); sound = false; }
+      if (element_of(f.type.type) != PinType::structure) continue;
+      std::size_t inner = 0;
+      while (inner < g.structs.size() && g.structs[inner].name != f.type.of) ++inner;
+      if (inner == at) err(0, "struct \"" + s.name + "\" contains itself (the field \"" + f.name + "\")");
+      else if (inner == g.structs.size()) err(0, what + " is of the struct \"" + f.type.of + "\", which this Blueprint does not have");
+      else if (inner > at) err(0, what + " is of the struct \"" + f.type.of + "\", which is declared below it (a struct holds structs declared above it)");
+      sound = sound && inner < at;
     }
+    if (!sound) continue;
+    for (const StructField& f : s.fields) held_ok(0, "struct \"" + s.name + "\": the field \"" + f.name + "\"", Value::from_json(f.value, f.type.type, g, f.type.of), f.type, 0);
+  }
+  // What is of an enum's or a struct's type names one the Blueprint has, and its default holds
+  // values of the enums only.
+  auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
+    if (element_of(type) == PinType::structure) {
+      if (!g.structure(of)) { err(0, what + " is of the struct \"" + of + "\", which this Blueprint does not have"); return; }
+      held_ok(0, what, Value::from_json(value, type, g, of), {type, of}, 0);
+      return;
+    }
+    if (element_of(type) != PinType::enumeration) return;
+    if (!g.enumeration(of)) { err(0, what + " is of the enum \"" + of + "\", which this Blueprint does not have"); return; }
+    held_ok(0, what, Value::from_json(value, type), {type, of}, 0);
   };
   for (const Variable& v : g.variables) typed_ok("variable \"" + v.name + "\"", v.type, v.of, v.value);
   for (const Function& f : g.functions)
@@ -868,24 +1135,7 @@ std::vector<Instance*>& instance_registry() {
 }
 bool numeric(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number; }
 
-/// What comes from outside - Instance::set, the arguments of Instance::call - as a value of
-/// `type`; for an enum's type one of its values: what is none of them is the first (inside a
-/// Blueprint every enum value is one - the check and the enum nodes see to that).
-Value from_outside(const Value& v, PinType type, const EnumType* e) {
-  Value r = v.converted(type);
-  if (element_of(type) != PinType::enumeration) return r;
-  const i64 count = e ? static_cast<i64>(e->values.size()) : 0;
-  if (type == PinType::enumeration) {
-    if (r.i < 0 || r.i >= count) r.i = 0;
-    return r;
-  }
-  bool all = true;
-  for (i64 x : r.items<i64>()) all = all && x >= 0 && x < count;
-  if (!all)
-    for (i64& x : r.edit<i64>())
-      if (x < 0 || x >= count) x = 0;
-  return r;
-}
+
 f64 to_type(f64 v, PinType t) {
   if (t == PinType::boolean) return v != 0 ? 1.0 : 0.0;
   if (t == PinType::integer) return static_cast<f64>(whole(v));  // (a whole number as Int holds it: logic::normal)
@@ -1043,7 +1293,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
   {
     int k = 0;
     for (const Variable& v : graph_.variables) {
-      const Value init = Value::from_json(v.value, v.type);
+      const Value init = Value::from_json(v.value, v.type, graph_, v.of);
       if (numeric(v.type)) {
         var_slots_[v.name] = k;
         slots_[static_cast<std::size_t>(k++)] = to_type(init.as_number(), v.type);
@@ -1061,7 +1311,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     if (!c.def) continue;
     lib.pins(*c.node, graph_, c.in, c.out);
     c.outputs.resize(c.out.size());
-    for (std::size_t k = 0; k < c.out.size(); ++k) c.outputs[k] = Value::zero(c.out[k].type);
+    for (std::size_t k = 0; k < c.out.size(); ++k) c.outputs[k] = zero_of({c.out[k].type, c.out[k].of}, graph_);
     c.data_in.resize(c.in.size());
     c.literal.resize(c.in.size());
     c.exec_in_index.assign(c.in.size(), -1);
@@ -1070,7 +1320,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
       const PinDef& p = c.in[k];
       if (p.type == PinType::exec) { c.exec_in_index[k] = ordinal++; continue; }
       const json::Value* lit = c.node->value(p.id);
-      c.literal[k] = Value::from_json(lit ? *lit : p.def, p.type);
+      c.literal[k] = Value::from_json(lit ? *lit : p.def, p.type, graph_, p.of);
     }
   }
   // Wires.
@@ -1183,7 +1433,7 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   const int f = it->second;
   const Function& fn = graph_.functions[static_cast<std::size_t>(f)];
   results.reserve(fn.outputs.size());
-  for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, p.type));
+  for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, p.type, graph_, p.of));
   const int entry = fn_entry_[static_cast<std::size_t>(f)];
   if (entry < 0 || disabled_) return false;
   // (A function does not call itself - check() refuses that. An event it raises may reach a
@@ -1193,7 +1443,7 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   std::size_t k = 0;
   for (std::size_t o = 0; o < e.out.size() && k < fn.inputs.size(); ++o) {
     if (e.out[o].type == PinType::exec) continue;
-    e.outputs[o] = k < args.size() ? from_outside(args[k], e.out[o].type, graph_.enumeration(e.out[o].of)) : Value::from_json(fn.inputs[k].value, fn.inputs[k].type).converted(e.out[o].type);
+    e.outputs[o] = k < args.size() ? from_outside(args[k], {e.out[o].type, e.out[o].of}, graph_) : Value::from_json(fn.inputs[k].value, fn.inputs[k].type, graph_, fn.inputs[k].of).converted(e.out[o].type);
     ++k;
   }
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
@@ -1265,7 +1515,7 @@ bool Instance::set(std::string_view variable, const Value& v) {
   auto it = vars_.find(std::string(variable));
   if (it == vars_.end()) return false;
   const Variable* var = graph_.variable(variable);
-  it->second = from_outside(v, it->second.type, var ? graph_.enumeration(var->of) : nullptr);
+  it->second = from_outside(v, {it->second.type, var ? var->of : std::string()}, graph_);
   return true;
 }
 
@@ -1665,6 +1915,8 @@ void Context::out(std::size_t index, Value v) {
   Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
   if (index >= c.outputs.size()) return;
   c.outputs[index] = v.converted(c.out[index].type);
+  // (a struct that holds no fields is its type's default: an item from beyond a list's end)
+  if (c.out[index].type == PinType::structure && !c.outputs[index].rows) c.outputs[index] = zero_of({c.out[index].type, c.out[index].of}, inst_.graph_);
   const int s = inst_.out_slot(node_, static_cast<int>(index));
   if (s >= 0) inst_.slots_[static_cast<std::size_t>(s)] = c.outputs[index].as_number();
 }

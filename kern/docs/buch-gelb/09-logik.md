@@ -226,7 +226,7 @@ trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in ei
 
 ## 9.5 Kern-Knoten
 
-Kern bringt **100** eingebaute Knoten mit:
+Kern bringt **103** eingebaute Knoten mit:
 
 | Kategorie | Beispiele |
 |---|---|
@@ -236,6 +236,7 @@ Kern bringt **100** eingebaute Knoten mit:
 | Variablen | Get, Set, Add |
 | Listen | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
 | Aufzählungen (Enums) | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
+| Strukturen (Structs) | Make, Break, Set Field |
 | Funktionen | Function Entry, Return, Call Function |
 | Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Rechnen mit Winkeln |
 | Logik | Compare, AND, OR, XOR, NOT, Select |
@@ -256,6 +257,14 @@ Viele Namen sind englisch. Was aus Scratch bekannt ist:
   ein Draht verbindet nur Pins derselben Aufzählung. Stattdessen sagen Knoten, was du meinst; im
   Menü tragen sie den Namen deiner Aufzählung: **Mode to Text** gibt den Namen des Werts,
   **Mode to Index** seine Stelle (die erste ist 0).
+- Eine **Struktur** (im Editor: Struct) = ein Typ, den du selbst anlegst, mit benannten Feldern:
+  „Weapon“ mit den Feldern „Name“, „Type“ und „Damage“. Jedes Feld hat seinen eigenen Typ und
+  einen Standardwert. Ein Wert hält einen Wert für jedes Feld – mehrere Variablen in einer
+  gebündelt, die auch in eine Liste passt. Wie der Wert einer Aufzählung wandelt er sich in
+  nichts um, und ein Draht verbindet nur Pins derselben Struktur. Im Menü tragen ihre Knoten den
+  Namen deiner Struktur: **Make Weapon** baut einen Wert aus seinen Feldern, **Break Weapon**
+  gibt die Felder, und **Set Field** ändert ein Feld einer Variablen und lässt die anderen, wie
+  sie sind. Zwei Werte sind gleich, wenn alle ihre Felder gleich sind.
 - **Switch** = je nach Zahl, Text oder Wert einer Aufzählung einer von mehreren Ausgängen, wie
   eine Weiche mit vielen Gleisen. **Switch on Mode** hat einen Ausgang für jeden Wert.
 - **AND, OR, NOT** = „und“, „oder“, „nicht“. **XOR** = „entweder – oder, aber nicht beides“.

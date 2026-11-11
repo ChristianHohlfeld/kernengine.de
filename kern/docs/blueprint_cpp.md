@@ -69,9 +69,15 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   einer Funktion und Pins können von so einem Typ sein; ein Wert ist genau einer der Werte –
   weder Zahl noch Text. Sieben Knoten arbeiten damit, darunter Switch on Enum mit einem Weg je
   Wert – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Aufzählungen“).
+- **Fertig: Strukturen (Structs).** Ein Blueprint deklariert eigene Typen mit benannten Feldern
+  (`KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`). Ein Feld ist ein Wert-Typ,
+  eine Aufzählung, eine weiter oben deklarierte Struktur oder eine Liste davon. Eine Variable,
+  eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
+  baut einen Wert aus seinen Feldern, Break gibt die Felder, Set Field ändert ein Feld einer
+  Variablen – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Strukturen“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (18 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (19 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -157,6 +163,7 @@ KERN_LAYOUT(Demo) {
 |---|---|
 | der Blueprint | `struct Name : kern::Blueprint { ... };` |
 | Aufzählung (mit Beschreibung) | `/// Beschreibung` und `KERN_ENUM(Mode, Closed, Opening, Open);` – im Abschnitt „types“, über den Variablen |
+| Struktur (mit Beschreibung) | `/// Beschreibung` und `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };` – im Abschnitt „types“, nach den Aufzählungen und über den Variablen; jedes Feld steht da wie eine Variable |
 | Variable (mit Beschreibung) | `/// Beschreibung` und `Float Heat = 0.0;` |
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
@@ -166,7 +173,7 @@ KERN_LAYOUT(Demo) {
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
-| Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)` |
+| Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung; „Struct“ von Make und Break) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)`, `struct_make<Weapon>(...)` |
 | Eingänge eines Knotens | Funktionsargumente, in der Reihenfolge der Pins |
 | unverdrahteter Eingang | der eingetippte Wert als Literal |
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
@@ -176,6 +183,8 @@ KERN_LAYOUT(Demo) {
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
+| Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
+| Set Field (ein Feld einer Struktur-Variablen ändern) | `Held.Damage = wert;` – wird sein Ergebnis gelesen: `n5.value = (Held.Damage = wert);` |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -210,10 +219,12 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Actor | `Actor` | `Actor{7}` |
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
+| Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
 Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
-einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“).
+einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“);
+für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 
 ### Listen
 
@@ -348,6 +359,86 @@ Die Knoten einer Aufzählung und ihre Funktionen (`E` ist die Aufzählung):
 | Index to Enum | `enum_from_index<E>(index)` | `.value`: der Wert an dieser Stelle; `.valid`: Gibt es sie? Wenn nicht, ist `.value` der erste Wert und `.valid` falsch |
 | All Values | `enum_values<E>()` | eine `List<E>` mit jedem Wert, in ihrer Reihenfolge – etwa für ein For Each |
 
+### Strukturen
+
+Ein Blueprint kann Strukturen (Structs) deklarieren: einen eigenen Typ mit benannten Feldern,
+etwa `Weapon` mit den Feldern `Name`, `Type`, `Damage`. Jedes Feld hat einen Typ und einen
+Default. Von diesem Typ kann eine Variable sein, ebenso eine Liste (`List<Weapon>`), die Ein- und
+Ausgänge einer Funktion und Pins. `KERN_STRUCT` deklariert dafür im `struct` des Blueprints ein
+gewöhnliches C++-`struct` – auch dieser Text ist C++, das ein Compiler übersetzt, so wie er
+dasteht:
+
+```cpp
+struct Arena : kern::Blueprint {
+  // ---- types ----
+  KERN_ENUM(Kind, Melee, Ranged);
+  /// What a weapon does.
+  KERN_STRUCT(Weapon) {
+    Text Name = "";
+    Kind Type = Kind::Melee;
+    Float Damage = 10.0;
+    List<Float> Falloff = List<Float>{};
+  };
+
+  // ---- variables ----
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}};
+  List<Weapon> Rack = List<Weapon>{};
+
+  // ---- events ----
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    Held.Damage = math_mul(struct_break<Weapon>(Held).Damage, 2.0);
+    list_add(Rack, struct_make<Weapon>("Bow", Kind::Ranged, 12.0, List<Float>{1.0, 0.5}));
+  }
+};
+```
+
+- **Deklariert wird über der ersten Verwendung.** `KERN_STRUCT(Name) { Felder };` steht im
+  Abschnitt „types“, nach den Aufzählungen und über den Variablen. Ein `///`-Kommentar darüber
+  ist die Beschreibung der Struktur. Ein Feld steht da wie eine Variable: `Typ Name = Default;`.
+- **Ein Feld** ist ein Wert-Typ, eine Aufzählung des Blueprints, eine Struktur, die **über** dieser
+  deklariert ist, oder eine Liste von einem davon. Keine Struktur enthält sich selbst – auch nicht
+  über andere. Eine Struktur hat mindestens ein Feld und höchstens 32.
+- **Ein Wert steht mit jedem Feld da,** in der Reihenfolge der Deklaration:
+  `Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}}`; eine Struktur darin ebenso
+  (`Slot{Weapon{...}, 1}`), eine Liste davon ist `List<Weapon>{Weapon{...}, Weapon{...}}`.
+- **Make** baut einen Wert aus einem Wert je Feld: `struct_make<Weapon>(name, kind, damage, falloff)`.
+  **Break** gibt die Felder eines Werts; gelesen wird ein Feld bei seinem Namen:
+  `struct_break<Weapon>(Held).Damage`. **Set Field** ändert ein Feld einer Struktur-Variablen und
+  lässt die anderen, wie sie sind – es ist die Zuweisung `Held.Damage = wert;`. Wird gelesen, was
+  der Schritt gibt (das Feld, wie es jetzt ist): `n5.value = (Held.Damage = wert);`.
+- **Nichts wandelt sich um.** Ein Wert einer Struktur ist weder Zahl noch Text, und er passt nur
+  dorthin, wo dieselbe Struktur verlangt ist; `kern::to<Text>(Held)` lehnt der Leser ab. Auch
+  eine `List<Weapon>` wird nicht zu Text.
+- **Die Einstellung, die die Struktur nennt, ist der Typ selbst.** Die generischen Knoten stehen
+  im Typ der Struktur: `logic_select<Weapon>(pick, a, b)`, `list_get<Weapon>(Rack, 0)`,
+  `flow_for_each<Weapon>(n7, Rack)`. Ein Eintrag jenseits der Liste ist der Default der Struktur –
+  jedes Feld mit seinem Default.
+- **Gleich sind zwei Werte, wenn alle ihre Felder gleich sind.** So vergleichen Contains, Find
+  Item und Remove Item (`list_contains<Weapon>(Rack, Held)`); in C++ ist das der Operator `==`
+  der Struktur, den `KERN_STRUCT` mitbringt.
+- **Von außen** – Code, der eine Variable einer Instanz setzt oder eine ihrer Funktionen aufruft
+  (`Instance::set`, `Instance::call`) – ist, was keine Struktur dieses Typs ist, ihr Default:
+  kein Struktur-Wert, einer mit anderen Feldern, einer, in dem ein Feld nicht von seinem Typ ist.
+  In einer Liste gilt das Eintrag für Eintrag.
+- **In der Datei des Graphen** ist ein Wert ein Objekt seiner Felder bei ihren Namen
+  (`{"Name": "Knife", "Damage": 25}`), eine Liste davon ein Array solcher Objekte. Ein Feld, das
+  dort fehlt, hat seinen Default.
+- **In jeder Stufe gleich:** Interpreter, JIT und die Klasse des Blueprints liefern dieselben
+  Ergebnisse – Wert für Wert geprüft, wie bei jedem Knoten. Der Klebstoff der Klasse
+  (`logic::native_glue`) wandelt zwischen dem Wert der Engine und dem C++-`struct` Feld für Feld,
+  mit Code, der je Struktur geschrieben wird.
+- **Was sie tun, steht einmal:** `kern::logic::structs` in `kern/logic/nodes.h`, für die Knoten
+  des Interpreters und für die Klasse.
+
+Die Knoten einer Struktur (`S` ist die Struktur):
+
+| Knoten | C++ | Ergebnis |
+|---|---|---|
+| Make S | `struct_make<S>(feld, feld, …)` | ein Wert der Struktur aus einem Wert je Feld |
+| Break S | `struct_break<S>(wert).Feld` | das Feld des Werts |
+| Set Feld of Variable | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
@@ -431,6 +522,13 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   (`Float` …). Der Name einer Aufzählung endet nicht auf `_list`, und sie heißt nicht wie eine
   Variable oder Funktion. Keine zwei Werte einer Aufzählung heißen gleich, und jede Aufzählung
   hat mindestens einen Wert.
+- Der Name einer **Struktur** und die Namen ihrer Felder sind ebenfalls C++-Namen, mit denselben
+  Regeln: kein Wort von C++ und keins der Schreibweise, nicht der Name eines Knotens. Der Name
+  einer Struktur endet nicht auf `_list`, und sie heißt nicht wie eine Variable, eine Funktion
+  oder eine Aufzählung. Keine zwei Felder einer Struktur heißen gleich, und kein Feld heißt wie
+  eine Aufzählung oder Struktur des Blueprints. Eine Struktur hat mindestens ein Feld und
+  höchstens 32; ein Feld ist von einem Typ, der über der Struktur deklariert ist – keine Struktur
+  enthält sich selbst.
 - **Ein Exec-Ausgang hat einen Draht.** Mehreres nacheinander ist eine Sequence.
 - **Return** liegt auf einem Weg seiner eigenen Funktion: nicht nach einem Warten, nicht in einem
   Event; treffen sich Wege davor, dann alle aus einem Branch oder Switch.
@@ -469,6 +567,8 @@ Form:
 - ganze Zahlen, wo ein Float steht (`Heat = 1;`).
 - Anweisungen nach den Blöcken einer Sequence sind ihr letzter Block.
 - Fehlt bei Switch on Enum der `case` eines Werts, ist das dasselbe wie ein leerer.
+- Fehlt bei einem Feld einer Struktur oder bei einer Variablen `= Wert`, ist ihr Default der leere
+  Wert des Typs (bei einer Struktur: jedes Feld mit seinem Default).
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
 
 Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen Schreibweise:
@@ -478,6 +578,10 @@ Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen 
 - die Knoten, die ihre eigene Form haben, als Aufruf (`var_set<"Heat">(wert);` – es heißt
   `Heat = wert;`),
 - unbekannte Namen, falsche Anzahl von Werten, falscher Typ ohne `kern::to`,
+- eine Struktur, die nicht mit jedem Feld ausgeschrieben ist (`Weapon has 3 field(s) (Label, Type,
+  Damage): Weapon{...} gives a value for each, in that order`), ein Feld vom falschen Typ, ein
+  Feld, das die Struktur nicht hat (`Held.Range = 1.0;`), eine Struktur, die über ihrer
+  Deklaration benutzt wird oder sich selbst enthält,
 - ein Parameter in einem Lambda nach einem Warten,
 - fehlende oder falsche Deklarationen (`n12 is not declared: struct { Float value = 0.0; } n12;`),
 - ein Layout, das nicht zu den Knoten des Textes passt.
@@ -640,18 +744,20 @@ verdrahtet, einmal keiner), von Hand geschriebene Texte mit allen Formen, die Ab
 ihren Stellen und die Regeln. In SpawnCity prüft `rules_wanted_blueprint_is_its_cpp` dasselbe
 für den Blueprint „Wanted“ des Levels.
 
-Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von sieben Blueprints genau so,
+Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von acht Blueprints genau so,
 wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Compiler des
 Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
 Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
-(`blueprint_native_test`, über 3000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
+(`blueprint_native_test`, über 4500 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 18, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+demselben Ergebnis: alle 19, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
-und Name und zurück, alle Werte in einem For Each), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine
+Liste vom Typ einer Struktur mit einer Aufzählung, einer Struktur und Listen als Feldern; Make,
+Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
 tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
@@ -659,7 +765,10 @@ tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Ende
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
 jenseits der Liste (`Lists`), Aufzählungen als Variablen, in Listen und durch Funktionen, Switch
-on Enum, der Weg zu Index und Name und zurück (`Enums`), Return in einer Sequence (`Functions`) und **jeder
+on Enum, der Weg zu Index und Name und zurück (`Enums`), Strukturen als Variablen, in Listen und
+durch Funktionen, eine Struktur in einer Struktur, Make, Break und Set Field, die Listen-Schritte
+auf einer Liste von Strukturen – und Werte von außen, die keine Struktur des verlangten Typs
+sind (`Structs`) –, Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
 vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
 sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen (und denen des Spiels,

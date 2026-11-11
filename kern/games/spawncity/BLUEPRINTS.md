@@ -179,7 +179,8 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Klasse dasselbe (Tier-Fall `lists`, Klassen-Fall `Lists`, jeder Knoten in jeder Einstellung).
   Im Editor: Listen-Pins, Listentypen für Variablen und Funktions-Pins, ein Eintrags-Editor;
   generische Knoten nehmen den Typ des ersten Drahts an.
-- [ ] Strukturen (benannte Felder) und Datentabellen im Level (im Editor als Tabelle).
+- [x] Strukturen (benannte Felder) als Pin-Typ: `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`, Variablen, Listen und Funktions-Pins des Typs, Felder aus Wert-Typen, Aufzählungen, Strukturen und Listen, Make (`struct_make<Weapon>(...)`), Break (`struct_break<Weapon>(w).Damage`) und Set Field (`Held.Damage = x;`); im Editor mit Feld-Editor in Details.
+- [ ] Datentabellen im Level (im Editor als Tabelle).
 - [x] Aufzählungen (Enum) als Pin-Typ mit Auswahl: `KERN_ENUM(Mode, Closed, Open)`, Variablen, Listen und Funktions-Pins des Typs, „Switch on Enum“ (`case Mode::Open:`), Namen und Plätze der Werte als Knoten.
 - [ ] Lokale Variablen in Funktionen; Funktionen, die sich selbst aufrufen dürfen.
 - [ ] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen.

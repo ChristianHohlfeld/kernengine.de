@@ -331,9 +331,9 @@ Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und
 | Bereich | Inhalt |
 |---|---|
 | Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, **C++** (der Blueprint als C++: ansehen, ändern, anwenden) |
-| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call), Enums (die Aufzählungen des Blueprints; + legt eine an) |
+| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call), Enums (die Aufzählungen des Blueprints; + legt eine an), Structures (die Strukturen des Blueprints; + legt eine an, die Knöpfe Make und Break setzen ihre Knoten in den Graphen) |
 | Graph | Tabs, Breadcrumb, Zoom-Stufen wie Unreal („Zoom 1:1“, „Zoom −2“), Wasserzeichen EVENT GRAPH |
-| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ – auch Listen und Aufzählungen –, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Aufzählung (Name, Beschreibung, Werte), Kommentar (Text, Farbe), State, Transition |
+| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ – auch Listen, Aufzählungen und Strukturen –, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Aufzählung (Name, Beschreibung, Werte), Struktur (Name, Beschreibung, Felder mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
 | Compiler Results / Find Results | Probleme und Suchtreffer, ein Klick springt zum Knoten |
 
 Im Graphen:
@@ -506,6 +506,62 @@ Text-Eingang). Wo eine Zahl oder ein Text gebraucht wird, sagt ein Knoten, was g
 - Als C++: `KERN_ENUM(Mode, Closed, Opening, Open);`, `Mode State = Mode::Closed;`,
   `switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { ... } break; ... }` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Aufzählungen“.
+
+### Strukturen
+
+Ein Blueprint kann **Strukturen** (Structs) deklarieren: einen eigenen Typ mit benannten Feldern,
+etwa `Weapon` mit den Feldern `Name`, `Type`, `Damage`. Jedes Feld hat einen Typ und einen
+Default. Von diesem Typ kann eine Variable sein, ebenso eine Liste (`Weapon List`), die Ein- und
+Ausgänge einer Funktion und Pins. Ein Wert einer Struktur hält einen Wert für jedes ihrer Felder.
+Er ist weder Zahl noch Text: Er wandelt sich in nichts um, und ein Draht verbindet nur Pins
+derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
+
+- **Anlegen:** **+** bei *Structures* in My Blueprint legt eine an; sie beginnt als `NewStruct`
+  mit dem Feld `Field` (Float). Ist sie ausgewählt, zeigt Details ihren Namen, eine Beschreibung
+  und ihre Felder: Jedes Feld hat einen Namen, einen Typ und einen Default; man kann es
+  umbenennen, nach oben oder unten schieben oder entfernen. **+ Field** fügt eins an.
+- **Der Typ eines Felds** ist ein Wert-Typ, eine Aufzählung, eine andere Struktur oder eine Liste
+  von einem davon. Keine Struktur enthält sich selbst, auch nicht über andere: Die Auswahlliste
+  führt nur die Strukturen, die diese nicht enthalten. Eine Struktur hat mindestens ein Feld und
+  höchstens 32.
+- **Als Typ wählen:** Die Auswahlliste *Type* einer Variablen und der Ein- und Ausgänge einer
+  Funktion führt die Strukturen des Blueprints und eine Liste von jeder (`Weapon`, `Weapon List`).
+- **Einen Wert eintragen:** Der Default einer Variablen vom Typ einer Struktur hat in Details eine
+  Zeile je Feld, mit dem Editor des Feld-Typs (Zahl, Haken, Text, Auswahlliste einer Aufzählung,
+  die Felder einer Struktur darin, die Einträge einer Liste). Eine Liste von Strukturen hat diese
+  Zeilen je Eintrag. Ein Pin vom Typ einer Struktur, an dem kein Draht hängt, beginnt beim
+  Default der Struktur – jedes Feld mit seinem Default – und zeigt am Knoten in Kurzform, was er
+  hält; eingetragen wird sein Wert in Details, Feld für Feld.
+- **Ihre Knoten** (Kategorie Structures) bietet das Aktionsmenü je Struktur an, bei ihrem Namen;
+  Make und Break setzen auch die Knöpfe an der Zeile der Struktur in My Blueprint:
+
+  | Knoten | Pins und Ergebnis |
+  |---|---|
+  | **Make Weapon** | ein Eingang je Feld (ohne Draht: der Default des Felds) → der Wert der Struktur |
+  | **Break Weapon** | der Wert → ein Ausgang je Feld |
+  | **Set Damage of Held** (Set Field; je Struktur-Variable und Feld) | ein Schritt mit Exec-Pins: ändert das eine Feld der Variablen und lässt die anderen, wie sie sind; gibt das Feld, wie es jetzt ist. Variable und Feld stehen in Details unter Settings |
+- **Die Knoten für jeden Typ** arbeiten auch mit Strukturen: Get und Set einer Variablen, Select,
+  Reroute, die Listen-Knoten und For Each. Contains, Find Item und Remove Item vergleichen Feld
+  für Feld: Zwei Werte sind gleich, wenn alle ihre Felder gleich sind. Ein Eintrag jenseits einer
+  Liste ist der Default der Struktur.
+- **Eine Struktur ändern, die benutzt wird:** Die Struktur oder ein Feld umzubenennen, ändert
+  nichts außer dem Namen – die Werte und die Drähte an Make und Break bleiben. Ein Feld nach oben
+  oder unten zu schieben, ändert nur seinen Platz. Ein neues Feld hat überall seinen Default. Wird
+  ein Feld entfernt, fällt sein Wert überall weg, ebenso die Drähte an seinen Pins; ein Set Field,
+  das es nennt, meldet danach einen Fehler. Bekommt ein Feld einen anderen Typ, bleibt sein Wert,
+  wo die Typen sich umwandeln, und Drähte, die nicht mehr passen, fallen weg. Nimmt ein Feld den
+  Typ einer Struktur an, die in My Blueprint unter dieser steht, rückt diese Struktur unter sie.
+  Eine Struktur, von deren Typ noch etwas ist – eine Variable, ein Pin einer Funktion, ein Feld,
+  ein Knoten –, lässt sich nicht entfernen; der Editor sagt, was sie benutzt.
+- **Namen:** Der Name einer Struktur und die Namen ihrer Felder sind C++-Namen: Buchstaben,
+  Ziffern und `_`, keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise
+  (`Float` …). Der Name einer Struktur endet nicht auf `_list`; sie heißt nicht wie eine Variable,
+  Funktion oder Aufzählung. Keine zwei Felder einer Struktur heißen gleich, und kein Feld heißt
+  wie eine Aufzählung oder Struktur des Blueprints.
+- Als C++: `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`,
+  `Weapon Held = Weapon{"Knife", 25.0};`, `struct_make<Weapon>("Bow", 12.0)`,
+  `struct_break<Weapon>(Held).Damage`, `Held.Damage = 30.0;` – siehe
+  [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Strukturen“.
 
 ### Formel-Knoten
 

@@ -8,6 +8,8 @@
 //     changed there and applied;
 //     then a list: a variable made a Float List in Details, its items typed in, nodes offered
 //     in the list's type from its pin, For Each over it - as C++, changed there, and played;
+//     then an enum and a struct, each made in My Blueprint and edited in Details, a variable of
+//     its type, its nodes from the action menu - as C++, changed there, and played;
 //  2. kern/games/spawncity/level/spawncity.klevel opens as a level: its actors are there, their
 //     Blueprints compile without errors with the editor's own node library, and Play runs them
 //     as machine code. (The game's project file must stay a file the editor reads.)
@@ -256,7 +258,7 @@ const literal = page.locator(`.lg-node[data-id="${setState}"] select.lg-lit.enm`
 check(await until(async () => await literal.count() === 1) && (await literal.locator("option").count()) === 3, "an enum pin without a wire has a dropdown of the values");
 await literal.selectOption({label: "Opening"});
 check(await until(async () => (await logic()).nodes.find(n => n.id === setState).inputs.find(q => q.id === "value").value === 1), "choosing sets the pin's value");
-check(await page.locator(`.lg-node[data-id="${getState}"] .lg-row[data-type="Mode"]`).count() === 1, "an enum pin is of its enum's type");
+check(await until(async () => await page.locator(`.lg-node[data-id="${getState}"] .lg-row[data-type="Mode"]`).count() === 1), "an enum pin is of its enum's type");
 for (const [from, out, to, input] of [[eb, "then", setState, "exec"], [setState, "then", sw.id, "exec"], [getState, "value", sw.id, "value"], [sw.id, "case1", say, "exec"],
                                       [getState, "value", nameOf, "value"], [nameOf, "name", join, "b"], [join, "result", say, "text"]])
   await cmd({cmd: "logicConnect", from, out, to, in: input});
@@ -278,6 +280,150 @@ check(await until(async () => await page.locator(`.lg-node[data-id="${sw.id}"]`)
 await cmd({cmd: "logicClose"});
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "is Ajar", 60000), `Play switches on the enum and says the value's name (${(await status()).hud?.message})`);
+await cmd({cmd: "stop"});
+
+// ---- 1e. a struct: its fields in Details, a variable of its type, Make / Break / Set Field, played ----
+// (The editor draws a change with its next frame: what is asked of the page comes after it.)
+const settle = async fn => {
+  const ok = await until(fn);
+  const frame = await page.evaluate(() => window.KernStudio.frames());
+  await page.waitForFunction(f => window.KernStudio.frames() >= f + 2, frame);
+  return ok;
+};
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await settle(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+const structs = async () => (await logic()).structs;
+const fieldsOf = async name => (((await structs()).find(s => s.name === name))?.fields || []).map(f => f.name + ":" + (f.of ? f.of + (f.type.endsWith("_list") ? "[]" : "") : f.type)).join(",");
+await page.click('.lg-sec[data-sec="structs"] [data-add]');
+check(await settle(async () => (await structs()).length === 1 && await page.locator('.lg-dbody [data-stk="name"]').count() === 1) && await fieldsOf("NewStruct") === "Field:float",
+      "+ in My Blueprint adds a struct with one field, shown in Details");
+await page.locator('.lg-dbody [data-stk="name"]').fill("Weapon");
+await page.locator('.lg-dbody [data-stk="name"]').press("Enter");
+check(await settle(async () => (await structs())[0]?.name === "Weapon" && await page.locator('.lg-st[data-struct="Weapon"].on').count() === 1), "the struct is renamed in Details");
+const fieldRow = name => page.locator(`.lg-dbody .lg-srow[data-field="${name}"]`);
+const renameField = async (from, to) => { await fieldRow(from).locator('[data-sf="name"]').fill(to); await fieldRow(from).locator('[data-sf="name"]').press("Enter"); };
+await renameField("Field", "Damage");
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:float"), "a field is renamed in place");
+await fieldRow("Damage").locator('[data-sf="value"]').fill("10");
+await fieldRow("Damage").locator('[data-sf="value"]').press("Enter");
+check(await settle(async () => (await structs())[0].fields[0].value === 10), "and given its default");
+await page.click('.lg-dbody [data-act="struct-field"]');
+await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 2);
+await renameField("Field", "Label");
+await settle(async () => await fieldRow("Label").count() === 1);
+await fieldRow("Label").locator('[data-sf="type"]').selectOption("text");
+await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text");
+await fieldRow("Label").locator('[data-sf="value"]').fill("Fist");
+await fieldRow("Label").locator('[data-sf="value"]').press("Enter");
+check(await settle(async () => (await structs())[0].fields[1]?.value === "Fist") && await fieldsOf("Weapon") === "Damage:float,Label:text", `+ Field adds a field; its name, type and default are set in its row (${await fieldsOf("Weapon")})`);
+await renameField("Label", "Damage");
+check(await settle(async () => await fieldRow("Label").locator('[data-sf="name"]').inputValue() === "Label") && await fieldsOf("Weapon") === "Damage:float,Label:text", "a name another field has is refused");
+// a field of an enum and one of another struct: the types a field can have, a struct inside a struct
+await cmd({cmd: "logicEnum", op: "add", name: "Kind"});
+await cmd({cmd: "logicStruct", op: "add", name: "Aim"});
+await cmd({cmd: "logicStruct", op: "renameField", name: "Aim", field: "Field", to: "Tries"});
+await cmd({cmd: "logicStruct", op: "fieldType", name: "Aim", field: "Tries", type: "int"});
+await cmd({cmd: "logicStruct", op: "fieldValue", name: "Aim", field: "Tries", value: 3});
+await page.click('.lg-dbody [data-act="struct-field"]');
+await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 3);
+await renameField("Field", "Type");
+await settle(async () => await fieldRow("Type").count() === 1);
+const fieldType = fieldRow("Type").locator('[data-sf="type"]');
+check((await fieldType.locator("option").count()) === 16 && (await fieldType.locator('option[value="Aim_list"]').textContent()) === "Aim List" && (await fieldType.locator('option[value="Weapon"]').count()) === 0,
+      "a field's Type offers the value types, the enums, the other structs and lists of them - not the struct itself");
+await fieldType.selectOption("Kind");
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Type:Kind" && await fieldRow("Type").locator('select[data-sf="value"] option').count() === 2), "a field of an enum: its default is one of the values");
+await page.click('.lg-dbody [data-act="struct-field"]');
+await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 4);
+await renameField("Field", "Sight");
+await settle(async () => await fieldRow("Sight").count() === 1);
+await fieldRow("Sight").locator('[data-sf="type"]').selectOption("Aim");
+const sightDefault = page.locator(`.lg-dbody .lg-vsub[data-sfield="Sight"] [data-vp='["Tries"]']`);
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Type:Kind,Sight:Aim" && await sightDefault.count() === 1) && (await sightDefault.inputValue()) === "3" &&
+      (await structs()).map(s => s.name).join(",") === "Aim,Weapon", "a field of another struct: its default is edited field by field, and that struct stands above");
+await fieldRow("Sight").locator('[data-sf="up"]').click();
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Sight:Aim,Type:Kind"), "a field moves up");
+// a variable of the struct: its default field by field
+await cmd({cmd: "logicVariable", op: "add", name: "Held", type: "float"});
+await page.click('.lg-var[data-var="Held"]');
+const heldType = page.locator('.lg-dbody [data-vk="type"]');
+check(await settle(async () => await heldType.count() === 1) && (await heldType.locator("option").count()) === 18 && (await heldType.locator('option[value="Weapon_list"]').textContent()) === "Weapon List",
+      "a variable's Type offers the structs and lists of them");
+await heldType.selectOption("Weapon");
+const held = async () => (await logic()).variables.find(v => v.name === "Held");
+const heldField = path => page.locator(`.lg-dbody .lg-vsub[data-var="Held"] [data-vp='${JSON.stringify(path)}']`);
+check(await settle(async () => (await held())?.of === "Weapon" && await heldField(["Damage"]).count() === 1) && (await held()).value.Damage === 10 && (await held()).value.Label === "Fist" && (await held()).value.Sight.Tries === 3,
+      "a variable of the struct starts at the fields' defaults, shown field by field");
+await heldField(["Damage"]).fill("25");
+await heldField(["Damage"]).press("Enter");
+await settle(async () => (await held()).value.Damage === 25);
+await heldField(["Sight", "Tries"]).fill("7");
+await heldField(["Sight", "Tries"]).press("Enter");
+await settle(async () => (await held()).value.Sight.Tries === 7);
+await heldField(["Type"]).selectOption({label: "Second"});
+check(await settle(async () => (await held()).value.Type === 1) && (await held()).value.Damage === 25 && (await held()).value.Sight.Tries === 7 && (await held()).value.Label === "Fist",
+      "a field of the default is edited by itself - also one of the struct inside");
+// a field's new name: what the variable holds stays with the field
+await page.click('.lg-st[data-struct="Weapon"]');
+await settle(async () => await fieldRow("Damage").count() === 1);
+await renameField("Damage", "Power");
+check(await settle(async () => await fieldsOf("Weapon") === "Power:float,Label:text,Sight:Aim,Type:Kind") && (await held()).value.Power === 25 && !("Damage" in (await held()).value), "a renamed field keeps its values");
+// Begin Play: Set Power of Held (typed on the node); the message says Break's Label and Power
+await page.hover('.lg-st[data-struct="Weapon"]');  // (a row's buttons show under the cursor)
+await page.click('.lg-st[data-struct="Weapon"] [data-make]');
+check(await settle(async () => (await logic()).nodes.some(n => n.type === "struct.make")), "Make in My Blueprint adds a Make node of the struct");
+l = await logic();
+const makeNode = l.nodes.find(n => n.type === "struct.make");
+check(makeNode.title === "Make Weapon" && makeNode.inputs.map(q => q.id).join(",") === "Power,Label,Sight,Type" && makeNode.outputs[0].of === "Weapon" && makeNode.inputs[2].value.Tries === 3, "it has an input for each field, at the field's default");
+check(await page.locator(`.lg-node[data-id="${makeNode.id}"] .lg-row[data-type="Aim"] .lg-scount`).count() === 1 && await page.locator(`.lg-node[data-id="${makeNode.id}"] .lg-row.out[data-type="Weapon"]`).count() === 1,
+      "a struct's pin is of its struct's type; without a wire it shows what it holds in short");
+// (a struct typed into a pin is edited in Details, field by field: the new node is the selection)
+const makeSight = page.locator(`.lg-dbody .lg-vsub[data-node="${makeNode.id}"][data-pin="Sight"] [data-vp='["Tries"]']`);
+check(await settle(async () => await makeSight.count() === 1), "Details shows the fields of a struct pin");
+await makeSight.fill("9");
+await makeSight.press("Enter");
+check(await settle(async () => (await logic()).nodes.find(n => n.id === makeNode.id).inputs.find(q => q.id === "Sight").value.Tries === 9), "typing there sets the pin's value");
+const ebs = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 300})).id;
+const tune = (await cmd({cmd: "logicAdd", type: "struct.set_field", x: 240, y: 300, params: {variable: "Held", field: "Power"}})).id;
+const getHeld = (await cmd({cmd: "logicAdd", type: "var.get", x: 240, y: 520, params: {variable: "Held"}})).id;
+const brk = (await cmd({cmd: "logicAdd", type: "struct.break", x: 480, y: 520, params: {struct: "Weapon"}})).id;
+const joined = (await cmd({cmd: "logicAdd", type: "text.append", x: 760, y: 520})).id;
+const says = (await cmd({cmd: "logicAdd", type: "game.message", x: 1000, y: 300})).id;
+l = await logic();
+const tuneNode = l.nodes.find(n => n.id === tune);
+check(tuneNode.title === "Set Power of Held" && tuneNode.params.find(q => q.key === "field").choices.map(c => c[0]).join(",") === "Power,Label,Sight,Type" && tuneNode.inputs.find(q => q.id === "value").type === "float",
+      "Set Field names a struct variable and one of its fields; its value is of the field's type");
+const fromHeld = (await cmd({cmd: "logicPalette", query: "", from: {node: getHeld, pin: "value", output: true}})).items;
+check(fromHeld.some(e => e.type === "struct.break" && e.params?.struct === "Weapon") && fromHeld.some(e => e.type === "logic.select" && e.params?.type === "Weapon") && !fromHeld.some(e => e.type === "debug.print" || e.type === "math.add" || e.params?.struct === "Aim"),
+      "from a Weapon pin the menu offers Break Weapon and Select of a Weapon, and nothing a struct does not go into");
+const power = page.locator(`.lg-node[data-id="${tune}"] input.lg-lit.num`);
+await power.fill("12.5");
+await power.press("Enter");
+check(await settle(async () => (await logic()).nodes.find(n => n.id === tune).inputs.find(q => q.id === "value").value === 12.5), "the field's new value is typed on the node");
+for (const [from, out, to, input] of [[ebs, "then", tune, "exec"], [tune, "then", says, "exec"], [getHeld, "value", brk, "value"], [brk, "Label", joined, "a"], [brk, "Power", joined, "c"], [joined, "result", says, "text"]])
+  await cmd({cmd: "logicConnect", from, out, to, in: input});
+await cmd({cmd: "logicValue", node: joined, pin: "b", value: ": "});
+check(!(await cmd({cmd: "logicConnect", from: getHeld, out: "value", to: joined, in: "b"})).ok && !(await cmd({cmd: "logicConnect", from: brk, out: "Sight", to: tune, in: "value"})).ok,
+      "a struct is no text and no other struct: it goes into its own type only");
+check(errorsOf(await logic()).length === 0, "the struct graph compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await page.click(".lg-cpp");
+check(await settle(async () => (await cppText.inputValue()).includes("KERN_STRUCT(Weapon) {")), "the C++ view declares the struct");
+code = await cppText.inputValue();
+check(code.includes("  KERN_STRUCT(Aim) {\n    Int Tries = 3;\n  };\n  KERN_STRUCT(Weapon) {\n    Float Power = 10.0;\n    Text Label = \"Fist\";\n    Aim Sight = Aim{3};\n    Kind Type = Kind::First;\n  };\n") &&
+      code.includes("Weapon Held = Weapon{25.0, \"Fist\", Aim{7}, Kind::Second};") && code.includes("Held.Power = 12.5;") && /struct_break<Weapon>\(Held\)/.test(code) && /n\d+\(\)\.Label/.test(code) &&
+      code.includes("struct_make<Weapon>(10.0, \"Fist\", Aim{9}, Kind::First)"),
+      "the structs with their fields, a variable written out with every field, Set Field as an assignment, Break read by the field's name");
+check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
+// a field renamed in the text is renamed in the Blueprint
+await cppText.fill(code.replaceAll("Label", "Title"));
+await cppText.press("Control+Enter");
+check(await settle(async () => await fieldsOf("Weapon") === "Power:float,Title:text,Sight:Aim,Type:Kind"), "a struct changed in the text is the Blueprint's struct");
+await page.click(".lg-cppclose");
+check(await settle(async () => (await logic()).nodes.some(n => n.type === "struct.break" && n.outputs[1].id === "Title")), "Break shows the new name");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await settle(async () => (await status()).hud?.message === "Fist: 12.5", 60000), `Play sets the field and reads the struct's fields (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
