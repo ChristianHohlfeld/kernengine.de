@@ -71,6 +71,30 @@ ParamDef type_param(bool with_lists) {
   p.with_lists = with_lists;
   return p;
 }
+/// The setting "Enum" of an enum node: which enum of the Blueprint.
+ParamDef enum_param() {
+  ParamDef p = param("enum", "Enum", ParamDef::Kind::type);
+  p.enums_only = true;
+  return p;
+}
+/// The type a node's setting "Type" names in its Blueprint - Float when it names none (the
+/// check says so). `lists`: a list type may be meant.
+TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
+  TypeRef t;
+  if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type))) t = {PinType::number, {}};
+  return t;
+}
+/// A data pin of a type a Blueprint names (an enum's with the enum).
+PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Value def = {}) {
+  PinDef p = data(std::move(id), std::move(label), t.type, std::move(def));
+  p.of = t.of;
+  return p;
+}
+void retype(PinDef& p, const TypeRef& t) {
+  p.type = t.type;
+  p.of = t.of;
+  p.def = Value::zero(t.type).to_json();
+}
 
 /// A value that is new on every read (Random): the node keeps its sequence.
 NodeDef fresh(NodeDef d) {
@@ -168,10 +192,10 @@ void add_flow(Library& lib) {
     NodeDef d = make("value.reroute", "Reroute", "Flow", NodeKind::pure, "A knot a data wire passes through, to route wires tidily.");
     d.params = {type_param(true)};
     d.keywords = "knot reroute wire";
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const PinType t = pin_type_setting(n.param("type", "float"));
-      in = {data("in", "", t, Value::zero(t).to_json())};
-      out = {data("out", "", t)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const TypeRef t = setting_type(n, g, true);
+      in = {typed_pin("in", "", t, Value::zero(t.type).to_json())};
+      out = {typed_pin("out", "", t)};
     };
     d.run = [](Context& c) {
       c.out(std::size_t{0}, c.in(std::size_t{0}));
@@ -393,8 +417,8 @@ void add_variables(Library& lib) {
     return [input, output](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const Variable* v = g.variable(n.param("variable"));
       const PinType t = v ? v->type : PinType::number;
-      for (PinDef& p : in) if (p.id == "value" && input) { p.type = t; p.def = v ? v->value : json::Value(0.0); }
-      for (PinDef& p : out) if (p.id == "value" && output) p.type = t;
+      for (PinDef& p : in) if (p.id == "value" && input) { p.type = t; p.of = v ? v->of : std::string(); p.def = v ? v->value : json::Value(0.0); }
+      for (PinDef& p : out) if (p.id == "value" && output) { p.type = t; p.of = v ? v->of : std::string(); }
     };
   };
   {
@@ -496,7 +520,7 @@ void add_variables(Library& lib) {
 // What they do is in kern/logic/nodes.h (logic::list): a Blueprint's C++ calls the same functions.
 
 /// The "Type" of a generic list node: the type of the list's items.
-PinType item_type(const Node& n) { return item_type_setting(n.param("type", "float")); }
+TypeRef item_type(const Node& n, const Graph& g) { return setting_type(n, g, false); }
 /// Calls f(std::type_identity<T>{}) with the C++ type of a list's items.
 template <class F> void with_items(PinType element, F&& f) {
   switch (element) {
@@ -506,34 +530,35 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::vector: f(std::type_identity<Vec3>{}); break;
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
+    case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
     default: break;
   }
 }
 
 void add_lists(Library& lib) {
   // ---- values: generic over the type of the items (the setting Type) ----
-  auto typed = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-    const PinType e = item_type(n);
+  auto typed = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+    const TypeRef e = item_type(n, g);
     for (std::vector<PinDef>* pins : {&in, &out})
       for (PinDef& p : *pins) {
-        if (p.id == "list") { p.type = list_of(e); p.def = json::Value::array(); }
-        if (p.id == "item") { p.type = e; p.def = Value::zero(e).to_json(); }
+        if (p.id == "list") { retype(p, {list_of(e.type), e.of}); p.def = json::Value::array(); }
+        if (p.id == "item") retype(p, e);
       }
   };
   {
     NodeDef d = make("list.make", "Make List", "Lists", NodeKind::pure, "A list of the values given, in their order.", "array create");
     d.params = {type_param(false), param("count", "Items", ParamDef::Kind::integer, "2")};
     d.outputs = {data("list", "List", PinType::number_list)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const PinType e = item_type(n);
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const TypeRef e = item_type(n, g);
       in.clear();
       const int k = clamp_count(n, "count", 2, 0, 16);
-      for (int i = 0; i < k; ++i) in.push_back(data("item" + std::to_string(i), std::to_string(i), e, Value::zero(e).to_json()));
-      out[0].type = list_of(e);
+      for (int i = 0; i < k; ++i) in.push_back(typed_pin("item" + std::to_string(i), std::to_string(i), e, Value::zero(e.type).to_json()));
+      retype(out[0], {list_of(e.type), e.of});
     };
     d.run = [](Context& c) {
       const std::size_t count = c.input_count();
-      with_items(item_type(c.node()), [&](auto type) {
+      with_items(element_of(c.output(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         std::vector<T> items;
         for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(c.in(k)));
@@ -564,7 +589,7 @@ void add_lists(Library& lib) {
     d.run = [](Context& c) {
       const Value items = c.in(std::size_t{0});
       const i64 index = c.in_int("index");
-      with_items(item_type(c.node()), [&](auto type) {
+      with_items(element_of(c.input(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         c.out(std::size_t{0}, to_value(list::get(items.template items<T>(), index)));
       });
@@ -580,7 +605,7 @@ void add_lists(Library& lib) {
     d.shape = typed;
     d.run = [](Context& c) {
       const Value items = c.in(std::size_t{0}), item = c.in(std::size_t{1});
-      with_items(item_type(c.node()), [&](auto type) {
+      with_items(element_of(c.input(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         c.out(std::size_t{0}, Value::boolean(list::contains(items.template items<T>(), from_value<T>(item))));
       });
@@ -596,7 +621,7 @@ void add_lists(Library& lib) {
     d.shape = typed;
     d.run = [](Context& c) {
       const Value items = c.in(std::size_t{0}), item = c.in(std::size_t{1});
-      with_items(item_type(c.node()), [&](auto type) {
+      with_items(element_of(c.input(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         c.out(std::size_t{0}, Value::integer(list::find(items.template items<T>(), from_value<T>(item))));
       });
@@ -608,9 +633,9 @@ void add_lists(Library& lib) {
   // ---- steps: they change a list variable (the setting Variable) ----
   auto of_variable = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
     const Variable* v = g.variable(n.param("variable"));
-    const PinType e = v && is_list(v->type) ? element_of(v->type) : PinType::number;
+    const TypeRef e = v && is_list(v->type) ? TypeRef{element_of(v->type), v->of} : TypeRef{};
     for (PinDef& p : in)
-      if (p.id == "item") { p.type = e; p.def = Value::zero(e).to_json(); }
+      if (p.id == "item") retype(p, e);
     (void)out;
   };
   auto needs_list = [](const Node& n, const Graph& g) {
@@ -752,6 +777,135 @@ void add_lists(Library& lib) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// enums
+// ---------------------------------------------------------------------------
+// A Blueprint declares enums (Graph::enums); these nodes work on the values of one of them - the
+// setting "Enum" says which. What they do is logic::enums (nodes.h).
+
+void add_enums(Library& lib) {
+  auto of = [](const Node& n, const Graph& g) { return g.enumeration(n.param("enum")); };
+  // Every pin called value, a, b is of the node's enum; "values" is the list of them.
+  auto typed = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+    const TypeRef e{PinType::enumeration, n.param("enum")};
+    (void)g;
+    for (std::vector<PinDef>* pins : {&in, &out})
+      for (PinDef& p : *pins) {
+        if (p.id == "value" || p.id == "a" || p.id == "b") retype(p, e);
+        if (p.id == "values") retype(p, {PinType::enumeration_list, e.of});
+      }
+  };
+  auto titled = [](const char* before, const char* after) {
+    return [before, after](const NodeDef&, const Node& n) { return std::string(before) + n.param("enum", "?") + after; };
+  };
+  auto node = [&](const char* type, const char* label, NodeKind kind, const char* help, const char* keywords) {
+    NodeDef d = make(type, label, "Enums", kind, help, keywords);
+    d.params = {enum_param()};
+    d.shape = typed;
+    return d;
+  };
+  {
+    NodeDef d = node("enum.equal", "Equal (Enum)", NodeKind::pure, "Are the two the same value of the enum?", "== same is compare");
+    d.inputs = {data("a", "A", PinType::enumeration), data("b", "B", PinType::enumeration)};
+    d.outputs = {data("result", "Result", PinType::boolean)};
+    d.title = titled("Equal (", ")");
+    d.run = [](Context& c) {
+      const i64 a = c.in_int("a"), b = c.in_int("b");
+      c.out(std::size_t{0}, Value::boolean(a == b));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("enum.name", "Enum to Text", NodeKind::pure, "The name of the value.", "string print show name");
+    d.inputs = {data("value", "Value", PinType::enumeration)};
+    d.outputs = {data("name", "Name", PinType::text)};
+    d.title = titled("", " to Text");
+    d.run = [of](Context& c) {
+      const i64 value = c.in_int("value");
+      const EnumType* e = of(c.node(), c.instance().graph());
+      c.out(std::size_t{0}, Value::text(e ? enums::name(e->values, value) : std::string()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("enum.from_name", "Text to Enum", NodeKind::pure, "The value with this name. Found: is there one? (If not: the first value.)", "string parse name");
+    d.inputs = {data("name", "Name", PinType::text, "")};
+    d.outputs = {data("value", "Value", PinType::enumeration), data("found", "Found", PinType::boolean)};
+    d.title = titled("Text to ", "");
+    d.run = [of](Context& c) {
+      const std::string name = c.in_text("name");
+      const EnumType* e = of(c.node(), c.instance().graph());
+      const i64 at = e ? enums::find(e->values, name) : -1;
+      c.out("value", Value::enumeration(at < 0 ? 0 : at));
+      c.out("found", Value::boolean(at >= 0));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("enum.index", "Enum to Index", NodeKind::pure, "The place of the value among the enum's values (the first is 0).", "int number ordinal");
+    d.inputs = {data("value", "Value", PinType::enumeration)};
+    d.outputs = {data("index", "Index", PinType::integer)};
+    d.title = titled("", " to Index");
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::integer(c.in_int("value")));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("enum.from_index", "Index to Enum", NodeKind::pure, "The value at this place. Valid: is there one? (If not: the first value.)", "int number ordinal byte");
+    d.inputs = {data("index", "Index", PinType::integer, 0)};
+    d.outputs = {data("value", "Value", PinType::enumeration), data("valid", "Valid", PinType::boolean)};
+    d.title = titled("Index to ", "");
+    d.run = [of](Context& c) {
+      const i64 index = c.in_int("index");
+      const EnumType* e = of(c.node(), c.instance().graph());
+      const std::size_t count = e ? e->values.size() : 0;
+      c.out("value", Value::enumeration(enums::valid(count, index)));
+      c.out("valid", Value::boolean(enums::is_value(count, index)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("enum.values", "All Values", NodeKind::pure, "Every value of the enum, in their order - a list For Each goes through.", "list every all each");
+    d.outputs = {data("values", "Values", PinType::enumeration_list)};
+    d.title = titled("All Values of ", "");
+    d.run = [of](Context& c) {
+      const EnumType* e = of(c.node(), c.instance().graph());
+      std::vector<i64> all;
+      for (std::size_t k = 0; e && k < e->values.size(); ++k) all.push_back(static_cast<i64>(k));
+      c.out(std::size_t{0}, Value::enumerations(std::move(all)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = node("flow.switch_enum", "Switch on Enum", NodeKind::flow, "Goes on at the output of the value: one for each value of the enum.", "case select match branch");
+    d.category = "Flow";
+    d.inputs = {exec_in(), data("value", "Value", PinType::enumeration)};
+    d.title = titled("Switch on ", "");
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const EnumType* e = g.enumeration(n.param("enum"));
+      for (PinDef& p : in)
+        if (p.id == "value") retype(p, {PinType::enumeration, n.param("enum")});
+      out.clear();
+      for (std::size_t k = 0; e && k < e->values.size(); ++k) out.push_back(exec_out("case" + std::to_string(k), e->values[k]));
+    };
+    d.run = [](Context& c) {
+      // (a value of the enum is one of its values: there is an output for each)
+      const i64 value = c.in_int("value");
+      int outs = 0;
+      for (std::size_t k = 0; k < c.node_outputs(); ++k) outs += c.output(k).type == PinType::exec ? 1 : 0;
+      return value >= 0 && value < outs ? static_cast<int>(value) : kStop;
+    };
+    lib.add(std::move(d));
+  }
+}
+
 void add_math(Library& lib) {
   using K = PinType;
   using P = PureNodes;
@@ -812,10 +966,10 @@ void add_math(Library& lib) {
                      },
                      "A when Pick A is true, otherwise B", "ternary choose if");
     d.params = {type_param(true)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const PinType t = pin_type_setting(n.param("type", "float"));
-      for (PinDef& p : in) if (p.id != "pick") { p.type = t; p.def = Value::zero(t).to_json(); }
-      out[0].type = t;
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const TypeRef t = setting_type(n, g, true);
+      for (PinDef& p : in) if (p.id != "pick") retype(p, t);
+      retype(out[0], t);
     };
     lib.add(std::move(d));
   }
@@ -914,9 +1068,9 @@ void add_functions(Library& lib) {
       const Function* f = g.function(n.param("function"));
       if (!f) return;
       if (which == 0 || which == 2)
-        for (const FunctionPin& p : f->inputs) (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value});
+        for (const FunctionPin& p : f->inputs) (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of});
       if (which == 1 || which == 2)
-        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value});
+        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of});
     };
   };
   auto named = [](const char* prefix) {
@@ -1004,6 +1158,7 @@ Library& Library::core() {
     add_flow(lib);
     add_variables(lib);
     add_lists(lib);
+    add_enums(lib);
     add_math(lib);
     add_formula(lib);
     add_functions(lib);

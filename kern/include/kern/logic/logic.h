@@ -22,6 +22,9 @@
 //                 change a list (Add, Insert, Set Item, Remove, Clear) change
 //                 a list variable; For Each goes through a list as it was
 //                 when the loop started.
+//   enums         a Blueprint may declare enumerations: a type of its own with named values
+//                 (Mode: Closed, Opening, Open). A value of it is one of them - held as
+//                 its place in the declaration, the first being 0.
 //   state machines  states and transitions in the style of the
 //                 digitalisierungsplanung.de state editor: a transition fires
 //                 on an event, a timer, a condition variable or automatically;
@@ -55,16 +58,21 @@ namespace kern::logic {
 
 using ActorRef = u32;  // game actor id (0 = none)
 
-/// What a pin carries: exec, a value, or a list of values of one type (after the six value types,
-/// in their order).
-enum class PinType : u8 { exec, boolean, integer, number, vector, text, actor, boolean_list, integer_list, number_list, vector_list, text_list, actor_list, count };
+/// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
+/// their order). `enumeration`: a value of an enum the Blueprint declares - which one says the
+/// name beside the type (PinDef::of, Variable::of ...).
+enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, count
+};
+constexpr u8 kValueTypes = 7;  // boolean ... enumeration
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
 constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t < PinType::count; }
-constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - 6) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::actor ? static_cast<PinType>(static_cast<u8>(t) + 6) : t; }
+constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::enumeration ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list"};
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -162,6 +170,15 @@ struct Value {
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// A value of an enum: its place among the enum's values (the first is 0).
+  static Value enumeration(i64 index) { Value r; r.type = PinType::enumeration; r.i = index < 0 ? 0 : index; return r; }
+  /// A list of values of an enum.
+  static Value enumerations(std::vector<i64> indices) {
+    for (i64& index : indices) index = index < 0 ? 0 : index;
+    Value r = of(std::move(indices));
+    r.type = PinType::enumeration_list;
+    return r;
+  }
   static Value zero(PinType t);
   /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle). Whole numbers
   /// are held as every Int is (logic::normal).
@@ -180,14 +197,19 @@ struct Value {
   /// The items of a list of T - none if this is no such list.
   template <class T> const std::vector<T>& items() const {
     static const std::vector<T> none;
-    return list && type == list_type_of<T>() ? std::get<std::vector<T>>(*list) : none;
+    return list && holds<T>() ? std::get<std::vector<T>>(*list) : none;
   }
+  /// Is this a list whose items are held as T? (A list of enum values holds them as i64.)
+  template <class T> bool holds() const { return type == list_type_of<T>() || (std::is_same_v<T, i64> && type == PinType::enumeration_list); }
   /// The items of a list of T, to change them: this value's own (it becomes that list if it is
   /// none).
   template <class T> std::vector<T>& edit() {
-    if (!list || type != list_type_of<T>()) list = std::make_shared<ListItems>();
+    if (!holds<T>()) {
+      type = list_type_of<T>();
+      list.reset();
+    }
+    if (!list) list = std::make_shared<ListItems>();
     else if (list.use_count() > 1) list = std::make_shared<ListItems>(*list);  // (someone else reads these)
-    type = list_type_of<T>();
     return std::get<std::vector<T>>(const_cast<ListItems&>(*list));  // (made as ListItems, above and in of())
   }
   /// How many items a list has (no list: 0).
@@ -236,7 +258,26 @@ struct Variable {
   PinType type = PinType::number;
   json::Value value;     // default
   std::string help;
+  std::string of = {};   // an enum value (or a list of them): the enum's name
 };
+
+/// An enumeration a Blueprint declares: a type with named values. A value of it is held as its
+/// place among them (the first is 0); in a Blueprint's C++ it is KERN_ENUM(Mode, Closed, Open).
+struct EnumType {
+  std::string name;
+  std::vector<std::string> values;
+  std::string help;
+};
+
+/// A type as pins, variables and settings name it: the pin type, and for an enum which one.
+struct TypeRef {
+  PinType type = PinType::number;
+  std::string of;
+  bool operator==(const TypeRef&) const = default;
+};
+/// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
+/// enums are the same enum.)
+bool fits(const TypeRef& from, const TypeRef& to);
 
 /// A state machine in the style of the digitalisierungsplanung.de editor.
 enum class TriggerKind : u8 { event, timer, condition, automatic };
@@ -275,6 +316,7 @@ struct FunctionPin {
   std::string name;
   PinType type = PinType::number;
   json::Value value;     // default: an input nobody wired, an output no Return node set
+  std::string of = {};   // an enum value (or a list of them): the enum's name
 };
 
 struct Function {
@@ -300,9 +342,12 @@ struct Graph {
   std::vector<Variable> variables;
   std::vector<StateMachine> machines;
   std::vector<Function> functions;
+  std::vector<EnumType> enums;         // the types it declares
   std::vector<CommentBox> comments;    // editor only: no effect on what runs
   u32 next_id = 1;
-  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && comments.empty(); }
+  bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && comments.empty(); }
+  const EnumType* enumeration(std::string_view name) const;
+  EnumType* enumeration(std::string_view name);
   Node* find(u32 id);
   const Node* find(u32 id) const;
   const Variable* variable(std::string_view name) const;
@@ -375,6 +420,7 @@ struct PinDef {
   PinType type = PinType::exec;
   json::Value def;       // default literal (data inputs)
   bool hidden = false;   // not drawn (advanced)
+  std::string of = {};   // an enum value (or a list of them): the enum's name
 };
 
 struct ParamDef {
@@ -385,11 +431,19 @@ struct ParamDef {
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
+  bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
 };
-/// The types a Kind::type setting can name, in the order they are offered.
-std::vector<PinType> type_choices(const ParamDef& pd);
-/// A type as people read it: "Float", "Integer", "Text List".
-std::string type_label(PinType t);
+/// The types a Kind::type setting can name in the Blueprint `g` - its enums among them -, in the
+/// order they are offered.
+std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g);
+/// The text that names a type in a setting: "float", "text_list"; an enum by its own name
+/// ("Mode"), a list of its values as "Mode_list".
+std::string type_text(const TypeRef& t);
+/// The type a text names in the Blueprint `g` (false: none).
+bool type_from_text(std::string_view text, const Graph& g, TypeRef& out);
+/// A type as people read it: "Float", "Integer", "Text List", "Mode", "Mode List".
+std::string type_label(const TypeRef& t);
+inline std::string type_label(PinType t) { return type_label(TypeRef{t, {}}); }
 
 class Context;
 
@@ -866,6 +920,8 @@ class Context {
   ActorRef in_actor(std::string_view pin) { return in(pin).as_actor(); }
   std::size_t input_count() const { return inst_.nodes_[node_].in.size(); }
   const PinDef& input(std::size_t i) const { return inst_.nodes_[node_].in[i]; }
+  const PinDef& output(std::size_t i) const { return inst_.nodes_[node_].out[i]; }
+  std::size_t node_outputs() const { return inst_.nodes_[node_].out.size(); }
   void out(std::string_view pin, Value v);
   void out(std::size_t index, Value v);
   /// Exec output ordinal by pin id (for returning from run()).

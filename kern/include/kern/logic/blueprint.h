@@ -249,6 +249,41 @@ struct BlueprintCore : logic::PureNodes {
   template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
 
+  // ---- enums ----
+  // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
+  // enum_name<Mode>(State). What they do is logic::enums (nodes.h).
+  template <class E> static const std::vector<std::string>& kern_enum_values() {
+    static const std::vector<std::string> names = logic::enums::names(kern_enum_names(E{}));
+    return names;
+  }
+  template <class E> struct EnumFound {
+    E value{};
+    Bool found = false;
+  };
+  template <class E> struct EnumValid {
+    E value{};
+    Bool valid = false;
+  };
+  template <class E> static Bool enum_equal(std::type_identity_t<E> a, std::type_identity_t<E> b) { return a == b; }
+  template <class E> static Text enum_name(std::type_identity_t<E> value) { return logic::enums::name(kern_enum_values<E>(), static_cast<i64>(value)); }
+  template <class E> static EnumFound<E> enum_from_name(const Text& name) {
+    const i64 at = logic::enums::find(kern_enum_values<E>(), name);
+    return {static_cast<E>(at < 0 ? 0 : at), at >= 0};
+  }
+  template <class E> static Int enum_index(std::type_identity_t<E> value) { return static_cast<i64>(value); }
+  template <class E> static EnumValid<E> enum_from_index(Int index) {
+    const std::size_t count = kern_enum_values<E>().size();
+    return {static_cast<E>(logic::enums::valid(count, index)), logic::enums::is_value(count, index)};
+  }
+  template <class E> static List<E> enum_values() {
+    List<E> all;
+    for (std::size_t k = 0; k < kern_enum_values<E>().size(); ++k) all.push_back(static_cast<E>(k));
+    return all;
+  }
+  /// switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { } break; ... }: the way on is
+  /// the value's - a case for every value of the enum, as C++ wants a switch over an enum to be.
+  template <class E> static constexpr E flow_switch_enum(std::type_identity_t<E> value) { return value; }
+
   // ---- steps ----
   void flow_reroute() {}
   /// A Return nothing leads to (a method of its own that nothing calls).
@@ -289,6 +324,13 @@ struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
 
 }  // namespace kern
 
+/// KERN_ENUM(Mode, Closed, Opening, Open); declares an enum of the Blueprint: the type Mode with
+/// the values Mode::Closed ..., a value being its place among them (the first is 0). The names
+/// are stated once - the enum nodes (Enum to Text ...) read them from here.
+#define KERN_ENUM(Name, ...)                                                                  \
+  enum class Name : ::kern::i64 { __VA_ARGS__ };                                              \
+  friend constexpr ::std::string_view kern_enum_names(Name) { return #__VA_ARGS__; }         \
+  static_assert(true)
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
 /// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event

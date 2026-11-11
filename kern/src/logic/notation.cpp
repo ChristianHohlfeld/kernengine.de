@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 
 namespace kern::logic {
 
@@ -77,6 +78,11 @@ const char* cpp_type(PinType t) {
     case PinType::actor_list: return "List<Actor>";
     default: return "void";
   }
+}
+/// A type as the notation writes it: Float, List<Text>; an enum by its name - Mode, List<Mode>.
+std::string cpp_type(const TypeRef& t) {
+  if (element_of(t.type) != PinType::enumeration) return cpp_type(t.type);
+  return is_list(t.type) ? "List<" + t.of + ">" : t.of;
 }
 /// A value type by its name (a list is List<that>).
 bool type_of_cpp(std::string_view name, PinType& out) {
@@ -160,16 +166,27 @@ std::string literal(const Value& v) {
   for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
   return r + "}";
 }
+/// A value as the notation writes it, where it may be an enum's: `of` says which enum, `g` has
+/// its values' names - Mode::Open, List<Mode>{Mode::Closed, Mode::Open}.
+std::string literal(const Value& v, const std::string& of, const Graph& g) {
+  if (element_of(v.type) != PinType::enumeration) return literal(v);
+  const EnumType* e = g.enumeration(of);
+  auto one = [&](i64 index) { return of + "::" + (e && enums::is_value(e->values.size(), index) ? e->values[static_cast<std::size_t>(index)] : std::string("_") + std::to_string(index)); };
+  if (v.type == PinType::enumeration) return one(v.i);
+  std::string r = "List<" + of + ">{";
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + one(v.item(k).i);
+  return r + "}";
+}
 /// The settings of a node as they stand behind its function's name: <"smooth">. A setting that
 /// names a variable is not among them - the variable itself is the call's first value.
 /// A setting that names a type is that type: logic_select<Float>, list_make<Text, "2">.
-std::string settings_of(const NodeDef& def, const Node& n) {
+std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
   std::string r;
   for (const ParamDef& pd : def.params) {
     if (pd.kind == ParamDef::Kind::variable) continue;
     const std::string value = n.param(pd.key, pd.def);
-    PinType type = PinType::number;
-    r += (r.empty() ? "<" : ", ") + (pd.kind == ParamDef::Kind::type && pin_type_from_name(value, type) ? std::string(cpp_type(type)) : text_literal(value));
+    TypeRef type;
+    r += (r.empty() ? "<" : ", ") + (pd.kind == ParamDef::Kind::type && type_from_text(value, g, type) ? cpp_type(type) : text_literal(value));
   }
   return r.empty() ? r : r + ">";
 }
@@ -371,7 +388,7 @@ struct Shape {
     if (x.def->latent) return Form::latent;
     if (x.def->loop && !x.exec_out.empty()) return Form::loop;
     if (x.exec_out.empty()) return Form::end;
-    if (x.exec_out.size() >= 2) return Form::choice;
+    if (x.exec_out.size() >= 2 || t == "flow.switch_enum") return Form::choice;
     return x.def->kind == NodeKind::flow ? Form::test : Form::plain;
   }
 
@@ -416,7 +433,7 @@ struct Shape {
         if (i != to.exec_in.front()) to.other_entry = true;
       } else {
         if (to.src[static_cast<std::size_t>(i)].first >= 0) return fail("the input \"" + l.in + "\" of " + title(ti->second) + " has more than one wire", ti->second);
-        if (!convertible(from.out[static_cast<std::size_t>(o)].type, to.in[static_cast<std::size_t>(i)].type))
+        if (!fits({from.out[static_cast<std::size_t>(o)].type, from.out[static_cast<std::size_t>(o)].of}, {to.in[static_cast<std::size_t>(i)].type, to.in[static_cast<std::size_t>(i)].of}))
           return fail("a wire into \"" + l.in + "\" of " + title(ti->second) + " carries the wrong type", ti->second);
         to.src[static_cast<std::size_t>(i)] = {fi->second, o};
         from.readers.push_back({ti->second, i});
@@ -658,9 +675,32 @@ struct Shape {
       if (node_names.count(name)) return fail(what + " \"" + name + "\" is the name of a node");
       return true;
     };
+    // An enum is a type of the Blueprint's C++: its name and its values' names are C++ names, and
+    // what is of its type holds one of its values.
+    for (const EnumType& e : g.enums) {
+      if (!name_ok(e.name, "the enum")) return false;
+      if (!names.insert(e.name).second) return fail("the name \"" + e.name + "\" is used twice");
+      if (e.name.size() > 5 && e.name.substr(e.name.size() - 5) == "_list") return fail("the enum \"" + e.name + "\": a name that ends in _list reads as a list");
+      if (e.values.empty()) return fail("the enum " + e.name + " has no values");
+      std::set<std::string> seen;
+      for (const std::string& v : e.values) {
+        if (!cpp_name_ok(v)) return fail("the value \"" + v + "\" of " + e.name + " is no name C++ can write: letters, digits and _, not a word of C++ or of the notation");
+        if (!seen.insert(v).second) return fail("the enum " + e.name + " has two values called \"" + v + "\"");
+      }
+    }
+    auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
+      if (element_of(type) != PinType::enumeration) return true;
+      const EnumType* e = g.enumeration(of);
+      if (!e) return fail(what + " is of the enum \"" + of + "\", which is not declared");
+      const Value v = Value::from_json(value, type);
+      for (std::size_t k = 0, count = type == PinType::enumeration ? 1 : v.size(); k < count; ++k)
+        if (!enums::is_value(e->values.size(), type == PinType::enumeration ? v.i : v.item(k).i)) return fail(what + " holds what is no value of " + e->name);
+      return true;
+    };
     for (const Variable& v : g.variables) {
       if (!name_ok(v.name, "the variable")) return false;
       if (!names.insert(v.name).second) return fail("the name \"" + v.name + "\" is used twice");
+      if (!typed_ok("the variable " + v.name, v.type, v.of, v.value)) return false;
     }
     for (const Function& f : g.functions) {
       if (!name_ok(f.name, "the function")) return false;
@@ -674,6 +714,7 @@ struct Shape {
           if (!name_ok(p.name, "the pin")) return false;
           if (!seen.insert(p.name).second) return fail("function \"" + f.name + "\" has two pins called \"" + p.name + "\"");
           if (pins == &f.inputs && names.count(p.name)) return fail("the input \"" + p.name + "\" of " + f.name + " has the name of a variable or a function");
+          if (!typed_ok("\"" + p.name + "\" of " + f.name, p.type, p.of, p.value)) return false;
         }
       }
       int entries = 0;
@@ -693,8 +734,14 @@ struct Shape {
         if (pd.kind != ParamDef::Kind::type) continue;
         const std::string value = x.node->param(pd.key, pd.def);
         bool known = false;
-        for (PinType choice : type_choices(pd)) known = known || value == pin_type_name(choice);
-        if (!known) return fail(title(i) + ": \"" + value + "\" is no type it can have", i);
+        for (const TypeRef& choice : type_choices(pd, g)) known = known || value == type_text(choice);
+        if (!known) return fail(title(i) + ": \"" + value + "\" is no " + (pd.enums_only ? "enum of this Blueprint" : "type it can have"), i);
+      }
+      for (int k : x.data_in) {
+        // (an enum's value typed into a pin is one of its values)
+        const PinDef& pin = x.in[static_cast<std::size_t>(k)];
+        const json::Value* typed = x.node->value(pin.id);
+        if (typed && !typed_ok(title(i) + ": \"" + pin.id + "\"", pin.type, pin.of, *typed)) return false;
       }
       if (t == "math.formula") {
         const std::string text = x.node->param("formula", "a + b");
@@ -743,13 +790,13 @@ struct Writer {
   std::string id(int x) { return std::to_string(at(x).node->id); }
 
   /// The name of a node's function with its settings: flow_tween<"smooth">.
-  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node); }
+  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node, s.g); }
 
   std::string literal_of(int x, int k) {
     const Info& X = at(x);
     const PinDef& p = X.in[static_cast<std::size_t>(k)];
     const json::Value* typed = X.node->value(p.id);
-    return literal(Value::from_json(typed ? *typed : p.def, p.type));
+    return literal(Value::from_json(typed ? *typed : p.def, p.type), p.of, s.g);
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
@@ -974,17 +1021,25 @@ struct Writer {
         follow(x, 0, c, ind + 1);
         line(ind, "}");
         return -1;
-      case Form::choice:
+      case Form::choice: {
+        // Switch on Enum: the cases are the enum's values, by their names, and every one of them
+        // is written - as C++ wants a switch over an enum to be.
+        const EnumType* values = t == "flow.switch_enum" ? s.g.enumeration(X.node->param("enum")) : nullptr;
         line(ind, "switch (" + call(x, entry, c, definition) + ") {");
         for (std::size_t k = 0; k < outs; ++k) {
           const int target = X.dst[k].first;
-          if (target < 0 || at(target).merged) continue;  // (nothing of its own on this path)
-          line(ind + 1, "case " + std::to_string(k) + ": {  // " + X.out[static_cast<std::size_t>(X.exec_out[k])].id);
+          if (values && k < values->values.size()) {
+            line(ind + 1, "case " + values->name + "::" + values->values[k] + ": {");
+          } else {
+            if (target < 0 || at(target).merged) continue;  // (nothing of its own on this path)
+            line(ind + 1, "case " + std::to_string(k) + ": {  // " + X.out[static_cast<std::size_t>(X.exec_out[k])].id);
+          }
           follow(x, k, c, ind + 2);
           line(ind + 1, "} break;");
         }
         line(ind, "}");
         return -1;
+      }
       case Form::end:
         line(ind, call(x, entry, c, definition) + ";");
         return -1;
@@ -1006,11 +1061,11 @@ struct Writer {
     return 0;
   }
 
-  static std::string fields(const std::vector<PinDef>& pins, const std::vector<int>& which) {
+  static std::string fields(const std::vector<PinDef>& pins, const std::vector<int>& which, const Graph& g) {
     std::string r;
     for (int k : which) {
       const PinDef& p = pins[static_cast<std::size_t>(k)];
-      r += std::string(cpp_type(p.type)) + " " + p.id + " = " + literal(Value::zero(p.type)) + "; ";
+      r += cpp_type(TypeRef{p.type, p.of}) + " " + p.id + " = " + literal(Value::zero(p.type), p.of, g) + "; ";
     }
     return r;
   }
@@ -1018,12 +1073,12 @@ struct Writer {
   /// what its call gives - a value's member is its memory only).
   static std::vector<int> member_fields(const Info& x) { return x.pure ? std::vector<int>() : x.data_out; }
   /// The declaration of a node's member n<id>.
-  static std::string member_text(const Info& x) {
+  static std::string member_text(const Info& x, const Graph& g) {
     const std::string id = std::to_string(x.node->id);
     const std::string base = x.def->memory && !x.event ? "kern::Node<" + id + ">" : std::string();
     if (x.def->type == "func.call") return x.node->param("function") + "Result n" + id + ";";
     if (member_fields(x).empty()) return base + " n" + id + ";";
-    return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + fields(x.out, member_fields(x)) + "} n" + id + ";";
+    return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + fields(x.out, member_fields(x), g) + "} n" + id + ";";
   }
   void doc(int ind, const std::string& help) {
     std::size_t from = 0;
@@ -1070,11 +1125,20 @@ struct Writer {
       any = true;
       line(1, std::string("// ---- ") + title + " ----");
     };
+    if (!g.enums.empty()) {
+      section("types");
+      for (const EnumType& e : g.enums) {
+        doc(1, e.help);
+        std::string values;
+        for (const std::string& v : e.values) values += ", " + v;
+        line(1, "KERN_ENUM(" + e.name + values + ");");
+      }
+    }
     if (!g.variables.empty()) {
       section("variables");
       for (const Variable& v : g.variables) {
         doc(1, v.help);
-        line(1, std::string(cpp_type(v.type)) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type)) + ";");
+        line(1, cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type), v.of, g) + ";");
       }
     }
     if (!g.machines.empty()) {
@@ -1112,12 +1176,12 @@ struct Writer {
         first = false;
         if (!f.outputs.empty()) {
           std::string members;
-          for (const FunctionPin& p : f.outputs) members += std::string(cpp_type(p.type)) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type)) + "; ";
+          for (const FunctionPin& p : f.outputs) members += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
           line(1, "struct " + f.name + "Result { " + members + "};");
         }
         doc(1, f.help);
         std::string args;
-        for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + std::string(cpp_type(p.type)) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type));
+        for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g);
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (a path that ends without a Return gives the outputs' defaults)
         if (!body(e, 2) && !f.outputs.empty()) line(2, "return {};");
@@ -1132,7 +1196,7 @@ struct Writer {
       events = true;
       line(1, "KERN_EVENT(on" + id(i) + ", " + callee(i) + ")");
       std::string args;
-      for (int k : at(i).data_out) args += (args.empty() ? "" : ", ") + std::string(cpp_type(at(i).out[static_cast<std::size_t>(k)].type)) + " " + at(i).out[static_cast<std::size_t>(k)].id;
+      for (int k : at(i).data_out) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{at(i).out[static_cast<std::size_t>(k)].type, at(i).out[static_cast<std::size_t>(k)].of}) + " " + at(i).out[static_cast<std::size_t>(k)].id;
       line(1, "void on" + id(i) + "(" + args + ") {");
       body(i, 2);
       line(1, "}");
@@ -1170,7 +1234,7 @@ struct Writer {
       if (!at(i).member) continue;
       if (!members) section("what nodes give and keep");
       members = true;
-      line(1, member_text(at(i)));
+      line(1, member_text(at(i), g));
     }
     out += "};\n";
     if (!layout) return;
@@ -1194,8 +1258,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, or List<one of them>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text> or List<Actor>";
+const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum of the Blueprint, or List<one of them>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor> or List<an enum of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -1219,18 +1283,18 @@ struct Reader {
   struct MemberDecl {
     bool memory = false, result = false;
     std::string result_of;
-    std::vector<std::pair<std::string, PinType>> fields;
+    std::vector<std::pair<std::string, TypeRef>> fields;
     std::size_t tok = 0;
   };
   std::map<u32, MemberDecl> members;
-  std::map<std::string, std::pair<std::vector<std::pair<std::string, PinType>>, std::vector<Value>>> results;  // function -> its Result struct
+  std::map<std::string, std::pair<std::vector<std::pair<std::string, TypeRef>>, std::vector<Value>>> results;  // function -> its Result struct
   struct Item {  // a body, read in the second pass
     enum Kind : u8 { shared, function, event, go, loose } kind = shared;
     std::size_t open = 0;        // the token after its "{"
     u32 id = 0;                  // shared, event, go
     std::string fn;              // function: its name; event: the node's function
     std::vector<std::string> params;                    // event: its settings
-    std::vector<std::pair<std::string, PinType>> args;  // event: the method's parameters
+    std::vector<std::pair<std::string, TypeRef>> args;  // event: the method's parameters
     bool entry = false;          // go: takes the exec input it is entered through
     std::size_t tok = 0;
   };
@@ -1257,6 +1321,7 @@ struct Reader {
     std::string pin;    // empty: its one output
     bool cast = false;
     PinType to = PinType::number;
+    std::string of;     // a value written out: of which enum (when it is an enum's)
     std::size_t tok = 0;
     bool root = false;  // the expression is one new value node (what a name can be given to)
   };
@@ -1485,8 +1550,28 @@ struct Reader {
 
   // ---- literals ----
   /// A literal: true, 12, -0.5, "text", Vector{x, y, z}, Actor{n}. False (nothing read): none here.
-  bool literal_here(Value& v) {
+  /// A value written out. `of`: which enum it is of, when it is an enum's value (or a list of them).
+  bool literal_here(Value& v, std::string* of = nullptr) {
     const Tok& t = peek();
+    if (of) of->clear();
+    if (t.kind == Tok::id && is("::", 1) && g.enumeration(t.s)) {
+      // Mode::Open
+      const EnumType& e = *g.enumeration(t.s);
+      p += 2;
+      std::string name;
+      const std::size_t at = p;
+      if (!word(name, "a value of " + e.name)) return true;
+      const i64 index = enums::find(e.values, name);
+      if (index < 0) {
+        std::string all;
+        for (const std::string& x : e.values) all += (all.empty() ? "" : ", ") + x;
+        fail(at, e.name + " has no value \"" + name + "\" (" + all + ")");
+        return true;
+      }
+      v = Value::enumeration(index);
+      if (of) *of = e.name;
+      return true;
+    }
     if (t.kind == Tok::text) { v = Value::text(toks[p++].s); return true; }
     if (t.kind == Tok::id && (t.s == "true" || t.s == "false")) { v = Value::boolean(toks[p++].s == "true"); return true; }
     const bool minus = is("-") && peek(1).kind == Tok::number;
@@ -1519,59 +1604,72 @@ struct Reader {
     }
     if (t.kind == Tok::id && t.s == "List" && is("<", 1)) {
       // List<Float>{1.0, 2.5}
-      PinType list;
+      TypeRef list;
       if (!type_here(list)) return true;
-      if (!expect("{", "(a list written out is " + std::string(cpp_type(list)) + "{...})")) return true;
+      if (!expect("{", "(a list written out is " + cpp_type(list) + "{...})")) return true;
       json::Value items = json::Value::array();
       while (!is("}")) {
         Value item;
-        if (!typed_literal(element_of(list), item, "a list's item")) return true;
+        if (!typed_literal({element_of(list.type), list.of}, item, "a list's item")) return true;
         items.push(item.to_json());
         if (!accept(",")) break;
       }
       if (!expect("}")) return true;
-      v = Value::from_json(items, list);
+      v = Value::from_json(items, list.type);
+      if (of) *of = list.of;
       return true;
     }
     return false;
   }
   /// A literal for a place of type `want` ("Float x = 1" is 1.0; nothing else converts).
-  bool typed_literal(PinType want, Value& out, const std::string& what) {
+  bool typed_literal(const TypeRef& want, Value& out, const std::string& what) {
     const std::size_t at = p;
     Value v;
-    if (!literal_here(v)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
+    std::string of;
+    if (!literal_here(v, &of)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
     if (failed()) return false;
-    if (v.type == PinType::integer && want == PinType::number) v = Value::number(static_cast<f64>(v.i));
-    if (v.type != want) return fail(at, what + ": this is " + cpp_type(v.type) + ", but " + cpp_type(want) + " is needed (like " + literal(Value::zero(want)) + ")");
+    if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
+    if (v.type != want.type || of != want.of)
+      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of}) + ", but " + cpp_type(want) + " is needed (like " + literal(Value::zero(want.type), want.of, g) + ")");
     out = v;
     return true;
   }
 
   // ---- the first pass: what the struct declares ----
-  bool type_here(PinType& t) {
-    if (peek().kind == Tok::id && type_of_cpp(peek().s, t)) { ++p; return true; }
-    // List<Float>: a list of values of one type
-    PinType item;
+  /// A type: Float, an enum the Blueprint has declared, List<one of them>.
+  bool type_here(TypeRef& t) {
+    t = {};
+    if (peek().kind != Tok::id) return false;
+    if (type_of_cpp(peek().s, t.type)) { ++p; return true; }
+    if (g.enumeration(peek().s)) {
+      t = {PinType::enumeration, toks[p++].s};
+      return true;
+    }
     if (is("List") && is("<", 1)) {
-      if (peek(2).kind != Tok::id || !type_of_cpp(peek(2).s, item) || !is(">", 3)) return fail(p + 2, shown(peek(2)) + " is no type a list holds: a list is " + kListTypes);
+      // List<Float>: a list of values of one type
+      const Tok inner = peek(2);
+      PinType item = PinType::number;
+      const bool value = inner.kind == Tok::id && type_of_cpp(inner.s, item);
+      const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s);
+      if ((!value && !of_enum) || !is(">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
       p += 4;
-      t = list_of(item);
+      t = value ? TypeRef{list_of(item), {}} : TypeRef{PinType::enumeration_list, inner.s};
       return true;
     }
     return false;
   }
   /// Type name = value; ... }   ("{" has been read)
-  bool fields(std::vector<std::pair<std::string, PinType>>& out, std::vector<Value>* defaults, const std::string& what) {
+  bool fields(std::vector<std::pair<std::string, TypeRef>>& out, std::vector<Value>* defaults, const std::string& what) {
     while (!is("}")) {
-      PinType t;
+      TypeRef t;
       std::string field;
       if (!type_here(t)) return fail(p, what + ": " + kTypes + shown(peek()));
       if (!word(field, "the name")) return false;
-      Value v = Value::zero(t);
+      Value v = Value::zero(t.type);
       const std::size_t at = p;
       if (accept("=") && !typed_literal(t, v, field)) return false;
       if (!expect(";")) return false;
-      if (!defaults && !(v == Value::zero(t))) return fail(at, "what a node gives starts empty: " + field + " = " + literal(Value::zero(t)));
+      if (!defaults && !(v == Value::zero(t.type))) return fail(at, "what a node gives starts empty: " + field + " = " + literal(Value::zero(t.type), t.of, g));
       out.push_back({field, t});
       if (defaults) defaults->push_back(v);
     }
@@ -1664,11 +1762,11 @@ struct Reader {
     if (!accept("<")) return true;
     while (!is(">")) {
       std::string s;
-      PinType t;
+      TypeRef t;
       const bool is_type = peek().kind == Tok::id;
       if (is_type) {
         if (!type_here(t)) return fail(p, std::string("a setting is a text (\"...\") or a type - ") + kTypes + shown(peek()));
-        s = pin_type_name(t);
+        s = type_text(t);
       } else if (!string(s, "a setting")) {
         return false;
       }
@@ -1699,13 +1797,32 @@ struct Reader {
       if (is("}")) break;
       if (t.kind == Tok::end) return fail(p, "\"};\" is missing at the end of the struct");
       const std::size_t at = p;
-      PinType type;
+      if (accept("KERN_ENUM")) {
+        // KERN_ENUM(Mode, Closed, Opening, Open);   an enum of the Blueprint
+        EnumType e;
+        if (!expect("(") || !word(e.name, "the enum's name")) return false;
+        if (g.enumeration(e.name) || g.variable(e.name) || g.function(e.name)) return fail(at + 2, "the name " + e.name + " is declared twice");
+        while (accept(",")) {
+          std::string value;
+          const std::size_t where = p;
+          if (!word(value, "a value's name")) return false;
+          if (std::find(e.values.begin(), e.values.end(), value) != e.values.end()) return fail(where, e.name + " has the value " + value + " twice");
+          e.values.push_back(std::move(value));
+        }
+        if (e.values.empty()) return fail(p, "an enum has values: KERN_ENUM(" + e.name + ", First, Second);");
+        if (!expect(")") || !expect(";")) return false;
+        e.help = take_docs();
+        g.enums.push_back(std::move(e));
+        continue;
+      }
+      TypeRef type;
       if (type_here(type)) {
         // a variable
         Variable v;
-        v.type = type;
+        v.type = type.type;
+        v.of = type.of;
         if (!word(v.name, "the variable's name")) return false;
-        Value init = Value::zero(type);
+        Value init = Value::zero(type.type);
         if (accept("=") && !typed_literal(type, init, v.name)) return false;
         if (!expect(";")) return false;
         if (g.variable(v.name)) return fail(at + 1, "the variable " + v.name + " is declared twice");
@@ -1794,7 +1911,7 @@ struct Reader {
         continue;
       }
       if (ret != "void" && (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result"))
-        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor or a List of one of them; a function gives void or <Function>Result");
+        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum declared above it, or a List of one of them; a function gives void or <Function>Result");
       if (!expect("(")) return false;
       Item it;
       if (ret == "void" && numbered(fn, "on")) {
@@ -1802,7 +1919,7 @@ struct Reader {
         it = event;
         has_event = false;
         while (!is(")")) {
-          PinType pt;
+          TypeRef pt;
           std::string arg;
           if (!type_here(pt)) return fail(p, kTypes + shown(peek()));
           if (!word(arg, "the parameter's name")) return false;
@@ -1831,14 +1948,18 @@ struct Reader {
           if (ret != fn + "Result") return fail(at, "the function " + fn + " gives " + fn + "Result (or is void), not \"" + ret + "\"");
           auto r = results.find(fn);
           if (r == results.end()) return fail(at, "struct " + ret + " { ... }; must be declared above the function");
-          for (std::size_t k = 0; k < r->second.first.size(); ++k) f.outputs.push_back({r->second.first[k].first, r->second.first[k].second, r->second.second[k].to_json()});
+          for (std::size_t k = 0; k < r->second.first.size(); ++k)
+            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(), r->second.first[k].second.of});
         }
         while (!is(")")) {
           FunctionPin in;
-          if (!type_here(in.type)) return fail(p, kTypes + shown(peek()));
+          TypeRef in_type;
+          if (!type_here(in_type)) return fail(p, kTypes + shown(peek()));
+          in.type = in_type.type;
+          in.of = in_type.of;
           if (!word(in.name, "the input's name")) return false;
           Value v = Value::zero(in.type);
-          if (accept("=") && !typed_literal(in.type, v, in.name)) return false;
+          if (accept("=") && !typed_literal(in_type, v, in.name)) return false;
           in.value = v.to_json();
           f.inputs.push_back(std::move(in));
           if (!accept(",")) break;
@@ -1889,7 +2010,8 @@ struct Reader {
     for (const ParamDef& pd : def->params) {
       if (pd.kind == ParamDef::Kind::variable) continue;
       PinType type = PinType::number;
-      want += (want.empty() ? "" : ", ") + (pd.kind == ParamDef::Kind::type && pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : "\"" + pd.def + "\"");
+      want += (want.empty() ? "" : ", ") +
+              (pd.kind == ParamDef::Kind::type ? (pd.enums_only ? std::string("AnEnum") : pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : std::string("Type")) : "\"" + pd.def + "\"");
       ++count;
     }
     return count == 0 ? " has no settings (no <...>)" : " has " + std::to_string(count) + " setting(s): " + node_name(def->type) + "<" + want + ">";
@@ -1912,7 +2034,7 @@ struct Reader {
       bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type);
       if (fits && pd.kind == ParamDef::Kind::type) {
         fits = false;
-        for (PinType choice : type_choices(pd)) fits = fits || given[at] == pin_type_name(choice);
+        for (const TypeRef& choice : type_choices(pd, g)) fits = fits || given[at] == type_text(choice);
       }
       if (!fits) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
       ++at;
@@ -1972,12 +2094,13 @@ struct Reader {
       data_wires.push_back({node, pin.id, src});
       return true;
     }
-    if (src.cast) return fail(src.tok, "a value written out needs no kern::to: write the " + std::string(cpp_type(pin.type)) + " itself");
+    const TypeRef want{pin.type, pin.of};
+    if (src.cast) return fail(src.tok, "a value written out needs no kern::to: write the " + cpp_type(want) + " itself");
     Value v = src.value;
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
-    if (v.type != pin.type)
-      return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(pin.type) + ", this is " + cpp_type(v.type) + " (a " + cpp_type(pin.type) + " looks like " +
-                               literal(Value::zero(pin.type)) + ")");
+    if (v.type != pin.type || src.of != pin.of)
+      return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
+                               literal(Value::zero(pin.type), pin.of, g) + ")");
     m.node.set_value(pin.id, v.to_json());
     return true;
   }
@@ -2051,7 +2174,7 @@ struct Reader {
     s.tok = p;
     if (failed()) return s;
     Value v;
-    if (literal_here(v)) {
+    if (literal_here(v, &s.of)) {
       s.literal = true;
       s.value = v;
       return s;
@@ -2062,7 +2185,7 @@ struct Reader {
       p += 1;
       if (!expect("::")) return s;
       if (accept("to")) {
-        PinType to;
+        TypeRef to;
         if (!expect("<")) return s;
         if (!type_here(to)) { fail(p, "kern::to<Type>: a type expected, not " + shown(peek())); return s; }
         if (!expect(">") || !expect("(")) return s;
@@ -2070,7 +2193,7 @@ struct Reader {
         if (failed() || !expect(")")) return s;
         if (inner.cast) { fail(s.tok, "one kern::to is enough"); return s; }
         inner.cast = true;
-        inner.to = to;
+        inner.to = to.type;
         inner.tok = s.tok;
         inner.root = false;
         return inner;
@@ -2351,6 +2474,7 @@ struct Reader {
         const int node = step(make_named(def, name), name);
         if (node < 0 || !expect("(")) return {};
         const std::vector<std::string> outs = exec_pins(node, false);
+        if (def->type == "flow.switch_enum") { fail(name, fname + " goes on at the enum's value: switch (" + fname + "<AnEnum>(...)) { case AnEnum::Value: { } break; }"); return {}; }
         if (def->latent || def->loop || outs.size() != 1 || def->kind != NodeKind::flow) {
           fail(name, fname + " does not decide whether the path goes on: " +
                          (outs.size() >= 2 && !def->latent && !def->loop ? "switch (" + fname + "(...)) { case 0: { } break; }" : "it stands on a line of its own"));
@@ -2390,7 +2514,9 @@ struct Reader {
       const int node = step(make_named(def, name), name);
       if (node < 0 || !expect("(")) return {};
       const std::vector<std::string> outs = exec_pins(node, false);
-      if (def->latent || def->loop || outs.size() < 2) { fail(name, fname + " has no several ways on to switch between"); return {}; }
+      // Switch on Enum: its cases are the enum's values, by their names (case Mode::Open:).
+      const EnumType* values = def->type == "flow.switch_enum" ? g.enumeration(made[static_cast<std::size_t>(node)].node.param("enum")) : nullptr;
+      if (def->latent || def->loop || (outs.size() < 2 && !values)) { fail(name, fname + " has no several ways on to switch between"); return {}; }
       Args a{*this};
       std::string entry;
       if (!head(node, a, entry) || !args_of(node, a, fname) || !expect(")", "(" + takes(node, fname) + ")") || !expect(")") || !expect("{")) return {};
@@ -2400,9 +2526,23 @@ struct Reader {
       while (!failed() && accept("case")) {
         i64 k = 0;
         const std::size_t which = p;
-        if (!integer(k, "the exec output's number")) return {};
+        if (values) {
+          if (peek().kind != Tok::id || peek().s != values->name || !is("::", 1)) {
+            fail(which, "a case of " + fname + "<" + values->name + "> is one of the enum's values: case " + values->name + "::" + (values->values.empty() ? std::string("Value") : values->values[0]) + ":");
+            return {};
+          }
+          Value v;
+          literal_here(v);
+          if (failed()) return {};
+          k = v.i;
+        } else if (!integer(k, "the exec output's number")) {
+          return {};
+        }
         if (k < 0 || static_cast<std::size_t>(k) >= outs.size()) { fail(which, fname + " has the exec outputs 0 to " + std::to_string(outs.size() - 1)); return {}; }
-        if (written[static_cast<std::size_t>(k)]) { fail(which, "case " + std::to_string(k) + " is there twice"); return {}; }
+        if (written[static_cast<std::size_t>(k)]) {
+          fail(which, "case " + (values ? values->name + "::" + values->values[static_cast<std::size_t>(k)] : std::to_string(k)) + " is there twice");
+          return {};
+        }
         written[static_cast<std::size_t>(k)] = true;
         if (!expect(":") || !expect("{")) return {};
         Ends arm = block({{node, outs[static_cast<std::size_t>(k)]}});
@@ -2555,6 +2695,7 @@ struct Reader {
     if (def->type == "flow.branch") { fail(at, "a Branch is if (value) { } else { }"); return {}; }
     if (def->type == "flow.sequence") { fail(at, "a Sequence is { } { }"); return {}; }
     if (def->type == "flow.while") { fail(at, "a While Loop is while (loop(value)) { }"); return {}; }
+    if (def->type == "flow.switch_enum") { fail(at, fname + " goes on at the enum's value: switch (" + fname + "<AnEnum>(...)) { case AnEnum::Value: { } break; }"); return {}; }
     const int node = step(make_named(def, at), at);
     if (node < 0 || !expect("(")) return {};
     const std::vector<std::string> outs = exec_pins(node, false);
@@ -2638,8 +2779,8 @@ struct Reader {
           if (!declare(it.id, node, it.tok)) break;
           std::string want, got;
           for (const PinDef& pd : made[static_cast<std::size_t>(node)].out)
-            if (pd.type != PinType::exec) want += (want.empty() ? "" : ", ") + std::string(cpp_type(pd.type)) + " " + pd.id;
-          for (const auto& [arg, type] : it.args) got += (got.empty() ? "" : ", ") + std::string(cpp_type(type)) + " " + arg;
+            if (pd.type != PinType::exec) want += (want.empty() ? "" : ", ") + cpp_type(TypeRef{pd.type, pd.of}) + " " + pd.id;
+          for (const auto& [arg, type] : it.args) got += (got.empty() ? "" : ", ") + cpp_type(type) + " " + arg;
           if (want != got) { fail(it.tok, "the method of " + it.fn + " is void on" + std::to_string(it.id) + "(" + want + ")"); break; }
           scope.root = node;
           const std::vector<std::string> outs = exec_pins(node, false);
@@ -2950,13 +3091,14 @@ struct Reader {
       const PinDef* in = nullptr;
       for (const PinDef& pd : to.in) if (pd.id == w.in) in = &pd;
       if (!in) continue;
-      const std::string need = cpp_type(in->type), have = cpp_type(out_pin->type);
+      const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
+      const std::string need = cpp_type(to_type), have = cpp_type(from_type);
       if (w.from.cast) {
-        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (out_pin->type == in->type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
-        if (out_pin->type == in->type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");
-        if (!convertible(out_pin->type, in->type)) return fail(w.from.tok, "a " + have + " cannot become a " + need);
-      } else if (out_pin->type != in->type) {
-        if (!convertible(out_pin->type, in->type)) return fail(w.from.tok, "this is " + have + ", the input is " + need + ": the two do not convert");
+        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (from_type == to_type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
+        if (from_type == to_type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");
+        if (!fits(from_type, to_type)) return fail(w.from.tok, "a " + have + " cannot become a " + need);
+      } else if (!(from_type == to_type)) {
+        if (!fits(from_type, to_type)) return fail(w.from.tok, "this is " + have + ", the input is " + need + ": the two do not convert");
         return fail(w.from.tok, "this is " + have + ", the input is " + need + ": write kern::to<" + need + ">(...)");
       }
       g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
@@ -3008,7 +3150,7 @@ struct Reader {
         return fail(m.tok, "its values are read outside its own method: the method begins with " + nid + " = {" + names + "};");
       }
       if (!x.member && decl == members.end()) continue;
-      const std::string want = Writer::member_text(x);
+      const std::string want = Writer::member_text(x, g);
       if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want);
       const MemberDecl& d = decl->second;
       bool same = d.memory == (x.def->memory && !x.event) && d.result == (x.def->type == "func.call");
@@ -3018,7 +3160,7 @@ struct Reader {
         same = same && d.fields.size() == held.size();
         for (std::size_t k = 0; same && k < d.fields.size(); ++k) {
           const PinDef& pd = x.out[static_cast<std::size_t>(held[k])];
-          same = d.fields[k].first == pd.id && d.fields[k].second == pd.type;
+          same = d.fields[k].first == pd.id && d.fields[k].second == TypeRef{pd.type, pd.of};
         }
       }
       if (!same) return fail(d.tok, nid + " is " + node_name(x.def->type) + ": " + want);
@@ -3036,19 +3178,26 @@ struct Reader {
 std::vector<std::pair<std::string, std::string>> described(const Graph& g, const Library& lib) {
   std::vector<std::pair<std::string, std::string>> r;
   auto add = [&](std::string key, std::string value) { r.push_back({std::move(key), std::move(value)}); };
+  add("the number of enums", std::to_string(g.enums.size()));
+  for (std::size_t i = 0; i < g.enums.size(); ++i) {
+    std::string values;
+    for (const std::string& v : g.enums[i].values) values += (values.empty() ? "" : ", ") + v;
+    add("enum " + std::to_string(i + 1), g.enums[i].name + " { " + values + " }");
+    add("the description of enum " + std::to_string(i + 1), g.enums[i].help);
+  }
   add("the number of variables", std::to_string(g.variables.size()));
   for (std::size_t i = 0; i < g.variables.size(); ++i) {
     const Variable& v = g.variables[i];
-    add("variable " + std::to_string(i + 1), std::string(cpp_type(v.type)) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type)));
+    add("variable " + std::to_string(i + 1), cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type), v.of, g));
     add("the description of variable " + std::to_string(i + 1), v.help);
   }
   add("the number of functions", std::to_string(g.functions.size()));
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const Function& f = g.functions[i];
     std::string sig = f.name + (f.pure ? " (pure)" : "") + " (";
-    for (const FunctionPin& p : f.inputs) sig += std::string(cpp_type(p.type)) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type)) + "; ";
+    for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
     sig += ") -> (";
-    for (const FunctionPin& p : f.outputs) sig += std::string(cpp_type(p.type)) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type)) + "; ";
+    for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type), p.of, g) + "; ";
     add("function " + std::to_string(i + 1), sig + ")");
     add("the description of function " + std::to_string(i + 1), f.help);
   }
@@ -3114,7 +3263,7 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
       if (wire != into.end()) add("the input \"" + p.id + "\" of " + key, "from " + wire->second);
       else {
         const json::Value* typed = n->value(p.id);
-        add("the input \"" + p.id + "\" of " + key, literal(Value::from_json(typed ? *typed : p.def, p.type)));
+        add("the input \"" + p.id + "\" of " + key, literal(Value::from_json(typed ? *typed : p.def, p.type), p.of, g));
       }
     }
     for (const PinDef& p : out) {
@@ -3306,7 +3455,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (error) *error = why;
     return false;
   }
-  auto type = [](PinType t) -> const char* {
+  auto builtin = [](PinType t) -> const char* {
     switch (t) {
       case PinType::boolean: return "bool";
       case PinType::integer: return "kern::i64";
@@ -3322,17 +3471,23 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       default: return "kern::logic::ActorHandle";
     }
   };
+  // (an enum is the class's own: <Class>::Mode)
+  auto type = [&](PinType t, const std::string& of) -> std::string {
+    if (element_of(t) != PinType::enumeration) return builtin(t);
+    return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
+  };
   // (the notation's literal, outside the class: with the types' own names)
-  std::function<std::string(const Value&)> spelled = [&](const Value& v) -> std::string {
+  std::function<std::string(const Value&, const std::string&)> spelled = [&](const Value& v, const std::string& of) -> std::string {
+    if (v.type == PinType::enumeration) return name + "::" + literal(v, of, g);
     const std::string text = literal(v);
     if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
     if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
     if (!is_list(v.type)) return text;
-    std::string r = std::string(type(v.type)) + "{";
-    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k));
+    std::string r = type(v.type, of) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k), of);
     return r + "}";
   };
-  auto value = [&](const json::Value& j, PinType t) { return spelled(Value::from_json(j, t)); };
+  auto value = [&](const json::Value& j, PinType t, const std::string& of) { return spelled(Value::from_json(j, t), of); };
   char hash[40];
   std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
   // The handlers of events: the runtime starts a chain at an event's node, the class has it as
@@ -3345,7 +3500,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const NodeDef* def = lib.find(n.type);
     if (def && def->latent) {
       // A node that waits: when the wait is over the runtime runs it again - <node>_resume.
-      const std::string fn = node_name(def->type) + "_resume" + settings_of(*def, n);
+      const std::string fn = node_name(def->type) + "_resume" + settings_of(*def, n, g);
       events += "      case " + std::to_string(i) + ": self." + fn + "(self.n" + std::to_string(n.id) + "); break;  // " + lib.title(n) + "\n";
       continue;
     }
@@ -3355,7 +3510,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     std::string args;
     for (std::size_t o = 0; o < outs.size(); ++o) {
       if (outs[o].type == PinType::exec) continue;
-      args += std::string(args.empty() ? "" : ", ") + "native_out<" + type(outs[o].type) + ">(*self.kern_world.instance, " + std::to_string(i) + ", " + std::to_string(o) + ")";
+      args += std::string(args.empty() ? "" : ", ") + "native_out<" + type(outs[o].type, outs[o].of) + ">(*self.kern_world.instance, " + std::to_string(i) + ", " + std::to_string(o) + ")";
     }
     const std::string id = std::to_string(n.id), call = "self.on" + id + "(" + args + ");";
     if (shape.at(static_cast<int>(i)).member) {
@@ -3399,7 +3554,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   for (const Function& f : g.functions) {
     std::string call = "self." + f.name + "(";
     for (std::size_t k = 0; k < f.inputs.size(); ++k)
-      call += std::string(k ? ", " : "") + "native_arg<" + type(f.inputs[k].type) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type) + ")";
+      call += std::string(k ? ", " : "") + "native_arg<" + type(f.inputs[k].type, f.inputs[k].of) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ")";
     call += ")";
     s += "    if (function == \"" + f.name + "\") {\n";
     if (f.outputs.empty()) {

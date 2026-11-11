@@ -36,6 +36,7 @@ std::string name_problem(const logic::Graph& g, const std::string& name) {
   }
   for (const logic::Function& f : g.functions)
     if (f.name + "Result" == name) return "\"" + name + "\" is taken by the function " + f.name + " (the type of its results in C++)";
+  if (g.enumeration(name)) return "\"" + name + "\" is an enum of this Blueprint";
   return {};
 }
 
@@ -121,18 +122,18 @@ bool pin_of(const logic::Graph& g, u32 node, const std::string& pin, bool output
 
 /// The value of the setting "Type" with which the pin `pin` of a generic node (Select, Reroute,
 /// the list nodes) is of type `want` - "" when it has no such setting or none of its types fits.
-std::string type_setting_for(const logic::Graph& g, const logic::Node& node, const std::string& pin, bool output, logic::PinType want) {
+std::string type_setting_for(const logic::Graph& g, const logic::Node& node, const std::string& pin, bool output, const logic::TypeRef& want) {
   const logic::NodeDef* def = logic::library().find(node.type);
   if (!def) return {};
   for (const logic::ParamDef& pd : def->params) {
-    if (pd.kind != logic::ParamDef::Kind::type) continue;
-    for (logic::PinType t : logic::type_choices(pd)) {
+    if (pd.kind != logic::ParamDef::Kind::type || pd.key != "type") continue;
+    for (const logic::TypeRef& t : logic::type_choices(pd, g)) {
       logic::Node probe = node;
-      probe.set_param(pd.key, logic::pin_type_name(t));
+      probe.set_param(pd.key, logic::type_text(t));
       std::vector<logic::PinDef> in, outs;
       logic::library().pins(probe, g, in, outs);
       for (const logic::PinDef& p : output ? outs : in)
-        if (p.id == pin && p.type == want) return logic::pin_type_name(t);
+        if (p.id == pin && logic::TypeRef{p.type, p.of} == want) return logic::type_text(t);
     }
   }
   return {};
@@ -147,25 +148,26 @@ std::vector<std::pair<std::string, std::string>> generic_pins(const logic::Graph
   const logic::NodeDef* def = logic::library().find(node.type);
   if (!def) return r;
   const logic::ParamDef* type = nullptr;
-  for (const logic::ParamDef& pd : def->params) if (pd.kind == logic::ParamDef::Kind::type) type = &pd;
+  for (const logic::ParamDef& pd : def->params) if (pd.kind == logic::ParamDef::Kind::type && pd.key == "type") type = &pd;
   if (!type) return r;
   std::vector<logic::PinDef> in, out;
   logic::library().pins(node, g, in, out);
   std::vector<std::string> types_in(in.size()), types_out(out.size());
   std::vector<bool> typed_in(in.size(), false), typed_out(out.size(), false);
-  for (logic::PinType choice : logic::type_choices(*type)) {
+  auto same = [](const logic::PinDef& a, const logic::PinDef& b) { return a.type == b.type && a.of == b.of; };
+  for (const logic::TypeRef& choice : logic::type_choices(*type, g)) {
     logic::Node probe = node;
-    probe.set_param(type->key, logic::pin_type_name(choice));
+    probe.set_param(type->key, logic::type_text(choice));
     std::vector<logic::PinDef> pin, pout;
     logic::library().pins(probe, g, pin, pout);
     if (pin.size() != in.size() || pout.size() != out.size()) return r;
     for (std::size_t i = 0; i < in.size(); ++i) {
-      if (pin[i].type != in[i].type) typed_in[i] = true;
-      types_in[i] += (types_in[i].empty() ? "" : " ") + std::string(logic::pin_type_name(pin[i].type));
+      if (!same(pin[i], in[i])) typed_in[i] = true;
+      types_in[i] += (types_in[i].empty() ? "" : " ") + logic::type_text({pin[i].type, pin[i].of});
     }
     for (std::size_t i = 0; i < out.size(); ++i) {
-      if (pout[i].type != out[i].type) typed_out[i] = true;
-      types_out[i] += (types_out[i].empty() ? "" : " ") + std::string(logic::pin_type_name(pout[i].type));
+      if (!same(pout[i], out[i])) typed_out[i] = true;
+      types_out[i] += (types_out[i].empty() ? "" : " ") + logic::type_text({pout[i].type, pout[i].of});
     }
   }
   std::size_t wired = 0;
@@ -195,8 +197,8 @@ bool retype(logic::Graph& g, u32 id, const std::string& type, const std::string&
   logic::library().pins(probe, g, in_b, out_b);
   if (in_a.size() != in_b.size() || out_a.size() != out_b.size()) return false;
   std::vector<std::string> typed_in, typed_out;
-  for (std::size_t k = 0; k < in_a.size(); ++k) if (in_a[k].type != in_b[k].type) typed_in.push_back(in_a[k].id);
-  for (std::size_t k = 0; k < out_a.size(); ++k) if (out_a[k].type != out_b[k].type) typed_out.push_back(out_a[k].id);
+  for (std::size_t k = 0; k < in_a.size(); ++k) if (in_a[k].type != in_b[k].type || in_a[k].of != in_b[k].of) typed_in.push_back(in_a[k].id);
+  for (std::size_t k = 0; k < out_a.size(); ++k) if (out_a[k].type != out_b[k].type || out_a[k].of != out_b[k].of) typed_out.push_back(out_a[k].id);
   for (const logic::Link& l : g.links) {
     if (l.to == id && l.in != replaced && std::find(typed_in.begin(), typed_in.end(), l.in) != typed_in.end()) return false;
     if (l.from == id && std::find(typed_out.begin(), typed_out.end(), l.out) != typed_out.end()) return false;
@@ -216,13 +218,14 @@ bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const st
   logic::PinDef po, pi;
   if (!pin_of(g, from, out, true, po) || !pin_of(g, to, in, false, pi)) { error = "no such pin"; return false; }
   if ((po.type == logic::PinType::exec) != (pi.type == logic::PinType::exec)) { error = "exec pins connect to exec pins only"; return false; }
-  if (po.type != pi.type && po.type != logic::PinType::exec) {
+  auto type_of = [](const logic::PinDef& p) { return logic::TypeRef{p.type, p.of}; };
+  if (!(type_of(po) == type_of(pi)) && po.type != logic::PinType::exec) {
     // (first the node the wire goes into, then the one it comes from)
-    if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, po.type), in)) pin_of(g, to, in, false, pi);
-    else if (const logic::Node* m = g.find(from); m && !logic::convertible(po.type, pi.type) && retype(g, from, type_setting_for(g, *m, out, true, pi.type))) pin_of(g, from, out, true, po);
+    if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, type_of(po)), in)) pin_of(g, to, in, false, pi);
+    else if (const logic::Node* m = g.find(from); m && !logic::fits(type_of(po), type_of(pi)) && retype(g, from, type_setting_for(g, *m, out, true, type_of(pi)))) pin_of(g, from, out, true, po);
   }
-  if (!logic::convertible(po.type, pi.type)) {
-    error = std::string("a ") + logic::pin_type_name(po.type) + " cannot go into a " + logic::pin_type_name(pi.type) + " pin";
+  if (!logic::fits(type_of(po), type_of(pi))) {
+    error = "a " + logic::type_text(type_of(po)) + " cannot go into a " + logic::type_text(type_of(pi)) + " pin";
     return false;
   }
   auto& links = g.links;
@@ -233,12 +236,12 @@ bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const st
 }
 
 /// The first pin of `node` that `type` can connect to (output side when `want_output`).
-std::string compatible_pin(const logic::Graph& g, const logic::Node& node, logic::PinType type, bool want_output) {
+std::string compatible_pin(const logic::Graph& g, const logic::Node& node, const logic::TypeRef& type, bool want_output) {
   std::vector<logic::PinDef> in, out;
   logic::library().pins(node, g, in, out);
   for (const logic::PinDef& p : want_output ? out : in) {
-    if ((p.type == logic::PinType::exec) != (type == logic::PinType::exec)) continue;
-    if (want_output ? logic::convertible(p.type, type) : logic::convertible(type, p.type)) return p.id;
+    if ((p.type == logic::PinType::exec) != (type.type == logic::PinType::exec)) continue;
+    if (want_output ? logic::fits({p.type, p.of}, type) : logic::fits(type, {p.type, p.of})) return p.id;
   }
   return {};
 }
@@ -339,6 +342,7 @@ json::Value Studio::logic_json() const {
         pj.set("id", p.id);
         pj.set("label", p.label);
         pj.set("type", logic::pin_type_name(p.type));
+        if (!p.of.empty()) pj.set("of", p.of);
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
         bool linked = false;
@@ -374,9 +378,9 @@ json::Value Studio::logic_json() const {
         if (pd.kind == K::choice)
           for (std::size_t i = 0; i + 1 < pd.choices.size(); i += 2) choice(pd.choices[i], pd.choices[i + 1]);
         if (pd.kind == K::type)
-          for (logic::PinType t : logic::type_choices(pd)) choice(logic::pin_type_name(t), logic::type_label(t));
+          for (const logic::TypeRef& t : logic::type_choices(pd, *g)) choice(logic::type_text(t), logic::type_label(t));
         if (pd.kind == K::variable)
-          for (const logic::Variable& v : g->variables) choice(v.name, v.name + " (" + logic::type_label(v.type) + ")");
+          for (const logic::Variable& v : g->variables) choice(v.name, v.name + " (" + logic::type_label(logic::TypeRef{v.type, v.of}) + ")");
         if (pd.kind == K::machine)
           for (const logic::StateMachine& m : g->machines) choice(m.name, m.name);
         if (pd.kind == K::function)
@@ -422,11 +426,13 @@ json::Value Studio::logic_json() const {
     json::Value x = json::Value::object();
     x.set("name", v.name);
     x.set("type", logic::pin_type_name(v.type));
+    if (!v.of.empty()) x.set("of", v.of);
     x.set("value", logic::Value::from_json(v.value, v.type).to_json());
     vars.push(std::move(x));
   }
   o.set("variables", std::move(vars));
   json::Value graph = logic::graph_to_json(*g);
+  o.set("enums", graph["enums"].is_array() ? graph["enums"] : json::Value::array());
   o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
   o.set("machines", graph["machines"]);
   o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
@@ -517,13 +523,13 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   }
   // Context: dragging from a pin keeps only nodes that can take the wire.
   bool from_pin = false, from_output = false;
-  logic::PinType from_type = logic::PinType::exec;
+  logic::TypeRef from_type{logic::PinType::exec, {}};
   if (c["from"].is_object()) {
     logic::PinDef p;
     from_output = c["from"]["output"].as_bool();
     if (pin_of(*g, static_cast<u32>(c["from"]["node"].as_number()), c["from"]["pin"].as_string(), from_output, p)) {
       from_pin = true;
-      from_type = p.type;
+      from_type = {p.type, p.of};
     }
   }
   struct Entry { std::string label, category, help, type; std::vector<std::pair<std::string, std::string>> params; int rank = 0; };
@@ -547,12 +553,17 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     for (const logic::ParamDef& pd : d.params) if (pd.kind == logic::ParamDef::Kind::variable) return true;
     return false;
   };
+  /// The nodes of an enum: offered per enum of the Blueprint.
+  auto enum_node = [](const logic::NodeDef& d) {
+    for (const logic::ParamDef& pd : d.params) if (pd.kind == logic::ParamDef::Kind::type && pd.enums_only) return true;
+    return false;
+  };
   for (const auto& d : lib.all()) {
-    if (variable_step(*d)) continue;                                                     // per variable below
+    if (variable_step(*d) || enum_node(*d)) continue;                                    // per variable, per enum below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
     if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
-    if (from_pin && from_type != logic::PinType::exec) {
+    if (from_pin && from_type.type != logic::PinType::exec) {
       // a generic node comes in the type that fits the wire (Length of a Text List, Select of a Vector)
       logic::Node probe;
       probe.type = d->type;
@@ -571,8 +582,8 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     consider(std::move(e));
   }
   if (from_pin) {
-    if (from_type == logic::PinType::exec) consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "flow.reroute", {}});
-    else consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "value.reroute", {{"type", logic::pin_type_name(from_type)}}});
+    if (from_type.type == logic::PinType::exec) consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "flow.reroute", {}});
+    else consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "value.reroute", {{"type", logic::type_text(from_type)}}});
   }
   for (const logic::Variable& v : g->variables) {
     consider({"Get " + v.name, "Variables", std::string("Reads ") + v.name, "var.get", {{"variable", v.name}}});
@@ -588,6 +599,14 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       consider({lib.title(named), "Lists", d->help, d->type, {{"variable", v.name}}});
     }
   }
+  for (const logic::EnumType& e : g->enums)
+    for (const auto& d : lib.all()) {
+      if (!enum_node(*d)) continue;
+      logic::Node named;
+      named.type = d->type;
+      named.set_param("enum", e.name);
+      consider({lib.title(named), d->category, d->help, d->type, {{"enum", e.name}}});
+    }
   for (const logic::Function& f : g->functions) {
     consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
     consider({"Return (" + f.name + ")", "Functions", "Ends " + f.name + " and gives its outputs to the caller", "func.return", {{"function", f.name}}});
@@ -602,7 +621,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       consider({"On " + s.name + " Entered", "State Machines", m.name + " entered " + s.name, "event.state_enter", {{"machine", m.name}, {"state", s.name}}});
     }
   // Categories in the order people reach for them.
-  static const char* order[] = {"Events", "Flow", "Variables", "Lists", "Functions", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
+  static const char* order[] = {"Events", "Flow", "Variables", "Lists", "Enums", "Functions", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
                                 "Math", "Logic", "Vector", "Text", "Values", "Utilities"};
   auto cat_rank = [](const std::string& c) {
     for (int i = 0; i < static_cast<int>(std::size(order)); ++i) if (c == order[i]) return i;
@@ -632,6 +651,13 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   json::Value r = ok_result();
   r.set("items", std::move(out));
   return r;
+}
+
+/// A default kept through a change of type: converted where the types convert; a value of an
+/// enum starts at the first value of another one.
+json::Value retyped_default(const json::Value& value, const logic::TypeRef& from, const logic::TypeRef& to) {
+  if (logic::element_of(to.type) == logic::PinType::enumeration && !(from == to)) return logic::Value::zero(to.type).to_json();
+  return logic::Value::from_json(value, from.type).converted(to.type).to_json();
 }
 
 // ---------------------------------------------------------------------------
@@ -847,7 +873,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         const bool output = c["from"]["output"].as_bool();
         logic::PinDef p;
         if (pin_of(g, from_node, from_pin, output, p)) {
-          const std::string other = compatible_pin(g, g.nodes.back(), p.type, !output);
+          const std::string other = compatible_pin(g, g.nodes.back(), {p.type, p.of}, !output);
           std::string ignore;
           if (!other.empty()) {
             if (output) connect(g, from_node, from_pin, n.id, other, ignore);
@@ -1060,10 +1086,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (pins.size() >= 16) { error = "a function has at most 16 inputs and 16 outputs"; return false; }
         std::string base = str("pin").empty() ? (input_side ? "value" : "result") : str("pin"), pname = base;
         for (int i = 2; !valid_name(pname) && i < 100; ++i) pname = base + std::to_string(i);
-        logic::PinType t = logic::PinType::number;
-        logic::pin_type_from_name(str("type").empty() ? "float" : str("type"), t);
-        if (t == logic::PinType::exec) t = logic::PinType::number;
-        pins.push_back({pname, t, logic::Value::zero(t).to_json()});
+        logic::TypeRef t;
+        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        pins.push_back({pname, t.type, logic::Value::zero(t.type).to_json(), t.of});
         result.set("pin", pname);
         return true;
       }
@@ -1101,10 +1126,11 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       if (op == "pinType") {
-        logic::PinType t;
-        if (!logic::pin_type_from_name(str("type"), t) || t == logic::PinType::exec) { error = "unknown type"; return false; }
-        it->value = logic::Value::from_json(it->value, it->type).converted(t).to_json();
-        it->type = t;
+        logic::TypeRef t;
+        if (!logic::type_from_text(str("type"), g, t)) { error = "unknown type"; return false; }
+        it->value = retyped_default(it->value, {it->type, it->of}, t);
+        it->type = t.type;
+        it->of = t.of;
         // values typed into the nodes were of the old type
         for (logic::Node& n : g.nodes)
           if (uses(n) && is_input_pin_of(n, input_side))
@@ -1129,11 +1155,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "add") {
         std::string base = var.empty() ? "NewVar" : var, n = base;
         if (const std::string why = name_problem(g, base); !why.empty() && !var.empty()) { error = why; return false; }
-        for (int i = 2; g.variable(n) || g.function(n); ++i) n = base + std::to_string(i);
-        logic::PinType t = logic::PinType::number;
-        logic::pin_type_from_name(str("type").empty() ? "float" : str("type"), t);
-        if (t == logic::PinType::exec) t = logic::PinType::number;
-        g.variables.push_back({n, t, logic::Value::zero(t).to_json(), {}});
+        for (int i = 2; g.variable(n) || g.function(n) || g.enumeration(n); ++i) n = base + std::to_string(i);
+        logic::TypeRef t;
+        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        g.variables.push_back({n, t.type, logic::Value::zero(t.type).to_json(), {}, t.of});
         result.set("name", n);
         return true;
       }
@@ -1145,7 +1170,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "rename") {
         const std::string to = str("to");
-        if (to.empty() || to.size() > 64 || g.variable(to) || g.function(to)) { error = "that name is empty or taken"; return false; }
+        if (to.empty() || to.size() > 64 || g.variable(to) || g.function(to) || g.enumeration(to)) { error = "that name is empty or taken"; return false; }
         if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         for (logic::Node& n : g.nodes)
           if (n.param("variable") == var) n.set_param("variable", to);
@@ -1156,10 +1181,11 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       if (op == "type") {
-        logic::PinType t;
-        if (!logic::pin_type_from_name(str("type"), t) || t == logic::PinType::exec) { error = "unknown type"; return false; }
-        v->value = logic::Value::from_json(v->value, v->type).converted(t).to_json();
-        v->type = t;
+        logic::TypeRef t;
+        if (!logic::type_from_text(str("type"), g, t)) { error = "unknown type"; return false; }
+        v->value = retyped_default(v->value, {v->type, v->of}, t);
+        v->type = t.type;
+        v->of = t.of;
         return true;
       }
       if (op == "value") {
@@ -1167,6 +1193,139 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       error = "unknown variable operation";
+      return false;
+    });
+  }
+  if (name == "logicEnum") {
+    // An enum of the Blueprint: its name, its values (their order is their meaning: a value is
+    // its place among them - what is typed into variables and pins follows when values move).
+    const std::string op = str("op");
+    return graph_edit("Edit Enum", [&](logic::Graph& g, game::Level&) {
+      const std::string which = str("name");
+      auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n); };
+      auto list_like = [](const std::string& n) { return n.size() > 5 && n.substr(n.size() - 5) == "_list"; };
+      if (op == "add") {
+        std::string base = which.empty() ? "NewEnum" : which, n = base;
+        if (const std::string why = name_problem(g, base); !why.empty() && !which.empty()) { error = why; return false; }
+        if (list_like(base)) { error = "a name that ends in _list reads as a list"; return false; }
+        for (int i = 2; taken(n); ++i) n = base + std::to_string(i);
+        g.enums.push_back({n, {"First", "Second"}, {}});
+        result.set("name", n);
+        return true;
+      }
+      logic::EnumType* e = g.enumeration(which);
+      if (!e) { error = "no enum " + which; return false; }
+      const std::string old = e->name;
+      // The settings of nodes that name this enum (a type setting: "Mode", "Mode_list").
+      auto each_setting = [&](const std::function<void(logic::Node&, const logic::ParamDef&, bool list)>& fn) {
+        for (logic::Node& n : g.nodes) {
+          const logic::NodeDef* d = logic::library().find(n.type);
+          if (!d) continue;
+          for (const logic::ParamDef& pd : d->params) {
+            if (pd.kind != logic::ParamDef::Kind::type) continue;
+            const std::string v = n.param(pd.key, pd.def);
+            if (v == old) fn(n, pd, false);
+            else if (v == old + "_list") fn(n, pd, true);
+          }
+        }
+      };
+      if (op == "remove") {
+        std::string user;
+        for (const logic::Variable& v : g.variables) if (user.empty() && v.of == old) user = "the variable " + v.name;
+        for (const logic::Function& f : g.functions)
+          for (const auto* pins : {&f.inputs, &f.outputs})
+            for (const logic::FunctionPin& fp : *pins) if (user.empty() && fp.of == old) user = "\"" + fp.name + "\" of the function " + f.name;
+        each_setting([&](logic::Node& n, const logic::ParamDef&, bool) { if (user.empty()) user = logic::library().title(n); });
+        if (!user.empty()) { error = old + " is in use: " + user; return false; }
+        g.enums.erase(std::remove_if(g.enums.begin(), g.enums.end(), [&](const logic::EnumType& x) { return x.name == old; }), g.enums.end());
+        return true;
+      }
+      if (op == "rename") {
+        const std::string to = str("to");
+        if (to == old) return true;
+        if (to.empty() || to.size() > 64 || taken(to)) { error = "that name is empty or taken"; return false; }
+        if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
+        if (list_like(to)) { error = "a name that ends in _list reads as a list"; return false; }
+        each_setting([&](logic::Node& n, const logic::ParamDef& pd, bool list) { n.set_param(pd.key, list ? to + "_list" : to); });
+        for (logic::Variable& v : g.variables) if (v.of == old) v.of = to;
+        for (logic::Function& f : g.functions)
+          for (auto* pins : {&f.inputs, &f.outputs})
+            for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.of = to;
+        e->name = to;
+        return true;
+      }
+      if (op == "help") { e->help = str("text"); return true; }
+      auto value_name_ok = [&](const std::string& n) {
+        if (!logic::cpp_name_ok(n)) { error = "\"" + n + "\" cannot be a value's name: letters, digits and _ (no spaces), not a word of C++"; return false; }
+        if (std::find(e->values.begin(), e->values.end(), n) != e->values.end()) { error = old + " has a value " + n + " already"; return false; }
+        return true;
+      };
+      if (op == "addValue") {
+        std::string base = str("value").empty() ? "Value" : str("value"), n = base;
+        if (!str("value").empty() && !value_name_ok(n)) return false;
+        for (int i = 2; std::find(e->values.begin(), e->values.end(), n) != e->values.end(); ++i) n = base + std::to_string(i);
+        if (e->values.size() >= 256) { error = "an enum has at most 256 values"; return false; }
+        e->values.push_back(n);
+        return true;
+      }
+      const std::size_t index = static_cast<std::size_t>(max_of(0.0, num("index")));
+      if (index >= e->values.size()) { error = old + " has no value " + std::to_string(index); return false; }
+      if (op == "renameValue") {
+        const std::string to = str("to");
+        if (to == e->values[index]) return true;
+        if (!value_name_ok(to)) return false;
+        e->values[index] = to;
+        return true;
+      }
+      if (op == "removeValue" || op == "moveValue") {
+        // where each value is afterwards (a removed one: the first)
+        std::vector<i64> place(e->values.size());
+        for (std::size_t k = 0; k < place.size(); ++k) place[k] = static_cast<i64>(k);
+        std::size_t other = index;
+        if (op == "removeValue") {
+          if (e->values.size() <= 1) { error = "an enum has at least one value"; return false; }
+          for (std::size_t k = 0; k < place.size(); ++k) place[k] = k == index ? 0 : static_cast<i64>(k > index ? k - 1 : k);
+        } else {
+          other = num("by") < 0 ? index - 1 : index + 1;
+          if ((num("by") < 0 && index == 0) || other >= e->values.size()) return false;
+          std::swap(place[index], place[other]);
+        }
+        auto moved = [&](const json::Value& j, logic::PinType type) {
+          logic::Value v = logic::Value::from_json(j, type);
+          auto to = [&](i64 at) { return at >= 0 && static_cast<std::size_t>(at) < place.size() ? place[static_cast<std::size_t>(at)] : 0; };
+          if (type == logic::PinType::enumeration) v.i = to(v.i);
+          else if (v.size() > 0)
+            for (i64& x : v.edit<i64>()) x = to(x);
+          return v.to_json();
+        };
+        // what is typed into the pins of this enum's type (the pins as they are now)
+        for (logic::Node& n : g.nodes) {
+          std::vector<logic::PinDef> in, out;
+          logic::library().pins(n, g, in, out);
+          for (const logic::PinDef& pd : in)
+            if (pd.of == old && logic::element_of(pd.type) == logic::PinType::enumeration)
+              if (const json::Value* typed = n.value(pd.id)) n.set_value(pd.id, moved(*typed, pd.type));
+        }
+        for (logic::Variable& v : g.variables) if (v.of == old) v.value = moved(v.value, v.type);
+        for (logic::Function& f : g.functions)
+          for (auto* pins : {&f.inputs, &f.outputs})
+            for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.value = moved(fp.value, fp.type);
+        // Switch on this enum: each wire stays with its value (the wires of a removed one go)
+        auto case_of = [&](const logic::Link& l) -> i64 {
+          const logic::Node* from = g.find(l.from);
+          if (!from || from->type != "flow.switch_enum" || from->param("enum") != old || l.out.rfind("case", 0) != 0) return -1;
+          const i64 k = static_cast<i64>(std::strtoll(l.out.c_str() + 4, nullptr, 10));
+          return k >= 0 && static_cast<std::size_t>(k) < place.size() ? k : -1;
+        };
+        if (op == "removeValue")
+          g.links.erase(std::remove_if(g.links.begin(), g.links.end(), [&](const logic::Link& l) { return case_of(l) == static_cast<i64>(index); }), g.links.end());
+        for (logic::Link& l : g.links)
+          if (const i64 k = case_of(l); k >= 0) l.out = "case" + std::to_string(place[static_cast<std::size_t>(k)]);
+        if (op == "removeValue") e->values.erase(e->values.begin() + static_cast<std::ptrdiff_t>(index));
+        else std::swap(e->values[index], e->values[other]);
+        return true;
+      }
+      error = "unknown enum operation";
       return false;
     });
   }
@@ -1323,8 +1482,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (base.empty() || std::isdigit(static_cast<unsigned char>(base[0]))) base = "NewVar" + base;
       if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
-      for (int i = 2; g.variable(vname) || g.function(vname); ++i) vname = base + std::to_string(i);
-      logic::Variable v{vname, p.type, logic::Value::zero(p.type).to_json(), {}};
+      for (int i = 2; g.variable(vname) || g.function(vname) || g.enumeration(vname); ++i) vname = base + std::to_string(i);
+      logic::Variable v{vname, p.type, logic::Value::zero(p.type).to_json(), {}, p.of};
       if (!output)
         if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, p.type).to_json();
       g.variables.push_back(v);
