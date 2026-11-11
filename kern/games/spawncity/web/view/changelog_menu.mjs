@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"18:49",title:"Mehrspieler: eine Welt für alle",items:[
+    "Polizei sehen jetzt alle: Polizisten, Streifenwagen, Polizeidrohnen und die Sandbox-Gegner eines Spielers erscheinen auch bei den Mitspielern und lassen sich von ihnen treffen. Gejagt wird weiterhin nur, wer gesucht wird.",
+    "Schaden an der Stadt gilt für alle: Wer als Mitspieler ein Auto der Stadt beschädigt oder einen Passanten trifft, tut das jetzt in der gemeinsamen Welt – Brand und Wrack sehen alle, und Passanten fliehen auch vor den Schüssen eines Mitspielers.",
+    "Wer später beitritt, sieht die Welt, wie sie ist: kaputte Laternen, Brand- und Wandspuren und die Barrikaden der Zombie-Runde.",
+    "Die Fahndungssterne eines Spielers stehen als ★ auf seinem Namensschild.",
+  ]},
   {date:"2026-11-11",time:"14:11",title:"Blueprints: Aufzählungen (Enums)",items:[
     "Kern-Blueprints: Ein Blueprint kann jetzt eigene Typen mit benannten Werten haben, etwa „Mode“ mit Closed, Opening, Open. Variablen, Listen, Funktions-Ein- und -Ausgänge und Pins können von diesem Typ sein; ein Wert ist immer genau einer der Werte, keine Zahl und kein Text.",
     "Neue Knoten je Aufzählung: „Switch on Mode“ mit einem Ausgang pro Wert, Vergleich, der Name eines Werts als Text und zurück, sein Platz als Zahl und zurück, und alle Werte als Liste für „For Each“.",
