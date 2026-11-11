@@ -225,7 +225,7 @@ red, it would still stay on yellow for one step. With **Set State** you jump dir
 
 ## 9.5 Core Nodes
 
-Kern brings **93** built-in nodes:
+Kern brings **100** built-in nodes:
 
 | Category | Examples |
 |---|---|
@@ -234,6 +234,7 @@ Kern brings **93** built-in nodes:
 | flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | variables | Get, Set, Add |
 | lists | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| enums | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
 | functions | Function Entry, Return, Call Function |
 | math | plus, minus, times, divided by, remainder, square root, random, calculating with angles |
 | logic | Compare, AND, OR, XOR, NOT, Select |
@@ -246,8 +247,15 @@ What you know from Scratch:
 - **For** = "repeat with a counter," **While** = "repeat as long as …".
 - A **list** = Scratch's lists: many values in a row, the first has the number 0. **For Each** =
   "repeat for every item of the list."
-- **Switch** = one of several outputs depending on a number or text, like a railroad switch with
-  many tracks.
+- An **enum** = a type you make yourself, with named values: "Mode" with the values "Closed,"
+  "Opening" and "Open." A value is exactly one of them, like the dropdown in a Scratch block where
+  you pick one of a few fixed choices – and a pin of this type without a wire shows such a
+  dropdown. An enum's value is neither a number nor a text: here even "anything to Text" (9.1) has
+  its exception, and a wire only connects pins of the same enum. Nodes say what you mean instead,
+  and in the menu they carry your enum's name: **Mode to Text** gives the value's name,
+  **Mode to Index** its place (the first is 0).
+- **Switch** = one of several outputs depending on a number, a text or an enum's value, like a
+  railroad switch with many tracks. **Switch on Mode** has one output for each value.
 - **AND, OR, NOT** = "and," "or," "not." **XOR** = "either – or, but not both."
 - **Append** = join texts together, **Contains** = "does the text contain …?"
 

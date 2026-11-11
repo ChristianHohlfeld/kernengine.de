@@ -197,6 +197,89 @@ await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "42.25 of [1.5, 40, 0.25, 0.5]", 60000), `Play adds to the list and loops over it (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
+// ---- 1d. an enum: its values in Details, a variable of its type, Switch on Enum, played -----------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+const enums = async () => (await logic()).enums;
+const enumValues = async () => ((await enums())[0]?.values || []).join(",");
+await page.click('.lg-sec[data-sec="enums"] [data-add]');
+check(await until(async () => (await enums()).length === 1 && await page.locator('.lg-dbody [data-ek="name"]').count() === 1) && await enumValues() === "First,Second", "+ in My Blueprint adds an enum with two values, shown in Details");
+await page.locator('.lg-dbody [data-ek="name"]').fill("Mode");
+await page.locator('.lg-dbody [data-ek="name"]').press("Enter");
+check(await until(async () => (await enums())[0]?.name === "Mode" && await page.locator('.lg-enum[data-enum="Mode"].on').count() === 1), "the enum is renamed in Details");
+const valueField = i => page.locator(`.lg-dbody .lg-erow[data-index="${i}"] [data-ev="name"]`);
+for (const [i, name] of [[0, "Closed"], [1, "Open"]]) {
+  await valueField(i).fill(name);
+  await valueField(i).press("Enter");
+  await until(async () => (await enumValues()).split(",")[i] === name);
+}
+await page.click('.lg-dbody [data-act="enum-value"]');
+await until(async () => await page.locator(".lg-dbody .lg-erow").count() === 3);
+await valueField(2).fill("Opening");
+await valueField(2).press("Enter");
+check(await until(async () => await enumValues() === "Closed,Open,Opening"), `values are renamed and added (${await enumValues()})`);
+await valueField(2).fill("Open");
+await valueField(2).press("Enter");
+check(await until(async () => await valueField(2).inputValue() === "Opening") && await enumValues() === "Closed,Open,Opening", "a name another value has is refused");
+// a variable of the enum, set to Open; then Opening moves up: the variable is still Open
+await cmd({cmd: "logicVariable", op: "add", name: "State", type: "float"});
+await page.click('.lg-var[data-var="State"]');
+const enumType = page.locator('.lg-dbody [data-vk="type"]');
+check(await until(async () => await enumType.count() === 1) && (await enumType.locator("option").count()) === 14 && (await enumType.locator('option[value="Mode_list"]').textContent()) === "Mode List",
+      "a variable's Type offers the enum and a list of it");
+await enumType.selectOption("Mode");
+const stateVar = async () => (await logic()).variables.find(v => v.name === "State");
+check(await until(async () => (await stateVar())?.of === "Mode" && await page.locator('.lg-dbody select[data-vk="value"] option').count() === 3), "its default is chosen among the enum's values");
+await page.locator('.lg-dbody select[data-vk="value"]').selectOption({label: "Open"});
+check(await until(async () => (await stateVar())?.value === 1), "the default is Open");
+await page.click('.lg-enum[data-enum="Mode"]');
+await page.click('.lg-dbody .lg-erow[data-index="2"] [data-ev="up"]');
+check(await until(async () => await enumValues() === "Closed,Opening,Open") && (await stateVar()).value === 2, "a value moves up, and what was set stays with its value");
+// Begin Play: State = Opening (chosen on the node); Switch on Mode; at Opening the message says the value's name
+await page.hover('.lg-enum[data-enum="Mode"]');  // (a row's buttons show under the cursor)
+await page.click('.lg-enum[data-enum="Mode"] [data-switch]');
+check(await until(async () => (await logic()).nodes.some(n => n.type === "flow.switch_enum")), "Switch in My Blueprint adds a Switch on the enum");
+l = await logic();
+const sw = l.nodes.find(n => n.type === "flow.switch_enum");
+check(sw.title === "Switch on Mode" && sw.outputs.map(o => o.label).join(",") === "Closed,Opening,Open" && sw.inputs.find(q => q.id === "value").of === "Mode", "it has an exec output for each value");
+const eb = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 0})).id;
+const setState = (await cmd({cmd: "logicAdd", type: "var.set", x: 240, y: 0, params: {variable: "State"}})).id;
+const getState = (await cmd({cmd: "logicAdd", type: "var.get", x: 240, y: 260, params: {variable: "State"}})).id;
+const fromPin = (await cmd({cmd: "logicPalette", query: "", from: {node: getState, pin: "value", output: true}})).items;
+check(fromPin.some(e => e.type === "enum.name" && e.params?.enum === "Mode") && fromPin.some(e => e.type === "logic.select" && e.params?.type === "Mode") && !fromPin.some(e => e.type === "debug.print" || e.type === "math.add"),
+      "from a Mode pin the menu offers the enum's nodes and Select of a Mode, and nothing an enum does not go into");
+const nameOf = (await cmd({cmd: "logicAdd", type: "enum.name", x: 520, y: 260, params: {enum: "Mode"}})).id;
+const join = (await cmd({cmd: "logicAdd", type: "text.append", x: 760, y: 260})).id;
+const say = (await cmd({cmd: "logicAdd", type: "game.message", x: 1000, y: 100})).id;
+const literal = page.locator(`.lg-node[data-id="${setState}"] select.lg-lit.enm`);
+check(await until(async () => await literal.count() === 1) && (await literal.locator("option").count()) === 3, "an enum pin without a wire has a dropdown of the values");
+await literal.selectOption({label: "Opening"});
+check(await until(async () => (await logic()).nodes.find(n => n.id === setState).inputs.find(q => q.id === "value").value === 1), "choosing sets the pin's value");
+check(await page.locator(`.lg-node[data-id="${getState}"] .lg-row[data-type="Mode"]`).count() === 1, "an enum pin is of its enum's type");
+for (const [from, out, to, input] of [[eb, "then", setState, "exec"], [setState, "then", sw.id, "exec"], [getState, "value", sw.id, "value"], [sw.id, "case1", say, "exec"],
+                                      [getState, "value", nameOf, "value"], [nameOf, "name", join, "b"], [join, "result", say, "text"]])
+  await cmd({cmd: "logicConnect", from, out, to, in: input});
+await cmd({cmd: "logicValue", node: join, pin: "a", value: "is "});
+check(!(await cmd({cmd: "logicConnect", from: getState, out: "value", to: join, in: "c"})).ok, "an enum's value is no text: it does not go into a Text pin");
+check(errorsOf(await logic()).length === 0, "the enum graph compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await page.click(".lg-cpp");
+check(await until(async () => (await cppText.inputValue()).includes("KERN_ENUM(Mode, Closed, Opening, Open);")), "the C++ view declares the enum");
+code = await cppText.inputValue();
+check(code.includes("Mode State = Mode::Open;") && code.includes("State = Mode::Opening;") && /switch \(flow_switch_enum<Mode>\(n\d+\(\)\)\) \{\n\s+case Mode::Closed: \{\n\s+\} break;\n\s+case Mode::Opening: \{/.test(code) &&
+      /enum_name<Mode>\(n\d+\(\)\)/.test(code), "a variable of the enum, its values by name, a switch with a case for every value");
+check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
+// a value renamed in the text is renamed in the Blueprint
+await cppText.fill(code.replaceAll("Opening", "Ajar"));
+await cppText.press("Control+Enter");
+check(await until(async () => await enumValues() === "Closed,Ajar,Open"), "an enum changed in the text is the Blueprint's enum");
+await page.click(".lg-cppclose");
+check(await until(async () => await page.locator(`.lg-node[data-id="${sw.id}"]`).count() === 0 || (await logic()).nodes.some(n => n.type === "flow.switch_enum" && n.outputs[1].label === "Ajar")), "the Switch shows the new name");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "is Ajar", 60000), `Play switches on the enum and says the value's name (${(await status()).hud?.message})`);
+await cmd({cmd: "stop"});
+
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 const text = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
 const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});

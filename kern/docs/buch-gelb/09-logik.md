@@ -226,7 +226,7 @@ trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in ei
 
 ## 9.5 Kern-Knoten
 
-Kern bringt **93** eingebaute Knoten mit:
+Kern bringt **100** eingebaute Knoten mit:
 
 | Kategorie | Beispiele |
 |---|---|
@@ -235,6 +235,7 @@ Kern bringt **93** eingebaute Knoten mit:
 | Flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | Variablen | Get, Set, Add |
 | Listen | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| Aufzählungen (Enums) | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
 | Funktionen | Function Entry, Return, Call Function |
 | Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Rechnen mit Winkeln |
 | Logik | Compare, AND, OR, XOR, NOT, Select |
@@ -247,8 +248,16 @@ Viele Namen sind englisch. Was aus Scratch bekannt ist:
 - **For** = „wiederhole mit Zähler“, **While** = „wiederhole, solange …“.
 - Eine **Liste** = die Listen aus Scratch: viele Werte hintereinander, der erste hat die Nummer 0.
   **For Each** = „wiederhole für jeden Eintrag der Liste“.
-- **Switch** = je nach Zahl oder Text einer von mehreren Ausgängen, wie eine Weiche mit vielen
-  Gleisen.
+- Eine **Aufzählung** (im Editor: Enum) = ein Typ, den du selbst anlegst, mit benannten Werten:
+  „Mode“ mit den Werten „Closed“, „Opening“ und „Open“. Ein Wert ist genau einer davon, wie beim
+  Auswahlmenü in einem Scratch-Block, in dem du eine von wenigen festen Möglichkeiten wählst – und
+  so ein Auswahlmenü zeigt auch ein Pin dieses Typs, an dem kein Draht hängt. Der Wert einer
+  Aufzählung ist weder Zahl noch Text: Hier hat sogar „alles nach Text“ (9.1) seine Ausnahme, und
+  ein Draht verbindet nur Pins derselben Aufzählung. Stattdessen sagen Knoten, was du meinst; im
+  Menü tragen sie den Namen deiner Aufzählung: **Mode to Text** gibt den Namen des Werts,
+  **Mode to Index** seine Stelle (die erste ist 0).
+- **Switch** = je nach Zahl, Text oder Wert einer Aufzählung einer von mehreren Ausgängen, wie
+  eine Weiche mit vielen Gleisen. **Switch on Mode** hat einen Ausgang für jeden Wert.
 - **AND, OR, NOT** = „und“, „oder“, „nicht“. **XOR** = „entweder – oder, aber nicht beides“.
 - **Append** = Texte aneinanderhängen, **Contains** = „enthält der Text …?“.
 

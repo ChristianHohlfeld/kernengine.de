@@ -180,7 +180,7 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
   Im Editor: Listen-Pins, Listentypen für Variablen und Funktions-Pins, ein Eintrags-Editor;
   generische Knoten nehmen den Typ des ersten Drahts an.
 - [ ] Strukturen (benannte Felder) und Datentabellen im Level (im Editor als Tabelle).
-- [ ] Aufzählungen (Enum) als Pin-Typ mit Auswahl.
+- [x] Aufzählungen (Enum) als Pin-Typ mit Auswahl: `KERN_ENUM(Mode, Closed, Open)`, Variablen, Listen und Funktions-Pins des Typs, „Switch on Enum“ (`case Mode::Open:`), Namen und Plätze der Werte als Knoten.
 - [ ] Lokale Variablen in Funktionen; Funktionen, die sich selbst aufrufen dürfen.
 - [ ] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen.
 

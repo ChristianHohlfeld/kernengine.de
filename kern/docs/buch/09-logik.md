@@ -47,6 +47,12 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   Arrays). Eine Liste auf einem Draht ist ein Wert wie jeder andere: Wer sie liest, hat die
   Liste, wie sie war. Die Schritte, die eine Liste ändern (Add, Insert, Set Item, Remove, Clear),
   ändern eine Listen-Variable; For Each geht durch eine Liste, wie sie beim Start der Schleife war.
+- **Aufzählungen** (Enums): Ein Blueprint kann eigene Typen mit benannten Werten deklarieren,
+  etwa `Mode` mit den Werten `Closed`, `Opening`, `Open`. Ein Wert einer Aufzählung ist genau
+  einer ihrer Werte, gehalten als seine Stelle unter ihnen (die erste ist 0). Er ist weder Zahl
+  noch Text: Er wandelt sich in nichts um, und ein Draht verbindet nur Pins derselben Aufzählung.
+  Wo eine Zahl oder ein Text gebraucht wird, sagt ein Knoten, was gemeint ist (Enum to Index,
+  Enum to Text).
 - **State Machines**: Zustände und Übergänge im Stil des Zustandseditors von
   digitalisierungsplanung.de. Ein Übergang feuert auf ein Event, einen Timer, eine Bedingungsvariable
   oder automatisch; Betreten und Verlassen eines Zustands lösen Events aus.
@@ -84,6 +90,31 @@ Ein Listen-`Value` hält seine Einträge in `list` (`Value::of(std::vector<T>)`,
 ändert (`edit<T>()`), ändert eine eigene Kopie. Im JSON ist eine Liste das Array ihrer Einträge.
 Eine Liste ganzer Zahlen hält jede so, wie jedes `integer` gehalten wird.
 
+Ein siebter Werttyp und ein siebter Listentyp gehören dem, was ein Blueprint selbst deklariert:
+seinen **Aufzählungen** (`Graph::enums`; ein `EnumType` hat `name`, `values` und `help`).
+`enumeration`, der Wert einer Aufzählung, steht nach `actor`, `enumeration_list` nach `actor_list`
+(im JSON `enum` und `enum_list`). Welche Aufzählung gemeint ist, steht als ihr Name neben dem Typ:
+`of` in einer `Variable`, einem `FunctionPin` und einem `PinDef`. Das `Value` hält die Stelle des
+Werts unter den Werten der Aufzählung, die erste ist 0 (`Value::enumeration(k)`; eine Liste:
+`Value::enumerations`) – und dasselbe steht in der Datei:
+
+```json
+"enums": [
+  {"name": "Mode", "values": ["Closed", "Opening", "Open"], "help": "What the door is doing."}
+],
+"variables": [
+  {"name": "State", "type": "enum", "of": "Mode", "value": 0},
+  {"name": "Seen", "type": "enum_list", "of": "Mode", "value": [0, 2]}
+]
+```
+
+`enums` erscheint nur, wenn der Blueprint welche deklariert. Die Einstellung eines Knotens nennt
+die Aufzählung (`"params": {"enum": "Mode"}`); eine Typ-Einstellung nennt sie als
+`"type": "Mode"`, eine Liste ihrer Werte als `"Mode_list"`. Von außen – Code, der eine Variable
+einer Instanz setzt oder eine ihrer Funktionen aufruft (`Instance::set`, `Instance::call`) – ist,
+was kein Wert der Aufzählung ist, ihr erster Wert. Im C++ eines Blueprints ist eine Aufzählung
+`KERN_ENUM(Mode, Closed, Opening, Open);` ([blueprint_cpp.md](../blueprint_cpp.md)).
+
 Eine ganze Zahl (`integer`) ist überall dieselbe: so, wie ein Blueprint sie hält (`logic::normal`).
 Unter jeder Zahl liegt ein `double` – in den Variablen des Interpreters, im JIT –, also sind
 ganze Zahlen bis 2^53 exakt, eine größere ist die nächste, die ein `double` hält, und keine geht
@@ -95,12 +126,15 @@ als Zahl und ist für jeden Wert definiert.
 Welche Drähte erlaubt sind, sagt `convertible(from, to)`:
 
 - gleicher Typ immer; Exec nur mit Exec;
-- **alles nach `text`** („everything prints“);
+- **alles nach `text`** („everything prints“) – außer den Werten einer Aufzählung, die zu nichts werden;
 - Zahlen untereinander (`bool`, `int`, `float`);
 - `actor` → `bool` („ist gültig“);
 - `float`/`int` → `vector` (in alle drei Komponenten);
 - eine **Liste** passt nur in eine Liste ihres eigenen Typs – und nach `text` (`[1, 2.5]`);
-  nichts wird zu einer Liste.
+  nichts wird zu einer Liste;
+- der **Wert einer Aufzählung** wandelt sich in nichts um, und nichts wird zu einem – keine Zahl
+  und auch kein `text`; dasselbe gilt für eine Liste davon. Ein Draht verbindet nur Pins
+  derselben Aufzählung (`fits(from, to)`: `convertible`, und zwei Aufzählungen sind dieselbe).
 
 Die Umrechnungen (`as_bool`, `as_int`, `as_number`, `as_vector`, `as_text`, `as_actor`) sind
 festgelegt, z. B. Text „0“ oder „false“ ist falsch, ein Vektor als Zahl ist seine Länge, eine Zahl
@@ -317,15 +351,16 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 
 ## 9.5 Kern-Knoten
 
-`src/logic/core_nodes.cpp` registriert 93 Knoten:
+`src/logic/core_nodes.cpp` registriert 100 Knoten:
 
 | Kategorie | Knoten |
 |---|---|
 | **Events** | `event.begin` Begin Play · `event.tick` Event Tick (Delta Seconds) · `event.every` Every N Seconds (Intervall-Parameter, zählt eigene Zeit, Ausgang Count) · `event.custom` Custom Event (Name; Ausgänge Actor, Value, Text; schaltet auch gleichnamige State-Machine-Übergänge) |
 | **State Machines** | `event.state_enter` On State Entered · `event.state_exit` On State Left · `state.set` Set State · `state.get` Current State · `state.is` Is In State |
-| **Flow** | `flow.reroute` / `value.reroute` (Knoten für Drähte) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 Ausgänge) · `flow.for` For Loop (First, Last inklusive; Index) · `flow.for_each` For Each (eine Liste; Item, Index; die Liste, wie sie beim Start der Schleife ist) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (Aufrufe während des Wartens werden ignoriert) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update jeden Schritt mit Alpha 0→1, Easing linear/smooth/in/out, dann Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (Fälle durch Kommas getrennt) · `flow.call` Call Event (Target, Actor, Value, Text) |
+| **Flow** | `flow.reroute` / `value.reroute` (Knoten für Drähte) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 Ausgänge) · `flow.for` For Loop (First, Last inklusive; Index) · `flow.for_each` For Each (eine Liste; Item, Index; die Liste, wie sie beim Start der Schleife ist) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (Aufrufe während des Wartens werden ignoriert) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update jeden Schritt mit Alpha 0→1, Easing linear/smooth/in/out, dann Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (Fälle durch Kommas getrennt) · `flow.switch_enum` Switch on Enum (Einstellung Enum; ein Exec-Ausgang je Wert der Aufzählung, beschriftet mit dem Namen des Werts) · `flow.call` Call Event (Target, Actor, Value, Text) |
 | **Variablen** | `var.get` · `var.set` · `var.add` (Amount, −1 zählt herunter) |
 | **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find` Find Item (Index oder −1) – Schritte auf einer Listen-Variablen (Einstellung List): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
+| **Aufzählungen** | auf den Werten einer Aufzählung des Blueprints (Einstellung Enum; im Editor trägt der Knoten ihren Namen, „Mode to Text“): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (der Name des Werts) · `enum.from_name` Text to Enum (der Wert mit diesem Namen; Found – heißt kein Wert so: der erste Wert, und Found ist falsch) · `enum.index` Enum to Index (die Stelle des Werts unter den Werten der Aufzählung, die erste ist 0) · `enum.from_index` Index to Enum (der Wert an dieser Stelle; Valid – gibt es die Stelle nicht: der erste Wert, und Valid ist falsch) · `enum.values` All Values (eine Liste aller Werte in ihrer Reihenfolge, für ein For Each) – die Knoten für jeden Typ arbeiten auch im Typ einer Aufzählung: Get und Set einer Variablen, Select, Reroute, die Listen-Knoten und For Each |
 | **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) |
 | **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` · `math.formula` Formula (jeder Name darin ist ein Eingang) |
 | **Logik** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; Gleichheit mit 10⁻⁹ Toleranz) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
@@ -584,11 +619,12 @@ Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zu
 | Befehl | Wirkung |
 |---|---|
 | `logicOpen {owner}`, `logicClose`, `logicView {view}` | Graph eines Actors (oder des Levels) öffnen, schließen, Ansicht |
-| `logicPalette {query, from}` | Aktionsmenü: Suche über Titel, Kategorie, Hilfe, Suchwörter; beim Ziehen von einem Pin nur Knoten, die den Draht annehmen; dazu „Get/Set/Add to <Variable>“, „Call/Event <Name>“, „Go to <Zustand>“, „On <Zustand> Entered“, „Add Reroute Node“; nach Kategorien geordnet, höchstens 120 |
+| `logicPalette {query, from}` | Aktionsmenü: Suche über Titel, Kategorie, Hilfe, Suchwörter; beim Ziehen von einem Pin nur Knoten, die den Draht annehmen; dazu „Get/Set/Add to <Variable>“, „Call/Event <Name>“, „Go to <Zustand>“, „On <Zustand> Entered“, „Add Reroute Node“ und die Knoten jeder Aufzählung bei ihrem Namen (für eine Aufzählung `Mode`: „Switch on Mode“, „Mode to Text“ …); nach Kategorien geordnet, höchstens 120 |
 | `logicAdd {type, x, y, params, from}` | Knoten auf das 8-px-Raster setzen; ohne Variable/State Machine wird eine angelegt; von einem Pin fallen gelassen wird er gleich verbunden |
-| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände); ein generischer Knoten (Select, Reroute, die Listen-Knoten), dessen typisierte Pins noch frei sind, nimmt den Typ des Drahts an |
+| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände); ein generischer Knoten (Select, Reroute, die Listen-Knoten), dessen typisierte Pins noch frei sind, nimmt den Typ des Drahts an, auch den einer Aufzählung |
 | `logicValue`, `logicParam`, `logicComment` | Literal, Einstellung (Drähte zu weggefallenen Pins werden entfernt), Knotenkommentar |
 | `logicVariable {op}` | `add`, `remove`, `rename` (auch in Knoten und Übergängen), `type` (Wert wird umgewandelt), `value` |
+| `logicEnum {op}` | die Aufzählungen des Blueprints: `add` (sie beginnt als `NewEnum` mit den Werten `First` und `Second`), `remove`, `rename`, `help` (ihre Beschreibung); ihre Werte: `addValue`, `renameValue`, `moveValue` (nach oben oder unten), `removeValue` |
 | `logicMachine {op}` | State Machines und Zustände anlegen, umbenennen, entfernen, Anfangszustand, Übergänge (`addTransition`, `editTransition`, `removeTransition`; Bedingung ohne Variable legt eine boolesche „Ready“ an) |
 | `logicCommentBox {op}` | Kommentarrahmen |
 | `logicPromote` | „Promote to Variable“: neue Variable vom Typ des Pins, über Get (Eingang) oder Set (Ausgang) angeschlossen |
@@ -601,10 +637,30 @@ Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zu
 | `logicTemplate {template}` | Vorlage unter den vorhandenen Knoten einfügen |
 | `logicRemoveGraph` | Graph des Actors entfernen bzw. Level-Graph leeren |
 
+**Aufzählungen im Editor.** My Blueprint hat einen Abschnitt **Enums**; **+** legt eine an. Ist
+sie ausgewählt, zeigt **Details** ihren Namen, eine Beschreibung und ihre Werte: Jeden Wert kann
+man umbenennen, nach oben oder unten schieben oder entfernen; **+ Value** fügt einen an. Die
+Auswahlliste *Type* einer Variablen und der Ein- und Ausgänge einer Funktion führt die
+Aufzählungen des Blueprints und eine Liste von jeder (`Mode`, `Mode List`). Ein Pin vom Typ einer
+Aufzählung, an dem kein Draht hängt, zeigt eine Auswahlliste mit ihren Werten; den Standardwert
+einer Variablen dieses Typs wählt man genauso, und eine Liste einer Aufzählung hat eine
+Auswahlliste je Eintrag.
+
+Eine Aufzählung, die benutzt wird, lässt sich weiter bearbeiten. Die Aufzählung oder einen Wert
+umzubenennen, ändert nichts außer dem Namen. Einen Wert nach oben oder unten zu schieben, lässt
+alles bei seinem Wert: was in Pins und Variablen eingetragen ist, und die Drähte eines Switch.
+Wird ein Wert entfernt, ist, was dieser Wert war, danach der erste Wert, und der Draht an seinem
+Switch-Ausgang fällt weg. Eine Aufzählung, von deren Typ noch etwas ist (eine Variable, ein Pin
+einer Funktion, ein Knoten), lässt sich nicht entfernen; der Editor sagt, was sie benutzt. Der
+Name einer Aufzählung und die Namen ihrer Werte sind C++-Namen: Buchstaben, Ziffern und `_`,
+keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise (`Float` …). Der Name einer
+Aufzählung endet nicht auf `_list`, keine zwei Werte einer Aufzählung heißen gleich, und eine
+Aufzählung hat mindestens einen Wert (höchstens 256).
+
 Mehrere Befehle mit derselben `transaction` werden ein Undo-Schritt (Drähte aufnehmen und
 woanders ablegen), aufeinanderfolgende Werteingaben in denselben Pin ebenfalls. Test:
-`studio_logic_editor_commands`, `studio_logic_lists`, `studio_blueprint_breakpoints_pause_the_game`,
-`studio_blueprint_comments_reroutes_promote`.
+`studio_logic_editor_commands`, `studio_logic_lists`, `studio_logic_enums`,
+`studio_blueprint_breakpoints_pause_the_game`, `studio_blueprint_comments_reroutes_promote`.
 
 ---
 

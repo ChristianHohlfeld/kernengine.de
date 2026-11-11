@@ -118,6 +118,34 @@ template <> struct Held<std::vector<Whole>> {
     return std::vector<Whole>(items.begin(), items.end());
   }
 };
+/// How many values an enum of a Blueprint's class has (KERN_ENUM states their names).
+template <class E> constexpr std::size_t enum_count() {
+  const std::string_view names = kern_enum_names(E{});
+  std::size_t count = names.empty() ? 0 : 1;
+  for (char c : names) count += c == ',' ? 1 : 0;
+  return count;
+}
+// An enum of a Blueprint's class: a value is its place among the enum's values. What comes in
+// from outside and is none of them is the first (as Instance::set and Instance::call hold it).
+template <class E>
+  requires std::is_enum_v<E>
+struct Held<E> {
+  static constexpr PinType type = PinType::enumeration;
+  static E from(const Value& v) {
+    const i64 index = v.as_int();
+    return static_cast<E>(index >= 0 && static_cast<u64>(index) < enum_count<E>() ? index : 0);
+  }
+};
+template <class E>
+  requires std::is_enum_v<E>
+struct Held<std::vector<E>> {
+  static constexpr PinType type = PinType::enumeration_list;
+  static std::vector<E> from(const Value& v) {
+    std::vector<E> r;
+    for (i64 index : v.items<i64>()) r.push_back(static_cast<E>(index >= 0 && static_cast<u64>(index) < enum_count<E>() ? index : 0));
+    return r;
+  }
+};
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
 template <class T> constexpr PinType pin_type_of() { return detail::Held<T>::type; }
@@ -129,6 +157,18 @@ inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
+template <class E>
+  requires std::is_enum_v<E>
+Value to_value(E v) {
+  return Value::enumeration(static_cast<i64>(v));
+}
+template <class E>
+  requires std::is_enum_v<E>
+Value to_value(std::vector<E> v) {
+  std::vector<i64> places;
+  for (E e : v) places.push_back(static_cast<i64>(e));
+  return Value::enumerations(std::move(places));
+}
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 
 /// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
@@ -181,6 +221,37 @@ template <class T> bool remove(std::vector<T>& items, const std::type_identity_t
 }
 template <class T> void clear(std::vector<T>& items) { items.clear(); }
 }  // namespace list
+
+/// What the enum nodes do. An enum's values have names; a value is its place among them (the
+/// first is 0). The node library and a Blueprint's C++ call these.
+namespace enums {
+/// `index` when it is the place of one of `count` values, else 0 (the first value).
+constexpr i64 valid(std::size_t count, i64 index) { return index >= 0 && static_cast<u64>(index) < count ? index : 0; }
+constexpr bool is_value(std::size_t count, i64 index) { return index >= 0 && static_cast<u64>(index) < count; }
+/// The name of the value at `index` ("" when there is none).
+inline std::string name(const std::vector<std::string>& values, i64 index) { return is_value(values.size(), index) ? values[static_cast<std::size_t>(index)] : std::string(); }
+/// The place of the value called `name`, or -1.
+inline i64 find(const std::vector<std::string>& values, std::string_view name) {
+  for (std::size_t k = 0; k < values.size(); ++k)
+    if (values[k] == name) return static_cast<i64>(k);
+  return -1;
+}
+/// The names of an enum as KERN_ENUM has them: "Closed, Opening, Open".
+inline std::vector<std::string> names(std::string_view list) {
+  std::vector<std::string> r;
+  std::size_t at = 0;
+  while (at < list.size()) {
+    std::size_t end = list.find(',', at);
+    if (end == std::string_view::npos) end = list.size();
+    std::size_t a = at, b = end;
+    while (a < b && (list[a] == ' ' || list[a] == '\n' || list[a] == '\t')) ++a;
+    while (b > a && (list[b - 1] == ' ' || list[b - 1] == '\n' || list[b - 1] == '\t')) --b;
+    if (b > a) r.emplace_back(list.substr(a, b - a));
+    at = end + 1;
+  }
+  return r;
+}
+}  // namespace enums
 
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,
 /// digits; anything else ends it. Empty or no digits: `fallback`.
@@ -235,6 +306,11 @@ inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
+template <class E>
+  requires std::is_enum_v<E>
+void native_set(E& variable, const Value& v) {
+  variable = from_value<E>(v.converted(PinType::enumeration));
+}
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a

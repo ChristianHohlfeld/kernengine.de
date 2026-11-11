@@ -216,9 +216,9 @@ einen Zustand.
 
 ## 9.5 Die Grundknoten
 
-Kern bringt **93 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen und Rechnen. Du musst sie
-nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar Beispiele zeigen, was in
-dem Baukasten steckt:
+Kern bringt **100 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen, Aufzählungen und
+Rechnen. Du musst sie nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar
+Beispiele zeigen, was in dem Baukasten steckt:
 
 - **Branch – die Weiche.** Ein Ja/Nein-Wert kommt herein, und der Ablauf fährt entweder auf das
   Gleis „True“ oder auf „False“. „Hat der Spieler genug Münzen? Dann öffne die Tür, sonst zeig eine
@@ -236,8 +236,12 @@ dem Baukasten steckt:
 
 Dazu kommen Variablen lesen, setzen und hochzählen, Listen (viele Werte hintereinander, mit
 **For Each** als Schleife darüber), Rechnen, Vergleichen, Zufall, Text und **Print**, das einen
-Text ins Protokoll oder auf den Bildschirm schreibt. Alle 93 Knoten mit ihren Feinheiten stehen im
-blauen Buch, Kapitel 9.
+Text ins Protokoll oder auf den Bildschirm schreibt. Du kannst auch eine eigene Sorte anlegen, eine
+**Aufzählung** (im Editor: Enum), indem du ihren Werten Namen gibst: Der „Mode“ einer Tür könnte
+„Closed“, „Opening“ oder „Open“ sein. So ein Wert ist immer genau einer davon. Er ist weder Zahl
+noch Text, sein Draht passt also nur an Pins derselben Aufzählung – und **Switch on Mode** ist eine
+Weiche mit einem Gleis für jeden Wert. Alle 100 Knoten mit ihren Feinheiten stehen im blauen Buch,
+Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
 > dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Wiederholungen und

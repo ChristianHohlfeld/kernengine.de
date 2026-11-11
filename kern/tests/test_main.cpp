@@ -2189,6 +2189,163 @@ struct L : kern::Blueprint {
     "links":[[1,"then",4,"exec"],[2,"value",3,"list"],[3,"length",4,"text"]]})"))));
 }
 
+TEST(logic_enums) {
+  using logic::PinType;
+  using logic::TypeRef;
+  using logic::Value;
+  // A value of an enum is its place among the enum's values (the first is 0); which enum it is
+  // of is the pin's or the variable's to say.
+  const Value open = Value::enumeration(2);
+  CHECK(open.type == PinType::enumeration && open.i == 2 && Value::enumeration(-4) == Value::enumeration(0) && Value::zero(PinType::enumeration) == Value::enumeration(0));
+  CHECK(open.to_json().as_number() == 2 && Value::from_json(open.to_json(), PinType::enumeration) == open && !(open == Value::integer(2)));
+  const Value some = Value::enumerations({2, 0, -1});
+  CHECK(some.type == PinType::enumeration_list && some.size() == 3 && some.item(0) == open && some.item(2) == Value::enumeration(0) && some.item(9) == Value::enumeration(0));
+  CHECK(Value::from_json(some.to_json(), PinType::enumeration_list) == some && !(some == Value::of(std::vector<i64>{2, 0, 0})) && Value::zero(PinType::enumeration_list).size() == 0);
+  PinType named = PinType::exec;
+  CHECK(logic::pin_type_from_name("enum", named) && named == PinType::enumeration && logic::pin_type_from_name("enum_list", named) && named == PinType::enumeration_list);
+  CHECK(logic::is_list(PinType::enumeration_list) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::enumeration) == PinType::enumeration_list);
+  // It is no number and no text: it becomes nothing but itself and nothing becomes it (the nodes
+  // Enum to Text, Enum to Index and their ways back say what is meant) ...
+  for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::integer_list, PinType::text_list}) {
+    CHECK(!logic::convertible(PinType::enumeration, other) && !logic::convertible(other, PinType::enumeration));
+    CHECK(!logic::convertible(PinType::enumeration_list, other) && !logic::convertible(other, PinType::enumeration_list));
+  }
+  CHECK(logic::convertible(PinType::enumeration, PinType::enumeration) && logic::convertible(PinType::enumeration_list, PinType::enumeration_list));
+  CHECK(!logic::convertible(PinType::enumeration, PinType::enumeration_list) && !logic::convertible(PinType::enumeration_list, PinType::enumeration));
+  // ... and a value of one enum is none of another.
+  const TypeRef mode{PinType::enumeration, "Mode"}, light{PinType::enumeration, "Light"}, modes{PinType::enumeration_list, "Mode"}, lights{PinType::enumeration_list, "Light"};
+  CHECK(logic::fits(mode, mode) && !logic::fits(mode, light) && logic::fits(modes, modes) && !logic::fits(modes, lights) && !logic::fits(mode, modes));
+  CHECK(logic::fits({PinType::integer, ""}, {PinType::number, ""}) && !logic::fits(mode, {PinType::integer, ""}) && !logic::fits({PinType::text, ""}, mode));
+
+  // A Blueprint with an enum: a variable and a list of its type, Switch on Enum (a case that is
+  // not wired goes nowhere), to and from a place and a name, a function that takes and gives them.
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(R"kn(
+struct Door : kern::Blueprint {
+  /// What the door is doing.
+  KERN_ENUM(Mode, Closed, Opening, Open);
+  Mode State = Mode::Opening;
+  List<Mode> Seen = List<Mode>{Mode::Open};
+  Text Log = "";
+  Int Place = 0;
+  Bool Ok = false;
+  KERN_EVENT(on1, event_custom<"Go">)
+  void on1(Actor actor, Float value, Text text) {
+    Ok = enum_from_index<Mode>(kern::to<Int>(value)).valid;
+    State = enum_from_index<Mode>(kern::to<Int>(value)).value;
+    list_add(Seen, State);
+    switch (flow_switch_enum<Mode>(State)) {
+      case Mode::Closed: {
+        Log = text_append(Log, "c", "");
+      } break;
+      case Mode::Open: {
+        Log = text_append(Log, enum_name<Mode>(State), "");
+      } break;
+    }
+    Place = enum_index<Mode>(enum_from_name<Mode>(text).value);
+  }
+  struct TakeResult { Mode now = Mode::Closed; Int count = 0; };
+  TakeResult Take(Mode to = Mode::Open, List<Mode> more = List<Mode>{}) {
+    State = to;
+    Seen = more;
+    return {State, list_length<Mode>(more)};
+  }
+};
+)kn", g, nullptr, &error));
+  if (!error.empty()) std::printf("enums: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  CHECK(g.enums.size() == 1 && g.enums[0].name == "Mode" && g.enums[0].values.size() == 3 && g.enums[0].help == "What the door is doing." && g.enumeration("Mode") == &g.enums[0]);
+  CHECK(g.variable("State")->type == PinType::enumeration && g.variable("State")->of == "Mode" && g.variable("State")->value.as_number() == 1 && g.variable("Seen")->of == "Mode");
+  // the names of its types, as a setting holds them
+  TypeRef t;
+  CHECK(logic::type_from_text("Mode", g, t) && t == mode && logic::type_text(t) == "Mode" && logic::type_label(t) == "Mode");
+  CHECK(logic::type_from_text("Mode_list", g, t) && t == modes && logic::type_text(t) == "Mode_list" && logic::type_label(t) == "Mode List");
+  CHECK(logic::type_from_text("float_list", g, t) && t.type == PinType::number_list && t.of.empty() && !logic::type_from_text("Light", g, t) && !logic::type_from_text("enum", g, t) && !logic::type_from_text("exec", g, t));
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Door");
+    rt.begin();
+    CHECK(inst->get("State") == Value::enumeration(1) && inst->get("Seen") == Value::enumerations({2}));
+    rt.call("Go", 0, {{"value", Value::number(2)}, {"text", Value::text("Opening")}});
+    CHECK(inst->get("Ok").as_bool() && inst->get("State") == open && inst->get("Seen") == Value::enumerations({2, 2}) && inst->get("Log").as_text() == "Open" && inst->get("Place").as_int() == 1);
+    // (a place the enum does not have, a name it does not have: the first value, and it says so)
+    rt.call("Go", 0, {{"value", Value::number(7)}, {"text", Value::text("nope")}});
+    CHECK(!inst->get("Ok").as_bool() && inst->get("State") == Value::enumeration(0) && inst->get("Log").as_text() == "Openc" && inst->get("Place").as_int() == 0);
+    rt.call("Go", 0, {{"value", Value::number(-1)}, {"text", Value::text("Open")}});
+    CHECK(!inst->get("Ok").as_bool() && inst->get("State") == Value::enumeration(0) && inst->get("Log").as_text() == "Opencc" && inst->get("Place").as_int() == 2);
+    rt.call("Go", 0, {{"value", Value::number(1)}, {"text", Value::text("Closed")}});
+    CHECK(inst->get("Ok").as_bool() && inst->get("State") == Value::enumeration(1) && inst->get("Log").as_text() == "Opencc" && inst->get("Seen") == Value::enumerations({2, 2, 0, 0, 1}));
+    // From outside an enum's variable takes one of its values: what is none of them is the first.
+    CHECK(inst->set("State", Value::enumeration(7)) && inst->get("State") == Value::enumeration(0));
+    CHECK(inst->set("State", Value::integer(2)) && inst->get("State") == open && inst->set("State", Value::text("Open")) && inst->get("State") == Value::enumeration(0));
+    CHECK(inst->set("Seen", Value::enumerations({2, 9, 1})) && inst->get("Seen") == Value::enumerations({2, 0, 1}));
+    CHECK(inst->set("Seen", Value::of(std::vector<i64>{1, -5})) && inst->get("Seen") == Value::enumerations({1, 0}));
+    CHECK(inst->set("Seen", Value::number(4)) && inst->get("Seen").size() == 0 && inst->get("Seen").type == PinType::enumeration_list);
+    std::vector<Value> out;
+    CHECK(inst->call("Take", {Value::enumeration(9), Value::enumerations({1, 1, 5})}, out) && out.size() == 2 && out[0] == Value::enumeration(0) && out[1].as_int() == 3);
+    CHECK(inst->get("Seen") == Value::enumerations({1, 1, 0}));
+    CHECK(inst->call("Take", {}, out) && out[0] == open && out[1].as_int() == 0 && inst->get("State") == open);
+    CHECK(host.errors.empty());
+  }
+  // The graph's file: the enums, and of which enum a variable or a function's pin is. A graph
+  // without enums is the file it was.
+  const json::Value file = logic::graph_to_json(g);
+  logic::Graph back;
+  CHECK(logic::graph_from_json(file, back) && back == g && logic::graph_hash(back) == logic::graph_hash(g));
+  CHECK(file["enums"].size() == 1 && file["enums"][0]["name"].as_string() == "Mode" && file["enums"][0]["values"].size() == 3 && file["enums"][0]["values"][2].as_string() == "Open");
+  CHECK(file["variables"][0]["type"].as_string() == "enum" && file["variables"][0]["of"].as_string() == "Mode" && file["variables"][0]["value"].as_number() == 1);
+  CHECK(file["variables"][1]["type"].as_string() == "enum_list" && file["functions"][0]["inputs"][0]["of"].as_string() == "Mode" && !file["variables"][2]["of"].is_string());
+  CHECK(!logic::graph_to_json(logic::Graph{})["enums"].is_array());
+  logic::Graph other = g;
+  other.enums[0].values[1] = "Ajar";
+  CHECK(!(other == g) && logic::graph_hash(other) != logic::graph_hash(g));
+
+  // What does not fit is said by the check.
+  auto problem = [](const char* graph, const char* why) {
+    const logic::Graph bad = logic_graph(graph);
+    bool said = false;
+    for (const logic::Issue& i : logic::check(bad)) said = said || (i.error && i.text.find(why) != std::string::npos);
+    if (!said)
+      for (const logic::Issue& i : logic::check(bad)) std::printf("enums: expected \"%s\", got: %s\n", why, i.text.c_str());
+    CHECK(said);
+  };
+  problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.switch_enum","params":{"enum":"Nope"}}],"links":[[1,"then",2,"exec"]]})", "\"Nope\" is no enum of this Blueprint");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"nodes":[{"id":1,"type":"logic.select","params":{"type":"F"}}],"links":[]})", "\"F\" is no type it can have");
+  problem(R"({"enums":[{"name":"E","values":[]}],"nodes":[],"links":[]})", "enum \"E\" has no values");
+  problem(R"({"enums":[{"name":"E","values":["A","B","A"]}],"nodes":[],"links":[]})", "enum \"E\" has two values called \"A\"");
+  problem(R"({"enums":[{"name":"E","values":["A","B"]}],"variables":[{"name":"V","type":"enum","of":"E","value":5}],"nodes":[],"links":[]})", "variable \"V\": 5 is no value of E (it has 2)");
+  problem(R"({"enums":[{"name":"E","values":["A","B"]}],"variables":[{"name":"L","type":"enum_list","of":"E","value":[1,2]}],"nodes":[],"links":[]})", "variable \"L\": 2 is no value of E (it has 2)");
+  problem(R"({"enums":[{"name":"E","values":["A","B"]}],"variables":[{"name":"V","type":"enum","of":"E","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"V"},"values":{"value":3}}],"links":[[1,"then",2,"exec"]]})",
+          "\"value\" is value 3 of E, which has 2");
+  // a value of one enum does not go into another's, into a number or into a text
+  const char* two = R"({"enums":[{"name":"E","values":["A","B"]},{"name":"F","values":["A","B"]}],
+    "variables":[{"name":"A","type":"enum","of":"E","value":0},{"name":"B","type":"enum","of":"F","value":0},{"name":"N","type":"int","value":0},{"name":"C","type":"enum","of":"E","value":1}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"%s"}},{"id":4,"type":"debug.print"}],
+    "links":[[1,"then",3,"exec"],[2,"value",%s]]})";
+  auto wired = [&](const char* into, const char* link) {
+    char text[1200];
+    std::snprintf(text, sizeof text, two, into, link);
+    return no_errors(logic::check(logic_graph(text)));
+  };
+  CHECK(wired("C", "3,\"value\"") && !wired("B", "3,\"value\"") && !wired("N", "3,\"value\"") && !wired("C", "4,\"text\""));
+  // a file that names an enum the Blueprint does not have, or declares one twice, is no graph
+  json::Value j;
+  logic::Graph none;
+  CHECK(json::parse(R"({"variables":[{"name":"V","type":"enum","of":"Gone","value":0}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"enums":[{"name":"E","values":["A"]},{"name":"E","values":["B"]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  // (an enum that went while a variable is of it - only an editor's mistake could do that)
+  logic::Graph gone = g;
+  gone.enums.clear();
+  bool said = false;
+  for (const logic::Issue& i : logic::check(gone)) said = said || (i.error && i.text.find("variable \"State\" is of the enum \"Mode\", which this Blueprint does not have") != std::string::npos);
+  CHECK(said);
+}
+
 TEST(logic_checks_and_infinite_loops) {
   FakeLogicHost host;
   // Errors: unknown type, missing variable, wrong wire types.
@@ -2516,8 +2673,11 @@ static logic::Graph every_node_graph(bool wired) {
   u32 next = 1;
   const std::pair<const char*, PinType> vars[] = {{"VB", PinType::boolean},       {"VI", PinType::integer},       {"VF", PinType::number},       {"VV", PinType::vector},
                                                   {"VT", PinType::text},          {"VA", PinType::actor},         {"LB", PinType::boolean_list}, {"LI", PinType::integer_list},
-                                                  {"LF", PinType::number_list},   {"LV", PinType::vector_list},   {"LT", PinType::text_list},    {"LA", PinType::actor_list}};
-  for (const auto& [name, type] : vars) g.variables.push_back({name, type, logic::Value::zero(type).to_json(), {}});
+                                                  {"LF", PinType::number_list},   {"LV", PinType::vector_list},   {"LT", PinType::text_list},    {"LA", PinType::actor_list},
+                                                  {"VE", PinType::enumeration},   {"LE", PinType::enumeration_list}};
+  g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
+  for (const auto& [name, type] : vars)
+    g.variables.push_back({name, type, logic::Value::zero(type).to_json(), {}, logic::element_of(type) == PinType::enumeration ? std::string("EM") : std::string()});
   g.variables[2].help = "A number.\n\nIts second paragraph.";
   auto var_of = [&](PinType t) {
     for (const auto& [name, type] : vars) if (type == t) return std::string(name);
@@ -2536,12 +2696,15 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
+      case PinType::enumeration: return logic::Value::enumeration(2);
+      case PinType::enumeration_list: return logic::Value::enumerations({2, 0, 1});
       default: return logic::Value::of(std::vector<logic::ActorHandle>{{3}, {0}});
     }
   };
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
-    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list) v.value = other_than_default(v.type).to_json();
+    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration)
+      v.value = other_than_default(v.type).to_json();
   logic::Function fn;
   fn.name = "Fn";
   fn.help = "Twice x.";
@@ -2553,8 +2716,9 @@ static logic::Graph every_node_graph(bool wired) {
   calc.name = "Calc";
   calc.pure = true;
   calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list).to_json()},
-                 {"none", PinType::actor_list, json::Value::array()}};
-  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list).to_json()}};
+                 {"none", PinType::actor_list, json::Value::array()}, {"e", PinType::enumeration, json::Value(1), "EM"}};
+  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list).to_json()},
+                  {"all", PinType::enumeration_list, other_than_default(PinType::enumeration_list).to_json(), "EM"}};
   g.functions = {fn, proc, calc};
   logic::StateMachine m;
   m.id = next++;
@@ -2612,7 +2776,7 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
     const u32 id = add(type, params);
@@ -3213,7 +3377,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
   refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
   refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text> or List<Actor>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor> or List<an enum of the Blueprint>", "line 5, column 8:");
   refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
   refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
@@ -3225,6 +3389,33 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_length<Float>(Items);"), "list_length is a value: alone on a line it does nothing");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    flow_for_each<Float>(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
   refused("  void List() {\n  }", "no name C++ can write");
+  // enums
+  const std::string mode = "  KERN_ENUM(Mode, Closed, Open);\n  Mode State = Mode::Closed;\n";
+  refused("  KERN_ENUM(Mode);", "an enum has values: KERN_ENUM(Mode, First, Second);");
+  refused("  KERN_ENUM(Mode, A, B, A);", "Mode has the value A twice", "line 5, column 25:");
+  refused("  KERN_ENUM(Heat, A);", "the name Heat is declared twice");
+  refused("  KERN_ENUM(Mode, A);\n  KERN_ENUM(Mode, B);", "the name Mode is declared twice");
+  refused("  KERN_ENUM(Mode, A, 2);", "a value's name expected");
+  refused("  KERN_ENUM(Items_list, A);", "a name that ends in _list reads as a list");
+  refused("  KERN_ENUM(Mode, A, Float);", "the value \"Float\" of Mode is no name C++ can write");
+  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum declared above it, or a List of one of them", "line 5, column 3:");
+  refused(mode + "  Mode Other = Mode::Ajar;", "Mode has no value \"Ajar\" (Closed, Open)", "line 7, column 22:");
+  refused(mode + "  Mode Other = 1;", "this is Int, but Mode is needed (like Mode::Closed)");
+  refused(mode + "  KERN_ENUM(Light, Red);\n  Mode Other = Light::Red;", "this is Light, but Mode is needed");
+  refused(mode + "  List<Mode> Other = List<Mode>{Mode::Open, 1};", "a list's item: this is Int, but Mode is needed");
+  refused(mode + in_event("    State = 1;"), "is Mode, this is Int");
+  refused(mode + in_event("    Count = State;"), "the two do not convert");
+  refused(mode + in_event("    Count = kern::to<Int>(State);"), "cannot become a Int");
+  refused(mode + in_event("    Name = State;"), "the two do not convert");
+  refused(mode + "  KERN_ENUM(Light, Red);\n  Light Lamp = Light::Red;\n" + in_event("    State = Lamp;"), "this is Light, the input is Mode: the two do not convert");
+  refused(mode + in_event("    Name = enum_name(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
+  refused(mode + in_event("    Name = enum_name<Float>(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
+  refused(mode + in_event("    Name = enum_name<\"Mode\">(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
+  refused(mode + in_event("    flow_switch_enum<Mode>(State);"), "flow_switch_enum goes on at the enum's value: switch (flow_switch_enum<AnEnum>(...)) { case AnEnum::Value: { } break; }");
+  refused(mode + in_event("    if (flow_switch_enum<Mode>(State)) {\n    }"), "flow_switch_enum goes on at the enum's value");
+  refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case 0: {\n      } break;\n    }"), "a case of flow_switch_enum<Mode> is one of the enum's values: case Mode::Closed:", "line 10, column 12:");
+  refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Ajar: {\n      } break;\n    }"), "Mode has no value \"Ajar\"");
+  refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Open: {\n      } break;\n      case Mode::Open: {\n      } break;\n    }"), "case Mode::Open is there twice");
   // the setting "Type" of a generic node is the type itself
   refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
   refused(in_event("    Heat = logic_select<Double>(true, 1.0, 2.0);"), "a setting is a text (\"...\") or a type");
@@ -3378,6 +3569,21 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   problem(R"({"variables":[{"name":"Name","type":"text","value":""}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Name"}}],"links":[[1,"then",2,"exec"]]})",
           "needs a number variable (Integer or Float): \"Name\" is", 2);
+  // an enum is a type of the Blueprint's C++: its name and its values' names are names there
+  problem(R"({"enums":[{"name":"my enum","values":["A"]}],"nodes":[],"links":[]})", "the enum \"my enum\" is no name C++ can write");
+  problem(R"({"enums":[{"name":"E","values":["A","b c"]}],"nodes":[],"links":[]})", "the value \"b c\" of E is no name C++ can write");
+  problem(R"({"enums":[{"name":"E","values":["A","Float"]}],"nodes":[],"links":[]})", "the value \"Float\" of E is no name C++ can write");
+  problem(R"({"enums":[{"name":"Items_list","values":["A"]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"variables":[{"name":"E","type":"float","value":0}],"nodes":[],"links":[]})", "the name \"E\" is used twice");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"functions":[{"name":"E","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"E"}}],"links":[]})",
+          "the name \"E\" is used twice");
+  problem(R"({"enums":[{"name":"math_add","values":["A"]}],"nodes":[],"links":[]})", "is the name of a node");
+  problem(R"({"enums":[{"name":"E","values":["A","B"]}],"variables":[{"name":"L","type":"enum_list","of":"E","value":[1,4]}],"nodes":[],"links":[]})", "4 is no value of E");
+  fine(R"({"enums":[{"name":"E","values":["A","B"]}],"variables":[{"name":"V","type":"enum","of":"E","value":1},{"name":"L","type":"enum_list","of":"E","value":[1,0]}],
+          "functions":[{"name":"F","inputs":[{"name":"e","type":"enum","of":"E","value":1}],"outputs":[{"name":"all","type":"enum_list","of":"E","value":[]}]}],
+          "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.switch_enum","params":{"enum":"E"}},{"id":3,"type":"func.return","params":{"function":"F"}},
+                   {"id":4,"type":"enum.values","params":{"enum":"E"}}],
+          "links":[[1,"then",2,"exec"],[1,"e",2,"value"],[2,"case1",3,"exec"],[4,"values",3,"all"]]})");
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
@@ -8524,6 +8730,249 @@ TEST(studio_logic_lists) {
   const json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
   CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<Float>(List<Float>{1.5, -2.0}, 0.0)") != std::string::npos);
   CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
+}
+
+TEST(studio_logic_enums) {
+  // Enums in the editor: an enum and its values; variables, pins and nodes of its type; and what
+  // follows when a value is renamed, moved or removed - a value is its place among the values,
+  // so what is typed in and wired stays with its value.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> kv) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : kv) c.set(k, v);
+    return f.s->command(c);
+  };
+  auto values = [&](const char* name) {
+    std::string all;
+    const json::Value st = f.s->state();
+    for (const json::Value& e : st["logic"]["enums"].items())
+      if (e["name"].as_string() == name)
+        for (const json::Value& v : e["values"].items()) all += (all.empty() ? "" : ",") + v.as_string();
+    return all;
+  };
+  const json::Value made = cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Mode"}});
+  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Mode" && values("Mode") == "First,Second");
+  // its name is a type's name in C++: not a word of the notation, not a list's name, not taken twice
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Float"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Items_list"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Mode"}})["ok"].as_bool() && cmd({{"cmd", "logicEnum"}, {"op", "add"}})["name"].as_string() == "NewEnum");
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "NewEnum"}, {"to", "Light"}})["ok"].as_bool() && values("Light") == "First,Second");
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "Light"}, {"to", "Mode"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Mode"}})["ok"].as_bool());
+  // the values: renamed, added, moved
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 0}, {"to", "Closed"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 1}, {"to", "Open"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "addValue"}, {"name", "Mode"}, {"value", "Opening"}})["ok"].as_bool() && cmd({{"cmd", "logicEnum"}, {"op", "addValue"}, {"name", "Mode"}})["ok"].as_bool());
+  CHECK(values("Mode") == "Closed,Open,Opening,Value");
+  json::Value r = cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 3}, {"to", "Open"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Mode has a value Open already");
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 3}, {"to", "my value"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "addValue"}, {"name", "Mode"}, {"value", "class"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 9}, {"to", "X"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Mode"}, {"index", 2}, {"by", -1}})["ok"].as_bool() && values("Mode") == "Closed,Opening,Open,Value");
+  // (the first one does not move up, the last one not down)
+  cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Mode"}, {"index", 0}, {"by", -1}});
+  cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Mode"}, {"index", 3}, {"by", 1}});
+  CHECK(values("Mode") == "Closed,Opening,Open,Value");
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "help"}, {"name", "Mode"}, {"text", "What the door is doing."}})["ok"].as_bool());
+
+  // A variable of the enum's type, a list of them, and a function's pins.
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "State"}, {"type", "Mode"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "State"}, {"value", 2}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "float"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Seen"}, {"type", "Mode_list"}})["ok"].as_bool());
+  json::Value places = json::Value::array();
+  places.push(2);
+  places.push(1);
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "Seen"}, {"value", places}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Other"}, {"type", "Nope"}})["ok"].as_bool());
+  auto variable = [&](const char* name) {
+    const json::Value st = f.s->state();
+    for (const json::Value& v : st["logic"]["variables"].items()) if (v["name"].as_string() == name) return v;
+    return json::Value();
+  };
+  CHECK(variable("State")["type"].as_string() == "enum" && variable("State")["of"].as_string() == "Mode" && variable("State")["value"].as_number() == 2);
+  CHECK(variable("Seen")["type"].as_string() == "enum_list" && variable("Seen")["of"].as_string() == "Mode" && variable("Seen")["value"].size() == 2 && variable("Seen")["value"][0].as_number() == 2);
+  // (a variable that becomes another enum's starts at that enum's first value)
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Lamp"}, {"type", "Mode"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "Lamp"}, {"value", 3}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Lamp"}, {"type", "Light"}})["ok"].as_bool() && variable("Lamp")["of"].as_string() == "Light" && variable("Lamp")["value"].as_number() == 0);
+
+  // The nodes of an enum are offered per enum, by its name - never bare.
+  auto offered = [&](const json::Value& pal, const char* type, const char* param = nullptr, const char* value = nullptr) {
+    for (const json::Value& it : pal["items"].items())
+      if (it["type"].as_string() == type && (!param || it["params"][param].as_string() == value)) return true;
+    return false;
+  };
+  json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "mode"}});
+  bool by_name = false;
+  for (const json::Value& it : pal["items"].items()) by_name |= it["label"].as_string() == "Switch on Mode" && it["type"].as_string() == "flow.switch_enum" && it["category"].as_string() == "Flow";
+  CHECK(by_name && offered(pal, "enum.name", "enum", "Mode") && offered(pal, "enum.values", "enum", "Mode") && !offered(pal, "enum.name", "enum", "Light"));
+  pal = cmd({{"cmd", "logicPalette"}, {"query", "enum"}});
+  bool bare = false;
+  std::size_t per_enum = 0;
+  for (const json::Value& it : pal["items"].items()) {
+    if (it["type"].as_string().rfind("enum.", 0) != 0 && it["type"].as_string() != "flow.switch_enum") continue;
+    ++per_enum;
+    bare |= !it["params"]["enum"].is_string() || it["params"]["enum"].as_string().empty();
+  }
+  CHECK(!bare && per_enum == 14);  // (seven nodes for each of the two enums)
+  // From the pin of Get State: what takes a Mode - its own nodes, Select and Reroute in its type, Set State; nothing of another enum, no number, no text.
+  auto added = [&](const char* type, const char* params = "{}") {
+    json::Value add = json::Value::object(), p;
+    add.set("cmd", "logicAdd");
+    add.set("type", type);
+    add.set("x", 0);
+    add.set("y", 0);
+    CHECK(json::parse(params, p));
+    add.set("params", p);
+    return static_cast<u32>(f.s->command(add)["id"].as_number());
+  };
+  const u32 get = added("var.get", R"({"variable":"State"})");
+  json::Value from = json::Value::object();
+  from.set("node", get);
+  from.set("pin", "value");
+  from.set("output", true);
+  pal = cmd({{"cmd", "logicPalette"}, {"query", ""}, {"from", from}});
+  CHECK(offered(pal, "flow.switch_enum", "enum", "Mode") && offered(pal, "enum.name", "enum", "Mode") && offered(pal, "enum.equal", "enum", "Mode") && offered(pal, "logic.select", "type", "Mode"));
+  CHECK(offered(pal, "value.reroute", "type", "Mode") && offered(pal, "var.set", "variable", "State") && offered(pal, "list.contains", "type", "Mode"));
+  CHECK(!offered(pal, "enum.name", "enum", "Light") && !offered(pal, "var.set", "variable", "Lamp") && !offered(pal, "math.add") && !offered(pal, "debug.print") && !offered(pal, "enum.from_index"));
+
+  // Switch on Mode has an exec output for each value, by its name; an enum's pin holds a place.
+  auto pin = [&](u32 node, const char* id, bool output) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items())
+      if (static_cast<u32>(n["id"].as_number()) == node)
+        for (const json::Value& p : n[output ? "outputs" : "inputs"].items()) if (p["id"].as_string() == id) return p;
+    return json::Value();
+  };
+  auto node = [&](u32 id) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items()) if (static_cast<u32>(n["id"].as_number()) == id) return n;
+    return json::Value();
+  };
+  auto wire = [&](u32 a, const char* out, u32 b, const char* in) { return cmd({{"cmd", "logicConnect"}, {"from", a}, {"out", out}, {"to", b}, {"in", in}}); };
+  auto wired = [&](u32 a, const char* out, u32 b) {
+    for (const logic::Link& l : f.s->level().logic.links) if (l.from == a && l.out == out && l.to == b) return true;
+    return false;
+  };
+  const u32 begin = added("event.begin"), sw = added("flow.switch_enum", R"({"enum":"Mode"})"), open = added("var.set", R"({"variable":"State"})"), shut = added("var.set", R"({"variable":"State"})");
+  CHECK(node(sw)["title"].as_string() == "Switch on Mode" && node(sw)["outputs"].size() == 4 && node(sw)["outputs"][2]["id"].as_string() == "case2" && node(sw)["outputs"][2]["label"].as_string() == "Open");
+  CHECK(pin(sw, "value", false)["type"].as_string() == "enum" && pin(sw, "value", false)["of"].as_string() == "Mode" && pin(get, "value", true)["of"].as_string() == "Mode");
+  CHECK(wire(begin, "then", sw, "exec")["ok"].as_bool() && wire(get, "value", sw, "value")["ok"].as_bool());
+  CHECK(wire(sw, "case2", open, "exec")["ok"].as_bool() && wire(sw, "case0", shut, "exec")["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicValue"}, {"node", open}, {"pin", "value"}, {"value", 2}})["ok"].as_bool() && pin(open, "value", false)["value"].as_number() == 2);
+  // (a value of another enum, a number, a text: none of them goes into a Mode)
+  const u32 lamp = added("var.get", R"({"variable":"Lamp"})"), sum = added("math.add"), name = added("enum.name", R"({"enum":"Mode"})"), print = added("debug.print");
+  r = wire(lamp, "value", shut, "value");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string().find("Light") != std::string::npos && !wire(sum, "result", shut, "value")["ok"].as_bool() && !wire(get, "value", print, "text")["ok"].as_bool());
+  CHECK(wire(get, "value", name, "value")["ok"].as_bool() && wire(name, "name", print, "text")["ok"].as_bool());
+  // a generic node takes the enum's type from its first wire: Select of a Mode, a Reroute of a list of them
+  const u32 select = added("logic.select"), seen = added("var.get", R"({"variable":"Seen"})"), knot = added("value.reroute");
+  CHECK(pin(select, "a", false)["generic"].as_string().find("Mode") != std::string::npos && wire(get, "value", select, "a")["ok"].as_bool());
+  CHECK(pin(select, "result", true)["type"].as_string() == "enum" && pin(select, "result", true)["of"].as_string() == "Mode" && f.s->level().logic.find(select)->param("type") == "Mode");
+  CHECK(wire(seen, "value", knot, "in")["ok"].as_bool() && f.s->level().logic.find(knot)->param("type") == "Mode_list" && pin(knot, "out", true)["type"].as_string() == "enum_list");
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+
+  // A value moves up: what is typed in and wired stays with its value.
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Mode"}, {"index", 2}, {"by", -1}})["ok"].as_bool() && values("Mode") == "Closed,Open,Opening,Value");
+  CHECK(variable("State")["value"].as_number() == 1 && variable("Seen")["value"][0].as_number() == 1 && variable("Seen")["value"][1].as_number() == 2 && pin(open, "value", false)["value"].as_number() == 1);
+  CHECK(wired(sw, "case1", open) && !wired(sw, "case2", open) && wired(sw, "case0", shut) && node(sw)["outputs"][1]["label"].as_string() == "Open");
+  // A value's new name changes nothing but the name.
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "renameValue"}, {"name", "Mode"}, {"index", 1}, {"to", "Ajar"}})["ok"].as_bool() && node(sw)["outputs"][1]["label"].as_string() == "Ajar" && wired(sw, "case1", open));
+  // A value goes: what was that value is the first one, its wire is gone, the ones after it move up.
+  const u32 last = added("var.set", R"({"variable":"State"})");
+  CHECK(wire(sw, "case3", last, "exec")["ok"].as_bool() && cmd({{"cmd", "logicValue"}, {"node", last}, {"pin", "value"}, {"value", 3}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "removeValue"}, {"name", "Mode"}, {"index", 1}})["ok"].as_bool() && values("Mode") == "Closed,Opening,Value");
+  CHECK(variable("State")["value"].as_number() == 0 && variable("Seen")["value"][0].as_number() == 0 && variable("Seen")["value"][1].as_number() == 1);
+  CHECK(pin(open, "value", false)["value"].as_number() == 0 && pin(last, "value", false)["value"].as_number() == 2 && node(sw)["outputs"].size() == 3);
+  CHECK(!wired(sw, "case1", open) && wired(sw, "case2", last) && !wired(sw, "case3", last) && no_errors(logic::check(f.s->level().logic)));
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && values("Mode") == "Closed,Ajar,Opening,Value" && wired(sw, "case1", open) && wired(sw, "case3", last) && pin(last, "value", false)["value"].as_number() == 3);
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool() && values("Mode") == "Closed,Opening,Value");
+  // (an enum keeps one value at least)
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "removeValue"}, {"name", "Light"}, {"index", 0}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "removeValue"}, {"name", "Light"}, {"index", 0}})["ok"].as_bool());
+
+  // The enum's new name: everything of its type follows - variables, settings (also of a list), titles.
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "Mode"}, {"to", "Door"}})["ok"].as_bool());
+  CHECK(variable("State")["of"].as_string() == "Door" && variable("Seen")["of"].as_string() == "Door" && node(sw)["title"].as_string() == "Switch on Door" && node(name)["title"].as_string() == "Door to Text");
+  CHECK(f.s->level().logic.find(select)->param("type") == "Door" && f.s->level().logic.find(knot)->param("type") == "Door_list" && pin(knot, "out", true)["of"].as_string() == "Door");
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+  // A function takes and gives an enum's value.
+  const u32 entry = added("func.entry");
+  const std::string fn = f.s->level().logic.find(entry)->param("function");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "in"}, {"pin", "to"}, {"type", "Door"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "Door_list"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", fn}, {"side", "in"}, {"pin", "to"}, {"value", 2}})["ok"].as_bool());
+  CHECK(pin(entry, "to", true)["type"].as_string() == "enum" && pin(entry, "to", true)["of"].as_string() == "Door");
+  const logic::Function* fun = f.s->level().logic.function(fn);
+  CHECK(fun && fun->inputs[0].of == "Door" && fun->inputs[0].value.as_number() == 2 && fun->outputs[0].type == logic::PinType::enumeration_list && fun->outputs[0].of == "Door");
+  // The whole of it as C++, and from the C++ back.
+  json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
+  const std::string text = cpp["text"].as_string();
+  if (!cpp["ok"].as_bool()) std::printf("%s\n", cpp["error"].as_string().c_str());
+  CHECK(cpp["ok"].as_bool() && text.find("  /// What the door is doing.\n  KERN_ENUM(Door, Closed, Opening, Value);\n  KERN_ENUM(Light, Second);\n") != std::string::npos);
+  CHECK(text.find("  Door State = Door::Closed;\n  List<Door> Seen = List<Door>{Door::Closed, Door::Opening};\n  Light Lamp = Light::Second;\n") != std::string::npos);
+  CHECK(text.find("    switch (flow_switch_enum<Door>(n1())) {\n      case Door::Closed: {\n        State = Door::Closed;\n      } break;\n      case Door::Opening: {\n      } break;\n      case Door::Value: {\n        State = Door::Value;\n      } break;\n    }\n") != std::string::npos);
+  json::Value apply = json::Value::object();
+  apply.set("cmd", "logicCppApply");
+  std::string changed = text;
+  const std::size_t at = changed.find("KERN_ENUM(Door, Closed, Opening, Value);");
+  CHECK(at != std::string::npos);
+  if (at != std::string::npos) changed.replace(at, 40, "KERN_ENUM(Door, Closed, Value, Opening, Wide);");
+  apply.set("text", changed);
+  r = f.s->command(apply);
+  if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+  // (the values in another order in the text: every name there still means its value)
+  CHECK(r["ok"].as_bool() && values("Door") == "Closed,Value,Opening,Wide" && variable("Seen")["value"][1].as_number() == 2);
+  u32 sw2 = 0, last2 = 0;
+  for (const logic::Node& n : f.s->level().logic.nodes) {
+    if (n.type == "flow.switch_enum") sw2 = n.id;
+    if (n.type == "var.set" && n.value("value") && n.value("value")->as_number() == 1) last2 = n.id;
+  }
+  CHECK(sw2 && last2 && wired(sw2, "case1", last2) && no_errors(logic::check(f.s->level().logic)));
+
+  // Copied nodes take their enum along. Pasted where the enum's values have other places, they
+  // mean their values by their names; pasted into a Blueprint without the enum, the enum comes too.
+  json::Value ids = json::Value::array();
+  ids.push(sw2);
+  ids.push(last2);
+  const json::Value copied = cmd({{"cmd", "logicCopy"}, {"ids", ids}});
+  CHECK(copied["ok"].as_bool() && copied["text"].as_string().find("\"enums\":[{\"name\":\"Door\"") != std::string::npos && copied["text"].as_string().find("Light") == std::string::npos);
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Door"}, {"index", 1}, {"by", 1}})["ok"].as_bool() && values("Door") == "Closed,Opening,Value,Wide" && wired(sw2, "case2", last2));
+  auto pasted_nodes = [&](const logic::Graph& into, const json::Value& result, u32& a_switch, u32& a_set) {
+    a_switch = a_set = 0;
+    for (const json::Value& id : result["ids"].items()) {
+      const logic::Node* n = into.find(static_cast<u32>(id.as_number()));
+      if (n && n->type == "flow.switch_enum") a_switch = n->id;
+      else if (n) a_set = n->id;
+    }
+    return a_switch && a_set;
+  };
+  json::Value pasted = cmd({{"cmd", "logicPaste"}, {"text", copied["text"]}, {"x", 0}, {"y", 900}});
+  u32 sw3 = 0, last3 = 0;
+  CHECK(pasted["ok"].as_bool() && pasted_nodes(f.s->level().logic, pasted, sw3, last3) && f.s->state()["logic"]["enums"].size() == 2);
+  CHECK(wired(sw3, "case2", last3) && !wired(sw3, "case1", last3) && pin(last3, "value", false)["value"].as_number() == 2 && no_errors(logic::check(f.s->level().logic)));
+  CHECK(!f.s->level().actors.empty());
+  if (!f.s->level().actors.empty()) {
+    const game::ActorId other = f.s->level().actors.front().id;
+    CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(other)}})["ok"].as_bool());
+    pasted = cmd({{"cmd", "logicPaste"}, {"text", copied["text"]}, {"x", 0}, {"y", 0}});
+    const game::Actor* owner = f.s->level().find(other);
+    CHECK(pasted["ok"].as_bool() && owner && owner->logic && owner->logic->enums.size() == 1 && values("Door") == "Closed,Value,Opening,Wide");
+    u32 sw4 = 0, last4 = 0;
+    bool kept = false;
+    if (owner && owner->logic && pasted_nodes(*owner->logic, pasted, sw4, last4))
+      for (const logic::Link& l : owner->logic->links) kept |= l.from == sw4 && l.out == "case1" && l.to == last4;
+    CHECK(kept);
+    CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool() && values("Door") == "Closed,Opening,Value,Wide");
+  }
+
+  // An enum in use stays; one nothing is of goes.
+  r = cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Door"}});
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Door is in use: the variable State");
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Light"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "remove"}, {"name", "Lamp"}})["ok"].as_bool());
+  r = cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Light"}});
+  if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+  CHECK(r["ok"].as_bool() && values("Light").empty() && f.s->state()["logic"]["enums"].size() == 1);
 }
 
 TEST(studio_blueprint_breakpoints_pause_the_game) {

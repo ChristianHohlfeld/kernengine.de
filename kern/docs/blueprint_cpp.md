@@ -64,9 +64,14 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   Typs sein (`List<Float>`, `List<Text>` …). Die Wert-Knoten lesen eine Liste, die Schritte ändern
   eine Listen-Variable, For Each geht durch eine Liste – in beiden Schreibweisen und in jeder
   Stufe gleich (siehe „Listen“).
+- **Fertig: Aufzählungen (Enums).** Ein Blueprint deklariert eigene Typen mit benannten Werten
+  (`KERN_ENUM(Mode, Closed, Opening, Open);`). Eine Variable, eine Liste, die Ein- und Ausgänge
+  einer Funktion und Pins können von so einem Typ sein; ein Wert ist genau einer der Werte –
+  weder Zahl noch Text. Sieben Knoten arbeiten damit, darunter Switch on Enum mit einem Weg je
+  Wert – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Aufzählungen“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (17 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (18 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -151,6 +156,7 @@ KERN_LAYOUT(Demo) {
 | Blueprint | C++ |
 |---|---|
 | der Blueprint | `struct Name : kern::Blueprint { ... };` |
+| Aufzählung (mit Beschreibung) | `/// Beschreibung` und `KERN_ENUM(Mode, Closed, Opening, Open);` – im Abschnitt „types“, über den Variablen |
 | Variable (mit Beschreibung) | `/// Beschreibung` und `Float Heat = 0.0;` |
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
@@ -160,7 +166,7 @@ KERN_LAYOUT(Demo) {
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
-| Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)` |
+| Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)` |
 | Eingänge eines Knotens | Funktionsargumente, in der Reihenfolge der Pins |
 | unverdrahteter Eingang | der eingetippte Wert als Literal |
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
@@ -169,6 +175,7 @@ KERN_LAYOUT(Demo) {
 | Schritt, der eine Listen-Variable ändert (Add to List, Insert, Set Item, Remove, Clear) | `list_add(Scores, wert);` – die Variable selbst ist das erste Argument; wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
+| Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -179,6 +186,7 @@ KERN_LAYOUT(Demo) {
 | While Loop | `while (loop(wert)) { ... }` – danach folgt „Completed“ |
 | Knoten, der entscheidet, ob es weitergeht (Do Once, Gate, Do N) | `if (flow_do_once(n7, "exec", false)) { ... }` |
 | Knoten mit mehreren Wegen (Switch, Flip Flop) | `switch (flow_flip_flop(n13)) { case 0: { ... } break; case 1: { ... } break; }` |
+| Switch on Enum | `switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { ... } break; ... }` – die Fälle sind die Werte der Aufzählung, bei ihren Namen; der Text hat einen für jeden Wert |
 | Knoten, der wartet (Delay, Tween) | `flow_delay(n8, 0.5, [this] { ... });` – was danach läuft, ist ein Lambda |
 | Schritt, der einfach weitergeht | `debug_print(text, true);` |
 | was ein Knoten gibt und anderswo gelesen wird | Member `struct { Float value = 0.0; } n12;`, gelesen als `n12.value` |
@@ -201,9 +209,11 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
 | Actor | `Actor` | `Actor{7}` |
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
+| Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
-Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung.
+Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
+einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“).
 
 ### Listen
 
@@ -240,13 +250,103 @@ void on1(Actor actor, Float value, Text text) {
   Knoten (`n9`), wie der Index einer For-Schleife: Startet der Rumpf dieselbe Schleife noch
   einmal (über ein Event), läuft die innere ganz, und die äußere ist danach zu Ende.
 - **Eine Liste wird nur zu Text.** `kern::to<Text>(Scores)` ergibt `[1, 2.5]`; sonst passt eine
-  Liste nur in einen Eingang ihres eigenen Typs, und nichts wird still zu einer Liste.
+  Liste nur in einen Eingang ihres eigenen Typs, und nichts wird still zu einer Liste. (Eine Liste
+  einer Aufzählung wird auch nicht zu Text: die Namen ihrer Werte kennt nur die Aufzählung.)
 - **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
   und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
   ersten Drahts an, der an ihn kommt.
 - **Was sie tun, steht einmal:** `kern::logic::list` in `kern/logic/nodes.h` – die Knoten des
   Interpreters und die Funktionen der Klasse rufen dieselben Funktionen auf.
 - Gameplay: „All Actors with Tag“ (`actor_all_with_tag(tag)`) gibt eine `List<Actor>`.
+
+### Aufzählungen
+
+Ein Blueprint kann Aufzählungen (Enums) deklarieren: einen eigenen Typ mit benannten Werten, etwa
+`Mode` mit den Werten `Closed`, `Opening`, `Open`. Von diesem Typ kann eine Variable sein, ebenso
+eine Liste (`List<Mode>`), die Ein- und Ausgänge einer Funktion und Pins. `KERN_ENUM` deklariert
+dafür im `struct` des Blueprints ein `enum class Mode : kern::i64` – auch dieser Text ist C++, das
+ein Compiler übersetzt, so wie er dasteht:
+
+```cpp
+struct Door : kern::Blueprint {
+  // ---- types ----
+  /// What the door is doing.
+  KERN_ENUM(Mode, Closed, Opening, Open);
+
+  // ---- variables ----
+  Mode State = Mode::Closed;
+  List<Mode> Seen = List<Mode>{Mode::Closed, Mode::Open};
+  Text Log = "";
+
+  // ---- functions ----
+  struct TakeResult { Mode now = Mode::Closed; Int count = 0; };
+  TakeResult Take(Mode to = Mode::Open, List<Mode> more = List<Mode>{}) {
+    State = to;
+    Seen = more;
+    return {State, list_length<Mode>(more)};
+  }
+
+  // ---- events ----
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    switch (flow_switch_enum<Mode>(State)) {
+      case Mode::Closed: {
+        State = Mode::Opening;
+      } break;
+      case Mode::Opening: {
+      } break;
+      case Mode::Open: {
+        Log = text_append(Log, enum_name<Mode>(State), "");
+      } break;
+    }
+    for (auto it7 = flow_for_each<Mode>(n7, enum_values<Mode>()); it7.next();) {
+      list_add(Seen, n7.item);
+    }
+  }
+
+  // ---- what nodes give and keep ----
+  struct : kern::Node<7> { Mode item = Mode::Closed; Int index = 0; } n7;
+};
+```
+
+- **Deklariert wird über der ersten Verwendung.** `KERN_ENUM(Name, Wert, Wert …);` steht im
+  Abschnitt „types“, über den Variablen. Ein `///`-Kommentar darüber ist die Beschreibung der
+  Aufzählung.
+- **Ein Wert ist genau einer ihrer Werte,** geschrieben `Mode::Open`; eine Liste davon ist
+  `List<Mode>{Mode::Closed, Mode::Open}`.
+- **Nichts wandelt sich um.** Ein Wert einer Aufzählung ist weder Zahl noch Text: `State = 1;`,
+  `Count = State;` und `kern::to<Int>(State)` lehnt der Leser ab, mit der Zeile und dem Grund.
+  Auch ein Wert der einen Aufzählung passt nicht dorthin, wo eine andere verlangt ist, und eine
+  `List<Mode>` wird – anders als die übrigen Listen – nicht zu Text. Wo eine Zahl oder ein Text
+  gebraucht wird, sagt ein Knoten, was gemeint ist (Enum to Index, Enum to Text – siehe die
+  Tabelle unten).
+- **Die Einstellung, die die Aufzählung nennt, ist der Typ selbst** – wie jede Einstellung, die
+  einen Typ nennt: `enum_name<Mode>(State)`. Die generischen Knoten stehen im Typ der
+  Aufzählung: `logic_select<Mode>(pick, a, b)`, `list_get<Mode>(Seen, 0)`,
+  `value_reroute<List<Mode>>(Seen)`.
+- **Switch on Enum** ist ein `switch` über den Wert:
+  `switch (flow_switch_enum<Mode>(wert)) { case Mode::Closed: { ... } break; ... }`. Die Fälle
+  sind die Werte der Aufzählung, bei ihren Namen, und der Text hat einen Fall für jeden Wert (so
+  will C++ ein `switch` über ein `enum` haben); ein Fall, an dem kein Draht hängt, ist leer. Beim
+  Lesen ist ein Fall, der fehlt, dasselbe wie ein leerer.
+- **Von außen** – Code, der eine Variable einer Instanz setzt oder eine ihrer Funktionen aufruft
+  (`Instance::set`, `Instance::call`) – ist, was kein Wert der Aufzählung ist, ihr erster Wert.
+- **In jeder Stufe gleich:** Interpreter, JIT und die Klasse des Blueprints liefern dieselben
+  Ergebnisse – Wert für Wert geprüft, wie bei jedem Knoten.
+- **Was sie tun, steht einmal:** `kern::logic::enums` in `kern/logic/nodes.h`, für die Knoten des
+  Interpreters und für die Funktionen der Klasse.
+
+Die Knoten einer Aufzählung und ihre Funktionen (`E` ist die Aufzählung):
+
+| Knoten | C++ | Ergebnis |
+|---|---|---|
+| Switch on Enum | `flow_switch_enum<E>(wert)` | der Weg des Werts: ein `case` je Wert |
+| Equal (Enum) | `enum_equal<E>(a, b)` | `Bool`: Sind A und B derselbe Wert? |
+| Enum to Text | `enum_name<E>(wert)` | der Name des Werts |
+| Text to Enum | `enum_from_name<E>(text)` | `.value`: der Wert mit diesem Namen; `.found`: Gibt es ihn? Heißt kein Wert so, ist `.value` der erste Wert und `.found` falsch |
+| Enum to Index | `enum_index<E>(wert)` | die Stelle des Werts unter den Werten der Aufzählung; die erste ist 0 |
+| Index to Enum | `enum_from_index<E>(index)` | `.value`: der Wert an dieser Stelle; `.valid`: Gibt es sie? Wenn nicht, ist `.value` der erste Wert und `.valid` falsch |
+| All Values | `enum_values<E>()` | eine `List<E>` mit jedem Wert, in ihrer Reihenfolge – etwa für ein For Each |
 
 ### Formeln
 
@@ -326,6 +426,11 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
 - Variablen und Funktionen teilen sich einen Namensraum; `FnResult` gehört der Funktion `Fn`.
   Ein Funktions-Eingang heißt nicht wie eine Variable oder Funktion, eine Variable nicht wie der
   Ausgang eines Events im selben Blueprint (`value`, `actor`, `delta` …).
+- Der Name einer **Aufzählung** und die Namen ihrer Werte sind ebenfalls C++-Namen: Buchstaben,
+  Ziffern und `_`, keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise
+  (`Float` …). Der Name einer Aufzählung endet nicht auf `_list`, und sie heißt nicht wie eine
+  Variable oder Funktion. Keine zwei Werte einer Aufzählung heißen gleich, und jede Aufzählung
+  hat mindestens einen Wert.
 - **Ein Exec-Ausgang hat einen Draht.** Mehreres nacheinander ist eine Sequence.
 - **Return** liegt auf einem Weg seiner eigenen Funktion: nicht nach einem Warten, nicht in einem
   Event; treffen sich Wege davor, dann alle aus einem Branch oder Switch.
@@ -363,6 +468,7 @@ Form:
   `if` (sie hängen an allen offenen Enden seiner Zweige).
 - ganze Zahlen, wo ein Float steht (`Heat = 1;`).
 - Anweisungen nach den Blöcken einer Sequence sind ihr letzter Block.
+- Fehlt bei Switch on Enum der `case` eines Werts, ist das dasselbe wie ein leerer.
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
 
 Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen Schreibweise:
@@ -534,7 +640,7 @@ verdrahtet, einmal keiner), von Hand geschriebene Texte mit allen Formen, die Ab
 ihren Stellen und die Regeln. In SpawnCity prüft `rules_wanted_blueprint_is_its_cpp` dasselbe
 für den Blueprint „Wanted“ des Levels.
 
-Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von sechs Blueprints genau so,
+Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von sieben Blueprints genau so,
 wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Compiler des
 Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
 Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
@@ -542,15 +648,18 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 17, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
-ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+demselben Ergebnis: alle 18, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
+(`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
+und Name und zurück, alle Werte in einem For Each), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
 tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
 (`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
-jenseits der Liste (`Lists`), Return in einer Sequence (`Functions`) und **jeder
+jenseits der Liste (`Lists`), Aufzählungen als Variablen, in Listen und durch Funktionen, Switch
+on Enum, der Weg zu Index und Name und zurück (`Enums`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
 vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
 sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen (und denen des Spiels,

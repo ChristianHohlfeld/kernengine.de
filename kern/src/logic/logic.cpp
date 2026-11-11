@@ -22,22 +22,55 @@ std::string number_text(f64 n) {
 
 const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinTypeNames[static_cast<u32>(t)].data() : "?"; }
 
-std::vector<PinType> type_choices(const ParamDef& pd) {
-  std::vector<PinType> r = {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor};
+std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
+  std::vector<TypeRef> r;
+  if (!pd.enums_only)
+    for (PinType t : {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor}) r.push_back({t, {}});
+  for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (pd.with_lists)
-    for (std::size_t k = 0; k < 6; ++k) r.push_back(list_of(r[k]));
+    for (std::size_t k = 0, n = r.size(); k < n; ++k) r.push_back({list_of(r[k].type), r[k].of});
   return r;
 }
-std::string type_label(PinType t) {
+std::string type_text(const TypeRef& t) {
+  if (element_of(t.type) != PinType::enumeration) return pin_type_name(t.type);
+  return is_list(t.type) ? t.of + "_list" : t.of;
+}
+bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
+  PinType builtin;
+  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && element_of(builtin) != PinType::enumeration) {
+    // (the types' own names only: a setting holds the one name of its type)
+    if (text != pin_type_name(builtin)) return false;
+    out = {builtin, {}};
+    return true;
+  }
+  if (g.enumeration(text)) {
+    out = {PinType::enumeration, std::string(text)};
+    return true;
+  }
+  if (text.size() > 5 && text.substr(text.size() - 5) == "_list" && g.enumeration(text.substr(0, text.size() - 5))) {
+    out = {PinType::enumeration_list, std::string(text.substr(0, text.size() - 5))};
+    return true;
+  }
+  return false;
+}
+std::string type_label(const TypeRef& t) {
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor"};
-  const PinType e = element_of(t);
-  const std::string name = static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
-  return is_list(t) ? name + " List" : name;
+  const PinType e = element_of(t.type);
+  const std::string name = e == PinType::enumeration ? (t.of.empty() ? std::string("Enum") : t.of) : static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
+  return is_list(t.type) ? name + " List" : name;
+}
+
+bool fits(const TypeRef& from, const TypeRef& to) {
+  if (!convertible(from.type, to.type)) return false;
+  return element_of(from.type) != PinType::enumeration || element_of(to.type) != PinType::enumeration || from.of == to.of;
 }
 
 bool convertible(PinType from, PinType to) {
   if (from == to) return true;
   if (from == PinType::exec || to == PinType::exec) return false;
+  // (a value of an enum is one of its names, a place among them: it is no number and no text
+  // by itself - Enum to Text, Enum to Index say which is meant)
+  if (element_of(from) == PinType::enumeration || element_of(to) == PinType::enumeration) return false;
   if (to == PinType::text) return true;  // everything prints
   if (is_list(from) || is_list(to)) return false;  // (a list is a list of its type and nothing else)
   const bool from_num = from == PinType::integer || from == PinType::number || from == PinType::boolean;
@@ -62,6 +95,7 @@ bool Value::as_bool() const {
     case PinType::vector: return length_sq(v) > 0;
     case PinType::text: return !s.empty() && s != "false" && s != "0";
     case PinType::actor: return a != 0;
+    case PinType::enumeration: return i != 0;
     default: return false;
   }
 }
@@ -70,6 +104,7 @@ i64 Value::as_int() const {
   switch (type) {
     case PinType::boolean: return b ? 1 : 0;
     case PinType::integer: return i;
+    case PinType::enumeration: return i;
     case PinType::number: return whole(n);
     case PinType::text: return std::strtoll(s.c_str(), nullptr, 10);
     case PinType::actor: return a;
@@ -81,6 +116,7 @@ f64 Value::as_number() const {
   switch (type) {
     case PinType::boolean: return b ? 1 : 0;
     case PinType::integer: return static_cast<f64>(i);
+    case PinType::enumeration: return static_cast<f64>(i);
     case PinType::number: return n;
     case PinType::vector: return length(v);
     case PinType::text: return std::strtod(s.c_str(), nullptr);
@@ -103,6 +139,7 @@ std::string Value::as_text() const {
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
+    case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
     default: break;
   }
   if (!is_list(type)) return "";
@@ -121,6 +158,7 @@ std::size_t Value::size() const {
     case PinType::vector_list: return std::get<std::vector<Vec3>>(*list).size();
     case PinType::text_list: return std::get<std::vector<std::string>>(*list).size();
     case PinType::actor_list: return std::get<std::vector<ActorHandle>>(*list).size();
+    case PinType::enumeration_list: return std::get<std::vector<i64>>(*list).size();
     default: return 0;
   }
 }
@@ -134,6 +172,7 @@ Value Value::item(std::size_t index) const {
     case PinType::vector_list: return vector(std::get<std::vector<Vec3>>(*list)[index]);
     case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
     case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index].id);
+    case PinType::enumeration_list: return enumeration(std::get<std::vector<i64>>(*list)[index]);
     default: return zero(element_of(type));
   }
 }
@@ -154,6 +193,14 @@ Value Value::converted(PinType to) const {
     case PinType::vector: return vector(as_vector());
     case PinType::text: return text(as_text());
     case PinType::actor: return actor(as_actor());
+    case PinType::enumeration: return enumeration(as_int());
+    case PinType::enumeration_list:
+      if (type == PinType::integer_list) {  // (what a node computed on the places of an enum's values: those values)
+        Value r = *this;
+        r.type = to;
+        return r;
+      }
+      return zero(to);
     default: return is_list(to) ? zero(to) : *this;  // (nothing but the list itself is a list of that type)
   }
 }
@@ -172,6 +219,7 @@ json::Value Value::to_json() const {
     }
     case PinType::text: return json::Value(s);
     case PinType::actor: return json::Value(static_cast<f64>(a));
+    case PinType::enumeration: return json::Value(static_cast<f64>(i));
     default: break;
   }
   if (!is_list(type)) return json::Value();
@@ -192,6 +240,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
       break;
     case PinType::text: v.s = j.is_string() ? j.as_string() : j.is_null() ? std::string() : json::stringify(j); break;
     case PinType::actor: v.a = j.is_number() ? static_cast<ActorRef>(max_of(0.0, j.as_number())) : 0; break;
+    case PinType::enumeration: v.i = j.is_number() ? max_of(i64{0}, whole(j.as_number())) : 0; break;
     default: break;
   }
   if (is_list(t) && j.is_array() && j.size() > 0) {
@@ -207,6 +256,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
         case PinType::vector: std::get<std::vector<Vec3>>(*held).push_back(x.v); break;
         case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
         case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back({x.a}); break;
+        case PinType::enumeration: std::get<std::vector<i64>>(*held).push_back(x.i); break;
         default: break;
       }
     }
@@ -217,6 +267,8 @@ Value Value::from_json(const json::Value& j, PinType t) {
 
 bool Value::operator==(const Value& o) const {
   if (type != o.type) {
+    // (an enum's value is no number and no text: it is equal to an enum's value only)
+    if (type == PinType::enumeration || o.type == PinType::enumeration) return false;
     if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
     if (is_list(type) || is_list(o.type)) return false;
     return as_number() == o.as_number();
@@ -228,6 +280,7 @@ bool Value::operator==(const Value& o) const {
     case PinType::vector: return v.x == o.v.x && v.y == o.v.y && v.z == o.v.z;
     case PinType::text: return s == o.s;
     case PinType::actor: return a == o.a;
+    case PinType::enumeration: return i == o.i;
     default: break;
   }
   if (!is_list(type)) return true;
@@ -301,6 +354,14 @@ const StateMachine* Graph::machine(std::string_view name) const {
   for (const StateMachine& m : machines) if (m.name == name) return &m;
   return nullptr;
 }
+const EnumType* Graph::enumeration(std::string_view name) const {
+  for (const EnumType& e : enums) if (e.name == name) return &e;
+  return nullptr;
+}
+EnumType* Graph::enumeration(std::string_view name) {
+  for (EnumType& e : enums) if (e.name == name) return &e;
+  return nullptr;
+}
 const Function* Graph::function(std::string_view name) const {
   for (const Function& f : functions) if (f.name == name) return &f;
   return nullptr;
@@ -329,11 +390,25 @@ json::Value graph_to_json(const Graph& g) {
     json::Value o = json::Value::object();
     o.set("name", v.name);
     o.set("type", pin_type_name(v.type));
+    if (!v.of.empty()) o.set("of", v.of);
     o.set("value", v.value);
     if (!v.help.empty()) o.set("help", v.help);
     vars.push(std::move(o));
   }
   root.set("variables", std::move(vars));
+  if (!g.enums.empty()) {  // (only then: graphs without types of their own keep their content hash)
+    json::Value enums = json::Value::array();
+    for (const EnumType& e : g.enums) {
+      json::Value o = json::Value::object();
+      o.set("name", e.name);
+      json::Value values = json::Value::array();
+      for (const std::string& v : e.values) values.push(v);
+      o.set("values", std::move(values));
+      if (!e.help.empty()) o.set("help", e.help);
+      enums.push(std::move(o));
+    }
+    root.set("enums", std::move(enums));
+  }
   json::Value nodes = json::Value::array();
   for (const Node& n : g.nodes) {
     json::Value o = json::Value::object();
@@ -406,6 +481,7 @@ json::Value graph_to_json(const Graph& g) {
         json::Value x = json::Value::object();
         x.set("name", p.name);
         x.set("type", pin_type_name(p.type));
+        if (!p.of.empty()) x.set("of", p.of);
         x.set("value", p.value);
         a.push(std::move(x));
       }
@@ -455,12 +531,28 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     max_id = max_of(max_id, id);
     return id;
   };
+  for (const json::Value& v : j["enums"].items()) {
+    EnumType e;
+    e.name = v["name"].as_string();
+    if (e.name.empty() || e.name.size() > 64) return bad("an enum needs a name (1-64 characters)");
+    if (g.enumeration(e.name)) return bad("enum \"" + e.name + "\" is declared twice");
+    for (const json::Value& x : v["values"].items()) e.values.push_back(x.as_string());
+    e.help = v["help"].as_string();
+    g.enums.push_back(std::move(e));
+  }
+  // A type in the file: its name, and for an enum's values which enum ("of").
+  auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
+    if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
+    if (element_of(type) != PinType::enumeration) return true;
+    of = v["of"].as_string();
+    return g.enumeration(of) != nullptr;
+  };
   for (const json::Value& v : j["variables"].items()) {
     Variable var;
     var.name = v["name"].as_string();
     if (var.name.empty() || var.name.size() > 64) return bad("a variable needs a name (1-64 characters)");
     if (g.variable(var.name)) return bad("variable \"" + var.name + "\" is declared twice");
-    if (!pin_type_from_name(v["type"].as_string(), var.type) || var.type == PinType::exec) return bad("variable \"" + var.name + "\" has an unknown type");
+    if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type");
     var.value = Value::from_json(v["value"], var.type).to_json();
     var.help = v["help"].as_string();
     g.variables.push_back(std::move(var));
@@ -542,7 +634,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
         p.name = x["name"].as_string();
         if (p.name.empty() || p.name.size() > 64 || p.name == "exec" || p.name == "then") return bad(std::string("function \"") + f.name + "\": " + what + " needs a name (not exec / then)");
         for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
-        if (!pin_type_from_name(x["type"].as_string(), p.type) || p.type == PinType::exec) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
+        if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
         p.value = Value::from_json(x["value"], p.type).to_json();
         out.push_back(std::move(p));
       }
@@ -635,13 +727,48 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (pd.kind == ParamDef::Kind::type) {
         // (the setting holds a type's own name: what it means does not depend on a reader's goodwill)
         bool known = false;
-        for (PinType t : type_choices(pd)) known = known || v == pin_type_name(t);
-        if (!known) err(n.id, lib.title(n) + ": \"" + v + "\" is no type it can have (" + pd.label + ": float, int, bool, vector, text, actor" + (pd.with_lists ? ", or a list of one - float_list ...)" : ")"));
+        for (const TypeRef& t : type_choices(pd, g)) known = known || v == type_text(t);
+        if (!known && pd.enums_only) err(n.id, lib.title(n) + ": \"" + v + "\" is no enum of this Blueprint");
+        else if (!known)
+          err(n.id, lib.title(n) + ": \"" + v + "\" is no type it can have (" + pd.label + ": float, int, bool, vector, text, actor, an enum of this Blueprint" +
+                        (pd.with_lists ? ", or a list of one - float_list ...)" : ")"));
       }
+    }
+    // a value of an enum typed into a pin is one of the enum's values
+    for (const PinDef& in : p.first) {
+      if (in.type != PinType::enumeration) continue;
+      const EnumType* e = g.enumeration(in.of);
+      const json::Value* typed = n.value(in.id);
+      if (e && typed && typed->is_number() && typed->as_number() >= static_cast<f64>(e->values.size()))
+        err(n.id, lib.title(n) + ": \"" + in.id + "\" is value " + std::to_string(whole(typed->as_number())) + " of " + e->name + ", which has " + std::to_string(e->values.size()));
     }
     if (d->problem)
       if (const std::string why = d->problem(n, g); !why.empty()) err(n.id, d->label + ": " + why);
   }
+  // The enums: each has values, and no two of them the same name.
+  for (const EnumType& e : g.enums) {
+    if (e.values.empty()) err(0, "enum \"" + e.name + "\" has no values");
+    for (std::size_t a = 0; a < e.values.size(); ++a) {
+      if (e.values[a].empty()) err(0, "enum \"" + e.name + "\": value " + std::to_string(a) + " has no name");
+      for (std::size_t b = 0; b < a; ++b)
+        if (e.values[a] == e.values[b]) err(0, "enum \"" + e.name + "\" has two values called \"" + e.values[a] + "\"");
+    }
+  }
+  // What is of an enum's type names an enum, and its default is one of the values.
+  auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
+    if (element_of(type) != PinType::enumeration) return;
+    const EnumType* e = g.enumeration(of);
+    if (!e) { err(0, what + " is of the enum \"" + of + "\", which this Blueprint does not have"); return; }
+    const Value v = Value::from_json(value, type);
+    for (std::size_t k = 0, n = type == PinType::enumeration ? 1 : v.size(); k < n; ++k) {
+      const i64 index = type == PinType::enumeration ? v.i : v.item(k).i;
+      if (index >= static_cast<i64>(e->values.size())) err(0, what + ": " + std::to_string(index) + " is no value of " + e->name + " (it has " + std::to_string(e->values.size()) + ")");
+    }
+  };
+  for (const Variable& v : g.variables) typed_ok("variable \"" + v.name + "\"", v.type, v.of, v.value);
+  for (const Function& f : g.functions)
+    for (const auto* pins_of : {&f.inputs, &f.outputs})
+      for (const FunctionPin& fp : *pins_of) typed_ok("function \"" + f.name + "\": \"" + fp.name + "\"", fp.type, fp.of, fp.value);
   // A function's body starts at its one entry node.
   for (const Function& f : g.functions) {
     int entries = 0, returns = 0;
@@ -669,7 +796,8 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       continue;
     }
     if ((o->type == PinType::exec) != (i->type == PinType::exec)) { err(l.to, "an exec wire is connected to a data pin"); continue; }
-    if (!convertible(o->type, i->type)) err(l.to, std::string("cannot convert ") + pin_type_name(o->type) + " to " + pin_type_name(i->type) + " (" + i->label + ")");
+    if (!fits({o->type, o->of}, {i->type, i->of}))
+      err(l.to, "cannot convert " + type_text({o->type, o->of}) + " to " + type_text({i->type, i->of}) + " (" + i->label + ")");
     if (i->type != PinType::exec && ++data_in_links[std::to_string(l.to) + ":" + l.in] > 1) err(l.to, "input \"" + i->label + "\" has more than one wire");
   }
   // Pure nodes must not depend on themselves.
@@ -739,6 +867,25 @@ std::vector<Instance*>& instance_registry() {
   return r;
 }
 bool numeric(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number; }
+
+/// What comes from outside - Instance::set, the arguments of Instance::call - as a value of
+/// `type`; for an enum's type one of its values: what is none of them is the first (inside a
+/// Blueprint every enum value is one - the check and the enum nodes see to that).
+Value from_outside(const Value& v, PinType type, const EnumType* e) {
+  Value r = v.converted(type);
+  if (element_of(type) != PinType::enumeration) return r;
+  const i64 count = e ? static_cast<i64>(e->values.size()) : 0;
+  if (type == PinType::enumeration) {
+    if (r.i < 0 || r.i >= count) r.i = 0;
+    return r;
+  }
+  bool all = true;
+  for (i64 x : r.items<i64>()) all = all && x >= 0 && x < count;
+  if (!all)
+    for (i64& x : r.edit<i64>())
+      if (x < 0 || x >= count) x = 0;
+  return r;
+}
 f64 to_type(f64 v, PinType t) {
   if (t == PinType::boolean) return v != 0 ? 1.0 : 0.0;
   if (t == PinType::integer) return static_cast<f64>(whole(v));  // (a whole number as Int holds it: logic::normal)
@@ -953,7 +1100,9 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
       if (to.in[static_cast<std::size_t>(in_index)].type != PinType::exec) continue;
       from.exec_out[static_cast<std::size_t>(exec_ordinal)] = ti->second;
       from.exec_out_entry[static_cast<std::size_t>(exec_ordinal)] = to.exec_in_index[static_cast<std::size_t>(in_index)];
-    } else if (to.in[static_cast<std::size_t>(in_index)].type != PinType::exec && convertible(from.out[static_cast<std::size_t>(out_index)].type, to.in[static_cast<std::size_t>(in_index)].type)) {
+    } else if (to.in[static_cast<std::size_t>(in_index)].type != PinType::exec &&
+               fits({from.out[static_cast<std::size_t>(out_index)].type, from.out[static_cast<std::size_t>(out_index)].of},
+                    {to.in[static_cast<std::size_t>(in_index)].type, to.in[static_cast<std::size_t>(in_index)].of})) {
       to.data_in[static_cast<std::size_t>(in_index)] = {fi->second, out_index};
     }
   }
@@ -1044,7 +1193,7 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   std::size_t k = 0;
   for (std::size_t o = 0; o < e.out.size() && k < fn.inputs.size(); ++o) {
     if (e.out[o].type == PinType::exec) continue;
-    e.outputs[o] = (k < args.size() ? args[k] : Value::from_json(fn.inputs[k].value, fn.inputs[k].type)).converted(e.out[o].type);
+    e.outputs[o] = k < args.size() ? from_outside(args[k], e.out[o].type, graph_.enumeration(e.out[o].of)) : Value::from_json(fn.inputs[k].value, fn.inputs[k].type).converted(e.out[o].type);
     ++k;
   }
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
@@ -1115,7 +1264,8 @@ bool Instance::set(std::string_view variable, const Value& v) {
   }
   auto it = vars_.find(std::string(variable));
   if (it == vars_.end()) return false;
-  it->second = v.converted(it->second.type);
+  const Variable* var = graph_.variable(variable);
+  it->second = from_outside(v, it->second.type, var ? graph_.enumeration(var->of) : nullptr);
   return true;
 }
 

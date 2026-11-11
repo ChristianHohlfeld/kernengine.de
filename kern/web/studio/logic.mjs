@@ -31,6 +31,22 @@ for (const t of LG_VALUE_TYPES) { LG_TYPE_COLORS[t + "_list"] = LG_TYPE_COLORS[t
 const LG_DATA_TYPES = [...LG_VALUE_TYPES, ...LG_VALUE_TYPES.map(t => t + "_list")];
 const lgIsList = t => typeof t === "string" && t.endsWith("_list");
 const lgItemType = t => t.slice(0, -5);
+// An enum of the Blueprint is a type by its name - "Mode", a list of its values "Mode_list" (no
+// enum's name ends in _list). The engine sends {type: "enum" | "enum_list", of: "Mode"}; here a
+// type is that one name, as a node's Type setting holds it. A value of an enum is its place among
+// the enum's values.
+const LG_ENUM_COLOR = "#a58bff";
+const lgBuiltin = t => t in LG_TYPE_NAMES;
+const lgColor = t => LG_TYPE_COLORS[t] || (t ? LG_ENUM_COLOR : "#aaa");
+const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
+const lgTyped = x => { if (x?.of && (x.type === "enum" || x.type === "enum_list")) x.type = x.type === "enum" ? x.of : x.of + "_list"; };
+const lgEnumOf = (enums, type) => lgBuiltin(type) ? null : (enums || []).find(e => e.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
+/** Every pin, variable and function pin of the editor's data with its type as one name. */
+function lgNormalize(data) {
+  for (const n of data.nodes || []) { (n.inputs || []).forEach(lgTyped); (n.outputs || []).forEach(lgTyped); }
+  (data.variables || []).forEach(lgTyped);
+  for (const f of data.functions || []) { (f.inputs || []).forEach(lgTyped); (f.outputs || []).forEach(lgTyped); }
+}
 const LG_KIND_COLORS = {event: "#8f1d1d", action: "#1f4e8c", pure: "#3c7a3c", flow: "#5c5c5c"};
 const LG_GRID = 16;
 const LG_SNAP = 16;
@@ -42,19 +58,25 @@ const lgEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<":
 const lgHex = n => "#" + (n >>> 0).toString(16).padStart(6, "0");
 const lgNum = v => (typeof v === "number" ? (Math.abs(v) >= 1e4 || Number.isInteger(v) ? String(v) : String(+v.toFixed(4))) : String(v ?? ""));
 const lgSnap = v => Math.round(v / LG_SNAP) * LG_SNAP;
-const lgValueText = (v, type) => lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x) + ")" : lgValueText(x)).join(", ") + "]"
-  : Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
+const lgValueText = (v, type, enums) => {
+  const e = lgEnumOf(enums, type);
+  if (e) return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => e.values[x] ?? "?").join(", ") + "]" : e.values[v] ?? "?";  // (an enum's value by its name)
+  return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x) + ")" : lgValueText(x)).join(", ") + "]"
+    : Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
+};
 const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : 0;
 const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
 
 /** The editor of a list's items (the default of a variable or a function input, a list typed
  *  into a node): one row per item with the field of its type, × takes it out, + adds one. */
-function lgListEditor(type, value) {
+function lgListEditor(type, value, enums) {
   const item = lgItemType(type), items = Array.isArray(value) ? value : [];
   if (item === "actor") return `<span class="lg-dim">${items.length ? items.length + " actors" : "empty (filled while playing)"}</span>`;
-  const field = (v, i) => item === "bool" ? `<input type="checkbox" data-li="${i}"${v ? " checked" : ""}>`
+  const of = lgEnumOf(enums, type);
+  const field = (v, i) => of ? `<select data-li="${i}">${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
+    : item === "bool" ? `<input type="checkbox" data-li="${i}"${v ? " checked" : ""}>`
     : `<input data-li="${i}" value="${lgEsc(item === "vector" ? (Array.isArray(v) ? v : [0, 0, 0]).map(lgNum).join(", ") : item === "text" ? (v ?? "") : lgNum(v))}" spellcheck="false"${item === "text" ? "" : ' inputmode="decimal"'}>`;
-  return `<div class="lg-list" data-list="${type}">${items.map((v, i) => `<div class="lg-li"><em>${i}</em>${field(v, i)}<button data-lx="${i}" title="Remove this item">×</button></div>`).join("")}
+  return `<div class="lg-list" data-list="${lgEsc(type)}">${items.map((v, i) => `<div class="lg-li"><em>${i}</em>${field(v, i)}<button data-lx="${i}" title="Remove this item">×</button></div>`).join("")}
     <button class="lg-ladd" data-ladd title="Add an item at the end">+ Item</button></div>`;
 }
 /** The items a list editor shows now. */
@@ -73,7 +95,7 @@ function lgListBind(box, send) {
 }
 
 function lgPinIcon(type, linked) {
-  const c = LG_TYPE_COLORS[type] || "#aaa";
+  const c = lgColor(type);
   if (type === "exec")
     return `<svg class="lg-pin exec" viewBox="0 0 14 14"><path d="M2 1.8h5.2l5 5.2-5 5.2H2z" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   if (lgIsList(type)) {
@@ -125,6 +147,7 @@ export class LogicEditor {
     this.selLink = null;             // selected wire [from, out, to, in]
     this.selVar = null;              // variable shown in Details
     this.selFn = null;               // function shown in Details
+    this.selEnum = null;             // enum shown in Details
     this.selTransition = null;
     this.drag = null;
     this.palette = null;
@@ -431,6 +454,7 @@ export class LogicEditor {
   render(data) {
     this.data = data;
     if (!data) return;
+    lgNormalize(data);
     this.host.classList.toggle("machine-view", data.view !== "graph");
     const owners = data.owners || [];
     const ownerKey = JSON.stringify(owners) + data.owner;
@@ -523,7 +547,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.enums, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -534,8 +558,8 @@ export class LogicEditor {
       ...(data.machines || []).filter(m => match(m.name)).map(m => `<div class="lg-item${data.view === "m:" + m.id ? " on" : ""}" data-graph="m:${m.id}">${lgIco("machine")}<span>${lgEsc(m.name)}</span></div>`)].join("");
     const vars = (data.variables || []).filter(v => match(v.name)).map(v => `
         <div class="lg-item lg-var${this.selVar === v.name ? " on" : ""}" draggable="true" data-var="${lgEsc(v.name)}" title="Drag into the graph: Ctrl = Get, Alt = Set">
-          <i class="lg-pill" style="--c:${LG_TYPE_COLORS[v.type]}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
-          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type))}</span>` : `<span class="lg-vt">${LG_TYPE_NAMES[v.type] || v.type}</span>`}
+          <i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
+          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data.enums))}</span>` : `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
           <span class="lg-acts"><button data-get title="Add a Get node">Get</button><button data-set title="Add a Set node">Set</button></span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
     // a function's signature in short: (x, y) -> result
@@ -545,16 +569,22 @@ export class LogicEditor {
           <i class="lg-fni">ƒ</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
           <span class="lg-acts"><button data-call title="Add a call of the function">Call</button><button data-ret title="Add a Return node">Return</button></span>
         </div>`).join("") || `<div class="lg-none">No functions${q ? " match" : " yet: + adds one"}</div>`;
+    // an enum: a type of this Blueprint with named values
+    const enums = (data.enums || []).filter(e => match(e.name)).map(e => `
+        <div class="lg-item lg-enum${this.selEnum === e.name ? " on" : ""}" data-enum="${lgEsc(e.name)}" title="${lgEsc(e.help || "An enum: a type of this Blueprint with named values")}">
+          <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span><span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
+          <span class="lg-acts"><button data-switch title="Add a Switch on the enum">Switch</button></span>
+        </div>`).join("") || `<div class="lg-none">No enums${q ? " match" : " yet: + adds one"}</div>`;
     const events = (data.events || []).filter(match).map(e => `
         <div class="lg-item lg-ev" draggable="true" data-ev="${lgEsc(e)}" title="Drag into the graph: the event; Ctrl = Call">${lgIco("event", "red")}<span class="lg-vn">${lgEsc(e)}</span>
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
-      section("fns", "Functions", "Add a function", fns) + section("events", "Events", "Add a custom event", events);
+      section("fns", "Functions", "Add a function", fns) + section("enums", "Enums", "Add an enum", enums) + section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
       s.querySelector(".lg-sec-t").onclick = () => { const id = s.dataset.sec; if (this.collapsed.has(id)) this.collapsed.delete(id); else this.collapsed.add(id); this.myKey = ""; this.renderMy(this.data); };
       const add = s.querySelector("[data-add]");
-      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : s.dataset.sec === "fns" ? this.addFunction() : this.addCustomEvent();
+      if (add) add.onclick = () => s.dataset.sec === "graphs" ? this.addMachine() : s.dataset.sec === "vars" ? this.addVariable() : s.dataset.sec === "fns" ? this.addFunction() : s.dataset.sec === "enums" ? this.addEnum() : this.addCustomEvent();
     }
     for (const it of this.el.mylist.querySelectorAll("[data-graph]")) {
       it.onclick = () => { this.openView(it.dataset.graph); if (this.phone) this.togglePanel(""); };
@@ -577,6 +607,12 @@ export class LogicEditor {
       row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-function", name); e.dataTransfer.effectAllowed = "copy"; };
       row.oncontextmenu = e => { e.preventDefault(); this.functionMenu(name, e.clientX, e.clientY); };
     }
+    for (const row of this.el.mylist.querySelectorAll(".lg-enum")) {
+      const name = row.dataset.enum;
+      row.onclick = e => { if (e.target.closest("button")) return; this.selectEnum(name); };
+      row.querySelector("[data-switch]").onclick = () => this.addAtCenter("flow.switch_enum", {enum: name});
+      row.oncontextmenu = e => { e.preventDefault(); this.enumMenu(name, e.clientX, e.clientY); };
+    }
     for (const row of this.el.mylist.querySelectorAll(".lg-ev")) {
       const name = row.dataset.ev;
       row.querySelector("[data-on]").onclick = () => this.addAtCenter("event.custom", {name});
@@ -591,7 +627,7 @@ export class LogicEditor {
 
   selectFunction(name) {
     this.selFn = name;
-    this.selVar = null;
+    this.selVar = this.selEnum = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -634,7 +670,7 @@ export class LogicEditor {
 
   selectVariable(name) {
     this.selVar = name;
-    this.selFn = null;
+    this.selFn = this.selEnum = null;
     this.selection.clear();
     this.selLink = null;
     this.markSelection();
@@ -656,11 +692,54 @@ export class LogicEditor {
     ], x, y);
   }
 
-  addVariable() {
-    const r = this.cmd({cmd: "logicVariable", op: "add", name: "NewVar", type: "float"});
+  addVariable(type = "float") {
+    const r = this.cmd({cmd: "logicVariable", op: "add", name: "NewVar", type});
     if (r?.name) {
       this.selectVariable(r.name);
       this.afterRender = () => { const f = this.el.dbody.querySelector("[data-vk='name']"); f?.focus(); f?.select(); };
+    }
+  }
+
+  // ---- enums ------------------------------------------------------------------------
+  enumNamed(name) { return (this.data?.enums || []).find(e => e.name === name) || null; }
+  /** The enum a type is of ("Mode", "Mode_list"), or null. */
+  enumOf(type) { return lgEnumOf(this.data?.enums, type); }
+  /** The types a variable or a function's pin can have: the value types, this Blueprint's enums, and a list of each. */
+  typeOptions(current) {
+    const values = [...LG_VALUE_TYPES, ...(this.data?.enums || []).map(e => e.name)];
+    return [...values, ...values.map(t => t + "_list")].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeName(t))}</option>`).join("");
+  }
+
+  selectEnum(name) {
+    this.selEnum = name;
+    this.selVar = this.selFn = null;
+    this.selection.clear();
+    this.selLink = null;
+    this.markSelection();
+    this.myKey = "";
+    this.renderMy(this.data);
+    this.renderDetails();
+    if (this.phone) this.togglePanel("details");
+  }
+
+  enumMenu(name, x, y) {
+    this.studio.openMenu([
+      {header: name},
+      {label: "Switch on " + name, run: () => this.addAtCenter("flow.switch_enum", {enum: name})},
+      {label: "All Values of " + name, run: () => this.addAtCenter("enum.values", {enum: name})},
+      {label: "New Variable of " + name, run: () => this.addVariable(name)},
+      {label: "Find References", run: () => this.findText(name)},
+      {label: "Rename / Edit...", run: () => this.selectEnum(name)},
+      {separator: true},
+      {label: "Delete Enum", run: () => { if (this.cmd({cmd: "logicEnum", op: "remove", name})?.ok !== false && this.selEnum === name) this.selEnum = null; }},
+    ], x, y);
+  }
+
+  addEnum() {
+    const r = this.cmd({cmd: "logicEnum", op: "add"});
+    if (r?.name) {
+      this.selectEnum(r.name);
+      this.afterRender = () => { const f = this.el.dbody.querySelector("[data-ek='name']"); f?.focus(); f?.select(); };
     }
   }
 
@@ -699,8 +778,8 @@ export class LogicEditor {
       let lit = "";
       if (dir === "in" && p.type !== "exec" && !p.linked) lit = this.literalHtml(n, p, actors);
       const label = p.label && !compact ? `<span class="lg-pl">${lgEsc(p.label)}</span>` : "";
-      const tip = `${LG_TYPE_NAMES[p.type] || p.type}${p.label ? " · " + p.label : ""}`;
-      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${p.type}"${p.generic ? ` data-generic="${lgEsc(p.generic)}"` : ""} title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + label + lit : label + lgPinIcon(p.type, p.linked)}</div>`;
+      const tip = `${lgTypeName(p.type)}${p.label ? " · " + p.label : ""}`;
+      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${lgEsc(p.type)}"${p.generic ? ` data-generic="${lgEsc(p.generic)}"` : ""} title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + label + lit : label + lgPinIcon(p.type, p.linked)}</div>`;
     };
     const cls = `lg-node k-${n.kind}${n.error ? " error" : n.issues ? " warn" : ""}${n.breakpoint ? " bp" : ""}${n.hit ? " hit" : ""}`;
     const tip = lgEsc((n.issues ? n.issues.join("\n") + "\n\n" : "") + (n.help || ""));
@@ -709,14 +788,14 @@ export class LogicEditor {
     const pos = `left:${n.x}px;top:${n.y}px`;
     if (n.compact === "reroute") {
       const t = n.inputs[0]?.type || "exec";
-      return `<div class="lg-node knot" data-id="${n.id}" style="${pos};--c:${LG_TYPE_COLORS[t]}" title="Reroute node">
-        <div class="lg-row in" data-pin="${lgEsc(n.inputs[0]?.id || "in")}" data-dir="in" data-type="${t}"></div><i class="lg-knot"></i>
-        <div class="lg-row out" data-pin="${lgEsc(n.outputs[0]?.id || "out")}" data-dir="out" data-type="${t}"></div></div>`;
+      return `<div class="lg-node knot" data-id="${n.id}" style="${pos};--c:${lgColor(t)}" title="Reroute node">
+        <div class="lg-row in" data-pin="${lgEsc(n.inputs[0]?.id || "in")}" data-dir="in" data-type="${lgEsc(t)}"></div><i class="lg-knot"></i>
+        <div class="lg-row out" data-pin="${lgEsc(n.outputs[0]?.id || "out")}" data-dir="out" data-type="${lgEsc(t)}"></div></div>`;
     }
     if (n.compact === "get") {
       const o = n.outputs[0];
       const name = (n.params || []).find(p => p.key === "variable")?.value || n.title;
-      return `<div class="${cls} compact var" data-id="${n.id}" style="${pos};--c:${LG_TYPE_COLORS[o?.type] || "#888"}" title="${tip}">${bubble}
+      return `<div class="${cls} compact var" data-id="${n.id}" style="${pos};--c:${o ? lgColor(o.type) : "#888"}" title="${tip}">${bubble}
         <span class="lg-vname">${lgEsc(name)}</span>${o ? pinRow(o, "out", true) : ""}${badge}</div>`;
     }
     if (n.compact) {
@@ -740,7 +819,10 @@ export class LogicEditor {
 
   literalHtml(n, p, actors) {
     const v = p.value;
-    const attr = `data-lit="${lgEsc(p.id)}" data-node="${n.id}" data-t="${p.type}"`;
+    const attr = `data-lit="${lgEsc(p.id)}" data-node="${n.id}" data-t="${lgEsc(p.type)}"`;
+    const of = this.enumOf(p.type);
+    // an enum's value: one of its values, by name
+    if (of && !lgIsList(p.type)) return `<select class="lg-lit enm" ${attr}>${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
     switch (p.type) {
       case "bool": return `<input type="checkbox" class="lg-lit chk" ${attr}${v ? " checked" : ""}>`;
       case "int":
@@ -750,7 +832,7 @@ export class LogicEditor {
       case "actor": return `<select class="lg-lit act" ${attr}><option value="0">${p.id === "target" || p.id === "a" ? "Self" : "None"}</option>${actors.map(([id, name]) => `<option value="${id}"${id === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
       default:
         // a list that is not wired: how many items are typed in (they are edited in Details)
-        return lgIsList(p.type) ? `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>` : "";
+        return lgIsList(p.type) ? `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type, this.data?.enums))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>` : "";
     }
   }
 
@@ -855,7 +937,7 @@ export class LogicEditor {
       const ran = t === "exec" && (this.ranAt.get(to) || 0) > now - 600;
       const hot = this.selection.has(from) || this.selection.has(to);
       const selected = sel === [from, out, to, inp].join();
-      lines += `<path class="lg-wire${t === "exec" ? " exec" : ""}${ran ? " ran" : ""}${hot ? " hot" : ""}${selected ? " sel" : ""}" d="${d}" stroke="${LG_TYPE_COLORS[t] || "#aaa"}"/>`;
+      lines += `<path class="lg-wire${t === "exec" ? " exec" : ""}${ran ? " ran" : ""}${hot ? " hot" : ""}${selected ? " sel" : ""}" d="${d}" stroke="${lgColor(t)}"/>`;
       hits += `<path class="lg-hit" data-k="${k}" d="${d}"/>`;
     });
     this.el.wires.innerHTML = lines + hits;
@@ -943,7 +1025,7 @@ export class LogicEditor {
     for (const id of ids) this.selection.add(id);
     this.selLink = null;
     this.selTransition = null;
-    if (ids.length) this.selVar = this.selFn = null;
+    if (ids.length) this.selVar = this.selFn = this.selEnum = null;
     this.markSelection();
     if (this.data?.view === "graph") this.drawWires();
     else if (this.machine) this.drawTransitions(this.machine);
@@ -962,12 +1044,13 @@ export class LogicEditor {
     const trans = this.selTransition && m ? m.transitions.find(t => t.id === this.selTransition) : null;
     const variable = this.selVar ? d.variables?.find(v => v.name === this.selVar) : null;
     const fn = this.selFn ? this.fn(this.selFn) : null;
-    const k = JSON.stringify([node, box, state, trans, variable, fn, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
+    const en = this.selEnum ? this.enumNamed(this.selEnum) : null;
+    const k = JSON.stringify([node, box, state, trans, variable, fn, en, d.enums, ids.length, this.selLink, d.variables?.length, d.events, this.trace?.variables?.[this.selVar]]);
     if (k === this.detKey) return;
     // Do not rebuild under the user's typing.
-    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable, fn)) return;
+    if (this.el.dbody.contains(document.activeElement) && document.activeElement.matches("input, textarea") && this.detSame?.(node, box, state, trans, variable, fn, en)) return;
     this.detKey = k;
-    this.detSame = (n2, b2, s2, t2, v2, f2) => (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "") &&
+    this.detSame = (n2, b2, s2, t2, v2, f2, e2) => (e2?.name ?? "") === (en?.name ?? "") && (e2?.values.length ?? 0) === (en?.values.length ?? 0) && (n2?.id ?? -1) === (node?.id ?? -1) && (b2?.id ?? -1) === (box?.id ?? -1) && (s2?.id ?? -1) === (state?.id ?? -1) && (t2?.id ?? -1) === (trans?.id ?? -1) && (v2?.name ?? "") === (variable?.name ?? "") &&
       (f2?.name ?? "") === (fn?.name ?? "") && (f2 ? f2.inputs.length + ":" + f2.outputs.length : "") === (fn ? fn.inputs.length + ":" + fn.outputs.length : "");
     const b = this.el.dbody;
     if (node) b.innerHTML = this.nodeDetails(node);
@@ -976,10 +1059,11 @@ export class LogicEditor {
     else if (state) b.innerHTML = this.stateDetails(m, state);
     else if (variable) b.innerHTML = this.variableDetails(variable);
     else if (fn) b.innerHTML = this.functionDetails(fn);
+    else if (en) b.innerHTML = this.enumDetails(en);
     else if (ids.length > 1) b.innerHTML = `<div class="lg-dh">${ids.length} selected</div><div class="lg-dsec"><div class="lg-dtxt">Drag one to move them all. C puts a comment around them; Q straightens their wires; the context menu aligns them.</div>
       <div class="lg-dacts"><button data-act="comment">Comment</button><button data-act="straighten">Straighten</button><button data-act="delete" class="danger">Delete</button></div></div>`;
     else b.innerHTML = this.graphDetails();
-    this.bindDetails(node, box, m, state, trans, variable, fn);
+    this.bindDetails(node, box, m, state, trans, variable, fn, en);
   }
 
   nodeDetails(n) {
@@ -987,7 +1071,7 @@ export class LogicEditor {
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
     const inputs = n.inputs.filter(p => p.type !== "exec");
     const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
-      (lgIsList(p.type) && !p.linked ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value)}</div>` : "")).join("");
+      (lgIsList(p.type) && !p.linked ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value, this.data.enums)}</div>` : "")).join("");
     const params = (n.params || []).map(p => `<div class="lg-drow"><label>${lgEsc(p.label)}</label><div>${this.paramHtml(n, p)}</div></div>`).join("");
     const issues = (n.issues || []).map(t => `<div class="lg-dissue ${n.error ? "err" : "warn"}">${lgIco(n.error ? "error" : "warn")}${lgEsc(t)}</div>`).join("");
     return `<div class="lg-dh"><i class="lg-dhc" style="background:${head}"></i>${lgEsc(n.title)}</div>
@@ -1010,36 +1094,37 @@ export class LogicEditor {
 
   variableDetails(v) {
     const live = this.trace?.variables?.[v.name];
-    const list = lgIsList(v.type);
+    const list = lgIsList(v.type), of = this.enumOf(v.type);
     const val = list ? `<span class="lg-dim">${Array.isArray(v.value) && v.value.length ? v.value.length + (v.value.length === 1 ? " item" : " items") : "empty"}</span>`
+      : of ? `<select data-vk="value">${of.values.map((name, k) => `<option value="${k}"${k === v.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
       : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
       : `<input data-vk="value" value="${lgEsc(lgNum(v.value))}">`;
     const refs = (this.data.nodes || []).filter(n => (n.params || []).some(p => p.key === "variable" && p.value === v.name)).length;
-    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_TYPE_COLORS[v.type]}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
+    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${lgColor(v.type)}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
-        <div class="lg-drow"><label>Type</label><div><select data-vk="type">${LG_DATA_TYPES.map(t => `<option value="${t}"${t === v.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select></div></div>
+        <div class="lg-drow"><label>Type</label><div><select data-vk="type">${this.typeOptions(v.type)}</select></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Default Value</div><div class="lg-drow"><label>${lgEsc(v.name)}</label><div>${val}</div></div>
-        ${list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value)}</div>` : ""}
-        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live, v.type))}</div></div>` : ""}</div>
+        ${list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value, this.data.enums)}</div>` : ""}
+        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live, v.type, this.data.enums))}</div></div>` : ""}</div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} node${refs === 1 ? "" : "s"} use${refs === 1 ? "s" : ""} ${lgEsc(v.name)}.</div></div>
       <div class="lg-dacts"><button data-act="get">Add Get</button><button data-act="set">Add Set</button><button data-act="refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
 
   functionDetails(f) {
-    const types = LG_DATA_TYPES;
-    const value = p => lgIsList(p.type) ? `<span class="lg-dim lg-fval" title="Default">${Array.isArray(p.value) && p.value.length ? p.value.length + " it." : "empty"}</span>`
+    const value = p => this.enumOf(p.type) && !lgIsList(p.type) ? `<select data-pf="value" class="lg-fval" title="Default">${this.enumOf(p.type).values.map((name, k) => `<option value="${k}"${k === p.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
+      : lgIsList(p.type) ? `<span class="lg-dim lg-fval" title="Default">${Array.isArray(p.value) && p.value.length ? p.value.length + " it." : "empty"}</span>`
       : p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
       : p.type === "actor" ? `<span class="lg-dim">none</span>`
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
-        <i class="lg-pill" style="--c:${LG_TYPE_COLORS[p.type]}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
-        <select data-pf="type" title="Type">${types.map(t => `<option value="${t}"${t === p.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select>${value(p)}
+        <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
+        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${value(p)}
         <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
-        (lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value)}</div>` : "")).join("") ||
+        (lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data.enums)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : "No outputs"}</div>`;
     const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
     return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
@@ -1052,6 +1137,25 @@ export class LogicEditor {
       <div class="lg-dsec"><div class="lg-dst">Outputs</div>${rows(f.outputs, "out")}<div class="lg-dacts"><button data-act="fn-out">+ Output</button></div></div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} call${refs === 1 ? "" : "s"} of ${lgEsc(f.name)} in this Blueprint. The function starts at its Function Entry node and ends at a Return node.</div></div>
       <div class="lg-dacts"><button data-act="fn-call">Add Call</button><button data-act="fn-return">Add Return</button><button data-act="fn-entry">Go to Entry</button><button data-act="delete" class="danger">Delete</button></div>`;
+  }
+
+  enumDetails(e) {
+    const of = t => t === e.name || t === e.name + "_list";
+    const vars = (this.data.variables || []).filter(v => of(v.type)).length;
+    const nodes = (this.data.nodes || []).filter(n => (n.params || []).some(p => (p.kind === "type") && of(p.value))).length;
+    const rows = e.values.map((name, i) => `<div class="lg-frow lg-erow" data-index="${i}"><em>${i}</em>
+        <input data-ev="name" class="lg-fname" value="${lgEsc(name)}" spellcheck="false" title="The value's name">
+        <button data-ev="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-ev="down" title="Move down"${i === e.values.length - 1 ? " disabled" : ""}>↓</button>
+        <button data-ev="remove" title="Remove this value"${e.values.length === 1 ? " disabled" : ""}>×</button></div>`).join("");
+    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_ENUM_COLOR}"></i>${lgEsc(e.name)}</div><div class="lg-dsub">Enum</div>
+      <div class="lg-dsec"><div class="lg-dst">Enum</div>
+        <div class="lg-drow"><label>Name</label><div><input data-ek="name" value="${lgEsc(e.name)}" spellcheck="false"></div></div>
+        <div class="lg-drow"><label>Description</label><div><input data-ek="help" value="${lgEsc(e.help || "")}"></div></div>
+      </div>
+      <div class="lg-dsec"><div class="lg-dst">Values</div>${rows}<div class="lg-dacts"><button data-act="enum-value">+ Value</button></div>
+        <div class="lg-dtxt">A variable or a pin of this enum holds one of these values. Moving a value keeps what is set and wired with it; removing one turns what was that value into the first.</div></div>
+      <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${vars} variable${vars === 1 ? "" : "s"} and ${nodes} node${nodes === 1 ? "" : "s"} are of ${lgEsc(e.name)}.</div></div>
+      <div class="lg-dacts"><button data-act="enum-switch">Add Switch</button><button data-act="enum-var">New Variable</button><button data-act="enum-refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
 
   transitionDetails(m, t) {
@@ -1091,7 +1195,7 @@ export class LogicEditor {
         <tr><td>F / Home</td><td>Frame selection / all</td></tr><tr><td>Ctrl+F</td><td>Find</td></tr><tr><td>F7</td><td>Compile</td></tr></table></div>`;
   }
 
-  bindDetails(node, box, m, state, trans, variable, fn) {
+  bindDetails(node, box, m, state, trans, variable, fn, en) {
     const b = this.el.dbody;
     this.bindInputs(b);
     for (const f of b.querySelectorAll("input, select, textarea")) f.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter" && f.tagName !== "TEXTAREA") f.blur(); });
@@ -1100,6 +1204,7 @@ export class LogicEditor {
     act("delete", () => {
       if (variable && !node && !box) { this.selVar = null; this.cmd({cmd: "logicVariable", op: "remove", name: variable.name}); return; }
       if (fn && !node && !box) { this.selFn = null; this.cmd({cmd: "logicFunction", op: "remove", name: fn.name}); return; }
+      if (en && !node && !box) { if (this.cmd({cmd: "logicEnum", op: "remove", name: en.name})?.ok !== false) this.selEnum = null; return; }
       if (trans) { this.selTransition = null; this.cmd({cmd: "logicMachine", op: "removeTransition", machine: m.id, transition: trans.id}); return; }
       this.deleteSelection();
     });
@@ -1144,6 +1249,29 @@ export class LogicEditor {
             else if (k === "type") edit({op: "pinType", side, pin, type: f.value});
             else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : def.type === "text" ? f.value : (+f.value || 0)});
           };
+        }
+      }
+    }
+    if (en) {
+      const edit = c => this.cmd({cmd: "logicEnum", name: en.name, ...c});
+      act("enum-value", () => edit({op: "addValue"}));
+      act("enum-switch", () => this.addAtCenter("flow.switch_enum", {enum: en.name}));
+      act("enum-var", () => this.addVariable(en.name));
+      act("enum-refs", () => this.findText(en.name));
+      for (const f of b.querySelectorAll("[data-ek]")) {
+        f.onchange = () => {
+          if (f.dataset.ek === "help") { edit({op: "help", text: f.value}); return; }
+          const to = f.value.trim();
+          if (edit({op: "rename", to})?.ok !== false) this.selEnum = to;
+          else f.value = en.name;
+        };
+      }
+      for (const row of b.querySelectorAll(".lg-erow")) {
+        const index = +row.dataset.index;
+        for (const f of row.querySelectorAll("[data-ev]")) {
+          const k = f.dataset.ev;
+          if (k === "name") f.onchange = () => { if (edit({op: "renameValue", index, to: f.value.trim()})?.ok === false) f.value = en.values[index]; };
+          else f.onclick = () => edit(k === "remove" ? {op: "removeValue", index} : {op: "moveValue", index, by: k === "up" ? -1 : 1});
         }
       }
     }
@@ -1206,7 +1334,7 @@ export class LogicEditor {
           if (hay.includes(q)) hits.push(`<div class="lg-res" data-node="${n.id}">${lgIco(n.kind === "event" ? "event" : n.kind === "pure" ? "pure" : "action")}<span>${lgEsc(n.title)}</span><em>${lgEsc(n.category || "")}</em></div>`);
         }
         for (const c of d.comments || []) if (c.text.toLowerCase().includes(q)) hits.push(`<div class="lg-res" data-node="${c.id}">${lgIco("box")}<span>Comment: ${lgEsc(c.text)}</span></div>`);
-        for (const v of d.variables || []) if (v.name.toLowerCase().includes(q)) hits.push(`<div class="lg-res" data-var="${lgEsc(v.name)}"><i class="lg-pill" style="--c:${LG_TYPE_COLORS[v.type]}"></i><span>Variable ${lgEsc(v.name)}</span><em>${LG_TYPE_NAMES[v.type]}</em></div>`);
+        for (const v of d.variables || []) if (v.name.toLowerCase().includes(q)) hits.push(`<div class="lg-res" data-var="${lgEsc(v.name)}"><i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span>Variable ${lgEsc(v.name)}</span><em>${lgEsc(lgTypeName(v.type))}</em></div>`);
         html = hits.join("") || `<div class="lg-res none">Nothing found for "${lgEsc(this.findQuery)}"</div>`;
       } else html = `<div class="lg-res none">Type to find nodes, values, comments and variables</div>`;
     }
@@ -1296,7 +1424,7 @@ export class LogicEditor {
 
   addAt(type, p, params, from) {
     const r = this.cmd({cmd: "logicAdd", type, x: lgSnap(p.x), y: lgSnap(p.y), params, from: from || undefined});
-    if (r?.id) { this.selection = new Set([r.id]); this.selVar = this.selFn = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
+    if (r?.id) { this.selection = new Set([r.id]); this.selVar = this.selFn = this.selEnum = null; this.selLink = null; this.markSelection(); this.renderDetails(); }
     return r;
   }
 
@@ -1611,7 +1739,7 @@ export class LogicEditor {
         for (const s of starts) {
           const pt = this.pinPoint(s.node, s.pin, s.out ? "out" : "in");
           const a = pt ? {x: pt.x * z + v.x, y: pt.y * z + v.y} : {x: d.x0 - r.left, y: d.y0 - r.top};
-          path += `<path d="${s.out ? this.wirePath(a, b) : this.wirePath(b, a)}" stroke="${LG_TYPE_COLORS[d.type]}" class="lg-wire${d.type === "exec" ? " exec" : ""} temp"/>`;
+          path += `<path d="${s.out ? this.wirePath(a, b) : this.wirePath(b, a)}" stroke="${lgColor(d.type)}" class="lg-wire${d.type === "exec" ? " exec" : ""} temp"/>`;
         }
         const target = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".lg-row");
         for (const h of this.el.nodes.querySelectorAll(".lg-row.hover")) h.classList.remove("hover");
@@ -1636,10 +1764,12 @@ export class LogicEditor {
     if (!other || other === d.node) return false;
     const from = d.out ? d.type : row.dataset.type, to = d.out ? row.dataset.type : d.type;
     if ((from === "exec") !== (to === "exec")) return false;
-    if (from === to || to === "text") return true;
+    if (from === to) return true;
     // a generic node nothing is wired to yet takes the wire's type (Select, Reroute, the list nodes)
     const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
     if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;
+    if (!lgBuiltin(from) || !lgBuiltin(to)) return false;  // an enum's value goes where its own enum is wanted, nowhere else
+    if (to === "text") return true;
     if (lgIsList(from) || lgIsList(to)) return false;
     const numeric = t => t === "int" || t === "float" || t === "bool";
     if (numeric(from) && numeric(to)) return true;
@@ -1702,7 +1832,7 @@ export class LogicEditor {
         this.studio.flushUi();
         return;
       }
-      if (row && row.closest(".lg-node") && +row.closest(".lg-node").dataset.id !== d.node && d.moved) { this.studio.toast(`A ${LG_TYPE_NAMES[d.type] || d.type} pin does not fit a ${LG_TYPE_NAMES[row.dataset.type] || row.dataset.type} pin`); return; }
+      if (row && row.closest(".lg-node") && +row.closest(".lg-node").dataset.id !== d.node && d.moved) { this.studio.toast(`A ${lgTypeName(d.type)} pin does not fit a ${lgTypeName(row.dataset.type)} pin`); return; }
       if (d.ends) return;  // picked-up wires dropped in empty space: they stay broken (Blueprint)
       // A wire dropped into empty space (or a tap on a pin): the nodes that fit.
       if (d.moved || d.touch) this.openPalette(e.clientX, e.clientY, {node: d.node, pin: d.pin, output: d.out});
@@ -1843,7 +1973,7 @@ export class LogicEditor {
     const p = (out ? n?.outputs : n?.inputs)?.find(q => q.id === pin);
     const links = (this.data.links || []).filter(([f, o, t, i]) => out ? f === node && o === pin : t === node && i === pin);
     const label = p?.label || pin;
-    const entries = [{header: `${label} (${LG_TYPE_NAMES[p?.type] || p?.type})`},
+    const entries = [{header: `${label} (${lgTypeName(p?.type)})`},
       {label: links.length > 1 ? `Break All Pin Links (${links.length})` : "Break Link", disabled: !links.length, run: () => this.cmd({cmd: "logicDisconnect", node, pin, output: out})}];
     for (const l of links.length > 1 ? links : []) {
       const other = this.data.nodes.find(k => k.id === (out ? l[2] : l[0]));
@@ -2214,7 +2344,7 @@ export const LOGIC_STYLE = `
 .lg-row.hover{background:rgba(255,255,255,.12)}
 .lg-lit,.lg-par{height:20px;background:#0a0a0a;border:1px solid #3c3c3c;border-radius:3px;color:#f0f0f0;font:11.5px/1 inherit;padding:0 5px;min-width:0;outline:none}
 .lg-lit:focus,.lg-par:focus{border-color:var(--lg-acc)}
-.lg-lit.num{width:56px}.lg-lit.txt{width:120px}.lg-lit.act,.lg-par{max-width:150px}
+.lg-lit.num{width:56px}.lg-lit.txt{width:120px}.lg-lit.act,.lg-lit.enm,.lg-par{max-width:150px}
 select.lg-par,select.lg-lit{padding:0 2px}
 .lg-lit.chk{width:15px;height:15px;accent-color:#d93b3b;margin:0 2px}
 .lg-vec{display:flex;gap:3px}.lg-vec label{display:flex;align-items:center;gap:2px}.lg-vec i{font-style:normal;font-size:10px;color:#888}
@@ -2326,6 +2456,8 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-li em{flex:0 0 18px;text-align:right;color:#808080;font-style:normal;font-size:11px}
 .lg-li input:not([type=checkbox]){flex:1 1 0;min-width:0;width:auto;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 6px;font:inherit}
 .lg-li input[type=checkbox]{margin:0 auto 0 0}
+.lg-li select{flex:1 1 0;min-width:0;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 4px;font:inherit}
+.lg-erow em{flex:0 0 16px;text-align:right;color:#808080;font-style:normal;font-size:11px}
 .lg-li button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-ladd{align-self:flex-start;height:24px;padding:0 10px;margin-left:23px;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-lcount{color:#9a9a9a;font-size:11px;padding:0 4px;white-space:nowrap}

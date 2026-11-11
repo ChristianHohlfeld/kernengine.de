@@ -331,9 +331,9 @@ Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und
 | Bereich | Inhalt |
 |---|---|
 | Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, **C++** (der Blueprint als C++: ansehen, ändern, anwenden) |
-| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call) |
+| My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call), Enums (die Aufzählungen des Blueprints; + legt eine an) |
 | Graph | Tabs, Breadcrumb, Zoom-Stufen wie Unreal („Zoom 1:1“, „Zoom −2“), Wasserzeichen EVENT GRAPH |
-| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ – auch Listen –, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
+| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ – auch Listen und Aufzählungen –, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Aufzählung (Name, Beschreibung, Werte), Kommentar (Text, Farbe), State, Transition |
 | Compiler Results / Find Results | Probleme und Suchtreffer, ein Klick springt zum Knoten |
 
 Im Graphen:
@@ -453,11 +453,59 @@ Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
   bietet das Menü sie schon im passenden Typ an; ein neuer Knoten nimmt den Typ des ersten Drahts
   an. Hängen schon Drähte an seinen typisierten Pins, bleibt er, was er ist.
 - Eine Liste passt nur in einen Eingang ihres Typs – und in jeden Text-Eingang: Print zeigt
-  `[1, 2.5, 7]`.
+  `[1, 2.5, 7]`. (Ausnahme: eine Liste einer Aufzählung, siehe unten.)
 - **All Actors with Tag** (Actors) gibt alle lebenden Actors mit einem Tag als Actor List.
 - Als C++: `List<Float> Scores = List<Float>{1.0, 2.5};`, `list_add(Scores, x);`,
   `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Listen“.
+
+### Aufzählungen
+
+Ein Blueprint kann **Aufzählungen** (Enums) deklarieren: einen eigenen Typ mit benannten Werten,
+etwa `Mode` mit den Werten `Closed`, `Opening`, `Open`. Von diesem Typ kann eine Variable sein,
+ebenso eine Liste (`Mode List`), die Ein- und Ausgänge einer Funktion und Pins. Ein Wert einer
+Aufzählung ist genau einer ihrer Werte. Er ist weder Zahl noch Text: Er wandelt sich in nichts um,
+und ein Draht verbindet nur Pins derselben Aufzählung (auch eine Liste davon passt in keinen
+Text-Eingang). Wo eine Zahl oder ein Text gebraucht wird, sagt ein Knoten, was gemeint ist.
+
+- **Anlegen:** **+** bei *Enums* in My Blueprint legt eine an; sie beginnt als `NewEnum` mit den
+  Werten `First` und `Second`. Ist sie ausgewählt, zeigt Details ihren Namen, eine Beschreibung und
+  ihre Werte: Jeden Wert kann man umbenennen, nach oben oder unten schieben oder entfernen;
+  **+ Value** fügt einen an.
+- **Als Typ wählen:** Die Auswahlliste *Type* einer Variablen und der Ein- und Ausgänge einer
+  Funktion führt die Aufzählungen des Blueprints und eine Liste von jeder (`Mode`, `Mode List`).
+- **Einen Wert wählen:** Ein Pin vom Typ einer Aufzählung, an dem kein Draht hängt, zeigt eine
+  Auswahlliste mit ihren Werten. Den Default einer Variablen dieses Typs wählt man genauso; eine
+  Liste einer Aufzählung hat eine Auswahlliste je Eintrag.
+- **Ihre Knoten** bietet das Aktionsmenü (Rechtsklick im Graphen, oder ein Draht, von einem Pin
+  gezogen) je Aufzählung an, bei ihrem Namen:
+
+  | Knoten | Pins und Ergebnis |
+  |---|---|
+  | **Switch on Mode** (Kategorie Flow) | ein Exec-Eingang, der Wert und ein Exec-Ausgang je Wert, beschriftet mit dem Namen des Werts |
+  | **Equal (Mode)** | A, B → Result (Boolean) |
+  | **Mode to Text** | der Name des Werts |
+  | **Text to Mode** | der Wert mit diesem Namen, dazu **Found** – heißt kein Wert so: der erste Wert, und Found ist falsch |
+  | **Mode to Index** | die Stelle des Werts unter den Werten der Aufzählung; die erste ist 0 |
+  | **Index to Mode** | der Wert an dieser Stelle, dazu **Valid** – gibt es die Stelle nicht: der erste Wert, und Valid ist falsch |
+  | **All Values of Mode** | eine Liste aller Werte in ihrer Reihenfolge, für ein For Each |
+- **Die Knoten für jeden Typ** arbeiten auch mit Aufzählungen: Get und Set einer Variablen, Select,
+  Reroute, die Listen-Knoten (Make List, Length, Get Item, Contains, Find Item, Add to … und die
+  übrigen Schritte auf einer Listen-Variablen) und For Each. Ein neuer solcher Knoten nimmt den
+  Typ der Aufzählung von seinem ersten Draht an.
+- **Eine Aufzählung ändern, die benutzt wird:** Die Aufzählung oder einen Wert umzubenennen,
+  ändert nichts außer dem Namen. Einen Wert nach oben oder unten zu schieben, lässt alles bei
+  seinem Wert: was in Pins und Variablen eingetragen ist, und die Drähte eines Switch. Wird ein
+  Wert entfernt, ist, was dieser Wert war, danach der erste Wert, und der Draht an seinem
+  Switch-Ausgang fällt weg. Eine Aufzählung, von deren Typ noch etwas ist – eine Variable, ein Pin
+  einer Funktion, ein Knoten –, lässt sich nicht entfernen; der Editor sagt, was sie benutzt.
+- **Namen:** Der Name einer Aufzählung und die Namen ihrer Werte sind C++-Namen: Buchstaben,
+  Ziffern und `_`, keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise
+  (`Float` …). Der Name einer Aufzählung endet nicht auf `_list`, keine zwei Werte einer
+  Aufzählung heißen gleich, und eine Aufzählung hat mindestens einen Wert (höchstens 256).
+- Als C++: `KERN_ENUM(Mode, Closed, Opening, Open);`, `Mode State = Mode::Closed;`,
+  `switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { ... } break; ... }` – siehe
+  [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Aufzählungen“.
 
 ### Formel-Knoten
 

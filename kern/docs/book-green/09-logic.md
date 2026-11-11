@@ -210,9 +210,9 @@ state.
 
 ## 9.5 The basic nodes
 
-Kern comes with **93 basic nodes**: for events, flow, memory, lists and calculating. You don't have to know
-them by heart – the menu in the editor suggests matching ones. A few examples show what's in the
-building set:
+Kern comes with **100 basic nodes**: for events, flow, memory, lists, enums and calculating. You
+don't have to know them by heart – the menu in the editor suggests matching ones. A few examples
+show what's in the building set:
 
 - **Branch – the railroad switch.** A yes/no value comes in, and the flow travels either onto the
   "True" track or onto "False". "Does the player have enough coins? Then open the door, otherwise
@@ -229,8 +229,11 @@ building set:
 
 On top of that come reading, setting and counting up variables, lists (many values in a row, with
 **For Each** as the loop over them), calculating, comparing, randomness, text and **Print**, which
-writes a text to the log or onto the screen. All 93 nodes with their fine points are in the blue
-book, Chapter 9.
+writes a text to the log or onto the screen. You can also make a type of your own, an **enum**, by
+giving its values names: a door's "Mode" could be "Closed", "Opening" or "Open". Such a value is
+always exactly one of them. It is neither a number nor a text, so its wire only fits pins of the
+same enum – and **Switch on Mode** is a railroad switch with one track for each value. All 100
+nodes with their fine points are in the blue book, Chapter 9.
 
 > **Did you know?** Even randomness isn't quite random in Kern. It comes from a generator whose
 > starting value is fixed – **deterministic** per world. That's why replays and network games match.

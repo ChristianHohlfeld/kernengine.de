@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"14:11",title:"Blueprints: Aufzählungen (Enums)",items:[
+    "Kern-Blueprints: Ein Blueprint kann jetzt eigene Typen mit benannten Werten haben, etwa „Mode“ mit Closed, Opening, Open. Variablen, Listen, Funktions-Ein- und -Ausgänge und Pins können von diesem Typ sein; ein Wert ist immer genau einer der Werte, keine Zahl und kein Text.",
+    "Neue Knoten je Aufzählung: „Switch on Mode“ mit einem Ausgang pro Wert, Vergleich, der Name eines Werts als Text und zurück, sein Platz als Zahl und zurück, und alle Werte als Liste für „For Each“.",
+    "Im Kern-Editor: Abschnitt „Enums“ in My Blueprint, Werte in Details umbenennen, verschieben, entfernen; an Pins und Variablen wählt man den Wert aus einer Liste. Beim Verschieben bleibt alles Gesetzte und Verdrahtete bei seinem Wert, kopierte Knoten nehmen ihre Aufzählung mit.",
+    "Als C++ ist es ein echtes enum: KERN_ENUM(Mode, Closed, Opening, Open), Werte heißen Mode::Open, und der Switch hat einen case für jeden Wert. Als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus.",
+  ]},
   {date:"2026-11-11",time:"13:11",title:"Lehrer: ruhiger posieren, Keyframes in gleichen Schritten",items:[
     "Kern-Editor, Lehrer: Ein Körperteil der Ente, das man mit der Maus führt, bewegt sich jetzt gegen Gelenkreibung. Es bleibt stehen, wo die Hand stehen bleibt, statt nachzuschwingen – so lässt sich etwa die Kopfneigung fein einstellen. Training, Spiel und die Ente selbst sind davon unberührt.",
     "Keyframes: Nach „+ Keyframe“ springt die Zeit nicht mehr ans Ende der Bewegung, sondern geht im gleichen Schritt weiter (nach 0.3 und 0.6 steht sie bei 0.9). Neu ist „Gleichmäßig verteilen“: alle Keyframes in gleichen Abständen über die Länge der Bewegung.",

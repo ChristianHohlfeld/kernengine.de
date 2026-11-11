@@ -378,6 +378,81 @@ struct Lists : kern::Blueprint {
 };
 )kn";
 
+// Enums: a type of the Blueprint's own with named values - variables and lists of it, Switch on
+// Enum, to and from an index and a name, an enum's value and a list of them through functions.
+inline const char* kEnums = R"kn(
+struct Enums : kern::Blueprint {
+  /// What the door is doing.
+  KERN_ENUM(Mode, Closed, Opening, Open, Closing);
+  KERN_ENUM(One, Only);
+
+  Mode State = Mode::Closed;
+  Mode Wanted = Mode::Open;
+  List<Mode> Seen = List<Mode>{Mode::Closed};
+  One Single = One::Only;
+  Text Log = "";
+  Int Steps = 0;
+
+  struct NextResult { Mode state = Mode::Closed; Text name = ""; Int index = 0; };
+  /// Switch on an enum, one case for each value; an enum's value set, read, shown as text.
+  NextResult Next() {
+    switch (flow_switch_enum<Mode>(State)) {
+      case Mode::Closed: {
+        State = Mode::Opening;
+      } break;
+      case Mode::Opening: {
+        State = Mode::Open;
+      } break;
+      case Mode::Open: {
+        State = Mode::Closing;
+      } break;
+      case Mode::Closing: {
+        State = Mode::Closed;
+      } break;
+    }
+    list_add(Seen, State);
+    Steps += 1;
+    if (enum_equal<Mode>(State, Wanted)) {
+      Log = text_append(Log, "wanted:", enum_name<Mode>(State));
+    }
+    return {State, enum_name<Mode>(State), enum_index<Mode>(State)};
+  }
+
+  struct FromResult { Mode byIndex = Mode::Closed; Bool valid = false; Mode byName = Mode::Closed; Bool found = false; Bool same = false; };
+  /// Index to Enum and Text to Enum: what names no value is the first one, and says so.
+  KERN_PURE FromResult From(Int index = 0, Text name = "Open") {
+    return {enum_from_index<Mode>(index).value, enum_from_index<Mode>(index).valid, enum_from_name<Mode>(name).value, enum_from_name<Mode>(name).found,
+            enum_equal<Mode>(enum_from_index<Mode>(index).value, enum_from_name<Mode>(name).value)};
+  }
+
+  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; };
+  /// A function takes an enum's value and a list of them (with defaults) and gives them back;
+  /// Select and the list nodes in the enum's type.
+  TakeResult Take(Mode want = Mode::Open, List<Mode> some = List<Mode>{Mode::Closing, Mode::Open}, Bool pick = true) {
+    Wanted = want;
+    Seen = some;
+    return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2)};
+  }
+
+  struct WalkResult { Text names = ""; Int last = 0; };
+  /// For Each over all values of an enum; an enum with one value has one way on.
+  WalkResult Walk() {
+    Log = "";
+    for (auto it40 = flow_for_each<Mode>(n40, enum_values<Mode>()); it40.next();) {
+      Log = text_append(Log, enum_name<Mode>(n40.item), kern::to<Text>(enum_index<Mode>(n40.item)));
+    }
+    switch (flow_switch_enum<One>(Single)) {
+      case One::Only: {
+        Log = text_append(Log, "/", enum_name<One>(Single));
+      } break;
+    }
+    return {Log, n40.index};
+  }
+
+  struct : kern::Node<40> { Mode item = Mode::Closed; Int index = 0; } n40;
+};
+)kn";
+
 // A Sequence whose first part returns: the function has ended, the second part does not run.
 inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"int","value":0}],
   "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
@@ -417,8 +492,8 @@ inline const char* kFormulas[] = {
     "pi",
 };
 
-/// The values a pin of a type is tried with.
-inline std::vector<Value> samples(PinType t) {
+/// The values a pin of a type is tried with (`count`: how many values its enum has, for an enum's).
+inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
   std::vector<Value> r;
   const f64 inf = std::numeric_limits<f64>::infinity();
   switch (t) {
@@ -442,11 +517,14 @@ inline std::vector<Value> samples(PinType t) {
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
       break;
+    case PinType::enumeration:
+      for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
+      break;
     default: break;
   }
   if (logic::is_list(t)) {
     // lists of the item type's samples: none, one, all of them, some of them twice
-    const std::vector<Value> items = samples(logic::element_of(t));
+    const std::vector<Value> items = samples(logic::element_of(t), count);
     auto list = [&](std::vector<std::size_t> picks) {
       json::Value a = json::Value::array();
       for (std::size_t k : picks) a.push(items[k % items.size()].to_json());
@@ -487,13 +565,13 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? Value::zero(p.type).to_json() : p.def});
+    f.inputs.push_back({name, p.type, p.def.is_null() ? Value::zero(p.type).to_json() : p.def, p.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, Value::zero(p.type).to_json()});
+    f.outputs.push_back({name, p.type, Value::zero(p.type).to_json(), p.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
@@ -509,6 +587,8 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
 inline Case nodes_case(const logic::Library& lib = logic::library()) {
   Case c;
   c.name = "Nodes";
+  // (an enum of its own: the generic nodes in its type, and the enum nodes)
+  c.graph.enums.push_back({"Season", {"Spring", "Summer", "Autumn", "Winter"}, "The four seasons."});
   int k = 0;
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
@@ -521,17 +601,18 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::type) {
-      // (a generic node in every type it can have)
+      // (a generic node in every type it can have; an enum node for the enum)
       variants.clear();
-      for (PinType t : logic::type_choices(d->params[0])) variants.push_back({{d->params[0].key, logic::pin_type_name(t)}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();
-      for (PinType t : logic::type_choices(d->params[0])) variants.push_back({{"type", logic::pin_type_name(t)}, {"count", "3"}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{"type", logic::type_text(t)}, {"count", "3"}});
       for (const char* count : {"0", "1", "16"}) variants.push_back({{"type", "int"}, {"count", count}});
     }
     for (const auto& params : variants) {
       logic::Graph alone;
+      alone.enums = c.graph.enums;
       add_probe(alone, *d, params, 0, lib);
       if (!logic::native_ready(alone, nullptr, lib)) continue;
       const std::string name = add_probe(c.graph, *d, params, k, lib);
@@ -539,7 +620,8 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       std::vector<std::vector<Value>> pool;
       std::size_t most = 1;
       for (const logic::FunctionPin& p : f.inputs) {
-        pool.push_back(samples(p.type));
+        const logic::EnumType* e = c.graph.enumeration(p.of);
+        pool.push_back(samples(p.type, e ? e->values.size() : 0));
         most = max_of(most, pool.back().size());
       }
       u32 seed = 2463534242u + static_cast<u32>(k) * 7919u;
@@ -649,6 +731,21 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Sum", {}});
   }
   {
+    Case& c = read("Enums", kEnums);
+    auto E = [](i64 place) { return Value::enumeration(place); };
+    for (int k = 0; k < 6; ++k) c.calls.push_back({"Next", {}});
+    for (i64 index : {i64{-1}, i64{0}, i64{2}, i64{3}, i64{4}, std::numeric_limits<i64>::max()})
+      for (const char* name : {"Open", "Closing", "nope", ""}) c.calls.push_back({"From", {I(index), T(name)}});
+    for (i64 want = 0; want < 4; ++want) {
+      c.calls.push_back({"Take", {E(want), Value::enumerations({3, 2}), yes}});
+      c.calls.push_back({"Take", {E(want), Value::enumerations({}), no}});
+      c.calls.push_back({"Take", {E(want), Value::enumerations({0, 1, 2, 3, want}), no}});
+      c.calls.push_back({"Next", {}});
+    }
+    c.calls.push_back({"Walk", {}});
+    c.calls.push_back({"Next", {}});
+  }
+  {
     all.push_back({"Functions", {}, {}});
     Case& c = all.back();
     json::Value j;
@@ -727,7 +824,7 @@ inline std::string c_string(const std::string& s) {
   return r + "\"";
 }
 
-inline const char* cpp_type(PinType t) {
+inline const char* builtin_cpp_type(PinType t) {
   switch (t) {
     case PinType::boolean: return "bool";
     case PinType::integer: return "kern::i64";
@@ -744,9 +841,14 @@ inline const char* cpp_type(PinType t) {
     default: return "void";
   }
 }
+/// A pin's type in C++, outside the class `owner` (an enum is the class's own: Owner::Mode).
+inline std::string cpp_type(PinType t, const std::string& of = {}, const std::string& owner = {}) {
+  if (logic::element_of(t) != PinType::enumeration) return builtin_cpp_type(t);
+  return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
+}
 
-/// A value as C++ source, bit for bit.
-inline std::string cpp_value(const Value& v) {
+/// A value as C++ source, bit for bit. (An enum's value: by its place - static_cast<Owner::Mode>(2).)
+inline std::string cpp_value(const Value& v, const std::string& of = {}, const std::string& owner = {}) {
   char b[160];
   auto number = [&](f64 x, const char* suffix) -> std::string {
     if (std::isnan(x)) return std::string("std::numeric_limits<") + (*suffix ? "float" : "double") + ">::quiet_NaN()";
@@ -761,11 +863,12 @@ inline std::string cpp_value(const Value& v) {
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
+    case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
     default: break;
   }
   if (!logic::is_list(v.type)) return "0";
-  std::string r = std::string(cpp_type(v.type)) + "{";
-  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + cpp_value(v.item(k));
+  std::string r = cpp_type(v.type, of, owner) + "{";
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + cpp_value(v.item(k), of, owner);
   return r + "}";
 }
 
@@ -843,11 +946,11 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       while (end < c.calls.size() && c.calls[end].function == c.calls[at].function) ++end;  // calls of one function in a row: one table
       const logic::Function& f = *c.graph.function(c.calls[at].function);
       body += "  {\n    const struct {";
-      for (std::size_t i = 0; i < f.inputs.size(); ++i) body += std::string(" ") + cpp_type(f.inputs[i].type) + " a" + std::to_string(i) + ";";
+      for (std::size_t i = 0; i < f.inputs.size(); ++i) body += " " + cpp_type(f.inputs[i].type, f.inputs[i].of, c.name) + " a" + std::to_string(i) + ";";
       body += " int row; } rows[] = {\n";
       for (std::size_t r = at; r < end; ++r) {
         body += "        {";
-        for (const Value& a : c.calls[r].args) body += cpp_value(a) + ", ";
+        for (std::size_t i = 0; i < c.calls[r].args.size(); ++i) body += cpp_value(c.calls[r].args[i], i < f.inputs.size() ? f.inputs[i].of : std::string(), c.name) + ", ";
         body += std::to_string(r) + "},\n";
       }
       body += "    };\n    for (const auto& r : rows) {\n      (void)r;\n      ";
