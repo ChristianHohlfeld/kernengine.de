@@ -232,7 +232,15 @@ jobs:
           # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
           cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          /tmp/e2e/node_modules/.bin/playwright install --with-deps chromium || { echo "::error::playwright install failed"; exit 1; }
+          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # packages - fonts above all - come from Ubuntu's archive: tried three times, and when the
+          # archive cannot be reached the test runs with what the runner image has.
+          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
+          for attempt in 1 2 3; do
+            if /tmp/e2e/node_modules/.bin/playwright install-deps chromium; then break; fi
+            echo "::warning::playwright install-deps failed (attempt $attempt): Ubuntu's archive is not reachable"
+            sleep 20
+          done
           python3 -m http.server 8771 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
           sleep 1
           mkdir -p artifacts/e2e
@@ -275,7 +283,15 @@ jobs:
         run: |
           set -euo pipefail
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          /tmp/e2e/node_modules/.bin/playwright install --with-deps chromium || { echo "::error::playwright install failed"; exit 1; }
+          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # packages - fonts above all - come from Ubuntu's archive: tried three times, and when the
+          # archive cannot be reached the test runs with what the runner image has.
+          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
+          for attempt in 1 2 3; do
+            if /tmp/e2e/node_modules/.bin/playwright install-deps chromium; then break; fi
+            echo "::warning::playwright install-deps failed (attempt $attempt): Ubuntu's archive is not reachable"
+            sleep 20
+          done
           # the example games as built, next to their pages; SpawnCity as the drop-in for spawncity.de
           for g in hello orbrun; do cp _site/kern/examples/$g/$g.wasm kern/examples/$g/; done
           python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
