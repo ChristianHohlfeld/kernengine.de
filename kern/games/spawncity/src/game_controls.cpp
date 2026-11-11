@@ -786,7 +786,7 @@ std::string Game::ctl_view_json() {
       if (along > 0 && along < reach && kern::length(to - dir * along) < 1.2f) { actor = true; break; }
     }
     add(",\"guidedView\":{\"lock\":%s,\"x\":%.1f,\"y\":%.1f,\"d\":%.0f,\"label\":\"%s\",\"denied\":%s,\"actor\":%s,\"cdMs\":%.0f}", lock ? "true" : "false", lx, ly, ld,
-        jesc(label).c_str(), now < C.guided_denied_until ? "true" : "false", actor ? "true" : "false", std::fmax(0.0f, guided_last_ + guided::kCooldown - now) * 1000);
+        jesc(label).c_str(), now < C.guided_denied_until ? "true" : "false", actor ? "true" : "false", std::fmax(0.0f, guided_last_ + guided::cooldown() - now) * 1000);
   }
   // ---- the strike's recharge (fighter_jets.mjs renderButton --cool)
   add(",\"strikeK\":%.3f", clampf((now - combat_.last_strike) / kStrikeCooldownS, 0, 1));
@@ -914,7 +914,7 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   }
   if (locked) trigger = pressed = false;
   // guided_missile.mjs press(): denied while it reloads -> body.guided-denied for 900 ms
-  if (pressed && drone_weapon_ == 2 && world_->sim_time() < guided_last_ + guided::kCooldown) C.guided_denied_until = world_->sim_time() + 0.9f;
+  if (pressed && drone_weapon_ == 2 && world_->sim_time() < guided_last_ + guided::cooldown()) C.guided_denied_until = world_->sim_time() + 0.9f;
   drone_attack(trigger, pressed);
   C.aim_point = false;
   trigger_was_ = trigger;

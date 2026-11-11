@@ -57,10 +57,10 @@ bool Game::guided_press() {
   // second launches at the mark. A mark lasts 8 s; a lost target (dead, gone) drops it.
   const f32 now = world_->sim_time();
   if (!drone_out_ || player_dead_) return false;
-  if (now < guided_last_ + guided::kCooldown) {
+  if (now < guided_last_ + guided::cooldown()) {
     // A press during the reload never silently does nothing: it says how long is left.
     char b[64];
-    std::snprintf(b, sizeof b, "LENKRAKETE LAEDT - %.1f s", guided_last_ + guided::kCooldown - now);
+    std::snprintf(b, sizeof b, "LENKRAKETE LAEDT - %.1f s", guided_last_ + guided::cooldown() - now);
     toast_ = b;
     toast_age_ = 0;
     world_->play_sound("builtin:click", cam_.eye, 0.4f, 0.7f, false);
@@ -75,11 +75,11 @@ bool Game::guided_press() {
   if (!marked) {
     const f32 height = std::fmax(1.0f, frame_h_);
     guided::Target best;
-    f32 best_score = guided::kPickPx;
+    f32 best_score = guided::pick_px();
     Vec3 best_at;
     auto consider = [&](const guided::Target& t, Vec3 at) {
       const f32 dist = kern::length(at - eye);
-      if (dist > guided::kRange || dist < 3) return;
+      if (dist > guided::range() || dist < 3) return;
       const f32 s = guided::pick_score(eye, fwd, cam_.fov, height, at);
       if (s >= 0 && s < best_score) { best_score = s; best = t; best_at = at; }
     };
@@ -99,8 +99,8 @@ bool Game::guided_press() {
                r.shown + Vec3{0, 0, r.state.mode == net::PlayerMode::foot ? 1.1f : 0.0f});
     if (best.kind == guided::TargetKind::point) {
       // Nothing to home on: the spot you aimed at.
-      const RayResult r = cast(world_->physics(), eye, fwd, guided::kRange, body(drone_actor_));
-      best_at = r.hit ? r.point : eye + fwd * guided::kRange;
+      const RayResult r = cast(world_->physics(), eye, fwd, guided::range(), body(drone_actor_));
+      best_at = r.hit ? r.point : eye + fwd * guided::range();
       best.label = "ZIELPUNKT";
     }
     gaps_guided_sounds();
@@ -170,7 +170,7 @@ void Game::update_guided(f32 dt) {
       }
     }
     if (boom) {
-      explosion(blast, guided::kBlastRadius, guided::kDamage, true, BlastBy::missile);
+      explosion(blast, guided::blast_radius(), guided::damage(), true, BlastBy::missile);
       guided_[i] = guided_.back();
       guided_.pop_back();
       continue;
@@ -215,7 +215,7 @@ void Game::guided_hud(std::string& s) {
   }
   const bool marked = guided_marked_ && now - guided_mark_time_ < kGuidedMarkSeconds;
   std::snprintf(b, sizeof b, ",\"guided\":{\"cd\":%.1f,\"flying\":%zu,\"lock\":\"%s\",\"dist\":%.0f,\"last\":\"%s\",\"marked\":\"%s\"}",
-                std::fmax(0.0f, guided_last_ + guided::kCooldown - now), guided_.size(), lock, dist, guided_lock_.c_str(), marked ? guided_mark_.label : "");
+                std::fmax(0.0f, guided_last_ + guided::cooldown() - now), guided_.size(), lock, dist, guided_lock_.c_str(), marked ? guided_mark_.label : "");
   s += b;
 }
 

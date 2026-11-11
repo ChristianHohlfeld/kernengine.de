@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"23:47",title:"Die Lenkrakete ist jetzt ein Blueprint",items:[
+    "Unter der Haube: Die Regeln der Lenkrakete der Drohne – Zielauswahl am Fadenkreuz, Flug von der Schiene über den Marschflug bis zum Sturz, Annäherungszünder und das Abschütteln durch Sprinten – stehen jetzt als Blueprint „Guided“ im Level. Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-11",time:"23:20",title:"Kleine Kampfregeln sind jetzt ein Blueprint",items:[
     "Unter der Haube: Wann ein Auto, Bus oder eine Drohne kritisch wird und wie lange es bis zur Explosion dauert, der Impuls einer Kugel und die Abstimmung über Spielregeln stehen jetzt als Blueprint „CombatDetail“ im Level – mit Aufzählungen, Tabellen und Strukturen statt als C++ des Spiels. Am Spiel ändert sich dadurch nichts.",
     "Der Blueprint läuft im Spiel als kompiliertes C++; die bisherigen Tests der Regeln laufen unverändert gegen ihn.",

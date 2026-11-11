@@ -2,22 +2,18 @@
 // lives here.
 #include "combat_detail.h"
 
+#include "blueprint_call.h"
+
 namespace sc::detail {
 
 namespace {
 using kern::logic::Value;
-kern::logic::Instance* g_blueprint = nullptr;
+using rules::of_enum;
+rules::Blueprint g_rules;
+kern::logic::Instance*& g_blueprint = g_rules.running;
 
-/// Calls a function of the Blueprint; false (and no results) while none is bound.
-bool call(const char* function, const std::vector<Value>& args, std::vector<Value>& results) {
-  results.clear();
-  return g_blueprint && g_blueprint->call(function, args, results);
-}
-f64 number(const char* function, const std::vector<Value>& args) {
-  std::vector<Value> r;
-  return call(function, args, r) && !r.empty() ? r[0].as_number() : 0;
-}
-template <class E> Value of_enum(E e) { return Value::enumeration(static_cast<i64>(e)); }
+bool call(const char* function, const std::vector<Value>& args, std::vector<Value>& results) { return g_rules.call(function, args, results); }
+f64 number(const char* function, const std::vector<Value>& args) { return g_rules.number(function, args); }
 Value numbers(const std::vector<u32>& v) {
   std::vector<i64> items(v.begin(), v.end());
   return Value::of(std::move(items));

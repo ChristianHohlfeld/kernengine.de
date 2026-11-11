@@ -15,7 +15,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 3,
+ "nextId": 4,
  "actors": [
   {
    "id": 1,
@@ -5287,6 +5287,4499 @@
          "name": "name",
          "type": "text",
          "value": ""
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 3,
+   "name": "Guided",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 227,
+     "variables": [
+      {
+       "name": "Speed",
+       "type": "float",
+       "value": 34,
+       "help": "guided_balance.mjs: cruise speed (m/s)"
+      },
+      {
+       "name": "TurnG",
+       "type": "float",
+       "value": 2.2,
+       "help": "How hard it turns (g)"
+      },
+      {
+       "name": "BlastRadius",
+       "type": "float",
+       "value": 4
+      },
+      {
+       "name": "Damage",
+       "type": "float",
+       "value": 34
+      },
+      {
+       "name": "Cooldown",
+       "type": "float",
+       "value": 5,
+       "help": "Seconds between launches"
+      },
+      {
+       "name": "DodgeSpeed",
+       "type": "float",
+       "value": 5.8,
+       "help": "A pedestrian who runs at least this fast (m/s) ..."
+      },
+      {
+       "name": "DodgeHold",
+       "type": "float",
+       "value": 0.35,
+       "help": "... for this long (s) shakes the lock off"
+      },
+      {
+       "name": "PickPx",
+       "type": "float",
+       "value": 70,
+       "help": "guided_missile.mjs: how close to the crosshair a press marks (px)"
+      },
+      {
+       "name": "Range",
+       "type": "float",
+       "value": 600
+      },
+      {
+       "name": "Ttl",
+       "type": "float",
+       "value": 22,
+       "help": "Seconds it flies at most"
+      },
+      {
+       "name": "Fuze",
+       "type": "float",
+       "value": 2.4,
+       "help": "Proximity fuze (m)"
+      },
+      {
+       "name": "DiveRange",
+       "type": "float",
+       "value": 70,
+       "help": "Inside this distance (m) it dives"
+      },
+      {
+       "name": "Ignite",
+       "type": "float",
+       "value": 0.32,
+       "help": "Seconds off the rail before the motor lights"
+      },
+      {
+       "name": "CruiseAboveLaunch",
+       "type": "float",
+       "value": 8
+      },
+      {
+       "name": "CruiseAboveTarget",
+       "type": "float",
+       "value": 28
+      },
+      {
+       "name": "CruiseAgl",
+       "type": "float",
+       "value": 18,
+       "help": "Metres above the ground it cruises at least"
+      }
+     ],
+     "enums": [
+      {
+       "name": "Result",
+       "values": [
+        "flying",
+        "fuze",
+        "ground",
+        "timeout"
+       ],
+       "help": "How a step of a missile ended"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Missile",
+       "fields": [
+        {
+         "name": "P",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "V",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Goal",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Born",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "CruiseZ",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Motor",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Pedestrian",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "DodgeSeconds",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "DodgeLost",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "DodgeLast",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Tracking",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "help": "A missile in flight. Goal: where it flies - the target's last known place. Pedestrian: the target can sprint away. Tracking: false once the lock is lost (dodged, or the target is gone)."
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 2,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 3,
+       "type": "vector.make",
+       "x": 160,
+       "y": 150,
+       "values": {
+        "z": 0
+       }
+      },
+      {
+       "id": 4,
+       "type": "vector.break",
+       "x": 160,
+       "y": 240
+      },
+      {
+       "id": 5,
+       "type": "vector.break",
+       "x": 160,
+       "y": 330
+      },
+      {
+       "id": 6,
+       "type": "func.entry",
+       "x": 0,
+       "y": 470,
+       "params": {
+        "function": "Toward"
+       }
+      },
+      {
+       "id": 7,
+       "type": "func.return",
+       "x": 280,
+       "y": 470,
+       "params": {
+        "function": "Toward"
+       }
+      },
+      {
+       "id": 8,
+       "type": "logic.select",
+       "x": 160,
+       "y": 620,
+       "params": {
+        "type": "vector"
+       },
+       "values": {
+        "b": [
+         1,
+         0,
+         0
+        ]
+       }
+      },
+      {
+       "id": 9,
+       "type": "math.compare",
+       "x": 160,
+       "y": 710,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0.000001
+       }
+      },
+      {
+       "id": 10,
+       "type": "vector.length",
+       "x": 160,
+       "y": 800
+      },
+      {
+       "id": 11,
+       "type": "vector.normalize",
+       "x": 160,
+       "y": 890
+      },
+      {
+       "id": 12,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1030,
+       "params": {
+        "function": "UpdateDodge"
+       }
+      },
+      {
+       "id": 13,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 1030
+      },
+      {
+       "id": 14,
+       "type": "logic.and",
+       "x": 160,
+       "y": 1180
+      },
+      {
+       "id": 15,
+       "type": "math.formula",
+       "x": 160,
+       "y": 1270,
+       "params": {
+        "formula": "dt > 0 && dt <= 0.1 && distance / dt >= sprint"
+       }
+      },
+      {
+       "id": 16,
+       "type": "vector.distance",
+       "x": 160,
+       "y": 1360
+      },
+      {
+       "id": 17,
+       "type": "var.get",
+       "x": 160,
+       "y": 1450,
+       "params": {
+        "variable": "DodgeSpeed"
+       }
+      },
+      {
+       "id": 18,
+       "type": "var.set",
+       "x": 560,
+       "y": 1030,
+       "params": {
+        "variable": "Next",
+        "scope": "UpdateDodge"
+       }
+      },
+      {
+       "id": 19,
+       "type": "math.add",
+       "x": 440,
+       "y": 1180
+      },
+      {
+       "id": 20,
+       "type": "func.return",
+       "x": 840,
+       "y": 1030,
+       "params": {
+        "function": "UpdateDodge"
+       }
+      },
+      {
+       "id": 21,
+       "type": "var.get",
+       "x": 720,
+       "y": 1180,
+       "params": {
+        "variable": "Next",
+        "scope": "UpdateDodge"
+       }
+      },
+      {
+       "id": 22,
+       "type": "logic.or",
+       "x": 720,
+       "y": 1270
+      },
+      {
+       "id": 23,
+       "type": "math.compare",
+       "x": 720,
+       "y": 1360,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 24,
+       "type": "var.get",
+       "x": 720,
+       "y": 1450,
+       "params": {
+        "variable": "Next",
+        "scope": "UpdateDodge"
+       }
+      },
+      {
+       "id": 25,
+       "type": "var.get",
+       "x": 720,
+       "y": 1540,
+       "params": {
+        "variable": "DodgeHold"
+       }
+      },
+      {
+       "id": 26,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1680,
+       "params": {
+        "function": "PickScore"
+       }
+      },
+      {
+       "id": 27,
+       "type": "var.set",
+       "x": 280,
+       "y": 1680,
+       "params": {
+        "variable": "Dist",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 28,
+       "type": "vector.distance",
+       "x": 160,
+       "y": 1830
+      },
+      {
+       "id": 29,
+       "type": "var.set",
+       "x": 560,
+       "y": 1680,
+       "params": {
+        "variable": "Ahead",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 30,
+       "type": "vector.dot",
+       "x": 440,
+       "y": 1830
+      },
+      {
+       "id": 31,
+       "type": "vector.sub",
+       "x": 440,
+       "y": 1920
+      },
+      {
+       "id": 32,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 1680
+      },
+      {
+       "id": 33,
+       "type": "logic.or",
+       "x": 720,
+       "y": 1830
+      },
+      {
+       "id": 34,
+       "type": "math.compare",
+       "x": 720,
+       "y": 1920,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 0.001
+       }
+      },
+      {
+       "id": 35,
+       "type": "var.get",
+       "x": 720,
+       "y": 2010,
+       "params": {
+        "variable": "Dist",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 36,
+       "type": "math.compare",
+       "x": 720,
+       "y": 2100,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 720,
+       "y": 2190,
+       "params": {
+        "variable": "Ahead",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 38,
+       "type": "func.return",
+       "x": 1120,
+       "y": 1680,
+       "params": {
+        "function": "PickScore"
+       },
+       "values": {
+        "px": -1
+       }
+      },
+      {
+       "id": 39,
+       "type": "func.return",
+       "x": 1400,
+       "y": 1680,
+       "params": {
+        "function": "PickScore"
+       }
+      },
+      {
+       "id": 40,
+       "type": "math.formula",
+       "x": 1280,
+       "y": 1830,
+       "params": {
+        "formula": "max(0, sqrt(max(0, dist * dist - ahead * ahead)) / ahead * (height * 0.5) / tan(fov * 0.5) - min(18, 600 / dist))"
+       }
+      },
+      {
+       "id": 41,
+       "type": "var.get",
+       "x": 1280,
+       "y": 1920,
+       "params": {
+        "variable": "Dist",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 42,
+       "type": "var.get",
+       "x": 1280,
+       "y": 2010,
+       "params": {
+        "variable": "Ahead",
+        "scope": "PickScore"
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2330,
+       "params": {
+        "function": "Launch"
+       }
+      },
+      {
+       "id": 44,
+       "type": "func.return",
+       "x": 280,
+       "y": 2330,
+       "params": {
+        "function": "Launch"
+       }
+      },
+      {
+       "id": 45,
+       "type": "struct.make",
+       "x": 160,
+       "y": 2480,
+       "params": {
+        "struct": "Missile"
+       },
+       "values": {
+        "Motor": false,
+        "DodgeSeconds": 0,
+        "DodgeLost": false,
+        "Tracking": true
+       }
+      },
+      {
+       "id": 46,
+       "type": "vector.add",
+       "x": 160,
+       "y": 2570,
+       "values": {
+        "b": [
+         0,
+         0,
+         -3
+        ]
+       }
+      },
+      {
+       "id": 47,
+       "type": "vector.scale",
+       "x": 160,
+       "y": 2660,
+       "values": {
+        "b": 6
+       }
+      },
+      {
+       "id": 48,
+       "type": "func.pure",
+       "x": 160,
+       "y": 2750,
+       "params": {
+        "function": "Toward"
+       }
+      },
+      {
+       "id": 49,
+       "type": "func.pure",
+       "x": 160,
+       "y": 2840,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 50,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 2930
+      },
+      {
+       "id": 51,
+       "type": "math.max",
+       "x": 160,
+       "y": 3020
+      },
+      {
+       "id": 52,
+       "type": "math.add",
+       "x": 160,
+       "y": 3110
+      },
+      {
+       "id": 53,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3200
+      },
+      {
+       "id": 54,
+       "type": "var.get",
+       "x": 160,
+       "y": 3290,
+       "params": {
+        "variable": "CruiseAboveLaunch"
+       }
+      },
+      {
+       "id": 55,
+       "type": "math.add",
+       "x": 160,
+       "y": 3380
+      },
+      {
+       "id": 56,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3470
+      },
+      {
+       "id": 57,
+       "type": "var.get",
+       "x": 160,
+       "y": 3560,
+       "params": {
+        "variable": "CruiseAboveTarget"
+       }
+      },
+      {
+       "id": 58,
+       "type": "func.pure",
+       "x": 160,
+       "y": 3650,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 59,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3790,
+       "params": {
+        "function": "Track"
+       }
+      },
+      {
+       "id": 60,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 3790
+      },
+      {
+       "id": 61,
+       "type": "logic.not",
+       "x": 160,
+       "y": 3940
+      },
+      {
+       "id": 62,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4030,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 63,
+       "type": "func.return",
+       "x": 560,
+       "y": 3790,
+       "params": {
+        "function": "Track"
+       }
+      },
+      {
+       "id": 64,
+       "type": "var.set",
+       "x": 840,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 65,
+       "type": "struct.set_field",
+       "x": 1120,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "field": "DodgeSeconds",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 66,
+       "type": "func.pure",
+       "x": 1000,
+       "y": 3940,
+       "params": {
+        "function": "UpdateDodge"
+       }
+      },
+      {
+       "id": 67,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 4030,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 68,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 4120,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 69,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 4210,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 70,
+       "type": "func.pure",
+       "x": 1000,
+       "y": 4300,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 71,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 4390,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 72,
+       "type": "struct.set_field",
+       "x": 1400,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "field": "DodgeLost",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 73,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 3940,
+       "params": {
+        "function": "UpdateDodge"
+       }
+      },
+      {
+       "id": 74,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4030,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 75,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4120,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 76,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4210,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 77,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 4300,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 78,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4390,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 79,
+       "type": "struct.set_field",
+       "x": 1680,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "field": "DodgeLast",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 80,
+       "type": "func.pure",
+       "x": 1560,
+       "y": 3940,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 81,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 3790
+      },
+      {
+       "id": 82,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 3940,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 83,
+       "type": "var.get",
+       "x": 1840,
+       "y": 4030,
+       "params": {
+        "variable": "M",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 84,
+       "type": "struct.set_field",
+       "x": 2240,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "field": "Tracking",
+        "scope": "Track"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 85,
+       "type": "func.return",
+       "x": 2520,
+       "y": 3790,
+       "params": {
+        "function": "Track"
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.get",
+       "x": 2400,
+       "y": 3940,
+       "params": {
+        "variable": "M",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 87,
+       "type": "struct.set_field",
+       "x": 2800,
+       "y": 3790,
+       "params": {
+        "variable": "M",
+        "field": "Goal",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 88,
+       "type": "func.return",
+       "x": 3080,
+       "y": 3790,
+       "params": {
+        "function": "Track"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 2960,
+       "y": 3940,
+       "params": {
+        "variable": "M",
+        "scope": "Track"
+       }
+      },
+      {
+       "id": 90,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       }
+      },
+      {
+       "id": 91,
+       "type": "var.set",
+       "x": 280,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 92,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 4530
+      },
+      {
+       "id": 93,
+       "type": "math.compare",
+       "x": 440,
+       "y": 4680,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 94,
+       "type": "math.add",
+       "x": 440,
+       "y": 4770
+      },
+      {
+       "id": 95,
+       "type": "struct.break",
+       "x": 440,
+       "y": 4860,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 96,
+       "type": "var.get",
+       "x": 440,
+       "y": 4950,
+       "params": {
+        "variable": "Ignite"
+       }
+      },
+      {
+       "id": 97,
+       "type": "var.set",
+       "x": 840,
+       "y": 4530,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 98,
+       "type": "vector.add",
+       "x": 720,
+       "y": 4680
+      },
+      {
+       "id": 99,
+       "type": "struct.break",
+       "x": 720,
+       "y": 4770,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 100,
+       "type": "vector.make",
+       "x": 720,
+       "y": 4860,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 101,
+       "type": "math.mul",
+       "x": 720,
+       "y": 4950,
+       "values": {
+        "a": -9.81
+       }
+      },
+      {
+       "id": 102,
+       "type": "struct.set_field",
+       "x": 1120,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 103,
+       "type": "var.get",
+       "x": 1000,
+       "y": 4680,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 104,
+       "type": "struct.set_field",
+       "x": 1400,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 105,
+       "type": "vector.add",
+       "x": 1280,
+       "y": 4680
+      },
+      {
+       "id": 106,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4770,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 107,
+       "type": "vector.scale",
+       "x": 1280,
+       "y": 4860
+      },
+      {
+       "id": 108,
+       "type": "var.get",
+       "x": 1280,
+       "y": 4950,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 109,
+       "type": "func.return",
+       "x": 1680,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       },
+       "values": {
+        "result": 0
+       }
+      },
+      {
+       "id": 110,
+       "type": "var.get",
+       "x": 1560,
+       "y": 4680,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 111,
+       "type": "struct.set_field",
+       "x": 1960,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "Motor",
+        "scope": "Step"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 112,
+       "type": "var.set",
+       "x": 2240,
+       "y": 4530,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 113,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 4680,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 114,
+       "type": "var.set",
+       "x": 2520,
+       "y": 4530,
+       "params": {
+        "variable": "Diving",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 115,
+       "type": "logic.or",
+       "x": 2400,
+       "y": 4680
+      },
+      {
+       "id": 116,
+       "type": "math.compare",
+       "x": 2400,
+       "y": 4770,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 117,
+       "type": "vector.length",
+       "x": 2400,
+       "y": 4860
+      },
+      {
+       "id": 118,
+       "type": "func.pure",
+       "x": 2400,
+       "y": 4950,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 119,
+       "type": "vector.sub",
+       "x": 2400,
+       "y": 5040
+      },
+      {
+       "id": 120,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 5130,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 121,
+       "type": "var.get",
+       "x": 2400,
+       "y": 5220,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 122,
+       "type": "var.get",
+       "x": 2400,
+       "y": 5310,
+       "params": {
+        "variable": "DiveRange"
+       }
+      },
+      {
+       "id": 123,
+       "type": "math.compare",
+       "x": 2400,
+       "y": 5400,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 124,
+       "type": "vector.distance",
+       "x": 2400,
+       "y": 5490
+      },
+      {
+       "id": 125,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 5580,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 126,
+       "type": "var.get",
+       "x": 2400,
+       "y": 5670,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 127,
+       "type": "var.get",
+       "x": 2400,
+       "y": 5760,
+       "params": {
+        "variable": "DiveRange"
+       }
+      },
+      {
+       "id": 128,
+       "type": "var.set",
+       "x": 2800,
+       "y": 4530,
+       "params": {
+        "variable": "Aim",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 129,
+       "type": "struct.break",
+       "x": 2680,
+       "y": 4680,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 130,
+       "type": "flow.branch",
+       "x": 3080,
+       "y": 4530
+      },
+      {
+       "id": 131,
+       "type": "logic.not",
+       "x": 2960,
+       "y": 4680
+      },
+      {
+       "id": 132,
+       "type": "var.get",
+       "x": 2960,
+       "y": 4770,
+       "params": {
+        "variable": "Diving",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 133,
+       "type": "var.set",
+       "x": 3360,
+       "y": 4530,
+       "params": {
+        "variable": "Aim",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 134,
+       "type": "vector.make",
+       "x": 3240,
+       "y": 4680
+      },
+      {
+       "id": 135,
+       "type": "vector.break",
+       "x": 3240,
+       "y": 4770
+      },
+      {
+       "id": 136,
+       "type": "var.get",
+       "x": 3240,
+       "y": 4860,
+       "params": {
+        "variable": "Aim",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 137,
+       "type": "vector.break",
+       "x": 3240,
+       "y": 4950
+      },
+      {
+       "id": 138,
+       "type": "var.get",
+       "x": 3240,
+       "y": 5040,
+       "params": {
+        "variable": "Aim",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 139,
+       "type": "math.max",
+       "x": 3240,
+       "y": 5130
+      },
+      {
+       "id": 140,
+       "type": "struct.break",
+       "x": 3240,
+       "y": 5220,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 141,
+       "type": "math.add",
+       "x": 3240,
+       "y": 5310
+      },
+      {
+       "id": 142,
+       "type": "var.get",
+       "x": 3240,
+       "y": 5400,
+       "params": {
+        "variable": "CruiseAgl"
+       }
+      },
+      {
+       "id": 143,
+       "type": "var.set",
+       "x": 3640,
+       "y": 4530,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 144,
+       "type": "vector.sub",
+       "x": 3520,
+       "y": 4680
+      },
+      {
+       "id": 145,
+       "type": "vector.scale",
+       "x": 3520,
+       "y": 4770
+      },
+      {
+       "id": 146,
+       "type": "func.pure",
+       "x": 3520,
+       "y": 4860,
+       "params": {
+        "function": "Toward"
+       }
+      },
+      {
+       "id": 147,
+       "type": "vector.sub",
+       "x": 3520,
+       "y": 4950
+      },
+      {
+       "id": 148,
+       "type": "var.get",
+       "x": 3520,
+       "y": 5040,
+       "params": {
+        "variable": "Aim",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 149,
+       "type": "var.get",
+       "x": 3520,
+       "y": 5130,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 150,
+       "type": "math.mul",
+       "x": 3520,
+       "y": 5220
+      },
+      {
+       "id": 151,
+       "type": "var.get",
+       "x": 3520,
+       "y": 5310,
+       "params": {
+        "variable": "Speed"
+       }
+      },
+      {
+       "id": 152,
+       "type": "logic.select",
+       "x": 3520,
+       "y": 5400,
+       "params": {
+        "type": "float"
+       },
+       "values": {
+        "a": 1.12,
+        "b": 1
+       }
+      },
+      {
+       "id": 153,
+       "type": "var.get",
+       "x": 3520,
+       "y": 5490,
+       "params": {
+        "variable": "Diving",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 154,
+       "type": "struct.break",
+       "x": 3520,
+       "y": 5580,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 155,
+       "type": "var.set",
+       "x": 3920,
+       "y": 4530,
+       "params": {
+        "variable": "MaxDv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 156,
+       "type": "math.formula",
+       "x": 3800,
+       "y": 4680,
+       "params": {
+        "formula": "9.81 * g * dt * factor"
+       }
+      },
+      {
+       "id": 157,
+       "type": "var.get",
+       "x": 3800,
+       "y": 4770,
+       "params": {
+        "variable": "TurnG"
+       }
+      },
+      {
+       "id": 158,
+       "type": "logic.select",
+       "x": 3800,
+       "y": 4860,
+       "params": {
+        "type": "float"
+       },
+       "values": {
+        "a": 1.4,
+        "b": 1
+       }
+      },
+      {
+       "id": 159,
+       "type": "var.get",
+       "x": 3800,
+       "y": 4950,
+       "params": {
+        "variable": "Diving",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 160,
+       "type": "flow.branch",
+       "x": 4200,
+       "y": 4530
+      },
+      {
+       "id": 161,
+       "type": "math.compare",
+       "x": 4080,
+       "y": 4680,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 162,
+       "type": "vector.length",
+       "x": 4080,
+       "y": 4770
+      },
+      {
+       "id": 163,
+       "type": "var.get",
+       "x": 4080,
+       "y": 4860,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 164,
+       "type": "var.get",
+       "x": 4080,
+       "y": 4950,
+       "params": {
+        "variable": "MaxDv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 165,
+       "type": "var.set",
+       "x": 4480,
+       "y": 4530,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 166,
+       "type": "vector.scale",
+       "x": 4360,
+       "y": 4680
+      },
+      {
+       "id": 167,
+       "type": "var.get",
+       "x": 4360,
+       "y": 4770,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 168,
+       "type": "math.div",
+       "x": 4360,
+       "y": 4860
+      },
+      {
+       "id": 169,
+       "type": "var.get",
+       "x": 4360,
+       "y": 4950,
+       "params": {
+        "variable": "MaxDv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 170,
+       "type": "vector.length",
+       "x": 4360,
+       "y": 5040
+      },
+      {
+       "id": 171,
+       "type": "var.get",
+       "x": 4360,
+       "y": 5130,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 172,
+       "type": "var.set",
+       "x": 4760,
+       "y": 4530,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 173,
+       "type": "vector.add",
+       "x": 4640,
+       "y": 4680
+      },
+      {
+       "id": 174,
+       "type": "struct.break",
+       "x": 4640,
+       "y": 4770,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 175,
+       "type": "var.get",
+       "x": 4640,
+       "y": 4860,
+       "params": {
+        "variable": "Dv",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 176,
+       "type": "var.set",
+       "x": 5040,
+       "y": 4530,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 177,
+       "type": "vector.scale",
+       "x": 4920,
+       "y": 4680
+      },
+      {
+       "id": 178,
+       "type": "func.pure",
+       "x": 4920,
+       "y": 4770,
+       "params": {
+        "function": "Toward"
+       }
+      },
+      {
+       "id": 179,
+       "type": "var.get",
+       "x": 4920,
+       "y": 4860,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 180,
+       "type": "math.max",
+       "x": 4920,
+       "y": 4950,
+       "values": {
+        "b": 8
+       }
+      },
+      {
+       "id": 181,
+       "type": "math.min",
+       "x": 4920,
+       "y": 5040
+      },
+      {
+       "id": 182,
+       "type": "var.get",
+       "x": 4920,
+       "y": 5130,
+       "params": {
+        "variable": "Speed"
+       }
+      },
+      {
+       "id": 183,
+       "type": "math.add",
+       "x": 4920,
+       "y": 5220
+      },
+      {
+       "id": 184,
+       "type": "vector.length",
+       "x": 4920,
+       "y": 5310
+      },
+      {
+       "id": 185,
+       "type": "var.get",
+       "x": 4920,
+       "y": 5400,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 186,
+       "type": "math.mul",
+       "x": 4920,
+       "y": 5490,
+       "values": {
+        "a": 40
+       }
+      },
+      {
+       "id": 187,
+       "type": "var.set",
+       "x": 5320,
+       "y": 4530,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 188,
+       "type": "vector.add",
+       "x": 5200,
+       "y": 4680
+      },
+      {
+       "id": 189,
+       "type": "var.get",
+       "x": 5200,
+       "y": 4770,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 190,
+       "type": "vector.scale",
+       "x": 5200,
+       "y": 4860
+      },
+      {
+       "id": 191,
+       "type": "var.get",
+       "x": 5200,
+       "y": 4950,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 192,
+       "type": "struct.set_field",
+       "x": 5600,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 193,
+       "type": "var.get",
+       "x": 5480,
+       "y": 4680,
+       "params": {
+        "variable": "V",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 194,
+       "type": "struct.set_field",
+       "x": 5880,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 195,
+       "type": "var.get",
+       "x": 5760,
+       "y": 4680,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 196,
+       "type": "flow.branch",
+       "x": 6160,
+       "y": 4530
+      },
+      {
+       "id": 197,
+       "type": "math.compare",
+       "x": 6040,
+       "y": 4680,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 198,
+       "type": "vector.distance",
+       "x": 6040,
+       "y": 4770
+      },
+      {
+       "id": 199,
+       "type": "struct.break",
+       "x": 6040,
+       "y": 4860,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 200,
+       "type": "var.get",
+       "x": 6040,
+       "y": 4950,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 201,
+       "type": "var.get",
+       "x": 6040,
+       "y": 5040,
+       "params": {
+        "variable": "Fuze"
+       }
+      },
+      {
+       "id": 202,
+       "type": "func.return",
+       "x": 6440,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       },
+       "values": {
+        "result": 1
+       }
+      },
+      {
+       "id": 203,
+       "type": "var.get",
+       "x": 6320,
+       "y": 4680,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 204,
+       "type": "flow.branch",
+       "x": 6720,
+       "y": 4530
+      },
+      {
+       "id": 205,
+       "type": "math.compare",
+       "x": 6600,
+       "y": 4680,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 206,
+       "type": "vector.break",
+       "x": 6600,
+       "y": 4770
+      },
+      {
+       "id": 207,
+       "type": "var.get",
+       "x": 6600,
+       "y": 4860,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 208,
+       "type": "math.add",
+       "x": 6600,
+       "y": 4950,
+       "values": {
+        "b": 0.3
+       }
+      },
+      {
+       "id": 209,
+       "type": "struct.set_field",
+       "x": 7000,
+       "y": 4530,
+       "params": {
+        "variable": "M",
+        "field": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 210,
+       "type": "vector.make",
+       "x": 6880,
+       "y": 4680
+      },
+      {
+       "id": 211,
+       "type": "vector.break",
+       "x": 6880,
+       "y": 4770
+      },
+      {
+       "id": 212,
+       "type": "var.get",
+       "x": 6880,
+       "y": 4860,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 213,
+       "type": "vector.break",
+       "x": 6880,
+       "y": 4950
+      },
+      {
+       "id": 214,
+       "type": "var.get",
+       "x": 6880,
+       "y": 5040,
+       "params": {
+        "variable": "P",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 215,
+       "type": "math.add",
+       "x": 6880,
+       "y": 5130,
+       "values": {
+        "b": 0.3
+       }
+      },
+      {
+       "id": 216,
+       "type": "func.return",
+       "x": 7280,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       },
+       "values": {
+        "result": 2
+       }
+      },
+      {
+       "id": 217,
+       "type": "var.get",
+       "x": 7160,
+       "y": 4680,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 218,
+       "type": "flow.branch",
+       "x": 7560,
+       "y": 4530
+      },
+      {
+       "id": 219,
+       "type": "math.compare",
+       "x": 7440,
+       "y": 4680,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 220,
+       "type": "math.sub",
+       "x": 7440,
+       "y": 4770
+      },
+      {
+       "id": 221,
+       "type": "struct.break",
+       "x": 7440,
+       "y": 4860,
+       "params": {
+        "struct": "Missile"
+       }
+      },
+      {
+       "id": 222,
+       "type": "var.get",
+       "x": 7440,
+       "y": 4950,
+       "params": {
+        "variable": "Ttl"
+       }
+      },
+      {
+       "id": 223,
+       "type": "func.return",
+       "x": 7840,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       },
+       "values": {
+        "result": 3
+       }
+      },
+      {
+       "id": 224,
+       "type": "var.get",
+       "x": 7720,
+       "y": 4680,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      },
+      {
+       "id": 225,
+       "type": "func.return",
+       "x": 8120,
+       "y": 4530,
+       "params": {
+        "function": "Step"
+       },
+       "values": {
+        "result": 0
+       }
+      },
+      {
+       "id": 226,
+       "type": "var.get",
+       "x": 8000,
+       "y": 4680,
+       "params": {
+        "variable": "M",
+        "scope": "Step"
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       1,
+       "v",
+       4,
+       "v"
+      ],
+      [
+       1,
+       "v",
+       5,
+       "v"
+      ],
+      [
+       3,
+       "result",
+       2,
+       "flat"
+      ],
+      [
+       4,
+       "x",
+       3,
+       "x"
+      ],
+      [
+       5,
+       "y",
+       3,
+       "y"
+      ],
+      [
+       6,
+       "then",
+       7,
+       "exec"
+      ],
+      [
+       6,
+       "v",
+       10,
+       "a"
+      ],
+      [
+       6,
+       "v",
+       11,
+       "a"
+      ],
+      [
+       8,
+       "result",
+       7,
+       "unit"
+      ],
+      [
+       9,
+       "result",
+       8,
+       "pick"
+      ],
+      [
+       10,
+       "result",
+       9,
+       "a"
+      ],
+      [
+       11,
+       "result",
+       8,
+       "a"
+      ],
+      [
+       12,
+       "current",
+       16,
+       "b"
+      ],
+      [
+       12,
+       "dt",
+       15,
+       "dt"
+      ],
+      [
+       12,
+       "dt",
+       19,
+       "b"
+      ],
+      [
+       12,
+       "lost",
+       22,
+       "a"
+      ],
+      [
+       12,
+       "pedestrian",
+       14,
+       "a"
+      ],
+      [
+       12,
+       "previous",
+       16,
+       "a"
+      ],
+      [
+       12,
+       "seconds",
+       19,
+       "a"
+      ],
+      [
+       12,
+       "then",
+       13,
+       "exec"
+      ],
+      [
+       13,
+       "false",
+       20,
+       "exec"
+      ],
+      [
+       13,
+       "true",
+       18,
+       "exec"
+      ],
+      [
+       14,
+       "result",
+       13,
+       "condition"
+      ],
+      [
+       15,
+       "result",
+       14,
+       "b"
+      ],
+      [
+       16,
+       "result",
+       15,
+       "distance"
+      ],
+      [
+       17,
+       "value",
+       15,
+       "sprint"
+      ],
+      [
+       18,
+       "then",
+       20,
+       "exec"
+      ],
+      [
+       19,
+       "result",
+       18,
+       "value"
+      ],
+      [
+       21,
+       "value",
+       20,
+       "seconds"
+      ],
+      [
+       22,
+       "result",
+       20,
+       "lost"
+      ],
+      [
+       23,
+       "result",
+       22,
+       "b"
+      ],
+      [
+       24,
+       "value",
+       23,
+       "a"
+      ],
+      [
+       25,
+       "value",
+       23,
+       "b"
+      ],
+      [
+       26,
+       "eye",
+       28,
+       "b"
+      ],
+      [
+       26,
+       "eye",
+       31,
+       "b"
+      ],
+      [
+       26,
+       "forward",
+       30,
+       "b"
+      ],
+      [
+       26,
+       "fov",
+       40,
+       "fov"
+      ],
+      [
+       26,
+       "heightPx",
+       40,
+       "height"
+      ],
+      [
+       26,
+       "target",
+       28,
+       "a"
+      ],
+      [
+       26,
+       "target",
+       31,
+       "a"
+      ],
+      [
+       26,
+       "then",
+       27,
+       "exec"
+      ],
+      [
+       27,
+       "then",
+       29,
+       "exec"
+      ],
+      [
+       28,
+       "result",
+       27,
+       "value"
+      ],
+      [
+       29,
+       "then",
+       32,
+       "exec"
+      ],
+      [
+       30,
+       "result",
+       29,
+       "value"
+      ],
+      [
+       31,
+       "result",
+       30,
+       "a"
+      ],
+      [
+       32,
+       "false",
+       39,
+       "exec"
+      ],
+      [
+       32,
+       "true",
+       38,
+       "exec"
+      ],
+      [
+       33,
+       "result",
+       32,
+       "condition"
+      ],
+      [
+       34,
+       "result",
+       33,
+       "a"
+      ],
+      [
+       35,
+       "value",
+       34,
+       "a"
+      ],
+      [
+       36,
+       "result",
+       33,
+       "b"
+      ],
+      [
+       37,
+       "value",
+       36,
+       "a"
+      ],
+      [
+       40,
+       "result",
+       39,
+       "px"
+      ],
+      [
+       41,
+       "value",
+       40,
+       "dist"
+      ],
+      [
+       42,
+       "value",
+       40,
+       "ahead"
+      ],
+      [
+       43,
+       "now",
+       45,
+       "Born"
+      ],
+      [
+       43,
+       "pedestrian",
+       45,
+       "Pedestrian"
+      ],
+      [
+       43,
+       "start",
+       45,
+       "P"
+      ],
+      [
+       43,
+       "start",
+       50,
+       "b"
+      ],
+      [
+       43,
+       "start",
+       53,
+       "v"
+      ],
+      [
+       43,
+       "target",
+       45,
+       "Goal"
+      ],
+      [
+       43,
+       "target",
+       50,
+       "a"
+      ],
+      [
+       43,
+       "target",
+       56,
+       "v"
+      ],
+      [
+       43,
+       "target",
+       58,
+       "v"
+      ],
+      [
+       43,
+       "then",
+       44,
+       "exec"
+      ],
+      [
+       45,
+       "value",
+       44,
+       "missile"
+      ],
+      [
+       46,
+       "result",
+       45,
+       "V"
+      ],
+      [
+       47,
+       "result",
+       46,
+       "a"
+      ],
+      [
+       48,
+       "unit",
+       47,
+       "a"
+      ],
+      [
+       49,
+       "flat",
+       48,
+       "v"
+      ],
+      [
+       50,
+       "result",
+       49,
+       "v"
+      ],
+      [
+       51,
+       "result",
+       45,
+       "CruiseZ"
+      ],
+      [
+       52,
+       "result",
+       51,
+       "a"
+      ],
+      [
+       53,
+       "z",
+       52,
+       "a"
+      ],
+      [
+       54,
+       "value",
+       52,
+       "b"
+      ],
+      [
+       55,
+       "result",
+       51,
+       "b"
+      ],
+      [
+       56,
+       "z",
+       55,
+       "a"
+      ],
+      [
+       57,
+       "value",
+       55,
+       "b"
+      ],
+      [
+       58,
+       "flat",
+       45,
+       "DodgeLast"
+      ],
+      [
+       59,
+       "at",
+       70,
+       "v"
+      ],
+      [
+       59,
+       "at",
+       77,
+       "v"
+      ],
+      [
+       59,
+       "at",
+       80,
+       "v"
+      ],
+      [
+       59,
+       "at",
+       87,
+       "value"
+      ],
+      [
+       59,
+       "dt",
+       66,
+       "dt"
+      ],
+      [
+       59,
+       "dt",
+       73,
+       "dt"
+      ],
+      [
+       59,
+       "m",
+       62,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       63,
+       "missile"
+      ],
+      [
+       59,
+       "m",
+       64,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       67,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       68,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       69,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       71,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       74,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       75,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       76,
+       "value"
+      ],
+      [
+       59,
+       "m",
+       78,
+       "value"
+      ],
+      [
+       59,
+       "then",
+       60,
+       "exec"
+      ],
+      [
+       60,
+       "false",
+       64,
+       "exec"
+      ],
+      [
+       60,
+       "true",
+       63,
+       "exec"
+      ],
+      [
+       61,
+       "result",
+       60,
+       "condition"
+      ],
+      [
+       62,
+       "Tracking",
+       61,
+       "a"
+      ],
+      [
+       64,
+       "then",
+       65,
+       "exec"
+      ],
+      [
+       65,
+       "then",
+       72,
+       "exec"
+      ],
+      [
+       66,
+       "seconds",
+       65,
+       "value"
+      ],
+      [
+       67,
+       "DodgeSeconds",
+       66,
+       "seconds"
+      ],
+      [
+       68,
+       "DodgeLost",
+       66,
+       "lost"
+      ],
+      [
+       69,
+       "DodgeLast",
+       66,
+       "previous"
+      ],
+      [
+       70,
+       "flat",
+       66,
+       "current"
+      ],
+      [
+       71,
+       "Pedestrian",
+       66,
+       "pedestrian"
+      ],
+      [
+       72,
+       "then",
+       79,
+       "exec"
+      ],
+      [
+       73,
+       "lost",
+       72,
+       "value"
+      ],
+      [
+       74,
+       "DodgeSeconds",
+       73,
+       "seconds"
+      ],
+      [
+       75,
+       "DodgeLost",
+       73,
+       "lost"
+      ],
+      [
+       76,
+       "DodgeLast",
+       73,
+       "previous"
+      ],
+      [
+       77,
+       "flat",
+       73,
+       "current"
+      ],
+      [
+       78,
+       "Pedestrian",
+       73,
+       "pedestrian"
+      ],
+      [
+       79,
+       "then",
+       81,
+       "exec"
+      ],
+      [
+       80,
+       "flat",
+       79,
+       "value"
+      ],
+      [
+       81,
+       "false",
+       87,
+       "exec"
+      ],
+      [
+       81,
+       "true",
+       84,
+       "exec"
+      ],
+      [
+       82,
+       "DodgeLost",
+       81,
+       "condition"
+      ],
+      [
+       83,
+       "value",
+       82,
+       "value"
+      ],
+      [
+       84,
+       "then",
+       85,
+       "exec"
+      ],
+      [
+       86,
+       "value",
+       85,
+       "missile"
+      ],
+      [
+       87,
+       "then",
+       88,
+       "exec"
+      ],
+      [
+       89,
+       "value",
+       88,
+       "missile"
+      ],
+      [
+       90,
+       "dt",
+       101,
+       "b"
+      ],
+      [
+       90,
+       "dt",
+       107,
+       "b"
+      ],
+      [
+       90,
+       "dt",
+       156,
+       "dt"
+      ],
+      [
+       90,
+       "dt",
+       186,
+       "b"
+      ],
+      [
+       90,
+       "dt",
+       190,
+       "b"
+      ],
+      [
+       90,
+       "ground",
+       141,
+       "a"
+      ],
+      [
+       90,
+       "ground",
+       208,
+       "a"
+      ],
+      [
+       90,
+       "ground",
+       215,
+       "a"
+      ],
+      [
+       90,
+       "m",
+       91,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       95,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       99,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       106,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       113,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       120,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       125,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       129,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       140,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       154,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       174,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       199,
+       "value"
+      ],
+      [
+       90,
+       "m",
+       221,
+       "value"
+      ],
+      [
+       90,
+       "now",
+       93,
+       "a"
+      ],
+      [
+       90,
+       "now",
+       220,
+       "a"
+      ],
+      [
+       90,
+       "then",
+       91,
+       "exec"
+      ],
+      [
+       91,
+       "then",
+       92,
+       "exec"
+      ],
+      [
+       92,
+       "false",
+       111,
+       "exec"
+      ],
+      [
+       92,
+       "true",
+       97,
+       "exec"
+      ],
+      [
+       93,
+       "result",
+       92,
+       "condition"
+      ],
+      [
+       94,
+       "result",
+       93,
+       "b"
+      ],
+      [
+       95,
+       "Born",
+       94,
+       "a"
+      ],
+      [
+       96,
+       "value",
+       94,
+       "b"
+      ],
+      [
+       97,
+       "then",
+       102,
+       "exec"
+      ],
+      [
+       98,
+       "result",
+       97,
+       "value"
+      ],
+      [
+       99,
+       "V",
+       98,
+       "a"
+      ],
+      [
+       100,
+       "result",
+       98,
+       "b"
+      ],
+      [
+       101,
+       "result",
+       100,
+       "z"
+      ],
+      [
+       102,
+       "then",
+       104,
+       "exec"
+      ],
+      [
+       103,
+       "value",
+       102,
+       "value"
+      ],
+      [
+       104,
+       "then",
+       109,
+       "exec"
+      ],
+      [
+       105,
+       "result",
+       104,
+       "value"
+      ],
+      [
+       106,
+       "P",
+       105,
+       "a"
+      ],
+      [
+       107,
+       "result",
+       105,
+       "b"
+      ],
+      [
+       108,
+       "value",
+       107,
+       "a"
+      ],
+      [
+       110,
+       "value",
+       109,
+       "missile"
+      ],
+      [
+       111,
+       "then",
+       112,
+       "exec"
+      ],
+      [
+       112,
+       "then",
+       114,
+       "exec"
+      ],
+      [
+       113,
+       "P",
+       112,
+       "value"
+      ],
+      [
+       114,
+       "then",
+       128,
+       "exec"
+      ],
+      [
+       115,
+       "result",
+       114,
+       "value"
+      ],
+      [
+       116,
+       "result",
+       115,
+       "a"
+      ],
+      [
+       117,
+       "result",
+       116,
+       "a"
+      ],
+      [
+       118,
+       "flat",
+       117,
+       "a"
+      ],
+      [
+       119,
+       "result",
+       118,
+       "v"
+      ],
+      [
+       120,
+       "Goal",
+       119,
+       "a"
+      ],
+      [
+       121,
+       "value",
+       119,
+       "b"
+      ],
+      [
+       122,
+       "value",
+       116,
+       "b"
+      ],
+      [
+       123,
+       "result",
+       115,
+       "b"
+      ],
+      [
+       124,
+       "result",
+       123,
+       "a"
+      ],
+      [
+       125,
+       "Goal",
+       124,
+       "a"
+      ],
+      [
+       126,
+       "value",
+       124,
+       "b"
+      ],
+      [
+       127,
+       "value",
+       123,
+       "b"
+      ],
+      [
+       128,
+       "then",
+       130,
+       "exec"
+      ],
+      [
+       129,
+       "Goal",
+       128,
+       "value"
+      ],
+      [
+       130,
+       "false",
+       143,
+       "exec"
+      ],
+      [
+       130,
+       "true",
+       133,
+       "exec"
+      ],
+      [
+       131,
+       "result",
+       130,
+       "condition"
+      ],
+      [
+       132,
+       "value",
+       131,
+       "a"
+      ],
+      [
+       133,
+       "then",
+       143,
+       "exec"
+      ],
+      [
+       134,
+       "result",
+       133,
+       "value"
+      ],
+      [
+       135,
+       "x",
+       134,
+       "x"
+      ],
+      [
+       136,
+       "value",
+       135,
+       "v"
+      ],
+      [
+       137,
+       "y",
+       134,
+       "y"
+      ],
+      [
+       138,
+       "value",
+       137,
+       "v"
+      ],
+      [
+       139,
+       "result",
+       134,
+       "z"
+      ],
+      [
+       140,
+       "CruiseZ",
+       139,
+       "a"
+      ],
+      [
+       141,
+       "result",
+       139,
+       "b"
+      ],
+      [
+       142,
+       "value",
+       141,
+       "b"
+      ],
+      [
+       143,
+       "then",
+       155,
+       "exec"
+      ],
+      [
+       144,
+       "result",
+       143,
+       "value"
+      ],
+      [
+       145,
+       "result",
+       144,
+       "a"
+      ],
+      [
+       146,
+       "unit",
+       145,
+       "a"
+      ],
+      [
+       147,
+       "result",
+       146,
+       "v"
+      ],
+      [
+       148,
+       "value",
+       147,
+       "a"
+      ],
+      [
+       149,
+       "value",
+       147,
+       "b"
+      ],
+      [
+       150,
+       "result",
+       145,
+       "b"
+      ],
+      [
+       151,
+       "value",
+       150,
+       "a"
+      ],
+      [
+       152,
+       "result",
+       150,
+       "b"
+      ],
+      [
+       153,
+       "value",
+       152,
+       "pick"
+      ],
+      [
+       154,
+       "V",
+       144,
+       "b"
+      ],
+      [
+       155,
+       "then",
+       160,
+       "exec"
+      ],
+      [
+       156,
+       "result",
+       155,
+       "value"
+      ],
+      [
+       157,
+       "value",
+       156,
+       "g"
+      ],
+      [
+       158,
+       "result",
+       156,
+       "factor"
+      ],
+      [
+       159,
+       "value",
+       158,
+       "pick"
+      ],
+      [
+       160,
+       "false",
+       172,
+       "exec"
+      ],
+      [
+       160,
+       "true",
+       165,
+       "exec"
+      ],
+      [
+       161,
+       "result",
+       160,
+       "condition"
+      ],
+      [
+       162,
+       "result",
+       161,
+       "a"
+      ],
+      [
+       163,
+       "value",
+       162,
+       "a"
+      ],
+      [
+       164,
+       "value",
+       161,
+       "b"
+      ],
+      [
+       165,
+       "then",
+       172,
+       "exec"
+      ],
+      [
+       166,
+       "result",
+       165,
+       "value"
+      ],
+      [
+       167,
+       "value",
+       166,
+       "a"
+      ],
+      [
+       168,
+       "result",
+       166,
+       "b"
+      ],
+      [
+       169,
+       "value",
+       168,
+       "a"
+      ],
+      [
+       170,
+       "result",
+       168,
+       "b"
+      ],
+      [
+       171,
+       "value",
+       170,
+       "a"
+      ],
+      [
+       172,
+       "then",
+       176,
+       "exec"
+      ],
+      [
+       173,
+       "result",
+       172,
+       "value"
+      ],
+      [
+       174,
+       "V",
+       173,
+       "a"
+      ],
+      [
+       175,
+       "value",
+       173,
+       "b"
+      ],
+      [
+       176,
+       "then",
+       187,
+       "exec"
+      ],
+      [
+       177,
+       "result",
+       176,
+       "value"
+      ],
+      [
+       178,
+       "unit",
+       177,
+       "a"
+      ],
+      [
+       179,
+       "value",
+       178,
+       "v"
+      ],
+      [
+       180,
+       "result",
+       177,
+       "b"
+      ],
+      [
+       181,
+       "result",
+       180,
+       "a"
+      ],
+      [
+       182,
+       "value",
+       181,
+       "a"
+      ],
+      [
+       183,
+       "result",
+       181,
+       "b"
+      ],
+      [
+       184,
+       "result",
+       183,
+       "a"
+      ],
+      [
+       185,
+       "value",
+       184,
+       "a"
+      ],
+      [
+       186,
+       "result",
+       183,
+       "b"
+      ],
+      [
+       187,
+       "then",
+       192,
+       "exec"
+      ],
+      [
+       188,
+       "result",
+       187,
+       "value"
+      ],
+      [
+       189,
+       "value",
+       188,
+       "a"
+      ],
+      [
+       190,
+       "result",
+       188,
+       "b"
+      ],
+      [
+       191,
+       "value",
+       190,
+       "a"
+      ],
+      [
+       192,
+       "then",
+       194,
+       "exec"
+      ],
+      [
+       193,
+       "value",
+       192,
+       "value"
+      ],
+      [
+       194,
+       "then",
+       196,
+       "exec"
+      ],
+      [
+       195,
+       "value",
+       194,
+       "value"
+      ],
+      [
+       196,
+       "false",
+       204,
+       "exec"
+      ],
+      [
+       196,
+       "true",
+       202,
+       "exec"
+      ],
+      [
+       197,
+       "result",
+       196,
+       "condition"
+      ],
+      [
+       198,
+       "result",
+       197,
+       "a"
+      ],
+      [
+       199,
+       "Goal",
+       198,
+       "a"
+      ],
+      [
+       200,
+       "value",
+       198,
+       "b"
+      ],
+      [
+       201,
+       "value",
+       197,
+       "b"
+      ],
+      [
+       203,
+       "value",
+       202,
+       "missile"
+      ],
+      [
+       204,
+       "false",
+       218,
+       "exec"
+      ],
+      [
+       204,
+       "true",
+       209,
+       "exec"
+      ],
+      [
+       205,
+       "result",
+       204,
+       "condition"
+      ],
+      [
+       206,
+       "z",
+       205,
+       "a"
+      ],
+      [
+       207,
+       "value",
+       206,
+       "v"
+      ],
+      [
+       208,
+       "result",
+       205,
+       "b"
+      ],
+      [
+       209,
+       "then",
+       216,
+       "exec"
+      ],
+      [
+       210,
+       "result",
+       209,
+       "value"
+      ],
+      [
+       211,
+       "x",
+       210,
+       "x"
+      ],
+      [
+       212,
+       "value",
+       211,
+       "v"
+      ],
+      [
+       213,
+       "y",
+       210,
+       "y"
+      ],
+      [
+       214,
+       "value",
+       213,
+       "v"
+      ],
+      [
+       215,
+       "result",
+       210,
+       "z"
+      ],
+      [
+       217,
+       "value",
+       216,
+       "missile"
+      ],
+      [
+       218,
+       "false",
+       225,
+       "exec"
+      ],
+      [
+       218,
+       "true",
+       223,
+       "exec"
+      ],
+      [
+       219,
+       "result",
+       218,
+       "condition"
+      ],
+      [
+       220,
+       "result",
+       219,
+       "a"
+      ],
+      [
+       221,
+       "Born",
+       220,
+       "b"
+      ],
+      [
+       222,
+       "value",
+       219,
+       "b"
+      ],
+      [
+       224,
+       "value",
+       223,
+       "missile"
+      ],
+      [
+       226,
+       "value",
+       225,
+       "missile"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Flat",
+       "pure": true,
+       "help": "A point on the map: without its height",
+       "inputs": [
+        {
+         "name": "v",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "flat",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "name": "Toward",
+       "pure": true,
+       "help": "The direction of a vector (along x for none)",
+       "inputs": [
+        {
+         "name": "v",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "unit",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "name": "UpdateDodge",
+       "pure": true,
+       "help": "How long the target has been sprinting; lost once held long enough (it stays lost). A valid sample is a pedestrian with 0 < dt <= 0.1 s.",
+       "inputs": [
+        {
+         "name": "seconds",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lost",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "previous",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "current",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "pedestrian",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "seconds",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lost",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "Next",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "PickScore",
+       "pure": true,
+       "help": "Screen distance (px) of a target from the screen centre for a camera at eye looking along forward (unit) with the vertical field of view fov (rad) on a view heightPx tall; below 0 when it is behind the camera. Small far things get a little slack: minus min(18, 600 / distance).",
+       "inputs": [
+        {
+         "name": "eye",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "forward",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "fov",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "heightPx",
+         "type": "float",
+         "value": 540
+        },
+        {
+         "name": "target",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "px",
+         "type": "float",
+         "value": -1
+        }
+       ],
+       "locals": [
+        {
+         "name": "Dist",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Ahead",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Launch",
+       "pure": true,
+       "help": "A missile dropped from start towards target: off the rail with 6 m/s ahead and 3 m/s down, then the motor lights",
+       "inputs": [
+        {
+         "name": "start",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "target",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "pedestrian",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "missile",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        }
+       ]
+      },
+      {
+       "name": "Track",
+       "pure": true,
+       "help": "The target moved to at (only while tracking). A target that dodged: the missile flies on to the last place it knew.",
+       "inputs": [
+        {
+         "name": "m",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        },
+        {
+         "name": "at",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "missile",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "M",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        }
+       ]
+      },
+      {
+       "name": "Step",
+       "pure": true,
+       "help": "One step of a missile; ground: the ground height under it. Off the rail it falls; then it climbs to its cruise height, flies flat and dives in to the fuze.",
+       "inputs": [
+        {
+         "name": "m",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "ground",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "missile",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        },
+        {
+         "name": "result",
+         "type": "enum",
+         "of": "Result",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "M",
+         "type": "struct",
+         "of": "Missile",
+         "value": {
+          "P": [
+           0,
+           0,
+           0
+          ],
+          "V": [
+           0,
+           0,
+           0
+          ],
+          "Goal": [
+           0,
+           0,
+           0
+          ],
+          "Born": 0,
+          "CruiseZ": 0,
+          "Motor": false,
+          "Pedestrian": false,
+          "DodgeSeconds": 0,
+          "DodgeLost": false,
+          "DodgeLast": [
+           0,
+           0,
+           0
+          ],
+          "Tracking": true
+         }
+        },
+        {
+         "name": "P",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "V",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Aim",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Dv",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Diving",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "MaxDv",
+         "type": "float",
+         "value": 0
         }
        ]
       }

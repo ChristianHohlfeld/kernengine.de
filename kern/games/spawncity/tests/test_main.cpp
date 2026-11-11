@@ -67,12 +67,14 @@ static blueprint_native::Case wanted_case() {
 
 // The same for the Blueprint of the actor "CombatDetail": every function with many values of its
 // inputs' types - enums, structs and lists among them.
-static blueprint_native::Case combat_detail_case() {
+/// Every function of a rule actor's Blueprint with many values of its inputs' types - enums,
+/// structs and lists among them.
+static blueprint_native::Case rule_case(const char* actor) {
   using kern::logic::Value;
   blueprint_native::Case c;
-  c.name = "CombatDetail";
+  c.name = actor;
   std::string error;
-  if (!sc::rules::actor_graph("CombatDetail", c.graph, &error)) std::printf("the level has no CombatDetail Blueprint: %s\n", error.c_str());
+  if (!sc::rules::actor_graph(actor, c.graph, &error)) std::printf("the level has no %s Blueprint: %s\n", actor, error.c_str());
   for (const kern::logic::Function& f : c.graph.functions) {
     std::vector<std::vector<Value>> samples;
     for (const kern::logic::FunctionPin& p : f.inputs) samples.push_back(blueprint_native::samples(kern::logic::TypeRef{p.type, p.of}, c.graph));
@@ -84,6 +86,12 @@ static blueprint_native::Case combat_detail_case() {
       if (f.inputs.empty()) break;
     }
   }
+  return c;
+}
+
+static blueprint_native::Case combat_detail_case() {
+  using kern::logic::Value;
+  blueprint_native::Case c = rule_case("CombatDetail");
   // a ballot from its start to unanimous, and the clock of a drone that turns critical and blows
   auto ints = [](std::initializer_list<kern::i64> v) { return Value::of(std::vector<kern::i64>(v)); };
   c.calls.push_back({"CreateBallot", {Value::text("b"), Value::text("friendlyFire"), Value::boolean(true), Value::integer(2), ints({3, 1, 2, 2}), Value::number(0)}});
@@ -93,12 +101,30 @@ static blueprint_native::Case combat_detail_case() {
   return c;
 }
 
+// The Blueprint of the actor "Guided": its functions with many values, and a missile from the
+// rail to its target - every step the class gives is the interpreter's.
+static blueprint_native::Case guided_case() {
+  using kern::logic::Value;
+  blueprint_native::Case c = rule_case("Guided");
+  auto missile = [](kern::Vec3 p, kern::Vec3 v, kern::Vec3 goal, double born, double cruise, bool motor) {
+    return Value::structure({Value::vector(p), Value::vector(v), Value::vector(goal), Value::number(born), Value::number(cruise), Value::boolean(motor), Value::boolean(true), Value::number(0.2),
+                             Value::boolean(false), Value::vector({goal.x, goal.y, 0}), Value::boolean(true)});
+  };
+  c.calls.push_back({"Launch", {Value::vector({0, 0, 20}), Value::vector({300, 0, 1}), Value::number(0), Value::boolean(false)}});
+  for (double now : {0.1, 0.5, 3.0, 30.0})
+    for (float x : {0.0f, 120.0f, 260.0f, 299.0f})
+      c.calls.push_back({"Step", {missile({x, 1, 25}, {30, 0, -2}, {300, 0, 1}, 0, 29, now > 0.4), Value::number(now), Value::number(1.0 / 60), Value::number(x > 250 ? 26 : 0)}});
+  for (float at : {0.0f, 0.4f})
+    c.calls.push_back({"Track", {missile({0, 0, 20}, {30, 0, 0}, {100, 0, 1}, 0, 29, true), Value::vector({100 + at, at, 1}), Value::number(0.05)}});
+  return c;
+}
+
 int main(int argc, char** argv) {
   // spawncity_tests --emit-native <dir>: the Wanted Blueprint as its C++ text, calls to it and
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
     std::string error;
-    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case()}, &error)) {
+    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case()}, &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
     }

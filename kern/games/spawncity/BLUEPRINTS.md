@@ -200,6 +200,16 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   der Blueprint als seine Klasse gegen den Interpreter (1007 Aufrufe, Wert für Wert gleich).
   **Gemessen** (Test `details_blueprint`, Build mit Speicherprüfung): ein Aufruf von ClockUpdate
   aus C++ kostet als Klasse rund 4 µs, im Interpreter rund 80 µs – das Spiel läuft mit der Klasse.
+- [x] **`guided`** – Actor „Guided“: die Lenkrakete. Sechzehn Zahlen als Variablen (Speed, TurnG,
+  Cooldown, PickPx, Range …), die Struktur Missile, die Aufzählung Result und die Funktionen
+  UpdateDodge, PickScore, Launch, Track und Step (der Flug: von der Schiene fallen, steigen, flach
+  fliegen, stürzen, zünden). `guided.cpp` ruft nur noch auf; die Flugtests sind dieselben und
+  laufen gegen den Blueprint. Klasse gegen Interpreter: mit CombatDetail und Wanted 1306 Aufrufe.
+- [ ] **`spawn_guard`** wartet auf Stufe 4: Die Regel fragt die Welt („verdeckt ein Gebäude den
+  Punkt?“) mit einem Strahl, der nur die Welt trifft. Line Trace der Engine trifft alles; die
+  Kollisionskanäle eines Projekts (Welt, Fahrzeug, Drohne …) kommen mit der Physik-Komponente.
+  Bis dahin bleibt die Datei, wie sie ist – nicht halb im Blueprint und halb im C++.
+- Der Aufruf aus C++ steht einmal in `blueprint_call.h` (`rules::Blueprint`).
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

@@ -12,8 +12,8 @@
 using namespace sc;
 
 namespace {
-/// The level's actor "CombatDetail" running in a logic runtime of its own, bound to combat_detail.h.
-struct CombatDetailBlueprint {
+/// A rule actor of the level running in a logic runtime of its own, bound to the C++ that calls it.
+struct RuleBlueprint {
   struct Host : kern::logic::Host {
     std::string errors;
     f64 time() const override { return 0; }
@@ -24,17 +24,24 @@ struct CombatDetailBlueprint {
   kern::logic::Runtime rt{host};
   kern::logic::Instance* inst = nullptr;
   std::string problems;
-  explicit CombatDetailBlueprint(bool native = true) {
+  void (*bind)(kern::logic::Instance*) = nullptr;
+  RuleBlueprint(const char* actor, void (*binder)(kern::logic::Instance*), bool native = true) : bind(binder) {
     kern::logic::Graph g;
     std::string error;
-    if (!rules::actor_graph("CombatDetail", g, &error)) { problems = error; return; }
+    if (!rules::actor_graph(actor, g, &error)) { problems = error; return; }
     for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     rt.native = native;
-    inst = rt.add(g, 2, "CombatDetail");
+    inst = rt.add(g, 2, actor);
     rt.begin();
-    detail::bind(inst);
+    bind(inst);
   }
-  ~CombatDetailBlueprint() { detail::bind(nullptr); }
+  ~RuleBlueprint() { bind(nullptr); }
+};
+struct CombatDetailBlueprint : RuleBlueprint {
+  explicit CombatDetailBlueprint(bool native = true) : RuleBlueprint("CombatDetail", &detail::bind, native) {}
+};
+struct GuidedBlueprint : RuleBlueprint {
+  GuidedBlueprint() : RuleBlueprint("Guided", &guided::bind) {}
 };
 }  // namespace
 
@@ -77,6 +84,7 @@ SC_TEST(details_blueprint) {
 }
 
 SC_TEST(guided_cruise_dive_and_fuze) {
+  GuidedBlueprint bp;
   // A target 300 m away on the ground: the missile drops, climbs to cruise height (target + 28 m),
   // flies flat at <= 34 m/s and dives in to the fuze.
   const Vec3 start{0, 0, 20}, target{300, 0, 1};
@@ -87,24 +95,25 @@ SC_TEST(guided_cruise_dive_and_fuze) {
   for (int i = 0; i < 60 * 30 && r == guided::Result::flying; ++i) {
     t += dt;
     r = guided::step(m, t, dt, 0);
-    if (t < guided::kIgnite) SC_CHECK(!m.motor, "no motor on the rail");
+    if (t < guided::ignite()) SC_CHECK(!m.motor, "no motor on the rail");
     if (t > 1) { max_z = std::fmax(max_z, m.p.z); max_speed = std::fmax(max_speed, kern::length(m.v)); }
   }
   SC_CHECK(r == guided::Result::fuze, "proximity fuze at the target (result %d)", static_cast<int>(r));
-  SC_CHECK(max_speed <= guided::kSpeed + 1e-3f, "never faster than 34 m/s (%.2f)", max_speed);
+  SC_CHECK(max_speed <= guided::speed() + 1e-3f, "never faster than 34 m/s (%.2f)", max_speed);
   // It aims at the cruise height above the target, so it climbs on a shallow slope from 20 m.
   SC_CHECK(max_z > 22 && max_z < 30, "climbs towards the 29 m cruise height before the dive (%.1f)", max_z);
   SC_CHECK(t > 300.0f / 34.0f && t < 16, "flight time plausible for 300 m (%.1f s)", t);
 }
 
 SC_TEST(guided_turn_limit_and_dodge) {
+  GuidedBlueprint bp;
   // Turning: velocity change per step never exceeds 2.2 g (x1.4 in the dive).
   guided::Missile m = guided::launch({0, 0, 50}, {0, 200, 50}, 0, true);
   m.born = -1;  // motor already lit
   m.v = {34, 0, 0};
   const Vec3 v0 = m.v;
   guided::step(m, 0, 0.1f, 0);
-  SC_CHECK(kern::length(m.v - v0) <= 9.81f * guided::kTurnG * 0.1f + 0.5f, "turn limited (dv %.2f)", kern::length(m.v - v0));
+  SC_CHECK(kern::length(m.v - v0) <= 9.81f * guided::turn_g() * 0.1f + 0.5f, "turn limited (dv %.2f)", kern::length(m.v - v0));
   // A sprinting pedestrian (>= 5.8 m/s) for 0.35 s shakes the lock off; walking does not.
   guided::Dodge d;
   for (int i = 0; i < 5; ++i) d = guided::update_dodge(d, {0, 0}, {0.3f, 0}, 0.05f, true);  // 6 m/s
@@ -124,6 +133,7 @@ SC_TEST(guided_turn_limit_and_dodge) {
 }
 
 SC_TEST(guided_pick_score) {
+  GuidedBlueprint bp;
   const Vec3 eye{0, 0, 10}, fwd{1, 0, 0};
   const f32 fov = 60 * kDeg;
   SC_CHECK(guided::pick_score(eye, fwd, fov, 540, {100, 0, 10}) == 0, "dead centre: 0 px");
