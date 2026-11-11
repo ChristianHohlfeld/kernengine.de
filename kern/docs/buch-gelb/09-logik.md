@@ -226,14 +226,16 @@ trotzdem einen Schritt lang auf Gelb. Mit **Set State** springst du direkt in ei
 
 ## 9.5 Kern-Knoten
 
-Kern bringt **76** eingebaute Knoten mit:
+Kern bringt **93** eingebaute Knoten mit:
 
 | Kategorie | Beispiele |
 |---|---|
 | Events | Begin Play, Event Tick, Every N Seconds, Custom Event |
 | State Machines | On State Entered/Left, Set State, Current State |
-| Flow | Branch, Sequence, For, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
+| Flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | Variablen | Get, Set, Add |
+| Listen | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| Funktionen | Function Entry, Return, Call Function |
 | Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Rechnen mit Winkeln |
 | Logik | Compare, AND, OR, XOR, NOT, Select |
 | Vektor | zusammenbauen, zerlegen, Länge, Abstand |
@@ -243,6 +245,8 @@ Kern bringt **76** eingebaute Knoten mit:
 Viele Namen sind englisch. Was aus Scratch bekannt ist:
 
 - **For** = „wiederhole mit Zähler“, **While** = „wiederhole, solange …“.
+- Eine **Liste** = die Listen aus Scratch: viele Werte hintereinander, der erste hat die Nummer 0.
+  **For Each** = „wiederhole für jeden Eintrag der Liste“.
 - **Switch** = je nach Zahl oder Text einer von mehreren Ausgängen, wie eine Weiche mit vielen
   Gleisen.
 - **AND, OR, NOT** = „und“, „oder“, „nicht“. **XOR** = „entweder – oder, aber nicht beides“.

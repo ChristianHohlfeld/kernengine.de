@@ -278,6 +278,106 @@ struct Casts : kern::Blueprint {
 };
 )kn";
 
+// Lists of every type: the steps that change a list variable (at every index), the values that
+// read a list, For Each (nested, over a list its body changes), lists a function takes and gives.
+inline const char* kLists = R"kn(
+struct Lists : kern::Blueprint {
+  List<Float> Scores = List<Float>{1.0, 2.5};
+  List<Int> Counts = List<Int>{};
+  List<Text> Names = List<Text>{"a", "b", "a"};
+  List<Bool> Flags = List<Bool>{};
+  List<Vector> Points = List<Vector>{Vector{1.0, 2.0, 3.0}};
+  List<Actor> Team = List<Actor>{};
+  Float Total = 0.0;
+  Text Shown = "";
+
+  struct PushResult { Int index = 0; Int length = 0; Text shown = ""; };
+  /// Add gives the index; a list prints its items.
+  PushResult Push(Float value = 0.0) {
+    list_add(n3, Scores, value);
+    return {n3.index, list_length<"float">(Scores), kern::to<Text>(Scores)};
+  }
+
+  struct EditResult { Bool removed = false; Int length = 0; Text shown = ""; };
+  /// The steps that change a list variable, at every index - also far beyond the list.
+  EditResult Edit(Text what = "insert", Int index = 0, Float value = 0.0) {
+    switch (flow_switch_text<"insert, set, remove_at, remove, clear">(what)) {
+      case 0: { list_insert(Scores, index, value); } break;
+      case 1: { list_set(Scores, index, value); } break;
+      case 2: { list_remove_at(Scores, index); } break;
+      case 3: { list_remove(n14, Scores, value); } break;
+      case 4: { list_clear(Scores); } break;
+    }
+    return {n14.removed, list_length<"float">(Scores), kern::to<Text>(Scores)};
+  }
+
+  struct SumResult { Float total = 0.0; Int passes = 0; Int last = 0; };
+  /// For Each, one inside the other; the index read after the loop.
+  SumResult Sum() {
+    Total = 0.0;
+    for (auto it20 = flow_for_each<"float">(n20, Scores); it20.next();) {
+      Total += n20.item;
+      for (auto it22 = flow_for_each<"text">(n22, Names); it22.next();) {
+        Shown = text_append(Shown, n22.item, kern::to<Text>(n22.index));
+      }
+    }
+    return {Total, list_length<"text">(Names), n20.index};
+  }
+
+  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; };
+  /// Get Item of every type (beyond the list: its zero), Find and Contains.
+  KERN_PURE AtResult At(Int index = 0, Text name = "a") {
+    return {list_get<"float">(Scores, index), list_get<"text">(Names, index), list_get<"int">(Counts, index), list_get<"bool">(Flags, index), list_get<"vector">(Points, index),
+            list_get<"actor">(Team, index), list_find<"text">(Names, name), list_contains<"text">(Names, name)};
+  }
+
+  struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
+  /// Lists of every type filled in a loop; a function gives lists.
+  FillResult Fill(Int n = 3, Int big = 4611686018427387904, Actor who = Actor{0}) {
+    list_clear(Counts);
+    list_clear(Flags);
+    list_clear(Points);
+    list_clear(Team);
+    for (auto it40 = flow_for(n40, 1, n); it40.next();) {
+      list_add(Counts, math_round(math_mul(kern::to<Float>(n40.index), kern::to<Float>(big))));
+      list_add(Flags, math_compare<"==">(math_mod(kern::to<Float>(n40.index), 2.0), 0.0));
+      list_insert(Points, 0, vector_make(kern::to<Float>(n40.index), 0.5, -1.0));
+      list_add(Team, who);
+    }
+    list_set(Counts, 0, -7);
+    list_remove(Flags, false);
+    return {Counts, Flags, Points, Team};
+  }
+
+  struct TakeResult { Int length = 0; List<Float> twice = List<Float>{}; List<Float> picked = List<Float>{}; };
+  /// A function takes a list (with a default); Set of a list variable; Make List; Select between lists.
+  TakeResult Take(List<Float> values = List<Float>{3.0, 4.0, 3.0}, Bool pick = true) {
+    Scores = values;
+    return {list_length<"float">(values), list_make<"float", "3">(list_get<"float">(values, 0), list_get<"float">(values, 0), 9.5),
+            logic_select<"float_list">(pick, Scores, value_reroute<"float_list">(List<Float>{-1.0}))};
+  }
+
+  struct GrowResult { Int passes = 0; Int length = 0; };
+  /// The loop goes through the list as it was when it started, whatever its body does to the variable.
+  GrowResult Grow() {
+    Total = 0.0;
+    for (auto it60 = flow_for_each<"float">(n60, Scores); it60.next();) {
+      list_add(Scores, math_add(n60.item, 100.0));
+      list_remove_at(Scores, 0);
+      Total += 1.0;
+    }
+    return {kern::to<Int>(Total), list_length<"float">(Scores)};
+  }
+
+  struct { Int index = 0; } n3;
+  struct { Bool removed = false; } n14;
+  struct : kern::Node<20> { Float item = 0.0; Int index = 0; } n20;
+  struct : kern::Node<22> { Text item = ""; Int index = 0; } n22;
+  struct : kern::Node<40> { Int index = 0; } n40;
+  struct : kern::Node<60> { Float item = 0.0; Int index = 0; } n60;
+};
+)kn";
+
 // A Sequence whose first part returns: the function has ended, the second part does not run.
 inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"int","value":0}],
   "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
@@ -344,6 +444,18 @@ inline std::vector<Value> samples(PinType t) {
       break;
     default: break;
   }
+  if (logic::is_list(t)) {
+    // lists of the item type's samples: none, one, all of them, some of them twice
+    const std::vector<Value> items = samples(logic::element_of(t));
+    auto list = [&](std::vector<std::size_t> picks) {
+      json::Value a = json::Value::array();
+      for (std::size_t k : picks) a.push(items[k % items.size()].to_json());
+      return Value::from_json(a, t);
+    };
+    std::vector<std::size_t> all;
+    for (std::size_t k = 0; k < items.size(); ++k) all.push_back(k);
+    r = {list({}), list({1}), list(all), list({1, 0, 1, 2, 1}), list({2, 3, 4, 5, 3, 2})};
+  }
   return r;
 }
 
@@ -408,6 +520,11 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::choice) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
+    } else if (d->type == "list.make") {
+      // (a list of every item type, and lists of no, one and many items)
+      variants.clear();
+      for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{"type", d->params[0].choices[i]}, {"count", "3"}});
+      for (const char* count : {"0", "1", "16"}) variants.push_back({{"type", "int"}, {"count", count}});
     }
     for (const auto& params : variants) {
       logic::Graph alone;
@@ -502,6 +619,32 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Pick", {no, Value::actor(3)}});
   }
   {
+    Case& c = read("Lists", kLists);
+    const f64 nan = std::numeric_limits<f64>::quiet_NaN();
+    const i64 most = std::numeric_limits<i64>::max();
+    c.calls.push_back({"At", {I(0), T("a")}});
+    for (f64 v : {7.5, 0.0, 2.5, nan, -1e300}) c.calls.push_back({"Push", {N(v)}});
+    for (i64 at : {i64{-5}, i64{0}, i64{2}, i64{100}, most, -most}) c.calls.push_back({"Edit", {T("insert"), I(at), N(static_cast<f64>(at % 7) + 0.25)}});
+    for (i64 at : {i64{-1}, i64{0}, i64{3}, i64{11}, i64{12}, most}) c.calls.push_back({"Edit", {T("set"), I(at), N(42)}});
+    c.calls.push_back({"Sum", {}});
+    for (f64 v : {42.0, 42.0, 2.5, nan, 1000.0}) c.calls.push_back({"Edit", {T("remove"), I(0), N(v)}});
+    for (i64 at : {i64{-1}, i64{99}, i64{1}, i64{0}, i64{0}, most}) c.calls.push_back({"Edit", {T("remove_at"), I(at), N(0)}});
+    c.calls.push_back({"Edit", {T("nothing"), I(0), N(0)}});
+    c.calls.push_back({"Grow", {}});
+    c.calls.push_back({"Sum", {}});
+    for (i64 n : {i64{0}, i64{1}, i64{3}, i64{6}}) c.calls.push_back({"Fill", {I(n), I(n == 3 ? 4611686018427387904 : 1000000007), Value::actor(static_cast<logic::ActorRef>(n * 7))}});
+    for (i64 at : {i64{-1}, i64{0}, i64{1}, i64{2}, i64{5}, i64{6}, most}) c.calls.push_back({"At", {I(at), T(at == 1 ? "b" : at == 2 ? "zz" : "a")}});
+    for (const Value& v : samples(PinType::number_list)) {
+      c.calls.push_back({"Take", {v, yes}});
+      c.calls.push_back({"Take", {v, no}});
+      c.calls.push_back({"Grow", {}});
+    }
+    c.calls.push_back({"Edit", {T("clear"), I(0), N(0)}});
+    c.calls.push_back({"Edit", {T("insert"), I(5), N(1.5)}});
+    c.calls.push_back({"Grow", {}});
+    c.calls.push_back({"Sum", {}});
+  }
+  {
     all.push_back({"Functions", {}, {}});
     Case& c = all.back();
     json::Value j;
@@ -588,6 +731,12 @@ inline const char* cpp_type(PinType t) {
     case PinType::vector: return "kern::Vec3";
     case PinType::text: return "std::string";
     case PinType::actor: return "kern::logic::ActorHandle";
+    case PinType::boolean_list: return "kern::List<bool>";
+    case PinType::integer_list: return "kern::List<kern::logic::Whole>";
+    case PinType::number_list: return "kern::List<kern::f64>";
+    case PinType::vector_list: return "kern::List<kern::Vec3>";
+    case PinType::text_list: return "kern::List<std::string>";
+    case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
     default: return "void";
   }
 }
@@ -608,8 +757,12 @@ inline std::string cpp_value(const Value& v) {
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
-    default: return "0";
+    default: break;
   }
+  if (!logic::is_list(v.type)) return "0";
+  std::string r = std::string(cpp_type(v.type)) + "{";
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + cpp_value(v.item(k));
+  return r + "}";
 }
 
 inline bool write_file(const std::string& path, const std::string& text) {

@@ -96,7 +96,8 @@ std::string key_code(std::string k) {
   return k;
 }
 
-const std::vector<std::string> kActions = {"jump", "Jump", "fire", "Fire", "aim", "Aim", "reload", "Reload", "crouch", "Crouch", "interact", "Interact", "boost", "Sprint / boost"};
+// (a function: the library is filled while the program starts, before this file's own constants may be there)
+std::vector<std::string> actions() { return {"jump", "Jump", "fire", "Fire", "aim", "Aim", "reload", "Reload", "crouch", "Crouch", "interact", "Interact", "boost", "Sprint / boost"}; }
 
 void add_events(logic::Library& lib) {
   const PinDef actor_out = data("actor", "Actor", PinType::actor), other_out = data("other", "Other Actor", PinType::actor);
@@ -127,7 +128,7 @@ void add_events(logic::Library& lib) {
   {
     NodeDef d = event("game.input", "On Input Action", "game.input", {data("actor", "Player", PinType::actor), data("pressed", "Pressed", PinType::boolean)},
                       "A player pressed or released an action (works for every player, on every device: keyboard, gamepad, touch).", "button control press");
-    d.params = {param("action", "Action", ParamDef::Kind::choice, "interact", kActions),
+    d.params = {param("action", "Action", ParamDef::Kind::choice, "interact", actions()),
                 param("edge", "When", ParamDef::Kind::choice, "pressed", {"pressed", "Pressed", "released", "Released", "both", "Both"})};
     d.title = [](const NodeDef&, const logic::Node& n) {
       std::string a = n.param("action", "interact");
@@ -171,6 +172,8 @@ void add_actor_nodes(logic::Library& lib) {
                 "The actor with this name (as in the Outliner).", "get lookup named"));
   lib.add(value("actor.find_tag", "Find Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actor", "Actor", PinType::actor), data("count", "Count", PinType::integer)},
                 "The first living actor with the tag, and how many have it.", "get tagged"));
+  lib.add(value("actor.all_with_tag", "All Actors with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actors", "Actors", PinType::actor_list)},
+                "Every living actor with the tag, as a list (For Each goes through it).", "get tagged every list array"));
   {
     NodeDef d = value("actor.random_tag", "Random Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "spawn")}, {data("actor", "Actor", PinType::actor)},
                       "One living actor with the tag, chosen at random.", "pick");

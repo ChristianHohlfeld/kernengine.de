@@ -43,6 +43,10 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   Bedarf ausgewertet; Ausgänge von Aktionsknoten behalten den Wert, den sie beim letzten Lauf
   hatten. Unverbundene Eingänge nutzen das im Knoten eingetragene Literal.
 - **Variablen**: pro Graph-Instanz, typisiert, mit Standardwert.
+- **Listen**: Ein Pin oder eine Variable kann eine Liste von Werten eines Typs halten (Unreals
+  Arrays). Eine Liste auf einem Draht ist ein Wert wie jeder andere: Wer sie liest, hat die
+  Liste, wie sie war. Die Schritte, die eine Liste ändern (Add, Insert, Set Item, Remove, Clear),
+  ändern eine Listen-Variable; For Each geht durch eine Liste, wie sie beim Start der Schleife war.
 - **State Machines**: Zustände und Übergänge im Stil des Zustandseditors von
   digitalisierungsplanung.de. Ein Übergang feuert auf ein Event, einen Timer, eine Bedingungsvariable
   oder automatisch; Betreten und Verlassen eines Zustands lösen Events aus.
@@ -72,6 +76,14 @@ Ein Level hat einen **Level-Graphen** (Self = keiner); jeder Actor kann einen ei
 `integer`, `string`). Ein `Value` trägt einen Typ und den passenden Inhalt (`b`, `i`, `n`, `v`, `s`,
 `a`; `ActorRef` ist die Actor-ID).
 
+Nach den sechs Werttypen kommen die sechs **Listentypen**, in derselben Reihenfolge:
+`boolean_list` … `actor_list` (im JSON `bool_list`, `int_list`, `float_list`, `vector_list`,
+`text_list`, `actor_list`; `is_list`, `element_of` und `list_of` führen vom einen zum anderen).
+Ein Listen-`Value` hält seine Einträge in `list` (`Value::of(std::vector<T>)`, `items<T>()`,
+`size()`, `item(k)`); beim Weitergeben werden die Einträge geteilt, nicht kopiert, und wer sie
+ändert (`edit<T>()`), ändert eine eigene Kopie. Im JSON ist eine Liste das Array ihrer Einträge.
+Eine Liste ganzer Zahlen hält jede so, wie jedes `integer` gehalten wird.
+
 Eine ganze Zahl (`integer`) ist überall dieselbe: so, wie ein Blueprint sie hält (`logic::normal`).
 Unter jeder Zahl liegt ein `double` – in den Variablen des Interpreters, im JIT –, also sind
 ganze Zahlen bis 2^53 exakt, eine größere ist die nächste, die ein `double` hält, und keine geht
@@ -86,7 +98,9 @@ Welche Drähte erlaubt sind, sagt `convertible(from, to)`:
 - **alles nach `text`** („everything prints“);
 - Zahlen untereinander (`bool`, `int`, `float`);
 - `actor` → `bool` („ist gültig“);
-- `float`/`int` → `vector` (in alle drei Komponenten).
+- `float`/`int` → `vector` (in alle drei Komponenten);
+- eine **Liste** passt nur in eine Liste ihres eigenen Typs – und nach `text` (`[1, 2.5]`);
+  nichts wird zu einer Liste.
 
 Die Umrechnungen (`as_bool`, `as_int`, `as_number`, `as_vector`, `as_text`, `as_actor`) sind
 festgelegt, z. B. Text „0“ oder „false“ ist falsch, ein Vektor als Zahl ist seine Länge, eine Zahl
@@ -303,15 +317,17 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 
 ## 9.5 Kern-Knoten
 
-`src/logic/core_nodes.cpp` registriert 76 Knoten:
+`src/logic/core_nodes.cpp` registriert 93 Knoten:
 
 | Kategorie | Knoten |
 |---|---|
 | **Events** | `event.begin` Begin Play · `event.tick` Event Tick (Delta Seconds) · `event.every` Every N Seconds (Intervall-Parameter, zählt eigene Zeit, Ausgang Count) · `event.custom` Custom Event (Name; Ausgänge Actor, Value, Text; schaltet auch gleichnamige State-Machine-Übergänge) |
 | **State Machines** | `event.state_enter` On State Entered · `event.state_exit` On State Left · `state.set` Set State · `state.get` Current State · `state.is` Is In State |
-| **Flow** | `flow.reroute` / `value.reroute` (Knoten für Drähte) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 Ausgänge) · `flow.for` For Loop (First, Last inklusive; Index) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (Aufrufe während des Wartens werden ignoriert) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update jeden Schritt mit Alpha 0→1, Easing linear/smooth/in/out, dann Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (Fälle durch Kommas getrennt) · `flow.call` Call Event (Target, Actor, Value, Text) |
+| **Flow** | `flow.reroute` / `value.reroute` (Knoten für Drähte) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 Ausgänge) · `flow.for` For Loop (First, Last inklusive; Index) · `flow.for_each` For Each (eine Liste; Item, Index; die Liste, wie sie beim Start der Schleife ist) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (Aufrufe während des Wartens werden ignoriert) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update jeden Schritt mit Alpha 0→1, Easing linear/smooth/in/out, dann Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (Fälle durch Kommas getrennt) · `flow.call` Call Event (Target, Actor, Value, Text) |
 | **Variablen** | `var.get` · `var.set` · `var.add` (Amount, −1 zählt herunter) |
-| **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` |
+| **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find` Find Item (Index oder −1) – Schritte auf einer Listen-Variablen (Einstellung List): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
+| **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) |
+| **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` · `math.formula` Formula (jeder Name darin ist ein Eingang) |
 | **Logik** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; Gleichheit mit 10⁻⁹ Toleranz) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
 | **Werte** | `value.float`, `value.int`, `value.bool`, `value.text` |
 | **Vektor** | `vector.make`, `break`, `add`, `sub`, `cross`, `scale`, `length`, `normalize`, `distance`, `dot`, `lerp` |
@@ -355,6 +371,7 @@ Besucher).
 
 `actor.self` Self · `actor.player` Get Player (0 = Spieler dieser Maschine, 1, 2 … weitere) ·
 `actor.player_count` · `actor.find` Find Actor by Name · `actor.find_tag` Find Actor with Tag ·
+`actor.all_with_tag` All Actors with Tag (eine Actor-Liste) ·
 `actor.random_tag` · `actor.has_tag` · `actor.name` · `actor.valid` · `actor.location` ·
 `actor.rotation` · `actor.forward` · `actor.velocity` · `actor.distance` · `actor.set_location` ·
 `actor.set_rotation` (Grad) · `actor.move_by` · `actor.spawn` Spawn Actor (Kopie einer Vorlage mit
@@ -569,7 +586,7 @@ Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zu
 | `logicOpen {owner}`, `logicClose`, `logicView {view}` | Graph eines Actors (oder des Levels) öffnen, schließen, Ansicht |
 | `logicPalette {query, from}` | Aktionsmenü: Suche über Titel, Kategorie, Hilfe, Suchwörter; beim Ziehen von einem Pin nur Knoten, die den Draht annehmen; dazu „Get/Set/Add to <Variable>“, „Call/Event <Name>“, „Go to <Zustand>“, „On <Zustand> Entered“, „Add Reroute Node“; nach Kategorien geordnet, höchstens 120 |
 | `logicAdd {type, x, y, params, from}` | Knoten auf das 8-px-Raster setzen; ohne Variable/State Machine wird eine angelegt; von einem Pin fallen gelassen wird er gleich verbunden |
-| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände) |
+| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | Drähte, Löschen, Verschieben (Kommentare samt Größe, Zustände); ein generischer Knoten (Select, Reroute, die Listen-Knoten), dessen typisierte Pins noch frei sind, nimmt den Typ des Drahts an |
 | `logicValue`, `logicParam`, `logicComment` | Literal, Einstellung (Drähte zu weggefallenen Pins werden entfernt), Knotenkommentar |
 | `logicVariable {op}` | `add`, `remove`, `rename` (auch in Knoten und Übergängen), `type` (Wert wird umgewandelt), `value` |
 | `logicMachine {op}` | State Machines und Zustände anlegen, umbenennen, entfernen, Anfangszustand, Übergänge (`addTransition`, `editTransition`, `removeTransition`; Bedingung ohne Variable legt eine boolesche „Ready“ an) |
@@ -586,7 +603,7 @@ Pins, Probleme, beim Spielen die gelaufenen Knoten, Live-Werte der Variablen, Zu
 
 Mehrere Befehle mit derselben `transaction` werden ein Undo-Schritt (Drähte aufnehmen und
 woanders ablegen), aufeinanderfolgende Werteingaben in denselben Pin ebenfalls. Test:
-`studio_logic_editor_commands`, `studio_blueprint_breakpoints_pause_the_game`,
+`studio_logic_editor_commands`, `studio_logic_lists`, `studio_blueprint_breakpoints_pause_the_game`,
 `studio_blueprint_comments_reroutes_promote`.
 
 ---

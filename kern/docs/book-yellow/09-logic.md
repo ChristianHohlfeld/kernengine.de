@@ -225,14 +225,16 @@ red, it would still stay on yellow for one step. With **Set State** you jump dir
 
 ## 9.5 Core Nodes
 
-Kern brings **76** built-in nodes:
+Kern brings **93** built-in nodes:
 
 | Category | Examples |
 |---|---|
 | events | Begin Play, Event Tick, Every N Seconds, Custom Event |
 | state machines | On State Entered/Left, Set State, Current State |
-| flow | Branch, Sequence, For, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
+| flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | variables | Get, Set, Add |
+| lists | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| functions | Function Entry, Return, Call Function |
 | math | plus, minus, times, divided by, remainder, square root, random, calculating with angles |
 | logic | Compare, AND, OR, XOR, NOT, Select |
 | vector | build, split, length, distance |
@@ -242,6 +244,8 @@ Kern brings **76** built-in nodes:
 What you know from Scratch:
 
 - **For** = "repeat with a counter," **While** = "repeat as long as …".
+- A **list** = Scratch's lists: many values in a row, the first has the number 0. **For Each** =
+  "repeat for every item of the list."
 - **Switch** = one of several outputs depending on a number or text, like a railroad switch with
   many tracks.
 - **AND, OR, NOT** = "and," "or," "not." **XOR** = "either – or, but not both."

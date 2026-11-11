@@ -216,7 +216,7 @@ einen Zustand.
 
 ## 9.5 Die Grundknoten
 
-Kern bringt **76 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis und Rechnen. Du musst sie
+Kern bringt **93 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen und Rechnen. Du musst sie
 nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar Beispiele zeigen, was in
 dem Baukasten steckt:
 
@@ -234,9 +234,10 @@ dem Baukasten steckt:
   einstellbare Zeit sanft von 0 auf 1 und meldet in jedem Schritt, wie weit er ist.
 - **Every N Seconds – der Wecker.** Feuert regelmäßig, etwa alle 3 Sekunden.
 
-Dazu kommen Variablen lesen, setzen und hochzählen, Rechnen, Vergleichen, Zufall, Text und
-**Print**, das einen Text ins Protokoll oder auf den Bildschirm schreibt. Alle 76 Knoten mit ihren
-Feinheiten stehen im blauen Buch, Kapitel 9.
+Dazu kommen Variablen lesen, setzen und hochzählen, Listen (viele Werte hintereinander, mit
+**For Each** als Schleife darüber), Rechnen, Vergleichen, Zufall, Text und **Print**, das einen
+Text ins Protokoll oder auf den Bildschirm schreibt. Alle 93 Knoten mit ihren Feinheiten stehen im
+blauen Buch, Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,
 > dessen Startwert fest ist – pro Welt **deterministisch**. Deshalb stimmen Wiederholungen und

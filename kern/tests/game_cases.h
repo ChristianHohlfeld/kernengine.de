@@ -45,6 +45,7 @@ struct Level : kern::Blueprint {
   Vector HitAt = Vector{0.0, 0.0, 0.0};
   Actor Last = Actor{0};
   Actor Made = Actor{0};
+  List<Actor> Tagged = List<Actor>{};
   Bool Ok = false;
   Bool Won = false;
 
@@ -140,7 +141,11 @@ struct Level : kern::Blueprint {
       actor_move_by(n60.actor, vector_make(0.0, 0.0, kern::to<Float>(n60.index)));
       Moved += 1;
     }
-    Log = text_append(Log, "each", ";");
+    Tagged = actor_all_with_tag(text);
+    for (auto it61 = flow_for_each<"actor">(n61, Tagged); it61.next();) {
+      Log = text_append(Log, actor_name(n61.item), kern::to<Text>(n61.index));
+    }
+    Log = text_append(Log, "each", kern::to<Text>(list_length<"actor">(Tagged)));
   }
 
   KERN_EVENT(on12, event_custom<"Win">)
@@ -232,6 +237,7 @@ struct Level : kern::Blueprint {
   struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n40;
   struct { Actor spawned = Actor{0}; } n50;
   struct : kern::Node<60> { Actor actor = Actor{0}; Int index = 0; } n60;
+  struct : kern::Node<61> { Actor item = Actor{0}; Int index = 0; } n61;
 };
 )kn";
 

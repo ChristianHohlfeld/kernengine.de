@@ -44,6 +44,13 @@ Found actor_find_tag(GameWorld& w, Self, const Text& tag) {
   w.actors_with_tag(tag, v);
   return {{v.empty() ? 0 : v.front()}, static_cast<Int>(v.size())};
 }
+std::vector<Actor> actor_all_with_tag(GameWorld& w, Self, const Text& tag) {
+  std::vector<ActorId> v;
+  w.actors_with_tag(tag, v);
+  std::vector<Actor> all;
+  for (ActorId id : v) all.push_back({id});
+  return all;
+}
 Actor actor_random_tag(GameWorld& w, Self, f64* memory, u32 seed, u32 node, const Text& tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
@@ -302,6 +309,7 @@ void bind_actor_nodes(logic::Library& lib) {
   bind(lib, "actor.player_count", &nodes::actor_player_count);
   bind(lib, "actor.find", &nodes::actor_find);
   bind(lib, "actor.find_tag", &nodes::actor_find_tag);
+  bind(lib, "actor.all_with_tag", &nodes::actor_all_with_tag);
   bind(lib, "actor.random_tag", [](Context& c) {
     const std::string tag = c.in_text("tag");
     if (GameWorld* w = world(c)) c.out("actor", logic::to_value(nodes::actor_random_tag(*w, c.self(), &c.slot(0), c.instance().seed(), c.node().id, tag)));

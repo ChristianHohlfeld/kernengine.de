@@ -5,15 +5,16 @@
 // typed, inline, the very function the interpreter's node calls (nodes.h). Nothing is looked up
 // at run time.
 //
-// This covers the core library - variables, functions, formulas, the value nodes, Branch /
-// Sequence / While / For, Do Once, Do N, Gate, Flip Flop, the switches; the events, Call Event,
-// Print, Game Time; Delay, Retriggerable Delay, Tween; state machines; Random - and the gameplay
+// This covers the core library - variables, functions, formulas, the value nodes, lists, Branch /
+// Sequence / While / For / For Each, Do Once, Do N, Gate, Flip Flop, the switches; the events,
+// Call Event, Print, Game Time; Delay, Retriggerable Delay, Tween; state machines; Random - and the gameplay
 // nodes (kern/game/blueprint_nodes.h). logic::native_ready tells what a Blueprint still lacks.
 #pragma once
 
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -23,13 +24,30 @@
 
 namespace kern {
 
-/// The C++ type of a pin type named in a setting ("float", "int", "bool", "vector", "text", "actor").
-template <Setting Type>
-using pin_t = std::conditional_t<
-    Type.view() == "bool", bool,
-    std::conditional_t<Type.view() == "int", i64,
-                       std::conditional_t<Type.view() == "vector", Vec3,
-                                          std::conditional_t<Type.view() == "text", std::string, std::conditional_t<Type.view() == "actor", logic::ActorHandle, f64>>>>>;
+/// A list in a Blueprint's C++: List<Float>, List<Int>, List<Text> ...
+template <class T> using List = std::vector<T>;
+
+namespace detail {
+/// The C++ type of a pin type.
+template <logic::PinType T> struct PinOf { using type = f64; };
+template <> struct PinOf<logic::PinType::boolean> { using type = bool; };
+template <> struct PinOf<logic::PinType::integer> { using type = logic::Whole; };
+template <> struct PinOf<logic::PinType::vector> { using type = Vec3; };
+template <> struct PinOf<logic::PinType::text> { using type = std::string; };
+template <> struct PinOf<logic::PinType::actor> { using type = logic::ActorHandle; };
+template <> struct PinOf<logic::PinType::boolean_list> { using type = List<bool>; };
+template <> struct PinOf<logic::PinType::integer_list> { using type = List<logic::Whole>; };
+template <> struct PinOf<logic::PinType::number_list> { using type = List<f64>; };
+template <> struct PinOf<logic::PinType::vector_list> { using type = List<Vec3>; };
+template <> struct PinOf<logic::PinType::text_list> { using type = List<std::string>; };
+template <> struct PinOf<logic::PinType::actor_list> { using type = List<logic::ActorHandle>; };
+}  // namespace detail
+
+/// The C++ type of a pin type named in a setting: "float", "int", "bool", "vector", "text",
+/// "actor", "float_list" ... (as the node reads the setting: logic::pin_type_setting).
+template <Setting Type> using pin_t = typename detail::PinOf<logic::pin_type_setting(Type.view())>::type;
+/// The C++ type of a list's items, named in a list node's setting (logic::item_type_setting).
+template <Setting Type> using item_t = typename detail::PinOf<logic::item_type_setting(Type.view())>::type;
 
 /// What a node keeps between runs: the member n<id> of a node with memory (a loop's index, Do
 /// Once, Gate ...). The same four numbers the interpreter keeps for the node.
@@ -41,6 +59,8 @@ template <u32 Id> struct Node {
   /// A loop over things: what it goes through, as it was when the loop started (For Each Actor
   /// with Tag).
   std::vector<logic::ActorRef> list;
+  /// For Each: the list as it was when the loop started (a List of the loop's item type).
+  std::shared_ptr<const void> kept;
 };
 
 /// One way on of a node that waits and has several: {"update", [this] { ... }}.
@@ -77,6 +97,8 @@ struct Layout {
 struct BlueprintCore : logic::PureNodes {
   /// A whole number as a Blueprint holds it (the functions of nodes.h take and give i64).
   using Int = logic::Whole;
+  /// A list of values of one type: List<Float>, List<Int> ...
+  template <class T> using List = kern::List<T>;
 
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;
@@ -206,6 +228,47 @@ struct BlueprintCore : logic::PureNodes {
     logic::flow::for_start(n.memory, first, last);
     return {*this, n};
   }
+
+  /// for (auto it = flow_for_each<"float">(n, list); it.next();): every item of the list as it
+  /// is when the loop starts; n.item and n.index are the pass's. Where the loop is, is the node's
+  /// (n.kept, n.memory[0]) - like the index of a For Loop.
+  template <class N, class T> struct ListLoop {
+    BlueprintCore& self;
+    N& n;
+    bool first = true;
+    bool next() {
+      if (!first) n.memory[0] += 1;
+      first = false;
+      const List<T>* list = static_cast<const List<T>*>(n.kept.get());
+      const std::size_t at = static_cast<std::size_t>(n.memory[0]);
+      if (!list || at >= list->size() || !self.kern_pass()) return false;
+      n.item = T((*list)[at]);
+      n.index = static_cast<i64>(at);
+      return true;
+    }
+  };
+  template <Setting Type, class N> ListLoop<N, item_t<Type>> flow_for_each(N& n, List<item_t<Type>> list) {
+    n.kept = std::make_shared<const List<item_t<Type>>>(std::move(list));
+    n.memory[0] = 0;
+    return {*this, n};
+  }
+
+  // ---- lists ----
+  // What they do is logic::list (nodes.h): the functions the interpreter's nodes call. The values
+  // take any list; the steps change a list variable - the member itself is their first value.
+  template <Setting Type, Setting Count, class... V> static List<item_t<Type>> list_make(const V&... items) { return List<item_t<Type>>{item_t<Type>(items)...}; }
+  template <Setting Type> static Int list_length(const List<item_t<Type>>& list) { return logic::list::length(list); }
+  template <Setting Type> static item_t<Type> list_get(const List<item_t<Type>>& list, Int index) { return logic::list::get(list, index); }
+  template <Setting Type> static Bool list_contains(const List<item_t<Type>>& list, const item_t<Type>& item) { return logic::list::contains(list, item); }
+  template <Setting Type> static Int list_find(const List<item_t<Type>>& list, const item_t<Type>& item) { return logic::list::find(list, item); }
+  template <class T> static void list_add(List<T>& list, std::type_identity_t<T> item) { logic::list::add(list, std::move(item)); }
+  template <class N, class T> static void list_add(N& n, List<T>& list, std::type_identity_t<T> item) { n.index = logic::list::add(list, std::move(item)); }
+  template <class T> static void list_insert(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::insert(list, index, std::move(item)); }
+  template <class T> static void list_set(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::set(list, index, std::move(item)); }
+  template <class T> static void list_remove_at(List<T>& list, Int index) { logic::list::remove_at(list, index); }
+  template <class T> static void list_remove(List<T>& list, const std::type_identity_t<T>& item) { logic::list::remove(list, item); }
+  template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
+  template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
 
   // ---- steps ----
   void flow_reroute() {}

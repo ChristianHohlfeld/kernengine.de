@@ -36,7 +36,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "List", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -69,9 +69,16 @@ const char* cpp_type(PinType t) {
     case PinType::vector: return "Vector";
     case PinType::text: return "Text";
     case PinType::actor: return "Actor";
+    case PinType::boolean_list: return "List<Bool>";
+    case PinType::integer_list: return "List<Int>";
+    case PinType::number_list: return "List<Float>";
+    case PinType::vector_list: return "List<Vector>";
+    case PinType::text_list: return "List<Text>";
+    case PinType::actor_list: return "List<Actor>";
     default: return "void";
   }
 }
+/// A value type by its name (a list is List<that>).
 bool type_of_cpp(std::string_view name, PinType& out) {
   for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor})
     if (name == cpp_type(t)) { out = t; return true; }
@@ -145,8 +152,28 @@ std::string literal(const Value& v) {
     case PinType::vector: return "Vector{" + f32_text(v.v.x) + ", " + f32_text(v.v.y) + ", " + f32_text(v.v.z) + "}";
     case PinType::text: return text_literal(v.s);
     case PinType::actor: return "Actor{" + std::to_string(v.a) + "}";
-    default: return "0";
+    default: break;
   }
+  if (!is_list(v.type)) return "0";
+  // a list: List<Float>{1.0, 2.5}
+  std::string r = std::string(cpp_type(v.type)) + "{";
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
+  return r + "}";
+}
+/// The settings of a node as they stand behind its function's name: <"smooth">. A setting that
+/// names a variable is not among them - the variable itself is the call's first value.
+std::string settings_of(const NodeDef& def, const Node& n) {
+  std::string r;
+  for (const ParamDef& pd : def.params)
+    if (pd.kind != ParamDef::Kind::variable) r += (r.empty() ? "<" : ", ") + text_literal(n.param(pd.key, pd.def));
+  return r.empty() ? r : r + ">";
+}
+/// The variables a node's settings name, in their order.
+std::vector<std::string> variables_of(const NodeDef& def, const Node& n) {
+  std::vector<std::string> r;
+  for (const ParamDef& pd : def.params)
+    if (pd.kind == ParamDef::Kind::variable) r.push_back(n.param(pd.key, pd.def));
+  return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -704,16 +731,7 @@ struct Writer {
   std::string id(int x) { return std::to_string(at(x).node->id); }
 
   /// The name of a node's function with its settings: flow_tween<"smooth">.
-  std::string callee(int x) {
-    const Info& X = at(x);
-    std::string r = node_name(X.def->type);
-    if (!X.def->params.empty()) {
-      r += "<";
-      for (std::size_t k = 0; k < X.def->params.size(); ++k) r += (k ? ", " : "") + text_literal(X.node->param(X.def->params[k].key, X.def->params[k].def));
-      r += ">";
-    }
-    return r;
-  }
+  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node); }
 
   std::string literal_of(int x, int k) {
     const Info& X = at(x);
@@ -771,6 +789,7 @@ struct Writer {
     }
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
+    for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
     const std::string args = inputs(x, c, head);
     return callee(x) + "(" + args + ")";
   }
@@ -836,11 +855,12 @@ struct Writer {
   }
 
   /// The call of a step: its member, the exec input it is entered through when it has several,
-  /// then what its inputs are given.
+  /// the variable it changes, then what its inputs are given.
   std::string call(int x, int entry, int c, bool definition) {
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
+    for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
     const std::string args = inputs(x, c, head);
     return callee(x) + "(" + args + ")";
   }
@@ -1162,6 +1182,9 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
+const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, or List<one of them>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text> or List<Actor>";
+
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
   std::string s;            // the name, the digits, the text's content, the punctuation, the doc line
@@ -1482,6 +1505,22 @@ struct Reader {
       v = Value::actor(static_cast<ActorRef>(a));
       return true;
     }
+    if (t.kind == Tok::id && t.s == "List" && is("<", 1)) {
+      // List<Float>{1.0, 2.5}
+      PinType list;
+      if (!type_here(list)) return true;
+      if (!expect("{", "(a list written out is " + std::string(cpp_type(list)) + "{...})")) return true;
+      json::Value items = json::Value::array();
+      while (!is("}")) {
+        Value item;
+        if (!typed_literal(element_of(list), item, "a list's item")) return true;
+        items.push(item.to_json());
+        if (!accept(",")) break;
+      }
+      if (!expect("}")) return true;
+      v = Value::from_json(items, list);
+      return true;
+    }
     return false;
   }
   /// A literal for a place of type `want` ("Float x = 1" is 1.0; nothing else converts).
@@ -1499,6 +1538,14 @@ struct Reader {
   // ---- the first pass: what the struct declares ----
   bool type_here(PinType& t) {
     if (peek().kind == Tok::id && type_of_cpp(peek().s, t)) { ++p; return true; }
+    // List<Float>: a list of values of one type
+    PinType item;
+    if (is("List") && is("<", 1)) {
+      if (peek(2).kind != Tok::id || !type_of_cpp(peek(2).s, item) || !is(">", 3)) return fail(p + 2, shown(peek(2)) + " is no type a list holds: a list is " + kListTypes);
+      p += 4;
+      t = list_of(item);
+      return true;
+    }
     return false;
   }
   /// Type name = value; ... }   ("{" has been read)
@@ -1506,7 +1553,7 @@ struct Reader {
     while (!is("}")) {
       PinType t;
       std::string field;
-      if (!type_here(t)) return fail(p, what + ": a type (Bool, Int, Float, Vector, Text, Actor) expected, not " + shown(peek()));
+      if (!type_here(t)) return fail(p, what + ": " + kTypes + shown(peek()));
       if (!word(field, "the name")) return false;
       Value v = Value::zero(t);
       const std::size_t at = p;
@@ -1619,7 +1666,6 @@ struct Reader {
       has_docs = false;
       return r;
     };
-    const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor) expected, not ";
     while (!failed()) {
       const Tok t = peek();
       if (t.kind == Tok::doc) {
@@ -1726,7 +1772,7 @@ struct Reader {
         continue;
       }
       if (ret != "void" && (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result"))
-        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text or Actor; a function gives void or <Function>Result");
+        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor or a List of one of them; a function gives void or <Function>Result");
       if (!expect("(")) return false;
       Item it;
       if (ret == "void" && numbered(fn, "on")) {
@@ -1817,16 +1863,42 @@ struct Reader {
   }
   static std::string settings_text(const NodeDef* def) {
     std::string want;
-    for (const ParamDef& pd : def->params) want += (want.empty() ? "\"" : ", \"") + pd.def + "\"";
-    return def->params.empty() ? " has no settings (no <...>)" : " has " + std::to_string(def->params.size()) + " setting(s): " + node_name(def->type) + "<" + want + ">";
+    std::size_t count = 0;
+    for (const ParamDef& pd : def->params) {
+      if (pd.kind == ParamDef::Kind::variable) continue;
+      want += (want.empty() ? "\"" : ", \"") + pd.def + "\"";
+      ++count;
+    }
+    return count == 0 ? " has no settings (no <...>)" : " has " + std::to_string(count) + " setting(s): " + node_name(def->type) + "<" + want + ">";
   }
-  /// A node made from its function's name and settings (the name has been read).
+  /// A node made from its function's name and settings (the name has been read). A setting that
+  /// names a variable is the call's first value, the variable itself - after the member n<id>
+  /// and the exec input: list_add(n7, Scores, 1.0). It is read ahead here (the node's pins
+  /// depend on it) and taken in its place (variable_args).
   int make_named(const NodeDef* def, std::size_t tok) {
     std::vector<std::string> given;
     if (!settings(given)) return -1;
-    if (given.size() != def->params.size()) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
+    std::size_t written = 0, variables = 0;
+    for (const ParamDef& pd : def->params) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
+    if (given.size() != written) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
+    std::vector<std::string> names;
+    if (variables) {
+      const std::string fname = node_name(def->type);
+      if (!is("(")) { fail(p, fname + "(...) expected, not " + shown(peek())); return -1; }
+      std::size_t q = 1;
+      if (peek(q).kind == Tok::id && numbered(peek(q).s, "n") && is(",", q + 1)) q += 2;                        // (its member)
+      if ((peek(q).kind == Tok::text || (peek(q).kind == Tok::id && peek(q).s == "entry")) && is(",", q + 1)) q += 2;  // (its exec input)
+      for (std::size_t k = 0; k < variables; ++k, q += 2) {
+        if (peek(q).kind != Tok::id || !g.variable(peek(q).s)) {
+          fail(p + q, fname + " changes a variable: that variable is its first value - " + fname + "(Variable, ...) - not " + shown(peek(q)));
+          return -1;
+        }
+        names.push_back(peek(q).s);
+      }
+    }
     std::vector<std::pair<std::string, std::string>> params;
-    for (std::size_t k = 0; k < given.size(); ++k) params.push_back({def->params[k].key, given[k]});
+    std::size_t g_at = 0, v_at = 0;
+    for (const ParamDef& pd : def->params) params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
     return make(def, tok, std::move(params));
   }
   bool declare(u32 id, int node, std::size_t tok) {
@@ -1912,6 +1984,18 @@ struct Reader {
     ++p;
     return true;
   }
+  /// The variables a node's settings name, where its call has them: its first values (make_named
+  /// has read them ahead).
+  bool variable_args(int node, Args& a) {
+    const Made& m = made[static_cast<std::size_t>(node)];
+    for (const ParamDef& pd : m.def->params) {
+      if (pd.kind != ParamDef::Kind::variable) continue;
+      const std::string name = m.node.param(pd.key);
+      if (!a.more() || peek().kind != Tok::id || peek().s != name) return fail(p, node_name(m.def->type) + ": the variable " + name + " expected, not " + shown(peek()));
+      ++p;
+    }
+    return true;
+  }
   /// A value node called by its function's name: math_add(a, b), math_random(n7, 0.0, 1.0).
   Src pure_call(const NodeDef* def, std::size_t tok) {
     Src s;
@@ -1919,7 +2003,7 @@ struct Reader {
     const int node = make_named(def, tok);
     if (node < 0 || !expect("(")) return s;
     Args a{*this};
-    if (!member_arg(node, a) || !args_of(node, a, node_name(def->type))) return s;
+    if (!member_arg(node, a) || !variable_args(node, a) || !args_of(node, a, node_name(def->type))) return s;
     if (!is(")")) { fail(p, takes(node, node_name(def->type)) + " - \")\" expected, not " + shown(peek())); return s; }
     ++p;
     s.node = node;
@@ -2073,9 +2157,11 @@ struct Reader {
     scope.first = false;
     return node;
   }
-  /// The arguments of a step in front of its values: its member n<id>, then the exec input it
-  /// is entered through when it has several. `entry`: that input ("": the first).
-  bool head(int node, Args& a, std::string& entry) {
+  /// The arguments of a step in front of its values: its member n<id>, the exec input it is
+  /// entered through when it has several, then the variable it changes. `entry`: that input
+  /// ("": the first).
+  bool head(int node, Args& a, std::string& entry) { return member_and_entry(node, a, entry) && variable_args(node, a); }
+  bool member_and_entry(int node, Args& a, std::string& entry) {
     const Made& m = made[static_cast<std::size_t>(node)];
     if (!member_arg(node, a)) return false;
     const std::vector<std::string> ins = exec_pins(node, true);
@@ -3191,16 +3277,26 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::number: return "kern::f64";
       case PinType::vector: return "kern::Vec3";
       case PinType::text: return "std::string";
+      case PinType::boolean_list: return "kern::List<bool>";
+      case PinType::integer_list: return "kern::List<kern::logic::Whole>";
+      case PinType::number_list: return "kern::List<kern::f64>";
+      case PinType::vector_list: return "kern::List<kern::Vec3>";
+      case PinType::text_list: return "kern::List<std::string>";
+      case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
       default: return "kern::logic::ActorHandle";
     }
   };
   // (the notation's literal, outside the class: with the types' own names)
-  auto value = [](const json::Value& j, PinType t) {
-    const std::string text = literal(Value::from_json(j, t));
-    if (t == PinType::vector) return "kern::Vec3" + text.substr(6);
-    if (t == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
-    return text;
+  std::function<std::string(const Value&)> spelled = [&](const Value& v) -> std::string {
+    const std::string text = literal(v);
+    if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
+    if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
+    if (!is_list(v.type)) return text;
+    std::string r = std::string(type(v.type)) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k));
+    return r + "}";
   };
+  auto value = [&](const json::Value& j, PinType t) { return spelled(Value::from_json(j, t)); };
   char hash[40];
   std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
   // The handlers of events: the runtime starts a chain at an event's node, the class has it as
@@ -3213,12 +3309,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const NodeDef* def = lib.find(n.type);
     if (def && def->latent) {
       // A node that waits: when the wait is over the runtime runs it again - <node>_resume.
-      std::string fn = node_name(def->type) + "_resume";
-      if (!def->params.empty()) {
-        fn += "<";
-        for (std::size_t k = 0; k < def->params.size(); ++k) fn += (k ? ", " : "") + text_literal(n.param(def->params[k].key, def->params[k].def));
-        fn += ">";
-      }
+      const std::string fn = node_name(def->type) + "_resume" + settings_of(*def, n);
       events += "      case " + std::to_string(i) + ": self." + fn + "(self.n" + std::to_string(n.id) + "); break;  // " + lib.title(n) + "\n";
       continue;
     }

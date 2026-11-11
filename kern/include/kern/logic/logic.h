@@ -16,6 +16,12 @@
 //                 they had when the node last ran. Unlinked inputs use the
 //                 literal typed into the node.
 //   variables     per graph instance, typed, with a default.
+//   lists         a pin or a variable may hold a list of values of one type
+//                 (Unreal's arrays). A list on a wire is a value like any
+//                 other: what reads it has the list as it was. The steps that
+//                 change a list (Add, Insert, Set Item, Remove, Clear) change
+//                 a list variable; For Each goes through a list as it was
+//                 when the loop started.
 //   state machines  states and transitions in the style of the
 //                 digitalisierungsplanung.de state editor: a transition fires
 //                 on an event, a timer, a condition variable or automatically;
@@ -36,6 +42,8 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -47,9 +55,43 @@ namespace kern::logic {
 
 using ActorRef = u32;  // game actor id (0 = none)
 
-enum class PinType : u8 { exec, boolean, integer, number, vector, text, actor, count };
+/// What a pin carries: exec, a value, or a list of values of one type (after the six value types,
+/// in their order).
+enum class PinType : u8 { exec, boolean, integer, number, vector, text, actor, boolean_list, integer_list, number_list, vector_list, text_list, actor_list, count };
+/// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t < PinType::count; }
+constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - 6) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::actor ? static_cast<PinType>(static_cast<u8>(t) + 6) : t; }
+/// The names of the pin types, in the order of PinType.
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list"};
+static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
+/// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
-bool pin_type_from_name(std::string_view name, PinType& out);
+/// The type with that name (also "number", "double", "boolean", "integer", "string").
+constexpr bool pin_type_from_name(std::string_view name, PinType& out) {
+  for (u32 i = 0; i < static_cast<u32>(PinType::count); ++i)
+    if (name == kPinTypeNames[i]) {
+      out = static_cast<PinType>(i);
+      return true;
+    }
+  if (name == "number" || name == "double") out = PinType::number;
+  else if (name == "boolean") out = PinType::boolean;
+  else if (name == "integer") out = PinType::integer;
+  else if (name == "string") out = PinType::text;
+  else return false;
+  return true;
+}
+/// The type a generic node's setting "Type" names (Select, Reroute): "float" when it names none.
+constexpr PinType pin_type_setting(std::string_view name) {
+  PinType t = PinType::number;
+  return pin_type_from_name(name, t) && t != PinType::exec ? t : PinType::number;
+}
+/// The type of a list node's items its setting "Type" names: a value type, "float" when it names none.
+constexpr PinType item_type_setting(std::string_view name) {
+  const PinType t = pin_type_setting(name);
+  return is_list(t) ? PinType::number : t;
+}
 /// Data that can flow from `from` into an input of type `to` (autocasts).
 bool convertible(PinType from, PinType to);
 
@@ -84,6 +126,23 @@ inline i64 whole_add(i64 a, i64 b) {
   return whole(static_cast<f64>(a) + static_cast<f64>(b));
 }
 
+/// An actor on a pin (`Actor` in a Blueprint's C++): its id, 0 = none.
+struct ActorHandle {
+  ActorRef id = 0;
+  bool operator==(const ActorHandle&) const = default;
+};
+
+/// The items of a list value: the vector of the list's type holds them (the others are empty).
+using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
+/// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
+template <class T> constexpr PinType list_type_of() = delete;
+template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
+template <> constexpr PinType list_type_of<i64>() { return PinType::integer_list; }
+template <> constexpr PinType list_type_of<f64>() { return PinType::number_list; }
+template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list; }
+template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
+template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
+
 /// A value on a data pin.
 struct Value {
   PinType type = PinType::number;
@@ -93,6 +152,9 @@ struct Value {
   Vec3 v;
   std::string s;
   ActorRef a = 0;
+  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
+  /// whoever changes one (edit) changes its own.
+  std::shared_ptr<const ListItems> list;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
   static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
@@ -101,6 +163,37 @@ struct Value {
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
   static Value zero(PinType t);
+  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle). Whole numbers
+  /// are held as every Int is (logic::normal).
+  template <class T> static Value of(std::vector<T> items) {
+    Value r;
+    r.type = list_type_of<T>();
+    if constexpr (std::is_same_v<T, i64>)
+      for (std::size_t k = 0; k < items.size(); ++k) items[k] = normal(items[k]);
+    if (!items.empty()) {
+      auto held = std::make_shared<ListItems>();
+      std::get<std::vector<T>>(*held) = std::move(items);
+      r.list = std::move(held);
+    }
+    return r;
+  }
+  /// The items of a list of T - none if this is no such list.
+  template <class T> const std::vector<T>& items() const {
+    static const std::vector<T> none;
+    return list && type == list_type_of<T>() ? std::get<std::vector<T>>(*list) : none;
+  }
+  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
+  /// none).
+  template <class T> std::vector<T>& edit() {
+    if (!list || type != list_type_of<T>()) list = std::make_shared<ListItems>();
+    else if (list.use_count() > 1) list = std::make_shared<ListItems>(*list);  // (someone else reads these)
+    type = list_type_of<T>();
+    return std::get<std::vector<T>>(const_cast<ListItems&>(*list));  // (made as ListItems, above and in of())
+  }
+  /// How many items a list has (no list: 0).
+  std::size_t size() const;
+  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
+  Value item(std::size_t index) const;
 
   bool as_bool() const;
   i64 as_int() const;
@@ -524,6 +617,10 @@ class Instance {
   /// the chain it is made in: it is no chain of its own for how deep events may nest - in the
   /// Blueprint's C++ it is a call like any other.
   bool call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// A variable's value, to change it in place (a list: Value::edit). Null for a number - those
+  /// live in the slots, use set -, for a name that is none, and for a Blueprint that runs as its
+  /// class (its variables are that class's members).
+  Value* variable(std::string_view name);
   /// How many chains of this Blueprint are running, one inside the other (more than one: an event
   /// a running chain raised has reached a handler of the same Blueprint).
   int chains() const { return active_; }

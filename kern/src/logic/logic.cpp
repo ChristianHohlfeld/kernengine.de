@@ -12,8 +12,6 @@ namespace kern::logic {
 // pin types and values
 
 namespace {
-constexpr const char* kPinNames[] = {"exec", "bool", "int", "float", "vector", "text", "actor"};
-
 std::string number_text(f64 n) {
   if (std::isfinite(n) && std::fabs(n) < 1e15 && n == std::floor(n)) return std::to_string(static_cast<i64>(n));
   char b[48];
@@ -22,22 +20,13 @@ std::string number_text(f64 n) {
 }
 }  // namespace
 
-const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinNames[static_cast<u32>(t)] : "?"; }
-
-bool pin_type_from_name(std::string_view name, PinType& out) {
-  for (u32 i = 0; i < static_cast<u32>(PinType::count); ++i)
-    if (name == kPinNames[i]) { out = static_cast<PinType>(i); return true; }
-  if (name == "number" || name == "double") { out = PinType::number; return true; }
-  if (name == "boolean") { out = PinType::boolean; return true; }
-  if (name == "integer") { out = PinType::integer; return true; }
-  if (name == "string") { out = PinType::text; return true; }
-  return false;
-}
+const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinTypeNames[static_cast<u32>(t)].data() : "?"; }
 
 bool convertible(PinType from, PinType to) {
   if (from == to) return true;
   if (from == PinType::exec || to == PinType::exec) return false;
   if (to == PinType::text) return true;  // everything prints
+  if (is_list(from) || is_list(to)) return false;  // (a list is a list of its type and nothing else)
   const bool from_num = from == PinType::integer || from == PinType::number || from == PinType::boolean;
   const bool to_num = to == PinType::integer || to == PinType::number || to == PinType::boolean;
   if (from_num && to_num) return true;
@@ -101,7 +90,38 @@ std::string Value::as_text() const {
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
-    default: return "";
+    default: break;
+  }
+  if (!is_list(type)) return "";
+  // a list prints its items: [1, 2.5, 3]
+  std::string r = "[";
+  for (std::size_t k = 0, n = size(); k < n; ++k) r += (k ? ", " : "") + item(k).as_text();
+  return r + "]";
+}
+
+std::size_t Value::size() const {
+  if (!list) return 0;
+  switch (type) {
+    case PinType::boolean_list: return std::get<std::vector<bool>>(*list).size();
+    case PinType::integer_list: return std::get<std::vector<i64>>(*list).size();
+    case PinType::number_list: return std::get<std::vector<f64>>(*list).size();
+    case PinType::vector_list: return std::get<std::vector<Vec3>>(*list).size();
+    case PinType::text_list: return std::get<std::vector<std::string>>(*list).size();
+    case PinType::actor_list: return std::get<std::vector<ActorHandle>>(*list).size();
+    default: return 0;
+  }
+}
+
+Value Value::item(std::size_t index) const {
+  if (index >= size()) return zero(element_of(type));
+  switch (type) {
+    case PinType::boolean_list: return boolean(std::get<std::vector<bool>>(*list)[index]);
+    case PinType::integer_list: return integer(std::get<std::vector<i64>>(*list)[index]);
+    case PinType::number_list: return number(std::get<std::vector<f64>>(*list)[index]);
+    case PinType::vector_list: return vector(std::get<std::vector<Vec3>>(*list)[index]);
+    case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
+    case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index].id);
+    default: return zero(element_of(type));
   }
 }
 
@@ -121,7 +141,7 @@ Value Value::converted(PinType to) const {
     case PinType::vector: return vector(as_vector());
     case PinType::text: return text(as_text());
     case PinType::actor: return actor(as_actor());
-    default: return *this;
+    default: return is_list(to) ? zero(to) : *this;  // (nothing but the list itself is a list of that type)
   }
 }
 
@@ -139,8 +159,12 @@ json::Value Value::to_json() const {
     }
     case PinType::text: return json::Value(s);
     case PinType::actor: return json::Value(static_cast<f64>(a));
-    default: return json::Value();
+    default: break;
   }
+  if (!is_list(type)) return json::Value();
+  json::Value arr = json::Value::array();  // a list: its items
+  for (std::size_t k = 0, n = size(); k < n; ++k) arr.push(item(k).to_json());
+  return arr;
 }
 
 Value Value::from_json(const json::Value& j, PinType t) {
@@ -157,12 +181,31 @@ Value Value::from_json(const json::Value& j, PinType t) {
     case PinType::actor: v.a = j.is_number() ? static_cast<ActorRef>(max_of(0.0, j.as_number())) : 0; break;
     default: break;
   }
+  if (is_list(t) && j.is_array() && j.size() > 0) {
+    // a list: an array of its items (anything else: the empty list)
+    const PinType e = element_of(t);
+    auto held = std::make_shared<ListItems>();
+    for (std::size_t k = 0; k < j.size(); ++k) {
+      const Value x = from_json(j[k], e);
+      switch (e) {
+        case PinType::boolean: std::get<std::vector<bool>>(*held).push_back(x.b); break;
+        case PinType::integer: std::get<std::vector<i64>>(*held).push_back(x.i); break;
+        case PinType::number: std::get<std::vector<f64>>(*held).push_back(x.n); break;
+        case PinType::vector: std::get<std::vector<Vec3>>(*held).push_back(x.v); break;
+        case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
+        case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back({x.a}); break;
+        default: break;
+      }
+    }
+    v.list = std::move(held);
+  }
   return v;
 }
 
 bool Value::operator==(const Value& o) const {
   if (type != o.type) {
     if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
+    if (is_list(type) || is_list(o.type)) return false;
     return as_number() == o.as_number();
   }
   switch (type) {
@@ -172,8 +215,11 @@ bool Value::operator==(const Value& o) const {
     case PinType::vector: return v.x == o.v.x && v.y == o.v.y && v.z == o.v.z;
     case PinType::text: return s == o.s;
     case PinType::actor: return a == o.a;
-    default: return true;
+    default: break;
   }
+  if (!is_list(type)) return true;
+  if (size() != o.size()) return false;  // lists: the same items in the same order
+  return size() == 0 || *list == *o.list;
 }
 
 // ---------------------------------------------------------------------------
@@ -1036,6 +1082,11 @@ Value Instance::get(std::string_view variable) const {
   return it == vars_.end() ? Value() : it->second;
 }
 
+Value* Instance::variable(std::string_view name) {
+  if (blueprint_) return nullptr;
+  auto it = vars_.find(std::string(name));
+  return it == vars_.end() ? nullptr : &it->second;
+}
 bool Instance::set(std::string_view variable, const Value& v) {
   if (blueprint_) return blueprint_->set(variable, v);
   if (const int k = var_slot(variable); k >= 0) {

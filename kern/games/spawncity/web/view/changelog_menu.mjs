@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"10:20",title:"Blueprints: Listen und „For Each“",items:[
+    "Kern-Blueprints: Eine Variable oder ein Pin kann jetzt eine Liste von Werten sein – Zahlen, Texte, Vektoren, Wahrheitswerte oder Actors. Neue Knoten lesen eine Liste (Make List, Length, Get Item, Contains, Find Item) und ändern eine Listen-Variable (Add, Insert, Set Item, Remove Index, Remove Item, Clear).",
+    "Die Schleife „For Each“ läuft einmal für jeden Eintrag einer Liste. Sie geht durch die Liste, wie sie beim Start war – ihr Rumpf darf die Liste ändern, ohne dass die Schleife springt oder nie endet. „All Actors with Tag“ liefert alle Actors mit einem Tag als Liste.",
+    "Kein Index führt ins Leere: Lesen jenseits der Liste gibt den Nullwert, Schreiben dort tut nichts. Als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus (in C++: List<Float>, list_add(Scores, x), eine for-Schleife).",
+    "Im Kern-Editor: Listen-Pins sehen aus wie ein kleines Raster, Listen lassen sich in Details Eintrag für Eintrag bearbeiten, und ein Knoten, der mit jeder Liste arbeitet, nimmt den Typ des ersten Kabels an.",
+  ]},
   {date:"2026-11-10",time:"22:29",title:"Ganze Zahlen: beide Enden gleich weit von null",items:[
     "Kern-Blueprints: Die kleinste ganze Zahl ist jetzt −(2^63 − 1), genauso weit von null wie die größte. So lässt sich jede ganze Zahl eines Blueprints auch in seinem C++ hinschreiben – der bisherige unterste Wert war dort keine gültige Zahl, ein Blueprint mit genau diesem Wert hätte sich nicht kompilieren lassen.",
   ]},

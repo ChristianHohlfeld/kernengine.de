@@ -60,6 +60,10 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
 - **Fertig: der native Export.** `tools/export_game.sh level.klevel spiel.html` schreibt ein Level
   als eigenständiges Spiel, dessen Engine-Modul für dieses Level gebaut ist: alle Blueprints als
   ihre C++-Klassen, voll optimiert. Die Seite ist die, die „Package Game“ im Editor schreibt.
+- **Fertig: Listen und „For Each“.** Ein Pin oder eine Variable kann eine Liste von Werten eines
+  Typs sein (`List<Float>`, `List<Text>` …). Die Wert-Knoten lesen eine Liste, die Schritte ändern
+  eine Listen-Variable, For Each geht durch eine Liste – in beiden Schreibweisen und in jeder
+  Stufe gleich (siehe „Listen“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
   ihren Enden, der Stapel des JIT –, ist gleichgezogen (17 Tier-Fälle, in jeder Stufe dasselbe).
@@ -161,6 +165,9 @@ KERN_LAYOUT(Demo) {
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
 | Get Variable | der Name der Variablen |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
+| Schritt, der eine Listen-Variable ändert (Add to List, Insert, Set Item, Remove, Clear) | `list_add(Scores, wert);` – die Variable selbst ist das erste Argument; wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
+| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<"float">(Scores, 0)`, `list_make<"text", "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| For Each | `for (auto it9 = flow_for_each<"float">(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -192,9 +199,53 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
 | Actor | `Actor` | `Actor{7}` |
+| Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
 Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung.
+
+### Listen
+
+Eine Liste hält Werte **eines** Typs, in ihrer Reihenfolge; der erste Eintrag hat den Index 0. In
+C++ ist `List<Float>` ein `std::vector` – eine Listen-Variable ist ein Member wie jede andere:
+
+```cpp
+List<Float> Scores = List<Float>{1.0, 2.5};
+List<Text> Names = List<Text>{};
+
+KERN_EVENT(on1, event_custom<"Hit">)
+void on1(Actor actor, Float value, Text text) {
+  list_add(Scores, value);
+  Total = 0.0;
+  for (auto it4 = flow_for_each<"float">(n4, Scores); it4.next();) {
+    Total += n4.item;
+  }
+  if (list_contains<"text">(Names, text)) {
+    debug_print(kern::to<Text>(Scores), true);
+  }
+}
+```
+
+- **Eine Liste auf einem Draht ist ein Wert.** Wer sie liest, hat die Liste, wie sie in dem
+  Moment war – eine Kopie, kein Verweis. Geändert wird nur eine Variable: Die Schritte Add,
+  Insert, Set Item, Remove Index, Remove Item und Clear nennen ihre Listen-Variable als
+  Einstellung, und in C++ steht sie als erstes Argument (nach `n<id>`), weil die Funktion genau
+  diesen Member ändert. Eine ganze Liste setzt man wie jede Variable: `Scores = werte;`.
+- **Kein Index führt ins Leere.** Get Item jenseits der Liste gibt den Nullwert des Typs, Set
+  Item und Remove Index tun dort nichts, Insert fügt vor dem ersten bzw. hinter dem letzten
+  Eintrag ein, Find gibt −1. Es gibt kein Lesen oder Schreiben neben der Liste – in keiner Stufe.
+- **For Each geht durch die Liste, wie sie beim Start der Schleife war.** Was der Rumpf mit der
+  Variablen tut (hinzufügen, leeren), ändert den Lauf nicht. Der Stand der Schleife gehört dem
+  Knoten (`n9`), wie der Index einer For-Schleife: Startet der Rumpf dieselbe Schleife noch
+  einmal (über ein Event), läuft die innere ganz, und die äußere ist danach zu Ende.
+- **Eine Liste wird nur zu Text.** `kern::to<Text>(Scores)` ergibt `[1, 2.5]`; sonst passt eine
+  Liste nur in einen Eingang ihres eigenen Typs, und nichts wird still zu einer Liste.
+- **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
+  und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
+  ersten Drahts an, der an ihn kommt.
+- **Was sie tun, steht einmal:** `kern::logic::list` in `kern/logic/nodes.h` – die Knoten des
+  Interpreters und die Funktionen der Klasse rufen dieselben Funktionen auf.
+- Gameplay: „All Actors with Tag“ (`actor_all_with_tag(tag)`) gibt eine `List<Actor>`.
 
 ### Formeln
 
@@ -482,21 +533,23 @@ verdrahtet, einmal keiner), von Hand geschriebene Texte mit allen Formen, die Ab
 ihren Stellen und die Regeln. In SpawnCity prüft `rules_wanted_blueprint_is_its_cpp` dasselbe
 für den Blueprint „Wanted“ des Levels.
 
-Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von fünf Blueprints genau so,
+Für die native Ausführung: `kern/tests/run.sh` schreibt die Texte von sechs Blueprints genau so,
 wie `to_cpp` sie liefert (`kern_tests --emit-native`), kompiliert sie mit dem Compiler des
 Systems (die Schalter der Engine: `-Wall -Wextra -Werror`, ASan, UBSan) und vergleicht **jeden
 Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variablen
-(`blueprint_native_test`, über 2000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
+(`blueprint_native_test`, über 3000 Aufrufe). Jeder Aufruf läuft zweimal: direkt auf der Klasse
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 17, auch die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
+demselben Ergebnis: alle 17, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
 tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
 (`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
-Draht zwischen verschiedenen Typen (`Casts`), Return in einer Sequence (`Functions`) und **jeder
+Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
+jenseits der Liste (`Lists`), Return in einer Sequence (`Functions`) und **jeder
 Wert-Knoten in jeder Einstellung als eigene Funktion** (`Nodes`, dazu 20 Formeln), jeweils mit
 vielen Werten samt 0, −0, 1e19, unendlich und „keine Zahl“. `logic_native_blueprints` stellt
 sicher, dass `native_ready` keinen Knoten durchlässt, der in diesen Fällen (und denen des Spiels,

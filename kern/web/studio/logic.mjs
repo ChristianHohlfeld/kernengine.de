@@ -25,6 +25,12 @@ import {wheelPixels} from "../kern.mjs";
 
 const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", int: "#1fe0b0", float: "#9be36b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5"};
 const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Float", vector: "Vector", text: "Text", actor: "Actor"};
+// A list of values of one type ("float_list"): the colour of its items, a pin of its own shape.
+const LG_VALUE_TYPES = ["bool", "int", "float", "vector", "text", "actor"];
+for (const t of LG_VALUE_TYPES) { LG_TYPE_COLORS[t + "_list"] = LG_TYPE_COLORS[t]; LG_TYPE_NAMES[t + "_list"] = LG_TYPE_NAMES[t] + " List"; }
+const LG_DATA_TYPES = [...LG_VALUE_TYPES, ...LG_VALUE_TYPES.map(t => t + "_list")];
+const lgIsList = t => typeof t === "string" && t.endsWith("_list");
+const lgItemType = t => t.slice(0, -5);
 const LG_KIND_COLORS = {event: "#8f1d1d", action: "#1f4e8c", pure: "#3c7a3c", flow: "#5c5c5c"};
 const LG_GRID = 16;
 const LG_SNAP = 16;
@@ -36,12 +42,46 @@ const lgEsc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<":
 const lgHex = n => "#" + (n >>> 0).toString(16).padStart(6, "0");
 const lgNum = v => (typeof v === "number" ? (Math.abs(v) >= 1e4 || Number.isInteger(v) ? String(v) : String(+v.toFixed(4))) : String(v ?? ""));
 const lgSnap = v => Math.round(v / LG_SNAP) * LG_SNAP;
-const lgValueText = v => Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
+const lgValueText = (v, type) => lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x) + ")" : lgValueText(x)).join(", ") + "]"
+  : Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
+const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : 0;
+const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
+
+/** The editor of a list's items (the default of a variable or a function input, a list typed
+ *  into a node): one row per item with the field of its type, × takes it out, + adds one. */
+function lgListEditor(type, value) {
+  const item = lgItemType(type), items = Array.isArray(value) ? value : [];
+  if (item === "actor") return `<span class="lg-dim">${items.length ? items.length + " actors" : "empty (filled while playing)"}</span>`;
+  const field = (v, i) => item === "bool" ? `<input type="checkbox" data-li="${i}"${v ? " checked" : ""}>`
+    : `<input data-li="${i}" value="${lgEsc(item === "vector" ? (Array.isArray(v) ? v : [0, 0, 0]).map(lgNum).join(", ") : item === "text" ? (v ?? "") : lgNum(v))}" spellcheck="false"${item === "text" ? "" : ' inputmode="decimal"'}>`;
+  return `<div class="lg-list" data-list="${type}">${items.map((v, i) => `<div class="lg-li"><em>${i}</em>${field(v, i)}<button data-lx="${i}" title="Remove this item">×</button></div>`).join("")}
+    <button class="lg-ladd" data-ladd title="Add an item at the end">+ Item</button></div>`;
+}
+/** The items a list editor shows now. */
+function lgListValue(box) {
+  const item = lgItemType(box.dataset.list);
+  return [...box.querySelectorAll("[data-li]")].map(f => item === "bool" ? f.checked : item === "vector" ? lgVector(f.value) : item === "text" ? f.value : (+f.value || 0));
+}
+/** Every change of a list editor gives `send` the whole list. */
+function lgListBind(box, send) {
+  if (!box) return;
+  const item = lgItemType(box.dataset.list);
+  for (const f of box.querySelectorAll("[data-li]")) f.onchange = () => send(lgListValue(box));
+  for (const x of box.querySelectorAll("[data-lx]")) x.onclick = () => send(lgListValue(box).filter((_, i) => i !== +x.dataset.lx));
+  const add = box.querySelector("[data-ladd]");
+  if (add) add.onclick = () => send([...lgListValue(box), lgItemZero(item)]);
+}
 
 function lgPinIcon(type, linked) {
   const c = LG_TYPE_COLORS[type] || "#aaa";
   if (type === "exec")
     return `<svg class="lg-pin exec" viewBox="0 0 14 14"><path d="M2 1.8h5.2l5 5.2-5 5.2H2z" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if (lgIsList(type)) {
+    // a list: a grid of its items
+    let cells = "";
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) cells += `<rect x="${1.2 + x * 3.6}" y="${2.2 + y * 3.6}" width="2.6" height="2.6" rx=".5" fill="${linked || (x === 1 && y === 1) ? c : "none"}" stroke="${c}" stroke-width=".9"/>`;
+    return `<svg class="lg-pin list" viewBox="0 0 14 14">${cells}</svg>`;
+  }
   return `<svg class="lg-pin" viewBox="0 0 14 14"><circle cx="6" cy="7" r="4.2" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.7"/><path d="M11 4.6l2.4 2.4L11 9.4z" fill="${c}"/></svg>`;
 }
 
@@ -495,7 +535,7 @@ export class LogicEditor {
     const vars = (data.variables || []).filter(v => match(v.name)).map(v => `
         <div class="lg-item lg-var${this.selVar === v.name ? " on" : ""}" draggable="true" data-var="${lgEsc(v.name)}" title="Drag into the graph: Ctrl = Get, Alt = Set">
           <i class="lg-pill" style="--c:${LG_TYPE_COLORS[v.type]}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
-          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name]))}</span>` : `<span class="lg-vt">${LG_TYPE_NAMES[v.type] || v.type}</span>`}
+          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type))}</span>` : `<span class="lg-vt">${LG_TYPE_NAMES[v.type] || v.type}</span>`}
           <span class="lg-acts"><button data-get title="Add a Get node">Get</button><button data-set title="Add a Set node">Set</button></span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
     // a function's signature in short: (x, y) -> result
@@ -660,7 +700,7 @@ export class LogicEditor {
       if (dir === "in" && p.type !== "exec" && !p.linked) lit = this.literalHtml(n, p, actors);
       const label = p.label && !compact ? `<span class="lg-pl">${lgEsc(p.label)}</span>` : "";
       const tip = `${LG_TYPE_NAMES[p.type] || p.type}${p.label ? " · " + p.label : ""}`;
-      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${p.type}" title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + label + lit : label + lgPinIcon(p.type, p.linked)}</div>`;
+      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${p.type}"${p.generic ? ` data-generic="${lgEsc(p.generic)}"` : ""} title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + label + lit : label + lgPinIcon(p.type, p.linked)}</div>`;
     };
     const cls = `lg-node k-${n.kind}${n.error ? " error" : n.issues ? " warn" : ""}${n.breakpoint ? " bp" : ""}${n.hit ? " hit" : ""}`;
     const tip = lgEsc((n.issues ? n.issues.join("\n") + "\n\n" : "") + (n.help || ""));
@@ -708,7 +748,9 @@ export class LogicEditor {
       case "text": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v)}" spellcheck="false">`;
       case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
       case "actor": return `<select class="lg-lit act" ${attr}><option value="0">${p.id === "target" || p.id === "a" ? "Self" : "None"}</option>${actors.map(([id, name]) => `<option value="${id}"${id === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
-      default: return "";
+      default:
+        // a list that is not wired: how many items are typed in (they are edited in Details)
+        return lgIsList(p.type) ? `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>` : "";
     }
   }
 
@@ -944,7 +986,8 @@ export class LogicEditor {
     const actors = this.studio.state()?.actors || [];
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
     const inputs = n.inputs.filter(p => p.type !== "exec");
-    const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>`).join("");
+    const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
+      (lgIsList(p.type) && !p.linked ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value)}</div>` : "")).join("");
     const params = (n.params || []).map(p => `<div class="lg-drow"><label>${lgEsc(p.label)}</label><div>${this.paramHtml(n, p)}</div></div>`).join("");
     const issues = (n.issues || []).map(t => `<div class="lg-dissue ${n.error ? "err" : "warn"}">${lgIco(n.error ? "error" : "warn")}${lgEsc(t)}</div>`).join("");
     return `<div class="lg-dh"><i class="lg-dhc" style="background:${head}"></i>${lgEsc(n.title)}</div>
@@ -967,7 +1010,9 @@ export class LogicEditor {
 
   variableDetails(v) {
     const live = this.trace?.variables?.[v.name];
-    const val = v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
+    const list = lgIsList(v.type);
+    const val = list ? `<span class="lg-dim">${Array.isArray(v.value) && v.value.length ? v.value.length + (v.value.length === 1 ? " item" : " items") : "empty"}</span>`
+      : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
       : `<input data-vk="value" value="${lgEsc(lgNum(v.value))}">`;
@@ -975,23 +1020,26 @@ export class LogicEditor {
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_TYPE_COLORS[v.type]}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
-        <div class="lg-drow"><label>Type</label><div><select data-vk="type">${["bool", "int", "float", "vector", "text", "actor"].map(t => `<option value="${t}"${t === v.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select></div></div>
+        <div class="lg-drow"><label>Type</label><div><select data-vk="type">${LG_DATA_TYPES.map(t => `<option value="${t}"${t === v.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Default Value</div><div class="lg-drow"><label>${lgEsc(v.name)}</label><div>${val}</div></div>
-        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live))}</div></div>` : ""}</div>
+        ${list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value)}</div>` : ""}
+        ${live !== undefined ? `<div class="lg-drow"><label>While playing</label><div class="lg-live">${lgEsc(lgValueText(live, v.type))}</div></div>` : ""}</div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} node${refs === 1 ? "" : "s"} use${refs === 1 ? "s" : ""} ${lgEsc(v.name)}.</div></div>
       <div class="lg-dacts"><button data-act="get">Add Get</button><button data-act="set">Add Set</button><button data-act="refs">Find</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
 
   functionDetails(f) {
-    const types = ["bool", "int", "float", "vector", "text", "actor"];
-    const value = p => p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
+    const types = LG_DATA_TYPES;
+    const value = p => lgIsList(p.type) ? `<span class="lg-dim lg-fval" title="Default">${Array.isArray(p.value) && p.value.length ? p.value.length + " it." : "empty"}</span>`
+      : p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
       : p.type === "actor" ? `<span class="lg-dim">none</span>`
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${LG_TYPE_COLORS[p.type]}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
         <select data-pf="type" title="Type">${types.map(t => `<option value="${t}"${t === p.type ? " selected" : ""}>${LG_TYPE_NAMES[t]}</option>`).join("")}</select>${value(p)}
-        <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>`).join("") ||
+        <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
+        (lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : "No outputs"}</div>`;
     const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
     return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
@@ -1062,6 +1110,13 @@ export class LogicEditor {
     act("get", () => this.addAtCenter("var.get", {variable: variable.name}));
     act("set", () => this.addAtCenter("var.set", {variable: variable.name}));
     act("refs", () => this.findText(variable.name));
+    // The items of lists: a variable's default, a function pin's default, a list typed into a node.
+    for (const sub of b.querySelectorAll(".lg-lsub")) {
+      const box = sub.querySelector(".lg-list");
+      if (sub.dataset.var) lgListBind(box, value => this.cmd({cmd: "logicVariable", op: "value", name: sub.dataset.var, value}));
+      else if (sub.dataset.fpin && fn) lgListBind(box, value => this.cmd({cmd: "logicFunction", name: fn.name, op: "pinValue", side: sub.dataset.side, pin: sub.dataset.fpin, value}));
+      else if (sub.dataset.node) lgListBind(box, value => this.cmd({cmd: "logicValue", node: +sub.dataset.node, pin: sub.dataset.pin, value}));
+    }
     if (fn) {
       const edit = c => this.cmd({cmd: "logicFunction", name: fn.name, ...c});
       act("fn-in", () => edit({op: "pinAdd", side: "in"}));
@@ -1394,7 +1449,7 @@ export class LogicEditor {
       if (e.altKey) { this.cmd({cmd: "logicDisconnect", node, pin, output: dir === "out"}); return; }
       // Ctrl+drag: pick up the pin's existing wires and move them (Blueprint).
       if ((e.ctrlKey || e.metaKey) && this.pickUpWires(node, pin, dir, e)) return;
-      this.drag = {kind: "wire", node, pin, out: dir === "out", type: row.dataset.type, x0: e.clientX, y0: e.clientY, touch};
+      this.drag = {kind: "wire", node, pin, out: dir === "out", type: row.dataset.type, generic: row.dataset.generic, x0: e.clientX, y0: e.clientY, touch};
       this.highlightTargets(this.drag);
       return;
     }
@@ -1582,6 +1637,10 @@ export class LogicEditor {
     const from = d.out ? d.type : row.dataset.type, to = d.out ? row.dataset.type : d.type;
     if ((from === "exec") !== (to === "exec")) return false;
     if (from === to || to === "text") return true;
+    // a generic node nothing is wired to yet takes the wire's type (Select, Reroute, the list nodes)
+    const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
+    if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;
+    if (lgIsList(from) || lgIsList(to)) return false;
     const numeric = t => t === "int" || t === "float" || t === "bool";
     if (numeric(from) && numeric(to)) return true;
     if (to === "bool" && from === "actor") return true;
@@ -1792,7 +1851,7 @@ export class LogicEditor {
     }
     entries.push({label: "Add Nodes That Fit…", run: () => this.openPalette(x, y, {node, pin, output: out})});
     if (p && p.type !== "exec") entries.push({label: "Promote to Variable", run: () => { const r = this.cmd({cmd: "logicPromote", node, pin, output: out}); if (r?.variable) this.studio.toast(`New variable ${r.variable}`); }});
-    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "bool" ? false : 0})});
+    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: lgIsList(p.type) ? [] : p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "bool" ? false : 0})});
     this.studio.openMenu(entries, x, y);
   }
 
@@ -2261,6 +2320,16 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-frow .lg-dim{flex:0 0 56px}
 .lg-frow button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-frow button:disabled{opacity:.3}
+.lg-lsub{margin:2px 0 8px 14px;padding-left:8px;border-left:2px solid #3a3a3a}
+.lg-list{display:flex;flex-direction:column;gap:3px}
+.lg-li{display:flex;align-items:center;gap:5px;min-height:26px}
+.lg-li em{flex:0 0 18px;text-align:right;color:#808080;font-style:normal;font-size:11px}
+.lg-li input:not([type=checkbox]){flex:1 1 0;min-width:0;width:auto;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 6px;font:inherit}
+.lg-li input[type=checkbox]{margin:0 auto 0 0}
+.lg-li button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
+.lg-ladd{align-self:flex-start;height:24px;padding:0 10px;margin-left:23px;border:1px solid #444;border-radius:3px;background:#262626}
+.lg-lcount{color:#9a9a9a;font-size:11px;padding:0 4px;white-space:nowrap}
+.lg-pin.list{width:15px;height:15px}
 .lg-dacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .lg-dacts button{height:28px;padding:0 12px;border:1px solid #444;border-radius:4px;background:#262626}
 .lg-dacts button:hover{border-color:var(--lg-acc)}

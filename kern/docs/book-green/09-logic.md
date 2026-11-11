@@ -210,7 +210,7 @@ state.
 
 ## 9.5 The basic nodes
 
-Kern comes with **76 basic nodes**: for events, flow, memory and calculating. You don't have to know
+Kern comes with **93 basic nodes**: for events, flow, memory, lists and calculating. You don't have to know
 them by heart – the menu in the editor suggests matching ones. A few examples show what's in the
 building set:
 
@@ -227,9 +227,10 @@ building set:
   over an adjustable time and reports in every step how far along it is.
 - **Every N Seconds – the alarm clock.** Fires regularly, for example every 3 seconds.
 
-On top of that come reading, setting and counting up variables, calculating, comparing, randomness,
-text and **Print**, which writes a text to the log or onto the screen. All 76 nodes with their fine
-points are in the blue book, Chapter 9.
+On top of that come reading, setting and counting up variables, lists (many values in a row, with
+**For Each** as the loop over them), calculating, comparing, randomness, text and **Print**, which
+writes a text to the log or onto the screen. All 93 nodes with their fine points are in the blue
+book, Chapter 9.
 
 > **Did you know?** Even randomness isn't quite random in Kern. It comes from a generator whose
 > starting value is fixed – **deterministic** per world. That's why replays and network games match.

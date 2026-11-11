@@ -6,6 +6,8 @@
 //     input and an output, a Formula node between the entry and the Return, a call from Begin
 //     Play - compiled, played, and the result on the screen; the same Blueprint in the C++ view,
 //     changed there and applied;
+//     then a list: a variable made a Float List in Details, its items typed in, nodes offered
+//     in the list's type from its pin, For Each over it - as C++, changed there, and played;
 //  2. kern/games/spawncity/level/spawncity.klevel opens as a level: its actors are there, their
 //     Blueprints compile without errors with the editor's own node library, and Play runs them
 //     as machine code. (The game's project file must stay a file the editor reads.)
@@ -120,6 +122,79 @@ await cmd({cmd: "logicClose"});
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "40.5", 60000), `Play calls the function: 20 * 2 + 0.5 on the screen (${(await status()).hud?.message})`);
 check(await until(async () => (await status()).logic?.compiled >= 1, 30000), "as machine code (JIT)");
+await cmd({cmd: "stop"});
+
+// ---- 1c. a list: its items in Details, nodes in its type, a loop over it, played -------------------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+await cmd({cmd: "logicVariable", op: "add", name: "Scores", type: "float"});
+await page.click('.lg-var[data-var="Scores"]');
+const typeSelect = page.locator('.lg-dbody [data-vk="type"]');
+check(await until(async () => await typeSelect.count() === 1) && (await typeSelect.locator("option").count()) === 12, "Details offers the six value types and their lists");
+await typeSelect.selectOption("float_list");
+check(await until(async () => (await logic()).variables.find(v => v.name === "Scores")?.type === "float_list"), "a variable becomes a Float List");
+const scores = async () => JSON.stringify((await logic()).variables.find(v => v.name === "Scores")?.value);
+check(await until(async () => await page.locator(".lg-dbody .lg-list [data-ladd]").count() === 1) && await scores() === "[]", "its default is the empty list, with + Item below");
+// (the rows are drawn from the Blueprint: each click waits for its row)
+const rows = n => until(async () => await page.locator(".lg-dbody .lg-li").count() === n);
+for (const n of [1, 2, 3]) {
+  await page.click(".lg-dbody .lg-list [data-ladd]");
+  await rows(n);
+}
+check(await scores() === "[0,0,0]" && await rows(3), `+ Item adds items (${await scores()})`);
+for (const [i, v] of [[0, "1.5"], [1, "40"], [2, "7"]]) {
+  const field = page.locator(`.lg-dbody .lg-list [data-li="${i}"]`);
+  await field.fill(v);
+  await field.press("Enter");
+  await until(async () => JSON.parse(await scores())[i] === +v);
+}
+check(await scores() === "[1.5,40,7]", `typing sets an item (${await scores()})`);
+await page.click('.lg-dbody .lg-list [data-lx="2"]');
+check(await rows(2) && await scores() === "[1.5,40]", "x takes an item out");
+// Get Scores; from its pin the menu's nodes come in the list's type; a new Length takes the wire's type
+const getScores = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 320, params: {variable: "Scores"}})).id;
+const offered = (await cmd({cmd: "logicPalette", query: "", from: {node: getScores, pin: "value", output: true}})).items;
+check(offered.some(e => e.type === "flow.for_each" && e.params?.type === "float") && offered.some(e => e.type === "list.get" && e.params?.type === "float") && !offered.some(e => e.type === "math.add"),
+      "from a Float List pin the menu offers For Each and Get Item of Floats, and nothing a list does not go into");
+const lengthNode = (await cmd({cmd: "logicAdd", type: "list.length", x: 320, y: 420, params: {type: "text"}})).id;
+await cmd({cmd: "logicConnect", from: getScores, out: "value", to: lengthNode, in: "list"});
+l = await logic();
+check(l.nodes.find(n => n.id === lengthNode).inputs[0].type === "float_list" && l.links.some(k => k[0] === getScores && k[2] === lengthNode), "a Length of Texts with nothing wired to it becomes a Length of Floats with the wire");
+check(await until(async () => await page.locator(`.lg-node[data-id="${getScores}"] .lg-pin.list`).count() === 1), "a list pin is drawn as a list");
+// Begin Play: Add 0.5 to Scores, then for each item add it to Sum; then show Sum and the list
+await cmd({cmd: "logicVariable", op: "add", name: "Sum", type: "float"});
+const lb = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 0})).id;
+const addStep = (await cmd({cmd: "logicAdd", type: "list.add", x: 280, y: 0, params: {variable: "Scores"}})).id;
+const each = (await cmd({cmd: "logicAdd", type: "flow.for_each", x: 560, y: 0, from: {node: getScores, pin: "value", output: true}})).id;
+const addSum = (await cmd({cmd: "logicAdd", type: "var.add", x: 840, y: 0, params: {variable: "Sum"}})).id;
+const getSum = (await cmd({cmd: "logicAdd", type: "var.get", x: 840, y: 240, params: {variable: "Sum"}})).id;
+const text3 = (await cmd({cmd: "logicAdd", type: "text.append", x: 1000, y: 240})).id;
+const show = (await cmd({cmd: "logicAdd", type: "game.message", x: 1200, y: 120})).id;
+l = await logic();
+check(l.nodes.find(n => n.id === addStep).title === "Add to Scores" && l.nodes.find(n => n.id === addStep).inputs.find(p => p.id === "item").type === "float", "Add to Scores takes an item of the list's type");
+check(l.nodes.find(n => n.id === each).outputs.find(p => p.id === "item").type === "float" && l.links.some(k => k[0] === getScores && k[2] === each), "For Each dropped from the list's pin is wired and gives Floats");
+await cmd({cmd: "logicValue", node: addStep, pin: "item", value: 0.5});
+for (const [from, out, to, input] of [[lb, "then", addStep, "exec"], [addStep, "then", each, "exec"], [each, "body", addSum, "exec"], [each, "item", addSum, "amount"], [each, "completed", show, "exec"],
+                                      [getSum, "value", text3, "a"], [getScores, "value", text3, "c"], [text3, "result", show, "text"]])
+  await cmd({cmd: "logicConnect", from, out, to, in: input});
+await cmd({cmd: "logicValue", node: text3, pin: "b", value: " of "});
+check(errorsOf(await logic()).length === 0, "the list graph compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await page.click(".lg-cpp");
+check(await until(async () => (await cppText.inputValue()).includes("List<Float> Scores = List<Float>{1.5, 40.0};")), "the C++ view has the list variable with its items");
+code = await cppText.inputValue();
+// (Get Scores is read by inputs of several bodies - the loop, the message, the Length nothing reads: a value with a name, n<id>())
+check(code.includes("list_add(Scores, 0.5);") && /for \(auto it\d+ = flow_for_each<"float">\(n\d+, n\d+\(\)\); it\d+\.next\(\);\) \{/.test(code) && /kern::to<Text>\(n\d+\(\)\)/.test(code) &&
+      /auto n\d+\(\) \{ return Scores; \}/.test(code), "Add to List names its variable, For Each is a for loop, a list becomes Text");
+check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
+// an item added in the text is an item in Details
+await cppText.fill(code.replace("List<Float>{1.5, 40.0};", "List<Float>{1.5, 40.0, 0.25};"));
+await cppText.press("Control+Enter");
+check(await until(async () => await scores() === "[1.5,40,0.25]"), "a list changed in the text is the Blueprint's list");
+await page.click(".lg-cppclose");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "42.25 of [1.5, 40, 0.25, 0.5]", 60000), `Play adds to the list and loops over it (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------

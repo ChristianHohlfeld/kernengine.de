@@ -43,6 +43,10 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
   outputs of action nodes keep the value they had at their last run. Unconnected inputs use the
   literal entered in the node.
 - **Variables**: per graph instance, typed, with a default value.
+- **Lists**: a pin or a variable may hold a list of values of one type (Unreal's arrays). A list
+  on a wire is a value like any other: whoever reads it has the list as it was. The steps that
+  change a list (Add, Insert, Set Item, Remove, Clear) change a list variable; For Each goes
+  through a list as it was when the loop started.
 - **State machines**: states and transitions in the style of the state editor of
   digitalisierungsplanung.de. A transition fires on an event, a timer, a condition variable or
   automatically; entering and leaving a state trigger events.
@@ -71,6 +75,14 @@ A level has a **level graph** (Self = none); every actor can carry a graph of it
 `integer`, `string`). A `Value` carries a type and the matching content (`b`, `i`, `n`, `v`, `s`,
 `a`; `ActorRef` is the actor ID).
 
+After the six value types come the six **list types**, in the same order: `boolean_list` …
+`actor_list` (in JSON `bool_list`, `int_list`, `float_list`, `vector_list`, `text_list`,
+`actor_list`; `is_list`, `element_of` and `list_of` go from one to the other). A list `Value`
+holds its items in `list` (`Value::of(std::vector<T>)`, `items<T>()`, `size()`, `item(k)`); the
+items are shared, not copied, when the value is passed on, and whoever changes them (`edit<T>()`)
+changes a copy of its own. In JSON a list is the array of its items. A list of whole numbers
+holds each of them as every `integer` is held.
+
 A whole number (`integer`) is the same everywhere: as a Blueprint holds it (`logic::normal`).
 Every number is a `double` underneath – in the interpreter's variables, in the JIT – so whole
 numbers are exact up to 2^53, a larger one is the nearest a `double` holds, and none is past the
@@ -85,7 +97,9 @@ Which wires are allowed is determined by `convertible(from, to)`:
 - **everything to `text`** ("everything prints");
 - numbers among themselves (`bool`, `int`, `float`);
 - `actor` → `bool` ("is valid");
-- `float`/`int` → `vector` (into all three components).
+- `float`/`int` → `vector` (into all three components);
+- a **list** goes into a list of its own type only – and into `text` (`[1, 2.5]`); nothing
+  becomes a list.
 
 The conversions (`as_bool`, `as_int`, `as_number`, `as_vector`, `as_text`, `as_actor`) are fixed,
 e.g. the text "0" or "false" is false, a vector as a number is its length, a number converted to
@@ -301,15 +315,17 @@ on an action node reads that node's last stored output.
 
 ## 9.5 Core nodes
 
-`src/logic/core_nodes.cpp` registers 76 nodes:
+`src/logic/core_nodes.cpp` registers 93 nodes:
 
 | Category | Nodes |
 |---|---|
 | **Events** | `event.begin` Begin Play · `event.tick` Event Tick (Delta Seconds) · `event.every` Every N Seconds (interval parameter, keeps its own time, output Count) · `event.custom` Custom Event (name; outputs Actor, Value, Text; also switches state machine transitions of the same name) |
 | **State machines** | `event.state_enter` On State Entered · `event.state_exit` On State Left · `state.set` Set State · `state.get` Current State · `state.is` Is In State |
-| **Flow** | `flow.reroute` / `value.reroute` (nodes for wires) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 outputs) · `flow.for` For Loop (First, Last inclusive; Index) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (calls during the wait are ignored) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update every step with Alpha 0→1, easing linear/smooth/in/out, then Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (cases separated by commas) · `flow.call` Call Event (Target, Actor, Value, Text) |
+| **Flow** | `flow.reroute` / `value.reroute` (nodes for wires) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 outputs) · `flow.for` For Loop (First, Last inclusive; Index) · `flow.for_each` For Each (a list; Item, Index; the list as it is when the loop starts) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (calls during the wait are ignored) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update every step with Alpha 0→1, easing linear/smooth/in/out, then Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (cases separated by commas) · `flow.call` Call Event (Target, Actor, Value, Text) |
 | **Variables** | `var.get` · `var.set` · `var.add` (Amount, −1 counts down) |
-| **Math** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (degrees), `sqrt`, `pow`, `round`, `floor`, `random` (float in range), `random_int`, `random_bool` |
+| **Lists** | values, generic over the items' type (setting Type): `list.make` Make List (0..16 items) · `list.length` · `list.get` Get Item (beyond the list: the type's zero) · `list.contains` · `list.find` Find Item (index or −1) – steps on a list variable (setting List): `list.add` Add to List (gives the index) · `list.insert` (in front of the index; past the end: at the end) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (every equal item; Removed) · `list.clear` |
+| **Functions** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (a function marked Pure, as a value) |
+| **Math** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (degrees), `sqrt`, `pow`, `round`, `floor`, `random` (float in range), `random_int`, `random_bool` · `math.formula` Formula (every name in it is an input) |
 | **Logic** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; equality with 10⁻⁹ tolerance) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
 | **Values** | `value.float`, `value.int`, `value.bool`, `value.text` |
 | **Vector** | `vector.make`, `break`, `add`, `sub`, `cross`, `scale`, `length`, `normalize`, `distance`, `dot`, `lerp` |
@@ -352,6 +368,7 @@ ends with the last one that leaves it (a player's capsule and head are one visit
 
 `actor.self` Self · `actor.player` Get Player (0 = this machine's player, 1, 2 … further ones) ·
 `actor.player_count` · `actor.find` Find Actor by Name · `actor.find_tag` Find Actor with Tag ·
+`actor.all_with_tag` All Actors with Tag (an Actor List) ·
 `actor.random_tag` · `actor.has_tag` · `actor.name` · `actor.valid` · `actor.location` ·
 `actor.rotation` · `actor.forward` · `actor.velocity` · `actor.distance` · `actor.set_location` ·
 `actor.set_rotation` (degrees) · `actor.move_by` · `actor.spawn` Spawn Actor (copy of a template with
@@ -562,7 +579,7 @@ playing the nodes that ran, live values of variables, states, tier).
 | `logicOpen {owner}`, `logicClose`, `logicView {view}` | open or close the graph of an actor (or of the level), view |
 | `logicPalette {query, from}` | action menu: search over title, category, help, search words; when dragging from a pin, only nodes that accept the wire; plus "Get/Set/Add to <Variable>", "Call/Event <Name>", "Go to <State>", "On <State> Entered", "Add Reroute Node"; ordered by category, at most 120 |
 | `logicAdd {type, x, y, params, from}` | place a node on the 8 px grid; without a variable/state machine one is created; when dropped from a pin it is connected right away |
-| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | wires, deleting, moving (comments including size, states) |
+| `logicConnect`, `logicDisconnect`, `logicDelete`, `logicMove` | wires, deleting, moving (comments including size, states); a generic node (Select, Reroute, the list nodes) whose typed pins are still free takes the type of the wire |
 | `logicValue`, `logicParam`, `logicComment` | literal, setting (wires to pins that no longer exist are removed), node comment |
 | `logicVariable {op}` | `add`, `remove`, `rename` (also in nodes and transitions), `type` (value is converted), `value` |
 | `logicMachine {op}` | create, rename and remove state machines and states, initial state, transitions (`addTransition`, `editTransition`, `removeTransition`; a condition without a variable creates a boolean "Ready") |
@@ -579,7 +596,7 @@ playing the nodes that ran, live values of variables, states, tier).
 
 Several commands with the same `transaction` become one undo step (picking up wires and dropping them
 elsewhere), as do consecutive value entries into the same pin. Tests:
-`studio_logic_editor_commands`, `studio_blueprint_breakpoints_pause_the_game`,
+`studio_logic_editor_commands`, `studio_logic_lists`, `studio_blueprint_breakpoints_pause_the_game`,
 `studio_blueprint_comments_reroutes_promote`.
 
 ---

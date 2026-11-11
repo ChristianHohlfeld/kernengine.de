@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include "kern/core/base.h"
@@ -73,20 +74,53 @@ struct Whole {
   }
 };
 
-/// An actor on a pin (`Actor` in a Blueprint's C++): its id, 0 = none.
-struct ActorHandle {
-  ActorRef id = 0;
-  bool operator==(const ActorHandle&) const = default;
+/// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
+/// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
+/// Blueprint's class.
+namespace detail {
+template <class T> struct Held;  // (no such pin type)
+template <> struct Held<bool> {
+  static constexpr PinType type = PinType::boolean;
+  static bool from(const Value& v) { return v.as_bool(); }
 };
-
-/// A value of the interpreter as the C++ type of its pin, and back.
-template <class T> T from_value(const Value& v) = delete;
-template <> inline bool from_value<bool>(const Value& v) { return v.as_bool(); }
-template <> inline i64 from_value<i64>(const Value& v) { return v.as_int(); }
-template <> inline f64 from_value<f64>(const Value& v) { return v.as_number(); }
-template <> inline Vec3 from_value<Vec3>(const Value& v) { return v.as_vector(); }
-template <> inline std::string from_value<std::string>(const Value& v) { return v.as_text(); }
-template <> inline ActorHandle from_value<ActorHandle>(const Value& v) { return {v.as_actor()}; }
+template <> struct Held<i64> {
+  static constexpr PinType type = PinType::integer;
+  static i64 from(const Value& v) { return v.as_int(); }
+};
+template <> struct Held<Whole> {
+  static constexpr PinType type = PinType::integer;
+  static Whole from(const Value& v) { return v.as_int(); }
+};
+template <> struct Held<f64> {
+  static constexpr PinType type = PinType::number;
+  static f64 from(const Value& v) { return v.as_number(); }
+};
+template <> struct Held<Vec3> {
+  static constexpr PinType type = PinType::vector;
+  static Vec3 from(const Value& v) { return v.as_vector(); }
+};
+template <> struct Held<std::string> {
+  static constexpr PinType type = PinType::text;
+  static std::string from(const Value& v) { return v.as_text(); }
+};
+template <> struct Held<ActorHandle> {
+  static constexpr PinType type = PinType::actor;
+  static ActorHandle from(const Value& v) { return {v.as_actor()}; }
+};
+template <class T> struct Held<std::vector<T>> {
+  static constexpr PinType type = list_type_of<T>();
+  static std::vector<T> from(const Value& v) { return v.items<T>(); }
+};
+template <> struct Held<std::vector<Whole>> {
+  static constexpr PinType type = PinType::integer_list;
+  static std::vector<Whole> from(const Value& v) {
+    const std::vector<i64>& items = v.items<i64>();
+    return std::vector<Whole>(items.begin(), items.end());
+  }
+};
+}  // namespace detail
+template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
+template <class T> constexpr PinType pin_type_of() { return detail::Held<T>::type; }
 inline Value to_value(bool v) { return Value::boolean(v); }
 inline Value to_value(i64 v) { return Value::integer(v); }
 inline Value to_value(Whole v) { return Value::integer(v); }
@@ -94,13 +128,59 @@ inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
-template <class T> constexpr PinType pin_type_of() = delete;
-template <> constexpr PinType pin_type_of<bool>() { return PinType::boolean; }
-template <> constexpr PinType pin_type_of<i64>() { return PinType::integer; }
-template <> constexpr PinType pin_type_of<f64>() { return PinType::number; }
-template <> constexpr PinType pin_type_of<Vec3>() { return PinType::vector; }
-template <> constexpr PinType pin_type_of<std::string>() { return PinType::text; }
-template <> constexpr PinType pin_type_of<ActorHandle>() { return PinType::actor; }
+template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
+inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
+
+/// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
+/// call these. Every one is defined for every index: there is no reading or writing past a
+/// list's end.
+namespace list {
+template <class T> i64 length(const std::vector<T>& items) { return static_cast<i64>(items.size()); }
+/// The item at `index`; beyond the list: the zero of its type.
+template <class T> T get(const std::vector<T>& items, i64 index) {
+  if (index < 0 || static_cast<u64>(index) >= items.size()) return T{};
+  return T(items[static_cast<std::size_t>(index)]);
+}
+/// The first index of an item that equals `item`, or -1.
+template <class T> i64 find(const std::vector<T>& items, const std::type_identity_t<T>& item) {
+  for (std::size_t k = 0; k < items.size(); ++k)
+    if (T(items[k]) == item) return static_cast<i64>(k);
+  return -1;
+}
+template <class T> bool contains(const std::vector<T>& items, const std::type_identity_t<T>& item) { return find(items, item) >= 0; }
+/// Adds `item` at the end; its index.
+template <class T> i64 add(std::vector<T>& items, std::type_identity_t<T> item) {
+  items.push_back(std::move(item));
+  return static_cast<i64>(items.size()) - 1;
+}
+/// Puts `item` in front of what is at `index` (before the first: at the start; past the end: at
+/// the end).
+template <class T> void insert(std::vector<T>& items, i64 index, std::type_identity_t<T> item) {
+  const std::size_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? items.size() : static_cast<std::size_t>(index);
+  items.insert(items.begin() + static_cast<std::ptrdiff_t>(at), std::move(item));
+}
+/// Replaces the item at `index`; beyond the list: nothing.
+template <class T> void set(std::vector<T>& items, i64 index, std::type_identity_t<T> item) {
+  if (index >= 0 && static_cast<u64>(index) < items.size()) items[static_cast<std::size_t>(index)] = std::move(item);
+}
+/// Takes the item at `index` out; beyond the list: nothing.
+template <class T> void remove_at(std::vector<T>& items, i64 index) {
+  if (index >= 0 && static_cast<u64>(index) < items.size()) items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
+}
+/// Takes every item that equals `item` out; was there one?
+template <class T> bool remove(std::vector<T>& items, const std::type_identity_t<T>& item) {
+  std::size_t kept = 0;
+  for (std::size_t k = 0; k < items.size(); ++k) {
+    if (T(items[k]) == item) continue;
+    if (kept != k) items[kept] = T(items[k]);
+    ++kept;
+  }
+  const bool removed = kept != items.size();
+  items.resize(kept);
+  return removed;
+}
+template <class T> void clear(std::vector<T>& items) { items.clear(); }
+}  // namespace list
 
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,
 /// digits; anything else ends it. Empty or no digits: `fallback`.
@@ -154,6 +234,7 @@ inline void native_set(f64& variable, const Value& v) { variable = v.as_number()
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
+template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a

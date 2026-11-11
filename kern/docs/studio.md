@@ -288,7 +288,7 @@ Der Blueprint-Editor folgt Unreals Blueprint-Editor (`web/studio/logic.mjs`) und
 | Toolbar | Viewport (zurück), **Compile** (F7, mit Status ✓ / ⚠ / ✖), Save, Find (Ctrl+F), welcher Blueprint (Level oder Actor), Vorlagen, **C++** (der Blueprint als C++: ansehen, ändern, anwenden) |
 | My Blueprint | Graphen (Event Graph, State Machines, +), Variablen (Typfarbe, Live-Wert beim Spielen, Get/Set, ziehen: Ctrl = Get, Alt = Set), Funktionen (Signatur, Call / Return, ziehen: ein Aufruf), Events (Custom Events: Event / Call) |
 | Graph | Tabs, Breadcrumb, Zoom-Stufen wie Unreal („Zoom 1:1“, „Zoom −2“), Wasserzeichen EVENT GRAPH |
-| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
+| Details | ausgewählter Knoten (Hilfe, Einstellungen, alle Eingänge, Kommentar), Variable (Name, Typ – auch Listen –, Default, Referenzen), Funktion (Name, Pure, Beschreibung, Ein- und Ausgänge mit Typ und Default), Kommentar (Text, Farbe), State, Transition |
 | Compiler Results / Find Results | Probleme und Suchtreffer, ein Klick springt zum Knoten |
 
 Im Graphen:
@@ -382,6 +382,37 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
 - Aus C++ ruft `logic::Instance::call("Name", args, results)` eine Funktion; `call_number` ist die
   Kurzform für Zahlen. So rufen Engine-Systeme Regeln auf, die im Blueprint stehen.
 - Kopierte Knoten nehmen die Funktionen mit, die sie nennen.
+
+### Listen und For Each
+
+Eine Variable, ein Pin einer Funktion oder ein Draht kann eine **Liste** von Werten eines Typs
+tragen: Boolean List, Integer List, Float List, Vector List, Text List, Actor List (Unreals
+Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
+
+- **Anlegen:** In Details einer Variablen (oder eines Funktions-Pins) als *Type* eine Liste
+  wählen. Darunter stehen die Einträge des Defaults, einer je Zeile mit dem Feld seines Typs;
+  **+ Item** fügt einen an, **×** nimmt einen heraus. Eine Liste, die direkt in einen Knoten
+  getippt ist, bearbeitet man genauso in dessen Details; am Pin steht, wie viele Einträge sie hat.
+- **Lesen** (Kategorie *Lists*, Wert-Knoten): **Make List**, **Length**, **Get Item**,
+  **Contains**, **Find Item**. Der erste Eintrag hat den Index 0. Get Item jenseits der Liste
+  gibt den Nullwert des Typs, Find Item gibt −1, wenn nichts passt.
+- **Ändern** (Schritte, je Listen-Variable angeboten: „Add to Scores“): **Add to List** (gibt den
+  Index), **Insert into List**, **Set List Item**, **Remove Index**, **Remove Item** (alle gleichen
+  Einträge; sagt, ob es einen gab), **Clear List**. Sie ändern die Variable, die sie nennen. Eine
+  ganze Liste setzt *Set* wie bei jeder Variablen.
+- **For Each** (Flow) läuft für jeden Eintrag einmal durch *Loop Body* – mit *Item* und *Index* –
+  und danach durch *Completed*. Es geht durch die Liste, wie sie beim Start der Schleife war: Der
+  Rumpf darf die Variable ändern, ohne dass die Schleife springt oder nie endet.
+- **Der Typ kommt vom Draht.** Die Knoten, die mit jeder Liste arbeiten (auch Select und Reroute),
+  tragen den Typ als Einstellung *Type*. Zieht man ein Kabel von einem Listen-Pin ins Leere,
+  bietet das Menü sie schon im passenden Typ an; ein neuer Knoten nimmt den Typ des ersten Drahts
+  an. Hängen schon Drähte an seinen typisierten Pins, bleibt er, was er ist.
+- Eine Liste passt nur in einen Eingang ihres Typs – und in jeden Text-Eingang: Print zeigt
+  `[1, 2.5, 7]`.
+- **All Actors with Tag** (Actors) gibt alle lebenden Actors mit einem Tag als Actor List.
+- Als C++: `List<Float> Scores = List<Float>{1.0, 2.5};`, `list_add(Scores, x);`,
+  `for (auto it9 = flow_for_each<"float">(n9, Scores); it9.next();) { ... }` – siehe
+  [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Listen“.
 
 ### Formel-Knoten
 

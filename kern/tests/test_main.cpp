@@ -2066,6 +2066,111 @@ TEST(logic_functions) {
   CHECK(no_entry == 1 && two == 1 && unknown == 1);
 }
 
+TEST(logic_lists) {
+  using logic::PinType;
+  using logic::Value;
+  // A list is a value: its items, shared until someone changes them.
+  const Value a = Value::of(std::vector<f64>{1, 2.5});
+  Value b = a;
+  CHECK(a == b && a.size() == 2 && a.as_text() == "[1, 2.5]");
+  b.edit<f64>().push_back(4);
+  CHECK(a.size() == 2 && b.size() == 3 && !(a == b) && b.as_text() == "[1, 2.5, 4]");
+  CHECK(Value::zero(PinType::number_list) == Value::of(std::vector<f64>{}) && Value::zero(PinType::number_list).size() == 0);
+  CHECK(!(Value::of(std::vector<f64>{}) == Value::of(std::vector<i64>{})));  // (lists of different types)
+  CHECK(a.item(1) == Value::number(2.5) && a.item(7) == Value::number(0) && Value::of(std::vector<std::string>{"x"}).item(3) == Value::text(""));
+  // (whole numbers in a list are held as every Int is)
+  CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).i == -std::numeric_limits<i64>::max());
+  const Value every[] = {Value::of(std::vector<bool>{true, false}),      Value::of(std::vector<i64>{-3, 9007199254740992}),   Value::of(std::vector<f64>{0.1, -1e300}),
+                         Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{4}, {0}})};
+  for (const Value& v : every) {
+    CHECK(logic::is_list(v.type) && logic::list_of(logic::element_of(v.type)) == v.type && Value::from_json(v.to_json(), v.type) == v);
+    PinType named = PinType::exec;
+    CHECK(logic::pin_type_from_name(logic::pin_type_name(v.type), named) && named == v.type);
+    // a list becomes text and nothing else; nothing becomes a list
+    CHECK(logic::convertible(v.type, PinType::text) && !logic::convertible(logic::element_of(v.type), v.type));
+    CHECK(v.type == PinType::text_list || !logic::convertible(v.type, logic::element_of(v.type)));
+    CHECK(v.converted(PinType::text).s == v.as_text() && v.converted(v.type) == v);
+  }
+  CHECK(!logic::convertible(PinType::integer_list, PinType::number_list) && a.converted(PinType::integer_list).size() == 0);
+  CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[actor 4, none]" && every[0].as_text() == "[true, false]");
+
+  // The nodes. The steps change a list variable; For Each goes through the list as it was when
+  // the loop started, whatever its body does to the variable.
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(R"kn(
+struct L : kern::Blueprint {
+  List<Float> Items = List<Float>{3.0, 1.0};
+  List<Text> Names = List<Text>{};
+  Float Sum = 0.0;
+  Int Length = 0;
+  Int At = 0;
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    list_add(Items, 2.0);
+    list_insert(Items, 0, 9.0);
+    list_set(Items, 1, 7.0);
+    list_remove_at(Items, 5);
+    list_remove(Items, 1.0);
+    for (auto it7 = flow_for_each<"float">(n7, Items); it7.next();) {
+      Sum += n7.item;
+      list_clear(Items);
+      list_add(n9, Names, kern::to<Text>(n7.index));
+    }
+    Length = list_length<"float">(Items);
+    At = n9.index;
+    debug_print(kern::to<Text>(list_make<"text", "2">("a", list_get<"text">(Names, 2))), false);
+  }
+  struct : kern::Node<7> { Float item = 0.0; Int index = 0; } n7;
+  struct { Int index = 0; } n9;
+};
+)kn", g, nullptr, &error));
+  if (!error.empty()) std::printf("lists: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    CHECK(inst->get("Items") == Value::of(std::vector<f64>{3, 1}) && inst->get("Names").type == PinType::text_list);
+    rt.begin();
+    CHECK(inst->get("Sum").as_number() == 18 && inst->get("Length").as_int() == 0 && inst->get("At").as_int() == 2);
+    CHECK(inst->get("Items").size() == 0 && inst->get("Names") == Value::of(std::vector<std::string>{"0", "1", "2"}));
+    CHECK(host.printed.size() == 1 && host.printed[0] == "[a, 2]" && host.errors.empty());
+    // from outside: a list is set as a list; what is no list of that type is the empty list
+    CHECK(inst->set("Items", Value::of(std::vector<f64>{5, 6})) && inst->get("Items").as_text() == "[5, 6]");
+    CHECK(inst->set("Items", Value::number(4)) && inst->get("Items").size() == 0 && inst->get("Items").type == PinType::number_list);
+  }
+  // JSON round trip of a graph with list variables.
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g && logic::graph_hash(back) == logic::graph_hash(g));
+
+  // What does not fit is said by the check.
+  auto problem = [](const char* graph, const char* why) {
+    const logic::Graph bad = logic_graph(graph);
+    bool said = false;
+    for (const logic::Issue& i : logic::check(bad)) said = said || (i.error && i.text.find(why) != std::string::npos);
+    if (!said)
+      for (const logic::Issue& i : logic::check(bad)) std::printf("lists: expected \"%s\", got: %s\n", why, i.text.c_str());
+    CHECK(said);
+  };
+  problem(R"({"variables":[{"name":"Sum","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.add","params":{"variable":"Sum"}}],
+            "links":[[1,"then",2,"exec"]]})",
+          "needs a list variable: \"Sum\" is float");
+  problem(R"({"variables":[{"name":"L","type":"float_list","value":[1]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"L"}}],
+            "links":[[1,"then",2,"exec"]]})",
+          "needs a number variable");
+  problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.clear","params":{"variable":"Gone"}}],"links":[[1,"then",2,"exec"]]})", "no variable \"Gone\"");
+  // a list goes into a list input of its own type only (and into Text)
+  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"float_list","value":[]},{"name":"X","type":"float","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"var.set","params":{"variable":"X"}}],
+    "links":[[1,"then",3,"exec"],[2,"value",3,"value"]]})"))));
+  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"float_list","value":[]}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"list.length","params":{"type":"int"}},{"id":4,"type":"debug.print"}],
+    "links":[[1,"then",4,"exec"],[2,"value",3,"list"],[3,"length",4,"text"]]})"))));
+}
+
 TEST(logic_checks_and_infinite_loops) {
   FakeLogicHost host;
   // Errors: unknown type, missing variable, wrong wire types.
@@ -2391,8 +2496,9 @@ static logic::Graph every_node_graph(bool wired) {
   const logic::Library& lib = logic::library();
   logic::Graph g;
   u32 next = 1;
-  const std::pair<const char*, PinType> vars[] = {{"VB", PinType::boolean}, {"VI", PinType::integer}, {"VF", PinType::number},
-                                                  {"VV", PinType::vector},  {"VT", PinType::text},    {"VA", PinType::actor}};
+  const std::pair<const char*, PinType> vars[] = {{"VB", PinType::boolean},       {"VI", PinType::integer},       {"VF", PinType::number},       {"VV", PinType::vector},
+                                                  {"VT", PinType::text},          {"VA", PinType::actor},         {"LB", PinType::boolean_list}, {"LI", PinType::integer_list},
+                                                  {"LF", PinType::number_list},   {"LV", PinType::vector_list},   {"LT", PinType::text_list},    {"LA", PinType::actor_list}};
   for (const auto& [name, type] : vars) g.variables.push_back({name, type, logic::Value::zero(type).to_json(), {}});
   g.variables[2].help = "A number.\n\nIts second paragraph.";
   auto var_of = [&](PinType t) {
@@ -2406,9 +2512,18 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::number: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
-      default: return logic::Value::actor(3);
+      case PinType::actor: return logic::Value::actor(3);
+      case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
+      case PinType::integer_list: return logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993});
+      case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
+      case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
+      case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
+      default: return logic::Value::of(std::vector<logic::ActorHandle>{{3}, {0}});
     }
   };
+  // (list variables that start with items, a list a function takes and one it gives)
+  for (logic::Variable& v : g.variables)
+    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list) v.value = other_than_default(v.type).to_json();
   logic::Function fn;
   fn.name = "Fn";
   fn.help = "Twice x.";
@@ -2419,8 +2534,9 @@ static logic::Graph every_node_graph(bool wired) {
   logic::Function calc;
   calc.name = "Calc";
   calc.pure = true;
-  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}};
-  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}};
+  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list).to_json()},
+                 {"none", PinType::actor_list, json::Value::array()}};
+  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list).to_json()}};
   g.functions = {fn, proc, calc};
   logic::StateMachine m;
   m.id = next++;
@@ -2478,7 +2594,7 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::variable ? "VF" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+      params.push_back({pd.key, pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
     const u32 id = add(type, params);
@@ -2999,7 +3115,7 @@ TEST(game_blueprints_as_classes) {
     if (!used.count(type)) std::printf("no game case has %s\n", type.c_str());
     CHECK(d && d->native && used.count(type));
   }
-  CHECK(game::logic_node_types().size() == 71 && game::logic_node_shapes_registered());
+  CHECK(game::logic_node_types().size() == 72 && game::logic_node_shapes_registered());
   // the Arena, as the file the classes are written from: the same Blueprints
   game::Level stored;
   CHECK(game::from_text(game::to_text(cases[0].level), stored, &error) && logic::graph_hash(stored.logic) == logic::graph_hash(cases[0].level.logic));
@@ -3007,7 +3123,7 @@ TEST(game_blueprints_as_classes) {
   CHECK(played.tiers.size() == 7);
   for (const std::string& t : played.tiers) CHECK(t.find("native C++") == std::string::npos);
   for (const char* happened :
-       {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "each;each;", "jump;", "key:truekey:false",
+       {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
         "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
         "event: Logic error: Spawn Actor: no template \"Nothing\"", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
     if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
@@ -3075,6 +3191,22 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  Float Heat = 1.0;", "the variable Heat is declared twice");
   refused("  double Heat2 = 1.0;", "\"double\" is no type here");
   refused("  Float Other = \"text\";", "this is Text, but Float is needed");
+  // lists
+  refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
+  refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
+  refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text> or List<Actor>", "line 5, column 8:");
+  refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
+  refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add<\"float\">(Items, 1.0);"), "list_add has no settings (no <...>)");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(Items, \"a\");"), "is Float, this is Text");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = Items;"), "the two do not convert");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = kern::to<Float>(Items);"), "cannot become a Float");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_length<\"int\">(Items);"), "do not convert");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_length<\"float\">(Items);"), "list_length is a value: alone on a line it does nothing");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    flow_for_each<\"float\">(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
+  refused("  void List() {\n  }", "no name C++ can write");
   refused("  void Fn() {\n  }\n  void Fn() {\n  }", "the function Fn is declared twice");
   refused("  FnResult Fn() {\n  }", "struct FnResult { ... }; must be declared above");
   refused("  void on3() {\n  }", "on3 needs its KERN_EVENT");
@@ -7856,6 +7988,117 @@ TEST(studio_logic_editor_commands) {
   CHECK(dg.machines.back().transitions.back().trigger == logic::TriggerKind::condition);
   CHECK(dg.variable(dg.machines.back().transitions.back().variable) != nullptr);
   CHECK(logic::check(dg).empty() || no_errors(logic::check(dg)));
+}
+
+TEST(studio_logic_lists) {
+  // Lists in the editor: a list variable and its items, the nodes offered for a list wire in the
+  // list's type, a generic node that takes the type of its first wire.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"shootingRange"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Names","type":"text_list"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Names","value":["a","b"]})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Nums","type":"float"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Nums","type":"float_list"})")["ok"].as_bool());
+  auto variable = [&](const char* name) {
+    const json::Value st = f.s->state();
+    for (const json::Value& v : st["logic"]["variables"].items()) if (v["name"].as_string() == name) return v;
+    return json::Value();
+  };
+  CHECK(variable("Names")["type"].as_string() == "text_list" && variable("Names")["value"].size() == 2 && variable("Names")["value"][1].as_string() == "b");
+  CHECK(variable("Nums")["type"].as_string() == "float_list" && variable("Nums")["value"].is_array() && variable("Nums")["value"].size() == 0);
+  // The steps that change a list are offered per list variable, by its name - never bare.
+  json::Value pal = f.cmd(R"({"cmd":"logicPalette","query":"names"})");
+  bool add_to = false, bare = false;
+  for (const json::Value& it : pal["items"].items()) add_to |= it["type"].as_string() == "list.add" && it["label"].as_string() == "Add to Names" && it["params"]["variable"].as_string() == "Names";
+  pal = f.cmd(R"({"cmd":"logicPalette","query":"list"})");
+  std::size_t steps = 0;
+  for (const json::Value& it : pal["items"].items()) {
+    if (it["type"].as_string().rfind("list.", 0) != 0 || !it["params"]["variable"].is_string()) continue;
+    ++steps;
+    bare |= it["params"]["variable"].as_string().empty();
+  }
+  CHECK(add_to && !bare && steps == 12);  // (six steps for each of the two list variables)
+  // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
+  auto added = [&](const char* type, const char* params = "{}") {
+    json::Value add = json::Value::object(), p;
+    add.set("cmd", "logicAdd");
+    add.set("type", type);
+    add.set("x", 0);
+    add.set("y", 0);
+    CHECK(json::parse(params, p));
+    add.set("params", p);
+    return static_cast<u32>(f.s->command(add)["id"].as_number());
+  };
+  const u32 get = added("var.get", R"({"variable":"Names"})");
+  json::Value pq = json::Value::object(), fp = json::Value::object();
+  pq.set("cmd", "logicPalette");
+  pq.set("query", "");
+  fp.set("node", get);
+  fp.set("pin", "value");
+  fp.set("output", true);
+  pq.set("from", fp);
+  bool each = false, length = false, plus = false, print = false;
+  const json::Value offered = f.s->command(pq);
+  for (const json::Value& it : offered["items"].items()) {
+    each |= it["type"].as_string() == "flow.for_each" && it["params"]["type"].as_string() == "text";
+    length |= it["type"].as_string() == "list.length" && it["params"]["type"].as_string() == "text";
+    plus |= it["type"].as_string() == "math.add";
+    print |= it["type"].as_string() == "debug.print";  // (a list prints: it goes into Text)
+  }
+  CHECK(each && length && !plus && print);
+  // A new Length is of a Float List; its list pin says what it could be, and the first wire decides.
+  const u32 len = added("list.length");
+  auto pin = [&](u32 node, const char* id, bool output) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items())
+      if (static_cast<u32>(n["id"].as_number()) == node)
+        for (const json::Value& p : n[output ? "outputs" : "inputs"].items()) if (p["id"].as_string() == id) return p;
+    return json::Value();
+  };
+  CHECK(pin(len, "list", false)["type"].as_string() == "float_list" && pin(len, "list", false)["generic"].as_string().find("text_list") != std::string::npos);
+  CHECK(!pin(len, "length", true)["generic"].is_string());  // (Length is an Integer whatever the list)
+  auto wire = [&](u32 from, const char* out, u32 to, const char* in) {
+    json::Value c = json::Value::object();
+    c.set("cmd", "logicConnect");
+    c.set("from", from);
+    c.set("out", out);
+    c.set("to", to);
+    c.set("in", in);
+    return f.s->command(c);
+  };
+  CHECK(wire(get, "value", len, "list")["ok"].as_bool());
+  CHECK(pin(len, "list", false)["type"].as_string() == "text_list" && pin(len, "list", false)["linked"].as_bool());
+  // Another list into the same pin replaces the wire, and the node follows ...
+  const u32 nums = added("var.get", R"({"variable":"Nums"})"), sum = added("math.add");
+  CHECK(pin(len, "list", false)["generic"].is_string() && wire(nums, "value", len, "list")["ok"].as_bool() && pin(len, "list", false)["type"].as_string() == "float_list");
+  // ... but not a node whose other pins are wired in its type: Get Item of Names, read as a Text.
+  const u32 item = added("list.get", R"({"type":"text"})"), names = added("list.contains", R"({"type":"text"})");
+  CHECK(wire(get, "value", item, "list")["ok"].as_bool() && wire(item, "item", names, "item")["ok"].as_bool() && wire(get, "value", names, "list")["ok"].as_bool());
+  CHECK(!pin(item, "list", false)["generic"].is_string() && !pin(item, "item", true)["generic"].is_string());
+  json::Value r = wire(nums, "value", item, "list");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string().find("float_list") != std::string::npos && pin(item, "list", false)["type"].as_string() == "text_list");
+  // A list never goes into a number.
+  CHECK(!wire(get, "value", sum, "a")["ok"].as_bool());
+  // Two new generic nodes: the one the wire goes into takes the type of the one it comes from ...
+  const u32 make = added("list.make", R"({"type":"vector"})"), has = added("list.contains", R"({"type":"text"})");
+  CHECK(wire(make, "list", has, "list")["ok"].as_bool() && pin(has, "item", false)["type"].as_string() == "vector" && pin(make, "list", true)["type"].as_string() == "vector_list");
+  // ... and where that one keeps its type (Get Item, read as a Text), the other way round: a new Make List makes Texts.
+  const u32 texts = added("list.make");
+  CHECK(wire(texts, "list", item, "list")["ok"].as_bool());
+  CHECK(pin(texts, "item0", false)["type"].as_string() == "text" && pin(texts, "list", true)["type"].as_string() == "text_list" && pin(item, "list", false)["type"].as_string() == "text_list");
+  // A list typed into a node, and the whole graph as C++ and back.
+  json::Value val = json::Value::object(), items = json::Value::array();
+  items.push(json::Value(1.5));
+  items.push(json::Value(-2.0));
+  val.set("cmd", "logicValue");
+  val.set("node", added("list.find"));
+  val.set("pin", "list");
+  val.set("value", items);
+  CHECK(f.s->command(val)["ok"].as_bool());
+  const json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
+  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<\"float\">(List<Float>{1.5, -2.0}, 0.0)") != std::string::npos);
+  CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
 }
 
 TEST(studio_blueprint_breakpoints_pause_the_game) {

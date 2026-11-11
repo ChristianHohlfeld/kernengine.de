@@ -25,8 +25,12 @@ inline std::string native_show(const kern::logic::Value& v) {
     case PinType::vector: return "(" + number(v.v.x, 9) + ", " + number(v.v.y, 9) + ", " + number(v.v.z, 9) + ")";
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "#%llu", static_cast<unsigned long long>(v.a)); return b;
-    default: return "?";
+    default: break;
   }
+  if (!kern::logic::is_list(v.type)) return "?";
+  std::string r = "[";  // a list: its items, each as above
+  for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + native_show(v.item(k));
+  return r + "]";
 }
 
 /// The host of the native Blueprint test: time stands still, errors are kept; its random numbers

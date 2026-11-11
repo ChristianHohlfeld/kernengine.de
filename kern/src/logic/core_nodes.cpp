@@ -17,13 +17,14 @@ PinDef exec_in(std::string id = "exec", std::string label = "") { return {std::m
 PinDef exec_out(std::string id = "then", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef data(std::string id, std::string label, PinType t, json::Value def = {}) { return {std::move(id), std::move(label), t, std::move(def)}; }
 
-NodeDef make(std::string type, std::string label, std::string category, NodeKind kind, std::string help) {
+NodeDef make(std::string type, std::string label, std::string category, NodeKind kind, std::string help, std::string keywords = {}) {
   NodeDef d;
   d.type = std::move(type);
   d.label = std::move(label);
   d.category = std::move(category);
   d.kind = kind;
   d.help = std::move(help);
+  d.keywords = std::move(keywords);
   return d;
 }
 
@@ -159,11 +160,11 @@ void add_flow(Library& lib) {
   {
     NodeDef d = make("value.reroute", "Reroute", "Flow", NodeKind::pure, "A knot a data wire passes through, to route wires tidily.");
     d.params = {param("type", "Type", ParamDef::Kind::choice, "float",
-                      {"bool", "Boolean", "int", "Integer", "float", "Float", "vector", "Vector", "text", "Text", "actor", "Actor"})};
+                      {"bool", "Boolean", "int", "Integer", "float", "Float", "vector", "Vector", "text", "Text", "actor", "Actor", "bool_list", "Boolean List", "int_list",
+                       "Integer List", "float_list", "Float List", "vector_list", "Vector List", "text_list", "Text List", "actor_list", "Actor List"})};
     d.keywords = "knot reroute wire";
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      PinType t = PinType::number;
-      if (!pin_type_from_name(n.param("type", "float"), t) || t == PinType::exec) t = PinType::number;
+      const PinType t = pin_type_setting(n.param("type", "float"));
       in = {data("in", "", t, Value::zero(t).to_json())};
       out = {data("out", "", t)};
     };
@@ -482,6 +483,272 @@ void add_variables(Library& lib) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// lists
+// ---------------------------------------------------------------------------
+// A list holds values of one type. The value nodes read a list (a wire, a variable, Make List);
+// the steps change a list variable; For Each goes through a list as it was when the loop started.
+// What they do is in kern/logic/nodes.h (logic::list): a Blueprint's C++ calls the same functions.
+
+/// The "Type" of a generic list node: the type of the list's items.
+// (a function: the library may be filled while the program starts, before this file's own constants are there)
+std::vector<std::string> item_types() { return {"float", "Float", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor"}; }
+PinType item_type(const Node& n) { return item_type_setting(n.param("type", "float")); }
+/// Calls f(std::type_identity<T>{}) with the C++ type of a list's items.
+template <class F> void with_items(PinType element, F&& f) {
+  switch (element) {
+    case PinType::boolean: f(std::type_identity<bool>{}); break;
+    case PinType::integer: f(std::type_identity<i64>{}); break;
+    case PinType::number: f(std::type_identity<f64>{}); break;
+    case PinType::vector: f(std::type_identity<Vec3>{}); break;
+    case PinType::text: f(std::type_identity<std::string>{}); break;
+    case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
+    default: break;
+  }
+}
+
+void add_lists(Library& lib) {
+  // ---- values: generic over the type of the items (the setting Type) ----
+  auto typed = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+    const PinType e = item_type(n);
+    for (std::vector<PinDef>* pins : {&in, &out})
+      for (PinDef& p : *pins) {
+        if (p.id == "list") { p.type = list_of(e); p.def = json::Value::array(); }
+        if (p.id == "item") { p.type = e; p.def = Value::zero(e).to_json(); }
+      }
+  };
+  {
+    NodeDef d = make("list.make", "Make List", "Lists", NodeKind::pure, "A list of the values given, in their order.", "array create");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types()), param("count", "Items", ParamDef::Kind::integer, "2")};
+    d.outputs = {data("list", "List", PinType::number_list)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const PinType e = item_type(n);
+      in.clear();
+      const int k = clamp_count(n, "count", 2, 0, 16);
+      for (int i = 0; i < k; ++i) in.push_back(data("item" + std::to_string(i), std::to_string(i), e, Value::zero(e).to_json()));
+      out[0].type = list_of(e);
+    };
+    d.run = [](Context& c) {
+      const std::size_t count = c.input_count();
+      with_items(item_type(c.node()), [&](auto type) {
+        using T = typename decltype(type)::type;
+        std::vector<T> items;
+        for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(c.in(k)));
+        c.out(std::size_t{0}, Value::of(std::move(items)));
+      });
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("list.length", "Length", "Lists", NodeKind::pure, "How many items the list has.", "count size number of items");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.inputs = {data("list", "List", PinType::number_list)};
+    d.outputs = {data("length", "Length", PinType::integer)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::integer(static_cast<i64>(c.in(std::size_t{0}).size())));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("list.get", "Get Item", "Lists", NodeKind::pure, "The item at the index (the first is 0). Beyond the list: the zero of its type.", "element at index array");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.inputs = {data("list", "List", PinType::number_list), data("index", "Index", PinType::integer, 0)};
+    d.outputs = {data("item", "Item", PinType::number)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      const Value items = c.in(std::size_t{0});
+      const i64 index = c.in_int("index");
+      with_items(item_type(c.node()), [&](auto type) {
+        using T = typename decltype(type)::type;
+        c.out(std::size_t{0}, to_value(list::get(items.template items<T>(), index)));
+      });
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("list.contains", "Contains", "Lists", NodeKind::pure, "Is there an item that equals the value?", "has includes in list");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.inputs = {data("list", "List", PinType::number_list), data("item", "Item", PinType::number, 0.0)};
+    d.outputs = {data("result", "Result", PinType::boolean)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      const Value items = c.in(std::size_t{0}), item = c.in(std::size_t{1});
+      with_items(item_type(c.node()), [&](auto type) {
+        using T = typename decltype(type)::type;
+        c.out(std::size_t{0}, Value::boolean(list::contains(items.template items<T>(), from_value<T>(item))));
+      });
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("list.find", "Find Item", "Lists", NodeKind::pure, "The index of the first item that equals the value, or -1.", "index of search");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.inputs = {data("list", "List", PinType::number_list), data("item", "Item", PinType::number, 0.0)};
+    d.outputs = {data("index", "Index", PinType::integer)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      const Value items = c.in(std::size_t{0}), item = c.in(std::size_t{1});
+      with_items(item_type(c.node()), [&](auto type) {
+        using T = typename decltype(type)::type;
+        c.out(std::size_t{0}, Value::integer(list::find(items.template items<T>(), from_value<T>(item))));
+      });
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+
+  // ---- steps: they change a list variable (the setting Variable) ----
+  auto of_variable = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+    const Variable* v = g.variable(n.param("variable"));
+    const PinType e = v && is_list(v->type) ? element_of(v->type) : PinType::number;
+    for (PinDef& p : in)
+      if (p.id == "item") { p.type = e; p.def = Value::zero(e).to_json(); }
+    (void)out;
+  };
+  auto needs_list = [](const Node& n, const Graph& g) {
+    const Variable* v = g.variable(n.param("variable"));
+    return v && !is_list(v->type) ? "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) : std::string();
+  };
+  // A step on the list variable of the node: `change(items, c)` with the vector of its items.
+  // The inputs have been read by then (each exactly once, whatever the variable is).
+  auto step = [&](const char* type, const char* label, const char* help, const char* keywords, std::vector<PinDef> in, std::vector<PinDef> out) {
+    NodeDef d = make(type, label, "Lists", NodeKind::action, help, keywords);
+    d.params = {param("variable", "List", ParamDef::Kind::variable)};
+    d.inputs = {exec_in()};
+    for (PinDef& p : in) d.inputs.push_back(std::move(p));
+    d.outputs = {exec_out()};
+    for (PinDef& p : out) d.outputs.push_back(std::move(p));
+    d.shape = of_variable;
+    d.problem = needs_list;
+    return d;
+  };
+  auto variable = [](Context& c) -> Value* {
+    Value* v = c.instance().variable(c.param("variable"));
+    return v && is_list(v->type) ? v : nullptr;
+  };
+  {
+    NodeDef d = step("list.add", "Add to List", "Adds the value at the end of a list variable. Index: where it is now.", "append push array", {data("item", "Item", PinType::number, 0.0)},
+                     {data("index", "Index", PinType::integer)});
+    d.title = [](const NodeDef&, const Node& n) { return "Add to " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      const Value item = c.in("item");
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          c.out("index", Value::integer(list::add(v->template edit<T>(), from_value<T>(item))));
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.insert", "Insert into List", "Puts the value in front of the item at the index (0: at the start; past the end: at the end).", "add at array",
+                     {data("index", "Index", PinType::integer, 0), data("item", "Item", PinType::number, 0.0)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Insert into " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      const i64 index = c.in_int("index");
+      const Value item = c.in("item");
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          list::insert(v->template edit<T>(), index, from_value<T>(item));
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.set", "Set List Item", "Replaces the item at the index. Beyond the list: nothing.", "replace change element array",
+                     {data("index", "Index", PinType::integer, 0), data("item", "Item", PinType::number, 0.0)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Set Item of " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      const i64 index = c.in_int("index");
+      const Value item = c.in("item");
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          list::set(v->template edit<T>(), index, from_value<T>(item));
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.remove_at", "Remove Index", "Takes the item at the index out of a list variable. Beyond the list: nothing.", "delete erase array", {data("index", "Index", PinType::integer, 0)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Remove Index from " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      const i64 index = c.in_int("index");
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          list::remove_at(v->template edit<T>(), index);
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.remove", "Remove Item", "Takes every item that equals the value out of a list variable. Removed: was there one?", "delete erase array",
+                     {data("item", "Item", PinType::number, 0.0)}, {data("removed", "Removed", PinType::boolean)});
+    d.title = [](const NodeDef&, const Node& n) { return "Remove from " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      const Value item = c.in("item");
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          c.out("removed", Value::boolean(list::remove(v->template edit<T>(), from_value<T>(item))));
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.clear", "Clear List", "Takes every item out of a list variable.", "empty reset array", {}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Clear " + n.param("variable", "?"); };
+    d.run = [variable](Context& c) {
+      if (Value* v = variable(c))
+        with_items(element_of(v->type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          list::clear(v->template edit<T>());
+        });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+
+  // ---- For Each ----
+  {
+    NodeDef d = make("flow.for_each", "For Each", "Flow", NodeKind::flow, "Runs Loop Body for every item of the list - as the list is when the loop starts - then Completed.",
+                     "loop list array every all items");
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.inputs = {exec_in(), data("list", "List", PinType::number_list)};
+    d.outputs = {exec_out("body", "Loop Body"), data("item", "Item", PinType::number), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
+    d.shape = typed;
+    d.loop = true;
+    d.memory = true;
+    d.run = [](Context& c) {
+      // Where the loop is, is the node's: the list as the loop started, and the pass.
+      NodeState& s = c.state();
+      if (c.entry() != Context::kResume) {
+        s.value = c.in("list");
+        s.index = 0;
+      } else {
+        ++s.index;
+      }
+      if (s.index < 0 || static_cast<u64>(s.index) >= s.value.size() || !c.loop_back(Context::kResume)) return c.exec("completed");
+      c.out("item", s.value.item(static_cast<std::size_t>(s.index)));
+      c.out("index", Value::integer(s.index));
+      return c.exec("body");
+    };
+    lib.add(std::move(d));
+  }
+}
+
 void add_math(Library& lib) {
   using K = PinType;
   using P = PureNodes;
@@ -541,11 +808,11 @@ void add_math(Library& lib) {
                        return pick ? a : b;
                      },
                      "A when Pick A is true, otherwise B", "ternary choose if");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", {"float", "Number", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor"})};
+    d.params = {param("type", "Type", ParamDef::Kind::choice, "float",
+                      {"float", "Number", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor", "bool_list", "Boolean List", "int_list", "Integer List",
+                       "float_list", "Float List", "vector_list", "Vector List", "text_list", "Text List", "actor_list", "Actor List"})};
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      PinType t = PinType::number;
-      pin_type_from_name(n.param("type", "float"), t);
-      if (t == PinType::exec) t = PinType::number;
+      const PinType t = pin_type_setting(n.param("type", "float"));
       for (PinDef& p : in) if (p.id != "pick") { p.type = t; p.def = Value::zero(t).to_json(); }
       out[0].type = t;
     };
@@ -735,6 +1002,7 @@ Library& Library::core() {
     add_events(lib);
     add_flow(lib);
     add_variables(lib);
+    add_lists(lib);
     add_math(lib);
     add_formula(lib);
     add_functions(lib);

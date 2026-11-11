@@ -45,6 +45,8 @@ Actor actor_player(GameWorld& w, Self self, Int index);
 Int actor_player_count(GameWorld& w, Self self);
 Actor actor_find(GameWorld& w, Self self, const Text& name);
 Found actor_find_tag(GameWorld& w, Self self, const Text& tag);
+/// Every living actor with the tag, as a list.
+std::vector<Actor> actor_all_with_tag(GameWorld& w, Self self, const Text& tag);
 /// One living actor with the tag, at random: the node's own sequence (logic::random; `memory`
 /// is the node's, `seed` the Blueprint's).
 Actor actor_random_tag(GameWorld& w, Self self, f64* memory, u32 seed, u32 node, const Text& tag);
@@ -121,6 +123,7 @@ template <class Core> struct BlueprintNodesOf : Core {
   using Vector = Vec3;
   using Text = std::string;
   using Actor = logic::ActorHandle;
+  template <class T> using List = std::vector<T>;
 
   GameWorld* kern_game() const { return this->kern_world.host ? static_cast<GameWorld*>(this->kern_world.host->game()) : nullptr; }
   logic::ActorRef kern_self() const { return this->kern_world.self; }
@@ -131,6 +134,7 @@ template <class Core> struct BlueprintNodesOf : Core {
   Int actor_player_count() const { GameWorld* g = kern_game(); return g ? nodes::actor_player_count(*g, kern_self()) : 0; }
   Actor actor_find(const Text& name) const { GameWorld* g = kern_game(); return g ? nodes::actor_find(*g, kern_self(), name) : Actor{}; }
   nodes::Found actor_find_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_find_tag(*g, kern_self(), tag) : nodes::Found{}; }
+  List<Actor> actor_all_with_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_all_with_tag(*g, kern_self(), tag) : List<Actor>(); }
   template <class N> Actor actor_random_tag(N& n, const Text& tag) {
     GameWorld* g = kern_game();
     return g ? nodes::actor_random_tag(*g, kern_self(), n.memory, this->kern_seed(), N::id, tag) : Actor{};

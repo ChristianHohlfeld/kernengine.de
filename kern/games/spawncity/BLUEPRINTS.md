@@ -169,7 +169,16 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 
 ### 2 – Die Sprache vervollständigen
 - [x] Formel-Knoten (Formula): eine Formel als ein Knoten statt als Knotenkette.
-- [ ] Listen (Arrays) und „For Each“.
+- [x] **Listen (Arrays) und „For Each“:** Ein Pin oder eine Variable hält eine Liste von Werten
+  eines Typs (`List<Float>`, `List<Text>`, `List<Actor>` …). Wert-Knoten lesen eine Liste (Make
+  List, Length, Get Item, Contains, Find Item), Schritte ändern eine Listen-Variable (Add, Insert,
+  Set Item, Remove Index, Remove Item, Clear), **For Each** geht durch eine Liste, wie sie beim
+  Start der Schleife war; „All Actors with Tag“ gibt eine Actor-Liste. In C++:
+  `list_add(Scores, x);`, `for (auto it9 = flow_for_each<"float">(n9, Scores); it9.next();)`.
+  Eine Bedeutung je Knoten (`logic::list`), kein Index führt ins Leere, in Interpreter, JIT und
+  Klasse dasselbe (Tier-Fall `lists`, Klassen-Fall `Lists`, jeder Knoten in jeder Einstellung).
+  Im Editor: Listen-Pins, Listentypen für Variablen und Funktions-Pins, ein Eintrags-Editor;
+  generische Knoten nehmen den Typ des ersten Drahts an.
 - [ ] Strukturen (benannte Felder) und Datentabellen im Level (im Editor als Tabelle).
 - [ ] Aufzählungen (Enum) als Pin-Typ mit Auswahl.
 - [ ] Lokale Variablen in Funktionen; Funktionen, die sich selbst aufrufen dürfen.

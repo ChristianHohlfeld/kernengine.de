@@ -118,13 +118,108 @@ bool pin_of(const logic::Graph& g, u32 node, const std::string& pin, bool output
   return false;
 }
 
+/// The value of the setting "Type" with which the pin `pin` of a generic node (Select, Reroute,
+/// the list nodes) is of type `want` - "" when it has no such setting or none of its types fits.
+std::string type_setting_for(const logic::Graph& g, const logic::Node& node, const std::string& pin, bool output, logic::PinType want) {
+  const logic::NodeDef* def = logic::library().find(node.type);
+  if (!def) return {};
+  for (const logic::ParamDef& pd : def->params) {
+    if (pd.key != "type" || pd.kind != logic::ParamDef::Kind::choice) continue;
+    for (std::size_t k = 0; k + 1 < pd.choices.size(); k += 2) {
+      logic::Node probe = node;
+      probe.set_param("type", pd.choices[k]);
+      std::vector<logic::PinDef> in, outs;
+      logic::library().pins(probe, g, in, outs);
+      for (const logic::PinDef& p : output ? outs : in)
+        if (p.id == pin && p.type == want) return pd.choices[k];
+    }
+  }
+  return {};
+}
+
+/// The types the pins of a generic node could have, were its setting "Type" another - for the
+/// pins that setting decides, and only while nothing is wired to any of them (the node takes the
+/// type of its first wire: connect; a wire into an input replaces the one that is there, so that
+/// one does not count for its own pin). Pin id -> the types' names, blank between them.
+std::vector<std::pair<std::string, std::string>> generic_pins(const logic::Graph& g, const logic::Node& node, bool output) {
+  std::vector<std::pair<std::string, std::string>> r;
+  const logic::NodeDef* def = logic::library().find(node.type);
+  if (!def) return r;
+  const logic::ParamDef* type = nullptr;
+  for (const logic::ParamDef& pd : def->params) if (pd.key == "type" && pd.kind == logic::ParamDef::Kind::choice) type = &pd;
+  if (!type) return r;
+  std::vector<logic::PinDef> in, out;
+  logic::library().pins(node, g, in, out);
+  std::vector<std::string> types_in(in.size()), types_out(out.size());
+  std::vector<bool> typed_in(in.size(), false), typed_out(out.size(), false);
+  for (std::size_t k = 0; k + 1 < type->choices.size(); k += 2) {
+    logic::Node probe = node;
+    probe.set_param("type", type->choices[k]);
+    std::vector<logic::PinDef> pin, pout;
+    logic::library().pins(probe, g, pin, pout);
+    if (pin.size() != in.size() || pout.size() != out.size()) return r;
+    for (std::size_t i = 0; i < in.size(); ++i) {
+      if (pin[i].type != in[i].type) typed_in[i] = true;
+      types_in[i] += (types_in[i].empty() ? "" : " ") + std::string(logic::pin_type_name(pin[i].type));
+    }
+    for (std::size_t i = 0; i < out.size(); ++i) {
+      if (pout[i].type != out[i].type) typed_out[i] = true;
+      types_out[i] += (types_out[i].empty() ? "" : " ") + std::string(logic::pin_type_name(pout[i].type));
+    }
+  }
+  std::size_t wired = 0;
+  std::vector<std::size_t> into(in.size(), 0);
+  for (const logic::Link& l : g.links) {
+    for (std::size_t i = 0; i < in.size(); ++i)
+      if (typed_in[i] && l.to == node.id && l.in == in[i].id) { ++wired; ++into[i]; }
+    for (std::size_t i = 0; i < out.size(); ++i) if (typed_out[i] && l.from == node.id && l.out == out[i].id) ++wired;
+  }
+  for (std::size_t i = 0; i < (output ? out.size() : in.size()); ++i) {
+    if (!(output ? typed_out[i] : typed_in[i]) || wired - (output ? 0 : into[i]) != 0) continue;
+    r.push_back({output ? out[i].id : in[i].id, output ? types_out[i] : types_in[i]});
+  }
+  return r;
+}
+
+/// A generic node whose typed pins are all free takes the type a new wire needs: its setting
+/// "Type" becomes `type` (values typed into those pins were of the old type and go). `replaced`:
+/// the input the new wire goes into - the wire that is there goes anyway.
+bool retype(logic::Graph& g, u32 id, const std::string& type, const std::string& replaced = {}) {
+  logic::Node* node = g.find(id);
+  if (!node || type.empty()) return false;
+  logic::Node probe = *node;
+  probe.set_param("type", type);
+  std::vector<logic::PinDef> in_a, out_a, in_b, out_b;
+  logic::library().pins(*node, g, in_a, out_a);
+  logic::library().pins(probe, g, in_b, out_b);
+  if (in_a.size() != in_b.size() || out_a.size() != out_b.size()) return false;
+  std::vector<std::string> typed_in, typed_out;
+  for (std::size_t k = 0; k < in_a.size(); ++k) if (in_a[k].type != in_b[k].type) typed_in.push_back(in_a[k].id);
+  for (std::size_t k = 0; k < out_a.size(); ++k) if (out_a[k].type != out_b[k].type) typed_out.push_back(out_a[k].id);
+  for (const logic::Link& l : g.links) {
+    if (l.to == id && l.in != replaced && std::find(typed_in.begin(), typed_in.end(), l.in) != typed_in.end()) return false;
+    if (l.from == id && std::find(typed_out.begin(), typed_out.end(), l.out) != typed_out.end()) return false;
+  }
+  node->values.erase(std::remove_if(node->values.begin(), node->values.end(), [&](const auto& v) { return std::find(typed_in.begin(), typed_in.end(), v.first) != typed_in.end(); }),
+                     node->values.end());
+  node->set_param("type", type);
+  return true;
+}
+
 /// Adds a link with the editor's rules: an exec output and a data input take one wire
-/// (the new one replaces the old); exec inputs and data outputs fan in / out freely.
+/// (the new one replaces the old); exec inputs and data outputs fan in / out freely. A generic
+/// node nothing is wired to yet takes the type of the wire (a Text List into Length makes it a
+/// Length of a Text List).
 bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const std::string& in, std::string& error) {
   if (from == to) { error = "a node cannot connect to itself"; return false; }
   logic::PinDef po, pi;
   if (!pin_of(g, from, out, true, po) || !pin_of(g, to, in, false, pi)) { error = "no such pin"; return false; }
   if ((po.type == logic::PinType::exec) != (pi.type == logic::PinType::exec)) { error = "exec pins connect to exec pins only"; return false; }
+  if (po.type != pi.type && po.type != logic::PinType::exec) {
+    // (first the node the wire goes into, then the one it comes from)
+    if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, po.type), in)) pin_of(g, to, in, false, pi);
+    else if (const logic::Node* m = g.find(from); m && !logic::convertible(po.type, pi.type) && retype(g, from, type_setting_for(g, *m, out, true, pi.type))) pin_of(g, from, out, true, po);
+  }
   if (!logic::convertible(po.type, pi.type)) {
     error = std::string("a ") + logic::pin_type_name(po.type) + " cannot go into a " + logic::pin_type_name(pi.type) + " pin";
     return false;
@@ -236,12 +331,15 @@ json::Value Studio::logic_json() const {
     lib.pins(n, *g, in, out);
     auto pins = [&](const std::vector<logic::PinDef>& v, bool output) {
       json::Value arr = json::Value::array();
+      const std::vector<std::pair<std::string, std::string>> generic = generic_pins(*g, n, output);
       for (const logic::PinDef& p : v) {
         if (p.hidden) continue;
         json::Value pj = json::Value::object();
         pj.set("id", p.id);
         pj.set("label", p.label);
         pj.set("type", logic::pin_type_name(p.type));
+        // (a pin that takes the type of the first wire: the types it can be)
+        for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
         bool linked = false;
         for (const logic::Link& l : g->links)
           if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
@@ -441,11 +539,27 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     e.rank = query.empty() ? 0 : l.rfind(query, 0) == 0 ? 0 : l.find(query) != std::string::npos ? 1 : 2;
     entries.push_back(std::move(e));
   };
+  /// The steps that change a list variable: offered per list variable.
+  auto variable_step = [](const logic::NodeDef& d) {
+    for (const logic::ParamDef& pd : d.params) if (pd.kind == logic::ParamDef::Kind::variable) return true;
+    return false;
+  };
   for (const auto& d : lib.all()) {
-    if (d->type == "var.get" || d->type == "var.set" || d->type == "var.add") continue;  // per variable below
+    if (variable_step(*d)) continue;                                                     // per variable below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
     if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
+    if (from_pin && from_type != logic::PinType::exec) {
+      // a generic node comes in the type that fits the wire (Length of a Text List, Select of a Vector)
+      logic::Node probe;
+      probe.type = d->type;
+      std::vector<logic::PinDef> in, out;
+      lib.pins(probe, *g, in, out);
+      std::string fits;
+      for (const logic::PinDef& p : from_output ? in : out)
+        if (fits.empty() && p.type != logic::PinType::exec) fits = type_setting_for(*g, probe, p.id, !from_output, from_type);
+      if (!fits.empty()) e.params.push_back({"type", fits});
+    }
     if (d->type == "func.entry") { e.label = "New Function"; e.help = "Adds a function to this Blueprint: its entry and a Return node. Inputs and outputs are set in Details."; }
     if (d->type == "event.state_enter" || d->type == "event.state_exit" || d->type == "state.set" || d->type == "state.is" || d->type == "state.get") {
       if (g->machines.empty()) continue;
@@ -462,6 +576,14 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     consider({"Set " + v.name, "Variables", std::string("Writes ") + v.name, "var.set", {{"variable", v.name}}});
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
       consider({"Add to " + v.name, "Variables", "Adds to " + v.name, "var.add", {{"variable", v.name}}});
+    if (!logic::is_list(v.type)) continue;
+    for (const auto& d : lib.all()) {
+      if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
+      logic::Node named;
+      named.type = d->type;
+      named.set_param("variable", v.name);
+      consider({lib.title(named), "Lists", d->help, d->type, {{"variable", v.name}}});
+    }
   }
   for (const logic::Function& f : g->functions) {
     consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
@@ -477,7 +599,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       consider({"On " + s.name + " Entered", "State Machines", m.name + " entered " + s.name, "event.state_enter", {{"machine", m.name}, {"state", s.name}}});
     }
   // Categories in the order people reach for them.
-  static const char* order[] = {"Events", "Flow", "Variables", "Functions", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
+  static const char* order[] = {"Events", "Flow", "Variables", "Lists", "Functions", "Game", "Actors", "Robots", "Physics", "Combat", "Effects", "Audio", "State Machines",
                                 "Math", "Logic", "Vector", "Text", "Values", "Utilities"};
   auto cat_rank = [](const std::string& c) {
     for (int i = 0; i < static_cast<int>(std::size(order)); ++i) if (c == order[i]) return i;
