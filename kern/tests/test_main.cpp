@@ -2103,6 +2103,139 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_call_on_actor) {
+  // A Blueprint calls a function of another one: it declares what the function looks like
+  // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  Int Asked = 0;
+
+  struct StarsResult { Int stars = -1; Text who = "none"; };
+  StarsResult Stars(Int base = 1, Text name = "x") {
+    Asked += base;
+    return {Asked, text_append(name, "!", "")};
+  }
+};
+)kn";
+  const char* cop_text = R"kn(
+struct Cop : kern::Blueprint {
+  Int Got = 0;
+  Text Heard = "";
+  Float Miss = 0.0;
+  Int Deep = 0;
+
+  struct StarsResult { Int stars = 5; Text who = "nobody"; };
+  /// How wanted somebody is (the Level knows).
+  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = "x");
+  struct MissingResult { Float value = 2.5; };
+  KERN_EXTERN MissingResult Missing();
+
+  struct DownResult { Float sum = 0.0; };
+  DownResult Down(Int n = 0, Actor me = Actor{0}) {
+    Int Mine = 0;
+    Mine = n;
+    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
+      func_call_on<"Down">(me, kern::out(n20.sum), kern::to<Int>(math_sub(kern::to<Float>(n), 1.0)), me);
+    }
+    return {math_add(kern::to<Float>(Mine), n20.sum)};
+  }
+
+  void Forever(Actor me = Actor{0}) {
+    Deep += 1;
+    func_call_on<"Forever">(me, kern::out(), me);
+  }
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Stars">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
+    Got = n2.stars;
+    Heard = n2.who;
+    func_call_on<"Missing">(actor, kern::out(n5.value));
+    Miss = n5.value;
+    func_call_on<"Stars">(actor, kern::out(n7.stars, n7.who), 1, "");
+    Heard = text_append(Heard, n7.who, "");
+  }
+
+  struct { Int stars = 0; Text who = ""; } n2;
+  struct { Float value = 0.0; } n5;
+  struct { Int stars = 0; Text who = ""; } n7;
+  struct { Float sum = 0.0; } n20;
+};
+)kn";
+  logic::Graph level, cop;
+  std::string error;
+  CHECK(logic::from_cpp(level_text, level, nullptr, &error));
+  CHECK(logic::from_cpp(cop_text, cop, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(level)) && no_errors(logic::check(cop)));
+  CHECK(cop.function("Stars") && cop.function("Stars")->external && !cop.function("Down")->external);
+  // as JSON and as C++ and back: the same Blueprint
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(cop), back) && back == cop);
+  std::string text;
+  CHECK(logic::to_cpp(cop, "Cop", text, &error));
+  CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = \"x\");\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Stars\">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Forever\">(me, kern::out(), me);\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == cop);
+  CHECK(logic::native_ready(cop, &error));
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* lv = rt.add(level, 0, "Level");
+    logic::Instance* a = rt.add(cop, 7, "Cop");
+    logic::Instance* b = rt.add(cop, 8, "Cop 2");
+    CHECK(lv && a && b && !a->disabled());
+    if (!lv || !a || !b) continue;
+    rt.begin();
+    // on the Level (no target): its Stars runs, with what this call gave it
+    rt.call("Ask", 7, {{"actor", logic::Value::actor(99)}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
+    CHECK(lv->get("Asked").i == 3 && a->get("Got").i == 3 && b->get("Got").i == 0);
+    // ... a target without a Blueprint, and one whose Blueprint has no such function: the declared defaults
+    CHECK(a->get("Heard").as_text() == "joe!nobody");
+    CHECK_NEAR(a->get("Miss").as_number(), 2.5, 1e-12);
+    rt.call("Ask", 8, {{"actor", logic::Value::actor(7)}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
+    CHECK(lv->get("Asked").i == 5 && b->get("Got").i == 5 && b->get("Heard").as_text() == "!nobody");
+    // a function that calls itself on its own actor: every call has its own parameters and locals
+    std::vector<logic::Value> out;
+    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor(7)}, out) && out.size() == 1);
+    CHECK_NEAR(out[0].as_number(), 10.0, 1e-12);
+    // ... and on another actor's Blueprint, back and forth
+    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor(8)}, out));
+    CHECK_NEAR(out[0].as_number(), 6.0, 1e-12);
+    // calls that never end are stopped: 64 deep, reported, and the Blueprint goes on
+    const std::size_t before = host.errors.size();
+    CHECK(a->call("Forever", {logic::Value::actor(7)}, out));
+    CHECK(host.errors.size() == before + 1 && host.errors.back().find("nest more than 64 deep") != std::string::npos);
+    CHECK(a->get("Deep").i >= 63 && a->get("Deep").i <= 65 && !a->disabled());
+  }
+  // Rules: a function of another Blueprint has no body here ...
+  {
+    logic::Graph bad = cop;
+    logic::Node call;
+    call.id = bad.next_id++;
+    call.type = "func.call";
+    call.set_param("function", "Stars");
+    bad.nodes.push_back(call);
+    CHECK(!no_errors(logic::check(bad)));
+    CHECK(logic::cpp_problem(bad).find("is a function of another Blueprint") != std::string::npos);
+    bad = cop;
+    bad.function("Stars")->pure = true;
+    CHECK(!no_errors(logic::check(bad)));
+  }
+  // ... and in the text
+  logic::Graph none;
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EXTERN void F() {\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("no body here") != std::string::npos);
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{0}, kern::out());\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("KERN_EXTERN") != std::string::npos);
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
+                         "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
+  CHECK(error.find("in their order") != std::string::npos);
+}
+
 TEST(logic_functions) {
   FakeLogicHost host;
   logic::Runtime rt(host);

@@ -1,5 +1,6 @@
 // Kern Studio: editing logic graphs (the level's and the actors'). Every edit is
 // a level edit (one undo step); the page draws what logic_json() describes.
+#include <tuple>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -107,6 +108,25 @@ const logic::Graph* graph_of(const game::Level& l, u32 owner) {
   if (!owner) return &l.logic;
   const game::Actor* a = l.find(owner);
   return a && a->logic ? &*a->logic : nullptr;
+}
+
+/// The other Blueprints of the level: (owner, its name, its graph) for each but `owner`'s.
+std::vector<std::tuple<u32, std::string, const logic::Graph*>> other_blueprints(const game::Level& l, u32 owner) {
+  std::vector<std::tuple<u32, std::string, const logic::Graph*>> r;
+  if (owner != 0 && !l.logic.empty()) r.emplace_back(0u, "Level", &l.logic);
+  for (const game::Actor& a : l.actors)
+    if (a.id != owner && a.logic && !a.logic->empty()) r.emplace_back(a.id, a.name, &*a.logic);
+  return r;
+}
+/// Does `other` have a function this declaration describes: of that name, with inputs and
+/// outputs of the same types in the same order?
+bool declares(const logic::Function& f, const logic::Function& other) {
+  auto same = [](const std::vector<logic::FunctionPin>& a, const std::vector<logic::FunctionPin>& b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k) if (a[k].type != b[k].type || a[k].of != b[k].of) return false;
+    return true;
+  };
+  return !other.external && f.name == other.name && same(f.inputs, other.inputs) && same(f.outputs, other.outputs);
 }
 
 /// Custom event names used anywhere in the level (for Call Event and transitions).
@@ -324,7 +344,23 @@ json::Value Studio::logic_json() const {
   if (!g) return o;
   const logic::Library& lib = logic::library();
   std::unordered_map<u32, std::vector<const logic::Issue*>> by_node;
-  const std::vector<logic::Issue> issues = logic::check(*g, lib);
+  std::vector<logic::Issue> issues = logic::check(*g, lib);
+  {
+    // A function of another Blueprint: one of this level should have it as it is declared here.
+    const auto others = other_blueprints(level_, logic_owner_);
+    for (const logic::Function& f : g->functions) {
+      if (!f.external) continue;
+      bool found = false, named = false;
+      for (const auto& [id, name, other] : others)
+        if (const logic::Function* of = other->function(f.name)) {
+          named = named || !of->external;
+          found = found || declares(f, *of);
+        }
+      if (!found)
+        issues.push_back({0, false, "no other Blueprint of this level has " + std::string(named ? "the function \"" + f.name + "\" with these inputs and outputs" : "a function \"" + f.name + "\"") +
+                                        ": a call of it gives the outputs' defaults"});
+    }
+  }
   for (const logic::Issue& i : issues) by_node[i.node].push_back(&i);
   json::Value nodes = json::Value::array();
   for (const logic::Node& n : g->nodes) {
@@ -470,6 +506,21 @@ json::Value Studio::logic_json() const {
   o.set("enums", graph["enums"].is_array() ? graph["enums"] : json::Value::array());
   o.set("structs", graph["structs"].is_array() ? graph["structs"] : json::Value::array());
   o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
+  {
+    // (the functions of the level's other Blueprints this one does not have or declare yet)
+    json::Value offered = json::Value::array();
+    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_))
+      for (const logic::Function& f : other->functions) {
+        if (f.external || g->function(f.name) || offered.size() >= 200) continue;
+        json::Value x = json::Value::object();
+        x.set("owner", id);
+        x.set("ownerName", name);
+        x.set("name", f.name);
+        if (!f.help.empty()) x.set("help", f.help);
+        offered.push(std::move(x));
+      }
+    o.set("otherFunctions", std::move(offered));
+  }
   o.set("machines", graph["machines"]);
   o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
   json::Value iss = json::Value::array();
@@ -602,7 +653,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   for (const auto& d : lib.all()) {
     if (variable_step(*d) || enum_node(*d) || struct_node(*d)) continue;                 // per variable, per enum, per struct below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
-    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure") continue;  // per function below
+    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure" || d->type == "func.call_on") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
     if (from_pin && from_type.type != logic::PinType::exec) {
       // a generic node comes in the type that fits the wire (Length of a Text List, Select of a Vector)
@@ -686,6 +737,9 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       consider({lib.title(named), d->category, d->help, d->type, {{"struct", s.name}}});
     }
   for (const logic::Function& f : g->functions) {
+    consider({f.name + " on Actor", "Functions", "Calls the function " + f.name + " of another actor's Blueprint (or the Level's)" + (f.help.empty() ? std::string() : ": " + f.help), "func.call_on",
+              {{"function", f.name}}});
+    if (f.external) continue;  // (a function of another Blueprint has no body here)
     consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
     consider({"Return (" + f.name + ")", "Functions", "Ends " + f.name + " and gives its outputs to the caller", "func.return", {{"function", f.name}}});
   }
@@ -1066,7 +1120,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           result.set("function", fname);
         }
       }
-      if ((type == "func.return" || type == "func.call" || type == "func.pure") && !g.function(n.param("function"))) {
+      if ((type == "func.return" || type == "func.call" || type == "func.pure" || type == "func.call_on") && !g.function(n.param("function"))) {
         if (g.functions.empty()) { error = "this Blueprint has no function yet: add one in My Blueprint"; return false; }
         n.set_param("function", g.functions.front().name);
       }
@@ -1298,12 +1352,41 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // A function of the graph: its name, whether it is offered as a pure node, its help and its
     // pins. The function's nodes (entry, Return, calls) follow every change.
     const std::string op = str("op");
-    return graph_edit("Edit Function", [&](logic::Graph& g, game::Level&) {
+    return graph_edit("Edit Function", [&](logic::Graph& g, game::Level& level) {
       const std::string fname = str("name");
+      if (op == "declare") {
+        // A function of another Blueprint of the level, declared here as it is there: this
+        // Blueprint can then call it on an actor. Its pins' types are types this Blueprint has.
+        const logic::Graph* from = graph_of(level, static_cast<u32>(num("from")));
+        const logic::Function* of = from && from != &g ? from->function(fname) : nullptr;
+        if (!of || of->external) { error = "that Blueprint has no function " + fname; return false; }
+        if (g.function(fname) || g.variable(fname) || g.enumeration(fname) || g.structure(fname) || is_local(g, fname)) { error = "this Blueprint has something called " + fname + " already"; return false; }
+        if (const std::string why = name_problem(g, fname); !why.empty()) { error = why; return false; }
+        logic::Function f;
+        f.name = of->name;
+        f.help = of->help;
+        f.external = true;
+        f.inputs = of->inputs;
+        f.outputs = of->outputs;
+        for (const auto* pins : {&f.inputs, &f.outputs})
+          for (const logic::FunctionPin& p : *pins) {
+            if (p.of.empty()) continue;
+            const bool is_enum = logic::element_of(p.type) == logic::PinType::enumeration;
+            if (is_enum ? !g.enumeration(p.of) : !g.structure(p.of)) {
+              error = "\"" + p.name + "\" of " + fname + " is of the type " + p.of + ", which this Blueprint does not have: declare that " + (is_enum ? "enum" : "struct") + " here first, as it is there";
+              return false;
+            }
+          }
+        for (const logic::FunctionPin& p : f.inputs)
+          if (g.variable(p.name) || g.function(p.name)) { error = "the input \"" + p.name + "\" of " + fname + " has the name of a variable or a function of this Blueprint"; return false; }
+        g.functions.push_back(std::move(f));
+        result.set("function", fname);
+        return true;
+      }
       logic::Function* f = g.function(fname);
       if (!f) { error = "no function " + fname; return false; }
       auto uses = [&](const logic::Node& n) {
-        return (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure") && n.param("function") == fname;
+        return (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure" || n.type == "func.call_on") && n.param("function") == fname;
       };
       // the nodes of its local variables (all of them, or of the one called `local`)
       auto of_local = [&](const logic::Node& n, const std::string& local = {}) {
@@ -1336,7 +1419,43 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         f->name = to;
         return true;
       }
+      if (op == "external") {
+        // A function of another Blueprint: what it looks like stays, its body goes - the entry,
+        // the Returns, the calls of it as one of this Blueprint's own, its local variables. And
+        // back: a function of this Blueprint again, with an entry and a Return.
+        const bool on = c["value"].as_bool();
+        if (on == f->external) return true;
+        if (on) {
+          std::vector<u32> ids;
+          for (const logic::Node& n : g.nodes) if ((uses(n) && n.type != "func.call_on") || of_local(n)) ids.push_back(n.id);
+          auto has = [&](u32 id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); };
+          drop_links([&](const logic::Link& l) { return has(l.from) || has(l.to); });
+          g.nodes.erase(std::remove_if(g.nodes.begin(), g.nodes.end(), [&](const logic::Node& n) { return has(n.id); }), g.nodes.end());
+          f->locals.clear();
+          f->pure = false;
+          f->external = true;
+          return true;
+        }
+        f->external = false;
+        logic::Node entry, ret;
+        entry.id = g.next_id++;
+        entry.type = "func.entry";
+        entry.x = static_cast<f32>(num("x"));
+        entry.y = static_cast<f32>(num("y"));
+        entry.set_param("function", fname);
+        ret.id = g.next_id++;
+        ret.type = "func.return";
+        ret.x = entry.x + 320;
+        ret.y = entry.y;
+        ret.set_param("function", fname);
+        g.links.push_back({entry.id, "then", ret.id, "exec"});
+        result.set("id", entry.id);
+        g.nodes.push_back(std::move(entry));
+        g.nodes.push_back(std::move(ret));
+        return true;
+      }
       if (op == "pure") {
+        if (f->external && c["value"].as_bool()) { error = "a function of another Blueprint is called as a step: what it does is not known here"; return false; }
         // The calls change their kind: a pure node has no exec pins.
         f->pure = c["value"].as_bool();
         for (logic::Node& n : g.nodes) {
@@ -1353,6 +1472,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       // (side "local": its local variables - edited like its pins; their nodes are the variable
       // nodes that name the function as their "scope")
       const bool locals = str("side") == "local";
+      if (locals && f->external) { error = "a function of another Blueprint has no local variables here"; return false; }
       const bool input_side = !locals && str("side") != "out";
       std::vector<logic::FunctionPin>& pins = locals ? f->locals : input_side ? f->inputs : f->outputs;
       auto valid_name = [&](const std::string& n) {
