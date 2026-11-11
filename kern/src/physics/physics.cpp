@@ -699,6 +699,17 @@ f32 World::joint_speed(Joint joint) const {
   return b3Dot(w, hinge_axis(id));
 }
 
+f32 World::hinge_lever(Joint joint, Vec3 point) const {
+  if (!joint_valid(joint)) return 0;
+  const b3JointId id = joint_id(joint);
+  if (b3Joint_GetType(id) != b3_revoluteJoint) return 0;
+  const b3BodyId a = b3Joint_GetBodyA(id);
+  const b3Vec3 on_axis = b3Add(b3Body_GetPosition(a), b3RotateVector(b3Body_GetRotation(a), b3Joint_GetLocalFrameA(id).p));
+  const b3Vec3 axis = hinge_axis(id);
+  const b3Vec3 d = b3Sub(b3Vec3{point.x, point.y, point.z}, on_axis);
+  return b3Length(b3Sub(d, b3MulSV(b3Dot(d, axis), axis)));
+}
+
 void World::set_joint_spring(Joint joint, f32 target, f32 stiffness, f32 damping) {
   if (!joint_valid(joint)) return;
   const b3JointId id = joint_id(joint);
@@ -1088,9 +1099,13 @@ bool MouseGrab::begin(World& world, Body body, Vec3 point, f32 stiffness_hertz, 
   body_ = body;
   joint_ = joint;
   target_ = point;
+  local_ = js.frame_b.position;
+  max_force_ = js.max_spring_force;
   world.set_awake(body, true);
   return true;
 }
+
+Vec3 MouseGrab::anchor() const { return world_ && world_->body_valid(body_) ? world_->world_point(body_, local_) : target_; }
 
 void MouseGrab::update(f32 dt) {
   if (!world_ || !(dt > 0)) return;

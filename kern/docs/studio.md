@@ -153,9 +153,8 @@ der Werkzeugleiste, Window → Lehrer oder die Adresse `…/editor/?train=1` (di
   (`src/studio/trainer.cpp`); das offene Level steht still, Viewport, Werkzeug und Auswahl kommen beim
   Schließen so zurück, wie sie waren. Posieren: Ente schwerelos, Rumpf fest, Glieder mit Box3Ds
   Maus-Gelenk ziehen (Maus oder Finger), sie halten, wo man loslässt. Das Gelenk des geführten
-  Glieds bewegt sich dabei gegen Gelenkreibung (ein Zehntel des Haltemoments seines Servos, als
-  Gelenkmotor mit Tempo 0): es bleibt stehen, wo die Hand stehen bleibt; die anderen Gelenke
-  behalten ihre Winkel. Das gilt nur beim Posieren – Training, Testen und Spiel haben das
+  Glieds bewegt sich dabei gegen Gelenkreibung (ein Gelenkmotor mit Tempo 0 und begrenztem Drehmoment: ein
+  Zehntel dessen, womit die Hand das Gelenk höchstens drehen kann): es bleibt stehen, wo die Hand stehen bleibt. Das gilt nur beim Posieren – Training, Testen und Spiel haben das
   unveränderte Servo-Gesetz. Testen: Ente bei normaler Schwerkraft auf ihrem Trainingsboden, sie
   spielt eine gelernte Bewegung.
 - **Kamera der Bühne:** die des Studios mit denselben Bedienungen und Tempo-Stufen, im Maßstab der

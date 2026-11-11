@@ -8,7 +8,7 @@
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
   {date:"2026-11-11",time:"13:11",title:"Lehrer: ruhiger posieren, Keyframes in gleichen Schritten",items:[
-    "Kern-Editor, Lehrer: Ein Körperteil der Ente, das man mit der Maus führt, bewegt sich jetzt gegen Gelenkreibung. Es bleibt stehen, wo die Hand stehen bleibt, statt nachzuschwingen – so lässt sich etwa die Kopfneigung fein einstellen. Die übrigen Gelenke behalten dabei ihre Winkel. Training, Spiel und die Ente selbst sind davon unberührt.",
+    "Kern-Editor, Lehrer: Ein Körperteil der Ente, das man mit der Maus führt, bewegt sich jetzt gegen Gelenkreibung. Es bleibt stehen, wo die Hand stehen bleibt, statt nachzuschwingen – so lässt sich etwa die Kopfneigung fein einstellen. Training, Spiel und die Ente selbst sind davon unberührt.",
     "Keyframes: Nach „+ Keyframe“ springt die Zeit nicht mehr ans Ende der Bewegung, sondern geht im gleichen Schritt weiter (nach 0.3 und 0.6 steht sie bei 0.9). Neu ist „Gleichmäßig verteilen“: alle Keyframes in gleichen Abständen über die Länge der Bewegung.",
     "Die Kamera auf der Bühne bewegt sich im Maßstab der Ente: Rad, Touchpad-Pinch, Fliegen und Verschieben sind dieselben wie im Level, aber ein Vierzigstel so weit – die Ente fliegt nicht mehr mit einer Geste aus dem Bild. In den Seitenansichten zoomen viele kleine Touchpad-Schritte jetzt so weit wie ein Mausrad-Klick, nicht jeder einzeln.",
   ]},

@@ -260,6 +260,9 @@ class World {
   /// joint's axial effective mass; this converts with the current mass, so call it every step.
   /// The spring is solved implicitly (soft step): stable for any stiffness. stiffness <= 0 disables it.
   void set_joint_spring(Joint joint, f32 target, f32 stiffness, f32 damping);
+  /// How far a point (world) lies from a hinge's axis, metres: the lever a force at the point has
+  /// about the hinge. 0: no hinge.
+  f32 hinge_lever(Joint joint, Vec3 point) const;
   Vec3 joint_torque(Joint joint) const;
   /// Touching contact points of a body (for debug views).
   void contact_points(Body body, std::vector<ContactPoint>& out) const;
@@ -323,12 +326,16 @@ class MouseGrab {
   void end();
   bool active() const { return world_ != nullptr; }
   Body body() const { return body_; }
+  /// Where the grab holds the body (world), and the most force its spring pulls with (N).
+  Vec3 anchor() const;
+  f32 max_force() const { return max_force_; }
 
  private:
   World* world_ = nullptr;
   Body mouse_, body_;
   Joint joint_;
-  Vec3 target_;
+  Vec3 target_, local_;
+  f32 max_force_ = 0;
 };
 
 /// A kinematic character controller on Box3D's mover API (the Box3D "Mover"
