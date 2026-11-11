@@ -511,6 +511,18 @@ Variable* Graph::variable(std::string_view name) {
   for (Variable& v : variables) if (v.name == name) return &v;
   return nullptr;
 }
+bool Graph::variable_of(const Node& n, Variable& out) const {
+  const std::string name = n.param("variable"), scope = n.param("scope");
+  if (scope.empty()) {
+    const Variable* v = variable(name);
+    if (v) out = *v;
+    return v != nullptr;
+  }
+  const Function* f = function(scope);
+  const FunctionPin* l = f ? f->local(name) : nullptr;
+  if (l) out = Variable{l->name, l->type, l->value, {}, l->of};
+  return l != nullptr;
+}
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
   return nullptr;
@@ -553,6 +565,14 @@ const FunctionPin* Function::input(std::string_view n) const {
 }
 const FunctionPin* Function::output(std::string_view n) const {
   for (const FunctionPin& p : outputs) if (p.name == n) return &p;
+  return nullptr;
+}
+const FunctionPin* Function::local(std::string_view n) const {
+  for (const FunctionPin& p : locals) if (p.name == n) return &p;
+  return nullptr;
+}
+FunctionPin* Function::local(std::string_view n) {
+  for (FunctionPin& p : locals) if (p.name == n) return &p;
   return nullptr;
 }
 bool Graph::operator==(const Graph& o) const { return graph_to_json(*this) == graph_to_json(o); }
@@ -691,6 +711,7 @@ json::Value graph_to_json(const Graph& g) {
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
       o.set("outputs", pins(f.outputs));
+      if (!f.locals.empty()) o.set("locals", pins(f.locals));
       functions.push(std::move(o));
     }
     root.set("functions", std::move(functions));
@@ -855,7 +876,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       }
       return true;
     };
-    if (!pins(v["inputs"], f.inputs, "an input") || !pins(v["outputs"], f.outputs, "an output")) return false;
+    if (!pins(v["inputs"], f.inputs, "an input") || !pins(v["outputs"], f.outputs, "an output") || !pins(v["locals"], f.locals, "a local variable")) return false;
     g.functions.push_back(std::move(f));
   }
   for (const json::Value& v : j["comments"].items()) {
@@ -951,7 +972,12 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     lib.pins(n, g, p.first, p.second);
     for (const ParamDef& pd : d->params) {
       const std::string v = n.param(pd.key, pd.def);
-      if (pd.kind == ParamDef::Kind::variable && !g.variable(v)) err(n.id, lib.title(n) + ": no variable \"" + v + "\"");
+      if (pd.kind == ParamDef::Kind::variable) {
+        const std::string scope = n.param("scope");
+        Variable named;
+        if (!scope.empty() && !g.function(scope)) err(n.id, lib.title(n) + ": no function \"" + scope + "\" (whose local variable \"" + v + "\" would be)");
+        else if (!g.variable_of(n, named)) err(n.id, lib.title(n) + (scope.empty() ? ": no variable \"" + v + "\"" : ": the function " + scope + " has no local variable \"" + v + "\""));
+      }
       if (pd.kind == ParamDef::Kind::machine && !g.machine(v)) err(n.id, lib.title(n) + ": no state machine \"" + v + "\"");
       if (pd.kind == ParamDef::Kind::state) {
         const StateMachine* m = g.machine(n.param("machine"));
@@ -1034,7 +1060,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   };
   for (const Variable& v : g.variables) typed_ok("variable \"" + v.name + "\"", v.type, v.of, v.value);
   for (const Function& f : g.functions)
-    for (const auto* pins_of : {&f.inputs, &f.outputs})
+    for (const auto* pins_of : {&f.inputs, &f.outputs, &f.locals})
       for (const FunctionPin& fp : *pins_of) typed_ok("function \"" + f.name + "\": \"" + fp.name + "\"", fp.type, fp.of, fp.value);
   // A function's body starts at its one entry node.
   for (const Function& f : g.functions) {
@@ -1195,6 +1221,14 @@ int Instance::var_slot(std::string_view name) const {
   auto it = var_slots_.find(std::string(name));
   return it == var_slots_.end() ? -1 : it->second;
 }
+namespace {
+/// Where an instance holds the variable a node names.
+std::string key_of(const Node& n) {
+  const std::string scope = n.param("scope");
+  return scope.empty() ? n.param("variable") : scope + "." + n.param("variable");
+}
+}  // namespace
+int Instance::var_slot(const Node& n) const { return var_slot(key_of(n)); }
 
 int Instance::out_slot(int node, int out) const {
   const CNode& c = nodes_[static_cast<std::size_t>(node)];
@@ -1233,7 +1267,7 @@ bool Instance::inline_pure(int node) const {
                                   "value.float", "value.int", "value.bool"};
   for (const char* t : kInline) if (c.def->type == t) return true;
   if (c.def->type == "logic.select") return numeric(c.out[0].type);
-  if (c.def->type == "var.get") return var_slot(c.node->param("variable")) >= 0;
+  if (c.def->type == "var.get") return var_slot(*c.node) >= 0;
   return false;
 }
 
@@ -1247,7 +1281,7 @@ bool Instance::inline_node(int node) const {
   if (t == "flow.branch" || t == "flow.sequence" || t == "flow.for" || t == "flow.while" || t == "flow.do_once" || t == "flow.do_n" || t == "flow.gate" ||
       t == "flow.flip_flop")
     return true;
-  if (t == "var.set" || t == "var.add") return var_slot(c.node->param("variable")) >= 0;
+  if (t == "var.set" || t == "var.add") return var_slot(*c.node) >= 0;
   return false;
 }
 
@@ -1287,6 +1321,8 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
   // Slots: numeric variables first, then 8 per node. Sizes never change afterwards.
   int numeric_vars = 0;
   for (const Variable& v : graph_.variables) numeric_vars += numeric(v.type) ? 1 : 0;
+  for (const Function& f : graph_.functions)
+    for (const FunctionPin& l : f.locals) numeric_vars += numeric(l.type) ? 1 : 0;
   node_slot_base_ = numeric_vars;
   slots_.assign(static_cast<std::size_t>(numeric_vars) + graph_.nodes.size() * CodeLayout::kNodeSlots, 0.0);
   stack_.assign(1 + 2 * CodeLayout::kStack, 0);
@@ -1294,6 +1330,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     int k = 0;
     for (const Variable& v : graph_.variables) {
       const Value init = Value::from_json(v.value, v.type, graph_, v.of);
+      var_types_[v.name] = {v.type, v.of};
       if (numeric(v.type)) {
         var_slots_[v.name] = k;
         slots_[static_cast<std::size_t>(k++)] = to_type(init.as_number(), v.type);
@@ -1301,6 +1338,22 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
         vars_[v.name] = init;
       }
     }
+    // A function's local variables are held like the others, under "<function>.<name>" (no
+    // variable has such a name): numbers in slots, where generated code reads them.
+    locals_.resize(graph_.functions.size());
+    for (std::size_t f = 0; f < graph_.functions.size(); ++f)
+      for (const FunctionPin& l : graph_.functions[f].locals) {
+        const std::string key = graph_.functions[f].name + "." + l.name;
+        const Value init = Value::from_json(l.value, l.type, graph_, l.of);
+        var_types_[key] = {l.type, l.of};
+        if (numeric(l.type)) {
+          var_slots_[key] = k;
+          slots_[static_cast<std::size_t>(k++)] = to_type(init.as_number(), l.type);
+        } else {
+          vars_[key] = init;
+        }
+        locals_[f].push_back({key, init});
+      }
   }
   nodes_.resize(graph_.nodes.size());
   for (std::size_t i = 0; i < graph_.nodes.size(); ++i) {
@@ -1450,6 +1503,7 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   // loop guard: the budget counts what one step runs, and a paused world has no ticks to start
   // a new count while its systems keep asking.
   if (rt_.depth_ == 0) rt_.step_starts();
+  for (const Local& l : locals_[static_cast<std::size_t>(f)]) hold(l.key, l.init);  // (every call starts with its locals' defaults)
   Frame frame;
   frame.function = f;
   frame.depth = rt_.depth_ + (inside ? 0 : 1);  // (the depth its own chain runs at)
@@ -1492,31 +1546,57 @@ Value Instance::get(std::string_view variable) const {
     Value v;
     return blueprint_->get(variable, v) ? v : Value();
   }
-  if (const int k = var_slot(variable); k >= 0) {
-    const Variable* v = graph_.variable(variable);
-    return from_slot(slots_[static_cast<std::size_t>(k)], v ? v->type : PinType::number);
+  // (a function's local variables are its own: nobody outside reads or sets them)
+  return variable.find('.') == std::string_view::npos ? held(std::string(variable)) : Value();
+}
+Value Instance::held(const std::string& key) const {
+  if (const int k = var_slot(key); k >= 0) {
+    auto t = var_types_.find(key);
+    return from_slot(slots_[static_cast<std::size_t>(k)], t != var_types_.end() ? t->second.type : PinType::number);
   }
-  auto it = vars_.find(std::string(variable));
+  auto it = vars_.find(key);
   return it == vars_.end() ? Value() : it->second;
+}
+bool Instance::hold(const std::string& key, const Value& v) {
+  auto t = var_types_.find(key);
+  if (t == var_types_.end()) return false;
+  if (const int k = var_slot(key); k >= 0) {
+    slots_[static_cast<std::size_t>(k)] = to_type(v.as_number(), t->second.type);
+    return true;
+  }
+  auto it = vars_.find(key);
+  if (it == vars_.end()) return false;
+  it->second = from_outside(v, {it->second.type, t->second.of}, graph_);
+  return true;
+}
+Value Instance::get(const Node& n) const { return blueprint_ ? Value() : held(key_of(n)); }
+bool Instance::set(const Node& n, const Value& v) { return !blueprint_ && hold(key_of(n), v); }
+Value* Instance::variable(const Node& n) {
+  if (blueprint_) return nullptr;
+  auto it = vars_.find(key_of(n));
+  return it == vars_.end() ? nullptr : &it->second;
+}
+std::vector<Value> Instance::locals() const {
+  std::vector<Value> r;
+  for (const auto& of : locals_)
+    for (const Local& l : of) r.push_back(held(l.key));
+  return r;
+}
+void Instance::set_locals(const std::vector<Value>& values) {
+  std::size_t k = 0;
+  for (const auto& of : locals_)
+    for (const Local& l : of)
+      if (k < values.size()) hold(l.key, values[k++]);
 }
 
 Value* Instance::variable(std::string_view name) {
   if (blueprint_) return nullptr;
-  auto it = vars_.find(std::string(name));
+  auto it = name.find('.') == std::string_view::npos ? vars_.find(std::string(name)) : vars_.end();
   return it == vars_.end() ? nullptr : &it->second;
 }
 bool Instance::set(std::string_view variable, const Value& v) {
   if (blueprint_) return blueprint_->set(variable, v);
-  if (const int k = var_slot(variable); k >= 0) {
-    const Variable* var = graph_.variable(variable);
-    slots_[static_cast<std::size_t>(k)] = to_type(v.as_number(), var ? var->type : PinType::number);
-    return true;
-  }
-  auto it = vars_.find(std::string(variable));
-  if (it == vars_.end()) return false;
-  const Variable* var = graph_.variable(variable);
-  it->second = from_outside(v, {it->second.type, var ? var->of : std::string()}, graph_);
-  return true;
+  return variable.find('.') == std::string_view::npos && hold(std::string(variable), v);
 }
 
 std::string Instance::state(std::string_view machine) const {
@@ -1685,6 +1765,7 @@ void Runtime::fire(const Event& e) {
       // that in its glue.)
       std::vector<std::vector<Value>> parameters;
       const bool at_work = !inst.blueprint_ && inst.active_ > 0;
+      const std::vector<Value> local_values = at_work ? inst.locals() : std::vector<Value>();
       if (at_work)
         for (int entry : inst.fn_entry_) parameters.push_back(entry >= 0 ? inst.nodes_[static_cast<std::size_t>(entry)].outputs : std::vector<Value>());
       for (std::size_t o = 0; o < c.out.size(); ++o)
@@ -1693,6 +1774,7 @@ void Runtime::fire(const Event& e) {
       run_from(inst, static_cast<int>(i), 0);
       --c.running;
       if (nested) c.outputs = std::move(outer);
+      if (at_work) inst.set_locals(local_values);
       for (std::size_t f = 0; f < parameters.size(); ++f)
         if (inst.fn_entry_[f] >= 0) inst.nodes_[static_cast<std::size_t>(inst.fn_entry_[f])].outputs = std::move(parameters[f]);
       if (inst.disabled_) break;

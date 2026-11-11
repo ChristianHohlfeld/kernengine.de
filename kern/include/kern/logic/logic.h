@@ -395,10 +395,17 @@ struct FunctionPin {
 struct Function {
   std::string name;
   std::vector<FunctionPin> inputs, outputs;
+  /// Its local variables: each call starts with their defaults, and they are gone when the call
+  /// is over (after a Return, at the end of its path, at a wait). In the Blueprint's C++ they are
+  /// the locals at the top of the function's body. The variable nodes name one with their
+  /// setting "scope" (the function); two functions may each have a local of one name.
+  std::vector<FunctionPin> locals;
   bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
+  const FunctionPin* local(std::string_view name) const;
+  FunctionPin* local(std::string_view name);
 };
 
 /// A comment box (Blueprint "C"): a titled frame behind a group of nodes; moving it moves them.
@@ -428,6 +435,9 @@ struct Graph {
   const Node* find(u32 id) const;
   const Variable* variable(std::string_view name) const;
   Variable* variable(std::string_view name);
+  /// The variable a node's settings name: a variable of the Blueprint, or - with the setting
+  /// "scope" - a local variable of that function. `out` holds it (a local as a Variable).
+  bool variable_of(const Node& n, Variable& out) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
@@ -523,7 +533,9 @@ struct ParamDef {
   /// (Select, Reroute, the list nodes). In a Blueprint's C++ it is that type: logic_select<Float>.
   /// field: the setting names a field of the struct variable the node's setting "variable" names
   /// (Set Field). In a Blueprint's C++ it is that member: Held.Damage = 2.0.
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field } kind = Kind::text;
+  /// scope: the function whose local variable the setting "variable" names; empty for a variable
+  /// of the Blueprint. A Blueprint's C++ does not write it: the body the text stands in says it.
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope } kind = Kind::text;
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
@@ -779,6 +791,12 @@ class Instance {
   /// live in the slots, use set -, for a name that is none, and for a Blueprint that runs as its
   /// class (its variables are that class's members).
   Value* variable(std::string_view name);
+  /// The same for the variable a node's settings name ("variable", and "scope" for a local
+  /// variable of a function) - what the variable nodes read and change. A local variable is held
+  /// here like any other; every call of its function starts it with its default.
+  Value get(const Node& n) const;
+  bool set(const Node& n, const Value& v);
+  Value* variable(const Node& n);
   /// How many chains of this Blueprint are running, one inside the other (more than one: an event
   /// a running chain raised has reached a handler of the same Blueprint).
   int chains() const { return active_; }
@@ -817,6 +835,7 @@ class Instance {
   int stack_capacity() const { return stack_capacity_; }
   i32* exec_table() { return exec_table_.data(); }
   int var_slot(std::string_view name) const;
+  int var_slot(const Node& n) const;
   int node_slot(int node) const { return node_slot_base_ + node * CodeLayout::kNodeSlots; }
   /// Data output index -> slot (inline nodes with outputs other generated code / C++ read), -1 none.
   int out_slot(int node, int out) const;
@@ -865,6 +884,15 @@ class Instance {
     f64 entered = 0;
   };
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside);
+  Value held(const std::string& key) const;
+  bool hold(const std::string& key, const Value& v);
+  /// The local variables of every function, as they are now - and back (Runtime::fire: a handler
+  /// that starts in a running Blueprint may call a function that is in the middle of a call).
+  std::vector<Value> locals() const;
+  void set_locals(const std::vector<Value>& values);
+  struct Local { std::string key; Value init; };
+  std::vector<std::vector<Local>> locals_;                // per function: its local variables
+  std::unordered_map<std::string, TypeRef> var_types_;    // what is held under a key
   struct Frame {                     // a function call that is running
     int function = -1;               // index in graph_.functions
     int depth = 0;                   // Runtime::depth_ of the call's own chain

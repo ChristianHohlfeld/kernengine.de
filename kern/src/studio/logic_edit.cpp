@@ -26,6 +26,11 @@ json::Value fail_result(const std::string& text) {
 
 /// Why `name` cannot name a variable, a function or a function's pin (empty: it can). A Blueprint
 /// is its C++ as well (logic::to_cpp), and there these are names of the language.
+/// Is `name` a local variable of one of the Blueprint's functions?
+bool is_local(const logic::Graph& g, const std::string& name) {
+  for (const logic::Function& f : g.functions) if (f.local(name)) return true;
+  return false;
+}
 std::string name_problem(const logic::Graph& g, const std::string& name) {
   if (!logic::cpp_name_ok(name))
     return "\"" + name + "\" cannot be a name: letters, digits and _ (no spaces), not a word of C++ (int, class ...) or of Blueprints in C++ (Float, Text, loop ...)";
@@ -82,6 +87,7 @@ const char* param_kind_name(logic::ParamDef::Kind k) {
     case K::function: return "function";
     case K::type: return "type";
     case K::field: return "field";
+    case K::scope: return "scope";
   }
   return "text";
 }
@@ -374,6 +380,8 @@ json::Value Studio::logic_json() const {
     if (d && !d->params.empty()) {
       json::Value params = json::Value::array();
       for (const logic::ParamDef& pd : d->params) {
+        // (the function a node's local variable belongs to: shown on the nodes that have one)
+        if (pd.kind == logic::ParamDef::Kind::scope && n.param(pd.key).empty()) continue;
         json::Value pj = json::Value::object();
         pj.set("key", pd.key);
         pj.set("label", pd.label);
@@ -391,12 +399,19 @@ json::Value Studio::logic_json() const {
           for (std::size_t i = 0; i + 1 < pd.choices.size(); i += 2) choice(pd.choices[i], pd.choices[i + 1]);
         if (pd.kind == K::type)
           for (const logic::TypeRef& t : logic::type_choices(pd, *g)) choice(logic::type_text(t), logic::type_label(t));
-        if (pd.kind == K::variable)
-          for (const logic::Variable& v : g->variables)
-            if (n.type != "struct.set_field" || v.type == logic::PinType::structure) choice(v.name, v.name + " (" + logic::type_label(logic::TypeRef{v.type, v.of}) + ")");
+        if (pd.kind == K::variable) {
+          // (the variables of the Blueprint - or, for a node of a function's local variables, those)
+          const logic::Function* of = g->function(n.param("scope"));
+          auto offer = [&](const std::string& name, logic::PinType type, const std::string& type_of) {
+            if (n.type != "struct.set_field" || type == logic::PinType::structure) choice(name, name + " (" + logic::type_label(logic::TypeRef{type, type_of}) + ")");
+          };
+          if (of) for (const logic::FunctionPin& l : of->locals) offer(l.name, l.type, l.of);
+          else for (const logic::Variable& v : g->variables) offer(v.name, v.type, v.of);
+        }
         if (pd.kind == K::field) {
           // (the fields of the struct the node's variable is of)
-          const logic::Variable* v = g->variable(n.param("variable"));
+          logic::Variable held;
+          const logic::Variable* v = g->variable_of(n, held) ? &held : nullptr;
           const logic::StructType* named = g->structure(n.param("struct"));  // (Find Row names its struct itself)
           if (const logic::StructType* s = named ? named : v && v->type == logic::PinType::structure ? g->structure(v->of) : nullptr)
             for (const logic::StructField& f : s->fields) choice(f.name, f.name + " (" + logic::type_label(f.type) + ")");
@@ -611,11 +626,20 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (from_type.type == logic::PinType::exec) consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "flow.reroute", {}});
     else consider({"Add Reroute Node", "Flow", "A knot the wire passes through", "value.reroute", {{"type", logic::type_text(from_type)}}});
   }
-  for (const logic::Variable& v : g->variables) {
-    consider({"Get " + v.name, "Variables", std::string("Reads ") + v.name, "var.get", {{"variable", v.name}}});
-    consider({"Set " + v.name, "Variables", std::string("Writes ") + v.name, "var.set", {{"variable", v.name}}});
+  // The nodes of a variable: of the Blueprint's, and of each function's local variables (those
+  // name their function, the setting "scope").
+  auto variable_nodes = [&](const logic::Variable& v, const std::string& scope) {
+    using Params = std::vector<std::pair<std::string, std::string>>;
+    auto with = [&](Params p) {
+      if (!scope.empty()) p.push_back({"scope", scope});
+      return p;
+    };
+    const std::string category = scope.empty() ? std::string("Variables") : "Local Variables of " + scope;
+    const std::string what = scope.empty() ? v.name : "the local variable " + v.name + " of " + scope;
+    consider({"Get " + v.name, category, "Reads " + what, "var.get", with({{"variable", v.name}})});
+    consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
-      consider({"Add to " + v.name, "Variables", "Adds to " + v.name, "var.add", {{"variable", v.name}}});
+      consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
     // a struct variable: Set Field, for each of its fields
     if (const logic::StructType* s = v.type == logic::PinType::structure ? g->structure(v.of) : nullptr)
       for (const logic::StructField& f : s->fields) {
@@ -623,17 +647,20 @@ json::Value Studio::logic_palette(const json::Value& c) const {
         named.type = "struct.set_field";
         named.set_param("variable", v.name);
         named.set_param("field", f.name);
-        consider({lib.title(named), "Structures", "Changes the field " + f.name + " of " + v.name, named.type, {{"variable", v.name}, {"field", f.name}}});
+        consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"field", f.name}})});
       }
-    if (!logic::is_list(v.type)) continue;
+    if (!logic::is_list(v.type)) return;
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
       logic::Node named;
       named.type = d->type;
       named.set_param("variable", v.name);
-      consider({lib.title(named), "Lists", d->help, d->type, {{"variable", v.name}}});
+      consider({lib.title(named), scope.empty() ? std::string("Lists") : category, d->help, d->type, with({{"variable", v.name}})});
     }
-  }
+  };
+  for (const logic::Variable& v : g->variables) variable_nodes(v, {});
+  for (const logic::Function& f : g->functions)
+    for (const logic::FunctionPin& l : f.locals) variable_nodes(logic::Variable{l.name, l.type, l.value, {}, l.of}, f.name);
   for (const logic::EnumType& e : g->enums)
     for (const auto& d : lib.all()) {
       if (!enum_node(*d)) continue;
@@ -726,7 +753,7 @@ static void each_held_value(logic::Graph& g, const std::function<void(json::Valu
   }
   for (logic::Variable& v : g.variables) fn(v.value, {v.type, v.of});
   for (logic::Function& f : g.functions)
-    for (auto* pins : {&f.inputs, &f.outputs})
+    for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
       for (logic::FunctionPin& fp : *pins) fn(fp.value, {fp.type, fp.of});
   for (logic::StructType& s : g.structs)
     for (logic::StructField& f : s.fields) fn(f.value, f.type);
@@ -900,7 +927,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
     };
     for (const logic::Function& f : part.functions)
-      for (const auto* pins : {&f.inputs, &f.outputs})
+      for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
         for (const logic::FunctionPin& fp : *pins) take(fp.of);
     for (const logic::Node& n : part.nodes) {
       std::vector<logic::PinDef> in, out;
@@ -1050,7 +1077,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       // Set Field names a struct variable and one of its fields: the first ones, when none is said.
       if (type == "struct.set_field") {
-        const logic::Variable* v = g.variable(n.param("variable"));
+        logic::Variable held;
+        const logic::Variable* v = g.variable_of(n, held) ? &held : nullptr;
         if (!v)
           for (const logic::Variable& x : g.variables)
             if (!v && x.type == logic::PinType::structure) v = &x;
@@ -1242,7 +1270,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       n->set_param(str("key"), v.is_string() ? v.as_string() : v.is_number() ? std::to_string(static_cast<i64>(v.as_number())) : json::stringify(v));
       // Set Field of another variable: a field that variable's struct has (its first, when it has none of that name).
       if (n->type == "struct.set_field" && str("key") == "variable") {
-        const logic::Variable* var = g.variable(n->param("variable"));
+        logic::Variable held;
+        const logic::Variable* var = g.variable_of(*n, held) ? &held : nullptr;
         const logic::StructType* s = var && var->type == logic::PinType::structure ? g.structure(var->of) : nullptr;
         if (s && !s->fields.empty() && s->field(n->param("field")) < 0) n->set_param("field", s->fields.front().name);
       }
@@ -1276,6 +1305,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       auto uses = [&](const logic::Node& n) {
         return (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure") && n.param("function") == fname;
       };
+      // the nodes of its local variables (all of them, or of the one called `local`)
+      auto of_local = [&](const logic::Node& n, const std::string& local = {}) {
+        return n.param("scope") == fname && (local.empty() || n.param("variable") == local);
+      };
       // a pin's side on a node: the function's inputs leave the entry and enter the calls; the
       // outputs enter the Returns and leave the calls
       auto is_input_pin_of = [&](const logic::Node& n, bool input_side) { return input_side ? n.type != "func.entry" : n.type == "func.return"; };
@@ -1284,7 +1317,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       };
       if (op == "remove") {
         std::vector<u32> ids;
-        for (const logic::Node& n : g.nodes) if (uses(n)) ids.push_back(n.id);
+        for (const logic::Node& n : g.nodes) if (uses(n) || of_local(n)) ids.push_back(n.id);
         auto has = [&](u32 id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); };
         drop_links([&](const logic::Link& l) { return has(l.from) || has(l.to); });
         g.nodes.erase(std::remove_if(g.nodes.begin(), g.nodes.end(), [&](const logic::Node& n) { return has(n.id); }), g.nodes.end());
@@ -1294,8 +1327,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "rename") {
         const std::string to = str("to");
         if (to.empty() || to.size() > 64 || g.function(to) || g.variable(to)) { error = "that name is empty or taken"; return false; }
+        if (is_local(g, to)) { error = "a function has a local variable of that name"; return false; }
         if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
-        for (logic::Node& n : g.nodes) if (uses(n)) n.set_param("function", to);
+        for (logic::Node& n : g.nodes) {
+          if (uses(n)) n.set_param("function", to);
+          if (of_local(n)) n.set_param("scope", to);
+        }
         f->name = to;
         return true;
       }
@@ -1313,18 +1350,24 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       if (op == "help") { f->help = str("text"); return true; }
-      const bool input_side = str("side") != "out";
-      std::vector<logic::FunctionPin>& pins = input_side ? f->inputs : f->outputs;
+      // (side "local": its local variables - edited like its pins; their nodes are the variable
+      // nodes that name the function as their "scope")
+      const bool locals = str("side") == "local";
+      const bool input_side = !locals && str("side") != "out";
+      std::vector<logic::FunctionPin>& pins = locals ? f->locals : input_side ? f->inputs : f->outputs;
       auto valid_name = [&](const std::string& n) {
         if (n.empty() || n.size() > 64 || n == "exec" || n == "then") return false;
         for (const logic::FunctionPin& p : pins) if (p.name == n) return false;
-        // (an input is a parameter in the function's C++: it cannot hide a variable or a function)
-        if (input_side && (g.variable(n) || g.function(n))) return false;
+        // (an input is a parameter in the function's C++: it cannot hide a variable or a function;
+        // a local variable is a local there: it hides nothing, and no pin hides it)
+        if ((input_side || locals) && (g.variable(n) || g.function(n))) return false;
+        if (locals && (f->input(n) || f->output(n) || g.enumeration(n) || g.structure(n))) return false;
+        if (!locals && f->local(n)) return false;
         return name_problem(g, n).empty();
       };
       if (op == "pinAdd") {
-        if (pins.size() >= 16) { error = "a function has at most 16 inputs and 16 outputs"; return false; }
-        std::string base = str("pin").empty() ? (input_side ? "value" : "result") : str("pin"), pname = base;
+        if (pins.size() >= (locals ? 64u : 16u)) { error = locals ? "a function has at most 64 local variables" : "a function has at most 16 inputs and 16 outputs"; return false; }
+        std::string base = str("pin").empty() ? (locals ? "local" : input_side ? "value" : "result") : str("pin"), pname = base;
         for (int i = 2; !valid_name(pname) && i < 100; ++i) pname = base + std::to_string(i);
         logic::TypeRef t;
         if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
@@ -1337,6 +1380,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (it == pins.end()) { error = "no pin " + pin; return false; }
       // the wires and the typed-in values of this pin on the function's nodes
       auto on_pin = [&](const logic::Link& l, bool& as_input) {
+        if (locals) return false;  // (a local variable is no pin)
         const logic::Node* to = g.find(l.to);
         const logic::Node* from = g.find(l.from);
         if (to && uses(*to) && l.in == pin && is_input_pin_of(*to, input_side)) { as_input = true; return true; }
@@ -1346,7 +1390,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "pinRemove") {
         drop_links([&](const logic::Link& l) { bool in; return on_pin(l, in); });
         for (logic::Node& n : g.nodes)
-          if (uses(n) && is_input_pin_of(n, input_side))
+          if (!locals && uses(n) && is_input_pin_of(n, input_side))
             n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
         pins.erase(it);
         return true;
@@ -1359,9 +1403,11 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           if (!on_pin(l, as_input)) continue;
           (as_input ? l.in : l.out) = to;
         }
-        for (logic::Node& n : g.nodes)
+        for (logic::Node& n : g.nodes) {
+          if (locals) { if (of_local(n, pin)) n.set_param("variable", to); continue; }
           if (uses(n) && is_input_pin_of(n, input_side))
             for (auto& v : n.values) if (v.first == pin) v.first = to;
+        }
         it->name = to;
         return true;
       }
@@ -1373,7 +1419,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         it->of = t.of;
         // values typed into the nodes were of the old type
         for (logic::Node& n : g.nodes)
-          if (uses(n) && is_input_pin_of(n, input_side))
+          if (!locals && uses(n) && is_input_pin_of(n, input_side))
             n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
         return true;
       }
@@ -1395,7 +1441,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "add") {
         std::string base = var.empty() ? "NewVar" : var, n = base;
         if (const std::string why = name_problem(g, base); !why.empty() && !var.empty()) { error = why; return false; }
-        for (int i = 2; g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n); ++i) n = base + std::to_string(i);
+        for (int i = 2; g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); ++i) n = base + std::to_string(i);
         logic::TypeRef t;
         if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
         g.variables.push_back({n, t.type, logic::zero_of(t, g).to_json(g, t.of), {}, t.of});
@@ -1411,9 +1457,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "rename") {
         const std::string to = str("to");
         if (to.empty() || to.size() > 64 || g.variable(to) || g.function(to) || g.enumeration(to) || g.structure(to)) { error = "that name is empty or taken"; return false; }
+        if (is_local(g, to)) { error = "a function has a local variable of that name"; return false; }
         if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         for (logic::Node& n : g.nodes)
-          if (n.param("variable") == var) n.set_param("variable", to);
+          if (n.param("variable") == var && n.param("scope").empty()) n.set_param("variable", to);
         for (logic::StateMachine& m : g.machines)
           for (logic::Transition& t : m.transitions)
             if (t.variable == var) t.variable = to;
@@ -1442,7 +1489,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const std::string op = str("op");
     return graph_edit("Edit Enum", [&](logic::Graph& g, game::Level&) {
       const std::string which = str("name");
-      auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n); };
+      auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); };
       if (op == "add") {
         std::string base = which.empty() ? "NewEnum" : which, n = base;
         if (const std::string why = name_problem(g, base); !why.empty() && !which.empty()) { error = why; return false; }
@@ -1472,7 +1519,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         std::string user;
         for (const logic::Variable& v : g.variables) if (user.empty() && v.of == old) user = "the variable " + v.name;
         for (const logic::Function& f : g.functions)
-          for (const auto* pins : {&f.inputs, &f.outputs})
+          for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
             for (const logic::FunctionPin& fp : *pins) if (user.empty() && fp.of == old) user = "\"" + fp.name + "\" of the function " + f.name;
         for (const logic::StructType& s : g.structs)
           for (const logic::StructField& f : s.fields) if (user.empty() && f.type.of == old) user = "the field " + f.name + " of the struct " + s.name;
@@ -1490,7 +1537,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         each_setting([&](logic::Node& n, const logic::ParamDef& pd, bool list) { n.set_param(pd.key, list ? to + "_list" : to); });
         for (logic::Variable& v : g.variables) if (v.of == old) v.of = to;
         for (logic::Function& f : g.functions)
-          for (auto* pins : {&f.inputs, &f.outputs})
+          for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
             for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.of = to;
         for (logic::StructType& s : g.structs)
           for (logic::StructField& f : s.fields) if (f.type.of == old) f.type.of = to;
@@ -1550,7 +1597,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const std::string op = str("op");
     return graph_edit("Edit Struct", [&](logic::Graph& g, game::Level&) {
       const std::string which = str("name");
-      auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n); };
+      auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); };
       if (op == "add") {
         std::string base = which.empty() ? "NewStruct" : which, n = base;
         if (const std::string why = name_problem(g, base); !why.empty() && !which.empty()) { error = why; return false; }
@@ -1580,7 +1627,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         std::string user;
         for (const logic::Variable& v : g.variables) if (user.empty() && v.of == old) user = "the variable " + v.name;
         for (const logic::Function& f : g.functions)
-          for (const auto* pins : {&f.inputs, &f.outputs})
+          for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
             for (const logic::FunctionPin& fp : *pins) if (user.empty() && fp.of == old) user = "\"" + fp.name + "\" of the function " + f.name;
         for (const logic::StructType& other : g.structs)
           for (const logic::StructField& f : other.fields) if (user.empty() && f.type.of == old) user = "the field " + f.name + " of the struct " + other.name;
@@ -1598,7 +1645,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         each_setting([&](logic::Node& n, const logic::ParamDef& pd, bool list) { n.set_param(pd.key, list ? to + "_list" : to); });
         for (logic::Variable& v : g.variables) if (v.of == old) v.of = to;
         for (logic::Function& f : g.functions)
-          for (auto* pins : {&f.inputs, &f.outputs})
+          for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
             for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.of = to;
         for (logic::StructType& other : g.structs)
           for (logic::StructField& f : other.fields) if (f.type.of == old) f.type.of = to;
@@ -1666,7 +1713,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       // the struct's own nodes: Make and Break have a pin for each field, Set Field names one
       auto is_node = [&](const logic::Node& n, const char* type) { return n.type == type && n.param("struct") == old; };
       auto sets_field = [&](const logic::Node& n) {
-        const logic::Variable* v = g.variable(n.param("variable"));
+        logic::Variable held;
+        const logic::Variable* v = g.variable_of(n, held) ? &held : nullptr;
         if (n.type == "list.find_row") return n.param("struct") == old && n.param("field") == field;  // (Find Row names its struct itself)
         return n.type == "struct.set_field" && v && v->type == logic::PinType::structure && v->of == old && n.param("field") == field;
       };

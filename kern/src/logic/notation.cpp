@@ -198,7 +198,7 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
   std::string r;
   for (std::size_t k = 0; k < def.params.size(); ++k) {
     const ParamDef& pd = def.params[k];
-    if (pd.kind == ParamDef::Kind::variable) continue;
+    if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
     const std::string value = n.param(pd.key, pd.def);
     // (a struct and one of its fields are one setting, as C++ names a field: &Weapon::Name)
     if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
@@ -678,7 +678,9 @@ struct Shape {
           }
           continue;
         }
-        const bool computes = d.type == "flow.reroute" || d.type == "func.return" || (d.kind == NodeKind::flow && !d.latent && (!d.memory || d.loop));
+        // (what it sets of its own local variables is part of computing: they are gone with the call)
+        const bool computes = d.type == "flow.reroute" || d.type == "func.return" || (d.kind == NodeKind::flow && !d.latent && (!d.memory || d.loop)) ||
+                              !at(x).node->param("scope").empty();
         if (!computes)
           return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
       }
@@ -767,6 +769,17 @@ struct Shape {
           if (!typed_ok("\"" + p.name + "\" of " + f.name, p.type, p.of, p.value)) return false;
         }
       }
+      // A local variable is a local of the function's C++: it hides nothing - no variable, no
+      // function, no type, none of the function's pins.
+      std::set<std::string> locals;
+      for (const FunctionPin& l : f.locals) {
+        if (!name_ok(l.name, "the local variable")) return false;
+        if (!locals.insert(l.name).second) return fail("function \"" + f.name + "\" has two local variables called \"" + l.name + "\"");
+        if (names.count(l.name)) return fail("the local variable \"" + l.name + "\" of " + f.name + " has the name of a variable, a function or a type");
+        if (f.input(l.name) || f.output(l.name)) return fail("the local variable \"" + l.name + "\" of " + f.name + " has the name of one of its pins");
+        if (l.type == PinType::exec || l.type >= PinType::count) return fail("the local variable " + l.name + " of " + f.name + " has no type");
+        if (!typed_ok("the local variable " + l.name + " of " + f.name, l.type, l.of, l.value)) return false;
+      }
       int entries = 0;
       for (const Info& x : n) entries += x.def->type == "func.entry" && x.node->param("function") == f.name ? 1 : 0;
       if (entries != 1) return fail("function \"" + f.name + "\" needs exactly one Function Entry node (it has " + std::to_string(entries) + ")");
@@ -776,8 +789,24 @@ struct Shape {
       const std::string& t = x.def->type;
       if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure")
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
-      if (t == "var.get" || t == "var.set" || t == "var.add")
-        if (!g.variable(x.node->param("variable"))) return fail(title(i) + " names a variable that is not there", i);
+      bool names_variable = false;
+      for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
+      if (names_variable) {
+        Variable named;
+        if (!g.variable_of(*x.node, named)) return fail(title(i) + " names a variable that is not there", i);
+        // A local variable is there while its function's call runs: on a path of that function,
+        // in that function's own body.
+        if (const std::string scope = x.node->param("scope"); !scope.empty()) {
+          const int where = place_of(i);
+          const int owner = where >= 0 && ctx[static_cast<std::size_t>(where)].first == kCallable && !(x.own && !x.pure) ? ctx[static_cast<std::size_t>(where)].second : -1;
+          if (where == detached)
+            return fail(title(i) + " reads the local variable \"" + named.name + "\" of " + scope + ", and nothing reads it: wire it on a path of that function, or remove it", i);
+          if (owner < 0 || at(owner).def->type != "func.entry" || at(owner).node->param("function") != scope)
+            return fail(title(i) + " uses the local variable \"" + named.name + "\" of " + scope + " outside a path of that function: a local variable is there while the function's call "
+                            "runs - not after a wait (Delay), not in an event or another function, and paths that meet before it must all come from one Branch or Switch",
+                        i);
+        }
+      }
       if (x.def->problem)
         if (const std::string why = x.def->problem(*x.node, g); !why.empty()) return fail(title(i) + ": " + why, i);
       for (const ParamDef& pd : x.def->params) {
@@ -1248,6 +1277,8 @@ struct Writer {
         std::string args;
         for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g);
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
+        // (its local variables: every call starts with them as they stand here)
+        for (const FunctionPin& l : f.locals) line(2, cpp_type(TypeRef{l.type, l.of}) + " " + l.name + " = " + literal(Value::from_json(l.value, l.type, g, l.of), l.of, g) + ";");
         // (a path that ends without a Return gives the outputs' defaults)
         if (!body(e, 2) && !f.outputs.empty()) line(2, "return {};");
         line(1, "}");
@@ -2104,6 +2135,26 @@ struct Reader {
       it.tok = at + 1;
       pure = false;
       if (!expect(")") || !expect("{")) return false;
+      if (it.kind == Item::function) {
+        // Type Name = value;   its local variables, at the top of its body
+        Function& f = g.functions.back();
+        for (TypeRef type; ((is("List") && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+          FunctionPin l;
+          l.type = type.type;
+          l.of = type.of;
+          const std::size_t where = p;
+          if (!word(l.name, "the local variable's name")) return false;
+          if (f.local(l.name)) return fail(where, "the function " + f.name + " has the local variable " + l.name + " twice");
+          if (g.variable(l.name) || g.function(l.name) || f.input(l.name) || f.output(l.name))
+            return fail(where, "the local variable " + l.name + " of " + f.name + " has the name of a variable, a function or one of its pins");
+          Value init = zero_of(type, g);
+          if (accept("=") && !typed_literal(type, init, l.name)) return false;
+          if (!expect(";")) return false;
+          l.value = init.to_json(g, type.of);
+          f.locals.push_back(std::move(l));
+        }
+        if (failed()) return false;
+      }
       it.open = p;
       items.push_back(std::move(it));
       if (!skip_block()) return false;
@@ -2116,6 +2167,23 @@ struct Reader {
   }
 
   // ---- nodes ----
+  /// The variable a name means here: in a function's own body one of its local variables,
+  /// everywhere a variable of the Blueprint.
+  bool variable_here(const std::string& name, Variable& out) const {
+    if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
+      out = Variable{l->name, l->type, l->value, {}, l->of};
+      return true;
+    }
+    const Variable* v = g.variable(name);
+    if (v) out = *v;
+    return v != nullptr;
+  }
+  /// The settings of a node that names it (a local variable: with its function as "scope").
+  std::vector<std::pair<std::string, std::string>> naming(const std::string& variable) const {
+    std::vector<std::pair<std::string, std::string>> r{{"variable", variable}};
+    if (scope.function && scope.function->local(variable)) r.push_back({"scope", scope.function->name});
+    return r;
+  }
   int make(const NodeDef* def, std::size_t tok, std::vector<std::pair<std::string, std::string>> params = {}) {
     Made m;
     m.def = def;
@@ -2141,7 +2209,7 @@ struct Reader {
     std::size_t count = 0;
     for (std::size_t k = 0; k < def->params.size(); ++k) {
       const ParamDef& pd = def->params[k];
-      if (pd.kind == ParamDef::Kind::variable) continue;
+      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
       if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def->params.size() && def->params[k + 1].kind == ParamDef::Kind::field) {
         want += (want.empty() ? "" : ", ") + std::string("&AStruct::Field");
         ++count;
@@ -2165,12 +2233,13 @@ struct Reader {
     std::vector<bool> as_type;
     if (!settings(given, &as_type)) return -1;
     std::size_t written = 0, variables = 0;
-    for (const ParamDef& pd : def->params) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
+    for (const ParamDef& pd : def->params)
+      if (pd.kind != ParamDef::Kind::scope) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
     if (given.size() != written) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
     // (a type is written as a type, everything else as a text; and the type is one the setting can name)
     for (std::size_t k = 0, at = 0; k < def->params.size(); ++k) {
       const ParamDef& pd = def->params[k];
-      if (pd.kind == ParamDef::Kind::variable) continue;
+      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
       bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type);
       if (fits && pd.kind == ParamDef::Kind::type) {
         fits = false;
@@ -2187,7 +2256,8 @@ struct Reader {
       if (peek(q).kind == Tok::id && numbered(peek(q).s, "n") && is(",", q + 1)) q += 2;                        // (its member)
       if ((peek(q).kind == Tok::text || (peek(q).kind == Tok::id && peek(q).s == "entry")) && is(",", q + 1)) q += 2;  // (its exec input)
       for (std::size_t k = 0; k < variables; ++k, q += 2) {
-        if (peek(q).kind != Tok::id || !g.variable(peek(q).s)) {
+        Variable named;
+        if (peek(q).kind != Tok::id || !variable_here(peek(q).s, named)) {
           fail(p + q, fname + " changes a variable: that variable is its first value - " + fname + "(Variable, ...) - not " + shown(peek(q)));
           return -1;
         }
@@ -2196,7 +2266,10 @@ struct Reader {
     }
     std::vector<std::pair<std::string, std::string>> params;
     std::size_t g_at = 0, v_at = 0;
-    for (const ParamDef& pd : def->params) params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
+    for (const ParamDef& pd : def->params) {
+      if (pd.kind != ParamDef::Kind::scope) params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
+      else if (scope.function && !names.empty() && scope.function->local(names.front())) params.push_back({pd.key, scope.function->name});
+    }
     return make(def, tok, std::move(params));
   }
   bool declare(u32 id, int node, std::size_t tok) {
@@ -2378,14 +2451,15 @@ struct Reader {
       else s.root = true;
       return s;
     }
-    if (const Variable* v = g.variable(t.s)) {
+    if (Variable named; variable_here(t.s, named)) {
+      const Variable* v = &named;
       if (is(".")) {
         const std::string field = peek(1).kind == Tok::id ? peek(1).s : std::string("Field");
         if (v->type == PinType::structure) fail(p, "a struct's field is read through Break: struct_break<" + v->of + ">(" + v->name + ")." + field);
         else fail(p, v->name + " is " + cpp_type(TypeRef{v->type, v->of}) + ": it has no fields");
         return s;
       }
-      s.node = make("var.get", s.tok, {{"variable", t.s}});
+      s.node = make("var.get", s.tok, naming(t.s));
       s.root = true;
       return s;
     }
@@ -2487,7 +2561,8 @@ struct Reader {
   /// Variable.Field = value   ("Variable" has been read, "." is next): the Set Field it is, up to
   /// and including the "=" (-1: refused).
   int field_step(const std::string& var, std::size_t at) {
-    const Variable* v = g.variable(var);
+    Variable named;
+    const Variable* v = variable_here(var, named) ? &named : nullptr;
     const StructType* s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
     if (!s) { fail(p, var + " is " + (v ? cpp_type(TypeRef{v->type, v->of}) : std::string("no variable")) + ": only a struct has fields to set (Variable.Field = value;)"); return -1; }
     ++p;
@@ -2497,7 +2572,9 @@ struct Reader {
     if (s->field(field) < 0) { fail(where, s->name + " has no field \"" + field + "\" (" + field_names(*s) + ")"); return -1; }
     if (!is("=")) { fail(p, var + "." + field + " = value; expected, not " + shown(peek())); return -1; }
     ++p;
-    return step(make("struct.set_field", at, {{"variable", var}, {"field", field}}), at);
+    std::vector<std::pair<std::string, std::string>> params = naming(var);
+    params.insert(params.begin() + 1, {"field", field});
+    return step(make("struct.set_field", at, std::move(params)), at);
   }
   /// A body in braces: "{" has been read; reads up to and including "}".
   Ends block(Ends open, bool keep_scope = true) {
@@ -2796,7 +2873,7 @@ struct Reader {
       const std::size_t name = p;
       std::string var;
       if (!word(var, "a variable")) return {};
-      if (!g.variable(var)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
+      if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
       int node = -1;
       if (is(".")) {
         node = field_step(var, at);  // n<id>.value = (Variable.Field = value);
@@ -2804,7 +2881,7 @@ struct Reader {
         const bool add = is("+=");
         if (!add && !is("=")) { fail(p, var + " = value or " + var + " += value expected, not " + shown(peek())); return {}; }
         ++p;
-        node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+        node = step(make(add ? "var.add" : "var.set", at, naming(var)), at);
       }
       if (node < 0 || !declare(id, node, at)) return {};
       enter(in, node, "", at);
@@ -2826,9 +2903,9 @@ struct Reader {
       if (!f) { fail(name, "\"" + fn + "\" is no function of this Blueprint (n<id> = Function(...); keeps what a called function gave)"); return {}; }
       return call_function(std::move(in), f->name, id, at);
     }
-    if (const Variable* v = g.variable(t.s)) {
+    if (Variable named; variable_here(t.s, named)) {
       // Variable = value;   Variable += value;   Variable.Field = value;
-      const std::string var = v->name;
+      const std::string var = named.name;
       p += 1;
       int node = -1;
       if (is(".")) {
@@ -2837,7 +2914,7 @@ struct Reader {
         const bool add = is("+=");
         if (!add && !is("=")) { fail(p, var + " = value; or " + var + " += value; expected, not " + shown(peek())); return {}; }
         ++p;
-        node = step(make(add ? "var.add" : "var.set", at, {{"variable", var}}), at);
+        node = step(make(add ? "var.add" : "var.set", at, naming(var)), at);
       }
       if (node < 0) return {};
       enter(in, node, "", at);
@@ -3378,7 +3455,10 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
     for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
     sig += ") -> (";
     for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
-    add("function " + std::to_string(i + 1), sig + ")");
+    sig += ")";
+    if (!f.locals.empty()) sig += " with the local variables (";
+    for (const FunctionPin& p : f.locals) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    add("function " + std::to_string(i + 1), sig + (f.locals.empty() ? "" : ")"));
     add("the description of function " + std::to_string(i + 1), f.help);
   }
   add("the number of state machines", std::to_string(g.machines.size()));
@@ -3554,6 +3634,8 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
     for (Node& n : g.nodes) {
       const NodeDef* def = lib.find(n.type);
       if (!def) continue;
+      // (a node that names a function's local variable does not name the Blueprint's variable)
+      if (kind == ParamDef::Kind::variable && !n.param("scope").empty()) continue;
       for (const ParamDef& p : def->params)
         if (p.kind == kind && n.param(p.key, p.def) == from) n.set_param(p.key, to);
     }
@@ -3574,6 +3656,7 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
     const std::string from = f.name, to = fn_names[i];
     if (from != to) {
       set_params(ParamDef::Kind::function, from, to);
+      set_params(ParamDef::Kind::scope, from, to);
       f.name = to;
       renamed.push_back({from, to});
     }

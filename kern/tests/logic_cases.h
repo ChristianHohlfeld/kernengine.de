@@ -347,6 +347,36 @@ inline const std::vector<Case>& cases() {
        R"({"variables":[{"name":"N","type":"int","value":0}],
         "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.while","values":{"condition":true}},{"id":3,"type":"var.add","params":{"variable":"N"}}],
         "links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})"},
+      // Local variables of functions: every call starts with their defaults (numbers in slots, a
+      // text); two functions have a Total; a pure function sets its own; Outer raises an event
+      // whose handler calls Outer again - the interrupted call has its own Own afterwards.
+      {"locals",
+       R"({"nextId":94,"variables":[{"name":"Sum","type":"float","value":0},{"name":"Steps","type":"int","value":0},{"name":"Kept","type":"float","value":0},{"name":"Got","type":"float","value":0},
+        {"name":"Shown","type":"text","value":""}],"nodes":[{"id":10,"type":"flow.for","values":{"first":1}},{"id":40,"type":"event.custom","params":{"name":"Again"}},
+        {"id":41,"type":"func.call","params":{"function":"Outer"},"values":{"again":false}},{"id":50,"type":"event.custom","params":{"name":"Go"}},
+        {"id":51,"type":"func.call","params":{"function":"SumTo"}},{"id":54,"type":"func.call","params":{"function":"Outer"},"values":{"again":true}},
+        {"id":56,"type":"func.call","params":{"function":"Join"}},{"id":57,"type":"func.entry","params":{"function":"SumTo"}},
+        {"id":58,"type":"var.add","params":{"variable":"Total","scope":"SumTo"}},{"id":59,"type":"var.add","params":{"variable":"Count","scope":"SumTo"},"values":{"amount":1}},
+        {"id":60,"type":"func.return","params":{"function":"SumTo"}},{"id":61,"type":"var.get","params":{"variable":"Total","scope":"SumTo"}},
+        {"id":62,"type":"var.get","params":{"variable":"Count","scope":"SumTo"}},{"id":63,"type":"func.entry","params":{"function":"Limit"}},
+        {"id":64,"type":"var.set","params":{"variable":"Out","scope":"Limit"}},{"id":65,"type":"flow.branch"},{"id":66,"type":"math.compare","params":{"op":">"},"values":{"b":1}},
+        {"id":67,"type":"var.set","params":{"variable":"Out","scope":"Limit"},"values":{"value":1}},{"id":68,"type":"func.return","params":{"function":"Limit"}},
+        {"id":69,"type":"var.get","params":{"variable":"Out","scope":"Limit"}},{"id":70,"type":"func.entry","params":{"function":"Outer"}},
+        {"id":71,"type":"var.add","params":{"variable":"Own","scope":"Outer"}},{"id":72,"type":"math.mul","values":{"b":10}},{"id":73,"type":"flow.branch"},
+        {"id":74,"type":"flow.call","params":{"name":"Again"},"values":{"target":0,"actor":0,"value":5,"text":""}},{"id":75,"type":"func.return","params":{"function":"Outer"}},
+        {"id":76,"type":"math.add"},{"id":77,"type":"var.get","params":{"variable":"Own","scope":"Outer"}},{"id":78,"type":"func.pure","params":{"function":"Limit"}},
+        {"id":79,"type":"var.get","params":{"variable":"Own","scope":"Outer"}},{"id":80,"type":"func.entry","params":{"function":"Join"}},
+        {"id":81,"type":"var.set","params":{"variable":"Total","scope":"Join"}},{"id":82,"type":"text.append","values":{"c":">"}},
+        {"id":83,"type":"var.get","params":{"variable":"Total","scope":"Join"}},{"id":84,"type":"func.return","params":{"function":"Join"}},
+        {"id":85,"type":"var.get","params":{"variable":"Total","scope":"Join"}},{"id":86,"type":"var.set","params":{"variable":"Kept"}},{"id":87,"type":"var.add","params":{"variable":"Sum"}},
+        {"id":88,"type":"var.add","params":{"variable":"Steps"}},{"id":89,"type":"var.set","params":{"variable":"Got"}},{"id":90,"type":"func.pure","params":{"function":"Limit"}},
+        {"id":91,"type":"var.set","params":{"variable":"Shown"}},{"id":92,"type":"text.append","values":{"c":""}},
+        {"id":93,"type":"var.get","params":{"variable":"Shown"}}],"links":[[10,"body",58,"exec"],[10,"completed",60,"exec"],[10,"index",58,"amount"],[40,"then",41,"exec"],[40,"value",41,"x"],[41,"mine",86,"value"],[41,"then",86,"exec"],[50,"then",51,"exec"],[50,"value",51,"n"],[50,"value",54,"x"],[50,"value",90,"x"],[51,"steps",88,"amount"],[51,"sum",87,"amount"],[51,"then",87,"exec"],[54,"mine",89,"value"],[54,"then",89,"exec"],[56,"text",92,"b"],[56,"then",91,"exec"],[57,"n",10,"last"],[57,"then",10,"exec"],[58,"then",59,"exec"],[61,"value",60,"sum"],[62,"value",60,"steps"],[63,"then",64,"exec"],[63,"x",64,"value"],[63,"x",66,"a"],[64,"then",65,"exec"],[65,"false",68,"exec"],[65,"true",67,"exec"],[66,"result",65,"condition"],[67,"then",68,"exec"],[69,"value",68,"out"],[70,"again",73,"condition"],[70,"then",71,"exec"],[70,"x",72,"a"],[71,"then",73,"exec"],[72,"result",71,"amount"],[73,"false",75,"exec"],[73,"true",74,"exec"],[74,"then",75,"exec"],[76,"result",75,"mine"],[77,"value",76,"a"],[78,"out",76,"b"],[79,"value",78,"x"],[80,"a",82,"b"],[80,"then",81,"exec"],[81,"then",84,"exec"],[82,"result",81,"value"],[83,"value",82,"a"],[85,"value",84,"text"],[87,"then",88,"exec"],[88,"then",54,"exec"],[89,"then",56,"exec"],[90,"out",56,"a"],[92,"result",91,"value"],[93,"value",92,"a"]],"functions":[{"name":"SumTo","inputs":[{"name":"n","type":"int","value":3}],"outputs":[{"name":"sum","type":"float","value":0},
+        {"name":"steps","type":"int","value":0}],"locals":[{"name":"Total","type":"float","value":0.5},{"name":"Count","type":"int","value":0}]},
+        {"name":"Limit","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"out","type":"float","value":0}],"locals":[{"name":"Out","type":"float","value":-1}]},
+        {"name":"Outer","inputs":[{"name":"x","type":"float","value":1},
+        {"name":"again","type":"bool","value":false}],"outputs":[{"name":"mine","type":"float","value":0}],"locals":[{"name":"Own","type":"float","value":0.25}]},
+        {"name":"Join","inputs":[{"name":"a","type":"text","value":"a"}],"outputs":[{"name":"text","type":"text","value":""}],"locals":[{"name":"Total","type":"text","value":"<"}]}]})"},
   };
   return list;
 }

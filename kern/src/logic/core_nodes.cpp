@@ -64,6 +64,9 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
   p.choices = std::move(choices);
   return p;
 }
+/// The setting of a node that names a variable: the function whose local variable it is (empty:
+/// a variable of the Blueprint).
+ParamDef local_of() { return param("scope", "Local of", ParamDef::Kind::scope); }
 
 /// The setting "Type" of a generic node: the type of its pins (`with_lists`: a list type too).
 ParamDef type_param(bool with_lists) {
@@ -423,7 +426,8 @@ void add_flow(Library& lib) {
 void add_variables(Library& lib) {
   auto var_shape = [](bool input, bool output) {
     return [input, output](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const Variable* v = g.variable(n.param("variable"));
+      Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
       const PinType t = v ? v->type : PinType::number;
       for (PinDef& p : in) if (p.id == "value" && input) { p.type = t; p.of = v ? v->of : std::string(); p.def = v ? v->value : json::Value(0.0); }
       for (PinDef& p : out) if (p.id == "value" && output) { p.type = t; p.of = v ? v->of : std::string(); }
@@ -431,56 +435,56 @@ void add_variables(Library& lib) {
   };
   {
     NodeDef d = make("var.get", "Get Variable", "Variables", NodeKind::pure, "Reads a variable of this graph.");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable)};
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
     d.outputs = {data("value", "Value", PinType::number)};
     d.shape = var_shape(false, true);
     d.title = [](const NodeDef&, const Node& n) { return n.param("variable", "?"); };
     d.run = [](Context& c) {
-      c.out(std::size_t{0}, c.instance().get(c.param("variable")));
+      c.out(std::size_t{0}, c.instance().get(c.node()));
       return kStop;
     };
     lib.add(std::move(d));
   }
   {
     NodeDef d = make("var.set", "Set Variable", "Variables", NodeKind::action, "Writes a variable of this graph.");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable)};
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
     d.inputs = {exec_in(), data("value", "Value", PinType::number)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.shape = var_shape(true, true);
     d.title = [](const NodeDef&, const Node& n) { return "Set " + n.param("variable", "?"); };
     d.run = [](Context& c) {
-      const std::string name = c.param("variable");
-      c.instance().set(name, c.in("value"));
-      c.out("value", c.instance().get(name));
+      c.instance().set(c.node(), c.in("value"));
+      c.out("value", c.instance().get(c.node()));
       return 0;
     };
     lib.add(std::move(d));
   }
   {
     NodeDef d = make("var.add", "Add to Variable", "Variables", NodeKind::action, "Adds Amount to a number variable, Integer or Float (use -1 to count down).");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable)};
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
     d.inputs = {exec_in(), data("amount", "Amount", PinType::number, 1.0)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.keywords = "increment decrement counter plus";
     d.title = [](const NodeDef&, const Node& n) { return "Add to " + n.param("variable", "?"); };
     // The amount and the result have the variable's type: whole numbers add as whole numbers.
     d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const Variable* v = g.variable(n.param("variable"));
+      Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
       if (!v || v->type != PinType::integer) return;
       for (PinDef& p : in) if (p.id == "amount") { p.type = PinType::integer; p.def = json::Value(1); }
       for (PinDef& p : out) if (p.id == "value") p.type = PinType::integer;
     };
     d.problem = [](const Node& n, const Graph& g) {
-      const Variable* v = g.variable(n.param("variable"));
+      Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
       return v && v->type != PinType::integer && v->type != PinType::number
                  ? "needs a number variable (Integer or Float): \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) + " - use Set"
                  : std::string();
     };
     d.run = [](Context& c) {
-      const std::string name = c.param("variable");
-      const Value cur = c.instance().get(name);
-      c.instance().set(name, Value::number(cur.as_number() + c.in_number("amount")));
-      c.out("value", c.instance().get(name));
+      const Value cur = c.instance().get(c.node());
+      c.instance().set(c.node(), Value::number(cur.as_number() + c.in_number("amount")));
+      c.out("value", c.instance().get(c.node()));
       return 0;
     };
     lib.add(std::move(d));
@@ -641,21 +645,23 @@ void add_lists(Library& lib) {
 
   // ---- steps: they change a list variable (the setting Variable) ----
   auto of_variable = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-    const Variable* v = g.variable(n.param("variable"));
+    Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
     const TypeRef e = v && is_list(v->type) ? TypeRef{element_of(v->type), v->of} : TypeRef{};
     for (PinDef& p : in)
       if (p.id == "item") retype(p, e, g);
     (void)out;
   };
   auto needs_list = [](const Node& n, const Graph& g) {
-    const Variable* v = g.variable(n.param("variable"));
+    Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
     return v && !is_list(v->type) ? "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) : std::string();
   };
   // A step on the list variable of the node: `change(items, c)` with the vector of its items.
   // The inputs have been read by then (each exactly once, whatever the variable is).
   auto step = [&](const char* type, const char* label, const char* help, const char* keywords, std::vector<PinDef> in, std::vector<PinDef> out) {
     NodeDef d = make(type, label, "Lists", NodeKind::action, help, keywords);
-    d.params = {param("variable", "List", ParamDef::Kind::variable)};
+    d.params = {param("variable", "List", ParamDef::Kind::variable), local_of()};
     d.inputs = {exec_in()};
     for (PinDef& p : in) d.inputs.push_back(std::move(p));
     d.outputs = {exec_out()};
@@ -665,7 +671,7 @@ void add_lists(Library& lib) {
     return d;
   };
   auto variable = [](Context& c) -> Value* {
-    Value* v = c.instance().variable(c.param("variable"));
+    Value* v = c.instance().variable(c.node());
     return v && is_list(v->type) ? v : nullptr;
   };
   {
@@ -1008,13 +1014,14 @@ void add_structs(Library& lib) {
   {
     // The struct of the node's variable, and the place of the node's field in it (-1: none).
     auto field = [](const Node& n, const Graph& g, const StructType*& s) {
-      const Variable* v = g.variable(n.param("variable"));
+      Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
       s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
       return s ? s->field(n.param("field")) : -1;
     };
     NodeDef d = make("struct.set_field", "Set Field", "Structures", NodeKind::action, "Changes one field of a struct variable; the others stay as they are. Value: what the field is now.",
                      "member assign change write");
-    d.params = {param("variable", "Struct", ParamDef::Kind::variable), param("field", "Field", ParamDef::Kind::field)};
+    d.params = {param("variable", "Struct", ParamDef::Kind::variable), param("field", "Field", ParamDef::Kind::field), local_of()};
     d.inputs = {exec_in(), data("value", "Value", PinType::number)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.title = [](const NodeDef&, const Node& n) { return "Set " + n.param("field", "?") + " of " + n.param("variable", "?"); };
@@ -1029,7 +1036,8 @@ void add_structs(Library& lib) {
         if (p.id == "value") retype(p, f.type, g);
     };
     d.problem = [field](const Node& n, const Graph& g) {
-      const Variable* v = g.variable(n.param("variable"));
+      Variable named;
+      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
       if (!v) return std::string();  // (the check says that there is no such variable)
       if (v->type != PinType::structure) return "needs a struct variable: \"" + v->name + "\" is " + type_text({v->type, v->of});
       const StructType* s = nullptr;
@@ -1042,7 +1050,7 @@ void add_structs(Library& lib) {
       const Value value = c.in("value");
       const StructType* s = nullptr;
       const int k = field(c.node(), c.instance().graph(), s);
-      Value* v = c.instance().variable(c.param("variable"));
+      Value* v = c.instance().variable(c.node());
       if (k < 0 || !v || v->type != PinType::structure) return 0;
       structs::set_field(*v, static_cast<std::size_t>(k), value);
       c.out("value", value);

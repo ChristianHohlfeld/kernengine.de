@@ -2018,6 +2018,91 @@ TEST(logic_formulas) {
   CHECK(said);
 }
 
+TEST(logic_local_variables) {
+  // A function's local variables: every call starts with their defaults; two functions have one
+  // of the same name; a call another call of the same function interrupts has its own back.
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kLocals, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  CHECK(g.function("SumTo") && g.function("SumTo")->locals.size() == 2 && g.function("Join")->locals.size() == 3);
+  CHECK(g.function("SumTo")->local("Total")->type == logic::PinType::number && g.function("Join")->local("Total")->type == logic::PinType::text);
+  // the graph as JSON and as its C++ and back: the same Blueprint
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  std::string text;
+  CHECK(logic::to_cpp(g, "Locals", text, &error));
+  CHECK(text.find("  SumToResult SumTo(Int n = 3) {\n    Float Total = 0.5;\n    Int Steps = 0;\n") != std::string::npos);
+  CHECK(text.find("    Hit Last = Hit{\"none\", 3.0};\n") != std::string::npos && text.find("scope") == std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == g);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    CHECK(inst && !inst->disabled());
+    if (!inst) continue;
+    std::vector<logic::Value> out;
+    for (int k = 0; k < 2; ++k) {
+      CHECK(inst->call("SumTo", {logic::Value::integer(3)}, out) && out.size() == 2);
+      CHECK_NEAR(out[0].as_number(), 6.5, 1e-12);  // (0.5 + 1 + 2 + 3, again)
+      CHECK(out[1].i == 3);
+    }
+    CHECK(inst->get("Calls").i == 6);
+    CHECK(inst->call("Join", {logic::Value::text("a"), logic::Value::text("b"), logic::Value::number(2)}, out) && out.size() == 3);
+    CHECK(out[0].as_text() == "<ab<ab>" && out[1].i == 3);
+    CHECK_NEAR(out[2].as_number(), 5.0, 1e-12);
+    CHECK(inst->call("Limit", {logic::Value::number(7)}, out) && out[0].as_number() == 1.0);
+    CHECK(inst->call("Limit", {logic::Value::number(0.5)}, out) && out[0].as_number() == 0.5);
+    CHECK(inst->call("Outer", {logic::Value::number(2), logic::Value::boolean(true)}, out) && out.size() == 2);
+    CHECK_NEAR(out[0].as_number(), 20.25, 1e-12);       // (its own Mine, not the inner call's 50.25)
+    CHECK_NEAR(inst->get("Kept").as_number(), 50.25, 1e-12);
+    // a local variable is the function's own: nobody outside reads or sets it
+    CHECK(inst->get("Outer.Mine").type == logic::Value().type && !inst->set("Outer.Mine", logic::Value::number(1)) && !inst->variable("Join.Seen"));
+  }
+  // Rules. A local variable is used on a path of its own function: not in an event ...
+  {
+    logic::Graph bad = g;
+    u32 set_kept = 0;
+    for (const logic::Node& n : bad.nodes) if (n.type == "var.set" && n.param("variable") == "Kept") set_kept = n.id;
+    CHECK(set_kept != 0);
+    logic::Node get;
+    get.id = bad.next_id++;
+    get.type = "var.get";
+    get.set_param("variable", "Mine");
+    get.set_param("scope", "Outer");
+    bad.nodes.push_back(get);
+    bad.links.erase(std::remove_if(bad.links.begin(), bad.links.end(), [&](const logic::Link& l) { return l.to == set_kept && l.in == "value"; }), bad.links.end());
+    bad.links.push_back({get.id, "value", set_kept, "value"});
+    u32 at = 0;
+    const std::string why = logic::cpp_problem(bad, &at);
+    CHECK(why.find("local variable \"Mine\" of Outer outside a path of that function") != std::string::npos && at == get.id);
+    CHECK(!no_errors(logic::check(bad)));
+  }
+  {
+    // ... it is one the function has, and it hides nothing
+    logic::Graph bad = g;
+    for (logic::Node& n : bad.nodes) if (n.param("scope") == "Outer") n.set_param("variable", "Gone");
+    CHECK(!no_errors(logic::check(bad)));
+    bad = g;
+    bad.function("Outer")->locals.front().name = "Calls";
+    for (logic::Node& n : bad.nodes) if (n.param("scope") == "Outer") n.set_param("variable", "Calls");
+    CHECK(logic::cpp_problem(bad).find("has the name of a variable") != std::string::npos);
+    bad = g;
+    bad.function("Outer")->locals.front().name = "x";
+    for (logic::Node& n : bad.nodes) if (n.param("scope") == "Outer") n.set_param("variable", "x");
+    CHECK(logic::cpp_problem(bad).find("has the name of one of its pins") != std::string::npos);
+  }
+  // In the text: a local variable is not known after a wait or in another body.
+  logic::Graph none;
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  void F() {\n    Float L = 1.0;\n    L += 1.0;\n  }\n  void G() {\n    L += 1.0;\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("line 7") != std::string::npos);
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  Float L = 0.0;\n  void F() {\n    Float L = 1.0;\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("local variable L") != std::string::npos);
+}
+
 TEST(logic_functions) {
   FakeLogicHost host;
   logic::Runtime rt(host);
@@ -8720,6 +8805,71 @@ TEST(studio_logic_functions) {
   // undo brings it back
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["functions"].size() == 1);
+}
+
+TEST(studio_logic_local_variables) {
+  // A function's local variables with the editor's commands: made, named, typed, offered as nodes.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  struct AddResult { Float out = 0.0; };\n  AddResult Add(Float x = 1.0) {\n    return {x};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Add"}, {"side", "local"}})["pin"].as_string() == "local");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "local"}, {"to", "Acc"}})["ok"].as_bool());
+  // it hides nothing: not a variable, not a pin of its function - and no pin or variable takes its name
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "Sum"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "x"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "in"}, {"pin", "x"}, {"to", "Acc"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicVariable"}, {"op", "rename"}, {"name", "Sum"}, {"to", "Acc"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"value", 4}})["ok"].as_bool());
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["functions"][0]["locals"].size() == 1 && st["logic"]["functions"][0]["locals"][0]["name"].as_string() == "Acc" &&
+        st["logic"]["functions"][0]["locals"][0]["type"].as_string() == "int" && st["logic"]["functions"][0]["locals"][0]["value"].as_number() == 4);
+  // the action menu offers its nodes, under the function's name
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "acc"}});
+  bool get = false, add = false;
+  for (const json::Value& e : pal["items"].items()) {
+    if (e["category"].as_string() != "Local Variables of Add") continue;
+    get = get || (e["label"].as_string() == "Get Acc" && e["params"]["scope"].as_string() == "Add");
+    add = add || e["label"].as_string() == "Add to Acc";
+  }
+  CHECK(get && add);
+  // as C++ it is a local of the function's body; the text sets it and the Blueprint runs
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  struct AddResult { Float out = 0.0; };\n  AddResult Add(Float x = 1.0) {\n    Int Acc = 4;\n    "
+                                                "Acc += 2;\n    return {math_add(x, kern::to<Float>(Acc))};\n  }\n};\n"}})["ok"].as_bool());
+  st = f.s->state();
+  u32 node = 0;
+  for (const json::Value& n : st["logic"]["nodes"].items())
+    if (n["type"].as_string() == "var.add") {
+      node = static_cast<u32>(n["id"].as_number());
+      bool scope = false;
+      for (const json::Value& p : n["params"].items()) scope = scope || (p["key"].as_string() == "scope" && p["kind"].as_string() == "scope" && p["value"].as_string() == "Add");
+      CHECK(scope);
+    }
+  CHECK(node != 0);
+  // renaming the local variable and the function: the nodes follow
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "Count"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "rename"}, {"name", "Add"}, {"to", "Plus"}})["ok"].as_bool());
+  const std::string text = cmd({{"cmd", "logicCpp"}})["text"].as_string();
+  CHECK(text.find("  PlusResult Plus(Float x = 1.0) {\n    Int Count = 4;\n    Count += 2;\n") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(0) : nullptr;
+  CHECK(inst != nullptr);
+  if (inst) {
+    CHECK_NEAR(inst->call_number("Plus", {1}), 7, 1e-9);
+    CHECK_NEAR(inst->call_number("Plus", {1}), 7, 1e-9);  // (every call starts with 4)
+  }
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+  // deleting the function takes the nodes of its local variables with it
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "remove"}, {"name", "Plus"}})["ok"].as_bool());
+  st = f.s->state();
+  for (const json::Value& n : st["logic"]["nodes"].items()) CHECK(n["type"].as_string() != "var.add");
 }
 
 TEST(studio_logic_cpp_view) {

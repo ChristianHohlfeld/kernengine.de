@@ -77,7 +77,7 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   Variablen – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Strukturen“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (19 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (20 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -169,6 +169,7 @@ KERN_LAYOUT(Demo) {
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
+| Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Return | `return {wert, wert};` bzw. `return;` |
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
@@ -472,6 +473,16 @@ von außen liest (`n20.x` aus einer `go`-Methode). Für den Graphen macht das `R
 die Klasse ihr Kleber – beide an derselben Stelle: um den Handler, der in einem laufenden
 Blueprint startet.
 
+**Lokale Variablen.** Eine lokale Variable einer Funktion ist in C++ eine lokale Variable ihres
+Rumpfs: Jeder Aufruf beginnt mit ihrem Default, und mit dem Aufruf ist sie vorbei. Darum steht
+jeder Knoten, der sie liest oder setzt, im Rumpf ihrer Funktion – nicht in einem Lambda nach einem
+Warten, nicht in einer `go`-Methode, nicht in einem Event (Regel, wie bei Return). Im Graphen nennt
+der Knoten die Funktion in seiner Einstellung „scope“; der Text schreibt sie nicht, denn der Rumpf,
+in dem er steht, sagt es. Der Interpreter und das JIT halten sie wie die anderen Variablen (Zahlen
+in Slots), setzen sie bei jedem Aufruf auf den Default und geben – wie bei den Parametern – einem
+unterbrochenen Aufruf die eigenen zurück, wenn ein Handler die Funktion währenddessen noch einmal
+aufgerufen hat (`Runtime::fire`).
+
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
 Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
@@ -545,10 +556,15 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   starten, ist ein Weg zurück. Aus Finished ist es ein Tween, der sich wiederholt – Finished
   kommt immer erst mit dem letzten Update in einem späteren Schritt, nie mit Play selbst (auch
   bei Dauer 0).
+- **Eine lokale Variable** wird auf einem Weg ihrer eigenen Funktion gelesen und gesetzt: nicht
+  nach einem Warten, nicht in einem Event oder einer anderen Funktion; treffen sich Wege davor,
+  dann alle aus einem Branch oder Switch. Sie heißt nicht wie eine Variable, eine Funktion oder
+  ein Typ des Blueprints und nicht wie ein Pin ihrer Funktion; zwei Funktionen dürfen je eine
+  desselben Namens haben.
 - **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
   auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
   geht.)
-- **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add, kein
+- **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add (außer auf ihre eigenen lokalen Variablen), kein
   Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
   rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
   wie oft und in welcher Reihenfolge ein Wert gelesen wird.
@@ -753,7 +769,9 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 19, auch Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+demselben Ergebnis: alle 20, auch lokale Variablen (`locals`: Zahlen und ein Text, zwei
+Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
+ein zweiter Aufruf derselben Funktion unterbricht), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
 und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine
