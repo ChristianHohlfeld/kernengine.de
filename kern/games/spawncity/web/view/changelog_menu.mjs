@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"19:37",title:"Blueprints: Strukturen",items:[
+    "Kern-Blueprints: Ein Blueprint kann jetzt eigene Typen mit benannten Feldern haben, etwa „Weapon“ mit Name, Art und Schaden. Variablen, Listen, Funktions-Ein- und -Ausgänge und Pins können von diesem Typ sein; ein Feld kann auch eine Aufzählung, eine andere Struktur oder eine Liste sein.",
+    "Neue Knoten je Struktur: „Make“ baut einen Wert aus seinen Feldern, „Break“ gibt die Felder einzeln heraus, „Set Field“ ändert ein Feld einer Variablen. Select, Reroute, die Listen-Knoten und For Each arbeiten auch mit Strukturen.",
+    "Im Kern-Editor: Abschnitt „Structures“ in My Blueprint; Felder in Details anlegen, umbenennen, verschieben und mit Standardwert versehen. Werte einer Struktur bearbeitet man Feld für Feld.",
+    "Als C++ ist es ein echtes struct: KERN_STRUCT(Weapon) { Text Name = \"\"; Float Damage = 10.0; }; – als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus.",
+  ]},
   {date:"2026-11-11",time:"18:49",title:"Mehrspieler: eine Welt für alle",items:[
     "Polizei sehen jetzt alle: Polizisten, Streifenwagen, Polizeidrohnen und die Sandbox-Gegner eines Spielers erscheinen auch bei den Mitspielern und lassen sich von ihnen treffen. Gejagt wird weiterhin nur, wer gesucht wird.",
     "Schaden an der Stadt gilt für alle: Wer als Mitspieler ein Auto der Stadt beschädigt oder einen Passanten trifft, tut das jetzt in der gemeinsamen Welt – Brand und Wrack sehen alle, und Passanten fliehen auch vor den Schüssen eines Mitspielers.",
