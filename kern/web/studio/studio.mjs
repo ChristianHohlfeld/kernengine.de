@@ -8,13 +8,12 @@
 // packaging standalone games.
 import {loadKern, BrowserInput} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
-import {StudioEngine, trainedPolicies, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
+import {Trainer} from "./trainer.mjs";
+import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = escHtml;
 const AUTOSAVE_KEY = "kern-studio.autosave.v1", LAYOUT_KEY = "kern-studio.layout.v1", LAST_KEY = "kern-studio.last.v1";
-// The embedded Lehrer puppet is a tool, NOT a second normal Studio session.
-const POSE_EMBED = new URLSearchParams(location.search).has("motion");
 // User settings (docs/studio.md, "Einstellungen"): only the user's own choices, as the engine reports
 // them (settings.cpp). A setting never changed is not stored and follows the defaults of the build.
 const SETTINGS_KEY = "kern-studio.settings.v1", SETTINGS_VERSION = 1;
@@ -142,93 +141,10 @@ export async function startStudio({url = null, base64 = null, bytes = null} = {}
   const engine = new StudioEngine(kern);
   const page = new StudioPage(kern, engine, () => base64 ?? toBase64(bytes));
   page.start();
-  // Embedded real-time Box3D puppet for Kern Lehrer. All posing happens inside
-  // the actual Studio renderer / GameWorld; the parent only records encoder data.
-  if (POSE_EMBED) {
-    const style = document.createElement("style");
-    style.textContent = `
-      #titlebar,#toolbar,#side,#sideSplit,#drawer,#statusbar,#touchExit,#touchPause{display:none!important}
-      html,body,#app{width:100%;height:100%;overflow:hidden}
-      #app{display:flex!important;flex-direction:column}
-      #main{display:flex!important;flex:1;min-height:0;overflow:hidden}
-      #viewArea{flex:1!important;width:100%;height:100%;min-height:0}
-      #gl,#viewports{width:100%;height:100%}
-      #viewArea .vp{cursor:grab!important;touch-action:none}
-      #viewArea .vp:active{cursor:grabbing!important}
-    `;
-    document.head.append(style);
-    const ready = engine.command({cmd: "motionBegin"});
-    let previewId = 0;
-    window.addEventListener("message", e => {
-      if (e.origin !== location.origin || e.source !== window.parent || !e.data?.type?.startsWith("kern-motion-")) return;
-      const m = e.data, send = value => e.source.postMessage({type: "kern-motion-reply", id: m.id, result: value}, e.origin);
-      if (m.type === "kern-motion-ping") {
-        e.source.postMessage({type:"kern-motion-ready",ok:!!ready.ok,error:ready.error},e.origin);
-        return;
-      }
-      if (m.type === "kern-motion-capture") send(engine.command({cmd: "motionPose"}));
-      if (m.type === "kern-motion-edit") { ++previewId; send(engine.command({cmd: "motionEdit"})); }
-      if (m.type === "kern-motion-preview") {
-        const result = engine.command({cmd: "motionPreview", joints: m.joints});
-        const ticket = ++previewId;
-        setTimeout(() => { if (ticket === previewId) engine.command({cmd: "motionEdit"}); }, 850);
-        send(result);
-      }
-      if (m.type === "kern-motion-run") {
-        // The BroadcastChannel is asynchronous; explicitly load these exact
-        // bytes before registering the skill or starting the simulation.
-        trainedPolicies(m.file).then(records => {
-          if (!records.length || !engine.registerPolicy(m.file, records[0][1]))
-            return send({ok:false,error:"Trainiertes ONNX fehlt oder ist inkompatibel"});
-          const register = engine.command({cmd: "motionRegister", name: m.name, file: m.file, duration: m.duration});
-          send(register.ok ? engine.command({cmd: "motionRun", name: m.name}) : register);
-        }).catch(error => send({ok:false,error:String(error)}));
-      }
-      if (m.type === "kern-motion-restart") send(engine.command({cmd: "motionBegin"}));
-    });
-    window.parent.postMessage({type:"kern-motion-ready", ok:!!ready.ok, error:ready.error}, location.origin);
-  }
   applyAudioPrefs(engine);  // music / effects switches remembered on this device
   window.KernStudio = page.api();
-  engine.loadPolicies().then(() => mountLearnedMotions(engine, page)).catch(() => {});  // including dynamic Lehrer skills
+  engine.loadPolicies().catch(() => {});
   return page;
-}
-
-/** Learned ONNX skills are callable on any Micro Duck in the current level.
- * No manifest edit, C++ rebuild or fixed UI button is required for each one. */
-function mountLearnedMotions(engine, page) {
-  if (new URLSearchParams(location.search).has("motion")) return;  // the embedded puppet has its own controls
-  const el = document.createElement("aside");
-  el.id = "learnedMotions";
-  el.style.cssText = "position:absolute;left:14px;bottom:14px;z-index:5;background:#1c1c1ee8;color:#eee;border:1px solid #444;border-radius:9px;padding:9px;max-width:270px;font:12px system-ui;display:none;box-shadow:0 4px 16px #0006";
-  $("#viewArea").append(el);
-  function refresh() {
-    let skills = {};
-    try { skills = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}"); } catch { return; }
-    el.replaceChildren();
-    const records = Object.values(skills).filter(s=>s && typeof s.name==="string" && typeof s.file==="string" && Number.isFinite(s.duration));
-    el.style.display = records.length ? "block" : "none";
-    if (!records.length) return;
-    const title = document.createElement("div");
-    title.textContent = "Gelernte Bewegungen";
-    title.style.cssText = "font-weight:650;margin-bottom:6px";
-    el.append(title);
-    for (const skill of records) {
-      const btn = document.createElement("button");
-      btn.textContent = skill.name.replace(/^motion_/, "").replace(/_/g," ");
-      btn.type = "button";
-      btn.style.cssText = "margin:2px 4px 3px 0;padding:5px 8px;color:#eee;border:1px solid #555;border-radius:6px;background:#303034;cursor:pointer";
-      btn.onclick = () => {
-        const reg = engine.command({cmd:"motionRegister",name:skill.name,file:skill.file,duration:skill.duration});
-        const r = reg.ok ? engine.command({cmd:"motionPlay",name:skill.name}) : reg;
-        if (!r.ok) page.toast("Bewegung: " + (r.error || "Netz noch nicht geladen"));
-      };
-      el.append(btn);
-    }
-  }
-  refresh();
-  addEventListener("storage", e => {if(e.key==="kern-lehrer.motion-skills.v1")refresh();});
-  try { new BroadcastChannel("kern-lehrer").onmessage = refresh; } catch { /* unsupported */ }
 }
 
 class StudioPage {
@@ -313,15 +229,18 @@ class StudioPage {
         uiAction: a => this.uiAction(a),
       });
     }
+    // The Lehrer's workspace: its panel takes the side while the duck stands on its stage in the viewport.
+    this.trainer = new Trainer({engine: this.engine, icon, toast: (text, actions, ms) => this.toast(text, actions, ms), kernSource: () => window.KERN_SOURCES?.kern || null});
+    $("#trainerClose").onclick = () => this.runCommand({cmd: "trainer", open: false});
     this.initToolbar();
     this.initPanels();
     this.initInput();
     this.initSplitters();
     this.catalog = this.engine.command({cmd: "catalog"}).groups;
     this.renderCatalog();
-    // Do not open the previous Studio game or show "Start fresh" / "Neu anfangen"
-    // inside the Lehrer iframe. Those controls refer to the ordinary editor.
-    if (!POSE_EMBED) { this.reopenLast(); this.offerRestore(); }
+    this.reopenLast();
+    this.offerRestore();
+    this.trainer.offerLegacy().catch(() => {});  // what the Lehrer's old page taught on this device
     requestAnimationFrame(t => this.frame(t));
     // Hosting or playing online in a background tab: keep the simulation and the network going.
     backgroundTicker(time => {
@@ -342,6 +261,8 @@ class StudioPage {
       get state() { return self.engine.state(); },
       get status() { return self.engine.status(); },
       get logic() { return self.logic; },  // the Blueprint editor (tests)
+      get trainer() { return self.trainer; },  // the Lehrer's workspace (tests)
+      get training() { return self.trainer.running; },  // a training run is under way (the page does not reload into a new build)
       get dialog() { return self.dialog?.name ?? null; },
       get logicOpenCached() { return !!self.state?.logic?.open; },
       key: (code, opts = {}) => self.engine.key(opts.key ?? code, code, opts.down !== false, (opts.shift ? 1 : 0) | (opts.ctrl ? 2 : 0) | (opts.alt ? 4 : 0), false),
@@ -388,7 +309,6 @@ class StudioPage {
   }
 
   rememberLast(time) {
-    if (POSE_EMBED) return;  // never replace the user's normal Studio last project
     const st = this.state;
     if (!st?.level || st.level.dirty || st.play?.state !== "editing") return;
     if (this.revision === this.lastRememberedRevision || time - (this.lastRemembered || 0) < 3000) return;
@@ -410,6 +330,9 @@ class StudioPage {
       this.frameCount = (this.frameCount || 0) + 1;
       this.resizeCanvas();
       this.placeViewports();
+      // ?train=1 opens the Lehrer's workspace (its old addresses /lehrer/ and /train/ lead here),
+      // once the viewport has its size: the stage frames its duck in it.
+      if (this.frameCount === 1 && new URLSearchParams(location.search).has("train")) this.runCommand({cmd: "trainer", open: true});
       (this.gamepad ||= new GamepadInput(this.engine)).poll();
       this.engine.frame(time);
       this.audio?.pump();
@@ -467,7 +390,6 @@ class StudioPage {
   }
 
   autosave(time) {
-    if (POSE_EMBED) return;  // poser is ephemeral; saved keyframes belong to Lehrer
     const text = this.engine.takeAutosave(time);
     if (this.engine.takeAutosaveDiscard()) this.dropAutosave();
     if (!text) return;
@@ -484,7 +406,6 @@ class StudioPage {
 
   /** Stores the user's choices when the engine reports a change (nothing at all while none was made). */
   saveSettings() {
-    if (POSE_EMBED) return;  // avoid changing normal Studio settings from an iframe
     const values = this.engine.command({cmd: "takeSettings"})?.values;
     if (!values) return;
     try {
@@ -825,6 +746,7 @@ class StudioPage {
       if (drag === "fly") hint = `Flying · WASD move · Q/E down/up · wheel speed ${st.camera?.speed ?? ""} · Shift faster · Z/C zoom`;
       else if (drag === "grab") hint = "Grabbing - release to throw";
       else if (active && st.play === "playing" && !st.captured && !s.play.ejected && st.hud?.status === "playing" && st.input?.device !== "touch") hint = "Click the viewport to control the game · Esc stops · F8 ejects";
+      else if (active && s.trainer) hint = s.trainer.stage === "pose" ? "Lehrer · drag a part of the duck to pose it · it holds where you let go · Esc leaves" : "Lehrer · the duck tries the move on its network · Esc leaves";
       else if (active && st.play === "simulating") hint = s.play.ejected ? "Ejected · free camera · F8 possess · Esc stop" : "Simulating · drag grabs bodies · K keeps poses · Esc stops";
       if (hint !== v.hintKey) { v.hintKey = hint; v.hint.textContent = hint; v.hint.hidden = !hint; }
       const gz = active && st.gizmo ? (st.gizmo.delta ? `Δ ${st.gizmo.delta.map(n => n.toFixed(2)).join("  ")} m` : st.gizmo.angle != null ? `${st.gizmo.angle.toFixed(1)}°` : `× ${st.gizmo.factor.map(n => n.toFixed(2)).join("  ")}`) : "";
@@ -913,8 +835,9 @@ class StudioPage {
     setSel("#rotStep", s.snap.rotationStep);
     setSel("#scaleStep", s.snap.scaleStep);
     setSel("#camSpeed", s.prefs.cameraSpeed);
-    $("#undoBtn").disabled = !editing || !s.history.canUndo;
-    $("#redoBtn").disabled = !editing || !s.history.canRedo;
+    const editable = editing || !!s.trainer;  // the Lehrer's workspace edits the level's motions
+    $("#undoBtn").disabled = !editable || !s.history.canUndo;
+    $("#redoBtn").disabled = !editable || !s.history.canRedo;
     $("#undoBtn").title = s.history.canUndo ? `Undo ${s.history.undo} (Ctrl+Z)` : "Undo (Ctrl+Z)";
     $("#redoBtn").title = s.history.canRedo ? `Redo ${s.history.redo} (Ctrl+Y)` : "Redo (Ctrl+Y)";
     $("#addBtn").disabled = !editing;
@@ -1029,7 +952,7 @@ class StudioPage {
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") this.autosave(Infinity); });
     addEventListener("beforeunload", e => {
       this.autosave(Infinity);
-      if (!this.engine.dirty()) return;
+      if (!this.engine.dirty() && !this.trainer.running) return;  // unsaved changes, or the duck is still learning
       // Reloading into a new build: the autosave carries the level over (offered on the next start).
       if (window.__kernReloadForUpdate) return;
       e.preventDefault();
@@ -1045,6 +968,7 @@ class StudioPage {
     if (!logicOpen && document.activeElement?.closest?.("#logicEditor")) document.activeElement.blur();
     $("#logicBtn")?.classList.toggle("on", logicOpen);
     if (logicOpen) this.logic.render(s.logic);
+    this.trainer.render(s);
     this.renderToolbar(s);
     this.renderViewports(s);
     this.renderOutliner(s.outliner);

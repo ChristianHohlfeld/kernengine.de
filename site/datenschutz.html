@@ -91,7 +91,7 @@ code { font: 14px var(--mono); }
     <ul>
       <li><b>Local Storage</b> (Kern Studio): die automatische Sicherung des geöffneten Levels, das zuletzt gespeicherte Level, Ihre Einstellungen und die Anordnung der Fenster (Schlüssel <code>kern-studio.*</code>).</li>
       <li><b>Session Storage</b> (Kern Studio): ein Zähler für Aktualisierungsversuche, der beim Schließen des Tabs gelöscht wird.</li>
-      <li><b>IndexedDB</b> (Kern Lehrer und Kern Studio): im Lehrer trainierte Netze, damit Kern Studio sie auf demselben Gerät verwenden kann (Datenbank <code>kern-lehrer</code>).</li>
+      <li><b>IndexedDB und Local Storage</b> (früherer Kern Lehrer): Netze, die eine frühere Fassung des Lehrers auf diesem Gerät abgelegt hat (Datenbank <code>kern-lehrer</code>, Schlüssel <code>kern-lehrer.*</code>). Kern Studio liest sie nur noch, um ihren Import in ein Level anzubieten, und legt dort nichts Neues ab; was der Lehrer heute trainiert, steht im Level.</li>
       <li><b>Service Worker und Cache Storage</b> (Kern Studio): eine Kopie der Editor-Seite, der Symbole und des Manifests, damit der Editor als App installiert und offline genutzt werden kann.</li>
     </ul>
     <p>Der Editor fragt beim Start und, solange er geöffnet ist, etwa einmal pro Minute die Datei <code>build.json</code> vom Server ab, um eine neuere Version zu erkennen. Dieser Abruf geht wie jeder Seitenabruf an GitHub Pages (siehe oben) und enthält keine Daten aus Ihren Projekten. Dateien, die Sie im Editor öffnen (Levels, Texturen, Klänge), werden nur in Ihrem Browser verarbeitet; Speichern und „Package Game“ legen Dateien auf Ihrem Gerät ab. Die Zwischenablage wird nur genutzt, wenn Sie selbst kopieren oder einfügen.</p>

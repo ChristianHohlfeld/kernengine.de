@@ -2,8 +2,9 @@
 
 Kern trainiert Policies für die Micro Duck selbst. Alles läuft in C++ auf Kerns eigener Engine und
 Box3D: Simulation, Lernverfahren, Export. Es gibt keine Python- oder PyTorch-Abhängigkeit. Gelernt
-wird beim Nutzer: nativ auf allen Kernen (auch headless auf einem Server), im Browser auf Desktop
-und Handy und später direkt im Studio.
+wird beim Nutzer: nativ auf allen Kernen (auch headless auf einem Server) und im Browser auf Desktop
+und Handy – dort direkt in Kern Studio, im Arbeitsbereich „Lehrer“ (`docs/studio.md`,
+`docs/keyframe-lehrer.md`). Was die Ente im Studio lernt, wird mit dem Level gespeichert.
 
 Die Ente im Lehrer ist dieselbe wie im Studio: dieselbe GameWorld, dieselben Servos (Gerätemodell,
 `docs/kalibrierung.md`), dieselben Sensoren, derselbe 50-Hz-Regler, dieselbe Physik (16 Substeps).
@@ -19,7 +20,7 @@ exportiert (61 Beobachtungen, 14 Aktionen) und kann wie diese auf den Roboter.
 | 3. PPO (wie rsl_rl: GAE, Clip, adaptive Lernrate, asymmetrischer Critic) | fertig |
 | 4. ONNX-Export im Format von Pollens Netzen | fertig |
 | 5. Variation (Domain Randomization) wie Pollens Rezepte, nativ auf allen Kernen | fertig |
-| 6. Lernen im Browser (Web Worker, Desktop und Handy) | fertig |
+| 6. Lernen im Browser (Web Worker, Desktop und Handy) als Arbeitsbereich von Kern Studio; Gelerntes gehört zum Level | fertig |
 | 7. Der Sprung: Vorbild → Nachahmen → Üben; als Bewegung im Studio | fertig |
 | 8. Determinismus: Bit für Bit auf jeder Plattform und mit jeder Zahl Worker | fertig |
 | 9. Digitaler Zwilling: Gerätemodelle, Kalibrierung, Abgleich (`docs/kalibrierung.md`) | fertig (ohne echte Messdaten) |

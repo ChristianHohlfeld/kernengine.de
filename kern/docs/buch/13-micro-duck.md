@@ -353,7 +353,9 @@ Die Gangart wählt das Feld **Laufnetz** (Walking network) im Details-Panel (`ga
 
 `walker_skill(id, "kick_left")` startet eine Bewegung wie der Daemon. Es gibt `""` zurück, wenn sie
 startet, sonst den Grund: „a ground pick is running“, „a scripted move is already running“, „the robot
-is sitting - stand it up first“, „… is not loaded“. Ein Move zur Zeit, aus dem Sitzen keiner. Die
+is sitting - stand it up first“, „… is not loaded“, „no such move“. Ein Move zur Zeit, aus dem Sitzen
+keiner. Der Name kann auch eine Bewegung sein, die der Lehrer dem Level beigebracht hat (`motions`); sie
+wird vor den eigenen Bewegungen des Roboters gesucht. Die
 Rückmeldung der letzten Aktion (Beobachtung 34–47) teilen sich alle Netze.
 
 Ist das Netz einer Bewegung noch nicht geladen, springt kein anderes ein: Die Servos halten die
@@ -803,9 +805,9 @@ Das Studio (`web/studio/game.mjs`) fragt die Engine nach fehlenden Netzen
 (`kern_studio_pending_policies`) und lädt sie: Pollens Netze aus `microduck/`, Kerns eigene
 (`jump.onnx`, `play.onnx`) aus `policies/` – auf der Entwicklerseite aus `third_party/microduck/` und
 `kern/policies/`. Eine Datei, die nicht lädt, wird nach 5, 10, 20 s … (höchstens einmal pro Minute)
-erneut angefragt. Netze, die der Lehrer im Browser auf demselben Gerät gespeichert hat (IndexedDB
-„kern-lehrer“), lädt das Studio ebenfalls, und offene Studio-Tabs übernehmen ein neues sofort
-(BroadcastChannel „kern-lehrer“).
+erneut angefragt. Was der Lehrer im Studio trainiert hat, steht im Level selbst (`motions`): Beim
+Start der Welt werden diese Netze zu Bewegungen der Enten des Levels (`GameWorld::learn_motions`), und
+`walker_skill` findet sie unter ihrem Namen vor den eigenen Bewegungen des Roboters.
 
 ### Details-Panel (Gruppe **Läufer** (Walker) unter **Spieler-Steuerung** (Player Controller))
 
@@ -826,7 +828,7 @@ erneut angefragt. Netze, die der Lehrer im Browser auf demselben Gerät gespeich
 | Look | Kopf gieren / nicken |
 | Set Autonomous | eigenes Verhalten an / aus |
 | Chirp | Zwitschern mit offenem Schnabel |
-| Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` |
+| Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` – oder der Name einer Bewegung, die der Lehrer dem Level beigebracht hat ([Kapitel 14](14-lehrer.md), 14.11) |
 | Robot Beak | Schnabel auf (1) / zu (0) |
 | Pet Robot | eine Hand auf der Ente für n Sekunden |
 | Robot Hears | Stimme oder Geräusch |

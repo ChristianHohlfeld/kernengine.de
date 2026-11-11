@@ -169,6 +169,8 @@ struct SimStats {
   u64 steps = 0;
 };
 
+struct WalkerMove;  // a walker's one-shot move (runtime_internal.h)
+
 class GameWorld {
  public:
   explicit GameWorld(Renderer& renderer, NightWindows* windows = nullptr);
@@ -382,7 +384,9 @@ class GameWorld {
   bool walker_quack(ActorId id);
   /// One of the robot's moves, as its daemon schedules them (robotd control.rs): "sit" (toggles
   /// sit / stand), "pick" (ground pick; the crouch on rollers), "kick_left", "kick_right",
-  /// "roulade" (asked again while it runs, it rolls on). Returns "" when it started, else why not.
+  /// "roulade" (asked again while it runs, it rolls on), Kern's "jump" - or a motion the level
+  /// taught it (Level::motions), by its name; one named like a move of the robot's own runs in its
+  /// place. Returns "" when it started, else why not.
   std::string walker_skill(ActorId id, std::string_view skill);
   /// Opens (1) or closes (0) the beak.
   bool walker_mouth(ActorId id, f32 open);
@@ -406,9 +410,13 @@ class GameWorld {
   /// of its networks (when no skill, pick or sit runs). The servos take it as trained: home + action,
   /// scale 1, no low-pass, through the actuator delay.
   bool set_walker_external(ActorId id, bool on);
-  /// Zero-g keyframe posing: lock the trunk and suspend joint servos while the Box3D
-  /// MouseGrab moves articulated links. Re-enable servos to preview targets.
+  /// Keyframe posing (in a level without gravity): the trunk is pinned and every joint holds the
+  /// angle it has; a link taken with the mouse joint (begin_grab) swings free within its hinges'
+  /// limits and holds where it is let go.
   bool set_walker_pose_edit(ActorId id, bool on);
+  /// While posing: the servos take walker `id` to `joints` (relative to home, rad) by their own law,
+  /// a keyframe shown as the robot reaches it. The next grab holds the measured angles again.
+  bool set_walker_pose(ActorId id, const f32 joints[14]);
   bool set_walker_action(ActorId id, const f32 action[14]);
   /// The observation walker `id`'s controller builds at its next control tick (robotd's 61, the
   /// command slots 48..60 as last smoothed); no side effects. Exact between ticks: the world is at a
@@ -487,6 +495,9 @@ class GameWorld {
   void drive_player(const PlayInput& input, f32 dt);
   void drive_walker(const PlayInput& input, f32 dt);
   void create_walkers();
+  void learn_motions();  // the level's learned motions become moves of its walkers (walker.cpp)
+  const WalkerMove& walker_move(i32 index) const;  // WalkerBrain::skill: the robot's own or a learned one
+  void hold_walker_pose(WalkerBrain& w);  // posing: holds the joint angles measured now, at rest
   void drive_walkers(f32 h);
   void sense_walker(WalkerBrain& w);
   void think_walker(WalkerBrain& w, f32 dt);  // the autonomous behaviour (walker_brain.cpp)
@@ -571,6 +582,7 @@ class GameWorld {
   std::unordered_map<u64, ActorId> actor_of_body_;
   std::vector<std::unique_ptr<SimJoint>> joints_;
   std::vector<std::unique_ptr<WalkerBrain>> walkers_;  // articulated robots and their policies
+  std::vector<std::unique_ptr<WalkerMove>> learned_;   // the moves the level taught them (Level::motions)
   std::vector<std::unique_ptr<Traffic>> traffic_;
   std::unordered_map<ActorId, bool> alive_;
   struct Respawn { ActorId id; f32 at; };

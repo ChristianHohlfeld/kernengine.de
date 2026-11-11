@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -32,6 +33,8 @@ enum class ViewType : u8 { perspective, top, bottom, left, right, front, back };
 enum class ViewMode : u8 { lit, unlit, wireframe, collision };
 enum class Layout : u8 { single, quad, two_columns };
 enum class PlayState : u8 { editing, simulating, playing };
+/// The Lehrer's stage (trainer.cpp): the Micro Duck weightless to be posed, or on the ground to try a motion.
+enum class TrainerStage : u8 { none, pose, test };
 
 const char* tool_name(Tool t);
 const char* view_type_name(ViewType t);
@@ -279,7 +282,7 @@ class Studio {
   /// edits the level in place and may change the selection; returning false
   /// rolls both back. A change that leaves the document identical adds no step.
   template <typename F> bool edit(const char* label, F&& fn) {
-    if (play_ != PlayState::editing) { report("Stop playing to edit the level", "warn"); return false; }
+    if (!editable()) { report("Stop playing to edit the level", "warn"); return false; }
     game::Level before = level_;
     std::vector<ActorId> selection_before = selection_;
     if (!fn(level_)) {
@@ -293,6 +296,9 @@ class Studio {
     commit(label, std::move(before), std::move(selection_before));
     return true;
   }
+  /// The document takes changes: while editing, and in the Lehrer's workspace (its stage is a
+  /// simulation of its own, not the level; what the duck is taught there belongs to the level).
+  bool editable() const { return play_ == PlayState::editing || trainer_open(); }
   void undo();
   void redo();
   /// Moves to history step `index` through the intermediate steps (same result as repeated undo/redo).
@@ -344,6 +350,20 @@ class Studio {
   bool add_component(const std::string& type);
   bool remove_component(const std::string& type, i32 index);
   void keep_simulation_changes();
+
+  // the Lehrer's workspace (trainer.cpp, docs/lehrer.md)
+  /// Opens the workspace: the Micro Duck alone on a stage in the viewport, weightless, to be posed
+  /// by hand. The stage is a simulation of its own; the level stays open and is not touched.
+  bool open_trainer();
+  /// Back to the level: the viewport, the tool and the selection as they were.
+  void close_trainer();
+  bool trainer_open() const { return trainer_.stage != TrainerStage::none; }
+  TrainerStage trainer_stage() const { return trainer_.stage; }
+  /// The stage's Micro Duck (its trunk), 0 while the workspace is closed.
+  ActorId trainer_duck() const { return trainer_.duck; }
+  /// The motion being taught: one of the level's (Level::motions), or a new one that enters the
+  /// level with its first change.
+  const game::MotionAsset& trainer_motion() const;
 
   // play
   bool play(game::SimMode mode);
@@ -441,6 +461,37 @@ class Studio {
   void push_ui(json::Value action);
   json::Value run(const json::Value& cmd);
   game::PlayInput play_input() const;
+  // the Lehrer's workspace (trainer.cpp)
+  struct Trainer {
+    TrainerStage stage = TrainerStage::none;
+    ActorId duck = 0;                       // the stage's Micro Duck
+    std::string motion;                     // the level's motion being taught ("": the new one below)
+    game::MotionAsset fresh;                // a new motion, not in the level before its first change
+    std::string testing;                    // the learned move running on the test stage
+    // What the stage took over in the editor; close_trainer puts it back.
+    struct Before {
+      Layout layout = Layout::single;
+      u32 active = 0;
+      ViewType type = ViewType::perspective;
+      ViewMode mode = ViewMode::lit;
+      ViewCamera camera;
+      Tool tool = Tool::translate;
+      std::vector<ActorId> selection;
+    } before;
+  } trainer_;
+  /// Runs `level` as the workspace's stage (a simulation that is not the level being edited).
+  bool start_stage(TrainerStage stage, const game::Level& level, ActorId duck);
+  /// Frames the stage's duck in viewport 0.
+  void frame_stage();
+  json::Value trainer_command(const std::string& name, const json::Value& c);
+  json::Value trainer_json() const;
+  json::Value motions_json() const;
+  /// A change of the motion being taught as one undo step; a new motion enters the level with it.
+  bool edit_motion(const char* label, const std::function<bool(game::MotionAsset&)>& fn);
+  /// A new motion to teach: the home pose at its start, a name the level does not have yet.
+  void fresh_motion();
+  /// Ends Simulate / Play (and the stage) without a word: the world shows the level again.
+  void end_simulation();
 
   Renderer* r_ = nullptr;
   game::NightWindows* windows_ = nullptr;

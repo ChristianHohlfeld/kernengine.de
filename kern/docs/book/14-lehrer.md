@@ -37,7 +37,7 @@ in [Chapter 15](15-your-own-models.md).
 | `src/lehrer/evaluate.cpp`, `fingerprint.cpp` | jump measurement, determinism fingerprint |
 | `src/lehrer/lehrer_api.cpp` | C interface for the browser |
 | `tools/kern_lehrer.cpp`, `tools/lehrer.sh` | the command-line tool and its build |
-| `web/lehrer/` | the Lehrer page: `index.html`, `lehrer.mjs`, `worker.mjs` |
+| `src/studio/trainer.cpp`, `web/studio/trainer.mjs` | the Lehrer in Kern Studio: stage, keyframes and the level's motions; panel and training run in web workers |
 
 Status according to `docs/lehrer.md`:
 
@@ -904,47 +904,87 @@ DAgger + PPO on Box3D)`, `rate_hz` = `25` and the names of the 23 observations a
 
 ## 14.11 The Lehrer in the browser
 
-![The Lehrer page in the browser with a training run in progress: settings and metrics](../buch/bilder/lehrer.png)
+![The Lehrer in Kern Studio: the duck on its stage in the viewport, beside it the panel with keyframes, training and the level's motions](../buch/bilder/lehrer.png)
 
 `kern/build.sh --lehrer` builds `kern_lehrer.wasm`: engine, Box3D, game runtime, `src/lehrer` and
-the C interface (`lehrer_api.cpp`). The page `/lehrer/` (`web/lehrer/`) loads it once and gives the
-compiled module to every worker.
+the C interface (`lehrer_api.cpp`). The Lehrer is a workspace of Kern Studio
+([Chapter 11](11-studio.md)): the toolbar's **Lehrer** button, **Window › Lehrer** or the address
+`/editor/?train=1` (the former addresses `/lehrer/` and `/train/` lead there). There is one page, one
+engine and one `GameWorld`: the duck stands in the Studio's viewport, the Lehrer's panel takes the
+place of the outliner and the details, and **Esc** or the same button lead back to the level.
 
-**Roles:**
+**The stage** (`src/studio/trainer.cpp`): the workspace simulates a small level of its own in the
+Studio's `GameWorld`; the open level stands still and its actors stay untouched. For **posing**, the
+duck is weightless, its trunk pinned, without collision shapes. Mouse or finger take a limb with
+Box3D's mouse joint (`set_walker_pose_edit`, like grabbing in Simulate); let go, the servos hold the
+pose. **+ Keyframe** in the bar on the stage records the 14 angles the encoders measure at the given
+time; **Show** drives the duck into a keyframe through its servos (`set_walker_pose`). For
+**trying**, the duck stands under normal gravity on the ground its networks train on and plays a
+learned motion.
 
-- **Collector:** each worker is a module instance with ducks `i · envs … (i + 1) · envs − 1` of a run
-  (`kern_lehrer_create(task, envs, seed, first)`). Per iteration it receives the policy
+**Tasks:** **Motion from keyframes** (the task `motion:{…}` from name, length and 2 to 32
+keyframes), **Jump** (`jump`), **Stand (quick test)** (`stand`) and **Free training scenario**
+(`scenario:{…}`: waypoints, obstacles, rewards). **Expert settings** hold **Workers** (default:
+cores − 1, at most 8), **Ducks per worker** (default 8), **Iterations** (default 1500), **Seed**,
+**Initial action noise** and **Learning rate** (empty = **Recipe**). The panel shows **Iteration**,
+**Duck steps**, **Steps / s**, **Mean episode return**, **Episode length (s)**, **Action noise
+(std)** and the task's own measure (pose error, real jumps with height and flight time, goals
+reached), and plots **Episode return** and **Episode length** over the iterations. **Pause** and
+**Stop** act on the run; it goes on while you edit or play in the Studio. The page keeps the screen
+awake (Wake Lock). The texts follow the Studio's language (English or German).
+
+**Roles in a run** (`web/studio/trainer.mjs`; the workers are made from a Blob, as in
+`web/jobs.mjs`, and each loads a module of its own):
+
+- **Collectors:** each worker is a module instance with ducks `i · envs … (i + 1) · envs − 1` of one
+  run (`kern_lehrer_create(task, envs, seed, first)`). Per iteration it receives the policy
   (`kern_lehrer_set_policy`) and the curricula (`kern_lehrer_progress`) and returns a rollout
-  (`kern_lehrer_collect`). During imitation each computes its share of every round
+  (`kern_lehrer_collect`). In imitation each computes its share of every round
   (`kern_lehrer_dagger`).
-- **Learner:** a separate worker (`kern_lehrer_learner`) for imitation (`kern_lehrer_imitate`), PPO
-  update (`kern_lehrer_learn`), jump evaluation every 25 iterations (`kern_lehrer_evaluate`, 5
-  episodes) and export (`kern_lehrer_export_onnx`).
+- **Learner:** a worker of its own (`kern_lehrer_learner`) for imitation (`kern_lehrer_imitate`),
+  the PPO update (`kern_lehrer_learn`), the evaluation every 25 iterations (`kern_lehrer_evaluate`,
+  5 episodes) and the export (`kern_lehrer_export_onnx`).
 
 The buffers are the same as natively (`Policy::serialize`, `Rollout::serialize`); results come back
-as pointers with `kern_lehrer_result_length()` bytes. The learner accepts JSON settings that override
-the recipe: `learningRate`, `initStd`, `entropyCoef`, `desiredKl`, `steps`, `epochs`, `minibatches`,
-`warmStart` (`velstand` | `none`), `imitate`.
+as a pointer with `kern_lehrer_result_length()` bytes. The learner accepts JSON settings that
+override the recipe: `learningRate`, `initStd`, `entropyCoef`, `desiredKl`, `steps`, `epochs`,
+`minibatches`, `warmStart` (`velstand` | `none`), `imitate`.
 
-**The page** offers **Motion** (**Jump**, or **Stand (quick test)**), **Workers** (default: cores − 1,
-at most 8), **Ducks per worker** (default 8), **Iterations** (default 1500), **Seed**, **Initial
-action noise** and **Learning rate** (empty = **Recipe**). It shows **Iteration**, **Duck steps**,
-**Steps / s**, **Mean episode return**, **Episode length (s)**, **Action noise (std)**, **Real jumps
-(clean robot)**, **Jump height (mm)** and **Flight time (ms)**, and plots **Episode return** and
-**Episode length** over the iterations. It keeps the screen awake (Wake Lock). Like Kern Studio, it
-follows the browser language (or `?lang=de|en`); the **DE | EN** button at the bottom right switches
-it.
+**What the duck learns belongs to the level.** A motion is stored in the level file under `motions`
+(`game::MotionAsset`, `include/kern/game/level.h`):
 
-Every 25 iterations and at the end it stores the network for Kern Studio on the device (IndexedDB
-"kern-lehrer", store "policies", key `<task>.onnx`, `jump.onnx` for the jump) and announces it via
-the BroadcastChannel "kern-lehrer"; open Studio tabs pick it up immediately. **Download .onnx** saves the
-file.
+```json
+"motions": [
+  {"name": "nod", "duration": 1.2,
+   "keys": [{"time": 0, "joints": [0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+            {"time": 0.6, "joints": [0,0,0,0,0,0,0.35,0,0,0,0,0,0,0]},
+            {"time": 1.2, "joints": [0,0,0,0,0,0,0,0,0,0,0,0,0,0]}],
+   "onnx": "<the ONNX file, Base64>"}
+]
+```
+
+Keyframes, name and length are steps of the level's history (Undo and Redo work in the workspace
+too). After imitation, every 25 iterations and at the end the page hands the network to the engine
+(`trainerLearned`); one run is one step of the history, however often it brings a newer network.
+While the level is being played the network waits until the level takes changes again. When a world
+starts (`GameWorld::start`, hence also in a packaged and in a natively exported game),
+`GameWorld::learn_motions` turns the level's motions into moves of its ducks;
+`walker_skill(duck, name)` and the Blueprint node **Robot Move** start them. The jump the Lehrer
+trains is the level's own `jump` and replaces the bundled network there. The network of a scenario
+or of the quick test is not a move; **Download .onnx** saves it as a file, as it does any network
+from the list **Motions of this level**.
+
+Networks that the former Lehrer page left on a device (IndexedDB "kern-lehrer", their names in
+`localStorage`) are offered once for import into the open level; after that the Studio no longer
+reads this store.
 
 The same seed and the same number of ducks produce the same network as natively. The play layer
-cannot be trained in the browser; the page knows only `jump` and `stand`.
+cannot be trained in the browser.
 
 Chrome's CPU throttling slows only the main thread, not the workers, so the single-core case stands
-in for a phone (table in 14.9); on a phone, the page shows its duck steps/s.
+in for a phone (table in 14.9); on a phone, the panel shows its duck steps/s. There the panel is the
+sheet over the stage (the button for outliner and details); the bar with **+ Keyframe** stays under
+the finger.
 
 ## 14.12 Tests
 
@@ -960,6 +1000,8 @@ in for a phone (table in 14.9); on a phone, the page shows its duck steps/s.
 | `lehrer_runs_the_same_on_any_number_of_workers` | 1, 2, 4 workers → the same network |
 | `lehrer_exports_onnx_like_pollens_networks` | export |
 | `micro_duck_jumps_with_a_network_trained_in_kern`, `micro_duck_jumps_for_real_in_the_studio` | jump |
+| `studio_lehrer_poses_the_duck_on_its_stage`, `studio_lehrer_keeps_what_the_duck_learned_in_the_level` | the Lehrer in the Studio: posing with the mouse joint, keyframes as steps of the history, the network in the level, trying, import |
+| `game_level_keeps_learned_motions`, `micro_duck_plays_the_motions_its_level_taught` | motions in the level file; a world knows its level's motions (through Robot Move, too) |
 | `lehrer_calibrates_a_servo_from_bench_logs`, `lehrer_replays_robot_logs_against_the_simulation` | calibration ([Chapter 16](16-calibration.md)) |
 
 ---

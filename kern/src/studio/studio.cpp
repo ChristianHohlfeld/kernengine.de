@@ -270,7 +270,7 @@ bool Studio::load_level_text(std::string_view text, std::string_view name) {
 
 std::string Studio::level_text() const {
   game::Level copy = level_;
-  const ViewCamera& c = views_[0].camera;
+  const ViewCamera& c = trainer_open() ? trainer_.before.camera : views_[0].camera;  // the level's view, not the stage's
   copy.camera.position = c.position;
   copy.camera.yaw = c.yaw;
   copy.camera.pitch = c.pitch;
@@ -283,8 +283,15 @@ namespace {
 /// editor camera (camera moves are not undo steps).
 bool same_document(const game::Level& a, const game::Level& b) {
   if (a.name != b.name || a.next_id != b.next_id || a.actors.size() != b.actors.size() || a.textures.size() != b.textures.size() ||
-      a.sounds.size() != b.sounds.size())
+      a.sounds.size() != b.sounds.size() || a.motions.size() != b.motions.size())
     return false;
+  for (std::size_t i = 0; i < a.motions.size(); ++i) {
+    const game::MotionAsset &x = a.motions[i], &y = b.motions[i];
+    if (x.name != y.name || x.duration != y.duration || x.keys.size() != y.keys.size()) return false;
+    for (std::size_t k = 0; k < x.keys.size(); ++k)
+      if (x.keys[k].time != y.keys[k].time || !std::equal(std::begin(x.keys[k].joints), std::end(x.keys[k].joints), std::begin(y.keys[k].joints))) return false;
+    if (x.onnx != y.onnx && (!x.onnx || !y.onnx || *x.onnx != *y.onnx)) return false;
+  }
   for (std::size_t i = 0; i < a.sounds.size(); ++i) {
     const game::SoundAsset &x = a.sounds[i], &y = b.sounds[i];
     if (x.id != y.id || x.name != y.name || x.duration != y.duration) return false;
@@ -312,12 +319,15 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
     changed();
     return false;
   }
+  // In the Lehrer's workspace the level's selection is put aside: a step taken there leaves it as it is.
+  const std::vector<ActorId>& selection = trainer_open() ? trainer_.before.selection : selection_;
+  if (trainer_open()) selection_before = selection;
   const bool merge = !key.empty() && !transaction.empty() && history_index_ > 0 && history_index_ + 1 == history_.size() &&
                      history_.back().merge_key == key && history_.back().transaction == transaction;
   if (merge) {
     HistoryEntry& e = history_.back();
     e.level = level_;
-    e.selection_after = selection_;
+    e.selection_after = selection;
     e.serial = next_serial_++;
     // A continuous edit that ends where it started is no step at all.
     if (same_document(history_[history_index_ - 1].level, level_)) {
@@ -330,7 +340,7 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
     e.label = label;
     e.level = level_;
     e.selection_before = std::move(selection_before);
-    e.selection_after = selection_;
+    e.selection_after = selection;
     e.merge_key = key;
     e.transaction = transaction;
     e.serial = next_serial_++;
@@ -353,12 +363,13 @@ void Studio::changed() {
 
 void Studio::step_history(bool forward) {
   const game::EditorCamera camera = level_.camera;  // the viewport camera is not part of the history
+  std::vector<ActorId>& selection = trainer_open() ? trainer_.before.selection : selection_;  // (put aside in the Lehrer's workspace)
   if (forward) {
     ++history_index_;
     level_ = history_[history_index_].level;
-    selection_ = history_[history_index_].selection_after;
+    selection = history_[history_index_].selection_after;
   } else {
-    selection_ = history_[history_index_].selection_before;
+    selection = history_[history_index_].selection_before;
     --history_index_;
     level_ = history_[history_index_].level;
   }
@@ -368,7 +379,7 @@ void Studio::step_history(bool forward) {
 }
 
 void Studio::undo() {
-  if (play_ != PlayState::editing) { report("Stop playing to undo", "warn"); return; }
+  if (!editable()) { report("Stop playing to undo", "warn"); return; }
   end_gizmo(false);
   if (!can_undo()) return;
   report("Undo " + history_[history_index_].label);
@@ -376,7 +387,7 @@ void Studio::undo() {
 }
 
 void Studio::redo() {
-  if (play_ != PlayState::editing) { report("Stop playing to redo", "warn"); return; }
+  if (!editable()) { report("Stop playing to redo", "warn"); return; }
   end_gizmo(false);
   if (!can_redo()) return;
   step_history(true);
@@ -384,7 +395,7 @@ void Studio::redo() {
 }
 
 bool Studio::jump_history(std::size_t index) {
-  if (play_ != PlayState::editing || index >= history_.size()) return false;
+  if (!editable() || index >= history_.size()) return false;
   end_gizmo(false);
   while (history_index_ > index) step_history(false);
   while (history_index_ < index) step_history(true);
@@ -408,7 +419,7 @@ bool Studio::restore_autosave(std::string_view text, std::string_view name) {
 }
 
 std::string Studio::take_autosave(f64 now_ms) {
-  if (save_due_ < 0 || now_ms < save_due_ || play_ != PlayState::editing) return {};
+  if (save_due_ < 0 || now_ms < save_due_ || !editable()) return {};
   save_due_ = -1;
   if (!dirty()) {
     // Undone back to the saved state: nothing is unsaved, an older copy must not come back.
@@ -703,7 +714,7 @@ void Studio::set_hidden(const std::vector<ActorId>& ids, bool hidden) {
 }
 
 void Studio::keep_simulation_changes() {
-  if (play_ == PlayState::editing || selection_.empty()) { report("Keep Simulation Changes works on selected actors while simulating", "warn"); return; }
+  if (play_ == PlayState::editing || selection_.empty() || trainer_open()) { report("Keep Simulation Changes works on selected actors while simulating", "warn"); return; }
   std::vector<std::pair<ActorId, Mat4>> poses;
   for (ActorId id : selection_roots()) {
     Mat4 m;
@@ -845,6 +856,7 @@ bool Studio::soldier_pawn() const {
 
 bool Studio::play(game::SimMode mode) {
   play_buttons_ = 0;
+  if (trainer_open()) close_trainer();  // Play and Simulate run the level, not the Lehrer's stage
   if (play_ != PlayState::editing) {
     // Simulate <-> Play while running.
     if (!world_->set_mode(mode)) { report(last_error(), "warn"); return false; }
@@ -919,6 +931,12 @@ bool Studio::play(game::SimMode mode) {
 
 void Studio::stop() {
   if (play_ == PlayState::editing) return;
+  if (trainer_open()) { close_trainer(); return; }  // the stage is the Lehrer's: stopping it leaves the workspace
+  end_simulation();
+  report("Stopped - back to editing");
+}
+
+void Studio::end_simulation() {
   stop_net();
   world_->stop();
   play_ = PlayState::editing;
@@ -930,7 +948,6 @@ void Studio::stop() {
   json::Value a = json::Value::object();
   a.set("action", "releasePointer");
   push_ui(std::move(a));
-  report("Stopped - back to editing");
   ++scene_revision_;
   synced_revision_ = ~0ull;
   world_synced_ = ~0ull;
@@ -944,7 +961,7 @@ void Studio::toggle_pause() {
 }
 
 void Studio::eject() {
-  if (play_ == PlayState::editing) return;
+  if (play_ == PlayState::editing || trainer_open()) return;  // (the stage's duck is nobody's player)
   if (play_ == PlayState::playing) {
     // Detach from the pawn: the simulation keeps running, the camera is free.
     world_->set_mode(game::SimMode::simulate);

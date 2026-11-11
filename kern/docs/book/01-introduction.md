@@ -9,7 +9,7 @@ trained networks, and the **Lehrer** (German for "teacher"), which trains new ne
 in C++ – natively and in the browser.
 
 Live: <https://kernengine.de/> – the start page with Kern Studio (`/editor/`), the
-Lehrer (`/lehrer/`), playable levels (`kern/web/studio/play.html?level=orbRun` or `physicsLab`) and
+Lehrer (a workspace of the Studio: `/editor/?train=1`), playable levels (`kern/web/studio/play.html?level=orbRun` or `physicsLab`) and
 the C++ examples `orbrun` and `hello`.
 
 ![Kern Studio with the Orb Run level: viewport, Outliner and Details](../buch/bilder/studio.png)
@@ -250,15 +250,16 @@ The Lehrer trains networks for the Micro Duck. It runs
 
 - **natively** as the command-line program `kern_lehrer` on all cores (`kern/tools/lehrer.sh`), also
   headless on a server, and
-- **in the browser** on the `/lehrer/` page: `kern/build.sh --lehrer` builds `kern_lehrer.wasm`; each
-  Web Worker loads its own module and acts as a collector or the learner
-  (`src/lehrer/lehrer_api.cpp`).
+- **in the browser** as a workspace of Kern Studio (`/editor/?train=1`): `kern/build.sh --lehrer`
+  builds `kern_lehrer.wasm`; each Web Worker of the Studio page loads its own module and acts as a
+  collector or the learner (`src/lehrer/lehrer_api.cpp`). What the duck learns there is saved with
+  the level.
 
 Both use the same recipes (`include/kern/lehrer/recipe.h`) and the same `GameWorld`. The same seed and
 the same number of ducks yield the same network – natively as in the browser. The export is ONNX in
 the format of Pollen's networks; the Studio loads it just like those ([Chapter 14](14-lehrer.md)).
 
-![The Lehrer page in the browser with a training run in progress: settings and metrics](../buch/bilder/lehrer.png)
+![The Lehrer in Kern Studio: the duck on its stage in the viewport, beside it the panel with keyframes, training and the level's motions](../buch/bilder/lehrer.png)
 
 ### The Micro Duck: Everything Working Together
 
@@ -321,8 +322,8 @@ generated files.
     web/
       kern.mjs                   browser platform layer + KernRenderer
       app.mjs                    host for C++ games
-      studio/                    index.html, studio.css, studio.mjs, logic.mjs, game.mjs, play.html
-      lehrer/                    index.html, lehrer.mjs, worker.mjs
+      studio/                    index.html, studio.css, studio.mjs, logic.mjs, trainer.mjs (the
+                                 Lehrer), game.mjs, play.html
     tools/
       kern_lehrer.cpp            the Lehrer as a command-line program
       lehrer.sh                  builds kern_lehrer natively

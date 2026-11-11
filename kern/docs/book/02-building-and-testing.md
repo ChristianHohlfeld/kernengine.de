@@ -479,7 +479,7 @@ x86 and WebAssembly do.
    kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
    kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
    kern/build.sh --lehrer generated/kern_lehrer.wasm
-   for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+   for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs tools/net_relay.mjs; do node --check "$f"; done
    python3 -I tools/kern_notices.py --check
    ```
 
@@ -502,9 +502,9 @@ x86 and WebAssembly do.
    | `editor/` | `site/editor/` (manifest, service worker, icons) |
    | `editor/microduck/` | `kern/third_party/microduck/*.onnx` (Pollen's policy set, Apache-2.0) |
    | `editor/policies/` | `kern/policies/*.onnx` (Kern's own networks) |
+   | `editor/kern_lehrer.wasm` | the Lehrer's module, next to the editor (the workers of its workspace load it) |
    | `generated/` | `kern_studio.wasm`, `kern_lehrer.wasm` |
-   | `lehrer/index.html`, `kern/web/lehrer/*.mjs` | the Lehrer page and its workers |
-   | `train/index.html` | redirect from the old address `/train/` to `../lehrer/` |
+   | `lehrer/index.html`, `train/index.html` | redirects from the Lehrer's former addresses to `../editor/?train=1` |
    | `kern/web/` | `kern.mjs`, `app.mjs`, `studio/*.mjs`, `studio/*.html`, `studio/*.css` |
    | `kern/examples/hello/`, `kern/examples/orbrun/` | `index.html` and `.wasm` of the examples |
    | `.nojekyll` | GitHub Pages without Jekyll |
@@ -565,9 +565,8 @@ The development pages load their files relatively: `kern/web/studio/index.html` 
 `kern/third_party/microduck/` and `kern/policies/` on the development page, from
 `../kern/third_party/microduck/` and `../kern/policies/` in the single-file build under
 `/generated/`, and from `microduck/` and `policies/` next to the editor on the published site
-(`loadPolicies` in `game.mjs`). The Lehrer page `kern/web/lehrer/index.html` includes
-`../kern/web/lehrer/lehrer.mjs` and is therefore laid out for the structure of the published site
-(`/lehrer/`).
+(`loadPolicies` in `game.mjs`). The Lehrer (`trainer.mjs`) loads `kern_lehrer.wasm` from `generated/`
+on the developer page and from next to the page otherwise.
 
 ---
 
@@ -585,7 +584,7 @@ The development pages load their files relatively: `kern/web/studio/index.html` 
 | Every small header edit rebuilds everything | intended: header hash in the cache key | – |
 | Browser test hangs at `openStudio` | page not served or module missing; the test waits up to 90 s for `KernStudio.frames() > 5` | start the server in the repository root, build `generated/` |
 | Playwright import fails | package not found | `npm install playwright` (CI: 1.56.0) and set `NODE_PATH`, as in CI |
-| Lehrer page locally without a module | paths are laid out for the published structure | assemble the site as in Section 2.10 (job `build`) |
+| Lehrer: **Start** reports a loading error | `kern_lehrer.wasm` is missing (`generated/` on the developer page, next to the page otherwise) | `kern/build.sh --lehrer generated/kern_lehrer.wasm` |
 
 ---
 

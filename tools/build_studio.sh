@@ -6,12 +6,15 @@
 # Steps:
 #   1. kern/build.sh --studio generated/kern_studio.wasm   (C++ engine, Box3D, game runtime, studio)
 #   2. inline kern/web/studio/studio.css, the module sources kern/web/kern.mjs,
-#      kern/web/studio/game.mjs and kern/web/studio/studio.mjs and the wasm
-#      (base64) into the markup of kern/web/studio/index.html.
+#      kern/web/studio/game.mjs, logic.mjs, trainer.mjs and studio.mjs and the
+#      wasm (base64) into the markup of kern/web/studio/index.html.
 #
 # The result runs from file:// or any static host without network access.
-# The page runs the three module sources as one inline module; kern.mjs and
-# game.mjs are also embedded as text, from which packaged games are written.
+# The page runs the module sources as one inline module; kern.mjs and game.mjs
+# are also embedded as text, from which packaged games are written and which
+# the Lehrer's workers run. The Lehrer's own module (kern/build.sh --lehrer:
+# kern_lehrer.wasm) is not inlined: the page fetches it from beside itself
+# when a training run starts.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 skip_wasm=0
@@ -32,6 +35,7 @@ sources = {
     "kern": (web / "kern.mjs").read_text(),
     "game": (web / "studio/game.mjs").read_text(),
     "logic": (web / "studio/logic.mjs").read_text(),
+    "trainer": (web / "studio/trainer.mjs").read_text(),
     "studio": (web / "studio/studio.mjs").read_text(),
 }
 for name, text in sources.items():
@@ -50,7 +54,7 @@ blocks += f'<script type="text/plain" id="kern-wasm">{b64}</script>\n'
 def strip(text):
     text = re.sub(r'^import \{[^}]*\} from "[^"]+";\n', "", text, flags=re.M)
     return re.sub(r"^export (?=(const|let|function|async function|class) )", "", text, flags=re.M)
-bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "game", "logic", "studio"))
+bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "game", "logic", "trainer", "studio"))
 boot = """<script type="module">
 """ + bundle + """
 // ---- single-file boot ----

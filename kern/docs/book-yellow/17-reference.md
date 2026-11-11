@@ -161,7 +161,7 @@ Trained networks are saved as **ONNX** files. ONNX is to networks what PDF is to
 many programs can read, on the robot, in the browser and on the server. Kern reads Pollen's networks
 and writes its own in the same format. The converter that brings the measurements to one scale
 ([Chapter 14](14-lehrer.md)) is included in the file – so the network comes with its own tape
-measure. Networks you train in the browser stay on your device and replace the supplied ones there.
+measure. Networks you train in Studio are in your level; a jump of your own replaces the supplied one there.
 
 ### Servo Profile
 
@@ -337,8 +337,8 @@ Studio controls are listed here with the English labels Studio shows.
   the same time (17.3, A).
 - **Vector (arrow):** an arrow with a direction and a length, such as (x, y, z) (3, B).
 - **WebAssembly:** a program format that browsers run very fast (1, B).
-- **Web Worker:** a calculation helper in the browser that runs alongside the web page; on the Lehrer
-  page they're called **Workers** (14).
+- **Web Worker:** a calculation helper in the browser that runs alongside the web page; in the
+  Lehrer they're called **Workers** (14).
 
 ### Physics
 

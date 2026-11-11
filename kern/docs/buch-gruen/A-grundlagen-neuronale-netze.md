@@ -794,8 +794,8 @@ paar Schichten, die malnehmen, zusammenzählen und verbiegen. Und das reicht, da
 > diesem Moment 50-mal pro Entensekunde (13.5) eine Zahl aus knapp 200 000 Reglern, die einmal reiner Zufall
 > waren.
 
-> **Probier's aus!** Öffne die Lehrer-Seite **kernengine.de/lehrer/** und wähle als Bewegung
-> **Stehen (Schnelltest)**. Trag bei **Aktionsrauschen am Anfang** 1 ein und drück **Start**. Lass
+> **Probier's aus!** Öffne Kern Studio (**kernengine.de/editor/**), klick oben auf **Lehrer** und
+> wähle als Aufgabe **Stehen (Schnelltest)**. Trag bei **Aktionsrauschen am Anfang** 1 ein und drück **Start**. Lass
 > es ein paar Dutzend Iterationen laufen (der Zähler **Iteration** zeigt, wie weit es ist), drück
 > **Pause** und merk dir die Kurve der Episodenlänge (wie lange die Enten durchhalten) und die Zahl
 > **Aktionsrauschen**. Lade die Seite neu, trag 0,1 ein und wiederhole das mit ebenso vielen

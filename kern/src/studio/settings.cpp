@@ -174,6 +174,7 @@ void Studio::reset_settings() {
 }
 
 void Studio::note_settings() {
+  if (trainer_open()) return;  // the Lehrer's stage arranges the viewport itself: not the user's choices
   json::Value now = settings_json();
   if (!settings_seen_.is_object()) {
     settings_seen_ = std::move(now);

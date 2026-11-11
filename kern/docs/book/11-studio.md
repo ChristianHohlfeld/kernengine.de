@@ -1069,11 +1069,12 @@ This is how loading works:
 4. If a file fails, the page retries after 5 s, 10 s, 20 s …, at most once a minute. Until then the
    movement is unavailable; the duck stands still and says why.
 
-**Self-trained networks:** what the Kern Lehrer trains in the browser (page `/lehrer/`,
-[Chapter 14](14-lehrer.md)) it stores in the same browser (IndexedDB `kern-lehrer`, store `policies`,
-key = file name such as `jump.onnx`). Studio loads these networks at startup and again as soon as the
-Lehrer announces a newer one (BroadcastChannel `kern-lehrer`). A network trained on the same device thus
-replaces the bundled one without copying any file.
+**Self-trained networks:** what the Lehrer trains in the Studio (toolbar **Lehrer**,
+[Chapter 14](14-lehrer.md), 14.11) belongs to the level: a learned motion is stored in the level file
+with its name, length, keyframes and network (`motions`, 11.15.1) and becomes a move of that level's
+Micro Ducks when the world starts. The node Robot Move plays it by its name. When the Lehrer trains
+the jump, its network replaces the bundled `jump.onnx` in this level. No file is copied for this and
+nothing is kept in the browser.
 
 On publishing, the CI copies the networks to `editor/microduck/` and `editor/policies/`. If you host an
 exported game with a duck yourself, put these two folders next to the HTML file
@@ -1088,8 +1089,9 @@ and the `NOTICE` go with it; a game with the duck's look is non-commercial
 ### 11.15.1 The `.klevel` format
 
 A level is a JSON file with `"format": "kern-level"` and `"version": 1`. It contains `name`, `world`, the
-editor camera (`camera`), `nextId`, `actors`, `textures`, `sounds` and, if present, `logic`. Textures and
-imported sounds are stored in it as data URLs; a file is therefore complete. Studio rejects a file from
+editor camera (`camera`), `nextId`, `actors`, `textures`, `sounds` and, if present, `logic` and `motions`
+(what the Lehrer taught the level's ducks). Textures and imported sounds are stored in it as data URLs,
+the networks of learned motions as Base64; a file is therefore complete. Studio rejects a file from
 a newer Studio version with "level was written by a newer Kern Studio". The format is described in
 detail in [Chapter 8](08-game-runtime.md).
 

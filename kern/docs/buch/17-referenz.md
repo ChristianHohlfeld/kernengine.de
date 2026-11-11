@@ -572,9 +572,9 @@ dann Gemm, ELU, Gemm, Sigmoid; Ausgang p(gehalten). Ihn liest `parse_onnx_pickup
 
 **Wo die Dateien liegen:** Pollens Set in `kern/third_party/microduck/` (`velstand.onnx` und
 `pickup_detector.onnx` sind zusätzlich eingebaut), Kerns eigene Netze in `kern/policies/` (`jump.onnx`, `play.onnx`). Auf der
-veröffentlichten Seite liegen sie in `editor/microduck/` und `editor/policies/`. Ein im Browser
-trainiertes Netz speichert die Lehrer-Seite in IndexedDB („kern-lehrer“); es ersetzt auf demselben
-Gerät das mitgelieferte ([Kapitel 14](14-lehrer.md), [Kapitel 15](15-eigene-modelle.md)).
+veröffentlichten Seite liegen sie in `editor/microduck/` und `editor/policies/`. Ein im Studio
+trainiertes Netz steht im Level (`motions`); ein dort trainierter Sprung ersetzt in diesem Level das
+mitgelieferte `jump.onnx` ([Kapitel 14](14-lehrer.md), [Kapitel 15](15-eigene-modelle.md)).
 
 ### Servoprofil (JSON)
 

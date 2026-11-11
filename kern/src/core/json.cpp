@@ -425,4 +425,46 @@ std::string stringify(const Value& value, i32 indent) {
   return out;
 }
 
+std::string base64_encode(Span<const u8> bytes) {
+  static constexpr char kDigits[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve((bytes.size + 2) / 3 * 4);
+  for (std::size_t i = 0; i < bytes.size; i += 3) {
+    const std::size_t left = bytes.size - i;
+    const u32 v = static_cast<u32>(bytes[i]) << 16 | (left > 1 ? static_cast<u32>(bytes[i + 1]) << 8 : 0u) | (left > 2 ? static_cast<u32>(bytes[i + 2]) : 0u);
+    out += kDigits[v >> 18];
+    out += kDigits[v >> 12 & 63];
+    out += left > 1 ? kDigits[v >> 6 & 63] : '=';
+    out += left > 2 ? kDigits[v & 63] : '=';
+  }
+  return out;
+}
+
+bool base64_decode(std::string_view text, std::string& out) {
+  auto digit = [](char c) -> i32 {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    return c == '+' ? 62 : c == '/' ? 63 : -1;
+  };
+  out.clear();
+  if (text.size() % 4 != 0) return false;
+  out.reserve(text.size() / 4 * 3);
+  for (std::size_t i = 0; i < text.size(); i += 4) {
+    // Padding only closes the text: one or two '=' in its last group.
+    const bool last = i + 4 == text.size();
+    const i32 pad = last && text[i + 3] == '=' ? (text[i + 2] == '=' ? 2 : 1) : 0;
+    u32 v = 0;
+    for (i32 k = 0; k < 4; ++k) {
+      const i32 d = k >= 4 - pad ? 0 : digit(text[i + static_cast<std::size_t>(k)]);
+      if (d < 0) { out.clear(); return false; }
+      v = v << 6 | static_cast<u32>(d);
+    }
+    out += static_cast<char>(v >> 16);
+    if (pad < 2) out += static_cast<char>(v >> 8 & 255);
+    if (pad < 1) out += static_cast<char>(v & 255);
+  }
+  return true;
+}
+
 }  // namespace kern::json

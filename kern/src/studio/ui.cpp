@@ -12,7 +12,6 @@
 
 #include "internal.h"
 #include "kern/game/walker.h"
-#include "kern/game/walker_policy.h"
 #include "kern/game/demos.h"
 #include "kern/studio/studio.h"
 
@@ -169,6 +168,21 @@ json::Value Studio::key(std::string_view key, std::string_view code, bool down, 
     } else if (c == "F8" && !repeat && observing_) {
       eject();  // the observer camera: take over the player and back
     }
+    return done();
+  }
+
+  // ---- the Lehrer's stage: the viewport's camera keys, and the ways out ----
+  if (trainer_open()) {
+    if (c == "Escape" && !repeat) { close_trainer(); handled = true; }
+    else if (c == "KeyZ" && m_ctrl && !m_alt) { if (m_shift) redo(); else undo(); handled = true; }  // (keyframes are steps of the level's history)
+    else if (c == "KeyY" && m_ctrl && !m_alt) { redo(); handled = true; }
+    else if (c == "Pause") { toggle_pause(); handled = true; }
+    else if (c == "KeyP" && m_alt && !repeat) { play(game::SimMode::play); handled = true; }
+    else if (c == "KeyS" && m_alt && !repeat) { play(game::SimMode::simulate); handled = true; }
+    else if (c == "KeyS" && m_ctrl && !m_alt) { json::Value a = json::Value::object(); a.set("action", m_shift ? "saveAs" : "save"); push_ui(std::move(a)); handled = true; }
+    else if (c == "KeyF" && !flying && !m_ctrl) { frame_stage(); handled = true; }
+    else if (c == "F11") { json::Value a = json::Value::object(); a.set("action", "fullscreen"); push_ui(std::move(a)); handled = true; }
+    else if (flying) handled = true;
     return done();
   }
 
@@ -397,8 +411,9 @@ json::Value Studio::menu_json(std::string_view name) const {
   const bool editing = play_ == PlayState::editing;
   const bool sel = !selection_.empty();
   if (name == "file") {
-    m.push(entry("New Level...", cmd("dialog", "name", "new"), "Ctrl+N", editing));
-    m.push(entry("Open Level...", cmd("ui", "action", "open"), "Ctrl+O", editing));
+    // (From the Lehrer's workspace too: another level closes it.)
+    m.push(entry("New Level...", cmd("dialog", "name", "new"), "Ctrl+N", editing || trainer_open()));
+    m.push(entry("Open Level...", cmd("ui", "action", "open"), "Ctrl+O", editing || trainer_open()));
     m.push(separator());
     m.push(entry("Save", cmd("ui", "action", "save"), "Ctrl+S"));
     m.push(entry("Save As...", cmd("ui", "action", "saveAs"), "Ctrl+Shift+S"));
@@ -418,9 +433,9 @@ json::Value Studio::menu_json(std::string_view name) const {
     std::string u = "Undo", r = "Redo";
     if (can_undo()) u += " " + history_[history_index_].label;
     if (can_redo()) r += " " + history_[history_index_ + 1].label;
-    m.push(entry(u, cmd("undo"), "Ctrl+Z", editing && can_undo()));
-    m.push(entry(r, cmd("redo"), "Ctrl+Y", editing && can_redo()));
-    m.push(entry("History...", cmd("dialog", "name", "history"), "", editing));
+    m.push(entry(u, cmd("undo"), "Ctrl+Z", editable() && can_undo()));
+    m.push(entry(r, cmd("redo"), "Ctrl+Y", editable() && can_redo()));
+    m.push(entry("History...", cmd("dialog", "name", "history"), "", editable()));
     m.push(separator());
     m.push(entry("Cut", cmd("cut"), "Ctrl+X", editing && sel));
     m.push(entry("Copy", cmd("copy"), "Ctrl+C", sel));
@@ -478,19 +493,21 @@ json::Value Studio::menu_json(std::string_view name) const {
     m.push(submenu("Show", std::move(show)));
     m.push(entry("Game View", cmd("gameView", "viewport", active_view_), "G", true, v.game_view));
     m.push(separator());
+    m.push(entry("Lehrer", cmd("trainer"), "", true, trainer_open()));
+    m.push(separator());
     m.push(entry("Focus Selection", cmd("focus"), "F"));
     m.push(entry("Content Drawer", cmd("ui", "action", "toggleDrawer"), "Ctrl+Space"));
     m.push(entry("Output Log", cmd("ui", "action", "toggleLog"), ""));
     m.push(entry("Fullscreen", cmd("ui", "action", "fullscreen"), "F11"));
   } else if (name == "play") {
     m.push(entry("Play", cmd("play", "mode", "play"), "Alt+P", play_ != PlayState::playing));
-    m.push(entry("Simulate", cmd("play", "mode", "simulate"), "Alt+S", play_ == PlayState::editing));
+    m.push(entry("Simulate", cmd("play", "mode", "simulate"), "Alt+S", play_ == PlayState::editing || trainer_open()));
     m.push(entry(paused_ ? "Resume" : "Pause", cmd("pause"), "Pause", !editing));
     m.push(entry("Advance One Frame", cmd("stepFrame"), ".", !editing && paused_));
     m.push(entry("Stop", cmd("stop"), "Esc", !editing));
     m.push(separator());
-    m.push(entry(play_ == PlayState::playing ? "Eject from Player" : "Possess Player", cmd("eject"), "F8", !editing));
-    m.push(entry("Restart Game", cmd("restart"), "Ctrl+R", !editing));
+    m.push(entry(play_ == PlayState::playing ? "Eject from Player" : "Possess Player", cmd("eject"), "F8", !editing && !trainer_open()));
+    m.push(entry("Restart Game", cmd("restart"), "Ctrl+R", !editing && !trainer_open()));
     m.push(entry("Keep Simulation Changes", cmd("keep"), "K", play_ == PlayState::simulating && sel));
     m.push(separator());
     {
@@ -903,6 +920,8 @@ json::Value Studio::state() {
   s.set("details", details_json());
   s.set("world", world_json());
   if (logic_open_) s.set("logic", logic_json());
+  if (trainer_open()) s.set("trainer", trainer_json());
+  s.set("motions", motions_json());
   json::Value sel = json::Value::array();
   for (ActorId id : selection_) sel.push(id);
   s.set("selection", std::move(sel));
@@ -1227,104 +1246,7 @@ json::Value Studio::run(const json::Value& c) {
   auto str = [&](const char* k) -> std::string { return c[k].is_string() ? c[k].as_string() : std::string(); };
   auto view_index = [&]() { return c["viewport"].is_number() ? clamp(static_cast<u32>(num("viewport")), 0u, 3u) : active_view_; };
   if (name.rfind("logic", 0) == 0) return logic_command(name, c);
-
-  if (name == "motionRegister")
-    return ok(game::register_learned_walker_skill(str("name"), str("file"), static_cast<f32>(num("duration"))));
-  if (name == "motionPlay") {
-    if (play_ == PlayState::editing && !play(game::SimMode::simulate))
-      return error("Could not start simulation");
-    for (const game::Actor& a : level_.actors) {
-      game::GameWorld::WalkerProbe p;
-      if (!world_->walker_probe(a.id, p)) continue;
-      const std::string failure = world_->walker_skill(a.id, str("name"));
-      return failure.empty() ? ok() : error(failure);
-    }
-    return error("This level has no Micro Duck");
-  }
-  if (name == "motionRun") {
-    if (str("name").empty()) return error("Missing learned skill name");
-    game::Level l = game::micro_duck_level();  // restore Earth gravity for genuine execution
-    for (game::Actor& a : l.actors) if (a.controller) a.controller->autonomous = false;
-    load_level(std::move(l));
-    if (!play(game::SimMode::simulate)) return error("Unable to start the simulation");
-    for (const game::Actor& a : level_.actors) {
-      game::GameWorld::WalkerProbe p;
-      if (world_->walker_probe(a.id, p)) {
-        const std::string failure = world_->walker_skill(a.id, str("name"));
-        if (!failure.empty()) return error(failure);
-        return ok();
-      }
-    }
-    return error("No Micro Duck");
-  }
-  // Kern Lehrer motion authoring uses this exact Studio/Box3D simulation.
-  // MouseGrab, joint limits and the 14 encoder angles are not approximated in JS.
-  if (name == "motionBegin") {
-    // A dedicated puppet scene. No room, furniture, ball, floor or other
-    // pickable objects can get between the finger and the actual Micro Duck.
-    game::Level l = game::empty_level();
-    l.name = "Micro Duck · Posen";
-    l.world.title = "Micro Duck · Keyframes";
-    l.world.gravity = {0, 0, 0};
-    l.world.ground = false;
-    l.world.time_of_day = 0.42f;
-    const ActorId duck = game::add_micro_duck(l, {0, 0, 0});
-    // The keyframe puppet is constrained by its 15 physical hinges, not by
-    // floor or shell-to-shell contacts. Keep body mass, inertia and all Box3D
-    // limit joints; the rendered duck meshes remain fully pickable.
-    for (game::Actor& a : l.actors) {
-      a.colliders.clear();
-      if (a.mesh) a.mesh->collision = false;
-    }
-    if (auto* actor = l.find(duck); actor && actor->controller)
-      actor->controller->autonomous = false;
-    l.world.player = 0;
-    l.camera.position = {-3.5f, -3.5f, 2.5f};
-    l.camera.yaw = 45.0f;
-    l.camera.pitch = -18.0f;
-    load_level(std::move(l));
-    set_layout(Layout::single);  // saved Studio quad layouts must not split the puppet
-    set_view_type(0, ViewType::perspective);
-    tool_ = Tool::select;  // don't let transform gizmos intercept mouse/touch drags
-    deselect();
-    if (!play(game::SimMode::simulate))
-      return error("Could not start the Micro Duck simulation");
-    if (!world_->set_walker_external(duck, true) ||
-        !world_->set_walker_pose_edit(duck, true))
-      return error("Could not initialise zero-gravity Box3D pose mode");
-    return ok();
-  }
-  if (name == "motionPose" || name == "motionEdit" || name == "motionPreview") {
-    if (play_ != PlayState::simulating) return error("Start motion posing first");
-    for (const game::Actor& a : level_.actors) {
-      game::GameWorld::WalkerProbe p;
-      if (!world_->walker_probe(a.id, p)) continue;
-      if (name == "motionEdit") return ok(world_->set_walker_pose_edit(a.id, true));
-      if (name == "motionPreview") {
-        const json::Value& q = c["joints"];
-        if (!q.is_array() || q.items().size() != 14) return error("Expected 14 joint targets");
-        f32 target[14];
-        for (i32 i = 0; i < 14; ++i) {
-          const auto& v = q.items()[static_cast<std::size_t>(i)];
-          if (!v.is_number() || !std::isfinite(v.as_number()) || std::fabs(v.as_number()) > 2.5)
-            return error("Joint target is outside the safe input range");
-          target[i] = static_cast<f32>(v.as_number());
-        }
-        world_->set_walker_external(a.id, true);
-        world_->set_walker_pose_edit(a.id, false);
-        return ok(world_->set_walker_action(a.id, target));
-      }
-      json::Value r = ok();
-      json::Value angles = json::Value::array(), names = json::Value::array();
-      for (i32 i = 0; i < 14; ++i) angles.push(static_cast<f64>(p.joint[i]));
-      for (const auto& joint : world_->walker_joints(a.id))
-        if (names.size() < 14) names.push(joint.name);
-      r.set("joints", std::move(angles));
-      r.set("names", std::move(names));
-      return r;
-    }
-    return error("No articulated Micro Duck in the running level");
-  }
+  if (name.rfind("trainer", 0) == 0) return trainer_command(name, c);
 
   // ---- selection ----
   if (name == "select") {
@@ -1606,7 +1528,7 @@ json::Value Studio::run(const json::Value& c) {
   }
   if (name == "stepFrame") { if (play_ != PlayState::editing) world_->step_once(play_input()); return ok(); }
   if (name == "eject") { eject(); return ok(); }
-  if (name == "restart") { if (play_ != PlayState::editing) { world_->restart(); report("Restarted"); } return ok(); }
+  if (name == "restart") { if (play_ != PlayState::editing && !trainer_open()) { world_->restart(); report("Restarted"); } return ok(); }
   if (name == "keep") { keep_simulation_changes(); return ok(); }
   if (name == "gameInput") {
     if (c["moveX"].is_number()) touch_.move_x = clamp(static_cast<f32>(num("moveX")), -1.0f, 1.0f);

@@ -100,6 +100,11 @@ std::string stringify(const Value& value, i32 indent = -1);
 
 /// Appends an ECMAScript Number::toString rendering (non-finite numbers become "null", as in JSON).
 void append_number(std::string& out, f64 value);
+/// Binary data in a JSON text: Base64 (RFC 4648, padded).
+std::string base64_encode(Span<const u8> bytes);
+/// False when `text` is not Base64 (`out` is then empty).
+bool base64_decode(std::string_view text, std::string& out);
+
 /// Appends a JSON string literal (quotes and escapes as JSON.stringify).
 void append_string(std::string& out, std::string_view text);
 

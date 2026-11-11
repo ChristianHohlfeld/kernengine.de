@@ -63,6 +63,7 @@
     <div class="group">
       <button class="tb icon" id="layoutBtn" title="Viewport layout" data-icon="layout"></button>
       <button class="tb logic" id="logicBtn" data-cmd='{"cmd":"logicOpen","owner":0}' title="Logic: the level's Blueprint-style graph (actors have their own: Details > Logic)"><span data-icon="logic"></span>Logic</button>
+      <button class="tb trainer" id="trainerBtn" data-cmd='{"cmd":"trainer"}' title="Lehrer: teach the Micro Duck new motions - it learns them on this device"><span data-icon="duck"></span>Lehrer<i id="trainerRun" hidden data-i18n-skip></i></button>
       <button class="tb icon" data-ui="packageGame" title="Package the game as one HTML file" data-icon="package"></button>
       <button class="tb icon" id="panelsBtn" title="Outliner and Details" data-icon="panels"></button>
     </div>
@@ -74,6 +75,7 @@
       <button id="touchPause" type="button" aria-label="Pause">❚❚ PAUSE</button>
       <canvas id="gl" tabindex="-1"></canvas>
       <div id="viewports"></div>
+      <div id="trainerBar" hidden></div>
     </section>
     <div class="splitter v" id="sideSplit"></div>
     <aside id="side" data-pane="details">
@@ -101,6 +103,12 @@
         </div>
         <div id="details" class="props"></div>
         <div id="worldSettings" class="props" hidden></div>
+      </section>
+      <section id="trainerPanel" class="panel" hidden>
+        <div class="panel-head"><span>Lehrer</span><div class="spacer"></div>
+          <button class="ph icon" id="trainerClose" title="Close the Lehrer (back to the level)" data-icon="close"></button>
+        </div>
+        <div id="trainer" class="props"></div>
       </section>
     </aside>
   </main>
@@ -168,8 +176,9 @@
   function safe() {
     var k = studio();
     if (!k) return true;  // still loading
-    // Editing: the autosave (written on pagehide) carries unsaved changes over. Playing waits.
-    try { return k.status && k.status.play === "editing"; } catch (e) { return false; }
+    // Editing: the autosave (written on pagehide) carries unsaved changes over. Playing waits, and
+    // so does a training run of the Lehrer.
+    try { return k.status && k.status.play === "editing" && !k.training; } catch (e) { return false; }
   }
   function tag(sha) {
     var el = document.getElementById("buildTag");

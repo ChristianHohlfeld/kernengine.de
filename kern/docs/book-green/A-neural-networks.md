@@ -784,8 +784,8 @@ jump.
 > **7**. At this moment, each servo gets a number 50 times per duck second (13.5) from just under
 > 200,000 sliders that were once pure randomness.
 
-> **Try it!** Open the Lehrer page **kernengine.de/lehrer/** and choose **Stand (quick test)**
-> as the **Motion**. Enter 1 under **Initial action noise** and press **Start**. Let it run a few
+> **Try it!** Open Kern Studio (**kernengine.de/editor/**), click **Lehrer** at the top and choose
+> **Stand (quick test)** as the **Task**. Enter 1 under **Initial action noise** and press **Start**. Let it run a few
 > dozen iterations (the **Iteration** counter shows how far along it is), press **Pause**, and note
 > the curve **Episode length** (how long the ducks hold out) and the **Action noise (std)** number. Reload the page, enter 0.1, and repeat with just as
 > many iterations. What you can expect: with 1 the bell is wide, and the ducks try things out wildly;

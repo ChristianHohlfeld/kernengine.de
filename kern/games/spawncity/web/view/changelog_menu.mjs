@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"11:43",title:"Kern Studio: der Lehrer gehört jetzt zum Editor",items:[
+    "Kern-Editor: Der Lehrer – das Werkzeug, mit dem die Micro Duck neue Bewegungen lernt – ist keine eigene Seite mehr, sondern ein Arbeitsbereich im Editor (Knopf „Lehrer“ in der Leiste). Die Ente steht auf einer eigenen Bühne im Viewport und wird dort mit Maus oder Finger in Pose gezogen; die alten Adressen führen dorthin.",
+    "Was die Ente lernt, gehört jetzt zum Level: Eine gelernte Bewegung wird mit dem Level gespeichert, läuft in Play, steckt im verpackten und im exportierten Spiel und lässt sich im Blueprint mit „Robot Move“ beim Namen abspielen. Im Browser des Geräts wird dafür nichts mehr abgelegt.",
+    "Netze, die die frühere Lehrer-Seite auf einem Gerät gespeichert hat, bietet der Editor einmal zum Übernehmen in das offene Level an.",
+  ]},
   {date:"2026-11-11",time:"11:23",title:"Blueprints als C++: ein Typ steht als Typ da",items:[
     "Kern-Blueprints: Knoten, die mit jedem Typ arbeiten (Select, Reroute, die Listen-Knoten, For Each), nennen ihren Typ im C++ jetzt als Typ – logic_select<Float>, list_get<Text> – statt als Text in Anführungszeichen. Das ist Vorarbeit für eigene Typen (Aufzählungen, Strukturen).",
     "Im Kern-Editor prüft Compile jetzt, dass die Einstellung „Type“ eines solchen Knotens wirklich einen Typ nennt.",

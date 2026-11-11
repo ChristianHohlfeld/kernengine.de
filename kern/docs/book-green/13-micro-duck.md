@@ -333,10 +333,9 @@ same way as Pollen's; it rejects a differently wired one and gives the reason. I
 work, the page tries again later. Until then, that movement doesn't start; the duck can still walk
 and stand with the built-in network.
 
-> **Did you know?** Networks you train yourself with Kern Lehrer in the browser
-> ([Chapter 14](14-lehrer.md)) stay in the storage of the same browser. The Studio fetches them from
-> there, and an open Studio takes over a new network immediately. So your own jump replaces the one
-> that ships with Kern, without you copying a file.
+> **Did you know?** Networks you train yourself with the Lehrer in the Studio
+> ([Chapter 14](14-lehrer.md)) land in your level and are saved with it. So in that level your own
+> jump replaces the one that ships with Kern, without you copying a file.
 
 ## 13.7 What the network sees: 61 in, 14 out
 

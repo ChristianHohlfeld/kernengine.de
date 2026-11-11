@@ -36,7 +36,7 @@ Schritt steht in [Kapitel 15](15-eigene-modelle.md).
 | `src/lehrer/evaluate.cpp`, `fingerprint.cpp` | Sprungmessung, Determinismus-Fingerabdruck |
 | `src/lehrer/lehrer_api.cpp` | C-Schnittstelle für den Browser |
 | `tools/kern_lehrer.cpp`, `tools/lehrer.sh` | das Kommandozeilenwerkzeug und sein Build |
-| `web/lehrer/` | die Lehrer-Seite: `index.html`, `lehrer.mjs`, `worker.mjs` |
+| `src/studio/trainer.cpp`, `web/studio/trainer.mjs` | der Lehrer in Kern Studio: Bühne, Keyframes und die Bewegungen des Levels; Panel und Trainingslauf in Web Workern |
 
 Stand laut `docs/lehrer.md`:
 
@@ -904,13 +904,37 @@ DAgger + PPO on Box3D)`, `rate_hz` = `25` und die Namen der 23 Beobachtungen und
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite im Browser mit laufendem Training: Einstellungen und Kennzahlen](bilder/lehrer.png)
+![Der Lehrer in Kern Studio: die Ente auf ihrer Bühne im Viewport, daneben das Panel mit Keyframes, Training und den Bewegungen des Levels](bilder/lehrer.png)
 
 `kern/build.sh --lehrer` baut `kern_lehrer.wasm`: Engine, Box3D, Spiel-Laufzeit, `src/lehrer` und die
-C-Schnittstelle (`lehrer_api.cpp`). Die Seite `/lehrer/` (`web/lehrer/`) lädt sie einmal und gibt das
-kompilierte Modul jedem Worker.
+C-Schnittstelle (`lehrer_api.cpp`). Der Lehrer ist ein Arbeitsbereich von Kern Studio
+([Kapitel 11](11-studio.md)): Werkzeugleiste **Lehrer**, **Fenster › Lehrer** oder die Adresse
+`/editor/?train=1` (die früheren Adressen `/lehrer/` und `/train/` leiten dorthin). Es gibt eine Seite,
+eine Engine und eine `GameWorld`: Die Ente steht im Viewport des Studios, das Panel des Lehrers nimmt
+den Platz von Outliner und Details ein, **Esc** oder derselbe Knopf führen zurück ins Level.
 
-**Rollen:**
+**Die Bühne** (`src/studio/trainer.cpp`): Der Arbeitsbereich simuliert ein eigenes kleines Level in
+der `GameWorld` des Studios; das offene Level steht still und seine Actors bleiben unberührt. Zum
+**Posieren** steht die Ente schwerelos mit festgehaltenem Rumpf und ohne Kollisionsformen da. Maus
+oder Finger nehmen ein Glied mit Box3Ds Maus-Gelenk (`set_walker_pose_edit`, wie das Greifen im
+Simulieren); losgelassen halten die Servos die Pose. **+ Keyframe** in der Leiste auf der Bühne
+nimmt die 14 Winkel, die die Encoder messen, zum eingestellten Zeitpunkt auf; **Anzeigen** fährt die
+Ente durch ihre Servos in einen Keyframe (`set_walker_pose`). Zum **Testen** steht die Ente bei
+normaler Schwerkraft auf dem Boden, auf dem ihre Netze trainieren, und spielt eine gelernte Bewegung.
+
+**Aufgaben:** **Bewegung aus Keyframes** (Aufgabe `motion:{…}` aus Namen, Länge und 2 bis 32
+Keyframes), **Sprung** (`jump`), **Stehen (Schnelltest)** (`stand`) und **Freies
+Trainingsszenario** (`scenario:{…}`: Zielpunkte, Hindernisse, Belohnungen). Unter
+**Experteneinstellungen** stehen Worker (Standard: Kerne − 1, höchstens 8), Enten je Worker
+(Standard 8), Iterationen (Standard 1500), Seed, Aktionsrauschen am Anfang und Lernrate (leer =
+Rezept). Das Panel zeigt Iteration, Entenschritte, Schritte/s, mittlere Episoden-Rückgabe und
+-länge, Aktionsrauschen und das Maß der Aufgabe (Posenfehler, echte Sprünge mit Höhe und Flugzeit,
+erreichte Ziele) und zeichnet Rückgabe und Länge über die Iterationen. **Pause** und **Stopp**
+gelten für den Lauf; er geht weiter, während man im Studio bearbeitet oder spielt. Die Seite hält
+den Bildschirm wach (Wake Lock). Die Texte folgen der Sprache des Studios (Deutsch oder Englisch).
+
+**Rollen im Lauf** (`web/studio/trainer.mjs`; die Worker entstehen aus einem Blob, wie in
+`web/jobs.mjs`, und laden je ein eigenes Modul):
 
 - **Sammler:** Jeder Worker ist eine Modulinstanz mit Enten `i · envs … (i + 1) · envs − 1` eines
   Laufs (`kern_lehrer_create(task, envs, seed, first)`). Pro Iteration bekommt er die Policy
@@ -918,7 +942,7 @@ kompilierte Modul jedem Worker.
   (`kern_lehrer_collect`). In der Nachahmung rechnet jeder seinen Teil jeder Runde
   (`kern_lehrer_dagger`).
 - **Lerner:** ein eigener Worker (`kern_lehrer_learner`) für Nachahmung (`kern_lehrer_imitate`),
-  PPO-Update (`kern_lehrer_learn`), Sprungbewertung alle 25 Iterationen (`kern_lehrer_evaluate`, 5
+  PPO-Update (`kern_lehrer_learn`), Bewertung alle 25 Iterationen (`kern_lehrer_evaluate`, 5
   Episoden) und Export (`kern_lehrer_export_onnx`).
 
 Die Puffer sind dieselben wie nativ (`Policy::serialize`, `Rollout::serialize`); Ergebnisse kommen
@@ -926,22 +950,41 @@ als Zeiger mit `kern_lehrer_result_length()` Bytes zurück. Der Lerner akzeptier
 die das Rezept überschreiben: `learningRate`, `initStd`, `entropyCoef`, `desiredKl`, `steps`, `epochs`,
 `minibatches`, `warmStart` (`velstand` | `none`), `imitate`.
 
-**Die Seite** bietet Bewegung (Sprung oder Stehen als Schnelltest), Worker (Standard: Kerne − 1,
-höchstens 8), Enten je Worker (Standard 8), Iterationen (Standard 1500), Seed, Aktionsrauschen am
-Anfang und Lernrate (leer = Rezept). Sie zeigt Iteration, Entenschritte, Schritte/s, mittlere
-Episoden-Rückgabe und -länge, Aktionsrauschen, echte Sprünge, Sprunghöhe und Flugzeit und zeichnet
-Rückgabe und Länge über die Iterationen. Sie hält den Bildschirm wach (Wake Lock).
+**Was die Ente lernt, gehört zum Level.** Eine Bewegung steht in der Level-Datei unter `motions`
+(`game::MotionAsset`, `include/kern/game/level.h`):
 
-Alle 25 Iterationen und am Ende speichert sie das Netz für Kern Studio auf dem Gerät (IndexedDB
-„kern-lehrer“, Store „policies“, Schlüssel `<Aufgabe>.onnx`, beim Sprung `jump.onnx`) und meldet es über den BroadcastChannel
-„kern-lehrer“; offene Studio-Tabs übernehmen es sofort. „.onnx herunterladen“ speichert die Datei.
+```json
+"motions": [
+  {"name": "kopfnicken", "duration": 1.2,
+   "keys": [{"time": 0, "joints": [0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+            {"time": 0.6, "joints": [0,0,0,0,0,0,0.35,0,0,0,0,0,0,0]},
+            {"time": 1.2, "joints": [0,0,0,0,0,0,0,0,0,0,0,0,0,0]}],
+   "onnx": "<die ONNX-Datei, Base64>"}
+]
+```
+
+Keyframes, Name und Länge sind Schritte im Verlauf des Levels (Rückgängig und Wiederholen gelten auch
+im Arbeitsbereich). Nach der Nachahmung, alle 25 Iterationen und am Ende übergibt die Seite das Netz
+der Engine (`trainerLearned`); ein Lauf ist ein Schritt im Verlauf, wie oft er auch ein neueres Netz
+bringt. Wird das Level gerade gespielt, wartet das Netz, bis es wieder Änderungen annimmt. Beim Start
+einer Welt (`GameWorld::start`, also auch im verpackten und im nativ exportierten Spiel) macht
+`GameWorld::learn_motions` aus den Bewegungen des Levels Bewegungen seiner Enten;
+`walker_skill(ente, name)` und der Blueprint-Knoten **Robot Move** starten sie. Der vom Lehrer
+trainierte Sprung ist der eigene `jump` des Levels und ersetzt dort das mitgelieferte Netz. Das Netz
+eines Szenarios oder des Schnelltests ist keine Bewegung; **.onnx herunterladen** speichert es als
+Datei, ebenso jedes Netz aus der Liste **Bewegungen dieses Levels**.
+
+Netze, die die frühere Lehrer-Seite auf einem Gerät abgelegt hat (IndexedDB „kern-lehrer“, Namen in
+`localStorage`), bietet das Studio einmal zum Import in das offene Level an; danach liest es diesen
+Speicher nicht mehr.
 
 Gleicher Seed und gleich viele Enten ergeben dasselbe Netz wie nativ. Die Spielschicht lässt sich im
-Browser nicht trainieren; die Seite kennt nur die Aufgaben `jump` und `stand`.
+Browser nicht trainieren.
 
 Auf dem Handy: Chromes CPU-Drosselung bremst nur den Hauptthread, nicht die Worker, und taugt deshalb
-nicht als Handy-Profil; gemessen ist stattdessen der Ein-Kern-Fall (Tabelle in 14.9). Die Seite zeigt
-auf dem Gerät selbst die Entenschritte/s.
+nicht als Handy-Profil; gemessen ist stattdessen der Ein-Kern-Fall (Tabelle in 14.9). Das Panel zeigt
+auf dem Gerät selbst die Entenschritte/s. Auf dem Telefon liegt das Panel als Blatt über der Bühne
+(Knopf für Outliner und Details); die Leiste mit **+ Keyframe** bleibt unter dem Finger.
 
 ## 14.12 Tests
 
@@ -957,6 +1000,8 @@ auf dem Gerät selbst die Entenschritte/s.
 | `lehrer_runs_the_same_on_any_number_of_workers` | 1, 2, 4 Worker → dasselbe Netz |
 | `lehrer_exports_onnx_like_pollens_networks` | Export |
 | `micro_duck_jumps_with_a_network_trained_in_kern`, `micro_duck_jumps_for_real_in_the_studio` | Sprung |
+| `studio_lehrer_poses_the_duck_on_its_stage`, `studio_lehrer_keeps_what_the_duck_learned_in_the_level` | der Lehrer im Studio: Posieren mit dem Maus-Gelenk, Keyframes als Schritte im Verlauf, das Netz im Level, Testen, Import |
+| `game_level_keeps_learned_motions`, `micro_duck_plays_the_motions_its_level_taught` | Bewegungen in der Level-Datei; eine Welt kennt die Bewegungen ihres Levels (auch über Robot Move) |
 | `lehrer_calibrates_a_servo_from_bench_logs`, `lehrer_replays_robot_logs_against_the_simulation` | Kalibrierung ([Kapitel 16](16-kalibrierung.md)) |
 
 ---

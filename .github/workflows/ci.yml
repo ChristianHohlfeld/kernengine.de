@@ -91,7 +91,7 @@ jobs:
             # (the browser test plays it: kern/tests/e2e/export_e2e.mjs).
             tools/export_game.sh kern/tests/e2e/native_export.klevel generated/native_export.html
             for f in kern/games/spawncity/web/*.mjs kern/games/spawncity/web/audio/*.mjs; do node --check "$f"; done
-            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs tools/export_game.mjs; do node --check "$f"; done
+            for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs tools/net_relay.mjs tools/export_game.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
           set -o pipefail
@@ -127,13 +127,14 @@ jobs:
           # Kern's own trained networks (docs/lehrer.md): the jump.
           mkdir -p _site/editor/policies && cp kern/policies/*.onnx _site/editor/policies/
           cp generated/kern_studio.wasm _site/generated/
-          # The Lehrer (docs/lehrer.md): its page, workers and module.
-          mkdir -p _site/lehrer _site/kern/web/lehrer
-          cp kern/web/lehrer/index.html _site/lehrer/
-          cp kern/web/lehrer/*.mjs _site/kern/web/lehrer/
+          # The Lehrer (docs/lehrer.md) is a workspace of the editor; the module its workers train
+          # with lies beside the editor (and in generated/ for the module page kern/web/studio/).
+          cp generated/kern_lehrer.wasm _site/editor/
           cp generated/kern_lehrer.wasm _site/generated/
-          # Its old address (/train/) leads there.
-          mkdir -p _site/train && printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../lehrer/"><a href="../lehrer/">Kern Lehrer</a>\n' > _site/train/index.html
+          # Its old addresses (/lehrer/, /train/) lead into the workspace.
+          for old in lehrer train; do
+            mkdir -p _site/$old && printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../editor/?train=1"><a href="../editor/?train=1">Kern Studio: Lehrer</a>\n' > _site/$old/index.html
+          done
           cp kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs _site/kern/web/
           cp kern/web/studio/*.mjs kern/web/studio/*.html kern/web/studio/*.css _site/kern/web/studio/
           for g in hello orbrun; do
@@ -228,8 +229,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p generated && cp _site/editor/index.html generated/studio.html && cp _site/generated/kern_studio.wasm generated/
-          # the app files next to the page, as deployed (manifest, icons, service worker)
-          cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck generated/
+          # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
+          cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
           /tmp/e2e/node_modules/.bin/playwright install --with-deps chromium || { echo "::error::playwright install failed"; exit 1; }
           python3 -m http.server 8771 --bind 127.0.0.1 >/tmp/http.log 2>&1 &

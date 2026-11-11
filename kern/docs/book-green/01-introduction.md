@@ -244,7 +244,7 @@ engine as the editor and therefore behaves the same way ([Chapter 8](08-game-run
 > log and the console commands.
 
 **The Lehrer.** It trains networks for the Micro Duck: on your computer as a program of its own,
-or in the browser on the Lehrer page. There, several background helpers gather experience with
+or in the browser, right inside Kern Studio (the **Lehrer** button). There, several background helpers gather experience with
 simulated ducks at the same time, and one learns from it. Both versions use the same training
 recipes and the same game world. Learning starts with a **seed** for chance – like a deck of
 cards that is shuffled in exactly the same way every time. Same seed, same number of ducks:

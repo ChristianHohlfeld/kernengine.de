@@ -172,7 +172,7 @@ The exact formats are in the blue book, Chapter 17.
 Two parts of the reference are pure programmer tools and are therefore only in the blue book,
 Chapter 17:
 
-- **The Lehrer as a command-line program:** besides the Lehrer page in the browser, the Lehrer also
+- **The Lehrer as a command-line program:** besides the Lehrer workspace in the Studio, the Lehrer also
   exists as a program you start with typed commands – for training, evaluating, calibrating and
   measuring. All commands with their settings and examples are there.
 - **The interface between engine and browser:** the engine is the heart of Kern, the program that
@@ -388,7 +388,7 @@ seen from the center is 1 rad. About six and a quarter such strings go once arou
 | **Distribution shift** | an imitating network, when doing things itself, gets into situations it has never seen |
 | **Entropy** | a measure of curiosity: how widely the duck tries things around its best idea |
 | **Episode** | one practice run, from the start until a fall or until time is up |
-| **Episode return** | all the points of an episode simply added up; that's the readout **Mean episode return** on the Lehrer page ([Ch. 15](15-your-own-models.md)) |
+| **Episode return** | all the points of an episode simply added up; that's the readout **Mean episode return** in the Lehrer workspace ([Ch. 15](15-your-own-models.md)) |
 | **Epoch** | going through all the collected practice data once |
 | **Evaluator / helpers** | in the Lehrer: the part that learns from the notes / the parts that let ducks work out and take notes; technical terms learner / collector ([Ch. 14](14-lehrer.md)) |
 | **Exponential function** | shrinking by the same share per step; ELU uses it to squash negative numbers |
@@ -401,7 +401,7 @@ seen from the center is 1 rad. About six and a quarter such strings go once arou
 | **Layer** | many neurons side by side that see the same inputs |
 | **Learning rate** | the step length when adjusting the sliders |
 | **Lehrer** | Kern's training system for the Micro Duck's networks ([Ch. 14](14-lehrer.md)) |
-| **Lehrer page** | the web page kernengine.de/lehrer/, where you train in the browser ([Ch. 14](14-lehrer.md), [15](15-your-own-models.md)) |
+| **Lehrer workspace** | the "Lehrer" area of Kern Studio (the **Lehrer** button), where you train in the browser; what the duck learns there belongs to the level ([Ch. 14](14-lehrer.md), [15](15-your-own-models.md)) |
 | **Loss** | a number that says how wrong the network is right now; smaller is better |
 | **Measurement** | a strict check of whether a movement really succeeded, independent of the points ([Ch. 15](15-your-own-models.md)) |
 | **Minibatch** | a small, random handful of practice data for one learning step |

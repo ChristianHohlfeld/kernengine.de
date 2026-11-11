@@ -334,10 +334,99 @@ const I18N_DE = {
   "Joint break": "Gelenkbruch", "Footstep": "Schritt", "Plastic tap": "Plastikklopfen", "Small footstep": "Kleiner Schritt", "Engine": "Motor", "Hover drive": "Schwebeantrieb",
   "Wind": "Wind", "City": "Stadt", "Electric hum": "Elektrisches Brummen", "Servo": "Servo", "Quack": "Quaken", "Robot beep": "Roboterpiepen", "Click": "Klick",
   "Confirm": "Bestätigen", "Error": "Fehler", "Drive (music)": "Fahrt (Musik)", "Calm (music)": "Ruhe (Musik)", "Micro Duck voice": "Stimme der Micro Duck",
+
+  // the Lehrer's workspace (trainer.mjs, kern/src/studio/trainer.cpp)
+  "Lehrer: teach the Micro Duck new motions - it learns them on this device": "Lehrer: bring der Micro Duck neue Bewegungen bei – sie lernt sie auf diesem Gerät",
+  "Close the Lehrer (back to the level)": "Lehrer schließen (zurück zum Level)",
+  "Lehrer · drag a part of the duck to pose it · it holds where you let go · Esc leaves": "Lehrer · zieh ein Körperteil der Ente in die Pose · es bleibt, wo du loslässt · Esc verlässt",
+  "Lehrer · the duck tries the move on its network · Esc leaves": "Lehrer · die Ente probiert die Bewegung mit ihrem Netz · Esc verlässt",
+  "Lehrer - drag a part of the duck to pose it; it holds where you let go": "Lehrer – zieh ein Körperteil der Ente in die Pose; es bleibt, wo du loslässt",
+  "Lehrer closed - back to the level": "Lehrer geschlossen – zurück im Level", "The Lehrer's stage could not start": "Die Bühne des Lehrers konnte nicht starten",
+  "Task": "Aufgabe", "Teach": "Beibringen", "Motion from keyframes": "Bewegung aus Keyframes", "Stand (quick test)": "Stehen (Schnelltest)",
+  "Free training scenario": "Freies Trainingsszenario", "New motion": "Neue Bewegung", "Length": "Länge", "Keyframes": "Keyframes",
+  "Remove all keyframes": "Alle Keyframes löschen", "Time of the keyframe (s)": "Zeitpunkt des Keyframes (s)",
+  "The servos take the duck to this pose": "Die Servos fahren die Ente in diese Pose", "Remove this keyframe": "Diesen Keyframe entfernen",
+  "Drag a part of the duck in the viewport and let go: it holds the pose. Add it as a keyframe at its time. The first keyframe is the home pose at 0 s, the last one lies at the motion's end.":
+    "Zieh ein Körperteil der Ente im Viewport und lass los: sie hält die Pose. Füg sie als Keyframe zu ihrem Zeitpunkt hinzu. Der erste Keyframe ist die Grundpose bei 0 s, der letzte liegt am Ende der Bewegung.",
+  "Keyframe at": "Keyframe bei", "Home pose": "Grundpose", "Again": "Nochmal", "Back to posing": "Zurück zum Posieren",
+  "Scenario": "Szenario", "Episode length": "Episodenlänge", "Forward command": "Vorwärtskommando", "Rewards": "Belohnungen", "Progress": "Fortschritt",
+  "Per waypoint": "Je Zielpunkt", "On finish": "Bei Abschluss", "Staying upright": "Aufrecht bleiben", "Fall penalty": "Sturzstrafe",
+  "Waypoints: x y radius (one per line)": "Zielpunkte: x y Radius (eine Zeile pro Ziel)",
+  "Objects: box x y width depth height, or sphere x y radius": "Objekte: box x y Breite Tiefe Höhe oder sphere x y Radius",
+  "Load example": "Beispiel laden", "Save scenario as JSON": "Szenario als JSON speichern", "Import scenario JSON": "Szenario-JSON importieren",
+  "More goals, joint poses, randomisation and weights as JSON": "Weitere Ziele, Gelenkposen, Randomisierung und Gewichte als JSON",
+  "Scenario configuration as JSON": "Szenariokonfiguration als JSON", "Apply JSON": "JSON übernehmen", "My course": "Mein Parcours",
+  "Waypoints and physical obstacles of your own, rewards to taste, and a new network learns the course. The order of the waypoints is the order of the task. All measures in metres from where the duck starts.":
+    "Eigene Zielpunkte und physische Hindernisse, Belohnungen nach Wunsch, und ein neues Netz lernt den Parcours. Die Reihenfolge der Zielpunkte ist die Reihenfolge der Aufgabe. Alle Maße in Metern ab dem Start der Ente.",
+  "The direction to the goal is a training command in the free inputs 55/56, not an invented IMU sensor: the real robot needs an external position for it. A scenario's network is not a move of the duck; download it as .onnx.":
+    "Die Richtung zum Ziel ist ein Trainingskommando in den freien Eingängen 55/56, kein erfundener IMU-Sensor: der echte Roboter braucht dafür eine externe Position. Das Netz eines Szenarios ist keine Bewegung der Ente; lade es als .onnx herunter.",
+  "Training": "Training", "Try the network on the duck": "Netz an der Ente testen", "Download .onnx": ".onnx herunterladen", "Expert settings": "Experteneinstellungen",
+  "Workers": "Worker", "Ducks per worker": "Enten je Worker", "Iterations": "Iterationen", "Initial action noise": "Aktionsrauschen am Anfang", "Learning rate": "Lernrate",
+  "Recipe": "Rezept", "Duck steps": "Entenschritte", "Steps / s": "Schritte / s", "Mean episode return": "Mittlere Episoden-Rückgabe",
+  "Action noise (std)": "Aktionsrauschen (std)", "Jump height (mm)": "Sprunghöhe (mm)", "Flight time (ms)": "Flugzeit (ms)", "Pose error (degrees)": "Posenfehler (Grad)",
+  "Real jumps (clean robot)": "Echte Sprünge (sauberer Roboter)", "Goals reached (evaluation)": "Ziele erreicht (Prüfläufe)", "Episode return": "Episoden-Rückgabe",
+  "Motions of this level": "Bewegungen dieses Levels", "Try": "Testen", "In the level": "Im Level", "The duck tries the move on the stage": "Die Ente probiert die Bewegung auf der Bühne",
+  "The level's Micro Duck plays the move": "Die Micro Duck des Levels spielt die Bewegung", "Remove from the level": "Aus dem Level entfernen",
+  "Its keyframes on the stage": "Ihre Keyframes auf der Bühne", "Download the network (.onnx)": "Netz herunterladen (.onnx)", "Not taught yet": "Noch nicht beigebracht",
+  "This level's ducks were not taught anything yet. A motion you teach appears here; it is saved with the level, and the Blueprint node Robot Move plays it by its name.":
+    "Den Enten dieses Levels wurde noch nichts beigebracht. Eine Bewegung, die du ihnen beibringst, erscheint hier; sie wird mit dem Level gespeichert, und der Blueprint-Knoten Robot Move spielt sie unter ihrem Namen.",
+  "New: it is the level's with its first keyframe.": "Neu: Mit ihrem ersten Keyframe gehört sie zum Level.", "In the level, taught.": "Im Level, beigebracht.",
+  "In the level, not taught yet.": "Im Level, noch nicht beigebracht.", "Import into this level": "In dieses Level importieren", "Import": "Importieren", "Not now": "Jetzt nicht",
+  "The network goes into the level when it stops playing.": "Das Netz kommt ins Level, sobald es nicht mehr gespielt wird.",
+  // (the level's history: the steps the Lehrer takes)
+  "Add keyframe": "Keyframe hinzufügen", "Remove keyframe": "Keyframe entfernen", "Move keyframe": "Keyframe verschieben", "Edit motion": "Bewegung ändern",
+  "Remove motion": "Bewegung entfernen", "Teach motion": "Bewegung beibringen", "Import learned motions": "Gelernte Bewegungen importieren",
+  "The level has no such motion": "Diese Bewegung hat das Level nicht", "The level has no such network": "Dieses Netz hat das Level nicht",
+  "The network is not one the robot runs": "Dieses Netz kann der Roboter nicht ausführen", "Stop playing to edit the level": "Beende das Spielen, um das Level zu bearbeiten",
+  "Nothing to import: the level has these motions already": "Nichts zu importieren: Das Level hat diese Bewegungen schon",
+  "How it works": "Wie es funktioniert",
+  "A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.":
+    "Eine Bewegung aus Keyframes lernt die Ente in zwei Schritten: Zuerst ahmt das Netz die Posen nach, die du gesetzt hast, unter Schwerkraft durch die Servos gespielt; danach übt es mit PPO und allen Variationen (Massen, Schwerpunkte, Servos, Sensoren), bis es die Bewegung selbst sicher kann. Der Sprung ahmt ein Vorbild nach, das eine Suche (CMA-ES) in derselben Physik gefunden hat. Zur Laufzeit gibt es nur das Netz.",
+  "Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.":
+    "Jeder Worker führt seine eigenen Enten in Kerns Engine (dieselben Servos, Sensoren und derselbe 50-Hz-Regler wie im Viewport) und handelt mit der aktuellen Policy. Der Lerner sammelt ihre Schritte und verbessert die Policy mit PPO, dem Rezept, mit dem Pollen Robotics die Netze des Roboters trainiert. Heraus kommt eine ONNX-Datei im Format von Pollens Netzen; Kern Studio und der Roboter selbst können sie laden.",
+  "Training goes on while you edit, play or leave this workspace; keep the tab open, and a phone on its charger. More workers use more cores. The same seed and the same number of ducks produce the same network bit for bit, on every device.":
+    "Das Training läuft weiter, während du bearbeitest, spielst oder diesen Arbeitsbereich verlässt; lass den Tab offen und ein Handy am Ladekabel. Mehr Worker nutzen mehr Kerne. Gleicher Seed und gleich viele Enten ergeben Bit für Bit dasselbe Netz, auf jedem Gerät.",
+  "Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own \"jump\". They are saved with the level, and a packaged or exported game has them.":
+    "Alle 25 Iterationen kommt das neueste Netz ins Level: Eine Bewegung spielt der Blueprint-Knoten Robot Move unter ihrem Namen, ein Sprung-Netz ist der eigene „jump“ des Levels. Sie werden mit dem Level gespeichert, und ein verpacktes oder exportiertes Spiel hat sie dabei.",
+  "Loading the Lehrer ...": "Der Lehrer lädt ...", "Paused.": "Pausiert.", "Learning ...": "Lernt ...", "Scenario loaded.": "Szenario geladen.", "Scenario imported.": "Szenario importiert.",
+  "The Lehrer does not take this task": "Der Lehrer nimmt diese Aufgabe nicht an",
+  "A scenario is a JSON object": "Ein Szenario ist ein JSON-Objekt", "Too many waypoints (16 at most)": "Zu viele Zielpunkte (höchstens 16)", "Too many objects (32 at most)": "Zu viele Objekte (höchstens 32)",
+  "A scenario needs a waypoint or a posture or speed goal": "Ein Szenario braucht einen Zielpunkt oder ein Haltungs- oder Geschwindigkeitsziel",
+  "The scenario is too large (16 KiB at most)": "Das Szenario ist zu groß (höchstens 16 KiB)", "The file is too large (16 KiB at most)": "Die Datei ist zu groß (höchstens 16 KiB)",
+  "A motion's name is made of a-z, 0-9, _ and -": "Der Name einer Bewegung besteht aus a-z, 0-9, _ und -", "A motion lasts 0.3 to 15 seconds": "Eine Bewegung dauert 0,3 bis 15 Sekunden",
+  "No such keyframe": "Diesen Keyframe gibt es nicht", "A keyframe lies between 0 and the motion's length": "Ein Keyframe liegt zwischen 0 und der Länge der Bewegung",
+  "A motion needs two keyframes at least: its start and its end": "Eine Bewegung braucht mindestens zwei Keyframes: ihren Anfang und ihr Ende",
+  "The first keyframe must be at 0 s": "Der erste Keyframe muss bei 0 s liegen", "Open the Lehrer first": "Öffne zuerst den Lehrer", "Go back to posing first": "Geh zuerst zurück zum Posieren",
+  "The stage has no Micro Duck": "Auf der Bühne steht keine Micro Duck", "The pose is outside what the servos reach": "Die Pose liegt außerhalb dessen, was die Servos erreichen",
+  "A motion has 32 keyframes at most": "Eine Bewegung hat höchstens 32 Keyframes", "This level has no Micro Duck": "In diesem Level gibt es keine Micro Duck",
+  "Could not start the simulation": "Die Simulation konnte nicht starten", "no such move": "diese Bewegung gibt es nicht",
 };
 
 // Phrases with a variable part (counts, names): [pattern, replacement].
 const I18N_PATTERNS = [
+  // The Lehrer's workspace: the run's status line and notes, and what a scenario's rows lack.
+  [/^Ready\. (\S+) cores on this device\.$/, "Bereit. $1 Kerne auf diesem Gerät."],
+  [/^Starting 1 worker with 1 duck each \.\.\.$/, "Starte 1 Worker mit 1 Ente ..."], [/^Starting (\d+) workers? with 1 duck each \.\.\.$/, "Starte $1 Worker mit je 1 Ente ..."],
+  [/^Starting (\d+) workers? with (\d+) ducks each \.\.\.$/, "Starte $1 Worker mit je $2 Enten ..."],
+  [/^Imitating: round (\d+) of (\d+) \.\.\.$/, "Nachahmen: Runde $1 von $2 ..."],
+  [/^Imitating: round (\d+) of (\d+), (\S+) samples, error (\S+)$/, "Nachahmen: Runde $1 von $2, $3 Beispiele, Fehler $4"],
+  [/^Learning: iteration (\d+) of (\d+), collecting (\S+) s, learning (\S+) s$/, "Lernt: Iteration $1 von $2, sammeln $3 s, lernen $4 s"],
+  [/^Done: (\d+) iterations\. Download the network, or play the move in your level\.$/, "Fertig: $1 Iterationen. Lade das Netz herunter oder spiel die Bewegung in deinem Level."],
+  [/^Stopped after (\d+) iterations\.$/, "Angehalten nach $1 Iterationen."],
+  [/^The level's ducks know "(.+)" now \(iteration (\d+)\)\.$/, "Die Enten des Levels können jetzt „%1“ (Iteration $2)."],
+  [/^The level's ducks jump with this network now \(iteration (\d+)\)\.$/, "Die Enten des Levels springen jetzt mit diesem Netz (Iteration $1)."],
+  [/^"(.+)" is a move of the robot's own$/, "„%1“ ist eine eigene Bewegung des Roboters"], [/^The level has a motion "(.+)" already$/, "Das Level hat schon eine Bewegung „%1“"],
+  [/^The motion "(.+)" is no longer in the level$/, "Die Bewegung „%1“ ist nicht mehr im Level"],
+  [/^Motion "(.+?)": its network is not one the robot runs( \(.+\))?$/, "Bewegung „%1“: Ihr Netz kann der Roboter nicht ausführen%2"],
+  [/^From the Lehrer's old page, on this device: (.+)$/, "Von der alten Lehrer-Seite, auf diesem Gerät: $1"], [/^Imported into the level: (.+)$/, "Ins Level importiert: $1"],
+  [/^The duck learned on the Lehrer's old page on this device: (.+)\. Import into this level\?$/, "Auf der alten Lehrer-Seite hat die Ente auf diesem Gerät gelernt: $1. In dieses Level importieren?"],
+  [/^The network is ready to download \(iteration (\d+)\)\.$/, "Das Netz ist zum Herunterladen bereit (Iteration $1)."],
+  [/^Waypoint line (\d+): x y radius expected$/, "Zielpunkt Zeile $1: erwartet x y Radius"], [/^Waypoint line (\d+) is outside the allowed range$/, "Zielpunkt Zeile $1 liegt außerhalb der erlaubten Grenzen"],
+  [/^Object line (\d+): box x y width depth height, or sphere x y radius$/, "Objekt Zeile $1: box x y Breite Tiefe Höhe oder sphere x y Radius"],
+  [/^Object line (\d+) is outside the allowed range$/, "Objekt Zeile $1 liegt außerhalb der erlaubten Grenzen"],
+  [/^(.+): a number from (\S+) to (\S+)$/, "$1: eine Zahl von $2 bis $3", true],
+  [/^There is a keyframe at (\S+) s already$/, "Bei $1 s gibt es schon einen Keyframe"],
+  [/^The last keyframe must be at the motion's end \((\S+) s\)$/, "Der letzte Keyframe muss am Ende der Bewegung liegen ($1 s)"],
   // Specific forms first; the general "Saved …", "Deleted …" below would take them otherwise.
   [/^Deleted 1 actor$/, "1 Actor gelöscht"], [/^Deleted (\d+) actors$/, "$1 Actors gelöscht"], [/^Copied (\d+) actors$/, "$1 Actors kopiert"],
   [/^Selected (\d+) actors$/, "$1 Actors ausgewählt"], [/^Kept the simulated placement of (\d+) actors$/, "Simulierte Position von $1 Actors übernommen"],
@@ -520,30 +609,6 @@ function defaultAmbientOcclusion() {
 /** The networks Kern trained itself (kern/policies/, docs/lehrer.md); all others are Pollen's. */
 const KERN_POLICIES = new Set(["jump.onnx", "play.onnx"]);
 
-/** Networks Kern Lehrer saved on this device: IndexedDB "kern-lehrer", store "policies", key =
- *  file name ("jump.onnx"), value = the ONNX bytes. [[file, Uint8Array], ...]; `only` picks one. */
-export function trainedPolicies(only) {
-  return new Promise(resolve => {
-    let open;
-    try { open = indexedDB.open("kern-lehrer", 1); } catch { resolve([]); return; }
-    open.onupgradeneeded = () => open.result.createObjectStore("policies");
-    open.onerror = () => resolve([]);
-    open.onsuccess = () => {
-      const out = [];
-      try {
-        const cursor = open.result.transaction("policies").objectStore("policies").openCursor();
-        cursor.onsuccess = () => {
-          const c = cursor.result;
-          if (!c) { resolve(out); return; }
-          if (!only || c.key === only) out.push([String(c.key), new Uint8Array(c.value)]);
-          c.continue();
-        };
-        cursor.onerror = () => resolve(out);
-      } catch { resolve(out); }
-    };
-  });
-}
-
 export class StudioEngine {
   constructor(kern) {
     this.kern = kern;
@@ -612,7 +677,6 @@ export class StudioEngine {
    *  trained networks (policies/<file>.onnx: jump.onnx, play.onnx, docs/lehrer.md). A file that fails is fetched again later; until then the move it
    *  drives is unavailable (the duck stands and says why). */
   async loadPolicies(bases = /\/kern\/web\/studio\//.test(location.pathname) ? ["../../third_party/microduck/", "../../policies/"] : /\/generated\/[^/]*$/.test(location.pathname) ? ["../kern/third_party/microduck/", "../kern/policies/"] : ["microduck/", "policies/"]) {
-    if (!this.trainedWatched) { this.trainedWatched = true; this.watchTrainedPolicies(); }
     if (this.policiesLoading) return this.policiesLoading;
     // A file that failed is asked for again later (5 s, 10 s, 20 s ... at most every minute).
     const retry = this.policyRetry ??= new Map(), now = Date.now();
@@ -651,24 +715,6 @@ export class StudioEngine {
     } finally {
       this.e.kern_free(ptr);
     }
-  }
-  /** Networks trained in Kern Lehrer on this device (same site): loaded now, and again whenever
-   *  the Lehrer saves a newer one (docs/lehrer.md). */
-  watchTrainedPolicies() {
-    const load = async only => {
-      let learned = {};
-      try { learned = JSON.parse(localStorage.getItem("kern-lehrer.motion-skills.v1") || "{}"); } catch { /* unavailable */ }
-      for (const [file, bytes] of await trainedPolicies(only)) {
-        if (!this.registerPolicy(file, bytes)) continue;
-        if (learned[file]) {
-          const s = learned[file];
-          this.command({cmd:"motionRegister",name:s.name,file,duration:s.duration});
-        }
-        console.info("Kern: trained network " + file + " loaded");
-      }
-    };
-    load().catch(() => {});
-    try { new BroadcastChannel("kern-lehrer").onmessage = e => load(e.data?.file).catch(() => {}); } catch { /* no channel */ }
   }
   /** Decodes the level's texture images (data URLs) into RGBA for the engine. */
   pollTextures(maxSide = 2048) {

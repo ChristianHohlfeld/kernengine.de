@@ -371,8 +371,8 @@ svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-widt
 
 .badge.player{margin-left:6px;padding:0 5px;border-radius:3px;background:#2f7de1;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:15px;flex:none}
 
-.tb.logic{display:inline-flex;align-items:center;gap:5px;padding:0 10px 0 8px;font-weight:600}
-.tb.logic.on{background:var(--accent-soft);color:var(--text-hi)}
+.tb.logic,.tb.trainer{display:inline-flex;align-items:center;gap:5px;padding:0 10px 0 8px;font-weight:600}
+.tb.logic.on,.tb.trainer.on{background:var(--accent-soft);color:var(--text-hi)}
 
 /* ---- Play on touch devices: the game fills the screen ---- */
 #touchExit, #touchPause { display: none; }
@@ -421,3 +421,58 @@ svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-widt
 .rp-tof canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
 .rp-label { position: absolute; left: 6px; top: 4px; font: 700 9.5px/1 var(--mono, monospace); letter-spacing: .08em; color: #fff; text-shadow: 0 1px 2px #000; }
 .rp-state, .rp-near { position: absolute; left: 6px; bottom: 5px; font: 600 11px/1 var(--mono, monospace); color: #ffd36b; text-shadow: 0 1px 2px #000; }
+
+/* ---- the Lehrer's workspace (trainer.mjs): its panel takes the side, its bar sits on the stage ---- */
+#trainerRun { font: 600 10px var(--mono); font-style: normal; padding: 1px 5px; border-radius: 8px; background: var(--play); color: #06210d; }
+#main.trainer-open #sideTabs, #main.trainer-open #outlinerPanel, #main.trainer-open #panelSplit, #main.trainer-open #detailsPanel { display: none; }
+#main.trainer-open #side, #app.compact #main.trainer-open #side { grid-template-rows: minmax(0, 1fr); }
+#trainerBar { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 4; max-width: calc(100% - 16px); padding: 6px 8px; border-radius: 8px;
+  background: rgba(18, 18, 20, .82); border: 1px solid var(--line2); backdrop-filter: blur(6px); user-select: none; touch-action: manipulation; }
+#trainerBar > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+#trainerBar.test .tr-pose, #trainerBar:not(.test) .tr-test { display: none; }
+#trainerBar .num { flex: 0 0 60px; height: 28px; font-size: 12px; }
+#trainerBar #trTesting { font: 600 12px var(--mono); color: var(--text-hi); padding: 0 4px; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.small { height: 22px; padding: 0 8px; font-size: 11px; }
+.btn.go { background: var(--play); border-color: var(--play); color: #06210d; font-weight: 700; }
+.btn.go:hover:not(:disabled) { filter: brightness(1.1); background: var(--play); }
+.tr-buttons { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 6px 4px 12px; }
+.tr-note { margin: 0; padding: 4px 12px 6px; color: var(--dim); line-height: 1.5; }
+.tr-status { padding: 2px 12px 4px; min-height: 1.6em; color: var(--text); overflow-wrap: anywhere; }
+.tr-status.err { color: var(--err); }
+.tr-status.tr-saved { color: var(--play); }
+.tr-status:empty { display: none; }
+.tr-bar { height: 3px; margin: 0 12px 6px; border-radius: 2px; background: var(--bg1); overflow: hidden; }
+.tr-bar i { display: block; height: 100%; width: 0; background: var(--play); transition: width .2s; }
+.tr-key, .tr-learned { display: grid; align-items: center; gap: 6px; min-height: 26px; padding: 1px 6px 1px 12px; }
+.tr-key { grid-template-columns: 64px auto 1fr auto; justify-items: start; }
+.tr-key .num { width: 100%; }
+/* A motion of the level: its name, length and state, and under them what can be done with it. */
+.tr-learned { grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 2px; padding-top: 4px; padding-bottom: 5px; }
+.tr-learned.on { box-shadow: inset 2px 0 var(--accent); }
+.tr-learned .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--text-hi); }
+.tr-acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tr-acts .ph:disabled { opacity: .35; pointer-events: none; }
+.tr-acts [data-net] { margin-left: auto; }
+.tr-key:hover, .tr-learned:hover { background: rgba(255, 255, 255, .02); }
+.tr-area { padding: 2px 6px 4px 12px; }
+.tr-area textarea { display: block; width: 100%; min-height: 60px; resize: vertical; padding: 4px 6px; border: 1px solid var(--line2); border-radius: 3px; background: var(--bg1); color: var(--text-hi); outline: none; font: 11px/1.45 var(--mono); }
+.tr-area textarea:focus { border-color: var(--accent); background: #101012; }
+.tr-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 4px; padding: 6px 8px 4px; }
+.tr-stat { padding: 5px 7px; border: 1px solid var(--line2); border-radius: var(--radius); background: var(--bg1); min-width: 0; }
+.tr-stat b { display: block; font: 600 13px var(--mono); color: var(--text-hi); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+.tr-stat span { color: var(--dim); font-size: 10.5px; }
+.tr-chart { display: block; width: calc(100% - 16px); height: 150px; margin: 2px 8px; }
+.tr-legend { display: flex; gap: 12px; padding: 2px 12px 8px; color: var(--dim); font-size: 11px; }
+.tr-legend i { display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; }
+/* Fingers: the bar's and the panel's buttons are touch-sized. */
+@media (pointer: coarse) {
+  #trainerBar .btn { height: 36px; padding: 0 14px; }
+  #trainerBar .num { height: 36px; font-size: 14px; }
+  #trainer .btn { height: 36px; padding: 0 14px; font-size: 12px; }
+  #trainer .num, #trainer .txt, #trainer .sel { height: 30px; font-size: 13px; }
+  #trainer .ph { width: 36px; height: 36px; }
+  .tr-key { grid-template-columns: 76px auto 1fr auto; }
+}
+#app.compact #trainerPanel > .panel-head { height: 44px; font-size: 13px; }
+#app.compact #trainerClose { width: 40px; height: 36px; }

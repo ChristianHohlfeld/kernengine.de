@@ -52,9 +52,9 @@ const PickupDetector* pickup_detector();
 /// The policies this program has: velstand.onnx is built in; the page (or a test) loads the
 /// others of the robot's set (kern_studio_load_policy / register_walker_policy).
 void register_walker_policy(std::shared_ptr<const WalkerPolicy> policy);
-/// Register a keyframed motion policy as a one-shot skill without recompiling the manifest.
-/// Requires a loaded 61->14 ONNX policy. The phase occupies observation slots 55/56.
-bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds);
+/// Whether `name` is a move of the robot's own (its policy set's, sit, pick, Kern's jump): what
+/// GameWorld::walker_skill runs without the level having taught it.
+bool is_walker_move(std::string_view name);
 std::shared_ptr<const WalkerPolicy> walker_policy(std::string_view file);
 std::vector<std::string> walker_policy_files();
 

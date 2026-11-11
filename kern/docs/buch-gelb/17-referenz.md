@@ -163,8 +163,8 @@ Trainierte Netze werden als **ONNX**-Datei gespeichert. ONNX ist für Netze, was
 Format, das viele Programme lesen können, auf dem Roboter, im Browser und auf dem Server. Kern liest
 Pollens Netze und schreibt seine eigenen im selben Format. Der Umrechner, der die Messwerte auf
 eine Skala bringt ([Kapitel 14](14-lehrer.md)), steckt mit in der Datei – das Netz kommt also mit
-seinem eigenen Maßband. Netze, die du im Browser trainierst, bleiben auf deinem Gerät und ersetzen
-dort die mitgelieferten.
+seinem eigenen Maßband. Netze, die du im Studio trainierst, stehen in deinem Level; ein eigener
+Sprung ersetzt dort den mitgelieferten.
 
 ### Servoprofil
 
@@ -344,7 +344,7 @@ Bedienelemente von Studio stehen hier mit ihrer deutschen Beschriftung, in Klamm
 - **Vorlesen / Übersetzen (JIT):** ein Logik-Graph wird Knoten für Knoten ausgeführt / während des
   Spiels in schnellen Code übersetzt (9).
 - **WebAssembly:** ein Programmformat, das Browser sehr schnell ausführen (1, B).
-- **Web Worker:** ein Rechenhelfer im Browser, der neben der Webseite herläuft; auf der Lehrer-Seite
+- **Web Worker:** ein Rechenhelfer im Browser, der neben der Webseite herläuft; im Lehrer
   heißen sie „Worker“ (14).
 
 ### Physik

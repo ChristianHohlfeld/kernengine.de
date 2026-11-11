@@ -506,15 +506,20 @@ Die genauen Bausteine und Beschriftungen der Datei stehen im blauen Buch, Kapite
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite im Browser während eines Trainings: oben die Einstellungen, darunter die Anzeigen und die Kurven von Episoden-Rückgabe und Episodenlänge](../buch/bilder/lehrer.png)
+![Der Lehrer in Kern Studio: links die Ente auf ihrer Bühne, rechts das Feld des Lehrers mit Aufgabe, Keyframes, Training und den Kurven von Episoden-Rückgabe und Episodenlänge](../buch/bilder/lehrer.png)
 
-Auf der **Lehrer-Seite** (Adresse: kernengine.de/lehrer/) kannst du selbst trainieren, ohne etwas zu
-installieren. Mehrere Hintergrund-Prozesse des Browsers teilen sich die Arbeit: Einige lassen Enten
-turnen (die Helfer), einer lernt (der Auswerter).
+Der Lehrer steckt mitten in **Kern Studio**: Oben in der Leiste gibt es den Knopf **Lehrer** (die
+Adresse kernengine.de/editor/?train=1 öffnet ihn gleich mit). Dort kannst du selbst trainieren, ohne
+etwas zu installieren. Die Ente steht dann allein auf einer kleinen Bühne im Bild, und rechts liegt
+das Feld des Lehrers. Dein Level bleibt dabei, wie es ist; **Esc** bringt dich zurück. Mehrere
+Hintergrund-Prozesse des Browsers teilen sich die Arbeit: Einige lassen Enten turnen (die Helfer),
+einer lernt (der Auswerter).
 
-Oben wählst du die **Bewegung**: „Sprung“ oder „Stehen (Schnelltest)“. Die übrigen Felder (Worker,
-Enten je Worker, Iterationen, Seed, Aktionsrauschen, Lernrate) kannst du auf ihren Voreinstellungen
-lassen. Die Seite zeigt laufend, wie es steht. Die wichtigsten Anzeigen:
+Oben im Feld wählst du die **Aufgabe**: „Bewegung aus Keyframes“ (eine eigene Bewegung, die du der
+Ente mit der Maus vormachst), „Sprung“, „Stehen (Schnelltest)“ oder ein freies Trainingsszenario.
+Die übrigen Felder unter „Experteneinstellungen“ (Worker, Enten je Worker, Iterationen, Seed,
+Aktionsrauschen, Lernrate) kannst du auf ihren Voreinstellungen lassen. Das Feld zeigt laufend, wie
+es steht. Die wichtigsten Anzeigen:
 
 - **mittlere Episoden-Rückgabe:** die Punkte einer ganzen Episode zusammengezählt, im Mittel über
   alle Enten. Steigt sie über viele Runden, lernen die Enten. (Beim Lernen selbst rechnet der
@@ -528,13 +533,15 @@ lassen. Die Seite zeigt laufend, wie es steht. Die wichtigsten Anzeigen:
 - **echte Sprünge:** wie viele von 5 Probesprüngen auf dem sauberen Roboter echt waren. Das ist das
   eigentliche Ziel.
 
-Nach dem Nachahmen, danach alle 25 Runden und am Ende speichert die Seite das Netz **im Browser**
-und meldet „Für Kern Studio gespeichert als …“. Offene Studio-Tabs im selben Browser übernehmen ein
-neues Sprung-Netz sofort. Mit „.onnx herunterladen“ bekommst du die Datei. Die Spielschicht lässt
-sich im Browser nicht trainieren.
+Nach dem Nachahmen, danach alle 25 Runden und am Ende legt der Lehrer das Netz **in dein Level**:
+Eine gelernte Bewegung gehört zum Level wie seine Actors. Sie wird mit ihm gespeichert, und auch
+ein verpacktes Spiel hat sie dabei. Unter dem Fortschritt steht dann zum Beispiel „Die Enten des
+Levels springen jetzt mit diesem Netz“. Mit „.onnx herunterladen“ bekommst du das Netz als Datei.
+Das Training läuft weiter, während du im Studio baust oder spielst. Die Spielschicht lässt sich im
+Browser nicht trainieren.
 
-> **Probier's aus!** Öffne **kernengine.de/lehrer/**, wähle **Stehen (Schnelltest)** und drück
-> **Start**. Am Anfang sind die Regler zufällig, die Enten fallen schnell um: Die Episodenlänge ist
+> **Probier's aus!** Öffne Kern Studio (**kernengine.de/editor/**), klick oben auf **Lehrer**, wähle
+> als Aufgabe **Stehen (Schnelltest)** und drück **Start**. Am Anfang sind die Regler zufällig, die Enten fallen schnell um: Die Episodenlänge ist
 > kurz. Beobachte, wie sie über die Runden wächst, Richtung 4 Sekunden – dann fallen die Enten nicht
 > mehr um. Du musst nicht bis zum Ende warten; **Pause** hält an. Den Sprung trainierst du in
 > [Kapitel 15](15-eigene-modelle.md).

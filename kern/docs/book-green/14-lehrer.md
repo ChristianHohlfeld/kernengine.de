@@ -495,17 +495,21 @@ The exact building blocks and labels of the file are in the blue book, Chapter 1
 
 ## 14.11 The Lehrer in the browser
 
-![The Lehrer page in the browser during training: the settings at the top, below them the readouts and the curves of episode return and episode length](../buch/bilder/lehrer.png)
+![The Lehrer in Kern Studio: on the left the duck on its stage, on the right the Lehrer's panel with task, keyframes, training and the curves of episode return and episode length](../buch/bilder/lehrer.png)
 
-On the **Lehrer page** (address: kernengine.de/lehrer/) you can train yourself, without installing
-anything. Several of the browser's background processes share the work: some let ducks work out (the
-helpers), one learns (the evaluator).
+The Lehrer sits right inside **Kern Studio**: at the top of the toolbar there's the **Lehrer** button
+(the address kernengine.de/editor/?train=1 opens it straight away). There you can train yourself,
+without installing anything. The duck then stands alone on a small stage in the view, and the
+Lehrer's panel lies on the right. Your level stays as it is meanwhile; **Esc** takes you back.
+Several of the browser's background processes share the work: some let ducks work out (the helpers),
+one learns (the evaluator).
 
-Like Kern Studio, the page speaks German or English: it follows your browser's language, and the
-**DE | EN** button at the bottom right switches. At the top you choose the **Motion**: **Jump** or
-**Stand (quick test)**. You can leave the other fields (**Workers**, **Ducks per worker**,
-**Iterations**, **Seed**, **Initial action noise**, **Learning rate**) at their defaults. The page
-shows continuously how things stand. The most important readouts:
+The Lehrer speaks the Studio's language, German or English. At the top of the panel you choose the
+**Task**: **Motion from keyframes** (a motion of your own that you show the duck with the mouse),
+**Jump**, **Stand (quick test)** or a free training scenario. You can leave the other fields under
+**Expert settings** (**Workers**, **Ducks per worker**, **Iterations**, **Seed**, **Initial action
+noise**, **Learning rate**) at their defaults. The panel shows continuously how things stand. The
+most important readouts:
 
 - **Mean episode return**: the points of a whole episode added up,
   averaged over all ducks. If it rises over many rounds, the ducks are learning. (When learning
@@ -519,11 +523,14 @@ shows continuously how things stand. The most important readouts:
 - **Real jumps (clean robot)**: how many of 5 test jumps on the clean robot were real. That's the
   actual goal.
 
-After imitation, then every 25 rounds, and at the end, the page saves the network **in the browser**
-and reports "Saved for Kern Studio as …". Open Studio tabs in the same browser take over a new jump
-network immediately. With **Download .onnx** you get the file. The play layer can't be trained in the browser.
+After imitation, then every 25 rounds, and at the end, the Lehrer puts the network **into your
+level**: a learned motion belongs to the level like its actors. It's saved with it, and a packaged
+game has it too. Below the progress it then says, for example, "The level's ducks jump with this
+network now". With **Download .onnx** you get the network as a file. Training goes on while you
+build or play in the Studio. The play layer can't be trained in the browser.
 
-> **Try it!** Open **kernengine.de/lehrer/**, choose **Stand (quick test)** and press **Start**. At
+> **Try it!** Open Kern Studio (**kernengine.de/editor/**), click **Lehrer** at the top, choose the
+> task **Stand (quick test)** and press **Start**. At
 > the beginning the sliders are random and the ducks fall over quickly: the episode length is short.
 > Watch how it grows over the rounds, toward 4 seconds – then the ducks no longer fall over. You don't
 > have to wait until the end; **Pause** stops it. You train the jump in

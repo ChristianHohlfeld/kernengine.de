@@ -1058,6 +1058,24 @@ TEST(json_numbers_match_javascript) {
   CHECK(num(NAN) == "null");
 }
 
+TEST(json_base64_carries_binary_data) {
+  // Binary data in level files (a learned motion's network): every length, every byte value.
+  std::string all;
+  for (int i = 0; i < 256; ++i) all += static_cast<char>(i);
+  for (std::size_t n : {std::size_t{0}, std::size_t{1}, std::size_t{2}, std::size_t{3}, std::size_t{4}, std::size_t{255}, std::size_t{256}}) {
+    const std::string bytes = all.substr(0, n);
+    const std::string text = json::base64_encode(Span<const u8>(reinterpret_cast<const u8*>(bytes.data()), bytes.size()));
+    CHECK(text.size() == (n + 2) / 3 * 4);
+    std::string back = "x";
+    CHECK(json::base64_decode(text, back) && back == bytes);
+  }
+  const char* kern = "Kern";
+  CHECK(json::base64_encode(Span<const u8>(reinterpret_cast<const u8*>(kern), 4)) == "S2Vybg==");
+  std::string out;
+  CHECK(json::base64_decode("S2Vybg==", out) && out == "Kern");
+  for (const char* bad : {"S2Vybg=", "S2Vy*g==", "S2=ybg==", "====", "S2Vybg==S2Vy"}) CHECK(!json::base64_decode(bad, out) && out.empty());
+}
+
 TEST(json_parse_and_stringify) {
   json::Value v;
   std::string err;
@@ -4924,29 +4942,77 @@ TEST(studio_observer_camera_grabs_bodies) {
   CHECK(!f.s->state()["play"]["observing"].as_bool());
 }
 
-TEST(studio_motion_mouse_joint_holds_pose_after_release) {
-  StudioFixture f;
-  CHECK(f.cmd(R"({"cmd":"motionBegin"})")["ok"].as_bool());
-  CHECK(f.s->level().world.gravity.z == 0);
-  CHECK(!f.s->level().world.ground);
-  game::ActorId duck = 0;
-  for (const game::Actor& a : f.s->level().actors) {
-    if (a.controller && a.controller->mode == game::ControlMode::walker) duck = a.id;
-    CHECK(a.colliders.empty());  // only hinge travel limits, not shell/floor contacts
+/// kern/policies/jump.onnx: a network of the shape a learned motion has (61 observations with the
+/// move's phase, 14 actions).
+std::string kern_jump_onnx() {
+  std::string file = __FILE__, bytes;
+  file = file.substr(0, file.find_last_of('/')) + "/../policies/jump.onnx";
+  if (FILE* fp = std::fopen(file.c_str(), "rb")) {
+    char buf[65536];
+    std::size_t n;
+    while ((n = std::fread(buf, 1, sizeof buf, fp)) > 0) bytes.append(buf, n);
+    std::fclose(fp);
   }
-  CHECK(duck != 0);
+  return bytes;
+}
+
+// The Lehrer's workspace (docs/lehrer.md): the Micro Duck on a stage of its own in the Studio's
+// viewport. Its limbs are posed with the mouse joint and hold where they are let go, keyframes are
+// the measured joint angles, the servos show a keyframe. The motion being taught is the level's:
+// its keyframes are steps of the level's history. The level's actors, the viewport and the
+// selection are the same when the workspace closes.
+TEST(studio_lehrer_poses_the_duck_on_its_stage) {
+  StudioFixture f;
+  const std::string level = f.s->level_text();
+  const std::size_t steps = f.s->history().size();
+  CHECK(f.cmd(R"({"cmd":"layout","layout":"quad"})")["ok"].as_bool());
+  f.s->select({f.s->level().actors[0].id});
+  const std::vector<game::ActorId> selection = f.s->selection();
+  const studio::ViewCamera camera = f.s->viewport(0).camera;
+  CHECK(f.cmd(R"({"cmd":"trainer","open":true})")["ok"].as_bool());
+  CHECK(f.s->trainer_open() && f.s->trainer_stage() == studio::TrainerStage::pose);
+  json::Value st = f.s->state();
+  CHECK(st["play"]["state"].as_string() == "simulating" && st["trainer"]["stage"].as_string() == "pose");
+  CHECK(st["prefs"]["layout"].as_string() == "single" && st["selection"].size() == 0);
+  // The stage is not the level: opening the workspace changes nothing of it, and the stage is a
+  // weightless duck and nothing else.
+  CHECK(f.s->level_text() == level && !f.s->dirty() && f.s->history().size() == steps);
+  game::GameWorld& w = f.s->world();
+  CHECK(w.level().world.gravity.z == 0 && !w.level().world.ground);
+  for (const game::Actor& a : w.level().actors) CHECK(a.colliders.empty());  // only its hinges limit a pose
+  const game::ActorId duck = f.s->trainer_duck();
+  CHECK(duck != 0 && w.walkers().size() == 1);
   if (!duck) return;
   f.frames(10);
-  game::GameWorld& w = f.s->world();
+  // A new motion starts in the home pose; it is not in the level before its first change.
+  CHECK(f.s->trainer_motion().name == "nod" && f.s->trainer_motion().keys.size() == 1 && f.s->trainer_motion().keys[0].time == 0);
+  CHECK(!st["trainer"]["motion"]["saved"].as_bool() && f.s->level().motions.empty());
+  json::Value home = f.cmd(R"({"cmd":"trainerPose"})");
+  CHECK(home["ok"].as_bool() && home["joints"].size() == 14 && home["names"].size() == 14);
+  for (std::size_t j = 0; j < home["joints"].size(); ++j) CHECK_NEAR(home["joints"][j].as_number(), 0.0, 0.02);
+  // The mouse on the head: the viewport's grab takes it (the mouse joint), it follows the cursor
+  // within its hinges' limits and holds where it is let go.
+  auto screen = [&](Vec3 p) {
+    json::Value c = json::Value::object(), at = json::Value::array();
+    c.set("cmd", "project");
+    for (int i = 0; i < 3; ++i) at.push(static_cast<f64>(p[i]));
+    c.set("point", std::move(at));
+    json::Value r = f.s->command(c);
+    return std::pair<f32, f32>{static_cast<f32>(r["x"].as_number()), static_cast<f32>(r["y"].as_number())};
+  };
   const auto initial = w.walker_joints(duck);
   CHECK(initial.size() == 15);
   const physics::Body head = w.actor_body(duck + 9);
   CHECK(w.physics().body_type(head) == physics::BodyType::dynamic);
-  const Vec3 p = w.physics().pose(head).position;
-  CHECK(w.begin_grab(duck + 9, p));
-  w.move_grab(p + Vec3{0, 0.7f, 0.7f});
-  f.frames(40);
-  w.end_grab();
+  Aabb head_box;
+  CHECK(w.actor_bounds(duck + 9, head_box));
+  auto [x, y] = screen(head_box.center());
+  f.s->pointer(0, 0, x, y, 0, 1, 0, 0);
+  CHECK(w.grabbing());
+  for (int i = 1; i <= 20; ++i) { f.s->pointer(0, 1, x + 3.0f * static_cast<f32>(i), y - 5.0f * static_cast<f32>(i), 0, 1, 0, 0); f.frames(2); }
+  f.s->pointer(0, 2, x + 60, y - 100, 0, 0, 0, 0);
+  CHECK(!w.grabbing());
+  CHECK(f.s->selection().empty());  // nothing of the stage is selected
   const auto held = w.walker_joints(duck);
   f32 moved = 0;
   for (std::size_t j = 0; j < 14 && j < held.size(); ++j) {
@@ -4954,15 +5020,171 @@ TEST(studio_motion_mouse_joint_holds_pose_after_release) {
     CHECK(held[j].angle >= held[j].lower - 0.10f);
     CHECK(held[j].angle <= held[j].upper + 0.10f);
   }
-  CHECK(moved > 0.005f);  // physical MouseGrab moved an actual servo joint
+  CHECK(moved > 0.005f);  // the mouse joint moved a real servo joint
   f.frames(50);
   const auto retained = w.walker_joints(duck);
   f32 worst_drift = 0;
-  for (std::size_t j = 0; j < 14 && j < retained.size(); ++j)
-    worst_drift = max_of(worst_drift, std::fabs(retained[j].angle - held[j].angle));
-  CHECK(worst_drift < 0.15f);  // no zero-g coast or spring back to home
-  const json::Value pose = f.cmd(R"({"cmd":"motionPose"})");
-  CHECK(pose["ok"].as_bool() && pose["joints"].size() == 14);
+  for (std::size_t j = 0; j < 14 && j < retained.size(); ++j) worst_drift = max_of(worst_drift, std::fabs(retained[j].angle - held[j].angle));
+  CHECK(worst_drift < 0.15f);  // no coasting without gravity, no spring back to home
+  // A drag beside the duck turns the view about it.
+  const f32 yaw = f.s->viewport(0).camera.yaw;
+  f.s->pointer(0, 0, 30, 30, 0, 1, 0, 0);
+  CHECK(!w.grabbing());
+  for (int i = 1; i <= 10; ++i) f.s->pointer(0, 1, 30 + 8.0f * static_cast<f32>(i), 30, 0, 1, 0, 0);
+  f.s->pointer(0, 2, 110, 30, 0, 0, 0, 0);
+  CHECK(std::fabs(f.s->viewport(0).camera.yaw - yaw) > 5 && f.s->selection().empty());
+  // The pose becomes the keyframe at the end: the angles the joints measure. The motion is the
+  // level's from here on - one step of its history, undone and redone like any other.
+  CHECK(f.cmd(R"({"cmd":"trainerCapture","time":1.2})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"trainerCapture","time":9})")["ok"].as_bool());  // past the motion's end
+  CHECK(f.s->level().motions.size() == 1 && f.s->level().motions[0].name == "nod" && f.s->dirty() && f.s->history().size() == steps + 1);
+  CHECK(f.s->state()["trainer"]["motion"]["saved"].as_bool() && f.s->state()["motions"].size() == 1);
+  CHECK(f.s->trainer_motion().keys.size() == 2);
+  f32 differ = 0;
+  if (f.s->trainer_motion().keys.size() == 2)
+    for (int j = 0; j < 14; ++j) differ += std::fabs(f.s->trainer_motion().keys[1].joints[j] - f.s->trainer_motion().keys[0].joints[j]);
+  CHECK(differ > 0.005f);
+  f.s->key("z", "KeyZ", true, 2, false);  // Ctrl+Z in the workspace
+  CHECK(f.s->level().motions.empty() && f.s->trainer_motion().keys.size() == 1 && f.s->trainer_open() && f.s->selection().empty());
+  f.s->key("y", "KeyY", true, 2, false);
+  CHECK(f.s->level().motions.size() == 1 && f.s->trainer_motion().keys.size() == 2);
+  // The servos show the first keyframe: the puppet goes back to the home pose by their own law.
+  CHECK(f.cmd(R"({"cmd":"trainerShow","index":0})")["ok"].as_bool());
+  f.frames(120);
+  const json::Value shown = f.cmd(R"({"cmd":"trainerPose"})");
+  for (std::size_t j = 0; j < shown["joints"].size(); ++j) CHECK_NEAR(shown["joints"][j].as_number(), 0.0, 0.05);
+  // The timeline: a keyframe in between, moved, removed; the length carries its last keyframe along.
+  CHECK(f.cmd(R"({"cmd":"trainerCapture","time":0.5})")["ok"].as_bool() && f.s->trainer_motion().keys.size() == 3);
+  CHECK(!f.cmd(R"({"cmd":"trainerKey","index":1,"time":1.2})")["ok"].as_bool());  // taken
+  CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"time":0.8})")["ok"].as_bool() && f.s->trainer_motion().keys[1].time == 0.8f);
+  CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"remove":true})")["ok"].as_bool() && f.s->trainer_motion().keys.size() == 2);
+  CHECK(f.cmd(R"({"cmd":"trainerMotion","name":"wave","duration":2})")["ok"].as_bool());
+  CHECK(f.s->level().motions.size() == 1 && f.s->level().motions[0].name == "wave" && f.s->trainer_motion().keys[1].time == 2.0f);
+  CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"Not a name"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"kick_left"})")["ok"].as_bool());  // a move of the robot's own
+  // What the Studio hands the Lehrer is a task the Lehrer takes.
+  const json::Value task = f.cmd(R"({"cmd":"trainerTask"})");
+  CHECK(task["ok"].as_bool() && task["name"].as_string() == "wave" && task["task"].as_string().rfind("motion:", 0) == 0);
+  if (task["ok"].as_bool()) {
+    auto motion = lehrer::make_motion_task(task["task"].as_string().substr(7));
+    CHECK(motion != nullptr && motion->episode_seconds() == 2.0f);
+  }
+  // Another motion beside it: a name of its own, and not the first one's.
+  CHECK(f.cmd(R"({"cmd":"trainerNew"})")["ok"].as_bool() && f.s->trainer_motion().name == "nod" && f.s->level().motions.size() == 1);
+  CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"wave"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"trainerTask"})")["ok"].as_bool());  // a motion needs its start and its end
+  CHECK(f.cmd(R"({"cmd":"trainerSelect","name":"wave"})")["ok"].as_bool() && f.s->trainer_motion().name == "wave");
+  // The level is saved with what it was taught - also by the autosave, while the workspace is open.
+  CHECK(f.s->take_autosave(f.now + 60000).find("\"motions\"") != std::string::npos);
+  // Escape leaves the workspace: the viewport and the selection as they were, the level's actors untouched.
+  f.s->key("Escape", "Escape", true, 0, false);
+  CHECK(!f.s->trainer_open() && f.s->play_state() == studio::PlayState::editing);
+  st = f.s->state();
+  CHECK(st["trainer"].is_null() && st["prefs"]["layout"].as_string() == "quad" && st["motions"].size() == 1);
+  CHECK(f.s->selection() == selection);
+  CHECK(distance(f.s->viewport(0).camera.position, camera.position) < 1e-5f && f.s->viewport(0).camera.yaw == camera.yaw);
+  game::Level saved, before;
+  std::string error;
+  CHECK(game::from_text(f.s->level_text(), saved, &error) && game::from_text(level, before, &error));
+  CHECK(saved.actors.size() == before.actors.size() && saved.motions.size() == 1 && saved.motions[0].keys.size() == 2 && !saved.motions[0].onnx);
+  f.frames(3);
+  CHECK(w.level().actors.size() == f.s->level().actors.size());  // the world shows the level again
+  // Opened again, the workspace is on the level's motion.
+  CHECK(f.s->open_trainer() && f.s->trainer_motion().name == "wave");
+  CHECK(f.cmd(R"({"cmd":"trainerRemove","name":"wave"})")["ok"].as_bool() && f.s->level().motions.empty());
+  CHECK(f.s->trainer_motion().keys.size() == 1);  // a new one again
+}
+
+// A trained network belongs to the level: the Lehrer hands it over, the level file carries it, the
+// duck tries it on the Lehrer's test stage and plays it in the level. Play leaves the workspace.
+TEST(studio_lehrer_keeps_what_the_duck_learned_in_the_level) {
+  StudioFixture f;
+  const std::string onnx = kern_jump_onnx();
+  CHECK(onnx.size() > 100000);
+  const std::string b64 = json::base64_encode(Span<const u8>(reinterpret_cast<const u8*>(onnx.data()), onnx.size()));
+  auto learned = [&](const char* name, const char* run, const std::string& net) {
+    json::Value c = json::Value::object();
+    c.set("cmd", "trainerLearned");
+    c.set("name", name);
+    c.set("run", run);
+    c.set("onnx", net);
+    return f.s->command(c)["ok"].as_bool();
+  };
+  CHECK(!f.cmd(R"({"cmd":"trainerTest","move":"wave"})")["ok"].as_bool());  // the workspace is closed
+  CHECK(f.s->open_trainer());
+  CHECK(!learned("wave", "run1", b64));  // the level has no such motion
+  CHECK(f.cmd(R"({"cmd":"trainerMotion","name":"wave","duration":0.6})")["ok"].as_bool());
+  CHECK(!learned("wave", "run1", "bm90IGEgbmV0d29yaw=="));  // not a network
+  // A run hands over a newer network every so often: one step of the history for the whole run.
+  std::string older = onnx;
+  older[older.size() / 2] ^= 1;  // (a weight's byte)
+  const std::size_t steps = f.s->history().size();
+  CHECK(learned("wave", "run1", json::base64_encode(Span<const u8>(reinterpret_cast<const u8*>(older.data()), older.size()))) && f.s->history().size() == steps + 1);
+  CHECK(f.s->level().motions[0].onnx && *f.s->level().motions[0].onnx == older);
+  CHECK(learned("wave", "run1", b64) && f.s->history().size() == steps + 1);
+  CHECK(f.s->level().motions[0].onnx && *f.s->level().motions[0].onnx == onnx && f.s->state()["motions"][0]["bytes"].as_number() == static_cast<f64>(onnx.size()));
+  CHECK(f.cmd(R"({"cmd":"trainerNet","name":"wave"})")["onnx"].as_string() == b64);
+  // The Lehrer's jump has no keyframes: its network is the level's own "jump".
+  CHECK(learned("jump", "run2", b64) && f.s->level().motions.size() == 2 && f.s->level().motions[1].duration == game::kJumpSeconds);
+  // The duck tries the motion on the ground it trains on.
+  CHECK(!f.cmd(R"({"cmd":"trainerTest","move":"none"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"trainerTest","move":"wave"})")["ok"].as_bool());
+  CHECK(f.s->trainer_stage() == studio::TrainerStage::test && f.s->state()["trainer"]["testing"].as_string() == "wave");
+  CHECK(f.s->world().level().world.gravity.z < -9 && f.s->world().level().world.ground);
+  const game::ActorId duck = f.s->trainer_duck();
+  f.frames(8);
+  CHECK(f.s->world().walker_driving(duck) == "wave");
+  f.frames(120);  // 0.6 s of the move at the duck's scale (time runs half as fast), and some more
+  CHECK(f.s->world().walker_driving(duck) == "walk");
+  CHECK(!f.cmd(R"({"cmd":"trainerCapture","time":0})")["ok"].as_bool());  // keyframes are taken on the posing stage
+  CHECK(f.cmd(R"({"cmd":"trainerStage"})")["ok"].as_bool() && f.s->trainer_stage() == studio::TrainerStage::pose);
+  // Play runs the level, not the stage; while it plays the level takes no network (the page hands
+  // it over again afterwards).
+  f.s->key("p", "KeyP", true, 4, false);
+  CHECK(!f.s->trainer_open() && f.s->play_state() == studio::PlayState::playing);
+  {
+    json::Value c = json::Value::object();
+    c.set("cmd", "trainerLearned");
+    c.set("name", "wave");
+    c.set("run", "run3");
+    c.set("onnx", b64);
+    const json::Value r = f.s->command(c);
+    CHECK(!r["ok"].as_bool() && r["later"].as_bool());
+  }
+  f.cmd(R"({"cmd":"stop"})");
+  CHECK(!f.cmd(R"({"cmd":"trainerPlay","move":"wave"})")["ok"].as_bool());  // Orb Run has no Micro Duck
+  f.cmd(R"({"cmd":"stop"})");
+  // Saved and opened again, the level still has what it was taught: keyframes and networks.
+  const std::string text = f.s->level_text();
+  CHECK(f.s->load_level(game::micro_duck_level()) && f.s->level().motions.empty());
+  CHECK(!f.cmd(R"({"cmd":"trainerPlay","move":"wave"})")["ok"].as_bool());  // this level was not taught it
+  f.cmd(R"({"cmd":"stop"})");
+  CHECK(f.s->load_level_text(text, "taught.klevel"));
+  CHECK(f.s->level().motions.size() == 2 && f.s->level().motions[0].name == "wave" && f.s->level().motions[0].onnx && *f.s->level().motions[0].onnx == onnx);
+  CHECK(f.s->level().motions[0].keys.size() == 1 && f.s->level().motions[0].duration == 0.6f);
+  // Networks from elsewhere (the Lehrer's old page kept them on the device) come in as motions.
+  json::Value import = json::Value::object(), list = json::Value::array();
+  for (const char* name : {"bow", "wave", "kick_left", "Not a name"}) {
+    json::Value m = json::Value::object();
+    m.set("name", name);
+    m.set("duration", 1.5);
+    m.set("onnx", b64);
+    list.push(std::move(m));
+  }
+  import.set("cmd", "trainerImport");
+  import.set("motions", std::move(list));
+  const json::Value imported = f.s->command(import);
+  CHECK(imported["ok"].as_bool() && imported["names"].size() == 1 && imported["names"][0].as_string() == "bow");
+  CHECK(f.s->level().motions.size() == 3 && f.s->level().motion("bow") && f.s->level().motion("bow")->duration == 1.5f);
+  CHECK(!f.s->command(import)["ok"].as_bool() && f.s->level().motions.size() == 3);  // the level has them already
+  // In a level with a duck: its first Micro Duck plays the motion the level taught it.
+  game::Level l = game::micro_duck_level();
+  l.motions = f.s->level().motions;
+  CHECK(f.s->load_level(l));
+  CHECK(f.cmd(R"({"cmd":"trainerPlay","move":"wave"})")["ok"].as_bool());
+  CHECK(f.s->play_state() == studio::PlayState::simulating && !f.s->trainer_open());
+  f.frames(8);
+  CHECK(f.s->world().walker_driving(f.s->world().walkers()[0]) == "wave");
 }
 
 TEST(studio_simulate_drags_bodies_without_ctrl) {
@@ -6460,6 +6682,111 @@ TEST(micro_duck_jumps_for_real_in_the_studio) {
     jumps += real ? 1 : 0;
   }
   CHECK(jumps >= 2);
+}
+
+// What the Lehrer taught belongs to the level: a learned motion (name, length, keyframes, the
+// trained network) is in the level file, and a world started from the level knows it as a move.
+TEST(game_level_keeps_learned_motions) {
+  const std::string onnx = kern_jump_onnx();
+  game::Level l = game::basic_level();
+  CHECK(game::to_text(l).find("\"motions\"") == std::string::npos);  // nothing learned: the file as before
+  game::MotionAsset wave;
+  wave.name = "wave";
+  wave.duration = 1.5f;
+  wave.keys.resize(3);
+  wave.keys[1].time = 0.75f;
+  wave.keys[1].joints[6] = 0.35f;
+  wave.keys[1].joints[13] = -0.125f;
+  wave.keys[2].time = 1.5f;
+  wave.onnx = std::make_shared<const std::string>(onnx);
+  game::MotionAsset planned;  // keyframes set, still to be taught
+  planned.name = "bow_2";
+  planned.keys.resize(1);
+  l.motions = {wave, planned};
+  const std::string text = game::to_text(l);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));
+  CHECK(back.motions.size() == 2 && back.motion("wave") && back.motion("bow_2") && !back.motion("jump"));
+  if (back.motions.size() == 2) {
+    const game::MotionAsset& m = back.motions[0];
+    CHECK(m.name == "wave" && m.duration == 1.5f && m.keys.size() == 3 && m.onnx && *m.onnx == onnx);
+    CHECK(m.keys.size() == 3 && m.keys[1].time == 0.75f && m.keys[1].joints[6] == 0.35f && m.keys[1].joints[13] == -0.125f && m.keys[2].time == 1.5f);
+    CHECK(back.motions[1].keys.size() == 1 && !back.motions[1].onnx && back.motions[1].duration == 1.2f);
+  }
+  CHECK(game::to_text(back) == text);  // the same file again
+  // A file from elsewhere: what is not a motion is left out, the rest is read.
+  json::Value doc;
+  CHECK(json::parse(text, doc));
+  json::Value list = json::Value::array();
+  json::parse(R"([{"name":"Bad Name","duration":1},{"name":"ok","duration":99,"keys":[{"time":0,"joints":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+    {"time":0.5,"joints":[0,0,0]},{"time":0.2,"joints":[9,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"time":1,"joints":[0,0,0,0,0,0,0.5,0,0,0,0,0,0,0]}],"onnx":"***"},
+    {"name":"ok","duration":2}])", list);
+  doc.set("motions", std::move(list));
+  CHECK(game::from_json(doc, back, &error));
+  CHECK(back.motions.size() == 1 && back.motions[0].name == "ok" && back.motions[0].duration == game::kMotionMaxSeconds);
+  CHECK(back.motions[0].keys.size() == 2 && back.motions[0].keys[1].joints[6] == 0.5f && !back.motions[0].onnx);
+  CHECK(game::motion_name_ok("head_nod-2") && !game::motion_name_ok("") && !game::motion_name_ok("Nod") && !game::motion_name_ok("a b"));
+}
+
+TEST(micro_duck_plays_the_motions_its_level_taught) {
+  const std::string onnx = kern_jump_onnx();
+  CHECK(game::is_walker_move("kick_left") && game::is_walker_move("jump") && game::is_walker_move("sit") && !game::is_walker_move("wave"));
+  GameFixture f;
+  game::Level l = game::basic_level();
+  for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {40, 40, 0.5f};
+  const game::ActorId duck = add_duck(l, {0, 0, 0});
+  game::MotionAsset wave, jump, planned, broken;
+  wave.name = "wave";
+  wave.duration = 0.6f;
+  wave.onnx = std::make_shared<const std::string>(onnx);
+  jump.name = "jump";  // the level's own jump: in place of the robot's (2 s), here half a second long
+  jump.duration = 0.5f;
+  jump.onnx = wave.onnx;
+  planned.name = "bow";
+  broken.name = "broken";
+  broken.onnx = std::make_shared<const std::string>("not a network");
+  l.motions = {wave, jump, planned, broken};
+  // The level file is what a game is made of: the world starts from the level read back.
+  game::Level loaded;
+  std::string error;
+  CHECK(game::from_text(game::to_text(l), loaded, &error));
+  f.world->sync(loaded);
+  CHECK(f.world->start(loaded, game::SimMode::simulate));
+  bool told = false;
+  for (const std::string& e : f.world->events()) told |= e.find("broken") != std::string::npos;
+  CHECK(told);  // a network the robot cannot run is said, not played
+  f.run(1);
+  CHECK(f.world->walker_skill(duck, "bow") == "no such move");     // not taught yet
+  CHECK(f.world->walker_skill(duck, "broken") == "no such move");
+  CHECK(f.world->walker_skill(duck, "wave").empty());
+  f.run(0.2f);
+  CHECK(f.world->walker_driving(duck) == "wave");
+  CHECK(!f.world->walker_skill(duck, "jump").empty());  // one move at a time
+  f.run(1.6f);  // 0.6 s of the robot's time is 1.2 s here
+  CHECK(f.world->walker_driving(duck) == "walk");
+  CHECK(f.world->walker_skill(duck, "jump").empty());
+  f.run(0.2f);
+  CHECK(f.world->walker_driving(duck) == "jump");
+  f.run(1.4f);  // the level's jump lasts half a second (the robot's own: two)
+  CHECK(f.world->walker_driving(duck) == "walk");
+  // The Blueprint node Robot Move (walker.skill) is this call: a level's graph plays the motion by name.
+  f.world->stop();
+  loaded.logic = logic::Graph{};
+  json::Value g;
+  CHECK(json::parse(R"({"nodes":[{"id":1,"type":"event.begin","x":0,"y":0},{"id":2,"type":"walker.skill","x":300,"y":0,"values":{"move":"wave"}}],
+    "links":[[1,"then",2,"exec"]]})", g));
+  CHECK(logic::graph_from_json(g, loaded.logic, &error));
+  CHECK(f.world->start(loaded, game::SimMode::simulate));
+  f.run(0.3f);
+  CHECK(f.world->walker_driving(duck) == "wave");
+  // Another level was not taught it.
+  f.world->stop();
+  loaded.motions.clear();
+  loaded.logic = logic::Graph{};
+  CHECK(f.world->start(loaded, game::SimMode::simulate));
+  f.run(0.2f);
+  CHECK(f.world->walker_skill(duck, "wave") == "no such move");
 }
 
 TEST(micro_duck_jumps_with_a_network_trained_in_kern) {

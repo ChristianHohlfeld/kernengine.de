@@ -1,16 +1,17 @@
 # 15 Eigene Modelle trainieren – die Werkstatt
 
-> **Kurz gesagt:** Hier trainierst du selbst. Auf der Lehrer-Seite im Browser bringst du der Ente
+> **Kurz gesagt:** Hier trainierst du selbst. Im Lehrer von Kern Studio bringst du der Ente
 > den Sprung bei, liest den Fortschritt an Kurven ab, sicherst ein gutes Netz und siehst es im Studio
 > springen. Dazu kommen die Regeln, nach denen man gute Übungen baut, und die Fallen, in die schon die
 > echten Trainingsläufe getappt sind.
 
 > **Begriffe vorab:**
-> - **Lehrer-Seite** – die Webseite kernengine.de/lehrer/, auf der du im Browser trainierst.
+> - **Lehrer-Bereich** – der Bereich „Lehrer“ in Kern Studio (Knopf **Lehrer** oben in der Leiste),
+>   in dem du im Browser trainierst.
 > - **Kommandozeile** – ein Fenster, in das man Befehle tippt, statt zu klicken. Für dieses Kapitel
 >   brauchst du sie nicht.
 > - **Rückgabe** – alle Punkte einer Episode zusammengezählt; so heißt die Anzeige
->   „Episoden-Rückgabe“ auf der Lehrer-Seite. (Der **Return** aus Anhang A.10 ist eine Variante, mit
+>   „Episoden-Rückgabe“ im Lehrer-Bereich. (Der **Return** aus Anhang A.10 ist eine Variante, mit
 >   der beim Lernen gerechnet wird: Punkte ab jetzt, spätere etwas weniger wert.)
 > - **Rauschen** – der Zufall, der zu jedem Befehl des Netzes dazukommt: die Neugier der Ente.
 > - **Lernrate** – wie weit der Auswerter (14.2) die Regler pro Schritt verstellt.
@@ -25,7 +26,7 @@ Wie der Lehrer innen arbeitet, steht in [Kapitel 14](14-lehrer.md). Die Begriffe
 
 Es gibt zwei Wege zu trainieren, und beide ergeben bei gleichen Einstellungen **dasselbe Netz**:
 
-- **Die Lehrer-Seite im Browser:** nichts installieren, alles mit Mausklicks. Das ist der Weg dieses
+- **Der Lehrer-Bereich im Studio:** nichts installieren, alles mit Mausklicks. Das ist der Weg dieses
   Kapitels.
 - **Das Werkzeug auf dem eigenen Rechner:** schneller und vielseitiger, aber man muss es selbst
   bauen und über die Kommandozeile bedienen.
@@ -51,17 +52,19 @@ Ein Sprung-Lauf hat zwei Phasen, die du auf der Seite mitverfolgen kannst:
 
 **Wie lange dauert das?** Auf einem Testrechner mit 2 Rechenkernen kam im Browser der erste echte
 Sprung nach knapp 9 Minuten, das Nachahmen war nach etwa 11 Minuten fertig. Das Üben dauert viel
-länger, denn es braucht Tausende Runden. Wie schnell dein Gerät ist, zeigt die Seite unter
+länger, denn es braucht Tausende Runden. Wie schnell dein Gerät ist, zeigt der Lehrer-Bereich unter
 „Schritte / s“: so viele Entscheidungstakte schaffen alle Enten zusammen pro Sekunde.
 
 > **Probier's aus!** Dein erster Sprung-Lauf:
-> 1. Öffne **kernengine.de/lehrer/**. Warte, bis die Statuszeile „Bereit“ meldet.
-> 2. Wähle bei **Bewegung** „Sprung“. Alle anderen Felder bleiben, wie sie sind.
+> 1. Öffne Kern Studio (**kernengine.de/editor/**) und dort das Beispiel-Level über **Datei ›
+>    Beispiel-Levels › Micro Duck**. Klick oben auf **Lehrer** und warte, bis die Statuszeile
+>    „Bereit“ meldet.
+> 2. Wähle bei **Aufgabe** „Sprung“. Alle anderen Felder bleiben, wie sie sind.
 > 3. Drück **Start** und lass den Tab offen. Ein Handy gehört ans Ladekabel.
 > 4. Beobachte die Statuszeile: erst „Nachahmen: Runde 1 von 8“ und so weiter, dann „Lernt:
 >    Iteration …“. Unter **echte Sprünge** siehst du, wie viele von 5 Probesprüngen gelingen.
-> 5. Sobald unter den Knöpfen „Für Kern Studio gespeichert als jump.onnx“ steht, ist dein Netz
->    bereit für 15.6.
+> 5. Sobald unter den Knöpfen „Die Enten des Levels springen jetzt mit diesem Netz“ steht, ist dein
+>    Netz bereit für 15.6.
 >
 > Was du lernst: Erst das Vorbild macht den Sprung möglich, das Üben macht ihn danach sicher.
 
@@ -82,7 +85,7 @@ schwanken die Werte, weil jede Runde andere Enten mit anderem Zufall turnen. Wic
 > **Stell dir vor …** die Fieberkurve im Krankenhaus: Eine einzelne Messung sagt wenig, der Verlauf
 > über Tage sagt alles.
 
-Die Lehrer-Seite zeichnet Rückgabe und Episodenlänge als Kurven und zeigt dazu Zahlen:
+Der Lehrer-Bereich zeichnet Rückgabe und Episodenlänge als Kurven und zeigt dazu Zahlen:
 
 | Anzeige | Bedeutung | Worauf achten |
 |---|---|---|
@@ -136,7 +139,7 @@ Lernrate, wenig Rauschen und Kritiker zuerst – sonst geht das Gelernte verlore
 > **Stell dir vor …** du hast einem Hund gerade mühsam einen Trick beigebracht. Brüllst du jetzt
 > neue Kommandos und wedelst wild mit Leckerlis, ist der Trick schnell wieder weg.
 
-Darum stehen die Felder „Aktionsrauschen am Anfang“ und „Lernrate“ auf der Lehrer-Seite leer: Dann
+Darum stehen die Felder „Aktionsrauschen am Anfang“ und „Lernrate“ im Lehrer-Bereich leer: Dann
 gilt das erprobte Rezept. Was die echten Läufe außerdem gezeigt haben:
 
 - **Mehr Herumprobieren hilft nicht.** Mit viel Rauschen und ohne Warmstart lernte die Ente nur zu
@@ -157,21 +160,22 @@ gilt das erprobte Rezept. Was die echten Läufe außerdem gezeigt haben:
 
 ## 15.6 Im Studio benutzen
 
-Ein Netz von der Lehrer-Seite landet von selbst im Studio, wenn beide im **selben Browser auf
-demselben Gerät** laufen. Das Studio lädt es beim Start und übernimmt jedes neue sofort, auch in
-schon offenen Tabs. Das gilt für den Sprung.
+Ein Netz aus dem Lehrer-Bereich landet von selbst dort, wo es gebraucht wird: **im Level**, das du
+gerade offen hast. Es gehört von da an zum Level, wird mit ihm gespeichert und ist auch in einem
+verpackten Spiel dabei. Trainierst du den Sprung, springen die Enten dieses Levels mit deinem Netz.
+Eine eigene Bewegung aus Keyframes bekommt einen Namen; der Logik-Knoten **Robot Move** spielt sie
+unter diesem Namen.
 
 > **Probier's aus!** Deine Ente springt mit deinem Netz:
-> 1. Starte auf der Lehrer-Seite einen Sprung-Lauf (15.2).
-> 2. Öffne im selben Browser einen zweiten Tab mit https://kernengine.de/ und dort das Beispiel-Level
->    über **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck).
-> 3. Warte, bis die Lehrer-Seite „Für Kern Studio gespeichert als jump.onnx“ meldet. Das passiert
->    zum ersten Mal nach dem Nachahmen, dann alle 25 Runden.
-> 4. Starte im Studio **Spielen** (Play), übernimm die Ente mit **F8** und drück **7**.
+> 1. Starte im Lehrer-Bereich einen Sprung-Lauf (15.2), im Beispiel-Level **Micro Duck**.
+> 2. Warte, bis unter den Knöpfen „Die Enten des Levels springen jetzt mit diesem Netz“ steht. Das
+>    passiert zum ersten Mal nach dem Nachahmen, dann alle 25 Runden.
+> 3. Drück **Netz an der Ente testen**: Die Ente auf der Bühne springt. Oder verlass den Lehrer mit
+>    **Esc**, starte **Spielen** (Play), übernimm die Ente mit **F8** und drück **7**.
 >
-> Was du siehst: Jetzt springt **dein** Netz, nicht mehr das mitgelieferte – es ersetzt es. Ein
-> früher Stand springt oft noch unsicher. Drück nach einer Weile Übung noch einmal **7** und
-> vergleiche.
+> Was du siehst: Jetzt springt **dein** Netz, nicht mehr das mitgelieferte – in diesem Level ersetzt
+> es das. Ein früher Stand springt oft noch unsicher. Probier es nach einer Weile Übung noch einmal
+> und vergleiche. Speicherst du das Level, ist dein Netz mit drin.
 
 > **Für Neugierige:** Man kann ein Netz auch als Datei in den Quellcode legen, und die
 > Entwicklerkonsole des Browsers meldet, wenn ein Netz geladen wurde. Welche Form das Netz haben muss
@@ -206,7 +210,7 @@ Angenommen, die Ente soll sich **verbeugen**. Dafür braucht man fünf Zutaten:
    gibt es Punkte (aufrecht bleiben, ruhig bewegen und natürlich die Verbeugung selbst), was beendet
    die Episode (Sturz)? Und was darf der Kritiker zusätzlich wissen?
 2. **Ein Rezept:** die Einstellungen fürs Training, etwa Warmstart von velstand, wenig Rauschen,
-   kleine Lernrate. Damit kennen Werkzeug und Browser die neue Übung; auf der Lehrer-Seite fehlt dann
+   kleine Lernrate. Damit kennen Werkzeug und Browser die neue Übung; im Lehrer-Bereich fehlt dann
    nur noch ein Eintrag in der Auswahl.
 3. **Eine Messung:** eine strenge Prüfung, ob wirklich eine Verbeugung stattfand (15.9).
 4. **Die Verbindung zum Studio:** eine Taste, ein Knopf für Touch, der Name im Logik-Knoten
@@ -297,7 +301,7 @@ Damit du nicht hineintappst – das ist in den echten Läufen passiert:
 
 ## Das nimmst du mit
 
-- Die Lehrer-Seite im Browser ist der einfachste Weg; das Werkzeug auf dem Rechner ist schneller,
+- Der Lehrer-Bereich im Studio ist der einfachste Weg; das Werkzeug auf dem Rechner ist schneller,
   ergibt aber dasselbe Netz.
 - Fortschritt liest man an Kurven, nicht an einer Zahl. Das eigentliche Ziel sind echte Sprünge.
 - Das letzte Netz ist nicht immer das beste: Zwischenstände sichern und gründlich prüfen, sauber

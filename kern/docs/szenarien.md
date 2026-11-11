@@ -8,12 +8,14 @@ Pipeline weiter, lässt neue Waypoint-/Pose-Aufgaben aber als JSON statt als neu
 
 ## Benutzeroberfläche
 
-1. Bewegung: Freies Trainingsszenario wählen.
+1. In Kern Studio den Arbeitsbereich **Lehrer** öffnen (Werkzeugleiste, `docs/studio.md`) und als
+   Aufgabe **Freies Trainingsszenario** wählen.
 2. Szenarioname, Episodendauer, Ziele (x y Radius in Metern), Hindernisse (Box/Kugel) setzen.
 3. Fortschritts-, Ziel-, Aufrecht- und Sturz-Belohnungen ändern.
 4. Start führt das Szenario in parallelen Web Workern durch und trainiert mit PPO.
 5. Alle 25 Iterationen wird über fünf saubere Episoden die Zielerreichung geprüft.
 6. ONNX herunterladen; Szenario-JSON speichern/importieren; zusätzliche Parameter per JSON bearbeiten.
+   Das Netz eines Szenarios ist keine Bewegung der Ente und wird deshalb nicht im Level abgelegt.
 
 ## Natives Training
 

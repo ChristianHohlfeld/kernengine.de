@@ -376,6 +376,28 @@ struct SoundAsset {
   f32 duration = 0;             // seconds (informational)
 };
 
+/// One keyframe of a learned motion: the Micro Duck's 14 servo angles as its joints measure them.
+struct MotionKey {
+  f32 time = 0;                 // seconds from the start of the motion
+  f32 joints[14] = {};          // relative to the home pose, radians, in the policy's joint order
+};
+
+/// A motion the Micro Duck learned in the Studio's Lehrer (docs/lehrer.md): the keyframes it was
+/// taught from and the trained network. The level's walkers know it as a move of that name
+/// (GameWorld::walker_skill, the Blueprint node Robot Move); one named like a move of the robot's
+/// own (Kern's "jump") takes its place in this level. Without a network it is still to be taught.
+struct MotionAsset {
+  std::string name;             // the move's name (motion_name_ok)
+  f32 duration = 1.2f;          // seconds, kMotionMinSeconds .. kMotionMaxSeconds
+  std::vector<MotionKey> keys;  // in time order (none: taught from something else, as the jump is)
+  std::shared_ptr<const std::string> onnx;  // the network (an ONNX file's bytes), shared by undo snapshots
+};
+// What the Lehrer takes as a keyframed motion (lehrer/motion.cpp).
+constexpr f32 kMotionMinSeconds = 0.3f, kMotionMaxSeconds = 15.0f, kMotionMaxAngle = 2.5f;
+constexpr std::size_t kMotionMaxKeys = 32;
+/// What a motion may be called: a-z, 0-9, _ and -, 1 to 38 characters.
+bool motion_name_ok(std::string_view name);
+
 struct EditorCamera {
   Vec3 position{-24, -30, 18};
   f32 yaw = 51, pitch = -24;    // degrees
@@ -391,6 +413,7 @@ struct Level {
   std::vector<Actor> actors;
   std::vector<TextureAsset> textures;
   std::vector<SoundAsset> sounds;
+  std::vector<MotionAsset> motions;  // what the Lehrer taught the level's Micro Ducks
   logic::Graph logic;            // the level graph (Self = none; sees every actor's events)
   EditorCamera camera;
   ActorId next_id = 1;
@@ -407,6 +430,8 @@ struct Level {
   bool is_ancestor(ActorId ancestor, ActorId id) const;
   const TextureAsset* texture(std::string_view id) const;
   const SoundAsset* sound(std::string_view id) const;
+  const MotionAsset* motion(std::string_view name) const;
+  MotionAsset* motion(std::string_view name);
 };
 
 // ---- serialization ----

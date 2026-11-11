@@ -126,8 +126,8 @@ in [Kapitel 14](14-lehrer.md)).
 
 ### Im Browser
 
-Die Seite `/lehrer/` trainiert dasselbe Rezept mit Web Workern
-(Abschnitt 14.11 in [Kapitel 14](14-lehrer.md)). Gleicher Seed und gleich viele Enten
+Der Lehrer in Kern Studio (Werkzeugleiste **Lehrer**, `/editor/?train=1`) trainiert dasselbe Rezept
+mit Web Workern (Abschnitt 14.11 in [Kapitel 14](14-lehrer.md)). Gleicher Seed und gleich viele Enten
 insgesamt (Worker × Enten je Worker) ergeben dasselbe Netz wie nativ.
 
 ## 15.4 Fortschritt lesen
@@ -363,9 +363,9 @@ Kerns eigene Netze haben feste Dateinamen: `jump.onnx` und `play.onnx` (`KERN_PO
 1. **Ins Repository:** die Datei nach `kern/policies/jump.onnx` bzw. `kern/policies/play.onnx`
    kopieren. Die Entwicklerseite lädt Kerns Netze aus `kern/policies/`, eine ausgelieferte Seite aus
    `policies/` neben der Seite. Die Engine fragt fehlende Netze an, sobald eine Ente sie braucht.
-2. **Aus dem Browser-Lehrer:** Die Lehrer-Seite speichert ihr Netz auf demselben Gerät (IndexedDB
-   „kern-lehrer“). Das Studio lädt es beim Start und übernimmt jedes neue sofort, auch in offenen
-   Tabs. Das gilt für den Sprung (die Seite trainiert keine Spielschicht).
+2. **Aus dem Lehrer im Studio:** Er legt sein Netz im offenen Level ab (`motions`): eine Bewegung aus
+   Keyframes unter ihrem Namen, den Sprung als den eigenen `jump` des Levels. Mit dem Level wird es
+   gespeichert, verpackt und exportiert. (Der Lehrer im Studio trainiert keine Spielschicht.)
 3. **Prüfen:** **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) öffnen,
    **Spielen** (Play), **F8** (Ente übernehmen), Taste **7** (Sprung) bzw. die Ente in Ruhe lassen
    (Spielschicht: **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) und **Kern-Extras
@@ -459,8 +459,8 @@ Recipe recipe_for(const std::string& task) {
 }
 ```
 
-Damit kennen `kern_lehrer --task bow` und die C-Schnittstelle des Browsers die Aufgabe; auf der
-Lehrer-Seite fehlt nur ein `<option>` in `web/lehrer/index.html`. Nutzt die Aufgabe Beobachtungsplätze,
+Damit kennen `kern_lehrer --task bow` und die C-Schnittstelle des Browsers die Aufgabe; im Lehrer des
+Studios fehlt nur ein Eintrag in `TRAINER_TASKS` (`web/studio/trainer.mjs`). Nutzt die Aufgabe Beobachtungsplätze,
 die velstand nie gesehen hat, müssen sie beim Warmstart als neue Eingänge angegeben werden: In
 `make_learner` übergibt Kern dafür derzeit die Phasenplätze 55 und 56 (`game::kJumpPhaseSlot` und
 der nächste).

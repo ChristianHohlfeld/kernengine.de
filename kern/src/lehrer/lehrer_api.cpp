@@ -1,5 +1,6 @@
-// C ABI of the Lehrer for the browser (kern/web/lehrer/): one module instance per Web Worker. A
-// worker collects (its own environments, the policy it was handed) and/or learns (the PPO learner).
+// C ABI of the Lehrer for the browser (the Lehrer's workspace in Kern Studio,
+// kern/web/studio/trainer.mjs): one module instance per Web Worker. A worker collects (its own
+// environments, the policy it was handed) and/or learns (the PPO learner).
 //
 // Buffers go in through kern_alloc'd memory; results come back as a pointer that stays valid until
 // the next call, with kern_lehrer_result_length() bytes.

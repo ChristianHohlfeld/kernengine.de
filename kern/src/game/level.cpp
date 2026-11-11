@@ -340,6 +340,25 @@ const SoundAsset* Level::sound(std::string_view id) const {
   return nullptr;
 }
 
+const MotionAsset* Level::motion(std::string_view name) const {
+  for (const MotionAsset& m : motions)
+    if (m.name == name) return &m;
+  return nullptr;
+}
+
+MotionAsset* Level::motion(std::string_view name) {
+  for (MotionAsset& m : motions)
+    if (m.name == name) return &m;
+  return nullptr;
+}
+
+bool motion_name_ok(std::string_view name) {
+  if (name.empty() || name.size() > 38) return false;
+  for (char c : name)
+    if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) return false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // colours
 
@@ -1041,6 +1060,28 @@ json::Value to_json(const Level& level) {
     snd.push(std::move(x));
   }
   o.set("sounds", std::move(snd));
+  if (!level.motions.empty()) {
+    json::Value list = json::Value::array();
+    for (const MotionAsset& m : level.motions) {
+      json::Value x = json::Value::object();
+      x.set("name", m.name);
+      x.set("duration", num(m.duration));
+      json::Value keys = json::Value::array();
+      for (const MotionKey& k : m.keys) {
+        json::Value e = json::Value::object();
+        e.set("time", num(k.time));
+        json::Value q = json::Value::array();
+        for (f32 a : k.joints) q.push(num(a));
+        e.set("joints", std::move(q));
+        keys.push(std::move(e));
+      }
+      x.set("keys", std::move(keys));
+      // The trained network: the ONNX file as Base64.
+      if (m.onnx && !m.onnx->empty()) x.set("onnx", json::base64_encode(Span<const u8>(reinterpret_cast<const u8*>(m.onnx->data()), m.onnx->size())));
+      list.push(std::move(x));
+    }
+    o.set("motions", std::move(list));
+  }
   if (!level.logic.empty()) o.set("logic", logic::graph_to_json(level.logic));
   return o;
 }
@@ -1119,6 +1160,30 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       s.src = std::make_shared<const std::string>(v["src"].as_string());
       if (s.id.empty() || s.id.rfind("builtin:", 0) == 0 || (s.src->rfind("data:audio/", 0) != 0 && s.src->rfind("data:video/", 0) != 0 && s.src->rfind("data:application/ogg", 0) != 0)) continue;
       l.sounds.push_back(std::move(s));
+    }
+  if (const json::Value* list = doc.find("motions"); list && list->is_array())
+    for (const json::Value& v : list->items()) {
+      MotionAsset m;
+      m.name = v["name"].as_string();
+      if (!motion_name_ok(m.name) || l.motion(m.name)) continue;
+      m.duration = static_cast<f32>(std::clamp(v["duration"].as_number(m.duration), static_cast<f64>(kMotionMinSeconds), static_cast<f64>(kMotionMaxSeconds)));
+      for (const json::Value& e : v["keys"].items()) {
+        MotionKey k;
+        const json::Value& q = e["joints"];
+        const f64 time = e["time"].as_number(-1);
+        bool good = q.is_array() && q.size() == 14 && time >= 0 && time <= m.duration && m.keys.size() < kMotionMaxKeys && (m.keys.empty() || time > m.keys.back().time);
+        for (std::size_t j = 0; good && j < 14; ++j) {
+          const f64 a = q[j].as_number(1e9);
+          good = std::fabs(a) <= kMotionMaxAngle;
+          k.joints[j] = static_cast<f32>(a);
+        }
+        if (!good) continue;
+        k.time = static_cast<f32>(time);
+        m.keys.push_back(k);
+      }
+      std::string bytes;
+      if (v["onnx"].is_string() && json::base64_decode(v["onnx"].as_string(), bytes) && !bytes.empty()) m.onnx = std::make_shared<const std::string>(std::move(bytes));
+      l.motions.push_back(std::move(m));
     }
   out = std::move(l);
   return true;

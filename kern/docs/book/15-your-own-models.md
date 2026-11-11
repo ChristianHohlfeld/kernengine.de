@@ -125,8 +125,8 @@ the search took about 18 minutes on 2 cores for about 2 million duck steps (Sect
 
 ### In the browser
 
-The page `/lehrer/` trains the same recipe with web workers
-(Section 14.11 in [Chapter 14](14-lehrer.md)). The same seed and the same total
+The Lehrer in Kern Studio (toolbar **Lehrer**, `/editor/?train=1`) trains the same recipe with web
+workers (Section 14.11 in [Chapter 14](14-lehrer.md)). The same seed and the same total
 number of ducks (workers × ducks per worker) produce the same network as natively.
 
 ## 15.4 Reading progress
@@ -359,9 +359,9 @@ Kern's own networks have fixed file names: `jump.onnx` and `play.onnx` (`KERN_PO
 1. **Into the repository:** copy the file to `kern/policies/jump.onnx` or `kern/policies/play.onnx`.
    The developer page loads Kern's networks from `kern/policies/`, a deployed page from `policies/`
    next to the page. The engine requests missing networks as soon as a duck needs them.
-2. **From the browser Lehrer:** the Lehrer page stores its network on the same device (IndexedDB
-   "kern-lehrer"). The Studio loads it on startup and picks up every new one immediately, including
-   in open tabs. This applies to the jump (the page does not train a play layer).
+2. **From the Lehrer in the Studio:** it puts its network into the open level (`motions`): a motion
+   from keyframes under its name, the jump as the level's own `jump`. It is saved, packaged and
+   exported with the level. (The Lehrer in the Studio does not train a play layer.)
 3. **Check:** open the Micro Duck level, Play, **F8** (take over the duck), key **7** (jump), or leave the duck alone (play
    layer: Autonomous and Kern extras on, ball or sock in view). The browser console reports
    "Kern: trained network jump.onnx loaded" for a network from the Lehrer, and a warning if a file
@@ -451,8 +451,8 @@ Recipe recipe_for(const std::string& task) {
 }
 ```
 
-With this, `kern_lehrer --task bow` and the browser's C interface know the task; on the Lehrer page
-only an `<option>` in `web/lehrer/index.html` is missing. If the task uses observation slots that
+With this, `kern_lehrer --task bow` and the browser's C interface know the task; in the Studio's
+Lehrer only an entry in `TRAINER_TASKS` (`web/studio/trainer.mjs`) is missing. If the task uses observation slots that
 velstand has never seen, they must be declared as new inputs for the warm start: in `make_learner`,
 Kern currently passes the phase slots 55 and 56 for this (`game::kJumpPhaseSlot` and the next one).
 

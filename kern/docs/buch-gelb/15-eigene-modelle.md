@@ -18,29 +18,30 @@ Wie der Lehrer innen rechnet – Actor und Kritiker, PPO, Vorbild, Nachmachen, V
 [Kapitel 14](14-lehrer.md). Hier probierst du es aus und lernst die Regeln, nach denen man ein
 Training plant.
 
-Es gibt zwei Wege. Der **Hauptweg** ist die **Lehrer-Seite im Browser**: Du brauchst nichts zu
-installieren, und sie kann den Sprung und das Stehen trainieren. Der zweite Weg ist ein Programm für
+Es gibt zwei Wege. Der **Hauptweg** ist der **Lehrer in Kern Studio**, also im Browser: Du brauchst
+nichts zu installieren, und er kann den Sprung, das Stehen und eigene Bewegungen trainieren. Der zweite Weg ist ein Programm für
 die Kommandozeile. Das bekommt nur, wer Kern selbst aus dem Quellcode baut, und es kann ein paar Dinge
 mehr. In diesem Kapitel steht es nur in den Kästen „Für Profis“.
 
-> **Mission:** Öffne auf https://kernengine.de/ den Eintrag „Der Lehrer“, wähle „Sprung“ und drücke
-> Start. Lass den Tab offen (ein Handy ans Ladekabel). Rechne mit 10 Minuten oder mehr, bis etwas
+> **Mission:** Öffne auf https://kernengine.de/ den Eintrag „Der Lehrer“ (oder klick in Kern Studio
+> oben auf **Lehrer**), wähle als Aufgabe „Sprung“ und drücke Start. Lass den Tab offen (ein Handy ans Ladekabel). Rechne mit 10 Minuten oder mehr, bis etwas
 > passiert. Beobachte die Anzeige „echte Sprünge (sauberer Roboter)“: Ab wann springt dein Netz?
 
-## 15.1 Die Lehrer-Seite
+## 15.1 Der Lehrer im Studio
 
-Die Lehrer-Seite ist eine komplette Trainingshalle im Browser. Du stellst oben ein, was trainiert wird,
-drückst Start und siehst unten zu, wie das Netz besser wird. Sie rechnet mit demselben Trainingsplan
-und derselben Physik wie das Programm auf einem großen Rechner.
+Der Lehrer in Kern Studio ist eine komplette Trainingshalle im Browser. Links steht die Ente auf
+ihrer Bühne, rechts stellst du ein, was trainiert wird, drückst Start und siehst darunter zu, wie das
+Netz besser wird. Er rechnet mit demselben Trainingsplan und derselben Physik wie das Programm auf
+einem großen Rechner.
 
 > **So kannst du es dir vorstellen:** wie ein Backofen mit Sichtfenster. Du stellst Temperatur und
 > Zeit ein, schiebst den Teig hinein und kannst durch die Scheibe sehen, wie er aufgeht.
 
-Die Felder der Seite:
+Die Felder des Lehrers:
 
 | Feld | Was es bedeutet |
 |---|---|
-| Bewegung | Sprung oder „Stehen“ als schneller Test |
+| Aufgabe | eine eigene Bewegung aus Keyframes, Sprung, „Stehen“ als schneller Test oder ein freies Szenario |
 | Worker | wie viele Helfer gleichzeitig rechnen |
 | Enten je Worker | wie viele Enten jeder Helfer führt |
 | Iterationen | wie viele Trainingsrunden |
@@ -48,8 +49,9 @@ Die Felder der Seite:
 | Aktionsrauschen am Anfang | wie viel Zufall am Anfang (leer: wie im Plan) |
 | Lernrate | wie große Schritte (leer: wie im Plan) |
 
-Die Zahl der Worker schlägt die Seite selbst vor, passend zu deinem Gerät. Darunter liegen die Knöpfe
-Start, Pause und „.onnx herunterladen“.
+Die Zahl der Worker schlägt der Lehrer selbst vor, passend zu deinem Gerät. Worker, Enten, Iterationen,
+Seed, Rauschen und Lernrate stehen unter „Experteneinstellungen“. Darüber liegen die Knöpfe Start,
+Pause und Stopp, darunter „Netz an der Ente testen“ und „.onnx herunterladen“.
 
 > **Für Profis:** Wer Kern auf dem eigenen Rechner baut ([Kapitel 2](02-bauen-und-testen.md), am besten
 > zusammen mit einem Erwachsenen), bekommt mit einem Skript auch das Lehrer-Programm für die
@@ -97,8 +99,8 @@ Der Ablauf als Zeitstrahl:
    von 8“ und prüft nach jeder Runde, ob das Netz schon springt.
 4. **Kritiker zuerst:** Die ersten 30 Iterationen lernt nur der Kritiker.
 5. **Üben:** Danach üben beide mit PPO, mit wenig Rauschen und voller Variation.
-6. **Prüfen und speichern:** Alle 25 Iterationen springt das Netz 5-mal zur Probe, und die Seite
-   speichert es.
+6. **Prüfen und speichern:** Alle 25 Iterationen springt das Netz 5-mal zur Probe, und der Lehrer
+   legt es in dein Level.
 
 Oft springt das Netz schon nach dem Nachmachen. Das Üben macht den Sprung danach **robust**, also
 sicher auch mit einer etwas anderen Ente.
@@ -109,7 +111,7 @@ Zwei Dinge aus echten Läufen sind lehrreich:
 - **Ein Training ist wie ein Spielstand.** Das Programm kann den ganzen Lernstand speichern und später
   genau dort weitermachen. Wegen des Determinismus kommt dabei dasselbe heraus wie ohne Pause.
 
-Die Lehrer-Seite trainiert genau dasselbe Rezept wie das Programm. Gleicher Seed und gleich viele
+Der Lehrer im Studio trainiert genau dasselbe Rezept wie das Programm. Gleicher Seed und gleich viele
 Enten insgesamt ergeben dasselbe Netz – im Browser wie auf dem großen Rechner.
 
 > **Für Profis:** Mit dem Programm entstand Kerns Sprungnetz: 32 Enten, Seed 1, 3000 Iterationen
@@ -146,7 +148,7 @@ verschiebt.
 
 Wenn etwas schiefgeht, hilft das **Nachsehen**: Das Kommandozeilen-Programm zeigt eine Episode Takt
 für Takt, mit jedem Punkte-Posten einzeln. So siehst du, ob das Netz springt – oder nur die Belohnung
-austrickst. Die Lehrer-Seite im Browser kann das nicht. Dort schaust du dir dein Netz im Studio genau
+austrickst. Der Lehrer im Browser kann das nicht. Dort schaust du dir dein Netz an der Ente genau
 an (15.8): Springt die Ente wirklich, oder macht sie etwas ganz anderes?
 
 > **Für Profis:** Das Programm zeigt zwei Werte mehr. Der Fehler des Kritikers ist nach dem Nachmachen
@@ -173,7 +175,7 @@ So wählt man richtig:
 
 Für Kerns Sprungnetz ergab das 40 von 40 echte Sprünge sauber und 36 von 40 mit Variation, ohne Sturz.
 
-Im Browser speichert die Seite alle 25 Iterationen den neuesten Stand und überschreibt den alten.
+Im Browser legt der Lehrer alle 25 Iterationen den neuesten Stand ins Level und ersetzt den alten.
 Siehst du einen guten Stand, sichere ihn mit „.onnx herunterladen“.
 
 > **Für Profis:** Das Programm hebt Schnappschüsse automatisch auf und misst jeden mit 40 Episoden.
@@ -249,22 +251,25 @@ nur zählt, was wirklich klappt.
 
 ## 15.8 Im Studio benutzen
 
-Ein Netz, das du im Browser trainierst, landet von selbst im Studio – auf demselben Gerät, im selben
-Browser. Die Lehrer-Seite speichert es auf deinem Gerät, und Kern Studio lädt es beim Start. Offene
-Studio-Tabs übernehmen jedes neue Netz sofort. Das gilt für den Sprung.
+Ein Netz, das du im Lehrer trainierst, landet von selbst dort, wo es gebraucht wird: in dem Level,
+das du gerade offen hast. Trainierst du den Sprung, springen die Enten dieses Levels mit deinem Netz.
+Eine eigene Bewegung aus Keyframes bekommt einen Namen, und der Logik-Knoten **Robot Move** spielt
+sie unter diesem Namen. Speicherst du das Level, ist alles Gelernte mit drin – auch in einem
+verpackten Spiel.
 
-> **So kannst du es dir vorstellen:** wie ein Spielstand, den zwei Spiele auf deiner Konsole
-> gemeinsam benutzen dürfen. Das eine speichert ihn, das andere lädt ihn.
+> **So kannst du es dir vorstellen:** wie ein Rezept, das du in dein eigenes Kochbuch klebst. Wer das
+> Buch bekommt, hat das Rezept gleich mit.
 
 Zum Prüfen: Micro-Duck-Level öffnen, **Spielen** (Play), Taste **7**. Die Spielschicht arbeitet von
 allein, wenn die Ente autonom ist, die Kern-Extras an sind und Ball oder Socke in Sicht sind
 ([Kapitel 13](13-micro-duck.md)).
 
-> **Mission:** Hast du im Browser einen Sprung trainiert? Öffne im selben Browser Kern Studio, lade
-> **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels › Micro Duck) – läuft gerade ein
-> Spiel, erst mit Esc stoppen –, starte **Spielen**, drücke F8 und dann **7**. Jetzt springt **dein** Netz. Am Computer kannst du es nachprüfen: Drück F12, wähle den
-> Reiter „Konsole“, dort steht „Kern: trained network jump.onnx loaded“. Auf dem Handy gibt es diese
-> Konsole nicht – da reicht der Sprung als Beweis.
+> **Mission:** Lade in Kern Studio **Datei › Beispiel-Levels › Micro Duck** (File › Example Levels ›
+> Micro Duck), klick auf **Lehrer** und trainiere den Sprung. Sobald unter den Knöpfen „Die Enten des
+> Levels springen jetzt mit diesem Netz“ steht, drück **Netz an der Ente testen**: Die Ente auf der
+> Bühne springt mit **deinem** Netz. Verlass danach den Lehrer mit Esc, starte **Spielen**, drücke F8
+> und dann **7** – auch im Level springt jetzt dein Netz. In der Liste „Bewegungen dieses Levels“
+> steht es als „jump“.
 
 > **Mission:** Klick im Micro-Duck-Level die Ente an und schau unter
 > **Details › Spieler-Steuerung › Läufer** (Details › Player Controller › Walker) nach
@@ -298,7 +303,7 @@ Nehmen wir als Beispiel eine **Verbeugung**:
    und beide Füße am Boden bleiben, Abzug fürs Zappeln, Ende bei einem Sturz. Dazu: Was darf der
    Kritiker extra sehen – etwa die wahre Höhe des Rumpfs?
 2. **Das Rezept (der Trainingsplan):** Mit welchem Netz startet das Training, mit wie viel Rauschen
-   und welcher Lernrate? Danach kennen Programm und Browser die neue Aufgabe; der Lehrer-Seite fehlt nur
+   und welcher Lernrate? Danach kennen Programm und Browser die neue Aufgabe; dem Lehrer im Studio fehlt nur
    noch ein Eintrag im Menü. Braucht die Bewegung eine neue Eingabe, die das Startnetz nie gesehen hat
    (beim Sprung die Zeiger-Uhr), beginnen deren Regler bei 0 – wie in Kapitel 14.4: Erst handelt das
    neue Netz wie das alte, dann lernt es die neue Eingabe zu nutzen.
@@ -457,7 +462,7 @@ trainiert, stolpert sonst über dieselben Steine.
 
 ## Level geschafft!
 
-- Du trainierst einen Sprung auf der Lehrer-Seite und weißt, was dabei gerade passiert.
+- Du trainierst einen Sprung im Lehrer von Kern Studio und weißt, was dabei gerade passiert.
 - Du liest Rückgabe, Episodenlänge, Rauschen und die Sprungprobe – und weißt, dass nur die Probe
   zeigt, ob die Ente es wirklich kann.
 - Du wählst das beste Netz aus, sauber und mit Variation gemessen.

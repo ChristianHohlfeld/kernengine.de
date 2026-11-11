@@ -94,7 +94,7 @@ Lange Menüs scrollen, und auf Touch sind die Zeilen 40 px hoch.
 
 ## Levels, Actors und Komponenten
 
-Ein Level (`.klevel`, JSON, `"format": "kern-level"`, Version 1) besteht aus World Settings, Actors, Texturen und der Editor-Kamera. Einheiten sind Meter, Sekunden und Kilogramm, Z zeigt nach oben. Rotationen stehen als Euler-Winkel in Grad (x Roll, y Pitch, z Yaw), Farben als sRGB.
+Ein Level (`.klevel`, JSON, `"format": "kern-level"`, Version 1) besteht aus World Settings, Actors, Texturen, Sounds, der Editor-Kamera und dem, was der Lehrer seinen Micro Ducks beigebracht hat (`motions`, siehe „Der Lehrer“). Einheiten sind Meter, Sekunden und Kilogramm, Z zeigt nach oben. Rotationen stehen als Euler-Winkel in Grad (x Roll, y Pitch, z Yaw), Farben als sRGB.
 
 Ein Actor hat Name, Eltern-Actor, Outliner-Ordner, Hidden/Locked, Tags, Transform und diese Komponenten:
 
@@ -141,6 +141,45 @@ Vorlagen unter File → New Level: Orb Run, Physics Lab (alle Gelenktypen: Stape
 **Nativer Export:** `tools/export_game.sh level.klevel spiel.html` schreibt dieselbe Seite wie Package Game, aber mit einem Engine-Modul, das für dieses Level gebaut ist – jeder Blueprint als seine C++-Klasse einkompiliert, voll optimiert (Stufe „native C++“ statt JIT; siehe [blueprint_cpp.md](blueprint_cpp.md)). Braucht wasi-sdk, einen C++-Compiler und Node.
 
 File → Package Game schreibt eine eigenständige HTML-Datei. Sie enthält das Engine-Modul (base64), `kern.mjs`, `game.mjs` und das Level. Das Spiel läuft im Vollbild mit HUD, Maus-Look per Pointer-Lock und Touch-Steuerung (Joystick, Sprung, Boost). Es braucht keinen Server und kein Netz.
+
+## Der Lehrer
+
+Der Lehrer bringt der Micro Duck neue Bewegungen bei (`docs/lehrer.md`, `docs/keyframe-lehrer.md`,
+`docs/szenarien.md`). Er ist ein Arbeitsbereich des Studios, keine eigene Seite: Knopf **Lehrer** in
+der Werkzeugleiste, Window → Lehrer oder die Adresse `…/editor/?train=1` (die früheren Adressen
+`/lehrer/` und `/train/` leiten dorthin). Esc, derselbe Knopf oder das Kreuz im Panel führen zurück.
+
+- **Bühne:** Der Arbeitsbereich simuliert ein eigenes kleines Level in der GameWorld des Studios
+  (`src/studio/trainer.cpp`); das offene Level steht still, Viewport, Werkzeug und Auswahl kommen beim
+  Schließen so zurück, wie sie waren. Posieren: Ente schwerelos, Rumpf fest, Glieder mit Box3Ds
+  Maus-Gelenk ziehen (Maus oder Finger), sie halten, wo man loslässt. Testen: Ente bei normaler
+  Schwerkraft auf ihrem Trainingsboden, sie spielt eine gelernte Bewegung.
+- **Panel** (`web/studio/trainer.mjs`, anstelle von Outliner und Details; auf dem Telefon das Blatt
+  über der Bühne): Aufgabe (Bewegung aus Keyframes, Sprung, Stehen, freies Szenario), Keyframes,
+  Start / Pause / Stopp, Experteneinstellungen, Fortschritt mit Kurve, „Bewegungen dieses Levels“.
+- **Training:** in Web Workern der Seite, je Worker ein `kern_lehrer.wasm` (Sammler und ein Lerner).
+  Es läuft weiter, während man bearbeitet, spielt oder den Arbeitsbereich verlässt; der Knopf in der
+  Werkzeugleiste zeigt den Fortschritt.
+- **Ergebnis im Level:** Eine Bewegung (Name, Länge, Keyframes, trainiertes Netz) steht im Level unter
+  `motions` und ist Teil seines Verlaufs (Undo / Redo, auch im Arbeitsbereich). Speichern, Öffnen,
+  Package Game und der native Export tragen sie mit; beim Start einer Welt werden sie zu Bewegungen
+  der Enten des Levels, und der Blueprint-Knoten Robot Move spielt sie unter ihrem Namen.
+
+| Befehl | Wirkung |
+|---|---|
+| `trainer {open?}` | Arbeitsbereich öffnen / schließen |
+| `trainerPose`, `trainerCapture {time}`, `trainerShow {index}` | gemessene Gelenkwinkel; Pose als Keyframe; Servos fahren in einen Keyframe |
+| `trainerMotion {name?, duration?}`, `trainerKey {index, time \| remove}`, `trainerClear` | die Bewegung, die gerade gelehrt wird |
+| `trainerNew`, `trainerSelect {name}`, `trainerRemove {name}` | neue Bewegung; eine des Levels bearbeiten; entfernen |
+| `trainerTask` | die Bewegung als Aufgabe des Lehrers (`motion:{…}`) |
+| `trainerLearned {name, onnx, run}` | ein trainiertes Netz (Base64) ins Level; ein Lauf (`run`) ist ein Verlaufsschritt |
+| `trainerTest {move}`, `trainerStage` | Bewegung auf der Bühne testen; zurück zum Posieren |
+| `trainerPlay {move}` | das Level simulieren, seine Micro Duck spielt die Bewegung |
+| `trainerNet {name}`, `trainerImport {motions}` | Netz einer Bewegung (Base64); Netze von woanders als Bewegungen ins Level |
+
+`state().trainer` (nur im Arbeitsbereich): `stage` (`pose` / `test`), `motion` (`name`, `duration`,
+`keys`, `saved`, `trained`), `testing`. `state().motions`: die Bewegungen des Levels (`name`,
+`duration`, Zahl der `keys`, `bytes` des Netzes).
 
 ## Protokoll
 

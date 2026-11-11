@@ -367,7 +367,7 @@ fällt nie.
 | Robot ToF | Hindernis gesehen, Entfernung, Richtung, freie linke / rechte Hälfte |
 | Robot Camera Sees | ein Actor im Bild: sichtbar, Richtung, Entfernung |
 | Robot State | Verhalten (Chill, Wander … Driven, Logic), gefallen, Geschwindigkeit |
-| Robot Move | eine Bewegung des Sets: sit, pick, kick_left, kick_right, roulade |
+| Robot Move | eine Bewegung des Sets: sit, pick, kick_left, kick_right, roulade, Kerns jump – oder eine Bewegung, die der Lehrer dem Level beigebracht hat, unter ihrem Namen (`docs/keyframe-lehrer.md`) |
 | Robot Beak | Schnabel auf (1) / zu (0) |
 | Pet Robot | eine Hand auf der Ente für n Sekunden (Petted) |
 | Robot Hears | eine Stimme (sie antwortet) oder ein Geräusch (sie schreckt aus dem Dösen) |
