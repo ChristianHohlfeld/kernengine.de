@@ -87,6 +87,22 @@ bool Field::set_state(i32 i, u8 state) {
   return true;
 }
 
+std::vector<std::pair<i64, u8>> Field::broken_list() const {
+  std::vector<std::pair<i64, u8>> out(broken_.begin(), broken_.end());
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+bool Field::merge_broken(i64 key, u8 state) {
+  if (state < 1 || state > 2) return false;
+  u8& known = broken_[key];
+  if (state <= known) return false;
+  known = state;
+  for (Lamp& l : lamps_)
+    if (l.key == key && l.state < state) l.state = state;
+  return true;
+}
+
 i32 Field::shot(Vec3 a, Vec3 b) const {
   const Vec3 d = b - a;
   const f32 L = kern::length(d);

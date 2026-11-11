@@ -70,6 +70,7 @@ struct EnemyAi {
   i32 burst_left = 0;
   bool retreat = false;
   bool hold = false;  // tests: a dummy that stands and never shoots
+  u16 id = 0;         // in the snapshots to the mates (game_swarm.cpp)
 };
 struct EnemyRocket { Vec3 p, v; f32 life = 0; };
 

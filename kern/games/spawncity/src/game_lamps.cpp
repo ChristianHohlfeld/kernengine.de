@@ -7,8 +7,10 @@
 //    60 % of its radius tops the post (a 140 kg Box3D prop that falls and rolls), further out it
 //    darkens the head; a car faster than 3.5 m/s heading into a post shears it off (and loses some
 //    speed), a slower one is stopped by it (clang); at most 14 fallen posts,
-//  * the other players see the same: a lamp we break goes to them (Fx lamp), blasts break lamps on
-//    every machine on their own; RESET puts every lamp back up.
+//  * the other players see the same: a lamp we break goes to them at once (Fx lamp: the glass, the
+//    post falling the way it was hit), blasts break lamps on every machine on their own - and which
+//    lamps are broken is the host's state (game_townsync.cpp): every break is told to him, he tells
+//    everybody, a player who joins later gets them all; RESET puts every lamp back up.
 #include <algorithm>
 #include <cmath>
 
@@ -141,6 +143,7 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   const lamps::Lamp& l = g.lamps.all()[static_cast<std::size_t>(i)];
   g.lamps_dirty = true;
   ++g.lamps_broken_events;
+  townsync_lamp(l.key, state);  // in a session: the host keeps which lamps are broken (game_townsync.cpp)
   gaps_lamps_sounds();
   const f32 fx_d = kern::length(l.foot - cam_.eye), vol = std::fmax(0.0f, 1 - fx_d / 90) * 0.5f;
   if (was < 1 && vol > 0) world_->play_sound("sc:lampglass", cam_.eye, vol, 1, false);

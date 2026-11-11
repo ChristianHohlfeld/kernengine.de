@@ -993,6 +993,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     if (traffic_clock > 0.5f && ui_.settings.on(Opt::world_traffic)) { traffic_clock = 0; manage_traffic(); }
     worldsync_update(dt);  // one world in multiplayer (game_worldsync.cpp)
     dsync_update(dt);  // one destroyed city in multiplayer (game_destruction_sync.cpp)
+    townsync_update(dt);  // lamps, planks, marks; a client's hits on the host's town (game_townsync.cpp)
     toss_update(dt);   // thrown people and animals fly on every machine (game_toss.cpp)
     projsync_update(dt);  // every round in flight on every machine (game_projsync.cpp)
     city_.anchor = player_position();  // ground collision stays under the pilot too
@@ -1023,7 +1024,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
     update_details(dt);  // critical damage, ballots (game_details.cpp)
     gaps_update(dt);  // dispatch, critical smoke, organic hits, impact bursts (game_gaps.cpp)
     update_combat(dt);  // military, flak, jets, fights, zombies, enemies, race (game_military.cpp, game_events.cpp)
-    swarm_update(dt);  // the mates' zombies and military (game_swarm.cpp)
+    swarm_update(dt);  // the mates' zombies, military, police and sandbox enemies (game_swarm.cpp)
     destruction_.update(dt, city_, rng_);  // broken buildings: torn pieces, debris (destruction.h)
     // Soldier died and respawned: GameWorld handles it (respawn at the spawn point).
   }
@@ -1218,6 +1219,7 @@ void Game::draw_vehicles() {
     }
     if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
     draw_remote_vehicles();
+    swarm_draw_vehicles();  // the mates' cruisers (game_swarm.cpp)
     draw_world_vehicles();  // M3: tow trucks (game_traffic.cpp)
   }
   art_.end();
@@ -1534,6 +1536,7 @@ std::string Game::command(const std::string& cmd) {
     return b;
   }
   if (cmd == "destroy sync") return dsync_json();
+  if (cmd == "town sync") return townsync_json();  // tests: the town's state in a session (game_townsync.cpp)
   if (cmd.rfind("toss", 0) == 0) return toss_command(cmd);
   if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {

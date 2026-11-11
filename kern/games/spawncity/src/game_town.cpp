@@ -159,10 +159,18 @@ void Game::handle_shots() {
 // ---------------------------------------------------------------------------------------------
 // damage and explosions
 
-void Game::damage_car(i32 i, f32 amount, bool by_player) {
+void Game::damage_car(i32 i, f32 amount, bool by_player, town::Cause cause) {
   if (i < 0 || i >= static_cast<i32>(cars_.size())) return;
   TrafficCar& c = cars_[i];
   if (c.wreck || !(amount > 0)) return;
+  // a car of the host's town (MP client): the hit is his to apply - it burns and blows up there and
+  // comes back with his snapshots (game_townsync.cpp); that we shot at it stays known here (the
+  // crime and the score when it goes up: game_worldsync.cpp)
+  if (town_car_remote(i)) {
+    if (by_player) c.hit_by_player = true;
+    townsync_car_hit(i, amount, cause);
+    return;
+  }
   const f32 now = world_->sim_time();
   // a cruiser the player drives takes nothing (police_ground_units.mjs damageCar: playerDriven)
   if (c.police && mode_ == Mode::car && i == car_index_) return;
@@ -205,6 +213,7 @@ void Game::wreck_car(i32 i) {
   // the default blast 8 m / 100 (world_car_explosion.mjs -> dispatchExplosion)
   if (c.police) explosion(at, 7, 110, by_player);
   else explosion(at, 8, 100, by_player);
+  if (!by_player) blast_shown(at, c.police ? 7.0f : 8.0f, c.police ? 110.0f : 100.0f);  // (ours goes to the mates as every blast of ours does)
   world_->push_actor(c.actor, {0, 0, 1450 * (c.police ? 5.5f : 3.5f)}, true);
   if (by_player && c.police) wanted_.report(wanted::Crime::police_car, true);
   else if (by_player) wanted_.report(c.car->spec().radius > 0.4f ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
@@ -540,6 +549,23 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
   }
 }
 
+void Game::police_drone_mate_hit(u16 id, f32 damage) {
+  // a mate's round on our drone (game_swarm.cpp): what our own round does (handle_shots) - but it
+  // is not our crime
+  const f32 now = world_->sim_time();
+  for (PoliceDrone& d : pdrones_) {
+    if (!d.active || static_cast<u16>(d.serial % 65535 + 1) != id) continue;
+    d.hp -= damage;
+    if (d.hp <= 0) {
+      osfx("wanted_police_drones.down", d.pos);
+      explosion(d.pos, 3, 40, false);
+      blast_shown(d.pos, 3, 40);
+      d.active = false;
+      d.destroyed_until = now + kPdRespawn;
+    }
+  }
+}
+
 void Game::spawn_police_drones() {
   const f32 now = world_->sim_time();
   const i32 stars = wanted_.stars();
@@ -851,6 +877,7 @@ void Game::update_town(f32 dt) {
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     if (!c.placed || c.wreck) continue;
+    if (town_car_remote(static_cast<i32>(i))) continue;  // the host's car: it burns and goes up on his machine
     const Vec3 v = world_->actor_velocity(c.actor);
     const Vec3 dv3 = v - c.last_velocity;
     const f32 dv = std::sqrt(dv3.x * dv3.x + dv3.y * dv3.y + 0.25f * dv3.z * dv3.z);
@@ -993,6 +1020,7 @@ void Game::draw_town() {
     }
   }
   draw_remote_people();
+  if (world_placed_) swarm_draw_town();  // the mates' police: light bars, drones (game_swarm.cpp)
   life_draw_people();  // M3 life: the running club
   people_art_.end();
 }

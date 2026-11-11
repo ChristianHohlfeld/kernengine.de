@@ -1,8 +1,17 @@
-// Multiplayer as SpawnCity plays it (vs_multiplayer.mjs, lan_vs.mjs): every player simulates his
-// own world - the same streamed city from the host's map origin - and the players exchange their
-// poses about 30 times a second (lan_vs.mjs SEND_MS 33): the active body (drone, car, jet,
-// parachute or the person), the person's own position, and the parked drone and jet, so everybody
-// sees everybody's craft where they stand.
+// Multiplayer as SpawnCity plays it (vs_multiplayer.mjs, lan_vs.mjs): one world for all players, three
+// kinds of ownership.
+//  * His own: every player simulates his body, weapons, health and death, the car he drives, his
+//    rounds in flight and what he throws, and sends his pose about 30 times a second (lan_vs.mjs
+//    SEND_MS 33): the active body (drone, car, jet, parachute or the person), the person's own
+//    position, the parked drone and jet, his wanted stars.
+//  * The host's: the town - traffic, parked cars, wrecks, passers-by, animals (game_worldsync.cpp),
+//    craters and broken buildings (game_destruction_sync.cpp), street lamps, barricade planks and
+//    the blasts that left marks (game_townsync.cpp), the time of day, the WORLD switches. A client's
+//    hit on a town car or a passer-by goes to the host, who applies it (town_to_host).
+//  * His own, shown to all (the "swarm"): what hunts a player - his zombies, the army's helicopters,
+//    tanks and soldiers, his police (officers, cruisers, drones) and the sandbox enemies. He alone
+//    simulates them and they chase him alone; the others see them where he has them every 120 ms,
+//    and their hits go to him, who applies them (send_swarm / send_swarm_hit).
 //
 // Authority (lan_vs.mjs getAuthorityId: the oldest participant) is the host. As in SpawnCity it
 // judges every damage request between players (friendly-fire rule, spawn protection, already down),
@@ -12,6 +21,8 @@
 // through the host to the others (voice only to those in range, proximity_voice.mjs).
 // The victim's own machine applies an approved hit (Kern's soldier health, death and respawn stay
 // local) and reports its death to the authority, which tells everybody (kill feed, scores).
+// A host that goes away is followed by the client with the lowest slot (host_lost / successor): the
+// session goes on under him.
 //
 // Transport: Kern's client / server connection (kern/net/client_server.h) over HostTransport; the
 // page moves the datagrams (web/mp_host.mjs: BroadcastChannel, the Kern relay, or WebRTC data
@@ -109,14 +120,25 @@ struct Remote {
 };
 
 /// Units a player simulates himself and the others see and shoot (zombie_nights.mjs zombie-sync,
-/// military_response.mjs mil-snap): his zombies, helicopters, tanks and soldiers, every 120 ms.
-enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3 };
+/// military_response.mjs mil-snap): his zombies, helicopters, tanks and soldiers, his police
+/// (officers on foot, cruisers, drones) and the sandbox enemies, every 120 ms.
+enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy };
+/// What `flags` says, per kind (aux: zombie / soldier / officer / enemy pace, tank turret, cruiser steer).
+enum SwarmFlag : u8 {
+  kUnitDead = 0x80,                              // officer, enemy: he went down (the body lies there)
+  kOfficerAims = 1, kOfficerSkinShift = 1,       // officer: bit 0 aims, bits 1..3 his skin
+  kCruiserLights = 1, kCruiserWreck = 2, kCruiserBurns = 4,  // cruiser: the light bar runs, burnt out, burning
+  kDroneEmp = 1,                                 // police drone: knocked out, falling
+  kEnemyTypeMask = 3, kEnemyAims = 4,            // enemy: bits 0..1 COP / SWAT / HEAVY, bit 2 aims
+};
+constexpr std::size_t kSwarmPerMessage = 64;     // units in one message (18 bytes each, under the 1200 of an unreliable one)
+constexpr std::size_t kSwarmMaxUnits = 127 * kSwarmPerMessage;  // what one snapshot can carry in its numbered parts
 struct SwarmUnit {
   u16 id = 0;
   SwarmKind kind = SwarmKind::zombie;
-  u8 flags = 0;     // zombie: attacking; heli: going down; soldier: 0 idle 1 aim 2 run 3 walk
+  u8 flags = 0;     // zombie: attacking; heli: going down; tank: wreck; soldier: 0 idle 1 aim 2 run 3 walk; the others: SwarmFlag
   Vec3 p;
-  f32 yaw = 0, aux = 0;  // aux: zombie speed, tank turret
+  f32 yaw = 0, aux = 0;
 };
 struct Swarm { u8 owner = 0; std::vector<SwarmUnit> units; };
 /// A hit on another player's unit (zombie-hit / mil-hit): the owner applies it.
@@ -152,8 +174,11 @@ class Session {
 
   // ---- outgoing ----
   void send_fx(Fx f);
-  /// Our units (all kinds in one snapshot, at most 64); the others draw and shoot them.
-  void send_swarm(const std::vector<SwarmUnit>& units);
+  /// Our units, all kinds in one snapshot; the others draw and shoot them. More than one message
+  /// carries (64) go as numbered parts: a receiver hands on only a snapshot whose every part came,
+  /// so a unit is never missing from a list that is shown. False: more than kSwarmMaxUnits (refused,
+  /// counted in send_refused).
+  bool send_swarm(const std::vector<SwarmUnit>& units);
   void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
   /// The host's world (traffic, people: game_worldsync.cpp) to every client, unreliable.
   void send_world(const std::vector<u8>& blob);
@@ -189,6 +214,12 @@ class Session {
   void destroy_to_all(const std::vector<u8>& blob, bool reliable);
   void destroy_to(u8 slot, const std::vector<u8>& blob);
   std::vector<Blob> take_destroy() { return std::move(destroy_); }
+  /// The town's state and what is done to it (game_townsync.cpp, town_sync.h), reliable: a client's
+  /// hits on the host's cars and passers-by and his changes to the host; the host's state to all / one.
+  void town_to_host(const std::vector<u8>& blob);
+  void town_to_all(const std::vector<u8>& blob);
+  void town_to(u8 slot, const std::vector<u8>& blob);
+  std::vector<Blob> take_town() { return std::move(town_); }
   /// Thrown things (game_toss.cpp): the thrower's machine streams their bodies; the host relays.
   void send_toss(const std::vector<u8>& blob);
   std::vector<Blob> take_toss() { return std::move(toss_); }
@@ -269,7 +300,12 @@ class Session {
   PlayerState me_;
   mp::Scoreboard scores_;
   bool friendly_fire_ = false;
-  std::vector<Blob> destroy_, toss_, proj_;
+  std::vector<Blob> destroy_, toss_, proj_, town_;
+  // a player's swarm snapshot while its parts come in (swarm_part)
+  struct SwarmParts { u8 owner = 0, serial = 0; u64 have[2] = {0, 0}; int last = -1; std::vector<SwarmUnit> units; };
+  std::vector<SwarmParts> swarm_parts_;
+  u8 swarm_serial_ = 0;
+  void swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units);
   u16 world_rules_ = 0;
   bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
   std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)

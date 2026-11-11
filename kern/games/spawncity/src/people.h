@@ -84,6 +84,7 @@ class People {
     u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
     f32 knocked_until = 0;          // thrown by a car and getting up again (ragdoll.h, M3 life)
     f32 hurt_at = -99;              // the last hit taken (the pain voice, game_gaps.cpp)
+    bool remote = false;            // MP: a mate's unit shown here (game_swarm.cpp) - a hit on it is noted for him, nothing is applied here
     i32 net = -1;                   // MP client: the host's index of this citizen (a puppet of his world)
     Vec3 net_to;                    // ... where the host has him (eased towards)
     f32 net_at = 0;                 // ... when (on our clock): he walks on from there at his pace
@@ -137,6 +138,21 @@ class People {
     if (p.hp <= 0) kill(p, from_dir, by_player, now, false);
   }
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
+  /// MP: what our rounds and blows did to a mate's unit (Person::remote) since the last call: the
+  /// damage by the unit's own rule (an officer 25 a counted hit, the others damage x 3 on the head) -
+  /// its owner applies it. Blasts are not noted: every machine runs a mate's blast on its own units.
+  struct RemoteHit { i32 index; f32 damage; };
+  void take_remote_hits(std::vector<RemoteHit>& out) { out.insert(out.end(), remote_hits_.begin(), remote_hits_.end()); remote_hits_.clear(); }
+  /// MP client: what we did to a citizen of the host's town that he survived (a round, a blow, our
+  /// car) since the last call - the host applies it (mate_hurt), so the person is hurt and runs for
+  /// everybody. A death goes its own way (take_deaths, "npc-death").
+  enum class HurtBy : u8 { round, blow, vehicle, kLast = vehicle };
+  struct Hurt { u8 net; u32 seed; f32 damage; HurtBy by; Vec3 push; };
+  void take_hurts(std::vector<Hurt>& out) { out.insert(out.end(), hurts_.begin(), hurts_.end()); hurts_.clear(); }
+  /// MP host: a mate's hit on citizen `index` (seed: it is still the same person), by the rules a
+  /// hit of our own follows - down at 0, a ragdoll that gets up again (a blow: only at 35 or less),
+  /// the people around run. No crime of ours.
+  void mate_hurt(i32 index, u32 seed, f32 damage, HurtBy by, Vec3 push, f32 now);
   /// A fall since the last take_falls() (ragdolls, M3 life): `push` is the car's throw (m/s,
   /// people_impacts.mjs) for `car`, else the direction of the shot or blast; `alive`: knocked down
   /// by a car and getting up again (the person waits until stand_up()).
@@ -173,6 +189,8 @@ class People {
   std::vector<CrimeReport> reports_;
   std::vector<Death> deaths_;
   std::vector<Fall> falls_;
+  std::vector<RemoteHit> remote_hits_;
+  std::vector<Hurt> hurts_;
   bool last_head_ = false, puppets_ = false;
   u32 budget_ = 60, serial_ = 1;
   f32 show_ = 170, hide_ = 190;

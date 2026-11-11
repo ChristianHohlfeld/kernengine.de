@@ -405,9 +405,14 @@ void Game::update_net(f32 dt) {
         if (f.dir.y > 0.5f) destruction_.blast(f.p, f.a, f.dir.x, f.dir.y > 1.5f, city_, rng_);  // and buildings
         // the scorch and the wall marks too (the crater, if any, comes with the host's state:
         // game_destruction_sync.cpp - dug here it would be ours, not the city's)
-        if (life_ && f.a >= 1.5f) life_->marks.blast(f.p, f.a, std::fmin(1.4f, f.dir.x / 110), city_, world_->physics(), rng_, world_->sim_time(), false);
-        // a mate's blast in our world hurts our people, zombies and military too (their own are his)
-        if (f.dir.x > 0) { people_.blast(f.p, f.a, f.dir.x, false, world_->sim_time()); combat_blast(f.p, f.a, f.dir.x, false); }
+        if (life_ && f.a >= 1.5f) town_mark(f.p, f.a, std::fmin(1.4f, f.dir.x / 110), false);
+        // a mate's blast in our world hurts our people, zombies, military and police too (their own are his)
+        if (f.dir.x > 0) {
+          people_.blast(f.p, f.a, f.dir.x, false, world_->sim_time());
+          combat_blast(f.p, f.a, f.dir.x, false);
+          blast_cars(f.p, f.a, f.dir.x, false, true);        // our cruisers (the town's cars took it where it was fired)
+          blast_police_drones(f.p, f.a, f.dir.x, false);
+        }
         break;
       }
       case net::Fx::impact: m.flashes.push_back({f.p, 0.35f, now, kImpactMs}); break;
@@ -625,6 +630,16 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);
   return true;
+}
+
+void Game::blast_shown(Vec3 at, f32 radius, f32 damage) {
+  if (!net_.active()) return;
+  net::Fx fx;
+  fx.kind = net::Fx::explosion;
+  fx.p = at;
+  fx.a = radius;
+  fx.dir = {damage, 0, 0};
+  net_.send_fx(fx);
 }
 
 void Game::blast_remotes(Vec3 at, f32 radius, f32 damage, u8 breaks) {
@@ -940,12 +955,13 @@ std::string Game::mp_hud_json() {
       const f32 dz = his.z - mine.z;
       const Vec3 look = cam_.target - cam_.eye;
       const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
+      // (stars: his wanted level - his own, as in the original; the plate shows it)
       add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
           "\"dz\":%.1f,\"rel\":%.0f,"
-          "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f}",
+          "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f,\"stars\":%u}",
           first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
           mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
-          r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y);
+          r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y, static_cast<unsigned>(std::min<u8>(r.state.stars, 5)));
       first = false;
     }
     s += "],\"scores\":[";

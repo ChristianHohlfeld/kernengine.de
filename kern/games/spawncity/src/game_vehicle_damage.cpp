@@ -26,18 +26,18 @@ void Game::car_bullet(i32 i, bool by_player) {
   const bool sniper = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper;
   f32 dmg = c.police ? 22.0f : is_bus(c) ? 26.0f : 30.0f;
   if (sniper) dmg = c.police ? 4 * 22.0f : std::fmax(1.0f, std::round(car_max_hp(c) * 0.34f));
-  damage_car(i, dmg, by_player);
+  damage_car(i, dmg, by_player, town::Cause::round);
 }
 
-void Game::blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player) {
+void Game::blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player, bool police_only) {
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
-    if (!c.placed || c.wreck) continue;
+    if (!c.placed || c.wreck || (police_only && !c.police)) continue;
     const Vec3 p = matrix_of(c.actor).translation();
     if (c.police) {
       // police_ground_units.mjs onExplosion: r 2..60, maxDamage >= 20, linear over r + 2.5 m, x 2.4
       const f32 r = clampf(radius, 2, 60), md = std::fmax(20.0f, damage), dd = std::hypot(p.x - at.x, p.y - at.y);
-      if (dd < r + 2.5f) damage_car(static_cast<i32>(i), md * 2.4f * (1 - dd / (r + 2.5f)), by_player);
+      if (dd < r + 2.5f) damage_car(static_cast<i32>(i), md * 2.4f * (1 - dd / (r + 2.5f)), by_player, town::Cause::blast);
       continue;
     }
     // dispatchExplosion: radius 2..18; f = smoothstep falloff x exposure (buildings .18); a car takes
@@ -55,7 +55,7 @@ void Game::blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player) {
     if (d >= r) continue;
     const f32 f = weapons::blast_factor(d, r, d > 0.8f && !line_of_sight(at, near));
     const f32 hits = std::fmin(5.0f, std::ceil(f * (is_bus(c) ? 4.0f : 3.0f)));
-    for (i32 k = 0; k < static_cast<i32>(hits); ++k) damage_car(static_cast<i32>(i), is_bus(c) ? 26.0f : 30.0f, by_player);  // hit by hit (a critical car speeds up)
+    for (i32 k = 0; k < static_cast<i32>(hits); ++k) damage_car(static_cast<i32>(i), is_bus(c) ? 26.0f : 30.0f, by_player, town::Cause::blast);  // hit by hit (a critical car speeds up)
   }
 }
 
