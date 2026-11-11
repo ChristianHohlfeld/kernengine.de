@@ -1114,11 +1114,12 @@ So läuft das Laden:
 4. Scheitert eine Datei, versucht die Seite es nach 5 s, 10 s, 20 s … erneut, höchstens jede Minute.
    Bis dahin steht die Bewegung nicht zur Verfügung; die Ente bleibt stehen und sagt, warum.
 
-**Selbst trainierte Netze:** Was der Kern Lehrer im Browser trainiert (Seite `/lehrer/`,
-[Kapitel 14](14-lehrer.md)), speichert er im selben Browser (IndexedDB `kern-lehrer`, Speicher
-`policies`, Schlüssel = Dateiname wie `jump.onnx`). Studio lädt diese Netze beim Start und erneut, sobald
-der Lehrer ein neueres meldet (BroadcastChannel `kern-lehrer`). Ein auf demselben Gerät trainiertes Netz
-ersetzt damit das mitgelieferte, ohne dass man eine Datei kopiert.
+**Selbst trainierte Netze:** Was der Lehrer im Studio trainiert (Werkzeugleiste **Lehrer**,
+[Kapitel 14](14-lehrer.md), 14.11), gehört zum Level: Eine gelernte Bewegung steht mit Namen, Länge,
+Keyframes und ihrem Netz in der Level-Datei (`motions`, 11.15.1) und wird beim Start der Welt zu einer
+Bewegung der Micro Ducks dieses Levels. Der Knoten Robot Move spielt sie unter ihrem Namen. Trainiert
+der Lehrer den Sprung, ersetzt dessen Netz in diesem Level das mitgelieferte `jump.onnx`. Dafür wird
+keine Datei kopiert und nichts im Browser abgelegt.
 
 Beim Veröffentlichen kopiert die CI die Netze nach `editor/microduck/` und `editor/policies/`. Wer ein
 exportiertes Spiel mit Ente selbst hostet, legt diese beiden Ordner neben die HTML-Datei
@@ -1133,8 +1134,9 @@ und die NOTICE; ein Spiel mit dem Aussehen der Ente ist nur nicht kommerziell nu
 ### 11.15.1 Das Format `.klevel`
 
 Ein Level ist eine JSON-Datei mit `"format": "kern-level"` und `"version": 1`. Sie enthält `name`,
-`world`, die Editor-Kamera (`camera`), `nextId`, `actors`, `textures`, `sounds` und gegebenenfalls `logic`.
-Texturen und importierte Sounds stehen als Data-URL darin; eine Datei ist damit vollständig. Eine Datei
+`world`, die Editor-Kamera (`camera`), `nextId`, `actors`, `textures`, `sounds` und gegebenenfalls `logic`
+und `motions` (was der Lehrer den Enten des Levels beigebracht hat). Texturen und importierte Sounds
+stehen als Data-URL darin, die Netze gelernter Bewegungen als Base64; eine Datei ist damit vollständig. Eine Datei
 einer neueren Studio-Version lehnt Studio mit „level was written by a newer Kern Studio" ab. Das Format
 im Einzelnen beschreibt [Kapitel 8](08-spiel-laufzeit.md).
 

@@ -589,8 +589,8 @@ that it needs one: Pollen's networks from one folder, Kern's own (jump and play 
 one. If loading doesn't work, Studio tries again later, with longer and longer pauses. Until then,
 the duck stays put for that movement and reports what's missing.
 
-Whatever you train with the Lehrer in the browser, it saves on your device. Studio loads it from
-there too, and an open Studio picks up a new network right away – without copying a file.
+Whatever you train with the Lehrer in Studio, it puts into your level. It's saved with the level,
+and this level's ducks can do it right away – without copying a file.
 
 In the **Details** panel, in the **Walker** group, you set whether the duck is **Autonomous
 (camera, ToF)**, which gait it uses (**Walking network**), how network answers become servo targets

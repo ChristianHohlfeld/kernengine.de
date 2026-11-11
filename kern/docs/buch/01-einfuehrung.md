@@ -8,7 +8,7 @@ der zweibeinige Roboter von Pollen Robotics, der in Kern mit seinen echten train
 und der **Lehrer**, der neue Netze für diesen Roboter in C++ trainiert – nativ und im Browser.
 
 Live: <https://kernengine.de/> – Startseite mit Kern Studio (`/editor/`), dem Lehrer
-(`/lehrer/`), spielbaren Levels (`kern/web/studio/play.html?level=orbRun` bzw. `physicsLab`) und den
+(ein Arbeitsbereich des Studios: `/editor/?train=1`), spielbaren Levels (`kern/web/studio/play.html?level=orbRun` bzw. `physicsLab`) und den
 C++-Beispielen `orbrun` und `hello`.
 
 ![Kern Studio mit dem Level Orb Run: Viewport, Outliner und Details](bilder/studio.png)
@@ -255,14 +255,15 @@ Der Lehrer trainiert Netze für die Micro Duck. Er läuft
 
 - **nativ** als Kommandozeilenprogramm `kern_lehrer` auf allen Kernen (`kern/tools/lehrer.sh`), auch
   headless auf einem Server, und
-- **im Browser** auf der Seite `/lehrer/`: `kern/build.sh --lehrer` baut `kern_lehrer.wasm`; jeder Web
-  Worker lädt ein eigenes Modul und ist Sammler oder Lerner (`src/lehrer/lehrer_api.cpp`).
+- **im Browser** als Arbeitsbereich von Kern Studio (`/editor/?train=1`): `kern/build.sh --lehrer` baut
+  `kern_lehrer.wasm`; jeder Web Worker der Studio-Seite lädt ein eigenes Modul und ist Sammler oder
+  Lerner (`src/lehrer/lehrer_api.cpp`). Was die Ente dort lernt, wird mit dem Level gespeichert.
 
 Beide benutzen dieselben Rezepte (`include/kern/lehrer/recipe.h`) und dieselbe `GameWorld`. Gleicher
 Seed und gleich viele Enten ergeben dasselbe Netz – nativ wie im Browser. Exportiert wird ONNX im
 Format von Pollens Netzen; das Studio lädt es wie diese ([Kapitel 14](14-lehrer.md)).
 
-![Die Lehrer-Seite im Browser mit laufendem Training: Einstellungen und Kennzahlen](bilder/lehrer.png)
+![Der Lehrer in Kern Studio: die Ente auf ihrer Bühne im Viewport, daneben das Panel mit Keyframes, Training und den Bewegungen des Levels](bilder/lehrer.png)
 
 ### Die Micro Duck im Zusammenspiel
 
@@ -325,8 +326,8 @@ erzeugte Dateien.
     web/
       kern.mjs                   Browser-Plattformschicht + KernRenderer
       app.mjs                    Host für C++-Spiele
-      studio/                    index.html, studio.css, studio.mjs, logic.mjs, game.mjs, play.html
-      lehrer/                    index.html, lehrer.mjs, worker.mjs
+      studio/                    index.html, studio.css, studio.mjs, logic.mjs, trainer.mjs (der
+                                 Lehrer), game.mjs, play.html
     tools/
       kern_lehrer.cpp            der Lehrer als Kommandozeilenprogramm
       lehrer.sh                  baut kern_lehrer nativ

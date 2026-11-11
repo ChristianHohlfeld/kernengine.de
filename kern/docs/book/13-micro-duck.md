@@ -352,8 +352,9 @@ The gait is chosen with the **Walking network** field in the Details panel (`gai
 
 `walker_skill(id, "kick_left")` starts a motion just as the daemon does. It returns `""` if the
 motion starts, otherwise the reason: "a ground pick is running", "a scripted move is already
-running", "the robot is sitting - stand it up first", "… is not loaded". One move at a time, and
-none from sitting. All networks share the feedback of the last action (observation 34–47).
+running", "the robot is sitting - stand it up first", "… is not loaded", "no such move". One move at
+a time, and none from sitting. The name can also be a motion the Lehrer taught the level (`motions`);
+it is looked up before the robot's own moves. All networks share the feedback of the last action (observation 34–47).
 
 If a motion's network is not loaded yet, no other network steps in: the servos hold the home pose,
 and the duck says once which file is missing.
@@ -796,9 +797,9 @@ The Studio (`web/studio/game.mjs`) asks the engine for missing networks
 (`kern_studio_pending_policies`) and loads them: Pollen's networks from `microduck/`, Kern's own
 (`jump.onnx`, `play.onnx`) from `policies/` – on the developer page from `third_party/microduck/` and
 `kern/policies/`. A file that fails to load is requested again after 5, 10, 20 s … (at most once a
-minute). Networks that the Lehrer has stored in the browser on the same device (IndexedDB
-"kern-lehrer") are loaded by the Studio as well, and open Studio tabs pick up a new one immediately
-(BroadcastChannel "kern-lehrer").
+minute). What the Lehrer trained in the Studio is in the level itself (`motions`): when the world
+starts, these networks become moves of the level's ducks (`GameWorld::learn_motions`), and
+`walker_skill` finds them by their name before the robot's own moves.
 
 ### Details panel (walker)
 
@@ -819,7 +820,7 @@ minute). Networks that the Lehrer has stored in the browser on the same device (
 | Look | head yaw / pitch |
 | Set Autonomous | own behavior on / off |
 | Chirp | chirp with open beak |
-| Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` |
+| Robot Move | `sit`, `pick`, `kick_left`, `kick_right`, `roulade`, `jump` – or the name of a motion the Lehrer taught the level ([Chapter 14](14-lehrer.md), 14.11) |
 | Robot Beak | beak open (1) / closed (0) |
 | Pet Robot | a hand on the duck for n seconds |
 | Robot Hears | voice or noise |

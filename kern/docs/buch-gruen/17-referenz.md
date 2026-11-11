@@ -178,7 +178,7 @@ Die genauen Formate stehen im blauen Buch, Kapitel 17.
 Zwei Teile der Referenz sind reine Programmierer-Werkzeuge und stehen deshalb nur im blauen Buch,
 Kapitel 17:
 
-- **Der Lehrer als Kommandozeilenprogramm:** Neben der Lehrer-Seite im Browser gibt es den Lehrer
+- **Der Lehrer als Kommandozeilenprogramm:** Neben dem Lehrer-Bereich im Studio gibt es den Lehrer
   auch als Programm, das man mit getippten Befehlen startet – zum Trainieren, Bewerten, Kalibrieren
   und Messen. Alle Befehle mit ihren Einstellungen und Beispielen stehen dort.
 - **Die Schnittstelle zwischen Engine und Browser:** Die Engine ist das Herz von Kern, das
@@ -405,7 +405,7 @@ reichen einmal um den Kreis.
 | **Kritiker** | das zweite Netz beim Üben; es schätzt, wie gut eine Lage ist, und handelt nie |
 | **Kritiker zuerst** | nach dem Nachahmen lernt eine Weile nur der Kritiker, bis seine Urteile taugen |
 | **Lehrer** | Kerns Trainingssystem für die Netze der Micro Duck ([Kap. 14](14-lehrer.md)) |
-| **Lehrer-Seite** | die Webseite kernengine.de/lehrer/, auf der du im Browser trainierst ([Kap. 14](14-lehrer.md), [15](15-eigene-modelle.md)) |
+| **Lehrer-Bereich** | der Bereich „Lehrer“ in Kern Studio (Knopf **Lehrer**), in dem du im Browser trainierst; was die Ente dort lernt, gehört zum Level ([Kap. 14](14-lehrer.md), [15](15-eigene-modelle.md)) |
 | **Lehrplan** | Schwierigkeiten kommen erst nach und nach dazu, wie beim Klavierüben |
 | **Lernrate** | die Schrittlänge beim Verstellen der Regler |
 | **Messung** | eine strenge Prüfung, ob eine Bewegung wirklich gelungen ist, unabhängig von den Punkten ([Kap. 15](15-eigene-modelle.md)) |
@@ -421,7 +421,7 @@ reichen einmal um den Kreis.
 | **Rauschen, σ (Sigma)** | zufällige Abweichung; σ sagt, wie breit sie ist |
 | **Return** | womit beim Lernen gerechnet wird: die Punkte ab jetzt, spätere etwas weniger wert ([Anhang A](A-grundlagen-neuronale-netze.md)); nicht dasselbe wie die Rückgabe |
 | **Rezept** | alle Trainingseinstellungen einer Aufgabe zusammen |
-| **Rückgabe** (Episoden-Rückgabe) | alle Punkte einer Episode einfach zusammengezählt; so heißt die Anzeige auf der Lehrer-Seite ([Kap. 15](15-eigene-modelle.md)) |
+| **Rückgabe** (Episoden-Rückgabe) | alle Punkte einer Episode einfach zusammengezählt; so heißt die Anzeige im Lehrer-Bereich ([Kap. 15](15-eigene-modelle.md)) |
 | **Schicht** | viele Neuronen nebeneinander, die dieselben Eingänge sehen |
 | **Schnappschuss** | ein unterwegs gespeicherter Zwischenstand des Netzes ([Kap. 15](15-eigene-modelle.md)) |
 | **Seed** | die Startzahl für den Zufall: gleicher Seed, gleicher Zufall |

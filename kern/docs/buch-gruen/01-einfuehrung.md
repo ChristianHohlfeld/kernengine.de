@@ -243,7 +243,7 @@ verschicken kannst. Sie läuft mit derselben Engine wie der Editor und verhält 
 > Befehle der Konsole.
 
 **Der Lehrer.** Er trainiert Netze für die Micro Duck: auf deinem Rechner als eigenes Programm oder
-im Browser auf der Lehrer-Seite. Dort sammeln mehrere Hintergrund-Helfer gleichzeitig Erfahrungen
+im Browser, mitten in Kern Studio (Knopf **Lehrer**). Dort sammeln mehrere Hintergrund-Helfer gleichzeitig Erfahrungen
 mit simulierten Enten, und einer lernt daraus. Beide Fassungen benutzen dieselben Trainingsrezepte
 und dieselbe Spielwelt. Am Anfang des Lernens steht ein **Startwert** für den Zufall – wie ein
 Kartenspiel, das jedes Mal auf genau dieselbe Weise gemischt wird. Gleicher Startwert, gleich viele

@@ -594,8 +594,8 @@ eins braucht: Pollens Netze aus einem Ordner, Kerns eigene (Sprung und Spielschi
 zweiten. Klappt das Laden nicht, versucht Studio es später noch einmal, mit immer längeren Pausen. Bis dahin bleibt die Ente bei dieser Bewegung stehen und meldet,
 was fehlt.
 
-Was du mit dem Lehrer im Browser trainierst, speichert er auf deinem Gerät. Studio lädt es von dort
-ebenfalls, und ein offenes Studio übernimmt ein neues Netz sofort – ohne eine Datei zu kopieren.
+Was du mit dem Lehrer im Studio trainierst, legt er in dein Level. Es wird mit dem Level gespeichert,
+und die Enten dieses Levels können es sofort – ohne eine Datei zu kopieren.
 
 Im **Details**-Panel stellst du in der Gruppe **Läufer** (Walker) ein, ob die Ente
 **Autonom (Kamera, ToF)** (Autonomous (camera, ToF)) ist, welche Gangart sie benutzt

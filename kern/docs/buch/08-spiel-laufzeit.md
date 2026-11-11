@@ -85,6 +85,7 @@ Aus dem Kopfkommentar von `level.h`:
 | `actors` | `vector<Actor>` | in Dokumentreihenfolge |
 | `textures` | `vector<TextureAsset>` | importierte Bilder (`id`, `name`, `src` als Data-URL, `width`, `height`) |
 | `sounds` | `vector<SoundAsset>` | importierte Sounds (`id`, `name`, `src` als Data-URL, `duration` informativ) |
+| `motions` | `vector<MotionAsset>` | was der Lehrer den Micro Ducks des Levels beigebracht hat: `name`, `duration`, `keys` (Keyframes: Zeit und 14 Gelenkwinkel), `onnx` (das trainierte Netz) ([Kapitel 14](14-lehrer.md), 14.11) |
 | `logic` | `logic::Graph` | der Level-Graph (Self = keiner; sieht die Events aller Actors) |
 | `camera` | `EditorCamera` | Editor-Kamera: `position` (−24, −30, 18), `yaw` 51°, `pitch` −24° |
 | `next_id` | `ActorId` | nächste freie Actor-ID |
@@ -432,6 +433,7 @@ einzeln (Studio und Logik nutzen sie).
 | `actors` | Liste der Actors (höchstens 100 000) |
 | `textures` | Liste: `id`, `name`, `width`, `height`, `src` (Data-URL `data:image/…`) |
 | `sounds` | Liste: `id`, `name`, `duration`, `src` (`data:audio/…`, `data:video/…` oder `data:application/ogg`) |
+| `motions` | Liste (fehlt, wenn leer): `name` (a–z, 0–9, `_`, `-`), `duration` (s), `keys` (Liste aus `time` und `joints` mit 14 Winkeln), `onnx` (die ONNX-Datei als Base64; fehlt, solange die Bewegung nicht trainiert ist) |
 | `logic` | Level-Graph (nur geschrieben, wenn nicht leer; Format in [Kapitel 9](09-logik.md)) |
 
 ### Actor

@@ -574,8 +574,8 @@ is built in as bytes (`third_party/microduck/pickup_detector.inc`, `pickup_detec
 
 **Where the files live:** Pollen's set in `kern/third_party/microduck/` (`velstand.onnx` and
 `pickup_detector.onnx` are also built in), Kern's own networks in `kern/policies/` (`jump.onnx`, `play.onnx`). On the published site
-they are in `editor/microduck/` and `editor/policies/`. A network trained in the browser is stored by
-the Lehrer page in IndexedDB ("kern-lehrer"); on the same device it replaces the bundled one
+they are in `editor/microduck/` and `editor/policies/`. A network trained in the Studio is in the
+level (`motions`); a jump trained there replaces the bundled `jump.onnx` in that level
 ([Chapter 14](14-lehrer.md), [Chapter 15](15-your-own-models.md)).
 
 ### Servo profile (JSON)

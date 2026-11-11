@@ -1,16 +1,17 @@
 # 15 Training Your Own Models – the Workshop
 
-> **In short:** Here you train for yourself. On the Lehrer page in the browser you teach the duck to
+> **In short:** Here you train for yourself. In Kern Studio's Lehrer you teach the duck to
 > jump, read its progress from curves, save a good network, and watch it jump in the Studio. On top of
 > that come the rules for building good exercises, and the traps that the real training runs have
 > already fallen into.
 
 > **Key terms:**
-> - **Lehrer page** – the web page kernengine.de/lehrer/, where you train in the browser.
+> - **Lehrer workspace** – the "Lehrer" area of Kern Studio (the **Lehrer** button at the top), where
+>   you train in the browser.
 > - **Command line** – a window where you type commands instead of clicking. You don't need it for
 >   this chapter.
 > - **Return** – all the points of an episode added up; that's what the **Mean episode return** readout
->   on the Lehrer page shows. (The **return** in Appendix A.10 is a variant that's used
+>   in the Lehrer workspace shows. (The **return** in Appendix A.10 is a variant that's used
 >   in the learning calculation: points from now on, later ones worth a bit less.)
 > - **Noise** – the randomness added to each of the network's commands: the duck's curiosity.
 > - **Learning rate** – how far the evaluator (14.2) adjusts the sliders per step.
@@ -25,7 +26,7 @@ How the Lehrer works inside is in [Chapter 14](14-lehrer.md). You'll need its te
 
 There are two ways to train, and with the same settings both give **the same network**:
 
-- **The Lehrer page in the browser:** nothing to install, everything with mouse clicks. That's the
+- **The Lehrer workspace in the Studio:** nothing to install, everything with mouse clicks. That's the
   path of this chapter.
 - **The tool on your own computer:** faster and more versatile, but you have to build it yourself and
   operate it from the command line.
@@ -51,17 +52,19 @@ A jump run has two phases that you can follow on the page:
 
 **How long does it take?** On a test computer with 2 cores, the first real jump came in the browser
 after just under 9 minutes, and imitation was finished after about 11 minutes. Practicing takes much
-longer, because it needs thousands of rounds. How fast your device is, the page shows under
+longer, because it needs thousands of rounds. How fast your device is, the Lehrer workspace shows under
 **Steps / s** (steps per second): that's how many decision ticks all ducks together manage per
 second.
 
 > **Try it!** Your first jump run:
-> 1. Open **kernengine.de/lehrer/**. Wait until the status line reports "Ready".
-> 2. Under **Motion**, choose **Jump**. All other fields stay as they are.
+> 1. Open Kern Studio (**kernengine.de/editor/**) and there the example level via **File › Example
+>    Levels › Micro Duck**. Click **Lehrer** at the top and wait until the status line reports "Ready".
+> 2. Under **Task**, choose **Jump**. All other fields stay as they are.
 > 3. Press **Start** and leave the tab open. A phone belongs on its charger.
 > 4. Watch the status line: first "Imitating: round 1 of 8" and so on, then "Learning: iteration …".
 >    Under **Real jumps (clean robot)** you see how many of 5 test jumps succeed.
-> 5. As soon as "Saved for Kern Studio as jump.onnx" appears below the buttons, your network is ready for 15.6.
+> 5. As soon as "The level's ducks jump with this network now" appears below the buttons, your
+>    network is ready for 15.6.
 >
 > What you learn: only the role model makes the jump possible; practicing then makes it reliable.
 
@@ -82,7 +85,7 @@ the trend over hundreds of rounds.
 > **Imagine …** the fever chart in a hospital: a single measurement says little, the trend over days
 > says everything.
 
-The Lehrer page draws return and episode length as curves and shows numbers alongside:
+The Lehrer workspace draws return and episode length as curves and shows numbers alongside:
 
 | Readout | Meaning | What to watch for |
 |---|---|---|
@@ -134,7 +137,7 @@ learning rate, little noise, and critic first – otherwise what was learned get
 > **Imagine …** you've just painstakingly taught a dog a trick. If you now yell new commands and wave
 > treats around wildly, the trick is quickly gone again.
 
-That's why the fields **Initial action noise** and **Learning rate** on the Lehrer page are empty
+That's why the fields **Initial action noise** and **Learning rate** in the Lehrer workspace are empty
 (they show **Recipe**): then the proven recipe applies. What the real runs also showed:
 
 - **More trying things out doesn't help.** With a lot of noise and no warm start, the duck only
@@ -155,19 +158,21 @@ That's why the fields **Initial action noise** and **Learning rate** on the Lehr
 
 ## 15.6 Using it in the Studio
 
-A network from the Lehrer page lands in the Studio by itself if both run in the **same browser on the
-same device**. The Studio loads it at startup and takes over every new one immediately, even in tabs
-that are already open. This applies to the jump.
+A network from the Lehrer workspace lands by itself where it's needed: **in the level** you have
+open. From then on it belongs to the level, is saved with it and is part of a packaged game too. If
+you train the jump, this level's ducks jump with your network. A motion of your own from keyframes
+gets a name; the logic node **Robot Move** plays it by that name.
 
 > **Try it!** Your duck jumps with your network:
-> 1. Start a jump run on the Lehrer page (15.2).
-> 2. In the same browser, open a second tab with https://kernengine.de/ and there the example level
->    via **File › Example Levels › Micro Duck**.
-> 3. Wait until the Lehrer page reports "Saved for Kern Studio as jump.onnx". That happens for the first time after imitation, then every 25 rounds.
-> 4. In the Studio, start **Play**, take over the duck with **F8** and press **7**.
+> 1. Start a jump run in the Lehrer workspace (15.2), in the example level **Micro Duck**.
+> 2. Wait until "The level's ducks jump with this network now" appears below the buttons. That
+>    happens for the first time after imitation, then every 25 rounds.
+> 3. Press **Try the network on the duck**: the duck on the stage jumps. Or leave the Lehrer with
+>    **Esc**, start **Play**, take over the duck with **F8** and press **7**.
 >
-> What you see: now **your** network jumps, not the one that ships with Kern – yours replaces it. An
-> early state often still jumps unsteadily. After a while of practice, press **7** again and compare.
+> What you see: now **your** network jumps, not the one that ships with Kern – in this level yours
+> replaces it. An early state often still jumps unsteadily. Try again after a while of practice and
+> compare. When you save the level, your network is in it.
 
 > **For the curious:** You can also put a network into the source code as a file, and the browser's
 > developer console reports when a network has been loaded. What form the network must have and where
@@ -201,8 +206,8 @@ Suppose the duck should **take a bow**. For that you need five ingredients:
    points (staying upright, moving calmly, and of course the bow itself), and what ends the episode
    (a fall)? And what may the critic know in addition?
 2. **A recipe:** the settings for training, such as a warm start from velstand, little noise, a small
-   learning rate. With that, the tool and the browser know the new exercise; on the Lehrer page all
-   that's missing is an entry in the selection.
+   learning rate. With that, the tool and the browser know the new exercise; in the Lehrer workspace
+   all that's missing is an entry in the selection.
 3. **A measurement:** a strict check of whether a bow really happened (15.9).
 4. **The connection to the Studio:** a key, a touch button, the name in the **Robot Move** logic node,
    and the network file. In the Studio the duck then switches to the new network for the duration of
@@ -286,7 +291,7 @@ So you don't fall into them – this happened in the real runs:
 
 ## What you take away
 
-- The Lehrer page in the browser is the easiest way; the tool on the computer is faster but gives the
+- The Lehrer workspace in the Studio is the easiest way; the tool on the computer is faster but gives the
   same network.
 - You read progress from curves, not from one number. The actual goal is real jumps.
 - The last network isn't always the best: save intermediate states and test them thoroughly, clean

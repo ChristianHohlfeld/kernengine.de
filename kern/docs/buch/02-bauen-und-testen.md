@@ -480,7 +480,7 @@ und WebAssembly bewegen.
    kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
    kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
    kern/build.sh --lehrer generated/kern_lehrer.wasm
-   for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs kern/web/lehrer/*.mjs tools/net_relay.mjs; do node --check "$f"; done
+   for f in kern/web/kern.mjs kern/web/app.mjs kern/web/studio/*.mjs tools/net_relay.mjs; do node --check "$f"; done
    python3 -I tools/kern_notices.py --check
    ```
 
@@ -503,9 +503,9 @@ und WebAssembly bewegen.
    | `editor/` | `site/editor/` (Manifest, Service Worker, Icons) |
    | `editor/microduck/` | `kern/third_party/microduck/*.onnx` (Pollens Policy-Set, Apache-2.0) |
    | `editor/policies/` | `kern/policies/*.onnx` (Kerns eigene Netze) |
+   | `editor/kern_lehrer.wasm` | das Modul des Lehrers, neben dem Editor (die Worker seines Arbeitsbereichs laden es) |
    | `generated/` | `kern_studio.wasm`, `kern_lehrer.wasm` |
-   | `lehrer/index.html`, `kern/web/lehrer/*.mjs` | die Lehrer-Seite und ihre Worker |
-   | `train/index.html` | Weiterleitung von der alten Adresse `/train/` nach `../lehrer/` |
+   | `lehrer/index.html`, `train/index.html` | Weiterleitungen von den früheren Adressen des Lehrers nach `../editor/?train=1` |
    | `kern/web/` | `kern.mjs`, `app.mjs`, `studio/*.mjs`, `studio/*.html`, `studio/*.css` |
    | `kern/examples/hello/`, `kern/examples/orbrun/` | `index.html` und `.wasm` der Beispiele |
    | `.nojekyll` | GitHub Pages ohne Jekyll |
@@ -565,9 +565,9 @@ Die Entwicklungsseiten laden ihre Dateien relativ: `kern/web/studio/index.html` 
 laden `../../../generated/kern_studio.wasm`; die Policies der Micro Duck kommen auf der
 Entwicklungsseite aus `kern/third_party/microduck/` und `kern/policies/`, im Single-File-Build unter
 `/generated/` aus `../kern/third_party/microduck/` und `../kern/policies/`, auf der veröffentlichten
-Seite aus `microduck/` und `policies/` neben dem Editor (`loadPolicies` in `game.mjs`). Die
-Lehrer-Seite `kern/web/lehrer/index.html` bindet `../kern/web/lehrer/lehrer.mjs` ein und ist damit
-auf die Anordnung der veröffentlichten Seite (`/lehrer/`) ausgelegt.
+Seite aus `microduck/` und `policies/` neben dem Editor (`loadPolicies` in `game.mjs`). Der Lehrer
+(`trainer.mjs`) lädt `kern_lehrer.wasm` auf der Entwicklungsseite aus `generated/`, sonst von neben der
+Seite.
 
 ---
 
@@ -585,7 +585,7 @@ auf die Anordnung der veröffentlichten Seite (`/lehrer/`) ausgelegt.
 | Jeder kleine Header-Edit baut alles neu | gewollt: Header-Hash im Cache-Schlüssel | – |
 | Browser-Test hängt bei `openStudio` | Seite nicht ausgeliefert oder Modul fehlt; der Test wartet bis 90 s auf `KernStudio.frames() > 5` | Server in der Repository-Wurzel starten, `generated/` bauen |
 | Playwright-Import schlägt fehl | Paket nicht gefunden | `npm install playwright` (CI: 1.56.0) und `NODE_PATH` setzen, wie in der CI |
-| Lehrer-Seite lokal ohne Modul | Pfade auf die veröffentlichte Anordnung ausgelegt | Seite wie in Abschnitt 2.10 (Job `build`) zusammenstellen |
+| Lehrer: „Start“ meldet einen Ladefehler | `kern_lehrer.wasm` fehlt (`generated/` auf der Entwicklungsseite, sonst neben der Seite) | `kern/build.sh --lehrer generated/kern_lehrer.wasm` |
 
 ---
 

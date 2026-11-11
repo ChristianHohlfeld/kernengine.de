@@ -17,33 +17,33 @@
 How the Lehrer calculates inside – actor and critic, PPO, role model, copying, variation – is in
 [Chapter 14](14-lehrer.md). Here you try it out and learn the rules for planning a training run.
 
-There are two ways. The **main way** is the **Lehrer page in the browser**: you don't need to
-install anything, and it can train the jump and standing. The second way is a program for the
+There are two ways. The **main way** is the **Lehrer in Kern Studio**, in the browser: you don't
+need to install anything, and it can train the jump, standing and moves of your own. The second way is a program for the
 command line. Only people who build Kern themselves from the source code get it, and it can do a few
 more things. In this chapter it only appears in the "For pros" boxes.
 
-The Lehrer page follows your browser's language, just like Studio; the **DE | EN** button at the
-bottom right switches between German and English. This chapter names its labels the way the page
-shows them in English.
+The Lehrer speaks Studio's language, English or German. This chapter names its labels the way
+Studio shows them in English.
 
-> **Mission:** On https://kernengine.de/, open the "Der Lehrer" entry, choose **Jump** and
-> press **Start**. Leave the tab open (plug a phone into its charger). Expect 10 minutes or more
+> **Mission:** On https://kernengine.de/, open the "Der Lehrer" entry (or click **Lehrer** at the
+> top of Kern Studio), choose the task **Jump** and press **Start**. Leave the tab open (plug a phone into its charger). Expect 10 minutes or more
 > before something happens. Watch the **Real jumps (clean robot)** display: from when on does your network jump?
 
-## 15.1 The Lehrer Page
+## 15.1 The Lehrer in Studio
 
-The Lehrer page is a complete training gym in the browser. At the top you set what gets trained,
-press Start, and at the bottom you watch the network get better. It calculates with the same
-training plan and the same physics as the program on a big computer.
+The Lehrer in Kern Studio is a complete training gym in the browser. On the left the duck stands on
+its stage; on the right you set what gets trained, press Start, and below that you watch the network
+get better. It calculates with the same training plan and the same physics as the program on a big
+computer.
 
 > **Picture it like this:** like an oven with a window. You set temperature and time, slide the
 > dough in, and can watch through the glass as it rises.
 
-The fields on the page:
+The Lehrer's fields:
 
 | Field | What it means |
 |---|---|
-| **Motion** | **Jump**, or **Stand (quick test)** |
+| **Task** | **Motion from keyframes** (a move of your own), **Jump**, **Stand (quick test)** or a free scenario |
 | **Workers** | how many helpers calculate at the same time |
 | **Ducks per worker** | how many ducks each helper runs |
 | **Iterations** | how many training rounds |
@@ -51,8 +51,9 @@ The fields on the page:
 | **Initial action noise** | how much chance at the start (empty, shows **Recipe**: as in the plan) |
 | **Learning rate** | how big the steps are (empty, shows **Recipe**: as in the plan) |
 
-The page suggests the number of workers itself, to suit your device. Below are the buttons
-**Start**, **Pause** and **Download .onnx**.
+The Lehrer suggests the number of workers itself, to suit your device. Workers, ducks, iterations,
+seed, noise and learning rate sit under **Expert settings**. Above them are the buttons **Start**,
+**Pause** and **Stop**, below them **Try the network on the duck** and **Download .onnx**.
 
 > **For pros:** If you build Kern on your own computer ([Chapter 2](02-building-and-testing.md),
 > best together with an adult), a script also gets you the Lehrer program for the command line. It
@@ -100,7 +101,8 @@ The process as a timeline:
    of 8" and checks after every round whether the network already jumps.
 4. **Critic first:** For the first 30 iterations, only the critic learns.
 5. **Practice:** After that, both practice with PPO, with little noise and full variation.
-6. **Check and save:** Every 25 iterations, the network does 5 test jumps, and the page saves it.
+6. **Check and save:** Every 25 iterations, the network does 5 test jumps, and the Lehrer puts it
+   into your level.
 
 Often the network already jumps after copying. Practice then makes the jump **robust**, meaning
 reliable even with a slightly different duck.
@@ -112,7 +114,7 @@ Two things from real runs are worth learning from:
 - **A training run is like a save game.** The program can save the whole learning state and later
   continue exactly there. Because of determinism, the result is the same as without a pause.
 
-The Lehrer page trains exactly the same recipe as the program. The same seed and the same total
+The Lehrer in Studio trains exactly the same recipe as the program. The same seed and the same total
 number of ducks give the same network – in the browser as on the big computer.
 
 > **For pros:** Kern's jump network was made with the program: 32 ducks, seed 1, 3000 iterations of
@@ -148,8 +150,8 @@ movements.
 
 When something goes wrong, **looking at** helps: the command-line program shows an episode tick by
 tick, with every point item separately. That way you see whether the network jumps – or just tricks
-the reward. The Lehrer page in the browser can't do that. There, you look closely at your network in
-Studio (15.8): does the duck really jump, or does it do something completely different?
+the reward. The Lehrer in the browser can't do that. There, you look closely at your network on
+the duck (15.8): does the duck really jump, or does it do something completely different?
 
 > **For pros:** The program shows two more values. The critic's error is high after copying (it
 > doesn't know the new player yet) and should then fall. The learning rate adjusts itself: if the
@@ -176,7 +178,7 @@ How to pick properly:
 For Kern's jump network, that gave 40 of 40 real jumps clean and 36 of 40 with variation, with no
 fall.
 
-In the browser, the page saves the newest state every 25 iterations and overwrites the old one. If
+In the browser, the Lehrer puts the newest state into the level every 25 iterations and replaces the old one. If
 you see a good state, secure it with **Download .onnx**.
 
 > **For pros:** The program keeps snapshots automatically and measures each with 40 episodes. How
@@ -253,22 +255,23 @@ because there only what really works counts.
 
 ## 15.8 Using It in Studio
 
-A network you train in the browser ends up in Studio by itself – on the same device, in the same
-browser. The Lehrer page saves it on your device, and Kern Studio loads it at startup. Open Studio
-tabs pick up every new network right away. That applies to the jump.
+A network you train in the Lehrer ends up by itself where it's needed: in the level you have open.
+If you train the jump, this level's ducks jump with your network. A move of your own from keyframes
+gets a name, and the logic node **Robot Move** plays it by that name. When you save the level,
+everything it learned is in it – in a packaged game, too.
 
-> **Picture it like this:** like a save game that two games on your console are allowed to share.
-> One saves it, the other loads it.
+> **Picture it like this:** like a recipe you glue into your own cookbook. Whoever gets the book has
+> the recipe along with it.
 
 To check: open the Micro Duck level, **Play**, key **7**. The play layer works by itself when the
 duck is autonomous, the Kern extras are on, and the ball or sock is in sight
 ([Chapter 13](13-micro-duck.md)).
 
-> **Mission:** Did you train a jump in the browser? Open Kern Studio in the same browser, load
-> **File › Example Levels › Micro Duck** – if a game is running, first stop it with Esc –, start
-> **Play**, press F8 and then **7**. Now **your** network is jumping. On a computer you can check:
-> press F12, choose the "Console" tab, and it says "Kern: trained network jump.onnx loaded." On a
-> phone there's no such console – there the jump is proof enough.
+> **Mission:** In Kern Studio, load **File › Example Levels › Micro Duck**, click **Lehrer** and train
+> the jump. As soon as "The level's ducks jump with this network now" appears below the buttons,
+> press **Try the network on the duck**: the duck on the stage jumps with **your** network. Then
+> leave the Lehrer with Esc, start **Play**, press F8 and then **7** – in the level your network
+> jumps now, too. In the list **Motions of this level** it's called "jump".
 
 > **Mission:** In the Micro Duck level, click the duck and look under
 > **Details › Player Controller › Walker** for **Autonomous (camera, ToF)** and **Kern extras (ball
@@ -299,7 +302,7 @@ Let's take a **bow** as an example:
    the true height of the body, for example?
 2. **The recipe (the training plan):** Which network does training start from, with how much noise
    and which learning rate? After that, the program and the browser know the new task; the Lehrer
-   page only still needs an entry in its menu. If the movement needs a new input that the starting
+   in Studio only still needs an entry in its menu. If the movement needs a new input that the starting
    network has never seen (for the jump, the clock hand), its sliders start at 0 – as in section
    14.4: first the new network acts like the old one, then it learns to use the new input.
 3. **The measurement (the referee):** A checker that determines whether a bow **really** succeeded –
@@ -459,7 +462,7 @@ you train yourself, you'd otherwise trip over the same stones.
 
 ## Level complete!
 
-- You train a jump on the Lehrer page and know what's happening while you do.
+- You train a jump in Kern Studio's Lehrer and know what's happening while you do.
 - You read return, episode length, noise and the jump test – and know that only the test shows
   whether the duck can really do it.
 - You pick the best network, measured clean and with variation.

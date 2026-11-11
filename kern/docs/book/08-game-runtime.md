@@ -84,6 +84,7 @@ From the header comment of `level.h`:
 | `actors` | `vector<Actor>` | in document order |
 | `textures` | `vector<TextureAsset>` | imported images (`id`, `name`, `src` as data URL, `width`, `height`) |
 | `sounds` | `vector<SoundAsset>` | imported sounds (`id`, `name`, `src` as data URL, `duration` informational) |
+| `motions` | `vector<MotionAsset>` | what the Lehrer taught the level's Micro Ducks: `name`, `duration`, `keys` (keyframes: time and 14 joint angles), `onnx` (the trained network) ([Chapter 14](14-lehrer.md), 14.11) |
 | `logic` | `logic::Graph` | the level graph (Self = none; sees the events of all actors) |
 | `camera` | `EditorCamera` | editor camera: `position` (−24, −30, 18), `yaw` 51°, `pitch` −24° |
 | `next_id` | `ActorId` | next free actor ID |
@@ -426,6 +427,7 @@ A level is a JSON document. `to_json` / `to_text` write it, `from_json` / `from_
 | `actors` | list of actors (at most 100,000) |
 | `textures` | list: `id`, `name`, `width`, `height`, `src` (data URL `data:image/…`) |
 | `sounds` | list: `id`, `name`, `duration`, `src` (`data:audio/…`, `data:video/…` or `data:application/ogg`) |
+| `motions` | list (absent when empty): `name` (a–z, 0–9, `_`, `-`), `duration` (s), `keys` (list of `time` and `joints` with 14 angles), `onnx` (the ONNX file as Base64; absent until the motion is trained) |
 | `logic` | level graph (only written if not empty; format in [Chapter 9](09-logic.md)) |
 
 ### Actor

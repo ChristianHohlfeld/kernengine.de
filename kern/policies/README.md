@@ -9,4 +9,5 @@ Netze aus `third_party/microduck/`.
 | `jump.onnx` | Sprung (Logik-Knoten Robot Move, Bewegung „jump“) | Vorbild (CMA-ES) → Nachahmen (DAgger) → Üben (PPO), siehe `docs/lehrer.md` |
 | `play.onnx` | Spielschicht: Ball kicken, Socke aufheben, wegtragen, ausspucken (23 Beobachtungen → 9 Aktionen, 25 Hz, über Pollens Netzen; im Level mit `kernExtras`) | Vorbild → Nachahmen (DAgger, 12 Runden), siehe `docs/lehrer.md`, Abschnitt 8 |
 
-Ein im Browser trainiertes Netz (Seite `/lehrer/`) ersetzt auf demselben Gerät das mitgelieferte.
+Ein im Studio trainierter Sprung (Arbeitsbereich „Lehrer“, `docs/keyframe-lehrer.md`) steht im Level
+(`motions`) und ersetzt in diesem Level das mitgelieferte Netz.

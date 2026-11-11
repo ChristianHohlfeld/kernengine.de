@@ -541,10 +541,13 @@ same as in the Lehrer, down to 0.0001.
 
 ## 14.11 The Lehrer in the Browser
 
-![The Lehrer page during training: settings, live numbers and the return curve](../buch/bilder/lehrer.png)
+![The Lehrer in Kern Studio: the duck on its stage on the left, settings, live numbers and the return curve on the right](../buch/bilder/lehrer.png)
 
-You can run the Lehrer yourself in the browser. The home page https://kernengine.de/ links to it. To
-make it fast, the page splits the work across several **helpers** (technical term: Web Workers). A
+You can run the Lehrer yourself in the browser. It sits right inside Kern Studio: click the
+**Lehrer** button at the top (the home page https://kernengine.de/ links straight to it, too). The
+duck then stands alone on a small stage, and the Lehrer's panel lies on the right. Your level waits
+meanwhile; **Esc** takes you back to it. To make training fast, the page splits the work across
+several **helpers** (technical term: Web Workers). A
 helper is a part of the program that calculates in the background, and each one can use its own
 **core** of your processor.
 
@@ -554,18 +557,18 @@ helper is a part of the program that calculates in the background, and each one 
 Each helper is a **collector** with its own group of ducks. One more helper is the **analyst**: it
 has the network copy, learns with PPO, checks the jump every 25 iterations, and saves the network.
 
-Just like Studio, the Lehrer page speaks English or German: it follows your browser's language,
-and the **DE | EN** button at the bottom right switches. You set: which movement (**Motion**:
-**Jump**, or **Stand (quick test)**), how many helpers (**Workers** on the page), how many ducks per
+The Lehrer speaks Studio's language, English or German. You set: which **Task** (**Motion from
+keyframes** for a move of your own, **Jump**, **Stand (quick test)** or a free training scenario),
+how many helpers (**Workers** on the page), how many ducks per
 helper (**Ducks per worker**), how many **Iterations**, and the **Seed**. Two more fields,
 **Initial action noise** and **Learning rate**, can be left empty (they say **Recipe**); then the
 training plan applies. The page
 shows you what's happening, as numbers and as a curve. What the numbers mean is explained in
 [Chapter 15](15-your-own-models.md).
 
-Every 25 iterations, the page saves the network **on your device**, and Kern Studio in the same
-browser picks it up right away. With **Download .onnx** you get the file. The
-play layer can't be trained here, only jump and stand.
+Every 25 iterations, the Lehrer puts the network **into your level**. A learned move then belongs
+to the level like its actors: it's saved with it, and a packaged game has it too. With
+**Download .onnx** you get the network as a file. The play layer can't be trained here.
 
 > **Mission:** Open the Lehrer, choose **Stand (quick test)** and press **Start**.
 > Do the math: **Workers** × **Ducks per worker** = ducks in total. How many steps per second does
@@ -574,7 +577,7 @@ play layer can't be trained here, only jump and stand.
 > **Mission:** Test the determinism. Choose **Stand (quick test)**, leave the **Seed** at 1 and enter
 > **20** under **Iterations**. Press **Start** and wait until the page reports "Done". Write down
 > the number at **Mean episode return**. Reload the
-> page, enter 20 again, change nothing else, and start once more. Is the number exactly the same?
+> page, open the Lehrer again, enter 20 again, change nothing else, and start once more. Is the number exactly the same?
 > Then try seed 2: now a different number comes out.
 
 ## 14.12 Tests

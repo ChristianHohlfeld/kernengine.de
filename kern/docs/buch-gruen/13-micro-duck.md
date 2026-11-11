@@ -336,10 +336,9 @@ Pollens; ein anders verdrahtetes lehnt es mit Begründung ab. Klappt das Laden n
 Seite es später noch einmal. So lange startet diese Bewegung nicht; laufen und stehen kann die Ente mit dem eingebauten Netz
 trotzdem.
 
-> **Wusstest du?** Netze, die du selbst mit dem Kern Lehrer im Browser trainierst
-> ([Kapitel 14](14-lehrer.md)), bleiben im Speicher desselben Browsers. Studio holt sie sich von dort,
-> und ein offenes Studio übernimmt ein neues Netz sofort. Dein eigener Sprung ersetzt also den
-> mitgelieferten, ohne dass du eine Datei kopierst.
+> **Wusstest du?** Netze, die du selbst mit dem Lehrer im Studio trainierst
+> ([Kapitel 14](14-lehrer.md)), landen in deinem Level und werden mit ihm gespeichert. Dein eigener
+> Sprung ersetzt in diesem Level also den mitgelieferten, ohne dass du eine Datei kopierst.
 
 ## 13.7 Was das Netz sieht: 61 hinein, 14 heraus
 

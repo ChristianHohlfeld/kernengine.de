@@ -539,11 +539,13 @@ auf 0,0001 dasselbe rechnet wie im Lehrer.
 
 ## 14.11 Der Lehrer im Browser
 
-![Die Lehrer-Seite während eines Trainings: Einstellungen, laufende Zahlen und die Kurve der Rückgabe](../buch/bilder/lehrer.png)
+![Der Lehrer in Kern Studio: links die Ente auf ihrer Bühne, rechts Einstellungen, laufende Zahlen und die Kurve der Rückgabe](../buch/bilder/lehrer.png)
 
-Den Lehrer kannst du selbst im Browser laufen lassen. Die Startseite https://kernengine.de/ verlinkt
-ihn. Damit das schnell geht, verteilt die Seite die Arbeit auf mehrere **Helfer** (Fachwort: Web
-Worker). Ein Helfer ist ein Programmteil, das im Hintergrund rechnet, und jeder kann einen eigenen
+Den Lehrer kannst du selbst im Browser laufen lassen. Er steckt mitten in Kern Studio: Klick oben
+auf den Knopf **Lehrer** (die Startseite https://kernengine.de/ verlinkt ihn auch direkt). Die Ente
+steht dann allein auf einer kleinen Bühne, und rechts liegt das Feld des Lehrers. Dein Level wartet
+solange; mit **Esc** bist du wieder dort. Damit das Training schnell geht, verteilt die Seite die
+Arbeit auf mehrere **Helfer** (Fachwort: Web Worker). Ein Helfer ist ein Programmteil, das im Hintergrund rechnet, und jeder kann einen eigenen
 **Rechenkern** deines Prozessors benutzen.
 
 > **So kannst du es dir vorstellen:** Ein Prozessor mit mehreren Rechenkernen ist wie eine Küche mit
@@ -553,15 +555,16 @@ Jeder Helfer ist ein **Sammler** mit seiner eigenen Gruppe Enten. Ein weiterer H
 **Auswerter**: Er lässt das Netz nachmachen, lernt mit PPO, prüft alle 25 Iterationen den Sprung und
 speichert das Netz.
 
-Du stellst ein: welche Bewegung (Sprung oder „Stehen“ als Schnelltest), wie viele Helfer (auf der
-Seite „Worker“), wie viele Enten je Helfer, wie viele Iterationen und den Seed. Zwei weitere Felder
+Du stellst ein: welche Aufgabe (eine eigene Bewegung aus Keyframes, den Sprung, „Stehen“ als
+Schnelltest oder ein freies Trainingsszenario), wie viele Helfer (auf der Seite „Worker“), wie viele Enten je Helfer, wie viele Iterationen und den Seed. Zwei weitere Felder
 für Rauschen und Lernrate kannst du leer lassen, dann gilt der Trainingsplan. Die Seite zeigt dir,
 was passiert, als Zahlen und als Kurve. Was die Zahlen bedeuten, erklärt
 [Kapitel 15](15-eigene-modelle.md).
 
-Alle 25 Iterationen speichert die Seite das Netz **auf deinem Gerät**, und Kern Studio im selben
-Browser übernimmt es sofort. Mit „.onnx herunterladen“ bekommst du die Datei. Die Spielschicht lässt
-sich hier nicht trainieren, nur Sprung und Stehen.
+Alle 25 Iterationen legt der Lehrer das Netz **in dein Level**. Eine gelernte Bewegung gehört damit
+zum Level wie seine Actors: Sie wird mit ihm gespeichert, und auch ein verpacktes Spiel hat sie dabei.
+Mit „.onnx herunterladen“ bekommst du das Netz als Datei. Die Spielschicht lässt sich hier nicht
+trainieren.
 
 > **Mission:** Öffne den Lehrer, wähle „Stehen (Schnelltest)“ und drücke Start. Rechne: Worker × Enten
 > je Worker = Enten insgesamt. Wie viele Schritte pro Sekunde schafft dein Gerät? Das ist die Anzeige
@@ -569,7 +572,7 @@ sich hier nicht trainieren, nur Sprung und Stehen.
 
 > **Mission:** Teste den Determinismus. Wähle „Stehen (Schnelltest)“, lass Seed auf 1 und trage bei
 > „Iterationen“ **20** ein. Drücke Start und warte, bis die Seite „Fertig“ meldet. Schreib die Zahl
-> bei „mittlere Episoden-Rückgabe“ auf. Lade die Seite neu, trag wieder 20 ein, ändere sonst nichts und
+> bei „mittlere Episoden-Rückgabe“ auf. Lade die Seite neu, öffne den Lehrer wieder, trag wieder 20 ein, ändere sonst nichts und
 > starte noch einmal. Stimmt die Zahl genau? Probier danach Seed 2: Jetzt kommt eine andere Zahl.
 
 ## 14.12 Tests
