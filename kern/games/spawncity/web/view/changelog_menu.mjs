@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"11:23",title:"Blueprints als C++: ein Typ steht als Typ da",items:[
+    "Kern-Blueprints: Knoten, die mit jedem Typ arbeiten (Select, Reroute, die Listen-Knoten, For Each), nennen ihren Typ im C++ jetzt als Typ – logic_select<Float>, list_get<Text> – statt als Text in Anführungszeichen. Das ist Vorarbeit für eigene Typen (Aufzählungen, Strukturen).",
+    "Im Kern-Editor prüft Compile jetzt, dass die Einstellung „Type“ eines solchen Knotens wirklich einen Typ nennt.",
+  ]},
   {date:"2026-11-11",time:"10:20",title:"Blueprints: Listen und „For Each“",items:[
     "Kern-Blueprints: Eine Variable oder ein Pin kann jetzt eine Liste von Werten sein – Zahlen, Texte, Vektoren, Wahrheitswerte oder Actors. Neue Knoten lesen eine Liste (Make List, Length, Get Item, Contains, Find Item) und ändern eine Listen-Variable (Add, Insert, Set Item, Remove Index, Remove Item, Clear).",
     "Die Schleife „For Each“ läuft einmal für jeden Eintrag einer Liste. Sie geht durch die Liste, wie sie beim Start war – ihr Rumpf darf die Liste ändern, ohne dass die Schleife springt oder nie endet. „All Actors with Tag“ liefert alle Actors mit einem Tag als Liste.",

@@ -65,6 +65,13 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
   return p;
 }
 
+/// The setting "Type" of a generic node: the type of its pins (`with_lists`: a list type too).
+ParamDef type_param(bool with_lists) {
+  ParamDef p = param("type", "Type", ParamDef::Kind::type, "float");
+  p.with_lists = with_lists;
+  return p;
+}
+
 /// A value that is new on every read (Random): the node keeps its sequence.
 NodeDef fresh(NodeDef d) {
   d.memory = true;
@@ -159,9 +166,7 @@ void add_flow(Library& lib) {
   }
   {
     NodeDef d = make("value.reroute", "Reroute", "Flow", NodeKind::pure, "A knot a data wire passes through, to route wires tidily.");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float",
-                      {"bool", "Boolean", "int", "Integer", "float", "Float", "vector", "Vector", "text", "Text", "actor", "Actor", "bool_list", "Boolean List", "int_list",
-                       "Integer List", "float_list", "Float List", "vector_list", "Vector List", "text_list", "Text List", "actor_list", "Actor List"})};
+    d.params = {type_param(true)};
     d.keywords = "knot reroute wire";
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const PinType t = pin_type_setting(n.param("type", "float"));
@@ -491,8 +496,6 @@ void add_variables(Library& lib) {
 // What they do is in kern/logic/nodes.h (logic::list): a Blueprint's C++ calls the same functions.
 
 /// The "Type" of a generic list node: the type of the list's items.
-// (a function: the library may be filled while the program starts, before this file's own constants are there)
-std::vector<std::string> item_types() { return {"float", "Float", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor"}; }
 PinType item_type(const Node& n) { return item_type_setting(n.param("type", "float")); }
 /// Calls f(std::type_identity<T>{}) with the C++ type of a list's items.
 template <class F> void with_items(PinType element, F&& f) {
@@ -519,7 +522,7 @@ void add_lists(Library& lib) {
   };
   {
     NodeDef d = make("list.make", "Make List", "Lists", NodeKind::pure, "A list of the values given, in their order.", "array create");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types()), param("count", "Items", ParamDef::Kind::integer, "2")};
+    d.params = {type_param(false), param("count", "Items", ParamDef::Kind::integer, "2")};
     d.outputs = {data("list", "List", PinType::number_list)};
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const PinType e = item_type(n);
@@ -542,7 +545,7 @@ void add_lists(Library& lib) {
   }
   {
     NodeDef d = make("list.length", "Length", "Lists", NodeKind::pure, "How many items the list has.", "count size number of items");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.params = {type_param(false)};
     d.inputs = {data("list", "List", PinType::number_list)};
     d.outputs = {data("length", "Length", PinType::integer)};
     d.shape = typed;
@@ -554,7 +557,7 @@ void add_lists(Library& lib) {
   }
   {
     NodeDef d = make("list.get", "Get Item", "Lists", NodeKind::pure, "The item at the index (the first is 0). Beyond the list: the zero of its type.", "element at index array");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.params = {type_param(false)};
     d.inputs = {data("list", "List", PinType::number_list), data("index", "Index", PinType::integer, 0)};
     d.outputs = {data("item", "Item", PinType::number)};
     d.shape = typed;
@@ -571,7 +574,7 @@ void add_lists(Library& lib) {
   }
   {
     NodeDef d = make("list.contains", "Contains", "Lists", NodeKind::pure, "Is there an item that equals the value?", "has includes in list");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.params = {type_param(false)};
     d.inputs = {data("list", "List", PinType::number_list), data("item", "Item", PinType::number, 0.0)};
     d.outputs = {data("result", "Result", PinType::boolean)};
     d.shape = typed;
@@ -587,7 +590,7 @@ void add_lists(Library& lib) {
   }
   {
     NodeDef d = make("list.find", "Find Item", "Lists", NodeKind::pure, "The index of the first item that equals the value, or -1.", "index of search");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.params = {type_param(false)};
     d.inputs = {data("list", "List", PinType::number_list), data("item", "Item", PinType::number, 0.0)};
     d.outputs = {data("index", "Index", PinType::integer)};
     d.shape = typed;
@@ -725,7 +728,7 @@ void add_lists(Library& lib) {
   {
     NodeDef d = make("flow.for_each", "For Each", "Flow", NodeKind::flow, "Runs Loop Body for every item of the list - as the list is when the loop starts - then Completed.",
                      "loop list array every all items");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float", item_types())};
+    d.params = {type_param(false)};
     d.inputs = {exec_in(), data("list", "List", PinType::number_list)};
     d.outputs = {exec_out("body", "Loop Body"), data("item", "Item", PinType::number), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
     d.shape = typed;
@@ -808,9 +811,7 @@ void add_math(Library& lib) {
                        return pick ? a : b;
                      },
                      "A when Pick A is true, otherwise B", "ternary choose if");
-    d.params = {param("type", "Type", ParamDef::Kind::choice, "float",
-                      {"float", "Number", "int", "Integer", "bool", "Boolean", "vector", "Vector", "text", "Text", "actor", "Actor", "bool_list", "Boolean List", "int_list", "Integer List",
-                       "float_list", "Float List", "vector_list", "Vector List", "text_list", "Text List", "actor_list", "Actor List"})};
+    d.params = {type_param(true)};
     d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const PinType t = pin_type_setting(n.param("type", "float"));
       for (PinDef& p : in) if (p.id != "pick") { p.type = t; p.def = Value::zero(t).to_json(); }

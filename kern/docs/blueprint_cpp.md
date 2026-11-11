@@ -160,14 +160,15 @@ KERN_LAYOUT(Demo) {
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
+| Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)` |
 | Eingänge eines Knotens | Funktionsargumente, in der Reihenfolge der Pins |
 | unverdrahteter Eingang | der eingetippte Wert als Literal |
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
 | Get Variable | der Name der Variablen |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Schritt, der eine Listen-Variable ändert (Add to List, Insert, Set Item, Remove, Clear) | `list_add(Scores, wert);` – die Variable selbst ist das erste Argument; wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
-| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<"float">(Scores, 0)`, `list_make<"text", "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
-| For Each | `for (auto it9 = flow_for_each<"float">(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
+| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -217,10 +218,10 @@ KERN_EVENT(on1, event_custom<"Hit">)
 void on1(Actor actor, Float value, Text text) {
   list_add(Scores, value);
   Total = 0.0;
-  for (auto it4 = flow_for_each<"float">(n4, Scores); it4.next();) {
+  for (auto it4 = flow_for_each<Float>(n4, Scores); it4.next();) {
     Total += n4.item;
   }
-  if (list_contains<"text">(Names, text)) {
+  if (list_contains<Text>(Names, text)) {
     debug_print(kern::to<Text>(Scores), true);
   }
 }

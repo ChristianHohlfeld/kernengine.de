@@ -22,6 +22,19 @@ std::string number_text(f64 n) {
 
 const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinTypeNames[static_cast<u32>(t)].data() : "?"; }
 
+std::vector<PinType> type_choices(const ParamDef& pd) {
+  std::vector<PinType> r = {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor};
+  if (pd.with_lists)
+    for (std::size_t k = 0; k < 6; ++k) r.push_back(list_of(r[k]));
+  return r;
+}
+std::string type_label(PinType t) {
+  static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor"};
+  const PinType e = element_of(t);
+  const std::string name = static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
+  return is_list(t) ? name + " List" : name;
+}
+
 bool convertible(PinType from, PinType to) {
   if (from == to) return true;
   if (from == PinType::exec || to == PinType::exec) return false;
@@ -619,6 +632,12 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       }
       if (pd.kind == ParamDef::Kind::event && v.empty()) err(n.id, lib.title(n) + ": the event needs a name");
       if (pd.kind == ParamDef::Kind::function && !g.function(v)) err(n.id, d->label + ": no function \"" + v + "\"");
+      if (pd.kind == ParamDef::Kind::type) {
+        // (the setting holds a type's own name: what it means does not depend on a reader's goodwill)
+        bool known = false;
+        for (PinType t : type_choices(pd)) known = known || v == pin_type_name(t);
+        if (!known) err(n.id, lib.title(n) + ": \"" + v + "\" is no type it can have (" + pd.label + ": float, int, bool, vector, text, actor" + (pd.with_lists ? ", or a list of one - float_list ...)" : ")"));
+      }
     }
     if (d->problem)
       if (const std::string why = d->problem(n, g); !why.empty()) err(n.id, d->label + ": " + why);

@@ -271,9 +271,9 @@ struct Casts : kern::Blueprint {
   struct PickResult { Float number = 0.0; Int whole = 0; Bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{0}; };
   /// Select and Reroute in every type; the typed-in values of a node.
   KERN_PURE PickResult Pick(Bool first = true, Actor who = Actor{0}) {
-    return {logic_select<"float">(first, 1.5, -2.5), logic_select<"int">(first, 7, -7), logic_select<"bool">(first, true, false),
-            value_reroute<"vector">(logic_select<"vector">(first, Vector{1.0, 2.0, 3.0}, Vector{-1.0, 0.5, 0.25})), value_reroute<"text">(logic_select<"text">(first, "a \"word\"", "tab\tand\\slash")),
-            value_reroute<"actor">(logic_select<"actor">(first, who, Actor{7}))};
+    return {logic_select<Float>(first, 1.5, -2.5), logic_select<Int>(first, 7, -7), logic_select<Bool>(first, true, false),
+            value_reroute<Vector>(logic_select<Vector>(first, Vector{1.0, 2.0, 3.0}, Vector{-1.0, 0.5, 0.25})), value_reroute<Text>(logic_select<Text>(first, "a \"word\"", "tab\tand\\slash")),
+            value_reroute<Actor>(logic_select<Actor>(first, who, Actor{7}))};
   }
 };
 )kn";
@@ -295,7 +295,7 @@ struct Lists : kern::Blueprint {
   /// Add gives the index; a list prints its items.
   PushResult Push(Float value = 0.0) {
     list_add(n3, Scores, value);
-    return {n3.index, list_length<"float">(Scores), kern::to<Text>(Scores)};
+    return {n3.index, list_length<Float>(Scores), kern::to<Text>(Scores)};
   }
 
   struct EditResult { Bool removed = false; Int length = 0; Text shown = ""; };
@@ -308,27 +308,27 @@ struct Lists : kern::Blueprint {
       case 3: { list_remove(n14, Scores, value); } break;
       case 4: { list_clear(Scores); } break;
     }
-    return {n14.removed, list_length<"float">(Scores), kern::to<Text>(Scores)};
+    return {n14.removed, list_length<Float>(Scores), kern::to<Text>(Scores)};
   }
 
   struct SumResult { Float total = 0.0; Int passes = 0; Int last = 0; };
   /// For Each, one inside the other; the index read after the loop.
   SumResult Sum() {
     Total = 0.0;
-    for (auto it20 = flow_for_each<"float">(n20, Scores); it20.next();) {
+    for (auto it20 = flow_for_each<Float>(n20, Scores); it20.next();) {
       Total += n20.item;
-      for (auto it22 = flow_for_each<"text">(n22, Names); it22.next();) {
+      for (auto it22 = flow_for_each<Text>(n22, Names); it22.next();) {
         Shown = text_append(Shown, n22.item, kern::to<Text>(n22.index));
       }
     }
-    return {Total, list_length<"text">(Names), n20.index};
+    return {Total, list_length<Text>(Names), n20.index};
   }
 
   struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; };
   /// Get Item of every type (beyond the list: its zero), Find and Contains.
   KERN_PURE AtResult At(Int index = 0, Text name = "a") {
-    return {list_get<"float">(Scores, index), list_get<"text">(Names, index), list_get<"int">(Counts, index), list_get<"bool">(Flags, index), list_get<"vector">(Points, index),
-            list_get<"actor">(Team, index), list_find<"text">(Names, name), list_contains<"text">(Names, name)};
+    return {list_get<Float>(Scores, index), list_get<Text>(Names, index), list_get<Int>(Counts, index), list_get<Bool>(Flags, index), list_get<Vector>(Points, index),
+            list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name)};
   }
 
   struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
@@ -353,20 +353,20 @@ struct Lists : kern::Blueprint {
   /// A function takes a list (with a default); Set of a list variable; Make List; Select between lists.
   TakeResult Take(List<Float> values = List<Float>{3.0, 4.0, 3.0}, Bool pick = true) {
     Scores = values;
-    return {list_length<"float">(values), list_make<"float", "3">(list_get<"float">(values, 0), list_get<"float">(values, 0), 9.5),
-            logic_select<"float_list">(pick, Scores, value_reroute<"float_list">(List<Float>{-1.0}))};
+    return {list_length<Float>(values), list_make<Float, "3">(list_get<Float>(values, 0), list_get<Float>(values, 0), 9.5),
+            logic_select<List<Float>>(pick, Scores, value_reroute<List<Float>>(List<Float>{-1.0}))};
   }
 
   struct GrowResult { Int passes = 0; Int length = 0; };
   /// The loop goes through the list as it was when it started, whatever its body does to the variable.
   GrowResult Grow() {
     Total = 0.0;
-    for (auto it60 = flow_for_each<"float">(n60, Scores); it60.next();) {
+    for (auto it60 = flow_for_each<Float>(n60, Scores); it60.next();) {
       list_add(Scores, math_add(n60.item, 100.0));
       list_remove_at(Scores, 0);
       Total += 1.0;
     }
-    return {kern::to<Int>(Total), list_length<"float">(Scores)};
+    return {kern::to<Int>(Total), list_length<Float>(Scores)};
   }
 
   struct { Int index = 0; } n3;
@@ -520,10 +520,14 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::choice) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
+    } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::type) {
+      // (a generic node in every type it can have)
+      variants.clear();
+      for (PinType t : logic::type_choices(d->params[0])) variants.push_back({{d->params[0].key, logic::pin_type_name(t)}});
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();
-      for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{"type", d->params[0].choices[i]}, {"count", "3"}});
+      for (PinType t : logic::type_choices(d->params[0])) variants.push_back({{"type", logic::pin_type_name(t)}, {"count", "3"}});
       for (const char* count : {"0", "1", "16"}) variants.push_back({{"type", "int"}, {"count", count}});
     }
     for (const auto& params : variants) {

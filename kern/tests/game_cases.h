@@ -142,10 +142,10 @@ struct Level : kern::Blueprint {
       Moved += 1;
     }
     Tagged = actor_all_with_tag(text);
-    for (auto it61 = flow_for_each<"actor">(n61, Tagged); it61.next();) {
+    for (auto it61 = flow_for_each<Actor>(n61, Tagged); it61.next();) {
       Log = text_append(Log, actor_name(n61.item), kern::to<Text>(n61.index));
     }
-    Log = text_append(Log, "each", kern::to<Text>(list_length<"actor">(Tagged)));
+    Log = text_append(Log, "each", kern::to<Text>(list_length<Actor>(Tagged)));
   }
 
   KERN_EVENT(on12, event_custom<"Win">)

@@ -757,7 +757,7 @@ export class LogicEditor {
   paramHtml(n, p) {
     const attr = `data-param="${lgEsc(p.key)}" data-node="${n.id}"`;
     const choices = p.choices || [];
-    if (["choice", "variable", "machine", "state", "sound", "function"].includes(p.kind)) {
+    if (["choice", "type", "variable", "machine", "state", "sound", "function"].includes(p.kind)) {
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
     }

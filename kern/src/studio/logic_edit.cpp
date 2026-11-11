@@ -68,6 +68,7 @@ const char* param_kind_name(logic::ParamDef::Kind k) {
     case K::tag: return "tag";
     case K::integer: return "integer";
     case K::function: return "function";
+    case K::type: return "type";
   }
   return "text";
 }
@@ -124,14 +125,14 @@ std::string type_setting_for(const logic::Graph& g, const logic::Node& node, con
   const logic::NodeDef* def = logic::library().find(node.type);
   if (!def) return {};
   for (const logic::ParamDef& pd : def->params) {
-    if (pd.key != "type" || pd.kind != logic::ParamDef::Kind::choice) continue;
-    for (std::size_t k = 0; k + 1 < pd.choices.size(); k += 2) {
+    if (pd.kind != logic::ParamDef::Kind::type) continue;
+    for (logic::PinType t : logic::type_choices(pd)) {
       logic::Node probe = node;
-      probe.set_param("type", pd.choices[k]);
+      probe.set_param(pd.key, logic::pin_type_name(t));
       std::vector<logic::PinDef> in, outs;
       logic::library().pins(probe, g, in, outs);
       for (const logic::PinDef& p : output ? outs : in)
-        if (p.id == pin && p.type == want) return pd.choices[k];
+        if (p.id == pin && p.type == want) return logic::pin_type_name(t);
     }
   }
   return {};
@@ -146,15 +147,15 @@ std::vector<std::pair<std::string, std::string>> generic_pins(const logic::Graph
   const logic::NodeDef* def = logic::library().find(node.type);
   if (!def) return r;
   const logic::ParamDef* type = nullptr;
-  for (const logic::ParamDef& pd : def->params) if (pd.key == "type" && pd.kind == logic::ParamDef::Kind::choice) type = &pd;
+  for (const logic::ParamDef& pd : def->params) if (pd.kind == logic::ParamDef::Kind::type) type = &pd;
   if (!type) return r;
   std::vector<logic::PinDef> in, out;
   logic::library().pins(node, g, in, out);
   std::vector<std::string> types_in(in.size()), types_out(out.size());
   std::vector<bool> typed_in(in.size(), false), typed_out(out.size(), false);
-  for (std::size_t k = 0; k + 1 < type->choices.size(); k += 2) {
+  for (logic::PinType choice : logic::type_choices(*type)) {
     logic::Node probe = node;
-    probe.set_param("type", type->choices[k]);
+    probe.set_param(type->key, logic::pin_type_name(choice));
     std::vector<logic::PinDef> pin, pout;
     logic::library().pins(probe, g, pin, pout);
     if (pin.size() != in.size() || pout.size() != out.size()) return r;
@@ -372,8 +373,10 @@ json::Value Studio::logic_json() const {
         using K = logic::ParamDef::Kind;
         if (pd.kind == K::choice)
           for (std::size_t i = 0; i + 1 < pd.choices.size(); i += 2) choice(pd.choices[i], pd.choices[i + 1]);
+        if (pd.kind == K::type)
+          for (logic::PinType t : logic::type_choices(pd)) choice(logic::pin_type_name(t), logic::type_label(t));
         if (pd.kind == K::variable)
-          for (const logic::Variable& v : g->variables) choice(v.name, v.name + " (" + logic::pin_type_name(v.type) + ")");
+          for (const logic::Variable& v : g->variables) choice(v.name, v.name + " (" + logic::type_label(v.type) + ")");
         if (pd.kind == K::machine)
           for (const logic::StateMachine& m : g->machines) choice(m.name, m.name);
         if (pd.kind == K::function)

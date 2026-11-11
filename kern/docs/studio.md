@@ -411,7 +411,7 @@ Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
   `[1, 2.5, 7]`.
 - **All Actors with Tag** (Actors) gibt alle lebenden Actors mit einem Tag als Actor List.
 - Als C++: `List<Float> Scores = List<Float>{1.0, 2.5};`, `list_add(Scores, x);`,
-  `for (auto it9 = flow_for_each<"float">(n9, Scores); it9.next();) { ... }` – siehe
+  `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Listen“.
 
 ### Formel-Knoten

@@ -184,7 +184,7 @@ await page.click(".lg-cpp");
 check(await until(async () => (await cppText.inputValue()).includes("List<Float> Scores = List<Float>{1.5, 40.0};")), "the C++ view has the list variable with its items");
 code = await cppText.inputValue();
 // (Get Scores is read by inputs of several bodies - the loop, the message, the Length nothing reads: a value with a name, n<id>())
-check(code.includes("list_add(Scores, 0.5);") && /for \(auto it\d+ = flow_for_each<"float">\(n\d+, n\d+\(\)\); it\d+\.next\(\);\) \{/.test(code) && /kern::to<Text>\(n\d+\(\)\)/.test(code) &&
+check(code.includes("list_add(Scores, 0.5);") && /for \(auto it\d+ = flow_for_each<Float>\(n\d+, n\d+\(\)\); it\d+\.next\(\);\) \{/.test(code) && /kern::to<Text>\(n\d+\(\)\)/.test(code) &&
       /auto n\d+\(\) \{ return Scores; \}/.test(code), "Add to List names its variable, For Each is a for loop, a list becomes Text");
 check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
 // an item added in the text is an item in Details

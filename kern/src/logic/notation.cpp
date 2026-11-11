@@ -162,10 +162,15 @@ std::string literal(const Value& v) {
 }
 /// The settings of a node as they stand behind its function's name: <"smooth">. A setting that
 /// names a variable is not among them - the variable itself is the call's first value.
+/// A setting that names a type is that type: logic_select<Float>, list_make<Text, "2">.
 std::string settings_of(const NodeDef& def, const Node& n) {
   std::string r;
-  for (const ParamDef& pd : def.params)
-    if (pd.kind != ParamDef::Kind::variable) r += (r.empty() ? "<" : ", ") + text_literal(n.param(pd.key, pd.def));
+  for (const ParamDef& pd : def.params) {
+    if (pd.kind == ParamDef::Kind::variable) continue;
+    const std::string value = n.param(pd.key, pd.def);
+    PinType type = PinType::number;
+    r += (r.empty() ? "<" : ", ") + (pd.kind == ParamDef::Kind::type && pin_type_from_name(value, type) ? std::string(cpp_type(type)) : text_literal(value));
+  }
   return r.empty() ? r : r + ">";
 }
 /// The variables a node's settings name, in their order.
@@ -684,6 +689,13 @@ struct Shape {
         if (!g.variable(x.node->param("variable"))) return fail(title(i) + " names a variable that is not there", i);
       if (x.def->problem)
         if (const std::string why = x.def->problem(*x.node, g); !why.empty()) return fail(title(i) + ": " + why, i);
+      for (const ParamDef& pd : x.def->params) {
+        if (pd.kind != ParamDef::Kind::type) continue;
+        const std::string value = x.node->param(pd.key, pd.def);
+        bool known = false;
+        for (PinType choice : type_choices(pd)) known = known || value == pin_type_name(choice);
+        if (!known) return fail(title(i) + ": \"" + value + "\" is no type it can have", i);
+      }
       if (t == "math.formula") {
         const std::string text = x.node->param("formula", "a + b");
         const Formula& f = Formula::cached(text);
@@ -1645,13 +1657,23 @@ struct Reader {
     members[id] = std::move(decl);
     return expect(";");
   }
-  /// The settings of a node: <"a", "b"> (nothing when it has none).
-  bool settings(std::vector<std::string>& out) {
+  /// The settings of a node: <"a", "b"> (nothing when it has none). A setting that names a type
+  /// is that type - <Float>, <List<Text>, "2"> - and is given by its name ("float"); `types`
+  /// says which ones were written so.
+  bool settings(std::vector<std::string>& out, std::vector<bool>* types = nullptr) {
     if (!accept("<")) return true;
     while (!is(">")) {
       std::string s;
-      if (!string(s, "a setting")) return false;
+      PinType t;
+      const bool is_type = peek().kind == Tok::id;
+      if (is_type) {
+        if (!type_here(t)) return fail(p, std::string("a setting is a text (\"...\") or a type - ") + kTypes + shown(peek()));
+        s = pin_type_name(t);
+      } else if (!string(s, "a setting")) {
+        return false;
+      }
       out.push_back(std::move(s));
+      if (types) types->push_back(is_type);
       if (!accept(",")) break;
     }
     return expect(">");
@@ -1866,7 +1888,8 @@ struct Reader {
     std::size_t count = 0;
     for (const ParamDef& pd : def->params) {
       if (pd.kind == ParamDef::Kind::variable) continue;
-      want += (want.empty() ? "\"" : ", \"") + pd.def + "\"";
+      PinType type = PinType::number;
+      want += (want.empty() ? "" : ", ") + (pd.kind == ParamDef::Kind::type && pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : "\"" + pd.def + "\"");
       ++count;
     }
     return count == 0 ? " has no settings (no <...>)" : " has " + std::to_string(count) + " setting(s): " + node_name(def->type) + "<" + want + ">";
@@ -1877,10 +1900,23 @@ struct Reader {
   /// depend on it) and taken in its place (variable_args).
   int make_named(const NodeDef* def, std::size_t tok) {
     std::vector<std::string> given;
-    if (!settings(given)) return -1;
+    std::vector<bool> as_type;
+    if (!settings(given, &as_type)) return -1;
     std::size_t written = 0, variables = 0;
     for (const ParamDef& pd : def->params) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
     if (given.size() != written) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
+    // (a type is written as a type, everything else as a text; and the type is one the setting can name)
+    for (std::size_t k = 0, at = 0; k < def->params.size(); ++k) {
+      const ParamDef& pd = def->params[k];
+      if (pd.kind == ParamDef::Kind::variable) continue;
+      bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type);
+      if (fits && pd.kind == ParamDef::Kind::type) {
+        fits = false;
+        for (PinType choice : type_choices(pd)) fits = fits || given[at] == pin_type_name(choice);
+      }
+      if (!fits) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
+      ++at;
+    }
     std::vector<std::string> names;
     if (variables) {
       const std::string fname = node_name(def->type);

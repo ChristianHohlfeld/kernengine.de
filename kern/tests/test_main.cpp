@@ -2112,14 +2112,14 @@ struct L : kern::Blueprint {
     list_set(Items, 1, 7.0);
     list_remove_at(Items, 5);
     list_remove(Items, 1.0);
-    for (auto it7 = flow_for_each<"float">(n7, Items); it7.next();) {
+    for (auto it7 = flow_for_each<Float>(n7, Items); it7.next();) {
       Sum += n7.item;
       list_clear(Items);
       list_add(n9, Names, kern::to<Text>(n7.index));
     }
-    Length = list_length<"float">(Items);
+    Length = list_length<Float>(Items);
     At = n9.index;
-    debug_print(kern::to<Text>(list_make<"text", "2">("a", list_get<"text">(Names, 2))), false);
+    debug_print(kern::to<Text>(list_make<Text, "2">("a", list_get<Text>(Names, 2))), false);
   }
   struct : kern::Node<7> { Float item = 0.0; Int index = 0; } n7;
   struct { Int index = 0; } n9;
@@ -3203,10 +3203,17 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(Items, \"a\");"), "is Float, this is Text");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = Items;"), "the two do not convert");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = kern::to<Float>(Items);"), "cannot become a Float");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_length<\"int\">(Items);"), "do not convert");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_length<\"float\">(Items);"), "list_length is a value: alone on a line it does nothing");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    flow_for_each<\"float\">(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_length<Int>(Items);"), "do not convert");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_length<Float>(Items);"), "list_length is a value: alone on a line it does nothing");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    flow_for_each<Float>(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
   refused("  void List() {\n  }", "no name C++ can write");
+  // the setting "Type" of a generic node is the type itself
+  refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
+  refused(in_event("    Heat = logic_select<Double>(true, 1.0, 2.0);"), "a setting is a text (\"...\") or a type");
+  refused(in_event("    Heat = logic_select(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
+  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_get<List<Float>>(Items, 0);"), "list_get has 1 setting(s): list_get<Float>");
+  refused(in_event("    Heat = kern::to<Float>(list_length<Float>(list_make<Float, 2>(1.0, 2.0)));"), "a setting (a text in quotes) expected, not \"2\"");
+  refused(in_event("    flow_tween<smooth>(n9, \"play\", 1.0, [this] {\n    });"), "a setting is a text (\"...\") or a type");
   refused("  void Fn() {\n  }\n  void Fn() {\n  }", "the function Fn is declared twice");
   refused("  FnResult Fn() {\n  }", "struct FnResult { ... }; must be declared above");
   refused("  void on3() {\n  }", "on3 needs its KERN_EVENT");
@@ -8097,7 +8104,7 @@ TEST(studio_logic_lists) {
   val.set("value", items);
   CHECK(f.s->command(val)["ok"].as_bool());
   const json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
-  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<\"float\">(List<Float>{1.5, -2.0}, 0.0)") != std::string::npos);
+  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<Float>(List<Float>{1.5, -2.0}, 0.0)") != std::string::npos);
   CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
 }
 

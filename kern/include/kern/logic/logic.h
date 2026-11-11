@@ -379,10 +379,17 @@ struct PinDef {
 
 struct ParamDef {
   std::string key, label;
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function } kind = Kind::text;
+  /// type: the setting names a type ("float", "text_list" ...) - the "Type" of a generic node
+  /// (Select, Reroute, the list nodes). In a Blueprint's C++ it is that type: logic_select<Float>.
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type } kind = Kind::text;
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
+  bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
 };
+/// The types a Kind::type setting can name, in the order they are offered.
+std::vector<PinType> type_choices(const ParamDef& pd);
+/// A type as people read it: "Float", "Integer", "Text List".
+std::string type_label(PinType t);
 
 class Context;
 
