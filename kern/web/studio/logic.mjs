@@ -626,7 +626,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.otherFunctions, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -645,9 +645,13 @@ export class LogicEditor {
     const sig = f => `(${f.inputs.map(p => p.name).join(", ")})${f.outputs.length ? " → " + f.outputs.map(p => p.name).join(", ") : ""}`;
     const fns = (data.functions || []).filter(f => match(f.name)).map(f => `
         <div class="lg-item lg-fn${this.selFn === f.name ? " on" : ""}" draggable="true" data-fn="${lgEsc(f.name)}" title="${lgEsc(f.help || "Drag into the graph: a call of the function")}">
-          <i class="lg-fni">ƒ</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
-          <span class="lg-acts"><button data-call title="Add a call of the function">Call</button><button data-ret title="Add a Return node">Return</button></span>
+          <i class="lg-fni"${f.external ? ' title="A function of another Blueprint: called on an actor"' : ""}>${f.external ? "↗" : "ƒ"}</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
+          <span class="lg-acts"><button data-call title="${f.external ? "Add a call of the function on an actor" : "Add a call of the function"}">Call</button>${f.external ? "" : `<button data-ret title="Add a Return node">Return</button>`}</span>
         </div>`).join("") || `<div class="lg-none">No functions${q ? " match" : " yet: + adds one"}</div>`;
+    // the functions of the level's other Blueprints: declared here, this Blueprint calls them on an actor
+    const others = (data.otherFunctions || []).filter(f => match(f.name));
+    const declare = others.length ? `<div class="lg-declare"><select data-declare title="Declares a function of another Blueprint of this level here, as it is there: this Blueprint can then call it on an actor">
+        <option value="">+ A function of another Blueprint…</option>${others.map(f => `<option value="${f.owner}:${lgEsc(f.name)}">${lgEsc(f.ownerName)}: ${lgEsc(f.name)}</option>`).join("")}</select></div>` : "";
     // an enum: a type of this Blueprint with named values
     const enums = (data.enums || []).filter(e => match(e.name)).map(e => `
         <div class="lg-item lg-enum${this.selEnum === e.name ? " on" : ""}" data-enum="${lgEsc(e.name)}" title="${lgEsc(e.help || "An enum: a type of this Blueprint with named values")}">
@@ -665,7 +669,7 @@ export class LogicEditor {
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
-      section("fns", "Functions", "Add a function", fns) + section("enums", "Enums", "Add an enum", enums) + section("structs", "Structures", "Add a struct", structs) +
+      section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums) + section("structs", "Structures", "Add a struct", structs) +
       section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
       s.querySelector(".lg-sec-t").onclick = () => { const id = s.dataset.sec; if (this.collapsed.has(id)) this.collapsed.delete(id); else this.collapsed.add(id); this.myKey = ""; this.renderMy(this.data); };
@@ -690,10 +694,20 @@ export class LogicEditor {
       row.onclick = e => { if (e.target.closest("button")) return; this.selectFunction(name); };
       row.ondblclick = () => this.focusFunction(name);
       row.querySelector("[data-call]").onclick = () => this.addCall(name);
-      row.querySelector("[data-ret]").onclick = () => this.addAtCenter("func.return", {function: name});
+      const ret = row.querySelector("[data-ret]");
+      if (ret) ret.onclick = () => this.addAtCenter("func.return", {function: name});
       row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-function", name); e.dataTransfer.effectAllowed = "copy"; };
       row.oncontextmenu = e => { e.preventDefault(); this.functionMenu(name, e.clientX, e.clientY); };
     }
+    const declareSel = this.el.mylist.querySelector("[data-declare]");
+    if (declareSel) declareSel.onchange = () => {
+      const at = declareSel.value.indexOf(":");
+      if (at < 0) return;
+      const name = declareSel.value.slice(at + 1);
+      const r = this.cmd({cmd: "logicFunction", op: "declare", name, from: +declareSel.value.slice(0, at)});
+      declareSel.value = "";
+      if (r?.ok !== false) this.selectFunction(name);
+    };
     for (const row of this.el.mylist.querySelectorAll(".lg-enum")) {
       const name = row.dataset.enum;
       row.onclick = e => { if (e.target.closest("button")) return; this.selectEnum(name); };
@@ -732,7 +746,7 @@ export class LogicEditor {
   }
 
   /** A call of the function: a pure function as a value node, any other with exec pins. */
-  addCall(name) { this.addAtCenter(this.fn(name)?.pure ? "func.pure" : "func.call", {function: name}); }
+  addCall(name) { this.addAtCenter(this.fn(name)?.external ? "func.call_on" : this.fn(name)?.pure ? "func.pure" : "func.call", {function: name}); }
 
   /** Shows where the function starts. */
   focusFunction(name) {
@@ -1279,18 +1293,21 @@ export class LogicEditor {
         (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : side === "out" ? "No outputs" : "No local variables"}</div>`;
-    const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
-    return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
+    const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure" || n.type === "func.call_on") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
+    const ext = !!f.external;
+    return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">${ext ? "Function of another Blueprint" : "Function"}</div>
       <div class="lg-dsec"><div class="lg-dst">Function</div>
         <div class="lg-drow"><label>Name</label><div><input data-fk="name" value="${lgEsc(f.name)}" spellcheck="false"></div></div>
-        <div class="lg-drow"><label title="A pure function only computes: it has no exec pins where it is called and runs whenever its outputs are read">Pure</label><div><input type="checkbox" data-fk="pure"${f.pure ? " checked" : ""}></div></div>
+        <div class="lg-drow"><label title="A function another actor's Blueprint (or the Level's) has: this Blueprint only says what it looks like and calls it on an actor. It has no body here.">Of another Blueprint</label><div><input type="checkbox" data-fk="external"${ext ? " checked" : ""}></div></div>
+        ${ext ? "" : `<div class="lg-drow"><label title="A pure function only computes: it has no exec pins where it is called and runs whenever its outputs are read">Pure</label><div><input type="checkbox" data-fk="pure"${f.pure ? " checked" : ""}></div></div>`}
         <div class="lg-drow"><label>Description</label><div><input data-fk="help" value="${lgEsc(f.help || "")}"></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows(f.inputs, "in")}<div class="lg-dacts"><button data-act="fn-in">+ Input</button></div></div>
       <div class="lg-dsec"><div class="lg-dst">Outputs</div>${rows(f.outputs, "out")}<div class="lg-dacts"><button data-act="fn-out">+ Output</button></div></div>
-      <div class="lg-dsec"><div class="lg-dst" title="Variables of the function alone: every call starts with their defaults">Local Variables</div>${rows(f.locals || [], "local")}<div class="lg-dacts"><button data-act="fn-local">+ Local Variable</button></div></div>
-      <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} call${refs === 1 ? "" : "s"} of ${lgEsc(f.name)} in this Blueprint. The function starts at its Function Entry node and ends at a Return node.</div></div>
-      <div class="lg-dacts"><button data-act="fn-call">Add Call</button><button data-act="fn-return">Add Return</button><button data-act="fn-entry">Go to Entry</button><button data-act="delete" class="danger">Delete</button></div>`;
+      ${ext ? "" : `<div class="lg-dsec"><div class="lg-dst" title="Variables of the function alone: every call starts with their defaults">Local Variables</div>${rows(f.locals || [], "local")}<div class="lg-dacts"><button data-act="fn-local">+ Local Variable</button></div></div>`}
+      <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} call${refs === 1 ? "" : "s"} of ${lgEsc(f.name)} in this Blueprint. ${ext ? "The function is another Blueprint's: Call on Actor runs it on Target's Blueprint, or on the Level's when Target is empty."
+        : "The function starts at its Function Entry node and ends at a Return node."}</div></div>
+      <div class="lg-dacts">${ext ? "" : `<button data-act="fn-call">Add Call</button>`}<button data-act="fn-call-on" title="Calls this function on another actor's Blueprint">Call on Actor</button>${ext ? "" : `<button data-act="fn-return">Add Return</button><button data-act="fn-entry">Go to Entry</button>`}<button data-act="delete" class="danger">Delete</button></div>`;
   }
 
   enumDetails(e) {
@@ -1422,6 +1439,7 @@ export class LogicEditor {
       act("fn-out", () => edit({op: "pinAdd", side: "out"}));
       act("fn-local", () => edit({op: "pinAdd", side: "local"}));
       act("fn-call", () => this.addCall(fn.name));
+      act("fn-call-on", () => this.addAtCenter("func.call_on", {function: fn.name}));
       act("fn-return", () => this.addAtCenter("func.return", {function: fn.name}));
       act("fn-entry", () => this.focusFunction(fn.name));
       for (const f of b.querySelectorAll("[data-fk]")) {
@@ -1429,6 +1447,7 @@ export class LogicEditor {
           const k = f.dataset.fk;
           if (k === "name") { const to = f.value.trim(); if (edit({op: "rename", to})?.ok !== false) this.selFn = to; }
           else if (k === "pure") edit({op: "pure", value: f.checked});
+          else if (k === "external") { const p = this.centerWorld(); edit({op: "external", value: f.checked, x: p.x, y: p.y}); }
           else edit({op: "help", text: f.value});
         };
       }
@@ -2496,6 +2515,8 @@ export const LOGIC_STYLE = `
 .lg-acts button{height:20px;padding:0 6px;border:1px solid #444;border-radius:3px;background:#161616;font-size:11px!important}
 .lg-acts button:hover{border-color:var(--lg-acc)}
 .lg-none{padding:4px 14px;color:#808080;font-size:11.5px}
+.lg-declare{padding:3px 12px 5px 14px}.lg-declare select{width:100%;height:22px;background:#161616;color:#9a9a9a;border:1px solid #333;border-radius:3px;font-size:11.5px}
+.lg-declare select:hover{border-color:var(--lg-acc);color:#ddd}
 .lg-center{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
 .lg-cppview{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;background:#181818}
 .lg-cppview[hidden]{display:none}

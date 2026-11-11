@@ -401,6 +401,10 @@ struct Function {
   /// setting "scope" (the function); two functions may each have a local of one name.
   std::vector<FunctionPin> locals;
   bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
+  /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
+  /// KERN_EXTERN FnResult Fn(Float x = 0.0);
+  bool external = false;
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
@@ -890,6 +894,11 @@ class Instance {
   /// that starts in a running Blueprint may call a function that is in the middle of a call).
   std::vector<Value> locals() const;
   void set_locals(const std::vector<Value>& values);
+  /// What its functions hold of their calls - parameters and local variables - as it is now,
+  /// and back: for a call that starts while the Blueprint is in the middle of one.
+  struct Held { std::vector<std::vector<Value>> parameters; std::vector<Value> locals; };
+  Held held_calls() const;
+  void set_held_calls(Held held);
   struct Local { std::string key; Value init; };
   std::vector<std::vector<Local>> locals_;                // per function: its local variables
   std::unordered_map<std::string, TypeRef> var_types_;    // what is held under a key
@@ -961,6 +970,13 @@ class Runtime {
   void fire(const Event& e);
   /// Custom event by name on every instance (or on `target`'s).
   void call(std::string_view name, ActorRef target = 0, std::vector<std::pair<std::string, Value>> args = {});
+  /// Call on Actor, for every tier: runs `function` of the Blueprint of `target` (0: the Level's)
+  /// with `args` and gives `results` as `caller` declares that function - its outputs in their
+  /// order, each of the declared type; the declared defaults where the target has no Blueprint,
+  /// no such function or fewer outputs. The call is a chain of its own (it counts for how deep
+  /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
+  /// the middle of a call of that function has its own values back afterwards.
+  void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.

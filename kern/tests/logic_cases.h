@@ -377,6 +377,22 @@ inline const std::vector<Case>& cases() {
         {"name":"Outer","inputs":[{"name":"x","type":"float","value":1},
         {"name":"again","type":"bool","value":false}],"outputs":[{"name":"mine","type":"float","value":0}],"locals":[{"name":"Own","type":"float","value":0.25}]},
         {"name":"Join","inputs":[{"name":"a","type":"text","value":"a"}],"outputs":[{"name":"text","type":"text","value":""}],"locals":[{"name":"Total","type":"text","value":"<"}]}]})"},
+      // Call on Actor: a function called on a Blueprint (here its own: the Level's) - one that
+      // calls itself that way, every call with its own parameters and local variable; a function
+      // of another Blueprint nobody has (the declared defaults); calls that never end (64 deep).
+      {"call_on",
+       R"({"nextId":75,"variables":[{"name":"Sum","type":"float","value":0},{"name":"Miss","type":"float","value":0},
+        {"name":"Deep","type":"int","value":0}],"nodes":[{"id":20,"type":"func.call_on","params":{"function":"Down"},"values":{"this":0}},{"id":50,"type":"event.custom","params":{"name":"Go"}},
+        {"id":51,"type":"func.call","params":{"function":"Down"}},{"id":53,"type":"func.call_on","params":{"function":"Missing"},"values":{"this":0}},
+        {"id":60,"type":"event.custom","params":{"name":"Open"}},{"id":61,"type":"func.entry","params":{"function":"Down"}},{"id":62,"type":"var.set","params":{"variable":"Mine","scope":"Down"}},
+        {"id":63,"type":"flow.branch"},{"id":64,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":65,"type":"math.sub","values":{"b":1}},
+        {"id":66,"type":"func.return","params":{"function":"Down"}},{"id":67,"type":"math.add"},{"id":68,"type":"var.get","params":{"variable":"Mine","scope":"Down"}},
+        {"id":69,"type":"func.entry","params":{"function":"Forever"}},{"id":70,"type":"var.add","params":{"variable":"Deep"},"values":{"amount":1}},
+        {"id":71,"type":"func.call_on","params":{"function":"Forever"},"values":{"this":0}},{"id":72,"type":"var.add","params":{"variable":"Sum"}},
+        {"id":73,"type":"var.add","params":{"variable":"Miss"}},
+        {"id":74,"type":"func.call","params":{"function":"Forever"}}],"links":[[20,"sum",67,"b"],[20,"then",66,"exec"],[50,"then",51,"exec"],[50,"value",51,"n"],[50,"value",53,"x"],[51,"sum",72,"amount"],[51,"then",72,"exec"],[53,"then",73,"exec"],[53,"value",73,"amount"],[60,"then",74,"exec"],[61,"n",62,"value"],[61,"n",64,"a"],[61,"n",65,"a"],[61,"then",62,"exec"],[62,"then",63,"exec"],[63,"false",66,"exec"],[63,"true",20,"exec"],[64,"result",63,"condition"],[65,"result",20,"n"],[67,"result",66,"sum"],[68,"value",67,"a"],[69,"then",70,"exec"],[70,"then",71,"exec"],[72,"then",53,"exec"]],"functions":[{"name":"Missing","external":true,"inputs":[{"name":"x","type":"float","value":1}],"outputs":[{"name":"value","type":"float","value":2.5}]},
+        {"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"sum","type":"float","value":0}],"locals":[{"name":"Mine","type":"int","value":0}]},
+        {"name":"Forever","inputs":[],"outputs":[]}]})"},
   };
   return list;
 }

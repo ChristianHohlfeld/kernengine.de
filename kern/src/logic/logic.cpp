@@ -708,6 +708,7 @@ json::Value graph_to_json(const Graph& g) {
       json::Value o = json::Value::object();
       o.set("name", f.name);
       if (f.pure) o.set("pure", true);
+      if (f.external) o.set("external", true);
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
       o.set("outputs", pins(f.outputs));
@@ -863,6 +864,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (f.name.empty() || f.name.size() > 64) return bad("a function needs a name (1-64 characters)");
     if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
     f.pure = v["pure"].as_bool();
+    f.external = v["external"].as_bool();
     f.help = v["help"].as_string();
     auto pins = [&](const json::Value& list, std::vector<FunctionPin>& out, const char* what) {
       for (const json::Value& x : list.items()) {
@@ -1069,6 +1071,15 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (n.param("function") != f.name) continue;
       entries += n.type == "func.entry" ? 1 : 0;
       returns += n.type == "func.return" ? 1 : 0;
+    }
+    if (f.external) {
+      // A function of another Blueprint has no body here: it is called on an actor.
+      for (const Node& n : g.nodes)
+        if (n.param("function") == f.name && (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure"))
+          err(n.id, "\"" + f.name + "\" is a function of another Blueprint: it has no body here and is called with Call on Actor");
+      if (f.pure) err(0, "function \"" + f.name + "\" is a function of another Blueprint: what it does is not known here, so it is called as a step (not Pure)");
+      if (!f.locals.empty()) err(0, "function \"" + f.name + "\" is a function of another Blueprint: it has no local variables here");
+      continue;
     }
     if (entries == 0) err(0, "function \"" + f.name + "\" has no Function Entry node");
     if (entries > 1) err(0, "function \"" + f.name + "\" has " + std::to_string(entries) + " Function Entry nodes (one is its start)");
@@ -1582,6 +1593,17 @@ std::vector<Value> Instance::locals() const {
     for (const Local& l : of) r.push_back(held(l.key));
   return r;
 }
+Instance::Held Instance::held_calls() const {
+  Held h;
+  for (int entry : fn_entry_) h.parameters.push_back(entry >= 0 ? nodes_[static_cast<std::size_t>(entry)].outputs : std::vector<Value>());
+  h.locals = locals();
+  return h;
+}
+void Instance::set_held_calls(Held held) {
+  set_locals(held.locals);
+  for (std::size_t f = 0; f < held.parameters.size() && f < fn_entry_.size(); ++f)
+    if (fn_entry_[f] >= 0) nodes_[static_cast<std::size_t>(fn_entry_[f])].outputs = std::move(held.parameters[f]);
+}
 void Instance::set_locals(const std::vector<Value>& values) {
   std::size_t k = 0;
   for (const auto& of : locals_)
@@ -1666,6 +1688,32 @@ void Runtime::clear() {
   instances_.clear();
   pending_.clear();
   trace_.clear();
+}
+
+void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {
+  results.clear();
+  const Graph& g = caller.graph();
+  const Function* declared = g.function(function);
+  if (declared)
+    for (const FunctionPin& p : declared->outputs) results.push_back(Value::from_json(p.value, p.type, g, p.of));
+  Instance* to = find(target);
+  if (!to || to->disabled_) return;
+  if (depth_ >= 64) {
+    host_.error(caller.name() + ": calls on other Blueprints nest more than 64 deep - the call of " + std::string(function) + " is left out");
+    return;
+  }
+  // (a Blueprint in the middle of a call of that function: the interpreter and the JIT hold a
+  // call's values in the instance - the call that is interrupted has its own back afterwards,
+  // as the Blueprint's class has them in its methods' own parameters and locals)
+  const bool at_work = !to->blueprint_ && to->active_ > 0;
+  Instance::Held held;
+  if (at_work) held = to->held_calls();
+  std::vector<Value> got;
+  const bool known = to->call(function, args, got);
+  if (at_work) to->set_held_calls(std::move(held));
+  if (!known || !declared) return;
+  for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
+    results[k] = from_outside(got[k], {declared->outputs[k].type, declared->outputs[k].of}, g);
 }
 
 Instance* Runtime::find(ActorRef self) {
@@ -1765,18 +1813,15 @@ void Runtime::fire(const Event& e) {
       // that in its glue.)
       std::vector<std::vector<Value>> parameters;
       const bool at_work = !inst.blueprint_ && inst.active_ > 0;
-      const std::vector<Value> local_values = at_work ? inst.locals() : std::vector<Value>();
-      if (at_work)
-        for (int entry : inst.fn_entry_) parameters.push_back(entry >= 0 ? inst.nodes_[static_cast<std::size_t>(entry)].outputs : std::vector<Value>());
+      Instance::Held held;
+      if (at_work) held = inst.held_calls();
       for (std::size_t o = 0; o < c.out.size(); ++o)
         if (const Value* v = e.arg(c.out[o].id)) c.outputs[o] = v->converted(c.out[o].type);
       ++c.running;
       run_from(inst, static_cast<int>(i), 0);
       --c.running;
       if (nested) c.outputs = std::move(outer);
-      if (at_work) inst.set_locals(local_values);
-      for (std::size_t f = 0; f < parameters.size(); ++f)
-        if (inst.fn_entry_[f] >= 0) inst.nodes_[static_cast<std::size_t>(inst.fn_entry_[f])].outputs = std::move(parameters[f]);
+      if (at_work) inst.set_held_calls(std::move(held));
       if (inst.disabled_) break;
     }
   }

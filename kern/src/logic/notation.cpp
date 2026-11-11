@@ -782,12 +782,23 @@ struct Shape {
       }
       int entries = 0;
       for (const Info& x : n) entries += x.def->type == "func.entry" && x.node->param("function") == f.name ? 1 : 0;
+      if (f.external) {
+        // A function of another Blueprint: a declaration - no body, no local variables, called as a step.
+        for (int i : by_id) {
+          const std::string& t = at(i).def->type;
+          if ((t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure") && at(i).node->param("function") == f.name)
+            return fail("\"" + f.name + "\" is a function of another Blueprint: it has no body here and is called with Call on Actor (" + title(i) + ")", i);
+        }
+        if (f.pure) return fail("function \"" + f.name + "\" is a function of another Blueprint: what it does is not known here, so it is called as a step (not Pure)");
+        if (!f.locals.empty()) return fail("function \"" + f.name + "\" is a function of another Blueprint: it has no local variables here");
+        continue;
+      }
       if (entries != 1) return fail("function \"" + f.name + "\" needs exactly one Function Entry node (it has " + std::to_string(entries) + ")");
     }
     for (int i : by_id) {
       const Info& x = at(i);
       const std::string& t = x.def->type;
-      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure")
+      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on")
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
       bool names_variable = false;
       for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
@@ -1144,6 +1155,16 @@ struct Writer {
       line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
       return 0;
     }
+    if (t == "func.call_on") {
+      // func_call_on<"Fn">(target, kern::out(n7.a, n7.b), values...);   (kern::out(): nothing reads what it gave)
+      std::string args = value(x, X.data_in.front(), c) + ", kern::out(";
+      if (X.member)
+        for (std::size_t k = 0; k < X.data_out.size(); ++k) args += (k ? ", n" : "n") + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out[k])].id;
+      args += ")";
+      for (std::size_t k = 1; k < X.data_in.size(); ++k) args += ", " + value(x, X.data_in[k], c);
+      line(ind, "func_call_on<" + text_literal(X.node->param("function")) + ">(" + args + ");");
+      return 0;
+    }
     line(ind, call(x, entry, c, definition) + ";");
     return 0;
   }
@@ -1276,6 +1297,11 @@ struct Writer {
         doc(1, f.help);
         std::string args;
         for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g);
+        if (f.external) {
+          // (a function of another Blueprint: what it looks like - it is called on an actor)
+          line(1, "KERN_EXTERN " + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
+          continue;
+        }
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
         for (const FunctionPin& l : f.locals) line(2, cpp_type(TypeRef{l.type, l.of}) + " " + l.name + " = " + literal(Value::from_json(l.value, l.type, g, l.of), l.of, g) + ";");
@@ -1912,7 +1938,7 @@ struct Reader {
   }
   bool declarations() {
     std::string docs;
-    bool has_docs = false, pure = false, has_event = false;
+    bool has_docs = false, pure = false, external = false, has_event = false;
     Item event;
     auto take_docs = [&] {
       std::string r = has_docs ? docs : std::string();
@@ -2059,6 +2085,10 @@ struct Reader {
         pure = true;
         continue;
       }
+      if (accept("KERN_EXTERN")) {
+        external = true;
+        continue;
+      }
       if (t.kind != Tok::id) return fail(p, shown(t) + " is not part of a Blueprint");
       // void name(...) {   <Function>Result name(...) {   <Function>Result n<id>;
       std::string ret = toks[p++].s, fn;
@@ -2106,6 +2136,8 @@ struct Reader {
         Function f;
         f.name = fn;
         f.pure = pure;
+        f.external = external;
+        if (pure && external) return fail(at, "a function of another Blueprint is called as a step: KERN_EXTERN, not KERN_PURE");
         if (g.function(fn)) return fail(at + 1, "the function " + fn + " is declared twice");
         if (ret != "void") {
           if (ret != fn + "Result") return fail(at, "the function " + fn + " gives " + fn + "Result (or is void), not \"" + ret + "\"");
@@ -2133,8 +2165,16 @@ struct Reader {
         g.functions.push_back(std::move(f));
       }
       it.tok = at + 1;
+      if (external && it.kind != Item::function) return fail(at, "KERN_EXTERN stands in front of a function of another Blueprint");
       pure = false;
-      if (!expect(")") || !expect("{")) return false;
+      if (!expect(")")) return false;
+      if (external) {
+        // KERN_EXTERN FnResult Fn(...);   what a function of another Blueprint looks like: no body
+        external = false;
+        if (!expect(";", "(a function of another Blueprint has no body here)")) return false;
+        continue;
+      }
+      if (!expect("{")) return false;
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
@@ -2945,6 +2985,7 @@ struct Reader {
     if (def->type == "flow.sequence") { fail(at, "a Sequence is { } { }"); return {}; }
     if (def->type == "flow.while") { fail(at, "a While Loop is while (loop(value)) { }"); return {}; }
     if (def->type == "flow.switch_enum") { fail(at, fname + " goes on at the enum's value: switch (" + fname + "<AnEnum>(...)) { case AnEnum::Value: { } break; }"); return {}; }
+    if (def->type == "func.call_on") return call_on(std::move(in), def, at);
     const int node = step(make_named(def, at), at);
     if (node < 0 || !expect("(")) return {};
     const std::vector<std::string> outs = exec_pins(node, false);
@@ -2978,6 +3019,45 @@ struct Reader {
     }
     if (!expect(")", "(" + takes(node, fname) + ")") || !expect(";")) return {};
     return outs.empty() ? gone() : Ends{{node, outs[0]}};
+  }
+  /// func_call_on<"Fn">(target, kern::out(n7.a, n7.b), values...);   (func_call_on has been read)
+  /// kern::out names the call's member and all of the function's outputs in their order - or
+  /// nothing, when nothing reads what the call gave.
+  Ends call_on(Ends in, const NodeDef* def, std::size_t at) {
+    const int node = step(make_named(def, at), at);
+    if (node < 0 || !expect("(")) return {};
+    const std::string fn = made[static_cast<std::size_t>(node)].node.param("function");
+    if (!g.function(fn)) { fail(at, "\"" + fn + "\" is no function this Blueprint has or declares (KERN_EXTERN " + fn + "(...);)"); return {}; }
+    enter(in, node, "", at);
+    const std::vector<int> ins = data_inputs(node);
+    const Src target = value();
+    if (failed() || !bind(node, ins.front(), target)) return {};
+    std::vector<std::string> gives;
+    for (const PinDef& pd : made[static_cast<std::size_t>(node)].out) if (pd.type != PinType::exec) gives.push_back(pd.id);
+    std::string all;
+    for (const std::string& o : gives) all += (all.empty() ? "" : ", ") + o;
+    const std::string form = "kern::out(" + (gives.empty() ? std::string() : "n<id>." + gives.front() + (gives.size() > 1 ? ", ..." : "")) + ")";
+    if (!expect(",", "(then " + form + ")") || !expect("kern", "(" + form + ")") || !expect("::") || !expect("out") || !expect("(")) return {};
+    std::size_t k = 0;
+    while (!is(")")) {
+      const std::size_t where = p;
+      const u32 id = peek().kind == Tok::id ? numbered(peek().s, "n") : 0;
+      if (!id || !is(".", 1) || peek(2).kind != Tok::id) { fail(where, form + ": the member of this call and the function's outputs"); return {}; }
+      if (k >= gives.size() || peek(2).s != gives[k]) { fail(where + 2, fn + (gives.empty() ? " gives nothing: kern::out()" : " gives " + all + ": kern::out names all of them, in their order - or none")); return {}; }
+      if (!declare(id, node, where)) return {};
+      p += 3;
+      ++k;
+      if (!accept(",")) break;
+    }
+    if (!expect(")")) return {};
+    if (k != 0 && k != gives.size()) { fail(p - 1, fn + " gives " + all + ": kern::out names all of them, in their order - or none"); return {}; }
+    for (std::size_t i = 1; i < ins.size(); ++i) {
+      if (!expect(",", "(" + takes(node, fn) + ")")) return {};
+      const Src s = value();
+      if (failed() || !bind(node, ins[i], s)) return {};
+    }
+    if (!expect(")", "(" + takes(node, fn) + ")") || !expect(";")) return {};
+    return {out(node, 0)};
   }
   /// [n<id> = ]Function(...);   (the function's name has been read)
   Ends call_function(Ends in, const std::string& fn, u32 id, std::size_t at) {
@@ -3451,7 +3531,7 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
   add("the number of functions", std::to_string(g.functions.size()));
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const Function& f = g.functions[i];
-    std::string sig = f.name + (f.pure ? " (pure)" : "") + " (";
+    std::string sig = f.name + (f.pure ? " (pure)" : "") + (f.external ? " (of another Blueprint)" : "") + " (";
     for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
     sig += ") -> (";
     for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
@@ -3850,6 +3930,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {
+    if (f.external) continue;  // (a function of another Blueprint: nothing of it is here to call)
     std::string call = "self." + f.name + "(";
     for (std::size_t k = 0; k < f.inputs.size(); ++k)
       call += std::string(k ? ", " : "") + "native_arg<" + type(f.inputs[k].type, f.inputs[k].of) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ")";

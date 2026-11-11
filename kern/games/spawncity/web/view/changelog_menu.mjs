@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"22:38",title:"Blueprints: Funktionen anderer Blueprints aufrufen",items:[
+    "Kern-Blueprints: Ein Blueprint kann jetzt eine Funktion aufrufen, die ein anderer Blueprint hat. Der neue Knoten „Call on Actor“ führt sie auf dem Blueprint eines Actors aus – oder, ohne Ziel, auf dem des Levels. Was im Level-Blueprint als Funktion steht, ist damit eine Bibliothek für alle.",
+    "Dazu sagt der Blueprint, wie die Funktion aussieht (Name, Ein- und Ausgänge). Hat das Ziel sie nicht, kommen die erklärten Standardwerte heraus. Auch eine eigene Funktion lässt sich so auf einem anderen Actor aufrufen.",
+    "Im Kern-Editor: Unter „Functions“ bietet „+ A function of another Blueprint…“ die Funktionen der anderen Blueprints des Levels an; Details einer Funktion hat „Of another Blueprint“ und „Call on Actor“. Der Editor weist darauf hin, wenn kein Blueprint des Levels die Funktion so hat.",
+    "Als C++: KERN_EXTERN StarsResult Stars(Actor who); erklärt die Funktion, func_call_on<\"Stars\">(ziel, kern::out(n7.stars), wer); ruft sie auf. Als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus.",
+  ]},
   {date:"2026-11-11",time:"21:43",title:"Blueprints: lokale Variablen in Funktionen",items:[
     "Kern-Blueprints: Eine Funktion kann jetzt eigene, lokale Variablen haben. Jeder Aufruf beginnt mit ihren Standardwerten, und mit dem Aufruf sind sie vorbei – Zwischenergebnisse brauchen keine Variable des ganzen Blueprints mehr.",
     "Gelesen und gesetzt werden sie mit denselben Knoten wie jede Variable (Get, Set, Add, Set Field, die Listen-Schritte). Zwei Funktionen dürfen je eine lokale Variable desselben Namens haben; auch eine Pure-Funktion darf ihre eigenen setzen.",

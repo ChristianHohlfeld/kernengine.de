@@ -396,7 +396,7 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 
 ## 9.5 Kern-Knoten
 
-`src/logic/core_nodes.cpp` registriert 104 Knoten:
+`src/logic/core_nodes.cpp` registriert 105 Knoten:
 
 | Kategorie | Knoten |
 |---|---|
@@ -407,7 +407,7 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 | **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find_row` Find Row (eine Liste einer Struktur als Tabelle: der erste Eintrag, dessen Feld der Wert ist; Found, Row, Index) · `list.find` Find Item (Index oder −1) – Schritte auf einer Listen-Variablen (Einstellung List): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
 | **Aufzählungen** | auf den Werten einer Aufzählung des Blueprints (Einstellung Enum; im Editor trägt der Knoten ihren Namen, „Mode to Text“): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (der Name des Werts) · `enum.from_name` Text to Enum (der Wert mit diesem Namen; Found – heißt kein Wert so: der erste Wert, und Found ist falsch) · `enum.index` Enum to Index (die Stelle des Werts unter den Werten der Aufzählung, die erste ist 0) · `enum.from_index` Index to Enum (der Wert an dieser Stelle; Valid – gibt es die Stelle nicht: der erste Wert, und Valid ist falsch) · `enum.values` All Values (eine Liste aller Werte in ihrer Reihenfolge, für ein For Each) – die Knoten für jeden Typ arbeiten auch im Typ einer Aufzählung: Get und Set einer Variablen, Select, Reroute, die Listen-Knoten und For Each |
 | **Strukturen** | auf einer Struktur des Blueprints (Einstellung Struct; im Editor trägt der Knoten ihren Namen, „Make Weapon“): `struct.make` Make Struct (ein Eingang je Feld – ohne Draht: der Standardwert des Felds; Value) · `struct.break` Break Struct (Value; ein Ausgang je Feld) · `struct.set_field` Set Field (ein Schritt auf einer Struktur-Variablen, Einstellungen Variable und Field: ändert dieses Feld und lässt die anderen; Value – das Feld, wie es jetzt ist) |
-| **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) |
+| **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) · `func.call_on` Call on Actor (eine Funktion auf dem Blueprint eines anderen Actors oder – ohne Target – des Levels; der Blueprint erklärt, wie sie aussieht) |
 | **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` · `math.formula` Formula (jeder Name darin ist ein Eingang) |
 | **Logik** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; Gleichheit mit 10⁻⁹ Toleranz) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
 | **Werte** | `value.float`, `value.int`, `value.bool`, `value.text` |

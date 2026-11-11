@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -63,6 +64,17 @@ struct Machine {
 /// kern::formula(lambda, values...): a Formula node. The lambda is the formula.
 template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(values...)); }
 
+/// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
+/// order of the function's outputs (func_call_on).
+template <class... O> struct Out {
+  std::tuple<O&...> to;
+  void take(const std::vector<logic::Value>& results) { take(results, std::index_sequence_for<O...>{}); }
+  template <std::size_t... I> void take(const std::vector<logic::Value>& results, std::index_sequence<I...>) {
+    ((I < results.size() ? void(std::get<I>(to) = logic::from_value<O>(results[I])) : void()), ...);
+  }
+};
+template <class... O> Out<O...> out(O&... o) { return {std::tuple<O&...>(o...)}; }
+
 /// Where the nodes are in the graph view (KERN_LAYOUT): for the editor, nothing at run time.
 struct Layout {
   void node(u32, f64, f64, const char* = "") {}
@@ -90,6 +102,14 @@ struct BlueprintCore : logic::PureNodes {
   template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
     if (kern_world.runtime)
       kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(text)}});
+  }
+
+  /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{0}: the Level's)
+  /// with `args`, and `out` takes what it gave - func_call_on<"Stars">(who, kern::out(n7.stars), x);
+  template <Setting Name, class... O, class... A> void func_call_on(Actor target, Out<O...> out, const A&... args) {
+    std::vector<logic::Value> results;
+    if (kern_world.runtime && kern_world.instance) kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, {logic::to_value(args)...}, results);
+    out.take(results);
   }
 
   // ---- random ----
@@ -365,6 +385,9 @@ struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
   struct Name
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
+/// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:
+/// it has no body here and is called on an actor (func_call_on<"Fn">).
+#define KERN_EXTERN
 /// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event
 /// node (for the reader and the editor). Which events reach it decides the runtime, for every
 /// tier the same; the engine calls the method through the Blueprint's glue (logic::native_glue).

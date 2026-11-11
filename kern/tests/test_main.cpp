@@ -2103,6 +2103,139 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_call_on_actor) {
+  // A Blueprint calls a function of another one: it declares what the function looks like
+  // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  Int Asked = 0;
+
+  struct StarsResult { Int stars = -1; Text who = "none"; };
+  StarsResult Stars(Int base = 1, Text name = "x") {
+    Asked += base;
+    return {Asked, text_append(name, "!", "")};
+  }
+};
+)kn";
+  const char* cop_text = R"kn(
+struct Cop : kern::Blueprint {
+  Int Got = 0;
+  Text Heard = "";
+  Float Miss = 0.0;
+  Int Deep = 0;
+
+  struct StarsResult { Int stars = 5; Text who = "nobody"; };
+  /// How wanted somebody is (the Level knows).
+  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = "x");
+  struct MissingResult { Float value = 2.5; };
+  KERN_EXTERN MissingResult Missing();
+
+  struct DownResult { Float sum = 0.0; };
+  DownResult Down(Int n = 0, Actor me = Actor{0}) {
+    Int Mine = 0;
+    Mine = n;
+    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
+      func_call_on<"Down">(me, kern::out(n20.sum), kern::to<Int>(math_sub(kern::to<Float>(n), 1.0)), me);
+    }
+    return {math_add(kern::to<Float>(Mine), n20.sum)};
+  }
+
+  void Forever(Actor me = Actor{0}) {
+    Deep += 1;
+    func_call_on<"Forever">(me, kern::out(), me);
+  }
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Stars">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
+    Got = n2.stars;
+    Heard = n2.who;
+    func_call_on<"Missing">(actor, kern::out(n5.value));
+    Miss = n5.value;
+    func_call_on<"Stars">(actor, kern::out(n7.stars, n7.who), 1, "");
+    Heard = text_append(Heard, n7.who, "");
+  }
+
+  struct { Int stars = 0; Text who = ""; } n2;
+  struct { Float value = 0.0; } n5;
+  struct { Int stars = 0; Text who = ""; } n7;
+  struct { Float sum = 0.0; } n20;
+};
+)kn";
+  logic::Graph level, cop;
+  std::string error;
+  CHECK(logic::from_cpp(level_text, level, nullptr, &error));
+  CHECK(logic::from_cpp(cop_text, cop, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(level)) && no_errors(logic::check(cop)));
+  CHECK(cop.function("Stars") && cop.function("Stars")->external && !cop.function("Down")->external);
+  // as JSON and as C++ and back: the same Blueprint
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(cop), back) && back == cop);
+  std::string text;
+  CHECK(logic::to_cpp(cop, "Cop", text, &error));
+  CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = \"x\");\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Stars\">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Forever\">(me, kern::out(), me);\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == cop);
+  CHECK(logic::native_ready(cop, &error));
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* lv = rt.add(level, 0, "Level");
+    logic::Instance* a = rt.add(cop, 7, "Cop");
+    logic::Instance* b = rt.add(cop, 8, "Cop 2");
+    CHECK(lv && a && b && !a->disabled());
+    if (!lv || !a || !b) continue;
+    rt.begin();
+    // on the Level (no target): its Stars runs, with what this call gave it
+    rt.call("Ask", 7, {{"actor", logic::Value::actor(99)}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
+    CHECK(lv->get("Asked").i == 3 && a->get("Got").i == 3 && b->get("Got").i == 0);
+    // ... a target without a Blueprint, and one whose Blueprint has no such function: the declared defaults
+    CHECK(a->get("Heard").as_text() == "joe!nobody");
+    CHECK_NEAR(a->get("Miss").as_number(), 2.5, 1e-12);
+    rt.call("Ask", 8, {{"actor", logic::Value::actor(7)}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
+    CHECK(lv->get("Asked").i == 5 && b->get("Got").i == 5 && b->get("Heard").as_text() == "!nobody");
+    // a function that calls itself on its own actor: every call has its own parameters and locals
+    std::vector<logic::Value> out;
+    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor(7)}, out) && out.size() == 1);
+    CHECK_NEAR(out[0].as_number(), 10.0, 1e-12);
+    // ... and on another actor's Blueprint, back and forth
+    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor(8)}, out));
+    CHECK_NEAR(out[0].as_number(), 6.0, 1e-12);
+    // calls that never end are stopped: 64 deep, reported, and the Blueprint goes on
+    const std::size_t before = host.errors.size();
+    CHECK(a->call("Forever", {logic::Value::actor(7)}, out));
+    CHECK(host.errors.size() == before + 1 && host.errors.back().find("nest more than 64 deep") != std::string::npos);
+    CHECK(a->get("Deep").i >= 63 && a->get("Deep").i <= 65 && !a->disabled());
+  }
+  // Rules: a function of another Blueprint has no body here ...
+  {
+    logic::Graph bad = cop;
+    logic::Node call;
+    call.id = bad.next_id++;
+    call.type = "func.call";
+    call.set_param("function", "Stars");
+    bad.nodes.push_back(call);
+    CHECK(!no_errors(logic::check(bad)));
+    CHECK(logic::cpp_problem(bad).find("is a function of another Blueprint") != std::string::npos);
+    bad = cop;
+    bad.function("Stars")->pure = true;
+    CHECK(!no_errors(logic::check(bad)));
+  }
+  // ... and in the text
+  logic::Graph none;
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EXTERN void F() {\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("no body here") != std::string::npos);
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{0}, kern::out());\n  }\n};\n", none, nullptr, &error));
+  CHECK(error.find("KERN_EXTERN") != std::string::npos);
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
+                         "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
+  CHECK(error.find("in their order") != std::string::npos);
+}
+
 TEST(logic_functions) {
   FakeLogicHost host;
   logic::Runtime rt(host);
@@ -8870,6 +9003,85 @@ TEST(studio_logic_local_variables) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "remove"}, {"name", "Plus"}})["ok"].as_bool());
   st = f.s->state();
   for (const json::Value& n : st["logic"]["nodes"].items()) CHECK(n["type"].as_string() != "var.add");
+}
+
+TEST(studio_logic_call_on_actor) {
+  // A function of the Level's Blueprint, declared in an actor's Blueprint with the editor's
+  // commands and called from there: the level plays it.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Asked = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  /// Two times x.\n  TwiceResult Twice(Float x = 1.0) {\n"
+                                                "    Asked += x;\n    return {math_mul(x, 2.0)};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(!f.s->level().actors.empty());
+  if (f.s->level().actors.empty()) return;
+  const game::ActorId other = f.s->level().actors.front().id;
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(other)}})["ok"].as_bool());
+  // the editor offers the Level's function; declared here it is a function of another Blueprint
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Got"}, {"type", "float"}})["ok"].as_bool());  // (the actor has a Blueprint now)
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["otherFunctions"].size() == 1 && st["logic"]["otherFunctions"][0]["name"].as_string() == "Twice" && st["logic"]["otherFunctions"][0]["ownerName"].as_string() == "Level");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "Twice"}, {"from", 0}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "Twice"}, {"from", 0}})["ok"].as_bool());  // (once)
+  st = f.s->state();
+  CHECK(st["logic"]["functions"].size() == 1 && st["logic"]["functions"][0]["external"].as_bool() && st["logic"]["functions"][0]["help"].as_string() == "Two times x." &&
+        st["logic"]["functions"][0]["inputs"].size() == 1 && st["logic"]["otherFunctions"].size() == 0 && st["logic"]["nodes"].size() == 0);
+  // it has no body here: no local variables, not pure, no plain call - the action menu offers the call on an actor
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "local"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pure"}, {"name", "Twice"}, {"value", true}})["ok"].as_bool());
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "twice"}});
+  bool on_actor = false, plain = false;
+  for (const json::Value& e : pal["items"].items()) {
+    on_actor = on_actor || (e["type"].as_string() == "func.call_on" && e["label"].as_string() == "Twice on Actor");
+    plain = plain || e["type"].as_string() == "func.call" || e["type"].as_string() == "func.return";
+  }
+  CHECK(on_actor && !plain);
+  // the actor's Blueprint asks the Level on Begin Play
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  Float Got = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(Float x = 1.0);\n\n"
+                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{0}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
+                                                "  struct { Float out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
+  st = f.s->state();
+  for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
+  // a declaration nobody has as it stands gets a hint (no error: the call gives the defaults)
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}, {"type", "int"}})["ok"].as_bool());
+  bool hint = false;
+  st = f.s->state();
+  for (const json::Value& i : st["logic"]["issues"].items()) hint = hint || (!i["error"].as_bool() && i["text"].as_string().find("with these inputs and outputs") != std::string::npos);
+  CHECK(hint);
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRemove"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}})["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Runtime* rt = f.s->world().logic_runtime();
+  logic::Instance* level = rt ? rt->find(0) : nullptr;
+  logic::Instance* actor = rt ? rt->find(static_cast<logic::ActorRef>(other)) : nullptr;
+  CHECK(level && actor);
+  if (level && actor) {
+    CHECK_NEAR(actor->get("Got").as_number(), 42, 1e-9);
+    CHECK_NEAR(level->get("Asked").as_number(), 21, 1e-9);
+  }
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+  // "Of another Blueprint" off: the function is this Blueprint's own, with an entry and a Return - and on again: they go
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "external"}, {"name", "Twice"}, {"value", false}, {"x", 0}, {"y", 400}})["ok"].as_bool());
+  st = f.s->state();
+  int entries = 0, returns = 0;
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    entries += n["type"].as_string() == "func.entry";
+    returns += n["type"].as_string() == "func.return";
+  }
+  CHECK(entries == 1 && returns == 1 && !st["logic"]["functions"][0]["external"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "external"}, {"name", "Twice"}, {"value", true}})["ok"].as_bool());
+  st = f.s->state();
+  bool call_stays = false;
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    CHECK(n["type"].as_string() != "func.entry" && n["type"].as_string() != "func.return");
+    call_stays = call_stays || n["type"].as_string() == "func.call_on";
+  }
+  CHECK(call_stays && st["logic"]["functions"][0]["external"].as_bool());
 }
 
 TEST(studio_logic_cpp_view) {

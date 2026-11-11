@@ -391,7 +391,7 @@ on an action node reads that node's last stored output.
 
 ## 9.5 Core nodes
 
-`src/logic/core_nodes.cpp` registers 104 nodes:
+`src/logic/core_nodes.cpp` registers 105 nodes:
 
 | Category | Nodes |
 |---|---|
@@ -402,7 +402,7 @@ on an action node reads that node's last stored output.
 | **Lists** | values, generic over the items' type (setting Type): `list.make` Make List (0..16 items) · `list.length` · `list.get` Get Item (beyond the list: the type's zero) · `list.contains` · `list.find` Find Item (index or −1) · `list.find_row` Find Row (a list of structs as a table: the first item whose field is the value; Found, Row, Index) – steps on a list variable (setting List): `list.add` Add to List (gives the index) · `list.insert` (in front of the index; past the end: at the end) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (every equal item; Removed) · `list.clear` |
 | **Enums** | on the values of one enum of the Blueprint (setting Enum; in the editor a node carries the enum's name, "Mode to Text"): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (the value's name) · `enum.from_name` Text to Enum (the value with that name; Found – no value has that name: the first value, and Found is false) · `enum.index` Enum to Index (the place of the value among the enum's values, the first is 0) · `enum.from_index` Index to Enum (the value at that place; Valid – no such place: the first value, and Valid is false) · `enum.values` All Values (a list of every value in their order, for a For Each) – the nodes that take any type work in an enum's type too: Get and Set of a variable, Select, Reroute, the list nodes and For Each |
 | **Structures** | on one struct of the Blueprint (setting Struct; in the editor a node carries the struct's name, "Make Weapon"): `struct.make` Make Struct (an input per field – without a wire: the field's default; Value) · `struct.break` Break Struct (Value; an output per field) · `struct.set_field` Set Field (a step on a struct variable, settings Variable and Field: changes that field and leaves the others; Value – the field as it is now) |
-| **Functions** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (a function marked Pure, as a value) |
+| **Functions** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (a function marked Pure, as a value) · `func.call_on` Call on Actor (a function on the Blueprint of another actor or - without a Target - of the Level; the Blueprint declares what it looks like) |
 | **Math** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (degrees), `sqrt`, `pow`, `round`, `floor`, `random` (float in range), `random_int`, `random_bool` · `math.formula` Formula (every name in it is an input) |
 | **Logic** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; equality with 10⁻⁹ tolerance) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
 | **Values** | `value.float`, `value.int`, `value.bool`, `value.text` |

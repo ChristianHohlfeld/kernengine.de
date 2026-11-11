@@ -1287,6 +1287,31 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    NodeDef d = make("func.call_on", "Call on Actor", "Functions", NodeKind::action,
+                     "Runs a function of another actor's Blueprint to its end, then continues: Target's, or the Level's when Target is empty. This Blueprint says what the "
+                     "function looks like (My Blueprint: a function \"of another Blueprint\", or one of its own with the same name and pins). Where the target has no such "
+                     "function, the outputs are their defaults.");
+    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.inputs = {exec_in(), data("this", "Target", PinType::actor, 0)};  // ("this": a word of C++ - no pin of a function has that name)
+    d.outputs = {exec_out()};
+    d.shape = shape(2);
+    d.title = [](const NodeDef&, const Node& n) { return n.param("function", "?") + " on Actor"; };
+    d.color = 0x2f6fd0;
+    d.keywords = "call run invoke function other blueprint actor library remote interface message";
+    d.run = [](Context& c) {
+      const Function* f = c.instance().graph().function(c.param("function"));
+      if (!f) return 0;
+      const ActorRef target = c.in_actor("this");
+      std::vector<Value> args, results;
+      args.reserve(f->inputs.size());
+      for (const FunctionPin& p : f->inputs) args.push_back(c.in(p.name));
+      c.runtime().call_on(c.instance(), f->name, target, args, results);
+      for (std::size_t k = 0; k < f->outputs.size() && k < results.size(); ++k) c.out(f->outputs[k].name, results[k]);
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
                      "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
     d.params = {param("function", "Function", ParamDef::Kind::function)};
