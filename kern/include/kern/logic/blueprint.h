@@ -290,6 +290,22 @@ struct BlueprintCore : logic::PureNodes {
   // field by field: struct_break<Weapon>(Held).Damage. (Set Field is the assignment
   // Held.Damage = 2.0; - no function.)
   template <class S, class... V> static S struct_make(const V&... fields) { return S{fields...}; }
+  /// list_find_row<&Weapon::Name>(Rack, "Bow"): the first item of a list of structs whose field
+  /// is the value - a table's row by its key. Not found: the struct's defaults, index -1.
+  template <class S> struct FoundRow {
+    Bool found = false;
+    S row{};
+    Int index = -1;
+  };
+  template <class F, class S> static S owner_of(F S::*);
+  template <class F, class S> static F field_of(F S::*);
+  template <auto Field>
+  static auto list_find_row(const List<decltype(owner_of(Field))>& list, const std::type_identity_t<decltype(field_of(Field))>& value) {
+    FoundRow<decltype(owner_of(Field))> r;
+    for (std::size_t k = 0; k < list.size(); ++k)
+      if (list[k].*Field == value) return FoundRow<decltype(owner_of(Field))>{true, list[k], static_cast<Int>(k)};
+    return r;
+  }
   template <class S> static S struct_break(std::type_identity_t<S> value) { return value; }
 
   // ---- steps ----

@@ -964,6 +964,48 @@ void add_structs(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // A list of structs read as a table: the row whose field is the value looked for.
+    NodeDef d = make("list.find_row", "Find Row", "Lists", NodeKind::pure,
+                     "The first item of a list of structs whose field is this value - a table's row by its key. Found: is there one? (If not: the struct's defaults, index -1.)",
+                     "table lookup data key search where by");
+    d.params = {struct_param(), param("field", "Field", ParamDef::Kind::field)};
+    d.inputs = {data("list", "List", PinType::structure_list), data("value", "Value", PinType::number)};
+    d.outputs = {data("found", "Found", PinType::boolean), data("row", "Row", PinType::structure), data("index", "Index", PinType::integer)};
+    d.title = [](const NodeDef&, const Node& n) { return "Find " + n.param("struct", "?") + " by " + n.param("field", "?"); };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const std::string name = n.param("struct");
+      retype(in[0], {PinType::structure_list, name}, g);
+      retype(out[1], {PinType::structure, name}, g);
+      const StructType* s = of(n, g);
+      const int k = s ? s->field(n.param("field")) : -1;
+      if (k < 0) return;
+      const StructField& f = s->fields[static_cast<std::size_t>(k)];
+      retype(in[1], f.type, g);
+      in[1].def = f.value;
+    };
+    d.problem = [of](const Node& n, const Graph& g) {
+      const StructType* s = of(n, g);
+      if (!s || s->field(n.param("field")) >= 0) return std::string();  // (the check says that there is no such struct)
+      std::string all;
+      for (const StructField& f : s->fields) all += (all.empty() ? "" : ", ") + f.name;
+      return s->name + " has no field \"" + n.param("field") + "\" (" + all + ")";
+    };
+    d.run = [of](Context& c) {
+      const Value list = c.in("list"), value = c.in("value");
+      const Graph& g = c.instance().graph();
+      const StructType* s = of(c.node(), g);
+      const int k = s ? s->field(c.param("field")) : -1;
+      i64 at = -1;
+      for (std::size_t i = 0; s && k >= 0 && at < 0 && i < list.size(); ++i)
+        if (field_of(list.item(i), *s, static_cast<std::size_t>(k), g) == value) at = static_cast<i64>(i);
+      c.out("found", Value::boolean(at >= 0));
+      c.out("row", at >= 0 ? list.item(static_cast<std::size_t>(at)) : s ? default_of(*s, g) : Value::zero(PinType::structure));
+      c.out("index", Value::integer(at));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     // The struct of the node's variable, and the place of the node's field in it (-1: none).
     auto field = [](const Node& n, const Graph& g, const StructType*& s) {
       const Variable* v = g.variable(n.param("variable"));

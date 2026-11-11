@@ -397,7 +397,8 @@ json::Value Studio::logic_json() const {
         if (pd.kind == K::field) {
           // (the fields of the struct the node's variable is of)
           const logic::Variable* v = g->variable(n.param("variable"));
-          if (const logic::StructType* s = v && v->type == logic::PinType::structure ? g->structure(v->of) : nullptr)
+          const logic::StructType* named = g->structure(n.param("struct"));  // (Find Row names its struct itself)
+          if (const logic::StructType* s = named ? named : v && v->type == logic::PinType::structure ? g->structure(v->of) : nullptr)
             for (const logic::StructField& f : s->fields) choice(f.name, f.name + " (" + logic::type_label(f.type) + ")");
         }
         if (pd.kind == K::machine)
