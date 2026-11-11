@@ -216,7 +216,7 @@ einen Zustand.
 
 ## 9.5 Die Grundknoten
 
-Kern bringt **103 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen, Aufzählungen,
+Kern bringt **104 Grundknoten** mit: für Ereignisse, Ablauf, Gedächtnis, Listen, Aufzählungen,
 Strukturen und Rechnen. Du musst sie nicht auswendig kennen – das Menü im Editor schlägt passende vor. Ein paar
 Beispiele zeigen, was in dem Baukasten steckt:
 
@@ -243,7 +243,7 @@ noch Text, sein Draht passt also nur an Pins derselben Aufzählung – und **Swi
 Weiche mit einem Gleis für jeden Wert. Auch eine **Struktur** (im Editor: Struct) ist eine eigene
 Sorte, aber sie bündelt mehrere Werte unter Namen, wie eine Karteikarte: eine „Weapon“ mit
 „Name“, „Type“ und „Damage“. **Make Weapon** füllt eine Karte aus, **Break Weapon** liest ihre
-Felder, und **Set Field** ändert ein Feld und lässt die anderen, wie sie sind. Alle 103 Knoten
+Felder, und **Set Field** ändert ein Feld und lässt die anderen, wie sie sind. Alle 104 Knoten
 mit ihren Feinheiten stehen im blauen Buch, Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,

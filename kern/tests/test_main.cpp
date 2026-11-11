@@ -9677,6 +9677,40 @@ TEST(studio_logic_structs) {
   if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
   CHECK(r["ok"].as_bool() && structure("Spare").is_null() && f.s->state()["logic"]["structs"].size() == 2 && !edit("remove", "Spare")["ok"].as_bool());
   CHECK(!edit("nope", "Gun")["ok"].as_bool() && no_errors(logic::check(f.s->level().logic)));
+  // A list of structs is a table, and Find Row looks a row up by one of its fields: offered per
+  // struct with its first field, written as C++ with the field as C++ names it, and a renamed
+  // field is the field it looks by.
+  {
+    StudioFixture t;
+    CHECK(t.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool() && t.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+    json::Value apply = json::Value::object();
+    apply.set("cmd", "logicCppApply");
+    apply.set("text", "struct Level : kern::Blueprint {\n  KERN_STRUCT(Item) {\n    Text Key = \"\";\n    Float Price = 1.0;\n  };\n"
+                      "  List<Item> Shop = List<Item>{Item{\"apple\", 2.5}, Item{\"pear\", 4.0}};\n  Float Cost = 0.0;\n  Bool Has = true;\n\n"
+                      "  KERN_EVENT(on1, event_custom<\"Buy\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+                      "    Cost = struct_break<Item>(list_find_row<&Item::Key>(Shop, text).row).Price;\n    Has = list_find_row<&Item::Key>(Shop, text).found;\n  }\n};\n");
+    json::Value r = t.s->command(apply);
+    if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
+    CHECK(r["ok"].as_bool() && no_errors(logic::check(t.s->level().logic)));
+    bool offered = false;
+    const json::Value palette = t.cmd(R"({"cmd":"logicPalette","query":"find item"})");
+    for (const json::Value& it : palette["items"].items())
+      offered |= it["type"].as_string() == "list.find_row" && it["label"].as_string() == "Find Item by Key" && it["params"]["field"].as_string() == "Key";
+    CHECK(offered);
+    CHECK(t.cmd(R"({"cmd":"logicStruct","op":"renameField","name":"Item","field":"Key","to":"Id"})")["ok"].as_bool() && no_errors(logic::check(t.s->level().logic)));
+    const std::string text = t.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
+    CHECK(text.find("list_find_row<&Item::Id>(Shop, text).found") != std::string::npos && text.find("Item{\"apple\", 2.5}") != std::string::npos);
+    CHECK(t.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+    logic::Instance* inst = t.s->world().logic_runtime() ? t.s->world().logic_runtime()->find(0) : nullptr;
+    CHECK(inst != nullptr);
+    if (inst) {
+      t.s->world().logic_runtime()->call("Buy", 0, {{"text", logic::Value::text("pear")}});
+      CHECK(inst->get("Cost").as_number() == 4 && inst->get("Has").as_bool());
+      t.s->world().logic_runtime()->call("Buy", 0, {{"text", logic::Value::text("plum")}});
+      CHECK(inst->get("Cost").as_number() == 1 && !inst->get("Has").as_bool());  // (no such row: the struct's defaults)
+    }
+    t.cmd(R"({"cmd":"stop"})");
+  }
 }
 
 TEST(studio_blueprint_breakpoints_pause_the_game) {

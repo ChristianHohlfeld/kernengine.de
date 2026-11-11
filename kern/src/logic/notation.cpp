@@ -196,9 +196,16 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
 /// A setting that names a type is that type: logic_select<Float>, list_make<Text, "2">.
 std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
   std::string r;
-  for (const ParamDef& pd : def.params) {
+  for (std::size_t k = 0; k < def.params.size(); ++k) {
+    const ParamDef& pd = def.params[k];
     if (pd.kind == ParamDef::Kind::variable) continue;
     const std::string value = n.param(pd.key, pd.def);
+    // (a struct and one of its fields are one setting, as C++ names a field: &Weapon::Name)
+    if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
+      r += (r.empty() ? "<&" : ", &") + value + "::" + n.param(def.params[k + 1].key, def.params[k + 1].def);
+      ++k;
+      continue;
+    }
     TypeRef type;
     r += (r.empty() ? "<" : ", ") + (pd.kind == ParamDef::Kind::type && type_from_text(value, g, type) ? cpp_type(type) : text_literal(value));
   }
@@ -1849,6 +1856,16 @@ struct Reader {
     while (!is(">")) {
       std::string s;
       TypeRef t;
+      if (accept("&")) {
+        // &Weapon::Name   a struct and one of its fields: two settings in one
+        std::string owner, field;
+        if (!word(owner, "a struct") || !expect("::") || !word(field, "a field of " + owner)) return false;
+        out.push_back(std::move(owner));
+        out.push_back(std::move(field));
+        if (types) { types->push_back(true); types->push_back(false); }
+        if (!accept(",")) break;
+        continue;
+      }
       const bool is_type = peek().kind == Tok::id;
       if (is_type) {
         if (!type_here(t)) return fail(p, std::string("a setting is a text (\"...\") or a type - ") + kTypes + shown(peek()));
@@ -2122,8 +2139,15 @@ struct Reader {
   static std::string settings_text(const NodeDef* def) {
     std::string want;
     std::size_t count = 0;
-    for (const ParamDef& pd : def->params) {
+    for (std::size_t k = 0; k < def->params.size(); ++k) {
+      const ParamDef& pd = def->params[k];
       if (pd.kind == ParamDef::Kind::variable) continue;
+      if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def->params.size() && def->params[k + 1].kind == ParamDef::Kind::field) {
+        want += (want.empty() ? "" : ", ") + std::string("&AStruct::Field");
+        ++count;
+        ++k;
+        continue;
+      }
       PinType type = PinType::number;
       want += (want.empty() ? "" : ", ") +
               (pd.kind == ParamDef::Kind::type ? (pd.enums_only ? std::string("AnEnum") : pd.structs_only ? std::string("AStruct") : pin_type_from_name(pd.def, type) ? std::string(cpp_type(type)) : std::string("Type"))

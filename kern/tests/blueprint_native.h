@@ -512,6 +512,15 @@ struct Structs : kern::Blueprint {
             struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only};
   }
 
+  struct LookupResult { Bool found = false; Text name = ""; Int at = 0; Float damage = 0.0; Bool byKind = false; Int kindAt = 0; Int strong = 0; };
+  /// Find Row: a list of structs read as a table - the first row whose field is the value, by a
+  /// text, by an enum's value, by a number; not found gives the struct's defaults and -1.
+  KERN_PURE LookupResult Lookup(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0) {
+    return {list_find_row<&Weapon::Name>(Rack, name).found, struct_break<Weapon>(list_find_row<&Weapon::Name>(Rack, name).row).Name, list_find_row<&Weapon::Name>(Rack, name).index,
+            struct_break<Weapon>(list_find_row<&Weapon::Name>(Rack, name).row).Damage, list_find_row<&Weapon::Type>(Rack, kind).found, list_find_row<&Weapon::Type>(Rack, kind).index,
+            list_find_row<&Weapon::Damage>(Rack, damage).index};
+  }
+
   struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Float was = 0.0; Int rack = 0; Int tries = 0; };
   /// Set Field: one field of a struct variable changes, the others stay - a number, a text, an
   /// enum's value, a struct, a list; what the step gives is read.
@@ -918,6 +927,8 @@ inline std::vector<Case> cases() {
       c.calls.push_back({"Edit", {T("add"), I(0), weapons[(k * 7 + 3) % weapons.size()]}});
       c.calls.push_back({"Tune", {N(static_cast<f64>(k) * 1.25), T(k % 2 ? "tuned" : ""), aims[k % aims.size()], E(static_cast<i64>(k % 3))}});
       c.calls.push_back({"Walk", {k % 2 ? yes : no}});
+      c.calls.push_back({"Lookup", {T(k % 2 ? "tuned" : ""), E(static_cast<i64>(k % 3)), N(static_cast<f64>(k) * 1.25)}});
+      c.calls.push_back({"Lookup", {T("nobody"), E(2), N(-1)}});
     }
     for (const Value& rack : racks) {
       c.calls.push_back({"Take", {weapons[2], rack, solos[0]}});

@@ -125,6 +125,16 @@ function lgValueEditor(type, value, data, path = []) {
   if (lgIsList(type)) {
     const item = lgItemType(type), items = Array.isArray(value) ? value : [];
     if (item === "actor") return `<span class="lg-dim">${items.length ? items.length + " actors" : "empty (filled while playing)"}</span>`;
+    if (st && !path.length) {
+      // A list of structs is a table: a row for each item, a column for each field. A field that
+      // is a struct or a list itself has no cell: it stands under its row.
+      const cell = f => !lgStructOf(data?.structs, f.type) && !lgIsList(f.type);
+      const cols = st.fields.filter(cell), deep = st.fields.filter(f => !cell(f));
+      return `<div class="lg-tablebox"><table class="lg-table"><thead><tr><th></th>${cols.map(f => `<th title="${lgEsc(lgTypeName(f.type))}"><i class="lg-pill" style="--c:${lgColor(f.type)}"></i>${lgEsc(f.name)}</th>`).join("")}<th></th></tr></thead>
+        <tbody>${items.map((v, i) => `<tr data-row="${i}"><td class="n">${i}</td>${cols.map(f => `<td>${lgValueEditor(f.type, v?.[f.name], data, [i, f.name])}</td>`).join("")}<td><button data-vx="${at([i])}" title="Remove this row">×</button></td></tr>` +
+          (deep.length ? `<tr class="deep"><td></td><td colspan="${cols.length + 1}">${deep.map(f => `<div class="lg-sf wide"><label title="${lgEsc(lgTypeName(f.type))}"><i class="lg-pill" style="--c:${lgColor(f.type)}"></i>${lgEsc(f.name)}</label>${lgValueEditor(f.type, v?.[f.name], data, [i, f.name])}</div>`).join("")}</td></tr>` : "")).join("")}</tbody></table>
+        <button class="lg-ladd" data-vadd="${at(path)}" data-vt="${lgEsc(item)}" title="Add a row at the end">+ Row</button></div>`;
+    }
     return `<div class="lg-list">${items.map((v, i) => `<div class="lg-li${st ? " lg-lis" : ""}"><em>${i}</em>${lgValueEditor(item, v, data, [...path, i])}<button data-vx="${at([...path, i])}" title="Remove this item">×</button></div>`).join("")}
       <button class="lg-ladd" data-vadd="${at(path)}" data-vt="${lgEsc(item)}" title="Add an item at the end">+ Item</button></div>`;
   }
@@ -2678,6 +2688,16 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-sf>input:not([type=checkbox]),.lg-sf>select{flex:1 1 0;min-width:0;width:auto;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 6px;font:inherit}
 .lg-sf>input[type=checkbox]{margin:0 auto 0 0}
 .lg-li.lg-lis{align-items:flex-start}
+.lg-tablebox{overflow-x:auto;padding-bottom:4px}
+.lg-table{border-collapse:collapse;font-size:11.5px}
+.lg-table th{padding:2px 6px 4px 2px;text-align:left;color:#b8b8b8;font-weight:500;white-space:nowrap}
+.lg-table th .lg-pill{margin-right:5px}
+.lg-table td{padding:1px 2px;vertical-align:top}
+.lg-table td.n{color:#808080;text-align:right;padding-right:5px;line-height:24px}
+.lg-table td>input:not([type=checkbox]),.lg-table td>select{width:86px;height:24px;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 5px;font:inherit}
+.lg-table td>input[type=checkbox]{margin:5px 0 0}
+.lg-table td>button{width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
+.lg-table tr.deep td{padding-bottom:6px}
 .lg-scount{max-width:150px;overflow:hidden;text-overflow:ellipsis}
 .lg-li button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}
 .lg-ladd{align-self:flex-start;height:24px;padding:0 10px;margin-left:23px;border:1px solid #444;border-radius:3px;background:#262626}

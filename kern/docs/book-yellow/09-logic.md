@@ -225,7 +225,7 @@ red, it would still stay on yellow for one step. With **Set State** you jump dir
 
 ## 9.5 Core Nodes
 
-Kern brings **103** built-in nodes:
+Kern brings **104** built-in nodes:
 
 | Category | Examples |
 |---|---|
