@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"20:51",title:"Blueprints: Datentabellen",items:[
+    "Kern-Blueprints: Eine Datentabelle ist eine Variable, die eine Liste einer Struktur ist – etwa „Shop“ als Liste von „Item“ mit Key, Price und Fresh. Jede Zeile ist ein Wert der Struktur, jede Spalte ein Feld.",
+    "Neuer Knoten „Find Row“ („Find Item by Key“): sucht in der Tabelle die erste Zeile, deren Feld den gesuchten Wert hat, und gibt aus, ob es sie gibt, die Zeile selbst und ihren Platz.",
+    "Im Kern-Editor zeigt Details so eine Variable als Tabelle: Zellen direkt bearbeiten, „+ Row“ für eine neue Zeile, × entfernt eine. Wird ein Feld umbenannt, folgen die Knoten.",
+    "Als C++ nennt der Knoten sein Feld als echtes Feld: list_find_row<&Item::Key>(Shop, \"pear\"). Als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus.",
+  ]},
   {date:"2026-11-11",time:"19:37",title:"Blueprints: Strukturen",items:[
     "Kern-Blueprints: Ein Blueprint kann jetzt eigene Typen mit benannten Feldern haben, etwa „Weapon“ mit Name, Art und Schaden. Variablen, Listen, Funktions-Ein- und -Ausgänge und Pins können von diesem Typ sein; ein Feld kann auch eine Aufzählung, eine andere Struktur oder eine Liste sein.",
     "Neue Knoten je Struktur: „Make“ baut einen Wert aus seinen Feldern, „Break“ gibt die Felder einzeln heraus, „Set Field“ ändert ein Feld einer Variablen. Select, Reroute, die Listen-Knoten und For Each arbeiten auch mit Strukturen.",

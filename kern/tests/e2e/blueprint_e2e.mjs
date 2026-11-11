@@ -426,6 +426,42 @@ await cmd({cmd: "play"});
 check(await settle(async () => (await status()).hud?.message === "Fist: 12.5", 60000), `Play sets the field and reads the struct's fields (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
+// ---- 1f. a data table: a list of structs shown as a table, a row looked up by its key, played ------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
+  KERN_STRUCT(Item) {
+    Text Key = "";
+    Float Price = 1.0;
+    Bool Fresh = true;
+  };
+  List<Item> Shop = List<Item>{Item{"apple", 2.5, true}, Item{"pear", 4.0, false}};
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    game_message(text_append("pear costs ", kern::to<Text>(struct_break<Item>(list_find_row<&Item::Key>(Shop, "pear").row).Price), ""));
+  }
+};
+`})).ok, "a table and a lookup written as C++ are a Blueprint");
+check(errorsOf(await logic()).length === 0, "the table graph compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await page.click('.lg-var[data-var="Shop"]');
+const tableRows = n => until(async () => await page.locator(".lg-dbody .lg-table tbody tr[data-row]").count() === n);
+check(await tableRows(2) && (await page.locator(".lg-dbody .lg-table thead th").allTextContents()).join("|").includes("Key|Price|Fresh"), "a list of structs is shown as a table: a row per item, a column per field");
+const shop = async () => (await logic()).variables.find(v => v.name === "Shop")?.value;
+const price = page.locator('.lg-dbody .lg-table tr[data-row="1"] td input:not([type=checkbox])').nth(1);
+await price.fill("6.5");
+await price.press("Enter");
+check(await until(async () => (await shop())?.[1]?.Price === 6.5) && (await shop())[0].Key === "apple", "a cell sets that field of that row");
+await page.click(".lg-dbody .lg-tablebox [data-vadd]");
+check(await tableRows(3) && (await shop())[2]?.Price === 1, "+ Row adds a row with the struct's defaults");
+await page.click('.lg-dbody .lg-table tr[data-row="0"] [data-vx]');
+check(await tableRows(2) && (await shop())[0].Key === "pear", "x takes a row out");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "pear costs 6.5", 60000), `Play looks the row up by its key (${(await status()).hud?.message})`);
+await cmd({cmd: "stop"});
+
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 const text = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
 const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
