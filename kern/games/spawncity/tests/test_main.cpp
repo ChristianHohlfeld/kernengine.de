@@ -65,12 +65,40 @@ static blueprint_native::Case wanted_case() {
   return c;
 }
 
+// The same for the Blueprint of the actor "CombatDetail": every function with many values of its
+// inputs' types - enums, structs and lists among them.
+static blueprint_native::Case combat_detail_case() {
+  using kern::logic::Value;
+  blueprint_native::Case c;
+  c.name = "CombatDetail";
+  std::string error;
+  if (!sc::rules::actor_graph("CombatDetail", c.graph, &error)) std::printf("the level has no CombatDetail Blueprint: %s\n", error.c_str());
+  for (const kern::logic::Function& f : c.graph.functions) {
+    std::vector<std::vector<Value>> samples;
+    for (const kern::logic::FunctionPin& p : f.inputs) samples.push_back(blueprint_native::samples(kern::logic::TypeRef{p.type, p.of}, c.graph));
+    for (std::size_t r = 0; r < 40; ++r) {
+      blueprint_native::Call call{f.name, {}};
+      for (std::size_t k = 0; k < samples.size(); ++k)
+        if (!samples[k].empty()) call.args.push_back(samples[k][(r * (2 * k + 1) + k * 3) % samples[k].size()]);
+      c.calls.push_back(std::move(call));
+      if (f.inputs.empty()) break;
+    }
+  }
+  // a ballot from its start to unanimous, and the clock of a drone that turns critical and blows
+  auto ints = [](std::initializer_list<kern::i64> v) { return Value::of(std::vector<kern::i64>(v)); };
+  c.calls.push_back({"CreateBallot", {Value::text("b"), Value::text("friendlyFire"), Value::boolean(true), Value::integer(2), ints({3, 1, 2, 2}), Value::number(0)}});
+  c.calls.push_back({"CreateBallot", {Value::text("b"), Value::text("friendlyFire"), Value::boolean(true), Value::integer(9), ints({1, 2}), Value::number(0)}});
+  for (double hp : {100.0, 28.0, 20.0, 20.0})
+    c.calls.push_back({"ClockUpdate", {Value::enumeration(3), Value::number(hp), Value::number(100), Value::number(1.5), Value::number(hp < 25 ? 3.05 : -1), Value::number(hp < 25 ? 28 : 100)}});
+  return c;
+}
+
 int main(int argc, char** argv) {
   // spawncity_tests --emit-native <dir>: the Wanted Blueprint as its C++ text, calls to it and
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
     std::string error;
-    if (!blueprint_native::emit(argv[2], {wanted_case()}, &error)) {
+    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case()}, &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
     }

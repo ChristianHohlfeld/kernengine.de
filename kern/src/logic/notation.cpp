@@ -3792,7 +3792,9 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   return true;
 }
 
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib) {
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space) {
+  // (the class from anywhere: ::Name, or ::space::Name)
+  const std::string rooted = "::" + (space.empty() ? std::string() : std::string(space) + "::") + name;
   std::string why;
   if (!native_ready(g, &why, lib)) {
     if (error) *error = why;
@@ -3842,10 +3844,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   // A value from outside that is no struct of this type is the struct's default.
   std::string structs;
   for (const StructType& st : g.structs) {
-    const std::string full = "::" + name + "::" + st.name;
+    const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
-      return is_list(f.type.type) ? "kern::List<::" + name + "::" + f.type.of + ">" : "::" + name + "::" + f.type.of;
+      return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };
     std::string is, from, to;
     for (std::size_t k = 0; k < st.fields.size(); ++k) {
@@ -3864,7 +3866,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                "  static Value to(const " + full + "& s) { return Value::structure({" + to + "}); }\n"
                "};\n";
   }
-  if (!structs.empty()) structs = "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n";
+  // (how a struct of the class is held as a Value is said in kern::logic::detail: outside the class's namespace)
+  if (!structs.empty())
+    structs = (space.empty() ? std::string() : "}  // namespace " + std::string(space) + "\n") + "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n" +
+              (space.empty() ? std::string() : "namespace " + std::string(space) + " {\n");
   char hash[40];
   std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
   // The handlers of events: the runtime starts a chain at an event's node, the class has it as

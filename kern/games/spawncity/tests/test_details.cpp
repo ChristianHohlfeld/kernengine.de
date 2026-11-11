@@ -3,9 +3,78 @@
 #include "../src/combat_audio.h"
 #include "../src/combat_detail.h"
 #include "../src/guided.h"
+#include "../src/rules.h"
 #include "test_util.h"
 
+#include <algorithm>
+#include <chrono>
+
 using namespace sc;
+
+namespace {
+/// The level's actor "CombatDetail" running in a logic runtime of its own, bound to combat_detail.h.
+struct CombatDetailBlueprint {
+  struct Host : kern::logic::Host {
+    std::string errors;
+    f64 time() const override { return 0; }
+    void print(const std::string&, bool) override {}
+    void error(const std::string& text) override { errors += text + "\n"; }
+    kern::u32 random() override { return 4; }
+  } host;
+  kern::logic::Runtime rt{host};
+  kern::logic::Instance* inst = nullptr;
+  std::string problems;
+  explicit CombatDetailBlueprint(bool native = true) {
+    kern::logic::Graph g;
+    std::string error;
+    if (!rules::actor_graph("CombatDetail", g, &error)) { problems = error; return; }
+    for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
+    rt.native = native;
+    inst = rt.add(g, 2, "CombatDetail");
+    rt.begin();
+    detail::bind(inst);
+  }
+  ~CombatDetailBlueprint() { detail::bind(nullptr); }
+};
+}  // namespace
+
+SC_TEST(details_blueprint) {
+  CombatDetailBlueprint bp;
+  SC_CHECK(bp.inst && bp.problems.empty(), "the level's CombatDetail Blueprint compiles without errors or warnings: %s", bp.problems.c_str());
+  if (!bp.inst) return;
+  SC_CHECK(!bp.inst->disabled() && bp.host.errors.empty(), "it runs (%s)", bp.host.errors.c_str());
+  // as in the game: its compiled C++ class (src/level_blueprints.cpp, written from the level by the build)
+  SC_CHECK(std::string(bp.inst->tier()) == "native C++", "the CombatDetail Blueprint runs as its C++ class (it runs: %s)", bp.inst->tier());
+  for (const char* f : {"IsCritical", "DetonationAt", "Accelerate", "ClockUpdate", "MomentumNs", "BulletImpulse", "CreateBallot", "CastVote", "BallotName"})
+    SC_CHECK(bp.inst->has_function(f), "function %s", f);
+  SC_CHECK(std::fabs(detail::projectile_gravity() - 9.80665f) < 1e-6f, "the constants are its variables");
+  SC_CHECK(detail::ballot_name(detail::Ballot::pending) == "pending" && detail::ballot_name(detail::Ballot::invalid) == "invalid", "a ballot's status by its name");
+  SC_CHECK(detail::bullet_impulse({0, 0, 0}, detail::Round::nine_mm).x > 2.8f, "a bullet without a direction pushes along x");
+  // How long a rule takes when the game asks the Blueprint for it - the clock of one vehicle,
+  // asked every frame - as the class and in the interpreter.
+  auto clock_ns = [](int rounds) {
+    detail::CriticalClock c;
+    const auto t0 = std::chrono::steady_clock::now();
+    int fired = 0;
+    for (int i = 0; i < rounds; ++i) fired += c.update(detail::Critical::drone, 100.0f - static_cast<f32>(std::min(i % 300, 95)), 100, static_cast<f32>(i) / 60) ? 1 : 0;
+    const f64 ns = std::chrono::duration<f64, std::nano>(std::chrono::steady_clock::now() - t0).count() / rounds;
+    return std::pair<f64, int>(ns, fired);
+  };
+  const auto native = clock_ns(20000);
+  f64 interpreted = 0;
+  int interpreted_fired = 0;
+  {
+    CombatDetailBlueprint slow(false);
+    SC_CHECK(slow.inst && std::string(slow.inst->tier()) != "native C++", "(the same Blueprint in the interpreter)");
+    const auto r = clock_ns(20000);
+    interpreted = r.first;
+    interpreted_fired = r.second;
+  }
+  detail::bind(bp.inst);
+  std::printf("  CombatDetail.ClockUpdate from C++: %.0f ns as its class, %.0f ns in the interpreter (this build checks every memory access)\n", native.first, interpreted);
+  SC_CHECK(native.second == interpreted_fired && native.second > 0, "both give the same (%d / %d blasts)", native.second, interpreted_fired);
+  SC_CHECK(native.first < 20000, "a rule asked every frame costs microseconds, not milliseconds (%.0f ns)", native.first);
+}
 
 SC_TEST(guided_cruise_dive_and_fuze) {
   // A target 300 m away on the ground: the missile drops, climbs to cruise height (target + 28 m),
@@ -66,6 +135,7 @@ SC_TEST(guided_pick_score) {
 
 SC_TEST(details_critical_clocks) {
   using namespace detail;
+  CombatDetailBlueprint bp;
   SC_CHECK(is_critical(Critical::car, 60, 300) && !is_critical(Critical::car, 61, 300), "car critical at 20 %%");
   SC_CHECK(is_critical(Critical::police_drone, 34, 100) && !is_critical(Critical::police_drone, 35, 100), "police drone at 34 %%");
   SC_CHECK(std::fabs(detonation_at(Critical::bus, 10) - 13.1f) < 1e-4f, "bus blows 3.1 s later");
@@ -85,6 +155,7 @@ SC_TEST(details_critical_clocks) {
 
 SC_TEST(details_bullet_momentum) {
   using namespace detail;
+  CombatDetailBlueprint bp;
   SC_CHECK(std::fabs(momentum_ns(Round::nine_mm) - 2.88f) < 1e-3f, "9 mm 2.88 N*s");
   SC_CHECK(std::fabs(momentum_ns(Round::fifty_bmg) - 40.762f) < 1e-2f, ".50 BMG ~41 N*s");
   const Vec3 j = bullet_impulse({0, 3, 0}, Round::five_five_six);
@@ -93,6 +164,7 @@ SC_TEST(details_bullet_momentum) {
 
 SC_TEST(details_rule_ballot) {
   using namespace detail;
+  CombatDetailBlueprint bp;
   SC_CHECK(create_ballot("b", "friendlyFire", true, 1, {1}, 0).status == Ballot::invalid, "one voter: invalid");
   SC_CHECK(create_ballot("b", "friendlyFire", true, 9, {1, 2}, 0).status == Ballot::invalid, "host not in roster: invalid");
   Vote b = create_ballot("b", "friendlyFire", true, 2, {3, 1, 2, 2}, 0);

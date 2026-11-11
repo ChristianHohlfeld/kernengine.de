@@ -15,7 +15,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 2,
+ "nextId": 3,
  "actors": [
   {
    "id": 1,
@@ -1786,6 +1786,3509 @@
        "w": 1760,
        "h": 1338,
        "text": "The heat: what the police know of, and how the player gets rid of it"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 2,
+   "name": "CombatDetail",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 208,
+     "variables": [
+      {
+       "name": "Profiles",
+       "type": "struct_list",
+       "of": "CriticalProfile",
+       "value": [
+        {
+         "Ratio": 0.2,
+         "DelayS": 2.45,
+         "AcceleratedS": 0.62
+        },
+        {
+         "Ratio": 0.2,
+         "DelayS": 3.1,
+         "AcceleratedS": 0.72
+        },
+        {
+         "Ratio": 0.34,
+         "DelayS": 2.2,
+         "AcceleratedS": 0.56
+        },
+        {
+         "Ratio": 0.28,
+         "DelayS": 2.05,
+         "AcceleratedS": 0.54
+        }
+       ],
+       "help": "A row for each Critical, in its order: car, bus, police drone, drone"
+      },
+      {
+       "name": "Rounds",
+       "type": "struct_list",
+       "of": "RoundSpec",
+       "value": [
+        {
+         "Name": "9mm",
+         "MassKg": 0.008,
+         "SpeedMps": 360
+        },
+        {
+         "Name": "5.56",
+         "MassKg": 0.004,
+         "SpeedMps": 940
+        },
+        {
+         "Name": ".50bmg",
+         "MassKg": 0.0458,
+         "SpeedMps": 890
+        }
+       ],
+       "help": "A row for each Round, in its order: 9x19 mm (Glock 17 / SMG), 5.56x45 mm (drone gun), 12.7x99 mm (sniper rifle, 41 N*s)"
+      },
+      {
+       "name": "ProjectileGravity",
+       "type": "float",
+       "value": 9.80665
+      },
+      {
+       "name": "BallotSeconds",
+       "type": "float",
+       "value": 30,
+       "help": "How long a ballot is open"
+      }
+     ],
+     "enums": [
+      {
+       "name": "Critical",
+       "values": [
+        "Car",
+        "Bus",
+        "PoliceDrone",
+        "Drone"
+       ],
+       "help": "What can turn critical (critical_damage_logic.mjs)"
+      },
+      {
+       "name": "Round",
+       "values": [
+        "NineMm",
+        "FiveFiveSix",
+        "FiftyBmg"
+       ],
+       "help": "The rounds a bullet can be (ballistics.mjs)"
+      },
+      {
+       "name": "Ballot",
+       "values": [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "ignored",
+        "invalid"
+       ],
+       "help": "How a ballot over a game rule stands (rules_vote_engine.mjs)"
+      }
+     ],
+     "structs": [
+      {
+       "name": "CriticalProfile",
+       "fields": [
+        {
+         "name": "Ratio",
+         "type": "float",
+         "value": 0.2
+        },
+        {
+         "name": "DelayS",
+         "type": "float",
+         "value": 2
+        },
+        {
+         "name": "AcceleratedS",
+         "type": "float",
+         "value": 0.5
+        }
+       ],
+       "help": "When it turns critical (the share of its health), how long until it blows, and how soon after a further hit"
+      },
+      {
+       "name": "RoundSpec",
+       "fields": [
+        {
+         "name": "Name",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "MassKg",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "SpeedMps",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Vote",
+       "fields": [
+        {
+         "name": "Id",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Key",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Value",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Host",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "Members",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Yes",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Expires",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Status",
+         "type": "enum",
+         "of": "Ballot",
+         "value": 5
+        }
+       ],
+       "help": "A unanimous ballot over a game rule: only the roster of its start votes, the host has voted yes"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 40,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 4280,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 45,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 4750,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 46,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Profile"
+       }
+      },
+      {
+       "id": 47,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "Profile"
+       }
+      },
+      {
+       "id": 48,
+       "type": "list.get",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "type": "CriticalProfile"
+       }
+      },
+      {
+       "id": 49,
+       "type": "var.get",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "variable": "Profiles"
+       }
+      },
+      {
+       "id": 50,
+       "type": "enum.index",
+       "x": 160,
+       "y": 330,
+       "params": {
+        "enum": "Critical"
+       }
+      },
+      {
+       "id": 51,
+       "type": "func.entry",
+       "x": 0,
+       "y": 470,
+       "params": {
+        "function": "IsCritical"
+       }
+      },
+      {
+       "id": 52,
+       "type": "func.return",
+       "x": 280,
+       "y": 470,
+       "params": {
+        "function": "IsCritical"
+       }
+      },
+      {
+       "id": 53,
+       "type": "math.formula",
+       "x": 160,
+       "y": 620,
+       "params": {
+        "formula": "top > 0 && clamp(hp, 0, top) <= top * ratio"
+       }
+      },
+      {
+       "id": 54,
+       "type": "struct.break",
+       "x": 160,
+       "y": 710,
+       "params": {
+        "struct": "CriticalProfile"
+       }
+      },
+      {
+       "id": 55,
+       "type": "func.pure",
+       "x": 160,
+       "y": 800,
+       "params": {
+        "function": "Profile"
+       }
+      },
+      {
+       "id": 56,
+       "type": "func.entry",
+       "x": 0,
+       "y": 940,
+       "params": {
+        "function": "DetonationAt"
+       }
+      },
+      {
+       "id": 57,
+       "type": "func.return",
+       "x": 280,
+       "y": 940,
+       "params": {
+        "function": "DetonationAt"
+       }
+      },
+      {
+       "id": 58,
+       "type": "math.add",
+       "x": 160,
+       "y": 1090
+      },
+      {
+       "id": 59,
+       "type": "struct.break",
+       "x": 160,
+       "y": 1180,
+       "params": {
+        "struct": "CriticalProfile"
+       }
+      },
+      {
+       "id": 60,
+       "type": "func.pure",
+       "x": 160,
+       "y": 1270,
+       "params": {
+        "function": "Profile"
+       }
+      },
+      {
+       "id": 61,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1410,
+       "params": {
+        "function": "Accelerate"
+       }
+      },
+      {
+       "id": 62,
+       "type": "func.return",
+       "x": 280,
+       "y": 1410,
+       "params": {
+        "function": "Accelerate"
+       }
+      },
+      {
+       "id": 63,
+       "type": "math.min",
+       "x": 160,
+       "y": 1560
+      },
+      {
+       "id": 64,
+       "type": "math.add",
+       "x": 160,
+       "y": 1650
+      },
+      {
+       "id": 65,
+       "type": "struct.break",
+       "x": 160,
+       "y": 1740,
+       "params": {
+        "struct": "CriticalProfile"
+       }
+      },
+      {
+       "id": 66,
+       "type": "func.pure",
+       "x": 160,
+       "y": 1830,
+       "params": {
+        "function": "Profile"
+       }
+      },
+      {
+       "id": 67,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       }
+      },
+      {
+       "id": 68,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 1970
+      },
+      {
+       "id": 69,
+       "type": "math.compare",
+       "x": 160,
+       "y": 2120,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 70,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 1970
+      },
+      {
+       "id": 71,
+       "type": "logic.and",
+       "x": 440,
+       "y": 2120
+      },
+      {
+       "id": 72,
+       "type": "math.compare",
+       "x": 440,
+       "y": 2210,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 73,
+       "type": "func.pure",
+       "x": 440,
+       "y": 2300,
+       "params": {
+        "function": "IsCritical"
+       }
+      },
+      {
+       "id": 74,
+       "type": "func.return",
+       "x": 840,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       },
+       "values": {
+        "fired": false
+       }
+      },
+      {
+       "id": 75,
+       "type": "func.pure",
+       "x": 720,
+       "y": 2120,
+       "params": {
+        "function": "DetonationAt"
+       }
+      },
+      {
+       "id": 76,
+       "type": "func.return",
+       "x": 1120,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       },
+       "values": {
+        "fired": false,
+        "at": -1
+       }
+      },
+      {
+       "id": 77,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 1970
+      },
+      {
+       "id": 78,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 2120
+      },
+      {
+       "id": 79,
+       "type": "logic.not",
+       "x": 1280,
+       "y": 2210
+      },
+      {
+       "id": 80,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 2300,
+       "params": {
+        "function": "IsCritical"
+       }
+      },
+      {
+       "id": 81,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 2390,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 82,
+       "type": "func.return",
+       "x": 1680,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       },
+       "values": {
+        "fired": false,
+        "at": -1
+       }
+      },
+      {
+       "id": 83,
+       "type": "var.set",
+       "x": 1960,
+       "y": 1970,
+       "params": {
+        "variable": "At",
+        "scope": "ClockUpdate"
+       }
+      },
+      {
+       "id": 84,
+       "type": "flow.branch",
+       "x": 2240,
+       "y": 1970
+      },
+      {
+       "id": 85,
+       "type": "math.formula",
+       "x": 2120,
+       "y": 2120,
+       "params": {
+        "formula": "last >= 0 && hp < last - 0.001"
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.set",
+       "x": 2520,
+       "y": 1970,
+       "params": {
+        "variable": "At",
+        "scope": "ClockUpdate"
+       }
+      },
+      {
+       "id": 87,
+       "type": "func.pure",
+       "x": 2400,
+       "y": 2120,
+       "params": {
+        "function": "Accelerate"
+       }
+      },
+      {
+       "id": 88,
+       "type": "flow.branch",
+       "x": 2800,
+       "y": 1970
+      },
+      {
+       "id": 89,
+       "type": "math.compare",
+       "x": 2680,
+       "y": 2120,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 90,
+       "type": "var.get",
+       "x": 2680,
+       "y": 2210,
+       "params": {
+        "variable": "At",
+        "scope": "ClockUpdate"
+       }
+      },
+      {
+       "id": 91,
+       "type": "func.return",
+       "x": 3080,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       },
+       "values": {
+        "fired": true,
+        "at": -1,
+        "lastHp": -1
+       }
+      },
+      {
+       "id": 92,
+       "type": "func.return",
+       "x": 3360,
+       "y": 1970,
+       "params": {
+        "function": "ClockUpdate"
+       },
+       "values": {
+        "fired": false
+       }
+      },
+      {
+       "id": 93,
+       "type": "var.get",
+       "x": 3240,
+       "y": 2120,
+       "params": {
+        "variable": "At",
+        "scope": "ClockUpdate"
+       }
+      },
+      {
+       "id": 94,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2530,
+       "params": {
+        "function": "MomentumNs"
+       }
+      },
+      {
+       "id": 95,
+       "type": "func.return",
+       "x": 280,
+       "y": 2530,
+       "params": {
+        "function": "MomentumNs"
+       }
+      },
+      {
+       "id": 96,
+       "type": "math.mul",
+       "x": 160,
+       "y": 2680
+      },
+      {
+       "id": 97,
+       "type": "struct.break",
+       "x": 160,
+       "y": 2770,
+       "params": {
+        "struct": "RoundSpec"
+       }
+      },
+      {
+       "id": 98,
+       "type": "list.get",
+       "x": 160,
+       "y": 2860,
+       "params": {
+        "type": "RoundSpec"
+       }
+      },
+      {
+       "id": 99,
+       "type": "var.get",
+       "x": 160,
+       "y": 2950,
+       "params": {
+        "variable": "Rounds"
+       }
+      },
+      {
+       "id": 100,
+       "type": "enum.index",
+       "x": 160,
+       "y": 3040,
+       "params": {
+        "enum": "Round"
+       }
+      },
+      {
+       "id": 101,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3130,
+       "params": {
+        "struct": "RoundSpec"
+       }
+      },
+      {
+       "id": 102,
+       "type": "list.get",
+       "x": 160,
+       "y": 3220,
+       "params": {
+        "type": "RoundSpec"
+       }
+      },
+      {
+       "id": 103,
+       "type": "var.get",
+       "x": 160,
+       "y": 3310,
+       "params": {
+        "variable": "Rounds"
+       }
+      },
+      {
+       "id": 104,
+       "type": "enum.index",
+       "x": 160,
+       "y": 3400,
+       "params": {
+        "enum": "Round"
+       }
+      },
+      {
+       "id": 105,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3540,
+       "params": {
+        "function": "BulletImpulse"
+       }
+      },
+      {
+       "id": 106,
+       "type": "func.return",
+       "x": 280,
+       "y": 3540,
+       "params": {
+        "function": "BulletImpulse"
+       }
+      },
+      {
+       "id": 107,
+       "type": "vector.scale",
+       "x": 160,
+       "y": 3690
+      },
+      {
+       "id": 108,
+       "type": "logic.select",
+       "x": 160,
+       "y": 3780,
+       "params": {
+        "type": "vector"
+       },
+       "values": {
+        "b": [
+         1,
+         0,
+         0
+        ]
+       }
+      },
+      {
+       "id": 109,
+       "type": "math.compare",
+       "x": 160,
+       "y": 3870,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 110,
+       "type": "vector.length",
+       "x": 160,
+       "y": 3960
+      },
+      {
+       "id": 111,
+       "type": "vector.normalize",
+       "x": 160,
+       "y": 4050
+      },
+      {
+       "id": 112,
+       "type": "func.pure",
+       "x": 160,
+       "y": 4140,
+       "params": {
+        "function": "MomentumNs"
+       }
+      },
+      {
+       "id": 113,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4280,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 114,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 4280
+      },
+      {
+       "id": 115,
+       "type": "logic.not",
+       "x": 440,
+       "y": 4430
+      },
+      {
+       "id": 116,
+       "type": "list.contains",
+       "x": 440,
+       "y": 4520,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 117,
+       "type": "var.get",
+       "x": 440,
+       "y": 4610,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 118,
+       "type": "list.add",
+       "x": 840,
+       "y": 4280,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 119,
+       "type": "func.return",
+       "x": 1120,
+       "y": 4280,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 120,
+       "type": "var.get",
+       "x": 1000,
+       "y": 4430,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 121,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4750,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 122,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 4750
+      },
+      {
+       "id": 123,
+       "type": "logic.not",
+       "x": 440,
+       "y": 4900
+      },
+      {
+       "id": 124,
+       "type": "list.contains",
+       "x": 440,
+       "y": 4990,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 125,
+       "type": "var.set",
+       "x": 840,
+       "y": 4750,
+       "params": {
+        "variable": "All",
+        "scope": "Within"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 126,
+       "type": "func.return",
+       "x": 1120,
+       "y": 4750,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 127,
+       "type": "var.get",
+       "x": 1000,
+       "y": 4900,
+       "params": {
+        "variable": "All",
+        "scope": "Within"
+       }
+      },
+      {
+       "id": 128,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5130,
+       "params": {
+        "function": "CreateBallot"
+       }
+      },
+      {
+       "id": 129,
+       "type": "var.set",
+       "x": 280,
+       "y": 5130,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 130,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5280,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 131,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 5130
+      },
+      {
+       "id": 132,
+       "type": "logic.or",
+       "x": 440,
+       "y": 5280
+      },
+      {
+       "id": 133,
+       "type": "logic.or",
+       "x": 440,
+       "y": 5370
+      },
+      {
+       "id": 134,
+       "type": "text.equal",
+       "x": 440,
+       "y": 5460,
+       "values": {
+        "b": ""
+       }
+      },
+      {
+       "id": 135,
+       "type": "text.equal",
+       "x": 440,
+       "y": 5550,
+       "values": {
+        "b": ""
+       }
+      },
+      {
+       "id": 136,
+       "type": "logic.or",
+       "x": 440,
+       "y": 5640
+      },
+      {
+       "id": 137,
+       "type": "logic.not",
+       "x": 440,
+       "y": 5730
+      },
+      {
+       "id": 138,
+       "type": "list.contains",
+       "x": 440,
+       "y": 5820,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 139,
+       "type": "var.get",
+       "x": 440,
+       "y": 5910,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 140,
+       "type": "math.compare",
+       "x": 440,
+       "y": 6000,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 141,
+       "type": "list.length",
+       "x": 440,
+       "y": 6090,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 142,
+       "type": "var.get",
+       "x": 440,
+       "y": 6180,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 143,
+       "type": "func.return",
+       "x": 840,
+       "y": 5130,
+       "params": {
+        "function": "CreateBallot"
+       }
+      },
+      {
+       "id": 144,
+       "type": "struct.make",
+       "x": 720,
+       "y": 5280,
+       "params": {
+        "struct": "Vote"
+       },
+       "values": {
+        "Id": "",
+        "Key": "",
+        "Value": false,
+        "Host": 0,
+        "Expires": 0,
+        "Status": 5
+       }
+      },
+      {
+       "id": 145,
+       "type": "list.make",
+       "x": 720,
+       "y": 5370,
+       "params": {
+        "type": "int",
+        "count": "0"
+       }
+      },
+      {
+       "id": 146,
+       "type": "list.make",
+       "x": 720,
+       "y": 5460,
+       "params": {
+        "type": "int",
+        "count": "0"
+       }
+      },
+      {
+       "id": 147,
+       "type": "func.return",
+       "x": 1120,
+       "y": 5130,
+       "params": {
+        "function": "CreateBallot"
+       }
+      },
+      {
+       "id": 148,
+       "type": "struct.make",
+       "x": 1000,
+       "y": 5280,
+       "params": {
+        "struct": "Vote"
+       },
+       "values": {
+        "Status": 0
+       }
+      },
+      {
+       "id": 149,
+       "type": "var.get",
+       "x": 1000,
+       "y": 5370,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 150,
+       "type": "list.make",
+       "x": 1000,
+       "y": 5460,
+       "params": {
+        "type": "int",
+        "count": "1"
+       }
+      },
+      {
+       "id": 151,
+       "type": "math.add",
+       "x": 1000,
+       "y": 5550
+      },
+      {
+       "id": 152,
+       "type": "var.get",
+       "x": 1000,
+       "y": 5640,
+       "params": {
+        "variable": "BallotSeconds"
+       }
+      },
+      {
+       "id": 153,
+       "type": "func.entry",
+       "x": 0,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 154,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 6320
+      },
+      {
+       "id": 155,
+       "type": "logic.not",
+       "x": 160,
+       "y": 6470
+      },
+      {
+       "id": 156,
+       "type": "enum.equal",
+       "x": 160,
+       "y": 6560,
+       "params": {
+        "enum": "Ballot"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 157,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6650,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 158,
+       "type": "func.return",
+       "x": 560,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 159,
+       "type": "struct.break",
+       "x": 440,
+       "y": 6470,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 160,
+       "type": "var.set",
+       "x": 840,
+       "y": 6320,
+       "params": {
+        "variable": "B",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 161,
+       "type": "var.set",
+       "x": 1120,
+       "y": 6320,
+       "params": {
+        "variable": "Now",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 162,
+       "type": "func.pure",
+       "x": 1000,
+       "y": 6470,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 163,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 6320
+      },
+      {
+       "id": 164,
+       "type": "logic.or",
+       "x": 1280,
+       "y": 6470
+      },
+      {
+       "id": 165,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 6560,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 166,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 6650,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 167,
+       "type": "logic.not",
+       "x": 1280,
+       "y": 6740
+      },
+      {
+       "id": 168,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 6830
+      },
+      {
+       "id": 169,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 6920,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 170,
+       "type": "var.get",
+       "x": 1280,
+       "y": 7010,
+       "params": {
+        "variable": "Now",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 171,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 7100,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 172,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 7190,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 173,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 7280,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 174,
+       "type": "var.get",
+       "x": 1280,
+       "y": 7370,
+       "params": {
+        "variable": "Now",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 175,
+       "type": "struct.set_field",
+       "x": 1680,
+       "y": 6320,
+       "params": {
+        "variable": "B",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 3
+       }
+      },
+      {
+       "id": 176,
+       "type": "func.return",
+       "x": 1960,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       },
+       "values": {
+        "status": 3
+       }
+      },
+      {
+       "id": 177,
+       "type": "var.get",
+       "x": 1840,
+       "y": 6470,
+       "params": {
+        "variable": "B",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 178,
+       "type": "flow.branch",
+       "x": 2240,
+       "y": 6320
+      },
+      {
+       "id": 179,
+       "type": "logic.or",
+       "x": 2120,
+       "y": 6470
+      },
+      {
+       "id": 180,
+       "type": "logic.not",
+       "x": 2120,
+       "y": 6560
+      },
+      {
+       "id": 181,
+       "type": "list.contains",
+       "x": 2120,
+       "y": 6650,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 182,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 6740,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 183,
+       "type": "list.contains",
+       "x": 2120,
+       "y": 6830,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 184,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 6920,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 185,
+       "type": "func.return",
+       "x": 2520,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       },
+       "values": {
+        "status": 4
+       }
+      },
+      {
+       "id": 186,
+       "type": "flow.branch",
+       "x": 2800,
+       "y": 6320
+      },
+      {
+       "id": 187,
+       "type": "logic.not",
+       "x": 2680,
+       "y": 6470
+      },
+      {
+       "id": 188,
+       "type": "struct.set_field",
+       "x": 3080,
+       "y": 6320,
+       "params": {
+        "variable": "B",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 2
+       }
+      },
+      {
+       "id": 189,
+       "type": "func.return",
+       "x": 3360,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       },
+       "values": {
+        "status": 2
+       }
+      },
+      {
+       "id": 190,
+       "type": "var.get",
+       "x": 3240,
+       "y": 6470,
+       "params": {
+        "variable": "B",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 191,
+       "type": "var.set",
+       "x": 3640,
+       "y": 6320,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 192,
+       "type": "struct.break",
+       "x": 3520,
+       "y": 6470,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 193,
+       "type": "list.add",
+       "x": 3920,
+       "y": 6320,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 194,
+       "type": "struct.set_field",
+       "x": 4200,
+       "y": 6320,
+       "params": {
+        "variable": "B",
+        "field": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 195,
+       "type": "var.get",
+       "x": 4080,
+       "y": 6470,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 196,
+       "type": "flow.branch",
+       "x": 4480,
+       "y": 6320
+      },
+      {
+       "id": 197,
+       "type": "func.pure",
+       "x": 4360,
+       "y": 6470,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 198,
+       "type": "struct.break",
+       "x": 4360,
+       "y": 6560,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 199,
+       "type": "var.get",
+       "x": 4360,
+       "y": 6650,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 200,
+       "type": "struct.set_field",
+       "x": 4760,
+       "y": 6320,
+       "params": {
+        "variable": "B",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 1
+       }
+      },
+      {
+       "id": 201,
+       "type": "func.return",
+       "x": 5040,
+       "y": 6320,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 202,
+       "type": "var.get",
+       "x": 4920,
+       "y": 6470,
+       "params": {
+        "variable": "B",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 203,
+       "type": "struct.break",
+       "x": 4920,
+       "y": 6560,
+       "params": {
+        "struct": "Vote"
+       }
+      },
+      {
+       "id": 204,
+       "type": "var.get",
+       "x": 4920,
+       "y": 6650,
+       "params": {
+        "variable": "B",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 205,
+       "type": "func.entry",
+       "x": 0,
+       "y": 7510,
+       "params": {
+        "function": "BallotName"
+       }
+      },
+      {
+       "id": 206,
+       "type": "func.return",
+       "x": 280,
+       "y": 7510,
+       "params": {
+        "function": "BallotName"
+       }
+      },
+      {
+       "id": 207,
+       "type": "enum.name",
+       "x": 160,
+       "y": 7660,
+       "params": {
+        "enum": "Ballot"
+       }
+      }
+     ],
+     "links": [
+      [
+       40,
+       "body",
+       114,
+       "exec"
+      ],
+      [
+       40,
+       "completed",
+       119,
+       "exec"
+      ],
+      [
+       40,
+       "item",
+       116,
+       "item"
+      ],
+      [
+       40,
+       "item",
+       118,
+       "item"
+      ],
+      [
+       45,
+       "body",
+       122,
+       "exec"
+      ],
+      [
+       45,
+       "completed",
+       126,
+       "exec"
+      ],
+      [
+       45,
+       "item",
+       124,
+       "item"
+      ],
+      [
+       46,
+       "kind",
+       50,
+       "value"
+      ],
+      [
+       46,
+       "then",
+       47,
+       "exec"
+      ],
+      [
+       48,
+       "item",
+       47,
+       "profile"
+      ],
+      [
+       49,
+       "value",
+       48,
+       "list"
+      ],
+      [
+       50,
+       "index",
+       48,
+       "index"
+      ],
+      [
+       51,
+       "hp",
+       53,
+       "hp"
+      ],
+      [
+       51,
+       "kind",
+       55,
+       "kind"
+      ],
+      [
+       51,
+       "maxHp",
+       53,
+       "top"
+      ],
+      [
+       51,
+       "then",
+       52,
+       "exec"
+      ],
+      [
+       53,
+       "result",
+       52,
+       "critical"
+      ],
+      [
+       54,
+       "Ratio",
+       53,
+       "ratio"
+      ],
+      [
+       55,
+       "profile",
+       54,
+       "value"
+      ],
+      [
+       56,
+       "kind",
+       60,
+       "kind"
+      ],
+      [
+       56,
+       "now",
+       58,
+       "a"
+      ],
+      [
+       56,
+       "then",
+       57,
+       "exec"
+      ],
+      [
+       58,
+       "result",
+       57,
+       "at"
+      ],
+      [
+       59,
+       "DelayS",
+       58,
+       "b"
+      ],
+      [
+       60,
+       "profile",
+       59,
+       "value"
+      ],
+      [
+       61,
+       "currentAt",
+       63,
+       "a"
+      ],
+      [
+       61,
+       "kind",
+       66,
+       "kind"
+      ],
+      [
+       61,
+       "now",
+       64,
+       "a"
+      ],
+      [
+       61,
+       "then",
+       62,
+       "exec"
+      ],
+      [
+       63,
+       "result",
+       62,
+       "at"
+      ],
+      [
+       64,
+       "result",
+       63,
+       "b"
+      ],
+      [
+       65,
+       "AcceleratedS",
+       64,
+       "b"
+      ],
+      [
+       66,
+       "profile",
+       65,
+       "value"
+      ],
+      [
+       67,
+       "at",
+       69,
+       "a"
+      ],
+      [
+       67,
+       "at",
+       83,
+       "value"
+      ],
+      [
+       67,
+       "at",
+       87,
+       "currentAt"
+      ],
+      [
+       67,
+       "hp",
+       72,
+       "a"
+      ],
+      [
+       67,
+       "hp",
+       73,
+       "hp"
+      ],
+      [
+       67,
+       "hp",
+       74,
+       "lastHp"
+      ],
+      [
+       67,
+       "hp",
+       76,
+       "lastHp"
+      ],
+      [
+       67,
+       "hp",
+       80,
+       "hp"
+      ],
+      [
+       67,
+       "hp",
+       81,
+       "a"
+      ],
+      [
+       67,
+       "hp",
+       82,
+       "lastHp"
+      ],
+      [
+       67,
+       "hp",
+       85,
+       "hp"
+      ],
+      [
+       67,
+       "hp",
+       92,
+       "lastHp"
+      ],
+      [
+       67,
+       "kind",
+       73,
+       "kind"
+      ],
+      [
+       67,
+       "kind",
+       75,
+       "kind"
+      ],
+      [
+       67,
+       "kind",
+       80,
+       "kind"
+      ],
+      [
+       67,
+       "kind",
+       87,
+       "kind"
+      ],
+      [
+       67,
+       "lastHp",
+       85,
+       "last"
+      ],
+      [
+       67,
+       "maxHp",
+       73,
+       "maxHp"
+      ],
+      [
+       67,
+       "maxHp",
+       80,
+       "maxHp"
+      ],
+      [
+       67,
+       "now",
+       75,
+       "now"
+      ],
+      [
+       67,
+       "now",
+       87,
+       "now"
+      ],
+      [
+       67,
+       "now",
+       89,
+       "a"
+      ],
+      [
+       67,
+       "then",
+       68,
+       "exec"
+      ],
+      [
+       68,
+       "false",
+       77,
+       "exec"
+      ],
+      [
+       68,
+       "true",
+       70,
+       "exec"
+      ],
+      [
+       69,
+       "result",
+       68,
+       "condition"
+      ],
+      [
+       70,
+       "false",
+       76,
+       "exec"
+      ],
+      [
+       70,
+       "true",
+       74,
+       "exec"
+      ],
+      [
+       71,
+       "result",
+       70,
+       "condition"
+      ],
+      [
+       72,
+       "result",
+       71,
+       "a"
+      ],
+      [
+       73,
+       "critical",
+       71,
+       "b"
+      ],
+      [
+       75,
+       "at",
+       74,
+       "at"
+      ],
+      [
+       77,
+       "false",
+       83,
+       "exec"
+      ],
+      [
+       77,
+       "true",
+       82,
+       "exec"
+      ],
+      [
+       78,
+       "result",
+       77,
+       "condition"
+      ],
+      [
+       79,
+       "result",
+       78,
+       "a"
+      ],
+      [
+       80,
+       "critical",
+       79,
+       "a"
+      ],
+      [
+       81,
+       "result",
+       78,
+       "b"
+      ],
+      [
+       83,
+       "then",
+       84,
+       "exec"
+      ],
+      [
+       84,
+       "false",
+       88,
+       "exec"
+      ],
+      [
+       84,
+       "true",
+       86,
+       "exec"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "condition"
+      ],
+      [
+       86,
+       "then",
+       88,
+       "exec"
+      ],
+      [
+       87,
+       "at",
+       86,
+       "value"
+      ],
+      [
+       88,
+       "false",
+       92,
+       "exec"
+      ],
+      [
+       88,
+       "true",
+       91,
+       "exec"
+      ],
+      [
+       89,
+       "result",
+       88,
+       "condition"
+      ],
+      [
+       90,
+       "value",
+       89,
+       "b"
+      ],
+      [
+       93,
+       "value",
+       92,
+       "at"
+      ],
+      [
+       94,
+       "round",
+       100,
+       "value"
+      ],
+      [
+       94,
+       "round",
+       104,
+       "value"
+      ],
+      [
+       94,
+       "then",
+       95,
+       "exec"
+      ],
+      [
+       96,
+       "result",
+       95,
+       "ns"
+      ],
+      [
+       97,
+       "MassKg",
+       96,
+       "a"
+      ],
+      [
+       98,
+       "item",
+       97,
+       "value"
+      ],
+      [
+       99,
+       "value",
+       98,
+       "list"
+      ],
+      [
+       100,
+       "index",
+       98,
+       "index"
+      ],
+      [
+       101,
+       "SpeedMps",
+       96,
+       "b"
+      ],
+      [
+       102,
+       "item",
+       101,
+       "value"
+      ],
+      [
+       103,
+       "value",
+       102,
+       "list"
+      ],
+      [
+       104,
+       "index",
+       102,
+       "index"
+      ],
+      [
+       105,
+       "direction",
+       110,
+       "a"
+      ],
+      [
+       105,
+       "direction",
+       111,
+       "a"
+      ],
+      [
+       105,
+       "round",
+       112,
+       "round"
+      ],
+      [
+       105,
+       "then",
+       106,
+       "exec"
+      ],
+      [
+       107,
+       "result",
+       106,
+       "impulse"
+      ],
+      [
+       108,
+       "result",
+       107,
+       "a"
+      ],
+      [
+       109,
+       "result",
+       108,
+       "pick"
+      ],
+      [
+       110,
+       "result",
+       109,
+       "a"
+      ],
+      [
+       111,
+       "result",
+       108,
+       "a"
+      ],
+      [
+       112,
+       "ns",
+       107,
+       "b"
+      ],
+      [
+       113,
+       "list",
+       40,
+       "list"
+      ],
+      [
+       113,
+       "then",
+       40,
+       "exec"
+      ],
+      [
+       114,
+       "true",
+       118,
+       "exec"
+      ],
+      [
+       115,
+       "result",
+       114,
+       "condition"
+      ],
+      [
+       116,
+       "result",
+       115,
+       "a"
+      ],
+      [
+       117,
+       "value",
+       116,
+       "list"
+      ],
+      [
+       120,
+       "value",
+       119,
+       "list"
+      ],
+      [
+       121,
+       "list",
+       45,
+       "list"
+      ],
+      [
+       121,
+       "other",
+       124,
+       "list"
+      ],
+      [
+       121,
+       "then",
+       45,
+       "exec"
+      ],
+      [
+       122,
+       "true",
+       125,
+       "exec"
+      ],
+      [
+       123,
+       "result",
+       122,
+       "condition"
+      ],
+      [
+       124,
+       "result",
+       123,
+       "a"
+      ],
+      [
+       127,
+       "value",
+       126,
+       "all"
+      ],
+      [
+       128,
+       "host",
+       138,
+       "item"
+      ],
+      [
+       128,
+       "host",
+       148,
+       "Host"
+      ],
+      [
+       128,
+       "host",
+       150,
+       "item0"
+      ],
+      [
+       128,
+       "id",
+       134,
+       "a"
+      ],
+      [
+       128,
+       "id",
+       148,
+       "Id"
+      ],
+      [
+       128,
+       "key",
+       135,
+       "a"
+      ],
+      [
+       128,
+       "key",
+       148,
+       "Key"
+      ],
+      [
+       128,
+       "members",
+       130,
+       "list"
+      ],
+      [
+       128,
+       "now",
+       151,
+       "a"
+      ],
+      [
+       128,
+       "then",
+       129,
+       "exec"
+      ],
+      [
+       128,
+       "value",
+       148,
+       "Value"
+      ],
+      [
+       129,
+       "then",
+       131,
+       "exec"
+      ],
+      [
+       130,
+       "list",
+       129,
+       "value"
+      ],
+      [
+       131,
+       "false",
+       147,
+       "exec"
+      ],
+      [
+       131,
+       "true",
+       143,
+       "exec"
+      ],
+      [
+       132,
+       "result",
+       131,
+       "condition"
+      ],
+      [
+       133,
+       "result",
+       132,
+       "a"
+      ],
+      [
+       134,
+       "result",
+       133,
+       "a"
+      ],
+      [
+       135,
+       "result",
+       133,
+       "b"
+      ],
+      [
+       136,
+       "result",
+       132,
+       "b"
+      ],
+      [
+       137,
+       "result",
+       136,
+       "a"
+      ],
+      [
+       138,
+       "result",
+       137,
+       "a"
+      ],
+      [
+       139,
+       "value",
+       138,
+       "list"
+      ],
+      [
+       140,
+       "result",
+       136,
+       "b"
+      ],
+      [
+       141,
+       "length",
+       140,
+       "a"
+      ],
+      [
+       142,
+       "value",
+       141,
+       "list"
+      ],
+      [
+       144,
+       "value",
+       143,
+       "vote"
+      ],
+      [
+       145,
+       "list",
+       144,
+       "Members"
+      ],
+      [
+       146,
+       "list",
+       144,
+       "Yes"
+      ],
+      [
+       148,
+       "value",
+       147,
+       "vote"
+      ],
+      [
+       149,
+       "value",
+       148,
+       "Members"
+      ],
+      [
+       150,
+       "list",
+       148,
+       "Yes"
+      ],
+      [
+       151,
+       "result",
+       148,
+       "Expires"
+      ],
+      [
+       152,
+       "value",
+       151,
+       "b"
+      ],
+      [
+       153,
+       "approve",
+       187,
+       "a"
+      ],
+      [
+       153,
+       "current",
+       162,
+       "list"
+      ],
+      [
+       153,
+       "now",
+       165,
+       "a"
+      ],
+      [
+       153,
+       "peer",
+       181,
+       "item"
+      ],
+      [
+       153,
+       "peer",
+       183,
+       "item"
+      ],
+      [
+       153,
+       "peer",
+       193,
+       "item"
+      ],
+      [
+       153,
+       "then",
+       154,
+       "exec"
+      ],
+      [
+       153,
+       "vote",
+       157,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       158,
+       "vote"
+      ],
+      [
+       153,
+       "vote",
+       159,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       160,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       166,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       171,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       173,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       182,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       184,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       185,
+       "vote"
+      ],
+      [
+       153,
+       "vote",
+       192,
+       "value"
+      ],
+      [
+       153,
+       "vote",
+       198,
+       "value"
+      ],
+      [
+       154,
+       "false",
+       160,
+       "exec"
+      ],
+      [
+       154,
+       "true",
+       158,
+       "exec"
+      ],
+      [
+       155,
+       "result",
+       154,
+       "condition"
+      ],
+      [
+       156,
+       "result",
+       155,
+       "a"
+      ],
+      [
+       157,
+       "Status",
+       156,
+       "a"
+      ],
+      [
+       159,
+       "Status",
+       158,
+       "status"
+      ],
+      [
+       160,
+       "then",
+       161,
+       "exec"
+      ],
+      [
+       161,
+       "then",
+       163,
+       "exec"
+      ],
+      [
+       162,
+       "list",
+       161,
+       "value"
+      ],
+      [
+       163,
+       "false",
+       178,
+       "exec"
+      ],
+      [
+       163,
+       "true",
+       175,
+       "exec"
+      ],
+      [
+       164,
+       "result",
+       163,
+       "condition"
+      ],
+      [
+       165,
+       "result",
+       164,
+       "a"
+      ],
+      [
+       166,
+       "Expires",
+       165,
+       "b"
+      ],
+      [
+       167,
+       "result",
+       164,
+       "b"
+      ],
+      [
+       168,
+       "result",
+       167,
+       "a"
+      ],
+      [
+       169,
+       "all",
+       168,
+       "a"
+      ],
+      [
+       170,
+       "value",
+       169,
+       "list"
+      ],
+      [
+       171,
+       "Members",
+       169,
+       "other"
+      ],
+      [
+       172,
+       "all",
+       168,
+       "b"
+      ],
+      [
+       173,
+       "Members",
+       172,
+       "list"
+      ],
+      [
+       174,
+       "value",
+       172,
+       "other"
+      ],
+      [
+       175,
+       "then",
+       176,
+       "exec"
+      ],
+      [
+       177,
+       "value",
+       176,
+       "vote"
+      ],
+      [
+       178,
+       "false",
+       186,
+       "exec"
+      ],
+      [
+       178,
+       "true",
+       185,
+       "exec"
+      ],
+      [
+       179,
+       "result",
+       178,
+       "condition"
+      ],
+      [
+       180,
+       "result",
+       179,
+       "a"
+      ],
+      [
+       181,
+       "result",
+       180,
+       "a"
+      ],
+      [
+       182,
+       "Members",
+       181,
+       "list"
+      ],
+      [
+       183,
+       "result",
+       179,
+       "b"
+      ],
+      [
+       184,
+       "Yes",
+       183,
+       "list"
+      ],
+      [
+       186,
+       "false",
+       191,
+       "exec"
+      ],
+      [
+       186,
+       "true",
+       188,
+       "exec"
+      ],
+      [
+       187,
+       "result",
+       186,
+       "condition"
+      ],
+      [
+       188,
+       "then",
+       189,
+       "exec"
+      ],
+      [
+       190,
+       "value",
+       189,
+       "vote"
+      ],
+      [
+       191,
+       "then",
+       193,
+       "exec"
+      ],
+      [
+       192,
+       "Yes",
+       191,
+       "value"
+      ],
+      [
+       193,
+       "then",
+       194,
+       "exec"
+      ],
+      [
+       194,
+       "then",
+       196,
+       "exec"
+      ],
+      [
+       195,
+       "value",
+       194,
+       "value"
+      ],
+      [
+       196,
+       "false",
+       201,
+       "exec"
+      ],
+      [
+       196,
+       "true",
+       200,
+       "exec"
+      ],
+      [
+       197,
+       "all",
+       196,
+       "condition"
+      ],
+      [
+       198,
+       "Members",
+       197,
+       "list"
+      ],
+      [
+       199,
+       "value",
+       197,
+       "other"
+      ],
+      [
+       200,
+       "then",
+       201,
+       "exec"
+      ],
+      [
+       202,
+       "value",
+       201,
+       "vote"
+      ],
+      [
+       203,
+       "Status",
+       201,
+       "status"
+      ],
+      [
+       204,
+       "value",
+       203,
+       "value"
+      ],
+      [
+       205,
+       "status",
+       207,
+       "value"
+      ],
+      [
+       205,
+       "then",
+       206,
+       "exec"
+      ],
+      [
+       207,
+       "name",
+       206,
+       "name"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Profile",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Critical",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "profile",
+         "type": "struct",
+         "of": "CriticalProfile",
+         "value": {
+          "Ratio": 0.2,
+          "DelayS": 2,
+          "AcceleratedS": 0.5
+         }
+        }
+       ]
+      },
+      {
+       "name": "IsCritical",
+       "pure": true,
+       "help": "Critical: at or below its share of the full health",
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Critical",
+         "value": 0
+        },
+        {
+         "name": "hp",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "maxHp",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "critical",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "DetonationAt",
+       "pure": true,
+       "help": "When something that turns critical now blows",
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Critical",
+         "value": 0
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "at",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Accelerate",
+       "pure": true,
+       "help": "A further hit brings the blast forward - never later than it is already due",
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Critical",
+         "value": 0
+        },
+        {
+         "name": "currentAt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "at",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "ClockUpdate",
+       "pure": true,
+       "help": "One thing that can turn critical, asked with its health every frame. at: when it blows (below 0: no countdown); lastHp: its health the last time. Fired: once, when the countdown has run out.",
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Critical",
+         "value": 0
+        },
+        {
+         "name": "hp",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "maxHp",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "at",
+         "type": "float",
+         "value": -1
+        },
+        {
+         "name": "lastHp",
+         "type": "float",
+         "value": -1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "fired",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "at",
+         "type": "float",
+         "value": -1
+        },
+        {
+         "name": "lastHp",
+         "type": "float",
+         "value": -1
+        }
+       ],
+       "locals": [
+        {
+         "name": "At",
+         "type": "float",
+         "value": -1
+        }
+       ]
+      },
+      {
+       "name": "MomentumNs",
+       "pure": true,
+       "help": "What a bullet carries: p = m * v",
+       "inputs": [
+        {
+         "name": "round",
+         "type": "enum",
+         "of": "Round",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ns",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "BulletImpulse",
+       "pure": true,
+       "help": "The impulse (N*s) a bullet that stops in a body hands over, along its flight direction",
+       "inputs": [
+        {
+         "name": "direction",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "round",
+         "type": "enum",
+         "of": "Round",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "impulse",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "name": "Unique",
+       "pure": true,
+       "help": "Every number of a list once",
+       "inputs": [
+        {
+         "name": "list",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "list",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "locals": [
+        {
+         "name": "Out",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "Within",
+       "pure": true,
+       "help": "Is every number of a list in another one?",
+       "inputs": [
+        {
+         "name": "list",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "other",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "all",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "locals": [
+        {
+         "name": "All",
+         "type": "bool",
+         "value": true
+        }
+       ]
+      },
+      {
+       "name": "CreateBallot",
+       "pure": true,
+       "help": "A new ballot. Invalid without id or key, with a host outside the roster or with fewer than two voters.",
+       "inputs": [
+        {
+         "name": "id",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "key",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "value",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "host",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "members",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "vote",
+         "type": "struct",
+         "of": "Vote",
+         "value": {
+          "Id": "",
+          "Key": "",
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "Expires": 0,
+          "Status": 5
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "Roster",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "CastVote",
+       "pure": true,
+       "help": "A vote. The ballot as it stands afterwards and what this vote did: ignored for a stranger or a second yes, cancelled when it has expired or the roster has changed.",
+       "inputs": [
+        {
+         "name": "vote",
+         "type": "struct",
+         "of": "Vote",
+         "value": {
+          "Id": "",
+          "Key": "",
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "Expires": 0,
+          "Status": 5
+         }
+        },
+        {
+         "name": "peer",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "approve",
+         "type": "bool",
+         "value": true
+        },
+        {
+         "name": "current",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "vote",
+         "type": "struct",
+         "of": "Vote",
+         "value": {
+          "Id": "",
+          "Key": "",
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "Expires": 0,
+          "Status": 5
+         }
+        },
+        {
+         "name": "status",
+         "type": "enum",
+         "of": "Ballot",
+         "value": 5
+        }
+       ],
+       "locals": [
+        {
+         "name": "B",
+         "type": "struct",
+         "of": "Vote",
+         "value": {
+          "Id": "",
+          "Key": "",
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "Expires": 0,
+          "Status": 5
+         }
+        },
+        {
+         "name": "Now",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Yes",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "BallotName",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "status",
+         "type": "enum",
+         "of": "Ballot",
+         "value": 5
+        }
+       ],
+       "outputs": [
+        {
+         "name": "name",
+         "type": "text",
+         "value": ""
+        }
+       ]
       }
      ]
     }

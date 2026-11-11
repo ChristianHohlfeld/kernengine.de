@@ -85,7 +85,7 @@ void Game::details_hud(std::string& s) {
   for (const detail::CriticalClock& c : pd_crit_) smoking += c.armed() ? 1 : 0;
   char b[200];
   std::snprintf(b, sizeof b, ",\"details\":{\"droneCritical\":%s,\"pdSmoking\":%d,\"critBlasts\":%u,\"bulletPushes\":%u,\"ballot\":\"%s\"}",
-                drone_crit_.armed() ? "true" : "false", smoking, crit_blasts_, bullet_pushes_, detail::ballot_name(ballot_.status));
+                drone_crit_.armed() ? "true" : "false", smoking, crit_blasts_, bullet_pushes_, detail::ballot_name(ballot_.status).c_str());
   s += b;
 }
 
