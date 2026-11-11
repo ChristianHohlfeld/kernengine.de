@@ -228,6 +228,76 @@ struct Calls : kern::Blueprint {
 };
 )kn";
 
+// Local variables of functions: every call starts with their defaults; two functions have one of
+// the same name; numbers, a text, a list, a struct; a pure function sets its own; a call that is
+// interrupted by another call of the same function has its own back.
+inline const char* kLocals = R"kn(
+struct Locals : kern::Blueprint {
+  KERN_STRUCT(Hit) { Text Who = ""; Float Damage = 1.0; };
+
+  Int Calls = 0;
+  Float Kept = 0.0;
+
+  struct SumToResult { Float sum = 0.0; Int steps = 0; };
+  /// Numbers: Add and a For loop; what a call left is gone with the next.
+  SumToResult SumTo(Int n = 3) {
+    Float Total = 0.5;
+    Int Steps = 0;
+    for (auto it10 = flow_for(n10, 1, n); it10.next();) {
+      Total += kern::to<Float>(n10.index);
+      Steps += 1;
+    }
+    Calls += Steps;
+    return {Total, Steps};
+  }
+
+  struct JoinResult { Text text = ""; Int count = 0; Float damage = 0.0; };
+  /// Another function's Total is a text; a list (Add to List), a struct (Set Field).
+  JoinResult Join(Text a = "a", Text b = "b", Float d = 2.0) {
+    Text Total = "<";
+    List<Text> Seen = List<Text>{"x"};
+    Hit Last = Hit{"none", 3.0};
+    Total = text_append(Total, a, b);
+    list_add(Seen, a);
+    list_add(Seen, b);
+    Last.Damage = math_add(struct_break<Hit>(Last).Damage, d);
+    Last.Who = Total;
+    return {text_append(Total, struct_break<Hit>(Last).Who, ">"), list_length<Text>(Seen), struct_break<Hit>(Last).Damage};
+  }
+
+  struct LimitResult { Float out = 0.0; };
+  /// A function read as a value sets its own local variables.
+  KERN_PURE LimitResult Limit(Float x = 0.0) {
+    Float Out = -1.0;
+    Out = x;
+    if (math_compare<">">(x, 1.0)) {
+      Out = 1.0;
+    }
+    return {Out};
+  }
+
+  struct OuterResult { Float mine = 0.0; Float limited = 0.0; };
+  /// It raises an event whose handler calls it again: this call's Mine is its own afterwards.
+  OuterResult Outer(Float x = 1.0, Bool again = false) {
+    Float Mine = 0.25;
+    Mine += math_mul(x, 10.0);
+    if (again) {
+      flow_call<"Again">(Actor{0}, Actor{0}, 5.0, "");
+    }
+    return {Mine, Limit(Mine).out};
+  }
+
+  KERN_EVENT(on40, event_custom<"Again">)
+  void on40(Actor actor, Float value, Text text) {
+    n41 = Outer(value, false);
+    Kept = n41.mine;
+  }
+
+  struct : kern::Node<10> { Int index = 0; } n10;
+  OuterResult n41;
+};
+)kn";
+
 // Every wire between different types, Select and Reroute in every type, typed-in values.
 inline const char* kCasts = R"kn(
 struct Casts : kern::Blueprint {
@@ -861,6 +931,16 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Both", {N(5), N(0.5)}});
     c.calls.push_back({"Both", {N(-1), N(-1)}});
     c.calls.push_back({"Scale", {N(0), N(0)}});
+  }
+  {
+    Case& c = read("Locals", kLocals);
+    for (i64 n : {3, 0, 5, 1}) c.calls.push_back({"SumTo", {I(n)}});
+    c.calls.push_back({"Join", {T("a"), T("b"), N(2)}});
+    c.calls.push_back({"Join", {T(""), T("zz"), N(-0.5)}});
+    for (f64 x : {0.5, 1.0, 7.0, -2.0}) c.calls.push_back({"Limit", {N(x)}});
+    c.calls.push_back({"Outer", {N(1), no}});
+    c.calls.push_back({"Outer", {N(0.01), no}});  // (with the event: the tier case "locals" - a class called directly has no runtime to raise it)
+    c.calls.push_back({"SumTo", {I(2)}});
   }
   {
     Case& c = read("Casts", kCasts);

@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"21:43",title:"Blueprints: lokale Variablen in Funktionen",items:[
+    "Kern-Blueprints: Eine Funktion kann jetzt eigene, lokale Variablen haben. Jeder Aufruf beginnt mit ihren Standardwerten, und mit dem Aufruf sind sie vorbei – Zwischenergebnisse brauchen keine Variable des ganzen Blueprints mehr.",
+    "Gelesen und gesetzt werden sie mit denselben Knoten wie jede Variable (Get, Set, Add, Set Field, die Listen-Schritte). Zwei Funktionen dürfen je eine lokale Variable desselben Namens haben; auch eine Pure-Funktion darf ihre eigenen setzen.",
+    "Im Kern-Editor: Details einer Funktion hat den Abschnitt „Local Variables“ mit Name, Typ und Standardwert; „Get“ und „Set“ legen den Knoten in den Graphen, das Aktionsmenü bietet sie unter „Local Variables of …“ an.",
+    "Als C++ ist es eine echte lokale Variable am Anfang des Funktionsrumpfs: Float Total = 0.0; – als Graph, im Browser beschleunigt und als kompiliertes C++ kommt dasselbe heraus.",
+  ]},
   {date:"2026-11-11",time:"20:51",title:"Blueprints: Datentabellen",items:[
     "Kern-Blueprints: Eine Datentabelle ist eine Variable, die eine Liste einer Struktur ist – etwa „Shop“ als Liste von „Item“ mit Key, Price und Fresh. Jede Zeile ist ein Wert der Struktur, jede Spalte ein Feld.",
     "Neuer Knoten „Find Row“ („Find Item by Key“): sucht in der Tabelle die erste Zeile, deren Feld den gesuchten Wert hat, und gibt aus, ob es sie gibt, die Zeile selbst und ihren Platz.",

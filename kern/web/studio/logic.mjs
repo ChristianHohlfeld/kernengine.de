@@ -985,6 +985,7 @@ export class LogicEditor {
   paramHtml(n, p) {
     const attr = `data-param="${lgEsc(p.key)}" data-node="${n.id}"`;
     const choices = p.choices || [];
+    if (p.kind === "scope") return `<span class="lg-dim" title="A local variable of this function">${lgEsc(p.value)}</span>`;
     if (["choice", "type", "variable", "field", "machine", "state", "sound", "function"].includes(p.kind)) {
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
@@ -1251,7 +1252,7 @@ export class LogicEditor {
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
       : `<input data-vk="value" value="${lgEsc(lgNum(v.value))}">`;
-    const refs = (this.data.nodes || []).filter(n => (n.params || []).some(p => p.key === "variable" && p.value === v.name)).length;
+    const refs = (this.data.nodes || []).filter(n => (n.params || []).some(p => p.key === "variable" && p.value === v.name) && !(n.params || []).some(p => p.key === "scope")).length;
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${lgColor(v.type)}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
@@ -1274,10 +1275,10 @@ export class LogicEditor {
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
         <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${value(p)}
-        <button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
+        ${side === "local" ? `<button data-pf="get" title="Add a Get node">Get</button><button data-pf="set" title="Add a Set node">Set</button>` : ""}<button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
         (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
-      `<div class="lg-none">${side === "in" ? "No inputs" : "No outputs"}</div>`;
+      `<div class="lg-none">${side === "in" ? "No inputs" : side === "out" ? "No outputs" : "No local variables"}</div>`;
     const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
     return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">Function</div>
       <div class="lg-dsec"><div class="lg-dst">Function</div>
@@ -1287,6 +1288,7 @@ export class LogicEditor {
       </div>
       <div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows(f.inputs, "in")}<div class="lg-dacts"><button data-act="fn-in">+ Input</button></div></div>
       <div class="lg-dsec"><div class="lg-dst">Outputs</div>${rows(f.outputs, "out")}<div class="lg-dacts"><button data-act="fn-out">+ Output</button></div></div>
+      <div class="lg-dsec"><div class="lg-dst" title="Variables of the function alone: every call starts with their defaults">Local Variables</div>${rows(f.locals || [], "local")}<div class="lg-dacts"><button data-act="fn-local">+ Local Variable</button></div></div>
       <div class="lg-dsec"><div class="lg-dst">References</div><div class="lg-dtxt">${refs} call${refs === 1 ? "" : "s"} of ${lgEsc(f.name)} in this Blueprint. The function starts at its Function Entry node and ends at a Return node.</div></div>
       <div class="lg-dacts"><button data-act="fn-call">Add Call</button><button data-act="fn-return">Add Return</button><button data-act="fn-entry">Go to Entry</button><button data-act="delete" class="danger">Delete</button></div>`;
   }
@@ -1409,7 +1411,7 @@ export class LogicEditor {
       if (!send) continue;
       if (!sub.classList.contains("lg-vsub")) { lgListBind(sub.querySelector(".lg-list"), send); continue; }
       const shown = () => d.var ? this.data.variables?.find(v => v.name === d.var)?.value
-        : d.fpin ? (d.side === "in" ? this.fn(fn.name)?.inputs : this.fn(fn.name)?.outputs)?.find(p => p.name === d.fpin)?.value
+        : d.fpin ? (d.side === "in" ? this.fn(fn.name)?.inputs : d.side === "local" ? this.fn(fn.name)?.locals : this.fn(fn.name)?.outputs)?.find(p => p.name === d.fpin)?.value
         : d.sfield ? this.structNamed(st.name)?.fields.find(f => f.name === d.sfield)?.value
         : this.data.nodes?.find(n => n.id === +d.node)?.inputs.find(p => p.id === d.pin)?.value;
       lgValueBind(sub, shown, send);
@@ -1418,6 +1420,7 @@ export class LogicEditor {
       const edit = c => this.cmd({cmd: "logicFunction", name: fn.name, ...c});
       act("fn-in", () => edit({op: "pinAdd", side: "in"}));
       act("fn-out", () => edit({op: "pinAdd", side: "out"}));
+      act("fn-local", () => edit({op: "pinAdd", side: "local"}));
       act("fn-call", () => this.addCall(fn.name));
       act("fn-return", () => this.addAtCenter("func.return", {function: fn.name}));
       act("fn-entry", () => this.focusFunction(fn.name));
@@ -1431,10 +1434,11 @@ export class LogicEditor {
       }
       for (const row of b.querySelectorAll(".lg-frow")) {
         const side = row.dataset.side, pin = row.dataset.pin;
-        const def = (side === "in" ? fn.inputs : fn.outputs).find(p => p.name === pin);
+        const def = (side === "in" ? fn.inputs : side === "local" ? fn.locals || [] : fn.outputs).find(p => p.name === pin);
         for (const f of row.querySelectorAll("[data-pf]")) {
           const k = f.dataset.pf;
-          if (k === "remove") f.onclick = () => edit({op: "pinRemove", side, pin});
+          if (k === "get" || k === "set") f.onclick = () => this.addAtCenter(k === "get" ? "var.get" : "var.set", {variable: pin, scope: fn.name});
+          else if (k === "remove") f.onclick = () => edit({op: "pinRemove", side, pin});
           else if (k === "up") f.onclick = () => edit({op: "pinMove", side, pin, by: -1});
           else f.onchange = () => {
             if (k === "name") edit({op: "pinRename", side, pin, to: f.value.trim()});

@@ -424,6 +424,17 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   dahinter erreicht ihn nicht mehr. Eine Funktion ruft sich nicht selbst auf, auch nicht über
   andere Funktionen: Das ist ein Compile-Fehler am aufrufenden Knoten (Wiederholen ist Sache der
   Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
+- **Lokale Variablen** gehören einer Funktion allein: Details der Funktion, Abschnitt *Local
+  Variables* – **+ Local Variable**, dann Name, Typ und Default wie bei einem Pin; *Get* und *Set*
+  in der Zeile legen den Knoten in den Graphen, das Aktionsmenü bietet sie unter „Local Variables
+  of <Funktion>“ an (auch Add, Set Field und die Listen-Schritte). Jeder Aufruf beginnt mit den
+  Defaults, und mit dem Aufruf sind sie vorbei: Eine lokale Variable wird nur auf einem Weg ihrer
+  eigenen Funktion gelesen und gesetzt – nicht nach einem Delay, nicht in einem Event, nicht in
+  einer anderen Funktion (sonst Compile-Fehler am Knoten, wie bei Return). Zwei Funktionen dürfen
+  je eine lokale Variable desselben Namens haben; sie heißt aber nicht wie eine Variable, eine
+  Funktion oder ein Typ des Blueprints und nicht wie ein Pin ihrer Funktion. Von außen
+  (`Instance::get`) ist sie nicht zu lesen. Auch eine Pure-Funktion darf ihre lokalen Variablen
+  setzen – das gehört zum Rechnen.
 - Aus C++ ruft `logic::Instance::call("Name", args, results)` eine Funktion; `call_number` ist die
   Kurzform für Zahlen. So rufen Engine-Systeme Regeln auf, die im Blueprint stehen.
 - Kopierte Knoten nehmen die Funktionen mit, die sie nennen.

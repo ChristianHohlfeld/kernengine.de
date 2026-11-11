@@ -462,6 +462,61 @@ await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "pear costs 6.5", 60000), `Play looks the row up by its key (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
+// ---- 1g. local variables of a function: made in Details, used as nodes, played -------------------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
+  struct SumToResult { Float sum = 0.0; };
+  SumToResult SumTo(Int n = 3) {
+    Float Total = 0.5;
+    for (auto it10 = flow_for(n10, 1, n); it10.next();) {
+      Total += kern::to<Float>(n10.index);
+    }
+    return {Total};
+  }
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    n2 = SumTo(3);
+    n3 = SumTo(2);
+    game_message(text_append(kern::to<Text>(n2.sum), "/", kern::to<Text>(n3.sum)));
+  }
+
+  struct : kern::Node<10> { Int index = 0; } n10;
+  SumToResult n2;
+  SumToResult n3;
+};
+`})).ok, "a function with a local variable written as C++ is a Blueprint");
+check(errorsOf(await logic()).length === 0, "it compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+const sumTo = async () => (await logic()).functions.find(f => f.name === "SumTo");
+await page.click('.lg-fn[data-fn="SumTo"]');
+const localRows = page.locator('.lg-dbody .lg-frow[data-side="local"]');
+check(await until(async () => await localRows.count() === 1) && await localRows.first().locator('[data-pf="name"]').inputValue() === "Total", "Details of the function lists its local variables");
+await page.click('.lg-dbody [data-act="fn-local"]');
+check(await until(async () => (await sumTo())?.locals?.length === 2) && (await sumTo()).locals[1].name === "local", "+ Local Variable adds one");
+const renamed = page.locator('.lg-dbody .lg-frow[data-side="local"][data-pin="local"] [data-pf="name"]');
+await renamed.fill("Count");
+await renamed.press("Enter");
+check(await until(async () => (await sumTo())?.locals?.[1]?.name === "Count"), "it takes a name");
+await page.selectOption('.lg-dbody .lg-frow[data-side="local"][data-pin="Count"] [data-pf="type"]', "int");
+check(await until(async () => (await sumTo())?.locals?.[1]?.type === "int"), "and a type");
+const scoped = async () => (await logic()).nodes.filter(n => (n.params || []).some(p => p.key === "scope" && p.value === "SumTo"));
+const scopedBefore = (await scoped()).length;
+await page.click('.lg-dbody .lg-frow[data-side="local"][data-pin="Count"] [data-pf="set"]');
+check(await until(async () => (await scoped()).length === scopedBefore + 1) && (await scoped()).some(n => n.type === "var.set" && n.params.some(p => p.key === "variable" && p.value === "Count")),
+      "Set in its row puts the node of that local variable into the graph");
+// (the Set is wired nowhere: it is no path of the function yet, and Compile says so at the node)
+const loose = (await scoped()).find(n => n.type === "var.set" && n.params.some(p => p.key === "variable" && p.value === "Count"));
+await cmd({cmd: "logicDelete", ids: [loose.id]});
+await cmd({cmd: "logicFunction", name: "SumTo", op: "pinRemove", side: "local", pin: "Count"});
+check(await until(async () => (await sumTo())?.locals?.length === 1) && errorsOf(await logic()).length === 0, "a local variable can be removed again");
+check((await cmd({cmd: "logicCpp"})).text.includes("  SumToResult SumTo(Int n = 3) {\n    Float Total = 0.5;\n"), "as C++ it is a local of the function's body");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "6.5/3.5", 60000), `every call starts with the local variable's default (${(await status()).hud?.message})`);
+await cmd({cmd: "stop"});
+
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 const text = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
 const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});

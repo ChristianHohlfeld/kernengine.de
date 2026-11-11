@@ -258,7 +258,7 @@ class WasmGen {
       lset(kF1);
       lset(kF0);
     };
-    if (t == "var.get") { load_slot(in_.var_slot(in_.node_at(node).param("variable"))); return; }
+    if (t == "var.get") { load_slot(in_.var_slot(in_.node_at(node))); return; }
     if (t == "value.float" || t == "value.int" || t == "value.bool") { value(node, "value", depth); return; }
     if (t == "math.add") { value(node, "a", depth); value(node, "b", depth); op(kF64Add); return; }
     if (t == "math.sub") { value(node, "a", depth); value(node, "b", depth); op(kF64Sub); return; }
@@ -469,8 +469,9 @@ class WasmGen {
       return;
     }
     if (t == "var.set" || t == "var.add") {
-      const Variable* v = in_.graph().variable(in_.node_at(i).param("variable"));
-      const int vs = in_.var_slot(in_.node_at(i).param("variable"));
+      Variable named;
+      const Variable* v = in_.graph().variable_of(in_.node_at(i), named) ? &named : nullptr;
+      const int vs = in_.var_slot(in_.node_at(i));
       if (t == "var.set") value(i, "value", 0);
       else { load_slot(vs); value(i, "amount", 0); op(kF64Add); }
       convert(v ? v->type : PinType::number);
