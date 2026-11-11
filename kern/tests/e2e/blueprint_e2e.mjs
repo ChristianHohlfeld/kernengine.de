@@ -517,6 +517,52 @@ await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "6.5/3.5", 60000), `every call starts with the local variable's default (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
+// ---- 1h. a function of another Blueprint: declared here, called on an actor, played ---------------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
+  struct TwiceResult { Float out = 0.0; };
+  /// Two times x.
+  TwiceResult Twice(Float x = 1.0) {
+    return {math_mul(x, 2.0)};
+  }
+};
+`})).ok, "the Level's Blueprint has a function");
+const asker = (await state()).actors?.[0]?.[0];
+await cmd({cmd: "logicOpen", owner: asker});
+await cmd({cmd: "logicVariable", op: "add", name: "Got", type: "float"});
+check(await until(async () => await page.locator('.lg-declare [data-declare] option[value="0:Twice"]').count() === 1), "an actor's Blueprint is offered the functions of the level's other Blueprints");
+await page.selectOption(".lg-declare [data-declare]", "0:Twice");
+const twice = async () => (await logic()).functions.find(f => f.name === "Twice");
+check(await until(async () => (await twice())?.external === true) && (await twice()).inputs.length === 1 && (await twice()).help === "Two times x.", "chosen there, the function is declared here as it is there");
+check(await until(async () => await page.locator('.lg-dbody [data-fk="external"]').isChecked().catch(() => false)) && await page.locator('.lg-dbody [data-act="fn-local"]').count() === 0,
+      "Details shows it as a function of another Blueprint: no body, no local variables");
+await page.click('.lg-dbody [data-act="fn-call-on"]');
+check(await until(async () => (await logic()).nodes.some(n => n.type === "func.call_on")) && (await logic()).nodes.find(n => n.type === "func.call_on").inputs.some(p => p.id === "this" && p.label === "Target"),
+      "Call on Actor puts its call into the graph, with a Target");
+check((await cmd({cmd: "logicCppApply", text: `struct Asker : kern::Blueprint {
+  Float Got = 0.0;
+
+  struct TwiceResult { Float out = 0.0; };
+  /// Two times x.
+  KERN_EXTERN TwiceResult Twice(Float x = 1.0);
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    func_call_on<"Twice">(Actor{0}, kern::out(n2.out), 21.0);
+    game_message(kern::to<Text>(n2.out));
+  }
+
+  struct { Float out = 0.0; } n2;
+};
+`})).ok, "the call written as C++ is the same Blueprint");
+check(errorsOf(await logic()).length === 0 && !(await logic()).issues.some(i => i.text.includes("no other Blueprint")), "it compiles, and the level has that function" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "42", 60000), `Play: the actor's Blueprint calls the Level's function (${(await status()).hud?.message})`);
+await cmd({cmd: "stop"});
+
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 const text = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
 const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});

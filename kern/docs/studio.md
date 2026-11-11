@@ -439,6 +439,32 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   Kurzform für Zahlen. So rufen Engine-Systeme Regeln auf, die im Blueprint stehen.
 - Kopierte Knoten nehmen die Funktionen mit, die sie nennen.
 
+### Funktionen anderer Blueprints (Call on Actor)
+
+Ein Blueprint kann eine Funktion aufrufen, die ein anderer Blueprint hat – der eines Actors oder
+der des Levels. Dazu sagt er, **wie die Funktion aussieht** (Name, Eingänge, Ausgänge), und ruft
+sie **auf einem Actor** auf.
+
+- **Erklären:** In My Blueprint steht unter *Functions* die Auswahl „+ A function of another
+  Blueprint…“ mit den Funktionen der anderen Blueprints des Levels; gewählt, steht die Funktion
+  hier so, wie sie dort ist (↗ vor dem Namen). Von Hand geht es auch: eine Funktion anlegen und in
+  Details **Of another Blueprint** ankreuzen. So eine Funktion hat hier keinen Rumpf – kein
+  Function Entry, kein Return, keine lokalen Variablen, nicht *Pure*.
+- **Aufrufen:** der Knoten **<Funktion> on Actor** (Details: *Call on Actor*, oder das
+  Aktionsmenü). Er hat den Eingang **Target**: der Actor, auf dessen Blueprint die Funktion läuft.
+  Ohne Target läuft sie auf dem **Blueprint des Levels** – was dort als Funktion steht, ist damit
+  die Bibliothek für alle Blueprints des Levels. Der Aufruf ist ein Schritt (was der andere
+  Blueprint tut, ist hier nicht bekannt) und läuft sofort bis zum Ende.
+- Auch eine **eigene** Funktion lässt sich so auf einem anderen Actor aufrufen, der sie ebenfalls
+  hat („Hit on Actor“ zwischen zwei Gegnern).
+- Hat das Ziel keinen Blueprint oder keine Funktion dieses Namens, geben die Ausgänge die hier
+  erklärten Defaults. Werte gehen der Reihe nach und werden umgewandelt wie an einem Draht; eine
+  Aufzählung geht als ihr Platz, eine Struktur Feld für Feld. Der Editor weist darauf hin, wenn
+  kein Blueprint des Levels die Funktion so hat, wie sie erklärt ist (kein Fehler).
+- Aufrufe über Blueprints hinweg dürfen im Kreis gehen (A ruft B, B ruft A, eine Funktion sich
+  selbst auf ihrem eigenen Actor): Jeder Aufruf hat seine eigenen Parameter und lokalen Variablen.
+  Tiefer als 64 ineinander geht es nicht – der Aufruf entfällt dann und wird gemeldet.
+
 ### Listen und For Each
 
 Eine Variable, ein Pin einer Funktion oder ein Draht kann eine **Liste** von Werten eines Typs

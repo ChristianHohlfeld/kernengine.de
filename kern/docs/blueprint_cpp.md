@@ -77,7 +77,7 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   Variablen – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Strukturen“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (20 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (21 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -168,6 +168,8 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
+| Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Return | `return {wert, wert};` bzw. `return;` |
@@ -483,6 +485,18 @@ in Slots), setzen sie bei jedem Aufruf auf den Default und geben – wie bei den
 unterbrochenen Aufruf die eigenen zurück, wenn ein Handler die Funktion währenddessen noch einmal
 aufgerufen hat (`Runtime::fire`).
 
+**Aufrufe auf anderen Blueprints.** Call on Actor geht in jeder Stufe denselben Weg:
+`Runtime::call_on` sucht den Blueprint des Targets (ohne Target den des Levels), ruft die Funktion
+beim Namen und gibt die Ergebnisse so zurück, wie der Aufrufer sie erklärt hat – der Reihe nach,
+umgewandelt wie an einem Draht, und die erklärten Defaults, wo das Ziel die Funktion nicht hat. In
+der Klasse ist `func_call_on` genau dieser Aufruf (`kern::out` nimmt die Ergebnisse entgegen);
+`KERN_EXTERN` erklärt nur, nichts davon wird aufgerufen. So ein Aufruf zählt mit, wenn Ketten
+ineinander liegen (höchstens 64), denn er kann im Kreis gehen: Eine Funktion, die sich auf ihrem
+eigenen Actor aufruft, läuft noch einmal, während sie läuft – jeder Aufruf mit seinen eigenen
+Parametern und lokalen Variablen, in C++ ohnehin, im Interpreter und im JIT, weil `call_on` dem
+unterbrochenen Aufruf die seinen zurückgibt. Was Knoten geben und behalten (`n7`), gehört wie immer
+dem Blueprint, nicht dem Aufruf.
+
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
 Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
@@ -561,6 +575,9 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   dann alle aus einem Branch oder Switch. Sie heißt nicht wie eine Variable, eine Funktion oder
   ein Typ des Blueprints und nicht wie ein Pin ihrer Funktion; zwei Funktionen dürfen je eine
   desselben Namens haben.
+- **Eine Funktion eines anderen Blueprints** (`KERN_EXTERN`) hat hier keinen Rumpf: kein Function
+  Entry, kein Return, kein Call und kein Function Value mit ihrem Namen, keine lokalen Variablen,
+  nicht pure. Aufgerufen wird sie mit Call on Actor – ein Schritt.
 - **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
   auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
   geht.)
@@ -769,7 +786,8 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 20, auch lokale Variablen (`locals`: Zahlen und ein Text, zwei
+demselben Ergebnis: alle 21, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
 ein zweiter Aufruf derselben Funktion unterbricht), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen

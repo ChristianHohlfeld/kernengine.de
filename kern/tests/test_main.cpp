@@ -9005,6 +9005,85 @@ TEST(studio_logic_local_variables) {
   for (const json::Value& n : st["logic"]["nodes"].items()) CHECK(n["type"].as_string() != "var.add");
 }
 
+TEST(studio_logic_call_on_actor) {
+  // A function of the Level's Blueprint, declared in an actor's Blueprint with the editor's
+  // commands and called from there: the level plays it.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Asked = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  /// Two times x.\n  TwiceResult Twice(Float x = 1.0) {\n"
+                                                "    Asked += x;\n    return {math_mul(x, 2.0)};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(!f.s->level().actors.empty());
+  if (f.s->level().actors.empty()) return;
+  const game::ActorId other = f.s->level().actors.front().id;
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(other)}})["ok"].as_bool());
+  // the editor offers the Level's function; declared here it is a function of another Blueprint
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Got"}, {"type", "float"}})["ok"].as_bool());  // (the actor has a Blueprint now)
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["otherFunctions"].size() == 1 && st["logic"]["otherFunctions"][0]["name"].as_string() == "Twice" && st["logic"]["otherFunctions"][0]["ownerName"].as_string() == "Level");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "Twice"}, {"from", 0}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "Twice"}, {"from", 0}})["ok"].as_bool());  // (once)
+  st = f.s->state();
+  CHECK(st["logic"]["functions"].size() == 1 && st["logic"]["functions"][0]["external"].as_bool() && st["logic"]["functions"][0]["help"].as_string() == "Two times x." &&
+        st["logic"]["functions"][0]["inputs"].size() == 1 && st["logic"]["otherFunctions"].size() == 0 && st["logic"]["nodes"].size() == 0);
+  // it has no body here: no local variables, not pure, no plain call - the action menu offers the call on an actor
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "local"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pure"}, {"name", "Twice"}, {"value", true}})["ok"].as_bool());
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "twice"}});
+  bool on_actor = false, plain = false;
+  for (const json::Value& e : pal["items"].items()) {
+    on_actor = on_actor || (e["type"].as_string() == "func.call_on" && e["label"].as_string() == "Twice on Actor");
+    plain = plain || e["type"].as_string() == "func.call" || e["type"].as_string() == "func.return";
+  }
+  CHECK(on_actor && !plain);
+  // the actor's Blueprint asks the Level on Begin Play
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  Float Got = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(Float x = 1.0);\n\n"
+                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{0}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
+                                                "  struct { Float out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
+  st = f.s->state();
+  for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
+  // a declaration nobody has as it stands gets a hint (no error: the call gives the defaults)
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}, {"type", "int"}})["ok"].as_bool());
+  bool hint = false;
+  st = f.s->state();
+  for (const json::Value& i : st["logic"]["issues"].items()) hint = hint || (!i["error"].as_bool() && i["text"].as_string().find("with these inputs and outputs") != std::string::npos);
+  CHECK(hint);
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRemove"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}})["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Runtime* rt = f.s->world().logic_runtime();
+  logic::Instance* level = rt ? rt->find(0) : nullptr;
+  logic::Instance* actor = rt ? rt->find(static_cast<logic::ActorRef>(other)) : nullptr;
+  CHECK(level && actor);
+  if (level && actor) {
+    CHECK_NEAR(actor->get("Got").as_number(), 42, 1e-9);
+    CHECK_NEAR(level->get("Asked").as_number(), 21, 1e-9);
+  }
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+  // "Of another Blueprint" off: the function is this Blueprint's own, with an entry and a Return - and on again: they go
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "external"}, {"name", "Twice"}, {"value", false}, {"x", 0}, {"y", 400}})["ok"].as_bool());
+  st = f.s->state();
+  int entries = 0, returns = 0;
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    entries += n["type"].as_string() == "func.entry";
+    returns += n["type"].as_string() == "func.return";
+  }
+  CHECK(entries == 1 && returns == 1 && !st["logic"]["functions"][0]["external"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "external"}, {"name", "Twice"}, {"value", true}})["ok"].as_bool());
+  st = f.s->state();
+  bool call_stays = false;
+  for (const json::Value& n : st["logic"]["nodes"].items()) {
+    CHECK(n["type"].as_string() != "func.entry" && n["type"].as_string() != "func.return");
+    call_stays = call_stays || n["type"].as_string() == "func.call_on";
+  }
+  CHECK(call_stays && st["logic"]["functions"][0]["external"].as_bool());
+}
+
 TEST(studio_logic_cpp_view) {
   // The editor's C++ view: a Blueprint written as C++ from nothing, played, changed in the text.
   StudioFixture f;
