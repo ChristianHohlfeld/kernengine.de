@@ -214,3 +214,7 @@ und des Levels.
 - Werte und Verhalten bleiben die des Originals; die bestehenden Tests wandern mit und prüfen
   danach den Blueprint bzw. das Engine-System.
 - Box3D wird nicht getunt; Physik bleibt nach `kern/docs/physics.md`.
+- Die Engine und die Blueprint-Sprache bleiben allgemein: Was hier dazukommt – Knoten, Typen,
+  Engine-Systeme, Replikation –, ist für jedes Spiel gebaut, nicht für SpawnCity. Was nur
+  SpawnCity ist (Werte, Regeln, Inhalte), steht im Projekt: in seinem Level, seinen Blueprints
+  und seinen Daten. Ein Engine-System bekommt nie einen SpawnCity-Sonderfall.
