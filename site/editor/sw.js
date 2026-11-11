@@ -5,6 +5,8 @@
 //    network is unreachable does the stored copy start the editor offline.
 //  * build.json (the page's version check): network only, never cached.
 //  * Icons and the manifest: from the cache, refreshed in the background.
+//  * The Lehrer's module (kern_lehrer.wasm, fetched when a training run starts): network first like
+//    the page it belongs to; the stored copy trains offline once it was fetched.
 // A new worker takes over at once; the page itself decides when to reload into a new build
 // (never while you play or have unsaved changes - it offers an UPDATE button instead).
 const APP = "kern-studio-v1", PAGE = "./";
@@ -39,6 +41,17 @@ async function pageFirst(request) {
   }
 }
 
+async function networkFirst(request) {
+  const c = await caches.open(APP);
+  try {
+    const r = await fetch(request, {cache: "no-cache"});
+    if (r.ok) await c.put(request, r.clone());
+    return r;
+  } catch {
+    return (await c.match(request)) || new Response("", {status: 504, statusText: "offline"});
+  }
+}
+
 async function staleWhileRevalidate(request) {
   const c = await caches.open(APP), hit = await c.match(request);
   const net = fetch(request).then(async r => { if (r && r.ok) await c.put(request, r.clone()); return r; }).catch(() => null);
@@ -56,6 +69,7 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (req.mode === "navigate") { event.respondWith(pageFirst(req)); return; }
+  if (/\.wasm$/.test(url.pathname)) { event.respondWith(networkFirst(req)); return; }
   if (/\.(png|webmanifest|onnx)$/.test(url.pathname)) event.respondWith(staleWhileRevalidate(req));
 });
 

@@ -4785,29 +4785,60 @@ TEST(studio_observer_camera_grabs_bodies) {
   CHECK(!f.s->state()["play"]["observing"].as_bool());
 }
 
-TEST(studio_motion_mouse_joint_holds_pose_after_release) {
+// The Lehrer's workspace (docs/lehrer.md): the Micro Duck on a stage of its own in the Studio's
+// viewport. Its limbs are posed with the mouse joint and hold where they are let go, keyframes are
+// the measured joint angles, the servos show a keyframe - and the level open in the editor, its
+// history, the viewport and the selection are the same when the workspace closes.
+TEST(studio_lehrer_poses_the_duck_on_its_stage) {
   StudioFixture f;
-  CHECK(f.cmd(R"({"cmd":"motionBegin"})")["ok"].as_bool());
-  CHECK(f.s->level().world.gravity.z == 0);
-  CHECK(!f.s->level().world.ground);
-  game::ActorId duck = 0;
-  for (const game::Actor& a : f.s->level().actors) {
-    if (a.controller && a.controller->mode == game::ControlMode::walker) duck = a.id;
-    CHECK(a.colliders.empty());  // only hinge travel limits, not shell/floor contacts
-  }
-  CHECK(duck != 0);
+  const std::string level = f.s->level_text();
+  const std::size_t steps = f.s->history().size();
+  CHECK(f.cmd(R"({"cmd":"layout","layout":"quad"})")["ok"].as_bool());
+  f.s->select({f.s->level().actors[0].id});
+  const std::vector<game::ActorId> selection = f.s->selection();
+  const studio::ViewCamera camera = f.s->viewport(0).camera;
+  CHECK(f.cmd(R"({"cmd":"trainer","open":true})")["ok"].as_bool());
+  CHECK(f.s->trainer_open() && f.s->trainer_stage() == studio::TrainerStage::pose);
+  json::Value st = f.s->state();
+  CHECK(st["play"]["state"].as_string() == "simulating" && st["trainer"]["stage"].as_string() == "pose");
+  CHECK(st["prefs"]["layout"].as_string() == "single" && st["selection"].size() == 0);
+  // The stage is not the level: the level is as it was, the stage a weightless duck and nothing else.
+  CHECK(f.s->level_text() == level && !f.s->dirty() && f.s->history().size() == steps);
+  game::GameWorld& w = f.s->world();
+  CHECK(w.level().world.gravity.z == 0 && !w.level().world.ground);
+  for (const game::Actor& a : w.level().actors) CHECK(a.colliders.empty());  // only its hinges limit a pose
+  const game::ActorId duck = f.s->trainer_duck();
+  CHECK(duck != 0 && w.walkers().size() == 1);
   if (!duck) return;
   f.frames(10);
-  game::GameWorld& w = f.s->world();
+  // A new motion starts in the home pose.
+  CHECK(f.s->trainer_keys().size() == 1 && f.s->trainer_keys()[0].time == 0);
+  json::Value home = f.cmd(R"({"cmd":"trainerPose"})");
+  CHECK(home["ok"].as_bool() && home["joints"].size() == 14 && home["names"].size() == 14);
+  for (std::size_t j = 0; j < home["joints"].size(); ++j) CHECK_NEAR(home["joints"][j].as_number(), 0.0, 0.02);
+  // The mouse on the head: the viewport's grab takes it (the mouse joint), it follows the cursor
+  // within its hinges' limits and holds where it is let go.
+  auto screen = [&](Vec3 p) {
+    json::Value c = json::Value::object(), at = json::Value::array();
+    c.set("cmd", "project");
+    for (int i = 0; i < 3; ++i) at.push(static_cast<f64>(p[i]));
+    c.set("point", std::move(at));
+    json::Value r = f.s->command(c);
+    return std::pair<f32, f32>{static_cast<f32>(r["x"].as_number()), static_cast<f32>(r["y"].as_number())};
+  };
   const auto initial = w.walker_joints(duck);
   CHECK(initial.size() == 15);
   const physics::Body head = w.actor_body(duck + 9);
   CHECK(w.physics().body_type(head) == physics::BodyType::dynamic);
-  const Vec3 p = w.physics().pose(head).position;
-  CHECK(w.begin_grab(duck + 9, p));
-  w.move_grab(p + Vec3{0, 0.7f, 0.7f});
-  f.frames(40);
-  w.end_grab();
+  Aabb head_box;
+  CHECK(w.actor_bounds(duck + 9, head_box));
+  auto [x, y] = screen(head_box.center());
+  f.s->pointer(0, 0, x, y, 0, 1, 0, 0);
+  CHECK(w.grabbing());
+  for (int i = 1; i <= 20; ++i) { f.s->pointer(0, 1, x + 3.0f * static_cast<f32>(i), y - 5.0f * static_cast<f32>(i), 0, 1, 0, 0); f.frames(2); }
+  f.s->pointer(0, 2, x + 60, y - 100, 0, 0, 0, 0);
+  CHECK(!w.grabbing());
+  CHECK(f.s->selection().empty());  // nothing of the stage is selected
   const auto held = w.walker_joints(duck);
   f32 moved = 0;
   for (std::size_t j = 0; j < 14 && j < held.size(); ++j) {
@@ -4815,15 +4846,98 @@ TEST(studio_motion_mouse_joint_holds_pose_after_release) {
     CHECK(held[j].angle >= held[j].lower - 0.10f);
     CHECK(held[j].angle <= held[j].upper + 0.10f);
   }
-  CHECK(moved > 0.005f);  // physical MouseGrab moved an actual servo joint
+  CHECK(moved > 0.005f);  // the mouse joint moved a real servo joint
   f.frames(50);
   const auto retained = w.walker_joints(duck);
   f32 worst_drift = 0;
-  for (std::size_t j = 0; j < 14 && j < retained.size(); ++j)
-    worst_drift = max_of(worst_drift, std::fabs(retained[j].angle - held[j].angle));
-  CHECK(worst_drift < 0.15f);  // no zero-g coast or spring back to home
-  const json::Value pose = f.cmd(R"({"cmd":"motionPose"})");
-  CHECK(pose["ok"].as_bool() && pose["joints"].size() == 14);
+  for (std::size_t j = 0; j < 14 && j < retained.size(); ++j) worst_drift = max_of(worst_drift, std::fabs(retained[j].angle - held[j].angle));
+  CHECK(worst_drift < 0.15f);  // no coasting without gravity, no spring back to home
+  // A drag beside the duck turns the view about it.
+  const f32 yaw = f.s->viewport(0).camera.yaw;
+  f.s->pointer(0, 0, 30, 30, 0, 1, 0, 0);
+  CHECK(!w.grabbing());
+  for (int i = 1; i <= 10; ++i) f.s->pointer(0, 1, 30 + 8.0f * static_cast<f32>(i), 30, 0, 1, 0, 0);
+  f.s->pointer(0, 2, 110, 30, 0, 0, 0, 0);
+  CHECK(std::fabs(f.s->viewport(0).camera.yaw - yaw) > 5 && f.s->selection().empty());
+  // The pose becomes the keyframe at the end: the angles the joints measure.
+  CHECK(f.cmd(R"({"cmd":"trainerCapture","time":1.2})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"trainerCapture","time":9})")["ok"].as_bool());  // past the motion's end
+  CHECK(f.s->trainer_keys().size() == 2);
+  f32 differ = 0;
+  if (f.s->trainer_keys().size() == 2)
+    for (int j = 0; j < 14; ++j) differ += std::fabs(f.s->trainer_keys()[1].joints[j] - f.s->trainer_keys()[0].joints[j]);
+  CHECK(differ > 0.005f);
+  // The servos show the first keyframe: the puppet goes back to the home pose by their own law.
+  CHECK(f.cmd(R"({"cmd":"trainerShow","index":0})")["ok"].as_bool());
+  f.frames(120);
+  const json::Value shown = f.cmd(R"({"cmd":"trainerPose"})");
+  for (std::size_t j = 0; j < shown["joints"].size(); ++j) CHECK_NEAR(shown["joints"][j].as_number(), 0.0, 0.05);
+  // The timeline: a keyframe in between, moved, removed; the length carries its last keyframe along.
+  CHECK(f.cmd(R"({"cmd":"trainerCapture","time":0.5})")["ok"].as_bool() && f.s->trainer_keys().size() == 3);
+  CHECK(!f.cmd(R"({"cmd":"trainerKey","index":1,"time":1.2})")["ok"].as_bool());  // taken
+  CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"time":0.8})")["ok"].as_bool() && f.s->trainer_keys()[1].time == 0.8f);
+  CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"remove":true})")["ok"].as_bool() && f.s->trainer_keys().size() == 2);
+  CHECK(f.cmd(R"({"cmd":"trainerMotion","name":"wave","duration":2})")["ok"].as_bool() && f.s->trainer_keys()[1].time == 2.0f);
+  CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"Not a name"})")["ok"].as_bool());
+  // What the Studio hands the Lehrer is a task the Lehrer takes.
+  const json::Value task = f.cmd(R"({"cmd":"trainerTask"})");
+  CHECK(task["ok"].as_bool() && task["move"].as_string() == "motion_wave" && task["task"].as_string().rfind("motion:", 0) == 0);
+  if (task["ok"].as_bool()) {
+    auto motion = lehrer::make_motion_task(task["task"].as_string().substr(7));
+    CHECK(motion != nullptr && motion->episode_seconds() == 2.0f);
+  }
+  CHECK(f.cmd(R"({"cmd":"trainerClear"})")["ok"].as_bool() && f.s->trainer_keys().size() == 1);
+  CHECK(!f.cmd(R"({"cmd":"trainerTask"})")["ok"].as_bool());  // a motion needs its start and its end
+  // Escape leaves the workspace: the level, the viewport and the selection as they were.
+  f.s->key("Escape", "Escape", true, 0, false);
+  CHECK(!f.s->trainer_open() && f.s->play_state() == studio::PlayState::editing);
+  st = f.s->state();
+  CHECK(st["trainer"].is_null() && st["prefs"]["layout"].as_string() == "quad");
+  CHECK(f.s->selection() == selection);
+  CHECK(distance(f.s->viewport(0).camera.position, camera.position) < 1e-5f && f.s->viewport(0).camera.yaw == camera.yaw);
+  CHECK(f.s->level_text() == level && !f.s->dirty() && f.s->history().size() == steps);
+  f.frames(3);
+  CHECK(w.level().actors.size() == f.s->level().actors.size());  // the world shows the level again
+}
+
+// A learned move on the Lehrer's test stage: the duck on its training ground runs the network,
+// and Play leaves the workspace for the level.
+TEST(studio_lehrer_tries_a_learned_move) {
+  StudioFixture f;
+  // A network of the right shape under a learned move's file name (velstand stands in for a trained one).
+  auto net = std::make_shared<game::WalkerPolicy>(game::builtin_velstand_policy());
+  net->file = "motion_test.onnx";
+  game::register_walker_policy(net);
+  CHECK(f.cmd(R"({"cmd":"trainerRegister","move":"motion_test","file":"motion_test.onnx","duration":0.6})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"trainerRegister","move":"jump","file":"motion_test.onnx","duration":0.6})")["ok"].as_bool());  // not over a move of the robot's own
+  CHECK(!f.cmd(R"({"cmd":"trainerTest","move":"motion_test"})")["ok"].as_bool());  // the workspace is closed
+  CHECK(f.s->open_trainer());
+  CHECK(!f.cmd(R"({"cmd":"trainerTest","move":"motion_none"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"trainerTest","move":"motion_test"})")["ok"].as_bool());
+  CHECK(f.s->trainer_stage() == studio::TrainerStage::test && f.s->state()["trainer"]["testing"].as_string() == "motion_test");
+  game::GameWorld& w = f.s->world();
+  CHECK(w.level().world.gravity.z < -9 && w.level().world.ground);
+  const game::ActorId duck = f.s->trainer_duck();
+  f.frames(8);
+  CHECK(w.walker_driving(duck) == "motion_test");
+  f.frames(120);  // 0.6 s of the move at the duck's scale (time runs half as fast), and some more
+  CHECK(w.walker_driving(duck) == "walk");
+  CHECK(!f.cmd(R"({"cmd":"trainerCapture","time":0})")["ok"].as_bool());  // keyframes are taken on the posing stage
+  CHECK(f.cmd(R"({"cmd":"trainerStage"})")["ok"].as_bool() && f.s->trainer_stage() == studio::TrainerStage::pose);
+  CHECK(f.s->world().level().world.gravity.z == 0);
+  // Play runs the level, not the stage.
+  f.s->key("p", "KeyP", true, 4, false);
+  CHECK(!f.s->trainer_open() && f.s->play_state() == studio::PlayState::playing);
+  CHECK(f.s->world().level().actors.size() == f.s->level().actors.size());
+  f.cmd(R"({"cmd":"stop"})");
+  // A learned move in a level with a duck: its first Micro Duck plays it.
+  CHECK(!f.cmd(R"({"cmd":"trainerPlay","move":"motion_test"})")["ok"].as_bool());  // Orb Run has none
+  f.cmd(R"({"cmd":"stop"})");
+  CHECK(f.s->load_level(game::micro_duck_level()));
+  CHECK(f.cmd(R"({"cmd":"trainerPlay","move":"motion_test"})")["ok"].as_bool());
+  CHECK(f.s->play_state() == studio::PlayState::simulating && !f.s->trainer_open());
+  f.frames(8);
+  CHECK(f.s->world().walker_driving(f.s->world().walkers()[0]) == "motion_test");
 }
 
 TEST(studio_simulate_drags_bodies_without_ctrl) {

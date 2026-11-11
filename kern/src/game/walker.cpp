@@ -757,6 +757,17 @@ bool GameWorld::set_walker_external(ActorId id, bool on) {
   return true;
 }
 
+void GameWorld::hold_walker_pose(WalkerBrain& w) {
+  for (i32 j = 0; j < kJoints; ++j) w.pose_hold[j] = physics_.joint_angle(w.joint[j]->joint);
+  if (w.mouth) w.pose_mouth_hold = physics_.joint_angle(w.mouth->joint);
+  w.pose_servo = false;
+  for (const physics::Body b : w.bodies) {
+    if (!b.valid()) continue;
+    physics_.set_linear_velocity(b, {});
+    physics_.set_angular_velocity(b, {});
+  }
+}
+
 bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
   WalkerBrain* w = walker_brain(id);
   if (!w) return false;
@@ -764,22 +775,25 @@ bool GameWorld::set_walker_pose_edit(ActorId id, bool on) {
     // Authoring is not an idle policy: stop all velocities and hold the physical
     // hinge angles where the user left them. Normal play and the PPO servo model
     // are untouched. Box3D's revolute joint limits stay enabled throughout.
-    if (on) {
-      for (i32 j = 0; j < kJoints; ++j) {
-        const SimJoint* sj = w->joint[j];
-        w->pose_hold[j] = clamp(physics_.joint_angle(sj->joint),
-                                kDuckLinks[j + 1].lower, kDuckLinks[j + 1].upper);
-      }
-      if (w->mouth) w->pose_mouth_hold = physics_.joint_angle(w->mouth->joint);
-    }
     w->pose_edit = on;
     physics_.set_body_type(w->trunk, on ? physics::BodyType::fixed : physics::BodyType::dynamic);
-    if (on) for (const physics::Body b : w->bodies) {
-      if (!b.valid()) continue;
-      physics_.set_linear_velocity(b, {});
-      physics_.set_angular_velocity(b, {});
+    if (on) {
+      hold_walker_pose(*w);
+      for (i32 j = 0; j < kJoints; ++j) w->pose_hold[j] = clamp(w->pose_hold[j], kDuckLinks[j + 1].lower, kDuckLinks[j + 1].upper);
     }
+    w->pose_servo = false;
   }
+  return true;
+}
+
+bool GameWorld::set_walker_pose(ActorId id, const f32 joints[14]) {
+  WalkerBrain* w = walker_brain(id);
+  if (!w || !w->pose_edit) return false;
+  for (i32 j = 0; j < kJoints; ++j) {
+    if (!std::isfinite(joints[j])) return false;
+    w->pose_hold[j] = clamp(kDuckLinks[j + 1].home + joints[j], kDuckLinks[j + 1].lower, kDuckLinks[j + 1].upper);
+  }
+  w->pose_servo = true;
   return true;
 }
 
@@ -1532,6 +1546,10 @@ void GameWorld::drive_servos(f32 h) {
         // Box3D motor mouse joint. Joint limits continue to constrain it.
         physics_.set_joint_spring(sj->joint, 0, 0, 0);
         physics_.set_joint_motor(sj->joint, false, 0, 0);
+      } else if (w->pose_servo && joint < kJoints) {
+        // A pose being shown: the servo's own law takes the joint there, as on the robot.
+        servo_step(physics_, sj->joint, w->pose_hold[joint], sj->servo_stiffness, sj->servo_damping,
+                   sj->servo_friction, sj->servo_torque);
       } else {
         // The other joints, and the released limb, stay put instead of
         // floating/gliding away in zero gravity. This is editor-only.

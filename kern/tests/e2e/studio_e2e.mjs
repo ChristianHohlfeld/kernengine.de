@@ -6,7 +6,8 @@
 // generated/studio.html (the single-file build) and kern/web/studio/index.html
 // (the module build), drives the editor through its UI - menus, viewport fly
 // navigation, the outliner, the details panel, the content drawer, Play and
-// Simulate - packages a game and plays the packaged page.
+// Simulate - packages a game and plays the packaged page, and teaches the
+// Micro Duck in the Lehrer's workspace (generated/kern_lehrer.wasm beside the page).
 import {createRequire} from "node:module";
 import fs from "node:fs";
 import path from "node:path";
@@ -824,63 +825,157 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await ctx.close();
 }
 
-// ---- Lehrer: the deployed HTML contains a *working* embedded Box3D puppet, not
-// merely a select with an invisible/keyframe panel. Exercise the real Studio C
-// ABI and the two-click home-pose + goal-pose workflow end to end. -----------
+// ---- The Lehrer's workspace (docs/lehrer.md): the trainer is a part of the one Studio page. The
+// duck stands on its stage in the Studio's own viewport and is posed with the real mouse (Box3D's
+// mouse joint), keyframes are what its joints measure, the servos show them, a short training run
+// goes through the workers and the duck tries the network - and the open level is not touched. ------
 {
-  const ctx = await browser.newContext({viewport:{width:1060,height:850}});
+  const {ctx, page, errors} = await openStudio(base + "/generated/studio.html?train=1", {width: 1280, height: 800});
+  const pose = async () => (await cmd(page, {cmd: "trainerPose"})).joints;
+  const apart = (a, b) => a.reduce((sum, v, i) => sum + Math.abs(v - b[i]), 0);
+  let s = await state(page);
+  check(s.trainer?.stage === "pose" && s.play.state === "simulating", "Lehrer: ?train=1 opens the workspace on the posing stage");
+  check(s.level.name === "Orb Run" && !s.level.dirty, "Lehrer: the level stays open and untouched");
+  check(await page.locator("#trainerPanel").isVisible() && !(await page.locator("#outlinerPanel").isVisible()) && !(await page.locator("#detailsPanel").isVisible()),
+        "Lehrer: its panel takes the side panels' place");
+  check(await page.locator("#trainerBar").isVisible() && await page.locator("#trainerBtn.on").count() === 1, "Lehrer: the bar on the stage, its toolbar button lit");
+  check(await page.locator("iframe").count() === 0, "Lehrer: one page, no embedded one");
+  check(await ink(page) > 12, "Lehrer: the viewport renders the duck on its stage");
+  const home = await pose();
+  check(home?.length === 14 && home.every(v => Math.abs(v) < 0.03) && s.trainer.motion.keys.length === 1, "Lehrer: the duck stands in its home pose, the motion's first keyframe");
+  // The real mouse takes a limb: press where a link is, drag, let go - it holds the new pose.
+  const c = await vpCenter(page);
+  let held = null;
+  for (const [dx, dy] of [[0, -0.22], [0, -0.3], [0.05, -0.25], [-0.05, -0.25], [0, -0.16], [0.08, 0.2], [-0.08, 0.2], [0, 0.25]]) {
+    const x = c.x + dx * c.r.height, y = c.y + dy * c.r.height;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    if (await until(async () => (await state(page)).play.grabbing, 1500)) { held = {x, y}; break; }
+    await page.mouse.up();
+  }
+  check(!!held, "Lehrer: the mouse takes a limb of the duck (the mouse joint)");
+  if (held) {
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(held.x + 9 * i, held.y - 12 * i); await page.waitForTimeout(40); }
+    await until(async () => apart(await pose(), home) > 0.05, 20000);
+    await page.mouse.up();
+  }
+  check(await until(async () => !(await state(page)).play.grabbing), "Lehrer: letting go releases the limb");
+  const posed = await pose();
+  check(apart(posed, home) > 0.05, `Lehrer: the drag moved real joints (${apart(posed, home).toFixed(2)} rad in all)`);
+  await page.waitForTimeout(600);
+  check(apart(await pose(), posed) < 0.05, "Lehrer: the limb holds where it was let go");
+  check((await state(page)).selection.length === 0, "Lehrer: nothing of the stage is selected");
+  // Two keyframes from the bar: the pose in the middle, then - shown by the servos - home at the end.
+  await page.fill("#trTime", "0.6");
+  await page.click("#trCapture");
+  check(await until(async () => (await state(page)).trainer.motion.keys.length === 2), "Lehrer: + Keyframe takes the pose at its time");
+  check(await until(async () => await page.locator("#trKeys .tr-key").count() === 2), "Lehrer: the keyframes are listed in the panel");
+  await page.locator("#trKeys .tr-key").first().locator("[data-show]").click();
+  check(await until(async () => (await pose()).every(v => Math.abs(v) < 0.05), 30000), "Lehrer: Show - the servos take the duck back to the first keyframe");
+  check(await page.inputValue("#trTime") === "1.2", "Lehrer: the next keyframe is offered at the motion's end");
+  await page.click("#trCapture");
+  check(await until(async () => (await state(page)).trainer.motion.keys.length === 3), "Lehrer: a second keyframe at the end");
+  const keys = (await state(page)).trainer.motion.keys;
+  check(keys.length === 3 && keys[1].time === 0.6 && keys[2].time === 1.2 && apart(keys[1].joints, keys[2].joints) > 0.05 && apart(keys[1].joints, posed) < 0.02,
+        "Lehrer: the two keyframes are the measured joint angles, and they differ");
+  // The timeline: a keyframe's time is edited in the list.
+  await page.locator("#trKeys .tr-key").nth(1).locator("input").fill("0.5");
+  await page.keyboard.press("Enter");
+  check(await until(async () => (await state(page)).trainer.motion.keys[1].time === 0.5), "Lehrer: a keyframe's time is edited in the list");
+  // A run as short as can be: one worker, one duck, one iteration - through the workers and the
+  // Lehrer's module, the network into this page's engine, the duck tries it on its training ground.
+  await page.fill("#trWorkers", "1");
+  await page.fill("#trEnvs", "1");
+  await page.fill("#trIterations", "1");
+  await page.click("#trStart");
+  check(await until(() => page.evaluate(() => window.KernStudio.training), 20000), "Lehrer: Start begins a training run");
+  const trained = await until(() => page.evaluate(() => !window.KernStudio.training && window.KernStudio.trainer.onnx?.bytes.length), 240000);
+  check(trained > 50000, `Lehrer: the run ends with a network (${trained} bytes of ONNX)` + (trained ? "" : ": " + await page.locator("#trStatus").textContent()));
+  check(await page.locator('#trLearned .tr-learned[data-move="motion_nod"]').count() === 1, "Lehrer: the learned motion is listed");
+  check(await page.locator("#trDownload").isEnabled(), "Lehrer: the network can be downloaded as .onnx");
+  await page.click("#trTest");
+  check(await until(async () => { const t = (await state(page)).trainer; return t.stage === "test" && t.testing === "motion_nod"; }), "Lehrer: the duck tries the network on its training ground");
+  check(await until(() => page.locator("#trPosing").isVisible()), "Lehrer: the bar leads back to posing");
+  await page.click("#trPosing");
+  check(await until(async () => (await state(page)).trainer.stage === "pose"), "Lehrer: back on the posing stage");
+  check((await state(page)).trainer.motion.keys.length === 3, "Lehrer: the keyframes are kept while trying");
+  await shot(page, "lehrer.png");
+  // Out through the toolbar: the editor as it was.
+  await page.click("#trainerBtn");
+  s = await until(async () => { const t = await state(page); return !t.trainer && t.play.state === "editing" ? t : null; });
+  check(!!s && s.level.name === "Orb Run" && !s.level.dirty, "Lehrer: the toolbar button leaves the workspace, the level untouched");
+  check(await until(async () => await page.locator("#outlinerPanel").isVisible() && !(await page.locator("#trainerPanel").isVisible()) && !(await page.locator("#trainerBar").isVisible())), "Lehrer: the editor's panels are back");
+  // In again through the menu, out with Escape.
+  await page.click('.mb[data-menu="window"]');
+  await page.locator(".menu .mi", {hasText: "Lehrer"}).click();
+  check(await until(async () => !!(await state(page)).trainer), "Lehrer: Window > Lehrer opens the workspace");
+  await page.mouse.move(c.x, c.r.top + 60);
+  await page.keyboard.press("Escape");
+  check(await until(async () => !(await state(page)).trainer), "Lehrer: Escape leaves it");
+  check(errors.length === 0, "Lehrer: no page errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  await ctx.close();
+}
+
+// ---- The Lehrer on a phone: the stage and its bar under the fingers, the panel as the sheet --------
+{
+  const ctx = await browser.newContext({viewport: {width: 390, height: 844}, hasTouch: true, isMobile: true});
   const page = await ctx.newPage();
   const errors = [];
-  page.on("pageerror", e=>errors.push(e.message));
-  // Reproduce a device where ordinary Studio has a saved previous game.
-  // The embedded puppet must NOT restore it or show the "Start fresh" toast.
-  await page.addInitScript(() => {
-    if (location.pathname.endsWith("/kern/web/studio/index.html") &&
-        new URLSearchParams(location.search).has("motion")) {
-      localStorage.setItem("kern-studio.autosave.v1", JSON.stringify({
-        name:"Orb Run", text:"saved-normal-Studio-session", time:Date.now()
-      }));
-    }
-  });
-  await page.goto(base + "/_site/lehrer/");
-  check((await page.locator("#motionStudio").getAttribute("src")) ===
-        "../kern/web/studio/index.html?motion=1",
-        "Lehrer: poser uses the module page outside the /editor/ service-worker scope");
-  check(await page.locator("#motionPanel").isVisible(), "Lehrer: keyframe mode is visible on first load");
-  check((await page.locator("#task").inputValue()) === "motion", "Lehrer: new motion is the default task");
-  await page.waitForFunction(() => {
-    try {
-      const w = document.querySelector("#motionStudio")?.contentWindow;
-      return w?.KernStudio?.state?.play?.state === "simulating";
-    } catch { return false; }
-  },null,{timeout:120000});
-  const state = await page.evaluate(() =>
-    document.querySelector("#motionStudio").contentWindow.KernStudio.state);
-  check(state.level.name === "Micro Duck · Posen" &&
-        state.play.state === "simulating",
-        "Lehrer: loads the zero-gravity Micro Duck instead of Orb Run");
-  const isolated = await page.evaluate(() => {
-    const w = document.querySelector("#motionStudio").contentWindow;
-    const toast = w.document.getElementById("toast");
-    return {toastHidden: !toast || toast.hidden,
-            preserved: !!w.localStorage.getItem("kern-studio.autosave.v1")};
-  });
-  check(isolated.toastHidden && isolated.preserved,
-        "Lehrer: no 'Start fresh' / 'Neu anfangen' overlay; saved Studio project untouched");
-  const duck = await page.evaluate(() => {
-    const w = document.querySelector("#motionStudio").contentWindow;
-    return w.KernStudio.command({cmd:"motionPose"});
-  });
-  check(duck.ok && duck.joints?.length === 14 &&
-        duck.joints.every(Number.isFinite), "Lehrer: real 14-joint Box3D Micro Duck is poseable");
-  check(await until(async () => (await page.locator("#motionFrames button").count()) === 2,15000),
-        "Lehrer: home pose automatically captured at t=0");
-  await page.locator("#motionCapture").click();
-  check(await until(async () => (await page.locator("#motionFrames button").count()) === 4,15000),
-        "Lehrer: one click captures the final pose at the chosen time");
-  check((await page.locator("#motionStatus").textContent()).includes("2 Keyframes"),
-        "Lehrer: both frames are ready for training");
-  check(errors.length === 0, "Lehrer: no browser JS errors" + (errors.length ? " " + errors.join(" | "):""));
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(base + "/generated/studio.html?train=1&lang=de");
+  await page.waitForFunction(() => window.KernStudio && window.KernStudio.frames() > 3 && window.KernStudio.state.trainer, null, {timeout: 120000});
+  const pose = async () => (await cmd(page, {cmd: "trainerPose"})).joints;
+  const apart = (a, b) => a.reduce((sum, v, i) => sum + Math.abs(v - b[i]), 0);
+  const reachable = sel => page.evaluate(sel => {
+    const el = document.querySelector(sel), r = el?.getBoundingClientRect();
+    if (!r || r.width < 36 || r.height < 36 || r.left < 0 || r.top < 0 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5) return false;
+    return !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(sel);
+  }, sel);
+  check(await until(() => reachable("#trCapture")) && await reachable("#trHome") && await reachable("#panelsBtn"), "Lehrer on a phone: + Keyframe, the home pose and the panel are touch-sized and one tap away");
+  check(await until(async () => (await page.locator("#trCapture").textContent()) === "+ Keyframe" && (await page.locator("#trHome").textContent()) === "Grundpose"), "Lehrer on a phone: German like the rest of the Studio");
+  // A finger takes a limb and poses it.
+  const home = await pose();
+  const finger = (type, x, y) => page.evaluate(([type, x, y]) => {
+    const el = document.querySelectorAll("#viewArea .vp")[0], r = el.getBoundingClientRect();
+    el.dispatchEvent(new PointerEvent(type, {pointerId: 41, pointerType: "touch", isPrimary: true, bubbles: true, cancelable: true, clientX: r.left + x, clientY: r.top + y, buttons: type === "pointerup" ? 0 : 1}));
+  }, [type, x, y]);
+  const r = await page.evaluate(() => window.KernStudio.viewportRect(0));
+  let held = null;
+  for (const [dx, dy] of [[0, -0.1], [0, -0.14], [0.03, -0.12], [-0.03, -0.12], [0, -0.07], [0.04, 0.1], [-0.04, 0.1], [0, 0.12]]) {
+    const x = r.width / 2 + dx * r.height, y = r.height / 2 + dy * r.height;
+    await finger("pointerdown", x, y);
+    if (await until(async () => (await state(page)).play.grabbing, 1500)) { held = {x, y}; break; }
+    await finger("pointerup", x, y);
+  }
+  check(!!held, "Lehrer on a phone: a finger takes a limb of the duck");
+  if (held) {
+    for (let i = 1; i <= 10; i++) { await finger("pointermove", held.x + 6 * i, held.y - 9 * i); await page.waitForTimeout(40); }
+    await until(async () => apart(await pose(), home) > 0.05, 20000);
+    await finger("pointerup", held.x + 60, held.y - 90);
+  }
+  check(apart(await pose(), home) > 0.05, "Lehrer on a phone: the finger poses real joints");
+  await page.tap("#trCapture");
+  check(await until(async () => (await state(page)).trainer.motion.keys.length === 2), "Lehrer on a phone: a tap on + Keyframe takes the pose");
+  // The panel is the sheet over the stage, as the editor's panels are.
+  await page.tap("#panelsBtn");
+  check(await until(() => page.locator("#trainerPanel").isVisible()), "Lehrer on a phone: the panels button opens the Lehrer's panel as a sheet");
+  await page.locator("#trStart").scrollIntoViewIfNeeded();
+  check(await until(() => reachable("#trStart")), "Lehrer on a phone: Start is touch-sized in the sheet");
+  check(await page.locator("#trKeys .tr-key").count() === 2 && !(await page.locator("#sideTabs").isVisible()), "Lehrer on a phone: the sheet shows the Lehrer, not the editor's tabs");
+  await page.tap("#trainerClose");
+  check(await until(async () => !(await state(page)).trainer), "Lehrer on a phone: its close button leaves the workspace");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Lehrer on a phone: no horizontal page scroll");
+  check(errors.length === 0, "Lehrer on a phone: no page errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  await ctx.close();
+}
+
+// ---- The Lehrer's old addresses (/lehrer/, /train/) lead into the workspace of the deployed editor -
+for (const old of ["lehrer", "train"]) {
+  const ctx = await browser.newContext({viewport: {width: 1024, height: 640}});
+  const page = await ctx.newPage();
+  await page.goto(base + `/_site/${old}/`);
+  const opened = await page.waitForFunction(() => window.KernStudio && window.KernStudio.frames() > 3 && !!window.KernStudio.state.trainer, null, {timeout: 120000}).then(() => true, () => false);
+  check(opened && new URL(page.url()).pathname.endsWith("/_site/editor/") && new URL(page.url()).searchParams.has("train"), `/${old}/ leads into the editor's Lehrer workspace`);
   await ctx.close();
 }
 

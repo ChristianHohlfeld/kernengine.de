@@ -33,8 +33,8 @@
 //   phone-dock-390.png, phone-play-390.png   the Studio on a phone, portrait
 //   game.png, game-phone.png          the packaged Orb Run (KERN_GAME_HTML names one; otherwise the
 //                                     Studio packages it into the system's temp folder)
-//   lehrer.png                        the Lehrer page training (KERN_LEHRER_URL, default <base-url>/lehrer/index.html;
-//                                     ?lang= like the Studio, the page is German and English)
+//   lehrer.png                        the Lehrer's workspace in the Studio while it trains (the jump; needs
+//                                     kern_lehrer.wasm beside the Studio page, as the site has it)
 //   duck-level.png, duck-play.png, duck-close.png   only with KERN_BOOK_DUCK=own-design, see below
 // Hidden in every picture, because they describe the machine the pictures are made on and not the
 // Studio: the frame rate (#fps, SwiftShader draws 1 to 3 frames a second), the build tag and the site's
@@ -317,20 +317,20 @@ for (const [name, viewport, phone] of [["game.png", {width: 1280, height: 800}, 
   });
 }
 
-// lehrer.png: the Lehrer page while it trains (one worker, the default jump), with its curve and values,
-// in the book's language (?lang=, the same rule as the Studio).
-const lehrerUrl = process.env.KERN_LEHRER_URL || base + "/lehrer/index.html";
+// lehrer.png: the Lehrer's workspace while it trains (one worker, the jump), with its curve and
+// values: the duck on its stage in the viewport, the Lehrer's panel beside it.
 if (want("lehrer.png")) await attempt("lehrer.png", async () => {
   const ctx = await browser.newContext({viewport: {width: 1280, height: 800}, deviceScaleFactor: 2});
   const page = await ctx.newPage();
   page.setDefaultTimeout(600000);
-  const res = await page.goto(lehrerUrl + query);
-  if (!res || !res.ok()) throw new Error("no Lehrer page at " + lehrerUrl);
-  await page.waitForFunction(() => !document.getElementById("start").disabled && /Bereit|Ready/.test(document.getElementById("status").textContent), null, {timeout: 600000});
-  await page.fill("#workers", "1");
-  await page.click("#start");
+  await page.goto(studioUrl + (query ? "&" : "?") + "train=1");
+  await page.waitForFunction(() => window.KernStudio?.state?.trainer && document.getElementById("trStart"), null, {timeout: 600000});
+  await page.selectOption("#trTask", "jump");
+  await page.fill("#trWorkers", "1");
+  await page.click("#trStart");
   // A curve needs a few dozen iterations.
-  await page.waitForFunction(() => Number(document.getElementById("s-it").textContent) >= 30, null, {timeout: 3600000});
+  await page.waitForFunction(() => Number(document.querySelector('#trainer [data-stat="it"] b').textContent) >= 30, null, {timeout: 3600000});
+  await page.locator('#trainer [data-tsec="stats"]').scrollIntoViewIfNeeded();
   await shot(page, "lehrer.png");
   await ctx.close();
 });

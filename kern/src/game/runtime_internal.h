@@ -58,9 +58,10 @@ struct GameWorld::WalkerBrain {
   u64 step = 0;                    // physics steps since start (the control clock)
   f32 action[14] = {};             // the last action (raw network output)
   bool external = false;           // set_walker_external: the Lehrer's action drives
-  bool pose_edit = false;          // true: static trunk + interactive MouseGrab posing
-  f32 pose_hold[14] = {};          // Box3D hinge angles held after the user releases a limb
-  f32 pose_mouth_hold = 0;         // pose the beak with the same physical hold
+  bool pose_edit = false;          // set_walker_pose_edit: the trunk pinned, the joints held, a grabbed link free
+  bool pose_servo = false;         // ... and the servos drive to pose_hold by their own law (set_walker_pose)
+  f32 pose_hold[14] = {};          // the hinge angles held: measured when a link is let go, or a pose shown
+  f32 pose_mouth_hold = 0;         // the beak's, held the same way
   f32 external_action[14] = {};
   f32 last_obs[61] = {};           // what the controller saw at the last tick
   f32 target[14] = {};             // joint targets of the last control tick (radians)

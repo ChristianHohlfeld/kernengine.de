@@ -270,7 +270,7 @@ bool Studio::load_level_text(std::string_view text, std::string_view name) {
 
 std::string Studio::level_text() const {
   game::Level copy = level_;
-  const ViewCamera& c = views_[0].camera;
+  const ViewCamera& c = trainer_open() ? trainer_.before.camera : views_[0].camera;  // the level's view, not the stage's
   copy.camera.position = c.position;
   copy.camera.yaw = c.yaw;
   copy.camera.pitch = c.pitch;
@@ -703,7 +703,7 @@ void Studio::set_hidden(const std::vector<ActorId>& ids, bool hidden) {
 }
 
 void Studio::keep_simulation_changes() {
-  if (play_ == PlayState::editing || selection_.empty()) { report("Keep Simulation Changes works on selected actors while simulating", "warn"); return; }
+  if (play_ == PlayState::editing || selection_.empty() || trainer_open()) { report("Keep Simulation Changes works on selected actors while simulating", "warn"); return; }
   std::vector<std::pair<ActorId, Mat4>> poses;
   for (ActorId id : selection_roots()) {
     Mat4 m;
@@ -845,6 +845,7 @@ bool Studio::soldier_pawn() const {
 
 bool Studio::play(game::SimMode mode) {
   play_buttons_ = 0;
+  if (trainer_open()) close_trainer();  // Play and Simulate run the level, not the Lehrer's stage
   if (play_ != PlayState::editing) {
     // Simulate <-> Play while running.
     if (!world_->set_mode(mode)) { report(last_error(), "warn"); return false; }
@@ -919,6 +920,12 @@ bool Studio::play(game::SimMode mode) {
 
 void Studio::stop() {
   if (play_ == PlayState::editing) return;
+  if (trainer_open()) { close_trainer(); return; }  // the stage is the Lehrer's: stopping it leaves the workspace
+  end_simulation();
+  report("Stopped - back to editing");
+}
+
+void Studio::end_simulation() {
   stop_net();
   world_->stop();
   play_ = PlayState::editing;
@@ -930,7 +937,6 @@ void Studio::stop() {
   json::Value a = json::Value::object();
   a.set("action", "releasePointer");
   push_ui(std::move(a));
-  report("Stopped - back to editing");
   ++scene_revision_;
   synced_revision_ = ~0ull;
   world_synced_ = ~0ull;
@@ -944,7 +950,7 @@ void Studio::toggle_pause() {
 }
 
 void Studio::eject() {
-  if (play_ == PlayState::editing) return;
+  if (play_ == PlayState::editing || trainer_open()) return;  // (the stage's duck is nobody's player)
   if (play_ == PlayState::playing) {
     // Detach from the pawn: the simulation keeps running, the camera is free.
     world_->set_mode(game::SimMode::simulate);

@@ -32,6 +32,8 @@ enum class ViewType : u8 { perspective, top, bottom, left, right, front, back };
 enum class ViewMode : u8 { lit, unlit, wireframe, collision };
 enum class Layout : u8 { single, quad, two_columns };
 enum class PlayState : u8 { editing, simulating, playing };
+/// The Lehrer's stage (trainer.cpp): the Micro Duck weightless to be posed, or on the ground to try a motion.
+enum class TrainerStage : u8 { none, pose, test };
 
 const char* tool_name(Tool t);
 const char* view_type_name(ViewType t);
@@ -150,6 +152,12 @@ struct Preferences {
   Layout layout = Layout::single;
   bool orbit_around_selection = true;
   f32 autosave_seconds = 2;
+};
+
+/// One keyframe of a motion being taught: the Micro Duck's 14 servo angles as its joints measure them.
+struct MotionKey {
+  f32 time = 0;                 // seconds from the start of the motion
+  f32 joints[14] = {};          // relative to the home pose, radians, in the policy's joint order
 };
 
 struct LogLine {
@@ -345,6 +353,18 @@ class Studio {
   bool remove_component(const std::string& type, i32 index);
   void keep_simulation_changes();
 
+  // the Lehrer's workspace (trainer.cpp, docs/lehrer.md)
+  /// Opens the workspace: the Micro Duck alone on a stage in the viewport, weightless, to be posed
+  /// by hand. The stage is a simulation of its own; the level stays open and is not touched.
+  bool open_trainer();
+  /// Back to the level: the viewport, the tool and the selection as they were.
+  void close_trainer();
+  bool trainer_open() const { return trainer_.stage != TrainerStage::none; }
+  TrainerStage trainer_stage() const { return trainer_.stage; }
+  /// The stage's Micro Duck (its trunk), 0 while the workspace is closed.
+  ActorId trainer_duck() const { return trainer_.duck; }
+  const std::vector<MotionKey>& trainer_keys() const { return trainer_.keys; }
+
   // play
   bool play(game::SimMode mode);
   void stop();
@@ -441,6 +461,34 @@ class Studio {
   void push_ui(json::Value action);
   json::Value run(const json::Value& cmd);
   game::PlayInput play_input() const;
+  // the Lehrer's workspace (trainer.cpp)
+  struct Trainer {
+    TrainerStage stage = TrainerStage::none;
+    ActorId duck = 0;                       // the stage's Micro Duck
+    // The motion being taught: its name (a move's name: a-z, 0-9, _ and -), its length and keyframes.
+    std::string name = "nod";
+    f32 duration = 1.2f;                    // seconds
+    std::vector<MotionKey> keys{MotionKey{}};  // in time order; a new motion starts in the home pose
+    std::string testing;                    // the learned move running on the test stage
+    // What the stage took over in the editor; close_trainer puts it back.
+    struct Before {
+      Layout layout = Layout::single;
+      u32 active = 0;
+      ViewType type = ViewType::perspective;
+      ViewMode mode = ViewMode::lit;
+      ViewCamera camera;
+      Tool tool = Tool::translate;
+      std::vector<ActorId> selection;
+    } before;
+  } trainer_;
+  /// Runs `level` as the workspace's stage (a simulation that is not the level being edited).
+  bool start_stage(TrainerStage stage, const game::Level& level, ActorId duck);
+  /// Frames the stage's duck in viewport 0.
+  void frame_stage();
+  json::Value trainer_command(const std::string& name, const json::Value& c);
+  json::Value trainer_json() const;
+  /// Ends Simulate / Play (and the stage) without a word: the world shows the level again.
+  void end_simulation();
 
   Renderer* r_ = nullptr;
   game::NightWindows* windows_ = nullptr;

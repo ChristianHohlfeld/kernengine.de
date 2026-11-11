@@ -2644,10 +2644,12 @@ bool GameWorld::begin_grab(ActorId actor, Vec3 point) {
     trunk = true;
     if (w->pose_edit) return false;  // the puppet's trunk is pinned by design
   }
-  for (const auto& w : walkers_) {
+  for (auto& w : walkers_) {
     if (!w->pose_edit) continue;
     for (const physics::Body b : w->bodies)
       if (b == it->second->body) { posing = true; break; }
+    // A pose being shown ends where the hand takes over: the other joints hold where they are.
+    if (posing && w->pose_servo) hold_walker_pose(*w);
   }
   // Damped, responsive Box3D mouse motor during keyframe authoring. It never
   // teleports the link: the solver and physical hinge limits do all movement.
@@ -2665,14 +2667,7 @@ void GameWorld::end_grab() {
     if (!ours) continue;
     // Latch the *measured* Box3D angles at release, never the mouse target
     // (which could be unreachable because of hard physical joint limits).
-    for (i32 j = 0; j < 14; ++j)
-      w->pose_hold[j] = physics_.joint_angle(w->joint[j]->joint);
-    if (w->mouth) w->pose_mouth_hold = physics_.joint_angle(w->mouth->joint);
-    for (const physics::Body b : w->bodies) {
-      if (!b.valid()) continue;
-      physics_.set_linear_velocity(b, {});
-      physics_.set_angular_velocity(b, {});
-    }
+    hold_walker_pose(*w);
     break;
   }
 }

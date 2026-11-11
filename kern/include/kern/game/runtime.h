@@ -406,9 +406,13 @@ class GameWorld {
   /// of its networks (when no skill, pick or sit runs). The servos take it as trained: home + action,
   /// scale 1, no low-pass, through the actuator delay.
   bool set_walker_external(ActorId id, bool on);
-  /// Zero-g keyframe posing: lock the trunk and suspend joint servos while the Box3D
-  /// MouseGrab moves articulated links. Re-enable servos to preview targets.
+  /// Keyframe posing (in a level without gravity): the trunk is pinned and every joint holds the
+  /// angle it has; a link taken with the mouse joint (begin_grab) swings free within its hinges'
+  /// limits and holds where it is let go.
   bool set_walker_pose_edit(ActorId id, bool on);
+  /// While posing: the servos take walker `id` to `joints` (relative to home, rad) by their own law,
+  /// a keyframe shown as the robot reaches it. The next grab holds the measured angles again.
+  bool set_walker_pose(ActorId id, const f32 joints[14]);
   bool set_walker_action(ActorId id, const f32 action[14]);
   /// The observation walker `id`'s controller builds at its next control tick (robotd's 61, the
   /// command slots 48..60 as last smoothed); no side effects. Exact between ticks: the world is at a
@@ -487,6 +491,7 @@ class GameWorld {
   void drive_player(const PlayInput& input, f32 dt);
   void drive_walker(const PlayInput& input, f32 dt);
   void create_walkers();
+  void hold_walker_pose(WalkerBrain& w);  // posing: holds the joint angles measured now, at rest
   void drive_walkers(f32 h);
   void sense_walker(WalkerBrain& w);
   void think_walker(WalkerBrain& w, f32 dt);  // the autonomous behaviour (walker_brain.cpp)

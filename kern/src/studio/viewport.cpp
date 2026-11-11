@@ -97,11 +97,13 @@ ActorId Studio::pick(u32 index, f32 x, f32 y, Vec3* hit_point) {
   Viewport& v = viewport(index);
   Ray r;
   if (!ray(v, x, y, r)) return 0;
+  // The Lehrer's stage shows its own level (and no icons).
+  const game::Level& shown = trainer_open() ? world_->level() : level_;
   // Actors without meshes (lights, empties) are picked by their icon on screen.
   ActorId icon = 0;
   f32 best = 14;
-  for (const game::Actor& a : level_.actors) {
-    if (a.mesh || a.city || a.locked || a.hidden) continue;
+  for (const game::Actor& a : shown.actors) {
+    if (a.mesh || a.city || a.locked || a.hidden || trainer_open()) continue;
     Mat4 m;
     if (!world_->actor_matrix(a.id, m)) continue;
     f32 sx, sy;
@@ -117,7 +119,7 @@ ActorId Studio::pick(u32 index, f32 x, f32 y, Vec3* hit_point) {
   for (int attempt = 0; attempt < 12; ++attempt) {
     if (!r_->pick_ray(r, q, hit)) break;
     const ActorId id = world_->actor_for_mesh(hit.mesh);
-    const game::Actor* a = level_.find(id);
+    const game::Actor* a = shown.find(id);
     if (a && !a->locked) {
       mesh_actor = id;
       if (hit_point) *hit_point = hit.point;
@@ -234,6 +236,15 @@ void Studio::look(f32 dx, f32 dy) {
 }
 
 Vec3 Studio::orbit_pivot(Viewport& v) {
+  if (trainer_open()) {
+    // The stage turns about its duck.
+    Aabb box;
+    for (const game::Actor& a : world_->level().actors) {
+      Aabb b;
+      if (world_->actor_bounds(a.id, b)) box.extend(b);
+    }
+    if (box.valid()) return box.center();
+  }
   if (prefs_.orbit_around_selection && !selection_.empty()) {
     Aabb box;
     for (ActorId id : selection_) {
@@ -540,7 +551,9 @@ bool Studio::free_touch_pointer(u32 type, i32 id, f32 x, f32 y, f64 time_ms) {
     t.mode = t.count ? Mode::orbit : Mode::none;
     if (t.count) t.pivot = orbit_pivot(v);
   }
-  if (still && held < 350) {
+  if (still && held < 350 && trainer_open()) {
+    if (tapped(x, y, time_ms)) frame_stage();  // (nothing of the stage is selected: a second tap frames the duck)
+  } else if (still && held < 350) {
     click(v, x, y, 0);
     if (tapped(x, y, time_ms) && !selection_.empty()) focus_selection(static_cast<i32>(active_view_));
   } else if (still && held >= 500 && play_ == PlayState::editing) {
@@ -651,7 +664,9 @@ json::Value Studio::pointer(u32 index, u32 type, f32 x, f32 y, i32 button, i32 b
         } else if (play_ == PlayState::simulating && observing_ && ejected_ && persp && v.drag != Drag::fly) {
           begin_drag(v, Drag::look_free);  // watching: dragging the empty view looks around
         } else if (v.drag == Drag::fly && persp) begin_drag(v, Drag::pedestal);
-        else {
+        else if (trainer_open()) {
+          if (persp) begin_drag(v, Drag::orbit);  // the Lehrer's stage: dragging beside the duck turns the view about it
+        } else {
           // Left button (as in Unreal): a click selects, a drag draws a marquee. Actors move only
           // with the gizmo (W / E / R), never by dragging them directly.
           v.press_actor = pick(index, x, y);
@@ -696,6 +711,7 @@ json::Value Studio::pointer(u32 index, u32 type, f32 x, f32 y, i32 button, i32 b
       const bool surface = d == Drag::gizmo && gizmo_.surface;
       if (d == Drag::marquee && v.moved && type == up) marquee_select(v, mods);
       end_drag(v);
+      if (trainer_open()) break;  // nothing of the stage is selected, and it has no context menu
       if (click_now && button == 0 && (surface || d == Drag::marquee || d == Drag::grab || d == Drag::look_free)) click(v, x, y, mods);
       if (click_now && button == 2 && (d == Drag::fly || d == Drag::ortho_pan) && play_ != PlayState::playing) {
         // Right click: select what is under the cursor and open the context menu.
@@ -883,7 +899,12 @@ void Studio::render_viewport(Viewport& v, f64 now_ms) {
       l.exposure *= 0.55f;
       break;
   }
-  if (helpers) {
+  if (helpers && trainer_open()) {
+    // The Lehrer's stage: the grid for orientation, none of the level's helpers.
+    if (v.flags.grid) p.layers |= cam.orthographic ? (layer::ortho_grid0 << v.index) : layer::grid;
+    if (v.flags.colliders) p.layers |= layer::colliders;
+    if (v.flags.joints || v.flags.contacts) p.layers |= layer::joints;
+  } else if (helpers) {
     if (v.flags.grid) p.layers |= cam.orthographic ? (layer::ortho_grid0 << v.index) : layer::grid;
     if (v.flags.icons) p.layers |= layer::icons;
     if (v.flags.selection) p.layers |= layer::selection;
@@ -927,7 +948,7 @@ void Studio::render_robot_camera(Viewport& v) {
   // What the robot sees: its head camera (the real duck's IMX219, 62 degrees across 16:9, mounted a
   // quarter turn off, so upright the picture is 9:16) in the corner of the viewport that plays, while
   // a walker runs.
-  if (!v.flags.robot_camera || play_ == PlayState::editing || v.index != active_view_ || world_->walkers().empty()) return;
+  if (!v.flags.robot_camera || play_ == PlayState::editing || trainer_open() || v.index != active_view_ || world_->walkers().empty()) return;
   ActorId who = 0;
   for (ActorId w : world_->walkers()) if (w == world_->player()) who = w;
   Camera cam;
