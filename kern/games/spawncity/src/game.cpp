@@ -264,6 +264,9 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* wanted = logic ? logic->find(world_->find_actor("Wanted")) : nullptr;
     if (!wanted || wanted->disabled()) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
     wanted::bind(wanted);
+    kern::logic::Instance* combat_detail = logic ? logic->find(world_->find_actor("CombatDetail")) : nullptr;
+    if (!combat_detail || combat_detail->disabled()) return kern::fail("the level's Blueprint \"CombatDetail\" is missing or has errors");
+    detail::bind(combat_detail);
   }
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");

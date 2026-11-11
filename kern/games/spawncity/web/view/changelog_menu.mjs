@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-11",time:"23:20",title:"Kleine Kampfregeln sind jetzt ein Blueprint",items:[
+    "Unter der Haube: Wann ein Auto, Bus oder eine Drohne kritisch wird und wie lange es bis zur Explosion dauert, der Impuls einer Kugel und die Abstimmung über Spielregeln stehen jetzt als Blueprint „CombatDetail“ im Level – mit Aufzählungen, Tabellen und Strukturen statt als C++ des Spiels. Am Spiel ändert sich dadurch nichts.",
+    "Der Blueprint läuft im Spiel als kompiliertes C++; die bisherigen Tests der Regeln laufen unverändert gegen ihn.",
+  ]},
   {date:"2026-11-11",time:"22:38",title:"Blueprints: Funktionen anderer Blueprints aufrufen",items:[
     "Kern-Blueprints: Ein Blueprint kann jetzt eine Funktion aufrufen, die ein anderer Blueprint hat. Der neue Knoten „Call on Actor“ führt sie auf dem Blueprint eines Actors aus – oder, ohne Ziel, auf dem des Levels. Was im Level-Blueprint als Funktion steht, ist damit eine Bibliothek für alle.",
     "Dazu sagt der Blueprint, wie die Funktion aussieht (Name, Ein- und Ausgänge). Hat das Ziel sie nicht, kommen die erklärten Standardwerte heraus. Auch eine eigene Funktion lässt sich so auf einem anderen Actor aufrufen.",

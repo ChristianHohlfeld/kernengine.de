@@ -192,6 +192,18 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
 `combat_detail`, `spawn_guard`, `guided`, `jet_seats`, `lamps`, `gaps_rules`, `controls`,
 `settings` (Datentabelle), `world_traffic`, `equipment`, `combat_rules`, `mp_rules`.
 
+- [x] **`combat_detail`** – Actor „CombatDetail“ im Level: die Aufzählungen Critical, Round und
+  Ballot, die Tabellen Profiles und Rounds (Listen der Strukturen CriticalProfile und RoundSpec),
+  die Struktur Vote und zwölf Funktionen (IsCritical, DetonationAt, Accelerate, ClockUpdate,
+  MomentumNs, BulletImpulse, CreateBallot, CastVote, BallotName …). `combat_detail.cpp` rechnet
+  nichts mehr: Es ruft den Blueprint auf, wie `wanted.cpp`. Die Tests sind dieselben; dazu läuft
+  der Blueprint als seine Klasse gegen den Interpreter (1007 Aufrufe, Wert für Wert gleich).
+  **Gemessen** (Test `details_blueprint`, Build mit Speicherprüfung): ein Aufruf von ClockUpdate
+  aus C++ kostet als Klasse rund 4 µs, im Interpreter rund 80 µs – das Spiel läuft mit der Klasse.
+- Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
+  `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
+  Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.
+
 ### 4 – Systeme in die Engine
 Je System: Code nach `kern/src/…`, als Komponente im Level und im Editor, Knoten für Blueprints,
 Replikation; das vereinfachte Gegenstück der Engine entfällt.

@@ -753,7 +753,8 @@ void register_native_blueprint(u64 hash, NativeBlueprintFactory make);
 /// The C++ that makes a Blueprint's class reachable by name and registers it under the graph's
 /// hash: compiled after the Blueprint's text (to_cpp(g, name)) in the same source. For graphs that
 /// are native_ready. It is glue for the engine, not part of the notation: nothing to edit there.
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library());
+/// `space`: the namespace the class stands in (the glue is written into it too), empty: none.
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), std::string_view space = {});
 
 struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loops, latent waits
   f64 time = 0, a = 0, b = 0;
