@@ -12,6 +12,9 @@ namespace kern::studio {
 namespace {
 
 constexpr f32 kSpeeds[8] = {1, 2.5f, 5, 10, 20, 40, 80, 160};  // m/s per camera speed setting
+// The Lehrer's stage is a duck of a metre, a level a place of tens of metres: on the stage the
+// camera moves at the stage's scale - the same settings, the same controls, a fortieth of the way.
+constexpr f32 kStageSpeed = 1.0f / 40;
 
 enum PointerType : u32 { down = 0, move = 1, up = 2, cancel = 3, wheel = 4, leave = 5 };
 enum Mods : u32 { shift = 1, ctrl = 2, alt = 4 };
@@ -33,7 +36,7 @@ void ortho_basis(ViewType t, Vec3& dir, Vec3& up) {
 
 f32 Studio::camera_speed() const {
   const i32 s = clamp(prefs_.camera_speed, 1, 8);
-  return kSpeeds[s - 1];
+  return kSpeeds[s - 1] * (trainer_open() ? kStageSpeed : 1.0f);
 }
 
 Camera Studio::camera_of(const Viewport& v) const {
@@ -731,10 +734,11 @@ json::Value Studio::pointer(u32 index, u32 type, f32 x, f32 y, i32 button, i32 b
     case wheel: {
       ViewCamera& c = v.camera;
       if (v.type != ViewType::perspective) {
-        // Zoom about the cursor.
+        // Zoom about the cursor: 15 % for one click of a mouse wheel (100 px), and as much for the
+        // many small steps of a touchpad that add up to one.
         Ray before;
         ray(v, x, y, before);
-        c.ortho_height = clamp(c.ortho_height * (wheel_delta > 0 ? 1.15f : 1 / 1.15f), 0.5f, 20000.0f);
+        c.ortho_height = clamp(c.ortho_height * std::pow(1.15f, clamp(wheel_delta, -300.0f, 300.0f) * 0.01f), 0.5f, 20000.0f);
         Ray after;
         ray(v, x, y, after);
         Vec3 dir, up;

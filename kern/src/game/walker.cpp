@@ -87,6 +87,7 @@ constexpr f32 kServoStiffness = 0.554f;   // N*m/rad
 constexpr f32 kServoDamping = 0.053f;     // N*m*s/rad
 constexpr f32 kServoFriction = 0.0048f;   // N*m
 constexpr f32 kServoTorque = 0.963f;     // N*m
+constexpr f32 kPosingFriction = 0.1f;    // a limb moved by hand on the posing stage: this share of the stall torque resists
 constexpr f32 kArmature = 0.0018f;       // kg*m^2: rotor inertia through the gearbox (MJCF chosen_actuator)
 constexpr f32 kDuckImpactThreshold = 0.12f;  // m/s: from here a touch sounds (plastic tap, footstep)
 constexpr f32 kWheelArmature = 0.0001f;  // kg*m^2: a roller wheel's bearing (MJCF passive_joint)
@@ -1542,8 +1543,11 @@ void GameWorld::drive_servos(f32 h) {
       if (grab_.active() && grab_.body() == sj->b) {
         // One limb is free *only while it is being dragged* by the real
         // Box3D motor mouse joint. Joint limits continue to constrain it.
+        // It moves against joint friction, as an unpowered servo's gear gives it: a motor at
+        // speed 0 with a limited torque (Erin Catto's joint friction). The hand's pull wins, and
+        // where the hand rests the limb rests - no swinging on at the mouse joint's spring.
         physics_.set_joint_spring(sj->joint, 0, 0, 0);
-        physics_.set_joint_motor(sj->joint, false, 0, 0);
+        physics_.set_joint_motor(sj->joint, true, 0, sj->servo_torque * kPosingFriction);
       } else if (w->pose_servo && joint < kJoints) {
         // A pose being shown: the servo's own law takes the joint there, as on the robot.
         servo_step(physics_, sj->joint, w->pose_hold[joint], sj->servo_stiffness, sj->servo_damping,

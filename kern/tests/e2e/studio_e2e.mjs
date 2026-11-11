@@ -867,6 +867,7 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   check(apart(await pose(), posed) < 0.05, "Lehrer: the limb holds where it was let go");
   check((await state(page)).selection.length === 0, "Lehrer: nothing of the stage is selected");
   // Two keyframes from the bar: the pose in the middle, then - shown by the servos - home at the end.
+  check(await page.inputValue("#trTime") === "0.3", "Lehrer: a new motion offers its first keyframe a quarter of the way in");
   await page.fill("#trTime", "0.6");
   await page.click("#trCapture");
   check(await until(async () => (await state(page)).trainer.motion.keys.length === 2), "Lehrer: + Keyframe takes the pose at its time");
@@ -880,7 +881,7 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   check(await until(async () => { const t = await state(page); return t.trainer?.motion.keys.length === 2 && t.motions.length === 1; }), "Lehrer: Redo brings it again");
   await page.locator("#trKeys .tr-key").first().locator("[data-show]").click();
   check(await until(async () => (await pose()).every(v => Math.abs(v) < 0.05), 30000), "Lehrer: Show - the servos take the duck back to the first keyframe");
-  check(await page.inputValue("#trTime") === "1.2", "Lehrer: the next keyframe is offered at the motion's end");
+  check(await page.inputValue("#trTime") === "1.2", "Lehrer: the next keyframe is offered one step on (here: the motion's end)");
   await page.click("#trCapture");
   check(await until(async () => (await state(page)).trainer.motion.keys.length === 3), "Lehrer: a second keyframe at the end");
   const keys = (await state(page)).trainer.motion.keys;
@@ -890,6 +891,9 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await page.locator("#trKeys .tr-key").nth(1).locator("input").fill("0.5");
   await page.keyboard.press("Enter");
   check(await until(async () => (await state(page)).trainer.motion.keys[1].time === 0.5), "Lehrer: a keyframe's time is edited in the list");
+  await page.click("#trSpread");
+  check(await until(async () => (await state(page)).trainer.motion.keys[1].time === 0.6) && await until(async () => await page.locator("#trKeys .tr-key").nth(1).locator("input").inputValue() === "0.6"),
+        "Lehrer: Spread evenly sets the keyframes in equal steps over the motion's length");
   // A run as short as can be: one worker, one duck, one iteration - through the workers and the
   // Lehrer's module, the network into the level, the duck tries it on its training ground.
   await page.fill("#trWorkers", "1");

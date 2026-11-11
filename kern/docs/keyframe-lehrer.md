@@ -18,7 +18,9 @@ gehört zum Level.
 3. Der erste Keyframe ist die Grundpose bei `0 s`. Gelenke bewegen und in der Leiste auf der Bühne
    **+ Keyframe** zu einem Zeitpunkt drücken, etwa Kopf nach unten bei `0,3 s`, nach oben bei
    `0,6 s`; am Ende bei der Länge der Bewegung die Endpose. **Anzeigen** an einem Keyframe fährt die
-   Ente durch die echten Servos in dessen Pose. Zeitpunkte lassen sich in der Liste ändern, Keyframes
+   Ente durch die echten Servos in dessen Pose. Nach jedem Keyframe geht die Zeit im gleichen Schritt weiter (nach `0,3` und `0,6` steht sie bei
+   `0,9`), und **Gleichmäßig verteilen** setzt alle Keyframes in gleichen Abständen über die Länge.
+   Zeitpunkte lassen sich in der Liste ändern, Keyframes
    löschen. Jede Änderung ist ein Schritt im Verlauf des Levels (Rückgängig / Wiederholen).
 4. **Start**: Der Lehrer übernimmt maximal 32 Keyframes, jeweils 14 **relative Servo-Winkel
    in Radiant** und ihre absolute Zeit in Sekunden. Die Werte kommen aus den Box3D-Encodern

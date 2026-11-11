@@ -5033,6 +5033,31 @@ TEST(studio_lehrer_poses_the_duck_on_its_stage) {
   for (int i = 1; i <= 10; ++i) f.s->pointer(0, 1, 30 + 8.0f * static_cast<f32>(i), 30, 0, 1, 0, 0);
   f.s->pointer(0, 2, 110, 30, 0, 0, 0, 0);
   CHECK(std::fabs(f.s->viewport(0).camera.yaw - yaw) > 5 && f.s->selection().empty());
+  // The camera on the stage is the Studio's, with its controls and its speed settings - at the
+  // stage's scale: a duck of a metre, not a level of tens of metres. One click of the wheel at
+  // speed 4 is a quarter of a metre (in a level: ten metres), the many small steps of a touchpad
+  // and of its pinch (the wheel with Ctrl held) add up to the same, and a drag pans as finely.
+  {
+    studio::ViewCamera& cam = f.s->viewport(0).camera;
+    CHECK(f.s->preferences().camera_speed == 4 && f.s->state()["prefs"]["cameraSpeedMs"].as_number() == 0.25);
+    const Vec3 start = cam.position, fwd = cam.forward();
+    f.s->pointer(0, 4, 480, 270, -1, 0, 0, -100);
+    CHECK_NEAR(dot(cam.position - start, fwd), 0.25f, 1e-4f);
+    CHECK_NEAR(length(cam.position - start), 0.25f, 1e-4f);
+    f.s->pointer(0, 4, 480, 270, -1, 0, 0, 100);
+    CHECK(distance(cam.position, start) < 1e-4f);
+    for (int i = 0; i < 50; ++i) f.s->pointer(0, 4, 480, 270, -1, 0, 0, -2);
+    CHECK_NEAR(dot(cam.position - start, fwd), 0.25f, 1e-3f);
+    for (int i = 0; i < 25; ++i) f.s->pointer(0, 4, 480, 270, -1, 0, 2, 4);  // a pinch: the wheel with Ctrl held
+    CHECK(distance(cam.position, start) < 1e-3f);
+    f.s->pointer(0, 0, 480, 270, 1, 4, 0, 0);  // the middle button pans
+    f.s->pointer(0, 1, 580, 270, -1, 4, 0, 0);
+    f.s->pointer(0, 2, 580, 270, 1, 0, 0, 0);
+    CHECK_NEAR(distance(cam.position, start), 0.5f, 0.01f);  // 100 px: half a metre (in a level: twenty)
+    f.s->key("f", "KeyF", true, 0, false);  // F frames the duck again
+    f.s->key("f", "KeyF", false, 0, false);
+    CHECK(distance(cam.position, start) < 0.2f);
+  }
   // The pose becomes the keyframe at the end: the angles the joints measure. The motion is the
   // level's from here on - one step of its history, undone and redone like any other.
   CHECK(f.cmd(R"({"cmd":"trainerCapture","time":1.2})")["ok"].as_bool());
@@ -5058,6 +5083,20 @@ TEST(studio_lehrer_poses_the_duck_on_its_stage) {
   CHECK(!f.cmd(R"({"cmd":"trainerKey","index":1,"time":1.2})")["ok"].as_bool());  // taken
   CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"time":0.8})")["ok"].as_bool() && f.s->trainer_motion().keys[1].time == 0.8f);
   CHECK(f.cmd(R"({"cmd":"trainerKey","index":1,"remove":true})")["ok"].as_bool() && f.s->trainer_motion().keys.size() == 2);
+  // Spread evenly: the keyframes in equal steps over the motion's length, as one undo step.
+  CHECK(f.cmd(R"({"cmd":"trainerCapture","time":0.1})")["ok"].as_bool() && f.cmd(R"({"cmd":"trainerCapture","time":0.15})")["ok"].as_bool() && f.s->trainer_motion().keys.size() == 4);
+  {
+    const std::size_t before = f.s->history().size();
+    CHECK(f.cmd(R"({"cmd":"trainerSpread"})")["ok"].as_bool() && f.s->history().size() == before + 1);
+    const auto& keys = f.s->trainer_motion().keys;
+    CHECK(keys.size() == 4 && keys[0].time == 0 && keys[1].time == 0.4f && keys[2].time == 0.8f && keys[3].time == 1.2f);
+    CHECK(f.cmd(R"({"cmd":"trainerSpread"})")["ok"].as_bool() && f.s->history().size() == before + 1);  // (they are spread: nothing to undo)
+    f.s->key("z", "KeyZ", true, 2, false);
+    CHECK(f.s->trainer_motion().keys.size() == 4 && f.s->trainer_motion().keys[1].time == 0.1f && f.s->trainer_motion().keys[2].time == 0.15f);
+    f.s->key("y", "KeyY", true, 2, false);
+    CHECK(f.s->trainer_motion().keys[2].time == 0.8f);
+    CHECK(f.cmd(R"({"cmd":"trainerKey","index":2,"remove":true})")["ok"].as_bool() && f.cmd(R"({"cmd":"trainerKey","index":1,"remove":true})")["ok"].as_bool() && f.s->trainer_motion().keys.size() == 2);
+  }
   CHECK(f.cmd(R"({"cmd":"trainerMotion","name":"wave","duration":2})")["ok"].as_bool());
   CHECK(f.s->level().motions.size() == 1 && f.s->level().motions[0].name == "wave" && f.s->trainer_motion().keys[1].time == 2.0f);
   CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"Not a name"})")["ok"].as_bool());
@@ -5073,6 +5112,7 @@ TEST(studio_lehrer_poses_the_duck_on_its_stage) {
   CHECK(f.cmd(R"({"cmd":"trainerNew"})")["ok"].as_bool() && f.s->trainer_motion().name == "nod" && f.s->level().motions.size() == 1);
   CHECK(!f.cmd(R"({"cmd":"trainerMotion","name":"wave"})")["ok"].as_bool());
   CHECK(!f.cmd(R"({"cmd":"trainerTask"})")["ok"].as_bool());  // a motion needs its start and its end
+  CHECK(!f.cmd(R"({"cmd":"trainerSpread"})")["ok"].as_bool());  // (and so does spreading its keyframes)
   CHECK(f.cmd(R"({"cmd":"trainerSelect","name":"wave"})")["ok"].as_bool() && f.s->trainer_motion().name == "wave");
   // The level is saved with what it was taught - also by the autosave, while the workspace is open.
   CHECK(f.s->take_autosave(f.now + 60000).find("\"motions\"") != std::string::npos);
@@ -5093,6 +5133,59 @@ TEST(studio_lehrer_poses_the_duck_on_its_stage) {
   CHECK(f.s->open_trainer() && f.s->trainer_motion().name == "wave");
   CHECK(f.cmd(R"({"cmd":"trainerRemove","name":"wave"})")["ok"].as_bool() && f.s->level().motions.empty());
   CHECK(f.s->trainer_motion().keys.size() == 1);  // a new one again
+}
+
+// A limb moved by hand on the posing stage moves against joint friction: where the hand rests
+// the limb rests, and the joints the pull bent take their angles back.
+TEST(studio_lehrer_a_posed_limb_rests_where_the_hand_rests) {
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"trainer","open":true})")["ok"].as_bool());
+  game::GameWorld& w = f.s->world();
+  const game::ActorId duck = f.s->trainer_duck();
+  CHECK(duck != 0);
+  if (!duck) return;
+  f.frames(10);
+  auto angles = [&] {
+    std::vector<f32> a;
+    for (const auto& j : w.walker_joints(duck)) a.push_back(j.angle);
+    return a;
+  };
+  json::Value c = json::Value::object(), at = json::Value::array();
+  Aabb head;
+  CHECK(w.actor_bounds(duck + 9, head));
+  c.set("cmd", "project");
+  for (int i = 0; i < 3; ++i) at.push(static_cast<f64>(head.center()[i]));
+  c.set("point", std::move(at));
+  const json::Value r = f.s->command(c);
+  const f32 x = static_cast<f32>(r["x"].as_number()), y = static_cast<f32>(r["y"].as_number());
+  const auto home = angles();
+  f.s->pointer(0, 0, x, y, 0, 1, 0, 0);
+  CHECK(w.grabbing());
+  for (int i = 1; i <= 20; ++i) { f.s->pointer(0, 1, x + 2.0f * static_cast<f32>(i), y - 3.0f * static_cast<f32>(i), 0, 1, 0, 0); f.frames(1); }
+  // the cursor rests: the head (its joint: head_roll, 8) has followed and does not swing on
+  f.frames(5);
+  f32 lo = 1e9f, hi = -1e9f;
+  for (int i = 0; i < 90; ++i) {
+    f.frames(1);
+    const f32 a = angles()[8];
+    lo = min_of(lo, a);
+    hi = max_of(hi, a);
+  }
+  CHECK(std::fabs(lo - home[8]) > 0.15f);  // it followed the hand
+  CHECK(hi - lo < 0.01f);                  // (without joint friction it swings by 0.15 rad here)
+  // a fine move: the limb follows a slow hand, a little with every few pixels
+  const f32 before = angles()[8];
+  for (int i = 1; i <= 30; ++i) { f.s->pointer(0, 1, x + 40 + static_cast<f32>(i), y - 60, 0, 1, 0, 0); f.frames(1); }
+  f.frames(20);
+  const f32 fine = std::fabs(angles()[8] - before);
+  CHECK(fine > 0.005f && fine < 0.2f);
+  f.s->pointer(0, 2, x + 70, y - 60, 0, 0, 0, 0);
+  const f32 let_go = angles()[8];
+  f.frames(90);
+  const auto rest = angles();
+  CHECK_NEAR(rest[8], let_go, 0.01f);  // it stays where it was let go
+  // the neck's other joints gave a little under the pull; they are back where they were held
+  for (std::size_t j : {5u, 6u, 7u}) CHECK_NEAR(rest[j], home[j], 0.01f);
 }
 
 // A trained network belongs to the level: the Lehrer hands it over, the level file carries it, the

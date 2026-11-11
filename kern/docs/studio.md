@@ -152,8 +152,14 @@ der Werkzeugleiste, Window → Lehrer oder die Adresse `…/editor/?train=1` (di
 - **Bühne:** Der Arbeitsbereich simuliert ein eigenes kleines Level in der GameWorld des Studios
   (`src/studio/trainer.cpp`); das offene Level steht still, Viewport, Werkzeug und Auswahl kommen beim
   Schließen so zurück, wie sie waren. Posieren: Ente schwerelos, Rumpf fest, Glieder mit Box3Ds
-  Maus-Gelenk ziehen (Maus oder Finger), sie halten, wo man loslässt. Testen: Ente bei normaler
-  Schwerkraft auf ihrem Trainingsboden, sie spielt eine gelernte Bewegung.
+  Maus-Gelenk ziehen (Maus oder Finger), sie halten, wo man loslässt. Das Gelenk des geführten
+  Glieds bewegt sich dabei gegen Gelenkreibung (ein Zehntel des Haltemoments seines Servos, als
+  Gelenkmotor mit Tempo 0): es bleibt stehen, wo die Hand stehen bleibt; die anderen Gelenke
+  behalten ihre Winkel. Das gilt nur beim Posieren – Training, Testen und Spiel haben das
+  unveränderte Servo-Gesetz. Testen: Ente bei normaler Schwerkraft auf ihrem Trainingsboden, sie
+  spielt eine gelernte Bewegung.
+- **Kamera der Bühne:** die des Studios mit denselben Bedienungen und Tempo-Stufen, im Maßstab der
+  Ente: ein Vierzigstel der Wege im Level (Stufe 4: ein Rad-Klick 25 cm statt 10 m).
 - **Panel** (`web/studio/trainer.mjs`, anstelle von Outliner und Details; auf dem Telefon das Blatt
   über der Bühne): Aufgabe (Bewegung aus Keyframes, Sprung, Stehen, freies Szenario), Keyframes,
   Start / Pause / Stopp, Experteneinstellungen, Fortschritt mit Kurve, „Bewegungen dieses Levels“.
@@ -170,6 +176,7 @@ der Werkzeugleiste, Window → Lehrer oder die Adresse `…/editor/?train=1` (di
 | `trainer {open?}` | Arbeitsbereich öffnen / schließen |
 | `trainerPose`, `trainerCapture {time}`, `trainerShow {index}` | gemessene Gelenkwinkel; Pose als Keyframe; Servos fahren in einen Keyframe |
 | `trainerMotion {name?, duration?}`, `trainerKey {index, time \| remove}`, `trainerClear` | die Bewegung, die gerade gelehrt wird |
+| `trainerSpread` | alle Keyframes in gleichen Abständen über die Länge der Bewegung |
 | `trainerNew`, `trainerSelect {name}`, `trainerRemove {name}` | neue Bewegung; eine des Levels bearbeiten; entfernen |
 | `trainerTask` | die Bewegung als Aufgabe des Lehrers (`motion:{…}`) |
 | `trainerLearned {name, onnx, run}` | ein trainiertes Netz (Base64) ins Level; ein Lauf (`run`) ist ein Verlaufsschritt |

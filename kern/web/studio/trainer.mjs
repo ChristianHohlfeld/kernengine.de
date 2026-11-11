@@ -169,6 +169,25 @@ function trainerDownload(name, data, type) {
 }
 
 const trainerNumber = text => Number(String(text).trim().replace(",", "."));
+/** A time as the panel shows it: milliseconds at most, no zeros at its end. */
+const trainerTime = t => +(+t).toFixed(3);
+/** The first step of a motion nobody has set a pace for yet: a quarter of its length, on a grid of 0.05 s. */
+const trainerFirstStep = duration => Math.max(0.05, Math.round(duration / 4 * 20) / 20);
+/** Where the next keyframe most likely goes when one was taken at `time`: on by the same step as
+ *  from the keyframe before it - after 0.3 and 0.6 comes 0.9 - and never past the motion's end.
+ *  `keys` are the motion's keyframes [{time}]. */
+function trainerNextTime(keys, duration, time) {
+  let before = null;
+  for (const k of keys) if (k.time < time - 1e-3 && (before === null || k.time > before)) before = k.time;
+  const next = time + (before === null ? trainerFirstStep(duration) : time - before);
+  return next > duration - 1e-3 ? duration : trainerTime(next);
+}
+/** The same for a motion as it stands: one step after its last keyframe before the end. */
+function trainerProposedTime(motion) {
+  let last = 0;
+  for (const k of motion.keys) if (k.time < motion.duration - 1e-3 && k.time > last) last = k.time;
+  return trainerNextTime(motion.keys, motion.duration, last);
+}
 
 // A scenario is data, not a generated C++ task. Both the collectors and the PPO learner receive
 // the exact same canonical JSON; the native trainer accepts the same schema with --scenario.
@@ -242,8 +261,10 @@ export class Trainer {
         field("Length", num("trDuration"), "s") +
         `<p class="tr-note" id="trMotion"></p>` +
         `<div class="grp">Keyframes</div><div id="trKeys"></div>` +
-        `<div class="tr-buttons"><button class="btn small" id="trClear" type="button">Remove all keyframes</button><button class="btn small" id="trNew" type="button">New motion</button></div>` +
-        `<p class="tr-note">Drag a part of the duck in the viewport and let go: it holds the pose. Add it as a keyframe at its time. The first keyframe is the home pose at 0 s, the last one lies at the motion's end.</p>`) +
+        `<div class="tr-buttons"><button class="btn small" id="trSpread" type="button" title="All keyframes in equal steps over the motion's length">Spread evenly</button>` +
+        `<button class="btn small" id="trClear" type="button">Remove all keyframes</button><button class="btn small" id="trNew" type="button">New motion</button></div>` +
+        `<p class="tr-note">Drag a part of the duck in the viewport and let go: it holds the pose. Add it as a keyframe at its time. The first keyframe is the home pose at 0 s, the last one lies at the motion's end.</p>` +
+        `<p class="tr-note">After each keyframe the time moves on by the same step: after 0.3 and 0.6 it stands at 0.9. Spread evenly sets all keyframes in equal steps over the length.</p>`) +
       sec("scenario", "Scenario",
         `<p class="tr-note">Waypoints and physical obstacles of your own, rewards to taste, and a new network learns the course. The order of the waypoints is the order of the task. All measures in metres from where the duck starts.</p>` +
         field("Name", `<input class="txt" id="scName" maxlength="80" spellcheck="false">`) +
@@ -276,7 +297,7 @@ export class Trainer {
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
         `<p class="tr-note">Training goes on while you edit, play or leave this workspace; keep the tab open, and a phone on its charger. More workers use more cores. The same seed and the same number of ducks produce the same network bit for bit, on every device.</p>` +
         `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
-    this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime", "1.2")}<span class="dim">s</span>` +
+    this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
       `<div class="tr-test"><span id="trTesting" data-i18n-skip></span><button class="btn primary" id="trAgain" type="button">Again</button><button class="btn" id="trPosing" type="button">Back to posing</button></div>`;
     const el = this.el = {};
@@ -327,12 +348,16 @@ export class Trainer {
     el.trDuration.onchange = () => {
       if (!command({cmd: "trainerMotion", duration: trainerNumber(el.trDuration.value)})?.ok) el.trDuration.value = this.s.motion.duration;
     };
+    el.trSpread.onclick = () => command({cmd: "trainerSpread"});
     el.trClear.onclick = () => command({cmd: "trainerClear"});
     el.trNew.onclick = () => command({cmd: "trainerNew"});
     el.trImport.onclick = () => this.importLegacy();
     el.trCapture.onclick = () => {
-      // The next pose is most likely the end of the motion.
-      if (command({cmd: "trainerCapture", time: trainerNumber(el.trTime.value)})?.ok) el.trTime.value = this.s.motion.duration;
+      const motion = this.s?.motion, time = trainerNumber(el.trTime.value);
+      if (!motion) return;
+      const keys = motion.keys.slice(), duration = motion.duration;
+      // The next pose most likely follows at the same step: the time moves on to it.
+      if (command({cmd: "trainerCapture", time})?.ok) el.trTime.value = trainerNextTime(keys, duration, time);
     };
     el.trHome.onclick = () => command({cmd: "trainerStage"});
     el.trPosing.onclick = () => command({cmd: "trainerStage"});
@@ -401,8 +426,9 @@ export class Trainer {
       if (document.activeElement !== el.trDuration) el.trDuration.value = motion.duration;
       el.trName.disabled = run?.move === motion.name;  // the run's network is this motion's, by its name
       this.text(el.trMotion, !motion.saved ? "New: it is the level's with its first keyframe." : motion.trained ? "In the level, taught." : "In the level, not taught yet.");
-      // A keyframe is most often taken for the motion's end.
-      if (motion.duration !== this.timeFor && document.activeElement !== el.trTime) { this.timeFor = motion.duration; el.trTime.value = motion.duration; }
+      // Another motion, or another length: the time for its next keyframe, one step after its last.
+      const timeFor = motion.name + "\n" + motion.duration;
+      if (timeFor !== this.timeFor && document.activeElement !== el.trTime) { this.timeFor = timeFor; el.trTime.value = trainerProposedTime(motion); }
       const key = JSON.stringify(motion.keys.map(k => k.time));
       if (key !== this.keysKey && !el.trKeys.contains(document.activeElement)) {
         this.keysKey = key;

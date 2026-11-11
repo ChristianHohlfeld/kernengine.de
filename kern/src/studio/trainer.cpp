@@ -395,6 +395,20 @@ json::Value Studio::trainer_command(const std::string& name, const json::Value& 
       return true;
     }));
   }
+  if (name == "trainerSpread") {
+    // The keyframes in equal steps over the motion's length: the first at 0 s, the last at its end.
+    const MotionAsset& now = trainer_motion();
+    if (now.keys.size() < 2) return error("A motion needs two keyframes at least: its start and its end");
+    const std::size_t last = now.keys.size() - 1;
+    auto place = [&](std::size_t k) { return static_cast<f32>(internal::round_num(static_cast<f64>(now.duration) * static_cast<f64>(k) / static_cast<f64>(last), 1000)); };
+    bool spread = true;
+    for (std::size_t k = 0; k <= last; ++k) spread = spread && std::fabs(now.keys[k].time - place(k)) < 1e-6f;
+    if (spread) return ok();  // (they are: nothing to undo)
+    return edited(edit_motion("Spread keyframes evenly", [&](MotionAsset& m) {
+      for (std::size_t k = 0; k <= last; ++k) m.keys[k].time = k == last ? m.duration : place(k);
+      return true;
+    }));
+  }
   if (name == "trainerClear") {
     if (trainer_motion().keys.size() == 1 && trainer_motion().keys[0].time == 0) return ok();  // as a new motion has it
     return edited(edit_motion("Remove all keyframes", [&](MotionAsset& m) {

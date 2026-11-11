@@ -345,6 +345,10 @@ const I18N_DE = {
   "Task": "Aufgabe", "Teach": "Beibringen", "Motion from keyframes": "Bewegung aus Keyframes", "Stand (quick test)": "Stehen (Schnelltest)",
   "Free training scenario": "Freies Trainingsszenario", "New motion": "Neue Bewegung", "Length": "Länge", "Keyframes": "Keyframes",
   "Remove all keyframes": "Alle Keyframes löschen", "Time of the keyframe (s)": "Zeitpunkt des Keyframes (s)",
+  "Spread evenly": "Gleichmäßig verteilen", "All keyframes in equal steps over the motion's length": "Alle Keyframes in gleichen Abständen über die Länge der Bewegung",
+  "Spread keyframes evenly": "Keyframes gleichmäßig verteilen",
+  "After each keyframe the time moves on by the same step: after 0.3 and 0.6 it stands at 0.9. Spread evenly sets all keyframes in equal steps over the length.":
+    "Nach jedem Keyframe geht die Zeit im gleichen Abstand weiter: nach 0.3 und 0.6 steht sie bei 0.9. „Gleichmäßig verteilen“ setzt alle Keyframes in gleichen Abständen über die Länge.",
   "The servos take the duck to this pose": "Die Servos fahren die Ente in diese Pose", "Remove this keyframe": "Diesen Keyframe entfernen",
   "Drag a part of the duck in the viewport and let go: it holds the pose. Add it as a keyframe at its time. The first keyframe is the home pose at 0 s, the last one lies at the motion's end.":
     "Zieh ein Körperteil der Ente im Viewport und lass los: sie hält die Pose. Füg sie als Keyframe zu ihrem Zeitpunkt hinzu. Der erste Keyframe ist die Grundpose bei 0 s, der letzte liegt am Ende der Bewegung.",

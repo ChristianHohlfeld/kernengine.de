@@ -2667,9 +2667,13 @@ void GameWorld::end_grab() {
     bool ours = false;
     for (const physics::Body b : w->bodies) if (b == released) { ours = true; break; }
     if (!ours) continue;
-    // Latch the *measured* Box3D angles at release, never the mouse target
-    // (which could be unreachable because of hard physical joint limits).
-    hold_walker_pose(*w);
+    // Latch the *measured* Box3D angle of the limb that was moved at release, never the mouse
+    // target (which could be unreachable because of hard physical joint limits). The other joints
+    // keep the angles they were holding: what the pull bent them by, they take back.
+    for (i32 j = 0; j < 14; ++j)
+      if (w->joint[j] && w->joint[j]->b == released) w->pose_hold[j] = physics_.joint_angle(w->joint[j]->joint);
+    if (w->mouth && w->mouth->b == released) w->pose_mouth_hold = physics_.joint_angle(w->mouth->joint);
+    w->pose_servo = false;
     break;
   }
 }
