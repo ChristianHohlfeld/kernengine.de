@@ -1306,6 +1306,7 @@ bool GameWorld::start(const Level& level, SimMode mode) {
 
   // Joints.
   for (const Actor& a : level_.actors) create_joints(a);
+  learn_motions();
   create_walkers();
 
   // City traffic: kinematic cars on the lanes.
@@ -1420,6 +1421,7 @@ void GameWorld::stop() {
   release_soldier_art();
   grab_.end();
   walkers_.clear();
+  learned_.clear();
   joints_.clear();
   traffic_.clear();
   bodies_.clear();

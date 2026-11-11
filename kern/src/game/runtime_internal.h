@@ -49,6 +49,21 @@ struct GameWorld::SimJoint {
   f32 servo_target = 0, servo_stiffness = 0, servo_damping = 0, servo_friction = 0, servo_torque = 1;
 };
 
+/// A one-shot move of a walker as its controller runs it (walker.cpp): a hard swap to the move's
+/// network for its length, then back. The robot's own moves come from its policy set's manifest
+/// (and Kern's jump); a motion the level taught (Level::motions) brings its network along.
+struct WalkerMove {
+  std::string name, file;
+  f32 duration = 0;
+  bool chain = false;
+  f32 command[3] = {0, 0, 0}, unwind[3] = {0, 0, 0};
+  f32 unwind_s = 0;
+  f32 action_scale = -1;  // < 0: the gait's
+  i32 phase_slot = -1;    // >= 0: the network sees the move's phase as cos / sin in this slot and the next
+  f32 period = 0;         // seconds per phase cycle
+  std::shared_ptr<const WalkerPolicy> net;  // a learned motion's own network (else the one registered as `file`)
+};
+
 /// A walker's controller state (walker.cpp): the Micro Duck's velstand policy and its servo bus.
 struct GameWorld::WalkerBrain {
   ActorId actor = 0;
@@ -85,7 +100,7 @@ struct GameWorld::WalkerBrain {
   enum class Sit : u8 { up, sitting, rising } sit = Sit::up;
   f32 sit_remaining = 0, sit_settle = 0;
   f32 pick_phase = -1;             // ground pick / crouch phase, < 0 when none runs
-  i32 skill = -1;                  // the one-shot skill running (index into the set), -1 none
+  i32 skill = -1;                  // the one-shot move running (GameWorld::walker_move), -1 none
   bool skill_unwinding = false;
   f32 skill_remaining = 0, skill_chain = 0;
   f32 previous_target[14] = {};    // the low-pass anchor

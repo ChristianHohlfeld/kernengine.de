@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -154,12 +155,6 @@ struct Preferences {
   f32 autosave_seconds = 2;
 };
 
-/// One keyframe of a motion being taught: the Micro Duck's 14 servo angles as its joints measure them.
-struct MotionKey {
-  f32 time = 0;                 // seconds from the start of the motion
-  f32 joints[14] = {};          // relative to the home pose, radians, in the policy's joint order
-};
-
 struct LogLine {
   std::string level;            // info, warn, error
   std::string text;
@@ -287,7 +282,7 @@ class Studio {
   /// edits the level in place and may change the selection; returning false
   /// rolls both back. A change that leaves the document identical adds no step.
   template <typename F> bool edit(const char* label, F&& fn) {
-    if (play_ != PlayState::editing) { report("Stop playing to edit the level", "warn"); return false; }
+    if (!editable()) { report("Stop playing to edit the level", "warn"); return false; }
     game::Level before = level_;
     std::vector<ActorId> selection_before = selection_;
     if (!fn(level_)) {
@@ -301,6 +296,9 @@ class Studio {
     commit(label, std::move(before), std::move(selection_before));
     return true;
   }
+  /// The document takes changes: while editing, and in the Lehrer's workspace (its stage is a
+  /// simulation of its own, not the level; what the duck is taught there belongs to the level).
+  bool editable() const { return play_ == PlayState::editing || trainer_open(); }
   void undo();
   void redo();
   /// Moves to history step `index` through the intermediate steps (same result as repeated undo/redo).
@@ -363,7 +361,9 @@ class Studio {
   TrainerStage trainer_stage() const { return trainer_.stage; }
   /// The stage's Micro Duck (its trunk), 0 while the workspace is closed.
   ActorId trainer_duck() const { return trainer_.duck; }
-  const std::vector<MotionKey>& trainer_keys() const { return trainer_.keys; }
+  /// The motion being taught: one of the level's (Level::motions), or a new one that enters the
+  /// level with its first change.
+  const game::MotionAsset& trainer_motion() const;
 
   // play
   bool play(game::SimMode mode);
@@ -465,10 +465,8 @@ class Studio {
   struct Trainer {
     TrainerStage stage = TrainerStage::none;
     ActorId duck = 0;                       // the stage's Micro Duck
-    // The motion being taught: its name (a move's name: a-z, 0-9, _ and -), its length and keyframes.
-    std::string name = "nod";
-    f32 duration = 1.2f;                    // seconds
-    std::vector<MotionKey> keys{MotionKey{}};  // in time order; a new motion starts in the home pose
+    std::string motion;                     // the level's motion being taught ("": the new one below)
+    game::MotionAsset fresh;                // a new motion, not in the level before its first change
     std::string testing;                    // the learned move running on the test stage
     // What the stage took over in the editor; close_trainer puts it back.
     struct Before {
@@ -487,6 +485,11 @@ class Studio {
   void frame_stage();
   json::Value trainer_command(const std::string& name, const json::Value& c);
   json::Value trainer_json() const;
+  json::Value motions_json() const;
+  /// A change of the motion being taught as one undo step; a new motion enters the level with it.
+  bool edit_motion(const char* label, const std::function<bool(game::MotionAsset&)>& fn);
+  /// A new motion to teach: the home pose at its start, a name the level does not have yet.
+  void fresh_motion();
   /// Ends Simulate / Play (and the stage) without a word: the world shows the level again.
   void end_simulation();
 

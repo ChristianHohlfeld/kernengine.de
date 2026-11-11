@@ -511,16 +511,9 @@ constexpr f32 kActuatorTravel = 3.14159265f;                       // safety.rs 
 constexpr f32 kPickOpen = 0.16f;
 constexpr f32 kPickClose = 0.24f;
 
-struct SkillDef {
-  std::string name, file;
-  f32 duration = 0;
-  bool chain = false;
-  f32 command[3] = {0, 0, 0}, unwind[3] = {0, 0, 0};
-  f32 unwind_s = 0;
-  f32 action_scale = -1;  // < 0: the gait's
-  i32 phase_slot = -1;    // >= 0: the network sees the move's phase as cos / sin in this slot and the next
-  f32 period = 0;         // seconds per phase cycle
-};
+using SkillDef = WalkerMove;  // (runtime_internal.h)
+// WalkerBrain::skill from here on: a motion the level taught (GameWorld::learned_), not one of the set.
+constexpr i32 kLearnedBase = 1 << 16;
 struct PhaseDef {
   std::string file;
   f32 period = 4, end_phase = 0.7f, action_scale = 1;
@@ -568,8 +561,9 @@ PolicySet& policy_set() {
         out.skills.push_back(std::move(d));
       }
     }
-    // Kern's own moves, trained in Kern (docs/lehrer.md; Kern Lehrer saves them for the Studio):
-    // the jump runs like Pollen's kicks - a hard swap to its network, then back after the episode.
+    // Kern's own move, trained in Kern (docs/lehrer.md): the jump runs like Pollen's kicks - a hard
+    // swap to its network, then back after the episode. (A level whose Lehrer trained a jump of its
+    // own brings it as a learned motion "jump".)
     SkillDef jump;
     jump.name = "jump";
     jump.file = "jump.onnx";
@@ -602,37 +596,37 @@ const char* move_blocked(const W& w) {
 
 }  // namespace
 
-bool register_learned_walker_skill(std::string_view name, std::string_view file, f32 seconds) {
-  if (name.empty() || name.size() > 48 || file.size() < 6 || file.size() > 80 ||
-      file.substr(file.size() - 5) != ".onnx" || !std::isfinite(seconds) ||
-      seconds < 0.3f || seconds > 15.0f) return false;
-  for (char c : name) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                            (c >= '0' && c <= '9') || c == '_' || c == '-')) return false;
-  for (char c : file) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                            (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) return false;
-  const auto policy = walker_policy(file);
-  if (!policy || policy->dims.empty() || policy->dims.front() != 61 || policy->dims.back() != 14)
-    return false;
-  PolicySet& set = policy_set();
-  for (SkillDef& skill : set.skills) {
-    if (skill.name != name) continue;
-    // Do not silently replace a shipped / built-in skill (especially jump).
-    if (skill.file.find("motion_") != 0) return false;
-    skill.file = std::string(file);
-    skill.duration = seconds;
-    skill.period = seconds;
-    return true;
+bool is_walker_move(std::string_view name) {
+  return name == "sit" || name == "pick" || name == "ground_pick" || name == "crouch" || skill_index(name) >= 0;
+}
+
+void GameWorld::learn_motions() {
+  learned_.clear();
+  for (const MotionAsset& m : level_.motions) {
+    if (!m.onnx || m.onnx->empty()) continue;  // still to be taught
+    auto net = std::make_shared<WalkerPolicy>();
+    std::string why;
+    const bool read = parse_onnx_policy(Span<const u8>(reinterpret_cast<const u8*>(m.onnx->data()), m.onnx->size()), *net, &why);
+    if (!read || net->dims.empty() || net->dims.front() != 61 || net->dims.back() != kJoints) {
+      events_.push_back("Motion \"" + m.name + "\": its network is not one the robot runs" + (why.empty() ? std::string() : " (" + why + ")"));
+      continue;
+    }
+    net->file = m.name + ".onnx";
+    // Like Kern's jump: its network alone for its length, the move's phase in the jump's slots
+    // (what the Lehrer trains a motion with: lehrer/motion.cpp).
+    auto move = std::make_unique<WalkerMove>();
+    move->name = m.name;
+    move->file = net->file;
+    move->duration = move->period = m.duration;
+    move->action_scale = 1.0f;
+    move->phase_slot = kJumpPhaseSlot;
+    move->net = std::move(net);
+    learned_.push_back(std::move(move));
   }
-  if (set.skills.size() >= 96) return false;
-  SkillDef skill;
-  skill.name = std::string(name);
-  skill.file = std::string(file);
-  skill.duration = seconds;
-  skill.period = seconds;
-  skill.action_scale = 1.0f;
-  skill.phase_slot = kJumpPhaseSlot;
-  set.skills.push_back(std::move(skill));
-  return true;
+}
+
+const WalkerMove& GameWorld::walker_move(i32 index) const {
+  return index >= kLearnedBase ? *learned_[static_cast<std::size_t>(index - kLearnedBase)] : policy_set().skills[static_cast<std::size_t>(index)];
 }
 
 std::string GameWorld::walker_skill(ActorId id, std::string_view name) {
@@ -657,10 +651,14 @@ std::string GameWorld::walker_skill(ActorId id, std::string_view name) {
     if (!w->rollers && w->kern_extras) w->mouth_open = 0;  // Kern: shut on the way down; opens at the bottom, then bites
     return "";
   }
-  const i32 index = skill_index(name);  // Controller::start_skill
+  i32 index = -1;  // Controller::start_skill
+  // What the level taught comes first: its own "jump" runs in place of the robot's.
+  for (std::size_t i = 0; i < learned_.size() && index < 0; ++i)
+    if (learned_[i]->name == name) index = kLearnedBase + static_cast<i32>(i);
+  if (index < 0) index = skill_index(name);
   if (index < 0) return "no such move";
-  const SkillDef& d = set.skills[static_cast<std::size_t>(index)];
-  if (!walker_policy(d.file)) return d.file + " is not loaded";
+  const SkillDef& d = walker_move(index);
+  if (!d.net && !walker_policy(d.file)) return d.file + " is not loaded";
   if (w->skill == index && d.chain && !w->skill_unwinding) { w->skill_chain = kChainWindow; return ""; }
   if (const char* why = move_blocked(*w)) return why;
   w->skill = index;
@@ -1212,7 +1210,7 @@ void GameWorld::run_controller(WalkerBrain& w, f32 obs[61]) {
   const PolicySet& set = policy_set();
   // Windows first: a tick after a deadline runs the next thing.
   if (w.skill >= 0 && w.skill_remaining <= 0) {
-    const SkillDef& d = set.skills[static_cast<std::size_t>(w.skill)];
+    const SkillDef& d = walker_move(w.skill);
     if (!w.skill_unwinding && d.unwind_s > 0) {
       w.skill_unwinding = true;
       w.skill_remaining = d.unwind_s;
@@ -1229,7 +1227,7 @@ void GameWorld::run_controller(WalkerBrain& w, f32 obs[61]) {
   f32 scale = w.rollers ? kActionScaleRoller : w.robot_actions ? kRobotActionScaleWalk : kActionScaleWalk;
   const f32 twist = std::sqrt(obs[48] * obs[48] + obs[49] * obs[49] + obs[50] * obs[50]);
   if (w.skill >= 0) {
-    const SkillDef& d = set.skills[static_cast<std::size_t>(w.skill)];
+    const SkillDef& d = walker_move(w.skill);
     const f32* c = w.skill_unwinding ? d.unwind : d.command;
     for (int i = 0; i < 3; ++i) obs[48 + i] = c[i];
     for (int i = 51; i < 61; ++i) obs[i] = 0;  // head and body zero-padded, as trained
@@ -1238,7 +1236,7 @@ void GameWorld::run_controller(WalkerBrain& w, f32 obs[61]) {
       obs[d.phase_slot] = kern::dm::cos(a);
       obs[d.phase_slot + 1] = kern::dm::sin(a);
     }
-    net = walker_policy(d.file);
+    net = d.net ? d.net : walker_policy(d.file);
     if (d.action_scale >= 0) scale = d.action_scale;
     w.driving = w.skill_unwinding ? d.name + ":unwind" : d.name;
   } else if (w.pick_phase >= 0) {

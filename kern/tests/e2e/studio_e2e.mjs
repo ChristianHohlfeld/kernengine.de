@@ -828,14 +828,15 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
 // ---- The Lehrer's workspace (docs/lehrer.md): the trainer is a part of the one Studio page. The
 // duck stands on its stage in the Studio's own viewport and is posed with the real mouse (Box3D's
 // mouse joint), keyframes are what its joints measure, the servos show them, a short training run
-// goes through the workers and the duck tries the network - and the open level is not touched. ------
+// goes through the workers and the duck tries the network. What it is taught is the level's: steps
+// of its history, saved with it, in the packaged game, played by the level's own duck. ---------------
 {
   const {ctx, page, errors} = await openStudio(base + "/generated/studio.html?train=1", {width: 1280, height: 800});
   const pose = async () => (await cmd(page, {cmd: "trainerPose"})).joints;
   const apart = (a, b) => a.reduce((sum, v, i) => sum + Math.abs(v - b[i]), 0);
   let s = await state(page);
   check(s.trainer?.stage === "pose" && s.play.state === "simulating", "Lehrer: ?train=1 opens the workspace on the posing stage");
-  check(s.level.name === "Orb Run" && !s.level.dirty, "Lehrer: the level stays open and untouched");
+  check(s.level.name === "Orb Run" && !s.level.dirty && s.motions.length === 0 && !s.trainer.motion.saved, "Lehrer: the level stays open; opening the workspace changes nothing of it");
   check(await page.locator("#trainerPanel").isVisible() && !(await page.locator("#outlinerPanel").isVisible()) && !(await page.locator("#detailsPanel").isVisible()),
         "Lehrer: its panel takes the side panels' place");
   check(await page.locator("#trainerBar").isVisible() && await page.locator("#trainerBtn.on").count() === 1, "Lehrer: the bar on the stage, its toolbar button lit");
@@ -870,6 +871,13 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await page.click("#trCapture");
   check(await until(async () => (await state(page)).trainer.motion.keys.length === 2), "Lehrer: + Keyframe takes the pose at its time");
   check(await until(async () => await page.locator("#trKeys .tr-key").count() === 2), "Lehrer: the keyframes are listed in the panel");
+  // The motion is the level's now, and a keyframe is a step of the level's history.
+  s = await state(page);
+  check(s.level.dirty && s.motions.length === 1 && s.motions[0].name === "nod" && s.motions[0].bytes === 0 && s.trainer.motion.saved, "Lehrer: the motion belongs to the level from its first keyframe on");
+  await page.click("#undoBtn");
+  check(await until(async () => { const t = await state(page); return t.trainer?.motion.keys.length === 1 && t.motions.length === 0; }), "Lehrer: Undo takes the keyframe back");
+  await page.click("#redoBtn");
+  check(await until(async () => { const t = await state(page); return t.trainer?.motion.keys.length === 2 && t.motions.length === 1; }), "Lehrer: Redo brings it again");
   await page.locator("#trKeys .tr-key").first().locator("[data-show]").click();
   check(await until(async () => (await pose()).every(v => Math.abs(v) < 0.05), 30000), "Lehrer: Show - the servos take the duck back to the first keyframe");
   check(await page.inputValue("#trTime") === "1.2", "Lehrer: the next keyframe is offered at the motion's end");
@@ -883,7 +891,7 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await page.keyboard.press("Enter");
   check(await until(async () => (await state(page)).trainer.motion.keys[1].time === 0.5), "Lehrer: a keyframe's time is edited in the list");
   // A run as short as can be: one worker, one duck, one iteration - through the workers and the
-  // Lehrer's module, the network into this page's engine, the duck tries it on its training ground.
+  // Lehrer's module, the network into the level, the duck tries it on its training ground.
   await page.fill("#trWorkers", "1");
   await page.fill("#trEnvs", "1");
   await page.fill("#trIterations", "1");
@@ -891,10 +899,20 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   check(await until(() => page.evaluate(() => window.KernStudio.training), 20000), "Lehrer: Start begins a training run");
   const trained = await until(() => page.evaluate(() => !window.KernStudio.training && window.KernStudio.trainer.onnx?.bytes.length), 240000);
   check(trained > 50000, `Lehrer: the run ends with a network (${trained} bytes of ONNX)` + (trained ? "" : ": " + await page.locator("#trStatus").textContent()));
-  check(await page.locator('#trLearned .tr-learned[data-move="motion_nod"]').count() === 1, "Lehrer: the learned motion is listed");
+  const row = page.locator('#trLearned .tr-learned[data-move="nod"]');
+  check(await until(async () => await row.count() === 1 && await row.locator("[data-try]").isEnabled()), "Lehrer: the taught motion is listed with the level's motions");
+  s = await state(page);
+  check(s.motions[0]?.bytes === trained && s.motions[0].keys === 3 && s.trainer.motion.trained, "Lehrer: the trained network is in the level");
+  // One run is one step of the history, however many networks it handed over.
+  await page.click("#undoBtn");
+  check(await until(async () => { const t = await state(page); return t.motions[0]?.bytes === 0 && t.trainer.motion.keys.length === 3; }), "Lehrer: one Undo takes the run's network back, the keyframes stay");
+  await page.click("#redoBtn");
+  check(await until(async () => (await state(page)).motions[0]?.bytes === trained), "Lehrer: Redo teaches it again");
   check(await page.locator("#trDownload").isEnabled(), "Lehrer: the network can be downloaded as .onnx");
+  const [file] = await Promise.all([page.waitForEvent("download"), row.locator("[data-net]").click()]);
+  check(file.suggestedFilename() === "nod_kern.onnx" && fs.statSync(await file.path()).size === trained, "Lehrer: a motion's network downloads from the level's list");
   await page.click("#trTest");
-  check(await until(async () => { const t = (await state(page)).trainer; return t.stage === "test" && t.testing === "motion_nod"; }), "Lehrer: the duck tries the network on its training ground");
+  check(await until(async () => { const t = (await state(page)).trainer; return t.stage === "test" && t.testing === "nod"; }), "Lehrer: the duck tries the network on its training ground");
   check(await until(() => page.locator("#trPosing").isVisible()), "Lehrer: the bar leads back to posing");
   await page.click("#trPosing");
   check(await until(async () => (await state(page)).trainer.stage === "pose"), "Lehrer: back on the posing stage");
@@ -903,7 +921,7 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   // Out through the toolbar: the editor as it was.
   await page.click("#trainerBtn");
   s = await until(async () => { const t = await state(page); return !t.trainer && t.play.state === "editing" ? t : null; });
-  check(!!s && s.level.name === "Orb Run" && !s.level.dirty, "Lehrer: the toolbar button leaves the workspace, the level untouched");
+  check(!!s && s.level.name === "Orb Run" && s.level.dirty && s.motions.length === 1 && s.outliner.rows.length > 10, "Lehrer: the toolbar button leaves the workspace; the level has what its ducks were taught");
   check(await until(async () => await page.locator("#outlinerPanel").isVisible() && !(await page.locator("#trainerPanel").isVisible()) && !(await page.locator("#trainerBar").isVisible())), "Lehrer: the editor's panels are back");
   // In again through the menu, out with Escape.
   await page.click('.mb[data-menu="window"]');
@@ -912,7 +930,79 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   await page.mouse.move(c.x, c.r.top + 60);
   await page.keyboard.press("Escape");
   check(await until(async () => !(await state(page)).trainer), "Lehrer: Escape leaves it");
+  // The packaged game's level carries the motion; saved and opened again, the level still has it.
+  const packaged = await page.evaluate(() => window.KernStudio.packageHtml("Orb Run"));
+  const packed = JSON.parse(/<script type="application\/json" id="kern-level">([\s\S]*?)<\/script>/.exec(packaged)[1]).motions;
+  check(packed?.length === 1 && packed[0].name === "nod" && packed[0].keys.length === 3 && Buffer.from(packed[0].onnx, "base64").length === trained,
+        "Lehrer: the packaged game's level carries the motion and its network");
+  const saved = (await cmd(page, {cmd: "save"})).text;
+  const net = (await cmd(page, {cmd: "trainerNet", name: "nod"})).onnx;
+  await cmd(page, {cmd: "new", template: "microDuck"});
+  check(await until(async () => (await state(page)).motions.length === 0), "Lehrer: another level was not taught it");
+  await cmd(page, {cmd: "open", text: saved, name: "taught.klevel"});
+  s = await until(async () => { const t = await state(page); return t.motions.length === 1 ? t : null; });
+  check(!!s && s.motions[0].name === "nod" && s.motions[0].keys === 3 && s.motions[0].bytes === trained, "Lehrer: saved and opened again, the level has the motion, its keyframes and its network");
+  // In a level with a Micro Duck: the duck plays what its level was taught, by the motion's name
+  // (the Blueprint node Robot Move makes the same call).
+  await cmd(page, {cmd: "new", template: "microDuck"});
+  const taken = await cmd(page, {cmd: "trainerImport", motions: [{name: "nod", duration: 1.2, onnx: net}]});
+  check(taken.ok && taken.names[0] === "nod", "Lehrer: a network from elsewhere comes into the level as a motion");
+  await page.click("#trainerBtn");
+  check(await until(async () => !!(await state(page)).trainer && await row.locator("[data-level]").isEnabled()), "Lehrer: the workspace lists the motion of the Micro Duck level");
+  await row.locator("[data-level]").click();
+  check(await until(async () => { const t = await state(page); return !t.trainer && t.play.state === "simulating"; }), "Lehrer: In the level - the level is simulated");
+  const busy = await cmd(page, {cmd: "trainerPlay", move: "nod"});
+  check(busy.ok || busy.error === "a scripted move is already running", "Lehrer: the level's Micro Duck plays the motion" + (busy.ok ? "" : ` (${busy.error})`));
+  await cmd(page, {cmd: "stop"});
   check(errors.length === 0, "Lehrer: no page errors" + (errors.length ? ": " + errors.join(" | ") : ""));
+  await ctx.close();
+}
+
+// ---- What the Lehrer's old page left on a device (its networks in IndexedDB "kern-lehrer", their
+// names in localStorage) is offered to the open level, once. ------------------------------------------
+{
+  const ctx = await browser.newContext({viewport: {width: 1280, height: 800}});
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(base + "/generated/build.json");
+  await page.evaluate(async () => {
+    const bytes = await (await fetch("/kern/policies/jump.onnx")).arrayBuffer();
+    localStorage.setItem("kern-lehrer.motion-skills.v1", JSON.stringify({"motion_wave.onnx": {name: "motion_wave", file: "motion_wave.onnx", duration: 1.5}}));
+    await new Promise((resolve, reject) => {
+      const open = indexedDB.open("kern-lehrer", 1);
+      open.onupgradeneeded = () => open.result.createObjectStore("policies");
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const tx = open.result.transaction("policies", "readwrite");
+        tx.objectStore("policies").put(bytes, "motion_wave.onnx");
+        tx.objectStore("policies").put(bytes, "jump.onnx");
+        tx.objectStore("policies").put(bytes, "stand.onnx");  // a quick test's network: not a move
+        tx.oncomplete = () => { open.result.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  await page.goto(base + "/generated/studio.html");
+  await page.waitForFunction(() => window.KernStudio && window.KernStudio.frames() > 5, null, {timeout: 90000});
+  const offer = page.locator("#toast");
+  check(await until(async () => await offer.isVisible() && /: jump, motion_wave\. /.test(await offer.textContent()), 30000), "Lehrer: the old page's motions on this device are offered to the open level");
+  check((await state(page)).motions.length === 0 && !(await state(page)).level.dirty, "Lehrer: nothing is imported before the answer");
+  await offer.locator(".btn.primary").click();
+  let s = await until(async () => { const t = await state(page); return t.motions.length === 2 ? t : null; });
+  const wave = s?.motions.find(m => m.name === "motion_wave");
+  check(!!wave && wave.duration === 1.5 && wave.bytes > 50000 && wave.keys === 0 && s.motions.some(m => m.name === "jump") && s.level.dirty,
+        "Lehrer: Import takes them into the level, under the names the Blueprints know");
+  check(await page.evaluate(() => localStorage.getItem("kern-studio.lehrer-import.v1")) === "1", "Lehrer: the offer is made once");
+  // Another level on the same device: the workspace still has them to take.
+  await cmd(page, {cmd: "new", template: "microDuck"});
+  await page.click("#trainerBtn");
+  check(await until(() => page.locator("#trLegacy").isVisible()) && /: jump, motion_wave$/.test(await page.locator("#trLegacyNote").textContent()), "Lehrer: the workspace offers them to a level that has not got them");
+  await page.click("#trImport");
+  check(await until(async () => (await state(page)).motions.length === 2) && await until(async () => !(await page.locator("#trLegacy").isVisible())), "Lehrer: taken into this level too, the offer is gone");
+  check(await page.locator('#trLearned .tr-learned[data-move="motion_wave"] [data-edit]').isDisabled() && await page.locator('#trLearned .tr-learned[data-move="motion_wave"] [data-try]').isEnabled(),
+        "Lehrer: an imported motion has its network and no keyframes");
+  check(errors.length === 0, "Lehrer: no page errors with the old page's motions" + (errors.length ? ": " + errors.join(" | ") : ""));
   await ctx.close();
 }
 

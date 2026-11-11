@@ -174,6 +174,8 @@ json::Value Studio::key(std::string_view key, std::string_view code, bool down, 
   // ---- the Lehrer's stage: the viewport's camera keys, and the ways out ----
   if (trainer_open()) {
     if (c == "Escape" && !repeat) { close_trainer(); handled = true; }
+    else if (c == "KeyZ" && m_ctrl && !m_alt) { if (m_shift) redo(); else undo(); handled = true; }  // (keyframes are steps of the level's history)
+    else if (c == "KeyY" && m_ctrl && !m_alt) { redo(); handled = true; }
     else if (c == "Pause") { toggle_pause(); handled = true; }
     else if (c == "KeyP" && m_alt && !repeat) { play(game::SimMode::play); handled = true; }
     else if (c == "KeyS" && m_alt && !repeat) { play(game::SimMode::simulate); handled = true; }
@@ -431,9 +433,9 @@ json::Value Studio::menu_json(std::string_view name) const {
     std::string u = "Undo", r = "Redo";
     if (can_undo()) u += " " + history_[history_index_].label;
     if (can_redo()) r += " " + history_[history_index_ + 1].label;
-    m.push(entry(u, cmd("undo"), "Ctrl+Z", editing && can_undo()));
-    m.push(entry(r, cmd("redo"), "Ctrl+Y", editing && can_redo()));
-    m.push(entry("History...", cmd("dialog", "name", "history"), "", editing));
+    m.push(entry(u, cmd("undo"), "Ctrl+Z", editable() && can_undo()));
+    m.push(entry(r, cmd("redo"), "Ctrl+Y", editable() && can_redo()));
+    m.push(entry("History...", cmd("dialog", "name", "history"), "", editable()));
     m.push(separator());
     m.push(entry("Cut", cmd("cut"), "Ctrl+X", editing && sel));
     m.push(entry("Copy", cmd("copy"), "Ctrl+C", sel));
@@ -919,6 +921,7 @@ json::Value Studio::state() {
   s.set("world", world_json());
   if (logic_open_) s.set("logic", logic_json());
   if (trainer_open()) s.set("trainer", trainer_json());
+  s.set("motions", motions_json());
   json::Value sel = json::Value::array();
   for (ActorId id : selection_) sel.push(id);
   s.set("selection", std::move(sel));

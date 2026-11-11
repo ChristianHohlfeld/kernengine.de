@@ -5,13 +5,15 @@
 // the engine returns, like every Studio panel, and runs the training: collectors and one learner
 // in Web Workers, each on its own instance of the headless Lehrer (generated/kern_lehrer.wasm,
 // kern/src/lehrer), so the editor stays responsive while the duck learns. A trained network goes
-// straight to the engine of this page.
-import {tr, escHtml} from "./game.mjs";
+// into the level: what the duck is taught is saved, played and exported with it (Level::motions).
+import {tr, escHtml, toBase64} from "./game.mjs";
 
 /** The Lehrer's module: beside the deployed editor and the single-file build; the module page reads the repository's build. */
 const TRAINER_WASM = /\/kern\/web\/studio\//.test(location.pathname) ? "../../../generated/kern_lehrer.wasm" : "./kern_lehrer.wasm";
-/** Learned moves kept on this device: {file: {name, file, duration}}; their networks are in IndexedDB "kern-lehrer". */
-const TRAINER_SKILLS = "kern-lehrer.motion-skills.v1";
+/** What the Lehrer's old page kept on this device: its learned motions {file: {name, file, duration}} here, their networks in IndexedDB "kern-lehrer". */
+const TRAINER_LEGACY = "kern-lehrer.motion-skills.v1";
+/** Set once taking those into a level was offered. */
+const TRAINER_OFFERED = "kern-studio.lehrer-import.v1";
 
 // A Lehrer worker: one Kern module (kern_lehrer.wasm) per worker. A worker is a collector (its own
 // ducks, the policy it is handed, returns rollouts) or the learner (PPO).
@@ -118,24 +120,41 @@ function trainerCall(worker, message, expect, transfer = []) {
   });
 }
 
-/** A network on this device (IndexedDB "kern-lehrer", store "policies", key = file name): kept, or dropped with `bytes` null. */
-function trainerStore(file, bytes) {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open("kern-lehrer", 1);
-    open.onupgradeneeded = () => open.result.createObjectStore("policies");
-    open.onerror = () => reject(open.error);
+/** The networks the Lehrer's old page kept on this device (IndexedDB "kern-lehrer", store "policies", key = file name): [[file, Uint8Array], ...]. */
+function trainerLegacyNets() {
+  return new Promise(resolve => {
+    let open;
+    try { open = indexedDB.open("kern-lehrer", 1); } catch { resolve([]); return; }
+    open.onupgradeneeded = () => open.transaction.abort();  // this device has none: none is made
+    open.onerror = e => { e.preventDefault(); resolve([]); };
     open.onsuccess = () => {
-      const tx = open.result.transaction("policies", "readwrite");
-      if (bytes) tx.objectStore("policies").put(bytes, file);
-      else tx.objectStore("policies").delete(file);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      const db = open.result, out = [];
+      const done = () => { db.close(); resolve(out); };
+      try {
+        const cursor = db.transaction("policies").objectStore("policies").openCursor();
+        cursor.onsuccess = () => {
+          const c = cursor.result;
+          if (!c) { done(); return; }
+          out.push([String(c.key), new Uint8Array(c.value)]);
+          c.continue();
+        };
+        cursor.onerror = done;
+      } catch { done(); }
     };
   });
 }
 
-function trainerSkills() {
-  try { return JSON.parse(localStorage.getItem(TRAINER_SKILLS) || "{}") || {}; } catch { return {}; }
+/** The motions the Lehrer's old page taught on this device: [{name, duration, bytes}]. Its jump was the robot's move "jump". */
+async function trainerLegacy() {
+  let learned = {};
+  try { learned = JSON.parse(localStorage.getItem(TRAINER_LEGACY) || "{}") || {}; } catch { /* storage blocked */ }
+  const out = [];
+  for (const [file, bytes] of await trainerLegacyNets()) {
+    const m = learned[file];
+    if (m && typeof m.name === "string" && Number.isFinite(m.duration)) out.push({name: m.name, duration: m.duration, bytes});
+    else if (file === "jump.onnx") out.push({name: "jump", duration: 2, bytes});
+  }
+  return out;
 }
 
 function trainerDownload(name, data, type) {
@@ -162,15 +181,15 @@ const TRAINER_SCENARIO = {
   rewards: {progress: 12, waypoint: 8, finish: 20, upright: 2, fall: -12, actionRate: -0.1, contact: -2, height: 0, speed: 0, pose: 0},
 };
 
-const TRAINER_TASKS = [["motion", "New motion (keyframes)"], ["jump", "Jump"], ["stand", "Stand (quick test)"], ["scenario", "Free training scenario"]];
+const TRAINER_TASKS = [["motion", "Motion from keyframes"], ["jump", "Jump"], ["stand", "Stand (quick test)"], ["scenario", "Free training scenario"]];
 const TRAINER_STATS = [["it", "Iteration"], ["steps", "Duck steps"], ["sps", "Steps / s"], ["ret", "Mean episode return"], ["len", "Episode length (s)"],
                        ["std", "Action noise (std)"], ["goal", ""], ["height", "Jump height (mm)"], ["flight", "Flight time (ms)"]];
 const TRAINER_GOAL = {motion: "Pose error (degrees)", jump: "Real jumps (clean robot)", scenario: "Goals reached (evaluation)"};
 
 export class Trainer {
   /**
-   * `engine`: the Studio's engine; `icon(name)`: the Studio's icons; `toast(text)`; `kernSource()`:
-   * the text of kern.mjs on single-file pages (the workers run it), else null.
+   * `engine`: the Studio's engine; `icon(name)`: the Studio's icons; `toast(text, actions, ms)`;
+   * `kernSource()`: the text of kern.mjs on single-file pages (the workers run it), else null.
    */
   constructor({engine, icon, toast, kernSource}) {
     this.engine = engine;
@@ -180,9 +199,13 @@ export class Trainer {
     this.host = document.getElementById("trainer");
     this.bar = document.getElementById("trainerBar");
     this.s = null;            // the engine's side while the workspace is open (state().trainer)
+    this.motions = [];        // the level's motions (state().motions)
+    this.editable = true;     // the level takes changes (it is not being played)
     this.task = "motion";
     this.run = null;          // the training run
-    this.onnx = null;         // the newest network of the last run: {bytes, name, move}
+    this.onnx = null;         // the newest network of the last run: {bytes, name, task, move}
+    this.handover = null;     // a network on its way into the level: {name, onnx (Base64), run, iteration}
+    this.legacy = [];         // what the Lehrer's old page taught on this device
     this.module = null;       // the compiled Lehrer
     this.note = "";
     this.statusText = "";
@@ -214,11 +237,12 @@ export class Trainer {
     const stats = TRAINER_STATS.map(([id, label]) => `<div class="tr-stat" data-stat="${id}"><b>-</b><span>${label}</span></div>`).join("");
     this.host.innerHTML =
       sec("task", "Task", field("Teach", `<select class="sel" id="trTask">${TRAINER_TASKS.map(([id, label]) => `<option value="${id}">${escHtml(tr(label))}</option>`).join("")}</select>`)) +
-      sec("motion", "New motion",
+      sec("motion", "Motion from keyframes",
         field("Name", `<input class="txt" id="trName" maxlength="38" spellcheck="false" autocomplete="off">`) +
         field("Length", num("trDuration"), "s") +
+        `<p class="tr-note" id="trMotion"></p>` +
         `<div class="grp">Keyframes</div><div id="trKeys"></div>` +
-        `<div class="tr-buttons"><button class="btn small" id="trClear" type="button">Remove all keyframes</button></div>` +
+        `<div class="tr-buttons"><button class="btn small" id="trClear" type="button">Remove all keyframes</button><button class="btn small" id="trNew" type="button">New motion</button></div>` +
         `<p class="tr-note">Drag a part of the duck in the viewport and let go: it holds the pose. Add it as a keyframe at its time. The first keyframe is the home pose at 0 s, the last one lies at the motion's end.</p>`) +
       sec("scenario", "Scenario",
         `<p class="tr-note">Waypoints and physical obstacles of your own, rewards to taste, and a new network learns the course. The order of the waypoints is the order of the task. All measures in metres from where the duck starts.</p>` +
@@ -245,12 +269,13 @@ export class Trainer {
         field("Initial action noise", num("trInitStd", "", `placeholder="Recipe"`)) + field("Learning rate", num("trLr", "", `placeholder="Recipe"`))) +
       sec("stats", "Progress", `<div class="tr-stats">${stats}</div><canvas class="tr-chart" id="trChart"></canvas>` +
         `<div class="tr-legend"><span><i style="background:var(--play)"></i>Episode return</span><span><i style="background:var(--accent)"></i>Episode length</span></div>`) +
-      sec("learned", "Learned motions", `<div id="trLearned"></div>`) +
+      sec("learned", "Motions of this level", `<div id="trLearned"></div>` +
+        `<div id="trLegacy" hidden><p class="tr-note" id="trLegacyNote"></p><div class="tr-buttons"><button class="btn small" id="trImport" type="button">Import into this level</button></div></div>`) +
       sec("help", "How it works",
         `<p class="tr-note">A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.</p>` +
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
         `<p class="tr-note">Training goes on while you edit, play or leave this workspace; keep the tab open, and a phone on its charger. More workers use more cores. The same seed and the same number of ducks produce the same network bit for bit, on every device.</p>` +
-        `<p class="tr-note">Every 25 iterations the newest network goes to the duck: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the duck's move "jump". They are kept on this device.</p>`, true);
+        `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
     this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime", "1.2")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
       `<div class="tr-test"><span id="trTesting" data-i18n-skip></span><button class="btn primary" id="trAgain" type="button">Again</button><button class="btn" id="trPosing" type="button">Back to posing</button></div>`;
@@ -278,9 +303,11 @@ export class Trainer {
       if (key && e.target.closest("[data-show]")) command({cmd: "trainerShow", index: +key.dataset.key});
       if (key && e.target.closest("[data-drop]")) command({cmd: "trainerKey", index: +key.dataset.key, remove: true});
       const row = e.target.closest("[data-move]");
+      if (row && e.target.closest("[data-edit]") && command({cmd: "trainerSelect", name: row.dataset.move})?.ok && !this.run) { this.task = "motion"; this.sync(); }
       if (row && e.target.closest("[data-try]")) command({cmd: "trainerTest", move: row.dataset.move});
       if (row && e.target.closest("[data-level]")) command({cmd: "trainerPlay", move: row.dataset.move});
-      if (row && e.target.closest("[data-forget]")) this.forget(row.dataset.file);
+      if (row && e.target.closest("[data-net]")) this.download(row.dataset.move);
+      if (row && e.target.closest("[data-forget]")) command({cmd: "trainerRemove", name: row.dataset.move});
     });
     this.host.addEventListener("change", e => {
       const key = e.target.closest("[data-key]");
@@ -301,6 +328,8 @@ export class Trainer {
       if (!command({cmd: "trainerMotion", duration: trainerNumber(el.trDuration.value)})?.ok) el.trDuration.value = this.s.motion.duration;
     };
     el.trClear.onclick = () => command({cmd: "trainerClear"});
+    el.trNew.onclick = () => command({cmd: "trainerNew"});
+    el.trImport.onclick = () => this.importLegacy();
     el.trCapture.onclick = () => {
       // The next pose is most likely the end of the motion.
       if (command({cmd: "trainerCapture", time: trainerNumber(el.trTime.value)})?.ok) el.trTime.value = this.s.motion.duration;
@@ -342,6 +371,13 @@ export class Trainer {
   render(s) {
     const open = !!s.trainer;
     this.s = s.trainer || null;
+    this.motions = s.motions || [];
+    this.editable = open || s.play.state === "editing";
+    // A network that waited for the level to stop playing goes in now.
+    if (this.handover && this.editable) {
+      const why = this.deliver();
+      if (why) { if (this.run) this.end(this.run); this.status(why, true); }
+    }
     this.covered = !!s.logic?.open;  // the Blueprint editor lies over the viewports, the stage with them
     document.getElementById("main").classList.toggle("trainer-open", open);
     document.getElementById("trainerPanel").hidden = !open;
@@ -363,6 +399,8 @@ export class Trainer {
     if (motion) {
       if (document.activeElement !== el.trName) el.trName.value = motion.name;
       if (document.activeElement !== el.trDuration) el.trDuration.value = motion.duration;
+      el.trName.disabled = run?.move === motion.name;  // the run's network is this motion's, by its name
+      this.text(el.trMotion, !motion.saved ? "New: it is the level's with its first keyframe." : motion.trained ? "In the level, taught." : "In the level, not taught yet.");
       // A keyframe is most often taken for the motion's end.
       if (motion.duration !== this.timeFor && document.activeElement !== el.trTime) { this.timeFor = motion.duration; el.trTime.value = motion.duration; }
       const key = JSON.stringify(motion.keys.map(k => k.time));
@@ -390,17 +428,24 @@ export class Trainer {
       if (id === "goal") { tile.hidden = !TRAINER_GOAL[shown]; this.text(tile.lastElementChild, TRAINER_GOAL[shown] || ""); }
       if (id === "height" || id === "flight") tile.hidden = shown !== "jump";
     }
-    // The learned moves on this device.
-    const learned = Object.values(trainerSkills()).filter(m => m && typeof m.name === "string" && typeof m.file === "string" && Number.isFinite(m.duration));
-    const lkey = JSON.stringify(learned);
+    // What the level's ducks were taught, and what the Lehrer's old page left on this device.
+    const motions = this.motions, current = motion?.saved ? motion.name : "";
+    const lkey = JSON.stringify([motions, current, run?.move ?? ""]);
     if (lkey !== this.learnedKey) {
       this.learnedKey = lkey;
-      el.trLearned.innerHTML = learned.length ? learned.map(m => `<div class="tr-learned" data-move="${escHtml(m.name)}" data-file="${escHtml(m.file)}"><span class="nm" data-i18n-skip title="${escHtml(m.name)}">${escHtml(m.name)}</span>` +
-        `<span class="dim">${m.duration} s</span><button class="btn small" data-try type="button" title="The duck tries the move on the stage">Try</button>` +
-        `<button class="btn small" data-level type="button" title="The level's Micro Duck plays the move">In the level</button>` +
-        `<button class="ph" data-forget type="button" title="Remove from this device">${this.icon("trash")}</button></div>`).join("")
-        : `<p class="tr-note">Nothing learned on this device yet. A motion you train appears here, and the Blueprint node Robot Move plays it by its name.</p>`;
+      const off = on => on ? "" : " disabled";
+      el.trLearned.innerHTML = motions.length ? motions.map(m => `<div class="tr-learned${m.name === current ? " on" : ""}" data-move="${escHtml(m.name)}">` +
+        `<span class="nm" data-i18n-skip title="${escHtml(m.name)}">${escHtml(m.name)}</span><span class="dim">${m.duration} s</span><span class="dim">${m.bytes ? "" : "Not taught yet"}</span>` +
+        `<span class="tr-acts"><button class="btn small" data-edit type="button" title="Its keyframes on the stage"${off(m.keys > 0)}>Edit</button>` +
+        `<button class="btn small" data-try type="button" title="The duck tries the move on the stage"${off(m.bytes > 0)}>Try</button>` +
+        `<button class="btn small" data-level type="button" title="The level's Micro Duck plays the move"${off(m.bytes > 0)}>In the level</button>` +
+        `<button class="ph" data-net type="button" title="Download the network (.onnx)"${off(m.bytes > 0)}>${this.icon("save")}</button>` +
+        `<button class="ph" data-forget type="button" title="Remove from the level"${off(run?.move !== m.name)}>${this.icon("trash")}</button></span></div>`).join("")
+        : `<p class="tr-note">This level's ducks were not taught anything yet. A motion you teach appears here; it is saved with the level, and the Blueprint node Robot Move plays it by its name.</p>`;
     }
+    const left = this.legacy.filter(m => !motions.some(x => x.name === m.name));
+    el.trLegacy.hidden = !left.length;
+    if (left.length) this.text(el.trLegacyNote, `From the Lehrer's old page, on this device: ${left.map(m => m.name).join(", ")}`);
     // The bar on the stage.
     const posing = open && s.stage === "pose" && task === "motion", testing = open && s.stage === "test";
     this.bar.hidden = this.covered || (!posing && !testing);
@@ -417,13 +462,37 @@ export class Trainer {
     if (this.el) this.sync();
   }
 
-  /** Removes a learned move from this device (the engine keeps it until the page reloads). */
-  async forget(file) {
-    const skills = trainerSkills();
-    delete skills[file];
-    try { localStorage.setItem(TRAINER_SKILLS, JSON.stringify(skills)); } catch { /* storage blocked */ }
-    await trainerStore(file, null).catch(() => {});
+  /** A motion's network as a file. */
+  download(name) {
+    const r = this.engine.command({cmd: "trainerNet", name});
+    if (!r.ok) { this.toast(r.error); return; }
+    trainerDownload(`${name}_kern.onnx`, Uint8Array.from(atob(r.onnx), c => c.charCodeAt(0)), "application/octet-stream");
+  }
+
+  // ---- what the Lehrer's old page left on this device ---------------------------------------
+  /** Looks for motions the old page taught here and offers, once, to take them into the open level. */
+  async offerLegacy() {
+    this.legacy = await trainerLegacy();
+    if (!this.legacy.length) return;
     this.sync();
+    try {
+      if (localStorage.getItem(TRAINER_OFFERED)) return;
+    } catch { return; }  // storage blocked: the offer would come back every time
+    const offer = () => {
+      if (!document.getElementById("toast").hidden) { setTimeout(offer, 2000); return; }  // another message first
+      try { localStorage.setItem(TRAINER_OFFERED, "1"); } catch { /* storage blocked */ }
+      this.toast(`The duck learned on the Lehrer's old page on this device: ${this.legacy.map(m => m.name).join(", ")}. Import into this level?`, [
+        {label: "Import", primary: true, run: () => this.importLegacy()},
+        {label: "Not now", run: () => {}},
+      ], 30000);
+    };
+    offer();
+  }
+
+  /** Takes them into the open level: saved with it from then on. */
+  importLegacy() {
+    const r = this.engine.command({cmd: "trainerImport", motions: this.legacy.map(m => ({name: m.name, duration: m.duration, onnx: toBase64(m.bytes)}))});
+    this.toast(r.ok ? `Imported into the level: ${r.names.join(", ")}` : r.error);
   }
 
   // ---- the free scenario's form ------------------------------------------------------------
@@ -509,14 +578,14 @@ export class Trainer {
   async start() {
     if (this.run) return;
     const el = this.el, task = this.task;
-    let name = task, move = null, label = task;
+    // `move`: the level's motion the run's network belongs to (Kern's jump: the level's own "jump").
+    let name = task, move = task === "jump" ? "jump" : null, label = task;
     try {
       if (task === "motion") {
         const r = this.engine.command({cmd: "trainerTask"});
         if (!r.ok) throw Error(r.error);
         name = r.task;
-        move = {name: r.move, file: r.file, duration: r.duration};
-        label = r.move;
+        move = label = r.name;
       } else if (task === "scenario") {
         const scenario = this.scenarioConfig();
         name = "scenario:" + JSON.stringify(scenario);
@@ -524,10 +593,11 @@ export class Trainer {
       }
     } catch (error) { this.status(error.message, true); return; }
     const whole = (id, lo, hi, fallback) => Math.max(lo, Math.min(hi, Math.round(trainerNumber(el[id].value)) || fallback));
-    const run = this.run = {task, name, move, label, workers: [], collectors: [], learner: null, workerUrl: null, wake: null, policy: null, steps: 24,
+    const run = this.run = {task, name, move, label, token: `run-${Date.now().toString(36)}`, workers: [], collectors: [], learner: null, workerUrl: null, wake: null, policy: null, steps: 24,
       count: whole("trWorkers", 1, 64, 1), envs: whole("trEnvs", 1, 256, 8), total: whole("trIterations", 1, 100000, 1), seed: whole("trSeed", 1, 4294967295, 1),
       iteration: 0, paused: false, history: []};
     this.onnx = null;
+    this.handover = null;
     this.note = "";
     this.history = run.history;
     for (const tile of this.host.querySelectorAll("[data-stat] b")) this.text(tile, "-");
@@ -604,32 +674,42 @@ export class Trainer {
     this.status(`Done: ${run.iteration} iterations. Download the network, or play the move in your level.`);
   }
 
-  /** The learner's network as ONNX: to the engine of this page at once, and kept on this device. */
+  /** The learner's network as ONNX: a motion's goes into the level (Level::motions), the others are for download. */
   async export(run) {
     const d = await trainerCall(run.learner, {type: "export"}, "onnx");
     if (this.run !== run) return;
-    const bytes = new Uint8Array(d.onnx), task = run.task;
-    this.onnx = {bytes, name: run.label, task, move: null};
-    if (task === "motion") {
-      const m = run.move;
-      if (!this.engine.registerPolicy(m.file, bytes) || !this.engine.command({cmd: "trainerRegister", move: m.name, file: m.file, duration: m.duration}).ok)
-        throw Error("The engine did not take the trained network");
-      this.onnx.move = m.name;
-      const skills = trainerSkills();
-      skills[m.file] = m;
-      try { localStorage.setItem(TRAINER_SKILLS, JSON.stringify(skills)); } catch { /* storage blocked: the move lasts until the page reloads */ }
-      await trainerStore(m.file, bytes).catch(() => {});
-      this.note = `The duck knows "${m.name}" now (iteration ${run.iteration}).`;
-    } else if (task === "jump") {
-      // Kern's jump: the duck's move "jump" runs this network from now on.
-      if (!this.engine.registerPolicy("jump.onnx", bytes)) throw Error("The engine did not take the trained network");
-      this.onnx.move = "jump";
-      await trainerStore("jump.onnx", bytes).catch(() => {});
-      this.note = `The duck's move "jump" runs this network now (iteration ${run.iteration}).`;
+    const bytes = new Uint8Array(d.onnx);
+    this.onnx = {bytes, name: run.label, task: run.task, move: null};
+    if (run.move) {
+      this.handover = {name: run.move, onnx: toBase64(bytes), run: run.token, iteration: run.iteration};
+      const why = this.deliver();
+      if (why) throw Error(why);
     } else {
       this.note = `The network is ready to download (iteration ${run.iteration}).`;
     }
     this.sync();
+  }
+
+  /**
+   * Hands the newest network to the level; one training run is one step of its history. While the
+   * level is played it takes no changes: the network waits and goes in when it stops (render()).
+   * Returns why the level did not take it, or "".
+   */
+  deliver() {
+    const h = this.handover;
+    const r = this.engine.command({cmd: "trainerLearned", name: h.name, onnx: h.onnx, run: h.run});
+    if (r.ok) {
+      this.handover = null;
+      if (this.onnx) this.onnx.move = h.name;
+      this.note = h.name === "jump" ? `The level's ducks jump with this network now (iteration ${h.iteration}).` : `The level's ducks know "${h.name}" now (iteration ${h.iteration}).`;
+    } else if (r.later) {
+      this.note = "The network goes into the level when it stops playing.";
+    } else {
+      this.handover = null;
+      return r.error;
+    }
+    this.sync();
+    return "";
   }
 
   stats(run, s, seconds) {
@@ -673,7 +753,7 @@ export class Trainer {
     this.status(`Stopped after ${run.iteration} iterations.`);
   }
 
-  /** Ends the run: its workers go; the newest exported network stays. */
+  /** Ends the run: its workers go; the newest exported network stays (one that waits for the level still goes in). */
   end(run) {
     if (this.run === run) this.run = null;
     for (const w of run.workers) w.terminate();

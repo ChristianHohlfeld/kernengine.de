@@ -230,7 +230,7 @@ class StudioPage {
       });
     }
     // The Lehrer's workspace: its panel takes the side while the duck stands on its stage in the viewport.
-    this.trainer = new Trainer({engine: this.engine, icon, toast: text => this.toast(text), kernSource: () => window.KERN_SOURCES?.kern || null});
+    this.trainer = new Trainer({engine: this.engine, icon, toast: (text, actions, ms) => this.toast(text, actions, ms), kernSource: () => window.KERN_SOURCES?.kern || null});
     $("#trainerClose").onclick = () => this.runCommand({cmd: "trainer", open: false});
     this.initToolbar();
     this.initPanels();
@@ -240,6 +240,7 @@ class StudioPage {
     this.renderCatalog();
     this.reopenLast();
     this.offerRestore();
+    this.trainer.offerLegacy().catch(() => {});  // what the Lehrer's old page taught on this device
     requestAnimationFrame(t => this.frame(t));
     // Hosting or playing online in a background tab: keep the simulation and the network going.
     backgroundTicker(time => {
@@ -834,8 +835,9 @@ class StudioPage {
     setSel("#rotStep", s.snap.rotationStep);
     setSel("#scaleStep", s.snap.scaleStep);
     setSel("#camSpeed", s.prefs.cameraSpeed);
-    $("#undoBtn").disabled = !editing || !s.history.canUndo;
-    $("#redoBtn").disabled = !editing || !s.history.canRedo;
+    const editable = editing || !!s.trainer;  // the Lehrer's workspace edits the level's motions
+    $("#undoBtn").disabled = !editable || !s.history.canUndo;
+    $("#redoBtn").disabled = !editable || !s.history.canRedo;
     $("#undoBtn").title = s.history.canUndo ? `Undo ${s.history.undo} (Ctrl+Z)` : "Undo (Ctrl+Z)";
     $("#redoBtn").title = s.history.canRedo ? `Redo ${s.history.redo} (Ctrl+Y)` : "Redo (Ctrl+Y)";
     $("#addBtn").disabled = !editing;
