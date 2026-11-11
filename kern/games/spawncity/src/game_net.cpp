@@ -390,6 +390,9 @@ void Game::update_net(f32 dt) {
         // The tracer starts where it would be by now (vs_multiplayer.mjs spawnRemoteShot).
         if (m.tracers.size() < 40) m.tracers.push_back({f.p, f.dir, std::fmax(1.0f, f.a), net_.color_of(f.owner)});
         osfx("player_vehicle_runtime_v2.playPistol", f.p);  // a mate's round: playPistol(p, true)
+        // the town is the host's: his people hear a mate's shot as they hear ours (handle_shots) -
+        // they run on his machine, so for everybody
+        if (net_.hosting()) people_.frighten(f.p, 22, world_->sim_time(), 1);
         break;
       }
       case net::Fx::explosion: {
@@ -1087,6 +1090,18 @@ std::string Game::net_command(const std::string& cmd) {
     if (rest == "migrate") return std::to_string(m.migrate);
     if (rest == "rules") { u16 w = 0; const bool have = net_.world_rules(w); return std::string(have ? "have " : "none ") + std::to_string(w) + (net_.hosting() ? " host" : " client"); }
     if (rest == "stop") { net_.stop(); return "stopped"; }
+    if (rest == "swarm") {
+      // Tests: the mates' units as they are shown here (game_swarm.cpp): [owner, kind, id, flags, x, y] each
+      std::string o = "[";
+      for (const auto& [owner, sw] : swarms_)
+        for (const RemoteUnit& u : sw.units) {
+          char b[96];
+          std::snprintf(b, sizeof b, "%s[%u,%u,%u,%u,%.1f,%.1f]", o.size() > 1 ? "," : "", static_cast<unsigned>(owner), static_cast<unsigned>(u.kind), static_cast<unsigned>(u.id),
+                        static_cast<unsigned>(u.flags), u.p.x, u.p.y);
+          o += b;
+        }
+      return o + "]";
+    }
     if (rest == "remotes") {
       std::string o = "[";
       for (const net::Remote& r : net_.remotes()) {
@@ -1115,7 +1130,7 @@ std::string Game::net_command(const std::string& cmd) {
       blast_remotes((r.state.mode == net::PlayerMode::foot ? r.person_shown : r.shown) + Vec3{1, 0, 1}, 7, 110);
       return "ok";
     }
-    return "usage: net host <self> | net join <self> <server> | net stop | net remotes | net hit N | net blast";
+    return "usage: net host <self> | net join <self> <server> | net stop | net remotes | net swarm | net hit N | net blast";
   }
   if (starts("mp ")) {
     const std::string rest = cmd.substr(3);

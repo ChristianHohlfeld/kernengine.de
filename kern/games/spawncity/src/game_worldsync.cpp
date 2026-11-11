@@ -401,6 +401,20 @@ void Game::worldsync_update(f32 dt) {
     if (type == kCars) {
       std::vector<bool>& seen = car_seen_;
       if (seen.size() != cars_.size()) seen.assign(cars_.size(), false);
+      // what a car's flags say of it (a whole entry, and one at rest that is only named, alike)
+      auto car_state = [&](TrafficCar& c, u8 fl, Vec3 at) {
+        // it went up on the host's machine: a wreck here from now (its fire, its debris) - and if we
+        // shot at it, our crime and our score, as when it goes up in our own town (wreck_car)
+        if ((fl & 2) && !c.wreck) {
+          c.wreck_at = now;
+          if (c.hit_by_player) wanted_.report(fl & 1 ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
+        }
+        c.wreck = fl & 2;
+        // critical on his machine: it smokes here too (the countdown is his - update_town leaves it)
+        if (!(fl & 8) || c.wreck) c.burn_until = -1;
+        else if (c.burn_until < 0) c.burn_until = now + (fl & 1 ? 3.1f : 2.45f);
+        c.input.pedal = (fl & 4) ? -0.5f : 0;
+      };
       for (u8 k = 0; k < n && r.ok; ++k) {
         const u8 idx = r.get<u8>(), flags = r.get<u8>();
         if (flags & 0x80) {
@@ -410,6 +424,7 @@ void Game::worldsync_update(f32 dt) {
             if (car_net_[i] == idx) {
               seen[i] = true;
               if (i < car_line_.size() && !car_line_[i].empty()) car_line_[i].push(car_line_[i].last_position(), car_rest_q_[i], {}, true, static_cast<f64>(t_ms), now_ms);
+              if (cars_[i].placed && static_cast<i32>(i) != car_index_) car_state(cars_[i], flags, matrix_of(cars_[i].actor).translation());  // (a standing car burns too)
               break;
             }
           continue;
@@ -461,17 +476,7 @@ void Game::worldsync_update(f32 dt) {
         }
         c.driver = false;
         c.color = col;
-        // it went up on the host's machine: a wreck here from now (its fire, its debris) - and if we
-        // shot at it, our crime and our score, as when it goes up in our own town (wreck_car)
-        if ((flags & 2) && !c.wreck) {
-          c.wreck_at = now;
-          if (c.hit_by_player) wanted_.report(bus ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(p));
-        }
-        c.wreck = flags & 2;
-        // critical on his machine: it smokes here too (the countdown is his - update_town leaves it)
-        if (!(flags & 8) || c.wreck) c.burn_until = -1;
-        else if (c.burn_until < 0) c.burn_until = now + (bus ? 3.1f : 2.45f);
-        c.input.pedal = (flags & 4) ? -0.5f : 0;
+        car_state(c, flags, p);
         c.car->show(steer);
         car_line_[static_cast<std::size_t>(local)].push(p, q, v, true, static_cast<f64>(t_ms), now_ms);
         car_rest_q_[static_cast<std::size_t>(local)] = q;

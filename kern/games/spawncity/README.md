@@ -700,7 +700,8 @@ Testbefehle: `gaps` (Zustand), `canspawn X Y`, `burn N`, `jetdamage N`, `lampbre
 Mehrspieler-Testbefehle (`SpawnCity.command`): `net remotes`, `net hit N` (Runde auf den ersten
 Mitspieler), `net blast`, `mp ff on|off`, `mp vote yes|no`, `mp state`, `voice mic|mute|all|tone N|state`,
 `ping [x y]`, `bigmap open|close|toggle|follow R|X Y R`, `nav set X Y Name | geo LON LAT Name | clear`,
-`qr TEXT`.
+`qr TEXT`, `net swarm` (die Einheiten der Mitspieler, wie sie hier stehen: Besitzer, Art, Id, Zustand, Ort),
+`town sync` (Zustand des Ortes in der Sitzung: Laternen, offene Türen, Spuren, Treffer auf Autos / Passanten).
 
 ```sh
 kern/games/spawncity/tests/run_tests.sh          # nativ, ohne GL, ASan/UBSan
